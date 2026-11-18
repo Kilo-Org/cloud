@@ -1,21 +1,23 @@
 import { and, eq, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { WorkerDb } from '@kilocode/db/client';
 import type {
   CloudAgentQueueReport,
   CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
-import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  classifyCloudAgentFailure,
+  CloudAgentAdmissionFailureCodeSchema,
+} from '@kilocode/worker-utils/cloud-agent-failure';
+import { SESSION_ID_RE } from '../shared/protocol.js';
 
 export const CLOUD_AGENT_REPORT_RETENTION_DAYS = 90;
 const CLOUD_AGENT_ERROR_RETENTION_DAYS = 30;
 
 const isoTimestampSchema = z.string().datetime({ offset: true });
-const cloudAgentSessionIdSchema = z
-  .string()
-  .regex(/^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-const kiloSessionIdSchema = z.string().startsWith('ses_').length(30);
+const cloudAgentSessionIdSchema = z.string().regex(SESSION_ID_RE);
 const diagnosticSchema = z.object({
   errorMessageRedacted: z.string().min(1).max(4096),
   errorExpiresAt: isoTimestampSchema,
@@ -30,6 +32,7 @@ const sessionFailureSchema = z.discriminatedUnion('stage', [
   z.object({
     stage: z.literal('initial_admission'),
     code: z.enum(['initial_admission_rejected', 'initial_queue_full', 'invalid_initial_intent']),
+    admissionCode: CloudAgentAdmissionFailureCodeSchema,
   }),
   z.object({ stage: z.literal('transport'), code: z.literal('do_rpc_outcome_unknown') }),
 ]);
@@ -69,7 +72,12 @@ const recordSessionFailureSchema = z
 
 type DatabaseTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 type MutationResult = { applied?: boolean };
-type SaveReportResult = { outcome: 'applied' | 'expired' | 'missing_parent' };
+type SaveReportResult = { outcome: 'applied' | 'expired' | 'missing_parent' | 'conflict' };
+type ReportingParent = {
+  createdAt: string;
+  kiloSessionId: string | null;
+  initialMessageId: string | null;
+};
 type StoredRunRow = {
   status: 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
   wrapperRunId: string | null;
@@ -81,12 +89,84 @@ type StoredRunRow = {
   failureCode: string | null;
   failureResponsibility: string | null;
   failureReason: string | null;
+  errorMessageRedacted: string | null;
+  errorExpiresAt: string | null;
 };
 
-function retentionCutoff(now: string): string {
+export function retentionCutoff(now: string): string {
   const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - CLOUD_AGENT_REPORT_RETENTION_DAYS);
   return cutoff.toISOString();
+}
+
+async function readReportingParent(
+  tx: DatabaseTransaction,
+  cloudAgentSessionId: string
+): Promise<ReportingParent | undefined> {
+  const rows = await tx
+    .select({
+      createdAt: cloud_agent_sessions.created_at,
+      kiloSessionId: cloud_agent_sessions.kilo_session_id,
+      initialMessageId: cloud_agent_sessions.initial_message_id,
+    })
+    .from(cloud_agent_sessions)
+    .where(eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
+    .limit(1);
+  return rows[0];
+}
+
+function parentConflictsWithAnchor(
+  parent: ReportingParent,
+  report: CloudAgentRunStateReport
+): boolean {
+  const { kiloSessionId, initialMessageId } = report.session;
+  if (kiloSessionId === undefined || initialMessageId === undefined) return false;
+  return (
+    (parent.kiloSessionId != null && parent.kiloSessionId !== kiloSessionId) ||
+    (parent.initialMessageId != null && parent.initialMessageId !== initialMessageId)
+  );
+}
+
+/**
+ * Ensures a reporting parent for a control-plane session that never had an
+ * initial turn (worktree and empty chats). The trusted anchor is written at
+ * admission; the parent is inserted only inside the retention window and is
+ * never updated or refreshed. A concurrent writer may already have created it,
+ * so the insert tolerates conflicts and the caller re-reads.
+ */
+async function ensureReportingParent(
+  tx: DatabaseTransaction,
+  report: CloudAgentRunStateReport,
+  now: string
+): Promise<ReportingParent | undefined> {
+  const { kiloSessionId, initialMessageId, reportingCreatedAt } = report.session;
+  if (
+    kiloSessionId === undefined ||
+    initialMessageId === undefined ||
+    reportingCreatedAt === undefined
+  ) {
+    return undefined;
+  }
+  if (Date.parse(reportingCreatedAt) <= Date.parse(retentionCutoff(now))) return undefined;
+
+  await tx
+    .insert(cloud_agent_sessions)
+    .values({
+      cloud_agent_session_id: report.session.cloudAgentSessionId,
+      kilo_session_id: kiloSessionId,
+      initial_message_id: initialMessageId,
+      created_at: reportingCreatedAt,
+    })
+    .onConflictDoNothing();
+
+  const ensured = await readReportingParent(tx, report.session.cloudAgentSessionId);
+  if (!ensured) {
+    console.error('Cloud Agent report could not ensure its session parent', {
+      cloudAgentSessionId: report.session.cloudAgentSessionId,
+    });
+    return undefined;
+  }
+  return ensured;
 }
 
 async function lockReportingSession(
@@ -118,14 +198,22 @@ function isTerminalStatus(status: StoredRunRow['status']): boolean {
   return status === 'completed' || status === 'failed' || status === 'interrupted';
 }
 
-function validDiagnostic(
-  diagnostic: { errorMessageRedacted: string; errorExpiresAt: string } | undefined,
-  now: string
-): { error_message_redacted: string; error_expires_at: string } | undefined {
-  if (!diagnostic || Date.parse(diagnostic.errorExpiresAt) <= Date.parse(now)) return undefined;
+function validDiagnostic(run: CloudAgentRunStateReport['run'], now: string) {
+  if (run.status !== 'failed' || run.terminalAt === undefined) return undefined;
+  const diagnostic = diagnosticSchema.safeParse(run.diagnostic);
+  if (!diagnostic.success) return undefined;
+  const expiresAt = Date.parse(diagnostic.data.errorExpiresAt);
+  const terminalAt = Date.parse(run.terminalAt);
+  if (
+    expiresAt <= Date.parse(now) ||
+    expiresAt <= terminalAt ||
+    expiresAt - terminalAt > CLOUD_AGENT_ERROR_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  ) {
+    return undefined;
+  }
   return {
-    error_message_redacted: diagnostic.errorMessageRedacted,
-    error_expires_at: diagnostic.errorExpiresAt,
+    error_message_redacted: diagnostic.data.errorMessageRedacted,
+    error_expires_at: diagnostic.data.errorExpiresAt,
   };
 }
 
@@ -136,13 +224,18 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     now: string
   ): Promise<SaveReportResult> {
     const cloudAgentSessionId = report.session.cloudAgentSessionId;
-    const parentRows = await tx
-      .select({ createdAt: cloud_agent_sessions.created_at })
-      .from(cloud_agent_sessions)
-      .where(eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
-      .limit(1);
-    const parent = parentRows[0];
-    if (!parent) return { outcome: 'missing_parent' };
+    let parent = await readReportingParent(tx, cloudAgentSessionId);
+    if (!parent) {
+      parent = await ensureReportingParent(tx, report, now);
+      if (!parent) return { outcome: 'missing_parent' };
+    }
+    if (parentConflictsWithAnchor(parent, report)) {
+      console.error('Cloud Agent report anchor conflicts with existing session parent', {
+        cloudAgentSessionId,
+        messageId: report.run.messageId,
+      });
+      return { outcome: 'conflict' };
+    }
     if (Date.parse(parent.createdAt) <= Date.parse(retentionCutoff(now))) {
       return { outcome: 'expired' };
     }
@@ -151,6 +244,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       .select({
         status: cloud_agent_session_runs.status,
         wrapperRunId: cloud_agent_session_runs.wrapper_run_id,
+        container: cloud_agent_session_runs.container,
         queuedAt: cloud_agent_session_runs.queued_at,
         dispatchAcceptedAt: cloud_agent_session_runs.dispatch_accepted_at,
         agentActivityObservedAt: cloud_agent_session_runs.agent_activity_observed_at,
@@ -159,6 +253,8 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         failureCode: cloud_agent_session_runs.failure_code,
         failureResponsibility: cloud_agent_session_runs.failure_responsibility,
         failureReason: cloud_agent_session_runs.failure_reason,
+        errorMessageRedacted: cloud_agent_session_runs.error_message_redacted,
+        errorExpiresAt: cloud_agent_session_runs.error_expires_at,
       })
       .from(cloud_agent_session_runs)
       .where(
@@ -170,13 +266,15 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       .limit(1);
     const existing = rows[0];
     const incoming = report.run;
-    const diagnostic = validDiagnostic(incoming.diagnostic, now);
+    const diagnostic = validDiagnostic(incoming, now);
+    const container = incoming.container ?? null;
 
     if (!existing) {
       await tx.insert(cloud_agent_session_runs).values({
         cloud_agent_session_id: cloudAgentSessionId,
         message_id: incoming.messageId,
         wrapper_run_id: incoming.wrapperRunId ?? null,
+        container,
         status: incoming.status,
         queued_at: incoming.queuedAt ?? null,
         dispatch_accepted_at: incoming.dispatchAcceptedAt ?? null,
@@ -192,6 +290,16 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     }
 
     const establishedTerminal = isTerminalStatus(existing.status);
+    if (
+      existing.container != null &&
+      incoming.container !== undefined &&
+      (existing.container.provider !== incoming.container.provider ||
+        existing.container.sandboxId !== incoming.container.sandboxId ||
+        (existing.container.allocationId ?? null) !== (incoming.container.allocationId ?? null) ||
+        (existing.container.instanceId ?? null) !== (incoming.container.instanceId ?? null))
+    ) {
+      console.error('Conflicting Cloud Agent container identity ignored');
+    }
     const incomingTerminal = isTerminalStatus(incoming.status);
     if (establishedTerminal && incomingTerminal && existing.status !== incoming.status) {
       console.error('Conflicting Cloud Agent terminal report ignored', {
@@ -234,6 +342,40 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     const mayFillFailureResponsibility =
       mayFillTerminalFacts &&
       (existing.failureCode === null || existing.failureCode === incoming.failureCode);
+    const mayFillDiagnostic =
+      mayFillTerminalFacts &&
+      incoming.status === 'failed' &&
+      (existing.failureStage === null || existing.failureStage === incoming.failureStage) &&
+      (existing.failureCode === null || existing.failureCode === incoming.failureCode) &&
+      (existing.failureResponsibility === null ||
+        incoming.failureResponsibility === undefined ||
+        existing.failureResponsibility === incoming.failureResponsibility) &&
+      (existing.failureReason === null ||
+        incoming.failureReason === undefined ||
+        existing.failureReason === incoming.failureReason) &&
+      (existing.wrapperRunId === null ||
+        incoming.wrapperRunId === undefined ||
+        existing.wrapperRunId === incoming.wrapperRunId) &&
+      (existing.terminalAt === null ||
+        (incoming.terminalAt !== undefined &&
+          Date.parse(existing.terminalAt) === Date.parse(incoming.terminalAt)));
+    const retainedDiagnostic = {
+      error_message_redacted: existing.errorMessageRedacted,
+      error_expires_at: existing.errorExpiresAt,
+    };
+    if (
+      existing.errorExpiresAt !== null &&
+      Date.parse(existing.errorExpiresAt) <= Date.parse(now)
+    ) {
+      retainedDiagnostic.error_message_redacted = null;
+      retainedDiagnostic.error_expires_at = null;
+    } else if (mayFillDiagnostic && diagnostic) {
+      retainedDiagnostic.error_message_redacted ??= diagnostic.error_message_redacted;
+      retainedDiagnostic.error_expires_at = earliestTimestamp(
+        existing.errorExpiresAt,
+        diagnostic.error_expires_at
+      );
+    }
     const status = establishedTerminal
       ? existing.status
       : incomingTerminal || incoming.status === 'accepted'
@@ -244,6 +386,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       .set({
         status,
         wrapper_run_id: existing.wrapperRunId ?? incoming.wrapperRunId ?? null,
+        ...(existing.container == null ? { container } : {}),
         queued_at: earliestTimestamp(existing.queuedAt, incoming.queuedAt),
         dispatch_accepted_at: earliestTimestamp(
           existing.dispatchAcceptedAt,
@@ -256,7 +399,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         terminal_at: mayApplyTerminalFacts
           ? (incoming.terminalAt ?? null)
           : incomingSameTerminal
-            ? earliestTimestamp(existing.terminalAt, incoming.terminalAt)
+            ? (existing.terminalAt ?? incoming.terminalAt ?? null)
             : existing.terminalAt,
         failure_stage:
           existing.failureStage ?? (mayFillTerminalFacts ? (incoming.failureStage ?? null) : null),
@@ -268,7 +411,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         failure_reason:
           existing.failureReason ??
           (mayFillFailureResponsibility ? (incoming.failureReason ?? null) : null),
-        ...(mayFillTerminalFacts ? (diagnostic ?? {}) : {}),
+        ...retainedDiagnostic,
       })
       .where(
         and(
@@ -359,6 +502,9 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         source: 'setup',
         stage: input.failure.stage,
         code: input.failure.code,
+        ...(input.failure.stage === 'initial_admission'
+          ? { admissionCode: input.failure.admissionCode }
+          : {}),
       });
       let applied = false;
       const result = await withReportingSessionLock(db, input.cloudAgentSessionId, async tx => {

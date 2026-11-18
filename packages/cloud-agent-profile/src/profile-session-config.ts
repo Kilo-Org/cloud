@@ -1,10 +1,9 @@
-import * as z from 'zod';
 import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profiles } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
 import type { AgentConfig } from '@kilocode/db/schema-types';
-import { getEffectiveDefaultProfileId, getDefaultProfile } from './profile-service';
+import { getEffectiveDefaultProfileId, getDefaultProfileId } from './profile-service';
 import { getBindingForRepo } from './repo-binding-service';
 import { getVarsForSession } from './profile-vars-service';
 import { getCommandsForSession } from './profile-commands-service';
@@ -19,17 +18,14 @@ import {
   getKiloCommandsForSession,
   type KiloCommandForSession,
 } from './profile-kilo-commands-service';
-import { resolveProfileLayers } from './profile-resolution';
+import {
+  getInstructionsForSession,
+  type InstructionForSession,
+} from './profile-instructions-service';
+import { appliesRepoBindings, resolveProfileLayers } from './profile-resolution';
 import { buildOwnershipCondition } from './profile-utils';
+import { encryptedEnvelopeSchema, type EnvironmentSessionLayer } from './environment-contracts';
 import type { ProfileOwner } from './types';
-
-// Schema to validate encrypted envelope structure from database
-const encryptedEnvelopeSchema = z.object({
-  encryptedData: z.string(),
-  encryptedDEK: z.string(),
-  algorithm: z.literal('rsa-aes-256-gcm'),
-  version: z.literal(1),
-});
 
 export class ProfileNotFoundError extends Error {
   constructor(public profileId: string) {
@@ -38,15 +34,13 @@ export class ProfileNotFoundError extends Error {
   }
 }
 
-export type MergedSkillForSession = {
-  name: string;
-  rawMarkdown: string;
-  files: Record<string, string>;
-};
+export type MergedSkillForSession = SkillForSession;
 
 export type MergedAgentForSession = AgentForSession;
 
 export type MergedKiloCommandForSession = KiloCommandForSession;
+
+export type MergedInstructionForSession = InstructionForSession;
 
 /**
  * Permissive shape for an inline runtime skill supplied by the caller. The
@@ -54,11 +48,9 @@ export type MergedKiloCommandForSession = KiloCommandForSession;
  * this type stays loose so the package does not depend on service-side
  * schemas.
  */
-export type InlineSkillInput = {
-  name: string;
-  rawMarkdown: string;
-  files?: Record<string, string>;
-};
+export type InlineSkillInput =
+  | { name: string; rawMarkdown: string; files?: Record<string, string> }
+  | { name: string; source: string };
 
 /**
  * Permissive shape for an inline runtime agent. `config` aliases the
@@ -80,6 +72,11 @@ export type MergeProfileConfigurationArgs = {
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
   /**
+   * Repository environment applied as the bottom layer: environment <
+   * repo-binding < selected/default < inline.
+   */
+  environment?: EnvironmentSessionLayer;
+  /**
    * Inline values supplied alongside the profile stack. They form a single
    * implicit "inline layer" applied on top of the resolved profile layers,
    * so each collection follows the same precedence: repo-binding base <
@@ -93,14 +90,41 @@ export type MergeProfileConfigurationArgs = {
   runtimeAgents?: InlineAgentInput[];
 };
 
+/** The inline layer the caller can supply without resolving any profile. */
+export type EnvironmentInlineArgs = Pick<
+  MergeProfileConfigurationArgs,
+  | 'envVars'
+  | 'setupCommands'
+  | 'encryptedSecrets'
+  | 'mcpServers'
+  | 'runtimeSkills'
+  | 'runtimeAgents'
+>;
+
 export type MergeProfileConfigurationResult = {
   envVars?: Record<string, string>;
   setupCommands?: string[];
+  /** The environment's start commands. Only an environment supplies them. */
+  startCommands?: string[];
+  /**
+   * How many leading `setupCommands` are the environment's build commands.
+   * They run only in an environment build; the rest are session setup commands.
+   */
+  environmentSetupCommandCount?: number;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   mcpServers?: McpServerForSession[];
   skills?: MergedSkillForSession[];
   agents?: MergedAgentForSession[];
   kiloCommands?: KiloCommandForSession[];
+  /**
+   * The profile that claimed the active layer: the explicit pick or effective
+   * default when one applied, else the repository-binding base. Absent when no
+   * profile applied to the session. Mirrors the picker's `selectedProfileId`
+   * (`topProfile?.id ?? baseProfile?.id`) so a recorded id names the profile
+   * the user saw selected.
+   */
+  resolvedProfileId?: string;
+  instructions?: MergedInstructionForSession[];
 };
 
 /** Ensure a profileId belongs to the given owner (or, for org context, to the user personally). */
@@ -148,6 +172,7 @@ type Layer = {
   skills: SkillForSession[];
   agents: AgentForSession[];
   kiloCommands: KiloCommandForSession[];
+  instructions: InstructionForSession[];
 };
 
 type ProfileLayerData = {
@@ -157,6 +182,7 @@ type ProfileLayerData = {
   skills: SkillForSession[];
   agents: AgentForSession[];
   kiloCommands: KiloCommandForSession[];
+  instructions: InstructionForSession[];
 };
 
 function profileToLayer(data: ProfileLayerData): Layer {
@@ -177,6 +203,7 @@ function profileToLayer(data: ProfileLayerData): Layer {
     skills: [...data.skills],
     agents: [...data.agents],
     kiloCommands: [...data.kiloCommands],
+    instructions: [...data.instructions],
   };
 }
 
@@ -205,7 +232,7 @@ function clientRecordToMcpServers(
   });
 }
 
-function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
+function inlineToLayer(args: EnvironmentInlineArgs): Layer | null {
   const { envVars, encryptedSecrets, setupCommands, mcpServers, runtimeSkills, runtimeAgents } =
     args;
   const hasInline =
@@ -222,22 +249,48 @@ function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
     secrets: { ...(encryptedSecrets ?? {}) },
     commands: setupCommands ? [...setupCommands] : [],
     mcpServers: mcpServers ? clientRecordToMcpServers(mcpServers) : [],
-    skills: (runtimeSkills ?? []).map(s => ({
-      name: s.name,
-      rawMarkdown: s.rawMarkdown,
-      files: s.files ?? {},
-    })),
+    skills: (runtimeSkills ?? []).map(s =>
+      'source' in s
+        ? { name: s.name, source: s.source }
+        : { name: s.name, rawMarkdown: s.rawMarkdown, files: s.files ?? {} }
+    ),
     agents: runtimeAgents ? [...runtimeAgents] : [],
     // Inline kilo commands are not supported — there is no `runtimeKiloCommands`
     // argument. Commands from resolved profiles flow through the DB query path
     // above (profileToLayer). Unresolved pass-through handles commands supplied
     // directly by the caller without merging.
     kiloCommands: [],
+    // Inline instructions are not supported either; like kilo commands they
+    // arrive only through the resolved-profile DB query path.
+    instructions: [],
+  };
+}
+
+function environmentToLayer(environment: EnvironmentSessionLayer | undefined): Layer | null {
+  if (!environment) return null;
+  const hasContent =
+    Object.keys(environment.envVars ?? {}).length > 0 ||
+    Object.keys(environment.encryptedSecrets ?? {}).length > 0 ||
+    (environment.setupCommands?.length ?? 0) > 0;
+  if (!hasContent) return null;
+
+  return {
+    envVars: { ...(environment.envVars ?? {}) },
+    secrets: { ...(environment.encryptedSecrets ?? {}) },
+    commands: environment.setupCommands ? [...environment.setupCommands] : [],
+    mcpServers: [],
+    skills: [],
+    agents: [],
+    kiloCommands: [],
+    instructions: [],
   };
 }
 
 /**
  * Reduce layers into a single result. Precedence: later layer wins per key.
+ * A later layer's key deletes the opposite representation of the same key from
+ * earlier layers, so an environment secret cannot outlive a higher plaintext
+ * override (and the reverse). Within one layer the secret representation wins.
  *
  * Disabled MCP servers (`enabled === false`) are skipped — they neither
  * contribute nor shadow an enabled entry of the same name in an earlier
@@ -252,9 +305,15 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
   const skillByName = new Map<string, MergedSkillForSession>();
   const agentBySlug = new Map<string, MergedAgentForSession>();
   const commandByName = new Map<string, KiloCommandForSession>();
+  const instructionByName = new Map<string, MergedInstructionForSession>();
 
   for (const layer of layers) {
-    Object.assign(envVars, layer.envVars);
+    for (const key of Object.keys(layer.envVars)) delete secrets[key];
+    for (const key of Object.keys(layer.secrets)) delete envVars[key];
+    for (const [key, value] of Object.entries(layer.envVars)) {
+      if (Object.hasOwn(layer.secrets, key)) continue;
+      envVars[key] = value;
+    }
     Object.assign(secrets, layer.secrets);
     commands.push(...layer.commands);
     for (const server of layer.mcpServers) {
@@ -262,17 +321,24 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
       mcpByName.set(server.name, server);
     }
     for (const skill of layer.skills) {
-      skillByName.set(skill.name, {
-        name: skill.name,
-        rawMarkdown: skill.rawMarkdown,
-        files: skill.files,
-      });
+      if ('source' in skill) {
+        skillByName.set(skill.name, { name: skill.name, source: skill.source });
+      } else {
+        skillByName.set(skill.name, {
+          name: skill.name,
+          rawMarkdown: skill.rawMarkdown,
+          files: skill.files,
+        });
+      }
     }
     for (const agent of layer.agents) {
       agentBySlug.set(agent.slug, agent);
     }
     for (const cmd of layer.kiloCommands) {
       commandByName.set(cmd.name, cmd);
+    }
+    for (const instruction of layer.instructions) {
+      instructionByName.set(instruction.name, instruction);
     }
   }
 
@@ -284,6 +350,7 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
     skills: skillByName.size > 0 ? Array.from(skillByName.values()) : undefined,
     agents: agentBySlug.size > 0 ? Array.from(agentBySlug.values()) : undefined,
     kiloCommands: commandByName.size > 0 ? Array.from(commandByName.values()) : undefined,
+    instructions: instructionByName.size > 0 ? Array.from(instructionByName.values()) : undefined,
   };
 }
 
@@ -292,10 +359,15 @@ export async function mergeProfileConfiguration(
   args: MergeProfileConfigurationArgs
 ): Promise<MergeProfileConfigurationResult> {
   const { profileId, owner, userId, repoFullName, platform } = args;
+  // A V2 environment has no single repository, so the repository binding does
+  // not apply. The implicit default still does.
+  const binds = appliesRepoBindings(args.environment);
 
   // Look up the inputs to resolution.
   const repoBindingProfileId =
-    repoFullName && platform ? await getBindingForRepo(db, owner, repoFullName, platform) : null;
+    binds && repoFullName && platform
+      ? await getBindingForRepo(db, owner, repoFullName, platform)
+      : null;
 
   let explicitOverrideProfileId: string | null = null;
   if (profileId) {
@@ -305,11 +377,12 @@ export async function mergeProfileConfiguration(
 
   // Default fills the top slot when no explicit pick is made — even if a
   // repo binding is also present, in which case the default layers on top.
+  // The environment version does not affect the default.
   const effectiveDefaultProfileId = explicitOverrideProfileId
     ? null
     : owner.type === 'organization' && userId
       ? await getEffectiveDefaultProfileId(db, userId, owner.id)
-      : ((await getDefaultProfile(db, owner))?.id ?? null);
+      : await getDefaultProfileId(db, owner);
 
   const { base, top } = resolveProfileLayers({
     repoBindingProfileId,
@@ -317,37 +390,76 @@ export async function mergeProfileConfiguration(
     explicitOverrideProfileId,
   });
 
-  // Load profile data for the resolved layers in parallel.
   const profilesToLoad: string[] = [];
   if (base) profilesToLoad.push(base.profileId);
   if (top) profilesToLoad.push(top.profileId);
 
-  const profileData = await Promise.all(
-    profilesToLoad.map(async id => {
-      const [vars, commands, mcpServers, skills, agents, kiloCommands] = await Promise.all([
-        getVarsForSession(db, id),
-        getCommandsForSession(db, id),
-        getMcpServersForSession(db, id),
-        getSkillsForSession(db, id),
-        getAgentsForSession(db, id),
-        getKiloCommandsForSession(db, id),
-      ]);
-      return { profileId: id, vars, commands, mcpServers, skills, agents, kiloCommands };
-    })
-  );
+  // Load profile data for the resolved layers in one read-only
+  // repeatable-read transaction. Each category is a separate SELECT, so without
+  // a shared snapshot a session prepared during a profile import could observe
+  // the new commands with the old agents. The snapshot makes resolution see
+  // either the complete old or the complete new bundle.
+  const profileData =
+    profilesToLoad.length === 0
+      ? []
+      : await db.transaction(
+          async tx => {
+            // The transaction handle has the same read builders as the
+            // pool-backed db these getters are typed for; only the nominal
+            // `$client` property differs between the two drizzle types.
+            const readDb = tx as unknown as WorkerDb;
+            const rows = [];
+            for (const id of profilesToLoad) {
+              // Sequential awaits keep every query on the transaction's single
+              // connection; the reads are cheap and the snapshot is what matters.
+              rows.push({
+                profileId: id,
+                vars: await getVarsForSession(readDb, id),
+                commands: await getCommandsForSession(readDb, id),
+                mcpServers: await getMcpServersForSession(readDb, id),
+                skills: await getSkillsForSession(readDb, id),
+                agents: await getAgentsForSession(readDb, id),
+                kiloCommands: await getKiloCommandsForSession(readDb, id),
+                instructions: await getInstructionsForSession(readDb, id),
+              });
+            }
+            return rows;
+          },
+          { isolationLevel: 'repeatable read', accessMode: 'read only' }
+        );
 
-  // Stack layers in precedence order: repo-binding base < explicit/default
-  // top < inline. The inline layer is built from the args and treated as
-  // just one more profile so the merge logic does not branch on its source.
+  // Stack layers in precedence order: environment < repo-binding base <
+  // explicit/default top < inline. The inline layer is built from the args and
+  // treated as just one more profile so the merge logic does not branch on its
+  // source.
   const layers: Layer[] = [];
-  const baseData = base ? profileData.find(d => d.profileId === base.profileId) : null;
-  const topData = top ? profileData.find(d => d.profileId === top.profileId) : null;
-  if (baseData) layers.push(profileToLayer(baseData));
-  if (topData) layers.push(profileToLayer(topData));
+  const environmentLayer = environmentToLayer(args.environment);
+  if (environmentLayer) layers.push(environmentLayer);
+  for (const layer of [base, top]) {
+    const data = layer ? profileData.find(d => d.profileId === layer.profileId) : undefined;
+    if (!data) continue;
+    // Profile setup commands are session setup: they run beside an environment
+    // as non-fatal commands. A command that was also moved into the environment
+    // runs twice; the user can remove the duplicate from the profile.
+    layers.push(profileToLayer(data));
+  }
   const inline = inlineToLayer(args);
   if (inline) layers.push(inline);
 
-  return mergeLayers(layers);
+  // The active layer's id: the top layer when it applied, else the repo-binding
+  // base. `top` is dropped when it duplicates `base`, so a dropped top leaves
+  // the (identical) base id as the active profile.
+  const resolvedProfileId = top?.profileId ?? base?.profileId ?? null;
+
+  const startCommands = args.environment?.startCommands ?? [];
+  const environmentSetupCommandCount =
+    args.environment === undefined ? undefined : (args.environment.setupCommands?.length ?? 0);
+  return {
+    ...mergeLayers(layers),
+    ...(startCommands.length > 0 ? { startCommands: [...startCommands] } : {}),
+    ...(environmentSetupCommandCount === undefined ? {} : { environmentSetupCommandCount }),
+    ...(resolvedProfileId ? { resolvedProfileId } : {}),
+  };
 }
 
 /**

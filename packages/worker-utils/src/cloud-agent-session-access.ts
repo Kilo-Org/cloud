@@ -1,6 +1,20 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
-import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
+} from './organization-membership';
 
 export type AccessibleSession = {
   kiloSessionId: string;
@@ -34,14 +48,11 @@ async function queryAccessibleSession(
   db: SessionAccessDb,
   query: AccessibleSessionQuery
 ): Promise<AccessibleKiloSession | null> {
-  const membershipJoin = and(
-    eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-    eq(organization_memberships.kilo_user_id, query.kiloUserId)
+  const membershipJoin = organizationMembershipJoinCondition(
+    query.kiloUserId,
+    cli_sessions_v2.organization_id
   );
-  const organizationJoin = and(
-    eq(organizations.id, cli_sessions_v2.organization_id),
-    isNull(organizations.deleted_at)
-  );
+  const organizationJoin = activeOrganizationJoinCondition(cli_sessions_v2.organization_id);
   const expectedOrganizationId =
     'expectedOrganizationId' in query ? query.expectedOrganizationId : undefined;
   const scopeCondition =
@@ -50,13 +61,9 @@ async function queryAccessibleSession(
       : expectedOrganizationId !== undefined
         ? and(
             eq(cli_sessions_v2.organization_id, expectedOrganizationId),
-            isNotNull(organization_memberships.id),
-            isNotNull(organizations.id)
+            personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
           )
-        : or(
-            isNull(cli_sessions_v2.organization_id),
-            and(isNotNull(organization_memberships.id), isNotNull(organizations.id))
-          );
+        : personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id);
   const sessionCondition =
     'cloudAgentSessionId' in query
       ? eq(cli_sessions_v2.cloud_agent_session_id, query.cloudAgentSessionId)
@@ -71,6 +78,11 @@ async function queryAccessibleSession(
     .from(cli_sessions_v2)
     .leftJoin(organization_memberships, membershipJoin)
     .leftJoin(organizations, organizationJoin)
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(query.kiloUserId)
+    )
     .where(
       and(
         eq(cli_sessions_v2.kilo_user_id, query.kiloUserId),
@@ -95,6 +107,56 @@ export async function queryAccessibleCloudAgentSession(
   return session
     ? { kiloSessionId: session.kiloSessionId, organizationId: session.organizationId }
     : null;
+}
+
+export const workspaceChatTargetErrors = {
+  not_found: 'The target Cloud Agent chat was not found. It may have been deleted.',
+  not_owner: 'The trigger must run as the owner of the target Cloud Agent chat.',
+  scope_mismatch:
+    'The target Cloud Agent chat must be in the same organization or personal scope as the trigger.',
+  no_workspace: 'The target Cloud Agent chat does not belong to a registered workspace.',
+} as const;
+
+export async function checkWorkspaceChatTarget(
+  db: SessionAccessDb,
+  {
+    cloudAgentSessionId,
+    userId,
+    organizationId,
+  }: {
+    cloudAgentSessionId: string;
+    userId: string;
+    organizationId: string | null;
+  }
+): Promise<keyof typeof workspaceChatTargetErrors | null> {
+  const [chat] = await db
+    .select({
+      userId: cli_sessions_v2.kilo_user_id,
+      organizationId: cli_sessions_v2.organization_id,
+      worktreeId: cloud_agent_worktrees.worktree_id,
+      workspaceOwner: cloud_agent_worktrees.kilo_user_id,
+      workspaceOrganization: cloud_agent_worktrees.organization_id,
+      deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+    })
+    .from(cli_sessions_v2)
+    .leftJoin(
+      cloud_agent_worktrees,
+      eq(cli_sessions_v2.cloud_agent_worktree_id, cloud_agent_worktrees.worktree_id)
+    )
+    .where(eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId))
+    .limit(1);
+
+  if (!chat) return 'not_found';
+  if (chat.userId !== userId) return 'not_owner';
+  if (chat.organizationId !== organizationId) return 'scope_mismatch';
+  if (
+    !chat.worktreeId ||
+    chat.workspaceOwner !== userId ||
+    chat.workspaceOrganization !== organizationId
+  ) {
+    return 'no_workspace';
+  }
+  return chat.deletionStartedAt ? 'not_found' : null;
 }
 
 export async function queryAccessibleKiloSession(

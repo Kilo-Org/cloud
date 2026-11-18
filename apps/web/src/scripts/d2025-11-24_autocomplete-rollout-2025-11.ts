@@ -1,7 +1,7 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { isNull, gt, and } from 'drizzle-orm';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import pLimit from 'p-limit';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';

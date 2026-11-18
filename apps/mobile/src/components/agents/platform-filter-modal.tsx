@@ -1,55 +1,42 @@
-import { Check, X } from '@/components/ui/icons';
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Check } from '@/components/ui/icons';
+import { useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
+import { buildProjectRows, mergePlatformOptions } from '@/components/agents/platform-filter-rows';
+import {
+  knownPlatformBucket,
+  PLATFORM_FILTERS,
+  type ProjectFilterOption,
+  projectOptionKey,
+} from '@/components/agents/session-list-helpers';
 import { Button } from '@/components/ui/button';
-import { ChoiceRow } from '@/components/ui/choice-row';
-import { RadioGroup } from '@/components/ui/radio-group';
+import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
-import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { type AgentSessionFilters } from '@/lib/agent-session-filters';
+import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-const PLATFORM_FILTERS = [
-  'cloud-agent',
-  'extension',
-  'cli',
-  'slack',
-  'github',
-  'linear',
-  'other',
-] as const;
-const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
+export { type ProjectFilterOption };
 
-const SORT_OPTIONS: readonly { value: AgentSessionSortBy; label: string }[] = [
-  { value: 'updated_at', label: 'Last updated' },
-  { value: 'created_at', label: 'Created' },
-];
-
-export type ProjectFilterOption = {
-  gitUrl: string;
-  displayName: string;
-};
-
-type SessionFilters = {
-  platformFilter: string[];
-  projectFilter: string[];
-  sortBy: AgentSessionSortBy;
-};
-
-type SessionFilterChipsProps = Omit<SessionFilters, 'sortBy'> & {
-  projectOptions: ProjectFilterOption[];
-  onRemovePlatform: (platform: string) => void;
-  onRemoveProject: (gitUrl: string) => void;
-};
+// Android lays out this hosted footer at the expanded height, so use one
+// full detent rather than hiding Apply below the partially visible sheet.
+const SHEET_SNAP_POINTS = ['100%'];
 
 type SessionFilterModalProps = {
+  visible: boolean;
   selectedPlatforms: string[];
   selectedProjects: string[];
-  selectedSortBy: AgentSessionSortBy;
   projectOptions: ProjectFilterOption[];
+  /** Platform rows to offer. Defaults to every known platform. */
+  platformOptions?: readonly string[];
   onClose: () => void;
-  onApply: (filters: SessionFilters) => void;
+  onApply: (filters: AgentSessionFilters) => void;
 };
 
 type FilterCheckboxRowProps = {
@@ -58,37 +45,48 @@ type FilterCheckboxRowProps = {
   onPress: () => void;
 };
 
+/** Every git URL that renders to one project label, offered as a single row. */
+type ProjectFilterGroup = {
+  gitUrls: string[];
+  displayName: string;
+};
+
 function platformFilterLabel(p: string): string {
   switch (p) {
     case 'cloud-agent': {
-      return 'Cloud';
+      return i18n.t('agentChat.sessionFilter.platformCloud');
     }
     case 'extension': {
-      return 'Extension';
+      return i18n.t('agentChat.sessionFilter.platformExtension');
+    }
+    case 'desktop': {
+      return i18n.t('agentChat.sessionFilter.platformDesktop');
     }
     case 'cli': {
-      return 'CLI';
+      return i18n.t('agentChat.sessionFilter.platformCli');
     }
     case 'slack': {
-      return 'Slack';
+      return i18n.t('agentChat.sessionFilter.platformSlack');
     }
     case 'github': {
-      return 'GitHub';
+      return i18n.t('common.github');
     }
     case 'linear': {
-      return 'Linear';
+      return i18n.t('agentChat.sessionFilter.platformLinear');
     }
     case 'other': {
-      return 'Other';
+      return i18n.t('agentChat.sessionFilter.platformOther');
     }
     default: {
-      return p;
+      return platformLabel(p);
     }
   }
 }
 
-function projectFilterLabel(gitUrl: string, projectOptions: ProjectFilterOption[]): string {
-  return projectOptions.find(project => project.gitUrl === gitUrl)?.displayName ?? gitUrl;
+/** Collapse a persisted platform variant into the single bucket row it maps to.
+ * An unknown platform keeps its own row. */
+function normalisePlatform(platform: string): string {
+  return knownPlatformBucket(platform) ?? platform;
 }
 
 function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckboxRowProps>) {
@@ -96,10 +94,12 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
 
   return (
     <Pressable
-      className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary'
+      )}
       onPress={onPress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: isChecked }}
+      {...selectableRowA11y({ multi: true, selected: isChecked })}
     >
       <View
         className={cn(
@@ -116,78 +116,67 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
   );
 }
 
-export function SessionFilterChips({
-  platformFilter,
-  projectFilter,
-  projectOptions,
-  onRemovePlatform,
-  onRemoveProject,
-}: Readonly<SessionFilterChipsProps>) {
-  const colors = useThemeColors();
-
-  if (platformFilter.length === 0 && projectFilter.length === 0) {
-    return null;
-  }
-
+export function SessionFilterModal({
+  visible,
+  ...contentProps
+}: Readonly<SessionFilterModalProps>) {
+  const { onClose: handleClose } = contentProps;
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={chipScrollContentStyle}
+    <Sheet
+      visible={visible}
+      onClose={handleClose}
+      dismissGestures={false}
+      snapPoints={SHEET_SNAP_POINTS}
     >
-      {projectFilter.map(gitUrl => {
-        const label = projectFilterLabel(gitUrl, projectOptions);
-        return (
-          <Pressable
-            key={`project-${gitUrl}`}
-            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
-            onPress={() => {
-              onRemoveProject(gitUrl);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Remove ${label} project filter`}
-          >
-            <Text
-              className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
-              numberOfLines={1}
-            >
-              {label}
-            </Text>
-            <X size={12} color={colors.accentSoftForeground} />
-          </Pressable>
-        );
-      })}
-      {platformFilter.map(platform => (
-        <Pressable
-          key={`platform-${platform}`}
-          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
-          onPress={() => {
-            onRemovePlatform(platform);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove ${platformFilterLabel(platform)} platform filter`}
-        >
-          <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
-            {platformFilterLabel(platform)}
-          </Text>
-          <X size={12} color={colors.accentSoftForeground} />
-        </Pressable>
-      ))}
-    </ScrollView>
+      <SessionFilterContent {...contentProps} />
+    </Sheet>
   );
 }
 
-export function SessionFilterModal({
+function SessionFilterContent({
   selectedPlatforms,
   selectedProjects,
-  selectedSortBy,
   projectOptions,
+  platformOptions = PLATFORM_FILTERS,
   onClose,
   onApply,
-}: Readonly<SessionFilterModalProps>) {
-  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
+}: Readonly<Omit<SessionFilterModalProps, 'visible'>>) {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(() => [
+    ...new Set(selectedPlatforms.map(platform => normalisePlatform(platform))),
+  ]);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
-  const [draftSortBy, setDraftSortBy] = useState<AgentSessionSortBy>(selectedSortBy);
+  // The sheet re-renders on every checkbox toggle, so the merged platform rows
+  // and the project lookup derive from the props only. Keying the memos on those
+  // props keeps the derived values stable while the draft selection changes, so
+  // a toggle never rebuilds the recent-repository map.
+  const platforms = useMemo(
+    () =>
+      mergePlatformOptions(
+        platformOptions,
+        selectedPlatforms.map(platform => normalisePlatform(platform))
+      ),
+    [platformOptions, selectedPlatforms]
+  );
+  // One row per visible project label, in first-seen order. Two git URLs that
+  // `formatGitUrlProject` renders identically (https vs ssh, a `.git` suffix,
+  // host case) share a group, so the sheet never shows the same project twice.
+  const projectGroups = useMemo(() => {
+    const groups = new Map<string, ProjectFilterGroup>();
+    for (const project of buildProjectRows(projectOptions, selectedProjects).values()) {
+      const key = projectOptionKey(project.gitUrl);
+      const group = groups.get(key);
+      if (group) {
+        if (!group.gitUrls.includes(project.gitUrl)) {
+          group.gitUrls.push(project.gitUrl);
+        }
+      } else {
+        groups.set(key, { gitUrls: [project.gitUrl], displayName: project.displayName });
+      }
+    }
+    return groups;
+  }, [projectOptions, selectedProjects]);
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -195,107 +184,87 @@ export function SessionFilterModal({
     );
   };
 
-  const toggleProject = (gitUrl: string) => {
+  // Toggle the whole group: every alias is stored or removed together, so the
+  // server query keeps the sessions of both variants filtered in.
+  const toggleProjectGroup = (group: ProjectFilterGroup) => {
     setDraftProjects(prev =>
-      prev.includes(gitUrl) ? prev.filter(value => value !== gitUrl) : [...prev, gitUrl]
+      group.gitUrls.some(gitUrl => prev.includes(gitUrl))
+        ? prev.filter(gitUrl => !group.gitUrls.includes(gitUrl))
+        : [...prev, ...group.gitUrls.filter(gitUrl => !prev.includes(gitUrl))]
     );
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        // Backdrop tap-to-dismiss. accessible={false} so it doesn't collapse the
-        // whole sheet subtree into a single VoiceOver node (Pressable defaults to
-        // accessible=true) — the inner controls stay individually navigable.
-        accessible={false}
-        className="flex-1 justify-start px-6 pt-[20%]"
-        onPress={onClose}
-      >
-        <View className="absolute inset-0 bg-black opacity-50" />
-        <Pressable
-          // Catches taps to stop backdrop dismissal; accessible={false} so the
-          // checkboxes/buttons inside stay individually navigable by VoiceOver
-          // (a pressable defaults to accessible=true and would collapse them).
-          accessible={false}
-          className="gap-4 rounded-2xl bg-popover p-5"
-          onPress={e => {
-            e.stopPropagation();
+    <View
+      className="flex-1 gap-4 p-5"
+      style={{
+        paddingTop: Platform.OS === 'ios' ? undefined : insets.top + 20,
+        paddingBottom: insets.bottom + 20,
+      }}
+    >
+      <Text accessibilityRole="header" className="text-center text-base font-semibold">
+        {t('agentChat.sessionFilter.title')}
+      </Text>
+      <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
+        <View className="gap-4">
+          {/* The rows are derived from the live sessions, so a list whose
+              rows all have an unknown origin (`liveSessionPlatformBucket`
+              returns null) offers no platform at all and nothing is
+              selected. Rendering the label then leaves an orphaned section
+              header above PROJECT (spot defect e4-filter); the section is
+              omitted exactly as PROJECT already is when it has no rows. */}
+          {platforms.length > 0 && (
+            <View className="gap-1">
+              <Text variant="eyebrow" className="px-3">
+                {t('common.platform')}
+              </Text>
+              {platforms.map(platform => (
+                <FilterCheckboxRow
+                  key={platform}
+                  label={platformFilterLabel(platform)}
+                  isChecked={draftPlatforms.includes(platform)}
+                  onPress={() => {
+                    togglePlatform(platform);
+                  }}
+                />
+              ))}
+            </View>
+          )}
+          {projectGroups.size > 0 && (
+            <View className="gap-1">
+              <Text variant="eyebrow" className="px-3">
+                {t('agentChat.sessionFilter.project')}
+              </Text>
+              {[...projectGroups.entries()].map(([key, group]) => (
+                <FilterCheckboxRow
+                  key={key}
+                  label={group.displayName}
+                  isChecked={group.gitUrls.some(gitUrl => draftProjects.includes(gitUrl))}
+                  onPress={() => {
+                    toggleProjectGroup(group);
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+      <View className="flex-row justify-end gap-3">
+        <Button variant="outline" onPress={onClose}>
+          <Text>{t('common.cancel')}</Text>
+        </Button>
+        <Button
+          onPress={() => {
+            onApply({
+              platformFilter: draftPlatforms,
+              projectFilter: draftProjects,
+            });
+            onClose();
           }}
         >
-          <Text className="text-base font-semibold">Filter sessions</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View className="gap-4">
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
-                  Sort by
-                </Text>
-                <RadioGroup label="Sort by">
-                  {SORT_OPTIONS.map(option => (
-                    <ChoiceRow
-                      key={option.value}
-                      label={option.label}
-                      selected={draftSortBy === option.value}
-                      onPress={() => {
-                        setDraftSortBy(option.value);
-                      }}
-                      className="rounded-lg px-3"
-                    />
-                  ))}
-                </RadioGroup>
-              </View>
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
-                  Platform
-                </Text>
-                {PLATFORM_FILTERS.map(platform => (
-                  <FilterCheckboxRow
-                    key={platform}
-                    label={platformFilterLabel(platform)}
-                    isChecked={draftPlatforms.includes(platform)}
-                    onPress={() => {
-                      togglePlatform(platform);
-                    }}
-                  />
-                ))}
-              </View>
-              {projectOptions.length > 0 && (
-                <View className="gap-1">
-                  <Text variant="eyebrow" className="px-3">
-                    Project
-                  </Text>
-                  {projectOptions.map(project => (
-                    <FilterCheckboxRow
-                      key={project.gitUrl}
-                      label={project.displayName}
-                      isChecked={draftProjects.includes(project.gitUrl)}
-                      onPress={() => {
-                        toggleProject(project.gitUrl);
-                      }}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
-          </ScrollView>
-          <View className="flex-row justify-end gap-3">
-            <Button variant="outline" onPress={onClose}>
-              <Text>Cancel</Text>
-            </Button>
-            <Button
-              onPress={() => {
-                onApply({
-                  platformFilter: draftPlatforms,
-                  projectFilter: draftProjects,
-                  sortBy: draftSortBy,
-                });
-                onClose();
-              }}
-            >
-              <Text className="text-primary-foreground">Apply</Text>
-            </Button>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          <Text className="text-primary-foreground">{t('common.apply')}</Text>
+        </Button>
+      </View>
+    </View>
   );
 }

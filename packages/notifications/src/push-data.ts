@@ -1,8 +1,12 @@
 import { z } from 'zod';
+import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
-import { instanceLifecycleEventSchema, scheduledActionEventSchema } from './notification-events';
-
-const nonEmptyStringSchema = z.string().min(1);
+import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
+import { securityLifecyclePayloadShape } from './notification-events';
+import { sessionLiveActivityContentStateSchema } from './session-live-content';
+import { nonEmptyStringSchema } from './non-empty-string';
+import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
 // Discriminates between attention-requiring and status-only cloud agent
 // session notifications. Optional everywhere it appears so old producers
@@ -11,6 +15,18 @@ const nonEmptyStringSchema = z.string().min(1);
 export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
 
+// The needs-input raise fields every cloud-agent-session contract carries,
+// whatever envelope transports it: the visible push in this module and the
+// send request in `./rpc-schemas`. Declared once so a field cannot be added
+// to one path and silently dropped by the other.
+export const cloudAgentSessionRaiseShape = {
+  category: cloudAgentSessionCategorySchema.optional(),
+  // Needs-input raise detail: which answer the waiting agent wants, and the
+  // PR that can be opened from the notification. Absent on status pushes.
+  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+  prUrl: nonEmptyStringSchema.optional(),
+};
+
 /**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
@@ -18,35 +34,107 @@ export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategory
  */
 export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
-    type: z.literal('chat.message'),
-    sandboxId: nonEmptyStringSchema,
-    conversationId: nonEmptyStringSchema,
-    messageId: nonEmptyStringSchema,
-  }),
-  z.object({
-    type: z.literal('instance-lifecycle'),
-    event: instanceLifecycleEventSchema,
-    sandboxId: z.string().min(1),
-  }),
-  z.object({
-    type: z.literal('scheduled-action'),
-    event: scheduledActionEventSchema,
-    sandboxId: z.string().min(1),
-  }),
-  z.object({
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,
-    category: cloudAgentSessionCategorySchema.optional(),
+    ...cloudAgentSessionRaiseShape,
+    /**
+     * The one raise this attention push presents: the waiting session's own
+     * status time (`cli_sessions_v2.status_updated_at`), in the payload's ISO
+     * form. The app answers the raise this id names and nothing else, so a
+     * notification left over from a raise that already moved cannot answer the
+     * session's current one. Absent on status pushes, on a producer that
+     * cannot name the raise, and on a payload posted before this field
+     * existed — the app then keeps its previous behaviour.
+     */
+    raiseId: nonEmptyStringSchema.optional(),
+    // The session's organization, so a tap can land the app in the context
+    // the session belongs to. Optional so a push from an older producer in a
+    // rolling deploy still validates; absent means Personal.
+    organizationId: nonEmptyStringSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('agent_briefing'),
+    url: z.literal('/agent-briefing'),
   }),
   z.object({
     type: z.literal('low_balance'),
     organizationId: nonEmptyStringSchema,
   }),
+  // Spend alert push. Carries the owner scope and its id only — never an
+  // amount, an email, or the configured threshold: this blob crosses the OS
+  // lock screen, so the generic preview copy in `genericPushContentForPushData`
+  // (`./push-copy.ts`) must stay content-free.
+  // The tap routes by the scope, so the scope and its id must agree: an
+  // organization alert without its id would open the personal spend view, and
+  // a personal alert naming an organization would open one that did not send.
+  z
+    .object({
+      type: z.literal('spend_alert'),
+      ...spendAlertScopeShape,
+    })
+    .superRefine(refineSpendAlertScope),
   z.object({
     type: z.literal('security_finding'),
     findingId: nonEmptyStringSchema,
     scope: nonEmptyStringSchema,
   }),
+  // 1:1 map to SecurityAuditLogAction, shared with the internal dispatch
+  // request schema: see SECURITY_LIFECYCLE_EVENTS in `notification-events.ts`
+  // for the event-to-action mapping and the FindingCreated rationale.
+  z.object({
+    type: z.literal('security_lifecycle'),
+    ...securityLifecyclePayloadShape,
+  }),
+  // Aggregate snapshot remains privacy-minimal. Optional Home-only details
+  // travel beside it for background Home widget updates and are never copied
+  // into Live Activity/ongoing content-state. Older producers omit them.
+  //
+  // Derived from the one snapshot schema so a field, its bound and its default
+  // exist once. `accountEpoch` is left out deliberately: it is client-set (see
+  // the shared schema's comment), and a server has no value to push for it.
+  glanceableAgentsSnapshotSchema.omit({ accountEpoch: true }).extend({
+    type: z.literal('active_agents_glanceable'),
+    homeWidgetDetails: homeWidgetDetailsSchema.optional(),
+  }),
+  // One followed session's Android ongoing notification
+  // (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
+  // data-only message to the device that follows the session; the app
+  // renders, updates, or cancels the notification from `content`. Only a
+  // device that registered an `android_session_ongoing` row receives it, and
+  // `schemaVersion` gates a later shape: a client that does not know the
+  // version ignores the message.
+  z.object({
+    type: z.literal('session_live_update'),
+    schemaVersion: z.literal(1),
+    event: z.enum(['update', 'end']),
+    content: sessionLiveActivityContentStateSchema,
+    /**
+     * Only on an end: how long a finished notification stays in the shade.
+     * 0 removes it at once (the session is gone or out of scope).
+     */
+    dismissAfterMs: z.number().int().min(0).optional(),
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;
+
+/**
+ * The raw content-state the Active Agents Live Activity renders. The server
+ * pushes exactly this shape (counts + status + the safe timestamps: when the
+ * counts were confirmed, the needs-input wait and the next wake) and the widget
+ * extension renders it directly with baked copy. It must never carry a title,
+ * session id, repository name, organization name, generated text, or a raw
+ * account id.
+ */
+export type GlanceableLiveActivityContentState = Pick<
+  Extract<PushData, { type: 'active_agents_glanceable' }>,
+  | 'status'
+  | 'running'
+  | 'needsInput'
+  | 'needsApproval'
+  | 'idle'
+  | 'updatedAt'
+  | 'needsInputSince'
+  | 'scheduled'
+  | 'scheduledAt'
+>;

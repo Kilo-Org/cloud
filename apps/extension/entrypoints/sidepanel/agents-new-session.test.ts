@@ -4,9 +4,6 @@ import {
   buildPrepareSessionInput,
   buildSubmitInput,
   isModelPreferencesGetResult,
-  MODE,
-  PROMPT_MAX_LENGTH,
-  PROMPT_MIN_LENGTH,
   submitBlockedReason,
 } from './agents-new-session';
 
@@ -23,10 +20,6 @@ vi.mock('#imports', () => ({
     }),
   },
 }));
-
-// ---------------------------------------------------------------------------
-// IsModelPreferencesGetResult
-// ---------------------------------------------------------------------------
 
 describe('isModelPreferencesGetResult helper', () => {
   it('returns true for a valid model preferences object with lastSelected', () => {
@@ -63,28 +56,6 @@ describe('isModelPreferencesGetResult helper', () => {
     expect(isModelPreferencesGetResult(value)).toBe(true);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-describe('constants', () => {
-  it('promptMinLength is 3', () => {
-    expect(PROMPT_MIN_LENGTH).toBe(3);
-  });
-
-  it('promptMaxLength is 4000', () => {
-    expect(PROMPT_MAX_LENGTH).toBe(4000);
-  });
-
-  it('mode is "code"', () => {
-    expect(MODE).toBe('code');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// BuildSubmitInput
-// ---------------------------------------------------------------------------
 
 describe('buildSubmitInput helper', () => {
   const baseParams = {
@@ -134,10 +105,6 @@ describe('buildSubmitInput helper', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// BuildPrepareSessionInput
-// ---------------------------------------------------------------------------
-
 describe('buildPrepareSessionInput helper', () => {
   const baseInput = {
     githubRepo: 'owner/repo',
@@ -183,9 +150,9 @@ describe('submitBlockedReason helper', () => {
     hasModels: true,
     integrationInstalled: true,
     isCloudTarget: true,
-    isLoading: false,
-    isPromptValid: true,
+    isModelsLoading: false,
     repoCount: 1,
+    repoStatus: 'ready' as const,
     selectedRepo: 'org/repo',
   };
 
@@ -193,9 +160,9 @@ describe('submitBlockedReason helper', () => {
     expect(submitBlockedReason(base)).toBeNull();
   });
 
-  it('stays silent while the prompt is still too short', () => {
-    // The textarea already reports the length requirement.
-    expect(submitBlockedReason({ ...base, isPromptValid: false, selectedRepo: '' })).toBeNull();
+  it('reports the blocker without waiting for a prompt', () => {
+    // The disabled Start button states its reason from the first render (A1).
+    expect(submitBlockedReason({ ...base, integrationInstalled: false })).toBe('connect-github');
   });
 
   it('stays silent for a CLI target, which needs no repo or model', () => {
@@ -211,17 +178,25 @@ describe('submitBlockedReason helper', () => {
     ).toBeNull();
   });
 
-  it('names no blocker while the repo and model lists are still loading', () => {
+  it('names no blocker while the repo or model list is still loading', () => {
     // An empty list mid-load means "not yet", not "none available".
     expect(
       submitBlockedReason({
         ...base,
         hasModels: false,
-        isLoading: true,
+        isModelsLoading: true,
         repoCount: 0,
+        repoStatus: 'loading',
         selectedRepo: '',
       })
     ).toBeNull();
+    expect(submitBlockedReason({ ...base, isModelsLoading: true })).toBeNull();
+  });
+
+  it('reports repos-unavailable when the repository query failed', () => {
+    expect(
+      submitBlockedReason({ ...base, repoCount: 0, repoStatus: 'error', selectedRepo: '' })
+    ).toBe('repos-unavailable');
   });
 
   it('reports connect-github before anything else', () => {

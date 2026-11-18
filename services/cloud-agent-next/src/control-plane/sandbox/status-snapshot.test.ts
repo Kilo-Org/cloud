@@ -1,0 +1,231 @@
+import { describe, expect, it } from 'vitest';
+import { SandboxStatusSnapshotSchema } from '../../shared/sandbox-status.js';
+import type { SandboxProviderConfiguration } from '../../sandbox-control/provider.js';
+import { initialAllocationState, type AllocationState } from './allocation.js';
+import { projectAllocationStatusSnapshot } from './status-snapshot.js';
+
+const OBSERVED_AT = 1_700_000_000_000;
+const IDLE_MS = 600_000;
+
+function allocation(overrides: Partial<AllocationState> = {}): AllocationState {
+  return { ...initialAllocationState(), ...overrides };
+}
+
+function project(overrides: Partial<AllocationState> | null, provider: 'cloudflare' | 'vercel') {
+  return projectAllocationStatusSnapshot({
+    allocation:
+      overrides === null ? null : { ...allocation(overrides), provider, configuration: null },
+    observedAt: OBSERVED_AT,
+    inactivityTimeoutMs: IDLE_MS,
+  });
+}
+
+describe('projectAllocationStatusSnapshot', () => {
+  it.each([
+    ['standard-3', 'containers-standard-3'],
+    ['standard-4', 'containers-standard-4'],
+    [undefined, 'containers-standard-3'],
+    [null, 'containers-standard-3'],
+    ['PRIVATE_SENTINEL', null],
+  ] as const)(
+    'reports bounded Containers runtime metadata from the persisted instance %s',
+    (instance, sandboxType) => {
+      const snapshot = projectAllocationStatusSnapshot({
+        allocation: {
+          ...allocation({ kind: 'connected' }),
+          provider: 'cloudflare-containers',
+          configuration:
+            instance === null
+              ? null
+              : ({ provider: 'cloudflare-containers', instance } as SandboxProviderConfiguration),
+        },
+        observedAt: OBSERVED_AT,
+        inactivityTimeoutMs: IDLE_MS,
+      });
+      expect(snapshot).toMatchObject({
+        status: 'active',
+        provider: 'Cloudflare Containers',
+        runtime: {
+          sandboxType,
+          kiloCliVersion: null,
+          wrapperVersion: null,
+          startedAt: null,
+          stoppedAt: null,
+        },
+      });
+      expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+      expect(JSON.stringify(snapshot)).not.toContain('PRIVATE_SENTINEL');
+    }
+  );
+
+  it.each([null, 'cloudflare'] as const)(
+    'omits Containers runtime metadata without a versioned allocation: %s',
+    provider => {
+      const snapshot = projectAllocationStatusSnapshot({
+        allocation:
+          provider === null
+            ? null
+            : { ...allocation({ kind: 'connected' }), provider, configuration: null },
+        observedAt: OBSERVED_AT,
+        inactivityTimeoutMs: IDLE_MS,
+      });
+      expect(snapshot.runtime).toBeUndefined();
+      expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    }
+  );
+
+  it('reports observed versions for a Vercel allocation with an unknown sandbox type', () => {
+    const snapshot = projectAllocationStatusSnapshot({
+      allocation: {
+        ...allocation({ kind: 'connected', allocationId: 'allocation-1' }),
+        provider: 'vercel',
+        configuration: null,
+      },
+      observedAt: OBSERVED_AT,
+      inactivityTimeoutMs: IDLE_MS,
+      runtimeIdentity: {
+        allocationId: 'allocation-1',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+      },
+    });
+    expect(snapshot).toMatchObject({
+      status: 'active',
+      provider: 'Vercel',
+      runtime: {
+        sandboxType: 'unknown',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      },
+    });
+    expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+  });
+
+  it.each(['containers-standard-3', 'containers-standard-4'] as const)(
+    'reports observed versions for a %s allocation',
+    sandboxType => {
+      const instance = sandboxType === 'containers-standard-4' ? 'standard-4' : 'standard-3';
+      const snapshot = projectAllocationStatusSnapshot({
+        allocation: {
+          ...allocation({ kind: 'connected', allocationId: 'allocation-1' }),
+          provider: 'cloudflare-containers',
+          configuration: { provider: 'cloudflare-containers', instance },
+        },
+        observedAt: OBSERVED_AT,
+        inactivityTimeoutMs: IDLE_MS,
+        runtimeIdentity: {
+          allocationId: 'allocation-1',
+          kiloCliVersion: '7.4.20-canary.1',
+          wrapperVersion: null,
+        },
+      });
+      expect(snapshot.runtime).toEqual({
+        sandboxType,
+        kiloCliVersion: '7.4.20-canary.1',
+        wrapperVersion: null,
+        startedAt: null,
+        stoppedAt: null,
+      });
+      expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    }
+  );
+
+  it('ignores identity observed for another allocation', () => {
+    const snapshot = projectAllocationStatusSnapshot({
+      allocation: {
+        ...allocation({ kind: 'connected', allocationId: 'allocation-1' }),
+        provider: 'cloudflare-containers',
+        configuration: { provider: 'cloudflare-containers' },
+      },
+      observedAt: OBSERVED_AT,
+      inactivityTimeoutMs: IDLE_MS,
+      runtimeIdentity: {
+        allocationId: 'allocation-0',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+      },
+    });
+    expect(snapshot.runtime).toMatchObject({ kiloCliVersion: null, wrapperVersion: null });
+  });
+
+  it('reports unknown with insufficient evidence and no provider', () => {
+    const snapshot = project(null, 'cloudflare');
+    expect(snapshot).toEqual({
+      status: 'unknown',
+      detailCode: 'insufficient_evidence',
+      provider: 'Unknown',
+      observedAt: OBSERVED_AT,
+      inactivityTimeoutMs: IDLE_MS,
+      estimatedSleepAt: null,
+    });
+  });
+
+  it.each([
+    ['creating', 'starting', 'sandbox_starting'],
+    ['starting', 'starting', 'sandbox_starting'],
+    ['stopping', 'stopping', 'sandbox_stopping'],
+    ['stopped', 'sleeping', 'sandbox_stopped'],
+    ['disconnected', 'unreachable', 'connection_unavailable'],
+  ] as const)('maps %s to %s/%s', (kind, status, detailCode) => {
+    const snapshot = project({ kind }, 'cloudflare');
+    expect(snapshot).toMatchObject({ status, detailCode, provider: 'Cloudflare' });
+    expect(snapshot.estimatedSleepAt).toBeNull();
+    expect(SandboxStatusSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
+  it('maps a connected allocation to active and labels the provider', () => {
+    const snapshot = project({ kind: 'connected', lastActivityAt: OBSERVED_AT - 1_000 }, 'vercel');
+    expect(snapshot).toMatchObject({
+      status: 'active',
+      detailCode: 'sandbox_ready',
+      provider: 'Vercel',
+      inactivityTimeoutMs: IDLE_MS,
+      estimatedSleepAt: OBSERVED_AT - 1_000 + IDLE_MS,
+    });
+    expect(SandboxStatusSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
+  it.each(['cloudflare', 'vercel'] as const)(
+    'reports unknown for an unconfirmed stop on %s',
+    provider => {
+      const snapshot = project(
+        { kind: 'stopped', unconfirmedProviderRef: 'unconfirmed-provider-reference' },
+        provider
+      );
+      expect(snapshot).toMatchObject({
+        status: 'unknown',
+        detailCode: 'insufficient_evidence',
+        estimatedSleepAt: null,
+      });
+      expect(JSON.stringify(snapshot)).not.toContain('unconfirmed-provider-reference');
+      expect(SandboxStatusSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    }
+  );
+
+  it('omits the sleep estimate when the idle anchor is missing or already past', () => {
+    expect(
+      project({ kind: 'connected', lastActivityAt: null }, 'cloudflare').estimatedSleepAt
+    ).toBe(null);
+    const stale = project(
+      { kind: 'connected', lastActivityAt: OBSERVED_AT - (IDLE_MS + 1) },
+      'cloudflare'
+    );
+    expect(stale.estimatedSleepAt).toBeNull();
+    expect(SandboxStatusSnapshotSchema.safeParse(stale).success).toBe(true);
+  });
+
+  it('passes the inactivity bound through for every kind', () => {
+    const snapshot = projectAllocationStatusSnapshot({
+      allocation: {
+        ...allocation({ kind: 'stopped' }),
+        provider: 'cloudflare',
+        configuration: null,
+      },
+      observedAt: OBSERVED_AT,
+      inactivityTimeoutMs: 12_345,
+    });
+    expect(snapshot.inactivityTimeoutMs).toBe(12_345);
+  });
+});

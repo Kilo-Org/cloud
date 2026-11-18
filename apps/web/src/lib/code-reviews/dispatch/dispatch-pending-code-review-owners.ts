@@ -5,7 +5,7 @@ import {
   listDispatchableCodeReviewOwnerCandidates,
   type DispatchableCodeReviewOwnerCandidate,
 } from '../db/code-reviews';
-import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
 import {
   cronPendingCodeReviewCreatedAtWindowSql,

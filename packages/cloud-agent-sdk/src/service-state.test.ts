@@ -1,6 +1,9 @@
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import { autocommitCompletedDataSchema, preparingDataSchema } from './schemas';
+import type { SessionCommit, SessionGoal } from './types';
 
 function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {
   return { rootSessionId: 'root-1', ...overrides };
@@ -20,6 +23,216 @@ function makeSession(id: string, parentID?: string): Session {
 }
 
 describe('createServiceState', () => {
+  describe('replay batching', () => {
+    it('publishes the observed snapshot once when replay is canceled without a following event', () => {
+      const state = createServiceState(makeConfig());
+      const snapshots: ReturnType<typeof state.snapshot>[] = [];
+      state.subscribe(() => snapshots.push(state.snapshot()));
+      state.beginReplay();
+      state.process({ type: 'connected', cloudStatus: { type: 'ready' } });
+      state.process({ type: 'session.created', info: makeSession('root-1') });
+      state.process({ type: 'question.asked', requestId: 'pending', questions: [] });
+      expect(snapshots).toHaveLength(0);
+      state.cancelReplay();
+      expect(snapshots).toEqual([state.snapshot()]);
+      expect(snapshots[0].question?.requestId).toBe('pending');
+      expect(snapshots[0].sessionInfo?.id).toBe('root-1');
+      expect(snapshots[0].cloudStatus).toEqual({ type: 'ready' });
+      state.cancelReplay();
+      expect(snapshots).toHaveLength(1);
+    });
+
+    it('retains replayed delivery failures without replaying live failure callbacks', () => {
+      const onMessageFailed = jest.fn();
+      const state = createServiceState(makeConfig({ onMessageFailed }));
+      state.beginReplay();
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'historical',
+        error: 'Delivery exhausted',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+      state.endReplay();
+      expect(state.getPendingMessages().get('historical')).toEqual({
+        status: 'failed',
+        error: 'Delivery exhausted',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+      expect(onMessageFailed).not.toHaveBeenCalled();
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'live',
+        error: 'Live delivery exhausted',
+        reason: 'exhausted',
+      });
+      expect(onMessageFailed).toHaveBeenCalledTimes(1);
+      expect(onMessageFailed).toHaveBeenCalledWith('live', state.getPendingMessages().get('live'));
+    });
+
+    it('does not raise an unchanged error again on a subsequent restore', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.process({ type: 'session.error', error: 'Current failure' });
+      onError.mockClear();
+      state.beginReplay();
+      state.process({ type: 'connected', cloudStatus: { type: 'ready' } });
+      state.endReplay();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Current failure' });
+      expect(onError).not.toHaveBeenCalled();
+      state.beginReplay();
+      state.process({ type: 'session.error', error: 'New failure' });
+      state.endReplay();
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('New failure');
+    });
+
+    it('preserves observed metadata and interaction resolutions when replay is interrupted', () => {
+      const onError = jest.fn();
+      const onSessionUpdated = jest.fn();
+      const onBranchChanged = jest.fn();
+      const onQuestionResolved = jest.fn();
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(
+        makeConfig({
+          onError,
+          onSessionUpdated,
+          onBranchChanged,
+          onQuestionResolved,
+          onPermissionResolved,
+        })
+      );
+      state.process({ type: 'session.created', info: makeSession('root-1') });
+      state.process({ type: 'question.asked', requestId: 'old-question', questions: [] });
+      state.process({
+        type: 'permission.asked',
+        requestId: 'old-permission',
+        permission: 'bash',
+        patterns: [],
+        metadata: {},
+        always: [],
+      });
+      state.beginReplay();
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', model: { providerID: 'provider', id: 'updated-model' } },
+      });
+      state.process({ type: 'stopped', reason: 'complete', branch: 'updated-branch' });
+      state.process({ type: 'connected' });
+      state.process({ type: 'session.error', error: 'Historical error' });
+      state.cancelReplay();
+      expect(onSessionUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ model: { providerID: 'provider', id: 'updated-model' } })
+      );
+      expect(onBranchChanged).toHaveBeenCalledWith('updated-branch');
+      expect(onQuestionResolved).toHaveBeenCalledWith('old-question');
+      expect(onPermissionResolved).toHaveBeenCalledWith('old-permission');
+      expect(onError).not.toHaveBeenCalled();
+      state.beginReplay();
+      state.process({ type: 'connected' });
+      state.endReplay();
+      expect(onBranchChanged).toHaveBeenCalledTimes(1);
+      expect(onQuestionResolved).toHaveBeenCalledTimes(1);
+      expect(onPermissionResolved).toHaveBeenCalledTimes(1);
+    });
+
+    it('coalesces metadata and branch callbacks, drops transient failures, and resumes live callbacks', () => {
+      const onError = jest.fn();
+      const onPreparationReady = jest.fn();
+      const onPreparationFailed = jest.fn();
+      const onBranchChanged = jest.fn();
+      const onSessionUpdated = jest.fn();
+      const onMessageQueued = jest.fn();
+      const state = createServiceState(
+        makeConfig({
+          onError,
+          onPreparationReady,
+          onPreparationFailed,
+          onBranchChanged,
+          onSessionUpdated,
+          onMessageQueued,
+        })
+      );
+      state.process({ type: 'session.created', info: makeSession('root-1') });
+      const notifications = jest.fn();
+      state.subscribe(notifications);
+      state.beginReplay();
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', model: { providerID: 'provider', id: 'old-model' } },
+      });
+      state.process({ type: 'preparing', step: 'failed', message: 'Old setup failure' });
+      state.process({ type: 'preparing', step: 'ready', message: 'Ready', branch: 'old-branch' });
+      state.process({ type: 'stopped', reason: 'complete', branch: 'final-branch' });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', model: { providerID: 'provider', id: 'final-model' } },
+      });
+      state.process({ type: 'connected', cloudStatus: { type: 'ready' } });
+      expect(notifications).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onPreparationReady).not.toHaveBeenCalled();
+      expect(onPreparationFailed).not.toHaveBeenCalled();
+      expect(onBranchChanged).not.toHaveBeenCalled();
+      expect(onSessionUpdated).not.toHaveBeenCalled();
+      state.endReplay();
+      expect(notifications).toHaveBeenCalledTimes(1);
+      expect(onError).not.toHaveBeenCalled();
+      expect(onBranchChanged).toHaveBeenCalledTimes(1);
+      expect(onBranchChanged).toHaveBeenCalledWith('final-branch');
+      expect(onSessionUpdated).toHaveBeenCalledTimes(1);
+      expect(onSessionUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ model: { providerID: 'provider', id: 'final-model' } })
+      );
+      state.process({ type: 'cloud.message.queued', messageId: 'live' });
+      expect(onMessageQueued).toHaveBeenCalledWith('live');
+      state.process({ type: 'session.error', error: 'Live error' });
+      expect(onError).toHaveBeenCalledWith('Live error');
+    });
+
+    it('does not resolve and re-ask a pending question midway through reconnect restoration', () => {
+      const onQuestionAsked = jest.fn();
+      const onQuestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionAsked, onQuestionResolved }));
+      state.process({ type: 'question.asked', requestId: 'pending', questions: [] });
+      onQuestionAsked.mockClear();
+      state.beginReplay();
+      state.process({ type: 'connected' });
+      state.process({ type: 'question.asked', requestId: 'pending', questions: [] });
+      expect(onQuestionAsked).not.toHaveBeenCalled();
+      expect(onQuestionResolved).not.toHaveBeenCalled();
+      state.endReplay();
+      expect(onQuestionResolved).not.toHaveBeenCalled();
+      expect(onQuestionAsked).toHaveBeenCalledTimes(1);
+      onQuestionAsked.mockClear();
+      state.beginReplay();
+      state.process({ type: 'connected' });
+      state.endReplay();
+      expect(onQuestionResolved).toHaveBeenCalledWith('pending');
+      expect(onQuestionAsked).not.toHaveBeenCalled();
+    });
+
+    it('restores callbacks after canceling an incomplete replay', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.beginReplay();
+      state.process({ type: 'session.error', error: 'Historical error' });
+      state.cancelReplay();
+      state.process({ type: 'session.error', error: 'Current error' });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('Current error');
+    });
+
+    it('supersedes a turn error when that active message completes successfully', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'cloud.message.sent', messageId: 'current' });
+      state.process({ type: 'session.error', error: 'Transient error' });
+      state.process({ type: 'cloud.message.completed', messageId: 'current' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+  });
+
   describe('initial state', () => {
     it('starts with connecting activity, idle status, no question, no permission', () => {
       const state = createServiceState(makeConfig());
@@ -60,7 +273,6 @@ describe('createServiceState', () => {
 
       state.process({ type: 'session.status', sessionId: 'unknown-1', status: { type: 'busy' } });
 
-      // Non-root session doesn't affect activity
       expect(state.getActivity()).toEqual({ type: 'connecting' });
     });
 
@@ -70,7 +282,6 @@ describe('createServiceState', () => {
 
       state.process({ type: 'session.status', sessionId: 'child-1', status: { type: 'busy' } });
 
-      // Activity remains busy (set manually above), not changed by child
       expect(state.getActivity()).toEqual({ type: 'busy' });
     });
 
@@ -99,6 +310,23 @@ describe('createServiceState', () => {
       });
     });
 
+    it.each(['child-1', 'unknown-1'])(
+      'retry on %s preserves root activity and status',
+      sessionId => {
+        const state = createServiceState(makeConfig());
+        state.setActivity({ type: 'busy' });
+        state.setStatus({ type: 'error', message: 'root error' });
+        state.process({
+          type: 'session.status',
+          sessionId,
+          status: { type: 'retry', attempt: 3, message: 'Overloaded', next: 5000 },
+        });
+        state.process({ type: 'session.status', sessionId, status: { type: 'idle' } });
+        expect(state.getActivity()).toEqual({ type: 'busy' });
+        expect(state.getStatus()).toEqual({ type: 'error', message: 'root error' });
+      }
+    );
+
     it('idle status on root transitions busy to idle', () => {
       const state = createServiceState(makeConfig());
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
@@ -119,7 +347,6 @@ describe('createServiceState', () => {
 
     it('idle status on root transitions any non-idle activity to idle', () => {
       const state = createServiceState(makeConfig());
-      // Activity starts as 'connecting'
       expect(state.getActivity()).toEqual({ type: 'connecting' });
 
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'idle' } });
@@ -144,6 +371,63 @@ describe('createServiceState', () => {
 
       expect(state.getStatus()).toEqual({ type: 'idle' });
     });
+
+    it('scheduled on root sets a scheduled status with its wake time and idles the activity', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
+
+      state.process({
+        type: 'session.status',
+        sessionId: 'root-1',
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+    });
+
+    it('scheduled without a wake time yields a scheduled status with no time', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'scheduled' } });
+
+      expect(state.getStatus()).toEqual({ type: 'scheduled' });
+      expect(state.getStatus()).not.toHaveProperty('scheduledAt');
+    });
+
+    it('scheduled on a child does not repaint the root status', () => {
+      const state = createServiceState(makeConfig());
+      state.setStatus({ type: 'error', message: 'previous error' });
+
+      state.process({
+        type: 'session.status',
+        sessionId: 'child-1',
+        status: { type: 'scheduled' },
+      });
+
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'previous error' });
+    });
+
+    it.each(['question', 'permission', 'offline'])(
+      'leaves activity and status untouched for a %s status',
+      type => {
+        const state = createServiceState(makeConfig());
+        state.setActivity({ type: 'busy' });
+        state.setStatus({ type: 'error', message: 'previous error' });
+
+        state.process({
+          type: 'session.status',
+          sessionId: 'root-1',
+          status: { type },
+        });
+
+        expect(state.getActivity()).toEqual({ type: 'busy' });
+        expect(state.getStatus()).toEqual({ type: 'error', message: 'previous error' });
+      }
+    );
   });
 
   describe('stopped', () => {
@@ -204,7 +488,11 @@ describe('createServiceState', () => {
       state.process({ type: 'stopped', reason: 'error' });
 
       expect(state.getActivity()).toEqual({ type: 'idle' });
-      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
       expect(onError).toHaveBeenCalledWith('Session terminated');
     });
 
@@ -284,6 +572,73 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'error', message: 'Something went wrong' });
     });
 
+    it('scopes child errors to onChildSessionError without touching root state', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({
+        type: 'session.error',
+        error: 'Requests ending with a model turn are not supported.',
+        sessionId: 'child-1',
+      });
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(onChildSessionError).toHaveBeenCalledWith(
+        'child-1',
+        'Requests ending with a model turn are not supported.'
+      );
+    });
+
+    it('keeps root session errors on onError and root status', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({
+        type: 'session.error',
+        error: 'Requests ending with a model turn are not supported.',
+        sessionId: 'root-1',
+      });
+
+      expect(onError).toHaveBeenCalledWith('Requests ending with a model turn are not supported.');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Requests ending with a model turn are not supported.',
+      });
+    });
+
+    it('adopts the server-reported root session ID for errors', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({ type: 'session.created', info: makeSession('server-root') });
+      state.process({
+        type: 'session.error',
+        error: 'Root session failed.',
+        sessionId: 'server-root',
+      });
+
+      expect(onError).toHaveBeenCalledWith('Root session failed.');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Root session failed.' });
+    });
+
+    it('keeps events without a sessionId on the legacy root path', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({ type: 'session.error', error: 'Something went wrong' });
+
+      expect(onError).toHaveBeenCalledWith('Something went wrong');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Something went wrong' });
+    });
+
     it('is suppressed after stopped(error) — aftershock absorption', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
@@ -324,14 +679,11 @@ describe('createServiceState', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
 
-      // First turn: error + stopped
       state.process({ type: 'stopped', reason: 'error' });
       onError.mockClear();
 
-      // New turn: busy resets terminated
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
 
-      // session.error should now fire
       state.process({ type: 'session.error', error: 'New error' });
 
       expect(onError).toHaveBeenCalledWith('New error');
@@ -387,6 +739,55 @@ describe('createServiceState', () => {
 
       expect(onSessionUpdated).toHaveBeenCalledWith(childInfo);
       expect(state.getSessionInfo()).toBe(rootInfo);
+    });
+  });
+
+  describe('goal reason preservation', () => {
+    const completeGoal: SessionGoal = {
+      text: 'Report the goal finished with a reason',
+      status: 'complete',
+      reason: 'Reported by the working model, not independently verified.',
+    };
+
+    it('keeps a known reason when a later update for the same goal omits it', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', goal: { text: completeGoal.text, status: 'complete' } },
+      });
+
+      expect(state.getSessionInfo()?.goal).toEqual(completeGoal);
+    });
+
+    it('drops the reason when the goal status changes (resume)', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', goal: { text: completeGoal.text, status: 'active' } },
+      });
+
+      expect(state.getSessionInfo()?.goal).toEqual({ text: completeGoal.text, status: 'active' });
+    });
+
+    it('drops the reason when the goal text changes (edit)', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', goal: { text: 'New objective', status: 'complete' } },
+      });
+
+      expect(state.getSessionInfo()?.goal).toEqual({ text: 'New objective', status: 'complete' });
+    });
+
+    it('does not carry a reason across a different session', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({ type: 'session.created', info: { id: 'root-2' } });
+
+      expect(state.getSessionInfo()).toEqual({ id: 'root-2' });
     });
   });
 
@@ -508,6 +909,26 @@ describe('createServiceState', () => {
       ]);
     });
 
+    it('accumulates session setup and start command messages into setupLog', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'preparing',
+        step: 'session_setup_commands',
+        message: 'Running session setup command 1 of 1: npm install',
+      });
+      state.process({
+        type: 'preparing',
+        step: 'start_commands',
+        message: 'Running start command 1 of 1: npm run dev',
+      });
+
+      expect(state.getSetupLog()).toEqual([
+        'Running session setup command 1 of 1: npm install',
+        'Running start command 1 of 1: npm run dev',
+      ]);
+    });
+
     it('clears setupLog on ready', () => {
       const state = createServiceState(makeConfig());
 
@@ -608,6 +1029,351 @@ describe('createServiceState', () => {
       });
 
       expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Clone failed' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          triggerMessageId: 'message-1',
+          status: 'failed',
+          safeError: 'Clone failed',
+        }),
+      ]);
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-2',
+        triggerMessageId: 'message-2',
+        revision: 1,
+        timestamp: 3_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          triggerMessageId: 'message-1',
+          status: 'failed',
+          safeError: 'Clone failed',
+        }),
+        expect.objectContaining({
+          id: 'attempt-2',
+          triggerMessageId: 'message-2',
+          status: 'running',
+        }),
+      ]);
+    });
+
+    it('v2 attempt_failed with the cancellation reason reads as a stop', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 2,
+        timestamp: 2_000,
+        step: 'failed',
+        message: 'preparation_cancelled',
+        action: 'attempt_failed',
+        safeError: 'preparation_cancelled',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+        }),
+      ]);
+    });
+
+    it.each(['reload', 'reconnect'] as const)(
+      'keeps historical cancellation snapshots from interrupting a healthy session on %s',
+      connection => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        const cancelled = {
+          type: 'preparing' as const,
+          version: 2 as const,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'message-1',
+          revision: 2,
+          timestamp: 2_000,
+          step: 'failed' as const,
+          message: 'preparation_cancelled',
+          action: 'attempt_snapshot' as const,
+          attempt: {
+            id: 'attempt-1',
+            triggerMessageId: 'message-1',
+            status: 'failed' as const,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            safeError: 'preparation_cancelled',
+            revision: 2,
+          },
+        };
+        const completed = {
+          ...cancelled,
+          attemptId: 'attempt-2',
+          triggerMessageId: 'message-2',
+          timestamp: 4_000,
+          step: 'ready' as const,
+          message: 'Environment prepared',
+          attempt: {
+            id: 'attempt-2',
+            triggerMessageId: 'message-2',
+            status: 'completed' as const,
+            startedAt: 3_000,
+            completedAt: 4_000,
+            revision: 2,
+          },
+        };
+        if (connection === 'reconnect') {
+          state.process(completed);
+          state.process({ type: 'stopped', reason: 'transport-disconnected' });
+        }
+        state.process({
+          type: 'connected',
+          sessionStatus: { type: 'idle' },
+          cloudStatus: { type: 'ready' },
+        });
+        state.process(cancelled);
+        state.process(completed);
+        state.process({
+          ...cancelled,
+          action: 'step_snapshot',
+          stepId: 'phase:workspace_setup',
+          stepSnapshot: {
+            id: 'phase:workspace_setup',
+            key: 'workspace_setup',
+            kind: 'phase',
+            label: 'Workspace setup',
+            status: 'failed',
+            startedAt: 1_000,
+            completedAt: 2_000,
+            safeError: 'preparation_cancelled',
+            revision: 2,
+          },
+        });
+
+        expect(state.getCloudStatus()).toEqual({ type: 'ready' });
+        expect(state.getStatus()).toEqual({ type: 'idle' });
+        expect(state.getPreparationAttempts()[0]).toMatchObject({
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+          steps: [expect.objectContaining({ status: 'failed' })],
+        });
+        onError.mockClear();
+        state.process({ type: 'session.error', error: 'Current error' });
+        expect(onError).toHaveBeenCalledWith('Current error');
+        expect(state.getStatus()).toEqual({ type: 'error', message: 'Current error' });
+      }
+    );
+
+    it('keeps a workspace stop interrupted after the preparation failure arrives', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'message-1',
+        error: 'The message was interrupted',
+        reason: 'interrupted',
+      });
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 2,
+        timestamp: 2_000,
+        step: 'failed',
+        message: 'preparation_cancelled',
+        action: 'attempt_failed',
+        safeError: 'preparation_cancelled',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+        }),
+      ]);
+    });
+
+    it('clearPreparationAttempts empties the rows and a new attempt starts fresh', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      expect(state.getPreparationAttempts()).toHaveLength(1);
+
+      state.clearPreparationAttempts();
+
+      expect(state.getPreparationAttempts()).toEqual([]);
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-2',
+        triggerMessageId: 'message-2',
+        revision: 1,
+        timestamp: 2_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({ id: 'attempt-2', status: 'running' }),
+      ]);
+    });
+
+    it.each([
+      {
+        terminalAction: 'attempt_completed' as const,
+        terminalStep: 'ready',
+        expectedStatus: 'completed' as const,
+        expectedCloudStatus: { type: 'ready' as const },
+      },
+      {
+        terminalAction: 'attempt_failed' as const,
+        terminalStep: 'failed',
+        expectedStatus: 'failed' as const,
+        expectedCloudStatus: { type: 'error' as const, message: 'Clone failed' },
+        safeError: 'Clone failed',
+      },
+    ])('does not restart a $expectedStatus attempt', terminal => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+      };
+
+      state.process({
+        ...base,
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      state.process({
+        ...base,
+        revision: 2,
+        timestamp: 2_000,
+        step: terminal.terminalStep,
+        message: 'Clone failed',
+        action: terminal.terminalAction,
+        ...(terminal.safeError === undefined ? {} : { safeError: terminal.safeError }),
+      });
+      state.process({
+        ...base,
+        revision: 3,
+        timestamp: 3_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      expect(state.getPreparationAttempts()[0]).toMatchObject({
+        status: terminal.expectedStatus,
+        revision: 2,
+        ...(terminal.safeError === undefined ? {} : { safeError: terminal.safeError }),
+      });
+      expect(state.getCloudStatus()).toEqual(terminal.expectedCloudStatus);
+    });
+
+    it('retains late terminal step snapshots without returning to preparing', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+      };
+
+      state.process({
+        ...base,
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      state.process({
+        ...base,
+        revision: 2,
+        timestamp: 2_000,
+        step: 'ready',
+        message: 'Preparation complete',
+        action: 'attempt_completed',
+      });
+      state.process({
+        ...base,
+        revision: 3,
+        timestamp: 3_000,
+        step: 'setup_commands',
+        message: 'Preparation snapshot',
+        action: 'step_snapshot',
+        stepId: 'command:install',
+        stepSnapshot: {
+          id: 'command:install',
+          key: 'setup_commands',
+          kind: 'setup_command',
+          label: 'Install dependencies',
+          status: 'completed',
+          startedAt: 2_500,
+          completedAt: 3_000,
+          revision: 3,
+          outputTail: 'Installed dependencies',
+        },
+      });
+
+      expect(state.getPreparationAttempts()[0]).toMatchObject({
+        status: 'completed',
+        revision: 3,
+        steps: [
+          expect.objectContaining({ id: 'command:install', outputTail: 'Installed dependencies' }),
+        ],
+      });
+      expect(state.getCloudStatus()).toEqual({ type: 'ready' });
     });
 
     it('replayed snapshots of a completed attempt leave cloudStatus ready', () => {
@@ -750,6 +1516,434 @@ describe('createServiceState', () => {
       expect(step?.completedAt).toBe(6_000);
     });
 
+    it.each([
+      { clock: 'tied', firstTimestamp: 2_000, secondTimestamp: 2_000, commandTimestamp: 2_000 },
+      { clock: 'skewed', firstTimestamp: 9_000, secondTimestamp: 1_000, commandTimestamp: 500 },
+    ])('keeps causal step order with $clock clocks across updates and reconnect', clocks => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'setup_commands',
+        message: 'Running setup commands',
+      };
+      const firstStepId = 'phase:z_setup_commands:1';
+      const secondStepId = 'phase:a_setup_commands:2';
+      const commandId = 'command:install';
+      const stepIds = [firstStepId, secondStepId, commandId];
+      state.process({ ...base, action: 'attempt_started', revision: 1, timestamp: 1_000 });
+      state.process({
+        ...base,
+        action: 'step_started',
+        stepId: firstStepId,
+        kind: 'phase',
+        label: 'Setup commands',
+        revision: 2,
+        timestamp: clocks.firstTimestamp,
+      });
+      state.process({
+        ...base,
+        action: 'step_started',
+        stepId: secondStepId,
+        kind: 'phase',
+        label: 'Setup commands',
+        revision: 3,
+        timestamp: clocks.secondTimestamp,
+      });
+      state.process({
+        ...base,
+        action: 'step_started',
+        stepId: commandId,
+        parentStepId: secondStepId,
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        command: 'pnpm install',
+        commandIndex: 0,
+        commandCount: 1,
+        revision: 4,
+        timestamp: clocks.commandTimestamp,
+      });
+      expect(state.getPreparationAttempts()[0]?.steps.map(step => step.id)).toEqual(stepIds);
+
+      const updates = [
+        { action: 'step_progress', stepId: firstStepId, revision: 5, detail: 'Retrying setup' },
+        { action: 'step_output', stepId: commandId, revision: 6, output: 'Installed dependencies' },
+        { action: 'step_completed', stepId: commandId, revision: 7, exitCode: 0 },
+        { action: 'step_completed', stepId: secondStepId, revision: 8 },
+        { action: 'step_completed', stepId: firstStepId, revision: 9 },
+      ] as const;
+      for (const update of updates) {
+        state.process({ ...base, timestamp: 10_000, ...update });
+        expect(state.getPreparationAttempts()[0]?.steps.map(step => step.id)).toEqual(stepIds);
+        expect(state.getPreparationAttempts()[0]?.steps.map(step => step.startedRevision)).toEqual([
+          2, 3, 4,
+        ]);
+      }
+      expect(state.getPreparationAttempts()[0]?.steps[2]).toMatchObject({
+        parentStepId: secondStepId,
+        command: 'pnpm install',
+        outputTail: 'Installed dependencies',
+        status: 'completed',
+      });
+      state.process({ ...base, action: 'attempt_completed', revision: 10, timestamp: 11_000 });
+
+      const attempt = state.getPreparationAttempts()[0];
+      if (!attempt) throw new Error('Expected preparation attempt');
+      const reconnected = createServiceState(makeConfig());
+      reconnected.process({
+        type: 'preparing',
+        ...preparingDataSchema.parse({
+          ...base,
+          action: 'attempt_snapshot',
+          revision: attempt.revision,
+          timestamp: 11_000,
+          attempt,
+        }),
+      });
+      for (const stepSnapshot of [...attempt.steps].reverse()) {
+        reconnected.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'step_snapshot',
+            revision: stepSnapshot.revision,
+            timestamp: 11_000,
+            stepId: stepSnapshot.id,
+            stepSnapshot,
+          }),
+        });
+      }
+      expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
+      expect(reconnected.getCloudStatus()).toEqual({ type: 'ready' });
+    });
+
+    it.each([0, 1_790_000_000_000, undefined])(
+      'preserves selected snapshot time %j through live updates and normalized replay',
+      snapshotCapturedAt => {
+        const state = createServiceState(makeConfig());
+        const base = {
+          type: 'preparing' as const,
+          version: 2 as const,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'message-1',
+          step: 'environment_snapshot',
+          message: 'Using environment snapshot',
+          timestamp: 2_000,
+        };
+        state.process({ ...base, action: 'attempt_started', revision: 1 });
+        state.process({
+          ...base,
+          action: 'step_started',
+          revision: 2,
+          stepId: 'snapshot',
+          kind: 'phase',
+          label: 'environment snapshot',
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 3,
+          stepId: 'snapshot',
+          detail: base.message,
+          ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 4,
+          stepId: 'snapshot',
+          detail: `${base.message}; a replacement build is running`,
+        });
+        state.process({ ...base, action: 'attempt_completed', revision: 5 });
+        const attempt = state.getPreparationAttempts()[0];
+        if (!attempt) throw new Error('Expected preparation attempt');
+        if (snapshotCapturedAt === undefined)
+          expect(attempt.steps[0]).not.toHaveProperty('snapshotCapturedAt');
+        else expect(attempt.steps[0]).toHaveProperty('snapshotCapturedAt', snapshotCapturedAt);
+        const reconnected = createServiceState(makeConfig());
+        reconnected.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'attempt_snapshot',
+            revision: 5,
+            attempt,
+          }),
+        });
+        for (const stepSnapshot of attempt.steps) {
+          reconnected.process({
+            type: 'preparing',
+            ...preparingDataSchema.parse({
+              ...base,
+              action: 'step_snapshot',
+              revision: stepSnapshot.revision,
+              stepId: stepSnapshot.id,
+              stepSnapshot,
+            }),
+          });
+        }
+        expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
+      }
+    );
+
+    it('keeps only the most recent step output and marks the step truncated', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'setup_commands',
+        message: 'Running setup commands',
+      };
+      state.process({ ...base, action: 'attempt_started', revision: 1, timestamp: 1_000 });
+      state.process({
+        ...base,
+        action: 'step_started',
+        stepId: 'command:install',
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        revision: 2,
+        timestamp: 2_000,
+      });
+      const chunk = (index: number): string =>
+        `${String(index).padStart(4, '0')}${'y'.repeat(2_043)}\n`;
+      let revision = 3;
+      for (let index = 0; index < 40; index += 1) {
+        state.process({
+          ...base,
+          action: 'step_output',
+          stepId: 'command:install',
+          revision,
+          timestamp: 3_000,
+          output: chunk(index),
+        });
+        revision += 1;
+      }
+
+      const truncated = state.getPreparationAttempts()[0]?.steps[0];
+      if (!truncated) throw new Error('Expected preparation step');
+      expect(truncated.outputTruncated).toBe(true);
+      expect(new TextEncoder().encode(truncated.outputTail ?? '').length).toBeLessThanOrEqual(
+        PREPARATION_OUTPUT_TAIL_MAX_BYTES
+      );
+      expect(truncated.outputTail?.endsWith(chunk(39))).toBe(true);
+      expect(truncated.outputTail?.startsWith(chunk(0))).toBe(false);
+
+      state.process({
+        ...base,
+        action: 'step_output',
+        stepId: 'command:install',
+        revision,
+        timestamp: 4_000,
+        output: 'done',
+      });
+      const appended = state.getPreparationAttempts()[0]?.steps[0];
+      expect(appended?.outputTruncated).toBe(true);
+      expect(appended?.outputTail?.endsWith('done')).toBe(true);
+    });
+
+    it('trims multi-byte step output on a code-point boundary', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'setup_commands',
+        message: 'Running setup commands',
+      };
+      state.process({ ...base, action: 'attempt_started', revision: 1, timestamp: 1_000 });
+      state.process({
+        ...base,
+        action: 'step_started',
+        stepId: 'command:install',
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        revision: 2,
+        timestamp: 2_000,
+      });
+      state.process({
+        ...base,
+        action: 'step_output',
+        stepId: 'command:install',
+        revision: 3,
+        timestamp: 3_000,
+        output: '€'.repeat(30_000),
+      });
+
+      const step = state.getPreparationAttempts()[0]?.steps[0];
+      if (!step) throw new Error('Expected preparation step');
+      expect(step.outputTruncated).toBe(true);
+      expect(new TextEncoder().encode(step.outputTail ?? '').length).toBeLessThanOrEqual(
+        PREPARATION_OUTPUT_TAIL_MAX_BYTES
+      );
+      expect(step.outputTail?.startsWith('€')).toBe(true);
+      expect(step.outputTail).not.toContain('\uFFFD');
+    });
+
+    it.each([
+      { arrival: ['L', 'A', 'C'] },
+      { arrival: ['L', 'C', 'A'] },
+      { arrival: ['A', 'L', 'C'] },
+      { arrival: ['A', 'C', 'L'] },
+      { arrival: ['C', 'L', 'A'] },
+      { arrival: ['C', 'A', 'L'] },
+    ] as const)('keeps mixed-skew steps in total order for $arrival', row => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+      };
+      const snapshotBase = {
+        key: 'workspace_setup',
+        kind: 'phase' as const,
+        label: 'Workspace setup',
+        status: 'running' as const,
+      };
+      const snapshots = {
+        L: { ...snapshotBase, id: 'phase:L', startedAt: 2_000, revision: 2 },
+        A: { ...snapshotBase, id: 'phase:A', startedAt: 3_000, startedRevision: 10, revision: 10 },
+        C: { ...snapshotBase, id: 'phase:C', startedAt: 1_000, startedRevision: 11, revision: 11 },
+      };
+      const stepIds = ['phase:L', 'phase:A', 'phase:C'];
+      state.process({ ...base, action: 'attempt_started', revision: 1, timestamp: 500 });
+      for (const key of row.arrival) {
+        const stepSnapshot = snapshots[key];
+        state.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'step_snapshot',
+            stepId: stepSnapshot.id,
+            revision: stepSnapshot.revision,
+            timestamp: 4_000,
+            stepSnapshot,
+          }),
+        });
+      }
+      expect(state.getPreparationAttempts()[0]?.steps.map(step => step.id)).toEqual(stepIds);
+
+      for (const [index, key] of [...row.arrival, ...row.arrival].entries()) {
+        state.process({
+          ...base,
+          action: 'step_progress',
+          stepId: snapshots[key].id,
+          revision: 12 + index,
+          timestamp: 5_000,
+          detail: `Updated ${key}`,
+        });
+        expect(state.getPreparationAttempts()[0]?.steps.map(step => step.id)).toEqual(stepIds);
+        expect(state.getPreparationAttempts()[0]?.steps.map(step => step.startedRevision)).toEqual([
+          undefined,
+          10,
+          11,
+        ]);
+      }
+
+      const attempt = state.getPreparationAttempts()[0];
+      if (!attempt) throw new Error('Expected preparation attempt');
+      const reconnected = createServiceState(makeConfig());
+      reconnected.process({
+        type: 'preparing',
+        ...preparingDataSchema.parse({
+          ...base,
+          action: 'attempt_snapshot',
+          revision: attempt.revision,
+          timestamp: 5_000,
+          attempt,
+        }),
+      });
+      for (const stepSnapshot of [...attempt.steps].reverse()) {
+        reconnected.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'step_snapshot',
+            stepId: stepSnapshot.id,
+            revision: stepSnapshot.revision,
+            timestamp: 5_000,
+            stepSnapshot,
+          }),
+        });
+      }
+      expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
+      for (const replayState of [state, reconnected]) {
+        replayState.process({
+          ...base,
+          action: 'step_progress',
+          stepId: snapshots.L.id,
+          revision: 18,
+          timestamp: 6_000,
+          detail: 'Progress after reconnect',
+        });
+        expect(replayState.getPreparationAttempts()[0]?.steps.map(step => step.id)).toEqual(
+          stepIds
+        );
+      }
+      expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
+    });
+
+    it('orders legacy snapshots first by start time and stable id through repeated updates', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+      };
+      state.process({ ...base, action: 'attempt_started', revision: 1, timestamp: 1_000 });
+      const snapshots = [
+        { id: 'phase:later', startedAt: 1_000, startedRevision: 2, revision: 2 },
+        { id: 'phase:z_setup', startedAt: 2_000, revision: 3 },
+        { id: 'phase:a_setup', startedAt: 2_000, revision: 4 },
+      ];
+      for (const snapshot of snapshots) {
+        state.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'step_snapshot',
+            stepId: snapshot.id,
+            revision: snapshot.revision,
+            timestamp: 4_000,
+            stepSnapshot: {
+              ...snapshot,
+              key: 'workspace_setup',
+              kind: 'phase',
+              label: 'Workspace setup',
+              status: 'running',
+            },
+          }),
+        });
+      }
+      const stepIds = ['phase:a_setup', 'phase:z_setup', 'phase:later'];
+      expect(state.getPreparationAttempts()[0]?.steps.map(step => step.id)).toEqual(stepIds);
+      expect(state.getPreparationAttempts()[0]?.steps[0]).not.toHaveProperty('startedRevision');
+      expect(state.getPreparationAttempts()[0]?.steps[0]).not.toHaveProperty('parentStepId');
+      for (const [index, stepId] of stepIds.entries()) {
+        for (const [offset, action] of ['step_progress', 'step_completed'].entries()) {
+          state.process({
+            ...base,
+            action,
+            stepId,
+            detail: 'Updated detail',
+            revision: 5 + index * 2 + offset,
+            timestamp: 5_000,
+          });
+          expect(state.getPreparationAttempts()[0]?.steps.map(step => step.id)).toEqual(stepIds);
+        }
+      }
+    });
+
     it('hydrates an attempt and its steps from reload snapshots', () => {
       const state = createServiceState(makeConfig());
 
@@ -870,6 +2064,36 @@ describe('createServiceState', () => {
       expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Sandbox failed' });
     });
 
+    it.each(['preparation_cancelled', 'Environment preparation was stopped'])(
+      'a preparation cancellation status %s reads as a stop, not an error',
+      message => {
+        const state = createServiceState(makeConfig());
+        state.process({
+          type: 'cloud.status',
+          cloudStatus: { type: 'preparing', step: 'cloning' },
+        });
+        state.process({
+          type: 'cloud.status',
+          cloudStatus: { type: 'error', message },
+        });
+        expect(state.getCloudStatus()).toBeNull();
+        expect(state.getStatus()).toEqual({ type: 'interrupted' });
+        expect(state.getActivity()).toEqual({ type: 'idle' });
+      }
+    );
+
+    it('a preparation cancellation replayed by a durable refresh reads as a stop', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'idle' },
+        cloudStatus: { type: 'error', message: 'preparation_cancelled' },
+      });
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+    });
+
     it('reset clears cloudStatus back to null', () => {
       const state = createServiceState(makeConfig());
       state.process({ type: 'cloud.status', cloudStatus: { type: 'ready' } });
@@ -912,9 +2136,91 @@ describe('createServiceState', () => {
       expect(state.getActivity()).toEqual({ type: 'idle' });
     });
 
+    it.each([
+      { type: 'busy' as const },
+      { type: 'idle' as const },
+      { type: 'retry' as const, attempt: 2, message: 'Overloaded', next: 5_000 },
+      { type: 'scheduled' as const, scheduledAt: '2026-09-24T09:00:00.000Z' },
+      { type: 'scheduled' as const },
+    ])('reads $type on connect exactly as a live status event does', status => {
+      const live = createServiceState(makeConfig());
+      const connected = createServiceState(makeConfig());
+
+      live.process({ type: 'session.status', sessionId: 'root-1', status });
+      connected.process({ type: 'connected', sessionStatus: status });
+
+      expect(connected.getActivity()).toEqual(live.getActivity());
+      expect(connected.getStatus()).toEqual(live.getStatus());
+    });
+
+    it('sets idle activity and carries the wake time from a scheduled sessionStatus', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      });
+
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({
+        type: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+    });
+
+    it('leaves a scheduled status bare when the server reports no wake time', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'connected', sessionStatus: { type: 'scheduled' } });
+
+      expect(state.getStatus()).toEqual({ type: 'scheduled' });
+      expect(state.getStatus()).not.toHaveProperty('scheduledAt');
+    });
+
+    it('reports the retry attempt and leaves the lifecycle status to the turn', () => {
+      const state = createServiceState(makeConfig());
+      state.setStatus({ type: 'error', message: 'Assistant request failed' });
+
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'retry', attempt: 2, message: 'Retrying', next: 5_000 },
+      });
+
+      expect(state.getActivity()).toEqual({ type: 'retrying', attempt: 2, message: 'Retrying' });
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Assistant request failed' });
+    });
+
+    it.each(['live', 'connect'] as const)(
+      'a retry from a %s report re-arms the lost-connection status after a completed turn',
+      source => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        const retry = { type: 'retry' as const, attempt: 2, message: 'Retrying', next: 5_000 };
+
+        state.process({ type: 'stopped', reason: 'complete' });
+        onError.mockClear();
+        if (source === 'live') {
+          state.process({ type: 'session.status', sessionId: 'root-1', status: retry });
+        } else {
+          state.process({ type: 'connected', sessionStatus: retry });
+        }
+        state.process({ type: 'stopped', reason: 'disconnected' });
+
+        expect(state.getStatus()).toEqual({ type: 'disconnected' });
+        expect(onError).toHaveBeenCalledWith('Connection to agent lost');
+      }
+    );
+
+    it('leaves activity and status alone for a status this SDK does not know', () => {
+      const state = createServiceState(makeConfig());
+      state.setActivity({ type: 'busy' });
+
+      state.process({ type: 'connected', sessionStatus: { type: 'offline' } });
+
+      expect(state.getActivity()).toEqual({ type: 'busy' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('defaults activity to idle when sessionStatus is absent', () => {
       const state = createServiceState(makeConfig());
-      // Verify we start in 'connecting'
       expect(state.getActivity()).toEqual({ type: 'connecting' });
       // Connected event without sessionStatus (server has no execution-derived state)
       state.process({ type: 'connected' });
@@ -945,17 +2251,14 @@ describe('createServiceState', () => {
 
     it('clears question when not provided on reconnect', () => {
       const state = createServiceState(makeConfig());
-      // Set a question via question.asked
       state.process({ type: 'question.asked', requestId: 'req-stale' });
       expect(state.getQuestion()).not.toBeNull();
-      // Reconnect without question — it was answered while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(state.getQuestion()).toBeNull();
     });
 
     it('clears permission when not provided on reconnect', () => {
       const state = createServiceState(makeConfig());
-      // Set a permission via permission.asked
       state.process({
         type: 'permission.asked',
         requestId: 'perm-stale',
@@ -965,7 +2268,6 @@ describe('createServiceState', () => {
         always: [],
       });
       expect(state.getPermission()).not.toBeNull();
-      // Reconnect without permission — it was resolved while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(state.getPermission()).toBeNull();
     });
@@ -973,10 +2275,8 @@ describe('createServiceState', () => {
     it('fires onQuestionResolved when clearing stale question on reconnect', () => {
       const onQuestionResolved = jest.fn();
       const state = createServiceState(makeConfig({ onQuestionResolved }));
-      // Set a question
       state.process({ type: 'question.asked', requestId: 'req-stale' });
       onQuestionResolved.mockClear();
-      // Reconnect — question was answered while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(onQuestionResolved).toHaveBeenCalledWith('req-stale');
     });
@@ -984,7 +2284,6 @@ describe('createServiceState', () => {
     it('fires onPermissionResolved when clearing stale permission on reconnect', () => {
       const onPermissionResolved = jest.fn();
       const state = createServiceState(makeConfig({ onPermissionResolved }));
-      // Set a permission
       state.process({
         type: 'permission.asked',
         requestId: 'perm-stale',
@@ -994,7 +2293,6 @@ describe('createServiceState', () => {
         always: [],
       });
       onPermissionResolved.mockClear();
-      // Reconnect — permission was resolved while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(onPermissionResolved).toHaveBeenCalledWith('perm-stale');
     });
@@ -1003,7 +2301,6 @@ describe('createServiceState', () => {
       const onQuestionResolved = jest.fn();
       const onPermissionResolved = jest.fn();
       const state = createServiceState(makeConfig({ onQuestionResolved, onPermissionResolved }));
-      // Connect with no prior question/permission
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(onQuestionResolved).not.toHaveBeenCalled();
       expect(onPermissionResolved).not.toHaveBeenCalled();
@@ -1012,12 +2309,9 @@ describe('createServiceState', () => {
     it('clears terminated flag', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
-      // Terminate
       state.process({ type: 'stopped', reason: 'error' });
       onError.mockClear();
-      // Connect
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
-      // session.error should fire again
       state.process({ type: 'session.error', error: 'New error' });
       expect(onError).toHaveBeenCalledWith('New error');
     });
@@ -1105,11 +2399,134 @@ describe('createServiceState', () => {
         type: 'autocommit',
         step: 'started',
         message: 'Committing…',
+        code: 'committing',
       });
     });
   });
 
   describe('autocommit_completed', () => {
+    const localCommit = {
+      commitHash: 'a'.repeat(40),
+      commitMessage: 'Actual commit\n\nPreserve the body.\n',
+      messageId: 'assistant-1',
+      userMessageId: 'user-1',
+      committedAt: '2026-09-01T10:00:00Z',
+      pushStatus: 'failed',
+    } satisfies SessionCommit;
+
+    it('retains the canonical local commit when the operation reports failure', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_completed', success: false, ...localCommit });
+      expect(state.getCommits()).toEqual([localCommit]);
+      expect(state.getStatus()).toMatchObject({
+        type: 'autocommit',
+        step: 'completed',
+        commitHash: localCommit.commitHash,
+      });
+    });
+
+    it('retains repository identity and deduplicates within each repository', () => {
+      const state = createServiceState(makeConfig());
+      for (const repository of ['acme/web', 'acme/api', 'acme/web']) {
+        state.process({ type: 'autocommit_completed', success: true, ...localCommit, repository });
+      }
+      expect(state.getCommits().map(commit => commit.repository)).toEqual(['acme/web', 'acme/api']);
+    });
+
+    it('deduplicates immutable facts and keeps multiple commits at one anchor', () => {
+      const state = createServiceState(makeConfig());
+      const second = {
+        ...localCommit,
+        commitHash: 'b'.repeat(40),
+        committedAt: '2026-09-01T10:00:01Z',
+      };
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      state.process({ type: 'autocommit_completed', success: true, ...second });
+      state.process({
+        type: 'autocommit_completed',
+        success: false,
+        ...localCommit,
+        commitMessage: 'Conflicting replay',
+      });
+      expect(state.getCommits()).toEqual([localCommit, second]);
+      state.clearCommits();
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      expect(state.getCommits()).toEqual([]);
+      state.reset();
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      expect(state.getCommits()).toEqual([localCommit]);
+    });
+
+    it.each([
+      { commitHash: 'abc123' },
+      { commitMessage: undefined },
+      { commitMessage: '漢'.repeat(6_000) },
+      { messageId: '' },
+      { messageId: 'a'.repeat(257) },
+      { userMessageId: undefined },
+      { userMessageId: 'u'.repeat(257) },
+      { committedAt: undefined },
+      { committedAt: 'not-a-date' },
+      { pushStatus: undefined },
+      { commitMessageTruncated: false },
+    ])('does not retain a commit from incomplete or invalid metadata: %j', invalid => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit, ...invalid });
+      expect(state.getCommits()).toEqual([]);
+    });
+
+    it('preserves offset timestamps and explicit bounded-message truncation through wire parsing', () => {
+      const state = createServiceState(makeConfig());
+      const data = autocommitCompletedDataSchema.parse({
+        ...localCommit,
+        success: false,
+        committedAt: '2026-09-01T12:00:00+02:00',
+        commitMessage: 'x'.repeat(16 * 1024),
+        commitMessageTruncated: true,
+      });
+      state.process({ type: 'autocommit_completed', ...data });
+      expect(state.getCommits()).toEqual([
+        expect.objectContaining({
+          committedAt: '2026-09-01T12:00:00+02:00',
+          commitMessage: data.commitMessage,
+          commitMessageTruncated: true,
+        }),
+      ]);
+    });
+
+    it('stores the commit when the wire event carries an explicit false truncation flag', () => {
+      const state = createServiceState(makeConfig());
+      const data = autocommitCompletedDataSchema.parse({
+        messageId: 'msg-1',
+        success: true,
+        commitHash: 'b'.repeat(40),
+        commitMessage: 'feat: add feature',
+        userMessageId: 'user-msg-1',
+        committedAt: '2026-09-01T12:00:00+02:00',
+        pushStatus: 'pushed',
+        commitMessageTruncated: false,
+      });
+
+      state.process({ type: 'autocommit_completed', ...data });
+
+      expect(state.getCommits()).toEqual([
+        expect.objectContaining({
+          commitHash: 'b'.repeat(40),
+          commitMessage: 'feat: add feature',
+          commitMessageTruncated: undefined,
+          pushStatus: 'pushed',
+        }),
+      ]);
+    });
+
+    it('never treats a skipped completion as a commit even with stale metadata', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_started', messageId: localCommit.messageId });
+      state.process({ type: 'autocommit_completed', success: true, skipped: true, ...localCommit });
+      expect(state.getCommits()).toEqual([]);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('success sets status to autocommit completed', () => {
       const state = createServiceState(makeConfig());
 
@@ -1147,12 +2564,10 @@ describe('createServiceState', () => {
       });
     });
 
-    it('skipped does not update status', () => {
+    it('skipped clears the running commit indicator', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'autocommit_started', messageId: 'msg-1', message: 'Committing...' });
-
-      const statusBefore = state.getStatus();
 
       state.process({
         type: 'autocommit_completed',
@@ -1161,7 +2576,8 @@ describe('createServiceState', () => {
         skipped: true,
       });
 
-      expect(state.getStatus()).toBe(statusBefore);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(state.getCommits()).toEqual([]);
     });
   });
 
@@ -1254,7 +2670,6 @@ describe('createServiceState', () => {
     it('returns to initial state', () => {
       const state = createServiceState(makeConfig());
 
-      // Mutate all state
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({
         type: 'session.created',
@@ -1332,17 +2747,18 @@ describe('createServiceState', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
 
-      // Turn 1: busy → error stopped
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({ type: 'stopped', reason: 'error' });
-      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
 
-      // Turn 2: busy resets everything
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       expect(state.getActivity()).toEqual({ type: 'busy' });
       expect(state.getStatus()).toEqual({ type: 'idle' });
 
-      // session.error now works again
       onError.mockClear();
       state.process({ type: 'session.error', error: 'Turn 2 error' });
       expect(onError).toHaveBeenCalledWith('Turn 2 error');
@@ -1465,6 +2881,96 @@ describe('createServiceState', () => {
       state.process({ type: 'permission.replied', requestId: 'perm-1' });
 
       expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+  });
+
+  describe('permission.unreadable', () => {
+    it('tracks a request whose scope could not be read', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+
+      expect(state.getUnreadablePermissions()).toEqual([{ requestId: 'perm-1' }]);
+      expect(state.snapshot().unreadablePermissions).toEqual([{ requestId: 'perm-1' }]);
+      expect(state.getPermission()).toBeNull();
+    });
+
+    it('keeps one notice per request id', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-2' });
+
+      expect(state.getUnreadablePermissions()).toEqual([
+        { requestId: 'perm-1' },
+        { requestId: 'perm-2' },
+      ]);
+    });
+
+    it('clears the notice on permission.replied', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.replied', requestId: 'perm-1' });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+
+    it('drops the notice when a readable request for the same id arrives', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-1',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+      expect(state.getPermission()?.requestId).toBe('perm-1');
+    });
+
+    it('replaces a readable card when the same request arrives unreadable', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-1',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+
+      expect(state.getPermission()).toBeNull();
+      expect(state.getUnreadablePermissions()).toEqual([{ requestId: 'perm-1' }]);
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+
+    it('clears the notice when the session reconnects', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+    });
+
+    it('clears the notice on reset', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.reset();
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
     });
   });
 
@@ -1671,21 +3177,213 @@ describe('createServiceState', () => {
       });
     });
 
-    it('cloud.message.failed with reason=interrupted settles the session', () => {
+    it('a replayed failure for a retried message does not restore the footer', () => {
+      const resolved = new Set(['m1']);
+      const state = createServiceState(
+        makeConfig({ isDeliveryFailureResolved: id => resolved.has(id) })
+      );
+
+      // The retry cleared the original row's footer, and the DO's stored-event
+      // replay delivers its failure again on the next open.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The agent could not run this message.',
+        reason: 'execution',
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      // A failure the user has not retried still shows its footer.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm2',
+        error: 'The agent could not run this message.',
+        reason: 'execution',
+      });
+      expect(state.getPendingMessages().get('m2')?.status).toBe('failed');
+    });
+
+    it('clearing the failure that set the terminal error undoes the status with it', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'The message could not be delivered',
+      });
+
+      // The durable memory of retried failures can resolve after this replay
+      // applied the failure. Removing it must leave what the
+      // suppressed-at-replay path leaves: no footer and no terminal error.
+      expect(state.clearFailedMessage('m1')).toBe(true);
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('clearing a failure that never set the terminal error leaves the status alone', () => {
+      const state = createServiceState(makeConfig());
+
+      // No `cloud.message.sent` for m1, so this failure is not the active
+      // turn's and never set a terminal error.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('a later sent turn takes the terminal error over', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      state.process({ type: 'cloud.message.sent', messageId: 'm2' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm2',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      // m2 owns the terminal error now; clearing the older failure must not
+      // reset the newer turn's state.
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'The message could not be delivered',
+      });
+    });
+
+    it('a later stopped event takes the terminal failure over', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      // The session then terminates with its own error. That is the terminal
+      // state now, so a late prune of the old delivery failure — the durable
+      // memory of retried failures can resolve after the replay applied it —
+      // must not discard the newer state.
+      state.process({ type: 'stopped', reason: 'error' });
+
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
+    });
+
+    it('terminal delivery failure resolves a stale preparing status', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Environment preparation failed',
+        reason: 'exhausted',
+      });
+
+      // The status carries `event.error`, the Durable Object's safe projection
+      // of the failure, so the specific reason survives to the clients that
+      // render it; the failed row's typed footer and its Copy action keep the
+      // reader's copy.
+      expect(state.getCloudStatus()).toEqual({
+        type: 'error',
+        message: 'Environment preparation failed',
+      });
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'Environment preparation failed',
+        reason: 'exhausted',
+      });
+    });
+
+    it('an interrupt during preparation clears the preparing status', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message was interrupted',
+        reason: 'interrupted',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+    });
+
+    it('a terminal preparation cancellation reads as an interrupt', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Environment preparation was stopped',
+        reason: 'execution',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'Environment preparation was stopped',
+        reason: 'interrupted',
+      });
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    it('cloud.message.failed with reason=interrupted settles the accepted turn', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({
         type: 'cloud.message.failed',
         messageId: 'm1',
-        error: 'Pending queued message interrupted by user',
+        error: 'Execution was interrupted',
         reason: 'interrupted',
       });
 
       expect(state.getPendingMessages().get('m1')).toEqual({
         status: 'failed',
-        error: 'Pending queued message interrupted by user',
+        error: 'Execution was interrupted',
         reason: 'interrupted',
       });
       expect(state.getActivity()).toEqual({ type: 'idle' });
@@ -1836,6 +3534,28 @@ describe('createServiceState', () => {
         state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
 
         expect(failed(state, 'm1')).toEqual({
+          status: 'failed',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+      });
+
+      it('connected keeps the failed entry and drops the queued one', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'queued-1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'failed-1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+        expect(state.getPendingMessages().has('queued-1')).toBe(false);
+        expect(failed(state, 'failed-1')).toEqual({
           status: 'failed',
           error: 'flush failed',
           reason: 'exhausted',

@@ -1,14 +1,12 @@
 /* eslint-disable sort-keys */
-import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import type { AgentWorkflow } from '@/src/shared/agent-workflows';
 import {
   deriveWorkflowRunDisabledReason,
   deriveWorkflowSettingsView,
-  formatWorkflowListDate,
   toWorkflowSettingsListItem,
-  workflowRunRequestAtom,
 } from './workflow-settings-state';
+import { formatLocalListDate } from './format-local-date';
 
 const workflow = (overrides: Partial<AgentWorkflow> = {}): AgentWorkflow => ({
   id: 'wf-1',
@@ -19,12 +17,6 @@ const workflow = (overrides: Partial<AgentWorkflow> = {}): AgentWorkflow => ({
   createdAt: 1_700_000_000_000,
   updatedAt: 1_700_000_000_000,
   ...overrides,
-});
-
-describe('workflow list date formatting', () => {
-  it('formats UTC YYYY-MM-DD', () => {
-    expect(formatWorkflowListDate(Date.UTC(2024, 5, 10, 12, 0, 0))).toBe('2024-06-10');
-  });
 });
 
 describe('workflow settings list item mapping', () => {
@@ -107,7 +99,7 @@ describe('workflow settings view selection', () => {
       kind: 'list',
       items: [
         {
-          dateLabel: formatWorkflowListDate(200),
+          dateLabel: formatLocalListDate(200),
           deleteAriaLabel: 'Delete workflow "Newer"',
           description: 'A test workflow',
           id: 'newer',
@@ -117,7 +109,7 @@ describe('workflow settings view selection', () => {
           scope: 'https://example.com',
         },
         {
-          dateLabel: formatWorkflowListDate(100),
+          dateLabel: formatLocalListDate(100),
           deleteAriaLabel: 'Delete workflow "Older"',
           description: 'A test workflow',
           id: 'older',
@@ -161,7 +153,11 @@ describe('workflow run disabled reason', () => {
       isApproved: false,
       isDangerousMode: true,
     });
-    expect(reason).toStrictEqual({ reason: 'notApproved', label: 'Needs approval' });
+    expect(reason).toStrictEqual({
+      hint: 'This version is not approved yet. Ask Kilo to save the workflow again to approve it.',
+      label: 'Needs approval',
+      reason: 'notApproved',
+    });
   });
 
   it('disables when safe mode toggle is off in safe mode', () => {
@@ -172,8 +168,9 @@ describe('workflow run disabled reason', () => {
       isDangerousMode: false,
     });
     expect(reason).toStrictEqual({
-      reason: 'safeModeDisabled',
+      hint: "Workflows can't run in safe mode until you allow them.",
       label: 'Safe mode workflows disabled',
+      reason: 'safeModeDisabled',
     });
   });
 
@@ -196,8 +193,9 @@ describe('workflow run disabled reason', () => {
       isDangerousMode: true,
     });
     expect(reason).toStrictEqual({
-      reason: 'conversationRunning',
+      hint: 'Wait for the conversation to finish, then run it.',
       label: 'Conversation is running',
+      reason: 'conversationRunning',
     });
   });
 
@@ -229,25 +227,5 @@ describe('workflow run disabled reason', () => {
       isDangerousMode: true,
     });
     expect(reason?.reason).toBe('conversationRunning');
-  });
-});
-
-describe('workflow run request atom', () => {
-  it('defaults to undefined', () => {
-    const store = createStore();
-    expect(store.get(workflowRunRequestAtom)).toBeUndefined();
-  });
-
-  it('sets and reads a run request', () => {
-    const store = createStore();
-    store.set(workflowRunRequestAtom, { workflowId: 'wf-test' });
-    expect(store.get(workflowRunRequestAtom)).toStrictEqual({ workflowId: 'wf-test' });
-  });
-
-  it('can be cleared back to undefined', () => {
-    const store = createStore();
-    store.set(workflowRunRequestAtom, { workflowId: 'wf-test' });
-    store.set(workflowRunRequestAtom, undefined);
-    expect(store.get(workflowRunRequestAtom)).toBeUndefined();
   });
 });

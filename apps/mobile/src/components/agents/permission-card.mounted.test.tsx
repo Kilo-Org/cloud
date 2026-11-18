@@ -1,10 +1,12 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as reasoning-part-renderer.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { type BlockingCardSubmissionError } from './blocking-card-state';
 import { PermissionCard } from './permission-card';
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   ScrollView: 'ScrollView',
@@ -21,11 +23,12 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
   useThemeColors: () => ({}),
 }));
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: vi.fn(),
-  moveA11yFocus: vi.fn(),
+  requestA11yFocus: vi.fn(),
 }));
 
 function findByAccessibilityLabel(
@@ -35,7 +38,33 @@ function findByAccessibilityLabel(
   return root.findAll(node => node.props.accessibilityLabel === label);
 }
 
-async function renderCard(metadata: Record<string, unknown> | undefined) {
+/** Every literal string child of a rendered text node, in tree order. */
+function textLines(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(node => String(node.type) === 'Text')
+    .flatMap(node => node.children.filter((value: unknown) => typeof value === 'string'));
+}
+
+/**
+ * The characters the card puts around a displayed value, written as code points
+ * so an expectation states the exact characters.
+ */
+const ISOLATE_OPEN = '\u2066';
+const ISOLATE_CLOSE = '\u2069';
+
+function isolated(text: string): string {
+  return `${ISOLATE_OPEN}${text}${ISOLATE_CLOSE}`;
+}
+
+type CardOverrides = {
+  permission?: string;
+  patterns?: string[];
+  metadata?: Record<string, unknown>;
+  submissionError?: BlockingCardSubmissionError | null;
+  onRespond?: (response: 'once' | 'always' | 'reject') => void;
+};
+
+async function renderCard(overrides: CardOverrides = {}) {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
   };
@@ -45,9 +74,9 @@ async function renderCard(metadata: Record<string, unknown> | undefined) {
       createElement(PermissionCard, {
         permission: 'bash',
         patterns: [],
-        metadata,
         onRespond: () => undefined,
         requestId: 'perm-req-1',
+        ...overrides,
       })
     );
   });
@@ -59,11 +88,73 @@ async function renderCard(metadata: Record<string, unknown> | undefined) {
 }
 
 describe('PermissionCard mounted', () => {
+  it('shows the command alone when a bash request carries one', async () => {
+    const renderer = await renderCard({
+      patterns: ['rg todo 2_/dev/null'],
+      metadata: { command: 'rg todo 2>/dev/null' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).not.toContain(isolated('rg todo 2_/dev/null'));
+    expect(lines).toContain(i18n.t('profiles.commandLabel'));
+    expect(lines).toContain(isolated('rg todo 2>/dev/null'));
+  });
+
+  it('renders an ordinary command unchanged', async () => {
+    const renderer = await renderCard({ metadata: { command: 'pnpm test --filter api' } });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(isolated('pnpm test --filter api'));
+  });
+
+  it('wraps a displayed command', async () => {
+    const command = 'echo \u202Ehello\u0000';
+
+    const renderer = await renderCard({ metadata: { command } });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(`${ISOLATE_OPEN}echo \\u202ehello\\x00${ISOLATE_CLOSE}`);
+    expect(lines).not.toContain(command);
+  });
+
+  it('wraps a displayed pattern when the request has no command', async () => {
+    const renderer = await renderCard({
+      permission: 'external_directory',
+      patterns: ['/var/tmp/\u200Escope/**'],
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain('• ');
+    expect(lines).toContain(`${ISOLATE_OPEN}/var/tmp/\\u200escope/**${ISOLATE_CLOSE}`);
+    expect(lines).not.toContain('/var/tmp/\u200Escope/**');
+  });
+
+  it('keeps the patterns for a request that has no command', async () => {
+    const renderer = await renderCard({
+      permission: 'external_directory',
+      patterns: ['/var/tmp/scope/**'],
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain('• ');
+    expect(lines).toContain(isolated('/var/tmp/scope/**'));
+    expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
+  });
+
+  it('shows neither block when the request has no patterns and no command', async () => {
+    const renderer = await renderCard({ permission: 'external_directory' });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
+  });
+
   it('hides Always allow for a skillShell request and keeps Allow once and Deny', async () => {
     const renderer = await renderCard({
-      skillShell: true,
-      skill: 'e2e',
-      commands: ['echo hi'],
+      metadata: { skillShell: true, skill: 'e2e', commands: ['echo hi'] },
     });
 
     expect(findByAccessibilityLabel(renderer.root, 'Always allow')).toHaveLength(0);
@@ -72,7 +163,7 @@ describe('PermissionCard mounted', () => {
   });
 
   it('keeps Always allow when metadata is undefined', async () => {
-    const renderer = await renderCard(undefined);
+    const renderer = await renderCard();
 
     expect(findByAccessibilityLabel(renderer.root, 'Always allow')).toHaveLength(1);
     expect(findByAccessibilityLabel(renderer.root, 'Allow once')).toHaveLength(1);
@@ -80,10 +171,65 @@ describe('PermissionCard mounted', () => {
   });
 
   it('keeps Always allow when metadata is empty', async () => {
-    const renderer = await renderCard({});
+    const renderer = await renderCard({ metadata: {} });
 
     expect(findByAccessibilityLabel(renderer.root, 'Always allow')).toHaveLength(1);
     expect(findByAccessibilityLabel(renderer.root, 'Allow once')).toHaveLength(1);
     expect(findByAccessibilityLabel(renderer.root, 'Deny permission')).toHaveLength(1);
+  });
+
+  it.each([
+    ['reject', 'Retry deny'],
+    ['once', 'Retry allow once'],
+    ['always', 'Retry always allow'],
+  ] as const)(
+    'retries the recorded %s decision after a failure',
+    async (permissionResponse, label) => {
+      const onRespond = vi.fn<(response: 'once' | 'always' | 'reject') => void>();
+      const renderer = await renderCard({
+        onRespond,
+        submissionError: {
+          kind: 'retryable',
+          message: 'Failed to respond to permission. Please try again.',
+          action: 'respond',
+          permissionResponse,
+        },
+      });
+
+      expect(
+        renderer.root.findByProps({
+          children: 'Failed to respond to permission. Please try again.',
+        })
+      ).toBeDefined();
+      const [retry] = findByAccessibilityLabel(renderer.root, label);
+      if (!retry) {
+        throw new Error(`missing retry control: ${label}`);
+      }
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+
+      expect(onRespond).toHaveBeenCalledExactlyOnceWith(permissionResponse);
+      expect(findByAccessibilityLabel(renderer.root, 'Deny permission')).toHaveLength(0);
+      expect(findByAccessibilityLabel(renderer.root, 'Allow once')).toHaveLength(0);
+    }
+  );
+
+  it('offers the decision controls again when the failure recorded no decision', async () => {
+    const renderer = await renderCard({
+      submissionError: {
+        kind: 'retryable',
+        message: 'Failed to respond to permission. Please try again.',
+        action: 'respond',
+        permissionResponse: null,
+      },
+    });
+
+    expect(findByAccessibilityLabel(renderer.root, 'Retry deny')).toHaveLength(0);
+    expect(findByAccessibilityLabel(renderer.root, 'Retry allow once')).toHaveLength(0);
+    expect(findByAccessibilityLabel(renderer.root, 'Retry always allow')).toHaveLength(0);
+    expect(findByAccessibilityLabel(renderer.root, 'Deny permission')).toHaveLength(1);
+    expect(findByAccessibilityLabel(renderer.root, 'Allow once')).toHaveLength(1);
+    expect(findByAccessibilityLabel(renderer.root, 'Always allow')).toHaveLength(1);
   });
 });

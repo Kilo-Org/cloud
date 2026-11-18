@@ -1,0 +1,92 @@
+/**
+ * Telemetry for a failed `expo-secure-store` operation.
+ *
+ * Kept free of `expo-secure-store` (and of every native import) so the pure
+ * suites that inject a fake store — `glanceable/persist`, `glanceable/waiting-ask`,
+ * `deep-link-launch` — can report a failure without loading the native module
+ * graph. The sink adapter itself stays in `error-sink.ts`.
+ */
+
+import { ProtectedDataUnavailableError } from '@/lib/protected-data';
+import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
+
+/**
+ * Which SecureStore call rejected. `read` is `getItemAsync`
+ * (`getValueWithKeyAsync` in the native layer), `write` is `setItemAsync`
+ * (`setValueWithKeyAsync`), `delete` is `deleteItemAsync`.
+ */
+export type SecureStoreOperation = 'read' | 'write' | 'delete';
+
+/**
+ * Stable Sentry fingerprint for one SecureStore failure. It names the
+ * operation only: the native message ("Calling the 'setValueWithKeyAsync'
+ * function has failed") varies with the platform, OS version and keychain
+ * status, so fingerprinting on it would scatter one failure across many
+ * issues instead of grouping it on the operation that failed.
+ */
+function secureStoreFailureFingerprint(operation: SecureStoreOperation): readonly string[] {
+  return ['secure-store-failure', operation];
+}
+
+/**
+ * The message expo-secure-store builds for `errSecInteractionNotAllowed`: its
+ * iOS `KeyChainException` (`ios/SecureStoreExceptions.swift`) returns this text
+ * from a fixed switch case, so it is the same on every OS version and in every
+ * device locale. The rejection reaches JS as a `FunctionCallException` whose
+ * `code` is the cause's `ERR_KEY_CHAIN`, which every keychain status shares, so
+ * the message is the only stable marker of this one.
+ */
+const KEYCHAIN_INTERACTION_REFUSED_MESSAGE = 'User interaction is not allowed';
+
+/**
+ * True when iOS refused a keychain call because the device was locked (or had
+ * not been unlocked once since boot). The refusal is a device state, not a
+ * failure: callers that own their own reporting skip it instead of filing an
+ * event. Total: an unrecognized value yields `false` and never throws.
+ */
+export function isKeychainInteractionRefused(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(KEYCHAIN_INTERACTION_REFUSED_MESSAGE);
+}
+
+/**
+ * Report one failed SecureStore operation at warning level.
+ *
+ * The fingerprint and tags name the operation, never the raw native message.
+ * The key and the stored value are never attached: a stored value can be a
+ * credential and the native error is built from the operation name, so the
+ * event carries no key material, no credential and no token.
+ *
+ * A refusal from a locked device is not reported: iOS rejects every
+ * `WHEN_UNLOCKED*` item with `errSecInteractionNotAllowed` until unlock, by
+ * design, and an `AFTER_FIRST_UNLOCK` item the same way until the device's first
+ * unlock since boot. The refusal itself is recognised by its fixed message — the
+ * cached protected-data state is not a substitute, because a background start
+ * can read it as available and it can flip during the call — and it leaves a
+ * breadcrumb on the next event instead of an event of its own.
+ *
+ * Every other failure is reported even while the keychain is closed: the widget
+ * and glanceable scope store runs in that state by design
+ * (`lib/auth/secure-store-gated`), so a real failure there must stay visible
+ * rather than being dropped as unattributable.
+ */
+export function reportSecureStoreFailure(operation: SecureStoreOperation, error: unknown): void {
+  // The app's own guard: the keychain was never called.
+  if (error instanceof ProtectedDataUnavailableError) {
+    return;
+  }
+  if (isKeychainInteractionRefused(error)) {
+    addTelemetryBreadcrumb({
+      category: 'secure_store',
+      level: 'warning',
+      message: 'keychain refused a call while the device was locked',
+      data: { operation },
+    });
+    return;
+  }
+  captureTelemetry({
+    error,
+    level: 'warning',
+    tags: { 'error.subsystem': 'secure_store', 'error.operation': operation },
+    fingerprint: secureStoreFailureFingerprint(operation),
+  });
+}

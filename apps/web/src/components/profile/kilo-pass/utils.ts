@@ -1,6 +1,10 @@
-import { computeYearlyCadenceMonthlyBonusUsd, getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import {
+  computeMonthlyCadenceBonusPercent,
+  computeYearlyCadenceMonthlyBonusUsd,
+  getMonthlyPriceUsd,
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 export function getTierName(tier: KiloPassTier): string {
   if (tier === KiloPassTier.Tier19) return 'Starter';
@@ -10,6 +14,21 @@ export function getTierName(tier: KiloPassTier): string {
 
 export function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+export function getMonthlyBonusPreview(params: {
+  tier: KiloPassTier;
+  isFirstTimeSubscriberEver: boolean;
+  subscriptionStartedAtIso: string;
+}) {
+  const firstMonthPercent = computeMonthlyCadenceBonusPercent({ ...params, streakMonths: 1 });
+  const secondMonthPercent = computeMonthlyCadenceBonusPercent({ ...params, streakMonths: 2 });
+
+  return {
+    firstMonthPercent,
+    secondMonthPercent,
+    welcomeDescription: `First-time monthly subscribers receive ${formatPercent(firstMonthPercent)} free bonus credits in the first month and ${formatPercent(secondMonthPercent)} in the second month, then the regular bonus ramp.`,
+  };
 }
 
 export function getBaseCreditsLabel(params: { tier: KiloPassTier }): string {

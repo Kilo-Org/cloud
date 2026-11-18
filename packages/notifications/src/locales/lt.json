@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Jūsų agento sesija turi atnaujinimą",
+      "lowBalance": "Jūsų balansui reikia dėmesio",
+      "spendAlert": "Jūsų išlaidoms reikia dėmesio",
+      "securityFinding": "Saugumo radiniui reikia dėmesio",
+      "securityUpdate": "Saugumo patikra turi atnaujinimą",
+      "activeAgentsGlanceable": "Aktyvūs agentai turi atnaujinimą"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Mažo balanso pranešimas",
+      "body": "{{organizationName}} balansas nukrito žemiau ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Išlaidų pranešimas",
+      "body": "{{scopeName}} išlaidos viršijo ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} ({{repoFullName}})"
+    },
+    "securityFindingNew": {
+      "title": "Naujas saugumo radinys ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA įspėjimas"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA pažeidimas"
+    }
+  },
+  "sessionReady": {
+    "body": "Jūsų Kilo sesija paruošta valdyti iš telefono"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

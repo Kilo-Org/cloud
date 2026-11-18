@@ -1,0 +1,150 @@
+import { type Href } from 'expo-router';
+import { createElement } from 'react';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+import { ProfileCommandsScreen } from '@/components/profiles/profile-commands-screen';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
+
+/**
+ * Shared harness for the Profile Setup Commands mounted tests. The `vi.mock`
+ * calls stay in the test file (they must be hoisted there); everything that
+ * does not depend on the hoisted mock state lives here.
+ */
+
+type TestCommand = { sequence: number; command: string };
+
+/** The setup-command list the mocked `useAgentProfileCommands` returns. */
+export type TestCommands = TestCommand[];
+
+export function testCommands(commands: string[] = []): TestCommands {
+  return commands.map((command, sequence) => ({ sequence, command }));
+}
+
+export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
+  return root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+export function findOne(root: ReactTestInstance, type: string): ReactTestInstance {
+  const node = findAll(root, type)[0];
+  if (!node) {
+    throw new Error(`${type} was not rendered`);
+  }
+  return node;
+}
+
+export function findFields(root: ReactTestInstance): ReactTestInstance[] {
+  return findAll(root, 'FormField');
+}
+
+function findPressable(root: ReactTestInstance, label: string, index: number): ReactTestInstance {
+  const match = findAll(root, 'Pressable').filter(node => node.props.accessibilityLabel === label)[
+    index
+  ];
+  if (!match) {
+    throw new Error(`pressable ${label} at ${index} was not rendered`);
+  }
+  return match;
+}
+
+export function pressPressable(root: ReactTestInstance, label: string, index = 0): void {
+  const pressable = findPressable(root, label, index);
+  act(() => {
+    (pressable.props as { onPress: () => void }).onPress();
+  });
+}
+
+export function pressableDisabled(root: ReactTestInstance, label: string, index = 0): boolean {
+  return findPressable(root, label, index).props.disabled === true;
+}
+
+export function changeRowText(root: ReactTestInstance, index: number, value: string): void {
+  const field = findFields(root)[index];
+  if (!field) {
+    throw new Error(`row ${index} was not rendered`);
+  }
+  act(() => {
+    (field.props as { onChangeText: (v: string) => void }).onChangeText(value);
+  });
+}
+
+/** Press the header Back control. Callers wait on their own save gates. */
+export function pressBack(root: ReactTestInstance): void {
+  const header = findOne(root, 'ScreenHeader');
+  const handler: unknown = header.props.onBack;
+  if (typeof handler !== 'function') {
+    throw new TypeError('header Back handler was not wired');
+  }
+  const start = handler as () => void;
+  act(() => {
+    start();
+  });
+}
+
+/** Press a plain button rendered by the screen, e.g. the add-command CTA. */
+export function pressButton(root: ReactTestInstance, index = 0): void {
+  const button = findAll(root, 'Button')[index];
+  if (!button) {
+    throw new Error(`button ${index} was not rendered`);
+  }
+  const onPress: unknown = button.props.onPress;
+  if (typeof onPress !== 'function') {
+    throw new TypeError(`button ${index} has no press handler`);
+  }
+  const press = onPress as () => void;
+  act(() => {
+    press();
+  });
+}
+
+/** Press a row's reorder control by its one-based position label. */
+export function pressMove(
+  root: ReactTestInstance,
+  direction: 'up' | 'down',
+  position: number
+): void {
+  pressPressable(root, `Move command ${position} ${direction}`);
+}
+
+/** Commit a row the way the keyboard's return key does. */
+export function commitRow(root: ReactTestInstance, index: number): void {
+  const field = findFields(root)[index];
+  if (!field) {
+    throw new Error(`row ${index} was not rendered`);
+  }
+  act(() => {
+    (field.props as { onSubmitEditing: () => void }).onSubmitEditing();
+  });
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
+export function mountScreen(organizationId?: string) {
+  return renderWithProviders(
+    createElement(ProfileCommandsScreen, {
+      profileId: 'profile-1',
+      organizationId,
+      backFallback: PROFILES_LIST_HREF,
+    })
+  );
+}
+
+export function rerenderScreen(
+  renderer: ReactTestRenderer,
+  queryClient: QueryClient,
+  organizationId?: string
+): void {
+  renderer.update(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ProfileCommandsScreen, {
+        profileId: 'profile-1',
+        organizationId,
+        backFallback: PROFILES_LIST_HREF,
+      })
+    )
+  );
+}

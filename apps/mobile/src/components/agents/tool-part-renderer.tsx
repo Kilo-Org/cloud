@@ -1,8 +1,11 @@
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { type ReactNode } from 'react';
+
+import { remoteServerView } from '@/lib/chat/remote-mcp-surface';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
-  ChildSessionSection,
-  getTaskToolSessionId,
+  LiveChildSessionSection,
   type OpenChildSession,
   type RenderPartFn,
 } from './child-session-section';
@@ -13,6 +16,7 @@ import {
   GlobToolCard,
   GrepToolCard,
   ListToolCard,
+  McpAppToolCard,
   PatchToolCard,
   ReadToolCard,
   TaskToolCard,
@@ -21,12 +25,14 @@ import {
   WriteToolCard,
 } from './tool-cards';
 import { SuggestToolCard } from './suggest-tool-card';
+import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
 type ToolPartRendererProps = {
   part: ToolPart;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   renderPart?: RenderPartFn;
   onOpenChildSession?: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 };
 
 export function ToolPartRenderer({
@@ -34,67 +40,93 @@ export function ToolPartRenderer({
   getChildMessages,
   renderPart,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<ToolPartRendererProps>) {
   if (part.tool === 'plan_exit' || part.tool === 'plan_enter') {
     return null;
   }
 
   if (part.tool === 'task' && getChildMessages && renderPart && onOpenChildSession) {
-    const sessionId = getTaskToolSessionId(part);
-    const childMessages = sessionId ? getChildMessages(sessionId) : [];
-
+    // `LiveChildSessionSection` subscribes to the child transcript itself, so
+    // the memoized `MessageBubble` above can keep one prop identity across
+    // streaming publishes while the card's activity label still updates.
     return (
-      <ChildSessionSection
+      <LiveChildSessionSection
         part={part}
-        childMessages={childMessages}
+        getChildMessages={getChildMessages}
         onOpenChildSession={onOpenChildSession}
+        modelOptions={modelOptions}
       />
     );
   }
 
+  let card: ReactNode = null;
   switch (part.tool) {
     case 'read': {
-      return <ReadToolCard part={part} />;
+      card = <ReadToolCard part={part} />;
+      break;
     }
     case 'edit': {
-      return <EditToolCard part={part} />;
+      card = <EditToolCard part={part} />;
+      break;
     }
     case 'write': {
-      return <WriteToolCard part={part} />;
+      card = <WriteToolCard part={part} />;
+      break;
     }
     case 'bash': {
-      return <BashToolCard part={part} />;
+      card = <BashToolCard part={part} />;
+      break;
     }
     case 'glob': {
-      return <GlobToolCard part={part} />;
+      card = <GlobToolCard part={part} />;
+      break;
     }
     case 'grep': {
-      return <GrepToolCard part={part} />;
+      card = <GrepToolCard part={part} />;
+      break;
     }
     case 'websearch':
     case 'codesearch':
     case 'webfetch': {
-      return <WebSearchToolCard part={part} />;
+      card = <WebSearchToolCard part={part} />;
+      break;
     }
     case 'list': {
-      return <ListToolCard part={part} />;
+      card = <ListToolCard part={part} />;
+      break;
     }
     case 'patch':
     case 'apply_patch': {
-      return <PatchToolCard part={part} />;
+      card = <PatchToolCard part={part} />;
+      break;
     }
     case 'todoread':
     case 'todowrite': {
-      return <TodoToolCard part={part} />;
+      card = <TodoToolCard part={part} />;
+      break;
     }
     case 'task': {
-      return <TaskToolCard part={part} />;
+      card = <TaskToolCard part={part} />;
+      break;
     }
     case 'suggest': {
-      return <SuggestToolCard part={part} />;
+      card = <SuggestToolCard part={part} />;
+      break;
     }
     default: {
-      return <GenericToolCard part={part} />;
+      // A tool whose server attached an MCP Apps view draws that view under its
+      // row, once the call has an answer to hand it. Every other tool, and every
+      // call still running or failed, keeps the row it has always had.
+      const view = part.state.status === 'completed' ? remoteServerView(part.tool) : undefined;
+      card =
+        view === undefined ? (
+          <GenericToolCard part={part} />
+        ) : (
+          <McpAppToolCard part={part} view={view} />
+        );
     }
   }
+
+  return <ToolSummaryTranslationScope itemId={part.id}>{card}</ToolSummaryTranslationScope>;
 }

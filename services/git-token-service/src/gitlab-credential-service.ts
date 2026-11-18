@@ -11,7 +11,7 @@ import {
   type GitLabCredentialOwner,
   type GitLabOAuthCredentialRow,
 } from '@kilocode/worker-utils/gitlab-credential';
-import { normalizeGitLabInstanceUrl } from './gitlab-url.js';
+import { normalizeGitLabInstanceUrl } from '@kilocode/worker-utils/gitlab-url';
 import type { GitLabCredentialCrypto } from './gitlab-credential-crypto.js';
 
 export type GitLabCredentialActor = { userId: string; orgId?: string };
@@ -159,6 +159,15 @@ export class GitLabCredentialService {
         credential.platform_integration_id !== parent.integrationId ||
         credential.provider_resource_id !== selector.projectId ||
         credential.provider_base_url !== instanceUrl
+      ) {
+        return { status: 'reconnect_required' };
+      }
+      if (credential.provider_metadata.unusableReason !== undefined) {
+        return { status: 'reconnect_required' };
+      }
+      if (
+        credential.provider_metadata.authorizedAccountId === undefined ||
+        credential.provider_metadata.authorizedAccountId !== parent.providerSubjectId
       ) {
         return { status: 'reconnect_required' };
       }

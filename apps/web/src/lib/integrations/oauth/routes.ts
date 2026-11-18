@@ -1,12 +1,17 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   handleStatefulPlatformOAuthConnect,
+  startStatefulOAuthConnect,
   type HandleStatefulOAuthConnectOptions,
 } from '@/lib/integrations/oauth/common';
+import type { User } from '@kilocode/db/schema';
 import type { StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
 
 type StatefulOAuthConnectRouteConfig = Omit<
@@ -23,6 +28,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'discord_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/discord-service')).getDiscordOAuthUrl,
+      organizationRoles: ORGANIZATION_BILLING_ROLES,
     },
   ],
   [
@@ -31,6 +37,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'dolthub_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/dolthub-service')).getDoltHubOAuthUrl,
+      organizationRoles: ORGANIZATION_BILLING_ROLES,
     },
   ],
   [
@@ -49,6 +56,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'slack_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/slack-service')).getSlackOAuthUrl,
+      organizationRoles: ORGANIZATION_MANAGE_ROLES,
     },
   ],
 ] as const satisfies readonly (readonly [StandardOAuthPlatform, StatefulOAuthConnectRouteConfig])[];
@@ -100,6 +108,56 @@ export async function handlePlatformOAuthConnect(
     platform,
     buildOAuthUrl,
   });
+}
+
+/**
+ * The app shell's connect entry point. The shell already resolved its own
+ * session, so this supplies the user instead of reading a web session, and the
+ * state it mints keeps the callback inside the shell.
+ */
+export async function handlePlatformOAuthConnectForAppShell(
+  request: NextRequest,
+  platform: string,
+  user: User
+): Promise<Response> {
+  if (platform === PLATFORM.GITLAB) {
+    return (
+      await import('@/lib/integrations/oauth/platforms/gitlab-connect')
+    ).startGitLabOAuthConnect(request, { user, appShell: true });
+  }
+
+  if (!isStatefulOAuthConnectPlatform(platform)) {
+    return unsupportedOAuthRoute(platform, 'connect');
+  }
+
+  const config = statefulOAuthConnectRouteConfigs.get(platform);
+  if (!config) {
+    return unsupportedOAuthRoute(platform, 'connect');
+  }
+
+  const { loadBuildOAuthUrl, ...connectOptions } = config;
+  const buildOAuthUrl = await loadBuildOAuthUrl();
+  return startStatefulOAuthConnect(request, {
+    ...connectOptions,
+    platform,
+    buildOAuthUrl,
+    user,
+    appShell: true,
+  });
+}
+
+/** The app shell's self-hosted GitLab start; the shell already resolved its user. */
+export async function handlePlatformOAuthConnectPostForAppShell(
+  request: NextRequest,
+  platform: string,
+  user: User
+): Promise<Response> {
+  if (platform === PLATFORM.GITLAB) {
+    return (
+      await import('@/lib/integrations/oauth/platforms/gitlab-connect')
+    ).startGitLabOAuthConnectPost(request, { user, appShell: true });
+  }
+  return unsupportedOAuthRoute(platform, 'connect');
 }
 
 export async function handlePlatformOAuthConnectPost(

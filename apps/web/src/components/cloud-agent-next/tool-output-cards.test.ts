@@ -1,0 +1,899 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { ToolPart } from './types';
+import type * as ToolCardShellModule from './ToolCardShell';
+
+let mockExpanded = false;
+
+jest.mock('./ToolCardShell', () => {
+  const actual = jest.requireActual<typeof ToolCardShellModule>('./ToolCardShell');
+  return {
+    ToolCardShell: (props: React.ComponentProps<typeof actual.ToolCardShell>) =>
+      React.createElement(actual.ToolCardShell, {
+        ...props,
+        defaultExpanded: mockExpanded ? true : props.defaultExpanded,
+      }),
+  };
+});
+jest.mock('react-markdown', () =>
+  process.getBuiltinModule('module').createRequire(__filename)('react-markdown')
+);
+jest.mock('remark-gfm', () =>
+  process.getBuiltinModule('module').createRequire(__filename)('remark-gfm')
+);
+jest.mock('./CloudAgentProvider', () => ({ useOptionalManager: () => null }));
+jest.mock('./use-preview', () => ({ usePreviewLinks: () => null }));
+
+import { BashToolCard } from './BashToolCard';
+import { BackgroundProcessToolCard } from './BackgroundProcessToolCard';
+import { ScheduledTaskToolCard } from './ScheduledTaskToolCard';
+import { GenericToolCard } from './GenericToolCard';
+import { ToolCodeBlock } from './ToolOutput';
+import { ApplyPatchToolCard } from './ApplyPatchToolCard';
+import { ToolPartRenderer } from './part-content';
+
+Object.assign(globalThis, { React });
+
+function completedTool(
+  tool: string,
+  input: Record<string, unknown>,
+  output: string,
+  metadata: Record<string, unknown> = {}
+): ToolPart {
+  return {
+    id: 'part-1',
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'tool',
+    callID: 'call-1',
+    tool,
+    state: {
+      status: 'completed',
+      input,
+      output,
+      title: tool,
+      metadata,
+      time: { start: 0, end: 2000 },
+    },
+  };
+}
+
+function expanded(card: React.ReactElement): string {
+  mockExpanded = true;
+  try {
+    return renderToStaticMarkup(card);
+  } finally {
+    mockExpanded = false;
+  }
+}
+
+function genericJsonOutput(output: string) {
+  const card = GenericToolCard({ toolPart: completedTool('lookup', {}, output) });
+  const outputBlock = React.Children.toArray(card.props.children).find(
+    (child): child is React.ReactElement<React.ComponentProps<typeof ToolCodeBlock>> =>
+      React.isValidElement<React.ComponentProps<typeof ToolCodeBlock>>(child) &&
+      child.type === ToolCodeBlock &&
+      child.props.label === 'Output'
+  );
+  if (!outputBlock) throw new Error('Expected a copyable JSON output block');
+  return { html: expanded(card), content: outputBlock.props.content };
+}
+
+describe('tool output disclosures', () => {
+  it.each(['pending', 'running', 'completed', 'error'] as const)(
+    'keeps %s cards collapsed with an enabled independent trigger',
+    status => {
+      for (const Component of [BashToolCard, BackgroundProcessToolCard, GenericToolCard]) {
+        const input = { command: 'pwd', action: 'start', description: 'Inspect workspace' };
+        const part = completedTool('test', input, 'private output');
+        if (status === 'pending') part.state = { status, input, raw: '' };
+        if (status === 'running') part.state = { status, input, time: { start: 1 } };
+        if (status === 'error') {
+          part.state = { status, input, error: 'private error', time: { start: 1, end: 2 } };
+        }
+        const html = renderToStaticMarkup(React.createElement(Component, { toolPart: part }));
+
+        expect(html).toContain('aria-expanded="false"');
+        expect(html).not.toContain('disabled=');
+        expect(html).not.toContain('Copy command');
+        expect(html).not.toContain('private output');
+        expect(html).not.toContain('private error');
+        expect(html.match(/<button\b/g)).toHaveLength(1);
+      }
+    }
+  );
+});
+
+describe('BashToolCard', () => {
+  it('leads with the description rather than the command', () => {
+    const part = completedTool(
+      'bash',
+      { command: 'pnpm test --filter unit', description: 'Run focused tests' },
+      'Tests passed'
+    );
+    const html = renderToStaticMarkup(React.createElement(BashToolCard, { toolPart: part }));
+
+    expect(html).toContain('Shell');
+    expect(html).toContain('Run focused tests');
+    expect(html).not.toContain('pnpm test');
+  });
+
+  it('shows the description only in the header and omits visible command/output labels', () => {
+    const part = completedTool(
+      'bash',
+      { command: 'pnpm test', description: 'Run focused tests' },
+      'Tests passed'
+    );
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
+
+    expect(html.match(/Run focused tests/g)).toHaveLength(1);
+    expect(html).not.toContain('>Command<');
+    expect(html).not.toContain('>Output<');
+    expect(html).toContain('aria-label="Command"');
+    expect(html).toContain('aria-label="Output"');
+    expect(html.match(/lucide-terminal/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="Copy command"');
+    expect(html).toContain('aria-label="Copy output"');
+  });
+
+  it('always shows the full command and output as separately copyable sections', () => {
+    const part = completedTool(
+      'bash',
+      { command: 'pwd', workdir: '/workspace/project' },
+      '/result'
+    );
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
+    const trigger = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/)?.[0];
+
+    expect(html).toContain('<code>pwd</code>');
+    expect(html).toContain('<code>/result</code>');
+    expect(html).toContain('cwd: /workspace/project');
+    expect(html).toContain('aria-label="Copy command"');
+    expect(html).toContain('aria-label="Copy output"');
+    expect(trigger).not.toContain('Copy command');
+    expect(trigger).not.toContain('Copy output');
+    expect(html).not.toContain('Open in editor');
+  });
+
+  it.each([
+    '/workspace/org/user/sessions/agent_36c067fe-a515-4fcf-876d-40ec25a90171/README',
+    '/workspace/7c21ccc1-e50c-4b65-a2a5-d89c70310f4b/sessions/workspace_36c067fe-a515-4fcf-876d-40ec25a90171/README',
+  ])('shortens workspace path %s only in the fallback preview', path => {
+    const command = `cat ${path}\npwd`;
+    const part = completedTool('bash', { command }, 'done');
+    const collapsed = renderToStaticMarkup(React.createElement(BashToolCard, { toolPart: part }));
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
+
+    expect(collapsed).toContain('cat ./README');
+    expect(collapsed).not.toContain('/workspace/');
+    expect(html).toContain(`<code>${command}</code>`);
+    expect(html).toContain('aria-label="Copy command"');
+  });
+
+  it('marks running metadata output busy while leaving the command idle', () => {
+    const part = completedTool('bash', {}, '');
+    part.state = {
+      status: 'running',
+      input: { command: 'pnpm test' },
+      metadata: { output: '\u001b[32m10%\r100%\r\nPassed\u001b[0m\n' },
+      time: { start: 1 },
+    };
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
+
+    expect(html).toContain('<code>100%\nPassed\n</code>');
+    expect(html).not.toContain('10%');
+    expect(html).not.toContain('Waiting for output');
+    expect(html.match(/<pre\b[^>]*aria-label="Output"[^>]*>/)?.[0]).toContain('aria-busy="true"');
+    expect(html.match(/<pre\b[^>]*aria-label="Command"[^>]*>/)?.[0]).not.toContain('aria-busy=');
+  });
+
+  it.each(['final output', ''])('uses the final output instead of stale metadata: %j', output => {
+    const part = completedTool('bash', { command: 'pwd' }, output, { output: 'stale snapshot' });
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
+
+    expect(html).not.toContain('stale snapshot');
+    expect(html).toContain(output || 'Command completed with no output.');
+    expect(html).not.toContain('aria-busy="true"');
+  });
+
+  it('uses known metadata fallbacks and tolerates incomplete or malformed input fields', () => {
+    const part = completedTool(
+      'bash',
+      { command: { invalid: true }, description: 42, workdir: ['not a directory'] },
+      'Finished',
+      { command: 'pwd', description: 'Inspect current directory' }
+    );
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
+
+    expect(html).toContain('Inspect current directory');
+    expect(html).toContain('<code>pwd</code>');
+    expect(html).toContain('<code>Finished</code>');
+    expect(html).not.toContain('[object Object]');
+    expect(html).not.toContain('cwd:');
+    expect(html).not.toContain('Waiting');
+  });
+
+  it.each([
+    [{ status: 'pending', input: {}, raw: '' }, 'Waiting to execute...'],
+    [
+      {
+        status: 'running',
+        input: { command: 'pwd' },
+        metadata: { output: 42 },
+        time: { start: 1 },
+      },
+      'Waiting for output...',
+    ],
+  ] satisfies [ToolPart['state'], string][])(
+    'shows an explicit waiting state when no output is available',
+    (state, expected) => {
+      const part = { ...completedTool('bash', {}, ''), state };
+      const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
+
+      expect(html).toContain(expected);
+      expect(html).not.toContain('Copy output');
+    }
+  );
+});
+
+describe('BackgroundProcessToolCard', () => {
+  it.each([
+    ['start', 'Start background process'],
+    ['list', 'List background processes'],
+    ['status', 'Check background process'],
+    ['logs', 'View background logs'],
+    ['stop', 'Stop background process'],
+    ['restart', 'Restart background process'],
+    ['unknown', 'Background process'],
+  ])('uses an action-specific title for %s', (action, title) => {
+    const part = completedTool('background_process', { action, id: 'bgp-1' }, '');
+    const html = renderToStaticMarkup(
+      React.createElement(BackgroundProcessToolCard, { toolPart: part })
+    );
+
+    expect(html).toContain(title);
+    expect(html).toContain('bgp-1');
+    expect(html).toContain('aria-expanded="false"');
+  });
+
+  it('renders the upstream text result and preserves unrecognized lines', () => {
+    const part = completedTool(
+      'background_process',
+      {
+        action: 'start',
+        command: 'pnpm dev',
+        description: 'Web server',
+        workdir: '/input-cwd',
+        ready: { port: 3000, pattern: 'ready', timeout: 5000 },
+      },
+      'id: bgp-1\nstatus: running\npid: 42\ncwd: /actual-cwd\ncommand: pnpm dev\nlast_output: \u001b[32mReady\u001b[0m\nlifetime: session',
+      { processID: 'stale-id', status: 'stopped' }
+    );
+    const html = expanded(BackgroundProcessToolCard({ toolPart: part }));
+
+    for (const value of [
+      'Web server',
+      'bgp-1',
+      'running',
+      '42',
+      '/actual-cwd',
+      '3000',
+      '5000 ms',
+    ]) {
+      expect(html).toContain(value);
+    }
+    expect(html).toContain('Readiness pattern');
+    expect(html).toContain('<code>Ready</code>');
+    expect(html).toContain('<code>lifetime: session</code>');
+    expect(html).not.toContain('/input-cwd');
+    expect(html).not.toContain('stale-id');
+    expect(html).not.toContain('animate-spin');
+    expect(html).not.toContain('Waiting for process result');
+    expect(html.match(/aria-label="Copy [^"]+"/g)).toEqual([
+      'aria-label="Copy command"',
+      'aria-label="Copy last output"',
+      'aria-label="Copy output"',
+    ]);
+    expect(html.match(/<button\b/g)).toHaveLength(4);
+  });
+
+  it('narrows structured JSON fields while preserving extra data and output', () => {
+    const part = completedTool(
+      'background_process',
+      { action: 'status', id: 'input-id' },
+      JSON.stringify({
+        id: 'bgp-json',
+        status: 'ready',
+        pid: 123,
+        cwd: '/project',
+        output: 'first\nsecond',
+        extra: { keep: true },
+      })
+    );
+    const html = expanded(BackgroundProcessToolCard({ toolPart: part }));
+
+    expect(html).toContain('bgp-json');
+    expect(html).toContain('123');
+    expect(html).toContain('/project');
+    expect(html).toContain('first\nsecond');
+    expect(html).toContain('&quot;keep&quot;: true');
+    expect(html).not.toContain('input-id');
+  });
+
+  it('preserves command and structured log whitespace for display and copying', () => {
+    const command = '\n  pnpm dev\n';
+    const part = completedTool(
+      'background_process',
+      { action: 'start', command },
+      JSON.stringify({ id: 'bgp-1', output: '  ready\n' })
+    );
+    const html = expanded(BackgroundProcessToolCard({ toolPart: part }));
+
+    expect(html).toContain(`<code>${command}</code>`);
+    expect(html).toContain('<code>  ready\n</code>');
+  });
+
+  it('retains malformed JSON fields as output instead of coercing them into process metadata', () => {
+    const part = completedTool(
+      'background_process',
+      { action: 'status', id: 'fallback-id', ready: { port: { invalid: true } } },
+      '{"id":{"nested":"preserved"},"pid":[7]}'
+    );
+    const html = expanded(BackgroundProcessToolCard({ toolPart: part }));
+
+    expect(html).toContain('fallback-id');
+    expect(html).toContain('preserved');
+    expect(html).not.toContain('[object Object]');
+    expect(html).not.toContain('Readiness port');
+    expect(html).not.toContain('>PID</dt>');
+  });
+
+  it.each(['logs', 'list'])(
+    'keeps %s output raw instead of parsing log lines as fields',
+    action => {
+      const part = completedTool(
+        'background_process',
+        { action, id: 'input-id' },
+        'status: internal log message\npid: not process metadata\nmore output',
+        { processID: 'bgp-meta', status: 'running' }
+      );
+      const html = expanded(BackgroundProcessToolCard({ toolPart: part }));
+
+      expect(html).toContain('bgp-meta');
+      expect(html).toContain(
+        '<code>status: internal log message\npid: not process metadata\nmore output</code>'
+      );
+      expect(html).not.toContain('>PID</dt>');
+    }
+  );
+
+  it.each(['[{"id":"array-id"}]', 'null', 'Unrecognized result'])('keeps raw result %j', output => {
+    const part = completedTool('background_process', { action: 'status' }, output);
+    const html = expanded(BackgroundProcessToolCard({ toolPart: part }));
+    const code = renderToStaticMarkup(React.createElement('code', null, output));
+
+    expect(html).toContain(code);
+    expect(html).not.toContain('>Process id</dt>');
+  });
+
+  it('shows the available list count without treating a process as an active tool call', () => {
+    const part = completedTool('background_process', { action: 'list' }, 'No processes.', {
+      count: 0,
+    });
+    const html = renderToStaticMarkup(
+      React.createElement(BackgroundProcessToolCard, { toolPart: part })
+    );
+
+    expect(html).toContain('0 processes');
+    expect(html).not.toContain('animate-spin');
+  });
+});
+
+describe('ScheduledTaskToolCard', () => {
+  it.each([
+    ['schedule_wakeup', {}, 'Schedule wakeup'],
+    ['cancel_wakeup', { action: 'list' }, 'List wakeups'],
+    ['cancel_wakeup', { action: 'cancel', id: 'wku-1' }, 'Cancel wakeup'],
+    ['cron_create', {}, 'Create cron task'],
+    ['cron_list', {}, 'List cron tasks'],
+    ['cron_delete', { id: 'wku-1' }, 'Delete cron task'],
+    ['unrecognized', {}, 'Scheduled task'],
+  ])('uses an identity-specific title for %s', (tool, input, expected) => {
+    const part = completedTool(tool, input, '');
+    const html = renderToStaticMarkup(
+      React.createElement(ScheduledTaskToolCard, { toolPart: part })
+    );
+
+    expect(html).toContain(expected);
+    expect(html).toContain('aria-expanded="false"');
+  });
+
+  it('parses a wakeup confirmation without leaking the raw sentence as output', () => {
+    const part = completedTool(
+      'schedule_wakeup',
+      { prompt: 'recheck the deploy', delay: '30m', reason: 'poll' },
+      'Scheduled wakeup wku_123, due 2026-09-30T22:05:43.781Z (in 30m).\nWhen it fires this session resumes with: recheck the deploy'
+    );
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('wku_123');
+    expect(html).toContain('due 2026-09-30T22:05:43.781Z (in 30m)');
+    expect(html).toContain('<code>recheck the deploy</code>');
+    expect(html).not.toContain('aria-label="Output"');
+    expect(html).toContain('poll');
+  });
+
+  it('parses a cron creation confirmation with its schedule', () => {
+    const part = completedTool(
+      'cron_create',
+      { prompt: 'nightly summary', cron: '0 3 * * *' },
+      'Scheduled cron task wku_456, schedule 0 3 * * *, next fire 2026-09-30T03:00:07.546Z (in 5h).\nWhen it fires this session resumes with: nightly summary'
+    );
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('wku_456');
+    expect(html).toContain('0 3 * * * · next 2026-09-30T03:00:07.546Z (in 5h)');
+    expect(html).toContain('<code>nightly summary</code>');
+  });
+
+  it('lists parsed rows and bounds the visible list', () => {
+    const lines = Array.from(
+      { length: 25 },
+      (_unused, index) =>
+        `wku_${index}  0 3 * * *  next 2026-09-30T03:00:07.546Z (in 5h)  prompt ${index}`
+    );
+    const part = completedTool('cron_list', {}, lines.join('\n'));
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('25 tasks');
+    expect(html).toContain('wku_0');
+    expect(html).toContain('wku_19');
+    expect(html).not.toContain('wku_20');
+    expect(html).toContain('+5 more');
+  });
+
+  it('shows the empty-list sentence as text instead of raw output', () => {
+    const part = completedTool('cron_list', {}, 'No scheduled cron tasks for this session.');
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('No scheduled cron tasks for this session.');
+    expect(html).not.toContain('aria-label="Output"');
+  });
+
+  it('keeps unrecognized list output bounded and copyable without claiming no tasks', () => {
+    const part = completedTool('cron_list', {}, 'Totally unexpected response');
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('aria-label="Output"');
+    expect(html).toContain('<code>Totally unexpected response</code>');
+    expect(html).toContain('aria-label="Copy output"');
+    expect(html).not.toContain('None scheduled');
+    expect(html).not.toContain('No scheduled tasks');
+  });
+
+  it('only treats the exact native empty-list phrase as an empty list', () => {
+    const empty = completedTool(
+      'cancel_wakeup',
+      { action: 'list' },
+      'No pending wakeups for this session.'
+    );
+    const emptyHtml = expanded(ScheduledTaskToolCard({ toolPart: empty }));
+
+    expect(emptyHtml).toContain('None scheduled');
+    expect(emptyHtml).toContain('No pending wakeups for this session.');
+
+    const nearMiss = completedTool(
+      'cancel_wakeup',
+      { action: 'list' },
+      'No pending wakeups for this session? '
+    );
+    const nearMissHtml = expanded(ScheduledTaskToolCard({ toolPart: nearMiss }));
+
+    expect(nearMissHtml).not.toContain('None scheduled');
+    expect(nearMissHtml).toContain('aria-label="Output"');
+  });
+
+  it('renders a completed part with missing or malformed input', () => {
+    for (const malformed of [undefined, null, 'bad', 42]) {
+      const part = completedTool('schedule_wakeup', { prompt: 'x' }, '');
+      Object.defineProperty(part.state, 'input', { value: malformed, enumerable: true });
+      const html = renderToStaticMarkup(
+        React.createElement(ScheduledTaskToolCard, { toolPart: part })
+      );
+
+      expect(html).toContain('Schedule wakeup');
+      expect(html).toContain('aria-expanded="false"');
+    }
+  });
+
+  it('surfaces a failed state with no unbacked cancel or delete controls', () => {
+    const part = completedTool('schedule_wakeup', { prompt: 'x' }, '');
+    part.state = {
+      status: 'error',
+      input: { prompt: 'x' },
+      error: 'Scheduler unavailable',
+      time: { start: 1, end: 2 },
+    };
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('Scheduler unavailable');
+    expect(html).toContain('text-destructive');
+    expect(html).not.toContain('aria-label="Cancel');
+    expect(html).not.toContain('aria-label="Delete');
+  });
+});
+
+describe('GenericToolCard', () => {
+  it.each(['filePath', 'file_path', 'filepath', 'path', 'workdir', 'directory', 'cwd', 'root'])(
+    'keeps %s visible ahead of description/query for generic and MCP tools',
+    key => {
+      for (const tool of ['lookup', 'mcp']) {
+        const args = {
+          description: 'Inspect matching records',
+          query: 'SELECT content',
+          [key]: '/cloud-agent/sessions/ses_test/src/config.ts',
+        };
+        const input =
+          tool === 'mcp'
+            ? { server_name: 'filesystem', tool_name: 'inspect', arguments: args }
+            : args;
+        const html = renderToStaticMarkup(
+          React.createElement(GenericToolCard, {
+            toolPart: completedTool(tool, input, ''),
+          })
+        );
+
+        expect(html).toContain('src/config.ts · Inspect matching records');
+        expect(html).not.toContain('/cloud-agent/');
+        expect(html).not.toContain('ses_test');
+        expect(html).not.toContain('SELECT content');
+      }
+    }
+  );
+
+  it('ignores blank and non-string paths instead of manufacturing file context', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(GenericToolCard, {
+        toolPart: completedTool(
+          'lookup',
+          {
+            filePath: {},
+            file_path: '',
+            filepath: false,
+            path: '  ',
+            description: 'Inspect records',
+          },
+          ''
+        ),
+      })
+    );
+
+    expect(html).toContain('Inspect records');
+    expect(html).not.toContain('[object Object]');
+    expect(html).not.toContain('filepath=');
+  });
+
+  it.each([['unrecognized_tool', 'unrecognized_tool']])(
+    'preserves the friendly display name for %s',
+    (tool, title) => {
+      const part = completedTool(tool, {}, '');
+      const html = renderToStaticMarkup(React.createElement(GenericToolCard, { toolPart: part }));
+
+      expect(html).toContain(title);
+    }
+  );
+
+  it('uses the MCP envelope for naming and only its arguments for the input section', () => {
+    const part = completedTool(
+      'mcp',
+      {
+        server_name: 'filesystem',
+        tool_name: 'read_file',
+        arguments: { url: 'https://example.com/image.png', quality: 'high' },
+      },
+      'Published'
+    );
+    const html = expanded(GenericToolCard({ toolPart: part }));
+
+    expect(html).toContain('filesystem/read_file');
+    expect(html).toContain('https://example.com/image.png · quality=high');
+    expect(html).toContain('aria-label="Copy arguments"');
+    expect(html).not.toContain('server_name');
+    expect(html).not.toContain('tool_name');
+  });
+
+  it('summarizes a meaningful label and only one other scalar argument', () => {
+    const part = completedTool(
+      'lookup',
+      {
+        description: 'Find matching records',
+        query: 'other label',
+        nested: {},
+        count: 0,
+        verbose: false,
+      },
+      ''
+    );
+    const html = renderToStaticMarkup(React.createElement(GenericToolCard, { toolPart: part }));
+
+    expect(html).toContain('Find matching records · count=0');
+    expect(html).not.toContain('other label');
+    expect(html).not.toContain('verbose');
+    expect(html).not.toContain('[object Object]');
+  });
+
+  it.each([
+    ['{"ok":true}', '{\n  &quot;ok&quot;: true\n}'],
+    ['[1,2]', '[\n  1,\n  2\n]'],
+    ['null', 'null'],
+    ['false', 'false'],
+    ['"hello"', '&quot;hello&quot;'],
+  ])('formats valid JSON output %s in a copyable code block', (output, expected) => {
+    const part = completedTool('lookup', {}, output);
+    const html = expanded(GenericToolCard({ toolPart: part }));
+
+    expect(html).toContain(`<code>${expected}</code>`);
+    expect(html).toContain('aria-label="Copy output"');
+    expect(html).toContain('2.0s');
+  });
+
+  it.each([
+    '9007199254740993',
+    '-9007199254740993',
+    '0.12345678901234567890123456789',
+    '-0.12345678901234567890123456789',
+    '1.0000000000000001e+30',
+    '-1.0000000000000001e+30',
+    '1e-400',
+    '-1e-400',
+    '1e400',
+    '-1e400',
+    '-0',
+    '-0.0',
+    '-0e+3',
+    '1.0',
+    '1e3',
+    '1E+3',
+    '0.0000001',
+  ])('preserves raw copyable JSON for numeric literal %s', literal => {
+    const output = `{"id":${literal}}`;
+    const { html, content } = genericJsonOutput(output);
+
+    expect(content).toBe(output);
+    expect(html).toContain(renderToStaticMarkup(React.createElement('code', null, output)));
+    expect(html).toContain('aria-label="Copy output"');
+  });
+
+  it('retains the entire original payload when a nested number cannot round-trip', () => {
+    const output = ' \n[{"safe":1},[{"precise":9007199254740993}]]\n ';
+    const { html, content } = genericJsonOutput(output);
+
+    expect(content).toBe(output);
+    expect(html).toContain(renderToStaticMarkup(React.createElement('code', null, output)));
+  });
+
+  it.each(['0', '9007199254740991', '-9007199254740991', '0.125', '-0.125', '1e-7', '1e+21'])(
+    'still formats JSON with an unchanged numeric literal %s',
+    literal => {
+      const { html, content } = genericJsonOutput(`{"value":${literal}}`);
+      const expected = `{\n  "value": ${literal}\n}`;
+
+      expect(content).toBe(expected);
+      expect(html).toContain(renderToStaticMarkup(React.createElement('code', null, expected)));
+    }
+  );
+
+  it.each([
+    '9007199254740993',
+    '-9007199254740993 1e400 -0 0.12345678901234567890123456789',
+    '{"id":9007199254740993,"value":1e-400}',
+    String.raw`escaped \"9007199254740993\" and \\ -1e400`,
+    String.raw`trailing backslash \\`,
+  ])('does not mistake digits or escaped quotes inside JSON strings for numbers: %s', value => {
+    const data = { '9007199254740993': value, count: 1 };
+    const output = JSON.stringify(data);
+    const expected = JSON.stringify(data, null, 2);
+    const { html, content } = genericJsonOutput(output);
+
+    expect(content).toBe(expected);
+    expect(html).toContain(renderToStaticMarkup(React.createElement('code', null, expected)));
+  });
+
+  it.each(['NaN', 'Infinity', '-Infinity'])(
+    'preserves invalid JSON numeric spelling %s as text rather than converting it to null',
+    literal => {
+      const output = `{"value":${literal}}`;
+      const part = completedTool('lookup', {}, output);
+      const html = expanded(GenericToolCard({ toolPart: part }));
+
+      expect(html).toContain(renderToStaticMarkup(React.createElement('p', null, output)));
+      expect(html).not.toContain('null');
+    }
+  );
+
+  it('renders non-JSON output as Markdown with safe links and copyable code', () => {
+    const part = completedTool(
+      'lookup',
+      {},
+      '**Result**\nnext line\n\n[Docs](https://example.com/docs) [Local](/workspace/file)\n\n```txt\nresult code\n```'
+    );
+    const html = expanded(GenericToolCard({ toolPart: part }));
+
+    expect(html).toContain('<strong>Result</strong>\nnext line');
+    expect(html).toContain('href="https://example.com/docs"');
+    expect(html).not.toContain('href="/workspace');
+    expect(html).toContain('Local');
+    expect(html).toContain('aria-label="Copy code"');
+    expect(html).toContain('<code>result code</code>');
+  });
+
+  it('preserves safe attachments and displays unsafe attachment names without links', () => {
+    const part = completedTool('lookup', {}, '');
+    if (part.state.status !== 'completed') throw new Error('Expected completed fixture');
+    part.state.attachments = [
+      {
+        id: 'safe-file',
+        sessionID: part.sessionID,
+        messageID: part.messageID,
+        type: 'file',
+        mime: 'text/plain',
+        filename: 'Safe file',
+        url: 'https://example.com/file.txt',
+      },
+      {
+        id: 'unsafe-file',
+        sessionID: part.sessionID,
+        messageID: part.messageID,
+        type: 'file',
+        mime: 'text/plain',
+        filename: 'Local file',
+        url: 'file:///workspace/file.txt',
+      },
+    ];
+    const html = expanded(GenericToolCard({ toolPart: part }));
+
+    expect(html).toContain('href="https://example.com/file.txt"');
+    expect(html).toContain('Safe file');
+    expect(html).toContain('Local file');
+    expect(html).not.toContain('href="file:');
+    expect(html).not.toContain('No output.');
+  });
+
+  it.each([null, ['invalid'], 'invalid'])('tolerates malformed MCP arguments %j', args => {
+    const part = completedTool(
+      'mcp',
+      { server_name: 'custom', tool_name: 'lookup', arguments: args },
+      'Still completed'
+    );
+    const html = expanded(GenericToolCard({ toolPart: part }));
+
+    expect(html).toContain('custom/lookup');
+    expect(html).toContain('Still completed');
+    expect(html).not.toContain('Copy arguments');
+    expect(html).not.toContain('Waiting');
+  });
+});
+
+describe('failed tool file context', () => {
+  it.each([
+    ['read', { filePath: '/cloud-agent/sessions/ses_test/src/read.ts' }, 'src/read.ts'],
+    ['edit', { filePath: '/cloud-agent/sessions/ses_test/src/edit.ts' }, 'src/edit.ts'],
+    ['write', { filePath: '/cloud-agent/sessions/ses_test/src/write.ts' }, 'src/write.ts'],
+    ['glob', { path: '/cloud-agent/sessions/ses_test/src', pattern: '*.ts' }, 'src'],
+    ['grep', { path: '/cloud-agent/sessions/ses_test', pattern: 'needle' }, '.'],
+    ['list', { path: '/cloud-agent/sessions/ses_test/docs' }, 'docs'],
+    ['bash', { workdir: '/cloud-agent/sessions/ses_test/scripts' }, 'scripts'],
+    ['bash', { cwd: '/cloud-agent/sessions/ses_test/scripts' }, 'scripts'],
+    ['custom', { file_path: '/cloud-agent/sessions/ses_test/src/custom.ts' }, 'src/custom.ts'],
+    ['custom', { root: '/cloud-agent/sessions/ses_test/src/custom.ts' }, 'src/custom.ts'],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { query: 'content', filepath: '/cloud-agent/sessions/ses_test/src/mcp.ts' },
+      },
+      'src/mcp.ts',
+    ],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { cwd: '/cloud-agent/sessions/ses_test/src' },
+      },
+      'src',
+    ],
+  ] satisfies [string, Record<string, unknown>, string][])(
+    'retains the normalized input path for failed %s',
+    (tool, input, path) => {
+      const part = completedTool(tool, input, '');
+      part.state = {
+        status: 'error',
+        input,
+        error: 'Permission denied',
+        time: { start: 1, end: 2 },
+      };
+      const html = renderToStaticMarkup(React.createElement(ToolPartRenderer, { part }));
+
+      expect(html).toContain(`Failed: <span class="font-mono">${tool}</span>`);
+      expect(html).toContain(`>${path}</code>`);
+      expect(html).toContain('Permission denied');
+      expect(html).not.toContain('/cloud-agent/');
+      expect(html).not.toContain('ses_test');
+    }
+  );
+});
+
+describe('apply patch file labels', () => {
+  const patchText = [
+    '*** Begin Patch',
+    '*** Update File: /cloud-agent/sessions/ses_test/src/old.ts',
+    '*** Move to: /cloud-agent/sessions/ses_test/src/new.ts',
+    '@@',
+    '-before',
+    '+after',
+    '+*** Add File: not-a-header.ts',
+    '*** Delete File: /cloud-agent/sessions/ses_test/src/deleted.ts',
+    '*** Add File: /cloud-agent/sessions/ses_test/src/added.ts',
+    '+new',
+    '*** End Patch',
+  ].join('\n');
+
+  it.each(['pending', 'running', 'completed', 'error'] as const)(
+    'identifies input filenames without claiming applied changes for %s',
+    status => {
+      const input = { patchText };
+      const part = completedTool('apply_patch', input, '');
+      if (status === 'pending') part.state = { status, input, raw: '' };
+      if (status === 'running') part.state = { status, input, time: { start: 1 } };
+      if (status === 'error')
+        part.state = { status, input, error: 'Patch rejected', time: { start: 1, end: 2 } };
+      const card = React.createElement(ToolPartRenderer, { part });
+      const collapsed = renderToStaticMarkup(card);
+      const html = expanded(card);
+
+      for (const path of ['src/old.ts', 'src/new.ts', 'src/deleted.ts', 'src/added.ts']) {
+        expect(collapsed).toContain(path);
+      }
+      expect(collapsed).not.toContain('not-a-header.ts');
+      expect(collapsed).not.toContain('ses_test');
+      if (status !== 'error') expect(html).toContain('Patch input (not an applied diff)');
+      expect(html).not.toContain('Unified patch');
+      expect(html).not.toContain('additions');
+      expect(html).not.toContain('>Added<');
+      if (status === 'error') {
+        expect(collapsed).toContain('Patch rejected');
+        expect(collapsed).toContain('Failed:');
+      }
+    }
+  );
+
+  it('keeps metadata authoritative and identifies multiple files in the collapsed header', () => {
+    const part = completedTool('apply_patch', { patchText }, '', {
+      files: [{ relativePath: 'src/actual.ts' }, { relativePath: 'src/other.ts' }],
+    });
+    const html = renderToStaticMarkup(React.createElement(ApplyPatchToolCard, { toolPart: part }));
+
+    expect(html).toContain('2 files');
+    expect(html).toContain('src/actual.ts, src/other.ts');
+    expect(html).not.toContain('src/old.ts');
+  });
+
+  it('labels a single pending file without expanding patch input', () => {
+    const part = completedTool('apply_patch', {}, '');
+    part.state = {
+      status: 'pending',
+      input: {
+        patchText:
+          '*** Begin Patch\r\n*** Add File: /cloud-agent/sessions/ses_test/src/new.ts\r\n+new\r\n*** End Patch',
+      },
+      raw: '',
+    };
+    const html = renderToStaticMarkup(React.createElement(ApplyPatchToolCard, { toolPart: part }));
+
+    expect(html).toContain('src/new.ts');
+    expect(html).not.toContain('ses_test');
+    expect(html).not.toContain('*** Begin Patch');
+  });
+});

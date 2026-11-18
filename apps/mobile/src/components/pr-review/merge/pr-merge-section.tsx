@@ -12,6 +12,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { GitMerge } from '@/components/ui/icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -21,20 +22,21 @@ import {
   type AllowedMergeMethod,
   defaultMergeMethodFor,
   getMergeabilityStatus,
-  getMergeBlockedReasons,
   type PrMergeMethod,
   type PrOverviewDto,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { useMergeBlockedReasons } from '@/lib/pr-review/merge/use-merge-blocked-reasons';
 import {
   useDisableAutoMergeMutation,
   useUpdateBranchMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
+import { githubPrRef, type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   AutoMergeEnabledBanner,
   BlockedPanel,
+  ClosedChip,
   MergeabilityCheckingRow,
   MergeabilityTimedOutRow,
-  TerminalChip,
 } from '@/components/pr-review/merge/pr-merge-section-parts';
 
 type PrMergeSectionProps = Readonly<{
@@ -62,13 +64,12 @@ function ignoreRejection(promise: Promise<unknown>): void {
   })();
 }
 
-function mergeSheetHref(args: {
-  owner: string;
-  repo: string;
-  number: number;
-  mode: 'merge' | 'enable-auto-merge';
-  method: PrMergeMethod;
-}): Href {
+function mergeSheetHref(
+  args: ProviderPrTriple & {
+    mode: 'merge' | 'enable-auto-merge';
+    method: PrMergeMethod;
+  }
+): Href {
   const href: Href = {
     pathname: '/(app)/pr-review/[owner]/[repo]/[number]/merge',
     params: {
@@ -91,19 +92,13 @@ export function PrMergeSection({
 }: PrMergeSectionProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const status = getMergeabilityStatus(overview);
-  const reasons = useMemo(
-    () =>
-      getMergeBlockedReasons({
-        state: overview.state,
-        draft: overview.draft,
-        mergeable: overview.mergeable,
-        mergeableState: overview.mergeableState,
-        reviewDecision: overview.reviewDecision,
-        allowUpdateBranch: overview.repo.allowUpdateBranch,
-      }),
-    [overview]
-  );
+  const { reasons } = useMergeBlockedReasons(overview, {
+    owner,
+    repo,
+    number: overview.number,
+  });
 
   // Bounded polling for the brief window after GitHub queues a
   // mergeability re-check. Poll on a fixed interval up to N ticks, then
@@ -111,6 +106,13 @@ export function PrMergeSection({
   // every status transition away from 'unknown'.
   const tickRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The timer outlives any one render, so it reads the callback through a ref
+  // updated every render: the orchestrator's refetch is re-created each render,
+  // and a tick must call the current one. That keeps the interval's lifetime
+  // keyed only to `status`, so a re-render never restarts (and so never
+  // extends) the bounded poll.
+  const onRefetchRef = useRef(onRefetch);
+  onRefetchRef.current = onRefetch;
   const [hasTimedOut, setHasTimedOut] = useState(false);
 
   useEffect(() => {
@@ -138,9 +140,9 @@ export function PrMergeSection({
         setHasTimedOut(true);
         return;
       }
-      ignoreRejection(onRefetch());
+      ignoreRejection(onRefetchRef.current());
     }, MERGEABILITY_POLL_INTERVAL_MS);
-  }, [status, onRefetch]);
+  }, [status]);
 
   useEffect(
     () => () => {
@@ -153,15 +155,16 @@ export function PrMergeSection({
   );
 
   const prRef = useMemo(
-    () => ({ owner, repo, number: overview.number }),
+    () => githubPrRef(owner, repo, overview.number),
     [owner, repo, overview.number]
   );
   const updateBranch = useUpdateBranchMutation(prRef);
   const disableAutoMerge = useDisableAutoMergeMutation(prRef);
 
-  // Terminal state.
+  // Terminal state. A merged review says so in the state chip and the
+  // merged-by line above, so only a closed one renders here.
   if (status === 'terminal') {
-    return <TerminalChip state={overview.state} />;
+    return overview.state === 'merged' ? null : <ClosedChip />;
   }
 
   // Unknown mergeability — poll until it resolves or the timer expires.
@@ -188,9 +191,6 @@ export function PrMergeSection({
           onDisable={() => {
             ignoreRejection(
               disableAutoMerge.mutateAsync({
-                owner,
-                repo,
-                number: overview.number,
                 prNodeId: overview.prNodeId,
               })
             );
@@ -210,11 +210,11 @@ export function PrMergeSection({
                 })
               );
             }}
-            accessibilityLabel="Merge now"
+            accessibilityLabel={t('prReview.merge.mergeNow')}
           >
             <View className="flex-row items-center gap-2">
               <GitMerge size={14} color={colors.primaryForeground} />
-              <Text>Merge now</Text>
+              <Text>{t('prReview.merge.mergeNow')}</Text>
             </View>
           </Button>
         ) : null}
@@ -224,6 +224,10 @@ export function PrMergeSection({
 
   // Blocked.
   if (status === 'blocked') {
+    // The panel's rows come from the read the Checks card above it renders, so
+    // they are final at the panel's first frame: it never paints a cause the
+    // answer replaces, never appends a row after the first paint, and never
+    // moves what is below it.
     return (
       <View className="gap-3">
         <BlockedPanel
@@ -257,9 +261,9 @@ export function PrMergeSection({
                 })
               );
             }}
-            accessibilityLabel="Enable auto-merge"
+            accessibilityLabel={t('prReview.merge.enableAutoMerge')}
           >
-            <Text>Enable auto-merge</Text>
+            <Text>{t('prReview.merge.enableAutoMerge')}</Text>
           </Button>
         ) : null}
       </View>
@@ -268,24 +272,19 @@ export function PrMergeSection({
 
   // Mergeable — single "Merge" CTA.
   return (
-    <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Merge
-      </Text>
-      <Button
-        onPress={() => {
-          const m: PrMergeMethod = defaultMergeMethodFor(overview.repo);
-          router.push(
-            mergeSheetHref({ owner, repo, number: overview.number, mode: 'merge', method: m })
-          );
-        }}
-        accessibilityLabel="Merge pull request"
-      >
-        <View className="flex-row items-center gap-2">
-          <GitMerge size={14} color={colors.primaryForeground} />
-          <Text>Merge</Text>
-        </View>
-      </Button>
-    </View>
+    <Button
+      onPress={() => {
+        const m: PrMergeMethod = defaultMergeMethodFor(overview.repo);
+        router.push(
+          mergeSheetHref({ owner, repo, number: overview.number, mode: 'merge', method: m })
+        );
+      }}
+      accessibilityLabel={t('prReview.merge.mergePullRequest')}
+    >
+      <View className="flex-row items-center gap-2">
+        <GitMerge size={14} color={colors.primaryForeground} />
+        <Text>{t('prReview.merge.merge')}</Text>
+      </View>
+    </Button>
   );
 }

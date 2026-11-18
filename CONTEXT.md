@@ -13,7 +13,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Code Reviewer** | Pull request and merge request review execution, Code Review Findings, review settings, and Review Analytics | `packages/app-shared/src/code-review/`, `apps/web/src/lib/code-reviews/`, `apps/web/src/components/code-reviews/` | A Code Reviewer owner is either one user or one organization; Review Analytics collection is organization- and platform-scoped |
 | **Security Agent** | Security Findings, owner-scoped policy, settings, Auto Remediation, and user-visible outcomes | `packages/app-shared/src/security-agent/`, `apps/web/src/lib/security-agent/`, `apps/web/src/components/security-agent/`, `.specs/security-agent.md` | A Security Agent owner is either one user or one organization |
 | **Security Sync** | Dependabot synchronization, finding persistence, notification eligibility, recipient intent materialization, and durable notification state | `services/security-sync/` | Event state remains owner-scoped; email sending does not occur inside finding persistence transactions |
-| **Security Agent Email Delivery** | Dispatch-time revalidation, email rendering, owner-aware links, and Mailgun delivery | `apps/web/src/app/api/internal/security-agent/`, `apps/web/src/lib/email.ts`, `apps/web/src/emails/` | Accepts notification identity only and loads current data before sending |
+| **Security Agent Email Delivery** | Dispatch-time revalidation, email rendering, owner-aware links, and Mailgun delivery | `apps/web/src/app/api/internal/security-agent/`, `packages/web-shared/src/lib/email.ts`, `packages/web-shared/src/emails/` | Accepts notification identity only and loads current data before sending |
 | **Shared Security Notification Policy** | Canonical config parsing, defaults, severity thresholds, and pure event eligibility rules | `packages/worker-utils/src/security-notification-policy.ts` | Web and Worker must use same policy contract |
 | **Auto Routing** | Efficient model-pool settings, shared benchmark profiles, and per-request model selection | `packages/auto-routing-contracts/`, `services/auto-routing/`, `services/auto-routing-benchmark/`, `apps/web/src/components/auto-routing/` | Personal and organization settings constrain the existing `kilo-auto/efficient` model |
 | **Kilo Pass for Organizations** | Organization-owned Kilo Pass agreements, term versions, purchased pass capacity, sub-org allocation, and pooled bonus unlock behavior | Organization billing, seats, credits, sub-orgs, and Kilo Pass org administration surfaces | Separate source of truth from personal Kilo Pass subscriptions |
@@ -22,6 +22,10 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 
 | Term | Agent meaning | Use this when | Avoid |
 |---|---|---|---|
+| **Apple subscription chain** | One original subscription purchase and its related renewals | Referring to the purchase identity that Bouncer correlates across payers | Apple ID, store account |
+| **Refund request** | A customer's request before the store grants or declines a refund | Referring to pending or declined requests | Completed refund |
+| **Refund** | A refund that the store grants for a transaction | Referring to a granted refund | Refund request |
+| **Refund reversal** | The store's cancellation of a granted refund for the same transaction | Referring to a reversal of a matching refund | Unrelated refund credit |
 | **Code Reviewer** | Agent that reviews pull requests and merge requests and may raise Code Review Findings | Naming the product capability, settings, review execution, and analytics | Security Agent, review bot |
 | **Code Review Finding** | Model-generated issue newly raised by Code Reviewer during one review execution | Referring to Code Reviewer output or its controlled analytics taxonomy | Security Finding, confirmed bug, verified vulnerability |
 | **Review Analytics** | Organization-only, opt-in prospective collection of bounded classifications for completed reviews and newly raised Code Review Findings | Referring to the Code Reviewer Analytics tab, collection setting, coverage, or aggregate metrics | Security Agent analytics, historical backfill |
@@ -40,9 +44,14 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Email Delivery** | Attempt to render and send one Security Agent Notification through Mailgun | Referring to provider side effect, retry, or acceptance | Notification event |
 | **Security Finding Activity Event** | Immutable record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding | Referring to evidence included in a Security Agent Audit Report | Page view, unchanged sync observation, queue claim, heartbeat |
 | **Security Agent Audit Report** | Owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding | Referring to the interactive audit report | Generic audit-log export, activity dump |
-| **Efficient model pool** | The exact model and thinking-variant pairs that `kilo-auto/efficient` may consider for an owner | Referring to either the platform default or an owner-configured pool | Custom mode, custom efficient model |
-| **Pool entry** | One concrete model paired with its canonical thinking-variant key, or the model's default only when it exposes no variants | Referring to benchmark and routing identity inside an Efficient model pool | Model alone, normalized effort |
-| **Benchmark profile** | Globally shared, current benchmark results for one Pool entry | Referring to readiness and measured routing evidence reused across owners | User benchmark, pool benchmark |
+| **Promotional model** | A Kilo-defined model that Kilo serves straight from an upstream provider and bills as Kilo credits or free; implemented as a custom LLM (`custom_llm2`) and made public or granted to organizations or groups | Referring to these models in user-facing UI, including request logs and BYOK routing, where its payer is Kilo credits or free | Custom model, custom LLM, custom model credential (user-facing); "custom LLM" stays correct in platform admin UI and code |
+| **Custom router** | An owner's named router with an owner-selected benchmark difficulty, routing mode, and pool of gateway and client models | Referring to owner-configured auto routing | Efficient model pool, custom mode |
+| **Platform router** | An auto router whose model pool is selected by the platform and whose routing mode is selected by users or organizations | Referring to Efficient or Frontier platform routing | Fixed-mode router, owner-configured platform pool |
+| **Routing mode** | The ranking objective: best accuracy per dollar or best accuracy | Referring to how a router ranks eligible models | Model pool, benchmark difficulty |
+| **Benchmark difficulty** | The selected Efficient or Frontier benchmark dataset and routing thresholds for a Custom router | Referring to the custom router's benchmark choice | Routing mode, model pool |
+| **Pool entry** | One gateway model or one client-served model in a Custom router's pool | Referring to membership inside a Custom router | Model alone, normalized effort |
+| **Benchmark profile** | Globally shared, current benchmark results for one model and thinking variant that the platform serves | Referring to readiness and measured routing evidence reused across owners | User benchmark, pool benchmark |
+| **Client profile** | Owner-scoped measurement of a Pool entry that the owner's CLI runs because the platform cannot serve it | Referring to client eval results | Benchmark profile, shared client result |
 | **Kilo Pass for Organizations** | Organization-owned Kilo Pass product that buys pass capacity for parent-org paid seats and allocates pooled credit capacity into parent or direct child containers | Referring to org Kilo Pass agreements, purchases, allocations, and admin workflows | Personal Kilo Pass, user Kilo Pass subscription |
 | **Kilo Pass org agreement** | Durable org-owned source of truth for one organization's Kilo Pass terms, version, purchase channel, and lifecycle | Preserving self-serve and manual org Kilo Pass terms | Personal subscription row, seat purchase row |
 | **Kilo Pass term version** | Immutable versioned commercial and credit-grant rules attached to a Kilo Pass org agreement; standard and dedicated custom versions are allowed | Referring to legacy upfront-bonus terms, default bonus-after-base terms, or future bonus changes | Promo flag, mutable agreement fields, plan metadata |
@@ -83,9 +92,9 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - An **Email Delivery** realizes a durable **Security Agent Notification** and may be retried without creating new event identity.
 - A **Security Remediation** belongs to one **Security Finding** and can have one or more **Security Remediation Attempts**.
 - A **Security Finding Activity Event** belongs to one Security Agent owner and one Security Finding, including after that finding is deleted.
-- An **Efficient model pool** belongs to one personal user or organization; an organization pool overrides members' personal pools, while no configured pool inherits the next available setting and then the platform default.
-- A **Pool entry** has at most one current **Benchmark profile** for a benchmark-engine version, shared by every owner that selects that entry.
-- `kilo-auto/efficient` considers only ready, request-compatible Pool entries from the effective Efficient model pool; its balanced failure fallback remains outside pool membership.
+- A **Custom router** belongs to one personal user or organization and holds at most 20 Pool entries; it never routes outside its pool.
+- A **Benchmark profile** is current for one benchmark-engine version and shared by every owner whose Custom router names that model; a **Client profile** never affects another owner.
+- `kilo-auto/efficient` and `kilo-auto/frontier` use platform-selected pools. Personal or organization settings select their routing mode; organization model policy still filters candidates.
 - **Kilo Pass for Organizations** uses a new org-owned source of truth; personal Kilo Pass subscription rows are not authoritative for org agreements.
 - A **Kilo Pass org agreement** belongs to a parent organization and records a **Kilo Pass term version**.
 - A parent organization has at most one non-ended **Kilo Pass org agreement**.
@@ -231,7 +240,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - Keep normal bonus unlock transactional with canonical spend recording and issuance-level idempotency. Do not rely on asynchronous or scheduled evaluation as primary unlock path.
 - Treat bonus eligibility as period-bounded by agreement-relative **Kilo Pass issuance window**. Do not carry a locked bonus threshold into later windows or count later spend toward multiple issuance bonuses.
 - Apply bonus-credit expiry at next agreement-relative issuance boundary, matching personal Kilo Pass period behavior. Do not apply same period expiry to base credits.
-- Use **Efficient model pool** for the candidate set and **Pool entry** for an exact model and canonical thinking variant. Do not introduce a second efficient mode or model ID.
+- Use **Custom router** for an owner-chosen candidate set and **Pool entry** for one of its models. Do not give platform routers a per-owner pool or mode.
 - Treat **Benchmark profiles** as global evidence, never owner-specific benchmark results.
 
 ## Ambiguities
@@ -247,6 +256,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | SLA reminder | Does not distinguish warning before deadline from breach at/after deadline | Use **SLA Warning Notification** or **SLA Breach Notification** |
 | Kilo Pass subscription | Can mean current personal Kilo Pass subscription or future org Kilo Pass purchase | Use **Kilo Pass org agreement** for org-owned terms and personal Kilo Pass subscription for the existing user product |
 | assigned pass | Can imply a user receives a personal credit wallet | Use **Kilo Pass allocation** for org pass distribution and **Purchased pass capacity** for bought capacity |
+| custom model | Users read it as a model they configured themselves, but the platform admin defines it | Use **Promotional model** in user-facing UI; keep "custom LLM" for platform admin UI and code |
 | admin | Can mean customer organization role or internal Kilo operator | Use "organization owner" or "billing manager" for customer roles; use "platform admin" for internal manual-commercial operations |
 
 ## Context Boundaries
@@ -258,7 +268,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - **Security Agent Email Delivery** may revalidate and deliver an existing notification but must not create notification eligibility or copy mutable finding data into Worker request.
 - **Shared Security Notification Policy** defines common parsing and pure eligibility behavior; it does not perform persistence or recipient lookup.
 - Cross-context dispatch sends only stable notification ID from **Security Sync** to authenticated **Security Agent Email Delivery** boundary.
-- **Auto Routing** owns effective pool resolution and per-request selection. The benchmark worker owns Benchmark profile measurement and publication; web owns catalog validation, permissions, and settings UI.
+- **Auto Routing** owns per-request selection for platform routers and Custom routers. The benchmark worker owns Benchmark profile and Client profile measurement and publication; web owns Custom router definitions, catalog validation, permissions, and the router editor.
 - **Kilo Pass for Organizations** owns org agreements, term versions, purchased pass capacity, allocation plans, issuance snapshots, and pooled bonus-after-base behavior. Personal Kilo Pass owns existing user subscriptions and user-global threshold behavior.
 - Org seat purchases may determine eligible seat counts for Kilo Pass for Organizations, but seat purchase rows are not the Kilo Pass agreement source of truth.
 

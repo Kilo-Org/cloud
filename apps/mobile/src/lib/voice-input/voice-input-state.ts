@@ -1,8 +1,10 @@
-export type VoiceInputStatus = 'idle' | 'starting' | 'listening' | 'stopping';
+import { i18n } from '@/i18n';
+
+export type VoiceInputStatus = 'idle' | 'starting' | 'listening' | 'transcribing' | 'stopping';
 export type VoiceInputAvailability = 'available' | 'unavailable';
 
 export type VoiceInputFeedback = {
-  action: 'none' | 'open-settings';
+  action: 'none' | 'open-settings' | 'open-transcription-settings';
   availability: VoiceInputAvailability;
   message: string;
   retryable: boolean;
@@ -89,7 +91,7 @@ export function classifyVoiceInputPermission(
     return {
       action: 'none',
       availability: 'available',
-      message: 'Voice input is restricted on this device.',
+      message: i18n.t('voiceInput.restricted'),
       retryable: false,
     };
   }
@@ -97,14 +99,14 @@ export function classifyVoiceInputPermission(
     return {
       action: 'none',
       availability: 'available',
-      message: 'Microphone access is required for voice input.',
+      message: i18n.t('voiceInput.micRequired'),
       retryable: true,
     };
   }
   return {
     action: 'open-settings',
     availability: 'available',
-    message: 'Microphone access is off. Enable it in Settings to use voice input.',
+    message: i18n.t('voiceInput.micOff'),
     retryable: false,
   };
 }
@@ -116,7 +118,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'none',
         availability: 'available',
-        message: 'No speech detected. Tap the microphone to try again.',
+        message: i18n.t('voiceInput.noSpeech'),
         retryable: true,
       };
     }
@@ -124,7 +126,55 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'none',
         availability: 'available',
-        message: 'Voice input needs a connection right now. Try again.',
+        message: i18n.t('voiceInput.needsConnection'),
+        retryable: true,
+      };
+    }
+    case 'gateway-unreachable': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayUnreachable'),
+        retryable: true,
+      };
+    }
+    case 'gateway-timeout': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayTimeout'),
+        retryable: true,
+      };
+    }
+    case 'gateway-model-unavailable': {
+      return {
+        action: 'open-transcription-settings',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayModelUnavailable'),
+        retryable: false,
+      };
+    }
+    case 'gateway-auth': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewaySignInRequired'),
+        retryable: false,
+      };
+    }
+    case 'gateway-no-model': {
+      return {
+        action: 'open-transcription-settings',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayNoModel'),
+        retryable: false,
+      };
+    }
+    case 'gateway-server': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.stopped'),
         retryable: true,
       };
     }
@@ -132,7 +182,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'none',
         availability: 'available',
-        message: 'Voice input is busy. Try again.',
+        message: i18n.t('voiceInput.busy'),
         retryable: true,
       };
     }
@@ -145,7 +195,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'none',
         availability: 'available',
-        message: 'Voice input stopped. Tap the microphone to try again.',
+        message: i18n.t('voiceInput.stopped'),
         retryable: true,
       };
     }
@@ -153,7 +203,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'open-settings',
         availability: 'available',
-        message: 'Microphone access is off. Enable it in Settings to use voice input.',
+        message: i18n.t('voiceInput.micOff'),
         retryable: false,
       };
     }
@@ -161,7 +211,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'none',
         availability: 'unavailable',
-        message: "Voice input isn't available on this device.",
+        message: i18n.t('voiceInput.unavailableDevice'),
         retryable: false,
       };
     }
@@ -169,7 +219,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'none',
         availability: 'available',
-        message: "Voice input isn't available for this device language.",
+        message: i18n.t('voiceInput.unavailableLanguage'),
         retryable: false,
       };
     }
@@ -177,7 +227,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       return {
         action: 'none',
         availability: 'available',
-        message: 'Voice input stopped. Tap the microphone to try again.',
+        message: i18n.t('voiceInput.stopped'),
         retryable: true,
       };
     }

@@ -2,8 +2,8 @@ import 'server-only';
 
 import { and, asc, desc, eq, inArray, isNotNull, max, ne, sql } from 'drizzle-orm';
 
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   getCodingPlanValidationResult,
@@ -12,7 +12,7 @@ import {
   validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
 
 export type ManualRevocationStatus = 'revocation_pending' | 'revocation_failed';
@@ -111,9 +111,8 @@ export async function listManualCredentialRevocations(input: {
 
   return rows.map(row => ({
     ...row,
-    // BytePlus stores the admin-supplied username in this column. It is only
-    // needed for server-side seat resolution and must never reach the admin UI.
-    upstreamPlanId: row.providerId === 'byteplus-coding' ? null : row.upstreamPlanId,
+    // The stored identifier (MiniMax Upstream Plan ID or BytePlus assigned
+    // username) is surfaced to authorized admins for remediation and mapping.
     status: row.status === 'revocation_failed' ? 'revocation_failed' : 'revocation_pending',
   }));
 }

@@ -1,6 +1,6 @@
-import { successResult } from '@/lib/maybe-result';
-import { getUserFromAuth } from '@/lib/user/server';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { NextResponse } from 'next/server';
 
 export async function POST() {

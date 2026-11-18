@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "جلسه عامل شما به‌روزرسانی دارد",
+      "lowBalance": "موجودی شما نیاز به توجه دارد",
+      "spendAlert": "هزینه شما نیاز به توجه دارد",
+      "securityFinding": "یک یافته امنیتی نیاز به توجه دارد",
+      "securityUpdate": "یک بررسی امنیتی به‌روزرسانی دارد",
+      "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "هشدار موجودی کم",
+      "body": "موجودی {{organizationName}} به زیر ${{minimumBalanceUsd}} رسید"
+    },
+    "spendAlert": {
+      "title": "هشدار هزینه",
+      "body": "هزینه {{scopeName}} از ${{amountUsd}} عبور کرد"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} در {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "یافته امنیتی جدید ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "هشدار SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "نقض SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "جلسه Kilo شما آماده است تا از تلفن خود کنترل کنید"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

@@ -2,6 +2,8 @@
 export type {
   ProfileOwner,
   ProfileOwnerType,
+  ProfileDatabase,
+  RepositoryPlatform,
   ProfileVarResponse,
   ProfileCommandResponse,
   ProfileMcpServerResponse,
@@ -9,6 +11,7 @@ export type {
   ProfileSkillResponse,
   ProfileAgentResponse,
   ProfileKiloCommandResponse,
+  ProfileInstructionResponse,
   ProfileResponse,
   ProfileResponseWithOwner,
   ProfileSummary,
@@ -19,6 +22,7 @@ export { MASKED_SECRET_VALUE } from './types';
 
 // Pure resolution helpers
 export {
+  appliesRepoBindings,
   resolveProfileLayers,
   type ProfileLayer,
   type ProfileLayerSource,
@@ -33,9 +37,11 @@ export {
   ProfileNotFoundError,
   type MergeProfileConfigurationArgs,
   type MergeProfileConfigurationResult,
+  type EnvironmentInlineArgs,
   type MergedSkillForSession,
   type MergedAgentForSession,
   type MergedKiloCommandForSession,
+  type MergedInstructionForSession,
   type ClientMcpServerValue,
   type InlineSkillInput,
   type InlineAgentInput,
@@ -45,27 +51,27 @@ export {
 export { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';
 
 // Profile CRUD + lookups
+export { MAX_OWNER_PROFILES } from './contracts/profiles';
 export {
   createProfile,
   updateProfile,
   deleteProfile,
   listProfiles,
   getProfile,
+  getProfileOverview,
   setDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
-  getProfileByName,
-  getProfileIdByName,
   getEffectiveDefaultProfileId,
 } from './profile-service';
 
 // Var CRUD
 export {
+  MAX_PROFILE_VARS,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
-  setVars,
   type VarForSession,
 } from './profile-vars-service';
 
@@ -83,6 +89,7 @@ export {
   mcpRemoteServerInputSchema,
   mcpServerFullInputSchema,
   listMcpServersForProfile,
+  getProfileMcpServers,
   createMcpServer,
   updateMcpServer,
   deleteMcpServer,
@@ -106,17 +113,26 @@ export {
   skillFilesSchema,
   skillCustomInputSchema,
   skillUpdateInputSchema,
+  skillsShInputSchema,
   parseSkillFrontmatter,
   listSkillsForProfile,
+  getProfileSkills,
   createCustomSkill,
+  createSkillsShSkill,
   updateSkill,
   deleteSkill,
   setSkillEnabled,
   getSkillsForSession,
   type SkillCustomInput,
   type SkillUpdateInput,
+  type SkillsShInput,
   type SkillForSession,
 } from './profile-skills-service';
+
+export type { SkillsShSource } from './skills-sh';
+
+// Size-limit copy shared by the profile and runtime contracts
+export { LIMIT_UNIT, overLimitMessage, overTotalMessage } from './contracts/limit-copy';
 
 // Agent CRUD + session helpers
 export {
@@ -129,6 +145,7 @@ export {
   agentCreateInputSchema,
   agentUpdateInputSchema,
   listAgentsForProfile,
+  getProfileAgents,
   createAgent,
   updateAgent,
   deleteAgent,
@@ -146,9 +163,11 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,
+  getProfileKiloCommands,
   createKiloCommand,
   updateKiloCommand,
   deleteKiloCommand,
@@ -160,10 +179,149 @@ export {
   type KiloCommandForSession,
 } from './profile-kilo-commands-service';
 
+// Instruction CRUD + session helpers
+export {
+  MAX_PROFILE_INSTRUCTIONS,
+  instructionCreateInputSchema,
+  instructionUpdateInputSchema,
+  listInstructionsForProfile,
+  getProfileInstructions,
+  createInstruction,
+  updateInstruction,
+  deleteInstruction,
+  setInstructionEnabled,
+  getInstructionsForSession,
+  type InstructionCreateInput,
+  type InstructionUpdateInput,
+  type InstructionForSession,
+} from './profile-instructions-service';
+
 // Repo binding CRUD
 export {
   bindProfileToRepo,
   unbindRepo,
+  removeRepoBinding,
   getBindingForRepo,
   listBindings,
 } from './repo-binding-service';
+export { canonicalRepoFullName } from './repo-binding-db';
+
+// Combined repository settings (profile binding + allocation override)
+export {
+  setRepositorySettings,
+  removeRepositorySettings,
+  type RepositorySettingsInput,
+} from './repository-settings-service';
+
+// Sandbox allocation settings (context default + per-repository overrides)
+export {
+  getSandboxAllocationSettings,
+  getSandboxAllocationCandidates,
+  setContextSandboxAllocation,
+  clearContextSandboxAllocation,
+  setRepoSandboxAllocation,
+  clearRepoSandboxAllocation,
+  type SandboxAllocationSettings,
+  type SandboxAllocationCandidates,
+  type RepositoryAllocationSetting,
+} from './sandbox-allocation-settings-service';
+
+// User-scoped built-in agent overrides (model, variant, visibility)
+export {
+  CLOUD_AGENT_BUILTIN_AGENTS,
+  CLOUD_AGENT_BUILTIN_AGENT_SLUGS,
+  BuiltinAgentOverrideSchema,
+  BuiltinAgentSettingsSchema,
+  BuiltinAgentSettingsInputSchema,
+  getCloudAgentBuiltinAgent,
+  normalizeBuiltinAgentSettings,
+  hasBuiltinAgentSettings,
+  MAX_BUILTIN_AGENT_MODEL_LENGTH,
+  MAX_BUILTIN_AGENT_VARIANT_LENGTH,
+  type CloudAgentBuiltinAgentDefinition,
+  type CloudAgentBuiltinAgentSlug,
+  type BuiltinAgentOverride,
+  type BuiltinAgentSettings,
+} from './builtin-agents';
+export { getBuiltinAgentSettings, setBuiltinAgentSettings } from './builtin-agent-settings-service';
+
+// User-scoped per-model context-window caps
+export {
+  ModelContextLimitsSchema,
+  normalizeModelContextLimits,
+  hasModelContextLimits,
+  MAX_MODEL_CONTEXT_LIMITS,
+  MAX_MODEL_CONTEXT_LIMIT_MODEL_LENGTH,
+  MIN_MODEL_CONTEXT_TOKENS,
+  MAX_MODEL_CONTEXT_TOKENS,
+  type ModelContextLimits,
+} from './model-context-limits';
+export { getModelContextLimits, setModelContextLimits } from './model-context-limits-service';
+
+// Local config import (preview diff + selective upsert)
+export {
+  buildImportPreview,
+  applyImport,
+  type ConfigImportPreview,
+  type ImportCategoryPreview,
+  type ImportChangedItem,
+  type ImportFieldChange,
+  type PostImportAgent,
+  type PostImportInstruction,
+  type PostImportKiloCommand,
+  type PostImportSkill,
+} from './profile-import-service';
+// Repository environments
+export {
+  ENVIRONMENT_SECRET_PLACEHOLDER,
+  ENVIRONMENT_LIMITS,
+  ENVIRONMENT_KEY_PATTERN,
+  isReservedEnvironmentKey,
+  validateEnvironmentName,
+  assertValidEnvironmentKey,
+  validateEnvironmentPlainVars,
+  validateEnvironmentSecretValue,
+  validateEnvironmentCommands,
+  validateEnvironmentVarCount,
+  bitbucketCloneUrl,
+  repositoryLeaf,
+  isSafeRepositoryLeaf,
+  normalizeRepoFullName,
+  sameRepositoryIdentity,
+  type EnvironmentOwner,
+  type EnvironmentPlatform,
+  type EnvironmentRepositoryIdentity,
+  type EnvironmentReferenceRepository,
+  type EnvironmentIdentityInput,
+  type EnvironmentIdentityResponse,
+  type EnvironmentV1CreateInput,
+  type EnvironmentV2CreateInput,
+  type EnvironmentCreateInput,
+  type EnvironmentSecretChange,
+  type EnvironmentUpdateInput,
+  type EnvironmentSessionLayer,
+  type EnvironmentReference,
+  type EnvironmentForSession,
+  type EnvironmentBuildInput,
+  type EnvironmentResponse,
+  type EnvironmentSummary,
+} from './environment-contracts';
+export {
+  environmentRepositoryEntrySchema,
+  environmentRepositoriesSchema,
+  type EnvironmentRepositoryEntry,
+} from './environment-repository-entry';
+export {
+  createEnvironment,
+  updateEnvironment,
+  deleteEnvironment,
+  getEnvironment,
+  listEnvironments,
+  listEnvironmentsForOwner,
+  loadEnvironmentForSession,
+  loadEnvironmentBuildInput,
+  readEnvironmentReference,
+  lockActiveOrganization,
+  type EnvironmentSessionResolution,
+  type EnvironmentTransaction,
+} from './environment-service';

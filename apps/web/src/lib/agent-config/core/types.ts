@@ -33,5 +33,4 @@ export const ReviewConfigSchema = z.object({
     ),
 });
 
-// Ensure the interface matches the Zod schema
 export type ReviewConfigValidated = z.infer<typeof ReviewConfigSchema>;

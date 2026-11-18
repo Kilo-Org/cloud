@@ -9,9 +9,23 @@
 // on iOS, so the mutation hook toasts onError AND the sheet shows inline.
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  View,
+} from 'react-native';
+
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { useFeedbackPromptRequest } from '@/components/use-feedback-prompt';
+import { cn } from '@/lib/utils';
 
 import {
   PrFormSheetFooter,
@@ -21,7 +35,10 @@ import {
 import { ReviewEventChips } from '@/components/pr-review/review-event-chips';
 import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   focusAfterPendingCommentRemoval,
   PendingQueueHint,
@@ -34,22 +51,111 @@ import {
   reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import {
-  ensureTermsAcceptedOutcome,
-  TERMS_CHECK_RETRY_COPY,
-  TERMS_OUTDATED_COPY,
-} from '@/components/pr-review/discussion/reply-input';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
+import {
+  mutationErrorDisplay,
+  type MutationErrorDisplayKind,
+} from '@/lib/pr-review/mutation-error-display';
+import {
+  buildProviderSubmitInput,
+  type ProviderReviewEventOption,
+  useSubmitReviewMutation,
+} from '@/lib/pr-review/use-pr-review-mutations';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
-import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
+import { maybeAskAfterSuccessfulOutcome } from '@/lib/feedback';
+import { buildReviewFooter } from '@/lib/pr-review/review-footer';
 import {
   selectPartialSubmitMessage,
   selectSubmitCtaLabel,
 } from '@/components/pr-review/pr-review-submit-view';
 
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
+
+/** The review event a provider `submitReview` input accepts, per chip event. */
+const EVENT_TO_PROVIDER = {
+  APPROVE: 'approve',
+  REQUEST_CHANGES: 'request_changes',
+  COMMENT: 'comment',
+} satisfies Record<ReviewEvent, ProviderReviewEventOption>;
+
+/** The chip label for one capability review event. */
+const PROVIDER_EVENT_LABEL_KEYS = {
+  approve: 'common.approve',
+  request_changes: 'prReview.eventChips.requestChanges',
+  comment: 'prReview.eventChips.comment',
+} satisfies Record<ProviderReviewEventOption, string>;
+
+/**
+ * Event chips driven by the server capability list (s6). The shared
+ * `ReviewEventChips` renders GitHub's three fixed options; on provider arms
+ * the capability list decides what is offered — a GitLab MR never offers
+ * request changes — so this renders only the events the provider accepts.
+ */
+function CapabilityReviewEventChips(props: {
+  events: readonly ProviderReviewEventOption[];
+  value: ReviewEvent;
+  disabled: boolean;
+  onChange: (next: ReviewEvent) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+        {t('prReview.eventChips.label')}
+      </Text>
+      <RadioGroup label={t('prReview.eventChips.label')} className="flex-row flex-wrap gap-2">
+        {props.events.map(providerEvent => {
+          const event = (Object.keys(EVENT_TO_PROVIDER) as ReviewEvent[]).find(
+            candidate => EVENT_TO_PROVIDER[candidate] === providerEvent
+          );
+          if (!event) {
+            return null;
+          }
+          const active = props.value === event;
+          return (
+            <Pressable
+              key={providerEvent}
+              disabled={props.disabled}
+              onPress={() => {
+                selectionHaptic();
+                props.onChange(event);
+              }}
+              {...radioItemA11y({
+                label: t(PROVIDER_EVENT_LABEL_KEYS[providerEvent]),
+                checked: active,
+                disabled: props.disabled,
+              })}
+              className={cn(
+                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
+                active ? 'border-primary bg-primary' : 'bg-secondary',
+                !active && (props.disabled ? 'border-hair-soft' : 'border-border')
+              )}
+            >
+              <Text
+                className={cn(
+                  'text-sm font-medium',
+                  active ? 'text-primary-foreground' : 'text-foreground',
+                  !active && props.disabled && 'text-muted-foreground'
+                )}
+              >
+                {t(PROVIDER_EVENT_LABEL_KEYS[providerEvent])}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </RadioGroup>
+    </View>
+  );
+}
 
 type PrReviewSubmitProps = Readonly<{
   owner: string;
@@ -58,29 +164,74 @@ type PrReviewSubmitProps = Readonly<{
   headSha: string;
   title: string;
   eyebrow: string;
+  /**
+   * The provider ref (s6). Present on the GitLab/Bitbucket surface: the
+   * submit posts one `providerReview.submitReview` event whose fresh pending
+   * comments ride the real inline `comments` batch (c3), and the
+   * pending-comment edit route is the ref's own. Absent on GitHub, which
+   * keeps the exact pre-s6 path.
+   */
+  prRef?: ProviderPrRef;
+  /**
+   * The review events to offer: the server capability list on provider arms,
+   * or comment only on the viewer's own GitHub pull request. Absent on any
+   * other GitHub pull request, which keeps the fixed three-option chip row.
+   */
+  reviewEvents?: readonly ProviderReviewEventOption[];
   onDismiss: () => void;
 }>;
 
 export function PrReviewSubmit(props: PrReviewSubmitProps) {
-  const { owner, repo, number, headSha, title, eyebrow, onDismiss } = props;
+  const { owner, repo, number, headSha, title, eyebrow, prRef, reviewEvents, onDismiss } = props;
   const router = useRouter();
+  const colors = useThemeColors();
   const pending = usePendingReview();
-  const submitReview = useSubmitReviewMutation({ owner, repo, number });
+  const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
+  const submitReview = useSubmitReviewMutation(prRef ?? { owner, repo, number });
+  const { userId } = useCurrentUserId();
+  // The post-submit prompt's surface is platform-specific
+  // (`feedback-prompt-platform.ts`): the claim below presents through it.
+  // The request goes to the FeedbackPromptProvider host mounted by the
+  // PR-review layout, not to a dialog hosted in this sheet's tree: the
+  // deferred claim runs after `onDismiss()` has dismissed this sheet
+  // (`router.back`), and a host inside the sheet would unmount before the
+  // claim presents — the Android in-app dialog would never render. The
+  // layout outlives the dismissal, so its host presents over the overview.
+  const requestFeedbackPrompt = useFeedbackPromptRequest();
+  const { prReviewFooter, hasLoaded: prReviewFooterLoaded } = usePrReviewFooterPreference();
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [hasSummary, setHasSummary] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
-  >(null);
+  // Same union the display helper returns, so a new display kind can never
+  // silently drift from this surface's state.
+  const [inlineErrorKind, setInlineErrorKind] = useState<MutationErrorDisplayKind | null>(null);
   const [partialResult, setPartialResult] = useState<string | null>(null);
 
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+
+  // Seed the summary refs from the default-on footer preference once it
+  // resolves, in the render that first sees the loaded preference and before
+  // the summary field mounts: the body below paints only after that, so its
+  // first frame already carries the prefilled footer and the settled hint.
+  const footerSeededRef = useRef(false);
+  const initialFooter =
+    prReviewFooterLoaded && prReviewFooter ? buildReviewFooter(Platform.OS) : '';
+  if (prReviewFooterLoaded && !footerSeededRef.current) {
+    footerSeededRef.current = true;
+    bodyRef.current = initialFooter;
+    setHasSummary(initialFooter.trim().length > 0);
+  }
 
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
+  // The provider platform as a stable primitive: the error effect words a
+  // rejected submit after the connected provider (s6f) without depending on
+  // the `prRef` object identity.
+  const providerPlatform = prRef?.platform;
   const { fresh, stale } = partitionPendingItems(pending.items, headSha);
   const staleIds = new Set(stale.map(item => item.id));
   const blockReason = reviewSubmitBlockReason({
@@ -103,23 +254,30 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             setInlineError(null);
             setInlineErrorKind(null);
           } else if (outcome.kind === 'outdated') {
-            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineError(i18n.t('prReview.discussion.termsOutdatedCopy'));
             setInlineErrorKind('bad-request');
           } else if (outcome.kind === 'unknown') {
-            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineError(i18n.t('prReview.discussion.termsCheckRetryCopy'));
             setInlineErrorKind('retryable');
           } else {
-            setInlineError('You must accept the Terms of Service to post.');
+            setInlineError(i18n.t('prReview.discussion.termsAcceptRequired'));
             setInlineErrorKind(null);
           }
         })();
         return;
       }
-      const display = mutationErrorDisplay('submit', classification, submitReview.error);
+      // The provider arm words the rejected submit after the connected
+      // provider (merge request vs pull request); GitHub rides no term and
+      // keeps the exact pre-s6 copy.
+      const display = mutationErrorDisplay('submit', classification, {
+        rawError: submitReview.error,
+        term: providerPlatform ? i18n.t(providerPrNounKey(providerPlatform)) : undefined,
+        platform: providerPlatform,
+      });
       setInlineError(display.message);
       setInlineErrorKind(display.kind);
     }
-  }, [submitReview.error]);
+  }, [submitReview.error, providerPlatform]);
 
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {
@@ -146,7 +304,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     setPartialResult(null);
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
-      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineError(i18n.t('prReview.discussion.termsOutdatedCopy'));
       setInlineErrorKind('bad-request');
       return;
     }
@@ -155,19 +313,30 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     }
     try {
       const body = bodyRef.current.trim();
+      // Provider arms post one event with a real inline batch (c3): every
+      // fresh pending comment rides `comments` anchored at its tapped diff
+      // position, and the summary stays the review body. An item without an
+      // anchor keeps the text-anchored body fallback.
+      const provider = buildProviderSubmitInput(body, fresh);
       await submitReview.mutateAsync(
-        buildSubmitReviewInput({
-          owner,
-          repo,
-          number,
-          event,
-          ...(body.length > 0 ? { body } : {}),
-          commitSha: headSha,
-          items: fresh,
-        })
+        prRef
+          ? {
+              event: EVENT_TO_PROVIDER[event],
+              ...(provider.body.length > 0 ? { body: provider.body } : {}),
+              ...(provider.comments.length > 0 ? { comments: provider.comments } : {}),
+            }
+          : buildSubmitReviewInput({
+              owner,
+              repo,
+              number,
+              event,
+              ...(body.length > 0 ? { body } : {}),
+              commitSha: headSha,
+              items: fresh,
+            })
       );
       pending.removeComments(fresh.map(item => item.id));
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       if (stale.length > 0) {
         // Stale items stay queued: keep the sheet open and report the partial
         // result instead of dismissing, so the user can edit or delete them.
@@ -176,6 +345,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         );
       } else {
         onDismiss();
+        requestIdleCallback(() => {
+          void maybeAskAfterSuccessfulOutcome(userId, requestFeedbackPrompt);
+        });
       }
     } catch {
       // Classified into inlineError by the effect above.
@@ -183,6 +355,20 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   }
 
   function openEditComposer(item: PendingReviewItem) {
+    if (prRef) {
+      // The pending comment edits through the ref's own composer route, so
+      // the composer stays inside the scope its queries run under.
+      router.push(
+        providerPrSheetHref(prRef, 'comment-composer', {
+          path: item.path,
+          side: item.side,
+          line: String(item.line),
+          ...(item.startLine !== undefined ? { startLine: String(item.startLine) } : {}),
+          pendingId: item.id,
+        })
+      );
+      return;
+    }
     const href: Href = {
       pathname: COMMENT_COMPOSER_PATH,
       params: {
@@ -200,21 +386,19 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   }
 
   function confirmDelete(item: PendingReviewItem) {
-    Alert.alert('Delete pending comment?', 'This comment will be removed from the review queue.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          // Announce/focus only when the remove is confirmed synchronous:
-          // the provider's removeComment filters by id and returns nothing,
-          // so the item must still be queued at delete-confirm time.
-          const removed = pending.items.some(queued => queued.id === item.id);
-          pending.removeComment(item.id);
-          focusAfterPendingCommentRemoval(bodyInputRef, removed);
-        },
+    confirm({
+      title: t('prReview.submit.deletePendingTitle'),
+      message: t('prReview.submit.deletePendingMessage'),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        // Announce/focus only when the remove is confirmed synchronous:
+        // the provider's removeComment filters by id and returns nothing,
+        // so the item must still be queued at delete-confirm time.
+        const removed = pending.items.some(queued => queued.id === item.id);
+        pending.removeComment(item.id);
+        focusAfterPendingCommentRemoval(bodyInputRef, removed);
       },
-    ]);
+    });
   }
 
   const submitDisabled =
@@ -225,6 +409,24 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     inlineErrorKind === 'reconnect';
 
   const keyboardVisible = useFormSheetKeyboardVisible();
+
+  // The body paints only once both device reads it is built from have settled:
+  // the stored footer preference seeds the summary (and with it the summary
+  // field's height and whether the queue card shows the block reason or the
+  // hint) and the stored pending queue decides the card's rows. A provisional
+  // body painted first moved the queue card 8.4 dp and the submit CTA 5.7 dp
+  // under the reader when the preference arrived. The header stays, so the
+  // sheet keeps its frame while the reads resolve.
+  if (!pending.hydrated || !prReviewFooterLoaded) {
+    return (
+      <>
+        <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={onDismiss} />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        </View>
+      </>
+    );
+  }
 
   // Hint only when empty/stale — skips the long happy-path line that
   // pushed footer CTAs below half-detent. blockReason replaces
@@ -250,21 +452,36 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-2 px-6 pt-2">
-          <ReviewEventChips
-            value={event}
-            disabled={isSubmitting}
-            onChange={next => {
-              setEvent(next);
-              clearRecoverableError();
-            }}
-          />
+        <View className="gap-4 px-6 pt-4">
+          {reviewEvents ? (
+            <CapabilityReviewEventChips
+              events={reviewEvents}
+              value={event}
+              disabled={isSubmitting}
+              onChange={next => {
+                setEvent(next);
+                clearRecoverableError();
+              }}
+            />
+          ) : (
+            <ReviewEventChips
+              value={event}
+              disabled={isSubmitting}
+              onChange={next => {
+                setEvent(next);
+                clearRecoverableError();
+              }}
+            />
+          )}
           <View className="gap-1.5">
-            <Text className="text-sm font-medium text-foreground">Summary (optional)</Text>
+            <Text className="text-sm font-medium text-foreground">
+              {t('prReview.submit.summaryOptional')}
+            </Text>
             <ReviewSummaryField
               bodyRef={bodyRef}
               inputRef={bodyInputRef}
               isDisabled={isSubmitting}
+              defaultValue={initialFooter}
               onChange={() => {
                 setHasSummary(bodyRef.current.trim().length > 0);
                 clearRecoverableError();
@@ -274,7 +491,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
           <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
             <Text className="text-sm font-medium text-foreground">
-              {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
+              {formatNumber(queuedCount, i18n.language)}{' '}
+              {t('prReview.submit.pendingComment', { count: queuedCount })}
             </Text>
             {queueHint}
             {/* Keyboard-open viewport is tight; keep the count, hide per-item
@@ -339,13 +557,14 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               }
             }}
             disabled={isSubmitting}
-            className="mt-1"
-            accessibilityLabel="Cancel"
+            className="mt-2"
+            accessibilityLabel={t('common.cancel')}
           >
-            <Text>Cancel</Text>
+            <Text>{t('common.cancel')}</Text>
           </Button>
         </PrFormSheetFooter>
       </ScrollView>
+      {dialog}
     </>
   );
 }

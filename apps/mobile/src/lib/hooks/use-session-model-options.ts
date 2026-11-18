@@ -9,7 +9,9 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { sortRemoteModelCatalogProviders } from '@kilocode/cloud-agent-sdk/remote-model-order';
 
-import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { i18n } from '@/i18n';
+import { type ModelOption, type ModelPricing } from '@/lib/hooks/use-available-models';
+import { formatShortModelDisplayName, resolveCatalogModelName } from '@/lib/model-display-name';
 
 type SessionModelSource =
   | 'cloud-agent-gateway'
@@ -26,13 +28,18 @@ export type SessionModelOption = {
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: ModelPricing;
   contextWindow?: number;
   provider?: { id: string; name: string };
   modelRef?: ModelRef;
   overrideSource?: RemoteModelOverride['source'];
   showGatewayMetadata: boolean;
   unavailable?: boolean;
+  /**
+   * What a custom or on-device chat model receives. Absent for Kilo models: all
+   * of them receive tools, and the attach control shows which read images.
+   */
+  capabilities?: { tools: boolean; images: boolean };
 };
 
 type BuildSessionModelOptionsInput = {
@@ -91,6 +98,20 @@ export function buildSessionModelOptions(
 ): SessionModelOptions {
   if (input.activeSessionType === 'remote') {
     if (input.remoteModelState.protocol === 'v1' && input.remoteModelState.catalog) {
+      // A v1 catalog with zero models is an empty answer (the CLI replied
+      // before its model list was ready, or a late/absent response), and must
+      // not become an enabled, zero-option picker whose sheet shows "No models
+      // available". Count models, not providers: the wire schema allows a
+      // connected provider with an empty `models` record, which projects to
+      // zero options. Route either shape through the unavailable projection
+      // instead, so the chip stays loading/disabled for the whole retry window.
+      // A populated catalog is unchanged.
+      const hasModel = input.remoteModelState.catalog.providers.some(
+        provider => provider.models.length > 0
+      );
+      if (!hasModel) {
+        return buildUnavailableRemoteOptions(input);
+      }
       return buildCliCatalogOptions(input);
     }
     if (input.remoteModelState.protocol === 'legacy') {
@@ -112,10 +133,10 @@ export function buildSessionModelOptions(
 function buildUnavailableRemoteOptions(input: BuildSessionModelOptionsInput): SessionModelOptions {
   const currentSelection = getCurrentRemoteSelection(input);
   const option = currentSelection
-    ? createUnavailableOption(currentSelection.model)
+    ? createUnavailableOption(currentSelection.model, input.gatewayModels)
     : ({
         id: 'remote-session-model',
-        name: 'Session model',
+        name: i18n.t('agentChat.modelSelector.sessionModel'),
         displayId: '',
         variants: [],
         isPreferred: false,
@@ -166,28 +187,17 @@ function buildLegacyGatewayOptions(input: BuildSessionModelOptionsInput): Sessio
     input.remoteModelOverride,
     input.gatewayModels
   );
-  const currentSelection = getCurrentRemoteSelection(input, remoteModelOverride);
-  let selectedOption = currentSelection
-    ? options.find(
-        option => option.modelRef && modelRefsEqual(option.modelRef, currentSelection.model)
-      )
-    : undefined;
-
-  if (currentSelection && !selectedOption) {
-    selectedOption = createUnavailableOption(currentSelection.model);
-    options.unshift(selectedOption);
-  }
-
-  const selectedVariant =
-    currentSelection?.variant && selectedOption?.variants.includes(currentSelection.variant)
-      ? currentSelection.variant
-      : '';
+  const projection = projectSelection(
+    options,
+    getCurrentRemoteSelection(input, remoteModelOverride),
+    input.gatewayModels
+  );
 
   return {
     source: 'remote-legacy-gateway',
-    options,
-    selectedValue: selectedOption?.id ?? '',
-    selectedVariant,
+    options: projection.options,
+    selectedValue: projection.selectedValue,
+    selectedVariant: projection.selectedVariant,
     pickerDisabled: input.gatewayModelsLoading,
     isLoading: input.gatewayModelsLoading,
   };
@@ -204,7 +214,7 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
     provider.models.map(model => {
       const option: SessionModelOption = {
         id: `remote-model-${opaqueIndex}`,
-        name: model.name ?? model.id,
+        name: formatShortModelDisplayName(model.name ?? model.id),
         displayId: model.id,
         variants: model.variants,
         isPreferred: false,
@@ -221,37 +231,73 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
       return option;
     })
   );
-  const currentSelection = getCurrentRemoteSelection(input);
-  let selectedOption = currentSelection
-    ? options.find(
-        option => option.modelRef && modelRefsEqual(option.modelRef, currentSelection.model)
-      )
-    : undefined;
-
-  if (currentSelection && !selectedOption) {
-    selectedOption = createUnavailableOption(currentSelection.model);
-    options.unshift(selectedOption);
-  }
-
-  const selectedVariant =
-    currentSelection?.variant && selectedOption?.variants.includes(currentSelection.variant)
-      ? currentSelection.variant
-      : '';
+  const projection = projectSelection(
+    options,
+    getCurrentRemoteSelection(input),
+    input.gatewayModels
+  );
 
   return {
     source: 'remote-cli-catalog',
-    options,
-    selectedValue: selectedOption?.id ?? '',
-    selectedVariant,
+    options: projection.options,
+    selectedValue: projection.selectedValue,
+    selectedVariant: projection.selectedVariant,
     pickerDisabled: false,
     isLoading: false,
   };
 }
 
-function createUnavailableOption(modelRef: ModelRef): SessionModelOption {
+/**
+ * Resolve a stored or observed selection against the option list it will be
+ * shown in: the matching row, plus an unavailable head row when the catalogue
+ * no longer lists the selected model. A variant survives only while the
+ * resolved row offers it.
+ *
+ * `gatewayModels` names that head row: a CLI catalogue that does not carry the
+ * model still leaves the app's own catalogue able to name it.
+ */
+function projectSelection(
+  options: SessionModelOption[],
+  selection: ModelSelection | null,
+  gatewayModels: ModelOption[]
+) {
+  const matched = selection
+    ? options.find(option => option.modelRef && modelRefsEqual(option.modelRef, selection.model))
+    : undefined;
+
+  if (selection && !matched) {
+    // The catalogue no longer lists the selected model: keep it reachable as a
+    // head row, with no variant to carry.
+    const unavailable = createUnavailableOption(selection.model, gatewayModels);
+    return {
+      options: [unavailable, ...options],
+      selectedValue: unavailable.id,
+      selectedVariant: '',
+    };
+  }
+
+  return {
+    options,
+    selectedValue: matched?.id ?? '',
+    selectedVariant:
+      selection?.variant && matched?.variants.includes(selection.variant) ? selection.variant : '',
+  };
+}
+
+/**
+ * The head row for a selected model the current option list cannot name. Its
+ * name comes from the app's own model catalogue, the one the picker lists, so a
+ * CLI session whose catalogue lost the model still shows the same human name
+ * the new-session composer does; a model no catalogue carries keeps a readable
+ * segment instead of the raw reference.
+ */
+function createUnavailableOption(
+  modelRef: ModelRef,
+  gatewayModels: ModelOption[]
+): SessionModelOption {
   return {
     id: 'remote-unavailable-model',
-    name: modelRef.modelID,
+    name: resolveCatalogModelName(modelRef.modelID, gatewayModels),
     displayId: modelRef.modelID,
     variants: [],
     isPreferred: false,

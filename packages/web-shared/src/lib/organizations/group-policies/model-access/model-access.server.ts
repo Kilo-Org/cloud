@@ -1,0 +1,417 @@
+import 'server-only';
+
+import {
+  ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
+  type OrganizationGroupModelAccessPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import { modelsByProvider, organizations } from '@kilocode/db/schema';
+import type { OrganizationSettings } from '@kilocode/db/schema-types';
+import { TRPCError } from '@trpc/server';
+import { and, desc, eq, isNull } from 'drizzle-orm';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  VIRTUAL_PROVIDER,
+  withoutVirtualProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import {
+  getModelInferenceProviders,
+  isModelRestrictionExempt,
+  type CustomLlmGrantee,
+  type ProviderLookup,
+} from '@kilocode/web-shared/lib/model-allow.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getOrganizationGroupPolicyContext,
+  type OrganizationGroupPolicyContext,
+} from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+
+export type EffectiveOrganizationModelPolicy = {
+  requireModelInCurrentSnapshot: boolean;
+  organizationModelDenyList: string[];
+  organizationProviderCeiling?: string[];
+  memberGrant:
+    | { mode: 'unrestricted' }
+    | { mode: 'organization_baseline' }
+    | {
+        mode: 'selected';
+        includeOrganizationBaseline: boolean;
+        modelAllowList: string[];
+        providerAllowList: string[];
+      };
+  dataCollection?: OrganizationSettings['data_collection'];
+  policyRevision: number;
+  customLlmGrantee: CustomLlmGrantee;
+};
+
+export type EffectiveModelDecision = {
+  allowed: boolean;
+  eligibleProviderRoutes?: ReadonlySet<string>;
+  denialSource?:
+    | 'organization_model'
+    | 'organization_provider'
+    | 'group_model'
+    | 'group_provider'
+    | 'no_grant';
+};
+
+export function evaluateEffectiveModelAccessPolicy(
+  context: OrganizationGroupPolicyContext
+): EffectiveOrganizationModelPolicy {
+  const organizationRestrictionsEnabled = context.organization.plan === 'enterprise';
+  const organizationModelDenyList = organizationRestrictionsEnabled
+    ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
+    : [];
+  const organizationProviderCeiling = organizationRestrictionsEnabled
+    ? context.organization.settings.provider_allow_list
+    : undefined;
+  // `organizationModelDenyList` and `organizationProviderCeiling` set the default
+  // model and provider access for organization members. Group policies set the
+  // access of their own members. Organization admins manage both.
+  // The fields below do not vary by branch; each branch adds only the snapshot
+  // requirement and the member grant that its policy mode implies.
+  const organizationFields = {
+    organizationModelDenyList,
+    organizationProviderCeiling,
+    dataCollection: context.organization.settings.data_collection,
+    policyRevision: context.policyRevision,
+    customLlmGrantee: {
+      organizationId: context.organization.id,
+      groupIds: context.groupIds,
+    },
+  };
+  if (!organizationRestrictionsEnabled) {
+    return {
+      ...organizationFields,
+      requireModelInCurrentSnapshot: false,
+      memberGrant: { mode: 'unrestricted' },
+    };
+  }
+
+  const defaultPolicy = context.defaultPolicies.find(policy => policy.type === 'model_access');
+  const groupPolicies = context.groupPolicies
+    .flat()
+    .filter(policy => policy.type === 'model_access');
+  const includeOrganizationBaseline =
+    !defaultPolicy ||
+    defaultPolicy.data.mode === 'all' ||
+    groupPolicies.some(policy => policy.data.mode === 'all');
+  const selectedPolicies = [defaultPolicy, ...groupPolicies].flatMap(policy =>
+    policy?.data.mode === 'selected' ? [policy] : []
+  );
+  if (selectedPolicies.length === 0 && includeOrganizationBaseline) {
+    return {
+      ...organizationFields,
+      requireModelInCurrentSnapshot: true,
+      memberGrant: { mode: 'organization_baseline' },
+    };
+  }
+
+  return {
+    ...organizationFields,
+    requireModelInCurrentSnapshot: true,
+    memberGrant: {
+      mode: 'selected',
+      includeOrganizationBaseline,
+      modelAllowList: [
+        ...new Set(
+          selectedPolicies.flatMap(policy =>
+            policy.data.mode === 'selected'
+              ? policy.data.model_allow_list.map(normalizeModelId)
+              : []
+          )
+        ),
+      ],
+      providerAllowList: [
+        ...new Set(
+          selectedPolicies.flatMap(policy =>
+            policy.data.mode === 'selected' ? policy.data.provider_allow_list : []
+          )
+        ),
+      ],
+    },
+  };
+}
+
+/**
+ * Routers listed under the snapshot-only virtual provider pick a real provider
+ * per request. Allowing `virtual` lets them route to every real provider that
+ * the same allow list permits; without one, they have nowhere to route.
+ */
+function getEligibleProviderRoutes(
+  modelProviders: ReadonlySet<string>,
+  allowedProviders: ReadonlySet<string>
+): Set<string> {
+  if (modelProviders.has(VIRTUAL_PROVIDER.slug) && allowedProviders.has(VIRTUAL_PROVIDER.slug)) {
+    const realProviders = withoutVirtualProvider([...allowedProviders]);
+    return new Set(realProviders.length > 0 ? [VIRTUAL_PROVIDER.slug, ...realProviders] : []);
+  }
+  return new Set([...modelProviders].filter(provider => allowedProviders.has(provider)));
+}
+
+export async function getEffectiveModelDecision(
+  policy: EffectiveOrganizationModelPolicy,
+  modelId: string,
+  providerLookup: ProviderLookup = getProviderSlugsForModel
+): Promise<EffectiveModelDecision> {
+  const normalizedModelId = normalizeModelId(modelId);
+  // An unrestricted grant admits every model, and `evaluateEffectiveModelAccessPolicy`
+  // only ever pairs it with `requireModelInCurrentSnapshot: false`. Neither the
+  // exemption nor the pinned-provider lookup below can change that decision, because
+  // the set the provider lookup pins is never empty: a public custom LLM declares at
+  // least one inference provider. Resolving them per model is pure cost.
+  if (policy.memberGrant.mode === 'unrestricted') {
+    return { allowed: true };
+  }
+  if (await isModelRestrictionExempt(modelId, policy.customLlmGrantee)) {
+    return { allowed: true };
+  }
+  if (
+    policy.memberGrant.mode === 'organization_baseline' &&
+    policy.organizationModelDenyList.includes(normalizedModelId)
+  ) {
+    return { allowed: false, denialSource: 'organization_model' };
+  }
+  const pinnedProviders = await getModelInferenceProviders(modelId);
+  const currentModelProviders =
+    pinnedProviders ??
+    (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);
+  if (currentModelProviders?.size === 0) {
+    return { allowed: false, denialSource: 'organization_model' };
+  }
+  const organizationRoutes = policy.organizationProviderCeiling
+    ? new Set(policy.organizationProviderCeiling)
+    : undefined;
+
+  async function decisionWithinOrganizationBaseline(): Promise<EffectiveModelDecision> {
+    if (policy.organizationModelDenyList.includes(normalizedModelId)) {
+      return { allowed: false, denialSource: 'organization_model' };
+    }
+    if (!organizationRoutes) return { allowed: true };
+    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
+    if (modelProviders.size === 0) {
+      return { allowed: false, denialSource: 'organization_model' };
+    }
+    const eligibleProviderRoutes = getEligibleProviderRoutes(modelProviders, organizationRoutes);
+    return eligibleProviderRoutes.size > 0
+      ? { allowed: true, eligibleProviderRoutes }
+      : { allowed: false, denialSource: 'organization_provider' };
+  }
+
+  if (policy.memberGrant.mode === 'organization_baseline') {
+    return await decisionWithinOrganizationBaseline();
+  }
+  // A group policy that selects models and providers sets the access of its own
+  // members.
+  if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
+    return { allowed: true };
+  }
+  if (policy.memberGrant.providerAllowList.length > 0) {
+    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
+    const memberProviders = new Set(policy.memberGrant.providerAllowList);
+    const eligibleProviderRoutes = getEligibleProviderRoutes(modelProviders, memberProviders);
+    if (eligibleProviderRoutes.size > 0) {
+      if (policy.memberGrant.includeOrganizationBaseline) {
+        const baselineDecision = await decisionWithinOrganizationBaseline();
+        if (baselineDecision.allowed && !baselineDecision.eligibleProviderRoutes) {
+          return baselineDecision;
+        }
+        baselineDecision.eligibleProviderRoutes?.forEach(provider =>
+          eligibleProviderRoutes.add(provider)
+        );
+      }
+      return { allowed: true, eligibleProviderRoutes };
+    }
+  }
+  if (policy.memberGrant.includeOrganizationBaseline) {
+    return await decisionWithinOrganizationBaseline();
+  }
+  return { allowed: false, denialSource: 'no_grant' };
+}
+
+/**
+ * Whether `decision` admits a request served by one of the organization's provider keys sent
+ * through Vercel that the provider allow-list cannot restrict, because the key's provider has no
+ * OpenRouter slug. Such a key names a provider the organization configured itself, so only the
+ * model restrictions and grants apply. Routing drops Vercel provider keys that the allow-list can
+ * name but does not admit (see `isVercelUserByokProviderAllowed`). Catalog-mode direct BYOK keys
+ * are decided per provider instead (see `isModelAllowedForProviderKey`).
+ */
+export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision): boolean {
+  return decision.allowed || decision.denialSource === 'organization_provider';
+}
+
+/**
+ * Whether the policy admits `modelId` served by the organization's own key for `providerSlug`, as
+ * a catalog-mode direct BYOK key serves it. The key's provider is the only route, whichever
+ * providers the snapshot lists for the model, so provider allow-lists and grants are checked
+ * against it alone. A policy that requires the model in the current snapshot still does.
+ */
+export async function isModelAllowedForProviderKey(
+  policy: EffectiveOrganizationModelPolicy,
+  modelId: string,
+  providerSlug: string,
+  providerLookup: ProviderLookup = getProviderSlugsForModel
+): Promise<boolean> {
+  const decision = await getEffectiveModelDecision(policy, modelId, async lookupModelId =>
+    (await providerLookup(lookupModelId)).size > 0 ? new Set([providerSlug]) : new Set()
+  );
+  return decision.allowed;
+}
+
+export async function isModelRouteAllowed(
+  policy: EffectiveOrganizationModelPolicy,
+  modelId: string,
+  providerSlug: string,
+  providerLookup: ProviderLookup = getProviderSlugsForModel
+) {
+  const decision = await getEffectiveModelDecision(policy, modelId, providerLookup);
+  return (
+    decision.allowed &&
+    (!decision.eligibleProviderRoutes || decision.eligibleProviderRoutes.has(providerSlug))
+  );
+}
+
+/**
+ * Resolve a member's effective model-access policy once. Callers that need to
+ * evaluate many models for one member should call this a single time and then
+ * loop with `getEffectiveModelDecision`, rather than re-resolving the policy
+ * context (a read-only transaction plus several queries) per model.
+ */
+export async function resolveOrganizationMemberModelPolicy(params: {
+  organizationId: string;
+  kiloUserId: string;
+  /** See `allowNonMember` on the member policy subject. */
+  allowNonMember?: boolean;
+  fromDb?: typeof db;
+}): Promise<EffectiveOrganizationModelPolicy> {
+  return evaluateEffectiveModelAccessPolicy(
+    await getOrganizationGroupPolicyContext({
+      organizationId: params.organizationId,
+      subject: {
+        type: 'member',
+        kiloUserId: params.kiloUserId,
+        allowNonMember: params.allowNonMember,
+      },
+      fromDb: params.fromDb,
+    })
+  );
+}
+
+/**
+ * Resolve an organization's default (non-member-specific) effective
+ * model-access policy once. See `resolveOrganizationMemberModelPolicy` for the
+ * per-model looping guidance.
+ */
+export async function resolveOrganizationDefaultModelPolicy(params: {
+  organizationId: string;
+}): Promise<EffectiveOrganizationModelPolicy> {
+  return evaluateEffectiveModelAccessPolicy(
+    await getOrganizationGroupPolicyContext({
+      organizationId: params.organizationId,
+      subject: { type: 'defaultAccess' },
+    })
+  );
+}
+
+export async function resolveOrganizationMemberModelDecision(params: {
+  organizationId: string;
+  kiloUserId: string;
+  allowNonMember?: boolean;
+  modelId: string;
+  providerLookup?: ProviderLookup;
+  fromDb?: typeof db;
+}) {
+  const policy = await resolveOrganizationMemberModelPolicy(params);
+  return {
+    policy,
+    decision: await getEffectiveModelDecision(policy, params.modelId, params.providerLookup),
+  };
+}
+
+export async function resolveOrganizationDefaultModelDecision(params: {
+  organizationId: string;
+  modelId: string;
+  providerLookup?: ProviderLookup;
+}) {
+  const policy = await resolveOrganizationDefaultModelPolicy(params);
+  return await getEffectiveModelDecision(policy, params.modelId, params.providerLookup);
+}
+
+/**
+ * Whether an organization-owned integration may set `modelId` as its default,
+ * per the organization's default model-access policy.
+ *
+ * A missing or soft-deleted organization is treated as allowed: the policy
+ * context throws `NOT_FOUND` in that case, but integration model updates
+ * historically skipped the policy check entirely when the organization row was
+ * absent, and `updateModel` must return a `{ success }` result rather than
+ * throwing.
+ */
+export async function isOrganizationModelUpdateAllowed(
+  organizationId: string,
+  modelId: string
+): Promise<boolean> {
+  try {
+    const { allowed } = await resolveOrganizationDefaultModelDecision({ organizationId, modelId });
+    return allowed;
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === 'NOT_FOUND') return true;
+    throw error;
+  }
+}
+
+export function normalizeModelAccessPolicy(
+  policy: OrganizationGroupModelAccessPolicy
+): OrganizationGroupModelAccessPolicy {
+  if (policy.data.mode !== 'selected') return policy;
+  return {
+    type: 'model_access',
+    data: {
+      mode: 'selected',
+      model_allow_list: [
+        ...new Set(policy.data.model_allow_list.map(value => normalizeModelId(value.trim()))),
+      ].sort(),
+      provider_allow_list: [
+        ...new Set(
+          policy.data.provider_allow_list.map(value => normalizeInferenceProviderId(value.trim()))
+        ),
+      ].sort(),
+    },
+  };
+}
+
+export async function getModelAccessPolicyEditorData(organizationId: string) {
+  const [[organization], [catalog]] = await Promise.all([
+    db
+      .select({ plan: organizations.plan })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1),
+    db
+      .select({ data: modelsByProvider.data })
+      .from(modelsByProvider)
+      .orderBy(desc(modelsByProvider.id))
+      .limit(1),
+  ]);
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  if (organization.plan !== 'enterprise') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
+    });
+  }
+  if (!catalog) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Model and provider catalog has not been synchronized.',
+    });
+  }
+  return {
+    policyType: 'model_access' as const,
+    catalog: catalog.data,
+  };
+}

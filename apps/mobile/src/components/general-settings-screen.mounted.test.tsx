@@ -1,0 +1,397 @@
+/* eslint-disable max-lines -- the provider mock harness, the focus simulator, and the General rows share one mounted fixture. */
+import { act } from '@/test/renderer';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
+import { useEffect, useSyncExternalStore } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import '@/i18n';
+import { GeneralSettingsScreen } from '@/components/general-settings-screen';
+import { AppUnlockProvider } from '@/lib/app-unlock-context';
+
+vi.hoisted(() => {
+  vi.stubGlobal('__DEV__', false);
+});
+
+const native = vi.hoisted(() => ({
+  hasHardwareAsync: vi.fn(),
+  isEnrolledAsync: vi.fn(),
+  getEnrolledLevelAsync: vi.fn(),
+  authenticateAsync: vi.fn(),
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+}));
+const storage = vi.hoisted(() => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+}));
+vi.mock('expo-local-authentication', () => native);
+vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: 'NativeStateSurface',
+  StateSurface: 'StateSurface',
+}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('react-native', () => ({
+  Switch: 'Switch',
+  Pressable: 'Pressable',
+  View: 'View',
+  ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
+  AccessibilityInfo: {},
+  AppState: { currentState: 'active', addEventListener: () => ({ remove: () => undefined }) },
+}));
+// Focus state drives the mocked focus effect: flipping it notifies subscribers,
+// so the effect's cleanup runs exactly like a real blur while the provider and
+// the screen stay mounted.
+const focus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: false,
+    setFocused(next: boolean) {
+      focus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(focus.subscribe, () => focus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
+}));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Brain: 'Brain',
+  CornerDownLeft: 'CornerDownLeft',
+  Cpu: 'Cpu',
+  EyeOff: 'EyeOff',
+  Globe: 'Globe',
+  MessageSquare: 'MessageSquare',
+  Mic: 'Mic',
+  Rows3: 'Rows3',
+  Shield: 'Shield',
+  Smartphone: 'Smartphone',
+}));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// Mutable because one row's state depends on the other: the auto-expand row
+// reads the hide-thinking value. Reset in beforeEach.
+const thinkingPreference = vi.hoisted(() => ({
+  reasoning: { defaultExpanded: false, hasLoaded: true, setDefaultExpanded: vi.fn() },
+  hide: { hideThinking: false, hasLoaded: true, setHideThinking: vi.fn() },
+}));
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => thinkingPreference.hide,
+}));
+vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
+  useKeepScreenOnPreference: () => ({
+    keepScreenOn: false,
+    hasLoaded: true,
+    setKeepScreenOn: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
+  usePrReviewFooterPreference: () => ({
+    prReviewFooter: true,
+    hasLoaded: true,
+    setPrReviewFooter: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
+  useReasoningPreference: () => thinkingPreference.reasoning,
+}));
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
+}));
+// Mutable so one test can hold the preference unloaded and assert the switch
+// stays disabled; every other test resets it to loaded in beforeEach.
+const condensePreference = vi.hoisted(() => ({
+  condenseToolCalls: false,
+  hasLoaded: true,
+  setCondenseToolCalls: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => condensePreference,
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
+}));
+
+let view: RenderWithProvidersResult | undefined = undefined;
+async function flush(update?: () => void) {
+  await act(async () => {
+    update?.();
+    await vi.dynamicImportSettled();
+  });
+}
+async function mountGeneral(): Promise<RenderWithProvidersResult> {
+  storage.getItemAsync.mockResolvedValue(null);
+  view = await renderWithProviders(<GeneralSettingsScreen />, {
+    wrapper: ({ children }) => (
+      <AppUnlockProvider promptMessage="Unlock with biometrics">{children}</AppUnlockProvider>
+    ),
+  });
+  await flush();
+  return view;
+}
+function texts(renderer: RenderWithProvidersResult) {
+  return renderer.renderer.root
+    .findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        typeof node.props.children === 'string'
+    )
+    .map(node => node.props.children as string);
+}
+function biometricToggle(renderer: RenderWithProvidersResult) {
+  const found = renderer.renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Switch')
+    .find(sw => sw.props.accessibilityLabel === 'Unlock with biometrics');
+  return typeof found?.props.onValueChange === 'function'
+    ? (found.props.onValueChange as (next: boolean) => void)
+    : undefined;
+}
+function switchByLabel(renderer: RenderWithProvidersResult, label: string) {
+  return renderer.renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Switch')
+    .find(sw => sw.props.accessibilityLabel === label);
+}
+/** The tappable half of the row that shows `title`, which carries the same disabled state. */
+function rowPressable(renderer: RenderWithProvidersResult, title: string) {
+  return renderer.renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable')
+    .find(
+      pressable =>
+        pressable.findAll(
+          node =>
+            typeof node.type === 'string' &&
+            (node.type as string) === 'Text' &&
+            node.props.children === title
+        ).length > 0
+    );
+}
+/** Which of the two subtitles the row paints, versus only reserves. */
+function paintedSubtitle(renderer: RenderWithProvidersResult, rowTitle: string) {
+  const overlay = rowPressable(renderer, rowTitle)?.find(
+    node => typeof node.type === 'string' && node.props.className === 'absolute inset-x-0 top-0'
+  );
+  return overlay
+    ?.findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+    .map(node => node.props.children as string);
+}
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', false);
+  vi.resetAllMocks();
+  focus.setFocused(false);
+  native.hasHardwareAsync.mockResolvedValue(true);
+  native.isEnrolledAsync.mockResolvedValue(true);
+  native.getEnrolledLevelAsync.mockResolvedValue(3);
+  native.authenticateAsync.mockResolvedValue({ success: true });
+  condensePreference.condenseToolCalls = false;
+  condensePreference.hasLoaded = true;
+  thinkingPreference.reasoning.defaultExpanded = false;
+  thinkingPreference.reasoning.hasLoaded = true;
+  thinkingPreference.hide.hideThinking = false;
+  thinkingPreference.hide.hasLoaded = true;
+});
+afterEach(() => {
+  view?.unmount();
+  view = undefined;
+  vi.unstubAllGlobals();
+});
+describe('GeneralSettingsScreen', () => {
+  it('renders the settings and the condense row with their exact titles and subtitles', async () => {
+    const renderer = await mountGeneral();
+    const rendered = texts(renderer);
+
+    expect(rendered).toContain('Unlock with biometrics');
+    expect(rendered).toContain('Unlock at launch and after five minutes in the background.');
+    expect(rendered).toContain('Auto expand thinking');
+    expect(rendered).toContain("Show the agent's thinking expanded when it finishes.");
+    expect(rendered).toContain('Hide thinking details');
+    expect(rendered).toContain("Don't show the agent's thinking on the session page.");
+    expect(rendered).toContain('Keep screen on while on session page');
+    expect(rendered).toContain('Hold the screen awake while the session is working.');
+    expect(rendered).toContain('Add app attribution to PR reviews');
+    expect(rendered).toContain('Append a Reviewed via Kilo footer when you submit a review.');
+    expect(rendered).toContain('Return key sends message');
+    expect(rendered).toContain('When off, Return inserts a newline in agent composers.');
+    expect(rendered).toContain('Condense tool calls');
+    expect(rendered).toContain('Group consecutive tool calls into one row you can open.');
+  });
+
+  it('renders the condense switch off and enabled while the other five rows are unchanged', async () => {
+    const renderer = await mountGeneral();
+
+    const switches = renderer.renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    const byLabel = (label: string) => switches.find(sw => sw.props.accessibilityLabel === label);
+
+    expect(byLabel('Condense tool calls')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+    expect(byLabel('Unlock with biometrics')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+    expect(byLabel('Auto expand thinking')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+    expect(byLabel('Keep screen on while on session page')?.props.accessibilityState).toMatchObject(
+      {
+        checked: false,
+        disabled: false,
+      }
+    );
+    expect(byLabel('Add app attribution to PR reviews')?.props.accessibilityState).toMatchObject({
+      checked: true,
+      disabled: false,
+    });
+    expect(byLabel('Return key sends message')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+  });
+
+  it('disables the condense switch until the preference has loaded', async () => {
+    condensePreference.hasLoaded = false;
+    const renderer = await mountGeneral();
+
+    const switches = renderer.renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    const condenseSwitch = switches.find(
+      sw => sw.props.accessibilityLabel === 'Condense tool calls'
+    );
+
+    expect(condenseSwitch?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: true,
+    });
+  });
+
+  it('makes the auto-expand row inert and says why while thinking details are hidden', async () => {
+    // The stored auto-expand value survives: hiding thinking stops it from
+    // applying, it does not throw the choice away.
+    thinkingPreference.reasoning.defaultExpanded = true;
+    thinkingPreference.hide.hideThinking = true;
+    const renderer = await mountGeneral();
+
+    const autoExpand = switchByLabel(renderer, 'Auto expand thinking');
+    expect(autoExpand?.props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+    expect(autoExpand?.props.accessibilityHint).toBe(
+      'No effect while thinking details are hidden.'
+    );
+    expect(rowPressable(renderer, 'Auto expand thinking')?.props.disabled).toBe(true);
+    expect(paintedSubtitle(renderer, 'Auto expand thinking')).toEqual([
+      'No effect while thinking details are hidden.',
+    ]);
+    // The row that hides thinking stays the independent switch the person uses to undo this.
+    expect(
+      switchByLabel(renderer, 'Hide thinking details')?.props.accessibilityState
+    ).toMatchObject({ checked: true, disabled: false });
+  });
+
+  it('restores the auto-expand row when thinking details are shown again', async () => {
+    thinkingPreference.reasoning.defaultExpanded = true;
+    const renderer = await mountGeneral();
+
+    const autoExpand = switchByLabel(renderer, 'Auto expand thinking');
+    expect(autoExpand?.props.accessibilityState).toMatchObject({ checked: true, disabled: false });
+    expect(autoExpand?.props.accessibilityHint).toBe(
+      "Show the agent's thinking expanded when it finishes."
+    );
+    expect(paintedSubtitle(renderer, 'Auto expand thinking')).toEqual([
+      "Show the agent's thinking expanded when it finishes.",
+    ]);
+  });
+
+  it('keeps the auto-expand row inert until both thinking preferences have loaded', async () => {
+    thinkingPreference.hide.hasLoaded = false;
+    const renderer = await mountGeneral();
+
+    expect(switchByLabel(renderer, 'Auto expand thinking')?.props.accessibilityState).toMatchObject(
+      { disabled: true }
+    );
+  });
+
+  it('does not prompt for native authentication when opening settings', async () => {
+    await mountGeneral();
+    expect(native.authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows the failure feedback while the screen stays focused after a failed enable attempt', async () => {
+    focus.setFocused(true);
+    native.authenticateAsync.mockResolvedValue({
+      success: false,
+      error: 'not_available',
+    });
+    const renderer = await mountGeneral();
+    const attempt = biometricToggle(renderer);
+    expect(attempt).toBeDefined();
+
+    await flush(() => {
+      attempt?.(true);
+    });
+
+    const feedback = texts(renderer);
+    expect(feedback).toContain('Unavailable');
+    expect(feedback).toContain('Check your device security settings and try again.');
+  });
+
+  it('shows no failure feedback after the screen loses focus and the user returns', async () => {
+    focus.setFocused(true);
+    native.authenticateAsync.mockResolvedValue({
+      success: false,
+      error: 'not_available',
+    });
+    const renderer = await mountGeneral();
+    const attempt = biometricToggle(renderer);
+    expect(attempt).toBeDefined();
+
+    await flush(() => {
+      attempt?.(true);
+    });
+    expect(texts(renderer)).toContain('Unavailable');
+
+    // Blur (back to Preferences) retires the attempt's feedback; the provider
+    // stays mounted, so the clear must come from the focus cleanup itself.
+    await flush(() => {
+      focus.setFocused(false);
+    });
+    await flush(() => {
+      focus.setFocused(true);
+    });
+
+    expect(texts(renderer)).not.toContain('Unavailable');
+    expect(texts(renderer)).not.toContain('Check your device security settings and try again.');
+  });
+});

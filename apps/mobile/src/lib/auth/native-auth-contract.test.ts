@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  parseAuthErrorCode,
+  buildChallengeEntry,
+  buildDeviceAuthPollRequest,
+  parseAuthError,
   parseDeviceAuthCodeResponse,
   parseDeviceAuthTokenResponse,
   parseEmailCodeResponse,
   parseTokenPair,
   parseTokenResponse,
+  selectChallengeId,
   shouldRefreshBeforeRequest,
 } from '@/lib/auth/native-auth-contract';
 
@@ -84,8 +87,8 @@ describe('parseTokenPair', () => {
     });
   });
 
-  it('parses a token without refresh (legacy server)', () => {
-    expect(parseTokenPair({ token: 'abc' })).toEqual({ token: 'abc' });
+  it('returns the token-only pair with an own created key set to undefined', () => {
+    expect(parseTokenPair({ token: 'abc' })).toStrictEqual({ token: 'abc', created: undefined });
   });
 
   it('returns null for an empty object', () => {
@@ -96,7 +99,7 @@ describe('parseTokenPair', () => {
     expect(parseTokenPair(null)).toBeNull();
   });
 
-  it('returns null when refreshToken is present but expiresIn is missing', () => {
+  it('drops refreshToken when expiresIn is missing and returns the token-only pair', () => {
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref' })).toEqual({ token: 'abc' });
   });
 
@@ -104,9 +107,20 @@ describe('parseTokenPair', () => {
     // expiresIn must be positive; zero is rejected by the schema
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 0 })).toBeNull();
   });
-});
 
-// --- parseDeviceAuthTokenResponse ---
+  it('returns created on a complete token pair', () => {
+    expect(
+      parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 3600, created: true })
+    ).toEqual({ token: 'abc', refreshToken: 'ref', expiresIn: 3600, created: true });
+  });
+
+  it('returns created on a token-only response', () => {
+    expect(parseTokenPair({ token: 'abc', created: false })).toEqual({
+      token: 'abc',
+      created: false,
+    });
+  });
+});
 
 describe('parseDeviceAuthTokenResponse', () => {
   it('parses an approved response with refresh pair', () => {
@@ -129,16 +143,8 @@ describe('parseDeviceAuthTokenResponse', () => {
     });
   });
 
-  it('parses a pending response', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'pending' })).toEqual({ status: 'pending' });
-  });
-
-  it('parses a denied response', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'denied' })).toEqual({ status: 'denied' });
-  });
-
-  it('parses an expired response', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'expired' })).toEqual({ status: 'expired' });
+  it.each(['pending', 'denied', 'expired'] as const)('parses a %s response', status => {
+    expect(parseDeviceAuthTokenResponse({ status })).toEqual({ status });
   });
 
   it('returns null for approved without token', () => {
@@ -165,20 +171,50 @@ describe('parseDeviceAuthTokenResponse', () => {
     ).toEqual({ status: 'approved', token: 'tok' });
   });
 
-  it('returns null for an unknown status', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'unknown' })).toBeNull();
-  });
-
-  it('returns null for non-object', () => {
-    expect(parseDeviceAuthTokenResponse(null)).toBeNull();
-  });
-
-  it('returns null for empty object', () => {
-    expect(parseDeviceAuthTokenResponse({})).toBeNull();
+  it.each([null, {}, { status: 'unknown' }])('returns null for %s', input => {
+    expect(parseDeviceAuthTokenResponse(input)).toBeNull();
   });
 });
 
-// --- parseEmailCodeResponse ---
+// --- Challenge selection and device polling helpers ---
+
+describe('buildChallengeEntry', () => {
+  it('returns null for a legacy success without challengeId', () => {
+    expect(buildChallengeEntry({ success: true, challengeId: undefined }, 'a@b.co')).toBeNull();
+  });
+
+  it('stores the email with the challenge id', () => {
+    expect(buildChallengeEntry({ success: true, challengeId: 'c-1' }, 'a@b.co')).toEqual({
+      email: 'a@b.co',
+      challengeId: 'c-1',
+    });
+  });
+});
+
+describe('selectChallengeId', () => {
+  const entry = { email: 'a@b.co', challengeId: 'c-1' };
+
+  it('returns the challenge id for the matching email', () => {
+    expect(selectChallengeId(entry, 'a@b.co')).toBe('c-1');
+  });
+
+  it('returns undefined for a different email so a stale challenge is not reused', () => {
+    expect(selectChallengeId(entry, 'other@b.co')).toBeUndefined();
+  });
+
+  it('returns undefined without a stored challenge', () => {
+    expect(selectChallengeId(null, 'a@b.co')).toBeUndefined();
+  });
+});
+
+describe('buildDeviceAuthPollRequest', () => {
+  it('builds a refresh-capable poll request', () => {
+    expect(buildDeviceAuthPollRequest('device-code')).toEqual({
+      deviceCode: 'device-code',
+      supportsRefresh: true,
+    });
+  });
+});
 
 describe('parseEmailCodeResponse', () => {
   it('parses success without challengeId (legacy server)', () => {
@@ -209,14 +245,31 @@ describe('parseEmailCodeResponse', () => {
   });
 });
 
-// --- parseAuthErrorCode ---
-
-describe('parseAuthErrorCode', () => {
-  it('parses an error', () => {
-    expect(parseAuthErrorCode({ error: 'BLOCKED' })).toBe('BLOCKED');
+describe('parseAuthError', () => {
+  it('returns the code and ssoOrganizationId for an SSO error', () => {
+    expect(parseAuthError({ error: 'SSO_ERROR', ssoOrganizationId: 'org_1' })).toEqual({
+      code: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
   });
 
-  it('returns undefined for non-object', () => {
-    expect(parseAuthErrorCode(null)).toBeUndefined();
+  it('tolerates the absence of ssoOrganizationId', () => {
+    expect(parseAuthError({ error: 'BLOCKED' })).toEqual({ code: 'BLOCKED' });
+  });
+
+  it('returns the step-up methods and keeps the code when they are malformed', () => {
+    expect(parseAuthError({ error: 'SIGNUP-STEP-UP', methods: ['google', 'apple'] })).toEqual({
+      code: 'SIGNUP-STEP-UP',
+      signupMethods: ['google', 'apple'],
+    });
+    expect(parseAuthError({ error: 'SIGNUP-STEP-UP', methods: 'apple' })).toEqual({
+      code: 'SIGNUP-STEP-UP',
+    });
+  });
+
+  it('returns undefined for null, undefined, and non-error objects', () => {
+    expect(parseAuthError(null)).toBeUndefined();
+    expect(parseAuthError(undefined)).toBeUndefined();
+    expect(parseAuthError({ success: true })).toBeUndefined();
   });
 });

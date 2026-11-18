@@ -1,141 +1,144 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 
+import logo from '@/../assets/images/logo.png';
+import { Image } from '@/components/ui/image';
 import { TabScreenScrollView } from '@/components/tab-screen';
-
-import {
-  AgentSessionsSection,
-  hasDisplayableAgentSessions,
-} from '@/components/home/agent-sessions-section';
-import { AgentsPromoCard } from '@/components/home/agents-promo-card';
+import { BriefingCard, useHomeBriefing } from '@/components/agent-briefing/briefing-card';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
+import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
-import { QueryError } from '@/components/query-error';
+import { NewTaskFromPictureButton } from '@/components/home/new-task-from-picture-button';
+import { ProductChoices } from '@/components/home/product-choices';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { useOrganization } from '@/lib/organization-context';
+import { UpNextSection } from '@/components/todos/up-next-section';
+import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 export function HomeScreen() {
-  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const [refreshing, setRefreshing] = useState(false);
-
-  const { organizationId, isLoaded: orgLoaded } = useOrganization();
-
-  const {
-    storedSessions,
-    activeSessions,
-    isLoading: sessionsLoading,
-    storedIsError,
-    storedIsSuccess,
-    activeIsError,
-    refetch: refetchSessions,
-  } = useAgentSessions({
-    organizationId,
-    enabled: orgLoaded,
+  const context = useLiveSessionContext();
+  const sessions = useLiveAgentSessions({
+    organizationId: context.organizationId,
+    enabled: context.isReady,
   });
-
-  const isLoading = sessionsLoading || !orgLoaded;
-
-  // Match what the Home Agent-sessions section actually renders (cloud-agent
-  // stored + any active), so a CLI-only account shows the first-use promo
-  // instead of an empty section + orphaned "New coding task" button.
-  const hasAnySession = hasDisplayableAgentSessions(storedSessions, activeSessions);
+  const homeBriefing = useHomeBriefing();
+  const refetch = context.isError ? context.refetch : sessions.refetch;
   const headerTitle = buildTimedGreeting();
+  const liveContent = liveSessionContent(context, sessions);
+  const centerFeedback = liveContent === 'error' && !context.isReady && !context.accountReady;
 
   const handleRefresh = useCallback(() => {
     void (async () => {
       setRefreshing(true);
       try {
-        await queryClient.invalidateQueries({ refetchType: 'active' });
+        await refetch();
       } finally {
         setRefreshing(false);
       }
     })();
-  }, [queryClient]);
+  }, [refetch]);
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={headerTitle} size="large" showBackButton={false} className="px-[22px]" />
-      <TabScreenScrollView
-        className="flex-1"
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      >
-        <Animated.View layout={LinearTransition}>
-          {isLoading ? (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-2">
-              <View className="px-4 pb-2 pt-5">
-                <Skeleton className="h-3 w-28 rounded" />
-              </View>
-              <View className="gap-2 px-4">
-                <Skeleton className="h-[72px] w-full rounded-2xl" />
-                <Skeleton className="h-[72px] w-full rounded-2xl" />
-              </View>
-            </Animated.View>
-          ) : (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-2">
-              {renderSessionsOrPromo({
-                hasAnySession,
-                organizationId,
-                sessionsError: storedIsError,
-                sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
-                activeIsError,
-                handleRetrySessions: () => void refetchSessions(),
-              })}
-
-              {hasAnySession ? (
-                <View className="pt-4">
-                  <NewTaskButton organizationId={organizationId} />
+      <ScreenHeader
+        title={headerTitle}
+        titleContent={
+          <Image
+            source={logo}
+            className="size-[40px] shrink-0"
+            contentFit="contain"
+            transition={0}
+            accessible={false}
+          />
+        }
+        size="large"
+        showBackButton={false}
+        // The active account at the mark's trailing edge, on the mark's row:
+        // the same switchable control the profile credits card uses, so the org
+        // a new task will start in is visible (and changeable) before the form
+        // opens. The heading is the mark alone, so the row never reflows the
+        // picker under it (`allowInlineActionsStacking` reserves room for a
+        // heading's text that this header does not have).
+        // The account-list failure never adds rows to this fixed header, so
+        // every section keeps its place while the list fails and after it
+        // recovers (finding home-header-failure-shift). Which of the two
+        // one-row forms depends on what the body states:
+        //
+        // - With an organization active, the live-session card below states the
+        //   failure and carries its Retry, so the header draws nothing.
+        // - In the personal scope the card reports the sessions query instead
+        //   and never this one, so the header row becomes the recovery: its
+        //   label is the failure message and a press refetches the list.
+        inlineActions={
+          <ContextControl failurePlacement={context.organizationId === null ? 'row' : 'none'} />
+        }
+        allowInlineActionsStacking={false}
+        // The logo is the header's only visible child, so this is the brand
+        // mark's leading edge: it must be the page gutter the sections, cards
+        // and actions use (`mx-4`), not a wider header-only gutter.
+        className="px-4 pb-1"
+      />
+      <View className="flex-1" style={centerFeedback ? sideInsetStyle : undefined}>
+        {centerFeedback ? (
+          <LiveSessionFeedback
+            context={context}
+            sessions={sessions}
+            failureLabel={t('home.couldNotLoadActiveSessions')}
+            centered
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          />
+        ) : (
+          <TabScreenScrollView
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              // One indicator per surface: while the live section is `pending`
+              // it paints its own loading card, so the platform pull control
+              // must not hold the scroll inset open for a second one (finding
+              // home-loading; refresh-indicator.ts:20-23).
+              <RefreshControl
+                refreshing={refreshing && liveContent !== 'pending'}
+                onRefresh={handleRefresh}
+              />
+            }
+          >
+            <Animated.View layout={LinearTransition} className="gap-2">
+              <AgentSessionsSection
+                context={context}
+                sessions={sessions}
+                briefing={{
+                  visible: homeBriefing.briefing !== undefined,
+                  card: homeBriefing.frameReport ? (
+                    <BriefingCard report={homeBriefing.frameReport} embedded />
+                  ) : null,
+                }}
+              />
+              <UpNextSection organizationId={context.organizationId} enabled={context.isReady} />
+              {context.isReady && (
+                <View className="gap-2 pt-2">
+                  <NewTaskButton organizationId={context.organizationId} />
+                  <NewTaskFromPictureButton organizationId={context.organizationId} />
                 </View>
-              ) : null}
+              )}
+              {context.accountReady && (
+                <ProductChoices
+                  organizationId={context.organizationId}
+                  contextReady={context.isReady}
+                />
+              )}
             </Animated.View>
-          )}
-        </Animated.View>
-      </TabScreenScrollView>
+          </TabScreenScrollView>
+        )}
+      </View>
     </View>
   );
-}
-
-function renderSessionsOrPromo(params: {
-  hasAnySession: boolean;
-  organizationId: string | null;
-  sessionsError: boolean;
-  sessionsLoadedEmpty: boolean;
-  activeIsError: boolean;
-  handleRetrySessions: () => void;
-}) {
-  // Stale stored history always wins over an error (e.g. a live-poll blip
-  // on the active-sessions query) — never blank out sessions we already
-  // have. The first-use promo only appears after a confirmed empty
-  // response, never merely because the fetch hasn't succeeded yet.
-  if (params.hasAnySession) {
-    return <AgentSessionsSection organizationId={params.organizationId} />;
-  }
-  if (params.sessionsError) {
-    return (
-      <QueryError
-        placement="top"
-        title="Couldn't load sessions"
-        onRetry={params.handleRetrySessions}
-      />
-    );
-  }
-  // Cold active-only failure: the stored query succeeded empty but the active
-  // poll failed before any data loaded. Retryable, so never claim first-use.
-  if (params.activeIsError) {
-    return (
-      <QueryError
-        placement="top"
-        title="Couldn't load active sessions"
-        onRetry={params.handleRetrySessions}
-      />
-    );
-  }
-  if (params.sessionsLoadedEmpty) {
-    return <AgentsPromoCard organizationId={params.organizationId} />;
-  }
-  return null;
 }

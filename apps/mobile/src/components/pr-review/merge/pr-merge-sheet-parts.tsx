@@ -1,90 +1,23 @@
-// Form sub-components for the S8 merge sheet. Extracted out of
-// `pr-merge-sheet.tsx` to keep that file under the repo's 300-line limit.
-
 import { type ReactNode, type RefObject } from 'react';
-import { Pressable, Switch, TextInput, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
+import { type TextInput, View } from 'react-native';
 
 import {
   PrFormSheetFooter,
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import {
-  type AllowedMergeMethod,
-  PR_MERGE_DESCRIPTIONS,
-} from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-
-const NO_ENABLED_METHODS_MESSAGE =
-  'This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.';
-
-const SHORT_METHOD_LABELS = {
-  merge: 'Merge',
-  squash: 'Squash',
-  rebase: 'Rebase',
-} satisfies Record<AllowedMergeMethod, string>;
-
-function MethodPicker({
-  methodOptions,
-  method,
-  isDisabled,
-  onChange,
-}: Readonly<{
-  methodOptions: MergeMethodOption[];
-  method: AllowedMergeMethod;
-  isDisabled: boolean;
-  onChange: (next: AllowedMergeMethod) => void;
-}>) {
-  return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Method
-      </Text>
-      <RadioGroup label="Method" className="flex-row flex-wrap gap-1">
-        {methodOptions.map(option => {
-          const active = method === option.value;
-          // Long labels stay readable via accessibilityLabel; chip shows short text.
-          return (
-            <Pressable
-              key={option.value}
-              disabled={isDisabled}
-              onPress={() => {
-                void Haptics.selectionAsync();
-                onChange(option.value);
-              }}
-              {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
-              accessibilityHint={PR_MERGE_DESCRIPTIONS[option.value]}
-              className={cn(
-                'min-h-8 items-center justify-center rounded-full border px-2.5 py-1 active:opacity-70',
-                active && 'border-primary bg-primary',
-                !active && isDisabled && 'border-hair-soft bg-secondary',
-                !active && !isDisabled && 'border-border bg-secondary'
-              )}
-            >
-              <Text
-                className={cn(
-                  'text-xs font-medium',
-                  active && 'text-primary-foreground',
-                  !active && isDisabled && 'text-muted-foreground',
-                  !active && !isDisabled && 'text-foreground'
-                )}
-              >
-                {SHORT_METHOD_LABELS[option.value]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </RadioGroup>
-    </View>
-  );
-}
+import { MethodPicker } from '@/components/pr-review/merge/pr-merge-method-picker';
 
 function CommitTitleField({
   titleRef,
@@ -98,21 +31,22 @@ function CommitTitleField({
   isDisabled: boolean;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium text-foreground">Commit title</Text>
-      <TextInput
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-foreground">{t('prReview.merge.commitTitle')}</Text>
+      <Input
         ref={inputRef}
         defaultValue={titleRef.current}
         editable={!isDisabled}
         placeholder={placeholder}
         placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel="Commit title"
+        accessibilityLabel={t('prReview.merge.commitTitle')}
         onChangeText={value => {
           titleRef.current = value;
         }}
         className={cn(
-          'min-h-9 max-h-12 rounded-md border border-input bg-background px-3 py-1 text-sm leading-5 text-foreground',
+          'min-h-11 rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -134,25 +68,28 @@ function CommitMessageField({
   compact?: boolean;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const keyboardVisible = useFormSheetKeyboardVisible();
   const tight = compact || keyboardVisible;
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium text-foreground">Commit message</Text>
-      <TextInput
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-foreground">
+        {t('prReview.merge.commitMessage')}
+      </Text>
+      <Input
         ref={inputRef}
         defaultValue={messageRef.current}
         editable={!isDisabled}
-        placeholder="Optional description for the merge commit"
+        placeholder={t('prReview.merge.commitMessagePlaceholder')}
         placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel="Commit message"
+        accessibilityLabel={t('prReview.merge.commitMessage')}
         onChangeText={value => {
           messageRef.current = value;
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-1 text-sm leading-5 text-foreground',
+          'rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring',
-          tight ? 'max-h-12 min-h-9' : 'min-h-11 max-h-16'
+          tight ? 'max-h-16 min-h-11' : 'min-h-24 max-h-40'
         )}
         multiline
         textAlignVertical="top"
@@ -174,19 +111,73 @@ function DeleteBranchToggle({
   hidden?: boolean;
 }>) {
   const keyboardVisible = useFormSheetKeyboardVisible();
+  const { t } = useTranslation();
   if (hidden || keyboardVisible) {
     return null;
   }
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-1.5">
-      <Text className="flex-1 pr-3 text-sm font-medium">Delete branch</Text>
+    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-4 py-3">
+      <Text className="flex-1 pr-3 text-sm font-medium">{t('prReview.merge.deleteBranch')}</Text>
       <Switch
-        accessibilityLabel="Delete branch after merge"
+        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
         value={value}
         disabled={isDisabled}
         onValueChange={onChange}
       />
     </View>
+  );
+}
+
+/**
+ * Stand-in for the form while the account's draft read settles.
+ *
+ * `PrMergeSheet` keeps the uncontrolled fields unmounted until the stored
+ * draft is known, so without this the sheet presents with an empty body under
+ * a finished header and the whole form then arrives in one frame. The
+ * placeholder repeats the form's own gutters and settled row heights, so the
+ * sheet reads as loading and the form replaces it in place.
+ */
+export function MergeSheetFormSkeleton(props: {
+  methodOptions: MergeMethodOption[];
+  showTitle: boolean;
+  showDeleteBranchToggle: boolean;
+}): ReactNode {
+  return (
+    <>
+      <View className="gap-4 px-6 pt-4">
+        <View className="gap-1.5">
+          <Skeleton className="h-5 w-16" />
+          {props.methodOptions.length === 0 ? (
+            <Skeleton className="h-11 rounded-md" />
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {props.methodOptions.map(option => (
+                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
+              ))}
+            </View>
+          )}
+        </View>
+        {props.showTitle ? (
+          <View className="gap-1.5">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-11" />
+          </View>
+        ) : null}
+        <View className="gap-1.5">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-24" />
+        </View>
+        {props.showDeleteBranchToggle ? (
+          <View className="rounded-lg bg-secondary px-4 py-3">
+            <Skeleton className="h-[44px]" />
+          </View>
+        ) : null}
+      </View>
+      <PrFormSheetFooter>
+        <Skeleton className="h-[44px]" />
+        <Skeleton className="mt-2 h-[44px]" />
+      </PrFormSheetFooter>
+    </>
   );
 }
 
@@ -200,6 +191,12 @@ export function MergeSheetFormBody(props: {
   titleRef: RefObject<string>;
   titleInputRef: RefObject<TextInput | null>;
   titlePlaceholder: string;
+  /**
+   * False on the Bitbucket merge arm (s6f): the provider merge takes only
+   * the message, so no commit-title input exists whose value would be
+   * silently dropped on submit.
+   */
+  showTitle: boolean;
   messageRef: RefObject<string>;
   messageInputRef: RefObject<TextInput | null>;
   isHalfDetent: boolean;
@@ -221,6 +218,7 @@ export function MergeSheetFormBody(props: {
     titleRef,
     titleInputRef,
     titlePlaceholder,
+    showTitle,
     messageRef,
     messageInputRef,
     isHalfDetent,
@@ -234,13 +232,15 @@ export function MergeSheetFormBody(props: {
     onDismiss,
   } = props;
 
+  const { t } = useTranslation();
+
   return (
     <>
-      <View className="gap-1.5 px-6 pt-1.5">
+      <View className="gap-4 px-6 pt-4">
         {noMethodsAllowed ? (
           <View className="rounded-md border border-border bg-secondary p-3">
             <AccessibleStatus
-              message={NO_ENABLED_METHODS_MESSAGE}
+              message={t('prReview.merge.noEnabledMethods')}
               tone="status"
               className="text-sm"
             />
@@ -253,12 +253,14 @@ export function MergeSheetFormBody(props: {
             onChange={onMethodChange}
           />
         )}
-        <CommitTitleField
-          titleRef={titleRef}
-          inputRef={titleInputRef}
-          placeholder={titlePlaceholder}
-          isDisabled={isMutating}
-        />
+        {showTitle ? (
+          <CommitTitleField
+            titleRef={titleRef}
+            inputRef={titleInputRef}
+            placeholder={titlePlaceholder}
+            isDisabled={isMutating}
+          />
+        ) : null}
         <CommitMessageField
           messageRef={messageRef}
           inputRef={messageInputRef}
@@ -286,9 +288,8 @@ export function MergeSheetFormBody(props: {
         ) : null}
       </View>
 
-      <PrFormSheetFooter className="pb-1 pt-1">
+      <PrFormSheetFooter>
         <Button
-          size="sm"
           onPress={onConfirm}
           loading={isMutating}
           disabled={
@@ -301,14 +302,13 @@ export function MergeSheetFormBody(props: {
           <Text>{submitLabel}</Text>
         </Button>
         <Button
-          size="sm"
           variant="ghost"
           onPress={onDismiss}
           disabled={isMutating}
-          className="mt-0.5"
-          accessibilityLabel="Cancel"
+          className="mt-2"
+          accessibilityLabel={t('common.cancel')}
         >
-          <Text>Cancel</Text>
+          <Text>{t('common.cancel')}</Text>
         </Button>
       </PrFormSheetFooter>
     </>

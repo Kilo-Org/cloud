@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Kikao chako cha wakala kimepokea sasisho",
+      "lowBalance": "Usawa wako unahitaji umakini",
+      "spendAlert": "Matumizi yako yanahitaji umakini",
+      "securityFinding": "Tokeo la usalama linahitaji umakini",
+      "securityUpdate": "Ukaguzi wa usalama umepokea sasisho",
+      "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Arifa ya salio la chini",
+      "body": "Usawa wa {{organizationName}} ulishuka chini ya ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Arifa ya matumizi",
+      "body": "Matumizi ya {{scopeName}} yalizidi ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} katika {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Tokeo jipya la usalama ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Onyo la SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Ukiukaji wa SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Kikao chako cha Kilo kiko tayari kudhibitiwa kutoka kwenye simu yako"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

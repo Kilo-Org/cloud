@@ -1,14 +1,24 @@
+/* eslint-disable max-lines -- one file for the save/toggle serialization and generation-guard rollback suites */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type ConfigPatch, PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
-import { useSaveReviewConfig } from './use-code-reviewer';
+import { useReviewConfig, useSaveReviewConfig, useToggleReviewer } from './use-code-reviewer';
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function makeServerError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { data: { code, message } });
+}
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
-  onError?: (error: unknown) => void;
+  onMutate?: (vars: unknown) => Promise<unknown> | unknown;
+  onError?: (error: unknown, vars?: unknown, context?: unknown) => void;
   onSettled?: () => void;
   onSuccess?: (data: unknown) => void;
+  scope?: { id: string };
 };
 
 type PersonalPatch = {
@@ -37,6 +47,8 @@ const personalPatchMutateMock = vi.fn();
 const orgPatchMutateMock = vi.fn();
 const personalSaveMutateMock = vi.fn();
 const orgSaveMutateMock = vi.fn();
+const personalToggleMutateMock = vi.fn();
+const orgToggleMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const cancelQueriesMock = vi.fn();
 const getQueryDataMock = vi.fn();
@@ -44,29 +56,44 @@ const setQueryDataMock = vi.fn();
 const toastErrorMock = vi.fn();
 
 let lastCapturedOptions: MutationOptions | null = null;
+const queryCalls: { queryKey?: unknown[]; enabled?: boolean }[] = [];
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     lastCapturedOptions = opts;
     return { mutate: vi.fn() };
   },
-  useQuery: () => ({ data: undefined }),
+  useQuery: (options: { queryKey?: unknown[]; enabled?: boolean }) => {
+    queryCalls.push(options);
+    return { data: undefined };
+  },
   useQueryClient: () => ({
     cancelQueries: cancelQueriesMock,
     getQueryData: getQueryDataMock,
     setQueryData: setQueryDataMock,
     invalidateQueries: invalidateQueriesMock,
   }),
+  hashKey: (key: unknown) => JSON.stringify(key),
 }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     personalReviewAgent: {
-      getReviewConfig: { queryKey: () => ['personalReviewAgent', 'getReviewConfig'] },
+      getReviewConfig: {
+        queryKey: () => ['personalReviewAgent', 'getReviewConfig'],
+        queryOptions: (input: unknown) => ({
+          queryKey: ['personalReviewAgent', 'getReviewConfig', input],
+        }),
+      },
     },
     organizations: {
       reviewAgent: {
-        getReviewConfig: { queryKey: () => ['organizations', 'reviewAgent', 'getReviewConfig'] },
+        getReviewConfig: {
+          queryKey: () => ['organizations', 'reviewAgent', 'getReviewConfig'],
+          queryOptions: (input: unknown) => ({
+            queryKey: ['organizations', 'reviewAgent', 'getReviewConfig', input],
+          }),
+        },
       },
     },
   }),
@@ -76,6 +103,8 @@ vi.mock('@/lib/trpc', () => ({
       patchReviewConfig: { mutate: (vars: unknown) => personalPatchMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       saveReviewConfig: { mutate: (vars: unknown) => personalSaveMutateMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      toggleReviewAgent: { mutate: (vars: unknown) => personalToggleMutateMock(vars) },
     },
     organizations: {
       reviewAgent: {
@@ -83,6 +112,8 @@ vi.mock('@/lib/trpc', () => ({
         patchReviewConfig: { mutate: (vars: unknown) => orgPatchMutateMock(vars) },
         // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
         saveReviewConfig: { mutate: (vars: unknown) => orgSaveMutateMock(vars) },
+        // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+        toggleReviewAgent: { mutate: (vars: unknown) => orgToggleMutateMock(vars) },
       },
     },
   },
@@ -114,12 +145,29 @@ function getSaveOptions(
   return lastCapturedOptions;
 }
 
+function getToggleOptions(
+  scope: string,
+  platform: 'github' | 'gitlab' | 'bitbucket'
+): MutationOptions {
+  lastCapturedOptions = null;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useToggleReviewer(scope, platform);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!lastCapturedOptions) {
+    throw new Error('mutation options for useToggleReviewer were not captured');
+  }
+  return lastCapturedOptions;
+}
+
 beforeEach(() => {
   lastCapturedOptions = null;
+  queryCalls.length = 0;
   personalPatchMutateMock.mockReset();
   orgPatchMutateMock.mockReset();
   personalSaveMutateMock.mockReset();
   orgSaveMutateMock.mockReset();
+  personalToggleMutateMock.mockReset();
+  orgToggleMutateMock.mockReset();
   invalidateQueriesMock.mockReset();
   cancelQueriesMock.mockReset();
   getQueryDataMock.mockReset();
@@ -129,10 +177,47 @@ beforeEach(() => {
   // override per-case when they need a different outcome.
   personalPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
   orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
+  personalToggleMutateMock.mockResolvedValue({ success: true });
+  orgToggleMutateMock.mockResolvedValue({ success: true });
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe('useReviewConfig enabled option', () => {
+  function readConfig(
+    scope: string,
+    platform: 'github' | 'gitlab' | 'bitbucket',
+    options?: { enabled?: boolean }
+  ) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useReviewConfig(scope, platform, options);
+    const [personal, org] = queryCalls;
+    return { personal, org };
+  }
+
+  it('enables only the personal query for the personal scope by default', () => {
+    const { personal, org } = readConfig(PERSONAL_SCOPE, 'gitlab');
+
+    expect(personal?.enabled).toBe(true);
+    expect(personal?.queryKey?.at(-1)).toEqual({ platform: 'gitlab' });
+    expect(org?.enabled).toBe(false);
+  });
+
+  it('sends no org query when disabled', () => {
+    const { personal, org } = readConfig('org-1', 'github', { enabled: false });
+
+    expect(personal?.enabled).toBe(false);
+    expect(org?.enabled).toBe(false);
+  });
+
+  it('does not call toPersonalPlatform for a disabled personal Bitbucket read', () => {
+    const { personal, org } = readConfig(PERSONAL_SCOPE, 'bitbucket', { enabled: false });
+
+    expect(personal?.enabled).toBe(false);
+    expect(org?.enabled).toBe(false);
+  });
 });
 
 describe('useSaveReviewConfig mutationFn payload shape', () => {
@@ -324,6 +409,61 @@ describe('useSaveReviewConfig mutationFn payload shape', () => {
   });
 });
 
+describe('useSaveReviewConfig GitLab webhook warning flag', () => {
+  const WARNING_KEY = ['codeReviewerGitLabWebhookWarning', 'org_42', 'gitlab'];
+
+  it('leaves the stored warning alone for an edit that does not touch the selection', async () => {
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ focusAreas: ['security'] });
+
+    // The server syncs project hooks only for a selection patch, so an
+    // unrelated save must not dismiss a warning it never re-checked.
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+
+  it('records a selection save whose sync reported errors', async () => {
+    orgPatchMutateMock.mockResolvedValue({
+      success: true,
+      webhookSync: { errors: ['repo 7 webhook sync failed'] },
+    });
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ selectedRepositoryIds: [7] });
+
+    expect(setQueryDataMock).toHaveBeenCalledWith(WARNING_KEY, true);
+  });
+
+  it('clears the warning once the selection sync reports no errors', async () => {
+    orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: { errors: [] } });
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ selectedRepositoryIds: [7] });
+
+    expect(setQueryDataMock).toHaveBeenCalledWith(WARNING_KEY, false);
+  });
+
+  it('leaves the stored warning alone for a mode save, which never syncs hooks', async () => {
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ repositorySelectionMode: 'all' });
+
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves the stored warning alone when a selection save reports no sync', async () => {
+    // The PATCH routers answer `webhookSync: null` when they skip the sync:
+    // no connected integration, or no stored hook secret. Such a save proved
+    // nothing about the stored hooks.
+    orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ selectedRepositoryIds: [7] });
+
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('useSaveReviewConfig onError', () => {
   it('toasts the thrown error message and does not call invalidateQueries from onError', async () => {
     personalPatchMutateMock.mockReset();
@@ -349,7 +489,7 @@ describe('useSaveReviewConfig onError', () => {
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 
-  it('propagates a transport-level rejection from patchReviewConfig verbatim and still toasts it', async () => {
+  it('propagates a transport-level rejection from patchReviewConfig verbatim but toasts the app copy', async () => {
     personalPatchMutateMock.mockReset();
     personalPatchMutateMock.mockRejectedValue(new Error('Network unreachable'));
     const opts = getSaveOptions(PERSONAL_SCOPE, 'github');
@@ -362,7 +502,149 @@ describe('useSaveReviewConfig onError', () => {
       opts.onError?.(error);
     }
 
+    // The promise rejection keeps the transport detail for the caller; the
+    // toast never shows a raw transport or server sentence.
     expect((thrown as Error).message).toBe('Network unreachable');
-    expect(toastErrorMock).toHaveBeenCalledWith('Network unreachable');
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.configSaveFailed'));
+  });
+
+  it('explains the organization trial gate instead of quoting the server sentence', async () => {
+    orgPatchMutateMock.mockReset();
+    orgPatchMutateMock.mockRejectedValue(
+      makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE)
+    );
+    const opts = getSaveOptions('org-1', 'github');
+
+    try {
+      await opts.mutationFn?.({ focusAreas: ['bugs'] });
+    } catch (error) {
+      opts.onError?.(error);
+    }
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+});
+
+describe('useSaveReviewConfig (generation guard)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it('a failing older save does not roll back while a newer save owns the config', async () => {
+    getQueryDataMock.mockReturnValue({ reviewStyle: 'lenient' });
+    const opts = getSaveOptions(PERSONAL_SCOPE, 'github');
+    const older = await opts.onMutate?.({ reviewStyle: 'strict' });
+    const newer = await opts.onMutate?.({ reviewStyle: 'lenient' });
+
+    setQueryDataMock.mockClear();
+    opts.onError?.(new Error('boom'), { reviewStyle: 'strict' }, older);
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+
+    opts.onError?.(new Error('boom'), { reviewStyle: 'lenient' }, newer);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failing latest save rolls back its snapshot and toasts', async () => {
+    getQueryDataMock.mockReturnValue({ reviewStyle: 'lenient' });
+    const opts = getSaveOptions(PERSONAL_SCOPE, 'github');
+    const context = await opts.onMutate?.({ reviewStyle: 'strict' });
+
+    setQueryDataMock.mockClear();
+    opts.onError?.(new Error('boom'), { reviewStyle: 'strict' }, context);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.configSaveFailed'));
+  });
+});
+
+describe('useToggleReviewer (generation guard + chain join)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+    personalToggleMutateMock.mockReset();
+    personalToggleMutateMock.mockResolvedValue({ success: true });
+  });
+
+  it('joins the save chain key (rule 1) and adds no scope.id', async () => {
+    const opts = getToggleOptions(PERSONAL_SCOPE, 'github');
+    await opts.mutationFn?.({ isEnabled: true });
+    expect(personalToggleMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'github', isEnabled: true })
+    );
+    expect(opts.scope).toBeUndefined();
+  });
+
+  it('serializes the toggle behind an in-flight save on the same chain key', async () => {
+    const saveOpts = getSaveOptions(PERSONAL_SCOPE, 'github');
+    const toggleOpts = getToggleOptions(PERSONAL_SCOPE, 'github');
+
+    const saveGate = Promise.withResolvers<unknown>();
+    personalPatchMutateMock.mockReset();
+    personalPatchMutateMock.mockReturnValueOnce(saveGate.promise);
+    personalToggleMutateMock.mockResolvedValue({ success: true });
+
+    const savePromise = saveOpts.mutationFn?.({ reviewStyle: 'strict' });
+    const togglePromise = toggleOpts.mutationFn?.({ isEnabled: true });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    // The toggle's network call must not start while the save is in flight.
+    expect(personalToggleMutateMock).not.toHaveBeenCalled();
+
+    saveGate.resolve({ success: true, webhookSync: null });
+    await Promise.all([savePromise, togglePromise]);
+    expect(personalToggleMutateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failing older toggle does not roll back while a newer toggle owns the config', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false });
+    const opts = getToggleOptions(PERSONAL_SCOPE, 'github');
+    const older = await opts.onMutate?.({ isEnabled: true });
+    const newer = await opts.onMutate?.({ isEnabled: false });
+
+    setQueryDataMock.mockClear();
+    opts.onError?.(new Error('boom'), { isEnabled: true }, older);
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+
+    opts.onError?.(new Error('boom'), { isEnabled: false }, newer);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failing latest toggle rolls back its snapshot and toasts', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false });
+    const opts = getToggleOptions(PERSONAL_SCOPE, 'github');
+    const context = await opts.onMutate?.({ isEnabled: true });
+
+    setQueryDataMock.mockClear();
+    opts.onError?.(new Error('boom'), { isEnabled: true }, context);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    // The toggle's own failure line, not the config-save one.
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.updateFailed'));
+  });
+
+  it('explains the organization trial gate on the toggle instead of quoting the server sentence', async () => {
+    orgToggleMutateMock.mockReset();
+    orgToggleMutateMock.mockRejectedValue(
+      makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE)
+    );
+    const opts = getToggleOptions('org-1', 'github');
+
+    try {
+      await opts.mutationFn?.({ isEnabled: true });
+    } catch (error) {
+      opts.onError?.(error);
+    }
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
   });
 });

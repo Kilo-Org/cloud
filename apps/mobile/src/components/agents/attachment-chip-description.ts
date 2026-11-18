@@ -1,9 +1,11 @@
-import { formatFileSize } from '@kilocode/kilo-chat';
+import { i18n } from '@/i18n';
+import { formatFileSize, formatPercent } from '@/lib/format';
 
 export type ChipStateInput = {
   filename: string;
   size: number;
-  status: 'pending' | 'uploading' | 'uploaded' | 'error';
+  /** `local` is a file this device keeps: no upload starts, so no progress text. */
+  status: 'pending' | 'uploading' | 'uploaded' | 'local' | 'error';
   progress: number | null;
   terminal?: boolean;
 };
@@ -44,12 +46,12 @@ type ChipDescription = {
  */
 export function progressLabel(progress: number | null): string {
   if (progress === null) {
-    return 'Uploading…';
+    return i18n.t('agentChat.attachmentPreview.uploading');
   }
   if (progress >= 1) {
-    return 'Uploaded';
+    return i18n.t('agentChat.attachmentPreview.uploaded');
   }
-  return `${Math.round(progress * 100)}%`;
+  return formatPercent(progress * 100, i18n.language);
 }
 
 /**
@@ -71,21 +73,27 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
 
   let message: string | null = null;
   if (isErrored) {
-    message = isRetryable ? 'Upload failed. Tap to retry.' : "This file can't be uploaded.";
+    message = isRetryable
+      ? i18n.t('agentChat.attachmentPreview.uploadFailedRetry')
+      : i18n.t('chat.attachment.cantUpload');
   }
 
   let progressText = '';
+  // A local chip has no progress to report, so it carries no progress label
+  // and its announcement falls back to the file size.
   if (status === 'pending' || status === 'uploading' || status === 'uploaded') {
     progressText = progressLabel(progress);
   }
 
   return {
     filename,
-    sizeText: formatFileSize(size),
+    sizeText: formatFileSize(size, i18n.language),
     progressText,
     message,
-    accessibilityLabel:
-      message !== null ? `${filename}, ${message}` : `${filename}, ${progressText}`,
+    accessibilityLabel: i18n.t('chat.attachmentPreview.accessibility', {
+      filename,
+      status: message ?? (progressText === '' ? formatFileSize(size, i18n.language) : progressText),
+    }),
     showRetry: isRetryable,
     showRemove: true,
   };

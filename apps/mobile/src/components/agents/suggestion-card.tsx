@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
-import { Sparkles } from '@/components/ui/icons';
+import { impactHaptic } from '@/lib/haptics';
+import { Sparkles, X } from '@/components/ui/icons';
 import { type StandaloneSuggestion, type SuggestionAction } from '@kilocode/cloud-agent-sdk';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 import { createSuggestionActionLock, suggestionActionError } from './suggestion-card-state';
 
@@ -28,6 +29,7 @@ export function SuggestionCard({
   onDismiss,
 }: Readonly<SuggestionCardProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const lockRef = useRef(createSuggestionActionLock());
   const [pending, setPending] = useState<PendingState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function SuggestionCard({
     if (!lockRef.current.tryAcquire()) {
       return;
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     setPending({ kind: 'accept', index });
     setError(null);
     try {
@@ -52,7 +54,7 @@ export function SuggestionCard({
     if (!lockRef.current.tryAcquire()) {
       return;
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     setPending({ kind: 'dismiss' });
     setError(null);
     try {
@@ -67,46 +69,36 @@ export function SuggestionCard({
   const isPending = pending !== null;
 
   return (
-    <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
-      <View className="flex-row items-center gap-2 border-b border-border bg-secondary px-4 py-3">
-        <Sparkles size={16} color={colors.mutedForeground} />
-        <Text className="text-sm font-medium">Suggestion</Text>
+    <View className="gap-2 px-3 py-2.5">
+      {/* The suggestion is context, not a control: it wraps in full so the
+          offered actions below stay the row's only affordances. */}
+      <View className="flex-row items-start gap-2">
+        <Sparkles size={15} color={colors.mutedForeground} />
+        <Text className="flex-1 text-sm text-foreground">{text}</Text>
       </View>
 
-      <View className="gap-3 p-4">
-        <Text className="text-sm leading-5 text-foreground">{text}</Text>
-
-        {error ? <AccessibleStatus message={error} className="text-xs" /> : null}
-
-        {actions.length > 0 ? (
-          <View className="gap-2">
-            {actions.map((action: SuggestionAction, index: number) => {
-              const isLoading = pending?.kind === 'accept' && pending.index === index;
-              return (
-                <View key={`${action.label}-${index}`} className="gap-1">
-                  <Button
-                    variant={index === 0 ? 'default' : 'outline'}
-                    onPress={() => {
-                      void handleAccept(index);
-                    }}
-                    disabled={isPending}
-                    loading={isLoading}
-                    accessibilityRole="button"
-                    accessibilityLabel={action.label}
-                    accessibilityHint={action.description}
-                  >
-                    <Text className="text-sm">{action.label}</Text>
-                  </Button>
-                  {action.description ? (
-                    <Text className="text-xs leading-5 text-muted-foreground">
-                      {action.description}
-                    </Text>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
-        ) : null}
+      <View className="flex-row flex-wrap items-center gap-2">
+        {actions.map((action: SuggestionAction, index: number) => (
+          <Button
+            key={`${action.label}-${index}`}
+            variant={index === 0 ? 'default' : 'outline'}
+            size="sm"
+            // The row no longer scrolls, so a model-generated label wider than
+            // the card cannot be reached by scrolling. The button is clamped to
+            // the row and its label shrinks and wraps instead of overflowing.
+            className="max-w-full shrink"
+            onPress={() => {
+              void handleAccept(index);
+            }}
+            disabled={isPending}
+            loading={pending?.kind === 'accept' && pending.index === index}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            accessibilityHint={action.description}
+          >
+            <Text className="shrink text-sm">{action.label}</Text>
+          </Button>
+        ))}
 
         <Button
           variant="ghost"
@@ -117,12 +109,13 @@ export function SuggestionCard({
           disabled={isPending}
           loading={pending?.kind === 'dismiss'}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss suggestion"
-          className={cn(actions.length > 0 && 'self-start')}
+          accessibilityLabel={t('agentChat.suggestion.dismiss')}
+          className="px-2"
         >
-          <Text className="text-sm">Dismiss suggestion</Text>
+          <X size={16} color={colors.mutedForeground} />
         </Button>
       </View>
+      {error ? <AccessibleStatus message={error} className="pt-1 text-xs" /> : null}
     </View>
   );
 }

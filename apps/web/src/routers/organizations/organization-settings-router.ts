@@ -2,37 +2,54 @@ import {
   getOrganizationById,
   mutateOrganizationSettings,
   setOrganizationRecommendationsDigestEnabled,
-  updateOrganizationSettings,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import type {
-  OpenRouterModelsResponse,
+  OrganizationPlan,
   OrganizationSettings,
-} from '@/lib/organizations/organization-types';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
-  organizationMemberProcedure,
   organizationAdminMutationProcedure,
-} from '@/routers/organizations/utils';
+  organizationMemberProcedure,
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
+import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS,
+  OrganizationBrowserAllowedOriginSchema,
+  OrganizationBrowserControlSchema,
+  OrganizationDataRegionSchema,
+  normalizeOrganizationBrowserOrigin,
+} from '@kilocode/db/schema-types';
+import {
+  resolveOrganizationBrowserPolicy,
+  type OrganizationBrowserPolicy,
+} from '@/lib/organizations/browser-policy';
+import {
+  isOrganizationFeatureEnabled,
+  readOrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getModelGateways } from '@kilocode/web-shared/lib/ai-gateway/providers/model-gateway-availability';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   MAX_ORGANIZATION_AUTO_ROUTES,
   assertOrganizationAutoEligible,
   assertOrganizationAutoWriteEnabled,
   validateOrganizationAutoTarget,
-} from '@/lib/organizations/organization-auto-model';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -105,6 +122,21 @@ function createDefaultModelDiffMessage(
   }
 
   return 'Updated default model';
+}
+
+/**
+ * Creates the audit message for a change to the organization data collection policy
+ */
+function createDataCollectionMessage(
+  dataCollection: OrganizationSettings['data_collection']
+): string {
+  if (dataCollection === 'allow') {
+    return 'Data collection: allowed';
+  }
+  if (dataCollection === 'deny') {
+    return 'Data collection: denied';
+  }
+  return 'Data collection: follow extension setting';
 }
 
 function assertOrganizationAutoRouteCount(routes: Record<string, string>): void {
@@ -221,9 +253,12 @@ async function validateOrganizationDefaultReplacement(
   );
   let availableModels: Awaited<ReturnType<typeof getAvailableModelsForOrganization>>;
   try {
-    availableModels = await getAvailableModelsForOrganization(organization.id, {
-      type: 'defaultAccess',
-    });
+    availableModels = await getAvailableModelsForOrganization(
+      organization.id,
+      { type: 'defaultAccess' },
+      'member',
+      { countryCode: null }
+    );
   } catch {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -275,10 +310,6 @@ const UpdateDataCollectionInputSchema = OrganizationIdInputSchema.extend({
   dataCollection: z.enum(['allow', 'deny']).nullable(),
 });
 
-const UpdateCodeIndexingEnabledInputSchema = OrganizationIdInputSchema.extend({
-  code_indexing_enabled: z.boolean(),
-});
-
 const UpdateProjectsUIEnabledInputSchema = OrganizationIdInputSchema.extend({
   projects_ui_enabled: z.boolean(),
 });
@@ -313,28 +344,160 @@ const SettingsResponseSchema = z.object({
   settings: z.custom<OrganizationSettings>(),
 });
 
-export const organizationsSettingsRouter = createTRPCRouter({
-  listAvailableModels: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
-    .output(z.custom<OpenRouterModelsResponse>())
-    .query(async ({ input, ctx }) => {
-      const { organizationId } = input;
+const UpdateBrowserControlInputSchema = OrganizationIdInputSchema.extend({
+  browserControl: OrganizationBrowserControlSchema,
+  browserAllowedOrigins: z
+    .array(OrganizationBrowserAllowedOriginSchema)
+    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS),
+});
 
-      const result = await getAvailableModelsForOrganization(organizationId, {
-        type: 'member',
-        kiloUserId: ctx.user.id,
-        // `ensureOrganizationAccess` also admits Kilo admins and parent-organization
-        // owners, who hold no membership row and belong to no group; they resolve
-        // against organization-level policy instead of being rejected.
-        allowNonMember: true,
-      });
-      if (!result) {
+const BrowserControlResponseSchema = z.object({
+  browserControl: OrganizationBrowserControlSchema,
+  browserAllowedOrigins: z.array(OrganizationBrowserAllowedOriginSchema),
+});
+
+function normalizeBrowserOrigins(values: readonly string[]): string[] {
+  const origins = new Set<string>();
+  for (const value of values) {
+    const origin = normalizeOrganizationBrowserOrigin(value);
+    if (origin !== null) {
+      origins.add(origin);
+    }
+  }
+  return [...origins];
+}
+
+function createBrowserControlMessage(policy: OrganizationBrowserPolicy): string {
+  const origins =
+    policy.browserAllowedOrigins.length > 0 ? policy.browserAllowedOrigins.join(', ') : 'none';
+  return `Browser control: ${policy.browserControl} (allowed origins: ${origins})`;
+}
+
+const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
+  disable_openrouter: z.boolean().optional(),
+  data_region: OrganizationDataRegionSchema.nullable().optional(),
+});
+
+const GatewaySettingsResponseSchema = z.object({
+  available: z.boolean(),
+  disable_openrouter: z.boolean(),
+  data_region: OrganizationDataRegionSchema.nullable(),
+});
+
+const ModelGatewayAvailabilityResponseSchema = z.object({
+  gateways: z.array(z.enum(['vercel', 'openrouter'])),
+});
+
+/**
+ * The advanced gateway policies are an enterprise feature, rolled out per organization through the
+ * `gateway_settings` organization feature. The gateway ignores them on any other plan.
+ */
+async function isGatewaySettingsAvailable(organizationId: string, plan: OrganizationPlan) {
+  if (plan !== 'enterprise') return false;
+  return isOrganizationFeatureEnabled(
+    await readOrganizationFeatures(db),
+    'gateway_settings',
+    organizationId
+  );
+}
+
+function createGatewaySettingsDiffMessage(
+  oldSettings: OrganizationSettings,
+  newSettings: OrganizationSettings
+): string {
+  const changes: string[] = [];
+  if (!!oldSettings.disable_openrouter !== !!newSettings.disable_openrouter) {
+    changes.push(`OpenRouter ${newSettings.disable_openrouter ? 'disabled' : 'enabled'}`);
+  }
+  if ((oldSettings.data_region ?? null) !== (newSettings.data_region ?? null)) {
+    changes.push(
+      `Inference region: ${newSettings.data_region ? ORGANIZATION_DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
+    );
+  }
+  return changes.length > 0
+    ? `Updated advanced policies: ${changes.join('; ')}`
+    : 'Updated advanced policies: no changes';
+}
+
+export const organizationsSettingsRouter = createTRPCRouter({
+  listAvailableModels: listAvailableModelsProcedure,
+
+  getGatewaySettings: organizationMemberProcedure
+    .output(GatewaySettingsResponseSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      return {
+        available: await isGatewaySettingsAvailable(input.organizationId, organization.plan),
+        disable_openrouter: organization.settings.disable_openrouter ?? false,
+        data_region: organization.settings.data_region ?? null,
+      };
+    }),
+
+  getModelGatewayAvailability: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.extend({ modelId: z.string().min(1) }))
+    .output(ModelGatewayAvailabilityResponseSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (!(await isGatewaySettingsAvailable(input.organizationId, organization.plan))) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
+          code: 'FORBIDDEN',
+          message: 'Advanced policies are not available for this organization.',
         });
       }
-      return result;
+      return { gateways: await getModelGateways(input.modelId) };
+    }),
+
+  updateGatewaySettings: organizationAdminMutationProcedure
+    .input(UpdateGatewaySettingsInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, disable_openrouter, data_region } = input;
+      const organization = await getOrganizationById(organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (!(await isGatewaySettingsAvailable(organizationId, organization.plan))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Advanced policies are not available for this organization.',
+        });
+      }
+
+      const updatedSettings = await db.transaction(async tx => {
+        let previousSettings: OrganizationSettings = {};
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            previousSettings = organization.settings;
+            const settingsUpdate: OrganizationSettings = { ...organization.settings };
+            if (disable_openrouter !== undefined) {
+              settingsUpdate.disable_openrouter = disable_openrouter;
+            }
+            if (data_region !== undefined) {
+              settingsUpdate.data_region = data_region;
+            }
+            return settingsUpdate;
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: createGatewaySettingsDiffMessage(previousSettings, settings),
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
+      });
+      return { settings: updatedSettings };
     }),
 
   updateAllowLists: organizationAdminMutationProcedure
@@ -383,6 +546,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 requireModelInCurrentSnapshot: true,
                 providerAllowList: settingsUpdate.provider_allow_list,
                 modelDenyList: settingsUpdate.model_deny_list ?? [],
+                customLlmGrantee: { organizationId: organization.id, groupIds: [] },
               });
               if (!(await isAllowed(currentSettings.default_model))) {
                 settingsUpdate.default_model = undefined;
@@ -725,7 +889,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
   updateDataCollection: organizationBillingMutationProcedure
     .input(UpdateDataCollectionInputSchema)
     .output(SettingsResponseSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { organizationId, dataCollection } = input;
 
       const existingOrg = await getOrganizationById(organizationId);
@@ -736,10 +900,29 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Update the data collection setting
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...existingOrg.settings,
-        data_collection: dataCollection,
+      const updatedSettings = await db.transaction(async tx => {
+        let previousDataCollection: OrganizationSettings['data_collection'];
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousDataCollection = organization.settings?.data_collection ?? null;
+            return { ...organization.settings, data_collection: dataCollection };
+          },
+          tx
+        );
+        // An unset value and an explicit null both follow the extension setting.
+        if ((dataCollection ?? null) !== previousDataCollection) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: createDataCollectionMessage(dataCollection),
+            organization_id: organizationId,
+            tx,
+          });
+        }
+        return settings;
       });
 
       return {
@@ -773,62 +956,31 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...currentSettings,
-        projects_ui_enabled,
+      const updatedSettings = await db.transaction(async tx => {
+        let previousValue: boolean | undefined;
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousValue = organization.settings?.projects_ui_enabled;
+            return { ...organization.settings, projects_ui_enabled };
+          },
+          tx
+        );
+
+        if (previousValue !== projects_ui_enabled) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
+            organization_id: organizationId,
+            tx,
+          });
+        }
+
+        return settings;
       });
-
-      // Create audit log if the value changed
-      if (currentSettings.projects_ui_enabled !== projects_ui_enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
-          organization_id: organizationId,
-        });
-      }
-
-      return {
-        settings: updatedSettings,
-      };
-    }),
-
-  updateCodeIndexingFeatureFlag: adminProcedure
-    .input(UpdateCodeIndexingEnabledInputSchema)
-    .output(SettingsResponseSchema)
-    .mutation(async ({ input, ctx }) => {
-      const { organizationId, code_indexing_enabled } = input;
-
-      const existingOrg = await getOrganizationById(organizationId);
-      if (!existingOrg) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...currentSettings,
-        code_indexing_enabled,
-      });
-
-      // Create audit log if the value changed
-      if (currentSettings.code_indexing_enabled !== code_indexing_enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `[Admin] Code indexing: ${code_indexing_enabled ? 'enabled' : 'disabled'}`,
-          organization_id: organizationId,
-        });
-      }
 
       return {
         settings: updatedSettings,
@@ -849,41 +1001,49 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      const currentSettings = existingOrg.settings || {};
-      let updatedSettings: OrganizationSettings;
+      const updatedSettings = await db.transaction(async tx => {
+        let previousSettings: OrganizationSettings = {};
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousSettings = organization.settings || {};
+            if (!enabled) {
+              // Remove the fields when disabled
+              const {
+                minimum_balance: _mb,
+                minimum_balance_alert_email: _mbae,
+                ...rest
+              } = previousSettings;
+              return rest;
+            }
+            return {
+              ...previousSettings,
+              minimum_balance,
+              minimum_balance_alert_email,
+            };
+          },
+          tx
+        );
 
-      if (enabled) {
-        updatedSettings = await updateOrganizationSettings(organizationId, {
-          ...currentSettings,
-          minimum_balance,
-          minimum_balance_alert_email,
-        });
-      } else {
-        // Remove the fields when disabled
-        const {
-          minimum_balance: _mb,
-          minimum_balance_alert_email: _mbae,
-          ...rest
-        } = currentSettings;
-        updatedSettings = await updateOrganizationSettings(organizationId, rest);
-      }
+        const wasEnabled =
+          previousSettings.minimum_balance !== undefined &&
+          previousSettings.minimum_balance_alert_email !== undefined;
+        if (enabled !== wasEnabled || enabled) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: enabled
+              ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
+              : 'Minimum balance alert: disabled',
+            organization_id: organizationId,
+            tx,
+          });
+        }
 
-      // Create audit log
-      const wasEnabled =
-        currentSettings.minimum_balance !== undefined &&
-        currentSettings.minimum_balance_alert_email !== undefined;
-      if (enabled !== wasEnabled || enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: enabled
-            ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
-            : 'Minimum balance alert: disabled',
-          organization_id: organizationId,
-        });
-      }
+        return settings;
+      });
 
       return {
         settings: updatedSettings,
@@ -938,5 +1098,68 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return {
         settings: updatedSettings,
       };
+    }),
+
+  // Browser automation policy: owners and admins decide whether members get browser
+  // tools, whether the bundled browser is the only backend, and which origins every
+  // member's client treats as already granted.
+  updateBrowserControl: organizationAdminMutationProcedure
+    .input(UpdateBrowserControlInputSchema)
+    .output(BrowserControlResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, browserControl, browserAllowedOrigins } = input;
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      const nextPolicy: OrganizationBrowserPolicy = {
+        browserControl,
+        browserAllowedOrigins: normalizeBrowserOrigins(browserAllowedOrigins),
+      };
+
+      const updatedSettings = await db.transaction(async tx => {
+        let previousPolicy = resolveOrganizationBrowserPolicy(existingOrg);
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousPolicy = resolveOrganizationBrowserPolicy(organization);
+            if (
+              previousPolicy.browserControl === nextPolicy.browserControl &&
+              previousPolicy.browserAllowedOrigins.join('\n') ===
+                nextPolicy.browserAllowedOrigins.join('\n')
+            ) {
+              return organization.settings;
+            }
+            return {
+              ...organization.settings,
+              browserControl: nextPolicy.browserControl,
+              browserAllowedOrigins: nextPolicy.browserAllowedOrigins,
+            };
+          },
+          tx
+        );
+
+        if (
+          previousPolicy.browserControl !== nextPolicy.browserControl ||
+          previousPolicy.browserAllowedOrigins.join('\n') !==
+            nextPolicy.browserAllowedOrigins.join('\n')
+        ) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: createBrowserControlMessage(nextPolicy),
+            organization_id: organizationId,
+            tx,
+          });
+        }
+
+        return settings;
+      });
+
+      return resolveOrganizationBrowserPolicy({ settings: updatedSettings });
     }),
 });

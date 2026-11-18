@@ -2,16 +2,26 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { CenteredState } from '@/components/centered-state';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { SheetHeader } from '@/components/sheet-header';
-import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { AlertCircle, File as FileIcon, Share } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { getDocumentPreviewTarget, previewRemoteDocument } from '@/lib/document-preview';
+import { cn } from '@/lib/utils';
 import {
   downloadRemoteFile,
   getSafeCacheFilename,
@@ -22,18 +32,25 @@ import {
 } from '@/lib/share-remote-file';
 
 import { ChatMarkdownText } from './chat-markdown-text';
-import { isUsableFilePartUrl, useFilePartCache } from './file-part-cache';
 import { getFilePartAccessibilityLabel, getFilePartKind } from './file-part-preview';
+import { SessionPageSheet } from './session-page-sheet';
+import { refreshFilePartUrl, useResolvedFilePartUrl } from './file-part-url-resolver';
 import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
 
 const CACHE_DIR_NAME = 'session-file-parts';
+
+/** 16:9 surface for an inline video part, matching the image part's frame. */
+const VIDEO_STYLE = { width: '100%', aspectRatio: 16 / 9 } as const;
 
 function cacheFilenameForPart(part: Pick<FilePart, 'id' | 'mime' | 'filename'>): string {
   return getSafeCacheFilename({ id: part.id, filename: part.filename ?? 'file' });
 }
 
 /** Write a base64 `data:` payload to the cache and return the file. */
-function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | 'filename'>): File {
+async function writeDataUrlToCache(
+  url: string,
+  part: Pick<FilePart, 'id' | 'mime' | 'filename'>
+): Promise<File> {
   const payload = stripDataUrlBase64Prefix(url, part.mime);
   if (payload === undefined) {
     throw new Error('decode-failed');
@@ -41,7 +58,7 @@ function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | '
   const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
   directory.create({ idempotent: true, intermediates: true });
   const file = new File(directory, cacheFilenameForPart(part));
-  file.write(payload, { encoding: 'base64' });
+  await file.write(payload, { encoding: 'base64' });
   return file;
 }
 
@@ -52,7 +69,7 @@ async function resolveFileText(url: string, part: Pick<FilePart, 'id' | 'mime' |
   }
 
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     return file.text();
   }
 
@@ -76,7 +93,7 @@ async function shareFilePart(url: string, part: FilePart): Promise<void> {
     return;
   }
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     await shareLocalFile(file.uri, { mimeType: part.mime });
     return;
   }
@@ -90,118 +107,251 @@ async function shareFilePart(url: string, part: FilePart): Promise<void> {
 
 type FilePartRendererProps = {
   part: FilePart;
+  onLongPress?: () => void;
 };
 
 type PreviewMode = 'markdown' | 'text';
 
-/** Prefer the captured cache URL, falling back to the part's own URL. The
- *  cached URL is produced by our cache and is always trusted. */
-function resolveUsableUrl(cachedUrl: string | undefined, partUrl: string): string | undefined {
-  if (cachedUrl) {
-    return cachedUrl;
-  }
-  if (isUsableFilePartUrl(partUrl)) {
-    return partUrl;
-  }
-  return undefined;
-}
-
-export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
+export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendererProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
-  const cached = useFilePartCache(part.id);
-  const url = resolveUsableUrl(cached?.url, part.url);
+  const resolved = useResolvedFilePartUrl(part);
+  const url = resolved.status === 'ready' ? resolved.url : undefined;
   const kind = getFilePartKind({ mime: part.mime, filename: part.filename });
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  // Reset a prior image error in render when the URL changes. A successful
+  // renew writes a NEW signed URL; the reset must land in the same commit so
+  // the refreshed image, not the retry chip, renders (and no open viewer is
+  // unmounted). A failed renew keeps the same URL, so `imageFailed` survives
+  // and the retry chip stays until a new URL lands.
+  const [previousUrl, setPreviousUrl] = useState(url);
+  if (url !== previousUrl) {
+    setPreviousUrl(url);
+    setImageFailed(false);
+  }
   const [preview, setPreview] = useState<PreviewMode | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  // A device with no viewer keeps that verdict for the part: the sheet drops the
+  // preview choice and leaves the text and share choices it always had.
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
+  const documentTarget = getDocumentPreviewTarget(part.mime);
+
+  const viewerVisibleRef = useRef(viewerVisible);
+  const previewRef = useRef(preview);
+
+  useEffect(() => {
+    viewerVisibleRef.current = viewerVisible;
+  }, [viewerVisible]);
+
+  useEffect(() => {
+    previewRef.current = preview;
+  }, [preview]);
 
   async function handleShare() {
     if (!url) {
       return;
     }
     setSharing(true);
+    setShareError(null);
     try {
       await shareFilePart(url, part);
     } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
+      let message = t('agentChat.filePart.shareFailed');
       if (reason === 'sharing-unavailable') {
-        toast.error('File sharing is not available on this device.');
+        message = t('agentChat.filePart.sharingUnavailable');
       } else if (error instanceof ShareRemoteFileError) {
-        toast.error('Failed to share file. Please try again.');
+        message = t('agentChat.filePart.shareFailedRetry');
+      }
+      if (viewerVisibleRef.current || previewRef.current) {
+        setShareError(message);
       } else {
-        toast.error('Share failed');
+        toast.error(message);
       }
     } finally {
       setSharing(false);
     }
   }
 
-  function handleChipTap() {
-    if (!url) {
-      toast.error('Preview unavailable');
-      return;
-    }
-    if (kind === 'markdown') {
-      setPreview('markdown');
-      return;
-    }
-    showActionSheetWithOptions(
-      {
-        options: ['Open as text', 'Open in external app', 'Cancel'],
-        cancelButtonIndex: 2,
-      },
-      index => {
-        if (index === undefined || index === 2) {
-          return;
-        }
-        if (index === 0) {
-          setPreview('text');
-        } else if (index === 1) {
-          void handleShare();
-        }
-      }
-    );
+  function openViewer() {
+    setShareError(null);
+    setViewerVisible(true);
   }
+
+  function closeViewer() {
+    setShareError(null);
+    setViewerVisible(false);
+  }
+
+  function openPreview(mode: PreviewMode) {
+    setShareError(null);
+    setPreview(mode);
+  }
+
+  function closePreview() {
+    setShareError(null);
+    setPreview(null);
+  }
+
+  async function handlePreviewDocument() {
+    if (!url) {
+      return;
+    }
+    setPreviewing(true);
+    try {
+      const outcome = await previewRemoteDocument({
+        key: part.id,
+        url,
+        mimeType: part.mime,
+        filename: part.filename,
+      });
+      if (outcome === 'unavailable') {
+        setPreviewUnavailable(true);
+        toast.error(t('agentChat.filePart.previewUnavailable'));
+      } else if (outcome === 'failed') {
+        toast.error(t('agentChat.filePart.couldNotLoadFileRetry'));
+      }
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  function handleChipTap() {
+    if (url) {
+      if (kind === 'markdown') {
+        openPreview('markdown');
+        return;
+      }
+      const offerPreview = documentTarget !== null && !previewUnavailable;
+      const previewIndex = offerPreview ? 0 : -1;
+      const textIndex = previewIndex + 1;
+      const shareIndex = textIndex + 1;
+      const cancelIndex = shareIndex + 1;
+      const options = [
+        ...(offerPreview
+          ? [
+              // i18n-dup-ok: this label is the document chip's action, and the
+              // markdown chip reuses it as its accessibility label.
+              t('agentChat.filePart.preview', {
+                name: part.filename ?? t('common.file'),
+              }),
+            ]
+          : []),
+        t('agentChat.filePart.openAsText'),
+        t('agentChat.filePart.openInExternalApp'),
+        t('common.cancel'),
+      ];
+      showActionSheetWithOptions(
+        {
+          ...themedSheet,
+          options,
+          cancelButtonIndex: cancelIndex,
+        },
+        index => {
+          if (index === undefined || index === cancelIndex) {
+            return;
+          }
+          if (index === previewIndex) {
+            void handlePreviewDocument();
+          } else if (index === textIndex) {
+            openPreview('text');
+          } else if (index === shareIndex) {
+            void handleShare();
+          }
+        }
+      );
+      return;
+    }
+    if (resolved.status === 'resolving') {
+      // A markdown chip tapped while the presign is in flight opens the
+      // modal as soon as the URL lands; the modal render is gated on `url`.
+      if (kind === 'markdown') {
+        openPreview('markdown');
+      }
+      return;
+    }
+    if (resolved.status === 'error') {
+      resolved.retry?.();
+      toast.error(t('agentChat.filePart.couldNotLoadFileRetry'));
+      return;
+    }
+    toast.error(t('agentChat.filePart.previewUnavailable'));
+  }
+
+  // A markdown tap during the presign sets `preview` before the URL lands.
+  // If the presign then fails, surface the failure instead of a silent no-op.
+  useEffect(() => {
+    if (preview !== null && resolved.status === 'error') {
+      toast.error(t('agentChat.filePart.couldNotLoadFileRetry'));
+      closePreview();
+    }
+  }, [preview, resolved.status, t]);
 
   if (kind === 'image') {
     if (url) {
-      if (imageFailed) {
+      // Show the retry chip while the image is failed and the viewer is closed.
+      // A renew must not hide the chip: `imageFailed` stays set until a NEW URL
+      // lands (the render-phase reset above), so the failed UI persists through
+      // a retry tap or a 30s sweep and clears atomically on success. An open
+      // viewer must stay mounted.
+      if (imageFailed && !viewerVisible) {
         return (
           <Pressable
+            onLongPress={onLongPress}
             onPress={() => {
-              setImageFailed(false);
+              if (!resolved.attachmentRef) {
+                setImageFailed(false);
+                return;
+              }
+              void (async () => {
+                const ok = await refreshFilePartUrl(part.id);
+                if (ok) {
+                  setImageFailed(false);
+                }
+              })();
             }}
-            className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+            className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
             accessibilityRole="button"
-            accessibilityLabel="Image unavailable, retry loading"
+            accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
           >
             <AlertCircle size={14} color={colors.mutedForeground} />
-            <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+            <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
           </Pressable>
         );
       }
       return (
         <>
           <Pressable
-            onPress={() => {
-              setViewerVisible(true);
-            }}
+            onLongPress={onLongPress}
+            onPress={openViewer}
             className="my-1 overflow-hidden rounded-lg active:opacity-80"
             accessibilityRole="button"
             accessibilityLabel={getFilePartAccessibilityLabel('image', part.filename)}
           >
             <Image
               source={{ uri: url }}
+              cachePolicy="memory"
+              transition={0}
               className="aspect-video w-full"
               contentFit="contain"
               accessible
               accessibilityRole="image"
-              accessibilityLabel={part.filename ? `Image output, ${part.filename}` : 'Image output'}
+              accessibilityLabel={
+                part.filename
+                  ? t('agentChat.filePart.imageOutputWithFilename', { filename: part.filename })
+                  : t('agentChat.filePart.imageOutput')
+              }
               onError={() => {
+                // Record the failure: `imageFailed` stays set until the URL
+                // changes, so the retry chip persists through a renew and
+                // clears atomically when a fresh signed URL lands.
                 setImageFailed(true);
               }}
             />
@@ -210,22 +360,113 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
             ) : null}
           </Pressable>
           {viewerVisible && (
-            <ImageViewerModal
+            <ImageViewer
               visible={viewerVisible}
               uri={url}
-              filename={part.filename ?? 'File'}
-              onClose={() => {
-                setViewerVisible(false);
+              // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+              // which languages inflect by number; this key is the standalone noun label.
+              filename={part.filename ?? t('common.file')}
+              onShare={() => {
+                void handleShare();
               }}
+              sharing={sharing}
+              shareError={shareError}
+              onClose={closeViewer}
             />
           )}
         </>
       );
     }
+    if (resolved.status === 'resolving') {
+      return (
+        <View
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+          accessibilityLabel={t('agentChat.filePart.loadingImage')}
+        >
+          <ActivityIndicator size="small" />
+          <Text className="text-xs text-muted-foreground">
+            {t('agentChat.filePart.loadingImage')}
+          </Text>
+        </View>
+      );
+    }
+    if (resolved.status === 'error') {
+      return (
+        <Pressable
+          onLongPress={onLongPress}
+          onPress={() => {
+            resolved.retry?.();
+          }}
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
+        >
+          <AlertCircle size={14} color={colors.mutedForeground} />
+          <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
+        </Pressable>
+      );
+    }
     return (
       <View className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
         <AlertCircle size={14} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+        <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
+      </View>
+    );
+  }
+
+  if (kind === 'video') {
+    if (url) {
+      return (
+        <FilePartVideo
+          part={part}
+          url={url}
+          onLongPress={onLongPress}
+          onShare={() => {
+            void handleShare();
+          }}
+          sharing={sharing}
+          shareError={shareError}
+        />
+      );
+    }
+    if (resolved.status === 'resolving') {
+      return (
+        <View
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+          accessibilityLabel={t('common.loading')}
+        >
+          <ActivityIndicator size="small" />
+          <Text className="text-xs text-muted-foreground">{t('common.loading')}</Text>
+        </View>
+      );
+    }
+    if (resolved.status === 'error') {
+      return (
+        <Pressable
+          onLongPress={onLongPress}
+          onPress={() => {
+            resolved.retry?.();
+          }}
+          className={cn(
+            STATE_ACTION_CLASS,
+            'my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900'
+          )}
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
+        >
+          <AlertCircle size={14} color={colors.mutedForeground} />
+          <Text className="text-xs text-muted-foreground">
+            {t('agentChat.filePart.couldNotLoadFile')}
+          </Text>
+        </Pressable>
+      );
+    }
+    return (
+      <View className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
+        <AlertCircle size={14} color={colors.mutedForeground} />
+        <Text className="text-xs text-muted-foreground">
+          {t('agentChat.filePart.fileUnavailableInSession')}
+        </Text>
       </View>
     );
   }
@@ -233,16 +474,23 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   return (
     <>
       <Pressable
+        onLongPress={onLongPress}
         onPress={handleChipTap}
-        disabled={sharing}
-        accessibilityState={{ busy: sharing }}
+        disabled={sharing || previewing}
+        accessibilityState={{ busy: sharing || previewing || resolved.status === 'resolving' }}
         accessibilityRole="button"
         accessibilityLabel={getFilePartAccessibilityLabel(kind, part.filename)}
         className="my-1 flex-row items-center gap-2 rounded-lg bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
       >
-        {sharing ? <ActivityIndicator /> : <FileIcon size={14} color={colors.mutedForeground} />}
+        {sharing || previewing || resolved.status === 'resolving' ? (
+          <ActivityIndicator size={14} color={colors.mutedForeground} />
+        ) : (
+          <FileIcon size={14} color={colors.mutedForeground} />
+        )}
         <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-          {part.filename ?? 'File'}
+          {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+              which languages inflect by number; this key is the standalone noun label. */}
+          {part.filename ?? t('common.file')}
         </Text>
       </Pressable>
       {preview && url ? (
@@ -250,12 +498,96 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           mode={preview}
           url={url}
           part={part}
-          onClose={() => {
-            setPreview(null);
+          onRetry={
+            resolved.attachmentRef
+              ? async () => {
+                  const ok = await refreshFilePartUrl(part.id);
+                  return ok;
+                }
+              : undefined
+          }
+          onShare={() => {
+            void handleShare();
           }}
+          sharing={sharing}
+          shareError={shareError}
+          onClose={closePreview}
         />
       ) : null}
     </>
+  );
+}
+
+type FilePartVideoProps = {
+  part: FilePart;
+  url: string;
+  onLongPress?: () => void;
+  onShare: () => void;
+  sharing: boolean;
+  shareError: string | null;
+};
+
+/**
+ * Inline video surface. Native controls own play, scrub and fullscreen, so the
+ * viewer has no separate screen: the part plays in the transcript like an
+ * image. The share control reuses the file part's share path, and a share
+ * failure renders inline below the frame because the toast layer sits behind a
+ * presented sheet.
+ */
+function FilePartVideo({
+  part,
+  url,
+  onLongPress,
+  onShare,
+  sharing,
+  shareError,
+}: Readonly<FilePartVideoProps>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const player = useVideoPlayer(url, videoPlayer => {
+    videoPlayer.loop = false;
+  });
+
+  return (
+    <View className="my-1">
+      <View className="overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900">
+        <VideoView
+          player={player}
+          nativeControls
+          contentFit="contain"
+          style={VIDEO_STYLE}
+          accessibilityLabel={getFilePartAccessibilityLabel('video', part.filename)}
+        />
+      </View>
+      <View className="mt-1 flex-row items-center gap-2">
+        <Text
+          onLongPress={onLongPress}
+          className="min-w-0 flex-1 text-xs text-muted-foreground"
+          numberOfLines={1}
+        >
+          {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+              which languages inflect by number; this key is the standalone noun label. */}
+          {part.filename ?? t('common.file')}
+        </Text>
+        <Pressable
+          onPress={onShare}
+          disabled={sharing}
+          accessibilityRole="button"
+          accessibilityState={{ busy: sharing }}
+          accessibilityLabel={t('common.share', { title: part.filename ?? t('common.file') })}
+          className="min-h-[44px] min-w-[44px] items-center justify-center rounded-md active:opacity-70"
+        >
+          {sharing ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <Share size={18} color={colors.mutedForeground} />
+          )}
+        </Pressable>
+      </View>
+      {shareError !== null ? (
+        <AccessibleStatus message={shareError} className="mt-1 text-xs text-destructive" />
+      ) : null}
+    </View>
   );
 }
 
@@ -263,11 +595,26 @@ type FilePreviewModalProps = {
   mode: PreviewMode;
   url: string;
   part: FilePart;
+  onRetry?: () => Promise<boolean>;
   onClose: () => void;
+  onShare?: () => void;
+  sharing?: boolean;
+  shareError?: string | null;
 };
 
-function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModalProps>) {
+function FilePreviewModal({
+  mode,
+  url,
+  part,
+  onRetry,
+  onClose,
+  onShare,
+  sharing = false,
+  shareError = null,
+}: Readonly<FilePreviewModalProps>) {
   const { id, mime, filename } = part;
+  const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -303,22 +650,43 @@ function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModa
     if (status === 'error') {
       return (
         <View className="gap-3">
-          <Text className="text-sm text-muted-foreground">Could not load this file.</Text>
+          <Text className="text-sm text-muted-foreground">
+            {t('agentChat.filePart.couldNotLoadFile')}
+          </Text>
           <Pressable
             onPress={() => {
-              setAttempt(prev => prev + 1);
+              if (!onRetry) {
+                setAttempt(prev => prev + 1);
+                return;
+              }
+              setStatus('loading');
+              void (async () => {
+                const ok = await onRetry();
+                if (!ok) {
+                  setStatus('error');
+                } else {
+                  setAttempt(prev => prev + 1);
+                }
+              })();
             }}
             accessibilityRole="button"
-            accessibilityLabel="Retry loading file"
-            className="rounded-md border border-border px-4 py-2 active:opacity-70"
+            accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
+            className={cn(
+              STATE_ACTION_CLASS,
+              'rounded-md border border-border px-4 py-2 active:opacity-70'
+            )}
           >
-            <Text className="text-center text-sm font-medium text-foreground">Retry</Text>
+            <Text className="text-center text-sm font-medium text-foreground">
+              {t('common.retry')}
+            </Text>
           </Pressable>
         </View>
       );
     }
     if (text === '') {
-      return <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+      return (
+        <Text className="text-xs text-muted-foreground">{t('agentChat.filePart.fileEmpty')}</Text>
+      );
     }
     if (mode === 'markdown') {
       return <ChatMarkdownText value={text} />;
@@ -327,11 +695,29 @@ function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModa
   }
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View className="flex-1 bg-background">
-        <SheetHeader title={part.filename ?? 'File'} onDone={onClose} doneLabel="Done" />
-        <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
-      </View>
-    </Modal>
+    <SessionPageSheet visible onClose={onClose} dismissible>
+      <SheetHeader
+        // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+        // which languages inflect by number; this key is the standalone noun label.
+        title={part.filename ?? t('common.file')}
+        titleEllipsis="middle"
+        onDone={onClose}
+        doneLabel={t('common.done')}
+        onShare={onShare}
+        sharing={sharing}
+        topInset="ios-page-sheet"
+      />
+      <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
+      {status === 'error' || (status === 'ready' && text === '') ? (
+        <CenteredState contentContainerClassName="px-6">
+          <View className="items-center py-6">{renderBody()}</View>
+        </CenteredState>
+      ) : (
+        <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+          {renderBody()}
+        </ScrollView>
+      )}
+      <View style={{ height: insets.bottom }} className="bg-background" />
+    </SessionPageSheet>
   );
 }

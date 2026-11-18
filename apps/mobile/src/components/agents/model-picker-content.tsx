@@ -1,14 +1,19 @@
-import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { AlertCircle, Info, Search, SearchX } from '@/components/ui/icons';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, TextInput, View } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { selectionHaptic } from '@/lib/haptics';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { FIELD_CLEAR_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -17,21 +22,34 @@ import {
   favoriteToggleAction,
   type ModelPickerRow,
 } from '@/lib/model-picker-rows';
-import {
-  clearModelPickerBridge,
-  commitModelPickerSelection,
-  getModelPickerBridge,
-  resolveModelPickerSelection,
-} from '@/lib/picker-bridge';
+import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { parseParam } from '@/lib/route-params';
+import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+
+// The picker sheet renders its own scroll container (`scrollable={false}`), so
+// the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export function ModelPickerContent() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
+  const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
+  const routeKey = parseParam(rawRouteKey) ?? UNFENCED_ROUTE_KEY;
+  useRouteRegistry(routeKey);
   const [search, setSearch] = useState('');
-  const [bridge, setBridge] = useState(() => getModelPickerBridge());
+  // The input stays urgent; the list derivation and its rows trail behind so a
+  // typing burst on a large catalog does not filter/reconcile on every key.
+  const deferredSearch = useDeferredValue(search);
+  // The input remains uncontrolled (iOS TextInput rules), so the in-field X
+  // clears the native text imperatively and `search` stays the rows' source.
+  const searchInputRef = useRef<TextInput>(null);
+  const listRef = useRef<FlashListRef<ModelPickerRow>>(null);
+  const [bridge, setBridge] = useState(() => modelPickerSlot.get(routeKey));
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
   const bridgeRef = useRef(bridge);
@@ -44,9 +62,14 @@ export function ModelPickerContent() {
     router.back();
   }, [router]);
 
+  // A caller that keeps no variant cannot apply an effort picked here, so the
+  // rows leave the chips out and a model tap is the whole selection. Read from
+  // the bridge rather than a prop: the slot is the picker route's only input.
+  const acceptsVariant = bridge?.acceptsVariant ?? true;
+
   useFocusEffect(
     useCallback(() => {
-      const nextBridge = getModelPickerBridge();
+      const nextBridge = modelPickerSlot.get(routeKey);
       const nextModel = nextBridge?.currentValue ?? '';
       const nextVariant = nextBridge?.currentVariant ?? '';
 
@@ -58,6 +81,7 @@ export function ModelPickerContent() {
       setSelectedModel(nextModel);
       setSelectedVariant(nextVariant);
       setSearch('');
+      searchInputRef.current?.clear();
 
       return () => {
         if (closePickerTimerRef.current) {
@@ -73,16 +97,30 @@ export function ModelPickerContent() {
             selectedVariantRef.current
           );
         }
-        clearModelPickerBridge();
-        bridgeRef.current = null;
+        modelPickerSlot.clear(routeKey);
+        bridgeRef.current = undefined;
       };
-    }, [])
+    }, [routeKey])
   );
 
   const rows = useMemo<ModelPickerRow[]>(
-    () => buildModelPickerRows({ models: bridge?.options ?? [], search, favoriteIds }),
-    [bridge, search, favoriteIds]
+    () =>
+      buildModelPickerRows({ models: bridge?.options ?? [], search: deferredSearch, favoriteIds }),
+    [bridge, deferredSearch, favoriteIds]
   );
+
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [deferredSearch]);
+
+  // Shared by the in-field X and the "No matches" empty state's CTA: drops the
+  // query and the input's visible text in one step, so the full list returns
+  // without backspacing. The field carries its own control because Android has
+  // no native `clearButtonMode` counterpart.
+  const handleClearSearch = useCallback(() => {
+    searchInputRef.current?.clear();
+    setSearch('');
+  }, []);
 
   // The favorite star button in ModelPickerOptionRow already fires its own
   // selection haptic on press — this callback must not fire a second one.
@@ -102,7 +140,8 @@ export function ModelPickerContent() {
 
   const handleSelectVariant = useCallback(
     (variant: string) => {
-      void Haptics.selectionAsync();
+      selectionHaptic();
+      dismissSearchPickerKeyboard();
       selectionChangedRef.current = true;
       selectedVariantRef.current = variant;
       setSelectedVariant(variant);
@@ -123,94 +162,209 @@ export function ModelPickerContent() {
       if (option.unavailable || !bridge) {
         return;
       }
-      void Haptics.selectionAsync();
+      selectionHaptic();
       const selection = resolveModelPickerSelection(bridge, option.id, selectedVariantRef.current);
       if (!selection) {
         return;
       }
 
+      // The pick is applied: close the search keyboard with it, so the chosen
+      // row's check mark and its thinking-effort chips are visible whether or
+      // not the sheet stays open for a variant choice.
+      dismissSearchPickerKeyboard();
       selectionChangedRef.current = true;
       selectedModelRef.current = option.id;
       selectedVariantRef.current = selection.variant;
       setSelectedModel(option.id);
       setSelectedVariant(selection.variant);
-      if (option.variants.length <= 1) {
+      if (!acceptsVariant || option.variants.length <= 1) {
         closePicker();
       }
     },
-    [bridge, closePicker]
+    [acceptsVariant, bridge, closePicker]
+  );
+
+  // Hoisted out of the list body: the inline arrow gave the virtualized list a
+  // new renderer on every render, which re-rendered every mounted row. Height
+  // differs between the group header and a model row, so `getItemType` lets
+  // FlashList recycle the two apart.
+  const renderItem = useCallback(
+    ({ item }: { item: ModelPickerRow | undefined }) => {
+      // A stale index past the end of the rows (see `keyExtractor` below).
+      if (!item) {
+        return null;
+      }
+      if (item.type === 'header') {
+        return (
+          <View className="bg-secondary px-4 py-2">
+            <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {item.title}
+            </Text>
+          </View>
+        );
+      }
+
+      return (
+        <ModelPickerOptionRow
+          option={item.model}
+          selected={item.model.id === selectedModel}
+          selectedVariant={selectedVariant}
+          acceptsVariant={acceptsVariant}
+          isFavorite={item.isFavorite}
+          showProvider={item.showsProvider}
+          onSelectModel={handleSelectModel}
+          onSelectVariant={handleSelectVariant}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      );
+    },
+    [
+      acceptsVariant,
+      handleSelectModel,
+      handleSelectVariant,
+      handleToggleFavorite,
+      selectedModel,
+      selectedVariant,
+    ]
   );
 
   if (!bridge) {
-    return <PickerSheet title="Select model" onDone={closePicker} scrollable={false} expired />;
+    return (
+      <PickerSheet
+        title={t('agentChat.modelPicker.title')}
+        onDone={closePicker}
+        scrollable={false}
+        expired
+      />
+    );
   }
 
   return (
-    <PickerSheet title="Select model" onDone={closePicker} scrollable={false}>
-      <FlatList
-        className="flex-1 bg-background"
-        data={rows}
-        keyExtractor={item => item.key}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: bottom }}
-        ListHeaderComponent={
-          <View>
-            <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
-              <Search size={18} color={colors.mutedForeground} />
-              <TextInput
-                placeholder="Search models..."
-                placeholderTextColor={colors.mutedForeground}
+    <PickerSheet
+      title={t('agentChat.modelPicker.title')}
+      onDone={closePicker}
+      scrollable={false}
+      headerContent={
+        <View>
+          <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
+            <Search size={18} color={colors.mutedForeground} />
+            {/* The placeholder is a single-line Text overlay, not the input's own
+                placeholder: Android lays the native hint out at the field's width
+                with no line cap, so copy wider than a narrow field wraps onto a
+                second line. A tail-ellipsized Text truncates the copy at any width
+                instead. The shared box draws the value on one line box and centres
+                it, and both texts start at the field's left edge so the overlay
+                sits exactly where the typed text will. The input also needs the
+                physical `pl-0 pr-0`: Android's TextInput ignores the logical
+                padding `px-0` compiles to and keeps its default inset. */}
+            <View className="relative flex-1">
+              <Input
+                ref={searchInputRef}
+                accessibilityLabel={t('common.searchModels')}
                 autoCapitalize="none"
                 autoCorrect={false}
-                clearButtonMode="while-editing"
                 returnKeyType="search"
-                className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+                className="flex-1 px-0 pl-0 pr-0 text-base text-foreground"
                 onChangeText={setSearch}
               />
+              {search.length === 0 ? (
+                <View className="absolute inset-0 justify-center" pointerEvents="none">
+                  <Text
+                    accessible={false}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    className="text-base leading-[normal] font-normal px-0 text-muted-foreground"
+                  >
+                    {t('common.searchModels')}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-            {favoritesError ? (
-              <View className="mx-4 mb-3 flex-row items-center gap-1.5">
-                <AlertCircle size={14} color={colors.destructive} />
-                <Text className="text-xs text-destructive">{favoritesError}</Text>
-              </View>
+            {/* In-field clear, on every platform: the native clear affordance is not
+                available on the platform without one, so the field carries its
+                own control. The frame, not the 16pt glyph, is what a
+                control-size audit reads, so the control renders a box that
+                carries the whole target on its own node, and it adds no
+                `hitSlop`: the box already reaches past the target, and a reach
+                across `gap-2` would take taps the search field should get. The
+                box cancels its own extra height, so the field keeps its height.
+                `-me-3` (the field's own `px-3`) puts the box's trailing edge on
+                the field's edge, so the whole box stays inside the field's
+                frame; it is a logical margin, so it mirrors with the row in
+                right-to-left layouts. */}
+            {search.length > 0 ? (
+              <Pressable
+                onPress={handleClearSearch}
+                accessibilityLabel={t('common.clearSearch')}
+                accessibilityRole="button"
+                className={`${FIELD_CLEAR_BOX_CLASS} -me-3 active:opacity-70`}
+              >
+                <X size={16} color={colors.mutedForeground} />
+              </Pressable>
             ) : null}
           </View>
-        }
-        ListEmptyComponent={
-          <EmptyState
-            icon={search.trim() ? SearchX : Info}
-            placement="top"
-            title={search.trim() ? 'No matches' : 'No models available'}
-            description={
-              search.trim() ? 'Try a different search term.' : 'No models are available to select.'
-            }
-          />
-        }
-        renderItem={({ item }) => {
-          if (item.type === 'header') {
-            return (
-              <View className="bg-secondary px-4 py-2">
-                <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {item.title}
-                </Text>
-              </View>
-            );
+          {favoritesError ? (
+            <View className="mx-4 mb-3 flex-row items-center gap-1.5">
+              <AlertCircle size={14} color={colors.destructive} />
+              <Text className="text-xs text-destructive">{favoritesError}</Text>
+            </View>
+          ) : null}
+        </View>
+      }
+    >
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={deferredSearch.trim() ? SearchX : Info}
+          title={
+            deferredSearch.trim()
+              ? t('agentChat.repoPicker.noMatches')
+              : t('common.noModelsAvailable')
           }
-
-          return (
-            <ModelPickerOptionRow
-              option={item.model}
-              selected={item.model.id === selectedModel}
-              selectedVariant={selectedVariant}
-              isFavorite={item.isFavorite}
-              onSelectModel={handleSelectModel}
-              onSelectVariant={handleSelectVariant}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          );
-        }}
-      />
+          description={
+            deferredSearch.trim()
+              ? t('agents.sessionList.tryDifferentSearch')
+              : t('agentChat.modelPicker.noModelsDescription')
+          }
+          action={
+            // The in-field X is one way back; the no-matches body offers the
+            // same recovery the Agents search empty state does, so the only
+            // exit from "No matches" is not backspacing the query away.
+            deferredSearch.trim() ? (
+              <Button variant="outline" onPress={handleClearSearch} className={STATE_ACTION_CLASS}>
+                <Text>{t('common.clearSearch')}</Text>
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : (
+        // No wrapping View: react-native-screens honors the formSheet header
+        // only when [header, scroll view] are the content's direct children,
+        // so the list itself carries the sheet background.
+        //
+        // The bottom inset rides on the list's frame, not its content: a content
+        // inset only cleared the end of the list, so a row at the viewport bottom
+        // (the picker's last row) was drawn under the opaque Android navigation
+        // bar. Ending the viewport above the bar is the same frame inset
+        // `session-list-screen` uses for its FAB band.
+        <FlashList<ModelPickerRow>
+          nestedScrollEnabled
+          ref={listRef}
+          maintainVisibleContentPosition={{ disabled: true }}
+          style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
+          data={rows}
+          // FlashList stores its props during render. When React discards a
+          // deferred search render, FlashList can keep that render's shorter
+          // rows and then ask for a row past their end, so the row can be
+          // undefined (Sentry KILO-APP-3K0). It indexes `data` without a bounds
+          // check for `renderItem` too, which renders nothing for such a row.
+          // The key and type fallbacks are the ones FlashList uses when these
+          // callbacks are absent.
+          keyExtractor={(item: ModelPickerRow | undefined, index) => item?.key ?? String(index)}
+          getItemType={(item: ModelPickerRow | undefined) => item?.type}
+          {...SEARCHABLE_PICKER_LIST_PROPS}
+          renderItem={renderItem}
+        />
+      )}
     </PickerSheet>
   );
 }

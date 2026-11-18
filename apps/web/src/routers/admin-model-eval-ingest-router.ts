@@ -1,5 +1,5 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { model_eval_ingestions } from '@kilocode/db/schema';
 import { desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';

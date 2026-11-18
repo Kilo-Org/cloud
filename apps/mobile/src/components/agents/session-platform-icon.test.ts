@@ -8,6 +8,7 @@ import { selectRowPlatformPresentation, sessionPlatformIconKind } from './sessio
 vi.mock('@/components/ui/icons', () => ({
   Cloud: () => null,
   Code: () => null,
+  Monitor: () => null,
   Terminal: () => null,
 }));
 vi.mock('@/components/icons/github-icon', () => ({
@@ -32,6 +33,10 @@ describe('sessionPlatformIconKind', () => {
     expect(sessionPlatformIconKind('agent-manager')).toBe('code');
   });
 
+  it('maps desktop to desktop', () => {
+    expect(sessionPlatformIconKind('desktop')).toBe('desktop');
+  });
+
   it('maps slack to slack', () => {
     expect(sessionPlatformIconKind('slack')).toBe('slack');
   });
@@ -45,7 +50,6 @@ describe('sessionPlatformIconKind', () => {
     expect(sessionPlatformIconKind('other')).toBeNull();
     expect(sessionPlatformIconKind('gastown')).toBeNull();
     expect(sessionPlatformIconKind('linear')).toBeNull();
-    expect(sessionPlatformIconKind('app-builder')).toBeNull();
     expect(sessionPlatformIconKind('agent-builder')).toBeNull();
     expect(sessionPlatformIconKind(null)).toBeNull();
     expect(sessionPlatformIconKind(undefined)).toBeNull();
@@ -62,6 +66,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: 'cli' });
@@ -73,6 +78,21 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'card',
         needsInput: false,
+        statusGlyph: false,
+        gitUrl: repoGitUrl,
+      })
+    ).toEqual({ iconKind: null, spokenPlatform: undefined });
+  });
+
+  it('suppresses the icon and speech when the eyebrow draws the status glyph', () => {
+    // Live rows: the status mark is the one glyph in the cluster; a platform
+    // glyph beside it reads as a stray second mark.
+    expect(
+      selectRowPlatformPresentation({
+        platform: 'cli',
+        variant: 'list',
+        needsInput: false,
+        statusGlyph: true,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: null, spokenPlatform: undefined });
@@ -84,38 +104,41 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: true,
+        statusGlyph: false,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
   });
 
-  it('leaves spokenPlatform undefined when the git URL yields no repo name', () => {
-    expect(
-      selectRowPlatformPresentation({
-        platform: 'cli',
-        variant: 'list',
-        needsInput: false,
-        gitUrl: null,
-      })
-    ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
+  it('draws no glyph when the eyebrow already names the platform (no repo name)', () => {
+    // The eyebrow renders the platform label itself, so a glyph beside the
+    // timestamp would repeat the word.
+    for (const gitUrl of [null, undefined, '']) {
+      expect(
+        selectRowPlatformPresentation({
+          platform: 'cloud-agent-web',
+          variant: 'list',
+          needsInput: false,
+          statusGlyph: false,
+          gitUrl,
+        })
+      ).toEqual({ iconKind: null, spokenPlatform: undefined });
+    }
+  });
 
+  it('treats a git URL with an empty project segment as the label fallback', () => {
+    // `repoNameFromGitUrl` answers `''` here, and the label helpers read it as
+    // absent, so the glyph has to fall back with them or the row states its
+    // type twice.
     expect(
       selectRowPlatformPresentation({
-        platform: 'cli',
+        platform: 'cloud-agent-web',
         variant: 'list',
         needsInput: false,
-        gitUrl: undefined,
+        statusGlyph: false,
+        gitUrl: 'git@github.com:/',
       })
-    ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
-
-    expect(
-      selectRowPlatformPresentation({
-        platform: 'cli',
-        variant: 'list',
-        needsInput: false,
-        gitUrl: '',
-      })
-    ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
+    ).toEqual({ iconKind: null, spokenPlatform: undefined });
   });
 
   it('sets spokenPlatform when an icon shows with a repo-name eyebrow (stored git_url shape)', () => {
@@ -125,6 +148,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cloud-agent',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: 'https://github.com/org/stored-repo.git',
       })
     ).toEqual({ iconKind: 'cloud', spokenPlatform: 'cloud-agent' });
@@ -137,6 +161,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: 'git@github.com:org/live-repo.git',
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: 'cli' });
@@ -148,6 +173,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'linear',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: null, spokenPlatform: undefined });

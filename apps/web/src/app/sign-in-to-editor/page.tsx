@@ -1,8 +1,8 @@
 import { OpenCodeEditor } from '@/components/auth/OpenCodeEditor';
 import { DelayedLinks } from '@/components/auth/DelayedLinks';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
-import { generateApiToken } from '@/lib/tokens';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { getUserFromSessionForCredentialIssuanceOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
@@ -18,7 +18,9 @@ export default async function RedirectPage({
     await searchParams,
     await cookies()
   );
-  const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/sign-in-to-editor');
+  const user = await getUserFromSessionForCredentialIssuanceOrRedirect(
+    '/users/sign_in?callbackPath=/sign-in-to-editor'
+  );
 
   if (user.has_validation_stytch === null) {
     // account-status does stytch verification and redirects to welcome when that's done

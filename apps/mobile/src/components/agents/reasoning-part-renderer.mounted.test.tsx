@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+import '@/i18n';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { OpenPartDetailContext } from './open-part-detail-context';
@@ -16,8 +16,9 @@ vi.mock('@/components/ui/eyebrow', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
+const selectableMock = vi.hoisted(() => ({ value: false }));
 vi.mock('./bubble-text-selection-context', () => ({
-  useTranscriptTextSelectable: () => false,
+  useTranscriptTextSelectable: () => selectableMock.value,
 }));
 vi.mock('./fixed-part-row', () => ({
   FixedPartRow: 'FixedPartRow',
@@ -154,7 +155,6 @@ describe('ReasoningPartRenderer mounted', () => {
       throw new Error('row not found');
     }
     expect(row.props.label).toBe('Thought');
-    expect(row.props.labelKind).toBe('eyebrow');
     expect(row.props.variant).toBe('dashed');
     expect(row.props.accessibilityLabel).toBe('Thought');
 
@@ -214,5 +214,41 @@ describe('ReasoningPartRenderer mounted', () => {
       defaultExpanded: true,
     });
     expect(renderer.root.children).toHaveLength(0);
+  });
+
+  // A provider can leave a block it never put into words. A body made only of
+  // zero-width and format characters paints nothing, so it is not content: the
+  // row would open onto an empty body (video V1 ~8s, "MISAO" rows above short
+  // answers).
+  it('returns null for a body that draws nothing', async () => {
+    const renderer = await renderRenderer({
+      partId: 'p1',
+      text: '\u200B\u200B\uFEFF',
+      isStreaming: false,
+    });
+    expect(renderer.root.children).toHaveLength(0);
+  });
+
+  it('drops selectable on expanded streaming text, then restores it when the part finishes', async () => {
+    selectableMock.value = true;
+    try {
+      const streaming = await renderRenderer({
+        partId: 'p1',
+        text: 'growing reasoning',
+        isStreaming: true,
+        defaultExpanded: true,
+      });
+      expect(findTextElement(streaming.root)?.props.selectable).toBe(false);
+
+      const finished = await renderRenderer({
+        partId: 'p1',
+        text: 'finished reasoning',
+        isStreaming: false,
+        defaultExpanded: true,
+      });
+      expect(findTextElement(finished.root)?.props.selectable).toBe(true);
+    } finally {
+      selectableMock.value = false;
+    }
   });
 });

@@ -51,6 +51,7 @@ describe('resolveShareHasFiles', () => {
       kind: 'all-rejected',
       reason: 'denied',
       message: 'None of the shared files can be attached.',
+      failedCopies: [],
     };
     expect(resolveShareHasFiles(validation, 2)).toBe(false);
   });
@@ -157,8 +158,9 @@ describe('resolveShareDestinationAdmission', () => {
     ).toEqual({ ok: true });
   });
 
-  it('rejects cli + live + capabilities-absent (attachmentsCapable false) + files', () => {
-    // Absent capabilities map to attachmentsCapable: false at the call site.
+  it('rejects cli + live + incapable (attachments:false) + files', () => {
+    // Call sites pass `attachmentsCapable: false` only on an explicit
+    // `capabilities.attachments === false`; unknown capabilities are capable.
     expect(
       resolveShareDestinationAdmission({
         createdOnPlatform: 'cli',

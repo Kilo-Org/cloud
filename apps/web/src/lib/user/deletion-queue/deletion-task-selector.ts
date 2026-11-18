@@ -10,13 +10,14 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   catalogEntryFor,
   catalogForVersion,
+  validateMaterializedStepKeys,
   UserDeletionPhase,
 } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_ANONYMIZE_MIN_REMAINING_MS } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_ANONYMIZE_MIN_REMAINING_MS } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { SUCCESSFUL_TASK_STATUSES } from '@/lib/user/deletion-queue/deletion-types';
 
 export type SelectedDeletionTask = {
@@ -96,7 +97,12 @@ async function pickNextTaskForRequest(
     .from(user_deletion_steps)
     .where(eq(user_deletion_steps.request_id, params.requestId));
 
+  validateMaterializedStepKeys(
+    request.catalog_version,
+    steps.map(step => step.step_key)
+  );
   const catalog = catalogForVersion(request.catalog_version);
+  const materialized = new Set(steps.map(step => step.step_key));
   const successful = new Set(
     steps
       .filter(step => (SUCCESSFUL_TASK_STATUSES as readonly string[]).includes(step.status))
@@ -105,6 +111,7 @@ async function pickNextTaskForRequest(
 
   const candidates = steps
     .filter(step => {
+      if (step.step_key === UserDeletionStepKey.CsaSupportDb) return false;
       if (params.excludeStepKeys?.includes(step.step_key)) return false;
       if (!CLAIMABLE_STATUSES.includes(step.status as (typeof CLAIMABLE_STATUSES)[number])) {
         return false;
@@ -129,7 +136,7 @@ async function pickNextTaskForRequest(
       ) {
         return false;
       }
-      return entry.dependsOn.every(dep => successful.has(dep));
+      return entry.dependsOn.filter(dep => materialized.has(dep)).every(dep => successful.has(dep));
     })
     .sort((left, right) => {
       const leftOrder = catalog.findIndex(entry => entry.stepKey === left.step_key);

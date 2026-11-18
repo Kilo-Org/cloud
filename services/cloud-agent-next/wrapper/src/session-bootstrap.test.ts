@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
+import { createLogArchiveId, createLogUploader, type LogUploader } from './log-uploader';
 import {
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
-  RestoredWorkspaceReconciliationError,
-  workspaceBootstrapErrorCode,
   type WrapperBootstrapDeps,
 } from './session-bootstrap';
 import type {
@@ -16,6 +16,8 @@ import type {
 } from '../../src/shared/wrapper-bootstrap';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
+import { isWrapperSessionReadyRequest } from '../../src/shared/wrapper-bootstrap.js';
+import { runProcess, type ExecResult } from './utils';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -89,21 +91,34 @@ async function createCompleteGitWorkspace(workspacePath: string): Promise<void> 
   await fsp.writeFile(path.join(gitPath, 'kilo-bootstrap-complete'), 'ready\n');
 }
 
+function gitCredentialsPath(sessionHome: string): string {
+  return path.join(sessionHome, '.local/share/kilo/cloud-agent/git-credentials');
+}
+
 describe('prepareWrapperBootstrapWorkspace', () => {
   let tmpDir: string;
   let originalEnv: Record<string, string | undefined>;
+  let originalFetch: typeof fetch;
+  const uploaders: LogUploader[] = [];
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wrapper-bootstrap-'));
+    originalFetch = globalThis.fetch;
     originalEnv = {
       HOME: process.env.HOME,
+      WRAPPER_LOG_PATH: process.env.WRAPPER_LOG_PATH,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       GH_TOKEN: process.env.GH_TOKEN,
+      GITLAB_TOKEN: process.env.GITLAB_TOKEN,
+      GITLAB_HOST: process.env.GITLAB_HOST,
+      DATABASE_URL: process.env.DATABASE_URL,
       [PNPM_STORE_ENV_VAR]: process.env[PNPM_STORE_ENV_VAR],
     };
   });
 
   afterEach(() => {
+    for (const uploader of uploaders.splice(0)) uploader.stop();
+    globalThis.fetch = originalFetch;
     for (const [key, value] of Object.entries(originalEnv)) {
       if (value === undefined) {
         delete process.env[key];
@@ -114,8 +129,13 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('prepares a cold workspace, restores Kilo, and runs setup commands', async () => {
+  it('materializes authoritative credentials before preparing a cold workspace', async () => {
     const request = makeRequest(tmpDir);
+    request.materialized.env.GH_TOKEN = 'profile-github-token';
+    const credentialsPath = gitCredentialsPath(request.workspace.sessionHome);
+    const credentialsDirectory = path.dirname(credentialsPath);
+    await fsp.mkdir(credentialsDirectory, { recursive: true });
+    await fsp.chmod(credentialsDirectory, 0o777);
     const progress = mock(() => {});
     const gitCalls: string[][] = [];
     const setupCalls: string[][] = [];
@@ -125,6 +145,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       git: async args => {
         gitCalls.push(args);
         if (args[0] === 'clone') {
+          expect(await fsp.readFile(credentialsPath, 'utf8')).toBe(
+            'protocol=https\nhost=github.com\nusername=x-access-token\npassword=gh-token\n'
+          );
+          expect((await fsp.stat(credentialsDirectory)).mode & 0o777).toBe(0o700);
+          expect((await fsp.stat(credentialsPath)).mode & 0o777).toBe(0o600);
           await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
         }
         if (args[0] === 'rev-parse') {
@@ -154,11 +179,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(gitCalls[0]).toEqual([
       'clone',
       '--progress',
-      'https://x-access-token:gh-token@github.com/acme/repo.git',
+      'https://github.com/acme/repo.git',
       request.workspace.workspacePath,
     ]);
     expect(gitCalls.some(args => args.join(' ') === 'checkout --progress -b main')).toBe(true);
-    expect(setupCalls).toEqual([['sh', '-lc', 'pnpm install']]);
+    expect(setupCalls).toEqual([['bash', '-e', '-o', 'pipefail', '-c', 'pnpm install']]);
     expect(restoreCalls[0]).toMatchObject({
       kiloSessionId: 'kilo_sess_1',
       workspacePath: request.workspace.workspacePath,
@@ -174,7 +199,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md'),
         'utf8'
       )
-    ).toBe(buildCloudAgentRules(request.agentSessionId));
+    ).toBe(
+      buildCloudAgentRules({
+        bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+      })
+    );
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
@@ -184,6 +213,54 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     );
     expect(JSON.parse(authFile)).toEqual({ kilo: { type: 'api', key: 'kilo-capability' } });
     expect(authFile).not.toContain('wrapper-dispatch-ticket');
+    expect(process.env.GH_TOKEN).toBe('profile-github-token');
+  });
+
+  it('writes profile instruction files beside cloud-agent.md and never overwrites it', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    const wrapperLogPath = path.join(tmpDir, 'instruction.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    request.materialized.runtimeInstructions = [
+      { name: 'bad\nforged-log-line', content: 'Rejected' },
+      { name: 'repo-rules', content: 'Follow the repository policy' },
+      { name: 'cloud-agent', content: 'hijack the reserved rules file' },
+    ];
+
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    const log = await fsp.readFile(wrapperLogPath, 'utf8');
+    expect(log).toContain('name="bad\\nforged-log-line"');
+    expect(log).not.toContain('\nforged-log-line');
+    const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
+    expect(await fsp.readFile(path.join(rulesDir, 'repo-rules.md'), 'utf8')).toBe(
+      'Follow the repository policy'
+    );
+    expect(await fsp.readFile(path.join(rulesDir, 'cloud-agent.md'), 'utf8')).toBe(
+      buildCloudAgentRules({
+        bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+      })
+    );
   });
 
   it('uses a blobless partial clone for GitHub/GitLab code review sessions', async () => {
@@ -262,15 +339,21 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       }
     );
 
-    // Bitbucket's origin is credential-stripped after bootstrap, so a deferred
-    // blob could never be lazily fetched — it keeps a normal full clone.
+    // Raw-token Bitbucket is not blobless-eligible; only capability-backed
+    // sessions qualify. Origin is still stripped to a credential-free URL.
     const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).toContain('https://bitbucket.org/acme/repo.git');
+    expect(cloneCall?.join(' ')).not.toContain('bb-token');
     expect(cloneCall).not.toContain('--filter=blob:none');
-    // The raw-token origin is stripped to a credential-free URL.
-    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(true);
+    expect(gitCalls).toContainEqual([
+      'remote',
+      'set-url',
+      'origin',
+      'https://bitbucket.org/acme/repo.git',
+    ]);
   });
 
-  it('uses a blobless clone and keeps the capability origin for a contained Bitbucket review session', async () => {
+  it('uses a blobless clone and strips origin to canonical for a contained Bitbucket review session', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.env.KILO_PLATFORM = 'code-review';
     request.materialized.setupCommands = [];
@@ -308,20 +391,31 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       }
     );
 
-    // A capability origin stays authenticated through the outbound interceptor,
-    // so the clone is blobless and the origin is NOT stripped.
-    expect(gitCalls.find(args => args[0] === 'clone')).toContain('--filter=blob:none');
-    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(false);
+    const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).toContain('--filter=blob:none');
+    expect(cloneCall).toContain('https://bitbucket.org/acme/repo.git');
+    expect(cloneCall?.join(' ')).not.toContain('kbb1.');
+    expect(gitCalls).toContainEqual([
+      'remote',
+      'set-url',
+      'origin',
+      'https://bitbucket.org/acme/repo.git',
+    ]);
+    expect(await fsp.readFile(gitCredentialsPath(request.workspace.sessionHome), 'utf8')).toBe(
+      'protocol=https\nhost=bitbucket.org\nusername=x-token-auth\npassword=kbb1.opaque-capability\n'
+    );
   });
 
-  it('uses a blobless partial clone for GitLab review sessions', async () => {
+  it('uses authoritative credentials for blobless GitLab clones on custom hosts', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.env.GITLAB_TOKEN = 'profile-gitlab-token';
+    request.materialized.env.GITLAB_HOST = 'profile.gitlab.example.com';
     request.materialized.setupCommands = [];
     request.repo = {
       kind: 'git',
-      url: 'https://gitlab.com/acme/repo.git',
-      token: 'gl-token',
+      url: 'https://gitlab.example.com:8443/acme/repo.git',
+      token: 'kgl2.opaque-capability',
       platform: 'gitlab',
     };
     request.workspace.branchName = 'feature/login';
@@ -352,15 +446,21 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       }
     );
 
-    expect(gitCalls.find(args => args[0] === 'clone')).toContain('--filter=blob:none');
+    const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).toContain('--filter=blob:none');
+    expect(cloneCall).toContain('https://gitlab.example.com:8443/acme/repo.git');
+    expect(cloneCall?.join(' ')).not.toContain('kgl2.opaque-capability');
+    expect(await fsp.readFile(gitCredentialsPath(request.workspace.sessionHome), 'utf8')).toBe(
+      'protocol=https\nhost=gitlab.example.com:8443\nusername=oauth2\npassword=kgl2.opaque-capability\n'
+    );
+    expect(process.env.GITLAB_TOKEN).toBe('profile-gitlab-token');
+    expect(process.env.GITLAB_HOST).toBe('profile.gitlab.example.com');
   });
 
   it('keeps a full clone for review sessions on an unrecognized git platform', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.env.KILO_PLATFORM = 'code-review';
     request.materialized.setupCommands = [];
-    // A `git` source with no recognized platform has no lazy-fetch credential
-    // guarantee, so it must not use a partial clone.
     request.repo = { kind: 'git', url: 'https://git.example.com/acme/repo.git', token: 't' };
     request.workspace.branchName = 'feature/login';
 
@@ -390,7 +490,287 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       }
     );
 
-    expect(gitCalls.find(args => args[0] === 'clone')).not.toContain('--filter=blob:none');
+    const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).not.toContain('--filter=blob:none');
+    expect(cloneCall).toContain('https://git.example.com/acme/repo.git');
+    expect(gitCalls).toContainEqual([
+      'remote',
+      'set-url',
+      'origin',
+      'https://git.example.com/acme/repo.git',
+    ]);
+    expect(await fsp.readFile(gitCredentialsPath(request.workspace.sessionHome), 'utf8')).toBe(
+      'protocol=https\nhost=git.example.com\nusername=x-access-token\npassword=t\n'
+    );
+  });
+
+  it('authenticates GitHub-labeled git sources without GH_TOKEN or URL credentials', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      token: 'leftover-github-pat',
+      platform: 'github',
+    };
+    delete request.materialized.env.GH_TOKEN;
+    delete process.env.GH_TOKEN;
+
+    const gitCalls: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).toContain('https://github.com/Kilo-Org/cloud.git');
+    expect(cloneCall?.join(' ')).not.toContain('leftover-github-pat');
+    expect(gitCalls).toContainEqual([
+      'remote',
+      'set-url',
+      'origin',
+      'https://github.com/Kilo-Org/cloud.git',
+    ]);
+    expect(await fsp.readFile(gitCredentialsPath(request.workspace.sessionHome), 'utf8')).toBe(
+      'protocol=https\nhost=github.com\nusername=x-access-token\npassword=leftover-github-pat\n'
+    );
+  });
+
+  it('clones kind:git + platform:github without embedding when GH_TOKEN is present', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    request.materialized.env.GH_TOKEN = 'leftover-github-pat';
+    request.repo = {
+      kind: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      token: 'leftover-github-pat',
+      platform: 'github',
+    };
+
+    const gitCalls: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).toContain('https://github.com/Kilo-Org/cloud.git');
+    expect(cloneCall?.join(' ')).not.toContain('leftover-github-pat');
+    expect(gitCalls).toContainEqual([
+      'remote',
+      'set-url',
+      'origin',
+      'https://github.com/Kilo-Org/cloud.git',
+    ]);
+  });
+
+  it('uses the current request credential after an earlier request sets GH_TOKEN', async () => {
+    const initialRequest = makeRequest(path.join(tmpDir, 'initial'));
+    initialRequest.workspace.preferSnapshot = true;
+    initialRequest.materialized.setupCommands = [];
+    initialRequest.materialized.env.GH_TOKEN = 'previous-github-token';
+    await createCompleteGitWorkspace(initialRequest.workspace.workspacePath);
+
+    const fallbackRequest = makeRequest(path.join(tmpDir, 'fallback'));
+    fallbackRequest.materialized.setupCommands = [];
+    fallbackRequest.repo = {
+      kind: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      token: 'current-github-pat',
+      platform: 'github',
+    };
+
+    const gitCalls: string[][] = [];
+    const deps: WrapperBootstrapDeps = {
+      git: async args => {
+        gitCalls.push(args);
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(fallbackRequest.workspace.workspacePath, '.git'), {
+            recursive: true,
+          });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    };
+
+    await prepareWrapperBootstrapWorkspace(initialRequest, undefined, deps);
+    expect(process.env.GH_TOKEN).toBe('previous-github-token');
+
+    gitCalls.length = 0;
+    await prepareWrapperBootstrapWorkspace(fallbackRequest, undefined, deps);
+
+    expect(gitCalls.find(args => args[0] === 'clone')).toContain(
+      'https://github.com/Kilo-Org/cloud.git'
+    );
+    expect(gitCalls).toContainEqual([
+      'remote',
+      'set-url',
+      'origin',
+      'https://github.com/Kilo-Org/cloud.git',
+    ]);
+    expect(
+      await fsp.readFile(gitCredentialsPath(fallbackRequest.workspace.sessionHome), 'utf8')
+    ).toBe(
+      'protocol=https\nhost=github.com\nusername=x-access-token\npassword=current-github-pat\n'
+    );
+    expect(process.env.GH_TOKEN).toBe('previous-github-token');
+  });
+
+  it('preserves anonymous generic HTTPS clones without repository credentials', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    request.repo = { kind: 'git', url: 'https://git.example.com/acme/public.git' };
+    const gitCalls: string[][] = [];
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        gitCalls.push(args);
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    });
+
+    expect(gitCalls[0]).toEqual([
+      'clone',
+      '--progress',
+      'https://git.example.com/acme/public.git',
+      request.workspace.workspacePath,
+    ]);
+    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(false);
+    expect(fs.existsSync(gitCredentialsPath(request.workspace.sessionHome))).toBe(false);
+  });
+
+  it.each([
+    ['newline', 'repository-token\npassword=injected'],
+    ['carriage return', 'repository-token\rinjected'],
+    ['NUL', 'repository-token\0injected'],
+  ])('rejects repository credentials containing a %s before Git runs', async (_kind, token) => {
+    const request = makeRequest(tmpDir);
+    request.repo = { kind: 'github', repo: 'acme/repo', token };
+    const runGit = mock(async () => ({ stdout: '', stderr: '', exitCode: 0 }));
+
+    let readinessError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, { git: runGit });
+    } catch (error) {
+      readinessError = error;
+    }
+
+    expect(readinessError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'workspace_setup_unknown',
+      message: 'Workspace setup failed',
+    });
+    expect(runGit).not.toHaveBeenCalled();
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+  });
+
+  it.each(['http://git.example.com/acme/repo.git', 'ssh://git.example.com/acme/repo.git'])(
+    'rejects authenticated non-HTTPS repository URL %s before Git runs',
+    async url => {
+      const request = makeRequest(tmpDir);
+      request.repo = { kind: 'git', url, token: 'repository-token' };
+      const runGit = mock(async () => ({ stdout: '', stderr: '', exitCode: 0 }));
+
+      let readinessError: unknown;
+      try {
+        await prepareWrapperBootstrapWorkspace(request, undefined, { git: runGit });
+      } catch (error) {
+        readinessError = error;
+      }
+
+      expect(readinessError).toMatchObject({
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'workspace_setup_unknown',
+      });
+      expect(runGit).not.toHaveBeenCalled();
+      expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+    }
+  );
+
+  it('fails warm readiness and removes temporary files when credential replacement fails', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const credentialsPath = gitCredentialsPath(request.workspace.sessionHome);
+    await fsp.mkdir(credentialsPath, { recursive: true });
+    const runGit = mock(async () => ({ stdout: '', stderr: '', exitCode: 0 }));
+
+    let readinessError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, { git: runGit });
+    } catch (error) {
+      readinessError = error;
+    }
+
+    expect(readinessError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'workspace_setup_unknown',
+    });
+    expect(runGit).not.toHaveBeenCalled();
+    expect(await fsp.readdir(path.dirname(credentialsPath))).toEqual(['git-credentials']);
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(true);
   });
 
   it('retries a full clone when the server rejects the blobless filter', async () => {
@@ -626,7 +1006,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
           await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
           opts?.onOutput?.(
             'stderr',
-            'remote: https://x-access-token:gh-token@github.com/acme/repo.git Receiving objects: 42% (42/100)\n'
+            `remote: ${(() => {
+              const url = new URL('https://github.com/acme/repo.git');
+              url.username = 'x-access-token';
+              url.password = 'gh-token';
+              return url.toString();
+            })()} Receiving objects: 42% (42/100)\n`
           );
         }
         if (args[0] === 'rev-parse') {
@@ -655,6 +1040,76 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress.mock.calls.flat().join(' ')).not.toContain('gh-token');
   });
 
+  it('bounds a progressing clone with its own hard timeout below the preparation deadline', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    let cloneResult: ExecResult | undefined;
+    const progressScript =
+      'for i in $(seq 1 50); do printf \'Receiving objects: %s%%\\n\' "$i"; sleep 0.05; done';
+
+    const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          expect(opts?.hardTimeoutMs).toBe(300_000);
+          cloneResult = await runProcess('sh', ['-c', progressScript], {
+            ...opts,
+            inactivityTimeoutMs: 400,
+            hardTimeoutMs: 400,
+          });
+          return cloneResult;
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        throw new Error('restore should not run after clone timeout');
+      },
+    });
+    const preparationError = await preparation.catch(caught => caught);
+
+    // A progressing clone is still bounded by the clone's own wall clock, so it
+    // is attributed as git_clone_timeout rather than the preparation deadline.
+    expect(preparationError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      retryable: true,
+    });
+    expect(cloneResult?.terminationReason).toBe('hard_timeout');
+  });
+
+  it('fails a silent clone with the inactivity bound', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    let cloneResult: ExecResult | undefined;
+
+    const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          expect(opts?.hardTimeoutMs).toBe(300_000);
+          cloneResult = await runProcess('sh', ['-c', 'sleep 3'], {
+            ...opts,
+            inactivityTimeoutMs: 400,
+          });
+          return cloneResult;
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        throw new Error('restore should not run after clone timeout');
+      },
+    });
+    const preparationError = await preparation.catch(caught => caught);
+    expect(preparationError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      retryable: true,
+    });
+
+    expect(cloneResult?.exitCode).toBe(124);
+    expect(cloneResult?.terminationReason).toBe('inactivity_timeout');
+  });
+
   it('fails and cleans up when a repository fetch reaches its hard limit', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];
@@ -669,6 +1124,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
             });
           }
           if (args[0] === 'fetch') {
+            expect(fs.existsSync(gitCredentialsPath(request.workspace.sessionHome))).toBe(true);
             return {
               stdout: '',
               stderr: 'exec hard timeout reached',
@@ -694,22 +1150,241 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       subtype: 'git_checkout_timeout',
       retryable: true,
       message: 'Repository checkout timed out',
-      detail: 'termination hard_timeout',
+      detail: 'termination hard_timeout, output: exec hard timeout reached',
     });
-    expect(JSON.stringify(caughtError)).not.toContain('exec hard timeout reached');
+    expect(JSON.stringify(caughtError)).toContain('exec hard timeout reached');
     expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
-  it('aborts active work and cleans up when the shared workspace deadline expires', async () => {
+  it.each([{ uploadResult: 'success' }, { uploadResult: 'failure' }, { uploadResult: 'timeout' }])(
+    'retains CLI evidence before cold cleanup with a $uploadResult final upload',
+    async ({ uploadResult }) => {
+      const request = makeRequest(tmpDir);
+      request.workspace.upstreamBranch = 'main';
+      const cliLogDir = path.join(request.workspace.sessionHome, '.local/share/kilo/log');
+      const cliLogPath = path.join(cliLogDir, 'kilo.log');
+      const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+      process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+      await fsp.mkdir(cliLogDir, { recursive: true });
+      await fsp.writeFile(cliLogPath, 'earlier CLI evidence\n');
+      await fsp.writeFile(wrapperLogPath, 'wrapper started\n');
+
+      const archives = new Map<string, string>();
+      let uploadCalls = 0;
+      let finalUploadSignal: AbortSignal | null | undefined;
+      let cliPresentDuringFinalUpload = false;
+      let cliPresentAfterFinalUpload = false;
+      let beforeCleanupCalls = 0;
+      globalThis.fetch = asFetch(async (input, init) => {
+        uploadCalls++;
+        const url = new URL(input instanceof Request ? input.url : input.toString());
+        const archive = gunzipSync(await new Response(init?.body).arrayBuffer()).toString();
+        if (uploadCalls === 2) {
+          cliPresentDuringFinalUpload = fs.existsSync(cliLogPath);
+          finalUploadSignal = init?.signal;
+          if (uploadResult === 'failure') {
+            throw new Error(`Authorization: Bearer ${request.session.workerAuthToken}`);
+          }
+          if (uploadResult === 'timeout') return new Promise<Response>(() => {});
+          await Bun.sleep(20);
+        }
+        archives.set(url.pathname, archive);
+        return new Response(null, { status: 204 });
+      });
+
+      let uploader: LogUploader | undefined;
+      let bootstrapError: unknown;
+      const readySession = async (
+        readyRequest: WrapperSessionReadyRequest,
+        archiveId: string
+      ): Promise<{ status: 'error' }> => {
+        const attemptUploader = createLogUploader({
+          archiveId,
+          context: {
+            workerBaseUrl: 'https://worker.example.com',
+            kiloSessionId: readyRequest.kiloSessionId,
+            workerAuthToken: readyRequest.session.workerAuthToken,
+          },
+          sessionId: readyRequest.agentSessionId,
+          userId: readyRequest.userId,
+          cliLogDir,
+          wrapperLogPath,
+        });
+        uploader = attemptUploader;
+        uploaders.push(attemptUploader);
+        attemptUploader.start();
+        await attemptUploader.uploadNow();
+        try {
+          await prepareWrapperBootstrapWorkspace(readyRequest, undefined, {
+            git: async args => {
+              if (args[0] === 'clone') {
+                await fsp.mkdir(path.join(readyRequest.workspace.workspacePath, '.git'), {
+                  recursive: true,
+                });
+              }
+              if (args[0] === 'fetch') {
+                await fsp.appendFile(cliLogPath, 'final CLI failure evidence\n');
+                return { stdout: '', stderr: '', exitCode: 1 };
+              }
+              return { stdout: '', stderr: '', exitCode: 0 };
+            },
+            beforeFailureCleanup: async () => {
+              beforeCleanupCalls++;
+              await attemptUploader.finalize(uploadResult === 'timeout' ? 100 : 5_000);
+              cliPresentAfterFinalUpload = fs.existsSync(cliLogPath);
+            },
+          });
+        } catch (error) {
+          bootstrapError = error;
+          return { status: 'error' };
+        }
+        throw new Error('Expected bootstrap failure');
+      };
+
+      const archiveId = createLogArchiveId(request.session.wrapperRunId);
+      const startedAt = Date.now();
+      const response = await readySession(request, archiveId);
+      const elapsedMs = Date.now() - startedAt;
+      if (!uploader) throw new Error('Expected attempt uploader');
+      const archivePath = `/sessions/${request.userId}/${request.agentSessionId}/logs/${uploader.archiveId}/logs.tar.gz`;
+      const retainedArchive = archives.get(archivePath);
+      await uploader.finalize();
+      await uploader.uploadNow();
+
+      expect(response.status).toBe('error');
+      expect(bootstrapError).toBeDefined();
+      expect(retainedArchive?.includes('earlier CLI evidence')).toBe(true);
+      expect(beforeCleanupCalls).toBe(1);
+      expect(cliPresentDuringFinalUpload).toBe(true);
+      expect(cliPresentAfterFinalUpload).toBe(true);
+      expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+      expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+      expect(uploadCalls).toBe(2);
+      expect(archives.size).toBe(1);
+      expect(archives.get(archivePath)).toBe(retainedArchive);
+      if (uploadResult === 'success') {
+        expect(retainedArchive).toContain('final CLI failure evidence');
+        expect(retainedArchive).toContain('code=WORKSPACE_SETUP_FAILED');
+        expect(retainedArchive).toContain('error=Repository checkout failed');
+      } else {
+        expect(retainedArchive).not.toContain('final CLI failure evidence');
+      }
+      if (uploadResult === 'timeout') {
+        expect(finalUploadSignal?.aborted).toBe(true);
+        expect(elapsedMs).toBeLessThan(1_500);
+      }
+      const wrapperLogs = await fsp.readFile(wrapperLogPath, 'utf8');
+      expect(wrapperLogs).not.toContain(request.session.workerAuthToken);
+      expect(retainedArchive).not.toContain(request.session.workerAuthToken);
+      expect(retainedArchive).not.toContain(request.materialized.env.KILOCODE_TOKEN);
+    }
+  );
+
+  it('preserves the recorded failure when finalization crosses the workspace deadline', async () => {
+    const request = makeRequest(tmpDir);
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    let commandSignal: AbortSignal | undefined;
+    let logsBeforeCleanup = '';
+    let bootstrapError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        workspacePreparationTimeoutMs: 100,
+        git: async (_args, options) => {
+          commandSignal = options?.signal;
+          return { stdout: '', stderr: '', exitCode: 1 };
+        },
+        beforeFailureCleanup: async () => {
+          logsBeforeCleanup = await fsp.readFile(wrapperLogPath, 'utf8');
+          if (commandSignal && !commandSignal.aborted) {
+            await new Promise<void>(resolve =>
+              commandSignal?.addEventListener('abort', () => resolve(), { once: true })
+            );
+          }
+        },
+      });
+    } catch (error) {
+      bootstrapError = error;
+    }
+
+    expect(commandSignal?.aborted).toBe(true);
+    expect(bootstrapError).toMatchObject({ message: 'Repository clone failed' });
+    expect(logsBeforeCleanup).toContain('error=Repository clone failed');
+    expect(logsBeforeCleanup).not.toContain('Workspace preparation timed out');
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+  });
+
+  it('still cleans up and preserves the bootstrap error if the pre-cleanup callback throws', async () => {
+    const request = makeRequest(tmpDir);
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    let callbackCalls = 0;
+    let bootstrapError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async () => ({ stdout: '', stderr: '', exitCode: 128 }),
+        beforeFailureCleanup: () => {
+          callbackCalls++;
+          throw new Error(`Authorization: Bearer ${request.session.workerAuthToken}`);
+        },
+      });
+    } catch (error) {
+      bootstrapError = error;
+    }
+
+    expect(callbackCalls).toBe(1);
+    expect(bootstrapError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      message: 'Repository clone failed',
+    });
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+    expect(await fsp.readFile(wrapperLogPath, 'utf8')).not.toContain(
+      request.session.workerAuthToken
+    );
+  });
+
+  it('archives the shared workspace deadline failure before cleaning up aborted work', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];
+    const cliLogDir = path.join(request.workspace.sessionHome, '.local/share/kilo/log');
+    const cliLogPath = path.join(cliLogDir, 'kilo.log');
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    await fsp.mkdir(cliLogDir, { recursive: true });
+    await fsp.writeFile(cliLogPath, 'earlier CLI evidence\n');
+
+    let archivedLogs = '';
+    let uploadCalls = 0;
+    let cliPresentDuringUpload = false;
+    globalThis.fetch = asFetch(async (_input, init) => {
+      uploadCalls++;
+      cliPresentDuringUpload = fs.existsSync(cliLogPath);
+      archivedLogs = gunzipSync(await new Response(init?.body).arrayBuffer()).toString();
+      return new Response(null, { status: 204 });
+    });
+    const uploader = createLogUploader({
+      archiveId: 'wr_test--workspace-timeout',
+      context: {
+        workerBaseUrl: 'https://worker.example.com',
+        kiloSessionId: request.kiloSessionId,
+        workerAuthToken: request.session.workerAuthToken,
+      },
+      sessionId: request.agentSessionId,
+      userId: request.userId,
+      cliLogDir,
+      wrapperLogPath,
+    });
+    uploaders.push(uploader);
     let commandSignal: AbortSignal | undefined;
     let caughtError: unknown;
 
     try {
       await prepareWrapperBootstrapWorkspace(request, undefined, {
-        workspacePreparationTimeoutMs: 20,
+        workspacePreparationTimeoutMs: 100,
+        beforeFailureCleanup: () => uploader.finalize(),
         git: async (args, opts) => {
           if (args[0] !== 'clone') {
             return { stdout: '', stderr: '', exitCode: 0 };
@@ -744,6 +1419,15 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       retryable: true,
       message: expect.stringContaining('Workspace preparation timed out'),
     });
+    await uploader.finalize();
+    await uploader.uploadNow();
+    expect(uploadCalls).toBe(1);
+    expect(cliPresentDuringUpload).toBe(true);
+    expect(archivedLogs).toContain('earlier CLI evidence');
+    expect(archivedLogs).toContain('code=WORKSPACE_SETUP_FAILED subtype=workspace_setup_unknown');
+    expect(archivedLogs).toContain('error=Workspace preparation timed out after 0.1s');
+    expect(archivedLogs).not.toContain('error=Repository clone failed');
+    expect(archivedLogs).not.toContain(request.session.workerAuthToken);
     expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
@@ -851,7 +1535,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     expect(setupOptions?.inactivityTimeoutMs).toBe(240_000);
     expect(setupOptions?.hardTimeoutMs).toBe(300_000);
-    expect(setupInvocation).toEqual(['sh', '-lc', 'pnpm install']);
+    expect(setupInvocation).toEqual(['bash', '-e', '-o', 'pipefail', '-c', 'pnpm install']);
     expect(markerExistedDuringSetup).toBe(false);
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
@@ -901,6 +1585,43 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progressText).not.toContain('spinner two');
     expect(progressText).not.toContain('progress-token');
     expect(progressText).not.toContain('\u001b');
+  });
+
+  it('redacts a named non-heuristic secret from setup command output', async () => {
+    const secret = 'postgres://user:pass@localhost:5432/prod';
+    const request = makeRequest(tmpDir);
+    request.materialized.env.DATABASE_URL = secret;
+    request.materialized.secretEnvKeys = ['DATABASE_URL'];
+    const progress = mock(() => {});
+    const splitAt = Math.floor(secret.length / 2);
+
+    await prepareWrapperBootstrapWorkspace(request, progress, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        opts?.onOutput?.('stderr', 'Updating files: 100% (1/1)\n');
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      runProcess: async (_command, _args, opts) => {
+        opts?.onOutput?.('stdout', `connecting ${secret.slice(0, splitAt)}`);
+        opts?.onOutput?.('stdout', `${secret.slice(splitAt)}\n`);
+        opts?.onOutput?.('stderr', `warning: ${secret}\n`);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    });
+
+    const progressText = JSON.stringify(progress.mock.calls);
+    expect(progressText).toContain('connecting [REDACTED]');
+    expect(progressText).toContain('warning: [REDACTED]');
+    expect(progressText).not.toContain('localhost');
   });
 
   it('fetches and checks out strict GitHub pull refs directly', async () => {
@@ -1012,6 +1733,17 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       name: 'clone timeout',
       stage: 'clone',
       result: { stdout: '', stderr: '', exitCode: 124, terminationReason: 'timeout' as const },
+      subtype: 'git_clone_timeout',
+    },
+    {
+      name: 'clone inactivity timeout',
+      stage: 'clone',
+      result: {
+        stdout: '',
+        stderr: '',
+        exitCode: 124,
+        terminationReason: 'inactivity_timeout' as const,
+      },
       subtype: 'git_clone_timeout',
     },
     {
@@ -1220,10 +1952,42 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
   });
 
-  it('exposes redacted setup command and stderr on failure but redacts secrets', async () => {
+  it('archives sanitized setup failure details before workspace cleanup', async () => {
     const request = makeRequest(tmpDir);
+    request.materialized.env.DATABASE_URL = 'named-url-secret';
+    request.materialized.secretEnvKeys = ['DATABASE_URL'];
     request.materialized.setupCommands = ['private-tool --token argv-secret'];
+    const cliLogDir = path.join(request.workspace.sessionHome, '.local/share/kilo/log');
+    const cliLogPath = path.join(cliLogDir, 'kilo.log');
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    await fsp.mkdir(cliLogDir, { recursive: true });
+    await fsp.writeFile(cliLogPath, 'earlier CLI evidence\n');
+
+    let archivedLogs = '';
+    let uploadCalls = 0;
+    let cliPresentDuringUpload = false;
+    globalThis.fetch = asFetch(async (_input, init) => {
+      uploadCalls++;
+      cliPresentDuringUpload = fs.existsSync(cliLogPath);
+      archivedLogs = gunzipSync(await new Response(init?.body).arrayBuffer()).toString();
+      return new Response(null, { status: 204 });
+    });
+    const uploader = createLogUploader({
+      archiveId: 'wr_test--setup-failure',
+      context: {
+        workerBaseUrl: 'https://worker.example.com',
+        kiloSessionId: request.kiloSessionId,
+        workerAuthToken: request.session.workerAuthToken,
+      },
+      sessionId: request.agentSessionId,
+      userId: request.userId,
+      cliLogDir,
+      wrapperLogPath,
+    });
+    uploaders.push(uploader);
     const deps: WrapperBootstrapDeps = {
+      beforeFailureCleanup: () => uploader.finalize(),
       git: async args => {
         if (args[0] === 'clone') {
           await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
@@ -1236,11 +2000,13 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       runProcess: async () => ({
         stdout: 'private-file-content',
         stderr: [
+          '\u001b[31mDependency resolution failed\u001b[0m',
           'bare-unlabeled-token',
           'https://user:url-secret@example.com/repo.git',
           'Authorization: Bearer bearer-secret',
           'Cookie: session=cookie-secret',
           'SECRET_VALUE=env-secret',
+          'DATABASE_URL=named-url-secret',
         ].join('\n'),
         exitCode: 1,
         elapsedMs: 17,
@@ -1280,8 +2046,21 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(detail).toContain('Authorization: Bearer [REDACTED]');
     expect(detail).toContain('Cookie: [REDACTED]');
     expect(detail).toContain('SECRET_VALUE=[REDACTED]');
+    expect(detail).toContain('DATABASE_URL=[REDACTED]');
     expect(detail).toContain('private-file-content');
     expect(detail).toContain('bare-unlabeled-token');
+    await uploader.finalize();
+    await uploader.uploadNow();
+    expect(uploadCalls).toBe(1);
+    expect(cliPresentDuringUpload).toBe(true);
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+    expect(archivedLogs).toContain('earlier CLI evidence');
+    expect(archivedLogs).toContain('subtype=setup_command_failed');
+    expect(archivedLogs).toContain(`error=${setupError.message}`);
+    expect(archivedLogs).toContain(`detail=${detail}`);
+    expect(archivedLogs).toContain('Dependency resolution failed');
+    expect(archivedLogs).not.toContain('\u001b');
     const projectedError = JSON.stringify(setupError);
     for (const sensitiveValue of [
       'argv-secret',
@@ -1289,8 +2068,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       'bearer-secret',
       'cookie-secret',
       'env-secret',
+      'named-url-secret',
+      request.session.workerAuthToken,
+      request.materialized.env.KILOCODE_TOKEN,
     ]) {
       expect(projectedError).not.toContain(sensitiveValue);
+      expect(archivedLogs).not.toContain(sensitiveValue);
     }
   });
 
@@ -1385,7 +2168,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     const request = makeRequest(tmpDir);
     request.workspace.preferSnapshot = true;
     request.materialized.setupCommands = [];
-    const progress = mock(() => {});
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    const progress = mock((..._args: unknown[]) => {});
 
     const result = await prepareWrapperBootstrapWorkspace(request, progress, {
       git: async args => {
@@ -1401,36 +2186,124 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         ok: true,
         downloaded: true,
         imported: true,
-        diffs: { applied: 1, skipped: 1, total: 2 },
+        diffs: {
+          applied: 1,
+          skipped: 1,
+          total: 2,
+          skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+        },
       }),
     });
 
+    // (a) The named skipped-diff report reaches the worker metric.
     expect(result.restore).toEqual({
       path: 'cold',
-      diffs: { applied: 1, skipped: 1, total: 2 },
+      diffs: {
+        applied: 1,
+        skipped: 1,
+        total: 2,
+        skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+      },
     });
-    expect(progress).toHaveBeenCalledWith(
+    // (b) The named step is emitted, with `started` before `failed` (the
+    // materializer drops a step event without a preceding step_started).
+    const stepEvents = progress.mock.calls
+      .flat()
+      .filter(
+        (event): event is { type: string; step: string; stepId: string; safeError?: string } =>
+          typeof event === 'object' && event !== null && 'type' in event
+      );
+    const startedIndex = stepEvents.findIndex(
+      event => event.type === 'started' && event.stepId === 'phase:restore_incomplete'
+    );
+    const failedIndex = stepEvents.findIndex(
+      event => event.type === 'failed' && event.stepId === 'phase:restore_incomplete'
+    );
+    expect(startedIndex).toBeGreaterThanOrEqual(0);
+    expect(stepEvents[startedIndex]).toMatchObject({
+      type: 'started',
+      step: 'restore_incomplete',
+      stepId: 'phase:restore_incomplete',
+      kind: 'phase',
+      label: 'Session restore incomplete',
+    });
+    expect(failedIndex).toBeGreaterThan(startedIndex);
+    expect(stepEvents[failedIndex]).toMatchObject({
+      type: 'failed',
+      step: 'restore_incomplete',
+      stepId: 'phase:restore_incomplete',
+      safeError: expect.stringContaining('1 of 2 files'),
+    });
+    // (d) The old progress line is replaced, not duplicated.
+    expect(progress).not.toHaveBeenCalledWith(
       'kilo_session',
       'Cold restore incomplete, 1/2 files restored'
     );
     expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
+    // The wrapper log carries the greppable named outcome.
+    const wrapperLog = await fsp.readFile(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('bootstrap restore incomplete');
+    expect(wrapperLog).toContain('skipped=1 total=2');
+    expect(wrapperLog).toContain('reasons=patch_apply_failed');
+    expect(wrapperLog).toContain('paths=src/index.ts');
+    // The line attributes the outcome to the wrapper replacement that restored
+    // the worktree, so two rebinds in one session are distinguishable.
+    expect(wrapperLog).toContain('wrapperRunId=wr_test wrapperGeneration=1');
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
   });
 
-  it('reports an incomplete backup restore without calling it cold', async () => {
+  it('throws when a required snapshot restore returns 404', async () => {
     const request = makeRequest(tmpDir);
     request.workspace.preferSnapshot = true;
-    request.workspace.restoredFromBackup = true;
+    request.workspace.requireSnapshot = true;
     request.materialized.setupCommands = [];
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    const progress = mock(() => {});
+
+    expect(
+      prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: false,
+          error: 'snapshot not found (404)',
+          code: 404,
+          step: 'download',
+        }),
+      })
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'kilo_import_failed',
+      retryable: true,
+      message: 'Session snapshot required but not found',
+    });
+  });
+
+  it('returns the restore telemetry when a required snapshot restore succeeds', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.workspace.requireSnapshot = true;
+    request.materialized.setupCommands = [];
+    const progress = mock((..._args: unknown[]) => {});
 
     const result = await prepareWrapperBootstrapWorkspace(request, progress, {
       git: async args => {
-        if (args.join(' ') === 'ls-remote --symref origin HEAD') {
-          return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+            recursive: true,
+          });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
         }
         return { stdout: '', stderr: '', exitCode: 0 };
       },
@@ -1438,22 +2311,69 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         ok: true,
         downloaded: true,
         imported: true,
-        diffs: { applied: 1, skipped: 1, total: 2 },
+        diffs: { applied: 1, skipped: 0, total: 1 },
       }),
     });
 
     expect(result.restore).toEqual({
-      path: 'backup',
-      diffs: { applied: 1, skipped: 1, total: 2 },
+      path: 'cold',
+      diffs: { applied: 1, skipped: 0, total: 1 },
     });
+    const stepEvents = progress.mock.calls
+      .flat()
+      .filter(
+        (event): event is { type: string; step: string } =>
+          typeof event === 'object' && event !== null && 'type' in event
+      );
+    expect(stepEvents.some(event => event.step === 'restore_incomplete')).toBe(false);
+    // The complete-restore progress line is unchanged.
     expect(progress).toHaveBeenCalledWith(
       'kilo_session',
-      'Resume restore incomplete, 1/2 files restored'
+      'Cold restore, snapshot applied, 1/1 files restored'
     );
-    expect(progress).not.toHaveBeenCalledWith(
-      'kilo_session',
-      'Cold restore incomplete, 1/2 files restored'
-    );
+  });
+
+  it('falls back to an empty import when a non-required snapshot restore returns 404', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.materialized.setupCommands = [];
+    const restoreCalls: Array<{ filePath?: string }> = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+            recursive: true,
+          });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async (_kiloSessionId, _workspacePath, filePath) => {
+        restoreCalls.push({ filePath });
+        if (filePath === undefined) {
+          return {
+            ok: false,
+            error: 'snapshot not found (404)',
+            code: 404,
+            step: 'download',
+          };
+        }
+        return {
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        };
+      },
+    });
+
+    expect(restoreCalls).toHaveLength(2);
+    expect(restoreCalls[0].filePath).toBeUndefined();
+    expect(restoreCalls[1].filePath).toContain('/tmp/kilo-empty-session-kilo_sess_1.json');
+    expect(result.restore).toEqual({ path: 'cold' });
   });
 
   it('reclones unfinished workspaces that have no bootstrap marker', async () => {
@@ -1508,7 +2428,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       workspacePath: request.workspace.workspacePath,
     });
     expect(restoreCalls[0].filePath).toContain('/tmp/kilo-empty-session-kilo_sess_1.json');
-    expect(setupCalls).toEqual([['sh', '-lc', 'pnpm install']]);
+    expect(setupCalls).toEqual([['bash', '-e', '-o', 'pipefail', '-c', 'pnpm install']]);
   });
 
   it('leaves a cold Bitbucket review origin credential-free before restoring Kilo', async () => {
@@ -1554,7 +2474,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     });
 
-    expect(gitCalls[0]).toContain('https://x-token-auth:managed-token@bitbucket.org/acme/repo.git');
+    expect(gitCalls[0]).toContain('https://bitbucket.org/acme/repo.git');
     const sanitizedRemote = 'git:remote set-url origin https://bitbucket.org/acme/repo.git';
     expect(events).toContain(sanitizedRemote);
     expect(events.indexOf(sanitizedRemote)).toBeLessThan(events.indexOf('restore'));
@@ -1603,15 +2523,107 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(result.restore).toEqual({ path: 'warm' });
     expect(progress).toHaveBeenCalledWith('kilo_session', 'Warm workspace reused');
     expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
-    expect(gitCalls).toEqual([
-      ['remote', 'set-url', 'origin', 'https://oauth2:gitlab-token@gitlab.com/acme/repo.git'],
-    ]);
-    expect(await fsp.readFile(rulesPath, 'utf8')).toBe(
-      buildCloudAgentRules(request.agentSessionId)
+    expect(gitCalls).toEqual([['remote', 'set-url', 'origin', 'https://gitlab.com/acme/repo.git']]);
+    const rules = await fsp.readFile(rulesPath, 'utf8');
+    expect(rules).toBe(
+      buildCloudAgentRules({
+        bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+      })
     );
+    expect(rules).toContain('**New stacked workspace**');
+    expect(rules).toContain('The parent does not need an open PR.');
+    expect(rules).toContain('does not register a Cloud workspace');
   });
 
-  it('refreshes a warm Bitbucket remote with x-token-auth', async () => {
+  it('atomically rotates warm credentials without rerunning runtime bootstrap', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.materialized.setupCommands = [];
+    request.materialized.env.GH_TOKEN = 'profile-github-token';
+    const repository = {
+      kind: 'github',
+      repo: 'acme/repo',
+      token: 'initial-repository-token',
+    } satisfies NonNullable<WrapperSessionReadyRequest['repo']>;
+    request.repo = repository;
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const credentialsPath = gitCredentialsPath(request.workspace.sessionHome);
+    const observedPasswords: string[] = [];
+    const deps: WrapperBootstrapDeps = {
+      git: async () => {
+        const credentials = await fsp.readFile(credentialsPath, 'utf8');
+        const password = credentials.split('\n').find(line => line.startsWith('password='));
+        if (!password) throw new Error('Missing authoritative repository credential');
+        observedPasswords.push(password);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      runProcess: async () => {
+        throw new Error('setup commands should not run when credentials rotate');
+      },
+      restoreSession: async () => {
+        throw new Error('Kilo sessions should not be restored when credentials rotate');
+      },
+    };
+
+    const initialResult = await prepareWrapperBootstrapWorkspace(request, undefined, deps);
+    const previousFile = await fsp.open(credentialsPath, 'r');
+    try {
+      const previousInode = (await previousFile.stat()).ino;
+      repository.token = 'rotated-repository-token';
+
+      const rotatedResult = await prepareWrapperBootstrapWorkspace(request, undefined, deps);
+
+      expect(initialResult.restore).toEqual({ path: 'warm' });
+      expect(rotatedResult.restore).toEqual({ path: 'warm' });
+      expect((await fsp.stat(credentialsPath)).ino).not.toBe(previousInode);
+      expect(await previousFile.readFile('utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=initial-repository-token\n'
+      );
+      expect(await fsp.readFile(credentialsPath, 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=rotated-repository-token\n'
+      );
+      expect(observedPasswords).toEqual([
+        'password=initial-repository-token',
+        'password=rotated-repository-token',
+      ]);
+      expect(process.env.GH_TOKEN).toBe('profile-github-token');
+    } finally {
+      await previousFile.close();
+    }
+  });
+
+  it('removes stale credentials when a warm generic repository has no token', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://git.example.com/acme/repo.git',
+      token: 'stale-repository-token',
+    };
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const gitCalls: string[][] = [];
+    const deps: WrapperBootstrapDeps = {
+      git: async args => {
+        gitCalls.push(args);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+    };
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, deps);
+    const credentialsPath = gitCredentialsPath(request.workspace.sessionHome);
+    expect(fs.existsSync(credentialsPath)).toBe(true);
+    gitCalls.length = 0;
+    request.repo = { kind: 'git', url: 'https://git.example.com/acme/repo.git' };
+
+    const result = await prepareWrapperBootstrapWorkspace(request, undefined, deps);
+
+    expect(result.restore).toEqual({ path: 'warm' });
+    expect(fs.existsSync(credentialsPath)).toBe(false);
+    expect(gitCalls).toEqual([]);
+  });
+
+  it('strips a warm Bitbucket leftover origin to the canonical URL', async () => {
     const request = makeRequest(tmpDir, {
       workspace: {
         workspacePath: path.join(tmpDir, 'workspace'),
@@ -1638,12 +2650,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
 
     expect(gitCalls).toEqual([
-      [
-        'remote',
-        'set-url',
-        'origin',
-        'https://x-token-auth:bitbucket-token@bitbucket.org/acme/repo.git',
-      ],
+      ['remote', 'set-url', 'origin', 'https://bitbucket.org/acme/repo.git'],
     ]);
   });
 
@@ -1722,136 +2729,10 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     expect(process.env.GH_TOKEN).toBe('user-token');
     expect(gitCalls).toEqual([
-      ['remote', 'set-url', 'origin', 'https://x-access-token:user-token@github.com/acme/repo.git'],
+      ['remote', 'set-url', 'origin', 'https://github.com/acme/repo.git'],
       ['config', 'user.name', 'octocat'],
       ['config', 'user.email', '1+octocat@users.noreply.github.com'],
     ]);
-  });
-
-  it('reconciles a same-commit restored workspace before running every setup command', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.branchName = 'session/new';
-    request.workspace.upstreamBranch = 'feature/source';
-    request.workspace.restoredFromBackup = true;
-    request.materialized.setupCommands = ['prepare one', 'prepare two'];
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    const events: string[] = [];
-
-    await prepareWrapperBootstrapWorkspace(request, undefined, {
-      git: async args => {
-        events.push(`git:${args.join(' ')}`);
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      runProcess: async (command, args) => {
-        events.push(`process:${command} ${args.join(' ')}`);
-        expect(process.env.HOME).toBe(request.workspace.sessionHome);
-        expect(process.env.KILOCODE_TOKEN).toBe('kilo-capability');
-        expect(process.env[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
-        expect(
-          fs.existsSync(path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json'))
-        ).toBe(true);
-        expect(
-          fs.existsSync(path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md'))
-        ).toBe(true);
-        expect(
-          fs.existsSync(
-            path.join(request.workspace.sessionHome, '.kilocode/skills/test-skill/SKILL.md')
-          )
-        ).toBe(true);
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      restoreSession: async () => ({
-        ok: true,
-        downloaded: false,
-        imported: true,
-        diffs: { applied: 0, skipped: 0, total: 0 },
-      }),
-    });
-
-    expect(events).toContain(
-      'git:remote set-url origin https://x-access-token:gh-token@github.com/acme/repo.git'
-    );
-    const fetchIndex = events.indexOf('git:fetch origin feature/source');
-    const checkoutIndex = events.indexOf('git:checkout -B session/new FETCH_HEAD');
-    const firstSetupIndex = events.indexOf('process:sh -lc prepare one');
-    expect(fetchIndex).toBeGreaterThan(-1);
-    expect(checkoutIndex).toBeGreaterThan(fetchIndex);
-    expect(firstSetupIndex).toBeGreaterThan(checkoutIndex);
-    expect(events.filter(event => event.startsWith('process:'))).toEqual([
-      'process:sh -lc prepare one',
-      'process:sh -lc prepare two',
-    ]);
-  });
-
-  it('keeps restored workspace setup failures as ordinary setup failures', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.restoredFromBackup = true;
-    await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
-
-    let setupError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args => {
-          if (args.join(' ') === 'ls-remote --symref origin HEAD') {
-            return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
-          }
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-        runProcess: async () => ({ stdout: '', stderr: 'install failed', exitCode: 17 }),
-        restoreSession: async () => ({
-          ok: true,
-          downloaded: false,
-          imported: true,
-          diffs: { applied: 0, skipped: 0, total: 0 },
-        }),
-      });
-    } catch (error) {
-      setupError = error;
-    }
-
-    expect(setupError).toBeInstanceOf(Error);
-    expect(setupError).not.toBeInstanceOf(RestoredWorkspaceReconciliationError);
-    expect(workspaceBootstrapErrorCode(setupError)).toBe('WORKSPACE_SETUP_FAILED');
-    expect((setupError as Error).message).toContain('Setup command 1 failed');
-  });
-
-  it('classifies restored workspace reconciliation failures before setup', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.restoredFromBackup = true;
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    let setupRan = false;
-
-    let reconciliationError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args => {
-          if (args.join(' ') === 'ls-remote --symref origin HEAD') {
-            return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
-          }
-          if (args.join(' ') === 'fetch origin main') {
-            return { stdout: '', stderr: 'remote unavailable', exitCode: 1 };
-          }
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-        runProcess: async () => {
-          setupRan = true;
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-      });
-    } catch (error) {
-      reconciliationError = error;
-    }
-
-    expect(reconciliationError).toBeInstanceOf(RestoredWorkspaceReconciliationError);
-    expect(workspaceBootstrapErrorCode(reconciliationError)).toBe(
-      'WORKSPACE_RECONCILIATION_FAILED'
-    );
-    expect((reconciliationError as Error).message).toBe(
-      'Failed to fetch authoritative remote state'
-    );
-    expect(setupRan).toBe(false);
-    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
-    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
   it('appends downloaded attachments to existing prompt parts', async () => {
@@ -2151,7 +3032,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       { type: 'text', text: 'Process this file' },
       {
         type: 'text',
-        text: 'attachment interrupted.bin could not be retrieved (stream reset)',
+        text: 'attachment interrupted.bin could not be retrieved (download failed after 3 attempts)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);
@@ -2215,7 +3096,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(await fsp.readFile(okPath, 'utf8')).toBe('png-bytes');
   });
 
-  it('converts a network/timeout failure into an explanatory text part and continues', async () => {
+  it('converts an exhausted retry into an explanatory text part and continues', async () => {
     const okPath = path.join(tmpDir, 'ok.json');
     const failPath = path.join(tmpDir, 'bad.json');
     const prompt: WrapperPromptRequest = {
@@ -2246,21 +3127,24 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
+    let badRequests = 0;
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(async input => {
         const url = typeof input === 'string' ? input : (input as Request).url;
         if (url === 'https://r2.example.com/bad.json') {
+          badRequests += 1;
           throw new Error('socket hang up');
         }
         return new Response('{"ok":true}', { status: 200 });
       }),
     });
 
+    expect(badRequests).toBe(3);
     expect(result.message.parts).toEqual([
       { type: 'text', text: 'Read both' },
       {
         type: 'text',
-        text: 'attachment bad.json could not be retrieved (socket hang up)',
+        text: 'attachment bad.json could not be retrieved (download failed after 3 attempts)',
       },
       {
         type: 'file',
@@ -2271,6 +3155,283 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ]);
     expect(fs.existsSync(failPath)).toBe(false);
     expect(await fsp.readFile(okPath, 'utf8')).toBe('{"ok":true}');
+  });
+
+  it('retries a transient fetch failure and materializes the attachment on the retry', async () => {
+    const localPath = path.join(tmpDir, 'retry.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_retry',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'retry.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/retry.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('socket hang up');
+        }
+        return new Response('png-bytes', {
+          status: 200,
+          headers: { 'content-length': '9' },
+        });
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'retry.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('falls back to a buffered read when the streaming read fails mid-transfer', async () => {
+    const localPath = path.join(tmpDir, 'fallback.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_fallback',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'fallback.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/fallback.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          const chunk = new Uint8Array(64 * 1024);
+          const body = new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(chunk);
+              controller.error(new Error('stream reset'));
+            },
+          });
+          return new Response(body, { status: 200 });
+        }
+        return new Response('png-bytes', {
+          status: 200,
+          headers: { 'content-length': '9' },
+        });
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'fallback.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('falls back to the bounded streaming read when a buffered retry has no content-length', async () => {
+    const localPath = path.join(tmpDir, 'no-content-length.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_no_content_length',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'no-content-length.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/no-content-length.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('socket hang up');
+        }
+        const response = new Response('png-bytes', { status: 200 });
+        response.headers.delete('content-length');
+        return response;
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'no-content-length.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('retries a 500 then succeeds, and reports a 400 without retrying', async () => {
+    const retryPath = path.join(tmpDir, 'flaky.png');
+    const badPath = path.join(tmpDir, 'bad.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_status_retry',
+        prompt: 'Show both',
+        attachments: [
+          {
+            filename: 'flaky.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/flaky.png',
+            localPath: retryPath,
+          },
+          {
+            filename: 'bad.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/bad.png',
+            localPath: badPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let flakyRequests = 0;
+    let badRequests = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async input => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        if (url === 'https://r2.example.com/flaky.png') {
+          flakyRequests += 1;
+          if (flakyRequests === 1) {
+            return new Response('busy', { status: 500 });
+          }
+          return new Response('png-bytes', { status: 200 });
+        }
+        badRequests += 1;
+        return new Response('bad request', { status: 400 });
+      }),
+    });
+
+    expect(flakyRequests).toBe(2);
+    expect(badRequests).toBe(1);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Show both' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${retryPath}`,
+        filename: 'flaky.png',
+      },
+      {
+        type: 'text',
+        text: 'attachment bad.png could not be retrieved (HTTP 400)',
+      },
+    ]);
+    expect(await fsp.readFile(retryPath, 'utf8')).toBe('png-bytes');
+    expect(fs.existsSync(badPath)).toBe(false);
+  });
+
+  it('propagates a caller abort instead of retrying or masking it as an exhausted attachment', async () => {
+    const localPath = path.join(tmpDir, 'aborted.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_aborted',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'aborted.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/aborted.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const controller = new AbortController();
+    let attempts = 0;
+    let abortError: unknown;
+    try {
+      await materializePromptAttachments(prompt, {
+        fetch: asFetch(async () => {
+          attempts += 1;
+          if (attempts < 3) {
+            throw new Error('socket hang up');
+          }
+          controller.abort();
+          return new Response('png-bytes', {
+            status: 200,
+            headers: { 'content-length': '9' },
+          });
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      abortError = error;
+    }
+
+    expect(abortError).toBeInstanceOf(Error);
+    expect(attempts).toBe(3);
+    expect(fs.existsSync(localPath)).toBe(false);
   });
 
   it('materializes a generic binary attachment as a text part describing the saved file', async () => {
@@ -2309,5 +3470,55 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     ]);
     expect(await fsp.readFile(localPath, 'utf8')).toBe('zip-payload');
+  });
+});
+
+describe('runtime credential proxy ready request validation', () => {
+  it('accepts only a stable handle and Worker proxy targets', () => {
+    const request = makeRequest(fs.mkdtempSync(path.join(os.tmpdir(), 'wrapper-proxy-request-')));
+    request.runtimeCredentialProxy = {
+      handle: 'stable-proxy-handle',
+      targets: {
+        backendBaseUrl: 'https://worker.example.com',
+        providerBaseUrl: 'https://worker.example.com',
+        sessionIngestBaseUrl: 'https://worker.example.com',
+      },
+    };
+    expect(isWrapperSessionReadyRequest(request)).toBe(true);
+    expect(
+      isWrapperSessionReadyRequest({
+        ...request,
+        runtimeCredentialProxy: { ...request.runtimeCredentialProxy, credential: 'backing-token' },
+      })
+    ).toBe(false);
+    for (const [requiredKey, wrongKey] of [
+      ['backendBaseUrl', 'backendUrl'],
+      ['providerBaseUrl', 'providerUrl'],
+      ['sessionIngestBaseUrl', 'ingestUrl'],
+    ]) {
+      expect(
+        isWrapperSessionReadyRequest({
+          ...request,
+          runtimeCredentialProxy: {
+            handle: 'stable-proxy-handle',
+            targets: Object.fromEntries(
+              Object.entries(request.runtimeCredentialProxy.targets).map(([key, value]) => [
+                key === requiredKey ? wrongKey : key,
+                value,
+              ])
+            ),
+          },
+        })
+      ).toBe(false);
+    }
+    expect(
+      isWrapperSessionReadyRequest({
+        ...request,
+        runtimeCredentialProxy: {
+          handle: 'stable-proxy-handle',
+          targets: { backendBaseUrl: 'not-a-url' },
+        },
+      })
+    ).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { APP_URL } from '@/lib/constants';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { buildPurchasePresentation } from '@/lib/kilo-pass/purchase-presentation';
 import {
   KILO_PASS_MANAGE_CTA_LABEL,
@@ -13,28 +13,43 @@ function stripeSub(status: KiloPassSubscriptionStatus) {
 }
 
 describe('buildPurchasePresentation', () => {
-  it('maps iOS App Store Kilo Pass to native_iap with no CTA', () => {
+  it.each([
+    ['ios', 'app_store'],
+    ['android', 'play'],
+  ] as const)(
+    'maps %s %s Kilo Pass without a Stripe sub to unavailable',
+    (platform, storefront) => {
+      const result = buildPurchasePresentation({
+        subscription: null,
+        input: { platform, storefront, product: 'kilo_pass' },
+      });
+
+      expect(result.kind).toBe('unavailable');
+      expect(result.statusClass).toBe('inactive');
+      expect(result.reason).toBe('kilo_pass_not_sold_in_app');
+      expect(result.cta).toEqual({ label: null, action: 'none' });
+      expect(result.webUrl).toBeNull();
+    }
+  );
+
+  it('maps a live store subscriber to unavailable, so the app cannot start another purchase', () => {
     const result = buildPurchasePresentation({
-      subscription: null,
+      subscription: { paymentProvider: KiloPassPaymentProvider.AppStore, status: 'active' },
       input: { platform: 'ios', storefront: 'app_store', product: 'kilo_pass' },
     });
 
-    expect(result.kind).toBe('native_iap');
-    expect(result.statusClass).toBe('inactive');
-    expect(result.reason).toBeNull();
-    expect(result.cta).toEqual({ label: null, action: 'none' });
-    expect(result.webUrl).toBeNull();
+    expect(result.kind).toBe('unavailable');
+    expect(result.statusClass).toBe('healthy');
+    expect(result.reason).toBe('kilo_pass_not_sold_in_app');
   });
 
-  it('maps Android Kilo Pass without a Stripe sub to unavailable', () => {
+  it('gives iOS no web link, even for a live Stripe sub', () => {
     const result = buildPurchasePresentation({
-      subscription: null,
-      input: { platform: 'android', storefront: 'play', product: 'kilo_pass' },
+      subscription: stripeSub('active'),
+      input: { platform: 'ios', storefront: 'app_store', product: 'kilo_pass' },
     });
 
     expect(result.kind).toBe('unavailable');
-    expect(result.reason).toBe('kilo_pass_not_available_on_android');
-    expect(result.cta).toEqual({ label: null, action: 'none' });
     expect(result.webUrl).toBeNull();
   });
 
@@ -93,7 +108,7 @@ describe('buildPurchasePresentation', () => {
       },
     });
 
-    expect(result.kind).toBe('native_iap');
+    expect(result.kind).toBe('unavailable');
     expect(result.program).toBe('impact');
   });
 
@@ -122,6 +137,6 @@ describe('buildPurchasePresentation', () => {
     });
 
     expect(result.kind).toBe('unavailable');
-    expect(result.reason).toBe('kilo_pass_not_available_on_android');
+    expect(result.reason).toBe('kilo_pass_not_sold_in_app');
   });
 });

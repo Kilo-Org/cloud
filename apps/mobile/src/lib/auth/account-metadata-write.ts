@@ -1,7 +1,20 @@
-import * as SecureStore from 'expo-secure-store';
-
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { LOCK_READABLE_METADATA_KEYS } from '@/lib/auth/secure-store-gated';
+import {
+  deleteStoredValue,
+  widgetStoreOptions,
+  writeStoredValue,
+} from '@/lib/auth/secure-store-value';
 import { chainSave } from '@/lib/hooks/save-chain';
+
+/**
+ * The account metadata written with the widget store's
+ * `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` class, so a push or background refresh
+ * can resolve its scope with the screen locked: the two ids the glanceable
+ * fences compare (`lib/glanceable/scope`). Every other key here keeps
+ * expo-secure-store's default class.
+ */
+const lockReadableKeys: ReadonlySet<string> = new Set(LOCK_READABLE_METADATA_KEYS);
 
 /**
  * Epoch-fenced, per-key serialized SecureStore write for account-scoped
@@ -19,10 +32,16 @@ export async function writeAccountMetadata(key: string, write: () => Promise<voi
   });
 }
 
-/** Epoch-fenced, per-key serialized write of one string value. */
+/** Epoch-fenced, per-key serialized write of one string value. A failed write
+ *  is reported at warning level with the stable write fingerprint and still
+ *  rejects, so a preference write can surface its own recoverable state. */
 export async function setAccountMetadata(key: string, value: string): Promise<void> {
   await writeAccountMetadata(key, async () => {
-    await SecureStore.setItemAsync(key, value);
+    await writeStoredValue(
+      key,
+      value,
+      lockReadableKeys.has(key) ? widgetStoreOptions() : undefined
+    );
   });
 }
 
@@ -34,6 +53,6 @@ export async function setAccountMetadata(key: string, value: string): Promise<vo
  */
 export async function deleteAccountMetadata(key: string): Promise<void> {
   await chainSave(key, async () => {
-    await SecureStore.deleteItemAsync(key);
+    await deleteStoredValue(key);
   });
 }

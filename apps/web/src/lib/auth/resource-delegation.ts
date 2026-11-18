@@ -1,0 +1,574 @@
+import 'server-only';
+
+import type { User } from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
+import { and, eq, isNull } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
+import { TRPCError } from '@trpc/server';
+import { headers as nextHeaders } from 'next/headers';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  AI_ATTRIBUTION_AUDIENCE,
+  CLOUD_AGENT_NEXT_AUDIENCE,
+  HTML_DEPLOY_AUDIENCE,
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+  PAGES_AUDIENCE,
+  PAGES_DEV_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  buildModernKiloTokenPayload,
+  isKiloCredentialExchangeEligible,
+  verifyKiloTokenForPolicy,
+} from '@kilocode/worker-utils/kilo-token-policy';
+import type { RuntimeAdmission } from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
+  isResourceTokenIssuanceEnabled,
+  NEXTAUTH_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+
+const ONE_HOUR_SECONDS = 60 * 60;
+/**
+ * Lifetimes a device-bound credential may carry: the one-hour access lifetime
+ * and the fixed long-term lifetime. Both require an active session.
+ */
+const LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS: readonly number[] = [
+  ONE_HOUR_SECONDS,
+  TOKEN_EXPIRY.default,
+];
+
+export type DelegableResource =
+  | 'api'
+  | 'gateway'
+  | 'attribution'
+  | 'html-deploy'
+  | 'pages'
+  | 'pages-dev';
+type PagesResource = Extract<DelegableResource, 'pages' | 'pages-dev'>;
+const PAGES_TOKEN_MAX_SECONDS = 5 * 60;
+
+export function isPagesResource(resource: DelegableResource): resource is PagesResource {
+  return resource === 'pages' || resource === 'pages-dev';
+}
+export type ControlResource = 'cloud-agent-next';
+type Resource = DelegableResource | ControlResource;
+type CredentialKind = 'human-api' | 'device-access';
+
+export type ResourceDelegationAuthority = {
+  user: User;
+  credentialKind: CredentialKind;
+  expiresAt?: number;
+  organizationId?: string;
+  audience?: string | string[];
+  tokenSource?: string;
+  deviceSessionId?: string;
+  isModern: boolean;
+  runtimeAdmission: RuntimeAdmission;
+};
+
+export class TypedResourceDelegationError extends TRPCError {
+  constructor(
+    public readonly status: 401 | 403 | 503,
+    public readonly delegationCode: 'UNAUTHORIZED' | 'FORBIDDEN' | 'MIGRATION_UNAVAILABLE',
+    message: string
+  ) {
+    super({
+      code: status === 401 ? 'UNAUTHORIZED' : status === 503 ? 'SERVICE_UNAVAILABLE' : 'FORBIDDEN',
+      message,
+    });
+  }
+}
+
+function unauthorized(message = 'Unauthorized resource delegation request'): never {
+  throw new TypedResourceDelegationError(401, 'UNAUTHORIZED', message);
+}
+
+function forbidden(message: string): never {
+  throw new TypedResourceDelegationError(403, 'FORBIDDEN', message);
+}
+
+export type CreateControlTokenOptions = {
+  headers?: Headers;
+  organizationId?: string;
+  tokenSource?: string;
+  expiresIn?: number;
+  legacyExpiresIn?: number;
+  extra?: {
+    botId?: string;
+    createdOnPlatform?: string;
+  };
+};
+
+export type CreateDelegatedResourceTokenOptions = {
+  headers?: Headers;
+  organizationId?: string;
+  organizationRole?: 'owner' | 'admin' | 'member';
+  tokenSource?: string;
+  expiresIn?: number;
+};
+
+function resourceAudience(resource: Resource): string {
+  return {
+    api: KILO_API_AUDIENCE,
+    gateway: KILO_GATEWAY_AUDIENCE,
+    attribution: AI_ATTRIBUTION_AUDIENCE,
+    'html-deploy': HTML_DEPLOY_AUDIENCE,
+    pages: PAGES_AUDIENCE,
+    'pages-dev': PAGES_DEV_AUDIENCE,
+    'cloud-agent-next': CLOUD_AGENT_NEXT_AUDIENCE,
+  }[resource];
+}
+
+export function isDelegableResource(value: unknown): value is DelegableResource {
+  return (
+    value === 'api' ||
+    value === 'gateway' ||
+    value === 'attribution' ||
+    value === 'html-deploy' ||
+    value === 'pages' ||
+    value === 'pages-dev'
+  );
+}
+
+export async function canIssueLegacyOrganizationToken(
+  requestHeaders: Headers,
+  user: Pick<User, 'id' | 'api_token_pepper'>
+): Promise<boolean> {
+  // Organization authorization has already authenticated the session or bearer.
+  if (!requestHeaders.get('authorization')) return true;
+  const bearer = tokenFromHeaders(requestHeaders);
+  if (!bearer) return false;
+  try {
+    const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+    if (
+      verified.userId !== user.id ||
+      verified.claims.env !== process.env.NODE_ENV ||
+      verified.claims.apiTokenPepper !== user.api_token_pepper ||
+      hasUnsafeLegacyClaims(verified.claimNames)
+    ) {
+      return false;
+    }
+    if (verified.claims.deviceSessionId !== undefined) {
+      await assertActiveDeviceSession(verified.claims.deviceSessionId, user.id);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function tokenFromHeaders(requestHeaders: Headers): string | null {
+  return extractBearerToken(requestHeaders.get('authorization'));
+}
+
+function hasUnsafeLegacyClaims(claimNames: readonly string[]): boolean {
+  const allowed = new Set([
+    'version',
+    'kiloUserId',
+    'apiTokenPepper',
+    'env',
+    'iat',
+    'exp',
+    'deviceAuthRequestCode',
+    'deviceSessionId',
+  ]);
+  return claimNames.some(name => !allowed.has(name));
+}
+
+async function currentUser(expectedUser: User): Promise<User> {
+  const user = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.id, expectedUser.id),
+  });
+  if (!user || user.blocked_at || user.blocked_reason) unauthorized();
+  return user;
+}
+
+async function assertActiveDeviceSession(id: string, userId: string): Promise<void> {
+  const session = await db.query.device_sessions.findFirst({
+    where: liveDeviceSessionCondition({ deviceSessionId: id, userId }),
+  });
+  if (!session) unauthorized();
+}
+
+async function assertCurrentOrganizationMembership(
+  userId: string,
+  organizationId?: string
+): Promise<void> {
+  if (!organizationId) return;
+  const membership = await db
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+    .where(
+      and(
+        eq(organization_memberships.kilo_user_id, userId),
+        eq(organization_memberships.organization_id, organizationId),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .limit(1);
+  if (!membership[0]) unauthorized();
+}
+
+function hasRestrictedPrincipalClaims(claimNames: readonly string[]): boolean {
+  const allowed = new Set([
+    'version',
+    'kiloUserId',
+    'apiTokenPepper',
+    'env',
+    'aud',
+    'iat',
+    'exp',
+    'tokenPurpose',
+    'credentialExchange',
+    'deviceSessionId',
+  ]);
+  return claimNames.some(name => !allowed.has(name));
+}
+
+export async function getResourceDelegationAuthority(
+  expectedUser: User,
+  options?: { headers?: Headers; organizationId?: string }
+): Promise<ResourceDelegationAuthority> {
+  const requestHeaders = options?.headers ?? (await nextHeaders());
+  const bearer = tokenFromHeaders(requestHeaders);
+  const authorizationPresent = requestHeaders.has('authorization');
+  const user = await currentUser(expectedUser);
+  await assertCurrentOrganizationMembership(user.id, options?.organizationId);
+
+  if (!bearer) {
+    if (authorizationPresent) {
+      unauthorized();
+    }
+    const session = await getUserFromSessionForCredentialIssuance();
+    if (!session.user || session.user.id !== expectedUser.id) {
+      unauthorized();
+    }
+    return {
+      user,
+      credentialKind: 'human-api',
+      isModern: false,
+      runtimeAdmission: {
+        source: 'user',
+        authorizationUserId: user.id,
+        authorizationPepper: user.api_token_pepper,
+      },
+    };
+  }
+
+  let verified: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
+  try {
+    verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+  } catch {
+    unauthorized();
+  }
+  const claims = verified.claims;
+  if (
+    verified.userId !== expectedUser.id ||
+    claims.env !== process.env.NODE_ENV ||
+    claims.apiTokenPepper !== user.api_token_pepper
+  ) {
+    unauthorized();
+  }
+
+  if (claims.tokenPurpose !== undefined) {
+    if (claims.tokenPurpose !== 'human-api' && claims.tokenPurpose !== 'device-access') {
+      forbidden('Delegated credentials cannot mint resource control tokens');
+    }
+    if (claims.aud !== KILO_API_AUDIENCE || hasRestrictedPrincipalClaims(verified.claimNames)) {
+      unauthorized();
+    }
+    if (claims.tokenPurpose === 'device-access') {
+      if (!claims.deviceSessionId) unauthorized();
+      await assertActiveDeviceSession(claims.deviceSessionId, user.id);
+    }
+    return {
+      user,
+      credentialKind: claims.tokenPurpose,
+      expiresAt: claims.exp,
+      organizationId: claims.organizationId,
+      audience: claims.aud,
+      tokenSource: claims.tokenSource,
+      deviceSessionId: claims.deviceSessionId,
+      isModern: true,
+      runtimeAdmission: {
+        source: 'user',
+        authorizationUserId: user.id,
+        authorizationPepper: user.api_token_pepper,
+      },
+    };
+  }
+
+  if (hasUnsafeLegacyClaims(verified.claimNames)) {
+    forbidden('Unsupported legacy credential context');
+  }
+  const isLegacyDevice = claims.deviceSessionId !== undefined;
+  if (isLegacyDevice) {
+    if (!LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS.includes(claims.exp - claims.iat)) {
+      forbidden('Unsupported legacy credential context');
+    }
+    await assertActiveDeviceSession(claims.deviceSessionId, user.id);
+  } else if (!isKiloCredentialExchangeEligible(verified, { legacy: 'five-year-api' })) {
+    forbidden('Unsupported legacy credential context');
+  }
+  return {
+    user,
+    credentialKind: isLegacyDevice ? 'device-access' : 'human-api',
+    expiresAt: claims.exp,
+    isModern: false,
+    deviceSessionId: claims.deviceSessionId,
+    runtimeAdmission: {
+      source: 'user',
+      authorizationUserId: user.id,
+      authorizationPepper: user.api_token_pepper,
+    },
+  };
+}
+
+export async function isModernResourceDelegationRequest(requestHeaders: Headers): Promise<boolean> {
+  const bearer = tokenFromHeaders(requestHeaders);
+  if (!bearer) return false;
+  const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+    audience: KILO_API_AUDIENCE,
+    mode: 'allow-legacy',
+  });
+  return verified.claims.tokenPurpose !== undefined;
+}
+
+async function createModernControlToken(
+  authority: ResourceDelegationAuthority,
+  resource: ControlResource,
+  options?: CreateControlTokenOptions
+): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
+  const now = Math.floor(Date.now() / 1000);
+  const requested = options?.expiresIn ?? ONE_HOUR_SECONDS;
+  const expiresIn = Math.min(
+    requested,
+    ONE_HOUR_SECONDS,
+    authority.expiresAt ? authority.expiresAt - now : requested
+  );
+  if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
+  const payload = buildModernKiloTokenPayload({
+    userId: authority.user.id,
+    pepper: authority.user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: resourceAudience(resource),
+    issuedAt: now,
+    expiresAt: now + expiresIn,
+    tokenPurpose: authority.credentialKind,
+    credentialExchange: false,
+    extra: {
+      organizationId: options?.organizationId ?? authority.organizationId,
+      tokenSource: options?.tokenSource ?? authority.tokenSource,
+      deviceSessionId: authority.deviceSessionId,
+      botId: options?.extra?.botId,
+      createdOnPlatform: options?.extra?.createdOnPlatform,
+      runtimeAdmission: authority.runtimeAdmission,
+    },
+  });
+  const token = jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
+  return {
+    token,
+    expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
+    user: authority.user,
+    tokenSource: options?.tokenSource ?? authority.tokenSource,
+  };
+}
+
+export async function createControlTokenForRequest(
+  user: User,
+  resource: ControlResource,
+  options?: CreateControlTokenOptions
+): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
+  const requestHeaders = options?.headers ?? (await nextHeaders());
+  const bearer = tokenFromHeaders(requestHeaders);
+  if (bearer) {
+    let verified: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
+    try {
+      verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+        audience: KILO_API_AUDIENCE,
+        mode: 'allow-legacy',
+      });
+    } catch {
+      unauthorized();
+    }
+    const scope = verified.claims.cloudAgentAuthority;
+    if (scope !== undefined) {
+      if (
+        resource !== 'cloud-agent-next' ||
+        (options?.organizationId ?? null) !== scope.organizationId
+      ) {
+        forbidden('Cloud Agent authority cannot broaden its resource or organization');
+      }
+      const current = await currentUser(user);
+      if (
+        verified.userId !== current.id ||
+        verified.claims.env !== process.env.NODE_ENV ||
+        verified.claims.apiTokenPepper !== current.api_token_pepper
+      ) {
+        unauthorized();
+      }
+      await assertCurrentOrganizationMembership(current.id, scope.organizationId ?? undefined);
+      const now = Math.floor(Date.now() / 1000);
+      if (verified.claims.exp <= now || scope.expiresAt <= now) {
+        unauthorized('Cloud Agent authority has expired');
+      }
+      const payload = buildModernKiloTokenPayload({
+        userId: current.id,
+        pepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        audience: CLOUD_AGENT_NEXT_AUDIENCE,
+        issuedAt: now,
+        expiresAt: verified.claims.exp,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        extra: {
+          ...(scope.organizationId === null ? {} : { organizationId: scope.organizationId }),
+          cloudAgentAuthority: { ...scope },
+        },
+      });
+      return {
+        token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+        expiresAt: new Date(verified.claims.exp * 1000).toISOString(),
+        user: current,
+      };
+    }
+  }
+  const authority = await getResourceDelegationAuthority(user, options);
+  if (authority.organizationId) {
+    forbidden('Organization-scoped credentials cannot mint resource control tokens');
+  }
+  if (!isResourceTokenIssuanceEnabled(resource)) {
+    if (authority.isModern) {
+      if (authority.credentialKind === 'device-access' && authority.deviceSessionId) {
+        return await createModernControlToken(authority, resource, options);
+      }
+      throw new TypedResourceDelegationError(
+        503,
+        'MIGRATION_UNAVAILABLE',
+        'Shared resource token migration is unavailable'
+      );
+    }
+    const expiresIn = options?.legacyExpiresIn ?? TOKEN_EXPIRY.default;
+    const token = generateApiToken(
+      authority.user,
+      {
+        ...options?.extra,
+        tokenSource: options?.tokenSource,
+      },
+      { expiresIn }
+    );
+    return {
+      token,
+      expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      user: authority.user,
+      tokenSource: options?.tokenSource,
+    };
+  }
+  return await createModernControlToken(authority, resource, options);
+}
+
+export async function createDelegatedResourceToken(
+  user: User,
+  resource: DelegableResource,
+  options?: CreateDelegatedResourceTokenOptions
+): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
+  const forPages = isPagesResource(resource);
+  if (forPages && options?.organizationId) {
+    forbidden('Organization credentials cannot mint Pages tokens');
+  }
+  const authority = await getResourceDelegationAuthority(user, { headers: options?.headers });
+  if (forPages && authority.organizationId) {
+    forbidden('Organization credentials cannot mint Pages tokens');
+  }
+  let organizationRole = options?.organizationRole;
+  if (options?.organizationId) {
+    // Explicit delegation follows REST organization access, including inherited and global-admin access.
+    // Control-token callers retain the direct-membership check in getResourceDelegationAuthority.
+    const context = await getAuthorizedOrgContext(options.organizationId);
+    if (!context.success || context.data.user.id !== authority.user.id) {
+      forbidden('Unauthorized organization resource delegation request');
+    }
+    const role = context.data.user.role;
+    if (
+      role === 'billing_manager' ||
+      (resource === 'attribution' && role === 'admin') ||
+      (organizationRole !== undefined && organizationRole !== role)
+    ) {
+      forbidden('Organization role cannot issue this resource token');
+    }
+    organizationRole = role;
+  }
+  if (authority.organizationId && authority.organizationId !== options?.organizationId) {
+    forbidden('Scoped credentials cannot mint tokens for another organization');
+  }
+  if (authority.organizationId && authority.audience !== resourceAudience(resource)) {
+    forbidden('Scoped credentials cannot broaden their resource audience');
+  }
+  if (!isResourceTokenIssuanceEnabled('delegated-resource')) {
+    throw new TypedResourceDelegationError(
+      503,
+      'MIGRATION_UNAVAILABLE',
+      'Shared resource token migration is unavailable'
+    );
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const maxLifetime = forPages ? PAGES_TOKEN_MAX_SECONDS : 15 * 60;
+  const requested = options?.expiresIn ?? maxLifetime;
+  const expiresIn = Math.min(
+    requested,
+    maxLifetime,
+    authority.expiresAt ? authority.expiresAt - now : requested
+  );
+  if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
+  if (forPages) {
+    // Pages holds the token only as an opaque bearer and trades it at the exchange for identity,
+    // so it carries no pepper, organization context or token source.
+    const payload = buildModernKiloTokenPayload({
+      userId: authority.user.id,
+      env: process.env.NODE_ENV,
+      audience: resourceAudience(resource),
+      issuedAt: now,
+      expiresAt: now + expiresIn,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+    });
+    return {
+      token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+      expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
+      user: authority.user,
+    };
+  }
+  const payload = buildModernKiloTokenPayload({
+    userId: authority.user.id,
+    pepper: authority.user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: resourceAudience(resource),
+    issuedAt: now,
+    expiresAt: now + expiresIn,
+    tokenPurpose: 'delegated-workload',
+    credentialExchange: false,
+    extra: {
+      organizationId: options?.organizationId ?? authority.organizationId,
+      organizationRole,
+      tokenSource: options?.tokenSource ?? authority.tokenSource,
+    },
+  });
+  return {
+    token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+    expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
+    user: authority.user,
+    tokenSource: options?.tokenSource ?? authority.tokenSource,
+  };
+}

@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Ваш сеанс агента мае абнаўленне",
+      "lowBalance": "Ваш баланс патрабуе ўвагі",
+      "spendAlert": "Вашы выдаткі патрабуюць увагі",
+      "securityFinding": "Знаходка ў бяспецы патрабуе ўвагі",
+      "securityUpdate": "Праверка бяспекі мае абнаўленне",
+      "activeAgentsGlanceable": "Актыўныя агенты маюць абнаўленне"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Апавяшчэнне аб нізкім балансе",
+      "body": "Баланс {{organizationName}} апусціўся ніжэй за ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Апавяшчэнне аб выдатках",
+      "body": "Выдаткі {{scopeName}} перавысілі ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} у {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Новая знаходка ў бяспецы ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Папярэджанне SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Парушэнне SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Ваш сеанс Kilo гатовы да кіравання з тэлефона"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

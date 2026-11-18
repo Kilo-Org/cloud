@@ -1,6 +1,10 @@
+import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
+import type { WebhookTriggerTarget } from '@kilocode/worker-utils/webhook-trigger-target';
 import 'server-only';
-import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@/lib/config.server';
-import { encodeUserIdForPath } from './user-id-encoding';
+import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
+import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import * as z from 'zod';
 
 /**
  * Response type for trigger config from the worker.
@@ -10,15 +14,21 @@ export type TriggerConfigResponse = {
   namespace: string;
   userId: string | null;
   orgId: string | null;
+  executionUserId?: string | null;
   createdAt: string;
   isActive: boolean;
-  targetType: 'cloud_agent' | 'kiloclaw_chat';
+  targetType: WebhookTriggerTarget;
+  cloudAgentSessionId?: string | null;
   kiloclawInstanceId?: string | null;
   githubRepo: string | null;
   mode: string | null;
   model: string | null;
+  variant?: string | null;
+  sandboxAllocation?: SandboxAllocation;
+  environmentId?: string | null;
   promptTemplate: string;
   profileId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   webhookAuthHeader?: string;
@@ -35,13 +45,19 @@ export type TriggerConfigResponse = {
  * Profile is referenced by ID - resolved at runtime in the worker.
  */
 export type CreateTriggerInput = {
-  targetType?: 'cloud_agent' | 'kiloclaw_chat';
+  executionUserId?: string;
+  targetType?: WebhookTriggerTarget;
+  cloudAgentSessionId?: string;
   kiloclawInstanceId?: string;
   githubRepo?: string;
   mode?: string;
   model?: string;
+  variant?: string;
+  sandboxAllocation?: SandboxAllocation;
+  environmentId?: string | null;
   promptTemplate: string;
-  profileId?: string;
+  profileId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   webhookAuth?: {
@@ -61,9 +77,13 @@ export type CreateTriggerInput = {
 export type UpdateTriggerInput = {
   mode?: string;
   model?: string;
+  variant?: string | null;
+  sandboxAllocation?: SandboxAllocation | null;
+  environmentId?: string | null;
   promptTemplate?: string;
   isActive?: boolean;
-  profileId?: string;
+  profileId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   webhookAuth?: {
@@ -106,6 +126,13 @@ export type EnrichedCapturedRequest = CapturedRequest & {
 type WorkerResponse<T> =
   | { success: true; data: T; status: number }
   | { success: false; error: string; status: number };
+
+const scheduledTriggerInvokeResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    requestId: z.string().uuid(),
+  }),
+});
 
 function buildNamespace(userId?: string, organizationId?: string): string {
   if (organizationId) {
@@ -284,6 +311,45 @@ export async function deleteWorkerTrigger(
   return { success: true };
 }
 
+export async function invokeWorkerScheduledTrigger(
+  userId: string | undefined,
+  organizationId: string | undefined,
+  triggerId: string
+): Promise<
+  { success: true; requestId: string } | { success: false; error: string; status: number }
+> {
+  const namespace = buildNamespace(userId, organizationId);
+  const path = `${buildTriggerPath(namespace, triggerId)}/invoke`;
+
+  try {
+    const response = await fetch(`${WEBHOOK_AGENT_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (response.status !== 202) {
+      return {
+        success: false,
+        error: 'Scheduled trigger invocation failed',
+        status: response.status,
+      };
+    }
+
+    const body: unknown = await response.json();
+    const parsed = scheduledTriggerInvokeResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      return { success: false, error: 'Scheduled trigger invocation failed', status: 502 };
+    }
+
+    return { success: true, requestId: parsed.data.data.requestId };
+  } catch {
+    return { success: false, error: 'Scheduled trigger invocation failed', status: 502 };
+  }
+}
+
 export async function listWorkerRequests(
   userId: string | undefined,
   organizationId: string | undefined,
@@ -313,6 +379,31 @@ export async function listWorkerRequests(
     success: true,
     requests: result.data.requests,
   };
+}
+
+export async function getWorkerRequest(
+  userId: string | undefined,
+  organizationId: string | undefined,
+  triggerId: string,
+  requestId: string
+): Promise<WorkerResponse<Pick<CapturedRequest, 'id' | 'processStatus' | 'cloudAgentSessionId'>>> {
+  const namespace = buildNamespace(userId, organizationId);
+  const result = await workerFetch<unknown>(
+    `${buildTriggerPath(namespace, triggerId)}/requests/${encodeURIComponent(requestId)}`,
+    { method: 'GET' }
+  );
+  if (!result.success) return result;
+  const parsed = z
+    .object({
+      id: z.string(),
+      processStatus: z.enum(['captured', 'inprogress', 'success', 'failed']),
+      cloudAgentSessionId: z.string().nullable(),
+    })
+    .safeParse(result.data);
+  if (!parsed.success || parsed.data.id !== requestId) {
+    return { success: false, error: 'Invalid request response', status: 502 };
+  }
+  return { ...result, data: parsed.data };
 }
 
 export function buildInboundUrl(

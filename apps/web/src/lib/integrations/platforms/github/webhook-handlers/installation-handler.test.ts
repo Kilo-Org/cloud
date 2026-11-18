@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type {
   InstallationDeletedPayload,
+  InstallationCreatedPayload,
   InstallationRepositoriesPayload,
   InstallationSuspendPayload,
   InstallationUnsuspendPayload,
@@ -25,24 +26,16 @@ const mockFindIntegrationByInstallationId =
       appType: GitHubAppType
     ) => Promise<GitHubIntegrationRow | null>
   >();
-const mockDeleteIntegration =
+const mockFindConnectedIntegrationByInstallationId =
   jest.fn<
     (
-      organizationId: string,
       platform: string,
-      appType: GitHubAppType,
-      installationId?: string
-    ) => Promise<void>
+      installationId: string,
+      appType: GitHubAppType
+    ) => Promise<GitHubIntegrationRow | null>
   >();
-const mockDeleteIntegrationForOwner =
-  jest.fn<
-    (
-      owner: GitHubOwner,
-      platform: string,
-      appType: GitHubAppType,
-      installationId?: string
-    ) => Promise<void>
-  >();
+const mockDeleteGitHubInstallationRecords =
+  jest.fn<(installationId: string, appType: GitHubAppType) => Promise<void>>();
 const mockSuspendIntegration =
   jest.fn<
     (
@@ -96,6 +89,48 @@ const mockUnlinkTeamKiloUsers =
   jest.fn<(state: unknown, platform: string, teamId: string) => Promise<number>>();
 const mockCaptureException = jest.fn<(...args: unknown[]) => void>();
 const mockLogExceptInTest = jest.fn<(...args: unknown[]) => void>();
+const mockObserveGitHubInstallationLifecycle = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockUpdateGitHubInstallationRepositories = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockAutoCompleteInstallation =
+  jest.fn<(...args: unknown[]) => Promise<{ ok: true } | { ok: false; reason: string }>>();
+const mockBindCanonical = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockFetchGitHubRepositories = jest.fn<() => Promise<PlatformRepository[]>>();
+let connectionManagementEnabled = false;
+let selectResults: unknown[][] = [];
+
+// A select terminates either at `.where()` or at a following `.limit()`. The
+// returned value is thenable and also answers `.limit()`, so one fixture queue
+// serves both forms.
+const mockSelectQuery = () => {
+  const rows = selectResults.shift() ?? [];
+  return {
+    limit: async (_count: number) => rows,
+    then: (resolve: (value: unknown[]) => unknown) => Promise.resolve(rows).then(resolve),
+  };
+};
+
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  db: {
+    select: () => ({
+      from: () => ({ where: mockSelectQuery }),
+    }),
+    transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        select: () => ({
+          from: () => ({ where: mockSelectQuery }),
+        }),
+        execute: async () => undefined,
+      }),
+  },
+}));
+
+jest.mock('@/lib/integrations/github/multiple-installations', () => ({
+  isGitHubConnectionManagementEnabled: () => connectionManagementEnabled,
+}));
+
+jest.mock('../adapter', () => ({
+  fetchGitHubRepositories: () => mockFetchGitHubRepositories(),
+}));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   findIntegrationByInstallationId: (
@@ -103,19 +138,14 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string,
     appType: GitHubAppType
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
-  autoCompleteInstallation: jest.fn(),
-  deleteIntegration: (
-    organizationId: string,
+  findConnectedIntegrationByInstallationId: (
     platform: string,
-    appType: GitHubAppType,
-    installationId?: string
-  ) => mockDeleteIntegration(organizationId, platform, appType, installationId),
-  deleteIntegrationForOwner: (
-    owner: GitHubOwner,
-    platform: string,
-    appType: GitHubAppType,
-    installationId?: string
-  ) => mockDeleteIntegrationForOwner(owner, platform, appType, installationId),
+    installationId: string,
+    appType: GitHubAppType
+  ) => mockFindConnectedIntegrationByInstallationId(platform, installationId, appType),
+  autoCompleteInstallation: (...args: unknown[]) => mockAutoCompleteInstallation(...args),
+  deleteGitHubInstallationRecords: (installationId: string, appType: GitHubAppType) =>
+    mockDeleteGitHubInstallationRecords(installationId, appType),
   suspendIntegration: (
     organizationId: string,
     platform: string,
@@ -151,6 +181,19 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   ) => mockUpdateIntegrationRepositories(platform, installationId, repositories, appType),
 }));
 
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  observeGitHubInstallationLifecycle: (...args: unknown[]) =>
+    mockObserveGitHubInstallationLifecycle(...args),
+  bindGitHubIntegrationToCanonicalInstallation: (...args: unknown[]) => mockBindCanonical(...args),
+  lockGitHubInstallationIdentity: jest.fn(async () => undefined),
+  updateGitHubInstallationRepositories: (...args: unknown[]) =>
+    mockUpdateGitHubInstallationRepositories(...args),
+}));
+
+jest.mock('@/lib/integrations/db/predicates', () => ({
+  effectiveAppTypeCondition: jest.fn(() => undefined),
+}));
+
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: () => mockBotInitialize(),
@@ -167,12 +210,16 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
 }));
 
 let handleInstallationDeleted: (
   payload: InstallationDeletedPayload,
+  appType: GitHubAppType
+) => Promise<Response>;
+let handleInstallationCreated: (
+  payload: InstallationCreatedPayload,
   appType: GitHubAppType
 ) => Promise<Response>;
 let handleInstallationSuspend: (
@@ -189,8 +236,12 @@ let handleInstallationRepositories: (
 ) => Promise<Response>;
 
 beforeAll(async () => {
-  ({ handleInstallationDeleted, handleInstallationSuspend, handleInstallationUnsuspend } =
-    await import('./installation-handler'));
+  ({
+    handleInstallationCreated,
+    handleInstallationDeleted,
+    handleInstallationSuspend,
+    handleInstallationUnsuspend,
+  } = await import('./installation-handler'));
   ({ handleInstallationRepositories } = await import('./installation-repositories-handler'));
 });
 
@@ -213,45 +264,344 @@ const userIntegration: GitHubIntegrationRow = {
   owned_by_user_id: 'user_1',
 };
 
+describe('handleInstallationCreated', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    connectionManagementEnabled = true;
+    selectResults = [[], [{ ...orgIntegration, metadata: {} }]];
+    mockFetchGitHubRepositories.mockResolvedValue([]);
+    mockAutoCompleteInstallation.mockResolvedValue({ ok: true });
+  });
+
+  it.each([false, true])(
+    'completes and canonically binds a pending approval when management enabled is %s',
+    async enabled => {
+      connectionManagementEnabled = enabled;
+      const response = await handleInstallationCreated(
+        {
+          action: 'created',
+          installation: {
+            id: 98765,
+            account: { id: 11, login: 'acme' },
+            repository_selection: 'all',
+            events: [],
+            created_at: '2026-09-07T00:00:00Z',
+            permissions: {},
+          },
+          requester: { id: 22, login: 'owner' },
+          sender: { id: 22, login: 'owner' },
+        },
+        'standard'
+      );
+      expect(response.status).toBe(200);
+      expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          integrationId: 'pi_org',
+          authorizedRequesterAccountIds: ['22'],
+        }),
+        expect.anything()
+      );
+      expect(mockBindCanonical).toHaveBeenCalledWith(
+        {
+          integrationId: 'pi_org',
+          installationId: '98765',
+          appType: 'standard',
+        },
+        expect.anything()
+      );
+    }
+  );
+
+  it('repairs an active unbound projection after a prior bind failure', async () => {
+    // Select queue: ACTIVE candidates, repair admission check, pending target, legacy matches.
+    selectResults = [[{ ...orgIntegration, metadata: {} }], [], [], []];
+    await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+    expect(mockBindCanonical).toHaveBeenCalledWith(
+      {
+        integrationId: 'pi_org',
+        installationId: '98765',
+        appType: 'standard',
+      },
+      expect.anything()
+    );
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+  });
+
+  it('binds a sole eligible active association when no other live association holds the installation', async () => {
+    // Select queue: ACTIVE candidates, repair admission check, pending target, legacy matches.
+    selectResults = [[{ ...orgIntegration, metadata: {} }], [], [], []];
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Installation recorded' });
+    expect(mockBindCanonical).toHaveBeenCalledTimes(1);
+    expect(mockBindCanonical).toHaveBeenCalledWith(
+      { integrationId: 'pi_org', installationId: '98765', appType: 'standard' },
+      expect.anything()
+    );
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockLogExceptInTest).not.toHaveBeenCalledWith(
+      'GitHub installation repair declined:',
+      expect.anything()
+    );
+  });
+
+  it('declines the repair and leaves the candidate unbound when another live association holds the installation', async () => {
+    // Select queue: ACTIVE candidates, repair admission check, pending target, legacy matches.
+    selectResults = [
+      [{ ...orgIntegration, metadata: {} }],
+      [{ id: 'existing-association' }],
+      [],
+      [],
+    ];
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockLogExceptInTest).toHaveBeenCalledWith('GitHub installation repair declined:', {
+      installation_id: '98765',
+      integration_id: 'pi_org',
+      reason: 'competing_association',
+    });
+  });
+
+  it('does not auto-attach a pending owner when the installation is already associated', async () => {
+    selectResults = [[], [{ ...orgIntegration, metadata: {} }], [{ id: 'existing-association' }]];
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(await response.json()).toEqual({
+      message: 'Installation association requires verified connection confirmation',
+    });
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+  });
+
+  it('completes when the delivery sender is the recorded requester', async () => {
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: null,
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        integrationId: 'pi_org',
+        authorizedRequesterAccountIds: ['22'],
+      }),
+      expect.anything()
+    );
+    expect(mockBindCanonical).toHaveBeenCalledWith(
+      { integrationId: 'pi_org', installationId: '98765', appType: 'standard' },
+      expect.anything()
+    );
+  });
+
+  it('declines completion and leaves the pending request pending when the delivery identity does not match', async () => {
+    mockAutoCompleteInstallation.mockResolvedValue({
+      ok: false,
+      reason: 'requester_mismatch',
+    });
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 23, login: 'other' },
+        sender: { id: 23, login: 'other' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      message: 'Installation association requires verified connection confirmation',
+    });
+    expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({ authorizedRequesterAccountIds: ['23'] }),
+      expect.anything()
+    );
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+  });
+
+  it('leaves the pending request pending when the delivery carries no GitHub identity', async () => {
+    selectResults = [[]];
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: null,
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Installation recorded' });
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+  });
+});
+
 describe('handleInstallationDeleted', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockBotInitialize.mockResolvedValue(undefined);
     mockBotGetState.mockReturnValue({});
     mockUnlinkTeamKiloUsers.mockResolvedValue(0);
-    mockDeleteIntegration.mockResolvedValue(undefined);
-    mockDeleteIntegrationForOwner.mockResolvedValue(undefined);
+    mockDeleteGitHubInstallationRecords.mockResolvedValue(undefined);
+    mockObserveGitHubInstallationLifecycle.mockResolvedValue(undefined);
+    mockUpdateGitHubInstallationRepositories.mockResolvedValue(undefined);
+    connectionManagementEnabled = false;
   });
 
   it('standard app deletion unlinks bot identities and passes the app type', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(orgIntegration);
-
     const response = await handleInstallationDeleted(deletedPayload, 'standard');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
     expect(mockBotInitialize).toHaveBeenCalled();
     expect(mockUnlinkTeamKiloUsers).toHaveBeenCalledWith(expect.anything(), 'github', '98765');
-    expect(mockDeleteIntegration).toHaveBeenCalledWith('org_1', 'github', 'standard', '98765');
-    expect(mockDeleteIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      state: 'deleted',
+    });
+    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'standard');
+  });
+
+  it('keeps completed database cleanup when bot identity unlink fails', async () => {
+    mockUnlinkTeamKiloUsers.mockRejectedValue(new Error('identity store unavailable'));
+
+    await expect(handleInstallationDeleted(deletedPayload, 'standard')).resolves.toBeDefined();
+    expect(mockCaptureException).toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'deleted' })
+    );
+    expect(mockObserveGitHubInstallationLifecycle.mock.invocationCallOrder[0]).toBeLessThan(
+      mockUnlinkTeamKiloUsers.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('fails before bot unlink when required database cleanup fails', async () => {
+    mockObserveGitHubInstallationLifecycle.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(handleInstallationDeleted(deletedPayload, 'standard')).rejects.toThrow(
+      'database unavailable'
+    );
+    expect(mockUnlinkTeamKiloUsers).not.toHaveBeenCalled();
   });
 
   it('lite app deletion does not unlink bot identities and passes the app type', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(userIntegration);
-
     const response = await handleInstallationDeleted(deletedPayload, 'lite');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
     expect(mockBotInitialize).not.toHaveBeenCalled();
     expect(mockUnlinkTeamKiloUsers).not.toHaveBeenCalled();
-    expect(mockDeleteIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user_1' },
-      'github',
-      'lite',
-      '98765'
-    );
-    expect(mockDeleteIntegration).not.toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+      state: 'deleted',
+    });
+    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'lite');
+  });
+
+  it('retains the local association on upstream deletion when management is enabled', async () => {
+    connectionManagementEnabled = true;
+    await handleInstallationDeleted(deletedPayload, 'standard');
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      state: 'deleted',
+    });
+    expect(mockDeleteGitHubInstallationRecords).not.toHaveBeenCalled();
   });
 });
 
@@ -260,15 +610,18 @@ describe('handleInstallationSuspend', () => {
     jest.clearAllMocks();
     mockSuspendIntegration.mockResolvedValue(undefined);
     mockSuspendIntegrationForOwner.mockResolvedValue(undefined);
+    connectionManagementEnabled = false;
   });
 
   it('passes the webhook app type to the organization suspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(orgIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(orgIntegration);
 
     const response = await handleInstallationSuspend(suspendPayload, 'standard');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: '98765', appType: 'standard', state: 'suspended' })
+    );
     expect(mockSuspendIntegration).toHaveBeenCalledWith(
       'org_1',
       'github',
@@ -276,23 +629,17 @@ describe('handleInstallationSuspend', () => {
       'standard',
       '98765'
     );
-    expect(mockSuspendIntegrationForOwner).not.toHaveBeenCalled();
   });
 
   it('passes the webhook app type to the user suspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(userIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(userIntegration);
 
     const response = await handleInstallationSuspend(suspendPayload, 'lite');
 
     expect(response.status).toBe(200);
-    expect(mockSuspendIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user_1' },
-      'github',
-      'octocat',
-      'lite',
-      '98765'
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: '98765', appType: 'lite', state: 'suspended' })
     );
-    expect(mockSuspendIntegration).not.toHaveBeenCalled();
   });
 });
 
@@ -301,32 +648,34 @@ describe('handleInstallationUnsuspend', () => {
     jest.clearAllMocks();
     mockUnsuspendIntegration.mockResolvedValue(undefined);
     mockUnsuspendIntegrationForOwner.mockResolvedValue(undefined);
+    connectionManagementEnabled = false;
   });
 
   it('passes the webhook app type to the organization unsuspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(orgIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(orgIntegration);
 
     const response = await handleInstallationUnsuspend(unsuspendPayload, 'lite');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+      state: 'active',
+    });
     expect(mockUnsuspendIntegration).toHaveBeenCalledWith('org_1', 'github', 'lite', '98765');
-    expect(mockUnsuspendIntegrationForOwner).not.toHaveBeenCalled();
   });
 
   it('passes the webhook app type to the user unsuspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(userIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(userIntegration);
 
     const response = await handleInstallationUnsuspend(unsuspendPayload, 'standard');
 
     expect(response.status).toBe(200);
-    expect(mockUnsuspendIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user_1' },
-      'github',
-      'standard',
-      '98765'
-    );
-    expect(mockUnsuspendIntegration).not.toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      state: 'active',
+    });
   });
 });
 
@@ -353,16 +702,12 @@ describe('handleInstallationRepositories', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
-    expect(mockUpdateIntegrationRepositories).toHaveBeenCalledWith(
-      'github',
-      '98765',
-      [
-        { id: 1, name: 'keep', full_name: 'acme/keep', private: false },
-        { id: 2, name: 'new', full_name: 'acme/new', private: true },
-      ],
-      'standard'
-    );
+    expect(mockUpdateGitHubInstallationRepositories).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      repositoriesAdded: [{ id: 2, name: 'new', full_name: 'acme/new', private: true }],
+      repositoryIdsRemoved: [],
+    });
   });
 
   it('removes repositories and passes the lite app type', async () => {
@@ -376,7 +721,11 @@ describe('handleInstallationRepositories', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
-    expect(mockUpdateIntegrationRepositories).toHaveBeenCalledWith('github', '98765', [], 'lite');
+    expect(mockUpdateGitHubInstallationRepositories).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+      repositoriesAdded: [],
+      repositoryIdsRemoved: [1],
+    });
   });
 });

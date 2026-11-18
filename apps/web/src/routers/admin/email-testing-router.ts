@@ -1,25 +1,46 @@
 import { TRPCError } from '@trpc/server';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
-import { verifyEmail } from '@/lib/email-neverbounce';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import {
+  getEmailVerificationRecipient,
+  sendViaMailgun,
+} from '@kilocode/web-shared/lib/email-mailgun';
+import { verifyEmail } from '@kilocode/web-shared/lib/email-neverbounce';
 import {
   subjects,
   creditsVars,
+  buildCreditsTopUpCreditsRowSection,
+  buildCreditsTopUpExpirySection,
   buildCreditsTopUpReceiptSection,
+  buildCreditsTopUpServiceFeeSection,
   RawHtml,
   renderTemplate,
   type TemplateName,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
+import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import * as z from 'zod';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { format } from 'date-fns';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { addCalendarYearUtc } from '@kilocode/web-shared/lib/paidCreditPolicy';
 
 const templateNames = Object.keys(subjects) as [TemplateName, ...TemplateName[]];
 
 const TemplateNameSchema = z.enum(templateNames);
 
-function fixtureTemplateVars(template: TemplateName): Record<string, string | RawHtml> {
+/**
+ * Every subject needs a preview fixture: the admin email-testing page renders
+ * whatever `getTemplates` lists, so a subject without a case here breaks its
+ * preview and send-test. Taking `never` makes a missing case a type error.
+ */
+function missingTemplateFixture(template: never): never {
+  throw new Error(`Unknown template: ${String(template)}`);
+}
+
+export function fixtureTemplateVars(template: TemplateName): Record<string, string | RawHtml> {
   const formatDate = (d: Date) => format(d, 'MMMM d, yyyy');
   const orgId = 'fixture-org-id';
   const organization_url = `${NEXTAUTH_URL}/organizations/${orgId}`;
@@ -30,6 +51,13 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${orgId}/code-reviews`;
 
   switch (template) {
+    case 'autoRoutingPoolNotice':
+      return {
+        cutover_at: 'Sunday, November 1, 2099 at 12:00 UTC',
+        routers: new RawHtml(
+          `<li><strong>Your personal pool:</strong> <code>kilo-auto/custom/efficient</code> · <a href="${NEXTAUTH_URL}/profile">Manage</a></li>`
+        ),
+      };
     case 'orgSubscription':
       return { seats: '5 seats', organization_url, invoices_url };
     case 'orgRenewed':
@@ -54,10 +82,43 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         app_url: NEXTAUTH_URL,
       };
+    case 'signInCode':
+      return { code: '482913', email: 'user@example.com', expires_in: '10 minutes' };
+    case 'accountLinkCode':
+      return {
+        code: '482913',
+        email: 'user@example.com',
+        provider_name: 'GitHub',
+        expires_in: '10 minutes',
+      };
+    case 'newSignInMethod':
+      return {
+        email: 'user@example.com',
+        provider_name: 'GitHub',
+        linked_identity: 'octocat (user@example.com)',
+        connected_accounts_link: new RawHtml(
+          `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
+        ),
+      };
     case 'balanceAlert':
       return { minimum_balance: '10', organization_url };
+    case 'spendAlert':
+      return {
+        scope_name: 'Acme Corp',
+        kind_label: 'Spend threshold',
+        amount_usd: '12.50',
+        threshold_usd: '10.00',
+        spend_url: `${NEXTAUTH_URL}/organizations/${orgId}/usage-details`,
+        cta_label: 'Open spend view',
+      };
     case 'autoTopUpFailed':
       return { reason: 'Card declined', credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up` };
+    case 'codeReviewDisabled':
+      return {
+        reason: `Code Reviewer was disabled after three repository clone timeouts today. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
+        recovery_url: `mailto:${SUPPORT_EMAIL}?subject=Repository%20clone%20timeouts`,
+        recovery_label: 'Contact support',
+      };
     case 'ossInviteNewUser':
       return {
         organization_name: 'Acme OSS',
@@ -101,7 +162,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         instance_name: 'Research Claw',
         scheduled_at_display: 'Sep 26, 2026, 4:30 PM UTC',
         admin_message_section: new RawHtml(
-          '<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
+          '<p class="kc-box" style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
         ),
       };
     case 'clawScheduledVersionChangeNotice':
@@ -111,7 +172,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         instance_name: 'Research Claw',
         scheduled_at_display: 'Sep 26, 2026, 4:30 PM UTC',
         admin_message_section: new RawHtml(
-          '<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
+          '<p class="kc-box" style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
         ),
         version_change_section:
           'Upgrading from v1.2.3 (OpenClaw 0.9.0) to v1.2.4 (OpenClaw 0.9.1).',
@@ -180,6 +241,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'accountDeletionRequest':
       return { email: 'user@example.com' };
+    case 'accountDeletionCompleted':
+      return { completion_message: new RawHtml(USER_DELETION_COMPLETION_HTML) };
     case 'dataExportDownloadCode':
       return { code: '123456', email: 'user@example.com', expires_in: '10 minutes' };
     case 'creditsTopUp':
@@ -187,9 +250,22 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         heading: 'Thanks for your top-up',
         intro:
           'Your Kilo credit top-up has been processed and the credits are now available on your account.',
+        amount_label: 'Amount',
         amount_usd: '10.00',
-        credits_usd: '10.00',
+        service_fee_section: buildCreditsTopUpServiceFeeSection({
+          serviceFeeCents: 0,
+          grossPaidCents: 1000,
+        }),
+        credits_row_section: buildCreditsTopUpCreditsRowSection({
+          creditsCents: 1000,
+          hasServiceFee: false,
+        }),
         purchase_date: formatDate(new Date()),
+        credit_expiry_section: buildCreditsTopUpExpirySection(
+          getPaidCreditTerms('stripe') === 'one_year'
+            ? new Date(addCalendarYearUtc(new Date()))
+            : null
+        ),
         credits_url: `${NEXTAUTH_URL}/credits`,
         receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),
       };
@@ -200,6 +276,18 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         billing_period: 'May 1, 2026 - June 1, 2026',
         next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
         manage_url: `${NEXTAUTH_URL}/claw/subscription`,
+      };
+    case 'kiloPassOrgBlocked':
+      return {
+        organization_name: 'Acme Corp',
+        manage_url: `${NEXTAUTH_URL}/organizations/${orgId}/subscriptions/kilo-pass`,
+      };
+    case 'kiloPassDuplicateCardCanceled':
+      return { support_url: `mailto:${SUPPORT_EMAIL}` };
+    case 'userDataExportReady':
+      return {
+        data_exports_url: `${NEXTAUTH_URL}/data-exports`,
+        expiry_date: formatDate(new Date(Date.now() + 7 * 86_400_000)),
       };
     case 'securityFindingNew':
       return securityFindingTemplateVars({
@@ -231,10 +319,10 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       });
     case 'recommendationsDigest': {
       const recRow = (title: string, description: string, label: string, url: string) =>
-        `<tr><td style="padding: 14px 0; border-top: 1px solid #ebebea">` +
-        `<p style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${title}</p>` +
-        `<p style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${description}</p>` +
-        `<a href="${url}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${label}</a>` +
+        `<tr><td class="kc-divider" style="padding: 14px 0; border-top: 1px solid #ebebea">` +
+        `<p class="kc-strong" style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${title}</p>` +
+        `<p class="kc-muted" style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${description}</p>` +
+        `<a class="kc-strong" href="${url}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${label}</a>` +
         `</td></tr>`;
       return {
         organization_name: 'Acme Corp',
@@ -266,7 +354,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       };
     }
   }
-  throw new Error(`Unknown template: ${template}`);
+  return missingTemplateFixture(template);
 }
 
 export const emailTestingRouter = createTRPCRouter({
@@ -291,7 +379,7 @@ export const emailTestingRouter = createTRPCRouter({
         recipient: z.string().email(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const verificationRecipient = getEmailVerificationRecipient(input.recipient);
       if (verificationRecipient) {
         const isSafeToSend = await verifyEmail(verificationRecipient);
@@ -322,6 +410,17 @@ export const emailTestingRouter = createTRPCRouter({
           message: 'MAILGUN_API_KEY/MAILGUN_DOMAIN is not configured — email was not sent',
         });
       }
+      // Store the recipient domain only; the full address is not needed to
+      // spot misuse and would put arbitrary email addresses in the audit log.
+      await recordAdminAction(ctx, {
+        action: 'email_test.send',
+        target: null,
+        message: `Sent test email: ${input.template}`,
+        metadata: {
+          template: input.template,
+          recipientDomain: getLowerDomainFromEmail(input.recipient),
+        },
+      });
       return { recipient: input.recipient };
     }),
 });

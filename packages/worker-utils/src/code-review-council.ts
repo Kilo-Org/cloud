@@ -18,6 +18,10 @@
 
 import * as z from 'zod';
 import {
+  COUNCIL_MIN_SPECIALISTS,
+  type CouncilSpecialistPreset,
+} from '@kilocode/app-shared/code-review';
+import {
   COUNCIL_BLOCKING_SEVERITY,
   COUNCIL_FINDING_SEVERITIES,
   DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
@@ -28,7 +32,6 @@ import {
   type CouncilAggregationStrategy,
   type CouncilFinding,
   type CouncilSpecialist,
-  type CouncilSpecialistRole,
   type CouncilVote,
 } from '@kilocode/db/schema-types';
 
@@ -539,12 +542,27 @@ const GOVERNANCE_EXPLANATIONS: Record<CouncilAggregationStrategy, string> = {
 };
 
 /**
- * Escapes a value for safe use inside a single markdown table cell. Backslashes are escaped
- * FIRST (before pipes), otherwise a pre-existing backslash in the input would consume the
- * escape we add to a following pipe and let the pipe break out of the cell.
+ * Escapes a value for use inside a single markdown table cell, so the cell renders the value
+ * as literal text: backslash-escaped CommonMark punctuation (including `|`), HTML-escaped
+ * `&`/`<`/`>`, and every line terminator or control character replaced with a single space.
+ * Backslashes are escaped FIRST (before the other punctuation), so each escape we add for a
+ * following character stays intact.
  */
 function escapeTableCell(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  return (
+    value
+      .replace(/\\/g, '\\\\')
+      // CommonMark backslash escapes; escaping is a no-op for plain alphanumeric text.
+      // `<` and `>` are handled by the HTML replacements below.
+      .replace(/[`*_{}[\]()#+.!|~-]/g, '\\$&')
+      // Escape `&` first so the entities introduced by the next two replacements stand.
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Replace line terminators and control characters with a single space.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f\u2028\u2029\r\n]/g, ' ')
+  );
 }
 
 /**
@@ -599,7 +617,7 @@ export function buildCouncilReviewSection(
   const tableRows = result.specialists
     .map(
       s =>
-        `| ${escapeTableCell(s.name)} | ${s.model ? escapeTableCell(s.model) : '—'} | ${s.highestSeverity ?? '—'} | ${s.findings.length} |`
+        `| ${escapeTableCell(s.name)} | ${s.model ? escapeTableCell(s.model) : '—'} | ${s.highestSeverity ? escapeTableCell(s.highestSeverity) : '—'} | ${s.findings.length} |`
     )
     .join('\n');
 
@@ -652,42 +670,16 @@ export function upsertCouncilVerdictInBody(body: string, section: string): strin
 // Specialist presets
 // ============================================================================
 
-export type CouncilSpecialistPreset = {
-  id: string;
-  role: CouncilSpecialistRole;
-  name: string;
-  lens: string;
-};
-
-export const COUNCIL_SPECIALIST_PRESETS: CouncilSpecialistPreset[] = [
-  {
-    id: 'security',
-    role: 'security',
-    name: 'Security',
-    lens: 'Injection, auth/authorization bypass, secret handling, unsafe deserialization, SSRF, and data exposure.',
-  },
-  {
-    id: 'performance',
-    role: 'performance',
-    name: 'Performance',
-    lens: 'Hot paths, N+1 queries, unnecessary allocations, blocking I/O, and algorithmic complexity regressions.',
-  },
-  {
-    id: 'testing',
-    role: 'testing',
-    name: 'Test coverage',
-    lens: 'Missing or weak tests for new behavior, untested edge cases, and regressions lacking coverage.',
-  },
-  {
-    id: 'correctness',
-    role: 'correctness',
-    name: 'Correctness',
-    lens: 'Logic errors, incorrect edge-case handling, race conditions, and broken invariants.',
-  },
-];
-
-/** Council must have at least this many specialists selected when enabled. */
-export const COUNCIL_MIN_SPECIALISTS = 2;
+// The roster the config UI paints is plain data and also rendered by the web
+// form and the mobile council screen, so it lives in
+// @kilocode/app-shared/code-review; this module re-exports it and uses it
+// locally. `presetToSpecialist` stays because it returns the db-persisted
+// specialist shape.
+export {
+  COUNCIL_MIN_SPECIALISTS,
+  COUNCIL_SPECIALIST_PRESETS,
+  type CouncilSpecialistPreset,
+} from '@kilocode/app-shared/code-review';
 
 /** Converts a preset into a persistable specialist (enabled, default model/effort). */
 export function presetToSpecialist(preset: CouncilSpecialistPreset): CouncilSpecialist {

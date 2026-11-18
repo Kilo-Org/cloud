@@ -20,7 +20,7 @@ const KEY_ID = 'slack-credential-key-v1';
 
 const mockConfig: { keyset: string | undefined } = { keyset: undefined };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get SLACK_CREDENTIAL_KEYSET_JSON() {
     return mockConfig.keyset;
   },

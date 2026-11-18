@@ -14,7 +14,7 @@ Read root and relevant package `package.json` files before selecting commands. P
 | `pnpm typecheck` | Runs `scripts/typecheck-all.sh`. |
 | `pnpm lint` | Runs `scripts/lint-all.sh`. |
 | `pnpm test` | Runs web, `test:web-env`, and `test:dev-local`; it does not run every package suite. |
-| `pnpm validate` | Runs root typecheck, lint, and test scripts. |
+| `pnpm validate` | Runs root typecheck, lint, and test scripts, then the dependency cycle check. |
 | `pnpm format` | Formats supported files with `oxfmt`. |
 | `pnpm format:check` | Lists supported files that differ from `oxfmt`. |
 | `pnpm format:changed` | Formats supported files changed from `main`. |

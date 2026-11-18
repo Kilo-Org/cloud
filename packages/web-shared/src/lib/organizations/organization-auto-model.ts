@@ -1,0 +1,311 @@
+import type { Organization } from '@kilocode/db/schema';
+import type { OrganizationAutoModelSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+  type ModelRestrictions,
+} from '@kilocode/web-shared/lib/model-allow.server';
+import {
+  getAllowedDirectByokCatalogModelIds,
+  modelsServedByOrganizationInferenceProviderUserByok,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  formatDirectByokModelId,
+  getDirectByokCatalogModelId,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getByokCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import { TRPCError } from '@trpc/server';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+  type EffectiveOrganizationModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+export {
+  getOrganizationAutoRoute,
+  hasOrganizationAutoRoute,
+  isOrganizationAutoTargetModel,
+  MAX_ORGANIZATION_AUTO_ROUTES,
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { isOrganizationAutoTargetModel } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { ORGANIZATION_AUTO_MODEL_FLAG } from '@kilocode/app-shared/feature-flags';
+import {
+  isCustomRouterModelId,
+  ORG_CUSTOM_ROUTER_MODEL_PREFIX,
+  parseCustomRouterModelId,
+} from '@kilocode/auto-routing-contracts';
+import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+
+type OrganizationAutoPolicyOrganization = Pick<Organization, 'id' | 'plan' | 'settings'>;
+
+export const DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS: OrganizationAutoModelSettings = {
+  routes: {},
+  fallback_model: KILO_AUTO_BALANCED_MODEL.id,
+};
+
+export function isOrganizationAutoEligible(organization: Pick<Organization, 'plan'>): boolean {
+  return organization.plan === 'enterprise';
+}
+
+// The rollout is actor-scoped so flagged admins can configure eligible organizations early.
+export async function assertOrganizationAutoWriteEnabled(userId: string): Promise<void> {
+  if (
+    process.env.NODE_ENV !== 'development' &&
+    !(await isReleaseToggleEnabled(ORGANIZATION_AUTO_MODEL_FLAG, userId))
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization Auto configuration is not available',
+    });
+  }
+}
+
+export function assertOrganizationAutoEligible(organization: Pick<Organization, 'plan'>): void {
+  if (!isOrganizationAutoEligible(organization)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization Auto is only available for Enterprise organizations.',
+    });
+  }
+}
+
+export function isOrganizationAutoConfigured(organization: Organization): boolean {
+  return isOrganizationAutoEligible(organization) && !!organization.settings.org_auto_model;
+}
+
+export function isOrganizationAutoEnabled(organization: Organization): boolean {
+  return (
+    isOrganizationAutoConfigured(organization) &&
+    organization.settings.default_model === ORG_AUTO_MODEL.id
+  );
+}
+
+export function getOrganizationAutoSettings(
+  organization: Organization
+): OrganizationAutoModelSettings | undefined {
+  return organization.settings.org_auto_model;
+}
+
+/** The organization's default model access policy, using the organization settings being validated. */
+async function resolveDefaultModelPolicy(
+  organization: OrganizationAutoPolicyOrganization,
+  dbClient: typeof readDb | DrizzleTransaction
+): Promise<EffectiveOrganizationModelPolicy> {
+  const context = await getOrganizationGroupPolicyContext({
+    organizationId: organization.id,
+    subject: { type: 'defaultAccess' },
+    ...('rollback' in dbClient ? { tx: dbClient } : { fromDb: dbClient }),
+  });
+  return evaluateEffectiveModelAccessPolicy({
+    ...context,
+    organization: {
+      ...context.organization,
+      plan: organization.plan,
+      settings: organization.settings,
+    },
+  });
+}
+
+/**
+ * Like requests and the organization model list, the provider allow-list does not exclude a model
+ * that the default model access policy explicitly grants, that a catalog-mode direct BYOK key
+ * serves when the policy admits the key's provider (see `getAllowedDirectByokCatalogModelIds`), or
+ * that a provider key exempt from the allow-list serves (see `allowsInferenceProviderUserByok`).
+ */
+async function isAllowedAutoTarget(
+  organization: OrganizationAutoPolicyOrganization,
+  restrictions: ModelRestrictions,
+  modelId: string,
+  dbClient: typeof readDb | DrizzleTransaction
+): Promise<boolean> {
+  if (await createAllowPredicateFromRestrictions(restrictions)(modelId)) return true;
+  if (!restrictions.providerAllowList) return false;
+  const policy = await resolveDefaultModelPolicy(organization, dbClient);
+  if ((await getEffectiveModelDecision(policy, modelId)).allowed) return true;
+  if ((await getAllowedDirectByokCatalogModelIds(organization.id, policy)).has(modelId))
+    return true;
+  const isAllowedWithoutProviderAllowList = createAllowPredicateFromRestrictions({
+    ...restrictions,
+    providerAllowList: undefined,
+  });
+  return (
+    (await isAllowedWithoutProviderAllowList(modelId)) &&
+    (await modelsServedByOrganizationInferenceProviderUserByok(organization.id, [modelId])).length >
+      0
+  );
+}
+
+export type OrganizationAutoTargetValidationResult =
+  | { kind: 'ok'; modelId: string }
+  | { kind: 'error'; message: string };
+
+export async function validateOrganizationAutoTarget(
+  organization: OrganizationAutoPolicyOrganization,
+  targetModelId: string,
+  options: {
+    apiKind?: 'chat_completions' | 'responses' | 'messages';
+    dbClient?: typeof readDb | DrizzleTransaction;
+  } = {}
+): Promise<OrganizationAutoTargetValidationResult> {
+  const rawModelId = targetModelId.trim().toLowerCase();
+  const normalizedModelId = normalizeModelId(rawModelId);
+
+  if (!rawModelId) {
+    return { kind: 'error', message: 'Organization Auto route target is required.' };
+  }
+
+  if (normalizedModelId.endsWith('/*')) {
+    return {
+      kind: 'error',
+      message: `Organization Auto route target '${targetModelId}' is not a concrete model identifier.`,
+    };
+  }
+
+  if (normalizedModelId === ORG_AUTO_MODEL.id) {
+    return { kind: 'error', message: 'Organization Auto cannot target itself.' };
+  }
+
+  if (await isCustomLlm(rawModelId)) {
+    return {
+      kind: 'error',
+      message: `Organization Auto route target '${targetModelId}' must be a Kilo-hosted model, supported auto tier, or organization-owned BYOK model.`,
+    };
+  }
+
+  if (isCustomRouterModelId(rawModelId)) {
+    const reference = parseCustomRouterModelId(rawModelId);
+    if (reference?.scope !== 'org') {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' must be one of this organization's custom routers (${ORG_CUSTOM_ROUTER_MODEL_PREFIX}<slug>).`,
+      };
+    }
+    const router = await findCustomRouter(
+      { type: 'org', id: organization.id },
+      reference.slug,
+      options.dbClient ?? readDb
+    );
+    if (!router) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' is not a custom router of this organization.`,
+      };
+    }
+    return { kind: 'ok', modelId: rawModelId };
+  }
+
+  const directByokTarget = await getDirectByokModel(rawModelId);
+  if (directByokTarget.provider && directByokTarget.model) {
+    const [credential] = await getByokCredentials(
+      options.dbClient ?? readDb,
+      { type: 'organization', id: organization.id },
+      [directByokTarget.provider.id]
+    );
+    if (!credential) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`,
+      };
+    }
+    const upstream = options.apiKind
+      ? await directByokTarget.provider.resolveUpstream({
+          credential: credential.decryptedAPIKey,
+          model: directByokTarget.model,
+          stream: false,
+        })
+      : null;
+    if (options.apiKind && !upstream?.supportedChatApis.includes(options.apiKind)) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
+      };
+    }
+    // A catalog-mode key serves the model only under its catalog id, which organization model and
+    // provider policies cover, so a stored bespoke target resolves to that id.
+    if (credential.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
+      const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
+      if (!catalogModelId) {
+        return {
+          kind: 'error',
+          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${directByokTarget.provider.id} key uses Kilo catalog model IDs and this model has no catalog ID.`,
+        };
+      }
+      return validateOrganizationAutoTarget(organization, catalogModelId, options);
+    }
+    return {
+      kind: 'ok',
+      modelId: formatDirectByokModelId(directByokTarget.provider, directByokTarget.model),
+    };
+  }
+
+  const restrictions = {
+    requireModelInCurrentSnapshot: organization.plan === 'enterprise',
+    providerAllowList:
+      organization.plan === 'enterprise' ? organization.settings.provider_allow_list : undefined,
+    modelDenyList:
+      organization.plan === 'enterprise' ? (organization.settings.model_deny_list ?? []) : [],
+  };
+
+  if (normalizedModelId.startsWith('kilo-auto/')) {
+    if (!isOrganizationAutoTargetModel(normalizedModelId)) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' is not a supported auto tier.`,
+      };
+    }
+
+    if (hasActiveModelRestrictions(restrictions)) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' cannot use an auto tier while the organization has an active model policy. Choose a concrete allowed model instead.`,
+      };
+    }
+
+    return { kind: 'ok', modelId: normalizedModelId };
+  }
+
+  let models;
+  try {
+    models = await getEnhancedOpenRouterModels({ countryCode: null });
+  } catch {
+    return {
+      kind: 'error',
+      message:
+        'Organization Auto could not validate this route target against the current model catalog.',
+    };
+  }
+  const catalogModel = models.data.find(model => model.id.toLowerCase() === rawModelId);
+  if (!catalogModel) {
+    return {
+      kind: 'error',
+      message: `Organization Auto route target '${targetModelId}' is unavailable.`,
+    };
+  }
+
+  if (
+    !(await isAllowedAutoTarget(
+      organization,
+      restrictions,
+      catalogModel.id,
+      options.dbClient ?? readDb
+    ))
+  ) {
+    return {
+      kind: 'error',
+      message: `Organization Auto route target '${targetModelId}' is not allowed by the organization's model policy.`,
+    };
+  }
+
+  return { kind: 'ok', modelId: catalogModel.id };
+}

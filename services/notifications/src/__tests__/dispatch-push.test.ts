@@ -1,11 +1,12 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { getTableName } from 'drizzle-orm';
-import type { DispatchPushInput } from '@kilocode/notifications';
+import type { DispatchPushInput, PushData } from '@kilocode/notifications';
 
 import { sendPushNotifications } from '../lib/expo-push';
 import { setPushSinkModeForTesting } from '../lib/push-sink';
 import * as dbClient from '@kilocode/db/client';
+import type { NotificationChannelDO } from '../dos/NotificationChannelDO';
 
 vi.mock('../lib/expo-push', () => ({
   sendPushNotifications: vi.fn(async () => ({
@@ -16,25 +17,72 @@ vi.mock('../lib/expo-push', () => ({
 }));
 
 type DbState = {
-  tokens: { user_id: string; token: string }[];
+  tokens: { user_id: string; token: string; app_version?: string | null; locale?: string | null }[];
   staleTokensToDelete?: string[];
   deleteCalls?: number;
+  // When set, the `user_notification_preferences` read returns this value.
+  // When unset, the read returns an absent row (treated as 'generic').
+  previews?: 'generic' | 'full';
+  // When true, the `user_notification_preferences` read throws.
+  previewsThrows?: boolean;
+  briefingEnabled?: boolean;
+  briefingReadThrows?: boolean;
+  briefingReports?: { facts: unknown; morningEndAt: string }[];
+  onBriefingReportRead?: () => void;
+  /** Rows the DO wrote to `user_notification_history`, in insert order. */
+  historyInserts?: Record<string, unknown>[];
+  /** When set, a history insert throws this error instead of recording. */
+  historyInsertError?: Error;
 };
 
 function installDbMock(state: DbState) {
   const fakeDb = {
     select: () => ({
-      from: (table: Parameters<typeof getTableName>[0]) => ({
-        where: async () => {
-          if (getTableName(table) === 'user_push_tokens') {
-            return state.tokens.map(t => ({ token: t.token }));
+      from: (table: Parameters<typeof getTableName>[0]) => {
+        const readRows = async () => {
+          const tableName = getTableName(table);
+          if (tableName === 'user_push_tokens') {
+            return state.tokens.map(t => ({
+              token: t.token,
+              app_version: t.app_version ?? null,
+              locale: t.locale ?? null,
+            }));
+          }
+          if (tableName === 'user_notification_preferences') {
+            if (state.previewsThrows) throw new Error('previews read failed');
+            return state.previews ? [{ notification_previews: state.previews }] : [];
+          }
+          if (tableName === 'agent_briefing_preferences') {
+            if (state.briefingReadThrows) throw new Error('briefing read failed');
+            return state.briefingEnabled === undefined ? [] : [{ enabled: state.briefingEnabled }];
+          }
+          if (tableName === 'agent_briefing_snapshots') {
+            state.onBriefingReportRead?.();
+            return state.briefingReports ?? [];
           }
           return [];
+        };
+        const where = () => {
+          const result = readRows();
+          return Object.assign(result, { limit: () => result });
+        };
+        const query = {
+          where,
+          innerJoin: () => query,
+          leftJoin: () => query,
+        };
+        return query;
+      },
+    }),
+    insert: (table: Parameters<typeof getTableName>[0]) => ({
+      values: (row: Record<string, unknown>) => ({
+        onConflictDoUpdate: async () => undefined,
+        onConflictDoNothing: async () => {
+          if (getTableName(table) !== 'user_notification_history') return;
+          if (state.historyInsertError) throw state.historyInsertError;
+          (state.historyInserts ??= []).push(row);
         },
       }),
-    }),
-    insert: () => ({
-      values: () => ({ onConflictDoUpdate: async () => undefined }),
     }),
     delete: () => ({
       where: async () => {
@@ -57,7 +105,7 @@ const baseInput = (over: Partial<DispatchPushInput> = {}): DispatchPushInput => 
   push: {
     title: 'T',
     body: 'B',
-    data: { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+    data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'attention' },
     sound: 'default',
     priority: 'high',
   },
@@ -68,6 +116,12 @@ function getDO(name = 'user-1') {
   const id = env.NOTIFICATION_CHANNEL_DO.idFromName(name);
   return env.NOTIFICATION_CHANNEL_DO.get(id);
 }
+
+afterEach(() => {
+  for (const [messages] of vi.mocked(sendPushNotifications).mock.calls) {
+    for (const message of messages) expect(message).not.toHaveProperty('badge');
+  }
+});
 
 describe('NotificationChannelDO.dispatchPush', () => {
   beforeEach(() => {
@@ -225,8 +279,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
 
     expect(result.kind).toBe('delivered');
     expect(sendPushNotifications).toHaveBeenCalledOnce();
-    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].badge).toBe(1);
 
     // Bucket persisted to DO storage.
     const stored = await runInDurableObject(stub, async (_inst, state) => ({
@@ -260,8 +312,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
 
     expect(result.outcome.kind).toBe('delivered');
     expect(result.totalReads).toBe(1);
-    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].badge).toBe(1);
   });
 
   it('returns failed and avoids delivered idempotency for non-stale Expo ticket errors', async () => {
@@ -392,13 +442,14 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(dbState.deleteCalls).toBe(1);
   });
 
-  it('terminalizes mixed accepted and retryable ticket errors to avoid resending accepted tokens', async () => {
-    installDbMock({
+  it('records accepted ticket history despite mixed errors and replay', async () => {
+    const state: DbState = {
       tokens: [
         { user_id: 'user-partial-ticket-error', token: 'tok-accepted' },
         { user_id: 'user-partial-ticket-error', token: 'tok-rate-limited' },
       ],
-    });
+    };
+    installDbMock(state);
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     vi.mocked(sendPushNotifications).mockResolvedValueOnce({
       ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }],
@@ -420,6 +471,12 @@ describe('NotificationChannelDO.dispatchPush', () => {
 
     const first = await stub.dispatchPush(input);
     const second = await stub.dispatchPush(input);
+    expect(state.historyInserts).toHaveLength(1);
+    expect(state.historyInserts?.[0]).toMatchObject({
+      user_id: 'user-partial-ticket-error',
+      push_type: 'cloud_agent_session',
+      idempotency_key: 'k-partial-ticket-error',
+    });
 
     expect(first).toEqual({
       kind: 'failed',
@@ -429,7 +486,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(sendPushNotifications).toHaveBeenCalledOnce();
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages.map(message => message.to)).toEqual(['tok-accepted', 'tok-rate-limited']);
-    expect(messages.map(message => message.badge)).toEqual([1, 1]);
     expect(receiptSpy).toHaveBeenCalledWith(
       { ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }] },
       { delaySeconds: 900 }
@@ -473,10 +529,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
     });
     expect(second).toEqual({ kind: 'delivered', tokenCount: 1 });
     expect(sendPushNotifications).toHaveBeenCalledTimes(2);
-    const [firstMessages] = vi.mocked(sendPushNotifications).mock.calls[0];
-    const [secondMessages] = vi.mocked(sendPushNotifications).mock.calls[1];
-    expect(firstMessages[0].badge).toBe(1);
-    expect(secondMessages[0].badge).toBe(1);
 
     const stored = await runInDurableObject(stub, async (_inst, state) =>
       state.storage.get<{ stage: string; ts: number }>('idem:k-retry-ticket-error')
@@ -484,7 +536,7 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(stored).toMatchObject({ stage: 'delivered' });
   });
 
-  it('accumulates bucket counts across deliveries and exposes total via badge', async () => {
+  it('accumulates bucket counts across deliveries', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     const stub = getDO('user-accumulate');
@@ -497,11 +549,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
         badge: { badgeBucket: 'conv2', delta: 1 },
       })
     );
-
-    const calls = vi.mocked(sendPushNotifications).mock.calls;
-    expect(calls[0]?.[0][0].badge).toBe(1);
-    expect(calls[1]?.[0][0].badge).toBe(2);
-    expect(calls[2]?.[0][0].badge).toBe(3);
 
     const buckets = await runInDurableObject(stub, async (_inst, state) => {
       const entries = await state.storage.list<number>({ prefix: 'bucket:' });
@@ -662,8 +709,20 @@ describe('NotificationChannelDO.dispatchPush', () => {
     );
     expect(afterFail).toBe(1);
 
-    const second = await stub.dispatchPush(input);
-    expect(second.kind).toBe('delivered');
+    const retry = await runInDurableObject(stub, async (instance, state) => {
+      const originalGet = state.storage.get.bind(state.storage);
+      let totalReads = 0;
+      state.storage.get = (<T = unknown>(key: string | string[]) => {
+        if (Array.isArray(key)) return originalGet<T>(key);
+        if (key === 'total') totalReads++;
+        return originalGet<T>(key);
+      }) as typeof state.storage.get;
+
+      const outcome = await instance.dispatchPush(input);
+      return { outcome, totalReads };
+    });
+    expect(retry.outcome.kind).toBe('delivered');
+    expect(retry.totalReads).toBe(0);
 
     // Bucket must not be incremented twice across the retry — the first
     // attempt's `pending` marker gates the second increment out.
@@ -671,9 +730,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
       state.storage.get<number>('bucket:conv1')
     );
     expect(afterRetry).toBe(1);
-
-    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].badge).toBe(1);
   });
 
   it('schedules cleanup when writing the pending marker (failed send)', async () => {
@@ -1045,6 +1101,10 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
         dataType: unknown;
         sound: string | null;
         priority: string;
+        channelId: string;
+        interruptionLevel: string;
+        mutableContent: boolean;
+        previews: string;
       };
       to: string;
     };
@@ -1057,6 +1117,10 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
       dataType: 'cloud_agent_session',
       sound: 'default',
       priority: 'high',
+      channelId: 'agent-progress',
+      interruptionLevel: 'active',
+      mutableContent: true,
+      previews: 'generic',
     });
     expect(payload.to).toBe('<redacted>');
     // Neither the device token nor the user/agent-controlled content may appear.
@@ -1216,5 +1280,803 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
     expect([first.kind, second.kind].sort()).toEqual(['delivered', 'duplicate']);
     // The core guarantee: exactly one OS push submission for the key.
     expect(sendPushNotifications).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('NotificationChannelDO preview mode and channel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  it.each([
+    { attentionKind: 'permission', prUrl: undefined, categoryId: 'kilo-needs-input:permission' },
+    {
+      attentionKind: 'question',
+      prUrl: 'https://github.com/org/repo/pull/7',
+      categoryId: 'kilo-needs-input:question-pr',
+    },
+    { attentionKind: undefined, prUrl: undefined, categoryId: 'kilo-needs-input:unknown' },
+  ] as const)(
+    'preserves $categoryId actions alongside needs-input routing and Focus metadata',
+    async ({ attentionKind, prUrl, categoryId }) => {
+      installDbMock({
+        tokens: [
+          { user_id: 'user-actions', token: 'tok-unknown', app_version: null },
+          { user_id: 'user-actions', token: 'tok-legacy', app_version: '1.0.11' },
+          { user_id: 'user-actions', token: 'tok-current', app_version: '1.0.12' },
+        ],
+      });
+      const data = {
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_actions',
+        category: 'attention',
+        ...(attentionKind && { attentionKind }),
+        ...(prUrl && { prUrl }),
+      } as const;
+      const result = await getDO(`user-actions-${categoryId}`).dispatchPush(
+        baseInput({
+          userId: 'user-actions',
+          idempotencyKey: `k-actions-${categoryId}`,
+          push: { title: 'T', body: 'B', data },
+        })
+      );
+
+      expect(result.kind).toBe('delivered');
+      const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+      expect(messages).toHaveLength(3);
+      for (const message of messages) {
+        expect(message).toMatchObject({ categoryId, interruptionLevel: 'time-sensitive', data });
+        expect(message.mutableContent).toBeUndefined();
+      }
+      expect(messages.find(message => message.to === 'tok-unknown')).not.toHaveProperty(
+        'channelId'
+      );
+      expect(messages.find(message => message.to === 'tok-legacy')?.channelId).toBe('agent');
+      expect(messages.find(message => message.to === 'tok-current')?.channelId).toBe('needs-input');
+    }
+  );
+
+  it('routes a status push to the agent-progress channel with an active level', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-status', token: 'tok-status', app_version: '1.0.12' }],
+    });
+    const stub = getDO('user-status');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-status',
+        idempotencyKey: 'k-status',
+        push: {
+          title: 'T',
+          body: 'B',
+          // No `category` is a status update, not a question for the user.
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_status' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0]?.channelId).toBe('agent-progress');
+    expect(messages[0]?.interruptionLevel).toBe('active');
+    // Progress is the only kind the per-Focus filter can drop, so only it
+    // carries mutable-content for the notification service extension.
+    expect(messages[0]?.mutableContent).toBe(true);
+    expect(messages[0]?.categoryId).toBeUndefined();
+    // The push reaches Expo with the iOS thread the OS stacks it into.
+    expect(messages[0]?.threadId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('keeps each account session in its own iOS thread and attention out of every thread', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-thread', token: 'tok-thread', app_version: '1.0.16' }],
+    });
+
+    async function dispatchThreaded(
+      userId: string,
+      cliSessionId: string,
+      options: { category?: 'status' | 'attention'; attempt?: number } = {}
+    ) {
+      vi.mocked(sendPushNotifications).mockClear();
+      const category = options.category;
+      const label = `${userId}-${cliSessionId}-${category ?? 'default'}-${options.attempt ?? 1}`;
+      const result = await getDO(label).dispatchPush(
+        baseInput({
+          userId,
+          idempotencyKey: `k-thread-${label}`,
+          push: {
+            title: 'T',
+            body: 'B',
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId,
+              ...(category === undefined ? {} : { category }),
+            },
+            sound: 'default',
+            priority: 'high',
+          },
+        })
+      );
+      expect(result.kind).toBe('delivered');
+      const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+      return messages[0];
+    }
+
+    const first = await dispatchThreaded('user-thread', 'ses_thread');
+    const repeated = await dispatchThreaded('user-thread', 'ses_thread', { attempt: 2 });
+    const otherSession = await dispatchThreaded('user-thread', 'ses_thread_2');
+    const otherAccount = await dispatchThreaded('user-thread-2', 'ses_thread');
+    const attention = await dispatchThreaded('user-thread', 'ses_thread', {
+      category: 'attention',
+    });
+
+    expect(repeated?.threadId).toBe(first?.threadId);
+    expect(otherSession?.threadId).not.toBe(first?.threadId);
+    expect(otherAccount?.threadId).not.toBe(first?.threadId);
+    // A raise keeps its actions and never joins a progress group.
+    expect(attention?.threadId).toBeUndefined();
+    expect(attention?.categoryId).toBe('kilo-needs-input:unknown');
+  });
+
+  it('leaves a non-agent push active while keeping its own channel', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-nonagent', token: 'tok-nonagent', app_version: '1.0.11' }],
+    });
+    const stub = getDO('user-nonagent');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-nonagent',
+        idempotencyKey: 'k-nonagent',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'low_balance', organizationId: 'org1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0]?.channelId).toBe('balance');
+    // Only needs-input is time-sensitive; every other kind stays active.
+    expect(messages[0]?.interruptionLevel).toBe('active');
+    // Only a progress agent push can be dropped per Focus; this one has no
+    // agent kind at all.
+    expect(messages[0]?.mutableContent).toBeUndefined();
+  });
+
+  it('omits channelId for a client that cannot have created the channel', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-chan-old', token: 'tok-old', app_version: null },
+        { user_id: 'user-chan-old', token: 'tok-split', app_version: '1.0.10' },
+        { user_id: 'user-chan-old', token: 'tok-new', app_version: '1.0.12' },
+      ],
+    });
+    const stub = getDO('user-chan-old');
+    const result = await stub.dispatchPush(
+      baseInput({ userId: 'user-chan-old', idempotencyKey: 'k-chan-old' })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages).toHaveLength(3);
+    const oldMessage = messages.find(m => m.to === 'tok-old');
+    const splitMessage = messages.find(m => m.to === 'tok-split');
+    const newMessage = messages.find(m => m.to === 'tok-new');
+    // Unknown clients omit the id; known pre-split clients retain the legacy
+    // agent channel they created. Only the split build creates needs-input.
+    expect(oldMessage?.channelId).toBeUndefined();
+    expect(splitMessage?.channelId).toBe('agent');
+    expect(newMessage?.channelId).toBe('needs-input');
+    // The interruption level has no older-client failure mode (unlike the
+    // Android channel), so it is attached to every message.
+    expect(oldMessage?.interruptionLevel).toBe('time-sensitive');
+    expect(splitMessage?.interruptionLevel).toBe('time-sensitive');
+    expect(newMessage?.interruptionLevel).toBe('time-sensitive');
+  });
+
+  it('keeps the pre-split channel for a non-agent push on an older client', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-old-balance', token: 'tok-old-balance', app_version: '1.0.4' }],
+    });
+    const stub = getDO('user-old-balance');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-old-balance',
+        idempotencyKey: 'k-old-balance',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'low_balance', organizationId: 'org1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    // `balance` predates the split: an older client created it, so the post
+    // still carries the channel id.
+    expect(messages[0]?.channelId).toBe('balance');
+  });
+
+  it('keeps an agent push on the legacy channel for a token registered before the split', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-agent-old', token: 'tok-old', app_version: '1.0.10' },
+        // 1.0.11 shipped before the split channels existed; its tokens must
+        // keep the legacy channel too.
+        { user_id: 'user-agent-old', token: 'tok-released', app_version: '1.0.11' },
+        { user_id: 'user-agent-old', token: 'tok-split', app_version: '1.0.12' },
+      ],
+    });
+    const stub = getDO('user-agent-old');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-agent-old',
+        idempotencyKey: 'k-agent-old',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'attention' },
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages.find(m => m.to === 'tok-old')?.channelId).toBe('agent');
+    expect(messages.find(m => m.to === 'tok-released')?.channelId).toBe('agent');
+    expect(messages.find(m => m.to === 'tok-split')?.channelId).toBe('needs-input');
+  });
+
+  it('keeps ordinary progress on the legacy channel for a token registered before the split', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-agent-progress', token: 'tok-old', app_version: '1.0.10' }],
+    });
+    const stub = getDO('user-agent-progress');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-agent-progress',
+        idempotencyKey: 'k-agent-progress',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        },
+      })
+    );
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].channelId).toBe('agent');
+  });
+
+  it('substitutes generic content when previews is generic', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-generic', token: 'tok1' }], previews: 'generic' });
+    const stub = getDO('user-generic');
+    await stub.dispatchPush(baseInput({ userId: 'user-generic', idempotencyKey: 'k-generic' }));
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Kilo');
+    expect(messages[0].title).not.toBe('T');
+    expect(messages[0].body).not.toBe('B');
+  });
+
+  it('passes through full content when previews is full', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-full', token: 'tok1' }], previews: 'full' });
+    const stub = getDO('user-full');
+    await stub.dispatchPush(baseInput({ userId: 'user-full', idempotencyKey: 'k-full' }));
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('T');
+    expect(messages[0].body).toBe('B');
+  });
+
+  it('substitutes generic content when the preference read throws', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-throw', token: 'tok1' }], previewsThrows: true });
+    const stub = getDO('user-throw');
+    await stub.dispatchPush(baseInput({ userId: 'user-throw', idempotencyKey: 'k-throw' }));
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Kilo');
+    expect(messages[0].body).not.toBe('B');
+  });
+});
+
+describe('NotificationChannelDO per-token locale translation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  it('translates title and body per token locale when i18nKey is present', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-locale', token: 'tok-es', locale: 'es' },
+        { user_id: 'user-locale', token: 'tok-en', locale: 'en' },
+      ],
+      previews: 'full',
+    });
+    const stub = getDO('user-locale');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-locale',
+        idempotencyKey: 'k-locale',
+        push: {
+          title: 'Low balance alert',
+          body: 'Acme Corp balance fell below $10',
+          i18nKey: 'internal.lowBalance',
+          i18nParams: { organizationName: 'Acme Corp', minimumBalanceUsd: '10' },
+          data: { type: 'low_balance', organizationId: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    const esMessage = messages.find(m => m.to === 'tok-es');
+    const enMessage = messages.find(m => m.to === 'tok-en');
+    expect(esMessage?.title).toBe('Alerta de saldo bajo');
+    expect(esMessage?.body).toBe('El saldo de Acme Corp cayó por debajo de $10');
+    expect(enMessage?.title).toBe('Low balance alert');
+    expect(enMessage?.body).toBe('Acme Corp balance fell below $10');
+    expect(esMessage?.title).not.toBe(enMessage?.title);
+  });
+
+  it('reads the shared body entry of a security finding push in the token language', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-security', token: 'tok-security', locale: 'es' }],
+      previews: 'full',
+    });
+    const stub = getDO('user-security');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-security',
+        idempotencyKey: 'k-security',
+        push: {
+          title: 'SLA warning',
+          body: 'XSS in admin in acme/api',
+          i18nKey: 'internal.securityFindingSlaWarning',
+          i18nParams: {
+            severity: 'high',
+            findingTitle: 'XSS in admin',
+            repoFullName: 'acme/api',
+          },
+          data: { type: 'security_finding', findingId: 'finding-1', scope: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Aviso de SLA');
+    expect(messages[0].body).toBe('XSS in admin en acme/api');
+    expect(messages[0].title).not.toBe('SLA warning');
+    expect(messages[0].body).not.toBe('XSS in admin in acme/api');
+  });
+
+  it('treats a null locale as English', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-null-locale', token: 'tok-null', locale: null }],
+      previews: 'full',
+    });
+    const stub = getDO('user-null-locale');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-null-locale',
+        idempotencyKey: 'k-null-locale',
+        push: {
+          title: 'Low balance alert',
+          body: 'Acme Corp balance fell below $10',
+          i18nKey: 'internal.lowBalance',
+          i18nParams: { organizationName: 'Acme Corp', minimumBalanceUsd: '10' },
+          data: { type: 'low_balance', organizationId: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Low balance alert');
+    expect(messages[0].body).toBe('Acme Corp balance fell below $10');
+  });
+
+  it('uses raw title/body when the payload has no i18nKey', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-raw', token: 'tok-raw', locale: 'es' }],
+      previews: 'full',
+    });
+    const stub = getDO('user-raw');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-raw',
+        idempotencyKey: 'k-raw',
+        push: {
+          title: 'My raw title',
+          body: 'My raw body',
+          data: { type: 'low_balance', organizationId: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('My raw title');
+    expect(messages[0].body).toBe('My raw body');
+  });
+});
+
+describe('NotificationChannelDO morning briefing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    setPushSinkModeForTesting('off');
+  });
+
+  afterEach(() => {
+    setPushSinkModeForTesting(undefined);
+  });
+
+  function briefingInput(userId: string): DispatchPushInput {
+    return baseInput({
+      userId,
+      presenceContext: null,
+      badge: null,
+      idempotencyKey: 'agent-briefing:2026-10-15',
+      agentBriefing: {
+        localDate: '2026-10-15',
+        expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+      },
+      push: {
+        title: 'Private report title must never appear',
+        body: 'Private report body must never appear',
+        data: { type: 'agent_briefing', url: '/agent-briefing' },
+      },
+    });
+  }
+
+  function eligibleState(): DbState {
+    return {
+      tokens: [{ user_id: 'user', token: 'tok1', locale: 'es', app_version: '1.0.12' }],
+      previews: 'full',
+      briefingEnabled: true,
+      briefingReports: [
+        {
+          facts: { scorecard: { sessions: 1 } },
+          morningEndAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+        },
+      ],
+    };
+  }
+
+  it.each([undefined, false])(
+    'requires explicit briefing opt-in, not default-on preferences: %s',
+    async enabled => {
+      installDbMock({ ...eligibleState(), briefingEnabled: enabled });
+      const result = await getDO(`briefing-opt-in-${enabled}`).dispatchPush(
+        briefingInput(`briefing-opt-in-${enabled}`)
+      );
+      expect(result.kind).toBe('suppressed_preference');
+      expect(sendPushNotifications).not.toHaveBeenCalled();
+    }
+  );
+
+  it('fails closed on a live preference read failure', async () => {
+    installDbMock({ ...eligibleState(), briefingReadThrows: true });
+    const result = await getDO('briefing-read-failure').dispatchPush(
+      briefingInput('briefing-read-failure')
+    );
+    expect(result.kind).toBe('failed');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it('requires a currently accessible published nonempty report', async () => {
+    installDbMock({ ...eligibleState(), briefingReports: [] });
+    const result = await getDO('briefing-no-access').dispatchPush(
+      briefingInput('briefing-no-access')
+    );
+    expect(result.kind).toBe('suppressed_access');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it.each([{}, { scorecard: { sessions: 0 } }, { scorecard: { sessions: '1' } }])(
+    'does not notify for empty or malformed persisted facts: %j',
+    async facts => {
+      const state = eligibleState();
+      state.briefingReports = [
+        {
+          facts,
+          morningEndAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ];
+      installDbMock(state);
+      expect(
+        (
+          await getDO(`briefing-empty-${JSON.stringify(facts)}`).dispatchPush(
+            briefingInput(`briefing-empty-${JSON.stringify(facts)}`)
+          )
+        ).kind
+      ).toBe('suppressed_access');
+      expect(sendPushNotifications).not.toHaveBeenCalled();
+    }
+  );
+
+  it('suppresses when expiry has passed, including a later retry', async () => {
+    installDbMock(eligibleState());
+    const input = briefingInput('briefing-expired');
+    input.agentBriefing = {
+      localDate: '2026-10-15',
+      expiresAt: new Date(Date.now() - 1).toISOString(),
+    };
+    expect((await getDO('briefing-expired').dispatchPush(input)).kind).toBe('suppressed_expired');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it('suppresses if the morning ends during the live report read', async () => {
+    let now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      const state = eligibleState();
+      const input = briefingInput('briefing-expires-during-read');
+      state.onBriefingReportRead = () => {
+        now += 5 * 60 * 60 * 1000;
+      };
+      installDbMock(state);
+      const result = await getDO('briefing-expires-during-read').dispatchPush(input);
+      expect(result.kind).toBe('suppressed_expired');
+      expect(sendPushNotifications).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('rechecks opt-in after token and credential lookups, immediately before sending', async () => {
+    const state = eligibleState();
+    installDbMock(state);
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockImplementation(async () => {
+      state.briefingEnabled = false;
+      return 'test-token';
+    });
+    const result = await getDO('briefing-opted-out-during-send').dispatchPush(
+      briefingInput('briefing-opted-out-during-send')
+    );
+    expect(result.kind).toBe('suppressed_preference');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it('rechecks live eligibility for Expo chunks and retry attempts', async () => {
+    const state = eligibleState();
+    installDbMock(state);
+    vi.mocked(sendPushNotifications).mockImplementationOnce(
+      async (_messages, _accessToken, isCurrent) => {
+        state.briefingEnabled = false;
+        expect(isCurrent).toBeTypeOf('function');
+        expect(await isCurrent?.()).toBe(false);
+        return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
+      }
+    );
+    const result = await getDO('briefing-stopped-at-expo').dispatchPush(
+      briefingInput('briefing-stopped-at-expo')
+    );
+    expect(result.kind).toBe('suppressed_preference');
+  });
+
+  it('uses localized generic copy even with full previews and only routes to the report list', async () => {
+    installDbMock(eligibleState());
+    const result = await getDO('briefing-localized').dispatchPush(
+      briefingInput('briefing-localized')
+    );
+    expect(result.kind).toBe('delivered');
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    const [messages] = vi.mocked(sendPushNotifications).mock.calls[0] ?? [];
+    expect(messages?.[0]).toMatchObject({
+      title: 'Kilo',
+      data: { type: 'agent_briefing', url: '/agent-briefing' },
+      channelId: 'agent-progress',
+      interruptionLevel: 'active',
+    });
+    expect(messages?.[0]?.expiration).toBeGreaterThan(Math.floor(Date.now() / 1000));
+    expect(messages?.[0]?.body).not.toContain('Private report');
+    expect(messages?.[0]?.body).not.toBe('Active agents have an update');
+    expect(messages?.[0]?.body?.length).toBeGreaterThan(0);
+  });
+
+  it('keeps user/date dedup across later context publications, summary attachments, and cleanup', async () => {
+    installDbMock(eligibleState());
+    const stub = getDO('briefing-one-per-morning');
+    const input = briefingInput('briefing-one-per-morning');
+    expect((await stub.dispatchPush(input)).kind).toBe('delivered');
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put(`idem:${input.idempotencyKey}`, {
+        stage: 'delivered',
+        ts: Date.now() - 2 * 60 * 60 * 1000,
+      });
+      const channel = instance as NotificationChannelDO;
+      await channel.alarm();
+    });
+    expect((await stub.dispatchPush(input)).kind).toBe('duplicate');
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+  });
+
+  it('reclaims briefing dedup records after their extended retention', async () => {
+    installDbMock(eligibleState());
+    const stub = getDO('briefing-dedup-cleanup');
+    const key = 'idem:agent-briefing:2026-10-12';
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put(key, { stage: 'delivered', ts: Date.now() - 49 * 60 * 60 * 1000 });
+      const channel = instance as NotificationChannelDO;
+      await channel.alarm();
+    });
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.get(key))
+    ).toBeUndefined();
+  });
+});
+
+describe('NotificationChannelDO.dispatchPush — notification history', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setPushSinkModeForTesting(undefined);
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    setPushSinkModeForTesting(undefined);
+  });
+
+  const historyPush = (idempotencyKey: string): DispatchPushInput =>
+    baseInput({
+      presenceContext: null,
+      badge: null,
+      idempotencyKey,
+      push: {
+        title: 'Fallback title',
+        body: 'Fallback body',
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        i18nKey: 'agentSession.notification',
+        i18nParams: { sessionTitle: 'Private session', message: 'Finished' },
+      },
+    });
+
+  it('writes one row carrying the row content for an accepted dispatch', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+
+    const input = historyPush('history-accepted');
+    const result = await getDO('history-accepted').dispatchPush(input);
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts).toEqual([
+      {
+        user_id: 'user-1',
+        category: 'sessionStatus',
+        push_type: 'cloud_agent_session',
+        payload: input.push.data,
+        i18n_key: 'agentSession.notification',
+        i18n_params: { sessionTitle: 'Private session', message: 'Finished' },
+        fallback_title: 'Fallback title',
+        fallback_body: 'Fallback body',
+        idempotency_key: 'history-accepted',
+        dedupe_bucket: expect.any(Number),
+      },
+    ]);
+  });
+
+  it('writes no second row for a replay with the same idempotency key', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const stub = getDO('history-replay');
+    const input = historyPush('history-replay-key');
+
+    expect((await stub.dispatchPush(input)).kind).toBe('delivered');
+    expect((await stub.dispatchPush(input)).kind).toBe('duplicate');
+
+    expect(state.historyInserts).toHaveLength(1);
+  });
+
+  it('writes no row when a presence context suppresses the push', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);
+
+    const result = await getDO('history-presence').dispatchPush({
+      ...historyPush('history-presence-key'),
+      presenceContext: '/presence/sb1/conv1',
+    });
+
+    expect(result.kind).toBe('suppressed_presence');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('writes no row when the account has no device token', async () => {
+    const state: DbState = { tokens: [] };
+    installDbMock(state);
+
+    const result = await getDO('history-no-tokens').dispatchPush(
+      historyPush('history-no-tokens-key')
+    );
+
+    expect(result.kind).toBe('no_tokens');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('writes no row for a push the rate limit suppresses', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const stub = getDO('history-rate-limit');
+    const rateLimit = { key: 'history-rate-limit', limit: 1, windowSeconds: 60 };
+
+    expect((await stub.dispatchPush({ ...historyPush('history-rl-1'), rateLimit })).kind).toBe(
+      'delivered'
+    );
+    expect((await stub.dispatchPush({ ...historyPush('history-rl-2'), rateLimit })).kind).toBe(
+      'suppressed_rate_limit'
+    );
+
+    expect(state.historyInserts).toHaveLength(1);
+  });
+
+  it('writes no row for a kind that has no message list', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+
+    const result = await getDO('history-os-only').dispatchPush(
+      baseInput({
+        presenceContext: null,
+        badge: null,
+        idempotencyKey: 'history-os-only-key',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: {
+            type: 'session_live_update',
+            schemaVersion: 1,
+            event: 'end',
+            content: {},
+          } as unknown as PushData,
+        },
+      })
+    );
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('keeps the delivery outcome and writes no row when the history write fails', async () => {
+    const state: DbState = {
+      tokens: [{ user_id: 'user-1', token: 'tok1' }],
+      historyInsertError: new Error('insert failed for user-1 secret body'),
+    };
+    installDbMock(state);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = await getDO('history-write-fails').dispatchPush(
+      historyPush('history-write-fails-key')
+    );
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+    // The failure is logged content-free: never the row, the user, or the
+    // provider error text.
+    expect(warn).toHaveBeenCalledWith('notification_history_write_failed', {
+      pushType: 'cloud_agent_session',
+      errorName: 'Error',
+    });
+    warn.mockRestore();
+  });
+
+  it('records the row through the local push sink as well', async () => {
+    setPushSinkModeForTesting('log');
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const result = await getDO('history-sink').dispatchPush(historyPush('history-sink-key'));
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts).toHaveLength(1);
+    log.mockRestore();
   });
 });

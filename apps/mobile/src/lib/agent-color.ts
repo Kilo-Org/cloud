@@ -110,6 +110,74 @@ export function toneColor(key: ToneKey): Tint {
   return TONES[key];
 }
 
+/**
+ * The tint every settings row with no hue of its own renders: the neutral tile
+ * (`bg-hair-soft` / `border-border`) behind a `secondaryForeground` icon.
+ *
+ * A settings list is not a list of agents, so no row hashes its title into the
+ * agent ramp: a single list would show several accents. `ConfigureRow` and
+ * `PreferenceRow` share this one value so a switch row and a destination row
+ * standing next to each other start their icon column at the same x.
+ */
+export const NEUTRAL_TINT = {
+  hueClass: 'bg-hair-soft',
+  hueTextClass: 'text-secondary-foreground',
+  hueBorderClass: 'border-border',
+  tileBgClass: 'bg-hair-soft',
+  tileBorderClass: 'border-border',
+  hueThemeKey: 'secondaryForeground',
+} as const satisfies Tint;
+
+/**
+ * The tint a row renders for a label that names the row's context rather than
+ * the session: a muted ink on a neutral strip, never an accent. The session
+ * title is the row's primary content, so the origin, the agent type and the
+ * repository beside it must not compete with it — a saturated label and strip
+ * would make such a row look more important than the one above it. It takes
+ * the theme's muted ink (`text-muted-foreground`) over the strip token, whose
+ * dark step is set to stay legible on the near-black page (see `global.css`).
+ */
+export const PLACEHOLDER_TINT = {
+  hueClass: 'bg-session-strip',
+  hueTextClass: 'text-muted-foreground',
+  hueBorderClass: 'border-border',
+  tileBgClass: 'bg-muted-soft',
+  tileBorderClass: 'border-border',
+  hueThemeKey: 'mutedForeground',
+} as const satisfies Tint;
+
+/** True for the tint that names the row's context instead of an agent. */
+export function isPlaceholderTint(tint: Tint): boolean {
+  return tint === PLACEHOLDER_TINT;
+}
+
+/**
+ * Fixed tint for eyebrow labels that name a state, a type or the row's
+ * context, not the session: the unknown origin, the platform the row ran on,
+ * the repository it ran in, idle, and live, in every language their catalog
+ * renders. A label's colour must not drift with its translation, so each is
+ * pinned instead of hashed, and stays put while every real-agent hash still
+ * walks the ramp. Rows derive the key from what the eyebrow names (the live
+ * row's origin predicate and the stored row's unknown label), never from
+ * comparing the rendered string.
+ *
+ * The unknown origin, `platform` and `repository` name the row's context
+ * rather than the session, so each takes {@link PLACEHOLDER_TINT} and the
+ * title leads. Idle and live are states on a real session, so each keeps the ramp
+ * entry the English word already hashed to (`agentColor('IDLE')` /
+ * `agentColor('LIVE')` → agent-sky).
+ */
+
+/** Tint for a row whose eyebrow names a state, a type or its context, not an agent. */
+export function stateTint(state: 'unknown' | 'platform' | 'repository' | 'idle' | 'live'): Tint {
+  if (state === 'unknown' || state === 'platform' || state === 'repository') {
+    return PLACEHOLDER_TINT;
+  }
+  // Literal index into the `as const` ramp resolves non-null (same rule as
+  // `agentColor` below).
+  return AGENT_RAMP[4];
+}
+
 /** Deterministic agent hue from the agent name. */
 export function agentColor(name: string): Tint {
   let hash = 0;
@@ -121,4 +189,102 @@ export function agentColor(name: string): Tint {
   // Tuple type guarantees element at every index in [0, length), so
   // flow-sensitive indexing resolves without `!`.
   return AGENT_RAMP[index] ?? AGENT_RAMP[0];
+}
+
+/**
+ * Curated row-hue palette — the logo yellow's own family.
+ *
+ * A menu row identifies a *destination*, so its colour is chosen once, here,
+ * and passed explicitly. It is never derived from a label, title, translation
+ * or hash of a string: the same row renders the same hue in every language.
+ *
+ * The rule: six steps walk the logo yellow's own warm band (50deg -> 105deg,
+ * an 11deg step) at one fixed chroma/value per theme, around the light primary
+ * olive (`#4f5a10`, h~71). The status
+ * hues sit outside the band (danger 8deg, warn 37deg, good 150deg, info
+ * 220deg), so no curated step can be mistaken for a status colour.
+ *
+ * Destination table (profile sections, reading order):
+ *
+ * | Section         | Destinations                        | Step  |
+ * | --------------- | ----------------------------------- | ----- |
+ * | Agents          | Code Reviewer, Security Agent       | honey |
+ * | Reviews         | PR Review                           | gold  |
+ * | Organization    | Manage/View organization            | lime  |
+ * | App             | Preferences, Tutorial               | sage  |
+ * | Linked accounts | provider rows                       | moss  |
+ * | Connected       | Integrations                        | pine  |
+ * | Actions         | Feedback, Privacy choices, Sign out | fern  |
+ * | reserved        | Delete account                      | `danger` tone, never a family step |
+ *
+ * Growth rule: a new row takes its section's step; a new section takes the next
+ * step in reading order; when the walk passes `fern`, extend the family one
+ * 11deg step toward the cool end and register the token the same way. A
+ * destination never takes a hue from a label, title, translation or hash, and
+ * never a status hue.
+ */
+export type RowHue = 'honey' | 'gold' | 'lime' | 'sage' | 'moss' | 'pine' | 'fern';
+
+export const ROW_PALETTE = {
+  honey: {
+    hueClass: 'bg-row-honey',
+    hueTextClass: 'text-row-honey',
+    hueBorderClass: 'border-row-honey',
+    tileBgClass: 'bg-row-honey-tile-bg',
+    tileBorderClass: 'border-row-honey-tile-border',
+    hueThemeKey: 'rowHoney',
+  },
+  gold: {
+    hueClass: 'bg-row-gold',
+    hueTextClass: 'text-row-gold',
+    hueBorderClass: 'border-row-gold',
+    tileBgClass: 'bg-row-gold-tile-bg',
+    tileBorderClass: 'border-row-gold-tile-border',
+    hueThemeKey: 'rowGold',
+  },
+  lime: {
+    hueClass: 'bg-row-lime',
+    hueTextClass: 'text-row-lime',
+    hueBorderClass: 'border-row-lime',
+    tileBgClass: 'bg-row-lime-tile-bg',
+    tileBorderClass: 'border-row-lime-tile-border',
+    hueThemeKey: 'rowLime',
+  },
+  sage: {
+    hueClass: 'bg-row-sage',
+    hueTextClass: 'text-row-sage',
+    hueBorderClass: 'border-row-sage',
+    tileBgClass: 'bg-row-sage-tile-bg',
+    tileBorderClass: 'border-row-sage-tile-border',
+    hueThemeKey: 'rowSage',
+  },
+  moss: {
+    hueClass: 'bg-row-moss',
+    hueTextClass: 'text-row-moss',
+    hueBorderClass: 'border-row-moss',
+    tileBgClass: 'bg-row-moss-tile-bg',
+    tileBorderClass: 'border-row-moss-tile-border',
+    hueThemeKey: 'rowMoss',
+  },
+  fern: {
+    hueClass: 'bg-row-fern',
+    hueTextClass: 'text-row-fern',
+    hueBorderClass: 'border-row-fern',
+    tileBgClass: 'bg-row-fern-tile-bg',
+    tileBorderClass: 'border-row-fern-tile-border',
+    hueThemeKey: 'rowFern',
+  },
+  pine: {
+    hueClass: 'bg-row-pine',
+    hueTextClass: 'text-row-pine',
+    hueBorderClass: 'border-row-pine',
+    tileBgClass: 'bg-row-pine-tile-bg',
+    tileBorderClass: 'border-row-pine-tile-border',
+    hueThemeKey: 'rowPine',
+  },
+} as const satisfies Record<RowHue, Tint>;
+
+/** Curated destination hue for a profile row. */
+export function rowTint(hue: RowHue): Tint {
+  return ROW_PALETTE[hue];
 }

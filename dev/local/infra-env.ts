@@ -18,13 +18,16 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getInfraBasePort, localPostgresUrl, portOffset } from './services';
+import { parseEnv } from 'node:util';
+import { byokKmsServicePort, getInfraBasePort, localPostgresUrl, portOffset } from './services';
+import { writeSecretsFile } from './secrets-file';
 
 /** Compose variable substituted into `dev/docker-compose.yml`, per service. */
 const COMPOSE_PORT_VARS: Record<string, string> = {
   postgres: 'KILO_POSTGRES_PORT',
   redis: 'KILO_REDIS_PORT',
   'redis-http': 'KILO_REDIS_HTTP_PORT',
+  'local-kms': 'KILO_KMS_PORT',
   grafana: 'KILO_GRAFANA_PORT',
 };
 
@@ -49,6 +52,19 @@ export function composeProjectName(worktreeRoot: string, offset: number): string
   return `kilo-dev-${slug}-${offset}`;
 }
 
+/**
+ * Compose's own default project name: the basename of the project directory,
+ * which for `docker compose -f dev/docker-compose.yml` is `dev/`. The primary
+ * checkout publishes no `dev/.env`, so this is the project its containers
+ * really carry — `composeProjectName(root, 0)` names a project nothing uses.
+ */
+export const DEFAULT_COMPOSE_PROJECT = 'dev';
+
+/** The project label this worktree's containers carry at `offset`. */
+export function currentComposeProject(worktreeRoot: string, offset: number): string {
+  return offset === 0 ? DEFAULT_COMPOSE_PROJECT : composeProjectName(worktreeRoot, offset);
+}
+
 export function buildComposeEnv(
   project: string,
   ports: Record<string, number>
@@ -66,8 +82,32 @@ export function buildAppEnv(ports: Record<string, number>): Record<string, strin
     POSTGRES_URL: `postgres://postgres:postgres@localhost:${ports.postgres}/postgres`,
     REDIS_URL: `redis://localhost:${ports.redis}`,
     UPSTASH_REDIS_REST_URL: `http://localhost:${ports['redis-http']}`,
+    ...(ports['byok-kms'] === undefined
+      ? {}
+      : { BYOK_KMS_SERVICE_URL: `http://127.0.0.1:${ports['byok-kms']}` }),
   };
 }
+
+/** Bearer token `dev/byok-kms/server.ts` accepts when `BYOK_KMS_SERVICE_TOKEN` is unset. */
+export const DEV_BYOK_KMS_SERVICE_TOKEN = 'dev-byok-kms-token';
+
+/**
+ * Where this worktree's `byok-kms` service listens and the token it accepts.
+ * Callers that cannot rely on `.env.local` having been synced (`dev:seed`) use
+ * it as the fallback, so it stays the single source of these values.
+ */
+export function localByokKmsServiceConfig(offset: number = portOffset): {
+  url: string;
+  token: string;
+} {
+  return {
+    url: `http://127.0.0.1:${byokKmsServicePort(offset)}`,
+    token: DEV_BYOK_KMS_SERVICE_TOKEN,
+  };
+}
+
+/** Keys whose blank value (left by an older `.env.local.example` or a hand-made file) is filled in rather than treated as an override. */
+const FILL_WHEN_EMPTY = new Set(['BYOK_KMS_SERVICE_URL']);
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -115,7 +155,7 @@ export function applyAppEnv(
     }
     const current = match[1].trim().replace(/^["']|["']$/g, '');
     if (sameEndpoint(current, value)) continue;
-    if (!isLocalHostUrl(current)) {
+    if (!isLocalHostUrl(current) && !(current === '' && FILL_WHEN_EMPTY.has(key))) {
       kept.push(key);
       continue;
     }
@@ -126,10 +166,18 @@ export function applyAppEnv(
   return { content: result, changed, kept };
 }
 
-function writeAtomic(filePath: string, content: string): void {
-  const temp = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temp, content);
-  fs.renameSync(temp, filePath);
+/**
+ * Gives `BYOK_KMS_SERVICE_TOKEN` the dev default when its parsed value is empty
+ * or the key is missing, and leaves any real token alone. The value is parsed
+ * the way `process.loadEnvFile` reads it, so `""` and `''` count as empty.
+ */
+export function ensureByokKmsToken(content: string): string {
+  if (parseEnv(content).BYOK_KMS_SERVICE_TOKEN?.trim()) return content;
+  const tokenLine = `BYOK_KMS_SERVICE_TOKEN=${DEV_BYOK_KMS_SERVICE_TOKEN}`;
+  const line = /^BYOK_KMS_SERVICE_TOKEN=.*$/m;
+  return line.test(content)
+    ? content.replace(line, tokenLine)
+    : `${content.replace(/\n*$/, '\n')}${tokenLine}\n`;
 }
 
 function infraPorts(offset: number): Record<string, number> {
@@ -138,6 +186,7 @@ function infraPorts(offset: number): Record<string, number> {
     const base = getInfraBasePort(service);
     if (base !== undefined) ports[service] = base + offset;
   }
+  ports['byok-kms'] = byokKmsServicePort(offset);
   return ports;
 }
 
@@ -145,13 +194,15 @@ function syncAppEnv(repoRoot: string, ports: Record<string, number>): string[] {
   const envLocalPath = path.join(repoRoot, '.env.local');
   if (!fs.existsSync(envLocalPath)) return [];
 
-  const { content, changed, kept } = applyAppEnv(
-    fs.readFileSync(envLocalPath, 'utf-8'),
-    buildAppEnv(ports)
-  );
+  const current = fs.readFileSync(envLocalPath, 'utf-8');
+  const withToken = ensureByokKmsToken(current);
+  const { content, changed, kept } = applyAppEnv(withToken, buildAppEnv(ports));
+  if (withToken !== current && !changed.includes('BYOK_KMS_SERVICE_TOKEN')) {
+    changed.push('BYOK_KMS_SERVICE_TOKEN');
+  }
   const report: string[] = [];
   if (changed.length > 0) {
-    writeAtomic(envLocalPath, content);
+    writeSecretsFile(envLocalPath, content);
     report.push(`.env.local: updated ${changed.join(', ')}`);
   }
   if (kept.length > 0) {
@@ -185,7 +236,7 @@ function syncWebTestEnv(
   });
   const report: string[] = [];
   if (changed.length > 0) {
-    writeAtomic(testEnvPath, content);
+    writeSecretsFile(testEnvPath, content);
     report.push(`${WEB_TEST_ENV_FILE}: updated POSTGRES_URL`);
   }
   if (kept.length > 0) {
@@ -214,7 +265,7 @@ export function syncInfraEnv(repoRoot: string): string[] {
   const project = composeProjectName(repoRoot, portOffset);
   const composeEnv = buildComposeEnv(project, ports);
   const lines = Object.entries(composeEnv).map(([key, value]) => `${key}=${value}`);
-  writeAtomic(composeEnvPath, `${GENERATED_HEADER}\n${lines.join('\n')}\n`);
+  writeSecretsFile(composeEnvPath, `${GENERATED_HEADER}\n${lines.join('\n')}\n`);
 
   return [
     `${COMPOSE_ENV_FILE}: project ${project}, postgres port ${ports.postgres}`,

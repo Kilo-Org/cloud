@@ -1,4 +1,8 @@
-import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import {
+  adminProcedure,
+  baseProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 
 export const testRouter = createTRPCRouter({

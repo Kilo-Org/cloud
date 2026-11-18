@@ -1,0 +1,303 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  authTerminalFingerprint,
+  claimAuthTerminalFailureReport,
+  classifyAuthResponse,
+  parseRetryAfterMs,
+  reportAuthTerminalFailure,
+  resetAuthTerminalReports,
+} from '@/lib/auth/auth-response-class';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
+describe('parseRetryAfterMs', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reads delta-seconds', () => {
+    expect(parseRetryAfterMs('30')).toBe(30_000);
+    expect(parseRetryAfterMs('0')).toBe(0);
+    expect(parseRetryAfterMs('  5  ')).toBe(5000);
+  });
+
+  it('reads an HTTP-date relative to now', () => {
+    const now = Date.parse('2026-09-23T02:00:00Z');
+    expect(parseRetryAfterMs('Wed, 23 Sep 2026 02:00:45 GMT', now)).toBe(45_000);
+  });
+
+  it('floors a date already in the past at zero', () => {
+    const now = Date.parse('2026-09-23T02:00:00Z');
+    expect(parseRetryAfterMs('Wed, 23 Sep 2026 01:59:00 GMT', now)).toBe(0);
+  });
+
+  it('returns undefined for absent or unparseable values', () => {
+    expect(parseRetryAfterMs(undefined)).toBeUndefined();
+    expect(parseRetryAfterMs(null)).toBeUndefined();
+    expect(parseRetryAfterMs('')).toBeUndefined();
+    expect(parseRetryAfterMs('later please')).toBeUndefined();
+  });
+});
+
+describe('classifyAuthResponse', () => {
+  it('classifies a 2xx as success', () => {
+    expect(classifyAuthResponse({ path: '/api/auth/native/token', status: 200 })).toEqual({
+      kind: 'success',
+    });
+  });
+
+  it('classifies a 401 on the refresh route as terminal and clears the stored pair', () => {
+    expect(classifyAuthResponse({ path: '/api/auth/native/refresh', status: 401 })).toEqual({
+      kind: 'terminal',
+      status: 401,
+      clearCredential: true,
+    });
+  });
+
+  it('keeps a 401 on native/token terminal without clearing the stored pair', () => {
+    // native/token takes no bearer: its 401 refuses the attempt's provider
+    // credential (a code, a ticket, an ID token), not the stored session.
+    expect(classifyAuthResponse({ path: '/api/auth/native/token', status: 401 })).toEqual({
+      kind: 'terminal',
+      status: 401,
+      clearCredential: false,
+    });
+  });
+
+  it('keeps a 401 on a non-credential route terminal without clearing the session', () => {
+    expect(classifyAuthResponse({ path: '/api/auth/passkey/authenticate', status: 401 })).toEqual({
+      kind: 'terminal',
+      status: 401,
+      clearCredential: false,
+    });
+  });
+
+  it('classifies a 408 as retryable and carries Retry-After', () => {
+    expect(
+      classifyAuthResponse({ path: '/api/auth/native/token', status: 408, retryAfterHeader: '12' })
+    ).toEqual({ kind: 'retry', status: 408, retryAfterMs: 12_000 });
+    expect(classifyAuthResponse({ path: '/api/auth/native/token', status: 408 })).toEqual({
+      kind: 'retry',
+      status: 408,
+      retryAfterMs: undefined,
+    });
+  });
+
+  it('classifies a 429 as retryable and carries Retry-After', () => {
+    expect(
+      classifyAuthResponse({ path: '/api/auth/native/otp', status: 429, retryAfterHeader: '12' })
+    ).toEqual({ kind: 'retry', status: 429, retryAfterMs: 12_000 });
+    expect(classifyAuthResponse({ path: '/api/auth/native/otp', status: 429 })).toEqual({
+      kind: 'retry',
+      status: 429,
+      retryAfterMs: undefined,
+    });
+  });
+
+  it('classifies 5xx as retryable', () => {
+    expect(classifyAuthResponse({ path: '/api/auth/native/token', status: 503 })).toEqual({
+      kind: 'retry',
+      status: 503,
+      retryAfterMs: undefined,
+    });
+  });
+
+  it('keeps an intermediary 403 on the refresh route retryable so the session survives', () => {
+    // The refresh route has no 403 branch, so a 403 is an edge firewall or WAF
+    // answering in front of it. Its body is not one the route writes, so it
+    // proves nothing about the stored pair: the rotation retries later instead
+    // of ending a session whose credentials may be perfectly healthy.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: { code: '403' } },
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: undefined });
+    expect(classifyAuthResponse({ path: '/api/auth/native/refresh', status: 403 })).toEqual({
+      kind: 'retry',
+      status: 403,
+      retryAfterMs: undefined,
+    });
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        retryAfterHeader: '15',
+        body: '<html>blocked</html>',
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: 15_000 });
+  });
+
+  it('keeps a refresh 403 carrying the route refusal body terminal', () => {
+    // A body the route itself writes is the route refusing, whatever the status
+    // an intermediary may have rewritten it to.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: 'SESSION_REVOKED' },
+      })
+    ).toEqual({ kind: 'terminal', status: 403, clearCredential: false });
+  });
+
+  it('treats a 403 carrying the 400-only INVALID_REQUEST body as an intermediary refusal', () => {
+    // The refresh route writes `INVALID_REQUEST` only alongside a 400 (its
+    // frozen contract has no other use for the code), so a 403 carrying it is
+    // an edge or gateway answering with the same generic word. Matching it
+    // would end a session the route never refused.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: 'INVALID_REQUEST' },
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: undefined });
+  });
+
+  it.each([400, 403, 404, 409, 425])(
+    'classifies a 4xx with no retry guidance (%i) as terminal and never retries it',
+    status => {
+      expect(classifyAuthResponse({ path: '/api/auth/native/token', status })).toEqual({
+        kind: 'terminal',
+        status,
+        clearCredential: false,
+      });
+    }
+  );
+});
+
+describe('terminal failure reporting', () => {
+  afterEach(() => {
+    setTelemetrySink(null);
+    resetAuthTerminalReports();
+  });
+
+  it('uses one stable fingerprint for every repeat of the same failure', () => {
+    expect(authTerminalFingerprint('/api/auth/native/token', 401)).toEqual([
+      'auth-terminal',
+      '/api/auth/native/token',
+      '401',
+    ]);
+    expect(authTerminalFingerprint('/api/auth/native/token', 401)).not.toEqual(
+      authTerminalFingerprint('/api/auth/native/refresh', 401)
+    );
+  });
+
+  it('reports each terminal failure once, not once per retry', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/token', '401']);
+  });
+
+  it('reports a distinct terminal failure separately', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 401);
+
+    expect(events).toHaveLength(2);
+  });
+
+  it('files a refused attempt credential as a warning, not a defect', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+
+    // native/token takes no bearer: its 401 refuses the code, ticket or ID
+    // token the attempt presented, which a mistyped code produces.
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'auth',
+      'auth.outcome': 'terminal',
+      'auth.route': '/api/auth/native/token',
+      'http.status': 401,
+    });
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/token', '401']);
+  });
+
+  it('files a refused passkey ceremony as a warning', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/passkey/authenticate', 401);
+
+    expect(events.map(event => event.level)).toEqual(['warning']);
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/passkey/authenticate', '401'],
+    ]);
+  });
+
+  it('files the stored credential expiry as a warning', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/refresh', 401);
+
+    expect(events.map(event => event.level)).toEqual(['warning']);
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/native/refresh', '401'],
+    ]);
+  });
+
+  it('keeps every terminal status other than a 401 at error', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 400);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 400);
+
+    expect(events.map(event => event.level)).toEqual(['error', 'error']);
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/native/token', '400'],
+      ['auth-terminal', '/api/auth/native/refresh', '400'],
+    ]);
+  });
+
+  it('reports nothing when no sink is installed', () => {
+    expect(() => {
+      reportAuthTerminalFailure('/api/auth/native/token', 401);
+    }).not.toThrow();
+  });
+
+  it('claims the first report of a route and status and refuses every repeat', () => {
+    resetAuthTerminalReports();
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(true);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(false);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/token', 401)).toBe(true);
+  });
+
+  it('lets a claim spend the report, so a later report of it files nothing', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    resetAuthTerminalReports();
+
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(true);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 401);
+
+    expect(events).toHaveLength(0);
+  });
+});

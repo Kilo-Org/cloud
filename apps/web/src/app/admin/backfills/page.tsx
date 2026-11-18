@@ -19,6 +19,10 @@ export default function BackfillsPage() {
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
       <div className="flex w-full flex-col gap-y-4">
+        <p className="text-muted-foreground text-sm">
+          A scheduled job runs one batch of every backfill below automatically. Use the buttons to
+          run a batch immediately.
+        </p>
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Normalized Email Backfill</h2>
         </div>

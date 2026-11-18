@@ -1,23 +1,27 @@
+import { signKiloToken } from '@kilocode/worker-utils';
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   getWorkerDb,
   findUserForToken,
   organizationExists,
   ensureBotUserForOrg,
+  isDirectOrgMember,
   type WorkerDb,
 } from '../db/queries.js';
-import { signJwt } from '../util/jwt.js';
 import { logger } from '../util/logger.js';
+import { getSecretValue } from '../util/secret.js';
 
-/**
- * Environment bindings required for token minting.
- */
 export type TokenMintingEnv = {
   HYPERDRIVE: { connectionString: string };
-  NEXTAUTH_SECRET: { get(): Promise<string> }; // Same secret used by kilocode-backend
+  NEXTAUTH_SECRET: SecretsStoreSecret | string; // Same secret used by kilocode-backend
   ENVIRONMENT: string;
+  SHARED_RESOURCE_TOKENS_ENABLED?: string | boolean;
 };
 
 type MintTokenParams = {
+  executionUserId?: string | null;
   userId?: string | null;
   orgId?: string | null;
   triggerId: string;
@@ -31,6 +35,9 @@ type MintTokenResult = {
 
 // Fixed botId for webhook tokens - used for attribution/analytics
 const WEBHOOK_BOT_ID = 'webhook-bot';
+
+export class CreatorExecutionAuthorizationError extends Error {}
+export class PersonalExecutionAuthorizationError extends Error {}
 
 export function getTokenMintingService(env: TokenMintingEnv): TokenMintingService {
   return new TokenMintingService(env);
@@ -57,31 +64,62 @@ export class TokenMintingService {
 
   private async getJwtSecret(): Promise<string> {
     if (!this.jwtSecret) {
-      this.jwtSecret = await this.env.NEXTAUTH_SECRET.get();
+      this.jwtSecret = await getSecretValue(this.env.NEXTAUTH_SECRET);
     }
     return this.jwtSecret;
   }
 
-  /**
-   * Mint a short-lived API token for webhook processing.
-   *
-   * For personal triggers: mints token for the real user
-   * For org triggers: mints token for the webhook bot user
-   */
   async mintToken(params: MintTokenParams): Promise<MintTokenResult> {
     const db = this.getDb();
 
+    if (params.executionUserId != null) {
+      if (!params.orgId || params.userId || !params.executionUserId) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution requires an organization trigger'
+        );
+      }
+      if (!(await organizationExists(db, params.orgId))) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution organization not found or deleted'
+        );
+      }
+      const user = await findUserForToken(db, params.executionUserId);
+      if (!user) {
+        throw new CreatorExecutionAuthorizationError('Creator execution user not found');
+      }
+      if (user.blocked_at || user.blocked_reason) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution user is blocked or deleted'
+        );
+      }
+      if (!(await isDirectOrgMember(db, params.orgId, user.id))) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution user is no longer a direct organization member'
+        );
+      }
+      const token = await this.signToken(
+        {
+          kiloUserId: user.id,
+          apiTokenPepper: user.api_token_pepper,
+          organizationId: params.orgId,
+          internalApiUse: true,
+          createdOnPlatform: 'webhook',
+        },
+        true
+      );
+      return { token, userId: user.id, isBot: false };
+    }
+
     if (params.userId) {
-      // Personal trigger - mint token for the real user
       logger.info('Token minting: lookup personal user', { userId: params.userId });
       const user = await findUserForToken(db, params.userId);
 
       if (!user) {
-        throw new Error(`User not found: ${params.userId}`);
+        throw new PersonalExecutionAuthorizationError(`User not found: ${params.userId}`);
       }
 
-      if (user.blocked_reason) {
-        throw new Error(`User is blocked: ${user.blocked_reason}`);
+      if (user.blocked_at || user.blocked_reason) {
+        throw new PersonalExecutionAuthorizationError('User is blocked');
       }
 
       const token = await this.signToken({
@@ -102,7 +140,6 @@ export class TokenMintingService {
         isBot: false,
       };
     } else if (params.orgId) {
-      // Org trigger - mint token for the webhook bot user
       logger.info('Token minting: checking org exists', { orgId: params.orgId });
       const orgExists = await organizationExists(db, params.orgId);
       if (!orgExists) {
@@ -111,11 +148,15 @@ export class TokenMintingService {
 
       logger.info('Token minting: ensuring bot user', { orgId: params.orgId });
       const botUser = await ensureBotUserForOrg(db, params.orgId);
+      if (botUser.blocked_at || botUser.blocked_reason) {
+        throw new Error('Webhook bot user is blocked');
+      }
 
       const token = await this.signToken({
         kiloUserId: botUser.id,
         apiTokenPepper: botUser.api_token_pepper,
         botId: WEBHOOK_BOT_ID,
+        organizationId: params.orgId,
         internalApiUse: true,
         createdOnPlatform: 'webhook',
       });
@@ -136,33 +177,60 @@ export class TokenMintingService {
     }
   }
 
-  /**
-   * Sign a JWT token with the given payload.
-   */
-  private async signToken(payload: {
-    kiloUserId: string;
-    apiTokenPepper: string | null;
-    botId?: string;
-    internalApiUse: boolean;
-    createdOnPlatform: string;
-  }): Promise<string> {
-    // JWT_TOKEN_VERSION must match kilocode-backend's version (src/lib/tokens.ts)
-    const JWT_TOKEN_VERSION = 3;
+  private async signToken(
+    payload: {
+      kiloUserId: string;
+      apiTokenPepper: string | null;
+      botId?: string;
+      organizationId?: string;
+      internalApiUse: boolean;
+      createdOnPlatform: string;
+    },
+    requireModern = false
+  ): Promise<string> {
     const jwtSecret = await this.getJwtSecret();
 
-    // signJwt is async (uses Web Crypto API)
-    return await signJwt(
-      {
-        env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
-        kiloUserId: payload.kiloUserId,
-        apiTokenPepper: payload.apiTokenPepper,
-        version: JWT_TOKEN_VERSION,
+    if (
+      requireModern ||
+      this.env.SHARED_RESOURCE_TOKENS_ENABLED === true ||
+      this.env.SHARED_RESOURCE_TOKENS_ENABLED === 'true'
+    ) {
+      const { token } = await signModernKiloToken({
+        userId: payload.kiloUserId,
+        pepper: payload.apiTokenPepper,
+        secret: jwtSecret,
+        expiresInSeconds: 60 * 60,
+        env: resolveRuntimeEnvironment(this.env.ENVIRONMENT),
+        audience: CLOUD_AGENT_NEXT_AUDIENCE,
+        tokenPurpose: 'internal-service',
+        credentialExchange: false,
+        extra: {
+          botId: payload.botId,
+          organizationId: payload.organizationId,
+          internalApiUse: payload.internalApiUse,
+          createdOnPlatform: payload.createdOnPlatform,
+          runtimeAdmission: {
+            source: 'automation',
+            authorizationUserId: payload.kiloUserId,
+            authorizationPepper: payload.apiTokenPepper,
+          },
+        },
+      });
+      return token;
+    }
+
+    const { token } = await signKiloToken({
+      userId: payload.kiloUserId,
+      pepper: payload.apiTokenPepper,
+      secret: jwtSecret,
+      expiresInSeconds: 60 * 60,
+      env: resolveRuntimeEnvironment(this.env.ENVIRONMENT),
+      extra: {
         botId: payload.botId,
         internalApiUse: payload.internalApiUse,
         createdOnPlatform: payload.createdOnPlatform,
       },
-      jwtSecret,
-      { expiresIn: '1h' }
-    );
+    });
+    return token;
   }
 }

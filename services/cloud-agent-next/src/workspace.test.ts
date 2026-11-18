@@ -1,1490 +1,46 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-const { mockTimeoutWarn, mockTimeoutWithFields, mockTimeoutWithTags } = vi.hoisted(() => {
-  const warn = vi.fn();
-  const loggerChain = { warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() };
-  const withFields = vi.fn(() => loggerChain);
-  const withTags = vi.fn(() => ({ ...loggerChain, withFields }));
-  return {
-    mockTimeoutWarn: warn,
-    mockTimeoutWithFields: withFields,
-    mockTimeoutWithTags: withTags,
-  };
-});
-
-vi.mock('./logger.js', () => ({
-  logger: {
-    setTags: vi.fn(),
-    withTags: mockTimeoutWithTags,
-    withFields: vi.fn(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() })),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-  WithLogTags: () => (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) =>
-    descriptor,
-}));
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import { describe, expect, it } from 'vitest';
 import {
-  BranchNotFoundError,
-  GitCloneFailedError,
-  GitRepositoryNotFoundError,
-  manageBranch,
-  cloneGitHubRepo,
-  cloneGitRepo,
-  updateGitAuthor,
-  updateGitRemoteToken,
-  updateGitRemoteUrl,
-  checkDiskSpace,
-  checkDiskAndCleanBeforeSetup,
-  cleanupStaleWorkspaces,
-  createSandboxUsageEvent,
-  setupWorkspace,
   getBaseWorkspacePath,
   getSessionWorkspacePath,
-  getSessionHomePath,
+  getWorktreeWorkspacePath,
+  getControlPlaneSessionDirectory,
   sanitizeIdForPath,
-  LOW_DISK_THRESHOLD_MB,
-  STALE_DIR_MIN_AGE_SECONDS,
-} from './workspace';
-import {
-  SandboxCapacityInspectionError,
-  WorkspaceCapacityAdmissionRejectedError,
-  WorkspaceCapacityInspectionUnavailableError,
-  WorkspaceFilesystemPreparationError,
-} from './workspace-errors';
-import type { ExecutionSession, SandboxInstance } from './types';
-
-describe('setupWorkspace', () => {
-  it('throws a typed preparation error when workspace directory creation fails', async () => {
-    const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
-    const mkdir = vi.fn().mockRejectedValueOnce(cause);
-    const sandbox = {
-      mkdir,
-    } as unknown as SandboxInstance;
-
-    const promise = setupWorkspace(sandbox, 'user-123', undefined, 'agent-session');
-
-    await expect(promise).rejects.toBeInstanceOf(WorkspaceFilesystemPreparationError);
-    await expect(promise).rejects.toMatchObject({
-      target: 'workspace_directory',
-      message:
-        'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN',
-      cause,
-    });
-  });
-
-  it('throws a typed preparation error when session home creation fails', async () => {
-    const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
-    const mkdir = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(cause);
-    const sandbox = {
-      mkdir,
-    } as unknown as SandboxInstance;
-
-    const promise = setupWorkspace(sandbox, 'user-123', 'org-123', 'agent-session');
-
-    await expect(promise).rejects.toBeInstanceOf(WorkspaceFilesystemPreparationError);
-    await expect(promise).rejects.toMatchObject({
-      target: 'session_home',
-      message:
-        'Failed to prepare session home: FileSystemError: mkdir operation failed with exit code NaN',
-      cause,
-    });
-    expect(mkdir).toHaveBeenNthCalledWith(1, '/workspace/org-123/user-123/sessions/agent-session', {
-      recursive: true,
-    });
-    expect(mkdir).toHaveBeenNthCalledWith(2, '/home/agent-session', { recursive: true });
-  });
-});
-
-describe('manageBranch', () => {
-  let fakeSession: ExecutionSession;
-  let mockExec: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    mockExec = vi.fn();
-    // Create a mock session with exec method
-    fakeSession = {
-      exec: mockExec,
-    } as unknown as ExecutionSession;
-  });
-
-  describe('when branch exists in both local and remote', () => {
-    it('should checkout session branch and pull leniently', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // checkout
-        .mockResolvedValueOnce({ exitCode: 0 }); // pull
-
-      await manageBranch(fakeSession, '/workspace', 'feature/foo', false);
-
-      const execCalls = mockExec.mock.calls;
-      expect(execCalls[3]?.[0]).toContain("git checkout 'feature/foo'");
-      expect(execCalls[4]?.[0]).toContain("git pull origin 'feature/foo'");
-      expect(execCalls[4]?.[0]).not.toContain('--ff-only');
-    });
-
-    it('should checkout upstream branch without pulling', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }); // checkout
-
-      await manageBranch(fakeSession, '/workspace', 'main', true);
-
-      const execCalls = mockExec.mock.calls;
-      expect(execCalls[3]?.[0]).toContain("git checkout 'main'");
-      // Verify NO pull occurs for upstream branches
-      expect(mockExec).toHaveBeenCalledTimes(4); // only fetch + 2 checks + checkout
-    });
-  });
-
-  describe('when branch exists only locally', () => {
-    it('should checkout local branch without pulling', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
-        .mockResolvedValueOnce({ exitCode: 0 }); // checkout
-
-      await manageBranch(fakeSession, '/workspace', 'feature/local', false);
-
-      const execCalls = mockExec.mock.calls;
-      expect(execCalls[3]?.[0]).toContain("git checkout 'feature/local'");
-      // Verify pull was not called (should only be 4 calls total)
-      expect(mockExec).toHaveBeenCalledTimes(4);
-    });
-  });
-
-  describe('when branch exists only remotely', () => {
-    it('should create tracking branch', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }); // create tracking branch
-
-      await manageBranch(fakeSession, '/workspace', 'feature/remote', false);
-
-      const execCalls = mockExec.mock.calls;
-      expect(execCalls[3]?.[0]).toContain(
-        "git checkout -b 'feature/remote' 'origin/feature/remote'"
-      );
-    });
-  });
-
-  describe('when branch does not exist anywhere', () => {
-    describe('and it is a session branch', () => {
-      it('should create new local branch', async () => {
-        mockExec
-          .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
-          .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
-          .mockResolvedValueOnce({ exitCode: 0 }); // create new branch
-
-        await manageBranch(fakeSession, '/workspace', 'session/123', false);
-
-        const execCalls = mockExec.mock.calls;
-        const createBranchCall = execCalls[3]?.[0] as string;
-        expect(createBranchCall).toContain("git checkout -b 'session/123'");
-        expect(createBranchCall).not.toContain('origin/');
-      });
-    });
-
-    describe('and it is an upstream branch', () => {
-      it('should always fetch and checkout GitHub pull refs', async () => {
-        mockExec
-          .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 0 }) // fetch pull ref
-          .mockResolvedValueOnce({ exitCode: 0 }); // checkout from FETCH_HEAD
-
-        const result = await manageBranch(fakeSession, '/workspace', 'refs/pull/42/head', true);
-
-        const execCalls = mockExec.mock.calls;
-        expect(execCalls[1]?.[0]).toContain("git fetch origin 'refs/pull/42/head'");
-        expect(execCalls[2]?.[0]).toContain("git checkout -B 'refs/pull/42/head' FETCH_HEAD");
-        expect(mockExec).toHaveBeenCalledTimes(3);
-        expect(result).toBe('refs/pull/42/head');
-      });
-
-      it('should always fetch and checkout GitLab merge-request refs', async () => {
-        mockExec
-          .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 0 }) // fetch merge-request ref
-          .mockResolvedValueOnce({ exitCode: 0 }); // checkout from FETCH_HEAD
-
-        const result = await manageBranch(
-          fakeSession,
-          '/workspace',
-          'refs/merge-requests/99/head',
-          true
-        );
-
-        const execCalls = mockExec.mock.calls;
-        expect(execCalls[1]?.[0]).toContain("git fetch origin 'refs/merge-requests/99/head'");
-        expect(execCalls[2]?.[0]).toContain(
-          "git checkout -B 'refs/merge-requests/99/head' FETCH_HEAD"
-        );
-        expect(mockExec).toHaveBeenCalledTimes(3);
-        expect(result).toBe('refs/merge-requests/99/head');
-      });
-
-      it('should throw when pull ref fetch fails', async () => {
-        mockExec
-          .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 1, stderr: 'fetch pull ref error' }); // fetch pull ref fails
-
-        await expect(
-          manageBranch(fakeSession, '/workspace', 'refs/pull/42/head', true)
-        ).rejects.toThrow('Failed to fetch pull ref refs/pull/42/head');
-      });
-
-      it('should throw BranchNotFoundError', async () => {
-        mockExec
-          .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
-          .mockResolvedValueOnce({ exitCode: 1 }); // remote check (does not exist)
-
-        const promise = manageBranch(fakeSession, '/workspace', 'main', true);
-        await expect(promise).rejects.toBeInstanceOf(BranchNotFoundError);
-        await expect(promise).rejects.toThrow('Branch "main" not found in repository');
-      });
-    });
-  });
-
-  describe('error handling', () => {
-    it('should throw when checkout fails', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 1, stderr: 'checkout error' }); // checkout fails
-
-      await expect(manageBranch(fakeSession, '/workspace', 'feature/foo', false)).rejects.toThrow(
-        'Failed to checkout branch feature/foo'
-      );
-    });
-
-    it('should throw when creating tracking branch fails', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 1, stderr: 'create error' }); // create tracking fails
-
-      await expect(
-        manageBranch(fakeSession, '/workspace', 'feature/remote', false)
-      ).rejects.toThrow('Failed to create tracking branch feature/remote');
-    });
-
-    it('should warn but not throw when session branch pull fails', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // checkout
-        .mockResolvedValueOnce({
-          exitCode: 1,
-          stderr: 'CONFLICT (content): Merge conflict in file.txt',
-        }); // pull fails
-
-      // Should not throw for session branches - warnings are logged but we don't assert on them
-      const result = await manageBranch(fakeSession, '/workspace', 'session/123', false);
-
-      // Verify the function completed successfully despite the pull failure
-      expect(result).toBe('session/123');
-    });
-
-    it('should continue when fetch fails', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 1, stderr: 'fetch error' }) // git fetch fails
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
-        .mockResolvedValueOnce({ exitCode: 0 }); // checkout
-
-      const result = await manageBranch(fakeSession, '/workspace', 'feature/local', false);
-
-      // Verify the function continued despite fetch failure and completed successfully
-      const execCalls = mockExec.mock.calls;
-      expect(execCalls[3]?.[0]).toContain("git checkout 'feature/local'");
-      expect(result).toBe('feature/local');
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle branch names with slashes and dashes', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // checkout
-        .mockResolvedValueOnce({ exitCode: 0 }); // pull
-
-      await manageBranch(fakeSession, '/workspace', 'feature/add-new-api', false);
-
-      const execCalls = mockExec.mock.calls;
-      expect(execCalls[3]?.[0]).toContain("git checkout 'feature/add-new-api'");
-    });
-  });
-
-  describe('pull strategy behavior', () => {
-    it('should NOT pull for upstream branches', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }); // checkout
-
-      await manageBranch(fakeSession, '/workspace', 'develop', true);
-
-      const execCalls = mockExec.mock.calls;
-      expect(execCalls[3]?.[0]).toContain("git checkout 'develop'");
-      // Verify NO pull occurs for upstream branches
-      expect(mockExec).toHaveBeenCalledTimes(4); // only fetch + 2 checks + checkout
-    });
-
-    it('should NOT use --ff-only flag for session branches', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // checkout
-        .mockResolvedValueOnce({ exitCode: 0 }); // pull
-
-      await manageBranch(fakeSession, '/workspace', 'session/456', false);
-
-      const execCalls = mockExec.mock.calls;
-      const pullCall = execCalls[4]?.[0] as string;
-      expect(pullCall).toContain("git pull origin 'session/456'");
-      expect(pullCall).not.toContain('--ff-only');
-    });
-
-    it('should succeed when branch is already up to date', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-        .mockResolvedValueOnce({ exitCode: 0 }) // local check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // remote check (exists)
-        .mockResolvedValueOnce({ exitCode: 0 }) // checkout
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'Already up to date.',
-        }); // pull (no-op)
-
-      const result = await manageBranch(fakeSession, '/workspace', 'feature/stable', false);
-
-      expect(result).toBe('feature/stable');
-    });
-  });
-});
-
-describe('disk space checking', () => {
-  let fakeSession: ExecutionSession;
-  let mockExec: ReturnType<typeof vi.fn>;
-  let mockGitCheckout: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    mockTimeoutWarn.mockClear();
-    mockTimeoutWithFields.mockClear();
-    mockTimeoutWithTags.mockClear();
-    mockExec = vi.fn();
-    mockGitCheckout = vi.fn();
-    fakeSession = {
-      exec: mockExec,
-      gitCheckout: mockGitCheckout,
-    } as unknown as ExecutionSession;
-  });
-
-  describe('checkDiskSpace direct', () => {
-    it('should return DiskSpaceResult with low disk space', async () => {
-      // 1024 MB in bytes, 10000 MB in bytes
-      mockExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: '1073741824  10485760000\n',
-        stderr: '',
-      });
-
-      const result = await checkDiskSpace(fakeSession);
-
-      expect(result).toBeDefined();
-      expect(result.availableMB).toBe(1024);
-      expect(result.totalMB).toBe(10000);
-      expect(result.isLow).toBe(true);
-    });
-
-    it('should return DiskSpaceResult with adequate disk space', async () => {
-      // 5000 MB in bytes, 10000 MB in bytes
-      mockExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: '5242880000  10485760000\n',
-        stderr: '',
-      });
-
-      const result = await checkDiskSpace(fakeSession);
-
-      expect(result).toBeDefined();
-      expect(result.availableMB).toBe(5000);
-      expect(result.totalMB).toBe(10000);
-      expect(result.isLow).toBe(false);
-    });
-
-    it('should throw when df command fails', async () => {
-      mockExec.mockResolvedValueOnce({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'df: command not found',
-      });
-
-      await expect(checkDiskSpace(fakeSession)).rejects.toThrow('Disk check failed');
-    });
-
-    it('should throw when df output format is unexpected', async () => {
-      mockExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: 'unexpected output\n',
-        stderr: '',
-      });
-
-      await expect(checkDiskSpace(fakeSession)).rejects.toThrow('Disk check failed');
-    });
-  });
-
-  describe('createSandboxUsageEvent', () => {
-    it('should create event with correct fields', async () => {
-      // 3000 MB in bytes, 10000 MB in bytes
-      mockExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: '3145728000  10485760000\n',
-        stderr: '',
-      });
-
-      const event = await createSandboxUsageEvent(fakeSession, 'session-123');
-
-      expect(event).toBeDefined();
-      expect(event.streamEventType).toBe('sandbox-usage');
-      expect(event.availableMB).toBe(3000);
-      expect(event.totalMB).toBe(10000);
-      expect(event.isLow).toBe(false);
-      expect(event.timestamp).toBeDefined();
-      expect(event.sessionId).toBe('session-123');
-    });
-
-    it('should set isLow to true when disk space is below threshold', async () => {
-      // 1000 MB in bytes, 10000 MB in bytes
-      mockExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: '1048576000  10485760000\n',
-        stderr: '',
-      });
-
-      const event = await createSandboxUsageEvent(fakeSession, 'session-123');
-
-      expect(event.isLow).toBe(true);
-    });
-
-    it('should throw when disk check fails', async () => {
-      mockExec.mockResolvedValueOnce({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'error',
-      });
-
-      await expect(createSandboxUsageEvent(fakeSession, 'session-123')).rejects.toThrow(
-        'Disk check failed'
-      );
-    });
-  });
-
-  describe('cloneGitHubRepo', () => {
-    it('should clone repository (disk space check is separate)', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      // Mock gitCheckout to succeed
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitHubRepo(fakeSession, '/workspace', 'org/repo');
-
-      // Verify clone was called
-      expect(mockGitCheckout).toHaveBeenCalled();
-    });
-  });
-
-  describe('cloneGitRepo', () => {
-    it('should clone repository (disk space check is separate)', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      // Mock gitCheckout to succeed
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-
-      // Verify clone was called
-      expect(mockGitCheckout).toHaveBeenCalled();
-    });
-
-    it('should include token in URL when provided', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      // Mock gitCheckout to succeed
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git', 'test-token');
-
-      // Verify gitCheckout was called with URL containing token
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use oauth2 username for gitlab platform', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(
-        fakeSession,
-        '/workspace',
-        'https://gitlab.com/repo.git',
-        'test-token',
-        undefined,
-        {
-          platform: 'gitlab',
-        }
-      );
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('oauth2:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-token-auth username for bitbucket platform', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-      mockGitCheckout.mockResolvedValue({ success: true, exitCode: 0 });
-
-      await cloneGitRepo(
-        fakeSession,
-        '/workspace',
-        'https://bitbucket.org/acme/repo.git',
-        'test-token',
-        undefined,
-        { platform: 'bitbucket' }
-      );
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-token-auth:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username for github platform', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(
-        fakeSession,
-        '/workspace',
-        'https://example.com/repo.git',
-        'test-token',
-        undefined,
-        {
-          platform: 'github',
-        }
-      );
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username when platform is undefined', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git', 'test-token');
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('logs sdk timeout when gitCheckout rejects with clone timeout', async () => {
-      mockGitCheckout.mockRejectedValueOnce(new Error('Git clone timed out after 120000ms'));
-
-      await expect(
-        cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git')
-      ).rejects.toThrow('Failed to clone repository from https://example.com/repo.git');
-
-      expect(mockTimeoutWithTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
-      expect(mockTimeoutWithFields).toHaveBeenCalledWith(
-        expect.objectContaining({
-          operation: 'git.clone',
-          timeoutMs: 120000,
-          timeoutLayer: 'sdk',
-          error: 'Git clone timed out after 120000ms',
-        })
-      );
-      expect(mockTimeoutWarn).toHaveBeenCalledWith('Sandbox operation timed out');
-    });
-
-    it('preserves sandbox 500 errors for recovery handling', async () => {
-      const error = new Error('HTTP error! status: 500');
-      Object.assign(error, { name: 'SandboxError' });
-      mockGitCheckout.mockRejectedValueOnce(error);
-
-      await expect(
-        cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git')
-      ).rejects.toBe(error);
-    });
-
-    it('throws GitRepositoryNotFoundError when git stderr says repository not found', async () => {
-      mockGitCheckout.mockRejectedValueOnce(
-        new Error(
-          "remote: Repository not found.\nfatal: repository 'https://example.com/repo' not found"
-        )
-      );
-
-      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-      await expect(promise).rejects.toBeInstanceOf(GitRepositoryNotFoundError);
-      await expect(promise).rejects.toThrow('Repository not found: https://example.com/repo.git');
-    });
-
-    it('throws GitRepositoryNotFoundError when stderr field on the SDK error contains the pattern', async () => {
-      const sdkError = Object.assign(new Error('Git checkout failed'), {
-        name: 'GitCheckoutError',
-        stderr: "remote: Repository not found.\nfatal: repository '...' not found",
-      });
-      mockGitCheckout.mockRejectedValueOnce(sdkError);
-
-      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-      await expect(promise).rejects.toBeInstanceOf(GitRepositoryNotFoundError);
-    });
-
-    it('throws GitCloneFailedError for LFS smudge failures (not repo-not-found)', async () => {
-      mockGitCheckout.mockRejectedValueOnce(
-        new Error(
-          "error: external filter 'git-lfs filter-process' failed: smudge filter lfs failed"
-        )
-      );
-
-      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-      await expect(promise).rejects.toBeInstanceOf(GitCloneFailedError);
-      await expect(promise).rejects.toThrow(
-        'Failed to clone repository from https://example.com/repo.git'
-      );
-    });
-
-    it('throws GitCloneFailedError when gitCheckout returns success=false', async () => {
-      mockGitCheckout.mockResolvedValue({ success: false, exitCode: 128 });
-
-      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-      await expect(promise).rejects.toBeInstanceOf(GitCloneFailedError);
-    });
-
-    it('sanitizes tokens out of GitCloneFailedError reason', async () => {
-      mockGitCheckout.mockRejectedValueOnce(
-        new Error('clone failed at https://x-access-token:secret123@example.com/repo.git')
-      );
-
-      try {
-        await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-        throw new Error('Expected cloneGitRepo to reject');
-      } catch (err) {
-        expect(err).toBeInstanceOf(GitCloneFailedError);
-        expect((err as Error).message).not.toContain('secret123');
-        expect((err as Error).message).toContain('x-access-token:***@');
-      }
-    });
-  });
-
-  describe('updateGitAuthor', () => {
-    it('shell-quotes author values and passes the workspace as cwd', async () => {
-      const workspacePath = "/workspace/repo with ' quote";
-      mockExec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitAuthor(fakeSession, workspacePath, {
-        name: `User "$(touch /tmp/name)" O'Brien`,
-        email: `user'$(touch /tmp/email)'@example.com`,
-      });
-
-      expect(mockExec).toHaveBeenNthCalledWith(
-        1,
-        `git config user.name 'User "$(touch /tmp/name)" O'\\''Brien'`,
-        expect.objectContaining({ cwd: workspacePath })
-      );
-      expect(mockExec).toHaveBeenNthCalledWith(
-        2,
-        `git config user.email 'user'\\''$(touch /tmp/email)'\\''@example.com'`,
-        expect.objectContaining({ cwd: workspacePath })
-      );
-    });
-  });
-
-  describe('updateGitRemoteUrl', () => {
-    it('replaces a tokenized origin with the credential-free canonical URL', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteUrl(
-        fakeSession,
-        '/workspace',
-        'https://x-token-auth:managed-token@bitbucket.org/acme/repo.git'
-      );
-
-      const command = String(mockExec.mock.calls[0]?.[0]);
-      expect(command).toContain("git remote set-url origin 'https://bitbucket.org/acme/repo.git'");
-      expect(command).not.toContain('managed-token');
-      expect(command).not.toContain('@bitbucket.org');
-    });
-  });
-
-  describe('updateGitRemoteToken', () => {
-    it('should use oauth2 username for gitlab platform', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://gitlab.com/repo.git',
-        'new-token',
-        'gitlab'
-      );
-
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('oauth2:new-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-token-auth username for bitbucket platform', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://bitbucket.org/acme/repo.git',
-        'new-token',
-        'bitbucket'
-      );
-
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('x-token-auth:new-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username for github platform', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://example.com/repo.git',
-        'new-token',
-        'github'
-      );
-
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:new-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username when platform is undefined', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://example.com/repo.git',
-        'new-token'
-      );
-
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:new-token'),
-        expect.any(Object)
-      );
-    });
-  });
-
-  describe('LOW_DISK_THRESHOLD_MB export', () => {
-    it('should export threshold constant as 2048 (2GB)', () => {
-      expect(LOW_DISK_THRESHOLD_MB).toBe(2048);
-    });
-  });
-
-  describe('cleanupStaleWorkspaces', () => {
-    let fakeSandbox: SandboxInstance;
-    let mockSandboxExec: ReturnType<typeof vi.fn>;
-    let mockListProcesses: ReturnType<typeof vi.fn>;
-
-    const dockerSocketPath = {
-      exitCode: 0,
-      stdout: '/run/user/1000/docker.sock',
-      stderr: '',
-    };
-
-    beforeEach(() => {
-      mockSandboxExec = vi.fn();
-      mockListProcesses = vi.fn();
-      fakeSandbox = {
-        exec: mockSandboxExec,
-        listProcesses: mockListProcesses,
-      } as unknown as SandboxInstance;
-    });
-
-    it('cleans up sessions with no running wrapper without inspecting Docker', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_stale-1111\nagent_current-aaaa\n',
-          stderr: '',
-        }) // ls sessions/
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_stale-1111
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm -rf workspace for stale session
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // rm -rf home for stale session
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await expect(
-        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({ cleaned: 1, skipped: 1 });
-
-      expect(mockListProcesses).toHaveBeenCalledTimes(1);
-
-      const execCalls = mockSandboxExec.mock.calls.map((c: string[]) => c[0]);
-      expect(execCalls.every((command: string) => !command.includes('docker'))).toBe(true);
-      expect(execCalls[1]).toContain('stat');
-      expect(execCalls[2]).toContain("rm -rf '/workspace/org/user/sessions/agent_stale-1111'");
-      expect(execCalls[3]).toContain("rm -rf '/home/agent_stale-1111'");
-    });
-
-    it('skips the current session directory', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: 'agent_current-aaaa\n',
-        stderr: '',
-      });
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      expect(mockSandboxExec).toHaveBeenCalledTimes(1);
-    });
-
-    it('skips sessions that have a running wrapper', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_active-bbbb\n',
-          stderr: '',
-        }) // ls sessions/
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }); // stat agent_active-bbbb
-
-      mockListProcesses.mockResolvedValue([
-        {
-          id: 1,
-          command: 'kilocode-wrapper --agent-session agent_active-bbbb WRAPPER_PORT=5001',
-          status: 'running',
-        },
-      ]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
-    });
-
-    it('skips sessions that have a starting wrapper', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_starting-bbbb\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' });
-
-      mockListProcesses.mockResolvedValue([
-        {
-          id: 1,
-          command: 'kilocode-wrapper --agent-session agent_starting-bbbb WRAPPER_PORT=5001',
-          status: 'starting',
-        },
-      ]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
-    });
-
-    it('returns early when sessions directory does not exist', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'No such file or directory',
-      });
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      expect(mockSandboxExec).toHaveBeenCalledTimes(1);
-      expect(mockListProcesses).not.toHaveBeenCalled();
-    });
-
-    it('returns early when sessions directory is empty', async () => {
-      mockSandboxExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      expect(mockSandboxExec).toHaveBeenCalledTimes(1);
-      expect(mockListProcesses).not.toHaveBeenCalled();
-    });
-
-    it('does not count failed removal as reclaimed workspace', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_stale-aaaa\n', stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'rm failed' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-      mockListProcesses.mockResolvedValue([]);
-
-      await expect(
-        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({ cleaned: 0, skipped: 1 });
-    });
-
-    it('continues cleaning remaining sessions when one throws', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_stale-aaaa\nagent_stale-bbbb\n',
-          stderr: '',
-        }) // ls
-        .mockRejectedValueOnce(new Error('exec threw during agent_stale-aaaa stat')) // stat throws for first session
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_stale-bbbb
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace agent_stale-bbbb
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // rm home agent_stale-bbbb
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await expect(
-        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({ cleaned: 1, skipped: 1 });
-
-      // listProcesses is called exactly once (not per session)
-      expect(mockListProcesses).toHaveBeenCalledTimes(1);
-
-      // second session was still attempted despite first throwing
-      const execCalls = mockSandboxExec.mock.calls.map((c: string[]) => c[0]);
-      expect(execCalls.some((c: string) => c.includes('agent_stale-bbbb'))).toBe(true);
-    });
-
-    it('does not throw when listProcesses rejects', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: 'agent_stale-1111\n',
-        stderr: '',
-      });
-      mockListProcesses.mockRejectedValue(new Error('sandbox unavailable'));
-
-      await expect(
-        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({ cleaned: 0, skipped: 1 });
-
-      // Only the ls call — no rm calls since listProcesses failed
-      expect(mockSandboxExec).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not throw when ls throws', async () => {
-      mockSandboxExec.mockRejectedValueOnce(new Error('exec error'));
-
-      await expect(
-        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({ cleaned: 0, skipped: 0 });
-    });
-
-    it('skips directory entries that do not match the agent_ session ID format', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'unexpected-dir\n.hidden\nlost+found\nagent_valid-1234\n',
-          stderr: '',
-        }) // ls
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_valid-1234
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace agent_valid-1234
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // rm home agent_valid-1234
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      const execCalls = mockSandboxExec.mock.calls.map((c: string[]) => c[0]);
-      // Non-matching entries never appear in any exec call after the ls
-      expect(execCalls.every(c => !c.includes('unexpected-dir'))).toBe(true);
-      expect(execCalls.every(c => !c.includes('.hidden'))).toBe(true);
-      expect(execCalls.every(c => !c.includes('lost+found'))).toBe(true);
-      // The valid session was cleaned up
-      expect(execCalls.some(c => c.includes('agent_valid-1234'))).toBe(true);
-    });
-
-    it('skips directories younger than STALE_DIR_MIN_AGE_SECONDS', async () => {
-      const recentMtime = String(Math.floor(Date.now() / 1000) - 30); // 30 seconds ago
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_recent-1111\n',
-          stderr: '',
-        }) // ls sessions/
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${recentMtime}\n`, stderr: '' }); // stat
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      // ls + stat only — no rm calls
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
-    });
-
-    it('cleans old directories but skips recent ones in the same run', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      const recentMtime = String(Math.floor(Date.now() / 1000) - 30);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_old-1111\nagent_recent-2222\n',
-          stderr: '',
-        }) // ls
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_old-1111
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace agent_old-1111
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm home agent_old-1111
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${recentMtime}\n`, stderr: '' }); // stat agent_recent-2222
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      const execCalls = mockSandboxExec.mock.calls.map((c: string[]) => c[0]);
-      // Old session was cleaned
-      expect(
-        execCalls.some((c: string) =>
-          c.includes("rm -rf '/workspace/org/user/sessions/agent_old-1111'")
-        )
-      ).toBe(true);
-      // Recent session was NOT cleaned (no rm call containing agent_recent-2222)
-      expect(
-        execCalls.every((c: string) => !c.includes('rm') || !c.includes('agent_recent-2222'))
-      ).toBe(true);
-    });
-
-    it('skips cleanup when stat fails (unknown age treated as recent)', async () => {
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_stale-1111\n',
-          stderr: '',
-        }) // ls
-        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'stat: cannot stat' }); // stat fails
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      // ls + stat only — no rm calls (directory was skipped)
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
-    });
-
-    it('skips cleanup when stat returns unparseable output', async () => {
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_stale-1111\n',
-          stderr: '',
-        }) // ls
-        .mockResolvedValueOnce({ exitCode: 0, stdout: 'not-a-number\n', stderr: '' }); // stat returns garbage
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: false,
-      });
-
-      // ls + stat only — no rm calls (directory was skipped)
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
-    });
-
-    it('skips all cleanup when devcontainer wrapper inspection fails', async () => {
-      mockSandboxExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_unknown-cccc\n', stderr: '' })
-        .mockResolvedValueOnce(dockerSocketPath)
-        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'docker unavailable' });
-      mockListProcesses.mockResolvedValue([]);
-
-      await expect(
-        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-          inspectContainers: true,
-        })
-      ).resolves.toEqual({ cleaned: 0, skipped: 1 });
-      const execCalls = mockSandboxExec.mock.calls.map((call: string[]) => call[0]);
-      expect(execCalls[1]).toContain('/run/user/1000/docker.sock');
-      expect(execCalls[2]).toContain('docker ps');
-      expect(execCalls.every((command: string) => !command.includes('stat'))).toBe(true);
-      expect(execCalls.every((command: string) => !command.includes('rm -rf'))).toBe(true);
-    });
-
-    it('skips sessions with a wrapper running inside a dev container', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_devc-cccc\n',
-          stderr: '',
-        }) // ls sessions/
-        .mockResolvedValueOnce(dockerSocketPath) // resolve Docker socket
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout:
-            // <id>\t<ports>\t<labels>
-            'cont-id\t0.0.0.0:5050->5050/tcp\tkilo.agentSession=agent_devc-cccc\n',
-          stderr: '',
-        }) // docker ps — wrapper container is alive
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }); // stat
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa', {
-        inspectContainers: true,
-      });
-
-      // ls + docker socket resolution + docker ps + stat only — no rm calls (live devcontainer wrapper)
-      expect(mockSandboxExec).toHaveBeenCalledTimes(4);
-    });
-  });
-
-  describe('checkDiskAndCleanBeforeSetup', () => {
-    let fakeSandbox: SandboxInstance;
-    let mockSandboxExec: ReturnType<typeof vi.fn>;
-    let mockListProcesses: ReturnType<typeof vi.fn>;
-
-    beforeEach(() => {
-      mockSandboxExec = vi.fn();
-      mockListProcesses = vi.fn();
-      fakeSandbox = {
-        exec: mockSandboxExec,
-        listProcesses: mockListProcesses,
-      } as unknown as SandboxInstance;
-    });
-
-    it('admits setup without cleanup when capacity is adequate', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: '5242880000  10485760000\n',
-        stderr: '',
-      });
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({
-        availableMB: 5000,
-        thresholdMB: LOW_DISK_THRESHOLD_MB,
-        cleanup: { cleaned: 0, skipped: 0 },
-      });
-
-      expect(mockSandboxExec).toHaveBeenCalledTimes(1);
-      expect(mockListProcesses).not.toHaveBeenCalled();
-    });
-
-    it('cleans low capacity and admits after a successful recheck', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '1073741824  10485760000\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_stale-1111\nagent_current-aaaa\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '3145728000  10485760000\n',
-          stderr: '',
-        });
-      mockListProcesses.mockResolvedValue([]);
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({
-        availableMB: 3000,
-        thresholdMB: LOW_DISK_THRESHOLD_MB,
-        cleanup: { cleaned: 1, skipped: 1 },
-      });
-
-      const execCalls = mockSandboxExec.mock.calls.map((call: string[]) => call[0]);
-      expect(execCalls[5]).toContain('df -B1');
-      expect(execCalls.every((command: string) => !command.includes('docker'))).toBe(true);
-    });
-
-    it('types ENOSPC during stale cleanup as sandbox unusable instead of rechecking capacity', async () => {
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '1073741824  10485760000\n',
-          stderr: '',
-        })
-        .mockRejectedValueOnce(new Error('ENOSPC: no space left on device'));
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
-    });
-
-    it('types ENOSPC returned by stale removal as sandbox unusable', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '1073741824  10485760000\n', stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_stale-aaaa\n', stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'No space left on device' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-      mockListProcesses.mockResolvedValue([]);
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
-    });
-
-    it('allows ordinary cleanup inspection failure only after a safe recheck', async () => {
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '1073741824  10485760000\n',
-          stderr: '',
-        })
-        .mockRejectedValueOnce(new Error('transient list sessions failure'))
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '3145728000  10485760000\n',
-          stderr: '',
-        });
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).resolves.toEqual({
-        availableMB: 3000,
-        thresholdMB: LOW_DISK_THRESHOLD_MB,
-        cleanup: { cleaned: 0, skipped: 0 },
-      });
-    });
-
-    it('rejects admission when low capacity remains after cleanup', async () => {
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '1073741824  10485760000\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'no sessions' })
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '1572864000  10485760000\n',
-          stderr: '',
-        });
-
-      const result = checkDiskAndCleanBeforeSetup(
-        fakeSandbox,
-        'org-1',
-        'user-1',
-        'agent_current-aaaa',
-        { inspectContainers: false }
-      );
-
-      await expect(result).rejects.toBeInstanceOf(WorkspaceCapacityAdmissionRejectedError);
-      await expect(result).rejects.toMatchObject({
-        availableMB: 1500,
-        thresholdMB: LOW_DISK_THRESHOLD_MB,
-        cleaned: 0,
-        skipped: 0,
-      });
-    });
-
-    it('continues to protect live sibling wrappers while rejecting unsafe admission', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      mockSandboxExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '1073741824  10485760000\n', stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_active-bbbb\n', stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '1073741824  10485760000\n', stderr: '' });
-      mockListProcesses.mockResolvedValue([
-        {
-          id: '1',
-          command: 'kilocode-wrapper --agent-session agent_active-bbbb WRAPPER_PORT=5001',
-          status: 'running',
-        },
-      ]);
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toMatchObject({ skipped: 1 });
-      expect(mockSandboxExec.mock.calls.every(call => !call[0].includes('rm -rf'))).toBe(true);
-    });
-
-    it('classifies ENOSPC disk inspection failures as sandbox unusable', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'cannot create temporary file: No space left on device',
-      });
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
-    });
-
-    it('does not classify temporary-file permission failures as destructive capacity evidence', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'cannot create temporary file: Permission denied',
-      });
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toBeInstanceOf(WorkspaceCapacityInspectionUnavailableError);
-    });
-
-    it('rejects admission without destroying a shared sandbox when disk execution is transiently unavailable', async () => {
-      mockSandboxExec.mockRejectedValueOnce(new Error('execution session unavailable'));
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toBeInstanceOf(WorkspaceCapacityInspectionUnavailableError);
-    });
-
-    it('classifies a thrown ENOSPC disk execution failure as sandbox unusable', async () => {
-      mockSandboxExec.mockRejectedValueOnce(new Error('ENOSPC: no space left on device'));
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
-    });
-
-    it('rejects admission without infrastructure recovery when a non-ENOSPC disk check returns failure', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'df: command not found',
-      });
-
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa', {
-          inspectContainers: false,
-        })
-      ).rejects.toBeInstanceOf(WorkspaceCapacityInspectionUnavailableError);
-    });
-  });
-});
+  ISOLATED_CONTAINER_WORKSPACE_PATH,
+} from './workspace.js';
 
 describe('workspace path construction', () => {
   const ORG_ID = '33c8c114-791f-463c-9f7f-fe74b284cfcf';
   const BOT_USER_ID = `bot-code-review-${ORG_ID}`;
   const SESSION_ID = 'agent_420ae020-e3c4-4e67-878b-66672c3d997e';
+  const WORKTREE_ID = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+
+  it('builds owner-scoped canonical worktree paths for personal and organization sessions', () => {
+    expect(getWorktreeWorkspacePath(undefined, 'user-1', WORKTREE_ID)).toBe(
+      `/workspace/user-1/worktrees/${WORKTREE_ID}`
+    );
+    expect(getWorktreeWorkspacePath(ORG_ID, 'user-1', WORKTREE_ID)).toBe(
+      `/workspace/${ORG_ID}/user-1/worktrees/${WORKTREE_ID}`
+    );
+  });
+
+  it('preserves arbitrary OAuth user IDs in canonical worktree paths', () => {
+    expect(getWorktreeWorkspacePath(ORG_ID, 'oauth/google:1234', WORKTREE_ID)).toBe(
+      `/workspace/${ORG_ID}/oauth-google-1234/worktrees/${WORKTREE_ID}`
+    );
+  });
+
+  it.each([
+    '',
+    'worktree_invalid',
+    'worktree_../../outside',
+    'worktree_420ae020-e3c4-4e67-878b-66672c3d997e/child',
+    'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+  ])('rejects unsafe worktree ID %s before constructing a path', worktreeId => {
+    expect(() =>
+      getWorktreeWorkspacePath(ORG_ID, 'user-1', worktreeId as CloudAgentWorktreeId)
+    ).toThrow(/invalid worktree id/);
+  });
 
   it('keeps the userId segment between the org and the sessions directory', () => {
     // Dropping this segment would yield `/workspace/<orgId>/sessions/<sessionId>`,
@@ -1549,18 +105,126 @@ describe('workspace path construction', () => {
     );
   });
 
-  it('renders a session id identically in the workspace path and the session home', () => {
-    // These two are independent entry points that feed the same permission
-    // allowlist, so a session id must never render one way in one and another
-    // way in the other.
-    expect(getSessionHomePath(SESSION_ID)).toBe(`/home/${SESSION_ID}`);
-    expect(getSessionWorkspacePath(ORG_ID, BOT_USER_ID, SESSION_ID)).toContain(`/${SESSION_ID}`);
+  it('uses the isolated container directory for isolated single-session sandboxes', () => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: 'ses-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: 'istd-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
   });
 
   it.each([
-    ['a blank session id', ''],
-    ['a session id containing a separator', 'x/y'],
-  ])('rejects %s for the session home path too', (_label, sessionId) => {
-    expect(() => getSessionHomePath(sessionId)).toThrow(/invalid session id/);
+    ['absent', undefined],
+    ['empty', ''],
+    ['shared', `usr-${'a'.repeat(48)}`],
+    ['code-review', `crv-${'a'.repeat(48)}`],
+    ['devcontainer', `dind-${'a'.repeat(48)}`],
+  ])('falls back to the per-session path when the sandbox id is %s', (_label, sandboxId) => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(getSessionWorkspacePath(ORG_ID, 'user-1', SESSION_ID));
+  });
+
+  it.each([
+    ['isolated', true],
+    ['code-review', false],
+    ['shared', false],
+  ] as const)('resolves a placed %s sandbox directory from its kind', (sandboxKind, isolated) => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: `sbx-${'a'.repeat(48)}`,
+        sandboxKind,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(
+      isolated
+        ? ISOLATED_CONTAINER_WORKSPACE_PATH
+        : getSessionWorkspacePath(ORG_ID, 'user-1', SESSION_ID)
+    );
+  });
+
+  it('rejects a placed sandbox key without its kind', () => {
+    expect(() =>
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: `sbx-${'a'.repeat(48)}`,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toThrow('Sandbox key and kind do not match');
+  });
+
+  it('uses the isolated container directory over an explicit worktree path', () => {
+    const explicit = getWorktreeWorkspacePath(ORG_ID, 'user-1', WORKTREE_ID);
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: explicit,
+        sandboxId: 'ses-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
+  });
+
+  it.each([
+    ['shared', `usr-${'a'.repeat(48)}`],
+    ['code-review', `crv-${'a'.repeat(48)}`],
+    ['devcontainer', `dind-${'a'.repeat(48)}`],
+  ])('keeps an explicit worktree path on a %s sandbox', (_label, sandboxId) => {
+    const explicit = getWorktreeWorkspacePath(ORG_ID, 'user-1', WORKTREE_ID);
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: explicit,
+        sandboxId,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(explicit);
+  });
+
+  it('treats an empty workspace path as explicit on a shared sandbox but not on an isolated one', () => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: '',
+        sandboxId: `usr-${'a'.repeat(48)}`,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe('');
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: '',
+        sandboxId: 'ses-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
   });
 });

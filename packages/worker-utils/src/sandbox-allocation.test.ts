@@ -1,0 +1,282 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  allocationSupportsMultiRepository,
+  getSandboxAllocationInstance,
+  getSandboxAllocationProvider,
+  getSandboxAllocationResources,
+  getSandboxAllocationRequest,
+  getSandboxAllocation,
+  sandboxAllocationInputSchema,
+  sandboxAllocationRequestSchema,
+  selectableSandboxAllocationInputSchema,
+  isSelectableSandboxAllocation,
+  isSandboxAllocationAvailable,
+  normalizeSandboxAllocation,
+  sandboxAllocationRequiresControlPlane,
+  sandboxAllocationSchema,
+  sandboxSelectionCapabilitiesSchema,
+  vercelSandboxResourcesSchema,
+} from './sandbox-allocation.js';
+
+describe('sandbox allocation contract', () => {
+  it.each(['isolated-standard', 'cloudflare-single', 'cloudflare-shared'] as const)(
+    'keeps retired %s out of the available allocations even for an enabled owner',
+    allocation => {
+      expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, allocation)).toBe(false);
+      expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, allocation)).toBe(false);
+    }
+  );
+
+  it('accepts cloudflare-single when the native default is offered', () => {
+    expect(normalizeSandboxAllocation('cloudflare-single')).toBe(
+      CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
+    );
+    expect(
+      isSandboxAllocationAvailable(
+        {
+          enabled: true,
+          options: [
+            {
+              allocation: getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION),
+            },
+          ],
+        },
+        'cloudflare-single'
+      )
+    ).toBe(true);
+  });
+
+  it.each([
+    { reasons: {}, expected: true },
+    { reasons: { unavailableReason: 'Provider unavailable' }, expected: false },
+    { reasons: { repositoryUnavailableReason: 'Repository unsupported' }, expected: false },
+  ])('checks offered allocation availability: $reasons', ({ reasons, expected }) => {
+    expect(
+      isSandboxAllocationAvailable(
+        {
+          enabled: true,
+          options: [{ allocation: getSandboxAllocationRequest('vercel-small'), ...reasons }],
+        },
+        'vercel-small'
+      )
+    ).toBe(expected);
+    expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, 'vercel-small')).toBe(
+      false
+    );
+  });
+
+  it.each(sandboxAllocationSchema.options)(
+    'normalizes legacy %s to its structured request',
+    allocation => {
+      const request = getSandboxAllocationRequest(allocation);
+      expect(sandboxAllocationInputSchema.parse(allocation)).toEqual(request);
+      expect(sandboxAllocationInputSchema.parse(request)).toEqual(request);
+      expect(getSandboxAllocation(request)).toBe(allocation);
+    }
+  );
+
+  it('accepts only BYOC Vercel and maps its selected size to the runtime allocation', () => {
+    const request = { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' } as const;
+    expect(sandboxAllocationRequestSchema.parse(request)).toEqual(
+      getSandboxAllocationRequest('vercel-small')
+    );
+    expect(getSandboxAllocation(request)).toBe('vercel-small');
+    expect(
+      sandboxAllocationRequestSchema.safeParse({
+        ...request,
+        provider: { id: 'vercel', account: 'kilo' },
+      }).success
+    ).toBe(false);
+    expect(selectableSandboxAllocationInputSchema.parse(request)).toEqual(request);
+  });
+
+  it.each([
+    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'shared' },
+    { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'large' },
+    { provider: { id: 'cloudflare', account: 'byoc' }, instanceType: 'single' },
+    { provider: { id: 'vercel', account: 'platform' }, instanceType: 'small' },
+    { provider: { id: 'vercel' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'kilo', token: 'not-allowed' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'small', vcpus: 2 },
+    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+    { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
+    { provider: { id: 'cloudflare-containers', account: 'byoc' }, instanceType: 'standard-3' },
+    { provider: { id: 'cloudflare-containers', account: 'kilo' }, instanceType: 'small' },
+    { provider: { id: 'cloudflare-containers', account: 'kilo' }, instanceType: 'standard-2' },
+  ])('rejects unsupported provider metadata and instance combinations %j', request => {
+    expect(sandboxAllocationInputSchema.safeParse(request).success).toBe(false);
+  });
+
+  it('keeps structured Dedicated Standard out of the manual choices', () => {
+    const request = getSandboxAllocationRequest('isolated-standard');
+    expect(sandboxAllocationInputSchema.parse(request)).toEqual(request);
+    expect(selectableSandboxAllocationInputSchema.safeParse(request).success).toBe(false);
+  });
+
+  it('reads legacy capabilities as structured choices without inventing a default', () => {
+    const capabilities = sandboxSelectionCapabilitiesSchema.parse({
+      enabled: true,
+      options: [{ allocation: 'vercel-small', available: true }],
+    });
+    expect(capabilities).toEqual({
+      enabled: true,
+      options: [{ allocation: getSandboxAllocationRequest('vercel-small') }],
+    });
+  });
+
+  it('accepts provider-default and devcontainer descriptions without making them selectable', () => {
+    for (const defaultDestination of [
+      { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
+      { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
+    ]) {
+      const capabilities = sandboxSelectionCapabilitiesSchema.parse({
+        enabled: true,
+        options: [],
+        defaultDestination,
+      });
+      expect(capabilities.defaultDestination).toEqual(defaultDestination);
+    }
+  });
+
+  it.each([
+    ['vercel-small', { vcpus: 2, memory: 4096 }],
+    ['vercel-large', { vcpus: 4, memory: 8192 }],
+    ['cloudflare-single', undefined],
+    ['cloudflare-shared', undefined],
+    ['cloudflare-containers-standard-3', undefined],
+    ['cloudflare-containers-standard-4', undefined],
+    ['isolated-standard', undefined],
+    [undefined, undefined],
+  ] as const)('maps %s to fixed provider resources', (preset, resources) => {
+    expect(getSandboxAllocationResources(preset)).toEqual(resources);
+    if (resources) expect(vercelSandboxResourcesSchema.parse(resources)).toEqual(resources);
+  });
+
+  it.each([
+    { vcpus: 2, memory: 8192 },
+    { vcpus: 4, memory: 4096 },
+    { vcpus: 1, memory: 2048 },
+    { vcpus: 2, memory: 4096, disk: 20 },
+    { vcpus: '2', memory: 4096 },
+  ])('rejects unsupported resource pairs %j', resources => {
+    expect(vercelSandboxResourcesSchema.safeParse(resources).success).toBe(false);
+  });
+
+  it.each([
+    ['isolated-standard', 'cloudflare', false],
+    ['cloudflare-single', 'cloudflare', false],
+    ['cloudflare-shared', 'cloudflare', false],
+    ['cloudflare-containers-standard-3', 'cloudflare-containers', true],
+    ['cloudflare-containers-standard-4', 'cloudflare-containers', true],
+    ['vercel-small', 'vercel', true],
+    ['vercel-large', 'vercel', true],
+  ] as const)(
+    'maps %s to provider %s and control-plane requirement %s',
+    (preset, provider, forcesPlane) => {
+      expect(getSandboxAllocationProvider(preset)).toBe(provider);
+      expect(sandboxAllocationRequiresControlPlane(preset)).toBe(forcesPlane);
+    }
+  );
+
+  it('leaves an omitted selection to the existing plane decision', () => {
+    expect(sandboxAllocationRequiresControlPlane(undefined)).toBe(false);
+  });
+
+  it.each([
+    ['cloudflare-containers-standard-3', 'standard-3'],
+    ['cloudflare-containers-standard-4', 'standard-4'],
+    ['cloudflare-single', undefined],
+    ['vercel-small', undefined],
+    ['isolated-standard', undefined],
+    [undefined, undefined],
+  ] as const)('maps %s to container instance %s', (preset, instance) => {
+    expect(getSandboxAllocationInstance(preset)).toBe(instance);
+  });
+
+  it('derives the default container instance from the default allocation', () => {
+    expect(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION).toBe('cloudflare-containers-standard-3');
+    expect(getSandboxAllocationInstance(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION)).toBe(
+      CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+    );
+    expect(CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE).toBe('standard-3');
+    expect(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION).toBe('cloudflare-containers-standard-3');
+    expect(getSandboxAllocationInstance(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION)).toBe(
+      'standard-3'
+    );
+  });
+
+  it('rejects arbitrary allocations and capability options', () => {
+    expect(sandboxAllocationSchema.safeParse('vercel-custom').success).toBe(false);
+    expect(
+      sandboxSelectionCapabilitiesSchema.safeParse({
+        enabled: true,
+        options: [{ allocation: 'custom' }],
+      }).success
+    ).toBe(false);
+  });
+
+  it.each(['isolated-standard', 'cloudflare-single', 'cloudflare-shared'] as const)(
+    'keeps retired %s decodable in persisted fields but out of the selectable set',
+    allocation => {
+      expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
+      expect(isSelectableSandboxAllocation(allocation)).toBe(false);
+      expect(SELECTABLE_SANDBOX_ALLOCATIONS).not.toContain(allocation);
+      expect(selectableSandboxAllocationInputSchema.safeParse(allocation).success).toBe(false);
+      expect(
+        sandboxSelectionCapabilitiesSchema.safeParse({
+          enabled: true,
+          options: [{ allocation }],
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('keeps every selectable allocation in the containers and BYOC Vercel providers', () => {
+    expect(SELECTABLE_SANDBOX_ALLOCATIONS).toEqual([
+      'cloudflare-containers-standard-3',
+      'cloudflare-containers-standard-4',
+      'vercel-small',
+      'vercel-large',
+    ]);
+    for (const allocation of SELECTABLE_SANDBOX_ALLOCATIONS) {
+      expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
+      expect(getSandboxAllocationProvider(allocation)).toMatch(/^(cloudflare-containers|vercel)$/);
+    }
+  });
+
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('treats %s as selectable', allocation => {
+    expect(isSelectableSandboxAllocation(allocation)).toBe(true);
+  });
+
+  it('requires disabled capability results to omit all options', () => {
+    expect(sandboxSelectionCapabilitiesSchema.parse({ enabled: false, options: [] })).toEqual({
+      enabled: false,
+      options: [],
+    });
+    expect(
+      sandboxSelectionCapabilitiesSchema.safeParse({
+        enabled: false,
+        options: [{ allocation: 'vercel-small' }],
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('multi-repository allocation support', () => {
+  const unsupported = ['vercel-small', 'vercel-large'];
+
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s', allocation => {
+    expect(allocationSupportsMultiRepository(allocation)).toBe(!unsupported.includes(allocation));
+  });
+
+  it('rejects exactly Vercel among selectable allocations', () => {
+    const rejected = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => !allocationSupportsMultiRepository(allocation)
+    );
+    expect(rejected).toEqual(unsupported);
+  });
+});

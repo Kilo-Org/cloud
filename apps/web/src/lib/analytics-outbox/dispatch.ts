@@ -11,9 +11,9 @@
  */
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
-import PostHogClient, { flushPostHog } from '@/lib/posthog';
-import { sentryLogger } from '@/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import PostHogClient, { flushPostHog } from '@kilocode/web-shared/lib/posthog';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   claimDueOutboxEvents,
   markOutboxDelivered,

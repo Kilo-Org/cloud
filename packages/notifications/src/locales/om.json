@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Shumarra agent kee keessa bakka jijjiiramni jira",
+      "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
+      "spendAlert": "Baasiin kee xiyyeeffannaa barbaada",
+      "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada",
+      "securityUpdate": "Sakatta'a nagaa keessa bakka jijjiiramni jira",
+      "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Akeekkachiisa baalansii xiqqaa",
+      "body": "Baalansiin {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
+    },
+    "spendAlert": {
+      "title": "Akeekkachiisa baasii",
+      "body": "Baasiin {{scopeName}} ${{amountUsd}} darbee"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} keessa {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Arganni nagaa haaraa ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Akeekkachiisa SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Diinqii SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Shumarra Kilo kee bilbilaa kee irraa bulchuuf qophaa'ee jira"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

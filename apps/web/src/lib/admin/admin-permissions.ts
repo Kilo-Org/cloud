@@ -1,6 +1,9 @@
 import 'server-only';
 
-import type { User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import { kilocode_users, type User } from '@kilocode/db/schema';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 export function userIsSuperadmin(user: User): boolean {
   return user.is_admin && user.is_super_admin;
@@ -8,4 +11,37 @@ export function userIsSuperadmin(user: User): boolean {
 
 export function userCanViewSessions(user: User): boolean {
   return user.is_admin && user.can_view_sessions;
+}
+
+export function userCanExportApiRequestLogs(user: User): boolean {
+  return user.is_admin && user.can_export_api_request_logs;
+}
+
+// Permission checks read the primary so a granted or revoked permission
+// applies to a session that is already signed in.
+export async function currentUserHasPermission(
+  kiloUserId: string,
+  hasPermission: (user: User) => boolean
+): Promise<boolean> {
+  const currentUser = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.id, kiloUserId),
+  });
+
+  if (!currentUser) {
+    return false;
+  }
+
+  if (isBlockedAccount(currentUser)) {
+    return false;
+  }
+
+  return hasPermission(currentUser);
+}
+
+export function canCurrentUserViewSessions(kiloUserId: string): Promise<boolean> {
+  return currentUserHasPermission(kiloUserId, userCanViewSessions);
+}
+
+export function canCurrentUserExportApiRequestLogs(kiloUserId: string): Promise<boolean> {
+  return currentUserHasPermission(kiloUserId, userCanExportApiRequestLogs);
 }

@@ -3,7 +3,7 @@ import 'server-only';
 import { Buffer } from 'node:buffer';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { z } from 'zod';
-import { SLACK_CREDENTIAL_KEYSET_JSON } from '@/lib/config.server';
+import { SLACK_CREDENTIAL_KEYSET_JSON } from '@kilocode/web-shared/lib/config.server';
 import type { ActiveEnvelopePublicKey, EnvelopePrivateKeySlots } from '@kilocode/encryption';
 
 /**
@@ -16,8 +16,6 @@ import type { ActiveEnvelopePublicKey, EnvelopePrivateKeySlots } from '@kilocode
  * threat this defends is a stolen database dump, not a compromise of web's
  * environment — an attacker holding web's env already holds `SLACK_CLIENT_SECRET`.
  *
- * `mcp-gateway` (`@/lib/mcp-gateway/config.ts`) is the existing precedent for a
- * keyed-envelope keyset with the private half in web, and this mirrors its env shape.
  * The keyset form (rather than three flat env vars) is what makes key rotation
  * possible: `decrypt` slots keep old ciphertext readable after `active` moves on.
  */
@@ -146,8 +144,7 @@ let cached: SlackCredentialKeyset | undefined;
 
 /**
  * Resolves the keyset, memoized per process. Throws `SlackCredentialKeysetError`
- * when unconfigured or invalid — callers on the install path treat that as
- * non-fatal while the new store is still write-only.
+ * when the keyset is unconfigured or invalid.
  */
 export function requireSlackCredentialKeyset(): SlackCredentialKeyset {
   if (cached) return cached;

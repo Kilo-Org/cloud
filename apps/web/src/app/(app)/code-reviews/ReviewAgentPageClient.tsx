@@ -15,7 +15,7 @@ import { Brain, ExternalLink, ListChecks, Rocket, Settings2 } from 'lucide-react
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@/lib/code-reviews/core/constants';
+import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@kilocode/app-shared/feature-flags';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PageContainer } from '@/components/layouts/PageContainer';
@@ -72,9 +72,8 @@ export function ReviewAgentPageClient({
   );
   const selectedActionRequired = selectedConfigData?.actionRequired ?? null;
 
-  const isGitHubAppInstalled =
-    githubStatusData?.connected && githubStatusData?.integration?.isValid;
-  const isGitLabConnected = gitlabStatusData?.connected && gitlabStatusData?.integration?.isValid;
+  const isGitHubAppInstalled = githubStatusData?.connected ?? false;
+  const isGitLabConnected = gitlabStatusData?.connected ?? false;
   const canUseGitHubJobs = isGitHubAppInstalled || localCodeReviewDevelopmentEnabled;
   const canUseGitLabJobs = isGitLabConnected || localCodeReviewDevelopmentEnabled;
 

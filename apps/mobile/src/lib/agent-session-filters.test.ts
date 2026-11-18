@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  type AgentSessionFilters,
-  clearAgentSessionNarrowingFilters,
+  countActiveSessionFilters,
   createDefaultAgentSessionFilters,
   parseStoredAgentSessionFilters,
+  sameAgentSessionFilters,
 } from './agent-session-filters';
 
 describe('createDefaultAgentSessionFilters', () => {
-  it('returns empty narrowing filters and the default sort', () => {
+  it('returns empty narrowing filters', () => {
     expect(createDefaultAgentSessionFilters()).toEqual({
       platformFilter: [],
       projectFilter: [],
-      sortBy: 'updated_at',
     });
   });
 });
@@ -37,7 +36,6 @@ describe('parseStoredAgentSessionFilters', () => {
     expect(parseStoredAgentSessionFilters(raw)).toEqual({
       platformFilter: ['cli', 'cloud-agent'],
       projectFilter: ['https://github.com/foo/bar'],
-      sortBy: 'updated_at',
     });
   });
 
@@ -49,58 +47,126 @@ describe('parseStoredAgentSessionFilters', () => {
     expect(parseStoredAgentSessionFilters(raw)).toEqual({
       platformFilter: ['cli', 'extension'],
       projectFilter: ['https://x', 'y'],
-      sortBy: 'updated_at',
     });
-  });
-
-  it('accepts a stored sortBy value', () => {
-    const raw = JSON.stringify({
-      platformFilter: [],
-      projectFilter: [],
-      sortBy: 'created_at',
-    });
-    expect(parseStoredAgentSessionFilters(raw)?.sortBy).toBe('created_at');
-  });
-
-  it('defaults sortBy to updated_at for missing, malformed, or unknown values', () => {
-    expect(
-      parseStoredAgentSessionFilters(JSON.stringify({ platformFilter: [], projectFilter: [] }))
-        ?.sortBy
-    ).toBe('updated_at');
-    expect(
-      parseStoredAgentSessionFilters(
-        JSON.stringify({ platformFilter: [], projectFilter: [], sortBy: 'title' })
-      )?.sortBy
-    ).toBe('updated_at');
-    expect(
-      parseStoredAgentSessionFilters(
-        JSON.stringify({ platformFilter: [], projectFilter: [], sortBy: 42 })
-      )?.sortBy
-    ).toBe('updated_at');
   });
 });
 
-describe('clearAgentSessionNarrowingFilters', () => {
-  const current: AgentSessionFilters = {
-    platformFilter: ['cli'],
-    projectFilter: ['https://github.com/foo/bar'],
-    sortBy: 'created_at',
-  };
-
-  it('resets platform and project filters but preserves sortBy', () => {
-    expect(clearAgentSessionNarrowingFilters(current)).toEqual({
-      platformFilter: [],
-      projectFilter: [],
-      sortBy: 'created_at',
-    });
+describe('countActiveSessionFilters', () => {
+  it('counts both narrowing dimensions', () => {
+    expect(countActiveSessionFilters(createDefaultAgentSessionFilters())).toBe(0);
+    expect(
+      countActiveSessionFilters({
+        platformFilter: ['cli', 'slack'],
+        projectFilter: ['https://github.com/foo/bar'],
+      })
+    ).toBe(3);
   });
 
-  it('does not mutate the input', () => {
-    const snapshot: AgentSessionFilters = {
-      ...current,
-      platformFilter: [...current.platformFilter],
-    };
-    clearAgentSessionNarrowingFilters(current);
-    expect(current).toEqual(snapshot);
+  it('counts an empty project filter as zero', () => {
+    expect(countActiveSessionFilters(createDefaultAgentSessionFilters())).toBe(0);
+  });
+
+  it('counts one project option as one', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: [],
+        projectFilter: ['https://github.com/org/repo.git'],
+      })
+    ).toBe(1);
+  });
+
+  it('counts one merged project option once across its git-URL aliases', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: [],
+        projectFilter: ['https://github.com/org/repo.git', 'git@github.com:org/repo.git'],
+      })
+    ).toBe(1);
+  });
+
+  it('counts two distinct projects as two', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: [],
+        projectFilter: ['https://github.com/org/a', 'https://github.com/org/b'],
+      })
+    ).toBe(2);
+  });
+
+  it('counts a persisted platform bucket and its variant as one checked row', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: ['cloud-agent', 'cloud-agent-web'],
+        projectFilter: [],
+      })
+    ).toBe(1);
+    expect(
+      countActiveSessionFilters({
+        platformFilter: ['extension', 'vscode', 'agent-manager'],
+        projectFilter: [],
+      })
+    ).toBe(1);
+  });
+
+  it('counts distinct platform buckets separately', () => {
+    expect(countActiveSessionFilters({ platformFilter: ['cli', 'slack'], projectFilter: [] })).toBe(
+      2
+    );
+  });
+
+  it('counts an unknown platform as its own row', () => {
+    expect(countActiveSessionFilters({ platformFilter: ['jetbrains'], projectFilter: [] })).toBe(1);
+  });
+});
+
+it('ignores a legacy stored sortBy field', () => {
+  expect(
+    parseStoredAgentSessionFilters(
+      JSON.stringify({ platformFilter: ['cli'], projectFilter: [], sortBy: 'created_at' })
+    )
+  ).toEqual({ platformFilter: ['cli'], projectFilter: [] });
+});
+
+describe('sameAgentSessionFilters', () => {
+  it('treats two filter sets with the same entries in the same order as one', () => {
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli'], projectFilter: ['https://github.com/kilo/cloud'] },
+        { platformFilter: ['cli'], projectFilter: ['https://github.com/kilo/cloud'] }
+      )
+    ).toBe(true);
+    expect(
+      sameAgentSessionFilters(
+        createDefaultAgentSessionFilters(),
+        createDefaultAgentSessionFilters()
+      )
+    ).toBe(true);
+  });
+
+  it('tells a changed entry, a different order, and a different length apart', () => {
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli'], projectFilter: [] },
+        { platformFilter: [], projectFilter: [] }
+      )
+    ).toBe(false);
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli', 'web'], projectFilter: [] },
+        { platformFilter: ['web', 'cli'], projectFilter: [] }
+      )
+    ).toBe(false);
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: [], projectFilter: ['one'] },
+        { platformFilter: [], projectFilter: ['two'] }
+      )
+    ).toBe(false);
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli'], projectFilter: [] },
+        { platformFilter: ['cli'], projectFilter: ['one'] }
+      )
+    ).toBe(false);
   });
 });

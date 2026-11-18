@@ -1,6 +1,21 @@
 'use client';
+import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
+import { BodyValidationField } from './BodyValidationField';
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import {
+  sandboxAllocationSchema,
+  getSandboxAllocationRequest,
+  type SandboxAllocation,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import { formatSandboxDestination } from '@/components/cloud-agent-next/sandbox-selection';
+import {
+  describeDefaultSandbox,
+  getEligibleAllocationChoices,
+  groupChoicesByProvider,
+} from '@/components/cloud-agent-next/settings/settings-options';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,10 +23,22 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
+import { environmentMembers, useCloudAgentEnvironments } from '@/hooks/useCloudAgentEnvironments';
+import { RepoProfileBindingsDialog } from '@/components/cloud-agent/RepoProfileBindingsDialog';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
-import { ModeCombobox } from '@/components/shared/ModeCombobox';
+import { LEGACY_MODE_OPTIONS, ModeCombobox } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
   Dialog,
@@ -26,24 +53,52 @@ import {
   triggerIdSchema,
   triggerIdCreateSchema,
   RESERVED_TRIGGER_IDS,
+  MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
+  CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
+  webhookTriggerModeSchema,
 } from '@/lib/webhook-trigger-validation';
+import { triggerChatIdSchema } from '@kilocode/worker-utils/webhook-trigger-target';
+import { ExistingChatField } from './ExistingChatField';
 import { TimezoneSelector } from './TimezoneSelector';
 import { ScheduleBuilder } from './ScheduleBuilder';
 import { cn } from '@/lib/utils';
-import { AlertCircle, Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
+import { Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
 import { toast } from 'sonner';
-import type { AgentMode } from '@/components/cloud-agent/types';
+
+const CUSTOM_AGENT_OPTION = '__custom_agent__';
+const BUILTIN_TRIGGER_MODE_OPTIONS = [
+  ...LEGACY_MODE_OPTIONS,
+  { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },
+  { value: 'build', label: 'Build', description: 'Write and modify code' },
+];
+const TRIGGER_MODE_OPTIONS = [
+  ...BUILTIN_TRIGGER_MODE_OPTIONS,
+  {
+    value: CUSTOM_AGENT_OPTION,
+    label: 'Custom agent',
+    description: 'Use an agent from the repository or profile',
+  },
+];
+
+type CloudAgentTarget = 'cloud_agent' | 'cloud_agent_chat';
 
 export type TriggerFormData = {
   triggerId: string;
+  targetType?: CloudAgentTarget;
+  cloudAgentSessionId?: ReturnType<typeof triggerChatIdSchema.parse>;
+  runAsCreator?: boolean;
   activationMode: 'webhook' | 'scheduled';
   cronExpression?: string;
   cronTimezone?: string;
-  githubRepo: string;
-  mode: AgentMode;
+  githubRepo?: string;
+  mode: string;
   model: string;
+  variant?: string | null;
+  sandboxAllocation?: SandboxAllocation | null;
   promptTemplate: string;
-  profileId: string;
+  profileId?: string | null;
+  environmentId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   isActive?: boolean;
@@ -59,14 +114,21 @@ export type TriggerFormProps = {
   organizationId?: string;
   initialData?: {
     triggerId: string;
+    targetType?: CloudAgentTarget;
+    cloudAgentSessionId?: string | null;
+    executionUserId?: string | null;
     activationMode?: 'webhook' | 'scheduled';
     cronExpression?: string | null;
     cronTimezone?: string | null;
     githubRepo: string;
-    mode: AgentMode;
+    mode: string;
     model: string;
+    variant?: string;
+    sandboxAllocation?: SandboxAllocation | null;
     promptTemplate: string;
     profileId?: string;
+    environmentId?: string | null;
+    bodySchema?: WebhookBodySchema | null;
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
     isActive?: boolean;
@@ -81,9 +143,17 @@ export type TriggerFormProps = {
   models: ModelOption[];
   isLoadingModels?: boolean;
   onSubmit: (data: TriggerFormData) => Promise<void>;
+  onSaveAndInvoke?: (data: TriggerFormData) => Promise<void>;
   onCancel?: () => void;
   onDelete?: () => Promise<void>;
   isLoading?: boolean;
+  canSetSandboxAllocation?: boolean;
+  sandboxSelection?: SandboxSelectionCapabilities;
+  onRepositoryChange?: (repository: string) => void;
+  onTargetTypeChange?: (target: CloudAgentTarget) => void;
+  isLoadingCapabilities?: boolean;
+  hasCapabilitiesError?: boolean;
+  onRetryCapabilities?: () => void;
   /** Full inbound webhook URL (only needed in edit mode) */
   inboundUrl?: string;
 };
@@ -94,7 +164,7 @@ export type TriggerFormProps = {
  * Key behaviors:
  * - Trigger ID auto-transforms to lowercase-hyphenated format
  * - Trigger ID and GitHub repo are read-only in edit mode
- * - Profile is REQUIRED for webhook triggers (unlike manual sessions)
+ * - Profiles are optional and resolved at execution time
  * - Shows webhook URL with copy button in edit mode
  * - Shows delete button with confirmation in edit mode
  */
@@ -108,12 +178,36 @@ export function TriggerForm({
   models,
   isLoadingModels,
   onSubmit,
+  onSaveAndInvoke,
   onCancel,
   onDelete,
   isLoading = false,
+  canSetSandboxAllocation = false,
+  sandboxSelection,
+  onRepositoryChange,
+  onTargetTypeChange,
+  isLoadingCapabilities = false,
+  hasCapabilitiesError = false,
+  onRetryCapabilities,
   inboundUrl,
 }: TriggerFormProps) {
+  const { data: session } = useSession();
   const isEditMode = formMode === 'edit';
+  const [targetType, setTargetType] = useState<CloudAgentTarget>(
+    initialData?.targetType ?? 'cloud_agent'
+  );
+  const [cloudAgentSessionId, setCloudAgentSessionId] = useState(
+    initialData?.cloudAgentSessionId ?? ''
+  );
+  const isExistingChat = targetType === 'cloud_agent_chat';
+  const [runAsCreator, setRunAsCreator] = useState(!!initialData?.executionUserId);
+  const isOtherCreator =
+    isEditMode &&
+    !!initialData?.executionUserId &&
+    initialData.executionUserId !== session?.user?.id;
+  const creatorLabel = isOtherCreator
+    ? 'Webhook creator'
+    : session?.user?.name || session?.user?.email || 'Your account';
 
   // Form state
   const [activationMode, setActivationMode] = useState<'webhook' | 'scheduled'>(
@@ -127,8 +221,80 @@ export function TriggerForm({
   const [triggerId, setTriggerId] = useState(initialData?.triggerId ?? '');
   const [triggerIdError, setTriggerIdError] = useState<string | null>(null);
   const [githubRepo, setGithubRepo] = useState(initialData?.githubRepo ?? '');
-  const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
+  const [environmentId, setEnvironmentId] = useState<string | null>(
+    initialData?.environmentId ?? null
+  );
+  const {
+    data: environments,
+    isLoading: isLoadingEnvironments,
+    isError: hasEnvironmentsError,
+    refetch: refetchEnvironments,
+  } = useCloudAgentEnvironments({
+    organizationId,
+    repository: githubRepo ? { platform: 'github', fullName: githubRepo } : undefined,
+    enabled: !isExistingChat,
+  });
+  const selectedEnvironment = environments?.find(environment => environment.id === environmentId);
+  const environmentIsUnchanged =
+    isEditMode && environmentId === (initialData?.environmentId ?? null);
+  const environmentUnavailable =
+    !isExistingChat &&
+    !!environmentId &&
+    !isLoadingEnvironments &&
+    !hasEnvironmentsError &&
+    !selectedEnvironment;
+  const [agentMode, setAgentMode] = useState(initialData?.mode ?? 'ask');
+  const [useCustomAgent, setUseCustomAgent] = useState(
+    !!initialData?.mode &&
+      !BUILTIN_TRIGGER_MODE_OPTIONS.some(option => option.value === initialData.mode)
+  );
+  const agentModeResult = webhookTriggerModeSchema.safeParse(agentMode);
+  const agentModeError = agentModeResult.success ? null : agentModeResult.error.issues[0].message;
   const [model, setModel] = useState(initialData?.model ?? '');
+  const [variant, setVariant] = useState(initialData?.variant);
+  const initialSandboxAllocation = initialData?.sandboxAllocation ?? 'automatic';
+  const [sandboxAllocation, setSandboxAllocation] = useState<'automatic' | SandboxAllocation>(
+    initialSandboxAllocation
+  );
+  const hasSavedSandboxAllocation = initialSandboxAllocation !== 'automatic';
+  const sandboxChoices = getEligibleAllocationChoices(sandboxSelection);
+  const sandboxIsAvailable = sandboxChoices.some(choice => choice.allocation === sandboxAllocation);
+  const sandboxIsUnchanged = isEditMode && sandboxAllocation === initialSandboxAllocation;
+  const showUnavailableSandbox =
+    sandboxSelection !== undefined &&
+    !isLoadingCapabilities &&
+    !hasCapabilitiesError &&
+    sandboxAllocation !== 'automatic' &&
+    !sandboxIsAvailable;
+  const defaultSandbox = describeDefaultSandbox(
+    sandboxSelection?.effectiveDestination ?? sandboxSelection?.defaultDestination
+  );
+  const showSandboxAllocation =
+    canSetSandboxAllocation ||
+    hasSavedSandboxAllocation ||
+    sandboxAllocation !== 'automatic' ||
+    hasCapabilitiesError;
+  let sandboxHelpText =
+    'Automatic uses your Cloud Agent repository and organization defaults. Sandbox selection may affect compute charges.';
+  if (isLoadingCapabilities) {
+    sandboxHelpText = 'Loading sandbox options...';
+  } else if (hasCapabilitiesError) {
+    sandboxHelpText =
+      'Sandbox options could not be loaded. Retry to change the sandbox, or choose Automatic.';
+  } else if (showUnavailableSandbox) {
+    sandboxHelpText = sandboxIsUnchanged
+      ? 'The saved sandbox is no longer offered. It is kept unless you choose another sandbox or Automatic.'
+      : 'Selected sandbox is not available. Choose another sandbox or Automatic.';
+  }
+  const modelVariants = models.find(option => option.id === model)?.variants ?? [];
+  const [showRepoDefaults, setShowRepoDefaults] = useState(false);
+
+  const handleModelChange = (nextModel: string) => {
+    if (nextModel === model) return;
+    setModel(nextModel);
+    const nextVariants = models.find(option => option.id === nextModel)?.variants ?? [];
+    setVariant(current => (current && nextVariants.includes(current) ? current : undefined));
+  };
   const WEBHOOK_DEFAULT_PROMPT = 'Describe this webhook request payload:\n\n{{body}}';
   const SCHEDULED_DEFAULT_PROMPT = 'Run the scheduled task. Triggered at {{scheduledTime}}.';
   const [promptTemplate, setPromptTemplate] = useState(
@@ -136,6 +302,10 @@ export function TriggerForm({
       (activationMode === 'scheduled' ? SCHEDULED_DEFAULT_PROMPT : WEBHOOK_DEFAULT_PROMPT)
   );
   const [profileId, setProfileId] = useState<string | null>(initialData?.profileId ?? null);
+  const [bodySchema, setBodySchema] = useState<WebhookBodySchema | null>(
+    initialData?.bodySchema ?? null
+  );
+  const [bodySchemaValid, setBodySchemaValid] = useState(true);
   const [autoCommit, setAutoCommit] = useState(initialData?.autoCommit ?? false);
   const [condenseOnComplete, setCondenseOnComplete] = useState(
     initialData?.condenseOnComplete ?? false
@@ -147,19 +317,33 @@ export function TriggerForm({
   const [webhookAuthSecret, setWebhookAuthSecret] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const submissionInFlightRef = useRef(false);
+  const [isSaveAndInvoking, setIsSaveAndInvoking] = useState(false);
 
   // Reset form when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData) {
+      setRunAsCreator(!!initialData.executionUserId);
       setActivationMode(initialData.activationMode ?? 'webhook');
       setCronExpression(initialData.cronExpression ?? '');
       setCronTimezone(initialData.cronTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
       setTriggerId(initialData.triggerId);
+      setTargetType(initialData.targetType ?? 'cloud_agent');
+      setCloudAgentSessionId(initialData.cloudAgentSessionId ?? '');
       setGithubRepo(initialData.githubRepo);
+      setEnvironmentId(initialData.environmentId ?? null);
       setAgentMode(initialData.mode ?? 'ask');
+      setUseCustomAgent(
+        !!initialData.mode &&
+          !BUILTIN_TRIGGER_MODE_OPTIONS.some(option => option.value === initialData.mode)
+      );
       setModel(initialData.model);
+      setVariant(initialData.variant);
+      setSandboxAllocation(initialData.sandboxAllocation ?? 'automatic');
       setPromptTemplate(initialData.promptTemplate);
       setProfileId(initialData.profileId ?? null);
+      setBodySchema(initialData.bodySchema ?? null);
+      setBodySchemaValid(true);
       setAutoCommit(initialData.autoCommit ?? false);
       setCondenseOnComplete(initialData.condenseOnComplete ?? false);
       setIsActive(initialData.isActive ?? true);
@@ -167,8 +351,11 @@ export function TriggerForm({
       setWebhookAuthHeader(initialData.webhookAuthHeader ?? '');
     }
     if (!initialData) {
+      setRunAsCreator(false);
+      setEnvironmentId(null);
       setWebhookAuthEnabled(false);
       setWebhookAuthHeader('');
+      setSandboxAllocation('automatic');
     }
     setWebhookAuthSecret('');
   }, [initialData]);
@@ -196,10 +383,15 @@ export function TriggerForm({
   const trimmedWebhookAuthSecret = webhookAuthSecret.trim();
   const webhookAuthHeaderError =
     webhookAuthEnabled && !trimmedWebhookAuthHeader ? 'Webhook auth header is required' : null;
-  const webhookAuthSecretError =
-    webhookAuthEnabled && !initialWebhookAuthConfigured && !trimmedWebhookAuthSecret
+  const webhookAuthSecretError = !webhookAuthEnabled
+    ? null
+    : !initialWebhookAuthConfigured && !trimmedWebhookAuthSecret
       ? 'Webhook auth secret is required when enabling authentication'
-      : null;
+      : runAsCreator &&
+          trimmedWebhookAuthSecret &&
+          trimmedWebhookAuthSecret.length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH
+        ? CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE
+        : null;
 
   // Trigger ID validation — use stricter schema for new triggers
   const activeTriggerIdSchema = isEditMode ? triggerIdSchema : triggerIdCreateSchema;
@@ -260,103 +452,216 @@ export function TriggerForm({
       }
     }
 
-    if (!githubRepo) {
+    if (isExistingChat && !triggerChatIdSchema.safeParse(cloudAgentSessionId).success) {
+      errors.push('Select a chat or enter a valid Cloud Agent chat ID.');
+    }
+    if (!isExistingChat && !githubRepo) {
       errors.push('Repository is required');
+    }
+    if (!isExistingChat && environmentId && !environmentIsUnchanged && !selectedEnvironment) {
+      errors.push('Select an available environment or Automatic.');
     }
 
     if (!model) {
       errors.push('Model is required');
     }
 
+    if (agentModeError) {
+      errors.push(agentModeError);
+    }
+
     if (!promptTemplate.trim()) {
       errors.push('Prompt template is required');
     }
 
-    if (!profileId) {
-      errors.push('Profile is required');
+    if (!isScheduled && !bodySchemaValid) {
+      errors.push('Fix the body validation schema before saving');
     }
 
     if (!isScheduled && webhookAuthHeaderError) {
       errors.push(webhookAuthHeaderError);
     }
 
+    if (runAsCreator && !isScheduled && !webhookAuthEnabled) {
+      errors.push('Webhook authentication is required when running as the creator');
+    }
+
     if (!isScheduled && webhookAuthSecretError) {
       errors.push(webhookAuthSecretError);
+    }
+
+    const requiresSandboxAllocationEligibility =
+      !isExistingChat && sandboxAllocation !== 'automatic' && !sandboxIsUnchanged;
+    if (
+      requiresSandboxAllocationEligibility &&
+      (!canSetSandboxAllocation ||
+        isLoadingCapabilities ||
+        hasCapabilitiesError ||
+        !sandboxIsAvailable)
+    ) {
+      errors.push('Selected sandbox is not available. Choose another sandbox or Automatic.');
     }
 
     return errors;
   }, [
     activeTriggerIdSchema,
+    cloudAgentSessionId,
+    isExistingChat,
     triggerId,
     isScheduled,
     cronExpression,
     githubRepo,
+    environmentId,
+    environmentIsUnchanged,
+    selectedEnvironment,
     model,
+    agentModeError,
     promptTemplate,
     profileId,
+    bodySchema,
+    bodySchemaValid,
     webhookAuthHeaderError,
     webhookAuthSecretError,
+    runAsCreator,
+    webhookAuthEnabled,
+    sandboxAllocation,
+    sandboxIsUnchanged,
+    sandboxIsAvailable,
+    canSetSandboxAllocation,
+    isLoadingCapabilities,
+    hasCapabilitiesError,
   ]);
 
   const isFormValid = formErrors.length === 0;
 
-  // Handle form submission
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
+  const getFormData = useCallback((): TriggerFormData | undefined => {
+    if (!isFormValid) {
+      toast.error('Please fix form errors before submitting');
+      return undefined;
+    }
+    const webhookAuthData: TriggerFormData['webhookAuth'] =
+      !isScheduled && webhookAuthEnabled
+        ? {
+            enabled: true,
+            header: trimmedWebhookAuthHeader,
+            secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
+          }
+        : { enabled: false };
 
-      if (!isFormValid || !profileId) {
-        toast.error('Please fix form errors before submitting');
-        return;
-      }
+    const submittedVariant = isEditMode
+      ? variant === initialData?.variant
+        ? undefined
+        : (variant ?? null)
+      : variant;
+    const submittedSandboxAllocation = isEditMode
+      ? sandboxAllocation === initialSandboxAllocation
+        ? undefined
+        : sandboxAllocation === 'automatic'
+          ? null
+          : sandboxAllocation
+      : sandboxAllocation !== 'automatic'
+        ? sandboxAllocation
+        : undefined;
 
-      const webhookAuthData: TriggerFormData['webhookAuth'] =
-        !isScheduled && webhookAuthEnabled
-          ? {
-              enabled: true,
-              header: trimmedWebhookAuthHeader,
-              secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
-            }
-          : { enabled: false };
-
-      await onSubmit({
-        triggerId,
-        activationMode,
-        cronExpression: isScheduled ? cronExpression.trim() : undefined,
-        cronTimezone: isScheduled ? cronTimezone : undefined,
-        githubRepo,
-        mode: agentMode,
-        model,
-        promptTemplate: promptTemplate.trim(),
-        profileId,
-        autoCommit,
-        condenseOnComplete,
-        isActive: isEditMode ? isActive : undefined,
-        webhookAuth: webhookAuthData,
-      });
-    },
-    [
-      isFormValid,
-      profileId,
-      onSubmit,
+    return {
       triggerId,
+      targetType,
+      ...(isExistingChat && !isEditMode
+        ? { cloudAgentSessionId: triggerChatIdSchema.parse(cloudAgentSessionId) }
+        : {}),
+      runAsCreator: organizationId ? runAsCreator : undefined,
       activationMode,
-      cronExpression,
-      cronTimezone,
-      isScheduled,
-      githubRepo,
-      agentMode,
+      cronExpression: isScheduled ? cronExpression.trim() : undefined,
+      cronTimezone: isScheduled ? cronTimezone : undefined,
+      ...(!isExistingChat
+        ? {
+            githubRepo,
+            ...(submittedSandboxAllocation !== undefined
+              ? { sandboxAllocation: submittedSandboxAllocation }
+              : {}),
+            profileId:
+              isEditMode && profileId === (initialData?.profileId ?? null) ? undefined : profileId,
+            environmentId: environmentIsUnchanged ? undefined : environmentId,
+          }
+        : {}),
+      mode: agentMode,
       model,
-      promptTemplate,
+      ...(submittedVariant !== undefined ? { variant: submittedVariant } : {}),
+      promptTemplate: promptTemplate.trim(),
+      ...(!isScheduled ? { bodySchema } : {}),
       autoCommit,
       condenseOnComplete,
-      isEditMode,
-      isActive,
-      webhookAuthEnabled,
-      trimmedWebhookAuthHeader,
-      trimmedWebhookAuthSecret,
-    ]
+      isActive: isEditMode ? isActive : undefined,
+      webhookAuth: webhookAuthData,
+    };
+  }, [
+    isFormValid,
+    targetType,
+    isExistingChat,
+    cloudAgentSessionId,
+    profileId,
+    environmentId,
+    environmentIsUnchanged,
+    bodySchema,
+    bodySchemaValid,
+    triggerId,
+    runAsCreator,
+    organizationId,
+    activationMode,
+    cronExpression,
+    cronTimezone,
+    isScheduled,
+    githubRepo,
+    agentMode,
+    model,
+    variant,
+    initialData?.variant,
+    initialData?.profileId,
+    sandboxAllocation,
+    initialSandboxAllocation,
+    promptTemplate,
+    autoCommit,
+    condenseOnComplete,
+    isEditMode,
+    isActive,
+    webhookAuthEnabled,
+    trimmedWebhookAuthHeader,
+    trimmedWebhookAuthSecret,
+  ]);
+
+  const runSubmission = useCallback(
+    async (submit: (data: TriggerFormData) => Promise<void>, isSaveAndInvokeAction = false) => {
+      if (isLoading || isDeleting || submissionInFlightRef.current) return;
+      const formData = getFormData();
+      if (!formData) return;
+
+      submissionInFlightRef.current = true;
+      if (isSaveAndInvokeAction) setIsSaveAndInvoking(true);
+      try {
+        await submit(formData);
+      } catch {
+        return;
+      } finally {
+        submissionInFlightRef.current = false;
+        if (isSaveAndInvokeAction) setIsSaveAndInvoking(false);
+      }
+    },
+    [getFormData, isDeleting, isLoading]
   );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      void runSubmission(onSubmit);
+    },
+    [onSubmit, runSubmission]
+  );
+
+  const handleSaveAndInvoke = useCallback(() => {
+    if (!isEditMode || !isScheduled || !isActive || !onSaveAndInvoke || environmentUnavailable)
+      return;
+    void runSubmission(onSaveAndInvoke, true);
+  }, [environmentUnavailable, isActive, isEditMode, isScheduled, onSaveAndInvoke, runSubmission]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -384,7 +689,7 @@ export function TriggerForm({
           <CardDescription>
             {isEditMode
               ? 'Update the configuration for this trigger'
-              : 'Configure a new trigger to automatically start cloud agent sessions'}
+              : 'Send a prompt to Cloud Agent on a schedule or when a webhook arrives.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -465,54 +770,273 @@ export function TriggerForm({
               <WebhookUrlDisplay url={inboundUrl} onCopy={handleCopyUrl} />
             )}
 
-            {/* GitHub Repository */}
             <div className="space-y-2">
-              <Label>
-                Repository <span className="text-red-400">*</span>
-              </Label>
-              {isEditMode ? (
-                <>
-                  <div className="bg-muted truncate rounded-md border px-3 py-2 font-mono text-sm">
-                    {githubRepo || 'No repository selected'}
-                  </div>
-                  <p className="text-muted-foreground text-xs">
-                    Repository cannot be changed after creation
+              <Label htmlFor="triggerTarget">Target</Label>
+              <Select
+                value={targetType}
+                disabled={isEditMode || isLoading}
+                onValueChange={value => {
+                  if (value !== 'cloud_agent' && value !== 'cloud_agent_chat') return;
+                  setTargetType(value);
+                  onTargetTypeChange?.(value);
+                  if (value === 'cloud_agent_chat' && organizationId) {
+                    setRunAsCreator(true);
+                    setWebhookAuthEnabled(true);
+                  }
+                }}
+              >
+                <SelectTrigger id="triggerTarget" className="w-full sm:max-w-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cloud_agent">New workspace</SelectItem>
+                  <SelectItem value="cloud_agent_chat">Existing chat</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isExistingChat ? (
+              <ExistingChatField
+                organizationId={organizationId}
+                value={cloudAgentSessionId}
+                onChange={setCloudAgentSessionId}
+                disabled={isLoading}
+                readOnly={isEditMode}
+              />
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>
+                    Repository <span className="text-red-400">*</span>
+                  </Label>
+                  {isEditMode ? (
+                    <>
+                      <div className="bg-muted truncate rounded-md border px-3 py-2 font-mono text-sm">
+                        {githubRepo || 'No repository selected'}
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        Repository cannot be changed after creation
+                      </p>
+                    </>
+                  ) : (
+                    <RepositoryCombobox
+                      repositories={repositories}
+                      value={githubRepo}
+                      onValueChange={repository => {
+                        setGithubRepo(repository);
+                        if (repository !== githubRepo) setEnvironmentId(null);
+                        onRepositoryChange?.(repository);
+                      }}
+                      isLoading={isLoadingRepositories}
+                      error={repositoriesError}
+                      placeholder="Select a repository"
+                      emptyStateText="Requires a GitHub integration — configure in Integrations"
+                      hideLabel
+                    />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="environmentId">Environment</Label>
+                  <Select
+                    value={environmentId ?? 'automatic'}
+                    onValueChange={value => setEnvironmentId(value === 'automatic' ? null : value)}
+                    disabled={isLoading || !githubRepo || isLoadingEnvironments}
+                  >
+                    <SelectTrigger
+                      id="environmentId"
+                      className="w-full min-w-0 pointer-coarse:min-h-11 sm:max-w-lg"
+                      aria-describedby="environmentHelp"
+                      aria-invalid={environmentUnavailable && !environmentIsUnchanged}
+                    >
+                      <SelectValue placeholder="Automatic" />
+                    </SelectTrigger>
+                    <SelectContent className="max-w-[calc(100vw-2rem)]">
+                      <SelectItem value="automatic" className="pointer-coarse:min-h-11">
+                        Automatic
+                      </SelectItem>
+                      {environments?.map(environment => (
+                        <SelectItem
+                          key={environment.id}
+                          value={environment.id}
+                          textValue={environment.name}
+                          className="pointer-coarse:min-h-11"
+                        >
+                          <span className="whitespace-normal break-words">{environment.name}</span>
+                        </SelectItem>
+                      ))}
+                      {environmentId && !selectedEnvironment && (
+                        <SelectItem value={environmentId} disabled>
+                          Saved environment{environmentUnavailable ? ' (unavailable)' : ''}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p
+                    id="environmentHelp"
+                    role={hasEnvironmentsError || environmentUnavailable ? 'alert' : undefined}
+                    className="text-muted-foreground max-w-prose text-xs"
+                  >
+                    {!githubRepo
+                      ? 'Select a repository to choose an environment.'
+                      : isLoadingEnvironments
+                        ? 'Loading environments...'
+                        : hasEnvironmentsError
+                          ? 'Environments could not be loaded. Retry, keep the saved selection, or choose Automatic.'
+                          : environmentUnavailable
+                            ? 'The saved environment is no longer available for this repository. Choose another environment or Automatic before running.'
+                            : 'Automatic uses the matching environment when exactly one exists; otherwise runs without an environment. Choose an environment to use it for every run.'}
                   </p>
-                </>
-              ) : (
-                <RepositoryCombobox
-                  repositories={repositories}
-                  value={githubRepo}
-                  onValueChange={setGithubRepo}
-                  isLoading={isLoadingRepositories}
-                  error={repositoriesError}
-                  placeholder="Select a repository"
-                  emptyStateText="Requires a GitHub integration — configure in Integrations"
-                  hideLabel
+                  {hasEnvironmentsError && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void refetchEnvironments()}
+                    >
+                      Retry environments
+                    </Button>
+                  )}
+                  {selectedEnvironment && (
+                    <p className="text-muted-foreground max-w-prose text-xs break-words">
+                      Repositories:{' '}
+                      {environmentMembers(selectedEnvironment)
+                        .map(member => member.repoFullName)
+                        .join(', ')}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="space-y-2">
+              <div
+                className={cn(
+                  'grid grid-cols-1 gap-4',
+                  modelVariants.length > 0 || variant
+                    ? 'lg:grid-cols-[1fr_2fr_1fr]'
+                    : 'md:grid-cols-2'
+                )}
+              >
+                <div className="min-w-0 space-y-2">
+                  <ModeCombobox
+                    label="Mode"
+                    options={TRIGGER_MODE_OPTIONS}
+                    value={useCustomAgent ? CUSTOM_AGENT_OPTION : agentMode}
+                    onValueChange={value => {
+                      if (value === CUSTOM_AGENT_OPTION && useCustomAgent) return;
+                      setUseCustomAgent(value === CUSTOM_AGENT_OPTION);
+                      setAgentMode(value === CUSTOM_AGENT_OPTION ? '' : value);
+                    }}
+                    disabled={isLoading}
+                  />
+                  {useCustomAgent && (
+                    <>
+                      <Label htmlFor="customAgentSlug">Agent slug</Label>
+                      <Input
+                        id="customAgentSlug"
+                        value={agentMode}
+                        onChange={event => setAgentMode(event.target.value)}
+                        placeholder="foreman"
+                        maxLength={50}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        disabled={isLoading}
+                        aria-invalid={!!agentModeError}
+                        aria-describedby={
+                          agentModeError ? 'customAgentHelp customAgentError' : 'customAgentHelp'
+                        }
+                      />
+                      <p id="customAgentHelp" className="text-muted-foreground text-xs">
+                        The agent must exist in the repository&apos;s <code>.kilo/agent/</code>{' '}
+                        directory (for example, <code>.kilo/agent/foreman.md</code>) or in the
+                        selected profile. Use 1-50 lowercase letters, numbers, or hyphens, starting
+                        with a letter.
+                      </p>
+                      {agentModeError && (
+                        <p id="customAgentError" role="alert" className="text-destructive text-xs">
+                          {agentModeError}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+                <ModelCombobox
+                  label="Model"
+                  models={models}
+                  value={model}
+                  onValueChange={handleModelChange}
+                  isLoading={isLoadingModels}
+                  required
+                  disabled={isLoading}
                 />
+                {(modelVariants.length > 0 || variant) && (
+                  <div className="min-w-0 space-y-2">
+                    <Label>Reasoning Effort</Label>
+                    <VariantCombobox
+                      variants={modelVariants}
+                      value={variant}
+                      onValueChange={setVariant}
+                      onClear={() => setVariant(undefined)}
+                      disabled={isLoading || isLoadingModels}
+                      triggerAriaLabel="Reasoning Effort"
+                      className="w-full"
+                    />
+                  </div>
+                )}
+              </div>
+              {(modelVariants.length > 0 || variant) && (
+                <p className="text-muted-foreground text-xs">
+                  Default uses the model&apos;s default reasoning effort, preserving existing
+                  trigger behavior.
+                </p>
               )}
             </div>
 
-            {/* Mode and Model Row */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <ModeCombobox
-                label="Mode"
-                value={agentMode}
-                onValueChange={setAgentMode}
-                disabled={isLoading}
-              />
-              <ModelCombobox
-                label="Model"
-                models={models}
-                value={model}
-                onValueChange={setModel}
-                isLoading={isLoadingModels}
-                required
-                disabled={isLoading}
-              />
-            </div>
+            {organizationId && (
+              <div className="space-y-2">
+                <Label htmlFor="runAsCreator">Run as</Label>
+                <Select
+                  value={runAsCreator ? 'creator' : 'organization-bot'}
+                  onValueChange={value => {
+                    setRunAsCreator(value === 'creator');
+                    setProfileId(null);
+                    if (value === 'creator') setWebhookAuthEnabled(true);
+                  }}
+                  disabled={isEditMode || isLoading || isExistingChat}
+                >
+                  <SelectTrigger
+                    id="runAsCreator"
+                    className="min-h-11 w-full sm:w-80"
+                    aria-describedby="runAsCreatorHelp"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="organization-bot">Organization bot</SelectItem>
+                    <SelectItem value="creator">{creatorLabel}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p id="runAsCreatorHelp" className="text-muted-foreground max-w-prose text-xs">
+                  {isExistingChat
+                    ? 'An existing chat must run as its owner. Organization credits cover the turns.'
+                    : runAsCreator
+                      ? 'Runs as the user who created this trigger, using organization credits. Only the creator can edit it. Execution stops if they leave the organization or their account is blocked.'
+                      : 'Runs as the organization webhook bot by default.'}
+                  {isEditMode
+                    ? ' Execution identity cannot be changed. Create a new trigger to use a different identity.'
+                    : ' This choice cannot be changed after creation. Creator-run webhooks require authentication.'}
+                </p>
+                {runAsCreator && !isExistingChat && (
+                  <p className="text-muted-foreground max-w-prose text-xs">
+                    Organization repository and default profiles remain shared. Members who can edit
+                    them can affect runs under your identity. Enable this only if you trust those
+                    members.
+                  </p>
+                )}
+              </div>
+            )}
 
-            {/* Prompt Template */}
             <PromptTemplateField
               value={promptTemplate}
               onChange={setPromptTemplate}
@@ -520,26 +1044,136 @@ export function TriggerForm({
               isScheduled={isScheduled}
             />
 
-            {/* Profile Selection (Required) */}
-            <div className="space-y-2">
-              <Label>
-                Environment Profile <span className="text-red-400">*</span>
-              </Label>
-              <ProfileSelector
-                organizationId={organizationId}
-                selectedProfileId={profileId}
-                onProfileSelect={setProfileId}
-                disabled={isLoading}
-                orgProfilesOnly={!!organizationId}
-              />
-              {!profileId && (
-                <p className="flex items-center gap-1 text-xs text-amber-400">
-                  <AlertCircle className="h-3 w-3" />A profile is required for webhook triggers
+            {!isExistingChat && showSandboxAllocation && (
+              <div className="space-y-2">
+                <Label htmlFor="sandboxAllocation">Sandbox</Label>
+                <Select
+                  value={sandboxAllocation}
+                  onValueChange={value => {
+                    if (value === 'automatic') return setSandboxAllocation(value);
+                    const allocation = sandboxAllocationSchema.safeParse(value);
+                    if (allocation.success) setSandboxAllocation(allocation.data);
+                  }}
+                  disabled={isLoading || isLoadingCapabilities}
+                >
+                  <SelectTrigger
+                    id="sandboxAllocation"
+                    className="w-full min-w-0 pointer-coarse:min-h-11 sm:max-w-lg"
+                    aria-describedby="sandboxAllocationHelp"
+                    aria-invalid={showUnavailableSandbox && !sandboxIsUnchanged}
+                  >
+                    <SelectValue>
+                      <span className="truncate tabular-nums">
+                        {sandboxAllocation === 'automatic'
+                          ? defaultSandbox
+                            ? `Automatic · ${defaultSandbox.summary}`
+                            : 'Automatic'
+                          : formatSandboxDestination(
+                              getSandboxAllocationRequest(sandboxAllocation)
+                            )}
+                      </span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
+                    <SelectItem value="automatic" className="pointer-coarse:min-h-11">
+                      Automatic
+                    </SelectItem>
+                    {groupChoicesByProvider(sandboxChoices).map(group => (
+                      <SelectGroup key={group.provider}>
+                        <SelectLabel>{group.provider}</SelectLabel>
+                        {group.choices.map(choice => (
+                          <SelectItem
+                            key={choice.allocation}
+                            value={choice.allocation}
+                            disabled={hasCapabilitiesError}
+                            textValue={choice.instance}
+                            className="pointer-coarse:min-h-11"
+                          >
+                            <span className="whitespace-normal tabular-nums">
+                              {choice.instance}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                    {showUnavailableSandbox && (
+                      <SelectItem value={sandboxAllocation} disabled>
+                        {sandboxAllocation === 'isolated-standard'
+                          ? 'Dedicated Standard (legacy)'
+                          : formatSandboxDestination(
+                              getSandboxAllocationRequest(sandboxAllocation)
+                            )}
+                        {' (unavailable)'}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p
+                  id="sandboxAllocationHelp"
+                  role={hasCapabilitiesError ? 'alert' : undefined}
+                  className="text-muted-foreground max-w-prose text-xs"
+                >
+                  {sandboxHelpText}
                 </p>
-              )}
-              <p className="text-muted-foreground text-xs">
-                Profile secrets will be resolved at webhook execution time
-              </p>
+                {hasCapabilitiesError && onRetryCapabilities && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading || isLoadingCapabilities}
+                    onClick={onRetryCapabilities}
+                  >
+                    Retry sandbox options
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {!isExistingChat && (
+              <div className="space-y-2">
+                <Label>Environment Profile (optional)</Label>
+                {isOtherCreator ? (
+                  <p className="text-sm">
+                    {profileId ? 'Saved creator profile (unchanged)' : 'Use defaults'}
+                  </p>
+                ) : (
+                  <ProfileSelector
+                    organizationId={runAsCreator ? undefined : organizationId}
+                    emptyLabel="Use defaults"
+                    savedSelectionLabel={
+                      isEditMode && profileId === initialData?.profileId
+                        ? 'Saved profile (unchanged)'
+                        : undefined
+                    }
+                    selectedProfileId={profileId}
+                    onProfileSelect={setProfileId}
+                    disabled={isLoading}
+                    orgProfilesOnly={!!organizationId}
+                    onRepoDefaultsClick={() => setShowRepoDefaults(true)}
+                  />
+                )}
+                <RepoProfileBindingsDialog
+                  organizationId={organizationId}
+                  open={showRepoDefaults}
+                  onOpenChange={setShowRepoDefaults}
+                />
+                <p className="text-muted-foreground text-xs">
+                  {isOtherCreator
+                    ? 'Only the trigger creator can change its personal environment profile. The saved setting is kept.'
+                    : 'Use defaults applies repository settings and the effective default profile. Selected profiles override default profile settings. Secrets resolve when the trigger runs.'}
+                </p>
+              </div>
+            )}
+
+            <div hidden={isScheduled}>
+              <BodyValidationField
+                initialSchema={initialData?.bodySchema}
+                disabled={isLoading}
+                onChange={(schema, valid) => {
+                  setBodySchema(schema);
+                  setBodySchemaValid(valid);
+                }}
+              />
             </div>
 
             {/* Webhook Authentication (webhook mode only) */}
@@ -564,7 +1198,7 @@ export function TriggerForm({
                           setWebhookAuthSecret('');
                         }
                       }}
-                      disabled={isLoading}
+                      disabled={isLoading || runAsCreator}
                     />
                     <Label htmlFor="webhookAuthEnabled" className="cursor-pointer font-normal">
                       {webhookAuthEnabled ? 'Authentication enabled' : 'Authentication disabled'}
@@ -694,13 +1328,15 @@ export function TriggerForm({
 
             {/* Form Actions */}
             <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   type="submit"
-                  disabled={!isFormValid || isLoading}
+                  disabled={!isFormValid || isLoading || isDeleting || isSaveAndInvoking}
                   className="min-w-[120px]"
                 >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {(isLoading || isSaveAndInvoking) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   {isLoading
                     ? isEditMode
                       ? 'Saving...'
@@ -709,8 +1345,31 @@ export function TriggerForm({
                       ? 'Save Changes'
                       : 'Create Trigger'}
                 </Button>
+                {isEditMode && isScheduled && onSaveAndInvoke && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSaveAndInvoke}
+                    disabled={
+                      !isFormValid ||
+                      environmentUnavailable ||
+                      isLoading ||
+                      isDeleting ||
+                      isSaveAndInvoking ||
+                      !isActive
+                    }
+                  >
+                    {isSaveAndInvoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isSaveAndInvoking ? 'Saving and invoking…' : 'Save and invoke now'}
+                  </Button>
+                )}
                 {onCancel && (
-                  <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isLoading || isDeleting || isSaveAndInvoking}
+                  >
                     Cancel
                   </Button>
                 )}
@@ -837,7 +1496,7 @@ const WebhookUrlDisplay = memo(function WebhookUrlDisplay({ url, onCopy }: Webho
         </Button>
       </div>
       <p className="text-muted-foreground text-xs">
-        Send HTTP requests to this URL to trigger cloud agent sessions
+        Send HTTP requests to this URL to invoke the trigger.
       </p>
     </div>
   );

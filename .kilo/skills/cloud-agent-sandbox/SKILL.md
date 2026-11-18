@@ -1,0 +1,342 @@
+---
+name: cloud-agent-sandbox
+description: Sets up and runs this monorepo inside a memory-constrained Kilo Cloud Agent sandbox with `.kilo/cloud-agent-setup.sh`. Use when working in a Cloud Agent sandbox, before starting local services there, after a sandbox restart, or when debugging the dev memory cap, Docker, DNS, fake login, agent-browser, or fake-LLM Cloud Agent sessions in the sandbox.
+---
+
+# Cloud Agent sandbox
+
+`.kilo/cloud-agent-setup.sh` prepares a Debian/Ubuntu Cloud Agent sandbox for
+`pnpm dev:start`. It usually runs automatically when the machine starts. You can
+run it at any time: reruns are safe and take about 20 s once the machine is set up.
+
+Follow the `local-development` skill for ports, fake login, and service
+management. This skill covers what is different in the sandbox.
+
+## Is setup done?
+
+What survives depends on how the sandbox came back:
+
+- A plain restart wipes Docker, the pnpm wrapper, and `.wrangler/kilo-startup/`.
+  The repository and `node_modules` survive. Run full setup.
+- A workspace resumed from a workspace tail snapshot, or a session started from
+  an environment snapshot, gets the whole disk back: the pnpm wrapper,
+  `.wrangler/kilo-startup/`, installed packages, and Docker images. Processes
+  and cgroups are not restored, so dockerd, dnsmasq, the DNS iptables rule, and
+  the `kilo-docker` cgroup are gone. Nothing restarts them automatically:
+  Docker is only needed by the dev stack, database tests, and local Cloud Agent
+  sessions, so start it when you need those.
+
+Check before starting services from the repository root:
+
+```bash
+if ! test -f .wrangler/kilo-startup/env \
+  || ! grep -q kilo-cloud-agent-pnpm-wrapper "$(command -v pnpm)"; then
+  echo 'setup needed'
+elif ! docker info >/dev/null 2>&1; then
+  echo 'resume needed'
+else
+  echo ready
+fi
+```
+
+For `resume needed`, restart Docker, dnsmasq, and the DNS redirect from the
+installed filesystem. This takes a few seconds and skips apt, installs, and
+image builds:
+
+```bash
+bash .kilo/cloud-agent-setup.sh --resume
+```
+
+For `setup needed`, run full setup:
+
+```bash
+bash .kilo/cloud-agent-setup.sh
+```
+
+`--resume` on a machine that was never set up runs full setup instead.
+
+A restarted machine takes about 6 minutes, mostly building the Cloud Agent
+sandbox images; `node_modules` survives the restart. A rerun on a running
+machine takes under 2 minutes, because images come from the build cache. A
+machine without dependencies adds about 3 minutes for `pnpm install`. Setup stops at the first failure and prints
+the line number.
+
+## Memory containment
+
+The session wrapper (`services/cloud-agent-next/wrapper/src/control/workload-cgroup.ts`)
+owns memory limits; setup does not create a cap of its own. Under the delegated
+`/sys/fs/cgroup/kilo-workloads`, capped at the container limit minus 1 GiB:
+
+| cgroup | Owner | Contents and limit |
+|---|---|---|
+| `kilo-control-<id>/server` | wrapper | The Kilo server, protected with `memory.min` and OOM immunity |
+| `kilo-control-<id>/tools` | wrapper | Every agent tool process: pnpm, node, tmux, dev servers. Moved there within a second. Capped 1.5 GiB below the parent |
+| `kilo-setup` | wrapper | Environment setup and start commands and the daemons they start |
+| `kilo-docker` | setup | `daemon/` holds dockerd, containerd, and dnsmasq. `containers/` holds every container, and `containers/builds` (2 GiB) holds image builds. Capped 1.5 GiB below the parent |
+
+Every agent process is capped within a second of starting, however it was
+started. When the Kilo runtime stops, the wrapper kills its whole
+`kilo-control-<id>` scope, including dev servers the agent started. Docker and
+its containers survive in `kilo-docker`.
+
+## What setup does
+
+- Creates the `kilo-docker` cgroup tree above.
+- Installs Docker, Compose v2, tmux, Chromium, agent-browser, and dnsmasq.
+  Starts dockerd with its containers in `kilo-docker/containers` and pulls
+  images through `mirror.gcr.io`. The daemon log is
+  `.wrangler/kilo-startup/dockerd.log`.
+- Installs a global `pnpm` wrapper. Inside this repository it loads
+  `.wrangler/kilo-startup/env`. Outside the repository it runs the real pnpm, saved at
+  `/usr/local/lib/kilo-cloud-agent/real-pnpm`, unchanged.
+- Installs dependencies, creates `.env.local`, runs `pnpm test:db`, and seeds a
+  fake-login user with credits and local Cloud Agent billing SKUs.
+- Builds the Cloud Agent sandbox images by running `wrangler dev` for
+  `cloud-agent-next` on spare ports until `Container image(s) ready`. The log is
+  `.wrangler/kilo-startup/sandbox-images.log`. Skip this with
+  `KILO_STARTUP_SANDBOX_IMAGES=0`.
+- It does not start the dev stack.
+
+## Environment builds
+
+The same script runs as an environment's setup command in the snapshot builder.
+The builder sets `KILO_ENVIRONMENT_BUILD=1` for every setup command; the script
+uses it to switch to build mode. That builder has no session wrapper, so it has
+no `kilo-workloads` cgroup. Build mode installs packages, pulls images and warms
+the sandbox image build, then stops the Docker daemon it started and exits. It
+skips the Docker cgroup, database migration and fake-user seed. Without
+`KILO_ENVIRONMENT_BUILD=1`, a missing `kilo-workloads` cgroup still fails setup.
+A snapshot captures files, not running daemons. In a session started from it,
+run `bash .kilo/cloud-agent-setup.sh --resume` before starting services, as
+described above.
+
+Environment-build setup commands may use the rest of the 30-minute build
+deadline; the inactivity timeout remains 5 minutes.
+
+`.wrangler/kilo-startup/env` only sets defaults. Override a value by exporting
+it before running pnpm. Do not edit the file: setup rewrites it.
+
+## Start services
+
+Run every command from the repository root, so that pnpm loads the env file.
+
+```bash
+pnpm dev:start --no-attach app               # web app
+pnpm dev:start --no-attach agents fake-llm   # Cloud Agents with local fake inference
+pnpm dev:status                              # services and ports
+pnpm dev:stop
+```
+
+- `KILO_DEV_WITHOUT` in the env file skips agents services that fake-LLM sessions
+  on public repositories do not need: notifications, event-service,
+  webhook-agent-ingest, scim-sync, and git-token-service. The usage meter must run:
+  compute admission fails closed without it, even for fake inference. Add services back with
+  `--without=<smaller list>`. `--without=` starts everything, but the full agents
+  stack does not fit in the cap.
+- GitHub-backed repositories need git-token-service and
+  GitHub App credentials, which the sandbox does not have.
+- `--no-attach` returns once services are up: about 50 s for `app`. The first
+  page load compiles with Turbopack and takes about 30 s more.
+- Wrangler rebuilds every sandbox image each time `cloud-agent-next` starts.
+  Images build in dockerd's own BuildKit, so unchanged images come from the
+  layer cache. Setup prebuilds them; without that, or after a Dockerfile change,
+  the build takes minutes. `cloud-agent-next` reports `up` before images are
+  ready, and sessions created meanwhile fail (`fetch failed` in the harness).
+  Wait for the build to finish:
+
+  ```bash
+  until grep -q 'Container image(s) ready' dev/logs/cloud-agent-next.log; do sleep 15; done
+  ```
+- `--reuse-running` currently refuses to reuse a session because the Stripe
+  forwarder is always skipped. Check `pnpm dev:status` instead.
+- `dev:start` moves the preferred service pane (normally `nextjs`) into the
+  dashboard window with `tmux join-pane`, so `nextjs` has no window of its own
+  and one window index is missing (`tmux list-windows` shows no `nextjs`).
+  This is expected, not a crash: the service runs as a pane of window 0. Find it
+  by pane identity (`tmux list-panes -s -t kilo-dev-app -F
+  '#{window_index}.#{pane_index}:#{@kilo_service}'`), not by window name.
+
+## Log in and use the browser
+
+Setup seeds a verified user with credits. Its email is `KILO_TEST_USER_EMAIL` in
+the env file. Shells outside the pnpm wrapper must load the env file first. It
+also puts setup's `docker` wrapper on `PATH`, which keeps builds serialized and
+inside the Docker build slice:
+
+```bash
+source .wrangler/kilo-startup/env
+agent-browser --session main open "http://localhost:3000/users/sign_in?fakeUser=$KILO_TEST_USER_EMAIL&callbackPath=/profile"
+```
+
+- Read the real port from `pnpm dev:status`. It is 3000 unless an offset applies.
+- The env file points agent-browser at the installed Chromium with a 120 s
+  timeout. Confirm login with
+  `agent-browser --session main eval '(async () => (await (await fetch("/api/auth/session")).json()).user?.email)()'`.
+- If a click fails because the element is covered, focus the input and use
+  `agent-browser press Enter`.
+- Starting a Cloud Agent session from `/cloud` requires a connected GitHub or
+  GitLab provider, which the sandbox cannot set up. Create sessions with the
+  fake-LLM harness instead, then view them in the browser.
+
+## Fake-LLM Cloud Agent sessions
+
+Start `agents fake-llm`, then follow `services/cloud-agent-next/test/e2e/README.md`.
+Ports below are the defaults; check `pnpm dev:status`.
+
+```bash
+WORKER_URL=http://localhost:8794 FAKE_LLM_URL=http://localhost:8811 \
+  E2E_FUNDED=1 pnpm -s exec tsx services/cloud-agent-next/test/e2e/run.ts cold echo:hi
+```
+
+For an older sandbox snapshot, include `container-usage-meter` in the stack and run
+`pnpm dev:seed cloud-agent:billing-skus` after migrations. Missing SKU catalog rows
+otherwise reject admission with `sku_not_found`. The seed is loopback-only, uses
+synthetic test prices, and preserves existing SKU rates and admission settings.
+Use `E2E_FUNDED=1` for newly created driver users; compute requires at least $5 credit.
+
+- Verified passing on the minimal stack: `cold echo:hi`, `cold-hot echo:hi`,
+  `chunked-streaming slow:5:50`, `queue-while-busy`, and
+  `--api=legacy cold-hot echo:legacy`. `llm-error boom` fails a retry-status
+  assertion that is unrelated to the sandbox.
+- Shared scenario teardown reclaims exclusively owned sandbox primaries and
+  proxies before deleting their native roots. If containers remain, follow
+  `services/cloud-agent-next/DEBUG.md` to identify the owned family; do not bulk
+  delete sandbox containers that could belong to another run.
+- The first session after `dev:start` can fail model validation with a 503
+  ("Model availability could not be verified"). Turbopack is still compiling
+  the validation route; retry once.
+- To view harness sessions in the browser, set `E2E_USER_EMAIL` so runs reuse
+  one driver user. Mark that user verified, then fake-login as it and open
+  `/cloud/sessions`:
+
+  ```bash
+  docker compose -f dev/docker-compose.yml exec -T postgres psql -U postgres -d postgres -c \
+    "UPDATE kilocode_users SET has_validation_stytch = true, completed_welcome_form = true WHERE google_user_email = '<driver email>'"
+  ```
+
+  Sending a message to a harness session from the UI fails with
+  "Session not found".
+
+### Selecting Kilo v2 for local tests
+
+The default development runtime runs **v1**. Select a local test organization
+for v2 before starting the stack. The driver user must have membership in that organization.
+Use the current `PINNED_CLIS.kilo2.version` in
+`services/cloud-agent-next/scripts/runtime-cli-artifact.ts`, not the moving
+`kilo-v2` npm tag. Run these commands from the repository root:
+
+```bash
+export E2E_ORG_ID=<organization-uuid>
+export E2E_USER_EMAIL=<funded-member-email>
+node services/cloud-agent-next/scripts/prepare-kilo2-local.mjs "$E2E_ORG_ID"
+pnpm dev:start --no-attach agents fake-llm
+pnpm dev:status --json
+```
+
+The preparation script generates ignored `wrangler.kilo2-local.json` in the
+service directory. The dev launcher selects it and publishes the pinned runtime
+artifacts to local R2. New sandboxes download those artifacts; production configuration is unchanged.
+The script accepts an organization UUID, not a CLI version or dist-tag. If the stack
+is already running, restart `cloud-agent-next` instead of starting another stack.
+Wait for `Container image(s) ready` in `dev/logs/cloud-agent-next.log` before
+creating a **fresh** test session; service status `up` alone is insufficient.
+
+Drain scenarios additionally require `E2E_KILO2_DRAIN=1`. This flag declares the
+test capability; it does **not** select or verify the runtime. Use the actual ports
+from `dev:status` (defaults shown), and fresh parent/child tags on repeated runs:
+
+```bash
+WORKER_URL=http://localhost:8794 FAKE_LLM_URL=http://localhost:8811 \
+  E2E_FUNDED=1 E2E_KILO2_DRAIN=1 pnpm exec tsx \
+  services/cloud-agent-next/test/e2e/run.ts \
+  drain-background-child background-task:parent1:child1 --timeout-ms=90000
+```
+
+Native full-tree drain requires the RPC supplied by `0.0.0-v2-85`; the older
+`v2-77` pin is insufficient. The child scenarios assert no callback during an
+eight-second hold, then completion after release. Keep inference routed through
+the gateway to fake-LLM, and retain the usage-meter/SKU/credit prerequisites above.
+
+For a v1 comparison, temporarily move the generated `wrangler.kilo2-local.json`
+aside, restart the Worker, unset `E2E_ORG_ID`, and create fresh sessions. Restore the file afterwards.
+Do not change branches or the production Wrangler configuration.
+
+Full recipes: `services/cloud-agent-next/test/e2e/README.md` and
+`services/cloud-agent-next/kilo2-runtime/README.md`. Recorded v1/v2 results:
+`services/cloud-agent-next/docs/drain-manual-verification.md`.
+
+## Memory
+
+The caps are hard limits with no swap. When a cgroup nears its cap, the kernel
+reclaims memory first: everything slows, and `docker`, `tmux`, and
+`pnpm dev:stop` can hang. Only after that does it OOM-kill the largest process in
+that cgroup. Check pressure on the tools, Docker, and parent cgroups:
+
+```bash
+for cg in /sys/fs/cgroup/kilo-workloads{/kilo-control-*/tools,/kilo-docker,}; do
+  printf '%s: %s MiB of %s MiB; ' "${cg#/sys/fs/cgroup/}" \
+    "$(( $(cat $cg/memory.current) / 1048576 ))" "$(( $(cat $cg/memory.max) / 1048576 ))"
+  grep -E '^(max|oom_kill) ' $cg/memory.events | tr '\n' ' '; echo
+done
+```
+
+If the `max` count keeps rising, you are near the cap. Stop work you do
+not need, remove idle sandbox containers, or start fewer services. Dev tooling is
+heavy: wrangler and workerd use about 3 GB, and the pnpm parents and log filters
+about 2 GB.
+
+- Next.js dev (Turbopack) grows by 1 to 3 GB while compiling a route and gives
+  most of it back after about two minutes idle: 4.2 GB after login fell to
+  2.8 GB, and 4.4 GB after `/cloud` fell to 2.0 GB. Opening many routes back to
+  back fills the cap before that happens. Pause between heavy routes.
+- Turbopack's default `experimental.turbopackMemoryEviction` is `auto`, which
+  decides from OS memory-pressure feedback. The tools cgroup cap (about 9.5 GiB) sits
+  well below the sandbox `MemTotal` (about 12.5 GiB), so that feedback reports
+  free memory the cgroup does not have and `auto` can leave the web dev server
+  holding several GB. Setup therefore exports
+  `KILO_TURBOPACK_MEMORY_EVICTION=full`, which `apps/web/next.config.mjs` reads
+  (the value is unset elsewhere, so Next keeps `auto`); `full` evicts Turbopack's
+  persistent cache to disk instead of holding it in RAM. If `memory.current`
+  still climbs toward `memory.max`, that is the pressure state below.
+- High Redis, redis-http, or Postgres CPU means memory pressure, not load. Under
+  pressure, Redis used 6 s of user CPU and 1590 s of system CPU in 90 minutes:
+  the kernel kept evicting and re-reading its code pages. Compare with
+  `cat /sys/fs/cgroup/kilo-workloads/kilo-docker/containers/*/cpu.stat`. Idle
+  Redis without pressure uses under 1%.
+- The next figures were measured under setup's former single dev cap, which put
+  dev servers and containers in one cgroup. Near a cap the kernel mostly
+  reclaims rather than OOM-killing, so
+  commands that shell out — `pnpm dev:restart`, `pnpm dev:stop`, `tmux`, `docker`,
+  wrangler — block and appear to hang. The same restart that hangs for minutes at
+  ~8.8 GiB runs in seconds at ~5 GiB. Recover by killing the large consumer
+  before retrying the restart or stop, e.g. `pkill -9 -f '^[n]ext-server'` (kill
+  by PID if the pattern is in your own command line), then `pnpm dev:stop`.
+
+Every agent command is capped wherever it runs, including direct `node` or
+`npx` and pnpm outside the repository. Builds, tests, and typechecks share the
+tools cap with running dev servers.
+
+## Docker networking and DNS
+
+`/proc/sys` is read-only, so dockerd runs with `--ip-forward=false`: bridge
+containers can reach only the host. Workerd also pins sandbox containers to
+1.1.1.1 and 8.8.8.8. Setup runs dnsmasq on the bridge gateway, 172.17.0.1, and
+uses iptables to redirect all DNS from `docker0` to it.
+
+A `git_network_failed` clone failure, or `Could not resolve host` inside a
+sandbox, means this redirect is missing. Rerun setup, then check:
+
+```bash
+iptables -t nat -S PREROUTING | grep 'dport 53'
+pgrep -a dnsmasq
+docker exec <sandbox container> git ls-remote https://github.com/octocat/Hello-World.git
+```
+
+## Pitfalls
+
+- `pkill -f next-server` also matches the shell that runs it. Use
+  `pkill -f '[n]ext-server'`.
+- Do not prune Docker images or build cache. Rebuilding the Cloud Agent images
+  costs about 12 minutes.
+- Lint setup changes with `shellcheck -S warning -e SC1090 .kilo/cloud-agent-setup.sh`.
+  Setup does not install ShellCheck; use `apt-get install -y shellcheck`.

@@ -15,15 +15,25 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { buildGitHubInstallState } from './github-install-state';
 import { useConfirm } from '@/components/ui/confirm';
+import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';
+import { GitHubIdentityCard } from './GitHubIdentityCard';
+import {
+  APP_RETURN_PATH,
+  INSTALLATION_UNAVAILABLE_MESSAGE,
+  appReturnBasePath,
+  buildAppReturnHref,
+  buildAppReturnOutcomeView,
+  buildInstallStateRecoveryHref,
+} from './github-app-outcome';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -38,94 +48,188 @@ type GitHubIntegrationDetailsProps = {
   pendingApproval?: boolean;
   existingPendingOrg?: string;
   appReturnPath?: string;
+  /**
+   * The app shell page that mints the install state and sets the shell's flow
+   * cookie. When set, starting or retrying an install navigates there instead
+   * of minting from the browser, so the callback is bound to this browser.
+   */
+  installStartPath?: string;
   onInstallationDetected?: () => void;
 };
 
-/**
- * /cloud/sessions return href for an app-initiated install outcome.  Carries
- * the original organizationId so the mobile app can retry an org-scoped
- * install on the same organization owner.
- */
-function buildAppReturnHref(query: string, organizationId?: string): string {
-  const orgParam = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
-  return `/cloud/sessions?${query}${orgParam}`;
+/** Targets the displayed installation so management actions cannot drift to another association. */
+export function buildGitHubManagementInput(
+  organizationId: string | undefined,
+  integrationId: string | undefined
+) {
+  if (organizationId) return { organizationId, integrationId };
+  return integrationId ? { integrationId } : undefined;
 }
 
-export type AppReturnOutcomeView = {
-  kind: 'installed' | 'pending' | 'blocked' | 'retryable';
-  title: string;
-  description: string;
-  cta: string;
-  href: string;
-};
-
-/**
- * View model for the fromApp outcome card. `blocked` (non-retryable) shows
- * `Back` and never offers retry; `retryable` shows `Try again` (a real action
- * wired by the component) plus `Return to Kilo App`, both via `href`.
- */
-export function buildAppReturnOutcomeView(input: {
-  success?: boolean;
-  pendingApproval?: boolean;
-  error?: string;
-  organizationId?: string;
-}): AppReturnOutcomeView {
-  const isSuccess = Boolean(input.success);
-  const isPending = !isSuccess && Boolean(input.pendingApproval);
-  const isNonRetryable =
-    input.error === 'install_state_user_mismatch' ||
-    input.error === 'not_installation_admin' ||
-    input.error === 'installation_already_claimed';
-  const returnQuery = isSuccess
-    ? 'github_install=success'
-    : isPending
-      ? 'github_pending_approval=true'
-      : `error=${encodeURIComponent(input.error ?? 'installation_failed')}`;
-  const title = isSuccess
-    ? 'GitHub App installed'
-    : isPending
-      ? 'Awaiting admin approval'
-      : isNonRetryable
-        ? 'Cannot complete installation'
-        : 'Installation failed';
-  const description = isSuccess
-    ? 'Your repositories are now connected.'
-    : isPending
-      ? 'An organization admin must approve the installation request.'
-      : input.error === 'not_installation_admin'
-        ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
-        : input.error === 'installation_already_claimed'
-          ? 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'
-          : input.error === 'install_state_user_mismatch'
-            ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-            : 'The installation did not complete. Try again or return to the Kilo App.';
-  const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
-
-  return {
-    kind: isSuccess
-      ? 'installed'
-      : isPending
-        ? 'pending'
-        : isNonRetryable
-          ? 'blocked'
-          : 'retryable',
-    title,
-    description,
-    cta,
-    href: buildAppReturnHref(returnQuery, input.organizationId),
-  };
+export function getGitHubUserConnectionErrorMessage(
+  error: string | undefined,
+  flow: string | null
+): string | null {
+  if (flow !== 'user-connect') return null;
+  switch (error) {
+    case 'authorization_cancelled':
+      return 'GitHub account authorization was cancelled. Start a new connection when you are ready.';
+    case 'missing_code':
+      return 'GitHub did not return a valid authorization code. Start a new connection.';
+    case 'invalid_state':
+      return 'This GitHub account connection attempt is no longer valid. Start a new connection.';
+    case 'connection_failed':
+      return 'We could not complete your GitHub account connection. Start a new connection and try again.';
+    case 'connection_conflict':
+      return 'Your GitHub connection changed while this connection was in progress. Start a new connection.';
+    case 'account_mismatch':
+      return 'Sign in to the Kilo account that started this GitHub connection, then start a new connection.';
+    default:
+      return null;
+  }
 }
 
-export function GitHubIntegrationDetails({
-  organizationId,
-  installState,
-  fromApp,
+function GitHubIntegrationOutcomeToasts({
   success,
   userConnectionSuccess,
   error,
   pendingApproval,
   existingPendingOrg,
+}: Pick<
+  GitHubIntegrationDetailsProps,
+  'success' | 'userConnectionSuccess' | 'error' | 'pendingApproval' | 'existingPendingOrg'
+>) {
+  useEffect(() => {
+    if (success) {
+      toast.success('GitHub App installed successfully!');
+    }
+    if (userConnectionSuccess) {
+      toast.success('GitHub identity connected');
+    }
+    if (pendingApproval) {
+      toast.info('Installation pending admin approval');
+    }
+    if (error === 'pending_installation_exists' && existingPendingOrg) {
+      toast.error('Cannot create installation request', {
+        description: `You already have a pending GitHub installation in another organization. Please complete or cancel that installation first.`,
+        duration: 8000,
+      });
+    } else if (error === 'not_installation_admin') {
+      toast.error(
+        'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
+        { duration: 8000 }
+      );
+    } else if (error === 'installation_already_claimed') {
+      toast.error(
+        'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
+        { duration: 8000 }
+      );
+    } else if (error === 'installation_unavailable') {
+      toast.error(INSTALLATION_UNAVAILABLE_MESSAGE, { duration: 8000 });
+    } else if (error === 'multiple_installations_disabled') {
+      toast.error('This organization can currently connect only one GitHub organization.', {
+        duration: 8000,
+      });
+    } else if (error === 'shared_installation_disabled') {
+      toast.error('Shared access is not approved for this organization.', { duration: 8000 });
+    } else if (error === 'incompatible_workflow') {
+      toast.error('An existing workflow is not yet compatible with shared access.', {
+        duration: 8000,
+      });
+    } else if (error === 'github_authorization_required') {
+      toast.error('GitHub did not return an authorization. Start the connection again.', {
+        duration: 8000,
+      });
+    } else if (error === 'already_connected_to_another_account') {
+      toast.error('This GitHub identity is already connected to another Kilo account.');
+    } else if (error === 'disconnect_existing_identity_first') {
+      toast.error('Disconnect your current GitHub identity before connecting another account.');
+    } else if (error === 'install_state_user_mismatch') {
+      // Handled by the fromApp fallback card or non-app mismatch landing.
+    } else if (error) {
+      const userConnectionMessage = getGitHubUserConnectionErrorMessage(
+        error,
+        new URLSearchParams(window.location.search).get('flow')
+      );
+      toast.error(userConnectionMessage ?? `GitHub connection failed: ${error}`);
+    }
+  }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
+
+  return null;
+}
+
+export function GitHubIntegrationDetails(props: GitHubIntegrationDetailsProps) {
+  if (props.error === 'install_state_invalid') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Restart GitHub setup</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground text-sm">
+            This setup link has expired, has already been used, or is invalid. Start GitHub setup
+            again from the Kilo account and organization you want to connect.
+          </p>
+          <Button asChild>
+            <Link
+              href={
+                props.fromApp ? '/cloud/sessions?error=install_state_unusable' : '/integrations'
+              }
+            >
+              {props.fromApp ? 'Return to Kilo App' : 'Open integration settings'}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <GitHubIntegrationOutcomeToasts {...props} />
+      {props.organizationId && !props.appReturnPath ? (
+        <div className="space-y-6">
+          <OrganizationGitHubInstallations organizationId={props.organizationId} />
+          <Card>
+            <CardHeader>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRound className="h-5 w-5" />
+                    Use your GitHub identity
+                  </CardTitle>
+                  <Badge variant="outline">Optional</Badge>
+                </div>
+                <CardDescription>
+                  Your GitHub identity is personal, not owned by this organization. Manage it from
+                  your personal integration to let eligible Cloud Agent sessions act as you where
+                  supported repository access is available.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline">
+                <Link href="/integrations/github#github-identity">Manage GitHub identity</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <GitHubIntegrationDetailsContent {...props} />
+      )}
+    </>
+  );
+}
+
+function GitHubIntegrationDetailsContent({
+  organizationId,
+  installState,
+  fromApp,
+  success,
+  error,
+  pendingApproval,
   appReturnPath,
+  installStartPath,
   onInstallationDetected,
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
@@ -133,6 +237,15 @@ export function GitHubIntegrationDetails({
   const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
   const hasAppOutcome = Boolean(success || pendingApproval || error);
+  // A shell install returns to the shell page instead of the Cloud sessions page.
+  const appBasePath = appReturnBasePath(appReturnPath);
+  // The shell mints its own install state so the callback is bound to the
+  // browser that started it; the full web page mints from here.
+  const shellInstallStartPath = installStartPath
+    ? `${installStartPath}${
+        organizationId ? `?${new URLSearchParams({ organizationId }).toString()}` : ''
+      }`
+    : null;
 
   // Fetch organization data to check GitHub app type
   const { data: organizationData } = useOrganizationWithMembers(organizationId ?? '', {
@@ -160,6 +273,7 @@ export function GitHubIntegrationDetails({
   // Track selected model
   const [selectedModel, setSelectedModel] = useState<string>('');
   const installationDetectedRef = useRef(false);
+  const launchedInstallStates = useRef(new Set<string>());
 
   const { data: onboardingAppType } = useQuery({
     ...trpc.githubApps.getAppType.queryOptions(input),
@@ -187,30 +301,6 @@ export function GitHubIntegrationDetails({
   // Check if user has pending installation in another org
   const { data: pendingCheck } = useQuery(
     trpc.githubApps.checkUserPendingInstallation.queryOptions(input)
-  );
-
-  const { data: userAuthorization } = useQuery({
-    ...trpc.githubApps.getUserAuthorization.queryOptions(),
-    enabled: !organizationId,
-  });
-
-  const connectUserAuthorization = useMutation(
-    trpc.githubApps.connectUserAuthorization.mutationOptions({
-      onSuccess: result => {
-        window.location.href = result.authorizationUrl;
-      },
-    })
-  );
-
-  const disconnectUserAuthorization = useMutation(
-    trpc.githubApps.disconnectUserAuthorization.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-        });
-        toast.success('GitHub identity disconnected');
-      },
-    })
   );
 
   const uninstallApp = useMutation(
@@ -295,51 +385,10 @@ export function GitHubIntegrationDetails({
     onInstallationDetected?.();
   }, [appReturnPath, isInstalled, onInstallationDetected]);
 
-  // Show success/error/pending toasts
-  useEffect(() => {
-    if (success) {
-      toast.success('GitHub App installed successfully!');
-    }
-    if (userConnectionSuccess) {
-      toast.success('GitHub identity connected');
-    }
-    if (pendingApproval) {
-      toast.info('Installation pending admin approval');
-    }
-    if (error === 'pending_installation_exists' && existingPendingOrg) {
-      toast.error('Cannot create installation request', {
-        description: `You already have a pending GitHub installation in another organization. Please complete or cancel that installation first.`,
-        duration: 8000,
-      });
-    } else if (error === 'not_installation_admin') {
-      toast.error(
-        'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
-        { duration: 8000 }
-      );
-    } else if (error === 'installation_already_claimed') {
-      toast.error(
-        'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
-        { duration: 8000 }
-      );
-    } else if (error === 'github_authorization_required') {
-      toast.error('GitHub did not return an authorization. Start the connection again.', {
-        duration: 8000,
-      });
-    } else if (error === 'already_connected_to_another_account') {
-      toast.error('This GitHub identity is already connected to another Kilo account.');
-    } else if (error === 'disconnect_existing_identity_first') {
-      toast.error('Disconnect your current GitHub identity before connecting another account.');
-    } else if (error === 'install_state_user_mismatch') {
-      // Handled by the fromApp fallback card — no toast needed.
-    } else if (error) {
-      toast.error(`GitHub connection failed: ${error}`);
-    }
-  }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
-
   const handleModelChange = (modelSlug: string) => {
     setSelectedModel(modelSlug);
     updateModel.mutate(
-      { modelSlug, organizationId },
+      { modelSlug, organizationId, integrationId: installationData?.installation?.id },
       {
         onSuccess: result => {
           if (result.success) {
@@ -360,11 +409,26 @@ export function GitHubIntegrationDetails({
   };
 
   const handleInstall = async () => {
+    // Inside the shell, the start route mints the state and sets the flow
+    // cookie the GitHub callback requires, so the browser never mints here.
+    if (shellInstallStartPath) {
+      window.location.href = shellInstallStartPath;
+      return;
+    }
     try {
       // Pre-minted state from the mobile app — use it directly without a
       // second mint.  The state token is the raw database token; it must be
       // passed to GitHub exactly as received.
       if (installState) {
+        if (launchedInstallStates.current.has(installState)) {
+          window.location.href = buildInstallStateRecoveryHref({
+            fromApp,
+            appBasePath,
+            organizationId,
+          });
+          return;
+        }
+        launchedInstallStates.current.add(installState);
         const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(installState))}`;
         window.open(installUrl, '_blank', 'noopener,noreferrer');
         return;
@@ -392,45 +456,28 @@ export function GitHubIntegrationDetails({
    * token was consumed by the callback.  A retry must never reuse it.
    */
   const handleAppRetry = async () => {
+    if (shellInstallStartPath) {
+      window.location.href = shellInstallStartPath;
+      return;
+    }
+    if (installState) {
+      window.location.href = buildInstallStateRecoveryHref({
+        fromApp,
+        appBasePath,
+        organizationId,
+      });
+      return;
+    }
     try {
       const result = await mintInstallState.mutateAsync({
         organizationId: organizationId ?? undefined,
-        returnTo: '/cloud/sessions',
+        returnTo: appReturnPath ?? APP_RETURN_PATH,
       });
       const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(result.token))}`;
       window.open(installUrl, '_blank', 'noopener,noreferrer');
     } catch (err) {
       toast.error('Failed to start GitHub installation', {
         description: err instanceof Error ? err.message : 'Unknown error',
-      });
-    }
-  };
-
-  const handleConnectIdentity = () => {
-    connectUserAuthorization.mutate(undefined, {
-      onError: error => {
-        toast.error('Failed to start GitHub connection', {
-          description: error.message,
-        });
-      },
-    });
-  };
-
-  const handleDisconnectIdentity = async () => {
-    if (
-      await confirm({
-        title: 'Disconnect your GitHub identity?',
-        description: 'Kilo will no longer act on your behalf with your personal GitHub account.',
-        confirmLabel: 'Disconnect',
-        destructive: true,
-      })
-    ) {
-      disconnectUserAuthorization.mutate(undefined, {
-        onError: error => {
-          toast.error('Failed to disconnect GitHub identity', {
-            description: error.message,
-          });
-        },
       });
     }
   };
@@ -444,7 +491,7 @@ export function GitHubIntegrationDetails({
         destructive: true,
       })
     ) {
-      uninstallApp.mutate(input, {
+      uninstallApp.mutate(managementInput, {
         onSuccess: async () => {
           toast.success('GitHub App uninstalled');
           await refetch();
@@ -459,6 +506,10 @@ export function GitHubIntegrationDetails({
   };
 
   const handleCancelPending = async () => {
+    // Cancel exactly the pending row this view rendered; the id is required so
+    // the request cannot fall back to another pending request.
+    const pendingIntegrationId = installationData?.installation?.id;
+    if (!pendingIntegrationId) return;
     if (
       await confirm({
         title: 'Cancel this installation request?',
@@ -468,22 +519,27 @@ export function GitHubIntegrationDetails({
         destructive: true,
       })
     ) {
-      cancelPendingInstallation.mutate(input, {
-        onSuccess: async () => {
-          toast.success('Installation request cancelled');
-          await refetch();
-        },
-        onError: error => {
-          toast.error('Failed to cancel installation request', {
-            description: error.message,
-          });
-        },
-      });
+      cancelPendingInstallation.mutate(
+        organizationId
+          ? { organizationId, integrationId: pendingIntegrationId }
+          : { integrationId: pendingIntegrationId },
+        {
+          onSuccess: async () => {
+            toast.success('Installation request cancelled');
+            await refetch();
+          },
+          onError: error => {
+            toast.error('Failed to cancel installation request', {
+              description: error.message,
+            });
+          },
+        }
+      );
     }
   };
 
   const handleRefresh = () => {
-    refreshInstallation.mutate(input, {
+    refreshInstallation.mutate(managementInput, {
       onSuccess: async () => {
         toast.success('Installation details refreshed', {
           description: 'Permissions and repositories have been updated from GitHub.',
@@ -518,6 +574,7 @@ export function GitHubIntegrationDetails({
   }
 
   const installation = installationData?.installation;
+  const managementInput = buildGitHubManagementInput(organizationId, installation?.id);
   const status = installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
 
@@ -563,8 +620,9 @@ export function GitHubIntegrationDetails({
                 Install the Kilo GitHub App
               </h2>
               <p className="type-body max-w-xl text-muted-foreground">
-                Choose the GitHub organization and repositories Kilo can access. GitHub opens in a
-                new tab so this setup guide stays available.
+                {shellInstallStartPath
+                  ? 'Choose the GitHub organization and repositories Kilo can access. GitHub setup opens next, and this page shows the result when it finishes.'
+                  : 'Choose the GitHub organization and repositories Kilo can access. GitHub opens in a new tab so this setup guide stays available.'}
               </p>
             </div>
             <Badge variant="secondary" className="shrink-0">
@@ -606,11 +664,12 @@ export function GitHubIntegrationDetails({
             }
           >
             {mintInstallState.isPending ? 'Starting installation...' : 'Open GitHub setup'}
-            <ExternalLink className="size-4" />
+            {shellInstallStartPath ? null : <ExternalLink className="size-4" />}
           </Button>
           <p className="type-label mt-3 text-muted-foreground">
-            Complete setup in the new tab, then return here. This page checks your connection when
-            you return.
+            {shellInstallStartPath
+              ? 'Complete setup in GitHub, then return here. This page checks your connection when you return.'
+              : 'Complete setup in the new tab, then return here. This page checks your connection when you return.'}
           </p>
           <div className="mt-5">
             <DevAddGitHubInstallationCard
@@ -625,7 +684,13 @@ export function GitHubIntegrationDetails({
   }
 
   if (fromApp && hasAppOutcome) {
-    const view = buildAppReturnOutcomeView({ success, pendingApproval, error, organizationId });
+    const view = buildAppReturnOutcomeView({
+      success,
+      pendingApproval,
+      error,
+      organizationId,
+      appBasePath,
+    });
     const isRetryable = view.kind === 'retryable';
 
     return (
@@ -882,84 +947,11 @@ export function GitHubIntegrationDetails({
       </Card>
 
       {!organizationId ? (
-        <Card id="github-identity">
-          <CardHeader>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <UserRound className="h-5 w-5" />
-                    Use your GitHub identity
-                  </CardTitle>
-                  <Badge variant="outline">Optional</Badge>
-                </div>
-                <CardDescription>
-                  Connect your GitHub account so eligible Cloud Agent sessions can act as you in
-                  repositories where the Kilo GitHub App is installed.
-                </CardDescription>
-              </div>
-              {userAuthorization?.connected ? (
-                <Badge variant="default" className="flex shrink-0 items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="shrink-0">
-                  Not connected
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {userAuthorization?.revoked && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  Your GitHub authorization is no longer valid. Reconnect your account to perform
-                  eligible GitHub actions as yourself.
-                </AlertDescription>
-              </Alert>
-            )}
-            {userAuthorization?.githubLogin && (
-              <div className="flex flex-col gap-1 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-muted-foreground text-sm">Connected account</span>
-                <span className="font-mono text-sm">@{userAuthorization.githubLogin}</span>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-3">
-              {!userAuthorization?.connected && (
-                <Button
-                  variant="outline"
-                  onClick={handleConnectIdentity}
-                  disabled={connectUserAuthorization.isPending}
-                >
-                  {connectUserAuthorization.isPending
-                    ? 'Connecting...'
-                    : userAuthorization?.revoked
-                      ? 'Reconnect GitHub account'
-                      : 'Connect GitHub account'}
-                </Button>
-              )}
-              {userAuthorization?.githubLogin && (
-                <Button
-                  variant="outline"
-                  onClick={handleDisconnectIdentity}
-                  disabled={disconnectUserAuthorization.isPending}
-                >
-                  {disconnectUserAuthorization.isPending
-                    ? 'Disconnecting...'
-                    : 'Disconnect account'}
-                </Button>
-              )}
-            </div>
-            {userAuthorization?.connected && (
-              <p className="text-muted-foreground text-sm">
-                {isInstalled
-                  ? 'Eligible Cloud Agent sessions can use your GitHub identity instead of the Kilo bot.'
-                  : 'To act as you, Cloud Agent also needs repository access from an installed Kilo GitHub App, either for your repository or through an organization.'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        // The identity link round trip completes on the full web app (its
+        // callback requires a web session), so the shell does not offer it.
+        appReturnPath ? null : (
+          <GitHubIdentityCard isInstalled={Boolean(isInstalled)} />
+        )
       ) : (
         !appReturnPath && (
           <Card>
@@ -1007,7 +999,13 @@ export function GitHubIntegrationDetails({
                     </p>
                   </div>
                   <Button asChild className="mt-2">
-                    <Link href={buildAppReturnHref('github_install=success', organizationId)}>
+                    <Link
+                      href={buildAppReturnHref(
+                        'github_install=success',
+                        organizationId,
+                        appBasePath
+                      )}
+                    >
                       Continue
                     </Link>
                   </Button>
@@ -1023,7 +1021,13 @@ export function GitHubIntegrationDetails({
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">
-                    <Link href={buildAppReturnHref('github_pending_approval=true', organizationId)}>
+                    <Link
+                      href={buildAppReturnHref(
+                        'github_pending_approval=true',
+                        organizationId,
+                        appBasePath
+                      )}
+                    >
                       Done
                     </Link>
                   </Button>
@@ -1040,7 +1044,11 @@ export function GitHubIntegrationDetails({
                   </div>
                   <Button asChild variant="outline" className="mt-2">
                     <Link
-                      href={buildAppReturnHref('error=install_state_user_mismatch', organizationId)}
+                      href={buildAppReturnHref(
+                        'error=install_state_user_mismatch',
+                        organizationId,
+                        appBasePath
+                      )}
                     >
                       Back
                     </Link>
@@ -1061,7 +1069,8 @@ export function GitHubIntegrationDetails({
                     <Link
                       href={buildAppReturnHref(
                         `error=${encodeURIComponent(error)}`,
-                        organizationId
+                        organizationId,
+                        appBasePath
                       )}
                     >
                       Back
@@ -1082,7 +1091,8 @@ export function GitHubIntegrationDetails({
                       <Link
                         href={buildAppReturnHref(
                           `error=${encodeURIComponent(error ?? 'installation_failed')}`,
-                          organizationId
+                          organizationId,
+                          appBasePath
                         )}
                       >
                         Back

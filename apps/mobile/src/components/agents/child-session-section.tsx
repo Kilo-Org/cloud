@@ -1,10 +1,15 @@
 import { type ReactNode } from 'react';
+import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { Bot, ChevronRight, Loader2 } from '@/components/ui/icons';
+import { Bot, Loader2 } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import {
   type KiloSessionId,
+  type MessageInfo,
   type Part,
+  type SessionManager,
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -12,6 +17,8 @@ import {
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 
 import {
   type ChildSessionCardState,
@@ -19,15 +26,22 @@ import {
   getChildSessionCardState,
   getTaskToolSessionId,
 } from './child-session-card-state';
+import { getChildSessionModelLabel } from './child-session-model';
+import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { partRendersContent } from './message-visibility';
 import { isToolPart } from './part-types';
-
-export { getTaskToolSessionId } from './child-session-card-state';
+import { useOptionalSessionManager } from './session-manager-context';
+import { toolStatusLabel } from './tool-status-label';
 
 const MAX_NESTING_DEPTH = 5;
 
+type ChildSessionStatus = ToolPart['state']['status'];
+
 export type RenderPartFn = (props: {
   part: Part;
+  messageInfo?: MessageInfo;
+  isStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 }) => ReactNode;
@@ -38,22 +52,26 @@ type ChildSessionSectionProps = {
   part: ToolPart;
   childMessages: StoredMessage[];
   onOpenChildSession: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 };
 
 export function ChildSessionSection({
   part,
   childMessages,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<ChildSessionSectionProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
-  const { agentName, taskName, latestActivity }: ChildSessionCardState = getChildSessionCardState(
-    part,
-    childMessages
-  );
+  const { agentName, taskName, translatable, latestActivity }: ChildSessionCardState =
+    getChildSessionCardState(part, childMessages);
+  const shownTaskName = useTranslatedToolSummary(taskName, translatable, part.id);
   const latestActivityLabel = getChildSessionActivityLabel(latestActivity);
+  const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 
   const { status } = part.state;
+  const statusLabel = toolStatusLabel(t, status);
   const isRunning = status === 'running' || status === 'pending';
   const sessionId = getTaskToolSessionId(part);
 
@@ -62,24 +80,30 @@ export function ChildSessionSection({
   return (
     <Animated.View
       layout={LinearTransition.duration(200)}
-      className="overflow-hidden rounded-r-lg"
+      className="overflow-hidden rounded-e-lg"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic border color
-      style={{ borderLeftWidth: 2, borderLeftColor: borderColor }}
+      style={{ borderStartWidth: 2, borderStartColor: borderColor }}
     >
       <Pressable
         className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
         onPress={() => {
           if (sessionId) {
-            onOpenChildSession(sessionId, taskName);
+            onOpenChildSession(sessionId, shownTaskName);
           }
         }}
         disabled={!sessionId}
         accessibilityRole="button"
-        accessibilityLabel={`${agentName}, ${taskName}, ${latestActivityLabel}, ${status}`}
-        accessibilityHint={sessionId ? 'Open subagent session' : undefined}
+        accessibilityLabel={t('agentChat.childSession.accessibilityLabel', {
+          agentName,
+          taskName: shownTaskName,
+          modelLabel: modelLabel ? `, ${modelLabel}` : '',
+          latestActivityLabel,
+          status: statusLabel,
+        })}
+        accessibilityHint={sessionId ? t('agentChat.childSession.openHint') : undefined}
         accessibilityState={{ disabled: !sessionId }}
       >
-        <ChevronRight size={14} color={colors.mutedForeground} />
+        <DirectionalChevronRight size={14} color={colors.mutedForeground} />
 
         {isRunning ? (
           <SpinningIcon icon={Loader2} size={16} color={colors.agentSky} />
@@ -88,53 +112,149 @@ export function ChildSessionSection({
         )}
 
         <View className="flex-1">
-          <Text className="text-xs leading-4 text-agent-sky" numberOfLines={1}>
+          <Text className="text-xs leading-[1rem] text-agent-sky" numberOfLines={1}>
             {agentName}
           </Text>
-          <Text className="text-sm leading-5 text-foreground" numberOfLines={1}>
-            {taskName}
+          <Text className="text-sm leading-[1.25rem] text-foreground" numberOfLines={1}>
+            {shownTaskName}
           </Text>
-          <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
-            {
-              // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
-              typeof latestActivity === 'string' ? (
-                latestActivity
-              ) : (
-                <>
-                  <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
-                  {latestActivity.context ? ` ${latestActivity.context}` : ''}
-                </>
-              )
-            }
-          </Text>
+          {modelLabel ? <ChildSessionModelLabel modelLabel={modelLabel} /> : null}
+          {latestActivity ? (
+            <Text className="text-xs leading-[1rem] text-muted-foreground" numberOfLines={1}>
+              {
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
+                typeof latestActivity === 'string' ? (
+                  latestActivity
+                ) : (
+                  <>
+                    <Text className="text-xs leading-[1rem] text-agent-sky">
+                      {latestActivity.tool}
+                    </Text>
+                    {latestActivity.context ? ` ${latestActivity.context}` : ''}
+                  </>
+                )
+              }
+            </Text>
+          ) : null}
         </View>
 
-        <StatusBadge status={status} />
+        <StatusBadge status={status} label={statusLabel} />
       </Pressable>
     </Animated.View>
   );
 }
 
+type LiveChildSessionSectionProps = {
+  part: ToolPart;
+  /** Resolves the child transcript. Read on every render so the caller's projection applies. */
+  getChildMessages: (sessionId: string) => StoredMessage[];
+  onOpenChildSession: OpenChildSession;
+  modelOptions?: SessionModelOption[];
+};
+
+/**
+ * The in-transcript subagent card, kept live by subscribing to the manager's
+ * child-message atom. That atom re-emits on every streaming publish (the SDK
+ * bumps `partsRevision` per flush), so a card that read a resolved list once
+ * would freeze its activity label while the subagent streams. Subscribing here
+ * — below the memoized `MessageBubble` — is what lets the bubble's props stay
+ * identical across publishes while the card still updates; the transcript's
+ * `renderItem` therefore does not need to change identity to re-render rows.
+ *
+ * Outside the session screen (tests, lighter hosts) there is no manager and the
+ * card renders the resolved list the caller already produced, exactly as before.
+ */
+export function LiveChildSessionSection({
+  part,
+  getChildMessages,
+  onOpenChildSession,
+  modelOptions,
+}: Readonly<LiveChildSessionSectionProps>) {
+  const manager = useOptionalSessionManager();
+  if (!manager) {
+    return (
+      <ChildSessionSection
+        part={part}
+        childMessages={resolveChildMessages(part, getChildMessages)}
+        onOpenChildSession={onOpenChildSession}
+        modelOptions={modelOptions}
+      />
+    );
+  }
+  return (
+    <SubscribedChildSessionSection
+      manager={manager}
+      part={part}
+      getChildMessages={getChildMessages}
+      onOpenChildSession={onOpenChildSession}
+      modelOptions={modelOptions}
+    />
+  );
+}
+
+function SubscribedChildSessionSection({
+  manager,
+  part,
+  getChildMessages,
+  onOpenChildSession,
+  modelOptions,
+}: Readonly<LiveChildSessionSectionProps & { manager: SessionManager }>) {
+  // Subscribe for re-render only; the list itself is read through the caller's
+  // accessor so a hidden-thinking projection still applies.
+  useAtomValue(manager.atoms.childMessages);
+  return (
+    <ChildSessionSection
+      part={part}
+      childMessages={resolveChildMessages(part, getChildMessages)}
+      onOpenChildSession={onOpenChildSession}
+      modelOptions={modelOptions}
+    />
+  );
+}
+
+function resolveChildMessages(
+  part: ToolPart,
+  getChildMessages: (sessionId: string) => StoredMessage[]
+): StoredMessage[] {
+  const sessionId = getTaskToolSessionId(part);
+  return sessionId ? getChildMessages(sessionId) : [];
+}
+
 export function ChildSessionMessage({
   message,
+  isStreaming,
   depth,
   getChildMessages,
   renderPart,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<{
   message: StoredMessage;
+  isStreaming?: boolean;
   depth: number;
   getChildMessages: (sessionId: string) => StoredMessage[];
   renderPart: RenderPartFn;
   onOpenChildSession: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 }>) {
+  const { t } = useTranslation();
+
   if (depth >= MAX_NESTING_DEPTH) {
-    return <Text className="text-xs text-muted-foreground">Maximum nesting depth reached.</Text>;
+    return (
+      <Text className="text-xs text-muted-foreground">
+        {t('agentChat.childSession.maxNestingDepth')}
+      </Text>
+    );
+  }
+
+  const visibleParts = message.parts.filter(partRendersContent);
+  if (visibleParts.length === 0) {
+    return null;
   }
 
   return (
     <View className="gap-1 rounded-md bg-secondary p-2">
-      {message.parts.map(p => {
+      {visibleParts.map(p => {
         if (isToolPart(p) && p.tool === 'task') {
           const nestedSessionId = getTaskToolSessionId(p);
           const nestedMessages = nestedSessionId ? getChildMessages(nestedSessionId) : [];
@@ -145,13 +265,20 @@ export function ChildSessionMessage({
               part={p}
               childMessages={nestedMessages}
               onOpenChildSession={onOpenChildSession}
+              modelOptions={modelOptions}
             />
           );
         }
 
         return (
           <MessageErrorBoundary key={p.id}>
-            {renderPart({ part: p, getChildMessages, onOpenChildSession })}
+            {renderPart({
+              part: p,
+              messageInfo: message.info,
+              isStreaming,
+              getChildMessages,
+              onOpenChildSession,
+            })}
           </MessageErrorBoundary>
         );
       })}
@@ -169,13 +296,13 @@ function getStatusBorderColor(status: string, colors: ThemeColors): string {
   return colors.info;
 }
 
-function StatusBadge({ status }: Readonly<{ status: string }>) {
+function StatusBadge({ status, label }: Readonly<{ status: ChildSessionStatus; label: string }>) {
   const bgClass = getStatusBgClass(status);
   const textClass = getStatusTextClass(status);
 
   return (
     <View className={`rounded px-1.5 py-0.5 ${bgClass}`}>
-      <Text className={`text-xs ${textClass}`}>{status}</Text>
+      <Text className={`text-xs ${textClass}`}>{label}</Text>
     </View>
   );
 }

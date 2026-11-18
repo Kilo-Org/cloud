@@ -1,19 +1,27 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React trees under vitest (same pattern as src/components/agents/attachment-preview-strip.mounted.test.tsx) */
+/* eslint-disable max-lines -- cohesive unit suite for the file-part cache: capture, overwrite, resolve-failed, and hook-subscription paths share one mock harness */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetFilePartCacheForTests,
   cacheFilePart,
+  clearFilePartCache,
+  clearFilePartRenewing,
+  clearFilePartResolveFailed,
   getFilePartCacheEntry,
   isUsableFilePartUrl,
+  listFilePartCacheEntries,
+  markFilePartRenewing,
+  markFilePartResolveFailed,
+  overwriteFilePartCacheEntry,
   useFilePartCache,
 } from '@/components/agents/file-part-cache';
 
 type FileInstance = {
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  written?: { content: string; encoding?: string };
+  write: (content: string, options?: { encoding?: string }) => Promise<void>;
   filename: string;
 };
 
@@ -21,16 +29,22 @@ const fileInstances: FileInstance[] = [];
 
 const expoFileSystemMock = vi.hoisted(() => {
   const directoryCreate = vi.fn();
+  const directoryDelete = vi.fn();
   const Directory = vi.fn(function DirectoryMock(_base: unknown, name: string) {
     return {
       name,
       create: directoryCreate,
+      exists: true,
+      delete: directoryDelete,
     };
   });
   const File = vi.fn(function FileMock(_directory: { name?: string }, filename: string) {
-    const instance = {
+    const instance: FileInstance = {
       uri: `file:///cache/session-file-parts/${filename}`,
-      write: vi.fn(),
+      write(content, options) {
+        this.written = { content, encoding: options?.encoding };
+        return Promise.resolve();
+      },
       filename,
     };
     fileInstances.push(instance);
@@ -41,6 +55,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     File,
     Paths: { cache: 'file:///cache' },
     directoryCreate,
+    directoryDelete,
   };
 });
 
@@ -60,6 +75,19 @@ beforeEach(() => {
   fileInstances.length = 0;
   __resetFilePartCacheForTests();
 });
+
+/** Settle the fire-and-forget `data:` write continuations, for "nothing further
+ *  landed" checks. A macrotask runs only after every microtask of the write chain
+ *  has drained, so the wait cannot fall short of the chain the way a fixed tick
+ *  count can. The pending-entry case below is the no-reset control: it publishes
+ *  through this same drain, which is what makes the sign-out absence check mean
+ *  "the publish ran and was refused" rather than "the publish had not run yet". */
+async function drainCacheWrites(): Promise<void> {
+  // A zero-delay macrotask is a scheduling barrier, not a timing guess.
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(resolve, 0);
+  await promise;
+}
 
 describe('cacheFilePart', () => {
   it('records url, mime, and filename for a part id', () => {
@@ -95,27 +123,21 @@ describe('cacheFilePart', () => {
     });
   });
 
-  it('writes a data: URL to disk and stores the file:// URI', () => {
+  it('writes a data: URL to disk and stores the file:// URI', async () => {
     cacheFilePart('part-1', {
       url: 'data:application/pdf;base64,QUJD',
       mime: 'application/pdf',
       filename: 'report.pdf',
     });
 
-    expect(expoFileSystemMock.Directory).toHaveBeenCalledWith(
-      'file:///cache',
-      'session-file-parts'
-    );
-    expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledWith({
-      idempotent: true,
-      intermediates: true,
-    });
     const file = fileInstances[0];
     expect(file?.filename).toBe('part-1-report.pdf');
-    expect(file?.write).toHaveBeenCalledWith('QUJD', { encoding: 'base64' });
-    expect(getFilePartCacheEntry('part-1')?.url).toBe(
-      'file:///cache/session-file-parts/part-1-report.pdf'
-    );
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-1')?.url).toBe(
+        'file:///cache/session-file-parts/part-1-report.pdf'
+      );
+    });
+    expect(file?.written).toEqual({ content: 'QUJD', encoding: 'base64' });
   });
 
   it('stores an http(s) URL as-is without writing to disk', () => {
@@ -129,7 +151,7 @@ describe('cacheFilePart', () => {
     expect(getFilePartCacheEntry('part-1')?.url).toBe('https://example.com/report.pdf');
   });
 
-  it('stores the raw URL when the data: prefix cannot be stripped', () => {
+  it('stores the raw URL when the data: prefix cannot be stripped', async () => {
     cacheFilePart('part-1', {
       url: 'data:text/plain,hello',
       mime: 'text/plain',
@@ -137,19 +159,19 @@ describe('cacheFilePart', () => {
     });
 
     expect(fileInstances).toHaveLength(0);
-    expect(getFilePartCacheEntry('part-1')?.url).toBe('data:text/plain,hello');
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-1')?.url).toBe('data:text/plain,hello');
+    });
   });
 
-  it('stores the raw URL when the disk write fails', () => {
+  it('stores the raw URL when the disk write fails', async () => {
     expoFileSystemMock.File.mockImplementationOnce(function FileFail(
       _directory: { name?: string },
       filename: string
     ) {
       const instance = {
         uri: `file:///cache/session-file-parts/${filename}`,
-        write: vi.fn(() => {
-          throw new Error('disk full');
-        }),
+        write: vi.fn(() => Promise.reject(new Error('disk full'))),
         filename,
       };
       fileInstances.push(instance);
@@ -164,7 +186,9 @@ describe('cacheFilePart', () => {
       });
     }).not.toThrow();
 
-    expect(getFilePartCacheEntry('part-1')?.url).toBe('data:application/pdf;base64,QUJD');
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-1')?.url).toBe('data:application/pdf;base64,QUJD');
+    });
   });
 
   it('does not store a file:// URL', () => {
@@ -188,8 +212,238 @@ describe('cacheFilePart', () => {
     expect(fileInstances).toHaveLength(0);
     expect(getFilePartCacheEntry('part-1')).toBeUndefined();
   });
+
+  it('stores a ref-only entry for a cloud-agent attachment file:// URL', () => {
+    const uuid = '11111111-2222-4333-8444-555555555555';
+    cacheFilePart('part-attach', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+
+    expect(fileInstances).toHaveLength(0);
+    expect(getFilePartCacheEntry('part-attach')).toEqual({
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+    expect(getFilePartCacheEntry('part-attach')).not.toHaveProperty('url');
+  });
 });
 
+describe('overwriteFilePartCacheEntry', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('replaces url, preserves attachmentRef, and emits', async () => {
+    cacheFilePart('part-overwrite', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const renderer = await mountProbe('part-overwrite');
+
+    await act(async () => {
+      await Promise.resolve();
+      overwriteFilePartCacheEntry('part-overwrite', {
+        url: 'https://r2.example/signed',
+        mime: 'text/markdown',
+        filename: `${uuid}.md`,
+      });
+    });
+
+    expect(textOf(renderer)).toBe('https://r2.example/signed|ok');
+    expect(getFilePartCacheEntry('part-overwrite')).toEqual({
+      url: 'https://r2.example/signed',
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+    renderer.unmount();
+  });
+
+  it('keeps attachmentRef and clears resolveFailed after a failed resolve', () => {
+    cacheFilePart('part-overwrite-failed', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    markFilePartResolveFailed('part-overwrite-failed');
+
+    overwriteFilePartCacheEntry('part-overwrite-failed', {
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: 'fresh.md',
+    });
+
+    expect(getFilePartCacheEntry('part-overwrite-failed')).toEqual({
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: 'fresh.md',
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+    expect(getFilePartCacheEntry('part-overwrite-failed')).not.toHaveProperty('resolveFailed');
+  });
+
+  it('persists urlExpiresAt and keeps attachmentRef', () => {
+    cacheFilePart('part-overwrite-expiry', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+
+    overwriteFilePartCacheEntry('part-overwrite-expiry', {
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      urlExpiresAt: 1_800_000_000_000,
+    });
+
+    expect(getFilePartCacheEntry('part-overwrite-expiry')).toEqual({
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      urlExpiresAt: 1_800_000_000_000,
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+  });
+
+  it('does not overwrite or emit when the payload URL is unusable', async () => {
+    cacheFilePart('part-overwrite-unusable', {
+      url: 'https://example.com/keep.md',
+      mime: 'text/markdown',
+      filename: 'keep.md',
+    });
+    const before = getFilePartCacheEntry('part-overwrite-unusable');
+
+    const onRender = vi.fn<() => void>();
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      await Promise.resolve();
+      ref.current = TestRenderer.create(
+        createElement(CountingProbe, { partId: 'part-overwrite-unusable', onRender })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const rendersBefore = onRender.mock.calls.length;
+    expect(textOf(renderer)).toBe('https://example.com/keep.md');
+
+    await act(async () => {
+      await Promise.resolve();
+      overwriteFilePartCacheEntry('part-overwrite-unusable', {
+        url: 'file:///etc/passwd',
+        mime: 'text/plain',
+        filename: 'x.txt',
+      });
+    });
+
+    expect(getFilePartCacheEntry('part-overwrite-unusable')).toBe(before);
+    expect(textOf(renderer)).toBe('https://example.com/keep.md');
+    expect(onRender.mock.calls.length).toBe(rendersBefore);
+
+    renderer.unmount();
+  });
+});
+
+describe('markFilePartResolveFailed / clearFilePartResolveFailed', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('marks on a new identity, clears the key, and emits', async () => {
+    cacheFilePart('part-fail', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/x.md`,
+      mime: 'text/markdown',
+      filename: 'x.md',
+    });
+    const before = getFilePartCacheEntry('part-fail');
+    const renderer = await mountProbe('part-fail');
+
+    await act(async () => {
+      await Promise.resolve();
+      markFilePartResolveFailed('part-fail');
+    });
+    const marked = getFilePartCacheEntry('part-fail');
+    expect(marked?.resolveFailed).toBe(true);
+    expect(marked).not.toBe(before);
+    expect(textOf(renderer)).toBe('none|failed');
+
+    await act(async () => {
+      await Promise.resolve();
+      clearFilePartResolveFailed('part-fail');
+    });
+    const cleared = getFilePartCacheEntry('part-fail');
+    expect(cleared).not.toHaveProperty('resolveFailed');
+    expect(cleared).not.toBe(marked);
+    expect(textOf(renderer)).toBe('none|ok');
+
+    renderer.unmount();
+  });
+});
+
+describe('markFilePartRenewing / clearFilePartRenewing', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('marks on a new identity and clears the key', async () => {
+    cacheFilePart('part-renewing', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/x.md`,
+      mime: 'text/markdown',
+      filename: 'x.md',
+    });
+    const before = getFilePartCacheEntry('part-renewing');
+    const renderer = await mountProbe('part-renewing');
+
+    await act(async () => {
+      await Promise.resolve();
+      markFilePartRenewing('part-renewing');
+    });
+    const marked = getFilePartCacheEntry('part-renewing');
+    expect(marked?.renewing).toBe(true);
+    expect(marked).not.toBe(before);
+
+    await act(async () => {
+      await Promise.resolve();
+      clearFilePartRenewing('part-renewing');
+    });
+    const cleared = getFilePartCacheEntry('part-renewing');
+    expect(cleared).not.toHaveProperty('renewing');
+    expect(cleared).not.toBe(marked);
+
+    renderer.unmount();
+  });
+});
+
+describe('markFilePartResolveFailed clears renewing', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('drops a stale renewing flag when a presign fails', () => {
+    cacheFilePart('part-fail-renewing', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/x.md`,
+      mime: 'text/markdown',
+      filename: 'x.md',
+    });
+    markFilePartRenewing('part-fail-renewing');
+    expect(getFilePartCacheEntry('part-fail-renewing')?.renewing).toBe(true);
+
+    markFilePartResolveFailed('part-fail-renewing');
+
+    const failed = getFilePartCacheEntry('part-fail-renewing');
+    expect(failed?.resolveFailed).toBe(true);
+    expect(failed).not.toHaveProperty('renewing');
+  });
+});
+
+describe('listFilePartCacheEntries', () => {
+  it('returns every part id in the map', () => {
+    cacheFilePart('part-a', { url: 'https://example.com/a.png', mime: 'image/png' });
+    cacheFilePart('part-b', { url: 'https://example.com/b.png', mime: 'image/png' });
+
+    const ids = listFilePartCacheEntries()
+      .map(({ partId }) => partId)
+      .toSorted();
+    expect(ids).toEqual(['part-a', 'part-b']);
+  });
+});
 describe('isUsableFilePartUrl', () => {
   it('accepts http, https, and data schemes', () => {
     expect(isUsableFilePartUrl('http://example.com/a.png')).toBe(true);
@@ -207,6 +461,30 @@ describe('isUsableFilePartUrl', () => {
 function Probe({ partId }: { partId: string }) {
   const entry = useFilePartCache(partId);
   return createElement('Text', null, entry?.url ?? 'none');
+}
+
+function EntryProbe({ partId }: { partId: string }) {
+  const entry = useFilePartCache(partId);
+  const failed = entry?.resolveFailed === true ? 'failed' : 'ok';
+  return createElement('Text', null, `${entry?.url ?? 'none'}|${failed}`);
+}
+
+function CountingProbe({ partId, onRender }: { partId: string; onRender: () => void }) {
+  const entry = useFilePartCache(partId);
+  onRender();
+  return createElement('Text', null, entry?.url ?? 'none');
+}
+
+async function mountProbe(partId: string): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    await Promise.resolve();
+    ref.current = TestRenderer.create(createElement(EntryProbe, { partId }));
+  });
+  if (!ref.current) {
+    throw new Error('renderer was not created');
+  }
+  return ref.current;
 }
 
 function textOf(renderer: TestRenderer.ReactTestRenderer): string | undefined {
@@ -238,10 +516,141 @@ describe('useFilePartCache', () => {
     renderer.unmount();
   });
 
-  it('reads the same store as getFilePartCacheEntry', () => {
-    expect(typeof useFilePartCache).toBe('function');
-    expect(getFilePartCacheEntry('missing')).toBeUndefined();
-    cacheFilePart('part-hook', { url: 'https://example.com/a.png', mime: 'image/png' });
-    expect(getFilePartCacheEntry('part-hook')?.url).toBe('https://example.com/a.png');
+  it('wakes only the subscribers of the part that changed', async () => {
+    const rendersA = vi.fn<() => void>();
+    const rendersB = vi.fn<() => void>();
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      await Promise.resolve();
+      ref.current = TestRenderer.create(
+        createElement(
+          'View',
+          null,
+          createElement(CountingProbe, { partId: 'part-a', onRender: rendersA }),
+          createElement(CountingProbe, { partId: 'part-b', onRender: rendersB })
+        )
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    expect(rendersA).toHaveBeenCalledTimes(1);
+    expect(rendersB).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      cacheFilePart('part-a', { url: 'https://example.com/a.png', mime: 'image/png' });
+    });
+
+    expect(rendersA).toHaveBeenCalledTimes(2);
+    expect(rendersB).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-b')).toBeUndefined();
+
+    renderer.unmount();
+  });
+});
+
+describe('clearFilePartCache', () => {
+  it('deletes the cache directory and resets in-memory entries', async () => {
+    cacheFilePart('part-clear', {
+      url: 'data:application/pdf;base64,QUJD',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-clear')?.url).toBe(
+        'file:///cache/session-file-parts/part-clear-report.pdf'
+      );
+    });
+
+    clearFilePartCache();
+
+    expect(expoFileSystemMock.directoryDelete).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-clear')).toBeUndefined();
+  });
+
+  it('skips delete when the directory does not exist', () => {
+    expoFileSystemMock.Directory.mockImplementationOnce(function DirectoryMissing(
+      _base: unknown,
+      name: string
+    ) {
+      return {
+        name,
+        create: expoFileSystemMock.directoryCreate,
+        exists: false,
+        delete: expoFileSystemMock.directoryDelete,
+      };
+    });
+
+    expect(() => {
+      clearFilePartCache();
+    }).not.toThrow();
+    expect(expoFileSystemMock.directoryDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('cacheFilePart write lifetime', () => {
+  it('publishes a pending entry at once and the file URI only after the write resolves', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      _directory: { name?: string },
+      filename: string
+    ) {
+      const instance = {
+        uri: `file:///cache/session-file-parts/${filename}`,
+        write: vi.fn(() => write.promise),
+        filename,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+
+    cacheFilePart('part-slow', {
+      url: 'data:application/pdf;base64,QUJD',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+
+    await drainCacheWrites();
+    expect(getFilePartCacheEntry('part-slow')).toEqual({
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+      writePending: true,
+    });
+
+    write.resolve(undefined);
+    await drainCacheWrites();
+    expect(getFilePartCacheEntry('part-slow')?.url).toBe(
+      'file:///cache/session-file-parts/part-slow-report.pdf'
+    );
+    expect(getFilePartCacheEntry('part-slow')).not.toHaveProperty('writePending');
+  });
+
+  it('does not publish a write that resolves after a sign-out reset', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      _directory: { name?: string },
+      filename: string
+    ) {
+      const instance = {
+        uri: `file:///cache/session-file-parts/${filename}`,
+        write: vi.fn(() => write.promise),
+        filename,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+
+    cacheFilePart('part-late', {
+      url: 'data:application/pdf;base64,QUJD',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+    clearFilePartCache();
+    write.resolve(undefined);
+    await drainCacheWrites();
+
+    expect(getFilePartCacheEntry('part-late')).toBeUndefined();
   });
 });

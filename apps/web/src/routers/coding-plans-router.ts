@@ -5,6 +5,8 @@ import * as z from 'zod';
 import {
   adminCancelCodingPlanSubscription,
   cancelCodingPlanSubscription,
+  CodingPlanCredentialReassignmentError,
+  CodingPlanInventoryReductionError,
   CodingPlanInventoryReplacementError,
   CodingPlanInventoryUploadError,
   extendCodingPlanSubscriptionPeriod,
@@ -12,6 +14,8 @@ import {
   getCodingPlanAvailabilityIntentCounts,
   getCodingPlanAvailabilityIntentPlanIds,
   getKeyInventoryCounts,
+  reassignSubscriptionCredential,
+  queueAvailableInventoryForRevocation,
   replaceInventoryCredential,
   requestCodingPlanAvailabilityNotification,
   subscribeToCodingPlan,
@@ -39,11 +43,16 @@ import {
   CODING_PLAN_IDS,
   getCodingPlanCatalog,
   getCodingPlanPrice,
+  isCodingPlanDisabledForNewSignups,
 } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
-import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
-import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import {
+  baseProcedure,
+  adminProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import {
   coding_plan_subscriptions,
   coding_plan_terms,
@@ -575,6 +584,11 @@ export const codingPlansRouter = createTRPCRouter({
       billingPeriodDays: plan.billingPeriodDays,
       availabilityStatus: toAvailabilityStatus(availablePlans.has(plan.planId)),
       notificationRequested: requestedNotifications.has(plan.planId),
+      // False for plans closed to new signups (see pricing.ts); the admin
+      // console still needs every catalog entry to manage existing
+      // inventory/subscriptions, so filtering happens in the customer-facing
+      // UI rather than here.
+      purchasable: !isCodingPlanDisabledForNewSignups(plan.planId),
     }));
   }),
 
@@ -741,6 +755,9 @@ export const codingPlansRouter = createTRPCRouter({
         if (message.includes('not available as a coding plan')) {
           throw new TRPCError({ code: 'NOT_FOUND', message });
         }
+        if (message.includes('not currently accepting new signups')) {
+          throw new TRPCError({ code: 'FORBIDDEN', message });
+        }
         if (message.includes('already has a live subscription')) {
           throw new TRPCError({ code: 'CONFLICT', message });
         }
@@ -757,6 +774,9 @@ export const codingPlansRouter = createTRPCRouter({
         const message = error instanceof Error ? error.message : String(error);
         if (message.includes('currently available')) {
           throw new TRPCError({ code: 'CONFLICT', message });
+        }
+        if (message.includes('not currently accepting new signups')) {
+          throw new TRPCError({ code: 'FORBIDDEN', message });
         }
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
       }
@@ -808,6 +828,25 @@ export const codingPlansRouter = createTRPCRouter({
             ? error.message
             : 'Unable to upload Coding Plan inventory.';
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: safeMessage });
+      }
+    }),
+
+  adminReduceInventory: adminProcedure
+    .input(
+      z.object({
+        planId: CodingPlanIdSchema,
+        count: z.number().int().min(1).max(1000),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await queueAvailableInventoryForRevocation(input.planId, input.count, ctx.user.id);
+      } catch (error) {
+        const message =
+          error instanceof CodingPlanInventoryReductionError
+            ? error.message
+            : 'Unable to reduce Coding Plan inventory.';
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
       }
     }),
 
@@ -866,9 +905,9 @@ export const codingPlansRouter = createTRPCRouter({
     .input(
       z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1).max(500) })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
-        await replaceInventoryCredential(input.inventoryKeyId, input.apiKey);
+        await replaceInventoryCredential(input.inventoryKeyId, input.apiKey, ctx.user.id);
       } catch (error) {
         if (error instanceof CodingPlanInventoryReplacementError) {
           throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
@@ -876,6 +915,26 @@ export const codingPlansRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Unable to replace the inventory credential.',
+        });
+      }
+    }),
+
+  adminReassignSubscriptionCredential: adminProcedure
+    .input(z.object({ subscriptionId: SubscriptionIdSchema }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await reassignSubscriptionCredential(input.subscriptionId, ctx.user.id);
+      } catch (error) {
+        if (error instanceof CodingPlanCredentialReassignmentError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('No live subscription')) {
+          throw new TRPCError({ code: 'NOT_FOUND', message });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Unable to reassign the subscription credential.',
         });
       }
     }),

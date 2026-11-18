@@ -1,0 +1,345 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useTRPC } from '@/lib/trpc';
+import { getCreditStorefront } from './storefront';
+import {
+  getStoreCreditProductsState,
+  type StoreCreditProduct,
+  type StoreCreditProductListing,
+  type StoreProductFetchOptions,
+} from './store-products';
+import {
+  getAuthoredProductsErrorMessageKey,
+  loadStoreCreditProducts,
+  STORE_FAILURE_KEY,
+  STORE_FAILURE_PLAY_KEY,
+} from './store-products-loader';
+
+const STORE_CREDIT_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
+// Fixed bound on the store connection handshake — raise if real
+// devices routinely need longer than this to connect.
+const STORE_CONNECTION_TIMEOUT_MS = 8000;
+
+export type StoreCreditProductsOptions = {
+  /** Whether the store connection (from the IAP owner) is established. */
+  connected: boolean;
+  /** Fetches store SKUs. Injected by the IAP owner so this module never imports `expo-iap`. */
+  fetchStoreProducts: (
+    productSkus: string[],
+    options?: StoreProductFetchOptions
+  ) => Promise<readonly StoreCreditProductListing[]>;
+  /**
+   * Restores the IAP owner's store connection.
+   *
+   * expo-iap removes its purchase-update listeners when initialization fails,
+   * and only the hook's `reconnect()` brings those listeners and the connected
+   * state back. A retry that only refetched products could therefore price packs
+   * the owner had no callback to complete.
+   */
+  reconnectStore: () => Promise<boolean>;
+};
+
+/**
+ * The cache key of the joined credit-pack catalog for one account. Exported so
+ * a development fixture can seed the exact entry this hook reads; there is no
+ * second spelling of the key anywhere.
+ */
+export function creditStoreProductsKey(userId: string | undefined) {
+  return ['credits', 'store-products', userId] as const;
+}
+
+/**
+ * What the screen has settled on: the packs it renders, whether the store is
+ * unavailable, and the message key for it. Kept across a retry so the screen
+ * keeps showing this view instead of blanking back to the loading placeholders.
+ */
+type SettledStoreCreditProductsView = {
+  products: readonly StoreCreditProduct[];
+  isError: boolean;
+  storeUnavailable: boolean;
+  errorMessageKey: string | null;
+};
+
+function sameSettledView(
+  left: SettledStoreCreditProductsView,
+  right: SettledStoreCreditProductsView
+): boolean {
+  return (
+    left.products === right.products &&
+    left.isError === right.isError &&
+    left.storeUnavailable === right.storeUnavailable &&
+    left.errorMessageKey === right.errorMessageKey
+  );
+}
+
+/**
+ * Loads the credit-pack catalog for the store this device buys from.
+ *
+ * The app ships on iOS and Android only, and both have in-app purchase, so the
+ * catalog is never gated on an "IAP-capable platform": every platform that runs
+ * this hook has the capability, and the only platform-derived value is the
+ * storefront (`getCreditStorefront`).
+ */
+export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const identity = useCurrentUserId();
+  const { userId, refetchAsync: refetchIdentity } = identity;
+  // The catalogue is gated on the identity read: without a user id neither the
+  // backend catalogue nor the store price lookup can run, so a failed identity
+  // read is the one state where nothing settles and no retry exists yet. It is
+  // reported to the screen as its own retryable failure rather than as a blank
+  // list, which is what an operator saw when the read timed out.
+  //
+  // Only the settled failure counts. `isUnreachable` also covers an attempt
+  // that has not answered yet, so using it would paint this card over a read
+  // that then succeeds — a false error, and movement on the screen this change
+  // exists to hold still. The read settles while offline by policy, so it
+  // either answers or fails.
+  const identityFailed = userId == null && identity.isError;
+  const [retryingIdentity, setRetryingIdentity] = useState(false);
+  const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
+
+  // One storefront per render, from the same helper the IAP owner and the
+  // screen read, so the storefront the loader asks and the store name the
+  // banner shows can never come from two different platform branches.
+  const storefront = getCreditStorefront();
+  const storeConnectionTimeoutKey =
+    storefront === 'play' ? STORE_FAILURE_PLAY_KEY : STORE_FAILURE_KEY;
+
+  const productsQuery = useQuery({
+    queryKey: creditStoreProductsKey(userId),
+    queryFn: async () => {
+      const loadedProducts = await loadStoreCreditProducts({
+        fetchStoreProducts: options.fetchStoreProducts,
+        loadBackendProducts: async () => {
+          const backendResponse = await queryClient.query(
+            trpc.credits.getMobileStoreProducts.queryOptions({ supportsCreditExpiry: true })
+          );
+          return backendResponse;
+        },
+        storefront,
+      });
+      return loadedProducts;
+    },
+    enabled: options.connected && userId != null,
+    staleTime: STORE_CREDIT_PRODUCTS_STALE_TIME_MS,
+    // One attempt: the loader already bounds the store call at 15 s, so a retry
+    // would only multiply the wait for a store that is hung rather than failing,
+    // and the screen offers its own Try again for the user to choose.
+    retry: false,
+  });
+
+  // Bounded wait for the store connection — without this, a stuck connection
+  // leaves the screen showing loading skeletons forever. A retry re-arms the
+  // timer, so the handle is kept in a ref: a fetch that answers the bound
+  // cancels it in the effect below, or it would re-raise the banner over the
+  // packs the store had just priced.
+  //
+  // A failed identity read never arms it: the pack area cannot settle at all
+  // there, and the account card already explains why with its own retry. Arming
+  // it would raise a second card blaming the store for a backend failure.
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (options.connected || identityFailed) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setStoreErrorMessage(current => current ?? storeConnectionTimeoutKey);
+    }, STORE_CONNECTION_TIMEOUT_MS);
+    connectionTimeoutRef.current = timer;
+    return () => {
+      clearTimeout(timer);
+      if (connectionTimeoutRef.current === timer) {
+        connectionTimeoutRef.current = null;
+      }
+    };
+  }, [options.connected, identityFailed, connectionAttempt, storeConnectionTimeoutKey]);
+
+  // The backend catalog on its own, so a store that failed to answer still has
+  // the pack amounts to render. The loader reads the same query through the
+  // cache, so this is a subscription, not a second fetch.
+  const backendProductsQuery = useQuery({
+    ...trpc.credits.getMobileStoreProducts.queryOptions({ supportsCreditExpiry: true }),
+    enabled: userId != null,
+  });
+
+  const { refetch: refetchProducts } = productsQuery;
+  const { reconnectStore } = options;
+  const refetch = useCallback(async () => {
+    // Keep `storeErrorMessage` until the retry answers: clearing it here drops
+    // the banner while the store is still unreachable. The success effect below
+    // clears it once the retry succeeds.
+    setConnectionAttempt(attempt => attempt + 1);
+    // Restore the connection before asking for prices. A failed initialization
+    // leaves the owner without purchase-update listeners, so pricing a pack
+    // without reconnecting would enable a row that can never complete; the
+    // screen also keeps every row disabled until the owner reports connected.
+    try {
+      await reconnectStore();
+    } catch {
+      // Still unreachable: the bounded store-connection wait keeps the banner up.
+    }
+    await refetchProducts();
+  }, [reconnectStore, refetchProducts]);
+
+  // One press recovers both surfaces: the identity read first, because it gates
+  // both catalogue reads, then the store prices the answered catalogue asks
+  // for. The identity read answers the id it produced, so a repeat failure
+  // leaves the store read alone: a manual refetch bypasses `enabled`, and
+  // running it with no user id would paint prices or a second banner beside
+  // this card.
+  const retryIdentity = useCallback(async () => {
+    setRetryingIdentity(true);
+    try {
+      const answeredUserId = await refetchIdentity();
+      if (answeredUserId !== undefined) {
+        await refetch();
+      }
+    } finally {
+      setRetryingIdentity(false);
+    }
+  }, [refetchIdentity, refetch]);
+
+  const queryErrorMessage = getAuthoredProductsErrorMessageKey(productsQuery.error);
+
+  // The store-connection bound is a claim about the connection, so a connected
+  // store clears it. Keying only on `isSuccess` never cleared it: React Query
+  // keeps `status: success` across a refetch and while the query is disabled
+  // with cached data, so after the 8s timeout fired the banner outlived the
+  // disconnection until the screen remounted. A completed fetch answers the
+  // bound too, so a successful refetch clears the banner and cancels the timer
+  // that refetch re-armed; otherwise the timer re-raised the banner over packs
+  // the store had just priced. A cached success is not an answer —
+  // `dataUpdatedAt` moves only when a fetch completes — so a store that drops
+  // with fresh prices still gets its banner.
+  const observedDataUpdatedAtRef = useRef(productsQuery.dataUpdatedAt);
+  useEffect(() => {
+    const storeAnswered = productsQuery.dataUpdatedAt !== observedDataUpdatedAtRef.current;
+    observedDataUpdatedAtRef.current = productsQuery.dataUpdatedAt;
+    if (storeAnswered && connectionTimeoutRef.current !== null) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+    if (options.connected || productsQuery.isSuccess) {
+      setStoreErrorMessage(null);
+    }
+  }, [options.connected, productsQuery.isSuccess, productsQuery.dataUpdatedAt]);
+
+  const productsState = getStoreCreditProductsState({
+    data: productsQuery.data,
+    isError: productsQuery.isError,
+    storeErrorMessage,
+    queryErrorMessage,
+  });
+
+  // The backend catalog answered with nothing to sell. That is the empty
+  // state, not a store failure: the store is never asked for a price when the
+  // catalog is empty, so its absence of prices must not read as unavailable.
+  const catalogEmpty =
+    backendProductsQuery.isSuccess && backendProductsQuery.data.products.length === 0;
+  // A failed backend catalog fetch surfaces the same retryable banner as a
+  // failed store fetch, so a network failure never reads as "nothing for sale".
+  const storeUnavailable =
+    !catalogEmpty && (productsState.storeUnavailable || backendProductsQuery.isError);
+
+  // A store failure must not blank the rows: keep the backend packs with no
+  // store price, so the amounts stay on screen and each row shows the
+  // price-unavailable note instead of disappearing.
+  const unpricedBackendProducts = useMemo<StoreCreditProduct[]>(
+    () =>
+      (backendProductsQuery.data?.products ?? []).map(backend => ({
+        backend,
+        storeProductId: null,
+        displayPrice: null,
+      })),
+    [backendProductsQuery.data]
+  );
+  let products = productsState.products;
+  if (products.length === 0 && !catalogEmpty) {
+    // The store query has not priced the packs: it is pending, paused while
+    // offline, or failed. A pending query has no data and is neither loading
+    // (`isLoading` is `isPending && isFetching`, so a paused query is false) nor
+    // an error, so reporting its empty result would hide the packs the backend
+    // catalog already named. Keep those rows without a price: only a successful
+    // catalog with nothing to sell is an empty catalog.
+    products = unpricedBackendProducts;
+  }
+
+  const liveView = useMemo<SettledStoreCreditProductsView>(
+    () => ({
+      products,
+      isError: productsState.isError,
+      storeUnavailable,
+      errorMessageKey:
+        productsState.errorMessageKey ??
+        // The loader authored no key because the failure was the backend catalog
+        // itself, not the store; say so instead of blaming the store.
+        (backendProductsQuery.isError ? 'common.somethingWentWrong' : null),
+    }),
+    [
+      products,
+      productsState.isError,
+      productsState.errorMessageKey,
+      storeUnavailable,
+      backendProductsQuery.isError,
+    ]
+  );
+
+  // A retry returns the store query to `pending` and drops the error it held, so
+  // the live view has no products and no store-unavailable flag while the retry
+  // runs. Keep the last settled view and render it until the retry answers; a
+  // first load has settled nothing yet, so it still renders the placeholders.
+  const settled = productsQuery.isSuccess || productsQuery.isError || storeErrorMessage !== null;
+  const [settledView, setSettledView] = useState<SettledStoreCreditProductsView | null>(null);
+  useEffect(() => {
+    if (!settled) {
+      return;
+    }
+    setSettledView(previous =>
+      previous !== null && sameSettledView(previous, liveView) ? previous : liveView
+    );
+  }, [settled, liveView]);
+
+  const view = !settled && settledView !== null ? settledView : liveView;
+  // Deliberately `isLoading`, not `isPending`: a paused store query is pending
+  // without fetching, and the packs the backend catalog already named render
+  // from the fallback above instead of hiding behind placeholders. Only a first
+  // load with nothing known yet shows the placeholders.
+  //
+  // An unresolved identity keeps those placeholders up: the store query stays
+  // disabled until the identity answers, so `productsQuery.isLoading` is false
+  // and the screen would otherwise paint an empty list the moment the store
+  // connects and then fill it. A failed identity read ends the wait instead —
+  // it is an error with a retry, not something the placeholders can resolve.
+  const identityPending = userId == null && !identityFailed;
+  const isLoading =
+    !identityFailed &&
+    settledView === null &&
+    storeErrorMessage === null &&
+    (identityPending || productsQuery.isLoading || !options.connected);
+
+  return {
+    products: view.products,
+    isLoading,
+    // A retry reports busy even though React Query's own `isRefetching` is
+    // false while the query is back to `pending` with no data. A first load is
+    // still loading, so it is never a refetch.
+    isRefetching: productsQuery.isFetching && !isLoading,
+    isError: view.isError,
+    errorMessageKey: view.errorMessageKey,
+    storeUnavailable: view.storeUnavailable,
+    // The backend catalog answered with nothing to sell — the one state that is
+    // an empty catalog. A pending, paused or failed store query is not.
+    catalogEmpty,
+    refetch,
+    // The identity read failed, so neither catalogue read can run: the screen
+    // offers its own retry instead of an empty pack area.
+    identityUnavailable: identityFailed,
+    isRetryingIdentity: retryingIdentity,
+    retryIdentity,
+  };
+}

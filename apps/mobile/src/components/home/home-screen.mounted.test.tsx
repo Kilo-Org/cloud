@@ -1,144 +1,970 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
-import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- The mounted Home matrix covers live provenance, admission, and independent recovery actions. */
+import { createElement, type ReactNode, useEffect } from 'react';
+import * as ReactQuery from '@tanstack/react-query';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { HomeScreen } from '@/components/home/home-screen';
+import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { type BannerState } from '@/lib/offline-banner-state';
 
-const hasSessions = vi.hoisted(() => ({ value: true }));
-const activeIsError = vi.hoisted(() => ({ value: false }));
-const storedIsError = vi.hoisted(() => ({ value: false }));
-const storedIsSuccess = vi.hoisted(() => ({ value: true }));
-
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+type Org = { organizationId: string; organizationName: string };
+const state = vi.hoisted(() => ({
+  auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
+  organization: { organizationId: null as string | null, isLoaded: true },
+  memberships: [] as Org[],
+  boundary: {
+    orgs: undefined as Org[] | undefined,
+    org: undefined as Org | undefined,
+    isResolving: false,
+    isError: false,
+  },
+  live: {
+    activeSessions: [] as ActiveSession[],
+    isLoading: false,
+    isError: false,
+    hasAcceptedSuccess: false,
+    isFetching: false,
+    isPaused: false,
+    terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
+  },
+  internet: 'online' as BannerState,
+  connection: { isConnected: true, reconnectExhausted: false },
+  /** Landscape side safe areas (notch/sensor); portrait is all zeros. */
+  insets: { top: 0, bottom: 0, left: 0, right: 0 },
+  /** The platform value the safe-area layout must be identical under. */
+  platformOS: 'ios' as 'ios' | 'android',
+  refetch: vi.fn<() => Promise<boolean>>(),
+  boundaryRefetch: vi.fn(),
+  socketRetry: vi.fn(),
+  announcements: [] as string[],
+  destination: '',
+  owners: 0,
+  liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
+const queryClient = new ReactQuery.QueryClient();
+vi.mock('@tanstack/react-query', async importOriginal => ({
+  ...(await importOriginal<typeof ReactQuery>()),
+  useQueryClient: () => queryClient,
+  // The account control on the header reads its memberships through useQuery:
+  // a disabled query (signed out) stays pending, exactly as the live one does.
+  useQuery: (options: { enabled?: boolean }) => ({
+    data: options.enabled === false ? undefined : state.memberships,
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
+}));
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => state.insets,
+}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
+  // A getter so a test can flip the platform and re-render: the safe-area
+  // layout must not depend on it.
+  Platform: {
+    get OS() {
+      return state.platformOS;
+    },
+  },
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
+  Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
-  ScrollView: 'ScrollView',
   View: 'View',
+  useWindowDimensions: () => ({ fontScale: 1 }),
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
-  FadeOut: { duration: vi.fn() },
   LinearTransition: {},
+  FadeIn: { duration: () => ({}) },
 }));
-vi.mock('@/components/home/agent-sessions-section', () => ({
-  AgentSessionsSection: 'AgentSessionsSection',
-  hasDisplayableAgentSessions: () => hasSessions.value,
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: (_reduced: boolean, crossfade: unknown) => crossfade,
 }));
-vi.mock('@/components/home/agents-promo-card', () => ({
-  AgentsPromoCard: 'AgentsPromoCard',
-}));
-vi.mock('@/components/home/greeting', () => ({
-  buildTimedGreeting: () => 'Good morning',
-}));
-vi.mock('@/components/home/new-task-button', () => ({
-  NewTaskButton: 'NewTaskButton',
-}));
-vi.mock('@/components/query-error', () => ({
-  QueryError: 'QueryError',
-}));
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: () => null,
-}));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: 'ScrollView',
-}));
-vi.mock('@/components/ui/skeleton', () => ({
-  Skeleton: 'Skeleton',
-}));
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
-    activeSessions: [],
-    isLoading: false,
-    storedSessions: [{}],
-    storedIsError: storedIsError.value,
-    storedIsSuccess: storedIsSuccess.value,
-    activeIsError: activeIsError.value,
-    refetch: vi.fn(),
+vi.mock('expo-router', () => ({
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  // The account picker closes itself on the owning screen's focus loss; this
+  // suite keeps Home focused, so the effect lives as long as the tree.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
+  useRouter: () => ({
+    canGoBack: () => false,
+    push: (path: string) => {
+      state.destination = path;
+    },
+    replace: (path: string) => {
+      state.destination = path;
+    },
   }),
 }));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
+// The briefing card renders the paid-summary surfaces and reaches the native
+// SQLCipher store; Home's layout assertions do not exercise it.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: 'BriefingCard',
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
 }));
-
-function nodeCount(root: TestRenderer.ReactTestInstance, type: string): number {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type)
-    .length;
-}
-
-function findNode(
-  root: TestRenderer.ReactTestInstance,
-  type: string
-): TestRenderer.ReactTestInstance | undefined {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type)[0];
-}
-
-async function mountHome(): Promise<TestRenderer.ReactTestRenderer> {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
+vi.mock('@/components/todos/up-next-section', () => ({ UpNextSection: 'UpNextSection' }));
+vi.mock('@/components/home/new-task-from-picture-button', () => ({
+  NewTaskFromPictureButton: 'NewTaskFromPictureButton',
+}));
+// A host element that still renders the header notice, so its text and Retry
+// stay observable beside the card. The factory is hoisted above the static
+// imports, so it loads React itself.
+vi.mock('@/components/home/section-header', async () => {
+  const { createElement: create } = await import('react');
+  return {
+    SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
   };
-  await act(async () => {
-    await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(HomeScreen));
-  });
-  const renderer = rendererRef.current;
+});
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext(''), EYEBROW_LATIN_DISPLAY: '' };
+});
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  Bot: 'Bot',
+  ChevronDown: 'ChevronDown',
+  GitMerge: 'GitMerge',
+  GitPullRequest: 'GitPullRequest',
+  Lock: 'Lock',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
+  ShieldCheck: 'ShieldCheck',
+  WifiOff: 'WifiOff',
+}));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
+vi.mock('@/components/agents/use-agent-session-navigator', () => ({
+  useAgentSessionNavigator: () => vi.fn(),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({
+    ...state.organization,
+    error: null,
+    retry: vi.fn(),
+    setOrganizationId: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: () => ({ ...state.boundary, refetch: state.boundaryRefetch }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.internet,
+}));
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionHealth: () => state.connection,
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: state.socketRetry }),
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: (message: string) => {
+    state.announcements.push(message);
+  },
+}));
+vi.mock('@/lib/hooks/use-agent-sessions', async () => {
+  // `vi.mock` factories are hoisted above the file's imports, so React has to
+  // be loaded here; binding it to a name keeps the file's own `useEffect` import
+  // from being shadowed.
+  const react = await import('react');
+  return {
+    useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
+      state.liveQuery(options);
+      react.useEffect(() => {
+        state.owners += 1;
+        return () => {
+          state.owners -= 1;
+        };
+      }, []);
+      return { ...state.live, refetch: state.refetch };
+    },
+    useAgentSessions: () => {
+      throw new Error('Home must not request delayed or failed stored history');
+    },
+  };
+});
+const row: ActiveSession = {
+  id: 'live-1',
+  status: 'running',
+  title: 'Live task',
+  connectionId: 'connection-1',
+  statusUpdatedAt: new Date().toISOString(),
+};
+const failure = { kind: 'retryable', error: new Error('temporary') } as const;
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+function nodes(type: string) {
   if (!renderer) {
-    throw new Error('renderer was not created');
+    throw new Error('Missing Home');
   }
-  return renderer;
+  return renderer.root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
+function text() {
+  return nodes('Text')
+    .map(node => node.children.filter(child => typeof child === 'string').join(''))
+    .join('\n');
+}
+function action(label: string) {
+  const button = nodes('Pressable').find(
+    node =>
+      node.props.accessibilityLabel === label ||
+      (node.props.accessibilityLabel == null &&
+        node.findAll(child => Object.is(child.type, 'Text') && child.children.includes(label))
+          .length > 0)
+  );
+  if (!button) {
+    throw new Error(`Missing action: ${label}`);
+  }
+  return button;
+}
+function press(label: string) {
+  (action(label).props.onPress as () => void)();
+}
+/** The one glanceable card's frame; absent while no card is shown. */
+// The Home card now renders through the shared adaptive frame that holds the
+// live card, the briefing and the pending placeholder.
+const CARD_FRAME =
+  'flex-row items-stretch overflow-hidden rounded-2xl border border-border bg-card';
+function cardFrame() {
+  return nodes('View').find(node => node.props.className === CARD_FRAME);
+}
+/** The card's newest-session title line, the card's stable identity. */
+function newestTitleNode() {
+  return nodes('Text').find(node => node.children.includes(row.title));
+}
+/** True only for the loaded rows card, not the pending skeleton. */
+function hasLoadedCard() {
+  return newestTitleNode() !== undefined;
+}
+async function renderHome() {
+  await act(async () => {
+    const tree = createElement(HomeScreen);
+    if (renderer) {
+      renderer.update(tree);
+    } else {
+      renderer = TestRenderer.create(tree);
+    }
+    await Promise.resolve();
+  });
+}
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  Object.assign(state.auth, { token: 'account', isLoading: false, isSigningOut: false });
+  Object.assign(state.organization, { organizationId: null, isLoaded: true });
+  state.memberships = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+  Object.assign(state.boundary, {
+    orgs: undefined,
+    org: undefined,
+    isResolving: false,
+    isError: false,
+  });
+  Object.assign(state.live, {
+    activeSessions: [],
+    isLoading: false,
+    isError: false,
+    hasAcceptedSuccess: false,
+    isFetching: false,
+    isPaused: false,
+    terminalError: null,
+  });
+  Object.assign(state.connection, { isConnected: true, reconnectExhausted: false });
+  Object.assign(state.insets, { top: 0, bottom: 0, left: 0, right: 0 });
+  state.platformOS = 'ios';
+  state.internet = 'online';
+  state.destination = '';
+  state.announcements = [];
+  state.refetch.mockReset().mockResolvedValue(true);
+  state.boundaryRefetch.mockReset();
+  state.socketRetry.mockReset();
+  state.liveQuery.mockReset();
+});
+afterEach(async () => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  queryClient.clear();
+  await i18n.changeLanguage('en');
+});
 
 describe('HomeScreen composition', () => {
-  it('renders the sessions section and new-task button when sessions are present', async () => {
-    hasSessions.value = true;
-    const renderer = await mountHome();
-    expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(1);
-    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(1);
-    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
-
-    await act(async () => {
-      await Promise.resolve();
-      renderer.unmount();
+  it.each(['en', 'sr'])('shows an accessible Kilo logo as the Home title in %s', async language => {
+    await i18n.changeLanguage(language);
+    await renderHome();
+    const title = nodes('View').find(node => node.props.accessibilityRole === 'header');
+    expect(title?.props).toMatchObject({ accessible: true, accessibilityLabel: 'Kilo' });
+    expect(nodes('Image')).toHaveLength(1);
+    expect(nodes('Image')[0]?.props).toMatchObject({
+      source: 1,
+      className: 'size-[40px] shrink-0',
+      contentFit: 'contain',
+      transition: 0,
+      accessible: false,
     });
+    expect(text()).not.toContain('Kilo');
+    expect(text()).not.toContain(i18n.t('login.welcome'));
   });
 
-  it('renders only the agents promo card when there are no sessions', async () => {
-    hasSessions.value = false;
-    storedIsError.value = false;
-    storedIsSuccess.value = true;
-    activeIsError.value = false;
-    const renderer = await mountHome();
-    expect(nodeCount(renderer.root, 'AgentsPromoCard')).toBe(1);
-    expect(nodeCount(renderer.root, 'QueryError')).toBe(0);
-    expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(0);
-    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(0);
+  it.each([null, 'org-1'])(
+    'shows the switchable account control for %s and keeps the live query scope',
+    async organizationId => {
+      state.organization.organizationId = organizationId;
+      state.memberships = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+      state.boundary.orgs = state.memberships;
+      state.boundary.org = state.boundary.orgs[0];
+      state.live.activeSessions = [row];
+      await renderHome();
+      expect(
+        nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
+      ).toHaveLength(1);
+      expect(text()).toContain(organizationId === null ? 'Personal' : 'Home organization');
+      expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId, enabled: true });
+      expect(text()).toContain('Live task');
+      expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe(organizationId);
+    }
+  );
 
-    await act(async () => {
-      await Promise.resolve();
-      renderer.unmount();
-    });
+  it.each([
+    { name: 'account pending', patch: { isLoading: true } },
+    { name: 'signed out', patch: { token: undefined } },
+    { name: 'signing out', patch: { isSigningOut: true } },
+  ])('revokes cached rows and actions while $name', async ({ patch }) => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+    state.boundary.org = state.boundary.orgs[0];
+    state.live.activeSessions = [row];
+    await renderHome();
+    expect(hasLoadedCard()).toBe(true);
+    expect(nodes('NewTaskButton')).toHaveLength(1);
+    Object.assign(state.auth, patch);
+    await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: false });
+    expect(hasLoadedCard()).toBe(false);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
+    for (const label of ['Code Reviewer', 'Security Agent', 'PR Review']) {
+      expect(text()).not.toContain(label);
+    }
   });
 
-  it('shows unavailable, not the promo, on active error with zero rows', async () => {
-    hasSessions.value = false;
-    storedIsError.value = false;
-    storedIsSuccess.value = true;
-    activeIsError.value = true;
-    const renderer = await mountHome();
-    const queryError = findNode(renderer.root, 'QueryError');
-    expect(queryError).toBeDefined();
-    expect(queryError?.props.title).toBe("Couldn't load active sessions");
-    expect(typeof queryError?.props.onRetry).toBe('function');
-    expect(nodeCount(renderer.root, 'AgentsPromoCard')).toBe(0);
-    expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(0);
-    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(0);
+  it('shows the picture entry beside the new task action once the Home surface is ready', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+    state.boundary.org = state.boundary.orgs[0];
+    await renderHome();
+    expect(nodes('NewTaskButton')).toHaveLength(1);
+    expect(nodes('NewTaskFromPictureButton')).toHaveLength(1);
+    expect(nodes('NewTaskFromPictureButton')[0]?.props.organizationId).toBe('org-1');
 
-    await act(async () => {
-      await Promise.resolve();
-      renderer.unmount();
+    state.auth.isLoading = true;
+    await renderHome();
+    expect(nodes('NewTaskFromPictureButton')).toHaveLength(0);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
+  });
+
+  it.each([false, true])('admits rows and actions with organization readiness=%s', async loaded => {
+    state.organization.organizationId = 'org-1';
+    state.organization.isLoaded = loaded;
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+    state.boundary.org = state.boundary.orgs[0];
+    state.live.activeSessions = [row];
+    state.live.hasAcceptedSuccess = true;
+    await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: loaded });
+    expect(hasLoadedCard()).toBe(loaded);
+    expect(nodes('NewTaskButton')).toHaveLength(loaded ? 1 : 0);
+    // The header account control adds one skeleton while the organization
+    // selection is unresolved.
+    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 16);
+  });
+
+  it.each([false, true])(
+    'keeps admitted actions during a live error with retained rows=%s',
+    async retained => {
+      state.organization.organizationId = 'org-1';
+      state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+      state.boundary.org = state.boundary.orgs[0];
+      state.live.activeSessions = retained ? [row] : [];
+      state.live.isError = true;
+      state.live.terminalError = failure;
+      await renderHome();
+      expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
+      expect(text()).toContain("Couldn't load active sessions");
+      expect(typeof action('Retry').props.onPress).toBe('function');
+      expect(hasLoadedCard()).toBe(retained);
+      expect(nodes('NewTaskButton')).toHaveLength(1);
+      for (const label of ['Code Reviewer', 'Security Agent', 'PR Review']) {
+        expect(typeof action(label).props.onPress).toBe('function');
+      }
+    }
+  );
+});
+
+describe('Home live presentation', () => {
+  it.each<{
+    name: string;
+    patch: Partial<typeof state.live>;
+    skeleton?: boolean;
+    empty?: boolean;
+    rows?: boolean;
+    error?: boolean;
+    updating?: boolean;
+  }>([
+    { name: 'pending', patch: { isLoading: true, isFetching: true }, skeleton: true },
+    { name: 'paused', patch: { isPaused: true }, skeleton: true },
+    { name: 'socket-only empty', patch: {}, skeleton: true },
+    { name: 'canceled without provenance', patch: {}, skeleton: true },
+    { name: 'accepted empty', patch: { hasAcceptedSuccess: true }, empty: true },
+    { name: 'initial failure', patch: { terminalError: failure, isError: true }, error: true },
+    {
+      name: 'retained cache after a socket write',
+      patch: { activeSessions: [row], terminalError: failure },
+      rows: true,
+      error: true,
+    },
+    {
+      name: 'updating',
+      patch: { activeSessions: [row], isFetching: true },
+      rows: true,
+      updating: true,
+    },
+    {
+      name: 'updating after a terminal failure',
+      patch: { activeSessions: [row], terminalError: failure, isFetching: true },
+      rows: true,
+      error: true,
+      updating: true,
+    },
+    {
+      name: 'paused cache',
+      patch: { activeSessions: [row], isPaused: true, isFetching: true },
+      rows: true,
+    },
+  ])('keeps valid actions and truthful content during $name', async test => {
+    Object.assign(state.live, test.patch);
+    await renderHome();
+    expect(nodes('Skeleton')).toHaveLength(test.skeleton ? 15 : 0);
+    if (test.skeleton) {
+      // The placeholder keeps the card frame: the reserved glanceable card,
+      // and no full-width skeleton block standing in for the whole surface.
+      expect(cardFrame()).toBeDefined();
+      expect(
+        nodes('Skeleton').some(skeleton =>
+          String(skeleton.props.className ?? '').includes('w-full')
+        )
+      ).toBe(false);
+    }
+    expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
+    expect(text().includes("Couldn't load active sessions")).toBe(Boolean(test.error));
+    expect(text().includes('Updating')).toBe(Boolean(test.updating));
+    expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
+    expect(hasLoadedCard()).toBe(Boolean(test.rows));
+    expect(nodes('NewTaskButton')).toHaveLength(1);
+    expect(text()).toContain('Code Reviewer');
+    expect(text()).toContain('Security Agent');
+    expect(text()).toContain('PR Review');
+    expect(state.owners).toBe(1);
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
+  });
+
+  it.each(['offline', 'unknown', 'reconnecting', 'exhausted'] as const)(
+    'retains row identity and running status while %s',
+    async mode => {
+      state.live.activeSessions = [row];
+      await renderHome();
+      const original = newestTitleNode();
+      state.connection.isConnected = false;
+      state.connection.reconnectExhausted = mode === 'exhausted';
+      state.internet = mode === 'offline' || mode === 'unknown' ? mode : 'online';
+      await renderHome();
+      expect(newestTitleNode()).toBe(original);
+      expect(text()).toContain('Live task');
+      expect(text()).toContain('Working');
+      expect(text().includes('No internet connection')).toBe(mode === 'offline');
+      expect(text().includes('Connection lost')).toBe(mode === 'exhausted');
+      expect(text().includes('Reconnecting…')).toBe(mode === 'reconnecting' || mode === 'unknown');
+      expect(text()).not.toContain('Internet connection restored');
+      if (mode === 'exhausted') {
+        // Device defect (Android portrait, pt-BR): the notice beside `Retry`
+        // and the header action ellipsized "Connection lost" to "Connection
+        // …". The message must keep no `numberOfLines` cap, so it wraps to a
+        // second line instead of clipping.
+        const message = nodes('Text').find(node => node.children.includes('Connection lost'));
+        expect(message).toBeDefined();
+        expect(message?.props.numberOfLines).toBeUndefined();
+        expect(String(message?.props.className).split(' ')).toEqual(
+          expect.arrayContaining(['min-w-0', 'shrink'])
+        );
+      }
+    }
+  );
+
+  it('shows Connecting on a cold socket and keeps it beside accepted empty content', async () => {
+    state.connection.isConnected = false;
+    state.live.hasAcceptedSuccess = true;
+    await renderHome();
+    expect(text()).toContain('Connecting…');
+    expect(text()).toContain('Nothing running right now');
+  });
+
+  it('does not invent internet or retry activity for an unknown paused connection', async () => {
+    state.internet = 'unknown';
+    state.connection.isConnected = false;
+    state.live.isPaused = true;
+    await renderHome();
+    expect(nodes('Skeleton')).toHaveLength(15);
+    expect(text()).not.toContain('Nothing running right now');
+    expect(text()).not.toContain('Connecting…');
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain('Updating');
+  });
+
+  it.each([
+    ['FORBIDDEN', 'Access denied'],
+    ['UNAUTHORIZED', 'Access denied'],
+    ['NOT_FOUND', 'Not found'],
+    ['BAD_REQUEST', "Couldn't load sessions"],
+    ['UNPROCESSABLE_CONTENT', "Couldn't load sessions"],
+  ])('suppresses denied rows and query Retry for %s', async (code, title) => {
+    state.live.activeSessions = [row];
+    state.live.hasAcceptedSuccess = true;
+    state.live.terminalError = { kind: 'non-retryable', error: { data: { code } } };
+    await renderHome();
+    expect(hasLoadedCard()).toBe(false);
+    expect(text()).toContain(title);
+    expect(text()).not.toContain('Nothing running right now');
+    expect(nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry')).toBe(false);
+    press('Back to profile');
+    expect(state.destination).toBe('/(app)/(tabs)/(3_profile)');
+  });
+
+  it('offers one header Retry at a time: the failed load, then the lost connection', async () => {
+    state.live.activeSessions = [row];
+    state.live.terminalError = failure;
+    state.connection.isConnected = false;
+    state.connection.reconnectExhausted = true;
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    await renderHome();
+    const original = newestTitleNode();
+    // The failed load outranks the lost connection in the one header line.
+    expect(
+      nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry connection')
+    ).toBe(false);
+    act(() => {
+      press('Retry');
+      press('Retry');
     });
+    expect(action('Retry').props.disabled).toBe(true);
+    expect(action('Retry').props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(text()).toContain("Couldn't load active sessions");
+    await act(async () => {
+      pending.resolve(false);
+      await pending.promise;
+    });
+    expect(action('Retry').props.disabled).toBe(false);
+    expect(text()).toContain("Couldn't load active sessions");
+    expect(newestTitleNode()).toBe(original);
+    expect(
+      state.announcements.filter(message => message === "Couldn't load active sessions")
+    ).toHaveLength(1);
+    expect(state.announcements.filter(message => message === 'Connection lost')).toHaveLength(1);
+
+    state.refetch.mockImplementation(async () => {
+      await Promise.resolve();
+      state.live.terminalError = null;
+      state.live.hasAcceptedSuccess = true;
+      return true;
+    });
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    await renderHome();
+    expect(text()).not.toContain("Couldn't load active sessions");
+    expect(text()).toContain('Connection lost');
+
+    state.socketRetry.mockImplementation(() => {
+      state.connection.reconnectExhausted = false;
+    });
+    act(() => {
+      press('Retry connection');
+    });
+    await renderHome();
+    expect(text()).toContain('Connecting…');
+    expect(text()).not.toContain('Connection lost');
+    expect(state.refetch).toHaveBeenCalledTimes(2);
+    expect(newestTitleNode()).toBe(original);
+  });
+
+  it('keeps the load failure and its Retry visible as socket rows appear and disappear', async () => {
+    state.live.terminalError = failure;
+    await renderHome();
+    const message = "Couldn't load active sessions";
+    expect(nodes('AlertCircle')).toHaveLength(1);
+
+    async function updateSocketRows(activeSessions: ActiveSession[]) {
+      state.live.activeSessions = activeSessions;
+      await renderHome();
+      expect(hasLoadedCard()).toBe(activeSessions.length > 0);
+      // Beside readable rows the failure moves into the header line; without
+      // rows it is the whole surface. It is announced once either way.
+      expect(typeof action('Retry').props.onPress).toBe('function');
+      expect(text()).toContain(message);
+      expect.soft(state.announcements).toEqual([message]);
+      expect(nodes('AlertCircle')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
+    }
+    await updateSocketRows([row]);
+    await updateSocketRows([]);
+  });
+
+  it('waits for the live coordinator without requesting or waiting for stored history', async () => {
+    const storedKey = [['cliSessionsV2', 'list']];
+    const history = Promise.withResolvers<undefined>();
+    queryClient.setQueryData(storedKey, 'history');
+    const observer = new ReactQuery.QueryObserver(queryClient, {
+      queryKey: storedKey,
+      staleTime: Infinity,
+      queryFn: async () => {
+        await history.promise;
+        return 'history';
+      },
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    try {
+      // An accepted-empty surface paints no loading card, so the native pull
+      // indicator is its only in-flight indicator and round-trips `refreshing`
+      // there (the `pending` surface withholds it; see the case below).
+      state.live.hasAcceptedSuccess = true;
+      const pending = Promise.withResolvers<boolean>();
+      state.refetch.mockReturnValue(pending.promise);
+      await renderHome();
+      const refresh = () =>
+        nodes('ScrollView')[0]?.props.refreshControl as {
+          props: { refreshing: boolean; onRefresh: () => void };
+        };
+      act(() => {
+        refresh().props.onRefresh();
+      });
+      expect(refresh().props.refreshing).toBe(true);
+      await act(async () => {
+        pending.resolve(true);
+        await pending.promise;
+      });
+      expect(refresh().props.refreshing).toBe(false);
+      expect(queryClient.getQueryState(storedKey)?.fetchStatus).toBe('idle');
+      expect(nodes('NewTaskButton')).toHaveLength(1);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('keeps cold-loading feedback stable until an accepted result', async () => {
+    state.live.isLoading = true;
+    state.live.isFetching = true;
+    await renderHome();
+    const loading = nodes('Text').find(node => node.children.includes('Loading…'));
+    const skeleton = nodes('Skeleton')[0];
+    expect(loading).toBeDefined();
+    expect(skeleton).toBeDefined();
+    expect(text()).not.toContain('Updating');
+    expect(text()).not.toContain('Nothing running right now');
+    expect(state.announcements).toEqual(['Loading…']);
+
+    await renderHome();
+    state.live.isLoading = false;
+    state.live.isFetching = false;
+    await renderHome();
+    expect(nodes('Text').find(node => node.children.includes('Loading…'))).toBe(loading);
+    expect(nodes('Skeleton')[0]).toBe(skeleton);
+    expect(state.announcements).toEqual(['Loading…']);
+    expect(text()).not.toContain('Nothing running right now');
+
+    state.live.hasAcceptedSuccess = true;
+    await renderHome();
+    expect(text()).not.toContain('Loading…');
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(text()).toContain('Nothing running right now');
+    expect(state.announcements).toEqual(['Loading…']);
+  });
+
+  it('withholds the platform pull indicator while the live section shows its own loading card', async () => {
+    state.live.isLoading = true;
+    state.live.isFetching = true;
+    state.live.hasAcceptedSuccess = false;
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    await renderHome();
+    const refresh = () =>
+      nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    // The section's own loading card is the surface's single in-flight
+    // indicator while the live content is pending, so the platform pull
+    // control must not also hold the scroll inset open for a second one.
+    expect(refresh().props.refreshing).toBe(false);
+    expect(cardFrame()).toBeDefined();
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+
+    // Control: an accepted empty card paints no loading card, so the native
+    // pull indicator is the surface's only in-flight indicator there.
+    state.live.hasAcceptedSuccess = true;
+    await renderHome();
+    const control = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(control.promise);
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      control.resolve(true);
+      await control.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
+  });
+});
+
+describe('Home admission', () => {
+  it('withholds cached rows and actions until membership admission', async () => {
+    state.organization.organizationId = 'org-1';
+    state.memberships = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    state.boundary.orgs = state.memberships;
+    state.boundary.org = state.memberships[0];
+    state.boundary.isResolving = true;
+    state.live.activeSessions = [row];
+    await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: false });
+    expect(hasLoadedCard()).toBe(false);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
+    state.boundary.isResolving = false;
+    await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
+    expect(text()).toContain('Live task');
+    expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe('org-1');
+  });
+
+  it.each(['unresolved', 'failed', 'missing'] as const)(
+    'keeps PR Review available on its own route while membership is %s',
+    async mode => {
+      state.organization.organizationId = 'org-1';
+      state.boundary.isResolving = mode === 'unresolved';
+      state.boundary.isError = mode === 'failed';
+      state.boundary.orgs = mode === 'missing' ? [] : undefined;
+      await renderHome();
+      expect(nodes('NewTaskButton')).toHaveLength(0);
+      expect(text()).not.toContain('Code Reviewer');
+      expect(text()).not.toContain('Security Agent');
+      press('PR Review');
+      expect(state.destination).toBe('/(app)/pr-review');
+    }
+  );
+  it.each(['pending', 'failed'] as const)(
+    'admits personal actions while membership is %s',
+    async mode => {
+      state.boundary.isResolving = mode === 'pending';
+      state.boundary.isError = mode === 'failed';
+      await renderHome();
+      expect(nodes('NewTaskButton')).toHaveLength(1);
+      expect(text()).toContain('Code Reviewer');
+      expect(text()).toContain('Security Agent');
+      expect(text()).toContain('PR Review');
+      expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
+      expect(text()).not.toContain("Couldn't load your organizations");
+    }
+  );
+
+  it.each([
+    'account pending',
+    'signed out',
+    'signing out',
+    'selection pending',
+    'membership paused',
+    'membership missing',
+    'wrong organization',
+    'permission denied',
+  ] as const)('suppresses protected rows for %s', async mode => {
+    state.live.activeSessions = [row];
+    state.live.hasAcceptedSuccess = true;
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    state.memberships = state.boundary.orgs;
+    state.boundary.org = state.boundary.orgs[0];
+    if (mode === 'account pending') {
+      state.auth.isLoading = true;
+    }
+    if (mode === 'signed out') {
+      state.auth.token = undefined;
+    }
+    if (mode === 'signing out') {
+      state.auth.isSigningOut = true;
+    }
+    if (mode === 'selection pending') {
+      state.organization.isLoaded = false;
+    }
+    if (mode === 'membership paused') {
+      state.boundary.orgs = undefined;
+    }
+    if (mode === 'membership missing') {
+      state.boundary.orgs = [];
+      state.boundary.org = undefined;
+    }
+    if (mode === 'wrong organization') {
+      state.boundary.org = { organizationId: 'old-org', organizationName: 'Old organization' };
+    }
+    if (mode === 'permission denied') {
+      state.live.terminalError = { kind: 'non-retryable', error: { data: { code: 'FORBIDDEN' } } };
+    }
+    await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({
+      organizationId: 'org-1',
+      enabled: mode === 'permission denied',
+    });
+    expect(hasLoadedCard()).toBe(false);
+    expect(text()).not.toContain('Nothing running right now');
+    expect(text()).not.toContain('Old organization');
+    expect(text().includes('PR Review')).toBe(
+      mode !== 'account pending' && mode !== 'signed out' && mode !== 'signing out'
+    );
+    if (mode !== 'permission denied') {
+      expect(nodes('NewTaskButton')).toHaveLength(0);
+      expect(text()).not.toContain('Code Reviewer');
+      expect(text()).not.toContain('Security Agent');
+      // The header account control still names the account on purpose (it owns
+      // its own error and pending presentation); the protected rows must not,
+      // so the name may appear at most once on the whole screen.
+      expect(text().split('Engineering').length - 1).toBeLessThanOrEqual(1);
+    }
+    if (mode === 'membership paused') {
+      // The sessions body pauses on skeleton, but the shared membership list
+      // the header control reads is settled, so it renders the name itself.
+      expect(nodes('Skeleton')).toHaveLength(15);
+      expect(text()).toContain('Engineering');
+      expect(text()).not.toContain('Organization unavailable');
+    }
+    if (
+      mode === 'membership missing' ||
+      mode === 'wrong organization' ||
+      mode === 'permission denied'
+    ) {
+      expect(text()).toContain(
+        mode === 'permission denied' ? 'Access denied' : 'Organization unavailable'
+      );
+      expect(nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry')).toBe(
+        false
+      );
+      press('Back to profile');
+      expect(state.destination).toBe('/(app)/(tabs)/(3_profile)');
+    }
+  });
+
+  it.each(['unavailable', 'error'] as const)(
+    'keeps %s feedback inline alongside PR Review',
+    async mode => {
+      state.organization.organizationId = 'org-1';
+      state.boundary.orgs = [];
+      state.boundary.isError = mode === 'error';
+      await renderHome();
+      expect(nodes('CenteredState')).toHaveLength(0);
+      expect(nodes('ScrollView')).toHaveLength(1);
+      expect(text()).toContain('PR Review');
+    }
+  );
+
+  it('keeps session failures inline when the new task choice remains', async () => {
+    state.live.terminalError = failure;
+    await renderHome();
+    expect(nodes('CenteredState')).toHaveLength(0);
+    expect(nodes('ScrollView')).toHaveLength(1);
+    expect(nodes('NewTaskButton')).toHaveLength(1);
+  });
+
+  it('refreshes organization errors through the context', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    const pending = Promise.withResolvers<undefined>();
+    state.boundaryRefetch.mockReturnValue(pending.promise);
+    await renderHome();
+    const refresh = () =>
+      nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+    expect(state.refetch).not.toHaveBeenCalled();
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      pending.resolve(undefined);
+      await pending.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
+
+    state.organization.organizationId = null;
+    state.live.activeSessions = [row];
+    await renderHome();
+    const readyRefresh = nodes('ScrollView')[0]?.props.refreshControl as {
+      props: { onRefresh: () => void };
+    };
+    await act(async () => {
+      readyRefresh.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(state.refetch).toHaveBeenCalledOnce();
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+  });
+
+  it('recovers membership through boundary Retry and revokes admission on an unresolved organization change', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    state.live.hasAcceptedSuccess = true;
+    state.boundaryRefetch.mockImplementation(async () => {
+      state.boundary.isError = false;
+      state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+      state.memberships = state.boundary.orgs;
+      state.boundary.org = state.boundary.orgs[0];
+      await Promise.resolve();
+    });
+    await renderHome();
+    expect(text()).toContain("Couldn't load your organizations");
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
+    expect(text()).toContain('Nothing running right now');
+    expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe('org-1');
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
+    expect(state.refetch).not.toHaveBeenCalled();
+    state.organization.organizationId = 'org-2';
+    state.live.activeSessions = [row];
+    await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-2', enabled: false });
+    expect(hasLoadedCard()).toBe(false);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
+    expect(text()).not.toContain('Nothing running right now');
   });
 });

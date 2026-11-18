@@ -1,8 +1,8 @@
-import { getEnvVariable } from '@/lib/dotenvx';
-import { db } from '@/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, eq, isNull, or } from 'drizzle-orm';
-import { isEmailBlacklistedByDomain } from '@/lib/user/server';
+import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
 
 type UnblockedUser = {
   id: string;

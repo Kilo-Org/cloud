@@ -1,43 +1,31 @@
+import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatNumber, formatPercent, formatPrefixedUsd } from '@/lib/format';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
-import { formatSessionTotalCost } from './session-list-helpers';
+import { formatSessionCostBadge, formatSessionTotalCost } from './session-list-helpers';
 import { formatSpokenCost } from './session-row-accessibility-label';
 
 export type ContextTone = 'primary' | 'warning' | 'destructive' | 'neutral';
 
-const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
-
 const WARNING_TONE_THRESHOLD = 75;
 const DESTRUCTIVE_TONE_THRESHOLD = 90;
-
-const INDETERMINATE_ARC_FRACTION = 0.25;
-const WINDOW_UNAVAILABLE_LABEL = 'Context-window size unavailable';
-
-export function formatCompactTokens(tokens: number): string {
-  if (!Number.isFinite(tokens) || tokens < 0) {
-    return '0';
-  }
-  if (tokens < 1000) {
-    return String(Math.trunc(tokens));
-  }
-  if (tokens < 1_000_000) {
-    return `${(tokens / 1000).toFixed(1)}K`;
-  }
-  return `${(tokens / 1_000_000).toFixed(1)}M`;
-}
 
 export function formatExactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens < 0) {
     return '0';
   }
-  return NUMBER_FORMAT.format(Math.trunc(tokens));
+  return formatNumber(Math.trunc(tokens), i18n.language);
 }
 
 export function formatCost(cost: number): string {
-  if (!Number.isFinite(cost) || cost <= 0) {
-    return '$0.0000';
-  }
-  return `$${cost.toFixed(4)}`;
+  const amount = Number.isFinite(cost) && cost > 0 ? cost : 0;
+  return isolateLtrBidiText(
+    formatPrefixedUsd(amount, i18n.language, {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
+    })
+  );
 }
 
 export function getContextTone(percentage: number | undefined): ContextTone {
@@ -66,14 +54,6 @@ export function getArcFraction(percentage: number | undefined): number | undefin
   return percentage / 100;
 }
 
-/**
- * Stable partial neutral arc used by the ring when capacity is unknown. Kept
- * pure and exported so the visual is testable without an RN render harness.
- */
-export function getIndeterminateArcFraction(): number {
-  return INDETERMINATE_ARC_FRACTION;
-}
-
 export function getRemainingTokens(info: SessionContextInfo): number | undefined {
   if (info.contextWindow === undefined) {
     return undefined;
@@ -88,12 +68,29 @@ export function formatRemainingTokens(remaining: number): string {
 export type HeaderPillContent = {
   primary: string | null;
   secondary: string | null;
-  hasCost: boolean;
+  /**
+   * What the cost part of the reading paints:
+   *
+   * - `label`: the session's cost, as text.
+   * - `loading`: the session is still resolving, so the pill paints nothing and
+   *   the accessibility label says a cost is coming.
+   * - `unreported`: the session settled without a cost, so nothing will fill
+   *   it and the pill paints only the values it has.
+   * - `none`: no cost to paint.
+   */
+  costSlot: PillCostSlot;
   tone: ContextTone;
-  /** `undefined` = indeterminate arc; `0` = track only (no usage asserted). */
+  /** `undefined` = unknown capacity (track only); `0` = track only (no usage). */
   arcFraction: number | undefined;
   interactive: boolean;
+  /**
+   * Settled without usage: the accessibility label names usage as unavailable.
+   * Stays false while the session is still loading.
+   */
+  usageUnavailable: boolean;
 };
+
+type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
 
 /**
  * Single selector for the session-detail header pill. Always returns content
@@ -103,41 +100,68 @@ export function getHeaderPillContent({
   info,
   totalCostMicrodollars,
   hasMessages,
+  loading = false,
 }: {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
   hasMessages: boolean;
+  loading?: boolean;
 }): HeaderPillContent {
   if (info) {
     const tone = getContextTone(info.percentage);
+    // The pill reports context usage as a percentage only. While the model's
+    // context window is unresolved there is no honest denominator, so the pill
+    // paints nothing for it: the ring's bare track carries the unknown,
+    // the sheet still shows the tokens, and a marker here would sit right
+    // before the cost and read as a negative amount.
     const primary =
-      info.percentage !== undefined
-        ? `${info.percentage}%`
-        : formatCompactTokens(info.contextTokens);
-    const secondary = formatSessionTotalCost(totalCostMicrodollars);
+      info.percentage === undefined ? null : formatPercent(info.percentage, i18n.language);
+    const secondary = formatSessionCostBadge(totalCostMicrodollars);
     return {
       primary,
       secondary,
-      hasCost: secondary !== null,
+      costSlot: secondary !== null ? 'label' : 'none',
       tone,
       arcFraction: getArcFraction(info.percentage),
       interactive: true,
+      usageUnavailable: false,
     };
   }
 
-  const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
+  const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
+  // Nothing has reported usage yet, so the pill paints nothing beside its ring:
+  // a value that has not arrived is not a value, and painting a dash for it
+  // would read as a reading that is still pending.
+  if (!hasMessages) {
+    return {
+      primary: null,
+      secondary: null,
+      costSlot: loading ? 'loading' : 'unreported',
+      tone: 'neutral',
+      arcFraction: 0,
+      interactive: false,
+      usageUnavailable: !loading,
+    };
+  }
+  // A transcript without usage. The pill keeps the track-only ring and, when
+  // this screen already knows it, the session's cost; no branch of this selector
+  // paints a dash standing in for a value.
   return {
-    primary: costText,
-    secondary: null,
-    hasCost: costText !== null,
+    primary: null,
+    secondary: costText,
+    costSlot: costText === null ? 'none' : 'label',
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,
+    usageUnavailable: !loading,
   };
 }
 
 type ContextSheetContent = {
-  usedTokens: string;
+  /** `null` until a usage report arrives, so the sheet paints no unit beside it. */
+  usedTokens: string | null;
+  /** Raw token count for the unit label's plural category; `null` alongside `usedTokens`. */
+  usedTokensCount: number | null;
   windowTokens: string | null;
   windowUnavailable: boolean;
   windowUnavailableLabel: string;
@@ -150,18 +174,19 @@ type ContextSheetContent = {
 };
 
 export function getContextSheetContent(
-  info: SessionContextInfo,
+  info: SessionContextInfo | undefined,
   totalCostMicrodollars: number | null
 ): ContextSheetContent {
-  const tone = getContextTone(info.percentage);
-  const usedTokens = formatExactTokens(info.contextTokens);
+  const tone = getContextTone(info?.percentage);
+  const usedTokens = info ? formatExactTokens(info.contextTokens) : null;
   const cost = formatSessionTotalCost(totalCostMicrodollars);
-  if (info.contextWindow === undefined) {
+  if (info?.contextWindow === undefined) {
     return {
       usedTokens,
+      usedTokensCount: info ? info.contextTokens : null,
       windowTokens: null,
       windowUnavailable: true,
-      windowUnavailableLabel: WINDOW_UNAVAILABLE_LABEL,
+      windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),
       capacityKnown: false,
       percentage: null,
       remainingTokens: null,
@@ -178,68 +203,130 @@ export function getContextSheetContent(
   const remainingPercentage = realPercentage >= 100 ? 0 : Math.max(0, 100 - realPercentage);
   return {
     usedTokens,
+    usedTokensCount: info.contextTokens,
     windowTokens: formatExactTokens(info.contextWindow),
     windowUnavailable: false,
-    windowUnavailableLabel: WINDOW_UNAVAILABLE_LABEL,
+    windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),
     capacityKnown: true,
-    percentage: `${realPercentage}%`,
+    percentage: formatPercent(realPercentage, i18n.language),
     remainingTokens: formatExactTokens(remaining),
-    remainingPercentage: `${remainingPercentage}%`,
+    remainingPercentage: formatPercent(remainingPercentage, i18n.language),
     cost,
     tone,
   };
+}
+
+/**
+ * Spoken body for a pill whose usage is unknown. While the session is
+ * unresolved the loading placeholder keeps its former spoken shape; once
+ * loading has stopped, unknown usage is named as unavailable instead of
+ * reading as an empty, unlabeled control.
+ */
+function getUnknownUsageBody(spoken: string | null, usageUnavailable: boolean): string {
+  if (!usageUnavailable) {
+    // The loading placeholder speaks only the cost. Its sentence ends the way
+    // the catalog closes one, so the tap hint after it stays a separate
+    // sentence in a locale that writes no space there.
+    return spoken ? i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: spoken }) : '';
+  }
+  return i18n.t('agentChat.contextUsage.usageUnavailable', {
+    costClause: spokenCostClause(spoken),
+  });
+}
+
+/**
+ * The spoken cost as a connecting clause for the context pill's sentences.
+ * Interpolated as `{{costClause}}`, so the catalog places it — and the
+ * sentence terminator — where its grammar puts them; the code adds no
+ * punctuation of its own. An absent cost contributes nothing.
+ */
+function spokenCostClause(spoken: string | null): string {
+  return spoken === null ? '' : i18n.t('agentChat.contextUsage.costClause', { cost: spoken });
 }
 
 export function getMetricsAccessibilityLabel({
   info,
   totalCostMicrodollars,
   interactive,
+  usageUnavailable = false,
 }: {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
   interactive: boolean;
+  usageUnavailable?: boolean;
 }): string {
   const spoken = formatSpokenCost(totalCostMicrodollars);
-  const tapPart = interactive ? ' Tap to view context details.' : '';
+  const tapPart = interactive ? i18n.t('agentChat.contextUsage.tapToViewDetails') : '';
 
   if (!info) {
-    return spoken ? `cost ${spoken}` : '';
+    return `${getUnknownUsageBody(spoken, usageUnavailable)}${tapPart}`.trim();
   }
 
-  const costPart = spoken ? `, cost ${spoken}` : '';
+  const costClause = spokenCostClause(spoken);
   const body =
     info.contextWindow === undefined
-      ? `Context ${formatExactTokens(info.contextTokens)} tokens, window unavailable${costPart}.`
-      : `Context ${formatExactTokens(info.contextTokens)} of ${formatExactTokens(info.contextWindow)} tokens, ${info.percentage ?? 0}% used${costPart}.`;
+      ? i18n.t('agentChat.contextUsage.tokensWindowUnavailable', {
+          used: formatExactTokens(info.contextTokens),
+          costClause,
+        })
+      : i18n.t('agentChat.contextUsage.tokensUsage', {
+          used: formatExactTokens(info.contextTokens),
+          window: formatExactTokens(info.contextWindow),
+          percentage: formatPercent(info.percentage ?? 0, i18n.language),
+          costClause,
+        });
   return `${body}${tapPart}`;
 }
 
 type SheetMountState =
   | { mounted: false }
-  | { mounted: true; visible: boolean; info: SessionContextInfo };
+  | { mounted: true; visible: boolean; info: SessionContextInfo | undefined };
 
 export type ContextSheetIdentity = {
   sessionId: string;
-  providerID: string;
-  modelID: string;
+  providerID?: string;
+  modelID?: string;
 };
 
 /**
+ * Whether an open request still matches the model usage currently reports.
+ *
+ * An open request recorded before the first usage report carries no model, and
+ * must keep matching whatever model usage later names — otherwise the sheet
+ * dismisses itself on arrival of the very report it was opened to read. An
+ * open request that did record a model stops matching once usage names another.
+ */
+function isOpenIdentityForModel(
+  info: SessionContextInfo | undefined,
+  openIdentity: ContextSheetIdentity | null
+): boolean {
+  const providerID = openIdentity?.providerID;
+  const modelID = openIdentity?.modelID;
+  if (providerID === undefined || modelID === undefined) {
+    return true;
+  }
+  return providerID === info?.providerID && modelID === info.modelID;
+}
+
+/**
  * Controls when the native Modal is mounted and when it is visible. Keeping
- * the sheet mounted while contextInfo exists lets `visible` transition from
- * true → false so the native pageSheet dismissal animation runs.
+ * the sheet mounted after it has been opened lets `visible` transition from
+ * true → false for native dismissal. The sheet is the session's own
+ * context/permission surface — it always has the session identity and the
+ * auto-approve row to show — so an open request mounts it even before usage is
+ * reported or permission controls are known to be available. Permission
+ * controls belong to the session, not the model reporting the latest usage.
  */
 export function getContextSheetMountState(
   info: SessionContextInfo | undefined,
   openIdentity: ContextSheetIdentity | null,
-  sessionId: string
+  { sessionId, autoApproveAvailable = false }: { sessionId: string; autoApproveAvailable?: boolean }
 ): SheetMountState {
-  if (!info) {
+  const openedForSession = openIdentity?.sessionId === sessionId;
+  if (!info && !autoApproveAvailable && !openedForSession) {
     return { mounted: false };
   }
   const visible =
-    openIdentity?.sessionId === sessionId &&
-    openIdentity.providerID === info.providerID &&
-    openIdentity.modelID === info.modelID;
+    openedForSession && (autoApproveAvailable || isOpenIdentityForModel(info, openIdentity));
   return { mounted: true, visible, info };
 }

@@ -1,0 +1,755 @@
+import { debugSaveProxyResponseStream } from '../../debugUtils';
+import { fetchWithBackoff } from '../../fetchWithBackoff';
+import { captureException, captureMessage } from '@sentry/nextjs';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type {
+  GatewayResponsesRequest,
+  OpenRouterChatCompletionRequest,
+  OpenRouterGeneration,
+  GatewayMessagesRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { getReasoningEffortTimeoutSuggestion } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import type {
+  GatewayChatApiKind,
+  Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { after, NextResponse } from 'next/server';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
+import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
+import type { CustomLlmAwsBedrockCredentials } from '@kilocode/db/schema-types';
+import {
+  isUpstreamUrlPolicyEnforced,
+  rejectDisallowedUpstreamUrls,
+  rejectUpstreamRedirect,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import {
+  UpstreamAddressUnverifiedError,
+  upstreamDispatcherFor,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-connection';
+import type { Dispatcher } from 'undici';
+import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+
+type UpstreamFetchFailureFamily =
+  | 'request_timeout'
+  | 'headers_timeout'
+  | 'connect_timeout'
+  | 'read_timeout'
+  | 'conn_reset'
+  | 'abort'
+  | 'unknown';
+
+/**
+ * Hard cap on one upstream call, from the fetch through the last body byte; the
+ * abort stays armed while the response streams.
+ *
+ * The gateway route's `maxDuration` of 800s covers the whole invocation,
+ * including the `after()` work that starts once the stream ends. That work runs
+ * in sequence in `countAndStoreUsage`: the generation lookup (`fetchGeneration`,
+ * about 75s of backoff), then the usage-record call (`ATTEMPT_TIMEOUT_MS`, 90s),
+ * then its local fallback write. By design that can need ~165s plus the
+ * fallback, nearly all of the 200s this cap leaves. Production logs agree on the
+ * typical case (after() done within 80s of a stream that ran this full cap), but
+ * only the design bound covers a slow usage endpoint, so the cap is not raised:
+ * a function killed at maxDuration loses its usage record.
+ *
+ * There is no separate header timer here: Node's fetch (undici) already fails a
+ * header wait after 300s (`headersTimeout`, surfaced as UND_ERR_HEADERS_TIMEOUT
+ * and classified `headers_timeout`), and that limit stops once headers arrive.
+ */
+export const UPSTREAM_DURATION_BUDGET_MS = 10 * 60 * 1000;
+
+/**
+ * What a route's `maxDuration` must keep beyond its upstream budget for the
+ * deferred usage work described above.
+ */
+export const UPSTREAM_POST_RESPONSE_HEADROOM_MS = 200 * 1000;
+
+function formatSeconds(ms: number): string {
+  return `${Number((ms / 1000).toFixed(1))}s`;
+}
+
+/**
+ * Abort reason when `UPSTREAM_DURATION_BUDGET_MS` stops an upstream call. Its
+ * name stays `TimeoutError`, so failure classification is unchanged. It records
+ * whether the response headers had arrived, so the logs and the client-visible
+ * error can tell a header wait from a stream that outlived the budget.
+ */
+export class UpstreamTimeoutError extends Error {
+  override readonly name = 'TimeoutError';
+  readonly limitMs: number;
+  /** Time from the upstream fetch to its response headers; null if they never arrived. */
+  readonly headersReceivedAfterMs: number | null;
+
+  constructor(limitMs: number, headersReceivedAfterMs: number | null) {
+    super(
+      headersReceivedAfterMs === null
+        ? `gateway timeout after ${limitMs}ms waiting for upstream response headers`
+        : `upstream stream exceeded the gateway duration budget after ${formatSeconds(limitMs)} (headers at ${formatSeconds(headersReceivedAfterMs)})`
+    );
+    this.limitMs = limitMs;
+    this.headersReceivedAfterMs = headersReceivedAfterMs;
+  }
+}
+
+// fetchWithBackoff reserves the next delay before retrying, so 75s yields about one minute.
+const GENERATION_FETCH_MAX_DELAY_MS = 75 * 1000;
+const CHAT_API_PATHS = {
+  chat_completions: '/chat/completions',
+  responses: '/responses',
+  messages: '/messages',
+} as const satisfies Record<GatewayChatApiKind, string>;
+
+function appendQueryString(apiUrl: string, search: string): string {
+  if (!search) return apiUrl;
+
+  const url = new URL(apiUrl);
+  const query = `${url.search}${url.search ? '&' : '?'}${search.slice(1)}`;
+  return new URL(`${query}${url.hash}`, url).toString();
+}
+
+function getProviderTargetHost(apiUrl: string): string {
+  try {
+    return new URL(apiUrl).host;
+  } catch {
+    return 'invalid_provider_api_url';
+  }
+}
+
+function getProviderOrigin(apiUrl: string): string {
+  try {
+    return new URL(apiUrl).origin;
+  } catch {
+    return 'invalid_provider_api_url';
+  }
+}
+
+function getErrorName(error: unknown): string {
+  if (error instanceof Error) return error.name;
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    typeof error.name === 'string'
+  ) {
+    return error.name;
+  }
+  return 'UnknownError';
+}
+
+function redactUrlsFromErrorMessage(message: string): string {
+  return message.replace(/https?:\/\/[^\s)]+/g, '[redacted-url]');
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return redactUrlsFromErrorMessage(error.message);
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return redactUrlsFromErrorMessage(error.message);
+  }
+  return 'Unknown upstream fetch error';
+}
+
+function getCauseCode(cause: unknown): string | undefined {
+  if (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    (typeof cause.code === 'string' || typeof cause.code === 'number')
+  ) {
+    return String(cause.code);
+  }
+  return undefined;
+}
+
+function getCauseName(cause: unknown): string | undefined {
+  if (cause instanceof Error) return cause.name;
+  if (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'name' in cause &&
+    typeof cause.name === 'string'
+  ) {
+    return cause.name;
+  }
+  return undefined;
+}
+
+function getCauseMessage(cause: unknown): string | undefined {
+  if (cause instanceof Error) return redactUrlsFromErrorMessage(cause.message);
+  if (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'message' in cause &&
+    typeof cause.message === 'string'
+  ) {
+    return redactUrlsFromErrorMessage(cause.message);
+  }
+  return undefined;
+}
+
+function createLoggedFetchFailure(errorName: string, errorMessage: string): Error {
+  const loggedError = new Error(errorMessage);
+  loggedError.name = errorName;
+  return loggedError;
+}
+
+/**
+ * The gateway refuses a connection whose target it could not verify (see
+ * `upstream-connection.ts`): before the fetch, or inside the connection when the
+ * pinned address is gone. undici reports the second as a fetch error whose cause
+ * is the refusal, so the cause chain is followed.
+ */
+function findUpstreamAddressUnverified(error: unknown): UpstreamAddressUnverifiedError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth += 1) {
+    if (current instanceof UpstreamAddressUnverifiedError) return current;
+    try {
+      current = 'cause' in current ? current.cause : undefined;
+    } catch {
+      // A cause that a wrapped error refuses to read is not a refusal; the fetch
+      // failure handling below then reports the error it already reports.
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function classifyUpstreamFetchFailure({
+  errorName,
+  causeCode,
+  causeName,
+}: {
+  errorName: string;
+  causeCode: string | undefined;
+  causeName: string | undefined;
+}): UpstreamFetchFailureFamily {
+  if (errorName === 'TimeoutError' || causeName === 'TimeoutError') {
+    return 'request_timeout';
+  }
+
+  if (errorName === 'AbortError' || causeName === 'AbortError' || causeCode === 'ABORT_ERR') {
+    return 'abort';
+  }
+
+  switch (causeCode) {
+    case 'UND_ERR_HEADERS_TIMEOUT':
+      return 'headers_timeout';
+    case 'UND_ERR_CONNECT_TIMEOUT':
+      return 'connect_timeout';
+    case 'UND_ERR_BODY_TIMEOUT':
+    case 'ETIMEDOUT':
+      return 'read_timeout';
+    case 'ECONNRESET':
+      return 'conn_reset';
+    default:
+      return 'unknown';
+  }
+}
+
+function isTimeoutFailure(failureFamily: UpstreamFetchFailureFamily): boolean {
+  return (
+    failureFamily === 'request_timeout' ||
+    failureFamily === 'headers_timeout' ||
+    failureFamily === 'connect_timeout' ||
+    failureFamily === 'read_timeout'
+  );
+}
+
+/**
+ * The client going away also aborts our upstream fetch, so the abort has to be
+ * attributed to the client rather than reported as an upstream fault. The body
+ * is mostly for logs and observability: the client that would read it is gone.
+ * 499 mirrors the nginx convention so these cancellations do not show up as
+ * upstream 5xx failures.
+ */
+function clientDisconnectResponse(vercelRequestId: string | null | undefined) {
+  const error = withRequestId(
+    'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
+    vercelRequestId
+  );
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.client_disconnect,
+      message: error,
+      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
+    },
+    { status: 499 }
+  );
+}
+
+function upstreamFetchFailureResponse(
+  failureFamily: UpstreamFetchFailureFamily,
+  vercelRequestId: string | null | undefined,
+  reasoningEffort: string | null
+) {
+  const error = withRequestId(
+    isTimeoutFailure(failureFamily)
+      ? `The upstream provider did not send response headers before the gateway timeout.${getReasoningEffortTimeoutSuggestion(reasoningEffort)}`
+      : 'The upstream provider closed the connection before sending a response.',
+    vercelRequestId
+  );
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.upstream_disconnect,
+      message: error,
+      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
+    },
+    { status: 503 }
+  );
+}
+
+async function buildSignedBedrockRequest({
+  url,
+  method,
+  headers,
+  body,
+  credentials,
+}: {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: object;
+  credentials: CustomLlmAwsBedrockCredentials;
+}) {
+  const serializedBody = JSON.stringify(body);
+  return {
+    url,
+    headers: await signBedrockRequest({
+      url,
+      method,
+      headers,
+      body: serializedBody,
+      credentials,
+    }),
+    body: serializedBody,
+  };
+}
+
+export type UpstreamFetchResult =
+  | { type: 'success'; response: Response }
+  | {
+      type: 'error';
+      response: NextResponse;
+      /**
+       * Set when the fetch itself failed, so the request may have reached the provider. Absent
+       * when the URL policy refused the request or its redirect.
+       */
+      fetchFailure?: { timedOut: boolean };
+    };
+
+type UpstreamFetchInput = {
+  provider: Pick<
+    Provider,
+    'type' | 'apiUrl' | 'apiKey' | 'apiKeyHeader' | 'secureProxy' | 'awsBedrock'
+  >;
+  method: string;
+  /** Sent as JSON, or as multipart when it is `FormData`, which lets fetch set the boundary. */
+  body: object;
+  extraHeaders?: Record<string, string>;
+  /** The incoming request signal: a client that goes away aborts the upstream call too. */
+  signal?: AbortSignal;
+  /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
+  vercelRequestId?: string | null;
+  reasoningEffort?: string | null;
+  /**
+   * Hard cap on the call, from the fetch through the last body byte. It must leave the route's
+   * `maxDuration` room for the deferred usage work; see `UPSTREAM_DURATION_BUDGET_MS`.
+   */
+  durationBudgetMs: number;
+};
+
+async function sendUpstreamFetch({
+  provider,
+  apiUrl,
+  path,
+  resolveUrl,
+  method,
+  body,
+  extraHeaders = {},
+  signal,
+  vercelRequestId,
+  reasoningEffort = null,
+  durationBudgetMs,
+}: UpstreamFetchInput & {
+  /** Reported with fetch failures, along with `path`. */
+  apiUrl: string;
+  path: string;
+  resolveUrl: () => string;
+}): Promise<UpstreamFetchResult> {
+  const isMultipartBody = body instanceof FormData;
+  if (isMultipartBody && (provider.secureProxy || provider.awsBedrock)) {
+    throw new Error(`Provider ${provider.type} cannot send a multipart upstream body`);
+  }
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
+    headers.set(key, value);
+  }
+  if (provider.secureProxy) {
+    for (const [key, value] of Object.entries(provider.secureProxy.upstreamAuthHeaders)) {
+      headers.set(key, value);
+    }
+  } else if (provider.apiKeyHeader === 'x-api-key') {
+    headers.set('x-api-key', provider.apiKey);
+  } else if (!provider.awsBedrock) {
+    headers.set('Authorization', `Bearer ${provider.apiKey}`);
+  }
+  if (!isMultipartBody) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  Object.entries(extraHeaders).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
+
+  const fetchStartedAt = performance.now();
+  let headersReceivedAfterMs: number | null = null;
+  // AbortSignal.timeout keeps its timer unref'd; re-aborting through our own
+  // controller lets the abort reason say which phase the budget ran out in.
+  const timeoutController = new AbortController();
+  const budgetSignal = AbortSignal.timeout(durationBudgetMs);
+  const onBudgetExceeded = () => {
+    const reason = new UpstreamTimeoutError(durationBudgetMs, headersReceivedAfterMs);
+    errorExceptInTest(`[upstreamRequest] ${reason.message}`, {
+      vercelRequestId: vercelRequestId ?? '<none>',
+      phase: headersReceivedAfterMs === null ? 'headers' : 'stream',
+    });
+    timeoutController.abort(reason);
+  };
+  budgetSignal.addEventListener('abort', onBudgetExceeded);
+  after(() => {
+    budgetSignal.removeEventListener('abort', onBudgetExceeded);
+  });
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeoutController.signal])
+    : timeoutController.signal;
+
+  try {
+    const targetUrl = resolveUrl();
+
+    const outgoing = provider.secureProxy
+      ? buildSecureProxyRequest({
+          proxyUrl: provider.secureProxy.url,
+          secret: provider.apiKey,
+          upstreamUrl: targetUrl,
+          upstreamHeaders: headers,
+          body,
+        })
+      : provider.awsBedrock
+        ? await buildSignedBedrockRequest({
+            url: targetUrl,
+            method,
+            headers,
+            body,
+            credentials: provider.awsBedrock,
+          })
+        : {
+            url: targetUrl,
+            headers,
+            body: body instanceof FormData ? body : JSON.stringify(body),
+          };
+
+    // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
+    // upstream URL from the relay body, so both hops are checked.
+    const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
+    const urlPolicy = enforceUrlPolicy
+      ? await rejectDisallowedUpstreamUrls({
+          urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
+          providerId: provider.type,
+          vercelRequestId,
+          signal: combinedSignal,
+        })
+      : null;
+    if (urlPolicy?.rejected) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return { type: 'error', response: urlPolicy.rejected };
+    }
+
+    // The request below dials the hop this process opens, so it connects to the
+    // addresses the policy checked for that exact URL. The secure-proxy
+    // `targetUrl` is a body field the relay dials itself, so only the policy
+    // check applies to it.
+    const dispatcher = urlPolicy
+      ? upstreamDispatcherFor(
+          urlPolicy.dialed.hostname,
+          urlPolicy.dialed.addresses,
+          urlPolicy.dialed.expiresAt
+        )
+      : undefined;
+
+    const requestOptions: RequestInit & { duplex: 'half'; dispatcher?: Dispatcher } = {
+      method,
+      headers: outgoing.headers,
+      body: outgoing.body,
+      redirect: enforceUrlPolicy ? 'manual' : 'follow',
+      duplex: 'half',
+      signal: combinedSignal,
+      ...(dispatcher ? { dispatcher } : {}),
+    };
+    const response =
+      provider.type === 'claude-billing'
+        ? await fetchClaudeWithRetry(
+            outgoing.url,
+            async () => requestOptions,
+            status => status === 503,
+            combinedSignal
+          )
+        : await fetch(outgoing.url, requestOptions);
+    headersReceivedAfterMs = performance.now() - fetchStartedAt;
+    const redirectRejection = enforceUrlPolicy
+      ? await rejectUpstreamRedirect({
+          response,
+          url: outgoing.url,
+          providerId: provider.type,
+          vercelRequestId,
+        })
+      : null;
+    if (redirectRejection) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return { type: 'error', response: redirectRejection };
+    }
+    return { type: 'success', response };
+  } catch (error) {
+    // No response body to bound; a later fallback attempt must not be blamed
+    // for this attempt's budget.
+    budgetSignal.removeEventListener('abort', onBudgetExceeded);
+    // A refused connection is the gateway's own decision, not a provider fault,
+    // so it is reported apart from the upstream fetch failures. The client
+    // answer stays the generic upstream failure response.
+    const unverified = findUpstreamAddressUnverified(error);
+    if (unverified) {
+      try {
+        const metadata = {
+          providerId: provider.type,
+          targetHost: getProviderTargetHost(apiUrl),
+          path,
+          code: unverified.code,
+          ...(vercelRequestId && { vercelRequestId }),
+        };
+        errorExceptInTest('AI gateway upstream connection refused', metadata);
+        captureException(unverified, {
+          level: 'error',
+          tags: {
+            source: 'ai-gateway-upstream-connection',
+            provider: provider.type,
+            code: unverified.code,
+          },
+          extra: metadata,
+        });
+      } catch {
+        // The failure must remain caller-visible even when reporting fails.
+      }
+      return {
+        type: 'error',
+        response: upstreamFetchFailureResponse('unknown', vercelRequestId, reasoningEffort),
+      };
+    }
+    // The caller passes the incoming request signal, so a client that goes away
+    // aborts this fetch as well. Those aborts are client-side cancellations and
+    // must not be reported (or alerted on) as upstream failures.
+    const clientDisconnected = signal?.aborted === true;
+    // An aborted fetch rejects with the signal's abort reason. Next.js aborts the request signal
+    // with its own `ResponseAborted` error, so the error name alone misses client aborts; the
+    // reason does not, and a duration budget that fired first leaves its timeout as the reason.
+    const abortedByClient = clientDisconnected && error === signal.reason;
+    // Stays `undefined` when diagnostic enrichment below throws before classifying.
+    let failureFamily: UpstreamFetchFailureFamily | undefined;
+    try {
+      const cause = error instanceof Error ? error.cause : undefined;
+      const errorName = getErrorName(error);
+      const errorMessage = getErrorMessage(error);
+      const causeCode = getCauseCode(cause);
+      const causeName = getCauseName(cause);
+      const causeMessage = getCauseMessage(cause);
+      failureFamily = abortedByClient
+        ? 'abort'
+        : classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      const failureMetadata = {
+        providerId: provider.type,
+        targetHost: getProviderTargetHost(apiUrl),
+        ...(provider.secureProxy && {
+          secureProxyHost: getProviderTargetHost(provider.secureProxy.url),
+        }),
+        path,
+        failureFamily,
+        errorName,
+        errorMessage,
+        ...(vercelRequestId && { vercelRequestId }),
+        ...(causeCode && { causeCode }),
+        ...(causeName && { causeName }),
+        ...(causeMessage && { causeMessage }),
+      };
+
+      if (!(failureFamily === 'abort' && clientDisconnected)) {
+        errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
+        captureException(createLoggedFetchFailure(errorName, errorMessage), {
+          level: 'error',
+          tags: {
+            source: 'ai-gateway-upstream-fetch',
+            provider: provider.type,
+            failure_family: failureFamily,
+          },
+          extra: failureMetadata,
+        });
+      }
+    } catch {
+      // Fetch failure must remain caller-visible even when diagnostic enrichment fails.
+    }
+
+    const causedByClientDisconnect =
+      clientDisconnected && (failureFamily === 'abort' || failureFamily === undefined);
+
+    return {
+      type: 'error',
+      response: causedByClientDisconnect
+        ? clientDisconnectResponse(vercelRequestId)
+        : upstreamFetchFailureResponse(
+            failureFamily ?? 'unknown',
+            vercelRequestId,
+            reasoningEffort
+          ),
+      fetchFailure: { timedOut: failureFamily !== undefined && isTimeoutFailure(failureFamily) },
+    };
+  }
+}
+
+/**
+ * Sends one request to `provider.apiUrl` + `path` with the provider's auth and attribution
+ * headers, the URL policy, and a duration budget. A failed fetch becomes a classified error
+ * response instead of a throw: 499 when the client went away, otherwise 503.
+ */
+export async function fetchUpstream({
+  path,
+  ...input
+}: UpstreamFetchInput & {
+  /** Such as `/embeddings`. */
+  path: string;
+}): Promise<UpstreamFetchResult> {
+  return await sendUpstreamFetch({
+    ...input,
+    apiUrl: input.provider.apiUrl,
+    path,
+    resolveUrl: () => `${input.provider.apiUrl}${path}`,
+  });
+}
+
+export async function upstreamRequest({
+  chatApi,
+  search,
+  method,
+  body,
+  extraHeaders,
+  provider,
+  signal,
+  vercelRequestId,
+  reasoningEffort,
+  durationBudgetMs,
+}: {
+  chatApi: GatewayChatApiKind;
+  search: string;
+  method: string;
+  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+  extraHeaders: Record<string, string>;
+  provider: Provider;
+  signal?: AbortSignal;
+  /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
+  vercelRequestId?: string | null;
+  reasoningEffort: string | null;
+  /** At most `UPSTREAM_DURATION_BUDGET_MS`; less when an earlier attempt of the invocation spent part of it. */
+  durationBudgetMs: number;
+}): Promise<UpstreamFetchResult> {
+  const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
+  const path = provider.disableUrlSuffix ? '' : CHAT_API_PATHS[chatApi];
+  return await sendUpstreamFetch({
+    provider,
+    apiUrl,
+    path,
+    resolveUrl: () =>
+      provider.disableUrlSuffix ? appendQueryString(apiUrl, search) : `${apiUrl}${path}${search}`,
+    method,
+    body,
+    extraHeaders,
+    signal,
+    vercelRequestId,
+    reasoningEffort,
+    durationBudgetMs,
+  });
+}
+
+/**
+ * Origins whose generation endpoint `fetchGeneration` may call. The request
+ * skips the upstream URL policy and carries the provider key, so it only goes
+ * to these fixed hosts.
+ */
+const GENERATION_LOOKUP_ORIGINS: ReadonlySet<string> = new Set(
+  [OPENROUTER.apiUrl, VERCEL_AI_GATEWAY.apiUrl].map(apiUrl => new URL(apiUrl).origin)
+);
+
+export async function fetchGeneration(messageId: string, provider: Provider) {
+  if (!GENERATION_LOOKUP_ORIGINS.has(getProviderOrigin(provider.apiUrl))) {
+    captureMessage('Skipped generation lookup for a provider outside the gateway origins', {
+      level: 'warning',
+      tags: { source: `${provider.type}_generation_fetch` },
+      extra: { targetHost: getProviderTargetHost(provider.apiUrl) },
+    });
+    return;
+  }
+  // We have to delay, openrouter doesn't have the cost immediately
+  await new Promise(res => setTimeout(res, 200));
+  //ref: https://openrouter.ai/docs/api-reference/get-a-generation
+  let response: Response;
+  try {
+    response = await fetchWithBackoff(
+      `${provider.apiUrl}/generation?id=${encodeURIComponent(messageId)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${provider.apiKey}`,
+          ...ATTRIBUTION_HEADERS,
+        },
+      },
+      {
+        baseDelayMs: 5_000,
+        maxDelayMs: GENERATION_FETCH_MAX_DELAY_MS,
+        retryResponse: r => r.status >= 400,
+      }
+    );
+  } catch (error) {
+    captureException(error, {
+      level: 'info',
+      tags: { source: `${provider.type}_generation_fetch` },
+      extra: { messageId },
+    });
+    return;
+  }
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    captureMessage(`Timed out fetching openrouter generation`, {
+      level: 'info',
+      tags: { source: `${provider.type}_generation_fetch` },
+      extra: {
+        messageId,
+        status: response.status,
+        statusText: response.statusText,
+        responseText,
+      },
+    });
+    return;
+  }
+
+  debugSaveProxyResponseStream(response, `-${messageId}.log.generation.json`);
+
+  return (await response.json()) as OpenRouterGeneration;
+}

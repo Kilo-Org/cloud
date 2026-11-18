@@ -1,5 +1,4 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
-process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 

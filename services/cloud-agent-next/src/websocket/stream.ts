@@ -23,8 +23,8 @@ import type {
   ConnectedEventData,
   CommandsAvailableData,
 } from '../shared/protocol.js';
-import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
+import { projectKilocodeEventForDisplay } from '../shared/tool-display-projection.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 /**
@@ -41,10 +41,6 @@ import type { CloudMessageFailedPayload } from '../session/message-settlement-ou
  */
 const REPLAY_BATCH_BYTES = 1_048_576; // 1 MiB
 
-// ---------------------------------------------------------------------------
-// Event Formatting
-// ---------------------------------------------------------------------------
-
 /**
  * Format a stored event for sending to client.
  *
@@ -55,6 +51,7 @@ const REPLAY_BATCH_BYTES = 1_048_576; // 1 MiB
 export function formatStreamEvent(event: StoredEvent, sessionId: SessionId): StreamEvent {
   return {
     eventId: event.id,
+    ...(event.mutation_cursor === undefined ? {} : { cursor: event.mutation_cursor }),
     ...(event.execution_id
       ? { executionId: event.execution_id as StreamEvent['executionId'] }
       : {}),
@@ -76,10 +73,6 @@ export function createErrorMessage(code: StreamErrorCode, message: string): Stre
   return { type: 'error', code, message };
 }
 
-// ---------------------------------------------------------------------------
-// Stream Handler Factory
-// ---------------------------------------------------------------------------
-
 /**
  * A currently-queued user message that should be resurfaced on WebSocket
  * connect so the client can render the user bubble without waiting for
@@ -89,6 +82,9 @@ export type QueuedMessageSnapshot = {
   messageId: string;
   content: string;
   timestamp: number;
+  delivery?: 'queued' | 'sent';
+  turnType?: 'command';
+  completedAt?: number;
   terminalFailure?: CloudMessageFailedPayload & { timestamp: number };
 };
 
@@ -96,12 +92,19 @@ export type QueuedMessageSnapshot = {
 export type StreamHandlerOptions = {
   deriveCloudStatus?: () => Promise<CloudStatusData['cloudStatus'] | null>;
   /**
-   * Read the cached slash-command catalog. The DO replies from cache on every
-   * connect — it never calls back to the wrapper at this point.
+   * Read the cached slash-command catalog and its bound status. The DO replies
+   * from cache on every connect — it never calls back to the wrapper at this
+   * point.
    */
-  getAvailableCommands?: () => Promise<SlashCommandInfo[]>;
+  getAvailableCommands?: () => Promise<CommandsAvailableData>;
   deriveQueuedMessages?: () => Promise<QueuedMessageSnapshot[]>;
+  deriveSessionStatus?: () => Promise<ConnectedEventData['sessionStatus']>;
+  derivePendingInteractions?: () => Promise<ConnectedEventData['pendingInteractions']>;
+  readPendingInteractions?: () => ConnectedEventData['pendingInteractions'];
   getPreparationSnapshots?: () => Promise<StoredEvent[]>;
+  reconcileMaterializedEvents?: boolean;
+  getUpdateCursor?: () => number;
+  getAncillaryBootstrap?: () => Promise<{ events: StoredEvent[]; omittedItemCount: number }>;
 };
 
 /**
@@ -150,7 +153,6 @@ export function createStreamHandler(
      * @returns HTTP response (101 on success, error status otherwise)
      */
     async handleStreamRequest(request: Request): Promise<Response> {
-      // Verify it's a WebSocket upgrade
       const upgradeHeader = request.headers.get('Upgrade');
       if (upgradeHeader !== 'websocket') {
         return new Response('Expected WebSocket upgrade', { status: 426 });
@@ -158,8 +160,16 @@ export function createStreamHandler(
 
       const url = new URL(request.url);
       const filters = parseStreamFilters(url, sessionId);
+      if (
+        options?.getUpdateCursor &&
+        url.searchParams.has('afterCursor') &&
+        (filters.afterCursor === undefined || url.searchParams.getAll('afterCursor').length !== 1)
+      ) {
+        return new Response('Invalid mutation cursor', { status: 400 });
+      }
+      const updateCursor = options?.getUpdateCursor?.();
       const skipReplay = url.searchParams.get('replay') === 'false';
-      // Create WebSocket pair
+      const bootstrap = url.searchParams.get('bootstrap') === 'true';
       const pair = new WebSocketPair();
       const client = pair[0];
       const server = pair[1];
@@ -178,41 +188,155 @@ export function createStreamHandler(
         .withFields({ sessionId, connectedClientCount: state.getWebSockets('stream').length })
         .info('Client stream WebSocket registered');
 
-      // Replay historical events unless client opted out
       if (!skipReplay) {
-        await this.replayEvents(server, filters);
+        const replayed = await this.replayEvents(server, filters, undefined, updateCursor);
+        if (!replayed && updateCursor !== undefined) {
+          server.close(1011, 'Historical replay failed');
+          return new Response(null, { status: 101, webSocket: client });
+        }
       }
 
-      // Send `connected` event with current service state.
-      // sessionStatus is omitted here — it arrives later via the wrapper's
-      // session.status kilocode event, which is the authoritative source.
-      {
-        const connectedData: ConnectedEventData = {};
-        const cloudStatus = await options?.deriveCloudStatus?.();
-        if (cloudStatus) connectedData.cloudStatus = cloudStatus;
-        // eventId: 0 is the sentinel for non-persisted synthetic events.
-        // Real SQLite-backed events carry their actual row ID; downstream
-        // clients that track a replay cursor should skip eventId 0.
+      if (options?.reconcileMaterializedEvents) {
+        await this.replayEvents(server, filters, 'updates');
+        await this.replayEvents(server, filters, 'removals');
+      }
+
+      const sendPreparationSnapshots = async () => {
+        if (!options?.getPreparationSnapshots) return;
+        const snapshots = await options.getPreparationSnapshots();
+        for (const snapshot of snapshots) {
+          if (!matchesFilters({ ...snapshot, id: 0 }, filters)) continue;
+          server.send(
+            JSON.stringify({
+              ...formatStreamEvent({ ...snapshot, id: 0 }, sessionId),
+              eventId: updateCursor === undefined ? 0 : snapshot.id,
+            })
+          );
+        }
+      };
+      if (options?.reconcileMaterializedEvents) await sendPreparationSnapshots();
+
+      const ancillary = await options?.getAncillaryBootstrap?.();
+      for (const event of ancillary?.events ?? []) {
+        if (!matchesFilters({ ...event, id: 0 }, filters)) continue;
+        server.send(JSON.stringify(formatStreamEvent(event, sessionId)));
+      }
+
+      const derivedPendingInteractions = options?.readPendingInteractions
+        ? undefined
+        : await options?.derivePendingInteractions?.();
+      const [cloudStatus, sessionStatus, queued] = await Promise.all([
+        options?.deriveCloudStatus?.(),
+        options?.deriveSessionStatus?.(),
+        options?.deriveQueuedMessages?.() ?? [],
+      ]);
+      const pendingInteractions = options?.readPendingInteractions
+        ? options.readPendingInteractions()
+        : derivedPendingInteractions;
+      const sendSnapshot = (
+        streamEventType:
+          | 'kilocode'
+          | 'cloud.message.queued'
+          | 'cloud.message.sent'
+          | 'cloud.message.completed'
+          | 'cloud.message.failed',
+        data: unknown,
+        timestamp: number
+      ) => {
+        if (
+          !matchesFilters(
+            {
+              id: 0,
+              execution_id: '',
+              session_id: sessionId,
+              stream_event_type: streamEventType,
+              payload: '',
+              timestamp,
+            },
+            filters
+          )
+        )
+          return;
         server.send(
           JSON.stringify({
             eventId: 0,
             sessionId,
-            streamEventType: 'connected' as const,
-            timestamp: new Date().toISOString(),
-            data: connectedData,
+            streamEventType,
+            timestamp: new Date(timestamp).toISOString(),
+            data,
           })
         );
+      };
+      for (const msg of queued) {
+        if (msg.completedAt !== undefined) {
+          sendSnapshot('cloud.message.completed', { messageId: msg.messageId }, msg.completedAt);
+          continue;
+        }
+        if (!msg.terminalFailure) continue;
+        sendSnapshot(
+          'cloud.message.queued',
+          { messageId: msg.messageId, content: msg.content, delivery: 'queued' },
+          msg.timestamp
+        );
+        const { timestamp, ...failure } = msg.terminalFailure;
+        sendSnapshot('cloud.message.failed', failure, timestamp);
       }
 
-      if (options?.getPreparationSnapshots) {
-        const snapshots = await options.getPreparationSnapshots();
-        for (const snapshot of snapshots) {
-          if (!matchesFilters({ ...snapshot, id: 0 as EventId }, filters)) continue;
-          server.send(
-            JSON.stringify({
-              ...formatStreamEvent({ ...snapshot, id: 0 as EventId }, sessionId),
-              eventId: 0,
-            })
+      const connectedData: ConnectedEventData = {};
+      if (ancillary) connectedData.ancillaryOmittedItemCount = ancillary.omittedItemCount;
+      if (bootstrap) connectedData.bootstrapPending = true;
+      if (cloudStatus) connectedData.cloudStatus = cloudStatus;
+      if (sessionStatus) connectedData.sessionStatus = sessionStatus;
+      if (pendingInteractions) connectedData.pendingInteractions = pendingInteractions;
+      if (options?.reconcileMaterializedEvents || updateCursor !== undefined) {
+        connectedData.activeMessageId =
+          queued.find(message => message.delivery === 'sent')?.messageId ?? null;
+      }
+      server.send(
+        JSON.stringify({
+          eventId: 0,
+          sessionId,
+          streamEventType: 'connected' as const,
+          ...(updateCursor === undefined ? {} : { cursor: updateCursor }),
+          timestamp: new Date().toISOString(),
+          data: connectedData,
+        })
+      );
+      if (pendingInteractions) {
+        const timestamp = Date.now();
+        for (const properties of pendingInteractions.questions) {
+          sendSnapshot(
+            'kilocode',
+            { type: 'question.asked', event: 'question.asked', properties },
+            timestamp
+          );
+        }
+        for (const properties of pendingInteractions.permissions) {
+          sendSnapshot(
+            'kilocode',
+            { type: 'permission.asked', event: 'permission.asked', properties },
+            timestamp
+          );
+        }
+      }
+      if (!options?.reconcileMaterializedEvents) await sendPreparationSnapshots();
+
+      for (const msg of queued) {
+        if (msg.terminalFailure || msg.completedAt !== undefined) continue;
+        sendSnapshot(
+          'cloud.message.queued',
+          { messageId: msg.messageId, content: msg.content, delivery: 'queued' },
+          msg.timestamp
+        );
+        if (msg.delivery === 'sent') {
+          sendSnapshot(
+            'cloud.message.sent',
+            {
+              messageId: msg.messageId,
+              delivery: 'sent',
+              ...(msg.turnType === 'command' ? { turnType: 'command' } : {}),
+            },
+            msg.timestamp
           );
         }
       }
@@ -228,8 +352,7 @@ export function createStreamHandler(
           !eventTypes || eventTypes.length === 0 || eventTypes.includes('commands.available');
 
         if (shouldSendCatalog) {
-          const commands = await options.getAvailableCommands();
-          const data: CommandsAvailableData = { commands };
+          const data = await options.getAvailableCommands();
           server.send(
             JSON.stringify({
               // eventId: 0 — synthetic, non-persisted (same sentinel as the connected event above)
@@ -244,59 +367,17 @@ export function createStreamHandler(
         }
       }
 
-      // Resurface currently-queued user messages so the client can render
-      // them immediately. This covers two gaps: (1) on the initial-session
-      // path, registerSession persists the prompt in metadata before any WS
-      // is connected and before queueExecutionPlan's synchronous broadcast
-      // runs, so no cloud.message.queued reaches the page otherwise; (2) on
-      // page reload while messages are still pending, replay=false on the
-      // client means past queued events aren't replayed from the event log.
-      // These are volatile — the client's synthesizeQueuedUserMessage is
-      // idempotent, so a later authoritative message.updated from the
-      // wrapper overwrites the synthetic bubble cleanly.
-      const queued = (await options?.deriveQueuedMessages?.()) ?? [];
-      for (const msg of queued) {
-        const matches = matchesFilters(
-          {
-            id: 0 as EventId,
-            execution_id: '',
-            session_id: sessionId,
-            stream_event_type: 'cloud.message.queued',
-            payload: '',
-            timestamp: msg.timestamp,
-          },
-          filters
-        );
-        if (!matches) continue;
-
+      if (bootstrap) {
         server.send(
           JSON.stringify({
             eventId: 0,
             sessionId,
-            streamEventType: 'cloud.message.queued' as const,
-            timestamp: new Date(msg.timestamp).toISOString(),
-            data: {
-              messageId: msg.messageId,
-              content: msg.content,
-              delivery: 'queued',
-            },
+            streamEventType: 'bootstrap.complete',
+            ...(updateCursor === undefined ? {} : { cursor: updateCursor }),
+            timestamp: new Date().toISOString(),
+            data: {},
           })
         );
-
-        if (msg.terminalFailure) {
-          server.send(
-            JSON.stringify({
-              eventId: 0,
-              sessionId,
-              streamEventType: 'cloud.message.failed' as const,
-              timestamp: new Date(msg.terminalFailure.timestamp).toISOString(),
-              data: {
-                ...msg.terminalFailure,
-                timestamp: undefined,
-              },
-            })
-          );
-        }
       }
 
       return new Response(null, { status: 101, webSocket: client });
@@ -316,41 +397,70 @@ export function createStreamHandler(
      * @param ws - The WebSocket connection to send events to
      * @param filters - The client's filter preferences
      */
-    async replayEvents(ws: WebSocket, filters: StreamFilters): Promise<void> {
+    async replayEvents(
+      ws: WebSocket,
+      filters: StreamFilters,
+      materialized?: 'updates' | 'removals',
+      throughCursor = options?.getUpdateCursor?.()
+    ): Promise<boolean> {
       const startedAt = Date.now();
       let totalBytesSent = 0;
       let totalEventsSent = 0;
       let replayRounds = 0;
       try {
-        let cursor: EventId | undefined = filters.fromId;
+        let cursor: EventId | undefined = materialized ? undefined : filters.fromId;
+        let afterCursor = throughCursor === undefined ? undefined : filters.afterCursor;
 
         for (;;) {
           if (ws.readyState !== WebSocket.OPEN) break;
 
           let bytesSent = 0;
-          let eventsSent = 0;
+          let eventsRead = 0;
           replayRounds++;
 
           for (const event of eventQueries.iterateByFilters({
-            fromId: cursor,
+            ...(afterCursor === undefined ? { fromId: cursor } : { afterCursor, throughCursor }),
             executionIds: filters.executionIds,
             eventTypes: filters.eventTypes,
             startTime: filters.startTime,
             endTime: filters.endTime,
+            ...(materialized ? { materialized } : {}),
           })) {
-            const message = JSON.stringify(formatStreamEvent(event, sessionId));
+            cursor = event.id;
+            if (afterCursor !== undefined) {
+              if (event.mutation_cursor === undefined || event.mutation_cursor <= afterCursor)
+                throw new Error('Historical replay did not advance its mutation cursor');
+              afterCursor = event.mutation_cursor;
+            }
+            eventsRead++;
+            if (
+              !materialized &&
+              options?.reconcileMaterializedEvents &&
+              event.stream_event_type === 'kilocode'
+            )
+              continue;
+            const formatted = formatStreamEvent(event, sessionId);
+            // Replay uses the same revisioned preview as history pages, so a
+            // reconnect does not redownload the tool bodies a page omitted.
+            if (
+              filters.toolDisplay === 'preview' &&
+              event.stream_event_type === 'kilocode' &&
+              event.mutation_cursor !== undefined
+            )
+              formatted.data = projectKilocodeEventForDisplay(
+                formatted.data,
+                event.mutation_cursor
+              );
+            const message = JSON.stringify(materialized ? { ...formatted, eventId: 0 } : formatted);
             ws.send(message);
             bytesSent += message.length;
             totalBytesSent += message.length;
-            cursor = event.id;
-            eventsSent++;
             totalEventsSent++;
 
             if (bytesSent >= REPLAY_BATCH_BYTES) break;
           }
 
-          // No events yielded — replay is complete
-          if (eventsSent === 0) break;
+          if (eventsRead === 0) break;
         }
         logger
           .withFields({
@@ -362,6 +472,7 @@ export function createStreamHandler(
             socketOpen: ws.readyState === WebSocket.OPEN,
           })
           .info('Client stream replay completed');
+        return true;
       } catch (error) {
         logger
           .withFields({
@@ -378,6 +489,7 @@ export function createStreamHandler(
             createErrorMessage('WS_INTERNAL_ERROR', 'Failed to replay historical events')
           )
         );
+        return false;
       }
     },
 
@@ -396,17 +508,14 @@ export function createStreamHandler(
 
       for (const ws of allWs) {
         try {
-          // Get filters from attachment
           const attachment = ws.deserializeAttachment() as StreamAttachment | null;
 
           if (!attachment) continue;
 
           const { filters } = attachment;
 
-          // Check if event matches this client's filters
           if (!matchesFilters(event, filters)) continue;
 
-          // Send formatted event
           const formatted = formatStreamEvent(event, sessionId);
           ws.send(JSON.stringify(formatted));
         } catch (error) {

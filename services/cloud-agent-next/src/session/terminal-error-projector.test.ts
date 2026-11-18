@@ -22,6 +22,8 @@ describe('projectTerminalClientError', () => {
     'session_metadata_missing',
     'model_missing',
     'payment_required',
+    'container_limit_reached',
+    'account_blocked',
     'user_interrupt',
   ] as const)('classifies %s as non-retryable regardless of stage', failureCode => {
     expect(

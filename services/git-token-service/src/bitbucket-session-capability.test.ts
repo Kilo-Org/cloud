@@ -1,3 +1,4 @@
+import { encryptWithSymmetricKey } from '@kilocode/encryption';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BitbucketSessionCapabilityCodec,
@@ -43,6 +44,42 @@ describe('BitbucketSessionCapabilityCodec', () => {
     vi.useRealTimers();
   });
 
+  it('round-trips an OAuth credential identity inside the opaque capability', () => {
+    const codec = new BitbucketSessionCapabilityCodec(encryptionKey);
+    const oauthCredentialId = 'oauth-credential-1';
+    const capability = codec.issue({ ...subject, oauthCredentialId });
+
+    expect(capability).toMatch(/^kbb1\./);
+    expect(capability).not.toContain(oauthCredentialId);
+    expect(codec.decode(capability)).toMatchObject({ ...subject, oauthCredentialId });
+  });
+
+  it.each([
+    { oauthCredentialId: '' },
+    { oauthCredentialId: null },
+    { oauthCredentialId: 42 },
+    { oauthCredentialId: 'oauth-credential-1', tokenDigest: undefined },
+    { oauthCredentialId: 'oauth-credential-1', tokenDigest: 'invalid-digest' },
+    { oauthCredentialId: 'oauth-credential-1', unexpected: true },
+  ])('rejects malformed OAuth capability claims %#', overrides => {
+    const codec = new BitbucketSessionCapabilityCodec(encryptionKey);
+    const capability = `kbb1.${encryptWithSymmetricKey(
+      JSON.stringify({
+        purpose: 'bitbucket_scm_session',
+        version: 1,
+        ...subject,
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 60 * 60 * 1000,
+        ...overrides,
+      }),
+      encryptionKey
+    )}`;
+
+    expect(() => codec.decode(capability)).toThrow(
+      new BitbucketSessionCapabilityError('invalid_capability')
+    );
+  });
+
   it('rejects a capability encrypted with a different key', () => {
     const capability = new BitbucketSessionCapabilityCodec(encryptionKey).issue(subject);
     expect(() =>
@@ -58,16 +95,19 @@ describe('BitbucketSessionCapabilityCodec', () => {
     );
   });
 
-  it('rejects an expired capability', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-31T12:00:00.000Z'));
-    const codec = new BitbucketSessionCapabilityCodec(encryptionKey);
-    const capability = codec.issue(subject);
+  it.each([undefined, 'oauth-credential-1'])(
+    'rejects an expired capability with OAuth identity %s',
+    oauthCredentialId => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-05-31T12:00:00.000Z'));
+      const codec = new BitbucketSessionCapabilityCodec(encryptionKey);
+      const capability = codec.issue({ ...subject, oauthCredentialId });
 
-    vi.setSystemTime(new Date('2026-05-31T16:00:00.001Z'));
-    expect(() => codec.decode(capability)).toThrow(
-      new BitbucketSessionCapabilityError('expired_capability')
-    );
-    vi.useRealTimers();
-  });
+      vi.setSystemTime(new Date('2026-05-31T16:00:00.001Z'));
+      expect(() => codec.decode(capability)).toThrow(
+        new BitbucketSessionCapabilityError('expired_capability')
+      );
+      vi.useRealTimers();
+    }
+  );
 });

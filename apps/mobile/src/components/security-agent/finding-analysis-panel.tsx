@@ -1,25 +1,46 @@
+/* eslint-disable max-lines -- this panel renders one analysis response. */
 import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
-  isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { type Href, useRouter } from 'expo-router';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useTranslation } from 'react-i18next';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { CenteredState } from '@/components/centered-state';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import {
+  formatConfidence,
+  formatExploitable,
+  formatSuggestedAction,
+  getAgentChatSessionHref,
+} from '@/components/security-agent/finding-analysis-panel-helpers';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
+import { formatNumber } from '@/lib/format';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type SecurityAnalysis } from '@/lib/security-agent';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
+import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
+import {
+  getAnalysisCapacityBlockedHint,
+  getSecurityAnalysisDetailDescription,
+  getSecurityAnalysisDetailTitle,
+} from '@/lib/security-agent-copy';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingAnalysisPanelProps = {
@@ -31,28 +52,19 @@ type FindingAnalysisPanelProps = {
   onRetry: () => void;
 };
 
-function humanize(value: string): string {
-  return value.replaceAll('_', ' ');
-}
-
-function getAgentChatSessionHref(scope: string, cliSessionId: string | null): Href | null {
-  if (!cliSessionId) {
-    return null;
+// Admission mirrors SecurityFindingRow.tsx's showAnalysisAction/canRestartAnalysis
+// — server owns eligibility, this just reads the already-fetched state. It reads
+// the response without requiring it, so the capacity read below can ask whether
+// a start action is offered before the panel's early returns.
+function offersAnalysisStart(analysis: SecurityAnalysis | undefined): boolean {
+  if (analysis?.findingState.status !== 'open') {
+    return false;
   }
-  const path = `/(app)/agent-chat/${cliSessionId}`;
-  return (isPersonalSecurityScope(scope) ? path : `${path}?organizationId=${scope}`) as Href;
+  const state = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
+  return state === 'not-analyzed' || state === 'failed';
 }
 
-function formatExploitable(isExploitable: boolean | 'unknown'): string {
-  if (isExploitable === 'unknown') {
-    return 'Unknown';
-  }
-  return isExploitable ? 'Yes' : 'No';
-}
-
-// Ported from FindingDetailDialog.tsx:985 (getAnalysisPresentation) — triage
-// and sandbox evidence rendered as plain facts plus the raw technical
-// report, rather than the web's hero/summary/action/steps narrative.
+// Ported from FindingDetailDialog.tsx:985; this panel keeps the raw technical report.
 export function FindingAnalysisPanel({
   scope,
   findingId,
@@ -61,39 +73,52 @@ export function FindingAnalysisPanel({
   isError,
   onRetry,
 }: Readonly<FindingAnalysisPanelProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
-  const capacity = useSecurityAnalysisCapacity(scope);
+  const mutedDisabledInk = useMutedDisabledInk();
+  const { i18n, t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
+  // Only a start action reads the admission counters, and that read polls while
+  // the owner is at the limit — so it stays disabled where no start is offered.
+  // The flag is computed from props before this hook, and the same value is the
+  // render's `canStartAnalysis` below, so the two cannot disagree.
+  const capacity = useSecurityAnalysisCapacity(scope, offersAnalysisStart(analysis));
   const startAnalysis = useStartSecurityAnalysis(scope);
+  const now = useRelativeTimeNow();
 
   if (isLoading && !analysis) {
     return (
-      <View className="gap-3">
+      <View className="gap-3 px-6 pt-2">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-32 w-full rounded-lg" />
+        {dialog}
       </View>
     );
   }
 
   if (isError && !analysis) {
     return (
-      <View className="items-center justify-center py-8">
-        <QueryError message="Could not load analysis" onRetry={onRetry} />
-      </View>
+      <>
+        <QueryError message={t('securityAgent.analysis.couldNotLoad')} onRetry={onRetry} />
+        {dialog}
+      </>
     );
   }
 
   if (!analysis) {
     return (
-      <EmptyState
-        icon={ScanSearch}
-        placement="top"
-        title="No analysis yet"
-        description="Run one from the Details tab"
-      />
+      <>
+        <EmptyState
+          icon={ScanSearch}
+          title={t('securityAgent.analysis.noAnalysisYet')}
+          description={t('securityAgent.analysis.noAnalysisYetDescription')}
+        />
+        {dialog}
+      </>
     );
   }
 
+  const analysisState = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
   const presentation = getSecurityAnalysisDetailPresentation(
     analysis.status,
     analysis.analysis,
@@ -101,7 +126,23 @@ export function FindingAnalysisPanel({
   );
   const triage = analysis.analysis?.triage;
   const sandbox = analysis.analysis?.sandboxAnalysis;
+  const analyzedAt = sandbox ? parseTimestamp(sandbox.analysisAt) : null;
+  const analyzedLabel =
+    analyzedAt === null || Number.isNaN(analyzedAt.getTime())
+      ? t('securityAgent.analysis.notRecorded')
+      : timeAgo(analyzedAt, undefined, now);
+  const presentationTitle = getSecurityAnalysisDetailTitle(analysisState);
+  const presentationDescription = getSecurityAnalysisDetailDescription(analysisState, {
+    analysisError: analysis.error,
+    sandboxSummary: sandbox?.summary,
+    sandboxReasoning: sandbox?.exploitabilityReasoning,
+    triageReasoning: triage?.needsSandboxReasoning,
+  });
   const technicalMarkdown = firstNonEmpty(sandbox?.rawMarkdown, analysis.analysis?.rawMarkdown);
+  // The model slug is an identifier, so its row names a left-to-right run; the
+  // fallback below is copy and keeps the interface direction. Both read this
+  // one value so they cannot drift apart.
+  const analysisModel = firstNonEmpty(sandbox?.modelUsed, analysis.analysis?.analysisModel);
   const uniqueLocations = sandbox ? [...new Set(sandbox.usageLocations)] : [];
   const exploitabilityReasoning = sandbox
     ? firstNonEmpty(sandbox.summary, sandbox.exploitabilityReasoning)
@@ -111,7 +152,6 @@ export function FindingAnalysisPanel({
   // Admission mirrors SecurityFindingRow.tsx's showAnalysisAction/canRestartAnalysis
   // — server owns eligibility, this just reads the already-fetched state.
   const findingOpen = analysis.findingState.status === 'open';
-  const analysisState = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
   // Sandbox/triage evidence is authoritative only once the analysis reached a
   // terminal sandbox/triage state. A stale result left behind by a failed
   // retry must not read as "Analyzed" (completion copy) in queued/running/failed.
@@ -124,17 +164,12 @@ export function FindingAnalysisPanel({
     analysisState === 'safe-to-dismiss' ||
     analysisState === 'manual-review' ||
     analysisState === 'analysis-required';
-  const canStartAnalysis =
-    findingOpen && (analysisState === 'not-analyzed' || analysisState === 'failed');
+  const canStartAnalysis = offersAnalysisStart(analysis);
   const canRestartAnalysis = findingOpen && analysis.status === 'running';
-  const hasCapacity =
-    capacity.runningCount !== undefined &&
-    capacity.concurrencyLimit !== undefined &&
-    capacity.runningCount < capacity.concurrencyLimit;
-  // "Capacity full" is only ever true after a successful count — while
-  // loading or on error, `hasCapacity` is false too (so the button stays
-  // disabled), but neither of those states means it's actually full.
-  const capacityConfirmedFull = !capacity.isLoading && !capacity.isError && !hasCapacity;
+  // A completed analysis whose finding changed since offers no start or restart
+  // action above, so the stale blocker would read as unfixable on this tab too.
+  const needsAnalysisRefresh = remediationNeedsAnalysisRefresh(analysis);
+  const hasCapacity = capacity.state === 'available';
 
   const handleStartAnalysis = () => {
     startAnalysis.mutate({
@@ -144,69 +179,60 @@ export function FindingAnalysisPanel({
   };
 
   const handleRestartAnalysis = () => {
-    Alert.alert(
-      'Restart this analysis?',
-      'Security Agent will stop waiting for the current run and queue a new analysis. Any result that arrives from the current run will be ignored.',
-      [
-        { text: 'Keep waiting', style: 'cancel' },
-        {
-          text: 'Restart analysis',
-          style: 'destructive',
-          onPress: () => {
-            startAnalysis.mutate({ findingId, restartActive: true });
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('securityAgent.analysis.restartTitle'),
+      message: t('securityAgent.analysis.restartMessage'),
+      confirmLabel: t('securityAgent.analysis.restartAnalysis'),
+      cancelLabel: t('securityAgent.analysis.keepWaiting'),
+      onConfirm: () => {
+        startAnalysis.mutate({ findingId, restartActive: true });
+      },
+    });
   };
 
-  return (
-    <View className="gap-4">
+  const hasContent =
+    (triageState && Boolean(triage)) ||
+    (sandboxState && Boolean(sandbox)) ||
+    Boolean(technicalMarkdown);
+  const Body = hasContent ? TabScreenScrollView : CenteredState;
+
+  const content = (
+    <View className="gap-4 px-6 py-2">
       <View className="gap-1 rounded-lg bg-secondary p-3">
         <FindingStatusBadge
           icon={presentation.icon}
-          label={presentation.title}
+          label={presentationTitle}
           tone={presentation.tone}
           spinning={presentation.spinning}
         />
         <Text variant="muted" className="text-sm" selectable>
-          {presentation.description}
+          {presentationDescription}
         </Text>
       </View>
 
-      {canStartAnalysis || canRestartAnalysis ? (
+      {canStartAnalysis || canRestartAnalysis || needsAnalysisRefresh ? (
         <View className="gap-2">
           {canStartAnalysis ? (
             <Button
               disabled={startAnalysis.isPending || !hasCapacity}
+              accessibilityHint={getAnalysisCapacityBlockedHint(capacity.state)}
               onPress={handleStartAnalysis}
             >
               {startAnalysis.isPending ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
+                <ActivityIndicator size="small" color={mutedDisabledInk} />
               ) : null}
-              <Text className="text-primary-foreground">
-                {analysisState === 'failed' ? 'Retry analysis' : 'Analyze repository'}
+              <Text>
+                {analysisState === 'failed'
+                  ? t('securityAgent.analysis.retryAnalysis')
+                  : t('securityAgent.analysis.analyzeRepository')}
               </Text>
             </Button>
           ) : null}
-          {canStartAnalysis && capacityConfirmedFull ? (
-            <Text variant="muted" className="text-xs">
-              Analysis capacity is full. Wait for an active analysis to finish.
-            </Text>
-          ) : null}
-          {canStartAnalysis && capacity.isError ? (
-            <View className="flex-row items-center gap-2">
-              <Text variant="muted" className="text-xs">
-                Could not check analysis capacity.
-              </Text>
-              <Pressable
-                onPress={() => void capacity.refetch()}
-                accessibilityRole="button"
-                accessibilityLabel="Retry"
-              >
-                <Text className="text-xs font-medium text-primary">Retry</Text>
-              </Pressable>
-            </View>
+          {canStartAnalysis ? (
+            <AnalysisCapacityNotice
+              state={capacity.state}
+              onRetry={() => void capacity.refetch()}
+            />
           ) : null}
           {canRestartAnalysis ? (
             <Button
@@ -217,8 +243,11 @@ export function FindingAnalysisPanel({
               {startAnalysis.isPending ? (
                 <ActivityIndicator size="small" color={colors.foreground} />
               ) : null}
-              <Text>Restart analysis</Text>
+              <Text>{t('securityAgent.analysis.restartAnalysis')}</Text>
             </Button>
+          ) : null}
+          {needsAnalysisRefresh ? (
+            <AnalysisRerunAction scope={scope} findingId={findingId} />
           ) : null}
         </View>
       ) : null}
@@ -227,24 +256,35 @@ export function FindingAnalysisPanel({
         <Pressable
           className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
           onPress={() => {
-            router.push(sessionHref);
+            pushOnce(sessionHref);
           }}
         >
           <ExternalLink size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">Watch in Cloud Agent</Text>
+          <Text className="text-sm font-medium">
+            {t('securityAgent.analysis.watchInCloudAgent')}
+          </Text>
         </Pressable>
       ) : null}
 
       {triageState && triage ? (
         <View className="gap-2">
           <View className="rounded-lg bg-secondary px-3">
-            <KvRow label="Triage confidence" value={humanize(triage.confidence)} />
-            <KvRow label="Suggested action" value={humanize(triage.suggestedAction)} last />
+            <KvRow
+              label={t('securityAgent.analysis.triageConfidence')}
+              value={formatConfidence(triage.confidence)}
+              valueFace="text"
+            />
+            <KvRow
+              label={t('securityAgent.analysis.suggestedAction')}
+              value={formatSuggestedAction(triage.suggestedAction)}
+              valueFace="text"
+              last
+            />
           </View>
           {triage.needsSandboxReasoning ? (
             <View className="rounded-lg bg-secondary p-3">
               <Text variant="muted" className="text-xs uppercase tracking-wide">
-                Triage reasoning
+                {t('securityAgent.analysis.triageReasoning')}
               </Text>
               <Text className="mt-1 text-sm" selectable>
                 {triage.needsSandboxReasoning}
@@ -257,20 +297,27 @@ export function FindingAnalysisPanel({
       {sandboxState && sandbox ? (
         <View className="gap-2">
           <View className="rounded-lg bg-secondary px-3">
-            <KvRow label="Exploitable" value={formatExploitable(sandbox.isExploitable)} />
-            <KvRow label="Suggested action" value={humanize(sandbox.suggestedAction)} />
             <KvRow
-              label="Model"
-              value={firstNonEmpty(
-                sandbox.modelUsed,
-                analysis.analysis?.analysisModel,
-                'Not recorded'
-              )}
+              label={t('securityAgent.analysis.exploitable')}
+              value={formatExploitable(sandbox.isExploitable)}
+              valueFace="text"
+            />
+            <KvRow
+              label={t('securityAgent.analysis.suggestedAction')}
+              value={formatSuggestedAction(sandbox.suggestedAction)}
+              valueFace="text"
+            />
+            <KvRow
+              label={t('common.model')}
+              value={firstNonEmpty(analysisModel, t('securityAgent.analysis.notRecorded'))}
+              valueFace={analysisModel === '' ? 'text' : 'mono'}
+              valueDirection={analysisModel === '' ? undefined : 'ltr'}
               selectable
             />
             <KvRow
-              label="Analyzed"
-              value={timeAgo(parseTimestamp(sandbox.analysisAt))}
+              label={t('securityAgent.analysis.analyzed')}
+              value={analyzedLabel}
+              valueFace="text"
               last
               selectable
             />
@@ -278,7 +325,7 @@ export function FindingAnalysisPanel({
           {exploitabilityReasoning ? (
             <View className="rounded-lg bg-secondary p-3">
               <Text variant="muted" className="text-xs uppercase tracking-wide">
-                Exploitability reasoning
+                {t('securityAgent.analysis.exploitabilityReasoning')}
               </Text>
               <Text className="mt-1 text-sm" selectable>
                 {exploitabilityReasoning}
@@ -288,7 +335,7 @@ export function FindingAnalysisPanel({
           {sandbox.suggestedFix ? (
             <View className="rounded-lg bg-secondary p-3">
               <Text variant="muted" className="text-xs uppercase tracking-wide">
-                Suggested fix
+                {t('securityAgent.analysis.suggestedFix')}
               </Text>
               <Text className="mt-1 text-sm" selectable>
                 {sandbox.suggestedFix}
@@ -297,11 +344,20 @@ export function FindingAnalysisPanel({
           ) : null}
           {uniqueLocations.length > 0 ? (
             <CollapsibleSection
-              title={`Where this was found (${uniqueLocations.length})`}
+              title={t('securityAgent.analysis.whereFound', {
+                count: uniqueLocations.length,
+                displayCount: formatNumber(uniqueLocations.length, i18n.language),
+              })}
               defaultExpanded={uniqueLocations.length <= 2}
             >
               {uniqueLocations.map(location => (
-                <Text key={location} variant="mono" className="text-xs" selectable>
+                <Text
+                  key={location}
+                  variant="mono"
+                  className="text-xs"
+                  selectable
+                  style={LTR_TEXT_DIRECTION}
+                >
                   {location}
                 </Text>
               ))}
@@ -311,10 +367,17 @@ export function FindingAnalysisPanel({
       ) : null}
 
       {technicalMarkdown ? (
-        <CollapsibleSection title="Full generated report">
+        <CollapsibleSection title={t('securityAgent.analysis.fullReport')}>
           <MarkdownText value={technicalMarkdown} />
         </CollapsibleSection>
       ) : null}
     </View>
+  );
+
+  return (
+    <>
+      <Body className="flex-1">{content}</Body>
+      {dialog}
+    </>
   );
 }

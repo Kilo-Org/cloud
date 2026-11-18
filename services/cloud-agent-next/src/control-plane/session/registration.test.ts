@@ -1,0 +1,1386 @@
+import { generateKeyPairSync } from 'node:crypto';
+import jwt from 'jsonwebtoken';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../sandbox-control/session-credentials.js';
+import {
+  controlPlaneCredentialSourceSchema,
+  controlPlanePrepareInputSchema,
+  controlPlaneRegistrationRouteSpecSchema,
+  controlPlaneRouteSpecSchema,
+} from '../../shared/control-plane-protocol.js';
+import { matchesKiloPermissionPattern } from '../../shared/profile-permission-policy.js';
+import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
+import { encryptWithPublicKey } from '../../utils/encryption.js';
+import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
+import { buildControlPlaneSessionRegistration } from './registration.js';
+import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
+
+function generateKeyPair() {
+  return generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+}
+
+let publicKey: string;
+let privateKey: string;
+let wrongPrivateKey: string;
+
+beforeAll(() => {
+  ({ publicKey, privateKey } = generateKeyPair());
+  ({ privateKey: wrongPrivateKey } = generateKeyPair());
+});
+
+const MODERN_KILO_TOKEN = jwt.sign(
+  { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+  'test'
+);
+
+function metadata(overrides: Record<string, unknown> = {}) {
+  return CurrentSessionMetadataSchema.parse({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      userId: 'usr_1',
+      createdOnPlatform: 'cloud-agent',
+    },
+    auth: {
+      kiloSessionId: 'ses_12345678901234567890123456',
+      kilocodeToken: MODERN_KILO_TOKEN,
+    },
+    agent: { mode: 'code', model: 'kilo/fake-deterministic' },
+    workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'cloudflare' },
+    lifecycle: { version: 1, timestamp: 1 },
+    ...overrides,
+  });
+}
+
+const selection = { provider: 'cloudflare' as const };
+
+describe('trusted runtime origin', () => {
+  it.each(['cloud-agent-web', 'cloud-agent', 'code-review', 'agent-manager', undefined])(
+    'preserves the worker origin %s separately from a client web claim',
+    billingOrigin => {
+      const input = metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'cloud-agent-web',
+          billingOrigin,
+        },
+      });
+      const registration = buildControlPlaneSessionRegistration(input, selection);
+      const parsed = controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      });
+      expect(parsed.credentials).toMatchObject({ createdOnPlatform: 'cloud-agent-web' });
+      expect(parsed.credentials.billingOrigin).toBe(billingOrigin);
+    }
+  );
+});
+
+describe('workspace tail snapshot authority', () => {
+  it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
+    const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
+    const registered = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId: workspaceId,
+        },
+      }),
+      selection
+    );
+    expect(registered.credentials.workspaceId).toBe(workspaceId);
+    expect(registered.credentials.scopeId).toBe(workspaceId);
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), selection).credentials.workspaceId
+    ).toBeUndefined();
+  });
+
+  it('rejects caller-supplied workspace restore provenance at both registration boundaries', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata(), selection);
+    const spec = {
+      ...registration.spec,
+      workspaceSnapshot: {
+        workspaceId: 'worktree_00000000-0000-4000-8000-000000000001',
+        directory: registration.spec.directory,
+        sourceAllocationId: 'source',
+      },
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec).success).toBe(true);
+    expect(controlPlaneRegistrationRouteSpecSchema.safeParse(spec).success).toBe(false);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({ spec, credentials: registration.credentials })
+        .success
+    ).toBe(false);
+  });
+});
+
+describe('egress policy registration', () => {
+  it.each(
+    ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
+      [
+        { storedAudit: true, selectedAudit: false },
+        { storedAudit: true, selectedAudit: undefined },
+        { storedAudit: false, selectedAudit: true },
+        { storedAudit: undefined, selectedAudit: true },
+      ].map(policy => ({ ...policy, egressMode }))
+    )
+  )('rejects mismatched audit opt-ins: %j', ({ storedAudit, selectedAudit, egressMode }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode,
+        egressAudit: storedAudit,
+      },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode,
+        egressAudit: selectedAudit,
+      })
+    ).toThrow('Sandbox selection egress audit does not match session metadata');
+  });
+
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'preserves audited %s registration',
+    egressMode => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+          egressAudit: true,
+        },
+      });
+      expect(
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode,
+          egressAudit: true,
+        }).sandboxSelection
+      ).toMatchObject({ egressAudit: true });
+    }
+  );
+
+  it.each([
+    { storedAudit: false, selectedAudit: undefined },
+    { storedAudit: undefined, selectedAudit: false },
+  ])('treats false and omitted audit equivalently: %j', ({ storedAudit, selectedAudit }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: storedAudit,
+      },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: selectedAudit,
+      }).sandboxSelection?.egressAudit
+    ).toBe(selectedAudit);
+  });
+
+  it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'preserves a matching policy %j',
+    ({ egressAllowlist }) => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        },
+      });
+      expect(
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).sandboxSelection?.egressAllowlist
+      ).toEqual(egressAllowlist);
+    }
+  );
+
+  it.each([undefined, [], ['other.example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'rejects a mismatched policy %j',
+    ({ egressAllowlist }) => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: ['example.com'],
+        },
+      });
+      expect(() =>
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        })
+      ).toThrow('Sandbox selection egress allowlist does not match session metadata');
+    }
+  );
+
+  it.each([
+    { storedList: undefined, selectedList: undefined },
+    { storedList: [], selectedList: undefined },
+    { storedList: undefined, selectedList: [] },
+  ])('treats omitted and empty deny lists equivalently: %j', ({ storedList, selectedList }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAllowlist: storedList,
+      },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAllowlist: selectedList,
+      }).sandboxSelection?.egressMode
+    ).toBe('allowlist');
+  });
+
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'rejects a mode-only mismatch against stored %s',
+    egressMode => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+        },
+      });
+      expect(() =>
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode: egressMode === 'allowlist' ? undefined : 'allowlist',
+        })
+      ).toThrow('Sandbox selection egress mode does not match session metadata');
+    }
+  );
+
+  it('treats explicit and omitted unrestricted equivalently', () => {
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), {
+        ...selection,
+        egressMode: 'unrestricted',
+      }).sandboxSelection?.egressMode
+    ).toBe('unrestricted');
+  });
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'invalid' },
+    { egressMode: 'allowlist', egressAudit: null },
+  ])('rejects ambiguous sandbox selection policy %j', policy => {
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({
+        provider: 'cloudflare-containers',
+        ...policy,
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    { provider: 'cloudflare' },
+    {
+      provider: 'vercel',
+      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
+    },
+    { provider: 'cloudflare-containers', sandboxKind: 'shared' },
+    { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
+  ])('restricts allowlist and audit policies to isolated containers: %j', placement => {
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'allowlist' })
+        .success
+    ).toBe(false);
+    for (const egressMode of [undefined, 'unrestricted', 'allowlist']) {
+      expect(
+        controlPlaneSandboxSelectionSchema.safeParse({
+          ...placement,
+          egressMode,
+          egressAudit: true,
+        }).success
+      ).toBe(false);
+    }
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'unrestricted' })
+        .success
+    ).toBe(true);
+  });
+});
+
+describe('migrated origin permissions', () => {
+  // A profile agent that permits every bash command and edit, so each case shows
+  // the session command policy and the agent restriction both applying.
+  const unrestrictedAgent = {
+    slug: 'reviewer',
+    name: 'Reviewer',
+    config: { permission: { edit: 'allow', bash: { '*': 'allow' } } },
+  };
+
+  function resolveBashPermission(
+    session: Record<string, string>,
+    agent: Record<string, string>,
+    command: string
+  ): string | undefined {
+    let action: string | undefined;
+    // The CLI installs the session rules first and appends the agent's rules,
+    // and a call resolves by the last matching rule.
+    for (const [pattern, verdict] of [...Object.entries(session), ...Object.entries(agent)]) {
+      if (matchesKiloPermissionPattern(command, pattern)) action = verdict;
+    }
+    return action;
+  }
+
+  it.each(['standard', 'lite', undefined] as const)(
+    'defers GitHub publisher identity %s to credential resolution',
+    appType => {
+      const input = metadata({
+        repository: {
+          type: 'github',
+          repo: 'acme/widgets',
+          githubAppType: appType,
+          pullRequestNumber: 42,
+        },
+        profile: {
+          envVars: {
+            KILO_GITHUB_REVIEW_TARGET: '{"forged":true}',
+            KILO_GITHUB_REVIEW_API_BASE: 'https://evil.test',
+          },
+        },
+      });
+      input.identity.createdOnPlatform = 'code-review';
+      const { spec } = buildControlPlaneSessionRegistration(input, selection, undefined, {
+        containmentEnabled: true,
+        workerUrl: 'https://worker.test',
+      });
+      expect(spec.githubReviewTarget).toBeUndefined();
+      expect(
+        buildControlPlaneSessionRegistration(input, selection).credentials.repository
+      ).toMatchObject({ repo: 'acme/widgets', pullRequestNumber: 42 });
+      expect(spec.runtimeIsolation).toBe('per-session');
+    }
+  );
+
+  it.each(['slack', 'github', 'linear', 'discord', 'security-agent', 'webhook', 'scheduled'])(
+    'preserves non-interactive question denial for %s',
+    createdOnPlatform => {
+      const input = metadata();
+      input.identity.createdOnPlatform = createdOnPlatform;
+      const { spec } = buildControlPlaneSessionRegistration(input, selection);
+      expect(spec.permission).toEqual({ question: 'deny' });
+      expect(spec.runtimeIsolation).toBe('per-session');
+    }
+  );
+
+  it('keeps interactive web permissions unchanged', () => {
+    const input = metadata();
+    input.identity.createdOnPlatform = 'cloud-agent-web';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    expect(spec.permission).toBeUndefined();
+  });
+
+  it.each(['security-remediation', 'code-review'])(
+    'preserves the %s command guard',
+    createdOnPlatform => {
+      const input = metadata();
+      input.identity.createdOnPlatform = createdOnPlatform;
+      const { spec } = buildControlPlaneSessionRegistration(input, selection);
+      expect(spec.permission).toMatchObject({
+        question: 'deny',
+        edit: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny',
+        webfetch: 'deny',
+        websearch: 'deny',
+        codesearch: 'deny',
+        bash: { git: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny' },
+      });
+      expect(spec.permission?.bash).toMatchObject(
+        createdOnPlatform === 'security-remediation'
+          ? {
+              'git push': 'allow',
+              'gh pr create': 'allow',
+              'git push --force': 'deny',
+              curl: 'deny',
+            }
+          : {
+              'git *': 'deny',
+              'git diff': 'allow',
+              'gh pr create': 'deny',
+              'gh api repos/*/issues/*/comments --input*': 'allow',
+              'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+              'find *-exec*': 'deny',
+              'sort *--compress-program*': 'deny',
+            }
+      );
+      expect(spec.env).toMatchObject({
+        CI: 'true',
+        GIT_TERMINAL_PROMPT: '0',
+        GH_PROMPT_DISABLED: '1',
+      });
+      expect(spec.runtimeIsolation).toBe('per-session');
+      expect(
+        controlPlaneRouteSpecSchema.safeParse({ ...spec, runtimeIsolation: undefined }).success
+      ).toBe(true);
+    }
+  );
+
+  it('narrows a profile agent permission map to the code-review command guard', () => {
+    const input = metadata({ profile: { runtimeAgents: [unrestrictedAgent] } });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The session policy covers every pattern the agent permitted, so the entry
+    // carries no allowance and the session map governs the agent.
+    expect(permission).toBeUndefined();
+    const guardBash = spec.permission?.bash as Record<string, string>;
+    expect(resolveBashPermission(guardBash, {}, 'npm test')).toBe('deny');
+    expect(resolveBashPermission(guardBash, {}, 'git push')).toBe('deny');
+    expect(resolveBashPermission(guardBash, {}, 'git log --oneline')).toBe('allow');
+  });
+
+  it('composes the stored agent against the review publisher refusals', () => {
+    const input = metadata({
+      repository: {
+        type: 'github',
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+      },
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { bash: { 'gh pr diff *': 'allow' } } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const sessionBash = spec.permission?.bash as Record<string, string>;
+    const agentBash = (
+      spec.runtimeAgents?.[0]?.config.permission as
+        | Record<string, Record<string, string>>
+        | undefined
+    )?.bash;
+    // The stored entry carries a publisher refusal, so it is not wider than the
+    // entry the runtime writes against the session policy plus those refusals.
+    const publisherRules = Object.keys(buildGitHubReviewBashRules());
+    expect(Object.keys(agentBash ?? {}).some(pattern => publisherRules.includes(pattern))).toBe(
+      true
+    );
+    // The session policy alone allows the read pattern to swallow the comment
+    // write, which the stored entry refuses solely through the publisher rules.
+    const command = 'gh pr diff 1 | gh pr comment 2 -b x';
+    expect(resolveBashPermission(sessionBash, {}, command)).toBe('allow');
+    expect(resolveBashPermission(sessionBash, agentBash ?? {}, command)).toBe('deny');
+    const entryWithoutPublisherRules = Object.fromEntries(
+      Object.entries(agentBash ?? {}).filter(([pattern]) => !publisherRules.includes(pattern))
+    );
+    expect(resolveBashPermission(sessionBash, entryWithoutPublisherRules, command)).toBe('allow');
+  });
+
+  it('narrows a pattern-map agent allow against the guard flat denial', () => {
+    const input = metadata({
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { edit: { '*': 'allow', 'notes.txt': 'allow' } } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    expect(spec.permission?.edit).toBe('deny');
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The session states its policy as one flat action, so it covers every
+    // pattern and the agent entry carries no allowance.
+    expect(permission).toBeUndefined();
+    expect(resolveBashPermission({ '*': 'deny' }, {}, 'npm test')).toBe('deny');
+  });
+
+  it('bounds an agent entry by the permission map the session runs with', () => {
+    const input = metadata({
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { cron_create: 'allow', suggest: 'allow' } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The map the route runs with states these tools, so the agent entry that
+    // allowed them is not stored.
+    expect(permission ?? {}).not.toHaveProperty('cron_create');
+    expect(permission ?? {}).not.toHaveProperty('suggest');
+  });
+
+  it('keeps a profile agent permission map unchanged without a command guard', () => {
+    const input = metadata({ profile: { runtimeAgents: [unrestrictedAgent] } });
+    input.identity.createdOnPlatform = 'cloud-agent-web';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    expect(spec.permission).toBeUndefined();
+    expect(spec.runtimeAgents).toEqual([unrestrictedAgent]);
+    expect(JSON.stringify(spec.runtimeAgents)).toBe(JSON.stringify([unrestrictedAgent]));
+  });
+});
+
+describe('runtime authorization admission', () => {
+  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
+    'preserves legacy isolation for modern %s and freezes the admission containment selection',
+    provider => {
+      const modern = metadata({
+        auth: {
+          kiloSessionId: 'ses_12345678901234567890123456',
+          kilocodeToken: jwt.sign({ runtimeAuthorization: { id: crypto.randomUUID() } }, 'test'),
+        },
+        workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: provider },
+      });
+      const registration = buildControlPlaneSessionRegistration(modern, { provider }, undefined, {
+        containmentEnabled: true,
+        workerUrl: 'https://worker.test',
+      });
+      // The Sandbox removes compatibility isolation only for new shared allocations.
+      expect(registration.spec.runtimeIsolation).toBe('per-session');
+      expect(registration.spec.env?.KILOCODE_TOKEN).toBeUndefined();
+      expect(registration.sandboxSelection?.containment).toEqual({
+        kilocode: true,
+        github: true,
+        worktreeScoped: true,
+      });
+    }
+  );
+
+  it('upgrades saved direct selection to mandatory containment', () => {
+    const modern = metadata({
+      auth: {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        kilocodeToken: jwt.sign({ runtimeAuthorization: { id: crypto.randomUUID() } }, 'test'),
+      },
+    });
+    const registration = buildControlPlaneSessionRegistration(
+      modern,
+      { ...selection, containment: { kilocode: false, github: false, worktreeScoped: true } },
+      undefined,
+      { containmentEnabled: true, workerUrl: 'https://worker.test' }
+    );
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(registration.sandboxSelection?.containment).toMatchObject({
+      kilocode: true,
+      github: true,
+    });
+  });
+
+  it.each([
+    { kilocode: false, github: false },
+    { kilocode: true, github: true },
+    { kilocode: false, github: true },
+  ])('rejects legacy authorization with containment %j', containment => {
+    const legacy = metadata({
+      auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'legacy-token' },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(
+        legacy,
+        { provider: 'cloudflare', containment },
+        undefined,
+        { containmentEnabled: true, workerUrl: 'https://worker.test' }
+      )
+    ).toThrow(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
+  });
+
+  it('requires containment on Vercel and rejects invalid modern proxy configuration', () => {
+    const vercel = metadata({
+      workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'vercel' },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(vercel, {
+        provider: 'vercel',
+        containment: { kilocode: false, github: false },
+      }).sandboxSelection?.containment
+    ).toMatchObject({ kilocode: true, github: true });
+    const modern = metadata({
+      auth: {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        kilocodeToken: jwt.sign({ runtimeAuthorization: { id: crypto.randomUUID() } }, 'test'),
+      },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(modern, selection, undefined, {
+        containmentEnabled: false,
+        workerUrl: 'http://worker.test',
+      })
+    ).toThrow('Runtime credential proxy configuration is unavailable');
+  });
+});
+
+describe('saved internal review allocation admission', () => {
+  it('admits a saved selectable allocation for a code-review origin', () => {
+    const saved = metadata({
+      identity: {
+        sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+        userId: 'usr_1',
+        createdOnPlatform: 'code-review',
+        billingOrigin: 'code-review',
+      },
+      repository: {
+        type: 'github',
+        repo: 'acme/widgets',
+        githubAppType: 'standard',
+        pullRequestNumber: 7,
+      },
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare',
+        sandboxAllocation: 'cloudflare-single',
+      },
+    });
+    expect(saved.workspace?.sandboxAllocation).toBe('cloudflare-single');
+    const registration = buildControlPlaneSessionRegistration(saved, selection);
+    expect(registration.spec.sessionId).toBe(saved.identity.sessionId);
+  });
+
+  it('still rejects a devcontainer combined with any sandbox allocation', () => {
+    expect(() =>
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          sandboxAllocation: 'cloudflare-single',
+        },
+        devcontainer: {
+          workspacePath: '/workspace',
+          innerWorkspaceFolder: '/inner',
+          wrapperPort: 1234,
+          configPath: '/workspace/.devcontainer.json',
+        },
+      })
+    ).toThrow();
+  });
+});
+
+describe('buildControlPlaneSessionRegistration MCP materialization', () => {
+  it('keeps materialized servers out of the spec and preserves compatibility isolation', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: {
+          mcpServers: {
+            github: {
+              type: 'remote',
+              url: 'https://mcp.example.com/github',
+              headers: { 'X-Plain': 'plain-header' },
+              timeout: 30_000,
+            },
+            local: {
+              type: 'local',
+              command: ['node', '-e', ''],
+              environment: { PLAIN: 'local-env' },
+            },
+          },
+        },
+      }),
+      selection
+    );
+
+    // Plaintext MCP must never be persisted into the route spec.
+    expect(registration.spec.mcp).toBeUndefined();
+    // Existing allocations retain their MCP isolation.
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    // The encrypted snapshot rides the DO-private credential source.
+    expect(registration.credentials.mcpServers).toEqual({
+      github: {
+        type: 'remote',
+        url: 'https://mcp.example.com/github',
+        headers: { 'X-Plain': 'plain-header' },
+        timeout: 30_000,
+      },
+      local: { type: 'local', command: ['node', '-e', ''], environment: { PLAIN: 'local-env' } },
+    });
+  });
+
+  it('decrypts encrypted header values transiently without persisting them', () => {
+    const envelope = encryptWithPublicKey('secret-header', publicKey);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: {
+          mcpServers: {
+            github: {
+              type: 'remote',
+              url: 'https://mcp.example.com/github',
+              headers: { Authorization: envelope },
+            },
+          },
+        },
+      }),
+      selection,
+      privateKey
+    );
+    expect(registration.spec.mcp).toBeUndefined();
+    expect(registration.credentials.mcpServers).toEqual({
+      github: {
+        type: 'remote',
+        url: 'https://mcp.example.com/github',
+        headers: { Authorization: envelope },
+      },
+    });
+    // The decrypted value survives only in memory.
+    expect(JSON.stringify(registration)).not.toContain('secret-header');
+  });
+
+  it('fails closed when an encrypted value has no decryption key', () => {
+    expect(() =>
+      buildControlPlaneSessionRegistration(
+        metadata({
+          profile: {
+            mcpServers: {
+              github: {
+                type: 'remote',
+                url: 'https://mcp.example.com/github',
+                headers: { Authorization: encryptWithPublicKey('secret-header', publicKey) },
+              },
+            },
+          },
+        }),
+        selection
+      )
+    ).toThrow(/worker decryption key is unavailable/);
+  });
+
+  it('fails closed when an encrypted value cannot be decrypted', () => {
+    expect(() =>
+      buildControlPlaneSessionRegistration(
+        metadata({
+          profile: {
+            mcpServers: {
+              github: {
+                type: 'remote',
+                url: 'https://mcp.example.com/github',
+                headers: { Authorization: encryptWithPublicKey('secret-header', publicKey) },
+              },
+            },
+          },
+        }),
+        selection,
+        wrongPrivateKey
+      )
+    ).toThrow(/contain an invalid encrypted value/);
+  });
+
+  it('omits MCP for a read-only Bitbucket code review', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'code-review',
+        },
+        repository: {
+          type: 'bitbucket',
+          url: 'https://bitbucket.org/acme/repo.git',
+          workspaceUuid: '11111111-1111-4111-8111-111111111111',
+          repositoryUuid: '22222222-2222-4222-8222-222222222222',
+        },
+        callback: { target: { url: 'https://app.test/api/internal/code-review-status/rev_123' } },
+        profile: {
+          mcpServers: {
+            github: {
+              type: 'remote',
+              url: 'https://mcp.example.com/github',
+              // An envelope with no key proves the read-only guard runs before
+              // any decryption attempt (which would throw here).
+              headers: { Authorization: encryptWithPublicKey('secret', publicKey) },
+            },
+          },
+        },
+      }),
+      selection
+    );
+
+    // No decryption and no credential-source snapshot for a read-only review.
+    expect(registration.spec.mcp).toBeUndefined();
+    expect(registration.credentials.mcpServers).toBeUndefined();
+  });
+
+  it('rejects a materialized config over the 80 KiB protocol limit with a static reason', () => {
+    const environment = Object.fromEntries(
+      Array.from({ length: 50 }, (_, index) => [`KEY_${index}`, 'x'.repeat(2048)])
+    );
+    expect(() =>
+      buildControlPlaneSessionRegistration(
+        metadata({
+          profile: { mcpServers: { local: { type: 'local', command: ['node'], environment } } },
+        }),
+        selection
+      )
+    ).toThrow(/Serialized MCP configuration exceeds the 80 KiB limit/);
+  });
+});
+
+describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
+  it('keeps secrets out of persisted env with compatibility isolation', () => {
+    const envelope = encryptWithPublicKey('secret-value', publicKey);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { encryptedSecrets: { DATABASE_URL: envelope } } }),
+      selection
+    );
+
+    expect(registration.credentials.encryptedSecrets).toEqual({ DATABASE_URL: envelope });
+    expect(registration.spec.env?.DATABASE_URL).toBeUndefined();
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(JSON.stringify(registration)).not.toContain('secret-value');
+  });
+
+  it('withholds profile env, secrets, agents and commands but keeps skills for a read-only Bitbucket review', () => {
+    const envelope = encryptWithPublicKey('secret-value', publicKey);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'code-review',
+        },
+        repository: {
+          type: 'bitbucket',
+          url: 'https://bitbucket.org/acme/widgets',
+          workspaceUuid: '11111111-1111-4111-8111-111111111111',
+          repositoryUuid: '22222222-2222-4222-8222-222222222222',
+        },
+        callback: {
+          target: { url: 'https://worker.test/api/internal/code-review-status/12345' },
+        },
+        profile: {
+          envVars: { USER_SETTING: 'private-profile-env' },
+          encryptedSecrets: { DATABASE_URL: envelope },
+          runtimeSkills: [{ name: 'bitbucket-cloud-review', rawMarkdown: 'Review' }],
+          runtimeInstructions: [
+            { name: 'profile-proof', content: 'SYNTHETIC_PROFILE_INSTRUCTION' },
+          ],
+          runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
+          kiloCommands: [{ name: 'review-now', template: 'Review' }],
+          modelContextLimits: { 'openai/gpt-6.1-sol': 300_000 },
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec.env?.USER_SETTING).toBeUndefined();
+    expect(registration.credentials.kiloToken).toBe(MODERN_KILO_TOKEN);
+    expect(registration.credentials.encryptedSecrets).toBeUndefined();
+    expect(registration.spec.runtimeSkills).toEqual([
+      { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },
+    ]);
+    expect(registration.spec.runtimeAgents).toBeUndefined();
+    expect(registration.spec.runtimeInstructions).toBeUndefined();
+    expect(registration.spec.kiloCommands).toBeUndefined();
+    expect(registration.spec.modelContextLimits).toBeUndefined();
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(registration.spec.permission).toMatchObject({
+      question: 'deny',
+      task: 'deny',
+      lsp: 'deny',
+      bash: { '*': 'deny', 'bb pr current': 'allow', '*;*': 'deny' },
+      edit: { '*': 'deny' },
+    });
+  });
+
+  it('accepts a stored credential source that predates the encryptedSecrets field', () => {
+    const parsed = controlPlaneCredentialSourceSchema.safeParse({
+      userId: 'usr_1',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      kiloToken: 'native-kilo-token',
+      scopeId: 'usr_1',
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('carries secretEnvKeys on the frame-only spec and rejects it on the prepare input', () => {
+    const spec = {
+      sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      directory: '/tmp/worktree',
+      attemptId: 'attempt-1',
+      secretEnvKeys: ['DATABASE_URL'],
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec).success).toBe(true);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({
+        spec,
+        credentials: {
+          userId: 'usr_1',
+          kiloSessionId: 'ses_12345678901234567890123456',
+          kiloToken: 'native-kilo-token',
+        },
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('controlPlaneRouteSpecSchema MCP boundaries', () => {
+  function spec(mcp: unknown): unknown {
+    return {
+      sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      directory: '/tmp/worktree',
+      attemptId: 'attempt-1',
+      mcp,
+    };
+  }
+
+  it('preserves an empty command argument', () => {
+    const parsed = controlPlaneRouteSpecSchema.safeParse(
+      spec({ local: { type: 'local', command: ['node', '-e', ''] } })
+    );
+    expect(parsed.success).toBe(true);
+    if (parsed.success)
+      expect(parsed.data.mcp?.local).toEqual({ type: 'local', command: ['node', '-e', ''] });
+  });
+
+  it('rejects more than 20 servers', () => {
+    const servers = Object.fromEntries(
+      Array.from({ length: 21 }, (_, index) => [
+        `server-${index}`,
+        { type: 'remote', url: 'https://mcp.example.com/x' },
+      ])
+    );
+    expect(controlPlaneRouteSpecSchema.safeParse(spec(servers)).success).toBe(false);
+  });
+
+  it('rejects more than 50 header values on one server', () => {
+    const headers = Object.fromEntries(
+      Array.from({ length: 51 }, (_, index) => [`H_${index}`, 'v'])
+    );
+    expect(
+      controlPlaneRouteSpecSchema.safeParse(
+        spec({ remote: { type: 'remote', url: 'https://mcp.example.com/x', headers } })
+      ).success
+    ).toBe(false);
+  });
+
+  it('rejects an oversized header value', () => {
+    expect(
+      controlPlaneRouteSpecSchema.safeParse(
+        spec({
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.com/x',
+            headers: { Authorization: 'x'.repeat(8193) },
+          },
+        })
+      ).success
+    ).toBe(false);
+  });
+
+  it('rejects a non-integer or non-positive timeout', () => {
+    expect(
+      controlPlaneRouteSpecSchema.safeParse(
+        spec({ remote: { type: 'remote', url: 'https://mcp.example.com/x', timeout: 0 } })
+      ).success
+    ).toBe(false);
+    expect(
+      controlPlaneRouteSpecSchema.safeParse(
+        spec({ remote: { type: 'remote', url: 'https://mcp.example.com/x', timeout: 1.5 } })
+      ).success
+    ).toBe(false);
+  });
+
+  it('rejects a materialized MCP spec on the prepare input', () => {
+    const parsed = controlPlanePrepareInputSchema.safeParse({
+      spec: spec({ local: { type: 'local', command: ['node'] } }),
+      credentials: {
+        userId: 'usr_1',
+        kiloSessionId: 'ses_12345678901234567890123456',
+        kiloToken: 'native-kilo-token',
+      },
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects frame-only secretEnvKeys at the registration boundary', () => {
+    const routeSpec = {
+      sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      directory: '/tmp/worktree',
+      attemptId: 'attempt-1',
+      secretEnvKeys: ['DATABASE_URL'],
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(routeSpec).success).toBe(true);
+    expect(controlPlaneRegistrationRouteSpecSchema.safeParse(routeSpec).success).toBe(false);
+  });
+
+  it('rejects a UTF-8 payload over the 80 KiB byte limit', () => {
+    // Eleven headers of 3000 three-byte characters each: every value is under
+    // the 8192-character cap, but the serialized UTF-8 bytes exceed 80 KiB.
+    const headers = Object.fromEntries(
+      Array.from({ length: 11 }, (_, index) => [`H${index}`, '✓'.repeat(3000)])
+    );
+    const servers = {
+      remote: { type: 'remote', url: 'https://mcp.example.com/x', headers },
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec(servers)).success).toBe(false);
+  });
+});
+
+describe('buildControlPlaneSessionRegistration sandbox kind', () => {
+  const placed = metadata({
+    workspace: {
+      sandboxId: `sbx-${'a'.repeat(48)}`,
+      sandboxProvider: 'cloudflare',
+      sandboxKind: 'isolated',
+    },
+  });
+
+  it.each([
+    ['omits the kind', { provider: 'cloudflare' as const }],
+    ['names another kind', { provider: 'cloudflare' as const, sandboxKind: 'shared' as const }],
+  ])('rejects a selection that %s', (_label, sandboxSelection) => {
+    expect(() => buildControlPlaneSessionRegistration(placed, sandboxSelection)).toThrow(
+      'Sandbox selection kind does not match session metadata'
+    );
+  });
+
+  it('rejects billing with a different kind than the pin', () => {
+    expect(() =>
+      buildControlPlaneSessionRegistration(placed, {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+        billing: {
+          sandboxId: `sbx-${'a'.repeat(48)}`,
+          subject: { type: 'user', id: 'usr_1' },
+          actor: { type: 'user', id: 'usr_1' },
+          enforcementRequested: false,
+        },
+      })
+    ).toThrow('Sandbox selection kind does not match session metadata');
+  });
+
+  it('rejects a kind on a legacy key selection', () => {
+    expect(() =>
+      buildControlPlaneSessionRegistration(metadata(), {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+      })
+    ).toThrow('Sandbox selection kind does not match session metadata');
+  });
+});
+
+describe('buildControlPlaneSessionRegistration session directory', () => {
+  const SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
+  const SHARED_SANDBOX_ID = `usr-${'a'.repeat(48)}`;
+
+  it('uses the isolated container directory for a ses-* sandbox with no explicit path', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata(), selection);
+
+    expect(registration.spec.directory).toBe('/workspace/app');
+  });
+
+  it('uses the isolated container directory for an istd-* sandbox with no explicit path', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: { sandboxId: 'istd-0123456789abcdef', sandboxProvider: 'cloudflare' },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe('/workspace/app');
+  });
+
+  it.each([
+    ['isolated', '/workspace/app'],
+    ['code-review', getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)],
+    ['shared', getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)],
+  ] as const)('resolves a placed %s sandbox directory', (sandboxKind, directory) => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: `sbx-${'a'.repeat(48)}`,
+          sandboxProvider: 'cloudflare',
+          sandboxKind,
+        },
+      }),
+      { provider: 'cloudflare', sandboxKind }
+    );
+
+    expect(registration.spec.directory).toBe(directory);
+  });
+
+  it('keeps the per-session path for a shared personal sandbox', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ workspace: { sandboxId: SHARED_SANDBOX_ID, sandboxProvider: 'cloudflare' } }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(
+      getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)
+    );
+    expect(registration.spec.directory).not.toBe('/workspace/app');
+  });
+
+  it('keeps the per-session path for a shared organization sandbox', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        identity: {
+          sessionId: SESSION_ID,
+          userId: 'usr_1',
+          orgId: 'org_1',
+          createdOnPlatform: 'cloud-agent',
+        },
+        workspace: { sandboxId: SHARED_SANDBOX_ID, sandboxProvider: 'cloudflare' },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(getSessionWorkspacePath('org_1', 'usr_1', SESSION_ID));
+  });
+
+  it.each([
+    ['code-review', `crv-${'a'.repeat(48)}`],
+    ['devcontainer', `dind-${'a'.repeat(48)}`],
+  ])('keeps the per-session path for a %s sandbox', (_label, sandboxId) => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ workspace: { sandboxId, sandboxProvider: 'cloudflare' } }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(
+      getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)
+    );
+  });
+
+  it('uses the isolated container directory over an explicit worktree path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const worktreePath = getWorktreeWorkspacePath(undefined, 'usr_1', worktreeId);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId,
+          workspacePath: worktreePath,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe('/workspace/app');
+  });
+
+  it('keeps the worktree path on a shared sandbox with the same explicit path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const worktreePath = getWorktreeWorkspacePath(undefined, 'usr_1', worktreeId);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: SHARED_SANDBOX_ID,
+          sandboxProvider: 'cloudflare',
+          worktreeId,
+          workspacePath: worktreePath,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(worktreePath);
+  });
+
+  it('shares the isolated container directory across a worktree scope and keeps the identity path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const worktreePath = getWorktreeWorkspacePath(undefined, 'usr_1', worktreeId);
+    const siblingMetadata = (sessionId: string) =>
+      metadata({
+        identity: { sessionId, userId: 'usr_1', createdOnPlatform: 'cloud-agent' },
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId,
+          workspacePath: worktreePath,
+        },
+      });
+    const firstInput = siblingMetadata('workspace_12345678-1234-1234-1234-123456789abc');
+    const secondInput = siblingMetadata('workspace_abcdefab-abcd-abcd-abcd-abcdefabcdef');
+    const first = buildControlPlaneSessionRegistration(firstInput, selection);
+    const second = buildControlPlaneSessionRegistration(secondInput, selection);
+
+    expect(first.spec.directory).toBe('/workspace/app');
+    expect(second.spec.directory).toBe('/workspace/app');
+    expect(first.credentials.scopeId).toBe(worktreeId);
+    expect(second.credentials.scopeId).toBe(worktreeId);
+    // Registration derives `spec.directory` without mutating the input metadata:
+    // the identity worktree path must survive on the caller's object.
+    expect(firstInput.workspace?.workspacePath).toBe(worktreePath);
+    expect(secondInput.workspace?.workspacePath).toBe(worktreePath);
+  });
+});
+
+describe('profile runtime delivery', () => {
+  const profile = {
+    runtimeInstructions: [
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ],
+    runtimeSkills: [
+      {
+        name: 'review',
+        rawMarkdown: '---\nname: review\ndescription: Review\n---\nReview changes',
+        files: { 'scripts/check.sh': 'echo checked' },
+      },
+    ],
+    runtimeAgents: [
+      {
+        slug: 'reviewer',
+        name: 'Reviewer',
+        config: { prompt: 'Review the diff', model: 'test-model' },
+      },
+    ],
+    kiloCommands: [{ name: 'review-now', template: 'Review $ARGUMENTS', agent: 'reviewer' }],
+    modelContextLimits: { 'openai/gpt-6.1-sol': 300_000 },
+  };
+
+  it.each([
+    'runtimeSkills',
+    'runtimeAgents',
+    'kiloCommands',
+    'runtimeInstructions',
+    'modelContextLimits',
+  ] as const)('delivers %s with compatibility isolation', key => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { [key]: profile[key] } }),
+      selection
+    );
+    expect(registration.spec[key]).toEqual(profile[key]);
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec[key]
+    ).toEqual(profile[key]);
+  });
+
+  it('delivers plain environment variables with compatibility isolation', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { envVars: { PROJECT: 'demo' } } }),
+      selection
+    );
+    expect(registration.spec.env).toEqual({ PROJECT: 'demo' });
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+  });
+
+  it('delivers the full runtime profile without changing setup commands or env', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: { ...profile, envVars: { PROJECT: 'demo' }, setupCommands: ['echo setup'] },
+      }),
+      selection
+    );
+    expect(registration.spec).toMatchObject({
+      ...profile,
+      env: { PROJECT: 'demo' },
+      setupCommands: ['echo setup'],
+    });
+  });
+
+  it('delivers the environment setup command boundary through prepare', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: {
+          setupCommands: ['env-setup', 'inline-setup'],
+          environmentSetupCommandCount: 1,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec).toMatchObject({
+      setupCommands: ['env-setup', 'inline-setup'],
+      environmentSetupCommandCount: 1,
+    });
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.environmentSetupCommandCount
+    ).toBe(1);
+  });
+
+  it('accepts an inherited worktree profile without per-session isolation', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata({ profile }), selection);
+    expect(
+      controlPlaneRouteSpecSchema.safeParse({ ...registration.spec, runtimeIsolation: undefined })
+        .success
+    ).toBe(true);
+  });
+
+  it('rejects unsafe companion paths at the wrapper protocol boundary', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata({ profile }), selection);
+    expect(
+      controlPlaneRouteSpecSchema.safeParse({
+        ...registration.spec,
+        runtimeSkills: [
+          { name: 'review', rawMarkdown: 'Review', files: { '../escape': 'unsafe' } },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
+  it('preserves skills.sh references through metadata and wrapper registration', () => {
+    const runtimeSkills = [{ name: 'find-skills', source: 'vercel-labs/skills' }];
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { runtimeSkills } }),
+      selection
+    );
+    expect(registration.spec.runtimeSkills).toEqual(runtimeSkills);
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.runtimeSkills
+    ).toEqual(runtimeSkills);
+  });
+});
+
+describe('continuation marker projection', () => {
+  it('projects the server-only continuation marker into the route spec', () => {
+    const { spec } = buildControlPlaneSessionRegistration(
+      metadata({ continuation: true }),
+      selection
+    );
+    expect(spec.continuation).toBe(true);
+  });
+
+  it('omits the marker for a normal session', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    expect(spec.continuation).toBeUndefined();
+  });
+});

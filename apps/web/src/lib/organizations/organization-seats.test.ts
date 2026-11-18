@@ -1,18 +1,19 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_seats_purchases,
   organization_invitations,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   getUserOrganizationsWithSeats,
   createOrganization,
   addUserToOrganization,
   inviteUserToOrganization,
-} from './organizations';
-import { getMostRecentSeatPurchase, getOrganizationSeatUsage } from './organization-seats';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { getOrganizationSeatUsage } from './organization-seats';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 
 describe('getUserOrganizationsWithSeats', () => {
   afterEach(async () => {
@@ -51,7 +52,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
-    // Create seat purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_test123',
       organization_id: organization.id,
@@ -61,7 +61,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 5 })
@@ -80,7 +79,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
-    // Create older seat purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_old123',
       starts_at: new Date().toISOString(),
@@ -91,7 +89,6 @@ describe('getUserOrganizationsWithSeats', () => {
       created_at: sql`NOW() - INTERVAL '1 day'`, // 1 day ago
     });
 
-    // Create newer seat purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_new123',
       starts_at: new Date().toISOString(),
@@ -101,7 +98,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the most recent purchase
     await db
       .update(organizations)
       .set({ seat_count: 10 })
@@ -122,11 +118,9 @@ describe('getUserOrganizationsWithSeats', () => {
     const member2 = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add members to organization
     await addUserToOrganization(organization.id, member1.id, 'member');
     await addUserToOrganization(organization.id, member2.id, 'owner');
 
-    // Create seat purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_test123',
       starts_at: new Date().toISOString(),
@@ -136,7 +130,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 5 })
@@ -158,12 +151,10 @@ describe('getUserOrganizationsWithSeats', () => {
     const member3 = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add more members than seats
     await addUserToOrganization(organization.id, member1.id, 'member');
     await addUserToOrganization(organization.id, member2.id, 'member');
     await addUserToOrganization(organization.id, member3.id, 'member');
 
-    // Create seat purchase with fewer seats than members
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_test123',
       starts_at: new Date().toISOString(),
@@ -173,7 +164,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 2 })
@@ -192,7 +182,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const user = await insertTestUser();
     const otherUser = await insertTestUser();
 
-    // Create first organization with seats
     const org1 = await createOrganization('Organization 1', user.id);
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_org1_123',
@@ -203,17 +192,14 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 3 })
       .where(sql`${organizations.id} = ${org1.id}`);
 
-    // Create second organization without seats
     const org2 = await createOrganization('Organization 2', otherUser.id);
     await addUserToOrganization(org2.id, user.id, 'member');
 
-    // Create third organization with different seat count
     const org3 = await createOrganization('Organization 3', otherUser.id);
     await addUserToOrganization(org3.id, user.id, 'owner');
     await db.insert(organization_seats_purchases).values({
@@ -225,7 +211,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 10 })
@@ -235,7 +220,6 @@ describe('getUserOrganizationsWithSeats', () => {
 
     expect(result).toHaveLength(3);
 
-    // Find each organization in results
     const org1Result = result.find(r => r.organizationId === org1.id);
     const org2Result = result.find(r => r.organizationId === org2.id);
     const org3Result = result.find(r => r.organizationId === org3.id);
@@ -257,7 +241,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const user1 = await insertTestUser();
     const user2 = await insertTestUser();
 
-    // Create organization for user2 with seats
     const organization = await createOrganization('Other User Org', user2.id);
     await db.insert(organization_seats_purchases).values({
       starts_at: new Date().toISOString(),
@@ -268,7 +251,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 5 })
@@ -284,13 +266,11 @@ describe('getUserOrganizationsWithSeats', () => {
     const orgName = 'Complete Test Org';
     const organization = await createOrganization(orgName, user.id);
 
-    // Add some balance to the organization
     await db
       .update(organizations)
       .set({ total_microdollars_acquired: 1000000 }) // $1.00 in microdollars
       .where(sql`${organizations.id} = ${organization.id}`);
 
-    // Create seat purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_test123',
       starts_at: new Date().toISOString(),
@@ -300,7 +280,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 7 })
@@ -326,7 +305,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const member = await insertTestUser();
     const organization = await createOrganization('Zero Seats Org', user.id);
 
-    // Add a member but no seat purchases
     await addUserToOrganization(organization.id, member.id, 'member');
 
     const result = await getUserOrganizationsWithSeats(user.id);
@@ -342,7 +320,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
-    // Create expired seat purchase (most recent)
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_expired123',
       organization_id: organization.id,
@@ -352,7 +329,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Expired yesterday
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 8 })
@@ -371,7 +347,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const user = await insertTestUser();
     const otherUser = await insertTestUser();
 
-    // Create multiple organizations
     const org1 = await createOrganization('Org A', user.id);
     const org2 = await createOrganization('Org B', otherUser.id);
     const org3 = await createOrganization('Org C', otherUser.id);
@@ -379,7 +354,6 @@ describe('getUserOrganizationsWithSeats', () => {
     await addUserToOrganization(org2.id, user.id, 'member');
     await addUserToOrganization(org3.id, user.id, 'owner');
 
-    // Add seat purchases
     await db.insert(organization_seats_purchases).values([
       {
         subscription_stripe_id: 'sub_a123',
@@ -399,7 +373,6 @@ describe('getUserOrganizationsWithSeats', () => {
       },
     ]);
 
-    // Update organization seat_counts to match the purchases
     await db
       .update(organizations)
       .set({ seat_count: 3 })
@@ -410,14 +383,12 @@ describe('getUserOrganizationsWithSeats', () => {
       .set({ seat_count: 5 })
       .where(sql`${organizations.id} = ${org3.id}`);
 
-    // Call multiple times to ensure consistent ordering
     const result1 = await getUserOrganizationsWithSeats(user.id);
     const result2 = await getUserOrganizationsWithSeats(user.id);
 
     expect(result1).toHaveLength(3);
     expect(result2).toHaveLength(3);
 
-    // Results should be in the same order
     expect(result1.map(r => r.organizationId)).toEqual(result2.map(r => r.organizationId));
     expect(result1.map(r => r.seatCount)).toEqual(result2.map(r => r.seatCount));
   });
@@ -426,7 +397,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const owner = await insertTestUser();
     const organization = await createOrganization('Large Org', owner.id);
 
-    // Add many members
     const members = [];
     for (let i = 0; i < 50; i++) {
       const member = await insertTestUser();
@@ -434,7 +404,6 @@ describe('getUserOrganizationsWithSeats', () => {
       members.push(member);
     }
 
-    // Create large seat purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_large123',
       starts_at: new Date().toISOString(),
@@ -444,7 +413,6 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 100 })
@@ -464,7 +432,6 @@ describe('getUserOrganizationsWithSeats', () => {
     const owner = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Create pending invitations
     await inviteUserToOrganization(organization.id, owner.id, 'invite1@example.com', 'member');
     await inviteUserToOrganization(organization.id, owner.id, 'invite2@example.com', 'owner');
 
@@ -483,10 +450,8 @@ describe('getUserOrganizationsWithSeats', () => {
     const member = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add active member
     await addUserToOrganization(organization.id, member.id, 'member');
 
-    // Create pending invitations
     await inviteUserToOrganization(organization.id, owner.id, 'invite1@example.com', 'member');
     await inviteUserToOrganization(organization.id, owner.id, 'invite2@example.com', 'owner');
 
@@ -504,10 +469,8 @@ describe('getUserOrganizationsWithSeats', () => {
     const owner = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Create valid invitation
     await inviteUserToOrganization(organization.id, owner.id, 'valid@example.com', 'member');
 
-    // Create expired invitation by directly inserting into DB
     await db.insert(organization_invitations).values({
       organization_id: organization.id,
       email: 'expired@example.com',
@@ -531,10 +494,8 @@ describe('getUserOrganizationsWithSeats', () => {
     const owner = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Create pending invitation
     await inviteUserToOrganization(organization.id, owner.id, 'pending@example.com', 'member');
 
-    // Create accepted invitation by directly inserting into DB
     await db.insert(organization_invitations).values({
       organization_id: organization.id,
       email: 'accepted@example.com',
@@ -560,10 +521,8 @@ describe('getUserOrganizationsWithSeats', () => {
     const member = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add active member
     await addUserToOrganization(organization.id, member.id, 'owner');
 
-    // Create seat purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_test123',
       starts_at: new Date().toISOString(),
@@ -573,13 +532,11 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 5 })
       .where(sql`${organizations.id} = ${organization.id}`);
 
-    // Create pending invitations
     await inviteUserToOrganization(organization.id, owner.id, 'invite1@example.com', 'member');
     await inviteUserToOrganization(organization.id, owner.id, 'invite2@example.com', 'member');
 
@@ -599,11 +556,9 @@ describe('getUserOrganizationsWithSeats', () => {
     const member2 = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add active members
     await addUserToOrganization(organization.id, member1.id, 'member');
     await addUserToOrganization(organization.id, member2.id, 'member');
 
-    // Create seat purchase with fewer seats than total members + invitations
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_test123',
       starts_at: new Date().toISOString(),
@@ -613,13 +568,11 @@ describe('getUserOrganizationsWithSeats', () => {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Update organization seat_count to match the purchase
     await db
       .update(organizations)
       .set({ seat_count: 2 })
       .where(sql`${organizations.id} = ${organization.id}`);
 
-    // Create pending invitations that will exceed seat count
     await inviteUserToOrganization(organization.id, owner.id, 'invite1@example.com', 'member');
     await inviteUserToOrganization(organization.id, owner.id, 'invite2@example.com', 'member');
 
@@ -637,15 +590,12 @@ describe('getUserOrganizationsWithSeats', () => {
     const user = await insertTestUser();
     const otherUser = await insertTestUser();
 
-    // Create first organization with invitations
     const org1 = await createOrganization('Organization 1', user.id);
     await inviteUserToOrganization(org1.id, user.id, 'invite1@example.com', 'member');
 
-    // Create second organization without invitations
     const org2 = await createOrganization('Organization 2', otherUser.id);
     await addUserToOrganization(org2.id, user.id, 'member');
 
-    // Create third organization with multiple invitations
     const org3 = await createOrganization('Organization 3', otherUser.id);
     await addUserToOrganization(org3.id, user.id, 'owner');
     await inviteUserToOrganization(org3.id, otherUser.id, 'invite2@example.com', 'member');
@@ -655,7 +605,6 @@ describe('getUserOrganizationsWithSeats', () => {
 
     expect(result).toHaveLength(3);
 
-    // Find each organization in results
     const org1Result = result.find(r => r.organizationId === org1.id);
     const org2Result = result.find(r => r.organizationId === org2.id);
     const org3Result = result.find(r => r.organizationId === org3.id);
@@ -735,7 +684,6 @@ describe('getMostRecentSeatPurchase', () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
-    // Create single purchase
     await db.insert(organization_seats_purchases).values({
       subscription_stripe_id: 'sub_single123',
       organization_id: organization.id,
@@ -757,7 +705,6 @@ describe('getMostRecentSeatPurchase', () => {
     const org1 = await createOrganization('Test Org 1', user.id);
     const org2 = await createOrganization('Test Org 2', user.id);
 
-    // Create purchases for both organizations
     await db.insert(organization_seats_purchases).values([
       {
         subscription_stripe_id: 'sub_org1_123',
@@ -797,13 +744,10 @@ describe('getOrganizationSeatUsage', () => {
     const billingManager = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add a regular member
     await addUserToOrganization(organization.id, member.id, 'member');
 
-    // Add a billing_manager - should NOT count towards seats
     await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
 
-    // Update organization seat_count
     await db
       .update(organizations)
       .set({ seat_count: 5 })
@@ -811,7 +755,6 @@ describe('getOrganizationSeatUsage', () => {
 
     const result = await getOrganizationSeatUsage(organization.id);
 
-    // Should only count owner + member (2), not billing_manager
     expect(result).toEqual({
       used: 2,
       total: 5,
@@ -842,6 +785,23 @@ describe('getOrganizationSeatUsage', () => {
     });
   });
 
+  test('should report no total for a soft-deleted organization', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization('Deleted Org', owner.id);
+
+    await db
+      .update(organizations)
+      .set({ seat_count: 5, deleted_at: sql`NOW()` })
+      .where(sql`${organizations.id} = ${organization.id}`);
+
+    const result = await getOrganizationSeatUsage(organization.id);
+
+    expect(result).toEqual({
+      used: 1,
+      total: 0,
+    });
+  });
+
   test('should count all non-billing_manager roles in seat usage', async () => {
     const owner = await insertTestUser();
     const member = await insertTestUser();
@@ -850,13 +810,11 @@ describe('getOrganizationSeatUsage', () => {
     const billingManager2 = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add various roles
     await addUserToOrganization(organization.id, member.id, 'member');
     await addUserToOrganization(organization.id, admin.id, 'owner');
     await addUserToOrganization(organization.id, billingManager1.id, 'billing_manager');
     await addUserToOrganization(organization.id, billingManager2.id, 'billing_manager');
 
-    // Update organization seat_count
     await db
       .update(organizations)
       .set({ seat_count: 10 })
@@ -864,7 +822,6 @@ describe('getOrganizationSeatUsage', () => {
 
     const result = await getOrganizationSeatUsage(organization.id);
 
-    // Should count owner + member + admin (3), not billing_managers
     expect(result).toEqual({
       used: 3,
       total: 10,
@@ -884,13 +841,10 @@ describe('getUserOrganizationsWithSeats billing_manager exclusion', () => {
     const billingManager = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Add a regular member
     await addUserToOrganization(organization.id, member.id, 'member');
 
-    // Add a billing_manager - should NOT count towards seats
     await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
 
-    // Update organization seat_count
     await db
       .update(organizations)
       .set({ seat_count: 5 })
@@ -899,7 +853,6 @@ describe('getUserOrganizationsWithSeats billing_manager exclusion', () => {
     const result = await getUserOrganizationsWithSeats(owner.id);
 
     expect(result).toHaveLength(1);
-    // Should only count owner + member (2), not billing_manager
     expect(result[0].seatCount).toEqual({
       used: 2,
       total: 5,
@@ -911,10 +864,8 @@ describe('getUserOrganizationsWithSeats billing_manager exclusion', () => {
     const owner = await insertTestUser();
     const organization = await createOrganization('Test Org', owner.id);
 
-    // Create a regular member invitation
     await inviteUserToOrganization(organization.id, owner.id, 'member@example.com', 'member');
 
-    // Create a billing_manager invitation - should NOT count towards seats
     await inviteUserToOrganization(
       organization.id,
       owner.id,
@@ -922,7 +873,6 @@ describe('getUserOrganizationsWithSeats billing_manager exclusion', () => {
       'billing_manager'
     );
 
-    // Update organization seat_count
     await db
       .update(organizations)
       .set({ seat_count: 5 })
@@ -931,7 +881,6 @@ describe('getUserOrganizationsWithSeats billing_manager exclusion', () => {
     const result = await getUserOrganizationsWithSeats(owner.id);
 
     expect(result).toHaveLength(1);
-    // Should only count owner + member invitation (2), not billing_manager invitation
     expect(result[0].seatCount).toEqual({
       used: 2,
       total: 5,

@@ -100,6 +100,7 @@ import {
   getProviderRegion,
   getRuntimeId,
   getStorageId,
+  INSTANCE_READY_EMAIL_RESET,
   loadState,
   storageUpdate,
   syncProviderStateForStorage,
@@ -133,11 +134,6 @@ import {
   syncMorningBriefingConfigToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
-import {
-  dispatchReadyPush,
-  LIFECYCLE_NOTIFICATION_RESET,
-  maybeDispatchStartFailurePush,
-} from './lifecycle-push';
 import { runScheduledActionApply } from './scheduled-action-apply';
 import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
@@ -582,13 +578,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStartErrorMessage: message,
       lastStartErrorAt: now,
     });
-    await maybeDispatchStartFailurePush(
-      this.env,
-      this.s,
-      this.ctx,
-      'provider_start_failed',
-      message
-    );
   }
 
   private async markRestartFailedFromProvider(message: string): Promise<void> {
@@ -759,9 +748,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   /**
    * Emit an analytics event with common DO dimensions baked in.
-   * Follows gastown's Omit<> pattern — callers provide only the
-   * event-specific fields; userId, delivery, and machine context
-   * are always filled from this.s.
+   * Callers provide only the event-specific fields; userId, delivery,
+   * and machine context are always filled from this.s.
    */
   private emitEvent(
     data: Omit<
@@ -842,9 +830,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return `fly_${err.status}_capacity_recovery`;
   }
 
-  // ========================================================================
   // Lifecycle methods (called by platform API routes via RPC)
-  // ========================================================================
 
   async provision(
     userId: string,
@@ -990,7 +976,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             pendingDestroyMachineId: null,
             pendingDestroyVolumeId: null,
             pendingPostgresMarkOnFinalize: false,
-            ...LIFECYCLE_NOTIFICATION_RESET,
+            ...INSTANCE_READY_EMAIL_RESET,
           })
         )
       : syncProviderStateForStorage(
@@ -1028,7 +1014,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.pendingDestroyMachineId = null;
       this.s.pendingDestroyVolumeId = null;
       this.s.pendingPostgresMarkOnFinalize = false;
-      Object.assign(this.s, LIFECYCLE_NOTIFICATION_RESET);
+      Object.assign(this.s, INSTANCE_READY_EMAIL_RESET);
     }
     this.s.loaded = true;
 
@@ -1141,7 +1127,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         const model = this.s.vectorMemoryModel ?? DEFAULT_VECTOR_MEMORY_MODEL;
         const baseUrl = this.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
         // Feature attribution for embedding calls — matches FEATURE_HEADER /
-        // FEATURE_VALUES in apps/web/src/lib/feature-detection.ts so that
+        // FEATURE_VALUES in packages/web-shared/src/lib/feature-detection.ts so that
         // microdollar_usage_metadata.feature_id records 'kiloclaw-embedding'.
         const headers: Record<string, string> = {
           'x-kilocode-feature': 'kiloclaw-embedding',
@@ -1876,8 +1862,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return { gmailNotificationsEnabled: enabled };
   }
 
-  // ── Pairing ─────────────────────────────────────────────────────────
-
   async listPairingRequests(forceRefresh = false) {
     await this.loadState();
     return pairing.listPairingRequests(this.s, this.env, forceRefresh);
@@ -1918,8 +1902,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return doctorRun.cancelDoctorViaController(this.s, this.env);
   }
 
-  // ── Kilo CLI Run ────────────────────────────────────────────────────
-
   async startKiloCliRun(prompt: string) {
     await this.loadState();
     return kiloCliRun.startKiloCliRun(this.s, this.env, prompt);
@@ -1934,8 +1916,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
     return kiloCliRun.cancelKiloCliRun(this.s, this.env);
   }
-
-  // ── Lifecycle ───────────────────────────────────────────────────────
 
   async forceRetryRecovery(): Promise<{ ok: true }> {
     await this.loadState();
@@ -2422,14 +2402,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.status = 'starting';
     this.s.startingAt = Date.now();
     this.s.pendingStartReason = options?.reason ?? null;
-    // Re-arm the failure push flag so this start attempt can trigger its own
-    // notification even if a previous attempt already sent one.
-    this.s.startFailurePushSentForAttempt = false;
     await this.persist({
       status: 'starting',
       startingAt: this.s.startingAt,
       pendingStartReason: this.s.pendingStartReason,
-      startFailurePushSentForAttempt: false,
     });
     await this.scheduleAlarm();
 
@@ -2823,9 +2799,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return finalized;
   }
 
-  // ========================================================================
   // Read methods
-  // ========================================================================
 
   async getStatus(): Promise<{
     userId: string | null;
@@ -2993,8 +2967,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
-    startFailurePushSentForAttempt: boolean;
-    // --- env key diagnostics ---
     envKeyAppDOKey: string | null;
     envKeyAppDOFlyAppName: string | null;
     envKeyAppDOKeySet: boolean | null;
@@ -3089,7 +3061,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
-      startFailurePushSentForAttempt: this.s.startFailurePushSentForAttempt,
       envKeyAppDOKey,
       envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
       envKeyAppDOKeySet: envKeyDiag?.envKeySet ?? null,
@@ -3131,7 +3102,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Atomically check-and-set the instance ready flag. Returns shouldNotify: true
    * on the first call per provision lifecycle, false on all subsequent calls.
    * Used by the controller checkin handler to trigger the one-time "instance
-   * ready" email and mobile push.
+   * ready" email.
    */
   async tryMarkInstanceReady(): Promise<{
     shouldNotify: boolean;
@@ -3150,10 +3121,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       return { shouldNotify: false, userId: this.s.userId };
     }
 
-    // Mobile push fires fire-and-forget so the checkin response isn't blocked
-    // on the notifications RPC. Email dispatch happens via the controller route.
-    this.ctx.waitUntil(dispatchReadyPush(this.env, this.s));
-
     return { shouldNotify: true, userId: this.s.userId };
   }
 
@@ -3171,8 +3138,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
     return cleanupRecoveryPreviousVolume(this.recoveryRuntime());
   }
-
-  // ── Volume reassociation (admin) ───────────────────────────────────
 
   async listCandidateVolumes(): Promise<{
     currentVolumeId: string | null;
@@ -3271,8 +3236,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       newRegion: volume.region,
     };
   }
-
-  // ── Machine resize (admin) ─────────────────────────────────────────
 
   async resizeMachine(input: {
     targetTierKey: InstanceTierKey;
@@ -3467,8 +3430,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error(`${args.notSupportedSubject} is not yet supported on Northflank instances`);
     }
   }
-
-  // ── Admin temporary CPU/RAM override ──────────────────────────────
 
   /**
    * Set a temporary admin override for the machine's CPU/RAM. Wins over
@@ -3669,8 +3630,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
-  // ── Snapshot restore (admin) ───────────────────────────────────────
-
   /**
    * Enqueue a snapshot restore job. Sets status to 'restoring' immediately
    * and sends a message to the CF Queue for async orchestration.
@@ -3865,8 +3824,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     console.log(`[DO] Snapshot restore failed, status restored to ${restoredStatus}`);
   }
-
-  // ── Gateway controller ─────────────────────────────────────────────
 
   async getGatewayProcessStatus(): Promise<GatewayProcessStatus> {
     await this.loadState();
@@ -4289,8 +4246,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.readMorningBriefing(this.s, this.env, day);
   }
 
-  // ── Restart machine (user-facing) ──────────────────────────────────
-
   async restartMachine(options?: {
     imageTag?: string;
   }): Promise<{ success: boolean; error?: string }> {
@@ -4586,9 +4541,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await runUnexpectedStopRecoveryInBackground(this.recoveryRuntime());
   }
 
-  // ========================================================================
   // Alarm (reconciliation loop)
-  // ========================================================================
 
   override async alarm(): Promise<void> {
     const pendingRegistryCleanup = await this.ctx.storage.get<PendingRegistryCleanup>(

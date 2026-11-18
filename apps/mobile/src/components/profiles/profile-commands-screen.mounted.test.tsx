@@ -1,0 +1,661 @@
+/* eslint-disable max-lines -- one cohesive mounted suite: rendering states, reorder and delete labels, and the save/reconcile paths share the screen's mock harness */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  changeRowText,
+  commitRow,
+  findAll,
+  findFields,
+  findOne,
+  mountScreen,
+  pressableDisabled,
+  pressButton,
+  pressMove,
+  pressPressable,
+  rerenderScreen,
+  testCommands,
+  type TestCommands,
+} from '@/components/profiles/profile-commands-screen.test-helpers';
+import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
+import { i18n } from '@/i18n';
+import { act } from '@/test/renderer';
+import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
+
+const h = vi.hoisted(() => ({
+  error: vi.fn(),
+  query: {
+    data: undefined as TestCommands | undefined,
+    isError: false,
+    isPending: true,
+    isRefetching: false,
+    refetch: vi.fn(),
+  },
+  mutations: {
+    setCommands: { mutateAsync: vi.fn() },
+  },
+  back: vi.fn(),
+}));
+
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useOrganizationProfilePermission: () => permissionState.permission,
+}));
+
+vi.mock('@/lib/hooks/use-agent-profiles', () => ({
+  useAgentProfileCommands: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
+  useAgentProfileMutations: () => h.mutations,
+}));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: h.back, canGoBack: () => true }),
+  usePreventRemove: () => undefined,
+}));
+vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
+  View: 'View',
+  ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#000000', destructive: '#FF0000' }),
+}));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/empty-state', async () => {
+  // vi.mock factories are hoisted above the module's imports, so the React
+  // helpers must be loaded inside the factory.
+  const { createElement } = await import('react');
+  return {
+    // The real state renders its `action` below the title, so the manage slot's
+    // sentence or the manager's CTA reaches the tree the way the screen hands it over.
+    EmptyState: (props: { action?: unknown }) =>
+      createElement('EmptyState', props, props.action as never),
+  };
+});
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/form-field', async () => {
+  const { createElement, useRef } = await import('react');
+  return {
+    FormField: (props: {
+      defaultValue?: string;
+      labelAccessory?: unknown;
+      onChangeText?: (value: string) => void;
+    }) => {
+      // Native uncontrolled text only accepts defaultValue when mounted.
+      const nativeText = useRef(props.defaultValue);
+      // The real field renders its label accessory beside the label, so the
+      // caller's row controls are children of the mocked field too.
+      return createElement(
+        'FormField',
+        {
+          ...props,
+          nativeText: nativeText.current,
+          onChangeText: (value: string) => {
+            nativeText.current = value;
+            props.onChangeText?.(value);
+          },
+        },
+        props.labelAccessory as never
+      );
+    },
+  };
+});
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
+  Terminal: 'Terminal',
+  Trash2: 'Trash2',
+}));
+
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
+/** Press the add CTA the empty state renders through its `action` prop. */
+function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['renderer']): void {
+  const action = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  if (!action) {
+    throw new Error('the empty state rendered no add CTA');
+  }
+  act(() => {
+    (action.props as { onPress: () => void }).onPress();
+  });
+}
+
+describe('ProfileCommandsScreen', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    Object.assign(h.query, {
+      data: undefined,
+      isError: false,
+      isPending: true,
+      isRefetching: false,
+    });
+  });
+
+  it('loading: renders skeletons and no rows', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
+    expect(findFields(renderer.root)).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('error: renders QueryError and Retry refetches', async () => {
+    Object.assign(h.query, { isError: true, isPending: false });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    act(() => {
+      (queryError.props as { onRetry: () => void }).onRetry();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('empty: shows commandsEmpty and the add CTA opens an empty row', async () => {
+    h.query.data = testCommands();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No setup commands yet');
+    pressEmptyAction(renderer);
+    expect(findFields(renderer.root)[0]?.props.placeholder).toBe('e.g. pnpm install');
+
+    unmount();
+  });
+
+  it('resolving: offers neither the add CTA nor the role sentence before the role is known', async () => {
+    permissionState.permission = 'resolving';
+    h.query.data = testCommands();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No setup commands yet');
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      ROLE_SENTENCE
+    );
+
+    unmount();
+  });
+
+  it('happy: a committed row persists the whole list', async () => {
+    h.query.data = testCommands();
+    h.query.isPending = false;
+    h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeRowText(renderer.root, 0, 'pnpm install');
+    commitRow(renderer.root, 0);
+
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setCommands.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      commands: ['pnpm install'],
+    });
+
+    unmount();
+  });
+
+  it('happy: moving a row persists the reordered list', async () => {
+    h.query.data = testCommands(['a', 'b']);
+    h.query.isPending = false;
+    h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressMove(renderer.root, 'down', 1);
+
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setCommands.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      commands: ['b', 'a'],
+    });
+
+    unmount();
+  });
+
+  it('counts the characters left near the bound and names the bound at it', async () => {
+    h.query.data = testCommands(['pnpm install']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const counterTexts = () =>
+      findAll(renderer.root, 'Text').filter(
+        node =>
+          typeof node.props.children === 'string' &&
+          node.props.children.endsWith('characters remaining')
+      );
+    const hintTexts = () =>
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .filter((child): child is string => typeof child === 'string');
+
+    // An ordinary command is far from the server bound, so the row stays quiet.
+    expect(counterTexts()).toEqual([]);
+
+    // Near the bound the row counts the room left, in the same visible phrase
+    // the chat composer and the new-session prompt show.
+    changeRowText(renderer.root, 0, 'a'.repeat(470));
+    expect(counterTexts().map(node => node.props.children)).toEqual(['30 characters remaining']);
+    expect(counterTexts()[0]?.props.accessibilityLabel).toBeUndefined();
+    expect(hintTexts()).not.toContain('The command is limited to 500 characters');
+
+    // At the bound the sentence replaces the count: a zero count would restate it.
+    changeRowText(renderer.root, 0, 'a'.repeat(500));
+    expect(counterTexts()).toEqual([]);
+    expect(hintTexts()).toContain('The command is limited to 500 characters');
+
+    unmount();
+  });
+
+  it('names the bound for a saved command that already sits on it', async () => {
+    h.query.data = testCommands(['a'.repeat(500)]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Text').filter(node => node.props.children === 0)).toEqual([]);
+    const hintTexts = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(hintTexts).toContain('The command is limited to 500 characters');
+
+    unmount();
+  });
+
+  it('names each reorder control by its one-based position', async () => {
+    h.query.data = testCommands(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const labels = findAll(renderer.root, 'Pressable')
+      .map(node => node.props.accessibilityLabel)
+      .filter(
+        (label): label is string => typeof label === 'string' && label.startsWith('Move command ')
+      );
+    expect(labels).toEqual([
+      'Move command 1 up',
+      'Move command 1 down',
+      'Move command 2 up',
+      'Move command 2 down',
+      'Move command 3 up',
+      'Move command 3 down',
+    ]);
+
+    unmount();
+  });
+
+  it('names each delete control by its one-based position', async () => {
+    h.query.data = testCommands(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const trash = findAll(renderer.root, 'Pressable').filter(
+      node => typeof node.props.accessibilityLabel === 'string'
+    );
+    expect(
+      trash
+        .map(node => node.props.accessibilityLabel as string)
+        .filter(label => label.startsWith('Delete'))
+    ).toEqual(['Delete command 1', 'Delete command 2', 'Delete command 3']);
+    // Each destructive control also carries the row's place in the list, like
+    // the move controls beside it.
+    expect(
+      trash
+        .filter(node => String(node.props.accessibilityLabel).startsWith('Delete'))
+        .map(node => node.props.accessibilityHint)
+    ).toEqual(['1 / 3', '2 / 3', '3 / 3']);
+
+    unmount();
+  });
+
+  it('names a blank draft row after the command slot it occupies', async () => {
+    h.query.data = testCommands(['a']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressButton(renderer.root);
+
+    // The draft row is the second slot in the list, so its controls name
+    // command 2 and carry that place, exactly like the saved row above it.
+    expect(findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)).toEqual([
+      'Move command 1 up',
+      'Move command 1 down',
+      'Delete command 1',
+      'Move command 2 up',
+      'Move command 2 down',
+      'Delete command 2',
+    ]);
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .filter(node => String(node.props.accessibilityLabel).startsWith('Delete'))
+        .map(node => node.props.accessibilityHint)
+    ).toEqual(['1 / 2', '2 / 2']);
+    expect(findFields(renderer.root).map(node => node.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
+    ]);
+
+    unmount();
+  });
+
+  it('edge: the move buttons are disabled at both ends', async () => {
+    h.query.data = testCommands(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(pressableDisabled(renderer.root, 'Move command 1 up')).toBe(true);
+    expect(pressableDisabled(renderer.root, 'Move command 1 down')).toBe(false);
+    expect(pressableDisabled(renderer.root, 'Move command 3 down')).toBe(true);
+    expect(pressableDisabled(renderer.root, 'Move command 3 up')).toBe(false);
+
+    unmount();
+  });
+
+  it('happy: deleting a row persists the remaining list', async () => {
+    h.query.data = testCommands(['a', 'b']);
+    h.query.isPending = false;
+    h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete command 1', 0);
+
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setCommands.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      commands: ['b'],
+    });
+
+    unmount();
+  });
+
+  it('never persists the blank draft row add() opens', async () => {
+    h.query.data = testCommands(['a']);
+    h.query.isPending = false;
+    h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    const addButton = findOne(renderer.root, 'Button');
+    act(() => {
+      (addButton.props as { onPress: () => void }).onPress();
+    });
+    pressPressable(renderer.root, 'Delete command 1', 0);
+
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setCommands.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      commands: [],
+    });
+
+    unmount();
+  });
+
+  it('retryable: a failure with no message toasts the fallback and keeps the edit', async () => {
+    h.query.data = testCommands(['a']);
+    h.query.isPending = false;
+    const error = new Error('placeholder');
+    error.message = '';
+    h.mutations.setCommands.mutateAsync.mockRejectedValue(error);
+
+    const { renderer, unmount } = await mountScreen();
+    changeRowText(renderer.root, 0, 'pnpm install');
+    commitRow(renderer.root, 0);
+
+    await waitFor(() => h.error.mock.calls.length > 0);
+    expect(h.error).toHaveBeenCalledWith("Couldn't save setup commands");
+    expect(findFields(renderer.root)[0]?.props.defaultValue).toBe('pnpm install');
+
+    unmount();
+  });
+
+  it('preserves edits typed while the saved list refetches', async () => {
+    h.query.data = testCommands(['a']);
+    h.query.isPending = false;
+    h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, queryClient, unmount } = await mountScreen();
+    changeRowText(renderer.root, 0, 'saved');
+    commitRow(renderer.root, 0);
+    changeRowText(renderer.root, 0, 'new draft');
+    h.query.data = testCommands(['saved']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root)[0]?.props.nativeText).toBe('new draft');
+    commitRow(renderer.root, 0);
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length === 2);
+    expect(h.mutations.setCommands.mutateAsync).toHaveBeenLastCalledWith({
+      profileId: 'profile-1',
+      commands: ['new draft'],
+    });
+    unmount();
+  });
+
+  it('remounts clean uncontrolled fields when refreshed server values change', async () => {
+    h.query.data = testCommands(['old']);
+    h.query.isPending = false;
+    const { renderer, queryClient, unmount } = await mountScreen();
+    h.query.data = testCommands(['remote edit']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root)[0]?.props.nativeText).toBe('remote edit');
+    unmount();
+  });
+
+  it('ignores a stale refetch until a pending save settles without discarding newer text', async () => {
+    h.query.data = testCommands(['old']);
+    h.query.isPending = false;
+    const pending = Promise.withResolvers<{ success: boolean }>();
+    h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
+    const { renderer, queryClient, unmount } = await mountScreen();
+    changeRowText(renderer.root, 0, 'submitted');
+    commitRow(renderer.root, 0);
+    changeRowText(renderer.root, 0, 'newer draft');
+    h.query.data = testCommands(['old']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root)[0]?.props.nativeText).toBe('newer draft');
+    await act(async () => {
+      pending.resolve({ success: true });
+      await pending.promise;
+    });
+    h.query.data = testCommands(['submitted']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    commitRow(renderer.root, 0);
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length === 2);
+    expect(h.mutations.setCommands.mutateAsync).toHaveBeenLastCalledWith({
+      profileId: 'profile-1',
+      commands: ['newer draft'],
+    });
+    unmount();
+  });
+
+  it('keeps the rows while a refetch is in flight', async () => {
+    h.query.data = testCommands(['pnpm install']);
+    h.query.isPending = false;
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+
+    h.query.isRefetching = true;
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    expect(findFields(renderer.root)[0]?.props.defaultValue).toBe('pnpm install');
+
+    unmount();
+  });
+
+  it('numbers every row, including a blank draft row', async () => {
+    h.query.data = testCommands(['pnpm install', 'pnpm build']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findFields(renderer.root).map(field => field.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
+    ]);
+
+    pressButton(renderer.root);
+    expect(findFields(renderer.root).map(field => field.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
+      'Command 3',
+    ]);
+
+    unmount();
+  });
+  it('keeps a typed command when the screen is mounted again', async () => {
+    h.query.data = testCommands(['npm install']);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 0);
+    changeRowText(first.renderer.root, 1, 'npm run build');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findFields(second.renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+      'npm run build',
+    ]);
+    second.unmount();
+  });
+
+  it('reseeds a restored draft that only copied server truth', async () => {
+    h.query.data = testCommands(['npm install']);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    first.unmount();
+
+    // The query cache is cold, so the restored draft is the only list the mount
+    // has until the server answers.
+    h.query.data = undefined;
+    h.query.isPending = true;
+    const second = await mountScreen();
+    expect(findFields(second.renderer.root)).toHaveLength(0);
+
+    h.query.data = testCommands(['npm install', 'npm run build']);
+    h.query.isPending = false;
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findFields(second.renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+      'npm run build',
+    ]);
+    expect(h.mutations.setCommands.mutateAsync).not.toHaveBeenCalled();
+
+    second.unmount();
+  });
+
+  it('keeps a restored draft that holds an unsaved edit when the server answers', async () => {
+    h.query.data = testCommands(['npm install']);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 0);
+    changeRowText(first.renderer.root, 1, 'npm run build');
+    first.unmount();
+
+    h.query.data = undefined;
+    h.query.isPending = true;
+    const second = await mountScreen();
+    h.query.data = testCommands(['npm install', 'remote edit']);
+    h.query.isPending = false;
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findFields(second.renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+      'npm run build',
+    ]);
+
+    second.unmount();
+  });
+
+  it('keeps the just-saved list until the refetched list arrives', async () => {
+    h.query.data = testCommands();
+    h.query.isPending = false;
+    const pending = Promise.withResolvers<{ success: boolean }>();
+    h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeRowText(renderer.root, 0, 'npm install');
+    commitRow(renderer.root, 0);
+    await act(async () => {
+      pending.resolve({ success: true });
+      await pending.promise;
+    });
+
+    // `setCommands` only invalidates, so the query still answers with the list
+    // from before the save; it must not replace the list just written.
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+    ]);
+
+    unmount();
+  });
+
+  it('names the setup command cap above the disabled add control', async () => {
+    h.query.data = testCommands(
+      Array.from({ length: MAX_SETUP_COMMANDS }, (_, index) => `cmd ${String(index)}`)
+    );
+    h.query.isPending = false;
+
+    const atCap = await mountScreen();
+    const capCopy = i18n.t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS });
+    const footer = atCap.renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' ||
+        (String(node.type) === 'Text' && node.props.children === capCopy)
+    );
+    // The notice holds the slot's first line, above the add control.
+    expect(footer).toHaveLength(2);
+    expect(footer[0]?.type).toBe('Text');
+    expect(footer[1]?.type).toBe('Button');
+    expect(String(footer[0]?.props.className)).toContain('text-warn');
+    expect(footer[1]?.props.disabled).toBe(true);
+    atCap.unmount();
+
+    // One row below the cap the same control is offered and says nothing.
+    h.query.data = testCommands(
+      Array.from({ length: MAX_SETUP_COMMANDS - 1 }, (_, index) => `cmd ${String(index)}`)
+    );
+    const belowCap = await mountScreen();
+    expect(findAll(belowCap.renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      capCopy
+    );
+    expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
+    belowCap.unmount();
+  });
+});

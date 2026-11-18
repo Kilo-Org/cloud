@@ -1,7 +1,9 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 import type { ConnectionTicketDO } from '../do/connection-ticket-do';
+import { TICKET_MINT_BUDGET_MS } from '../ticket-mint-budget';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const ACCEPTED_PROTOCOL = 'kilo.events.v1';
@@ -11,8 +13,19 @@ function ticketNamespace(): DurableObjectNamespace<ConnectionTicketDO> {
     .CONNECTION_TICKET_DO;
 }
 
-function ticketStub(ticket: string): DurableObjectStub<ConnectionTicketDO> {
-  return ticketNamespace().get(ticketNamespace().idFromName(ticket));
+type StoredTicket = { userId: string; expiresAt: number };
+
+/** Stores a ticket the way `/connect-ticket` does and returns its wire form. */
+async function storeTicket(state: StoredTicket): Promise<{
+  ticket: string;
+  secret: string;
+  stub: DurableObjectStub<ConnectionTicketDO>;
+}> {
+  const id = ticketNamespace().newUniqueId();
+  const stub = ticketNamespace().get(id);
+  const secret = crypto.randomUUID();
+  await stub.mint({ ...state, secret });
+  return { ticket: `${id.toString()}.${secret}`, secret, stub };
 }
 
 function workerEnv(): string {
@@ -100,8 +113,7 @@ describe('event-service WebSocket connection tickets', () => {
   });
 
   it('rejects stale tickets', async () => {
-    const ticket = crypto.randomUUID();
-    await ticketStub(ticket).mint({
+    const { ticket } = await storeTicket({
       userId: 'user-ticket-stale',
       expiresAt: Date.now() - 1,
     });
@@ -111,23 +123,64 @@ describe('event-service WebSocket connection tickets', () => {
     expect(res.status).toBe(401);
   });
 
-  it('deletes ticket storage and alarm after a successful consume', async () => {
-    const ticket = crypto.randomUUID();
-    const stub = ticketStub(ticket);
-    const expiresAt = Date.now() + 30_000;
+  it('rejects a ticket whose secret does not match, and burns it', async () => {
+    const { ticket } = await storeTicket({
+      userId: 'user-ticket-wrong-secret',
+      expiresAt: Date.now() + 30_000,
+    });
+    const [objectId] = ticket.split('.');
 
-    await stub.mint({ userId: 'user-ticket-consume-cleanup', expiresAt });
+    const forged = await connect(`${objectId}.${crypto.randomUUID()}`);
+    expect(forged.status).toBe(401);
+
+    const genuine = await connect(ticket);
+    expect(genuine.status).toBe(401);
+  });
+
+  it('mints the ticket when the first use of a named object stalls', async () => {
+    // KILO-APP-2NH: the first use of an `idFromName()` id waits on a worldwide
+    // uniqueness check, and every ticket used a fresh name. When that check
+    // stalls past the budget, the route answered 500. Stall every named object
+    // here: the mint must not depend on one.
+    const namespace = ticketNamespace();
+    const realGet = namespace.get.bind(namespace);
+    const get = vi.spyOn(namespace, 'get').mockImplementation((id, options) =>
+      id.name === undefined
+        ? realGet(id, options)
+        : ({
+            mint: () => new Promise<never>(() => {}),
+          } as unknown as DurableObjectStub<ConnectionTicketDO>)
+    );
+    let ticket: string;
+    try {
+      ticket = await mintTicket('user-ticket-named-stall');
+    } finally {
+      get.mockRestore();
+    }
+
+    const res = await connect(ticket);
+    expect(res.status).toBe(101);
+    res.webSocket?.accept();
+    res.webSocket?.close();
+  }, 20_000);
+
+  it('deletes ticket storage and alarm after a successful consume', async () => {
+    const expiresAt = Date.now() + 30_000;
+    const { stub, secret } = await storeTicket({
+      userId: 'user-ticket-consume-cleanup',
+      expiresAt,
+    });
     await expect(
       runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => ({
         ticket: await state.storage.get('ticket'),
         alarm: await state.storage.getAlarm(),
       }))
     ).resolves.toEqual({
-      ticket: { userId: 'user-ticket-consume-cleanup', expiresAt },
+      ticket: { userId: 'user-ticket-consume-cleanup', secret, expiresAt },
       alarm: expiresAt,
     });
 
-    await expect(stub.consume()).resolves.toEqual({ userId: 'user-ticket-consume-cleanup' });
+    await expect(stub.consume(secret)).resolves.toEqual({ userId: 'user-ticket-consume-cleanup' });
 
     await expect(
       runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => ({
@@ -141,14 +194,14 @@ describe('event-service WebSocket connection tickets', () => {
   });
 
   it('deletes unconsumed expired ticket storage when the alarm runs', async () => {
-    const ticket = crypto.randomUUID();
-    const stub = ticketStub(ticket);
-    const expiresAt = Date.now() + 30_000;
-
-    await stub.mint({ userId: 'user-ticket-alarm-cleanup', expiresAt });
+    const { stub, secret } = await storeTicket({
+      userId: 'user-ticket-alarm-cleanup',
+      expiresAt: Date.now() + 30_000,
+    });
     await runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => {
       await state.storage.put('ticket', {
         userId: 'user-ticket-alarm-cleanup',
+        secret,
         expiresAt: Date.now() - 1,
       });
     });
@@ -164,5 +217,154 @@ describe('event-service WebSocket connection tickets', () => {
       ticket: undefined,
       alarm: null,
     });
+  });
+
+  it('keeps the mint budget strictly below the client control-plane deadline', () => {
+    expect(TICKET_MINT_BUDGET_MS).toBeGreaterThan(0);
+    expect(TICKET_MINT_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+  });
+
+  it('does not export the mint budget from the worker entry', async () => {
+    // workerd treats every named export of the Worker entry as a Durable Object
+    // or ExportedHandler. A number there fails boot with
+    // "Incorrect type for map entry 'TICKET_MINT_BUDGET_MS'".
+    const workerEntry = await import('../index');
+    expect(workerEntry).not.toHaveProperty('TICKET_MINT_BUDGET_MS');
+  });
+
+  it('answers the retryable status when the platform drops the mint hop', async () => {
+    // A cold unique object (the first use of every ticket id) can be answered
+    // with a transient platform failure. The mint did not run, so a retry can
+    // still succeed and the client's reconnect must not be told the mint is
+    // broken.
+    const namespace = ticketNamespace();
+    const realGet = namespace.get.bind(namespace);
+    const get = vi.spyOn(namespace, 'get').mockImplementation((id, options) =>
+      id.name === undefined
+        ? ({
+            mint: async () => {
+              throw new Error('Durable Object is overloaded. Too much data queued.');
+            },
+          } as unknown as DurableObjectStub<ConnectionTicketDO>)
+        : realGet(id, options)
+    );
+    const token = await chatToken('user-ticket-transient-mint');
+    let res: Response;
+    try {
+      res = await SELF.fetch('https://events.test/connect-ticket', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } finally {
+      get.mockRestore();
+    }
+
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
+  });
+
+  it('answers 500 when the object itself rejects the mint', async () => {
+    // The object answered, so the failure is not transient: reporting it as
+    // retryable would hide a real defect behind an infinite reconnect loop.
+    const namespace = ticketNamespace();
+    const realGet = namespace.get.bind(namespace);
+    const get = vi.spyOn(namespace, 'get').mockImplementation((id, options) =>
+      id.name === undefined
+        ? ({
+            mint: async () => {
+              throw new Error('Connection ticket storage is corrupt');
+            },
+          } as unknown as DurableObjectStub<ConnectionTicketDO>)
+        : realGet(id, options)
+    );
+    const token = await chatToken('user-ticket-rejected-mint');
+    let res: Response;
+    try {
+      res = await SELF.fetch('https://events.test/connect-ticket', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } finally {
+      get.mockRestore();
+    }
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
+  });
+
+  it('answers the retryable mint failure when the auth read never settles', async () => {
+    // Stall the first unbounded hop: authenticateToken reads the signing
+    // secret before it verifies the bearer, so a secret read that never
+    // resolves hangs the auth read. The budget must resolve the route instead
+    // of letting it hang past the client's control-plane deadline.
+    vi.spyOn(env.NEXTAUTH_SECRET, 'get').mockImplementation(() => new Promise<string>(() => {}));
+    const token = await chatToken('user-ticket-hanging-auth');
+    const startedAt = Date.now();
+
+    const res = await SELF.fetch('https://events.test/connect-ticket', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    const elapsed = Date.now() - startedAt;
+    // A stalled hop is not a fault here, so the route answers the retryable
+    // status the client's reconnect-and-retry path already handles.
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
+    // It waited for the budget rather than returning early, and stayed inside
+    // the client's deadline, so the client never sees the gateway's 504.
+    expect(elapsed).toBeGreaterThanOrEqual(TICKET_MINT_BUDGET_MS);
+    expect(elapsed).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+  }, 20_000);
+
+  it('emits one allow-listed duration line per mint, stripped of query and identity', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const token = await chatToken('user-ticket-duration');
+
+    const res = await SELF.fetch(
+      'https://events.test/connect-ticket?token=super-secret&userId=should-not-be-logged',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      }
+    );
+
+    expect(res.status).toBe(200);
+    const durations = log.mock.calls
+      .map(call => call[0])
+      .filter((line): line is string => typeof line === 'string')
+      .flatMap(line => {
+        try {
+          return [JSON.parse(line) as Record<string, unknown>];
+        } catch {
+          return [];
+        }
+      })
+      .filter(line => line.route === '/connect-ticket');
+
+    expect(durations).toHaveLength(1);
+    const [duration] = durations;
+    expect(duration).toMatchObject({
+      route: '/connect-ticket',
+      method: 'POST',
+      status: 200,
+      outcome: 'ok',
+    });
+    expect(typeof duration.durationMs).toBe('number');
+    // The allow-list is exhaustive: no query string, no Authorization header,
+    // no token, no user id, no body.
+    expect(Object.keys(duration).sort()).toEqual([
+      'durationMs',
+      'method',
+      'outcome',
+      'route',
+      'status',
+    ]);
+    const serialized = JSON.stringify(duration);
+    expect(serialized).not.toContain('?');
+    expect(serialized).not.toContain('super-secret');
+    expect(serialized).not.toContain('should-not-be-logged');
+    expect(serialized).not.toContain(token);
+    expect(duration).not.toHaveProperty('userId');
   });
 });

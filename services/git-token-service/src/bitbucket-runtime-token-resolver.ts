@@ -408,12 +408,9 @@ export type BitbucketCapabilitySubject = {
   repositoryUuid: string;
   repositoryFullName: string;
   token: string;
+  oauthCredentialId?: string;
 };
 
-// Resolve the same authorized repository as resolveBitbucketToken, but return
-// the identity needed to mint an outbound session capability (and the token, so
-// the caller can bind a rotation digest). Used at capability issue time and, on
-// the redeem path, to re-resolve the current token for comparison.
 export async function resolveBitbucketCapabilitySubject(
   env: CloudflareEnv,
   params: GetBitbucketTokenParams,
@@ -431,6 +428,9 @@ export async function resolveBitbucketCapabilitySubject(
       repositoryUuid: repository.id,
       repositoryFullName: repository.fullName,
       token: authorization.token,
+      ...(authorization.source === 'oauth'
+        ? { oauthCredentialId: authorization.credentialId }
+        : {}),
     },
   };
 }

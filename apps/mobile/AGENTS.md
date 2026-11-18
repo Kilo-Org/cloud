@@ -9,7 +9,7 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Stack
 
-- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 58, React Native 0.88, React 19.3, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt
@@ -28,19 +28,145 @@ git diff --check
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
+- Use `agent-device` (Callstack) to drive and inspect the app on a simulator, emulator, or device. Run `agent-device help workflow` first.
+  - Open the app with `agent-device open <app-id>`. Read the screen with `agent-device snapshot -i`, then act on its `@eN` refs with `press` and `fill`.
+  - Use `agent-device logs`, `network`, `perf`, `react-devtools`, and `trace` for app logs, HTTP traffic, frames and memory, render profiles, and traces.
+  - Use `agent-device metro` to reload the app. Do not start Metro yourself.
+  - Bind one session to one device with `--session <name>`. A session that is bound to another device rejects the command.
 
 ## Dependencies
 
 - Install with `npx expo install <package>` (or `--dev`), never `pnpm add`.
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
-- `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
+- `jotai` stays on 2.x for now, and the four pins move together: `apps/mobile`,
+  `apps/web`, `apps/extension` and `packages/cloud-agent-sdk`. The SDK creates
+  the session atoms and each app reads them through its own jotai hooks, so a
+  partial bump fails `typecheck`: a 2.x `Atom` is not assignable to the 3.x
+  type because its `read` options still require `setSelf`, which 3.x removed
+  (mobile alone reports 153 such errors). `apps/web` cannot move first while
+  `jotai-minidb@0.0.8` (the latest release) imports `atomFamily` from
+  `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
+  soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
+  clears `minimumReleaseAge`.
 
-  ```bash
-  pnpm install --filter kilo-app...
-  rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
-  ```
+## Library First
 
-  Then restart Metro and force-quit the app.
+Before you build a UI element, find the library that already does it.
+
+1. Check the element map below. If the concern has an entry, use that element.
+2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `58.x`: universal
+   `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
+   `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
+3. Check the Expo SDK 58 docs for the concern.
+4. Check npm for a maintained package. A release in the last six months is the bar.
+
+A hand-built element is correct only when steps 1–4 fail. Record the decision in the PR body: the library
+and version you chose, or which candidates you rejected and why. "It was easier to write it" is not a
+reason.
+
+## Unified Elements
+
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` is the
+authoritative list; this table summarizes the main concerns.
+
+| Concern | Element | Use instead of |
+|---|---|---|
+| Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
+| Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
+| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
+| Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| Form fields | `FormField` from `@/components/ui/form-field` | `react-hook-form`, `@tanstack/react-form` |
+| System confirm, non-destructive | `Alert.alert` | — |
+| Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Keep awake | `useKeepAwake` from `@/lib/keep-awake` | `expo-keep-awake` |
+| Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Skeleton | `Skeleton` from `@/components/ui/skeleton` | `moti`, `react-native-reanimated-skeleton`, `react-native-skeleton-placeholder` |
+| Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
+| Video | `expo-video` | `react-native-video`, `expo-av` |
+| Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
+| Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
+| Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Segmented control | `SegmentedControl` from `@/components/ui/segmented-control` | `@react-native-segmented-control/segmented-control` |
+| Icons | `@/components/ui/icons` | `lucide-react-native` |
+| Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
+| HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
+| Diagram | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`) | — |
+
+No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`
+outside `@/components/ui/sheet` and `@/components/ui/dialog`. A sheet or a confirm must be able to stack
+above another native sheet, and a dialog rendered through `@rn-primitives/portal` lives in the app's React
+tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a portal card. A `DialogCard`
+is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
+needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
+
+Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
+`markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.
+`ImageViewer` measures its viewport and gives the zoom child concrete dimensions.
+Do not use percentage dimensions inside `ResumableZoom`'s unconstrained child container.
+Use explicit pixel sizes for minimum touch targets; native rem is 14 points.
+Use `TabScreenScrollView` for scrolling screens under the absolute tab bar.
+Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone does not create a viewport.
+Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
+
+Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
+manual-review surfaces. The new-session form and the PR-discussion comment bar render
+`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
+and animates it with the keyboard's own motion progress. The Agents list and the stored history render
+`@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
+writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
+the property it last applied stays on the native view). The pad never takes more room than the body can spare:
+it is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in `@/lib/body-viewport`, the same floor
+`TabScreenScrollView` applies to its frame), because a keyboard height belongs to the window it was measured in
+and a rotation replaces that window with a much shorter one — an unclamped pad then fills the body and the list
+renders nothing, with no rows, skeleton, empty state or error. The clamp measures the body frame and keys that
+measurement to `useWindowDimensions().height`: the layout pass that reports a new frame runs after the first
+render a rotation produces, so a frame measured in the previous window is released for that render instead of
+being trusted. `useKeyboardState` is the app's one keyboard-height read.
+The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
+A surface whose content
+pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
+`@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
+height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
+a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
+stayed behind the keyboard that way).
+
+Nothing else may read the keyboard: no surface adds a listener beside the provider.
+
+Android searchable `formSheet` routes use only the existing safe-area-capped full detent.
+Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
+iOS keeps native detent expansion when the search field gains focus.
+
+A searchable picker in a window shorter than 600pt also presents at the full detent, on either platform.
+The half detent sizes the sheet to its title row and search field, so a short window leaves the list under
+one row and the first result is clipped at the sheet edge (measured in a 501pt-tall iPad window).
+`searchPickerHeaderInList` (`@/lib/form-sheet-detents`) owns that threshold, and the language picker moves
+its search field into the scrolling list there so the title row, its actions, the field and a row stay
+together.
+
+An imperative `Sheet` with `snapPoints` hands its React content the window height on Android, not the
+detent's height, so a body that takes its slack is laid out past the sheet frame and whatever sits at its
+bottom — a dismiss row, a submit row — cannot be reached. Size such a sheet to its content instead, keep
+the rows that must stay reachable at the sheet's own edge, and bound a list that could otherwise push them
+off.
+
+The picker `formSheet` routes the `(app)` layout registers carry a single half detent on Android.
+Android lays a formSheet route's content out at the largest allowed detent, not at the presented one, so a second
+detent leaves the rows below the half sheet's edge outside the frame: the list has nothing to scroll and a drag
+on a row fires that row. One detent bounds the content host to the presented height, so the list scrolls inside
+it. `pickerSheetOptions` in that layout carries it.
+
+A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
+its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
+once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`
+mode names which surface owns the top of the window (`always` for a full-screen surface that may apply its own
+top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`). A formSheet that is its stack's
+first screen presents at the window top and its header reserves the inset; a sheet pushed over another screen
+settles an inset lower, so it reserves nothing — `useRouteIsStackRoot` (`@/lib/navigation/route-focus`) answers
+which, before the first frame.
+Keep `pt-5` for the sheet grabber on top of that clearance.
 
 ## Implementation Rules
 
@@ -49,17 +175,40 @@ git diff --check
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
-- Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
+- Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
+- A stored value has one owner. Change it only through that owner's API, and never keep a second optimistic copy beside it in a component.
+- After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+
+## State Machines
+
+A phase that several flags, refs, nullable fields, or timers encode together is an implicit state machine. Do not write one.
+
+- Model each phase as one discriminated union with a tag for each state, and keep each payload inside the state that owns it.
+- Before you add a flag beside existing state, list the combinations it creates. If one is invalid, extend the union instead.
+- Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
+- For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
+  - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
+  - Settle the attempt exactly once. Leave no entry behind that nothing renders; the doc in `@/lib/surface-feedback` says which settle keeps one.
+  - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
+  - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
+- Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
+- Settle async work by its own request identity, never by a shared attribute such as a product id or a name.
+- When an outcome cannot be tied to one request, keep the safe state and give the person an explicit way out. Never leave a state with no exit.
+- Scope a barrier to the account or identity that created it. Release it only on an authoritative outcome or the person's informed consent.
+- Progress UI ends when its own work ends. It never waits for an outcome to be attributed.
+- Retire retained state only when its identity still matches. At capacity, refuse new entries; never evict an unresolved one.
+- A regression test must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
-- Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
+- Add reusables with `pnpm reusables add <component> --styling-library nativewind`, in a terminal: it asks before overwriting a file you edited. It runs the version pinned in `package.json`; bump it there, never through a moving tag or `dlx`/`npx`, and never pass `-y`, which auto-answers setup and dependency prompts.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
-- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` fails. Use a concrete Tailwind color with a dark variant. Non-variable colors like `bg-black/5` are fine.
+- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
 - Use Lucide icons, never emoji. Color icons with `color={colors.<token>}` from `useThemeColors()`; `className` colors do not work on them.
 
@@ -68,22 +217,140 @@ git diff --check
 - iOS: never control text with `value` plus state. Store text in a ref via `onChangeText`, use state only for derived UI, read the ref on submit.
 - Use `defaultValue` only for initial content.
 - Single-line inputs: use `leading-[normal]`. A `lineHeight` above the font's natural one (which `text-sm`/`text-base` set on their own) makes iOS draw the placeholder lower than the typed text and clip it. Multi-line inputs keep an explicit `leading-*`.
+- Single-line inputs: set the height with `min-h-*`, not `py-*`. iOS insets the already-centered text rect by the padding, so vertical padding draws the text and the placeholder low.
+- Use the shared `Input` for every single-line field.
+- `Input` removes vertical padding, centers Android text, and defaults iOS line breaks to `clip`.
+- A single-line caller can change horizontal padding, text size, and minimum height.
+- All inputs use physical `pl-*`/`pr-*` for horizontal padding, including caller overrides and zero-inset search fields; Android `TextInput` does not apply logical `paddingInline` from `px-*`.
+- A multiline caller keeps its alignment and line breaks; its physical padding classes override the shared `pl-3 pr-3 pt-2.5 pb-2.5` inset.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules
 
 - `ScreenHeader` is the first child of the screen root; set stack `headerShown: false`.
-- Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Confirm destructive actions with `Alert.alert()`.
+- Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Confirm a non-destructive action with `Alert.alert()`. Confirm a destructive action with `@/components/ui/dialog`, because Android's native `AlertDialog` drops the `style: 'destructive'` affordance.
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
-- Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
+- Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
+- A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
+- Respect padding at every size: content never touches or crosses its container's padding, and opposite sides match unless the design says otherwise.
+- Center single-line content on both axes in its row or control: icons beside text, carets, button labels, badges, and the text and placeholder of single-line inputs.
+- Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
+- Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
+- Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
+- Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
+- Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
+- Change only the visual properties the task names. A color fix does not change dimensions.
+
+## Translations
+
+Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
+against the screens their keys render on, so a key's name and its context are
+what a translator has to work from.
+
+- Add and edit copy in `en.json` only. Never hand-edit another catalog. The
+  exceptions are value-level edits of an existing non-English entry. For both,
+  keep the key name, the placeholder set, and the surrounding entries as they
+  are, and say so in the pull request:
+  - a confirmed mistranslation, meaning a wrong word rather than a style
+    preference: fix the value in place, leave the English copy unchanged, and
+    verify the corrected string on the screen that renders it;
+  - a change to the meaning of the English copy, or to the surface it names: the
+    existing value in every catalog now describes the old meaning, so update it
+    in each of them, using that catalog's own established wording for the new
+    meaning or surface. `check:i18n` and `check:plurals` still have to pass.
+- Search `en.json` for the string before you add a key. If the copy already
+  exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
+- Put copy used by more than one section under `common.`.
+- Name a label with `$t(other.key)`; never spell an English label inside another
+  message, or every catalog quotes a button the reader never sees.
+- Keep the `{{placeholder}}` set identical to English. Word order around a
+  placeholder is the translator's to change, so never assume English order.
+  One exception: a plural category may interpolate the count its own family
+  already declares, where that language's plural rules select the category for
+  counts other than one. Never drop a placeholder English requires, and never
+  add one the family does not use.
+- Case follows the English copy, and only in a language that has case. Georgian
+  Mkhedruli has none, and Greek keeps the tonos on a capital initial and drops
+  it only in full capitals.
+- Name a key for what the string is, not for the one screen that shows it first.
+- If one English word truly needs two senses, add it to `TWO_SENSE_COPY` in
+  `tools/i18n/check-catalogs.mjs` and record both senses there.
+- Run `pnpm check:i18n` after you touch copy.
+- A key `en.json` gains must reach all 86 catalogs before the pull request
+  merges: `check:i18n` fails on a key one of them lacks, so a change that adds
+  copy either waits for the translation slice or lands the catalog values
+  itself and says so.
 
 ## Design
 
 The app follows https://github.com/Kilo-Org/kilo-design/ in general, except where this file states otherwise.
 
+## Design gate
+
+Before you call a UI change done, run the design gate on every screen and state the change touches:
+
+```bash
+pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standard --out <dir>
+```
+
+- It needs a dev build connected to Metro. The dev-only probe (`src/lib/design-gate/probe.ts`) reports every element's frame, so the gate measures layout in numbers instead of judging a screenshot.
+- Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
+- The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
+- After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
+- Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
+- The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
+- Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
+- Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
+- Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
+- A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
+- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
+- For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
+
 ## Debugging
 
+- Keep the simulator font size and font scaling at their defaults.
+- Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
+
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+- `pnpm dev:mobile:diagnostics status` names this worktree's dev server, whether the bundler is ready, and how many apps are connected to it.
+- `pnpm dev:mobile:diagnostics errors` prints what the connected app threw, with the project frame of each error. It reads the port of this worktree's dev session and refuses a dev server that serves another worktree.
+- Both use Expo's agent CLI on an explicit dev-server URL. They never start Metro or a build, and they prove no tap: `runtime:tap` and `runtime:tree` invoke props, so use `agent-device` for a touch and `agent-device metro reload` after an edit.
+
+## Chat tab
+
+The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.
+
+**A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
+
+A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it and write it through `setChatFlag`, never with a `useState` mirror beside it. A refused persist rejects and restores the stored choice, including its application status and Retry when that choice is behind. `retryChatFlag` applies that saved choice again without another persist. Both flags and every move share the chat's registry turn.
+
+Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
+
+Sign-out and account switch cancel only the old account's chat flags: drop waiting flag tickets and abandon a pending flag persist, whose captured `AbortSignal` fences the SQL write and later application/publication. Every non-flag operation, session move and runtime close is still awaited, with no teardown deadline. Once a flag begins moving a session, finish that move and its metadata migration before teardown continues. A deferred flag stays `moving` until its move publishes `current` or `behind`.
+
+Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
+
+The header usage pill shows its percentage, or a dash while the context window is unknown, without a visible Context prefix. Its accessibility label names the context and the token count.
+Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
+
+A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.
+
+**Prove a chat change against the same eleven models the SDK's live runs use.** The list is in `packages/harness-sdk/e2e/setup.ts`, and `pnpm --filter @kilocode/harness-sdk test:e2e:time full` is the sweep across all of them. Take one of those models through the app itself on the simulator as well: the sweep proves what the models do, the simulator proves this app's wiring, and neither proves the other. Both cost real money, so run the sweep when the tool set or the system prompt changes, not for a change to a screen.
+
+Reading the model picker's accessibility tree in full takes WebDriverAgent down, and the Appium server with it. Drive it by XPath, never `getPageSource`, and cap the snapshot with `driver.updateSettings({ snapshotMaxDepth: 50 })`.
+
+## Fixtures for End-to-End Testing
+
+Make a fixture when you test your work end to end (E2E) and the state you need is hard to reach by hand.
+
+- Fixtures must be reachable only in development builds. Gate an in-app fixture behind `__DEV__`, and enter it only through `src/app/+native-intent.tsx`, as `src/lib/home-fixture.ts` does.
+- A fixture must be faithful to actual usage. Produce the same data shapes, the same code paths, and the same timing that real use produces. Do not add a code path that only the fixture takes.
+- If a fixture cannot mimic actual usage correctly, use actual backend state. Seed the local backend with a `pnpm dev:seed` topic, or create the state through the real API.
+- Put backend fixtures in `dev/seed/<scope>/<topic>.ts`, and follow the contract in `dev/seed/AGENTS.md`.
+- Commit every fixture you make, so that the next agent can use it again. Do not keep a fixture only in a scratch directory.
+- Write in the fixture what it represents and how to open it, for example the deep link that the seed topic returns.

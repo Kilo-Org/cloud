@@ -1,0 +1,52 @@
+# Local overrides for `wrangler dev --env staging`. Run
+# `pnpm dev:env -y cloudflare-scim-sync` to generate `.dev.vars` from this
+# file; it is gitignored, this template is not.
+#
+# `.dev.vars` overrides `wrangler.jsonc`'s `vars`. It does **not** shadow a
+# `secrets_store_secrets` binding, so the three secrets this Worker binds
+# (`WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, `INTERNAL_API_SECRET`) still resolve
+# from the local Secrets Store and have to be seeded there — see README.md
+# "Secrets". They are listed below anyway because `wrangler.test.jsonc`
+# declares them as plain vars, so the values carry into a test run.
+#
+# What this file does decide is `BACKEND_API_URL`, and that one matters:
+# without the override below, `--env staging` points at `staging-app.kilo.ai`,
+# so a local poll with a working WorkOS key would apply directory state to
+# staging's database rather than yours.
+
+# The app whose `/api/internal/scim/*` endpoints this Worker calls. Local
+# Next.js, so every organization, user and membership the dispatcher writes
+# lands in your local Postgres. `@url nextjs` resolves the dev server's port,
+# including a `KILO_PORT_OFFSET` worktree.
+# @url nextjs
+BACKEND_API_URL=http://localhost:3000
+
+# Authenticates every call to those endpoints as `x-internal-api-key`. Must be
+# the value the local Next.js checks, which `pnpm dev:env` generates into the
+# root `.env.local`.
+# @from INTERNAL_API_SECRET
+INTERNAL_API_SECRET=your-internal-api-secret-here
+
+# WorkOS Events API credentials.
+#
+# Use a **staging or sandbox** WorkOS environment, never production. The Events
+# API is scoped to whichever environment issued the key, and the cursor is
+# per-deployment state rather than a lease — a production key here would make
+# your machine consume the same stream the deployed Worker does, and both would
+# apply the same events.
+#
+# Leaving these unset is fine for ordinary local work: the poll fails, reports
+# the failure, and the alarm retries, so nothing is applied. They are required
+# only for the end-to-end run documented in README.md.
+WORKOS_API_KEY=sk_test_your_staging_key_here
+WORKOS_CLIENT_ID=client_your_staging_client_id_here
+
+# Faster than the 60-second production default so a local run is observable.
+# Clamped to 10..3600 in code.
+SCIM_POLL_INTERVAL_SECONDS=10
+
+# Optional `after` cursor. Empty starts from the oldest event WorkOS still
+# retains, up to 90 days — and the dispatcher now *applies* what it reads, so
+# against a long-lived directory that is a real backlog. Set a recent event id
+# to start from there instead.
+WORKOS_EVENT_CURSOR=

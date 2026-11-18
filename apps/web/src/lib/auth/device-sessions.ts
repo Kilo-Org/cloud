@@ -1,16 +1,92 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
-import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  device_sessions,
+  device_refresh_tokens,
+  kilocode_users,
+  user_auth_provider,
+} from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { eq, and, isNull, gt } from 'drizzle-orm';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { eq, and, isNull, gt, gte, lt, ne, inArray, desc, sql, getTableColumns } from 'drizzle-orm';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { createHash, randomBytes } from 'node:crypto';
-import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
+import { persistAttestedKey, type VerifyAdmissionOk } from './native-admission';
+import { checkDomainSignInEligibility } from './email-signin-eligibility';
 
 const REFRESH_TOKEN_BYTES = 32;
 
+/**
+ * How long a consumed refresh token can rotate again while the pair it was
+ * exchanged for was never used. A mobile client loses a rotation response
+ * when the OS suspends the app mid-request, the connection drops, or the
+ * keychain write fails. The client then retries with the token it still holds.
+ * Without this window, that retry is reuse and revokes the session.
+ */
+const LOST_ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
+
+function isWithinLostRotationGrace(consumedAt: string): boolean {
+  return Date.now() - new Date(consumedAt).getTime() < LOST_ROTATION_GRACE_MS;
+}
+
+async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promise<void> {
+  await revokeDeviceSession(deviceSessionId, 'refresh_reuse_detected', revokedAt);
+  console.warn('[native-refresh] refresh token reuse detected; session revoked', {
+    deviceSessionId,
+  });
+}
+
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+type RenewalDomainPolicy = 'allow' | 'revoke' | 'unavailable';
+
+/**
+ * Decides whether a session may renew against the domain policy of the
+ * account's current email. `revoke` means the domain is refused; `unavailable`
+ * means the policy could not be evaluated and the caller must not treat it as
+ * a refusal.
+ *
+ * A domain that requires SSO allows renewal when the account is linked to that
+ * domain's SSO authority, since such an account signs in through SSO.
+ */
+async function evaluateRenewalDomainPolicy(user: {
+  id: string;
+  google_user_email: string;
+}): Promise<RenewalDomainPolicy> {
+  const eligibility = await checkDomainSignInEligibility(user.google_user_email);
+  if (eligibility.ok) {
+    return 'allow';
+  }
+
+  if (eligibility.status >= 500) {
+    return 'unavailable';
+  }
+
+  if (eligibility.errorCode === 'BLOCKED') {
+    return 'revoke';
+  }
+
+  const domain = getLowerDomainFromEmail(user.google_user_email);
+  if (domain) {
+    const ssoLink = await db.query.user_auth_provider.findFirst({
+      where: and(
+        eq(user_auth_provider.kilo_user_id, user.id),
+        eq(user_auth_provider.provider, 'workos'),
+        eq(user_auth_provider.hosted_domain, domain)
+      ),
+      columns: { kilo_user_id: true },
+    });
+    if (ssoLink) {
+      return 'allow';
+    }
+  }
+
+  return 'revoke';
 }
 
 function generateRefreshToken(): string {
@@ -18,15 +94,63 @@ function generateRefreshToken(): string {
 }
 
 /**
- * Create a new device session.
- * @returns the created session ID.
+ * Live app sessions one account may keep. A sign-in beyond the cap signs out
+ * the least recently used session instead of being refused: an uninstalled
+ * app leaves its rows behind for the refresh-token lifetime, so refusing at
+ * the cap would lock the account out of every new device.
  */
-export async function createDeviceSession(params: {
-  userId: string;
-  userAgent?: string;
-  deviceAuthRequestId?: string;
-}): Promise<string> {
-  const [session] = await db
+export const MAX_LIVE_APP_SESSIONS = 20;
+
+/**
+ * Revoke the account's app sessions beyond {@link MAX_LIVE_APP_SESSIONS},
+ * least recently active first. Device-auth (CLI) sessions are neither counted
+ * nor revoked: this cap bounds the rows the app sign-in surfaces create.
+ *
+ * Runs in the transaction that inserted the new session, so a sign-in never
+ * leaves the account above the cap once it commits.
+ */
+async function enforceLiveAppSessionLimit(
+  executor: typeof db | DrizzleTransaction,
+  userId: string
+): Promise<string[]> {
+  const stale = await executor
+    .select({ id: device_sessions.id })
+    .from(device_sessions)
+    .where(
+      and(
+        eq(device_sessions.kilo_user_id, userId),
+        isNull(device_sessions.revoked_at),
+        isNull(device_sessions.device_auth_request_id)
+      )
+    )
+    .orderBy(desc(device_sessions.last_seen_at), desc(device_sessions.created_at))
+    .offset(MAX_LIVE_APP_SESSIONS);
+
+  if (stale.length === 0) {
+    return [];
+  }
+
+  const staleSessionIds = stale.map(session => session.id);
+  await executor
+    .update(device_sessions)
+    .set({ revoked_at: new Date().toISOString(), revoked_reason: 'session_limit' })
+    .where(inArray(device_sessions.id, staleSessionIds));
+
+  return staleSessionIds;
+}
+
+/**
+ * Insert one device session inside the caller's transaction and enforce the
+ * app-session cap when the session counts toward it.
+ *
+ * Runs in that transaction so a sign-in never commits above the cap. Returns
+ * the evicted session ids for post-commit invalidation.
+ */
+async function insertDeviceSession(
+  tx: DrizzleTransaction,
+  params: { userId: string; userAgent?: string; deviceAuthRequestId?: string }
+): Promise<{ sessionId: string; evictedSessionIds: string[] }> {
+  const [session] = await tx
     .insert(device_sessions)
     .values({
       kilo_user_id: params.userId,
@@ -39,53 +163,110 @@ export async function createDeviceSession(params: {
     throw new Error('Failed to create device session');
   }
 
-  return session.id;
+  // A device-auth session is minted by the CLI flow, so it neither counts
+  // toward the app-session cap nor evicts one.
+  const evictedSessionIds =
+    params.deviceAuthRequestId === undefined
+      ? await enforceLiveAppSessionLimit(tx, params.userId)
+      : [];
+
+  return { sessionId: session.id, evictedSessionIds };
+}
+
+/**
+ * Drop the cached auth of evicted sessions. Must run after the transaction commits.
+ */
+function invalidateEvictedSessions(evictedSessionIds: string[]): void {
+  for (const evictedSessionId of evictedSessionIds) {
+    invalidateDeviceSession(evictedSessionId);
+  }
+}
+
+/**
+ * Create a new device session.
+ * @returns the created session ID.
+ */
+export async function createDeviceSession(params: {
+  userId: string;
+  userAgent?: string;
+  deviceAuthRequestId?: string;
+}): Promise<string> {
+  const { sessionId, evictedSessionIds } = await db.transaction(tx =>
+    insertDeviceSession(tx, params)
+  );
+
+  invalidateEvictedSessions(evictedSessionIds);
+
+  return sessionId;
+}
+
+/**
+ * Mint an access token + refresh token pair for a device session and persist the
+ * refresh token's hash, through `executor` so a transaction caller keeps the
+ * insert atomic with the rows around it.
+ *
+ * The access token is short-lived (one hour). The refresh token is 30 days.
+ */
+async function mintSessionCredentials(
+  executor: typeof db | DrizzleTransaction,
+  user: User,
+  deviceSessionId: string
+): Promise<{ token: string; refreshToken: string; expiresIn: number }> {
+  const token = generateApiToken(user, { deviceSessionId }, { expiresIn: TOKEN_EXPIRY.oneHour });
+  const refreshToken = generateRefreshToken();
+
+  await executor.insert(device_refresh_tokens).values({
+    token_hash: hashToken(refreshToken),
+    device_session_id: deviceSessionId,
+    expires_at: new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString(),
+  });
+
+  return { token, refreshToken, expiresIn: TOKEN_EXPIRY.oneHour };
 }
 
 /**
  * Issue an access token + refresh token pair for a device session.
- * The access token is short-lived (one hour). The refresh token is 30 days.
  */
 export async function issueSessionCredentials(
   user: User,
   deviceSessionId: string
 ): Promise<{ token: string; refreshToken: string; expiresIn: number }> {
-  const accessToken = generateApiToken(
-    user,
-    { deviceSessionId },
-    { expiresIn: TOKEN_EXPIRY.oneHour }
-  );
-
-  const refreshToken = generateRefreshToken();
-  const tokenHash = hashToken(refreshToken);
-  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
-
-  await db.insert(device_refresh_tokens).values({
-    token_hash: tokenHash,
-    device_session_id: deviceSessionId,
-    expires_at: expiresAt,
-  });
-
-  return {
-    token: accessToken,
-    refreshToken,
-    expiresIn: TOKEN_EXPIRY.oneHour,
-  };
+  return mintSessionCredentials(db, user, deviceSessionId);
 }
 
 /**
  * Rotate a refresh token. On success, returns a new token pair.
- * On failure, returns null with an error code.
  *
- * Precondition checks (session validity, user blocked_reason) happen BEFORE
- * the atomic consume, so a blocked refusal does not consume the token.
- * Reuse-detection: if the refresh token was already consumed (consumed_at is set),
- * the session is revoked because replay implies theft.
- * An unknown or expired token is refused without revocation.
+ * Precondition checks (session validity, user blocked_reason, and the domain
+ * policy of the account's current email) happen BEFORE the atomic consume, so a
+ * refusal does not consume the token. A domain that requires SSO keeps renewing
+ * for an account linked to that domain's SSO authority; a refused domain
+ * revokes the session. A policy that cannot be evaluated throws without
+ * revoking. An unknown or expired token is refused without revocation.
+ *
+ * Reuse detection: a consumed token is a replay, and the session is revoked,
+ * when the session chain has advanced past it (a later token was consumed),
+ * it was consumed more than `LOST_ROTATION_GRACE_MS` ago, or it was already
+ * recovered once. Otherwise the pair it was exchanged for was never used: the
+ * client lost the response. The token then rotates again and the unused pair
+ * is retired. A retired token is stamped with the original consume time, so a
+ * later use of it is a replay and revokes the session. The session keeps one
+ * live refresh token.
+ *
+ * Stale requests: a request that read the token before the consume that won
+ * is refused without revocation and retires nothing. After a client timeout,
+ * the aborted request can reach the session lock after the retry. It must not
+ * retire the pair that the retry delivered.
+ *
+ * Each consume is stamped with the database time of the request's first read
+ * (`firstReadAt`), not with the time it got the lock. A request writes only if
+ * its first read came after the consume it replaces, so the consume times of
+ * a session are ordered, and a stale request is identified in either lock
+ * order.
  *
  * The session validity check is repeated INSIDE the transaction under a row
  * lock, so a session revoked concurrently with the rotation cannot receive a
- * replacement pair.
+ * replacement pair. The same lock serializes every rotation of the session.
  *
  * The consume and the replacement issuance run in one transaction. If issuing
  * the replacement fails, the transaction rolls back so the old token stays
@@ -100,81 +281,72 @@ export async function rotateRefreshToken(
   const tokenHash = hashToken(refreshToken);
   const now = new Date().toISOString();
 
-  // Step 1: Look up the token row to check validity and reuse BEFORE consuming.
+  // Steps 1-3: Look up the token, its parent session, and the user in one
+  // joined read BEFORE consuming. `firstReadAt` is the database time of this
+  // request's first read. The joins are inner: a missing session or user row
+  // yields no row, which refuses without revocation, and the full user row
+  // read here is the one token generation consumes later.
   const [row] = await db
-    .select()
+    .select({
+      ...getTableColumns(device_refresh_tokens),
+      firstReadAt: sql<string>`clock_timestamp()::text`,
+      session: device_sessions,
+      user: kilocode_users,
+    })
     .from(device_refresh_tokens)
+    .innerJoin(device_sessions, eq(device_sessions.id, device_refresh_tokens.device_session_id))
+    .innerJoin(kilocode_users, eq(kilocode_users.id, device_sessions.kilo_user_id))
     .where(eq(device_refresh_tokens.token_hash, tokenHash))
     .limit(1);
 
-  // Unknown token: refuse without revocation.
+  // Unknown token, or a token whose session or user no longer exists: refuse
+  // without revocation.
   if (!row) {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
+  const { firstReadAt, session, user } = row;
 
   // Expired token: refuse without revocation.
   if (new Date(row.expires_at) <= new Date()) {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
-  // Reused (consumed_at is set): refuse AND revoke the session.
-  if (row.consumed_at) {
-    await db
-      .update(device_sessions)
-      .set({
-        revoked_at: now,
-        revoked_reason: 'refresh_reuse_detected',
-      })
-      .where(eq(device_sessions.id, row.device_session_id));
+  // Consumed outside the lost-rotation grace: refuse AND revoke the session.
+  // A consume inside the grace is decided under the session lock below.
+  if (row.consumed_at && !isWithinLostRotationGrace(row.consumed_at)) {
+    await revokeForReuse(row.device_session_id, now);
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
-  // Step 2: Check parent session validity BEFORE consuming.
-  const [session] = await db
-    .select()
-    .from(device_sessions)
-    .where(eq(device_sessions.id, row.device_session_id))
-    .limit(1);
-
-  if (!session) {
-    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
-  }
-
+  // Parent session validity BEFORE consuming.
   if (session.revoked_at) {
     return { ok: false, error: 'SESSION_REVOKED' };
   }
 
-  // Step 3: Check user blocked_reason BEFORE consuming.
-  const [user] = await db
-    .select({ id: kilocode_users.id, blocked_reason: kilocode_users.blocked_reason })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, session.kilo_user_id))
-    .limit(1);
-
-  if (!user) {
-    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
-  }
-
-  if (user.blocked_reason) {
+  // Blocked account BEFORE consuming.
+  if (isBlockedAccount(user)) {
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
-  // Steps 4-8: Consume the old token and issue the replacement pair in one
+  // Step 3b: Apply the domain policy that governs renewal, before the consume,
+  // so a refusal leaves the token untouched. A verdict that could not be
+  // evaluated throws: renewal stops instead of proceeding unverified.
+  const renewalPolicy = await evaluateRenewalDomainPolicy(user);
+  if (renewalPolicy === 'unavailable') {
+    throw new Error('Domain sign-in policy could not be evaluated for refresh rotation');
+  }
+  if (renewalPolicy === 'revoke') {
+    await revokeDeviceSession(session.id, 'domain_ineligible');
+    console.warn('[native-refresh] domain not eligible; session revoked', {
+      deviceSessionId: session.id,
+    });
+    return { ok: false, error: 'USER_BLOCKED' };
+  }
+
+  // Steps 4-7: Consume the old token and issue the replacement pair in one
   // transaction. If issuing the replacement fails, the transaction rolls back
   // and the old token remains usable, so the client can retry with it.
   const outcome = await db.transaction(async tx => {
-    // Fetch the full user for token generation BEFORE consuming, so a missing
-    // user refuses without burning the token.
-    const [fullUser] = await tx
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, session.kilo_user_id))
-      .limit(1);
-
-    if (!fullUser) {
-      return { kind: 'missing_user' } as const;
-    }
-
     // Step 4: Lock the parent session row and recheck revoked_at INSIDE the
     // transaction, before consuming. The pre-transaction session check above
     // can be raced by a revokeDeviceSession that commits between that read and
@@ -196,56 +368,112 @@ export async function rotateRefreshToken(
       return { kind: 'session_revoked' } as const;
     }
 
-    // Step 5: Atomic consume — only after the in-transaction revocation check.
-    const [consumed] = await tx
-      .update(device_refresh_tokens)
-      .set({ consumed_at: now })
-      .where(
-        and(
-          eq(device_refresh_tokens.token_hash, tokenHash),
-          isNull(device_refresh_tokens.consumed_at),
-          gt(device_refresh_tokens.expires_at, now)
-        )
-      )
-      .returning();
+    // Step 5: Re-read the token under the session lock. Every rotation of
+    // this session holds the same lock, so this read sees the result of any
+    // rotation that ran concurrently with the checks above.
+    const [current] = await tx
+      .select({
+        expires_at: device_refresh_tokens.expires_at,
+        consumed_at: device_refresh_tokens.consumed_at,
+        consumedAfterFirstRead: sql<boolean>`${device_refresh_tokens.consumed_at} >= ${firstReadAt}::timestamptz`,
+      })
+      .from(device_refresh_tokens)
+      .where(eq(device_refresh_tokens.token_hash, tokenHash))
+      .limit(1);
 
-    // Step 6: If consume failed, a concurrent request consumed the token.
-    // We already confirmed the token was not reused at Step 1, so this is
-    // a race, not theft. Refuse without revocation.
-    if (!consumed) {
-      return { kind: 'consume_lost' } as const;
+    if (!current || new Date(current.expires_at) <= new Date()) {
+      return { kind: 'invalid_token' } as const;
     }
 
-    // Step 7: Update last_seen_at on the session.
+    if (current.consumed_at) {
+      // The consume that won happened after this request read the token:
+      // this request is stale. Refuse it and change nothing.
+      if (current.consumedAfterFirstRead) {
+        return { kind: 'stale_request' } as const;
+      }
+
+      const consumedAt = current.consumed_at;
+      // Recoveries stamp the retired rows with the presented token's consume
+      // time. Consume stamps are per-request database reads, so two rows of a
+      // session share a consume time only through such a recovery. A shared
+      // consume time on a later presentation therefore means this token was
+      // already recovered.
+      const [matchingConsume] = await tx
+        .select({ token_hash: device_refresh_tokens.token_hash })
+        .from(device_refresh_tokens)
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, lockedSession.id),
+            gte(device_refresh_tokens.consumed_at, consumedAt),
+            ne(device_refresh_tokens.token_hash, tokenHash)
+          )
+        )
+        .limit(1);
+
+      if (matchingConsume || !isWithinLostRotationGrace(consumedAt)) {
+        return { kind: 'reuse_detected' } as const;
+      }
+
+      // Lost rotation: retire the unused replacement with this token's
+      // consume time. This token keeps its consume time, so the recovery
+      // window stays anchored to it.
+      await tx
+        .update(device_refresh_tokens)
+        .set({ consumed_at: consumedAt })
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, lockedSession.id),
+            isNull(device_refresh_tokens.consumed_at)
+          )
+        );
+      console.info('[native-refresh] lost rotation recovered', {
+        deviceSessionId: lockedSession.id,
+      });
+    } else {
+      // Atomic consume — only after the in-transaction revocation check.
+      const [consumed] = await tx
+        .update(device_refresh_tokens)
+        .set({ consumed_at: firstReadAt })
+        .where(
+          and(
+            eq(device_refresh_tokens.token_hash, tokenHash),
+            isNull(device_refresh_tokens.consumed_at),
+            gt(device_refresh_tokens.expires_at, now)
+          )
+        )
+        .returning({ token_hash: device_refresh_tokens.token_hash });
+
+      if (!consumed) {
+        return { kind: 'invalid_token' } as const;
+      }
+    }
+
+    // Step 6: Update last_seen_at on the session.
     await tx
       .update(device_sessions)
       .set({ last_seen_at: now })
-      .where(eq(device_sessions.id, consumed.device_session_id));
+      .where(eq(device_sessions.id, lockedSession.id));
 
-    // Step 8: Issue the replacement pair in the same transaction.
-    const accessToken = generateApiToken(
-      fullUser,
-      { deviceSessionId: lockedSession.id },
-      { expiresIn: TOKEN_EXPIRY.oneHour }
-    );
+    // Step 7: Issue the replacement pair in the same transaction.
+    const pair = await mintSessionCredentials(tx, user, lockedSession.id);
 
-    const newRefreshToken = generateRefreshToken();
-    const newExpiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
-
-    await tx.insert(device_refresh_tokens).values({
-      token_hash: hashToken(newRefreshToken),
-      device_session_id: lockedSession.id,
-      expires_at: newExpiresAt,
-    });
-
-    return {
-      kind: 'ok',
-      pair: { token: accessToken, refreshToken: newRefreshToken, expiresIn: TOKEN_EXPIRY.oneHour },
-    } as const;
+    return { kind: 'ok', pair } as const;
   });
 
   if (outcome.kind === 'session_revoked') {
     return { ok: false, error: 'SESSION_REVOKED' };
+  }
+
+  if (outcome.kind === 'reuse_detected') {
+    await revokeForReuse(session.id, now);
+    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
+  }
+
+  if (outcome.kind === 'stale_request') {
+    console.info('[native-refresh] stale rotation request refused', {
+      deviceSessionId: session.id,
+    });
+    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
   if (outcome.kind !== 'ok') {
@@ -270,58 +498,57 @@ export async function createDeviceSessionWithAttestedKey(params: {
   user: User;
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
-  return await db.transaction(async tx => {
-    // Persist the attested key inside the transaction
-    await persistAttestedKeyTx(tx, params.userId, params.verification);
+  const { credentials, evictedSessionIds } = await db.transaction(async tx => {
+    await persistAttestedKey(params.userId, params.verification, tx);
 
-    // Create the device session
-    const [session] = await tx
-      .insert(device_sessions)
-      .values({
-        kilo_user_id: params.userId,
-        user_agent: params.userAgent,
-      })
-      .returning({ id: device_sessions.id });
-
-    if (!session) {
-      throw new Error('Failed to create device session');
-    }
-
-    // Issue credentials
-    const accessToken = generateApiToken(
-      params.user,
-      { deviceSessionId: session.id },
-      { expiresIn: TOKEN_EXPIRY.oneHour }
-    );
-
-    const refreshToken = generateRefreshToken();
-    const tokenHash = hashToken(refreshToken);
-    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
-
-    await tx.insert(device_refresh_tokens).values({
-      token_hash: tokenHash,
-      device_session_id: session.id,
-      expires_at: expiresAt,
+    const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
+      userId: params.userId,
+      userAgent: params.userAgent,
     });
 
-    return {
-      token: accessToken,
-      refreshToken,
-      expiresIn: TOKEN_EXPIRY.oneHour,
-      sessionId: session.id,
+    const credentials = {
+      ...(await mintSessionCredentials(tx, params.user, sessionId)),
+      sessionId,
     };
+
+    return { credentials, evictedSessionIds };
   });
+
+  invalidateEvictedSessions(evictedSessionIds);
+
+  return credentials;
 }
 
 /**
  * Revoke a device session and all its refresh tokens.
+ * `revokedAt` stamps the revocation; callers that must record the request time
+ * (refresh-token reuse) pass it explicitly.
  */
-export async function revokeDeviceSession(sessionId: string, reason: string): Promise<void> {
+export async function revokeDeviceSession(
+  sessionId: string,
+  reason: string,
+  revokedAt?: string
+): Promise<void> {
   await db
     .update(device_sessions)
     .set({
-      revoked_at: new Date().toISOString(),
+      revoked_at: revokedAt ?? new Date().toISOString(),
       revoked_reason: reason,
     })
     .where(eq(device_sessions.id, sessionId));
+  invalidateDeviceSession(sessionId);
+}
+
+/**
+ * Delete refresh tokens whose expiry has passed. Expired tokens are refused
+ * before any other check, so removing them changes no rotation outcome.
+ * @returns the number of deleted rows.
+ */
+export async function cleanupExpiredDeviceRefreshTokens(): Promise<number> {
+  const deleted = await db
+    .delete(device_refresh_tokens)
+    .where(lt(device_refresh_tokens.expires_at, new Date().toISOString()))
+    .returning({ token_hash: device_refresh_tokens.token_hash });
+
+  return deleted.length;
 }

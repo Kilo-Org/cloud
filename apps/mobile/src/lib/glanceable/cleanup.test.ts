@@ -1,0 +1,449 @@
+/* eslint-disable max-lines -- one cohesive suite: the terminal blanks, the org fence, and the republish fences they share */
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  buildOpaqueScopeKey,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
+
+import {
+  confirmGlanceableOrgMembership,
+  getGlanceableOrgConfirmationEpoch,
+  getTerminalBlankEpoch,
+  isGlanceableOrgLost,
+  planOrgFenceAction,
+  republishLastSnapshotStale,
+  writeLostOrgSnapshotAndEnd,
+  writePrivacySnapshotAndEnd,
+  writeSignedOutSnapshotAndEnd,
+} from './cleanup';
+import { GlanceablePublisher } from './publisher';
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+  _setSecureStoreForTests,
+  getLastGlanceableSnapshot,
+  persistGlanceableSink,
+  restorePersistedGlanceable,
+} from './persist';
+import {
+  type GlanceableSink,
+  registerGlanceableSink,
+  unregisterGlanceableSink,
+} from './sink-registry';
+import {
+  _flushWaitingAskMirrorForTests,
+  _resetWaitingAskForTests,
+  _setSecureStoreForTests as _setAskSecureStoreForTests,
+  getWaitingAsk,
+  recordWaitingAsk,
+} from './waiting-ask';
+
+type SinkCall =
+  | { type: 'publish'; snapshot: GlanceableAgentsSnapshot }
+  | { type: 'startOrUpdate'; snapshot: GlanceableAgentsSnapshot }
+  | { type: 'endImmediate' };
+
+function makeSink() {
+  const calls: SinkCall[] = [];
+  const sink: GlanceableSink = {
+    publish(snapshot) {
+      _setLastGlanceableSnapshotForTests(snapshot);
+      calls.push({ type: 'publish', snapshot });
+    },
+    startOrUpdate(snapshot) {
+      calls.push({ type: 'startOrUpdate', snapshot });
+    },
+    endImmediate() {
+      calls.push({ type: 'endImmediate' });
+    },
+  };
+  return { sink, calls };
+}
+
+const PUB_CTX = { userId: 'u1', organizationId: 'revoked-org' };
+
+/** A happy frame of one account, as that account's own publish built it. */
+function snapshotForScope(userId: string): GlanceableAgentsSnapshot {
+  return {
+    schemaVersion: 1,
+    revision: 1,
+    updatedAt: '2026-08-27T00:00:00.000Z',
+    expiresAt: '2026-08-27T08:00:00.000Z',
+    scopeKey: buildOpaqueScopeKey({ userId, organizationId: null }),
+    organizationBound: false,
+    status: 'happy',
+    running: 2,
+    needsInput: 1,
+    needsApproval: 1,
+    idle: 0,
+    scheduled: 0,
+    needsInputSince: '2026-08-26T23:00:00.000Z',
+    scheduledAt: null,
+    newestResultKind: 'running',
+    newestResultAt: '2026-08-26T23:30:00.000Z',
+  };
+}
+
+function lastSnapshot(calls: SinkCall[]): GlanceableAgentsSnapshot {
+  const found = [...calls].toReversed().find(call => call.type === 'publish');
+  if (found === undefined) {
+    throw new Error('no publish call');
+  }
+  return found.snapshot;
+}
+
+afterEach(() => {
+  _resetGlanceablePersistForTests();
+  _resetWaitingAskForTests();
+  // The lost-org latch is module state: release it so it cannot leak forward.
+  confirmGlanceableOrgMembership();
+  vi.useRealTimers();
+});
+
+describe('cleanup', () => {
+  it('writes the signed-out snapshot before ending, and skips the terminal wait', () => {
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    try {
+      writeSignedOutSnapshotAndEnd();
+      expect(calls.map(call => call.type)).toEqual(['publish', 'endImmediate']);
+      const snapshot = lastSnapshot(calls);
+      expect(snapshot.status).toBe('signed_out');
+      expect(snapshot.running + snapshot.needsInput + snapshot.idle).toBe(0);
+    } finally {
+      unregisterGlanceableSink(sink);
+    }
+  });
+
+  it('ends the recorded ask with the account it named', async () => {
+    const askStore = new Map<string, string>();
+    _setAskSecureStoreForTests({
+      setItemAsync: (key, value) => {
+        askStore.set(key, value);
+        return Promise.resolve();
+      },
+      getItemAsync: key => Promise.resolve(askStore.get(key) ?? null),
+      deleteItemAsync: key => {
+        askStore.delete(key);
+        return Promise.resolve();
+      },
+    });
+    recordWaitingAsk({
+      kiloSessionId: 'ses_signing_out',
+      status: 'permission',
+      isCloudAgent: true,
+      scopeKey: buildOpaqueScopeKey(PUB_CTX),
+      organizationId: PUB_CTX.organizationId,
+      userId: PUB_CTX.userId,
+      recordedAt: Date.now(),
+      boundPermissionId: 'perm_signing_out',
+    });
+    await _flushWaitingAskMirrorForTests();
+    expect(askStore.size).toBe(1);
+
+    writeSignedOutSnapshotAndEnd();
+
+    // The ask names a session and an organization of the scope that just
+    // ended, so the blank ends it in memory and on disk alike.
+    expect(getWaitingAsk()).toBeNull();
+    await _flushWaitingAskMirrorForTests();
+    expect(askStore.size).toBe(0);
+  });
+
+  it('blanks every other sink when one sink throws', () => {
+    // A throwing WidgetKit or ActivityKit host function must not reach the
+    // caller: `writeSignedOutSnapshotAndEnd` runs inside the auth transition,
+    // so a propagated failure would abort the sign-in outright.
+    const throwing: GlanceableSink = {
+      publish() {
+        throw new Error('Exception in HostFunction: <unknown>');
+      },
+      startOrUpdate() {
+        throw new Error('Exception in HostFunction: <unknown>');
+      },
+      endImmediate() {
+        throw new Error('Exception in HostFunction: <unknown>');
+      },
+    };
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(throwing);
+    registerGlanceableSink(sink);
+    try {
+      expect(() => {
+        writeSignedOutSnapshotAndEnd();
+      }).not.toThrow();
+      expect(calls.map(call => call.type)).toEqual(['publish', 'endImmediate']);
+      expect(lastSnapshot(calls).status).toBe('signed_out');
+    } finally {
+      unregisterGlanceableSink(sink);
+      unregisterGlanceableSink(throwing);
+    }
+  });
+
+  it('blanks to privacy on org switch', () => {
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    try {
+      writePrivacySnapshotAndEnd();
+      const snapshot = lastSnapshot(calls);
+      expect(snapshot.status).toBe('privacy');
+      expect(snapshot.running + snapshot.needsInput + snapshot.idle).toBe(0);
+    } finally {
+      unregisterGlanceableSink(sink);
+    }
+  });
+
+  it('does not latch publication off for an intentional org switch', () => {
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    writePrivacySnapshotAndEnd();
+    expect(isGlanceableOrgLost()).toBe(false);
+    // The org change rebuilds the publisher, which must emit for the new org
+    // without waiting for the fence to confirm membership.
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      terminalBlankEpoch: getTerminalBlankEpoch,
+      orgLost: isGlanceableOrgLost,
+    });
+    try {
+      publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(lastSnapshot(calls).status).toBe('happy');
+    } finally {
+      unregisterGlanceableSink(sink);
+      publisher.dispose();
+    }
+  });
+
+  it('keeps a rebuilt publisher silent after a lost org until membership returns', () => {
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    const options = {
+      sinks: [sink],
+      terminalBlankEpoch: getTerminalBlankEpoch,
+      orgLost: isGlanceableOrgLost,
+    };
+    const publisher = new GlanceablePublisher(options);
+    let rebuilt: GlanceablePublisher | null = null;
+    try {
+      publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(1);
+
+      writeLostOrgSnapshotAndEnd();
+      expect(lastSnapshot(calls).status).toBe('privacy');
+      const afterBlank = calls.filter(call => call.type === 'publish').length;
+
+      // A token refresh rebuilds the publisher: it captures the new epoch, so
+      // only the latch stops it republishing the revoked org's counts.
+      rebuilt = new GlanceablePublisher(options);
+      rebuilt.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(calls.filter(call => call.type === 'publish')).toHaveLength(afterBlank);
+      expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(1);
+      expect(lastSnapshot(calls).status).toBe('privacy');
+
+      // A successful org list that holds the selection releases the latch.
+      confirmGlanceableOrgMembership();
+      rebuilt.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(2);
+      expect(lastSnapshot(calls).status).toBe('happy');
+    } finally {
+      unregisterGlanceableSink(sink);
+      publisher.dispose();
+      rebuilt?.dispose();
+    }
+  });
+
+  it('advances the org confirmation epoch only when a lost org comes back', () => {
+    // The Home widget credential latches a refusal against this value: a plain
+    // confirmation must not release it, or a revoked credential would be asked
+    // for again on every org list.
+    const before = getGlanceableOrgConfirmationEpoch();
+
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before);
+
+    writeLostOrgSnapshotAndEnd();
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before + 1);
+
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before + 1);
+  });
+
+  it('blanks to privacy only after a successful list misses the selection', () => {
+    const fence = {
+      organizationId: 'missing-org',
+      orgs: [{ organizationId: 'kept-org' }],
+      isLoading: false,
+      isError: false,
+    };
+    expect(planOrgFenceAction(fence)).toBe('privacy');
+    expect(planOrgFenceAction({ ...fence, isLoading: true })).toBe('none');
+    expect(planOrgFenceAction({ ...fence, organizationId: 'kept-org', orgs: fence.orgs })).toBe(
+      'confirmed'
+    );
+    expect(
+      planOrgFenceAction({ organizationId: null, orgs: [], isLoading: false, isError: false })
+    ).toBe('confirmed');
+    // An offline or not-yet-fetched list (orgs undefined) is not a lost org.
+    expect(
+      planOrgFenceAction({
+        organizationId: 'kept-org',
+        orgs: undefined,
+        isLoading: false,
+        isError: false,
+      })
+    ).toBe('none');
+  });
+
+  it('keeps the original deadline through repeated org list failures', () => {
+    vi.useFakeTimers();
+    expect(
+      planOrgFenceAction({
+        organizationId: 'kept-org',
+        orgs: undefined,
+        isLoading: false,
+        isError: true,
+      })
+    ).toBe('stale');
+
+    const seeded: GlanceableAgentsSnapshot = {
+      schemaVersion: 1,
+      revision: 3,
+      updatedAt: '2026-08-27T00:00:00.000Z',
+      expiresAt: '2026-08-27T08:00:00.000Z',
+      scopeKey: 'deadbeef',
+      accountEpoch: 7,
+      organizationBound: true,
+      status: 'happy',
+      running: 2,
+      needsInput: 1,
+      needsApproval: 1,
+      idle: 1,
+      scheduled: 0,
+      needsInputSince: '2026-08-26T23:00:00.000Z',
+      scheduledAt: null,
+      newestResultKind: 'running',
+      newestResultAt: '2026-08-26T23:30:00.000Z',
+    };
+    _setLastGlanceableSnapshotForTests(seeded);
+
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    try {
+      const staleAt = ['2026-08-27T01:00:00.000Z', '2026-08-27T07:59:59.999Z'];
+      const expiredAt = ['2026-08-27T08:00:00.000Z', '2026-08-27T09:00:00.000Z'];
+      for (const [index, now] of staleAt.entries()) {
+        vi.setSystemTime(new Date(now));
+        republishLastSnapshotStale();
+        expect(lastSnapshot(calls)).toEqual({ ...seeded, revision: index + 4, status: 'stale' });
+      }
+      for (const [index, now] of expiredAt.entries()) {
+        vi.setSystemTime(new Date(now));
+        republishLastSnapshotStale();
+        expect(lastSnapshot(calls)).toEqual({
+          ...seeded,
+          revision: index + 6,
+          status: 'expired',
+          running: 0,
+          needsInput: 0,
+          needsApproval: 0,
+          idle: 0,
+          needsInputSince: null,
+        });
+      }
+    } finally {
+      unregisterGlanceableSink(sink);
+    }
+  });
+
+  it('republishes a restored record only for the signed-in scope', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-27T01:00:00.000Z'));
+    const store = new Map<string, string>([
+      // The class upgrade has run, so an absent identity hint is absent.
+      [WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value],
+    ]);
+    const secureStore = {
+      setItemAsync: async (key: string, value: string) => {
+        store.set(key, value);
+        await Promise.resolve();
+      },
+      getItemAsync: async (key: string) => {
+        await Promise.resolve();
+        return store.get(key) ?? null;
+      },
+    };
+    _setSecureStoreForTests(secureStore);
+    const record = {
+      ...snapshotForScope('u1'),
+      revision: 6,
+      updatedAt: '2026-08-27T00:30:00.000Z',
+      expiresAt: '2026-08-27T08:00:00.000Z',
+    } satisfies GlanceableAgentsSnapshot;
+    persistGlanceableSink.publish(record);
+    // A restart: the identity on this device derives another scope.
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStore);
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+    await restorePersistedGlanceable();
+
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    try {
+      republishLastSnapshotStale();
+      expect(calls).toEqual([]);
+    } finally {
+      unregisterGlanceableSink(sink);
+    }
+  });
+
+  it.each(['signed_out', 'privacy', 'expired'] as const)(
+    'does not replace %s with stale before or after its deadline',
+    status => {
+      vi.useFakeTimers();
+      const terminal: GlanceableAgentsSnapshot = {
+        schemaVersion: 1,
+        revision: 5,
+        updatedAt: '2026-08-27T00:00:00.000Z',
+        expiresAt: '2026-08-27T08:00:00.000Z',
+        scopeKey: `terminal:${status}`,
+        organizationBound: false,
+        status,
+        running: 0,
+        needsInput: 0,
+        needsApproval: 0,
+        idle: 0,
+        scheduled: 0,
+        needsInputSince: null,
+        scheduledAt: null,
+        newestResultKind: null,
+        newestResultAt: null,
+      };
+      _setLastGlanceableSnapshotForTests(terminal);
+
+      const { sink } = makeSink();
+      registerGlanceableSink(sink);
+      try {
+        for (const now of ['2026-08-27T01:00:00.000Z', '2026-08-27T09:00:00.000Z']) {
+          vi.setSystemTime(new Date(now));
+          republishLastSnapshotStale();
+          expect(getLastGlanceableSnapshot()).toMatchObject({
+            status,
+            scopeKey: terminal.scopeKey,
+            updatedAt: terminal.updatedAt,
+            running: 0,
+            needsInput: 0,
+            needsApproval: 0,
+            idle: 0,
+            needsInputSince: null,
+          });
+        }
+      } finally {
+        unregisterGlanceableSink(sink);
+      }
+    }
+  );
+});

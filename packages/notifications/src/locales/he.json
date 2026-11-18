@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "לסשן הסוכן שלך יש עדכון",
+      "lowBalance": "היתרה שלך דורשת תשומת לב",
+      "spendAlert": "ההוצאה שלך דורשת תשומת לב",
+      "securityFinding": "ממצא אבטחה דורש תשומת לב",
+      "securityUpdate": "לבדיקת אבטחה יש עדכון",
+      "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "התראת יתרה נמוכה",
+      "body": "היתרה של {{organizationName}} ירדה מתחת ל-${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "התראת הוצאה",
+      "body": "ההוצאה של {{scopeName}} חצתה ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} ב-{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ממצא אבטחה חדש ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "אזהרת SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "הפרת SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "סשן ה-Kilo שלך מוכן לשליטה מהטלפון"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEFAULT_SOURCE_SKIPS, SourceSkips, type HashSourceContents } from '@expo/fingerprint';
+import { DEFAULT_SOURCE_SKIPS, type HashSource, SourceSkips } from '@expo/fingerprint';
 
 import { hashRootNativeInputs } from './mobile-native-build';
 
@@ -41,20 +41,42 @@ export type AndroidBuildDeps = {
   readPackageId: (apkPath: string) => string | undefined;
   install: (serial: string, apkPath: string) => void;
   now: () => Date;
+  // Fetch a prebuilt Kilo.apk for this nativeHash into destDir and return
+  // its path, or undefined on a miss. When set, a cache miss tries this
+  // before compiling locally.
+  fetchRemote?: (args: { nativeHash: string; destDir: string }) => Promise<string | undefined>;
+  // When true, a failed remote fetch fails the build instead of compiling
+  // locally (KILO_REMOTE_NATIVE=required).
+  requireRemote?: boolean;
 };
 
 // Repo-root inputs that shape the native build but live outside
-// apps/mobile (pnpm patches, pnpm-workspace.yaml, pnpm-lock.yaml) are
-// mixed in as an extra source.
+// apps/mobile (pnpm patches, pnpm-workspace.yaml, pnpm-lock.yaml) are mixed in
+// as an extra source, and so is the local modules/ tree: Expo hashes an
+// autolinked module by its package identity, which a module under modules/ has
+// none of, so its native sources would otherwise never key a build. Module JS
+// and tests stay out; the native sources of one platform for another platform
+// only over-key the hash, which is the safe direction.
 export function buildAndroidFingerprintOptions(): {
   platforms: ['android'];
   sourceSkips: number;
-  extraSources: HashSourceContents[];
+  ignorePaths: string[];
+  extraSources: HashSource[];
   silent: boolean;
 } {
   return {
     platforms: ['android'],
     sourceSkips: DEFAULT_SOURCE_SKIPS | SourceSkips.ExpoConfigExtraSection,
+    // The generated android/ tree is output, not an input: its bytes differ
+    // per worktree. Pin it out of the hash so no fingerprint version can key
+    // builds on it.
+    ignorePaths: [
+      'android/**',
+      // Module build output is generated per tree and machine, not an input.
+      'modules/**/build/**',
+      'modules/*/src/**',
+      'modules/**/*.test.ts',
+    ],
     extraSources: [
       {
         type: 'contents',
@@ -62,6 +84,7 @@ export function buildAndroidFingerprintOptions(): {
         contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
         reasons: ['repo-root patches/, pnpm-workspace.yaml, and pnpm-lock.yaml'],
       },
+      { type: 'dir', filePath: 'modules', reasons: ['localExpoModules'] },
     ],
     silent: true,
   };
@@ -128,6 +151,11 @@ export async function runAndroidBuild(serial: string, deps: AndroidBuildDeps): P
   };
   const key = buildAndroidCompatibilityKey(compatibility);
   let entry = await lookup(deps.cacheRoot, key, compatibility, deps.readPackageId);
+  if (!entry && deps.fetchRemote) {
+    // Outside the native-build semaphore: a download (or a wait on a remote
+    // runner) burns no local CPU, so it must not block a local compile.
+    entry = await tryRemotePublish(serial, key, compatibility, deps);
+  }
   if (!entry) {
     entry = await deps.withNativeBuildSlot(async () => {
       const queuedHit = await lookup(deps.cacheRoot, key, compatibility, deps.readPackageId);
@@ -136,6 +164,45 @@ export async function runAndroidBuild(serial: string, deps: AndroidBuildDeps): P
     });
   }
   deps.install(serial, entry.apkPath);
+}
+
+// Publish a cache entry from a remote-built APK instead of a local compile.
+// Reuses publish() unchanged — only the build step is swapped for a fetch
+// into staging — so the package-id check, checksum, manifest, and atomic
+// publish all still apply. Any failure returns undefined and the caller
+// compiles locally, unless deps.requireRemote is set: then the failure
+// propagates.
+async function tryRemotePublish(
+  serial: string,
+  key: string,
+  compatibility: AndroidCompatibility,
+  deps: AndroidBuildDeps
+): Promise<{ apkPath: string; manifest: AndroidManifest } | undefined> {
+  const fetchRemote = deps.fetchRemote;
+  if (!fetchRemote) return undefined;
+  try {
+    return await publish(serial, key, compatibility, {
+      ...deps,
+      build: async staging => {
+        const apkPath = await fetchRemote({
+          nativeHash: compatibility.nativeHash,
+          destDir: staging,
+        });
+        if (!apkPath) throw new Error('remote native artifact unavailable');
+        return apkPath;
+      },
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    if (deps.requireRemote) {
+      throw new Error(
+        `remote native build unavailable (${reason}); KILO_REMOTE_NATIVE=required forbids a local build`,
+        { cause: error }
+      );
+    }
+    process.stderr.write(`remote native build unavailable (${reason}); building locally\n`);
+    return undefined;
+  }
 }
 
 async function lookup(

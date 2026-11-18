@@ -5,7 +5,9 @@ import {
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 
-import { computeStatus } from './compute-status';
+import { i18n } from '@/i18n';
+
+import { computeStatus, lastActivePart } from './compute-status';
 import { isToolPart } from './part-types';
 import { getFilename, truncateText } from './tool-card-utils';
 
@@ -14,6 +16,12 @@ export type ChildSessionActivity = { tool: string; context?: string };
 export type ChildSessionCardState = {
   agentName: string;
   taskName: string;
+  /**
+   * Whether `taskName` carries task content worth translating. False when it
+   * falls back to the already-localized `agentChat.childSession.task` label, so
+   * the subagent card never sends app-language copy to the gateway.
+   */
+  translatable: boolean;
   latestActivity: ChildSessionActivity | string;
 };
 
@@ -62,16 +70,11 @@ function getToolContext(p: ToolPart): string | undefined {
   return undefined;
 }
 
-function findLatestAssistantPart(messages: StoredMessage[]): Part | undefined {
+function findLatestAssistantParts(messages: StoredMessage[]): readonly Part[] | undefined {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
-    if (msg?.info.role === 'assistant') {
-      for (let j = msg.parts.length - 1; j >= 0; j -= 1) {
-        const part = msg.parts[j];
-        if (part) {
-          return part;
-        }
-      }
+    if (msg?.info.role === 'assistant' && msg.parts.length > 0) {
+      return msg.parts;
     }
   }
   return undefined;
@@ -82,23 +85,40 @@ export function getChildSessionCardState(
   childMessages: StoredMessage[]
 ): ChildSessionCardState {
   const input = part.state.input;
-  const agentName = getStringProperty(input, 'subagent_type') ?? 'Subagent';
+  const agentName =
+    getStringProperty(input, 'subagent_type') ?? i18n.t('agentChat.childSession.subagent');
   const description = getStringProperty(input, 'description');
   const prompt = getStringProperty(input, 'prompt');
-  const taskName = description ?? (prompt ? truncateText(prompt, 60) : 'Task');
+  const taskName =
+    description ?? (prompt ? truncateText(prompt, 60) : i18n.t('agentChat.childSession.task'));
+  // Same rule as the task tool-card projection: only real input content is
+  // translatable; the localized fallback label is not.
+  const translatable = description !== undefined || Boolean(prompt);
 
-  const latestPart = findLatestAssistantPart(childMessages);
   const latestActivity: ChildSessionActivity | string = (() => {
-    if (!latestPart) {
-      return 'Waiting for activity';
+    if (part.state.status === 'completed' || part.state.status === 'error') {
+      return '';
     }
-    if (isToolPart(latestPart)) {
-      return { tool: latestPart.tool, context: getToolContext(latestPart) };
+    const assistantParts = findLatestAssistantParts(childMessages);
+    if (assistantParts) {
+      const latestPart = lastActivePart(assistantParts);
+      if (latestPart) {
+        if (isToolPart(latestPart)) {
+          return { tool: latestPart.tool, context: getToolContext(latestPart) };
+        }
+        return computeStatus(latestPart);
+      }
     }
-    return computeStatus(latestPart);
+    // A running subagent without a loaded child transcript is still working, so
+    // the card shows the same "Thinking" label the composer spinner uses while
+    // it streams reasoning. A pending task has no child session yet; it is
+    // queued and genuinely waiting to start.
+    return part.state.status === 'running'
+      ? i18n.t('agentChat.partDetail.thinking')
+      : i18n.t('agentChat.childSession.waitingForActivity');
   })();
 
-  return { agentName, taskName, latestActivity };
+  return { agentName, taskName, translatable, latestActivity };
 }
 
 export function getChildSessionActivityLabel(activity: ChildSessionActivity | string): string {

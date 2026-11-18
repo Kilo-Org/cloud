@@ -1,27 +1,113 @@
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
+
 const TAB_BAR_BASE_HEIGHT = 50;
 const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
 export const TAB_LABEL_WRAP_FONT_SCALE = 1.8;
 /**
- * Above this font scale the tab bar drops visible labels and switches to an
- * icon-forward presentation. The label height (which scales with fontScale) is
+ * At or above this font scale the tab bar drops visible labels and switches to
+ * an icon-forward presentation. The label height (which scales with fontScale) is
  * removed from the overlay height calculation, so the bar stays at the base
  * 50pt instead of ballooning. Labels remain available to assistive tech via
  * `tabBarAccessibilityLabel`. Picked above the label-wrap threshold so
  * moderate-to-large text still keeps a visible word label.
  */
 export const TAB_ICON_FORWARD_FONT_SCALE = 2;
+/**
+ * Floor for a tab label's shrink-to-fit, honoured on iOS only: RN implements
+ * `Text`'s `minimumFontScale` on iOS, while Android's `adjustsFontSizeToFit`
+ * floors at RN's own platform minimum. The cap is a residual guard, not the
+ * legibility rule — `shouldShowTabLabel` drops the labels as soon as one
+ * full-size label would not fit its tab, so a label that renders never needs to
+ * shrink that far on either platform, and the one-line/tail-truncate behaviour
+ * is the same on both.
+ */
+export const TAB_LABEL_MINIMUM_FONT_SCALE = 0.75;
 const TAB_ICON_BASE_SIZE = 22;
 const TAB_ICON_MAX_SIZE = 26;
 
+// Label metrics mirrored from `TabBarLabel`
+// (`apps/mobile/src/components/tab-bar-label.tsx`): `font-mono-medium text-[11px]
+// leading-[1rem] uppercase tracking-[0.2px]`. Keep these in step with that style.
+const TAB_LABEL_FONT_SIZE = 11;
+const TAB_LABEL_LETTER_SPACING = 0.2;
+/** JetBrains Mono (the `font-mono-medium` label) advances 0.6em per glyph. */
+const MONO_ADVANCE_EM = 0.6;
+/** CJK/Kana/Hangul/fullwidth glyphs render one em wide in the same stack. */
+const FULL_WIDTH_ADVANCE_EM = 1;
+/**
+ * RTL-script glyphs (Arabic and Hebrew) render in the system fallback font, not
+ * the mono family (`Text` drops `font-mono*` for RTL-script copy —
+ * `withoutMonoFamily`), and a proportional glyph of either script averages
+ * roughly half an em at this size. Counting those glyphs at the mono advance
+ * inflated the width estimate until the width rule dropped every label in
+ * Arabic at phone widths (الملف الشخصي measured wider than its tab while
+ * fitting comfortably on screen), so the bar rendered icon-only with no labels.
+ * The value bounds the true advance the same way the full-width class does: a
+ * stray over-estimate hides the labels slightly early rather than leaving a
+ * clipped label on screen.
+ */
+const RTL_SCRIPT_ADVANCE_EM = 0.55;
+/**
+ * The script blocks whose glyphs take the fallback advance: the Hebrew block
+ * and its presentation forms, then Arabic, Arabic Supplement, Arabic
+ * Extended-B, Arabic Extended-A, and the Arabic Presentation Forms-A and -B.
+ * Mirrors `RTL_SCRIPT` in `rtl-text.ts` — the class `hasRtlScript` uses to drop
+ * the mono family, so the measure and the renderer agree on which copy is
+ * proportional. Inlined because that module imports react-native, which this
+ * node-side module must not (`tab-bar-layout.test.ts` runs untransformed).
+ */
+const RTL_SCRIPT =
+  /[\u0590-\u05FF\uFB1D-\uFB4F\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+/**
+ * react-navigation's vertical tab item (`tabVerticalUiKit: { padding: 5 }` in
+ * `BottomTabItem`), so a tab's label box is `tabWidth - 10`.
+ */
+const TAB_ITEM_HORIZONTAL_PADDING = 10;
+
 type TabBarPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
 
-export function getTabBarOverlayHeight(
-  bottomInset: number,
-  platform: TabBarPlatform,
-  fontScale = 1
-): number {
-  const labelLines = fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
-  const tabContentHeight = 34 + 16 * fontScale * labelLines;
+/**
+ * Number of label lines the bar reserves and the label may use. Below the wrap
+ * threshold the bar is sized for one line, so the label must stay on one line
+ * and shrink to fit it: a word wider than its tab would otherwise wrap into a
+ * second line the bar has no room for, and be clipped at the bar's edge
+ * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). Above the threshold the
+ * bar reserves a second line for labels with an explicit line break.
+ */
+export function tabLabelLineCount(fontScale = 1, needsWrap = false): 1 | 2 {
+  return fontScale > TAB_LABEL_WRAP_FONT_SCALE || needsWrap ? 2 : 1;
+}
+
+/**
+ * Lines one tab's label needs at the current window width. Copy that carries
+ * its own break keeps two lines. A label that fits its tab keeps one. A label
+ * that does not fit takes a second line only when it can break between words:
+ * a single word wider than its tab stays on one line and shrinks, because a
+ * mid-word wrap leaves the bar unreadable (155c33b5).
+ */
+export function tabLabelLines(label: string, tabWidth: number, fontScale = 1): 1 | 2 {
+  if (tabLabelNumberOfLines(label) === 2) {
+    return 2;
+  }
+  if (fontScale > TAB_LABEL_WRAP_FONT_SCALE || tabLabelFits(label, tabWidth, fontScale)) {
+    return 1;
+  }
+  return label.includes(' ') ? 2 : 1;
+}
+
+export function getTabBarOverlayHeight({
+  bottomInset,
+  platform,
+  fontScale = 1,
+  lines = tabLabelLineCount(fontScale),
+}: {
+  bottomInset: number;
+  platform: TabBarPlatform;
+  fontScale?: number;
+  lines?: 1 | 2;
+}): number {
+  const tabContentHeight = 34 + 16 * fontScale * lines;
   return (
     Math.max(TAB_BAR_BASE_HEIGHT, tabContentHeight) +
     Math.max(bottomInset, 0) +
@@ -56,38 +142,165 @@ export function getTabBarIconSize(fontScale = 1): number {
  * Effective rendered tab bar height for the current platform/font scale. This
  * is the single source of truth for both the tab bar itself and the content
  * clearance below it: it switches to the compact icon-forward height once labels
- * are hidden, and otherwise uses the label-inclusive overlay height.
+ * are hidden, and otherwise uses the label-inclusive overlay height. Callers
+ * that already decided the label state and the reserved line count pass them as
+ * `showLabel` and `labelLines`; the defaults keep the font-scale-only answer.
+ * Tab screens use `useEffectiveTabBarHeight` (`tab-bar-clearance.ts`), which
+ * supplies the tab layout's decision so the clearance cannot drift from the
+ * rendered height.
  */
 export function getEffectiveTabBarHeight({
   bottomInset,
   platform,
   fontScale = 1,
+  showLabel = shouldShowTabLabel(fontScale),
+  labelLines = tabLabelLineCount(fontScale),
 }: {
   bottomInset: number;
   platform: TabBarPlatform;
   fontScale?: number;
+  showLabel?: boolean;
+  labelLines?: 1 | 2;
 }): number {
-  return shouldShowTabLabel(fontScale)
-    ? getTabBarOverlayHeight(bottomInset, platform, fontScale)
+  return showLabel
+    ? getTabBarOverlayHeight({ bottomInset, platform, fontScale, lines: labelLines })
     : getTabBarIconForwardHeight(bottomInset, platform);
 }
 
+/**
+ * Horizontal padding that keeps the tab bar icon row clear of the landscape
+ * side safe areas (notch/Dynamic Island, Android cutouts). The bar's BlurBar
+ * background stays full-bleed because it is absolutely positioned, so only the
+ * icon row is inset. Zero insets (portrait) collapse to a no-op.
+ */
+export function getTabBarHorizontalInset({
+  left = 0,
+  right = 0,
+}: {
+  left?: number;
+  right?: number;
+}) {
+  return {
+    paddingLeft: Math.max(left, 0),
+    paddingRight: Math.max(right, 0),
+  };
+}
+
+/**
+ * Whether the tab bar shows visible labels at all. Labels are dropped only at
+ * and above `TAB_ICON_FORWARD_FONT_SCALE`, where the bar would balloon with the
+ * scaled label; assistive tech still names every tab. Width never hides the
+ * labels: one label too wide for its tab takes a second line, or shrinks on its
+ * own, while the others keep their full-size label (`tabLabelLines`).
+ */
 export function shouldShowTabLabel(fontScale = 1): boolean {
   return fontScale < TAB_ICON_FORWARD_FONT_SCALE;
 }
 
-export function shouldHideTabBar(pathname: string): boolean {
-  const parts = pathname.split('/').filter(Boolean);
-  const isKiloClawInstancePicker = parts[0] === 'chat' && parts.length === 3;
-  const isSecurityFindingFilter =
-    parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
-  return isKiloClawInstancePicker || isSecurityFindingFilter;
+/**
+ * Characters the tab label's monospace stack draws one em wide: CJK
+ * ideographs, Kana, Hangul and fullwidth forms/punctuation. A conservative
+ * class — it only bounds the glyph advance, so a stray match over-estimates
+ * the width and hides the labels slightly earlier rather than leaving a
+ * mid-word break on screen. Ranges mirror the `is-fullwidth-code-point` class.
+ */
+const FULL_WIDTH_CHARACTER =
+  /[\u1100-\u115F\u2329\u232A\u2E80-\u3247\u3250-\u4DBF\u4E00-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6\u{1F200}-\u{1F251}\u{20000}-\u{3FFFD}]/u;
+
+function isFullWidthCharacter(character: string): boolean {
+  return FULL_WIDTH_CHARACTER.test(character);
 }
 
 /**
- * Accessibility label for a tab bar entry. The position and the total must match
- * the rendered tab count, which changes when the KiloClaw tab is hidden.
+ * Estimated rendered width (dp) of the widest line of a tab label. A label is
+ * one line (`tabLabelNumberOfLines`), except copy that carries its own break,
+ * whose wider line is the one that has to fit. Only an explicit
+ * break starts a new line: an ordinary space stays on the same one line and
+ * counts toward its width (the renderer tail-ellipsizes, it does not wrap on a
+ * space). The estimate is deliberately
+ * conservative: it only decides whether the labels are dropped, so
+ * over-estimating hides them slightly early and never leaves a clipped label
+ * on screen. Per-glyph advances: full-width glyphs one em, RTL-script glyphs
+ * (Arabic and Hebrew — the fallback font the label renders in, see
+ * `RTL_SCRIPT_ADVANCE_EM`) about half an em, every other glyph the mono
+ * advance.
  */
+function glyphAdvanceEm(character: string): number {
+  if (isFullWidthCharacter(character)) {
+    return FULL_WIDTH_ADVANCE_EM;
+  }
+  return RTL_SCRIPT.test(character) ? RTL_SCRIPT_ADVANCE_EM : MONO_ADVANCE_EM;
+}
+
+export function tabLabelWidth(label: string, fontScale = 1): number {
+  let widest = 0;
+  for (const line of label.split('\n')) {
+    let lineWidth = 0;
+    for (const character of line) {
+      const advanceEm = glyphAdvanceEm(character);
+      lineWidth += advanceEm * TAB_LABEL_FONT_SIZE * fontScale + TAB_LABEL_LETTER_SPACING;
+    }
+    widest = Math.max(widest, lineWidth);
+  }
+  return widest;
+}
+
+/**
+ * Whether `label` fits a tab item `tabWidth` dp wide without wrapping mid-word.
+ * The item's own horizontal padding is removed first, matching
+ * react-navigation's tab item (`padding: 5` on each side).
+ */
+export function tabLabelFits(label: string, tabWidth: number, fontScale = 1): boolean {
+  const available = Math.max(tabWidth - TAB_ITEM_HORIZONTAL_PADDING, 0);
+  return tabLabelWidth(label, fontScale) <= available;
+}
+
+/**
+ * Line count for a bottom-tab label: one line, tail-truncated, unless the copy
+ * carries its own break. A two-line
+ * wrap of a single word wider than its tab breaks it mid-word and leaves the
+ * bar unreadable (155c33b5), so no label is allowed to wrap on its own; the
+ * explicit break is the only way to reach two lines.
+ */
+export function tabLabelNumberOfLines(label: string): 1 | 2 {
+  return label.includes('\n') ? 2 : 1;
+}
+
+/**
+ * The route group of the Chat tab, and the one screen in it that is not the
+ * list. A conversation puts its composer where the tab bar sits, so the bar
+ * goes while one is open. The group is read from the segments rather than the
+ * path, because a conversation's path is the session id and nothing else.
+ */
+const CHAT_TAB_GROUP = '(4_chat)';
+const CHAT_CONVERSATION = '[id]';
+
+export function shouldHideTabBar(pathname: string, segments: readonly string[]): boolean {
+  const parts = pathname.split('/').filter(Boolean);
+  const isSecurityFindingFilter =
+    parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
+  const isChatConversation =
+    segments.includes(CHAT_TAB_GROUP) && segments.at(-1) === CHAT_CONVERSATION;
+  return isSecurityFindingFilter || isChatConversation;
+}
+
+export type TabBarTab = 'home' | 'agents' | 'chat' | 'profile';
+
+export const VISIBLE_TAB_COUNT = 4;
+
+const TAB_BAR_POSITIONS = { home: 1, agents: 2, chat: 3, profile: 4 } satisfies Record<
+  TabBarTab,
+  number
+>;
+
+export function tabBarPosition(tab: TabBarTab): number {
+  return TAB_BAR_POSITIONS[tab];
+}
+
 export function tabAccessibilityLabel(name: string, position: number, total: number): string {
-  return `${name}, tab, ${position} of ${total}`;
+  return i18n.t('tabs.position', {
+    name,
+    position: formatNumber(position, i18n.language),
+    total: formatNumber(total, i18n.language),
+  });
 }

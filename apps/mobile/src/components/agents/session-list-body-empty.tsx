@@ -1,100 +1,80 @@
-import { Activity, History, SearchX } from '@/components/ui/icons';
+import { History, SearchX } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { type ScrollViewProps, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
+import { sessionListNoMatchDescription } from '@/components/agents/session-list-empty-copy';
 import { QueryError } from '@/components/query-error';
 
 type BodyEmptyProps = {
-  kind: 'filtered-empty' | 'query-error-empty' | 'no-past-sessions' | 'all-active';
+  kind: 'filtered-empty' | 'query-error-empty' | 'no-past-sessions';
   isSearching: boolean;
-  secondaryAction?: 'clear-search' | 'clear-filters' | 'none';
-  emptyStateAction: ReactNode;
-  clearQueryAction: ReactNode;
+  /** A platform or project filter narrows the list, so it can cause the empty body. */
+  hasActiveFilters: boolean;
+  /** One control per active narrowing input; each clears only what its label names. */
+  clearActions?: ReactNode;
+  /** In-flight state of the retry the query-error body offers. */
+  isRetrying?: boolean;
+  /** The no-history body's next step (start a session). */
+  createSessionAction?: ReactNode;
   onRetry: () => void;
+  refreshControl?: ScrollViewProps['refreshControl'];
 };
 
-/**
- * Renders the body empty-state for the Agents session list, switched on the
- * `kind` returned by the body render model. Each branch is a compact
- * `View` matching the design language of the rest of the list (icon + title
- * + description). Every branch keeps its action, except `all-active`, which
- * intentionally has no CTA: the tray, the FAB, and the header action already
- * offer creation.
- */
 export function BodyEmpty({
   kind,
   isSearching,
-  secondaryAction,
-  emptyStateAction,
-  clearQueryAction,
+  hasActiveFilters,
+  clearActions,
+  isRetrying,
+  createSessionAction,
   onRetry,
+  refreshControl,
 }: Readonly<BodyEmptyProps>) {
+  const { t } = useTranslation();
   if (kind === 'filtered-empty') {
-    // Active search/filter narrowed the results to zero matches — never
-    // show the "create a task" CTA here, it's not the fix for a filter
-    // that's too narrow.
+    // The search field and the filter badge stay visible above this body, so
+    // naming every cause keeps the copy honest: a filter alone can hide the
+    // session, and the row below offers one action per cause.
     return (
-      <View className="items-center justify-center pt-16">
-        <EmptyState
-          icon={SearchX}
-          title="No sessions match"
-          description={
-            isSearching ? 'Try a different search term.' : 'Try adjusting or clearing your filters.'
-          }
-          action={clearQueryAction}
-        />
-      </View>
+      <EmptyState
+        icon={SearchX}
+        title={t('agents.sessionList.noMatches')}
+        description={sessionListNoMatchDescription(t, { isSearching, hasActiveFilters })}
+        action={clearActions}
+        refreshControl={refreshControl}
+      />
     );
   }
   if (kind === 'query-error-empty') {
-    // The query in error produced no rows to show — surface a retry for
-    // it (search or list, whichever `onRetry` targets). A Clear CTA is
-    // shown whenever the model reports an active query, choosing the
-    // label that matches the query type.
     return (
-      <View className="items-center gap-4 pt-16">
-        <QueryError
-          placement="top"
-          className="pt-0"
-          message={isSearching ? 'Could not search sessions' : 'Could not load sessions'}
-          onRetry={onRetry}
-        />
-        {secondaryAction === 'clear-search' || secondaryAction === 'clear-filters'
-          ? clearQueryAction
-          : null}
-      </View>
+      <CenteredState refreshControl={refreshControl}>
+        <View className="items-center gap-4">
+          <QueryError
+            placement="top"
+            className="pt-0"
+            message={
+              isSearching
+                ? t('agents.sessionList.couldNotSearch')
+                : t('common.couldNotLoadSessions')
+            }
+            onRetry={onRetry}
+            isRetrying={isRetrying}
+          />
+          {clearActions}
+        </View>
+      </CenteredState>
     );
   }
-  if (kind === 'all-active') {
-    // Every loaded stored session is excluded by the live active set, so the
-    // body is empty only because the active set consumed the history. In the
-    // full view the exclusion set also covers WS-written rows awaiting org
-    // attribution, so the tray can be momentarily empty here. No creation
-    // CTA: the tray, the FAB, and the header action already offer creation.
-    return (
-      <View className="items-center justify-center pt-12">
-        <EmptyState
-          icon={Activity}
-          title="All sessions are active"
-          description="Completed sessions will appear here."
-          placement="top"
-        />
-      </View>
-    );
-  }
-  // 'no-past-sessions' — body is empty but the tray is populated. The
-  // screen-level first-use empty ("No sessions yet") is handled by the
-  // caller when there is no tray either.
   return (
-    <View className="items-center justify-center pt-12">
-      <EmptyState
-        icon={History}
-        title="No past sessions"
-        description="Completed sessions will appear here."
-        action={emptyStateAction}
-        placement="top"
-      />
-    </View>
+    <EmptyState
+      icon={History}
+      title={t('agents.sessionList.noPastSessions')}
+      description={t('agents.sessionList.completedWillAppear')}
+      action={createSessionAction}
+      refreshControl={refreshControl}
+    />
   );
 }

@@ -1,8 +1,24 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import * as Crypto from 'expo-crypto';
-import { cacheDirectory, copyAsync, deleteAsync } from 'expo-file-system/legacy';
+import { File, Paths } from 'expo-file-system';
 import { type ShareIntent } from 'expo-share-intent';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import type * as DraftsModule from '@/lib/persist/drafts';
+import { registerTempFile } from '@/lib/temp-file-registry';
+
+// Durable persistence of the in-memory payload store (DEC-01 drafts). Loaded
+// lazily via dynamic import so unit tests that only touch the in-memory map or
+// the pure helpers do not load encrypted-kv (expo-sqlite/drizzle) at import
+// time (same reasoning as lib/deep-link-launch.ts).
+
+let draftsPromise: Promise<typeof DraftsModule> | null = null;
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function getDrafts(): Promise<typeof DraftsModule> {
+  draftsPromise ??= import('@/lib/persist/drafts');
+  return draftsPromise;
+}
 
 export type ShareId = string;
 
@@ -13,8 +29,8 @@ export type SharePayload = {
   failedFiles: string[];
 };
 
-/** Mirrors PROMPT_INPUT_MAX_CHARS in new-session-prompt.tsx (module-local; composer clamps again). */
-export const SHARE_TEXT_MAX_CHARS = 4000;
+/** The cloud agent prompt cap; the composer clamps again on delivery. */
+export const SHARE_TEXT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 
 export const SHARE_PAYLOAD_MAX_ENTRIES = 5;
 
@@ -22,20 +38,54 @@ type ShareIntentLike = Pick<ShareIntent, 'text' | 'webUrl' | 'meta' | 'files'>;
 
 type CopyToCache = (args: { from: string; fileName: string }) => Promise<string>;
 
-type DeleteCachedFile = (uri: string) => Promise<void>;
+type DeleteCachedFile = (uri: string) => void | Promise<void>;
 
 const payloads = new Map<ShareId, SharePayload>();
 const insertionOrder: ShareId[] = [];
 
-async function defaultDeleteCachedFile(uri: string): Promise<void> {
+// Signed-in user id that scopes durable persistence. When null, every
+// persist/clear helper no-ops (DEC-01 account scope): a share captured while
+// signed out stays in-memory only so a same-process login can still open the
+// gate. `_layout.tsx` sets this on identity transitions.
+let sharePersistUserId: string | null = null;
+
+/** Sets the signed-in user id that scopes share persistence (null = signed out). */
+export function setSharePersistUserId(userId: string | null): void {
+  sharePersistUserId = userId;
+}
+
+/** Current persist-scoped user id, shared with share-navigation. */
+export function getSharePersistUserId(): string | null {
+  return sharePersistUserId;
+}
+
+function defaultDeleteCachedFile(uri: string): void {
   try {
-    await deleteAsync(uri, { idempotent: true });
+    // The modern File API deletes synchronously; a missing file is a no-op.
+    const file = new File(uri);
+    if (file.exists) {
+      file.delete();
+    }
   } catch {
     // Best-effort hygiene; ignore delete failures.
   }
 }
 
 let deleteCachedFile: DeleteCachedFile = defaultDeleteCachedFile;
+
+type FileExists = (uri: string) => boolean;
+
+function defaultFileExists(uri: string): boolean {
+  try {
+    // `File.exists` is false for a directory path, so the `!isDirectory` guard
+    // the legacy `getInfoAsync` needed is implicit.
+    return new File(uri).exists;
+  } catch {
+    return false;
+  }
+}
+
+let checkFileExists: FileExists = defaultFileExists;
 
 /** Fire-and-forget delete of each file uri in a dropped payload. */
 function discardPayloadCacheFiles(payload: SharePayload): void {
@@ -49,6 +99,58 @@ export function discardUnstoredSharePayload(payload: SharePayload): void {
   discardPayloadCacheFiles(payload);
 }
 
+/** Snapshot of the in-memory store in the persisted draft shape. */
+function sharePayloadsDraftSnapshot() {
+  const order = [...insertionOrder];
+  const entries: Record<
+    ShareId,
+    { text: string; files: { name: string; uri: string }[]; failedFiles: string[] }
+  > = {};
+  for (const [id, payload] of payloads) {
+    entries[id] = {
+      text: payload.text,
+      files: payload.files.map(file => ({ name: file.name, uri: file.uri })),
+      failedFiles: [...payload.failedFiles],
+    };
+  }
+  return { order, entries };
+}
+
+/**
+ * Persists the current in-memory payload store (debounced + flushed) so it
+ * survives process death. No-ops while signed out (DEC-01 account scope).
+ */
+export async function persistSharePayloadsNow(): Promise<void> {
+  const userId = sharePersistUserId;
+  if (!userId) {
+    return;
+  }
+  const { saveDraft, flushDraft, SHARE_PAYLOADS_DRAFT_KEY } = await getDrafts();
+  saveDraft(userId, SHARE_PAYLOADS_DRAFT_KEY, sharePayloadsDraftSnapshot());
+  await flushDraft(userId, SHARE_PAYLOADS_DRAFT_KEY);
+}
+
+/**
+ * Clears the durable pending-share-id hint only when it still names `id`.
+ * The durable remove is value-scoped in the storage layer (compare inside the
+ * serialized chain), so clearing/taking share A never drops share B's durable
+ * pending id even when B is written concurrently and not yet flushed. No-op
+ * while signed out.
+ *
+ * Called by the share gate's commit so a process kill between commit and
+ * navigation delivery never re-arms the gate (the pending id is the only
+ * thing the cold-start restore reads to re-open it). The payload itself is
+ * intentionally left staged: the navigator still needs it to deliver.
+ */
+export async function clearPendingShareIdDraft(id: ShareId): Promise<void> {
+  const userId = sharePersistUserId;
+  if (!userId) {
+    return;
+  }
+  const { clearDraftIfStill, PENDING_SHARE_ID_DRAFT_KEY } = await getDrafts();
+  await clearDraftIfStill(userId, PENDING_SHARE_ID_DRAFT_KEY, JSON.stringify(id));
+}
+
 function evictOldestIfNeeded(): void {
   while (payloads.size > SHARE_PAYLOAD_MAX_ENTRIES && insertionOrder.length > 0) {
     const oldest = insertionOrder.shift();
@@ -60,6 +162,7 @@ function evictOldestIfNeeded(): void {
       }
     }
   }
+  void persistSharePayloadsNow();
 }
 
 /** Adds an entry and returns its id. Evicts oldest beyond SHARE_PAYLOAD_MAX_ENTRIES. */
@@ -68,12 +171,14 @@ export function putSharePayload(payload: SharePayload): ShareId {
   payloads.set(id, payload);
   insertionOrder.push(id);
   evictOldestIfNeeded();
+  void persistSharePayloadsNow();
   return id;
 }
 
 /**
  * Read-and-delete map entry only. Never deletes cache files here — the
- * composer's uploads still read those uris after take.
+ * composer's uploads still read those uris after take. Consuming the payload
+ * also clears the durable pending-share-id hint so the gate never re-opens.
  */
 export function takeSharePayload(id: ShareId): SharePayload | null {
   const payload = payloads.get(id) ?? null;
@@ -85,7 +190,26 @@ export function takeSharePayload(id: ShareId): SharePayload | null {
   if (index !== -1) {
     insertionOrder.splice(index, 1);
   }
+  void persistSharePayloadsNow();
+  void clearPendingShareIdDraft(id);
   return payload;
+}
+
+/**
+ * Put a payload back under the id it was taken with, after a delivery that
+ * threw. The route keeps its `shareId`, so the next mount of that route (the
+ * composer's own Retry) delivers the same files again instead of showing an
+ * empty composer. Re-insertion re-files the id at the newest position and
+ * evicts the oldest past the cap, so a restored payload lives exactly as long
+ * as a freshly staged one.
+ */
+export function restoreSharePayload(id: ShareId, payload: SharePayload): void {
+  if (payloads.has(id)) {
+    return;
+  }
+  payloads.set(id, payload);
+  insertionOrder.push(id);
+  evictOldestIfNeeded();
 }
 
 /** Read-only, for the gate's own preview. */
@@ -105,6 +229,67 @@ export function clearSharePayload(id: ShareId): void {
     insertionOrder.splice(index, 1);
   }
   discardPayloadCacheFiles(payload);
+  void persistSharePayloadsNow();
+  void clearPendingShareIdDraft(id);
+}
+
+/**
+ * Restores the payloads map from the durable draft for `userId`. Fills the
+ * store first (in recorded order), then reconciles each file against the
+ * filesystem: a missing cache copy moves its name into `failedFiles` and is
+ * dropped from `files`. Fills ONLY an empty store, so a live share staged in
+ * this process (cold-start share-to-app, or a signed-out share then
+ * same-process login) is never clobbered by a stale or empty draft.
+ */
+export async function restoreSharePayloads(userId: string): Promise<void> {
+  if (!userId) {
+    return;
+  }
+  const { loadDraft, SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft } = await getDrafts();
+  const draft = await loadDraft(userId, SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+
+  // Fill only an empty store. The check runs after the read settles so a put
+  // that lands during the read also wins, and it must not be replaced with an
+  // early "no draft" return: a take/clear persists a truthy empty draft
+  // (`{ order: [], entries: {} }`) that must not wipe live in-memory shares.
+  if (payloads.size > 0) {
+    return;
+  }
+  if (!draft) {
+    return;
+  }
+
+  // Fill first, keeping every recorded id in order.
+  payloads.clear();
+  insertionOrder.length = 0;
+  for (const id of draft.order) {
+    const entry = draft.entries[id];
+    if (entry) {
+      payloads.set(id, {
+        text: entry.text,
+        files: entry.files.map(file => ({ name: file.name, uri: file.uri })),
+        failedFiles: [...entry.failedFiles],
+      });
+      insertionOrder.push(id);
+    }
+  }
+
+  // Then reconcile each file against the filesystem.
+  for (const payload of payloads.values()) {
+    const kept: AgentAttachmentCandidate[] = [];
+    const failed = [...payload.failedFiles];
+    for (const file of payload.files) {
+      if (checkFileExists(file.uri)) {
+        kept.push(file);
+      } else {
+        failed.push(file.name);
+      }
+    }
+    payload.files.length = 0;
+    payload.files.push(...kept);
+    payload.failedFiles.length = 0;
+    payload.failedFiles.push(...failed);
+  }
 }
 
 /** Test-only: wipe the module store between cases. */
@@ -112,11 +297,18 @@ export function __resetSharePayloadStoreForTests(): void {
   payloads.clear();
   insertionOrder.length = 0;
   deleteCachedFile = defaultDeleteCachedFile;
+  checkFileExists = defaultFileExists;
+  sharePersistUserId = null;
 }
 
 /** Test-only: replace the cache-file delete implementation. */
 export function __setDeleteCachedFileForTests(fn: DeleteCachedFile | null): void {
   deleteCachedFile = fn ?? defaultDeleteCachedFile;
+}
+
+/** Test-only: replace the file-existence check used by restore. */
+export function __setCheckFileExistsForTests(fn: FileExists | null): void {
+  checkFileExists = fn ?? defaultFileExists;
 }
 
 export function composeShareText(shareIntent: ShareIntentLike): string {
@@ -135,14 +327,11 @@ export function composeShareText(shareIntent: ShareIntentLike): string {
 }
 
 async function defaultCopyToCache(args: { from: string; fileName: string }): Promise<string> {
-  const root = cacheDirectory;
-  if (!root) {
-    throw new Error('cacheDirectory is unavailable');
-  }
   const safeName = args.fileName.replaceAll(/[/\\]/g, '_') || 'shared-file';
-  const destination = `${root}share-${Crypto.randomUUID()}-${safeName}`;
-  await copyAsync({ from: args.from, to: destination });
-  return destination;
+  const destination = new File(Paths.cache, `share-${Crypto.randomUUID()}-${safeName}`);
+  await new File(args.from).copy(destination);
+  registerTempFile(destination.uri);
+  return destination.uri;
 }
 
 export async function normalizeShareIntent(
@@ -181,11 +370,9 @@ export async function normalizeShareIntent(
     }
   }
 
-  // Throw only when nothing usable remains: no text and zero successful copies
-  // while at least one file was attempted.
-  if (text === '' && files.length === 0 && incomingFiles.length > 0) {
-    throw new Error('Failed to copy shared files');
-  }
-
+  // A share whose copies all failed is a recoverable outcome, not an error:
+  // the payload carries the failed names, and the gate's all-rejected state
+  // reports them and offers no session to start. Text and any successful copy
+  // still count.
   return { text, files, failedFiles };
 }

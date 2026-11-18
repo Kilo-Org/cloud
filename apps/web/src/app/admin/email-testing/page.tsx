@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { TemplateName } from '@/lib/email';
+import type { TemplateName } from '@kilocode/web-shared/lib/email';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,14 +38,12 @@ export default function EmailTestingPage() {
 
   const { data: templates } = useQuery(trpc.admin.emailTesting.getTemplates.queryOptions());
 
-  // Pre-fill recipient with logged-in admin's email
   useEffect(() => {
     if (session?.user?.email && !recipient) {
       setRecipient(session.user.email);
     }
   }, [session?.user?.email, recipient]);
 
-  // Auto-select first template on load
   useEffect(() => {
     if (templates && templates.length > 0 && !selectedTemplate) {
       setSelectedTemplate(templates[0].name);

@@ -5,6 +5,15 @@ import {
   WebOutboundMessageSchema,
   WebInboundMessageSchema,
   SessionEventPayloadSchema,
+  MAX_HEARTBEAT_GIT_BRANCH_LENGTH,
+  MAX_HEARTBEAT_GIT_URL_LENGTH,
+  MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH,
+  MAX_HEARTBEAT_SESSION_ID_LENGTH,
+  MAX_HEARTBEAT_SESSIONS,
+  MAX_HEARTBEAT_SCHEDULED_AT_LENGTH,
+  MAX_HEARTBEAT_STATUS_LENGTH,
+  MAX_HEARTBEAT_TITLE_LENGTH,
+  heartbeatSessionCount,
 } from './user-connection-protocol';
 
 const validSessionId = 'ses_12345678901234567890123456';
@@ -23,6 +32,147 @@ describe('CLIOutboundMessageSchema', () => {
     const msg = { type: 'heartbeat', sessions: [] };
     const result = CLIOutboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(true);
+  });
+
+  it('parses a heartbeat session with a scheduled status and wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          id: 'ses_scheduled',
+          status: 'scheduled',
+          scheduledAt: '2026-09-24T09:00:00.000Z',
+          title: 'Wake later',
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).toMatchObject({
+        status: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+    }
+  });
+
+  it('parses a scheduled heartbeat session without a wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_scheduled', status: 'scheduled', title: 'Wake later' }],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).not.toHaveProperty('scheduledAt');
+    }
+  });
+
+  it('parses a heartbeat session whose producer sends an explicit null wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        { id: 'ses_busy', status: 'busy', title: 'Working', scheduledAt: null },
+        { id: 'ses_scheduled', status: 'scheduled', title: 'Wake later', scheduledAt: null },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions.map(session => session.scheduledAt)).toEqual([
+        undefined,
+        undefined,
+      ]);
+      expect(result.data.sessions.map(session => session.status)).toEqual(['busy', 'scheduled']);
+    }
+  });
+
+  it.each([
+    {},
+    { headRef: null, headSha: null },
+    { headRef: 'feature/fix', headSha: null },
+    { headRef: null, headSha: 'abc123' },
+    { headRef: 'feature/fix', headSha: 'abc123' },
+  ])('keeps all heartbeat sessions with nullable or omitted PR evidence: %j', evidence => {
+    const prLink = {
+      platform: 'github',
+      prUrl: 'https://github.com/kilo/repo/pull/7',
+      prNumber: 7,
+      ...evidence,
+    };
+    const result = CLIOutboundMessageSchema.parse({
+      type: 'heartbeat',
+      sessions: [
+        { id: validSessionId, status: 'busy', title: 'Linked session', prLink },
+        { id: 'ses_other', status: 'idle', title: 'Other session' },
+      ],
+    });
+    expect(result.type).toBe('heartbeat');
+    if (result.type === 'heartbeat') {
+      expect(result.sessions.map(session => session.id)).toEqual([validSessionId, 'ses_other']);
+      expect(JSON.parse(JSON.stringify(result.sessions[0].prLink))).toEqual({
+        platform: 'github',
+        prUrl: 'https://github.com/kilo/repo/pull/7',
+        prNumber: 7,
+        ...(evidence.headRef ? { headRef: evidence.headRef } : {}),
+        ...(evidence.headSha ? { headSha: evidence.headSha } : {}),
+      });
+    }
+  });
+
+  it.each([
+    { headRef: '' },
+    { headRef: 42 },
+    { headRef: 'x'.repeat(257) },
+    { headSha: '' },
+    { headSha: false },
+    { headSha: 'x'.repeat(65) },
+    { platform: '' },
+    { prNumber: -1 },
+    { prUrl: 'x'.repeat(2049) },
+  ])('rejects malformed PR input rather than treating it as absent: %j', invalid => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [
+          {
+            id: validSessionId,
+            status: 'busy',
+            title: 'Linked session',
+            prLink: {
+              platform: 'github',
+              prUrl: 'https://github.com/kilo/repo/pull/7',
+              prNumber: 7,
+              headRef: null,
+              headSha: null,
+              ...invalid,
+            },
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
+  it('does not let nullable PR evidence hide unrelated heartbeat errors', () => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [
+          {
+            id: validSessionId,
+            status: 'busy',
+            title: null,
+            prLink: {
+              platform: 'github',
+              prUrl: 'https://github.com/kilo/repo/pull/7',
+              prNumber: 7,
+              headRef: null,
+              headSha: null,
+            },
+          },
+        ],
+      }).success
+    ).toBe(false);
   });
 
   it('parses heartbeat with instance and per-session platform (kilo remote CLI)', () => {
@@ -61,6 +211,69 @@ describe('CLIOutboundMessageSchema', () => {
     if (result.success && result.data.type === 'heartbeat') {
       expect(result.data.instance).toEqual({ name: 'laptop-1', projectName: 'kilo' });
     }
+  });
+
+  it.each(['cli', 'remote'])('preserves full %s metadata and both capabilities', kind => {
+    const msg = {
+      type: 'heartbeat',
+      protocolVersion: '1',
+      capabilities: { attachments: true, sessionClone: true },
+      instance: {
+        name: 'laptop-1',
+        projectName: 'kilo',
+        version: '0.1.2',
+        kind,
+        startedAt: '2026-08-28T12:34:56.789Z',
+        gitBranch: 'feature/identity',
+      },
+      sessions: [{ id: 'ses_1', status: 'busy', title: 'Remote session', platform: 'darwin' }],
+    };
+    expect(CLIOutboundMessageSchema.parse(msg)).toEqual(msg);
+  });
+
+  it.each([
+    ['kind', 'terminal'],
+    ['kind', null],
+    ['startedAt', '2026-08-28T12:34:56Z'],
+    ['startedAt', '2026-08-28T12:34:56.78Z'],
+    ['startedAt', '2026-08-28T12:34:56.7890Z'],
+    ['startedAt', '2026-08-28T12:34:56.789+00:00'],
+    ['startedAt', '2026-02-30T12:34:56.789Z'],
+    ['startedAt', null],
+    ['gitBranch', null],
+  ])('rejects invalid instance %s: %s', (field, value) => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [],
+        instance: { name: 'host', projectName: 'project', [field]: value },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    ['ASCII', 'a'.repeat(24), 'a'.repeat(25)],
+    ['escaped characters', '\\"'.repeat(12), '\\"'.repeat(12) + '\\'],
+    ['CJK', '界'.repeat(24), '界'.repeat(25)],
+    // zod 4.6 measures string bounds in Unicode code points, so a surrogate
+    // pair counts once: 24 astral characters fit even though they are 48
+    // UTF-16 units.
+    ['surrogate pairs', '\u{10400}'.repeat(24), '\u{10400}'.repeat(25)],
+  ])('bounds %s branches by Unicode code points, not JSON bytes', (_label, valid, invalid) => {
+    const heartbeat = {
+      type: 'heartbeat',
+      sessions: [],
+      instance: { name: 'host', projectName: 'project', gitBranch: valid },
+    };
+    expect(CLIOutboundMessageSchema.parse(JSON.parse(JSON.stringify(heartbeat)))).toEqual(
+      heartbeat
+    );
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        ...heartbeat,
+        instance: { ...heartbeat.instance, gitBranch: invalid },
+      }).success
+    ).toBe(false);
   });
 
   it('rejects instance with empty name', () => {
@@ -258,6 +471,45 @@ describe('CLIOutboundMessageSchema capabilities', () => {
     const result = CLIOutboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(false);
   });
+
+  it('accepts capabilities.sessionClone: true on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { sessionClone: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ sessionClone: true });
+    }
+  });
+
+  it('accepts an absent sessionClone flag (legacy CLI)', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { attachments: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ attachments: true });
+    }
+  });
+
+  it('accepts capabilities.sessionCloneAtMessage beside sessionClone', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { sessionClone: true, sessionCloneAtMessage: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ sessionClone: true, sessionCloneAtMessage: true });
+    }
+  });
 });
 
 describe('CLIOutboundMessageSchema prLink', () => {
@@ -290,6 +542,35 @@ describe('CLIOutboundMessageSchema prLink', () => {
     expect(result.success).toBe(true);
     if (result.success && result.data.type === 'heartbeat') {
       expect(result.data.sessions[0]).not.toHaveProperty('prLink');
+    }
+  });
+
+  it('parses a prLink with headRef and headSha evidence', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          ...baseSession,
+          prLink: {
+            platform: 'github',
+            prUrl: 'https://github.com/o/r/pull/42',
+            prNumber: 42,
+            headRef: 'fix/typo',
+            headSha: 'abc123',
+          },
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0].prLink).toEqual({
+        platform: 'github',
+        prUrl: 'https://github.com/o/r/pull/42',
+        prNumber: 42,
+        headRef: 'fix/typo',
+        headSha: 'abc123',
+      });
     }
   });
 
@@ -569,6 +850,105 @@ describe('SessionEventPayloadSchema', () => {
     }
   });
 
+  it.each(['session.created', 'session.updated'] as const)(
+    'preserves a worktree ID in %s events',
+    type => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const result = SessionEventPayloadSchema.parse({
+        type,
+        data: {
+          source: 'v2',
+          session: { ...session, worktreeId },
+          changedAt: session.updatedAt,
+        },
+      });
+
+      expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
+    }
+  );
+
+  it('preserves a worktree ID in full-row status events', () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, worktreeId },
+        previousStatus: null,
+        status: 'idle',
+        statusUpdatedAt: null,
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
+  });
+
+  it('preserves a wake time in session rows', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.created',
+      data: {
+        source: 'v2',
+        session: { ...session, status: 'scheduled', scheduledAt },
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect(result.data).toHaveProperty('session.scheduledAt', scheduledAt);
+  });
+
+  it('parses status-updated payloads carrying scheduled and scheduledAt', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const fullRow = SessionEventPayloadSchema.safeParse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, status: 'scheduled', scheduledAt },
+        previousStatus: 'idle',
+        status: 'scheduled',
+        scheduledAt,
+        statusUpdatedAt: '2026-09-23T00:00:02.000Z',
+        changedAt: '2026-09-23T00:00:02.000Z',
+      },
+    });
+    expect(fullRow.success).toBe(true);
+    if (fullRow.success) {
+      expect(fullRow.data.data).toHaveProperty('session.scheduledAt', scheduledAt);
+      expect(fullRow.data.data).toHaveProperty('scheduledAt', scheduledAt);
+    }
+
+    const lightweight = SessionEventPayloadSchema.safeParse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        sessionId: validSessionId,
+        previousStatus: 'idle',
+        status: 'scheduled',
+        scheduledAt,
+        statusUpdatedAt: '2026-09-23T00:00:02.000Z',
+        changedAt: '2026-09-23T00:00:02.000Z',
+      },
+    });
+    expect(lightweight.success).toBe(true);
+    if (lightweight.success) {
+      expect(lightweight.data.data).toHaveProperty('scheduledAt', scheduledAt);
+    }
+  });
+
+  it.each([null, undefined])('accepts legacy sessions with worktree ID %s', worktreeId => {
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.created',
+      data: {
+        source: 'v2',
+        session: { ...session, ...(worktreeId === undefined ? {} : { worktreeId }) },
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect('session' in result.data ? result.data.session.worktreeId : undefined).toBe(worktreeId);
+  });
+
   it('parses lightweight status update payloads during rollout compatibility', () => {
     const result = SessionEventPayloadSchema.safeParse({
       type: 'session.status.updated',
@@ -586,7 +966,7 @@ describe('SessionEventPayloadSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects invalid v2 session statuses', () => {
+  it('accepts unknown v2 session statuses instead of dropping the event', () => {
     const events = [
       {
         type: 'session.updated',
@@ -621,7 +1001,7 @@ describe('SessionEventPayloadSchema', () => {
     ];
 
     for (const event of events) {
-      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(false);
+      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(true);
     }
   });
 
@@ -648,5 +1028,112 @@ describe('extra fields', () => {
     };
     const result = WebOutboundMessageSchema.parse(msg);
     expect(result).not.toHaveProperty('extra');
+  });
+});
+
+describe('CLIOutboundMessageSchema heartbeat session bounds', () => {
+  function row(overrides: Record<string, unknown> = {}) {
+    return { id: validSessionId, status: 'permission', title: 'Session title', ...overrides };
+  }
+
+  function heartbeat(sessions: unknown[]) {
+    return { type: 'heartbeat', sessions };
+  }
+
+  /** Parsed heartbeat rows; fails the test when the frame is refused. */
+  function parsedRows(sessions: unknown[]) {
+    const parsed = CLIOutboundMessageSchema.parse(heartbeat(sessions));
+    if (parsed.type !== 'heartbeat') throw new Error('expected a heartbeat frame');
+    return parsed.sessions;
+  }
+
+  function rows(count: number) {
+    return Array.from({ length: count }, (_, index) =>
+      row({ id: `ses_${String(index).padStart(26, '0')}` })
+    );
+  }
+
+  it('parses a heartbeat at the session count limit', () => {
+    expect(
+      CLIOutboundMessageSchema.safeParse(heartbeat(rows(MAX_HEARTBEAT_SESSIONS))).success
+    ).toBe(true);
+  });
+
+  it('refuses a heartbeat one session over the session limit', () => {
+    const result = CLIOutboundMessageSchema.safeParse(heartbeat(rows(MAX_HEARTBEAT_SESSIONS + 1)));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({ path: ['sessions'], code: 'too_big' })
+      );
+    }
+  });
+
+  it('parses a session whose values sit at their limits', () => {
+    const session = row({
+      id: `ses_${'a'.repeat(MAX_HEARTBEAT_SESSION_ID_LENGTH - 4)}`,
+      status: 's'.repeat(MAX_HEARTBEAT_STATUS_LENGTH),
+      title: 't'.repeat(MAX_HEARTBEAT_TITLE_LENGTH),
+      gitUrl: `https://example.invalid/${'r'.repeat(MAX_HEARTBEAT_GIT_URL_LENGTH - 25)}`,
+      gitBranch: 'b'.repeat(MAX_HEARTBEAT_GIT_BRANCH_LENGTH),
+      parentSessionId: 'p'.repeat(MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH),
+    });
+    expect(CLIOutboundMessageSchema.safeParse(heartbeat([session])).success).toBe(true);
+  });
+
+  it.each([
+    ['id', MAX_HEARTBEAT_SESSION_ID_LENGTH],
+    ['status', MAX_HEARTBEAT_STATUS_LENGTH],
+    ['parentSessionId', MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH],
+  ])('refuses a session whose %s is one character over its limit', (field, limit) => {
+    const result = CLIOutboundMessageSchema.safeParse(
+      heartbeat([row({ [field]: 'x'.repeat(limit + 1) })])
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({ path: ['sessions', 0, field] })
+      );
+    }
+  });
+
+  it.each([
+    ['title', MAX_HEARTBEAT_TITLE_LENGTH],
+    ['gitUrl', MAX_HEARTBEAT_GIT_URL_LENGTH],
+    ['gitBranch', MAX_HEARTBEAT_GIT_BRANCH_LENGTH],
+  ])('shortens %s to its limit', (field, limit) => {
+    const [session] = parsedRows([row({ [field]: 'x'.repeat(limit + 1) })]);
+    expect(session?.[field as 'title']).toHaveLength(limit);
+  });
+
+  it('shortens an over-limit title without leaving a lone surrogate', () => {
+    // The limit falls between the two halves of the last code point.
+    const title = `${'a'.repeat(MAX_HEARTBEAT_TITLE_LENGTH - 1)}😀`;
+    const [session] = parsedRows([row({ title })]);
+    expect(session?.title).toBe('a'.repeat(MAX_HEARTBEAT_TITLE_LENGTH - 1));
+  });
+
+  it('treats an over-limit wake time as absent', () => {
+    const [session] = parsedRows([
+      row({
+        status: 'scheduled',
+        scheduledAt: 'z'.repeat(MAX_HEARTBEAT_SCHEDULED_AT_LENGTH + 1),
+      }),
+    ]);
+    // The over-limit value is not carried into the parsed row.
+    expect(session?.scheduledAt).toBeUndefined();
+    expect(JSON.stringify(session)).not.toContain('zzzz');
+  });
+
+  it('reports the advertised count of a heartbeat over the session limit', () => {
+    expect(heartbeatSessionCount(heartbeat(rows(MAX_HEARTBEAT_SESSIONS + 1)))).toBe(
+      MAX_HEARTBEAT_SESSIONS + 1
+    );
+  });
+
+  it('reports no count for a frame that is not a heartbeat with a session list', () => {
+    expect(heartbeatSessionCount({ type: 'event', sessionId: validSessionId })).toBeUndefined();
+    expect(heartbeatSessionCount({ type: 'heartbeat', sessions: 'nope' })).toBeUndefined();
+    expect(heartbeatSessionCount(null)).toBeUndefined();
   });
 });

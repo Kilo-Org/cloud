@@ -1,119 +1,129 @@
+/* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useScrollToTop } from 'expo-router';
-import { Bot, Plus } from '@/components/ui/icons';
-import {
-  type ReactElement,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  RefreshControl,
-  SectionList,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NewSessionButton } from '@/components/agents/new-session-button';
+import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
-import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
+import {
+  selectSessionListBodyModel,
+  type SessionListClearAction,
+} from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
-import { type SessionSection } from '@/components/agents/session-list-helpers';
+import {
+  type SessionSection,
+  sessionSectionAccessibilityLabel,
+} from '@/components/agents/session-list-helpers';
+import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
+import {
+  flattenSessionSections,
+  type SessionListRow,
+  skeletonSessionRows,
+} from '@/components/agents/session-list-rows';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
+import {
+  SessionRowSkeleton,
+  SessionSectionHeaderSkeleton,
+} from '@/components/agents/session-list-skeleton-rows';
 import { StoredSessionRow } from '@/components/agents/session-row';
-import { EmptyState } from '@/components/empty-state';
+import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
-import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
-import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { requestA11yFocus } from '@/lib/a11y/announce';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 export const FAB_SIZE = 56;
 export const FAB_MARGIN = 16;
+const REFRESH_STATUS_BAND_HEIGHT = 20;
 
 type AgentSessionListContentProps = {
   /** Post-deletion focus anchor: the screen's always-mounted search input. */
-  searchInputRef: Parameters<typeof moveA11yFocus>[0];
+  searchInputRef: Parameters<typeof requestA11yFocus>[0];
   sections: SessionSection[];
+  activeSessionIds: ReadonlySet<string>;
   hasAnySessions: boolean;
-  /** True when the pinned "Active now" tray is non-empty. Used by the
-   * render model to keep the inline "Couldn't refresh" line visible and
-   * to suppress the full-screen QueryError when the tray is the only
-   * thing on screen. */
-  hasPinnedActive: boolean;
   isLoading: boolean;
   /** Body-driving error flag — a search failure (when searching) OR a
-   * stored/history failure. Active-only failures are surfaced separately
-   * via the body's `showInlineError` output, NEVER as the empty-state
-   * message. */
+   * stored/history failure. */
   isError: boolean;
-  /** Active-poll failure — drives ONLY the inline staleness line and the
-   * cold `active-error-empty` surface. */
-  activeIsError: boolean;
-  /** True when at least one stored row is loaded, including rows excluded
-   * from the sections by the active set. Drives the body model's
-   * `all-active` decision. */
-  hasStoredSessions: boolean;
-  /** True when the stored pagination reports more pages. Keeps the body
-   * rendered while the bounded backfill is in flight or at its bound. */
-  hasMoreHistory: boolean;
+  /**
+   * True when the stored query delivered rows since this screen mounted. A
+   * failed stored load with only rows cached from an earlier mount shows the
+   * retryable full-screen error; rows delivered this mount keep rendering.
+   */
+  hasFreshHistory: boolean;
   isFetchingNextPage: boolean;
+  /**
+   * The last next-page request failed. The loaded rows stay, and the list
+   * footer carries the retryable line with its Retry action, so the end of the
+   * list never reads as the end of the history.
+   */
+  isFetchNextPageError: boolean;
+  onRetryNextPage: () => void;
   refetch: () => Promise<void>;
   onRetry: () => void;
   onEndReached: () => void;
-  onSessionPress: (sessionId: string, organizationId?: string | null) => void;
+  onSessionPress: (sessionId: string, organizationId?: string | null, title?: string) => void;
+  /**
+   * Count of refreshes the screen settled outside the pull lifecycle (focus
+   * return, app foreground). When it advances, a standing pull failure is
+   * stale — the list was just refreshed — so the gesture failure line retires
+   * while the query error state keeps owning persistent failures.
+   */
+  nonPullRefreshes: number;
   hasActiveQuery: boolean;
+  /** A platform or project filter narrows the list, so it can cause an empty body. */
+  hasActiveFilters: boolean;
   isSearching: boolean;
+  /** True while the driving query fetches — the error body's retry in flight. */
+  isRetrying: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
-  onClearQuery: () => void;
+  /** Retires exactly the narrowing input the pressed clear control names. */
+  onClearAction: (action: SessionListClearAction) => void;
+  /** The no-history body's next step: open the new-session composer. */
   onCreateSession: () => void;
-  sortBy: AgentSessionSortBy;
-  /**
-   * Pinned "Active now" tray rendered as `ListHeaderComponent` so it scrolls
-   * with history in one continuous gesture. The tray and its rows are fully
-   * atomic — no entering, exiting, or layout animations — so a session moving
-   * between history and the tray swaps in one commit. Pass `null` when empty.
-   */
-  activeNowSection: ReactElement | null;
 };
 
 export function AgentSessionListContent({
   searchInputRef,
   sections,
+  activeSessionIds,
   hasAnySessions,
-  hasPinnedActive,
   isLoading,
   isError,
-  activeIsError,
-  hasStoredSessions,
-  hasMoreHistory,
+  hasFreshHistory,
   isFetchingNextPage,
+  isFetchNextPageError,
+  onRetryNextPage,
   refetch,
   onRetry,
   onEndReached,
   onSessionPress,
+  nonPullRefreshes,
   hasActiveQuery,
+  hasActiveFilters,
   isSearching,
+  isRetrying,
   searchQuery,
-  onClearQuery,
+  onClearAction,
   onCreateSession,
-  sortBy,
-  activeNowSection,
 }: Readonly<AgentSessionListContentProps>) {
-  const listRef = useRef<SectionList<StoredSession, SessionSection>>(null);
+  const listRef = useRef<FlashListRef<SessionListRow>>(null);
   useScrollToTop(listRef);
 
   // Scroll to top on committed-query change only. Skip the initial mount
@@ -127,93 +137,122 @@ export function AgentSessionListContent({
     if (!shouldResetScrollOnCommittedQuery(prev, searchQuery)) {
       return;
     }
-    listRef.current?.getScrollResponder()?.scrollTo({ y: 0, animated: false });
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [searchQuery]);
 
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const { t } = useTranslation();
+  const { left, right } = useSafeAreaInsets();
+  // The tabs layout's width-aware label decision rides along, so the list
+  // clearance tracks the bar height the layout actually renders.
+  const tabBarHeight = useEffectiveTabBarHeight();
   const { deleteSession, renameSession } = useSessionMutations();
-  const [refreshing, setRefreshing] = useState(false);
+  // The stored refetch resolves void: a pull failure surfaces through the
+  // query error state (showInlineError below), so a settlement is always
+  // "accepted" here. Only the feedback budget can fail a history pull.
+  const pullStartedFromHistoryError = useRef(false);
+  const pull = usePullRefresh(async () => {
+    await refetch();
+    return true;
+  });
+  const { markSettled } = pull;
+  const pullBusy = pull.refreshing || pull.busy;
+  // Preserve the full-screen error during a pull only when the pull began there;
+  // an empty-history pull must keep its empty state while the refresh is pending.
+  const errorPullBusy = pullStartedFromHistoryError.current && pullBusy;
+  const errorPullFailed = pullStartedFromHistoryError.current && pull.failed;
+  const handleRefresh = () => {
+    pullStartedFromHistoryError.current =
+      (isError || errorPullFailed) && !hasActiveQuery && !hasFreshHistory;
+    pull.startPull();
+  };
+  const handlePullRetry = () => {
+    pull.startRetry();
+  };
+  // The screen refreshes outside the pull lifecycle (focus return, app
+  // foreground). When one settles, a standing pull failure is stale — the
+  // list was just refreshed — so retire the gesture failure line. The
+  // query-driven error (showInlineError below) still owns persistent
+  // failures and auto-clears on recovery, as it did before the pull state.
+  useEffect(() => {
+    markSettled();
+  }, [nonPullRefreshes, markSettled]);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
-  // must clear it or the last rows are stuck underneath it. The FAB adds its
-  // own inset so the last row scrolls clear of the button too.
-  const tabBarClearanceStyle = useMemo(
-    () => ({
-      paddingBottom:
-        getEffectiveTabBarHeight({
-          bottomInset: bottom,
-          platform: Platform.OS,
-          fontScale,
-        }) +
-        FAB_SIZE +
-        FAB_MARGIN,
-    }),
-    [bottom, fontScale]
+  // must clear it or the last rows are stuck underneath it. The top padding
+  // holds the refresh status band at rest; scrolled rows pass under it.
+  const contentInsetStyle = useMemo(
+    () => ({ paddingTop: REFRESH_STATUS_BAND_HEIGHT, paddingBottom: tabBarHeight }),
+    [tabBarHeight]
   );
 
-  // Tab-bar-only clearance for the full-screen error and first-use empty
-  // containers — the FAB is hidden in those states so they must not include
-  // the FAB inset.
-  const tabBarOnlyClearanceStyle = useMemo(
-    () => ({
-      paddingBottom: getEffectiveTabBarHeight({
-        bottomInset: bottom,
-        platform: Platform.OS,
-        fontScale,
-      }),
-    }),
-    [bottom, fontScale]
+  // The landscape side insets keep row text clear of the sensor housing
+  // (portrait insets are 0, keeping the geometry unchanged). They live on a
+  // wrapper around the list rather than on `contentContainerStyle`.
+  const landscapeSideInsetStyle = useMemo(
+    () => ({ paddingLeft: left, paddingRight: right }),
+    [left, right]
   );
 
   // Pure body decision — see `session-list-body-model.ts`.
   const bodyModel = selectSessionListBodyModel({
     hasHistoryContent: sections.length > 0,
-    hasStoredSessions,
-    hasMoreHistory,
-    hasPinnedActive,
-    hasActiveQuery,
     isSearching,
+    hasActiveFilters,
     isError,
-    activeIsError,
   });
 
   const surface = selectSessionListContentSurface({
     isLoading,
-    isError,
-    activeIsError,
+    isError: isError || errorPullFailed,
+    isRetrying: isRetrying || errorPullBusy,
     hasAnySessions,
-    hasPinnedActive,
     hasHistoryContent: sections.length > 0,
+    hasActiveQuery,
+    hasFreshHistory,
   });
 
-  const emptyStateAction = useMemo(
-    () => (
-      <Button variant="outline" onPress={onCreateSession}>
-        <Plus size={16} color={colors.foreground} />
-        <Text>New coding task</Text>
-      </Button>
-    ),
-    [colors.foreground, onCreateSession]
-  );
+  // One control per active narrowing input, each naming exactly what it clears.
+  // A search and a filter can both hide the session, so the body would otherwise
+  // leave the hidden cause in place behind a label naming the other one.
+  const clearActions = useMemo(() => {
+    const actions =
+      bodyModel.kind === 'filtered-empty' || bodyModel.kind === 'query-error-empty'
+        ? bodyModel.clearActions
+        : [];
+    if (actions.length === 0) {
+      return null;
+    }
+    return (
+      <View className="flex-row flex-wrap items-center justify-center gap-2">
+        {actions.map(action => (
+          <Button
+            key={action}
+            variant="outline"
+            testID={action === 'clear-search' ? 'session-clear-search' : 'session-clear-filters'}
+            onPress={() => {
+              onClearAction(action);
+            }}
+            className={STATE_ACTION_CLASS}
+          >
+            <Text>
+              {action === 'clear-search' ? t('common.clearSearch') : t('common.clearFilters')}
+            </Text>
+          </Button>
+        ))}
+      </View>
+    );
+  }, [bodyModel, onClearAction, t]);
 
-  const clearQueryAction = useMemo(
-    () => (
-      <Button variant="outline" onPress={onClearQuery}>
-        <Text>{isSearching ? 'Clear search' : 'Clear filters'}</Text>
-      </Button>
-    ),
-    [isSearching, onClearQuery]
-  );
+  // The no-history body's next step. It opens the same composer the Agents
+  // tab's "New session" action does, so an empty history never dead-ends at a
+  // message.
+  const createSessionAction = <NewSessionButton onPress={onCreateSession} />;
 
-  // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
-  // is pushed the Agents list is frozen. On return, each row re-reads the ack
-  // store via its own `useSyncExternalStore` subscription
-  // (`useSessionAttentionRevision`). Snapshot the attention revision only when
-  // the tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and
-  // pass it as `extraData` so visible cells re-render without remounting the
-  // list — preserving scroll. Remount only on sort change (`key={sortBy}`).
+  // Each row re-reads the ack store through its own `useSyncExternalStore`
+  // subscription (`useSessionAttentionRevision`). The snapshot taken when the
+  // tab regains focus passes back down as `extraData`, so visible cells
+  // re-render on return without remounting the list — preserving scroll.
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {
@@ -221,166 +260,286 @@ export function AgentSessionListContent({
     }, [])
   );
 
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setRefreshing(true);
-      try {
-        await refetch();
-      } finally {
-        setRefreshing(false);
-      }
-    })();
-  }, [refetch]);
+  // Screen-reader status for the in-flight pull on the non-list surfaces:
+  // those already carry their own Retry (QueryError / BodyEmpty), so the pull
+  // only announces Updating here (same contract as the live Agents tab). The
+  // rows surface renders the visible reserved status line instead.
+  const updatingStatus = pullBusy ? (
+    <AccessibleStatus
+      message={t('agents.sessionList.updating')}
+      tone="status"
+      className="absolute size-px overflow-hidden"
+    />
+  ) : null;
+  // The rows list starts at the FlashList's top edge, where Android's floating
+  // indicator would rest on the first row's text (device defect uxs1):
+  // `RowsRefreshControl` carries the platform rule that keeps it off the rows.
+  const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+  const rowsControl = <RowsRefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+
+  // Flatten the date sections into a single row array for the recycling list.
+  // While the first page loads with nothing to show, reserved skeleton rows
+  // render in the data itself — not `ListEmptyComponent`: FlashList
+  // mis-lays-out the empty → populated transition (one stray row over a blank
+  // gap until a later commit), while a populated →
+  // populated swap reuses the reserved space in place. The `sections.length`
+  // guard keeps the old `ListEmptyComponent` semantics: rows already on
+  // screen (e.g. stale search results while a new query is pending) are never
+  // overwritten by skeletons. Memoized so pagination, refresh, and focus
+  // re-renders keep the same array identity while `sections` is unchanged.
+  const showLoadingSkeletons =
+    surface.kind === 'session-list' && surface.listEmpty === 'loading-skeletons';
+  const rows = useMemo(
+    () =>
+      showLoadingSkeletons && sections.length === 0
+        ? skeletonSessionRows()
+        : flattenSessionSections(sections),
+    [showLoadingSkeletons, sections]
+  );
+
+  // Pagination is user-driven. A programmatic page-one reset (the foreground,
+  // focus and pull reconciles) empties the retained pages, so the list shrinks
+  // under the viewport once the new page one lands, and FlashList reports that
+  // shrink as an end-reach. Honoring it re-fetched one page per retained page
+  // around a foreground transition instead of the single page the reconcile
+  // re-issued (device defect e2). A shrink therefore parks pagination until the
+  // next user drag; a query change that resets the list parks it too, and the
+  // drag the user makes to browse resumes it.
+  const paginationParkedRef = useRef(false);
+  const previousRowCountRef = useRef(rows.length);
+  useEffect(() => {
+    if (rows.length < previousRowCountRef.current) {
+      paginationParkedRef.current = true;
+    }
+    previousRowCountRef.current = rows.length;
+  }, [rows.length]);
+  // FlashList reports the end once per data change, so the end-reach the shrink
+  // produces is not followed by another one on its own. Hold it while parked and
+  // replay it when the user's movement lifts the park: a list whose rows fit the
+  // viewport never reaches the end again, so without the replay it would stay
+  // parked for good and never load older sessions.
+  const parkedEndReachRef = useRef(false);
+  const handleEndReached = useCallback(() => {
+    if (paginationParkedRef.current) {
+      parkedEndReachRef.current = true;
+      return;
+    }
+    onEndReached();
+  }, [onEndReached]);
+  // The park must be released by the user's own movement, and `onScrollBeginDrag`
+  // only fires when the list can scroll: a shrink that leaves fewer rows than
+  // fill the viewport (a filter or search change, or a reconcile collapsing the
+  // list to page one) has nothing to scroll, so a drag never opened the park and
+  // `hasNextPage` stayed true behind it. `onTouchMove` is the finger's own
+  // movement, which a viewport-fitting list still reports; the PR-review diff
+  // file list wires the same two events for the same reason.
+  const releasePaginationPark = useCallback(() => {
+    if (!paginationParkedRef.current) {
+      return;
+    }
+    paginationParkedRef.current = false;
+    if (parkedEndReachRef.current) {
+      parkedEndReachRef.current = false;
+      onEndReached();
+    }
+  }, [onEndReached]);
+
+  // A failed next page keeps every loaded row and says so at the end of the
+  // list: the spinner alone ended the list silently, so the last loaded row
+  // read as the end of the history. The retry calls `fetchNextPage`, and the
+  // end-reach gate stops re-firing while this line stands (see
+  // `shouldLoadMoreSessions`).
+  let listFooter: ReactNode = null;
+  if (isFetchNextPageError) {
+    listFooter = (
+      <View className="items-center gap-3 px-6 py-4">
+        <Text variant="muted" className="text-center text-xs">
+          {t('common.couldnTLoadMore')}
+        </Text>
+        <Button
+          variant="outline"
+          size="sm"
+          className={STATE_ACTION_CLASS}
+          onPress={onRetryNextPage}
+          loading={isFetchingNextPage}
+          accessibilityLabel={t('common.retry')}
+        >
+          <Text>{t('common.retry')}</Text>
+        </Button>
+      </View>
+    );
+  } else if (isFetchingNextPage) {
+    listFooter = (
+      <View className="py-4">
+        <ActivityIndicator color={colors.mutedForeground} />
+      </View>
+    );
+  }
 
   const renderItem = useCallback(
-    ({ item }: { item: StoredSession }) => (
-      <StoredSessionRow
-        session={item}
-        sortBy={sortBy}
-        onPress={() => {
-          onSessionPress(item.session_id, item.organization_id);
-        }}
-        onDelete={() => {
-          // The hook's success toast announces the deletion; onDeleted only
-          // restores focus, and moveA11yFocus no-ops once the header is
-          // unmounted (last session deleted).
-          deleteSession(item.session_id, () => {
-            moveA11yFocus(searchInputRef);
-          });
-        }}
-        onRename={newTitle => {
-          renameSession(item.session_id, newTitle);
-        }}
-      />
-    ),
-    [onSessionPress, deleteSession, renameSession, sortBy, searchInputRef]
+    ({ item }: ListRenderItemInfo<SessionListRow>) => {
+      // The reserved cold-open slots are separate list items in the stored
+      // list's own shape — a date-header placeholder, then one cell per session
+      // placeholder — so each is measured at its real height and the rows swap
+      // into the reserved space without a jump.
+      if (item.kind === 'section-header-skeleton') {
+        return <SessionSectionHeaderSkeleton />;
+      }
+      if (item.kind === 'skeleton') {
+        return <SessionRowSkeleton index={item.index} subtitle={false} />;
+      }
+      if (item.kind === 'section-header') {
+        return (
+          <SessionListSectionHeader
+            title={item.title}
+            count={item.count}
+            accessibilityLabel={sessionSectionAccessibilityLabel(item.title, item.count)}
+          />
+        );
+      }
+      return (
+        <StoredSessionRow
+          session={item.session}
+          sortBy={SESSION_LIST_SORT}
+          sectionTitle={item.sectionTitle}
+          timeZone={item.timeZone}
+          live={activeSessionIds.has(item.session.session_id)}
+          metaWhileLive
+          onPress={() => {
+            onSessionPress(
+              item.session.session_id,
+              item.session.organization_id,
+              item.session.title ?? undefined
+            );
+          }}
+          onDelete={() => {
+            deleteSession(item.session.session_id, () => {
+              requestA11yFocus(searchInputRef);
+            });
+          }}
+          onRename={newTitle => {
+            renameSession(item.session.session_id, newTitle);
+          }}
+        />
+      );
+    },
+    [activeSessionIds, onSessionPress, deleteSession, renameSession, searchInputRef]
   );
 
-  const renderSectionHeader = useCallback(
-    ({ section }: { section: SessionSection }) => (
-      <SessionListSectionHeader title={section.title} count={section.data.length} />
-    ),
-    []
-  );
+  const keyExtractor = useCallback((row: SessionListRow) => row.key, []);
 
-  const keyExtractor = useCallback((item: StoredSession) => item.session_id, []);
+  const getItemType = useCallback((row: SessionListRow) => row.kind, []);
 
-  // Full-screen error only when there is nothing cached to fall back on —
-  // a background refetch/search failure with stale sessions already in
-  // cache (keepPreviousData) must never blank out what's already rendered.
-  // A populated tray counts as "something on screen" and also suppresses.
+  // Full-screen error only when there is nothing this screen loaded to fall
+  // back on — a background refetch/search failure with rows already delivered
+  // to this mount (keepPreviousData) must never blank out what's already
+  // rendered. Rows cached by an earlier mount do not count as a fallback: a
+  // fresh open whose own load failed shows the retryable error instead of
+  // presenting them as loaded (see `selectSessionListContentSurface`).
   // Gated on !isLoading so a cold-open load never flashes this surface.
+  //
+  // None of these bodies carries an entering animation. An entering fade holds
+  // the view at its start value until the animation runs, and a body mounted
+  // during a screen transition can miss that run: its whole area then stays
+  // invisible, which reads as the blank body this screen must never show.
   if (surface.kind === 'full-screen-error') {
     return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center"
-        style={tabBarOnlyClearanceStyle}
-      >
-        <QueryError message="Could not load sessions" onRetry={onRetry} />
-      </Animated.View>
-    );
-  }
-
-  // Cold active-only failure on an otherwise empty screen: the stored query
-  // succeeded (or returned nothing) but the active poll failed before any
-  // data. Same full-screen layout as full-screen-error — the FAB is hidden
-  // in both states, so only the tab bar needs clearing. `onRetry` refetches
-  // both queries.
-  if (surface.kind === 'active-error-empty') {
-    return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center"
-        style={tabBarOnlyClearanceStyle}
-      >
-        <QueryError message="Could not load active sessions" onRetry={onRetry} />
-      </Animated.View>
-    );
-  }
-
-  // The screen gates the search header on `hasAnySessions` to keep the
-  // first-use "No sessions yet" empty state chrome-free, so when the user
-  // has no sessions at all we skip the SectionList entirely here and just
-  // render the empty state. Gated on !isLoading (via surface) so a cold
-  // open with an empty cache does not flash this while queries run.
-  if (surface.kind === 'first-use-empty') {
-    return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center"
-        style={tabBarOnlyClearanceStyle}
-      >
-        <EmptyState
-          icon={Bot}
-          title="No sessions yet"
-          description="Start a coding task from your phone. Your sessions will appear here."
-          action={emptyStateAction}
+      <View className="flex-1">
+        {updatingStatus}
+        <QueryError
+          message={t('common.couldNotLoadSessions')}
+          onRetry={onRetry}
+          isRetrying={isRetrying || errorPullBusy}
+          refreshControl={refreshControl}
         />
-      </Animated.View>
+      </View>
     );
   }
 
-  // Single SectionList render site: tray stays in ListHeaderComponent across
-  // loading → rows, so the atomic tray never remounts while the body toggles
-  // between skeletons and rows. While loading, sections are empty and
-  // skeletons fill ListEmptyComponent under the tray (active query may
-  // already have resolved).
-  let emptyComponent: ReactNode = null;
-  if (surface.listEmpty === 'loading-skeletons') {
-    emptyComponent = (
-      <Animated.View exiting={FadeOut.duration(150)}>
-        {Array.from({ length: 8 }, (_, i) => (
-          <View key={i} className="py-1.5">
-            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
-          </View>
-        ))}
-      </Animated.View>
-    );
-  } else if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
-    emptyComponent = (
-      <BodyEmpty
-        kind={bodyModel.kind}
-        isSearching={isSearching}
-        secondaryAction={
-          bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
-        }
-        emptyStateAction={emptyStateAction}
-        clearQueryAction={clearQueryAction}
-        onRetry={onRetry}
-      />
+  // No stored rows and no active query: render the history-empty body with its
+  // new-session action full-screen. The surface selector gates this on !isLoading
+  // so a cold open with an empty cache does not flash before queries settle.
+  if (surface.kind === 'history-empty') {
+    return (
+      <View className="flex-1">
+        {updatingStatus}
+        <BodyEmpty
+          kind="no-past-sessions"
+          isSearching={isSearching}
+          hasActiveFilters={hasActiveFilters}
+          createSessionAction={createSessionAction}
+          onRetry={onRetry}
+          refreshControl={refreshControl}
+        />
+      </View>
     );
   }
 
+  // Single FlashList render site. The loading phase renders reserved skeleton
+  // rows in the data itself (see `rows` above); the non-loading empty bodies
+  // early-return above, so the list never needs a `ListEmptyComponent` — the
+  // FlashList empty → populated transition is what mis-lays-out the swap.
+  if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
+    return (
+      <View className="flex-1">
+        {updatingStatus}
+        <BodyEmpty
+          kind={bodyModel.kind}
+          isSearching={isSearching}
+          hasActiveFilters={hasActiveFilters}
+          clearActions={clearActions}
+          isRetrying={isRetrying}
+          onRetry={onRetry}
+          refreshControl={refreshControl}
+        />
+      </View>
+    );
+  }
+
+  // No entering fade on the list surface: the loading skeletons are the
+  // reserved space and must paint at full opacity from the first frame — a
+  // 200ms fade reads as a blank list area on a fast cold open (the skeleton
+  // phase would live entirely inside the fade). The skeleton → rows swap is
+  // a same-pitch data update inside the mounted list.
   return (
-    <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-      <SectionList<StoredSession, SessionSection>
-        ref={listRef}
-        key={sortBy}
-        sections={sections}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        keyExtractor={keyExtractor}
-        extraData={attentionFocusRevision}
-        ListHeaderComponent={activeNowSection}
-        ListEmptyComponent={emptyComponent}
-        ListFooterComponent={
-          isFetchingNextPage ? (
-            <View className="py-4">
-              <ActivityIndicator color={colors.mutedForeground} />
-            </View>
-          ) : null
-        }
-        contentContainerStyle={tabBarClearanceStyle}
-        keyboardDismissMode="on-drag"
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-          autoscrollToTopThreshold: 10,
-        }}
-      />
-    </Animated.View>
+    <View className="flex-1">
+      {/* The band floats over the list's top padding, so the in-flight
+          spinner and the failure line never push the rows down (device defect
+          uxs1) and scrolled rows run up to the header instead of stopping
+          under an empty strip. */}
+      <View className="absolute left-[22px] right-[22px] top-0 z-10" pointerEvents="box-none">
+        <SessionListRefreshStatus
+          busy={pullBusy}
+          failed={pull.failed || bodyModel.showInlineError}
+          onRetry={handlePullRetry}
+          className="bg-background"
+        />
+      </View>
+      <View className="flex-1" style={landscapeSideInsetStyle}>
+        <FlashList<SessionListRow>
+          ref={listRef}
+          data={rows}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          getItemType={getItemType}
+          extraData={attentionFocusRevision}
+          ListFooterComponent={listFooter}
+          contentContainerStyle={contentInsetStyle}
+          // The search field above this list holds the keyboard while results
+          // are filtered. With the platform default the list claims that touch
+          // and only closes the keyboard, so a result needed two taps; with
+          // this value the row's own press runs and the list still follows a
+          // drag (see `keyboardDismissMode`).
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          onScrollBeginDrag={releasePaginationPark}
+          onTouchMove={releasePaginationPark}
+          refreshControl={rowsControl}
+          maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
+        />
+      </View>
+    </View>
   );
 }

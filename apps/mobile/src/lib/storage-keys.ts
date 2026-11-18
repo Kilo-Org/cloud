@@ -8,17 +8,90 @@
 
 export const AUTH_TOKEN_KEY = 'auth-token';
 export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
+/**
+ * Settled "Personal was chosen" marker, beside `ORGANIZATION_STORAGE_KEY`.
+ * That key keeps deleting on a Personal choice because every other reader
+ * treats a stored value as an organization id; this marker tells an explicit
+ * Personal choice apart from an absent key ("not chosen yet"), which the
+ * organization-context default rule resolves from the organization list.
+ * Account-scoped selection state: deleted with the rest of the account
+ * metadata on sign-out and on a direct account switch, so the next account on
+ * the device resolves its own default instead of inheriting this choice.
+ */
+export const ORGANIZATION_PERSONAL_STORAGE_KEY = 'selected-organization-personal';
+/** Filter record for the session history page. */
 export const SESSION_FILTERS_KEY = 'agent-session-filters';
+/** Filter record for the live sessions page. Separate: the pages filter separate lists. */
+export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
-export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
+/** The user chose Not now on the iOS install-attribution pre-prompt; do not ask again. */
+export const TRACKING_PROMPT_DISMISSED_KEY = 'tracking-prompt-dismissed';
+/** Last "Run on" destination on the new-agent screen. Empty means Cloud Agent. */
+export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
+/** The last cloud environment chosen per repository and scope, by choice key. */
+export const LAST_CLOUD_ENVIRONMENT_KEY = 'last-cloud-environment';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
+export const HIDE_THINKING_KEY = 'agent-hide-thinking-details';
 export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';
+/** One-time gate for the neutral post-success feedback prompt. */
+export const FEEDBACK_LAST_ASKED_AT_KEY = 'feedback-last-asked-at';
 export const PR_REVIEW_RECENTS_KEY = 'pr-review-recents';
 export const PR_REVIEW_VIEWED_KEY = 'pr-review-viewed';
 export const THEME_PREFERENCE_KEY = 'theme-preference';
+export const LANGUAGE_PREFERENCE_KEY = 'language-preference';
+/** One-shot screen to reopen after an RTL language reload. */
+export const LANGUAGE_RETURN_TARGET_KEY = 'language-return-target';
+/** Language whose forced layout direction the last launch already reloaded for. */
+export const LANGUAGE_DIRECTION_ATTEMPT_KEY = 'language-direction-attempt';
+/** Login email draft, persisted before an RTL language reload. Read only by the migration that deletes it. */
+export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
+/** Login SSO-recovery banner draft, persisted before an RTL language reload. Read only by the migration that deletes it. */
+export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
+/** The one sign-in attempt record: the draft a reload reads, or the tombstone that retires it. */
+export const LOGIN_DRAFT_RECORD_KEY = 'login-draft-record';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
+/** Profile credit balance masked as `*****`. Device preference; survives reboot. */
+export const HIDE_BALANCE_KEY = 'hide-balance';
+/** The painted stand-in for an amount the hide-balance preference keeps off screen. */
+export const HIDDEN_BALANCE = '*****';
+export const LIVE_ACTIVITY_KEY = 'live-activity-enabled';
+/** Return key in the agent composer sends/start instead of inserting a newline. */
+export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
+/** Master switch for gateway transcription of voice input (off = device speech recognition). */
+export const GATEWAY_TRANSCRIPTION_ENABLED_KEY = 'gateway-transcription-enabled';
+/** Persisted `{ id, name }` of the chosen gateway transcription model (null = none chosen). */
+export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
+/** Master switch for translating tool summaries into the app language (off = raw summaries). */
+export const TOOL_SUMMARY_TRANSLATION_ENABLED_KEY = 'tool-summary-translation-enabled';
+/** Persisted `{ id, name }` of the chosen tool-summary translation model (defaults to Auto Small). */
+export const TOOL_SUMMARY_TRANSLATION_MODEL_KEY = 'tool-summary-translation-model';
+/** Persisted BCP-47 tag of the chosen voice-input language (empty = auto from the app/device language). */
+export const VOICE_INPUT_LANGUAGE_KEY = 'voice-input-language';
+/** Revocable per-host list of markdown link hosts that open without an Alert. */
+export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
+/**
+ * Revocable per-host list of markdown image hosts whose images load without a
+ * tap. Separate from `TRUSTED_HOSTS_KEY`: opening a link and fetching an image
+ * from a host are different consents.
+ */
+export const TRUSTED_IMAGE_HOSTS_KEY = 'trusted-image-hosts';
+export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
+/** Group consecutive tool calls on the session page into one condensed row. */
+export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
+/** Master switch for the agent-callable settings tools (the profile settings a Quick Chat agent may change). */
+export const SETTINGS_TOOLS_ENABLED_KEY = 'settings-tools-enabled';
+/** Persisted remote MCP servers: a JSON array of `StoredRemoteMcpServer`. */
+export const REMOTE_MCP_SERVERS_KEY = 'remote-mcp-servers';
+/** OAuth tokens, client registrations and PKCE verifiers of remote MCP servers, by server id. */
+export const REMOTE_MCP_OAUTH_KEY = 'remote-mcp-oauth';
+/** Account-scoped remote Quick Chat profiles, including provider credentials. */
+export const CHAT_BACKENDS_KEY = 'chat-backends';
+/** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */
+export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
+/** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
+ * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**
@@ -34,9 +107,95 @@ export const ACTIVE_USER_ID_KEY = 'active-user-id';
  * epoch-fenced and NOT deleted on sign-out: it must survive the teardown.
  */
 export const LOGOUT_CLEANUP_TOMBSTONE_KEY = 'logout-cleanup-tombstone';
-export const KILOCLAW_OWNED_KEY = 'kiloclaw-owned';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';
 /** iOS App Attest key identifier. The key itself lives in the Secure Enclave. */
 export const ATTEST_KEY_ID_KEY = 'auth-attest-key-id';
+/**
+ * Durable mirror of the pending deep-link destination (P1-E-43b). Written
+ * fire-and-forget on `setPendingDeepLink`, restored on cold start, and deleted
+ * when the slot is consumed or on sign-out.
+ */
+export const PENDING_DEEP_LINK_KEY = 'pending-deep-link';
+/**
+ * Launch context for the Android image picker (P1-I-66b). Written right before
+ * a camera/library launch and read by the recovery hook after an Activity
+ * recreation. Deleted on sign-out: it carries a user id and a session id.
+ */
+export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
+/**
+ * The composer a camera or library launch belongs to, kept for the launch that
+ * never comes back: Activity recreation rebuilds the app on its opening route
+ * and drops the composer. Written next to `PICKER_LAUNCH_CONTEXT_KEY` before
+ * the launch and cleared by the same JS once the picker returns, so a record
+ * that outlives the launch means the composer did not survive. Deleted on
+ * sign-out: it carries a user id and a session id.
+ */
+export const PICKER_RESTORE_RECORD_KEY = 'picker-restore-record';
+/**
+ * Per-user network-fallback consent for voice transcription (P1-I-68a). Not
+ * deleted on sign-out — a per-user decision must survive sign-out and sign-in
+ * of the same account, matching `CONSENT_USER_KEY_PREFIX`.
+ */
+export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';
+/**
+ * Per-user first-sign-in tour decision (finished or skipped). Not deleted on
+ * sign-out — a per-account decision must survive sign-out and sign-in of the
+ * same account, exactly like `VOICE_NETWORK_CONSENT_KEY_PREFIX`.
+ */
+export const TOUR_COMPLETED_KEY_PREFIX = 'tour-completed-';
+/**
+ * Encrypted-KV scope for the durable session-attention ack store (P1-F-48a).
+ * Holds one serialized blob of `{ sessionId, raiseId, status, ackedAt,
+ * expiresAt }` entries; ids and timestamps only, no secrets.
+ */
+export const SESSION_ATTENTION_KEY = 'session-attention';
+/**
+ * Encrypted-KV scope for the offline tool-summary translation cache. Holds one
+ * entry per translated summary: the item's persistent id, the language tag,
+ * the model id, the source summary, the translated summary, and `storedAt` —
+ * ids, tags, and text only, no secrets. The caller owns the expiry rule.
+ */
+export const TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE = 'tool-summary-translation-cache';
+/**
+ * Encrypted-KV scope for the durable record of the session titles the user set
+ * through the app's rename flow that look like the backend's unnamed-session
+ * placeholder. Holds one serialized blob of `{ sessionId, title }` entries —
+ * ids and user titles only, no secrets. Survives an app restart so a chosen
+ * title is not re-hidden as unnamed after a cold start.
+ */
+export const USER_SESSION_TITLES_KEY = 'user-session-titles';
+/**
+ * Durable "Open last session" record behind the launcher shortcut and the
+ * quick-settings tile. Holds `{ sessionId, userId, storedAt }`; the account id
+ * scopes it so one account is never offered another account's session. Not a
+ * secret, but it is mirrored through SecureStore like every other record.
+ */
+export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
+
+/**
+ * Durable "last focused in-app route" record behind the relaunch restore.
+ * Holds `{ href, userId, storedAt }`; the account id scopes the record so one
+ * account never restores another account's route (see `lib/last-route.ts`).
+ */
+export const LAST_ROUTE_KEY = 'last-route';
+
+/**
+ * The scope names the app last showed behind the Code Reviewer headers. Holds
+ * `{ version, userId, entries }`; the account id inside the record scopes it,
+ * so one account's names never paint under another account's header (see
+ * `lib/code-reviewer-scope-name.ts`).
+ */
+export const REVIEWER_SCOPE_NAMES_KEY = 'reviewer-scope-names';
+
+/**
+ * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
+ * no collisions. Shared by the analytics, voice-network consent, and
+ * tour-completion records.
+ */
+export function encodeStorageKey(prefix: string, userId: string): string {
+  return `${prefix}${[...new TextEncoder().encode(userId)]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')}`;
+}

@@ -4,20 +4,22 @@ import {
   verifyNativeGoogleIdToken,
   exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
+  NonceStoreUnavailableError,
 } from '@/lib/auth/native-id-tokens';
 import {
   reserveSignInCode,
   commitSignInCode,
   releaseSignInCode,
   consumeSignInCode,
-} from '@/lib/auth/magic-link-tokens';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
-  findUserById,
-  findUserByNormalizedEmail,
+  findUserBySignInCodeEmail,
   findUserIdByAuthProvider,
 } from '@/lib/user';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import type { User } from '@kilocode/db/schema';
 
@@ -29,20 +31,31 @@ jest.mock('@/lib/auth/native-id-tokens', () => ({
   verifyNativeGoogleIdToken: jest.fn(),
   exchangeNativeGoogleAuthCode: jest.fn(),
 }));
-jest.mock('@/lib/auth/magic-link-tokens');
+jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
+jest.mock('@/lib/auth/passkey', () => ({
+  consumeSignInTicket: jest.fn(),
+}));
 jest.mock('@/lib/user');
-jest.mock('@/lib/tokens');
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
+jest.mock('@kilocode/web-shared/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
-  checkNativeAdmission: jest.fn(),
-  validateAdmissionPayload: jest.fn(),
+  requireAdmissionPayload: jest.fn(),
   verifyAdmissionAsync: jest.fn(),
   persistAttestedKey: jest.fn(),
-  shouldRefuseAsyncFailure: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions');
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@/lib/auth/pending-link', () => ({
+  createPendingLinkForDifferentOAuth: jest.fn(),
+  resolvePendingLinkForUser: jest.fn(),
+  summarizePendingLink: jest.fn(),
+}));
+jest.mock('@/lib/auth/native-token-rate-limit', () => ({
+  isNativeTokenAddressRateLimited: jest.fn(),
+  isNativeTokenUserRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -51,9 +64,11 @@ jest.mock('@sentry/nextjs', () => ({
 
 // eslint-disable-next-line no-var
 var mockPosthogCapture: jest.Mock;
-jest.mock('@/lib/posthog', () => {
-  const capture = jest.fn();
-  mockPosthogCapture = capture;
+// Jest also runs this factory while it generates the automatic `@/lib/user`
+// mock, so reuse one capture mock across calls.
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
+  mockPosthogCapture ??= jest.fn();
+  const capture = mockPosthogCapture;
   return {
     __esModule: true,
     default: jest.fn(() => ({
@@ -68,19 +83,27 @@ jest.mock('@/lib/posthog', () => {
 
 import { POST } from './route';
 import {
-  checkNativeAdmission,
-  validateAdmissionPayload,
+  requireAdmissionPayload,
   verifyAdmissionAsync,
   persistAttestedKey,
-  shouldRefuseAsyncFailure,
   KeyCollisionError,
 } from '@/lib/auth/native-admission';
 import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
+import {
+  isNativeTokenAddressRateLimited,
+  isNativeTokenUserRateLimited,
+} from '@/lib/auth/native-token-rate-limit';
 import { captureMessage } from '@sentry/nextjs';
+import {
+  createPendingLinkForDifferentOAuth,
+  resolvePendingLinkForUser,
+  summarizePendingLink,
+} from '@/lib/auth/pending-link';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
@@ -89,23 +112,32 @@ const mockReserveSignInCode = jest.mocked(reserveSignInCode);
 const mockCommitSignInCode = jest.mocked(commitSignInCode);
 const mockReleaseSignInCode = jest.mocked(releaseSignInCode);
 const mockConsumeSignInCode = jest.mocked(consumeSignInCode);
+const mockConsumeSignInTicket = jest.mocked(consumeSignInTicket);
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockFindUserById = jest.mocked(findUserById);
-const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
+const mockFindUserBySignInCodeEmail = jest.mocked(findUserBySignInCodeEmail);
 const mockFindUserIdByAuthProvider = jest.mocked(findUserIdByAuthProvider);
 const mockGenerateApiToken = jest.mocked(generateApiToken);
 const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibility);
-const mockCheckNativeAdmission = jest.mocked(checkNativeAdmission);
-const mockValidateAdmissionPayload = jest.mocked(validateAdmissionPayload);
+const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
 const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
-const mockShouldRefuseAsyncFailure = jest.mocked(shouldRefuseAsyncFailure);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
+const mockIsNativeTokenAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
+const mockIsNativeTokenUserRateLimited = jest.mocked(isNativeTokenUserRateLimited);
+const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
 const mockCaptureMessage = jest.mocked(captureMessage);
+const mockCreatePendingLink = jest.mocked(createPendingLinkForDifferentOAuth);
+const mockResolvePendingLink = jest.mocked(resolvePendingLinkForUser);
+const mockSummarizePendingLink = jest.mocked(summarizePendingLink);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
+
+const actualRequireAdmissionPayload = jest.requireActual<{
+  requireAdmissionPayload: typeof requireAdmissionPayload;
+}>('@/lib/auth/native-admission').requireAdmissionPayload;
 
 describe('POST /api/auth/native/token', () => {
   const createRequest = (body: unknown) =>
@@ -130,15 +162,20 @@ describe('POST /api/auth/native/token', () => {
       isNew: false,
     } as never);
     mockGenerateApiToken.mockReturnValue('minted-jwt');
+    mockCreateDeviceSession.mockResolvedValue('session-1');
     mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: false });
     mockFindUserById.mockResolvedValue(undefined);
-    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
+    mockFindUserBySignInCodeEmail.mockResolvedValue(undefined);
     mockFindUserIdByAuthProvider.mockResolvedValue(null);
-    mockCheckNativeAdmission.mockReturnValue({ admission: { ok: true }, verifyAsync: true });
-    mockValidateAdmissionPayload.mockReturnValue(undefined);
+    mockRequireAdmissionPayload.mockReturnValue({
+      platform: 'ios',
+      kind: 'assertion',
+      challenge: 'challenge',
+      payload: 'assertion',
+      keyId: 'key1',
+    });
     mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'ios', keyId: 'key1' });
     mockPersistAttestedKey.mockResolvedValue(undefined);
-    mockShouldRefuseAsyncFailure.mockReturnValue(false);
     mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
       token: 'short-jwt',
       refreshToken: 'refresh-xyz',
@@ -149,6 +186,11 @@ describe('POST /api/auth/native/token', () => {
     mockCommitSignInCode.mockResolvedValue(true);
     mockReleaseSignInCode.mockResolvedValue(undefined);
     mockConsumeSignInCode.mockResolvedValue(true);
+    mockIsNativeTokenAddressRateLimited.mockResolvedValue(false);
+    mockIsNativeTokenUserRateLimited.mockResolvedValue(false);
+    mockRevokeDeviceSession.mockResolvedValue(undefined);
+    mockCreatePendingLink.mockResolvedValue(null);
+    mockResolvePendingLink.mockResolvedValue(undefined);
   });
 
   describe('apple', () => {
@@ -159,13 +201,18 @@ describe('POST /api/auth/native/token', () => {
       });
 
       const response = await POST(
-        createRequest({ provider: 'apple', idToken: 'apple-id-token', fullName: 'Jane Doe' })
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          fullName: 'Jane Doe',
+          nonce: 'test-nonce',
+        })
       );
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
-      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', 'test-nonce');
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           google_user_email: 'appleuser@example.com',
@@ -179,9 +226,16 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
     });
 
     it('falls back to the email prefix as the name when fullName is not provided', async () => {
@@ -190,7 +244,9 @@ describe('POST /api/auth/native/token', () => {
         email: 'appleuser@example.com',
       });
 
-      await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' })
+      );
 
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({ google_user_name: 'appleuser' }),
@@ -199,14 +255,17 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
     });
 
     it('returns 401 INVALID_TOKEN when Apple verification throws NativeIdTokenError', async () => {
       mockVerifyNativeAppleIdToken.mockRejectedValue(new NativeIdTokenError('bad token'));
 
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'bad-token' }));
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'bad-token', nonce: 'test-nonce' })
+      );
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -218,7 +277,7 @@ describe('POST /api/auth/native/token', () => {
       mockVerifyNativeAppleIdToken.mockRejectedValue(new Error('network'));
 
       await expect(
-        POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }))
+        POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' }))
       ).rejects.toThrow('network');
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
@@ -235,7 +294,9 @@ describe('POST /api/auth/native/token', () => {
         ssoOrganizationId: 'workos-organization-id',
       });
 
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' })
+      );
       const data = await response.json();
 
       expect(response.status).toBe(403);
@@ -255,7 +316,9 @@ describe('POST /api/auth/native/token', () => {
         errorCode: 'BLOCKED',
       });
 
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' })
+      );
       const data = await response.json();
 
       expect(response.status).toBe(403);
@@ -263,12 +326,20 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
 
-    // C12: nonce forwarding
-    it('passes the raw nonce to verifyNativeAppleIdToken', async () => {
-      mockVerifyNativeAppleIdToken.mockResolvedValue({
-        sub: 'apple-sub-1',
-        email: 'appleuser@example.com',
-      });
+    it('returns 401 INVALID_TOKEN when the client sends no nonce and the verifier refuses', async () => {
+      mockVerifyNativeAppleIdToken.mockRejectedValue(new NativeIdTokenError('Apple nonce missing'));
+
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_TOKEN' });
+      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
+    });
+
+    it('returns 503 NONCE_STORE_UNAVAILABLE when the nonce record cannot be written', async () => {
+      mockVerifyNativeAppleIdToken.mockRejectedValue(
+        new NonceStoreUnavailableError('Apple nonce check unavailable')
+      );
 
       const response = await POST(
         createRequest({
@@ -278,23 +349,9 @@ describe('POST /api/auth/native/token', () => {
         })
       );
 
-      expect(response.status).toBe(200);
-      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith(
-        'apple-id-token',
-        'raw-nonce-from-client'
-      );
-    });
-
-    it('provides no nonce when the client sends none (legacy)', async () => {
-      mockVerifyNativeAppleIdToken.mockResolvedValue({
-        sub: 'apple-sub-1',
-        email: 'appleuser@example.com',
-      });
-
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
-
-      expect(response.status).toBe(200);
-      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'NONCE_STORE_UNAVAILABLE' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
   });
 
@@ -314,7 +371,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           google_user_email: 'googleuser@example.com',
@@ -329,7 +386,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
     });
 
@@ -348,7 +406,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
     });
 
@@ -428,7 +487,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCreateOrUpdateUser).toHaveBeenCalled();
     });
 
@@ -536,7 +595,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockReserveSignInCode).toHaveBeenCalledWith(
         'emailuser@example.com',
         '123456',
@@ -560,7 +619,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
       expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith('emailuser@example.com');
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
@@ -580,7 +640,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockReserveSignInCode).toHaveBeenCalledWith(
         'emailuser@example.com',
         '123456',
@@ -631,7 +691,35 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
+      );
+    });
+
+    it('resolves the account for the delivered address, not for an alias of another address', async () => {
+      await POST(
+        createRequest({
+          provider: 'email',
+          email: 'victim+tag@example.com',
+          code: '123456',
+        })
+      );
+
+      expect(mockFindUserBySignInCodeEmail).toHaveBeenCalledWith('victim+tag@example.com');
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          google_user_email: 'victim+tag@example.com',
+          google_user_name: 'victim+tag',
+          provider: 'email',
+          provider_account_id: 'victim+tag@example.com',
+        }),
+        undefined,
+        true,
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true,
+        expect.any(Function)
       );
     });
 
@@ -704,6 +792,105 @@ describe('POST /api/auth/native/token', () => {
       expect(mockReleaseSignInCode).toHaveBeenCalled();
     });
 
+    it('returns 403 SIGNUP-STEP-UP with the methods and releases the reservation', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('presents a disabled email signup as the step-up shipped apps understand', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'EMAIL-SIGNUP-DISABLED' });
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('returns the pending link object on an eligible DIFFERENT-OAUTH', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'DIFFERENT-OAUTH',
+        targetUserId: 'user-1',
+        accountHasVerifiedPrimaryAddress: true,
+        providerAlreadyPresent: false,
+      } as never);
+      mockCreatePendingLink.mockResolvedValue({
+        secret: 'pending-secret',
+        pendingLink: { id: 'pending-1' },
+      } as never);
+      mockSummarizePendingLink.mockResolvedValue({
+        provider: 'email',
+        email: 'pending@example.com',
+        methods: ['google'],
+        emailCode: true,
+        expiresAt: '2026-01-01T00:15:00.000Z',
+        kind: 'existing_account',
+        callbackPath: null,
+        kiloUserId: 'user-1',
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'pending@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'DIFFERENT-OAUTH',
+        pendingLink: {
+          token: 'pending-secret',
+          provider: 'email',
+          email: 'pending@example.com',
+          methods: ['google'],
+          emailCode: true,
+          expiresAt: '2026-01-01T00:15:00.000Z',
+        },
+      });
+    });
+
+    it('adds the pending link result to a successful sign-in that carried a token', async () => {
+      mockResolvePendingLink.mockResolvedValue({
+        status: 'linked',
+        provider: 'github',
+      } as never);
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'linked@example.com',
+          code: '123456',
+          pendingLinkToken: 'pending-secret',
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.pendingLink).toEqual({ status: 'linked', provider: 'github' });
+      expect(mockResolvePendingLink).toHaveBeenCalledWith('pending-secret', fakeUser.id);
+    });
+
     it('releases the code on DIFFERENT-OAUTH settlement failure so retry succeeds', async () => {
       mockCreateOrUpdateUser.mockResolvedValue({
         success: false,
@@ -726,13 +913,14 @@ describe('POST /api/auth/native/token', () => {
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
     });
 
-    it('retry after DIFFERENT-OAUTH release reserves and settles the same code', async () => {
-      // First call: DIFFERENT-OAUTH triggers release. The second call must
-      // re-reserve the same code and settle successfully, proving the release.
+    it.each([
+      { error: 'DIFFERENT-OAUTH' as const, status: 403 },
+      { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+    ])('retry after $error reserves and settles the same code', async ({ error, status }) => {
       mockCreateOrUpdateUser
         .mockResolvedValueOnce({
           success: false,
-          error: 'DIFFERENT-OAUTH',
+          error,
         } as never)
         // Second call falls back to the beforeEach success default.
         .mockResolvedValueOnce({
@@ -744,10 +932,9 @@ describe('POST /api/auth/native/token', () => {
       const email = 'retry-oauth@example.com';
       const code = '654321';
 
-      // First attempt: DIFFERENT-OAUTH → release.
       const first = await POST(createRequest({ provider: 'email', email, code }));
-      expect(first.status).toBe(403);
-      expect(await first.json()).toEqual({ error: 'DIFFERENT-OAUTH' });
+      expect(first.status).toBe(status);
+      expect(await first.json()).toEqual({ error });
       expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
@@ -755,7 +942,7 @@ describe('POST /api/auth/native/token', () => {
       // Second attempt: code was released, re-reserve succeeds, settle works.
       const second = await POST(createRequest({ provider: 'email', email, code }));
       expect(second.status).toBe(200);
-      expect(await second.json()).toEqual({ token: 'minted-jwt' });
+      expect(await second.json()).toEqual({ token: 'minted-jwt', created: false });
 
       // One account minted across both attempts.
       expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(2);
@@ -764,6 +951,34 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code, undefined);
       // releaseSignInCode was only called once (on the first failure).
       expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the same email sign-in after a subsequent attempt', async () => {
+      mockCreateDeviceSession
+        .mockRejectedValueOnce(new Error('temporary'))
+        .mockResolvedValueOnce('session-retry');
+
+      const email = 'session-retry@example.com';
+      const code = '246810';
+
+      await expect(POST(createRequest({ provider: 'email', email, code }))).rejects.toThrow(
+        'temporary'
+      );
+
+      // Retry the same sign-in after session-bound credential preparation.
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+
+      const retry = await POST(createRequest({ provider: 'email', email, code }));
+
+      expect(retry.status).toBe(200);
+      expect(await retry.json()).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-retry',
+      });
     });
 
     it('releases the reservation on an unexpected error', async () => {
@@ -801,20 +1016,36 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(401);
       expect(await response.json()).toEqual({ error: 'INVALID_CODE' });
-      // No credentials must be issued when consumeSignInCode fails.
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      // The prepared session is not left usable for a request that delivers nothing.
+      expect(mockRevokeDeviceSession).toHaveBeenCalledWith('session-1', 'sign_in_not_completed');
+    });
+
+    it('revokes the prepared session when the code confirmation throws', async () => {
+      mockCommitSignInCode.mockRejectedValue(new Error('commit failed'));
+
+      const email = 'commit-failed@example.com';
+      const code = '135790';
+
+      await expect(POST(createRequest({ provider: 'email', email, code }))).rejects.toThrow(
+        'commit failed'
+      );
+
+      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockRevokeDeviceSession).toHaveBeenCalledWith('session-1', 'sign_in_not_completed');
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
     });
 
     it('reservation-lapse full-flow produces one account and one device session', async () => {
       mockCommitSignInCode.mockResolvedValue(false);
       mockConsumeSignInCode.mockResolvedValue(true);
-      mockCreateDeviceSession.mockResolvedValue('session-lapse-1');
-      mockIssueSessionCredentials.mockResolvedValue({
+      mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
         token: 'short-jwt',
         refreshToken: 'refresh-xyz',
         expiresIn: 3600,
+        sessionId: 'session-lapse-1',
       });
 
       const response = await POST(
@@ -831,12 +1062,14 @@ describe('POST /api/auth/native/token', () => {
         token: 'short-jwt',
         refreshToken: 'refresh-xyz',
         expiresIn: 3600,
+        created: false,
       });
 
       // One account, one session, no legacy token.
       expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
-      expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
-      expect(mockIssueSessionCredentials).toHaveBeenCalledTimes(1);
+      expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledTimes(1);
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).toHaveBeenCalledWith('lapse@example.com', '123456', undefined);
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_code_reservation_lapsed');
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
@@ -866,19 +1099,41 @@ describe('POST /api/auth/native/token', () => {
     });
   });
 
-  it('returns 403 with the AuthErrorType when createOrUpdateUser fails', async () => {
+  it.each([
+    { error: 'BLOCKED' as const, status: 403 },
+    { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+  ])('returns $status for $error without credentials', async ({ error, status }) => {
     mockVerifyNativeGoogleIdToken.mockResolvedValue({
       sub: 'google-sub-1',
       email: 'googleuser@example.com',
     });
-    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'BLOCKED' } as never);
+    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error });
 
     const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data).toEqual({ error: 'BLOCKED' });
+    expect(response.status).toBe(status);
+    expect(data).toEqual({ error });
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 SIGNUP-STEP-UP with the methods for a Google signup without credentials', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'googleuser@example.com',
+    });
+    mockCreateOrUpdateUser.mockResolvedValue({
+      success: false,
+      error: 'SIGNUP-STEP-UP',
+      methods: ['apple'],
+    });
+
+    const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'SIGNUP-STEP-UP', methods: ['apple'] });
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
   });
 
   it('does not mint a token for an individually blocked user', async () => {
@@ -1023,26 +1278,118 @@ describe('POST /api/auth/native/token', () => {
   });
 
   describe('admission', () => {
-    it('returns 403 ADMISSION_REQUIRED when admission check fails', async () => {
-      mockCheckNativeAdmission.mockReturnValue({
-        admission: {
-          ok: false,
-          errorCode: 'ADMISSION_REQUIRED',
-        },
-        verifyAsync: false,
-      });
+    it.each([
+      { provider: 'email', email: 'new@example.com', code: '123456' },
+      { provider: 'apple', idToken: 'apple-id-token' },
+      { provider: 'google', idToken: 'google-id-token' },
+      { provider: 'passkey', ticket: 'ticket-1' },
+    ])('applies the admission contract to $provider requests', async body => {
+      mockRequireAdmissionPayload.mockImplementation(actualRequireAdmissionPayload);
 
-      const response = await POST(
-        createRequest({ provider: 'google', idToken: 'google-id-token' })
-      );
+      const response = await POST(createRequest(body));
+
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
-      // Must not proceed to provider verification.
-      expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
+      expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
+      if (body.provider === 'email') {
+        expect(mockReserveSignInCode).not.toHaveBeenCalled();
+        expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      }
+      if (body.provider === 'apple') expect(mockVerifyNativeAppleIdToken).not.toHaveBeenCalled();
+      if (body.provider === 'google') expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
     });
 
-    it('runs admission check before provider verification', async () => {
+    it('refuses a failed verdict before reserving the sign-in code', async () => {
+      mockVerifyAdmissionAsync.mockResolvedValue({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'new@example.com',
+          code: '123456',
+          admission: { platform: 'android' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(mockVerifyAdmissionAsync).toHaveBeenCalledTimes(1);
+      expect(mockReserveSignInCode).not.toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+    });
+
+    it('rejects an existing iOS key before creating a new account', async () => {
+      mockRequireAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'challenge',
+        payload: 'assertion',
+        keyId: 'existing-key',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'existing-key',
+        signCount: 1,
+        existingKeyUserId: 'other-user',
+      });
+      mockCreateOrUpdateUser.mockImplementation(async (...args) =>
+        (await args[7]?.())
+          ? ({ success: true, user: fakeUser, isNew: true } as never)
+          : ({ success: false, error: 'ADMISSION_REQUIRED' } as never)
+      );
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'new@example.com',
+          code: '123456',
+          admission: { platform: 'ios' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(mockVerifyAdmissionAsync).toHaveBeenCalledTimes(1);
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      { provider: 'email', email: 'new@example.com', code: '123456' },
+      { provider: 'google', idToken: 'google-id-token' },
+    ])(
+      'returns a retryable 500 when $provider admission verification is unavailable',
+      async body => {
+        mockRequireAdmissionPayload.mockReturnValue({
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'challenge',
+          payload: 'integrity-token',
+        });
+        mockVerifyNativeGoogleIdToken.mockResolvedValue({
+          sub: 'google-sub',
+          email: 'new@example.com',
+        });
+        mockVerifyAdmissionAsync.mockRejectedValue(new Error('provider unavailable'));
+
+        const response = await POST(createRequest({ ...body, admission: { platform: 'android' } }));
+
+        expect(response.status).toBe(500);
+        expect(await response.json()).toEqual({ error: 'INTERNAL_ERROR' });
+        expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
+        expect(mockGenerateApiToken).not.toHaveBeenCalled();
+        expect(mockCommitSignInCode).not.toHaveBeenCalled();
+        expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      }
+    );
+
+    it('runs admission verification before provider verification', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',
         email: 'googleuser@example.com',
@@ -1052,15 +1399,15 @@ describe('POST /api/auth/native/token', () => {
         createRequest({ provider: 'google', idToken: 'google-id-token' })
       );
       expect(response.status).toBe(200);
-      expect(mockCheckNativeAdmission).toHaveBeenCalled();
-      expect(mockVerifyNativeGoogleIdToken).toHaveBeenCalled();
+      expect(mockVerifyAdmissionAsync.mock.invocationCallOrder[0]).toBeLessThan(
+        mockVerifyNativeGoogleIdToken.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+      );
     });
 
     // ── Fix 3: ownership check before code commit (email path) ─────────
 
-    it('refuses ownership mismatch WITHOUT consuming the sign-in code (enforce, email path)', async () => {
-      mockShouldRefuseAsyncFailure.mockReturnValue(true);
-      mockValidateAdmissionPayload.mockReturnValue({
+    it('refuses ownership mismatch WITHOUT consuming the sign-in code (email path)', async () => {
+      mockRequireAdmissionPayload.mockReturnValue({
         platform: 'ios',
         kind: 'assertion',
         challenge: 'ch123',
@@ -1093,48 +1440,8 @@ describe('POST /api/auth/native/token', () => {
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
 
-    // ── C14 repair: report mode logs mismatch and issues credentials ─
-
-    it('logs ownership mismatch and issues credentials in report mode (email path)', async () => {
-      // shouldRefuseAsyncFailure defaults to false (report mode)
-      mockValidateAdmissionPayload.mockReturnValue({
-        platform: 'ios',
-        kind: 'assertion',
-        challenge: 'ch123',
-        payload: 'data',
-        keyId: 'key1',
-      });
-      mockVerifyAdmissionAsync.mockResolvedValue({
-        ok: true,
-        platform: 'ios',
-        keyId: 'key1',
-        signCount: 11,
-        existingKeyUserId: 'other-user',
-      });
-
-      const response = await POST(
-        createRequest({
-          provider: 'email',
-          email: 'emailuser@example.com',
-          code: '123456',
-          admission: {},
-        })
-      );
-
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
-      // Ownership mismatch is logged before code commit.
-      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
-      // Code is committed and credentials are issued.
-      expect(mockCommitSignInCode).toHaveBeenCalled();
-      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
-      // Key persistence is skipped — mismatch was detected pre-commit.
-      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
-    });
-
-    it('refuses attestation key collision before code commit (enforce, email path)', async () => {
-      mockShouldRefuseAsyncFailure.mockReturnValue(true);
-      mockValidateAdmissionPayload.mockReturnValue({
+    it('refuses attestation key collision before code commit (email path)', async () => {
+      mockRequireAdmissionPayload.mockReturnValue({
         platform: 'ios',
         kind: 'attestation',
         challenge: 'ch123',
@@ -1167,9 +1474,8 @@ describe('POST /api/auth/native/token', () => {
 
     // ── Fix 3: KeyCollisionError during persistence does not burn the code ─
 
-    it('refuses key collision during persistence without burning the sign-in code (enforce, email, supportsRefresh)', async () => {
-      mockShouldRefuseAsyncFailure.mockReturnValue(true);
-      mockValidateAdmissionPayload.mockReturnValue({
+    it('refuses key collision during persistence without burning the sign-in code (email, supportsRefresh)', async () => {
+      mockRequireAdmissionPayload.mockReturnValue({
         platform: 'ios',
         kind: 'attestation',
         challenge: 'ch123',
@@ -1206,9 +1512,8 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
     });
 
-    it('refuses key collision during persistence without burning the sign-in code (enforce, email, no supportsRefresh)', async () => {
-      mockShouldRefuseAsyncFailure.mockReturnValue(true);
-      mockValidateAdmissionPayload.mockReturnValue({
+    it('refuses key collision during persistence without burning the sign-in code (email, no supportsRefresh)', async () => {
+      mockRequireAdmissionPayload.mockReturnValue({
         platform: 'ios',
         kind: 'attestation',
         challenge: 'ch123',
@@ -1240,85 +1545,14 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
     });
 
-    it('logs ownership mismatch and issues token in report mode (apple/google)', async () => {
-      // shouldRefuseAsyncFailure defaults to false (report mode)
-      mockVerifyNativeAppleIdToken.mockResolvedValue({
-        sub: 'apple-sub-1',
-        email: 'appleuser@example.com',
-      });
-      mockValidateAdmissionPayload.mockReturnValue({
-        platform: 'ios',
-        kind: 'assertion',
-        challenge: 'ch123',
-        payload: 'data',
-        keyId: 'key1',
-      });
-      mockVerifyAdmissionAsync.mockResolvedValue({
-        ok: true,
-        platform: 'ios',
-        keyId: 'key1',
-        signCount: 11,
-        existingKeyUserId: 'other-user',
-      });
-
-      const response = await POST(
-        createRequest({
-          provider: 'apple',
-          idToken: 'apple-id-token',
-          admission: {},
-        })
-      );
-
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
-      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
-      // Key persistence is skipped.
-      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
-    });
-
-    it('logs KeyCollisionError and issues token in report mode (apple/google, no supportsRefresh)', async () => {
-      // shouldRefuseAsyncFailure defaults to false (report mode)
-      mockVerifyNativeAppleIdToken.mockResolvedValue({
-        sub: 'apple-sub-1',
-        email: 'appleuser@example.com',
-      });
-      mockValidateAdmissionPayload.mockReturnValue({
-        platform: 'ios',
-        kind: 'attestation',
-        challenge: 'ch123',
-        payload: 'data',
-        keyId: 'key1',
-      });
-      mockVerifyAdmissionAsync.mockResolvedValue({
-        ok: true,
-        platform: 'ios',
-        keyId: 'key1',
-        publicKey: 'base64pubkey',
-      });
-      mockPersistAttestedKey.mockRejectedValue(new KeyCollisionError());
-
-      const response = await POST(
-        createRequest({
-          provider: 'apple',
-          idToken: 'apple-id-token',
-          admission: {},
-        })
-      );
-
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
-      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
-    });
-
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
 
-    it('returns 403 ADMISSION_REQUIRED when persistAttestedKey throws KeyCollisionError (enforce, apple/google, no supportsRefresh)', async () => {
-      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+    it('returns 403 ADMISSION_REQUIRED when persistAttestedKey throws KeyCollisionError (apple/google, no supportsRefresh)', async () => {
       mockVerifyNativeAppleIdToken.mockResolvedValue({
         sub: 'apple-sub-1',
         email: 'appleuser@example.com',
       });
-      mockValidateAdmissionPayload.mockReturnValue({
+      mockRequireAdmissionPayload.mockReturnValue({
         platform: 'ios',
         kind: 'attestation',
         challenge: 'ch123',
@@ -1337,6 +1571,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           admission: {},
         })
       );
@@ -1347,13 +1582,12 @@ describe('POST /api/auth/native/token', () => {
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
     });
 
-    it('returns 403 ADMISSION_REQUIRED when createDeviceSessionWithAttestedKey throws KeyCollisionError (enforce, apple/google, supportsRefresh)', async () => {
-      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+    it('returns 403 ADMISSION_REQUIRED when createDeviceSessionWithAttestedKey throws KeyCollisionError (apple/google, supportsRefresh)', async () => {
       mockVerifyNativeAppleIdToken.mockResolvedValue({
         sub: 'apple-sub-1',
         email: 'appleuser@example.com',
       });
-      mockValidateAdmissionPayload.mockReturnValue({
+      mockRequireAdmissionPayload.mockReturnValue({
         platform: 'ios',
         kind: 'attestation',
         challenge: 'ch123',
@@ -1372,6 +1606,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           supportsRefresh: true,
           admission: {},
         })
@@ -1389,7 +1624,7 @@ describe('POST /api/auth/native/token', () => {
         sub: 'apple-sub-1',
         email: 'appleuser@example.com',
       });
-      mockValidateAdmissionPayload.mockReturnValue({
+      mockRequireAdmissionPayload.mockReturnValue({
         platform: 'ios',
         kind: 'attestation',
         challenge: 'ch123',
@@ -1413,6 +1648,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           supportsRefresh: true,
           admission: {},
         })
@@ -1423,6 +1659,7 @@ describe('POST /api/auth/native/token', () => {
         token: 'short-jwt',
         refreshToken: 'refresh-abc',
         expiresIn: 3600,
+        created: false,
       });
       // Must use the transactional combined function, not separate calls.
       expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
@@ -1447,11 +1684,11 @@ describe('POST /api/auth/native/token', () => {
         sub: 'google-sub-1',
         email: 'googleuser@example.com',
       });
-      mockCreateDeviceSession.mockResolvedValue('session-1');
-      mockIssueSessionCredentials.mockResolvedValue({
+      mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
         token: 'short-jwt',
         refreshToken: 'refresh-abc',
         expiresIn: 3600,
+        sessionId: 'session-1',
       });
 
       const response = await POST(
@@ -1467,12 +1704,16 @@ describe('POST /api/auth/native/token', () => {
         token: 'short-jwt',
         refreshToken: 'refresh-abc',
         expiresIn: 3600,
+        created: false,
       });
-      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
-        userId: fakeUser.id,
-        userAgent: undefined, // NextRequest has no user-agent header by default
-      });
-      expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1');
+      expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: fakeUser.id,
+          userAgent: undefined, // NextRequest has no user-agent header by default
+        })
+      );
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
       // idToken path records legacy use even with supportsRefresh.
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_google_idtoken_legacy_count: 1');
@@ -1489,9 +1730,14 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
@@ -1511,8 +1757,14 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
   });
@@ -1536,6 +1788,27 @@ describe('POST /api/auth/native/token', () => {
       mockCreateOrUpdateUser.mockResolvedValue({
         success: true,
         user: { ...fakeUser, blocked_reason: 'manual block' },
+        isNew: false,
+        deferredSignInEvent: deferredEvent,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockPosthogCapture).not.toHaveBeenCalled();
+    });
+
+    it('refuses a settled user with a block timestamp before emitting analytics', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: { ...fakeUser, blocked_reason: null, blocked_at: '2026-01-15T12:00:00.000Z' },
         isNew: false,
         deferredSignInEvent: deferredEvent,
       } as never);
@@ -1620,6 +1893,340 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(mockPosthogCapture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('created field', () => {
+    it('returns created: true for a new account on the email path', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: true,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'new@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });
+    });
+
+    it('returns created: true for a new account on the apple path', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: true,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });
+    });
+
+    it('returns created: true for a new account on the google path', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: true,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });
+    });
+
+    it('returns created: false for an existing account on the email path', async () => {
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'existing@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
+    });
+  });
+
+  describe('passkey', () => {
+    const ticketBody = { provider: 'passkey', ticket: 'ticket-1' } as const;
+
+    beforeEach(() => {
+      mockConsumeSignInTicket.mockResolvedValue({
+        id: 'ticket-row-1',
+        ticket_hash: 'hash',
+        kilo_user_id: fakeUser.id,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockFindUserById.mockResolvedValue(fakeUser);
+      mockCreateDeviceSession.mockResolvedValue('device-session-1');
+      mockIssueSessionCredentials.mockResolvedValue({
+        token: 'session-jwt',
+        refreshToken: 'session-refresh',
+        expiresIn: 3600,
+      });
+    });
+
+    it('exchanges a valid ticket for a device session without touching settlement or the OTP path', async () => {
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        token: 'session-jwt',
+        refreshToken: 'session-refresh',
+        expiresIn: 3600,
+        created: false,
+      });
+      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1');
+      expect(mockFindUserById).toHaveBeenCalledWith(fakeUser.id);
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'device-session-1');
+      // The ticket is the identity proof: no account settlement.
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+      // The email OTP reservation path stays untouched for a passkey.
+      expect(mockReserveSignInCode).not.toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+    });
+
+    it('mints a legacy long-lived token when the client does not support refresh', async () => {
+      const response = await POST(createRequest(ticketBody));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'device-session-1',
+      });
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('refuses a replayed ticket with 401 INVALID_TICKET and mints no second session', async () => {
+      const first = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+      expect(first.status).toBe(200);
+
+      // The ticket row is consumed atomically, so the replay finds no row.
+      mockConsumeSignInTicket.mockResolvedValue(null);
+      const replayed = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(replayed.status).toBe(401);
+      expect(await replayed.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
+      expect(mockIssueSessionCredentials).toHaveBeenCalledTimes(1);
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('refuses an expired ticket with 401 INVALID_TICKET and mints no session', async () => {
+      mockConsumeSignInTicket.mockResolvedValue(null);
+
+      const response = await POST(
+        createRequest({ provider: 'passkey', ticket: 'expired', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('rejects a blocked user without minting a session', async () => {
+      mockFindUserById.mockResolvedValue({ ...fakeUser, blocked_reason: 'banned' });
+
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('rejects a user with a block timestamp without minting a session', async () => {
+      mockFindUserById.mockResolvedValue({
+        ...fakeUser,
+        blocked_reason: null,
+        blocked_at: '2026-01-15T12:00:00.000Z',
+      });
+
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('refuses an SSO-required domain instead of bypassing it', async () => {
+      mockCheckDomainSignInEligibility.mockResolvedValue({
+        ok: false,
+        status: 403,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+      expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith(fakeUser.google_user_email);
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('requires a ticket', async () => {
+      const response = await POST(createRequest({ provider: 'passkey' }));
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rate limits', () => {
+    it('refuses a rate-limited address before verifying admission or the provider', async () => {
+      mockIsNativeTokenAddressRateLimited.mockResolvedValue(true);
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockIsNativeTokenAddressRateLimited).toHaveBeenCalledWith(expect.any(Object));
+      expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+      expect(mockVerifyNativeAppleIdToken).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('leaves the account rule unspent when the address is already rate limited', async () => {
+      mockIsNativeTokenAddressRateLimited.mockResolvedValue(true);
+
+      await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'nonce' }));
+
+      expect(mockIsNativeTokenUserRateLimited).not.toHaveBeenCalled();
+    });
+
+    it('refuses a rate-limited account after settlement and writes no session', async () => {
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          nonce: 'test-nonce',
+          supportsRefresh: true,
+        })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockIsNativeTokenUserRateLimited).toHaveBeenCalledWith(
+        expect.any(Object),
+        fakeUser.id
+      );
+      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('refuses a rate-limited account on the passkey path without minting a session', async () => {
+      mockConsumeSignInTicket.mockResolvedValue({
+        id: 'ticket-row-1',
+        ticket_hash: 'hash',
+        kilo_user_id: fakeUser.id,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockFindUserById.mockResolvedValue(fakeUser);
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+
+      const response = await POST(
+        createRequest({ provider: 'passkey', ticket: 'ticket-1', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('releases the email code reservation when the account is rate limited', async () => {
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('single-use provider assertions', () => {
+    it('returns 503 NONCE_STORE_UNAVAILABLE when the Google record cannot be written', async () => {
+      mockVerifyNativeGoogleIdToken.mockRejectedValue(
+        new NonceStoreUnavailableError('Google token record unavailable')
+      );
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'NONCE_STORE_UNAVAILABLE' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 INVALID_TOKEN for a Google token that was already spent', async () => {
+      mockVerifyNativeGoogleIdToken.mockRejectedValue(
+        new NativeIdTokenError('Google ID token already used')
+      );
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_TOKEN' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
   });
 });

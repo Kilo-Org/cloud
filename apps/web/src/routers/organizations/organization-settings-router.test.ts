@@ -1,33 +1,45 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   addUserToOrganization,
-  updateOrganizationSettings,
+  mutateOrganizationSettings,
   getOrganizationById,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   type User,
   type Organization,
-  custom_llm2,
+  ai_gateway_config,
+  auto_routing_custom_routers,
   organization_audit_logs,
   organization_group_memberships,
   organization_groups,
+  organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.setTimeout(30_000);
+
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
+// The experimental-settings procedure only admits a fixed allowlist of organization
+// ids. Point that allowlist at a throwaway organization so the procedure is testable.
+jest.mock('@kilocode/web-shared/lib/organizations/constants', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/organizations/constants'),
+  KILO_ORGANIZATION_ID: '3f1d8f7e-6a2b-4f0d-9a3c-0b6e5d4c2a10',
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => {
   return {
     getEnhancedOpenRouterModels: jest.fn(),
     buildAutoModelCatalogEntry: jest.fn(model => ({
@@ -43,21 +55,25 @@ jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => {
-  return {
-    getProviderSlugsForModel: jest.fn(),
-  };
-});
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => {
+    return {
+      getProviderSlugsForModel: jest.fn(),
+    };
+  }
+);
 
-jest.mock('@/lib/ai-gateway/experiments/membership', () => ({
-  isPublicIdExperimented: jest.fn(async () => false),
-}));
-
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
-import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
-import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
   return {
@@ -83,25 +99,22 @@ const mockedGetEnhancedOpenRouterModels =
 const mockedGetProviderSlugsForModel = getProviderSlugsForModel as unknown as jest.MockedFunction<
   typeof getProviderSlugsForModel
 >;
-const mockedIsPublicIdExperimented = isPublicIdExperimented as unknown as jest.MockedFunction<
-  typeof isPublicIdExperimented
->;
 
 describe('organizations settings trpc router', () => {
   beforeEach(() => {
     mockedGetProviderSlugsForModel.mockReset();
+    // The lookup receives exact ids (e.g. `openai/gpt-4o:free`); this fixture
+    // serves every variant from the same provider.
     mockedGetProviderSlugsForModel.mockImplementation(async modelId => {
       const provider = {
         'anthropic/claude-3-opus': 'anthropic',
         'gpt-3.5-turbo': 'openai',
         'gpt-4': 'openai',
         'openai/gpt-4o': 'openai',
-      }[modelId];
+      }[normalizeModelId(modelId)];
       return provider ? new Set([provider]) : new Set();
     });
     mockedGetEnhancedOpenRouterModels.mockReset();
-    mockedIsPublicIdExperimented.mockReset();
-    mockedIsPublicIdExperimented.mockResolvedValue(false);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({
       data: [
         makeTestOpenRouterModel('gpt-4'),
@@ -186,11 +199,11 @@ describe('organizations settings trpc router', () => {
     it('should clear default_model if it is in the new model_deny_list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
         provider_allow_list: ['openai'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: orgWithSettings.id,
@@ -206,11 +219,11 @@ describe('organizations settings trpc router', () => {
     it('should clear default_model if its provider is removed from provider_allow_list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
         provider_allow_list: ['openai'],
-      });
+      }));
       mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
 
       const result = await caller.organizations.settings.updateAllowLists({
@@ -297,10 +310,10 @@ describe('organizations settings trpc router', () => {
     it('should update partial settings', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
         provider_allow_list: ['openai'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
@@ -355,6 +368,52 @@ describe('organizations settings trpc router', () => {
       };
     }
 
+    it('lists only the requested organization routers for fallback and custom-mode pickers', async () => {
+      const organization = await createTestOrganization('Router catalog', owner.id, 0, {}, false);
+      const otherOrganization = await createTestOrganization(
+        'Other router catalog',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const personalSlug = `personal-${randomUUID()}`;
+      const gatewayModel = 'openai/gpt-4o';
+      const routerSettings = {
+        name: 'Coding',
+        base_router: 'efficient' as const,
+        mode: 'cost_per_accuracy' as const,
+        entries: [{ kind: 'gateway' as const, model: gatewayModel }],
+        default_entry_key: `gateway:${gatewayModel}`,
+      };
+      await db.insert(auto_routing_custom_routers).values([
+        { ...routerSettings, slug: 'coding', owned_by_organization_id: organization.id },
+        { ...routerSettings, slug: 'other', owned_by_organization_id: otherOrganization.id },
+        { ...routerSettings, slug: personalSlug, owned_by_user_id: member.id },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(member.id);
+        const result = await caller.organizations.settings.listAvailableModels({
+          organizationId: organization.id,
+        });
+
+        expect(result.data.filter(model => model.id.startsWith('kilo-auto/custom/'))).toEqual([
+          expect.objectContaining({
+            id: 'kilo-auto/custom/org/coding',
+            autoRouting: { models: [gatewayModel] },
+          }),
+        ]);
+      } finally {
+        await db
+          .delete(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.slug, personalSlug));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+        await db.delete(organizations).where(eq(organizations.id, otherOrganization.id));
+      }
+    });
+
     it('includes group-only custom LLMs only for members of an allowed group', async () => {
       const organization = await createTestOrganization(
         'Custom LLM Group Access',
@@ -387,10 +446,7 @@ describe('organizations settings trpc router', () => {
         organization_ids: [],
         group_ids: [group.id],
       };
-      await db.insert(custom_llm2).values({
-        public_id: publicId,
-        definition,
-      });
+      await insertCustomLlmForTest(publicId, definition);
 
       try {
         await expect(userHasCustomLlmAccess(definition, organization.id, member.id)).resolves.toBe(
@@ -412,7 +468,7 @@ describe('organizations settings trpc router', () => {
         expect(memberResult.data.some(model => model.id === publicId)).toBe(true);
         expect(ownerResult.data.some(model => model.id === publicId)).toBe(false);
       } finally {
-        await db.delete(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+        await deleteCustomLlmForTest(publicId);
         await db.delete(organizations).where(eq(organizations.id, organization.id));
       }
     });
@@ -639,9 +695,9 @@ describe('organizations settings trpc router', () => {
     it('should update default model when it is not denied', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         model_deny_list: ['claude-3'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateDefaultModel({
         organizationId: orgWithSettings.id,
@@ -688,9 +744,9 @@ describe('organizations settings trpc router', () => {
     it('rejects models outside the snapshot when no access policy is configured', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         data_collection: 'allow',
-      });
+      }));
 
       await expect(
         caller.organizations.settings.updateDefaultModel({
@@ -702,9 +758,24 @@ describe('organizations settings trpc router', () => {
       );
     });
 
-    it.each(['kilo-auto/balanced', 'kilo-internal/private-model'])(
-      'keeps %s defaults exempt from Enterprise model restrictions',
-      async modelId => {
+    it('keeps kilo-auto/balanced defaults exempt from Enterprise model restrictions', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateDefaultModel({
+        organizationId: orgWithModelDenyList.id,
+        default_model: 'kilo-auto/balanced',
+      });
+
+      expect(result.settings.default_model).toBe('kilo-auto/balanced');
+    });
+
+    it('keeps custom LLM defaults exempt when the custom LLM is granted to the organization', async () => {
+      const modelId = `acme/private-${randomUUID()}`;
+      await insertCustomLlmForTest(
+        modelId,
+        customLlmDefinition({ organization_ids: [orgWithModelDenyList.id] })
+      );
+      try {
         const caller = await createCallerForUser(owner.id);
 
         const result = await caller.organizations.settings.updateDefaultModel({
@@ -713,8 +784,27 @@ describe('organizations settings trpc router', () => {
         });
 
         expect(result.settings.default_model).toBe(modelId);
+      } finally {
+        await deleteCustomLlmForTest(modelId);
       }
-    );
+    });
+
+    it('applies Enterprise model restrictions to a custom LLM granted to another organization', async () => {
+      const modelId = `acme/private-${randomUUID()}`;
+      await insertCustomLlmForTest(modelId, customLlmDefinition({ organization_ids: [] }));
+      try {
+        const caller = await createCallerForUser(owner.id);
+
+        await expect(
+          caller.organizations.settings.updateDefaultModel({
+            organizationId: orgWithModelDenyList.id,
+            default_model: modelId,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      } finally {
+        await deleteCustomLlmForTest(modelId);
+      }
+    });
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {
       const caller = await createCallerForUser(member.id);
@@ -1038,19 +1128,6 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.org_auto_model?.fallback_model).toBe('openai/gpt-4o');
       expect(result.settings.provider_allow_list).toEqual(['openai']);
     });
-
-    it('rejects active model experiment public IDs as Organization Auto targets', async () => {
-      const caller = await createCallerForUser(owner.id);
-      mockedIsPublicIdExperimented.mockImplementation(async modelId => modelId === 'openai/gpt-4o');
-
-      await expect(
-        caller.organizations.settings.setOrganizationAutoRoute({
-          organizationId: testOrganization.id,
-          mode_slug: 'code',
-          model_id: 'openai/gpt-4o',
-        })
-      ).rejects.toThrow('cannot use an active model experiment');
-    });
   });
 
   describe('updateMinimumBalanceAlert procedure', () => {
@@ -1200,10 +1277,10 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when enabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
-      });
+      }));
 
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
@@ -1221,12 +1298,12 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when disabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
         minimum_balance: 100,
         minimum_balance_alert_email: ['alert@example.com'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
@@ -1243,7 +1320,7 @@ describe('organizations settings trpc router', () => {
   describe('updateRecommendationsDigest procedure', () => {
     afterEach(async () => {
       // Reset settings between cases so each starts from a clean slate.
-      await updateOrganizationSettings(testOrganization.id, {});
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
     });
 
     it('should enable the recommendations digest (enterprise org)', async () => {
@@ -1308,11 +1385,11 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when toggling the digest', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         minimum_balance: 100,
         minimum_balance_alert_email: ['alert@example.com'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateRecommendationsDigest({
         organizationId: testOrganization.id,
@@ -1323,6 +1400,436 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance).toBe(100);
       expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
       expect(result.settings.recommendations_digest_enabled).toBe(true);
+    });
+  });
+
+  describe('gateway settings', () => {
+    async function enableGatewaySettings(organizationIds: string[]) {
+      const config = { organization_features: { gateway_settings: organizationIds } };
+      await db
+        .insert(ai_gateway_config)
+        .values({ config })
+        .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
+    }
+
+    async function setPlan(organizationId: string, plan: 'teams' | 'enterprise') {
+      await db.update(organizations).set({ plan }).where(eq(organizations.id, organizationId));
+    }
+
+    beforeEach(async () => {
+      await setPlan(testOrganization.id, 'enterprise');
+    });
+
+    afterEach(async () => {
+      await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
+      await setPlan(testOrganization.id, 'teams');
+    });
+
+    it('reports whether gateway settings are available', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toEqual({
+        available: true,
+        disable_openrouter: false,
+        data_region: null,
+      });
+    });
+
+    it('saves gateway settings and records an audit log', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateGatewaySettings({
+        organizationId: testOrganization.id,
+        disable_openrouter: true,
+        data_region: 'eu',
+      });
+
+      expect(result.settings).toMatchObject({ disable_openrouter: true, data_region: 'eu' });
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({
+        disable_openrouter: true,
+        data_region: 'eu',
+      });
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.id);
+      expect(auditLogs.map(log => log.message)).toContain(
+        'Updated advanced policies: OpenRouter disabled; Inference region: European Union'
+      );
+    });
+
+    it('reports gateway settings as unavailable for a non-enterprise organization', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
+    });
+
+    it('rejects gateway settings for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Advanced policies are not available for this organization.',
+      });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('reports gateway settings as unavailable for an enterprise organization outside the feature', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
+    });
+
+    it('reports model gateway availability while the feature is enabled', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).resolves.toEqual({ gateways: [] });
+    });
+
+    it('rejects model gateway availability while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects model gateway availability for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects gateway settings while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('rejects gateway settings changes by members', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          data_region: 'us',
+        })
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('settings saves next to other settings writes', () => {
+    // Resolve once `expected` other backends wait for the organization row.
+    async function waitForOrganizationRowLockWaiters(expected: number): Promise<void> {
+      const deadline = Date.now() + 10_000;
+      for (;;) {
+        // A row lock wait is recorded against the waiting transaction.
+        const { rows } = await db.execute<{ n: number }>(sql`
+          SELECT count(DISTINCT activity.pid)::int AS n
+            FROM pg_locks locked
+            JOIN pg_stat_activity activity ON activity.pid = locked.pid
+           WHERE NOT locked.granted
+             AND locked.pid <> pg_backend_pid()
+             AND activity.datname = current_database()
+             AND activity.wait_event_type = 'Lock'
+             AND activity.query LIKE '%organizations%'
+        `);
+        if (Number(rows[0]?.n ?? 0) >= expected) return;
+        if (Date.now() > deadline) {
+          throw new Error(`timed out waiting for ${expected} organization row lock waiters`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+
+    // Holds the organization row with a locked settings write of
+    // `provider_allow_list` while `save` runs.
+    async function withConcurrentSettingsWrite<T>(
+      organizationId: string,
+      save: () => Promise<T>
+    ): Promise<T> {
+      const held = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const holder = db.transaction(async tx => {
+        await mutateOrganizationSettings(
+          organizationId,
+          organization => ({ ...organization.settings, provider_allow_list: ['anthropic'] }),
+          tx
+        );
+        held.resolve();
+        await release.promise;
+      });
+
+      try {
+        await held.promise;
+        const pending = save();
+        await waitForOrganizationRowLockWaiters(1);
+        release.resolve();
+        const [result] = await Promise.all([pending, holder]);
+        return result;
+      } finally {
+        release.resolve();
+      }
+    }
+
+    async function resetSettings(organizationId: string, settings: object) {
+      await mutateOrganizationSettings(organizationId, () => settings);
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+    }
+
+    it('saves the data collection policy', async () => {
+      await resetSettings(testOrganization.id, { data_collection: 'allow' });
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await withConcurrentSettingsWrite(testOrganization.id, () =>
+        caller.organizations.settings.updateDataCollection({
+          organizationId: testOrganization.id,
+          dataCollection: 'deny',
+        })
+      );
+
+      expect(result.settings.data_collection).toBe('deny');
+      expect(result.settings.provider_allow_list).toEqual(['anthropic']);
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.data_collection).toBe('deny');
+      expect(stored?.settings.provider_allow_list).toEqual(['anthropic']);
+    });
+
+    it('saves the minimum balance alert', async () => {
+      await resetSettings(testOrganization.id, {});
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await withConcurrentSettingsWrite(testOrganization.id, () =>
+        caller.organizations.settings.updateMinimumBalanceAlert({
+          organizationId: testOrganization.id,
+          enabled: true,
+          minimum_balance: 100,
+          minimum_balance_alert_email: ['alert@example.com'],
+        })
+      );
+
+      expect(result.settings.minimum_balance).toBe(100);
+      expect(result.settings.provider_allow_list).toEqual(['anthropic']);
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
+      expect(stored?.settings.provider_allow_list).toEqual(['anthropic']);
+    });
+
+    it('saves the projects UI flag', async () => {
+      const privilegedOrganizationId = KILO_ORGANIZATION_ID;
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, privilegedOrganizationId));
+      await db.delete(organizations).where(eq(organizations.id, privilegedOrganizationId));
+      await db.insert(organizations).values({
+        id: privilegedOrganizationId,
+        name: 'Privileged Settings Organization',
+        created_by_kilo_user_id: owner.id,
+        plan: 'enterprise',
+        require_seats: false,
+        settings: {},
+      });
+      await addUserToOrganization(privilegedOrganizationId, owner.id, 'owner');
+
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await withConcurrentSettingsWrite(privilegedOrganizationId, () =>
+        caller.organizations.settings.updateProjectsUIEnabled({
+          organizationId: privilegedOrganizationId,
+          projects_ui_enabled: true,
+        })
+      );
+
+      expect(result.settings.projects_ui_enabled).toBe(true);
+      expect(result.settings.provider_allow_list).toEqual(['anthropic']);
+
+      const stored = await getOrganizationById(privilegedOrganizationId);
+      expect(stored?.settings.projects_ui_enabled).toBe(true);
+      expect(stored?.settings.provider_allow_list).toEqual(['anthropic']);
+    });
+
+    it('records a data collection policy change in the audit log', async () => {
+      await resetSettings(testOrganization.id, {});
+      const caller = await createCallerForUser(billingManager.id);
+
+      const save = (dataCollection: 'allow' | 'deny' | null) =>
+        caller.organizations.settings.updateDataCollection({
+          organizationId: testOrganization.id,
+          dataCollection,
+        });
+
+      await save('deny');
+      await save('deny');
+      await save(null);
+      await save(null);
+
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.created_at, organization_audit_logs.id);
+
+      expect(auditLogs.map(log => log.message)).toEqual([
+        'Data collection: denied',
+        'Data collection: follow extension setting',
+      ]);
+      for (const log of auditLogs) {
+        expect(log.action).toBe('organization.settings.change');
+        expect(log.actor_id).toBe(billingManager.id);
+        expect(log.actor_email).toBe('billing-settings@example.com');
+      }
+    });
+  });
+
+  describe('browser control', () => {
+    async function resetBrowserControl() {
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+    }
+
+    it('saves the control mode and normalizes the allowed origins', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateBrowserControl({
+        organizationId: testOrganization.id,
+        browserControl: 'playwright_only',
+        browserAllowedOrigins: [
+          'https://example.com/',
+          'https://EXAMPLE.com',
+          'http://localhost:3000',
+        ],
+      });
+
+      expect(result).toEqual({
+        browserControl: 'playwright_only',
+        browserAllowedOrigins: ['https://example.com', 'http://localhost:3000'],
+      });
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.browserControl).toBe('playwright_only');
+      expect(stored?.settings.browserAllowedOrigins).toEqual([
+        'https://example.com',
+        'http://localhost:3000',
+      ]);
+    });
+
+    it('rejects a stored origin with a path', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateBrowserControl({
+          organizationId: testOrganization.id,
+          browserControl: 'allow',
+          browserAllowedOrigins: ['https://example.com/checkout'],
+        })
+      ).rejects.toThrow();
+    });
+
+    it('rejects changes by members and billing managers', async () => {
+      await resetBrowserControl();
+
+      for (const user of [member, billingManager]) {
+        const caller = await createCallerForUser(user.id);
+        await expect(
+          caller.organizations.settings.updateBrowserControl({
+            organizationId: testOrganization.id,
+            browserControl: 'off',
+            browserAllowedOrigins: [],
+          })
+        ).rejects.toThrow();
+      }
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.browserControl).toBeUndefined();
+    });
+
+    it('records one audit log entry per change', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+      const save = (browserControl: 'allow' | 'playwright_only' | 'off') =>
+        caller.organizations.settings.updateBrowserControl({
+          organizationId: testOrganization.id,
+          browserControl,
+          browserAllowedOrigins: ['https://example.com'],
+        });
+
+      await save('off');
+      await save('off');
+      await save('allow');
+
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.created_at, organization_audit_logs.id);
+
+      expect(auditLogs.map(log => log.message)).toEqual([
+        'Browser control: off (allowed origins: https://example.com)',
+        'Browser control: allow (allowed origins: https://example.com)',
+      ]);
+      for (const log of auditLogs) {
+        expect(log.action).toBe('organization.settings.change');
+        expect(log.actor_id).toBe(owner.id);
+      }
     });
   });
 });

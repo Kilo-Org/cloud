@@ -15,10 +15,6 @@
 
 import { atom } from 'jotai';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type EnvVar = {
   key: string;
   value: string;
@@ -29,10 +25,6 @@ export type ProfileConfig = {
   vars: EnvVar[];
   commands: string[];
 };
-
-// ============================================================================
-// Base Atoms - Manual Configuration
-// ============================================================================
 
 /**
  * Manual environment variables added by user via EnvVarsDialog
@@ -62,10 +54,6 @@ export const hasAutoSelectedDefaultAtom = atom(false);
  * Set by useEffect when profile data is fetched via React Query
  */
 export const profileConfigAtom = atom<ProfileConfig | null>(null);
-
-// ============================================================================
-// Derived Atoms - Effective Configuration
-// ============================================================================
 
 /**
  * Effective environment variables: profile + manual merged
@@ -116,10 +104,6 @@ export const effectiveSetupCommandsAtom = atom(get => {
 
   return effectiveCommands;
 });
-
-// ============================================================================
-// Action Atoms
-// ============================================================================
 
 /**
  * Add or update a manual env var

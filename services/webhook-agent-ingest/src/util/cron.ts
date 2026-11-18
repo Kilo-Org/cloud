@@ -1,20 +1,25 @@
 import { Cron } from 'croner';
 
 /**
- * Compute the next occurrence of a cron expression after now.
+ * Compute the next occurrence of a cron expression strictly after `after`
+ * (defaults to now). Passing the previously targeted occurrence as `after`
+ * guarantees the result advances to the following occurrence even if this
+ * is called before that previous occurrence's wall-clock time has passed
+ * (e.g. an alarm that fired a few seconds early).
  */
-export function computeNextCronTime(expression: string, timezone: string): Date | null {
+export function computeNextCronTime(
+  expression: string,
+  timezone: string,
+  after?: Date
+): Date | null {
   try {
     const job = new Cron(expression, { timezone });
-    return job.nextRun() ?? null;
+    return job.nextRun(after) ?? null;
   } catch {
     return null;
   }
 }
 
-/**
- * Validate a cron expression. Returns { valid: true } or { valid: false, error: string }.
- */
 export function validateCronExpression(
   expression: string
 ): { valid: true } | { valid: false; error: string } {
@@ -26,10 +31,6 @@ export function validateCronExpression(
   }
 }
 
-/**
- * Check that the minimum interval between consecutive runs is at least `minMs` milliseconds.
- * Default minimum is 60000ms (1 minute).
- */
 export function enforcesMinimumInterval(
   expression: string,
   timezone: string,
@@ -47,9 +48,6 @@ export function enforcesMinimumInterval(
   }
 }
 
-/**
- * Check if a string is a valid IANA timezone identifier.
- */
 export function isValidTimezone(tz: string): boolean {
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });

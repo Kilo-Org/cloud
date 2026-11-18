@@ -8,7 +8,13 @@ import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStream
 import { CouncilGovernancePanel } from '@/components/code-reviews/CouncilGovernancePanel';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
+import { getCodeReviewCancellationCopy } from '@/lib/code-reviews/cancellation-copy';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
+import {
+  formatSessionCost,
+  formatSessionTotalCost,
+  isRenderableSessionCost,
+} from '@/components/cloud-agent-next/session-cost-breakdown';
 import { ExternalLink, GitPullRequest, Loader2, ArrowLeft, RotateCcw, Ban } from 'lucide-react';
 import { getCodeReviewStatusIcon } from '@/components/code-reviews/code-review-status-icons';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -16,6 +22,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow, format } from 'date-fns';
 import { TRPCClientError } from '@trpc/client';
 import { toast } from 'sonner';
+import { useCallback } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -33,6 +40,11 @@ type CodeReviewDetailClientProps = {
 export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const handleComplete = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
+    });
+  }, [queryClient, reviewId, trpc]);
 
   const { data, isLoading, error } = useQuery({
     ...trpc.codeReviews.get.queryOptions({ reviewId }),
@@ -45,10 +57,15 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
 
   const retriggerMutation = useMutation(
     trpc.codeReviews.retrigger.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Code review retriggered', {
-          description: 'The code review has been queued for processing.',
-        });
+      onSuccess: async result => {
+        if (!result.success) {
+          // Dispatch marked the review failed again, so the retry never started.
+          toast.error('Failed to retrigger code review', { description: result.error });
+        } else {
+          toast.success('Code review retriggered', {
+            description: 'The code review has been queued for processing.',
+          });
+        }
         await queryClient.invalidateQueries({
           queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
         });
@@ -122,29 +139,40 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   const canCancel = isCancellableReviewStatus(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
   const jobsHref = getCodeReviewJobsHref(review.platform, review.owned_by_organization_id);
-  const isSupersededCancellation =
-    status === 'cancelled' &&
-    (review.terminal_reason === 'superseded' ||
-      review.error_message?.toLowerCase().includes('superseded'));
+  // Billing-derived session cost is authoritative when available; fall back to the
+  // orchestrator-accumulated review cost when the billing lookup has nothing (no
+  // linked session, an in-flight review, or a failed lookup).
+  const sessionCostMusd = data.sessionCostMusd ?? review.total_cost_musd;
   // Reasons with customer-facing copy render muted rather than destructive: the
   // cause is stated plainly and there is nothing broken on our side to alarm
-  // about. Checked before the raw error_message so the friendlier text wins.
+  // about. Checked before the cancellation copy so the specific reason wins, and
+  // both before the raw error_message.
   const terminalReasonCopy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
+  const cancellationCopy = getCodeReviewCancellationCopy({
+    status: review.status,
+    terminalReason: review.terminal_reason,
+    errorMessage: review.error_message,
+    platform: review.platform,
+  });
   const reviewMessage = terminalReasonCopy
     ? {
         label: terminalReasonCopy.label,
         message: terminalReasonCopy.message,
         className: 'border-border bg-muted/30 text-muted-foreground',
       }
-    : review.error_message
+    : cancellationCopy
       ? {
-          label: isSupersededCancellation ? 'Cancelled' : 'Error',
-          message: isSupersededCancellation ? 'Superseded by a newer push.' : review.error_message,
-          className: isSupersededCancellation
-            ? 'border-border bg-muted/30 text-muted-foreground'
-            : 'border-destructive/30 bg-destructive/10 text-destructive',
+          label: cancellationCopy.label,
+          message: cancellationCopy.message,
+          className: 'border-border bg-muted/30 text-muted-foreground',
         }
-      : null;
+      : review.error_message
+        ? {
+            label: 'Error',
+            message: review.error_message,
+            className: 'border-destructive/30 bg-destructive/10 text-destructive',
+          }
+        : null;
   return (
     <PageContainer>
       {/* Back link */}
@@ -258,10 +286,16 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                 </dd>
               </div>
             )}
-            {review.total_cost_musd != null && review.total_cost_musd > 0 && (
+            {sessionCostMusd != null && isRenderableSessionCost(sessionCostMusd / 1_000_000) && (
               <div>
-                <dt className="text-muted-foreground">Cost</dt>
-                <dd>${(review.total_cost_musd / 1_000_000).toFixed(4)}</dd>
+                <dt className="text-muted-foreground">Model cost</dt>
+                <dd>{formatSessionCost(sessionCostMusd / 1_000_000)}</dd>
+              </div>
+            )}
+            {data.containerCostMusd != null && (
+              <div>
+                <dt className="text-muted-foreground">Compute cost</dt>
+                <dd>{formatSessionTotalCost(data.containerCostMusd / 1_000_000)}</dd>
               </div>
             )}
             <div>
@@ -304,7 +338,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                   className="gap-2"
                 >
                   <RotateCcw
-                    className={`h-3 w-3 ${retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                    className={`h-3 w-3 ${retriggerMutation.isPending ? 'animate-spin [animation-direction:reverse]' : ''}`}
                   />
                   {retriggerMutation.isPending ? 'Retrying...' : 'Retry'}
                 </Button>
@@ -327,11 +361,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
         <CodeReviewStreamView
           reviewId={reviewId}
           attempts={data.attempts}
-          onComplete={() => {
-            void queryClient.invalidateQueries({
-              queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
-            });
-          }}
+          onComplete={handleComplete}
         />
       )}
     </PageContainer>

@@ -1,0 +1,321 @@
+import { describe, expect, it, jest } from '@jest/globals';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { agent_configs, security_findings } from '@kilocode/db/schema';
+import type { NewSecurityFinding } from '@kilocode/db/schema';
+import type { SecurityFindingAnalysis } from '@kilocode/db/schema-types';
+import { SecurityAuditLogActorType } from '@kilocode/db/schema-types';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { and, eq, inArray } from 'drizzle-orm';
+import { autoDismissEligibleFindings, countEligibleForAutoDismiss } from './auto-dismiss-service';
+
+const mockDismissDependabotAlert = jest.fn();
+
+jest.mock('@/lib/security-agent/github/dependabot-api', () => ({
+  dismissDependabotAlert: mockDismissDependabotAlert,
+}));
+
+function finding(
+  userId: string,
+  sourceId: string,
+  overrides: Partial<NewSecurityFinding> = {}
+): NewSecurityFinding {
+  return {
+    owned_by_user_id: userId,
+    repo_full_name: 'acme/repo',
+    source: 'dependabot',
+    source_id: sourceId,
+    severity: 'high',
+    package_name: `package-${sourceId}`,
+    package_ecosystem: 'npm',
+    title: `Security Finding ${sourceId}`,
+    analysis_status: 'completed',
+    ...overrides,
+  };
+}
+
+function triageAnalysis(
+  triage: Partial<NonNullable<SecurityFindingAnalysis['triage']>> = {}
+): SecurityFindingAnalysis {
+  return {
+    analyzedAt: '2026-06-16T10:00:00.000Z',
+    triage: {
+      suggestedAction: 'dismiss',
+      confidence: 'high',
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'No runtime path',
+      triageAt: '2026-06-16T10:00:00.000Z',
+      ...triage,
+    },
+  };
+}
+
+const sandboxAnalysis = {
+  analyzedAt: '2026-06-16T10:00:00.000Z',
+  sandboxAnalysis: {
+    isExploitable: false,
+    exploitabilityReasoning: 'The vulnerable path is unreachable.',
+    usageLocations: [],
+    suggestedFix: 'Upgrade the dependency',
+    suggestedAction: 'dismiss',
+    summary: 'Not reachable',
+    rawMarkdown: 'Not reachable',
+    analysisAt: '2026-06-16T10:00:00.000Z',
+  },
+} satisfies SecurityFindingAnalysis;
+
+async function enableAutoDismissFor(userId: string): Promise<void> {
+  await db.insert(agent_configs).values({
+    owned_by_user_id: userId,
+    agent_type: 'security_scan',
+    platform: 'github',
+    config: { auto_dismiss_enabled: true, auto_dismiss_confidence_threshold: 'low' },
+    is_enabled: true,
+    created_by: userId,
+  });
+}
+
+async function statusesBySourceId(userId: string): Promise<Record<string, string>> {
+  const rows = await db
+    .select({ sourceId: security_findings.source_id, status: security_findings.status })
+    .from(security_findings)
+    .where(eq(security_findings.owned_by_user_id, userId));
+
+  return Object.fromEntries(rows.map(row => [row.sourceId, row.status]));
+}
+
+describe('auto-dismiss eligibility', () => {
+  it('returns owner-scoped eligibility totals and dismissal results', async () => {
+    const user = await insertTestUser();
+    const otherUser = await insertTestUser();
+    await enableAutoDismissFor(user.id);
+
+    await db.insert(security_findings).values([
+      finding(user.id, 'triage-high', { analysis: triageAnalysis({ confidence: 'high' }) }),
+      finding(user.id, 'triage-medium', { analysis: triageAnalysis({ confidence: 'medium' }) }),
+      finding(user.id, 'triage-low', { analysis: triageAnalysis({ confidence: 'low' }) }),
+      finding(user.id, 'sandbox-present', {
+        analysis: { ...sandboxAnalysis, triage: triageAnalysis().triage },
+      }),
+      finding(user.id, 'sandbox-null', {
+        analysis: {
+          analyzedAt: '2026-06-16T10:00:00.000Z',
+          triage: triageAnalysis().triage,
+          sandboxAnalysis: null,
+        } as unknown as SecurityFindingAnalysis,
+      }),
+      finding(user.id, 'needs-sandbox', {
+        analysis: triageAnalysis({ needsSandboxAnalysis: true }),
+      }),
+      finding(user.id, 'needs-sandbox-string', {
+        analysis: triageAnalysis({ needsSandboxAnalysis: 'false' as unknown as boolean }),
+      }),
+      finding(user.id, 'already-ignored', {
+        status: 'ignored',
+        analysis: triageAnalysis(),
+      }),
+      finding(user.id, 'analysis-pending', {
+        analysis_status: 'pending',
+        analysis: triageAnalysis(),
+      }),
+      finding(user.id, 'manual-review', {
+        analysis: triageAnalysis({ suggestedAction: 'manual_review' }),
+      }),
+      finding(user.id, 'no-triage', { analysis: { analyzedAt: '2026-06-16T10:00:00.000Z' } }),
+      finding(otherUser.id, 'other-owner', { analysis: triageAnalysis() }),
+    ]);
+
+    await expect(countEligibleForAutoDismiss({ userId: user.id }, user.id)).resolves.toEqual({
+      eligible: 3,
+      byConfidence: { high: 1, medium: 1, low: 1 },
+    });
+
+    await expect(
+      autoDismissEligibleFindings(
+        { userId: user.id },
+        {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: user.id,
+          email: 'owner@example.com',
+          name: 'Owner Example',
+        }
+      )
+    ).resolves.toEqual({ dismissed: 3, skipped: 4, errors: 0 });
+
+    await expect(statusesBySourceId(user.id)).resolves.toEqual({
+      'triage-high': 'ignored',
+      'triage-medium': 'ignored',
+      'triage-low': 'ignored',
+      'sandbox-present': 'open',
+      'sandbox-null': 'open',
+      'needs-sandbox': 'open',
+      'needs-sandbox-string': 'open',
+      'already-ignored': 'ignored',
+      'analysis-pending': 'open',
+      'manual-review': 'open',
+      'no-triage': 'open',
+    });
+
+    await expect(countEligibleForAutoDismiss({ userId: user.id }, user.id)).resolves.toEqual({
+      eligible: 0,
+      byConfidence: { high: 0, medium: 0, low: 0 },
+    });
+    expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
+  });
+
+  it('counts the supported confidence levels', async () => {
+    const user = await insertTestUser();
+
+    await db.insert(security_findings).values([
+      finding(user.id, 'confidence-high', { analysis: triageAnalysis({ confidence: 'high' }) }),
+      finding(user.id, 'confidence-unknown', {
+        analysis: triageAnalysis({ confidence: 'certain' as unknown as 'high' }),
+      }),
+    ]);
+
+    await expect(countEligibleForAutoDismiss({ userId: user.id }, user.id)).resolves.toEqual({
+      eligible: 1,
+      byConfidence: { high: 1, medium: 0, low: 0 },
+    });
+  });
+
+  it('applies organization policy with owner-scoped accounting', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Security fixture', user.id, 0);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: { auto_dismiss_enabled: true, auto_dismiss_confidence_threshold: 'medium' },
+      is_enabled: true,
+      created_by: user.id,
+    });
+    const rows = await db
+      .insert(security_findings)
+      .values([
+        ...(['high', 'medium', 'low'] as const).map(confidence =>
+          finding(user.id, `org-${confidence}`, {
+            owned_by_user_id: null,
+            owned_by_organization_id: organization.id,
+            analysis: triageAnalysis({ confidence }),
+          })
+        ),
+        finding(user.id, 'personal-high', { analysis: triageAnalysis() }),
+      ])
+      .returning({ id: security_findings.id });
+    const owner = { organizationId: organization.id };
+
+    await expect(countEligibleForAutoDismiss(owner, user.id)).resolves.toEqual({
+      eligible: 3,
+      byConfidence: { high: 1, medium: 1, low: 1 },
+    });
+    await expect(
+      autoDismissEligibleFindings(owner, {
+        type: SecurityAuditLogActorType.CustomerUser,
+        id: user.id,
+        email: user.google_user_email,
+        name: user.google_user_name,
+      })
+    ).resolves.toEqual({ dismissed: 2, skipped: 1, errors: 0 });
+    await expect(countEligibleForAutoDismiss(owner, user.id)).resolves.toEqual({
+      eligible: 1,
+      byConfidence: { high: 0, medium: 0, low: 1 },
+    });
+    const stored = await db
+      .select({ sourceId: security_findings.source_id, status: security_findings.status })
+      .from(security_findings)
+      .where(
+        inArray(
+          security_findings.id,
+          rows.map(row => row.id)
+        )
+      );
+    expect(Object.fromEntries(stored.map(row => [row.sourceId, row.status]))).toEqual({
+      'org-high': 'ignored',
+      'org-medium': 'ignored',
+      'org-low': 'open',
+      'personal-high': 'open',
+    });
+  });
+
+  it('dismisses a backlog larger than one read page with real keyset paging', async () => {
+    const user = await insertTestUser();
+    await enableAutoDismissFor(user.id);
+    // Threshold 'high' makes the medium-confidence seeded row an in-page skip
+    // (the SQL candidate condition still fetches it), which makes a dropped id
+    // cursor observable as repeated skips.
+    await db
+      .update(agent_configs)
+      .set({ config: { auto_dismiss_enabled: true, auto_dismiss_confidence_threshold: 'high' } })
+      .where(
+        and(
+          eq(agent_configs.owned_by_user_id, user.id),
+          eq(agent_configs.agent_type, 'security_scan')
+        )
+      );
+
+    // 102 eligible rows span one full read page plus a tail. An ineligible
+    // finding inside the first page makes a dropped id cursor observable: a
+    // correct cursor skips it once, while a dropped cursor re-reads it (it is
+    // still open) on every page and the skip count grows.
+    const eligibleCount = 102;
+    await db.insert(security_findings).values([
+      ...Array.from({ length: eligibleCount }, (_, index) =>
+        finding(user.id, `bulk-page-${String(index).padStart(3, '0')}`, {
+          analysis: triageAnalysis({ confidence: 'high', needsSandboxReasoning: 'Unreachable' }),
+        })
+      ),
+      finding(user.id, 'bulk-page-ineligible', {
+        // Deterministic uuid that sorts first among generated v4 ids, so this
+        // row is always read in page 1. The SQL candidate condition keeps it
+        // (suggestedAction is 'dismiss'); the configured confidence threshold
+        // rejects it inside the page. Its per-page re-reads make a dropped id
+        // cursor observable.
+        id: '00000000-0000-4000-8000-000000000000',
+        analysis: triageAnalysis({ confidence: 'medium' }),
+      }),
+    ]);
+
+    await expect(
+      autoDismissEligibleFindings(
+        { userId: user.id },
+        {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: user.id,
+          email: 'owner@example.com',
+          name: 'Owner Example',
+        }
+      )
+    ).resolves.toEqual({ dismissed: eligibleCount, skipped: 1, errors: 0 });
+
+    const statuses = await statusesBySourceId(user.id);
+    const pageStatuses = Object.entries(statuses).filter(([sourceId]) =>
+      sourceId.startsWith('bulk-page-')
+    );
+    expect(pageStatuses).toHaveLength(eligibleCount + 1);
+    expect(
+      pageStatuses.every(([sourceId, status]) =>
+        sourceId === 'bulk-page-ineligible' ? status === 'open' : status === 'ignored'
+      )
+    ).toBe(true);
+
+    await expect(countEligibleForAutoDismiss({ userId: user.id }, user.id)).resolves.toEqual({
+      eligible: 1,
+      byConfidence: { high: 0, medium: 1, low: 0 },
+    });
+    // The sweep stops when the final read page is short: a second run dismisses
+    // nothing new and re-skips only the medium-confidence row.
+    await expect(
+      autoDismissEligibleFindings(
+        { userId: user.id },
+        {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: user.id,
+          email: 'owner@example.com',
+          name: 'Owner Example',
+        }
+      )
+    ).resolves.toEqual({ dismissed: 0, skipped: 1, errors: 0 });
+    expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
+  });
+});

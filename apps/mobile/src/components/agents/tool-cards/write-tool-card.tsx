@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { FilePlus } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -13,6 +14,7 @@ import { useOpenPartDetail } from '../open-part-detail-context';
 import { ReadMarkdownBody } from '../read-markdown-body';
 import { isMarkdownPath } from '../read-tool-markdown';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 
 const WRITE_CODE_CHARACTER_CAP = 50_000;
 
@@ -25,6 +27,7 @@ const optionalStringSchema = z.string().optional();
  * `ToolPartDetailBody`.
  */
 export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
+  const { t } = useTranslation();
   const input = part.state.input;
   const filePath = optionalStringSchema.safeParse(input.filePath).data ?? '';
   const content = optionalStringSchema.safeParse(input.content).data ?? '';
@@ -38,7 +41,9 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   } else if (isMarkdownPath(filePath)) {
     body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
   } else if (content === '') {
-    body = <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+    body = (
+      <Text className="text-xs text-muted-foreground">{t('agentChat.filePart.fileEmpty')}</Text>
+    );
   } else {
     body = (
       <CodeBlock
@@ -59,6 +64,7 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -66,8 +72,12 @@ export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={FilePlus}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: toolStatusLabel(t, part.state.status),
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

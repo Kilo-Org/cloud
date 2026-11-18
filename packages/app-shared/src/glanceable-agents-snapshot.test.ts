@@ -1,0 +1,702 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
+  countGlanceableApprovals,
+  countGlanceableSessions,
+  GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  glanceableAgentsSnapshotSchema,
+  glanceableStatusKind,
+  isEligibleGlanceableWork,
+  isStartableGlanceableWork,
+  newestGlanceableResult,
+  oldestNeedsInputSince,
+  shouldDiscardGlanceableRevision,
+  soonestScheduledAt,
+} from './glanceable-agents-snapshot';
+import { parseTimestamp } from './utils';
+
+const NOW = 1_750_000_000_000;
+
+describe('countGlanceableSessions', () => {
+  it('maps busy to running, question/permission/retry to needs-input, idle to idle', () => {
+    const counts = countGlanceableSessions([
+      { status: 'busy' },
+      { status: 'busy' },
+      { status: 'question' },
+      { status: 'permission' },
+      { status: 'permission' },
+      { status: 'retry' },
+      { status: 'idle' },
+      { status: 'idle' },
+    ]);
+    expect(counts).toEqual({ running: 2, needsInput: 4, idle: 2, scheduled: 0 });
+  });
+
+  it('counts Cloud Agent-shaped and CLI-shaped rows together on status alone', () => {
+    const cloudRow = { status: 'busy', kind: 'cloud-agent' };
+    const cliRow = { status: 'retry', connectionId: 'cli-1' };
+    expect(countGlanceableSessions([cloudRow, cliRow])).toEqual({
+      running: 1,
+      needsInput: 1,
+      idle: 0,
+      scheduled: 0,
+    });
+  });
+
+  it('counts idle-only sessions as idle', () => {
+    expect(countGlanceableSessions([{ status: 'idle' }, { status: 'idle' }])).toEqual({
+      running: 0,
+      needsInput: 0,
+      idle: 2,
+      scheduled: 0,
+    });
+  });
+
+  it('counts a scheduled row as scheduled, not idle or running', () => {
+    expect(
+      countGlanceableSessions([
+        { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+        { status: 'scheduled' },
+      ])
+    ).toEqual({ running: 0, needsInput: 0, idle: 0, scheduled: 2 });
+  });
+
+  it('counts completed, failed, unknown, and empty statuses as running', () => {
+    expect(
+      countGlanceableSessions([
+        { status: 'completed' },
+        { status: 'failed' },
+        { status: 'mystery' },
+        { status: '' },
+      ])
+    ).toEqual({ running: 4, needsInput: 0, idle: 0, scheduled: 0 });
+  });
+});
+
+describe('countGlanceableApprovals', () => {
+  const cases = [
+    {
+      label: 'permission-only',
+      sessions: [{ status: 'permission' }],
+      approvals: 1,
+      counts: { running: 0, needsInput: 1, idle: 0, scheduled: 0 },
+    },
+    {
+      label: 'question-only',
+      sessions: [{ status: 'question' }],
+      approvals: 0,
+      counts: { running: 0, needsInput: 1, idle: 0, scheduled: 0 },
+    },
+    {
+      label: 'retry-only',
+      sessions: [{ status: 'retry' }],
+      approvals: 0,
+      counts: { running: 0, needsInput: 1, idle: 0, scheduled: 0 },
+    },
+    {
+      label: 'mixed',
+      sessions: [
+        { status: 'busy' },
+        { status: 'question' },
+        { status: 'permission' },
+        { status: 'retry' },
+        { status: 'idle' },
+      ],
+      approvals: 1,
+      counts: { running: 1, needsInput: 3, idle: 1, scheduled: 0 },
+    },
+  ] as const;
+
+  it.each(cases)(
+    'counts $label as $approvals approvable while every existing count is unchanged',
+    ({ sessions, approvals, counts }) => {
+      // Narrower than needsInput: only a permission can be approved without
+      // choosing an option, so question and retry must not move this count.
+      expect(countGlanceableApprovals(sessions)).toBe(approvals);
+      expect(countGlanceableSessions(sessions)).toEqual(counts);
+    }
+  );
+
+  it('counts each permission row and ignores every other status', () => {
+    expect(
+      countGlanceableApprovals([
+        { status: 'busy' },
+        { status: 'permission' },
+        { status: 'permission' },
+        { status: 'question' },
+        { status: 'retry' },
+        { status: 'idle' },
+        { status: 'mystery' },
+      ])
+    ).toBe(2);
+    expect(countGlanceableApprovals([])).toBe(0);
+  });
+});
+
+describe('glanceableStatusKind', () => {
+  // The one matrix every glanceable sink reads — the platform-specific sinks
+  // (iOS Live Activity, Android widget) all consume these counts and kinds.
+  it('maps busy, starting, unknown, and empty to running', () => {
+    expect(glanceableStatusKind('busy')).toBe('running');
+    expect(glanceableStatusKind('starting')).toBe('running');
+    expect(glanceableStatusKind('mystery')).toBe('running');
+    expect(glanceableStatusKind('')).toBe('running');
+  });
+
+  it('maps question/permission/retry to needsInput', () => {
+    expect(glanceableStatusKind('question')).toBe('needsInput');
+    expect(glanceableStatusKind('permission')).toBe('needsInput');
+    expect(glanceableStatusKind('retry')).toBe('needsInput');
+  });
+
+  it('maps idle to idle', () => {
+    expect(glanceableStatusKind('idle')).toBe('idle');
+  });
+
+  it('maps the literal scheduled status to scheduled', () => {
+    expect(glanceableStatusKind('scheduled')).toBe('scheduled');
+  });
+
+  it('maps an unknown status kind to running, never idle', () => {
+    expect(glanceableStatusKind('mystery')).toBe('running');
+    expect(glanceableStatusKind('mystery')).not.toBe('idle');
+    expect(glanceableStatusKind('')).toBe('running');
+    expect(glanceableStatusKind('')).not.toBe('idle');
+  });
+});
+
+describe('buildOpaqueScopeKey', () => {
+  it('is stable for the same input and never returns the raw ids', () => {
+    const a = buildOpaqueScopeKey({ userId: 'oauth/user-1', organizationId: 'org-9' });
+    const b = buildOpaqueScopeKey({ userId: 'oauth/user-1', organizationId: 'org-9' });
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{8}$/);
+    expect(a).not.toContain('oauth/user-1');
+    expect(a).not.toContain('org-9');
+  });
+
+  it('differs when the user or organization differs', () => {
+    const personal = buildOpaqueScopeKey({ userId: 'u1', organizationId: null });
+    const org = buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-1' });
+    const otherUser = buildOpaqueScopeKey({ userId: 'u2', organizationId: 'org-1' });
+    expect(new Set([personal, org, otherUser]).size).toBe(3);
+  });
+});
+
+describe('buildGlanceableSnapshot', () => {
+  it('increases revision and marks expiry 8 hours after updatedAt', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'oauth/user-1',
+      organizationId: 'org-9',
+      now: NOW,
+    });
+    expect(snapshot.revision).toBe(1);
+    expect(snapshot.status).toBe('happy');
+    expect(snapshot.running).toBe(1);
+    expect(Date.parse(snapshot.expiresAt) - Date.parse(snapshot.updatedAt)).toBe(
+      GLANCEABLE_SNAPSHOT_EXPIRY_MS
+    );
+  });
+
+  it('keeps revision monotonic and reports the oldest wait from the rows', () => {
+    const waitedLonger = new Date(NOW - 600_000).toISOString();
+    const first = buildGlanceableSnapshot({
+      sessions: [{ status: 'question', statusUpdatedAt: waitedLonger }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const second = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'busy' },
+        { status: 'question', statusUpdatedAt: waitedLonger },
+        { status: 'permission', statusUpdatedAt: new Date(NOW - 1000).toISOString() },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 5000,
+      previousRevision: first.revision,
+    });
+    expect(second.revision).toBe(first.revision + 1);
+    expect(second.needsInput).toBe(2);
+    // Read from the rows every build, so a later revision still reports the
+    // oldest wait rather than a value latched at the first eligible emit.
+    expect(second.needsInputSince).toBe(waitedLonger);
+  });
+
+  it('clears needsInputSince when no session is connected', () => {
+    const snapshot = buildGlanceableSnapshot({
+      // No rows at all: with the total status map every row counts as
+      // something (unknown counts as running), so only an empty list is
+      // "nothing connected".
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+      previousRevision: 3,
+    });
+    expect(snapshot.status).toBe('empty');
+    expect(snapshot.needsInputSince).toBeNull();
+    expect(snapshot.revision).toBe(4);
+  });
+
+  it('reports no wait while work runs but nothing needs input', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'busy', statusUpdatedAt: new Date(NOW - 900_000).toISOString() },
+        { status: 'idle', statusUpdatedAt: new Date(NOW - 900_000).toISOString() },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.status).toBe('happy');
+    expect(snapshot.needsInputSince).toBeNull();
+  });
+
+  it('produces the approvable permission count next to needsInput', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'permission' }, { status: 'question' }, { status: 'permission' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.needsApproval).toBe(2);
+    // The narrower approval count never changes the needs-input total.
+    expect(snapshot.needsInput).toBe(3);
+  });
+
+  it('parses with and without needsApproval, since an older producer omits it', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'permission' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(glanceableAgentsSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    const { needsApproval: _needsApproval, ...withoutCount } = snapshot;
+    // The parse fills the zero, so every reader downstream sees a total count.
+    expect(glanceableAgentsSnapshotSchema.parse(withoutCount).needsApproval).toBe(0);
+  });
+
+  // The release before the newest-result fact wrote schema version 1 records
+  // without these two keys. A parse that rejects them would drop the last
+  // counts from a widget that survived the app upgrade, so the fact must parse
+  // as absent and default to null.
+  it('parses a version-1 record written before the newest-result fields existed', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'question', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const { newestResultKind: _kind, newestResultAt: _at, ...previousRelease } = snapshot;
+
+    const result = glanceableAgentsSnapshotSchema.safeParse(previousRelease);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.newestResultKind).toBeNull();
+      expect(result.data.newestResultAt).toBeNull();
+    }
+  });
+
+  it('parses a version-1 record written before the scheduled fields existed', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const { scheduled: _scheduled, scheduledAt: _scheduledAt, ...previousRelease } = snapshot;
+
+    const result = glanceableAgentsSnapshotSchema.safeParse(previousRelease);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scheduled).toBe(0);
+      expect(result.data.scheduledAt).toBeNull();
+    }
+  });
+
+  it('fills scheduled from the rows and scheduledAt as the soonest wake', () => {
+    const later = new Date(NOW + 3_600_000).toISOString();
+    const sooner = new Date(NOW + 600_000).toISOString();
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'scheduled', scheduledAt: later },
+        { status: 'busy' },
+        { status: 'scheduled', scheduledAt: sooner },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.scheduled).toBe(2);
+    expect(snapshot.scheduledAt).toBe(sooner);
+    expect(snapshot.running).toBe(1);
+    expect(isEligibleGlanceableWork(snapshot)).toBe(true);
+    expect(isStartableGlanceableWork(snapshot)).toBe(true);
+  });
+
+  it('yields scheduledAt null when a scheduled row carries no wake time', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'scheduled' }, { status: 'scheduled', scheduledAt: 'not a date' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.scheduled).toBe(2);
+    expect(snapshot.scheduledAt).toBeNull();
+    expect(snapshot.status).toBe('happy');
+  });
+
+  it('sets organizationBound only when organizationId is a string', () => {
+    const personal = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const org = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: 'org-9',
+      now: NOW,
+    });
+    expect(personal.organizationBound).toBe(false);
+    expect(org.organizationBound).toBe(true);
+  });
+
+  it('honours a status override and omits accountEpoch when absent', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+      status: 'waiting',
+    });
+    expect(snapshot.status).toBe('waiting');
+    expect('accountEpoch' in snapshot).toBe(false);
+  });
+
+  it('carries exactly the newest row kind and ISO timestamp', () => {
+    const newestAt = new Date(NOW - 2000).toISOString();
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'idle', statusUpdatedAt: new Date(NOW - 900_000).toISOString() },
+        { status: 'question', statusUpdatedAt: newestAt },
+        { status: 'busy', statusUpdatedAt: new Date(NOW - 500_000).toISOString() },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    // The newest change is the question, not the aggregate counts: the footer
+    // reads exactly this row's kind and timestamp.
+    expect(snapshot.newestResultKind).toBe('needsInput');
+    expect(snapshot.newestResultAt).toBe(newestAt);
+  });
+
+  it('nulls the newest fact when no row carries a timestamp', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }, { status: 'idle' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.newestResultKind).toBeNull();
+    expect(snapshot.newestResultAt).toBeNull();
+  });
+
+  it('serializes without any forbidden fixture', () => {
+    const rows = [
+      {
+        status: 'busy',
+        title: 'Secret prompt',
+        gitUrl: 'github.com/acme/repo',
+        id: 'ses_raw_1',
+        statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      { status: 'question', organizationName: 'Acme Org' },
+    ];
+    const snapshot = buildGlanceableSnapshot({
+      sessions: rows,
+      userId: 'oauth/user-1',
+      organizationId: 'org-9',
+      now: NOW,
+    });
+    // The newest fact carries the kind and the timestamp, nothing else.
+    expect(snapshot.newestResultKind).toBe('running');
+    expect(snapshot.newestResultAt).toBe('2026-01-01T00:00:00.000Z');
+    const json = JSON.stringify(snapshot);
+    expect(json).not.toContain('Secret prompt');
+    expect(json).not.toContain('Acme Org');
+    expect(json).not.toContain('github.com/acme/repo');
+    expect(json).not.toContain('ses_raw_1');
+    expect(json).not.toContain('oauth/user-1');
+    expect(json).not.toContain('org-9');
+  });
+});
+
+describe('isEligibleGlanceableWork and revision discard', () => {
+  it('reports eligibility from the four counts', () => {
+    const empty = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const busy = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const scheduled = buildGlanceableSnapshot({
+      sessions: [{ status: 'scheduled' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(isEligibleGlanceableWork(empty)).toBe(false);
+    expect(isEligibleGlanceableWork(busy)).toBe(true);
+    expect(isEligibleGlanceableWork(scheduled)).toBe(true);
+    expect(isStartableGlanceableWork(scheduled)).toBe(true);
+    expect(isStartableGlanceableWork(empty)).toBe(false);
+  });
+
+  it('discards a lower revision and an older updatedAt at equal revision', () => {
+    const current = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+      previousRevision: 4,
+    });
+    const lowerRevision = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 10_000,
+      previousRevision: 3,
+    });
+    const olderAtEqualRevision = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW - 5000,
+      previousRevision: 4,
+    });
+    const newerAtEqualRevision = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 15_000,
+      previousRevision: 4,
+    });
+    expect(shouldDiscardGlanceableRevision(lowerRevision, current)).toBe(true);
+    expect(shouldDiscardGlanceableRevision(olderAtEqualRevision, current)).toBe(true);
+    expect(shouldDiscardGlanceableRevision(newerAtEqualRevision, current)).toBe(false);
+  });
+});
+
+describe('oldestNeedsInputSince', () => {
+  const at = (ms: number) => new Date(NOW - ms).toISOString();
+
+  it('returns the earliest wait among the needs-input rows', () => {
+    expect(
+      oldestNeedsInputSince([
+        { status: 'question', statusUpdatedAt: at(60_000) },
+        { status: 'retry', statusUpdatedAt: at(600_000) },
+        { status: 'permission', statusUpdatedAt: at(120_000) },
+      ])
+    ).toBe(at(600_000));
+  });
+
+  it('ignores a row that does not need input, however old', () => {
+    expect(
+      oldestNeedsInputSince([
+        { status: 'busy', statusUpdatedAt: at(9_000_000) },
+        { status: 'idle', statusUpdatedAt: at(8_000_000) },
+        { status: 'question', statusUpdatedAt: at(1000) },
+      ])
+    ).toBe(at(1000));
+  });
+
+  it('skips a missing or unparseable timestamp instead of reporting now', () => {
+    expect(oldestNeedsInputSince([{ status: 'question' }])).toBeNull();
+    expect(
+      oldestNeedsInputSince([{ status: 'question', statusUpdatedAt: 'not a date' }])
+    ).toBeNull();
+    expect(
+      oldestNeedsInputSince([
+        { status: 'question', statusUpdatedAt: 'not a date' },
+        { status: 'question', statusUpdatedAt: at(300_000) },
+      ])
+    ).toBe(at(300_000));
+    // A producer that serializes an absent value reads the same as one that
+    // omits it: null, absent and unparseable are one outcome for the reader.
+    expect(oldestNeedsInputSince([{ status: 'question', statusUpdatedAt: null }])).toBeNull();
+  });
+
+  it('returns null when nothing needs input', () => {
+    expect(oldestNeedsInputSince([{ status: 'busy', statusUpdatedAt: at(1000) }])).toBeNull();
+    expect(oldestNeedsInputSince([])).toBeNull();
+  });
+});
+
+describe('newestGlanceableResult', () => {
+  const at = (ms: number) => new Date(NOW - ms).toISOString();
+
+  it('returns the newest status change across all rows', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'busy', statusUpdatedAt: at(600_000) },
+        { status: 'question', statusUpdatedAt: at(1000) },
+        { status: 'idle', statusUpdatedAt: at(120_000) },
+      ])
+    ).toEqual({ kind: 'needsInput', at: at(1000) });
+  });
+
+  it('ignores a row with no timestamp, however new its status looks', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'question' },
+        { status: 'busy', statusUpdatedAt: at(900_000) },
+      ])
+    ).toEqual({ kind: 'running', at: at(900_000) });
+  });
+
+  it('maps the newest row through the shared status vocabulary', () => {
+    const cases = [
+      ['question', 'needsInput'],
+      ['permission', 'needsInput'],
+      ['retry', 'needsInput'],
+      ['busy', 'running'],
+      // Completed folds into running, the same fold the counts use, so the
+      // newest-result line can never disagree with the row above it.
+      ['completed', 'running'],
+      ['idle', 'idle'],
+      ['scheduled', 'scheduled'],
+    ] as const;
+    for (const [status, kind] of cases) {
+      expect(newestGlanceableResult([{ status, statusUpdatedAt: at(1000) }])).toEqual({
+        kind,
+        at: at(1000),
+      });
+    }
+  });
+
+  it('returns null when no row carries a usable timestamp', () => {
+    expect(newestGlanceableResult([{ status: 'busy' }, { status: 'question' }])).toBeNull();
+    expect(
+      newestGlanceableResult([
+        { status: 'busy', statusUpdatedAt: 'not a date' },
+        { status: 'idle', statusUpdatedAt: '' },
+      ])
+    ).toBeNull();
+  });
+
+  it('skips an unparseable timestamp while keeping a parseable one', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'question', statusUpdatedAt: 'not a date' },
+        { status: 'busy', statusUpdatedAt: at(300_000) },
+      ])
+    ).toEqual({ kind: 'running', at: at(300_000) });
+  });
+
+  it('returns null for an empty session list', () => {
+    expect(newestGlanceableResult([])).toBeNull();
+  });
+});
+
+describe('extreme timestamp ties', () => {
+  // A tie can only change an aggregate whose result carries more than the
+  // instant. The newest-result kind is read from the winning row, so the first
+  // row of a tie must win: only a strictly later value replaces the winner.
+  // The two ISO-returning aggregates serialise whichever tied row wins to the
+  // same string, so no assertion on them can distinguish the tie-break.
+  const instant = new Date(NOW).toISOString();
+
+  it('takes the newest-result kind from the first row of a tie', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'permission', statusUpdatedAt: instant },
+        { status: 'busy', statusUpdatedAt: instant },
+      ])
+    ).toEqual({ kind: 'needsInput', at: instant });
+  });
+});
+
+describe('session timestamp parsing', () => {
+  // A producer can hand the rows a PostgreSQL timestamp rather than ISO 8601,
+  // and Hermes cannot parse that form, so every helper reads the instant
+  // through the shared parser and reports it as ISO 8601.
+  const postgres = '2026-03-16 15:21:40.957+00';
+
+  it('orders the oldest wait by a PostgreSQL timestamp and reports it as ISO', () => {
+    expect(
+      oldestNeedsInputSince([
+        { status: 'permission', statusUpdatedAt: '2026-03-16 15:00:00+00' },
+        { status: 'question', statusUpdatedAt: postgres },
+      ])
+    ).toBe('2026-03-16T15:00:00.000Z');
+  });
+
+  it('picks the soonest wake from PostgreSQL timestamps and reports it as ISO', () => {
+    expect(
+      soonestScheduledAt([
+        { status: 'scheduled', scheduledAt: '2026-03-16 18:00:00.5+00' },
+        { status: 'scheduled', scheduledAt: postgres },
+      ])
+    ).toBe('2026-03-16T15:21:40.957Z');
+    expect(
+      soonestScheduledAt([
+        { status: 'busy', scheduledAt: '2026-03-16 09:00:00+00' },
+        { status: 'scheduled', scheduledAt: 'garbage' },
+      ])
+    ).toBeNull();
+    // A serialized absent wake reads the same as an omitted one.
+    expect(soonestScheduledAt([{ status: 'scheduled', scheduledAt: null }])).toBeNull();
+  });
+
+  it('reports the newest change from a PostgreSQL timestamp as ISO', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'busy', statusUpdatedAt: '2026-03-16 15:00:00+00' },
+        { status: 'retry', statusUpdatedAt: postgres },
+      ])
+    ).toEqual({ kind: 'needsInput', at: '2026-03-16T15:21:40.957Z' });
+  });
+
+  it('reports a date-only wake in the canonical ISO form of its parsed instant', () => {
+    // The instant a date-only value denotes is the parser's business (a
+    // separate change moves it to local midnight), so this pins the form: the
+    // helper reports the parsed instant as ISO 8601, never the raw string.
+    expect(soonestScheduledAt([{ status: 'scheduled', scheduledAt: '2026-03-16' }])).toBe(
+      parseTimestamp('2026-03-16').toISOString()
+    );
+  });
+
+  it('carries PostgreSQL timestamps into the snapshot as ISO 8601', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'permission', statusUpdatedAt: postgres },
+        { status: 'scheduled', scheduledAt: '2026-03-16 18:00:00+00' },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.needsInputSince).toBe('2026-03-16T15:21:40.957Z');
+    expect(snapshot.scheduledAt).toBe('2026-03-16T18:00:00.000Z');
+    expect(snapshot.newestResultKind).toBe('needsInput');
+    expect(snapshot.newestResultAt).toBe('2026-03-16T15:21:40.957Z');
+    expect(glanceableAgentsSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+});

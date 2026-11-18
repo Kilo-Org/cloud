@@ -3,18 +3,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   canResendInvite,
   emailStatusLabel,
-  INVITE_SUCCESS_MESSAGE,
+  getInviteSuccessMessage,
   invitedMemberActionOptions,
   useResendInvite,
 } from '@/components/organization/invited-member-row-state';
+import { i18n } from '@/i18n';
 
 // The state module now imports the resend mutation hook, which pulls in
 // `@/lib/trpc` (native modules) and `@tanstack/react-query`. Mock those so the
 // pure `emailStatusLabel` tests and the hook wiring test both run in node.
 const resendInviteMutateMock = vi.fn();
+const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), warning: vi.fn() }));
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
+  onError?: (error: unknown) => void;
 };
 let capturedOptions: MutationOptions | null = null;
 
@@ -39,9 +42,7 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
-vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
-}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: toast }));
 
 describe('emailStatusLabel', () => {
   it('maps pending and sending to Pending', () => {
@@ -62,17 +63,17 @@ describe('emailStatusLabel', () => {
   });
 });
 
-describe('INVITE_SUCCESS_MESSAGE', () => {
+describe('getInviteSuccessMessage', () => {
   it('says the invite was created, not sent', () => {
-    expect(INVITE_SUCCESS_MESSAGE).toBe('Invite created');
-    expect(INVITE_SUCCESS_MESSAGE.toLowerCase()).not.toContain('sent');
+    expect(getInviteSuccessMessage()).toBe('Invite created');
+    expect(getInviteSuccessMessage().toLowerCase()).not.toContain('sent');
   });
 });
 
 describe('invitedMemberActionOptions', () => {
   it('offers a Resend invite option for a failed invite', () => {
     expect(canResendInvite('failed')).toBe(true);
-    expect(invitedMemberActionOptions('failed')).toEqual([
+    expect(invitedMemberActionOptions('failed', true)).toEqual([
       'Share invite link',
       'Resend invite',
       'Revoke invitation',
@@ -83,12 +84,21 @@ describe('invitedMemberActionOptions', () => {
   it('omits the Resend invite option for non-failed statuses', () => {
     for (const status of ['pending', 'sending', 'delivered', null] as const) {
       expect(canResendInvite(status)).toBe(false);
-      expect(invitedMemberActionOptions(status)).toEqual([
+      expect(invitedMemberActionOptions(status, true)).toEqual([
         'Share invite link',
         'Revoke invitation',
         'Cancel',
       ]);
     }
+  });
+
+  it('omits the Share invite link option when the caller has no invite URL', () => {
+    expect(invitedMemberActionOptions('failed', false)).toEqual([
+      'Resend invite',
+      'Revoke invitation',
+      'Cancel',
+    ]);
+    expect(invitedMemberActionOptions('delivered', false)).toEqual(['Revoke invitation', 'Cancel']);
   });
 });
 
@@ -107,5 +117,25 @@ describe('useResendInvite', () => {
       organizationId: 'org-1',
       inviteId: 'inv-1',
     });
+  });
+
+  it('names a missing invitation instead of claiming the resend failed', () => {
+    toast.error.mockClear();
+    useResendInvite('org-1');
+
+    capturedOptions?.onError?.(new Error('Invitation not found'));
+
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('queryError.notFoundDescription'));
+    expect(toast.error).not.toHaveBeenCalledWith('Invitation not found');
+  });
+
+  it('announces any other failed resend in catalog copy, not the server sentence', () => {
+    toast.error.mockClear();
+    useResendInvite('org-1');
+
+    capturedOptions?.onError?.(new Error('Failed to fetch'));
+
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('organization.members.resendInviteError'));
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
 });

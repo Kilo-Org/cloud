@@ -10,6 +10,8 @@ export default function globalSetup() {
   loadEnvFile({ path: join(cwd, '.env') });
   loadEnvFile({ path: join(cwd, '.env.test'), override: true });
   loadEnvFile({ path: join(cwd, '.env.test.local'), override: true });
+  // Not in tracked .env.test: `pnpm web:env set` rejects tracked values equal to remote ones.
+  process.env.EMAIL_SIGNUPS_ENABLED ??= 'true';
 
   // Clean up any existing worker setup flags from previous test runs
   const tmpDir = join(cwd, '.tmp');

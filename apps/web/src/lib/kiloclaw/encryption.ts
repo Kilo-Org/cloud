@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { encryptWithPublicKey, type EncryptedEnvelope } from '@/lib/encryption';
-import { AGENT_ENV_VARS_PUBLIC_KEY } from '@/lib/config.server';
+import { encryptWithPublicKey, type EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
+import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Encrypt a plaintext secret for the KiloClaw worker using the shared

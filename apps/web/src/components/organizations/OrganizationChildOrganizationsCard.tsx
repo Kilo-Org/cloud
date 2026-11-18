@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+// React must be in scope for the classic JSX runtime used by the jest transform.
+import React, { useState, type FormEvent } from 'react';
 import { Building2, ChevronRight, Loader2, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, type ButtonProps } from '@/components/ui/button';
@@ -109,12 +110,25 @@ export function CreateSubOrganizationButton({
 }
 
 export function OrganizationChildOrganizationsCard({ organizationId }: Props) {
-  const { data: children } = useOrganizationChildren(organizationId);
+  const { data: children = [], isLoading } = useOrganizationChildren(organizationId);
 
-  if (!children || children.length === 0) {
-    return null;
-  }
+  return (
+    <OrganizationChildOrganizationsCardView
+      organizationId={organizationId}
+      childOrganizations={children}
+      isLoading={isLoading}
+    />
+  );
+}
 
+export function OrganizationChildOrganizationsCardView({
+  organizationId,
+  childOrganizations: children,
+  isLoading,
+}: Props & {
+  childOrganizations: { id: string; name: string }[];
+  isLoading: boolean;
+}) {
   const visibleChildren = children.slice(0, 5);
   const remainingCount = Math.max(0, children.length - visibleChildren.length);
 
@@ -126,36 +140,43 @@ export function OrganizationChildOrganizationsCard({ organizationId }: Props) {
           Sub-organizations
         </CardTitle>
         <CardDescription>
-          {children.length} sub-organization{children.length === 1 ? '' : 's'} belong to this
-          organization
+          {isLoading
+            ? 'Loading sub-organizations...'
+            : children.length > 0
+              ? `${children.length} sub-organization${children.length === 1 ? ' belongs' : 's belong'} to this organization`
+              : 'Create sub-organizations to manage teams, usage, credits, models, and permissions separately.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          {visibleChildren.map(child => (
-            <Link
-              key={child.id}
-              prefetch={false}
-              href={`/organizations/${encodeURIComponent(child.id)}`}
-              className="hover:bg-surface-hover focus-visible:ring-ring -mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
-            >
-              <span className="truncate font-medium" title={child.name}>
-                {child.name}
-              </span>
-              <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-            </Link>
-          ))}
-        </div>
-        <CardLinkFooter
-          href={`/organizations/${encodeURIComponent(organizationId)}/sub-organizations`}
-          className="flex items-center gap-2"
-        >
-          Manage Sub-Organizations
-          <span className="ml-auto flex items-center gap-2">
-            {remainingCount > 0 && `${remainingCount} more`}
-            <ChevronRight className="size-4" />
-          </span>
-        </CardLinkFooter>
+        {visibleChildren.length > 0 && (
+          <div className="space-y-2">
+            {visibleChildren.map(child => (
+              <Link
+                key={child.id}
+                prefetch={false}
+                href={`/organizations/${encodeURIComponent(child.id)}`}
+                className="hover:bg-surface-hover focus-visible:ring-ring -mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
+              >
+                <span className="truncate font-medium" title={child.name}>
+                  {child.name}
+                </span>
+                <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+              </Link>
+            ))}
+          </div>
+        )}
+        {!isLoading && (
+          <CardLinkFooter
+            href={`/organizations/${encodeURIComponent(organizationId)}/sub-organizations`}
+            className="flex items-center gap-2"
+          >
+            {children.length > 0 ? 'Manage sub-organizations' : 'Set up sub-organizations'}
+            <span className="ml-auto flex items-center gap-2">
+              {remainingCount > 0 && `${remainingCount} more`}
+              <ChevronRight className="size-4" />
+            </span>
+          </CardLinkFooter>
+        )}
       </CardContent>
     </Card>
   );

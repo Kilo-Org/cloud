@@ -16,28 +16,41 @@ import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { IS_DEVELOPMENT } from '@/lib/constants';
+import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  /** Organization members without management authority get a read-only view. */
+  canManage?: boolean;
+  /** Overrides the OAuth start route, which the app shell serves itself. */
+  connectPath?: string;
 };
 
 const slackConnectionErrorMessages: Record<string, string> = {
   workspace_already_connected:
     'This Slack workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
+  permission_required:
+    'Only organization owners and admins can connect or change the organization Slack integration.',
+  organization_access_required:
+    'You no longer have access to this organization. Ask an organization owner or admin for access.',
 };
 
 const duplicateSlackWorkspaceMigration = 'duplicate_slack_workspace_migration';
 
 function getSlackConnectionErrorMessage(error: string): string {
-  return slackConnectionErrorMessages[error] ?? `Connection failed: ${error}`;
+  return resolveConnectionErrorMessage(
+    slackConnectionErrorMessages,
+    error,
+    `Connection failed: ${error}`
+  );
 }
 
 function getSuspendedSlackIntegrationMessage(suspendedBy: string | null): string {
@@ -52,6 +65,8 @@ export function SlackIntegrationDetails({
   organizationId,
   success,
   error,
+  canManage = true,
+  connectPath,
 }: SlackIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -159,7 +174,8 @@ export function SlackIntegrationDetails({
 
   const handleInstall = () => {
     setIsStartingSlackConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
+    window.location.href =
+      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
   };
 
   const handleUninstall = async () => {
@@ -289,14 +305,16 @@ export function SlackIntegrationDetails({
               This Slack installation is missing required permissions. Re-install the Slack app to
               refresh its scopes.
             </p>
-            <Button
-              onClick={handleInstall}
-              disabled={isStartingSlackConnection}
-              className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
-            </Button>
+            {canManage && (
+              <Button
+                onClick={handleInstall}
+                disabled={isStartingSlackConnection}
+                className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -307,14 +325,26 @@ export function SlackIntegrationDetails({
           <AlertTitle>Slack integration suspended</AlertTitle>
           <AlertDescription className="gap-3">
             <p>{getSuspendedSlackIntegrationMessage(installation.suspendedBy)}</p>
-            <Button
-              onClick={handleInstall}
-              disabled={isStartingSlackConnection}
-              className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {isStartingSlackConnection ? 'Loading...' : 'Re-install Slack'}
-            </Button>
+            {canManage && (
+              <Button
+                onClick={handleInstall}
+                disabled={isStartingSlackConnection}
+                className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {isStartingSlackConnection ? 'Loading...' : 'Re-install Slack'}
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!canManage && (
+        <Alert>
+          <AlertDescription>
+            Only organization owners and admins can connect, re-install, or disconnect this Slack
+            integration.
+            {installation && !isSuspended && ' You can still test the connection.'}
           </AlertDescription>
         </Alert>
       )}
@@ -401,20 +431,23 @@ export function SlackIntegrationDetails({
                   onValueChange={handleModelChange}
                   isLoading={isLoadingModels}
                   placeholder="Select a model"
+                  disabled={!canManage}
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleInstall}
-                    disabled={isStartingSlackConnection}
-                    title="Re-run the Slack OAuth flow to refresh scopes and permissions"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
-                  </Button>
+                  {canManage && (
+                    <Button
+                      variant="outline"
+                      onClick={handleInstall}
+                      disabled={isStartingSlackConnection}
+                      title="Re-run the Slack OAuth flow to refresh scopes and permissions"
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
+                    </Button>
+                  )}
                   {!isSuspended && (
                     <TestConnectionButton
                       isPending={testConnection.isPending}
@@ -422,13 +455,15 @@ export function SlackIntegrationDetails({
                       onClick={handleTestConnection}
                     />
                   )}
-                  <Button
-                    variant="destructive"
-                    onClick={handleUninstall}
-                    disabled={uninstallApp.isPending}
-                  >
-                    {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
-                  </Button>
+                  {canManage && (
+                    <Button
+                      variant="destructive"
+                      onClick={handleUninstall}
+                      disabled={uninstallApp.isPending}
+                    >
+                      {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
+                    </Button>
+                  )}
                   {IS_DEVELOPMENT && (
                     <Button
                       variant="outline"
@@ -476,15 +511,17 @@ export function SlackIntegrationDetails({
                 </ul>
               </div>
 
-              <Button
-                onClick={handleInstall}
-                size="lg"
-                className="w-full"
-                disabled={isStartingSlackConnection}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                {isStartingSlackConnection ? 'Loading...' : 'Connect Slack'}
-              </Button>
+              {canManage && (
+                <Button
+                  onClick={handleInstall}
+                  size="lg"
+                  className="w-full"
+                  disabled={isStartingSlackConnection}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  {isStartingSlackConnection ? 'Loading...' : 'Connect Slack'}
+                </Button>
+              )}
             </>
           )}
         </CardContent>

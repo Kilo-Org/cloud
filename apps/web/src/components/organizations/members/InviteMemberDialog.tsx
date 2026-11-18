@@ -20,7 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { OrganizationPlan, OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { hasInviteSeatCapacity } from '@kilocode/app-shared/organizations';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -33,9 +34,24 @@ import {
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
-import { getLowerDomainFromEmail } from '@/lib/utils';
 
-const emailSchema = z.email();
+// The procedure's own address rule: syntax plus the 254-character maximum a
+// mail system delivers. Kept beside the field so an over-length address is
+// reported before the round trip, not as a server rejection toast.
+const emailSchema = z
+  .email({ message: 'Please enter a valid email address' })
+  .max(254, 'Email address must be 254 characters or fewer');
+
+/**
+ * The field's own sentence for an address it cannot send: the rule above writes
+ * each one, so a well-formed but over-length address names its length instead of
+ * being called invalid. `null` means the field may send.
+ */
+export function inviteEmailErrorMessage(value: string): string | null {
+  const result = emailSchema.safeParse(value.trim());
+  if (result.success) return null;
+  return result.error.issues[0]?.message ?? 'Please enter a valid email address';
+}
 
 /**
  * Success copy for the invite mutation. The invitation is created but the email
@@ -75,20 +91,16 @@ type InviteMemberDialogProps = {
   onMemberInvited: () => void;
 };
 
-type InviteSeatCapacity = {
-  plan: OrganizationPlan | undefined;
-  requireSeats: boolean | undefined;
-  usedSeats: number;
-  totalSeats: number;
-};
-
-export function hasInviteSeatCapacity({
-  plan,
-  requireSeats,
-  usedSeats,
-  totalSeats,
-}: InviteSeatCapacity): boolean {
-  return requireSeats === false || plan === 'enterprise' || totalSeats - usedSeats > 0;
+/**
+ * Capture properties for `organization_member_invited`: `role` only. The old
+ * form also captured the organization id and the invitee email; do not
+ * restore it — the catalog schema allows `role` only and the deny-list
+ * forbids the email.
+ */
+export function organizationMemberInvitedCaptureProperties(role: OrganizationRole): {
+  role: OrganizationRole;
+} {
+  return { role };
 }
 
 export function InviteMemberDialog({
@@ -114,22 +126,11 @@ export function InviteMemberDialog({
 
   const isEmailValid = useMemo(() => {
     if (!email.trim()) return false;
-    return emailSchema.safeParse(email.trim()).success;
+    return inviteEmailErrorMessage(email) === null;
   }, [email]);
 
-  const emailDomainMatchesDirectSSODomain = useMemo(() => {
-    const policy = organizationData?.effectiveSsoPolicy;
-    if (!email.trim() || !policy?.required || policy.source !== 'self' || !policy.domain) {
-      return false;
-    }
-    const emailDomain = getLowerDomainFromEmail(email.trim());
-    return emailDomain === policy.domain;
-  }, [email, organizationData?.effectiveSsoPolicy]);
-
-  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.effectiveSsoPolicy.domain}) should sign in through your SSO provider to join this organization.`;
-
   const shouldShowEmailError = useMemo(() => {
-    return email.trim() && !isEmailFocused && !isEmailValid;
+    return email.trim().length > 0 && !isEmailFocused && !isEmailValid;
   }, [email, isEmailFocused, isEmailValid]);
 
   const inviteMemberMutation = useInviteMember();
@@ -160,12 +161,7 @@ export function InviteMemberDialog({
     }
 
     if (!isEmailValid) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-
-    if (emailDomainMatchesDirectSSODomain) {
-      toast.error(ssoErrorText);
+      toast.error(inviteEmailErrorMessage(email) ?? 'Please enter a valid email address');
       return;
     }
 
@@ -181,7 +177,12 @@ export function InviteMemberDialog({
           onMemberInvited();
           onOpenChange(false);
           handleReset();
-          posthog?.capture('organization_member_invited', { organizationId, email, role });
+          // Compatibility: keep capture properties to `role` only. The old form
+          // also sent the organization id and the email; do not restore it.
+          posthog?.capture(
+            'organization_member_invited',
+            organizationMemberInvitedCaptureProperties(role)
+          );
         },
         onError: error => {
           toast.error(error instanceof Error ? error.message : 'Failed to invite member');
@@ -211,8 +212,9 @@ export function InviteMemberDialog({
           <DialogHeader>
             <DialogTitle>Invite Member</DialogTitle>
             <DialogDescription className="text-pretty">
-              Send an invitation to join this team. They will receive an email with instructions to
-              join.
+              {organizationData?.parent_organization_id
+                ? 'Invite someone who is already a member of the parent organization. They will receive an email with instructions to join.'
+                : 'Send an invitation to join this team. They will receive an email with instructions to join.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -234,18 +236,16 @@ export function InviteMemberDialog({
                         handleInviteMember();
                       }
                     }}
-                    className={
-                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
-                        ? 'border-red-500 focus:border-red-500'
-                        : ''
-                    }
+                    aria-invalid={shouldShowEmailError}
+                    aria-describedby={shouldShowEmailError ? 'invite-email-error' : undefined}
+                    className={shouldShowEmailError ? 'border-red-500 focus:border-red-500' : ''}
                     disabled={!hasSeatsAvailable}
                   />
                 </div>
               </div>
 
               <div className="w-32 space-y-2">
-                <Label htmlFor="role">Role</Label>
+                <span className="text-sm leading-none font-medium">Role</span>
                 <div className="flex min-h-[60px] flex-col justify-start">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -254,6 +254,7 @@ export function InviteMemberDialog({
                         size="sm"
                         className="flex h-10 items-center justify-between gap-2 px-3"
                         disabled={inviteMemberMutation.isPending}
+                        aria-label={`Role: ${ROLE_LABELS[role]}`}
                       >
                         {ROLE_LABELS[role]}
                         <ChevronDown className="h-3 w-3" />
@@ -285,7 +286,7 @@ export function InviteMemberDialog({
               </div>
             </div>
 
-            {(shouldShowEmailError || emailDomainMatchesDirectSSODomain) && (
+            {shouldShowEmailError && (
               <div className="rounded-md border border-red-800 bg-red-950/30 p-3">
                 <div className="flex items-center gap-2">
                   <svg
@@ -299,9 +300,8 @@ export function InviteMemberDialog({
                       clipRule="evenodd"
                     />
                   </svg>
-                  <p className="text-sm text-red-300" role="alert">
-                    {shouldShowEmailError && 'Please enter a valid email address'}
-                    {emailDomainMatchesDirectSSODomain && ssoErrorText}
+                  <p id="invite-email-error" className="text-sm text-red-300" role="alert">
+                    {inviteEmailErrorMessage(email) ?? 'Please enter a valid email address'}
                   </p>
                 </div>
               </div>
@@ -330,7 +330,6 @@ export function InviteMemberDialog({
               onClick={handleInviteMember}
               disabled={
                 !isEmailValid ||
-                emailDomainMatchesDirectSSODomain ||
                 inviteMemberMutation.isPending ||
                 !canInviteMembers ||
                 !hasSeatsAvailable

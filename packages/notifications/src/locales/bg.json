@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Вашата агентна сесия има актуализация",
+      "lowBalance": "Вашият баланс изисква внимание",
+      "spendAlert": "Разходите ви изискват внимание",
+      "securityFinding": "Открит проблем със сигурността изисква внимание",
+      "securityUpdate": "Проверка за сигурност има актуализация",
+      "activeAgentsGlanceable": "Активните агенти имат актуализация"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Предупреждение за нисък баланс",
+      "body": "Балансът на {{organizationName}} падна под ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Предупреждение за разходи",
+      "body": "Разходите на {{scopeName}} надхвърлиха ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} в {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Нов проблем със сигурността ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA предупреждение"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA нарушение"
+    }
+  },
+  "sessionReady": {
+    "body": "Вашата Kilo сесия е готова за управление от телефона ви"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

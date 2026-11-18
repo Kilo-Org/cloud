@@ -1,0 +1,178 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+import { i18n } from '@/i18n';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { type ProposalDraft } from '@/lib/review-memory-proposals';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { trpcClient, useTRPC } from '@/lib/trpc';
+
+// Review memory only exists for GitHub, so the owner input pins the platform
+// and only varies the scope segment (personal vs. an organization id).
+export function reviewMemoryOwnerInput(scope: string) {
+  return scope === PERSONAL_SCOPE
+    ? { platform: 'github' as const }
+    : { organizationId: scope, platform: 'github' as const };
+}
+
+export function useSetReviewMemoryEnabled(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const ownerInput = reviewMemoryOwnerInput(scope);
+
+  return useMutation({
+    // Reachability is the switch's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the connectivity
+    // manager reports the device offline, so the request is never sent, the
+    // caller's `mutateAsync` never settles, and the queued write lands
+    // silently once the connection returns. Attempting the request instead
+    // lets it fail through the normal path: onError toasts the failure, so
+    // the switch returns to an enabled retry state.
+    networkMode: 'always',
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (enabled: boolean) =>
+      trpcClient.reviewMemory.setEnabled.mutate({ ...ownerInput, enabled }),
+    onSuccess: data => {
+      // The stored value is authoritative, so write it into the cached summary
+      // as soon as the mutation settles: the switch and the screen's state
+      // branch read one source, and the refetch below replaces it with the
+      // server's answer instead of a value that outlives the request.
+      queryClient.setQueryData(
+        trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+        previous => (previous ? { ...previous, enabled: data.enabled } : previous)
+      );
+      void queryClient.invalidateQueries({
+        queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+      });
+    },
+    onError: error => {
+      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+    },
+  });
+}
+
+/**
+ * "Analyze now": asks the server to look for one repeated guidance pattern in a
+ * repository's recent maintainer replies. Mirroring the web panel, the caller
+ * disables the action while a run is pending, and the summary's repository list
+ * is what says whether there is anything to analyze at all.
+ */
+export function useTriggerReviewMemoryAnalysis(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const ownerInput = reviewMemoryOwnerInput(scope);
+
+  return useMutation({
+    // Reachability is the run's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the device reports
+    // offline, so the caller's `mutateAsync` never settles and the run lands
+    // silently later. Attempting the request instead lets it fail through the
+    // normal path: onError toasts the failure, so the action returns to an
+    // enabled retry state.
+    networkMode: 'always',
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (repoFullName: string) =>
+      trpcClient.reviewMemory.triggerAnalysis.mutate({ ...ownerInput, repoFullName }),
+    onSuccess: data => {
+      // All three outcomes are successes; each names what happened, so a run
+      // that found nothing repeated does not read as a failure.
+      let outcomeKey = 'codeReviewer.reviewMemory.analyze.noPattern';
+      if (data.status === 'proposed') {
+        outcomeKey = 'codeReviewer.reviewMemory.analyze.proposed';
+      } else if (data.status === 'no_feedback') {
+        outcomeKey = 'codeReviewer.reviewMemory.analyze.noFeedback';
+      }
+      announcingToast.success(i18n.t(outcomeKey));
+    },
+    onError: error => {
+      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({ queryKey: trpc.reviewMemory.listProposalsPage.pathKey() }),
+      ]);
+    },
+  });
+}
+
+export function useReviewMemoryProposalActions(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const ownerInput = reviewMemoryOwnerInput(scope);
+  const onError = (error: unknown) => {
+    announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+  };
+  const onSettled = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.reviewMemory.listProposalsPage.pathKey(),
+      }),
+    ]);
+  };
+  // Reachability is each proposal action's outcome, not a precondition: the
+  // default `networkMode: 'online'` pauses a mutation while the device
+  // reports offline, so the caller's `mutateAsync` never settles (the
+  // combined `isPending` flag stays true with no failure surface) and the
+  // queued write — including the approval that opens a change request —
+  // lands silently once the connection returns. Attempting the request
+  // instead lets it fail through the normal path: onError toasts the failure,
+  // so the controls return to an enabled retry state.
+  const networkMode = { networkMode: 'always' } as const;
+  const save = useMutation(
+    trpc.reviewMemory.updateProposal.mutationOptions({
+      ...networkMode,
+      onError,
+      onSettled,
+      onSuccess: () => {
+        announcingToast.success(i18n.t('codeReviewer.reviewMemory.proposalSaved'));
+      },
+    })
+  );
+  const reject = useMutation(
+    trpc.reviewMemory.rejectProposal.mutationOptions({
+      ...networkMode,
+      onError,
+      onSettled,
+      onSuccess: () => {
+        announcingToast.success(i18n.t('codeReviewer.reviewMemory.proposalDismissed'));
+      },
+    })
+  );
+  const approve = useMutation(
+    trpc.reviewMemory.approveAndOpenChangeRequest.mutationOptions({
+      ...networkMode,
+      onError,
+      onSettled,
+      onSuccess: proposal => {
+        announcingToast.success(
+          i18n.t(
+            proposal.status === 'superseded'
+              ? 'codeReviewer.reviewMemory.alreadyPresent'
+              : 'codeReviewer.reviewMemory.prOpened'
+          )
+        );
+      },
+    })
+  );
+  return {
+    isPending: save.isPending || reject.isPending || approve.isPending,
+    save: async (proposalId: string, draft: ProposalDraft) => {
+      const proposal = await save.mutateAsync({ ...ownerInput, proposalId, ...draft });
+      return proposal;
+    },
+    reject: async (proposalId: string) => {
+      const proposal = await reject.mutateAsync({ ...ownerInput, proposalId });
+      return proposal;
+    },
+    approve: async (proposalId: string) => {
+      const proposal = await approve.mutateAsync({ ...ownerInput, proposalId });
+      return proposal;
+    },
+  };
+}

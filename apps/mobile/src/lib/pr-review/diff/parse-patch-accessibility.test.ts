@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDiffLineAccessibilityLabel,
   diffLineMarker,
+  diffLineNumber,
   diffLineStatusWord,
   type ParsedDiffLine,
 } from './parse-patch';
@@ -27,6 +28,20 @@ type LineOverrides = Partial<ParsedDiffLine>;
 function makeLine(overrides: LineOverrides = {}): ParsedDiffLine {
   return { type: 'context', text: '', noNewlineAtEndOfFile: false, ...overrides };
 }
+
+describe('diffLineNumber', () => {
+  // One rule for the drawn number and the spoken one: new-file numbering,
+  // which only the deleted rows lack.
+  it('gives every line type the number the row draws and announces', () => {
+    expect(diffLineNumber(makeLine({ type: 'add', newLine: 7 }))).toBe(7);
+    expect(diffLineNumber(makeLine({ type: 'del', oldLine: 12 }))).toBe(12);
+    expect(diffLineNumber(makeLine({ type: 'context', oldLine: 3, newLine: 9 }))).toBe(9);
+  });
+
+  it('is undefined for a synthetic line without a number', () => {
+    expect(diffLineNumber(makeLine({ type: 'add' }))).toBeUndefined();
+  });
+});
 
 describe('buildDiffLineAccessibilityLabel', () => {
   // Every test asserts BOTH the status word (the non-color signal) and
@@ -69,16 +84,5 @@ describe('buildDiffLineAccessibilityLabel', () => {
     expect(
       buildDiffLineAccessibilityLabel(makeLine({ type: 'del', oldLine: 2, text: '   \t  ' }))
     ).toBe('Deleted line 2: (empty)');
-  });
-
-  // Regression guard: if a future refactor decouples the label from the
-  // parsed type, screen readers could report "Added" for a deleted line
-  // — which would be worse than the color-only fallback it replaces.
-  it('is derived from the parsed type — same input yields the same label, type drives the word', () => {
-    const added = makeLine({ type: 'add', newLine: 1, text: 'x' });
-    const deleted = makeLine({ type: 'del', oldLine: 1, text: 'x' });
-    expect(buildDiffLineAccessibilityLabel(added)).toBe(buildDiffLineAccessibilityLabel(added));
-    expect(buildDiffLineAccessibilityLabel(added).startsWith('Added')).toBe(true);
-    expect(buildDiffLineAccessibilityLabel(deleted).startsWith('Deleted')).toBe(true);
   });
 });

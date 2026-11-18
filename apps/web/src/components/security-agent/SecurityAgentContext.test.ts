@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   getSecurityAgentActiveCommandState,
+  getSecurityAgentCommandGitHubError,
   getUnprocessedTerminalSecurityAgentCommands,
   mergeSecurityAgentActiveCommands,
   refetchConfigOnConflictError,
@@ -162,18 +163,44 @@ describe('SecurityAgentContext command helpers', () => {
     ).toEqual([failed]);
   });
 
-  it('runs dismissal success callbacks only after successful terminal states', () => {
+  it('does not treat a failed sync as a successful freshness update', () => {
+    expect(
+      shouldRunSecurityAgentCommandSuccessCallback(
+        command({ commandType: 'sync', status: 'failed', resultCode: 'GITHUB_TOKEN_UNAVAILABLE' })
+      )
+    ).toBe(false);
+  });
+
+  it('runs success callbacks only after successful terminal states', () => {
     expect(shouldRunSecurityAgentCommandSuccessCallback(command({ status: 'accepted' }))).toBe(
       false
     );
     expect(shouldRunSecurityAgentCommandSuccessCallback(command({ status: 'running' }))).toBe(
       false
     );
-    expect(shouldRunSecurityAgentCommandSuccessCallback(command({ status: 'failed' }))).toBe(false);
     expect(shouldRunSecurityAgentCommandSuccessCallback(command({ status: 'succeeded' }))).toBe(
       true
     );
     expect(shouldRunSecurityAgentCommandSuccessCallback(command({ status: 'no_op' }))).toBe(true);
+  });
+
+  it.each(['sync', 'dismiss_finding'] as const)(
+    'surfaces GitHub token unavailability for failed %s commands',
+    commandType => {
+      expect(
+        getSecurityAgentCommandGitHubError(
+          command({ commandType, status: 'failed', resultCode: 'GITHUB_TOKEN_UNAVAILABLE' })
+        )
+      ).toBe('GitHub authorization needs attention. Re-authorize GitHub App, then retry.');
+    }
+  );
+
+  it('does not surface an integration alert for unrelated failed commands', () => {
+    expect(
+      getSecurityAgentCommandGitHubError(
+        command({ status: 'failed', resultCode: 'REPOSITORY_UNAVAILABLE' })
+      )
+    ).toBeUndefined();
   });
 });
 

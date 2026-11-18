@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { useUpdateOrganizationPlan } from '@/app/api/organizations/hooks';
 import { useState, useEffect } from 'react';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type Props = {
   organizationId: string;
@@ -32,7 +32,6 @@ export function PlanDialog({ organizationId, open, onOpenChange, currentPlan }: 
   const [selectedPlan, setSelectedPlan] = useState<OrganizationPlan>(currentPlan || 'enterprise');
   const updatePlan = useUpdateOrganizationPlan();
 
-  // Reset to current plan when dialog opens
   useEffect(() => {
     if (open && currentPlan) {
       setSelectedPlan(currentPlan);

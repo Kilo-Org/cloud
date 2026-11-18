@@ -1,0 +1,3481 @@
+import { test, describe, expect, beforeEach, afterEach } from '@jest/globals';
+import { captureException, captureMessage } from '@sentry/nextjs';
+import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUsage.types';
+import {
+  extractPromptInfo,
+  extractUsageContextInfo,
+  countAndStoreUsage,
+  parseMicrodollarUsageFromStream,
+  parseMicrodollarUsageFromString,
+  mapToUsageStats,
+  logMicrodollarUsage,
+  insertUsageRecord,
+  processOpenRouterUsage,
+  processTokenData,
+  stripNulBytesInPlace,
+  toInsertableDbUsageRecord,
+  usageTransactionIdleTimeoutQuery,
+} from './processUsage';
+import {
+  deliverUsageEventWireBody,
+  reportUsageEvent,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
+import { verifyApproval } from '@kilocode/web-shared/tests/helpers/approval.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  defineMicrodollarUsage,
+  insertUsageWithOverrides,
+} from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import { join } from 'node:path';
+import { createReadStream } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  bouncer_usage_event_outbox,
+  microdollar_usage,
+  microdollar_usage_daily,
+  microdollar_usage_daily_repairs,
+  inference_region,
+  microdollar_usage_metadata,
+  microdollar_usage_view,
+  organization_user_usage,
+  organizations,
+} from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
+import { eq, getTableColumns } from 'drizzle-orm';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { Readable } from 'node:stream';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import {
+  GATEWAY_HEADER_VALUE_MAX_LENGTH,
+  OVERSIZED_METADATA_VALUE,
+} from '@kilocode/web-shared/lib/ai-gateway/header-limits';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { extractReasoningSetting } from './llm-proxy-helpers';
+import { fetchGeneration } from './providers/upstream-request';
+import {
+  createUserOpenRouterProvider,
+  OPENROUTER,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { createUserVercelAiGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
+
+// Mock the bouncer transport so the usage-event payload and the outbox delivery can be asserted
+// without a network call.
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
+  reportUsageEvent: jest.fn(async () => undefined),
+  deliverUsageEventWireBody: jest.fn(async () => ({ delivered: true, status: 204 })),
+}));
+
+// The OpenRouter generation lookup is a network call; a test that needs it
+// resolves this mock. Unresolved, it behaves like a failed lookup.
+jest.mock('./providers/upstream-request', () => ({
+  ...(jest.requireActual('./providers/upstream-request') as Record<string, unknown>),
+  fetchGeneration: jest.fn(async () => undefined),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(async () => ({ models: [] })),
+}));
+
+const mockedReportUsageEvent = jest.mocked(reportUsageEvent);
+const mockedDeliverUsageEventWireBody = jest.mocked(deliverUsageEventWireBody);
+
+describe('processOpenRouterUsage', () => {
+  const coreProps = {
+    messageId: 'test-message-id',
+    model: 'test-model',
+    responseContent: 'test-response',
+    hasError: false,
+    kiloUserId: 'test-user-id',
+    inference_provider: 'Provider',
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: 200,
+  };
+
+  const tokenUsage = {
+    completion_tokens: 100,
+    completion_tokens_details: { reasoning_tokens: 0 },
+    prompt_tokens: 50,
+    prompt_tokens_details: { cached_tokens: 0 },
+    total_tokens: 150,
+  };
+
+  beforeEach(() => {
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  test('should correctly process usage for a non-byok case', () => {
+    const usage = {
+      cost: 0.001,
+      is_byok: false,
+      cost_details: { upstream_inference_cost: 0.7 },
+      completion_tokens: 100,
+      completion_tokens_details: { reasoning_tokens: 0 },
+      prompt_tokens: 50,
+      prompt_tokens_details: { cached_tokens: 0 },
+      total_tokens: 150,
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(1000);
+    expect(result.is_byok).toBe(false);
+  });
+
+  test('should correctly process usage for a byok case', () => {
+    const usage = {
+      is_byok: true,
+      cost: 0.001,
+      cost_details: { upstream_inference_cost: 0.02 },
+      completion_tokens: 100,
+      completion_tokens_details: { reasoning_tokens: 0 },
+      prompt_tokens: 50,
+      prompt_tokens_details: { cached_tokens: 0 },
+      total_tokens: 150,
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(20000);
+    expect(result.nonInferenceCost_mUsd).toBe(0);
+    expect(result.is_byok).toBe(true);
+  });
+
+  describe('missing BYOK status', () => {
+    const usage = {
+      cost: 0.075966,
+      completion_tokens: 100,
+      completion_tokens_details: { reasoning_tokens: 0 },
+      prompt_tokens: 50,
+      prompt_tokens_details: { cached_tokens: 0 },
+      total_tokens: 150,
+    };
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    test.each(['openrouter', 'vercel'] as const)(
+      'reports %s usage with cost but without is_byok',
+      provider => {
+        processOpenRouterUsage(usage, coreProps, provider);
+
+        expect(captureMessage).toHaveBeenCalledWith(
+          "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+          expect.anything()
+        );
+      }
+    );
+
+    test('bills the reported cost from providers that never report is_byok', () => {
+      const result = processOpenRouterUsage(usage, coreProps, 'direct-byok');
+
+      expect(result.cost_mUsd).toBe(75966);
+      expect(result.is_byok).toBeNull();
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  // Usage figures below were returned by real BYOK requests with one web search.
+  test('charges OpenRouter BYOK non-inference costs without the 5% BYOK fee', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.0072658, // $0.007 Exa search + 5% of the upstream cost
+      cost_details: { upstream_inference_cost: 0.005316 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, 'openrouter');
+
+    expect(result.nonInferenceCost_mUsd).toBe(7000);
+    expect(result.cost_mUsd).toBe(5316 + 7000);
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  test('charges Vercel BYOK non-inference costs in full, since Vercel has no BYOK fee', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.025, // five $0.005 Perplexity searches
+      cost_details: { upstream_inference_cost: 0.041388 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, 'vercel');
+
+    expect(result.nonInferenceCost_mUsd).toBe(25000);
+    expect(result.cost_mUsd).toBe(41388 + 25000);
+  });
+
+  test('undercharges OpenRouter non-inference costs by the fee while OpenRouter waives it', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.005,
+      cost_details: { upstream_inference_cost: 0.04 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, 'openrouter');
+
+    expect(result.nonInferenceCost_mUsd).toBe(5000 - 2000);
+    expect(result.cost_mUsd).toBe(40000 + 3000);
+  });
+
+  test('does not separate non-inference costs from the cost of a non-BYOK request', () => {
+    const usage = { ...tokenUsage, is_byok: false, cost: 0.0123 };
+
+    const result = processOpenRouterUsage(usage, coreProps, 'vercel');
+
+    expect(result.nonInferenceCost_mUsd).toBeUndefined();
+    expect(result.cost_mUsd).toBe(12300);
+  });
+
+  test('reports a BYOK charge below the OpenRouter fee as suspicious', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.0001,
+      cost_details: { upstream_inference_cost: 0.04 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, 'openrouter');
+
+    expect(result.nonInferenceCost_mUsd).toBe(0);
+    expect(captureMessage).toHaveBeenCalledWith(
+      "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+      expect.anything()
+    );
+  });
+
+  test.each(['openrouter', 'vercel'] as const)(
+    'reports %s BYOK usage without an upstream cost as suspicious',
+    provider => {
+      const usage = { ...tokenUsage, is_byok: true, cost: 0.001 };
+
+      const result = processOpenRouterUsage(usage, coreProps, provider);
+
+      expect(result.cost_mUsd).toBe(1000);
+      expect(captureMessage).toHaveBeenCalledWith(
+        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        expect.anything()
+      );
+    }
+  );
+});
+
+describe('authoritative usage transaction configuration', () => {
+  test('sets a transaction-local 60-second idle timeout', async () => {
+    const compiled = new PgDialect().sqlToQuery(usageTransactionIdleTimeoutQuery());
+
+    expect(compiled.sql).toContain("'idle_in_transaction_session_timeout'");
+    expect(compiled.sql).toContain('true');
+    expect(compiled.params).toEqual(['60000ms']);
+  });
+});
+
+const sampleDir = join(process.cwd(), 'src/tests/sample');
+describe('parseMicrodollarUsageFromStream approval tests', () => {
+  // Usage processing times the response chunks; a fixed clock keeps the approved output stable.
+  let performanceNow: jest.SpiedFunction<typeof performance.now>;
+  beforeEach(() => {
+    performanceNow = jest.spyOn(performance, 'now').mockReturnValue(0);
+  });
+  afterEach(() => {
+    performanceNow.mockRestore();
+  });
+
+  const normalAnthropic = 'normal-anthropic.log.resp.sse';
+  test(normalAnthropic, async () => {
+    const inputFile = join(sampleDir, normalAnthropic);
+    const nodeStream = createReadStream(inputFile);
+    const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+
+  const normalGpt41 = 'normal-gpt41.log.resp.sse';
+  test(normalGpt41, async () => {
+    const inputFile = join(sampleDir, normalGpt41);
+    const nodeStream = createReadStream(inputFile);
+    const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+
+  // Real BYOK streams with web search: OpenRouter bills an Exa search plus its 5%
+  // BYOK fee to its own credits, Vercel bills an Exa search without a fee.
+  test.each([
+    ['openrouter-byok-web-search.log.resp.sse', 'openrouter'],
+    ['vercel-byok-web-search.log.resp.sse', 'vercel'],
+  ] as const)('%s', async (sample, provider) => {
+    const inputFile = join(sampleDir, sample);
+    const nodeStream = createReadStream(inputFile);
+    const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      provider,
+      200,
+      false
+    );
+    const resultString = JSON.stringify(result, null, 2);
+    await verifyApproval(resultString, inputFile + '.approved.json');
+  });
+
+  const outOfCredits = 'openrouter-key-out-of-credits.log.resp.sse';
+  test(outOfCredits, async () => {
+    const inputFile = join(sampleDir, outOfCredits);
+    const nodeStream = createReadStream(inputFile);
+    const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+
+  const nonStreaming = 'nonstreaming-anthropic.log.resp.json';
+  test(nonStreaming, async () => {
+    const inputFile = join(sampleDir, nonStreaming);
+    const jsonString = await readFile(inputFile, 'utf-8');
+    const result = parseMicrodollarUsageFromString(jsonString, 'fake-user-id', 200, 'openrouter');
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+
+  const interruptedStreamErrors: [name: string, error: Error][] = [
+    [
+      'ResponseAborted',
+      Object.assign(new Error('Response interrupted'), { name: 'ResponseAborted' }),
+    ],
+    ['TimeoutError', Object.assign(new Error('Response interrupted'), { name: 'TimeoutError' })],
+    [
+      'Undici body timeout',
+      new TypeError('terminated', {
+        cause: Object.assign(new Error('Body Timeout Error'), {
+          name: 'BodyTimeoutError',
+          code: 'UND_ERR_BODY_TIMEOUT',
+        }),
+      }),
+    ],
+    ['unexpected read failure', new Error('Unexpected stream failure')],
+  ];
+
+  test.each(interruptedStreamErrors)(
+    'handles %s gracefully and returns partial data',
+    async (_name, streamError) => {
+      // Create a stream that emits some SSE data then fails.
+      const partialSSEData = `data: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":" world"}}]}\n\n`;
+
+      let pullCount = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pullCount++;
+          if (pullCount === 1) {
+            controller.enqueue(new TextEncoder().encode(partialSSEData));
+          } else {
+            controller.error(streamError);
+          }
+        },
+      });
+
+      const result = await parseMicrodollarUsageFromStream(
+        stream,
+        'fake-user-id',
+        undefined,
+        'openrouter',
+        200,
+        false
+      );
+
+      expect(result.messageId).toBe('gen-123');
+      expect(result.model).toBe('anthropic/claude-3-5-sonnet');
+      expect(result.responseContent).toBe('Hello world');
+      expect(result.hasError).toBe(true);
+    }
+  );
+
+  test('handles SSE parser errors as aborted streams', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: not-json\n\n'));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+
+    expect(result.hasError).toBe(true);
+  });
+
+  test.each([
+    ['malformed JSON', 'private response content {', true, { errorName: 'SyntaxError' }],
+    [
+      'null payload',
+      'null',
+      true,
+      { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] },
+    ],
+    [
+      'invalid choices',
+      '{"choices":{}}',
+      true,
+      { errorName: 'ZodError', issues: [{ path: 'choices', code: 'invalid_type' }] },
+    ],
+    [
+      'invalid nested content',
+      '{"choices":[{"delta":{"content":{"secret":"private content"}}}]}',
+      true,
+      {
+        errorName: 'ZodError',
+        issues: [{ path: 'choices.0.delta.content', code: 'invalid_union' }],
+      },
+    ],
+    [
+      'invalid usage',
+      '{"usage":{"prompt_tokens":"private token value"}}',
+      true,
+      { errorName: 'ZodError', issues: [{ path: 'usage.prompt_tokens', code: 'invalid_type' }] },
+    ],
+    ['null error', '{"error":null}', false, undefined],
+  ] as const)('retains later chat usage after %s', async (_name, payload, hasError, readError) => {
+    jest.mocked(captureMessage).mockClear();
+    jest.mocked(captureException).mockClear();
+    const initialChunk = {
+      id: 'gen-recovered-chat',
+      model: 'test-model',
+      choices: [{ delta: { content: 'Hello' } }],
+    };
+    const finalChunk = {
+      choices: [{ delta: { content: ' world' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.001, is_byok: false },
+      error: null,
+    };
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const data of [
+          JSON.stringify(initialChunk),
+          payload,
+          JSON.stringify(finalChunk),
+          '[DONE]',
+        ]) {
+          controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+        }
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      messageId: 'gen-recovered-chat',
+      model: 'test-model',
+      responseContent: 'Hello world',
+      inputTokens: 10,
+      outputTokens: 2,
+      cost_mUsd: 1000,
+      hasError,
+      finish_reason: 'stop',
+      status_code: 200,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+    if (hasError) {
+      expect(captureMessage).toHaveBeenCalledTimes(1);
+      expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
+        level: 'error',
+        tags: { source: 'usage_stream_parsing' },
+        extra: {
+          kiloUserId: 'fake-user-id',
+          provider: 'openrouter',
+          messageId: 'gen-recovered-chat',
+          model: 'test-model',
+          malformedEventCount: 1,
+          ...readError,
+        },
+      });
+    } else {
+      expect(captureMessage).not.toHaveBeenCalled();
+    }
+  });
+
+  test('captures numeric error.code from in-stream error event as status_code_override', async () => {
+    const errorChunk = `data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"","provider":"Amazon Bedrock","choices":[],"error":{"code":502,"message":"Internal server error","metadata":{"error_type":"provider_unavailable"}}}\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(errorChunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+
+    expect(result.hasError).toBe(true);
+    expect(result.status_code).toBe(502);
+  });
+
+  describe('upstream error reporting', () => {
+    beforeEach(() => {
+      jest.mocked(captureException).mockClear();
+      jest.mocked(captureMessage).mockClear();
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    const parseChunks = (chunks: object[], usesUserCredentials = false) =>
+      parseMicrodollarUsageFromStream(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const chunk of chunks) {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk)}\n\n`));
+            }
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+            controller.close();
+          },
+        }),
+        'fake-user-id',
+        undefined,
+        'openrouter',
+        200,
+        usesUserCredentials
+      );
+
+    test.each([
+      { code: 502, message: 'Upstream error from Nvidia: Service temporarily overloaded' },
+      { code: '502', message: 'Upstream error from Nvidia: Internal server error' },
+      { code: undefined, message: 'Upstream stream ended before terminal chunk' },
+      {
+        code: 502,
+        message: 'JSON error injected into SSE stream',
+        metadata: { error_type: 'provider_unavailable' },
+      },
+      {
+        code: 504,
+        message: 'Upstream idle timeout exceeded',
+        metadata: { error_type: 'timeout' },
+      },
+    ])('logs transient upstream error $message without reporting to Sentry', async error => {
+      const result = await parseChunks([
+        {
+          id: 'gen-transient',
+          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+          provider: 'Nvidia',
+          choices: [],
+          error,
+        },
+      ]);
+
+      expect(console.warn).toHaveBeenCalledWith(`OpenRouter error: ${error.message}`, {
+        source: 'sse_processing',
+        code: error.code,
+        error_type: error.metadata?.error_type,
+        uses_user_credentials: false,
+        provider: 'openrouter',
+        inference_provider: 'Nvidia',
+        messageId: 'gen-transient',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+      });
+      expect(captureException).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        hasError: true,
+        status_code: typeof error.code === 'number' ? error.code : 200,
+        messageId: 'gen-transient',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        inference_provider: 'Nvidia',
+      });
+    });
+
+    test.each([
+      { code: 401, message: 'User not found.' },
+      { code: '403', message: 'Key is not allowed to access this model' },
+      { code: 402, message: 'Insufficient credits' },
+      { code: 500, message: 'Invalid key', metadata: { error_type: 'authentication_error' } },
+    ])('reports account error $message on Kilo credentials to Sentry', async error => {
+      const chunk = { choices: [{ delta: { content: 'private response content' } }], error };
+      await parseChunks([chunk]);
+
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        new Error(`OpenRouter error: ${error.message}`),
+        {
+          tags: { source: 'sse_processing' },
+          extra: {
+            kiloUserId: 'fake-user-id',
+            provider: 'openrouter',
+            messageId: null,
+            model: null,
+          },
+        }
+      );
+    });
+
+    test('only logs account errors on user credentials', async () => {
+      await parseChunks([{ choices: [], error: { code: 401, message: 'Invalid API key' } }], true);
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith(
+        'OpenRouter error: Invalid API key',
+        expect.objectContaining({ code: 401, uses_user_credentials: true })
+      );
+    });
+
+    test('preserves partial content and usage across multiple upstream errors', async () => {
+      const result = await parseChunks([
+        { id: 'gen-partial', model: 'test-model', choices: [{ delta: { content: 'Hello' } }] },
+        {
+          error: {
+            code: 502,
+            message: 'Upstream error from Nvidia: Service temporarily overloaded',
+          },
+        },
+        {
+          choices: [{ delta: { content: ' world' } }],
+          usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.001, is_byok: false },
+        },
+        { error: { code: 504, message: 'Upstream idle timeout exceeded' } },
+      ]);
+
+      expect(console.warn).toHaveBeenCalledTimes(2);
+      expect(console.warn).toHaveBeenLastCalledWith(
+        'OpenRouter error: Upstream idle timeout exceeded',
+        expect.objectContaining({ messageId: 'gen-partial', model: 'test-model', code: 504 })
+      );
+      expect(captureException).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        hasError: true,
+        status_code: 504,
+        responseContent: 'Hello world',
+        inputTokens: 10,
+        outputTokens: 2,
+        cost_mUsd: 1000,
+      });
+    });
+  });
+
+  test('records the Vercel upstream provider request id as upstream_id', async () => {
+    const chunk = `data: {"id":"gen_01KYMFY57BAFKZGK45197SCRGD","object":"chat.completion.chunk","created":1785246720,"model":"moonshotai/kimi-k3-fast","choices":[{"index":0,"delta":{"provider_metadata":{"fireworks":{},"gateway":{"routing":{"originalModelId":"moonshotai/kimi-k3-fast","resolvedProvider":"fireworks","fallbacksAvailable":[],"canonicalSlug":"moonshotai/kimi-k3-fast","finalProvider":"fireworks","speed":"fast","modelAttemptCount":1,"modelAttempts":[{"canonicalSlug":"moonshotai/kimi-k3-fast","success":true,"providerAttemptCount":1,"providerAttempts":[{"provider":"fireworks","credentialType":"system","success":true,"startTime":1785246717210,"endTime":1785246721497,"providerRequestId":"chatcmpl-ccebc94c526d4f8797cfe00023478a9a","statusCode":200,"providerResponseId":"chatcmpl-ccebc94c526d4f8797cfe00023478a9a"}]}],"totalProviderAttemptCount":1},"cost":"0.0474822","marketCost":"0.0474822","generationId":"gen_01KYMFY57BAFKZGK45197SCRGD"}}},"logprobs":null,"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":91904,"completion_tokens":134,"total_tokens":92038,"cost":0.0474822,"is_byok":false,"prompt_tokens_details":{"cached_tokens":91136},"cost_details":{"upstream_inference_cost":null},"completion_tokens_details":{"reasoning_tokens":0}},"generationId":"gen_01KYMFY57BAFKZGK45197SCRGD"}\n\ndata: [DONE]\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(chunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200,
+      false
+    );
+
+    expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
+    expect(result.inference_provider).toBe('fireworks');
+    expect(result.cost_mUsd).toBe(47482);
+  });
+
+  test('leaves upstream_id null when the Vercel gateway reports no provider request id', async () => {
+    const chunk = `data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"moonshotai/kimi-k3-fast","choices":[{"index":0,"delta":{"provider_metadata":{"gateway":{"routing":{"finalProvider":"fireworks","modelAttempts":[{"success":true,"providerAttempts":[{"provider":"fireworks","credentialType":"system","success":true}]}]},"marketCost":"0.001"}}},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}\n\ndata: [DONE]\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(chunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200,
+      false
+    );
+
+    expect(result.upstream_id).toBeNull();
+  });
+
+  test('records the Vercel upstream provider request id for non-streamed responses', () => {
+    const response = JSON.stringify({
+      id: 'gen-2',
+      object: 'chat.completion',
+      created: 1,
+      model: 'moonshotai/kimi-k3-fast',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: 'hi',
+            provider_metadata: {
+              gateway: {
+                routing: {
+                  finalProvider: 'fireworks',
+                  modelAttempts: [
+                    {
+                      success: true,
+                      providerAttempts: [
+                        {
+                          provider: 'fireworks',
+                          credentialType: 'system',
+                          success: true,
+                          startTime: 1791906882421,
+                          endTime: 1791906921724,
+                          providerResponseId: 'chatcmpl-non-streamed',
+                        },
+                      ],
+                    },
+                  ],
+                },
+                marketCost: '0.001',
+              },
+            },
+          },
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    });
+
+    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200, 'openrouter');
+
+    expect(result.upstream_id).toBe('chatcmpl-non-streamed');
+    expect(result.inference_provider).toBe('fireworks');
+  });
+
+  // https://docs.mistral.ai/inference/conversations/reasoning#handling-thinking-chunks
+  const mistralReasoningContent = [
+    { type: 'thinking', thinking: [{ type: 'text', text: 'Calculating.' }] },
+    { type: 'text', text: '391' },
+  ];
+
+  test('keeps usage of a non-streamed response with reasoning content chunks', () => {
+    const response = JSON.stringify({
+      id: 'gen-mistral-reasoning',
+      model: 'mistral/magistral-medium',
+      choices: [
+        {
+          message: { role: 'assistant', content: mistralReasoningContent },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+    });
+
+    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200, 'custom');
+
+    expect(result).toMatchObject({
+      hasError: false,
+      responseContent: '391',
+      inputTokens: 10,
+      outputTokens: 20,
+    });
+  });
+
+  test('keeps usage of a stream with reasoning content chunks', async () => {
+    jest.mocked(captureMessage).mockClear();
+    const chunks = [
+      {
+        id: 'gen-mistral-reasoning',
+        model: 'mistral/magistral-medium',
+        choices: [{ delta: { content: mistralReasoningContent.slice(0, 1) } }],
+      },
+      { choices: [{ delta: { content: mistralReasoningContent.slice(1) } }] },
+      {
+        choices: [{ delta: { content: '!' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+      },
+    ];
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const data of [...chunks.map(chunk => JSON.stringify(chunk)), '[DONE]']) {
+          controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+        }
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'custom',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      hasError: false,
+      responseContent: '391!',
+      inputTokens: 10,
+      outputTokens: 20,
+    });
+    expect(captureMessage).not.toHaveBeenCalledWith(
+      'Malformed upstream usage SSE events',
+      expect.anything()
+    );
+  });
+
+  test.each([
+    ['a text chunk without text', [{ type: 'text' }]],
+    ['a chunk without a type', [{ text: 'hi' }]],
+  ])('rejects reasoning content with %s', (_name, content) => {
+    const response = JSON.stringify({
+      model: 'mistral/magistral-medium',
+      choices: [{ message: { content } }],
+    });
+    expect(() =>
+      parseMicrodollarUsageFromString(response, 'fake-user-id', 200, 'custom')
+    ).toThrow();
+  });
+});
+
+const sampleReqDir = join(process.cwd(), 'src/tests/req_sample');
+describe('extractPromptInfo approval tests', () => {
+  const anthropicFile = 'anthropic-claude37.log.req.json';
+  test(anthropicFile, async () => {
+    const inputFile = join(sampleReqDir, anthropicFile);
+    const prompt = await readFile(inputFile, 'utf-8');
+    const result = extractPromptInfo(JSON.parse(prompt));
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.extractPromptInfo.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+
+  const geminiFile = 'google-gemini25.log.req.json';
+  test(geminiFile, async () => {
+    const inputFile = join(sampleReqDir, geminiFile);
+    const prompt = await readFile(inputFile, 'utf-8');
+    const result = extractPromptInfo(JSON.parse(prompt));
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.extractPromptInfo.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+
+  const openAiGptFile = 'openai-gpt41.log.req.json';
+  test(openAiGptFile, async () => {
+    const inputFile = join(sampleReqDir, openAiGptFile);
+    const prompt = await readFile(inputFile, 'utf-8');
+    const result = extractPromptInfo(JSON.parse(prompt));
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.extractPromptInfo.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+});
+
+describe('usage accounting error reports', () => {
+  beforeEach(() => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  describe('extractPromptInfo failure', () => {
+    test('reports the requested model', () => {
+      extractPromptInfo(JSON.parse('{"messages":"not-a-message-list","model":"openai/gpt-4o"}'));
+
+      const [error, options] = jest.mocked(captureException).mock.calls[0];
+      expect(error).toBeInstanceOf(TypeError);
+      expect(options).toEqual({
+        level: 'warning',
+        tags: { source: 'prompt_extraction' },
+        extra: { model: 'openai/gpt-4o' },
+      });
+      expect(JSON.stringify(options)).not.toContain('not-a-message-list');
+    });
+
+    test('reports no request field when the body carries no string model', () => {
+      extractPromptInfo(JSON.parse('{"messages":"not-a-message-list","model":{"nested":true}}'));
+
+      const [error, options] = jest.mocked(captureException).mock.calls[0];
+      expect(error).toBeInstanceOf(TypeError);
+      expect(options).toEqual({
+        level: 'warning',
+        tags: { source: 'prompt_extraction' },
+        extra: {},
+      });
+      expect(JSON.stringify(options)).not.toContain('not-a-message-list');
+    });
+
+    test('bounds the reported model length', () => {
+      const model = 'm'.repeat(5000);
+      extractPromptInfo(JSON.parse(`{"messages":"not-a-message-list","model":"${model}"}`));
+
+      const [, options] = jest.mocked(captureException).mock.calls[0];
+      expect(options).toMatchObject({ extra: { model: 'm'.repeat(200) } });
+    });
+  });
+
+  describe('processTokenData without usage statistics', () => {
+    const contextSentinel = {
+      system_prompt_prefix: 'zzq-system-prefix',
+      user_prompt_prefix: 'zzq-user-prefix',
+      email: 'zzq-account@example.com',
+      machine_id: 'zzq-machine',
+      session_id: 'zzq-session',
+      client_request_id: 'zzq-request',
+      organization_id: 'zzq-organization',
+    };
+    const usageId = '6f2a1c9b-4d3e-4f5a-8b7c-1d2e3f4a5b6c';
+
+    const makeContext = (
+      overrides: Partial<MicrodollarUsageContext> = {}
+    ): MicrodollarUsageContext => ({
+      api_kind: 'chat_completions',
+      usageId,
+      kiloUserId: 'report-user',
+      provider: 'openrouter',
+      requested_model: 'anthropic/claude-3.7-sonnet',
+      promptInfo: {
+        system_prompt_prefix: contextSentinel.system_prompt_prefix,
+        system_prompt_length: contextSentinel.system_prompt_prefix.length,
+        user_prompt_prefix: contextSentinel.user_prompt_prefix,
+      },
+      fraudHeaders: getFraudDetectionHeaders(
+        new Headers({ 'user-agent': 'zzq-agent', 'x-forwarded-for': '203.0.113.7' })
+      ),
+      posthog_distinct_id: contextSentinel.email,
+      machine_id: contextSentinel.machine_id,
+      session_id: contextSentinel.session_id,
+      clientRequestId: contextSentinel.client_request_id,
+      project_id: null,
+      max_tokens: 200,
+      has_middle_out_transform: null,
+      isStreaming: true,
+      prior_microdollar_usage: 0,
+      status_code: 200,
+      editor_name: null,
+      user_byok: false,
+      is_free: false,
+      has_tools: true,
+      feature: null,
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+      custom_llm_pricing: null,
+      organizationId: undefined,
+      ...overrides,
+    });
+
+    test.each([
+      { name: 'a personal request', organization_id: undefined },
+      { name: 'an organization request', organization_id: contextSentinel.organization_id },
+    ])('reports only operational context fields for $name', async ({ organization_id }) => {
+      expect(
+        await processTokenData(null, makeContext({ organizationId: organization_id }))
+      ).toBeNull();
+
+      expect(captureMessage).toHaveBeenCalledWith('SUSPICIOUS: No usage information', {
+        level: 'error',
+        tags: { source: 'usage_processing' },
+        extra: {
+          usageContext: {
+            kiloUserId: 'report-user',
+            usageId,
+            provider: 'openrouter',
+            api_kind: 'chat_completions',
+            requested_model: 'anthropic/claude-3.7-sonnet',
+            status_code: 200,
+            isStreaming: true,
+          },
+        },
+      });
+      expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain('zzq-');
+    });
+
+    test('reports a null usage id when the context carries none', async () => {
+      await processTokenData(null, makeContext({ usageId: undefined }));
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: No usage information',
+        expect.objectContaining({
+          extra: { usageContext: expect.objectContaining({ usageId: null }) },
+        })
+      );
+    });
+
+    test('bounds the reported requested model', async () => {
+      const model = 'm'.repeat(5000);
+
+      await processTokenData(null, makeContext({ requested_model: model }));
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: No usage information',
+        expect.objectContaining({
+          extra: {
+            usageContext: expect.objectContaining({ requested_model: 'm'.repeat(200) }),
+          },
+        })
+      );
+    });
+  });
+});
+
+describe('mapToUsageStats approval tests', () => {
+  const claudeSonnetGeneration = 'claude-3-7-sonnet-generation.log.generation.json';
+  test(claudeSonnetGeneration, async () => {
+    const inputFile = join(sampleDir, claudeSonnetGeneration);
+    const generationData = JSON.parse(await readFile(inputFile, 'utf-8')) as OpenRouterGeneration;
+    const result = mapToUsageStats(generationData, 'nonsense', 'fake-user-id', 'openrouter');
+    const resultString = JSON.stringify(result, null, 2);
+    const approvalFilePath = inputFile + '.mapToUsageStats.approved.json';
+    await verifyApproval(resultString, approvalFilePath);
+  });
+});
+
+describe('toMicrodollars', () => {
+  test('converts dollar amount to microdollars', () => {
+    expect(toMicrodollars(0.123456)).toBe(123456);
+    expect(toMicrodollars(1)).toBe(1000000);
+    expect(toMicrodollars(0)).toBe(0);
+    expect(toMicrodollars(0.00000099)).toBe(1); // 0.00000099 * 1000000 = 0.99, round to 1
+    expect(toMicrodollars(0.1234567)).toBe(123457); // 0.1234567 * 1000000 = 123456.7, round to 123457
+    expect(toMicrodollars(0.0849 / 20)).toBe(4245); // float accuracy: 4245.000000000001 should round to 4245.
+  });
+});
+
+describe('mapToUsageStats', () => {
+  test('applies BYOK multiplier when is_byok is true', () => {
+    // Create a sample OpenRouterGeneration with is_byok set to true
+    const byokGeneration: OpenRouterGeneration = {
+      data: {
+        id: 'test-byok-id',
+        total_cost: 0.1,
+        upstream_inference_cost: 2.0, // Example cost for BYOK
+        is_byok: true,
+        created_at: '2025-05-14T00:00:00Z',
+        model: 'test-model',
+        origin: 'test-origin',
+        usage: 0.1,
+        native_tokens_prompt: 100,
+        native_tokens_completion: 50,
+        native_tokens_cached: 0,
+      },
+    };
+
+    // Call mapToUsageStats with the BYOK generation
+    const result = mapToUsageStats(byokGeneration, 'test response', 'fake-user-id', 'openrouter');
+
+    // Verify that the cost is multiplied by OPENROUTER_BYOK_COST_MULTIPLIER
+    expect(result.cost_mUsd).toBe(toMicrodollars(0.1 * 20.0)); // 0.1 * 20 = 2, then convert to microdollars
+  });
+
+  test('does not apply BYOK multiplier when is_byok is false', () => {
+    // Create a sample OpenRouterGeneration with is_byok set to false
+    const nonByokGeneration: OpenRouterGeneration = {
+      data: {
+        id: 'test-non-byok-id',
+        total_cost: 0.1,
+        created_at: '2025-05-14T00:00:00Z',
+        model: 'test-model',
+        origin: 'test-origin',
+        usage: 0.1,
+        is_byok: false,
+        native_tokens_prompt: 100,
+        native_tokens_completion: 50,
+        native_tokens_cached: 0,
+      },
+    };
+
+    // Call mapToUsageStats with the non-BYOK generation
+    const result = mapToUsageStats(
+      nonByokGeneration,
+      'test response',
+      ' fake-user-id',
+      'openrouter'
+    );
+
+    // Verify that the cost is not multiplied
+    expect(result.cost_mUsd).toBe(toMicrodollars(0.1)); // Just convert to microdollars without multiplier
+  });
+
+  test.each([
+    // A real OpenRouter Responses request with one $0.007 Exa search and the 5% BYOK fee.
+    { provider: 'openrouter', total_cost: 0.00765975, upstream: 0.013195, nonInference: 7000 },
+    // A real Vercel request with five $0.005 Perplexity searches; Vercel has no BYOK fee.
+    { provider: 'vercel', total_cost: 0.025, upstream: 0.041388, nonInference: 25000 },
+  ] as const)('charges $provider BYOK non-inference costs from the generation', input => {
+    const generation: OpenRouterGeneration = {
+      data: {
+        id: 'test-byok-non-inference-id',
+        total_cost: input.total_cost,
+        upstream_inference_cost: input.upstream,
+        is_byok: true,
+        created_at: '2026-10-22T00:00:00Z',
+        model: 'test-model',
+        origin: 'test-origin',
+        usage: input.total_cost,
+      },
+    };
+
+    const result = mapToUsageStats(generation, '', 'fake-user-id', input.provider);
+
+    expect(result.nonInferenceCost_mUsd).toBe(input.nonInference);
+    expect(result.cost_mUsd).toBe(toMicrodollars(input.upstream) + input.nonInference);
+  });
+});
+
+describe('logMicrodollarUsage', () => {
+  const BASE_USAGE_STATS: MicrodollarUsageStats = {
+    messageId: 'test-msg-123',
+    hasError: false,
+    cost_mUsd: 500,
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheWriteTokens: 10,
+    cacheHitTokens: 5,
+    is_byok: true,
+    model: 'anthropic/claude-3.7-sonnet',
+    responseContent: 'Test response content',
+    inference_provider: 'Provider',
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: 200,
+  };
+  const createBaseUsageContext = (user: {
+    id: string;
+    microdollars_used: number;
+    google_user_email: string | null;
+  }) =>
+    ({
+      api_kind: 'chat_completions',
+      kiloUserId: user.id,
+      prior_microdollar_usage: user.microdollars_used,
+      posthog_distinct_id: user.google_user_email!,
+      provider: 'openrouter',
+      fraudHeaders: getFraudDetectionHeaders(new Headers({ 'user-agent': 'test-agent' })),
+      isStreaming: true,
+      project_id: null,
+      requested_model: 'anthropic/claude-3.7-sonnet',
+      is_free: false,
+      custom_llm_pricing: null,
+      promptInfo: {
+        system_prompt_prefix: 'You are a helpful assistant',
+        system_prompt_length: 'You are a helpful assistant'.length,
+        user_prompt_prefix: 'Please help me with',
+      },
+      max_tokens: 200,
+      has_middle_out_transform: true,
+      status_code: 200,
+      editor_name: null,
+      machine_id: null,
+      user_byok: false,
+      has_tools: false,
+      feature: 'vscode-extension',
+      session_id: null,
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+    }) satisfies MicrodollarUsageContext;
+
+  describe.each(['chat_completions', 'messages', 'responses'] as const)(
+    '%s usage response recovery',
+    apiKind => {
+      beforeEach(() => {
+        jest.mocked(fetchGeneration).mockReset();
+        jest.mocked(captureException).mockClear();
+        mockedReportUsageEvent.mockClear();
+      });
+
+      const nestedShapeIssue = {
+        chat_completions: { path: 'choices.0.message.content', code: 'invalid_union' },
+        messages: { path: 'content.0.text', code: 'invalid_type' },
+        responses: { path: 'output.0.content', code: 'invalid_type' },
+      }[apiKind];
+
+      test.each([
+        ['ResponseAborted', false, undefined],
+        ['TimeoutError', false, undefined],
+        ['undici terminated', false, undefined],
+        ['cross-realm undici terminated', false, undefined],
+        ['malformed JSON', true, { errorName: 'SyntaxError' }],
+        [
+          'unexpected nested shape',
+          true,
+          {
+            errorName: 'ZodError',
+            issues: [nestedShapeIssue],
+          },
+        ],
+        ['missing body', true, { errorName: 'Error' }],
+      ] as const)(
+        'records a zero-cost error row and Bouncer event for %s',
+        async (failure, reportsToSentry, readError) => {
+          const user = await insertTestUser({ microdollars_used: 1000 });
+          const usageId = crypto.randomUUID();
+          const messageId = `gen-${usageId}`;
+          const streamError =
+            failure === 'undici terminated'
+              ? new TypeError('terminated', {
+                  cause: Object.assign(new Error('private upstream error content'), {
+                    code: 'UND_ERR_SOCKET',
+                  }),
+                })
+              : failure === 'cross-realm undici terminated'
+                ? {
+                    name: 'TypeError',
+                    message: 'terminated',
+                    cause: { code: 'UND_ERR_SOCKET', message: 'private upstream error content' },
+                  }
+                : Object.assign(new Error('private upstream error content'), { name: failure });
+          const invalidNestedResponse = {
+            chat_completions: {
+              choices: [{ message: { content: { secret: 'private content' } } }],
+            },
+            messages: { content: [{ type: 'text', text: { secret: 'private content' } }] },
+            responses: { output: [{ type: 'message', content: { secret: 'private content' } }] },
+          }[apiKind];
+          const body =
+            failure === 'missing body'
+              ? null
+              : failure === 'malformed JSON'
+                ? 'private malformed response content {'
+                : failure === 'unexpected nested shape'
+                  ? JSON.stringify({ model: 'test-model', ...invalidNestedResponse })
+                  : new ReadableStream<Uint8Array>({
+                      start(controller) {
+                        controller.error(streamError);
+                      },
+                    });
+          const response = new Response(body, {
+            status: 202,
+            headers: { 'content-type': 'application/json', 'x-generation-id': messageId },
+          });
+          const usageContext: MicrodollarUsageContext = {
+            ...createBaseUsageContext(user),
+            usageId,
+            api_kind: apiKind,
+            isStreaming: false,
+            bouncer: {
+              requestId: usageId,
+              occurredAt: new Date(),
+              accountId: `user:${user.id}`,
+              clientIp: null,
+              clientAttributed: true,
+              requestedLogprobs: false,
+              samples: null,
+              promptSimHash: null,
+            },
+          };
+
+          const result = await countAndStoreUsage(response, usageContext, undefined).usagePromise;
+
+          expect(result).toMatchObject({ usageId });
+          const usageRecords = await db.query.microdollar_usage.findMany({
+            where: eq(microdollar_usage.kilo_user_id, user.id),
+          });
+          expect(usageRecords).toEqual([
+            expect.objectContaining({
+              id: usageId,
+              cost: 0,
+              input_tokens: 0,
+              output_tokens: 0,
+              has_error: true,
+              model: usageContext.requested_model,
+            }),
+          ]);
+          const metadata = await db.query.microdollar_usage_metadata.findFirst({
+            where: eq(microdollar_usage_metadata.id, usageId),
+          });
+          expect(metadata).toMatchObject({
+            message_id: messageId,
+            status_code: 202,
+          });
+          expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+          expect(fetchGeneration).toHaveBeenCalledTimes(1);
+          expect(fetchGeneration).toHaveBeenCalledWith(messageId, expect.anything());
+          expect(mockedReportUsageEvent).toHaveBeenCalledTimes(1);
+          expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+              requestId: usageId,
+              accountId: `user:${user.id}`,
+              apiKind,
+              costMicrodollars: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+            })
+          );
+          if (reportsToSentry) {
+            expect(captureException).toHaveBeenCalledTimes(1);
+            expect(captureException).toHaveBeenCalledWith(
+              new Error('Unable to read or parse upstream usage response'),
+              {
+                tags: { source: 'usage_response_parsing', api_kind: apiKind },
+                extra: {
+                  usageId,
+                  kiloUserId: user.id,
+                  organizationId: undefined,
+                  provider: 'openrouter',
+                  messageId,
+                  ...readError,
+                },
+              }
+            );
+          } else {
+            expect(captureException).not.toHaveBeenCalled();
+          }
+        }
+      );
+
+      test.each(['openrouter', 'vercel'] as const)(
+        'recovers paid %s generation usage from the header after a parse failure',
+        async provider => {
+          const user = await insertTestUser({ microdollars_used: 0 });
+          const generation = JSON.parse(
+            await readFile(
+              join(sampleDir, 'claude-3-7-sonnet-generation.log.generation.json'),
+              'utf-8'
+            )
+          ) as OpenRouterGeneration;
+          generation.data.id = `gen-recovered-${apiKind}-${provider}`;
+          jest.mocked(fetchGeneration).mockResolvedValueOnce(generation);
+          const servingProvider =
+            provider === 'openrouter'
+              ? createUserOpenRouterProvider('test-openrouter-key')
+              : createUserVercelAiGatewayProvider('test-vercel-key');
+
+          const result = await countAndStoreUsage(
+            new Response('private malformed response content {', {
+              status: 202,
+              headers: {
+                'content-type': 'application/json',
+                'x-generation-id': generation.data.id,
+              },
+            }),
+            { ...createBaseUsageContext(user), api_kind: apiKind, provider, isStreaming: false },
+            undefined,
+            servingProvider
+          ).usagePromise;
+
+          assert(result);
+          expect(fetchGeneration).toHaveBeenCalledTimes(1);
+          expect(fetchGeneration).toHaveBeenCalledWith(generation.data.id, servingProvider);
+          const usage = await db.query.microdollar_usage.findFirst({
+            where: eq(microdollar_usage.id, result.usageId),
+          });
+          expect(usage).toMatchObject({
+            provider,
+            cost: 129158,
+            input_tokens: 33439,
+            output_tokens: 251,
+            has_error: true,
+            inference_provider: 'Amazon Bedrock',
+          });
+          const metadata = await db.query.microdollar_usage_metadata.findFirst({
+            where: eq(microdollar_usage_metadata.id, result.usageId),
+          });
+          expect(metadata).toMatchObject({
+            message_id: generation.data.id,
+            status_code: 202,
+          });
+          expect((await findUserById(user.id))?.microdollars_used).toBe(129158);
+        }
+      );
+    }
+  );
+
+  describe('served model recovery', () => {
+    const generationModel = 'anthropic/claude-3-7-sonnet-20250219';
+    const responseAlias = 'anthropic/claude-3.7-sonnet';
+    const requestedModel = 'openrouter/free';
+
+    test.each([
+      {
+        name: 'recovers the generation model when the response model is missing',
+        responseModel: undefined,
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'recovers the generation model when the response model is null',
+        responseModel: null,
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'recovers the generation model when the response model is empty',
+        responseModel: '',
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'prefers the response alias over the dated generation model',
+        responseModel: responseAlias,
+        generationModel,
+        expectedModel: responseAlias,
+      },
+      {
+        name: 'falls back to the requested model when the generation model is empty',
+        responseModel: null,
+        generationModel: '',
+        expectedModel: requestedModel,
+      },
+      {
+        name: 'falls back to the requested model when the generation lookup fails',
+        responseModel: null,
+        generationModel: undefined,
+        expectedModel: requestedModel,
+      },
+    ])('$name', async ({ responseModel, generationModel, expectedModel }) => {
+      const user = await insertTestUser();
+      const messageId = `gen-model-recovery-${crypto.randomUUID()}`;
+      jest.mocked(fetchGeneration).mockReset();
+      jest.mocked(fetchGeneration).mockResolvedValueOnce(
+        generationModel === undefined
+          ? undefined
+          : {
+              data: {
+                id: messageId,
+                model: generationModel,
+                provider_name: 'Amazon Bedrock',
+                is_byok: false,
+                total_cost: 0,
+                created_at: new Date().toISOString(),
+                origin: '',
+                usage: 0,
+                native_tokens_prompt: 10,
+                native_tokens_completion: 2,
+              },
+            }
+      );
+
+      const result = await countAndStoreUsage(
+        new Response(
+          JSON.stringify({
+            id: messageId,
+            model: responseModel,
+            choices: [{ message: { content: 'Test response' }, finish_reason: 'stop' }],
+            usage: {
+              cost: 0,
+              is_byok: false,
+              prompt_tokens: 10,
+              completion_tokens: 2,
+              total_tokens: 12,
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        ),
+        { ...createBaseUsageContext(user), requested_model: requestedModel, isStreaming: false },
+        undefined
+      ).usagePromise;
+
+      assert(result);
+      expect(fetchGeneration).toHaveBeenCalledTimes(1);
+      expect(fetchGeneration).toHaveBeenCalledWith(messageId, OPENROUTER);
+      const usage = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, result.usageId),
+      });
+      expect(usage).toMatchObject({
+        model: expectedModel,
+        requested_model: requestedModel,
+      });
+      if (generationModel !== undefined) {
+        expect(usage?.inference_provider).toBe('Amazon Bedrock');
+      }
+    });
+  });
+
+  async function waitForExpectation(expectation: () => Promise<void>): Promise<void> {
+    const deadline = Date.now() + 2000;
+    let lastError: unknown;
+
+    while (Date.now() < deadline) {
+      try {
+        await expectation();
+        return;
+      } catch (error) {
+        lastError = error;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+
+    throw lastError;
+  }
+
+  test.each([
+    {
+      name: 'Messages thinking',
+      body: { thinking: { type: 'enabled', budget_tokens: 32_000 } },
+      expected: 'thinking:enabled:le64k',
+    },
+    { name: 'chat effort', body: { reasoning_effort: 'high' }, expected: 'effort:high' },
+    { name: 'no reasoning', body: {}, expected: null },
+  ])(
+    'stores usage data and increments user microdollars for $name',
+    async ({ name, body, expected }) => {
+      const user = await insertTestUser({
+        id: `test-log-user-${name}`,
+        microdollars_used: 1000,
+        google_user_email: `test-${name.replaceAll(' ', '-')}@example.com`,
+      });
+
+      const usageStats = { ...BASE_USAGE_STATS, messageId: `test-msg-${name}` };
+      const usageContext = {
+        ...createBaseUsageContext(user),
+        reasoning_setting: extractReasoningSetting(body),
+      };
+
+      await logMicrodollarUsage(usageStats, usageContext);
+
+      const updatedUser = await findUserById(user.id);
+      expect(updatedUser?.microdollars_used).toBe(1500); // 1000 + 500
+
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.message_id, usageStats.messageId),
+      });
+      expect(metadataRecord).toBeTruthy();
+
+      const usageRecord = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, metadataRecord!.id),
+      });
+      expect(usageRecord).toBeTruthy();
+      expect(usageRecord?.kilo_user_id).toBe(user.id);
+      expect(usageRecord?.cost).toBe(500);
+      expect(usageRecord?.input_tokens).toBe(100);
+      expect(usageRecord?.output_tokens).toBe(50);
+      expect(usageRecord?.cache_write_tokens).toBe(10);
+      expect(usageRecord?.cache_hit_tokens).toBe(5);
+      expect(usageRecord?.provider).toBe('openrouter');
+      expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
+      expect(metadataRecord?.system_prompt_length).toBe(27);
+      expect(metadataRecord?.user_prompt_prefix).toBe('Please help me with');
+      expect(metadataRecord?.max_tokens).toBe(200);
+      expect(metadataRecord?.has_middle_out_transform).toBe(true);
+      if (expected === null) {
+        expect(metadataRecord?.reasoning_setting_id).toBeNull();
+      } else {
+        expect(metadataRecord?.reasoning_setting_id).not.toBeNull();
+      }
+      const [usageViewRecord] = await db
+        .select({ reasoning_setting: microdollar_usage_view.reasoning_setting })
+        .from(microdollar_usage_view)
+        .where(eq(microdollar_usage_view.id, metadataRecord!.id))
+        .limit(1);
+      expect(usageViewRecord?.reasoning_setting).toBe(expected);
+      expect(metadataRecord?.session_id).toBeNull();
+      expect(usageRecord?.has_error).toBe(false);
+      expect(usageRecord?.created_at).toBeTruthy();
+      expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
+    }
+  );
+
+  test.each([
+    { region: 'eu', stored: true },
+    { region: null, stored: false },
+  ] as const)('stores inference region $region in the lookup table', async ({ region, stored }) => {
+    const user = await insertTestUser({
+      id: `test-log-user-region-${region}`,
+      microdollars_used: 1000,
+      google_user_email: `test-region-${region}@example.com`,
+    });
+    const usageStats = { ...BASE_USAGE_STATS, messageId: `test-msg-region-${region}` };
+
+    await logMicrodollarUsage(usageStats, {
+      ...createBaseUsageContext(user),
+      inference_region: region,
+    });
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, usageStats.messageId),
+    });
+    if (!stored) {
+      expect(metadataRecord?.inference_region_id).toBeNull();
+      return;
+    }
+    const [lookup] = await db
+      .select()
+      .from(inference_region)
+      .where(eq(inference_region.inference_region_id, metadataRecord!.inference_region_id!));
+    expect(lookup?.inference_region).toBe('eu');
+  });
+
+  test('stores session_id when provided', async () => {
+    const user = await insertTestUser({
+      id: 'test-log-user-session',
+      microdollars_used: 0,
+      google_user_email: 'session-test@example.com',
+    });
+
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-msg-session',
+    };
+
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      session_id: 'task-abc123',
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-msg-session'),
+    });
+    expect(metadataRecord).toBeTruthy();
+    expect(metadataRecord?.session_id).toBe('task-abc123');
+  });
+
+  test('stores the usage and metadata rows under the id chosen before the request', async () => {
+    const user = await insertTestUser({ microdollars_used: 0 });
+    const usageId = crypto.randomUUID();
+
+    const usageIdentity = await logMicrodollarUsage(
+      { ...BASE_USAGE_STATS, messageId: `test-msg-${usageId}` },
+      { ...createBaseUsageContext(user), usageId }
+    );
+
+    expect(usageIdentity?.usageId).toBe(usageId);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, usageId),
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, usageId),
+    });
+    expect(usageRecord?.kilo_user_id).toBe(user.id);
+    expect(metadataRecord?.message_id).toBe(`test-msg-${usageId}`);
+  });
+
+  test('stores usage data without incrementing user microdollars for zero cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-log-user-2',
+      microdollars_used: 2000,
+      google_user_email: 'test2@example.com',
+    });
+
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-msg-456',
+      hasError: true,
+      cost_mUsd: 0, // Zero cost
+      market_cost: 500,
+      model: 'openai/gpt-4.1',
+    };
+
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: 'openai/gpt-4.1',
+      isStreaming: false,
+      has_middle_out_transform: false,
+      promptInfo: {
+        system_prompt_prefix: '',
+        system_prompt_length: 0,
+        user_prompt_prefix: 'error test',
+      },
+    };
+
+    const usageIdentity = await logMicrodollarUsage(usageStats, usageContext);
+
+    // Verify user microdollars were NOT incremented
+    const updatedUser = await findUserById('test-log-user-2');
+    expect(updatedUser?.microdollars_used).toBe(2000); // unchanged
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-msg-456'),
+    });
+    expect(metadataRecord).toBeTruthy();
+
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, metadataRecord!.id),
+    });
+    expect(usageRecord).toBeTruthy();
+    expect(usageIdentity?.usageId).toBe(usageRecord?.id);
+    expect(usageIdentity?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(usageRecord?.kilo_user_id).toBe('test-log-user-2');
+    expect(usageRecord?.cost).toBe(0);
+    expect(metadataRecord?.market_cost).toBe(500);
+    expect(usageRecord?.has_error).toBe(true);
+    expect(usageRecord?.model).toBe('openai/gpt-4.1');
+    expect(metadataRecord?.has_middle_out_transform).toBe(false);
+  });
+
+  test('keeps AI source rows when legacy usage owner does not exist', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { core, metadata } = await defineMicrodollarUsage();
+    const missingUserId = `missing-ai-user-${crypto.randomUUID()}`;
+
+    try {
+      const result = await insertUsageRecord(
+        { ...core, kilo_user_id: missingUserId, cost: 1000 },
+        metadata
+      );
+
+      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: null });
+      const sourceRows = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, missingUserId));
+      expect(sourceRows).toHaveLength(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  test('stores 3 usage records with overlapping data and tests metadata deduplication', async () => {
+    const user = await insertTestUser({
+      id: 'test-dedup-user',
+      microdollars_used: 3000,
+      google_user_email: 'dedup@example.com',
+    });
+
+    // Record 1: baseline data
+    const usageStats1 = { ...BASE_USAGE_STATS, messageId: 'dedup-msg-1', cost_mUsd: 300 };
+    const baseContext1 = createBaseUsageContext(user);
+    const req1headers = {
+      'user-agent': 'test-agent-1',
+      'x-forwarded-for': '52.10.20.30',
+      'x-vercel-ip-country': 'US',
+      'x-vercel-ip-city': 'NYC',
+      'x-vercel-ja4-digest': 'digest1',
+    };
+    const usageContext1: MicrodollarUsageContext = {
+      ...baseContext1,
+      fraudHeaders: getFraudDetectionHeaders(new Headers(req1headers)),
+      promptInfo: {
+        system_prompt_prefix: 'You are helpful',
+        system_prompt_length: 'You are helpful'.length,
+        user_prompt_prefix: 'Test message',
+      },
+    };
+
+    // Record 2: overlapping IP, country, ja4, and system prompt with record 1
+    const usageStats2 = { ...BASE_USAGE_STATS, messageId: 'dedup-msg-2', cost_mUsd: 400 };
+    const baseContext2 = createBaseUsageContext(user);
+    const usageContext2: MicrodollarUsageContext = {
+      ...baseContext2,
+      fraudHeaders: getFraudDetectionHeaders(
+        new Headers({
+          ...req1headers,
+          'user-agent': 'test-agent-2',
+          'x-vercel-ip-city': 'LA',
+        })
+      ),
+      promptInfo: {
+        system_prompt_prefix: 'You are helpful', // same system prompt as record 1
+        system_prompt_length: 'You are helpful'.length,
+        user_prompt_prefix: 'Test message',
+      },
+    };
+
+    // Record 3: overlapping user-agent and city with record 1, different others
+    const usageStats3 = { ...BASE_USAGE_STATS, messageId: 'dedup-msg-3', cost_mUsd: 500 };
+    const baseContext3 = createBaseUsageContext(user);
+    const usageContext3: MicrodollarUsageContext = {
+      ...baseContext3,
+      fraudHeaders: getFraudDetectionHeaders(
+        new Headers({
+          ...req1headers,
+          'x-forwarded-for': '52.10.20.31',
+          'x-vercel-ip-country': 'CA',
+          'x-vercel-ja4-digest': 'digest2',
+        })
+      ),
+      promptInfo: {
+        system_prompt_prefix: 'You are an assistant', // different system prompt
+        system_prompt_length: 'You are an assistant'.length,
+        user_prompt_prefix: 'Test message',
+      },
+    };
+
+    await logMicrodollarUsage(usageStats1, usageContext1);
+    await logMicrodollarUsage(usageStats2, usageContext2);
+    await logMicrodollarUsage(usageStats3, usageContext3);
+
+    const updatedUser = await findUserById('test-dedup-user');
+    expect(updatedUser?.microdollars_used).toBe(4200); // 3000 + 300 + 400 + 500
+
+    // Verify all 3 usage records exist
+    const usageRecords = await db.query.microdollar_usage.findMany({
+      where: eq(microdollar_usage.kilo_user_id, 'test-dedup-user'),
+    });
+    expect(usageRecords).toHaveLength(3);
+
+    const relevantMetadata = await db
+      .select(getTableColumns(microdollar_usage_metadata))
+      .from(microdollar_usage_metadata)
+      .innerJoin(microdollar_usage, eq(microdollar_usage_metadata.id, microdollar_usage.id))
+      .where(eq(microdollar_usage.kilo_user_id, 'test-dedup-user'))
+      .orderBy(microdollar_usage_metadata.message_id);
+
+    // If we get here, the tables exist and we can test deduplication
+    expect(relevantMetadata).toHaveLength(3);
+
+    // Test deduplication by checking that shared values have the same IDs
+    const metadata1 = relevantMetadata.find(r => r.message_id === 'dedup-msg-1')!;
+    const metadata2 = relevantMetadata.find(r => r.message_id === 'dedup-msg-2')!;
+    const metadata3 = relevantMetadata.find(r => r.message_id === 'dedup-msg-3')!;
+
+    // Records 1 and 3 should share the same user-agent ID (both use 'test-agent-1')
+    expect(metadata1.http_user_agent_id).toBe(metadata3.http_user_agent_id);
+    expect(metadata1.http_user_agent_id).not.toBe(metadata2.http_user_agent_id);
+
+    // Records 1 and 2 send the same address, so they share the same IP ID
+    expect(metadata1.http_ip_id).toBe(metadata2.http_ip_id);
+    expect(metadata1.http_ip_id).not.toBe(metadata3.http_ip_id);
+
+    // Records 1 and 2 should share the same country ID (both use 'US')
+    expect(metadata1.vercel_ip_country_id).toBe(metadata2.vercel_ip_country_id);
+    expect(metadata1.vercel_ip_country_id).not.toBe(metadata3.vercel_ip_country_id);
+
+    // Records 1 and 3 should share the same city ID (both use 'NYC')
+    expect(metadata1.vercel_ip_city_id).toBe(metadata3.vercel_ip_city_id);
+    expect(metadata1.vercel_ip_city_id).not.toBe(metadata2.vercel_ip_city_id);
+
+    // Records 1 and 2 should share the same ja4 ID (both use 'digest1')
+    expect(metadata1.ja4_digest_id).toBe(metadata2.ja4_digest_id);
+    expect(metadata1.ja4_digest_id).not.toBe(metadata3.ja4_digest_id);
+
+    // Records 1 and 2 should share the same system prompt prefix ID (both use 'You are helpful')
+    expect(metadata1.system_prompt_prefix_id).toBe(metadata2.system_prompt_prefix_id);
+    expect(metadata1.system_prompt_prefix_id).not.toBe(metadata3.system_prompt_prefix_id);
+
+    // All records should have their expected non-shared metadata
+    expect(metadata1.max_tokens).toBe(200);
+    expect(metadata2.max_tokens).toBe(200);
+    expect(metadata3.max_tokens).toBe(200);
+    expect(metadata1.has_middle_out_transform).toBe(true);
+    expect(metadata2.has_middle_out_transform).toBe(true);
+    expect(metadata3.has_middle_out_transform).toBe(true);
+  });
+
+  test('nullifies sensitive data for organization usage (data minimization)', async () => {
+    const user = await insertTestUser({
+      id: 'test-org-user-1',
+      microdollars_used: 500,
+      google_user_email: 'orguser@example.com',
+    });
+
+    const organization = await createTestOrganization('AI usage organization', user.id, 10_000);
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-org-msg-123',
+    };
+
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      organizationId: organization.id,
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-org-msg-123'),
+    });
+
+    expect(metadataRecord).toBeTruthy();
+
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, metadataRecord!.id),
+    });
+
+    expect(usageRecord).toBeTruthy();
+    expect(usageRecord?.kilo_user_id).toBe('test-org-user-1');
+    expect(usageRecord?.organization_id).toBe(organization.id);
+    expect(usageRecord?.cost).toBe(500);
+
+    // Verify data minimization: sensitive prompt data should be null for organizations
+    expect(metadataRecord?.user_prompt_prefix).toBe(null);
+    expect(metadataRecord?.system_prompt_prefix_id).toBe(null);
+
+    // Other fields should still be populated normally
+    expect(usageRecord?.input_tokens).toBe(100);
+    expect(usageRecord?.output_tokens).toBe(50);
+    expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
+    expect(usageRecord?.provider).toBe('openrouter');
+
+    await waitForExpectation(async () => {
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+      expect(chargedOrganization.microdollars_used).toBe(500);
+
+      const [memberUsage] = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      expect(memberUsage).toMatchObject({
+        kilo_user_id: user.id,
+        microdollar_usage: 500,
+      });
+    });
+  });
+
+  test('insertUsageRecord updates user balance atomically via insertUsageWithOverrides', async () => {
+    const user = await insertTestUser({
+      id: 'test-insert-balance-user',
+      microdollars_used: 5000,
+      google_user_email: 'insertbalance@example.com',
+    });
+
+    // Insert usage record directly via insertUsageWithOverrides (which calls insertUsageRecord)
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      cost: 2500,
+    });
+
+    // Verify user balance was updated
+    const updatedUser = await findUserById('test-insert-balance-user');
+    expect(updatedUser?.microdollars_used).toBe(7500); // 5000 + 2500
+
+    // Insert another usage record
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      cost: 1000,
+    });
+
+    // Verify balance accumulated correctly
+    const finalUser = await findUserById('test-insert-balance-user');
+    expect(finalUser?.microdollars_used).toBe(8500); // 7500 + 1000
+  });
+
+  test('insertUsageRecord does not update balance for zero cost via insertUsageWithOverrides', async () => {
+    const user = await insertTestUser({
+      id: 'test-insert-zero-cost-user',
+      microdollars_used: 3000,
+      google_user_email: 'insertzero@example.com',
+    });
+
+    // Insert usage record with zero cost
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      cost: 0,
+    });
+
+    // Verify user balance was NOT updated
+    const updatedUser = await findUserById('test-insert-zero-cost-user');
+    expect(updatedUser?.microdollars_used).toBe(3000); // unchanged
+  });
+
+  test('insertUsageRecord does not update user balance for organization usage via insertUsageWithOverrides', async () => {
+    const user = await insertTestUser({
+      id: 'test-insert-org-user',
+      microdollars_used: 4000,
+      google_user_email: 'insertorg@example.com',
+    });
+
+    const organization = await createTestOrganization('Insert usage organization', user.id, 10_000);
+
+    // Insert usage record with organization_id (should not update user balance)
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      organization_id: organization.id,
+      cost: 2000,
+    });
+
+    // Verify user balance was NOT updated (org usage doesn't deplete user balance)
+    const updatedUser = await findUserById('test-insert-org-user');
+    expect(updatedUser?.microdollars_used).toBe(4000); // unchanged
+  });
+
+  test('insertUsageRecord enqueues durable daily-rollup work without mutating the daily table', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-personal-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-personal@example.com',
+    });
+
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      cost: 1500,
+    });
+
+    const [repair] = await db
+      .select()
+      .from(microdollar_usage_daily_repairs)
+      .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id));
+    expect(repair).toMatchObject({
+      kilo_user_id: user.id,
+      organization_id: null,
+      usage_date: '2025-08-15',
+      attempt_count: 0,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1500);
+    const dailyRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
+    expect(dailyRows).toHaveLength(0);
+  });
+
+  test('does not enqueue or apply a daily repair when the authoritative usage insert fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const user = await insertTestUser({
+      id: 'test-daily-authoritative-failure-user',
+      microdollars_used: 1000,
+      google_user_email: 'daily-authoritative-failure@example.com',
+    });
+    const { core, metadata } = await defineMicrodollarUsage();
+    const invalidUsageId = 'not-a-usage-uuid';
+
+    try {
+      await expect(
+        insertUsageRecord(
+          { ...core, id: invalidUsageId, kilo_user_id: user.id, cost: 600 },
+          metadata
+        )
+      ).resolves.toBeNull();
+
+      const sourceRows = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, user.id));
+      expect(sourceRows).toHaveLength(0);
+      expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+
+      const repairRows = await db
+        .select()
+        .from(microdollar_usage_daily_repairs)
+        .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id));
+      expect(repairRows).toHaveLength(0);
+      const dailyRows = await db
+        .select()
+        .from(microdollar_usage_daily)
+        .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
+      expect(dailyRows).toHaveLength(0);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  test('rolls negative usage into its UTC day without changing the personal balance', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-negative-utc-user',
+      microdollars_used: 1000,
+      google_user_email: 'daily-negative-utc@example.com',
+    });
+    const { core: beforeMidnightCore, metadata: beforeMidnightMetadata } =
+      await defineMicrodollarUsage();
+    const { core: afterMidnightCore, metadata: afterMidnightMetadata } =
+      await defineMicrodollarUsage();
+
+    await insertUsageRecord(
+      {
+        ...beforeMidnightCore,
+        kilo_user_id: user.id,
+        cost: -250,
+        created_at: '2025-08-15T23:59:59.999Z',
+      },
+      beforeMidnightMetadata
+    );
+    await insertUsageRecord(
+      {
+        ...afterMidnightCore,
+        kilo_user_id: user.id,
+        cost: 400,
+        created_at: '2025-08-16T00:00:00.000Z',
+      },
+      afterMidnightMetadata
+    );
+
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1400);
+    const repairRows = await db
+      .select({ usage_date: microdollar_usage_daily_repairs.usage_date })
+      .from(microdollar_usage_daily_repairs)
+      .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id))
+      .orderBy(microdollar_usage_daily_repairs.usage_date);
+    expect(repairRows).toEqual([{ usage_date: '2025-08-15' }, { usage_date: '2025-08-16' }]);
+  });
+
+  test('applies negative organization corrections to balance and member daily usage', async () => {
+    const user = await insertTestUser({
+      id: 'test-org-negative-correction-user',
+      microdollars_used: 0,
+      google_user_email: 'org-negative-correction@example.com',
+    });
+    const organization = await createTestOrganization(
+      'Negative correction organization',
+      user.id,
+      10_000
+    );
+    const { core, metadata } = await defineMicrodollarUsage();
+
+    await insertUsageRecord(
+      {
+        ...core,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        cost: 500,
+      },
+      metadata
+    );
+    const { core: correctionCore, metadata: correctionMetadata } = await defineMicrodollarUsage();
+    await insertUsageRecord(
+      {
+        ...correctionCore,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        cost: -200,
+      },
+      correctionMetadata
+    );
+
+    const [correctedOrganization] = await db
+      .select({
+        microdollarsUsed: organizations.microdollars_used,
+        microdollarsBalance: organizations.microdollars_balance,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    expect(correctedOrganization).toMatchObject({
+      microdollarsUsed: 300,
+      microdollarsBalance: 9_700,
+    });
+    const [memberUsage] = await db
+      .select({ microdollarUsage: organization_user_usage.microdollar_usage })
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, organization.id));
+    expect(memberUsage?.microdollarUsage).toBe(300);
+  });
+
+  // A redelivery of the same usage id can reach the write while, or after, the
+  // first delivery commits: `recordUsageInPrimaryRegion` retries a 10s attempt
+  // timeout, and after exhausting its retries the SFO caller falls back to
+  // writing locally with the same `core.id`. The row is billed exactly once, so
+  // the second write must report the identity rather than a failure — otherwise
+  // the caller treats billed usage as unrecorded and skips dependent writes.
+  test('insertUsageRecord reports a redelivered usage id as recorded and bills it once', async () => {
+    const user = await insertTestUser({
+      id: 'test-usage-redelivery-user',
+      microdollars_used: 0,
+      google_user_email: 'usage-redelivery@example.com',
+    });
+    const { core, metadata } = await defineMicrodollarUsage();
+    const usage = { ...core, kilo_user_id: user.id, cost: 700 };
+
+    const first = await insertUsageRecord(usage, metadata);
+    expect(first).toMatchObject({ usageId: usage.id, newMicrodollarsUsed: 700 });
+
+    const redelivery = await insertUsageRecord(usage, metadata);
+    expect(redelivery).toMatchObject({ usageId: usage.id, createdAt: usage.created_at });
+
+    const rows = await db
+      .select({ id: microdollar_usage.id })
+      .from(microdollar_usage)
+      .where(eq(microdollar_usage.kilo_user_id, user.id));
+    expect(rows).toHaveLength(1);
+    expect((await findUserById(user.id))?.microdollars_used).toBe(700);
+  });
+
+  // The same redelivery can also arrive while the first write is still open: the
+  // client's attempt timeout fires long before the database gives up. One
+  // transaction then loses on the primary key (or is picked as a deadlock victim
+  // and retried into that collision), and the surviving caller must still learn
+  // the identity of the single billed row.
+  test('insertUsageRecord bills a concurrent redelivery once and reports the identity', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const user = await insertTestUser({
+        id: 'test-usage-concurrent-redelivery-user',
+        microdollars_used: 0,
+        google_user_email: 'usage-concurrent-redelivery@example.com',
+      });
+      const { core, metadata } = await defineMicrodollarUsage();
+      const usage = { ...core, kilo_user_id: user.id, cost: 900 };
+
+      const outcomes = await Promise.all([
+        insertUsageRecord(usage, metadata),
+        insertUsageRecord(usage, metadata),
+      ]);
+
+      // Neither caller may be told the usage was lost: the row is committed, so
+      // both must be able to attach dependent writes to it. Only `usageId` is
+      // asserted because the winning transaction reports the database's own
+      // `created_at` rendering, which `logMicrodollarUsage` discards in favour of
+      // the ISO 8601 value it constructed.
+      for (const outcome of outcomes) {
+        expect(outcome?.usageId).toBe(usage.id);
+      }
+      const rows = await db
+        .select({ id: microdollar_usage.id })
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, user.id));
+      expect(rows).toHaveLength(1);
+      expect((await findUserById(user.id))?.microdollars_used).toBe(900);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  test('insertUsageRecord skips microdollar_usage_daily for zero-cost rows', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-zero-cost-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-zero@example.com',
+    });
+
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 0 });
+
+    const dailyRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
+    expect(dailyRows).toHaveLength(0);
+  });
+
+  describe('OpenRouter usage without a BYOK status', () => {
+    const transcriptionStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'gen-stt-123',
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheHitTokens: 0,
+      cost_mUsd: 10,
+      is_byok: null,
+      inference_provider: null,
+      generation_time: 2,
+    };
+
+    const costMismatchWarning =
+      'Cost from provider generation lookup differs from cost computed from response usage data:';
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+      jest.mocked(fetchGeneration).mockReset();
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      jest.mocked(console.warn).mockRestore();
+    });
+
+    test.each([
+      {
+        case: 'the serving provider with a user gateway key',
+        userSuffix: 'user-key',
+        servingProvider: createUserOpenRouterProvider('user-openrouter-key'),
+        expectedApiKey: 'user-openrouter-key',
+      },
+      {
+        case: 'Kilo OpenRouter without a serving provider',
+        userSuffix: 'kilo-key',
+        expectedApiKey: OPENROUTER.apiKey,
+      },
+      {
+        case: 'Kilo OpenRouter when the serving provider is another gateway',
+        userSuffix: 'other-gateway',
+        servingProvider: createUserVercelAiGatewayProvider('user-vercel-key'),
+        expectedApiKey: OPENROUTER.apiKey,
+      },
+    ])(
+      'looks up the generation with $case',
+      async ({ userSuffix, servingProvider, expectedApiKey }) => {
+        const user = await insertTestUser({
+          id: `test-generation-lookup-${userSuffix}`,
+          microdollars_used: 0,
+          google_user_email: `generation-lookup-${userSuffix}@example.com`,
+        });
+        jest.mocked(fetchGeneration).mockResolvedValue(undefined);
+
+        await processTokenData(
+          { ...transcriptionStats },
+          { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions', user_byok: true },
+          servingProvider
+        );
+
+        expect(fetchGeneration).toHaveBeenCalledWith(
+          'gen-stt-123',
+          expect.objectContaining({ type: 'openrouter', apiKey: expectedApiKey })
+        );
+      }
+    );
+
+    test('reports the unresolved cost when the generation lookup fails', async () => {
+      const user = await insertTestUser({
+        id: 'test-generation-lookup-failure-user',
+        microdollars_used: 0,
+        google_user_email: 'generation-lookup-failure@example.com',
+      });
+      jest.mocked(fetchGeneration).mockResolvedValue(undefined);
+
+      await processTokenData(
+        { ...transcriptionStats },
+        { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions' }
+      );
+
+      expect(fetchGeneration).toHaveBeenCalledWith('gen-stt-123', expect.anything());
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
+        expect.objectContaining({ tags: { source: 'generation_lookup_fallback' } })
+      );
+    });
+
+    test('bills the upstream cost the generation lookup reports', async () => {
+      const user = await insertTestUser({
+        id: 'test-generation-lookup-success-user',
+        microdollars_used: 0,
+        google_user_email: 'generation-lookup-success@example.com',
+      });
+      jest.mocked(fetchGeneration).mockResolvedValue({
+        data: {
+          id: 'gen-stt-123',
+          model: 'openai/whisper-1',
+          is_byok: true,
+          total_cost: 0.00001,
+          upstream_inference_cost: 0.0002,
+          provider_name: 'OpenAI',
+        },
+      } as OpenRouterGeneration);
+
+      const result = await processTokenData(
+        { ...transcriptionStats },
+        { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions' }
+      );
+
+      expect(result).not.toBeNull();
+      expect((await findUserById(user.id))?.microdollars_used).toBe(200);
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalledWith(costMismatchWarning, expect.anything());
+    });
+
+    test('warns when a non-BYOK generation cost differs from the response cost', async () => {
+      const user = await insertTestUser({
+        id: 'test-generation-cost-mismatch-user',
+        microdollars_used: 0,
+        google_user_email: 'generation-cost-mismatch@example.com',
+      });
+      jest.mocked(fetchGeneration).mockResolvedValue({
+        data: {
+          id: 'gen-stt-123',
+          model: 'openai/whisper-1',
+          is_byok: false,
+          total_cost: 0.00003,
+          provider_name: 'OpenAI',
+        },
+      } as OpenRouterGeneration);
+
+      await processTokenData(
+        { ...transcriptionStats },
+        { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions' }
+      );
+
+      expect((await findUserById(user.id))?.microdollars_used).toBe(30);
+      expect(console.warn).toHaveBeenCalledWith(
+        costMismatchWarning,
+        expect.objectContaining({ cost_mUsd: { generation: 30, response: 10 } })
+      );
+    });
+  });
+
+  test('skips anonymous usage without an IP instead of inventing one', async () => {
+    mockedReportUsageEvent.mockClear();
+    const user = await insertTestUser({
+      id: 'test-bouncer-anonymous-no-ip-user',
+      microdollars_used: 0,
+      google_user_email: 'bouncer-anonymous-no-ip@example.com',
+    });
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      bouncer: {
+        requestId: 'req-bouncer-anon-2',
+        occurredAt: new Date('2026-09-29T10:06:00.000Z'),
+        accountId: null,
+        clientIp: null,
+        clientAttributed: false,
+        requestedLogprobs: false,
+        samples: null,
+        promptSimHash: null,
+      },
+    };
+
+    // The absence of an IP is a telemetry gap; the row is still persisted.
+    await expect(
+      processTokenData({ ...BASE_USAGE_STATS, messageId: null }, usageContext)
+    ).resolves.not.toBeNull();
+    expect(mockedReportUsageEvent).not.toHaveBeenCalled();
+  });
+
+  test('records custom LLM usage as free regardless of upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-free-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-free@example.com',
+    });
+
+    await insertCustomLlmForTest('acme/free-custom-model');
+    try {
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: 'test-custom-llm-free', cost_mUsd: 700 },
+        {
+          ...createBaseUsageContext(user),
+          provider: 'custom',
+          requested_model: 'acme/free-custom-model',
+          is_free: true,
+        }
+      );
+    } finally {
+      await deleteCustomLlmForTest('acme/free-custom-model');
+    }
+
+    expect((await findUserById('test-custom-llm-free-user'))?.microdollars_used).toBe(1000);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-custom-llm-free'),
+    });
+    expect(metadataRecord?.is_free).toBe(true);
+  });
+
+  test('bills custom LLM usage at the custom LLM pricing instead of the upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-priced-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-priced@example.com',
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 300, cacheDiscount_mUsd: 50 },
+      {
+        ...createBaseUsageContext(user),
+        provider: 'custom',
+        requested_model: 'acme/priced-custom-model',
+        is_free: false,
+        custom_llm_pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 2,
+              completion_per_million: 10,
+              input_cache_read_per_million: 1,
+              input_cache_write_per_million: 3,
+            },
+          },
+        ],
+      }
+    );
+
+    // 85 uncached * 2 + 10 cache writes * 3 + 5 cache reads * 1 + 50 output * 10
+    const pricedCost = 705;
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({ provider: 'custom', cost: pricedCost });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 300 });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
+  });
+
+  test.each([
+    ['custom', 'deleted'],
+    ['custom', 'unavailable'],
+    ['custom-public', 'deleted'],
+    ['custom-public', 'unavailable'],
+  ] as const)(
+    'preserves selected %s usage when its catalog entry is %s',
+    async (provider, catalogState) => {
+      const user = await insertTestUser({
+        id: `test-${catalogState}-${provider}-llm-user`,
+        microdollars_used: 1000,
+        google_user_email: `${catalogState}-${provider}-llm@example.com`,
+      });
+      const organization = await createTestOrganization('Deleted custom LLM', user.id, 10_000);
+      const modelId = `acme/${catalogState}-${provider}-model`;
+      await insertCustomLlmForTest(
+        modelId,
+        provider === 'custom-public' ? publicCustomLlmDefinition(['acme']) : customLlmDefinition()
+      );
+      const catalogReadSpy = jest.spyOn(readDb, 'select');
+      try {
+        expect(await isCustomLlm(modelId)).toBe(true);
+        const usageContext: MicrodollarUsageContext = {
+          ...createBaseUsageContext(user),
+          organizationId: organization.id,
+          provider,
+          requested_model: modelId,
+          is_free: true,
+        };
+
+        await deleteCustomLlmForTest(modelId);
+        if (catalogState === 'unavailable') {
+          catalogReadSpy.mockImplementation(() => {
+            throw new Error('Custom LLM catalog unavailable');
+          });
+        }
+        expect(await isCustomLlm(modelId)).toBe(false);
+
+        const result = await processTokenData(
+          { ...BASE_USAGE_STATS, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+          usageContext
+        );
+        assert(result);
+        const usageRecord = await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, result.usageId),
+        });
+        expect(usageRecord).toMatchObject({
+          provider,
+          model: modelId,
+          requested_model: modelId,
+          cost: 0,
+          cache_discount: 0,
+        });
+        const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+          where: eq(microdollar_usage_metadata.id, result.usageId),
+        });
+        expect(metadataRecord).toMatchObject({ is_free: true, market_cost: 700 });
+        expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+        const updatedOrganization = await db.query.organizations.findFirst({
+          where: eq(organizations.id, organization.id),
+        });
+        expect(updatedOrganization).toMatchObject({
+          microdollars_used: 0,
+          microdollars_balance: 10_000,
+        });
+      } finally {
+        catalogReadSpy.mockRestore();
+        await deleteCustomLlmForTest(modelId);
+      }
+    }
+  );
+
+  test.each([false, true])('preserves paid model accounting with user BYOK=%s', async userByok => {
+    const user = await insertTestUser({
+      id: `test-paid-model-byok-${userByok}`,
+      microdollars_used: 1000,
+      google_user_email: `paid-model-byok-${userByok}@example.com`,
+    });
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+      { ...createBaseUsageContext(user), user_byok: userByok }
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({
+      cost: userByok ? 0 : 700,
+      cache_discount: userByok ? 0 : 50,
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({
+      is_free: false,
+      is_user_byok: userByok,
+      market_cost: 700,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
+  });
+
+  describe.each([
+    {
+      apiKind: 'chat_completions',
+      response: {
+        id: 'direct-chat',
+        model: 'upstream-model',
+        choices: [
+          { index: 0, message: { content: 'hi' }, delta: { content: 'hi' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+      },
+    },
+    {
+      apiKind: 'messages',
+      response: {
+        id: 'direct-message',
+        model: 'upstream-model',
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 10, output_tokens: 2 },
+      },
+    },
+    {
+      apiKind: 'responses',
+      response: {
+        id: 'direct-response',
+        model: 'upstream-model',
+        status: 'completed',
+        output: [],
+        usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 },
+      },
+    },
+  ] as const)('direct BYOK $apiKind usage', ({ apiKind, response }) => {
+    test.each([false, true])(
+      'persists the serving inference provider with streaming=%s',
+      async isStreaming => {
+        const user = await insertTestUser();
+        const events =
+          apiKind === 'messages'
+            ? [
+                { type: 'message_start', message: response },
+                {
+                  type: 'message_delta',
+                  delta: { stop_reason: 'end_turn' },
+                  usage: response.usage,
+                },
+              ]
+            : apiKind === 'responses'
+              ? [{ type: 'response.completed', response }]
+              : [response];
+        const body = isStreaming
+          ? events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')
+          : JSON.stringify(response);
+
+        const accounting = countAndStoreUsage(
+          new Response(body),
+          {
+            ...createBaseUsageContext(user),
+            api_kind: apiKind,
+            provider: 'direct-byok',
+            user_byok: true,
+            isStreaming,
+            requested_model: 'neuralwatt/upstream-model',
+          },
+          undefined,
+          { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'neuralwatt' }
+        );
+        expect((await accounting.statsPromise)?.inference_provider).toBe('neuralwatt');
+        const result = await accounting.usagePromise;
+
+        assert(result);
+        const usageRecord = await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, result.usageId),
+        });
+        expect(usageRecord).toMatchObject({
+          provider: 'direct-byok',
+          inference_provider: 'neuralwatt',
+          input_tokens: 10,
+          output_tokens: 2,
+          has_error: false,
+        });
+      }
+    );
+  });
+
+  test.each([
+    {
+      name: 'preserves the upstream inference provider',
+      upstream: 'upstream-provider',
+      servingProvider: { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'z-ai' },
+      expected: 'upstream-provider',
+    },
+    {
+      name: 'leaves unknown direct BYOK attribution null',
+      upstream: null,
+      servingProvider: { ...OPENROUTER, type: 'direct-byok' },
+      expected: null,
+    },
+    {
+      name: 'leaves attribution null without a serving provider',
+      upstream: null,
+      servingProvider: undefined,
+      expected: null,
+    },
+    {
+      name: 'uses configured attribution regardless of provider type',
+      upstream: null,
+      servingProvider: { ...OPENROUTER, inferenceProviderId: 'z-ai' },
+      expected: 'z-ai',
+    },
+  ] as const)('$name', async ({ upstream, servingProvider, expected }) => {
+    const user = await insertTestUser();
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, inference_provider: upstream },
+      {
+        ...createBaseUsageContext(user),
+        provider: servingProvider?.type ?? 'direct-byok',
+        user_byok: true,
+      },
+      servingProvider
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord?.inference_provider).toBe(expected);
+  });
+
+  test.each([
+    { provider: 'openrouter', user_byok: false, reportsToSentry: true },
+    { provider: 'custom', user_byok: false, reportsToSentry: true },
+    { provider: 'openrouter', user_byok: true, reportsToSentry: false },
+    { provider: 'openai-chatgpt', user_byok: false, reportsToSentry: false },
+  ] as const)(
+    'reports in-stream auth errors to Sentry=$reportsToSentry for provider $provider with user BYOK=$user_byok',
+    async ({ provider, user_byok, reportsToSentry }) => {
+      jest.mocked(captureException).mockClear();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const user = await insertTestUser({
+        id: `test-stream-auth-error-${provider}-${user_byok}`,
+        microdollars_used: 0,
+        google_user_email: `stream-auth-error-${provider}-${user_byok}@example.com`,
+      });
+      const errorEvent = {
+        type: 'error',
+        error: { code: 'invalid_api_key', message: 'Incorrect API key provided' },
+      };
+
+      try {
+        await countAndStoreUsage(
+          new Response(`data: ${JSON.stringify(errorEvent)}\n\n`),
+          { ...createBaseUsageContext(user), api_kind: 'responses', provider, user_byok },
+          undefined
+        ).usagePromise;
+
+        const authError = new Error('Responses API error: Incorrect API key provided');
+        const authErrorContext = expect.objectContaining({
+          tags: { source: 'responses_sse_processing' },
+        });
+        if (reportsToSentry) {
+          expect(captureException).toHaveBeenCalledWith(authError, authErrorContext);
+        } else {
+          expect(captureException).not.toHaveBeenCalledWith(authError, authErrorContext);
+          expect(warn).toHaveBeenCalledWith(
+            'Responses API error: Incorrect API key provided',
+            expect.objectContaining({ uses_user_credentials: true })
+          );
+        }
+      } finally {
+        warn.mockRestore();
+      }
+    }
+  );
+
+  test('stores latency and generation_time measured from the response body', async () => {
+    const user = await insertTestUser({
+      id: 'test-measured-timing-user',
+      microdollars_used: 0,
+      google_user_email: 'measured-timing@example.com',
+    });
+    const chunk = {
+      id: 'gen-measured-timing',
+      model: 'anthropic/claude-3.7-sonnet',
+      provider: 'Anthropic',
+      choices: [{ index: 0, delta: { content: 'hi' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 2,
+        total_tokens: 12,
+        cost: 0.001,
+        is_byok: false,
+      },
+    };
+
+    let now = 0;
+    const performanceNow = jest.spyOn(performance, 'now').mockImplementation(() => now);
+    const chunks: [at: number, text: string][] = [
+      [100, ': OPENROUTER PROCESSING\n\n'],
+      [700, `data: ${JSON.stringify(chunk)}\n\n`],
+      [1000, 'data: [DONE]\n\n'],
+    ];
+    // With a high-water mark of 0 each chunk is produced, and the clock set to
+    // its arrival time, only when usage processing reads it.
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          const next = chunks.shift();
+          if (!next) {
+            controller.close();
+            return;
+          }
+          now = next[0];
+          controller.enqueue(new TextEncoder().encode(next[1]));
+        },
+      },
+      { highWaterMark: 0 }
+    );
+
+    try {
+      const result = await countAndStoreUsage(
+        new Response(body),
+        { ...createBaseUsageContext(user), requestStartedAt: 50 },
+        undefined
+      ).usagePromise;
+
+      assert(result);
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.id, result.usageId),
+      });
+      expect(metadataRecord).toMatchObject({ latency: 650, generation_time: 300 });
+    } finally {
+      performanceNow.mockRestore();
+    }
+  });
+
+  test.each([false, true])('records BYOK non-inference costs with user BYOK=%s', async userByok => {
+    const user = await insertTestUser({
+      id: `test-byok-non-inference-${userByok}`,
+      microdollars_used: 1000,
+      google_user_email: `byok-non-inference-${userByok}@example.com`,
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 12_316, nonInferenceCost_mUsd: 7000 },
+      { ...createBaseUsageContext(user), user_byok: userByok }
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord?.cost).toBe(userByok ? 0 : 12_316);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ non_inference_cost: 7000, market_cost: 12_316 });
+    const [usageViewRecord] = await db
+      .select({ non_inference_cost: microdollar_usage_view.non_inference_cost })
+      .from(microdollar_usage_view)
+      .where(eq(microdollar_usage_view.id, result.usageId))
+      .limit(1);
+    expect(usageViewRecord?.non_inference_cost).toBe(7000);
+    expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 13_316);
+  });
+
+  test('records no non-inference cost when it is not reported separately', async () => {
+    const user = await insertTestUser({
+      id: 'test-no-non-inference',
+      microdollars_used: 0,
+      google_user_email: 'no-non-inference@example.com',
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null },
+      createBaseUsageContext(user)
+    );
+
+    assert(result);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord?.non_inference_cost).toBeNull();
+  });
+
+  test('charges BYOK non-inference costs on top of custom pricing', async () => {
+    const user = await insertTestUser({
+      id: 'test-byok-non-inference-custom-pricing',
+      microdollars_used: 0,
+      google_user_email: 'byok-non-inference-custom-pricing@example.com',
+    });
+    const usageStats = { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 12_316 };
+    const customInferenceCost_mUsd = calculateCustomCost_mUsd(
+      TEST_CUSTOM_PRICING_CONFIG,
+      'google/gemini-3.8-flash',
+      { ...usageStats, cost_mUsd: 5316 }
+    );
+    assert(customInferenceCost_mUsd !== undefined);
+    jest.mocked(getCustomPricingConfig).mockResolvedValueOnce(TEST_CUSTOM_PRICING_CONFIG);
+
+    const result = await processTokenData(
+      { ...usageStats, nonInferenceCost_mUsd: 7000 },
+      { ...createBaseUsageContext(user), requested_model: 'google/gemini-3.8-flash' }
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord?.cost).toBe(customInferenceCost_mUsd + 7000);
+  });
+
+  test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {
+    const user = await insertTestUser({
+      id: 'test-paid-snapshot-user',
+      microdollars_used: 1000,
+      google_user_email: 'paid-snapshot@example.com',
+    });
+    const modelId = 'acme/registered-after-routing';
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: modelId,
+      is_free: false,
+    };
+
+    await insertCustomLlmForTest(modelId);
+    try {
+      expect(await isCustomLlm(modelId)).toBe(true);
+      const result = await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+        usageContext
+      );
+      assert(result);
+      const usageRecord = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, result.usageId),
+      });
+      expect(usageRecord).toMatchObject({ cost: 700, cache_discount: 50 });
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.id, result.usageId),
+      });
+      expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 700 });
+      expect((await findUserById(user.id))?.microdollars_used).toBe(1700);
+    } finally {
+      await deleteCustomLlmForTest(modelId);
+    }
+  });
+
+  test('does not report a bouncer usage event without the bouncer context', async () => {
+    mockedReportUsageEvent.mockClear();
+    const user = await insertTestUser({
+      id: 'test-bouncer-usage-absent-user',
+      microdollars_used: 0,
+      google_user_email: 'bouncer-absent@example.com',
+    });
+
+    await processTokenData({ ...BASE_USAGE_STATS, messageId: null }, createBaseUsageContext(user));
+
+    // The classifier overhead row builds a context without a bouncer account and
+    // must not reach the worker.
+    expect(mockedReportUsageEvent).not.toHaveBeenCalled();
+  });
+
+  describe('bouncer usage-event outbox', () => {
+    function spendWatchContext(
+      user: User,
+      requestId: string,
+      spendWatch: boolean
+    ): MicrodollarUsageContext {
+      return {
+        ...createBaseUsageContext(user),
+        bouncer: {
+          requestId,
+          occurredAt: new Date('2026-10-06T10:00:00.000Z'),
+          accountId: `user:${user.id}`,
+          clientIp: '203.0.113.9',
+          clientAttributed: true,
+          requestedLogprobs: false,
+          samples: null,
+          promptSimHash: null,
+          spendWatch,
+        },
+      };
+    }
+
+    beforeEach(() => {
+      mockedReportUsageEvent.mockClear();
+      mockedDeliverUsageEventWireBody.mockClear();
+    });
+
+    test('enqueues a spend-watched usage event with the billing row and delivers it', async () => {
+      const user = await insertTestUser({
+        id: 'test-bouncer-outbox-watched-user',
+        microdollars_used: 0,
+        google_user_email: 'bouncer-outbox-watched@example.com',
+      });
+      const requestId = 'req-bouncer-outbox-watched';
+
+      await expect(
+        processTokenData(
+          { ...BASE_USAGE_STATS, messageId: null },
+          spendWatchContext(user, requestId, true)
+        )
+      ).resolves.not.toBeNull();
+
+      const rows = await db
+        .select()
+        .from(bouncer_usage_event_outbox)
+        .where(eq(bouncer_usage_event_outbox.request_id, requestId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.user_id).toBe(user.id);
+      expect(rows[0]?.status).toBe('delivered');
+      expect(rows[0]?.payload).toMatchObject({
+        requestId,
+        accountId: `user:${user.id}`,
+        costMicrodollars: BASE_USAGE_STATS.cost_mUsd,
+      });
+      expect(mockedDeliverUsageEventWireBody).toHaveBeenCalledTimes(1);
+      expect(mockedReportUsageEvent).not.toHaveBeenCalled();
+    });
+
+    test('keeps the best-effort send and enqueues nothing without spendWatch', async () => {
+      const user = await insertTestUser({
+        id: 'test-bouncer-outbox-unwatched-user',
+        microdollars_used: 0,
+        google_user_email: 'bouncer-outbox-unwatched@example.com',
+      });
+      const requestId = 'req-bouncer-outbox-unwatched';
+
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null },
+        spendWatchContext(user, requestId, false)
+      );
+
+      const rows = await db
+        .select()
+        .from(bouncer_usage_event_outbox)
+        .where(eq(bouncer_usage_event_outbox.request_id, requestId));
+      expect(rows).toHaveLength(0);
+      expect(mockedDeliverUsageEventWireBody).not.toHaveBeenCalled();
+      expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId, costMicrodollars: BASE_USAGE_STATS.cost_mUsd })
+      );
+      expect(mockedReportUsageEvent.mock.calls[0]?.[0]).not.toHaveProperty('siwc');
+    });
+
+    test('marks a request served on the delegated ChatGPT connection as siwc', async () => {
+      const user = await insertTestUser({
+        id: 'test-bouncer-siwc-user',
+        microdollars_used: 0,
+        google_user_email: 'bouncer-siwc@example.com',
+      });
+      const requestId = 'req-bouncer-siwc';
+
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null },
+        { ...spendWatchContext(user, requestId, false), provider: 'openai-chatgpt' }
+      );
+
+      expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId, accountId: `user:${user.id}`, siwc: true })
+      );
+    });
+  });
+});
+
+describe('stripNulBytesInPlace', () => {
+  test('strips NUL bytes from string values and tracks field names', () => {
+    const obj: Record<string, unknown> = {
+      clean: 'normal',
+      dirty: 'bad\u0000val',
+      other: 42,
+      nil: null,
+      multiple: 'a\u0000b\u0000c',
+    };
+    const dirtyFields: string[] = [];
+
+    stripNulBytesInPlace(obj, dirtyFields);
+
+    expect(obj.clean).toBe('normal');
+    expect(obj.dirty).toBe('badval');
+    expect(obj.other).toBe(42);
+    expect(obj.nil).toBeNull();
+    expect(obj.multiple).toBe('abc');
+    expect(dirtyFields.sort()).toEqual(['dirty', 'multiple']);
+  });
+
+  test('is a no-op when no NUL bytes are present', () => {
+    const obj: Record<string, unknown> = { a: 'x', b: 'y', c: 1 };
+    const dirtyFields: string[] = [];
+
+    stripNulBytesInPlace(obj, dirtyFields);
+
+    expect(dirtyFields).toEqual([]);
+    expect(obj).toEqual({ a: 'x', b: 'y', c: 1 });
+  });
+});
+
+describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
+  const baseUsageStats: MicrodollarUsageStats = {
+    messageId: 'msg-id',
+    hasError: false,
+    cost_mUsd: 500,
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+    model: 'provider/model',
+    responseContent: '',
+    inference_provider: 'prov',
+    upstream_id: 'up',
+    finish_reason: 'stop',
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: 200,
+  };
+
+  // Node's Headers constructor rejects values containing NUL bytes (invalid
+  // per RFC 7230), so HTTP-header-sourced fields like `http_user_agent`,
+  // `machine_id`, `session_id`, `editor_name`, and `project_id` cannot
+  // realistically carry NULs in production. The realistic vector is fields
+  // sourced from the JSON request body or upstream LLM responses:
+  // `model`, `requested_model`, `inference_provider`, `upstream_id`,
+  // `finish_reason`, `message_id`, `system_prompt_prefix`, `user_prompt_prefix`.
+  // The sanitizer still covers every string field defensively.
+  const makeUsageContext = (overrides: Partial<MicrodollarUsageContext> = {}) =>
+    ({
+      api_kind: 'chat_completions',
+      kiloUserId: 'user-1',
+      prior_microdollar_usage: 0,
+      provider: 'openrouter',
+      fraudHeaders: getFraudDetectionHeaders(new Headers({ 'user-agent': 'test-agent' })),
+      isStreaming: false,
+      project_id: null,
+      requested_model: 'provider/requested-model',
+      is_free: false,
+      custom_llm_pricing: null,
+      promptInfo: {
+        system_prompt_prefix: 'sys-prefix',
+        system_prompt_length: 10,
+        user_prompt_prefix: 'usr-prefix',
+      },
+      max_tokens: null,
+      has_middle_out_transform: null,
+      status_code: null,
+      editor_name: 'vscode',
+      machine_id: 'machine',
+      user_byok: false,
+      has_tools: false,
+      feature: null,
+      session_id: 'session',
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+      ...overrides,
+    }) satisfies MicrodollarUsageContext;
+
+  test('strips NUL bytes from body- and upstream-sourced string fields', async () => {
+    // Fields whose values cross the CTE insert as individual SQL parameters.
+    // A NUL byte in any of them crashes the insert with Postgres 22021 --
+    // see KILOCODE-WEB-1G3Z.
+    const usageStats: MicrodollarUsageStats = {
+      ...baseUsageStats,
+      messageId: 'msg\u0000id',
+      model: 'provider/model\u0000evil',
+      inference_provider: 'prov\u0000',
+      upstream_id: 'up\u0000',
+      finish_reason: 'stop\u0000',
+    };
+    const usageContext = makeUsageContext({
+      requested_model: 'req\u0000model',
+      promptInfo: {
+        system_prompt_prefix: 'sys\u0000prefix',
+        system_prompt_length: 10,
+        user_prompt_prefix: 'usr\u0000prefix',
+      },
+    });
+
+    const { core, metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(usageContext)
+    );
+
+    // core fields (from the LLM response body)
+    expect(core.model).toBe('provider/modelevil');
+    expect(core.inference_provider).toBe('prov');
+    expect(core.requested_model).toBe('reqmodel');
+
+    // metadata fields (from prompt extraction + upstream response)
+    expect(metadata.system_prompt_prefix).toBe('sysprefix');
+    expect(metadata.user_prompt_prefix).toBe('usrprefix');
+    expect(metadata.upstream_id).toBe('up');
+    expect(metadata.finish_reason).toBe('stop');
+    expect(metadata.message_id).toBe('msgid');
+
+    // No stray NUL bytes anywhere in the returned record.
+    for (const value of Object.values(core)) {
+      if (typeof value === 'string') expect(value.includes('\u0000')).toBe(false);
+    }
+    for (const value of Object.values(metadata)) {
+      if (typeof value === 'string') expect(value.includes('\u0000')).toBe(false);
+    }
+  });
+
+  test('strips NUL bytes from a directly-constructed fraudHeaders object', async () => {
+    // Bypass Node's Headers validation to exercise the defensive coverage of
+    // HTTP-header-sourced fields. This documents that IF a NUL byte ever
+    // reaches these fields (e.g. through a future upstream change), the
+    // sanitizer will still strip it.
+    const usageContext = makeUsageContext({
+      fraudHeaders: {
+        http_x_forwarded_for: '1.2.3.4\u0000',
+        http_x_vercel_ip_city: 'Amsterdam\u0000',
+        http_x_vercel_ip_country: 'NL\u0000',
+        http_x_vercel_ip_latitude: 52.37,
+        http_x_vercel_ip_longitude: 4.89,
+        http_x_vercel_ja4_digest: 'abc\u0000',
+        http_user_agent: 'kilo\u0000evil',
+      },
+    });
+
+    const { metadata } = await toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(usageContext)
+    );
+
+    expect(metadata.http_user_agent).toBe('kiloevil');
+    expect(metadata.http_x_forwarded_for).toBe('1.2.3.4');
+    expect(metadata.http_x_vercel_ip_city).toBe('Amsterdam');
+    expect(metadata.http_x_vercel_ip_country).toBe('NL');
+    expect(metadata.http_x_vercel_ja4_digest).toBe('abc');
+  });
+
+  test('is a no-op on records without NUL bytes', async () => {
+    const { core, metadata } = await toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(makeUsageContext())
+    );
+
+    expect(core.model).toBe('provider/model');
+    expect(core.inference_provider).toBe('prov');
+    expect(core.requested_model).toBe('provider/requested-model');
+    expect(metadata.machine_id).toBe('machine');
+    expect(metadata.session_id).toBe('session');
+    expect(metadata.editor_name).toBe('vscode');
+    expect(metadata.upstream_id).toBe('up');
+    expect(metadata.finish_reason).toBe('stop');
+    expect(metadata.message_id).toBe('msg-id');
+  });
+
+  test('stores audio transcription api kind metadata', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(makeUsageContext({ api_kind: 'audio_transcriptions' }))
+    );
+
+    expect(metadata.api_kind).toBe('audio_transcriptions');
+  });
+});
+
+describe('toInsertableDbUsageRecord header-derived metadata bounds', () => {
+  const usageStats: MicrodollarUsageStats = {
+    messageId: 'msg-id',
+    hasError: false,
+    cost_mUsd: 500,
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+    model: 'provider/model',
+    responseContent: '',
+    inference_provider: 'prov',
+    upstream_id: 'up',
+    finish_reason: 'stop',
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: 200,
+  };
+
+  const contextWith = (
+    fraudHeaders: Partial<MicrodollarUsageContext['fraudHeaders']>
+  ): MicrodollarUsageContext => ({
+    api_kind: 'chat_completions',
+    kiloUserId: 'user-1',
+    prior_microdollar_usage: 0,
+    provider: 'openrouter',
+    fraudHeaders: {
+      ...getFraudDetectionHeaders(new Headers()),
+      ...fraudHeaders,
+    },
+    isStreaming: false,
+    project_id: null,
+    requested_model: 'provider/requested-model',
+    is_free: false,
+    custom_llm_pricing: null,
+    promptInfo: { system_prompt_prefix: 'sys', system_prompt_length: 3, user_prompt_prefix: 'usr' },
+    max_tokens: null,
+    has_middle_out_transform: null,
+    status_code: 200,
+    editor_name: null,
+    machine_id: null,
+    user_byok: false,
+    has_tools: false,
+    feature: null,
+    session_id: null,
+    mode: null,
+    auto_model: null,
+    reasoning_setting: null,
+    inference_region: null,
+    ttfb_ms: null,
+  });
+
+  const recordFor = async (
+    fraudHeaders: Partial<MicrodollarUsageContext['fraudHeaders']>,
+    stats: MicrodollarUsageStats = usageStats
+  ) => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      stats,
+      extractUsageContextInfo(contextWith(fraudHeaders))
+    );
+    return metadata;
+  };
+
+  test('stores the client User-Agent within the shared maximum', async () => {
+    const userAgent = 'Mozilla/5.0 ' + 'a'.repeat(GATEWAY_HEADER_VALUE_MAX_LENGTH);
+
+    const metadata = await recordFor({ http_user_agent: userAgent });
+
+    expect(metadata.http_user_agent).toBe(OVERSIZED_METADATA_VALUE);
+  });
+
+  test('stores the first forward hop only, as one validated public literal', async () => {
+    const metadata = await recordFor({
+      http_x_forwarded_for:
+        '52.10.20.30, 70.41.3.18, 2a02:26f0:117::1f5, 131.203.0.9.1, not-an-address',
+    });
+
+    expect(metadata.http_x_forwarded_for).toBe('52.10.20.30');
+  });
+
+  test('drops the port and the IPv6 brackets from the recorded address', async () => {
+    expect(
+      (await recordFor({ http_x_forwarded_for: '52.10.20.30:51234' })).http_x_forwarded_for
+    ).toBe('52.10.20.30');
+    expect(
+      (await recordFor({ http_x_forwarded_for: '[2606:4700:4700::1111]:443' })).http_x_forwarded_for
+    ).toBe('2606:4700:4700::1111');
+  });
+
+  test('records no address when the first hop is not a public IP literal', async () => {
+    for (const forwardedFor of [
+      'not-an-address',
+      '192.168.1.5',
+      '127.0.0.1',
+      '10.0.0.7, 52.10.20.30',
+      'fe80::1%eth0',
+      '',
+    ]) {
+      expect((await recordFor({ http_x_forwarded_for: forwardedFor })).http_x_forwarded_for).toBe(
+        null
+      );
+    }
+  });
+
+  test('keeps an ordinary header value unchanged', async () => {
+    const metadata = await recordFor({
+      http_user_agent: 'Kilo-Code/4.2.1 VSCode/1.98.0',
+      http_x_forwarded_for: '52.10.20.30',
+      http_x_vercel_ip_country: 'NL',
+      http_x_vercel_ip_city: 'Amsterdam',
+      http_x_vercel_ja4_digest: 't13d1516h2_8daaf6152771_02713d6af862',
+    });
+
+    expect(metadata.http_user_agent).toBe('Kilo-Code/4.2.1 VSCode/1.98.0');
+    expect(metadata.http_x_forwarded_for).toBe('52.10.20.30');
+    expect(metadata.http_x_vercel_ip_country).toBe('NL');
+    expect(metadata.http_x_vercel_ip_city).toBe('Amsterdam');
+    expect(metadata.http_x_vercel_ja4_digest).toBe('t13d1516h2_8daaf6152771_02713d6af862');
+  });
+
+  test('applies the same bound to the other header-derived columns', async () => {
+    const long = 'b'.repeat(GATEWAY_HEADER_VALUE_MAX_LENGTH + 1);
+
+    const metadata = await recordFor({
+      http_x_vercel_ip_country: long,
+      http_x_vercel_ip_city: long,
+      http_x_vercel_ja4_digest: long,
+    });
+
+    expect(metadata.http_x_vercel_ip_country).toBe(OVERSIZED_METADATA_VALUE);
+    expect(metadata.http_x_vercel_ip_city).toBe(OVERSIZED_METADATA_VALUE);
+    expect(metadata.http_x_vercel_ja4_digest).toBe(OVERSIZED_METADATA_VALUE);
+  });
+
+  test('stores nothing for an absent or blank header', async () => {
+    const metadata = await recordFor({
+      http_user_agent: '   ',
+      http_x_vercel_ip_country: null,
+      http_x_vercel_ip_city: '',
+      http_x_vercel_ja4_digest: null,
+    });
+
+    expect(metadata.http_user_agent).toBeNull();
+    expect(metadata.http_x_vercel_ip_country).toBeNull();
+    expect(metadata.http_x_vercel_ip_city).toBeNull();
+    expect(metadata.http_x_vercel_ja4_digest).toBeNull();
+    expect(metadata.http_x_forwarded_for).toBeNull();
+  });
+
+  test('applies the same bound to a zero-cost record', async () => {
+    const metadata = await recordFor(
+      {
+        http_user_agent: 'c'.repeat(GATEWAY_HEADER_VALUE_MAX_LENGTH + 1),
+        http_x_forwarded_for: '52.10.20.30, 70.41.3.18',
+      },
+      { ...usageStats, cost_mUsd: 0, hasError: true, inputTokens: 0, outputTokens: 0 }
+    );
+
+    expect(metadata.http_user_agent).toBe(OVERSIZED_METADATA_VALUE);
+    expect(metadata.http_x_forwarded_for).toBe('52.10.20.30');
+  });
+});

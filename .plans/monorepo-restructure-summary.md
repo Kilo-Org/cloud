@@ -33,7 +33,7 @@ BEFORE                              AFTER
 /kilo-app/                   →      /apps/mobile/
 /cloud-agent/                →      /services/cloud-agent/
 /cloud-agent-next/           →      /services/cloud-agent-next/
-/cloudflare-gastown/         →      /services/gastown/
+/cloudflare-gastown/         →      (removed; Gastown no longer exists in the repo)
 /cloudflare-deploy-infra/    →      /services/deploy-infra/
 /cloudflare-*                →      /services/* (prefix stripped)
 /kiloclaw/                   →      /services/kiloclaw/
@@ -57,7 +57,6 @@ packages:
   - services/*
   - services/cloud-agent/wrapper
   - services/cloud-agent-next/wrapper
-  - services/gastown/container
   - services/deploy-infra/builder
   - services/deploy-infra/dispatcher
   - packages/*

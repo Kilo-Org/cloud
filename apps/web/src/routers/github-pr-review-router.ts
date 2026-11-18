@@ -5,8 +5,8 @@ import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_terms_acceptances, type OperationLedgerRow } from '@kilocode/db/schema';
 import { PR_OPERATION_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import { prIntentFingerprint, type PrLedgerIntent } from '@kilocode/app-shared/pr-review';
@@ -19,6 +19,7 @@ import {
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
 import type { createGitHubPrReviewOctokit } from '@/lib/github-pr-review/client';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
 import {
   buildChecksResult,
   buildFilesPage,
@@ -27,17 +28,23 @@ import {
   buildReviewThreadsResult,
   sliceFileLines,
   type GraphQlInboxNode,
+  type OverviewGraphQlData,
 } from '@/lib/github-pr-review/mappers';
 import {
+  CHECKS_MAX_PAGES,
+  CHECKS_PAGE_SIZE,
   CONVERSATION_COMMENTS_MAX_PAGES,
   CONVERSATION_COMMENTS_PAGE_SIZE,
   FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
   FILES_MAX_PAGES,
   FILES_PAGE_SIZE,
   INBOX_PAGE_SIZE,
   REVIEW_THREADS_PAGE_SIZE,
 } from '@/lib/github-pr-review/dtos';
 import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
+import { classifyGitHubHttpError } from '@/lib/github-pr-review/errors';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
 import {
   AutoMergeMethodSchema,
@@ -48,6 +55,7 @@ import {
   ReviewSideSchema,
   buildAddReactionVariables,
   buildCreateReviewCommentParams,
+  buildDeleteCommentParams,
   buildDeleteRefParams,
   buildDisableAutoMergeVariables,
   buildEnableAutoMergeVariables,
@@ -58,6 +66,7 @@ import {
   buildSubmitReviewParams,
   buildUnresolveThreadVariables,
   buildUpdateBranchParams,
+  buildUpdateCommentParams,
 } from '@/lib/github-pr-review/mutations';
 
 const ownerRepoRegex = /^[A-Za-z0-9_.-]+$/;
@@ -153,6 +162,36 @@ const ReplyToCommentInput = ownerRepoSchema
   })
   .strict();
 
+const AddIssueCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    body: z.string().min(1).max(65_535),
+    operationKey: operationKeySchema,
+  })
+  .strict();
+
+// A posted PR comment is either an inline review comment (`pulls.*`) or a PR
+// conversation/issue comment (`issues.*`). The two endpoints take the same
+// `comment_id`, so the client only has to say which kind it is editing.
+const CommentKindSchema = z.enum(['review', 'conversation']);
+
+const UpdateCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    commentId: z.number().int().positive(),
+    kind: CommentKindSchema,
+    body: z.string().min(1).max(65_535),
+  })
+  .strict();
+
+const DeleteCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    commentId: z.number().int().positive(),
+    kind: CommentKindSchema,
+  })
+  .strict();
+
 const SubmitReviewInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
@@ -210,21 +249,68 @@ const UpdateBranchInput = ownerRepoSchema
   })
   .strict();
 
-const AutoMergeInput = ownerRepoSchema
-  .extend({
-    number: prNumberSchema,
+// Both auto-merge mutations address the pull request by its GraphQL node id:
+// the caller's own token is authorized against that node, and neither mutation
+// is ledgered, so `owner`/`repo`/`number` carry no authorization or keying
+// weight. They were REQUIRED by an earlier wire version and older shipped
+// mobile clients still send them, so the schema keeps `.strict()` (unknown
+// fields are still rejected) and tolerates all three as accepted and IGNORED.
+// `method`/`commitTitle`/`commitMessage` are enable-only: `disableAutoMerge`
+// reads nothing but `prNodeId`.
+const AutoMergeNodeInput = z
+  .object({
     prNodeId: z.string().min(1).max(256),
-    method: AutoMergeMethodSchema.optional(),
-    commitTitle: z.string().min(1).max(255).optional(),
-    commitMessage: z.string().min(1).max(65_535).optional(),
+    // Legacy fields — accepted for backward compat, ignored by the server.
+    owner: z.string().regex(ownerRepoRegex).optional(),
+    repo: z.string().regex(ownerRepoRegex).optional(),
+    number: prNumberSchema.optional(),
   })
   .strict();
 
+const EnableAutoMergeInput = AutoMergeNodeInput.extend({
+  method: AutoMergeMethodSchema.optional(),
+  commitTitle: z.string().min(1).max(255).optional(),
+  commitMessage: z.string().min(1).max(65_535).optional(),
+}).strict();
+
+// Overview enrichment: the aggregate review decision plus the three sidebar
+// boxes REST cannot answer — per-reviewer state, pending review requests, and
+// the issues this PR closes. `latestReviews` returns ONE node per reviewer
+// (their newest review), which is exactly what GitHub's own sidebar lists.
+// Only the `User` inline fragment is selected on `requestedReviewer`: a
+// requested team has no login or avatar and is dropped by the mapper.
 const PULL_REQUEST_FRAGMENT_QUERY = /* GraphQL */ `
   query PrReviewDecision($owner: String!, $name: String!, $number: Int!) {
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
         reviewDecision
+        latestReviews(first: 25) {
+          nodes {
+            state
+            author {
+              login
+              avatarUrl
+            }
+          }
+        }
+        reviewRequests(first: 25) {
+          nodes {
+            requestedReviewer {
+              ... on User {
+                login
+                avatarUrl
+              }
+            }
+          }
+        }
+        closingIssuesReferences(first: 10) {
+          nodes {
+            number
+            title
+            url
+            closed
+          }
+        }
       }
     }
     viewer {
@@ -753,6 +839,15 @@ const PR_LEDGER_SETTLE_FAILED_MESSAGE =
 // distinct non-retryable error so the client cannot blind-retry the same key.
 const PR_LEDGER_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
+// A settled row whose stored canonical result does not match its intent's
+// result shape cannot be replayed. Reporting a partial object as a success
+// would tell the client an action completed with fields the provider never
+// confirmed, so the row is surfaced as an unreadable result instead.
+const PR_LEDGER_RESULT_UNREADABLE_MESSAGE =
+  'We could not read the recorded result of this action. Please try again.';
+// Retryable copy for an inbox page GitHub did not answer inside the mobile
+// procedure budget. Fixed text: never GitHub's own message.
+const INBOX_UNAVAILABLE_MESSAGE = 'Your review inbox took too long to load. Try again.';
 
 function ambiguousPrError(): TRPCError {
   return new TRPCError({ code: 'CONFLICT', message: PR_AMBIGUOUS_MESSAGE });
@@ -944,6 +1039,38 @@ function prSettledOutboxEvent(params: {
   };
 }
 
+/**
+ * Canonical results as stored in `operation_ledgers.canonical_result`, one
+ * schema per ledger intent. These are the exact shapes the mobile client reads,
+ * so a replayed row is validated into the intent's concrete result instead of
+ * being asserted into it. Unknown keys are stripped: only these fields were
+ * ever part of the replay contract.
+ */
+const CommentWriteResultSchema = z.object({ commentId: z.number(), nodeId: z.string() });
+type CommentWriteResult = z.infer<typeof CommentWriteResultSchema>;
+
+const ReviewWriteResultSchema = z.object({
+  reviewId: z.number(),
+  nodeId: z.string(),
+  state: z.string(),
+});
+type ReviewWriteResult = z.infer<typeof ReviewWriteResultSchema>;
+
+/**
+ * The merge effect's result. `branchDeleteError` is response-only free text and
+ * never enters the ledger canonical result, so a settled row only ever holds
+ * the two `branchDeleted` arms.
+ */
+type MergeWriteResult =
+  | { merged: boolean; sha: string; branchDeleted: false }
+  | { merged: true; sha: string; branchDeleted: true }
+  | { merged: true; sha: string; branchDeleted: false; branchDeleteError: string };
+
+const MergeSettledResultSchema = z.discriminatedUnion('branchDeleted', [
+  z.object({ merged: z.literal(true), sha: z.string(), branchDeleted: z.literal(false) }),
+  z.object({ merged: z.literal(true), sha: z.string(), branchDeleted: z.literal(true) }),
+]);
+
 type PrLedgerMutationArgs<T> = {
   userId: string;
   intent: PrLedgerIntent;
@@ -956,6 +1083,8 @@ type PrLedgerMutationArgs<T> = {
   execute: (row: OperationLedgerRow) => Promise<T>;
   /** Reconcilies a same-key retry before any effect. */
   reconcile: (row: OperationLedgerRow) => Promise<T | ReplayedResult<T>>;
+  /** Validates a settled row's stored canonical result into this intent's result. */
+  parseCanonical: (raw: unknown) => T;
 };
 
 /** The canonical result replayed under the same key carries `replayed: true`. */
@@ -968,7 +1097,7 @@ type ReplayedResult<T> = T & { replayed: true };
  * creates a ledger row. Throws PRECONDITION_FAILED `terms_required` when
  * absent.
  */
-async function assertTermsAccepted(userId: string): Promise<void> {
+export async function assertTermsAccepted(userId: string): Promise<void> {
   const [row] = await db
     .select({ id: user_terms_acceptances.id })
     .from(user_terms_acceptances)
@@ -991,6 +1120,8 @@ async function assertTermsAccepted(userId: string): Promise<void> {
  * - `duplicate_in_flight` / `duplicate_reconcile_in_progress`: CONFLICT
  *   `operation_in_progress` (never re-execute).
  * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect.
+ * - `organization_mismatch`: CONFLICT `operation_key_reuse_mismatch`; the row
+ *   was admitted in another organization scope and carries no row.
  *
  * The ledger identity is `(user, domain, operation_key)`, so `admitOperation`
  * returns the row for that key regardless of intent. Before ANY outcome is
@@ -1012,6 +1143,10 @@ async function runPrLedgerMutation<T>(
     leaseSeconds: PR_LEDGER_LEASE_SECONDS,
   });
 
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: PR_OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+  }
+
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({
       code: 'CONFLICT',
@@ -1023,7 +1158,7 @@ async function runPrLedgerMutation<T>(
     case 'admitted':
       return args.execute(admission.row);
     case 'duplicate_settled':
-      return replaySettledPrRow<T>(admission.row);
+      return replaySettledPrRow(admission.row, args.parseCanonical);
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
       throw new TRPCError({ code: 'CONFLICT', message: OPERATION_IN_PROGRESS_MESSAGE });
@@ -1034,9 +1169,22 @@ async function runPrLedgerMutation<T>(
 }
 
 /** Replays a terminal row: only `completed`/`no_op` may replay a canonical result. */
-function replaySettledPrRow<T>(row: OperationLedgerRow): ReplayedResult<T> {
+function replaySettledPrRow<T>(
+  row: OperationLedgerRow,
+  parseCanonical: (raw: unknown) => T
+): ReplayedResult<T> {
   if (row.status === 'completed' || row.status === 'no_op') {
-    return { ...(row.canonical_result ?? {}), replayed: true } as ReplayedResult<T>;
+    let parsed: T;
+    try {
+      parsed = parseCanonical(row.canonical_result);
+    } catch (error) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: PR_LEDGER_RESULT_UNREADABLE_MESSAGE,
+        cause: error,
+      });
+    }
+    return Object.assign({}, parsed, { replayed: true } as const);
   }
   // A settled `failed` row cannot be recovered under the same key: surface a
   // non-retryable typed rejection so the client starts a fresh intent.
@@ -1215,6 +1363,8 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
     octokit: ReturnType<typeof createGitHubPrReviewOctokit>,
     providerId: number
   ) => Promise<T>;
+  /** Validates this intent's stored canonical result on replay. */
+  parseCanonical: (raw: unknown) => T;
 }): Promise<T | ReplayedResult<T>> {
   if (args.operationKey === undefined) {
     return withGitHubUserTokenRetry({ kiloUserId: args.userId, call: args.write });
@@ -1243,6 +1393,7 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
         providerRefKey: args.providerRefKey,
         readRef: args.readRef,
       }),
+    parseCanonical: args.parseCanonical,
   });
 }
 
@@ -1256,7 +1407,7 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
  *   re-execute the merge under the same row (takeover);
  * - the authoritative read failed → stay reconcile-pending, surface ambiguous.
  */
-async function reconcileMergePrRow<T>(args: {
+async function reconcileMergePrRow(args: {
   userId: string;
   /** Analytics identity channel, from `ctx.user` — never re-queried here. */
   distinctId: string;
@@ -1266,8 +1417,8 @@ async function reconcileMergePrRow<T>(args: {
   repo: string;
   number: number;
   expectedHeadSha: string;
-  execute: (row: OperationLedgerRow) => Promise<T>;
-}): Promise<T | ReplayedResult<T>> {
+  execute: (row: OperationLedgerRow) => Promise<MergeWriteResult>;
+}): Promise<MergeWriteResult | ReplayedResult<MergeWriteResult>> {
   type MergeReconcileState =
     | { kind: 'merged'; sha: string | null }
     | { kind: 'closed_unmerged' }
@@ -1323,13 +1474,13 @@ async function reconcileMergePrRow<T>(args: {
         merged: true,
         sha: reconcile.sha ?? 'unknown',
         branchDeleted: false,
-      };
+      } satisfies MergeWriteResult;
       await settleCompletedPrRow({
         ...ledgerArgs,
         canonicalResult: canonical,
         reconcileResult: 'confirmed_completed',
       });
-      return { ...canonical, replayed: true } as unknown as ReplayedResult<T>;
+      return Object.assign({}, canonical, { replayed: true } as const);
     }
     case 'closed_unmerged':
     case 'stale_head':
@@ -1355,11 +1506,6 @@ async function reconcileMergePrRow<T>(args: {
  * branch-delete error text stays in the response only — it is free text and
  * must never enter the ledger `canonical_result`.
  */
-type MergeWriteResult =
-  | { merged: boolean; sha: string; branchDeleted: false }
-  | { merged: true; sha: string; branchDeleted: true }
-  | { merged: true; sha: string; branchDeleted: false; branchDeleteError: string };
-
 async function runMergeWrite(
   octokit: ReturnType<typeof createGitHubPrReviewOctokit>,
   input: z.infer<typeof MergePullRequestInput>
@@ -1425,12 +1571,10 @@ async function runMergeWrite(
   }
 }
 
-type OverviewGraphQl = {
-  repository: {
-    pullRequest: { reviewDecision: string | null } | null;
-  } | null;
-  viewer: { login: string } | null;
-};
+// Mirrors PULL_REQUEST_FRAGMENT_QUERY. `OverviewGraphQlData` (mappers.ts) owns
+// the field-by-field shape; this alias keeps the fetch helper's return type in
+// step with it without restating the selection twice.
+type OverviewGraphQl = NonNullable<OverviewGraphQlData>;
 
 // GraphQL enrichment for the overview (reviewDecision + viewer.login). It keeps
 // its own try/catch: a TRPCError and any raw 401 are rethrown so
@@ -1467,6 +1611,114 @@ async function fetchOverviewGraphQl(
     // the overview — degrade the reviewDecision/viewer enrichment.
     return null;
   }
+}
+
+const COMMENT_NOT_OWNED_MESSAGE = 'You can only edit or delete your own comments.';
+
+/**
+ * Own-comment guard for `updateComment` / `deleteComment`.
+ *
+ * The mobile row offers Edit / Delete only on the viewer's own comment
+ * (`comment-row.tsx` compares the author login to the viewer login), but that
+ * is a UI rule: both procedures take a bare comment id, and GitHub lets a
+ * repository collaborator write over another author's comment, so a caller
+ * that skips the app could rewrite or remove someone else's. The guard reads
+ * the comment's author plus the identity the caller's own credential
+ * authenticates as — the same comparison, server-side — and refuses a
+ * mismatch with FORBIDDEN. GitHub logins are case-insensitive, so case folds.
+ *
+ * The viewer identity is read live rather than taken from the credential's
+ * recorded `githubLogin`: a GitHub rename leaves the recorded value stale and
+ * would refuse the user their own comment.
+ *
+ * A comment read that 404s is NOT an ownership verdict — it means the comment
+ * is already gone (`deleteComment` treats that as success) or unreadable — so
+ * the guard reports `missing` and each caller keeps its behavior for it.
+ */
+async function assertViewerOwnsComment(args: {
+  octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
+  owner: string;
+  repo: string;
+  commentId: number;
+  kind: z.infer<typeof CommentKindSchema>;
+}): Promise<'owned' | 'missing'> {
+  const commentPromise =
+    args.kind === 'review'
+      ? args.octokit.pulls.getReviewComment({
+          owner: args.owner,
+          repo: args.repo,
+          comment_id: args.commentId,
+        })
+      : args.octokit.issues.getComment({
+          owner: args.owner,
+          repo: args.repo,
+          comment_id: args.commentId,
+        });
+  const [commentResult, viewerResult] = await Promise.allSettled([
+    commentPromise,
+    args.octokit.users.getAuthenticated(),
+  ]);
+  if (commentResult.status === 'rejected') {
+    if (classifyGitHubHttpError(commentResult.reason).code === 'NOT_FOUND') {
+      return 'missing';
+    }
+    throw commentResult.reason;
+  }
+  if (viewerResult.status === 'rejected') {
+    throw viewerResult.reason;
+  }
+  const authorLogin = commentResult.value.data.user?.login ?? null;
+  const viewerLogin = viewerResult.value.data.login;
+  if (authorLogin === null || authorLogin.toLowerCase() !== viewerLogin.toLowerCase()) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: COMMENT_NOT_OWNED_MESSAGE });
+  }
+  return 'owned';
+}
+
+/**
+ * One file read behind `getFileLines` holds at most the shared byte budget,
+ * whichever observation of the blob supplies the number. A file above it is a
+ * typed `PAYLOAD_TOO_LARGE` rejection; a window is never truncated.
+ */
+function assertFileWithinReadBudget(bytes: number): void {
+  if (bytes > FILE_READ_MAX_BYTES) {
+    throw new TRPCError({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: FILE_READ_TOO_LARGE_MESSAGE,
+    });
+  }
+}
+
+// One page of a REST listing, plus the provider's own "there is more" signal:
+// `Link: rel="next"` is present exactly while another page exists.
+type CheckListPage = { items: unknown[]; linkHasNext: boolean | undefined };
+
+function readLinkHasNext(headers: { link?: string } | undefined): boolean | undefined {
+  const link = headers?.link;
+  return typeof link === 'string' ? link.includes('rel="next"') : undefined;
+}
+
+/**
+ * Read one check listing page by page until the provider reports no next page
+ * or CHECKS_MAX_PAGES pages have been read. `truncated` says the walk stopped
+ * at the ceiling with entries left behind, which the response carries so a
+ * client can present the rows as partial instead of as the whole list.
+ */
+async function fetchBoundedCheckList(args: {
+  fetchPage: (page: number) => Promise<CheckListPage>;
+}): Promise<{ items: unknown[]; truncated: boolean }> {
+  const items: unknown[] = [];
+  for (let page = 1; page <= CHECKS_MAX_PAGES; page += 1) {
+    const { items: pageItems, linkHasNext } = await args.fetchPage(page);
+    items.push(...pageItems);
+    // The Link header decides, so a page shorter than the requested size can
+    // still have more pages behind it. A response with no Link header (an
+    // older proxy, a test double) falls back to the page-length heuristic,
+    // the same rule listFiles uses.
+    const hasNext = linkHasNext ?? pageItems.length === CHECKS_PAGE_SIZE;
+    if (!hasNext) return { items, truncated: false };
+  }
+  return { items, truncated: true };
 }
 
 export const githubPrReviewRouter = createTRPCRouter({
@@ -1521,19 +1773,37 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        // Start both paginate calls before awaiting so the checks retrieval
-        // runs in parallel.
-        const checkRunsPromise = octokit.paginate(octokit.checks.listForRef, {
-          owner: input.owner,
-          repo: input.repo,
-          ref: input.ref,
-          per_page: 100,
+        // Start both walks before awaiting so their first pages are fetched in
+        // parallel.
+        const checkRunsPromise = fetchBoundedCheckList({
+          fetchPage: async page => {
+            const response = await octokit.checks.listForRef({
+              owner: input.owner,
+              repo: input.repo,
+              ref: input.ref,
+              per_page: CHECKS_PAGE_SIZE,
+              page,
+            });
+            return {
+              items: response.data.check_runs,
+              linkHasNext: readLinkHasNext(response.headers),
+            };
+          },
         });
-        const statusesPromise = octokit.paginate(octokit.repos.listCommitStatusesForRef, {
-          owner: input.owner,
-          repo: input.repo,
-          ref: input.ref,
-          per_page: 100,
+        const statusesPromise = fetchBoundedCheckList({
+          fetchPage: async page => {
+            const response = await octokit.repos.listCommitStatusesForRef({
+              owner: input.owner,
+              repo: input.repo,
+              ref: input.ref,
+              per_page: CHECKS_PAGE_SIZE,
+              page,
+            });
+            return {
+              items: response.data,
+              linkHasNext: readLinkHasNext(response.headers),
+            };
+          },
         });
 
         const [checkRunsResult, statusesResult] = await Promise.allSettled([
@@ -1548,8 +1818,9 @@ export const githubPrReviewRouter = createTRPCRouter({
         if (statusesResult.status === 'rejected') throw statusesResult.reason;
 
         return buildChecksResult({
-          checkRuns: checkRunsResult.value as never,
-          commitStatuses: statusesResult.value as never,
+          checkRuns: checkRunsResult.value.items as never,
+          commitStatuses: statusesResult.value.items as never,
+          truncated: checkRunsResult.value.truncated || statusesResult.value.truncated,
         });
       },
     });
@@ -1567,10 +1838,16 @@ export const githubPrReviewRouter = createTRPCRouter({
           page,
           per_page: FILES_PAGE_SIZE,
         });
+        const link = response.headers?.link;
         return buildFilesPage({
           page,
           perPage: FILES_PAGE_SIZE,
           rawFiles: response.data as never,
+          // GitHub answers with `Link: rel="next"` exactly while more pages
+          // exist, so the header — not the page length — decides whether the
+          // client keeps paging. A response with no Link header (an older
+          // proxy, a test double) falls back to the page-length heuristic.
+          linkHasNext: typeof link === 'string' ? link.includes('rel="next"') : undefined,
         });
       },
     });
@@ -1580,20 +1857,52 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        const response = await octokit.repos.getContent({
+        // The window is capped at FILE_LINES_MAX lines and the body at
+        // FILE_READ_MAX_BYTES. The contents metadata reports the blob size and,
+        // for a blob inside GitHub's inline limit, carries the body itself, so
+        // one request answers the read; only a body the metadata leaves out is
+        // fetched from the raw endpoint, and either body is measured against
+        // the budget before any line is sliced.
+        const metadata = await octokit.repos.getContent({
           owner: input.owner,
           repo: input.repo,
           path: input.path,
           ref: input.ref,
-          mediaType: { format: 'raw' },
         });
-        const data = response.data as unknown;
-        if (typeof data !== 'string') {
+        const entry = metadata.data as unknown;
+        if (Array.isArray(entry)) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Requested path is not a file',
           });
         }
+        const { size, encoding, content } = (entry ?? {}) as {
+          size?: number;
+          encoding?: string;
+          content?: string;
+        };
+        assertFileWithinReadBudget(typeof size === 'number' ? size : 0);
+        let data: string;
+        if (encoding === 'base64' && typeof content === 'string') {
+          data = Buffer.from(content, 'base64').toString('utf8');
+        } else {
+          const response = await octokit.repos.getContent({
+            owner: input.owner,
+            repo: input.repo,
+            path: input.path,
+            ref: input.ref,
+            mediaType: { format: 'raw' },
+          });
+          const raw = response.data as unknown;
+          if (typeof raw !== 'string') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Requested path is not a file',
+            });
+          }
+          data = raw;
+        }
+        assertFileWithinReadBudget(Buffer.byteLength(data));
         const cappedEnd = Math.min(input.endLine, input.startLine + FILE_LINES_MAX - 1);
         return sliceFileLines({
           rawContent: data,
@@ -1674,37 +1983,49 @@ export const githubPrReviewRouter = createTRPCRouter({
   // paginated through GitHub GraphQL `search`. The query string is
   // server-fixed (INBOX_SEARCH_QUERY) so the caller can only ever see PRs
   // their own token can already see. Read-only — no ledger, no Terms check.
-  listInbox: baseProcedure.input(ListInboxInput).query(async ({ ctx, input }) => {
-    return withGitHubUserTokenRetry({
-      kiloUserId: ctx.user.id,
-      call: async octokit => {
-        const resp = (await octokit.request('POST /graphql', {
-          query: INBOX_QUERY,
-          variables: {
-            q: INBOX_SEARCH_QUERY,
-            first: INBOX_PAGE_SIZE,
-            after: input.cursor ?? null,
+  //
+  // GitHub can leave the GraphQL read open for minutes; the mobile app budgets
+  // the whole procedure, so the request carries the read's deadline signal and
+  // a stall answers retryably instead of failing opaquely.
+  listInbox: baseProcedure.input(ListInboxInput).query(async ({ ctx, input }) =>
+    withControlPlaneReadBudget({
+      clock: ctx,
+      message: INBOX_UNAVAILABLE_MESSAGE,
+      read: signal =>
+        withGitHubUserTokenRetry({
+          kiloUserId: ctx.user.id,
+          call: async octokit => {
+            const resp = (await octokit.request('POST /graphql', {
+              query: INBOX_QUERY,
+              variables: {
+                q: INBOX_SEARCH_QUERY,
+                first: INBOX_PAGE_SIZE,
+                after: input.cursor ?? null,
+              },
+              // Octokit reads request options (and so the deadline signal) from
+              // `request`, never from the top level, which is sent to GitHub.
+              request: { signal },
+            })) as {
+              data: {
+                data: {
+                  search: {
+                    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                    nodes: GraphQlInboxNode[];
+                  } | null;
+                } | null;
+                errors?: unknown;
+              };
+            };
+            throwTrpcFromGraphQlErrors(resp.data.errors as never);
+            const connection = resp.data.data?.search ?? null;
+            return buildInboxResult({
+              nodes: connection?.nodes ?? [],
+              pageInfo: connection?.pageInfo ?? null,
+            });
           },
-        })) as {
-          data: {
-            data: {
-              search: {
-                pageInfo: { hasNextPage: boolean; endCursor: string | null };
-                nodes: GraphQlInboxNode[];
-              } | null;
-            } | null;
-            errors?: unknown;
-          };
-        };
-        throwTrpcFromGraphQlErrors(resp.data.errors as never);
-        const connection = resp.data.data?.search ?? null;
-        return buildInboxResult({
-          nodes: connection?.nodes ?? [],
-          pageInfo: connection?.pageInfo ?? null,
-        });
-      },
-    });
-  }),
+        }),
+    })
+  ),
 
   // Post a single immediate review comment (no pending review required).
   createReviewComment: baseProcedure
@@ -1718,7 +2039,8 @@ export const githubPrReviewRouter = createTRPCRouter({
         input,
         operationKey: input.operationKey,
         providerRefKey: 'commentId',
-        write: async octokit => {
+        parseCanonical: raw => CommentWriteResultSchema.parse(raw),
+        write: async (octokit): Promise<CommentWriteResult> => {
           const response = await octokit.pulls.createReviewComment(
             buildCreateReviewCommentParams({
               owner: input.owner,
@@ -1757,7 +2079,8 @@ export const githubPrReviewRouter = createTRPCRouter({
       input,
       operationKey: input.operationKey,
       providerRefKey: 'commentId',
-      write: async octokit => {
+      parseCanonical: raw => CommentWriteResultSchema.parse(raw),
+      write: async (octokit): Promise<CommentWriteResult> => {
         const response = await octokit.pulls.createReplyForReviewComment(
           buildReplyToCommentParams({
             owner: input.owner,
@@ -1780,6 +2103,131 @@ export const githubPrReviewRouter = createTRPCRouter({
     });
   }),
 
+  // Post a REGULAR PR conversation (issue) comment — not a review-thread
+  // reply, not a review. Ledger dedupe (same operationKey replays the
+  // canonical result) is the duplicate-submission guard for the GitHub write.
+  addIssueComment: baseProcedure.input(AddIssueCommentInput).mutation(async ({ ctx, input }) => {
+    await assertTermsAccepted(ctx.user.id);
+    return runPrCommentMutation({
+      userId: ctx.user.id,
+      distinctId: ctx.user.google_user_email ?? ctx.user.id,
+      intent: 'add_pr_comment',
+      input,
+      operationKey: input.operationKey,
+      providerRefKey: 'commentId',
+      parseCanonical: raw => CommentWriteResultSchema.parse(raw),
+      write: async (octokit): Promise<CommentWriteResult> => {
+        const response = await octokit.issues.createComment({
+          owner: input.owner,
+          repo: input.repo,
+          issue_number: input.number,
+          body: input.body,
+        });
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+      readRef: async (octokit, commentId) => {
+        const response = await octokit.issues.getComment({
+          owner: input.owner,
+          repo: input.repo,
+          comment_id: commentId,
+        });
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+    });
+  }),
+
+  // Edit a posted comment the viewer owns. Unledgered, exactly like
+  // `resolveThread`: the update is idempotent (same body → same state), so a
+  // retry after a lost response is safe without an operation key. The UGC gate
+  // still runs because an edit publishes new text. GitHub-only: GitLab and
+  // Bitbucket have no note-edit seam, so the mobile surface withholds the
+  // affordance there.
+  updateComment: baseProcedure.input(UpdateCommentInput).mutation(async ({ ctx, input }) => {
+    await assertTermsAccepted(ctx.user.id);
+    return withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        // Ownership is enforced HERE, not only by the mobile row: a caller
+        // that skips the app must not edit another author's comment. A missing
+        // comment is not an ownership verdict — the update below reports it.
+        await assertViewerOwnsComment({
+          octokit,
+          owner: input.owner,
+          repo: input.repo,
+          commentId: input.commentId,
+          kind: input.kind,
+        });
+        const params = buildUpdateCommentParams({
+          owner: input.owner,
+          repo: input.repo,
+          commentId: input.commentId,
+          body: input.body,
+        });
+        const response =
+          input.kind === 'review'
+            ? await octokit.pulls.updateReviewComment(params)
+            : await octokit.issues.updateComment(params);
+        return {
+          commentId: response.data.id,
+          nodeId: response.data.node_id,
+          body: response.data.body,
+        };
+      },
+    });
+  }),
+
+  // Delete a posted comment the viewer owns. Unledgered for the same reason as
+  // `updateComment` plus one more: GitHub 404s an already-deleted comment, so a
+  // retry whose first response was lost is treated as success instead of
+  // surfacing a failure for work that already happened (idempotent delete).
+  // A bare 404 is not proof of that, though: GitHub returns the same status for
+  // a missing PR / repo or a repo the App cannot see, so the write confirms the
+  // PR itself is still reachable before reporting the delete as done. When it
+  // is not, the 404 propagates and the client sees the real failure.
+  deleteComment: baseProcedure.input(DeleteCommentInput).mutation(async ({ ctx, input }) => {
+    await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        // Ownership is enforced HERE, not only by the mobile row: a caller that
+        // skips the app must not delete another author's comment. The guard
+        // runs before the idempotent-delete handling below so a provider 404
+        // from the guard is never mistaken for a deleted comment.
+        await assertViewerOwnsComment({
+          octokit,
+          owner: input.owner,
+          repo: input.repo,
+          commentId: input.commentId,
+          kind: input.kind,
+        });
+        try {
+          const params = buildDeleteCommentParams({
+            owner: input.owner,
+            repo: input.repo,
+            commentId: input.commentId,
+          });
+          if (input.kind === 'review') {
+            await octokit.pulls.deleteReviewComment(params);
+          } else {
+            await octokit.issues.deleteComment(params);
+          }
+        } catch (error) {
+          if (classifyGitHubHttpError(error).code !== 'NOT_FOUND') {
+            throw error;
+          }
+          // Same 404 boundary as a non-matching comment: a reachable PR means
+          // the comment is gone; a failing read rethrows the provider error,
+          // which the wrapper classifies as NOT_FOUND.
+          await octokit.pulls.get({
+            owner: input.owner,
+            repo: input.repo,
+            pull_number: input.number,
+          });
+        }
+      },
+    });
+    return { commentId: input.commentId, deleted: true };
+  }),
+
   // Submit a pending review with an optional batch of inline comments and
   // an overall event (APPROVE / REQUEST_CHANGES / COMMENT). The confirmed
   // `state` is a bounded GitHub enum (not free text), so it is carried in the
@@ -1793,7 +2241,8 @@ export const githubPrReviewRouter = createTRPCRouter({
       input,
       operationKey: input.operationKey,
       providerRefKey: 'reviewId',
-      write: async octokit => {
+      parseCanonical: raw => ReviewWriteResultSchema.parse(raw),
+      write: async (octokit): Promise<ReviewWriteResult> => {
         const response = await octokit.pulls.createReview(
           buildSubmitReviewParams({
             owner: input.owner,
@@ -1967,6 +2416,7 @@ export const githubPrReviewRouter = createTRPCRouter({
           expectedHeadSha: input.expectedHeadSha,
           execute,
         }),
+      parseCanonical: raw => MergeSettledResultSchema.parse(raw),
     });
   }),
 
@@ -1991,7 +2441,7 @@ export const githubPrReviewRouter = createTRPCRouter({
     });
   }),
 
-  enableAutoMerge: baseProcedure.input(AutoMergeInput).mutation(async ({ ctx, input }) => {
+  enableAutoMerge: baseProcedure.input(EnableAutoMergeInput).mutation(async ({ ctx, input }) => {
     const result = await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
@@ -2014,7 +2464,7 @@ export const githubPrReviewRouter = createTRPCRouter({
     return result;
   }),
 
-  disableAutoMerge: baseProcedure.input(AutoMergeInput).mutation(async ({ ctx, input }) => {
+  disableAutoMerge: baseProcedure.input(AutoMergeNodeInput).mutation(async ({ ctx, input }) => {
     const result = await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {

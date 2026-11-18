@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "သင့် agent session တွင် အသစ်အဆန်း ရှိသည်",
+      "lowBalance": "သင့်လက်ကျန် အာရုံစိုက်ရန် လိုအပ်သည်",
+      "spendAlert": "သင့်အသုံးစရိတ် အာရုံစိုက်ရန် လိုအပ်သည်",
+      "securityFinding": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်",
+      "securityUpdate": "လုံခြုံရေး စစ်ဆေးမှုတွင် အသစ်အဆန်း ရှိသည်",
+      "activeAgentsGlanceable": "လုပ်ဆောင်နေသော agent များတွင် အသစ်အဆန်း ရှိသည်"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "လက်ကျန်နည်း သတိပေးချက်",
+      "body": "{{organizationName}} လက်ကျန်သည် ${{minimumBalanceUsd}} အောက်သို့ ကျဆင်းသွားသည်"
+    },
+    "spendAlert": {
+      "title": "အသုံးစရိတ် သတိပေးချက်",
+      "body": "{{scopeName}} အသုံးစရိတ်သည် ${{amountUsd}} ကျော်လွန်သွားသည်"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}} ရှိ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "လုံခြုံရေး တွေ့ရှိချက် အသစ် ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA သတိပေးချက်"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ချိုးဖောက်မှု"
+    }
+  },
+  "sessionReady": {
+    "body": "သင့် Kilo session ကို သင့်ဖုန်းမှ ထိန်းချုပ်ရန် အသင့်ဖြစ်ပါပြီ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

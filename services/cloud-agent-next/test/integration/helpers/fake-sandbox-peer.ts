@@ -1,0 +1,193 @@
+import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session/session-do.js';
+import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+} from '../../../src/control-plane/sandbox/preview-target.js';
+import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
+import type { WorkspaceBillingProjection } from '../../../src/shared/workspace-runtime-status.js';
+import type { ControlPlanePrepareInputWithSelection } from '../../../src/control-plane/session/sandbox-selection.js';
+import type {
+  ControlPlaneAnswerPayload,
+  ControlPlaneCancelWorkspacePayload,
+  ControlPlaneCancelWorkspaceResult,
+  ControlPlaneDeliverPayload,
+  ControlPlaneDeliverResult,
+  ControlPlaneRouteView,
+} from '../../../src/shared/control-plane-protocol.js';
+
+/**
+ * A synthetic Sandbox DO peer for the Session DO tests. The real end-to-end
+ * path uses the `SANDBOX_CONTROL` binding; state tests inject this to control
+ * `prepare`/`deliver` results deterministically.
+ */
+export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
+  async getWorktreeChanges() {
+    return { snapshot: null };
+  }
+  async getWorktreeFile() {
+    return { status: 'not_captured' as const };
+  }
+  async refreshWorktreeChanges() {
+    return { status: 'offline' as const, snapshot: null };
+  }
+  async getWorktreeRecovery() {
+    return undefined;
+  }
+  readonly fetchCalls: Request[] = [];
+  async fetch(request: Request): Promise<Response> {
+    this.fetchCalls.push(request);
+    return new Response('status-stream');
+  }
+  /** The route attempt every view/notification from this peer belongs to. */
+  attemptId = crypto.randomUUID();
+  prepareView: ControlPlaneRouteView = { state: 'preparing', attemptId: this.attemptId };
+  deliverResult: ControlPlaneDeliverResult = 'sent';
+  /** When set, `prepare` rejects (a transport failure, not a route view). */
+  prepareError: Error | null = null;
+  deliverDelayMs = 0;
+  deliverError: Error | null = null;
+  statusError: Error | null = null;
+  readonly statusCalls: string[] = [];
+  /** Optional fence returned by `getRuntimeCredentialProxyFence` (H4 tests). */
+  runtimeCredentialProxyFence: ControlRuntimeCredentialProxyFence | null = null;
+  /** The snapshot returned by `getStatusSnapshot` (B10 badge tests). */
+  statusSnapshot: SandboxStatusSnapshot = {
+    status: 'sleeping',
+    provider: 'Cloudflare Containers',
+    observedAt: 1,
+    detailCode: 'sandbox_stopped',
+    inactivityTimeoutMs: 600_000,
+    estimatedSleepAt: null,
+  };
+  /** Optional queues; each call shifts one, then falls back to the scalar. */
+  prepareViews: ControlPlaneRouteView[] = [];
+  deliverResults: ControlPlaneDeliverResult[] = [];
+  readonly prepareCalls: ControlPlanePrepareInputWithSelection[] = [];
+  readonly deliverCalls: ControlPlaneDeliverPayload[] = [];
+  readonly abortCalls: string[] = [];
+  readonly answerCalls: ControlPlaneAnswerPayload[] = [];
+  readonly cancelWorkspaceCalls: ControlPlaneCancelWorkspacePayload[] = [];
+  /** Authoritative workspace phase, including a sibling's preparation. */
+  workspacePreparing = false;
+  /** The epoch/at the fake returns and expects on the next prepare. */
+  stopEpoch = 0;
+  stopAt = 0;
+  cancelWorkspaceError: Error | null = null;
+
+  /** A view/update carrying this peer's attempt id, for direct `onRoute` calls. */
+  view(state: 'preparing' | 'ready' | 'reconnecting'): ControlPlaneRouteView {
+    return { state, attemptId: this.attemptId };
+  }
+
+  async prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView> {
+    this.prepareCalls.push(input);
+    if (this.prepareError !== null) throw this.prepareError;
+    const view = injectAttempt(this.prepareViews.shift() ?? this.prepareView, this.attemptId);
+    this.workspacePreparing = view.state === 'preparing';
+    return view;
+  }
+
+  async deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult> {
+    this.deliverCalls.push(payload);
+    if (this.deliverError !== null) throw this.deliverError;
+    if (this.deliverDelayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, this.deliverDelayMs));
+    }
+    return this.deliverResults.shift() ?? this.deliverResult;
+  }
+
+  async abort(payload: { sessionId: string }): Promise<'sent'> {
+    this.abortCalls.push(payload.sessionId);
+    return 'sent';
+  }
+
+  async cancelWorkspace(
+    payload: ControlPlaneCancelWorkspacePayload
+  ): Promise<ControlPlaneCancelWorkspaceResult> {
+    this.cancelWorkspaceCalls.push(payload);
+    if (this.cancelWorkspaceError !== null) throw this.cancelWorkspaceError;
+    if (this.stopEpoch === 0 || payload.requestedAt > this.stopAt) {
+      this.stopEpoch += 1;
+      this.stopAt = Math.max(this.stopAt, payload.requestedAt);
+    }
+    this.workspacePreparing = false;
+    return { stopEpoch: this.stopEpoch, stopAt: this.stopAt };
+  }
+
+  async answer(payload: ControlPlaneAnswerPayload): Promise<'sent'> {
+    this.answerCalls.push(payload);
+    return 'sent';
+  }
+
+  async release(): Promise<void> {}
+
+  async status(payload: { sessionId: string }) {
+    this.statusCalls.push(payload.sessionId);
+    if (this.statusError !== null) throw this.statusError;
+    return {
+      sessionId: payload.sessionId,
+      view: injectAttempt(this.prepareView, this.attemptId),
+      workspacePreparing: this.workspacePreparing,
+      workspaceStopEpoch: this.stopEpoch,
+      workspaceStopAt: this.stopAt,
+    };
+  }
+
+  async getRuntimeCredentialProxyFence(): Promise<ControlRuntimeCredentialProxyFence | null> {
+    return this.runtimeCredentialProxyFence;
+  }
+
+  /** The synthetic peer never has an accepted scope handle. */
+  async resolveScopeHandle(): Promise<{ type: 'denied' }> {
+    return { type: 'denied' };
+  }
+
+  async getAcceptedHandleIssuerLocator(): Promise<null> {
+    return null;
+  }
+
+  async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
+    return this.statusSnapshot;
+  }
+
+  /** The stored billing projection returned by `getWorkspaceBillingProjection`. */
+  billingProjection: WorkspaceBillingProjection | null = null;
+
+  async getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null> {
+    return this.billingProjection;
+  }
+
+  /** The workspace snapshot descriptor's capture time, or null when absent. */
+  workspaceSnapshotRecovery: { capturedAt: number | null } | null = null;
+  readonly removeWorkspaceSnapshotCalls: string[] = [];
+
+  async removeWorkspaceSnapshot(payload: { sessionId: string }): Promise<{ success: true }> {
+    this.removeWorkspaceSnapshotCalls.push(payload.sessionId);
+    this.workspaceSnapshotRecovery = null;
+    return { success: true };
+  }
+
+  async getWorkspaceSnapshotRecovery(): Promise<{ capturedAt: number | null } | null> {
+    return this.workspaceSnapshotRecovery;
+  }
+
+  previewTargetResult: PreviewTargetResult = {
+    status: 'ok',
+    coordinates: {
+      provider: 'cloudflare-containers',
+      logicalSandboxId: 'sbx',
+      allocationRef: 'sbx',
+    },
+  };
+  readonly previewTargetCalls: PreviewSandboxScope[] = [];
+
+  async previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult> {
+    this.previewTargetCalls.push(scope);
+    return this.previewTargetResult;
+  }
+}
+
+function injectAttempt(view: ControlPlaneRouteView, attemptId: string): ControlPlaneRouteView {
+  return view.state === 'unknown' ? view : { ...view, attemptId };
+}

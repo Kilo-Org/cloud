@@ -1,8 +1,9 @@
+/* eslint-disable max-lines -- the composer suite covers the draft clear rules and the provider-arm anchored post in one cohesive file */
 // Clear-rule coverage for the comment composer's durable draft. The composer
 // clears its draft on three committed outcomes — comment post, add-to-review,
 // and a confirmed discard — and keeps it on a dismissed-without-confirmation
-// discard. `Alert.alert` is captured so the test can press the Discard /
-// Keep editing buttons the discard gate renders.
+// discard. The confirm request is captured so the test can drive the
+// discard gate's confirm.
 //
 // The composer is mounted by calling it as a plain function (no renderer), so
 // the React hook primitives are stubbed, mirroring pr-merge-sheet.test.tsx.
@@ -10,19 +11,50 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
+import type * as ReactI18next from 'react-i18next';
 import { PrReviewCommentComposer } from './pr-review-comment-composer';
 import { clearDraft } from '@/lib/persist/drafts';
+import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
-type AlertButton = { text?: string; style?: string; onPress?: () => void };
-type AlertCall = { title: string; message: string; buttons: AlertButton[] };
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
-const { alertCalls, createCommentMocks } = vi.hoisted(() => ({
-  alertCalls: [] as AlertCall[],
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
+
+const { confirmRequests, createCommentMocks, surfaceFeedback } = vi.hoisted(() => ({
+  confirmRequests: [] as ConfirmRequest[],
   createCommentMocks: {
     mutateAsync: vi.fn<() => Promise<unknown>>(),
-    isPending: false,
-    error: null as Error | null,
   },
+  surfaceFeedback: {
+    begin: () => ({ abandon: vi.fn(), fail: vi.fn(), owns: () => true, succeed: vi.fn() }),
+    clearWhere: vi.fn(),
+  },
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 
 vi.mock('react', async () => {
@@ -45,11 +77,6 @@ vi.mock('react', async () => {
 });
 
 vi.mock('react-native', () => ({
-  Alert: {
-    alert: (title: string, message: string, buttons: AlertButton[]) => {
-      alertCalls.push({ title, message, buttons });
-    },
-  },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   ScrollView: 'ScrollView',
   View: 'View',
@@ -78,16 +105,32 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 
 vi.mock('@/components/pr-review/composer-inline-error', () => ({
   ComposerInlineError: 'ComposerInlineError',
-  useComposerInlineError: () => ({
-    inlineError: null,
-    inlineErrorKind: null,
-    inlineErrorIsLocal: false,
-    setInlineError: vi.fn(),
-    setInlineErrorKind: vi.fn(),
-    setInlineErrorIsLocal: vi.fn(),
-    clearBadRequestOnBodyEdit: vi.fn(),
+}));
+
+// The composer reads the connectivity snapshot and its own surface phase
+// through adapters whose real modules reach native code (NetInfo) or need a
+// React dispatcher (useSyncExternalStore); the plain-function mount below
+// stubs the React primitives instead of rendering.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  connectionRefusesWrites: () => false,
+  getCommittedConnectivityStatus: () => 'online',
+  useOfflineBannerState: () => false,
+  useCommittedConnectivityStatus: () => 'online',
+}));
+
+vi.mock('@/lib/hooks/use-surface-feedback', () => ({
+  useSurfaceFeedback: () => ({
+    feedback: { status: 'idle' },
+    failure: null,
+    begin: surfaceFeedback.begin,
+    clearWhere: surfaceFeedback.clearWhere,
   }),
 }));
+
+vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
+  const actual = await importOriginal<typeof ProviderPrRefModule>();
+  return { ...actual, useProviderPrScopeOrNull: () => null };
+});
 
 vi.mock('@/components/pr-review/pr-review-comment-composer-parts', () => ({
   CommentBodyField: 'CommentBodyField',
@@ -99,7 +142,6 @@ vi.mock('@/components/pr-review/pr-review-comment-composer-parts', () => ({
 
 vi.mock('@/components/pr-review/discussion/reply-input', () => ({
   ensureTermsAcceptedOutcome: vi.fn().mockResolvedValue({ kind: 'accepted' as const }),
-  TERMS_OUTDATED_COPY: 'outdated',
 }));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
@@ -143,8 +185,6 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
 vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
   useCreateReviewCommentMutation: () => ({
     mutateAsync: createCommentMocks.mutateAsync,
-    isPending: createCommentMocks.isPending,
-    error: createCommentMocks.error,
   }),
 }));
 
@@ -222,10 +262,8 @@ async function flushMicrotasks(): Promise<void> {
 
 describe('PrReviewCommentComposer draft clear rules', () => {
   beforeEach(() => {
-    alertCalls.length = 0;
+    confirmRequests.length = 0;
     createCommentMocks.mutateAsync.mockReset();
-    createCommentMocks.isPending = false;
-    createCommentMocks.error = null;
     vi.clearAllMocks();
   });
 
@@ -244,6 +282,18 @@ describe('PrReviewCommentComposer draft clear rules', () => {
     footerProp(element, 'onCommentNow')?.();
     await flushMicrotasks();
 
+    // The GitHub arm keeps its exact pre-s6 variables: the position rides
+    // the flat input fields, never the provider `anchor` shape (c3).
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      body: 'hello',
+      path: 'src/a.ts',
+      line: 10,
+      side: 'RIGHT',
+      commitSha: 'a'.repeat(40),
+    });
     expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-comment:key');
   });
 
@@ -252,26 +302,92 @@ describe('PrReviewCommentComposer draft clear rules', () => {
     typeBody(element, 'hello');
     footerProp(element, 'onCancel')?.();
 
-    const call = alertCalls.at(-1);
-    if (!call) {
-      throw new Error('No discard Alert was shown');
-    }
-    call.buttons.find(b => b.style === 'destructive')?.onPress?.();
+    expect(confirmRequests.at(-1)).toMatchObject({
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+    });
+    confirmRequests.at(-1)?.onConfirm();
 
     expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-comment:key');
   });
 
-  it('does not clear the draft on a dismissed-without-confirmation discard', () => {
+  it('does not clear the draft when the discard gate is dismissed without confirming', () => {
     const element = mountComposer();
     typeBody(element, 'hello');
     footerProp(element, 'onCancel')?.();
 
-    const call = alertCalls.at(-1);
-    if (!call) {
-      throw new Error('No discard Alert was shown');
-    }
-    call.buttons.find(b => b.text === 'Keep editing')?.onPress?.();
+    // The gate presented the keep-editing / discard choice; taking the safe
+    // choice (never confirming) leaves the durable draft intact.
+    expect(confirmRequests.at(-1)?.cancelLabel).toBe('Keep editing');
 
     expect(clearDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrReviewCommentComposer provider arm (s6)', () => {
+  // A GitLab MR with the same owner/repo/number triple as the GitHub
+  // fixtures: the folded draft key and the anchored post must differ from
+  // the GitHub arm in both bytes.
+  const gitlabRef = { platform: 'gitlab' as const, projectPath: 'octocat/hello', mrIid: 1 };
+  const providerProps = { ...baseProps, prRef: gitlabRef };
+
+  function mountProviderComposer(): React.ReactElement {
+    // eslint-disable-next-line new-cap
+    return PrReviewCommentComposer(providerProps);
+  }
+
+  beforeEach(() => {
+    createCommentMocks.mutateAsync.mockReset();
+    vi.clearAllMocks();
+  });
+
+  it('posts the tapped diff position as the real anchor through the provider arm (c3)', async () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onCommentNow')?.();
+    await flushMicrotasks();
+
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      body: 'hello',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 10 },
+    });
+  });
+
+  it('carries a multi-line range into the anchor (c3)', async () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    // eslint-disable-next-line new-cap
+    const element = PrReviewCommentComposer({
+      ...providerProps,
+      startLine: 8,
+    });
+    typeBody(element, 'hello');
+    footerProp(element, 'onCommentNow')?.();
+    await flushMicrotasks();
+
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      body: 'hello',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 10, startLine: 8 },
+    });
+  });
+
+  it('keeps the provider comment out of the pending queue path (comment now is direct)', () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onAddToReview')?.();
+
+    // Add-to-review stays provider-agnostic: the queue is local and the
+    // submit sheet folds it into the review body later.
+    expect(createCommentMocks.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('folds the provider ref identity into the durable comment draft key', () => {
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onAddToReview')?.();
+
+    const expected = `pr-comment:key@${providerPrRefKey(gitlabRef)}`;
+    expect(clearDraft).toHaveBeenCalledWith('u1', expected);
   });
 });

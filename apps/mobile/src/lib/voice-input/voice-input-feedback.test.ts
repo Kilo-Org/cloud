@@ -31,6 +31,26 @@ describe('resolveVoiceInputFeedbackPresentation', () => {
       kind: 'alert',
       title: 'Microphone access is off',
       message: 'Microphone access is off. Enable it in Settings to use voice input.',
+      actionLabel: 'Open Settings',
+      destination: 'system-settings',
+    });
+  });
+
+  it('returns an alert whose action names the picker instead of repeating the title', () => {
+    const presentation: VoiceInputFeedbackPresentation = resolveVoiceInputFeedbackPresentation(
+      feedback({
+        action: 'open-transcription-settings',
+        message: "This transcription model isn't available. Pick another one in Preferences.",
+        retryable: false,
+      })
+    );
+
+    expect(presentation).toEqual({
+      kind: 'alert',
+      title: 'Transcription model',
+      message: "This transcription model isn't available. Pick another one in Preferences.",
+      actionLabel: 'Choose a model',
+      destination: 'transcription-model-picker',
     });
   });
 
@@ -67,7 +87,13 @@ describe('resolveVoiceInputFeedbackPresentation', () => {
 });
 
 describe('shouldAnnounceListeningTransition', () => {
-  const allStatuses: VoiceInputStatus[] = ['idle', 'starting', 'listening', 'stopping'];
+  const allStatuses: VoiceInputStatus[] = [
+    'idle',
+    'starting',
+    'listening',
+    'transcribing',
+    'stopping',
+  ];
 
   it('fires exactly once for the first transition into listening (null → listening)', () => {
     expect(shouldAnnounceListeningTransition(null, 'listening')).toBe(true);

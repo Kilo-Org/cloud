@@ -1,7 +1,19 @@
 import Expo from 'expo-server-sdk';
-import type { ExpoPushMessage, ExpoPushReceipt } from 'expo-server-sdk';
+import type { ExpoPushMessage as ExpoServerPushMessage, ExpoPushReceipt } from 'expo-server-sdk';
 
-export type { ExpoPushMessage } from 'expo-server-sdk';
+export type { ExpoPushReceipt } from 'expo-server-sdk';
+
+/**
+ * The Expo push message plus the iOS thread field the Push API accepts.
+ *
+ * `expo-server-sdk@6.1.0` omits `threadId` from its `ExpoPushMessage` type, but
+ * `sendPushNotificationsAsync` posts the message array verbatim
+ * (`JSON.stringify(options.body)`), so the documented iOS field reaches Expo
+ * without an SDK upgrade. The Expo Push API documents `threadId` as
+ * iOS-only: notifications that share it are stacked into one group and none is
+ * replaced, and it maps to `aps.thread-id`. Android ignores it.
+ */
+export type ExpoPushMessage = ExpoServerPushMessage & { threadId?: string };
 
 export type TicketTokenPair = {
   ticketId: string;
@@ -49,9 +61,12 @@ function sleep(ms: number): Promise<void> {
 
 async function sendChunkWithTransientRetry(
   expo: ExpoClient,
-  chunk: ExpoPushChunk
+  chunk: ExpoPushChunk,
+  isCurrent?: () => Promise<boolean>
 ): Promise<ExpoPushTicket[]> {
   for (let attempt = 0; ; attempt++) {
+    // A newer refresh can supersede this chunk during a retry delay.
+    if (isCurrent && !(await isCurrent())) return [];
     try {
       return await expo.sendPushNotificationsAsync(chunk);
     } catch (err) {
@@ -71,7 +86,8 @@ function isRetryableTicketError(errorCode: string | undefined): boolean {
 
 export async function sendPushNotifications(
   messages: ExpoPushMessage[],
-  accessToken: string
+  accessToken: string,
+  isCurrent?: () => Promise<boolean>
 ): Promise<SendResult> {
   if (messages.length === 0) return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
 
@@ -86,7 +102,7 @@ export async function sendPushNotifications(
     let pendingChunk = chunk;
 
     for (let attempt = 0; ; attempt++) {
-      const tickets = await sendChunkWithTransientRetry(expo, pendingChunk);
+      const tickets = await sendChunkWithTransientRetry(expo, pendingChunk, isCurrent);
       const retryChunk: ExpoPushMessage[] = [];
 
       for (let i = 0; i < tickets.length; i++) {

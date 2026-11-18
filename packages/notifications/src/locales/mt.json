@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Is-sessjoni tal-aġent tiegħek għandha aġġornament",
+      "lowBalance": "Il-bilanċ tiegħek għandu bżonn attenzjoni",
+      "spendAlert": "L-infiq tiegħek għandu bżonn attenzjoni",
+      "securityFinding": "Seba ta' sigurtà għandu bżonn attenzjoni",
+      "securityUpdate": "Verifika tas-sigurtà għandha aġġornament",
+      "activeAgentsGlanceable": "L-aġenti attivi għandhom aġġornament"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Allert ta' bilanċ baxx",
+      "body": "Il-bilanċ ta' {{organizationName}} waqa' taħt ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Allert ta' infiq",
+      "body": "L-infiq ta' {{scopeName}} qabeż ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} f'{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Seba ta' sigurtà ġdid ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Twissija tal-SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Ksur tal-SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Is-sessjoni ta' Kilo tiegħek hi lesta biex tikkontrollaha mit-telefon tiegħek"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

@@ -18,9 +18,15 @@ import type {
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { cn } from '@/lib/utils';
 import { useManager } from './CloudAgentProvider';
-import { formatAttemptDuration, phaseStatus, phaseStatusLabel } from './preparation-phases';
-import { phaseDisplayText } from './preparation-summary';
+import { commandsForPhase, phaseStatus, phaseStatusLabel } from './preparation-phases';
+import {
+  phaseDisplayText,
+  preparationFailureText,
+  preparationSummaryLine,
+  summarizePreparationAttempt,
+} from './preparation-summary';
 import { useStickToBottom } from './hooks/useStickToBottom';
+import { PreparationDuration } from './PreparationDuration';
 
 type PreparationDrawerProps = {
   attemptId: string | null;
@@ -43,6 +49,11 @@ export function PreparationDrawer({
   const manager = useManager();
   const attempts = useAtomValue(manager.atoms.preparationAttempts);
   const attempt = attemptId ? attempts.find(candidate => candidate.id === attemptId) : undefined;
+  // The drawer header must agree with the row it was opened from: both derive
+  // from the same summary, and both read destructive when the attempt failed
+  // or its restore was incomplete.
+  const summary = attempt ? summarizePreparationAttempt(attempt) : undefined;
+  const destructive = summary?.kind === 'failed' || summary?.kind === 'incomplete';
 
   return (
     <Sheet modal={false} open={Boolean(attempt)} onOpenChange={onOpenChange}>
@@ -57,10 +68,8 @@ export function PreparationDrawer({
       >
         <SheetHeader className="shrink-0 border-b pr-14">
           <SheetTitle className="text-base">Environment preparation</SheetTitle>
-          <SheetDescription
-            className={cn(attempt?.status === 'failed' && 'text-status-destructive')}
-          >
-            {attempt && attemptSummaryLine(attempt)}
+          <SheetDescription className={cn(destructive && 'text-status-destructive')}>
+            {attempt && preparationSummaryLine(attempt)}
           </SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-xs sm:px-6">
@@ -71,21 +80,14 @@ export function PreparationDrawer({
   );
 }
 
-function attemptSummaryLine(attempt: PreparationAttempt): string {
-  const title =
-    attempt.status === 'running'
-      ? 'Preparing environment'
-      : attempt.status === 'completed'
-        ? 'Environment prepared'
-        : 'Preparation failed';
-  const duration = formatAttemptDuration(attempt);
-  return duration ? `${title} · ${duration}` : title;
-}
-
 function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
   const phaseSteps = attempt.steps.filter(step => step.kind === 'phase');
   const commands = attempt.steps.filter(step => step.kind === 'setup_command');
-  const commandsUnderPhase = phaseSteps.some(step => step.key === 'setup_commands');
+  const phaseIds = new Set(phaseSteps.map(step => step.id));
+  const hasLegacySetupPhase = phaseSteps.some(step => step.key === 'setup_commands');
+  const standaloneCommands = commands.filter(command =>
+    command.parentStepId === undefined ? !hasLegacySetupPhase : !phaseIds.has(command.parentStepId)
+  );
   // A failed command card displays attempt.safeError as its fallback, and a
   // failed phase row displays its own safeError inline — only surface the
   // attempt error separately when no step already carries an error.
@@ -97,24 +99,27 @@ function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
   return (
     <>
       <ol className="flex flex-col">
-        {phaseSteps.map(step => (
-          <PhaseRow key={step.id} step={step} status={phaseStatus(step, commands)}>
-            {step.key === 'setup_commands' && commands.length > 0 && (
-              <CommandList commands={commands} attemptError={attempt.safeError} />
-            )}
-          </PhaseRow>
-        ))}
+        {phaseSteps.map(step => {
+          const phaseCommands = commandsForPhase(step, attempt.steps);
+          return (
+            <PhaseRow key={step.id} step={step} status={phaseStatus(step, phaseCommands)}>
+              {phaseCommands.length > 0 && (
+                <CommandList commands={phaseCommands} attemptError={attempt.safeError} />
+              )}
+            </PhaseRow>
+          );
+        })}
       </ol>
 
-      {!commandsUnderPhase && commands.length > 0 && (
+      {standaloneCommands.length > 0 && (
         <div className="mt-4">
           <p className="type-label mb-2 text-muted-foreground">Setup commands</p>
-          <CommandList commands={commands} attemptError={attempt.safeError} />
+          <CommandList commands={standaloneCommands} attemptError={attempt.safeError} />
         </div>
       )}
 
       {attempt.safeError && !errorShownOnStep && (
-        <p className="mt-3 text-status-destructive">{attempt.safeError}</p>
+        <p className="mt-3 text-status-destructive">{preparationFailureText(attempt.safeError)}</p>
       )}
     </>
   );
@@ -129,8 +134,6 @@ function PhaseRow({
   status: PreparationStepStatus;
   children?: React.ReactNode;
 }) {
-  const duration = formatAttemptDuration(step);
-
   return (
     <li className="border-b border-border py-2 last:border-b-0">
       <div className="flex min-h-6 items-center gap-2">
@@ -154,11 +157,16 @@ function PhaseRow({
           {phaseDisplayText(step)}
         </span>
         <span className="sr-only">{phaseStatusLabel(status)}</span>
-        {duration && (
-          <span className="ml-auto shrink-0 text-foreground-subtle tabular-nums">{duration}</span>
-        )}
+        <PreparationDuration
+          step={step}
+          className="ml-auto shrink-0 text-foreground-subtle tabular-nums"
+        />
       </div>
-      {step.safeError && <p className="ml-7 mt-0.5 text-status-destructive">{step.safeError}</p>}
+      {step.safeError && (
+        <p className="ml-7 mt-0.5 text-status-destructive">
+          {preparationFailureText(step.safeError)}
+        </p>
+      )}
       {children && <div className="ml-7 mt-2">{children}</div>}
     </li>
   );
@@ -198,7 +206,7 @@ function CommandCard({
   step: PreparationStepSnapshot;
   fallbackError?: string;
 }) {
-  const error = step.safeError ?? fallbackError;
+  const error = preparationFailureText(step.safeError ?? fallbackError);
   const output = useStickToBottom<HTMLPreElement>(step.outputTail);
 
   return (
@@ -221,11 +229,12 @@ function CommandCard({
         </code>
         <span
           className={cn(
-            'ml-auto shrink-0 text-muted-foreground tabular-nums',
+            'ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums',
             step.status === 'failed' && 'text-status-destructive'
           )}
         >
-          {commandStatus(step)}
+          <span>{commandStatus(step)}</span>
+          <PreparationDuration step={step} />
         </span>
       </div>
       {error && (

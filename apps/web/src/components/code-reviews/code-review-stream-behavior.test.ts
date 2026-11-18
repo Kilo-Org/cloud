@@ -6,43 +6,66 @@ describe('getCodeReviewDisplayBehavior', () => {
       getCodeReviewDisplayBehavior({
         agentVersion: 'v1',
         status: 'running',
-        cloudAgentSessionId: 'agent_historical',
       })
     ).toEqual({
       isHistorical: true,
       isTerminal: false,
-      shouldLoadHistory: true,
+      shouldLoadMessages: true,
+      shouldPollMessages: false,
       shouldPollStatus: false,
     });
   });
 
-  it('keeps an active V2 review on the live stream path', () => {
+  it('keeps a personal V2 review on the live stream path while polling its status', () => {
     expect(
       getCodeReviewDisplayBehavior({
         agentVersion: 'v2',
         status: 'running',
-        cloudAgentSessionId: 'agent_current',
       })
     ).toEqual({
       isHistorical: false,
       isTerminal: false,
-      shouldLoadHistory: false,
-      shouldPollStatus: false,
-    });
-  });
-
-  it('polls while a V2 review is waiting for its session', () => {
-    expect(
-      getCodeReviewDisplayBehavior({
-        agentVersion: 'v2',
-        status: 'queued',
-        cloudAgentSessionId: null,
-      })
-    ).toEqual({
-      isHistorical: false,
-      isTerminal: false,
-      shouldLoadHistory: false,
+      shouldLoadMessages: false,
+      shouldPollMessages: false,
       shouldPollStatus: true,
     });
   });
+
+  it.each(['pending', 'queued', 'running'])(
+    'polls organization review transcripts when %s',
+    status => {
+      expect(
+        getCodeReviewDisplayBehavior({
+          agentVersion: 'v2',
+          status,
+          organizationId: 'org-1',
+        })
+      ).toEqual({
+        isHistorical: false,
+        isTerminal: false,
+        shouldLoadMessages: true,
+        shouldPollMessages: true,
+        shouldPollStatus: true,
+      });
+    }
+  );
+
+  it.each(['completed', 'failed', 'cancelled', 'interrupted'])(
+    'loads the transcript without polling when %s',
+    status => {
+      expect(
+        getCodeReviewDisplayBehavior({
+          agentVersion: 'v2',
+          status,
+          organizationId: 'org-1',
+        })
+      ).toEqual({
+        isHistorical: false,
+        isTerminal: true,
+        shouldLoadMessages: true,
+        shouldPollMessages: false,
+        shouldPollStatus: false,
+      });
+    }
+  );
 });

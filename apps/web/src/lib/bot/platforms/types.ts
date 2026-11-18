@@ -42,6 +42,19 @@ export type BotPlatform = {
     message: Message;
     platformIntegration: PlatformIntegration;
   }): Promise<boolean> | boolean;
+  /**
+   * Conversation-level authorization gate for bot actions that can change
+   * code. Runs after the account is resolved and before any bot request is
+   * created. Only GitHub-triggered actions check the actor's write access to
+   * the conversation's repository. Chat integrations authorize GitHub repositories
+   * and GitLab projects through the organization's connection, without requiring
+   * a personal provider identity. Platforms without this hook allow every message.
+   */
+  authorizeBotActions?(params: {
+    thread: Thread;
+    message: Message;
+    platformIntegration: PlatformIntegration;
+  }): Promise<{ allowed: true } | { allowed: false; markdown: string }>;
   promptLinkAccount(params: {
     thread: Thread;
     message: Message;
@@ -53,6 +66,16 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
     fn: () => Promise<T>;
   }): Promise<T>;
+  /**
+   * Authorization for the platform's own attachment URLs, so the bot layer can
+   * read a file body under its size cap and stop the transfer as soon as the
+   * cap is passed. Slack's private file URLs need the installation's bot token.
+   * Returns undefined, or is absent, when the adapter must fetch the body
+   * itself; the bot layer then falls back to the adapter's own fetch.
+   */
+  createAttachmentUrlFetcher?(params: {
+    platformIntegration: PlatformIntegration;
+  }): Promise<((url: string) => Promise<Response>) | undefined>;
   getConversationContext(params: {
     thread: Thread;
     triggerMessage: ContextTriggerMessage;
@@ -75,6 +98,7 @@ export type BotPlatform = {
     thread: Thread;
     messageId: string;
     status?: string;
+    platformIntegration: PlatformIntegration;
   }): Promise<StopProcessingIndicator>;
   handleAction?(event: ActionEvent): Promise<void>;
   handleAssistantThreadStarted?(event: AssistantThreadStartedEvent): Promise<void>;

@@ -1,13 +1,21 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
-import { createTRPCRouter, baseProcedure, type TRPCContext } from '@/lib/trpc/init';
+import type { CodeReviewMemoryProposal } from '@kilocode/db/schema';
+import {
+  createTRPCRouter,
+  baseProcedure,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { runReviewMemoryAnalysis } from '@/lib/code-reviews/review-memory/aggregation';
 import {
   countActiveProposals,
   listProposals,
+  listProposalsPage,
   listRepositoriesWithRecentFeedback,
   rejectProposal,
+  ReviewMemoryInvalidCursorError,
+  ReviewMemoryProposalConflictError,
   updateProposal,
   type ReviewMemoryOwner,
 } from '@/lib/code-reviews/review-memory/db';
@@ -22,13 +30,19 @@ import {
 } from '@/lib/code-reviews/review-memory/change-request';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { REVIEW_MEMORY_PROPOSAL_STATUSES } from '@kilocode/db/schema-types';
 
 const OwnerInputSchema = z.object({ organizationId: z.uuid().optional() });
 const PlatformOwnerInputSchema = OwnerInputSchema.extend({ platform: z.enum(['github']) });
 const ProposalStatusSchema = z.enum(REVIEW_MEMORY_PROPOSAL_STATUSES);
+const ProposalListInputSchema = PlatformOwnerInputSchema.extend({
+  repoFullName: z.string().min(1).optional(),
+  statuses: z.array(ProposalStatusSchema).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
 
 async function ownerFromInput(
   ctx: TRPCContext,
@@ -46,7 +60,7 @@ async function assertEnabled(owner: ReviewMemoryOwner, platform: 'github') {
   if (!(await isReviewMemoryEnabled({ owner, platform }))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'Review memory is disabled for this platform.',
+      message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled,
     });
   }
 }
@@ -65,23 +79,38 @@ export const reviewMemoryRouter = createTRPCRouter({
       return { enabled, repositories, openProposalCount };
     }),
 
-  listProposals: baseProcedure
-    .input(
-      PlatformOwnerInputSchema.extend({
-        repoFullName: z.string().min(1).optional(),
-        statuses: z.array(ProposalStatusSchema).optional(),
-        limit: z.number().int().min(1).max(100).optional(),
-      })
-    )
+  listProposals: baseProcedure.input(ProposalListInputSchema).query(async ({ ctx, input }) => {
+    const owner = await ownerFromInput(ctx, input);
+    return await listProposals({
+      owner,
+      platform: input.platform,
+      repoFullName: input.repoFullName,
+      statuses: input.statuses,
+      limit: input.limit,
+    });
+  }),
+
+  // Compatibility: `listProposals` above keeps the deployed array shape for
+  // the web panel and stale client bundles. The paginated shape is additive.
+  listProposalsPage: baseProcedure
+    .input(ProposalListInputSchema.extend({ cursor: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const owner = await ownerFromInput(ctx, input);
-      return await listProposals({
-        owner,
-        platform: input.platform,
-        repoFullName: input.repoFullName,
-        statuses: input.statuses,
-        limit: input.limit,
-      });
+      try {
+        return await listProposalsPage({
+          owner,
+          platform: input.platform,
+          repoFullName: input.repoFullName,
+          statuses: input.statuses,
+          limit: input.limit,
+          cursor: input.cursor,
+        });
+      } catch (error) {
+        if (error instanceof ReviewMemoryInvalidCursorError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+        }
+        throw error;
+      }
     }),
 
   setEnabled: baseProcedure
@@ -122,14 +151,27 @@ export const reviewMemoryRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
-      const proposal = await updateProposal({
-        owner,
-        proposalId: input.proposalId,
-        title: input.title,
-        rationale: input.rationale,
-        proposedMarkdown: input.proposedMarkdown,
-      });
-      if (!proposal) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposal not found.' });
+      let proposal: CodeReviewMemoryProposal | null;
+      try {
+        proposal = await updateProposal({
+          owner,
+          proposalId: input.proposalId,
+          title: input.title,
+          rationale: input.rationale,
+          proposedMarkdown: input.proposedMarkdown,
+        });
+      } catch (error) {
+        if (error instanceof ReviewMemoryProposalConflictError) {
+          throw new TRPCError({ code: 'CONFLICT', message: error.message });
+        }
+        throw error;
+      }
+      if (!proposal) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found,
+        });
+      }
       return proposal;
     }),
 
@@ -139,7 +181,12 @@ export const reviewMemoryRouter = createTRPCRouter({
       const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
       const proposal = await rejectProposal({ owner, proposalId: input.proposalId });
-      if (!proposal) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposal not found.' });
+      if (!proposal) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found,
+        });
+      }
       return proposal;
     }),
 

@@ -1,14 +1,20 @@
 // admin-router.ts
 import {
-  adminProcedure,
-  createTRPCRouter,
+  apiRequestLogExporterProcedure,
   sessionViewerProcedure,
   superadminProcedure,
-} from '@/lib/trpc/init';
-import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
+} from '@/lib/trpc/admin-procedures';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  userCanExportApiRequestLogs,
+  userCanViewSessions,
+  userIsSuperadmin,
+} from '@/lib/admin/admin-permissions';
+import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import {
   user_admin_notes,
@@ -26,22 +32,25 @@ import {
   kiloclaw_instances,
   organizations,
   modelsByProvider,
-  api_request_log,
+  ai_gateway_sync_providers_state,
+  ai_gateway_metadata_cache,
+  api_request_log_2,
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
-import { postTestStaleSyncAlert } from '@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert';
-import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
-import { redisClient } from '@/lib/redis';
-import { SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY } from '@/lib/redis-keys';
-import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
-import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
+import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { postTestMetadataCacheStaleAlert } from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
+import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
+import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
+import { refreshMetadataCache } from '@/lib/providers/metadata-cache/refresh-metadata-cache';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
 import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
+import { adminKiloclawStripeRenewalsRouter } from '@/routers/admin-kiloclaw-stripe-renewals-router';
+import { adminKiloclawCreditRenewalsRouter } from '@/routers/admin-kiloclaw-credit-renewals-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
@@ -53,63 +62,100 @@ import { ContainerMetricsAnalyticsError } from '@/lib/cloudflare/container-metri
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
+import { salesDemoRouter } from '@/routers/admin/sales-demo-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
+import { adminInternalBotUsersRouter } from '@/routers/admin/internal-bot-users-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
-import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
-import { adminModelExperimentsRouter } from '@/routers/admin/model-experiments-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
+import { adminAutoFreeConfigRouter } from '@/routers/admin/auto-free-config-router';
+import { adminGatewayModelListsRouter } from '@/routers/admin/gateway-model-lists-router';
+import { adminVercelModelIdOverridesRouter } from '@/routers/admin/vercel-model-id-overrides-router';
+import { adminPreferredProviderOrderRouter } from '@/routers/admin/preferred-provider-order-router';
+import { adminCustomPricingRouter } from '@/routers/admin/custom-pricing-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
-import { adminKiloclawReferralsRouter } from '@/routers/admin/kiloclaw-referrals-router';
+import { adminServiceFeeRollbackRouter } from '@/routers/admin/service-fee-rollback-router';
+import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
 import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
+import { adminActionAuditLogsRouter } from '@/routers/admin/admin-action-audit-logs-router';
 import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
-import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
+import { adminModelTrafficRouter } from '@/routers/admin/model-traffic-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
+import { adminSupportAccessRouter } from '@/routers/admin/admin-support-access-router';
 import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
-import { eq, and, ne, or, ilike, like, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  ne,
+  or,
+  ilike,
+  like,
+  desc,
+  asc,
+  sql,
+  isNull,
+  inArray,
+  count,
+  min,
+  max,
+} from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
-import { findUsersByIds, findUserById } from '@/lib/user';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import {
+  findUsersByIds,
+  getCrossAccountEmailConflicts,
+  inferRowlessAuthProviders,
+} from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import {
+  isRetryableRecoveryError,
+  resetAccountToMagicLink,
+  type MagicLinkRecoveryResult,
+} from '@/lib/user/account-recovery';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
-import { assertNoError, successResult } from '@/lib/maybe-result';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
-import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
+import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
   microdollar_usage,
+  type User,
 } from '@kilocode/db/schema';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { fromMicrodollars } from '@/lib/utils';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { sum } from 'drizzle-orm';
-import { CRON_SECRET } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { revalidatePath } from 'next/cache';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
-import { client as stripeClient } from '@/lib/stripe-client';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
-import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import {
+  cancelAndRefundKiloPassForUser,
+  type CancelAndRefundKiloPassResult,
+} from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -119,6 +165,12 @@ import {
   getKiloClawSubscriptionAccessReason,
 } from '@/lib/kiloclaw/access-state';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
+import {
+  recordAdminAction,
+  redactEmailAddressesInAuditText,
+  userActionTarget,
+  type AdminActionContext,
+} from '@/lib/admin/admin-action-audit';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getKilocodeRepoOpenPullRequestCounts,
@@ -127,6 +179,10 @@ import {
   getKilocodeRepoRecentlyMergedExternalPRs,
   ALL_REPO_IDS,
 } from '@/lib/github/open-pull-request-counts';
+import { GitHubOrganizationInstallationLookupInputSchema } from '@/lib/admin/github-installation-lookup-input';
+import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
+import { GitHubInstallationUninstallInputSchema } from '@/lib/admin/github-installation-uninstall-input';
+import { uninstallGitHubOrganizationInstallation } from '@/lib/admin/github-installation-uninstall';
 
 const SyncResponseSchema = z.object({
   success: z.boolean(),
@@ -269,6 +325,10 @@ function parseJsonSafe(text: string): unknown {
   return JSON.parse(text) as unknown;
 }
 
+function isManualProviderSyncEnabled(): boolean {
+  return process.env.VERCEL_ENV !== 'production';
+}
+
 const AddNoteSchema = z.object({
   kilo_user_id: z.string(),
   noteContent: z.string().min(1, 'Note content cannot be empty').trim(),
@@ -298,6 +358,13 @@ const ResetToMagicLinkLoginSchema = z.object({
   userId: z.string(),
 });
 
+const ReleaseEmailAddressSchema = z.object({
+  userId: z.string().min(1),
+  expectedEmail: z.string().min(1),
+});
+
+const RELEASED_EMAIL_DOMAIN = 'released.invalid';
+
 const UpdateUserBlockStatusSchema = z.object({
   userId: z.string(),
   blocked_reason: z.string().trim().min(1).nullable(),
@@ -324,6 +391,7 @@ const SetAdminPermissionsSchema = z.object({
       isSuperadmin: z.boolean().optional(),
       canViewSessions: z.boolean().optional(),
       canManageCredits: z.boolean().optional(),
+      canExportApiRequestLogs: z.boolean().optional(),
     })
     .refine(
       permissions => Object.values(permissions).some(value => value !== undefined),
@@ -346,6 +414,7 @@ const platformAdminUserColumns = {
   is_super_admin: kilocode_users.is_super_admin,
   can_view_sessions: kilocode_users.can_view_sessions,
   can_manage_credits: kilocode_users.can_manage_credits,
+  can_export_api_request_logs: kilocode_users.can_export_api_request_logs,
   is_admin: kilocode_users.is_admin,
 };
 
@@ -364,6 +433,7 @@ function toPlatformAdminUser(user: typeof kilocode_users.$inferSelect): Platform
     is_super_admin: user.is_super_admin,
     can_view_sessions: user.can_view_sessions,
     can_manage_credits: user.can_manage_credits,
+    can_export_api_request_logs: user.can_export_api_request_logs,
     is_admin: user.is_admin,
   };
 }
@@ -378,7 +448,7 @@ async function assertNotLastUnblockedSuperadmin(
   tx: DrizzleTransaction,
   target: typeof kilocode_users.$inferSelect
 ) {
-  if (!target.is_admin || !target.is_super_admin || target.blocked_reason !== null) return;
+  if (!target.is_admin || !target.is_super_admin || isBlockedAccount(target)) return;
 
   const [result] = await tx
     .select({ value: sql<number>`count(*)::int` })
@@ -387,6 +457,7 @@ async function assertNotLastUnblockedSuperadmin(
       and(
         eq(kilocode_users.is_admin, true),
         eq(kilocode_users.is_super_admin, true),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
     );
@@ -449,7 +520,7 @@ const GetUserInvoicesSchema = z.object({
 
 const CancelAndRefundKiloPassSchema = z.object({
   userId: z.string(),
-  reason: z.string().min(1, 'Reason is required').trim(),
+  reason: z.string().trim().min(1, 'Reason is required').max(500),
 });
 
 const GetKiloClawStateSchema = z.object({
@@ -474,13 +545,41 @@ const CancelKiloClawSubscriptionSchema = z.object({
   mode: z.enum(['period_end', 'immediate']),
 });
 
+function adminRoleSnapshot(user: User) {
+  return {
+    isAdmin: user.is_admin,
+    isSuperadmin: user.is_super_admin,
+    canViewSessions: user.can_view_sessions,
+    canManageCredits: user.can_manage_credits,
+    canExportApiRequestLogs: user.can_export_api_request_logs,
+  };
+}
+
+// Viewing a session's conversation exposes customer content, so each content
+// fetch is recorded against the session owner.
+async function recordSessionContentView(
+  ctx: AdminActionContext,
+  action: 'cloud_agent_session.messages.view' | 'cloud_agent_session.api_history.view',
+  { sessionId, ownerKiloUserId }: { sessionId: string; ownerKiloUserId: string }
+) {
+  await recordAdminAction(ctx, {
+    action,
+    target: userActionTarget(ownerKiloUserId),
+    message:
+      action === 'cloud_agent_session.messages.view'
+        ? 'Viewed session messages'
+        : 'Viewed session API conversation history',
+    metadata: { sessionId },
+  });
+}
+
 export const adminRouter = createTRPCRouter({
   getPermissions: adminProcedure.query(async ({ ctx }) => {
     const currentUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, ctx.user.id),
     });
 
-    if (!currentUser || currentUser.blocked_reason !== null || !currentUser.is_admin) {
+    if (!currentUser || isBlockedAccount(currentUser) || !currentUser.is_admin) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
     }
 
@@ -488,11 +587,36 @@ export const adminRouter = createTRPCRouter({
       isSuperadmin: userIsSuperadmin(currentUser),
       canViewSessions: userCanViewSessions(currentUser),
       canManageCredits: userCanManageCredits(currentUser),
+      canExportApiRequestLogs: userCanExportApiRequestLogs(currentUser),
     };
   }),
-  kiloclawReferrals: adminKiloclawReferralsRouter,
+  impactReferrals: adminImpactReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
+    lookupOrganizationInstallation: adminProcedure
+      .input(GitHubOrganizationInstallationLookupInputSchema)
+      .mutation(async ({ input }) => {
+        try {
+          return await lookupGitHubOrganizationInstallation(input.organization);
+        } catch {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'GitHub installation lookup failed',
+          });
+        }
+      }),
+    uninstallOrganizationInstallation: adminProcedure
+      .input(GitHubInstallationUninstallInputSchema)
+      .mutation(async ({ ctx, input }) => {
+        return uninstallGitHubOrganizationInstallation({
+          input,
+          actor: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
+        });
+      }),
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });
     }),
@@ -563,20 +687,34 @@ export const adminRouter = createTRPCRouter({
       return { success: (res.rowCount ?? 0) > 0 };
     }),
 
-    resetAPIKey: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
+    resetAPIKey: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input, ctx }) => {
       await db
         .update(kilocode_users)
         .set({ api_token_pepper: crypto.randomUUID() })
         .where(eq(kilocode_users.id, input.userId));
 
+      await recordAdminAction(ctx, {
+        action: 'user.api_key.reset',
+        target: userActionTarget(input.userId),
+        message: 'Reset API key (all API tokens invalidated)',
+      });
+
       return successResult();
     }),
 
-    signOutBrowserSessions: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
-      await revokeWebSessions(input.userId);
+    signOutBrowserSessions: adminProcedure
+      .input(ResetAPIKeySchema)
+      .mutation(async ({ input, ctx }) => {
+        await revokeWebSessions(input.userId);
 
-      return successResult();
-    }),
+        await recordAdminAction(ctx, {
+          action: 'user.browser_sessions.revoke',
+          target: userActionTarget(input.userId),
+          message: 'Signed out all browser sessions',
+        });
+
+        return successResult();
+      }),
 
     checkKiloPass: adminProcedure.input(CheckKiloPassSchema).mutation(async ({ input }) => {
       const before = await db.query.kilocode_users.findFirst({
@@ -609,7 +747,7 @@ export const adminRouter = createTRPCRouter({
 
     resetToMagicLinkLogin: adminProcedure
       .input(ResetToMagicLinkLoginSchema)
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const user = await findUserById(input.userId);
         if (!user) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
@@ -627,9 +765,196 @@ export const adminRouter = createTRPCRouter({
           }
         }
 
-        await db
-          .delete(user_auth_provider)
-          .where(eq(user_auth_provider.kilo_user_id, input.userId));
+        let recovery: MagicLinkRecoveryResult | null;
+        try {
+          recovery = await resetAccountToMagicLink(input.userId);
+        } catch (error) {
+          // The reset runs in one transaction, so a failed revocation also
+          // keeps the provider rows: never report a recovery that left the
+          // prior holder signed in. A transient failure is a CONFLICT, which
+          // Sentry's `beforeSend` drops as a 4xx; any other failure stays a
+          // 500 and the tRPC Sentry middleware reports it once.
+          if (isRetryableRecoveryError(error)) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message:
+                'Account recovery did not complete and the previous sessions were not revoked. Retry the reset.',
+              cause: error,
+            });
+          }
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message:
+              'Account recovery failed and the previous sessions were not revoked. Investigate the error before retrying.',
+            cause: error,
+          });
+        }
+        if (!recovery) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+
+        await recordAdminAction(ctx, {
+          action: 'user.login.reset_to_magic_link',
+          target: userActionTarget(input.userId),
+          message:
+            'Reset login to magic link (removed linked auth providers and passkeys, revoked browser, API and device sessions)',
+          metadata: {
+            removedProviders: recovery.removedProviders,
+            removedPasskeyCount: recovery.removedPasskeyCount,
+            revokedDeviceSessionCount: recovery.revokedDeviceSessionCount,
+          },
+        });
+
+        return successResult();
+      }),
+
+    releaseEmailAddress: adminProcedure
+      .input(ReleaseEmailAddressSchema)
+      .mutation(async ({ input, ctx }) => {
+        if (input.userId === ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Administrators cannot release their own email address',
+          });
+        }
+
+        await db.transaction(async tx => {
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${`release-email:${normalizeEmail(input.expectedEmail)}`}, 0))`
+          );
+
+          const [user] = await tx
+            .select({
+              id: kilocode_users.id,
+              googleUserEmail: kilocode_users.google_user_email,
+              emailDomain: kilocode_users.email_domain,
+              hostedDomain: kilocode_users.hosted_domain,
+              blockedReason: kilocode_users.blocked_reason,
+            })
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, input.userId))
+            .for('update')
+            .limit(1);
+
+          if (!user) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+          }
+          if (user.googleUserEmail !== input.expectedEmail) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'Email address changed. Reload the user before releasing it.',
+            });
+          }
+          if (isGoneOrDeletingBlockedReason(user.blockedReason)) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an email address for a deleted or deleting user',
+            });
+          }
+          if (
+            user.emailDomain === RELEASED_EMAIL_DOMAIN ||
+            user.googleUserEmail.toLowerCase().endsWith(`@${RELEASED_EMAIL_DOMAIN}`)
+          ) {
+            throw new TRPCError({ code: 'CONFLICT', message: 'Email address is already released' });
+          }
+
+          const [linkedProvider] = await tx
+            .select({ provider: user_auth_provider.provider })
+            .from(user_auth_provider)
+            .where(eq(user_auth_provider.kilo_user_id, user.id))
+            .limit(1);
+          if (linkedProvider) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an email address from an account with a linked provider',
+            });
+          }
+          const inferredProviders = inferRowlessAuthProviders({
+            id: user.id,
+            hosted_domain: user.hostedDomain,
+          });
+          if (inferredProviders.length !== 1 || inferredProviders[0] !== 'email') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an account without inferred email authentication',
+            });
+          }
+
+          const domain = getLowerDomainFromEmail(user.googleUserEmail);
+          if (!domain) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an account without an email-based identity',
+            });
+          }
+          const ssoAuthority = await resolveSsoAuthorityForDomain(domain, tx);
+          if (ssoAuthority.status !== 'not_required') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an email address managed by organization SSO',
+            });
+          }
+
+          const conflicts = await getCrossAccountEmailConflicts(
+            [user.googleUserEmail],
+            user.id,
+            tx
+          );
+          if (!conflicts.get(user.googleUserEmail)) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Email address does not conflict with another account',
+            });
+          }
+
+          const [released] = await tx
+            .update(kilocode_users)
+            .set({
+              google_user_email: `${crypto.randomUUID()}@${RELEASED_EMAIL_DOMAIN}`,
+              normalized_email: null,
+              email_domain: RELEASED_EMAIL_DOMAIN,
+              updated_at: new Date().toISOString(),
+            })
+            .where(
+              and(
+                eq(kilocode_users.id, user.id),
+                eq(kilocode_users.google_user_email, input.expectedEmail),
+                sql`NOT EXISTS (
+                  SELECT 1 FROM ${user_auth_provider}
+                  WHERE ${user_auth_provider.kilo_user_id} = ${kilocode_users.id}
+                )`,
+                sql`EXISTS (
+                  SELECT 1 FROM ${user_auth_provider} AS conflicting_provider
+                  WHERE lower(conflicting_provider.email) = lower(${user.googleUserEmail})
+                    AND conflicting_provider.kilo_user_id <> ${user.id}
+                  UNION ALL
+                  SELECT 1 FROM ${kilocode_users} AS conflicting_user
+                  WHERE conflicting_user.id <> ${user.id}
+                    AND (
+                      conflicting_user.normalized_email = ${normalizeEmail(user.googleUserEmail)}
+                      OR (
+                        conflicting_user.normalized_email IS NULL
+                        AND lower(conflicting_user.google_user_email) = lower(${user.googleUserEmail})
+                      )
+                    )
+                )`
+              )
+            )
+            .returning({ id: kilocode_users.id });
+
+          if (!released) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'Account changed while releasing the email address. Reload and try again.',
+            });
+          }
+        });
+
+        await recordAdminAction(ctx, {
+          action: 'user.email.release',
+          target: userActionTarget(input.userId),
+          message: 'Released email address to a placeholder so another account can use it',
+        });
 
         return successResult();
       }),
@@ -640,9 +965,13 @@ export const adminRouter = createTRPCRouter({
         const isBlocking = Boolean(input.blocked_reason);
         let didTransition = false;
 
-        await db.transaction(async tx => {
+        const previousBlock = await db.transaction(async tx => {
           const [current] = await tx
-            .select({ blocked_reason: kilocode_users.blocked_reason })
+            .select({
+              blocked_reason: kilocode_users.blocked_reason,
+              blocked_at: kilocode_users.blocked_at,
+              blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+            })
             .from(kilocode_users)
             .where(eq(kilocode_users.id, input.userId))
             .for('update')
@@ -674,24 +1003,22 @@ export const adminRouter = createTRPCRouter({
               })
               .where(eq(kilocode_users.id, input.userId));
           }
+
+          return current;
         });
 
-        if (didTransition && isBlocking) {
-          await revokeGatewayGrantsForBlockedUser(input.userId);
-        }
-
-        if (didTransition) {
-          void reportEvents({
-            events: [
-              {
-                type: isBlocking ? 'user.blocked' : 'user.unblocked',
-                data: {
-                  kilo_user_id: input.userId,
-                  reason: input.blocked_reason ?? null,
-                  actor_email: ctx.user.google_user_email,
-                },
-              },
-            ],
+        // Blocking is attributed on the user row; unblocking clears those
+        // columns, so the audit row is the only record of who lifted it.
+        if (didTransition && !isBlocking) {
+          await recordAdminAction(ctx, {
+            action: 'user.unblock',
+            target: userActionTarget(input.userId),
+            message: 'Unblocked user',
+            metadata: {
+              previousBlockedReason: previousBlock?.blocked_reason ?? null,
+              previousBlockedAt: previousBlock?.blocked_at ?? null,
+              previousBlockedByKiloUserId: previousBlock?.blocked_by_kilo_user_id ?? null,
+            },
           });
         }
 
@@ -700,7 +1027,7 @@ export const adminRouter = createTRPCRouter({
 
     setPersonalAccountDisabled: adminProcedure
       .input(SetPersonalAccountDisabledSchema)
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const result = await db
           .update(kilocode_users)
           .set({ personal_account_disabled: input.value })
@@ -709,6 +1036,13 @@ export const adminRouter = createTRPCRouter({
         if ((result.rowCount ?? 0) === 0) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
+
+        await recordAdminAction(ctx, {
+          action: 'user.personal_account.set_disabled',
+          target: userActionTarget(input.userId),
+          message: input.value ? 'Disabled personal account' : 'Enabled personal account',
+          metadata: { disabled: input.value },
+        });
 
         return successResult();
       }),
@@ -1194,6 +1528,7 @@ export const adminRouter = createTRPCRouter({
                 input.userId,
                 workerInstanceId(activeInstance),
                 {
+                  skipCooldown: true,
                   reason: 'admin_request',
                 }
               );
@@ -1536,7 +1871,7 @@ export const adminRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    cancelAndRefundKiloPass: adminProcedure
+    cancelAndRefundKiloPass: superadminProcedure
       .input(CancelAndRefundKiloPassSchema)
       .mutation(async ({ input, ctx }) => {
         const userExists = await db.query.kilocode_users.findFirst({
@@ -1547,13 +1882,30 @@ export const adminRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
-        const result = await cancelAndRefundKiloPassForUser({
-          db,
-          stripe: stripeClient,
-          userId: input.userId,
-          reason: input.reason,
-          adminKiloUserId: ctx.user.id,
-        });
+        // The helper writes the reason to the target user records (block reason,
+        // admin note and credit transaction description); the audit row repeats it.
+        const reason = redactEmailAddressesInAuditText(input.reason);
+
+        let result: CancelAndRefundKiloPassResult;
+        try {
+          result = await cancelAndRefundKiloPassForUser({
+            db,
+            stripe: stripeClient,
+            userId: input.userId,
+            reason,
+            adminKiloUserId: ctx.user.id,
+          });
+        } catch (error) {
+          // The helper creates the Stripe refund before its local transaction, so
+          // a failure here can leave a refund with no other attribution.
+          await recordAdminAction(ctx, {
+            action: 'kilo_pass.cancel_refund',
+            target: userActionTarget(input.userId),
+            message: 'Kilo Pass cancel attempted with unknown outcome',
+            metadata: { reason },
+          });
+          throw error;
+        }
 
         if (result.status === 'skipped') {
           if (result.reason.kind === 'no_subscription') {
@@ -1574,6 +1926,24 @@ export const adminRouter = createTRPCRouter({
             message: 'Kilo Pass subscription is already canceled',
           });
         }
+
+        await recordAdminAction(ctx, {
+          action: 'kilo_pass.cancel_refund',
+          target: userActionTarget(input.userId),
+          // `cancelled_and_refunded` is reported whenever a refund was requested,
+          // even when no paid invoice or payment intent existed, so the wording
+          // keys off the amount Stripe actually refunded.
+          message:
+            result.refundedAmountCents != null
+              ? 'Cancelled Kilo Pass and refunded the latest payment'
+              : 'Cancelled Kilo Pass with no refundable payment',
+          metadata: {
+            refundedAmountCents: result.refundedAmountCents,
+            balanceResetAmountUsd: result.balanceResetAmountUsd,
+            alreadyBlocked: result.alreadyBlocked,
+            reason,
+          },
+        });
 
         return {
           success: true,
@@ -1670,7 +2040,7 @@ export const adminRouter = createTRPCRouter({
             const actor = lockedRows.find(row => row.id === actorId);
             const target = lockedRows.find(row => row.id === targetId);
 
-            if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+            if (!actor || isBlockedAccount(actor) || !userIsSuperadmin(actor)) {
               throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
             }
 
@@ -1719,6 +2089,7 @@ export const adminRouter = createTRPCRouter({
                       is_super_admin: false,
                       can_view_sessions: false,
                       can_manage_credits: false,
+                      can_export_api_request_logs: false,
                       web_session_pepper: crypto.randomUUID(),
                       api_token_pepper: crypto.randomUUID(),
                     }
@@ -1733,6 +2104,17 @@ export const adminRouter = createTRPCRouter({
               });
             }
 
+            if (!input.isAdmin) {
+              await revokeOpenSupportGrants(tx, {
+                actorKiloUserId: target.id,
+                reason: 'platform admin access revoked',
+                performedByKiloUserId: actor.id,
+              });
+            }
+            // The session pepper and API pepper rotated above, so every step-up
+            // proof bound to the old credentials is no longer usable.
+            await revokeStepUpProofs(target.id, 'role_change', tx);
+
             await tx.insert(user_admin_notes).values({
               kilo_user_id: target.id,
               admin_kilo_user_id: actor.id,
@@ -1744,20 +2126,34 @@ export const adminRouter = createTRPCRouter({
             return {
               retryWithMembershipLock: false as const,
               result: { changed: true as const, user: toPlatformAdminUser(updatedTarget) },
+              previous: adminRoleSnapshot(target),
             };
           });
 
-        const firstAttempt = await updateAccess(false);
-        if (!firstAttempt.retryWithMembershipLock) return firstAttempt.result;
-
-        const serializedAttempt = await updateAccess(true);
-        if (serializedAttempt.retryWithMembershipLock) {
+        let attempt = await updateAccess(false);
+        if (attempt.retryWithMembershipLock) {
+          attempt = await updateAccess(true);
+        }
+        if (attempt.retryWithMembershipLock) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to serialize superadmin revocation',
           });
         }
-        return serializedAttempt.result;
+
+        // user_admin_notes can be deleted by any admin, so the audit row is the
+        // durable record of role changes.
+        if (attempt.result.changed) {
+          await recordAdminAction(ctx, {
+            action: 'admin.platform_access.set',
+            target: userActionTarget(targetId),
+            message: input.isAdmin
+              ? 'Granted platform admin access'
+              : 'Revoked platform admin access',
+            metadata: { isAdmin: input.isAdmin, previous: attempt.previous },
+          });
+        }
+        return attempt.result;
       }),
 
     setAdminPermissions: superadminProcedure
@@ -1773,7 +2169,7 @@ export const adminRouter = createTRPCRouter({
           });
         }
 
-        return db.transaction(async tx => {
+        const outcome = await db.transaction(async tx => {
           if (input.permissions.isSuperadmin !== undefined) {
             await lockSuperadminMembership(tx);
           }
@@ -1789,7 +2185,7 @@ export const adminRouter = createTRPCRouter({
           const actor = lockedRows.find(row => row.id === actorId);
           const target = lockedRows.find(row => row.id === targetId);
 
-          if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+          if (!actor || isBlockedAccount(actor) || !userIsSuperadmin(actor)) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
           }
           if (!target) {
@@ -1815,10 +2211,17 @@ export const adminRouter = createTRPCRouter({
               input.permissions.canManageCredits !== target.can_manage_credits && {
                 can_manage_credits: input.permissions.canManageCredits,
               }),
+            ...(input.permissions.canExportApiRequestLogs !== undefined &&
+              input.permissions.canExportApiRequestLogs !== target.can_export_api_request_logs && {
+                can_export_api_request_logs: input.permissions.canExportApiRequestLogs,
+              }),
           };
 
           if (Object.keys(changes).length === 0) {
-            return { changed: false as const, user: toPlatformAdminUser(target) };
+            return {
+              result: { changed: false as const, user: toPlatformAdminUser(target) },
+              audit: null,
+            };
           }
 
           if (changes.is_super_admin === false) {
@@ -1842,6 +2245,8 @@ export const adminRouter = createTRPCRouter({
             });
           }
 
+          await revokeStepUpProofs(target.id, 'permission_change', tx);
+
           const notes = [
             changes.is_super_admin !== undefined &&
               (changes.is_super_admin
@@ -1855,6 +2260,10 @@ export const adminRouter = createTRPCRouter({
               (changes.can_manage_credits
                 ? 'Granted credit manager access.'
                 : 'Revoked credit manager access.'),
+            changes.can_export_api_request_logs !== undefined &&
+              (changes.can_export_api_request_logs
+                ? 'Granted API request log export access.'
+                : 'Revoked API request log export access.'),
           ].filter((note): note is string => typeof note === 'string');
 
           await tx.insert(user_admin_notes).values(
@@ -1865,8 +2274,21 @@ export const adminRouter = createTRPCRouter({
             }))
           );
 
-          return { changed: true as const, user: toPlatformAdminUser(updatedTarget) };
+          return {
+            result: { changed: true as const, user: toPlatformAdminUser(updatedTarget) },
+            audit: { notes, changes, previous: adminRoleSnapshot(target) },
+          };
         });
+
+        if (outcome.audit) {
+          await recordAdminAction(ctx, {
+            action: 'admin.permissions.set',
+            target: userActionTarget(targetId),
+            message: outcome.audit.notes.join(' '),
+            metadata: { changes: outcome.audit.changes, previous: outcome.audit.previous },
+          });
+        }
+        return outcome.result;
       }),
   }),
 
@@ -2034,6 +2456,7 @@ export const adminRouter = createTRPCRouter({
         })
         .returning();
 
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
 
       return newModel;
@@ -2055,6 +2478,7 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
 
       return updatedModel;
@@ -2082,6 +2506,7 @@ export const adminRouter = createTRPCRouter({
     }),
 
     bustCache: adminProcedure.mutation(() => {
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
       revalidatePath('/api/models/stats/[slug]', 'page');
       return { success: true, message: 'Cache busted successfully' };
@@ -2089,46 +2514,95 @@ export const adminRouter = createTRPCRouter({
   }),
 
   syncProviders: createTRPCRouter({
+    getManualSyncEnabled: adminProcedure.query(() => isManualProviderSyncEnabled()),
     triggerSync: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
       const result = await syncAndStoreProviders();
       return result;
     }),
-    postTestStaleAlert: adminProcedure.mutation(async () => {
-      const delivery = await postTestStaleSyncAlert();
-      return { delivery };
+    triggerDirectByokSync: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
+      return syncAndStoreDirectByokProviders();
     }),
+    triggerMetadataCacheRefresh: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
+      return refreshMetadataCache();
+    }),
+    postTestStaleAlert: adminProcedure
+      .input(z.object({ job: z.enum(['metadata_cache', 'providers', 'direct_byok']) }))
+      .mutation(async ({ input }) => {
+        const delivery =
+          input.job === 'metadata_cache'
+            ? await postTestMetadataCacheStaleAlert()
+            : await postTestStaleSyncAlert(input.job);
+        return { delivery };
+      }),
     getLastSync: adminProcedure.query(async () => {
-      const [[latest], lastCompletedAt] = await Promise.all([
+      const [[latest], [syncState], [metadataCache]] = await Promise.all([
         db
-          .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+          .select({ data: modelsByProvider.data })
           .from(modelsByProvider)
           .orderBy(desc(modelsByProvider.id))
           .limit(1),
-        redisClient.get<string>(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY),
+        db
+          .select({
+            lastCompletedAt: ai_gateway_sync_providers_state.last_completed_at,
+            directByokLastCompletedAt:
+              ai_gateway_sync_providers_state.direct_byok_last_completed_at,
+          })
+          .from(ai_gateway_sync_providers_state)
+          .where(eq(ai_gateway_sync_providers_state.id, 1))
+          .limit(1),
+        db
+          .select({
+            newestUpdatedAt: max(ai_gateway_metadata_cache.updated_at),
+            oldestUpdatedAt: min(ai_gateway_metadata_cache.updated_at),
+          })
+          .from(ai_gateway_metadata_cache),
       ]);
-      if (!latest && !lastCompletedAt) return null;
+      const toIso = (value: string | null | undefined) =>
+        value ? new Date(value).toISOString() : null;
       return {
-        id: latest?.id ?? null,
-        generated_at: latest?.data.generated_at ?? null,
-        completed_at: lastCompletedAt ?? null,
-        total_providers: latest?.data.total_providers ?? 0,
-        total_models: latest?.data.total_models ?? 0,
+        completed_at: toIso(syncState?.lastCompletedAt),
+        direct_byok_completed_at: toIso(syncState?.directByokLastCompletedAt),
+        metadata_cache_newest_updated_at: toIso(metadataCache?.newestUpdatedAt),
+        metadata_cache_oldest_updated_at: toIso(metadataCache?.oldestUpdatedAt),
+        total_providers: latest?.data.total_providers ?? null,
+        total_models: latest?.data.total_models ?? null,
       };
     }),
   }),
 
   apiRequestLog: createTRPCRouter({
-    getOldestEntry: adminProcedure.query(async () => {
-      const [oldest] = await db
-        .select({ created_at: api_request_log.created_at })
-        .from(api_request_log)
-        .orderBy(asc(api_request_log.created_at))
-        .limit(1);
-      return oldest ? { created_at: oldest.created_at } : null;
+    getSummary: apiRequestLogExporterProcedure.query(async () => {
+      const [summary] = await db
+        .select({
+          recordCount: count(),
+          sizeBytes: sql<number>`pg_total_relation_size('api_request_log_2'::regclass)`.mapWith(
+            Number
+          ),
+          oldestCreatedAt: min(api_request_log_2.created_at),
+        })
+        .from(api_request_log_2);
+
+      return summary;
     }),
   }),
-
-  deployments: adminDeploymentsRouter,
 
   alerting: adminAlertingRouter,
 
@@ -2140,7 +2614,13 @@ export const adminRouter = createTRPCRouter({
 
   sessionTraces: createTRPCRouter({
     resolveCloudAgentSession: sessionViewerProcedure
-      .input(z.object({ cloud_agent_session_id: z.string().startsWith('agent_') }))
+      .input(
+        z.object({
+          cloud_agent_session_id: z
+            .string()
+            .regex(/^(agent|workspace)_/, 'Invalid cloud agent session ID'),
+        })
+      )
       .query(async ({ input }) => {
         // Check v1 first
         const [v1] = await db
@@ -2224,8 +2704,9 @@ export const adminRouter = createTRPCRouter({
 
         return {
           ...session,
-          // V1 doesn't have git_branch — null it out for a consistent shape
+          // V1 doesn't have git_branch or per-session cost — null them out for a consistent shape
           git_branch: null,
+          total_cost_microdollars: null,
           user: user
             ? {
                 id: user.id,
@@ -2269,7 +2750,7 @@ export const adminRouter = createTRPCRouter({
 
     getMessages: sessionViewerProcedure
       .input(z.object({ session_id: sessionIdSchema }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         if (isNewSession(input.session_id)) {
           // V2 session — fetch messages from the session-ingest worker.
           // We need the owner's kilo_user_id to generate a service token.
@@ -2286,10 +2767,15 @@ export const adminRouter = createTRPCRouter({
             });
           }
 
+          await recordSessionContentView(ctx, 'cloud_agent_session.messages.view', {
+            sessionId: input.session_id,
+            ownerKiloUserId: session.kilo_user_id,
+          });
+
           try {
             const snapshot = await fetchSessionSnapshot(input.session_id, session.kilo_user_id);
-            // The export streams messages/parts in ingest order; re-sort by the
-            // time-ordered IDs so the trace matches the cloud-agent-next UI.
+            // The export streams messages/parts in ingest order; re-sort in the
+            // transcript's turn order so the trace matches the cloud-agent-next UI.
             return {
               messages: sortSessionMessagesForDisplay(snapshot?.messages ?? []),
               format: 'v2' as const,
@@ -2307,6 +2793,7 @@ export const adminRouter = createTRPCRouter({
         const [session] = await db
           .select({
             ui_messages_blob_url: cliSessions.ui_messages_blob_url,
+            kilo_user_id: cliSessions.kilo_user_id,
           })
           .from(cliSessions)
           .where(eq(cliSessions.session_id, input.session_id))
@@ -2318,6 +2805,11 @@ export const adminRouter = createTRPCRouter({
             message: 'Session not found',
           });
         }
+
+        await recordSessionContentView(ctx, 'cloud_agent_session.messages.view', {
+          sessionId: input.session_id,
+          ownerKiloUserId: session.kilo_user_id,
+        });
 
         if (!session.ui_messages_blob_url) {
           return { messages: [], format: 'v1' as const };
@@ -2333,7 +2825,7 @@ export const adminRouter = createTRPCRouter({
 
     getApiConversationHistory: sessionViewerProcedure
       .input(z.object({ session_id: sessionIdSchema }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         if (isNewSession(input.session_id)) {
           // V2 sessions have no separate raw API conversation history
           return { history: null };
@@ -2343,6 +2835,7 @@ export const adminRouter = createTRPCRouter({
         const [session] = await db
           .select({
             api_conversation_history_blob_url: cliSessions.api_conversation_history_blob_url,
+            kilo_user_id: cliSessions.kilo_user_id,
           })
           .from(cliSessions)
           .where(eq(cliSessions.session_id, input.session_id))
@@ -2359,6 +2852,11 @@ export const adminRouter = createTRPCRouter({
           return { history: null };
         }
 
+        await recordSessionContentView(ctx, 'cloud_agent_session.api_history.view', {
+          sessionId: input.session_id,
+          ownerKiloUserId: session.kilo_user_id,
+        });
+
         try {
           const history = await getBlobContent(session.api_conversation_history_blob_url);
           return { history: history ?? null };
@@ -2367,37 +2865,46 @@ export const adminRouter = createTRPCRouter({
         }
       }),
   }),
-  appBuilder: adminAppBuilderRouter,
   kiloclawInstances: adminKiloclawInstancesRouter,
   kiloclawVersions: adminKiloclawVersionsRouter,
   kiloclawRegions: adminKiloclawRegionsRouter,
   kiloclawProviders: adminKiloclawProvidersRouter,
+  kiloclawStripeRenewals: adminKiloclawStripeRenewalsRouter,
+  kiloclawCreditRenewals: adminKiloclawCreditRenewalsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,
+  salesDemo: salesDemoRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   creditCampaigns: creditCampaignsRouter,
+  internalBotUsers: adminInternalBotUsersRouter,
   cloudBillingSkus: cloudBillingSkusRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
-  gastown: adminGastownRouter,
   extendClawTrial: extendClawTrialRouter,
   customLlm: adminCustomLlmRouter,
-  modelExperiments: adminModelExperimentsRouter,
   gatewayConfig: adminGatewayConfigRouter,
+  autoFreeConfig: adminAutoFreeConfigRouter,
+  gatewayModelLists: adminGatewayModelListsRouter,
+  vercelModelIdOverrides: adminVercelModelIdOverridesRouter,
+  preferredProviderOrder: adminPreferredProviderOrderRouter,
+  customPricing: adminCustomPricingRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
+  serviceFeeRollback: adminServiceFeeRollbackRouter,
   disputes: adminStripeDisputesRouter,
   earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
+  actionAuditLogs: adminActionAuditLogsRouter,
   // Key kept as `securityAdvisorContent` for tRPC client compatibility —
   // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
   // Backing router renamed to `adminShellSecurityContentRouter` as part of
   // the shell-security rebrand; the key/symbol asymmetry is intentional.
   securityAdvisorContent: adminShellSecurityContentRouter,
-  freeModelUsage: adminFreeModelUsageRouter,
+  modelTraffic: adminModelTrafficRouter,
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
   userDeletionQueue: adminUserDeletionQueueRouter,
+  supportAccess: adminSupportAccessRouter,
 });

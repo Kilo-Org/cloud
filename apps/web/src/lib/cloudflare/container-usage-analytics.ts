@@ -2,7 +2,10 @@ import 'server-only';
 
 import * as z from 'zod';
 
-import { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_ANALYTICS_API_TOKEN } from '@/lib/config.server';
+import {
+  CLOUDFLARE_ACCOUNT_ID,
+  CLOUDFLARE_ANALYTICS_API_TOKEN,
+} from '@kilocode/web-shared/lib/config.server';
 
 const GRAPHQL_URL = 'https://api.cloudflare.com/client/v4/graphql';
 const DATASET = 'containersUsageAdaptiveGroups' as const;

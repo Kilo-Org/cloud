@@ -26,6 +26,26 @@ describe('WebSocket Filters', () => {
       expect(filters.fromId).toBe(123);
     });
 
+    it('parses a mutation cursor independently of event identity', () => {
+      const filters = parseStreamFilters(
+        new URL('https://example.com/stream?fromId=900&afterCursor=12'),
+        sessionId
+      );
+      expect(filters.fromId).toBe(900);
+      expect(filters.afterCursor).toBe(12);
+    });
+
+    it.each(['-1', '1.5', 'Infinity', 'NaN', '2x', '9007199254740992', ''])(
+      'ignores invalid mutation cursor %s',
+      cursor => {
+        const filters = parseStreamFilters(
+          new URL(`https://example.com/stream?afterCursor=${cursor}`),
+          sessionId
+        );
+        expect(filters.afterCursor).toBeUndefined();
+      }
+    );
+
     it('should ignore non-numeric fromId', () => {
       const url = new URL('https://example.com/stream?fromId=abc');
       const filters = parseStreamFilters(url, sessionId);

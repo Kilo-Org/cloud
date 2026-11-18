@@ -9,6 +9,7 @@ export type SecurityRemediationConfig = {
   auto_remediation_enabled: boolean;
   auto_remediation_min_severity: SecurityRemediationMinSeverity;
   auto_remediation_include_existing: boolean;
+  auto_remediation_require_approval: boolean;
   auto_remediation_enabled_at: string | null;
 };
 
@@ -94,15 +95,22 @@ export const SECURITY_REMEDIATION_REJECTION_REASONS = [
 
 export type SecurityRemediationRejectionReason =
   (typeof SECURITY_REMEDIATION_REJECTION_REASONS)[number];
-export type SecurityRemediationCapabilityReason = 'eligible' | SecurityRemediationRejectionReason;
 
 export const SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS = [
   ...SECURITY_REMEDIATION_REJECTION_REASONS,
   'finding_not_found',
+  'approval_required',
 ] as const;
 
 export type SecurityRemediationAdmissionRejectionReason =
   (typeof SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS)[number];
+
+// The capability decision reuses the admission reason set: the approval flag
+// rejects auto admission with `approval_required` (manual start is the
+// approval path and never reaches it).
+export type SecurityRemediationCapabilityReason =
+  | 'eligible'
+  | SecurityRemediationAdmissionRejectionReason;
 
 export type SecurityRemediationEligibilityParams = {
   finding: SecurityRemediationFinding;
@@ -375,6 +383,7 @@ export function decideSecurityRemediationEligibility(
   if (!hasConcretePath) return reject('action_not_concrete');
 
   if (!params.config.auto_remediation_enabled) return reject('auto_remediation_disabled');
+  if (params.config.auto_remediation_require_approval) return reject('approval_required');
   if (params.origin === 'bulk_existing' && !params.config.auto_remediation_include_existing) {
     return reject('include_existing_disabled');
   }

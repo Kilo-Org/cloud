@@ -20,18 +20,19 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 
-import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
+import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
+import { isSameOriginNavigation } from '@/lib/auth/same-origin';
 import {
-  CODE_REVIEW_MD_CONVERSION_FLAG,
   DEFAULT_CODE_REVIEW_MODE,
   REVIEW_MD_CONVERSION_RATE_LIMIT,
   REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS,
 } from '@/lib/code-reviews/core/constants';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@kilocode/app-shared/feature-flags';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
-import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
-import { redisClient } from '@/lib/redis';
+import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import { isSessionStartRateLimited } from '@/lib/code-reviews/core/session-start-rate-limit';
 import { buildAllowedRepositoryFullNames } from '@/lib/code-reviews/core/selectable-repositories';
 
 const createCaller = createCallerFactory(rootRouter);
@@ -54,27 +55,18 @@ const QuerySchema = z.object({
 });
 
 /**
- * Per-actor abuse cap: a Redis fixed window keyed by the acting USER (scoped by org, so one member
- * cannot drain a shared bucket for co-members) and by the window bucket. Embedding the bucket in the
- * key makes the window self-healing: even if `expire` fails after `incr`, the key rotates on the
- * next window rather than counting up forever. Fails OPEN on any Redis error (per redis.ts guidance).
- * Callers MUST invoke this only after membership is proven, so an unauthorized org id can never
- * touch that org's counter.
+ * Per-actor cap for this flow. The shared fixed-window implementation lives in
+ * lib/code-reviews/core/session-start-rate-limit and runs only after membership
+ * is proven.
  */
-async function isConversionRateLimited(ownerScope: string, userId: string): Promise<boolean> {
-  try {
-    const windowMs = REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS * 1000;
-    const bucket = Math.floor(Date.now() / windowMs);
-    const key = `review-md-conversion:${ownerScope}:${userId}:${bucket}`;
-    const count = await redisClient.incr(key);
-    if (count === 1) {
-      // Best-effort TTL cleanup; correctness does not depend on it (the key rotates per window).
-      await redisClient.expire(key, REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS * 2);
-    }
-    return count > REVIEW_MD_CONVERSION_RATE_LIMIT;
-  } catch {
-    return false;
-  }
+function isConversionRateLimited(ownerScope: string, userId: string): Promise<boolean> {
+  return isSessionStartRateLimited({
+    keyPrefix: 'review-md-conversion',
+    ownerScope,
+    userId,
+    limit: REVIEW_MD_CONVERSION_RATE_LIMIT,
+    windowSeconds: REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS,
+  });
 }
 
 function settingsPath(organizationId: string | undefined): string {
@@ -118,13 +110,13 @@ export async function GET(request: NextRequest) {
 
   const { platform, repo, organizationId } = parsed.data;
 
-  // CSRF defense for this mutating, credit-spending GET. Fail CLOSED: allow only same-origin dialog
-  // clicks (`same-origin`/`same-site`) and deliberate direct navigation (`none`, e.g. typing the URL
-  // or a bookmark). A `cross-site` value OR a MISSING header (older browsers, embedded webviews,
-  // header-stripping proxies) is rejected, since a forged top-level navigation carries the session
-  // cookie and would otherwise start a billable session.
-  const secFetchSite = request.headers.get('sec-fetch-site');
-  if (secFetchSite !== 'same-origin' && secFetchSite !== 'same-site' && secFetchSite !== 'none') {
+  // CSRF defense for this mutating, credit-spending GET. Fail CLOSED: accept only a navigation the
+  // app itself started (`Sec-Fetch-Site: same-origin`, or an `Origin` header that names this host)
+  // and a deliberate direct navigation (`Sec-Fetch-Site: none`, e.g. typing the URL or a
+  // bookmark). Every other value names a page outside this origin, and so does a MISSING header
+  // (older browsers, embedded webviews, header-stripping proxies): such a navigation carries the
+  // session cookie and would otherwise start a billable session on the user's behalf.
+  if (!isSameOriginNavigation(request)) {
     return redirectToError(organizationId, 'invalid_conversion_request');
   }
 
@@ -174,19 +166,22 @@ export async function GET(request: NextRequest) {
     // integration actually covers them), so they must NOT gate this credit-spending, PR-opening
     // action — otherwise a user could add an arbitrary full_name to their config and pass this
     // check. The worker enforces installation scope regardless; this keeps the fail-fast honest.
+    // forceRefresh keeps the allowlist off the cached snapshot: a synced-empty cache (connect-time
+    // sync stored zero repositories, then access was granted) would otherwise reject a repo the
+    // provider now reports, and GitLab never invalidates that cache.
     const repositoryList = organizationId
       ? platform === 'gitlab'
         ? await caller.organizations.reviewAgent.listGitLabRepositories({
             organizationId,
-            forceRefresh: false,
+            forceRefresh: true,
           })
         : await caller.organizations.reviewAgent.listGitHubRepositories({
             organizationId,
-            forceRefresh: false,
+            forceRefresh: true,
           })
       : platform === 'gitlab'
-        ? await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: false })
-        : await caller.personalReviewAgent.listGitHubRepositories({ forceRefresh: false });
+        ? await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: true })
+        : await caller.personalReviewAgent.listGitHubRepositories({ forceRefresh: true });
 
     const allowedRepoFullNames = buildAllowedRepositoryFullNames(repositoryList.repositories, []);
     if (!allowedRepoFullNames.has(repo)) {

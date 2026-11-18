@@ -1,0 +1,378 @@
+/**
+ * Mounted harness for the new-session discard guard.
+ *
+ * The confirm the hook returns is the real `DestructiveConfirmDialog`, which
+ * presents a native sheet, so this module stubs the primitives that dialog's own
+ * mounted suite stubs and drives the same boundary: a press only starts the
+ * dismissal, and the pressed choice runs when the sheet reports it. The mocks
+ * live here with the harness so the suite reads as a list of behaviours.
+ */
+import { createElement, Fragment, type RefObject } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { vi } from 'vitest';
+
+import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
+
+const alertMock = vi.hoisted(() => vi.fn());
+const backMock = vi.hoisted(() => vi.fn());
+// The route on top of the composer's stack. A picker route makes the guard
+// treat a Back as the picker's, exactly as the app's live stack does while a
+// sheet presents. `focused` is false while a route sits above this screen.
+const navigationState = vi.hoisted(() => ({ topRoute: 'agent-chat/new', focused: true }));
+const stateListeners = vi.hoisted(() => new Set<() => void>());
+const dispatchMock = vi.hoisted(() => vi.fn());
+const toastErrorMock = vi.hoisted(() => vi.fn());
+// Mutable so a single file proves the confirm is one cross-platform
+// implementation: the same in-app dialog opens for both platform values, and
+// the native alert is never reached on either.
+const platform = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
+// The provider's keyboard state and the focused prompt, so a suite can hold the
+// keyboard open across a leave and report its close the way the provider does.
+const keyboardState = vi.hoisted(() => ({ visible: false, listeners: new Set<() => void>() }));
+const focusedInput = vi.hoisted(() => ({ current: null as object | null }));
+const keyboardDismissMock = vi.hoisted(() => vi.fn());
+const focusTextInputMock = vi.hoisted(() => vi.fn());
+// Android's window focus events, which move to the sheet's dialog window while
+// the confirm is presented and back to the app window after it closes.
+const windowFocusListeners = vi.hoisted(
+  () =>
+    new Map<'blur' | 'focus', Set<() => void>>([
+      ['blur', new Set()],
+      ['focus', new Set()],
+    ])
+);
+
+/** Both platform values, so every behaviour below is proven for iOS and Android. */
+const PLATFORMS = ['ios', 'android'] as const;
+
+type Action = { type: string };
+
+const usePreventRemoveHolder = vi.hoisted(() => ({
+  preventRemove: undefined as boolean | undefined,
+  callback: undefined as
+    | ((options: { data: { action: Action }; repeat: () => void }) => void)
+    | undefined,
+}));
+
+const usePreventRemoveMock = vi.hoisted(() =>
+  vi.fn(
+    (
+      preventRemove: boolean,
+      handler: (options: { data: { action: Action }; repeat: () => void }) => void
+    ) => {
+      usePreventRemoveHolder.preventRemove = preventRemove;
+      usePreventRemoveHolder.callback = handler;
+    }
+  )
+);
+
+// The dialog the hook returns is rendered for real, so its primitives and the
+// UI components it composes are stubbed the same way the dialog's own mounted
+// test stubs them. `Alert` stays mocked only so a regression that reaches for
+// the native confirm again fails here.
+vi.mock('react-native', () => ({
+  Alert: { alert: alertMock },
+  AppState: {
+    addEventListener: (event: 'blur' | 'focus', listener: () => void) => {
+      windowFocusListeners.get(event)?.add(listener);
+      return {
+        remove: () => {
+          windowFocusListeners.get(event)?.delete(listener);
+        },
+      };
+    },
+  },
+  I18nManager: { isRTL: false },
+  Modal: 'Modal',
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
+  Pressable: 'Pressable',
+  Text: 'Text',
+  View: 'View',
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
+  Keyboard: { dismiss: keyboardDismissMock },
+  TextInput: {
+    State: {
+      currentlyFocusedInput: () => focusedInput.current,
+      focusTextInput: focusTextInputMock,
+    },
+  },
+}));
+
+vi.mock('react-native-keyboard-controller', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    keyboardState.listeners.add(listener);
+    return () => {
+      keyboardState.listeners.delete(listener);
+    };
+  };
+  return {
+    useKeyboardState: <T,>(selector: (state: { isVisible: boolean }) => T) =>
+      selector({
+        isVisible: useSyncExternalStore(subscribe, () => keyboardState.visible),
+      }),
+  };
+});
+
+vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
+
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    destructiveForeground: '#FFFFFF',
+    foreground: '#1A1A10',
+    primary: '#00BAA9',
+    primaryForeground: '#FFFFFF',
+  }),
+}));
+
+vi.mock('sonner-native', () => ({
+  toast: { error: toastErrorMock },
+}));
+
+vi.mock('expo-router', () => {
+  const navigation = {
+    // False while a route sits above this composer (the session route's card).
+    isFocused: () => navigationState.focused,
+    getState: () => ({
+      index: 1,
+      routes: [{ name: 'agent-chat/new' }, { name: navigationState.topRoute }],
+    }),
+    addListener: (_event: string, listener: () => void) => {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
+  };
+  return {
+    useNavigation: () => navigation,
+    usePreventRemove: usePreventRemoveMock,
+    useRouter: () => ({ back: backMock }),
+  };
+});
+
+function GuardHarness({
+  dirty,
+  hasUnclaimedAttachments = false,
+  onDiscard,
+  skipRef,
+}: {
+  dirty: boolean;
+  hasUnclaimedAttachments?: boolean;
+  onDiscard: () => Promise<void>;
+  skipRef: RefObject<boolean>;
+}) {
+  const { discardConfirm } = useNewSessionDiscardGuard({
+    dirty,
+    hasUnclaimedAttachments,
+    onDiscard,
+    skipNextGuardRef: skipRef,
+  });
+  // The screen body renders `discardConfirm` once in its tree; the harness does
+  // the same so the returned node is exercised, not just its props.
+  return createElement(Fragment, null, discardConfirm);
+}
+
+export async function noOpDiscard(): Promise<void> {
+  await Promise.resolve();
+}
+
+/** Mounts the harness body and returns its renderer plus the caller-owned skip ref. */
+function mountHarness(props: {
+  dirty: boolean;
+  hasUnclaimedAttachments?: boolean;
+  onDiscard: () => Promise<void>;
+}) {
+  const skipRef: RefObject<boolean> = { current: false };
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(createElement(GuardHarness, { ...props, skipRef }));
+  });
+  if (!ref.current) {
+    throw new Error('guard did not render');
+  }
+  return { renderer: ref.current, skipRef };
+}
+
+/** Mounts the guard and returns its renderer plus the caller-owned skip ref. */
+export function mountGuard(dirty: boolean, onDiscard: () => Promise<void>) {
+  return mountHarness({ dirty, onDiscard });
+}
+
+/**
+ * Mounts the guard while one of the screen's picker sheets is the top route.
+ * Clean prompt: the picker rule is the only reason a Back is held back.
+ */
+export function mountGuardWithPicker(dirty = false) {
+  navigationState.topRoute = 'agent-chat/repo-picker';
+  return mountHarness({ dirty, onDiscard: noOpDiscard });
+}
+
+/** Mounts the guard for an empty prompt that still holds admitted uploads. */
+export function mountGuardWithAttachments() {
+  return mountHarness({ dirty: true, hasUnclaimedAttachments: true, onDiscard: noOpDiscard });
+}
+
+/** Fires the captured leave outside `act`; the hook's handler runs synchronously. */
+export function triggerPreventRemove(action?: Action): Action {
+  const leave = action ?? { type: 'GO_BACK' };
+  usePreventRemoveHolder.callback?.({
+    data: { action: leave },
+    repeat: () => {
+      dispatchMock(leave);
+    },
+  });
+  return leave;
+}
+
+/** Triggers a leave inside `act` so the confirm's state update flushes. */
+export function triggerPreventRemoveInAct(action?: Action): Action {
+  const holder: { action: Action } = { action: action ?? { type: 'GO_BACK' } };
+  act(() => {
+    holder.action = triggerPreventRemove(action);
+  });
+  return holder.action;
+}
+
+/** Reports whether the composer is the screen the person is on. */
+export function setComposerFocused(focused: boolean): void {
+  act(() => {
+    navigationState.focused = focused;
+  });
+}
+
+/** Reports the keyboard as shown or hidden, as the provider's events do. */
+export function setKeyboardVisible(visible: boolean): void {
+  act(() => {
+    keyboardState.visible = visible;
+    for (const listener of keyboardState.listeners) {
+      listener();
+    }
+  });
+}
+
+/** Reports the app window losing or regaining focus, as Android does around a sheet. */
+export function setWindowFocused(focused: boolean): void {
+  act(() => {
+    for (const listener of windowFocusListeners.get(focused ? 'focus' : 'blur') ?? []) {
+      listener();
+    }
+  });
+}
+
+export function setPickerTopRoute(topRoute: string): void {
+  act(() => {
+    navigationState.topRoute = topRoute;
+    for (const listener of stateListeners) {
+      listener();
+    }
+  });
+}
+
+/** Returns every hoisted mock and the captured removal to its pre-test state. */
+export function resetGuardHarness(): void {
+  platform.os = 'ios';
+  alertMock.mockReset();
+  dispatchMock.mockReset();
+  toastErrorMock.mockReset();
+  usePreventRemoveMock.mockReset();
+  usePreventRemoveHolder.preventRemove = undefined;
+  usePreventRemoveHolder.callback = undefined;
+  navigationState.topRoute = 'agent-chat/new';
+  navigationState.focused = true;
+  stateListeners.clear();
+  keyboardState.visible = false;
+  keyboardState.listeners.clear();
+  focusedInput.current = null;
+  keyboardDismissMock.mockReset();
+  focusTextInputMock.mockReset();
+  for (const listeners of windowFocusListeners.values()) {
+    listeners.clear();
+  }
+}
+
+export function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
+  return typeof node.type === 'string' && node.type === type;
+}
+
+export function classNameOf(node: TestRenderer.ReactTestInstance): string {
+  return typeof node.props.className === 'string' ? node.props.className : '';
+}
+
+/** Every string rendered through a `Text` node, in tree order. */
+export function renderedLabels(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => isType(node, 'Text'))
+    .flatMap(node => node.children.filter((child): child is string => typeof child === 'string'));
+}
+
+/**
+ * Presses the dialog control whose button variant carries `token` (the
+ * destructive fill or the neutral outline), by the same class-based lookup the
+ * dialog's own mounted test uses.
+ */
+export function pressDialogButton(renderer: TestRenderer.ReactTestRenderer, token: string) {
+  const node = renderer.root.find(
+    candidate => isType(candidate, 'Pressable') && classNameOf(candidate).includes(token)
+  );
+  callProp(node, 'onPress');
+}
+
+/**
+ * Reports the native sheet's own dismissal, which is the moment the pressed
+ * choice runs. The confirm is a native sheet, so a press only starts the
+ * dismissal: it keeps the request on screen and hands the action to
+ * `onDismiss`, exactly as the sheet does on device.
+ */
+export function dismissDialogSheet(renderer: TestRenderer.ReactTestRenderer) {
+  const sheet = renderer.root.find(node => isType(node, 'BottomSheet'));
+  callProp(sheet, 'onDismiss');
+}
+
+/**
+ * Calls one of a mounted element's own props inside `act`. The test renderer
+ * leaves `props` untyped, and this suite only ever calls handlers it would
+ * otherwise fire by hand, so the shape is guarded here instead of assumed.
+ */
+function callProp(node: TestRenderer.ReactTestInstance, name: string): void {
+  const prop = node.props[name] as (() => void) | undefined;
+  if (typeof prop !== 'function') {
+    throw new TypeError(`The element has no callable ${name}`);
+  }
+  act(() => {
+    prop();
+  });
+}
+
+export async function flushMicrotasks() {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  await act(async () => {
+    setTimeout(() => {
+      resolve(undefined);
+    }, 0);
+    await promise;
+  });
+}
+
+export {
+  alertMock,
+  backMock,
+  dispatchMock,
+  focusedInput,
+  focusTextInputMock,
+  keyboardDismissMock,
+  platform,
+  PLATFORMS,
+  toastErrorMock,
+  usePreventRemoveHolder,
+  usePreventRemoveMock,
+};

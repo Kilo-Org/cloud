@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -22,7 +24,7 @@ export function NormalizedEmailBackfill() {
   const { data: counts, isLoading } = useQuery<NormalizedEmailCountsResponse>({
     queryKey: ['normalized-email-counts'],
     queryFn: async () => {
-      const res = await fetch('/admin/api/backfills/normalized-email');
+      const res = await adminFetch('/admin/api/backfills/normalized-email');
       return res.json() as Promise<NormalizedEmailCountsResponse>;
     },
     refetchInterval: false,
@@ -30,7 +32,7 @@ export function NormalizedEmailBackfill() {
 
   const mutation = useMutation<NormalizedEmailBackfillResponse, Error>({
     mutationFn: async () => {
-      const res = await fetch('/admin/api/backfills/normalized-email', { method: 'POST' });
+      const res = await adminFetch('/admin/api/backfills/normalized-email', { method: 'POST' });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);

@@ -1,13 +1,23 @@
-import type { NextRequest } from 'next/server';
+import { after, type NextRequest } from 'next/server';
+import { captureException, captureMessage } from '@sentry/nextjs';
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
 
 const mockVerifyGitHubWebhookSignature = jest.fn(
-  (_payload: string, _signature: string, _appType: string) => true
+  (_payload: string, _signature: string, _appType: string): 'valid' | 'invalid' | 'unconfigured' =>
+    'valid'
 );
 const mockFindIntegrationByInstallationId = jest.fn();
+const mockFindConnectedIntegrationByInstallationId = jest.fn();
+const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
-const mockHandlePRReviewComment = jest.fn();
+const mockUpsertCliSessionPullRequestsFromWebhook = jest.fn();
+const mockLinkStackedPullRequestsFromWebhook = jest.fn();
 const mockHandleGitHubReviewCommentReply = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
 const mockRevokeStoredGitHubUserAuthorization = jest.fn();
@@ -15,6 +25,21 @@ const mockHandleInstallationDeleted = jest.fn();
 const mockHandleInstallationSuspend = jest.fn();
 const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
+const mockAssertGitHubInstallationRuntimeAuthorized = jest.fn();
+const mockIsSharedGitHubInstallation = jest.fn();
+const mockClaimSharedGitHubInstallationDelivery = jest.fn();
+const mockCompleteSharedGitHubInstallationDelivery = jest.fn();
+const mockReleaseSharedGitHubInstallationDelivery = jest.fn();
+const mockMaterializeGitHubInstallationIdentity = jest.fn();
+const mockObserveWatchPrWebhook = jest.fn();
+const mockObservePrWebhook = jest.fn();
+
+jest.mock('@/lib/cloud-agent/watch-pr-webhook', () => ({
+  observeWatchPrWebhook: (input: unknown) => mockObserveWatchPrWebhook(input),
+}));
+jest.mock('./pr-observations-webhook', () => ({
+  observePrWebhook: (input: unknown) => mockObservePrWebhook(input),
+}));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -27,6 +52,13 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string | undefined,
     githubAppType?: string
   ) => mockFindIntegrationByInstallationId(platform, installationId, githubAppType),
+  findConnectedIntegrationByInstallationId: (
+    platform: string,
+    installationId: string | undefined,
+    githubAppType?: string
+  ) => mockFindConnectedIntegrationByInstallationId(platform, installationId, githubAppType),
+  getIntegrationForOrganization: (organizationId: string, platform: string) =>
+    mockGetIntegrationForOrganization(organizationId, platform),
 }));
 
 jest.mock('@/lib/integrations/db/webhook-events', () => ({
@@ -40,6 +72,20 @@ jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
     mockRevokeStoredGitHubUserAuthorization(githubUserId, appType, reason),
 }));
 
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {
+    constructor(message: string) {
+      super(message);
+    }
+  },
+  assertGitHubInstallationRuntimeAuthorized: (
+    installationId: string,
+    appType: string,
+    expectedIntegrationId?: string
+  ) =>
+    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType, expectedIntegrationId),
+}));
+
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handleInstallationCreated: jest.fn(),
   handleInstallationDeleted: (payload: unknown, appType: string) =>
@@ -50,16 +96,28 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationSuspend(payload, appType),
   handleInstallationUnsuspend: (payload: unknown, appType: string) =>
     mockHandleInstallationUnsuspend(payload, appType),
-  handleInstallationTargetRenamed: (payload: unknown, integrationId: string, appType: string) =>
-    mockHandleInstallationTargetRenamed(payload, integrationId, appType),
-  handleIssue: jest.fn(),
-  handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
-    mockHandlePRReviewComment(payload, platformIntegration),
+  handleInstallationTargetRenamed: (payload: unknown, appType: string) =>
+    mockHandleInstallationTargetRenamed(payload, appType),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
-  handlePushEvent: jest.fn(),
-  upsertCliSessionPullRequestsFromWebhook: jest.fn(),
+  upsertCliSessionPullRequestsFromWebhook: (payload: unknown, owner: unknown) =>
+    mockUpsertCliSessionPullRequestsFromWebhook(payload, owner),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
+  linkStackedPullRequestsFromWebhook: (input: unknown) =>
+    mockLinkStackedPullRequestsFromWebhook(input),
+}));
+
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  isSharedGitHubInstallation: (installationId: string, appType: string) =>
+    mockIsSharedGitHubInstallation(installationId, appType),
+  claimGitHubInstallationDelivery: (input: unknown) =>
+    mockClaimSharedGitHubInstallationDelivery(input),
+  completeGitHubInstallationDelivery: (input: unknown) =>
+    mockCompleteSharedGitHubInstallationDelivery(input),
+  releaseGitHubInstallationDelivery: (input: unknown) =>
+    mockReleaseSharedGitHubInstallationDelivery(input),
+  materializeGitHubInstallationIdentity: (input: unknown) =>
+    mockMaterializeGitHubInstallationIdentity(input),
 }));
 
 jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
@@ -70,18 +128,24 @@ jest.mock('next/server', () => {
   const actual = jest.requireActual('next/server');
   return {
     ...actual,
-    after: (fn: () => unknown) => fn(),
+    after: jest.fn((fn: () => unknown) => fn()),
   };
 });
 
 import { handleGitHubWebhook } from './webhook-handler';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
+import { normalizeWatchPrEvent } from '@/lib/cloud-agent/watch-pr-events';
 
 const integration = {
   id: 'pi_github',
   owned_by_organization_id: 'org_1',
   owned_by_user_id: null,
   platform_installation_id: '98765',
+  github_app_type: 'standard',
+  integration_status: 'active',
   suspended_at: null,
+  auth_invalid_at: null,
+  github_disconnected_at: null,
 };
 
 function signedGitHubRequest(eventType: string, payload: unknown): NextRequest {
@@ -186,14 +250,29 @@ async function waitForAfterTask() {
 }
 
 describe('handleGitHubWebhook', () => {
+  let now = Date.UTC(2026, 0, 1);
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockVerifyGitHubWebhookSignature.mockReturnValue(true);
+    // Each test starts a fresh alarm window for the missing-secret report.
+    now += 60_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    mockObserveWatchPrWebhook.mockResolvedValue(undefined);
+    mockObservePrWebhook.mockResolvedValue(undefined);
+    mockGetIntegrationForOrganization.mockResolvedValue(integration);
+    mockVerifyGitHubWebhookSignature.mockReturnValue('valid');
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(integration);
+    mockIsSharedGitHubInstallation.mockResolvedValue(false);
+    mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({
+      status: 'claimed',
+      githubInstallationId: 'canonical-installation',
+    });
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
-    mockHandlePRReviewComment.mockResolvedValue(undefined);
+    mockUpsertCliSessionPullRequestsFromWebhook.mockResolvedValue(1);
+    mockLinkStackedPullRequestsFromWebhook.mockResolvedValue(undefined);
     mockHandleGitHubReviewCommentReply.mockResolvedValue({
       recorded: false,
       reason: 'not-review-comment-reply',
@@ -216,6 +295,255 @@ describe('handleGitHubWebhook', () => {
     );
   });
 
+  it('awaits watch projection before secondary installation suppression and legacy deduplication', async () => {
+    const calls: string[] = [];
+    mockObserveWatchPrWebhook.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      calls.push('watch-durable');
+    });
+    mockFindIntegrationByInstallationId.mockImplementationOnce(async () => {
+      calls.push('legacy-route');
+      return integration;
+    });
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('check_run', { installation: { id: 98765 } }),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(['watch-durable', 'legacy-route']);
+    expect(mockObserveWatchPrWebhook).toHaveBeenCalledWith({
+      eventType: 'check_run',
+      payload: { installation: { id: 98765 } },
+      deliveryId: 'delivery-check_run',
+      appType: 'standard',
+    });
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('persists passive observations before secondary-installation suppression', async () => {
+    const calls: string[] = [];
+    mockObservePrWebhook.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      calls.push('observations');
+    });
+    mockFindIntegrationByInstallationId.mockImplementationOnce(async () => {
+      calls.push('legacy');
+      return integration;
+    });
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
+    const payload = { installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('check_run', payload),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(['observations', 'legacy']);
+    expect(mockObservePrWebhook).toHaveBeenCalledWith({
+      eventType: 'check_run',
+      payload,
+      appType: 'standard',
+    });
+  });
+
+  it.each(['standard', 'lite'] as const)(
+    'reports passive observation failures and continues core handling for the %s app',
+    async appType => {
+      const error = new Error('database unavailable');
+      const payload = pullRequestPayload();
+      mockObservePrWebhook.mockRejectedValueOnce(error);
+
+      const response = await handleGitHubWebhook(
+        signedGitHubRequest('pull_request', payload),
+        appType
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'review queued' });
+      expect(mockObservePrWebhook).toHaveBeenCalledWith({
+        eventType: 'pull_request',
+        payload,
+        appType,
+      });
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(error, {
+        tags: {
+          source: appType === 'lite' ? 'github_lite_pr_observation' : 'github_pr_observation',
+          event: 'pull_request',
+          delivery: 'delivery-pull_request',
+          installation: '98765',
+          action: 'opened',
+        },
+      });
+      expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', appType);
+      expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+      expect(mockHandlePullRequest).toHaveBeenCalledWith(payload, integration);
+    }
+  );
+
+  it('passes the signed raw PR payload to watch normalization before legacy schema stripping', async () => {
+    const headSha = 'a'.repeat(40);
+    const baseSha = 'b'.repeat(40);
+    const payload = pullRequestPayload({
+      before: 'c'.repeat(40),
+      pull_request: {
+        ...pullRequestPayload().pull_request,
+        updated_at: '2026-10-14T12:00:00Z',
+        head: {
+          sha: headSha,
+          ref: 'feature/widgets',
+          repo: { id: 123, full_name: 'acme/widgets' },
+        },
+        base: { sha: baseSha, ref: 'main', repo: { id: 123 } },
+      },
+    });
+    mockObserveWatchPrWebhook.mockImplementationOnce(async ({ eventType, payload: rawPayload }) => {
+      expect(normalizeWatchPrEvent(eventType, rawPayload)).toMatchObject({
+        kind: 'pull_request',
+        installationId: '98765',
+        repositoryId: '123',
+        headRepositoryId: '123',
+        baseRepositoryId: '123',
+        headSha,
+        baseSha,
+        before: 'c'.repeat(40),
+      });
+    });
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', payload),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(mockObserveWatchPrWebhook).toHaveBeenCalledWith(expect.objectContaining({ payload }));
+  });
+
+  it('continues legacy handling when durable watch projection fails', async () => {
+    mockObserveWatchPrWebhook.mockRejectedValueOnce(new Error('projection database unavailable'));
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'lite'
+    );
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalled();
+    expect(mockLogWebhookEvent).toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ source: 'github_lite_watch_pr_observation' }),
+      })
+    );
+  });
+
+  it('does not admit watch events before signature validation', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');
+    expect(
+      (
+        await handleGitHubWebhook(
+          signedGitHubRequest('pull_request', pullRequestPayload()),
+          'standard'
+        )
+      ).status
+    ).toBe(401);
+    expect(mockObserveWatchPrWebhook).not.toHaveBeenCalled();
+    expect(mockObservePrWebhook).not.toHaveBeenCalled();
+  });
+
+  it('still projects redelivered observations before a legacy duplicate short circuit', async () => {
+    mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: true });
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(mockObserveWatchPrWebhook).toHaveBeenCalledTimes(1);
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+  });
+
+  it('routes operational events to the selected workflow association despite shared installation state', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      message: 'review queued',
+    });
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalled();
+    expect(mockLogWebhookEvent).toHaveBeenCalled();
+    expect(mockHandlePullRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('must not route an active sibling installation webhook to a disconnected tenant', async () => {
+    const disconnected = {
+      ...integration,
+      integration_status: 'suspended',
+      github_disconnected_at: '2026-09-14T00:00:00.000Z',
+      suspended_by: 'local_disconnect',
+    };
+    mockFindIntegrationByInstallationId.mockResolvedValue(disconnected);
+    mockGetIntegrationForOrganization.mockResolvedValue(disconnected);
+    // The real unscoped runtime resolver succeeds on the remaining active sibling.
+    mockAssertGitHubInstallationRuntimeAuthorized.mockResolvedValue(undefined);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect({
+      logged: mockLogWebhookEvent.mock.calls.length,
+      dispatched: mockHandlePullRequest.mock.calls.length,
+    }).toEqual({ logged: 0, dispatched: 0 });
+    expect(mockAssertGitHubInstallationRuntimeAuthorized).not.toHaveBeenCalled();
+  });
+
+  it('validates deferred dispatch against the exact routed association', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockResolvedValue(undefined);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockAssertGitHubInstallationRuntimeAuthorized).toHaveBeenCalledWith(
+      '98765',
+      'standard',
+      'pi_github'
+    );
+  });
+
+  it('runs the PR cache upsert and stack linking after a stacked delivery', async () => {
+    const payload = pullRequestPayload({
+      action: 'stacked',
+      stack: { number: 3, position: 2, size: 2 },
+    });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockUpsertCliSessionPullRequestsFromWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'stacked' }),
+      { kind: 'organization', organizationId: 'org_1' }
+    );
+    expect(mockLinkStackedPullRequestsFromWebhook).toHaveBeenCalledWith({
+      payload: expect.objectContaining({ action: 'stacked' }),
+      owner: { kind: 'organization', organizationId: 'org_1' },
+      installationId: '98765',
+      appType: 'standard',
+    });
+  });
+
   it('routes installation_target renamed events through authoritative login synchronization', async () => {
     const payload = {
       action: 'renamed',
@@ -233,7 +561,6 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     expect(mockHandleInstallationTargetRenamed).toHaveBeenCalledWith(
       expect.objectContaining(payload),
-      integration.id,
       'lite'
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
@@ -327,14 +654,143 @@ describe('handleGitHubWebhook', () => {
       expect.objectContaining(payload),
       integration
     );
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })
     );
   });
 
-  it('keeps pull_request_review_comment created events on the legacy auto-fix path', async () => {
+  it.each([
+    { ref: 'refs/heads/main', deleted: false },
+    { ref: 'refs/heads/feature', deleted: false },
+    { ref: 'refs/tags/v1', deleted: false },
+    { ref: 'refs/heads/main', deleted: true },
+  ])('acknowledges push $ref (deleted=$deleted) without scheduling builds', async push => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', {
+        ...push,
+        installation: { id: 98765 },
+        repository: { full_name: 'acme/widgets' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Event received' });
+    expect(after).not.toHaveBeenCalled();
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+  });
+
+  it('still rejects malformed push payloads without scheduling work', async () => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', { installation: { id: 98765 }, ref: 'refs/heads/main' }),
+      'standard'
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid push event payload' });
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('still rejects unauthenticated pushes without scheduling work', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', {
+        installation: { id: 98765 },
+        ref: 'refs/heads/main',
+        repository: { full_name: 'acme/widgets' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(401);
+    expect(after).not.toHaveBeenCalled();
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+  });
+
+  it('refuses every delivery and reports the configuration error when the app secret is absent', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'lite'
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe('Unauthorized');
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'github_lite_webhook_signature', app: 'lite' },
+    });
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('returns the same refusal for a missing secret and a bad signature', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+    const unconfigured = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');
+    const invalid = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(unconfigured.status).toBe(invalid.status);
+    expect(await unconfigured.text()).toBe(await invalid.text());
+  });
+
+  it('reports the absent app secret once a minute while refusing every delivery', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+
+    const first = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+    const second = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(first.status).toBe(401);
+    expect(second.status).toBe(401);
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    now += 60_000;
+    const third = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(third.status).toBe(401);
+    expect(captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a separate alarm window per app type', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+
+    await handleGitHubWebhook(signedGitHubRequest('pull_request', pullRequestPayload()), 'lite');
+    await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(captureException).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenNthCalledWith(1, expect.any(Error), {
+      tags: { source: 'github_lite_webhook_signature', app: 'lite' },
+    });
+    expect(captureException).toHaveBeenNthCalledWith(2, expect.any(Error), {
+      tags: { source: 'github_webhook_signature', app: 'standard' },
+    });
+  });
+
+  it('routes pull_request_review_comment created events to review memory feedback', async () => {
     const response = await handleGitHubWebhook(
       signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
       'standard'
@@ -343,14 +799,79 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     await waitForAfterTask();
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
-    expect(mockHandlePRReviewComment).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'created' }),
-      integration
+    expect(mockHandleGitHubReviewCommentReply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ action: 'created' }),
+        integration,
+      })
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
-      expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
+      expect.objectContaining({ handlers_triggered: [] })
     );
+  });
+
+  it('skips deferred GitHub work when the association disconnects after receipt', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new GitHubRuntimeAuthorizationError()
+    );
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+  });
+
+  it('returns 500 when the runtime availability query fails unexpectedly', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+    expect(response.status).toBe(500);
+  });
+
+  it('captures the 500 path with safe delivery tags and no payload or secret', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+    const payload = reviewCommentPayload({
+      comment: {
+        id: 456,
+        body: 'secret-payload-marker',
+        diff_hunk: '@@ -1 +1 @@ secret-payload-marker',
+      },
+    });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(500);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          source: 'github_webhook_handler',
+          event: 'pull_request_review_comment',
+          delivery: 'delivery-pull_request_review_comment',
+          installation: '98765',
+          action: 'created',
+        }),
+      })
+    );
+
+    const captured = JSON.stringify(jest.mocked(captureException).mock.calls);
+    expect(captured).not.toContain('secret-payload-marker');
+    expect(captured).not.toContain('sha256=test');
+    expect(captured).not.toContain('x-hub-signature-256');
+    expect(captured).not.toContain('x-github-delivery');
   });
 
   it('logs review memory feedback only when it records feedback', async () => {
@@ -366,7 +887,7 @@ describe('handleGitHubWebhook', () => {
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({
-        handlers_triggered: ['pr_review_comment_fix', 'review_memory_feedback'],
+        handlers_triggered: ['review_memory_feedback'],
       })
     );
   });
@@ -380,7 +901,6 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ message: 'Event received' });
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
   it('acknowledges non-created issue_comment events without invoking the bot', async () => {
@@ -392,7 +912,212 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ message: 'Event received' });
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+  });
+
+  it.each(['standard', 'lite'] as const)(
+    'ignores installation.deleted with a null installation for the %s app',
+    async appType => {
+      const request = signedGitHubRequest('installation', {
+        action: 'deleted',
+        installation: null,
+        sender: { id: 111, login: 'alice' },
+        organization: { id: 222, login: 'acme' },
+        repositories: [{ id: 333, full_name: 'acme/widgets' }],
+      });
+      request.headers.set('x-github-hook-id', '444');
+      request.headers.set('x-github-hook-installation-target-id', '555');
+      request.headers.set('x-github-hook-installation-target-type', 'integration');
+
+      const response = await handleGitHubWebhook(request, appType);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        message: 'Event ignored: missing installation ID',
+      });
+      expect(mockVerifyGitHubWebhookSignature).toHaveBeenCalledWith(
+        expect.any(String),
+        'sha256=test',
+        appType
+      );
+      expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+      expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+      expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+      expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects installation.deleted with a null installation when signature verification fails', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', { action: 'deleted', installation: null }),
+      'standard'
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, {}, { id: '98765' }])(
+    'still rejects malformed installation.deleted installation %j',
+    async installation => {
+      const response = await handleGitHubWebhook(
+        signedGitHubRequest('installation', { action: 'deleted', installation }),
+        'standard'
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+      expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        'Invalid GitHub webhook payload structure',
+        expect.objectContaining({
+          level: 'error',
+          tags: { source: 'github_webhook_validation', event: 'installation.deleted' },
+        })
+      );
+    }
+  );
+
+  it('preserves duplicate installation.deleted handling', async () => {
+    mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({ status: 'completed' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', { action: 'deleted', installation: { id: 98765 } }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Duplicate event' });
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('dispatches a duplicate shared delivery exactly once while a claim is held', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockClaimSharedGitHubInstallationDelivery
+      .mockResolvedValueOnce({ status: 'claimed', githubInstallationId: 'canonical-installation' })
+      .mockResolvedValueOnce({ status: 'processing' });
+    mockHandleInstallationDeleted.mockResolvedValue(
+      Response.json({ message: 'Installation removed' })
+    );
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const first = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+    const duplicate = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(await first.json()).toEqual({ message: 'Installation removed' });
+    expect(await duplicate.json()).toEqual({ message: 'Duplicate event' });
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(1);
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+    expect(mockClaimSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      deliveryId: 'delivery-installation',
+      eventType: 'installation.deleted',
+    });
+  });
+
+  it('leaves no completed receipt when required cleanup fails before manual redelivery', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockHandleInstallationDeleted.mockRejectedValueOnce(new Error('transient'));
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const failed = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+    const retried = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(failed.status).toBe(500);
+    expect(await retried.json()).toEqual({ message: 'Installation removed' });
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+    expect(mockReleaseSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not record a completion receipt when the dispatched response is not ok', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockHandleInstallationDeleted.mockResolvedValueOnce(
+      Response.json({ error: 'upstream failure' }, { status: 502 })
+    );
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const failed = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+    const retried = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(failed.status).toBe(502);
+    expect(await retried.json()).toEqual({ message: 'Installation removed' });
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+    expect(mockReleaseSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it('records a completion receipt when the dispatched response is ok', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockHandleInstallationDeleted.mockResolvedValueOnce(
+      Response.json({ message: 'Installation removed' }, { status: 200 })
+    );
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches lifecycle when a canonical receipt cannot be resolved', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({ status: 'missing_canonical' });
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes installation.deleted with a known ID even when no integration is found', async () => {
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+    mockFindIntegrationByInstallationId.mockResolvedValue(null);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(payload, 'standard');
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
   });
 
   it('routes installation.deleted to the handler with the webhook app type', async () => {
@@ -404,11 +1129,23 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockMaterializeGitHubInstallationIdentity).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+    });
+    expect(mockMaterializeGitHubInstallationIdentity.mock.invocationCallOrder[0]).toBeLessThan(
+      mockClaimSharedGitHubInstallationDelivery.mock.invocationCallOrder[0]!
+    );
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
     expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'lite'
     );
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
+      githubInstallationId: 'canonical-installation',
+      deliveryId: 'delivery-installation',
+    });
   });
 
   it('routes installation.suspend to the handler with the webhook app type', async () => {
@@ -420,7 +1157,54 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
+    expect(mockFindConnectedIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      '98765',
+      'standard'
+    );
+    expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('dispatches installation.suspend for the connected tenant when a disconnected former tenant exists', async () => {
+    // The unfiltered lookup would return the retained disconnected row; the
+    // route must not use it (and must not drop the delivery), so the handler
+    // still runs and canonical state is reconciled.
+    mockFindIntegrationByInstallationId.mockResolvedValue({
+      ...integration,
+      github_disconnected_at: '2026-09-15T00:00:00.000Z',
+    });
+
+    const payload = { action: 'suspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+    expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('still dispatches installation.suspend when only a disconnected former tenant remains', async () => {
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(null);
+
+    const payload = { action: 'suspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    // Canonical state is still reconciled by the handler; nothing is logged
+    // against the disconnected tenant.
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'standard'
@@ -436,11 +1220,53 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockFindConnectedIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      '98765',
+      'lite'
+    );
     expect(mockHandleInstallationUnsuspend).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'lite'
     );
+  });
+
+  it('processes installation.unsuspend for a suspended association instead of dropping it', async () => {
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue({
+      ...integration,
+      integration_status: 'suspended',
+      suspended_at: '2026-09-15T00:00:00.000Z',
+      suspended_by: 'github_suspend',
+    });
+
+    const payload = { action: 'unsuspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation unsuspended' });
+    expect(mockHandleInstallationUnsuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('does not log installation.unsuspend when only a disconnected former tenant remains', async () => {
+    // The connected-tenant lookup ignores retained disconnected rows, so the
+    // delivery is not recorded against a tenant that no longer owns the
+    // installation. Canonical state is still reconciled by the handler.
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(null);
+
+    const payload = { action: 'unsuspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
   });
 
   it('routes installation_repositories to the handler with the webhook app type', async () => {

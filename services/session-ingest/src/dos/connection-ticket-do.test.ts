@@ -57,48 +57,66 @@ function makeDO() {
   return { instance, store, getAlarm };
 }
 
+const SECRET = 'ticket-secret';
+
 describe('ConnectionTicketDO', () => {
   it('mints a ticket by storing state and arming an alarm', async () => {
     const { instance, store, getAlarm } = makeDO();
     const expiresAt = Date.now() + 60_000;
 
-    await instance.mint({ userId: 'usr_1', expiresAt });
+    await instance.mint({ userId: 'usr_1', expiresAt, secret: SECRET });
 
-    expect(store.get('ticket')).toEqual({ userId: 'usr_1', expiresAt });
+    expect(store.get('ticket')).toEqual({ userId: 'usr_1', expiresAt, secret: SECRET });
     expect(getAlarm()).toBe(expiresAt);
   });
 
   it('consumes a fresh ticket once and returns the userId', async () => {
     const { instance } = makeDO();
-    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000 });
+    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000, secret: SECRET });
 
-    await expect(instance.consume()).resolves.toEqual({ userId: 'usr_1' });
+    await expect(instance.consume(SECRET)).resolves.toEqual({ userId: 'usr_1' });
   });
 
   it('rejects a replay of an already-consumed ticket', async () => {
     const { instance } = makeDO();
-    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000 });
+    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000, secret: SECRET });
 
-    await expect(instance.consume()).resolves.toEqual({ userId: 'usr_1' });
-    await expect(instance.consume()).resolves.toBeNull();
+    await expect(instance.consume(SECRET)).resolves.toEqual({ userId: 'usr_1' });
+    await expect(instance.consume(SECRET)).resolves.toBeNull();
   });
 
   it('rejects an expired ticket', async () => {
     const { instance } = makeDO();
-    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() - 1 });
+    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() - 1, secret: SECRET });
 
-    await expect(instance.consume()).resolves.toBeNull();
+    await expect(instance.consume(SECRET)).resolves.toBeNull();
+  });
+
+  it('rejects a wrong secret and burns the ticket', async () => {
+    const { instance, store } = makeDO();
+    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000, secret: SECRET });
+
+    await expect(instance.consume('wrong-secret')).resolves.toBeNull();
+    expect(store.get('ticket')).toBeUndefined();
+    await expect(instance.consume(SECRET)).resolves.toBeNull();
+  });
+
+  it('rejects a stored ticket without a secret', async () => {
+    const { instance, store } = makeDO();
+    store.set('ticket', { userId: 'usr_1', expiresAt: Date.now() + 60_000 });
+
+    await expect(instance.consume(SECRET)).resolves.toBeNull();
   });
 
   it('deletes ticket storage and alarm after a successful consume', async () => {
     const { instance, store, getAlarm } = makeDO();
     const expiresAt = Date.now() + 60_000;
-    await instance.mint({ userId: 'usr_1', expiresAt });
+    await instance.mint({ userId: 'usr_1', expiresAt, secret: SECRET });
 
-    expect(store.get('ticket')).toEqual({ userId: 'usr_1', expiresAt });
+    expect(store.get('ticket')).toEqual({ userId: 'usr_1', expiresAt, secret: SECRET });
     expect(getAlarm()).toBe(expiresAt);
 
-    await expect(instance.consume()).resolves.toEqual({ userId: 'usr_1' });
+    await expect(instance.consume(SECRET)).resolves.toEqual({ userId: 'usr_1' });
 
     expect(store.get('ticket')).toBeUndefined();
     expect(getAlarm()).toBeNull();
@@ -106,10 +124,10 @@ describe('ConnectionTicketDO', () => {
 
   it('deletes unconsumed expired ticket storage when the alarm runs', async () => {
     const { instance, store } = makeDO();
-    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000 });
+    await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000, secret: SECRET });
 
     // Simulate expiry before the alarm fires.
-    store.set('ticket', { userId: 'usr_1', expiresAt: Date.now() - 1 });
+    store.set('ticket', { userId: 'usr_1', expiresAt: Date.now() - 1, secret: SECRET });
     await instance.alarm();
 
     expect(store.get('ticket')).toBeUndefined();

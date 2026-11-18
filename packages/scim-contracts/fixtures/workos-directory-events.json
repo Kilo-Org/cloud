@@ -1,0 +1,310 @@
+{
+  "rangeStart": "event_01M6HD40E0R5Z1JZ1K8RVB101F",
+  "rangeEnd": "event_01M6HDAZASZDQCSMWVFYG5N1WV",
+  "recordedAt": "2026-11-09",
+  "events": [
+    {
+      "object": "event",
+      "id": "event_01M6HD40E0R5Z1JZ1K8RVB101F",
+      "event": "dsync.activated",
+      "data": {
+        "id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "name": "z-corp",
+        "type": "okta scim v2.0",
+        "state": "active",
+        "object": "directory",
+        "domains": [
+          {
+            "id": "org_domain_01M6HCGCK2C1YTV6RBBJE3TPJR",
+            "domain": "integrator-6483000.okta.com",
+            "object": "organization_domain"
+          }
+        ],
+        "created_at": "2026-11-03T19:06:23.716Z",
+        "updated_at": "2026-11-03T19:10:34.411Z",
+        "external_key": "rShbHZvCy8duwij9",
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ"
+      },
+      "created_at": "2026-11-03T19:10:34.432Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HD40GS99VTWF5T9W3Y6T74",
+      "event": "dsync.user.created",
+      "data": {
+        "id": "directory_user_01M6HD40G3RJHWSFQCHMWC7Y8D",
+        "name": "Bob Bobert",
+        "role": {
+          "slug": "member"
+        },
+        "email": "bob.bobert@anaconda.com",
+        "roles": [
+          {
+            "slug": "member"
+          }
+        ],
+        "state": "active",
+        "emails": [],
+        "idp_id": "00u19gyl8j029SgVQ698",
+        "object": "directory_user",
+        "username": null,
+        "job_title": null,
+        "last_name": "Bobert",
+        "created_at": "2026-11-03T19:10:34.484Z",
+        "first_name": "Bob",
+        "updated_at": "2026-11-03T19:10:34.484Z",
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "raw_attributes": {},
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+        "custom_attributes": {}
+      },
+      "created_at": "2026-11-03T19:10:34.521Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HD989C5EZDMSC7NMJY2QPC",
+      "event": "dsync.group.created",
+      "data": {
+        "id": "directory_group_01M6HD9895EBM5VG540FSMJ055",
+        "name": "kilo-users",
+        "idp_id": "kilo-users",
+        "object": "directory_group",
+        "created_at": "2026-11-03T19:13:26.302Z",
+        "updated_at": "2026-11-03T19:13:26.302Z",
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "raw_attributes": {
+          "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+          "displayName": "kilo-users"
+        },
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ"
+      },
+      "created_at": "2026-11-03T19:13:26.316Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HD9P854KJ7DYA5M8EDG1KB",
+      "event": "dsync.group.created",
+      "data": {
+        "id": "directory_group_01M6HD9P7ZTMT8BZAF5D6FNBAS",
+        "name": "kilo-admins",
+        "idp_id": "kilo-admins",
+        "object": "directory_group",
+        "created_at": "2026-11-03T19:13:40.598Z",
+        "updated_at": "2026-11-03T19:13:40.598Z",
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "raw_attributes": {
+          "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+          "displayName": "kilo-admins"
+        },
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ"
+      },
+      "created_at": "2026-11-03T19:13:40.613Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HDAV7F0QWQ1FXRPNDHWYXJ",
+      "event": "dsync.group.updated",
+      "data": {
+        "id": "directory_group_01M6HD9P7ZTMT8BZAF5D6FNBAS",
+        "name": "kilo-admins",
+        "idp_id": "kilo-admins",
+        "object": "directory_group",
+        "created_at": "2026-11-03T19:13:40.598Z",
+        "updated_at": "2026-11-03T19:14:18.469Z",
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "raw_attributes": {},
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+        "previous_attributes": {}
+      },
+      "created_at": "2026-11-03T19:14:18.479Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HDAVA2DN56V4D32CT377W2",
+      "event": "dsync.user.created",
+      "data": {
+        "id": "directory_user_01M6HDAV9B7FZBJFW72NAX6X42",
+        "name": "Kilo Admin",
+        "role": {
+          "slug": "member"
+        },
+        "email": "kilo.admin@gmail.com",
+        "roles": [
+          {
+            "slug": "member"
+          }
+        ],
+        "state": "active",
+        "emails": [],
+        "idp_id": "00u19gylxnmsETL6V698",
+        "object": "directory_user",
+        "username": null,
+        "job_title": null,
+        "last_name": "Admin",
+        "created_at": "2026-11-03T19:14:18.521Z",
+        "first_name": "Kilo",
+        "updated_at": "2026-11-03T19:14:18.521Z",
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "raw_attributes": {},
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+        "custom_attributes": {}
+      },
+      "created_at": "2026-11-03T19:14:18.562Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HDAVCWN46DVJMV51QWJZX3",
+      "event": "dsync.group.user_added",
+      "data": {
+        "user": {
+          "id": "directory_user_01M6HDAV9B7FZBJFW72NAX6X42",
+          "name": "Kilo Admin",
+          "role": {
+            "slug": "member"
+          },
+          "email": "kilo.admin@gmail.com",
+          "roles": [
+            {
+              "slug": "member"
+            }
+          ],
+          "state": "active",
+          "emails": [],
+          "idp_id": "00u19gylxnmsETL6V698",
+          "object": "directory_user",
+          "username": null,
+          "job_title": null,
+          "last_name": "Admin",
+          "created_at": "2026-11-03T19:14:18.521Z",
+          "first_name": "Kilo",
+          "updated_at": "2026-11-03T19:14:18.521Z",
+          "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+          "raw_attributes": {},
+          "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+          "custom_attributes": {}
+        },
+        "group": {
+          "id": "directory_group_01M6HD9P7ZTMT8BZAF5D6FNBAS",
+          "name": "kilo-admins",
+          "idp_id": "kilo-admins",
+          "object": "directory_group",
+          "created_at": "2026-11-03T19:13:40.598Z",
+          "updated_at": "2026-11-03T19:14:18.469Z",
+          "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+          "raw_attributes": {},
+          "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ"
+        },
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV"
+      },
+      "created_at": "2026-11-03T19:14:18.652Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HDAXV9BNHXMPMTQ41EW8EB",
+      "event": "dsync.user.created",
+      "data": {
+        "id": "directory_user_01M6HDAXTKTVWRCFMWJ1P73SSH",
+        "name": "Kilo User",
+        "role": {
+          "slug": "member"
+        },
+        "email": "kilo.user@gmail.com",
+        "roles": [
+          {
+            "slug": "member"
+          }
+        ],
+        "state": "active",
+        "emails": [],
+        "idp_id": "00u19gyp4erWrFmeq698",
+        "object": "directory_user",
+        "username": null,
+        "job_title": null,
+        "last_name": "User",
+        "created_at": "2026-11-03T19:14:21.124Z",
+        "first_name": "Kilo",
+        "updated_at": "2026-11-03T19:14:21.124Z",
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "raw_attributes": {},
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+        "custom_attributes": {}
+      },
+      "created_at": "2026-11-03T19:14:21.161Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HDAYP6YQGQF22WBJRBCN3E",
+      "event": "dsync.group.updated",
+      "data": {
+        "id": "directory_group_01M6HD9895EBM5VG540FSMJ055",
+        "name": "kilo-users",
+        "idp_id": "kilo-users",
+        "object": "directory_group",
+        "created_at": "2026-11-03T19:13:26.302Z",
+        "updated_at": "2026-11-03T19:14:22.012Z",
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+        "raw_attributes": {},
+        "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+        "previous_attributes": {}
+      },
+      "created_at": "2026-11-03T19:14:22.022Z",
+      "context": {}
+    },
+    {
+      "object": "event",
+      "id": "event_01M6HDAZASZDQCSMWVFYG5N1WV",
+      "event": "dsync.group.user_added",
+      "data": {
+        "user": {
+          "id": "directory_user_01M6HDAXTKTVWRCFMWJ1P73SSH",
+          "name": "Kilo User",
+          "role": {
+            "slug": "member"
+          },
+          "email": "kilo.user@gmail.com",
+          "roles": [
+            {
+              "slug": "member"
+            }
+          ],
+          "state": "active",
+          "emails": [],
+          "idp_id": "00u19gyp4erWrFmeq698",
+          "object": "directory_user",
+          "username": null,
+          "job_title": null,
+          "last_name": "User",
+          "created_at": "2026-11-03T19:14:21.124Z",
+          "first_name": "Kilo",
+          "updated_at": "2026-11-03T19:14:21.124Z",
+          "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+          "raw_attributes": {},
+          "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+          "custom_attributes": {}
+        },
+        "group": {
+          "id": "directory_group_01M6HD9895EBM5VG540FSMJ055",
+          "name": "kilo-users",
+          "idp_id": "kilo-users",
+          "object": "directory_group",
+          "created_at": "2026-11-03T19:13:26.302Z",
+          "updated_at": "2026-11-03T19:14:22.012Z",
+          "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+          "raw_attributes": {},
+          "organization_id": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ"
+        },
+        "directory_id": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV"
+      },
+      "created_at": "2026-11-03T19:14:22.681Z",
+      "context": {}
+    }
+  ]
+}

@@ -7,17 +7,33 @@
  * files are driver-invoked, not picked up by `pnpm run test`.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import path from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { streamEventSchema } from '../e2e/client.js';
 import {
+  buildRealisticReasoning,
+  buildSeedFixture,
   extractLastUserMessageText,
+  extractMultipartField,
+  isToolError,
+  MAX_REALISTIC_CHARS,
+  MAX_REALISTIC_PIECES,
+  MAX_TOOL_STREAM_BYTES,
   parseDirective,
+  parseFileDirective,
   startFakeLlmServer,
+  splitRealisticContent,
+  stripKiloPromptWrapping,
+  toolCallId,
   type FakeLlmServerHandle,
 } from '../e2e/fake-llm-server.js';
-
-// ---------------------------------------------------------------------------
-// Pure-helper tests
-// ---------------------------------------------------------------------------
+import { LOCAL_FAKE_LLM_ADMIN_TOKEN, resolveFakeAdminToken } from '../e2e/fake-llm-admin.js';
+import {
+  findControlPlaneKiloRuntime,
+  stopOwnedControlPlaneSandbox,
+  type DockerCommandExecutor,
+} from '../e2e/sandbox-control.js';
 
 describe('parseDirective', () => {
   it('returns null when the prefix is absent', () => {
@@ -66,6 +82,20 @@ describe('parseDirective', () => {
 });
 
 describe('extractLastUserMessageText', () => {
+  it.each([
+    '<system-reminder>Agent changed</system-reminder>',
+    [{ type: 'text', text: '<system-reminder>Agent changed</system-reminder>' }],
+  ])('ignores a native agent-switch reminder after the command', content => {
+    expect(
+      extractLastUserMessageText({
+        messages: [
+          { role: 'user', content: '__fake__:echo:command-argument' },
+          { role: 'user', content },
+        ],
+      })
+    ).toBe('__fake__:echo:command-argument');
+  });
+
   it('returns empty when messages is missing or not an array', () => {
     expect(extractLastUserMessageText({})).toBe('');
     expect(extractLastUserMessageText({ messages: 'nope' })).toBe('');
@@ -112,9 +142,174 @@ describe('extractLastUserMessageText', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// End-to-end HTTP tests against an ephemeral server
-// ---------------------------------------------------------------------------
+describe('stripKiloPromptWrapping', () => {
+  it('returns the prompt unchanged when no wrappers are present', () => {
+    expect(stripKiloPromptWrapping('hello world')).toBe('hello world');
+  });
+
+  it('removes environment_details and trims leftover whitespace', () => {
+    expect(
+      stripKiloPromptWrapping(
+        'hello world\n\n<environment_details>\nCurrent time: 2026-05-05T10:17:23+00:00\n</environment_details>'
+      )
+    ).toBe('hello world');
+  });
+});
+
+describe('extractMultipartField', () => {
+  const boundary = '----kilo-fake-llm-form';
+
+  function multipart(parts: string[]): string {
+    return parts.map(part => `--${boundary}\r\n${part}\r\n`).join('') + `--${boundary}--\r\n`;
+  }
+
+  it('extracts the model field from a record with model and file parts', () => {
+    const body = multipart([
+      'Content-Disposition: form-data; name="model"\r\n\r\nfake-transcribe',
+      'Content-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\nRIFFbinary-audio-bytes',
+    ]);
+    expect(extractMultipartField(body, boundary, 'model')).toBe('fake-transcribe');
+    expect(extractMultipartField(body, boundary, 'file')).toBe('RIFFbinary-audio-bytes');
+  });
+
+  it('returns null when the model part is missing', () => {
+    const body = multipart([
+      'Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n\r\nRIFF',
+    ]);
+    expect(extractMultipartField(body, boundary, 'model')).toBeNull();
+  });
+});
+
+describe('parseFileDirective', () => {
+  it('parses write with literal contents, including colons', () => {
+    expect(parseFileDirective('write:turn-1:shared-checkout.txt:nonce:with:colons')).toEqual({
+      ok: true,
+      directive: {
+        op: 'write',
+        opTag: 'turn-1',
+        path: 'shared-checkout.txt',
+        contents: 'nonce:with:colons',
+      },
+    });
+  });
+
+  it('parses seed with a byte count and nonce', () => {
+    expect(parseFileDirective('seed:turn-2:big.txt:65536:nonce-abc')).toEqual({
+      ok: true,
+      directive: { op: 'seed', opTag: 'turn-2', path: 'big.txt', bytes: 65536, nonce: 'nonce-abc' },
+    });
+  });
+
+  it('parses read with a single colon-free path', () => {
+    expect(parseFileDirective('read:turn-3:shared-checkout.txt')).toEqual({
+      ok: true,
+      directive: { op: 'read', opTag: 'turn-3', path: 'shared-checkout.txt' },
+    });
+  });
+
+  it('rejects an unknown op', () => {
+    const parsed = parseFileDirective('delete:turn-4:shared.txt');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('rejects a read directive whose path contains a colon', () => {
+    const parsed = parseFileDirective('read:turn-5:dir:file.txt');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('rejects a seed directive whose path contains a colon', () => {
+    const parsed = parseFileDirective('seed:turn-6:dir:file.txt:10:nonce');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('normalizes away trailing prompt lines before parsing', () => {
+    expect(
+      parseFileDirective(
+        'read:turn-normalized:shared.txt\n\n<environment_details>noise</environment_details>'
+      )
+    ).toEqual({
+      ok: true,
+      directive: { op: 'read', opTag: 'turn-normalized', path: 'shared.txt' },
+    });
+  });
+
+  it('treats a colon after the write path as literal contents, not a path', () => {
+    expect(parseFileDirective('write:turn-colon:a:b:c')).toEqual({
+      ok: true,
+      directive: { op: 'write', opTag: 'turn-colon', path: 'a', contents: 'b:c' },
+    });
+  });
+
+  it('preserves literal newlines in write contents', () => {
+    expect(parseFileDirective('write:turn-multiline:a.txt:first\nsecond')).toEqual({
+      ok: true,
+      directive: {
+        op: 'write',
+        opTag: 'turn-multiline',
+        path: 'a.txt',
+        contents: 'first\nsecond',
+      },
+    });
+  });
+
+  it('strips only the appended prompt-context block from write contents', () => {
+    expect(
+      parseFileDirective(
+        'write:turn-context:a.txt:first\nsecond\n\n<environment_details>\nnoise\n</environment_details>'
+      )
+    ).toEqual({
+      ok: true,
+      directive: { op: 'write', opTag: 'turn-context', path: 'a.txt', contents: 'first\nsecond' },
+    });
+  });
+
+  it('rejects a write path that contains a newline', () => {
+    expect(parseFileDirective('write:turn-nl:a\nb:contents').ok).toBe(false);
+  });
+
+  it('rejects a seed byte count too small for the nonce prefix', () => {
+    expect(parseFileDirective('seed:turn-small:big.txt:4:nonce').ok).toBe(false);
+  });
+
+  it('rejects a seed nonce longer than the bound', () => {
+    expect(parseFileDirective(`seed:turn-long:big.txt:200:${'x'.repeat(65)}`).ok).toBe(false);
+  });
+
+  it('rejects missing arguments and an out-of-range seed size', () => {
+    expect(parseFileDirective('read:turn-7').ok).toBe(false);
+    expect(parseFileDirective('seed:turn-8:big.txt:999999999999:nonce').ok).toBe(false);
+  });
+});
+
+describe('isToolError', () => {
+  it('recognizes an is_error JSON marker and conservative error prefixes', () => {
+    expect(isToolError('{"is_error":true,"message":"nope"}')).toBe(true);
+    expect(isToolError('Error: file not found')).toBe(true);
+    expect(isToolError('error: ENOENT')).toBe(true);
+    expect(isToolError('failed to read file')).toBe(true);
+  });
+
+  it('does not treat ordinary file contents as an error', () => {
+    expect(isToolError('nonce-value')).toBe(false);
+    expect(isToolError('Errorless text')).toBe(false);
+    expect(isToolError('')).toBe(false);
+  });
+});
+
+describe('buildSeedFixture', () => {
+  it('produces exactly the requested UTF-8 byte count including the nonce prefix', () => {
+    const fixture = buildSeedFixture(200, 'nonce');
+    expect(Buffer.byteLength(fixture, 'utf8')).toBe(200);
+    expect(fixture.startsWith('nonce\n')).toBe(true);
+    const body = fixture.slice('nonce\n'.length);
+    const lines = body.split('\n').slice(0, -1);
+    for (const line of lines) expect(line).toHaveLength(99);
+  });
+
+  it('throws when the byte count is too small for the nonce prefix', () => {
+    expect(() => buildSeedFixture(3, 'nonce')).toThrow(/smaller than/);
+  });
+});
 
 let handle: FakeLlmServerHandle | null = null;
 
@@ -168,6 +363,116 @@ async function postChat(url: string, prompt: string): Promise<Response> {
   });
 }
 
+const advertisedFileTools = [
+  {
+    type: 'function',
+    function: {
+      name: 'write',
+      parameters: {
+        type: 'object',
+        properties: { filePath: { type: 'string' }, content: { type: 'string' } },
+        required: ['filePath', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'read',
+      parameters: {
+        type: 'object',
+        properties: { filePath: { type: 'string' } },
+        required: ['filePath'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'edit',
+      parameters: {
+        type: 'object',
+        properties: {
+          filePath: { type: 'string' },
+          oldString: { type: 'string' },
+          newString: { type: 'string' },
+        },
+        required: ['filePath', 'oldString', 'newString'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'question',
+      parameters: {
+        type: 'object',
+        properties: { questions: { type: 'array' } },
+        required: ['questions'],
+      },
+    },
+  },
+];
+
+async function postToolChat(
+  url: string,
+  prompt: string,
+  history: Array<Record<string, unknown>> = [],
+  tools: unknown[] = advertisedFileTools
+): Promise<Response> {
+  return fetch(`${url}/api/openrouter/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'kilo/fake-deterministic',
+      messages: [{ role: 'user', content: prompt }, ...history],
+      tools,
+      stream: true,
+    }),
+  });
+}
+
+async function parseSse(response: Response): Promise<Array<Record<string, unknown>>> {
+  if (!response.body) throw new Error('Expected a streamed response body');
+  const chunks = await readAllSse(response.body);
+  expect(chunks.at(-1)?.data).toBe('[DONE]');
+  return chunks.slice(0, -1).map(chunk => JSON.parse(chunk.data));
+}
+
+function extractToolCall(chunks: Array<Record<string, unknown>>): {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+} {
+  const firstChoice = chunks[0]?.choices;
+  const secondChoice = chunks[1]?.choices;
+  if (!Array.isArray(firstChoice) || !Array.isArray(secondChoice)) {
+    throw new Error('Expected streamed tool-call choices');
+  }
+  const opening = firstChoice[0]?.delta?.tool_calls?.[0];
+  const continuation = secondChoice[0]?.delta?.tool_calls?.[0];
+  if (
+    typeof opening?.id !== 'string' ||
+    typeof opening?.function?.name !== 'string' ||
+    typeof continuation?.function?.arguments !== 'string'
+  ) {
+    throw new Error('Expected streamed tool-call identity and arguments');
+  }
+  return {
+    id: opening.id,
+    name: opening.function.name,
+    arguments: JSON.parse(continuation.function.arguments),
+  };
+}
+
+/** The first streamed assistant content, if the response is a plain completion. */
+function assistantContent(chunks: Array<Record<string, unknown>>): string | undefined {
+  const choices = chunks[0]?.choices;
+  if (!Array.isArray(choices)) return undefined;
+  const delta = (choices[0] as { delta?: { content?: string } } | undefined)?.delta;
+  return delta?.content;
+}
+
 async function postModelValidation(
   url: string,
   modelId: string,
@@ -213,16 +518,116 @@ describe('fake-llm-server HTTP', () => {
     await expect(organizationAvailable.json()).resolves.toEqual({ valid: true });
   });
 
-  it('reports chat completion request counts for fail-fast assertions', async () => {
+  it('reports chat completion and transcription request counts for fail-fast assertions', async () => {
     const h = await start();
-    const before = await fetch(`${h.url}/test/requests`);
-    await expect(before.json()).resolves.toEqual({ chatCompletions: 0 });
+    const before = await h.adminFetch(`/test/requests`);
+    await expect(before.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 0 });
 
     const response = await postChat(h.url, '__fake__:echo:hello');
     expect(response.status).toBe(200);
 
-    const after = await fetch(`${h.url}/test/requests`);
-    await expect(after.json()).resolves.toEqual({ chatCompletions: 1 });
+    const after = await h.adminFetch(`/test/requests`);
+    await expect(after.json()).resolves.toEqual({ chatCompletions: 1, transcriptions: 0 });
+  });
+
+  it('attributes completions to a prompt scope while keeping the global total', async () => {
+    const h = await start();
+    await postChat(h.url, '__e2e_scope__:shardA\n__fake__:echo:hello');
+    await postChat(h.url, '__e2e_scope__:shardB\n__fake__:echo:hello');
+
+    const global = await h.adminFetch(`/test/requests`);
+    await expect(global.json()).resolves.toEqual({ chatCompletions: 2, transcriptions: 0 });
+
+    const a = await h.adminFetch(`/test/requests?scope=shardA`);
+    await expect(a.json()).resolves.toEqual({
+      chatCompletions: 1,
+      transcriptions: 0,
+      scope: 'shardA',
+    });
+
+    const missing = await h.adminFetch(`/test/requests?scope=shardC`);
+    await expect(missing.json()).resolves.toEqual({
+      chatCompletions: 0,
+      transcriptions: 0,
+      scope: 'shardC',
+    });
+
+    const invalid = await h.adminFetch(`/test/requests?scope=bad%20scope`);
+    expect(invalid.status).toBe(400);
+  });
+
+  it('strips the scope marker from a default echo response', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__e2e_scope__:shardD\njust a plain prompt');
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain('just a plain prompt');
+    expect(text).not.toContain('__e2e_scope__');
+  });
+
+  it('serves the transcription catalogue when output_modalities=transcription', async () => {
+    const h = await start();
+    const res = await fetch(`${h.url}/api/openrouter/models?output_modalities=transcription`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        id: string;
+        name: string;
+        context_length: number;
+        pricing: { prompt: string; completion: string };
+      }>;
+    };
+    expect(body.data.map(m => m.id)).toEqual(['fake-transcribe', 'fake-transcribe-broken']);
+    expect(body.data[0]).toMatchObject({
+      name: 'Fake Transcribe',
+      context_length: 128000,
+      pricing: { prompt: '0', completion: '0' },
+    });
+
+    // Without the query the chat catalogue is unchanged.
+    const plain = await fetch(`${h.url}/api/openrouter/models`);
+    const plainBody = (await plain.json()) as { data: Array<{ id: string }> };
+    expect(plainBody.data.some(m => m.id === 'fake-deterministic')).toBe(true);
+    expect(plainBody.data.some(m => m.id === 'fake-transcribe')).toBe(false);
+  });
+
+  async function postMultipartTranscription(url: string, model: string): Promise<Response> {
+    const form = new FormData();
+    form.set('model', model);
+    form.set('file', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/wav' }), 'clip.wav');
+    return fetch(`${url}/api/openrouter/audio/transcriptions`, { method: 'POST', body: form });
+  }
+
+  it('transcribes multipart audio with the happy-path model', async () => {
+    const h = await start();
+    const res = await postMultipartTranscription(h.url, 'fake-transcribe');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ text: 'Gateway transcription online' });
+    const counts = await h.adminFetch(`/test/requests`);
+    await expect(counts.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 1 });
+  });
+
+  it('returns 404 for the broken transcription model', async () => {
+    const h = await start();
+    const res = await postMultipartTranscription(h.url, 'fake-transcribe-broken');
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: { message: string; code: number } };
+    expect(body.error.message).toBe('model not found: fake-transcribe-broken');
+    expect(body.error.code).toBe(404);
+  });
+
+  it('transcribes JSON input_audio bodies forwarded by the web proxy', async () => {
+    const h = await start();
+    const res = await fetch(`${h.url}/api/openrouter/audio/transcriptions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'fake-transcribe',
+        input_audio: { data: 'aGVsbG8=', format: 'wav' },
+      }),
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ text: 'Gateway transcription online' });
   });
 
   it('returns HTTP 404 for routes outside the fake gateway contract', async () => {
@@ -260,6 +665,74 @@ describe('fake-llm-server HTTP', () => {
     expect(parsed[0].choices[0].delta.content).toBe('hello');
   });
 
+  it('builds deterministic reasoning and bounded separator-preserving content pieces', () => {
+    const reasoning = buildRealisticReasoning('alpha beta');
+    expect(reasoning).toHaveLength(3);
+    expect(buildRealisticReasoning('alpha beta')).toEqual(reasoning);
+    expect(buildRealisticReasoning('different input')).not.toEqual(reasoning);
+
+    expect(splitRealisticContent('alpha  beta:gamma\n delta')).toEqual([
+      'alpha',
+      '  ',
+      'beta:gamma',
+      '\n ',
+      'delta',
+    ]);
+
+    const whitespaceRich = 'x '.repeat(MAX_REALISTIC_CHARS / 2);
+    const whitespacePieces = splitRealisticContent(whitespaceRich);
+    expect(whitespacePieces).toHaveLength(MAX_REALISTIC_PIECES);
+    expect(whitespacePieces.join('')).toBe(whitespaceRich.slice(0, MAX_REALISTIC_CHARS));
+
+    const overflow = 'z'.repeat(MAX_REALISTIC_CHARS + 5);
+    expect(splitRealisticContent(overflow).join('')).toBe('z'.repeat(MAX_REALISTIC_CHARS));
+  });
+
+  it('realistic streams deterministic reasoning and capped content', async () => {
+    const h = await start();
+    const text = ' alpha beta:gamma path:to delta ';
+    const prompt = `__fake__:realistic:${text}<environment_details>\nprivate context\n</environment_details>`;
+    const expectedText = text.trimEnd();
+
+    const readRealistic = async (): Promise<Array<Record<string, unknown>>> => {
+      const response = await postChat(h.url, prompt);
+      expect(response.status).toBe(200);
+      const events = await readAllSse(response.body!);
+      expect(events.at(-1)?.data).toBe('[DONE]');
+      return events.slice(0, -1).map(event => JSON.parse(event.data));
+    };
+
+    const first = await readRealistic();
+    const firstDelta = first[0]?.choices?.[0]?.delta;
+    expect(firstDelta).toEqual({ role: 'assistant' });
+
+    const reasoningChunks = first.filter(
+      chunk => typeof chunk.choices?.[0]?.delta?.reasoning === 'string'
+    );
+    expect(reasoningChunks).toHaveLength(3);
+    expect(reasoningChunks.every(chunk => chunk.choices[0].delta.content === undefined)).toBe(true);
+
+    const contentPieces = first
+      .map(chunk => chunk.choices?.[0]?.delta?.content)
+      .filter((piece): piece is string => typeof piece === 'string');
+    expect(contentPieces.join('')).toBe(expectedText);
+    expect(contentPieces.join('')[0]).toBe(' ');
+
+    const finish = first.at(-1);
+    expect(finish?.choices?.[0]?.finish_reason).toBe('stop');
+    expect(finish?.usage?.completion_tokens).toBeGreaterThan(0);
+
+    const second = await readRealistic();
+    const normalize = (chunks: Array<Record<string, unknown>>) =>
+      chunks.map(chunk => {
+        const normalized = { ...chunk };
+        delete normalized.id;
+        delete normalized.created;
+        return normalized;
+      });
+    expect(normalize(second)).toEqual(normalize(first));
+  });
+
   it('idle scenario emits empty delta, stop, [DONE]', async () => {
     const h = await start();
     const res = await postChat(h.url, '__fake__:idle');
@@ -281,6 +754,15 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[chunks.length - 1].data).toBe('[DONE]');
   });
 
+  it('error-terminal returns HTTP 400 with an OpenAI-shaped error', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:error-terminal:boom');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { message: 'boom', code: 400, type: 'invalid_request' },
+    });
+  });
+
   it('error scenario returns HTTP 402 with OpenAI-shaped error', async () => {
     const h = await start();
     const res = await postChat(h.url, '__fake__:error:too broke');
@@ -299,12 +781,51 @@ describe('fake-llm-server HTTP', () => {
     expect(body.error.message).toContain('unknown fake scenario: nosuch');
   });
 
-  it('missing directive returns HTTP 402', async () => {
+  it.each([
+    {
+      kind: 'initial',
+      prompt:
+        'You MUST summarize the conversation above into a structured summary that will be given to another agent to resume the work.\nSummarize only what the user and the assistant said and did.',
+    },
+    {
+      kind: 'checkpoint',
+      prompt:
+        'Update the existing checkpoint in the conversation above into one consolidated summary.\nNewer history always takes precedence over the existing checkpoint.',
+    },
+  ])('streams a deterministic summary for the $kind compaction prompt', async ({ prompt }) => {
     const h = await start();
-    const res = await postChat(h.url, 'just some prompt with no directive');
-    expect(res.status).toBe(402);
-    const body = (await res.json()) as { error: { message: string } };
-    expect(body.error.message).toContain('missing directive');
+    const res = await postChat(h.url, prompt);
+    expect(res.status).toBe(200);
+    const chunks = await parseSse(res);
+    const content = assistantContent(chunks);
+    expect(content).toContain('## Objective');
+    expect(content).toContain('This is a deterministic local test summary.');
+    expect(content).not.toContain(prompt);
+    expect(chunks.at(-1)?.choices).toEqual([{ index: 0, delta: {}, finish_reason: 'stop' }]);
+  });
+
+  it.each(['just some prompt with no directive', 'Please summarize this conversation'])(
+    'missing directive echoes the last user message: %s',
+    async prompt => {
+      const h = await start();
+      const res = await postChat(h.url, prompt);
+      expect(res.status).toBe(200);
+      const chunks = await parseSse(res);
+      expect(assistantContent(chunks)).toBe(prompt);
+      expect(chunks.at(-1)?.choices).toEqual([{ index: 0, delta: {}, finish_reason: 'stop' }]);
+    }
+  );
+
+  it('missing directive strips kilo environment_details from the echo', async () => {
+    const h = await start();
+    const res = await postChat(
+      h.url,
+      'hello world\n<environment_details>\nCurrent time: 2026-05-05T10:17:23+00:00\n</environment_details>'
+    );
+    expect(res.status).toBe(200);
+    const chunks = await readAllSse(res.body!);
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    expect(parsed[0].choices[0].delta.content).toBe('hello world');
   });
 
   it('invalid JSON body returns HTTP 400', async () => {
@@ -350,6 +871,19 @@ describe('fake-llm-server HTTP', () => {
     expect(contentChunks.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('slow:4:1:8 streams four 8-byte content chunks', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:slow:4:1:8');
+    const chunks = await readAllSse(res.body!);
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    const pieces = parsed
+      .map(p => p.choices[0].delta.content)
+      .filter((c): c is string => typeof c === 'string' && c.length > 0);
+    expect(pieces).toHaveLength(4);
+    expect(pieces.every(piece => piece.length === 8)).toBe(true);
+    expect(pieces.join('').length).toBe(32);
+  });
+
   it('gate:<tag> blocks until POST /test/release?tag=<tag>', async () => {
     const h = await start();
     const chatPromise = postChat(h.url, '__fake__:gate:t1').then(async res => {
@@ -362,7 +896,7 @@ describe('fake-llm-server HTTP', () => {
     // time fetch() resolves with a response the gate is registered.
     await new Promise(r => setTimeout(r, 50));
 
-    const releaseRes = await fetch(`${h.url}/test/release?tag=t1`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=t1`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     const chunks = await chatPromise;
@@ -372,6 +906,1013 @@ describe('fake-llm-server HTTP', () => {
       .map(p => p.choices[0].delta.content)
       .filter((c): c is string => typeof c === 'string');
     expect(contentPieces.join('')).toBe('done');
+  });
+
+  it('gate emits an attributable completion marker without changing legacy defaults', async () => {
+    const h = await start();
+    const response = await postChat(
+      h.url,
+      '__fake__:gate:attributed:root_a_complete<environment_details>private context</environment_details>'
+    );
+    expect(response.status).toBe(200);
+    const release = await h.adminFetch(`/test/release?tag=attributed`, { method: 'POST' });
+    expect(release.status).toBe(204);
+    const chunks = await parseSse(response);
+    expect(chunks[0]?.choices).toEqual([
+      expect.objectContaining({
+        delta: { role: 'assistant', content: 'root_a_complete' },
+      }),
+    ]);
+  });
+
+  it('keeps distinct completion markers isolated while both gates are engaged', async () => {
+    const h = await start();
+    const [rootA, rootB] = await Promise.all([
+      postChat(h.url, '__fake__:gate:root_a:only_root_a'),
+      postChat(h.url, '__fake__:gate:root_b:only_root_b'),
+    ]);
+    const [statusA, statusB] = await Promise.all([
+      h.adminFetch(`/test/gate-status?tag=root_a`),
+      h.adminFetch(`/test/gate-status?tag=root_b`),
+    ]);
+    await expect(statusA.json()).resolves.toMatchObject({ engaged: true });
+    await expect(statusB.json()).resolves.toMatchObject({ engaged: true });
+
+    expect((await h.adminFetch(`/test/release?tag=root_b`, { method: 'POST' })).status).toBe(204);
+    const completedB = await parseSse(rootB);
+    expect(completedB[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_b' } }),
+    ]);
+    const stillGatedA = await h.adminFetch(`/test/gate-status?tag=root_a`);
+    await expect(stillGatedA.json()).resolves.toMatchObject({ engaged: true });
+
+    expect((await h.adminFetch(`/test/release?tag=root_a`, { method: 'POST' })).status).toBe(204);
+    const completedA = await parseSse(rootA);
+    expect(completedA[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_a' } }),
+    ]);
+  });
+
+  it.each(['name', 'id'])('uses the advertised skill %s argument', async key => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:skill:profile-test:profile-review',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'skill',
+            parameters: {
+              type: 'object',
+              properties: { [key]: { type: 'string' } },
+              required: [key],
+            },
+          },
+        },
+      ]
+    );
+    const chunks = await parseSse(response);
+    expect(chunks[0]?.choices[0]?.delta?.tool_calls?.[0]?.function).toMatchObject({
+      name: 'skill',
+      arguments: JSON.stringify({ [key]: 'profile-review' }),
+    });
+  });
+
+  it('streams a real write call and gates only after its tool result', async () => {
+    const h = await start();
+    const prompt = '__fake__:write-then-gate:writer:shared.txt:private-content';
+    const initial = await parseSse(await postToolChat(h.url, prompt));
+    const call = extractToolCall(initial);
+    expect(call).toMatchObject({
+      name: 'write',
+      arguments: { filePath: 'shared.txt', content: 'private-content' },
+    });
+    const finishChoices = initial.at(-1)?.choices;
+    expect(finishChoices).toEqual([expect.objectContaining({ finish_reason: 'tool_calls' })]);
+
+    const followup = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+    ]);
+    const statusResponse = await h.adminFetch(`/test/scenario-status?tag=writer`);
+    const status = await statusResponse.json();
+    expect(status).toEqual({
+      tag: 'writer',
+      requests: 2,
+      toolCalls: { write: 1, read: 0, edit: 0, question: 0 },
+      toolResults: { write: 1, read: 0, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+    expect(JSON.stringify(status)).not.toContain('private-content');
+
+    const gate = await h.adminFetch(`/test/gate-status?tag=writer`);
+    await expect(gate.json()).resolves.toEqual({ tag: 'writer', engaged: true });
+    expect((await h.adminFetch(`/test/release?tag=writer`, { method: 'POST' })).status).toBe(204);
+    const completed = await parseSse(followup);
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-writer' } }),
+    ]);
+  });
+
+  it('derives alternate write arguments from the advertised tool schema', async () => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:write-then-gate:alternate:shared.txt:private-content',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'write_file',
+            parameters: {
+              type: 'object',
+              properties: { path: { type: 'string' }, contents: { type: 'string' } },
+              required: ['path', 'contents'],
+            },
+          },
+        },
+      ]
+    );
+    expect(extractToolCall(await parseSse(response))).toMatchObject({
+      name: 'write_file',
+      arguments: { path: 'shared.txt', contents: 'private-content' },
+    });
+  });
+
+  it('reads through one real tool, edits through another, then gates', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-edit-then-gate:reader:shared.txt:replacement';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(readCall).toMatchObject({ name: 'read', arguments: { filePath: 'shared.txt' } });
+
+    const readHistory = [
+      { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+      {
+        role: 'tool',
+        tool_call_id: readCall.id,
+        content:
+          '<path>/private/shared.txt</path>\n<content>\n1: original-value\n\n(End of file - total 1 lines)\n</content>',
+      },
+    ];
+    const editCall = extractToolCall(
+      await parseSse(await postToolChat(h.url, prompt, readHistory))
+    );
+    expect(editCall).toMatchObject({
+      name: 'edit',
+      arguments: {
+        filePath: 'shared.txt',
+        oldString: 'original-value',
+        newString: 'replacement',
+      },
+    });
+
+    const gated = await postToolChat(h.url, prompt, [
+      ...readHistory,
+      { role: 'assistant', tool_calls: [{ id: editCall.id }] },
+      { role: 'tool', tool_call_id: editCall.id, content: 'Edited successfully' },
+    ]);
+    const status = await h.adminFetch(`/test/scenario-status?tag=reader`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 1, edit: 1, question: 0 },
+      toolResults: { write: 0, read: 1, edit: 1, question: 0 },
+    });
+    expect((await h.adminFetch(`/test/release?tag=reader`, { method: 'POST' })).status).toBe(204);
+    const completed = await parseSse(gated);
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-reader' } }),
+    ]);
+  });
+
+  it('reads a source, writes a cleaned body to a destination, then gates', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:carrier:plan.md:impl.ts:impl-token';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(readCall).toMatchObject({ name: 'read', arguments: { filePath: 'plan.md' } });
+
+    const readHistory = [
+      { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+      {
+        role: 'tool',
+        tool_call_id: readCall.id,
+        content:
+          '<path>/private/plan.md</path>\n<content>\n1: plan-token\n\n(End of file - total 1 lines)\n</content>',
+      },
+    ];
+    const writeCall = extractToolCall(
+      await parseSse(await postToolChat(h.url, prompt, readHistory))
+    );
+    expect(writeCall).toMatchObject({
+      name: 'write',
+      arguments: { filePath: 'impl.ts', content: 'impl-token\nplan-token' },
+    });
+
+    const gated = await postToolChat(h.url, prompt, [
+      ...readHistory,
+      { role: 'assistant', tool_calls: [{ id: writeCall.id }] },
+      { role: 'tool', tool_call_id: writeCall.id, content: 'File written successfully' },
+    ]);
+    const status = await h.adminFetch(`/test/scenario-status?tag=carrier`);
+    await expect(status.json()).resolves.toEqual({
+      tag: 'carrier',
+      requests: 3,
+      toolCalls: { write: 1, read: 1, edit: 0, question: 0 },
+      toolResults: { write: 1, read: 1, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+    const gate = await h.adminFetch(`/test/gate-status?tag=carrier`);
+    await expect(gate.json()).resolves.toEqual({ tag: 'carrier', engaged: true });
+    expect((await h.adminFetch(`/test/release?tag=carrier`, { method: 'POST' })).status).toBe(204);
+    const completed = await parseSse(gated);
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-carrier' } }),
+    ]);
+  });
+
+  it('keeps colons in the read-then-write prefix', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:colon:plan.md:impl.ts:prefix:with:colons';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const writeCall = extractToolCall(
+      await parseSse(
+        await postToolChat(h.url, prompt, [
+          { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+          { role: 'tool', tool_call_id: readCall.id, content: 'plan-token' },
+        ])
+      )
+    );
+    expect(writeCall.arguments).toMatchObject({
+      filePath: 'impl.ts',
+      content: 'prefix:with:colons\nplan-token',
+    });
+  });
+
+  it('strips an appended environment_details block from an unwrapped read result', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:context:plan.md:impl.ts:impl-token';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const writeCall = extractToolCall(
+      await parseSse(
+        await postToolChat(h.url, prompt, [
+          { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+          {
+            role: 'tool',
+            tool_call_id: readCall.id,
+            content: 'plan-token\n<environment_details>\nprivate context\n</environment_details>',
+          },
+        ])
+      )
+    );
+    expect(writeCall.arguments).toMatchObject({
+      filePath: 'impl.ts',
+      content: 'impl-token\nplan-token',
+    });
+  });
+
+  it('rejoins multiline line-numbered read output before writing', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:multiline:plan.md:impl.ts:impl-token';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const writeCall = extractToolCall(
+      await parseSse(
+        await postToolChat(h.url, prompt, [
+          { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+          {
+            role: 'tool',
+            tool_call_id: readCall.id,
+            content:
+              '<content>\n1: first line\n2: second line\n(End of file - total 2 lines)\n</content>',
+          },
+        ])
+      )
+    );
+    expect(writeCall.arguments).toMatchObject({
+      filePath: 'impl.ts',
+      content: 'impl-token\nfirst line\nsecond line',
+    });
+  });
+
+  it('finishes read-then-write title-model requests without tool calls', async () => {
+    const h = await start();
+    const chunks = await parseSse(
+      await postChat(h.url, '__fake__:read-then-write:title:plan.md:impl.ts:secret')
+    );
+    expect(chunks[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
+    ]);
+    const status = await h.adminFetch(`/test/scenario-status?tag=title`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
+      toolResults: { write: 0, read: 0, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+  });
+
+  it('rejects malformed read-then-write directives', async () => {
+    const h = await start();
+    const response = await postChat(h.url, '__fake__:read-then-write:tag:only-two-parts');
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'read-then-write directive requires tag, srcPath, destPath, and prefix',
+        type: 'invalid_request',
+      },
+    });
+  });
+
+  it('tool-stream asks Kilo to read the harness-staged file and completes on its result', async () => {
+    const h = await start();
+    const prompt = '__fake__:tool-stream:streamer:100';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(readCall).toMatchObject({
+      name: 'read',
+      arguments: { filePath: 'tool-stream-streamer.txt' },
+    });
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+        { role: 'tool', tool_call_id: readCall.id, content: 'x'.repeat(100) },
+      ])
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-streamer' } }),
+    ]);
+    const status = await h.adminFetch(`/test/scenario-status?tag=streamer`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 1, edit: 0, question: 0 },
+      toolResults: { write: 0, read: 1, edit: 0, question: 0 },
+    });
+  });
+
+  it('rejects malformed or oversized tool-stream directives', async () => {
+    const h = await start();
+    const missingArgs = await postChat(h.url, '__fake__:tool-stream:streamer');
+    expect(missingArgs.status).toBe(402);
+    await expect(missingArgs.json()).resolves.toMatchObject({
+      error: {
+        message: 'tool-stream directive requires a tag and a byte count',
+        type: 'invalid_request',
+      },
+    });
+
+    const overCap = await postChat(
+      h.url,
+      `__fake__:tool-stream:streamer:${MAX_TOOL_STREAM_BYTES + 1}`
+    );
+    expect(overCap.status).toBe(402);
+    await expect(overCap.json()).resolves.toMatchObject({
+      error: {
+        message: `tool-stream byte request ${MAX_TOOL_STREAM_BYTES + 1} exceeds maximum ${MAX_TOOL_STREAM_BYTES}`,
+        type: 'invalid_request',
+      },
+    });
+  });
+
+  it('streams a real question and finishes only after its answered tool result', async () => {
+    const h = await start();
+    const prompt = '__fake__:question:asker:Choose a safe option: now';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({
+      name: 'question',
+      arguments: {
+        questions: [
+          {
+            question: 'Choose a safe option: now',
+            header: 'E2E',
+            options: [{ label: 'Continue', description: 'Continue the E2E scenario' }],
+          },
+        ],
+      },
+    });
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'Continue' },
+      ])
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-asker' } }),
+    ]);
+    const status = await h.adminFetch(`/test/scenario-status?tag=asker`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 0, edit: 0, question: 1 },
+      toolResults: { write: 0, read: 0, edit: 0, question: 1 },
+      unsupportedToolSchema: false,
+    });
+  });
+
+  it('issues a task tool call that parks the child on a gate, then finishes after the result', async () => {
+    const h = await start();
+    const prompt = '__fake__:task:drainparent:drainchild';
+    const call = extractToolCall(
+      await parseSse(
+        await postToolChat(
+          h.url,
+          prompt,
+          [],
+          [
+            {
+              type: 'function',
+              function: {
+                name: 'task',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    description: { type: 'string' },
+                    prompt: { type: 'string' },
+                    subagent_type: { type: 'string' },
+                  },
+                  required: ['description', 'prompt', 'subagent_type'],
+                },
+              },
+            },
+          ]
+        )
+      )
+    );
+    expect(call).toMatchObject({
+      name: 'task',
+      arguments: {
+        description: 'Drain child drainchild',
+        prompt: '__fake__:gate:drainchild:waiting',
+        subagent_type: 'explore',
+      },
+    });
+    expect(call.arguments).not.toHaveProperty('background');
+
+    const completed = await parseSse(
+      await postToolChat(
+        h.url,
+        prompt,
+        [
+          { role: 'assistant', tool_calls: [{ id: call.id }] },
+          { role: 'tool', tool_call_id: call.id, content: 'waiting' },
+        ],
+        [
+          {
+            type: 'function',
+            function: {
+              name: 'task',
+              parameters: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  prompt: { type: 'string' },
+                  subagent_type: { type: 'string' },
+                },
+                required: ['description', 'prompt', 'subagent_type'],
+              },
+            },
+          },
+        ]
+      )
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-drainparent' } }),
+    ]);
+  });
+
+  it('refuses a background task when the advertised schema has no background property', async () => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:background-task:drainbg:drainheld',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'task',
+            parameters: {
+              type: 'object',
+              properties: {
+                description: { type: 'string' },
+                prompt: { type: 'string' },
+                subagent_type: { type: 'string' },
+              },
+              required: ['description', 'prompt', 'subagent_type'],
+            },
+          },
+        },
+      ]
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'background subagents are not advertised',
+        type: 'unsupported_tool_schema',
+      },
+    });
+  });
+
+  it('uses the native v2 subagent schema for a background child', async () => {
+    const h = await start();
+    const call = extractToolCall(
+      await parseSse(
+        await postToolChat(
+          h.url,
+          '__fake__:background-task:drainbg:drainheld',
+          [],
+          [
+            {
+              type: 'function',
+              function: {
+                name: 'subagent',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    agent: { type: 'string' },
+                    description: { type: 'string' },
+                    prompt: { type: 'string' },
+                    background: { type: 'boolean' },
+                  },
+                  required: ['agent', 'description', 'prompt'],
+                },
+              },
+            },
+          ]
+        )
+      )
+    );
+    expect(call).toMatchObject({
+      name: 'subagent',
+      arguments: {
+        agent: 'explore',
+        description: 'Drain child drainheld',
+        prompt: '__fake__:gate:drainheld:waiting',
+        background: true,
+      },
+    });
+    expect(call.arguments).not.toHaveProperty('subagent_type');
+  });
+
+  it('issues cron_create and schedule_wakeup, and rejects them when not advertised', async () => {
+    const h = await start();
+    const cronTools = [
+      {
+        type: 'function',
+        function: {
+          name: 'cron_create',
+          parameters: {
+            type: 'object',
+            properties: {
+              prompt: { type: 'string' },
+              delay: { type: 'string' },
+              reason: { type: 'string' },
+            },
+            required: ['prompt'],
+          },
+        },
+      },
+    ];
+    const cron = extractToolCall(
+      await parseSse(await postToolChat(h.url, '__fake__:cron:draincron:20s', [], cronTools))
+    );
+    expect(cron).toMatchObject({
+      name: 'cron_create',
+      arguments: {
+        prompt: '__fake__:echo:fired-draincron',
+        delay: '20s',
+        reason: 'drain-draincron',
+      },
+    });
+
+    const missing = await postToolChat(h.url, '__fake__:wakeup:drainwake:20s', [], cronTools);
+    expect(missing.status).toBe(422);
+    await expect(missing.json()).resolves.toMatchObject({
+      error: {
+        message: 'unsupported schedule_wakeup tool schema',
+        type: 'unsupported_tool_schema',
+      },
+    });
+  });
+
+  it('finishes title-model requests without advertising or inventing a tool schema', async () => {
+    const h = await start();
+    const chunks = await parseSse(
+      await postChat(h.url, '__fake__:write-then-gate:title:shared.txt:secret')
+    );
+    expect(chunks[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
+    ]);
+    const status = await h.adminFetch(`/test/scenario-status?tag=title`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+  });
+
+  it('reports unsupported advertised tool schemas instead of inventing tool calls', async () => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:write-then-gate:unsupported:shared.txt:secret',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'write',
+            parameters: {
+              type: 'object',
+              properties: { unexpected: { type: 'string' } },
+              required: ['unexpected'],
+            },
+          },
+        },
+      ]
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { message: 'unsupported write tool schema', type: 'unsupported_tool_schema' },
+    });
+    const status = await h.adminFetch(`/test/scenario-status?tag=unsupported`);
+    await expect(status.json()).resolves.toMatchObject({ unsupportedToolSchema: true });
+  });
+
+  it('echoes a real read result for a fresh file opTag and counts one call and result', async () => {
+    const h = await start();
+    const opTag = 'file-read-positive';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({ name: 'read', arguments: { filePath: 'shared-checkout.txt' } });
+    expect(call.id).toBe(toolCallId(opTag, 'read'));
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        {
+          role: 'tool',
+          tool_call_id: call.id,
+          content:
+            '<path>/workspace/shared-checkout.txt</path>\n<content>\n1: nonce-value\n\n(End of file - total 1 lines)\n</content>',
+        },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-read:shared-checkout.txt\nnonce-value');
+
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      requests: 2,
+      toolCalls: { read: 1 },
+      toolResults: { read: 1 },
+    });
+  });
+
+  it('echoes numbered file contents from a Kilo v2 paged read', async () => {
+    const h = await start();
+    const prompt = '__fake__:file:read:native-read:shared-checkout.txt';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: [
+          'Read file shared-checkout.txt, lines 1-2',
+          '1: nonce-value',
+          '2: fixture contents',
+          '[Output truncated. Continue reading with offset: 3]',
+        ].join('\n'),
+      },
+    ]);
+    expect(response.status).toBe(200);
+    expect(assistantContent(await parseSse(response))).toBe(
+      'file-read:shared-checkout.txt\nnonce-value\nfixture contents'
+    );
+  });
+
+  it('rejects a Kilo v2 read result for a different file', async () => {
+    const h = await start();
+    const prompt = '__fake__:file:read:native-wrong-path:shared-checkout.txt';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: 'Read file different.txt, lines 1-1\n1: nonce-value',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('ignores a previous opTag tool result and emits a fresh read call', async () => {
+    const h = await start();
+    const opTag = 'file-read-fresh';
+    const staleTag = 'file-read-stale';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    await parseSse(await postToolChat(h.url, prompt));
+
+    const staleId = toolCallId(staleTag, 'read');
+    const followup = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: staleId }] },
+        { role: 'tool', tool_call_id: staleId, content: 'stale-body' },
+      ])
+    );
+    expect(extractToolCall(followup)).toMatchObject({
+      name: 'read',
+      arguments: { filePath: 'shared-checkout.txt' },
+    });
+    expect(assistantContent(followup)).toBeUndefined();
+
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { read: 2 },
+      toolResults: { read: 0 },
+    });
+  });
+
+  it('treats a mismatched tool-call id as no result and emits a fresh call', async () => {
+    const h = await start();
+    const opTag = 'file-read-wrongid';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    await parseSse(await postToolChat(h.url, prompt));
+
+    const followup = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: 'call_deadbeef_read' }] },
+        { role: 'tool', tool_call_id: 'call_deadbeef_read', content: 'nonce-value' },
+      ])
+    );
+    expect(extractToolCall(followup)).toMatchObject({ name: 'read' });
+    expect(assistantContent(followup)).toBeUndefined();
+  });
+
+  it('accepts a relative request matching a same-basename result in another directory', async () => {
+    // Contract: a relative requested path is bound by an absolute result that
+    // ends with `/<requested>`. The shared-checkout proof is the nonce body, not
+    // path exactness, so the reader's own working directory may differ.
+    const h = await start();
+    const opTag = 'file-read-wrongdir';
+    const prompt = `__fake__:file:read:${opTag}:requested.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content:
+          '<path>/workspace/other/requested.txt</path>\n<content>\n1: other-value\n\n(End of file - total 1 lines)\n</content>',
+      },
+    ]);
+    expect(response.status).toBe(200);
+    expect(assistantContent(await parseSse(response))).toBe('file-read:requested.txt\nother-value');
+  });
+
+  it('rejects a same-basename result for an absolute request', async () => {
+    const h = await start();
+    const opTag = 'file-read-abs-wrongdir';
+    const prompt = `__fake__:file:read:${opTag}:/workspace/requested.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content:
+          '<path>/workspace/other/requested.txt</path>\n<content>\n1: other-value\n</content>',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a read result whose envelope and inner path metadata conflict', async () => {
+    const h = await start();
+    const opTag = 'file-read-conflict';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output:
+            '<path>/workspace/other/shared-checkout.txt</path>\n<content>\n1: nonce-value\n</content>',
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a doubly nested tool-result envelope instead of echoing it', async () => {
+    const h = await start();
+    const opTag = 'file-read-nested';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output: JSON.stringify({ output: 'Error: file not found' }),
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('fails closed with 422 when the read result is an envelope-wrapped error', async () => {
+    const h = await start();
+    const opTag = 'file-read-envelope-error';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output: 'Error: file not found',
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a reused file opTag after it completed', async () => {
+    const h = await start();
+    const opTag = 'file-read-reuse';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const resultMessage = {
+      role: 'tool',
+      tool_call_id: call.id,
+      content:
+        '<path>/workspace/shared-checkout.txt</path>\n<content>\n1: nonce-value\n\n(End of file - total 1 lines)\n</content>',
+    };
+    await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        resultMessage,
+      ])
+    );
+
+    const reuse = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      resultMessage,
+    ]);
+    expect(reuse.status).toBe(409);
+    await expect(reuse.json()).resolves.toMatchObject({
+      error: { type: 'invalid_request' },
+    });
+  });
+
+  it('fails closed with 422 when the read result is a nonempty tool error', async () => {
+    const h = await start();
+    const opTag = 'file-read-error';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: '<path>/workspace/shared-checkout.txt</path>\nError: file not found',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'read tool did not return file contents for the requested path',
+        type: 'invalid_tool_result',
+      },
+    });
+  });
+
+  it('rejects a file directive with a colon path', async () => {
+    const h = await start();
+    const response = await postChat(h.url, '__fake__:file:read:colon:dir:file.txt');
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_request' },
+    });
+  });
+
+  it('streams one write call for file:write and finishes with the write marker', async () => {
+    const h = await start();
+    const opTag = 'file-write';
+    const prompt = `__fake__:file:write:${opTag}:shared-checkout.txt:nonce-value`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({
+      name: 'write',
+      arguments: { filePath: 'shared-checkout.txt', content: 'nonce-value' },
+    });
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-write:shared-checkout.txt\n');
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 1 },
+      toolResults: { write: 1 },
+    });
+  });
+
+  it('streams one write call carrying the generated fixture for file:seed', async () => {
+    const h = await start();
+    const opTag = 'file-seed';
+    const prompt = `__fake__:file:seed:${opTag}:big.txt:200:nonce-seed`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call.name).toBe('write');
+    expect(call.arguments.filePath).toBe('big.txt');
+    const contents = call.arguments.content as string;
+    expect(contents.startsWith('nonce-seed\n')).toBe(true);
+    expect(Buffer.byteLength(contents, 'utf8')).toBe(200);
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-write:big.txt\n');
+  });
+
+  it('finishes a file title request without tools as a benign terminal', async () => {
+    const h = await start();
+    const opTag = 'file-title';
+    const chunks = await parseSse(
+      await postChat(h.url, `__fake__:file:read:${opTag}:shared-checkout.txt`)
+    );
+    expect(assistantContent(chunks)).toBe(`done-${opTag}`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { read: 0 },
+      toolResults: { read: 0 },
+    });
+  });
+
+  it('attributes a file directive to its opTag, never the op, for all three ops', async () => {
+    const h = await start();
+    const cases = [
+      { op: 'write', prompt: '__fake__:file:write:attr-write:shared.txt:body' },
+      { op: 'seed', prompt: '__fake__:file:seed:attr-seed:big.txt:100:nonce' },
+      { op: 'read', prompt: '__fake__:file:read:attr-read:shared.txt' },
+    ];
+    for (const { op, prompt } of cases) {
+      const opTag = prompt.split(':')[3];
+      await parseSse(await postToolChat(h.url, prompt));
+      const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+      await expect(status.json()).resolves.toMatchObject({ requests: 1 });
+      const opStatus = await h.adminFetch(`/test/scenario-status?tag=${op}`);
+      await expect(opStatus.json()).resolves.toMatchObject({ requests: 0 });
+    }
+  });
+
+  it('never logs directive contents, raw request bodies, or authorization headers', async () => {
+    const h = await start();
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const response = await fetch(`${h.url}/api/openrouter/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer secret-authorization-value',
+        },
+        body: JSON.stringify({
+          model: 'kilo/fake-deterministic',
+          messages: [{ role: 'user', content: '__fake__:echo:secret-prompt-value' }],
+          stream: true,
+        }),
+      });
+      await parseSse(response);
+      const logged = spy.mock.calls.flat().join(' ');
+      expect(logged).not.toContain('secret-prompt-value');
+      expect(logged).not.toContain('secret-authorization-value');
+      expect(logged).not.toContain('messages":');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('gate normalizes contaminated tags so concurrent kilo calls share one waiter', async () => {
@@ -413,7 +1954,7 @@ describe('fake-llm-server HTTP', () => {
     let waiterCount = 0;
     for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { tags: Array<{ tag: string; count: number }> };
       const entry = body.tags.find(t => t.tag === 'shared');
       waiterCount = entry?.count ?? 0;
@@ -422,7 +1963,7 @@ describe('fake-llm-server HTTP', () => {
     expect(waiterCount).toBe(2);
 
     // One release drains both.
-    const releaseRes = await fetch(`${h.url}/test/release?tag=shared`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=shared`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     const drain = async (p: Promise<Response>): Promise<void> => {
@@ -435,7 +1976,7 @@ describe('fake-llm-server HTTP', () => {
     };
     await Promise.all([drain(bareChatP), drain(contaminatedChatP)]);
 
-    const after = (await (await fetch(`${h.url}/test/waiters`)).json()) as {
+    const after = (await (await h.adminFetch(`/test/waiters`)).json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
     expect(after.tags.find(t => t.tag === 'shared')).toBeUndefined();
@@ -451,7 +1992,7 @@ describe('fake-llm-server HTTP', () => {
     });
 
     await new Promise(r => setTimeout(r, 50));
-    const releaseRes = await fetch(`${h.url}/test/release?tag=sequential`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=sequential`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
     await firstGate;
 
@@ -467,7 +2008,7 @@ describe('fake-llm-server HTTP', () => {
     ]);
 
     expect(lateChunks[lateChunks.length - 1].data).toBe('[DONE]');
-    const after = (await (await fetch(`${h.url}/test/waiters`)).json()) as {
+    const after = (await (await h.adminFetch(`/test/waiters`)).json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
     expect(after.tags.find(t => t.tag === 'sequential')).toBeUndefined();
@@ -475,7 +2016,7 @@ describe('fake-llm-server HTTP', () => {
 
   it('POST /test/release without a tag returns 400', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/release`, { method: 'POST' });
+    const res = await h.adminFetch(`/test/release`, { method: 'POST' });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('tag query param required');
@@ -483,7 +2024,7 @@ describe('fake-llm-server HTTP', () => {
 
   it('POST /test/release with unknown tag returns 404', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/release?tag=nope`, { method: 'POST' });
+    const res = await h.adminFetch(`/test/release?tag=nope`, { method: 'POST' });
     expect(res.status).toBe(404);
   });
 
@@ -491,7 +2032,7 @@ describe('fake-llm-server HTTP', () => {
     const h = await start();
 
     // Before any gate request: not engaged.
-    const beforeRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+    const beforeRes = await h.adminFetch(`/test/gate-status?tag=status1`);
     expect(beforeRes.status).toBe(200);
     const beforeBody = (await beforeRes.json()) as { tag: string; engaged: boolean };
     expect(beforeBody).toEqual({ tag: 'status1', engaged: false });
@@ -506,7 +2047,7 @@ describe('fake-llm-server HTTP', () => {
     let engaged = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const statusRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+      const statusRes = await h.adminFetch(`/test/gate-status?tag=status1`);
       const statusBody = (await statusRes.json()) as { engaged: boolean };
       if (statusBody.engaged) {
         engaged = true;
@@ -516,19 +2057,19 @@ describe('fake-llm-server HTTP', () => {
     expect(engaged).toBe(true);
 
     // Release it and confirm the status flips back.
-    const releaseRes = await fetch(`${h.url}/test/release?tag=status1`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=status1`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     await chatPromise;
 
-    const afterRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+    const afterRes = await h.adminFetch(`/test/gate-status?tag=status1`);
     const afterBody = (await afterRes.json()) as { engaged: boolean };
     expect(afterBody.engaged).toBe(false);
   });
 
   it('GET /test/gate-status without tag returns 400', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/gate-status`);
+    const res = await h.adminFetch(`/test/gate-status`);
     expect(res.status).toBe(400);
   });
 
@@ -563,7 +2104,7 @@ describe('fake-llm-server HTTP', () => {
     const h = await start();
 
     // No activity: empty snapshot.
-    const before = await fetch(`${h.url}/test/waiters`);
+    const before = await h.adminFetch(`/test/waiters`);
     expect(before.status).toBe(200);
     const beforeBody = (await before.json()) as {
       tags: Array<{ tag: string; count: number }>;
@@ -589,7 +2130,7 @@ describe('fake-llm-server HTTP', () => {
     let engaged = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { tags: Array<{ tag: string; count: number }> };
       const entry = body.tags.find(t => t.tag === 'waiters-test');
       if (entry && entry.count === 1) {
@@ -600,10 +2141,10 @@ describe('fake-llm-server HTTP', () => {
     expect(engaged).toBe(true);
 
     // Release and confirm snapshot drains.
-    await fetch(`${h.url}/test/release?tag=waiters-test`, { method: 'POST' });
+    await h.adminFetch(`/test/release?tag=waiters-test`, { method: 'POST' });
     await gatePromise.then(r => r.body?.cancel()).catch(() => undefined);
 
-    const after = await fetch(`${h.url}/test/waiters`);
+    const after = await h.adminFetch(`/test/waiters`);
     const afterBody = (await after.json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
@@ -669,7 +2210,7 @@ describe('fake-llm-server HTTP', () => {
     let parked = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { liveResponses: number };
       if (body.liveResponses === 1) {
         parked = true;
@@ -682,5 +2223,550 @@ describe('fake-llm-server HTTP', () => {
     handle = null;
     await hangPromise.catch(() => undefined);
     ac.abort();
+  });
+});
+
+type ProcFixture = {
+  pid: number;
+  port: number;
+  inode: string;
+  directory: string;
+  home: string;
+  roots: string[];
+  address?: string;
+  state?: string;
+  fdInode?: string;
+  command?: string[];
+  executable?: string;
+  canonicalDirectory?: string;
+  rootOverride?: Record<string, unknown>;
+  bootstrapped?: boolean;
+};
+
+function discoveryFixture(processes: ProcFixture[], log?: string) {
+  const requests: URL[] = [];
+  const killed: string[] = [];
+  const forbiddenReads: string[] = [];
+  let afterFetch: (() => void) | undefined;
+  const containers = new Map([
+    ['owned', processes],
+    ['unrelated', [] as ProcFixture[]],
+  ]);
+  const execute: DockerCommandExecutor = async args => {
+    if (args[0] === 'ps') {
+      return {
+        stdout: [...containers.keys()]
+          .map(id => `${id}\tcloud-agent-next-dev-Sandbox-${id}\timage`)
+          .concat('proxy\tcloud-agent-next-dev-Sandbox-owned-proxy\timage')
+          .join('\n'),
+      };
+    }
+    if (args[0] === 'kill') {
+      killed.push(args[1]);
+      return { stdout: '' };
+    }
+    const entries = containers.get(args[1]);
+    if (args[0] !== 'exec' || !entries) throw new Error('Unexpected container operation');
+    const fs = {
+      readFileSync(filename: string): string {
+        if (filename === '/proc/net/tcp' || filename === '/proc/net/tcp6') {
+          return (
+            'header\n' +
+            entries
+              .filter(entry => (entry.address?.length ?? 8) > 8 === filename.endsWith('tcp6'))
+              .map(
+                entry =>
+                  `0: ${entry.address ?? '0100007F'}:${entry.port.toString(16)} 00000000:0000 ${entry.state ?? '0A'} 0 0 0 0 0 ${entry.inode}`
+              )
+              .join('\n')
+          );
+        }
+        const entry = entries.find(item => filename === `/proc/${item.pid}/cmdline`);
+        if (entry)
+          return (
+            (
+              entry.command ?? ['/usr/local/bin/kilo', 'serve', '--hostname=127.0.0.1', '--port=0']
+            ).join('\0') + '\0'
+          );
+        const environmentEntry = entries.find(item => filename === `/proc/${item.pid}/environ`);
+        if (environmentEntry) return `HOME=${environmentEntry.home}\0PATH=/usr/local/bin\0`;
+        if (filename === '/tmp/kilocode-control-wrapper.log' && log !== undefined) return log;
+        forbiddenReads.push(filename);
+        throw new Error('Unexpected filesystem read');
+      },
+      readdirSync(directory: string): string[] {
+        if (directory === '/proc') return entries.map(entry => String(entry.pid));
+        if (directory === '/tmp') return log === undefined ? [] : ['kilocode-control-wrapper.log'];
+        if (directory === '/workspace/worktrees')
+          return entries.map(entry => path.basename(entry.directory));
+        if (entries.some(entry => directory === `/proc/${entry.pid}/fd`)) return ['3', '4'];
+        throw new Error('Unexpected directory read');
+      },
+      readlinkSync(filename: string): string {
+        for (const entry of entries) {
+          if (filename === `/proc/${entry.pid}/cwd`) return entry.directory;
+          if (filename === `/proc/${entry.pid}/exe`)
+            return entry.executable ?? '/opt/cli-linux-x64/bin/kilo';
+          if (filename === `/proc/${entry.pid}/fd/3` || filename === `/proc/${entry.pid}/fd/4`) {
+            return `socket:[${entry.fdInode ?? entry.inode}]`;
+          }
+        }
+        throw new Error('Missing process');
+      },
+      realpathSync(directory: string): string {
+        return (
+          entries.find(entry => entry.directory === directory)?.canonicalDirectory ?? directory
+        );
+      },
+      existsSync(filename: string): boolean {
+        return entries.some(
+          entry =>
+            entry.bootstrapped !== false &&
+            filename === `${entry.directory}/.kilo-bootstrap-complete`
+        );
+      },
+      statSync: () => ({ isDirectory: () => true }),
+    };
+    const fetch = async (url: URL) => {
+      requests.push(url);
+      const entry = entries.find(item => String(item.port) === url.port);
+      const rootId = decodeURIComponent(url.pathname.slice('/session/'.length));
+      const matched =
+        entry &&
+        entry.roots.includes(rootId) &&
+        url.searchParams.get('directory') === entry.directory;
+      const root = matched
+        ? { id: rootId, directory: entry.directory, ...entry.rootOverride }
+        : null;
+      afterFetch?.();
+      return { ok: root !== null, json: async () => root };
+    };
+    let stdout = '';
+    await runInNewContext(args[4].replace(/^import .*;\n/gm, ''), {
+      fs,
+      path: path.posix,
+      fetch,
+      URL,
+      AbortSignal,
+      process: {
+        argv: ['bun', args[5]],
+        stdout: {
+          write: (text: string) => {
+            stdout += text;
+          },
+        },
+      },
+      execFileSync: () => {
+        throw new Error('Process execution is forbidden in discovery tests');
+      },
+    });
+    return { stdout };
+  };
+  return {
+    execute,
+    requests,
+    killed,
+    forbiddenReads,
+    containers,
+    onFetch: (callback: () => void) => {
+      afterFetch = callback;
+    },
+  };
+}
+
+function directoryProcesses(): ProcFixture[] {
+  return [
+    {
+      pid: 101,
+      port: 41001,
+      inode: '501',
+      directory: '/workspace/worktrees/worktree-a',
+      home: '/tmp/kilo-worktrees/a1b2c3d4',
+      roots: ['ses_a', 'ses_sibling'],
+    },
+    {
+      pid: 202,
+      port: 41002,
+      inode: '502',
+      directory: '/workspace/worktrees/worktree-b',
+      home: '/tmp/kilo-worktrees/e5f6a7b8',
+      roots: ['ses_b'],
+      address: '00000000000000000000000001000000',
+    },
+  ];
+}
+
+describe('per-directory Kilo discovery', () => {
+  it('discovers exact roots in distinct PID/cwd listeners without any server log', async () => {
+    const fixture = discoveryFixture(directoryProcesses());
+    const owner = vi.fn();
+    const first = await findControlPlaneKiloRuntime('ses_a', fixture.execute, owner);
+    const sibling = await findControlPlaneKiloRuntime('ses_sibling', fixture.execute);
+    const second = await findControlPlaneKiloRuntime('ses_b', fixture.execute);
+    expect(first).toMatchObject({
+      container: { id: 'owned' },
+      processId: 101,
+      directory: '/workspace/worktrees/worktree-a',
+      home: '/tmp/kilo-worktrees/a1b2c3d4',
+      serverUrl: 'http://127.0.0.1:41001',
+    });
+    expect(sibling).toMatchObject({
+      processId: first?.processId,
+      directory: first?.directory,
+      home: first?.home,
+    });
+    expect(second).toMatchObject({
+      container: { id: 'owned' },
+      processId: 202,
+      directory: '/workspace/worktrees/worktree-b',
+      home: '/tmp/kilo-worktrees/e5f6a7b8',
+      serverUrl: 'http://[::1]:41002',
+    });
+    expect(first?.logPath).toBeUndefined();
+    expect(owner.mock.calls.map(([container]) => container.id)).toEqual(['owned']);
+    expect(fixture.requests.every(url => url.searchParams.has('directory'))).toBe(true);
+    expect(fixture.forbiddenReads).toEqual([]);
+  });
+
+  it('uses an existing exact-root attach log only as optional evidence', async () => {
+    const fixture = discoveryFixture(
+      directoryProcesses(),
+      'snapshot metadata validated status=valid expectedKiloSessionId=ses_a\nsession.attach ready directory=/workspace/worktrees/worktree-a\n'
+    );
+    expect((await findControlPlaneKiloRuntime('ses_a', fixture.execute))?.logPath).toBe(
+      '/tmp/kilocode-control-wrapper.log'
+    );
+    expect(
+      (await findControlPlaneKiloRuntime('ses_sibling', fixture.execute))?.logPath
+    ).toBeUndefined();
+  });
+
+  it.each([
+    { label: 'wrong root ID', rootOverride: { id: 'ses_other' } },
+    { label: 'other directory', rootOverride: { directory: '/workspace/worktrees/worktree-b' } },
+    {
+      label: 'descendant directory',
+      rootOverride: { directory: '/workspace/worktrees/worktree-a/nested' },
+    },
+    { label: 'child session', rootOverride: { parentID: 'ses_parent' } },
+    { label: 'noncanonical cwd', canonicalDirectory: '/canonical/worktree-a' },
+    { label: 'wrong inode', fdInode: '999' },
+    { label: 'non-listening socket', state: '01' },
+    { label: 'public listener', address: '00000000' },
+    { label: 'wrong command', command: ['/usr/bin/node', 'serve'] },
+    { label: 'not Kilo serve', command: ['/usr/local/bin/kilo', 'run'] },
+  ])(
+    'rejects $label instead of claiming container ownership',
+    async ({ label: _label, ...override }) => {
+      const entry = { ...directoryProcesses()[0], ...override };
+      const fixture = discoveryFixture([entry]);
+      const owner = vi.fn();
+      expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute, owner)).toBeNull();
+      expect(owner).not.toHaveBeenCalled();
+      expect(fixture.forbiddenReads).toEqual([]);
+    }
+  );
+
+  it.each([
+    {
+      label: 'a Rosetta-prefixed argv and a non-Kilo exe',
+      executable: '/run/rosetta/rosetta',
+      command: [
+        'node',
+        '--no-opt',
+        '-r',
+        '/proc/.reset',
+        '/usr/local/bin/kilo',
+        'serve',
+        '--hostname=127.0.0.1',
+        '--port=0',
+      ],
+    },
+    {
+      label: 'a re-executed .kilo entrypoint and a non-Kilo exe',
+      executable: '/run/rosetta/rosetta',
+      command: ['/usr/local/lib/node_modules/@kilocode/cli/bin/.kilo', 'serve'],
+    },
+  ])(
+    'discovers a Kilo serve listener from argv alone for $label without a bootstrap marker',
+    async ({ label: _label, ...override }) => {
+      const entry = { ...directoryProcesses()[0], ...override, bootstrapped: false };
+      const fixture = discoveryFixture([entry]);
+      expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toMatchObject({
+        container: { id: 'owned' },
+        processId: 101,
+        directory: '/workspace/worktrees/worktree-a',
+        serverUrl: 'http://127.0.0.1:41001',
+      });
+      expect(fixture.forbiddenReads).toEqual([]);
+    }
+  );
+
+  it.each(['cwd', 'pid'])(
+    'rejects ownership if the listener %s changes during the root query',
+    async field => {
+      const entries = directoryProcesses();
+      const fixture = discoveryFixture(entries);
+      fixture.onFetch(() => {
+        if (field === 'cwd') entries[0].directory = '/workspace/worktrees/replacement';
+        else entries[0].pid += 1;
+      });
+      expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toBeNull();
+    }
+  );
+
+  it('rejects a socket inode held by multiple processes', async () => {
+    const entries = directoryProcesses();
+    entries[1].fdInode = entries[0].inode;
+    const fixture = discoveryFixture(entries);
+    expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toBeNull();
+    expect(fixture.requests).toEqual([]);
+  });
+
+  it('discovers IPv4-mapped loopback sockets in tcp6', async () => {
+    const entry = directoryProcesses()[0];
+    entry.address = '0000000000000000FFFF00000100007F';
+    const fixture = discoveryFixture([entry]);
+    expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toMatchObject({
+      serverUrl: 'http://127.0.0.1:41001',
+      processId: 101,
+    });
+  });
+
+  it('rejects ambiguous root ownership across listeners and containers', async () => {
+    const entries = directoryProcesses();
+    entries[1].roots = ['ses_a'];
+    const fixture = discoveryFixture(entries);
+    const owner = vi.fn();
+    await expect(findControlPlaneKiloRuntime('ses_a', fixture.execute, owner)).rejects.toThrow(
+      'Ambiguous Kilo root listener ownership'
+    );
+    const duplicate = discoveryFixture([directoryProcesses()[0]]);
+    duplicate.containers.set('unrelated', [directoryProcesses()[0]]);
+    await expect(findControlPlaneKiloRuntime('ses_a', duplicate.execute, owner)).rejects.toThrow(
+      'Ambiguous Kilo root container ownership'
+    );
+    expect(owner).not.toHaveBeenCalled();
+  });
+
+  it('does not let stale log evidence establish ownership without a root listener', async () => {
+    const fixture = discoveryFixture(
+      [],
+      'kilo server started at http://127.0.0.1:41001\nsnapshot metadata validated status=missing expectedKiloSessionId=ses_a\nsnapshot missing info.id — likely an error response'
+    );
+    const owner = vi.fn();
+    expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute, owner)).toBeNull();
+    expect(owner).not.toHaveBeenCalled();
+    expect(fixture.requests).toEqual([]);
+  });
+
+  it('refuses container cleanup when another worktree shares that container', async () => {
+    const fixture = discoveryFixture(directoryProcesses());
+    const runtime = await findControlPlaneKiloRuntime('ses_a', fixture.execute);
+    if (!runtime) throw new Error('Expected owned runtime');
+    await expect(
+      stopOwnedControlPlaneSandbox(runtime.container, 'ses_a', fixture.execute)
+    ).rejects.toThrow('other worktrees');
+    expect(fixture.killed).toEqual([]);
+  });
+
+  it('cleans only the proven exclusive container and its proxy', async () => {
+    const fixture = discoveryFixture([directoryProcesses()[0]]);
+    const runtime = await findControlPlaneKiloRuntime('ses_a', fixture.execute);
+    if (!runtime) throw new Error('Expected owned runtime');
+    await stopOwnedControlPlaneSandbox(runtime.container, 'ses_a', fixture.execute);
+    expect(fixture.killed).toEqual(['owned', 'proxy']);
+  });
+});
+
+describe('strict harness stream events', () => {
+  const event = {
+    eventId: 1,
+    sessionId: 'workspace_a',
+    streamEventType: 'kilocode',
+    timestamp: '2026-08-29T00:00:00Z',
+    data: { type: 'question.asked', properties: { id: 'question_b', sessionID: 'ses_b' } },
+  };
+
+  it('preserves sibling event fields and the inherited executionId default', () => {
+    expect(streamEventSchema.parse(event)).toEqual({ ...event, executionId: null });
+  });
+
+  it.each([
+    { ...event, eventId: '1' },
+    { ...event, sessionId: undefined },
+    { ...event, timestamp: undefined },
+    { ...event, executionId: 1 },
+    { ...event, data: [] },
+  ])('rejects malformed stream envelopes', invalid => {
+    expect(streamEventSchema.safeParse(invalid).success).toBe(false);
+  });
+});
+
+const CONTROL_ROUTES: Array<{ label: string; path: string; init?: RequestInit }> = [
+  { label: 'POST /test/release', path: '/test/release?tag=guard', init: { method: 'POST' } },
+  { label: 'GET /test/gate-status', path: '/test/gate-status?tag=guard' },
+  { label: 'GET /test/waiters', path: '/test/waiters' },
+  { label: 'GET /test/requests', path: '/test/requests' },
+  { label: 'GET /test/scenario-status', path: '/test/scenario-status?tag=guard' },
+];
+
+const MODEL_CREDENTIAL = 'eyJhbGciOiJIUzI1NiJ9.eyJ2ZXJzaW9uIjozfQ.signature';
+
+describe('fake-llm-server /test/* admin guard', () => {
+  it('resolves the admin token the driver and the server share', async () => {
+    // The development-default assertion is only meaningful with
+    // FAKE_LLM_ADMIN_TOKEN absent, so make the test independent of the
+    // operator's ambient environment.
+    const previous = process.env.FAKE_LLM_ADMIN_TOKEN;
+    delete process.env.FAKE_LLM_ADMIN_TOKEN;
+    try {
+      const h = await start();
+      expect(h.adminToken).toBe(resolveFakeAdminToken());
+      expect(h.adminToken).toBe(LOCAL_FAKE_LLM_ADMIN_TOKEN);
+    } finally {
+      if (previous === undefined) delete process.env.FAKE_LLM_ADMIN_TOKEN;
+      else process.env.FAKE_LLM_ADMIN_TOKEN = previous;
+    }
+  });
+
+  it('accepts the resolved admin bearer on every /test/* route', async () => {
+    const h = await start();
+    for (const route of CONTROL_ROUTES) {
+      const res = await h.adminFetch(route.path, route.init);
+      expect(res.status, `${route.label} with the admin bearer`).not.toBe(401);
+    }
+    const counts = await h.adminFetch('/test/requests');
+    await expect(counts.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 0 });
+  });
+
+  it('rejects a missing admin bearer on every /test/* route', async () => {
+    const h = await start();
+    for (const route of CONTROL_ROUTES) {
+      const res = await fetch(`${h.url}${route.path}`, route.init);
+      expect(res.status, `${route.label} without a bearer`).toBe(401);
+      await expect(res.json()).resolves.toEqual({ error: 'admin authorization required' });
+    }
+  });
+
+  it('rejects a wrong bearer, a malformed bearer and the model credential', async () => {
+    const h = await start();
+    const credentials = [
+      'Bearer not-the-admin-token',
+      `Bearer ${MODEL_CREDENTIAL}`,
+      'Bearer ',
+      'Basic dXNlcjpwYXNz',
+      LOCAL_FAKE_LLM_ADMIN_TOKEN,
+    ];
+    for (const route of CONTROL_ROUTES) {
+      for (const Authorization of credentials) {
+        const res = await fetch(`${h.url}${route.path}`, {
+          ...route.init,
+          headers: { Authorization },
+        });
+        expect(res.status, `${route.label} with "${Authorization}"`).toBe(401);
+      }
+    }
+  });
+
+  it('guards unsupported methods on /test/* before method dispatch', async () => {
+    const h = await start();
+    const unauthenticated = await fetch(`${h.url}/test/requests`, { method: 'DELETE' });
+    expect(unauthenticated.status).toBe(401);
+
+    const authenticated = await h.adminFetch('/test/requests', { method: 'DELETE' });
+    expect(authenticated.status).toBe(404);
+    await expect(authenticated.json()).resolves.toEqual({
+      error: 'not found: DELETE /test/requests',
+    });
+  });
+
+  it('keeps the local model routes open while /test/* stays guarded', async () => {
+    const h = await start();
+
+    const models = await fetch(`${h.url}/api/openrouter/models`);
+    expect(models.status).toBe(200);
+
+    // The Next.js gateway dials the model routes with the static local
+    // credential; the local adapter deliberately does not verify it.
+    const chat = await fetch(`${h.url}/api/openrouter/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${MODEL_CREDENTIAL}` },
+      body: JSON.stringify({
+        model: 'kilo/fake-deterministic',
+        messages: [{ role: 'user', content: '__fake__:echo:open' }],
+        stream: true,
+      }),
+    });
+    expect(chat.status).toBe(200);
+    await parseSse(chat);
+
+    const control = await fetch(`${h.url}/test/requests`);
+    expect(control.status).toBe(401);
+  });
+
+  it('answers the public health route without a credential', async () => {
+    const h = await start();
+    const res = await fetch(`${h.url}/health`);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ status: 'ok', service: 'fake-llm' });
+  });
+});
+
+describe('first-token directive', () => {
+  it('emits one held content chunk, then completes on the replayed request', async () => {
+    const h = await start();
+
+    const first = await postChat(h.url, '__fake__:first-token:held');
+    expect(first.status).toBe(200);
+    if (!first.body) throw new Error('Expected a streamed response body');
+    const reader = first.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let held = '';
+    // The first request never finishes, so read only until the held token.
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const boundary = buffer.indexOf('\n\n');
+      if (boundary < 0) continue;
+      const event = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const dataLine = event.split('\n').find(line => line.startsWith('data: '));
+      if (!dataLine || dataLine.slice('data: '.length) === '[DONE]') continue;
+      const parsed = JSON.parse(dataLine.slice('data: '.length)) as {
+        choices?: Array<{ delta?: { content?: unknown } }>;
+      };
+      const content = parsed.choices?.[0]?.delta?.content;
+      if (typeof content === 'string' && content.length > 0) {
+        held = content;
+        break;
+      }
+    }
+    expect(held).toBe('held-first-token');
+    await reader.cancel().catch(() => undefined);
+
+    const replay = await postChat(h.url, '__fake__:first-token:held');
+    const chunks = await parseSse(replay);
+    const text = chunks
+      .map(chunk => {
+        const choices = chunk.choices as Array<{ delta?: { content?: unknown } }> | undefined;
+        const content = choices?.[0]?.delta?.content;
+        return typeof content === 'string' ? content : '';
+      })
+      .join('');
+    expect(text).toContain('done-held');
+
+    const status = await h.adminFetch('/test/scenario-status?tag=held');
+    await expect(status.json()).resolves.toMatchObject({ tag: 'held', requests: 2 });
+  });
+
+  it('records the last user prompt for prompt-content assertions', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:echo:prompt-recording');
+    await parseSse(res);
+    const last = await h.adminFetch('/test/last-prompt');
+    await expect(last.json()).resolves.toMatchObject({ text: '__fake__:echo:prompt-recording' });
   });
 });

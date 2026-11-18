@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "เซสชันเอเจนต์ของคุณมีการอัปเดต",
+      "lowBalance": "ยอดคงเหลือของคุณต้องได้รับการดูแล",
+      "spendAlert": "ค่าใช้จ่ายของคุณต้องได้รับการดูแล",
+      "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล",
+      "securityUpdate": "การตรวจสอบความปลอดภัยมีการอัปเดต",
+      "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "การแจ้งเตือนยอดคงเหลือต่ำ",
+      "body": "ยอดคงเหลือของ {{organizationName}} ลดลงต่ำกว่า ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "การแจ้งเตือนค่าใช้จ่าย",
+      "body": "ค่าใช้จ่ายของ {{scopeName}} เกิน ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} ใน {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "คำเตือน SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "ละเมิด SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "เซสชัน Kilo ของคุณพร้อมให้ควบคุมจากโทรศัพท์ของคุณ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

@@ -1,23 +1,58 @@
-import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-
-import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
-import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { platformLabel } from '@/lib/platform-label';
+import { i18n } from '@/i18n';
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import {
+  CURRENCY_ZERO_THRESHOLD,
+  formatClockTime,
+  formatNumber,
+  formatPrefixedUsd,
+} from '@/lib/format';
+import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { isUnknownOrigin, platformLabel, remoteAgentState } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
-// Re-exported so existing importers of `platformLabel` from this module keep
-// working while `@/lib/platform-label` stays the single source of truth for
-// the platform→label mapping (no duplicate definition to drift).
-export { platformLabel };
-
 /**
- * One stored-history section. Exclusivity against the "Active now" tray is
- * enforced on the history side via `excludeActiveFromGroups`; active sessions
- * no longer appear as `SessionItem`s in any section.
+ * One stored-history section. A stored session that is also live still
+ * appears in its section; the stored list is rendered as-is.
  */
 export type SessionSection = {
   title: string;
   data: StoredSession[];
+  /** The zone this section's day boundary was computed in, so a row under it
+   * names the same day the heading does. */
+  timeZone: string;
+};
+
+/**
+ * Spoken heading for one session-list section: the day label with the number of
+ * sessions under it, counted in the active language. The visible row keeps the
+ * label and a bare numeral apart, so this is the one string that ties the count
+ * to what it counts.
+ */
+export function sessionSectionAccessibilityLabel(title: string, count: number): string {
+  return i18n.t('agents.sessionList.sectionAccessibility', {
+    title,
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  });
+}
+
+/** Platform buckets offered by the session filters, in display order. */
+export const PLATFORM_FILTERS = [
+  'cloud-agent',
+  'extension',
+  'desktop',
+  'cli',
+  'slack',
+  'github',
+  'linear',
+  'other',
+] as const;
+
+/** One repository the session filters can select. */
+export type ProjectFilterOption = {
+  gitUrl: string;
+  displayName: string;
 };
 
 const platformExpansion: ReadonlyMap<string, string[]> = new Map([
@@ -33,11 +68,79 @@ export function expandPlatformFilter(filter: string[]): string[] {
   return filter.flatMap(p => platformExpansion.get(p) ?? [p]);
 }
 
+// Inverse of `expandPlatformFilter` for the UI buckets, so the live list and the
+// filter sheet speak the same vocabulary ('cloud-agent' covers
+// 'cloud-agent-web', 'extension' covers 'vscode' and 'agent-manager'). Built
+// from `expandPlatformFilter` so the mapping stays in one place.
+const BUCKET_BY_PLATFORM = new Map<string, string>(
+  PLATFORM_FILTERS.filter(bucket => bucket !== 'other').flatMap(bucket =>
+    expandPlatformFilter([bucket]).map(platform => [platform, bucket] as const)
+  )
+);
+
+const PLATFORM_BUCKETS = new Set<string>(PLATFORM_FILTERS);
+
+/**
+ * Inverse of `expandPlatformFilter` for the UI buckets: a platform variant
+ * maps to its bucket (`cloud-agent-web` -> `cloud-agent`, `vscode` and
+ * `agent-manager` -> `extension`), a bucket maps to itself, and anything else
+ * returns null. Used to collapse a persisted variant into the single row the
+ * filter sheet offers for its bucket.
+ */
+export function knownPlatformBucket(platform: string): string | null {
+  if (PLATFORM_BUCKETS.has(platform)) {
+    return platform;
+  }
+  return BUCKET_BY_PLATFORM.get(platform) ?? null;
+}
+
+/**
+ * Collapse a persisted platform selection into the bucket rows the filter sheet
+ * renders: a stored variant maps to its bucket (`cloud-agent-web` ->
+ * `cloud-agent`, `vscode` and `agent-manager` -> `extension`), a bucket maps to
+ * itself, and an unknown platform keeps its own value. Deduplicated, so a
+ * bucket saved alongside one of its variants is one entry.
+ *
+ * The badge count and the sheet already speak this vocabulary; the live-list
+ * comparison and the history query use this so a legacy selection behaves the
+ * same way everywhere: one checked row means one active filter that covers each
+ * of that row's raw platforms.
+ */
+export function normalisePlatformSelection(filter: readonly string[]): string[] {
+  return [...new Set(filter.map(platform => knownPlatformBucket(platform) ?? platform))];
+}
+
+/**
+ * Decode every segment of a git URL path. Splitting before decoding keeps an
+ * encoded slash inside its own segment, so the path keeps the boundaries the
+ * raw URL had. A malformed escape (a lone `%` or a truncated sequence) cannot
+ * be decoded, and its raw segment is kept instead of throwing: one bad segment
+ * never blanks the label.
+ */
+function decodePathSegments(path: string): string {
+  return path
+    .split('/')
+    .map(segment => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join('/');
+}
+
+/**
+ * Render a git URL as the `owner/repo` path its labels and filter keys show.
+ * Segments are percent-decoded because a session stores the encoded URL while
+ * the repository's own name is the decoded one, and each segment is decoded
+ * once: a name holding a literal `%` stays intact.
+ */
 export function formatGitUrlProject(gitUrl: string): string {
   const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
   const sshPath = sshMatch?.[1];
   if (sshPath) {
-    return stripGitSuffix(sshPath);
+    return stripGitSuffix(decodePathSegments(sshPath));
   }
 
   const protocolIndex = gitUrl.indexOf('://');
@@ -56,14 +159,100 @@ export function formatGitUrlProject(gitUrl: string): string {
   const projectParts = dashIndex >= 2 ? pathParts.slice(0, dashIndex) : pathParts;
 
   if (projectParts.length >= 2) {
-    return stripGitSuffix(projectParts.join('/'));
+    return stripGitSuffix(decodePathSegments(projectParts.join('/')));
   }
 
   return gitUrl;
 }
 
-export function formatMeta(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
+/**
+ * Identity of a repository filter option: the visible label, trimmed and
+ * case-folded. Two git URLs (https vs ssh, a `.git` suffix, host case) that
+ * `formatGitUrlProject` renders identically share one key, so the filter sheet
+ * offers them as a single row and one stored URL matches every row the merged
+ * option covers. Case-folds with the active locale (bare `toLowerCase()` is
+ * banned by `src/lib/case-guard.test.ts`); both sides of every comparison are
+ * folded in the same locale, so the key stays a stable comparison key.
+ */
+export function projectOptionKey(gitUrl: string): string {
+  return formatGitUrlProject(gitUrl).trim().toLocaleLowerCase(i18n.language);
+}
+
+/**
+ * Relative-time label for a row's meta line. `nowMs` is the caller's sampled
+ * clock so a memoized row can pass the tick that re-rendered it instead of
+ * reading `Date.now()` behind the memo (see `useNowTicker`); omitted, the
+ * formatter reads the current time.
+ */
+export function formatMeta(timestamp: string | null | undefined, nowMs?: number): string {
+  const date = parseTimestamp(timestamp);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : timeAgo(date, undefined, nowMs).toLocaleUpperCase(i18n.language);
+}
+
+/**
+ * Time of day of a row's own timestamp, in the active language
+ * (e.g. `"9:00 AM"`), for a label that carries no relative day.
+ *
+ * Returns `null` when the timestamp does not parse, so a caller shows nothing
+ * rather than an `"Invalid Date"` or a midnight the record never held.
+ */
+function clockTime(timestamp: string | null | undefined): string | null {
+  const date = parseTimestamp(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return formatClockTime(date, i18n.language);
+}
+
+/**
+ * Clock time of a scheduled session's wake, for the `SCHEDULED · <wake>`
+ * eyebrow. `null` when the timestamp does not parse, so a missing or garbage
+ * `scheduledAt` shows the `SCHEDULED` label with no time; the caller appends
+ * the value only when it is non-null.
+ */
+export function formatScheduledWake(at: string): string | null {
+  return clockTime(at);
+}
+
+/**
+ * The one place a visible session cost decides its digits: at or above half a
+ * cent (`>= 5000` µ$) the amount needs two decimals, below it four, and the
+ * band that would round to `$0.0000` (1..49 µ$) is omitted rather than printed
+ * as a false zero. `null` means the surface shows no cost at all.
+ */
+function visibleCostAmount(
+  microdollars: number | null | undefined
+): { usd: number; fractionDigits: number } | null {
+  if (microdollars == null || !Number.isFinite(microdollars) || microdollars <= 0) {
+    return null;
+  }
+  const usd = microdollars / 1_000_000;
+  if (usd < CURRENCY_ZERO_THRESHOLD) {
+    return null;
+  }
+  return { usd, fractionDigits: usd >= 0.005 ? 2 : 4 };
+}
+
+/**
+ * One visible cost in the canonical shape: the sign leads the digits in every
+ * language, the digits, their separators and the minus glyph stay the
+ * language's own, and the whole run is wrapped in a left-to-right isolate
+ * (U+2066 … U+2069) because `$` is a neutral character a right-to-left
+ * paragraph would otherwise move behind the number.
+ */
+function prefixedVisibleCost(microdollars: number | null | undefined): string | null {
+  const amount = visibleCostAmount(microdollars);
+  if (amount === null) {
+    return null;
+  }
+  return isolateLtrBidiText(
+    formatPrefixedUsd(amount.usd, i18n.language, {
+      minimumFractionDigits: amount.fractionDigits,
+      maximumFractionDigits: amount.fractionDigits,
+    })
+  );
 }
 
 /**
@@ -78,17 +267,26 @@ export function formatMeta(timestamp: string): string {
  * two-decimal dollars (e.g. `$0.01`, `$1.23`). Below half a cent, four
  * decimals (e.g. `$0.0031`); values that would render `$0.0000` (1..49 µ$)
  * are omitted instead of a false zero.
+ *
+ * The string carries the sign in front of the digits in every language, so a
+ * right-to-left locale reads the same `$0.0005` the rest of the screen paints
+ * rather than its own suffix shape (`0.0005 $`). The digits, their separators
+ * and the minus glyph stay the language's own, and the run is wrapped in an
+ * LTR isolate (U+2066 … U+2069) because `$` is a neutral character an RTL
+ * paragraph would otherwise move behind the number.
  */
 export function formatSessionTotalCost(microdollars: number | null | undefined): string | null {
-  if (microdollars == null || !Number.isFinite(microdollars) || microdollars <= 0) {
-    return null;
-  }
-  const usd = microdollars / 1_000_000;
-  if (usd >= 0.005) {
-    return `$${usd.toFixed(2)}`;
-  }
-  const fine = `$${usd.toFixed(4)}`;
-  return fine === '$0.0000' ? null : fine;
+  return prefixedVisibleCost(microdollars);
+}
+
+/**
+ * The header pill's cost slot: the same canonical string as
+ * `formatSessionTotalCost` (sign in front of the digits in every language, the
+ * digits and separators the language's own, the run in an LTR isolate), kept
+ * as its own slot-named export so the pill names the value it shows.
+ */
+export function formatSessionCostBadge(microdollars: number | null | undefined): string | null {
+  return prefixedVisibleCost(microdollars);
 }
 
 /**
@@ -123,7 +321,7 @@ export function selectSessionCostInputs(
  * in-progress, old, or zero-cost sessions).
  */
 export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: string): string {
-  return cost ? `${cost} · ${timeMeta}` : timeMeta;
+  return composeActiveSessionVisibleMeta(cost, timeMeta) ?? '';
 }
 
 /**
@@ -133,7 +331,7 @@ export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: s
  * the visible "$0.12 · 5M AGO" order.
  */
 export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
-  return cost ? `cost ${cost}, ${timeSpoken}` : timeSpoken;
+  return composeActiveSessionSpokenMeta(cost, timeSpoken) ?? '';
 }
 
 /**
@@ -180,10 +378,10 @@ export function composeActiveSessionSpokenMeta(
   timeSpoken: string | null
 ): string | null {
   if (cost && timeSpoken) {
-    return `cost ${cost}, ${timeSpoken}`;
+    return i18n.t('agents.sessionRow.costSpokenWithTime', { cost, time: timeSpoken });
   }
   if (cost) {
-    return `cost ${cost}`;
+    return i18n.t('agents.sessionRow.costSpoken', { cost });
   }
   if (timeSpoken) {
     return timeSpoken;
@@ -191,17 +389,25 @@ export function composeActiveSessionSpokenMeta(
   return null;
 }
 
-/**
- * Selector for the spoken meta of a remote session row. When `needsInput`
- * is true, spoken cost/time are suppressed entirely (`null`) — the spoken
- * label announces "needs input" instead via `sessionRowAccessibilityLabel`.
- * Otherwise delegates to `composeActiveSessionSpokenMeta`.
- */
 export function selectRemoteRowSpokenMeta(params: {
+  variant: 'card' | 'list';
+  scheduled: boolean;
+  scheduledWake: string | null;
   needsInput: boolean;
   costSpoken: string | null;
   timeSpoken: string | null;
 }): string | null {
+  if (params.variant === 'list') {
+    const parts = [
+      params.scheduledWake,
+      composeActiveSessionSpokenMeta(params.costSpoken, params.timeSpoken),
+    ].filter(Boolean);
+    // Intl unit lists still add a conjunction in Arabic; the outer label owns its connector.
+    return parts.join(i18n.t('common.listJoiner')) || null;
+  }
+  if (params.scheduled) {
+    return params.scheduledWake;
+  }
   if (params.needsInput) {
     return null;
   }
@@ -212,11 +418,17 @@ export function selectRemoteRowSpokenMeta(params: {
  * Pinned-tray label for an active session. Reuses `platformLabel` when the
  * origin is known, otherwise falls back to 'LIVE'. An undefined, empty, or
  * 'unknown' origin is treated as unknown and returns 'LIVE' rather than a
- * definitive (and potentially wrong) label.
+ * definitive (and potentially wrong) label: this row is live, so the word
+ * names its state and the row draws the live glyph beside it. A stored row
+ * never takes this path — `storedSessionEyebrowLabel` shows the neutral origin
+ * label instead.
+ *
+ * The word is catalog copy, so its text changes per locale. A row that renders
+ * it takes its tint from {@link remoteAgentState}, never from the string.
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
-  if (!createdOnPlatform || createdOnPlatform === 'unknown') {
-    return 'LIVE';
+  if (remoteAgentState(createdOnPlatform) === 'live') {
+    return i18n.t('agents.sessionList.live');
   }
   return platformLabel(createdOnPlatform);
 }
@@ -236,14 +448,18 @@ export function activeSessionMetaTimestamp(session: {
  * Pinned-tray meta line for an active session. Prefers `lastActivityAt`, falls
  * back to `updatedAt`; otherwise `undefined` so `SessionRow` renders the live
  * dot alone. Never the CLI status — status words in the timestamp slot were a
- * defect (BUSY/IDLE/RETRY).
+ * defect (BUSY/IDLE/RETRY). `nowMs` is the caller's sampled clock, so a
+ * memoized row ages its own label (see {@link formatMeta}).
  */
-export function remoteMeta(session: {
-  updatedAt?: string;
-  lastActivityAt?: string;
-}): string | undefined {
+export function remoteMeta(
+  session: {
+    updatedAt?: string;
+    lastActivityAt?: string;
+  },
+  nowMs?: number
+): string | undefined {
   const ts = activeSessionMetaTimestamp(session);
-  return ts ? formatMeta(ts) : undefined;
+  return ts ? formatMeta(ts, nowMs) : undefined;
 }
 
 /**
@@ -263,15 +479,16 @@ export function repoNameFromGitUrl(gitUrl: string | null | undefined): string | 
 
 /**
  * Canonical eyebrow label for a stored session: repo name (uppercased) when
- * a git URL is present, else the platform fallback. Replaces the legacy
- * platform-only label in the Agents list.
+ * a git URL is present, else the origin label from `platformLabel`. A stored
+ * row has no live state, so an unrecorded origin reads the neutral origin
+ * label, never "LIVE".
  */
 export function storedSessionEyebrowLabel(session: {
   git_url: string | null;
   created_on_platform: string;
 }): string {
   const repo = repoNameFromGitUrl(session.git_url);
-  return repo ? repo.toUpperCase() : platformLabel(session.created_on_platform);
+  return repo ? repo.toLocaleUpperCase(i18n.language) : platformLabel(session.created_on_platform);
 }
 
 /**
@@ -285,85 +502,44 @@ export function remoteSessionEyebrowLabel(session: {
   createdOnPlatform?: string;
 }): string {
   const repo = repoNameFromGitUrl(session.gitUrl);
-  return repo ? repo.toUpperCase() : remoteAgentLabel(session.createdOnPlatform);
-}
-
-const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
-
-/**
- * Select which active sessions appear in the pinned "Active now" tray.
- *
- * `searchQuery` narrows the tray with the same semantics as the
- * server-side history search: a case-insensitive substring match on the
- * session's `title` OR `id` (`position()`/`includes` — LIKE wildcards
- * match literally). Empty or whitespace-only queries perform no narrowing.
- * The text query applies in conjunction with the platform/project filters,
- * which mirror the server-side narrowing used by the stored-session list.
- *
- * No dedup against stored pages is performed here — exclusivity is enforced
- * on the history side by Task 3, so this helper stays pure and symmetric.
- */
-export function selectPinnedActiveSessions(params: {
-  activeSessions: ActiveSession[];
-  projectFilter: string[];
-  platformFilter: string[];
-  searchQuery: string;
-}): ActiveSession[] {
-  const { activeSessions, projectFilter, platformFilter, searchQuery } = params;
-  const projectActive = projectFilter.length > 0;
-  const platformActive = platformFilter.length > 0;
-  const needle = searchQuery.trim().toLowerCase();
-
-  const concretePlatforms = platformFilter.filter(p => p !== 'other');
-  const includeOther = platformFilter.includes('other');
-  const expanded = expandPlatformFilter(concretePlatforms);
-  return activeSessions.filter(session => {
-    if (needle.length > 0) {
-      const hayTitle = session.title.toLowerCase();
-      const hayId = session.id.toLowerCase();
-      if (!hayTitle.includes(needle) && !hayId.includes(needle)) {
-        return false;
-      }
-    }
-
-    if (projectActive && (!session.gitUrl || !projectFilter.includes(session.gitUrl))) {
-      return false;
-    }
-
-    if (platformActive) {
-      if (!session.createdOnPlatform) {
-        return false;
-      }
-      const knownMatch = expanded.includes(session.createdOnPlatform);
-      const otherMatch = includeOther && !KNOWN_PLATFORM_VALUES.includes(session.createdOnPlatform);
-      if (!knownMatch && !otherMatch) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  return repo ? repo.toLocaleUpperCase(i18n.language) : remoteAgentLabel(session.createdOnPlatform);
 }
 
 /**
- * Drop sessions whose `session_id` is in the active set from date-bucketed
- * groups, and drop any groups that become empty as a result. Preserves the
- * original group order.
- *
- * The generic is constrained to the intersection of what the helper needs
- * (`session_id`) and what `AgentSessionDateGroup` itself requires
- * (`created_at`/`updated_at`); the Task 3 caller passes
- * `AgentSessionDateGroup<StoredSession>[]` which satisfies both bounds.
+ * Tint key for a remote row's eyebrow, next to the label it belongs to: `live`
+ * for a state word, `platform` for the kind of agent the row ran on, and
+ * `repository` when the eyebrow names the repository it ran in.
  */
-export function excludeActiveFromGroups<
-  T extends { session_id: string; created_at: string; updated_at: string },
->(groups: AgentSessionDateGroup<T>[], activeSessionIds: Set<string>): AgentSessionDateGroup<T>[] {
-  const result: AgentSessionDateGroup<T>[] = [];
-  for (const group of groups) {
-    const remaining = group.sessions.filter(s => !activeSessionIds.has(s.session_id));
-    if (remaining.length > 0) {
-      result.push({ label: group.label, sessions: remaining });
-    }
+export function remoteSessionEyebrowState(session: {
+  gitUrl?: string | null;
+  createdOnPlatform?: string;
+}): 'live' | 'platform' | 'repository' {
+  return repoNameFromGitUrl(session.gitUrl)
+    ? 'repository'
+    : remoteAgentState(session.createdOnPlatform);
+}
+
+/**
+ * Tint key for a stored row's eyebrow, next to {@link storedSessionEyebrowLabel}:
+ * `repository` when the eyebrow names the repository the row ran in, `unknown`
+ * for the placeholder of an origin the row cannot name, and `platform` when it
+ * names only the kind of agent the row ran on.
+ */
+export function storedSessionEyebrowState(session: {
+  git_url: string | null;
+  created_on_platform: string;
+}): 'unknown' | 'platform' | 'repository' {
+  if (repoNameFromGitUrl(session.git_url)) {
+    return 'repository';
   }
-  return result;
+  return isUnknownOrigin(session.created_on_platform) ? 'unknown' : 'platform';
+}
+
+/**
+ * Whether the Active now row's long-press menu may offer Exit session.
+ * Cloud-agent rows carry the sentinel `connectionId` and have no CLI
+ * connection to receive `exit_cli`; only real CLI rows can be exited.
+ */
+export function canExitSessionFromList(session: { connectionId: string }): boolean {
+  return session.connectionId !== CLOUD_AGENT_CONNECTION_ID;
 }

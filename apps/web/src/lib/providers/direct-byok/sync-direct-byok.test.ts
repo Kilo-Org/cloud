@@ -1,0 +1,680 @@
+import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { ai_gateway_sync_providers_state, direct_byok_model_lists } from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
+import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  indexCatalogModelIdsByCanonicalId,
+  parseModelsDevProviderModels,
+  parseOpenAICompatibleProviderModels,
+  syncAndStoreDirectByokProviders,
+  syncDirectByokModels,
+} from './sync-direct-byok';
+
+describe('parseOpenAICompatibleProviderModels', () => {
+  test('parses Morph OpenAI-compatible model metadata', () => {
+    const models = parseOpenAICompatibleProviderModels({
+      data: [
+        {
+          id: 'morph-qwen35-397b',
+          name: 'Morph: Qwen 3.5 397B',
+          input_modalities: ['text', 'image'],
+          output_modalities: ['text'],
+          context_length: 262144,
+          max_output_length: 131072,
+          supported_features: ['tools', 'json_mode'],
+        },
+        {
+          id: 'morph-minimax3-428b',
+          max_model_len: 256000,
+        },
+        {
+          id: 'provider-with-null-context',
+          context_length: null,
+        },
+      ],
+    });
+
+    expect(models).toEqual([
+      {
+        id: 'morph-qwen35-397b',
+        name: 'Morph: Qwen 3.5 397B',
+        context_length: 262144,
+        max_completion_tokens: 131072,
+        input_modalities: ['text', 'image'],
+        flags: ['reasoning'],
+      },
+      {
+        id: 'morph-minimax3-428b',
+        name: undefined,
+        context_length: 256000,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+        flags: ['reasoning'],
+      },
+      {
+        id: 'provider-with-null-context',
+        name: undefined,
+        context_length: undefined,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+        flags: ['reasoning'],
+      },
+    ]);
+  });
+
+  test('excludes models with supported features that do not include tools', () => {
+    const models = parseOpenAICompatibleProviderModels({
+      data: [
+        { id: 'without-supported-features' },
+        { id: 'supports-tools', supported_features: ['tools', 'json_mode'] },
+        { id: 'unsupported-tools', supported_features: ['json_mode'] },
+        { id: 'empty-supported-features', supported_features: [] },
+      ],
+    });
+
+    expect(models.map(model => model.id)).toEqual(['without-supported-features', 'supports-tools']);
+  });
+});
+
+describe('parseModelsDevProviderModels', () => {
+  test('excludes deprecated and non-text-output models while retaining other statuses', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          stable: {
+            id: 'stable',
+            name: 'provider/stable',
+            reasoning: true,
+            reasoning_options: [
+              { type: 'toggle' },
+              { type: 'effort', values: ['high', 'max', 'default', null] },
+            ],
+            limit: { context: 128_000, output: 32_000 },
+            modalities: { input: ['text', 'image'], output: ['text'] },
+          },
+          alpha: {
+            id: 'alpha',
+            status: 'alpha',
+            reasoning: true,
+            reasoning_options: [{ type: 'toggle' }],
+          },
+          beta: {
+            id: 'claude-beta',
+            status: 'beta',
+            reasoning: false,
+          },
+          unknownStatus: {
+            id: 'unknown-status',
+            status: 'active',
+          },
+          deprecated: {
+            id: 'mimo-v2-omni',
+            name: 'MiMo V2 Omni',
+            status: 'deprecated',
+          },
+          imageOnly: {
+            id: 'wan2.7-image',
+            name: 'Wan2.7 Image',
+            modalities: { input: ['text'], output: ['image'] },
+          },
+        },
+      },
+      'alibaba-token-plan'
+    );
+
+    expect(models).toEqual([
+      {
+        id: 'stable',
+        name: 'stable',
+        context_length: 128_000,
+        max_completion_tokens: 32_000,
+        input_modalities: ['text', 'image'],
+        flags: ['reasoning'],
+        reasoning_options: [
+          { type: 'toggle' },
+          { type: 'effort', values: ['high', 'max', 'default', null] },
+        ],
+      },
+      {
+        id: 'alpha',
+        name: undefined,
+        context_length: undefined,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+        flags: ['reasoning'],
+        reasoning_options: [{ type: 'toggle' }],
+      },
+      {
+        id: 'claude-beta',
+        name: undefined,
+        context_length: undefined,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+        flags: undefined,
+        reasoning_options: undefined,
+      },
+      {
+        id: 'unknown-status',
+        name: undefined,
+        context_length: undefined,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+        flags: undefined,
+        reasoning_options: undefined,
+      },
+    ]);
+  });
+
+  test('ignores reasoning option types that are not supported locally', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          futureControl: {
+            id: 'future-control',
+            reasoning: true,
+            reasoning_options: [{ type: 'budget_tokens', min: 0, max: 32_000 }],
+          },
+        },
+      },
+      'alibaba-token-plan'
+    );
+
+    expect(models[0]).toMatchObject({
+      id: 'future-control',
+      flags: ['reasoning'],
+    });
+    expect(models[0].reasoning_options).toBeUndefined();
+  });
+
+  test('leaves reasoning options without sendable controls to the model-name fallback', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          alwaysOn: { id: 'always-on', reasoning: true, reasoning_options: [] },
+          defaultOnly: {
+            id: 'default-only',
+            reasoning: true,
+            reasoning_options: [{ type: 'effort', values: ['default', null] }],
+          },
+        },
+      },
+      'alibaba-token-plan'
+    );
+
+    expect(models.map(model => model.reasoning_options)).toEqual([undefined, undefined]);
+    expect(models.map(model => model.flags)).toEqual([['reasoning'], ['reasoning']]);
+  });
+
+  test('excludes models missing from the provider model list', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          available: { id: 'available', limit: { context: 128_000 } },
+          removed: { id: 'removed', limit: { context: 64_000 } },
+        },
+      },
+      'alibaba-token-plan',
+      new Set(['available', 'provider-only'])
+    );
+
+    expect(models.map(model => model.id)).toEqual(['available']);
+    expect(models[0].context_length).toBe(128_000);
+  });
+
+  test('excludes explicit capability mismatches while accepting missing metadata', () => {
+    const model = (id: string, overrides: Record<string, unknown> = {}) => ({
+      id,
+      name: id,
+      tool_call: true,
+      modalities: { input: ['text'], output: ['text'] },
+      ...overrides,
+    });
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          chat: model('nvidia/chat', {
+            reasoning: true,
+            reasoning_options: [{ type: 'effort', values: ['none', 'high', 'max'] }],
+            limit: { context: 128000 },
+          }),
+          vision: model('nvidia/vision', {
+            modalities: { input: ['text', 'image'], output: ['text'] },
+          }),
+          unknownCapabilities: { id: 'nvidia/unknown' },
+          unavailable: model('nvidia/unavailable'),
+          noTools: model('nvidia/no-tools', { tool_call: false }),
+          noTextInput: model('nvidia/no-text-input', {
+            modalities: { input: ['image'], output: ['text'] },
+          }),
+        },
+      },
+      'nvidia-byok',
+      new Set([
+        'nvidia/chat',
+        'nvidia/vision',
+        'nvidia/unknown',
+        'nvidia/no-tools',
+        'nvidia/no-text-input',
+      ])
+    );
+
+    expect(models).toEqual([
+      expect.objectContaining({
+        id: 'nvidia/chat',
+        context_length: 128000,
+        flags: ['reasoning'],
+        reasoning_options: [{ type: 'effort', values: ['none', 'high', 'max'] }],
+      }),
+      expect.objectContaining({
+        id: 'nvidia/vision',
+        input_modalities: ['text', 'image'],
+      }),
+      expect.objectContaining({ id: 'nvidia/unknown' }),
+    ]);
+  });
+
+  test('excludes models served only over the native Gemini API', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          'glm-5.3': {
+            id: 'glm-5.3',
+            provider: { api: 'https://opencode.ai/inference/go/openai/v1' },
+          },
+          'qwen3.7-plus': {
+            id: 'qwen3.7-plus',
+            provider: {
+              npm: '@ai-sdk/anthropic',
+              api: 'https://opencode.ai/inference/go/anthropic/v1',
+            },
+          },
+          'gpt-6-luna': {
+            id: 'gpt-6-luna',
+            provider: { npm: '@ai-sdk/openai', api: 'https://opencode.ai/inference/go/openai/v1' },
+          },
+          'compatible-model': {
+            id: 'compatible-model',
+            provider: { npm: '@ai-sdk/openai-compatible' },
+          },
+          'gemini-4-argon-contributor': {
+            id: 'gemini-4-argon-contributor',
+            provider: {
+              npm: '@ai-sdk/google',
+              api: 'https://opencode.ai/inference/go/google/v1beta',
+            },
+          },
+          'vertex-gemini': {
+            id: 'vertex-gemini',
+            provider: { npm: '@ai-sdk/google-vertex' },
+          },
+          'mistral-alias': {
+            id: 'mistral-alias',
+            provider: { npm: '@ai-sdk/mistral', api: 'https://opencode.ai/inference/openai/v1' },
+          },
+          'openrouter-alias': {
+            id: 'openrouter-alias',
+            provider: { npm: '@openrouter/ai-sdk-provider' },
+          },
+        },
+      },
+      'opencode-go',
+      new Set([
+        'glm-5.3',
+        'qwen3.7-plus',
+        'gpt-6-luna',
+        'compatible-model',
+        'gemini-4-argon-contributor',
+        'vertex-gemini',
+        'mistral-alias',
+        'openrouter-alias',
+      ])
+    );
+
+    expect(models.map(model => model.id)).toEqual([
+      'glm-5.3',
+      'qwen3.7-plus',
+      'gpt-6-luna',
+      'compatible-model',
+      'mistral-alias',
+      'openrouter-alias',
+    ]);
+  });
+});
+
+describe('indexCatalogModelIdsByCanonicalId', () => {
+  test('maps canonical IDs to OpenRouter IDs, preferring the canonical ID and then the shortest', () => {
+    const index = indexCatalogModelIdsByCanonicalId({
+      openrouter: {
+        models: {
+          'deepseek/deepseek-v4.1-flash-1017': {
+            id: 'deepseek/deepseek-v4.1-flash-1017',
+            canonical_model_id: 'deepseek/deepseek-v4.1-flash',
+          },
+          'deepseek/deepseek-v4.1-flash': {
+            id: 'deepseek/deepseek-v4.1-flash',
+            canonical_model_id: 'deepseek/deepseek-v4.1-flash',
+          },
+          'z-ai/glm-5.2-0901': { id: 'z-ai/glm-5.2-0901', canonical_model_id: 'zhipuai/glm-5.2' },
+          'z-ai/glm-5.2': { id: 'z-ai/glm-5.2', canonical_model_id: 'zhipuai/glm-5.2' },
+          'minimax/minimax-m3.1-flash:free': {
+            id: 'minimax/minimax-m3.1-flash:free',
+            canonical_model_id: 'minimax/MiniMax-M3.1-Flash',
+          },
+          'openrouter/auto': { id: 'openrouter/auto' },
+        },
+      },
+    });
+
+    expect(Object.fromEntries(index)).toEqual({
+      'deepseek/deepseek-v4.1-flash': 'deepseek/deepseek-v4.1-flash',
+      'zhipuai/glm-5.2': 'z-ai/glm-5.2',
+    });
+  });
+
+  test('returns an empty index when models.dev lacks the openrouter provider', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(indexCatalogModelIdsByCanonicalId({}).size).toBe(0);
+    jest.restoreAllMocks();
+  });
+});
+
+describe('syncDirectByokModels database snapshots', () => {
+  const providerId = 'nvidia-byok';
+  const oldSyncedAt = '2020-01-02T03:04:05.000Z';
+  const downloadedModels = {
+    reasoner: {
+      id: 'nvidia/reasoner',
+      name: 'NVIDIA / Vision Reasoner ',
+      reasoning: true,
+      reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['high', 'max'] }],
+      limit: { context: 16_000, output: 64_000 },
+      modalities: { input: ['text', 'image'], output: ['text'] },
+      tool_call: true,
+    },
+    defaults: { id: 'nvidia/defaults' },
+    unsupported: { id: 'nvidia/no-tools', tool_call: false },
+  };
+  const normalizedModels: DirectByokModel[] = [
+    {
+      id: 'nvidia/reasoner',
+      name: 'Vision Reasoner',
+      flags: ['reasoning', 'vision'],
+      context_length: 16_000,
+      max_completion_tokens: 16_000,
+      reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['high', 'max'] }],
+    },
+    {
+      id: 'nvidia/defaults',
+      name: 'defaults',
+      context_length: 200_000,
+      max_completion_tokens: 32_000,
+    },
+  ];
+  let providerModels: Record<string, { id: string } & Record<string, unknown>>;
+  let openCodeGoModels: Record<string, { id: string } & Record<string, unknown>>;
+  let openRouterModels: Record<string, { id: string } & Record<string, unknown>>;
+  let chutesModelsDevModels: Record<string, { id: string } & Record<string, unknown>>;
+  let chutesModels: Array<{ id: string }>;
+  let fetchAvailableModels: () => Promise<Response>;
+
+  beforeEach(async () => {
+    await db
+      .delete(direct_byok_model_lists)
+      .where(
+        inArray(
+          direct_byok_model_lists.provider_id,
+          DirectUserByokInferenceProviderIdSchema.options
+        )
+      );
+    providerModels = downloadedModels;
+    openCodeGoModels = { placeholder: { id: 'placeholder/model' } };
+    openRouterModels = {};
+    chutesModelsDevModels = {};
+    chutesModels = [{ id: 'placeholder/model' }];
+    fetchAvailableModels = async () =>
+      Response.json({ data: Object.values(providerModels).map(({ id }) => ({ id })) });
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      if (input === 'https://models.dev/api.json') {
+        return Response.json({
+          openrouter: { models: openRouterModels },
+          chutes: { models: chutesModelsDevModels },
+          nvidia: { models: providerModels },
+          'alibaba-token-plan': { models: {} },
+          edenai: { models: {} },
+          'zai-coding-plan': { models: {} },
+          'ollama-cloud': { models: {} },
+          'opencode-go': { models: openCodeGoModels },
+          'xiaomi-token-plan-ams': { models: {} },
+          'xiaomi-token-plan-sgp': { models: {} },
+          'amazon-bedrock': { models: {} },
+          'google-vertex': { models: {} },
+        });
+      }
+      if (input === 'https://integrate.api.nvidia.com/v1/models') {
+        return fetchAvailableModels();
+      }
+      if (input === 'https://opencode.ai/zen/go/v1/models') {
+        return Response.json({ data: Object.values(openCodeGoModels).map(({ id }) => ({ id })) });
+      }
+      if (input === 'https://llm.chutes.ai/v1/models') {
+        return Response.json({ data: chutesModels });
+      }
+      return Response.json({ data: [{ id: 'placeholder/model' }] });
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  async function readSnapshot() {
+    const rows = await db
+      .select()
+      .from(direct_byok_model_lists)
+      .where(eq(direct_byok_model_lists.provider_id, providerId));
+    expect(rows).toHaveLength(1);
+    return rows[0];
+  }
+
+  async function backdateSnapshot() {
+    await db
+      .update(direct_byok_model_lists)
+      .set({ synced_at: oldSyncedAt })
+      .where(eq(direct_byok_model_lists.provider_id, providerId));
+  }
+
+  test('persists the normalized download, defaults, and reasoning options in PostgreSQL', async () => {
+    const startedAt = Date.now();
+    const counts = await syncDirectByokModels();
+    const snapshot = await readSnapshot();
+
+    expect(snapshot.models).toStrictEqual(normalizedModels);
+    expect(Date.parse(snapshot.synced_at)).toBeGreaterThanOrEqual(startedAt);
+    expect(Date.parse(snapshot.synced_at)).toBeLessThanOrEqual(Date.now());
+    expect(counts[providerId]).toBe(normalizedModels.length);
+    const snapshots = await db.select().from(direct_byok_model_lists);
+    expect(snapshots.map(row => row.provider_id).sort()).toEqual(Object.keys(counts).sort());
+  });
+
+  test('persists the OpenRouter catalog model ID that models.dev identifies', async () => {
+    openRouterModels = {
+      'nvidia/reasoner-catalog': {
+        id: 'nvidia/reasoner-catalog',
+        canonical_model_id: 'nvidia/reasoner-canonical',
+      },
+      'moonshotai/kimi-k2.6': {
+        id: 'moonshotai/kimi-k2.6',
+        canonical_model_id: 'moonshotai/kimi-k2.6',
+      },
+    };
+    providerModels = {
+      reasoner: { id: 'nvidia/reasoner', canonical_model_id: 'nvidia/reasoner-canonical' },
+      unknown: { id: 'nvidia/unknown', canonical_model_id: 'nvidia/not-on-openrouter' },
+    };
+    chutesModelsDevModels = {
+      'moonshotai/Kimi-K2.6-TEE': {
+        id: 'moonshotai/Kimi-K2.6-TEE',
+        canonical_model_id: 'moonshotai/kimi-k2.6',
+      },
+    };
+    chutesModels = [{ id: 'moonshotai/Kimi-K2.6-TEE' }, { id: 'chutes-only-model' }];
+
+    await syncDirectByokModels();
+
+    const catalogModelIds = async (providerId: 'nvidia-byok' | 'chutes-byok') => {
+      const [row] = await db
+        .select()
+        .from(direct_byok_model_lists)
+        .where(eq(direct_byok_model_lists.provider_id, providerId));
+      return Object.fromEntries(row.models.map(model => [model.id, model.catalog_model_id]));
+    };
+    expect(await catalogModelIds('nvidia-byok')).toEqual({
+      'nvidia/reasoner': 'nvidia/reasoner-catalog',
+      'nvidia/unknown': undefined,
+    });
+    expect(await catalogModelIds('chutes-byok')).toEqual({
+      'moonshotai/Kimi-K2.6-TEE': 'moonshotai/kimi-k2.6',
+      'chutes-only-model': undefined,
+    });
+  });
+
+  test('re-sync replaces models and metadata, removes stale models, and refreshes synced_at', async () => {
+    await syncDirectByokModels();
+    await backdateSnapshot();
+    providerModels = {
+      reasoner: {
+        id: 'nvidia/reasoner',
+        name: 'NVIDIA/Updated Reasoner',
+        reasoning: false,
+        limit: { context: 128_000, output: 64_000 },
+      },
+    };
+    const startedAt = Date.now();
+
+    const counts = await syncDirectByokModels();
+    const snapshot = await readSnapshot();
+
+    expect(snapshot.models).toStrictEqual([
+      {
+        id: 'nvidia/reasoner',
+        name: 'Updated Reasoner',
+        context_length: 128_000,
+        max_completion_tokens: 64_000,
+      },
+    ]);
+    expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
+    expect(Date.parse(snapshot.synced_at)).toBeGreaterThanOrEqual(startedAt);
+    expect(Date.parse(snapshot.synced_at)).toBeLessThanOrEqual(Date.now());
+    expect(counts[providerId]).toBe(1);
+  });
+
+  test('rejects an empty upstream list without replacing the last successful snapshot', async () => {
+    await syncDirectByokModels();
+    await backdateSnapshot();
+    const previousSnapshot = await readSnapshot();
+    fetchAvailableModels = async () => Response.json({ data: [] });
+
+    await expect(syncDirectByokModels()).rejects.toThrow(
+      'Suspicious: https://integrate.api.nvidia.com/v1/models returned 0 entries, fewer than 1'
+    );
+
+    expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+  });
+
+  test('re-sync removes previously synced OpenCode Go models served only over the Gemini API', async () => {
+    await db.insert(direct_byok_model_lists).values({
+      provider_id: 'opencode-go',
+      models: [
+        {
+          id: 'gemini-4-argon-contributor',
+          name: 'Gemini 4 Argon Contributor',
+          context_length: 1_048_576,
+          max_completion_tokens: 65_536,
+        },
+      ],
+      synced_at: oldSyncedAt,
+    });
+    openCodeGoModels = {
+      'glm-5.3': { id: 'glm-5.3', name: 'GLM-5.3' },
+      'gemini-4-argon-contributor': {
+        id: 'gemini-4-argon-contributor',
+        name: 'Gemini 4 Argon Contributor',
+        provider: { npm: '@ai-sdk/google', api: 'https://opencode.ai/inference/go/google/v1beta' },
+      },
+    };
+
+    const counts = await syncDirectByokModels();
+    const [snapshot] = await db
+      .select()
+      .from(direct_byok_model_lists)
+      .where(eq(direct_byok_model_lists.provider_id, 'opencode-go'));
+
+    expect(snapshot.models).toStrictEqual([
+      { id: 'glm-5.3', name: 'GLM-5.3', context_length: 200_000, max_completion_tokens: 32_000 },
+    ]);
+    expect(counts['opencode-go']).toBe(1);
+  });
+
+  test('rejects an upstream failure without replacing the last successful snapshot', async () => {
+    await syncDirectByokModels();
+    await backdateSnapshot();
+    const previousSnapshot = await readSnapshot();
+    fetchAvailableModels = async () => {
+      return new Response(null, { status: 503, statusText: 'Service Unavailable' });
+    };
+
+    await expect(syncDirectByokModels()).rejects.toThrow(
+      'Fetching https://integrate.api.nvidia.com/v1/models failed: 503 Service Unavailable'
+    );
+
+    expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+  });
+
+  describe('syncAndStoreDirectByokProviders', () => {
+    const providersCompletedAt = '2020-01-01T00:00:00.000Z';
+
+    beforeEach(async () => {
+      await db
+        .delete(ai_gateway_sync_providers_state)
+        .where(eq(ai_gateway_sync_providers_state.id, 1));
+      await db
+        .insert(ai_gateway_sync_providers_state)
+        .values({ id: 1, last_completed_at: providersCompletedAt });
+    });
+
+    async function readSyncState() {
+      const [row] = await db.select().from(ai_gateway_sync_providers_state);
+      return row;
+    }
+
+    test('records direct BYOK completion separately from the full provider sync', async () => {
+      const startedAt = Date.now();
+      const summary = await syncAndStoreDirectByokProviders();
+      const state = await readSyncState();
+
+      expect(summary.direct_byok_model_counts[providerId]).toBe(normalizedModels.length);
+      expect(summary.total_providers).toBe(Object.keys(summary.direct_byok_model_counts).length);
+      expect(summary.total_models).toBe(
+        Object.values(summary.direct_byok_model_counts).reduce((sum, count) => sum + count, 0)
+      );
+      expect(state.direct_byok_last_completed_at).not.toBeNull();
+      expect(new Date(state.direct_byok_last_completed_at ?? '').toISOString()).toBe(
+        summary.completed_at
+      );
+      expect(Date.parse(summary.completed_at)).toBeGreaterThanOrEqual(startedAt);
+      expect(new Date(state.last_completed_at ?? '').toISOString()).toBe(providersCompletedAt);
+    });
+
+    test('does not record completion when a provider fetch fails', async () => {
+      fetchAvailableModels = async () =>
+        new Response(null, { status: 503, statusText: 'Service Unavailable' });
+
+      await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(
+        'Fetching https://integrate.api.nvidia.com/v1/models failed: 503 Service Unavailable'
+      );
+
+      expect((await readSyncState()).direct_byok_last_completed_at).toBeNull();
+    });
+  });
+});

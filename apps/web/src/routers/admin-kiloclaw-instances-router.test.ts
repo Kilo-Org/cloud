@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   kiloclaw_admin_audit_logs,
@@ -19,7 +19,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { UpstreamApiError } from '@/lib/trpc/init';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
@@ -2748,8 +2748,8 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('voids pending notice rows so the sweep does not deliver after cancel', async () => {
-      // scheduleAction with default notify=true queues 3 pending notice
-      // rows (email, webapp, mobile_push) per target. After cancel,
+      // scheduleAction with default notify=true queues a pending notice
+      // row per default channel (email, webapp) per target. After cancel,
       // those rows must transition to 'failed' so selectDueNotifications
       // never picks them up again.
       const caller = await createCallerForUser(adminUser.id);

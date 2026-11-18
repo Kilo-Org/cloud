@@ -1,6 +1,16 @@
-/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry init are kept together */
+/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry error-boundary wrap are kept together */
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
+// Enter the local Android Live Update module's JS in the main process on both
+// platforms: its import side effect registers the Live Update sink on the one
+// platform that can load it, and the require is the capability gate (see the
+// module's src/index.ts). Imported by path: the module is autolinked from
+// modules/ and intentionally absent from dependencies.
+import '../../modules/active-agents-live-update/src';
+// Registers the iOS Live Activity and widget sink with the glanceable
+// publisher. iOS-only by capability (WidgetKit/ActivityKit): the module loads
+// on Android but registers nothing there.
+import '@/glanceable-ios/register';
 
 import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 
@@ -11,10 +21,10 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import * as Sentry from '@sentry/react-native';
-import { isRunningInExpoGo } from 'expo';
+import { reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
 import {
-  ErrorBoundary as ExpoRouterErrorBoundary,
+  type ErrorBoundaryProps,
   type Href,
   Slot,
   ThemeProvider,
@@ -22,128 +32,146 @@ import {
   usePathname,
   useRouter,
   useSegments,
+  useUnstableGlobalHref,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+
+import { useRootNavigationReady } from '@/lib/navigation-ready';
+import { useTranslation } from 'react-i18next';
+import { View, type ViewInstance } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
+import { DesignGateProbe } from '@/components/design-gate-probe';
+import { OfflineBannerSpaceGate } from '@/components/offline-banner';
+import { StateSurface } from '@/components/centered-state-surface';
+import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
+import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
+import { splashContentScale } from '@/components/splash-reveal';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
+import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
+import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
 import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
-import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { isStartupComplete, markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
+import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
+import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/context-scope';
+import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
-import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
+import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
+import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
+import { useNavigationTheme } from '@/lib/hooks/use-navigation-theme';
 import {
   applyThemePreference,
   preloadThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
+import { i18n } from '@/i18n';
+import { clearDirectionAttemptAsync } from '@/i18n/direction-attempt';
+import { retryLanguageStartupDirectionAsync } from '@/i18n/startup-direction-run';
+import {
+  preloadLanguagePreference,
+  useLanguagePreference,
+} from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
-import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
+import { useLanguageStartupPreparation } from '@/lib/hooks/use-language-startup-preparation';
+import {
+  applyConsumedPendingDeepLink,
+  captureLaunchDeepLink,
+  clearPendingDeepLink,
+  consumePendingDeepLink,
+  getPendingDeepLinkSnapshot,
+  subscribeToPendingDeepLink,
+  wasLaunchAppRouteCaptured,
+  wasLaunchLinkHandled,
+} from '@/lib/deep-link-launch';
+import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { registerNeedsInputCategories } from '@/lib/notification-actions';
+import { useOrganization } from '@/lib/organization-context';
 import {
   checkInitialNotification,
+  ensureAndroidNotificationChannels,
+  setupNotificationBackgroundHandler,
   setupNotificationHandler,
+  setupNotificationPermissionGate,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
+import { useTRPC } from '@/lib/trpc';
+import { readNotificationPreviewsIfLoaded } from '@/lib/hooks/agent-push-preference';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
   resolveSupersededPendingShareId,
+  SHARE_INTENT_OPTIONS,
+  shouldIngestShareIntent,
 } from '@/lib/pending-share-navigation';
+import {
+  consumeLastRouteForRepair,
+  getLastRouteHydrationVersion,
+  isLastRouteHydrated,
+  noteRestoredRouteOpen,
+  prepareLastRouteRepair,
+  subscribeLastRoute,
+} from '@/lib/last-route';
+import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
+import { lastRouteHrefFrom } from '@/lib/last-route-recordable';
+import { useRecordLastRoute } from '@/lib/hooks/use-record-last-route';
 import {
   clearSharePayload,
   discardUnstoredSharePayload,
   normalizeShareIntent,
+  peekSharePayload,
+  persistSharePayloadsNow,
   putSharePayload,
+  restoreSharePayloads,
+  setSharePersistUserId,
   type ShareId,
   type SharePayload,
 } from '@/lib/share-payload';
-import { SENTRY_ENVIRONMENT } from '@/lib/config';
-import { SENTRY_DSN } from '@/lib/sentry-dsn';
-import { sentryOptionsForConsent } from '@/lib/sentry-consent';
-import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
-import { resolveSentryEnvironment } from '@/lib/sentry-environment';
+import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { captureSystemSearchLaunch } from '@/lib/system-search-route';
+import {
+  flushDraft,
+  isStringDraft,
+  loadDraft,
+  PENDING_SHARE_ID_DRAFT_KEY,
+  saveDraft,
+} from '@/lib/persist/drafts';
+import { setSentryContext } from '@/lib/sentry-context';
+import { initSentry } from '@/lib/sentry-init';
+import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
+import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
-
-const expoRouterIntegration = Sentry.expoRouterIntegration({
-  enableTimeToInitialDisplay: !isRunningInExpoGo(),
-});
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
+import { reapTempFiles } from '@/lib/temp-file-registry';
 
 // No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
 installE2EWebSocketLatency();
 
-// DEC-02 consent rule: crash and error reporting is mandatory, so
-// `initSentry(false)` runs at module scope — a crash during bootstrap
-// must still be reported. The optional group is `tracesSampleRate` plus
-// MASKED session replay and error screenshots (DEC-02 amendment, owner
-// decision 2026-08-17); the replay integration is only registered once
-// optional consent is accepted, so no replay code runs before the
-// decision. Account identity is cleared by step 7's `Sentry.setUser(null)`.
-// `enableTombstone` is Android 12+ only; NDK stays on for older devices.
-// `enableMetricKit` is iOS 15+ only. App-hang tracking stays off so MetricKit
-// hangs are not reported twice. Native init in the Expo plugin captures
-// crashes before JS loads.
-//
-// In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
-// — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
-//   integration). The authoritative per-launch timing metric is the PostHog
-//   `app_startup` event in src/lib/startup-timing.ts.
-function initSentry(optionalConsented: boolean) {
-  Sentry.init({
-    dsn: SENTRY_DSN,
-
-    enabled: true,
-
-    sendDefaultPii: false,
-
-    enableTombstone: true,
-    enableMetricKit: true,
-    enableAppHangTracking: false,
-
-    environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
-    ...sentryOptionsForConsent(optionalConsented),
-
-    integrations: optionalConsented
-      ? [
-          expoRouterIntegration,
-          Sentry.deeplinkIntegration(),
-          Sentry.mobileReplayIntegration({
-            maskAllText: true,
-            maskAllImages: true,
-            maskAllVectors: true,
-          }),
-        ]
-      : [expoRouterIntegration, Sentry.deeplinkIntegration()],
-    enableNativeFramesTracking: false,
-
-    beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
-    beforeBreadcrumb: scrubBreadcrumb as NonNullable<
-      Parameters<typeof Sentry.init>[0]
-    >['beforeBreadcrumb'],
-
-    spotlight: __DEV__,
-  });
-}
-
 initSentry(false);
+// Install the Sentry sink and the global fetch wrapper before any other
+// module-scope side effect can start a request.
+installErrorReporting();
 
 // Kick the font load off at module scope so it overlaps JS bootstrap; the
 // same family names make `loadAsync` dedupe with the `useFonts` call in
@@ -160,15 +188,45 @@ function preloadStartupFonts(): void {
 }
 
 void SplashScreen.preventAutoHideAsync();
+void ensureAndroidNotificationChannels();
+// The Approve / Reply / Open PR / Open session buttons a needs-input
+// notification carries; idempotent, one pass per launch.
+void registerNeedsInputCategories();
 setupNotificationHandler();
+// The Live Activity waits for the notification grant, so a fresh install never
+// meets iOS's "Allow Live Activities?" prompt before the user asked for alerts.
+setupNotificationPermissionGate();
+// Applies the aggregate glanceable push while backgrounded/killed via a
+// headless expo-notifications task; see setupNotificationBackgroundHandler.
+setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
+// A tap on a result in the phone's own search: capture the cold-launch payload
+// now, before any screen mounts. The warm `onSystemSearchOpen` wake-up is held
+// by the mounted layout (useSystemSearchOpenListener below). Both feed the
+// pending deep-link slot the layout already consumes.
+captureSystemSearchLaunch();
 prefetchCurrentUser();
 preloadThemePreference();
+preloadHideBalancePreference();
+preloadLanguagePreference();
 preloadStartupFonts();
 
-function RootLayoutNav() {
-  const { token, isLoading: authLoading, signOut } = useAuth();
+function RootLayoutNav({
+  languageReady,
+  setLanguageReady,
+}: Readonly<{
+  languageReady: boolean;
+  setLanguageReady: (ready: boolean) => void;
+}>) {
+  const {
+    token,
+    isLoading: authLoading,
+    isSigningOut,
+    signOut,
+    restoreFailed,
+    retryRestore,
+  } = useAuth();
   const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
@@ -176,33 +234,114 @@ function RootLayoutNav() {
   });
   const segments = useSegments();
   const pathname = usePathname();
+  const globalHref = useUnstableGlobalHref();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  const trpc = useTRPC();
+  const preferencesQueryKey = useMemo(
+    () => trpc.user.getNotificationPreferences.queryOptions().queryKey,
+    [trpc]
+  );
+  // The warm answer to one of the app's own notification actions. It lives here,
+  // not at the layout root, because the notification it posts in place of the
+  // acted-on one follows the user's message-preview choice, read from the
+  // preferences query this tree holds. A response arriving before this mount is
+  // still covered by the background task and by `checkInitialNotification`.
+  useEffect(() => {
+    const subscription = setupNotificationResponseHandler({
+      readPreviews: () => readNotificationPreviewsIfLoaded(queryClient, preferencesQueryKey),
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [preferencesQueryKey]);
+
+  // The root navigation container's readiness. `store.assertIsReady()` throws
+  // when `navigationRef.isReady()` is false — the exact crash
+  // "Attempted to navigate before mounting the Root Layout component" — and
+  // that bit is the container's focus adapter, true only after the root
+  // navigator's mount effects. The navigation *state* exists earlier (it is
+  // assigned during render), so every router call below gates on this hook
+  // instead: none lands in the mount window.
+  const navigationReady = useRootNavigationReady();
+  // The gated pending-deep-link consumer below switches to the tapped
+  // notification's organization through this provider before it navigates.
+  const { setOrganizationId } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
+  const { hasLoaded: languageHasLoaded } = useLanguagePreference();
+  const { t } = useTranslation();
   const {
     userId,
     email,
     isLoading: userIdLoading,
     isError: userIdError,
+    isUnreachable: userIdUnreachable,
     refetch: refetchUserId,
   } = useCurrentUserId({ enabled: token != null });
+  // A cold start that cannot reach the API has no confirmed account once the
+  // read cache holding the last confirmation has expired. The identity hint
+  // names the account the restored credentials belong to (see
+  // `useRestoredAccountId`), so the app opens on it and what runs on the device
+  // — a chat with an on-device model — works with no connection. An answer
+  // that refuses the credentials is not covered and still settles on the error.
+  const authenticatedOwner = useSyncExternalStore(
+    subscribeAuthenticatedOwner,
+    getAuthenticatedOwner
+  );
+  const restoredUserId = useRestoredAccountId(
+    authenticatedOwner.authEpoch,
+    authenticatedOwner.restored
+  );
+  const offlineUserId = userId === undefined && userIdUnreachable ? restoredUserId : null;
+  const accountUserId = userId ?? offlineUserId ?? undefined;
+  const identityLoading = userIdLoading && offlineUserId === null;
+  const identityError = userIdError && offlineUserId === null;
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
-  // Flipped by every splash-hide site below, so the app_startup drain can
-  // depend on "startup finished" as an ordinary dependency.
-  const [startupFinished, setStartupFinished] = useState(false);
+  // A recreated activity has no splash once this runtime completed startup.
+  const [startupFinished, setStartupFinished] = useState(isStartupComplete);
   // Reactive snapshot so the drain effect re-triggers when the PostHog
   // client becomes ready after async init.
   const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
 
   useEffect(() => {
     if (fontsError) {
-      Sentry.captureException(fontsError);
+      Sentry.captureException(fontsError, {
+        tags: { 'error.subsystem': 'startup', 'error.operation': 'load_fonts' },
+      });
     }
   }, [fontsError]);
+
+  useEffect(() => {
+    let authState: 'error' | 'loading' | 'signed_in' | 'signed_out' = 'signed_out';
+    if (isSigningOut) {
+      authState = 'signed_out';
+    } else if (authLoading || userIdLoading) {
+      authState = 'loading';
+    } else if (userIdError) {
+      authState = 'error';
+    } else if (token && userId) {
+      authState = 'signed_in';
+    }
+    setSentryContext({
+      userId: authState === 'signed_in' ? (userId ?? null) : null,
+      authState,
+      telemetryMode: consentChecked && !needsConsent && optionalConsent ? 'optional' : 'mandatory',
+    });
+  }, [
+    authLoading,
+    consentChecked,
+    isSigningOut,
+    needsConsent,
+    optionalConsent,
+    token,
+    userId,
+    userIdError,
+    userIdLoading,
+  ]);
 
   // Cold-start read-cache restore: best effort, never blocks startup. Starts
   // before the auth gate resolves so allowlisted queries can hydrate under
@@ -210,6 +349,38 @@ function RootLayoutNav() {
   useEffect(() => {
     void restorePersistedCacheOnColdStart(queryClient);
   }, []);
+
+  // Restore a deep-link destination persisted before process death. Waits for
+  // auth bootstrap to settle into a state where the account binding is known:
+  // a persisted record is account-bound, and the token owner publishes the
+  // signed-in user id before `authLoading` clears. Restoring earlier compares
+  // an account-bound record against a null user id, so a signed-in cold start
+  // would delete its own destination — and a FAILED restore is not a
+  // signed-out answer, so the hook also holds the restore through the
+  // retryable error surface.
+  usePendingDeepLinkRestore({ authLoading, restoreFailed });
+
+  // Scope share persistence to the current account (DEC-01): null while signed
+  // out, so a share captured signed out never persists (in-memory only, and a
+  // same-process login can still open the gate).
+  useEffect(() => {
+    setSharePersistUserId(userId ?? null);
+  }, [userId]);
+
+  // Reactive hydration version so the relaunch repair below re-runs when the
+  // restart read settles (a restored record lands, or reads as absent).
+  const lastRouteHydratedVersion = useSyncExternalStore(
+    subscribeLastRoute,
+    getLastRouteHydrationVersion
+  );
+
+  // Record the focused in-app route on every navigation commit, so a process
+  // death restores the screen the person had on screen instead of the base
+  // Intent's stale deep link. Account-scoped: a signed-out launch records
+  // nothing. The hook itself holds recording until the store's restart read
+  // has settled, so the repair effect (declared later, same render pass) reads
+  // the persisted record before this process's first commit can overwrite it.
+  useRecordLastRoute({ userId: accountUserId });
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
@@ -219,10 +390,11 @@ function RootLayoutNav() {
   // holding first paint for it only ever costs time. `updateRequired` starts
   // false, first paint happens, and the effect below routes to /force-update
   // if the check later says an update is required.
-  const isLoading = authLoading || !fontsReady || !themeHasLoaded;
+  const isLoading =
+    authLoading || !fontsReady || !themeHasLoaded || !languageHasLoaded || !languageReady;
 
   // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
-  // effect re-runs freely as gates settle. `userIdLoading` is false while the
+  // effect re-runs freely as gates settle. `identityLoading` is false while the
   // query is disabled, so it only counts once there is a token.
   useEffect(() => {
     if (!authLoading) {
@@ -234,22 +406,34 @@ function RootLayoutNav() {
     if (themeHasLoaded) {
       markStartup('theme_ready');
     }
-    if (token != null && !userIdLoading) {
+    if (token != null && !identityLoading) {
       markStartup('user_ready');
     }
     if (consentChecked) {
       markStartup('consent_ready');
     }
-  }, [authLoading, fontsReady, themeHasLoaded, token, userIdLoading, consentChecked]);
+  }, [authLoading, fontsReady, themeHasLoaded, token, identityLoading, consentChecked]);
 
   useEffect(() => {
     if (themeHasLoaded) {
       applyThemePreference(themePreference);
     }
   }, [themeHasLoaded, themePreference]);
+
+  // The startup language preparation: one pass per preference load, plus the
+  // deferred readiness-driven return navigation (both effects moved into the
+  // hook). Its returned failure bit owns the Retry/Continue screen below.
+  const { languageReloadFailed, dismissLanguageReloadFailure } = useLanguageStartupPreparation({
+    navigationReady,
+    setLanguageReady,
+  });
+
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
+  // Groups are not part of `pathname`, so both the (app) and the (auth)
+  // legal screen answer to `/legal/<document>`.
+  const onLegalRoute = pathname.startsWith('/legal/');
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
   const onGateRoute = (segments as readonly string[]).includes('share-gate');
   const {
@@ -267,6 +451,70 @@ function RootLayoutNav() {
   // without reading stale state or adding the id to effect deps.
   const pendingShareIdRef = useRef(pendingShareId);
   pendingShareIdRef.current = pendingShareId;
+  // Bumped by the ingest arm and the gate consume so the cold-start restore can
+  // detect any live arm/consume during its async reads and skip the fill.
+  const pendingShareIdEpochRef = useRef(0);
+
+  // Flush a share staged while the account id was still loading: the ingest
+  // effect persisted nothing (userId was falsy), so once userId resolves the
+  // staged payload map, navigation queue, and pending id are written to durable
+  // drafts. A signed-out share never reaches this branch (userId stays null),
+  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
+  // closure references an already-declared const.
+  useEffect(() => {
+    if (userId && pendingShareIdRef.current !== null) {
+      void persistSharePayloadsNow();
+      void persistShareNavigationNow();
+      saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingShareIdRef.current);
+      void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+    }
+  }, [userId]);
+
+  // Cold-start share restore. Order matters: payloads first, then the
+  // navigation queue (deliveries point at restored payloads), then the pending
+  // id — and only when its payload still exists. A restored id with an empty
+  // map is the existing stale-share empty path, so it must not re-arm the gate.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreShare() {
+      const startEpoch = pendingShareIdEpochRef.current;
+      if (!userId) {
+        return;
+      }
+      await restoreSharePayloads(userId);
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      await restoreShareNavigation(userId);
+      // `cancelled` is set by the cleanup below; the previous check narrows the
+      // fall-through path, but the variable is genuinely mutable.
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      const pendingId = await loadDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, isStringDraft);
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      if (
+        pendingId !== null &&
+        peekSharePayload(pendingId) !== null &&
+        pendingShareIdRef.current === null
+      ) {
+        // Fill only an empty slot: a live ingest that armed a newer pending id
+        // during this restore must win, so never overwrite a non-null slot.
+        setPendingShareId(pendingId);
+      }
+    }
+
+    void restoreShare();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
   const isShellReady = isShellReadyForShare({
@@ -275,8 +523,8 @@ function RootLayoutNav() {
     updateRequired,
     inAuthGroup,
     inForceUpdate,
-    userIdLoading,
-    userIdError,
+    userIdLoading: identityLoading,
+    userIdError: identityError,
     consentCheckError: consentCheckError != null,
     consentChecked,
     needsConsent,
@@ -288,7 +536,7 @@ function RootLayoutNav() {
     let cancelled = false;
 
     async function checkConsent() {
-      if (!token || !userId) {
+      if (!token || !accountUserId) {
         setConsentChecked(false);
         setNeedsConsent(false);
         setOptionalConsentState(false);
@@ -296,13 +544,19 @@ function RootLayoutNav() {
         return;
       }
 
-      const result = await checkConsentGate(userId);
+      const result = await checkConsentGate(accountUserId);
       if (cancelled) {
         return;
       }
 
       if (result.status === 'error') {
-        Sentry.captureException(result.error);
+        // A locked device refusing the keychain read is that device state, not
+        // a defect; the gate reports its own retry state below either way.
+        if (!isKeychainInteractionRefused(result.error)) {
+          Sentry.captureException(result.error, {
+            tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
+          });
+        }
         setNeedsConsent(false);
         setOptionalConsentState(false);
         setConsentChecked(false);
@@ -325,15 +579,15 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [token, userId, consentCheckRetryKey]);
+  }, [token, accountUserId, consentCheckRetryKey]);
 
   useEffect(() => {
-    if (!token || !userId) {
+    if (!token || !accountUserId) {
       return undefined;
     }
 
     const unsubscribe = subscribeToConsentChanges(change => {
-      if (change.userId !== userId) {
+      if (change.userId !== accountUserId) {
         return;
       }
 
@@ -343,15 +597,18 @@ function RootLayoutNav() {
     });
 
     return unsubscribe;
-  }, [token, userId]);
+  }, [token, accountUserId]);
 
   useTrackingPermissionPrompt(
     optionalConsent &&
       shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
   );
   useAnalyticsConsentGate({
+    authLoading,
     hasToken: token != null,
+    userIdLoading,
     consentChecked,
+    consentCheckFailed: consentCheckError != null,
     needsConsent,
     email,
     accountId: userId,
@@ -364,8 +621,14 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (shareIntentError) {
-      Sentry.captureException(new Error(shareIntentError));
-      toast.error("Couldn't read the shared content");
+      Sentry.captureException(new Error('Share intent provider error'), {
+        tags: {
+          'error.subsystem': 'share-intent',
+          'error.operation': 'read_native_payload',
+        },
+        fingerprint: ['share-intent-provider-error'],
+      });
+      toast.error(i18n.t('share.couldNotReadContent'));
       resetShareIntentRef.current();
     }
   }, [shareIntentError]);
@@ -376,7 +639,10 @@ function RootLayoutNav() {
   // error path. Calls go through resetShareIntentRef so the unstable context
   // function stays out of the deps.
   useEffect(() => {
-    if (!hasShareIntent) {
+    // Copy the shared files only once the shell can open the gate. The
+    // provider keeps the intent across a backgrounding (SHARE_INTENT_OPTIONS)
+    // so a sign-in that leaves the app cannot drop the deferred payload.
+    if (!shouldIngestShareIntent({ hasShareIntent, isShellReady })) {
       return undefined;
     }
 
@@ -397,13 +663,22 @@ function RootLayoutNav() {
         if (superseded !== null) {
           clearSharePayload(superseded);
         }
+        pendingShareIdEpochRef.current += 1;
         setPendingShareId(shareId);
+        // Persist the pending id so a process death before the gate opens still
+        // restores it; skipped while the account has not resolved (signed out).
+        if (userId) {
+          saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, shareId);
+          void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+        }
       } catch (error) {
         if (cancelled) {
           return;
         }
-        Sentry.captureException(error);
-        toast.error("Couldn't read the shared content");
+        Sentry.captureException(error, {
+          tags: { 'error.subsystem': 'share-intent', 'error.operation': 'normalize_payload' },
+        });
+        toast.error(i18n.t('share.couldNotReadContent'));
         resetShareIntentRef.current();
       }
     };
@@ -413,96 +688,258 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [hasShareIntent, shareIntent]);
+  }, [hasShareIntent, shareIntent, isShellReady, userId]);
+
+  // Memoized because the repair effect below keys on it: a plain call would
+  // hand the effect a new object identity every render and re-run it each time.
+  const decision = useMemo(
+    () =>
+      resolveBootstrapDecision({
+        isLoading,
+        updateRequired,
+        inForceUpdate,
+        inAuthGroup,
+        hasToken: token != null,
+        userIdLoading: identityLoading,
+        userIdError: identityError,
+        consentCheckError: consentCheckError != null,
+        consentChecked,
+        needsConsent,
+        onConsentRoute,
+        onConsentReviewRoute,
+        onLegalRoute,
+        languageReloadFailed,
+        restoreFailed,
+      }),
+    [
+      isLoading,
+      updateRequired,
+      inForceUpdate,
+      inAuthGroup,
+      token,
+      identityLoading,
+      identityError,
+      consentCheckError,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+      onLegalRoute,
+      languageReloadFailed,
+      restoreFailed,
+    ]
+  );
 
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-
-    if (updateRequired) {
-      if (!inForceUpdate) {
+    switch (decision.tag) {
+      case 'settle-language-error': {
+        markStartupComplete('language-error');
+        setStartupFinished(true);
+        return;
+      }
+      case 'settle-restore-error': {
+        markStartupComplete('restore-error');
+        setStartupFinished(true);
+        return;
+      }
+      case 'wait-loading':
+      case 'wait-user-consent': {
+        return;
+      }
+      case 'redirect-force-update': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/force-update');
-      } else {
+        return;
+      }
+      case 'settle-force-update': {
         markStartupComplete('force-update');
         setStartupFinished(true);
+        return;
       }
-      return;
-    }
-
-    if (inForceUpdate) {
-      router.replace('/(app)');
-      return;
-    }
-
-    if (!token) {
-      if (inAuthGroup) {
+      case 'exit-force-update': {
+        if (!navigationReady) {
+          return;
+        }
+        router.replace('/(app)');
+        return;
+      }
+      case 'settle-login': {
         markStartupComplete('login');
         setStartupFinished(true);
-      } else {
-        router.replace('/(auth)/login');
+        return;
       }
-    } else {
-      if (userIdError) {
+      case 'redirect-login': {
+        if (!navigationReady) {
+          return;
+        }
+        router.replace('/(auth)/login');
+        return;
+      }
+      case 'settle-user-error': {
         markStartupComplete('user-error');
         setStartupFinished(true);
         return;
       }
-
-      if (consentCheckError) {
+      case 'settle-consent-error': {
         markStartupComplete('consent-error');
         setStartupFinished(true);
         return;
       }
-
-      if (userIdLoading || !consentChecked) {
+      case 'settle-consent': {
+        markStartupComplete('consent');
+        setStartupFinished(true);
         return;
       }
-
-      if (needsConsent) {
-        if (onConsentRoute) {
-          markStartupComplete('consent');
-          setStartupFinished(true);
-        } else {
-          router.replace('/(app)/consent' as Href);
+      case 'redirect-consent': {
+        if (!navigationReady) {
+          return;
         }
+        router.replace('/(app)/consent' as Href);
         return;
       }
-
-      if ((onConsentRoute && !onConsentReviewRoute) || inAuthGroup) {
+      case 'redirect-app': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(app)');
         return;
       }
-
-      markStartupComplete('app');
-      setStartupFinished(true);
-      // Navigate to pending deep link (cold start universal link / notification tap)
-      const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
-      if (pendingNavigation) {
-        router.navigate(pendingNavigation.href as Href);
+      case 'settle-app': {
+        // The relaunch repair navigates to the recorded screen in this same
+        // flush. Revealing the tree before the root navigator accepts
+        // navigation, or before the record's restart read settles, would paint
+        // the restored route first.
+        if (!navigationReady || !isLastRouteHydrated()) {
+          return;
+        }
+        markStartupComplete('app');
+        setStartupFinished(true);
+        // Deep-link navigation is owned by the pendingDeepLink effect below.
+        // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
+        break;
       }
-      // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
+      default:
+      // Unreachable: BootstrapDecisionTag is a closed union.
     }
+  }, [decision, navigationReady, router, setStartupFinished, lastRouteHydratedVersion]);
+
+  // Reactive snapshot of the pending deep-link slot so a destination stashed
+  // after the gate effect last ran (e.g. a notification tap while signed out,
+  // or a restored persisted record) is consumed without waiting for an
+  // unrelated dependency change.
+  const pendingDeepLink = useSyncExternalStore(
+    subscribeToPendingDeepLink,
+    getPendingDeepLinkSnapshot
+  );
+
+  // Relaunch repair. When the process died, Android recreates the task with
+  // its original base Intent, so a stale deep link (a notification or launcher
+  // session link) replays as the initial route and the app reopens on a
+  // session that may be long gone — the not-found screen. The last focused
+  // in-app route was recorded on every navigation commit
+  // (useRecordLastRoute); once bootstrap settles into the app and before the
+  // hidden wrapper clears for the first frame, replace onto that route. A
+  // missing, foreign-account, or gate route reads as no record: Home stays.
+  //
+  // The latch waits for the mirror read: `getLastRoute` hydrates
+  // asynchronously, so a settle that runs before the read resolves would
+  // otherwise read "no record", latch done, and never repair. The store is
+  // observable (subscribeLastRoute notifies when the restored record lands),
+  // so the effect re-runs on the read's completion and only then latches.
+  // After that, one pass per process — a later navigation away from the
+  // recorded route is never "repaired" back.
+  const lastRouteRepairDone = useRef(false);
+  useEffect(() => {
+    if (lastRouteRepairDone.current) {
+      return;
+    }
+    if (decision.tag !== 'settle-app') {
+      return;
+    }
+    if (!navigationReady) {
+      return;
+    }
+    if (!isLastRouteHydrated()) {
+      return;
+    }
+    lastRouteRepairDone.current = true;
+    // Consume-and-latch: the recorder holds writes until this ran, so the
+    // cold start's first commit (the base Intent's restored route) cannot
+    // overwrite the persisted record before it is read here.
+    const recordedHref = consumeLastRouteForRepair(accountUserId ?? null);
+    if (recordedHref === null) {
+      return;
+    }
+    if (
+      !shouldRepairRestoredRoute({
+        recordedHref,
+        // The tab group is part of the destination: `/profiles` and `/` are the
+        // same path once groups are stripped, so the resolved href of the route
+        // actually on screen is the comparison, not the bare pathname.
+        restoredRoute: lastRouteHrefFrom(globalHref, pathname, segments) ?? pathname,
+        // A launch that named one of the app's own routes is the screen this
+        // process was started for: the pending-deep-link consumer below opens
+        // it (with the layout anchors beneath it) instead of the record.
+        launchOpenedAppRoute: wasLaunchAppRouteCaptured(),
+      })
+    ) {
+      return;
+    }
+    // The launch-captured link is the stale replay this repair undoes: the
+    // route it points at was not the screen the person had focused, so the
+    // pending-deep-link consumer (declared below, same flush) must not
+    // re-apply it after this navigation. The slot is dropped only when it
+    // carries exactly the href the cold-start capture stashed — slot and
+    // capture come from the same launch Intent, so a live tap (a notification
+    // or search result delivering a different URL, or the same session via a
+    // fresh resume link with a new anchor) never matches and is left for the
+    // consumer below.
+    const launchCaptured = wasLaunchLinkHandled();
+    const slotHref = getPendingDeepLinkSnapshot();
+    if (launchCaptured !== null && slotHref === launchCaptured) {
+      clearPendingDeepLink();
+    }
+    // `navigate` (not `replace`): replacing the stack root leaves the target
+    // screen with no back stack, the same reasoning as resolvePendingNavigation.
+    // The mark lets the screen it lands on tell this automatic restore from a
+    // destination the person chose, so a recorded session that no longer
+    // resolves falls back to the start screen instead of a dead end.
+    noteRestoredRouteOpen(recordedHref);
+    router.navigate(recordedHref as Href, { withAnchor: true });
   }, [
-    token,
-    isLoading,
-    updateRequired,
-    inAuthGroup,
-    inForceUpdate,
+    decision,
+    accountUserId,
+    pathname,
+    segments,
+    globalHref,
     router,
-    userIdLoading,
-    userIdError,
-    consentCheckError,
-    consentChecked,
-    needsConsent,
-    onConsentRoute,
-    onConsentReviewRoute,
+    navigationReady,
+    lastRouteHydratedVersion,
   ]);
 
   // Declared after the auth effect so that on the same flush a pending
-  // notification navigate runs first and the share gate opens on top.
+  // deep-link navigate runs first and the share gate opens on top.
   useEffect(() => {
-    if (pendingShareId === null || !isShellReady) {
+    if (pendingDeepLink === null || !isShellReady || !navigationReady) {
+      return;
+    }
+    // The shared step switches to the destination's organization before
+    // navigating, in the same effect body with nothing awaited between: the
+    // route reads the new organization on its first render instead of fetching
+    // the old scope and showing an empty list. A destination with no
+    // organization (Personal) leaves the selection unchanged.
+    applyConsumedPendingDeepLink(consumePendingDeepLink(), setOrganizationId, href => {
+      const navigation = resolvePendingNavigation(href);
+      if (navigation) {
+        router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
+      }
+    });
+  }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
+
+  useEffect(() => {
+    if (pendingShareId === null || !isShellReady || !navigationReady) {
       return;
     }
 
@@ -519,8 +956,9 @@ function RootLayoutNav() {
     } else {
       router.push(navigation.href as Href);
     }
+    pendingShareIdEpochRef.current += 1;
     setPendingShareId(null);
-  }, [pendingShareId, isShellReady, onGateRoute, router]);
+  }, [pendingShareId, isShellReady, navigationReady, onGateRoute, router]);
 
   // One `app_startup` event per launch, delegated to a drain helper so
   // tests can drive the real guard logic without mounting the full layout.
@@ -543,39 +981,68 @@ function RootLayoutNav() {
     });
   }, [startupFinished, token, consentChecked, needsConsent, optionalConsent, postHogReady]);
 
-  const needsForceUpdate = updateRequired && !inForceUpdate;
-  const showingForceUpdate = updateRequired && inForceUpdate;
-  const needsAuth = !token && !inAuthGroup;
-  const needsAppRedirect = token != null && inAuthGroup;
-  const hasUserBootstrapError = token != null && userIdError;
-  const hasConsentBootstrapError = token != null && consentCheckError !== null;
-  const hasBootstrapError = hasUserBootstrapError || hasConsentBootstrapError;
-  const consentLoading =
-    token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
-  const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
-
-  const needsRedirect =
-    !isLoading &&
-    (needsForceUpdate ||
-      (!showingForceUpdate && (needsAuth || needsAppRedirect || needsConsentRedirect)));
-
   // Always keep Slot mounted so Expo Router's navigation tree stays
   // initialised — returning null unmounts it and breaks router.replace.
   // The native splash screen covers everything during initial load, and
   // opacity 0 hides the wrong screen during redirects.
-  const hidden =
-    !hasUserBootstrapError &&
-    !hasConsentBootstrapError &&
-    (isLoading || needsRedirect || consentLoading);
+  const {
+    hasUserBootstrapError,
+    hasConsentBootstrapError,
+    hasRestoreError,
+    hasBootstrapError,
+    hidden,
+  } = resolveBootstrapDecision({
+    isLoading,
+    updateRequired,
+    inForceUpdate,
+    inAuthGroup,
+    hasToken: token != null,
+    userIdLoading: identityLoading,
+    userIdError: identityError,
+    consentCheckError: consentCheckError != null,
+    consentChecked,
+    needsConsent,
+    onConsentRoute,
+    onConsentReviewRoute,
+    onLegalRoute,
+    languageReloadFailed,
+    restoreFailed,
+  });
+
+  // Post-startup hidden windows (a sign-in's redirect + consent check, a
+  // sign-out's redirect to login) have no splash over them, so the hidden
+  // wrapper would otherwise paint an empty background. Keep one spinner up
+  // for exactly those windows (app-blank-after-oauth). A sign-out is the same
+  // exposed window for its teardown: the session is revoked over the network
+  // while the signed-in tree is still published, and the profile it leaves
+  // behind is already stale (explorer signout-loading).
+  //
+  // The teardown half is bounded by the token, not by `isSigningOut` alone:
+  // that flag flips at the start of sign-out and only clears when a *later*
+  // sign-in publishes credentials, so gating on it would hold the surface over
+  // the login screen forever. Once the token clears, `hidden` owns the window
+  // until the login route mounts, so the surface is continuous either way.
+  const signingOutWindow = startupFinished && isSigningOut && token != null;
+  const showBootstrapLoading = shouldShowBootstrapLoading({
+    startupFinished,
+    hidden,
+    signingOut: isSigningOut && token != null,
+  });
+
+  // The wait surface owns the screen for a sign-out's whole teardown too, so
+  // the tree leaves both accessibility trees and stops taking touches for
+  // `wrapperObscured`, and the same signal drives the entry announcement: the
+  // login screen is the deterministic entry context in both cases.
+  const wrapperObscured = hidden || signingOutWindow;
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
   // `announceForA11y` is the deterministic entry context for screen-reader
-  // users, and the wrapper focus is best-effort (`moveA11yFocus` returns false
-  // when the platform declines — no retry), deferred to the next frame so the
-  // revealed tree is measurable. Per-screen heading/first-control focus is
-  // owned by the screens themselves; the gate cannot know the active screen's
-  // heading.
+  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
+  // only when the wrapper has no node yet or the native call throws — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
   //
   // The transition is skipped while a bootstrap error is shown: the wrapper
   // is unmounted then (the error screen replaces it), so "Content ready"
@@ -583,33 +1050,65 @@ function RootLayoutNav() {
   // cleanup cancels the pending frame, which React runs before any later
   // render's frame can fire, so an interrupted reveal never focuses a stale
   // wrapper.
-  const wrapperRef = useRef<View>(null);
-  const wasHiddenRef = useRef(hidden);
+  const wrapperRef = useRef<ViewInstance>(null);
+  const wasHiddenRef = useRef(wrapperObscured);
   useEffect(() => {
     const wasHidden = wasHiddenRef.current;
-    wasHiddenRef.current = hidden;
-    if (!wasHidden || hidden || hasBootstrapError) {
+    wasHiddenRef.current = wrapperObscured;
+    if (!wasHidden || wrapperObscured || hasBootstrapError) {
       return undefined;
     }
-    announceForA11y('Content ready');
+    announceForA11y(i18n.t('bootstrap.contentReady'));
     const frame = requestAnimationFrame(() => {
-      moveA11yFocus(wrapperRef);
+      requestA11yFocus(wrapperRef);
     });
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [hidden, hasBootstrapError]);
+  }, [wrapperObscured, hasBootstrapError]);
 
-  if (hasUserBootstrapError) {
+  // The restore-error surface is settled, but a successful Retry does not
+  // reveal the app immediately: the token publish, the user fetch, and the
+  // consent check still run behind the loading gate, and the splash overlay
+  // that covers a cold start's hidden window is already gone (startup
+  // completed when the error settled). Dropping the error screen the moment
+  // `restoreFailed` clears would expose that hidden window as a blank frame
+  // before Home. `useRestoreErrorHold` latches the settled surface: it stays
+  // mounted while the retried bootstrap finishes, and the layout effect
+  // releases it only when the gate actually reveals the tree (`hidden` flips
+  // false) or sign-out begins the escape hatch — released in a layout effect,
+  // so the error screen and the revealed tree swap inside one paint.
+  const showRestoreError = useRestoreErrorHold({
+    hasRestoreError,
+    hidden,
+    isSigningOut,
+  });
+
+  // The wait surface (or the held restore surface) covers the tree: it leaves
+  // both accessibility trees, stops taking touches, and paints nothing that
+  // would show through the opaque surface above it.
+  const obscureTree = wrapperObscured || showRestoreError;
+
+  // Sign-out from either error screen below outranks the error: the failure
+  // belongs to the account being revoked, and its Sign out starts the teardown
+  // behind the screen, so the branch would leave the stale error (and the
+  // account copy on it) over the app for the whole revoke (explorer
+  // signout-loading). While `signingOutWindow` owns the screen, the shared
+  // render below paints its wait surface; the error flags below both require
+  // the token, so clearing the token cannot bring the screen back, and the
+  // fall-through also keeps Slot mounted for the login replace.
+  const bootstrapErrorOwnsScreen = !signingOutWindow;
+
+  if (hasUserBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
-        title="Could not load your account"
-        description="Check your connection and try again."
-        primaryLabel="Retry"
-        primaryAccessibilityLabel="Retry loading account"
+        title={t('bootstrap.couldNotLoadAccount')}
+        description={t('organization.boundary.loadErrorMessage')}
+        primaryLabel={t('common.retry')}
+        primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
         onPrimaryPress={refetchUserId}
-        secondaryLabel="Sign out"
-        secondaryAccessibilityLabel="Sign out"
+        secondaryLabel={t('common.signOut')}
+        secondaryAccessibilityLabel={t('common.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}
@@ -617,19 +1116,19 @@ function RootLayoutNav() {
     );
   }
 
-  if (hasConsentBootstrapError) {
+  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
-        title="Could not load privacy choices"
-        description="Check your device security settings and try again."
-        primaryLabel="Retry"
-        primaryAccessibilityLabel="Retry loading privacy choices"
+        title={t('bootstrap.couldNotLoadPrivacy')}
+        description={t('bootstrap.couldNotLoadPrivacyDescription')}
+        primaryLabel={t('common.retry')}
+        primaryAccessibilityLabel={t('bootstrap.retryLoadingPrivacy')}
         onPrimaryPress={() => {
           setConsentCheckError(null);
           setConsentCheckRetryKey(key => key + 1);
         }}
-        secondaryLabel="Sign out"
-        secondaryAccessibilityLabel="Sign out"
+        secondaryLabel={t('common.signOut')}
+        secondaryAccessibilityLabel={t('common.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}
@@ -637,45 +1136,179 @@ function RootLayoutNav() {
     );
   }
 
+  if (languageReloadFailed) {
+    return (
+      <LanguageReloadErrorScreen
+        onRetry={() => {
+          // A retry is the user asking for another attempt, not the automatic
+          // relaunch the record guards against. The runner drops the record
+          // first; a reload failure leaves this screen up so the user can retry
+          // or continue.
+          void retryLanguageStartupDirectionAsync({
+            clearAttempt: clearDirectionAttemptAsync,
+            reload: reloadAppAsync,
+          });
+        }}
+        onContinue={() => {
+          dismissLanguageReloadFailure();
+        }}
+      />
+    );
+  }
+
+  // Placed after the language block so the render order matches the decision
+  // tag chain. The user and consent errors above cannot co-occur with this
+  // one: both require a token, and a failed credential read has none.
+  //
+  // The stored session could not be read, so it is not known to be gone: the
+  // person is asked to retry, never presented as signed out. A retry holds
+  // this settled surface until the fresh reads resolve (`restoreFailed`
+  // stays true) AND through the post-restore gates (the hold), so the busy
+  // state is the primary button's inline spinner — no blank frame and no
+  // gate swap — and Sign out is the explicit escape hatch to the login
+  // screen.
+  //
+  // The held surface is an absolute overlay ABOVE the wrapper, not an early
+  // return: while it is up, the retried bootstrap settles into redirect tags
+  // (redirect-login / redirect-consent / redirect-app) whose router.replace
+  // must land. An early return unmounts Slot, so those replaces fire into a
+  // torn-down navigation tree and the hold can dead-end on the error screen
+  // (retry succeeds with the session deleted → login). With the overlay, Slot
+  // stays mounted, the replace lands (login mounts, inAuthGroup flips), and
+  // `hidden` clears — the hold releases in a layout effect, so the error
+  // surface and the revealed tree swap inside one paint. Under the overlay
+  // the wrapper is forced to the hidden presentation (opacity-0, no touch, no
+  // a11y), so the settled state renders exactly like the early return it
+  // replaces.
   return (
-    <View
-      ref={wrapperRef}
-      // `opacity-0` + `pointerEvents` hide the redirecting tree visually and
-      // from touch, but not from screen readers. Leave both accessibility
-      // trees while hidden (iOS, then Android).
-      accessibilityElementsHidden={hidden}
-      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
-      className={`flex-1 ${hidden ? 'opacity-0' : 'opacity-100'}`}
-      pointerEvents={hidden ? 'none' : 'auto'}
-    >
-      <Slot />
-    </View>
+    <>
+      <View
+        ref={wrapperRef}
+        // `opacity-0` + `pointerEvents` hide the redirecting tree visually and
+        // from touch, but not from screen readers. Leave both accessibility
+        // trees while hidden (iOS, then Android). The held error surface
+        // forces the same presentation: it owns the screen above the wrapper.
+        // `bg-background` keeps the root surface opaque: while a rotation
+        // relayout runs, frames before React's first commit must show the
+        // app's own background, never the window's foreign default.
+        accessibilityElementsHidden={obscureTree}
+        importantForAccessibility={obscureTree ? 'no-hide-descendants' : 'auto'}
+        className={`flex-1 bg-background ${obscureTree ? 'opacity-0' : 'opacity-100'}`}
+        pointerEvents={obscureTree ? 'none' : 'auto'}
+      >
+        <Slot />
+      </View>
+      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
+      {showRestoreError ? (
+        <View className="absolute inset-0">
+          <BootstrapErrorScreen
+            title={t('bootstrap.couldNotLoadAccount')}
+            description={t('common.somethingWentWrong')}
+            primaryLabel={t('common.retry')}
+            primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
+            onPrimaryPress={retryRestore}
+            primaryLoading={authLoading || userIdLoading}
+            secondaryLabel={t('common.signOut')}
+            secondaryAccessibilityLabel={t('common.signOut')}
+            onSecondaryPress={() => {
+              void signOut();
+            }}
+          />
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+/** Settles the app tree from the splash overlay's overscan back to 1. */
+function AppContentReveal({ children }: Readonly<{ children: React.ReactNode }>) {
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: splashContentScale.value }],
+  }));
+  return (
+    // bg-background keeps the scaled wrapper opaque over the window: the
+    // overscan frame and every relayout gap behind it render the app's own
+    // background, never the platform default.
+    <Animated.View className="flex-1 bg-background" style={style}>
+      {children}
+    </Animated.View>
   );
 }
 
 function RootLayout() {
   const navigationTheme = useNavigationTheme();
+  // Share catalog readiness with native unlock without delaying the mounted tree.
+  // A catalog failure still resolves readiness with the existing English fallback.
+  const [languageReady, setLanguageReady] = useState(false);
 
+  // The warm half of a tap on one of the app's own search results: the native
+  // wake-up re-reads the pending slot, so registering it with this tree is
+  // enough. Held here rather than at module scope so unmounting releases the
+  // native listener instead of leaving it alive past the tree that uses it.
+  useSystemSearchOpenListener();
+
+  // Reap expired temp files at cold start, deferred past the current
+  // interaction frame so a navigation never waits on it. AppState is already
+  // `active` at launch, so the foreground edge alone never reaps in a
+  // launch/use/kill cycle.
   useEffect(() => {
-    const subscription = setupNotificationResponseHandler();
-    return () => {
-      subscription.remove();
-    };
+    scheduleCacheMaintenance(() => {
+      reapTempFiles();
+    });
   }, []);
 
+  // The foreground half of the same reap. The app's shared `useAppLifecycle()`
+  // store is the single foreground subscription for this work, so the edge
+  // fires only on background -> active and never on an active -> active echo.
+  // The reap is idempotent, so dropping the layout's own `AppState` listener
+  // for this loses nothing.
+  const { isActive } = useAppLifecycle();
+  const wasActiveRef = useRef(isActive);
+  useEffect(() => {
+    if (!wasActiveRef.current && isActive) {
+      scheduleCacheMaintenance(() => {
+        reapTempFiles();
+      });
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive]);
+
   return (
-    <ShareIntentProvider>
-      <ThemeProvider value={navigationTheme}>
-        <AppRootProviders>
-          <StatusBar style="auto" />
-          <RootLayoutNav />
-          <AnimatedSplashOverlay />
-        </AppRootProviders>
-      </ThemeProvider>
-    </ShareIntentProvider>
+    <MotionProvider>
+      <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
+        <ThemeProvider value={navigationTheme}>
+          <OfflineBannerSpaceGate>
+            <AppRootProviders languageReady={languageReady}>
+              <StatusBar style="auto" />
+              {__DEV__ ? <DesignGateProbe /> : null}
+              <AppContentReveal>
+                <StateSurface className="flex-1">
+                  <RootLayoutNav
+                    languageReady={languageReady}
+                    setLanguageReady={setLanguageReady}
+                  />
+                </StateSurface>
+              </AppContentReveal>
+              <AnimatedSplashOverlay />
+            </AppRootProviders>
+          </OfflineBannerSpaceGate>
+        </ThemeProvider>
+      </ShareIntentProvider>
+    </MotionProvider>
   );
 }
 
-export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(ExpoRouterErrorBoundary);
+function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return (
+    <RuntimeErrorScreen
+      onRetry={() => {
+        prepareLastRouteRepair();
+        void retry();
+      }}
+    />
+  );
+}
+
+export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);
 
 export default Sentry.wrap(RootLayout);

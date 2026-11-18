@@ -1,0 +1,133 @@
+import { hasVisibleGlyph } from '@kilocode/app-shared/display-text';
+import { sessionDisplayLine } from '@kilocode/session-ingest-contracts';
+import { z } from 'zod';
+
+/**
+ * The OAuth client a device-auth request asks to connect, as the requester
+ * describes it and as the approval page shows it. The approval applies to this
+ * exact client: the page displays it, the approver confirms it, and the
+ * requester receives an approved pairing only for the client it named.
+ */
+export type RequestingClient = {
+  clientId: string;
+  clientName: string;
+  redirectOrigin: string;
+};
+
+/** Longest value accepted for any displayed client field. */
+export const REQUESTING_CLIENT_FIELD_MAX = 200;
+
+/**
+ * A value rendered as text on the approval page: bounded, free of control
+ * characters so it cannot break a line or a shell-style record, and normalized
+ * through the repository's display-text rule so a layout format control cannot
+ * reorder what the approver confirms. The value is normalized after the raw
+ * checks, so what is stored and echoed is the display text the approver reads,
+ * and a value that draws nothing is refused: the approver cannot confirm a
+ * blank client.
+ */
+const displayField = z
+  .string()
+  .trim()
+  .min(1)
+  .max(REQUESTING_CLIENT_FIELD_MAX)
+  .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters')
+  .transform(value => sessionDisplayLine(value).trim())
+  .refine(hasVisibleGlyph, 'must not contain only invisible characters');
+
+/**
+ * Schemes a browser handles itself. A bare scheme is only accepted for a native
+ * app that takes the code without a host, never for one of these.
+ */
+const browserSchemes: Readonly<Record<string, true>> = {
+  'about:': true,
+  'blob:': true,
+  'data:': true,
+  'file:': true,
+  'ftp:': true,
+  'http:': true,
+  'https:': true,
+  'javascript:': true,
+  'vbscript:': true,
+  'ws:': true,
+  'wss:': true,
+};
+
+/**
+ * An absolute origin: `scheme://host[:port]` for a web redirect, or a bare
+ * `scheme:` / `scheme://host` for a native app. A path, query, fragment,
+ * userinfo or whitespace means the value is not an origin, and the approval
+ * page never presents it as one.
+ */
+function isRedirectOrigin(value: string): boolean {
+  const scheme = /^[a-z][a-z0-9+.-]*:/iu.exec(value)?.[0];
+  if (scheme === undefined) return false;
+  if (value === scheme) return browserSchemes[scheme.toLowerCase()] !== true;
+  if (/[\s@]/u.test(value)) return false;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (!url.hostname) return false;
+  if (url.username || url.password || url.search || url.hash) return false;
+  if (url.pathname !== '' && url.pathname !== '/') return false;
+  return value.replace(/\/$/u, '') === redirectOriginFor(url).replace(/\/$/u, '');
+}
+
+/** The origin shape the approval page shows for a parsed redirect URL. */
+function redirectOriginFor(url: URL): string {
+  if (url.protocol === 'http:' || url.protocol === 'https:') return url.origin;
+  return `${url.protocol}//${url.host}`;
+}
+
+/** The `requesting_client` member of `POST /api/device-auth/codes`. */
+export const requestingClientSchema = z.object({
+  client_id: displayField,
+  client_name: displayField,
+  redirect_origin: displayField.refine(
+    isRedirectOrigin,
+    'must be an absolute origin with no path, query, or fragment'
+  ),
+});
+
+export type RequestingClientPayload = z.infer<typeof requestingClientSchema>;
+
+/** The stored shape back to the wire shape the approval page and the worker read. */
+export function toRequestingClient(payload: RequestingClientPayload): RequestingClient {
+  return {
+    clientId: payload.client_id,
+    clientName: payload.client_name,
+    redirectOrigin: payload.redirect_origin,
+  };
+}
+
+/**
+ * The requesting client of a stored row, or null when the row carries none
+ * (a caller that names no client, and every row written before this flow).
+ *
+ * The values are the stored ones: the approval posts `clientId` back to confirm
+ * the client it approved, and the server compares it with the stored value, so
+ * this type must not transform it. The approval page renders each value through
+ * `displaySafeText`, which is where display text belongs.
+ */
+export function requestingClientOfRow(row: {
+  requesting_client_id: string | null;
+  requesting_client_name: string | null;
+  requesting_redirect_origin: string | null;
+}): RequestingClient | null {
+  const { requesting_client_id, requesting_client_name, requesting_redirect_origin } = row;
+  if (
+    requesting_client_id === null ||
+    requesting_client_name === null ||
+    requesting_redirect_origin === null
+  ) {
+    return null;
+  }
+  return {
+    clientId: requesting_client_id,
+    clientName: requesting_client_name,
+    redirectOrigin: requesting_redirect_origin,
+  };
+}

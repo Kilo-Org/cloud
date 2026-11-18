@@ -1,0 +1,129 @@
+# Email Templates
+
+These HTML files are server-rendered transactional email templates, sent via Mailgun. Variables use `{{ variable_name }}` syntax and are substituted in `renderTemplate()` in [`src/lib/email.ts`](../lib/email.ts).
+
+## Styling
+
+All templates use a light-mode design system aligned with the Customer.io marketing template:
+
+| Property | Value |
+|---|---|
+| Font | `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif` |
+| Page background | none — never set `#ffffff`; the client renders its own page background (dark mode via `kc-page`) |
+| Content width | 520px max |
+| H1 / strong / emphasis | `#1a1a1a`, 24px/700 |
+| Body text | `#333`, 14–15px, line-height 1.5–1.7 |
+| Secondary text (inside boxes) | `#555`, 13–14px |
+| Inline links | `#1a1a1a` underlined |
+| Info-box background | `#f6f6f4` |
+| Info-box border | `1px solid #ebebea` |
+| Info-box border-radius | `10px` |
+| Primary CTA button background | `#1a1a1a` |
+| Primary CTA button text | `#ffffff`, 13px/600, `border-radius: 7px`, `padding: 10px 20px` |
+| Section divider | `1px solid #ebebea` |
+| Footer divider | `1px solid #eee` |
+| Footer legal / address | `#ccc`, 11px |
+
+### Dark mode
+
+`renderTemplate()` injects a `<meta name="color-scheme">` pair and a `prefers-color-scheme: dark` stylesheet into every `emails/` template. Templates must not add their own `<style>` tags or their own `color-scheme`/`supported-color-schemes` metas; the usual `<meta charset>` and `<meta name="viewport">` stay as they are. Every inline palette color needs the matching class on the same element (`email.test.ts` enforces this):
+
+| Inline style on the element | Class |
+|---|---|
+| Page/outer table (no `background`; never `#ffffff`/`#fff`) | `kc-page` |
+| `color: #1a1a1a` (not on `background: #1a1a1a`) | `kc-strong` |
+| `color: #333` | `kc-text` |
+| `color: #555` | `kc-muted` |
+| `color: #ccc` | `kc-faint` |
+| `background-color: #f6f6f4` or `background: #f6f6f4`, `border: 1px solid #ebebea` | `kc-box` |
+| `border-top: 1px solid #ebebea` or `#eee` | `kc-divider` |
+| Primary CTA `background-color: #1a1a1a` or `background: #1a1a1a` | `kc-btn` |
+
+One element can need several classes (e.g. `class="kc-divider kc-muted"`). Keep the inline styles unchanged — they are the light theme; the classes let dark clients override them. Never set `background-color`/`background` to `#ffffff` or `#fff`; leave the page background unset so the client's own (light or dark) background shows through, with `kc-page` only supplying the dark override. Any new inline palette value requires a corresponding class and dark rule.
+
+## Content Guidelines
+
+All templates in this directory are **transactional** emails sent via `app.kilocode.ai`. Keep content factual and account-status focused:
+
+- State what changed and what the user needs to know.
+- A single CTA linking to the relevant page in the app is appropriate.
+- Do **not** include sales copy, upsell blocks, pricing language, or secondary CTAs promoting features or plans.
+- The footer company name is **Kilo Code, Inc** — never "LLC".
+
+## Footer
+
+Every template must include this branding footer below the content table:
+
+```html
+<!-- Branding Footer -->
+<table width="520" cellpadding="0" cellspacing="0" role="presentation">
+  <tr>
+    <td
+      align="center"
+      class="kc-faint kc-divider"
+      style="
+        padding: 30px 20px;
+        border-top: 1px solid #eee;
+        color: #ccc;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+          sans-serif;
+        font-size: 11px;
+      "
+    >
+      © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San Francisco, CA
+      94105, USA
+    </td>
+  </tr>
+</table>
+```
+
+## Template Variables
+
+| Template file | Variables | Customer.io ID (crosswalk) |
+|---|---|---|
+| `orgSubscription.html` | `seats`, `organization_url`, `invoices_url`, `year` | `10` |
+| `orgRenewed.html` | `seats`, `invoices_url`, `year` | `11` |
+| `orgCancelled.html` | `invoices_url`, `year` | `12` |
+| `orgSSOUserJoined.html` | `new_user_email`, `organization_url`, `year` | `13` |
+| `orgInvitation.html` | `organization_name`, `inviter_name`, `accept_invite_url`, `year` | `6` |
+| `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
+| `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
+| `accountLinkCode.html` | `code`, `provider_name`, `email`, `expires_in`, `year` | — |
+| `newSignInMethod.html` | `provider_name`, `linked_identity`, `connected_accounts_link` (rendered HTML anchor), `email`, `year` | — |
+| `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
+| `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
+| `codeReviewDisabled.html` | `reason`, `recovery_url`, `recovery_label`, `support_email` (populated by `renderTemplate`), `year` | — |
+| `ossInviteNewUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` | `18` |
+| `ossInviteExistingUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year` | `19` |
+| `ossExistingOrgProvisioned.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year` | `20` |
+| `deployFailed.html` | `deployment_name`, `deployment_url`, `repository`, `year` | `21` |
+| `clawTrialEndingSoon.html` | `days_remaining`, `claw_url`, `year` | `22` |
+| `clawTrialExpiresTomorrow.html` | `claw_url`, `year` | `23` |
+| `clawSuspendedTrial.html` | `destruction_date`, `claw_url`, `year` | `24` |
+| `clawSuspendedSubscription.html` | `destruction_date`, `claw_url`, `year` | `25` |
+| `clawSuspendedPayment.html` | `destruction_date`, `claw_url`, `year` | `26` |
+| `clawDestructionWarning.html` | `destruction_date`, `claw_url`, `instance_label`, `instance_id_short`, `year` | `27` |
+| `clawInstanceReady.html` | `claw_url`, `year` | — |
+| `clawInstanceDestroyed.html` | `claw_url`, `year` | `28` |
+| `clawOrganizationTrialSuspendedBillingAuthority.html` | `organization_name`, `instance_label`, `destruction_date`, `organization_billing_url`, `year` | — |
+| `clawOrganizationTrialSuspendedUser.html` | `organization_name`, `instance_label`, `destruction_date`, `organization_claw_url`, `year` | — |
+| `clawOrganizationDestructionWarningBillingAuthority.html` | `organization_name`, `instance_label`, `destruction_date`, `organization_billing_url`, `year` | — |
+| `clawOrganizationDestructionWarningUser.html` | `organization_name`, `instance_label`, `destruction_date`, `organization_claw_url`, `year` | — |
+| `clawOrganizationInstanceDestroyedBillingAuthority.html` | `organization_name`, `instance_label`, `organization_billing_url`, `year` | — |
+| `clawOrganizationInstanceDestroyedUser.html` | `organization_name`, `instance_label`, `organization_claw_url`, `year` | — |
+| `clawEarlybirdEndingSoon.html` | `days_remaining`, `expiry_date`, `claw_url`, `year` | `29` |
+| `clawEarlybirdExpiresTomorrow.html` | `expiry_date`, `claw_url`, `year` | `30` |
+| `clawComplementaryInferenceEnded.html` | `claw_url`, `year` | — |
+| `accountDeletionRequest.html` | `email`, `year` | — |
+| `accountDeletionCompleted.html` | `completion_message`, `year` | — |
+| `userDataExportReady.html` | `data_exports_url`, `expiry_date`, `year` | — |
+| `dataExportDownloadCode.html` | `code`, `email`, `expires_in`, `year` | — |
+| `creditsTopUp.html` | `heading`, `intro`, `amount_label`, `amount_usd`, `service_fee_section`, `credits_row_section`, `purchase_date`, `credit_expiry_section`, `credits_url`, `receipt_section`, `year`. `amount_label` is `Amount` when there is no service fee and `Credits added` when `serviceFeeCents > 0`. `service_fee_section` and `credits_row_section` are escaped RawHtml built in `email.ts`: fee-free top-ups keep the current Amount/Credits/Date summary, and a charged fee replaces that with Credits added / Service fee (5%) / Total paid / Date. `credit_expiry_section` is escaped RawHtml from `buildCreditsTopUpExpirySection`: the persisted purchased-credit deadline, a no-expiration row for nonexpiring purchases, or empty when unknown. Do not put exemption or fee-failure reasons in this email. Org variants render org-specific copy into `intro` before template rendering; when provided, the organization name is interpolated there rather than passed as a separate template variable. | — |
+| `kiloClawSubscriptionStarted.html` | `plan_name`, `price_usd`, `billing_period`, `next_billing_date`, `manage_url`, `year` | — |
+| `securityFindingNew.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `action_url`, `manage_notifications_url`, `year` | — |
+| `securityFindingSlaWarning.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |
+| `securityFindingSlaBreach.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |
+| `recommendationsDigest.html` | `organization_name`, `adopted_summary`, `open_count`, `recommendations_section`, `dashboard_url`, `year` | — |
+| `spendAlert.html` | `scope_name`, `kind_label`, `amount_usd`, `threshold_usd`, `spend_url`, `cta_label`, `year`. One email per authorized billing contact; the single CTA opens that scope's spend view (`/usage` for a personal scope, `/organizations/<id>/usage-details` for an organization). | — |
+| `kiloPassOrgBlocked.html` | `organization_name`, `manage_url`, `year` | — |
+| `autoRoutingPoolConverted.html` | `pool_owner`, `router_name`, `model_id`, `manage_url`, `year`. ADR 0005 cutover notice: the owner's saved Efficient pool became a custom router. `manage_url` is `/profile` for a user and `/organizations/<id>/providers-and-models` for an organization. | — |

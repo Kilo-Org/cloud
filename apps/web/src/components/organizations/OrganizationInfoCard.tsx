@@ -7,11 +7,14 @@ import {
   useUpdateOrganizationName,
   useUpdateCompanyDomain,
   useOrganizationWithMembers,
-  useAdminToggleCodeIndexing,
   useUpdateSuppressTrialMessaging,
+  useUpdateKiloEncrypt,
 } from '@/app/api/organizations/hooks';
-import type { OrganizationWithMembers } from '@/lib/organizations/organization-types';
-import { normalizeCompanyDomain, isValidDomain } from '@/lib/organizations/company-domain';
+import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  normalizeCompanyDomain,
+  isValidDomain,
+} from '@kilocode/web-shared/lib/organizations/company-domain';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { AnimatedDollars } from './AnimatedDollars';
@@ -35,15 +38,20 @@ import {
 import BuyOrganizationCreditsDialog from '@/components/payment/BuyOrganizationCreditsDialog';
 import { SeatsRequirementDialog } from '@/app/admin/components/OrganizationAdmin/SeatsRequirementDialog';
 import { PlanDialog } from '@/app/admin/components/OrganizationAdmin/PlanDialog';
+import { AdminViewOrganizationButton } from '@/app/admin/support-access/AdminViewOrganizationButton';
 import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/TrialEndDateDialog';
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { hasVisibleText } from '@kilocode/app-shared/text';
+import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useExpiringCredits } from './useExpiringCredits';
 import { useAdminOrganizationHierarchy } from '@/app/admin/api/organizations/hooks';
+import { OrganizationSalesDemoResetButton } from './OrganizationSalesDemoResetButton';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -62,14 +70,14 @@ const OSS_TIER_NAMES: Record<number, string> = {
   3: 'Seed',
 };
 
-function useCanManagePaymentInfo() {
+function useCanManageBilling() {
   const isKiloAdmin = useIsKiloAdmin();
   const orgRole = useUserOrganizationRole();
-  return isKiloAdmin || orgRole === 'owner' || orgRole === 'billing_manager';
+  return isKiloAdmin || canManageOrganizationBilling(orgRole);
 }
 
 type InnerProps = {
-  info: OrganizationWithMembers;
+  info: OrganizationWithMembersResponse;
   className?: string;
   showAdminControls: boolean;
 };
@@ -156,7 +164,6 @@ function Inner(props: InnerProps) {
     updated_at,
     total_microdollars_acquired,
     microdollars_used,
-    stripe_customer_id,
     deleted_at,
     auto_top_up_enabled,
   } = info;
@@ -174,12 +181,17 @@ function Inner(props: InnerProps) {
   const [ossSponsorshipDialogOpen, setOssSponsorshipDialogOpen] = useState(false);
   const updateOrganizationName = useUpdateOrganizationName();
   const updateCompanyDomain = useUpdateCompanyDomain();
-  const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
+  const updateKiloEncrypt = useUpdateKiloEncrypt();
 
-  const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(id);
+  const expiringCreditGroups = useExpiringCredits(id);
 
   const handleSave = async () => {
+    // The button is disabled for a name without visible characters, but the
+    // field's Enter key reaches this handler directly.
+    if (!hasVisibleText(editedName)) {
+      return;
+    }
     if (editedName.trim() === name) {
       setIsEditing(false);
       return;
@@ -256,7 +268,7 @@ function Inner(props: InnerProps) {
   const isKiloAdmin = useIsKiloAdmin();
   const isAutoTopUpEnabled = useIsAutoTopUpEnabled();
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
-  const isOrgOwner = useCanManagePaymentInfo();
+  const canManageBilling = useCanManageBilling();
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
 
   const handleSeatsRequirementEdit = () => {
@@ -272,17 +284,6 @@ function Inner(props: InnerProps) {
     setTrialEndDateDialogOpen(true);
   };
 
-  const handleCodeIndexingToggle = async () => {
-    try {
-      await adminToggleCodeIndexing.mutateAsync({
-        organizationId: id,
-        code_indexing_enabled: !info.settings?.code_indexing_enabled,
-      });
-    } catch (error) {
-      console.error('Failed to toggle code indexing:', error);
-    }
-  };
-
   const handleSuppressTrialMessagingToggle = async () => {
     try {
       await updateSuppressTrialMessaging.mutateAsync({
@@ -294,13 +295,32 @@ function Inner(props: InnerProps) {
     }
   };
 
+  const handleKiloEncryptToggle = async () => {
+    try {
+      await updateKiloEncrypt.mutateAsync({
+        organizationId: id,
+        kilo_encrypt: !info.settings?.kilo_encrypt,
+      });
+    } catch (error) {
+      console.error('Failed to toggle AI Guardrails:', error);
+    }
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle>
-          <Building2 className="mr-2 inline h-5 w-5" />
-          Organization Information
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle>
+            <Building2 className="mr-2 inline h-5 w-5" />
+            Organization Information
+          </CardTitle>
+          {!showAdminControls && (
+            <OrganizationSalesDemoResetButton
+              organizationId={id}
+              isSalesDemo={info.settings.is_sales_demo === true}
+            />
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isInAdminDashboard && hierarchyQuery.data ? (
@@ -322,7 +342,7 @@ function Inner(props: InnerProps) {
                 size="sm"
                 variant="ghost"
                 onClick={handleSave}
-                disabled={updateOrganizationName.isPending || !editedName.trim()}
+                disabled={updateOrganizationName.isPending || !hasVisibleText(editedName)}
                 className="h-8 w-8 p-0"
               >
                 <Check className="h-4 w-4 text-green-400" />
@@ -340,7 +360,7 @@ function Inner(props: InnerProps) {
           ) : (
             <div className="mt-1 flex items-center gap-2">
               <p className="text-lg font-semibold">{name}</p>
-              {isOrgOwner && (
+              {canManageBilling && (
                 <button
                   onClick={() => setIsEditing(true)}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
@@ -397,7 +417,7 @@ function Inner(props: InnerProps) {
                   <span className="text-muted-foreground text-sm">Not set</span>
                 )}
               </p>
-              {isOrgOwner && (
+              {canManageBilling && (
                 <button
                   onClick={() => setIsEditingDomain(true)}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
@@ -409,7 +429,7 @@ function Inner(props: InnerProps) {
             </div>
           )}
         </div>
-        {isOrgOwner && (
+        {canManageBilling && (
           <div>
             <span className="text-muted-foreground text-sm font-medium">
               <PiggyBank className="mr-1 inline h-4 w-4" />
@@ -450,13 +470,18 @@ function Inner(props: InnerProps) {
                 <Link href={`/organizations/${id}/payment-details`}>View Payments</Link>
               </Button>
             </div>
-            {expiringBlocks.length > 0 && earliestExpiry && (
-              <div className="mt-2 flex items-center gap-1 text-sm text-amber-600">
-                <Clock className="h-3.5 w-3.5" />
-                {formatDollars(fromMicrodollars(expiring_mUsd))} expiring at{' '}
-                {formatIsoDateTime_IsoOrderNoSeconds(earliestExpiry)}
+            {expiringCreditGroups.map(group => (
+              <div
+                key={group.expiry_date}
+                className="mt-2 flex items-center gap-1 text-sm text-amber-600"
+              >
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {formatDollars(fromMicrodollars(group.balance_mUsd))} expiring at{' '}
+                  {formatIsoDateTime_IsoOrderNoSeconds(group.expiry_date)}
+                </span>
               </div>
-            )}
+            ))}
           </div>
         )}
         {isInAdminDashboard && (
@@ -465,31 +490,13 @@ function Inner(props: InnerProps) {
               <label className="text-muted-foreground text-sm font-medium">Quick Actions</label>
               <div className="mt-1">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/organizations/${id}`} target="_blank">
+                  <AdminViewOrganizationButton organizationId={id} organizationName={name}>
                     <ExternalLink className="mr-2 h-4 w-4" />
                     View Organization Page
-                  </Link>
+                  </AdminViewOrganizationButton>
                 </Button>
               </div>
             </div>
-            {stripe_customer_id && (
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  Stripe Customer ID
-                </label>
-                <p className="font-mono text-sm">
-                  {stripe_customer_id}
-                  <a
-                    href={`https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${stripe_customer_id}`}
-                    target="_blank"
-                    className="ml-1 inline-flex items-center rounded-full bg-purple-900 px-2 py-1 text-xs font-medium text-purple-200 transition-colors hover:bg-purple-800"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    View in Stripe
-                  </a>
-                </p>
-              </div>
-            )}
             <div>
               <label className="text-muted-foreground text-sm font-medium">Seats Required</label>
               <div className="mt-1 flex items-center gap-2">
@@ -525,22 +532,6 @@ function Inner(props: InnerProps) {
               </div>
             </div>
             <div>
-              <label className="text-muted-foreground text-sm font-medium">Managed Indexing</label>
-              <div className="mt-1 flex items-center gap-2">
-                <BooleanBadge positive={info.settings?.code_indexing_enabled ?? false}>
-                  {info.settings?.code_indexing_enabled ? 'Enabled' : 'Disabled'}
-                </BooleanBadge>
-                <button
-                  onClick={handleCodeIndexingToggle}
-                  disabled={adminToggleCodeIndexing.isPending}
-                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Toggle code indexing"
-                >
-                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div>
               <label className="text-muted-foreground text-sm font-medium">
                 Suppress Trial Messaging
               </label>
@@ -553,6 +544,23 @@ function Inner(props: InnerProps) {
                   disabled={updateSuppressTrialMessaging.isPending}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   title="Toggle trial messaging suppression"
+                >
+                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-muted-foreground text-sm font-medium">AI Guardrails</label>
+              <div className="mt-1 flex items-center gap-2">
+                <BooleanBadge positive={info.settings?.kilo_encrypt ?? false}>
+                  {info.settings?.kilo_encrypt ? 'Enabled' : 'Disabled'}
+                </BooleanBadge>
+                <button
+                  onClick={handleKiloEncryptToggle}
+                  disabled={updateKiloEncrypt.isPending}
+                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Toggle AI Guardrails for this organization"
+                  aria-label="Toggle AI Guardrails for this organization"
                 >
                   <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
                 </button>

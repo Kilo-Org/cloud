@@ -14,11 +14,11 @@ import type { WorkerDb } from '@kilocode/db/client';
  *
  * No real Postgres connection: services/kiloclaw's `pnpm test` runs in
  * CI's workspace-tests matrix job, which has no Postgres service
- * container (unlike the root `test` job). A real-DB integration test
- * for this function would pass locally and fail in CI. Instead this
- * fakes the WorkerDb transaction surface just enough to observe the
- * control flow: does the notification INSERT (`tx.execute`) fire, and
- * how many times.
+ * container (unlike the root web-test and test-scripts jobs). A real-DB
+ * integration test for this function would pass locally and fail in CI.
+ * Instead this fakes the WorkerDb transaction surface just enough to
+ * observe the control flow: does the notification INSERT (`tx.execute`)
+ * fire, and how many times.
  *
  * The target/stage/parent UPDATE calls in the real function chain
  * `.update().set().where()` (and `.returning()` for the target row

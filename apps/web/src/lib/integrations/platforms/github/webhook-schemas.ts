@@ -1,11 +1,5 @@
 import * as z from 'zod';
 
-/**
- * Zod schemas for GitHub webhook payload validation
- * These ensure we receive the expected data structure from GitHub
- */
-
-// Common schemas used across multiple webhook types
 const GitHubAccountSchema = z.object({
   id: z.number(),
   login: z.string(),
@@ -38,15 +32,20 @@ export const GitHubAppAuthorizationRevokedPayloadSchema = z.object({
   }),
 });
 
-// installation.created webhook payload
+// installation.created always carries `sender.id`; the handler compares the
+// delivery's GitHub identities with the pending request's recorded requester,
+// so the id must survive validation instead of being stripped.
+const InstallationCreatedSenderSchema = GitHubSenderSchema.extend({
+  id: z.number(),
+});
+
 export const InstallationCreatedPayloadSchema = z.object({
   action: z.literal('created'),
   installation: GitHubInstallationSchema,
   requester: GitHubRequesterSchema.nullable().optional(),
-  sender: GitHubSenderSchema.optional(),
+  sender: InstallationCreatedSenderSchema.optional(),
 });
 
-// installation.deleted webhook payload
 export const InstallationDeletedPayloadSchema = z.object({
   action: z.literal('deleted'),
   installation: z.object({
@@ -55,7 +54,10 @@ export const InstallationDeletedPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// installation.suspend webhook payload
+export const InstallationDeletedWebhookPayloadSchema = InstallationDeletedPayloadSchema.extend({
+  installation: InstallationDeletedPayloadSchema.shape.installation.nullable(),
+});
+
 export const InstallationSuspendPayloadSchema = z.object({
   action: z.literal('suspend'),
   installation: z.object({
@@ -64,7 +66,6 @@ export const InstallationSuspendPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// installation.unsuspend webhook payload
 export const InstallationUnsuspendPayloadSchema = z.object({
   action: z.literal('unsuspend'),
   installation: z.object({
@@ -73,7 +74,6 @@ export const InstallationUnsuspendPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// installation_target.renamed webhook payload
 export const InstallationTargetRenamedPayloadSchema = z.object({
   action: z.literal('renamed'),
   installation: z.object({
@@ -84,7 +84,6 @@ export const InstallationTargetRenamedPayloadSchema = z.object({
   target_type: z.string(),
 });
 
-// installation_repositories webhook payload
 export const InstallationRepositoriesPayloadSchema = z.object({
   action: z.enum(['added', 'removed']),
   installation: z.object({
@@ -112,7 +111,6 @@ export const InstallationRepositoriesPayloadSchema = z.object({
     .optional(),
 });
 
-// push webhook payload
 export const PushEventPayloadSchema = z.object({
   ref: z.string(),
   repository: z.object({
@@ -121,7 +119,6 @@ export const PushEventPayloadSchema = z.object({
   deleted: z.boolean(),
 });
 
-// pull_request webhook payload
 export const GitHubRepositorySchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -132,6 +129,22 @@ export const GitHubRepositorySchema = z.object({
   }),
 });
 
+/**
+ * GitHub's stack metadata on a pull request. Every numeric member is nullable
+ * and optional: the field is present only while the pull request belongs to a
+ * stack, and external payloads have been observed with a `stack` object whose
+ * members are null. A malformed/absent stack must not reject the whole webhook,
+ * because the PR state, review decision and session verification in the same
+ * delivery are still useful.
+ */
+export const GitHubStackSchema = z
+  .object({
+    number: z.number().nullable().optional(),
+    position: z.number().nullable().optional(),
+    size: z.number().nullable().optional(),
+  })
+  .passthrough();
+
 export const PullRequestPayloadSchema = z.object({
   action: z.string(),
   pull_request: z.object({
@@ -141,7 +154,10 @@ export const PullRequestPayloadSchema = z.object({
     state: z.string(),
     draft: z.boolean().optional(),
     merged: z.boolean().nullable().optional(),
+    mergeable: z.boolean().nullable().optional(),
+    mergeable_state: z.string().nullable().optional(),
     html_url: z.string().optional(),
+    created_at: z.string().datetime().optional(),
     user: z.object({
       id: z.number(),
       login: z.string(),
@@ -173,52 +189,16 @@ export const PullRequestPayloadSchema = z.object({
       sha: z.string(),
       ref: z.string(),
     }),
+    // Stack membership accompanies lifecycle events while the PR is stacked.
+    stack: GitHubStackSchema.nullable().optional(),
   }),
   repository: GitHubRepositorySchema,
   installation: z.object({
     id: z.number(),
   }),
   sender: GitHubSenderSchema.optional(),
-});
-
-// issues webhook payload
-export const IssuePayloadSchema = z.object({
-  action: z.string(),
-  issue: z.object({
-    number: z.number(),
-    html_url: z.string(),
-    title: z.string(),
-    body: z.string().nullable().optional(),
-    user: z.object({
-      login: z.string(),
-      type: z.string().optional(),
-    }),
-    labels: z
-      .array(
-        z.union([
-          z.string(),
-          z.object({
-            name: z.string(),
-          }),
-        ])
-      )
-      .optional(),
-  }),
-  // Label field is present for "labeled" and "unlabeled" actions
-  label: z
-    .object({
-      name: z.string(),
-      color: z.string().optional(),
-    })
-    .optional(),
-  repository: GitHubRepositorySchema,
-  installation: z.object({
-    id: z.number(),
-  }),
-  sender: z.object({
-    login: z.string(),
-    type: z.string().optional(),
-  }),
+  // The `stacked` action carries the stack at the payload's top level.
+  stack: GitHubStackSchema.nullable().optional(),
 });
 
 // GitHub author_association values from webhook payloads
@@ -233,7 +213,6 @@ export const GitHubAuthorAssociationSchema = z.enum([
   'OWNER',
 ]);
 
-// pull_request_review_comment webhook payload
 export const PullRequestReviewCommentPayloadSchema = z.object({
   action: z.string(),
   comment: z.object({
@@ -273,7 +252,6 @@ export const PullRequestReviewCommentPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// pull_request_review webhook payload
 export const PullRequestReviewPayloadSchema = z.object({
   action: z.enum(['submitted', 'edited', 'dismissed']),
   review: z.object({
@@ -308,7 +286,6 @@ export const PullRequestReviewPayloadSchema = z.object({
   installation: z.object({ id: z.number() }),
 });
 
-// Type exports for use in the webhook handler
 export type GitHubAppAuthorizationRevokedPayload = z.infer<
   typeof GitHubAppAuthorizationRevokedPayloadSchema
 >;
@@ -322,7 +299,6 @@ export type InstallationTargetRenamedPayload = z.infer<
 export type InstallationRepositoriesPayload = z.infer<typeof InstallationRepositoriesPayloadSchema>;
 export type PushEventPayload = z.infer<typeof PushEventPayloadSchema>;
 export type PullRequestPayload = z.infer<typeof PullRequestPayloadSchema>;
-export type IssuePayload = z.infer<typeof IssuePayloadSchema>;
 export type PullRequestReviewCommentPayload = z.infer<typeof PullRequestReviewCommentPayloadSchema>;
 export type PullRequestReviewPayload = z.infer<typeof PullRequestReviewPayloadSchema>;
 export type GitHubAuthorAssociation = z.infer<typeof GitHubAuthorAssociationSchema>;

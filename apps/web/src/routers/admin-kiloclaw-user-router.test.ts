@@ -1,7 +1,7 @@
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   kiloclaw_admin_audit_logs,
   kiloclaw_subscription_change_log,
@@ -11,7 +11,7 @@ import {
 import { count, eq } from 'drizzle-orm';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import type { User } from '@kilocode/db/schema';
-import { client as stripeMock } from '@/lib/stripe-client';
+import { client as stripeMock } from '@kilocode/web-shared/lib/stripe-client';
 
 const mockKiloclawStart = jest.fn();
 const startedResponse = {
@@ -299,6 +299,7 @@ describe('admin.users.getKiloClawState', () => {
   });
 
   it('returns earlybird access from canonical subscription row', async () => {
+    const futureTrialEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
     const [instance] = await db
       .insert(kiloclaw_instances)
       .values({
@@ -315,7 +316,7 @@ describe('admin.users.getKiloClawState', () => {
       access_origin: 'earlybird',
       cancel_at_period_end: false,
       trial_started_at: '2026-01-01T00:00:00.000Z',
-      trial_ends_at: '2026-09-26T00:00:00.000Z',
+      trial_ends_at: futureTrialEnd,
     });
 
     const caller = await createCallerForUser(adminUser.id);
@@ -1054,6 +1055,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
 
     expect(result).toEqual({ success: true });
     expect(mockKiloclawStart).toHaveBeenCalledWith(targetUser.id, instance.id, {
+      skipCooldown: true,
       reason: 'admin_request',
     });
 

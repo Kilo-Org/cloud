@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Таны агентын сессид шинэчлэлт бий",
+      "lowBalance": "Таны үлдэгдэл анхаарал шаарддаг",
+      "spendAlert": "Таны зарлага анхаарал шаарддаг",
+      "securityFinding": "Аюулгүй байдлын олдолт анхаарал шаарддаг",
+      "securityUpdate": "Аюулгүй байдлын шалгалт шинэчлэлттэй байна",
+      "activeAgentsGlanceable": "Идэвхтэй агентуудад шинэчлэлт бий"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Бага үлдэгдэлийн дохиолол",
+      "body": "{{organizationName}} үлдэгдэл ${{minimumBalanceUsd}}-оос доош унав"
+    },
+    "spendAlert": {
+      "title": "Зарлагын дохиолол",
+      "body": "{{scopeName}}-ийн зарлага ${{amountUsd}}-аас хэтэрсэн"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}}-д {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Шинэ аюулгүй байдлын олдолт ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA анхааруулга"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA зөрчил"
+    }
+  },
+  "sessionReady": {
+    "body": "Таны Kilo сесси утаснаасаа удирдахад бэлэн боллоо"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

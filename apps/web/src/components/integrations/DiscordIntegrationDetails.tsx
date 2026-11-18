@@ -9,9 +9,9 @@ import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { IS_DEVELOPMENT } from '@/lib/constants';
+import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { useConfirm } from '@/components/ui/confirm';
 
 type DiscordIntegrationDetailsProps = {
@@ -38,8 +38,11 @@ export function DiscordIntegrationDetails({
   } = useQuery(trpc.discord.getInstallation.queryOptions(input));
 
   // Fetch models for the model selector
-  const { data: openRouterModels, isLoading: isLoadingModels } =
-    useModelSelectorList(organizationId);
+  const { data: openRouterModels, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    true,
+    'shared_services'
+  );
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (

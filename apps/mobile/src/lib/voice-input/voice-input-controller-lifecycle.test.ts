@@ -6,6 +6,7 @@ import {
   makeStartOptions,
   type VoiceInputNativeHarness,
 } from './voice-input-controller-test-helpers';
+import { type VoiceInputFeedback } from './voice-input-state';
 
 async function isPending<T>(promise: Promise<T>): Promise<boolean> {
   const sentinel = Symbol('pending');
@@ -82,12 +83,7 @@ describe('createVoiceInputController - lifecycle', () => {
     it('ignores duplicate or late events after terminalization', async () => {
       const { harness, controller } = build();
       const drafts: string[] = [];
-      const feedback: {
-        action: 'none' | 'open-settings';
-        availability: 'available' | 'unavailable';
-        message: string;
-        retryable: boolean;
-      }[] = [];
+      const feedback: VoiceInputFeedback[] = [];
       await controller.start(
         makeStartOptions({
           owner: 'A',
@@ -174,12 +170,7 @@ describe('createVoiceInputController - lifecycle', () => {
       harness.mocks.stop = ((): void => {
         throw new Error('boom');
       }) as typeof harness.mocks.stop;
-      const feedback: {
-        action: 'none' | 'open-settings';
-        availability: 'available' | 'unavailable';
-        message: string;
-        retryable: boolean;
-      }[] = [];
+      const feedback: VoiceInputFeedback[] = [];
       await controller.start(
         makeStartOptions({
           onFeedback: (f): void => {
@@ -265,12 +256,7 @@ describe('createVoiceInputController - lifecycle', () => {
 
     it('initiates an expected abort when active, terminalizes safely, and resolves', async () => {
       const { harness, controller } = build();
-      const feedback: {
-        action: 'none' | 'open-settings';
-        availability: 'available' | 'unavailable';
-        message: string;
-        retryable: boolean;
-      }[] = [];
+      const feedback: VoiceInputFeedback[] = [];
       await controller.start(
         makeStartOptions({
           owner: 'A',

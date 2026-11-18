@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { FeatureSignupUser } from '@/routers/admin-feature-interest-router';
 import { format, parseISO } from 'date-fns';
 import { HelpCircle, Download } from 'lucide-react';
+import { csvField, downloadCsv } from '@/lib/admin-csv';
 
 type FeatureInterestUserListProps = {
   feature: string;
@@ -24,10 +25,8 @@ export function FeatureInterestUserList({
   const [showQueries, setShowQueries] = useState(false);
 
   const downloadCSV = useCallback(() => {
-    // CSV header
     const header = ['Email', 'Name', 'Company', 'Role', 'Signed Up'];
 
-    // CSV rows
     const rows = users.map(user => [
       user.email,
       user.name || '',
@@ -36,21 +35,11 @@ export function FeatureInterestUserList({
       user.signed_up_at ? format(parseISO(user.signed_up_at), 'yyyy-MM-dd HH:mm:ss') : '',
     ]);
 
-    // Combine header and rows
     const csvContent = [header, ...rows]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .map(row => row.map(cell => csvField(String(cell))).join(','))
       .join('\n');
 
-    // Create blob and download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${feature.toLowerCase().replace(/\s+/g, '-')}-signups.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadCsv(csvContent, `${feature.toLowerCase().replace(/\s+/g, '-')}-signups.csv`);
   }, [users, feature]);
 
   return (

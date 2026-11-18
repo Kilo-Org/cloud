@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "La teva sessió d'agent té una actualització",
+      "lowBalance": "El teu saldo necessita atenció",
+      "spendAlert": "La teva despesa necessita atenció",
+      "securityFinding": "Una troballa de seguretat necessita atenció",
+      "securityUpdate": "Una comprovació de seguretat té una actualització",
+      "activeAgentsGlanceable": "Els agents actius tenen una actualització"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Avís de saldo baix",
+      "body": "El saldo de {{organizationName}} ha baixat per sota de ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Avís de despesa",
+      "body": "La despesa de {{scopeName}} ha superat els ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} a {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nova troballa de seguretat ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Avís d'SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Incompliment d'SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "La teva sessió de Kilo està a punt per controlar-la des del telèfon"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

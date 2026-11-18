@@ -2,6 +2,8 @@ import type {
   FilePart,
   Message,
   Part,
+  PatchPart,
+  ReasoningPart,
   TextPart,
   ToolPart,
   UserMessage,
@@ -9,6 +11,9 @@ import type {
 import { createChatProcessor } from './chat-processor';
 import type { ChatEvent } from './normalizer';
 import { createMemoryStorage } from './storage/memory';
+import { createJotaiStorage } from './storage/jotai';
+import { MAX_REMOVAL_VERSIONS, storageVersions } from './storage/versions';
+import { createStore } from 'jotai';
 
 // Helpers that return properly typed stubs (literal role/type fields).
 function makeUserMsg(id: string, sessionID = 'ses-1') {
@@ -46,6 +51,17 @@ function makeTextPart(id: string, messageID: string, text: string, sessionID = '
     messageID,
     type: 'text' as const,
     text,
+  } satisfies Part;
+}
+
+function makeReasoningPart(id: string, messageID: string, text: string, sessionID = 'ses-1') {
+  return {
+    id,
+    sessionID,
+    messageID,
+    type: 'reasoning' as const,
+    text,
+    time: { start: 1, end: 2 },
   } satisfies Part;
 }
 
@@ -89,6 +105,48 @@ function makeCompletedToolPart(
       time: { start: 1, end: 2 },
       attachments,
     },
+  } satisfies ToolPart;
+}
+
+function makeTaskPart(
+  status: 'pending' | 'running' | 'completed' | 'error',
+  id = 'part-task',
+  messageID = 'msg-1',
+  sessionID = 'ses-1'
+) {
+  const base = {
+    id,
+    sessionID,
+    messageID,
+    type: 'tool' as const,
+    callID: `call-${id}`,
+    tool: 'task',
+  };
+  if (status === 'pending') {
+    return { ...base, state: { status, input: {}, raw: '' } } satisfies ToolPart;
+  }
+  if (status === 'running') {
+    return {
+      ...base,
+      state: { status, input: {}, time: { start: 1 } },
+    } satisfies ToolPart;
+  }
+  if (status === 'completed') {
+    return {
+      ...base,
+      state: {
+        status,
+        input: {},
+        output: 'done',
+        title: 'task',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    } satisfies ToolPart;
+  }
+  return {
+    ...base,
+    state: { status, input: {}, error: 'boom', time: { start: 1, end: 2 } },
   } satisfies ToolPart;
 }
 
@@ -148,8 +206,6 @@ describe('createChatProcessor', () => {
       expect(storedFile.url).toBe('');
       expect(storedFile.source?.text.value).toBe('');
     });
-
-    // --- onFilePart callback gates ---
 
     it('calls onFilePart for a top-level FilePart with a non-blank url', () => {
       const storage = createMemoryStorage();
@@ -211,8 +267,6 @@ describe('createChatProcessor', () => {
       expect(storedFile.url).toBe('');
     });
 
-    // --- onToolAttachment callback gates ---
-
     it('calls onToolAttachment for image attachments from any tool', () => {
       const storage = createMemoryStorage();
       const onToolAttachment = jest.fn();
@@ -265,7 +319,6 @@ describe('createChatProcessor', () => {
       processor.process({ type: 'message.part.updated', part });
 
       expect(onToolAttachment).not.toHaveBeenCalled();
-      // Still strips the URL from storage
       const stored = storage.getParts('msg-1');
       const storedTool = stored[0] satisfies Part as ToolPart;
       if (storedTool.state.status !== 'completed') return;
@@ -363,7 +416,6 @@ describe('createChatProcessor', () => {
       const storage = createMemoryStorage();
       const processor = createChatProcessor(storage);
 
-      // Add synthetic optimistic part with text
       const syntheticPart = {
         id: 'part-1',
         sessionID: 'ses-1',
@@ -377,7 +429,6 @@ describe('createChatProcessor', () => {
         'user message text'
       );
 
-      // Server sends non-synthetic part with empty text
       const nonSyntheticEmptyPart = {
         id: 'part-1',
         sessionID: 'ses-1',
@@ -388,7 +439,6 @@ describe('createChatProcessor', () => {
       };
       processor.process({ type: 'message.part.updated', part: nonSyntheticEmptyPart });
 
-      // Should preserve the existing text
       const stored = storage.getParts('msg-1');
       expect(stored).toHaveLength(1);
       expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
@@ -418,6 +468,269 @@ describe('createChatProcessor', () => {
       const stored = storage.getParts('msg-1');
       expect(stored).toHaveLength(1);
       expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
+    });
+
+    // --- textless part normalization (KILO-APP-99) ---
+    // The generated Part types declare `text: string`, but the wire can omit
+    // the field (per-event schemas are `.passthrough()`), so a textless part
+    // used to be stored verbatim and crashed every mobile reader.
+
+    it('stores a reasoning part whose text field is missing with text: ""', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      // The cast is the fixture: the wire really omits `text`.
+      const part = {
+        id: 'part-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning' as const,
+        time: { start: 1, end: 2 },
+      } as unknown as Part;
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ReasoningPart).text).toBe('');
+    });
+
+    it('stores a text part whose text field is missing with text: ""', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = {
+        id: 'part-text',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text' as const,
+      } as unknown as Part;
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('');
+    });
+
+    it('stores a whitespace-only reasoning part unchanged', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = makeReasoningPart('part-reasoning', 'msg-1', '   \n\t  ');
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ReasoningPart).text).toBe('   \n\t  ');
+    });
+
+    it('keeps existing reasoning text when a textless update arrives', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeReasoningPart('part-reasoning', 'msg-1', 'streamed reasoning'),
+      });
+      const textless = {
+        id: 'part-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning' as const,
+        time: { start: 1, end: 2 },
+      } as unknown as Part;
+      processor.process({ type: 'message.part.updated', part: textless });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ReasoningPart).text).toBe('streamed reasoning');
+    });
+
+    // --- files-less patch part normalization (KILO-APP-BZ) ---
+    // The generated Part types declare `files: Array<string>`, but the wire can
+    // omit the field (per-event schemas are `.passthrough()`), so a files-less
+    // patch part used to be stored verbatim and crashed the mobile transcript
+    // reader on `part.files.length`.
+
+    it('stores a patch part whose files field is missing with files: []', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      // The cast is the fixture: the wire really omits `files`.
+      const part = {
+        id: 'part-patch',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'patch' as const,
+        hash: 'abc',
+      } as unknown as Part;
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as PatchPart).files).toEqual([]);
+    });
+
+    it('stores a patch part whose files were sent intact', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part: Part = {
+        id: 'part-patch',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'patch',
+        hash: 'abc',
+        files: ['src/a.ts', 'src/b.ts'],
+      };
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as PatchPart).files).toEqual(['src/a.ts', 'src/b.ts']);
+    });
+
+    // --- unreadable tool state ---
+    // The generated ToolPart declares a full `state`, but the wire does not
+    // guarantee it: the per-event schema is `.passthrough()` and the replay
+    // paths hand stored parts straight to this seam. A tool part with no
+    // readable state is dropped.
+
+    // The cast is the fixture: the wire really sends these shapes.
+    function unstatedToolPart(state: unknown): Part {
+      return {
+        id: 'part-tool',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+        callID: 'call-part-tool',
+        tool: 'bash',
+        state,
+      } as unknown as Part;
+    }
+
+    it('drops a tool part with no state and keeps processing later events', () => {
+      const storage = createMemoryStorage();
+      const onToolAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onToolAttachment });
+      const missing = {
+        id: 'part-tool',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+      } as unknown as Part;
+
+      expect(() =>
+        processor.process({ type: 'message.part.updated', part: missing })
+      ).not.toThrow();
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+      expect(onToolAttachment).not.toHaveBeenCalled();
+
+      const valid = makeTextPart('part-text', 'msg-1', 'after the malformed part');
+      processor.process({ type: 'message.part.updated', part: valid });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('after the malformed part');
+    });
+
+    it('drops a tool part whose state is null, an array, or a primitive', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      for (const state of [null, [], 'running']) {
+        expect(() =>
+          processor.process({ type: 'message.part.updated', part: unstatedToolPart(state) })
+        ).not.toThrow();
+      }
+
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+
+    it('drops a tool part whose status is not a non-empty string', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      for (const state of [{}, { status: 42 }, { status: '' }]) {
+        expect(() =>
+          processor.process({ type: 'message.part.updated', part: unstatedToolPart(state) })
+        ).not.toThrow();
+      }
+
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+
+    it('keeps a previously stored tool part when an unreadable update arrives', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running', 'part-tool'),
+      });
+      processor.process({ type: 'message.part.updated', part: unstatedToolPart({}) });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ToolPart).state).toEqual({
+        status: 'running',
+        input: {},
+        time: { start: 1 },
+      });
+    });
+
+    it('stores a completed tool part with a non-array attachments field as an empty list', () => {
+      const storage = createMemoryStorage();
+      const onToolAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onToolAttachment });
+      const part = unstatedToolPart({ status: 'completed', attachments: {} });
+
+      expect(() => processor.process({ type: 'message.part.updated', part })).not.toThrow();
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ToolPart).state).toEqual({
+        status: 'completed',
+        attachments: [],
+      });
+      expect(onToolAttachment).not.toHaveBeenCalled();
+    });
+
+    it('emits only the readable attachments of a completed tool part', () => {
+      const storage = createMemoryStorage();
+      const onToolAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onToolAttachment });
+      const good = { mime: 'image/png', url: 'data:image/png;base64,AAA' };
+      const second = { mime: 'image/jpeg', url: 'data:image/jpeg;base64,BBB' };
+      const part = unstatedToolPart({
+        status: 'completed',
+        attachments: [
+          good,
+          null,
+          'nope',
+          { mime: 42, url: 'data:x' },
+          { mime: 'image/png' },
+          second,
+        ],
+      });
+
+      expect(() => processor.process({ type: 'message.part.updated', part })).not.toThrow();
+
+      expect(onToolAttachment).toHaveBeenCalledTimes(2);
+      expect(onToolAttachment).toHaveBeenCalledWith('part-tool', {
+        mime: 'image/png',
+        dataUrl: 'data:image/png;base64,AAA',
+      });
+      expect(onToolAttachment).toHaveBeenCalledWith('part-tool', {
+        mime: 'image/jpeg',
+        dataUrl: 'data:image/jpeg;base64,BBB',
+      });
+      const stored = storage.getParts('msg-1');
+      expect((stored[0] satisfies Part as ToolPart).state).toMatchObject({
+        attachments: [
+          { mime: 'image/png', url: '' },
+          { mime: 'image/jpeg', url: '' },
+        ],
+      });
     });
   });
 
@@ -463,7 +776,283 @@ describe('createChatProcessor', () => {
     });
   });
 
+  describe('tool part lifecycle ordering', () => {
+    function toolStatus(storage: ReturnType<typeof createMemoryStorage>): string {
+      const part = storage.getParts('msg-1').find(p => p.id === 'part-task');
+      if (!part || part.type !== 'tool') throw new Error('task part missing');
+      return part.state.status;
+    }
+
+    it('keeps a running task running when a stale terminal update replays with an older event time', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+        time: 200,
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('completed'),
+        time: 150,
+      });
+
+      expect(toolStatus(storage)).toBe('running');
+    });
+
+    it('keeps a running task running when a terminal snapshot replay carries no event time', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+        time: 200,
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('completed'),
+      });
+
+      expect(toolStatus(storage)).toBe('running');
+    });
+
+    it('keeps a running task running when a no-time re-delivery precedes a stale terminal replay', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+        time: 200,
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('completed'),
+        time: 150,
+      });
+
+      expect(toolStatus(storage)).toBe('running');
+    });
+
+    it('applies a terminal update that is newer than the running state', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+        time: 200,
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('completed'),
+        time: 250,
+      });
+
+      expect(toolStatus(storage)).toBe('completed');
+    });
+
+    it('keeps a pending task pending when a stale running update replays', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('pending'),
+        time: 300,
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+        time: 100,
+      });
+
+      expect(toolStatus(storage)).toBe('pending');
+    });
+
+    it('keeps a running task running when no terminal event ever arrives', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+        time: 200,
+      });
+
+      expect(toolStatus(storage)).toBe('running');
+    });
+
+    it('shows the error when a newer terminal update ends the task in error', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running'),
+        time: 200,
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('error'),
+        time: 250,
+      });
+
+      expect(toolStatus(storage)).toBe('error');
+    });
+
+    it('keeps a running task running across child-session streaming and a stale terminal replay', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({ type: 'message.updated', info: makeUserMsg('msg-1') });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('p-1', 'msg-1', 'delegate the subtask'),
+      });
+      processor.process({ type: 'message.updated', info: makeAssistantMsg('msg-2', 'msg-1') });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('pending', 'part-task', 'msg-2'),
+        time: 100,
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running', 'part-task', 'msg-2'),
+        time: 150,
+      });
+
+      processor.process({
+        type: 'message.updated',
+        info: makeAssistantMsg('msg-4', 'msg-3', 'child-1'),
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('p-4', 'msg-4', 'still working', 'child-1'),
+      });
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('completed', 'part-task', 'msg-2'),
+        time: 120,
+      });
+
+      const taskPart = storage.getParts('msg-2').find(p => p.id === 'part-task');
+      expect(taskPart?.type === 'tool' && taskPart.state.status).toBe('running');
+      const childParts = storage.getParts('msg-4');
+      expect(childParts).toHaveLength(1);
+      expect(childParts[0]).toEqual(expect.objectContaining({ id: 'p-4', text: 'still working' }));
+    });
+  });
+
+  describe('message.removed', () => {
+    it('deletes the message and its parts from storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const message = makeAssistantMsg('msg-1', 'msg-user-1');
+      const part = makeTextPart('part-1', 'msg-1', 'hello');
+
+      processor.process({ type: 'message.updated', info: message });
+      processor.process({ type: 'message.part.updated', part });
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+      expect(storage.getParts('msg-1')).toHaveLength(1);
+
+      processor.process({ type: 'message.removed', sessionId: 'ses-1', messageId: 'msg-1' });
+
+      expect(storage.getMessageIds()).toEqual([]);
+      expect(storage.getMessageInfo('msg-1')).toBeUndefined();
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+
+    it('ignores a removal for a message the store never had', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const message = makeAssistantMsg('msg-1', 'msg-user-1');
+      processor.process({ type: 'message.updated', info: message });
+
+      processor.process({ type: 'message.removed', sessionId: 'ses-1', messageId: 'msg-other' });
+
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+    });
+  });
+
   describe('synthesizeQueuedUserMessage', () => {
+    it('records the server queue time on a new unconfirmed row', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: 'hello',
+        createdAt: 100,
+      });
+      expect(storage.getMessageInfo('msg-queued')).toMatchObject({
+        time: { created: 100 },
+        queuedAt: 100,
+        synthetic: true,
+      });
+      expect(storage.getParts('msg-queued')).toMatchObject([{ text: 'hello', synthetic: true }]);
+    });
+
+    it('records the server queue time on an optimistic row without replacing its text or attachments', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const optimistic = { ...makeUserMsg('msg-1'), synthetic: true };
+      storage.upsertMessage(optimistic);
+      const text = { ...makeTextPart('msg-1-text', 'msg-1', 'original text'), synthetic: true };
+      const file: Part = {
+        id: 'msg-1-file',
+        messageID: 'msg-1',
+        sessionID: 'ses-1',
+        type: 'file',
+        mime: 'image/png',
+        url: 'data:image/png;base64,AA==',
+        synthetic: true,
+      };
+      storage.upsertPart('msg-1', text);
+      storage.upsertPart('msg-1', file);
+      const parts = storage.getParts('msg-1');
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: undefined,
+        createdAt: 100,
+      });
+
+      expect(storage.getMessageInfo('msg-1')).toEqual({ ...optimistic, queuedAt: 100 });
+      expect(storage.getParts('msg-1')).toEqual(parts);
+    });
+
+    it('keeps the first queue time of a row on a repeated acknowledgement', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const input = { messageId: 'msg-1', sessionId: 'ses-1', content: 'hello' };
+      processor.synthesizeQueuedUserMessage({ ...input, createdAt: 100 });
+      processor.synthesizeQueuedUserMessage({ ...input, createdAt: 500 });
+      expect(storage.getMessageInfo('msg-1')).toMatchObject({ queuedAt: 100, synthetic: true });
+    });
+
+    it('does not change a native row on queue acknowledgement', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const native = makeUserMsg('msg-1');
+      storage.upsertMessage(native);
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: 'hello',
+        createdAt: 1,
+      });
+      expect(storage.getMessageInfo('msg-1')).toEqual(native);
+    });
+
     it('inserts a synthetic user message with text part when storage is empty', () => {
       const storage = createMemoryStorage();
       const processor = createChatProcessor(storage);
@@ -478,6 +1067,7 @@ describe('createChatProcessor', () => {
       const info = storage.getMessageInfo('msg-queued') as UserMessage;
       expect(info?.role).toBe('user');
       expect(info?.sessionID).toBe('ses-1');
+      expect(info?.synthetic).toBe(true);
       const parts = storage.getParts('msg-queued');
       expect(parts).toHaveLength(1);
       const textPart = parts[0] satisfies Part as TextPart;
@@ -500,6 +1090,7 @@ describe('createChatProcessor', () => {
         messageId: 'msg-1',
         sessionId: 'ses-1',
         content: 'duplicate',
+        createdAt: 999,
       });
 
       expect(storage.getMessageIds()).toEqual(['msg-1']);
@@ -561,13 +1152,10 @@ describe('createChatProcessor', () => {
       const user = makeUserMsg('msg-1');
       const assistant = makeAssistantMsg('msg-2', 'msg-1');
 
-      // 1. User message arrives
       processor.process({ type: 'message.updated', info: user });
 
-      // 2. Assistant message arrives
       processor.process({ type: 'message.updated', info: assistant });
 
-      // 3. Text part with streaming deltas
       processor.process({
         type: 'message.part.delta',
         sessionId: 'ses-1',
@@ -585,13 +1173,11 @@ describe('createChatProcessor', () => {
         delta: 'world',
       });
 
-      // 4. Full part update replaces the delta-seeded part
       processor.process({
         type: 'message.part.updated',
         part: makeTextPart('part-1', 'msg-2', 'Hello world!'),
       });
 
-      // 5. Second part arrives then gets removed
       processor.process({
         type: 'message.part.updated',
         part: makeTextPart('part-2', 'msg-2', 'ephemeral'),
@@ -603,7 +1189,6 @@ describe('createChatProcessor', () => {
         partId: 'part-2',
       });
 
-      // Verify final state
       expect(storage.getMessageIds()).toEqual(['msg-1', 'msg-2']);
       expect(storage.getMessageInfo('msg-1')).toEqual(user);
       expect(storage.getMessageInfo('msg-2')).toEqual(assistant);
@@ -613,5 +1198,466 @@ describe('createChatProcessor', () => {
       expect(parts[0].id).toBe('part-1');
       expect((parts[0] satisfies Part as TextPart).text).toBe('Hello world!');
     });
+  });
+});
+
+describe.each([
+  { backend: 'memory', createStorage: () => createMemoryStorage() },
+  { backend: 'jotai', createStorage: () => createJotaiStorage(createStore()) },
+])('$backend workspace row versions', ({ createStorage }) => {
+  const sourceId = 'workspace_root';
+
+  it.each(['text', 'reasoning'] as const)(
+    'preserves streamed %s text and merges lifecycle fields from a versioned textless update',
+    type => {
+      const storage = createStorage();
+      const processor = createChatProcessor(storage);
+      const part =
+        type === 'text'
+          ? makeTextPart('part-1', 'msg-1', 'streamed')
+          : makeReasoningPart('part-1', 'msg-1', 'streamed');
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, eventId: 1, cursor: 10 },
+      });
+      processor.process({
+        type: 'message.part.delta',
+        sessionId: part.sessionID,
+        messageId: part.messageID,
+        partId: part.id,
+        field: 'text',
+        delta: ' delta',
+        version: { sourceId, eventId: 2, cursor: 11 },
+      });
+      const textless = {
+        id: part.id,
+        sessionID: part.sessionID,
+        messageID: part.messageID,
+        type,
+        time: { start: 1, end: 4 },
+      } as Part;
+      processor.process({
+        type: 'message.part.updated',
+        part: textless,
+        version: { sourceId, eventId: 1, cursor: 12 },
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, cursor: 11 },
+      });
+      expect(storage.getParts(part.messageID)).toEqual([{ ...textless, text: 'streamed delta' }]);
+    }
+  );
+
+  it('does not rebuild the parts snapshot while streaming versioned events', () => {
+    const base = createStorage();
+    const wrapper = {
+      ...base,
+      getParts: jest.fn((id: string) => base.getParts(id)),
+      getPart: jest.fn((m: string, p: string) => base.getPart(m, p)),
+    };
+    const processor = createChatProcessor(wrapper);
+    const part = makeTextPart('part-1', 'msg-1', 'streamed');
+    processor.process({
+      type: 'message.updated',
+      info: makeUserMsg('msg-1'),
+      version: { sourceId, eventId: 1, cursor: 1 },
+    });
+    processor.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 1, cursor: 1 },
+    });
+    for (let i = 0; i < 40; i++) {
+      processor.process({
+        type: 'message.part.delta',
+        sessionId: part.sessionID,
+        messageId: part.messageID,
+        partId: part.id,
+        field: 'text',
+        delta: 'x',
+        version: { sourceId, eventId: 1, cursor: 2 + i },
+      });
+    }
+    const textless = {
+      id: part.id,
+      sessionID: part.sessionID,
+      messageID: part.messageID,
+      type: 'reasoning' as const,
+      time: { start: 1, end: 4 },
+    } as Part;
+    for (let i = 0; i < 3; i++) {
+      processor.process({
+        type: 'message.part.updated',
+        part: textless,
+        version: { sourceId, eventId: 1, cursor: 42 + i },
+      });
+    }
+    // The same-cursor duplicate of the last textless write arrives: only the
+    // version presence check can drop it, and it must be present.
+    const accepted = processor.process({
+      type: 'message.part.updated',
+      part: textless,
+      version: { sourceId, eventId: 1, cursor: 44 },
+    });
+    expect(accepted).toBe(false);
+    expect(wrapper.getParts).not.toHaveBeenCalled();
+    expect(wrapper.getPart.mock.calls.length).toBeGreaterThanOrEqual(1);
+    const stored = base.getParts('msg-1');
+    expect(stored).toHaveLength(1);
+    expect((stored[0] satisfies Part as TextPart).text).toBe(`streamed${'x'.repeat(40)}`);
+  });
+
+  it('re-accepts the part version after the versioned removal took the row out', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const part = makeTextPart('part-1', 'msg-1', 'streamed');
+    processor.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 1, cursor: 10 },
+    });
+    processor.process({
+      type: 'message.part.removed',
+      sessionId: part.sessionID,
+      messageId: part.messageID,
+      partId: part.id,
+      version: { sourceId, eventId: 1, cursor: 11 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([]);
+    // The replay carries a cursor above the removal, so it stores the row again.
+    const replayed = { ...part, text: 'v2' };
+    processor.process({
+      type: 'message.part.updated',
+      part: replayed,
+      version: { sourceId, eventId: 1, cursor: 12 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([replayed]);
+    // The same version again is dropped: the stored row makes it a duplicate.
+    processor.process({
+      type: 'message.part.updated',
+      part: replayed,
+      version: { sourceId, eventId: 1, cursor: 12 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([replayed]);
+  });
+
+  it.each(['text', 'reasoning'] as const)(
+    'accepts an explicit authoritative empty %s string and rejects an older nonempty snapshot',
+    type => {
+      const storage = createStorage();
+      const processor = createChatProcessor(storage);
+      const part =
+        type === 'text'
+          ? makeTextPart('part-1', 'msg-1', 'old')
+          : makeReasoningPart('part-1', 'msg-1', 'old');
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, cursor: 10 },
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: { ...part, text: '' },
+        version: { sourceId, eventId: 1, cursor: 12 },
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, cursor: 11 },
+      });
+      expect(storage.getParts(part.messageID)).toEqual([{ ...part, text: '' }]);
+    }
+  );
+
+  it('shares guards between snapshot and live processors without ordering rows by cursor', () => {
+    const storage = createStorage();
+    const live = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    const message = makeUserMsg('msg-2');
+    const latest = makeTextPart('part-2', 'msg-2', 'new');
+    live.process({
+      type: 'message.updated',
+      info: message,
+      version: { sourceId, eventId: 2, cursor: 20 },
+    });
+    live.process({
+      type: 'message.part.updated',
+      part: latest,
+      version: { sourceId, eventId: 3, cursor: 25 },
+    });
+    snapshot.process({
+      type: 'message.updated',
+      info: { ...message, agent: 'old' },
+      version: { sourceId, cursor: 10 },
+    });
+    snapshot.process({
+      type: 'message.part.updated',
+      part: { ...latest, text: 'old' },
+      version: { sourceId, cursor: 10 },
+    });
+    live.process({
+      type: 'message.updated',
+      info: makeUserMsg('msg-1'),
+      version: { sourceId, eventId: 1, cursor: 30 },
+    });
+
+    expect(storage.getMessageInfo('msg-2')).toEqual(message);
+    expect(storage.getParts('msg-2')).toEqual([latest]);
+    expect(storage.getMessageIds()).toEqual(['msg-1', 'msg-2']);
+  });
+
+  it('keeps streamed text when the stored part row takes a cursor above its deltas', () => {
+    // The server buffers delta text and writes the part row later, at a new cursor.
+    const storage = createStorage();
+    const live = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    const part = makeTextPart('part-1', 'msg-1', 'a');
+    const delta = (text: string, cursor: number) =>
+      live.process({
+        type: 'message.part.delta',
+        sessionId: part.sessionID,
+        messageId: part.messageID,
+        partId: part.id,
+        field: 'text',
+        delta: text,
+        version: { sourceId, eventId: 1, cursor },
+      });
+    const text = () => storage.getParts(part.messageID).map(value => (value as TextPart).text);
+
+    live.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 1, cursor: 10 },
+    });
+    delta('b', 11);
+    delta('c', 12);
+    expect(text()).toEqual(['abc']);
+    // A page read writes the buffered text first, so the row holds every earlier delta.
+    snapshot.process({
+      type: 'message.part.updated',
+      part: { ...part, text: 'abc' },
+      version: { sourceId, cursor: 13 },
+    });
+    delta('c', 12);
+    expect(text()).toEqual(['abc']);
+    delta('d', 14);
+    // A timer write the client never saw, sent again by a reconnect replay.
+    live.process({
+      type: 'message.part.updated',
+      part: { ...part, text: 'abcd' },
+      version: { sourceId, eventId: 1, cursor: 15 },
+    });
+    delta('d', 14);
+    delta('e', 16);
+    expect(text()).toEqual(['abcde']);
+  });
+
+  it('accepts a higher revision for the same completed tool event even when lifecycle times are unchanged', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const completed = makeCompletedToolPart('part-1', 'msg-1', []);
+    const updated = {
+      ...completed,
+      state: { ...completed.state, input: { filePath: '/later.png' }, output: 'late output' },
+    };
+    processor.process({
+      type: 'message.part.updated',
+      part: completed,
+      version: { sourceId, eventId: 1, cursor: 10 },
+    });
+    processor.process({
+      type: 'message.part.updated',
+      part: updated,
+      version: { sourceId, eventId: 1, cursor: 30 },
+    });
+    processor.process({
+      type: 'message.part.updated',
+      part: completed,
+      version: { sourceId, eventId: 1, cursor: 20 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([updated]);
+  });
+
+  it('retains removal tombstones against older snapshots and stale deletes against newer parts', () => {
+    const storage = createStorage();
+    const live = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    const info = makeUserMsg('msg-1');
+    const part = makeTextPart('part-1', 'msg-1', 'latest');
+    live.process({ type: 'message.updated', info, version: { sourceId, eventId: 1, cursor: 10 } });
+    live.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 2, cursor: 30 },
+    });
+    live.process({
+      type: 'message.removed',
+      sessionId: 'ses-1',
+      messageId: info.id,
+      version: { sourceId, eventId: 3, cursor: 20 },
+    });
+    expect(storage.getMessageInfo(info.id)).toEqual(info);
+
+    live.process({
+      type: 'message.removed',
+      sessionId: 'ses-1',
+      messageId: info.id,
+      version: { sourceId, eventId: 3, cursor: 40 },
+    });
+    snapshot.process({ type: 'message.updated', info, version: { sourceId, cursor: 35 } });
+    snapshot.process({ type: 'message.part.updated', part, version: { sourceId, cursor: 35 } });
+    expect(storage.getMessageIds()).toEqual([]);
+    expect(storage.getParts(info.id)).toEqual([]);
+  });
+
+  it('does not compare another DO snapshot cursor with live row revisions', () => {
+    const storage = createStorage();
+    const live = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    const part = makeTextPart('part-1', 'msg-1', 'live child');
+    live.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 1, cursor: 2 },
+    });
+    snapshot.process({
+      type: 'message.part.updated',
+      part: { ...part, text: 'older child' },
+      version: { sourceId: 'workspace_other', cursor: 200 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([part]);
+  });
+
+  it('releases versions when retained history is trimmed and allows the same page to reload', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const retained = makeTextPart('retained-part', 'retained', 'latest');
+    processor.process({
+      type: 'message.part.updated',
+      part: retained,
+      version: { sourceId, eventId: 1, cursor: 20 },
+    });
+    for (let i = 0; i < 1024; i++) {
+      const info = makeUserMsg(`trimmed-${i}`);
+      processor.process({ type: 'message.updated', info, version: { sourceId, cursor: 10 } });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart(`part-${i}`, info.id, 'older page'),
+        version: { sourceId, cursor: 10 },
+      });
+      storage.deleteMessage(info.id);
+    }
+    expect(storageVersions.get(storage)?.rows.size).toBe(1);
+    expect(storageVersions.get(storage)?.messages.size).toBe(1);
+    expect(storageVersions.get(storage)?.removals.size).toBe(0);
+    expect(
+      processor.process({
+        type: 'message.updated',
+        info: makeUserMsg('trimmed-0'),
+        version: { sourceId, cursor: 10 },
+      })
+    ).toBe(true);
+    expect(
+      processor.process({
+        type: 'message.part.updated',
+        part: { ...retained, text: 'stale' },
+        version: { sourceId, cursor: 10 },
+      })
+    ).toBe(false);
+    expect(storage.getParts(retained.messageID)).toEqual([retained]);
+    storage.deletePart(retained.messageID, retained.id);
+    expect(storageVersions.get(storage)?.rows.size).toBe(1);
+    expect(storageVersions.get(storage)?.messages.size).toBe(1);
+    for (let i = 0; i < 1024; i++) {
+      const part = makeTextPart(`orphan-part-${i}`, `orphan-${i}`, 'text');
+      processor.process({ type: 'message.part.updated', part, version: { sourceId, cursor: 10 } });
+      storage.deletePart(part.messageID, part.id);
+    }
+    expect(storageVersions.get(storage)?.rows.size).toBe(1);
+    expect(storageVersions.get(storage)?.messages.size).toBe(1);
+  });
+
+  it.each(['message.removed', 'message.part.removed'] as const)(
+    'bounds %s tombstones without allowing evicted stale rows to resurrect',
+    type => {
+      const storage = createStorage();
+      const processor = createChatProcessor(storage);
+      for (let i = 0; i < MAX_REMOVAL_VERSIONS * 2; i++) {
+        const messageId = type === 'message.removed' ? `removed-${i}` : 'retained';
+        processor.process({
+          type,
+          sessionId: 'ses-1',
+          messageId,
+          partId: `part-${i}`,
+          version: { sourceId, eventId: i + 1, cursor: i + 1 },
+        });
+      }
+      const versions = storageVersions.get(storage);
+      expect(versions?.rows.size).toBe(MAX_REMOVAL_VERSIONS);
+      expect(versions?.removals.size).toBe(MAX_REMOVAL_VERSIONS);
+      expect(versions?.messages.size).toBeLessThanOrEqual(MAX_REMOVAL_VERSIONS);
+      expect(versions?.removalFloors.get('ses-1')?.get(sourceId)).toBe(MAX_REMOVAL_VERSIONS);
+      const part = makeTextPart(
+        'part-0',
+        type === 'message.removed' ? 'removed-0' : 'retained',
+        'stale'
+      );
+      expect(
+        processor.process({
+          type: 'message.part.updated',
+          part,
+          version: { sourceId, cursor: 1 },
+        })
+      ).toBe(false);
+      expect(
+        processor.process({
+          type: 'message.part.updated',
+          part,
+          version: { sourceId: 'workspace_other', cursor: 9999 },
+        })
+      ).toBe(false);
+      expect(storage.getParts(part.messageID)).toEqual([]);
+      expect(
+        processor.process({
+          type: 'message.part.updated',
+          part: { ...part, text: 'new revision' },
+          version: { sourceId, eventId: 1, cursor: MAX_REMOVAL_VERSIONS * 2 + 1 },
+        })
+      ).toBe(true);
+      expect(storage.getParts(part.messageID)).toEqual([{ ...part, text: 'new revision' }]);
+    }
+  );
+
+  it('clears all row versions, tombstones and eviction floors for existing processors', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    for (let i = 0; i <= MAX_REMOVAL_VERSIONS; i++) {
+      processor.process({
+        type: 'message.removed',
+        sessionId: 'ses-1',
+        messageId: `msg-${i}`,
+        version: { sourceId, eventId: i + 1, cursor: i + 1 },
+      });
+    }
+    expect(storageVersions.get(storage)?.removalFloors.size).toBe(1);
+    processor.process({
+      type: 'message.updated',
+      info: makeUserMsg('retained'),
+      version: { sourceId, cursor: MAX_REMOVAL_VERSIONS + 2 },
+    });
+    storage.clear();
+    expect(storageVersions.has(storage)).toBe(false);
+    const info = makeUserMsg('msg-0');
+    expect(
+      snapshot.process({ type: 'message.updated', info, version: { sourceId, cursor: 0 } })
+    ).toBe(true);
+    expect(storage.getMessageInfo(info.id)).toEqual(info);
+    expect(
+      processor.process({ type: 'message.updated', info, version: { sourceId, cursor: 0 } })
+    ).toBe(false);
   });
 });

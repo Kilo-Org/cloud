@@ -1,5 +1,45 @@
-import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { eq } from 'drizzle-orm';
+import { describe, it, expect, vi } from 'vitest';
+import { requests, triggerConfig } from '../../src/db/sqlite-schema';
+import type { TriggerDO } from '../../src/dos/TriggerDO';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import { validateWebhookBody } from '@kilocode/worker-utils/webhook-body-validation';
+
+async function expectSandboxAllocation(
+  stub: DurableObjectStub<TriggerDO>,
+  sandboxAllocation: SandboxAllocation | undefined
+): Promise<void> {
+  expect((await stub.getConfig())?.sandboxAllocation).toBe(sandboxAllocation);
+  expect((await stub.getConfigForResponse())?.sandboxAllocation).toBe(sandboxAllocation);
+  await runInDurableObject(stub, async (_instance, state) => {
+    const config = await state.storage.get<{ sandboxAllocation?: SandboxAllocation }>('config');
+    expect(config?.sandboxAllocation).toBe(sandboxAllocation);
+    const row = drizzle(state.storage)
+      .select({ sandboxAllocation: triggerConfig.sandbox_allocation })
+      .from(triggerConfig)
+      .get();
+    expect(row?.sandboxAllocation).toBe(sandboxAllocation ?? null);
+  });
+}
+
+async function expectEnvironmentId(
+  stub: DurableObjectStub<TriggerDO>,
+  environmentId: string | null
+): Promise<void> {
+  expect((await stub.getConfig())?.environmentId).toBe(environmentId);
+  expect((await stub.getConfigForResponse())?.environmentId).toBe(environmentId);
+  await runInDurableObject(stub, async (_instance, state) => {
+    const config = await state.storage.get<{ environmentId?: string | null }>('config');
+    expect(config?.environmentId).toBe(environmentId);
+    const row = drizzle(state.storage)
+      .select({ environmentId: triggerConfig.environment_id })
+      .from(triggerConfig)
+      .get();
+    expect(row?.environmentId).toBe(environmentId);
+  });
+}
 
 describe('TriggerDO', () => {
   const testUserId = 'user123';
@@ -9,6 +49,584 @@ describe('TriggerDO', () => {
   const testOrgNamespace = `org/${testOrgId}`;
 
   describe('configure', () => {
+    it.each(['webhook', 'scheduled'] as const)(
+      'persists immutable creator identity in SQLite, responses and KV for %s triggers',
+      async activationMode => {
+        const triggerId = `creator-${activationMode}`;
+        const stub = env.TRIGGER_DO.get(
+          env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+        );
+        const input = {
+          executionUserId: 'oauth/creator',
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'model-1',
+          promptTemplate: 'Process {{body}}',
+          activationMode,
+          ...(activationMode === 'webhook'
+            ? { webhookAuth: { header: 'x-secret', secret: 'creator-secret-0123456789' } }
+            : { cronExpression: '* * * * *' }),
+        };
+        await stub.configure(testOrgNamespace, triggerId, input);
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        expect((await stub.getConfigForResponse())?.executionUserId).toBe('oauth/creator');
+        await runInDurableObject(stub, async (instance, state) => {
+          const cached = await state.storage.get<{ executionUserId?: string }>('config');
+          expect(cached?.executionUserId).toBe('oauth/creator');
+          expect(
+            drizzle(state.storage)
+              .select({ executionUserId: triggerConfig.execution_user_id })
+              .from(triggerConfig)
+              .get()?.executionUserId
+          ).toBe('oauth/creator');
+          await state.storage.delete('config');
+          expect((await instance.getConfig())?.executionUserId).toBe('oauth/creator');
+          await expect(
+            instance.configure(testOrgNamespace, triggerId, {
+              ...input,
+              executionUserId: 'other-user',
+            })
+          ).rejects.toThrow('immutable');
+          await expect(
+            instance.configure(testOrgNamespace, triggerId, {
+              ...input,
+              executionUserId: undefined,
+            })
+          ).rejects.toThrow('immutable');
+          if (activationMode === 'webhook') {
+            await expect(instance.updateConfig({ webhookAuth: { secret: null } })).rejects.toThrow(
+              'Webhook auth is required'
+            );
+          }
+        });
+        expect((await stub.getConfig())?.executionUserId).toBe('oauth/creator');
+      }
+    );
+
+    it('defaults legacy identities to null and prevents opting into creator mode after creation', async () => {
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/legacy-execution`)
+      );
+      const input = {
+        githubRepo: 'owner/repo',
+        promptTemplate: 'test',
+        webhookAuth: { header: 'x-secret', secret: 'creator-secret-0123456789' },
+      };
+      await stub.configure(testOrgNamespace, 'legacy-execution', input);
+      expect((await stub.getConfig())?.executionUserId).toBeNull();
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure(testOrgNamespace, 'legacy-execution', {
+            ...input,
+            executionUserId: 'creator',
+          })
+        ).rejects.toThrow('immutable');
+      });
+    });
+
+    it('rejects personal, KiloClaw and unauthenticated creator configs without writes', async () => {
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('invalid-creator'));
+      await runInDurableObject(stub, async (instance, state) => {
+        const input = {
+          executionUserId: 'creator',
+          promptTemplate: 'test',
+          webhookAuth: { header: 'x-secret', secret: 'secret' },
+        };
+        await expect(
+          instance.configure(testUserNamespace, 'invalid-creator', input)
+        ).rejects.toThrow('only supported for organization');
+        await expect(
+          instance.configure(testOrgNamespace, 'invalid-creator', {
+            ...input,
+            targetType: 'kiloclaw_chat',
+          })
+        ).rejects.toThrow('only supported for organization');
+        await expect(
+          instance.configure(testOrgNamespace, 'invalid-creator', {
+            ...input,
+            webhookAuth: undefined,
+          })
+        ).rejects.toThrow('Webhook auth is required');
+        expect(await instance.getConfig()).toBeNull();
+        expect(await state.storage.get('config')).toBeUndefined();
+      });
+    });
+
+    it('requires a strong secret for creator webhooks on create and rotation only', async () => {
+      const triggerId = 'creator-secret-strength';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+      );
+      const input = {
+        executionUserId: 'oauth/creator',
+        githubRepo: 'owner/repo',
+        promptTemplate: 'test',
+      };
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure(testOrgNamespace, triggerId, {
+            ...input,
+            webhookAuth: { header: 'x-secret', secret: ` ${'a'.repeat(15)} ` },
+          })
+        ).rejects.toThrow('at least 16 characters');
+        expect(await instance.getConfig()).toBeNull();
+
+        await instance.configure(testOrgNamespace, triggerId, {
+          ...input,
+          webhookAuth: { header: 'x-secret', secret: 'a'.repeat(16) },
+        });
+        const before = await instance.getConfig();
+        await expect(instance.updateConfig({ webhookAuth: { secret: 'short' } })).rejects.toThrow(
+          'at least 16 characters'
+        );
+        expect(await instance.getConfig()).toEqual(before);
+        await instance.updateConfig({ webhookAuth: { header: 'x-other' } });
+        expect((await instance.getConfig())?.webhookAuthHeader).toBe('x-other');
+      });
+    });
+
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'persists sandbox allocation for %s triggers independently from KV hydration',
+      async (activationMode, cronExpression) => {
+        const triggerId = `sandbox-allocation-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          sandboxAllocation: 'isolated-standard',
+          activationMode,
+          cronExpression,
+        });
+
+        await runInDurableObject(stub, async (_instance, state) => {
+          const config = await state.storage.get<{ sandboxAllocation?: SandboxAllocation }>(
+            'config'
+          );
+          expect(config?.sandboxAllocation).toBe('isolated-standard');
+          const row = drizzle(state.storage)
+            .select({ sandboxAllocation: triggerConfig.sandbox_allocation })
+            .from(triggerConfig)
+            .get();
+          expect(row?.sandboxAllocation).toBe('isolated-standard');
+          await state.storage.delete('config');
+        });
+
+        expect((await stub.getConfig())?.sandboxAllocation).toBe('isolated-standard');
+      }
+    );
+
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'updates, preserves, and clears sandbox allocation in SQLite and KV for %s triggers',
+      async (activationMode, cronExpression) => {
+        const triggerId = `sandbox-allocation-update-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          activationMode,
+          cronExpression,
+        });
+        await stub.updateConfig({ sandboxAllocation: 'isolated-standard' });
+        await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ sandboxAllocation: undefined });
+        await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ sandboxAllocation: null });
+        await expectSandboxAllocation(stub, undefined);
+      }
+    );
+
+    it.each([
+      'cloudflare-containers-standard-3',
+      'cloudflare-containers-standard-4',
+      'vercel-large',
+    ] as const)(
+      'persists the %s allocation, preserves it on unrelated updates, and clears it on null',
+      async sandboxAllocation => {
+        const triggerId = `sandbox-allocation-${sandboxAllocation}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          sandboxAllocation,
+        });
+        await expectSandboxAllocation(stub, sandboxAllocation);
+
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        await expectSandboxAllocation(stub, sandboxAllocation);
+
+        await stub.updateConfig({ sandboxAllocation: undefined });
+        await expectSandboxAllocation(stub, sandboxAllocation);
+
+        await stub.updateConfig({ sandboxAllocation: null });
+        await expectSandboxAllocation(stub, undefined);
+      }
+    );
+
+    it('hydrates an existing SQLite row with a null sandbox allocation', async () => {
+      const triggerId = 'sandbox-allocation-legacy';
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .insert(triggerConfig)
+          .values({
+            trigger_id: triggerId,
+            namespace: testUserNamespace,
+            user_id: testUserId,
+            org_id: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+            is_active: 1,
+            target_type: 'cloud_agent',
+            github_repo: 'owner/repo',
+            prompt_template: 'Process {{body}}',
+            activation_mode: 'webhook',
+          })
+          .run();
+      });
+
+      expect((await stub.getConfig())?.sandboxAllocation).toBeUndefined();
+    });
+
+    it('rejects an invalid persisted sandbox allocation', async () => {
+      const triggerId = 'sandbox-allocation-invalid';
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage).update(triggerConfig).set({ sandbox_allocation: 'invalid' }).run();
+      });
+
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getConfig()).rejects.toThrow();
+      });
+    });
+
+    it('rejects sandbox allocation for KiloClaw without mutating it or normal configs', async () => {
+      const kiloclawId = env.TRIGGER_DO.idFromName(
+        `${testUserNamespace}/sandbox-allocation-kiloclaw`
+      );
+      const normalId = env.TRIGGER_DO.idFromName(`${testUserNamespace}/sandbox-allocation-normal`);
+      const kiloclawStub = env.TRIGGER_DO.get(kiloclawId);
+      const normalStub = env.TRIGGER_DO.get(normalId);
+      const baseConfig = {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+      };
+
+      await runInDurableObject(kiloclawStub, async (instance, state) => {
+        await expect(
+          instance.configure(testUserNamespace, 'sandbox-allocation-kiloclaw', {
+            ...baseConfig,
+            targetType: 'kiloclaw_chat',
+            sandboxAllocation: 'isolated-standard',
+          })
+        ).rejects.toThrow('Sandbox allocation is only supported for cloud agent triggers');
+        expect(await instance.getConfig()).toBeNull();
+        expect(await state.storage.get('config')).toBeUndefined();
+      });
+
+      await kiloclawStub.configure(testUserNamespace, 'sandbox-allocation-kiloclaw', {
+        ...baseConfig,
+        targetType: 'kiloclaw_chat',
+      });
+      await normalStub.configure(testUserNamespace, 'sandbox-allocation-normal', {
+        ...baseConfig,
+        sandboxAllocation: 'isolated-standard',
+      });
+      const before = await kiloclawStub.getConfig();
+
+      await runInDurableObject(kiloclawStub, async instance => {
+        await expect(
+          instance.updateConfig({ sandboxAllocation: 'isolated-standard' })
+        ).rejects.toThrow('Sandbox allocation is only supported for cloud agent triggers');
+        await expect(instance.updateConfig({ sandboxAllocation: null })).rejects.toThrow(
+          'Sandbox allocation is only supported for cloud agent triggers'
+        );
+      });
+      expect(await kiloclawStub.getConfig()).toEqual(before);
+      await expectSandboxAllocation(kiloclawStub, undefined);
+
+      await expect(
+        kiloclawStub.updateConfig({ promptTemplate: 'Updated {{body}}' })
+      ).resolves.toEqual({ success: true });
+      expect(await kiloclawStub.getConfig()).toMatchObject({
+        ...before,
+        promptTemplate: 'Updated {{body}}',
+      });
+      await expectSandboxAllocation(normalStub, 'isolated-standard');
+    });
+
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'persists environment selection for %s triggers',
+      async (activationMode, cronExpression) => {
+        const triggerId = `environment-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+        const environmentId = '11111111-1111-4111-8111-111111111111';
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          environmentId,
+          activationMode,
+          cronExpression,
+        });
+
+        await expectEnvironmentId(stub, environmentId);
+      }
+    );
+
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'preserves, clears, and ignores undefined environment updates for %s triggers',
+      async (activationMode, cronExpression) => {
+        const triggerId = `environment-update-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+        const environmentId = '22222222-2222-4222-8222-222222222222';
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          activationMode,
+          cronExpression,
+        });
+        await expectEnvironmentId(stub, null);
+
+        await stub.updateConfig({ environmentId });
+        await expectEnvironmentId(stub, environmentId);
+
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        await expectEnvironmentId(stub, environmentId);
+
+        await stub.updateConfig({ environmentId: undefined });
+        await expectEnvironmentId(stub, environmentId);
+
+        await stub.updateConfig({ environmentId: null });
+        await expectEnvironmentId(stub, null);
+      }
+    );
+
+    it('hydrates a legacy trigger without an environment selection as null', async () => {
+      const triggerId = 'environment-legacy';
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .insert(triggerConfig)
+          .values({
+            trigger_id: triggerId,
+            namespace: testUserNamespace,
+            user_id: testUserId,
+            org_id: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+            is_active: 1,
+            target_type: 'cloud_agent',
+            github_repo: 'owner/repo',
+            prompt_template: 'Process {{body}}',
+            activation_mode: 'webhook',
+          })
+          .run();
+      });
+
+      expect((await stub.getConfig())?.environmentId).toBeNull();
+    });
+
+    it('rejects environment selection for KiloClaw without mutating configs', async () => {
+      const kiloclawId = env.TRIGGER_DO.idFromName(`${testUserNamespace}/environment-kiloclaw`);
+      const kiloclawStub = env.TRIGGER_DO.get(kiloclawId);
+      const environmentId = '33333333-3333-4333-8333-333333333333';
+      const baseConfig = {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+      };
+
+      await runInDurableObject(kiloclawStub, async (instance, state) => {
+        await expect(
+          instance.configure(testUserNamespace, 'environment-kiloclaw', {
+            ...baseConfig,
+            targetType: 'kiloclaw_chat',
+            environmentId,
+          })
+        ).rejects.toThrow('Environment selection is only supported for Cloud Agent triggers');
+        expect(await instance.getConfig()).toBeNull();
+        expect(await state.storage.get('config')).toBeUndefined();
+      });
+
+      await kiloclawStub.configure(testUserNamespace, 'environment-kiloclaw', {
+        ...baseConfig,
+        targetType: 'kiloclaw_chat',
+        environmentId: null,
+      });
+      const before = await kiloclawStub.getConfig();
+
+      await runInDurableObject(kiloclawStub, async instance => {
+        await expect(instance.updateConfig({ environmentId })).rejects.toThrow(
+          'Environment selection is only supported for Cloud Agent triggers'
+        );
+      });
+      expect(await kiloclawStub.getConfig()).toEqual(before);
+      await expectEnvironmentId(kiloclawStub, null);
+
+      await expect(
+        kiloclawStub.updateConfig({ promptTemplate: 'Updated {{body}}', environmentId: null })
+      ).resolves.toEqual({ success: true });
+      await expectEnvironmentId(kiloclawStub, null);
+      expect(await kiloclawStub.getConfig()).toMatchObject({
+        ...before,
+        promptTemplate: 'Updated {{body}}',
+      });
+    });
+
+    it('round-trips an omitted variant as undefined', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/variant-omitted`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, 'variant-omitted', {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      expect((await stub.getConfig())?.variant).toBeUndefined();
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBeNull();
+      });
+    });
+
+    it('round-trips a configured variant and clears it on update', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/variant-set`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, 'variant-set', {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        variant: 'high',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      expect((await stub.getConfig())?.variant).toBe('high');
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBe('high');
+      });
+      await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+      expect((await stub.getConfig())?.variant).toBe('high');
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBe('high');
+      });
+      await stub.updateConfig({ variant: null });
+      expect((await stub.getConfig())?.variant).toBeUndefined();
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBeNull();
+      });
+    });
+
+    it('preserves existing columns and leaves variant unset for a legacy-shaped row', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/variant-legacy`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .insert(triggerConfig)
+          .values({
+            trigger_id: 'variant-legacy',
+            namespace: testUserNamespace,
+            user_id: testUserId,
+            org_id: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+            is_active: 1,
+            target_type: 'cloud_agent',
+            github_repo: 'owner/repo',
+            mode: 'code',
+            model: 'openai/gpt-4.1',
+            prompt_template: 'Process {{body}}',
+            profile_id: 'profile-id',
+            auto_commit: 1,
+            condense_on_complete: 0,
+            activation_mode: 'scheduled',
+            cron_expression: '* * * * *',
+            cron_timezone: 'UTC',
+            last_scheduled_at: '2026-01-01T00:00:00.000Z',
+            next_scheduled_at: '2026-01-01T00:01:00.000Z',
+          })
+          .run();
+      });
+
+      await expect(stub.getConfig()).resolves.toMatchObject({
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        autoCommit: true,
+        condenseOnComplete: false,
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+        cronTimezone: 'UTC',
+      });
+      expect((await stub.getConfig())?.variant).toBeUndefined();
+    });
+
     it('should return config for user namespace', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
       const stub = env.TRIGGER_DO.get(id);
@@ -86,6 +704,46 @@ describe('TriggerDO', () => {
     });
   });
 
+  describe('exists', () => {
+    it('should return false for unconfigured trigger', async () => {
+      const id = env.TRIGGER_DO.idFromName('unconfigured/trigger');
+      const stub = env.TRIGGER_DO.get(id);
+
+      expect(await stub.exists()).toBe(false);
+    });
+
+    it('should distinguish a paused trigger from a missing one', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+      await stub.updateConfig({ isActive: false });
+
+      expect(await stub.isActive()).toBe(false);
+      expect(await stub.exists()).toBe(true);
+    });
+
+    it('should return false after deletion', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+      await stub.deleteTrigger();
+
+      expect(await stub.exists()).toBe(false);
+    });
+  });
+
   describe('captureRequest', () => {
     it('should fail for unconfigured trigger', async () => {
       const id = env.TRIGGER_DO.idFromName('unconfigured/trigger');
@@ -143,6 +801,76 @@ describe('TriggerDO', () => {
       expect(request.path).toBe('/webhook');
       expect(request.body).toBe('{"test": true}');
       expect(request.processStatus).toBe('captured');
+    });
+
+    it.each([
+      ['personal', testUserNamespace, {}],
+      ['creator-run organization', testOrgNamespace, { executionUserId: 'oauth/creator' }],
+    ] as const)(
+      'rejects public capture for %s scheduled triggers without writing a request',
+      async (_name, namespace, identity) => {
+        const triggerId = 'public-scheduled';
+        const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+        await stub.configure(namespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          activationMode: 'scheduled',
+          cronExpression: '* * * * *',
+          ...identity,
+        });
+
+        const result = await stub.captureRequest({
+          method: 'POST',
+          path: `/inbound/${namespace}/${triggerId}`,
+          queryString: null,
+          headers: {},
+          body: 'attacker controlled',
+          contentType: 'text/plain',
+          sourceIp: '203.0.113.1',
+        });
+
+        expect(result).toEqual({ success: false, error: 'Trigger not configured or inactive' });
+        expect((await stub.listRequests()).requests).toEqual([]);
+      }
+    );
+
+    it('requires the configured secret before capturing for creator-run webhook triggers', async () => {
+      const triggerId = 'creator-webhook-capture';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+      );
+      const secret = 'creator-secret-0123456789';
+      await stub.configure(testOrgNamespace, triggerId, {
+        executionUserId: 'oauth/creator',
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+        webhookAuth: { header: 'X-Secret', secret },
+      });
+      const capture = (headers: Record<string, string>) =>
+        stub.captureRequest({
+          method: 'POST',
+          path: '/',
+          queryString: null,
+          headers,
+          body: '{}',
+          contentType: 'application/json',
+          sourceIp: null,
+        });
+
+      await expect(capture({})).resolves.toEqual({ success: false, error: 'Unauthorized' });
+      await expect(capture({ 'x-secret': 'wrong' })).resolves.toEqual({
+        success: false,
+        error: 'Unauthorized',
+      });
+      expect((await stub.listRequests()).requests).toEqual([]);
+
+      const accepted = await capture({ 'x-secret': secret });
+      expect(accepted.success).toBe(true);
+      expect((await stub.listRequests()).requests[0]?.headers['x-secret']).toBe('[REDACTED]');
     });
 
     it('should reject payload exceeding 256KB', async () => {
@@ -210,7 +938,317 @@ describe('TriggerDO', () => {
     });
   });
 
+  describe('invokeScheduled', () => {
+    it.each([
+      ['cloud_agent', { githubRepo: 'owner/repo', mode: 'code', model: 'openai/gpt-4.1' }],
+      [
+        'kiloclaw_chat',
+        {
+          targetType: 'kiloclaw_chat' as const,
+          kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+        },
+      ],
+    ] as const)(
+      'captures distinct scheduled %s requests without changing schedule state',
+      async (_target, target) => {
+        const triggerId = 'invoke-scheduled';
+        const stub = env.TRIGGER_DO.get(
+          env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+        );
+        await stub.configure(testUserNamespace, triggerId, {
+          promptTemplate: 'Run now',
+          activationMode: 'scheduled',
+          cronExpression: '* * * * *',
+          ...target,
+        });
+        const before = await stub.getConfig();
+        let beforeAlarm: number | null = null;
+        let beforeRetry: boolean | undefined;
+        await runInDurableObject(stub, async (_instance, state) => {
+          beforeAlarm = await state.storage.getAlarm();
+          beforeRetry = await state.storage.get<boolean>('alarmRetry');
+        });
+
+        const first = await stub.invokeScheduled();
+        const second = await stub.invokeScheduled();
+        expect(first).toMatchObject({ success: true });
+        expect(second).toMatchObject({ success: true });
+        if (!first.success || !second.success)
+          throw new Error('Expected scheduled invocation to succeed');
+        expect(first.requestId).not.toBe(second.requestId);
+
+        expect(await stub.getRequest(first.requestId)).toMatchObject({
+          method: 'SCHEDULED',
+          body: '{}',
+          headers: {},
+          triggerSource: 'scheduled',
+          processStatus: 'captured',
+        });
+        expect(await stub.getConfig()).toEqual(before);
+        await runInDurableObject(stub, async (_instance, state) => {
+          expect(await state.storage.getAlarm()).toBe(beforeAlarm);
+          expect(await state.storage.get<boolean>('alarmRetry')).toBe(beforeRetry);
+          const storedConfig = await state.storage.get<Record<string, unknown>>('config');
+          expect(storedConfig).toBeDefined();
+          if (!storedConfig) throw new Error('Expected stored trigger config');
+          expect(storedConfig).not.toHaveProperty('lastScheduledAt');
+          const { lastScheduledAt: _lastScheduledAt, ...storedConfigWithoutLastScheduledAt } =
+            storedConfig;
+          const { lastScheduledAt: _beforeLastScheduledAt, ...beforeWithoutLastScheduledAt } =
+            before ?? {};
+          expect(storedConfigWithoutLastScheduledAt).toEqual(beforeWithoutLastScheduledAt);
+          const schedule = drizzle(state.storage)
+            .select({
+              lastScheduledAt: triggerConfig.last_scheduled_at,
+              nextScheduledAt: triggerConfig.next_scheduled_at,
+            })
+            .from(triggerConfig)
+            .get();
+          expect(schedule).toEqual({
+            lastScheduledAt: before?.lastScheduledAt ?? null,
+            nextScheduledAt: before?.nextScheduledAt ?? null,
+          });
+        });
+      }
+    );
+
+    it.each([
+      ['missing', undefined, 'NOT_FOUND'],
+      ['webhook', 'webhook', 'NOT_SCHEDULED'],
+      ['inactive', 'scheduled', 'INACTIVE'],
+    ] as const)('rejects %s triggers without writing a request', async (_name, mode, error) => {
+      const triggerId = `invoke-${error.toLowerCase()}`;
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      if (mode) {
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Run now',
+          activationMode: mode,
+          ...(mode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
+        });
+      }
+      if (error === 'INACTIVE') await stub.updateConfig({ isActive: false });
+
+      await expect(stub.invokeScheduled()).resolves.toEqual({ success: false, error });
+      expect((await stub.listRequests()).requests).toEqual([]);
+    });
+
+    it('allows exactly one concurrent invocation when nineteen requests are in flight', async () => {
+      const triggerId = 'invoke-cap';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run now',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+      for (let index = 0; index < 19; index++) {
+        const captured = await stub.invokeScheduled();
+        if (!captured.success) throw new Error('Expected request to be captured');
+        if (index % 2 === 0)
+          await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });
+      }
+
+      const results = await Promise.all([stub.invokeScheduled(), stub.invokeScheduled()]);
+      expect(results.filter(result => result.success)).toHaveLength(1);
+      expect(results.filter(result => !result.success)).toEqual([
+        { success: false, error: 'INFLIGHT_LIMIT' },
+      ]);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(drizzle(state.storage).select().from(requests).all()).toHaveLength(20);
+      });
+    });
+
+    it('preserves the captured timestamp as the alarm last-scheduled timestamp', async () => {
+      const triggerId = 'alarm-timestamp';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run on alarm',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+
+      await runInDurableObject(stub, async instance => {
+        await instance.alarm();
+      });
+      const captured = (await stub.listRequests()).requests[0];
+      expect(captured).toMatchObject({ method: 'SCHEDULED', triggerSource: 'scheduled' });
+      expect((await stub.getConfig())?.lastScheduledAt).toBe(captured.timestamp);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
+    });
+
+    it('persists a failed manual invocation without changing scheduling state when enqueue fails', async () => {
+      const triggerId = 'invoke-queue-failure';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run now',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+      const before = await stub.getConfig();
+      let beforeAlarm: number | null = null;
+      let beforeRetry: boolean | undefined;
+      await runInDurableObject(stub, async (_instance, state) => {
+        beforeAlarm = await state.storage.getAlarm();
+        beforeRetry = await state.storage.get<boolean>('alarmRetry');
+      });
+
+      await runInDurableObject(stub, async instance => {
+        const queue = (instance as unknown as { env: Env }).env.WEBHOOK_DELIVERY_QUEUE;
+        const send = vi.spyOn(queue, 'send').mockRejectedValue(new Error('queue unavailable'));
+        try {
+          await expect(instance.invokeScheduled()).resolves.toEqual({
+            success: false,
+            error: 'QUEUE_FAILED',
+          });
+        } finally {
+          send.mockRestore();
+        }
+      });
+
+      const failed = (await stub.listRequests()).requests;
+      expect(failed).toHaveLength(1);
+      expect(failed[0]).toMatchObject({
+        method: 'SCHEDULED',
+        processStatus: 'failed',
+        errorMessage: 'Queue enqueue failed',
+      });
+      expect(failed[0]?.completedAt).toEqual(expect.any(String));
+      expect(await stub.getConfig()).toEqual(before);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).toBe(beforeAlarm);
+        expect(await state.storage.get<boolean>('alarmRetry')).toBe(beforeRetry);
+        const schedule = drizzle(state.storage)
+          .select({
+            lastScheduledAt: triggerConfig.last_scheduled_at,
+            nextScheduledAt: triggerConfig.next_scheduled_at,
+          })
+          .from(triggerConfig)
+          .get();
+        expect(schedule).toEqual({
+          lastScheduledAt: before?.lastScheduledAt ?? null,
+          nextScheduledAt: before?.nextScheduledAt ?? null,
+        });
+      });
+    });
+
+    it('advances the schedule after an alarm enqueue failure', async () => {
+      const triggerId = 'alarm-queue-failure';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run on alarm',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+
+      await runInDurableObject(stub, async instance => {
+        const queue = (instance as unknown as { env: Env }).env.WEBHOOK_DELIVERY_QUEUE;
+        const send = vi.spyOn(queue, 'send').mockRejectedValue(new Error('queue unavailable'));
+        try {
+          await instance.alarm();
+        } finally {
+          send.mockRestore();
+        }
+      });
+
+      const failed = (await stub.listRequests()).requests[0];
+      expect(failed).toMatchObject({ method: 'SCHEDULED', processStatus: 'failed' });
+      expect((await stub.getConfig())?.lastScheduledAt).toBe(failed?.timestamp);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
+    });
+
+    it('rearms an alarm at the mixed in-flight cap without adding a request or advancing lastScheduledAt', async () => {
+      const triggerId = 'alarm-inflight-cap';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run on alarm',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+      for (let index = 0; index < 20; index++) {
+        const captured = await stub.invokeScheduled();
+        if (!captured.success) throw new Error('Expected request to be captured');
+        if (index % 2 === 0)
+          await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });
+      }
+      const before = await stub.getConfig();
+
+      await runInDurableObject(stub, async instance => {
+        await instance.alarm();
+      });
+
+      expect((await stub.listRequests()).requests).toHaveLength(20);
+      expect((await stub.getConfig())?.lastScheduledAt).toBe(before?.lastScheduledAt);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
+    });
+  });
+
   describe('listRequests', () => {
+    it('should return captured requests for a paused trigger', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const captured = await stub.captureRequest({
+        method: 'POST',
+        path: '/while-active',
+        queryString: null,
+        headers: {},
+        body: 'body',
+        contentType: null,
+        sourceIp: null,
+      });
+      expect(captured.success).toBe(true);
+
+      await stub.updateConfig({ isActive: false });
+
+      const result = await stub.listRequests();
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].path).toBe('/while-active');
+      if (!captured.success) throw new Error('capture failed');
+      expect(await stub.getRequest(captured.requestId)).toMatchObject({ path: '/while-active' });
+    });
+
     it('should return empty array for new trigger', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
       const stub = env.TRIGGER_DO.get(id);
@@ -402,5 +1440,366 @@ describe('TriggerDO', () => {
       const isActive = await stub.isActive();
       expect(isActive).toBe(false);
     });
+  });
+});
+
+describe('webhook body validation', () => {
+  const bodySchema = {
+    type: 'object' as const,
+    properties: { event: { type: 'string' as const, enum: ['issue.opened', 'issue.closed'] } },
+    required: ['event'],
+    additionalProperties: false,
+  };
+  const captured = (body: string, headers: Record<string, string> = {}) => ({
+    method: 'POST',
+    path: '/',
+    queryString: null,
+    headers,
+    body,
+    contentType: 'application/json',
+    sourceIp: null,
+  });
+
+  it('rejects invalid input before request persistence and queue dispatch, then captures exact valid bytes', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/capture'));
+    await stub.configure('user/schema', 'capture', { promptTemplate: '{{body}}', bodySchema });
+    for (const body of [
+      '{',
+      '{}',
+      '{"event":"private-value"}',
+      '{"event":"issue.opened","extra":true}',
+    ]) {
+      const result = await stub.captureRequest(captured(body));
+      expect(result).toMatchObject({ success: false, error: 'Body validation failed' });
+      expect(JSON.stringify(result)).not.toContain('private-value');
+      expect((await stub.listRequests()).requests).toEqual([]);
+    }
+    // A failing queue proves that invalid payloads never reach enqueue.
+    await runInDurableObject(stub, async instance => {
+      const queue = (instance as unknown as { env: Env }).env.WEBHOOK_DELIVERY_QUEUE;
+      const send = vi.spyOn(queue, 'send').mockRejectedValue(new Error('queue unavailable'));
+      const rejected = await instance.captureRequest(captured('{}'));
+      expect(rejected.success).toBe(false);
+      expect(send).not.toHaveBeenCalled();
+      send.mockRestore();
+    });
+    const raw = ' { "event" : "issue.opened" }\n';
+    const accepted = await stub.captureRequest(captured(raw));
+    expect(accepted.success).toBe(true);
+    if (accepted.success) expect((await stub.getRequest(accepted.requestId))?.body).toBe(raw);
+    expect((await stub.listRequests()).requests).toHaveLength(1);
+  });
+
+  it('authenticates before schema validation', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/auth'));
+    await stub.configure('user/schema', 'auth', {
+      promptTemplate: '{{body}}',
+      bodySchema,
+      webhookAuth: { header: 'x-secret', secret: 'test-secret' },
+    });
+    expect(await stub.captureRequest(captured('{'))).toEqual({
+      success: false,
+      error: 'Unauthorized',
+    });
+    expect(await stub.captureRequest(captured('{', { 'x-secret': 'test-secret' }))).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    expect((await stub.listRequests()).requests).toEqual([]);
+  });
+
+  it('persists schema/profile updates in SQLite and KV, preserves omission and clears null', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/persistence'));
+    await stub.configure('user/schema', 'persistence', {
+      promptTemplate: '{{body}}',
+      profileId: 'saved-profile',
+      bodySchema,
+    });
+    await stub.updateConfig({ promptTemplate: 'Changed' });
+    expect(await stub.getConfig()).toMatchObject({ bodySchema, profileId: 'saved-profile' });
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await state.storage.get('config')).toMatchObject({
+        bodySchema,
+        profileId: 'saved-profile',
+      });
+      await state.storage.delete('config');
+      expect(await instance.getConfig()).toMatchObject({ bodySchema, profileId: 'saved-profile' });
+      expect(drizzle(state.storage).select().from(triggerConfig).get()).toMatchObject({
+        body_schema: bodySchema,
+        profile_id: 'saved-profile',
+      });
+    });
+    await stub.updateConfig({ bodySchema: null, profileId: null });
+    expect(await stub.getConfigForResponse()).toMatchObject({ bodySchema: null, profileId: null });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('config')).toMatchObject({
+        bodySchema: null,
+        profileId: null,
+      });
+      expect(drizzle(state.storage).select().from(triggerConfig).get()).toMatchObject({
+        body_schema: null,
+        profile_id: null,
+      });
+    });
+    expect((await stub.captureRequest(captured('plain text'))).success).toBe(true);
+    await stub.updateConfig({ bodySchema });
+    expect((await stub.captureRequest(captured('plain text'))).success).toBe(false);
+  });
+
+  it('rejects body schemas for scheduled and KiloClaw targets on direct RPC', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/unsupported'));
+    for (const options of [
+      { activationMode: 'scheduled' as const, cronExpression: '* * * * *' },
+      { targetType: 'kiloclaw_chat' as const },
+    ]) {
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure('user/schema', 'unsupported', {
+            promptTemplate: 'test',
+            bodySchema,
+            ...options,
+          })
+        ).rejects.toThrow('only available');
+      });
+      await stub.configure('user/schema', 'unsupported', { promptTemplate: 'test', ...options });
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.updateConfig({ bodySchema })).rejects.toThrow('only available');
+      });
+    }
+  });
+});
+
+describe('JSON own-property capture', () => {
+  it.each(['constructor', 'toString', '__proto__'])(
+    'validates %s without changing accepted raw bodies',
+    async key => {
+      for (const nested of [false, true]) {
+        const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`user/special/${key}-${nested}`));
+        const objectSchema = {
+          type: 'object',
+          properties: { [key]: { type: 'string' } },
+          additionalProperties: false,
+        };
+        const wrapSchema = (schema: object) =>
+          nested
+            ? {
+                type: 'object',
+                properties: { outer: schema },
+                required: ['outer'],
+                additionalProperties: false,
+              }
+            : schema;
+        const wrapBody = (value: object) => JSON.stringify(nested ? { outer: value } : value);
+        const capture = (body: string) =>
+          stub.captureRequest({
+            method: 'POST',
+            path: '/',
+            queryString: null,
+            headers: {},
+            body,
+            contentType: 'application/json',
+            sourceIp: null,
+          });
+        await stub.configure('user/special', `${key}-${nested}`, {
+          promptTemplate: '{{body}}',
+          bodySchema: wrapSchema(objectSchema),
+        });
+        expect((await capture(wrapBody({}))).success).toBe(true);
+        const raw = ` \n${wrapBody({ [key]: 'value' })} \n`;
+        const accepted = await capture(raw);
+        expect(accepted.success).toBe(true);
+        if (accepted.success) expect((await stub.getRequest(accepted.requestId))?.body).toBe(raw);
+        await stub.updateConfig({ bodySchema: wrapSchema({ ...objectSchema, required: [key] }) });
+        expect(await capture(wrapBody({}))).toMatchObject({
+          success: false,
+          error: 'Body validation failed',
+        });
+        expect(await capture(wrapBody({ [key]: 42 }))).toMatchObject({
+          success: false,
+          error: 'Body validation failed',
+        });
+        expect((await stub.listRequests()).requests).toHaveLength(2);
+        expect((await capture(raw)).success).toBe(true);
+        expect((await stub.listRequests()).requests).toHaveLength(3);
+      }
+    }
+  );
+});
+
+describe('standard JSON Schema patterns', () => {
+  it('persists a grouped unanchored pattern and captures matching raw bytes', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/standard'));
+    const bodySchema = {
+      type: 'object',
+      properties: { event: { type: 'string', pattern: 'issue\\.(opened|closed)' } },
+      required: ['event'],
+      additionalProperties: false,
+    };
+    await stub.configure('user/pattern', 'standard', { promptTemplate: '{{body}}', bodySchema });
+    expect((await stub.getConfig())?.bodySchema).toEqual(bodySchema);
+    const capture = (body: string) =>
+      stub.captureRequest({
+        method: 'POST',
+        path: '/',
+        queryString: null,
+        headers: {},
+        body,
+        contentType: 'application/json',
+        sourceIp: null,
+      });
+    const raw = ' {"event":"prefix issue.opened suffix"}\n';
+    const result = await capture(raw);
+    expect(result.success).toBe(true);
+    if (result.success) expect((await stub.getRequest(result.requestId))?.body).toBe(raw);
+    expect(await capture('{"event":"issue.changed"}')).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    expect((await stub.listRequests()).requests).toHaveLength(1);
+  });
+
+  it('rejects malformed patterns before configuration persistence', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/malformed'));
+    await runInDurableObject(stub, async instance => {
+      await expect(
+        instance.configure('user/pattern', 'malformed', {
+          promptTemplate: '{{body}}',
+          bodySchema: { type: 'string', pattern: '[' },
+        })
+      ).rejects.toThrow('Pattern must be a valid regular expression');
+    });
+    expect(await stub.getConfig()).toBeNull();
+    expect((await stub.listRequests()).requests).toEqual([]);
+  });
+
+  it('refuses patterns outside the accepted subset', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/subset'));
+    const bodySchema = { type: 'string', pattern: '^(a+)+$' };
+    await runInDurableObject(stub, async instance => {
+      await expect(
+        instance.configure('user/pattern', 'subset', {
+          promptTemplate: '{{body}}',
+          bodySchema,
+        })
+      ).rejects.toThrow('Pattern must not combine quantifiers');
+    });
+    expect(await stub.getConfig()).toBeNull();
+    await stub.configure('user/pattern', 'subset', { promptTemplate: '{{body}}' });
+    await runInDurableObject(stub, async instance => {
+      await expect(instance.updateConfig({ bodySchema })).rejects.toThrow(
+        'Pattern must not combine quantifiers'
+      );
+    });
+    expect((await stub.getConfig())?.bodySchema).toBeNull();
+  });
+
+  it('keeps a schema stored under the previous policy loadable and captures without applying it', async () => {
+    const legacySchema = {
+      type: 'object',
+      properties: { event: { type: 'string', pattern: '^(a+)+$' } },
+      required: ['event'],
+      additionalProperties: false,
+    };
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/legacy'));
+    await stub.configure('user/pattern', 'legacy', {
+      promptTemplate: '{{body}}',
+      bodySchema: { type: 'object', properties: { event: { type: 'string' } } },
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      drizzle(state.storage)
+        .update(triggerConfig)
+        .set({ body_schema: legacySchema })
+        .where(eq(triggerConfig.trigger_id, 'legacy'))
+        .run();
+    });
+    expect((await stub.getConfig())?.bodySchema).toEqual(legacySchema);
+    expect((await stub.getConfigForResponse())?.bodySchema).toEqual(legacySchema);
+    const capture = (body: string) =>
+      stub.captureRequest({
+        method: 'POST',
+        path: '/',
+        queryString: null,
+        headers: {},
+        body,
+        contentType: 'application/json',
+        sourceIp: null,
+      });
+    const started = Date.now();
+    expect(await capture(JSON.stringify({ event: `${'a'.repeat(40)}!` }))).toMatchObject({
+      success: true,
+    });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(await capture('{}')).toMatchObject({ success: true });
+    expect(await capture('not json')).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    await runInDurableObject(stub, async instance => {
+      await expect(instance.updateConfig({ bodySchema: legacySchema })).rejects.toThrow(
+        'Pattern must not combine quantifiers'
+      );
+    });
+  });
+
+  it('rejects an over-budget pattern on create and update', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/over-budget'));
+    const pattern = '^' + 'a+'.repeat(20) + 'b$';
+    const bodySchema = { type: 'object', properties: { event: { type: 'string', pattern } } };
+    await runInDurableObject(stub, async instance => {
+      await expect(
+        instance.configure('user/pattern', 'over-budget', {
+          promptTemplate: '{{body}}',
+          bodySchema,
+        })
+      ).rejects.toThrow('Pattern must not combine quantifiers');
+    });
+    expect(await stub.getConfig()).toBeNull();
+    expect((await stub.listRequests()).requests).toEqual([]);
+    await stub.configure('user/pattern', 'over-budget', { promptTemplate: '{{body}}' });
+    await runInDurableObject(stub, async instance => {
+      await expect(instance.updateConfig({ bodySchema })).rejects.toThrow(
+        'Pattern must not combine quantifiers'
+      );
+    });
+    expect((await stub.getConfig())?.bodySchema).toBeNull();
+  });
+
+  it('keeps a stored over-budget pattern loadable', async () => {
+    const legacySchema = {
+      type: 'object',
+      properties: { event: { type: 'string', pattern: '^' + 'a+'.repeat(20) + 'b$' } },
+      required: ['event'],
+      additionalProperties: false,
+    };
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/legacy-over-budget'));
+    await stub.configure('user/pattern', 'legacy-over-budget', {
+      promptTemplate: '{{body}}',
+      bodySchema: { type: 'object', properties: { event: { type: 'string' } } },
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      drizzle(state.storage)
+        .update(triggerConfig)
+        .set({ body_schema: legacySchema })
+        .where(eq(triggerConfig.trigger_id, 'legacy-over-budget'))
+        .run();
+    });
+    expect((await stub.getConfig())?.bodySchema).toEqual(legacySchema);
+    expect(validateWebhookBody(legacySchema, JSON.stringify({ event: 'aab' }))).toEqual({
+      valid: true,
+      unsupportedPatterns: ['/properties/event/pattern'],
+    });
+    const started = Date.now();
+    expect(
+      await stub.captureRequest({
+        method: 'POST',
+        path: '/',
+        queryString: null,
+        headers: {},
+        body: JSON.stringify({ event: 'aab' }),
+        contentType: 'application/json',
+        sourceIp: null,
+      })
+    ).toMatchObject({ success: true });
+    expect(Date.now() - started).toBeLessThan(5_000);
   });
 });

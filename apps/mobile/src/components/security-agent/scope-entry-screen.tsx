@@ -1,92 +1,180 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
-import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
+import {
+  isHandoffRefusal,
+  selectScopeEntryLoadFailure,
+  selectScopeEntryView,
+} from '@/components/security-agent/scope-entry-render';
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
+import {
+  DashboardLoadingView,
+  DashboardScreen,
+} from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { trpcClient } from '@/lib/trpc';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import {
+  useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentPermissionStatus,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 
-function ScopeEntrySkeleton() {
+/**
+ * The pending body reserves the centred setup state's shape — icon circle,
+ * title line, two description lines, full-width button — so the placeholder
+ * names the size and the position of the content that replaces it instead of
+ * painting a bar and a card at the top of the screen. The entry uses it while a
+ * resolved config already points at a setup state; an unanswered config paints
+ * the dashboard frame instead (`DashboardLoadingView`).
+ *
+ * Sizes are the loaded state's, in px: the `ShieldCheck` mark, the `text-base`
+ * title line, two `text-sm` description lines, the `mt-3` the button carries,
+ * and the button's `min-h-[44px]` default at the shared `rounded-md`.
+ */
+function ScopeEntryBodySkeleton() {
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Security Agent" />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-10 w-full rounded-lg" />
-        <View className="flex-row flex-wrap gap-3">
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-        </View>
-        <Skeleton className="h-32 w-full rounded-lg" />
-        <Skeleton className="h-48 w-full rounded-lg" />
+    <View className="flex-1 items-center justify-center px-6">
+      <View className="w-full items-center gap-3">
+        <Skeleton className="size-[28px] rounded-full" />
+        <Skeleton className="h-[20px] w-40 rounded" />
+        <Skeleton className="h-[14px] w-full rounded" />
+        <Skeleton className="h-[14px] w-2/3 rounded" />
+        <Skeleton className="mt-3 h-[44px] w-full rounded-md" />
       </View>
     </View>
   );
 }
 
+function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader className="px-6" title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScopeEntryBodySkeleton />
+    </View>
+  );
+}
+
 export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   const capability = useSecurityAgentCapability(scope);
+  const recovery = useRetrySecurityAgentSettings(scope);
+  const connectivity = useCommittedConnectivityStatus();
+  const isConnectivityKnown = connectivity !== 'unknown';
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: !isPersonalSecurityScope(scope),
+    errors: [permission.error, config.error, repositories.error],
+  });
 
-  const isLoading = permission.isLoading || config.isLoading || capability.isLoading;
-  const isError = permission.isError || config.isError || capability.isError;
+  // The config decides the destination. Once it is cached its owner is known,
+  // so the GitHub status and role reads only refine the setup gates and the
+  // controls — a pending, paused or failed one must not replace a destination
+  // that renders fine. Those reads are still fatal while the config itself is
+  // unread, or while the setup gates genuinely depend on them (agent disabled).
+  const configSettled = config.data !== undefined;
+  const isEnabledResolved = config.data?.isEnabled ?? false;
+  const isGithubStatusResolved = permission.data !== undefined;
+  // Only a status read that failed without a value is a failure of this screen.
+  const isGithubStatusUnknown = !isGithubStatusResolved && permission.isError;
+  const isConfigUnread = !config.data && config.isError;
+  const isLoading =
+    config.isPending ||
+    (!isEnabledResolved && (permission.isPending || capability.status === 'loading'));
+  const isError = configSettled
+    ? !isEnabledResolved && (isGithubStatusUnknown || capability.status === 'error')
+    : isConfigUnread || capability.status === 'error' || permission.isError;
+  const isPaused =
+    permission.fetchStatus === 'paused' ||
+    config.fetchStatus === 'paused' ||
+    capability.fetchStatus === 'paused';
 
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;
-  const isEnabled = config.data?.isEnabled ?? false;
+  const isEnabled = isEnabledResolved;
 
   const view = selectScopeEntryView({
     isLoading,
     isError,
+    isDenied: access !== 'granted',
+    isGithubStatusResolved,
     hasIntegration,
     hasPermissions,
     isEnabled,
   });
 
-  // Pre-mint a C1 install state token so the web /github-app page
-  // receives it and does not mint a second token.  The return path is
-  // /cloud/sessions — a claimed universal-link route that maps to the
-  // agents tab.
+  // Pre-mint the shell hand-off so the press opens a URL the screen already
+  // holds, and a mount-time failure never replaces the setup screen. Reading
+  // the return edge is what brings the outcome back to this screen.
   const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
   const [mintUrl, setMintUrl] = useState<string | null>(null);
-  const [mintFailed, setMintFailed] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
   const cancelledRef = useRef(false);
+  const mintUrlRef = useRef<string | null>(null);
+  // The hand-off mint resolves the caller's organization membership on the
+  // server, which is also where an elevated (Kilo admin) or inherited
+  // (parent-organization) membership is known — neither is visible in the
+  // device's membership read. So the press is offered until the server answers,
+  // and its `UNAUTHORIZED` answer retires the press for the owner notice.
+  const [handoffRefused, setHandoffRefused] = useState(false);
 
-  const performMint = useCallback(async () => {
-    setMintFailed(false);
-    setMintUrl(null);
-    try {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId: orgId ?? undefined,
-        returnTo: '/cloud/sessions',
-      });
-      if (!cancelledRef.current) {
-        setMintUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
+  // A failed mint must not replace the setup screen with an error-only page:
+  // the setup state (with the audit-report action) stays usable and the press
+  // retries the mint before opening. The mount-time mint (`isInitial`) clears
+  // any previous URL and drives the skeleton; a press-time re-mint leaves the
+  // setup mounted — its own connecting spinner covers the wait, and unmounting
+  // it would drop that state mid-press. Resolves to whether a URL is
+  // available afterwards so the button handler can open immediately.
+  const performMint = useCallback(
+    async (isInitial = false): Promise<boolean> => {
+      if (isInitial) {
+        setMintUrl(null);
+        mintUrlRef.current = null;
+        setIsMinting(true);
+        setHandoffRefused(false);
       }
-    } catch {
-      if (!cancelledRef.current) {
-        setMintFailed(true);
+      try {
+        const url = await appShellHandoffUrl({
+          page: 'github-app',
+          ...(orgId ? { organizationId: orgId } : {}),
+        });
+        mintUrlRef.current = url;
+        if (!cancelledRef.current) {
+          setMintUrl(url);
+          setHandoffRefused(false);
+        }
+        return true;
+      } catch (error) {
+        // A refused membership is the answer this screen acts on; a transport or
+        // server failure leaves the press in place to retry.
+        if (!cancelledRef.current && isHandoffRefusal(error)) {
+          setHandoffRefused(true);
+        }
+        return false;
+      } finally {
+        if (isInitial && !cancelledRef.current) {
+          setIsMinting(false);
+        }
       }
-    }
-  }, [orgId]);
+    },
+    [orgId]
+  );
 
   const reauthUrl = permission.data?.reauthorizeUrl;
 
@@ -100,7 +188,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   useEffect(() => {
     cancelledRef.current = false;
     if (shouldMint) {
-      void performMint();
+      void performMint(true);
     }
     return () => {
       cancelledRef.current = true;
@@ -111,32 +199,94 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // pre-minted token or the connect action must fail closed.
   const connectUrl = mintUrl;
 
-  const refetchAll = async () => {
-    await Promise.all([
-      permission.refetch(),
-      config.refetch(),
-      repositories.refetch(),
-      capability.refetch(),
-    ]);
-  };
+  const refetchAll = recovery.retry;
+  const { clearLastAttemptFailed } = recovery;
 
-  if (view === 'loading') {
-    return <ScopeEntrySkeleton />;
-  }
+  // A recorded failure describes the error episode that produced it. Clearing
+  // it on any other view keeps a later, unrelated failure from claiming that
+  // the reader's last retry is what failed.
+  useEffect(() => {
+    if (view !== 'error') {
+      clearLastAttemptFailed();
+    }
+  }, [view, clearLastAttemptFailed]);
 
-  if (view === 'error') {
+  if (view === 'denied') {
     return (
-      <PlatformErrorScreen
-        title="Security Agent"
-        errorTitle="Could not load Security Agent"
-        onRetry={() => {
-          void permission.refetch();
-          void config.refetch();
-          void capability.refetch();
-        }}
-        isRetrying={permission.isFetching || config.isFetching || capability.isFetching}
+      <ScopeAccessDeniedScreen
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        kind={access === 'not-found' ? 'not-found' : 'denied'}
+        onRetry={() => void recovery.retry()}
+        isRetrying={recovery.isRetrying}
       />
     );
+  }
+
+  // A settled, enabled config already names the destination, so a paused or
+  // failing secondary read only delays its chrome and must never replace it.
+  // Without that destination the setup gates do depend on those reads, so a
+  // paused one stays the retriable failure it describes.
+  const isDestinationKnown = configSettled && isEnabledResolved;
+  const isLoadFailureView =
+    view === 'error' ||
+    (!isDestinationKnown && isLoading && (isError || (isPaused && isConnectivityKnown)));
+
+  // What the entry paints while it waits. An unanswered config can still land on
+  // any of this screen's views, and the dashboard is the common one: its frame
+  // keeps the header actions, the filter row and the tile slots in place instead
+  // of showing a centered placeholder the destination then moves. A config that
+  // already answered and left only its gates pending points at a setup state, so
+  // that pending frame stays the neutral one.
+  const pendingView = configSettled ? (
+    <ScopeEntrySkeleton scope={scope} />
+  ) : (
+    <DashboardLoadingView scope={scope} />
+  );
+
+  if (isLoadFailureView) {
+    // A retry in flight must be visible: the failure screen is swapped for the
+    // loading skeleton, so progress does not depend on a text-less button
+    // spinner. The screen the retry returns to names the cause of the latest
+    // failure: a connection cause adds the retry-failed wording, while a server
+    // answer keeps the server wording, so that frame can repeat the one the tap
+    // started from. A retry that resolves the other reads still lands on their
+    // own view, as before.
+    if (recovery.isRetrying) {
+      return pendingView;
+    }
+    // Only the reads that produced this screen carry the cause. A read that
+    // still holds cached data, or that resolved, must not vote on it.
+    const failedReads: unknown[] = [];
+    if (isConfigUnread) {
+      failedReads.push(config.error);
+    }
+    if (capability.status === 'error') {
+      failedReads.push(capability.error);
+    }
+    if (isGithubStatusUnknown) {
+      failedReads.push(permission.error);
+    }
+    const failure = selectScopeEntryLoadFailure({
+      errors: failedReads,
+      isPaused,
+      connectivity,
+      lastAttemptFailed: recovery.lastAttemptFailed,
+    });
+    return (
+      <PlatformErrorScreen
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
+        variant={failure.variant}
+        message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
+        onRetry={() => void recovery.retry()}
+      />
+    );
+  }
+
+  if (view === 'loading') {
+    return pendingView;
   }
 
   // Audit-report access shouldn't depend on the agent being connected or
@@ -147,99 +297,99 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   switch (view) {
     case 'connect-github': {
-      if (mintFailed) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
-            <PlatformErrorScreen
-              title="Security Agent"
-              variant="offline"
-              message="Could not start GitHub setup. Please try again."
-              onRetry={() => void performMint()}
-            />
-          </View>
-        );
-      }
-      if (!connectUrl) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
-            <View className="gap-3 px-6 pt-4">
-              <Skeleton className="h-10 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </View>
-          </View>
-        );
-      }
+      // A failed or pending mount-time mint keeps this setup screen up; the
+      // button resolves (re-mints) the URL on press. An error-only page here
+      // made the landing permanently unusable on a transient backend failure.
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title="Security Agent" headerRight={auditAction} />
-          <SecurityAgentSetup
-            title="Connect GitHub to get started"
-            description="Install the Kilo GitHub App to automatically sync Dependabot alerts and manage security findings across your repositories."
-            buttonLabel="Install GitHub App"
-            url={connectUrl}
-            onConnected={refetchAll}
+          <ScreenHeader
+            className="px-6"
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
+            headerRight={auditAction}
           />
+          {!connectUrl && isMinting ? (
+            <ScopeEntryBodySkeleton />
+          ) : (
+            <SecurityAgentSetup
+              title={t('securityAgent.scopeEntry.connectTitle')}
+              description={t('securityAgent.scopeEntry.connectDescription')}
+              buttonLabel={t('securityAgent.scopeEntry.installApp')}
+              // The Code Reviewer's connect gate shows the same role rule, but
+              // its sentence also restates that the provider is unconnected,
+              // which this heading already says; the narrower notice leaves one
+              // message on the screen. It is a personal scope's mint that asks
+              // no organization for access, so only the server's refusal sets
+              // it.
+              readOnlyNotice={
+                handoffRefused
+                  ? t('securityAgent.scopeEntry.connectOwnerOnly', { platform: t('common.github') })
+                  : undefined
+              }
+              url={connectUrl ?? undefined}
+              resolveUrl={async () => {
+                const minted = await performMint();
+                return minted ? (mintUrlRef.current ?? undefined) : undefined;
+              }}
+              onConnected={refetchAll}
+            />
+          )}
         </View>
       );
     }
     case 'reauthorize': {
-      if (!reauthUrl && mintFailed) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
-            <PlatformErrorScreen
-              title="Security Agent"
-              variant="offline"
-              message="Could not start re-authorization. Please try again."
-              onRetry={() => void performMint()}
-            />
-          </View>
-        );
-      }
-      if (!reauthUrl && !connectUrl) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
-            <View className="gap-3 px-6 pt-4">
-              <Skeleton className="h-10 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </View>
-          </View>
-        );
-      }
-      const url = reauthUrl ?? connectUrl;
-      if (!url) {
-        return null;
-      }
+      // Same contract as connect-github: the reauthorize setup stays up when
+      // the server offered no URL and the mount-time mint failed; the button
+      // re-mints on press.
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title="Security Agent" headerRight={auditAction} />
-          <SecurityAgentSetup
-            title="Additional permissions required"
-            description="Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission."
-            buttonLabel="Re-authorize GitHub App"
-            url={url}
-            onConnected={refetchAll}
+          <ScreenHeader
+            className="px-6"
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
+            headerRight={auditAction}
           />
+          {!reauthUrl && !connectUrl && isMinting ? (
+            <ScopeEntryBodySkeleton />
+          ) : (
+            <SecurityAgentSetup
+              title={t('securityAgent.scopeEntry.reauthorizeTitle')}
+              description={t('securityAgent.scopeEntry.reauthorizeDescription')}
+              buttonLabel={t('securityAgent.scopeEntry.reauthorizeButton')}
+              url={reauthUrl ?? connectUrl ?? undefined}
+              resolveUrl={async () => {
+                if (reauthUrl) {
+                  return reauthUrl;
+                }
+                const minted = await performMint();
+                return minted ? (mintUrlRef.current ?? undefined) : undefined;
+              }}
+              onConnected={refetchAll}
+            />
+          )}
         </View>
       );
     }
     case 'disabled-settings': {
-      return <SettingsOverviewScreen scope={scope} presentation="inline" />;
+      return (
+        <SettingsOverviewScreen
+          scope={scope}
+          presentation="inline"
+          permissionError={permission.isError}
+        />
+      );
     }
     case 'dashboard': {
-      // Fade the Dashboard in when the agent is enabled: the
-      // `disabled-settings` branch's <SettingsOverviewScreen> unmounts in
-      // place once `config.isEnabled` flips true, which is otherwise an
-      // abrupt snap. Only the incoming subtree is wrapped — the loading,
-      // error, and setup branches above must stay snap-instant so they
-      // feel like real state changes, not animations.
+      // No entrance animation: a Reanimated `FadeIn` carries
+      // `initialValues: { opacity: 0 }`, so a first mount whose entrance is
+      // dropped or never started leaves this whole subtree — the header
+      // included — invisible at opacity 0, and only the tab bar outside the
+      // screen paints. The dashboard (and its header) must paint in the frame
+      // the enabled view resolves.
       return (
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <View className="flex-1">
           <DashboardScreen scope={scope} />
-        </Animated.View>
+        </View>
       );
     }
     default: {

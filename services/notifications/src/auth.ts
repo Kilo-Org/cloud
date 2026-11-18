@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import { extractBearerToken } from '@kilocode/worker-utils';
+import { NOTIFICATIONS_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { logger } from './util/logger';
 
 export type AuthContext = {
@@ -30,6 +31,7 @@ export const authMiddleware = createMiddleware<{
       nextAuthSecret: c.env.NEXTAUTH_SECRET,
       workerEnv: c.env.WORKER_ENV,
       connectionString: c.env.HYPERDRIVE.connectionString,
+      resourceAudience: { audience: NOTIFICATIONS_AUDIENCE, mode: 'allow-legacy' },
     });
     if (!auth) {
       return c.json({ error: 'Unauthorized' }, 401);

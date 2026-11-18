@@ -2,7 +2,8 @@
   description = "Kilo Code Backend development environment";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    # Pin staging until the Node 24 and Brotli CVE-2026-111497 fixes reach the channel.
+    nixpkgs.url = "github:NixOS/nixpkgs/2486754ae6ac7c38b6efe3137f41a1fc0f02db30";
   };
 
   outputs =

@@ -1,31 +1,36 @@
-import { getSecurityAgentAuditUrl } from '@kilocode/app-shared/security-agent';
-import { MoreHorizontal } from '@/components/ui/icons';
-import { Pressable } from 'react-native';
+import { FileText } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
+import { IconButton } from '@/components/ui/icon-button';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getSecurityAgentPath } from '@/lib/security-agent';
+
+// Compatibility: external web report URL kept for the web client and app versions before the native report; remove when the minimum supported app version ships the native report.
 
 /**
- * Header action that opens the web audit report directly — shared by the
+ * Header action that opens the native audit report — shared by the
  * dashboard, scope-entry, and settings-overview screens, all of which show
  * it only when the viewer can manage Security Agent for this scope.
+ *
+ * The glyph is a document, not the horizontal ellipsis: the press opens the
+ * report directly and never a menu, so the icon has to name its destination
+ * the way the accessibility label does (explorer finding: a `MoreHorizontal`
+ * action that navigates straight to the report promised a menu it never shows).
  */
 export function AuditReportButton({ scope }: Readonly<{ scope: string }>) {
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
-    <Pressable
+    <IconButton
       onPress={() => {
-        void openExternalUrl(getSecurityAgentAuditUrl(WEB_BASE_URL, scope), {
-          label: 'audit report',
-        });
+        pushOnce(getSecurityAgentPath(scope, 'audit-report'));
       }}
-      accessibilityRole="button"
-      accessibilityLabel="View audit report"
-      className="size-11 items-center justify-center active:opacity-70"
+      accessibilityLabel={t('securityAgent.auditReportButton.viewA11y')}
     >
-      <MoreHorizontal size={20} color={colors.foreground} />
-    </Pressable>
+      <FileText size={20} color={colors.foreground} />
+    </IconButton>
   );
 }

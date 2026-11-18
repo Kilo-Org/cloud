@@ -29,9 +29,7 @@ function toolDetail(input: Record<string, unknown> | undefined): string | undefi
   const command = input.command;
   const query = input.query ?? input.pattern;
   if (typeof filePath === 'string') return filePath;
-  if (typeof command === 'string') {
-    return command.length > 100 ? `${command.slice(0, 100)}...` : command;
-  }
+  if (typeof command === 'string') return command;
   if (typeof query === 'string') return query;
   return undefined;
 }
@@ -103,12 +101,9 @@ function toDisplayEventFromKilocode(
     }
 
     if (partType === 'text') {
-      const status = partStateStatus(part.state);
-      if (!isCompletedStatus(status)) return null;
       const text = typeof part.text === 'string' ? part.text : undefined;
       if (text && text.trim()) {
-        const truncated = text.length > 200 ? `${text.slice(0, 200)}...` : text;
-        return { timestamp, message: truncated, eventType: 'text', key: partKey(part) };
+        return { timestamp, message: text, eventType: 'text', key: partKey(part) };
       }
       return null;
     }

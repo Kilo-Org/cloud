@@ -1,0 +1,229 @@
+import {
+  GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  type GlanceableAgentsSnapshot,
+  isTerminalGlanceableStatus,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  emptyHomeWidgetDetails,
+  type HomeWidgetData,
+  homeWidgetDataSchema,
+  type HomeWidgetDetails,
+} from '@kilocode/app-shared/home-widget';
+
+import {
+  type GatedSecureStore,
+  readGatedValueForUpdate,
+  widgetSecureStore,
+  writeGatedValue,
+} from '@/lib/auth/secure-store-gated';
+
+import { HOME_WIDGET_DATA_KEY } from './widget-store';
+
+let storeForTests: GatedSecureStore | null = null;
+let lastData: HomeWidgetData | null = null;
+let details: HomeWidgetDetails = emptyHomeWidgetDetails();
+let confirmedAt: number | null = null;
+let epoch = 0;
+let writes: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function store(): GatedSecureStore {
+  return storeForTests ?? widgetSecureStore();
+}
+
+function changed(): void {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+/**
+ * Each write waits for the previous one so the mirror never lands out of order.
+ * A write the keychain refuses — only before the device's first unlock since
+ * boot, for an item written `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` — leaves the
+ * in-memory record authoritative, and the next publish mirrors it again.
+ */
+async function writeAfter(previous: Promise<void> | null, raw: string): Promise<void> {
+  await previous;
+  await writeGatedValue(store, HOME_WIDGET_DATA_KEY, raw);
+}
+
+function mirror(data: HomeWidgetData | null): void {
+  writes = writeAfter(writes, JSON.stringify(data));
+}
+
+/** Home-only private details never enter the generic glanceable snapshot. */
+export function setHomeWidgetDetails(
+  next: HomeWidgetDetails,
+  checkedAt: number | null = null
+): void {
+  details = next;
+  confirmedAt = checkedAt;
+}
+
+export function getLastHomeWidgetData(): HomeWidgetData | null {
+  return lastData;
+}
+
+export function subscribeHomeWidgetData(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function clearHomeWidgetData(): void {
+  epoch += 1;
+  lastData = null;
+  details = emptyHomeWidgetDetails();
+  confirmedAt = null;
+  mirror(null);
+  changed();
+}
+
+/** Accept only a confirmed fetch. Render time and failed fetches cannot renew the timestamp. */
+export function rememberHomeWidgetData(data: HomeWidgetData): boolean {
+  const snapshot = data.snapshot;
+  if (isTerminalGlanceableStatus(snapshot.status)) {
+    epoch += 1;
+    details = emptyHomeWidgetDetails();
+    lastData = { snapshot, details };
+    mirror(lastData);
+    changed();
+    return true;
+  }
+  if (snapshot.status !== 'happy' && snapshot.status !== 'empty') {
+    return false;
+  }
+  if (
+    lastData?.snapshot.scopeKey === snapshot.scopeKey &&
+    Date.parse(snapshot.updatedAt) < Date.parse(lastData.snapshot.updatedAt)
+  ) {
+    return false;
+  }
+  epoch += 1;
+  lastData = data;
+  details = data.details;
+  mirror(data);
+  changed();
+  return true;
+}
+
+/** Record before native sinks draw. Activity expiry must not erase the Home record. */
+export function rememberHomeWidgetSnapshot(snapshot: GlanceableAgentsSnapshot): void {
+  const homeSnapshot =
+    confirmedAt !== null && (snapshot.status === 'happy' || snapshot.status === 'empty')
+      ? {
+          ...snapshot,
+          updatedAt: new Date(confirmedAt).toISOString(),
+          expiresAt: new Date(confirmedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS).toISOString(),
+        }
+      : snapshot;
+  rememberHomeWidgetData({ snapshot: homeSnapshot, details });
+}
+
+export function getHomeWidgetDataForSnapshot(snapshot: GlanceableAgentsSnapshot): HomeWidgetData {
+  if (isTerminalGlanceableStatus(snapshot.status)) {
+    return { snapshot, details: emptyHomeWidgetDetails() };
+  }
+  if (lastData !== null && isTerminalGlanceableStatus(lastData.snapshot.status)) {
+    return { snapshot: lastData.snapshot, details: emptyHomeWidgetDetails() };
+  }
+  const retained = lastData?.snapshot.scopeKey === snapshot.scopeKey ? lastData : null;
+  if (retained !== null) {
+    if (snapshot.status === 'stale' || snapshot.status === 'expired') {
+      return {
+        ...retained,
+        snapshot:
+          retained.snapshot.status === 'empty'
+            ? retained.snapshot
+            : { ...retained.snapshot, status: 'stale' },
+      };
+    }
+    if (
+      snapshot.status === 'waiting' ||
+      Date.parse(snapshot.updatedAt) <= Date.parse(retained.snapshot.updatedAt)
+    ) {
+      return retained;
+    }
+  }
+  return {
+    snapshot,
+    details:
+      snapshot.status === 'happy' || snapshot.status === 'empty'
+        ? details
+        : emptyHomeWidgetDetails(),
+  };
+}
+
+/** Corrupt stored JSON is treated like a missing record. */
+function parseStoredHomeWidgetData(raw: string): HomeWidgetData | null {
+  try {
+    const parsed = homeWidgetDataSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A scope fence and live-write epoch prevent restores from resurrecting private data. */
+export async function restoreHomeWidgetData(scopeKey: string | null): Promise<void> {
+  if (scopeKey === null || scopeKey.startsWith('terminal:') || lastData !== null) {
+    return;
+  }
+  const startedAtEpoch = epoch;
+  // A device that has not been unlocked since boot, and a read that failed, both
+  // read as unreadable rather than as no record: the Home surface draws from
+  // memory until a confirmed fetch mirrors a new one.
+  const read = await readGatedValueForUpdate(store, HOME_WIDGET_DATA_KEY);
+  if (read.status === 'unreadable' || read.value === null || epoch !== startedAtEpoch) {
+    return;
+  }
+  const stored = parseStoredHomeWidgetData(read.value);
+  if (
+    stored === null ||
+    stored.snapshot.scopeKey !== scopeKey ||
+    (stored.snapshot.status !== 'happy' &&
+      stored.snapshot.status !== 'empty' &&
+      stored.snapshot.status !== 'privacy')
+  ) {
+    return;
+  }
+  lastData = stored;
+  details = stored.details;
+  changed();
+}
+
+export function hasSameHomeWidgetDetails(a: HomeWidgetDetails, b: HomeWidgetDetails): boolean {
+  return (
+    a.primaryTitle === b.primaryTitle &&
+    a.waitingAgents.length === b.waitingAgents.length &&
+    a.waitingAgents.every((row, index) => {
+      const other = b.waitingAgents[index];
+      return row.title === other?.title && row.kind === other.kind;
+    }) &&
+    a.scheduledAgents.length === b.scheduledAgents.length &&
+    a.scheduledAgents.every((row, index) => {
+      const other = b.scheduledAgents[index];
+      return row.title === other?.title && row.scheduledAt === other.scheduledAt;
+    })
+  );
+}
+
+export function _setHomeWidgetStoreForTests(next: GatedSecureStore | null): void {
+  storeForTests = next;
+}
+
+/** Settle the mirror chain so a case can assert what landed on disk. */
+export async function _flushHomeWidgetMirrorForTests(): Promise<void> {
+  await writes;
+}
+
+export function _resetHomeWidgetDataForTests(): void {
+  epoch += 1;
+  lastData = null;
+  details = emptyHomeWidgetDetails();
+  confirmedAt = null;
+  storeForTests = null;
+  listeners.clear();
+}

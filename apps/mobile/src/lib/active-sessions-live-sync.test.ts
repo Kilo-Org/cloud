@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  acceptScope,
   ActiveSessionsLiveSync,
   deferred,
   makeCached,
@@ -15,7 +16,7 @@ import {
 setupTimers();
 
 describe('ActiveSessionsLiveSync — attach / detach', () => {
-  it('retains the connection on attach and releases on detach', () => {
+  it('retains the connection on attach and ignores socket writes after detach', async () => {
     const release = vi.fn();
     const conn = makeConnection({ retain: vi.fn(() => release) });
     const qc = makeFakeQueryClient();
@@ -31,6 +32,9 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     expect(conn.onConnectionChange).toHaveBeenCalledTimes(1);
     detach();
     expect(release).toHaveBeenCalledTimes(1);
+    conn.__fireSystem({ event: 'sessions.list', data: { sessions: [makeCached()] } });
+    await sync.getWriteQueue();
+    expect(qc.__getCached()).toEqual({ sessions: [] });
   });
 
   it('does not publish a queued write after detach', async () => {
@@ -44,7 +48,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     });
     sync.attach();
     const blockedWrite = deferred<undefined>();
-    vi.mocked(qc.cancelQueries).mockImplementationOnce(async () => {
+    vi.spyOn(qc, 'cancelQueries').mockImplementationOnce(async () => {
       await blockedWrite.promise;
     });
     conn.__fireSystem({
@@ -58,21 +62,14 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     sync.detach();
     blockedWrite.resolve(undefined);
     await sync.getWriteQueue();
-    expect(qc.setQueryData).not.toHaveBeenCalled();
+    expect(qc.__getCached()).toEqual({ sessions: [] });
   });
 
   it('keeps queued work fenced after detach and re-attach', async () => {
     const conn = makeConnection();
-    const qc = makeFakeQueryClient();
-    qc.__setCached({
-      sessions: [
-        makeCached({
-          id: 'current',
-          connectionId: 'c2',
-          createdAt: '2026-07-20T00:00:00.000Z',
-        }),
-      ],
-    });
+    const createdAt = '2026-07-20T00:00:00.000Z';
+    const current = makeCached({ id: 'current', connectionId: 'c2', createdAt });
+    const qc = makeFakeQueryClient({ sessions: [current] });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
       queryClient: qc,
@@ -80,8 +77,17 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
       queryFn: makeQueryFn(),
     });
     const detach = sync.attach();
+    await acceptScope(qc, sync, { sessions: [current] });
+    const published: string[][] = [];
+    qc.getQueryCache().subscribe(event => {
+      if (event.type === 'updated' && event.action.type === 'success') {
+        published.push(qc.__getCached()?.sessions.map(session => session.id) ?? []);
+      }
+    });
     const blockedWrite = deferred<undefined>();
-    vi.mocked(qc.cancelQueries).mockImplementationOnce(async () => {
+    const reachedCancel = deferred<undefined>();
+    vi.spyOn(qc, 'cancelQueries').mockImplementationOnce(async () => {
+      reachedCancel.resolve(undefined);
       await blockedWrite.promise;
     });
     conn.__fireSystem({
@@ -98,10 +104,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
         ],
       },
     });
-    await new Promise<void>(resolve => {
-      setTimeout(resolve, 0);
-    });
-    expect(qc.cancelQueries).toHaveBeenCalledTimes(1);
+    await reachedCancel.promise;
 
     detach();
     sync.attach();
@@ -121,7 +124,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     blockedWrite.resolve(undefined);
     await sync.getWriteQueue();
 
-    expect(qc.setQueryData).toHaveBeenCalledTimes(1);
+    expect(published).toEqual([['current']]);
     expect(qc.__getCached()?.sessions.map(session => session.id)).toEqual(['current']);
     expect(sync.getPendingReasons()).toEqual(new Set());
   });
@@ -144,7 +147,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     await Promise.resolve();
     expect(sync.getPendingReasons()).toEqual(new Set());
     expect(qc.fetchQueryCalls).toBe(1);
-    expect(qc.setQueryData).not.toHaveBeenCalled();
+    expect(qc.__getCached()).toEqual({ sessions: [] });
   });
 });
 
@@ -270,8 +273,6 @@ describe('ActiveSessionsLiveSync — cli.connected', () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
     qc.__setCached({ sessions: [makeCached({ id: 'a' })] });
-    const setQueryDataCalls = qc.setQueryData as ReturnType<typeof vi.fn>;
-    setQueryDataCalls.mockClear();
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
@@ -280,13 +281,15 @@ describe('ActiveSessionsLiveSync — cli.connected', () => {
       queryFn,
     });
     sync.attach();
+    const seeded = qc.__getCached()?.sessions[0];
     const event: SystemEvent = {
       event: 'cli.connected',
       data: { connectionId: 'c1' },
     };
     conn.__fireSystem(event);
+    await sync.getWriteQueue();
     await sync.getFetchQueue();
-    expect(setQueryDataCalls).not.toHaveBeenCalled();
+    expect(qc.__getCached()?.sessions[0]).toBe(seeded);
     expect(queryFn).toHaveBeenCalledTimes(1);
   });
 

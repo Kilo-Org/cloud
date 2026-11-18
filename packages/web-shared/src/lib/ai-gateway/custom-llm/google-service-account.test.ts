@@ -1,0 +1,214 @@
+import { GoogleAuth } from 'google-auth-library';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  type GoogleServiceAccountKey,
+} from '@kilocode/db/schema-types';
+import {
+  getGoogleServiceAccountAccessToken,
+  MAX_CACHED_AUTH_CLIENTS,
+} from './google-service-account';
+
+jest.mock('google-auth-library');
+
+const mockGoogleAuth = jest.mocked(GoogleAuth);
+
+function serviceAccount(privateKey: string): GoogleServiceAccountKey {
+  return {
+    type: 'service_account',
+    project_id: 'example-project',
+    private_key_id: 'key-id',
+    private_key: privateKey,
+    client_email: 'custom-llm@example-project.iam.gserviceaccount.com',
+    client_id: '1234567890',
+    auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+    token_uri: 'https://oauth2.googleapis.com/token',
+    auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+    client_x509_cert_url:
+      'https://www.googleapis.com/robot/v1/metadata/x509/custom-llm%40example-project.iam.gserviceaccount.com',
+  };
+}
+
+const baseDefinition = {
+  internal_id: 'gemini-2.5-pro',
+  display_name: 'Vertex Gemini',
+  context_length: 1_000_000,
+  max_completion_tokens: 65_536,
+  base_url: 'https://us-central1-aiplatform.googleapis.com/v1',
+  organization_ids: ['00000000-0000-4000-8000-000000000001'],
+};
+
+describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
+  it('accepts API key credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({ type: 'api_key', api_key: 'partner-token' }).success
+    ).toBe(true);
+  });
+
+  it('accepts x-api-key credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({ type: 'x-api-key', api_key: 'partner-token' }).success
+    ).toBe(true);
+  });
+
+  it('accepts Google Cloud service account authentication', () => {
+    expect(CustomLlmCredentialsSchema.safeParse(serviceAccount('private-key')).success).toBe(true);
+  });
+
+  it('accepts secure proxy credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'secure_proxy',
+        proxy_secret: 'proxy-secret',
+        config: {
+          url: 'https://llm.example.com/v1',
+          extra_headers: { Authorization: 'Bearer partner-token' },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects secure proxy credentials with a non-HTTPS upstream', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'secure_proxy',
+        proxy_secret: 'proxy-secret',
+        config: { url: 'http://llm.example.com/v1' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts Amazon Bedrock IAM access key credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'aws_bedrock',
+        region: 'us-east-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret-access-key',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects Amazon Bedrock credentials without a region', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'aws_bedrock',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret-access-key',
+      }).success
+    ).toBe(false);
+  });
+
+  it('validates custom LLM definition without credentials', () => {
+    expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
+  });
+
+  it('rejects non-UUID organization IDs', () => {
+    expect(
+      CustomLlmDefinitionSchema.safeParse({
+        ...baseDefinition,
+        organization_ids: ['organization-1'],
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('getGoogleServiceAccountAccessToken', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('requests a cloud-platform access token with the supplied credentials', async () => {
+    const getAccessToken = jest.fn(async () => 'gcp-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = serviceAccount('private-key-one');
+
+    await expect(getGoogleServiceAccountAccessToken(credentials)).resolves.toBe('gcp-token');
+    expect(mockGoogleAuth).toHaveBeenCalledWith({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  });
+
+  it('accepts a key with only the fields needed to sign token requests', async () => {
+    const getAccessToken = jest.fn(async () => 'gcp-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = {
+      client_email: 'direct-byok@example-project.iam.gserviceaccount.com',
+      private_key: 'private-key-four',
+    };
+
+    await expect(getGoogleServiceAccountAccessToken(credentials)).resolves.toBe('gcp-token');
+    expect(mockGoogleAuth).toHaveBeenCalledWith({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  });
+
+  it('reuses the Google auth client so its access token cache remains effective', async () => {
+    const getAccessToken = jest.fn(async () => 'cached-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = serviceAccount('private-key-two');
+
+    await getGoogleServiceAccountAccessToken(credentials);
+    await getGoogleServiceAccountAccessToken(credentials);
+
+    expect(mockGoogleAuth).toHaveBeenCalledTimes(1);
+    expect(getAccessToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps recent clients cached up to the configured capacity', async () => {
+    const getAccessToken = jest.fn(async () => 'bounded-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = Array.from({ length: MAX_CACHED_AUTH_CLIENTS + 5 }, (_, index) =>
+      serviceAccount(`capacity-key-${index}`)
+    );
+
+    for (const credential of credentials) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+    expect(mockGoogleAuth).toHaveBeenCalledTimes(credentials.length);
+
+    mockGoogleAuth.mockClear();
+    for (const credential of credentials.slice(-MAX_CACHED_AUTH_CLIENTS)) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+    expect(mockGoogleAuth).not.toHaveBeenCalled();
+
+    await getGoogleServiceAccountAccessToken(credentials[0]);
+    expect(mockGoogleAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('evicts the least recently used client rather than the oldest insertion', async () => {
+    const getAccessToken = jest.fn(async () => 'lru-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = Array.from({ length: MAX_CACHED_AUTH_CLIENTS }, (_, index) =>
+      serviceAccount(`lru-key-${index}`)
+    );
+    for (const credential of credentials) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+
+    await getGoogleServiceAccountAccessToken(credentials[0]);
+    const newest = serviceAccount('lru-key-newest');
+    await getGoogleServiceAccountAccessToken(newest);
+
+    mockGoogleAuth.mockClear();
+    for (const credential of [credentials[2], credentials[0], newest]) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+    expect(mockGoogleAuth).not.toHaveBeenCalled();
+
+    await getGoogleServiceAccountAccessToken(credentials[1]);
+    expect(mockGoogleAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails when Google returns no access token', async () => {
+    const getAccessToken = jest.fn(async () => null);
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+
+    await expect(
+      getGoogleServiceAccountAccessToken(serviceAccount('private-key-three'))
+    ).rejects.toThrow('Google service account authentication returned no access token');
+  });
+});

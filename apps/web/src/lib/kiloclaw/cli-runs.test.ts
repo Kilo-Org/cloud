@@ -2,7 +2,7 @@ process.env.KILOCLAW_API_URL ||= 'http://localhost:8795';
 process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cancelCliRun,
   createCliRun,
@@ -11,7 +11,7 @@ import {
   markCliRunCancelled,
   shouldPersistCliRunControllerStatus,
 } from '@/lib/kiloclaw/cli-runs';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { kiloclaw_cli_runs, kiloclaw_instances } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

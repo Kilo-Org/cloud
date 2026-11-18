@@ -1,8 +1,15 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/agents/markdown-image.mounted.test.tsx) */
+/* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConsentCard } from './consent-card';
+import {
+  INLINE_LINK_BOX_CLASS,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
+import { i18n } from '@/i18n';
 
 const mockedAcceptConsent = vi.hoisted(() => vi.fn());
 const mockedReadConsent = vi.hoisted(() => vi.fn());
@@ -39,19 +46,22 @@ const mockedBack = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
 }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
   LineChart: 'LineChart',
   MessageSquare: 'MessageSquare',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
+  Sparkles: 'Sparkles',
   User: 'User',
 }));
 vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://kilo.ai' }));
+vi.mock('@/lib/config', () => ({
+  WEB_BASE_URL: 'https://kilo.ai',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     background: '#fff',
@@ -65,7 +75,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -99,6 +111,10 @@ function singleSwitch(root: I): I {
   return n;
 }
 
+function countByType(root: I, type: string): number {
+  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === type).length;
+}
+
 function findButton(root: I, label: string): I {
   const buttons = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
   const btn = buttons.find(b => (b.props.accessibilityLabel as string) === label);
@@ -117,6 +133,62 @@ function texts(root: I): string[] {
         typeof n.props.children === 'string'
     )
     .map(n => n.props.children as string);
+}
+
+function disclosureTexts(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Text' &&
+      n.props.children === 'Kilo privacy policy'
+  );
+}
+
+function requireDisclosure(root: I): I {
+  const nodes = disclosureTexts(root);
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 privacy disclosure, got ${nodes.length}`);
+  }
+  const n = nodes[0];
+  if (!n) {
+    throw new Error('privacy disclosure not found');
+  }
+  return n;
+}
+
+function findDetailsRow(root: I): I {
+  const label = i18n.t('consent.seeFullDetails');
+  const rows = root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      (n.props.accessibilityLabel as string) === label
+  );
+  if (rows.length !== 1) {
+    throw new Error(`expected 1 details row, got ${rows.length}`);
+  }
+  const row = rows[0];
+  if (!row) {
+    throw new Error('details row not found');
+  }
+  return row;
+}
+
+function requireParent(node: I): I {
+  const parent = node.parent;
+  if (!parent) {
+    throw new Error('node has no parent');
+  }
+  return parent;
+}
+
+function hasAncestorOfType(node: I, type: string): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === type) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function flush() {
@@ -140,19 +212,162 @@ describe('ConsentCard', () => {
     const renderer = mountCard('onboarding');
     const t = texts(renderer.root);
     expect(t).toContain('Required to use Kilo');
-    expect(t).toContain('Optional');
+    expect(t).toContain('Before we get started');
+    expect(t).toContain('Optional — on unless you turn it off');
+    expect(t).not.toContain('Data sharing preferences');
+    expect(t).not.toContain('Optional');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
     expect(t).toContain('Decline');
+
+    // The feature-rollout disclosure belongs to the required group, so it is
+    // visible before the user has to open the full details.
+    const rows = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ConsentRow'
+    );
+    const featureRow = rows.find(node => (node.props.title as string) === 'Feature rollout');
+    expect(featureRow).toBeDefined();
+    expect(featureRow?.props.description as string).toContain('PostHog');
   });
 
-  it('defaults the optional switch to on', () => {
+  it('names the brand with the header mark instead of repeating it as text', () => {
     const renderer = mountCard('onboarding');
+    expect(texts(renderer.root)).not.toContain(i18n.t('consent.kilo'));
+    const marks = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' && node.props.accessibilityLabel === i18n.t('consent.kilo')
+    );
+    expect(marks).toHaveLength(1);
+    expect(marks[0]?.props.accessibilityRole).toBe('image');
+  });
+
+  it('renders review wording in review mode', () => {
+    const renderer = mountCard('review');
+    const t = texts(renderer.root);
+    expect(t).toContain('Data sharing preferences');
+    // The optional section header is the headword alone: the toggle card's own
+    // description already says the choice can be changed in Settings.
+    expect(t).toContain('Optional');
+    expect(t).not.toContain('Optional — you can change this any time in Settings');
+    expect(t).not.toContain('Before we get started');
+    expect(t).not.toContain('Optional — on unless you turn it off');
+
+    // One filled action per footer: the safe way out keeps the fill, and the
+    // destructive one is outlined so it cannot compete with it.
+    const back = findButton(renderer.root, 'Back');
+    const revoke = findButton(renderer.root, 'Revoke consent');
+    expect(back.props.variant ?? 'default').toBe('default');
+    expect(revoke.props.variant).toBe('outline-destructive');
+  });
+
+  it('defaults the optional switch to on', async () => {
+    const renderer = mountCard('onboarding');
+    await act(flush);
     expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('starts the switch from the choice an older consent record carries', async () => {
+    mockedReadConsent.mockResolvedValue({
+      mandatory: false,
+      optional: false,
+      previousOptional: false,
+    });
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
+
+    const btn = findButton(renderer.root, 'Accept and continue');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+    // Accepting the updated disclosure keeps the choice the user already made.
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', false);
+  });
+
+  it('keeps an on choice carried from an older consent record', async () => {
+    mockedReadConsent.mockResolvedValue({
+      mandatory: false,
+      optional: false,
+      previousOptional: true,
+    });
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('keeps an onboarding toggle made before the account id resolves', async () => {
+    currentUserId.value = undefined;
+    const load = Promise.withResolvers<{
+      mandatory: boolean;
+      optional: boolean;
+      previousOptional?: boolean;
+    }>();
+    mockedReadConsent.mockReturnValue(load.promise);
+
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    // No account id yet, so nothing has been read: the switch stays operable and
+    // its position is the user's own answer.
+    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    const sw = singleSwitch(renderer.root);
+    expect(sw.props.value).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      (sw.props.onValueChange as (v: boolean) => void)(false);
+    });
+
+    // The account id resolves, and then the stored record arrives carrying the
+    // opposite choice.
+    currentUserId.value = 'test-user-1';
+    await act(async () => {
+      renderer.update(createElement(ConsentCard, { mode: 'onboarding' }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      load.resolve({ mandatory: false, optional: false, previousOptional: true });
+      await Promise.resolve();
+    });
+    await act(flush);
+
+    // The user's toggle survives the late read.
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
+  });
+
+  it('keeps the privacy line clear of the pinned actions', () => {
+    // Finding 2 (the sentence cut in half at the footer boundary) is fixed at
+    // the base revision by pinning the disclosure into the footer above the
+    // actions, so the footer edge can no longer cut it and the actions cannot
+    // overlay it. The earlier assertion that the sentence was the tail of the
+    // scrolling body no longer holds: the sentence has left the scroller.
+    const renderer = mountCard('onboarding');
+    const scroller = renderer.root.findByType('ScrollView' as never);
+
+    const privacyPrefix = i18n.t('consent.privacyPolicyPrefix');
+    const privacyLine = renderer.root.findAll(node => {
+      const text = node.children
+        .filter((child): child is string => typeof child === 'string')
+        .join('');
+      return (node.type as string) === 'Text' && text.length > 0 && text.includes(privacyPrefix);
+    });
+    expect(privacyLine).toHaveLength(1);
+    const line = privacyLine[0];
+    if (!line) {
+      throw new Error('privacy line not found');
+    }
+    expect(hasAncestorOfType(line, 'ScrollView')).toBe(false);
+
+    // The pinned actions are outside the scroller, so they never cover it.
+    const primary = findButton(renderer.root, 'Accept and continue');
+    expect(scroller.findAll(node => node === primary)).toHaveLength(0);
   });
 
   it('accepts with optional on when the switch is untouched', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
       await Promise.resolve();
@@ -163,6 +378,7 @@ describe('ConsentCard', () => {
 
   it('calls acceptConsent with optional value on primary action', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     const sw = singleSwitch(renderer.root);
     await act(async () => {
       await Promise.resolve();
@@ -202,6 +418,43 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
+  it('shows a same-size placeholder, not a default-off switch, while the stored value loads', async () => {
+    let resolveLoad: ((v: { mandatory: boolean; optional: boolean }) => void) | undefined =
+      undefined;
+    mockedReadConsent.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      })
+    );
+    const renderer = mountCard('review');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // The pre-load state must not claim "off": an e3 revoke check mistook the
+    // pre-load off for a completed revoke (b911 vr5, e3-toggled-off.png).
+    expect(countByType(renderer.root, 'Switch')).toBe(0);
+    expect(countByType(renderer.root, 'Skeleton')).toBe(1);
+
+    await act(() => {
+      resolveLoad?.({ mandatory: true, optional: true });
+    });
+    await act(flush);
+    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('shows the switch with an error when the stored value fails to load', async () => {
+    mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
+    const renderer = mountCard('review');
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    // The placeholder is gone: the error names the unreliability, so the
+    // control is at least operable (a failed toggle reverts with its error).
+    expect(singleSwitch(renderer.root)).toBeTruthy();
+  });
+
   it('writes optional choice immediately without sign-out on toggle', async () => {
     mockedReadConsent.mockResolvedValue({ mandatory: true, optional: false });
     const renderer = mountCard('review');
@@ -234,10 +487,13 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(false);
   });
 
-  it('does not call readConsent in onboarding mode', async () => {
-    mountCard('onboarding');
+  it('reads the stored choice in onboarding so an older record can carry it', async () => {
+    const renderer = mountCard('onboarding');
     await act(flush);
-    expect(mockedReadConsent).not.toHaveBeenCalled();
+
+    expect(mockedReadConsent).toHaveBeenCalledWith('test-user-1');
+    // No older record: onboarding keeps its on-by-default.
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
   it('clears error when optional toggle succeeds after a prior failure', async () => {
@@ -305,5 +561,119 @@ describe('ConsentCard', () => {
     expect(row).toBeDefined();
     expect(row?.props.title).toBe('Account & usage data');
     expect(row?.props.title).not.toContain('&amp;');
+  });
+
+  it('exposes the see-full-details row as a button that opens the details screen', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      mockedPush.mockClear();
+      const row = findDetailsRow(mountCard(mode).root);
+      expect(row.props.accessibilityRole).toBe('button');
+      expect(row.props.accessibilityLabel).toBe(i18n.t('consent.seeFullDetails'));
+      (row.props.onPress as () => void)();
+      expect(mockedPush).toHaveBeenCalledWith(
+        mode === 'review' ? '/(app)/consent-details?mode=review' : '/(app)/consent-details'
+      );
+    }
+  });
+
+  it('renders the privacy disclosure in the pinned footer, outside the scrolling body', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      const renderer = mountCard(mode);
+      const root = renderer.root;
+      // One scroll region and one disclosure: the disclosure lives in the
+      // pinned footer, where the footer edge cannot cut it (the body tail
+      // rendered across the fold on a full-height screen).
+      expect(countByType(root, 'ScrollView')).toBe(1);
+      const disclosure = requireDisclosure(root);
+      expect(hasAncestorOfType(disclosure, 'ScrollView')).toBe(false);
+
+      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Back';
+      const footer = requireParent(findButton(root, primary));
+      expect(disclosureTexts(footer).length).toBe(1);
+    }
+  });
+
+  it('keeps the privacy disclosure in the footer when an error occupies the footer slot', async () => {
+    mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
+    const renderer = mountCard('review');
+    await act(flush);
+    const root = renderer.root;
+    expect(texts(root)).toContain('Could not load your consent settings. Please try again.');
+    const footer = requireParent(findButton(root, 'Back'));
+    expect(disclosureTexts(footer).length).toBe(1);
+    expect(hasAncestorOfType(requireDisclosure(root), 'ScrollView')).toBe(false);
+  });
+
+  it('caps the pinned disclosure font scale so its footer height stays bounded', () => {
+    // The cap is bounded by the two-line guarantee, not by taste: on the
+    // smallest supported width the card leaves 318dp for the sentence, and
+    // its longer segment (the pt-BR lead-in, `text-sm`) measures 209.52dp at
+    // scale 1, so a cap above 318 / 209.52 = 1.52 would wrap that segment and
+    // push the pinned footer's second action off the sheet. Headroom is why
+    // the shipped value is lower than the bound.
+    expect(CONSENT_DISCLOSURE_MAX_FONT_SCALE * 209.52).toBeLessThanOrEqual(318);
+    for (const mode of ['onboarding', 'review'] as const) {
+      const root = mountCard(mode).root;
+      // The sentence has no line cap: uncapped it grows to several lines at
+      // the largest system text size and the pinned footer's fixed height
+      // pushes the actions off the sheet.
+      const outer = root.findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'Text' &&
+          Array.isArray(n.props.children) &&
+          n.props.children.includes('Your data is handled per the')
+      );
+      expect(outer.length).toBe(1);
+      expect(outer[0]?.props.maxFontSizeMultiplier).toBe(CONSENT_DISCLOSURE_MAX_FONT_SCALE);
+      // The nested link is its own native text node, so it needs the cap too.
+      expect(requireDisclosure(root).props.maxFontSizeMultiplier).toBe(
+        CONSENT_DISCLOSURE_MAX_FONT_SCALE
+      );
+    }
+  });
+
+  it('gives the pinned disclosure privacy link a full target and opens the policy natively', async () => {
+    mockedPush.mockClear();
+    const links = (['onboarding', 'review'] as const).map(mode => {
+      const root = mountCard(mode).root;
+      const found = root.findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'Pressable' &&
+          (n.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+      );
+      expect(found).toHaveLength(1);
+      const link = found[0];
+      if (!link) {
+        throw new Error('privacy link not found');
+      }
+      // A real 28dp box plus the vertical slop: the control-size audit reads
+      // the node's own rect, so the 14dp text line alone was reported as too
+      // small to tap, and the slop carries the 44pt region.
+      // Test renderer props are untyped; name the two reads once.
+      const props = link.props as {
+        className?: string;
+        hitSlop?: { top?: number; bottom?: number };
+      };
+      expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
+      expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_DP
+      );
+      return link;
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      for (const link of links) {
+        (link.props as { onPress: () => void }).onPress();
+      }
+    });
+
+    expect(mockedPush).toHaveBeenCalledTimes(2);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
   });
 });

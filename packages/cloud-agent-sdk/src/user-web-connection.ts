@@ -1,5 +1,6 @@
 import {
   createBaseConnection,
+  MAX_RECONNECT_ATTEMPTS,
   type Connection,
   type ConnectionLifecycleHooks,
 } from './base-connection';
@@ -13,6 +14,7 @@ import {
 } from './schemas';
 
 const COMMAND_TIMEOUT_MS = 30_000;
+const GENERIC_COMMAND_ERROR_MESSAGE = 'Command failed';
 const INITIAL_AUTH_RETRY_BASE_MS = 1_000;
 const INITIAL_AUTH_RETRY_CAP_MS = 30_000;
 export const VIEWER_PING_INTERVAL_MS = 20_000;
@@ -38,11 +40,12 @@ class UserWebCommandError extends Error {
 
 /**
  * Error class used to wrap a *delivered* (non-structured, bare-string) command
- * error response. The message is preserved verbatim so generic `catch (e)`
- * consumers see the same string the relay/CLI emitted; the new class only
- * lets downstream callers distinguish a delivered error from a transport-level
- * failure (timeout, connection destroyed, socket gone — those stay plain
- * `Error`).
+ * error response. A non-blank message is preserved verbatim so generic
+ * `catch (e)` consumers see the same string the relay/CLI emitted; a blank one
+ * is replaced by the generic message so no surface shows empty error copy. The
+ * new class only lets downstream callers distinguish a delivered error from a
+ * transport-level failure (timeout, connection destroyed, socket gone — those
+ * stay plain `Error`).
  *
  * Structured `UserWebCommandError` responses (relay envelopes with a `.code`)
  * are NOT wrapped — they already carry enough info.
@@ -60,6 +63,7 @@ type UserWebConnectionConfig = {
   onError?: (message: string) => void;
   onReconnect?: () => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
+  maxReconnectAttempts?: number;
 };
 
 type SendCommandToConnectionInput = {
@@ -91,6 +95,11 @@ type UserWebConnection = {
    * never invoked and the unsubscribe is a no-op.
    */
   onConnectionChange: (listener: (connected: boolean) => void) => () => void;
+  // The boolean readiness API (old form) stays the readiness source for existing consumers; the exhaustion signal is additive and owns only recovery UI. Removal condition: none — the boolean API is permanent.
+  isReconnectExhausted: () => boolean;
+  onReconnectExhaustionChange: (listener: (exhausted: boolean) => void) => () => void;
+  /** Replace the viewer socket and restore subscriptions without replaying interrupted commands. */
+  retryConnection: () => void;
   subscribeToCliSession: (sessionId: string) => () => void;
   sendCommand: (
     sessionId: string,
@@ -123,19 +132,24 @@ type UserWebConnection = {
  *
  * - A bare-string delivered error is wrapped in `CommandDeliveredError` so
  *   downstream consumers can distinguish it from transport-level failures
- *   (which stay plain `Error`).
+ *   (which stay plain `Error`). A blank string carries no copy to show, so it
+ *   reports the generic message instead of an empty one.
  * - A structured relay envelope that matches `userWebCommandErrorDataSchema`
  *   becomes a `UserWebCommandError` (already has a `.code`).
- * - A malformed structured payload collapses to a plain `Error('Command failed')`
- *   — the relay envelope wasn't trustworthy so this is not a real "delivered"
- *   message.
+ * - A malformed structured payload collapses to a plain
+ *   `Error(GENERIC_COMMAND_ERROR_MESSAGE)` — the relay envelope wasn't
+ *   trustworthy so this is not a real "delivered" message.
  */
 function parseCommandError(error: unknown): Error {
-  if (typeof error === 'string') return new CommandDeliveredError(error);
+  if (typeof error === 'string') {
+    return new CommandDeliveredError(
+      error.trim().length > 0 ? error : GENERIC_COMMAND_ERROR_MESSAGE
+    );
+  }
 
   const parsed = userWebCommandErrorDataSchema.safeParse(error);
   if (parsed.success) return new UserWebCommandError(parsed.data);
-  return new Error('Command failed');
+  return new Error(GENERIC_COMMAND_ERROR_MESSAGE);
 }
 
 function createUserWebConnection(
@@ -159,6 +173,12 @@ function createUserWebConnection(
   let pingInterval: ReturnType<typeof setInterval> | null = null;
   let pongTimeout: ReturnType<typeof setTimeout> | null = null;
   let initialAuthRetryTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Consecutive pre-socket token fetches allowed before the wrapper publishes
+  // exhaustion. Shares the socket reconnect cap so both transport retry series
+  // stop at the same point and exhaustion means one thing to recovery UI.
+  const maxInitialAuthAttempts = config.maxReconnectAttempts ?? MAX_RECONNECT_ATTEMPTS;
+  // Retries scheduled since the last successful token; `+ 1` is the failure
+  // that just happened, so this equals the current consecutive failure count - 1.
   let initialAuthRetryAttempt = 0;
   let outstandingPingNonce: string | null = null;
   const preSocketLifecycleCleanupFns: Array<() => void> = [];
@@ -191,6 +211,19 @@ function createUserWebConnection(
     if (connected === value) return;
     connected = value;
     for (const listener of connectionChangeListeners) listener(value);
+  }
+
+  // Wrapper-owned reconnect-exhaustion snapshot, mirroring `connected`. The base
+  // connection fires the two-edge callback; the wrapper keeps a synchronous
+  // snapshot so `isReconnectExhausted()` reads it without crossing the base
+  // boundary and listeners fire only on value changes.
+  let exhausted = false;
+  const exhaustionChangeListeners = new Set<(exhausted: boolean) => void>();
+
+  function setExhausted(value: boolean): void {
+    if (exhausted === value) return;
+    exhausted = value;
+    for (const listener of exhaustionChangeListeners) listener(value);
   }
 
   function hasLifetime(): boolean {
@@ -252,10 +285,11 @@ function createUserWebConnection(
 
   function requestPreSocketRecovery(): void {
     if (destroyed || !hasLifetime() || baseConnection || started || connectPromise) return;
-    if (initialAuthRetryTimeout !== null) {
-      clearTimeout(initialAuthRetryTimeout);
-      initialAuthRetryTimeout = null;
-    }
+    // Mirrors the base connection's resume paths: a fresh network or visibility
+    // signal restarts the attempt series and clears exhaustion before the probe,
+    // so the surface reads "reconnecting" rather than terminal while it tries.
+    clearInitialAuthRetry();
+    setExhausted(false);
     startConnection(false);
   }
 
@@ -392,7 +426,7 @@ function createUserWebConnection(
     if (!pending) return;
     clearTimeout(pending.timer);
     pendingCommands.delete(msg.id);
-    if (msg.error) pending.reject(parseCommandError(msg.error));
+    if (msg.error !== undefined) pending.reject(parseCommandError(msg.error));
     else pending.resolve(msg.result);
   }
 
@@ -415,6 +449,7 @@ function createUserWebConnection(
               sendPing();
             }) ?? (() => {})
         : undefined,
+      hiddenPauseDelayMs: lifecycleHooks.hiddenPauseDelayMs,
     };
   }
 
@@ -431,6 +466,8 @@ function createUserWebConnection(
     hasEverOpened = false;
     baseConnection = createBaseConnection({
       lifecycleHooks: createLifecycleHooks(),
+      maxReconnectAttempts: config.maxReconnectAttempts,
+      onReconnectExhaustionChange: setExhausted,
       buildUrl,
       parseMessage: (data: unknown) => {
         if (typeof data !== 'string') return null;
@@ -499,6 +536,11 @@ function createUserWebConnection(
     const openWithToken = (value: string): void => {
       if (!started || destroyed || !hasLifetime() || expectedGeneration !== generation) return;
       clearInitialAuthRetry();
+      // Before the first base connection exists, exhaustion is wrapper-owned and
+      // only a token that finally resolves (manual retry, or lifecycle recovery
+      // after signing in again) can clear it. Afterwards the base connection
+      // emits its own edges, so the flag is left alone.
+      if (!baseConnection) setExhausted(false);
       token = value;
       ensureBaseConnection();
       baseConnection?.connect();
@@ -508,6 +550,15 @@ function createUserWebConnection(
       started = false;
       rejectPending('Failed to get auth token');
       config.onError?.('Failed to get auth token');
+      // Bound the series the same way the base connection bounds socket
+      // reconnects: once the cap is reached, publish the exhaustion edge so the
+      // recovery surface renders instead of retrying silently forever. The
+      // counter stays spent here; only `retryConnection()` or a lifecycle
+      // resume restarts the series, and both go through `clearInitialAuthRetry`.
+      if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
+        setExhausted(true);
+        return;
+      }
       scheduleInitialAuthRetry(expectedGeneration);
     };
 
@@ -541,6 +592,7 @@ function createUserWebConnection(
     // callback, so the wrapper must drive the disconnected transition itself
     // before the next `startConnection()` reopens from a false baseline.
     setConnected(false);
+    setExhausted(false);
   }
 
   function connect(): void {
@@ -646,6 +698,7 @@ function createUserWebConnection(
       reconnectListeners.clear();
       sessionListeners.clear();
       connectionChangeListeners.clear();
+      exhaustionChangeListeners.clear();
     },
     isConnected: () => connected,
     onConnectionChange(listener) {
@@ -654,6 +707,27 @@ function createUserWebConnection(
       return () => {
         connectionChangeListeners.delete(listener);
       };
+    },
+    isReconnectExhausted: () => exhausted,
+    onReconnectExhaustionChange(listener) {
+      if (destroyed) return () => {};
+      exhaustionChangeListeners.add(listener);
+      return () => {
+        exhaustionChangeListeners.delete(listener);
+      };
+    },
+    retryConnection() {
+      if (baseConnection) {
+        baseConnection.reconnectWithRefreshedAuth?.();
+        return;
+      }
+      if (destroyed || !hasLifetime()) return;
+      // No base connection yet means the failure was token acquisition, which
+      // the wrapper owns: clear that state, restart the attempt budget, and ask
+      // for a token again so the user can recover after signing in again.
+      clearInitialAuthRetry();
+      setExhausted(false);
+      if (!started && !connectPromise) startConnection(false);
     },
     subscribeToCliSession(sessionId) {
       if (destroyed) return () => {};
@@ -714,10 +788,10 @@ function createUserWebConnection(
     },
     onSessionEvent(event, listener) {
       const listeners = sessionListeners.get(event) ?? new Set<(data: never) => void>();
-      listeners.add(listener as (data: never) => void);
+      listeners.add(listener);
       sessionListeners.set(event, listeners);
       return () => {
-        listeners.delete(listener as (data: never) => void);
+        listeners.delete(listener);
         if (listeners.size === 0) sessionListeners.delete(event);
       };
     },

@@ -1,0 +1,514 @@
+package com.kilocode.activeagentsliveupdate
+
+import android.app.Notification
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
+import android.net.Uri
+import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import expo.modules.kotlin.exception.Exceptions
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.records.Field
+import expo.modules.kotlin.records.Record
+import kotlinx.coroutines.CoroutineScope
+import org.json.JSONObject
+
+/**
+ * Local Expo module for the Android aggregate ongoing notification.
+ *
+ * The JS side owns the translated copy, the deep link, the kind's channel (and
+ * its creation), the alert decision, and the revision guard; this module owns
+ * the fixed notification id, the posted-channel mirror, the API 36.1+ promotion
+ * gate, and the content intent plus named actions: Open deep-links into the
+ * recorded session (the Agents tab when nothing waits), Approve runs the
+ * headless approval when a cloud-agent permission waits, and New agent opens
+ * the composer on a working card. Both platforms answer through
+ * `src/lib/glanceable/approve-ask.ts`.
+ *
+ * This is the Android mechanism for the one shared kind model, not a second
+ * behaviour: `@kilocode/notifications` maps each agent surface to `needs-input`
+ * or `progress`, the JS side passes the resulting channel and alert decision
+ * here, and `src/glanceable-ios/ios-sink.ts` renders the same ongoing card as an
+ * ActivityKit Live Activity on the same model. The forks are the capabilities
+ * Android has and iOS does not, each named where it is used: an ongoing
+ * notification in the shade, with its channel and per-channel Do Not Disturb
+ * override; the read of that posted notification behind `getPostedChannel`
+ * (iOS's card is not a notification, so its posted read is ActivityKit's
+ * `getInstances()`); and the API 36.1+ promoted-ongoing Live Update. The one
+ * user-visible difference that follows is the mechanism itself — the Android
+ * card alerts when it first becomes needs-input, while a Live Activity never
+ * alerts, so on iOS that breakthrough is the needs-input push's
+ * `time-sensitive` level plus the per-Focus filter.
+ */
+class ActiveAgentsLiveUpdateModule : Module() {
+  override fun definition() = ModuleDefinition {
+    Name("ActiveAgentsLiveUpdate")
+
+    Function("isPromotionCapable") {
+      PromotionGate.capable(context)
+    }
+
+    // The framework applies the Do Not Disturb access gate when a channel is
+    // created and ignores later app writes to a channel's override, so the JS
+    // side can only tell whether the user's grant still stands by asking here.
+    Function("isDndAccessGranted") {
+      notificationManager.isNotificationPolicyAccessGranted
+    }
+
+    // The card's content and actions travel as one record so both entry points
+    // fit Expo's eight-argument Function limit beside the notification-kind fields.
+    //
+    // `start`, `update` and `end` are the durable writes whose state the JS side
+    // never reads back in the same turn: their bodies commit to SharedPreferences
+    // (a synchronous fsync), arm or cancel the OS alarm, and post the
+    // notification, so they run on the module queue rather than the JavaScript
+    // thread. The JS bridge (`src/glanceable-android/live-update.ts`) declares
+    // them `void` and never consumes the promise, which is why
+    // `DurableWrites.durable` logs a failure instead of letting it become an
+    // unhandled rejection. The queue is the receivers' too: a card write from a
+    // broadcast lands in the same one order as a write from here.
+    AsyncFunction("start") { card: LiveUpdateCard, channelId: String, alerting: Boolean, promotion: Boolean ->
+      DurableWrites.durable {
+        post(card, channelId, alerting, promotion, 0)
+      }
+    }.runOnQueue(moduleQueue)
+
+    // `update` carries the terminal `timeoutMs` instead of `start`'s `promotion`
+    // flag. The flag is redundant on this path: `post` gates promotion on
+    // `PromotionGate.capable(context)` itself, which is the value the JS side
+    // passes.
+    AsyncFunction("update") { card: LiveUpdateCard, channelId: String, alerting: Boolean, timeoutMs: Double ->
+      DurableWrites.durable {
+        post(card, channelId, alerting, PromotionGate.capable(context), timeoutMs.toLong())
+      }
+    }.runOnQueue(moduleQueue)
+
+    AsyncFunction("end") {
+      DurableWrites.durable {
+        dismiss()
+      }
+    }.runOnQueue(moduleQueue)
+
+    // One followed session's ongoing notification
+    // (`.specs/mobile-session-live-activity.md` "Android"). The card travels as
+    // JSON text: Expo's record converter rejects a null inside an object
+    // argument, and the card carries nullable fields. The durable bodies run on
+    // the same queue as the aggregate card's, for the same prefs-fsync reason.
+    AsyncFunction("postSession") { cardJson: String, dismissAfterMs: Double ->
+      DurableWrites.durable {
+        SessionNotifications.post(context, sessionCardFromJson(cardJson), dismissAfterMs.toLong())
+      }
+    }.runOnQueue(moduleQueue)
+
+    AsyncFunction("restoreSession") { sessionId: String ->
+      DurableWrites.durable {
+        SessionNotifications.restore(context, sessionId)
+      }
+    }.runOnQueue(moduleQueue)
+
+    AsyncFunction("dismissSession") { sessionId: String ->
+      DurableWrites.durable {
+        SessionNotifications.cancel(context, sessionId)
+      }
+    }.runOnQueue(moduleQueue)
+
+    // The JS side calls this after a restart or a scope change: every stored
+    // session card whose id is not in the list is cancelled and forgotten.
+    AsyncFunction("pruneSessions") { keepJson: String ->
+      DurableWrites.durable {
+        SessionNotifications.prune(context, keepJson)
+      }
+    }.runOnQueue(moduleQueue)
+
+    // The stored session cards, as a JSON array of the cards the JS side
+    // posted. Native storage is authoritative: a notification outlives the
+    // process that posted it, and a fresh process rebuilds the followed set
+    // from here. Synchronous, like `getWidgetSnapshot`, so a same-turn read sees
+    // the write the JS side just issued.
+    Function("getSessionCards") {
+      SessionNotifications.cards(context)
+    }
+
+    // `setWidgetSnapshot` is the one durable write the JS side reads back in the
+    // same turn: an in-place widget action republishes the snapshot through the
+    // sink and `register.ts`'s `handleWidgetAction` redraws immediately, whose
+    // `currentProps()` re-reads native storage (`register.ts:176-189`). The read
+    // must see this write, so the entry point stays a synchronous `Function`: it
+    // records the snapshot on the JS thread and hands only the durable body —
+    // the prefs fsync and the `AlarmManager` round-trip — to the module queue.
+    Function("setWidgetSnapshot") { snapshot: String, expiresAt: Double ->
+      widgetSnapshot = snapshot
+      DurableWrites.queue.execute {
+        DurableWrites.durable {
+          ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
+        }
+      }
+    }
+
+    // This read stays a synchronous `Function` too: its Promise form would change
+    // the JS bridge and its consumers (`live-update.ts`, `register.ts`,
+    // `android-sink.ts`), which this module does not own. It answers with the
+    // snapshot this runtime last handed to `setWidgetSnapshot` — so the redraw
+    // after a successful in-place action never reads the pre-action snapshot the
+    // still-queued commit has not replaced — and falls back to the persisted
+    // snapshot only for a runtime that has written none (a fresh process), which
+    // is exactly what the old synchronous body returned.
+    Function("getWidgetSnapshot") {
+      widgetSnapshot ?: ActiveAgentsDeadlineReceiver.getWidgetSnapshot(context)
+    }
+
+    // The channel the posted card carries, or null when the module has posted
+    // nothing. The JS side reads this after a process restart to tell a card
+    // still in the shade from a widget snapshot that was stored without a post.
+    Function("getPostedChannel") {
+      postedChannelOrNull()
+    }
+  }
+
+  /**
+   * The module's one serial queue for the durable write path, shared with the
+   * receivers through `DurableWrites`.
+   */
+  private val moduleQueue = CoroutineScope(DurableWrites.dispatcher)
+
+  /**
+   * The snapshot this JS runtime most recently handed to `setWidgetSnapshot`, or
+   * null when it has written none. The durable commit runs on the module queue,
+   * so a read in the same turn as the write would otherwise see the previous
+   * snapshot; this record is what lets `getWidgetSnapshot` answer with the value
+   * the JS side just issued. A fresh runtime starts null and falls back to the
+   * persisted snapshot. Both the assignment and the read happen on the JS
+   * thread, so no synchronization is needed.
+   */
+  private var widgetSnapshot: String? = null
+
+  // `AppContext` exposes only the React context. Every entry point here runs
+  // from a JS call, so losing it means the module cannot work at all.
+  private val context: Context
+    get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
+
+  private val notificationManager: NotificationManager
+    get() = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+  private val notificationState
+    get() = context.getSharedPreferences("active_agents_notification", Context.MODE_PRIVATE)
+
+  /**
+   * The channel the module last posted, or null when it has posted nothing.
+   *
+   * The card changes channel when its kind changes, and the framework drops a
+   * post addressed to a channel the user disabled instead of moving the card,
+   * so `post` needs the posted channel to clear the card first.
+   *
+   * The module mirrors the channel it posted in its own state instead of
+   * reading the framework's copy: `Notification.channelId` only exists on API
+   * 26+, and notification channels do not exist below it, so a version fork
+   * would buy nothing the mirror does not already hold on every API.
+   */
+  private fun postedChannelId(): String? = notificationState.getString(POSTED_CHANNEL, null)
+
+  /** The view intent one deep-link record mints, so every copy matches on filterEquals. */
+  private fun viewIntent(url: String): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+    setPackage(context.packageName)
+  }
+
+  /**
+   * A PendingIntent that deep-links the app to the URL the JS side named: the
+   * waiting session's route when one is recorded, the Agents tab otherwise.
+   *
+   * `PendingIntent.getActivity` matches on `Intent.filterEquals`, which includes
+   * the data URI, so a per-session URL would leave the previous session's record
+   * behind under the fixed request code instead of updating it, and the OS would
+   * accumulate one Open record per session. `commitOpenUrl` retires the
+   * superseded record once the post that carries this one lands, so the app
+   * holds one Open record at a time and a post that throws leaves the card still
+   * in the shade with the record it already carries.
+   */
+  private fun openPendingIntent(openUrl: String): PendingIntent =
+    PendingIntent.getActivity(
+      context,
+      OPEN_REQUEST_CODE,
+      viewIntent(openUrl),
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+  /**
+   * Drop the PendingIntent record a superseded Open URL created. `FLAG_NO_CREATE`
+   * returns the existing record only, so a URL whose record is already gone is a
+   * no-op rather than a new record.
+   */
+  private fun cancelOpenIntent(openUrl: String) {
+    PendingIntent.getActivity(
+      context,
+      OPEN_REQUEST_CODE,
+      viewIntent(openUrl),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
+  }
+
+  /**
+   * Retire the Open record the superseded URL created and remember the URL now
+   * in the shade. Called only after the post lands: the card still on screen
+   * after a failed post carries the previous record, so cancelling it before the
+   * post succeeds would leave that card unservable.
+   */
+  private fun commitOpenUrl(previousUrl: String?, openUrl: String) {
+    if (previousUrl == openUrl) {
+      return
+    }
+    if (previousUrl != null) {
+      cancelOpenIntent(previousUrl)
+    }
+    check(notificationState.edit().putString(OPEN_URL, openUrl).commit()) {
+      "Cannot persist the active agents open URL"
+    }
+  }
+
+  /**
+   * The Approve action: the one tap that answers a waiting permission. It goes
+   * through `ActiveAgentsApprovalActivity`, which starts the headless approval
+   * once the device is unlocked, and `ApprovalGate.action` adds the platform's
+   * own authentication requirement where the platform has one.
+   */
+  private fun approvePendingIntent(
+    sessionId: String? = null,
+    approvalKey: String? = null
+  ): PendingIntent =
+    ApprovalGate.pendingIntent(context, APPROVE_REQUEST_CODE, sessionId, approvalKey)
+
+  /**
+   * The New agent action: the app's fixed new-agent deep link. One constant URL,
+   * so the record under its request code never accumulates.
+   */
+  private fun newAgentPendingIntent(url: String): PendingIntent =
+    PendingIntent.getActivity(
+      context,
+      NEW_AGENT_REQUEST_CODE,
+      viewIntent(url),
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+  /** The app is drawing in its dark theme: the card's accent and retry red follow it. */
+  private fun isNight(): Boolean =
+    (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+      Configuration.UI_MODE_NIGHT_YES
+
+  /**
+   * The channel a card still in the shade carries, or null when no card is
+   * posted. The stored marker alone can outlive the card: a terminal timeout
+   * removes the notification without any further app call, and the marker
+   * survives a process exit, so confirm the fixed id is still active before the
+   * JS side adopts the kind on a restart.
+   *
+   * The fork here is the capability: the posted card is an Android
+   * notification, and only its own `NotificationManager` can report whether it
+   * is still in the shade. iOS's counterpart card is the ActivityKit Live
+   * Activity, whose posted read is `ActiveAgentsLiveActivity.getInstances()` in
+   * `src/glanceable-ios/ios-sink.ts`; the kind model both sides read is shared,
+   * so the restart adoption exists on both platforms.
+   */
+  private fun postedChannelOrNull(): String? {
+    val posted = postedChannelId() ?: return null
+    val stillPosted = notificationManager.activeNotifications.any {
+      it.id == ActiveAgentsDeadlineReceiver.NOTIFICATION_ID
+    }
+    return if (stillPosted) posted else null
+  }
+
+  private fun post(
+    card: LiveUpdateCard,
+    channelId: String,
+    alerting: Boolean,
+    promotion: Boolean,
+    timeoutMs: Long
+  ) {
+    val openUrl = card.openUrl
+    // Read the URL the shade card carries before this call can change it: a
+    // failed post must leave `OPEN_URL` naming the previous card's record.
+    val previousOpenUrl = notificationState.getString(OPEN_URL, null)
+    val contentIntent = openPendingIntent(openUrl)
+    // The two OS paths a notification can interrupt Do Not Disturb with are the
+    // channel's DND override (user-granted, requested by the app) and the
+    // message category, which is what a notification that expects an answer
+    // uses. A needs-input card takes both; a progress card keeps the status
+    // category and the silent behaviour it had.
+    val needsInput = channelId == NEEDS_INPUT_CHANNEL_ID
+    // The system template, coloured with the app's primary (olive by day, yellow
+    // by night). The retry line after a failed approve draws in the destructive
+    // red; everything else is the template's own text colour.
+    val night = isNight()
+    val text: CharSequence = if (card.textIsError) {
+      SpannableString(card.text).apply {
+        setSpan(
+          ForegroundColorSpan(
+            Color.parseColor(if (night) CardStyle.ERROR_NIGHT else CardStyle.ERROR_DAY)
+          ),
+          0,
+          length,
+          Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+      }
+    } else {
+      card.text
+    }
+    val icon = CardStyle.icon(context)
+    val builder = CardBuilders.builder(context, channelId)
+      .setSmallIcon(icon)
+      .setColor(Color.parseColor(if (night) CardStyle.PRIMARY_NIGHT else CardStyle.PRIMARY_DAY))
+      .setContentTitle(card.title)
+      .setContentText(text)
+      .setSubText(card.subText)
+      .setContentIntent(contentIntent)
+      .setOngoing(true)
+      .setCategory(if (needsInput) Notification.CATEGORY_MESSAGE else Notification.CATEGORY_STATUS)
+
+    // Approve first, then Open, then New agent. An action the card does not
+    // offer is omitted, not disabled: the JS side drops Approve once the wait is
+    // answered elsewhere or while an answer is in flight. Approve runs once the
+    // device is unlocked, so it goes through the gate activity.
+    card.approveLabel?.let {
+      builder.addAction(ApprovalGate.action(context, icon, it, approvePendingIntent()))
+    }
+    builder.addAction(CardBuilders.action(context, icon, card.openLabel, contentIntent))
+    card.newAgentLabel?.let {
+      builder.addAction(
+        CardBuilders.action(context, icon, it, newAgentPendingIntent(card.newAgentUrl))
+      )
+    }
+
+    if (needsInput) {
+      // Only the first entry into the kind alerts; a later update in the same
+      // kind must not re-alert.
+      builder.setOnlyAlertOnce(!alerting)
+    } else {
+      builder.setSound(null)
+      builder.setOnlyAlertOnce(true)
+    }
+
+    // API 36.1+ Live Update: the one gate both Android cards request through.
+    if (promotion) {
+      PromotionGate.request(context, builder, card.compactText)
+    }
+
+    // Snapshot the timeout flag a failed same-channel post must restore: that
+    // post leaves the previous card in the shade, so the flag must keep
+    // describing it rather than the timeout this call could not arm.
+    val previousHasTimeout = notificationState.getBoolean(HAS_TIMEOUT, false)
+
+    // Commit before arming a timeout so process exit cannot lose cancellation state.
+    if (timeoutMs > 0) {
+      check(notificationState.edit().putBoolean(HAS_TIMEOUT, true).commit()) {
+        "Cannot persist the active agents notification timeout"
+      }
+    }
+
+    // The card changes channel when its kind changes, so clear the posted card
+    // first: a destination channel the user disabled drops the post rather than
+    // moving the card, which would leave the previous kind's card in the shade.
+    // The alert decision above is unchanged, so the fresh post still alerts only
+    // when the JS side asked it to.
+    //
+    // Each cancel is also what a failed post below needs to know: only a post
+    // that removed the card it found leaves no card for the durable marker to
+    // describe. A same-channel update removes nothing and keeps the previous
+    // card in the shade (see the catch).
+    val previousChannelId = postedChannelId()
+    val clearsOnChannelSwitch = previousChannelId != null && previousChannelId != channelId
+    if (clearsOnChannelSwitch) {
+      notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
+    }
+
+    // Ordinary updates must retain the notification so onlyAlertOnce suppresses repeat alerts.
+    val clearsOnTimeoutChange = Build.VERSION.SDK_INT >= 26 && timeoutMs <= 0 && previousHasTimeout
+    if (clearsOnTimeoutChange) {
+      notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
+    }
+    if (Build.VERSION.SDK_INT >= 26) {
+      builder.setTimeoutAfter(timeoutMs.coerceAtLeast(0))
+    } else {
+      ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, timeoutMs)
+    }
+    try {
+      notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
+    } catch (error: Throwable) {
+      // The post did not land. The Open record this call created is
+      // unreferenced: any card still in the shade carries the previous record,
+      // which `openPendingIntent` left intact, so drop the new record and keep
+      // `OPEN_URL` naming the previous card's.
+      if (previousOpenUrl != openUrl) {
+        cancelOpenIntent(openUrl)
+      }
+      // When this call removed the previous card the shade holds nothing, so
+      // drop the marker before rethrowing a later start does not adopt a kind
+      // from a card that is not there. A same-channel update removed nothing:
+      // its previous card is still posted, so clearing the marker would strand
+      // it on the next channel switch and hide it from a JS restart's adoption.
+      // Restore the timeout flag with the marker.
+      if (previousChannelId != channelId || clearsOnTimeoutChange) {
+        notificationState.edit().remove(POSTED_CHANNEL).remove(HAS_TIMEOUT).apply()
+      } else {
+        notificationState.edit().putBoolean(HAS_TIMEOUT, previousHasTimeout).apply()
+      }
+      throw error
+    }
+    // The post landed: retire the superseded Open record and remember the new
+    // URL, so the card in the shade and `OPEN_URL` describe the same record.
+    commitOpenUrl(previousOpenUrl, openUrl)
+    // Mirror the posted channel so the next post can tell whether the card moves.
+    // Commit, like the timeout flag: the shade card survives a process exit, so
+    // the mirror that describes it must too.
+    val state = notificationState.edit().putString(POSTED_CHANNEL, channelId)
+    if (timeoutMs <= 0) {
+      state.putBoolean(HAS_TIMEOUT, false)
+    }
+    check(state.commit()) { "Cannot persist the active agents notification channel" }
+  }
+
+  private fun dismiss() {
+    if (Build.VERSION.SDK_INT < 26) {
+      ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, 0)
+    }
+    notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
+    // The card's Open record outlives the notification unless it is cancelled
+    // here; the fixed id stays, so the next post creates a new one.
+    notificationState.getString(OPEN_URL, null)?.let { cancelOpenIntent(it) }
+    notificationState.edit().remove(HAS_TIMEOUT).remove(POSTED_CHANNEL).remove(OPEN_URL).apply()
+  }
+
+  private companion object {
+    const val HAS_TIMEOUT = "has_timeout"
+    const val OPEN_REQUEST_CODE = 1002
+    const val OPEN_URL = "open_url"
+    const val POSTED_CHANNEL = "posted_channel"
+
+    /** The kind marker in the channel id the JS side creates for needs-input. */
+    const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
+    const val APPROVE_REQUEST_CODE = 1003
+    const val NEW_AGENT_REQUEST_CODE = 1004
+  }
+}
+
+/** One card's content and actions, as the JS bridge (`live-update.ts`) sends it. */
+class LiveUpdateCard : Record {
+  @Field val title: String = ""
+  @Field val text: String = ""
+  @Field val textIsError: Boolean = false
+  @Field val subText: String? = null
+  @Field val compactText: String? = null
+  @Field val openLabel: String = ""
+  @Field val openUrl: String = ""
+  @Field val approveLabel: String? = null
+  @Field val newAgentLabel: String? = null
+  @Field val newAgentUrl: String = ""
+}
+
+/** One session card from the JSON text the JS bridge passes. */
+internal fun sessionCardFromJson(cardJson: String): SessionNotificationCard =
+  SessionNotificationCard().apply { fillFromJson(JSONObject(cardJson)) }

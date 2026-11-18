@@ -2,34 +2,48 @@
 
 import { useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersContent';
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
-import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
-import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
+import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
+import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListContent';
+import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
+import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
+import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
+import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
-import RequestLoggingOptInsPage from '@/app/admin/request-logging-opt-ins/page';
+import { ProviderMetadataContent } from '@/app/admin/gateway/ProviderMetadataContent';
+import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
   'custom-llms',
   'routing',
-  'model-experiments',
-  'experiment-requests',
+  'auto-free',
+  'preferred-models',
+  'unavailable-models',
+  'provider-order',
+  'custom-pricing',
+  'organization-features',
   'api-request-log',
-  'request-logging-opt-ins',
+  'provider-metadata',
 ];
 type Tab =
   | 'sync-providers'
   | 'custom-llms'
   | 'routing'
-  | 'model-experiments'
-  | 'experiment-requests'
+  | 'auto-free'
+  | 'preferred-models'
+  | 'unavailable-models'
+  | 'provider-order'
+  | 'custom-pricing'
+  | 'organization-features'
   | 'api-request-log'
-  | 'request-logging-opt-ins';
+  | 'provider-metadata';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -42,11 +56,7 @@ export default function AdminGatewayPage() {
   const pathname = usePathname();
 
   const tabParam = searchParams.get('tab');
-  const activeTab: Tab = isValidTab(tabParam)
-    ? tabParam
-    : searchParams.has('experimentId')
-      ? 'model-experiments'
-      : 'sync-providers';
+  const activeTab: Tab = isValidTab(tabParam) ? tabParam : 'sync-providers';
 
   const onTabChange = useCallback(
     (value: string) => {
@@ -55,9 +65,6 @@ export default function AdminGatewayPage() {
         params.delete('tab');
       } else {
         params.set('tab', value);
-      }
-      if (value !== 'model-experiments') {
-        params.delete('experimentId');
       }
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
@@ -73,10 +80,9 @@ export default function AdminGatewayPage() {
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
-      <div className="flex w-full flex-col gap-y-4">
-        <h2 className="text-2xl font-bold">Gateway</h2>
+      <div className="flex w-full flex-col">
         <Tabs value={activeTab} onValueChange={onTabChange}>
-          <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-x-6 rounded-none border-b bg-transparent p-0">
             <TabsTrigger value="sync-providers" className={tabTriggerClass}>
               Sync Providers
             </TabsTrigger>
@@ -84,19 +90,31 @@ export default function AdminGatewayPage() {
               Custom LLMs
             </TabsTrigger>
             <TabsTrigger value="routing" className={tabTriggerClass}>
-              Routing
+              Vercel Routing
             </TabsTrigger>
-            <TabsTrigger value="model-experiments" className={tabTriggerClass}>
-              Model Experiments
+            <TabsTrigger value="auto-free" className={tabTriggerClass}>
+              Auto Free
             </TabsTrigger>
-            <TabsTrigger value="experiment-requests" className={tabTriggerClass}>
-              Experiment Requests
+            <TabsTrigger value="preferred-models" className={tabTriggerClass}>
+              Preferred Models
+            </TabsTrigger>
+            <TabsTrigger value="unavailable-models" className={tabTriggerClass}>
+              Unavailable Models
+            </TabsTrigger>
+            <TabsTrigger value="provider-order" className={tabTriggerClass}>
+              Provider Order
+            </TabsTrigger>
+            <TabsTrigger value="custom-pricing" className={tabTriggerClass}>
+              Custom Pricing
+            </TabsTrigger>
+            <TabsTrigger value="organization-features" className={tabTriggerClass}>
+              Organization Features
             </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
-            <TabsTrigger value="request-logging-opt-ins" className={tabTriggerClass}>
-              Request Logging Opt-ins
+            <TabsTrigger value="provider-metadata" className={tabTriggerClass}>
+              Provider Metadata
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
@@ -105,26 +123,60 @@ export default function AdminGatewayPage() {
           <TabsContent value="custom-llms" className="mt-4">
             <CustomLlmsContent />
           </TabsContent>
-          <TabsContent value="routing" className="mt-4">
+          <TabsContent value="routing" className="mt-4 flex flex-col gap-y-6">
             <RoutingContent />
+            <VercelModelIdOverridesContent />
           </TabsContent>
-          <TabsContent value="model-experiments" className="mt-4">
-            <ModelExperimentsContent />
+          <TabsContent value="auto-free" className="mt-4">
+            <AutoFreeContent />
           </TabsContent>
-          <TabsContent value="experiment-requests" className="mt-4">
-            <ModelExperimentRequestsContent />
+          <TabsContent value="preferred-models" className="mt-4">
+            <GatewayModelListContent
+              list="preferred_models"
+              title="Preferred Models"
+              ordered
+              description={
+                <>
+                  The model catalog lists these models first, in this order. Model stats and health
+                  checks monitor every listed model except <code>kilo-auto/*</code>.
+                </>
+              }
+            />
+          </TabsContent>
+          <TabsContent value="unavailable-models" className="mt-4">
+            <GatewayModelListContent
+              list="unavailable_models"
+              title="Unavailable Models"
+              ordered={false}
+              description={
+                <>
+                  The gateway hides these models from the catalog and rejects direct requests for
+                  them; <code>kilo-auto</code> can still route to them.{' '}
+                  <code>{AUTO_SMALL_TARGET_MODELS.free}</code> is always treated as unavailable.
+                </>
+              }
+            />
+          </TabsContent>
+          <TabsContent value="provider-order" className="mt-4">
+            <PreferredProviderOrderContent />
+          </TabsContent>
+          <TabsContent value="custom-pricing" className="mt-4">
+            <CustomPricingContent />
+          </TabsContent>
+          <TabsContent value="organization-features" className="mt-4">
+            <OrganizationFeaturesContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"
             className="mt-4 [&>div]:mx-0 [&>div]:py-0 [&>header]:hidden"
           >
             <ApiRequestLogPage />
+            <div className="mt-8">
+              <RequestLoggingOptInsContent />
+            </div>
           </TabsContent>
-          <TabsContent
-            value="request-logging-opt-ins"
-            className="mt-4 [&>div]:mx-0 [&>div]:py-0 [&>header]:hidden"
-          >
-            <RequestLoggingOptInsPage />
+          <TabsContent value="provider-metadata" className="mt-4">
+            <ProviderMetadataContent />
           </TabsContent>
         </Tabs>
       </div>

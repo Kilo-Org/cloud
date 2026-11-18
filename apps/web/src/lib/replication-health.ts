@@ -1,8 +1,8 @@
 import { createDrizzleClient, type DrizzleClient, type pg } from '@kilocode/db/client';
 import { sql } from 'drizzle-orm';
 
-import { getEnvVariable } from '@/lib/dotenvx';
-import { db } from '@/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * Replication health for the primary's read replicas and logical (Snowflake)
@@ -362,19 +362,17 @@ export async function collectReplicationHealth(options?: {
     // report and blank the walsender and slot data below.
     Promise.all(
       targets.map(target =>
-        probe(target).catch(
-          (error): ReplicaHealth => ({
-            name: target.name,
-            status: 'unreachable',
-            in_recovery: null,
-            replay_lsn: null,
-            receive_lsn: null,
-            receive_replay_gap_bytes: null,
-            last_xact_replay_timestamp: null,
-            replay_delay_seconds: null,
-            error: errorMessage(error),
-          })
-        )
+        probe(target).catch((error): ReplicaHealth => ({
+          name: target.name,
+          status: 'unreachable',
+          in_recovery: null,
+          replay_lsn: null,
+          receive_lsn: null,
+          receive_replay_gap_bytes: null,
+          last_xact_replay_timestamp: null,
+          replay_delay_seconds: null,
+          error: errorMessage(error),
+        }))
       )
     ),
     getWalSenders().catch(error => {

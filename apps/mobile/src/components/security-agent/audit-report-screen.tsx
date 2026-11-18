@@ -1,0 +1,316 @@
+import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { useQuery } from '@tanstack/react-query';
+import { type TFunction } from 'i18next';
+import { FileText, ShieldOff } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
+import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import {
+  eventEvidenceLines,
+  SEVERITY_LABEL_KEYS,
+} from '@/components/security-agent/audit-report-copy';
+import { ReportSummary } from '@/components/security-agent/audit-report-summary';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatCalendarDate, formatDate } from '@/lib/format';
+import { useTRPC } from '@/lib/trpc';
+import { parseTimestamp } from '@/lib/utils';
+
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
+type SecurityAgentAuditReport = Extract<AuditReportResponse, { status: 'ok' }>['report'];
+type SecurityFindingAuditSection = SecurityAgentAuditReport['findings'][number];
+type SecurityAgentAuditReportActor = SecurityFindingAuditSection['events'][number]['actor'];
+
+const MASKED_ACTOR_LABEL_KEYS = {
+  kilo_admin: 'securityAgent.auditReport.actorMaskedKiloAdmin',
+  user: 'securityAgent.auditReport.actorMaskedUser',
+} as const;
+
+// Every timestamp inside the report formats the same way, so one frozen
+// options object serves them all instead of one allocation per rendered row.
+const UTC_TIMESTAMP_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = Object.freeze({
+  timeZone: 'UTC',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+// The period line is labelled UTC, so every timestamp inside the report carries
+// the same zone: a reader west of UTC must never see a generated date their own
+// calendar has not reached yet. `formatDate` renders the date and clock in the
+// language's own order and 12/24-hour cycle; the zone marker stays invariant,
+// like `periodUtc`'s.
+function formatUtcTimestamp(value: string): string {
+  return `${formatDate(parseTimestamp(value), i18n.language, UTC_TIMESTAMP_FORMAT_OPTIONS)} UTC`;
+}
+
+// A masked actor's displayName is a server-side English label; the localized
+// label is chosen from the mask the server reports, never from that string.
+function actorLabel(actor: SecurityAgentAuditReportActor, t: TFunction): string {
+  if (actor.type === 'system') {
+    return t('securityAgent.auditReport.actorSystem');
+  }
+  if (!actor.masked) {
+    return actor.displayName;
+  }
+  return t(MASKED_ACTOR_LABEL_KEYS[actor.maskedKind ?? 'user']);
+}
+
+// Literal keys, never a template: the catalog check scans the source for the
+// keys a lookup passes on, and a computed key is invisible to it. An action
+// the server adds before this app learns it falls back to the server label.
+const EVENT_ACTION_LABEL_KEYS: Record<string, string> = Object.freeze({
+  'security.finding.created': 'securityAgent.auditReport.eventActions.findingCreated',
+  'security.finding.severity_changed':
+    'securityAgent.auditReport.eventActions.findingSeverityChanged',
+  'security.finding.status_change': 'securityAgent.auditReport.eventActions.findingStatusChange',
+  'security.finding.dismissed': 'securityAgent.auditReport.eventActions.findingDismissed',
+  'security.finding.auto_dismissed': 'securityAgent.auditReport.eventActions.findingAutoDismissed',
+  'security.finding.superseded': 'securityAgent.auditReport.eventActions.findingSuperseded',
+  'security.finding.analysis_completed':
+    'securityAgent.auditReport.eventActions.findingAnalysisCompleted',
+  'security.finding.analysis_failed':
+    'securityAgent.auditReport.eventActions.findingAnalysisFailed',
+  'security.remediation.queued': 'securityAgent.auditReport.eventActions.remediationQueued',
+  'security.remediation.pr_opened': 'securityAgent.auditReport.eventActions.remediationPrOpened',
+  'security.remediation.failed': 'securityAgent.auditReport.eventActions.remediationFailed',
+  'security.remediation.blocked': 'securityAgent.auditReport.eventActions.remediationBlocked',
+  'security.remediation.no_changes_needed':
+    'securityAgent.auditReport.eventActions.remediationNoChangesNeeded',
+  'security.remediation.cancelled': 'securityAgent.auditReport.eventActions.remediationCancelled',
+  'security.finding.deleted': 'securityAgent.auditReport.eventActions.findingDeleted',
+});
+
+function eventLabel(action: string, serverLabel: string): string {
+  // Object.hasOwn: a bare index would return inherited members like
+  // `constructor` or `toString` instead of undefined for an unknown action.
+  const key = Object.hasOwn(EVENT_ACTION_LABEL_KEYS, action)
+    ? EVENT_ACTION_LABEL_KEYS[action]
+    : undefined;
+  return key === undefined ? serverLabel : i18n.t(key);
+}
+
+// Personal and org procedures resolve to nominally distinct tRPC option
+// types even when structurally identical, so we always call both hooks (one
+// disabled) and return whichever is active — the same branching pattern as
+// use-security-agent.ts.
+function useSecurityAgentAuditReport(scope: string) {
+  const trpc = useTRPC();
+  const personal = useQuery({
+    ...trpc.securityAgent.getAuditReport.queryOptions({}),
+    enabled: isPersonalSecurityScope(scope),
+  });
+  const organization = useQuery({
+    ...trpc.organizations.securityAgent.getAuditReport.queryOptions({ organizationId: scope }),
+    enabled: !isPersonalSecurityScope(scope),
+  });
+  return isPersonalSecurityScope(scope) ? personal : organization;
+}
+
+function AuditReportSkeleton() {
+  return (
+    <View className="flex-1 gap-3 px-6 pt-4">
+      <Skeleton className="h-4 w-2/3 rounded" />
+      <Skeleton className="h-4 w-1/3 rounded" />
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <Skeleton className="h-16 w-full rounded-lg" />
+      <Skeleton className="h-16 w-full rounded-lg" />
+    </View>
+  );
+}
+
+// The report's window is a UTC calendar range. `start` is an instant rendered in
+// UTC; `displayEnd` is a date-only calendar day, not an instant, so its calendar
+// components are formatted as they are. The header and the empty state both
+// render these values through `periodUtc`, so neither can describe the window in
+// the reader's own calendar days without saying which zone it is.
+function reportPeriod(report: SecurityAgentAuditReport) {
+  return {
+    start: formatDate(parseTimestamp(report.period.start), i18n.language, { timeZone: 'UTC' }),
+    end: formatCalendarDate(report.period.displayEnd, i18n.language),
+  };
+}
+
+function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
+  const { t } = useTranslation();
+  const { start, end } = reportPeriod(report);
+  const generatedAt = formatUtcTimestamp(report.generatedAt);
+
+  return (
+    <View className="gap-1">
+      <Text className="text-sm font-medium">{report.owner.displayName}</Text>
+      <Text variant="muted" className="text-xs">
+        {t('securityAgent.auditReport.periodUtc', { start, end })}
+      </Text>
+      <Text variant="muted" className="text-xs">
+        {t('securityAgent.auditReport.generated', { generatedAt })}
+      </Text>
+    </View>
+  );
+}
+
+function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSection }>) {
+  const { t } = useTranslation();
+  const meta = [
+    t(SEVERITY_LABEL_KEYS[finding.severity]),
+    finding.repository ?? t('securityAgent.auditReport.repositoryNotRecorded'),
+  ].join(' · ');
+
+  return (
+    <CollapsibleSection title={finding.title}>
+      {/* The body formats one timestamp and one actor label per event, so it is
+          built only while the section is expanded. */}
+      {() => (
+        <>
+          <Text variant="muted" className="text-xs">
+            {meta}
+          </Text>
+          <View className="gap-3">
+            {finding.events.map(event => (
+              <View key={event.id} className="gap-0.5">
+                <Text className="text-sm">{eventLabel(event.action, event.label)}</Text>
+                {eventEvidenceLines(event, t).map(line => (
+                  <Text key={line} variant="muted" className="text-xs">
+                    {line}
+                  </Text>
+                ))}
+                <Text variant="muted" className="text-xs">
+                  {formatUtcTimestamp(event.occurredAt)} · {actorLabel(event.actor, t)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+    </CollapsibleSection>
+  );
+}
+
+function AuditReportView({
+  report,
+  onRetry,
+}: Readonly<{ report: SecurityAgentAuditReport; onRetry?: () => void }>) {
+  const { t } = useTranslation();
+  if (report.findings.length === 0) {
+    const period = reportPeriod(report);
+    // Explorer security-audit finding 3: CenteredState's measured path painted
+    // the icon bubble but collapsed the copy, so the screen owns the layout and
+    // EmptyState renders its plain content (`placement="static"`).
+    // The heading says there is no recorded activity; the only other datum the
+    // empty state has is the window, so `periodUtc` states it once, with the
+    // invariant UTC marker, at the same size the non-empty header uses. A
+    // second sentence saying the same thing in words was removed: it restated
+    // the heading and pointed at this line. The owner line is the header's
+    // first line, so an empty report identifies whose window it covers instead
+    // of leaving that to the screen the reader came from.
+    return (
+      <TabScreenScrollView className="flex-1" contentContainerClassName="grow">
+        <Text className="px-6 pt-4 text-sm font-medium">{report.owner.displayName}</Text>
+        <View className="grow justify-center">
+          <EmptyState
+            placement="static"
+            icon={FileText}
+            title={t('securityAgent.auditReport.noActivity')}
+            description={
+              <Text variant="muted" className="text-xs text-center">
+                {t('securityAgent.auditReport.periodUtc', period)}
+              </Text>
+            }
+          />
+        </View>
+      </TabScreenScrollView>
+    );
+  }
+
+  return (
+    <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
+      {onRetry ? (
+        <QueryError
+          placement="top"
+          message={t('securityAgent.auditReport.couldNotLoad')}
+          onRetry={onRetry}
+        />
+      ) : null}
+      <ReportHeader report={report} />
+      <ReportSummary summary={report.summary} />
+      {report.findings.map(finding => (
+        <FindingSection key={finding.findingId} finding={finding} />
+      ))}
+    </TabScreenScrollView>
+  );
+}
+
+export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
+  const query = useSecurityAgentAuditReport(scope);
+  const errorCode = query.error?.data?.code;
+  const hasReport = query.data?.status === 'ok' && query.data.report.findings.length > 0;
+  // The org procedure is `organizationBillingProcedure`, which rejects
+  // viewers without the owner/billing_manager role. That denial is
+  // non-retryable: retrying cannot change the viewer's role.
+  const forbidden =
+    !isPersonalSecurityScope(scope) &&
+    query.isError &&
+    (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED');
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader className="px-6" title={t('securityAgent.auditReport.title')} showBackButton />
+
+      {query.isLoading && <AuditReportSkeleton />}
+
+      {forbidden && (
+        <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
+          <EmptyState
+            placement="static"
+            icon={ShieldOff}
+            title={t('securityAgent.auditReport.unavailable')}
+            description={t('securityAgent.auditReport.unavailableDescription')}
+          />
+        </TabScreenScrollView>
+      )}
+
+      {!query.isLoading && query.isError && !forbidden && !hasReport && (
+        <QueryError
+          message={t('securityAgent.auditReport.couldNotLoad')}
+          onRetry={() => void query.refetch()}
+        />
+      )}
+
+      {!query.isLoading && !query.isError && query.data?.status === 'query_failed' && (
+        <QueryError
+          message={t('securityAgent.auditReport.queryFailed')}
+          onRetry={() => void query.refetch()}
+        />
+      )}
+
+      {query.isPending && query.isPaused && (
+        <QueryError
+          variant="offline"
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => void query.refetch()}
+        />
+      )}
+
+      {!query.isLoading &&
+        !forbidden &&
+        (!query.isError || hasReport) &&
+        query.data?.status === 'ok' && (
+          <AuditReportView
+            report={query.data.report}
+            onRetry={query.isError ? () => void query.refetch() : undefined}
+          />
+        )}
+    </View>
+  );
+}

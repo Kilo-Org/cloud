@@ -1,32 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 
+import { SECURITY_COMMAND_TYPES } from '@kilocode/app-shared/security-agent';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
+
 import {
-  ACCESS_REQUIRED_SHOWN_EVENT,
   ANALYTICS_EVENT_SCHEMAS,
   APP_STARTUP_EVENT,
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
   CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
-  COMPLETION_REACHED_EVENT,
-  CONVERSATION_CREATED_EVENT,
+  CODE_REVIEW_SETTLED_EVENT,
+  CONSENT_OUTCOME_EVENT,
   FEEDBACK_SUBMITTED_EVENT,
-  INSTANCE_ACTION_EVENT,
   KILO_PASS_PURCHASE_COMPLETED_EVENT,
   KILO_PASS_PURCHASE_FAILED_EVENT,
   KILO_PASS_PURCHASE_STARTED_EVENT,
   LEGACY_EVENT_NAMES,
   LOGIN_EVENT,
+  LOGOUT_EVENT,
   MESSAGE_SENT_EVENT,
-  ONBOARDING_ENTERED_EVENT,
+  NOTIFICATION_PERMISSION_RESPONDED_EVENT,
+  NOTIFICATION_TOKEN_UPDATED_EVENT,
   ORGANIZATION_MEMBER_INVITED_EVENT,
+  ORGANIZATION_MEMBER_JOINED_EVENT,
   PERMISSION_RESPONDED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
-  PROVISION_FAILED_EVENT,
-  PROVISION_REQUESTED_EVENT,
-  PROVISION_SUCCEEDED_EVENT,
   PURCHASE_SETTLED_EVENT,
   QUESTION_ANSWERED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  SECURITY_INTENT_FOR_COMMAND_TYPE,
+  SECURITY_INTENTS,
   SESSION_CREATED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   SESSION_VIEWED_EVENT,
@@ -42,26 +45,24 @@ const ALL_EVENT_CONSTANTS = [
   SESSION_CREATED_EVENT,
   PERMISSION_RESPONDED_EVENT,
   QUESTION_ANSWERED_EVENT,
-  CONVERSATION_CREATED_EVENT,
-  INSTANCE_ACTION_EVENT,
   FEEDBACK_SUBMITTED_EVENT,
   ORGANIZATION_MEMBER_INVITED_EVENT,
   KILO_PASS_PURCHASE_STARTED_EVENT,
   KILO_PASS_PURCHASE_COMPLETED_EVENT,
   KILO_PASS_PURCHASE_FAILED_EVENT,
   APP_STARTUP_EVENT,
-  ONBOARDING_ENTERED_EVENT,
-  PROVISION_REQUESTED_EVENT,
-  PROVISION_SUCCEEDED_EVENT,
-  PROVISION_FAILED_EVENT,
-  ACCESS_REQUIRED_SHOWN_EVENT,
-  COMPLETION_REACHED_EVENT,
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
   CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
   LOGIN_EVENT,
+  LOGOUT_EVENT,
+  CONSENT_OUTCOME_EVENT,
+  NOTIFICATION_PERMISSION_RESPONDED_EVENT,
+  NOTIFICATION_TOKEN_UPDATED_EVENT,
+  ORGANIZATION_MEMBER_JOINED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  CODE_REVIEW_SETTLED_EVENT,
   PURCHASE_SETTLED_EVENT,
 ];
 
@@ -148,21 +149,6 @@ describe('event name rules', () => {
       expect(name, `${name} must be snake_case`).toMatch(SNAKE_CASE);
     }
   });
-
-  it('freezes LEGACY_EVENT_NAMES to the kebab-case KiloClaw onboarding names', () => {
-    expect(LEGACY_EVENT_NAMES).toEqual(
-      new Set([
-        ONBOARDING_ENTERED_EVENT,
-        PROVISION_REQUESTED_EVENT,
-        PROVISION_SUCCEEDED_EVENT,
-        PROVISION_FAILED_EVENT,
-        ACCESS_REQUIRED_SHOWN_EVENT,
-        COMPLETION_REACHED_EVENT,
-        CLAW_WEATHER_LOCATION_SELECTED_EVENT,
-        CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
-      ])
-    );
-  });
 });
 
 describe('phase classification', () => {
@@ -173,7 +159,7 @@ describe('phase classification', () => {
       KILO_PASS_PURCHASE_COMPLETED_EVENT,
       APP_STARTUP_EVENT,
     ];
-    expect(terminal).toHaveLength(4);
+    expect(terminal).toHaveLength(5);
     for (const name of TERMINAL_PHASE_EVENTS) {
       expect(ANALYTICS_EVENT_SCHEMAS).toHaveProperty(name);
     }
@@ -194,6 +180,41 @@ describe('phase classification', () => {
   });
 });
 
+describe('security intent map', () => {
+  it('keys the map by the shared command-type authority', () => {
+    expect(new Set(Object.keys(SECURITY_INTENT_FOR_COMMAND_TYPE))).toEqual(
+      new Set(SECURITY_COMMAND_TYPES)
+    );
+  });
+
+  it('maps every command type to exactly one intent and covers every intent', () => {
+    const commandTypes = Object.keys(SECURITY_INTENT_FOR_COMMAND_TYPE);
+    const intents = Object.values(SECURITY_INTENT_FOR_COMMAND_TYPE);
+
+    // The map is a bijection: every command type has exactly one intent and no
+    // two command types share an intent.
+    expect(commandTypes).toHaveLength(4);
+    expect(new Set(intents).size).toBe(commandTypes.length);
+
+    // The intents cover every SECURITY_INTENTS member. `sync` maps to
+    // `manual_sync`, so an array-equality assertion between the command types
+    // and the intents can never pass.
+    expect(new Set(intents)).toEqual(new Set(SECURITY_INTENTS));
+  });
+
+  it('pins the exact command-to-intent pairing', () => {
+    // A value swap (e.g. `sync: 'dismiss_finding'`) would pass the key-set and
+    // value-set assertions above, so pin the whole map. `sync` must map to the
+    // legacy ledger intent `manual_sync` that deployed producers emit.
+    expect(SECURITY_INTENT_FOR_COMMAND_TYPE).toEqual({
+      sync: 'manual_sync',
+      dismiss_finding: 'dismiss_finding',
+      start_analysis: 'start_analysis',
+      apply_auto_remediation: 'apply_auto_remediation',
+    });
+  });
+});
+
 describe('organization_member_invited role schema', () => {
   const invitedSchema = ANALYTICS_EVENT_SCHEMAS[ORGANIZATION_MEMBER_INVITED_EVENT];
 
@@ -205,6 +226,73 @@ describe('organization_member_invited role schema', () => {
 
   it('rejects an unknown role payload', () => {
     expect(invitedSchema.safeParse({ role: 'superadmin' }).success).toBe(false);
+  });
+});
+
+describe('new accepted-phase privacy-minimal schemas', () => {
+  it('accepts the logout empty payload and rejects unknown or privacy keys', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[LOGOUT_EVENT];
+    expect(schema.safeParse({}).success).toBe(true);
+    expect(schema.safeParse({ unexpected_key: 'x' }).success).toBe(false);
+    expect(schema.safeParse({ email: 'a@b.co' }).success).toBe(false);
+    expect(schema.safeParse({ token: 'tok' }).success).toBe(false);
+  });
+
+  it('accepts consent_outcome payloads and rejects privacy keys and unknown enums', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[CONSENT_OUTCOME_EVENT];
+    expect(schema.safeParse({ action: 'accepted', optional: true }).success).toBe(true);
+    expect(schema.safeParse({ action: 'optional_changed', optional: false }).success).toBe(true);
+    expect(schema.safeParse({ action: 'revoked', optional: true }).success).toBe(true);
+    expect(
+      schema.safeParse({ action: 'accepted', optional: true, unexpected_key: 'x' }).success
+    ).toBe(false);
+    expect(schema.safeParse({ action: 'accepted', optional: true, email: 'a@b.co' }).success).toBe(
+      false
+    );
+    expect(schema.safeParse({ action: 'accepted', optional: true, token: 'tok' }).success).toBe(
+      false
+    );
+    expect(schema.safeParse({ action: 'bogus', optional: true }).success).toBe(false);
+  });
+
+  it('accepts notification_permission_responded payloads and rejects privacy keys and unknown enums', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[NOTIFICATION_PERMISSION_RESPONDED_EVENT];
+    expect(schema.safeParse({ outcome: 'granted' }).success).toBe(true);
+    expect(schema.safeParse({ outcome: 'denied' }).success).toBe(true);
+    expect(schema.safeParse({ outcome: 'granted', unexpected_key: 'x' }).success).toBe(false);
+    expect(schema.safeParse({ outcome: 'granted', email: 'a@b.co' }).success).toBe(false);
+    expect(schema.safeParse({ outcome: 'granted', token: 'tok' }).success).toBe(false);
+    expect(schema.safeParse({ outcome: 'bogus' }).success).toBe(false);
+  });
+
+  it('accepts notification_token_updated payloads and rejects privacy keys and unknown enums', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[NOTIFICATION_TOKEN_UPDATED_EVENT];
+    expect(schema.safeParse({ action: 'registered' }).success).toBe(true);
+    expect(schema.safeParse({ action: 'unregistered' }).success).toBe(true);
+    expect(schema.safeParse({ action: 'registered', unexpected_key: 'x' }).success).toBe(false);
+    expect(schema.safeParse({ action: 'registered', email: 'a@b.co' }).success).toBe(false);
+    expect(schema.safeParse({ action: 'registered', token: 'tok' }).success).toBe(false);
+    expect(schema.safeParse({ action: 'bogus' }).success).toBe(false);
+  });
+});
+
+describe('organization_member_joined role schema', () => {
+  const joinedSchema = ANALYTICS_EVENT_SCHEMAS[ORGANIZATION_MEMBER_JOINED_EVENT];
+
+  it('parses { role } for every organization role', () => {
+    for (const role of ORGANIZATION_ROLES) {
+      expect(joinedSchema.safeParse({ role }).success, `role=${role}`).toBe(true);
+    }
+  });
+
+  it('rejects an unknown role payload', () => {
+    expect(joinedSchema.safeParse({ role: 'superadmin' }).success).toBe(false);
+  });
+
+  it('rejects privacy keys on the role payload', () => {
+    expect(joinedSchema.safeParse({ role: 'member', email: 'a@b.co' }).success).toBe(false);
+    expect(joinedSchema.safeParse({ role: 'member', token: 'tok' }).success).toBe(false);
+    expect(joinedSchema.safeParse({ role: 'member', unexpected_key: 'x' }).success).toBe(false);
   });
 });
 
@@ -230,6 +318,9 @@ describe('app_startup validation', () => {
         splash_hidden: 85,
       }).success
     ).toBe(true);
+    expect(startupSchema.safeParse({ outcome: 'language-error', splash_hidden: 90 }).success).toBe(
+      true
+    );
   });
 
   it('rejects an invalid startup outcome', () => {
@@ -374,7 +465,7 @@ describe('privacy deny-list', () => {
 
   it('drops prohibited keys from a runtime payload without mutating the input', () => {
     const input = {
-      surface: 'claw',
+      surface: 'cloud-agent',
       email: 'a@b.co',
       session_id: 'x',
       repository: 'acme/app',
@@ -398,7 +489,7 @@ describe('privacy deny-list', () => {
     const copy = { ...input };
 
     expect(redactProhibitedProperties(input)).toEqual({
-      surface: 'claw',
+      surface: 'cloud-agent',
       ok_count: 1,
       repo_count: 3,
       duration_ms: 42,

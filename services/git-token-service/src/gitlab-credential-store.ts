@@ -1,14 +1,16 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { platform_access_token_credentials, platform_oauth_credentials } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
-import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
+import {
+  DEFAULT_GITLAB_INSTANCE_URL,
+  normalizeGitLabInstanceUrl,
+} from '@kilocode/worker-utils/gitlab-url';
 import { GitLabLookupService, type GitLabLookupParams } from './gitlab-lookup-service.js';
 import type {
   GitLabCredentialFence,
   GitLabCredentialSelector,
   GitLabCredentialStore,
 } from './gitlab-credential-service.js';
-import { normalizeGitLabInstanceUrl } from './gitlab-url.js';
 
 export class DrizzleGitLabCredentialStore implements GitLabCredentialStore {
   private lookupService: GitLabLookupService;

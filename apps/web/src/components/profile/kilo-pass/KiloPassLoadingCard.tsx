@@ -80,9 +80,7 @@ export function KiloPassLoadingCard() {
           <Skeleton className="h-4 w-28" />
         </div>
 
-        <div className="text-muted-foreground text-xs">
-          Paid credits never expire. Unused bonus credits expire on refill.
-        </div>
+        <div className="text-muted-foreground text-xs">Unused bonus credits expire on refill.</div>
       </CardContent>
     </Card>
   );

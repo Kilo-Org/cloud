@@ -1,9 +1,10 @@
-import { type Href, router } from 'expo-router';
+import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
-import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
-
-import { setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import { opensAppRoutePath, opensDestination, shellRouteHref } from './deep-link-destination';
+import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import { isRemovedMobileDeepLink } from './deep-link-policy';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
+import { isSystemSearchFamilyLink } from './system-search-families';
 
 /** Target app path for the /cloud/sessions universal-link route. */
 const AGENTS_TAB_HREF = '/(app)/(tabs)/(2_agents)';
@@ -36,6 +37,9 @@ function getQueryFromRaw(raw: string): string | null {
  * 3. `initial` is the cold/warm discriminator — never try/catch around navigate
  *    as a readiness probe; `router.navigate` queues rather than throws when the
  *    router is unmounted, so try/catch silently drops cold deep links.
+ * 4. A link that names no screen the app can open returns FALSY, like a handled
+ *    one: the resolver must not run for it, because resolving a link replaces
+ *    the visible route and unmounts the screen beneath it, losing unsaved state.
  */
 export function redirectSystemPath({
   path,
@@ -45,13 +49,52 @@ export function redirectSystemPath({
   initial: boolean;
 }): string | null {
   try {
-    const href = resolveIncomingUrl(path);
-    // Untouched → default handling (and future share intent).
-    if (href == null) {
-      return path;
+    if (isRemovedMobileDeepLink(path)) {
+      return initial ? '/' : null;
     }
+    const resume = resolveIncomingResume(path);
+    // Not a universal-link route: only the app's own route namespace reaches the
+    // navigator. Anything else (a bare `kiloapp:///`, an unknown path, another
+    // host) names no screen, and handing it over would replace the current
+    // screen — and with it unsaved state such as an open form — with whatever
+    // the resolver makes of it. A link that opens nothing leaves the screen be.
+    if (resume == null) {
+      // A link that opens a screen inside the signed-in shell travels the same
+      // way a universal link does: stashed, then navigated by the root layout
+      // with `withAnchor`, which puts each Stack's layout anchor beneath the
+      // target. Handing it to expo-router's resolver instead builds the target
+      // as its stack's only route, so Back leaves the tab and the tab itself
+      // reopens the linked screen (see `shellRouteHref`).
+      const shellRoute = shellRouteHref(path);
+      if (shellRoute !== null) {
+        // The cold-launch capture may have stashed this very launch URL
+        // already; only a later arrival restashes, so consuming the slot once
+        // is enough and the durable mirror is not rewritten for the same link.
+        if (!initial || wasLaunchLinkHandled() !== shellRoute) {
+          setPendingDeepLink(shellRoute, 'universal-link');
+        }
+        return null;
+      }
+      return opensAppRoutePath(path) ? path : null;
+    }
+    const { href, anchorMessageId } = resume;
+    // A table route that cannot open its destination is not a link either: the
+    // session row accepts any capture, and a capture the session store cannot
+    // address names no session screen, so following it would replace the
+    // current screen with one that cannot exist. A capture the store CAN
+    // address is followed even though it may not resolve: the route owns that
+    // answer and shows its not-found state.
+    if (!opensDestination(href)) {
+      return null;
+    }
+    // A resume link carries `?at=<message id>`: stash it on the href so the
+    // session screen can land on the recorded position. Links without an
+    // anchor keep their href byte-identical (the AGENTS_TAB_HREF check below
+    // compares against the un-suffixed href on purpose). The synchronous
+    // launch capture formats its stash through the same helper.
+    const stashHref = resumeDeepLinkHref({ href, anchorMessageId });
 
-    // C13 return-outcome: extract query params before resolveIncomingUrl
+    // C13 return-outcome: extract query params before resolveIncomingResume
     // strips them.  Store so the agents tab can show the outcome state.
     if (href === AGENTS_TAB_HREF) {
       const query = getQueryFromRaw(path);
@@ -63,6 +106,13 @@ export function redirectSystemPath({
       }
     }
 
+    // An app-scheme URL that names a family the phone's search indexes is a
+    // system-search result's identifier (the app scheme is how Android
+    // delivers the tap), so it is bound to the session that indexed it and
+    // must not open for another account. An `https://` link stays
+    // account-independent.
+    const sessionBound = isSystemSearchFamilyLink(path);
+
     if (initial) {
       // COLD: stash only. Never navigate — router isn't mounted.
       // Skip when the synchronous launch capture already stashed this launch
@@ -70,11 +120,13 @@ export function redirectSystemPath({
       // the slot, and a restash would surface as a duplicate navigation on a
       // later, unrelated effect re-run (e.g. token refresh).
       if (!wasLaunchLinkHandled()) {
-        setPendingDeepLink(href, 'universal-link');
+        setPendingDeepLink(stashHref, 'universal-link', { sessionBound });
       }
     } else {
-      // WARM: router is mounted; group hrefs work here.
-      router.navigate(href as Href);
+      // WARM: stash like the cold path. The layout consumer navigates once the
+      // shell is ready, so a signed-out warm https link survives login; a
+      // session-bound one is dropped by the slot's account rules instead.
+      setPendingDeepLink(stashHref, 'universal-link', { sessionBound });
     }
     // Falsy in both handled cases — critical (see above).
     return null;

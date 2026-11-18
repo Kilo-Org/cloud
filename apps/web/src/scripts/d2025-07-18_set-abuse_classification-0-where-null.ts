@@ -1,5 +1,5 @@
 import { microdollar_usage } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { count, isNull, sql } from 'drizzle-orm';
 
 async function run() {

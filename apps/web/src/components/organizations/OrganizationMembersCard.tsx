@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getInitialsFromName } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -33,9 +35,9 @@ import { ErrorCard } from '../ErrorCard';
 import { LoadingCard } from '../LoadingCard';
 import type {
   OrganizationRole,
-  OrganizationMember,
-  OrganizationWithMembers,
-} from '@/lib/organizations/organization-types';
+  OrganizationMemberResponse,
+  OrganizationWithMembersResponse,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,
@@ -60,10 +62,24 @@ const formatDate = (dateString: string) => {
 };
 
 type DailyUsageLimitDisplayProps = {
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
+  isSalesDemo: boolean;
 };
 
-function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
+function DailyUsageLimitDisplay({ member, isSalesDemo }: DailyUsageLimitDisplayProps) {
+  if (
+    isSalesDemo &&
+    member.dailyUsageLimitUsd !== null &&
+    'currentDailyUsageUsd' in member &&
+    member.currentDailyUsageUsd !== null
+  ) {
+    return (
+      <span className="tabular-nums">
+        ${member.currentDailyUsageUsd.toFixed(2)} / ${member.dailyUsageLimitUsd.toFixed(2)}
+      </span>
+    );
+  }
+
   if (member.dailyUsageLimitUsd !== null) {
     return <span>Daily limit: ${member.dailyUsageLimitUsd.toFixed(2)}</span>;
   }
@@ -114,7 +130,7 @@ const canRemoveMember = (
 
 type DeleteMemberButtonProps = {
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function DeleteMemberButton({ organizationId, member }: DeleteMemberButtonProps) {
@@ -155,7 +171,7 @@ function DeleteMemberButton({ organizationId, member }: DeleteMemberButtonProps)
 
 type DeleteInvitationButtonProps = {
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function DeleteInvitationButton({ organizationId, member }: DeleteInvitationButtonProps) {
@@ -197,7 +213,7 @@ function DeleteInvitationButton({ organizationId, member }: DeleteInvitationButt
 }
 
 type InvitedBadgeProps = {
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function InvitedBadge({ member }: InvitedBadgeProps) {
@@ -216,11 +232,17 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
   const isFailed = member.emailStatus === 'failed';
   const variant = isFailed ? 'destructive' : 'secondary';
 
-  const canCopy = canManageMembers(currentUserRole, isKiloAdmin);
+  const canCopy = canManageMembers(currentUserRole, isKiloAdmin) && 'inviteUrl' in member;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // The member variant strips the invite URL, so the copy action is only
+    // available on the admin-and-above variant that still carries it.
+    if (!('inviteUrl' in member)) {
+      return;
+    }
 
     try {
       await navigator.clipboard.writeText(member.inviteUrl);
@@ -250,7 +272,7 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
 
 type ResendInvitationButtonProps = {
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function ResendInvitationButton({ organizationId, member }: ResendInvitationButtonProps) {
@@ -305,8 +327,8 @@ function ResendInvitationButton({ organizationId, member }: ResendInvitationButt
 }
 
 type EditLimitButtonProps = {
-  organization: OrganizationWithMembers;
-  member: OrganizationMember;
+  organization: OrganizationWithMembersResponse;
+  member: OrganizationMemberResponse;
 };
 
 function EditLimitButton({ organization, member }: EditLimitButtonProps) {
@@ -363,9 +385,16 @@ function EditLimitButton({ organization, member }: EditLimitButtonProps) {
   );
 }
 
+const CHILD_ROLE_LABELS = {
+  owner: { badge: 'Owner', detail: 'Owner' },
+  admin: { badge: 'Admin', detail: 'Admin' },
+  billing_manager: { badge: 'Billing', detail: 'Billing manager' },
+  member: { badge: '', detail: 'Member' },
+} satisfies Record<OrganizationRole, { badge: string; detail: string }>;
+
 type ChildTeamsControlProps = {
-  organization: OrganizationWithMembers;
-  member: OrganizationMember;
+  organization: OrganizationWithMembersResponse;
+  member: OrganizationMemberResponse;
   editable: boolean;
   canOpenChildOrganizations: boolean;
 };
@@ -414,7 +443,8 @@ function ChildTeamsControl({
     childMemberships.length > 0 ? (
       <div className="flex flex-wrap gap-1">
         {childMemberships.map(child => {
-          const label = `${child.name}${child.role !== 'member' ? ` · ${child.role === 'owner' ? 'Owner' : 'Billing'}` : ''}`;
+          const roleLabel = CHILD_ROLE_LABELS[child.role].badge;
+          const label = `${child.name}${roleLabel ? ` · ${roleLabel}` : ''}`;
 
           if (!canOpenChildOrganizations) {
             return (
@@ -480,7 +510,7 @@ function ChildTeamsControl({
                     <span className="truncate">{childOrganization.name}</span>
                     {locked ? (
                       <span className="text-muted-foreground text-xs">
-                        {membership.role === 'owner' ? 'Owner' : 'Billing manager'} in child team
+                        {CHILD_ROLE_LABELS[membership.role].detail} in child team
                       </span>
                     ) : null}
                   </span>
@@ -573,12 +603,7 @@ export function OrganizationAdminMembers({
   // Show "Add Member" button only for Kilo admins
   const showAddMemberButton = isKiloAdmin;
 
-  // Child organizations manage membership through their parent organization,
-  // so the self-serve invite flow is hidden for them.
-  const isChildOrganization = organizationData.parent_organization_id !== null;
-
-  const showInviteMemberButton =
-    canInviteMembers(currentUserRole, isKiloAdmin) && !isChildOrganization;
+  const showInviteMemberButton = canInviteMembers(currentUserRole, isKiloAdmin);
 
   return (
     <>
@@ -662,7 +687,13 @@ export function OrganizationAdminMembers({
                       className="flex items-center justify-between border-b pb-4 last:border-b-0"
                     >
                       <div className="flex flex-1 items-center justify-between gap-4">
-                        <div className="flex-1 space-y-1">
+                        {member.status === 'active' && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.imageUrl ?? undefined} alt={member.name} />
+                            <AvatarFallback>{getInitialsFromName(member.name)}</AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2">
                             {member.status === 'active' && member.name ? (
                               showAdminLinks ? (
@@ -674,7 +705,7 @@ export function OrganizationAdminMembers({
                                   <UserCog className="h-3 w-3" />
                                 </Link>
                               ) : (
-                                <span className="font-medium">{member.name}</span>
+                                <span className="min-w-0 truncate font-medium">{member.name}</span>
                               )
                             ) : (
                               <span className="text-muted-foreground italic">
@@ -687,7 +718,9 @@ export function OrganizationAdminMembers({
                               member={member}
                             />
                           </div>
-                          <p className="text-muted-foreground text-sm">{member.email}</p>
+                          <p className="text-muted-foreground min-w-0 truncate text-sm">
+                            {member.email}
+                          </p>
                           {member.status === 'active' && groupsQuery.data?.access === 'manager' && (
                             <div className="flex flex-wrap gap-1 pt-1">
                               {groupsQuery.data.groups
@@ -703,7 +736,10 @@ export function OrganizationAdminMembers({
                             <span>
                               Joined: {member.inviteDate ? formatDate(member.inviteDate) : 'N/A'}
                             </span>
-                            <DailyUsageLimitDisplay member={member} />
+                            <DailyUsageLimitDisplay
+                              member={member}
+                              isSalesDemo={organizationData.settings.is_sales_demo === true}
+                            />
                           </div>
                           <ChildTeamsControl
                             organization={organizationData}

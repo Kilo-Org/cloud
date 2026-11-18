@@ -1,0 +1,341 @@
+import 'server-only';
+import { TRPCClientError } from '@trpc/client';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ORGANIZATION_MANAGE_ROLES,
+  canManageOrganization,
+} from '@kilocode/app-shared/organizations';
+import { cloud_agent_user_settings, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import * as z from 'zod';
+import {
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  sandboxSelectionCapabilitiesSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  BuiltinAgentSettingsInputSchema,
+  ModelContextLimitsSchema,
+  canonicalRepoFullName,
+  clearContextSandboxAllocation,
+  getBuiltinAgentSettings,
+  getModelContextLimits,
+  getSandboxAllocationSettings,
+  listBindings,
+  removeRepositorySettings,
+  setBuiltinAgentSettings,
+  setContextSandboxAllocation,
+  setModelContextLimits,
+  setRepositorySettings,
+  type ProfileOwner,
+  type RepositoryPlatform,
+} from '@kilocode/cloud-agent-profile';
+import {
+  assertAllocationOffered,
+  findSandboxOption,
+  getSavedAllocationReason,
+  loadSandboxCapabilities,
+} from '@/lib/cloud-agent-next/sandbox-allocation-offers';
+import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+
+const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
+
+const RepositorySettingsRowSchema = z.object({
+  repositoryFullName: z.string(),
+  repositoryPlatform: RepositoryPlatformSchema,
+  profileId: z.uuid().nullable(),
+  profileName: z.string().nullable(),
+  allocation: z.string().nullable(),
+  allocationUnavailableReason: z.string().optional(),
+  allocationRepositoryUnavailableReason: z.string().optional(),
+});
+
+const CloudAgentSettingsSchema = z.object({
+  canManage: z.boolean(),
+  contextAllocation: z.string().nullable(),
+  contextUnavailableReason: z.string().optional(),
+  builtinAgents: BuiltinAgentSettingsInputSchema,
+  modelContextLimits: ModelContextLimitsSchema,
+  repositories: z.array(RepositorySettingsRowSchema),
+  capabilities: sandboxSelectionCapabilitiesSchema.nullable(),
+  // Repository-scoped capability views so a GitLab row never offers a
+  // GitHub-only allocation such as Vercel.
+  capabilitiesByPlatform: z.object({
+    github: sandboxSelectionCapabilitiesSchema.nullable(),
+    gitlab: sandboxSelectionCapabilitiesSchema.nullable(),
+  }),
+});
+
+const WorkspaceOrderSchema = z.object({ workspaceOrder: workspaceOrderSchema });
+
+function ownerFromInput(organizationId: string | undefined, userId: string): ProfileOwner {
+  return organizationId
+    ? { type: 'organization', id: organizationId }
+    : { type: 'user', id: userId };
+}
+
+function toRepositoryPlatform(platform: string): RepositoryPlatform {
+  return platform === 'gitlab' ? 'gitlab' : 'github';
+}
+
+async function loadSettingsCapabilities(
+  user: User,
+  headersList: Headers | undefined,
+  organizationId: string | undefined
+) {
+  try {
+    const capabilities = await loadSandboxCapabilities(user, headersList, organizationId);
+    const [github, gitlab] = await Promise.all(
+      (['github', 'gitlab'] as const).map(platform =>
+        loadSandboxCapabilities(user, headersList, organizationId, platform)
+      )
+    );
+    return { capabilities, capabilitiesByPlatform: { github, gitlab } };
+  } catch (error) {
+    const code: unknown =
+      error instanceof TRPCClientError ? (error.data?.code ?? error.shape?.data?.code) : undefined;
+    if (code !== 'SERVICE_UNAVAILABLE') throw error;
+    return { capabilities: null, capabilitiesByPlatform: { github: null, gitlab: null } };
+  }
+}
+
+export const cloudAgentSettingsRouter = createTRPCRouter({
+  canManage: baseProcedure
+    .input(z.object({ organizationId: z.uuid().optional() }))
+    .output(z.object({ canManage: z.boolean() }))
+    .query(async ({ ctx, input }) => {
+      if (!input.organizationId) return { canManage: true };
+      const role = await ensureOrganizationAccess(ctx, input.organizationId);
+      return { canManage: canManageOrganization(role) };
+    }),
+
+  get: baseProcedure
+    .input(z.object({ organizationId: z.uuid().optional() }))
+    .output(CloudAgentSettingsSchema)
+    .query(async ({ ctx, input }) => {
+      const organizationId = input.organizationId;
+      const role = organizationId ? await ensureOrganizationAccess(ctx, organizationId) : undefined;
+      const canManage = role ? canManageOrganization(role) : true;
+      const owner = ownerFromInput(organizationId, ctx.user.id);
+
+      const [
+        { capabilities, capabilitiesByPlatform },
+        settings,
+        bindings,
+        builtinAgents,
+        modelContextLimits,
+      ] = await Promise.all([
+        loadSettingsCapabilities(ctx.user, ctx.headersList, organizationId),
+        getSandboxAllocationSettings(db, owner),
+        listBindings(db, owner),
+        getBuiltinAgentSettings(db, ctx.user.id),
+        getModelContextLimits(db, ctx.user.id),
+      ]);
+
+      const rows = new Map<string, z.infer<typeof RepositorySettingsRowSchema>>();
+      const rowKey = (fullName: string, platform: RepositoryPlatform) =>
+        `${platform}:${fullName.toLowerCase()}`;
+
+      for (const binding of bindings) {
+        const platform = toRepositoryPlatform(binding.platform);
+        const key = rowKey(binding.repoFullName, platform);
+        rows.set(key, {
+          repositoryFullName: binding.repoFullName,
+          repositoryPlatform: platform,
+          profileId: binding.profileId,
+          profileName: binding.profileName,
+          allocation: null,
+        });
+      }
+
+      for (const setting of settings.repositories) {
+        const key = rowKey(setting.repositoryFullName, setting.repositoryPlatform);
+        const existing = rows.get(key);
+        rows.set(key, {
+          repositoryFullName: existing?.repositoryFullName ?? setting.repositoryFullName,
+          repositoryPlatform: setting.repositoryPlatform,
+          profileId: existing?.profileId ?? null,
+          profileName: existing?.profileName ?? null,
+          allocation: setting.allocation,
+        });
+      }
+
+      const repositories = [...rows.values()]
+        .map(row => {
+          if (!row.allocation || !capabilities) return row;
+          const caps = capabilitiesByPlatform[row.repositoryPlatform] ?? capabilities;
+          const ownerReason = getSavedAllocationReason(capabilities, row.allocation);
+          const repositoryReason = findSandboxOption(
+            caps,
+            row.allocation
+          )?.repositoryUnavailableReason;
+          return {
+            ...row,
+            ...(ownerReason ? { allocationUnavailableReason: ownerReason } : {}),
+            ...(repositoryReason
+              ? { allocationRepositoryUnavailableReason: repositoryReason }
+              : {}),
+          };
+        })
+        .sort(
+          (a, b) =>
+            a.repositoryFullName.localeCompare(b.repositoryFullName) ||
+            a.repositoryPlatform.localeCompare(b.repositoryPlatform)
+        );
+
+      const contextReason =
+        settings.contextAllocation && capabilities
+          ? getSavedAllocationReason(capabilities, settings.contextAllocation)
+          : undefined;
+
+      return {
+        canManage,
+        contextAllocation: settings.contextAllocation,
+        ...(contextReason ? { contextUnavailableReason: contextReason } : {}),
+        builtinAgents,
+        modelContextLimits,
+        repositories,
+        capabilities,
+        capabilitiesByPlatform,
+      };
+    }),
+
+  setContextAllocation: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+        allocation: z.enum(SELECTABLE_SANDBOX_ALLOCATIONS).nullable(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+      }
+      const owner = ownerFromInput(input.organizationId, ctx.user.id);
+
+      if (input.allocation === null) {
+        await clearContextSandboxAllocation(db, owner);
+        return { success: true };
+      }
+
+      const capabilities = await loadSandboxCapabilities(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      assertAllocationOffered(capabilities, input.allocation);
+      await setContextSandboxAllocation(db, owner, input.allocation);
+      return { success: true };
+    }),
+
+  setRepositorySettings: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+        repoFullName: z.string().min(1).max(500),
+        platform: RepositoryPlatformSchema,
+        profileId: z.uuid().nullable().optional(),
+        allocation: z.enum(SELECTABLE_SANDBOX_ALLOCATIONS).nullable().optional(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+      }
+      const owner = ownerFromInput(input.organizationId, ctx.user.id);
+
+      // Validate only a newly chosen allocation. A saved allocation that is left
+      // unchanged while the profile is edited or cleared may already be stale or
+      // unavailable; re-validating it would block an unrelated profile change.
+      if (input.allocation) {
+        const currentAllocation = (await getSandboxAllocationSettings(db, owner)).repositories.find(
+          row =>
+            row.repositoryPlatform === input.platform &&
+            row.repositoryFullName === canonicalRepoFullName(input.repoFullName)
+        )?.allocation;
+        if (input.allocation !== currentAllocation) {
+          const capabilities = await loadSandboxCapabilities(
+            ctx.user,
+            ctx.headersList,
+            input.organizationId,
+            input.platform
+          );
+          assertAllocationOffered(capabilities, input.allocation, input.platform);
+        }
+      }
+
+      await setRepositorySettings(db, owner, input.repoFullName, input.platform, {
+        profileId: input.profileId ?? null,
+        allocation: input.allocation ?? null,
+      });
+      return { success: true };
+    }),
+
+  getBuiltinAgents: baseProcedure
+    .output(BuiltinAgentSettingsInputSchema)
+    .query(({ ctx }) => getBuiltinAgentSettings(db, ctx.user.id)),
+
+  setBuiltinAgents: baseProcedure
+    .input(z.object({ agents: BuiltinAgentSettingsInputSchema }))
+    .output(z.object({ success: z.boolean(), agents: BuiltinAgentSettingsInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const agents = await setBuiltinAgentSettings(db, ctx.user.id, input.agents);
+      return { success: true, agents };
+    }),
+
+  getModelContextLimits: baseProcedure
+    .output(ModelContextLimitsSchema)
+    .query(({ ctx }) => getModelContextLimits(db, ctx.user.id)),
+
+  setModelContextLimits: baseProcedure
+    .input(z.object({ limits: ModelContextLimitsSchema }))
+    .output(z.object({ success: z.boolean(), limits: ModelContextLimitsSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const limits = await setModelContextLimits(db, ctx.user.id, input.limits);
+      return { success: true, limits };
+    }),
+
+  getWorkspaceOrder: baseProcedure.output(WorkspaceOrderSchema).query(async ({ ctx }) => {
+    const [settings] = await db
+      .select({ workspaceOrder: cloud_agent_user_settings.workspace_order })
+      .from(cloud_agent_user_settings)
+      .where(eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id))
+      .limit(1);
+    return { workspaceOrder: settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER };
+  }),
+
+  setWorkspaceOrder: baseProcedure
+    .input(WorkspaceOrderSchema)
+    .output(WorkspaceOrderSchema)
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(cloud_agent_user_settings)
+        .values({ kilo_user_id: ctx.user.id, workspace_order: input.workspaceOrder })
+        .onConflictDoUpdate({
+          target: cloud_agent_user_settings.kilo_user_id,
+          set: { workspace_order: input.workspaceOrder },
+        });
+      return { workspaceOrder: input.workspaceOrder };
+    }),
+
+  removeRepositorySettings: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+        repoFullName: z.string().min(1).max(500),
+        platform: RepositoryPlatformSchema,
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+      }
+      const owner = ownerFromInput(input.organizationId, ctx.user.id);
+      await removeRepositorySettings(db, owner, input.repoFullName, input.platform);
+      return { success: true };
+    }),
+});

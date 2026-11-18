@@ -4,7 +4,6 @@ import {
   type ReviewThread,
   selectCommentAuthorName,
   selectThreadAnchorLabel,
-  selectThreadBadges,
 } from './review-discussion-types';
 
 function makeThread(overrides: Partial<ReviewThread> = {}): ReviewThread {
@@ -137,31 +136,6 @@ describe('selectThreadAnchorLabel', () => {
     expect(selectThreadAnchorLabel(makeThread({ diffSide: null, line: 10 }))).toBe(
       'src/index.ts L10'
     );
-  });
-});
-
-describe('selectThreadBadges', () => {
-  it('flags resolved + outdated + file-level independently', () => {
-    expect(selectThreadBadges(makeThread({ isResolved: true }))).toEqual({
-      resolved: true,
-      outdated: false,
-      fileLevel: false,
-    });
-    expect(selectThreadBadges(makeThread({ isOutdated: true }))).toEqual({
-      resolved: false,
-      outdated: true,
-      fileLevel: false,
-    });
-    expect(selectThreadBadges(makeThread({ subjectType: 'FILE' }))).toEqual({
-      resolved: false,
-      outdated: false,
-      fileLevel: true,
-    });
-    expect(selectThreadBadges(makeThread({ line: null }))).toEqual({
-      resolved: false,
-      outdated: false,
-      fileLevel: true,
-    });
   });
 });
 

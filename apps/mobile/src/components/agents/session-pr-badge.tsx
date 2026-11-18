@@ -10,10 +10,10 @@ import {
   type LucideIcon,
 } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { openExternalUrl } from '@/lib/external-link';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
@@ -51,6 +51,20 @@ const ACCENT_COLOR_KEY = {
 export type SessionPrBadgeProps = Readonly<{
   pr: AssociatedPrData | null;
   loading: boolean;
+  /**
+   * Replaces the badge's own press navigation. The context sheet passes a
+   * handler that closes the sheet before routing through
+   * `resolveSessionPrTapTarget`, because a native `Modal` outlives the
+   * imperative route push and would cover the destination.
+   */
+  onPress?: () => void;
+  /**
+   * Extra classes for the pressable. The compact pill is ~18pt tall, below the
+   * 44pt touch-target minimum; a caller whose row reserves the taller box
+   * (the context sheet's PR row) passes `self-stretch justify-center` so the
+   * whole row height answers the tap instead of the short pill alone.
+   */
+  className?: string;
 }>;
 
 /**
@@ -59,13 +73,15 @@ export type SessionPrBadgeProps = Readonly<{
  * Shows `#N` with an icon/accent derived from the PR state and review
  * decision. While `loading` is true it reserves a fixed-width skeleton; after
  * the fetch it renders the badge or nothing (never a guess from `git_branch`).
- * Tapping navigates in-app for GitHub PRs and opens the browser otherwise.
+ * Tapping routes through the one provider URL resolver: a GitHub pull request,
+ * a GitLab merge request (any host) and a Bitbucket pull request all open the
+ * in-app review route, and anything else opens the browser.
  */
 export function SessionPrBadge(props: SessionPrBadgeProps) {
   const { loading } = props;
   const router = useRouter();
   const colors = useThemeColors();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  const { t } = useTranslation();
 
   if (loading) {
     return <Skeleton className="h-5 w-[52px] rounded-full" />;
@@ -84,20 +100,18 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   const Icon = ICON_BY_KIND[descriptor.icon];
 
   function handlePress() {
-    // Flag off: GitHub taps fall back to the browser (same as chat links).
-    if (!prReviewEnabled) {
-      void openExternalUrl(pr.url, { label: 'pull request' });
+    if (props.onPress) {
+      props.onPress();
       return;
     }
     const target = resolveSessionPrTapTarget({
       url: pr.url,
-      number: pr.number,
     });
     if (target.kind === 'in-app') {
       router.push(target.href);
       return;
     }
-    void openExternalUrl(target.url, { label: 'pull request' });
+    void openExternalUrl(target.url, { label: t('common.pullRequest') });
   }
 
   return (
@@ -105,7 +119,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={descriptor.accessibilityLabel}
-      className="active:opacity-70"
+      className={cn('active:opacity-70', props.className)}
     >
       <View className="flex-row items-center gap-1 rounded-full bg-secondary py-0.5 pl-1.5 pr-2">
         <Icon size={12} color={colors[ACCENT_COLOR_KEY[descriptor.accent]]} />

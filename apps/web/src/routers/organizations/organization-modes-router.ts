@@ -1,10 +1,10 @@
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -20,11 +20,14 @@ import {
   OrganizationModeConfigSchema,
   type OrganizationModeConfig,
   type OrganizationSettings,
-} from '@/lib/organizations/organization-types';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { getOrganizationById, mutateOrganizationSettings } from '@/lib/organizations/organizations';
-import { successResult } from '@/lib/maybe-result';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import {
+  getOrganizationById,
+  mutateOrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -33,7 +36,7 @@ import {
   assertOrganizationAutoWriteEnabled,
   hasOrganizationAutoRoute,
   validateOrganizationAutoTarget,
-} from '@/lib/organizations/organization-auto-model';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 
 const ModeConfigInputSchema = OrganizationModeConfigSchema.partial();
 const RouteModelInputSchema = z

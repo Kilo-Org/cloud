@@ -1,12 +1,14 @@
 import { View } from 'react-native';
 import { Search } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 
 import { FixedPartRow } from '../fixed-part-row';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 import { buildResultRowsModel } from '../tool-list-model';
 import { ToolResultRows } from '../tool-result-rows';
 
@@ -37,6 +39,7 @@ export function GlobToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function GlobToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -44,9 +47,13 @@ export function GlobToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={Search}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       {...(display.badge ? { badge: display.badge } : {})}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: toolStatusLabel(t, part.state.status),
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

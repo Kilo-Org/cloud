@@ -9,18 +9,38 @@ import { type AgentSessionRouterLike } from '@/components/agents/session-router-
  * and the provider at that route re-keys on the `organizationId` so the new
  * session's manager picks up the right org context.
  */
-export function getAgentSessionPath(kiloSessionId: string, organizationId?: string): Href {
-  return organizationId
-    ? (`/(app)/agent-chat/${kiloSessionId}?organizationId=${organizationId}` as Href)
-    : (`/(app)/agent-chat/${kiloSessionId}` as Href);
+export function getAgentSessionPath(
+  kiloSessionId: string,
+  organizationId?: string,
+  /**
+   * Title the caller already has on screen. The detail route paints its
+   * header with it on the first frame instead of the generic "Session"
+   * label its own query would swap out a beat later. Deep links and push
+   * opens carry no title and keep the fallback.
+   */
+  title?: string
+): Href {
+  const params = [
+    organizationId ? `organizationId=${encodeURIComponent(organizationId)}` : null,
+    title?.trim() ? `title=${encodeURIComponent(title.trim())}` : null,
+  ].filter(Boolean);
+  return (
+    params.length > 0
+      ? `/(app)/agent-chat/${kiloSessionId}?${params.join('&')}`
+      : `/(app)/agent-chat/${kiloSessionId}`
+  ) as Href;
 }
 
 /**
  * Replace the current route with the canonical agent-chat detail for the new
- * session. Using `replace` (not `push`) means the previous session route is
- * not on the stack, so the system back gesture does not return to it. The
- * route-keyed `AgentSessionProvider` recreates the manager for the new id, so
- * the caller does not switch the current manager before navigation.
+ * session. Replacing (not pushing) means the previous route is not left on the
+ * stack, so the system back gesture does not return to it. The route-keyed
+ * `AgentSessionProvider` recreates the manager for the new id, so the caller
+ * does not switch the current manager before navigation.
+ *
+ * Pass `useStackSafeReplace()` as the router: a literal `router.replace` swaps
+ * both screens in one native-stack commit, which crashes Android Fabric with
+ * `addViewAt: failed to insert view` (Sentry KILO-APP-25).
  */
 export function replaceWithAgentSession(
   router: AgentSessionRouterLike,
@@ -44,8 +64,15 @@ export function replaceWithAgentSession(
  * replaces an existing query string. The optional `?organizationId=`
  * already produced by `getAgentSessionPath` is preserved and `spawned=1`
  * is joined with `&` in that case.
+ *
+ * `cloned` adds `cloned=1` for a spawn that cloned a session: the route then
+ * re-reads an empty first page until the CLI's sync of the clone lands.
  */
-export function getSpawnedAgentSessionPath(kiloSessionId: string, organizationId?: string): Href {
+export function getSpawnedAgentSessionPath(
+  kiloSessionId: string,
+  organizationId?: string,
+  options: { cloned?: boolean } = {}
+): Href {
   // `getAgentSessionPath` returns an `Href` (= `string | HrefObject`)
   // but in this codebase every construction site uses the string
   // branch. Narrow with `as string` so the `.includes('?')` check
@@ -53,5 +80,6 @@ export function getSpawnedAgentSessionPath(kiloSessionId: string, organizationId
   // HrefObject (which the rest of the app does not use).
   const base = getAgentSessionPath(kiloSessionId, organizationId) as string;
   const separator = base.includes('?') ? '&' : '?';
-  return `${base}${separator}spawned=1` as Href;
+  const cloned = options.cloned ? '&cloned=1' : '';
+  return `${base}${separator}spawned=1${cloned}` as Href;
 }

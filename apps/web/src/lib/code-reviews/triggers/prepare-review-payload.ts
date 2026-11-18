@@ -8,11 +8,12 @@
  */
 
 import { captureException } from '@sentry/nextjs';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateApiToken } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import {
   generateGitHubInstallationToken,
   findKiloReviewComment,
@@ -27,6 +28,7 @@ import type {
   ReviewAgentsConfig,
 } from '@kilocode/worker-utils/review-agents';
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import { DEFAULT_COUNCIL_AGGREGATION_STRATEGY } from '@kilocode/db/schema-types';
 import {
@@ -46,29 +48,39 @@ import {
   getOrCreateProjectAccessToken,
   type GitLabIntegrationMetadata,
 } from '@/lib/integrations/gitlab-service';
+import { isGitLabReconnectRequiredError } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import type {
   ExistingReviewState,
+  InlineComment,
   PreviousReviewStatus,
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { resolveReviewProviderIntegration } from '../provider-integration';
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
   updatePreviousReviewSummary,
   updateRepositoryReviewInstructionsMetadata,
-  type ReviewScope,
 } from '../db/code-reviews';
 import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { logExceptInTest, errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
-import type { CodeReviewPlatform } from '../core/schemas';
 import {
-  normalizeRepositoryReviewInstructions,
-  REVIEW_INSTRUCTIONS_FILE,
-} from '../prompts/repository-review-instructions';
+  logExceptInTest,
+  errorExceptInTest,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
+import type { CodeReviewPlatform } from '../core/schemas';
+import { REVIEW_INSTRUCTIONS_FILE } from '../prompts/repository-review-instructions';
+import {
+  MAX_REVIEW_GUIDELINE_IMPORTS,
+  resolveReviewGuidelines,
+  unusedRepositoryReviewInstructionsLookup,
+  type RepositoryReviewInstructionsLookup,
+} from '../resolve-review-guidelines';
+import { ReviewGuidelineSourceRepositoriesSchema } from '@kilocode/db/schema-types';
 import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -77,6 +89,8 @@ import {
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import { getManualCodeReviewConfig } from '../manual-config';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 
 const BitbucketWorkspaceSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/);
 const BitbucketRepositorySlugSchema = z.string().regex(/^[A-Za-z0-9_.-]+$/);
@@ -118,6 +132,8 @@ export type SessionInput = {
   upstreamBranch: string;
   /** GitHub installation token (for GitHub platform) */
   githubToken?: string;
+  /** GitHub pull request number the review must publish its summary to. */
+  githubPullRequestNumber?: number;
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
   /** Git platform type for correct token/env var handling */
@@ -130,9 +146,11 @@ export type SessionInput = {
   bitbucketPullRequestId?: number;
   bitbucketExpectedHeadSha?: string;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   /** Council runs only: one inline sub-agent per specialist, each pinned to its own model. */
   runtimeAgents?: RuntimeAgentInput[];
+  /** Session environment variables, e.g. the publication self-check opt-in. */
+  envVars?: Record<string, string>;
 };
 
 /**
@@ -191,6 +209,24 @@ export async function prepareReviewPayload(
     const outputMode = manualConfig?.outputMode ?? 'provider';
     const config = manualConfig?.agentConfig ?? (agentConfig.config as CodeReviewAgentConfig);
     const shouldUseReviewMd = outputMode === 'provider' && config.disable_review_md === false;
+    const guidelineConfig =
+      manualConfig && shouldUseReviewMd && platform === 'github'
+        ? (
+            await getAgentConfigForOwner(owner, 'code_review', platform).catch(error => {
+              warnExceptInTest(
+                '[prepareReviewPayload] Guideline allowlist lookup failed; imports disabled',
+                {
+                  error: getReviewInstructionsFetchErrorMetadata(error),
+                }
+              );
+              return null;
+            })
+          )?.config
+        : agentConfig.config;
+    const allowedRepositories = ReviewGuidelineSourceRepositoriesSchema.safeParse(
+      guidelineConfig?.review_guideline_source_repositories ?? []
+    );
+    const guidelineSources = allowedRepositories.success ? allowedRepositories.data : [];
 
     logExceptInTest('[prepareReviewPayload] Found review in DB', {
       reviewId,
@@ -298,7 +334,15 @@ export async function prepareReviewPayload(
             expectedHeadSha: expectedHeadSha.data,
           }
         );
-        const authToken = generateApiToken(user, { botId: 'reviewer' });
+        const authToken = generateCloudAgentWorkflowToken(
+          await prepareCloudAgentWorkflowUser(user),
+          {
+            organizationId: owner.type === 'org' ? owner.id : undefined,
+            tokenSource: 'code-review',
+            botId: 'reviewer',
+            expiresIn: TOKEN_EXPIRY.default,
+          }
+        );
         // Single source for the standard reviewer's model so the session input and the
         // forward-shaped `reviewAgents[0]` can never drift apart.
         const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
@@ -365,24 +409,16 @@ export async function prepareReviewPayload(
     // 3. Get platform token and build review state based on platform
     let githubToken: string | undefined;
     let gitlabToken: string | undefined;
-    const reviewScope: ReviewScope = {
-      owner,
-      platform,
-      repoFullName: review.repo_full_name,
-      prNumber: review.pr_number,
-    };
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
+    let summaryObservation: { observed: boolean; body: string | null } | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
     let repositorySize: string | null = null;
 
     if (outputMode === 'provider') {
-      if (!review.platform_integration_id) {
-        throw new Error(`Provider Code Reviewer job ${reviewId} is missing its integration`);
-      }
-
-      const integration = await getIntegrationById(review.platform_integration_id);
+      requireProviderIntegrationId(review.platform_integration_id, reviewId);
+      const integration = await resolveReviewProviderIntegration(review, owner);
 
       if (!integration) {
         throw new Error(`Provider Code Reviewer job ${reviewId} integration is unavailable`);
@@ -396,7 +432,11 @@ export async function prepareReviewPayload(
         // blocking, suspended/uninstalled app) are hard failures: without a token
         // we cannot clone private repos or post review comments. Let the error
         // propagate so the user sees a meaningful failure on the review.
-        const tokenData = await generateGitHubInstallationToken(installationId, appType);
+        const tokenData = await generateGitHubInstallationToken(
+          installationId,
+          appType,
+          integration.id
+        );
         const installationToken = tokenData.token;
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
@@ -427,6 +467,8 @@ export async function prepareReviewPayload(
                 platform,
                 repoFullName: review.repo_full_name,
                 baseRef: review.base_ref,
+                allowedRepositories: guidelineSources,
+                githubToken: installationToken,
                 fetchInstructions: () =>
                   fetchGitHubRootTextFileAtRef({
                     token: installationToken,
@@ -450,11 +492,18 @@ export async function prepareReviewPayload(
         }
 
         // Build complete review state for intelligent update/create decisions
+        const summaryLookup = findKiloReviewComment(
+          installationId,
+          repoOwner,
+          repoName,
+          review.pr_number,
+          appType
+        );
         try {
           // Fetch all state in parallel for efficiency
           const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
             await Promise.all([
-              findKiloReviewComment(installationId, repoOwner, repoName, review.pr_number, appType),
+              summaryLookup,
               fetchPRInlineComments(installationId, repoOwner, repoName, review.pr_number, appType),
               getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
               repositoryReviewInstructionsPromise ??
@@ -463,6 +512,7 @@ export async function prepareReviewPayload(
           repositoryReviewInstructionsLookup = reviewInstructions;
 
           existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
+          summaryObservation = { observed: true, body: summaryComment?.body ?? null };
 
           logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
             reviewId,
@@ -480,6 +530,13 @@ export async function prepareReviewPayload(
             reviewId,
             error: stateLookupError,
           });
+        } finally {
+          if (summaryObservation === null) {
+            summaryObservation = await summaryLookup.then(
+              summaryComment => ({ observed: true, body: summaryComment?.body ?? null }),
+              () => ({ observed: false, body: null })
+            );
+          }
         }
       } else if (platform === 'gitlab') {
         // GitLab: Use Project Access Token (PrAT) for all operations
@@ -519,6 +576,12 @@ export async function prepareReviewPayload(
             projectId,
           });
         } catch (pratError) {
+          if (isGitLabReconnectRequiredError(pratError)) {
+            throw new Error(
+              `GitLab rejected the connected credential while preparing this review of ` +
+                `${review.repo_full_name}. Reconnect the GitLab integration, then retry.`
+            );
+          }
           if (pratError instanceof GitLabProjectAccessTokenPermissionError) {
             throw new Error(
               `Cannot create Project Access Token for GitLab code review. ` +
@@ -570,15 +633,15 @@ export async function prepareReviewPayload(
           : undefined;
 
         // Build complete review state for GitLab (using PrAT for reading)
+        const mrIid = review.pr_number;
+        // Use repo_full_name as the project path for GitLab API calls
+        const repoPath = review.repo_full_name;
+        const summaryLookup = findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl);
         try {
-          const mrIid = review.pr_number;
-          // Use repo_full_name as the project path for GitLab API calls
-          const repoPath = review.repo_full_name;
-
           // Fetch all state in parallel for efficiency (using PrAT)
           const [summaryNote, inlineComments, headCommitSha, diffRefs, reviewInstructions] =
             await Promise.all([
-              findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
+              summaryLookup,
               fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
               getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
               getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
@@ -599,6 +662,7 @@ export async function prepareReviewPayload(
             line: c.line,
             body: c.body,
             isOutdated: c.isOutdated,
+            authoredByKilo: c.authoredByKilo,
           }));
 
           existingReviewState = buildReviewState(
@@ -606,6 +670,7 @@ export async function prepareReviewPayload(
             convertedInlineComments,
             headCommitSha
           );
+          summaryObservation = { observed: true, body: summaryNote?.body ?? null };
 
           // Store GitLab diff context for prompt generation
           gitlabContext = {
@@ -630,6 +695,13 @@ export async function prepareReviewPayload(
             reviewId,
             error: stateLookupError,
           });
+        } finally {
+          if (summaryObservation === null) {
+            summaryObservation = await summaryLookup.then(
+              summaryNote => ({ observed: true, body: summaryNote?.body ?? null }),
+              () => ({ observed: false, body: null })
+            );
+          }
         }
       } else {
         throw new Error(
@@ -647,7 +719,16 @@ export async function prepareReviewPayload(
       const previousReview =
         manualConfig === null
           ? await findPreviousCompletedReview(
-              reviewScope,
+              {
+                owner,
+                platform,
+                repoFullName: review.repo_full_name,
+                prNumber: review.pr_number,
+                platformIntegrationId: requireProviderIntegrationId(
+                  review.platform_integration_id,
+                  reviewId
+                ),
+              },
               existingReviewState?.headCommitSha ?? review.head_sha
             )
           : null;
@@ -701,18 +782,27 @@ export async function prepareReviewPayload(
 
     await Promise.all([
       updatePreviousReviewSummary(reviewId, {
-        body: existingReviewState?.summaryComment?.body ?? null,
+        body: summaryObservation
+          ? summaryObservation.body
+          : (existingReviewState?.summaryComment?.body ?? null),
         headSha: existingReviewState?.summaryComment ? previousHeadSha : null,
+        observed: summaryObservation?.observed ?? null,
       }),
       updateRepositoryReviewInstructionsMetadata(reviewId, {
         used: repositoryReviewInstructionsLookup.used,
         ref: repositoryReviewInstructionsLookup.ref,
         truncated: repositoryReviewInstructionsLookup.truncated,
+        imports: repositoryReviewInstructionsLookup.imports,
       }),
     ]);
 
     // 5. Generate auth token for cloud agent with bot identifier
-    const authToken = generateApiToken(user, { botId: 'reviewer' });
+    const authToken = generateCloudAgentWorkflowToken(await prepareCloudAgentWorkflowUser(user), {
+      organizationId: owner.type === 'org' ? owner.id : undefined,
+      tokenSource: 'code-review',
+      botId: 'reviewer',
+      expiresIn: TOKEN_EXPIRY.default,
+    });
 
     // A council run replaces the standard sub-agent sharding policy with a coordinator
     // contract (one sub-agent per specialist, no self-review), so the base prompt must OMIT
@@ -792,6 +882,7 @@ export async function prepareReviewPayload(
               // GitHub: use owner/repo format
               githubRepo: review.repo_full_name,
               githubToken,
+              githubPullRequestNumber: review.pr_number,
               platform: 'github',
               kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
               prompt,
@@ -887,7 +978,11 @@ export async function prepareReviewPayload(
       owner,
       repositorySize,
       sessionInput: {
-        ...sessionInput,
+        githubRepo: sessionInput.githubRepo,
+        gitUrl: sessionInput.gitUrl,
+        platform: sessionInput.platform,
+        model: sessionInput.model,
+        upstreamBranch: sessionInput.upstreamBranch,
         githubToken: sessionInput.githubToken ? '***' : undefined, // Redact token
         gitToken: sessionInput.gitToken ? '***' : undefined, // Redact token
         promptLength: sessionInput.prompt.length,
@@ -898,22 +993,34 @@ export async function prepareReviewPayload(
   } catch (error) {
     errorExceptInTest('[prepareReviewPayload] Error preparing payload:', error);
     captureException(error, {
-      tags: { operation: 'prepareReviewPayload' },
-      extra: { reviewId, owner, platform },
+      tags: {
+        operation: 'prepareReviewPayload',
+        ...(error instanceof GitHubRuntimeAuthorizationError && {
+          githubRuntimeAuthorizationReason: error.reason,
+        }),
+      },
+      extra: {
+        reviewId,
+        owner,
+        platform,
+        ...(error instanceof GitHubRuntimeAuthorizationError && {
+          githubRuntimeAuthorization: { reason: error.reason, ...error.diagnostics },
+        }),
+      },
     });
     throw error;
   }
 }
 
-type RepositoryReviewInstructionsLookup = {
-  content: string | null;
-  used: boolean;
-  ref: string | null;
-  truncated: boolean;
-};
-
-function unusedRepositoryReviewInstructionsLookup(): RepositoryReviewInstructionsLookup {
-  return { content: null, used: false, ref: null, truncated: false };
+/**
+ * Every provider call for a review uses that review's platform integration, so
+ * resolve it once and treat a missing value as a job error.
+ */
+function requireProviderIntegrationId(integrationId: string | null, reviewId: string): string {
+  if (!integrationId) {
+    throw new Error(`Provider Code Reviewer job ${reviewId} is missing its integration`);
+  }
+  return integrationId;
 }
 
 async function fetchRepositoryReviewInstructions(params: {
@@ -921,29 +1028,45 @@ async function fetchRepositoryReviewInstructions(params: {
   repoFullName: string;
   baseRef: string;
   fetchInstructions: () => Promise<string | null>;
+  allowedRepositories?: readonly string[];
+  githubToken?: string;
 }): Promise<RepositoryReviewInstructionsLookup> {
   try {
     const rawInstructions = await params.fetchInstructions();
-    const normalized = normalizeRepositoryReviewInstructions(rawInstructions);
+    const resolved = await resolveReviewGuidelines({
+      rawContent: rawInstructions,
+      platform: params.platform,
+      repository: params.repoFullName,
+      baseRef: params.baseRef,
+      allowedRepositories: params.allowedRepositories ?? [],
+      githubToken: params.githubToken,
+    });
 
     logExceptInTest('[prepareReviewPayload] REVIEW.md lookup complete', {
       platform: params.platform,
       repoFullName: params.repoFullName,
       baseRef: params.baseRef,
-      found: !!normalized,
-      truncated: normalized?.truncated ?? false,
+      found: resolved.used,
+      truncated: resolved.truncated,
+      importCount: resolved.imports.length,
     });
 
-    if (!normalized) {
-      return unusedRepositoryReviewInstructionsLookup();
+    const failedImports = resolved.imports.filter(
+      entry => entry.status !== 'imported' && entry.status !== 'dropped_budget'
+    );
+    if (failedImports.length > 0) {
+      warnExceptInTest('[prepareReviewPayload] Review guideline imports not applied', {
+        platform: params.platform,
+        repoFullName: params.repoFullName,
+        baseRef: params.baseRef,
+        failedImportCount: failedImports.length,
+        failedImports: failedImports
+          .slice(0, MAX_REVIEW_GUIDELINE_IMPORTS)
+          .map(({ source, sha, status }) => ({ source: source.slice(0, 200), sha, status })),
+      });
     }
 
-    return {
-      content: normalized.content,
-      used: true,
-      ref: params.baseRef,
-      truncated: normalized.truncated,
-    };
+    return resolved;
   } catch (error) {
     warnExceptInTest('[prepareReviewPayload] REVIEW.md lookup failed; using default guidance', {
       platform: params.platform,
@@ -983,13 +1106,7 @@ function getReviewInstructionsFetchErrorMetadata(error: unknown): {
  */
 function buildReviewState(
   summaryComment: { commentId: number; body: string } | null,
-  inlineComments: Array<{
-    id: number;
-    path: string;
-    line: number | null;
-    body: string;
-    isOutdated: boolean;
-  }>,
+  inlineComments: InlineComment[],
   headCommitSha: string
 ): ExistingReviewState {
   // Determine previous status from summary body

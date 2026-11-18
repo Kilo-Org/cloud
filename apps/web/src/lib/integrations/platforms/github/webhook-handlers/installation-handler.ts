@@ -1,19 +1,28 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
 import {
-  findIntegrationByInstallationId,
-  suspendIntegration,
-  unsuspendIntegration,
-  deleteIntegration,
+  bindGitHubIntegrationToCanonicalInstallation,
+  type DbTransaction,
+  lockGitHubInstallationIdentity,
+  observeGitHubInstallationLifecycle,
+} from '@/lib/integrations/db/github-installations';
+import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { platform_integrations } from '@kilocode/db/schema';
+import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import {
   autoCompleteInstallation,
+  deleteGitHubInstallationRecords,
+  findConnectedIntegrationByInstallationId,
+  suspendIntegration,
   suspendIntegrationForOwner,
+  unsuspendIntegration,
   unsuspendIntegrationForOwner,
-  deleteIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '../adapter';
+import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import type { IntegrationPermissions } from '@/lib/integrations/core/types';
 import type {
   InstallationCreatedPayload,
   InstallationDeletedPayload,
@@ -21,8 +30,8 @@ import type {
   InstallationUnsuspendPayload,
 } from '../webhook-schemas';
 import { buildInstallationData } from '../webhook-helpers';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -33,12 +42,71 @@ import type { GitHubAppType } from '../app-selector';
  * Handles: created, deleted, suspend, unsuspend
  */
 
-export async function handleInstallationCreated(payload: InstallationCreatedPayload) {
+/**
+ * Admission rule for both automatic repair paths of an installation-created
+ * delivery: an association attaches to the canonical installation only when no
+ * other live association holds it. A live association is one in PENDING or
+ * ACTIVE status that is not disconnected, whether or not it is already bound to
+ * a canonical row. Callers already hold the installation identity lock.
+ */
+async function hasOtherLiveAssociation(
+  tx: DbTransaction,
+  appType: GitHubAppType,
+  installationId: string,
+  exceptIntegrationId: string
+): Promise<boolean> {
+  const [otherAssociation] = await tx
+    .select({ id: platform_integrations.id })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        effectiveAppTypeCondition(appType),
+        eq(platform_integrations.platform_installation_id, installationId),
+        inArray(platform_integrations.integration_status, [
+          INTEGRATION_STATUS.PENDING,
+          INTEGRATION_STATUS.ACTIVE,
+        ]),
+        isNull(platform_integrations.github_disconnected_at),
+        ne(platform_integrations.id, exceptIntegrationId)
+      )
+    )
+    .limit(1);
+  return Boolean(otherAssociation);
+}
+
+/**
+ * Bounds how long a repair transaction waits on a contended installation
+ * identity lock, so a delivery that cannot proceed fails fast and GitHub
+ * redelivers it. Matches the bounds of connectVerifiedGitHubInstallation.
+ */
+async function boundRepairTransaction(tx: DbTransaction): Promise<void> {
+  await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+  await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+  await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '60s'`);
+}
+
+export async function handleInstallationCreated(
+  payload: InstallationCreatedPayload,
+  appType: GitHubAppType
+) {
   const { installation, requester } = payload;
   const requesterId = requester?.id?.toString();
+  // The delivery's GitHub identities, as attributed by GitHub: the requester
+  // recorded on the installation, and the actor that triggered the delivery.
+  // A pending request may only be completed by a delivery attributed to the
+  // GitHub identity that recorded it.
+  const installerAccountIds = [
+    ...new Set(
+      [requester?.id, payload.sender?.id]
+        .filter((value): value is number => typeof value === 'number')
+        .map(value => value.toString())
+    ),
+  ];
 
   // Build installation data using helper function
   const installationData = buildInstallationData(installation);
+  const appTypeCondition = effectiveAppTypeCondition(appType);
 
   logExceptInTest('GitHub App installation created:', {
     installation_id: installationData.installation_id,
@@ -48,71 +116,162 @@ export async function handleInstallationCreated(payload: InstallationCreatedPayl
     requester_login: requester?.login,
   });
 
-  // Simple 1:1 mapping: Find THE pending installation by this requester
-  if (!requesterId) {
-    // No requester ID - let callback handle (direct install flow)
-    logExceptInTest('No requester ID - callback will handle');
-    return NextResponse.json({ message: 'Installation recorded' }, { status: 200 });
-  }
-
-  // Direct indexed query - O(1) lookup using platform_requester_account_id column
-  const [pending] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.platform_requester_account_id, requesterId),
-        eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
-        isNull(platform_integrations.platform_installation_id)
-      )
-    )
-    .limit(1);
-
-  if (!pending) {
-    // No pending - normal install via callback will handle
-    logExceptInTest('No pending installation found - callback will handle');
-    return NextResponse.json({ message: 'Installation recorded' }, { status: 200 });
-  }
-
-  const metadata = pending.metadata as Record<string, unknown> | null;
-
-  // Auto-complete the installation immediately
-  await autoCompleteInstallation({
-    integrationId: pending.id,
-    installationData,
-    existingMetadata: metadata || {},
+  await observeGitHubInstallationLifecycle({
+    installationId: installationData.installation_id,
+    appType,
+    state: 'active',
+    accountId: installationData.account_id,
+    accountLogin: installationData.account_login,
+    permissions: installationData.permissions as IntegrationPermissions,
+    scopes: installationData.events,
+    repositoryAccess: installationData.repository_selection,
   });
-
-  logExceptInTest('Auto-completed pending installation', {
-    integration_id: pending.id,
-    owned_by_organization_id: pending.owned_by_organization_id,
-    owned_by_user_id: pending.owned_by_user_id,
-    installation_id: installationData.installation_id,
+  const activeRepair = await db.transaction(async tx => {
+    await boundRepairTransaction(tx);
+    await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
+    const candidates = await tx
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          appTypeCondition,
+          eq(platform_integrations.platform_installation_id, installationData.installation_id),
+          eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
+          isNull(platform_integrations.github_installation_id),
+          isNull(platform_integrations.github_disconnected_at)
+        )
+      );
+    if (candidates.length !== 1)
+      return { ok: false as const, reason: 'no_sole_candidate' as const };
+    const candidate = candidates[0];
+    if (!candidate) return { ok: false as const, reason: 'no_sole_candidate' as const };
+    if (
+      await hasOtherLiveAssociation(tx, appType, installationData.installation_id, candidate.id)
+    ) {
+      return {
+        ok: false as const,
+        reason: 'competing_association' as const,
+        integrationId: candidate.id,
+      };
+    }
+    await bindGitHubIntegrationToCanonicalInstallation(
+      {
+        integrationId: candidate.id,
+        installationId: installationData.installation_id,
+        appType,
+      },
+      tx
+    );
+    return { ok: true as const };
   });
-
-  // Auto-sync repositories on installation
-  try {
-    const appType = pending.github_app_type || 'standard';
-    const repos = await fetchGitHubRepositories(installationData.installation_id, appType);
-    await updateRepositoriesForIntegration(pending.id, repos);
-    logExceptInTest('Auto-synced repositories on installation', {
-      integration_id: pending.id,
-      repo_count: repos.length,
+  if (!activeRepair.ok && activeRepair.reason === 'competing_association') {
+    logExceptInTest('GitHub installation repair declined:', {
+      installation_id: installationData.installation_id,
+      integration_id: activeRepair.integrationId,
+      reason: activeRepair.reason,
     });
-  } catch (error) {
-    // Non-fatal - user can manually refresh later
-    console.error('Failed to auto-sync repositories on installation:', error);
   }
-
-  return NextResponse.json(
-    {
-      message: 'Installation completed',
-      owned_by_organization_id: pending.owned_by_organization_id,
-      owned_by_user_id: pending.owned_by_user_id,
-    },
-    { status: 200 }
-  );
+  const targetMatches =
+    installerAccountIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, PLATFORM.GITHUB),
+              appTypeCondition,
+              eq(platform_integrations.platform_account_id, installationData.account_id),
+              eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
+              isNull(platform_integrations.platform_installation_id),
+              inArray(platform_integrations.platform_requester_account_id, installerAccountIds)
+            )
+          );
+  let pending = targetMatches.length === 1 ? targetMatches[0] : undefined;
+  if (!pending && installerAccountIds.length > 0) {
+    const legacyMatches = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          appTypeCondition,
+          inArray(platform_integrations.platform_requester_account_id, installerAccountIds),
+          eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
+          isNull(platform_integrations.platform_installation_id),
+          isNull(platform_integrations.platform_account_id)
+        )
+      );
+    if (legacyMatches.length === 1) pending = legacyMatches[0];
+  }
+  if (pending) {
+    // The decision, the pending-row completion, and the canonical binding run
+    // as one serialized unit under the installation identity lock, the same
+    // lock connectVerifiedGitHubInstallation and
+    // bindGitHubIntegrationToCanonicalInstallation take. Admission therefore
+    // holds under concurrency for every writer of this installation identity.
+    const completed = await db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
+      // A live association may be bound or unbound, so peers are counted by
+      // status rather than by whether they already carry a canonical binding.
+      if (
+        await hasOtherLiveAssociation(tx, appType, installationData.installation_id, pending.id)
+      ) {
+        return { ok: false as const, reason: 'competing_association' as const };
+      }
+      const completion = await autoCompleteInstallation(
+        {
+          integrationId: pending.id,
+          installationData,
+          existingMetadata: (pending.metadata as Record<string, unknown> | null) ?? {},
+          authorizedRequesterAccountIds: installerAccountIds,
+        },
+        tx
+      );
+      if (!completion.ok) return completion;
+      await bindGitHubIntegrationToCanonicalInstallation(
+        {
+          integrationId: pending.id,
+          installationId: installationData.installation_id,
+          appType,
+        },
+        tx
+      );
+      return { ok: true as const };
+    });
+    if (!completed.ok) {
+      // The pending request must not be auto-activated: either another tenant
+      // already owns this installation, or this delivery is not attributed to
+      // the GitHub identity that recorded the request. Leave the row pending
+      // so it goes through verified connection confirmation.
+      logExceptInTest('GitHub pending installation completion declined:', {
+        installation_id: installationData.installation_id,
+        account_id: installationData.account_id,
+        integration_id: pending.id,
+        reason: completed.reason,
+      });
+      return NextResponse.json(
+        { message: 'Installation association requires verified connection confirmation' },
+        { status: 200 }
+      );
+    }
+    try {
+      const repositories = await fetchGitHubRepositories(installationData.installation_id, appType);
+      await updateRepositoriesForIntegration(pending.id, repositories);
+    } catch (error) {
+      captureException(error, { tags: { operation: 'github-pending-repository-sync' } });
+    }
+    return NextResponse.json(
+      {
+        message: 'Installation completed',
+        owned_by_organization_id: pending.owned_by_organization_id,
+        owned_by_user_id: pending.owned_by_user_id,
+      },
+      { status: 200 }
+    );
+  }
+  return NextResponse.json({ message: 'Installation recorded' }, { status: 200 });
 }
 
 export async function handleInstallationDeleted(
@@ -121,14 +280,14 @@ export async function handleInstallationDeleted(
 ) {
   const installationIdStr = payload.installation.id.toString();
 
-  // Find and delete the integration (whether completed or pending). The
-  // webhook is signed by a specific GitHub App, so scope the lookup by app
-  // type to avoid deleting the other app's row for the same installation ID.
-  const integrationToDelete = await findIntegrationByInstallationId(
-    PLATFORM.GITHUB,
-    installationIdStr,
-    appType
-  );
+  await observeGitHubInstallationLifecycle({
+    installationId: installationIdStr,
+    appType,
+    state: 'deleted',
+  });
+  if (!isGitHubConnectionManagementEnabled()) {
+    await deleteGitHubInstallationRecords(installationIdStr, appType);
+  }
 
   try {
     // The bot identity store has no app-type dimension and the lite app has no
@@ -144,35 +303,6 @@ export async function handleInstallationDeleted(
     });
   }
 
-  if (integrationToDelete) {
-    // Determine owner from the integration record
-    if (integrationToDelete.owned_by_organization_id) {
-      await deleteIntegration(
-        integrationToDelete.owned_by_organization_id,
-        PLATFORM.GITHUB,
-        appType,
-        installationIdStr
-      );
-      logExceptInTest('Deleted organization installation:', {
-        installation_id: installationIdStr,
-        owned_by_organization_id: integrationToDelete.owned_by_organization_id,
-      });
-    } else if (integrationToDelete.owned_by_user_id) {
-      await deleteIntegrationForOwner(
-        { type: 'user', id: integrationToDelete.owned_by_user_id },
-        PLATFORM.GITHUB,
-        appType,
-        installationIdStr
-      );
-      logExceptInTest('Deleted user installation:', {
-        installation_id: installationIdStr,
-        owned_by_user_id: integrationToDelete.owned_by_user_id,
-      });
-    } else {
-      console.error('Integration found but has no owner:', integrationToDelete.id);
-    }
-  }
-
   return NextResponse.json({ message: 'Installation removed' }, { status: 200 });
 }
 
@@ -181,42 +311,35 @@ export async function handleInstallationSuspend(
   appType: GitHubAppType
 ) {
   const installationIdStr = payload.installation.id.toString();
-  const integrationToSuspend = await findIntegrationByInstallationId(
+  const integration = await findConnectedIntegrationByInstallationId(
     PLATFORM.GITHUB,
     installationIdStr,
     appType
   );
-
-  if (integrationToSuspend) {
+  await observeGitHubInstallationLifecycle({
+    installationId: installationIdStr,
+    appType,
+    state: 'suspended',
+    suspendedAt: new Date().toISOString(),
+  });
+  if (!isGitHubConnectionManagementEnabled() && integration) {
     const suspendedBy = payload.sender?.login || 'unknown';
-
-    // Determine owner from the integration record
-    if (integrationToSuspend.owned_by_organization_id) {
+    if (integration.owned_by_organization_id) {
       await suspendIntegration(
-        integrationToSuspend.owned_by_organization_id,
+        integration.owned_by_organization_id,
         PLATFORM.GITHUB,
         suspendedBy,
         appType,
         installationIdStr
       );
-      logExceptInTest('GitHub App suspended (organization):', {
-        installation_id: payload.installation.id,
-        owned_by_organization_id: integrationToSuspend.owned_by_organization_id,
-      });
-    } else if (integrationToSuspend.owned_by_user_id) {
+    } else if (integration.owned_by_user_id) {
       await suspendIntegrationForOwner(
-        { type: 'user', id: integrationToSuspend.owned_by_user_id },
+        { type: 'user', id: integration.owned_by_user_id },
         PLATFORM.GITHUB,
         suspendedBy,
         appType,
         installationIdStr
       );
-      logExceptInTest('GitHub App suspended (user):', {
-        installation_id: payload.installation.id,
-        owned_by_user_id: integrationToSuspend.owned_by_user_id,
-      });
-    } else {
-      console.error('Integration found but has no owner:', integrationToSuspend.id);
     }
   }
 
@@ -228,38 +351,31 @@ export async function handleInstallationUnsuspend(
   appType: GitHubAppType
 ) {
   const installationIdStr = payload.installation.id.toString();
-  const integrationToUnsuspend = await findIntegrationByInstallationId(
+  const integration = await findConnectedIntegrationByInstallationId(
     PLATFORM.GITHUB,
     installationIdStr,
     appType
   );
-
-  if (integrationToUnsuspend) {
-    // Determine owner from the integration record
-    if (integrationToUnsuspend.owned_by_organization_id) {
+  await observeGitHubInstallationLifecycle({
+    installationId: installationIdStr,
+    appType,
+    state: 'active',
+  });
+  if (!isGitHubConnectionManagementEnabled() && integration) {
+    if (integration.owned_by_organization_id) {
       await unsuspendIntegration(
-        integrationToUnsuspend.owned_by_organization_id,
+        integration.owned_by_organization_id,
         PLATFORM.GITHUB,
         appType,
         installationIdStr
       );
-      logExceptInTest('GitHub App unsuspended (organization):', {
-        installation_id: payload.installation.id,
-        owned_by_organization_id: integrationToUnsuspend.owned_by_organization_id,
-      });
-    } else if (integrationToUnsuspend.owned_by_user_id) {
+    } else if (integration.owned_by_user_id) {
       await unsuspendIntegrationForOwner(
-        { type: 'user', id: integrationToUnsuspend.owned_by_user_id },
+        { type: 'user', id: integration.owned_by_user_id },
         PLATFORM.GITHUB,
         appType,
         installationIdStr
       );
-      logExceptInTest('GitHub App unsuspended (user):', {
-        installation_id: payload.installation.id,
-        owned_by_user_id: integrationToUnsuspend.owned_by_user_id,
-      });
-    } else {
-      console.error('Integration found but has no owner:', integrationToUnsuspend.id);
     }
   }
 

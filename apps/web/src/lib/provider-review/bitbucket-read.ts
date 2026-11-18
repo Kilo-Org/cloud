@@ -1,0 +1,1677 @@
+/**
+ * Bitbucket Cloud pull-request READ layer for the provider review surfaces.
+ *
+ * Every function resolves credentials through bitbucket-authorization first,
+ * so the workspace identity and the workspace access token are always
+ * server-derived, and returns the shared s1 DTOs so a provider difference
+ * never leaks past this module. Bitbucket paginates with opaque `next` URLs:
+ * cursors are encoded server-side, every page re-authorizes against the org
+ * integration, and a cursor — or a provider next URL — can never change the
+ * workspace or repository identity a request reads.
+ */
+import 'server-only';
+
+import { createHash } from 'node:crypto';
+import { z } from 'zod';
+import {
+  type ProviderPrChecksResult,
+  type ProviderPrFile,
+  type ProviderPrFilesPage,
+  type ProviderPrInboxItem,
+  type ProviderPrInboxPage,
+  type ProviderPrMergeBlockedReason,
+  type ProviderPrMergeState,
+  type ProviderPrSummary,
+  type ProviderPrThread,
+} from '@kilocode/app-shared/provider-review';
+import {
+  authorizeRepository,
+  authorizeWorkspace,
+  classifyBitbucketError,
+  BitbucketApiStatusError,
+  BitbucketReviewError,
+  type BitbucketRepositoryAccess,
+  type BitbucketWorkspaceRepositoryAccess,
+  type BitbucketReviewOwner,
+} from './bitbucket-authorization';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
+import { createSignedToken, verifySignedToken } from '@/lib/signed-token';
+
+const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
+const BITBUCKET_PAGE_SIZE = 50;
+const BITBUCKET_REQUEST_TIMEOUT_MS = 30_000;
+/** Same response cap the GitLab read layer applies, so one response cannot stream unbounded bytes. */
+const MAX_BITBUCKET_RESPONSE_BYTES = 10 * 1024 * 1024;
+/**
+ * The counts folded into the PR summary come from the diffstat; cap the pages
+ * so one detail load can never fan out into an unbounded crawl on a huge pull
+ * request (same rule as the GitLab detail load).
+ */
+const MAX_SUMMARY_DIFFSTAT_PAGES = 3;
+/** The merge gate checks at most this many pages of the latest builds. */
+const MAX_BUILD_PAGES = 3;
+/** How many repository PR collections the inbox fetches at once. */
+const INBOX_REPOSITORY_CONCURRENCY = 8;
+/** The maximum repository count served by the inbox on one load. */
+const MAX_INBOX_REPOSITORIES = 300;
+/**
+ * The receiving wire limit of an inbox cursor: the `pageCursor` bound the
+ * provider-review router accepts, so a cursor this layer issues always fits
+ * the next request. The per-repository page state is two bytes each — 300
+ * repositories stay far below the limit — and a test pins the maximum-size
+ * cursor to it.
+ */
+export const INBOX_CURSOR_MAX_CHARS = 2048;
+/** How long a server-issued inbox cursor stays usable. */
+const INBOX_CURSOR_TTL_SECONDS = 60 * 60;
+/**
+ * The task-collection page bound for the discussion task walk: the same
+ * bounded walk the write layer's thread resolution uses, so one discussion
+ * load can never crawl an unbounded collection.
+ */
+const MAX_TASK_COLLECTION_PAGES = 10;
+
+const BitbucketUserSchema = z.object({
+  uuid: z.string().min(1),
+  display_name: z.string().nullable().optional(),
+  nickname: z.string().nullable().optional(),
+  links: z
+    .object({ avatar: z.object({ href: z.string() }).nullable().optional() })
+    .nullable()
+    .optional(),
+});
+
+const BitbucketCommitSideSchema = z.object({
+  branch: z.object({ name: z.string().nullable().optional() }).nullable().optional(),
+  commit: z
+    .object({ hash: z.string().min(1) })
+    .nullable()
+    .optional(),
+  repository: z
+    .object({
+      full_name: z.string().min(3).optional(),
+      uuid: z.string().min(1).optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
+/** The PR detail JSON carries more fields than the mapped subset. */
+const BitbucketPullRequestDetailSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  state: z.enum(['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED']),
+  draft: z.boolean().nullable().optional(),
+  summary: z.object({ raw: z.string().nullable().optional() }).nullable().optional(),
+  author: BitbucketUserSchema.nullable().optional(),
+  source: BitbucketCommitSideSchema.nullable().optional(),
+  destination: BitbucketCommitSideSchema.nullable().optional(),
+  task_count: z.number().nullable().optional(),
+  merge_state: z.string().nullable().optional(),
+  created_on: z.string().nullable().optional(),
+  updated_on: z.string().nullable().optional(),
+  links: z
+    .object({ html: z.object({ href: z.string() }).nullable().optional() })
+    .nullable()
+    .optional(),
+  participants: z.array(z.unknown()).nullable().optional(),
+});
+
+type BitbucketPullRequestDetail = z.infer<typeof BitbucketPullRequestDetailSchema>;
+
+const BitbucketDiffstatEntrySchema = z.object({
+  status: z.string().nullable().optional(),
+  lines_added: z.number().nullable().optional(),
+  lines_removed: z.number().nullable().optional(),
+  old: z
+    .object({
+      path: z.string().nullable().optional(),
+      escaped_path: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  new: z
+    .object({
+      path: z.string().nullable().optional(),
+      escaped_path: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
+const BitbucketCommentSchema = z.object({
+  id: z.number(),
+  parent: z.object({ id: z.number() }).nullable().optional(),
+  content: z.object({ raw: z.string().nullable().optional() }).nullable().optional(),
+  inline: z
+    .object({
+      path: z.string().nullable().optional(),
+      from: z.number().nullable().optional(),
+      to: z.number().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  created_on: z.string().nullable().optional(),
+  deleted: z.boolean().nullable().optional(),
+  user: BitbucketUserSchema.nullable().optional(),
+});
+
+const BitbucketBuildStatusSchema = z.object({
+  state: z.string(),
+  key: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  url: z.string().nullable().optional(),
+  links: z
+    .object({ status: z.object({ href: z.string() }).nullable().optional() })
+    .nullable()
+    .optional(),
+});
+
+const BitbucketTaskSchema = z.object({
+  id: z.number(),
+  resolved_on: z.string().nullable().optional(),
+  comment: z.object({ id: z.number() }).nullable().optional(),
+});
+
+const BitbucketBranchRestrictionSchema = z.object({
+  kind: z.string(),
+  value: z.union([z.number(), z.string(), z.null()]).nullable().optional(),
+});
+
+const BitbucketParticipantSchema = z.object({
+  user: BitbucketUserSchema.nullable().optional(),
+  role: z.string().nullable().optional(),
+  approved: z.boolean().nullable().optional(),
+  state: z.string().nullable().optional(),
+});
+
+const BitbucketInboxPullRequestSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  state: z.enum(['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED']),
+  draft: z.boolean().nullable().optional(),
+  author: BitbucketUserSchema.nullable().optional(),
+  updated_on: z.string().nullable().optional(),
+  source: BitbucketCommitSideSchema.nullable().optional(),
+  destination: BitbucketCommitSideSchema.nullable().optional(),
+});
+
+const BitbucketPageSchema = z.object({
+  values: z.array(z.unknown()).default([]),
+  next: z.string().nullable().optional(),
+});
+
+/** `GET /src/{ref}/{path}?format=meta` describes the file instead of returning it. */
+const BitbucketFileMetadataSchema = z.object({
+  size: z.number().nullable().optional(),
+});
+
+function mapPullRequestState(state: string): ProviderPrSummary['state'] {
+  if (state === 'MERGED') return 'merged';
+  if (state === 'OPEN') return 'open';
+  return 'closed';
+}
+
+function mapUser(user: z.infer<typeof BitbucketUserSchema> | null | undefined) {
+  if (!user) return null;
+  const login = user.nickname ?? user.display_name ?? '';
+  if (!login) return null;
+  return { login, avatarUrl: user.links?.avatar?.href ?? null };
+}
+
+/**
+ * One JSON request against api.bitbucket.org. The origin is fixed (Bitbucket
+ * Cloud is SaaS-only — there is no self-managed URL to resolve) and the
+ * bearer token is the server-derived workspace access token. Only the status
+ * survives a provider failure, so no response body can leak into the error.
+ *
+ * `undefined` is part of the result on purpose: a bodyless 204/205/304 — or a
+ * response without a body reader — carries no JSON, so the type says so and
+ * every caller validates the payload it needs before reading it.
+ */
+export async function requestBitbucketJson<T>(
+  access: { accessToken: string },
+  path: string,
+  request: {
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    query?: Record<string, string | number | boolean | undefined>;
+    body?: unknown;
+  } = {}
+): Promise<T | undefined> {
+  if (!path.startsWith('/2.0/')) {
+    throw new BitbucketReviewError('bad_request', 'Bitbucket request paths must use the 2.0 API.');
+  }
+  // The path is the full versioned API path; the origin contributes no
+  // version prefix, so a double `/2.0/2.0/` segment can never be built.
+  const url = new URL(`${BITBUCKET_API_ORIGIN}${path}`);
+  for (const [key, value] of Object.entries(request.query ?? {})) {
+    if (value !== undefined) url.searchParams.set(key, String(value));
+  }
+  try {
+    const text = await fetchBoundedText(url.toString(), {
+      accessToken: access.accessToken,
+      method: request.method ?? 'GET',
+      body: request.body,
+    });
+    if (text === null || text === '') return undefined;
+    return JSON.parse(text) as T;
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+/**
+ * One bearer request with a bounded read: the body is streamed with a cap so
+ * a hostile response cannot stream unbounded bytes (same rule as the GitLab
+ * transport). Returns null for a bodyless 204/205/304.
+ *
+ * Bitbucket Cloud legitimately answers some GET endpoints with a 30x redirect
+ * (the pull-request diffstat endpoint redirects onto its `/diffstat/<spec>`
+ * form), so the transport follows redirect responses itself: `fetch` runs
+ * with `redirect: 'manual'`, and a redirect is re-issued only when it is a
+ * GET whose `location` resolves back onto the Bitbucket API origin under
+ * `/2.0/` — the bearer token never leaves that origin. Everything else keeps
+ * the pre-existing behavior: the bare status is raised and classified.
+ */
+const BITBUCKET_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const BITBUCKET_MAX_REDIRECT_HOPS = 3;
+
+function sameApiOriginRedirectTarget(currentUrl: string, location: string): string | null {
+  try {
+    const target = new URL(location, currentUrl);
+    if (target.origin !== BITBUCKET_API_ORIGIN) return null;
+    if (!target.pathname.startsWith('/2.0/')) return null;
+    return target.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function fetchBoundedText(
+  url: string,
+  request: {
+    accessToken: string;
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    body?: unknown;
+    accept?: string;
+    /** Response byte limit for this request; the transport ceiling otherwise. */
+    maxBytes?: number;
+  }
+): Promise<string | null> {
+  const method = request.method ?? 'GET';
+  let requestUrl = url;
+  for (let hop = 0; hop <= BITBUCKET_MAX_REDIRECT_HOPS; hop += 1) {
+    const response = await fetch(requestUrl, {
+      method,
+      headers: {
+        Authorization: `Bearer ${request.accessToken}`,
+        Accept: request.accept ?? 'application/json',
+        ...(request.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: request.body !== undefined ? JSON.stringify(request.body) : undefined,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(BITBUCKET_REQUEST_TIMEOUT_MS),
+    });
+    if (BITBUCKET_REDIRECT_STATUSES.has(response.status)) {
+      const location = response.headers.get('location');
+      const target =
+        method === 'GET' && location !== null
+          ? sameApiOriginRedirectTarget(requestUrl, location)
+          : null;
+      if (target !== null && hop < BITBUCKET_MAX_REDIRECT_HOPS) {
+        requestUrl = target;
+        continue;
+      }
+      throw new BitbucketApiStatusError(
+        response.status,
+        `Bitbucket ${method} request failed: ${response.status}`
+      );
+    }
+    if (!response.ok) {
+      throw new BitbucketApiStatusError(
+        response.status,
+        `Bitbucket ${method} request failed: ${response.status}`
+      );
+    }
+    if (response.status === 204 || response.status === 205 || response.status === 304) return null;
+    const reader = response.body?.getReader();
+    if (!reader) return '';
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!(value instanceof Uint8Array)) {
+          throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected response.');
+        }
+        totalBytes += value.byteLength;
+        const maxBytes = request.maxBytes ?? MAX_BITBUCKET_RESPONSE_BYTES;
+        if (totalBytes > maxBytes) {
+          try {
+            await reader.cancel();
+          } catch {
+            // The bounded read remains failed if cancellation itself fails.
+          }
+          throw request.maxBytes === undefined
+            ? new BitbucketReviewError(
+                'retryable',
+                'The Bitbucket response exceeded the size limit.'
+              )
+            : new BitbucketReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const merged = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(merged);
+  }
+  // The loop always returns or throws; this line is unreachable.
+  throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected response.');
+}
+
+/** One raw-text request (the `/src` file endpoint answers plain text). */
+async function requestBitbucketText(
+  access: { accessToken: string },
+  path: string
+): Promise<string> {
+  try {
+    const text = await fetchBoundedText(`${BITBUCKET_API_ORIGIN}${path}`, {
+      accessToken: access.accessToken,
+      accept: '*/*',
+      maxBytes: FILE_READ_MAX_BYTES,
+    });
+    return text ?? '';
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+function repositorySegment(repository: { fullName: string }): string {
+  const [workspace, repoSlug] = repository.fullName.split('/');
+  return `${encodeURIComponent(workspace ?? '')}/${encodeURIComponent(repoSlug ?? '')}`;
+}
+
+/**
+ * A provider `next` URL is followed only when it stays on the Bitbucket API
+ * origin under `/2.0/`. Anything else ends pagination — a hostile next link
+ * must never re-target the bearer token.
+ */
+function validatedNextUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.hostname !== 'api.bitbucket.org' ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.port !== '' ||
+    !url.pathname.startsWith('/2.0/') ||
+    url.hash !== ''
+  ) {
+    return null;
+  }
+  return url.toString();
+}
+
+/**
+ * A page cursor carries the collection identity it was minted for. A cursor
+ * bound to another collection is ignored (page 1), so a cursor can never
+ * switch the workspace or repository a request reads.
+ */
+function encodePageCursor(identity: string, nextUrl: string): string {
+  return Buffer.from(JSON.stringify({ identity, next: nextUrl })).toString('base64url');
+}
+
+function decodePageCursor(
+  cursor: string | undefined,
+  identity: string
+): { followUrl: string | null } {
+  if (!cursor) return { followUrl: null };
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      identity?: unknown;
+      next?: unknown;
+    };
+    if (typeof parsed.identity !== 'string' || parsed.identity !== identity) {
+      return { followUrl: null };
+    }
+    if (typeof parsed.next !== 'string') return { followUrl: null };
+    return { followUrl: validatedNextUrl(parsed.next) };
+  } catch {
+    return { followUrl: null };
+  }
+}
+
+function repositoryPathGuard(repository: BitbucketRepositoryAccess): (pathname: string) => boolean {
+  const prefix = `/2.0/repositories/${encodeURIComponent(repository.workspace.slug)}/${encodeURIComponent(repository.repository.slug)}/`;
+  return pathname => pathname.startsWith(prefix);
+}
+
+export { repositoryPathGuard };
+
+/**
+ * One page of any Bitbucket collection. When a cursor carries a validated
+ * next URL the page is fetched there (with the caller's fresh token); the
+ * next URL is followed only inside the guarded path space, so a cursor — or
+ * a provider next link — can never change the collection a request reads.
+ * Shared with the write layer, which paginates the task collection the same
+ * way when it resolves a thread.
+ */
+export async function fetchPage(
+  access: { accessToken: string },
+  basePath: string,
+  identity: string,
+  cursor: string | undefined,
+  pathGuard: (pathname: string) => boolean,
+  extraQuery: Record<string, string | number | boolean> = {}
+): Promise<{ values: unknown[]; nextCursor: string | null }> {
+  const page = decodePageCursor(cursor, identity);
+  let payload: unknown;
+  if (page.followUrl) {
+    const followUrl = new URL(page.followUrl);
+    if (!pathGuard(followUrl.pathname)) return { values: [], nextCursor: null };
+    try {
+      const text = await fetchBoundedText(followUrl.toString(), {
+        accessToken: access.accessToken,
+      });
+      payload = text ? JSON.parse(text) : {};
+    } catch (error) {
+      // Classify exactly like the first-page branch: the callers that degrade
+      // on an unreadable collection (task evidence, branch restrictions, file
+      // conflicts) match on a classified `BitbucketReviewError` kind, so a raw
+      // `BitbucketApiStatusError` from a followed page must not skip them.
+      throw classifyBitbucketError(error);
+    }
+  } else {
+    payload = await requestBitbucketJson(access, basePath, {
+      query: { pagelen: BITBUCKET_PAGE_SIZE, ...extraQuery },
+    });
+  }
+
+  const parsed = BitbucketPageSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
+  }
+  // validatedNextUrl never throws: a malformed provider next link ends
+  // pagination instead of failing the page, and a next link outside the
+  // guarded path space is dropped the same way.
+  const nextUrl = validatedNextUrl(parsed.data.next ?? null);
+  const guardedNext = nextUrl && pathGuard(new URL(nextUrl).pathname) ? nextUrl : null;
+  return {
+    values: parsed.data.values,
+    nextCursor: guardedNext ? encodePageCursor(identity, guardedNext) : null,
+  };
+}
+
+async function fetchPullRequestDetail(
+  access: BitbucketRepositoryAccess,
+  prId: number
+): Promise<BitbucketPullRequestDetail> {
+  const payload = await requestBitbucketJson(
+    access,
+    `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}`
+  );
+  const parsed = BitbucketPullRequestDetailSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected pull request.');
+  }
+  return parsed.data;
+}
+
+function mapDiffstatEntry(entry: z.infer<typeof BitbucketDiffstatEntrySchema>): ProviderPrFile {
+  const oldPath = entry.old?.escaped_path ?? entry.old?.path ?? null;
+  const newPath = entry.new?.escaped_path ?? entry.new?.path ?? null;
+  const path = newPath ?? oldPath ?? '';
+  return {
+    path,
+    previousPath: oldPath !== null && oldPath !== path ? oldPath : null,
+    status: entry.status ?? 'modified',
+    additions: entry.lines_added ?? 0,
+    deletions: entry.lines_removed ?? 0,
+    patch: null,
+    patchMissing: true,
+  };
+}
+
+async function fetchDiffstatPage(
+  access: BitbucketRepositoryAccess,
+  prId: number,
+  identity: string,
+  cursor: string | undefined
+): Promise<{ values: z.infer<typeof BitbucketDiffstatEntrySchema>[]; nextCursor: string | null }> {
+  const page = await fetchPage(
+    access,
+    `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}/diffstat`,
+    identity,
+    cursor,
+    repositoryPathGuard(access)
+  );
+  const values: z.infer<typeof BitbucketDiffstatEntrySchema>[] = [];
+  for (const value of page.values) {
+    const parsed = BitbucketDiffstatEntrySchema.safeParse(value);
+    if (parsed.success) values.push(parsed.data);
+  }
+  return { values, nextCursor: page.nextCursor };
+}
+
+/**
+ * The PR as the review screen renders it: detail with `source.commit.hash` as
+ * the head sha, and change counts folded in from the first diffstat pages.
+ */
+export async function getPullRequest(
+  owner: BitbucketReviewOwner,
+  workspaceSlug: string,
+  repoSlug: string,
+  prId: number
+): Promise<ProviderPrSummary> {
+  const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
+  try {
+    const identity = `bitbucket-pr:${access.repository.fullName}#${prId}`;
+    const detail = await fetchPullRequestDetail(access, prId);
+    // Counts come from the diffstat; cap the pages so one detail load can
+    // never fan out into an unbounded crawl on a huge pull request.
+    const files: z.infer<typeof BitbucketDiffstatEntrySchema>[] = [];
+    let cursor: string | undefined = undefined;
+    for (let page = 0; page < MAX_SUMMARY_DIFFSTAT_PAGES; page++) {
+      const result = await fetchDiffstatPage(access, prId, identity, cursor);
+      files.push(...result.values);
+      if (!result.nextCursor) break;
+      cursor = result.nextCursor;
+    }
+    let additions = 0;
+    let deletions = 0;
+    for (const file of files) {
+      const mapped = mapDiffstatEntry(file);
+      additions += mapped.additions;
+      deletions += mapped.deletions;
+    }
+
+    return {
+      ref: {
+        platform: 'bitbucket',
+        workspace: access.workspace.slug,
+        repoSlug: access.repository.slug,
+        prId,
+      },
+      title: detail.title,
+      body: detail.summary?.raw ?? null,
+      author: mapUser(detail.author ?? null),
+      state: mapPullRequestState(detail.state),
+      draft: detail.draft === true,
+      headRef: detail.source?.branch?.name ?? '',
+      baseRef: detail.destination?.branch?.name ?? '',
+      headSha: detail.source?.commit?.hash ?? '',
+      changedFiles: files.length,
+      additions,
+      deletions,
+      webUrl: detail.links?.html?.href ?? '',
+      createdAt: detail.created_on ?? detail.updated_on ?? '',
+      updatedAt: detail.updated_on ?? '',
+    };
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+/** One page of changed files. `cursor` is the opaque page token from a prior call. */
+export async function listChangedFiles(
+  owner: BitbucketReviewOwner,
+  workspaceSlug: string,
+  repoSlug: string,
+  prId: number,
+  cursor?: string
+): Promise<ProviderPrFilesPage> {
+  const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
+  try {
+    const identity = `bitbucket-diffstat:${access.repository.fullName}#${prId}`;
+    const page = await fetchDiffstatPage(access, prId, identity, cursor);
+    return {
+      files: page.values.map(mapDiffstatEntry),
+      nextCursor: page.nextCursor,
+    };
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+export type BitbucketFileLines = {
+  lines: string[];
+  totalLines: number;
+};
+
+/**
+ * A file above the shared read budget is a non-retryable too_large rejection.
+ * Both observations of the blob (the `format=meta` size and the delivered text)
+ * pass through here.
+ */
+function assertFileWithinReadBudget(size: number | null | undefined): void {
+  if (typeof size === 'number' && size > FILE_READ_MAX_BYTES) {
+    throw new BitbucketReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
+  }
+}
+
+/**
+ * A 1-based inclusive line window of a file at a commit, for comment context.
+ * A missing file is a non-retryable not_found.
+ */
+export async function getFileLines(
+  owner: BitbucketReviewOwner,
+  workspaceSlug: string,
+  repoSlug: string,
+  ref: string,
+  path: string,
+  startLine: number,
+  endLine: number
+): Promise<BitbucketFileLines> {
+  const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
+  try {
+    if (!/^[0-9a-fA-F]{6,64}$/.test(ref)) {
+      throw new BitbucketReviewError('bad_request', 'The file ref must be a commit hash.');
+    }
+    const cleanPath = path.replace(/^\/+/, '');
+    if (!cleanPath || cleanPath.includes('..')) {
+      throw new BitbucketReviewError('not_found', 'The file was not found at this commit.');
+    }
+    const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
+    const sourcePath = `/2.0/repositories/${repositorySegment(access.repository)}/src/${encodeURIComponent(ref)}/${encodedPath}`;
+    // The `format=meta` probe is best effort: it reports the file size before
+    // the body read, and when the provider cannot answer it the body read
+    // enforces the same ceiling, so a failed probe never fails a read that
+    // would otherwise succeed.
+    let probedSize: number | null | undefined;
+    try {
+      const metadata = BitbucketFileMetadataSchema.safeParse(
+        await requestBitbucketJson<unknown>(access, sourcePath, { query: { format: 'meta' } })
+      );
+      if (metadata.success) probedSize = metadata.data.size;
+    } catch {
+      probedSize = undefined;
+    }
+    assertFileWithinReadBudget(probedSize);
+    const text = await requestBitbucketText(access, sourcePath);
+    assertFileWithinReadBudget(Buffer.byteLength(text));
+    const allLines = text.split('\n');
+    const start = Math.max(1, Math.min(startLine, allLines.length));
+    // Bound the window by the same shared cap the GitHub adapter applies, so
+    // the transport response cap is not the only limit on the returned slice.
+    const cappedEnd = Math.min(endLine, startLine + FILE_LINES_MAX - 1);
+    const end = Math.max(start, Math.min(cappedEnd, allLines.length));
+    return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+/**
+ * A discussion thread. Bitbucket threads are top-level comments with replies;
+ * inline anchors come from the root comment's `inline` block. `taskCount` is
+ * the number of tasks collected for the thread root, resolved and unresolved
+ * — Bitbucket comments carry no task count of their own.
+ */
+export type BitbucketDiscussionThread = ProviderPrThread & { taskCount: number };
+
+export type BitbucketDiscussionsPage = {
+  threads: BitbucketDiscussionThread[];
+  nextCursor: string | null;
+};
+
+type BitbucketComment = z.infer<typeof BitbucketCommentSchema>;
+
+type BitbucketTaskEvidence = {
+  commentIds: ReadonlySet<number>;
+  unresolvedCommentIds: ReadonlySet<number>;
+  taskCounts: ReadonlyMap<number, number>;
+};
+
+/**
+ * Map one thread onto the shared DTO. `threadId` is the id consumers key
+ * rows and per-thread state on; `rootCommentId` is the root comment's id,
+ * which drives the resolved flag and the task count — for a fragment whose
+ * root was read on an earlier page it is an identity, not a comment in
+ * `threadComments`, so resolution and task counts still key off it.
+ */
+function mapThread(
+  threadId: string,
+  rootCommentId: number,
+  inline: BitbucketComment['inline'],
+  threadComments: BitbucketComment[],
+  taskEvidence: BitbucketTaskEvidence
+): BitbucketDiscussionThread {
+  const anchorLine = inline?.to ?? inline?.from ?? null;
+  return {
+    threadId,
+    resolved:
+      taskEvidence.commentIds.has(rootCommentId) &&
+      !taskEvidence.unresolvedCommentIds.has(rootCommentId),
+    path: inline?.path ?? null,
+    line: anchorLine,
+    side: inline ? (inline.to != null ? 'RIGHT' : 'LEFT') : null,
+    comments: threadComments.map(comment => ({
+      commentId: String(comment.id),
+      author: mapUser(comment.user),
+      body: comment.content?.raw ?? '',
+      createdAt: comment.created_on ?? '',
+    })),
+    taskCount: taskEvidence.taskCounts.get(rootCommentId) ?? 0,
+  };
+}
+
+/**
+ * Build threads from one flat page of comments: top-level comments are the
+ * thread roots, replies attach to their parent. Both the resolved flag and
+ * the task count come from the task evidence the caller supplies — Bitbucket
+ * never sends task fields on comments: a thread is resolved when a task
+ * exists for its root comment and no task on it is unresolved.
+ *
+ * The collection is flat and creation-ordered, so a page can start on a reply
+ * whose root sits on an earlier page. Such a reply can never attach to a root
+ * here: it is surfaced as its own thread keyed `root:firstReplyId` — namespaced
+ * so it cannot repeat the root thread's id the earlier page already served
+ * (consumers key rows and state by threadId), while the root comment id still
+ * drives the resolved flag, the task count, and every thread action. Nothing
+ * is dropped, and thread actions still target the root the reply belongs to.
+ */
+function buildThreadsFromComments(
+  comments: BitbucketComment[],
+  taskEvidence: BitbucketTaskEvidence
+): BitbucketDiscussionThread[] {
+  const roots = comments.filter(comment => !comment.parent && comment.deleted !== true);
+  const repliesByParent = new Map<number, BitbucketComment[]>();
+  for (const comment of comments) {
+    if (comment.parent && comment.deleted !== true) {
+      const existing = repliesByParent.get(comment.parent.id) ?? [];
+      existing.push(comment);
+      repliesByParent.set(comment.parent.id, existing);
+    }
+  }
+  const threads = roots.map(root =>
+    mapThread(
+      String(root.id),
+      root.id,
+      root.inline ?? null,
+      [root, ...(repliesByParent.get(root.id) ?? [])],
+      taskEvidence
+    )
+  );
+  const rootIds = new Set(roots.map(root => root.id));
+  for (const [parentId, replies] of repliesByParent) {
+    if (rootIds.has(parentId)) continue;
+    threads.push(
+      mapThread(
+        `${parentId}:${String(replies[0].id)}`,
+        parentId,
+        replies[0]?.inline ?? null,
+        replies,
+        taskEvidence
+      )
+    );
+  }
+  return threads;
+}
+
+/**
+ * Fetch the PR's task collection and fold it into task evidence per
+ * comment: which comments hold tasks at all, which still hold an unresolved
+ * task, and how many tasks each holds. The collection is paginated, so the
+ * walk follows every page up to the same bounded page count the write
+ * layer's thread resolution uses. A provider that does not expose the
+ * collection (404) or forbids reading it leaves no task evidence — threads
+ * then read unresolved and taskless instead of failing the whole discussion
+ * list. A walk that hits the page bound with pages left unread is treated
+ * the same way: partial evidence must never claim a resolution or a count
+ * the unread pages could contradict.
+ */
+async function fetchTaskEvidence(
+  access: BitbucketRepositoryAccess,
+  prId: number
+): Promise<{
+  commentIds: ReadonlySet<number>;
+  unresolvedCommentIds: ReadonlySet<number>;
+  taskCounts: ReadonlyMap<number, number>;
+}> {
+  const noTaskEvidence = () => ({
+    commentIds: new Set<number>(),
+    unresolvedCommentIds: new Set<number>(),
+    taskCounts: new Map<number, number>(),
+  });
+  const { commentIds, unresolvedCommentIds, taskCounts } = noTaskEvidence();
+  let cursor: string | undefined = undefined;
+  let exhausted = true;
+  try {
+    for (let pageIndex = 0; pageIndex < MAX_TASK_COLLECTION_PAGES; pageIndex++) {
+      const page = await fetchPage(
+        access,
+        `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}/tasks`,
+        `bitbucket-tasks:${access.repository.fullName}#${prId}`,
+        cursor,
+        repositoryPathGuard(access),
+        { pagelen: 100 }
+      );
+      for (const value of page.values) {
+        const parsed = BitbucketTaskSchema.safeParse(value);
+        if (!parsed.success) continue;
+        const commentId = parsed.data.comment?.id;
+        if (typeof commentId !== 'number') continue;
+        commentIds.add(commentId);
+        if (parsed.data.resolved_on == null) unresolvedCommentIds.add(commentId);
+        taskCounts.set(commentId, (taskCounts.get(commentId) ?? 0) + 1);
+      }
+      if (!page.nextCursor) {
+        exhausted = true;
+        break;
+      }
+      exhausted = false;
+      cursor = page.nextCursor;
+    }
+  } catch (error) {
+    if (
+      error instanceof BitbucketReviewError &&
+      (error.kind === 'not_found' || error.kind === 'forbidden')
+    ) {
+      return noTaskEvidence();
+    }
+    throw error;
+  }
+  if (!exhausted) return noTaskEvidence();
+  return { commentIds, unresolvedCommentIds, taskCounts };
+}
+
+/** One page of discussions (threads and replies) with their diff anchors. */
+export async function listDiscussions(
+  owner: BitbucketReviewOwner,
+  workspaceSlug: string,
+  repoSlug: string,
+  prId: number,
+  cursor?: string
+): Promise<BitbucketDiscussionsPage> {
+  const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
+  try {
+    const identity = `bitbucket-comments:${access.repository.fullName}#${prId}`;
+    const page = await fetchPage(
+      access,
+      `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}/comments`,
+      identity,
+      cursor,
+      repositoryPathGuard(access)
+    );
+    const comments: z.infer<typeof BitbucketCommentSchema>[] = [];
+    for (const value of page.values) {
+      const parsed = BitbucketCommentSchema.safeParse(value);
+      if (parsed.success) comments.push(parsed.data);
+    }
+    const taskEvidence = await fetchTaskEvidence(access, prId);
+    return {
+      threads: buildThreadsFromComments(comments, taskEvidence),
+      nextCursor: page.nextCursor,
+    };
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+async function fetchBuildStatusesPage(
+  access: BitbucketRepositoryAccess,
+  headSha: string,
+  cursor: string | undefined
+): Promise<{ values: z.infer<typeof BitbucketBuildStatusSchema>[]; nextCursor: string | null }> {
+  const page = await fetchPage(
+    access,
+    `/2.0/repositories/${repositorySegment(access.repository)}/commit/${encodeURIComponent(headSha)}/statuses`,
+    `bitbucket-statuses:${access.repository.fullName}#${headSha}`,
+    cursor,
+    repositoryPathGuard(access)
+  );
+  const values: z.infer<typeof BitbucketBuildStatusSchema>[] = [];
+  for (const value of page.values) {
+    const parsed = BitbucketBuildStatusSchema.safeParse(value);
+    if (parsed.success) values.push(parsed.data);
+  }
+  return { values, nextCursor: page.nextCursor };
+}
+
+const FINISHED_BUILD_STATES = new Set(['SUCCESSFUL', 'FAILED']);
+
+/**
+ * The builds running on the PR head commit, as the shared checks DTO. A
+ * finished build keeps the provider verdict; a running or stopped build reads
+ * as pending with no conclusion.
+ */
+export async function listChecks(
+  owner: BitbucketReviewOwner,
+  workspaceSlug: string,
+  repoSlug: string,
+  prId: number
+): Promise<ProviderPrChecksResult> {
+  const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
+  try {
+    const detail = await fetchPullRequestDetail(access, prId);
+    const headSha = detail.source?.commit?.hash;
+    if (!headSha) return { checks: [] };
+    const checks: ProviderPrChecksResult['checks'] = [];
+    let cursor: string | undefined = undefined;
+    for (let page = 0; page < MAX_BUILD_PAGES; page++) {
+      const result = await fetchBuildStatusesPage(access, headSha, cursor);
+      for (const status of result.values) {
+        const state = status.state.toUpperCase();
+        checks.push({
+          name: status.name ?? status.key ?? 'build',
+          status: FINISHED_BUILD_STATES.has(state) ? 'completed' : 'pending',
+          conclusion: state === 'SUCCESSFUL' ? 'success' : state === 'FAILED' ? 'failed' : null,
+          detailsUrl: status.links?.status?.href ?? status.url ?? null,
+        });
+      }
+      if (!result.nextCursor) break;
+      cursor = result.nextCursor;
+    }
+    return { checks };
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+/**
+ * A provider permission refusal on the inbox read is the CONNECTION's: the
+ * inbox reads only the integration's repositories, so no pull-request role is
+ * involved. Left as `forbidden` it becomes the member's "you don't have
+ * permission" state, which is wrong for someone who does have organization
+ * access; the connection needs reconnecting.
+ */
+function classifyInboxError(error: unknown): BitbucketReviewError {
+  const classified = classifyBitbucketError(error);
+  if (classified.kind !== 'forbidden') return classified;
+  return new BitbucketReviewError(
+    'reconnect',
+    'Your Bitbucket connection cannot read your review requests. Reconnect Bitbucket and try again.'
+  );
+}
+
+/**
+ * Open pull requests of the integration's cached repositories, for the PR
+ * Review inbox. Each item carries platform, workspace, and repository
+ * identity, so the list can never navigate into a different provider's repo.
+ *
+ * The candidate repositories are the integration's cached repository set —
+ * the same set authorizeRepository treats as the repository boundary — so
+ * every row names a repository this layer can open.
+ *
+ * Bitbucket removed the aggregate collections that used to answer this in one
+ * request (`/2.0/pullrequests?role=REVIEWER` and the workspace-level twin
+ * both answer "There is no API hosted at this URL" today), and a workspace
+ * access token cannot resolve its own account (`/2.0/user` answers 403), so
+ * "reviewer = me" is not reproducible. The inbox therefore lists the open
+ * PRs of the integration's repositories, newest first.
+ *
+ * The fan-out sorts across repositories, so one inbox page cannot map onto a
+ * single provider page. A signed continuation carries the provider ceiling of
+ * the window it is walking — the newest `updated_on` that window's first load
+ * saw, so every row of the window that existed then stays inside the
+ * collection — and, per repository, the provider page it is on and how many
+ * leading rows of that page are already served.
+ *
+ * Rows are emitted in the merged order, so a repository's served rows are
+ * always the leading rows of its current page: the next load re-reads that
+ * page, skips them, and moves to the next page once the page is fully served.
+ * The continuation advances monotonically, never moves back to the first page,
+ * and reads at most one provider page per repository per load (two when the
+ * current page is already fully served). A workspace with more cached
+ * repositories than one cursor can carry is walked one window of repositories
+ * at a time, so every cached repository is covered instead of the walk stopping
+ * at the first window; each window starts its own ceiling, because its rows
+ * were never read under the previous window's. A pull request updated after
+ * the window's first load sits above the ceiling and appears on a fresh inbox
+ * load; one that stops being open leaves the collection and shifts the rows
+ * after it up, which the provider's page-number paging cannot prevent. A
+ * repository or a page the provider no longer serves ends that repository's
+ * walk rather than failing the whole inbox.
+ */
+export async function listInbox(
+  owner: BitbucketReviewOwner,
+  cursor?: string
+): Promise<ProviderPrInboxPage> {
+  try {
+    const access = await authorizeWorkspace(owner);
+    const cachedRepositories = [...access.repositories].sort((left, right) =>
+      left.fullName.toLowerCase() < right.fullName.toLowerCase()
+        ? -1
+        : left.fullName.toLowerCase() > right.fullName.toLowerCase()
+          ? 1
+          : 0
+    );
+    const repositoryFingerprint = createHash('sha256')
+      .update(cachedRepositories.map(repository => repository.fullName.toLowerCase()).join('\0'))
+      .digest('base64url');
+    const identity =
+      owner.type === 'organization'
+        ? `bitbucket-inbox:${access.workspace.slug}:${owner.organizationId}:${owner.userId}:${repositoryFingerprint}`
+        : `bitbucket-inbox:${access.workspace.slug}:user:${owner.userId}:${repositoryFingerprint}`;
+    const position = decodeInboxCursor(cursor, identity, cachedRepositories);
+    const windowIndex = position?.window ?? 0;
+    const repositories = inboxRepositoryWindow(cachedRepositories, windowIndex);
+    const repositoryNames = new Set(
+      repositories.map(repository => repository.fullName.toLowerCase())
+    );
+    const providerQuery = position?.ceiling
+      ? `state="OPEN" AND updated_on <= ${position.ceiling}`
+      : 'state="OPEN"';
+    let window: InboxCandidate[] = [];
+    const pageReads: InboxPageRead[] = [];
+    for (let offset = 0; offset < repositories.length; offset += INBOX_REPOSITORY_CONCURRENCY) {
+      const batch = repositories
+        .slice(offset, offset + INBOX_REPOSITORY_CONCURRENCY)
+        .filter(repository => position?.pages.get(repository.fullName.toLowerCase())?.page !== 0);
+      const pages = await Promise.all(
+        batch.map(async repository => {
+          const key = repository.fullName.toLowerCase();
+          let page = position?.pages.get(key)?.page ?? 1;
+          let served = position?.pages.get(key)?.served ?? 0;
+          for (let reads = 1; ; reads += 1) {
+            let payload: unknown;
+            try {
+              payload = await requestBitbucketJson(
+                access,
+                `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(repository.slug)}/pullrequests`,
+                {
+                  query: {
+                    pagelen: BITBUCKET_PAGE_SIZE,
+                    page,
+                    q: providerQuery,
+                    sort: '-updated_on',
+                  },
+                }
+              );
+            } catch (error) {
+              // A repository the cached set still names but the provider no
+              // longer serves, and a page an earlier load was promised for a
+              // collection that has since shrunk, are both that repository's
+              // end: the rest of the inbox still loads, and the repository
+              // stops appearing in later continuations.
+              if (classifyBitbucketError(error).kind === 'not_found') {
+                return { key, page, rows: [], fromRow: 0, hadNext: false };
+              }
+              throw error;
+            }
+            const parsedPage = BitbucketPageSchema.safeParse(payload);
+            if (!parsedPage.success) {
+              throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
+            }
+            const rows = inboxItemsFrom(parsedPage.data.values, repositoryNames).map(
+              (item, rowIndex) => ({ item, repoKey: key, rowIndex })
+            );
+            const hadNext = Boolean(parsedPage.data.next);
+            // The page was fully served on an earlier load: move on to the next
+            // page within this load, so the continuation makes progress without
+            // spending a load on a page that has nothing left to offer.
+            if (
+              served >= rows.length &&
+              hadNext &&
+              page < INBOX_PAGE_MAX &&
+              reads < INBOX_PAGE_READS_PER_LOAD
+            ) {
+              page += 1;
+              served = 0;
+              continue;
+            }
+            return { key, page, rows, fromRow: Math.min(served, rows.length), hadNext };
+          }
+        })
+      );
+      for (const read of pages) {
+        const merged = [...window, ...read.rows.slice(read.fromRow)].sort(compareInboxCandidates);
+        window = merged.slice(0, BITBUCKET_PAGE_SIZE);
+        pageReads.push(read);
+      }
+    }
+    const ceiling = position?.ceiling ?? inboxCeiling(pageReads);
+    const emitted = new Map<string, number>();
+    for (const candidate of window) {
+      emitted.set(candidate.repoKey, (emitted.get(candidate.repoKey) ?? 0) + 1);
+    }
+    const pages = new Map<string, InboxPageState>();
+    for (const repository of repositories) {
+      const carried = position?.pages.get(repository.fullName.toLowerCase());
+      if (!carried || carried.page === 0) pages.set(repository.fullName.toLowerCase(), DONE);
+    }
+    for (const read of pageReads) {
+      const served = read.fromRow + (emitted.get(read.key) ?? 0);
+      pages.set(
+        read.key,
+        served >= read.rows.length
+          ? read.hadNext && read.page < INBOX_PAGE_MAX
+            ? { page: read.page + 1, served: 0 }
+            : DONE
+          : { page: read.page, served }
+      );
+    }
+    const hasMore = [...pages.values()].some(state => state.page !== 0);
+    const nextWindow = windowIndex + 1;
+    const carriesNextWindow =
+      !hasMore && inboxRepositoryWindow(cachedRepositories, nextWindow).length > 0;
+    let nextCursor: string | null = null;
+    if (hasMore) {
+      // A page whose rows all lack a timestamp leaves no ceiling yet; the
+      // continuation then carries none and the next load reads on unfiltered,
+      // so the rest of the window is still walked instead of ending here.
+      nextCursor = encodeInboxCursor(identity, windowIndex, ceiling, pages, repositories);
+    } else if (carriesNextWindow) {
+      // This window is served in full: the walk moves to the next slice of the
+      // cached repositories, so a workspace larger than one window is still
+      // covered. The next window sets its own ceiling from its first load:
+      // its rows were never read under this window's ceiling, and one newer
+      // than it would otherwise stay outside the collection for the whole walk.
+      // A window that served nothing (every repository gone or empty) still
+      // hands the walk on, so the windows behind it are read.
+      nextCursor = encodeInboxCursor(
+        identity,
+        nextWindow,
+        null,
+        new Map<string, InboxPageState>(),
+        inboxRepositoryWindow(cachedRepositories, nextWindow)
+      );
+    }
+    return {
+      items: window.map(candidate => candidate.item),
+      nextCursor,
+    };
+  } catch (error) {
+    throw classifyInboxError(error);
+  }
+}
+
+/** The row's `updated_on` in milliseconds, including any sub-millisecond digits. */
+function inboxUpdatedMs(item: ProviderPrInboxItem): number {
+  const ms = Date.parse(item.updatedAt);
+  if (Number.isNaN(ms)) return 0;
+  const fraction = /\.(\d+)/.exec(item.updatedAt)?.[1] ?? '';
+  return fraction.length > 3 ? ms + Number(fraction.slice(3)) / 10 ** (fraction.length - 3) : ms;
+}
+
+/**
+ * The newest provider timestamp the pages of a load carry: the continuation's
+ * fixed ceiling. Stored as the provider's own string, so the filter keeps the
+ * full microsecond precision the collection was read at.
+ */
+function inboxCeiling(reads: InboxPageRead[]): string | null {
+  let ceiling: string | null = null;
+  let newest = -Infinity;
+  for (const read of reads) {
+    for (const candidate of read.rows) {
+      if (Number.isNaN(Date.parse(candidate.item.updatedAt))) continue;
+      const ms = inboxUpdatedMs(candidate.item);
+      if (ms > newest) {
+        newest = ms;
+        ceiling = candidate.item.updatedAt;
+      }
+    }
+  }
+  return ceiling;
+}
+
+/**
+ * The inbox rows of one provider page, in provider order. A row the provider
+ * gives without a parseable `updated_on` has no place in the merged newest-first
+ * order and no comparable position for a continuation, so it is left out
+ * instead of sorting as the oldest row.
+ */
+function inboxItemsFrom(
+  values: unknown[],
+  allowedFullNames: ReadonlySet<string>
+): ProviderPrInboxItem[] {
+  const items: ProviderPrInboxItem[] = [];
+  for (const value of values) {
+    const parsed = BitbucketInboxPullRequestSchema.safeParse(value);
+    if (!parsed.success) continue;
+    const ref = inboxRefFrom(parsed.data, allowedFullNames);
+    if (ref?.platform !== 'bitbucket') continue;
+    const updatedAt = parsed.data.updated_on ?? '';
+    if (Number.isNaN(Date.parse(updatedAt))) continue;
+    items.push({
+      ref,
+      title: parsed.data.title,
+      author: mapUser(parsed.data.author ?? null),
+      state: mapPullRequestState(parsed.data.state),
+      draft: parsed.data.draft === true,
+      updatedAt,
+    });
+  }
+  return items;
+}
+
+/**
+ * The merged inbox order: newest first, ties broken by repository and then by
+ * the row's position in that repository's provider page. Page order is kept,
+ * so the rows a continuation served from a page are always its leading rows.
+ */
+function compareInboxCandidates(left: InboxCandidate, right: InboxCandidate): number {
+  const timestampOrder = inboxUpdatedMs(right.item) - inboxUpdatedMs(left.item);
+  if (timestampOrder !== 0) return timestampOrder;
+  if (left.repoKey !== right.repoKey) return left.repoKey < right.repoKey ? -1 : 1;
+  return left.rowIndex - right.rowIndex;
+}
+
+const INBOX_CURSOR_KIND = 'bitbucket-inbox-cursor';
+/** Bits of the packed word that hold the page number; the rest hold the count. */
+const INBOX_PAGE_BITS = 10;
+const INBOX_PAGE_MAX = (1 << INBOX_PAGE_BITS) - 1;
+/**
+ * Provider page reads one repository may spend on a single load: its current
+ * page, plus the next page when the current one is already fully served.
+ */
+const INBOX_PAGE_READS_PER_LOAD = 2;
+const inboxCursorPayloadSchema = z.object({
+  kind: z.literal(INBOX_CURSOR_KIND),
+  identity: z.string().min(1),
+  /** The current window's ceiling; null starts a window whose walk begins now. */
+  ceiling: z.string().min(1).nullable(),
+  window: z.number().int().min(0),
+  pages: z.string().max(800),
+});
+
+/** One provider row with the repository and page position it was read at. */
+type InboxCandidate = {
+  item: ProviderPrInboxItem;
+  repoKey: string;
+  rowIndex: number;
+};
+
+type InboxPageRead = {
+  key: string;
+  page: number;
+  rows: InboxCandidate[];
+  /** How many of this page's leading rows were already served before this load. */
+  fromRow: number;
+  hadNext: boolean;
+};
+
+/**
+ * One repository's position in the continuation: the provider page it is on
+ * and how many of that page's leading rows are served. Page 0 means the
+ * repository has nothing left to serve.
+ */
+type InboxPageState = { page: number; served: number };
+
+/** A repository with nothing left to serve. */
+const DONE: InboxPageState = { page: 0, served: 0 };
+
+type InboxCursorPosition = {
+  ceiling: string | null;
+  window: number;
+  pages: ReadonlyMap<string, InboxPageState>;
+};
+
+/**
+ * The slice of the sorted cached repositories one walk covers: the cursor's
+ * window index times the per-window bound. A workspace with more cached
+ * repositories than one window is walked window by window, so every cached
+ * repository is served within the cursor's wire limit.
+ */
+function inboxRepositoryWindow(
+  repositories: BitbucketWorkspaceRepositoryAccess['repositories'],
+  window: number
+): BitbucketWorkspaceRepositoryAccess['repositories'] {
+  const start = window * MAX_INBOX_REPOSITORIES;
+  return repositories.slice(start, start + MAX_INBOX_REPOSITORIES);
+}
+
+/**
+ * The inbox cursor is a signed continuation token carrying the caller and
+ * repository-set identity, the provider timestamp ceiling the collection was
+ * read at, the repository window the walk is on, and two packed bytes per
+ * repository of that window: its page number and how many leading rows of that
+ * page are served.
+ */
+function encodeInboxCursor(
+  identity: string,
+  window: number,
+  ceiling: string | null,
+  pages: ReadonlyMap<string, InboxPageState>,
+  repositories: BitbucketWorkspaceRepositoryAccess['repositories']
+): string {
+  const pageState = Buffer.alloc(repositories.length * 2);
+  for (const [index, repository] of repositories.entries()) {
+    const state = pages.get(repository.fullName.toLowerCase());
+    const page = Math.min(state?.page ?? 1, INBOX_PAGE_MAX);
+    pageState.writeUInt16BE(((state?.served ?? 0) << INBOX_PAGE_BITS) | page, index * 2);
+  }
+  return createSignedToken({
+    kind: INBOX_CURSOR_KIND,
+    identity,
+    ceiling,
+    window,
+    pages: pageState.toString('base64url'),
+  });
+}
+
+function decodeInboxCursor(
+  cursor: string | undefined,
+  identity: string,
+  cachedRepositories: BitbucketWorkspaceRepositoryAccess['repositories']
+): InboxCursorPosition | null {
+  if (!cursor) return null;
+  const payload = verifySignedToken(cursor, {
+    ttlSeconds: INBOX_CURSOR_TTL_SECONDS,
+    parse: value => {
+      const parsed = inboxCursorPayloadSchema.safeParse(value);
+      if (!parsed.success || parsed.data.identity !== identity) return null;
+      const repositories = inboxRepositoryWindow(cachedRepositories, parsed.data.window);
+      if (repositories.length === 0) return null;
+      const pageState = Buffer.from(parsed.data.pages, 'base64url');
+      if (pageState.length !== repositories.length * 2) return null;
+      const pages = new Map<string, InboxPageState>();
+      for (let index = 0; index < repositories.length; index += 1) {
+        const packed = pageState.readUInt16BE(index * 2);
+        const served = packed >> INBOX_PAGE_BITS;
+        if (served > BITBUCKET_PAGE_SIZE) return null;
+        pages.set(repositories[index].fullName.toLowerCase(), {
+          page: packed & INBOX_PAGE_MAX,
+          served,
+        });
+      }
+      return { ceiling: parsed.data.ceiling, window: parsed.data.window, pages };
+    },
+  });
+  return payload;
+}
+/**
+ * The ref of an inbox row: `workspace/repo-slug` from the destination
+ * repository full name. Every published row names a repository in the
+ * integration's repository set, so a row from any other repository — or with
+ * an unparseable identity — is skipped.
+ */
+function inboxRefFrom(
+  value: z.infer<typeof BitbucketInboxPullRequestSchema>,
+  allowedFullNames: ReadonlySet<string>
+): ProviderPrSummary['ref'] | null {
+  const fullName =
+    value.destination?.repository?.full_name ?? value.source?.repository?.full_name ?? '';
+  const segments = fullName.split('/');
+  if (segments.length !== 2) return null;
+  const [rowWorkspace, rowRepoSlug] = segments;
+  if (!rowWorkspace || !rowRepoSlug) return null;
+  if (!allowedFullNames.has(fullName.toLowerCase())) return null;
+  return {
+    platform: 'bitbucket',
+    workspace: rowWorkspace,
+    repoSlug: rowRepoSlug,
+    prId: value.id,
+  };
+}
+
+/**
+ * The merge gate: the PR's own state (open, draft, unresolved tasks) plus the
+ * repository's merge checks (branch restrictions, where the token can reach
+ * them) → `blockedReasons[]` in provider wording. Reviewer approvals come
+ * from the PR's participants.
+ */
+export async function getMergeRestrictions(
+  owner: BitbucketReviewOwner,
+  workspaceSlug: string,
+  repoSlug: string,
+  prId: number
+): Promise<ProviderPrMergeState> {
+  const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
+  try {
+    const detail = await fetchPullRequestDetail(access, prId);
+
+    const participants: z.infer<typeof BitbucketParticipantSchema>[] = [];
+    for (const value of detail.participants ?? []) {
+      const parsed = BitbucketParticipantSchema.safeParse(value);
+      if (parsed.success) participants.push(parsed.data);
+    }
+
+    // Repository merge checks: a workspace access token without the
+    // administration scope may not read branch restrictions — absent
+    // restrictions mean no visible merge gate, not a missing repository.
+    const restrictions: z.infer<typeof BitbucketBranchRestrictionSchema>[] = [];
+    try {
+      const page = await fetchPage(
+        access,
+        `/2.0/repositories/${repositorySegment(access.repository)}/branch-restrictions`,
+        `bitbucket-restrictions:${access.repository.fullName}`,
+        undefined,
+        repositoryPathGuard(access),
+        { pagelen: 100 }
+      );
+      for (const value of page.values) {
+        const parsed = BitbucketBranchRestrictionSchema.safeParse(value);
+        if (parsed.success) restrictions.push(parsed.data);
+      }
+    } catch (error) {
+      if (
+        !(error instanceof BitbucketReviewError) ||
+        (error.kind !== 'forbidden' && error.kind !== 'not_found')
+      ) {
+        throw error;
+      }
+    }
+
+    const approvalsRequired = readRestrictionNumber(restrictions, 'require_approvals_to_merge');
+    const buildsMustPass = hasRestriction(restrictions, 'require_passing_builds_to_merge');
+    // The provider's own merge verdict: an UNCLEAN (or conflict-worded) merge
+    // state means the branches diverged — independent of the restriction list.
+    // The pull-request detail usually carries no merge state at all, so the
+    // documented file-conflicts endpoint answers whether the branches would
+    // clash on merge.
+    const conflicts =
+      isConflictMergeState(detail.merge_state) || (await fileConflictsExist(access, detail));
+
+    const blockedReasons: ProviderPrMergeBlockedReason[] = [];
+    if (detail.state !== 'OPEN') {
+      blockedReasons.push({
+        code: 'other',
+        message: 'Only open pull requests can be merged.',
+      });
+    }
+    if (detail.draft === true) {
+      blockedReasons.push({ code: 'draft', message: 'The pull request is still a draft.' });
+    }
+    if (conflicts) {
+      blockedReasons.push({
+        code: 'conflicts',
+        message: 'The pull request has conflicts that must be resolved.',
+      });
+    }
+    // Unresolved tasks always gate the merge from the PR's own task_count:
+    // the restriction list is often unreadable or unconfigured, so it must
+    // never decide whether the provider counts tasks.
+    if ((detail.task_count ?? 0) > 0) {
+      blockedReasons.push({
+        code: 'other',
+        message: 'Resolve all tasks before merging.',
+      });
+    }
+    if (approvalsRequired > 0) {
+      const approvedCount = participants.filter(
+        participant => participant.approved === true
+      ).length;
+      const approvalsLeft = Math.max(0, approvalsRequired - approvedCount);
+      if (approvalsLeft > 0) {
+        blockedReasons.push({
+          code: 'required_approvals',
+          message: `${approvalsLeft} more approval${approvalsLeft === 1 ? '' : 's'} required.`,
+        });
+      }
+    }
+    if (buildsMustPass && detail.state === 'OPEN') {
+      const buildState = await latestBuildStateFor(access, detail.source?.commit?.hash ?? '');
+      if (buildState === 'failed') {
+        blockedReasons.push({
+          code: 'failing_pipeline',
+          message: 'The build on the latest commit failed.',
+        });
+      } else if (buildState !== 'success') {
+        blockedReasons.push({
+          code: 'pending_pipeline',
+          message:
+            buildState === 'none'
+              ? 'No build was found for the latest commit.'
+              : 'The builds on the latest commit have not finished yet.',
+        });
+      }
+    }
+
+    return {
+      canMerge: detail.state === 'OPEN' && blockedReasons.length === 0,
+      approvalsRequired,
+      pipelineMustSucceed: buildsMustPass,
+      conflicts,
+      blockedReasons,
+    };
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}
+
+function hasRestriction(
+  restrictions: z.infer<typeof BitbucketBranchRestrictionSchema>[],
+  kind: string
+): boolean {
+  return restrictions.some(restriction => restriction.kind === kind);
+}
+
+/**
+ * Whether the provider reports merge conflicts for the pull request's
+ * `source..destination` commit range. The pull-request detail carries no
+ * merge state of its own — the documented conflict surface is the
+ * file-conflicts endpoint. A range the provider cannot answer (an endpoint
+ * the token cannot read, commits missing from the detail) reports no
+ * conflict: the merge attempt itself stays the final arbiter.
+ */
+async function fileConflictsExist(
+  access: BitbucketRepositoryAccess,
+  detail: BitbucketPullRequestDetail
+): Promise<boolean> {
+  const sourceHash = detail.source?.commit?.hash ?? '';
+  const destinationHash = detail.destination?.commit?.hash ?? '';
+  // Commit hashes are hex; anything else never builds the range spec.
+  if (!/^[0-9a-f]+$/i.test(sourceHash) || !/^[0-9a-f]+$/i.test(destinationHash)) {
+    return false;
+  }
+  try {
+    const page = await fetchPage(
+      access,
+      `/2.0/repositories/${repositorySegment(access.repository)}/file-conflicts/${encodeURIComponent(
+        `${sourceHash}..${destinationHash}`
+      )}`,
+      `bitbucket-conflicts:${access.repository.fullName}`,
+      undefined,
+      repositoryPathGuard(access),
+      { pagelen: 100 }
+    );
+    return page.values.length > 0;
+  } catch (error) {
+    // A workspace access token without the repository scope may not read
+    // file conflicts — absent visibility means no visible conflict gate, not
+    // a missing pull request.
+    if (
+      error instanceof BitbucketReviewError &&
+      (error.kind === 'forbidden' || error.kind === 'not_found')
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Bitbucket's own merge verdict. `UNCLEAN` (any casing, or provider wording
+ * that names a conflict) means the source and destination branches diverged
+ * and Bitbucket cannot merge them cleanly.
+ */
+function isConflictMergeState(mergeState: string | null | undefined): boolean {
+  const normalized = mergeState?.toUpperCase() ?? '';
+  return normalized === 'UNCLEAN' || normalized.includes('CONFLICT');
+}
+
+function readRestrictionNumber(
+  restrictions: z.infer<typeof BitbucketBranchRestrictionSchema>[],
+  kind: string
+): number {
+  const restriction = restrictions.find(candidate => candidate.kind === kind);
+  const value = typeof restriction?.value === 'number' ? restriction.value : 0;
+  return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+async function latestBuildStateFor(
+  access: BitbucketRepositoryAccess,
+  headSha: string
+): Promise<'success' | 'failed' | 'pending' | 'none'> {
+  if (!headSha) return 'none';
+  let sawSuccess = false;
+  let sawPending = false;
+  let cursor: string | undefined = undefined;
+  for (let page = 0; page < MAX_BUILD_PAGES; page++) {
+    const result = await fetchBuildStatusesPage(access, headSha, cursor);
+    for (const status of result.values) {
+      const state = status.state.toUpperCase();
+      // One failed build blocks the merge even when another build succeeded;
+      // a running build keeps the gate pending until every build finished.
+      if (state === 'FAILED') return 'failed';
+      if (state === 'SUCCESSFUL') sawSuccess = true;
+      else sawPending = true;
+    }
+    if (!result.nextCursor) break;
+    cursor = result.nextCursor;
+  }
+  if (sawPending) return 'pending';
+  return sawSuccess ? 'success' : 'none';
+}
+
+export type BitbucketReviewStatusParticipant = {
+  login: string;
+  avatarUrl: string | null;
+  approved: boolean;
+  reviewer: boolean;
+};
+
+export type BitbucketReviewStatus = {
+  participants: BitbucketReviewStatusParticipant[];
+};
+
+/**
+ * The review status of one PR: the provider's participants with their
+ * approval state and REVIEWER role, straight from the PR detail.
+ */
+export async function getReviewStatus(
+  owner: BitbucketReviewOwner,
+  workspaceSlug: string,
+  repoSlug: string,
+  prId: number
+): Promise<BitbucketReviewStatus> {
+  const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
+  try {
+    const detail = await fetchPullRequestDetail(access, prId);
+    const participants: BitbucketReviewStatusParticipant[] = [];
+    for (const value of detail.participants ?? []) {
+      const parsed = BitbucketParticipantSchema.safeParse(value);
+      if (!parsed.success) continue;
+      const user = mapUser(parsed.data.user ?? null);
+      if (!user) continue;
+      participants.push({
+        login: user.login,
+        avatarUrl: user.avatarUrl,
+        approved: parsed.data.approved === true,
+        reviewer: parsed.data.role === 'REVIEWER',
+      });
+    }
+    return { participants };
+  } catch (error) {
+    throw classifyBitbucketError(error);
+  }
+}

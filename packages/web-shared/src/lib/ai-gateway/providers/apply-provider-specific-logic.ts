@@ -1,0 +1,456 @@
+import * as z from 'zod';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
+import {
+  type GatewayResponsesRequest,
+  type OpenRouterChatCompletionRequest,
+  type GatewayRequest,
+  type GatewayMessagesRequest,
+  type OpenRouterProviderConfig,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  applyMistralModelSettings,
+  isMistralModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import {
+  AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
+  isAutoSmallFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import {
+  applyOpenAiModelSettings,
+  isOpenAiModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import {
+  isGatewayUserByokProviderId,
+  OpenRouterInferenceProviderIdSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  applyMoonshotModelSettings,
+  isKimiModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
+import {
+  ReasoningDetailsTransform,
+  type BYOKResult,
+  type Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import {
+  repairChatCompletionsTools,
+  repairMessagesTools,
+  sanitizeBinaryToolResults,
+} from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
+import { fixOpenCodeDuplicateReasoning } from '@kilocode/web-shared/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
+import {
+  addCacheBreakpoints,
+  enableReasoningSummaries,
+  fixResponsesRequest,
+  mapReasoningDetailsToReasoning,
+  mapReasoningDetailsToReasoningContent,
+  replaceReasoningObjectWithReasoningEffort,
+  scrubOpenCodeSpecificProperties,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
+import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import type { CustomPricing } from '@kilocode/db/schema-types';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gateway/providers/add-missing-tool-schema-enum-types';
+import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
+import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
+import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
+import {
+  addReflectionReasoningPlaceholders,
+  isReflectionModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
+
+function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
+  const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
+  const google = isRecord(extraContent.google) ? extraContent.google : {};
+  value.extra_content = {
+    ...extraContent,
+    google: {
+      ...google,
+      thought_signature: signature,
+    },
+  };
+}
+
+function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    if (!isRecord(message)) {
+      continue;
+    }
+
+    delete message.thoughtSignature;
+    delete message.reasoning;
+
+    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+    for (const toolCall of toolCalls) {
+      const legacySignature = toolCall.thoughtSignature;
+      delete toolCall.thoughtSignature;
+      if (typeof legacySignature === 'string') {
+        setGeminiThoughtSignature(toolCall, legacySignature);
+      }
+    }
+
+    const reasoningDetails = message.reasoning_details;
+    delete message.reasoning_details;
+    if (!Array.isArray(reasoningDetails)) {
+      continue;
+    }
+
+    for (const detail of reasoningDetails) {
+      if (
+        !isRecord(detail) ||
+        detail.type !== ReasoningDetailType.Encrypted ||
+        typeof detail.data !== 'string' ||
+        detail.format !== ReasoningFormat.GoogleGeminiV1
+      ) {
+        continue;
+      }
+
+      const toolCall =
+        typeof detail.id === 'string'
+          ? toolCalls.find(candidate => candidate.id === detail.id)
+          : undefined;
+      setGeminiThoughtSignature(toolCall ?? message, detail.data);
+    }
+  }
+}
+
+function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest) {
+  const reasoningEffort = request.reasoning_effort;
+  const extra = request as typeof request & { google?: unknown };
+  delete extra.reasoning_effort;
+
+  if (reasoningEffort !== 'none') {
+    const existingGoogle = isRecord(extra.google) ? extra.google : {};
+    extra.google = {
+      ...existingGoogle,
+      thinking_config: {
+        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
+        include_thoughts: true,
+      },
+      // Without streaming, thoughts and answer share one content string, and
+      // only these tags separate them. Streams flag thought chunks instead, and
+      // asking for tags there would also put the closing tag in the answer.
+      ...(request.stream !== true ? { thought_tag_marker: GEMINI_THOUGHT_TAG_MARKER } : {}),
+    };
+  }
+
+  mapGeminiReasoningDetails(request);
+}
+
+/**
+ * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
+ * non-trial enterprise organizations; everyone else is served by the other
+ * providers of the model.
+ */
+export function getIgnoredProviders(
+  requestedModel: string,
+  isNonTrialEnterprise: boolean
+): string[] {
+  if (isNonTrialEnterprise) {
+    return [];
+  }
+  if (isClaudeModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.anthropic];
+  }
+  if (isOpenAiModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']];
+  }
+  return [];
+}
+
+export function withIgnoredProviders(
+  provider: OpenRouterProviderConfig | undefined,
+  ignoredProviders: string[]
+): OpenRouterProviderConfig | undefined {
+  if (ignoredProviders.length === 0) {
+    return provider;
+  }
+  return { ...provider, ignore: [...new Set([...(provider?.ignore ?? []), ...ignoredProviders])] };
+}
+
+export function applyPreferredProvider(
+  preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  requestedModel: string,
+  requestToMutate:
+    | OpenRouterChatCompletionRequest
+    | GatewayResponsesRequest
+    | GatewayMessagesRequest,
+  isNonTrialEnterprise: boolean
+) {
+  const preferredProviderOrder = resolvePreferredProviderOrder(
+    preferredProviderOrderConfig,
+    requestedModel
+  );
+  const ignoredProviders = getIgnoredProviders(requestedModel, isNonTrialEnterprise);
+  if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
+    return;
+  }
+  const provider = isRecord(requestToMutate.provider) ? requestToMutate.provider : {};
+  if (preferredProviderOrder.length > 0 && !provider.order) {
+    console.debug(
+      `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
+    );
+    provider.order = preferredProviderOrder;
+  }
+  requestToMutate.provider = withIgnoredProviders(provider, ignoredProviders);
+}
+
+/**
+ * Fallback models are not supported: a request for a free model could fall
+ * back to a paid model and be served without being charged. OpenRouter accepts
+ * them as `models` on every API and as `fallbacks` on the Messages API.
+ */
+export function removeModelsFallback(requestedModel: string, requestToMutate: GatewayRequest) {
+  const { models, fallbacks } = requestToMutate.body;
+  delete requestToMutate.body.models;
+  delete requestToMutate.body.fallbacks;
+
+  if (!hasFallbackModels(models) && !hasFallbackModels(fallbacks)) {
+    return;
+  }
+  console.warn('[applyProviderSpecificLogic] Removed caller-provided fallback models', {
+    model: requestedModel,
+    requestKind: requestToMutate.kind,
+    modelsPresent: hasFallbackModels(models),
+    modelsCount: Array.isArray(models) ? models.length : null,
+    fallbacksPresent: hasFallbackModels(fallbacks),
+    fallbacksCount: Array.isArray(fallbacks) ? fallbacks.length : null,
+  });
+}
+
+function hasFallbackModels(value: unknown) {
+  return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
+}
+
+/**
+ * Service tiers the log may name. Every other value, including non-strings and
+ * names inherited from `Object.prototype`, is recorded as `unrecognized` rather
+ * than as the client-supplied value.
+ */
+const loggedServiceTierSchema = z.enum(['auto', 'default', 'flex', 'priority', 'scale']);
+
+function serviceTierForLog(serviceTier: unknown) {
+  const parsed = loggedServiceTierSchema.safeParse(serviceTier);
+  return parsed.success ? parsed.data : 'unrecognized';
+}
+
+export function removeUnsupportedRequestServiceTier(
+  requestedModel: string,
+  requestToMutate: GatewayRequest,
+  customPricing: CustomPricing | undefined
+) {
+  const reason =
+    customPricing && !customPricing.fallbackOnly
+      ? 'non-fallback custom pricing'
+      : isAutoSmallFreeModel(requestedModel)
+        ? 'auto small free model'
+        : null;
+  const serviceTier = requestToMutate.body.service_tier;
+  if (!reason || serviceTier === undefined) {
+    return;
+  }
+
+  console.warn('[applyProviderSpecificLogic] Removed unsupported request-level service tier', {
+    model: requestedModel,
+    requestKind: requestToMutate.kind,
+    serviceTier: serviceTierForLog(serviceTier),
+    reason,
+  });
+  delete requestToMutate.body.service_tier;
+}
+
+/**
+ * Inverse of the reasoning-content and reasoning response transforms: folds
+ * client-supplied `reasoning_details` back into the `reasoning_content` or
+ * `reasoning` string the upstream speaks, so reasoning survives the round trip.
+ * These upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is
+ * also replaced with `reasoning_effort`.
+ */
+export function applyReasoningDetailsTransform(
+  provider: Provider,
+  requestToMutate: GatewayRequest
+) {
+  if (requestToMutate.kind !== 'chat_completions') {
+    return;
+  }
+
+  switch (provider.responseTransforms) {
+    case ReasoningDetailsTransform.GeminiThought:
+      applyGeminiReasoningTransform(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.ReasoningContent:
+      replaceReasoningObjectWithReasoningEffort(requestToMutate);
+      mapReasoningDetailsToReasoningContent(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.Reasoning:
+      replaceReasoningObjectWithReasoningEffort(requestToMutate);
+      mapReasoningDetailsToReasoning(requestToMutate.body);
+      break;
+    case null:
+      break;
+  }
+}
+
+export async function applyProviderSpecificLogic(
+  provider: Provider,
+  requestedModel: string,
+  requestToMutate: GatewayRequest,
+  extraHeaders: Record<string, string>,
+  userByok: BYOKResult[] | null,
+  originalHeaders: FraudDetectionHeaders,
+  userId: string,
+  organizationId: string | null,
+  sessionId: string | null,
+  taskId: string | null,
+  isNonTrialEnterprise: boolean,
+  dataRegion: OrganizationDataRegion | null
+) {
+  // A user's own gateway key bills their account, so Kilo's routing preferences
+  // do not override what the request and their account ask for, and the
+  // gateway's paid server features bill that account rather than Kilo's.
+  const usesUserGatewayKey =
+    userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
+
+  removeModelsFallback(requestedModel, requestToMutate);
+  if (isFreeModel(requestedModel) || (userByok !== null && !usesUserGatewayKey)) {
+    removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
+  }
+  applyTrackingIds(requestToMutate, provider, userId, taskId);
+
+  sanitizeBinaryToolResults(requestToMutate);
+
+  if (isGeminiModel(requestedModel)) {
+    sanitizeJsonRefToolResults(requestToMutate);
+  }
+
+  if (isMuseModel(requestedModel)) {
+    // Meta rejects tools with "Recursive JSON schemas are not currently supported"
+    removeRecursiveToolSchemaRefs(requestToMutate);
+  }
+
+  if (isClaudeModel(requestedModel)) {
+    // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
+    removeTopLevelToolSchemaCombinators(requestToMutate);
+  }
+
+  if (isKimiModel(requestedModel)) {
+    // Moonshot rejects tools with "tools.function.parameters is not a valid moonshot flavored json schema, details: <At path '...': type is not defined>"
+    addMissingToolSchemaEnumTypes(requestToMutate);
+  }
+
+  if (requestToMutate.kind === 'chat_completions') {
+    scrubOpenCodeSpecificProperties(requestToMutate.body);
+
+    repairChatCompletionsTools(requestToMutate.body);
+
+    if (isClaudeModel(requestedModel)) {
+      // Workaround for older clients corrupting Claude reasoning, resulting in:
+      // `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified
+      fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
+    }
+  }
+
+  if (requestToMutate.kind === 'messages') {
+    repairMessagesTools(requestToMutate.body);
+    removeWhitespaceOnlyMessages(requestToMutate.body);
+  }
+
+  if (requestToMutate.kind === 'responses') {
+    fixResponsesRequest(requestToMutate.body);
+  }
+
+  enableReasoningSummaries(requestToMutate);
+
+  removeUnsupportedRequestServiceTier(
+    requestedModel,
+    requestToMutate,
+    getCustomPricing(await getCustomPricingConfig(), requestedModel)
+  );
+  if (isAutoSmallFreeModel(requestedModel)) {
+    requestToMutate.body.model = AUTO_SMALL_FREE_MODEL_UPSTREAM_ID;
+  }
+  if (provider.type === 'openrouter' && requestedModel.startsWith('~')) {
+    // Kilo pins a latest alias to its stored target, so OpenRouter serves that target rather than
+    // the newest model it would pick.
+    requestToMutate.body.model = await resolveOpenRouterModelAlias(requestedModel);
+  }
+
+  if (isClaudeModel(requestedModel)) {
+    applyAnthropicModelSettings(requestToMutate, extraHeaders);
+  }
+
+  if (isOpenAiModel(requestedModel)) {
+    applyOpenAiModelSettings(requestToMutate);
+  }
+
+  // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
+  if (userByok === null && (provider.type === 'openrouter' || provider.type === 'vercel')) {
+    applyPreferredProvider(
+      await getPreferredProviderOrderConfig(),
+      requestedModel,
+      requestToMutate.body,
+      isNonTrialEnterprise
+    );
+  }
+
+  if (isKimiModel(requestedModel)) {
+    applyMoonshotModelSettings(requestToMutate);
+  }
+
+  if (isMistralModel(requestedModel)) {
+    applyMistralModelSettings(requestToMutate);
+  }
+
+  if (isQwenExplicitCacheModel(requestedModel)) {
+    addCacheBreakpoints(requestToMutate);
+  }
+
+  if (isReflectionModel(requestedModel)) {
+    addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
+  }
+
+  if (provider.type === 'vercel') {
+    // A user's own Vercel AI Gateway key is shaped like a managed request: the
+    // user's account pays and the provider routing settings still apply.
+    // The inference region pins only a route Kilo pays for; a user's own key is exempt.
+    await applyVercelSettings(
+      requestedModel,
+      requestToMutate,
+      usesUserGatewayKey ? null : userByok,
+      userByok === null ? dataRegion : null
+    );
+  }
+
+  await provider.transformRequest({
+    provider,
+    model: requestedModel,
+    request: requestToMutate,
+    originalHeaders,
+    extraHeaders,
+    userByok,
+    kilo_user_id: userId,
+    organization_id: organizationId,
+    session_id: sessionId,
+  });
+
+  applyReasoningDetailsTransform(provider, requestToMutate);
+}

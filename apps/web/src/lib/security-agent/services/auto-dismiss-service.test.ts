@@ -1,6 +1,6 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
-import type * as securityFindingsModule from '@/lib/security-agent/db/security-findings';
 import type * as securityConfigModule from '@/lib/security-agent/db/security-config';
+import type { SecurityAgentConfig } from '../core/types';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type * as dependabotApiModule from '@/lib/security-agent/github/dependabot-api';
 import type * as posthogModule from '@/lib/security-agent/posthog-tracking';
@@ -8,7 +8,6 @@ import type {
   writebackDependabotDismissal as writebackDependabotDismissalType,
   maybeAutoDismissAnalysis as maybeAutoDismissAnalysisType,
   autoDismissEligibleFindings as autoDismissEligibleFindingsType,
-  countEligibleForAutoDismiss as countEligibleForAutoDismissType,
 } from './auto-dismiss-service';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { SecurityAuditLogActorType } from '@kilocode/db/schema-types';
@@ -16,12 +15,6 @@ import type { SecurityFindingAnalysis } from '../core/types';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
-  typeof securityFindingsModule.getSecurityFindingById
->;
-const mockUpdateSecurityFindingStatus = jest.fn() as jest.MockedFunction<
-  typeof securityFindingsModule.updateSecurityFindingStatus
->;
 const mockGetSecurityAgentConfig = jest.fn() as jest.MockedFunction<
   typeof securityConfigModule.getSecurityAgentConfig
 >;
@@ -34,14 +27,17 @@ const mockDismissDependabotAlert = jest.fn() as jest.MockedFunction<
 const mockTrackAutoDismiss = jest.fn() as jest.MockedFunction<
   typeof posthogModule.trackSecurityAgentAutoDismiss
 >;
+const mockCaptureMessage = jest.fn();
+const mockCaptureException = jest.fn();
 let mockTransactionFinding: SecurityFinding | null = null;
+const mockTransactionQueue: SecurityFinding[] = [];
 const mockAuditRows: unknown[] = [];
 const mockUpdatedRows: unknown[] = [];
 const mockBulkFindings: Array<{ id: string; analysis: SecurityFindingAnalysis | null }> = [];
 
-jest.mock('@/lib/security-agent/db/security-findings', () => ({
-  getSecurityFindingById: mockGetSecurityFindingById,
-  updateSecurityFindingStatus: mockUpdateSecurityFindingStatus,
+jest.mock('@sentry/nextjs', () => ({
+  captureMessage: mockCaptureMessage,
+  captureException: mockCaptureException,
 }));
 
 jest.mock('@/lib/security-agent/db/security-config', () => ({
@@ -60,22 +56,66 @@ jest.mock('@/lib/security-agent/posthog-tracking', () => ({
   trackSecurityAgentAutoDismiss: mockTrackAutoDismiss,
 }));
 
-jest.mock('@/lib/drizzle', () => ({
+// With no prebuilt pages the bulk-read chain serves mockBulkFindings. When a
+// test primes mockBulkFindingsPages, each where chain shifts one prebuilt page
+// from the queue, so the service walks the batches exactly as it would with a
+// real keyset cursor and stops on the short tail page.
+const mockBulkFindingsPages: Array<
+  Array<{ id: string; analysis: SecurityFindingAnalysis | null }>
+> = [];
+const mockWhereCallCount = { value: 0 };
+// Keyset bound of every bulk read, in read order: lets tests assert each read
+// advances past the previous page's last id.
+const mockKeysetCursors: Array<string | undefined> = [];
+
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
-        where: jest.fn(() => mockBulkFindings),
+        where: jest.fn((condition: unknown) => {
+          mockWhereCallCount.value += 1;
+          // gt(id, cursor) renders as SQL whose chunk tree carries the bound
+          // cursor string; under and() it nests several SQL objects deep.
+          // Visit every own property except decoder/usedTables metadata.
+          const findCursors = (node: unknown, depth = 0): string | undefined => {
+            if (depth > 8) return undefined;
+            if (typeof node === 'string') return /^finding-/.test(node) ? node : undefined;
+            if (Array.isArray(node)) {
+              for (const child of node) {
+                const hit = findCursors(child, depth + 1);
+                if (hit) return hit;
+              }
+              return undefined;
+            }
+            if (node && typeof node === 'object') {
+              for (const [key, value] of Object.entries(node)) {
+                if (key === 'decoder' || key === 'usedTables') continue;
+                const hit = findCursors(value, depth + 1);
+                if (hit) return hit;
+              }
+            }
+            return undefined;
+          };
+          const cursor = findCursors(condition);
+          mockKeysetCursors.push(cursor);
+          return {
+            orderBy: jest.fn(() => ({
+              limit: jest.fn(
+                (n: number) => mockBulkFindingsPages.shift() ?? mockBulkFindings.slice(0, n)
+              ),
+            })),
+          };
+        }),
       })),
     })),
     transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
+      const transactionFinding = mockTransactionQueue.shift() ?? mockTransactionFinding;
       const tx = {
         select: jest.fn(() => ({
           from: jest.fn(() => ({
             where: jest.fn(() => ({
               for: jest.fn(() => ({
-                limit: jest.fn(async () =>
-                  mockTransactionFinding ? [mockTransactionFinding] : []
-                ),
+                limit: jest.fn(async () => (transactionFinding ? [transactionFinding] : [])),
               })),
             })),
           })),
@@ -84,9 +124,8 @@ jest.mock('@/lib/drizzle', () => ({
           set: jest.fn((values: Record<string, unknown>) => ({
             where: jest.fn(() => ({
               returning: jest.fn(async () => {
-                if (!mockTransactionFinding) return [];
-                const updated = { ...mockTransactionFinding, ...values };
-                mockTransactionFinding = updated as SecurityFinding;
+                if (!transactionFinding) return [];
+                const updated = { ...transactionFinding, ...values };
                 mockUpdatedRows.push(updated);
                 return [updated];
               }),
@@ -114,15 +153,10 @@ jest.mock('@/lib/drizzle', () => ({
 let writebackDependabotDismissal: typeof writebackDependabotDismissalType;
 let maybeAutoDismissAnalysis: typeof maybeAutoDismissAnalysisType;
 let autoDismissEligibleFindings: typeof autoDismissEligibleFindingsType;
-let countEligibleForAutoDismiss: typeof countEligibleForAutoDismissType;
 
 beforeAll(async () => {
-  ({
-    writebackDependabotDismissal,
-    maybeAutoDismissAnalysis,
-    autoDismissEligibleFindings,
-    countEligibleForAutoDismiss,
-  } = await import('./auto-dismiss-service'));
+  ({ writebackDependabotDismissal, maybeAutoDismissAnalysis, autoDismissEligibleFindings } =
+    await import('./auto-dismiss-service'));
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -177,25 +211,25 @@ function makeIntegration(installationId: string) {
   } as NonNullable<Awaited<ReturnType<typeof platformIntegrationsModule.getIntegrationForOwner>>>;
 }
 
-const userOwner = { type: 'user' as const, id: 'user-1', userId: 'user-1' };
-
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockTransactionFinding = makeFinding();
+  mockTransactionQueue.length = 0;
   mockAuditRows.length = 0;
   mockUpdatedRows.length = 0;
   mockBulkFindings.length = 0;
+  mockBulkFindingsPages.length = 0;
+  mockWhereCallCount.value = 0;
+  mockKeysetCursors.length = 0;
 });
 
 describe('writebackDependabotDismissal', () => {
   it('dismisses a Dependabot alert on GitHub', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
 
-    await writebackDependabotDismissal('finding-1', userOwner, 'Not exploitable');
+    await writebackDependabotDismissal(makeFinding(), 'inst-123', 'Not exploitable');
 
     expect(mockDismissDependabotAlert).toHaveBeenCalledWith(
       'inst-123',
@@ -208,66 +242,49 @@ describe('writebackDependabotDismissal', () => {
   });
 
   it('skips non-dependabot findings', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding({ source: 'pnpm_audit' }));
-
-    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
-
-    expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
-  });
-
-  it('skips when finding is not found', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(null);
-
-    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
+    await writebackDependabotDismissal(makeFinding({ source: 'pnpm_audit' }), 'inst-123', 'reason');
 
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
   it('skips when source_id is not a valid number', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding({ source_id: 'not-a-number' }));
-
-    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
+    await writebackDependabotDismissal(
+      makeFinding({ source_id: 'not-a-number' }),
+      'inst-123',
+      'reason'
+    );
 
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
   it('skips partially numeric Dependabot alert IDs', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding({ source_id: '42junk' }));
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
-    mockDismissDependabotAlert.mockResolvedValue(undefined);
-
-    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
+    await writebackDependabotDismissal(makeFinding({ source_id: '42junk' }), 'inst-123', 'reason');
 
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
   it('skips when repo_full_name is invalid', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding({ repo_full_name: 'no-slash' }));
-
-    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
+    await writebackDependabotDismissal(
+      makeFinding({ repo_full_name: 'no-slash' }),
+      'inst-123',
+      'reason'
+    );
 
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
   it('skips repo_full_name values with extra path segments', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(
-      makeFinding({ repo_full_name: 'acme/repo/extra' })
+    await writebackDependabotDismissal(
+      makeFinding({ repo_full_name: 'acme/repo/extra' }),
+      'inst-123',
+      'reason'
     );
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
-    mockDismissDependabotAlert.mockResolvedValue(undefined);
-
-    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
 
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
   it('skips when no GitHub installation ID is available', async () => {
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-    mockGetIntegrationForOwner.mockResolvedValue(
-      makeIntegration(undefined as unknown as string) // simulate missing installation ID
-    );
-
-    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
+    await writebackDependabotDismissal(makeFinding(), null, 'reason');
 
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
@@ -307,11 +324,8 @@ describe('maybeAutoDismissAnalysis', () => {
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding());
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: sandboxAnalysis,
@@ -335,11 +349,8 @@ describe('maybeAutoDismissAnalysis', () => {
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding());
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: triageAnalysis,
@@ -433,16 +444,17 @@ describe('maybeAutoDismissAnalysis', () => {
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
-  it('still dismisses locally even if Dependabot writeback fails', async () => {
+  it('preserves dismissal results and exception visibility', async () => {
     mockGetSecurityAgentConfig.mockResolvedValue({
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
-    mockGetSecurityFindingById.mockResolvedValue(makeFinding());
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
-    mockDismissDependabotAlert.mockRejectedValue(new Error('GitHub API error'));
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
+    const rejection = Object.assign(new Error('GitHub API error'), {
+      status: 403,
+      request: { headers: { authorization: 'token installation-secret' } },
+    });
+    mockDismissDependabotAlert.mockRejectedValue(rejection);
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: sandboxAnalysis,
@@ -450,7 +462,6 @@ describe('maybeAutoDismissAnalysis', () => {
       userId: 'user-1',
     });
 
-    // Should still succeed — writeback failure is non-fatal
     expect(result).toEqual({ dismissed: true, source: 'sandbox' });
     expect(mockUpdatedRows).toHaveLength(1);
     expect(mockUpdatedRows[0]).toMatchObject({ status: 'ignored', ignored_reason: 'not_used' });
@@ -461,6 +472,38 @@ describe('maybeAutoDismissAnalysis', () => {
       source_context: 'web',
       schema_version: 1,
     });
+
+    expect(mockCaptureMessage).toHaveBeenCalledWith('Dependabot writeback failed', {
+      level: 'error',
+      tags: { source: 'security-agent:auto-dismiss' },
+      extra: {
+        args: [
+          {
+            findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            status: 403,
+            message: 'GitHub API error',
+          },
+        ],
+      },
+    });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [captured, capturedContext] = mockCaptureException.mock.calls[0] as [
+      Error,
+      { tags: Record<string, string>; extra: Record<string, unknown> },
+    ];
+    expect(captured).toBeInstanceOf(Error);
+    expect(captured).not.toBe(rejection);
+    expect(captured.message).toBe('Dependabot writeback error: 403');
+    expect(capturedContext).toEqual({
+      tags: { operation: 'writebackDependabotDismissal' },
+      extra: {
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        status: 403,
+        message: 'GitHub API error',
+      },
+    });
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('installation-secret');
+    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('installation-secret');
   });
 
   describe('autoDismissEligibleFindings', () => {
@@ -480,7 +523,6 @@ describe('maybeAutoDismissAnalysis', () => {
         auto_dismiss_enabled: true,
         auto_dismiss_confidence_threshold: 'high',
       } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
-      mockGetSecurityFindingById.mockResolvedValue(makeFinding());
       mockGetIntegrationForOwner.mockResolvedValue(makeIntegration(undefined as unknown as string));
 
       await expect(
@@ -548,51 +590,146 @@ describe('maybeAutoDismissAnalysis', () => {
       expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
     });
 
-    it('excludes sandbox-analyzed findings from triage-only eligibility counts', async () => {
-      mockBulkFindings.push(
-        {
-          id: 'triage-only',
-          analysis: {
-            analyzedAt: '2026-06-16T10:00:00.000Z',
-            triage: triageResult,
-          },
+    it('applies the configured confidence threshold', async () => {
+      const triageCandidate = (
+        confidence: NonNullable<SecurityFindingAnalysis['triage']>['confidence']
+      ): SecurityFindingAnalysis => ({
+        triage: {
+          suggestedAction: 'dismiss',
+          confidence,
+          needsSandboxAnalysis: false,
+          needsSandboxReasoning: 'No runtime path',
+          triageAt: '2026-06-16T10:00:00.000Z',
         },
+        analyzedAt: '2026-06-16T10:00:00.000Z',
+      });
+      mockBulkFindings.push(
+        { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', analysis: triageCandidate('high') },
+        { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', analysis: triageCandidate('medium') }
+      );
+      mockGetSecurityAgentConfig.mockResolvedValue({
+        auto_dismiss_enabled: true,
+        auto_dismiss_confidence_threshold: 'high',
+      } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
+
+      await expect(
+        autoDismissEligibleFindings(
+          { userId: 'user-1' },
+          {
+            type: SecurityAuditLogActorType.CustomerUser,
+            id: 'user-1',
+            email: 'owner@example.com',
+            name: 'Owner Example',
+          }
+        )
+      ).resolves.toEqual({ dismissed: 1, skipped: 1, errors: 0 });
+
+      expect(mockUpdatedRows).toHaveLength(1);
+      expect(mockAuditRows).toHaveLength(1);
+    });
+
+    it('completes provider updates for the owner selection', async () => {
+      const eligibleAnalysis: SecurityFindingAnalysis = {
+        triage: {
+          suggestedAction: 'dismiss',
+          confidence: 'high',
+          needsSandboxAnalysis: false,
+          needsSandboxReasoning: 'No runtime path',
+          triageAt: '2026-06-16T10:00:00.000Z',
+        },
+        analyzedAt: '2026-06-16T10:00:00.000Z',
+      };
+      mockBulkFindings.push(
+        { id: '11111111-1111-4111-8111-111111111111', analysis: eligibleAnalysis },
+        { id: '22222222-2222-4222-8222-222222222222', analysis: eligibleAnalysis },
+        { id: '33333333-3333-4333-8333-333333333333', analysis: eligibleAnalysis }
+      );
+      mockTransactionQueue.push(
+        makeFinding({ id: '11111111-1111-4111-8111-111111111111', source_id: '42' }),
+        makeFinding({ id: '22222222-2222-4222-8222-222222222222', source_id: '43' }),
+        makeFinding({ id: '33333333-3333-4333-8333-333333333333', source_id: '44' })
+      );
+      mockGetSecurityAgentConfig.mockResolvedValue({
+        auto_dismiss_enabled: true,
+        auto_dismiss_confidence_threshold: 'high',
+      } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
+      mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+      mockDismissDependabotAlert.mockResolvedValue(undefined);
+
+      const result = await autoDismissEligibleFindings(
+        { userId: 'user-1' },
         {
-          id: 'sandbox-completed',
-          analysis: {
-            analyzedAt: '2026-06-16T10:00:00.000Z',
-            triage: triageResult,
-            sandboxAnalysis: {
-              ...sandboxResult,
-              isExploitable: true,
-              suggestedAction: 'open_pr',
-            },
-          },
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: 'user-1',
+          email: 'owner@example.com',
+          name: 'Owner Example',
         }
       );
 
-      await expect(countEligibleForAutoDismiss({ userId: 'user-1' }, 'user-1')).resolves.toEqual({
-        eligible: 1,
-        byConfidence: { high: 1, medium: 0, low: 0 },
-      });
+      expect(result).toEqual({ dismissed: 3, skipped: 0, errors: 0 });
+
+      expect(mockGetIntegrationForOwner).toHaveBeenCalledTimes(1);
+      expect(mockDismissDependabotAlert).toHaveBeenCalledTimes(3);
+      expect(
+        mockDismissDependabotAlert.mock.calls.map(call => call[3]).sort((a, b) => a - b)
+      ).toEqual([42, 43, 44]);
+      expect(mockDismissDependabotAlert.mock.calls.every(call => call[0] === 'inst-123')).toBe(
+        true
+      );
     });
 
-    it('excludes malformed triage confidence from eligibility counts', async () => {
-      mockBulkFindings.push({
-        id: 'malformed-confidence',
-        analysis: {
-          analyzedAt: '2026-06-16T10:00:00.000Z',
-          triage: {
-            ...triageResult,
-            confidence: 'certain',
-          },
-        } as unknown as SecurityFindingAnalysis,
-      });
+    it('dismisses every finding across multiple read pages', async () => {
+      // Mirrors the service's AUTO_DISMISS_BATCH_SIZE: queue two full pages and
+      // a short tail so the service must loop until the short page appears and
+      // aggregate totals across all three pages.
+      const batchSize = 100;
+      const eligibleAnalysis: SecurityFindingAnalysis = {
+        triage: {
+          suggestedAction: 'dismiss',
+          confidence: 'high',
+          needsSandboxAnalysis: false,
+          needsSandboxReasoning: 'No runtime path',
+          triageAt: '2026-06-16T10:00:00.000Z',
+        },
+        analyzedAt: '2026-06-16T10:00:00.000Z',
+      };
+      const makeRows = (start: number, count: number) =>
+        Array.from({ length: count }, (_, offset) => ({
+          id: `finding-${String(start + offset).padStart(4, '0')}`,
+          analysis: eligibleAnalysis,
+        }));
+      const page1 = makeRows(0, batchSize);
+      const page2 = makeRows(batchSize, batchSize);
+      const tailPage = makeRows(batchSize * 2, 3);
+      const total = page1.length + page2.length + tailPage.length;
+      mockBulkFindingsPages.push(page1, page2, tailPage);
+      mockGetSecurityAgentConfig.mockResolvedValue({
+        auto_dismiss_enabled: true,
+        auto_dismiss_confidence_threshold: 'high',
+      } as SecurityAgentConfig);
+      mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+      mockDismissDependabotAlert.mockResolvedValue(undefined);
 
-      await expect(countEligibleForAutoDismiss({ userId: 'user-1' }, 'user-1')).resolves.toEqual({
-        eligible: 0,
-        byConfidence: { high: 0, medium: 0, low: 0 },
-      });
+      const result = await autoDismissEligibleFindings(
+        { userId: 'user-1' },
+        {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: 'user-1',
+          email: 'owner@example.com',
+          name: 'Owner Example',
+        }
+      );
+
+      expect(result).toEqual({ dismissed: total, skipped: 0, errors: 0 });
+      expect(mockUpdatedRows).toHaveLength(total);
+      // Two full pages keep the cursor advancing; the three-row tail page stops
+      // the loop, so the bulk read runs exactly three times.
+      expect(mockWhereCallCount.value).toBe(3);
+      // The second read must carry the first page's last id as the keyset
+      // bound, and the third the second page's: dropping the cursor would
+      // re-read still-open candidates forever.
+      expect(mockKeysetCursors).toEqual([undefined, 'finding-0099', 'finding-0199']);
+      expect(mockDismissDependabotAlert).toHaveBeenCalledTimes(total);
     });
   });
 });

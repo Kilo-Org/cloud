@@ -1,0 +1,301 @@
+import { act } from '@/test/renderer';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  buildProps,
+  errorState,
+  findByTestID,
+  host,
+  makeAssistantMessage,
+  reactNativeMock,
+  readyState,
+  renderSheet,
+  retryButton,
+  safeAreaMock,
+  sheet,
+  textValues,
+  updateSheet,
+} from './child-session-sheet-test-helpers';
+import { QueryError } from '@/components/query-error';
+import { i18n } from '@/i18n';
+import { ChildSessionModelLabel } from './child-session-model-label';
+
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
+
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
+  performCopy: vi.fn(),
+}));
+
+describe('ChildSessionSheet title layout', () => {
+  it.each([
+    {
+      state: 'loading',
+      hydrationState: { status: 'loading' } as const,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.childSessionSheet.loading'),
+      retryCount: 0,
+    },
+    {
+      state: 'ready',
+      hydrationState: readyState,
+      messages: [makeAssistantMessage()],
+      sessionError: null,
+      expectedText: 'child text',
+      retryCount: 0,
+    },
+    {
+      state: 'empty',
+      hydrationState: readyState,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.childSessionSheet.noMessages'),
+      retryCount: 0,
+    },
+    {
+      state: 'retryable error',
+      hydrationState: errorState,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.session.connectionTrouble'),
+      retryCount: 1,
+    },
+    {
+      state: 'terminal error',
+      hydrationState: readyState,
+      messages: [],
+      sessionError: 'Runtime failure',
+      expectedText: i18n.t('agentChat.messageFailure.assistantFailed'),
+      retryCount: 0,
+    },
+  ])('keeps the selected title wrapped during $state', async state => {
+    const props = {
+      ...buildProps({
+        getChildMessages: () => state.messages,
+        hydrationState: state.hydrationState,
+      }),
+      title: 'Inspect performance child 01',
+      sessionError: state.sessionError,
+    };
+    const renderer = await renderSheet(props);
+    const header = host(renderer.root, 'SheetHeader');
+
+    expect(header.props).toMatchObject({ title: 'Inspect performance child 01' });
+    expect(header.props.onDone).toBe(props.onClose);
+    expect(textValues(renderer.root)).toContain(state.expectedText);
+    expect(renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))).toHaveLength(
+      state.messages.length === 0 ? 1 : 0
+    );
+    expect(
+      renderer.root.findAll(
+        node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === 'Retry'
+      )
+    ).toHaveLength(state.retryCount);
+  });
+});
+
+describe('ChildSessionSheet mounted', () => {
+  it.each([true, false])(
+    'passes the child live state %s to its message parts',
+    async isStreaming => {
+      const renderPart = vi.fn(() => null);
+      const renderer = await renderSheet({
+        ...buildProps({
+          getChildMessages: () => [makeAssistantMessage()],
+          hydrationState: readyState,
+        }),
+        isStreaming,
+        renderPart,
+      });
+      expect(renderPart).toHaveBeenCalledWith(expect.objectContaining({ isStreaming }));
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
+  it('keeps the wrapped title, live rows, and Retry through hydration recovery', async () => {
+    const messages = [makeAssistantMessage()];
+    const props = buildProps({
+      getChildMessages: () => messages,
+      hydrationState: { status: 'loading' },
+    });
+    const renderer = await renderSheet(props);
+    const list = host(renderer.root, 'FlashList');
+    const header = host(renderer.root, 'SheetHeader');
+
+    await updateSheet(renderer, { ...props, hydrationState: errorState });
+
+    expect(textValues(renderer.root)).toContain('child text');
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(renderer.root.findAllByType(QueryError)[0]?.props.placement).toBe('top');
+    expect(renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))).toHaveLength(0);
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.session.connectionTrouble'));
+    expect(retryButton(renderer.root).props.accessibilityState).toEqual({
+      disabled: false,
+      busy: false,
+    });
+    expect(host(renderer.root, 'FlashList')).toBe(list);
+
+    await updateSheet(renderer, props);
+
+    expect(host(renderer.root, 'SheetHeader')).toBe(header);
+    expect(header.props).toMatchObject({ title: props.title });
+    expect(textValues(renderer.root)).toEqual(
+      expect.arrayContaining(['child text', i18n.t('agentChat.session.connectionTrouble')])
+    );
+    expect(retryButton(renderer.root).props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+    });
+    expect(host(renderer.root, 'FlashList')).toBe(list);
+
+    await updateSheet(renderer, { ...props, hydrationState: readyState });
+
+    expect(host(renderer.root, 'SheetHeader')).toBe(header);
+    expect(header.props).toMatchObject({ title: props.title });
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(host(renderer.root, 'FlashList')).toBe(list);
+  });
+  it('renders the model row when child messages carry model data', async () => {
+    const messages = [makeAssistantMessage()];
+    const renderer = await renderSheet(
+      buildProps({
+        getChildMessages: () => messages,
+        hydrationState: readyState,
+      })
+    );
+
+    const labels = renderer.root.findAllByType(ChildSessionModelLabel);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({ modelLabel: 'Test Model' });
+
+    const a11yNodes = renderer.root.findAll(
+      node => node.props.accessibilityLabel === 'Model: Test Model'
+    );
+    expect(a11yNodes).toHaveLength(1);
+  });
+
+  it('renders no model row for an empty transcript', async () => {
+    const renderer = await renderSheet(
+      buildProps({
+        getChildMessages: () => [],
+        hydrationState: readyState,
+      })
+    );
+
+    expect(renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
+  });
+
+  it('renders the QueryError and no model row when hydration fails', async () => {
+    const renderer = await renderSheet(
+      buildProps({
+        getChildMessages: () => [],
+        hydrationState: errorState,
+      })
+    );
+
+    expect(renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
+    const errors = renderer.root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+  });
+});
+
+describe('ChildSessionSheet sheet surface', () => {
+  it('renders the native full-window sheet on iOS and preserves onDismiss', async () => {
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      onClose,
+      onDismiss,
+    });
+
+    const sheetNode = sheet(renderer.root);
+    // One detent, the whole window, and no drag indicator: the caller's
+    // SheetHeader owns the top of the surface.
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    expect(sheetNode.props.handleComponent).toBeNull();
+    expect(sheetNode.props.index).toBe(0);
+    act(() => {
+      (sheetNode.props.onClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
+
+    // The native dismiss event flows through to the caller.
+    await act(async () => {
+      await Promise.resolve();
+      (sheet(renderer.root).props.onDismiss as () => void)();
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34, left: 0, right: 0 });
+
+    const renderer = await renderSheet(
+      buildProps({ getChildMessages: () => [], hydrationState: readyState })
+    );
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    expect(sheetNode.props.index).toBe(0);
+
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // flex-1 fills the window; the padding clears the system status bar.
+    expect(surface[0]?.props.className).toContain('flex-1');
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
+  });
+
+  it('closes when the native sheet dismisses', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const onClose = vi.fn<() => void>();
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      onClose,
+    });
+
+    // Android Back, a swipe down and a backdrop tap all route through the
+    // native sheet's one close path.
+    await act(async () => {
+      await Promise.resolve();
+      (sheet(renderer.root).props.onClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the loading child once when Done is pressed', async () => {
+    const props = {
+      ...buildProps({ getChildMessages: () => [], hydrationState: { status: 'loading' } }),
+    };
+    let closeCount = 0;
+    props.onClose = () => {
+      closeCount += 1;
+      props.visible = false;
+    };
+    const renderer = await renderSheet(props);
+
+    await act(async () => {
+      (host(renderer.root, 'SheetHeader').props.onDone as () => void)();
+      await Promise.resolve();
+    });
+    await updateSheet(renderer, props);
+
+    expect(sheet(renderer.root).props.index).toBe(-1);
+    expect(closeCount).toBe(1);
+  });
+});

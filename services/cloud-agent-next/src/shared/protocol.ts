@@ -1,4 +1,4 @@
-import type { SlashCommandInfo } from './slash-commands.js';
+import type { SlashCommandCatalogStatus, SlashCommandInfo } from './slash-commands.js';
 
 /**
  * Event types that flow through the streaming system.
@@ -35,12 +35,16 @@ export type StreamEventType =
   | 'preparing' // Lazy workspace preparation step progress
   // DO -> /stream clients (cloud infrastructure lifecycle)
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
+  | 'cloud.sandbox.status'
+  | 'cloud.worktree.changes.ready'
+  | 'cloud.workspace.artifacts.changed'
   // DO -> /stream clients (session message queue)
   | 'cloud.message.queued' // User message accepted into the pending queue
   | 'cloud.message.sent' // Queued user message delivered to Kilo
   | 'cloud.message.completed' // Accepted user message completed execution
   | 'cloud.message.failed' // User message delivery failed or was canceled before completion
   | 'connected' // Sent on WebSocket connect with current service state
+  | 'bootstrap.complete'
   // Wrapper -> DO -> /stream clients (slash command catalog)
   | 'commands.available'; // Catalog of kilo slash commands available in this session
 
@@ -89,6 +93,8 @@ export type KilocodeEventData = {
 export type AutocommitStartedData = {
   message: string;
   messageId?: string;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -101,6 +107,12 @@ export type AutocommitCompletedData = {
   skipped?: boolean;
   commitHash?: string;
   commitMessage?: string;
+  userMessageId?: string;
+  committedAt?: string;
+  pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
+  commitMessageTruncated?: true;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -129,12 +141,17 @@ export type PreparingStep =
   | 'branch'
   | 'devcontainer_setup'
   | 'setup_commands'
+  | 'session_setup_commands'
+  | 'start_commands'
   | 'workspace_restore'
   | 'workspace_backup'
   | 'sandbox_provision'
+  | 'environment_snapshot'
   | 'sandbox_boot'
+  | 'snapshot_fallback'
   | 'kilo_server'
   | 'kilo_session'
+  | 'restore_incomplete'
   | 'ready'
   | 'failed';
 
@@ -149,13 +166,17 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number;
   completedAt?: number;
   revision: number;
   latestDetail?: string;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number;
   safeError?: string;
   command?: string;
   commandIndex?: number;
   commandCount?: number;
+  parentStepId?: string;
   outputTail?: string;
   outputTruncated?: boolean;
   exitCode?: number;
@@ -193,8 +214,9 @@ export type PreparingEventDataV2 = PreparingEventDataV2Base &
         command?: string;
         commandIndex?: number;
         commandCount?: number;
+        parentStepId?: string;
       }
-    | { action: 'step_progress'; stepId: string; detail: string }
+    | { action: 'step_progress'; stepId: string; detail: string; snapshotCapturedAt?: number }
     | { action: 'step_output'; stepId: string; output: string }
     | { action: 'step_completed'; stepId: string; exitCode?: number }
     | { action: 'step_failed'; stepId: string; safeError: string; exitCode?: number }
@@ -237,8 +259,12 @@ export type SessionStatus =
 
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
+  bootstrapPending?: boolean;
+  ancillaryOmittedItemCount?: number;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
+  activeMessageId?: string | null;
+  pendingInteractions?: { questions: unknown[]; permissions: unknown[] };
 };
 
 /**
@@ -248,11 +274,17 @@ export type ConnectedEventData = {
  */
 export type CommandsAvailableData = {
   commands: SlashCommandInfo[];
+  /**
+   * Present when the wrapper bounded the catalog to the shared limits. The
+   * client renders a notice for it, so a catalog that is missing rows is never
+   * silent. Absent means the commands are the whole catalog.
+   */
+  catalogStatus?: SlashCommandCatalogStatus;
 };
 
 /**
- * Regex for validating session IDs (agent_<uuid>).
+ * Regex for validating session IDs (`workspace_<uuid>`).
  * Shared between worker (zod schema) and wrapper (defense-in-depth validation).
  */
 export const SESSION_ID_RE =
-  /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  /^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

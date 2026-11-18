@@ -8,19 +8,31 @@ const colors = {
   foreground: '#14130F',
   primary: '#4F5A10',
   primaryForeground: '#FFFFFF',
+  primaryDisabled: '#6F6A61',
+  primaryDisabledAction: '#6F6A61',
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
+  secondaryFill: '#F0EEE6',
   muted: '#F0EEE6',
   mutedForeground: '#7A756B',
   destructive: '#C25647',
   destructiveForeground: '#FFFFFF',
+  destructiveSolid: '#C25647',
+  destructiveSolidForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
   card: '#FFFFFF',
+  selection: '#4F5A10',
+  selectionForeground: '#FFFFFF',
   ink2: '#3C382F',
   mutedSoft: '#A9A39A',
   hairSoft: 'rgba(20, 15, 10, 0.05)',
-  accentSoft: '#E8F27A',
+  controlIdle: '#F0EEE6',
+  skeletonFill: '#F0EEE6',
+  ringTrack: 'rgba(20, 15, 10, 0.05)',
+  accentSoft: '#FFDD00',
   accentSoftForeground: '#1A1A10',
+  accentSoftTint: '#4F5A1029',
+  accentSoftTintForeground: '#4F5A10',
   good: '#2F9A5F',
   warn: '#B27214',
   warnForeground: '#FFFFFF',
@@ -31,6 +43,13 @@ const colors = {
   agentKilocode: '#B27214',
   agentCoral: '#C25647',
   agentSky: '#2C7FB0',
+  rowHoney: '#7C6C1D',
+  rowGold: '#7A7C1D',
+  rowLime: '#697C1D',
+  rowSage: '#587C1D',
+  rowMoss: '#467C1D',
+  rowFern: '#357C1D',
+  rowPine: '#237C1D',
 } satisfies ThemeColors;
 
 describe('markdown palette', () => {
@@ -38,11 +57,5 @@ describe('markdown palette', () => {
     const palette = getPalette('user', colors);
 
     expect(palette.textColor).toBe(colors.accentSoftForeground);
-  });
-
-  it('uses primary-foreground for kilo-chat user bubbles (bg-primary)', () => {
-    const palette = getPalette('kilo-chat-user', colors);
-
-    expect(palette.textColor).toBe(colors.primaryForeground);
   });
 });

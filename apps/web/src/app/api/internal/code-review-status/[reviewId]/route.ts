@@ -22,21 +22,22 @@ import * as z from 'zod';
 import {
   updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
-  updateCodeReviewUsage,
+  backfillCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing,
+  recordCodeReviewAttemptPublicationStatus,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   addReactionToPR,
   createPRComment,
-  hasPRCommentWithMarker,
   findKiloReviewComment,
   updateKiloReviewComment,
   updateCheckRun,
@@ -45,29 +46,37 @@ import type { CheckRunConclusion } from '@/lib/integrations/platforms/github/ada
 import {
   addReactionToMR,
   createMRNote,
-  hasMRNoteWithMarker,
   findKiloReviewNote,
   updateKiloReviewNote,
   setCommitStatus,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  resolveReviewProviderIntegration,
+  reviewOwnerScope,
+} from '@/lib/code-reviews/provider-integration';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
+import {
+  classifyCodeReviewPublication,
+  type CodeReviewPublicationObservation,
+} from '@/lib/code-reviews/summary/publication-status';
+import { recordCodeReviewPublicationOutcome } from '@/lib/code-reviews/summary/record-publication-outcome';
 import {
   getGitLabInstanceUrl,
   resolveGitLabAccessToken,
 } from '@/lib/code-reviews/platform/gitlab-access';
 import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
+import { postCodeReviewBillingNotice } from '@/lib/code-reviews/billing';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
 } from '@/lib/code-reviews/summary/usage-footer';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type {
   CloudAgentCodeReview,
   CloudAgentCodeReviewAttempt,
@@ -89,6 +98,10 @@ import {
   CloudAgentCallbackFailureSchema,
   type CloudAgentSafeFailure,
 } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  parseModelNotFoundRuntimeDiagnostics,
+  type ModelNotFoundRuntimeDiagnostics,
+} from '@kilocode/worker-utils/runtime-model-diagnostics';
 import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
@@ -157,89 +170,8 @@ type TerminalOwnerResolution = {
   canDispatch: boolean;
 };
 
-type ModelNotFoundRuntimeDiagnostics = {
-  requestedModel: string;
-  availableModelCount: number;
-  availableModels: string[];
-  suggestedModels: string[];
-  suggestionSource: ModelNotFoundSuggestionSource;
-};
-
-type ModelNotFoundSuggestionSource = 'fuzzy' | 'first-five' | 'none';
-
-const MODEL_DIAGNOSTIC_MAX_MODEL_ID_LENGTH = 512;
-const MODEL_DIAGNOSTIC_MAX_SUGGESTIONS = 5;
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function parseCodeReviewPlatform(platform: string): CodeReviewPlatform {
   return CodeReviewPlatformSchema.parse(platform);
-}
-
-function isValidDiagnosticModelId(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= MODEL_DIAGNOSTIC_MAX_MODEL_ID_LENGTH
-  );
-}
-
-function hasUniqueEntries(values: string[]): boolean {
-  return new Set(values).size === values.length;
-}
-
-function isModelDiagnosticSuggestionSource(value: unknown): value is ModelNotFoundSuggestionSource {
-  return value === 'fuzzy' || value === 'first-five' || value === 'none';
-}
-
-function parseModelNotFoundRuntimeDiagnostics(
-  value: unknown
-): ModelNotFoundRuntimeDiagnostics | undefined {
-  if (!isRecord(value)) return undefined;
-  const requestedModel = value.requestedModel;
-  const availableModelCount = value.availableModelCount;
-  const availableModels = value.availableModels;
-  const suggestedModels = value.suggestedModels;
-  const suggestionSource = value.suggestionSource;
-
-  if (!isValidDiagnosticModelId(requestedModel)) return undefined;
-  if (
-    typeof availableModelCount !== 'number' ||
-    !Number.isInteger(availableModelCount) ||
-    availableModelCount < 0
-  ) {
-    return undefined;
-  }
-  if (!Array.isArray(availableModels) || !availableModels.every(isValidDiagnosticModelId)) {
-    return undefined;
-  }
-  if (availableModels.length !== availableModelCount || !hasUniqueEntries(availableModels)) {
-    return undefined;
-  }
-  if (
-    !Array.isArray(suggestedModels) ||
-    suggestedModels.length > MODEL_DIAGNOSTIC_MAX_SUGGESTIONS ||
-    !suggestedModels.every(isValidDiagnosticModelId) ||
-    !hasUniqueEntries(suggestedModels)
-  ) {
-    return undefined;
-  }
-  if (!isModelDiagnosticSuggestionSource(suggestionSource)) {
-    return undefined;
-  }
-  if (suggestionSource === 'none' && suggestedModels.length > 0) return undefined;
-  if (availableModelCount === 0 && (availableModels.length > 0 || suggestedModels.length > 0)) {
-    return undefined;
-  }
-
-  return {
-    requestedModel,
-    availableModelCount,
-    availableModels,
-    suggestedModels,
-    suggestionSource,
-  };
 }
 
 function getModelNotFoundRuntimeDiagnostics(
@@ -248,7 +180,8 @@ function getModelNotFoundRuntimeDiagnostics(
 ): ModelNotFoundRuntimeDiagnostics | undefined {
   if (terminalReason !== 'model_not_found') return undefined;
   if (!('modelNotFoundRuntimeDiagnostics' in payload)) return undefined;
-  return parseModelNotFoundRuntimeDiagnostics(payload.modelNotFoundRuntimeDiagnostics);
+  const parsed = parseModelNotFoundRuntimeDiagnostics(payload.modelNotFoundRuntimeDiagnostics);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function getLoggableStatusErrorMessage(
@@ -476,9 +409,23 @@ function getActionRequiredTerminalReason(
 const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
 const MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY = 200_000;
 
+// Pre-dispatch codes that only mean the session never reached the agent: the
+// sandbox never connected, the workspace never finished, the runtime or the
+// Kilo server never came up, or preparation timed out. None of them can have
+// spent model usage, so an unmeasurable usage read must not forfeit the single
+// infra retry. Codes that describe a request the platform rejected, missing
+// metadata, or a missing model stay out: a retry would repeat the same answer.
+const SESSIONLESS_PRE_DISPATCH_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'sandbox_connect_failed',
+  'workspace_setup_failed',
+  'kilo_server_failed',
+  'wrapper_start_failed',
+]);
+
 function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
   return (
     terminalReason === 'billing' ||
+    terminalReason === 'account_blocked' ||
     terminalReason === 'model_not_found' ||
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
@@ -491,6 +438,7 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     // sees it. That check has therefore never fired; the structured reason makes
     // the existing intent actually work.
     terminalReason === 'assistant_rate_limited_byok' ||
+    terminalReason === 'assistant_invalid_request_byok' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }
@@ -539,10 +487,6 @@ function isInfraRetryAttempt(attempt: CloudAgentCodeReviewAttempt): boolean {
   return attempt.retry_reason === 'infra_failure' || attempt.retry_of_attempt_id !== null;
 }
 
-function isPreDispatchSandboxConnectFailure(failure?: CloudAgentSafeFailure): boolean {
-  return failure?.stage === 'pre_dispatch' && failure.code === 'sandbox_connect_failed';
-}
-
 type FailedSessionUsage = NonNullable<Awaited<ReturnType<typeof getSessionUsageFromBilling>>>;
 
 function failedSessionTokenCount(usage: FailedSessionUsage): number {
@@ -574,7 +518,14 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
 
   const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
   if (!usage) {
-    const allowUnavailableUsage = isPreDispatchSandboxConnectFailure(params.failure);
+    // A pre-dispatch failure means the agent never ran, so an unmeasurable
+    // attempt cannot have spent model usage and the spend guard must not block
+    // the single infra retry.
+    const failureCode = params.failure?.code;
+    const allowUnavailableUsage =
+      params.failure?.stage === 'pre_dispatch' &&
+      !!failureCode &&
+      SESSIONLESS_PRE_DISPATCH_FAILURE_CODES.has(failureCode);
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,
@@ -675,7 +626,6 @@ async function resolveTerminalOwner(
 }
 
 const GITHUB_COMMENT_MAX_CHARACTERS = 65_536;
-const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
 const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
 const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
@@ -687,11 +637,6 @@ const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
 The review did not run because the selected model is no longer available.
 
 Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
-
-const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
-**Kilo Code Review could not run — your account is out of credits.**
-
-[Add credits](https://app.kilo.ai/) or [switch to a free model](https://app.kilo.ai/code-reviews) to enable reviews on this change.`;
 
 /**
  * Read a review's usage data.
@@ -722,7 +667,7 @@ async function getReviewUsageData(reviewId: string) {
     return persistedUsage;
   }
 
-  updateCodeReviewUsage(reviewId, {
+  backfillCodeReviewUsage(reviewId, {
     ...(review.model == null ? { model: billing.model } : {}),
     totalTokensIn: billing.totalTokensIn,
     totalTokensOut: billing.totalTokensOut,
@@ -754,6 +699,10 @@ function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
  * When `gateResult` is `'fail'` and the review completed successfully (no system error),
  * the conclusion is set to `'failure'` — the agent determined that the review found
  * blocking issues (based on the `gate_threshold` setting in the agent config).
+ *
+ * `errorMessage` is read only to classify the failure. Every string this returns is
+ * authored here or in the copy modules: the check run is published to the pull request,
+ * which may be public, so the callback's own text never becomes part of it.
  */
 function mapStatusToCheckRun(
   reviewStatus: string,
@@ -818,12 +767,14 @@ function mapStatusToCheckRun(
     completed: reviewFailed
       ? 'Code review completed with findings that require attention.'
       : 'Code review completed successfully.',
+    // Authored copy only: the check run renders on the pull request, which may be
+    // public. The raw callback text stays on the review and attempt rows and in the
+    // logs, where only the owning account and Kilo can read it.
     failed: actionRequiredCopy
       ? actionRequiredCopy.checkSummary
       : billingFailure
         ? 'Review could not start because the account has insufficient credits.'
-        : (terminalReasonCopy?.checkSummary ??
-          (errorMessage ? `Review failed: ${errorMessage}` : 'Review failed.')),
+        : (terminalReasonCopy?.checkSummary ?? 'Review failed.'),
     cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
@@ -887,10 +838,8 @@ function getGitLabStatusDescription(
     const terminalReasonCopy = getCodeReviewTerminalReasonCopy(terminalReason);
     if (terminalReasonCopy) return terminalReasonCopy.checkSummary;
   }
-  if (reviewStatus === 'failed' && errorMessage) {
-    const desc = `Review failed: ${errorMessage}`;
-    return desc.length > 255 ? desc.slice(0, 252) + '...' : desc;
-  }
+  // Fixed sentence, never the callback text: a commit status renders on the merge
+  // request, which may be public. See the failure row in the Kilo app for detail.
   if (reviewStatus === 'failed') return 'Kilo Code Review failed';
   return undefined;
 }
@@ -1138,9 +1087,30 @@ export async function POST(
     const isManualReview = manualConfig !== null;
     const shouldPublishToProvider = shouldPublishCodeReviewToProvider(review);
 
+    // Every provider side effect below runs with the review owner's own integration. A review
+    // row whose integration belongs to another owner resolves to null, so the completion still
+    // records while no foreign credential is used.
+    const reviewOwner = reviewOwnerScope(review);
+    let ownerScopedIntegrationResolved = false;
+    let ownerScopedIntegration: PlatformIntegration | null = null;
+    const getOwnerScopedIntegration = async (): Promise<PlatformIntegration | null> => {
+      if (!shouldPublishToProvider || !reviewOwner) return null;
+      if (!ownerScopedIntegrationResolved) {
+        ownerScopedIntegrationResolved = true;
+        ownerScopedIntegration = await resolveReviewProviderIntegration(review, reviewOwner);
+      }
+      return ownerScopedIntegration;
+    };
+
     const callbackCompletedAt = new Date();
     let attempt: CloudAgentCodeReviewAttempt;
     let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
+    // Publication eligibility uses the row state before updateCodeReviewAttemptForCallback
+    // writes session_id through the callback update.
+    const preUpdateAttemptId = latestAttempt?.id ?? null;
+    const preUpdateAttemptSessionId = latestAttempt?.session_id ?? null;
+    const preUpdateReviewSessionId = review.session_id;
+    let publicationWriteFailed = false;
     let analyticsCompletionApplied = false;
     // Code-owned council outcome for a completed council run. Set on whichever completion path
     // runs below, then used to drive the merge gate (the council LLM never sets `gateResult`).
@@ -1187,6 +1157,43 @@ export async function POST(
       });
 
       if (completionResult.outcome !== 'applied') {
+        // The completion claim did not commit here (redelivery, stale, or
+        // already-terminal). Settle the ledger row anyway: a transient settle
+        // failure on the first attempt would otherwise lose the terminal event
+        // forever, because redelivery short-circuits on this path. The CAS in
+        // settleOperation makes the retry safe, and a non-terminal review is a
+        // no-op.
+        await settleCodeReviewLedgerRow({
+          reviewId,
+          status: review.status,
+          terminalReason: review.terminal_reason,
+          triggerSource: review.trigger_source,
+        });
+        if (
+          (completionResult.outcome === 'duplicate' || completionResult.outcome === 'repaired') &&
+          status === 'completed' &&
+          review.status === 'completed' &&
+          review.platform === PLATFORM.GITHUB &&
+          preUpdateAttemptId
+        ) {
+          const publicationResult = await recordCodeReviewPublicationOutcome({
+            attemptId: preUpdateAttemptId,
+            reviewId,
+            platform: review.platform,
+            platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
+            repoFullName: review.repo_full_name,
+            prNumber: review.pr_number,
+            previousSummaryBody: review.previous_summary_body,
+            previousSummaryObserved: review.previous_summary_observed,
+            shouldPublish: shouldPublishToProvider,
+          });
+          if (publicationResult === 'write_failed') {
+            return NextResponse.json(
+              { error: 'Failed to record code review publication outcome' },
+              { status: 500 }
+            );
+          }
+        }
         return NextResponse.json({
           success: true,
           message:
@@ -1203,6 +1210,15 @@ export async function POST(
 
       attempt = latestAttempt;
       analyticsCompletionApplied = true;
+      // The completion claim committed, so settle the ledger row. Best-effort:
+      // a settle failure must not fail the callback, and a missing admit row
+      // skips with a log.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status: 'completed',
+        terminalReason: null,
+        triggerSource: review.trigger_source,
+      });
     } else {
       attempt = await updateCodeReviewAttemptForCallback({
         codeReviewId: reviewId,
@@ -1250,6 +1266,48 @@ export async function POST(
         currentStatus: review.status,
         requestedStatus: status,
       });
+      // Settle on this short-circuit path too: a transient settle failure on
+      // the first attempt would otherwise lose the terminal event forever,
+      // because redelivery lands here before any settle site. The CAS in
+      // settleOperation makes the retry safe.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status: review.status,
+        terminalReason: review.terminal_reason,
+        triggerSource: review.trigger_source,
+      });
+      const terminalUpdatesLatestAttemptSession =
+        !!sessionId && preUpdateAttemptId === attempt.id && preUpdateAttemptSessionId === sessionId;
+      const terminalSuperseded =
+        !!sessionId &&
+        !!preUpdateReviewSessionId &&
+        sessionId !== preUpdateReviewSessionId &&
+        !terminalUpdatesLatestAttemptSession;
+      if (
+        !terminalSuperseded &&
+        status === 'completed' &&
+        review.status === 'completed' &&
+        review.platform === PLATFORM.GITHUB &&
+        preUpdateAttemptId
+      ) {
+        const publicationResult = await recordCodeReviewPublicationOutcome({
+          attemptId: preUpdateAttemptId,
+          reviewId,
+          platform: review.platform,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
+          repoFullName: review.repo_full_name,
+          prNumber: review.pr_number,
+          previousSummaryBody: review.previous_summary_body,
+          previousSummaryObserved: review.previous_summary_observed,
+          shouldPublish: shouldPublishToProvider,
+        });
+        if (publicationResult === 'write_failed') {
+          return NextResponse.json(
+            { error: 'Failed to record code review publication outcome' },
+            { status: 500 }
+          );
+        }
+      }
       return NextResponse.json({
         success: true,
         message: 'Review already in terminal state',
@@ -1287,6 +1345,20 @@ export async function POST(
         message: 'Stale callback from superseded session',
       });
     }
+
+    const recordPublication = async (
+      attemptId: string,
+      observation: CodeReviewPublicationObservation
+    ): Promise<void> => {
+      try {
+        await recordCodeReviewAttemptPublicationStatus(
+          attemptId,
+          classifyCodeReviewPublication(observation)
+        );
+      } catch {
+        // Recording is best-effort; it must not change the callback result.
+      }
+    };
 
     const modelNotFoundRuntimeDiagnostics = getModelNotFoundRuntimeDiagnostics(
       rawPayload,
@@ -1494,8 +1566,25 @@ export async function POST(
           diagnostics: modelNotFoundRuntimeDiagnostics,
         });
       }
+      // The terminal claim committed, so settle the ledger row once.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status,
+        terminalReason: terminalReason ?? null,
+        triggerSource: review.trigger_source,
+      });
     } else {
       await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
+      // Settle idempotently: a cross-request redelivery of this terminal
+      // callback settles through the terminal short-circuit above, where the
+      // compare-and-set and the deterministic event uuid make the repeat a
+      // no-op. Non-terminal statuses (running) are a no-op.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status,
+        terminalReason: terminalReason ?? null,
+        triggerSource: review.trigger_source,
+      });
     }
 
     let providerTerminalReason = terminalReason;
@@ -1550,10 +1639,28 @@ export async function POST(
     }
 
     // Fetch integration once — used for gate check updates and post-completion actions
-    const integration =
-      shouldPublishToProvider && review.platform_integration_id
-        ? await getIntegrationById(review.platform_integration_id)
-        : null;
+    const integration = await getOwnerScopedIntegration();
+
+    if (status === 'completed') {
+      if (review.platform === PLATFORM.GITHUB) {
+        const publicationResult = await recordCodeReviewPublicationOutcome({
+          attemptId: attempt.id,
+          reviewId,
+          platform: review.platform,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
+          repoFullName: review.repo_full_name,
+          prNumber: review.pr_number,
+          previousSummaryBody: review.previous_summary_body,
+          previousSummaryObserved: review.previous_summary_observed,
+          shouldPublish: shouldPublishToProvider,
+        });
+        publicationWriteFailed = publicationResult === 'write_failed';
+      } else if (!shouldPublishToProvider) {
+        await recordPublication(attempt.id, { kind: 'not_applicable' });
+      } else if (!integration) {
+        await recordPublication(attempt.id, { kind: 'unknown' });
+      }
+    }
 
     // Resolve GitLab token once, shared between gate check and reaction/footer logic
     const reviewPlatform = parseCodeReviewPlatform(review.platform);
@@ -1709,27 +1816,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasPRCommentWithMarker(
-                  integration.platform_installation_id,
-                  repoOwner,
-                  repoName,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  appType
-                );
-                if (!alreadyPosted) {
-                  await createPRComment(
-                    integration.platform_installation_id,
-                    repoOwner,
-                    repoName,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    appType
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration);
               }
 
               // Summary history and footer (completed only)
@@ -1807,25 +1894,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasMRNoteWithMarker(
-                  accessToken,
-                  review.repo_full_name,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  instanceUrl
-                );
-                if (!alreadyPosted) {
-                  await createMRNote(
-                    accessToken,
-                    review.repo_full_name,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    instanceUrl
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on GitLab MR ${review.repo_full_name}!${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration, { gitlabAccessToken });
               }
 
               // Summary history and footer (completed only)
@@ -1841,6 +1910,12 @@ export async function POST(
                   review.pr_number,
                   instanceUrl
                 );
+                await recordPublication(attempt.id, {
+                  kind: 'summary',
+                  summaryBody: existing?.body ?? null,
+                  previousSummaryBody: review.previous_summary_body,
+                  previousSummaryObserved: review.previous_summary_observed,
+                });
                 if (existing) {
                   // Inject the code-owned Council Review section first (no-op for non-council),
                   // then history + footer, so the whole note updates in a single PUT.
@@ -1872,12 +1947,18 @@ export async function POST(
                 }
               }
             } else if (platform === PLATFORM.BITBUCKET) {
+              if (status === 'completed') {
+                await recordPublication(attempt.id, { kind: 'unknown' });
+              }
               logExceptInTest(
                 '[code-review-status] Skipping deferred Bitbucket provider completion actions',
                 { reviewId }
               );
             }
           } catch (postCompletionError) {
+            if (status === 'completed' && review.platform !== PLATFORM.GITHUB) {
+              await recordPublication(attempt.id, { kind: 'unknown' });
+            }
             // Non-blocking - log but don't fail the callback
             logExceptInTest(
               '[code-review-status] Failed to add completion reaction or summary metadata:',
@@ -1886,6 +1967,13 @@ export async function POST(
           }
         }
       }
+    }
+
+    if (publicationWriteFailed) {
+      return NextResponse.json(
+        { error: 'Failed to record code review publication outcome' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true });

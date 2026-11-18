@@ -65,6 +65,7 @@ beforeEach(() => {
     status: 'open',
     severity: 'high',
     repo_full_name: 'kilo/repo',
+    platform_integration_id: 'integration-a',
   } as never);
   vi.mocked(resolveAutoAnalysisActor).mockResolvedValue({
     user: { id: userId, api_token_pepper: null },
@@ -78,6 +79,7 @@ beforeEach(() => {
 
 describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
   it('passes the claimed queue row into launch and leaves running settlement to the lifecycle module', async () => {
+    const getTokenForRepo = vi.fn(async () => ({ success: true, token: 'github-token' }));
     const message = {
       body: {
         ownerType: 'user',
@@ -98,7 +100,7 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
         INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
         CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
         GIT_TOKEN_SERVICE: {
-          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+          getTokenForRepo,
         },
       } as unknown as CloudflareEnv
     );
@@ -113,6 +115,9 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
           claimToken: 'scheduled-claim-token',
         },
       })
+    );
+    expect(getTokenForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedIntegrationId: 'integration-a' })
     );
     expect(updateQueueFromPending).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
@@ -165,7 +170,122 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
           queueStatus: 'queued',
           failureCode: 'NETWORK_TIMEOUT',
           incrementAttempt: true,
+          nextRetryAt: expect.any(String),
         }),
+      })
+    );
+    expect(updateQueueFromPending).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('requeues a declared temporary precondition start failure', async () => {
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'Cloud Agent credit admission returned HTTP 503',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+    });
+    const message = {
+      body: {
+        ownerType: 'user',
+        ownerId: userId,
+        dispatchId: 'dispatch-requeue',
+        enqueuedAt: '2026-05-19T08:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await consumeOwnerBatch(
+      { queue: 'security-auto-analysis-owner', messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://example' },
+        NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+        INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
+      } as unknown as CloudflareEnv
+    );
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledTimes(1);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        claim: {
+          source: 'scheduled',
+          findingId,
+          queueRowId,
+          claimToken: 'scheduled-claim-token',
+        },
+        outcome: expect.objectContaining({
+          type: 'start-failed',
+          errorMessage: 'Cloud Agent credit admission returned HTTP 503',
+          queueStatus: 'queued',
+          failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+          incrementAttempt: true,
+          nextRetryAt: expect.any(String),
+        }),
+      })
+    );
+    expect(updateQueueFromPending).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('settles a declared permanent start failure once without requeueing it', async () => {
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'Cloud Agent credit admission was refused',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'PERMISSION_DENIED_PERMANENT',
+    });
+    const message = {
+      body: {
+        ownerType: 'user',
+        ownerId: userId,
+        dispatchId: 'dispatch-refused',
+        enqueuedAt: '2026-05-19T08:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await consumeOwnerBatch(
+      { queue: 'security-auto-analysis-owner', messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://example' },
+        NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+        INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
+      } as unknown as CloudflareEnv
+    );
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledTimes(1);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        claim: {
+          source: 'scheduled',
+          findingId,
+          queueRowId,
+          claimToken: 'scheduled-claim-token',
+        },
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'Cloud Agent credit admission was refused',
+          queueStatus: 'failed',
+          failureCode: 'PERMISSION_DENIED_PERMANENT',
+          incrementAttempt: true,
+          nextRetryAt: null,
+        },
       })
     );
     expect(updateQueueFromPending).not.toHaveBeenCalled();
@@ -253,6 +373,7 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
       status: 'open',
       severity: 'unexpected',
       repo_full_name: 'kilo/repo',
+      platform_integration_id: 'integration-a',
     } as never);
     const message = {
       body: {

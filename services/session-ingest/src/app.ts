@@ -1,6 +1,7 @@
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from './env';
 import { z } from 'zod';
 
@@ -14,7 +15,6 @@ import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
 
-const sessionIdSchema = z.string().startsWith('ses_').length(30);
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.uuid(),
@@ -28,17 +28,7 @@ async function hasValidInternalSecret(c: {
   const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
   if (!provided || !expected) return false;
 
-  const encoder = new TextEncoder();
-  const providedBytes = encoder.encode(provided);
-  const expectedBytes = encoder.encode(expected);
-  if (providedBytes.byteLength !== expectedBytes.byteLength) {
-    // timingSafeEqual requires equal lengths; self-compare so a length
-    // mismatch is not observably faster to reject than a value mismatch.
-    timingSafeEqual(providedBytes, providedBytes);
-    return false;
-  }
-
-  return timingSafeEqual(providedBytes, expectedBytes);
+  return timingSafeEqual(provided, expected);
 }
 
 const requireValidInternalSecret = createMiddleware<{
@@ -81,7 +71,7 @@ app.use('/internal/cloud-agent/v1/*', requireValidInternalSecret);
 app.route('/internal/cloud-agent/v1', cloudAgentSessionScopeApi);
 
 // Public session endpoint: resolve the purpose-bound share token, then return
-// all ingested DO events for the current session generation.
+// the public transcript for the current session generation.
 app.get('/session/:shareToken', async c => {
   const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
   if (!sharedSession) {
@@ -96,8 +86,14 @@ app.get('/session/:shareToken', async c => {
         kiloUserId: sharedSession.kiloUserId,
         sessionId: sharedSession.sessionId,
       }),
-    s => s.getAllStream(),
-    'SessionIngestDO.getAllStream'
+    s =>
+      sharedSession.contentCutoffMs === null
+        ? s.getLiveSharedSessionStream()
+        : s.getSharedSessionStream({
+            publicId: sharedSession.publicId,
+            ingestedBeforeMs: sharedSession.contentCutoffMs,
+          }),
+    'SessionIngestDO.getSharedSessionStream'
   );
 
   return c.body(stream, 200, {
@@ -119,6 +115,9 @@ app.get('/session/:shareToken/metadata', async c => {
       success: true,
       title: sharedSession.title,
       owner_name: sharedSession.ownerName,
+      git_url: sharedSession.gitUrl,
+      git_branch: sharedSession.gitBranch,
+      created_at: new Date(sharedSession.createdAt).toISOString(),
     },
     200,
     { 'cache-control': 'no-store' }
@@ -150,8 +149,8 @@ app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async
   const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
   if (!parsed.success) return c.json({ success: false, error: 'Invalid sessionId' }, 400);
 
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
-  if (stream === null) return c.json({ success: false, error: 'Session not found' }, 404);
+  const result = await getSessionExport(c.env, parsed.data, kiloUserId);
+  if (result.status !== 'ok') return c.json({ success: false, error: 'Session not found' }, 404);
 
-  return c.body(stream, 200, { 'content-type': 'application/json; charset=utf-8' });
+  return c.body(result.stream, 200, { 'content-type': 'application/json; charset=utf-8' });
 });

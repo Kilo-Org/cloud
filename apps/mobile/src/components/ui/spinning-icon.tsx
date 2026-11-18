@@ -4,11 +4,12 @@ import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+
+import { useMotionPolicy } from '@/lib/a11y/motion';
 
 type SpinningIconProps = {
   icon: LucideIcon;
@@ -18,14 +19,14 @@ type SpinningIconProps = {
   spinning?: boolean;
 };
 
-/** Lucide icon with an infinite-rotate loop, honoring the OS reduced-motion setting. */
+/** Lucide icon with an infinite-rotate loop, honoring the shared motion policy. */
 export function SpinningIcon({
   icon: Icon,
   size,
   color,
   spinning = true,
 }: Readonly<SpinningIconProps>) {
-  const reducedMotion = useReducedMotion();
+  const { reducedMotion } = useMotionPolicy();
   const isAnimating = spinning && !reducedMotion;
   const rotation = useSharedValue(0);
 

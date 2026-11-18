@@ -1,169 +1,276 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { ChevronRight, ChevronDown, Bot, Loader2 } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { atom, useAtomValue, type Atom } from 'jotai';
+import { ChevronRight, ChevronDown, Bot, CornerDownRight } from 'lucide-react';
+import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
-import { isMessageStreaming, isToolPart } from './types';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
+import type { ChildSessionHydrationState, KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { formatModelRefName } from '@/lib/format-model-name';
+import { useOptionalManager } from './CloudAgentProvider';
+import type { SubtaskPart, StoredMessage, ToolPart } from './types';
+import { isToolPart } from './types';
+import { getToolArguments, getToolInputPath } from './toolCardUtils';
+import { getChildSessionTaskStatus, isBackgroundChildTask } from './child-session-status';
+import type { SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 
 const MAX_NESTING_DEPTH = 5;
+const emptyChildSessionStatusAtom = atom(
+  () =>
+    (_sessionId: string): SessionStatus | undefined =>
+      undefined
+);
+const emptyChildSessionErrorAtom = atom(
+  () =>
+    (_sessionId: string): string | null =>
+      null
+);
+const emptyChildSessionHydrationStateAtom = atom(
+  () =>
+    (_sessionId: string): ChildSessionHydrationState | undefined =>
+      undefined
+);
 
 export type ChildSessionDrawerEntry = {
   sessionId: KiloSessionId;
   description?: string;
   agent?: string;
+  model?: string;
 };
 
 export type OpenChildSession = (entry: ChildSessionDrawerEntry) => void;
-
-export type RenderPartFn = (props: {
-  part: Part;
-  isStreaming?: boolean;
-  childSessionMessages?: Map<string, StoredMessage[]>;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  onOpenChildSession?: OpenChildSession;
-}) => ReactNode;
 
 type ChildSessionSectionProps = {
   subtaskPart?: SubtaskPart;
   taskToolPart?: ToolPart;
   sessionId?: KiloSessionId;
   childMessages?: StoredMessage[];
+  sessionStatus?: SessionStatus;
+  childError?: string | null;
+  hydrationState?: ChildSessionHydrationState;
   depth?: number;
   getChildMessages?: (sessionId: string) => StoredMessage[];
-  renderPart?: RenderPartFn;
+  renderChildTranscript?: (
+    messages: StoredMessage[],
+    depth: number,
+    getChildMessages?: (sessionId: string) => StoredMessage[]
+  ) => ReactNode;
   onOpenChildSession?: OpenChildSession;
 };
 
-/**
- * ChildSessionSection - Compact task row that opens Cloud Agent child transcripts in a drawer.
- * Consumers without a drawer callback retain the existing inline child transcript fallback.
- */
-export function ChildSessionSection({
+export function ChildSessionSection(props: ChildSessionSectionProps) {
+  const manager = useOptionalManager();
+  const childMessagesAtom = manager?.atoms.childMessages;
+  if (childMessagesAtom && props.sessionId) {
+    return (
+      <LiveChildSessionSection
+        childMessagesAtom={childMessagesAtom}
+        childSessionStatusAtom={manager?.atoms.childSessionStatus}
+        childSessionErrorAtom={manager?.atoms.childSessionError}
+        childSessionHydrationStateAtom={manager?.atoms.childSessionHydrationState}
+        hydrateChildSession={manager?.hydrateChildSession}
+        sessionId={props.sessionId}
+        {...props}
+      />
+    );
+  }
+  return <ChildSessionSectionBody {...props} />;
+}
+
+function LiveChildSessionSection({
+  childMessagesAtom,
+  childSessionStatusAtom,
+  childSessionErrorAtom,
+  childSessionHydrationStateAtom,
+  hydrateChildSession,
+  sessionId,
+  ...props
+}: ChildSessionSectionProps & {
+  childMessagesAtom: Atom<(childSessionId: string) => StoredMessage[]>;
+  childSessionStatusAtom?: Atom<(childSessionId: string) => SessionStatus | undefined>;
+  childSessionErrorAtom?: Atom<(childSessionId: string) => string | null>;
+  childSessionHydrationStateAtom?: Atom<(childSessionId: string) => ChildSessionHydrationState>;
+  hydrateChildSession?: (sessionId: KiloSessionId) => Promise<void>;
+  sessionId: KiloSessionId;
+}) {
+  const getChildMessages = useAtomValue(childMessagesAtom);
+  const getChildStatus = useAtomValue(childSessionStatusAtom ?? emptyChildSessionStatusAtom);
+  const getChildError = useAtomValue(childSessionErrorAtom ?? emptyChildSessionErrorAtom);
+  const getChildHydrationState = useAtomValue(
+    childSessionHydrationStateAtom ?? emptyChildSessionHydrationStateAtom
+  );
+  const childMessages = getChildMessages(sessionId);
+  const sessionStatus = getChildStatus(sessionId);
+  const taskToolPart = props.taskToolPart;
+  useEffect(() => {
+    if (sessionStatus || childMessages.length > 0 || !isBackgroundChildTask(taskToolPart)) return;
+    void hydrateChildSession?.(sessionId);
+  }, [sessionStatus, childMessages.length, taskToolPart, hydrateChildSession, sessionId]);
+  return (
+    <ChildSessionSectionBody
+      {...props}
+      sessionId={sessionId}
+      childMessages={childMessages}
+      sessionStatus={sessionStatus}
+      childError={getChildError(sessionId)}
+      hydrationState={getChildHydrationState(sessionId)}
+      getChildMessages={getChildMessages}
+    />
+  );
+}
+
+function ChildSessionSectionBody({
   subtaskPart,
   taskToolPart,
   sessionId,
   childMessages = [],
+  sessionStatus,
+  childError,
+  hydrationState,
   depth = 0,
   getChildMessages,
-  renderPart,
+  renderChildTranscript,
   onOpenChildSession,
 }: ChildSessionSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const description = subtaskPart?.description || getTaskDescription(taskToolPart);
   const agent = subtaskPart?.agent || getTaskAgent(taskToolPart);
-  const taskStatus = taskToolPart?.state?.status;
+  const model = subtaskPart?.model
+    ? formatModelRefName(subtaskPart.model)
+    : getTaskModel(taskToolPart);
+  const taskStatus = getChildSessionTaskStatus({
+    taskToolPart,
+    childMessages,
+    sessionStatus,
+    childError,
+    hydrationState,
+  });
   const isRunning = taskStatus === 'running' || taskStatus === 'pending';
-  const currentTool = isRunning ? getCurrentRunningTool(childMessages) : undefined;
+  const latestTool = isRunning ? getLatestToolActivity(childMessages) : undefined;
+  const agentLabel = agent ? agent.charAt(0).toUpperCase() + agent.slice(1) : undefined;
+  const statusLabel = taskStatus
+    ? {
+        completed: 'Completed',
+        error: 'Failed',
+        pending: 'Delegating',
+        running: 'Working',
+        unavailable: 'Status unavailable',
+      }[taskStatus]
+    : undefined;
+  const toolCount = childMessages.reduce(
+    (total, message) => total + message.parts.filter(isToolPart).length,
+    0
+  );
   const canOpenDrawer = Boolean(sessionId && onOpenChildSession);
-  const inlineRenderPart = sessionId && !canOpenDrawer ? renderPart : undefined;
-  const canExpandInline = Boolean(inlineRenderPart);
+  const canExpandInline = Boolean(sessionId && !canOpenDrawer && renderChildTranscript);
   const isInteractive = canOpenDrawer || canExpandInline;
 
   const handleOpen = () => {
     if (!sessionId) return;
     if (onOpenChildSession) {
-      onOpenChildSession({ sessionId, description, agent });
+      onOpenChildSession({ sessionId, description, agent, model });
       return;
     }
-    if (inlineRenderPart) {
+    if (canExpandInline) {
       setIsExpanded(expanded => !expanded);
     }
   };
 
-  const borderColor =
-    taskStatus === 'error'
-      ? 'border-red-500/40'
-      : taskStatus === 'completed'
-        ? 'border-green-500/40'
-        : 'border-blue-500/40';
+  const summary = (statusLabel || toolCount > 0) && (
+    <span className="flex shrink-0 items-center gap-2 font-normal whitespace-nowrap">
+      {statusLabel && (
+        <span
+          className={taskStatus === 'error' ? 'text-destructive' : undefined}
+          title={taskStatus === 'unavailable' ? 'Sub-agent status is unavailable.' : undefined}
+        >
+          {statusLabel}
+        </span>
+      )}
+      {statusLabel && toolCount > 0 && <span aria-hidden="true">·</span>}
+      {toolCount > 0 && (
+        <span className="tabular-nums">
+          {toolCount} {toolCount === 1 ? 'tool call' : 'tool calls'}
+        </span>
+      )}
+    </span>
+  );
 
   const rowContent = (
     <>
-      {canOpenDrawer ? (
-        <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-      ) : canExpandInline ? (
-        isExpanded ? (
-          <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
+      <span className="flex min-w-0 items-center gap-2">
+        {isRunning ? (
+          <StatusSpinner
+            className="size-4 shrink-0 motion-reduce:[&_rect]:animate-none!"
+            title={taskStatus === 'pending' ? 'Delegating' : 'Working'}
+          />
         ) : (
-          <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-        )
-      ) : (
-        <span className="h-4 w-4 shrink-0" aria-hidden />
-      )}
-
-      {isRunning ? (
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />
-      ) : (
-        <Bot className="h-4 w-4 shrink-0 text-blue-500" />
-      )}
-
-      <span className="flex-1 truncate text-left text-sm font-medium">
-        {description || 'Subtask'}
-        {currentTool && (
-          <span className="text-muted-foreground ml-2 font-normal">
-            <span className="text-blue-500">{currentTool.tool}</span>
-            {currentTool.context && <span className="ml-1 opacity-70">{currentTool.context}</span>}
-          </span>
+          <Bot className="size-4 shrink-0" aria-hidden="true" />
         )}
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="min-w-0 truncate font-normal" title={description}>
+            {description || 'Subagent task'}
+          </span>
+          {agentLabel && (
+            <Badge
+              variant="outline"
+              className="max-w-[45%] shrink-0 px-1.5 py-0 text-xs font-normal"
+            >
+              <span className="truncate" title={agentLabel}>
+                {agentLabel}
+              </span>
+            </Badge>
+          )}
+        </span>
+        {summary}
+        {isInteractive &&
+          (canExpandInline && isExpanded ? (
+            <ChevronDown className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+          ))}
       </span>
-
-      {taskStatus && (
-        <Badge
-          variant={
-            taskStatus === 'completed'
-              ? 'default'
-              : taskStatus === 'error'
-                ? 'destructive'
-                : 'outline'
-          }
-          className="shrink-0 text-xs"
-        >
-          {taskStatus}
-        </Badge>
-      )}
-
-      {agent && (
-        <Badge variant="outline" className="shrink-0 text-xs">
-          {agent}
-        </Badge>
+      {latestTool && (
+        <span className="text-muted-foreground ml-6 flex min-w-0 items-center gap-2 font-normal">
+          <CornerDownRight className="size-4 shrink-0" aria-hidden="true" />
+          <span className="truncate" title={latestTool}>
+            {latestTool}
+          </span>
+        </span>
       )}
     </>
   );
 
   return (
-    <div className={`bg-muted/20 my-2 rounded-r-md border-l-2 ${borderColor}`}>
+    <div className="text-muted-foreground min-w-0 py-1 text-xs">
       {isInteractive ? (
         <Button
           variant="ghost"
+          size={null}
           onClick={handleOpen}
-          className="hover:bg-muted/50 h-auto w-full justify-start gap-2 px-3 py-2 text-left"
+          aria-busy={isRunning || undefined}
+          aria-haspopup={canOpenDrawer ? 'dialog' : undefined}
+          aria-expanded={canExpandInline ? isExpanded : undefined}
+          className="hover:bg-muted/40 h-auto min-h-8 w-full flex-col items-stretch justify-center gap-1 px-2 py-2 text-left text-xs whitespace-normal pointer-coarse:min-h-11"
         >
           {rowContent}
         </Button>
       ) : (
-        <div className="flex h-auto w-full items-center justify-start gap-2 px-3 py-2 text-left">
+        <div
+          aria-busy={isRunning || undefined}
+          className="flex min-h-8 w-full flex-col justify-center gap-1 px-2 py-2 pointer-coarse:min-h-11"
+        >
           {rowContent}
         </div>
       )}
 
-      {isExpanded && inlineRenderPart && (
+      {isExpanded && canExpandInline && (
         <div className="space-y-2 px-4 pt-1 pb-3">
           {childMessages.length > 0 ? (
             depth < MAX_NESTING_DEPTH ? (
-              childMessages.map(message => (
-                <MessageErrorBoundary key={message.info.id}>
-                  <ChildSessionMessage
-                    message={message}
-                    depth={depth}
-                    getChildMessages={getChildMessages}
-                    renderPart={inlineRenderPart}
-                  />
-                </MessageErrorBoundary>
-              ))
+              renderChildTranscript ? (
+                renderChildTranscript(childMessages, depth + 1, getChildMessages)
+              ) : null
             ) : (
               <div className="text-muted-foreground text-xs italic">
                 Maximum nesting depth reached. Unable to display nested sessions.
@@ -176,59 +283,6 @@ export function ChildSessionSection({
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function ChildSessionMessage({
-  message,
-  depth,
-  getChildMessages,
-  renderPart,
-}: {
-  message: StoredMessage;
-  depth: number;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  renderPart: RenderPartFn;
-}) {
-  const isStreaming = isMessageStreaming(message);
-
-  return (
-    <div className="bg-muted/30 rounded-md p-2">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge variant="outline" className="text-xs">
-          {message.info.role}
-        </Badge>
-        {isStreaming && (
-          <span className="text-muted-foreground animate-pulse text-xs">streaming...</span>
-        )}
-      </div>
-      <div className="mt-2 space-y-1">
-        {message.parts.map((part, index) => {
-          if (isToolPart(part) && part.tool === 'task') {
-            const nestedSessionId = getTaskToolSessionId(part);
-            const nestedChildMessages = nestedSessionId ? getChildMessages?.(nestedSessionId) : [];
-
-            return (
-              <ChildSessionSection
-                key={part.id || index}
-                taskToolPart={part}
-                sessionId={nestedSessionId}
-                childMessages={nestedChildMessages || []}
-                depth={depth + 1}
-                getChildMessages={getChildMessages}
-                renderPart={renderPart}
-              />
-            );
-          }
-
-          return (
-            <MessageErrorBoundary key={part.id || index}>
-              {renderPart({ part, isStreaming, getChildMessages })}
-            </MessageErrorBoundary>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -255,6 +309,20 @@ function getTaskAgent(toolPart?: ToolPart): string | undefined {
   return getStringProperty(input, 'subagent_type');
 }
 
+function getTaskModel(toolPart?: ToolPart): string | undefined {
+  if (!toolPart || toolPart.tool !== 'task') return undefined;
+  const state = toolPart.state;
+  if (state.status !== 'running' && state.status !== 'completed') return undefined;
+  const metadata = state.metadata;
+  if (!isRecord(metadata)) return undefined;
+  const model = metadata['model'];
+  if (!isRecord(model)) return undefined;
+  const { providerID, modelID } = model;
+  if (typeof providerID !== 'string' || providerID.length === 0) return undefined;
+  if (typeof modelID !== 'string' || modelID.length === 0) return undefined;
+  return formatModelRefName({ providerID, modelID });
+}
+
 function isKiloSessionId(sessionId: string | undefined): sessionId is KiloSessionId {
   return sessionId !== undefined && sessionId.startsWith('ses_') && sessionId.length === 30;
 }
@@ -274,14 +342,7 @@ export function getTaskToolSessionId(toolPart: ToolPart): KiloSessionId | undefi
   return undefined;
 }
 
-/**
- * Find the currently running tool from child session messages.
- * Looks through all assistant messages to find a tool part with status 'running' or 'pending'.
- * Returns the tool name and optional context (e.g., filename for read/edit tools).
- */
-export function getCurrentRunningTool(
-  childMessages: StoredMessage[]
-): { tool: string; context?: string } | undefined {
+function getLatestToolActivity(childMessages: StoredMessage[]): string | undefined {
   for (let i = childMessages.length - 1; i >= 0; i--) {
     const msg = childMessages[i];
     if (msg.info.role !== 'assistant') continue;
@@ -290,38 +351,34 @@ export function getCurrentRunningTool(
       const part = msg.parts[j];
       if (!isToolPart(part)) continue;
 
-      const status = part.state.status;
-      if (status === 'running' || status === 'pending') {
-        const tool = part.tool;
-        let context: string | undefined;
-
-        const input = part.state.input;
-        if (tool === 'read' || tool === 'edit' || tool === 'write') {
-          const filePath = getStringProperty(input, 'filePath');
-          if (filePath) {
-            context = filePath.split('/').pop();
-          }
-        } else if (tool === 'bash') {
-          const command = getStringProperty(input, 'command');
-          if (command) {
-            const firstWord = command.split(/\s+/)[0];
-            context = firstWord.length > 20 ? firstWord.slice(0, 20) + '...' : firstWord;
-          }
-        } else if (tool === 'glob' || tool === 'grep') {
-          const pattern = getStringProperty(input, 'pattern');
-          if (pattern) {
-            context = pattern.length > 25 ? pattern.slice(0, 25) + '...' : pattern;
-          }
-        } else if (tool === 'task') {
-          const taskDescription = getStringProperty(input, 'description');
-          if (taskDescription) {
-            context =
-              taskDescription.length > 30 ? taskDescription.slice(0, 30) + '...' : taskDescription;
-          }
+      const tool = part.tool;
+      let context = getToolInputPath(getToolArguments(part));
+      const input = part.state.input;
+      if (tool === 'bash') {
+        const command = getStringProperty(input, 'command');
+        if (command) {
+          const firstWord = command.split(/\s+/)[0];
+          context = [firstWord.length > 20 ? firstWord.slice(0, 20) + '...' : firstWord, context]
+            .filter(Boolean)
+            .join(' · ');
         }
-
-        return { tool, context };
+      } else if (tool === 'glob' || tool === 'grep') {
+        const pattern = getStringProperty(input, 'pattern');
+        if (pattern) {
+          context = [context, pattern.length > 25 ? pattern.slice(0, 25) + '...' : pattern]
+            .filter(Boolean)
+            .join(' · ');
+        }
+      } else if (tool === 'task') {
+        const taskDescription = getStringProperty(input, 'description');
+        if (taskDescription) {
+          context =
+            taskDescription.length > 30 ? taskDescription.slice(0, 30) + '...' : taskDescription;
+        }
       }
+
+      const label = tool === 'bash' ? 'Shell' : tool.charAt(0).toUpperCase() + tool.slice(1);
+      return `${label}${context ? ` ${context}` : ''}${part.state.status === 'error' ? ' (failed)' : ''}`;
     }
   }
   return undefined;

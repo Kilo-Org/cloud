@@ -1,25 +1,28 @@
-import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
-import { Switch, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { selectionHaptic } from '@/lib/haptics';
+import { type Href } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
+import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
-import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
 import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
   classifyProviderState,
   useBitbucketReadiness,
@@ -27,7 +30,7 @@ import {
   useSaveReviewConfig,
   type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
-import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
 
@@ -44,11 +47,16 @@ export function BitbucketOverview({
   canEdit: boolean;
   permissionLoading: boolean;
 }>) {
-  const router = useRouter();
-  const paddingBottom = useTabBarBottomPadding();
+  const pushOnce = useSinglePushRoute();
+  const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
-  const { models, isLoading: modelsLoading } = useAvailableModels(scope);
+  const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  const { reducedMotion } = useMotionPolicy();
+  // The body of the config read has exactly one surface: rows from cache, an
+  // error with retry, or a loading state -- never the header over an empty
+  // scroll area.
+  const configBody = useReviewConfigBody(config);
   const providerState = classifyProviderState({
     isLoading: readiness.isLoading,
     isError: readiness.isError,
@@ -61,44 +69,62 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-        <View className="flex-1" style={{ paddingBottom }}>
-          <QueryError
-            onRetry={() => {
-              providerState.refetch();
-            }}
-            isRetrying={providerState.isRetrying}
-          />
-        </View>
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <QueryError
+          onRetry={() => {
+            providerState.refetch();
+          }}
+          isRetrying={providerState.isRetrying}
+        />
       </View>
     );
   }
 
-  const isLoading = providerState.status === 'loading' || config.isLoading || permissionLoading;
+  const isLoading = providerState.status === 'loading' || permissionLoading;
   const connected = providerState.status === 'connected';
 
-  // A connected workspace whose config fails to load (and has no stale
-  // cache to fall back on) has nothing to show — surface a retry instead of
-  // a header over blank space. A background refetch failure with data
-  // already cached falls through to the normal content below, unaffected.
-  if (!isLoading && connected && config.isError && config.data == null) {
+  // A connected workspace whose config read failed (no cache to fall back on),
+  // or whose idle read could not be restarted, has nothing to show: surface a
+  // retry instead. Cached config keeps the rows through a background refetch
+  // failure, and an unsettled connectivity still waits on the skeleton.
+  if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-        <View className="flex-1" style={{ paddingBottom }}>
-          <QueryError
-            onRetry={() => {
-              void config.refetch();
-            }}
-            isRetrying={config.isFetching}
-          />
-        </View>
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <QueryError
+          variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
+          onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
+          isRetrying={config.isFetching}
+        />
+      </View>
+    );
+  }
+
+  if (!isLoading && !connected) {
+    const readinessData = readiness.data;
+    return (
+      <View className="flex-1 bg-background">
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <CenteredState contentContainerClassName="px-6">
+          {canEdit && readinessData ? (
+            <BitbucketSetupRecovery
+              scope={scope}
+              readiness={readinessData}
+              message={t('prReview.connect.bitbucketNotConnectedTitle')}
+              className="w-full"
+            />
+          ) : (
+            <Text className="text-center text-xs text-muted-foreground">
+              {t('codeReviewer.bitbucket.notConnectedReadOnly')}
+            </Text>
+          )}
+        </CenteredState>
       </View>
     );
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/bitbucket/${field}` as Href);
+    pushOnce(`/(app)/code-reviewer/${scope}/bitbucket/${field}` as Href);
   };
 
   const data = config.data;
@@ -110,6 +136,10 @@ export function BitbucketOverview({
     (data.repositorySelectionMode === 'all' || data.selectedRepositoryIds.length > 0);
   const isReady = readiness.data?.ready !== false;
   const canEnableAutoReview = hasRepoSelection && isReady;
+  // The workspace line under the Automatic reviews label is optional: a
+  // readiness read without a workspace slug paints the label alone, so the row
+  // keeps one line and matches the sibling Follow REVIEW.md row.
+  const autoReviewsWorkspace = readiness.data?.workspace?.slug;
   const rows =
     data == null
       ? null
@@ -119,10 +149,11 @@ export function BitbucketOverview({
           models,
           modelsLoading,
           onOpenModelPicker: () => {
-            openModelPicker(router, {
+            openModelPicker(pushOnce, {
               options: models,
               value: data.modelSlug,
               variant: data.thinkingEffort ?? '',
+              acceptsVariant: true,
               onSelect: (modelSlug, variant) => {
                 save.mutate({ modelSlug, thinkingEffort: variant || null });
               },
@@ -132,68 +163,43 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
+      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 pt-4"
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>
-          {isLoading && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <View className="gap-2">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <Skeleton key={index} className="h-12 w-full rounded-lg" />
-                ))}
-              </View>
-            </Animated.View>
-          )}
+          {/* Every read state paints something: while connectivity is unsettled a
+             paused read keeps the skeleton, and a pending read that nothing is
+             fetching also keeps it until its restart runs. */}
+          {(isLoading || configBody.body.status === 'loading') && <PlatformOverviewSkeleton />}
 
-          {!isLoading && !connected && (
-            <Animated.View entering={FadeIn.duration(200)}>
-              {canEdit ? (
-                <BitbucketConnectForm scope={scope} />
-              ) : (
-                <Text className="text-center text-xs text-muted-foreground">
-                  Bitbucket isn't connected. Only organization owners and billing managers can
-                  connect it.
-                </Text>
-              )}
-            </Animated.View>
-          )}
-
-          {!isLoading && connected && config.data != null && rows != null && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+          {!isLoading && data != null && rows != null && (
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(200))}
+              className="gap-6"
+            >
               {readiness.data?.ready === false && (
-                <View className="items-center gap-2 rounded-lg bg-secondary p-4">
-                  <Text className="text-center text-xs text-muted-foreground">
-                    Setup incomplete — finish configuration on kilo.ai
-                  </Text>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={() => {
-                      void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                        label: 'Bitbucket setup',
-                      });
-                    }}
-                  >
-                    <Text>Finish setup</Text>
-                  </Button>
-                </View>
+                <BitbucketSetupRecovery
+                  scope={scope}
+                  readiness={readiness.data}
+                  message={t('common.couldNotLoadRepositories')}
+                />
               )}
 
               <View className="rounded-lg bg-secondary p-4">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Automatic reviews</Text>
-                    <Text variant="muted" className="text-xs">
-                      {readiness.data?.workspace?.slug ?? ''}
-                    </Text>
+                  <View className="flex-1 pe-3">
+                    <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
+                    {autoReviewsWorkspace ? (
+                      <Text variant="muted" className="text-xs">
+                        {autoReviewsWorkspace}
+                      </Text>
+                    ) : null}
                   </View>
                   <Switch
-                    accessibilityLabel="Automatic reviews"
+                    accessibilityLabel={t('codeReviewer.autoReviews')}
                     value={config.data.isEnabled}
                     disabled={
                       !canEdit ||
@@ -201,7 +207,7 @@ export function BitbucketOverview({
                       (!canEnableAutoReview && !config.data.isEnabled)
                     }
                     onValueChange={value => {
-                      void Haptics.selectionAsync();
+                      selectionHaptic();
                       toggle.mutate({ isEnabled: value });
                     }}
                   />
@@ -209,7 +215,7 @@ export function BitbucketOverview({
                 {isReady && !hasRepoSelection && (
                   <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
-                      Select at least one repository to enable automatic reviews.
+                      {t('codeReviewer.selectRepository')}
                     </Text>
                     <Button
                       variant="outline"
@@ -219,7 +225,7 @@ export function BitbucketOverview({
                         pushField('repos');
                       }}
                     >
-                      <Text>Select repositories</Text>
+                      <Text>{t('common.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}
@@ -240,7 +246,7 @@ export function BitbucketOverview({
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
-                  Only organization owners and billing managers can change these settings.
+                  {t('securityAgent.sla.permissionNote')}
                 </Text>
               )}
             </Animated.View>

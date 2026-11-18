@@ -5,7 +5,7 @@ import {
   buildReviewThreadsResult,
   sliceFileLines,
 } from './mappers';
-import { FILES_MAX_PAGES } from './dtos';
+import { FILE_LINES_MAX, FILES_MAX_PAGES } from './dtos';
 
 describe('buildOverviewDto', () => {
   const basePr = {
@@ -25,6 +25,8 @@ describe('buildOverviewDto', () => {
     mergeable: true,
     mergeable_state: 'clean',
     auto_merge: { merge_method: 'squash' },
+    created_at: '2026-03-01T12:00:00Z',
+    updated_at: '2026-03-02T09:30:00Z',
   };
 
   it('returns overview DTO with all required fields populated', () => {
@@ -92,6 +94,136 @@ describe('buildOverviewDto', () => {
     expect(dto.reviewDecision).toBeNull();
     expect(dto.repo.viewerLogin).toBeNull();
   });
+
+  it('maps labels, assignees, timestamps, merged-by and the comment count from REST', () => {
+    const dto = buildOverviewDto({
+      pr: {
+        ...basePr,
+        merged: true,
+        labels: [
+          { name: 'bug', color: 'd73a4a' },
+          { name: 'no-color', color: null },
+          { name: null, color: 'ffffff' },
+        ],
+        assignees: [{ login: 'octocat', avatar_url: 'https://avatars.example/octocat' }, null],
+        closed_at: '2026-03-03T10:00:00Z',
+        merged_at: '2026-03-03T10:00:00Z',
+        merged_by: { login: 'hubot', avatar_url: 'https://avatars.example/hubot' },
+        comments: 4,
+        review_comments: 7,
+      },
+      repo: {},
+      graphQl: { repository: { pullRequest: { reviewDecision: null } }, viewer: null },
+      viewer: null,
+    });
+    // A label without a name is dropped; a null color falls back to empty.
+    expect(dto.labels).toEqual([
+      { name: 'bug', color: 'd73a4a' },
+      { name: 'no-color', color: '' },
+    ]);
+    expect(dto.assignees).toEqual([
+      { login: 'octocat', avatarUrl: 'https://avatars.example/octocat' },
+    ]);
+    expect(dto.createdAt).toBe('2026-03-01T12:00:00Z');
+    expect(dto.updatedAt).toBe('2026-03-02T09:30:00Z');
+    expect(dto.closedAt).toBe('2026-03-03T10:00:00Z');
+    expect(dto.mergedAt).toBe('2026-03-03T10:00:00Z');
+    expect(dto.mergedBy).toEqual({ login: 'hubot', avatarUrl: 'https://avatars.example/hubot' });
+    expect(dto.commentCount).toBe(11);
+  });
+
+  it('defaults every REST-sourced sidebar field when GitHub omits it', () => {
+    const dto = buildOverviewDto({
+      pr: basePr,
+      repo: {},
+      graphQl: null,
+      viewer: null,
+    });
+    expect(dto.labels).toEqual([]);
+    expect(dto.assignees).toEqual([]);
+    expect(dto.closedAt).toBeNull();
+    expect(dto.mergedAt).toBeNull();
+    expect(dto.mergedBy).toBeNull();
+    expect(dto.commentCount).toBe(0);
+    // A degraded GraphQL leg must not blank the overview.
+    expect(dto.reviewers).toEqual([]);
+    expect(dto.linkedIssues).toEqual([]);
+  });
+
+  it('lists submitted reviewers first and requested-only reviewers as PENDING', () => {
+    const dto = buildOverviewDto({
+      pr: basePr,
+      repo: {},
+      graphQl: {
+        repository: {
+          pullRequest: {
+            reviewDecision: 'CHANGES_REQUESTED',
+            latestReviews: {
+              nodes: [
+                { state: 'APPROVED', author: { login: 'ada', avatarUrl: 'https://a.example/ada' } },
+                { state: 'CHANGES_REQUESTED', author: { login: 'grace', avatarUrl: null } },
+                // An unknown state and a null author are both skipped.
+                { state: 'SOMETHING_NEW', author: { login: 'linus', avatarUrl: null } },
+                { state: 'COMMENTED', author: null },
+                null,
+              ],
+            },
+            reviewRequests: {
+              nodes: [
+                { requestedReviewer: { login: 'ken', avatarUrl: null } },
+                // Already reviewed — keeps the submitted verdict, no PENDING row.
+                { requestedReviewer: { login: 'ada', avatarUrl: 'https://a.example/ada' } },
+                // A requested TEAM resolves to null and is dropped.
+                { requestedReviewer: null },
+              ],
+            },
+          },
+        },
+        viewer: { login: 'octocat' },
+      },
+      viewer: { login: 'octocat' },
+    });
+    expect(dto.reviewers).toEqual([
+      { login: 'ada', avatarUrl: 'https://a.example/ada', state: 'APPROVED' },
+      { login: 'grace', avatarUrl: null, state: 'CHANGES_REQUESTED' },
+      { login: 'ken', avatarUrl: null, state: 'PENDING' },
+    ]);
+  });
+
+  it('maps the issues the PR closes', () => {
+    const dto = buildOverviewDto({
+      pr: basePr,
+      repo: {},
+      graphQl: {
+        repository: {
+          pullRequest: {
+            reviewDecision: null,
+            closingIssuesReferences: {
+              nodes: [
+                {
+                  number: 42,
+                  title: 'Flux capacitor leaks',
+                  url: 'https://github.com/kilo/flux/issues/42',
+                  closed: false,
+                },
+                null,
+              ],
+            },
+          },
+        },
+        viewer: null,
+      },
+      viewer: null,
+    });
+    expect(dto.linkedIssues).toEqual([
+      {
+        number: 42,
+        title: 'Flux capacitor leaks',
+        url: 'https://github.com/kilo/flux/issues/42',
+        closed: false,
+      },
+    ]);
+  });
 });
 
 describe('buildChecksResult', () => {
@@ -154,6 +286,30 @@ describe('buildChecksResult', () => {
       result.rollup.success + result.rollup.failure + result.rollup.pending + result.rollup.skipped
     ).toBe(result.rollup.total);
   });
+
+  it('carries the partial flag only when the caller read less than the ref has', () => {
+    const args = {
+      checkRuns: [{ name: 'ci', status: 'completed', conclusion: 'success' }],
+      commitStatuses: [],
+    };
+
+    // A complete listing keeps the shape it has always had: no key at all.
+    expect(buildChecksResult(args)).toEqual({
+      checkRuns: [
+        {
+          name: 'ci',
+          status: 'completed',
+          conclusion: 'success',
+          detailsUrl: null,
+          appName: null,
+        },
+      ],
+      rollup: { total: 1, success: 1, failure: 0, pending: 0, skipped: 0 },
+    });
+    expect(Object.hasOwn(buildChecksResult(args), 'truncated')).toBe(false);
+    expect(buildChecksResult({ ...args, truncated: false })).not.toHaveProperty('truncated');
+    expect(buildChecksResult({ ...args, truncated: true }).truncated).toBe(true);
+  });
 });
 
 describe('buildFilesPage', () => {
@@ -174,6 +330,36 @@ describe('buildFilesPage', () => {
     const raw = Array.from({ length: 50 }, (_, i) => makeFile(i));
     const result = buildFilesPage({ page: 1, perPage: 50, rawFiles: raw });
     expect(result.nextCursor).toBe(2);
+  });
+
+  it('follows a short page that carries a Link: rel="next"', () => {
+    // A page can be shorter than the requested size and still have more pages;
+    // the client's partial-load row ("1 of 5 files loaded") only exists because
+    // of this case.
+    const result = buildFilesPage({
+      page: 1,
+      perPage: 50,
+      rawFiles: [makeFile(0)],
+      linkHasNext: true,
+    });
+    expect(result.files).toHaveLength(1);
+    expect(result.nextCursor).toBe(2);
+  });
+
+  it('stops on a full page that carries no Link: rel="next"', () => {
+    const raw = Array.from({ length: 50 }, (_, i) => makeFile(i));
+    const result = buildFilesPage({ page: 1, perPage: 50, rawFiles: raw, linkHasNext: false });
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('still stops at the page cap when the Link header says there is a next page', () => {
+    const result = buildFilesPage({
+      page: FILES_MAX_PAGES,
+      perPage: 50,
+      rawFiles: [makeFile(0)],
+      linkHasNext: true,
+    });
+    expect(result.nextCursor).toBeNull();
   });
 
   it('clamps to FILES_MAX_PAGES and returns null nextCursor at the cap', () => {
@@ -235,6 +421,58 @@ describe('sliceFileLines', () => {
     const huge = Array.from({ length: 1000 }, (_, i) => `line${i}`).join('\n');
     const result = sliceFileLines({ rawContent: huge, startLine: 1, endLine: 10_000 });
     expect(result.lines).toHaveLength(500);
+  });
+
+  it('reads a trailing newline as a final empty line', () => {
+    const result = sliceFileLines({ rawContent: 'a\nb\n', startLine: 1, endLine: 10 });
+    expect(result.lines).toEqual(['a', 'b', '']);
+    expect(result.totalLines).toBe(3);
+  });
+
+  it('drops the carriage return of a CRLF ending', () => {
+    const result = sliceFileLines({ rawContent: 'a\r\nb\r\nc', startLine: 2, endLine: 3 });
+    expect(result.lines).toEqual(['b', 'c']);
+    expect(result.totalLines).toBe(3);
+  });
+
+  it('keeps a bare trailing carriage return as file content', () => {
+    const result = sliceFileLines({ rawContent: 'a\r', startLine: 1, endLine: 1 });
+    expect(result.lines).toEqual(['a\r']);
+    expect(result.totalLines).toBe(1);
+  });
+
+  it('reads empty content as one empty line', () => {
+    expect(sliceFileLines({ rawContent: '', startLine: 1, endLine: 5 })).toEqual({
+      lines: [''],
+      totalLines: 1,
+    });
+  });
+
+  it('matches the slice of a fully split body for arbitrary content and windows', () => {
+    // Deterministic generator: the window scan must agree with the full split
+    // for every combination of CRLF endings, empty lines, and window bounds.
+    let seed = 20261022;
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    const pieces = ['', 'a', 'bb', 'x\r', 'line', '\r', 'tail\r'];
+    for (let round = 0; round < 500; round += 1) {
+      const lineCount = Math.floor(random() * 20);
+      const body = Array.from(
+        { length: lineCount },
+        () => pieces[Math.floor(random() * pieces.length)]
+      ).join(random() < 0.3 ? '\r\n' : '\n');
+      const rawContent = random() < 0.4 ? `${body}\n` : body;
+      const startLine = 1 + Math.floor(random() * 25);
+      const endLine = startLine + Math.floor(random() * 1200);
+      const result = sliceFileLines({ rawContent, startLine, endLine });
+      const all = rawContent.split(/\r?\n/);
+      expect(result.totalLines).toBe(all.length);
+      expect(result.lines).toEqual(
+        all.slice(startLine - 1, Math.min(endLine, startLine + FILE_LINES_MAX - 1))
+      );
+    }
   });
 });
 

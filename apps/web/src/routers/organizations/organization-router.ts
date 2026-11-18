@@ -4,50 +4,61 @@ import {
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
-import { db, readDb } from '@/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
-import { successResult } from '@/lib/maybe-result';
-import { captureMessage } from '@sentry/nextjs';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import type {
+  MemberOrganizationWithMembers,
+  OrganizationSsoPolicyView,
   OrganizationWithMembers,
+  OrganizationWithMembersResponse,
   UserOrganizationWithInheritedChildren,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   OrganizationNameSchema,
   UsageStatsSchema,
   TimePeriodSchema,
   OrganizationCreateRequestSchema,
   OrganizationPlanSchema,
-} from '@/lib/organizations/organization-types';
-import { CompanyDomainSchema } from '@/lib/organizations/company-domain';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { CompanyDomainSchema } from '@kilocode/web-shared/lib/organizations/company-domain';
 import {
   createOrganization,
   getOrganizationById,
   getOrganizationMembers,
   getUserOrganizationsWithSeats,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
-import { getStripeInvoices } from '@/lib/stripe';
-import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getStripeInvoices, getStripeInvoicesPage } from '@/lib/stripe';
+import {
+  adminProcedure,
+  baseProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
+  requireLiveOrganizationForPlatformAdmin,
   organizationMemberProcedure,
   organizationAdminMutationProcedure,
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { organizationsMembersRouter } from '@/routers/organizations/organization-members-router';
 import { organizationsSubscriptionRouter } from '@/routers/organizations/organization-subscription-router';
 import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
 import { organizationsUsageDetailsRouter } from '@/routers/organizations/organization-usage-details-router';
+import { organizationRequestLogsRouter } from '@/routers/organizations/organization-request-logs-router';
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import {
+  getCreditTransactionsForOrganization,
+  getCreditTransactionsForOrganizationPage,
+} from '@kilocode/web-shared/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { credit_transactions } from '@kilocode/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import {
@@ -59,16 +70,13 @@ import { organizationSsoRouter } from '@/routers/organizations/organization-sso-
 import { organizationAuditLogRouter } from '@/routers/organizations/organization-audit-log-router';
 import { organizationAdminRouter } from '@/routers/organizations/organization-admin-router';
 import { organizationModesRouter } from '@/routers/organizations/organization-modes-router';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { organizationDeploymentsRouter } from '@/routers/organizations/organization-deployments-router';
-import PostHogClient from '@/lib/posthog';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
-import { organizationAppBuilderRouter } from '@/routers/organizations/organization-app-builder-router';
+import { organizationVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
-import { organizationAutoTriageRouter } from '@/routers/organizations/organization-auto-triage-router';
-import { organizationAutoFixRouter } from '@/routers/organizations/organization-auto-fix-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
@@ -76,7 +84,10 @@ import { organizationFundsRouter } from '@/routers/organizations/organization-fu
 import { organizationKiloPassRouter } from '@/routers/organizations/organization-kilo-pass-router';
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
+import { organizationMcpGuardrailsRouter } from './organization-mcp-guardrails-router';
+import { organizationGuardrailsRouter } from '@/routers/organizations/organization-guardrails-router';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
@@ -100,12 +111,18 @@ const OrganizationInvoicesInputSchema = OrganizationIdInputSchema.extend({
   period: TimePeriodSchema.optional().default('month'),
 });
 
+const OrganizationTransactionsPageInputSchema = OrganizationIdInputSchema.extend({
+  cursor: z.string().optional(),
+});
+
+const OrganizationInvoicesPageInputSchema = OrganizationInvoicesInputSchema.extend({
+  cursor: z.string().optional(),
+});
+
 function daysAgo(days: number): Date {
   const now = new Date();
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 }
-
-const MAX_ORGANIZATIONS_PER_USER = 5;
 
 function getDateThreshold(period: string): Date | null {
   switch (period) {
@@ -127,18 +144,16 @@ export const organizationsRouter = createTRPCRouter({
   subscription: organizationsSubscriptionRouter,
   settings: organizationsSettingsRouter,
   usageDetails: organizationsUsageDetailsRouter,
+  requestLogs: organizationRequestLogsRouter,
   sso: organizationSsoRouter,
   auditLogs: organizationAuditLogRouter,
   admin: organizationAdminRouter,
   modes: organizationModesRouter,
-  deployments: organizationDeploymentsRouter,
   reviewAgent: organizationReviewAgentRouter,
   cloudAgentNext: organizationCloudAgentNextRouter,
-  appBuilder: organizationAppBuilderRouter,
+  vercelCompute: organizationVercelComputeRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
-  autoTriage: organizationAutoTriageRouter,
-  autoFix: organizationAutoFixRouter,
   autoTopUp: organizationAutoTopUpRouter,
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,
@@ -146,6 +161,9 @@ export const organizationsRouter = createTRPCRouter({
   kiloPass: organizationKiloPassRouter,
   groups: organizationGroupsRouter,
   subOrganizations: organizationSubOrganizationsRouter,
+  salesDemo: organizationSalesDemoRouter,
+  guardrails: organizationGuardrailsRouter,
+  mcpGuardrails: organizationMcpGuardrailsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;
@@ -191,35 +209,14 @@ export const organizationsRouter = createTRPCRouter({
       childrenByParentId.set(child.parentOrganizationId, children);
     }
 
-    return directOrganizations.map(
-      (organization): UserOrganizationWithInheritedChildren => ({
-        ...organization,
-        inheritedChildren: childrenByParentId.get(organization.organizationId) ?? [],
-      })
-    );
+    return directOrganizations.map((organization): UserOrganizationWithInheritedChildren => ({
+      ...organization,
+      inheritedChildren: childrenByParentId.get(organization.organizationId) ?? [],
+    }));
   }),
 
   create: baseProcedure.input(OrganizationCreateRequestSchema).mutation(async opts => {
     const { user } = opts.ctx;
-    const existingOrgMemberships = await getUserOrganizationsWithSeats(user.id);
-
-    if (
-      existingOrgMemberships.length >= MAX_ORGANIZATIONS_PER_USER &&
-      !user.google_user_email.endsWith('kilocode.ai')
-    ) {
-      captureMessage('User hit max organizations', {
-        level: 'warning',
-        extra: {
-          userId: user.id,
-          existingOrgMemberships: existingOrgMemberships.length,
-          max: MAX_ORGANIZATIONS_PER_USER,
-        },
-      });
-      throw new TRPCError({
-        code: 'TOO_MANY_REQUESTS',
-        message: `You have reached the maximum number of organizations (${MAX_ORGANIZATIONS_PER_USER}) allowed. Please contact support if you need more.`,
-      });
-    }
     const org = await createOrganization(
       opts.input.name,
       user.id,
@@ -275,18 +272,8 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: input.organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(input.organizationId)) ?? organization;
-        }
+        const expiryResult = await processOrganizationExpirations(input.organizationId, new Date());
+        organization = { ...organization, ...expiryResult };
       }
 
       return {
@@ -312,7 +299,7 @@ export const organizationsRouter = createTRPCRouter({
 
   withMembers: baseProcedure
     .input(OrganizationIdInputSchema)
-    .query<OrganizationWithMembers>(async opts => {
+    .query<OrganizationWithMembersResponse>(async opts => {
       const organizationId = opts.input.organizationId;
       const callerRole = await ensureOrganizationAccess(opts.ctx, organizationId);
 
@@ -330,18 +317,12 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(organizationId)) ?? organization;
+        await processOrganizationExpirations(organizationId, new Date());
+        const refreshedOrganization = await getOrganizationById(organizationId);
+        if (!refreshedOrganization) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
         }
+        organization = refreshedOrganization;
       }
 
       const [members, ssoPolicy, childOrganizations] = await Promise.all([
@@ -402,32 +383,76 @@ export const organizationsRouter = createTRPCRouter({
         };
       });
 
+      // Role-gated DTO: ordinary members must not receive the Stripe customer
+      // id or the invitation secret. Admin-and-above keep the full shape.
+      //
+      // Stripped for member:
+      // - organization.stripe_customer_id (payment identifier; rendered only in
+      //   the admin dashboard, OrganizationInfoCard.tsx).
+      // - invited member inviteToken/inviteUrl (the accept-invite secret).
+      // - member currentDailyUsageUsd (no member-role consumer).
+      //
+      // Compatibility: inviteId, dailyUsageLimitUsd, emailStatus, and
+      // childOrganizationMemberships are kept for member-facing consumers
+      // (OrganizationMembersCard, mobile members screen); remove when those
+      // consumers migrate to organizations.members.listPublic.
+      const effectiveSsoPolicy: OrganizationSsoPolicyView =
+        ssoPolicy.status === 'required'
+          ? {
+              required: true,
+              source: ssoPolicy.source,
+              domain: ssoPolicy.domain,
+              configurationError: false,
+            }
+          : {
+              required: false,
+              source: null,
+              domain: null,
+              configurationError: ssoPolicy.status === 'misconfigured',
+            };
+
+      if (callerRole === 'member') {
+        const { stripe_customer_id: _stripeCustomerId, ...memberOrganization } = organization;
+        const memberPayload = membersWithChildOrganizations.map(member => {
+          if (member.status === 'active') {
+            const { currentDailyUsageUsd: _currentDailyUsageUsd, ...activeMember } = member;
+            return activeMember;
+          }
+          const {
+            inviteToken: _inviteToken,
+            inviteUrl: _inviteUrl,
+            currentDailyUsageUsd: _currentDailyUsageUsd,
+            ...invitedMember
+          } = member;
+          return invitedMember;
+        });
+
+        return {
+          ...memberOrganization,
+          callerRole,
+          members: memberPayload,
+          childOrganizations,
+          effectiveSsoPolicy,
+        } satisfies MemberOrganizationWithMembers;
+      }
+
       return {
         ...organization,
         callerRole,
         members: membersWithChildOrganizations,
         childOrganizations,
-        effectiveSsoPolicy:
-          ssoPolicy.status === 'required'
-            ? {
-                required: true,
-                source: ssoPolicy.source,
-                domain: ssoPolicy.domain,
-                configurationError: false,
-              }
-            : {
-                required: false,
-                source: null,
-                domain: null,
-                configurationError: ssoPolicy.status === 'misconfigured',
-              },
-      };
+        effectiveSsoPolicy,
+      } satisfies OrganizationWithMembers;
     }),
 
   createChild: organizationAdminMutationProcedure
     .input(OrganizationCreateChildSchema)
-    .mutation(async ({ input }) => {
-      const organization = await createChildOrganization(input.name, input.organizationId);
+    .mutation(async ({ input, ctx }) => {
+      const organization = await createChildOrganization(
+        input.name,
+        input.organizationId,
+        ctx.user.id
+      );
       return { organization };
     }),
 
@@ -452,10 +477,28 @@ export const organizationsRouter = createTRPCRouter({
   update: organizationBillingMutationProcedure
     .input(OrganizationUpdateSchema)
     .mutation(async opts => {
-      await db
-        .update(organizations)
-        .set({ name: opts.input.name })
-        .where(eq(organizations.id, opts.input.organizationId));
+      await db.transaction(async tx => {
+        const [current] = await tx
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, opts.input.organizationId));
+        const oldName = current?.name;
+        await tx
+          .update(organizations)
+          .set({ name: opts.input.name })
+          .where(eq(organizations.id, opts.input.organizationId));
+        if (oldName !== undefined && oldName !== opts.input.name) {
+          await createAuditLog({
+            organization_id: opts.input.organizationId,
+            action: 'organization.settings.change',
+            actor_email: opts.ctx.user.google_user_email,
+            actor_id: opts.ctx.user.id,
+            actor_name: opts.ctx.user.google_user_name,
+            message: `Renamed organization from "${oldName}" to "${opts.input.name}"`,
+            tx,
+          });
+        }
+      });
       return {
         organization: {
           id: opts.input.organizationId,
@@ -488,7 +531,7 @@ export const organizationsRouter = createTRPCRouter({
     }),
 
   updateSeatsRequired: adminProcedure.input(OrganizationSeatsUpdateSchema).mutation(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     await db
       .update(organizations)
       .set({ require_seats: opts.input.seatsRequired })
@@ -536,6 +579,15 @@ export const organizationsRouter = createTRPCRouter({
     return await getCreditTransactionsForOrganization(opts.input.organizationId);
   }),
 
+  creditTransactionsPage: organizationMemberProcedure
+    .input(OrganizationTransactionsPageInputSchema)
+    .query(async opts => {
+      return await getCreditTransactionsForOrganizationPage(
+        opts.input.organizationId,
+        opts.input.cursor
+      );
+    }),
+
   getCreditBlocks: organizationMemberProcedure.query(async opts => {
     const now = new Date();
     const organizationId = opts.input.organizationId;
@@ -571,7 +623,7 @@ export const organizationsRouter = createTRPCRouter({
 
   // this is an admin only route used to show seat purchases in a debug UI for KILO admins
   seatPurchases: adminProcedure.input(OrganizationIdInputSchema).query(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     const seatPurchases = await db
       .select()
       .from(organization_seats_purchases)
@@ -600,5 +652,26 @@ export const organizationsRouter = createTRPCRouter({
 
       const invoices = await getStripeInvoices(stripeId, dateThreshold);
       return invoices;
+    }),
+
+  invoicesPage: organizationBillingProcedure
+    .input(OrganizationInvoicesPageInputSchema)
+    .query(async opts => {
+      const organization = await getOrganizationById(opts.input.organizationId);
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      const dateThreshold = getDateThreshold(opts.input.period);
+
+      let stripeId = organization.stripe_customer_id;
+      if (!stripeId) {
+        stripeId = await getOrCreateStripeCustomerIdForOrganization(opts.input.organizationId);
+      }
+
+      return await getStripeInvoicesPage(stripeId, dateThreshold, opts.input.cursor);
     }),
 });

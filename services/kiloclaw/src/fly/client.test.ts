@@ -309,10 +309,6 @@ describe('extendVolume', () => {
   });
 });
 
-// ============================================================================
-// createVolumeWithFallback
-// ============================================================================
-
 const fakeConfig: FlyClientConfig = { apiToken: 'test', appName: 'test-app' };
 
 function mockFetchResponse(status: number, body: object | string): Response {
@@ -431,10 +427,6 @@ describe('createVolumeWithFallback', () => {
   });
 });
 
-// ============================================================================
-// listVolumeSnapshots
-// ============================================================================
-
 describe('listVolumeSnapshots', () => {
   it('returns snapshots array on success', async () => {
     const snapshots = [
@@ -481,10 +473,6 @@ describe('listVolumeSnapshots', () => {
     fetchSpy.mockRestore();
   });
 });
-
-// ============================================================================
-// updateMachine — skipLaunch
-// ============================================================================
 
 describe('updateMachine', () => {
   const machineResponse = {

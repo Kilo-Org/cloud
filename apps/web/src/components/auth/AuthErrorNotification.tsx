@@ -1,21 +1,73 @@
 'use client';
-import { BlockedNotification } from '@/components/auth/BlockedNotification';
 
-export function AuthErrorNotification({ error }: { error: string }) {
-  if (error === 'BLOCKED') return <BlockedNotification />;
+import React from 'react';
+import { BlockedNotification } from '@/components/auth/BlockedNotification';
+import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
+import { getProviderById } from '@/lib/auth/provider-metadata';
+import { parseSignupStepUpMethodsParam } from '@/lib/auth/redirect-urls';
+
+export function AuthErrorNotification({
+  error,
+  stepUpMethods,
+  shell = false,
+}: {
+  error: string;
+  /** The untrusted `methods` query value that accompanies `SIGNUP-STEP-UP`. */
+  stepUpMethods?: string;
+  /** True inside the app shell, which renders no link out of itself. */
+  shell?: boolean;
+}) {
+  if (error === 'BLOCKED') return <BlockedNotification shell={shell} />;
 
   if (error === 'DIFFERENT-OAUTH')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Error">
-          An account already exists with this email. Did you use a different login method?
+          An account already exists with this email, and it already has this type of sign-in method
+          linked. Sign in with the original account for that method.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'DISCOVERY_RATE_LIMITED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Too Many Attempts">
+          Too many sign-in attempts. Please try again later.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'DISCOVERY_FAILED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Sign-in Methods Unavailable">
+          We could not find your sign-in methods. Please try again.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'NO_SUPPORTED_SIGN_IN_METHOD')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="No Supported Sign-in Method">
+          No supported sign-in method is available for this account. Use a different email.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'MAGIC_LINK_DELIVERY_FAILED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Magic Link Not Sent">
+          We could not send your magic link. Please try again.
         </ErrorNotificationBox>
       </div>
     );
 
   if (error === 'ACCOUNT-ALREADY-LINKED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Already Linked">
           This account is already linked to another user. Please use a different account or contact
           support if you believe this is an error.
@@ -25,7 +77,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'PROVIDER-ALREADY-LINKED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Provider Already Linked">
           You already have this type of account linked. Please unlink the existing account first.
         </ErrorNotificationBox>
@@ -34,7 +86,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'LINKING-FAILED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Linking Failed">
           Account linking failed. Please try again or contact support if the problem persists.
         </ErrorNotificationBox>
@@ -43,34 +95,101 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'SIGNUP-RATE-LIMITED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Signup Blocked">
           Automated account creation was detected and blocked. If this was a mistake, please{' '}
-          <a href="https://kilo.ai/support" className="underline hover:text-red-100">
-            contact support
-          </a>{' '}
+          {shell ? (
+            'contact support'
+          ) : (
+            <a
+              href="https://kilo.ai/support"
+              className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
+            >
+              contact support
+            </a>
+          )}{' '}
           and we&apos;ll get you sorted out.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'SIGNUP-STEP-UP') {
+    const methodNames = parseSignupStepUpMethodsParam(stepUpMethods).map(
+      method => getProviderById(method).name
+    );
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Finish Creating Your Account">
+          {methodNames.length > 0
+            ? `To create your account, continue with ${new Intl.ListFormat('en', { type: 'disjunction' }).format(methodNames)}.`
+            : 'To create your account, continue with a different sign-in method.'}
+        </ErrorNotificationBox>
+      </div>
+    );
+  }
+
+  if (error === 'SIGNUP-UNAVAILABLE')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Signup Temporarily Unavailable">
+          We couldn&apos;t complete your signup right now. Please try again in a few moments.
         </ErrorNotificationBox>
       </div>
     );
 
   if (error === 'EMAIL-ALREADY-USED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Already Exists">
           An account already exists for this email address. Try signing in with the original login
           method, or{' '}
-          <a href="https://kilo.ai/support" className="underline hover:text-red-100">
-            contact support
-          </a>{' '}
+          {shell ? (
+            'contact support'
+          ) : (
+            <a
+              href="https://kilo.ai/support"
+              className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
+            >
+              contact support
+            </a>
+          )}{' '}
           if you need help accessing it.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'EMAIL-REQUIRED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Email Address Required">
+          This sign-in method did not share an email address, so it cannot identify an account. Add
+          an email address to the provider, or use a different sign-in method.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'EMAIL-SIGNUP-DISABLED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Email Sign-up Is Paused">
+          New accounts can&apos;t be created with email right now. Please choose one of the other
+          sign-in options. Already have an account? You can still sign in with email.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'EMAIL-INVALID-FORMAT')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Invalid Email">
+          Please enter a valid email address.
         </ErrorNotificationBox>
       </div>
     );
 
   if (error === 'EMAIL-MUST-BE-LOWERCASE')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Invalid Email">
           Email address must be lowercase for new account signup.
         </ErrorNotificationBox>
@@ -79,7 +198,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'EMAIL-CANNOT-CONTAIN-PLUS')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Invalid Email">
           Email address cannot contain a + character for new account signup.
         </ErrorNotificationBox>
@@ -87,7 +206,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
     );
 
   return (
-    <div data-error-notification>
+    <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
       <ErrorNotificationBox title="Error">
         Oops! Something went wrong trying to log in.
       </ErrorNotificationBox>
@@ -110,7 +229,7 @@ function ErrorNotificationBox({ title, children }: { title: string; children: Re
       </div>
       <p className="mt-2 text-red-300">{children}</p>
       <button
-        className="absolute top-2 right-2 rounded-md p-1 text-red-600 hover:bg-red-900/50 hover:text-red-200"
+        className="absolute top-2 right-2 rounded-md p-1 text-red-600 hover:bg-red-900/50 hover:text-red-200 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center pointer-coarse:justify-center"
         onClick={() => {
           // Close the notification by hiding it
           const element = document.querySelector('[data-error-notification]') as HTMLElement;

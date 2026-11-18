@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import {
@@ -6,6 +5,7 @@ import {
   verifyNativeGoogleIdToken,
   exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
+  NonceStoreUnavailableError,
 } from '@/lib/auth/native-id-tokens';
 import { AppleJwtClientError } from '@/lib/auth/apple-jwks';
 import {
@@ -13,34 +13,52 @@ import {
   commitSignInCode,
   releaseSignInCode,
   consumeSignInCode,
-} from '@/lib/auth/magic-link-tokens';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import {
+  hosted_domain_specials,
+  SIGNUP_STEP_UP_METHODS,
+} from '@kilocode/web-shared/lib/auth/constants';
+import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
-  findUserById,
-  findUserByNormalizedEmail,
+  findUserBySignInCodeEmail,
   findUserIdByAuthProvider,
   type CreateOrUpdateUserArgs,
+  type CreateOrUpdateUserResult,
 } from '@/lib/user';
-import { generateApiToken } from '@/lib/tokens';
+import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
-  checkNativeAdmission,
-  validateAdmissionPayload,
+  requireAdmissionPayload,
+  countAdmissionCondition,
   verifyAdmissionAsync,
   persistAttestedKey,
-  shouldRefuseAsyncFailure,
   KeyCollisionError,
-  type AdmissionPayload,
   type VerifyAdmissionOk,
 } from '@/lib/auth/native-admission';
 import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
+import {
+  isNativeTokenAddressRateLimited,
+  isNativeTokenUserRateLimited,
+} from '@/lib/auth/native-token-rate-limit';
+import {
+  createPendingLinkForDifferentOAuth,
+  resolvePendingLinkForUser,
+  summarizePendingLink,
+  type PendingLinkResult,
+} from '@/lib/auth/pending-link';
 import { captureMessage } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const posthogClient = PostHogClient();
 
@@ -64,6 +82,62 @@ function eligibilityResponse(
   );
 }
 
+/**
+ * A refused user settlement. An unavailable signup is retryable (503); a step-up names the
+ * sign-in methods that can finish the signup.
+ */
+async function settlementFailureResponse(
+  failure: Extract<CreateOrUpdateUserResult, { success: false }>,
+  args?: CreateOrUpdateUserArgs
+) {
+  if (failure.error === 'DIFFERENT-OAUTH' && args) {
+    const created = await createPendingLinkForDifferentOAuth(args, failure);
+    if (created) {
+      const summary = await summarizePendingLink(created.pendingLink);
+      return NextResponse.json(
+        {
+          error: failure.error,
+          pendingLink: {
+            token: created.secret,
+            provider: summary.provider,
+            email: summary.email,
+            methods: summary.methods,
+            emailCode: summary.emailCode,
+            expiresAt: summary.expiresAt,
+          },
+        },
+        { status: 403 }
+      );
+    }
+  }
+  if (failure.error === 'SIGNUP-STEP-UP') {
+    return NextResponse.json({ error: failure.error, methods: failure.methods }, { status: 403 });
+  }
+  // Shipped apps only understand step-up, which offers their native Google and Apple sign-in.
+  if (failure.error === 'EMAIL-SIGNUP-DISABLED') {
+    return NextResponse.json(
+      { error: 'SIGNUP-STEP-UP', methods: [...SIGNUP_STEP_UP_METHODS] },
+      { status: 403 }
+    );
+  }
+  return NextResponse.json(
+    { error: failure.error },
+    { status: failure.error === 'SIGNUP-UNAVAILABLE' ? 503 : 403 }
+  );
+}
+
+/**
+ * A rate-limited account. Counted once the sign-in has resolved its account and
+ * before any device session or refresh token is written, so a caller that
+ * outruns the firewall rule leaves no credential rows behind.
+ */
+async function userRateLimitResponse(request: Request, kiloUserId: string) {
+  if (await isNativeTokenUserRateLimited(request, kiloUserId)) {
+    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+  }
+  return undefined;
+}
+
 async function checkExistingProviderAccount(
   provider: 'apple' | 'google',
   providerAccountId: string
@@ -76,12 +150,37 @@ async function checkExistingProviderAccount(
   if (!user) {
     throw new Error(`Auth provider references missing user ${userId}`);
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
   const eligibility = await checkDomainSignInEligibility(user.google_user_email);
   return eligibility.ok ? undefined : eligibilityResponse(eligibility);
 }
+
+/**
+ * Mint the long-lived credential returned to a sign-in that does not receive a
+ * refresh pair. The response shape stays the same, and the credential carries
+ * the device session resolved by the caller.
+ */
+function legacyTokenResponse(params: {
+  user: User;
+  deviceSessionId: string;
+  created: boolean;
+  pendingLink?: PendingLinkResult;
+}) {
+  captureMessage('native_token_legacy_long_lived_count: 1');
+  const token = generateApiToken(params.user, { deviceSessionId: params.deviceSessionId });
+  return NextResponse.json(
+    {
+      token,
+      created: params.created,
+      ...(params.pendingLink ? { pendingLink: params.pendingLink } : {}),
+    },
+    { status: 200 }
+  );
+}
+
+const pendingLinkTokenSchema = z.string().trim().min(1).max(512).optional();
 
 const requestSchema = z.discriminatedUnion('provider', [
   z.object({
@@ -91,6 +190,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     nonce: z.string().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
   }),
   z.object({
     provider: z.literal('google'),
@@ -99,6 +199,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     googleClientId: z.string().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
   }),
   z.object({
     provider: z.literal('email'),
@@ -107,33 +208,52 @@ const requestSchema = z.discriminatedUnion('provider', [
     challengeId: z.string().uuid().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
+  }),
+  z.object({
+    // A passkey ticket is minted by the passkey authenticate route after the
+    // WebAuthn assertion verified server-side; it is redeemed exactly once.
+    provider: z.literal('passkey'),
+    ticket: z.string(),
+    supportsRefresh: z.boolean().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
   }),
 ]);
 
 /**
- * Native (mobile) sign-in token exchange. Verifies an Apple/Google ID token or an
- * email sign-in code, creates or updates the user, and mints an API token.
+ * Native (mobile) sign-in token exchange. Verifies an Apple/Google ID token, an
+ * email sign-in code, or a passkey sign-in ticket, creates or updates the user,
+ * and mints an API token.
  *
- * Verification order per plan:
- *   1. Sync admission gate (checkNativeAdmission).
- *   2. Provider identity verification.
- *   3. Async admission verification (BEFORE user settlement).
+ * Every request must prove the device is attested. The order is:
+ *   1. Admission gate: a missing or malformed proof is refused with 403.
+ *   2. Admission verification: the App Attest or Play Integrity proof is
+ *      verified before any provider call, OTP reservation, ticket consumption,
+ *      or user settlement, so a refusal precedes every side effect.
+ *   3. Provider identity verification.
  *   4. User settlement (createOrUpdateUser).
  *   5. Key persistence (after settlement, binds key to user id).
  *
+ * A passkey ticket skips steps 4 and 5: the ticket is a live proof that a
+ * WebAuthn assertion verified server-side, so the user exists already and no
+ * account settlement or attested-key binding applies.
+ *
  * Response contract (frozen — mobile client is built against it):
- *   200 { token, refreshToken?, expiresIn? }
+ *   200 { token, refreshToken?, expiresIn?, created? }
  *   401 { error: 'INVALID_TOKEN' }
  *   401 { error: 'INVALID_CODE' }
+ *   401 { error: 'INVALID_TICKET' }
  *   425 { error: 'CODE_IN_PROGRESS' }
  *   429 { error: 'TOO_MANY_ATTEMPTS' }
+ *   429 { error: 'RATE_LIMITED' }
+ *   503 { error: 'NONCE_STORE_UNAVAILABLE' }
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
  *   403 { error: AuthErrorType }
  *   403 { error: 'ADMISSION_REQUIRED' }
  *   400 invalid request body
- *   500 provider infrastructure error
+ *   500 admission provider or identity provider infrastructure error
  */
-export async function POST(request: NextRequest) {
+export const POST = withRestTiming('/api/auth/native/token', async (request: Request) => {
   const body = await request.json().catch(() => undefined);
   const validation = requestSchema.safeParse(body);
 
@@ -143,28 +263,120 @@ export async function POST(request: NextRequest) {
 
   const data = validation.data;
 
-  // ── Step 1: Sync admission gate ──────────────────────────────────────────
-  const admissionGate = checkNativeAdmission(body);
-  if (!admissionGate.admission.ok) {
-    return NextResponse.json({ error: admissionGate.admission.errorCode }, { status: 403 });
+  // ── Step 0: Client-address rate limit ────────────────────────────────────
+  // Counted before the admission gate so one address cannot spend the provider
+  // calls that admission and identity verification make. Only a rule that
+  // answered may let the exchange through: a rule that is not configured
+  // refuses here, before any of that work, and is reported.
+  if (await isNativeTokenAddressRateLimited(request)) {
+    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
   }
 
-  // ── Step 2: Extract and validate admission payload ───────────────────────
-  // Only extract when async verification is needed (enforce or report mode).
-  let admissionPayload: AdmissionPayload | undefined;
-  if (admissionGate.verifyAsync && body['admission'] && typeof body['admission'] === 'object') {
-    admissionPayload = validateAdmissionPayload(body['admission']);
+  // ── Step 1: Admission gate ───────────────────────────────────────────────
+  // Credentials are issued only to an attested device. A missing or malformed
+  // proof is refused before any provider call, OTP reservation, ticket
+  // consumption, or user settlement, so no side effect precedes the gate.
+  const admissionPayload = requireAdmissionPayload(body);
+  if (!admissionPayload) {
+    countAdmissionCondition('native_admission_missing');
+    return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
+
+  // ── Step 2: Verify the proof ─────────────────────────────────────────────
+  // A refused verdict is a 403. A provider fault is retryable, so it must not
+  // be reported as a refusal of the device.
+  let admissionVerification: VerifyAdmissionOk;
+  try {
+    const verified = await verifyAdmissionAsync(admissionPayload);
+    if (!verified.ok) {
+      countAdmissionCondition('native_admission_refused');
+      return NextResponse.json({ error: verified.errorCode }, { status: 403 });
+    }
+    admissionVerification = verified;
+  } catch {
+    captureMessage('native_admission_unavailable');
+    return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+
+  // A proof bound to a key that already belongs to an account cannot create a
+  // second one. Checked before settlement so a collision never leaves a user
+  // row or a Stripe customer behind.
+  const verifyNewAccountAdmission = () => Promise.resolve(!admissionVerification.existingKeyUserId);
 
   // ── Step 3: Provider identity verification ───────────────────────────────
   let args: CreateOrUpdateUserArgs;
   let autoLinkToExistingUser: boolean;
+
+  if (data.provider === 'passkey') {
+    // The ticket is single-use and short-lived, and was minted only after a
+    // WebAuthn assertion verified against a server-stored challenge, so
+    // redeeming it is the identity proof. A replay consumes no row.
+    const ticket = await consumeSignInTicket(data.ticket);
+    if (!ticket) {
+      return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+    }
+
+    const user = await findUserById(ticket.kilo_user_id);
+    if (!user) {
+      return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+    }
+
+    if (isBlockedAccount(user)) {
+      return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
+    }
+
+    // Same forced-SSO and blacklist gate every other native provider passes.
+    const eligibility = await checkDomainSignInEligibility(user.google_user_email);
+    if (!eligibility.ok) {
+      return eligibilityResponse(eligibility);
+    }
+
+    // Fall into the same device-session issuance the other providers use.
+    // `created` is always false: a passkey belongs to an existing user.
+    const rateLimited = await userRateLimitResponse(request, user.id);
+    if (rateLimited) {
+      return rateLimited;
+    }
+
+    const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+
+    if (data.supportsRefresh) {
+      const sid = await createDeviceSession({
+        userId: user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      });
+      const pair = await issueSessionCredentials(user, sid);
+      return NextResponse.json(
+        {
+          token: pair.token,
+          refreshToken: pair.refreshToken,
+          expiresIn: pair.expiresIn,
+          created: false,
+          ...(pendingLink ? { pendingLink } : {}),
+        },
+        { status: 200 }
+      );
+    }
+
+    return legacyTokenResponse({
+      user,
+      deviceSessionId: await createDeviceSession({
+        userId: user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      }),
+      created: false,
+      ...(pendingLink ? { pendingLink } : {}),
+    });
+  }
 
   if (data.provider === 'apple') {
     let verified;
     try {
       verified = await verifyNativeAppleIdToken(data.idToken, data.nonce);
     } catch (error) {
+      if (error instanceof NonceStoreUnavailableError) {
+        return NextResponse.json({ error: 'NONCE_STORE_UNAVAILABLE' }, { status: 503 });
+      }
       if (!isInvalidNativeTokenError(error)) {
         throw error;
       }
@@ -195,7 +407,7 @@ export async function POST(request: NextRequest) {
     let verified;
     try {
       if (data.serverAuthCode) {
-        const { GOOGLE_CLIENT_ID } = await import('@/lib/config.server');
+        const { GOOGLE_CLIENT_ID } = await import('@kilocode/web-shared/lib/config.server');
         if (!data.googleClientId || data.googleClientId !== GOOGLE_CLIENT_ID) {
           return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
         }
@@ -209,6 +421,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
       }
     } catch (error) {
+      if (error instanceof NonceStoreUnavailableError) {
+        return NextResponse.json({ error: 'NONCE_STORE_UNAVAILABLE' }, { status: 503 });
+      }
       if (!isInvalidNativeTokenError(error)) {
         throw error;
       }
@@ -237,8 +452,12 @@ export async function POST(request: NextRequest) {
     autoLinkToExistingUser = true;
   } else {
     // Email sign-in code path: reserve → settle → commit.
-    const existingUser = await findUserByNormalizedEmail(data.email);
-    const email = existingUser?.google_user_email ?? data.email.toLowerCase();
+    // The code is bound to the address it was delivered to, so the account is
+    // resolved for that same address. An alias of another account's address is
+    // a different address: it settles the alias, and the signup rules refuse it
+    // when the normalized address is already taken.
+    const existingUser = await findUserBySignInCodeEmail(data.email);
+    const email = existingUser?.google_user_email ?? getDeliveredEmailAddress(data.email);
 
     const reserveResult = await reserveSignInCode(data.email, data.code, data.challengeId);
     if (reserveResult === 'invalid') {
@@ -252,6 +471,22 @@ export async function POST(request: NextRequest) {
     }
 
     let phase: 'reserved' | 'release' | 'committed' = 'reserved';
+    // Session-bound credentials prepared for this request. They are minted
+    // before the code is finalized, so a request that ends without delivering
+    // them must revoke what it created.
+    let preparedSessionId: string | undefined;
+    let preparedCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
+
+    const abandonPreparedCredentials = async () => {
+      if (!preparedSessionId) {
+        return;
+      }
+      try {
+        await revokeDeviceSession(preparedSessionId, 'sign_in_not_completed');
+      } catch {
+        captureMessage('native_token_session_cleanup_failed');
+      }
+    };
 
     try {
       const eligibility = await checkDomainSignInEligibility(email);
@@ -272,27 +507,6 @@ export async function POST(request: NextRequest) {
       };
       autoLinkToExistingUser = true;
 
-      // ── Step 3b: Async admission verification BEFORE settlement ────────
-      let admissionVerification: VerifyAdmissionOk | undefined;
-      if (admissionPayload) {
-        try {
-          const verified = await verifyAdmissionAsync(admissionPayload);
-          if (!verified.ok) {
-            // Under report mode, evaluate but still admit.
-            if (shouldRefuseAsyncFailure()) {
-              phase = 'release';
-              return NextResponse.json({ error: verified.errorCode }, { status: 403 });
-            }
-          } else {
-            admissionVerification = verified;
-          }
-        } catch {
-          // Provider infrastructure failure — surface as 5xx.
-          phase = 'release';
-          return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
-        }
-      }
-
       // ── Step 4: User settlement ──────────────────────────────────────
       const result = await createOrUpdateUser(
         args,
@@ -301,14 +515,15 @@ export async function POST(request: NextRequest) {
         request.headers,
         undefined,
         undefined,
-        true
+        true,
+        verifyNewAccountAdmission
       );
       if (!result.success) {
         phase = 'release';
-        return NextResponse.json({ error: result.error }, { status: 403 });
+        return settlementFailureResponse(result, args);
       }
 
-      if (result.user.blocked_reason) {
+      if (isBlockedAccount(result.user)) {
         phase = 'release';
         return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
       }
@@ -321,33 +536,30 @@ export async function POST(request: NextRequest) {
 
       // ── Step 4.5: Key ownership check BEFORE code commit ─────────────
       // For assertion (existing key) and attestation (keyId already bound to
-      // another user): enforce → refuse without consuming the code so a
-      // legitimate retry remains possible. Report → log, skip persistence,
-      // and issue credentials.
-      if (admissionVerification) {
-        const hasOwnershipMismatch =
-          admissionVerification.existingKeyUserId &&
-          admissionVerification.existingKeyUserId !== result.user.id;
-        if (hasOwnershipMismatch) {
-          captureMessage('native_attested_key_ownership_mismatch');
-          if (shouldRefuseAsyncFailure()) {
-            phase = 'release';
-            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-          }
-          // Report mode: skip key persistence, admit, and issue credentials.
-          admissionVerification = undefined;
-        }
+      // another user): refuse without consuming the code so a legitimate retry
+      // remains possible.
+      if (
+        admissionVerification.existingKeyUserId &&
+        admissionVerification.existingKeyUserId !== result.user.id
+      ) {
+        captureMessage('native_attested_key_ownership_mismatch');
+        phase = 'release';
+        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+      }
+
+      // ── Step 4.6: Account rate limit BEFORE code commit ───────────────
+      // A refusal releases the reservation, so the code stays usable once the
+      // caller is under the rate limit again.
+      const rateLimited = await userRateLimitResponse(request, result.user.id);
+      if (rateLimited) {
+        phase = 'release';
+        return rateLimited;
       }
 
       // ── Step 5: Persist attested key after settlement ─────────────────
-      // Must run BEFORE code commit so a key collision under enforce does
-      // not burn the sign-in code without issuing a credential.
-      let sessionId: string | undefined;
-      let refreshCredentials:
-        | { token: string; refreshToken: string; expiresIn: number }
-        | undefined;
-
-      if (admissionVerification && data.supportsRefresh) {
+      // Must run BEFORE code commit so a key collision does not burn the
+      // sign-in code without issuing a credential.
+      if (data.supportsRefresh) {
         // Bind key persistence and session creation in one transaction.
         try {
           const combined = await createDeviceSessionWithAttestedKey({
@@ -356,8 +568,8 @@ export async function POST(request: NextRequest) {
             user: result.user,
             verification: admissionVerification,
           });
-          sessionId = combined.sessionId;
-          refreshCredentials = {
+          preparedSessionId = combined.sessionId;
+          preparedCredentials = {
             token: combined.token,
             refreshToken: combined.refreshToken,
             expiresIn: combined.expiresIn,
@@ -365,40 +577,44 @@ export async function POST(request: NextRequest) {
         } catch (err) {
           if (err instanceof KeyCollisionError) {
             captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              phase = 'release';
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            // Bookkeeping failure — log and fall through to legacy token.
-            captureMessage('native_attested_key_persist_failed_after_settlement');
+            phase = 'release';
+            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
+          // Bookkeeping failure — log and fall through to a plain session.
+          captureMessage('native_attested_key_persist_failed_after_settlement');
         }
-      } else if (admissionVerification) {
+      } else {
         try {
           await persistAttestedKey(result.user.id, admissionVerification);
         } catch (err) {
           if (err instanceof KeyCollisionError) {
             captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              phase = 'release';
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            captureMessage('native_attested_key_persist_failed_after_settlement');
+            phase = 'release';
+            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
+          captureMessage('native_attested_key_persist_failed_after_settlement');
         }
       }
 
-      // ── Step 6: Consume the sign-in code AFTER key persistence ─────────
+      // ── Step 5.5: Resolve the device session and credential pair ───────
+      // Prepare session-bound credentials before finalizing the sign-in code.
+      preparedSessionId ??= await createDeviceSession({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      });
+
+      if (data.supportsRefresh && !preparedCredentials) {
+        preparedCredentials = await issueSessionCredentials(result.user, preparedSessionId);
+      }
+
+      // ── Step 6: Consume the sign-in code AFTER key and session persistence ─
       // The code is only committed once all pre-credential gates pass, so
       // a refusal never burns a code without issuing a credential.
       const committed = await commitSignInCode(data.email, data.code, data.challengeId);
       if (!committed) {
         const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
         if (!consumed) {
+          await abandonPreparedCredentials();
           return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
         }
         captureMessage('native_token_code_reservation_lapsed');
@@ -409,36 +625,30 @@ export async function POST(request: NextRequest) {
       if (result.deferredSignInEvent) {
         posthogClient.capture(result.deferredSignInEvent);
       }
+      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
 
-      if (refreshCredentials) {
+      if (preparedCredentials) {
         return NextResponse.json(
           {
-            token: refreshCredentials.token,
-            refreshToken: refreshCredentials.refreshToken,
-            expiresIn: refreshCredentials.expiresIn,
+            token: preparedCredentials.token,
+            refreshToken: preparedCredentials.refreshToken,
+            expiresIn: preparedCredentials.expiresIn,
+            created: result.isNew,
+            ...(pendingLink ? { pendingLink } : {}),
           },
           { status: 200 }
         );
       }
 
-      if (data.supportsRefresh) {
-        const sid =
-          sessionId ??
-          (await createDeviceSession({
-            userId: result.user.id,
-            userAgent: request.headers.get('user-agent') ?? undefined,
-          }));
-        const pair = await issueSessionCredentials(result.user, sid);
-        return NextResponse.json(
-          { token: pair.token, refreshToken: pair.refreshToken, expiresIn: pair.expiresIn },
-          { status: 200 }
-        );
-      }
-
-      captureMessage('native_token_legacy_long_lived_count: 1');
-      const token = generateApiToken(result.user);
-      return NextResponse.json({ token }, { status: 200 });
+      return legacyTokenResponse({
+        user: result.user,
+        deviceSessionId: preparedSessionId,
+        created: result.isNew,
+        ...(pendingLink ? { pendingLink } : {}),
+      });
     } catch (error) {
+      // Nothing was delivered, so nothing minted for this request stays usable.
+      await abandonPreparedCredentials();
       phase = 'release';
       throw error;
     } finally {
@@ -450,24 +660,6 @@ export async function POST(request: NextRequest) {
 
   // Apple/Google path.
 
-  // ── Step 3c: Async admission verification BEFORE settlement ──────────────
-  let admissionVerification: VerifyAdmissionOk | undefined;
-  if (admissionPayload) {
-    try {
-      const verified = await verifyAdmissionAsync(admissionPayload);
-      if (!verified.ok) {
-        if (shouldRefuseAsyncFailure()) {
-          return NextResponse.json({ error: verified.errorCode }, { status: 403 });
-        }
-      } else {
-        admissionVerification = verified;
-      }
-    } catch {
-      // Provider infrastructure failure — surface as 5xx.
-      return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
-    }
-  }
-
   // ── Step 4: User settlement ──────────────────────────────────────────────
   const result = await createOrUpdateUser(
     args,
@@ -476,13 +668,14 @@ export async function POST(request: NextRequest) {
     request.headers,
     undefined,
     undefined,
-    true
+    true,
+    verifyNewAccountAdmission
   );
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 403 });
+    return settlementFailureResponse(result, args);
   }
 
-  if (result.user.blocked_reason) {
+  if (isBlockedAccount(result.user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
 
@@ -499,62 +692,52 @@ export async function POST(request: NextRequest) {
   let sessionId: string | undefined;
   let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
 
-  if (admissionVerification) {
-    // Cross-user ownership: enforce → refuse, report → log and skip persistence.
-    if (
-      admissionVerification.existingKeyUserId &&
-      admissionVerification.existingKeyUserId !== result.user.id
-    ) {
-      captureMessage('native_attested_key_ownership_mismatch');
-      if (shouldRefuseAsyncFailure()) {
+  // Cross-user ownership: a key bound to another account cannot sign this one
+  // in. Refuse before any credential is issued.
+  if (
+    admissionVerification.existingKeyUserId &&
+    admissionVerification.existingKeyUserId !== result.user.id
+  ) {
+    captureMessage('native_attested_key_ownership_mismatch');
+    return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+  }
+
+  const rateLimited = await userRateLimitResponse(request, result.user.id);
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  if (data.supportsRefresh) {
+    // Bind key persistence and session creation in one transaction.
+    try {
+      const combined = await createDeviceSessionWithAttestedKey({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+        user: result.user,
+        verification: admissionVerification,
+      });
+      sessionId = combined.sessionId;
+      refreshCredentials = {
+        token: combined.token,
+        refreshToken: combined.refreshToken,
+        expiresIn: combined.expiresIn,
+      };
+    } catch (err) {
+      if (err instanceof KeyCollisionError) {
+        captureMessage('native_attested_key_cross_user_collision');
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
-      // Report mode: skip key persistence, admit, and issue credentials.
-      admissionVerification = undefined;
+      captureMessage('native_attested_key_persist_failed_after_settlement');
     }
-
-    if (admissionVerification) {
-      if (data.supportsRefresh) {
-        // Bind key persistence and session creation in one transaction.
-        try {
-          const combined = await createDeviceSessionWithAttestedKey({
-            userId: result.user.id,
-            userAgent: request.headers.get('user-agent') ?? undefined,
-            user: result.user,
-            verification: admissionVerification,
-          });
-          sessionId = combined.sessionId;
-          refreshCredentials = {
-            token: combined.token,
-            refreshToken: combined.refreshToken,
-            expiresIn: combined.expiresIn,
-          };
-        } catch (err) {
-          if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            captureMessage('native_attested_key_persist_failed_after_settlement');
-          }
-        }
-      } else {
-        try {
-          await persistAttestedKey(result.user.id, admissionVerification);
-        } catch (err) {
-          if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            captureMessage('native_attested_key_persist_failed_after_settlement');
-          }
-        }
+  } else {
+    try {
+      await persistAttestedKey(result.user.id, admissionVerification);
+    } catch (err) {
+      if (err instanceof KeyCollisionError) {
+        captureMessage('native_attested_key_cross_user_collision');
+        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
+      captureMessage('native_attested_key_persist_failed_after_settlement');
     }
   }
 
@@ -562,6 +745,7 @@ export async function POST(request: NextRequest) {
   if (result.deferredSignInEvent) {
     posthogClient.capture(result.deferredSignInEvent);
   }
+  const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
 
   if (refreshCredentials) {
     return NextResponse.json(
@@ -569,6 +753,8 @@ export async function POST(request: NextRequest) {
         token: refreshCredentials.token,
         refreshToken: refreshCredentials.refreshToken,
         expiresIn: refreshCredentials.expiresIn,
+        created: result.isNew,
+        ...(pendingLink ? { pendingLink } : {}),
       },
       { status: 200 }
     );
@@ -583,12 +769,26 @@ export async function POST(request: NextRequest) {
       }));
     const pair = await issueSessionCredentials(result.user, sid);
     return NextResponse.json(
-      { token: pair.token, refreshToken: pair.refreshToken, expiresIn: pair.expiresIn },
+      {
+        token: pair.token,
+        refreshToken: pair.refreshToken,
+        expiresIn: pair.expiresIn,
+        created: result.isNew,
+        ...(pendingLink ? { pendingLink } : {}),
+      },
       { status: 200 }
     );
   }
 
-  captureMessage('native_token_legacy_long_lived_count: 1');
-  const token = generateApiToken(result.user);
-  return NextResponse.json({ token }, { status: 200 });
-}
+  return legacyTokenResponse({
+    user: result.user,
+    deviceSessionId:
+      sessionId ??
+      (await createDeviceSession({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      })),
+    created: result.isNew,
+    ...(pendingLink ? { pendingLink } : {}),
+  });
+});

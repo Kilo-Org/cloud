@@ -85,7 +85,8 @@ test('model and thinking controls wait for the model catalog', async () => {
 
     await expect(sidePanel.getByLabel('Model')).toBeDisabled();
     await expect(sidePanel.getByLabel('Model')).toContainText('Loading models...');
-    await expect(sidePanel.getByLabel('Thinking effort')).toBeDisabled();
+    // The thinking control only exists once the catalog supplies the model's variants.
+    await expect(sidePanel.getByLabel('Thinking effort')).toHaveCount(0);
     await sidePanel.getByLabel('Message agent').fill('Inspect this tab');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeDisabled();
 

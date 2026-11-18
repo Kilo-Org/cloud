@@ -2,21 +2,22 @@ import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
+
+import { COPY_TOAST_DURATION_MS } from './copy-toast-duration';
 
 type ChatLinkAction = 'open' | 'copy' | 'share' | 'review-pr';
 
-type ChatLinkActionOption =
-  | { kind: ChatLinkAction; label: string }
-  | { kind: 'cancel'; label: 'Cancel' };
+type ChatLinkActionOption = { kind: ChatLinkAction | 'cancel'; label: string };
 
 export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: boolean } = {}) {
   const actions: ChatLinkActionOption[] = [
-    ...(isPrLink ? ([{ kind: 'review-pr', label: 'Review PR' }] as const) : []),
-    { kind: 'open', label: 'Open link' },
-    { kind: 'copy', label: 'Copy link' },
-    { kind: 'share', label: 'Share link' },
-    { kind: 'cancel', label: 'Cancel' },
+    ...(isPrLink ? ([{ kind: 'review-pr', label: i18n.t('common.reviewPr') }] as const) : []),
+    { kind: 'open', label: i18n.t('agentChat.chatLink.openLink') },
+    { kind: 'copy', label: i18n.t('common.copyLink') },
+    { kind: 'share', label: i18n.t('agentChat.chatLink.shareLink') },
+    { kind: 'cancel', label: i18n.t('common.cancel') },
   ];
 
   return {
@@ -28,15 +29,16 @@ export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: bool
 
 /**
  * The tap (not long-press) action sheet for a GitHub PR link. The accepted
- * contract is exactly three options: Review PR, Open in browser, Cancel.
+ * contract is exactly four options: Review PR, Open in browser, Share, Cancel.
  * This is intentionally distinct from the long-press sheet, which also
- * offers Copy/Share.
+ * offers Copy link.
  */
 export function buildPrLinkTapActionSheet() {
   const actions: ChatLinkActionOption[] = [
-    { kind: 'review-pr', label: 'Review PR' },
-    { kind: 'open', label: 'Open in browser' },
-    { kind: 'cancel', label: 'Cancel' },
+    { kind: 'review-pr', label: i18n.t('common.reviewPr') },
+    { kind: 'open', label: i18n.t('common.openInBrowser') },
+    { kind: 'share', label: i18n.t('agentChat.chatLink.share') },
+    { kind: 'cancel', label: i18n.t('common.cancel') },
   ];
 
   return {
@@ -60,7 +62,7 @@ export function getSelectedChatLinkAction(
 function showRetryableError(message: string, retry: () => Promise<void>) {
   toast.error(message, {
     action: {
-      label: 'Try again',
+      label: i18n.t('common.tryAgain'),
       onClick: () => {
         void retry();
       },
@@ -68,9 +70,33 @@ function showRetryableError(message: string, retry: () => Promise<void>) {
   });
 }
 
+/**
+ * Sheet-callback entry for chat link actions. The themed sheet renders in an
+ * RN Modal (`useModal: true`), and the sheet library runs the select callback
+ * before that Modal unmounts — so opening the browser or the share sheet from
+ * the callback presents Safari / the share sheet from the dying sheet Modal,
+ * and the page flashes then vanishes on iOS. Defer those presentations past
+ * the sheet's 195 ms dismiss animation plus the Modal teardown. Copy needs
+ * no presentation, so it runs at once.
+ */
+export const CHAT_LINK_SHEET_DISMISS_DELAY_MS = 400;
+
+export function performChatLinkActionAfterSheet(
+  action: Exclude<ChatLinkAction, 'review-pr'>,
+  href: string
+): void {
+  if (action === 'open' || action === 'share') {
+    setTimeout(() => {
+      void performChatLinkAction(action, href);
+    }, CHAT_LINK_SHEET_DISMISS_DELAY_MS);
+    return;
+  }
+  void performChatLinkAction(action, href);
+}
+
 export async function performChatLinkAction(action: ChatLinkAction, href: string): Promise<void> {
   if (action === 'open') {
-    await openExternalUrl(href, { label: 'link', retryOnError: true });
+    await openExternalUrl(href, { retryOnError: true });
     return;
   }
 
@@ -80,9 +106,14 @@ export async function performChatLinkAction(action: ChatLinkAction, href: string
       if (!copied) {
         throw new Error('Clipboard rejected link');
       }
-      toast.success('Link copied');
+      // Same duration as every other clipboard confirmation: on Android the
+      // system clipboard preview covers the bottom-center toast region for
+      // ~6s, so a default-length toast would be hidden for its whole life.
+      toast.success(i18n.t('agentChat.chatLink.linkCopied'), {
+        duration: COPY_TOAST_DURATION_MS,
+      });
     } catch {
-      showRetryableError('Could not copy link', async () => {
+      showRetryableError(i18n.t('agentChat.chatLink.couldNotCopyLink'), async () => {
         await performChatLinkAction('copy', href);
       });
     }
@@ -92,7 +123,7 @@ export async function performChatLinkAction(action: ChatLinkAction, href: string
   try {
     await Share.share({ message: href });
   } catch {
-    showRetryableError('Could not share link', async () => {
+    showRetryableError(i18n.t('agentChat.chatLink.couldNotShareLink'), async () => {
       await performChatLinkAction('share', href);
     });
   }

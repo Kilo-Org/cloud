@@ -5,7 +5,7 @@ import {
   type UserDeletionActivityDetails,
   type UserDeletionAuditDetails,
 } from '@kilocode/db/schema-types';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type AuditWrite = {
   requestId?: string | null;

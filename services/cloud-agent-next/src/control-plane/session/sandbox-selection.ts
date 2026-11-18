@@ -1,0 +1,73 @@
+import { byocVercelOwnerSchema } from '../../byoc/vercel-owner.js';
+import { z } from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { agentSandboxProviderSchema } from '../../types.js';
+import { sandboxProviderConfigurationSchema } from '../../sandbox-control/provider.js';
+import { sandboxBillingInputEnvelopeSchema } from '../../container-usage-context.js';
+import { credentialContainmentSchema } from '../../sandbox-control/credential-containment.js';
+import { sandboxKindSchema } from '../../sandbox-placement.js';
+import { environmentReferenceSchema } from '../../environment-build/reference.js';
+import {
+  controlPlaneCredentialSourceSchema,
+  controlPlaneRouteSpecSchema,
+} from '../../shared/control-plane-protocol.js';
+
+/**
+ * DO-only sandbox selection (H1). The Worker owns selection (H2) and carries the
+ * chosen provider/allocation/billing/containment into `prepare`; the Sandbox DO
+ * applies it to its provider pin while the allocation is `stopped`. Same private
+ * boundary as the credential source: it never reaches the wrapper.
+ */
+export const controlPlaneSandboxSelectionSchema = egressPolicySchema
+  .safeExtend({
+    provider: agentSandboxProviderSchema,
+    allocationName: z.string().min(1).max(256).optional(),
+    configuration: sandboxProviderConfigurationSchema.optional(),
+    billing: sandboxBillingInputEnvelopeSchema.optional(),
+    containment: credentialContainmentSchema.optional(),
+    /** The stored kind of a placed (`sbx-`) key; absent for a legacy prefixed key. */
+    sandboxKind: sandboxKindSchema.optional(),
+    byoc: z.object({ credentialId: z.uuid() }).and(byocVercelOwnerSchema).optional(),
+  })
+  .strict()
+  .refine(
+    selection =>
+      (selection.egressMode !== 'allowlist' && selection.egressAudit !== true) ||
+      (selection.provider === 'cloudflare-containers' &&
+        (selection.sandboxKind === undefined || selection.sandboxKind === 'isolated')),
+    'Egress policy requires an isolated Cloudflare containers sandbox'
+  )
+  .refine(input => input.byoc === undefined || input.provider === 'vercel', 'BYOC requires Vercel')
+  .refine(
+    input => input.provider !== 'vercel' || input.byoc !== undefined,
+    'Vercel requires BYOC credentials'
+  );
+
+export type ControlPlaneSandboxSelection = z.infer<typeof controlPlaneSandboxSelectionSchema>;
+
+/**
+ * Extended `prepare` input. Kept out of `shared/control-plane-protocol.ts` so the
+ * shared protocol stays free of Cloudflare-worker-only imports (the wrapper
+ * typechecks `src/shared/**` without the generated worker globals).
+ */
+export const controlPlanePrepareInputWithSelectionSchema = z
+  .object({
+    spec: controlPlaneRouteSpecSchema,
+    credentials: controlPlaneCredentialSourceSchema,
+    sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
+    /** The admitted repository environment; DO-private like `credentials`. */
+    environment: environmentReferenceSchema.optional(),
+    /**
+     * The newest workspace stop this session observed. A prepare that names an
+     * older epoch than the Sandbox's current one is stale work and must not
+     * revive the workspace.
+     */
+    stopEpoch: z.number().int().nonnegative().optional(),
+    /** When the oldest queued message was created; new intent after a Stop. */
+    intentAt: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+export type ControlPlanePrepareInputWithSelection = z.infer<
+  typeof controlPlanePrepareInputWithSelectionSchema
+>;

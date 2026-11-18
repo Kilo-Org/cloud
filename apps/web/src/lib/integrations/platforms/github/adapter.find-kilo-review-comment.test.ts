@@ -10,6 +10,10 @@ process.env.GITHUB_LITE_APP_PRIVATE_KEY = 'test-lite-private-key';
 
 const mockListComments = jest.fn();
 
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
+}));
+
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     issues: { listComments: mockListComments },
@@ -30,6 +34,9 @@ describe('findKiloReviewComment', () => {
   it('finds a marked Kilo review comment across paginated issue comments', async () => {
     mockListComments
       .mockResolvedValueOnce({
+        headers: {
+          link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=2>; rel="next", <https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=2>; rel="last"',
+        },
         data: Array.from({ length: 100 }, (_, index) => ({
           id: index + 1,
           body: 'ordinary discussion',
@@ -37,16 +44,19 @@ describe('findKiloReviewComment', () => {
         })),
       })
       .mockResolvedValueOnce({
+        headers: {},
         data: [
           {
             id: 101,
             body: '<!-- kilo-review -->\n## Code Review Summary\nOlder summary',
             updated_at: '2026-05-02T00:00:00Z',
+            performed_via_github_app: { id: 'test-app-id' },
           },
           {
             id: 102,
             body: '<!-- kilo-review -->\n## Code Review Summary\nLatest summary',
             updated_at: '2026-05-03T00:00:00Z',
+            performed_via_github_app: { id: 'test-app-id' },
           },
         ],
       });
@@ -72,8 +82,52 @@ describe('findKiloReviewComment', () => {
     });
   });
 
-  it('stops instead of creating a duplicate after the safe scan limit', async () => {
+  it('ignores a marker comment not authored by the trusted app', async () => {
+    mockListComments.mockResolvedValueOnce({
+      headers: {},
+      data: [
+        {
+          id: 1,
+          body: '<!-- kilo-review -->\n## Code Review Summary\nCopied by a user',
+          updated_at: '2026-05-01T00:00:00Z',
+          performed_via_github_app: { id: 'someone-else' },
+        },
+        {
+          id: 2,
+          body: '<!-- kilo-review -->\n## Code Review Summary\nReal summary',
+          updated_at: '2026-05-02T00:00:00Z',
+          performed_via_github_app: { id: 'test-app-id' },
+        },
+      ],
+    });
+
+    await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toEqual({
+      commentId: 2,
+      body: '<!-- kilo-review -->\n## Code Review Summary\nReal summary',
+    });
+  });
+
+  it('ignores every marker comment when none is authored by the trusted app', async () => {
+    mockListComments.mockResolvedValueOnce({
+      headers: {},
+      data: [
+        {
+          id: 1,
+          body: '<!-- kilo-review -->\n## Code Review Summary\nCopied',
+          updated_at: '2026-05-01T00:00:00Z',
+          performed_via_github_app: { id: 'someone-else' },
+        },
+      ],
+    });
+
+    await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toBeNull();
+  });
+
+  it('stops at the safe scan limit when the summary is not in the read pages', async () => {
     mockListComments.mockResolvedValue({
+      headers: {
+        link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=12>; rel="last"',
+      },
       data: Array.from({ length: 100 }, (_, index) => ({
         id: index + 1,
         body: 'ordinary discussion',
@@ -84,6 +138,46 @@ describe('findKiloReviewComment', () => {
     await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).rejects.toThrow(
       'safe issue-comment scan limit'
     );
+
+    const requestedPages = mockListComments.mock.calls.map(call => call[0].page);
+    expect(requestedPages).toEqual([1, 2, 3, 11, 12]);
+  });
+
+  it('finds the summary on the first page of a long comment list', async () => {
+    mockListComments
+      .mockResolvedValueOnce({
+        headers: {
+          link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=12>; rel="last"',
+        },
+        data: [
+          {
+            id: 5,
+            body: '<!-- kilo-review -->\n## Code Review Summary\nMaintained in place',
+            updated_at: '2026-05-09T00:00:00Z',
+            performed_via_github_app: { id: 'test-app-id' },
+          },
+          ...Array.from({ length: 99 }, (_, index) => ({
+            id: 100 + index,
+            body: 'ordinary discussion',
+            updated_at: '2026-05-01T00:00:00Z',
+          })),
+        ],
+      })
+      .mockResolvedValue({
+        headers: {
+          link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=12>; rel="last"',
+        },
+        data: Array.from({ length: 100 }, (_, index) => ({
+          id: 1000 + index,
+          body: 'ordinary discussion',
+          updated_at: '2026-05-01T00:00:00Z',
+        })),
+      });
+
+    await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toEqual({
+      commentId: 5,
+      body: '<!-- kilo-review -->\n## Code Review Summary\nMaintained in place',
+    });
 
     expect(mockListComments).toHaveBeenCalledTimes(5);
   });

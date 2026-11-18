@@ -1,4 +1,4 @@
-/* eslint-disable import/max-dependencies */
+/* eslint-disable import/max-dependencies, max-lines -- the header owns sign-in, identity, organization picker and the settings dialog; splitting it would spread one state machine across files */
 import { storage } from '#imports';
 import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
@@ -24,10 +24,13 @@ import {
   resolveAnalyticsOptOutIdentity,
   shouldShowFirefoxUsageDataHint,
 } from './analytics-settings-logic';
+import { ErrorNotice } from './error-notice';
+import { LocalAgentsSettings } from './local-agents-settings';
 import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
 import { settingsDialogOpenAtom } from './settings-dialog-state';
+import { useModalDialog } from './use-dismiss';
 import { WebMcpSettings } from './web-mcp-settings';
 import { WorkflowSettings } from './workflow-settings';
 
@@ -50,8 +53,14 @@ const IconButton = ({
   </button>
 );
 
-const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }): JSX.Element => {
+export const AnalyticsSettingsRow = ({
+  userEmail,
+}: {
+  userEmail: string | undefined;
+}): JSX.Element => {
   const [state, setState] = useState<AnalyticsSettingsState>(createInitialAnalyticsSettingsState);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const interactive = isAnalyticsSettingsInteractive(state);
   const showFirefoxHint = shouldShowFirefoxUsageDataHint(state.firefoxUsageDataGranted);
 
@@ -59,27 +68,36 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
     let cancelled = false;
 
     void (async () => {
-      const [optedOut, firefoxUsageDataGranted] = await Promise.all([
-        loadAnalyticsOptOut(storage),
-        getFirefoxUsageDataGranted(),
-      ]);
+      try {
+        const [optedOut, firefoxUsageDataGranted] = await Promise.all([
+          loadAnalyticsOptOut(storage),
+          getFirefoxUsageDataGranted(),
+        ]);
 
-      if (cancelled) {
-        return;
+        if (cancelled) {
+          return;
+        }
+
+        setLoadError(false);
+        setState(
+          applyAnalyticsSettingsLoaded({
+            firefoxUsageDataGranted,
+            optedOut,
+          })
+        );
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setLoadError(true);
       }
-
-      setState(
-        applyAnalyticsSettingsLoaded({
-          firefoxUsageDataGranted,
-          optedOut,
-        })
-      );
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   const onToggle = (): void => {
     const started = beginAnalyticsSettingsFlip(state);
@@ -105,7 +123,8 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
 
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
-      <div className="flex items-start justify-between gap-3">
+      <h2 className="type-label text-foreground-muted">Usage analytics</h2>
+      <div className="mt-2 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="type-body font-medium text-foreground">Share usage analytics</p>
           <p className="type-label mt-0.5 leading-4 text-foreground-muted">
@@ -141,6 +160,17 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
           />
         </button>
       </div>
+      {loadError ? (
+        <div className="mt-2">
+          <ErrorNotice
+            onRetry={() => {
+              setLoadAttempt(current => current + 1);
+            }}
+            retryable
+            title="Couldn't load the analytics setting."
+          />
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -161,6 +191,10 @@ const HeaderActions = ({
   selectedOrganizationId: string;
 }): JSX.Element => {
   const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
+  const closeSettings = (): void => {
+    setIsSettingsOpen(false);
+  };
+  const settingsDialogRef = useModalDialog({ onClose: closeSettings, open: isSettingsOpen });
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
@@ -179,16 +213,16 @@ const HeaderActions = ({
           aria-label="Settings panel"
           aria-modal="true"
           className="fixed inset-0 z-30 flex flex-col bg-surface-background"
+          ref={settingsDialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-4">
             <p className="text-sm font-semibold text-foreground">Settings</p>
             <button
               aria-label="Close settings"
               className={iconButtonClassName}
-              onClick={() => {
-                setIsSettingsOpen(false);
-              }}
+              onClick={closeSettings}
               type="button"
             >
               <X aria-hidden="true" className="size-4" />
@@ -210,6 +244,7 @@ const HeaderActions = ({
             />
             <WebMcpSettings />
             <RemoteMcpSettings />
+            <LocalAgentsSettings />
             <AnalyticsSettingsRow userEmail={auth.userEmail} />
             <button
               className="type-label h-9 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"

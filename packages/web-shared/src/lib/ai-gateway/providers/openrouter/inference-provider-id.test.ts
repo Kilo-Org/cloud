@@ -1,0 +1,215 @@
+import {
+  AzureCredentialsSchema,
+  BedrockCredentialsSchema,
+  DirectUserByokInferenceProviderIdSchema,
+  GatewayUserByokProviderIdSchema,
+  getVercelUserByokProviderIdForEndpoint,
+  isGatewayUserByokProviderId,
+  isVercelUserByokProviderAllowed,
+  UserByokProviderIdSchema,
+  UserByokTestModels,
+  normalizeVercelInferenceProviderIdForRouting,
+  openRouterToVercelInferenceProviderId,
+  OpenRouterInferenceProviderIdSchema,
+  VercelInferenceProviderIdSchema,
+  VercelNonUserByokInferenceProviderIdSchema,
+  VercelUserByokInferenceProviderIdSchema,
+} from './inference-provider-id';
+
+describe('AzureCredentialsSchema', () => {
+  test('accepts Azure credentials with optional model mappings', () => {
+    const credentials = {
+      apiKey: 'azure-api-key',
+      resourceName: 'example-resource',
+      modelMappings: [
+        {
+          gatewayModelSlug: 'openai/gpt-5.4-nano',
+          customModelId: 'custom-gpt-5.4-nano',
+        },
+      ],
+    };
+
+    expect(AzureCredentialsSchema.parse(credentials)).toEqual(credentials);
+  });
+
+  test.each([
+    null,
+    'azure-api-key',
+    {},
+    { apiKey: 'azure-api-key' },
+    { resourceName: 'example-resource' },
+    { apiKey: '', resourceName: 'example-resource' },
+    { apiKey: 'azure-api-key', resourceName: '' },
+    {
+      apiKey: 'azure-api-key',
+      resourceName: 'example-resource',
+      modelMappings: [{ gatewayModelSlug: 'openai/gpt-5.4-nano' }],
+    },
+  ])('rejects incomplete or invalid Azure credentials: %j', credentials => {
+    expect(AzureCredentialsSchema.safeParse(credentials).success).toBe(false);
+  });
+});
+
+describe('BedrockCredentialsSchema', () => {
+  test.each([
+    { accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' },
+    { apiKey: 'bedrock-api-key', region: 'eu-west-1' },
+  ])('accepts Bedrock credentials: %j', credentials => {
+    expect(BedrockCredentialsSchema.parse(credentials)).toEqual(credentials);
+  });
+
+  test.each([
+    null,
+    'bedrock-api-key',
+    {},
+    { region: 'us-east-1' },
+    { apiKey: 'bedrock-api-key' },
+    { apiKey: '', region: 'us-east-1' },
+    { apiKey: '   ', region: 'us-east-1' },
+    { apiKey: 123, region: 'us-east-1' },
+    { apiKey: 'bedrock-api-key', region: '' },
+    { apiKey: 'bedrock-api-key', region: '   ' },
+    { apiKey: 'bedrock-api-key', region: 123 },
+    { apiKey: 'bedrock-api-key', region: 'us-east-1', accessKeyId: 'AKIAEXAMPLE' },
+    { apiKey: 'bedrock-api-key', region: 'us-east-1', secretAccessKey: 'secret' },
+    {
+      apiKey: 'bedrock-api-key',
+      region: 'us-east-1',
+      accessKeyId: 'AKIAEXAMPLE',
+      secretAccessKey: 'secret',
+    },
+    { accessKeyId: 'AKIAEXAMPLE', region: 'us-east-1' },
+  ])('rejects incomplete, invalid, or mixed credentials: %j', credentials => {
+    expect(BedrockCredentialsSchema.safeParse(credentials).success).toBe(false);
+  });
+});
+
+describe('inference provider ids', () => {
+  test('keeps Vercel-only Meituan in the shared provider registry', () => {
+    expect(VercelNonUserByokInferenceProviderIdSchema.parse('meituan')).toBe('meituan');
+    expect(VercelInferenceProviderIdSchema.safeParse('longcat').success).toBe(false);
+    expect(OpenRouterInferenceProviderIdSchema.safeParse('longcat').success).toBe(false);
+    expect(OpenRouterInferenceProviderIdSchema.parse('meituan')).toBe('meituan');
+    expect(UserByokProviderIdSchema.safeParse('meituan').success).toBe(false);
+    expect(openRouterToVercelInferenceProviderId('meituan')).toBe('meituan');
+    expect(normalizeVercelInferenceProviderIdForRouting('meituan')).toBe('meituan');
+  });
+
+  test('direct BYOK provider ids do not overlap with OpenRouter provider ids', () => {
+    const overlappingProviderIds = DirectUserByokInferenceProviderIdSchema.options.filter(
+      providerId => OpenRouterInferenceProviderIdSchema.safeParse(providerId).success
+    );
+
+    expect(overlappingProviderIds).toEqual([]);
+  });
+
+  test('direct BYOK provider ids do not overlap with known Vercel provider ids', () => {
+    const overlappingProviderIds = DirectUserByokInferenceProviderIdSchema.options.filter(
+      providerId => VercelInferenceProviderIdSchema.safeParse(providerId).success
+    );
+
+    expect(overlappingProviderIds).toEqual([]);
+  });
+
+  test('gateway BYOK provider ids do not overlap with other BYOK or inference provider ids', () => {
+    const overlappingProviderIds = GatewayUserByokProviderIdSchema.options.filter(
+      providerId =>
+        OpenRouterInferenceProviderIdSchema.safeParse(providerId).success ||
+        VercelInferenceProviderIdSchema.safeParse(providerId).success ||
+        DirectUserByokInferenceProviderIdSchema.safeParse(providerId).success
+    );
+
+    expect(overlappingProviderIds).toEqual([]);
+  });
+
+  test('accepts gateway keys as user BYOK providers', () => {
+    expect(UserByokProviderIdSchema.parse('openrouter')).toBe('openrouter');
+    expect(UserByokProviderIdSchema.parse('vercel-ai-gateway')).toBe('vercel-ai-gateway');
+    expect(isGatewayUserByokProviderId('openrouter')).toBe(true);
+    expect(isGatewayUserByokProviderId('anthropic')).toBe(false);
+  });
+
+  test('maps the OpenRouter Claude AWS provider to its Vercel provider id', () => {
+    expect(openRouterToVercelInferenceProviderId('claude-on-aws')).toBe('claudeaws');
+  });
+
+  test('maps the OpenRouter Particle AI provider to its Vercel provider id', () => {
+    expect(OpenRouterInferenceProviderIdSchema.parse('particle-ai')).toBe('particle-ai');
+    expect(VercelNonUserByokInferenceProviderIdSchema.parse('particle')).toBe('particle');
+    expect(openRouterToVercelInferenceProviderId('particle-ai')).toBe('particle');
+  });
+
+  test('maps the OpenRouter TypeSafe provider to its Vercel provider id', () => {
+    expect(OpenRouterInferenceProviderIdSchema.parse('typesafe')).toBe('typesafe');
+    expect(VercelNonUserByokInferenceProviderIdSchema.parse('typesafe-ai')).toBe('typesafe-ai');
+    expect(openRouterToVercelInferenceProviderId('typesafe')).toBe('typesafe-ai');
+  });
+
+  test('preserves provider ids that are not in the known provider registry', () => {
+    expect(openRouterToVercelInferenceProviderId('future-provider')).toBe('future-provider');
+    expect(normalizeVercelInferenceProviderIdForRouting('future-provider')).toBe('future-provider');
+  });
+
+  test('promotes Vertex to a user BYOK provider', () => {
+    expect(VercelUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(true);
+    expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(false);
+    expect(openRouterToVercelInferenceProviderId('google-vertex')).toBe('vertex');
+  });
+
+  test('promotes Cohere to a user BYOK provider with a Vercel-supported test model', () => {
+    expect(UserByokProviderIdSchema.parse('cohere')).toBe('cohere');
+    expect(VercelUserByokInferenceProviderIdSchema.safeParse('cohere').success).toBe(true);
+    expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('cohere').success).toBe(false);
+    expect(getVercelUserByokProviderIdForEndpoint('cohere')).toBe('cohere');
+    expect(openRouterToVercelInferenceProviderId('cohere')).toBe('cohere');
+    expect(UserByokTestModels.cohere).toBe('cohere/command-a');
+  });
+
+  test('promotes Azure to a user BYOK provider', () => {
+    expect(VercelUserByokInferenceProviderIdSchema.safeParse('azure').success).toBe(true);
+    expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('azure').success).toBe(false);
+    expect(getVercelUserByokProviderIdForEndpoint('azure')).toBe('azure');
+  });
+
+  test('uses the Vertex user key for Vertex Anthropic endpoints', () => {
+    expect(normalizeVercelInferenceProviderIdForRouting('vertexAnthropic')).toBe('vertex');
+    expect(getVercelUserByokProviderIdForEndpoint('vertexAnthropic')).toBe('vertex');
+    expect(getVercelUserByokProviderIdForEndpoint('vertex')).toBe('vertex');
+    expect(getVercelUserByokProviderIdForEndpoint('unsupported')).toBeUndefined();
+  });
+});
+
+describe('isVercelUserByokProviderAllowed', () => {
+  test('admits every key when the policy does not restrict providers', () => {
+    expect(isVercelUserByokProviderAllowed('bedrock', undefined)).toBe(true);
+  });
+
+  test('matches keys against OpenRouter provider slugs', () => {
+    const allowed = new Set(['amazon-bedrock', 'google-vertex', 'z-ai', 'mistral']);
+    expect(isVercelUserByokProviderAllowed('bedrock', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('vertex', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('zai', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('codestral', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('anthropic', allowed)).toBe(false);
+    expect(isVercelUserByokProviderAllowed('moonshotai', new Set())).toBe(false);
+  });
+
+  test('every Vercel provider key can be named on the provider policy screen', () => {
+    for (const providerId of VercelUserByokInferenceProviderIdSchema.options) {
+      expect([providerId, isVercelUserByokProviderAllowed(providerId, new Set())]).toEqual([
+        providerId,
+        false,
+      ]);
+    }
+  });
+
+  test('applies the organization provider allow-list to Cohere keys', () => {
+    expect(isVercelUserByokProviderAllowed('cohere', new Set(['cohere']))).toBe(true);
+    expect(isVercelUserByokProviderAllowed('cohere', new Set(['anthropic']))).toBe(false);
+  });
+
+  test('does not restrict direct BYOK or gateway keys', () => {
+    expect(isVercelUserByokProviderAllowed('synthetic', new Set())).toBe(true);
+    expect(isVercelUserByokProviderAllowed('openrouter', new Set())).toBe(true);
+  });
+});

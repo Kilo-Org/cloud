@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 
 export type KiloclawEventRow = {
   timestamp: string;
@@ -34,7 +35,7 @@ export function useKiloclawInstanceEvents(sandboxId: string) {
   return useQuery<AnalyticsEngineResponse<KiloclawEventRow>>({
     queryKey: ['kiloclaw-analytics', 'instance-events', sandboxId],
     queryFn: async () => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/kiloclaw-analytics?query=instance-events&sandboxId=${encodeURIComponent(sandboxId)}`
       );
       if (!response.ok) {
@@ -66,7 +67,7 @@ export function useKiloclawAllEvents(params: AllEventsParams) {
       });
       if (flyAppName) searchParams.set('flyAppName', flyAppName);
       if (flyMachineId) searchParams.set('flyMachineId', flyMachineId);
-      const response = await fetch(`/admin/api/kiloclaw-analytics?${searchParams.toString()}`);
+      const response = await adminFetch(`/admin/api/kiloclaw-analytics?${searchParams.toString()}`);
       if (!response.ok) {
         throw new Error('Failed to fetch kiloclaw all events');
       }

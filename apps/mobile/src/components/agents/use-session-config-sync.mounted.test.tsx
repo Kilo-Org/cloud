@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React trees under vitest (same pattern as use-history-backfill.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it } from 'vitest';
 
 import { type AgentMode } from './mode-normalize';
@@ -22,18 +21,24 @@ function spawnedRemoteInputs(overrides: Partial<Inputs> = {}): Inputs {
     modelOptions: [],
     selectedModel: '',
     selectedVariant: '',
+    sessionId: 'k1',
     ...overrides,
   };
 }
 
+/** What the hook hands the send path, and the picker's own setter. */
+type Probe = { current: AgentMode; setMode: (mode: AgentMode) => void };
+
 /** Records the mode the hook hands the send path on every render. */
-function ModeProbe({ inputs, seen }: { inputs: Inputs; seen: { current: AgentMode } }) {
-  seen.current = useSessionConfigSync(inputs).currentMode;
+function ModeProbe({ inputs, seen }: { inputs: Inputs; seen: Probe }) {
+  const sync = useSessionConfigSync(inputs);
+  seen.current = sync.currentMode;
+  seen.setMode = sync.setCurrentMode;
   return null;
 }
 
-async function mountProbe(inputs: Inputs): Promise<{ renderer: R; seen: { current: AgentMode } }> {
-  const seen: { current: AgentMode } = { current: 'code' };
+async function mountProbe(inputs: Inputs): Promise<{ renderer: R; seen: Probe }> {
+  const seen: Probe = { current: 'code', setMode: () => undefined };
   const ref: { current: R | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
@@ -46,11 +51,7 @@ async function mountProbe(inputs: Inputs): Promise<{ renderer: R; seen: { curren
   return { renderer, seen };
 }
 
-async function updateProbe(
-  renderer: R,
-  inputs: Inputs,
-  seen: { current: AgentMode }
-): Promise<void> {
+async function updateProbe(renderer: R, inputs: Inputs, seen: Probe): Promise<void> {
   await act(async () => {
     await Promise.resolve();
     renderer.update(createElement(ModeProbe, { inputs, seen }));
@@ -91,6 +92,53 @@ describe('useSessionConfigSync mode seeding', () => {
         spawnedMode: 'reviewer',
         fetchedData: { mode: 'plan', model: null, variant: null },
       })
+    );
+
+    expect(seen.current).toBe('plan');
+  });
+
+  it('keeps a mode picked before the session row lands', async () => {
+    /* The composer is live on a cached transcript while the session row is still
+       in flight, so a person can pick a mode before anything tells the composer
+       what the session's own mode is. That pick is their answer: the row that
+       lands afterwards is about the session as it was before they answered, so
+       it may not replace it. */
+    const { renderer, seen } = await mountProbe(
+      spawnedRemoteInputs({ fetchedData: null, sessionConfig: null })
+    );
+
+    await act(async () => {
+      seen.setMode('debug');
+      await Promise.resolve();
+    });
+    expect(seen.current).toBe('debug');
+
+    await updateProbe(
+      renderer,
+      spawnedRemoteInputs({ sessionConfig: { mode: 'code', model: null, variant: null } }),
+      seen
+    );
+
+    expect(seen.current).toBe('debug');
+  });
+
+  it('does not carry a pick made in one session into another', async () => {
+    const { renderer, seen } = await mountProbe(
+      spawnedRemoteInputs({ fetchedData: null, sessionConfig: null })
+    );
+
+    await act(async () => {
+      seen.setMode('debug');
+      await Promise.resolve();
+    });
+
+    await updateProbe(
+      renderer,
+      spawnedRemoteInputs({
+        sessionId: 'k2',
+        sessionConfig: { mode: 'plan', model: null, variant: null },
+      }),
+      seen
     );
 
     expect(seen.current).toBe('plan');

@@ -1,13 +1,184 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines -- The mounted tests keep the refresh boundary, error mapping, globe, and draft-restore contracts together. */
+import { createElement } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// login-screen.test.tsx — narrow contract tests.
-// The LoginScreen component mounts native modules (expo-clipboard,
-// expo-web-browser, react-native-safe-area-context) that are not available
-// in the Vitest environment, so we verify the refresh boundary contract
-// through the useDeviceAuth hook's output shape.
+// login-screen.test.ts — narrow contract tests plus mounted globe tests.
+// The refresh boundary contract is verified through the useDeviceAuth hook's
+// output shape; the language globe is verified by mounting LoginScreen with
+// the native modules stubbed.
 
-import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
-import { errorMessage } from './login-screen-state';
+import {
+  parseDeviceAuthTokenResponse,
+  type PendingLinkOffer,
+} from '@/lib/auth/native-auth-contract';
+import { recordPendingLinkOutcome, setPendingLinkOffer } from '@/lib/auth/pending-link-state';
+import { type DeviceAuthError } from '@/lib/auth/device-auth-state';
+import { i18n } from '@/i18n';
+import { persistLoginDrafts, restoreLoginDrafts } from '@/lib/login-draft';
+import LoginRoute from '@/app/(auth)/login';
+import { LoginScreen } from './login-screen';
+import {
+  errorMessage,
+  resolveBottomChromePadding,
+  resolveFieldActionReserve,
+} from './login-screen-state';
+
+// ── Hoisted mocks for the mounted globe tests ──────────────────────────────
+
+const deviceAuth = vi.hoisted(() => ({
+  status: 'idle' as string,
+  token: undefined as string | undefined,
+  code: undefined as string | undefined,
+  refreshToken: undefined as string | undefined,
+  expiresIn: undefined as number | undefined,
+  error: undefined as DeviceAuthError | undefined,
+  verificationUrl: undefined as string | undefined,
+  resumed: false,
+}));
+const push = vi.hoisted(() => vi.fn());
+const clearDeviceError = vi.hoisted(() => vi.fn());
+const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+// The session-ended announcement is asserted through this spy, so it must
+// outlive a single render: the mock factory below runs per import, the spy is
+// cleared per test.
+const announcingWarning = vi.hoisted(() => vi.fn());
+// `sessionEnded` is toggled per test to drive the login screen's announcement
+// effect without re-mocking the module.
+const authState = vi.hoisted(() => ({
+  sessionEnded: false,
+  token: undefined as string | undefined,
+}));
+// Per-test safe-area insets: the header row reserves the top inset, so the
+// mounted test drives it to a non-zero status bar instead of the zero default.
+const safeInsets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push }),
+}));
+// The globe's opener goes through the guarded push; the assertion below reads
+// the same spy.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
+}));
+
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  View: 'View',
+  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: 1 }),
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => safeInsets,
+}));
+vi.mock('sonner-native', () => ({ toast: vi.fn() }));
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
+vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/login/idle-auth', () => ({ IdleAuth: 'IdleAuth' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({ Globe: 'Globe', ExternalLink: 'ExternalLink' }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { warning: announcingWarning },
+}));
+vi.mock('@/lib/auth/auth-context', () => ({
+  useAuth: () => ({
+    sessionEnded: authState.sessionEnded,
+    signIn: vi.fn(),
+    token: authState.token,
+  }),
+}));
+vi.mock('@/lib/auth/use-device-auth', () => ({
+  useDeviceAuth: () => ({
+    status: deviceAuth.status,
+    token: deviceAuth.token,
+    code: deviceAuth.code,
+    refreshToken: deviceAuth.refreshToken,
+    expiresIn: deviceAuth.expiresIn,
+    error: deviceAuth.error,
+    verificationUrl: deviceAuth.verificationUrl,
+    resumed: deviceAuth.resumed,
+    start: vi.fn(),
+    cancel: vi.fn(),
+    openBrowser: vi.fn(),
+    clearError: clearDeviceError,
+  }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#111827', mutedForeground: '#6b7280' }),
+}));
+vi.mock('@/lib/login-draft', () => ({
+  persistLoginDrafts: vi.fn().mockResolvedValue(undefined),
+  restoreLoginDrafts: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('@/lib/picker-bridge', () => ({
+  setLanguagePickerBridge,
+}));
+
+// ── Mounted globe helpers ──────────────────────────────────────────────────
+
+function findGlobe(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const pressables = root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+  );
+  const globe = pressables.find(pressable => pressable.props.accessibilityLabel === 'Language');
+  if (!globe) {
+    throw new Error('language globe not found');
+  }
+  return globe;
+}
+
+function findByType(
+  root: TestRenderer.ReactTestInstance,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
+}
+
+function findButtonByLabel(
+  root: TestRenderer.ReactTestInstance,
+  label: string
+): TestRenderer.ReactTestInstance {
+  const control = findByType(root, 'Button').find(
+    button => button.props.accessibilityLabel === label
+  );
+  if (!control) {
+    throw new Error(`button ${label} not found`);
+  }
+  return control;
+}
+
+async function mountLoginScreen(): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(createElement(LoginScreen));
+    await Promise.resolve();
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+async function mountLoginRoute(): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(createElement(LoginRoute));
+    await Promise.resolve();
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
 
 describe('login-screen refresh boundary', () => {
   it('passes refreshToken and expiresIn through the approved token response', () => {
@@ -98,12 +269,49 @@ describe('login-screen error mapping', () => {
     expect(errorMessage('denied', undefined)).toBe('Access was denied.');
   });
 
-  it('falls back to the provided error for unknown status', () => {
-    expect(errorMessage('error', 'custom error')).toBe('custom error');
+  it('translates a keyed error descriptor at render', () => {
+    expect(errorMessage('error', { kind: 'key', key: 'authErrors.networkError' })).toBe(
+      'Network error. Please try again.'
+    );
   });
 
   it('falls back to default when no error is provided', () => {
     expect(errorMessage('error', undefined)).toBe('Something went wrong. Please try again.');
+  });
+});
+
+describe('login-screen bottom chrome padding', () => {
+  it('floors the reported inset at the platform bottom chrome', () => {
+    // The reported inset is not a reliable floor for the chrome the platform
+    // draws over the app: Android reports navigationBars() only and reports 0
+    // when the window does not inset for the bar, so a bare inset let the
+    // form's last control sit under the home indicator (landscape gesture bar).
+    // 48 is the tallest bottom chrome either platform draws.
+    expect(resolveBottomChromePadding({ bottomInset: 28 })).toBe(48);
+    expect(resolveBottomChromePadding({ bottomInset: 0 })).toBe(48);
+  });
+
+  it('keeps a reported inset larger than the floor', () => {
+    expect(resolveBottomChromePadding({ bottomInset: 63 })).toBe(63);
+  });
+});
+
+describe('login-screen keyboard field action reserve', () => {
+  it('floors the reserve at the action and the form gaps when nothing reported a height', () => {
+    // One action box and a form gap on each side.
+    expect(resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 0 })).toBe(68);
+  });
+
+  it('covers a measured block under the field, such as a wrapped refusal', () => {
+    // A two-line refusal above the action is taller than the action alone, and
+    // the reserve follows it instead of a fixed count of lines.
+    expect(resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 92 })).toBe(116);
+  });
+
+  it('grows with the system text scale', () => {
+    // The action's label is text; the gaps are fixed lengths.
+    expect(resolveFieldActionReserve({ fontScale: 1.5, belowFieldHeight: 0 })).toBe(90);
+    expect(resolveFieldActionReserve({ fontScale: 2, belowFieldHeight: 0 })).toBe(112);
   });
 });
 
@@ -140,5 +348,569 @@ describe('login-screen malformed poll boundary', () => {
       refreshToken: undefined,
       expiresIn: undefined,
     });
+  });
+});
+
+describe('login-screen language globe', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    authState.token = undefined;
+    push.mockClear();
+    setLanguagePickerBridge.mockClear();
+  });
+
+  it('renders the globe and names it Language', async () => {
+    const renderer = await mountLoginScreen();
+    const globe = findGlobe(renderer.root);
+
+    expect(globe.props.accessibilityRole).toBe('button');
+    expect(globe.props.accessibilityLabel).toBe('Language');
+    expect(globe.props.disabled).toBe(false);
+    expect(globe.props.accessibilityState).toEqual({ disabled: false });
+
+    const icons = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Globe'
+    );
+    expect(icons).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('reserves a header row above the scroll content for the globe', async () => {
+    safeInsets.top = 24;
+    const renderer = await mountLoginScreen();
+    const globe = findGlobe(renderer.root);
+    const headerRow = globe.parent;
+    if (!headerRow) {
+      throw new Error('language globe parent not found');
+    }
+
+    const screen = headerRow.parent;
+    if (!screen) {
+      throw new Error('language globe header row parent not found');
+    }
+    const scrollViewIndex = screen.children.findIndex(
+      child => typeof child !== 'string' && (child.type as string) === 'KeyboardAwareScrollView'
+    );
+    // The row comes first and the scroller after it, so the scroll content
+    // starts below the control instead of running under an absolute overlay.
+    expect(screen.children.indexOf(headerRow)).toBeLessThan(scrollViewIndex);
+    // The row clears the status bar before the globe's own 48dp box.
+    expect(headerRow.props.style).toMatchObject({ paddingTop: 24 + 8, paddingEnd: 16 });
+    expect(globe.props.className).not.toMatch(/\bz-/);
+    // The scroller keeps room under the focused field for whatever the form
+    // renders below it, and can scroll that far because the keyboard spacer
+    // participates in layout.
+    const scroller = findByType(renderer.root, 'KeyboardAwareScrollView')[0];
+    expect(scroller?.props.bottomOffset).toBe(
+      resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 0 })
+    );
+    expect(scroller?.props.mode).toBe('layout');
+
+    renderer.unmount();
+    safeInsets.top = 0;
+  });
+
+  it('disables the globe during pending auth', async () => {
+    deviceAuth.status = 'pending';
+    deviceAuth.code = 'UC-1234';
+
+    const renderer = await mountLoginScreen();
+    const globe = findGlobe(renderer.root);
+
+    expect(globe.props.disabled).toBe(true);
+    expect(globe.props.accessibilityState).toEqual({ disabled: true });
+
+    renderer.unmount();
+  });
+
+  it('globe press sets the language bridge and opens the auth language picker', async () => {
+    const renderer = await mountLoginScreen();
+    const globe = findGlobe(renderer.root);
+
+    act(() => {
+      (globe.props.onPress as () => void)();
+    });
+
+    expect(setLanguagePickerBridge).toHaveBeenCalledTimes(1);
+    expect(setLanguagePickerBridge).toHaveBeenCalledWith({ beforeReload: persistLoginDrafts });
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith('/(auth)/language-picker');
+
+    renderer.unmount();
+  });
+});
+
+describe('login route language refresh', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+  });
+
+  it('remounts the sign-in screen and re-labels it in the applied language', async () => {
+    vi.mocked(restoreLoginDrafts).mockClear();
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({
+      email: 'typed@example.com',
+      ssoRecovery: null,
+    });
+    const renderer = await mountLoginRoute();
+    const mountsBeforeSwitch = vi.mocked(restoreLoginDrafts).mock.calls.length;
+    expect(mountsBeforeSwitch).toBeGreaterThan(0);
+
+    await act(async () => {
+      await i18n.changeLanguage('ja');
+    });
+    try {
+      // A fresh mount re-runs the draft restore, so the count is how a remount
+      // is observable: the route's `useTranslation` re-render alone would keep
+      // the same screen instance.
+      expect(vi.mocked(restoreLoginDrafts).mock.calls.length).toBeGreaterThan(mountsBeforeSwitch);
+      // The fresh mount restores its drafts asynchronously, so flush that
+      // before reading the revealed form.
+      await act(async () => {
+        await Promise.resolve();
+      });
+      const pressableLabels = renderer.root
+        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable')
+        .map(node => node.props.accessibilityLabel);
+      expect(pressableLabels).toContain(i18n.t('common.language'));
+      expect(pressableLabels).not.toContain('Language');
+      // The remount keeps the address the person had typed, so a language
+      // change does not blank the field it re-labels.
+      const idleAuth = findByType(renderer.root, 'IdleAuth')[0];
+      expect(idleAuth?.props.initialEmail).toBe('typed@example.com');
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+      vi.mocked(restoreLoginDrafts).mockResolvedValue({
+        email: '',
+        ssoRecovery: null,
+      });
+    }
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen device-code actions', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'pending';
+    deviceAuth.token = undefined;
+    deviceAuth.code = 'UC-1234';
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = 'https://kilo.example/device';
+    deviceAuth.resumed = false;
+  });
+
+  it('renders both device-code actions as icon-free label-only buttons', async () => {
+    const renderer = await mountLoginScreen();
+
+    const openInBrowser = findButtonByLabel(renderer.root, 'Open sign-in page in browser');
+    const copyLink = findButtonByLabel(renderer.root, 'Copy sign-in link');
+
+    // The pair reads as one iconography: each action is a single label child.
+    expect(openInBrowser.children).toHaveLength(1);
+    expect(copyLink.children).toHaveLength(1);
+
+    const openChild = openInBrowser.children[0];
+    const copyChild = copyLink.children[0];
+    if (
+      !openChild ||
+      !copyChild ||
+      typeof openChild === 'string' ||
+      typeof copyChild === 'string'
+    ) {
+      throw new Error('expected a rendered label child for each action');
+    }
+    expect(openChild.type).toBe('Text');
+    expect(copyChild.type).toBe('Text');
+    expect(
+      openInBrowser.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'ExternalLink'
+      )
+    ).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen timeout error dismissal', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'error';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = { kind: 'key', key: 'authErrors.signInTimedOut' };
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    clearDeviceError.mockClear();
+  });
+
+  it('shows the timed-out message above the idle form and clears it when a new attempt starts', async () => {
+    const renderer = await mountLoginScreen();
+
+    const timeout = i18n.t('authErrors.signInTimedOut');
+    expect(findByType(renderer.root, 'Text').some(node => node.props.children === timeout)).toBe(
+      true
+    );
+
+    // The retry form carries the shell's error-clear so a new attempt dismisses
+    // the stale timeout banner at the moment it starts.
+    const idleAuth = findByType(renderer.root, 'IdleAuth')[0];
+    if (!idleAuth) {
+      throw new Error('IdleAuth not found');
+    }
+    expect(idleAuth.props.onSignInStart).toBe(clearDeviceError);
+
+    act(() => {
+      (idleAuth.props.onSignInStart as () => void)();
+    });
+    expect(clearDeviceError).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps the idle form on screen while a restarted attempt is pending without a code', async () => {
+    const renderer = await mountLoginScreen();
+    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
+
+    // A new browser attempt clears the terminal error and enters the
+    // start-in-flight state (`pending` with no code yet). The form must stay on
+    // screen instead of being replaced by a starting spinner, so the retry never
+    // reads as a blank screen.
+    deviceAuth.status = 'pending';
+    deviceAuth.code = undefined;
+    deviceAuth.error = undefined;
+    act(() => {
+      renderer.update(createElement(LoginScreen));
+    });
+
+    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
+    const timeout = i18n.t('authErrors.signInTimedOut');
+    expect(findByType(renderer.root, 'Text').some(node => node.props.children === timeout)).toBe(
+      false
+    );
+
+    renderer.unmount();
+  });
+
+  // The descriptor stores a catalog key, so flipping the i18n instance under a
+  // mounted screen must re-read the banner in the new language — the defect
+  // this PR fixes was exactly a banner that stayed in the previous language.
+  // The German string is read after the flip: the de catalog loads lazily, so
+  // a `lng: 'de'` lookup before changeLanguage falls back to English.
+  it('re-renders the stored error banner in the new language after changeLanguage', async () => {
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await i18n.changeLanguage('de');
+    });
+    try {
+      const germanTimeout = i18n.t('authErrors.signInTimedOut');
+      expect(germanTimeout).not.toBe('Sign-in timed out. Please try again.');
+      expect(
+        findByType(renderer.root, 'Text').some(node => node.props.children === germanTimeout)
+      ).toBe(true);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    // The flip back proves the banner re-reads on every language change, not
+    // just on a one-way switch.
+    const englishTimeout = i18n.t('authErrors.signInTimedOut');
+    expect(
+      findByType(renderer.root, 'Text').some(node => node.props.children === englishTimeout)
+    ).toBe(true);
+    renderer.unmount();
+  });
+});
+
+describe('login-screen idle form', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    authState.token = undefined;
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+    vi.mocked(persistLoginDrafts).mockClear();
+  });
+
+  it('paints the form before the draft restore and re-seeds it when an address arrives', async () => {
+    const state: {
+      resolve: ((value: { email: string; ssoRecovery: null }) => void) | undefined;
+    } = { resolve: undefined };
+    vi.mocked(restoreLoginDrafts).mockReturnValue(
+      new Promise(resolve => {
+        state.resolve = resolve;
+      })
+    );
+
+    const renderer = await mountLoginScreen();
+
+    // The form owns its space on the first frame, so the centered column never
+    // grows into a placeholder's place.
+    const before = findByType(renderer.root, 'IdleAuth');
+    expect(before).toHaveLength(1);
+    expect(before[0]?.props.initialEmail).toBe('');
+
+    await act(async () => {
+      state.resolve?.({ email: 'stored@example.com', ssoRecovery: null });
+      await Promise.resolve();
+    });
+
+    // The field reads its seed once: the restored address needs a fresh mount.
+    const after = findByType(renderer.root, 'IdleAuth');
+    expect(after).toHaveLength(1);
+    expect(after[0]).not.toBe(before[0]);
+    expect(after[0]?.props.initialEmail).toBe('stored@example.com');
+
+    renderer.unmount();
+  });
+
+  it('mounts an empty address once a completed sign-in retired the attempt', async () => {
+    /* A completed sign-in retires the attempt, so its restore answers nothing
+       and the next signed-out mount starts on a blank field. */
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(restoreLoginDrafts).toHaveBeenCalled();
+    const idle = findByType(renderer.root, 'IdleAuth');
+    expect(idle[0]?.props.initialEmail).toBe('');
+
+    renderer.unmount();
+  });
+
+  it('persists the drafts when the screen unmounts so a rotation remount restores them', async () => {
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips unmount persistence once the mount completed a sign-in', async () => {
+    deviceAuth.status = 'approved';
+    deviceAuth.token = 'tok';
+    // signIn's mock does not publish through the context; the completed
+    // sign-in publishes the token there, which is what retires the drafts.
+    authState.token = 'tok';
+
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
+  });
+
+  it('skips unmount persistence when a non-device sign-in published its token', async () => {
+    // Email-code, Apple, Google, and passkey sign-ins complete without the
+    // device-auth approved path: they publish the token through the auth
+    // context directly. The unmount persistence must stay off for them too,
+    // or the typed email would pre-fill the next login as the previous
+    // account's address.
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    authState.token = 'provider-token';
+    await act(async () => {
+      renderer.update(createElement(LoginScreen));
+      await Promise.resolve();
+    });
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
+  });
+});
+
+describe('login-screen approved wait surface', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'approved';
+    deviceAuth.token = 'tok';
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+  });
+
+  // The hold between the device approving and the root layout redirecting used
+  // to be a bare spinner on the app background: the explorer read it as an
+  // unbranded blank page (signin-language). It is now the shared branded wait
+  // surface, the same one the root layout paints over its hidden windows.
+  it('renders the branded wait surface while the approved token is written', async () => {
+    const renderer = await mountLoginScreen();
+
+    const progress = renderer.root.findAll(node => node.props.accessibilityRole === 'progressbar');
+    expect(progress).toHaveLength(1);
+    expect(progress[0]?.props.accessibilityLabel).toBe('Loading…');
+
+    const logo = findByType(renderer.root, 'Image').find(
+      node => node.props.accessibilityLabel === 'Kilo logo'
+    );
+    expect(logo).toBeDefined();
+    expect(findByType(renderer.root, 'Text').some(node => node.children[0] === 'Loading…')).toBe(
+      true
+    );
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen session-ended announcement', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    announcingWarning.mockClear();
+    authState.sessionEnded = false;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+  });
+
+  it('announces the ended session once and stays silent while it is live', async () => {
+    // s2 reaches `signOut(true)` only on a server-confirmed 401, so `sessionEnded`
+    // is the only signal that the stored session is gone. The login screen must
+    // announce it once, keyed so a remount while still signed out does not
+    // repeat the toast.
+    authState.sessionEnded = true;
+    const ended = await mountLoginScreen();
+
+    expect(announcingWarning).toHaveBeenCalledTimes(1);
+    expect(announcingWarning).toHaveBeenCalledWith(i18n.t('login.sessionEnded'), {
+      id: 'session-ended',
+    });
+    ended.unmount();
+
+    announcingWarning.mockClear();
+    authState.sessionEnded = false;
+    const live = await mountLoginScreen();
+
+    expect(announcingWarning).not.toHaveBeenCalled();
+    live.unmount();
+  });
+});
+
+describe('login-screen pending link across a remount', () => {
+  const offer: PendingLinkOffer = {
+    token: 'link-token',
+    provider: 'github',
+    email: 'person@example.com',
+    methods: ['google'],
+    emailCode: true,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+  };
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    announcingWarning.mockClear();
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    authState.sessionEnded = false;
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+    setPendingLinkOffer(null);
+  });
+
+  it('returns to the same link after an activity restart', async () => {
+    setPendingLinkOffer(offer);
+
+    const restarted = await mountLoginScreen();
+
+    // The restart lost the screen's own state; the link comes back with it
+    // instead of falling through to the plain landing.
+    const idle = findByType(restarted.root, 'IdleAuth')[0];
+    expect(idle?.props.pendingLink).toEqual(offer);
+    restarted.unmount();
+  });
+
+  it('tells the person once what happened to a link the restart interrupted', async () => {
+    setPendingLinkOffer(offer);
+    recordPendingLinkOutcome({ status: 'failed', reason: 'WRONG_ACCOUNT' });
+
+    const restarted = await mountLoginScreen();
+    expect(announcingWarning).toHaveBeenCalledWith(
+      "GitHub wasn't added because you signed in to a different account."
+    );
+    restarted.unmount();
+
+    announcingWarning.mockClear();
+    const later = await mountLoginScreen();
+    expect(announcingWarning).not.toHaveBeenCalled();
+    later.unmount();
+  });
+
+  it('drops a record the link outlived', async () => {
+    setPendingLinkOffer({ ...offer, expiresAt: Date.now() - 1 });
+    recordPendingLinkOutcome({ status: 'linked', provider: 'github' });
+
+    const late = await mountLoginScreen();
+    expect(announcingWarning).not.toHaveBeenCalled();
+    late.unmount();
   });
 });

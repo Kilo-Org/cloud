@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { KILO_AUTO_FREE_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import { isOrganizationAutoConfigured } from '@/lib/organizations/organization-auto-model';
-import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getModelIdToProviderSlugsIndex } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  KILO_AUTO_FREE_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isOrganizationAutoConfigured } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 type DefaultsResponse = {
   defaultModel: string;
@@ -21,11 +24,16 @@ type DefaultsResponse = {
 };
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<DefaultsResponse | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId);
+  const { success, data, nextResponse } = await getAuthorizedOrgContextOrSupport(
+    organizationId,
+    '/api/organizations/[id]/defaults',
+    undefined,
+    { requestMethod: request.method }
+  );
   if (!success) {
     return nextResponse;
   }
@@ -62,7 +70,7 @@ export async function GET(
   };
 
   const findFirstAllowedModelFromOpenRouter = async () => {
-    const openRouterModels = await getEnhancedOpenRouterModels();
+    const openRouterModels = await getEnhancedOpenRouterModels({ countryCode: null });
     for (const model of openRouterModels.data ?? []) {
       if (await isAllowed(model.id)) {
         return model.id;

@@ -5,7 +5,7 @@
  * - Ensures a test user row exists in Postgres (direct insert via
  *   `@kilocode/db`; no reliance on the Next.js fake-login HTTP flow).
  * - Mints Kilo user JWTs for tRPC and short-lived `stream_ticket` JWTs for
- *   the `/stream` WebSocket — same shapes as `apps/web/src/lib/tokens.ts`
+ *   the `/stream` WebSocket — same shapes as `packages/web-shared/src/lib/tokens.ts`
  *   and `apps/web/src/lib/cloud-agent/stream-ticket.ts`.
  *
  * Dev-only — never run against a production DB.
@@ -16,15 +16,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import jwt from 'jsonwebtoken';
+import { eq, or } from 'drizzle-orm';
 import { computeDatabaseUrl, createDrizzleClient, kilocode_users, sql } from '@kilocode/db';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 
 export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
-const JWT_TOKEN_VERSION = 3;
-
-// ---------------------------------------------------------------------------
-// .dev.vars loader
-// ---------------------------------------------------------------------------
 
 /**
  * Parse a `.dev.vars` file — same format as `.env`, with `KEY=value` pairs.
@@ -84,14 +81,10 @@ export function loadRepoEnvFiles(servicePackageDir: string): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// User ensure
-// ---------------------------------------------------------------------------
-
 export type TestUser = {
   id: string;
   email: string;
-  api_token_pepper: string;
+  api_token_pepper: string | null;
 };
 
 /**
@@ -148,30 +141,87 @@ export async function ensureTestUser(
   }
 }
 
-// ---------------------------------------------------------------------------
-// JWT minting
-// ---------------------------------------------------------------------------
+/**
+ * Load a seeded local user by email (the cloud-worktree-setup identity).
+ * Does not create a `usr_e2e_*` stand-in; GitHub integration lives on the
+ * real row. Never logs the pepper or other credentials.
+ */
+export async function loadExistingUserByEmail(
+  databaseUrl: string | undefined,
+  email: string
+): Promise<TestUser> {
+  const resolvedUrl = databaseUrl ?? computeDatabaseUrl();
+  const driver = createDrizzleClient({
+    connectionString: resolvedUrl,
+    poolConfig: { application_name: 'cloud-agent-next-e2e-driver', max: 1 },
+  });
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const rows = await driver.db
+      .select({
+        id: kilocode_users.id,
+        email: kilocode_users.google_user_email,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(
+        or(
+          eq(kilocode_users.google_user_email, email),
+          eq(kilocode_users.normalized_email, normalizedEmail)
+        )
+      );
+    const exact = rows.filter(row => row.email === email);
+    const matches = exact.length > 0 ? exact : rows;
+    const row = matches[0];
+    if (matches.length !== 1 || !row?.id) {
+      throw new Error(
+        `No unique local user for ${email}. Run ~/.config/kilo/bin/cloud-worktree-setup from this worktree, then retry.`
+      );
+    }
+    return {
+      id: row.id,
+      email: row.email ?? email,
+      api_token_pepper: row.api_token_pepper,
+    };
+  } finally {
+    await driver.pool.end().catch(() => {});
+  }
+}
 
 export type MintedTokens = {
   apiToken: string;
 };
 
-/**
- * Mint a Kilo user JWT for tRPC authentication. Mirrors
- * `apps/web/src/lib/tokens.ts:generateApiToken` but with a short expiry
- * since the driver is ephemeral.
- */
-export function mintApiToken(user: TestUser, nextAuthSecret: string): string {
+/** Mint the Cloud Agent control token that authorizes local E2E runtime creation. */
+export function mintApiToken(
+  user: { id: string; api_token_pepper?: string | null },
+  nextAuthSecret: string | undefined,
+  expiresInSeconds = 60 * 60,
+  organizationId?: string
+): string {
+  if (!nextAuthSecret) {
+    throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
+  }
+  const pepper = user.api_token_pepper ?? null;
   return jwt.sign(
     {
       env: 'development',
       kiloUserId: user.id,
-      apiTokenPepper: user.api_token_pepper,
-      version: JWT_TOKEN_VERSION,
+      ...(organizationId ? { organizationId } : {}),
+      apiTokenPepper: pepper,
+      version: KILO_TOKEN_VERSION,
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'human-api',
+      credentialExchange: false,
+      runtimeAdmission: {
+        source: 'user',
+        authorizationUserId: user.id,
+        authorizationPepper: pepper,
+      },
       tokenSource: 'cloud-agent',
     },
     nextAuthSecret,
-    { algorithm: 'HS256', expiresIn: '1h' }
+    { algorithm: 'HS256', expiresIn: expiresInSeconds }
   );
 }
 
@@ -180,19 +230,62 @@ export function mintApiToken(user: TestUser, nextAuthSecret: string): string {
  * `apps/web/src/lib/cloud-agent/stream-ticket.ts:signStreamTicket`.
  */
 export function mintStreamTicket(
-  user: TestUser,
+  user: { id: string },
   cloudAgentSessionId: string,
   nextAuthSecret: string,
-  expiresInSeconds = 120
+  expiresInSeconds = 120,
+  organizationId?: string
 ): string {
   return jwt.sign(
     {
       type: 'stream_ticket',
       userId: user.id,
       cloudAgentSessionId,
+      ...(organizationId ? { organizationId } : {}),
       nonce: randomUUID(),
     },
     nextAuthSecret,
-    { algorithm: 'HS256', expiresIn: expiresInSeconds }
+    { algorithm: 'HS256', expiresIn: expiresInSeconds, audience: 'cloud-agent-stream' }
+  );
+}
+
+/**
+ * Mint a `stream_ticket` for a preview port. Mirrors the entry-ticket claim
+ * shape: audience `cloud-agent-preview`, purpose `preview`, `port` in the
+ * ticket. The Worker exchanges this short-lived entry ticket for a host-bound
+ * session cookie it signs itself, so the default TTL is 60 seconds (matching
+ * the web `signPreviewTicket` `PREVIEW_TICKET_TTL_SECONDS`); the harness never
+ * mints a session token. The negative-observation overrides (`audience`, `purpose`,
+ * `expiresInSeconds`) exist so `preview-http` can mint a wrong-audience or
+ * already-expired ticket without a second signer.
+ */
+export function mintPreviewTicket(
+  user: { id: string },
+  cloudAgentSessionId: string,
+  port: number,
+  nextAuthSecret: string,
+  options: {
+    organizationId?: string;
+    expiresInSeconds?: number;
+    audience?: string;
+    purpose?: string;
+  } = {}
+): string {
+  return jwt.sign(
+    {
+      type: 'stream_ticket',
+      purpose: options.purpose ?? 'preview',
+      userId: user.id,
+      cloudAgentSessionId,
+      port,
+      ...(options.organizationId ? { organizationId: options.organizationId } : {}),
+      nonce: randomUUID(),
+    },
+    nextAuthSecret,
+    {
+      algorithm: 'HS256',
+      expiresIn: options.expiresInSeconds ?? 60,
+      audience: options.audience ?? 'cloud-agent-preview',
+    }
   );
 }

@@ -1,10 +1,18 @@
-import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { FlashList } from '@shopify/flash-list';
+import { selectionHaptic } from '@/lib/haptics';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
-import { useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, View, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
-import { getModeIcon, MODE_OPTIONS } from '@/components/agents/mode-options';
+import {
+  type BuiltinModeOption,
+  getBuiltinModeDescriptionKey,
+  getBuiltinModeLabelKey,
+  getModeIcon,
+  MODE_OPTIONS,
+} from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import {
   dedupeCustomModeOptions,
@@ -14,37 +22,46 @@ import {
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { clearModePickerBridge, getModePickerBridge } from '@/lib/picker-bridge';
+import { parseParam } from '@/lib/route-params';
+import { modePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { selectionCheckColor } from '@/lib/selection-check-color';
+
+// FlashList takes `style`/`contentContainerStyle` (never `className`), so the
+// list's `flex-1 bg-background` classes become the list style plus the themed
+// background. The picker sheet renders its own scroll container
+// (`scrollable={false}`), so the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export default function ModePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  // Lazy init reads the bridge synchronously on first render — no effect, no
+  const { t } = useTranslation();
+  const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
+  const routeKey = parseParam(rawRouteKey) ?? UNFENCED_ROUTE_KEY;
+  useRouteRegistry(routeKey);
+  // Lazy init reads the slot synchronously on first render — no effect, no
   // "No options available" flash before a later effect populates state.
-  const [bridge] = useState(() => getModePickerBridge());
+  const [bridge] = useState(() => modePickerSlot.get(routeKey));
 
-  useEffect(
-    () => () => {
-      clearModePickerBridge();
-    },
-    []
-  );
+  function close() {
+    router.back();
+  }
 
   function handleSelect(mode: AgentMode) {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     bridge?.onSelect(mode);
-    clearModePickerBridge();
+    modePickerSlot.clear(routeKey);
     router.back();
   }
 
   if (!bridge) {
     return (
       <PickerSheet
-        title="Select mode"
-        onDone={() => {
-          router.back();
-        }}
+        title={t('agentChat.modePicker.title')}
+        onDone={close}
+        onCancel={close}
         scrollable={false}
+        topInset="never"
         expired
       />
     );
@@ -56,9 +73,14 @@ export default function ModePickerScreen() {
     currentValue
   );
 
-  function renderItem({ item }: { item: ModeOption }) {
+  function renderItem({ item }: { item: BuiltinModeOption | ModeOption }) {
     const Icon = getModeIcon(item.value);
     const selected = item.value === currentValue;
+    const isBuiltin = 'labelKey' in item;
+    const label = isBuiltin ? t(getBuiltinModeLabelKey(item.value) ?? '') : item.label;
+    const description = isBuiltin
+      ? t(getBuiltinModeDescriptionKey(item.value) ?? '')
+      : item.description;
 
     return (
       <Pressable
@@ -67,14 +89,18 @@ export default function ModePickerScreen() {
           handleSelect(item.value);
         }}
         accessibilityRole="button"
-        accessibilityLabel={`${item.label}: ${item.description}`}
+        accessibilityLabel={t('agentChat.modePicker.modeLabel', {
+          label,
+          description,
+        })}
+        accessibilityState={{ selected }}
       >
         <Icon size={20} color={colors.foreground} />
         <View className="flex-1">
-          <Text className="text-base font-medium text-foreground">{item.label}</Text>
-          <Text className="text-sm text-muted-foreground">{item.description}</Text>
+          <Text className="text-base font-medium text-foreground">{label}</Text>
+          <Text className="text-sm text-muted-foreground">{description}</Text>
         </View>
-        {selected && <Check size={18} color={colors.primary} />}
+        {selected && <Check size={18} color={selectionCheckColor(colors)} />}
       </Pressable>
     );
   }
@@ -83,22 +109,23 @@ export default function ModePickerScreen() {
 
   return (
     <PickerSheet
-      title="Select mode"
-      onDone={() => {
-        router.back();
-      }}
+      title={t('agentChat.modePicker.title')}
+      onDone={close}
+      onCancel={close}
       scrollable={false}
+      topInset="never"
     >
       {custom.length === 0 ? (
-        <FlatList
-          className="flex-1 bg-background"
+        <FlashList
+          nestedScrollEnabled
+          style={[listStyle, { backgroundColor: colors.background }]}
           data={MODE_OPTIONS}
           keyExtractor={item => item.value}
           renderItem={renderItem}
           ItemSeparatorComponent={() => separator}
         />
       ) : (
-        <ScrollView className="flex-1 bg-background">
+        <ScrollView nestedScrollEnabled className="flex-1 bg-background">
           {MODE_OPTIONS.map((item, index) => (
             <View key={item.value}>
               {index > 0 ? separator : null}
@@ -106,7 +133,7 @@ export default function ModePickerScreen() {
             </View>
           ))}
           <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Custom modes
+            {t('agentChat.modePicker.customModes')}
           </Text>
           {custom.map((item, index) => (
             <View key={item.value}>

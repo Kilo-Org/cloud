@@ -1,0 +1,522 @@
+import { z } from 'zod';
+import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type {
+  GatewayRequest,
+  GatewayResponsesRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
+import {
+  getOpenAiChatGptStoredConnection,
+  openAiChatGptSharedServicesOwner,
+  type OpenAiChatGptOwner,
+  type OpenAiChatGptStoredConnection,
+} from './store';
+import { isOpenAiModelServed } from './served-models';
+import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
+import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
+
+/**
+ * Routing for the delegated "Sign in with ChatGPT" connection. When a person
+ * has an enabled connection, an eligible OpenAI model is served by api.openai.com
+ * on the delegated token instead of a managed gateway.
+ */
+
+/**
+ * The delegated access token travels in its own upstream header. `extraHeaders`
+ * is merged into the upstream request by `upstream-request.ts`; the partner key
+ * stays the bearer credential on `Authorization`.
+ */
+export const OPENAI_ON_BEHALF_OF_TOKEN_HEADER = 'OpenAI-On-Behalf-Of-Token';
+
+/** The gateway addresses this model as `openai/...`; api.openai.com does not. */
+const OPENAI_MODEL_PREFIX = /^openai\//i;
+
+/**
+ * OpenAI's traceability metadata for subscription sharing. The activity type is
+ * stable for the integration; the purpose is a short, human-readable reason and
+ * must never contain prompt, document, or credential content.
+ */
+const OPENAI_CHATGPT_ACTIVITY = 'coding_agent';
+const OPENAI_CHATGPT_PURPOSE = "Run the user's coding task in Kilo Code.";
+
+/** OpenAI's metadata limits: 16 entries and 512 characters per value. */
+const METADATA_ENTRY_LIMIT = 16;
+const METADATA_VALUE_LIMIT = 512;
+
+/** OpenAI rejects a smaller `max_output_tokens` with `integer_below_min_value`. */
+const MIN_MAX_OUTPUT_TOKENS = 16;
+
+/**
+ * api.openai.com rejects these with `unknown_parameter`. `enabled`, `exclude`
+ * and `max_tokens` are OpenRouter's reasoning extensions; `generate_summary` is
+ * OpenAI's deprecated name for `summary`, which the gateway always sets.
+ */
+const UNSUPPORTED_REASONING_FIELDS = ['enabled', 'exclude', 'max_tokens', 'generate_summary'];
+
+const reasoningEffortUpdateSchema = z.strictObject({
+  type: z.literal('configuration_update'),
+  id: z.string().optional(),
+  reasoning: z.strictObject({ effort: ReasoningEffortSchema.or(z.literal('ultra')) }),
+});
+
+/**
+ * Adds the required traceability keys to the request metadata, keeping any
+ * caller-supplied entries. `session_id` is the gateway's identifier for one
+ * run, which is what `subscription_sharing_activity_id` expects; it is optional
+ * and is omitted when absent. When the merge would exceed the entry limit the
+ * caller's oldest entries are dropped before the required ones.
+ */
+export function withTraceabilityMetadata(
+  metadata: Record<string, string> | null | undefined,
+  sessionId: string | null
+): Record<string, string> {
+  const traceability: Record<string, string> = {
+    subscription_sharing_activity: OPENAI_CHATGPT_ACTIVITY,
+    subscription_sharing_purpose: OPENAI_CHATGPT_PURPOSE,
+  };
+  const activityId = sessionId?.trim() ?? '';
+  if (activityId !== '' && activityId.length <= METADATA_VALUE_LIMIT) {
+    traceability.subscription_sharing_activity_id = activityId;
+  }
+
+  const merged: Record<string, string> = { ...(metadata ?? {}), ...traceability };
+  const removable = Object.keys(merged).filter(key => !(key in traceability));
+  while (Object.keys(merged).length > METADATA_ENTRY_LIMIT && removable.length > 0) {
+    delete merged[removable.shift() as string];
+  }
+  return merged;
+}
+
+export type OpenAiChatGptRoutingInput = {
+  request: GatewayRequest;
+  requestedModel: string;
+  /** Null for anonymous callers, who can never own a connection. */
+  userId: string | null;
+  /**
+   * The organization the request runs for. Set means the request must use that
+   * organization's connection and never the caller's personal one.
+   */
+  organizationId: string | undefined;
+  /**
+   * The platform caller that made the request, when the request is a service
+   * run rather than a person's own. Set with an organization, it makes the
+   * organization's shared-services connection the first candidate.
+   */
+  botId?: string | undefined;
+};
+
+export type OpenAiChatGptRoutingResult =
+  | {
+      kind: 'provider';
+      provider: Provider;
+      userByok: null;
+      bypassAccessCheck: false;
+      skipBalanceCheck: true;
+    }
+  | {
+      /**
+       * The person has an enabled connection for an eligible request, but the
+       * stored credential is terminally dead. The request must fail with the
+       * reconnect message: serving it through another billing path would spend
+       * a different allowance without telling the person.
+       */
+      kind: 'reconnect';
+      message: string;
+    };
+
+function isOpenAiChatGptModel(requestedModel: string): boolean {
+  const model = requestedModel.trim().toLowerCase();
+  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model);
+}
+
+/**
+ * The api.openai.com model id for a gateway model id, or null when the model
+ * cannot take the delegated route. A `~` alias such as `~openai/gpt-luna-latest`
+ * routes like its catalog target.
+ */
+async function resolveOpenAiChatGptUpstreamModel(modelId: string): Promise<string | null> {
+  const model = (await resolveOpenRouterModelAlias(modelId.trim())).trim();
+  if (!isOpenAiChatGptModel(model)) return null;
+  return model.replace(OPENAI_MODEL_PREFIX, '');
+}
+
+/**
+ * The api.openai.com model a ChatGPT connection could serve the request with, before the
+ * connection and served-model checks; null when the request can never take the delegated route.
+ */
+export async function getOpenAiChatGptCandidateModel(
+  apiKind: GatewayRequest['kind'],
+  requestedModel: string
+): Promise<string | null> {
+  if (apiKind !== 'responses') return null;
+  return resolveOpenAiChatGptUpstreamModel(requestedModel);
+}
+
+/**
+ * The connection owners a request may use, in order. A member connection is
+ * always the caller's own: an organization request uses their connection for
+ * that organization and never their personal one, so an organization without
+ * the caller's connection falls through to the API path. Anonymous callers have
+ * no owner.
+ *
+ * A service request is one the platform's own callers make for an organization,
+ * and it carries a bot id. It uses the organization's shared-services
+ * connection first, because that connection exists so a service run does not
+ * spend a member's own ChatGPT plan. An organization without a usable shared
+ * connection falls back to the caller's own connection, which is the behavior
+ * every existing caller has today.
+ */
+function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiChatGptOwner[] {
+  const owners: OpenAiChatGptOwner[] = [];
+  if (input.botId && input.organizationId) {
+    owners.push(openAiChatGptSharedServicesOwner(input.organizationId));
+  }
+  if (input.userId) {
+    owners.push({ kiloUserId: input.userId, organizationId: input.organizationId ?? null });
+  }
+  return owners;
+}
+
+/**
+ * Whether a stored row may serve traffic. The payload's `status` mirrors a save
+ * or a terminal failure, but a person can also disable the row through the
+ * ordinary BYOK toggle, which leaves the payload saying `connected`. Both the
+ * enable flag and a connected status must hold for the route to be eligible and
+ * for the models list to carry the BYOK tag.
+ */
+function isUsableStoredConnection(stored: OpenAiChatGptStoredConnection | null): boolean {
+  return stored?.isEnabled === true && stored.connection.status === 'connected';
+}
+
+/**
+ * The upstream model one specific owner's connection would serve the request
+ * with, or null when that connection is not eligible.
+ */
+async function eligibleUpstreamModelForOwner(
+  input: OpenAiChatGptRoutingInput,
+  owner: OpenAiChatGptOwner
+): Promise<string | null> {
+  const upstreamModel = await getOpenAiChatGptCandidateModel(
+    input.request.kind,
+    input.requestedModel
+  );
+  if (!upstreamModel) return null;
+
+  // The catalog can list an OpenAI model the plain API does not serve. A
+  // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
+  // base model, not an API model id, so sending it upstream fails the request.
+  // Only a model this project actually serves may take the delegated route.
+  if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
+    return null;
+  }
+
+  const stored = await getOpenAiChatGptStoredConnection(owner);
+  return isUsableStoredConnection(stored) ? upstreamModel : null;
+}
+
+/**
+ * The catalog model ids an enabled ChatGPT connection can serve, for the models
+ * list's BYOK tag. Returns null when the person has no usable connection, so the
+ * caller leaves the list untouched. The served-model gate is the same one
+ * routing uses, so a model is tagged only when the delegated route can carry it.
+ */
+export async function getOpenAiChatGptByokModelIds(
+  owner: OpenAiChatGptOwner,
+  candidateModelIds: readonly string[]
+): Promise<Set<string> | null> {
+  const stored = await getOpenAiChatGptStoredConnection(owner);
+  if (!isUsableStoredConnection(stored)) return null;
+
+  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+  if (apiKey.trim().length === 0) return null;
+
+  const tagged = await Promise.all(
+    candidateModelIds.map(async modelId => {
+      const upstreamModel = await resolveOpenAiChatGptUpstreamModel(modelId);
+      if (!upstreamModel) return null;
+      return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
+    })
+  );
+  return new Set(tagged.filter((id): id is string => id !== null));
+}
+
+/**
+ * Returns `models` with the ChatGPT-served ones marked BYOK-available, so the
+ * model picker and the extension show the BYOK badge like pasted BYOK keys. The
+ * list is returned unchanged when the person has no usable connection.
+ */
+export async function tagOpenAiChatGptByokModels<
+  T extends { id: string; hasUserByokAvailable?: boolean },
+>(owner: OpenAiChatGptOwner, models: T[]): Promise<T[]> {
+  const byokModelIds = await getOpenAiChatGptByokModelIds(
+    owner,
+    models.map(model => model.id)
+  );
+  if (!byokModelIds) return models;
+  return models.map(model =>
+    model.hasUserByokAvailable !== true && !byokModelIds.has(model.id)
+      ? model
+      : { ...model, hasUserByokAvailable: true, isFree: false }
+  );
+}
+
+function normalizeReasoningEffort(
+  effort: unknown,
+  model: string,
+  normalizations: Set<string>
+): ReasoningEffort | undefined {
+  // https://developers.openai.com/api/docs/models/gpt-6.1-sol
+  if (effort === 'ultra' && model === 'gpt-6.1-sol') {
+    normalizations.add('reasoning_effort_ultra_to_max');
+    return 'max';
+  }
+  const parsed = ReasoningEffortSchema.safeParse(effort);
+  if (parsed.success) return parsed.data;
+  normalizations.add('reasoning_effort_removed');
+  return undefined;
+}
+
+function normalizeInputItems(
+  body: GatewayResponsesRequest,
+  upstreamModel: string,
+  normalizations: Set<string>
+): void {
+  const input: unknown = body.input;
+  if (!Array.isArray(input)) return;
+
+  // Subscription sharing rejects inline updates; promoting effort can break prompt-cache reuse.
+  const normalizedInput = input.filter(item => {
+    const update = reasoningEffortUpdateSchema.safeParse(item);
+    if (!update.success) return true;
+    body.reasoning = {
+      ...body.reasoning,
+      effort: normalizeReasoningEffort(update.data.reasoning.effort, upstreamModel, normalizations),
+    };
+    normalizations.add('reasoning_effort_update_promoted');
+    return false;
+  });
+  body.input = normalizedInput;
+
+  for (const item of normalizedInput) {
+    if (!isRecord(item)) continue;
+
+    if (item.type === 'reasoning' && 'encrypted_content' in item && !('summary' in item)) {
+      item.summary = [];
+      normalizations.add('reasoning_summary_added');
+    }
+
+    if (
+      (item.type === 'function_call' || item.type === 'custom_tool_call') &&
+      item.namespace == null &&
+      typeof item.name === 'string' &&
+      Array.isArray(body.tools)
+    ) {
+      const toolType = item.type === 'function_call' ? 'function' : 'custom';
+      if (
+        body.tools.some(
+          tool => isRecord(tool) && tool.type !== 'namespace' && tool.name === item.name
+        )
+      ) {
+        continue;
+      }
+      const namespaces = body.tools.flatMap(tool =>
+        isRecord(tool) &&
+        tool.type === 'namespace' &&
+        typeof tool.name === 'string' &&
+        Array.isArray(tool.tools) &&
+        tool.tools.some(
+          nestedTool =>
+            isRecord(nestedTool) && nestedTool.type === toolType && nestedTool.name === item.name
+        )
+          ? [tool.name]
+          : []
+      );
+      if (namespaces.length === 1) {
+        item.namespace = namespaces[0];
+        normalizations.add('tool_namespace_added');
+      }
+    }
+  }
+}
+
+function defaultFunctionToolStrict(tools: GatewayResponsesRequest['tools']): boolean {
+  if (!Array.isArray(tools)) return false;
+
+  // Avoid Responses auto-strict reinterpretation of caller-supplied function schemas.
+  let changed = false;
+  for (const tool of tools) {
+    if (tool?.type === 'function' && tool.strict === undefined) {
+      tool.strict = false;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/**
+ * Builds the provider that serves the delegated request. Returns null when the
+ * partner key is missing: the deployment is misconfigured for token sharing, so
+ * the request falls back to the existing route and the person's session never
+ * breaks. A terminal connection failure is reported by `checkOpenAiChatGptByok`
+ * before this point, so it never reaches another billing path. An upstream
+ * failure *after* a token was obtained is returned to the client as-is by the
+ * gateway and is never silently replayed through another billing path.
+ */
+export function buildOpenAiChatGptProvider(
+  apiKey: string,
+  accessToken: string,
+  upstreamModel: string,
+  owner?: OpenAiChatGptOwner
+): Provider | null {
+  if (apiKey.trim().length === 0) return null;
+
+  return {
+    type: OPENAI_CHATGPT_PROVIDER_ID,
+    inferenceProviderId: OPENAI_CHATGPT_PROVIDER_ID,
+    ...(owner ? { chatGptOwner: owner } : {}),
+    apiUrl: OPENAI_CHATGPT_API_URL,
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey,
+    apiKeyHeader: null,
+    supportedChatApis: ['responses'],
+    responseTransforms: null,
+    async transformRequest(context) {
+      if (context.request.kind !== 'responses') return;
+
+      // The delegated token is resolved before the provider is built, so a
+      // terminal refresh failure is reported to the person instead of silently
+      // running this request on another billing path. Resolution and the
+      // upstream send happen back-to-back in the same gateway request, so the
+      // captured token is still the fresh one.
+      context.extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = accessToken;
+
+      const body = context.request.body;
+      const normalizations = new Set<string>();
+      if (body.model !== upstreamModel) normalizations.add('model_prefix_removed');
+      body.model = upstreamModel;
+      // Stored conversations, background mode and hosted tools are not
+      // supported by the delegated flow, so the request is forced stateless.
+      if (body.store !== false) normalizations.add('store_disabled');
+      body.store = false;
+      // Subscription sharing rejects gateway routing, non-default tiers, and sampling parameters.
+      for (const field of [
+        'conversation',
+        'background',
+        'provider',
+        'service_tier',
+        'temperature',
+        'top_p',
+      ]) {
+        if (Object.hasOwn(body, field)) {
+          Reflect.deleteProperty(body, field);
+          normalizations.add(`${field}_removed`);
+        }
+      }
+      if (defaultFunctionToolStrict(body.tools))
+        normalizations.add('function_tool_strict_defaulted');
+      if (
+        typeof body.max_output_tokens === 'number' &&
+        body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
+      ) {
+        body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+        normalizations.add('max_output_tokens_clamped');
+      }
+
+      const streamOptions: unknown = body.stream_options;
+      if (isRecord(streamOptions) && 'include_usage' in streamOptions) {
+        delete streamOptions.include_usage;
+        normalizations.add('stream_options_include_usage_removed');
+        if (Object.keys(streamOptions).length === 0) delete body.stream_options;
+      }
+
+      normalizeInputItems(body, upstreamModel, normalizations);
+      const reasoning: unknown = body.reasoning;
+      if (isRecord(reasoning)) {
+        for (const field of UNSUPPORTED_REASONING_FIELDS) {
+          if (Object.hasOwn(reasoning, field)) {
+            delete reasoning[field];
+            normalizations.add(`reasoning_${field}_removed`);
+          }
+        }
+        if ('effort' in reasoning) {
+          const effort = normalizeReasoningEffort(reasoning.effort, upstreamModel, normalizations);
+          if (effort === undefined) delete reasoning.effort;
+          else reasoning.effort = effort;
+        }
+      }
+      // OpenAI requires this traceability metadata on every delegated Responses
+      // request, including later turns. Without it the request is rejected once
+      // the integration is enabled for it.
+      const metadata = withTraceabilityMetadata(body.metadata, context.session_id);
+      if (
+        Object.keys(metadata).length !== Object.keys(body.metadata ?? {}).length ||
+        Object.entries(metadata).some(([key, value]) => body.metadata?.[key] !== value)
+      ) {
+        normalizations.add('traceability_metadata_added');
+      }
+      body.metadata = metadata;
+      if (normalizations.size > 0) {
+        logExceptInTest(
+          JSON.stringify({
+            type: 'openai_chatgpt_request_normalized',
+            model: upstreamModel,
+            normalizations: [...normalizations],
+          })
+        );
+      }
+    },
+  };
+}
+
+/**
+ * Resolves the ChatGPT connection as a provider, a reconnect requirement, or
+ * null when the request is not eligible or cannot be served. A `reconnect`
+ * result is returned when the person's enabled credential is terminally dead:
+ * the request must fail readably instead of silently running on another billing
+ * path. Callers keep the standard abuse and organization policy checks
+ * (`bypassAccessCheck: false`), but skip the zero-balance paid-model block:
+ * the ChatGPT plan pays for the request, not Kilo credits.
+ */
+export async function checkOpenAiChatGptByok(
+  input: OpenAiChatGptRoutingInput
+): Promise<OpenAiChatGptRoutingResult | null> {
+  const candidates = openAiChatGptOwnerCandidates(input);
+
+  for (const owner of candidates) {
+    const upstreamModel = await eligibleUpstreamModelForOwner(input, owner);
+    if (!upstreamModel) continue;
+
+    const outcome = await resolveOpenAiChatGptAccessToken(owner);
+
+    // A terminally dead credential must fail readably instead of falling back
+    // to the next connection or another billing path.
+    if (outcome.kind === 'terminal') {
+      return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };
+    }
+    // `no_connection` and a transient `failed` refresh keep the existing route,
+    // and let a later candidate (the caller's own connection) be tried.
+    if (outcome.kind !== 'access_token') continue;
+
+    const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, upstreamModel, owner);
+    // A missing partner key is a deployment-wide misconfiguration.
+    if (!provider) return null;
+
+    return {
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+      skipBalanceCheck: true,
+    };
+  }
+
+  return null;
+}

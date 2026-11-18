@@ -1,13 +1,20 @@
+import jwt from 'jsonwebtoken';
+import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchSessionMetadata } from '../session-service.js';
+import { fetchSessionMetadata } from './metadata.js';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import type { PersistenceEnv, CloudAgentSessionState } from '../persistence/types.js';
 import {
   preflightExistingPromptModel,
   preflightPreparedInitialPromptModel,
+  preflightSessionRuntime,
 } from './model-preflight.js';
+import { CLOUDFLARE_RUNTIME_RETIRED_MESSAGE } from '../persistence/session-metadata.js';
 
-vi.mock('../session-service.js', () => ({ fetchSessionMetadata: vi.fn() }));
+vi.mock('../sandbox-session/session-stub.js', () => ({
+  getSandboxSessionStub: vi.fn(),
+}));
+vi.mock('./metadata.js', () => ({ fetchSessionMetadata: vi.fn() }));
 vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
 
 const metadata: CloudAgentSessionState = {
@@ -35,6 +42,64 @@ describe('model preflight for stored sessions', () => {
     vi.mocked(assertKiloModelAvailable).mockResolvedValue(undefined);
   });
 
+  it.each([
+    { workspace: { sandboxId: 'dind-abcdef' as const } },
+    { workspace: { sandboxId: 'ses-abcdef' as const, devcontainerRequested: true } },
+    {
+      devcontainer: {
+        workspacePath: '/repo',
+        innerWorkspaceFolder: '/repo',
+        wrapperPort: 3000,
+        configPath: '.devcontainer/devcontainer.json',
+      },
+    },
+  ])('rejects retired metadata before auth renewal or catalog checks: %j', async legacy => {
+    vi.mocked(fetchSessionMetadata).mockResolvedValue({ ...metadata, ...legacy });
+    const input = {
+      env,
+      userId: 'user-1',
+      cloudAgentSessionId: metadata.identity.sessionId,
+      procedure: 'resume',
+    };
+    for (const preflight of [
+      preflightSessionRuntime,
+      preflightExistingPromptModel,
+      preflightPreparedInitialPromptModel,
+    ]) {
+      await expect(preflight(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Devcontainer support has been retired'),
+      });
+    }
+    expect(getSandboxSessionStub).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailable).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retired Cloudflare runtime before auth renewal or catalog checks', async () => {
+    vi.mocked(fetchSessionMetadata).mockResolvedValue({
+      ...metadata,
+      workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare' },
+    });
+    const input = {
+      env,
+      userId: 'user-1',
+      cloudAgentSessionId: metadata.identity.sessionId,
+      procedure: 'resume',
+    };
+    for (const preflight of [
+      preflightSessionRuntime,
+      preflightExistingPromptModel,
+      preflightPreparedInitialPromptModel,
+    ]) {
+      await expect(preflight(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: CLOUDFLARE_RUNTIME_RETIRED_MESSAGE,
+      });
+    }
+    expect(getSandboxSessionStub).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailable).not.toHaveBeenCalled();
+  });
+
   it('validates an explicit continuation model in stored runtime context', async () => {
     await preflightExistingPromptModel({
       env,
@@ -44,6 +109,7 @@ describe('model preflight for stored sessions', () => {
       procedure: 'send',
     });
 
+    expect(getSandboxSessionStub).not.toHaveBeenCalled();
     expect(assertKiloModelAvailable).toHaveBeenCalledWith({
       env,
       submittedModel: 'override/model',
@@ -125,6 +191,72 @@ describe('model preflight for stored sessions', () => {
       procedure: 'initiateFromKilocodeSessionV2',
     });
 
+    expect(assertKiloModelAvailable).not.toHaveBeenCalled();
+  });
+});
+
+describe('modern preflight token renewal', () => {
+  const getRuntimeToken = vi.fn<() => Promise<string | null>>();
+  const expiredToken = jwt.sign(
+    { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' }, exp: 1 },
+    'test-secret'
+  );
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fetchSessionMetadata).mockResolvedValue({
+      ...metadata,
+      auth: { kilocodeToken: expiredToken },
+    });
+    vi.mocked(getSandboxSessionStub).mockReturnValue({ getRuntimeToken } as unknown as ReturnType<
+      typeof getSandboxSessionStub
+    >);
+  });
+
+  it.each([preflightExistingPromptModel, preflightPreparedInitialPromptModel])(
+    'renews the expired backing token before prompt validation',
+    async preflight => {
+      getRuntimeToken.mockResolvedValue('renewed-token');
+      await preflight({
+        env,
+        userId: 'user-1',
+        cloudAgentSessionId: metadata.identity.sessionId,
+        procedure: 'send',
+      });
+      expect(getSandboxSessionStub).toHaveBeenCalledWith(
+        env,
+        'user-1',
+        metadata.identity.sessionId
+      );
+      expect(getRuntimeToken).toHaveBeenCalledTimes(1);
+      expect(assertKiloModelAvailable).toHaveBeenCalledWith(
+        expect.objectContaining({ originalToken: 'renewed-token' })
+      );
+    }
+  );
+
+  it.each(['revoked', 'expired'])('fails closed when delegation is %s', async reason => {
+    getRuntimeToken.mockRejectedValue(new Error(reason));
+    await expect(
+      preflightExistingPromptModel({
+        env,
+        userId: 'user-1',
+        cloudAgentSessionId: metadata.identity.sessionId,
+        procedure: 'send',
+      })
+    ).rejects.toThrow(reason);
+    expect(assertKiloModelAvailable).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the owning session returns no credential', async () => {
+    getRuntimeToken.mockResolvedValue(null);
+    await expect(
+      preflightExistingPromptModel({
+        env,
+        userId: 'user-1',
+        cloudAgentSessionId: metadata.identity.sessionId,
+        procedure: 'send',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(assertKiloModelAvailable).not.toHaveBeenCalled();
   });
 });

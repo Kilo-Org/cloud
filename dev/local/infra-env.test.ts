@@ -3,15 +3,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { parseEnv } from 'node:util';
 
 import {
   applyAppEnv,
   buildAppEnv,
   buildComposeEnv,
   composeProjectName,
+  currentComposeProject,
+  DEFAULT_COMPOSE_PROJECT,
+  localByokKmsServiceConfig,
   syncInfraEnv,
 } from './infra-env';
 import { applyPortOffset, portOffset } from './services';
+import { writeSecretsFile } from './secrets-file';
 
 const PORTS = { postgres: 5532, redis: 6479, 'redis-http': 8179, grafana: 4100 };
 
@@ -44,6 +49,27 @@ test('rewrites local endpoints in .env.local and adds a missing key', () => {
   assert.match(content, /^POSTGRES_URL=postgres:\/\/postgres:postgres@localhost:5532\/postgres$/m);
   assert.match(content, /^REDIS_URL=redis:\/\/localhost:6479$/m);
   assert.match(content, /^UPSTASH_REDIS_REST_URL=http:\/\/localhost:8179$/m);
+});
+
+test('points the web app at the offset BYOK KMS service and fills a blank value', () => {
+  const ports = { ...PORTS, 'local-kms': 8932, 'byok-kms': 8933 };
+  const before = ['BYOK_KMS_SERVICE_URL=', 'BYOK_KMS_SERVICE_TOKEN=', ''].join('\n');
+
+  const { content, changed } = applyAppEnv(before, buildAppEnv(ports));
+
+  assert.ok(changed.includes('BYOK_KMS_SERVICE_URL'));
+  assert.match(content, /^BYOK_KMS_SERVICE_URL=http:\/\/127\.0\.0\.1:8933$/m);
+  assert.equal(buildComposeEnv('p', ports).KILO_KMS_PORT, '8932');
+});
+
+test('keeps a blank value for keys other than the BYOK KMS URL', () => {
+  const before = ['POSTGRES_URL=', 'BYOK_KMS_SERVICE_URL=', ''].join('\n');
+
+  const { content, kept } = applyAppEnv(before, buildAppEnv({ ...PORTS, 'byok-kms': 8933 }));
+
+  assert.match(content, /^POSTGRES_URL=$/m);
+  assert.match(content, /^BYOK_KMS_SERVICE_URL=http:\/\/127\.0\.0\.1:8933$/m);
+  assert.ok(kept.includes('POSTGRES_URL'));
 });
 
 test('keeps a value that names another host', () => {
@@ -94,6 +120,131 @@ test('publishes this worktree database to the Jest env file', () => {
   }
 });
 
+test('fills the BYOK KMS token when it is empty or missing and keeps one that is set', () => {
+  const cases: Array<{ line: string; expected: string }> = [
+    { line: '', expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=', expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=   ', expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=""', expected: 'dev-byok-kms-token' },
+    { line: "BYOK_KMS_SERVICE_TOKEN=''", expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=my-token', expected: 'my-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN="my token"', expected: 'my token' },
+  ];
+  const original = portOffset;
+
+  try {
+    applyPortOffset(700);
+    for (const { line, expected } of cases) {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+      try {
+        fs.mkdirSync(path.join(root, 'dev'));
+        fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
+        const envLocalPath = path.join(root, '.env.local');
+        fs.writeFileSync(envLocalPath, `BYOK_KMS_SERVICE_URL=""\n${line}\n`);
+
+        syncInfraEnv(root);
+
+        const env = parseEnv(fs.readFileSync(envLocalPath, 'utf-8'));
+        assert.equal(env.BYOK_KMS_SERVICE_TOKEN, expected, `token for ${JSON.stringify(line)}`);
+        assert.match(env.BYOK_KMS_SERVICE_URL ?? '', /^http:\/\/127\.0\.0\.1:\d+$/);
+        const occurrences = fs
+          .readFileSync(envLocalPath, 'utf-8')
+          .split('\n')
+          .filter(l => l.startsWith('BYOK_KMS_SERVICE_TOKEN=')).length;
+        assert.equal(occurrences, 1);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    applyPortOffset(original);
+  }
+});
+
+test('keeps a 0600 .env.local at 0600 through a sync', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  fs.mkdirSync(path.join(root, 'dev'));
+  fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
+  const envLocalPath = path.join(root, '.env.local');
+  fs.writeFileSync(
+    envLocalPath,
+    'POSTGRES_URL=postgres://postgres:postgres@localhost:5432/postgres\nNEXTAUTH_SECRET=keep-me\n'
+  );
+  fs.chmodSync(envLocalPath, 0o600);
+  const original = portOffset;
+
+  try {
+    applyPortOffset(700);
+    syncInfraEnv(root);
+
+    assert.equal(fs.statSync(envLocalPath).mode & 0o777, 0o600);
+    assert.match(
+      fs.readFileSync(envLocalPath, 'utf-8'),
+      /^POSTGRES_URL=postgres:\/\/postgres:postgres@localhost:6132\/postgres$/m
+    );
+  } finally {
+    applyPortOffset(original);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('writeSecretsFile tightens a default-mode destination and creates at 0600', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  try {
+    const fresh = path.join(root, 'fresh.env');
+    writeSecretsFile(fresh, 'a=1\n');
+    assert.equal(fs.statSync(fresh).mode & 0o777, 0o600);
+
+    const loose = path.join(root, 'loose.env');
+    fs.writeFileSync(loose, 'a=1\n');
+    fs.chmodSync(loose, 0o644);
+    writeSecretsFile(loose, 'a=2\n');
+    assert.equal(fs.statSync(loose).mode & 0o777, 0o600);
+    assert.equal(fs.readFileSync(loose, 'utf-8'), 'a=2\n');
+
+    const strict = path.join(root, 'strict.env');
+    fs.writeFileSync(strict, 'a=1\n');
+    fs.chmodSync(strict, 0o400);
+    writeSecretsFile(strict, 'a=3\n');
+    assert.equal(fs.statSync(strict).mode & 0o777, 0o400);
+    assert.equal(fs.readFileSync(strict, 'utf-8'), 'a=3\n');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('writeSecretsFile refuses a symlinked destination and cleans up its temp file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  try {
+    const target = path.join(root, 'target.env');
+    fs.writeFileSync(target, 'a=1\n');
+    const link = path.join(root, 'link.env');
+    fs.symlinkSync(target, link);
+
+    assert.throws(() => writeSecretsFile(link, 'a=2\n'), /symlink/);
+    assert.equal(fs.readFileSync(target, 'utf-8'), 'a=1\n');
+    assert.equal(fs.readdirSync(root).filter(name => name.endsWith('.tmp')).length, 0);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('writeSecretsFile cleans up its temp file when the rename fails', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  try {
+    // A rename onto an existing directory always fails, forcing the failure
+    // path after the temp file exists: the catch must remove the temp.
+    const blocked = path.join(root, 'blocked.env');
+    fs.mkdirSync(blocked);
+
+    assert.throws(() => writeSecretsFile(blocked, 'a=1\n'));
+    assert.equal(fs.readdirSync(root).filter(name => name.endsWith('.tmp')).length, 0);
+    assert.ok(fs.statSync(blocked).isDirectory());
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('leaves a value that already names the target host and port', () => {
   const before = 'POSTGRES_URL=postgresql://postgres:postgres@localhost:5532/postgres\n';
 
@@ -102,4 +253,21 @@ test('leaves a value that already names the target host and port', () => {
   assert.deepEqual(kept, []);
   assert.ok(!changed.includes('POSTGRES_URL'));
   assert.equal(content.split('\n')[0], before.trim());
+});
+
+test('currentComposeProject names the project compose really uses', () => {
+  // At offset 0 no dev/.env is written, so compose falls back to the basename
+  // of its project directory. `composeProjectName(root, 0)` names a project no
+  // container ever carries — comparing against it makes a checkout's own
+  // database look like another worktree's squatter.
+  assert.equal(currentComposeProject('/repo/kilo', 0), DEFAULT_COMPOSE_PROJECT);
+  assert.equal(currentComposeProject('/repo/kilo', 2500), 'kilo-dev-kilo-2500');
+});
+
+test('derives the seed fallback KMS endpoint from the port offset', () => {
+  assert.deepEqual(localByokKmsServiceConfig(0), {
+    url: 'http://127.0.0.1:8901',
+    token: 'dev-byok-kms-token',
+  });
+  assert.equal(localByokKmsServiceConfig(300).url, 'http://127.0.0.1:9201');
 });

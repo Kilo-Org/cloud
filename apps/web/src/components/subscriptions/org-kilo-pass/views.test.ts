@@ -2,7 +2,12 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PageTitleProvider } from '@/contexts/PageTitleContext';
 import type { OrgKiloPassTerms } from './types';
+import { usePaidCreditPolicyReady } from '@/components/payment/CreditExpiryNotice';
 
+jest.mock('@/components/payment/CreditExpiryNotice', () => ({
+  CreditExpiryNotice: () => null,
+  usePaidCreditPolicyReady: jest.fn(() => true),
+}));
 const starterTerms: OrgKiloPassTerms = {
   tier: 'tier_19',
   tierName: 'Starter',
@@ -381,6 +386,10 @@ describe('OrgKiloPassDetailView', () => {
 describe('OrgKiloPassSetupView', () => {
   type SetupProps = Parameters<typeof OrgKiloPassSetupView>[0];
 
+  beforeEach(() => {
+    jest.mocked(usePaidCreditPolicyReady).mockReturnValue(true);
+  });
+
   function render(overrides: Partial<SetupProps> = {}) {
     const props: SetupProps = {
       organizationId: 'org-parent',
@@ -426,6 +435,15 @@ describe('OrgKiloPassSetupView', () => {
     const end = html.indexOf('>', start);
     return html.slice(start, end);
   }
+
+  test('blocks saved-card purchase before credit expiration policy is confirmed', () => {
+    jest.mocked(usePaidCreditPolicyReady).mockReturnValue(false);
+    expect(buttonTag(render(), 'Purchase Kilo Pass')).toContain('disabled=""');
+  });
+
+  test('allows saved-card purchase after expiration policy is confirmed, including disabled rollout', () => {
+    expect(buttonTag(render(), 'Purchase Kilo Pass')).not.toContain('disabled=""');
+  });
 
   test('shows no setup status badge next to the title', () => {
     const html = render();

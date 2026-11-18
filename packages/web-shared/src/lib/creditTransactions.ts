@@ -1,0 +1,362 @@
+import { eq, desc, and, isNull, gt, notExists, or, notLike } from 'drizzle-orm';
+import { z } from 'zod';
+import { db, readDb, sql } from './drizzle';
+import type { Organization } from '@kilocode/db/schema';
+import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
+import { isPaidCreditReportingSql, paidCreditPrincipalSql } from './paidCreditReporting';
+
+export type CreditSummary = {
+  total_promotional_musd: number;
+  total_purchased_musd: number;
+  credit_transaction_count: number;
+};
+
+export async function getCreditTransactionsSummaryByUserId(
+  kiloUserId: string
+): Promise<CreditSummary> {
+  const { rows } = await db.execute(
+    sql`
+    select
+      coalesce(sum(amount_microdollars) filter (where is_free and paid_credit_policy is null),0) :: bigint total_promotional_musd,
+      coalesce(sum(${paidCreditPrincipalSql}) filter (where ${isPaidCreditReportingSql}),0) :: bigint total_purchased_musd,
+      count(*) as credit_transaction_count
+    from public.credit_transactions
+    where kilo_user_id = ${kiloUserId}
+      and organization_id is null
+  `
+  );
+  const result = rows[0] as {
+    total_promotional_musd: string;
+    total_purchased_musd: string;
+    credit_transaction_count: string;
+  };
+
+  return {
+    total_promotional_musd: Number(result.total_promotional_musd),
+    total_purchased_musd: Number(result.total_purchased_musd),
+    credit_transaction_count: Number(result.credit_transaction_count),
+  };
+}
+
+export async function getCreditTransactionsSummaryForOrganization(
+  organizationId: Organization['id']
+): Promise<CreditSummary> {
+  // Same visibility rule as the paged list below: the per-request accounting
+  // entries (`kpo:consumption:*`) are internal bookkeeping, so the count and
+  // the balances report only grants, purchases, transfers and adjustments.
+  // Excluding them here is intended, not an oversight; keep both filters in step.
+  const { rows } = await db.execute(
+    sql`
+    select
+      coalesce(sum(amount_microdollars) filter (where is_free and paid_credit_policy is null),0) :: bigint total_promotional_musd,
+      coalesce(sum(${paidCreditPrincipalSql}) filter (where ${isPaidCreditReportingSql}),0) :: bigint total_purchased_musd,
+      count(*) as credit_transaction_count
+    from public.credit_transactions
+    where organization_id = ${organizationId}
+      and (credit_category is null or credit_category not like 'kpo:consumption:%')
+  `
+  );
+  const result = rows[0] as {
+    total_promotional_musd: string;
+    total_purchased_musd: string;
+    credit_transaction_count: string;
+  };
+
+  return {
+    total_promotional_musd: Number(result.total_promotional_musd),
+    total_purchased_musd: Number(result.total_purchased_musd),
+    credit_transaction_count: Number(result.credit_transaction_count),
+  };
+}
+
+export type CreditInfo = {
+  balance: number;
+  isDepleted: boolean;
+  hasPendingPayments: boolean;
+};
+
+export type UserPaymentsSummary = Awaited<ReturnType<typeof summarizeUserPayments>>;
+export async function summarizeUserPayments(kiloUserId: string, fromDb: typeof db = readDb) {
+  return (
+    await fromDb
+      .select({
+        payments_count: sql<number>`count(*)::int`,
+        payments_total_microdollars: sql<number>`coalesce(sum(${credit_transactions.amount_microdollars}), 0)::float`,
+      })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, kiloUserId),
+          eq(credit_transactions.is_free, false),
+          isNull(credit_transactions.organization_id),
+          gt(credit_transactions.amount_microdollars, 0),
+          notExists(
+            fromDb
+              .select({ id: kilo_pass_issuance_items.id })
+              .from(kilo_pass_issuance_items)
+              .where(eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id))
+          )
+        )
+      )
+  )[0];
+}
+
+// old form: array capped at 100, no cursor; remove when every client pages.
+export async function getCreditTransactionsForOrganization(organizationId: Organization['id']) {
+  return db
+    .select({
+      id: credit_transactions.id,
+      kilo_user_id: credit_transactions.kilo_user_id,
+      amount_microdollars: credit_transactions.amount_microdollars,
+      expiration_baseline_microdollars_used:
+        credit_transactions.expiration_baseline_microdollars_used,
+      original_baseline_microdollars_used: credit_transactions.original_baseline_microdollars_used,
+      consumed_microdollars: credit_transactions.consumed_microdollars,
+      retired_microdollars: credit_transactions.retired_microdollars,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_source: credit_transactions.credit_source,
+      source_transaction_id: credit_transactions.source_transaction_id,
+      is_free: credit_transactions.is_free,
+      description: credit_transactions.description,
+      original_transaction_id: credit_transactions.original_transaction_id,
+      stripe_payment_id: credit_transactions.stripe_payment_id,
+      coinbase_credit_block_id: credit_transactions.coinbase_credit_block_id,
+      credit_category: credit_transactions.credit_category,
+      expiry_date: credit_transactions.expiry_date,
+      created_at: credit_transactions.created_at,
+      organization_id: credit_transactions.organization_id,
+      check_category_uniqueness: credit_transactions.check_category_uniqueness,
+    })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.organization_id, organizationId),
+        or(
+          isNull(credit_transactions.credit_category),
+          notLike(credit_transactions.credit_category, 'kpo:consumption:%')
+        )
+      )
+    )
+    .orderBy(desc(credit_transactions.created_at))
+    .limit(100);
+}
+
+const CREDIT_TRANSACTIONS_PAGE_SIZE = 25;
+
+type OrganizationCreditTransaction = Awaited<
+  ReturnType<typeof getCreditTransactionsForOrganization>
+>[number];
+
+export type CreditTransactionsPage = {
+  entries: OrganizationCreditTransaction[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  summary: CreditSummary;
+};
+
+/**
+ * Opaque keyset cursor: the ordering key of the last row a page returned,
+ * as `<created_at>|<id>`. An OFFSET cursor is not stable here — the ledger
+ * grows at the head, so a row inserted between two requests shifts every
+ * later page and page 2 repeats a row page 1 already showed.
+ *
+ * `created_at` is read in `mode: 'string'`, so the value keeps the full
+ * Postgres microsecond precision a JS `Date` would round away.
+ */
+function encodeLedgerCursor(row: { created_at: string; id: string }): string {
+  return `${row.created_at}|${row.id}`;
+}
+
+// `created_at` is selected in `mode: 'string'`, so a cursor carries it exactly as
+// Postgres renders a `timestamptz`: `2026-10-22 10:49:31.051648+00`, or `+05:30`
+// for a half-hour offset.
+const LEDGER_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?[+-](\d{2})(?::?(\d{2}))?$/;
+const LEDGER_CURSOR_ID = z.uuid();
+
+function isLedgerTimestamp(value: string): boolean {
+  const match = LEDGER_TIMESTAMP_PATTERN.exec(value);
+  if (!match) {
+    return false;
+  }
+  const [, year, month, day, hour, minute, second, fraction = '', offsetHour, offsetMinute = '00'] =
+    match;
+  if (Number(offsetHour) > 15 || Number(offsetMinute) > 59) {
+    return false;
+  }
+  // `Date.UTC` normalizes out-of-range fields where the database cast rejects them
+  // (`2026-02-30` becomes March 2, `24:00` the next day), so the wall clock has to
+  // survive a round trip before the value can be handed to the query.
+  const wallClock = new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+      Number(fraction.padEnd(3, '0').slice(0, 3))
+    )
+  );
+  return (
+    wallClock.getUTCFullYear() === Number(year) &&
+    wallClock.getUTCMonth() === Number(month) - 1 &&
+    wallClock.getUTCDate() === Number(day) &&
+    wallClock.getUTCHours() === Number(hour) &&
+    wallClock.getUTCMinutes() === Number(minute) &&
+    wallClock.getUTCSeconds() === Number(second)
+  );
+}
+
+function decodeLedgerCursor(cursor: string): { createdAt: string; id: string } | null {
+  const separator = cursor.indexOf('|');
+  if (separator <= 0 || separator === cursor.length - 1) {
+    return null;
+  }
+  const createdAt = cursor.slice(0, separator);
+  const id = cursor.slice(separator + 1);
+  if (!isLedgerTimestamp(createdAt) || !LEDGER_CURSOR_ID.safeParse(id).success) {
+    return null;
+  }
+  return { createdAt, id };
+}
+
+export async function getCreditTransactionsForOrganizationPage(
+  organizationId: Organization['id'],
+  cursor?: string | null
+): Promise<CreditTransactionsPage> {
+  // A malformed cursor reads as "start from the top" rather than throwing: the
+  // value is opaque to the client and a stale one must not break the screen.
+  const decoded = cursor ? decodeLedgerCursor(cursor) : null;
+  const [transactions, summary] = await Promise.all([
+    db
+      .select({
+        id: credit_transactions.id,
+        kilo_user_id: credit_transactions.kilo_user_id,
+        amount_microdollars: credit_transactions.amount_microdollars,
+        expiration_baseline_microdollars_used:
+          credit_transactions.expiration_baseline_microdollars_used,
+        original_baseline_microdollars_used:
+          credit_transactions.original_baseline_microdollars_used,
+        consumed_microdollars: credit_transactions.consumed_microdollars,
+        retired_microdollars: credit_transactions.retired_microdollars,
+        paid_credit_policy: credit_transactions.paid_credit_policy,
+        credit_source: credit_transactions.credit_source,
+        source_transaction_id: credit_transactions.source_transaction_id,
+        is_free: credit_transactions.is_free,
+        description: credit_transactions.description,
+        original_transaction_id: credit_transactions.original_transaction_id,
+        stripe_payment_id: credit_transactions.stripe_payment_id,
+        coinbase_credit_block_id: credit_transactions.coinbase_credit_block_id,
+        credit_category: credit_transactions.credit_category,
+        expiry_date: credit_transactions.expiry_date,
+        created_at: credit_transactions.created_at,
+        organization_id: credit_transactions.organization_id,
+        check_category_uniqueness: credit_transactions.check_category_uniqueness,
+      })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.organization_id, organizationId),
+          // Visibility rule for the organization readers that list transactions
+          // in this module: the per-request accounting entries
+          // (`kpo:consumption:*`) are internal bookkeeping, so the paged list,
+          // its summary and the admin list show only grants, purchases,
+          // transfers and adjustments. A page therefore ends when the visible
+          // rows run out, which can be before the organization's total row
+          // count. That is intended, not a lost page. The paid-history checks
+          // below are outside this rule and read the table unfiltered.
+          or(
+            isNull(credit_transactions.credit_category),
+            notLike(credit_transactions.credit_category, 'kpo:consumption:%')
+          ),
+          // Row-value comparison in the same (created_at desc, id desc) order,
+          // so later pages stay disjoint from the ones already shown.
+          decoded
+            ? sql`(${credit_transactions.created_at}, ${credit_transactions.id}) < (${decoded.createdAt}::timestamptz, ${decoded.id}::uuid)`
+            : undefined
+        )
+      )
+      .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
+      .limit(CREDIT_TRANSACTIONS_PAGE_SIZE + 1),
+    getCreditTransactionsSummaryForOrganization(organizationId),
+  ]);
+
+  const hasMore = transactions.length > CREDIT_TRANSACTIONS_PAGE_SIZE;
+  const entries = transactions.slice(0, CREDIT_TRANSACTIONS_PAGE_SIZE);
+  const lastEntry = entries.at(-1);
+
+  return {
+    entries,
+    nextCursor: hasMore && lastEntry ? encodeLedgerCursor(lastEntry) : null,
+    hasMore,
+    summary,
+  };
+}
+
+export async function getAdminCreditTransactionsForOrganization(
+  organizationId: Organization['id']
+) {
+  const transactions = await db
+    .select({
+      id: credit_transactions.id,
+      amount_microdollars: credit_transactions.amount_microdollars,
+      expiration_baseline_microdollars_used:
+        credit_transactions.expiration_baseline_microdollars_used,
+      is_free: credit_transactions.is_free,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_source: credit_transactions.credit_source,
+      description: credit_transactions.description,
+      stripe_payment_id: credit_transactions.stripe_payment_id,
+      credit_category: credit_transactions.credit_category,
+      expiry_date: credit_transactions.expiry_date,
+      created_at: credit_transactions.created_at,
+      created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id,
+      created_by_user_name: kilocode_users.google_user_name,
+      created_by_user_email: kilocode_users.google_user_email,
+    })
+    .from(credit_transactions)
+    .leftJoin(kilocode_users, eq(credit_transactions.created_by_kilo_user_id, kilocode_users.id))
+    .where(
+      and(
+        eq(credit_transactions.organization_id, organizationId),
+        or(
+          isNull(credit_transactions.credit_category),
+          notLike(credit_transactions.credit_category, 'kpo:consumption:%')
+        )
+      )
+    )
+    .orderBy(desc(credit_transactions.created_at))
+    .limit(100);
+
+  return transactions.map(transaction => ({
+    ...transaction,
+    created_at: new Date(transaction.created_at).toISOString(),
+    expiry_date: transaction.expiry_date ? new Date(transaction.expiry_date).toISOString() : null,
+  }));
+}
+
+export async function hasUserEverPaid(kiloUserId: string): Promise<boolean> {
+  const result = await db.query.credit_transactions.findFirst({
+    where: and(
+      eq(credit_transactions.kilo_user_id, kiloUserId),
+      eq(credit_transactions.is_free, false),
+      isNull(credit_transactions.organization_id)
+    ),
+    columns: { id: true },
+  });
+  return result !== undefined;
+}
+
+export async function hasOrganizationEverPaid(
+  organizationId: Organization['id']
+): Promise<boolean> {
+  const result = await db.query.credit_transactions.findFirst({
+    where: and(
+      eq(credit_transactions.organization_id, organizationId),
+      eq(credit_transactions.is_free, false)
+    ),
+    columns: { id: true },
+  });
+  return result !== undefined;
+}

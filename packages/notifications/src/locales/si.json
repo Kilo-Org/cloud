@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ඔබගේ ඒජන්ත සැසියට යාවත්කාලීනයක් ඇත",
+      "lowBalance": "ඔබගේ ශේෂයට අවධානය අවශ්‍යයි",
+      "spendAlert": "ඔබගේ වියදමට අවධානය අවශ්‍යයි",
+      "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි",
+      "securityUpdate": "ආරක්ෂක පරීක්ෂාවකට යාවත්කාලීනයක් ඇත",
+      "activeAgentsGlanceable": "සක්‍රිය නියෝජිතයන්ට යාවත්කාලීනයක් ඇත"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "අඩු ශේෂ අනතුරු ඇඟවීම",
+      "body": "{{organizationName}} ශේෂය ${{minimumBalanceUsd}} ට පහළට වැටුණි"
+    },
+    "spendAlert": {
+      "title": "වියදම් අනතුරු ඇඟවීම",
+      "body": "{{scopeName}} වියදම ${{amountUsd}} ඉක්මවා ගියේය"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} {{repoFullName}} තුළ"
+    },
+    "securityFindingNew": {
+      "title": "නව ආරක්ෂක සොයා ගැනීම ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA අනතුරු ඇඟවීම"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA උල්ලංඝනය"
+    }
+  },
+  "sessionReady": {
+    "body": "ඔබගේ Kilo සැසිය ඔබගේ දුරකථනයෙන් පාලනය කිරීමට සූදානම්"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

@@ -6,6 +6,8 @@ import {
   applyPortOffset,
   candidatePortOffsets,
   clearDevLogs,
+  excludeServices,
+  parseServiceList,
   resolveTargets,
   getService,
   getGroups,
@@ -14,13 +16,24 @@ import {
   resolveGroups,
   topologicalSort,
   portOffset,
+  readPersistedPortOffset,
   writePersistedPortOffset,
   resolveSessionNextAuthUrl,
   resolveDeletionMockSessionEnv,
+  resolveFakeLlmSessionEnv,
+  resolveE2eInternalSecretSessionEnv,
   services,
 } from './services';
 import { acquireProcessLock, withProcessLockAsync } from './process-lock';
-import { syncInfraEnv } from './infra-env';
+import {
+  manifestPath,
+  readManifest,
+  manifestServiceNames,
+  restartSelection,
+  type Manifest,
+  type ManifestEntry,
+} from './manifest';
+import { currentComposeProject, syncInfraEnv } from './infra-env';
 import { syncEnvVars } from './env-sync';
 import { getWranglerRegistryPath } from './wrangler-registry';
 import {
@@ -42,11 +55,15 @@ import {
   enablePaneBorders,
   isTmuxAvailable,
   findServicePane,
-  isPaneRunningCommand,
+  paneHasRunningService,
   captureServicePane,
   pipeServicePane,
 } from './tmux';
+import type { PaneInfo } from './tmux';
 import { detectLanIp, prepareMobileEnvironment } from './mobile-env';
+import { isPortlessServiceHealthy } from './tunnel-health';
+import { describeForeignPortOwners, foreignPortOwners, listPortOwners } from './compose-port-owner';
+import type { PortOwner } from './compose-port-owner';
 import { probeDockerApi } from './docker-api-probe';
 import {
   findRepoRoot,
@@ -59,31 +76,71 @@ import {
   buildFollowLogPipeCommand,
   buildLogPipeCommand,
   probePort,
+  waitForPort,
   restartServiceInTmux,
+  buildStartCommand,
+  snapshotCloudAgentPublicTunnelEnv,
+  waitForCloudAgentPublicTunnelCapture,
 } from './runner';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import { shellQuote } from './shell';
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+type PortScanOptions = {
+  portProbe?: typeof probePort;
+  dockerProbe?: typeof probeDockerApi;
+  /** Compose project whose published infra ports are this stack's own. */
+  ownProject?: string;
+  /**
+   * One `docker ps` snapshot, shared across candidate offsets. `undefined` —
+   * docker did not answer — skips the infra scan entirely.
+   */
+  portOwners?: PortOwner[];
+};
+
+type PortScan = {
+  conflicts: string[];
+  reusedHostServices: Set<string>;
+  /** Subset of `conflicts` on infra ports — moving off those loses a database. */
+  infraConflicts?: string[];
+  foreignInfraOwners?: PortOwner[];
+};
 
 // Scan the resolved services' full computed port set for occupants. The
 // shared kiloclaw-docker-tcp bridge on 23750 is reused (not a conflict) when
 // the listener really is the Docker API.
 async function findPortConflicts(
   serviceNames: string[],
-  portProbe: typeof probePort = probePort,
-  dockerProbe: typeof probeDockerApi = probeDockerApi
-): Promise<{
-  conflicts: string[];
-  reusedHostServices: Set<string>;
-}> {
+  options: PortScanOptions = {}
+): Promise<PortScan> {
+  const portProbe = options.portProbe ?? probePort;
+  const dockerProbe = options.dockerProbe ?? probeDockerApi;
   const conflicts: string[] = [];
+  const infraConflicts: string[] = [];
+  const foreignInfraOwners: PortOwner[] = [];
   const reusedHostServices = new Set<string>();
   for (const name of serviceNames) {
     const service = getService(name);
-    if (service.type === 'infra' || service.port <= 0) continue;
+    if (service.port <= 0) continue;
+    // Infra ports used to be skipped here. An offset whose app ports are all
+    // free can still have another compose project sitting on its postgres, and
+    // `docker compose up` then fails with a bare "port is already allocated" —
+    // which is how an auto-selected offset ends up unusable. A container of
+    // *this* worktree's own project is not a conflict: it is the database the
+    // stack is meant to use.
+    if (service.type === 'infra') {
+      // Without a container listing there is no way to tell this worktree's own
+      // postgres from a squatter, and convicting every occupied infra port
+      // would refuse starts that a slow `docker ps` alone should never block.
+      if (options.portOwners === undefined) continue;
+      if (!(await portProbe(service.port))) continue;
+      const owner = options.portOwners.find(entry => entry.port === service.port);
+      if (owner !== undefined && owner.project === options.ownProject) continue;
+      if (owner !== undefined) foreignInfraOwners.push(owner);
+      conflicts.push(`${name}:${service.port}`);
+      infraConflicts.push(`${name}:${service.port}`);
+      continue;
+    }
     const ports = [
       { label: name, port: service.port },
       ...(service.type === 'worker'
@@ -103,7 +160,7 @@ async function findPortConflicts(
       }
     }
   }
-  return { conflicts, reusedHostServices };
+  return { conflicts, reusedHostServices, infraConflicts, foreignInfraOwners };
 }
 
 // Next.js rejects the X11 range. Keep automatic worktree offsets away from it
@@ -148,13 +205,18 @@ async function acquirePortOffsetLease(
   repoRoot: string,
   sessionName: string,
   leasesRoot = path.join(os.tmpdir(), 'kilo-port-offset-leases'),
-  scanPorts: typeof findPortConflicts = findPortConflicts
+  scanPorts: typeof findPortConflicts = findPortConflicts,
+  /** Offset this worktree last started on — the one holding its database. */
+  persistedOffset?: number
 ): Promise<Set<string>> {
   const startingOffset = portOffset;
   const candidates = explicit
     ? [startingOffset]
     : [startingOffset, ...candidatePortOffsets(startingOffset)];
   fs.mkdirSync(leasesRoot, { recursive: true });
+  // One snapshot for all 50 candidates: `docker ps` per candidate would cost
+  // seconds, and container ownership does not change mid-scan.
+  const portOwners = listPortOwners();
 
   for (const candidate of candidates) {
     applyPortOffset(candidate);
@@ -192,12 +254,33 @@ async function acquirePortOffsetLease(
       }
       fs.rmSync(claimPath, { force: true });
 
-      const scan = await scanPorts(serviceNames);
+      const scan = await scanPorts(serviceNames, {
+        ownProject: currentComposeProject(repoRoot, candidate),
+        portOwners,
+      });
       if (scan.conflicts.length > 0) {
         if (explicit) {
           throw new Error(
-            `Refusing to share occupied worktree service ports: ${scan.conflicts.join(', ')}. ` +
-              'Stop the owning worktree or set a distinct KILO_PORT_OFFSET.'
+            [
+              `Refusing to share occupied worktree service ports: ${scan.conflicts.join(', ')}.`,
+              ...describeForeignPortOwners(scan.foreignInfraOwners ?? []).map(line => `  ${line}`),
+              '  Stop the owning worktree or set a distinct KILO_PORT_OFFSET.',
+            ].join('\n')
+          );
+        }
+        // Moving off the offset this worktree last started on means a new
+        // compose project, a new volume, and an empty database — a start that
+        // looks fine and confuses later. Only infra ports carry that cost, so
+        // stop and name the occupant instead of quietly reshuffling.
+        const blockedInfra = scan.infraConflicts ?? [];
+        if (candidate === persistedOffset && blockedInfra.length > 0) {
+          throw new Error(
+            [
+              `Port offset ${candidate} holds this stack's database, but its infrastructure ports are taken: ${blockedInfra.join(', ')}.`,
+              ...describeForeignPortOwners(scan.foreignInfraOwners ?? []).map(line => `  ${line}`),
+              '  Free them and retry. To start on another offset instead — a fresh, empty',
+              '  database — rerun with KILO_PORT_OFFSET=<n>.',
+            ].join('\n')
           );
         }
         continue;
@@ -292,26 +375,71 @@ function determineEnabledGroups(serviceNames: string[]): string[] {
   return enabled;
 }
 
-// ---------------------------------------------------------------------------
-// ANSI helpers
-// ---------------------------------------------------------------------------
-
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
 const GREEN = '\x1b[32m';
 const CAPTURE_TIMEOUT_MS = 30_000;
 
-// ---------------------------------------------------------------------------
-// Commands
-// ---------------------------------------------------------------------------
+function isCaptureServiceRunning(sessionName: string, serviceName: string): boolean {
+  const pane = findServicePane(sessionName, serviceName);
+  return pane !== undefined && paneHasRunningService(sessionName, pane);
+}
+
+/**
+ * Infra ports of `serviceNames` that a *different* compose project publishes.
+ *
+ * Offsets are not exclusive across worktrees: another stack's containers can
+ * still hold this offset's ports after our own `dev:stop`. Docker's own error
+ * ("port is already allocated") names neither the owner nor the fix.
+ */
+function collidingInfraPorts(repoRoot: string, serviceNames: string[]): string[] {
+  const ports = serviceNames
+    .filter(name => getService(name).type === 'infra')
+    .map(name => getService(name).port)
+    .filter(port => port > 0);
+  if (ports.length === 0) return [];
+  return describeForeignPortOwners(
+    foreignPortOwners(ports, currentComposeProject(repoRoot, portOffset))
+  );
+}
+
+/**
+ * Tears down this worktree's containers at the offset it no longer uses.
+ *
+ * Nothing else ever names that project again — `dev/.env` is about to be
+ * rewritten to the new one and `dev:stop` only downs what that file names — so
+ * without this the old containers run forever, holding the old offset's ports
+ * against whoever picks it up next. `down` keeps volumes, so returning to that
+ * offset still finds the data.
+ */
+function removeStaleComposeProject(repoRoot: string, previousOffset: number | undefined): void {
+  // Offset 0 is the shared default project; other checkouts may be using it.
+  if (previousOffset === undefined || previousOffset <= 0 || previousOffset === portOffset) return;
+  const project = currentComposeProject(repoRoot, previousOffset);
+  const [cmd, cmdArgs] = buildInfraDownArgs(project);
+  console.log(`${DIM}Removing containers left at offset ${previousOffset} (${project})${RESET}`);
+  try {
+    execFileSync(cmd, cmdArgs, { cwd: repoRoot, stdio: 'ignore' });
+  } catch {
+    console.warn(
+      `⚠ Could not remove ${project}. Free its ports with: docker compose -p ${project} down`
+    );
+  }
+}
 
 async function cmdUp(args: string[], repoRoot: string): Promise<string | undefined> {
   const noAttach = args.includes('--no-attach');
   const reuseRunning = args.includes('--reuse-running');
-  const targets = args.filter(arg => arg !== '--no-attach' && arg !== '--reuse-running');
+  const withoutArg = args.findLast(arg => arg.startsWith('--without='));
+  const withoutSource = withoutArg === undefined ? 'KILO_DEV_WITHOUT' : '--without';
+  const without = parseServiceList(
+    withoutArg === undefined ? process.env.KILO_DEV_WITHOUT : withoutArg.slice('--without='.length)
+  );
+  const targets = args.filter(
+    arg => arg !== '--no-attach' && arg !== '--reuse-running' && !arg.startsWith('--without=')
+  );
 
-  // --- Preflight checks ---
   if (!isTmuxAvailable()) {
     console.error('tmux is not installed. Install it with: brew install tmux');
     process.exit(1);
@@ -336,16 +464,33 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     console.warn('  To sync from Vercel: vercel env pull .env.local');
   }
 
-  // --- Resolve targets ---
   // Always start core (always-on) groups; additional targets are merged in
   const coreServices = resolveGroups(getAlwaysOnGroupIds());
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
   let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+  if (without.length > 0) {
+    const exclusion = excludeServices(serviceNames, without);
+    serviceNames = exclusion.serviceNames;
+    if (exclusion.skipped.length > 0) {
+      console.log(`${DIM}Skipping (${withoutSource}): ${exclusion.skipped.join(', ')}${RESET}`);
+    }
+    for (const [name, missing] of exclusion.dependents) {
+      console.warn(`⚠ ${name} runs without ${missing.join(', ')}; calls to them will fail.`);
+    }
+  }
 
   const sessionName = getSessionName();
-  const sessionAlreadyRunning = sessionExists(sessionName);
+  let sessionAlreadyRunning = sessionExists(sessionName);
+  if (
+    sessionAlreadyRunning &&
+    !reuseRunning &&
+    serviceNames.every(name => findServicePane(sessionName, name) === undefined)
+  ) {
+    console.log(`Session ${sessionName} has no running services — recreating it.`);
+    killSession(sessionName);
+    sessionAlreadyRunning = false;
+  }
 
-  // --- Pick a free port offset before anything derives URLs from ports ---
   // An explicit KILO_PORT_OFFSET is honored as-is. Otherwise, when the
   // hash/persisted offset's ports are held by a foreign occupant (another
   // worktree's stack, macOS AirPlay on 5000/7000), probe +100 candidate
@@ -357,23 +502,28 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   let reusedHostServices = new Set<string>();
   if (!sessionAlreadyRunning) {
     const originalOffset = portOffset;
+    // Read before the lease writes over it: it names the offset whose compose
+    // project holds this worktree's containers right now.
+    const previousOffset = readPersistedPortOffset(repoRoot);
     reusedHostServices = await acquirePortOffsetLease(
       serviceNames,
       offsetIsExplicit,
       repoRoot,
-      sessionName
+      sessionName,
+      undefined,
+      undefined,
+      previousOffset
     );
     if (portOffset !== originalOffset)
       console.log(`${DIM}Auto-selected port offset ${portOffset}${RESET}`);
     // Persist before tmux or any service exists: a killed partial startup still
     // leaves every later command on the ports the children inherited.
     writePersistedPortOffset(repoRoot, portOffset);
+    removeStaleComposeProject(repoRoot, previousOffset);
   }
 
-  // --- Export port offset for child processes (e.g. scripts/dev.sh) ---
   process.env.KILO_PORT_OFFSET = String(portOffset);
 
-  // --- Publish this worktree's Compose project and infra endpoints ---
   // After the offset is final: Compose and the app env must name the same
   // database. An offset worktree runs its own containers on its own ports.
   for (const line of syncInfraEnv(repoRoot)) console.log(`${DIM}${line}${RESET}`);
@@ -426,19 +576,28 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     throw new Error('Failed to prepare required local service environment');
   }
 
-  // --- Check for existing session ---
+  if (serviceNames.includes('cloud-agent-public-tunnels')) {
+    try {
+      execSync('cloudflared --version', { stdio: 'ignore' });
+    } catch {
+      console.error('cloudflared is not installed. Install it with: brew install cloudflared');
+      process.exit(1);
+    }
+  }
+
   if (sessionAlreadyRunning) {
     for (const name of serviceNames) {
       const service = getService(name);
       if (service.type !== 'worker' || !findServicePane(sessionName, name)) continue;
-      const outcome = await restartServiceInTmux(sessionName, name);
+      const outcome = await restartServiceInTmux(sessionName, name, undefined, serviceNames);
       if (outcome === 'gave-up') throw new Error(`${name} did not restart with refreshed secrets`);
     }
     if (Object.keys(mobileEnv).length > 0) {
       setSessionEnvironment(sessionName, mobileEnv);
       const nextjsPane = findServicePane(sessionName, 'nextjs');
       if (nextjsPane) {
-        const outcome = await restartServiceInTmux(sessionName, 'nextjs');
+        // The selection keeps the mock's CA export on the relaunched command.
+        const outcome = await restartServiceInTmux(sessionName, 'nextjs', undefined, serviceNames);
         if (outcome === 'gave-up')
           throw new Error('nextjs did not restart with refreshed mobile URLs');
       }
@@ -449,6 +608,30 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
           throw new Error('mobile did not restart with refreshed mobile URLs');
       }
     }
+    if (
+      serviceNames.includes('cloud-agent-public-tunnels') &&
+      !findServicePane(sessionName, 'cloud-agent-public-tunnels')
+    ) {
+      const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+      startServiceInTmux(sessionName, 'cloud-agent-public-tunnels', undefined, serviceNames);
+      const captured = await waitForCloudAgentPublicTunnelCapture(
+        repoRoot,
+        previous,
+        CAPTURE_TIMEOUT_MS
+      );
+      if (!captured) {
+        throw new Error(
+          'Public sandbox tunnel URLs were not captured. Check the cloud-agent-public-tunnels window.'
+        );
+      }
+      const cloudAgentPane = findServicePane(sessionName, 'cloud-agent-next');
+      if (cloudAgentPane) {
+        const outcome = await restartServiceInTmux(sessionName, 'cloud-agent-next');
+        if (outcome === 'gave-up') {
+          throw new Error('cloud-agent-next did not restart with public tunnel URLs');
+        }
+      }
+    }
     console.log(
       noAttach
         ? `Session ${sessionName} already running.`
@@ -457,7 +640,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     return noAttach ? undefined : sessionName;
   }
 
-  // --- Check for socat when kiloclaw-docker-tcp is requested ---
   if (serviceNames.includes('kiloclaw-docker-tcp')) {
     try {
       execSync('which socat', { stdio: 'ignore' });
@@ -467,7 +649,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     }
   }
 
-  // --- Skip Stripe webhook forwarding when the optional Stripe CLI is absent ---
   if (serviceNames.includes('stripe')) {
     try {
       execSync('stripe --version', { stdio: 'ignore' });
@@ -478,7 +659,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     }
   }
 
-  // --- Warn if grafana is enabled but CF_AE_TOKEN is not set ---
   // Grafana boots fine without the token; only dashboard queries fail. Treat
   // this as advisory so devs poking around the repo don't get blocked. Check
   // .env.local in addition to the shell so the warning doesn't fire when the
@@ -494,18 +674,18 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     }
   }
 
-  // --- Start Docker infra ---
   const hasInfra = serviceNames.some(name => getService(name).type === 'infra');
   if (hasInfra) {
+    for (const line of collidingInfraPorts(repoRoot, serviceNames)) {
+      console.warn(`⚠ ${line}`);
+    }
     console.log(`${BOLD}Starting infrastructure…${RESET}`);
     await startInfra(repoRoot, serviceNames);
     console.log();
   }
 
-  // --- Prepare log directory ---
   clearDevLogs(repoRoot);
 
-  // --- Create tmux session ---
   // Pass critical runtime env into the session so panes see this worktree's
   // values even when an existing tmux server is shared with sibling worktrees.
   const wranglerRegistryPath = getWranglerRegistryPath(repoRoot);
@@ -540,6 +720,14 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   if (sessionNextAuthUrl !== undefined) {
     sessionEnv.NEXTAUTH_URL = sessionNextAuthUrl;
   }
+  // The enriched tRPC timing line carries the client dimensions and the
+  // per-call `x-kilo-request-id` that joins it with the app's client_latency
+  // sample, and mobile traffic logs at 100% while other clients stay sampled.
+  // Emit it in local development without an operator remembering the switch;
+  // production keeps its own deployment setting.
+  if (serviceNames.includes('nextjs')) {
+    sessionEnv.TRPC_TIMING_LOGGING = '1';
+  }
   if (process.env.DEBUG_SHOW_DEV_UI !== undefined && process.env.DEBUG_SHOW_DEV_UI !== '') {
     sessionEnv.DEBUG_SHOW_DEV_UI = process.env.DEBUG_SHOW_DEV_UI;
   }
@@ -557,17 +745,23 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     mockPort: getService('deletion-mock').port,
   });
   if (deletionMockEnv) Object.assign(sessionEnv, deletionMockEnv);
+  const fakeLlmEnv = resolveFakeLlmSessionEnv({ serviceNames });
+  if (fakeLlmEnv) Object.assign(sessionEnv, fakeLlmEnv);
+  const e2eInternalSecretEnv = resolveE2eInternalSecretSessionEnv({ serviceNames });
+  if (e2eInternalSecretEnv) Object.assign(sessionEnv, e2eInternalSecretEnv);
   createSession(sessionName, sessionEnv);
 
-  // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
 
-  // --- Start capture services first (tunnel, stripe) and wait for output ---
+  // The fake-LLM Worker is a capture service too: the public-tunnel service
+  // probes it before publishing and exits if it is not answering, so it must be
+  // started and ready before the tunnel capture runs.
   const captureServiceSet = new Set([
     'kiloclaw-tunnel',
     'stripe',
-    'app-builder-tunnel',
     'bitbucket-webhook-tunnel',
+    'cloud-agent-public-tunnels',
+    'fake-llm-worker',
   ]);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
@@ -591,11 +785,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
       oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
     }
-    if (captureServices.includes('app-builder-tunnel')) {
-      const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
-      oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
-      oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
-    }
     if (captureServices.includes('bitbucket-webhook-tunnel')) {
       const appEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
       oldValues.set(
@@ -604,9 +793,22 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       );
       oldMtimes.set('bitbucket-webhook-tunnel', readEnvMtime(appEnvPath));
     }
+    const previousPublicTunnelSnapshot = captureServices.includes('cloud-agent-public-tunnels')
+      ? snapshotCloudAgentPublicTunnelEnv(repoRoot)
+      : undefined;
+
+    // Start the fake-LLM Worker and wait for it to answer before any tunnel
+    // capture: the tunnels refuse to publish the fake when the guard probe
+    // cannot authenticate against it.
+    if (captureServices.includes('fake-llm-worker')) {
+      startServiceInTmux(sessionName, 'fake-llm-worker', sessionEnv, serviceNames);
+      startedServices.push('fake-llm-worker');
+      await waitForPort(getService('fake-llm-worker').port, 'fake-llm-worker', CAPTURE_TIMEOUT_MS);
+    }
 
     for (const name of captureServices) {
-      startServiceInTmux(sessionName, name, sessionEnv);
+      if (name === 'fake-llm-worker') continue;
+      startServiceInTmux(sessionName, name, sessionEnv, serviceNames);
       startedServices.push(name);
       await sleep(300);
     }
@@ -622,21 +824,24 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
             'KILOCODE_API_BASE_URL',
             oldValues.get('tunnel'),
             CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('tunnel')
+            oldMtimes.get('tunnel'),
+            () => isCaptureServiceRunning(sessionName, 'kiloclaw-tunnel')
           ),
           waitForEnvValueChange(
             path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
             'KILOCLAW_CHECKIN_URL',
             oldValues.get('checkin'),
             CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('checkin')
+            oldMtimes.get('checkin'),
+            () => isCaptureServiceRunning(sessionName, 'kiloclaw-tunnel')
           ),
           waitForEnvValueChange(
             path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
             'KILOCHAT_BASE_URL',
             oldValues.get('kilochat'),
             CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('kilochat')
+            oldMtimes.get('kilochat'),
+            () => isCaptureServiceRunning(sessionName, 'kiloclaw-tunnel')
           ),
         ]).then(([gatewayReady, checkinReady, kiloChatReady]) => {
           kiloclawTunnelCaptured = gatewayReady && checkinReady && kiloChatReady;
@@ -671,32 +876,13 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
           'STRIPE_WEBHOOK_SECRET',
           oldValues.get('stripe'),
           CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('stripe')
+          oldMtimes.get('stripe'),
+          () => isCaptureServiceRunning(sessionName, 'stripe')
         ).then(ready => {
           if (ready) {
             console.log('  Stripe webhook secret captured');
           } else {
             console.warn('  Stripe secret not captured after 30s - check stripe window');
-          }
-        })
-      );
-    }
-
-    if (captureServices.includes('app-builder-tunnel')) {
-      waits.push(
-        waitForEnvValueChange(
-          path.join(repoRoot, 'services/app-builder/.dev.vars'),
-          'BUILDER_HOSTNAME',
-          oldValues.get('app-builder-tunnel'),
-          CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('app-builder-tunnel')
-        ).then(ready => {
-          if (ready) {
-            console.log('  App builder tunnel URL captured');
-          } else {
-            console.warn(
-              '  App builder tunnel URL not captured after 30s - check app-builder-tunnel window'
-            );
           }
         })
       );
@@ -709,13 +895,32 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
           'BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL',
           oldValues.get('bitbucket-webhook-tunnel'),
           CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('bitbucket-webhook-tunnel')
+          oldMtimes.get('bitbucket-webhook-tunnel'),
+          () => isCaptureServiceRunning(sessionName, 'bitbucket-webhook-tunnel')
         ).then(ready => {
           if (ready) {
             console.log('  Bitbucket webhook tunnel URL captured');
           } else {
             console.warn(
               '  Bitbucket webhook tunnel URL not captured after 30s - check bitbucket-webhook-tunnel window'
+            );
+          }
+        })
+      );
+    }
+
+    if (previousPublicTunnelSnapshot) {
+      waits.push(
+        waitForCloudAgentPublicTunnelCapture(
+          repoRoot,
+          previousPublicTunnelSnapshot,
+          CAPTURE_TIMEOUT_MS
+        ).then(captured => {
+          if (captured) {
+            console.log('  Public sandbox tunnel URLs captured');
+          } else {
+            console.warn(
+              '  Public sandbox tunnel URLs not captured after 30s - check cloud-agent-public-tunnels window'
             );
           }
         })
@@ -739,7 +944,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       continue;
     }
 
-    startServiceInTmux(sessionName, name, sessionEnv);
+    startServiceInTmux(sessionName, name, sessionEnv, serviceNames);
     startedServices.push(name);
     await sleep(300);
   }
@@ -751,7 +956,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     console.warn('Start or restart these services after the tunnel URL is ready.');
   }
 
-  // --- Set up split layout in window 0: left=sidebar, right=service terminal ---
   // Join the preferred service's pane into window 0 as pane 1 (right column).
   // join-pane moves the pane process — no ghost shells.
   let initialViewedService = '';
@@ -771,13 +975,11 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   // Use main-vertical layout so the sidebar stays at SIDEBAR_WIDTH even after terminal resizes.
   setMainLeftLayout(sessionName, 0, SIDEBAR_WIDTH);
 
-  // Show service names in pane border titles
   enablePaneBorders(sessionName, 0);
   if (initialViewedService) {
     setPaneTitle(sessionName, 0, 1, initialViewedService);
   }
 
-  // --- Start sidebar TUI in left pane (0.0) ---
   const enabledGroupIds = determineEnabledGroups(startedServices);
   const dashboardArgs = [
     JSON.stringify(startedServices),
@@ -787,11 +989,9 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   const dashboardCmd = `tsx dev/local/dashboard.tsx ${dashboardArgs.map(a => JSON.stringify(a)).join(' ')}`;
   sendKeys(sessionName, 0, dashboardCmd, 0);
 
-  // --- Focus sidebar pane and attach ---
   selectPane(sessionName, 0, 0);
   selectWindow(sessionName, 0);
 
-  // --- Write manifest for agents ---
   writeManifest(repoRoot, sessionName, wranglerRegistryPath, startedServices);
 
   console.log(
@@ -807,20 +1007,6 @@ type StatusEntry = {
   port: number;
   status: ServiceStatus;
   group: string;
-};
-
-type ManifestEntry = {
-  name: string;
-  port: number;
-  group: string;
-  type: string;
-};
-
-type Manifest = {
-  session: string;
-  portOffset: number;
-  wranglerRegistryPath: string;
-  services: ManifestEntry[];
 };
 
 function writeManifest(
@@ -839,25 +1025,7 @@ function writeManifest(
       return { name, port, group: svc.group, type: svc.type };
     }),
   };
-  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-}
-
-function readManifest(repoRoot: string): Manifest | undefined {
-  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
-  try {
-    const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-    if (
-      typeof raw?.session !== 'string' ||
-      typeof raw?.portOffset !== 'number' ||
-      !Array.isArray(raw?.services)
-    ) {
-      return undefined;
-    }
-    return raw;
-  } catch {
-    return undefined;
-  }
+  fs.writeFileSync(manifestPath(repoRoot), JSON.stringify(manifest, null, 2));
 }
 
 async function missingRunningServices(
@@ -867,7 +1035,7 @@ async function missingRunningServices(
   checks: {
     repoRoot?: string;
     findPane?: typeof findServicePane;
-    isPaneRunning?: typeof isPaneRunningCommand;
+    isPaneRunning?: typeof paneHasRunningService;
     probe?: typeof probePort;
     waitMs?: number;
     pollMs?: number;
@@ -880,7 +1048,7 @@ async function missingRunningServices(
     )
   );
   const findPane = checks.findPane ?? findServicePane;
-  const isPaneRunning = checks.isPaneRunning ?? isPaneRunningCommand;
+  const isPaneRunning = checks.isPaneRunning ?? paneHasRunningService;
   const probe = checks.probe ?? probePort;
   const repoRoot = checks.repoRoot ?? process.cwd();
   const missing = requested.filter(name => getService(name).type !== 'infra' && !entries.has(name));
@@ -931,6 +1099,24 @@ function getManifestEntry(
   return manifest?.services.find(entry => entry.name === serviceName);
 }
 
+/**
+ * Liveness for a service that listens on no port (tunnels, stripe).
+ *
+ * `pane_current_command` used to answer this and reported `zsh` — the start
+ * wrapper — as "not running" while the service was alive. For tunnels the
+ * captured public URL is the source of truth: cloudflared stays in the pane
+ * tree while it retries a hostname that no longer resolves. Stripe and a
+ * tunnel that has not captured yet fall back to the process tree.
+ */
+async function isPortlessServiceUp(
+  repoRoot: string,
+  sessionName: string,
+  serviceName: string,
+  pane: PaneInfo
+): Promise<boolean> {
+  return isPortlessServiceHealthy(repoRoot, serviceName, paneHasRunningService(sessionName, pane));
+}
+
 async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   const sessionName = getSessionName();
   const manifest = readManifest(repoRoot);
@@ -970,7 +1156,10 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
         name === 'nextjs'
           ? (readNextjsDevPort(repoRoot) ?? manifestEntry?.port ?? svc.port)
           : (manifestEntry?.port ?? svc.port);
-      const isUp = port === 0 ? isPaneRunningCommand(sessionName, pane) : await probePort(port);
+      const isUp =
+        port === 0
+          ? await isPortlessServiceUp(repoRoot, sessionName, name, pane)
+          : await probePort(port);
       const status: ServiceStatus = isUp ? 'up' : 'down';
       return {
         name,
@@ -981,8 +1170,20 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
     })
   );
 
+  // A foreign compose project on our infra ports is why an infra service reads
+  // down here and why the next dev:start fails on "port already allocated".
+  const warnings = collidingInfraPorts(
+    repoRoot,
+    runningServices.map(service => service.name)
+  );
+
   if (isJson) {
-    const result = { session: sessionName, portOffset: statusPortOffset, services: entries };
+    const result = {
+      session: sessionName,
+      portOffset: statusPortOffset,
+      services: entries,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
     console.log(JSON.stringify(result));
     return;
   }
@@ -994,6 +1195,7 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
     const portStr = e.port > 0 ? `:${e.port}` : 'n/a';
     console.log(`${e.name.padEnd(nameWidth)}  ${portStr.padEnd(portWidth)}  ${e.status}`);
   }
+  for (const line of warnings) console.warn(`⚠ ${line}`);
 }
 
 // Metro's jest-haste-map cache ($TMPDIR/metro-file-map-*) persists per project
@@ -1019,6 +1221,56 @@ function clearStaleMetroFileMaps(repoRoot: string): void {
       // Another worktree's file or a race with Metro — leave it.
     }
   }
+}
+
+/**
+ * Print the exact command that starts a service, env prefix included.
+ *
+ * Typing a bare `pnpm run dev` in a service pane is not a restart: worker
+ * commands carry `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_*`, without
+ * which wrangler dials the default :5432 — another worktree's postgres, or
+ * nothing. Prefer `dev:restart`; use this when the pane must be driven by hand.
+ */
+function cmdStartCommand(serviceName: string, repoRoot: string): void {
+  if (!services.has(serviceName)) {
+    console.error(`Unknown service: ${serviceName}`);
+    process.exit(1);
+  }
+  const svc = getService(serviceName);
+  if (svc.type === 'infra') {
+    console.error(`${serviceName} is an infrastructure service; use docker compose`);
+    process.exit(1);
+  }
+
+  // The printed line bakes in ports and the Hyperdrive URLs of *this* offset.
+  // Printing a line for a different stack than the one running would recreate
+  // the bug this command exists to prevent, so refuse instead.
+  const manifest = readManifest(repoRoot);
+  if (manifest && manifest.portOffset !== portOffset) {
+    console.error(
+      `Port offset mismatch: this shell resolves ${portOffset}, the running stack uses ${manifest.portOffset}.\n` +
+        `Re-run with KILO_PORT_OFFSET=${manifest.portOffset} to print the command for the running stack.`
+    );
+    process.exit(1);
+  }
+
+  // `pnpm --filter {./dir}` resolves the filter against the cwd, so the repo
+  // root has to be explicit; commands that already cd into the service dir
+  // must not be prefixed twice.
+  // The selection the stack recorded carries the mock's CA export
+  // (`serviceCommand`), so a pane driven by this line behaves like the pane the
+  // stack started. A missing or empty manifest falls back to the always-on
+  // core selection, and the downgrade is worth a line on stderr because a
+  // narrowed start would differ from it.
+  const selection = restartSelection(repoRoot);
+  if (manifestServiceNames(manifest)?.length !== selection.length) {
+    console.error(
+      `No usable manifest in dev/logs — derived the command from the always-on core selection. ` +
+        `If this stack started with --without, run it from the stack's own pane instead.`
+    );
+  }
+  const command = buildStartCommand(serviceName, selection);
+  console.log(command.startsWith('cd ') ? command : `cd ${shellQuote(repoRoot)} && ${command}`);
 }
 
 async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
@@ -1054,13 +1306,53 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
     clearStaleMetroFileMaps(repoRoot);
   }
 
+  const previousTunnels =
+    serviceName === 'cloud-agent-public-tunnels'
+      ? snapshotCloudAgentPublicTunnelEnv(repoRoot)
+      : undefined;
+
   console.log(`Restarting ${serviceName} (waiting for the old process to shut down)...`);
-  const outcome = await restartServiceInTmux(sessionName, serviceName, restartEnv);
+  // The relaunch and any recreate rebuild the command from the selection, so it
+  // has to be the one the stack started with: without it the web app loses the
+  // Snowflake mock's `NODE_EXTRA_CA_CERTS` export and every usage read fails
+  // with a certificate error. A missing or empty manifest falls back to the
+  // always-on core group — visible on stderr, because a start narrowed with
+  // `--without` would rebuild a wider command than it ran.
+  const manifest = readManifest(repoRoot);
+  const selection = restartSelection(repoRoot);
+  if (manifestServiceNames(manifest)?.length !== selection.length) {
+    console.error(
+      `No usable manifest in dev/logs — rebuilding ${serviceName} from the always-on core selection.`
+    );
+  }
+  const outcome = await restartServiceInTmux(sessionName, serviceName, restartEnv, selection);
   if (outcome === 'gave-up') {
     console.error(`${serviceName} did not shut down in time; not relaunched`);
     process.exit(1);
   }
   console.log(`Restarted ${serviceName}`);
+
+  if (previousTunnels === undefined) return;
+  console.log('Waiting for new public tunnel URLs...');
+  const captured = await waitForCloudAgentPublicTunnelCapture(
+    repoRoot,
+    previousTunnels,
+    CAPTURE_TIMEOUT_MS
+  );
+  if (!captured) {
+    console.warn(
+      'Public tunnel URLs were not recaptured. cloud-agent-next still has the previous WORKER_URL.'
+    );
+    return;
+  }
+  if (!findServicePane(sessionName, 'cloud-agent-next')) return;
+  console.log('Reloading cloud-agent-next with the new tunnel URLs...');
+  const workerOutcome = await restartServiceInTmux(sessionName, 'cloud-agent-next');
+  if (workerOutcome === 'gave-up') {
+    console.warn('cloud-agent-next did not restart with the new tunnel URLs');
+    return;
+  }
+  console.log('Reloaded cloud-agent-next');
 }
 
 function cmdCapture(serviceName: string, linesArg: string | undefined): void {
@@ -1113,7 +1405,13 @@ async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
       const [cmd, args] = buildInfraDownArgs();
       execFileSync(cmd, args, { cwd: repoRoot, stdio: 'inherit' });
     } catch {
-      // docker compose down may fail if nothing is running
+      // Nothing running is the common case and harmless. A real failure leaves
+      // containers holding this offset's ports with the claim already released,
+      // so say so instead of reporting a clean stop.
+      console.warn(
+        '⚠ docker compose down did not complete — containers may still hold this offset.'
+      );
+      console.warn('  Check with: docker compose -f dev/docker-compose.yml ps');
     }
   }
 
@@ -1146,20 +1444,21 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Usage
-// ---------------------------------------------------------------------------
-
 function printUsage(): void {
   console.log(`
 Usage:
-  dev:start [--no-attach] [--reuse-running] [targets...]
+  dev:start [--no-attach] [--reuse-running] [--without=a,b] [targets...]
                           Start services (default: core)
                           --reuse-running never restarts an existing complete stack
+                          --without skips the named services (default: $KILO_DEV_WITHOUT;
+                          --without= starts everything)
   dev:stop [--force]      Stop all services (skips shared Docker infra if
                           other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports
   dev:restart <service>   Restart a running service
+  dev:start-command <service>
+                          Print the full start command (env prefix included) for
+                          driving a service pane by hand
   dev:capture <service> [lines]
                           Capture a service pane wherever the dashboard moved it
   dev:capture <service> --follow <file>
@@ -1171,13 +1470,9 @@ Usage:
   dev:env --missing-secrets-only
                           Create missing Secrets Store entries without refreshing existing ones
 
-Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
+Targets: app, agents, code-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 async function main() {
   const args = process.argv.slice(2);
@@ -1193,7 +1488,17 @@ async function main() {
           () => cmdUp(args.slice(1), repoRoot),
           1_200_000
         );
-        if (sessionToAttach) attachSession(sessionToAttach);
+        if (sessionToAttach) {
+          if (process.stdin.isTTY) {
+            attachSession(sessionToAttach);
+          } else {
+            // tmux needs a controlling terminal; without one `attach-session`
+            // exits non-zero and the started services look like a failed start.
+            console.log(
+              `Not a TTY; services are running. Attach with: tmux attach -t ${sessionToAttach}`
+            );
+          }
+        }
       }
       break;
     case 'stop':
@@ -1214,6 +1519,15 @@ async function main() {
         process.exit(1);
       }
       await cmdRestart(serviceName, repoRoot);
+      break;
+    }
+    case 'start-command': {
+      const serviceName = args[1];
+      if (!serviceName) {
+        console.error('Usage: dev:start-command <service>');
+        process.exit(1);
+      }
+      cmdStartCommand(serviceName, repoRoot);
       break;
     }
     case 'capture': {

@@ -1,17 +1,30 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull, desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_webhook_triggers } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
-import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
+import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
+import { sessionViewerProcedure } from '@/lib/trpc/admin-procedures';
+import {
+  organizationActionTarget,
+  recordAdminAction,
+  userActionTarget,
+} from '@/lib/admin/admin-action-audit';
+import {
+  triggerIdSchema,
+  type WebhookTriggerEditRestriction,
+} from '@/lib/webhook-trigger-validation';
 import {
   getWorkerTrigger,
   listWorkerRequests,
   buildInboundUrl,
-  type EnrichedCapturedRequest,
 } from '@/lib/webhook-agent/webhook-agent-client';
+import {
+  summarizeRequestForAdmin,
+  type AdminWebhookRequestSummary,
+} from '@/lib/webhook-agent/request-projection';
 
 const AdminUserScope = z.object({ scope: z.literal('user'), userId: z.string() });
 const AdminOrgScope = z.object({
@@ -129,12 +142,50 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
     return {
       ...workerResult.config,
       inboundUrl,
+      canEdit: true,
+      canEditReason: null as WebhookTriggerEditRestriction,
+      canRun: true,
     };
   }),
 
-  listRequests: adminProcedure
+  getRequestLogs: sessionViewerProcedure
+    .input(AdminTriggerGetInput.and(z.object({ requestId: z.string().uuid() })))
+    .query(async ({ input, ctx }) => {
+      const { scope, id } = resolveScope(input);
+      const [trigger] = await db
+        .select({ id: cloud_agent_webhook_triggers.id })
+        .from(cloud_agent_webhook_triggers)
+        .where(
+          and(
+            eq(cloud_agent_webhook_triggers.trigger_id, input.triggerId),
+            scope === 'org'
+              ? eq(cloud_agent_webhook_triggers.organization_id, id)
+              : and(
+                  eq(cloud_agent_webhook_triggers.user_id, id),
+                  isNull(cloud_agent_webhook_triggers.organization_id)
+                )
+          )
+        );
+      if (!trigger) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
+      }
+      await recordAdminAction(ctx, {
+        action: 'webhook_trigger.request_logs.view',
+        target: scope === 'org' ? organizationActionTarget(id) : userActionTarget(id),
+        message: 'Viewed webhook trigger request logs',
+        metadata: { triggerId: input.triggerId, requestId: input.requestId },
+      });
+      return getWebhookRequestLogs(
+        scope === 'user' ? id : undefined,
+        scope === 'org' ? id : undefined,
+        input.triggerId,
+        input.requestId
+      );
+    }),
+
+  listRequests: sessionViewerProcedure
     .input(AdminTriggerRequestsInput)
-    .query(async ({ input }): Promise<EnrichedCapturedRequest[]> => {
+    .query(async ({ input }): Promise<AdminWebhookRequestSummary[]> => {
       const { scope, id } = resolveScope(input);
 
       const whereClause =
@@ -184,11 +235,13 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
 
       const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds);
 
-      return result.requests.map(request => ({
-        ...request,
-        kiloSessionId: request.cloudAgentSessionId
-          ? (sessionIdMap.get(request.cloudAgentSessionId) ?? null)
-          : null,
-      }));
+      return result.requests.map(request =>
+        summarizeRequestForAdmin({
+          ...request,
+          kiloSessionId: request.cloudAgentSessionId
+            ? (sessionIdMap.get(request.cloudAgentSessionId) ?? null)
+            : null,
+        })
+      );
     }),
 });

@@ -100,7 +100,7 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
 
   async ensureStorage({ env, state, reason }) {
     const flyConfig = getFlyConfig(env, state);
-    const providerState = await flyMachines.ensureVolume(
+    const { providerState } = await flyMachines.ensureVolume(
       flyConfig,
       state,
       getFlyProviderState(state),

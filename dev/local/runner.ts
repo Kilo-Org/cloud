@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { getService, getInfraProfile, getAllInfraProfiles } from './services';
+import { getService, getInfraProfile, getAllInfraProfiles, serviceCommand } from './services';
+import { shellQuote } from './shell';
 import {
   createWindow,
   sendKeys,
@@ -14,17 +15,14 @@ import {
   breakPane,
   countPanes,
   findServicePane,
-  paneHasRunningChild,
+  paneHasRunningService,
   selectPane,
   setPaneTitle,
   setPaneServiceIdentity,
   setMainLeftLayout,
   pipePane,
+  closePipePane,
 } from './tmux';
-
-// ---------------------------------------------------------------------------
-// Repo root
-// ---------------------------------------------------------------------------
 
 export function findRepoRoot(): string {
   let dir = import.meta.dirname;
@@ -44,10 +42,6 @@ export function findRepoRoot(): string {
   }
   throw new Error("Could not find repo root (package.json with name 'kilocode-monorepo')");
 }
-
-// ---------------------------------------------------------------------------
-// Port probing
-// ---------------------------------------------------------------------------
 
 export function probePort(port: number, timeoutMs = 500): Promise<boolean> {
   return new Promise(resolve => {
@@ -82,40 +76,36 @@ export async function waitForPort(port: number, name: string, maxWaitMs: number)
   console.warn(`⚠ ${name} on port ${port} did not become ready within ${maxWaitMs / 1000}s`);
 }
 
-// ---------------------------------------------------------------------------
-// Command building
-// ---------------------------------------------------------------------------
-
-export function buildStartCommand(serviceName: string): string {
+export function buildStartCommand(serviceName: string, serviceNames?: readonly string[]): string {
   const svc = getService(serviceName);
+  const command = serviceNames ? serviceCommand(serviceName, serviceNames) : svc.command;
 
   // Use pnpm --filter instead of cd to avoid cwd issues on restart —
   // after ctrl-c the shell stays in the service dir, so a relative cd
   // would try to descend into <dir>/<dir> which doesn't exist.
-  if (svc.dir !== '.' && svc.command[0] === 'pnpm') {
-    const [, ...rest] = svc.command;
+  if (svc.dir !== '.' && command[0] === 'pnpm') {
+    const [, ...rest] = command;
     return `pnpm --filter {./${svc.dir}} ${rest.join(' ')}`;
   }
 
   const parts: string[] = [];
   if (svc.dir !== '.') parts.push(`cd ${shellQuote(path.join(findRepoRoot(), svc.dir))}`);
-  parts.push(svc.command.join(' '));
+  parts.push(command.join(' '));
 
   return parts.join(' && ');
 }
 
-// ---------------------------------------------------------------------------
-// Tmux service lifecycle
-// ---------------------------------------------------------------------------
-
 export function startServiceInTmux(
   sessionName: string,
   serviceName: string,
-  env?: Record<string, string>
+  env?: Record<string, string>,
+  serviceNames?: readonly string[]
 ): void {
   const svc = getService(serviceName);
   const startupCommand =
-    svc.type === 'infra' ? buildInfraLogCommand(serviceName) : buildStartCommand(serviceName);
+    svc.type === 'infra'
+      ? buildInfraLogCommand(serviceName)
+      : buildStartCommand(serviceName, serviceNames);
   const winIndex = createWindow(sessionName, serviceName, env, startupCommand);
   setPaneServiceIdentity(sessionName, winIndex, 0, serviceName);
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
@@ -134,21 +124,102 @@ function buildInfraLogCommand(serviceName: string): string {
   return `docker compose ${profileArg}-f dev/docker-compose.yml logs -f ${shellQuote(serviceName)}`;
 }
 
+function isLogFilterRunning(logPath: string): boolean {
+  try {
+    execFileSync('pgrep', ['-f', logPath], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function ensureServiceLogPipe(sessionName: string, serviceName: string): void {
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) return;
+  const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  fs.closeSync(fs.openSync(logPath, 'a'));
+  if (isLogFilterRunning(logPath)) return;
+  // `pipe-pane -o` is a no-op while tmux still thinks a pipe exists, including
+  // after the filter process has exited. Close first, then attach a new one.
+  closePipePane(sessionName, pane.windowIndex, pane.paneIndex);
+  pipePane(sessionName, pane.windowIndex, pane.paneIndex, buildLogPipeCommand(logPath));
+}
+
+/** Re-attach `pipe-pane` for any known service whose log filter is not running. */
+export function ensureDeadServiceLogPipes(sessionName: string, serviceNames: string[]): string[] {
+  const repaired: string[] = [];
+  for (const name of serviceNames) {
+    const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${name}.log`);
+    if (isLogFilterRunning(logPath)) continue;
+    try {
+      ensureServiceLogPipe(sessionName, name);
+      if (isLogFilterRunning(logPath)) repaired.push(name);
+    } catch {
+      // Pane may have vanished between the list and the attach.
+    }
+  }
+  return repaired;
+}
+
+const CLOUD_AGENT_PUBLIC_TUNNEL_KEYS = [
+  'WORKER_URL',
+  'KILOCODE_BACKEND_BASE_URL',
+  'KILO_SESSION_INGEST_URL',
+] as const;
+
+export function cloudAgentDevVarsPath(repoRoot: string): string {
+  return path.join(repoRoot, 'services/cloud-agent-next/.dev.vars');
+}
+
+export type CloudAgentPublicTunnelSnapshot = {
+  values: Record<(typeof CLOUD_AGENT_PUBLIC_TUNNEL_KEYS)[number], string | undefined>;
+  mtime: number | undefined;
+};
+
+export function snapshotCloudAgentPublicTunnelEnv(
+  repoRoot: string
+): CloudAgentPublicTunnelSnapshot {
+  const envPath = cloudAgentDevVarsPath(repoRoot);
+  return {
+    values: {
+      WORKER_URL: readEnvValue(envPath, 'WORKER_URL'),
+      KILOCODE_BACKEND_BASE_URL: readEnvValue(envPath, 'KILOCODE_BACKEND_BASE_URL'),
+      KILO_SESSION_INGEST_URL: readEnvValue(envPath, 'KILO_SESSION_INGEST_URL'),
+    },
+    mtime: readEnvMtime(envPath),
+  };
+}
+
+export async function waitForCloudAgentPublicTunnelCapture(
+  repoRoot: string,
+  previous: CloudAgentPublicTunnelSnapshot,
+  timeoutMs: number
+): Promise<boolean> {
+  const envPath = cloudAgentDevVarsPath(repoRoot);
+  const results = await Promise.all(
+    CLOUD_AGENT_PUBLIC_TUNNEL_KEYS.map(key =>
+      waitForEnvValueChange(envPath, key, previous.values[key], timeoutMs)
+    )
+  );
+  return results.every(Boolean);
+}
+
 export function buildLogPipeCommand(logPath: string): string {
-  const filterPath = path.join(findRepoRoot(), 'dev', 'local', 'log-filter.ts');
-  // Absolute tsx path: tmux pipe-pane commands inherit the tmux *server's*
-  // PATH, not the caller's, and a server started outside a direnv shell has
-  // no node_modules/.bin on it.
-  const tsxPath = path.join(findRepoRoot(), 'node_modules', '.bin', 'tsx');
-  return `${shellQuote(tsxPath)} ${shellQuote(filterPath)} >> ${shellQuote(logPath)}`;
+  const repoRoot = findRepoRoot();
+  const filterPath = path.join(repoRoot, 'dev', 'local', 'log-filter.ts');
+  // Absolute tsx path and an explicit cd: tmux pipe-pane commands inherit the
+  // tmux *server's* PATH and cwd. A server started outside direnv has no
+  // node_modules/.bin, and a server whose start directory was deleted makes
+  // `tsx` die on `uv_cwd` before it can read the filter.
+  const tsxPath = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
+  return `cd ${shellQuote(repoRoot)} && ${shellQuote(tsxPath)} ${shellQuote(filterPath)} >> ${shellQuote(logPath)}`;
 }
 
 export function buildFollowLogPipeCommand(logPath: string, followPath: string): string {
-  return `tee -a ${shellQuote(followPath)} | ${buildLogPipeCommand(logPath)}`;
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
+  // Group the cd+tsx command: `|` binds tighter than `&&`, so an ungrouped
+  // `tee | cd && tsx` would run tsx with no pane stdin.
+  return `tee -a ${shellQuote(followPath)} | ( ${buildLogPipeCommand(logPath)} )`;
 }
 
 export function stopServiceInTmux(sessionName: string, serviceName: string): void {
@@ -179,18 +250,15 @@ function setRightPanes(
   serviceNames: string[],
   currentPaneNames: string
 ): string[] {
-  // Break all current right-side panes (>= 1) back to their own named windows
   const total = countPanes(sessionName, 0);
   const current = currentPaneNames ? currentPaneNames.split(',') : [];
   // Break in reverse order to avoid index shifts
   for (let i = total - 1; i >= 1; i--) {
     const name = current[i - 1];
     if (name) {
-      // Service pane — break back to its named window
       try {
         breakPane(sessionName, 0, i, name);
       } catch {
-        // If break fails, just kill the pane
         try {
           killPane(sessionName, 0, i);
         } catch {
@@ -198,7 +266,6 @@ function setRightPanes(
         }
       }
     } else {
-      // Empty shell from initial startup split — just kill it
       try {
         killPane(sessionName, 0, i);
       } catch {
@@ -209,13 +276,11 @@ function setRightPanes(
 
   if (serviceNames.length === 0) return [];
 
-  // Join first service horizontally (right of sidebar pane 0)
   const firstWin = listWindows(sessionName).find(w => w.name === serviceNames[0]);
   if (!firstWin) return [];
   joinPane(sessionName, firstWin.index, 0, 0, 0, 'h');
   const joinedServiceNames = [serviceNames[0]];
 
-  // Join subsequent services vertically below pane 1 (stacked in the right column)
   for (let i = 1; i < serviceNames.length; i++) {
     const win = listWindows(sessionName).find(w => w.name === serviceNames[i]);
     if (!win) continue;
@@ -235,7 +300,6 @@ function setRightPanes(
     // best-effort
   }
 
-  // Label each right-side pane so pane border titles show the service name
   for (let i = 0; i < joinedServiceNames.length; i++) {
     try {
       setPaneTitle(sessionName, 0, i + 1, joinedServiceNames[i]);
@@ -309,11 +373,12 @@ const inFlightRestarts = new Map<string, () => void>();
 export function restartServiceInTmux(
   sessionName: string,
   serviceName: string,
-  env?: Record<string, string>
+  env?: Record<string, string>,
+  serviceNames?: readonly string[]
 ): Promise<RestartOutcome> {
   const svc = getService(serviceName);
   if (svc.type === 'infra') return Promise.resolve('not-running');
-  const cmd = buildStartCommand(serviceName);
+  const cmd = buildStartCommand(serviceName, serviceNames);
   // Find the service wherever it lives (own window or joined into window 0).
   // Bail before touching the in-flight map: if the pane is already gone, a
   // previous restart's poll may be mid-recreate and must not be cancelled.
@@ -330,9 +395,14 @@ export function restartServiceInTmux(
   const POLL_MS = 500;
   const ESCALATE_AT_MS = 15_000; // second SIGINT for shutdowns stuck on children
   const GIVE_UP_AT_MS = 60_000;
+  // Two consecutive idle polls, not one: a service on its way out can briefly
+  // have a shell as its last living descendant, and typing then would feed the
+  // keystrokes to a process that still owns the tty.
+  const IDLE_POLLS_BEFORE_RELAUNCH = 2;
   return new Promise<RestartOutcome>(resolve => {
     let elapsed = 0;
     let escalated = false;
+    let idlePolls = 0;
     const settle = (outcome: RestartOutcome) => {
       clearInterval(timer);
       if (inFlightRestarts.get(restartKey) === cancel) inFlightRestarts.delete(restartKey);
@@ -350,7 +420,7 @@ export function restartServiceInTmux(
         // window instead of leaving the service stopped after reporting
         // "Restarted"; the new window inherits the tmux session environment.
         try {
-          startServiceInTmux(sessionName, serviceName, env);
+          startServiceInTmux(sessionName, serviceName, env, serviceNames);
           settle('recreated');
         } catch {
           // Same policy as below: keep the TUI alive; the next explicit
@@ -359,7 +429,11 @@ export function restartServiceInTmux(
         }
         return;
       }
-      if (paneHasRunningChild(sessionName, currentPane)) {
+      // Shell children do not count: ctrl-c, send-keys and dashboard clicks
+      // leave extra login shells parented to the pane shell, and waiting on
+      // those meant refusing to relaunch an already-idle pane for 60s.
+      if (paneHasRunningService(sessionName, currentPane)) {
+        idlePolls = 0;
         if (elapsed >= GIVE_UP_AT_MS) {
           // Refuses to die — typing into it would only feed its stdin.
           settle('gave-up');
@@ -376,6 +450,7 @@ export function restartServiceInTmux(
         }
         return;
       }
+      if (++idlePolls < IDLE_POLLS_BEFORE_RELAUNCH) return;
       try {
         const envArgs = Object.entries(env ?? {})
           .map(([key, value]) => `${key}=${shellQuote(value)}`)
@@ -386,6 +461,11 @@ export function restartServiceInTmux(
           envArgs ? `env ${envArgs} ${cmd}` : cmd,
           currentPane.paneIndex
         );
+        try {
+          ensureServiceLogPipe(sessionName, serviceName);
+        } catch {
+          // Restart succeeded; a dead pipe is recoverable on the next poll.
+        }
         settle('relaunched');
       } catch {
         // The dashboard may have moved or closed the pane after we resolved it.
@@ -396,10 +476,6 @@ export function restartServiceInTmux(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Infrastructure
-// ---------------------------------------------------------------------------
-
 /**
  * Build `docker compose down` argv with `--profile` flags for every known
  * infra profile so profile-gated services (e.g. grafana) are torn down
@@ -409,9 +485,15 @@ export function restartServiceInTmux(
  * surprises. Returned as an argv array for execFileSync — keeps the
  * shell out of the loop entirely, matching startInfra.
  */
-export function buildInfraDownArgs(): [string, string[]] {
+export function buildInfraDownArgs(project?: string): [string, string[]] {
   const profileArgs = getAllInfraProfiles().flatMap(p => ['--profile', p]);
-  return ['docker', ['compose', ...profileArgs, '-f', 'dev/docker-compose.yml', 'down']];
+  // `-p` names the project explicitly, for tearing down a project other than
+  // the one `dev/.env` currently publishes (a stack whose offset has moved).
+  const projectArgs = project === undefined ? [] : ['-p', project];
+  return [
+    'docker',
+    ['compose', ...projectArgs, ...profileArgs, '-f', 'dev/docker-compose.yml', 'down'],
+  ];
 }
 
 const COMPOSE_SECRETS_ENV_REL = path.join('dev', '.env.compose-secrets');
@@ -520,10 +602,6 @@ export async function startInfra(repoRoot: string, serviceNames: string[]): Prom
   }
 }
 
-// ---------------------------------------------------------------------------
-// Env value helpers (used for capture-service coordination)
-// ---------------------------------------------------------------------------
-
 export function readEnvValue(filePath: string, key: string): string | undefined {
   let content: string;
   try {
@@ -554,9 +632,11 @@ export async function waitForEnvValueChange(
   key: string,
   previousValue: string | undefined,
   timeoutMs: number,
-  previousMtimeMs?: number
+  previousMtimeMs?: number,
+  isRunning?: () => boolean
 ): Promise<boolean> {
   const start = Date.now();
+  let hasWaited = false;
   while (Date.now() - start < timeoutMs) {
     const current = readEnvValue(filePath, key);
     const currentMtimeMs = readEnvMtime(filePath);
@@ -566,6 +646,11 @@ export async function waitForEnvValueChange(
       currentMtimeMs > previousMtimeMs;
 
     if (current !== undefined && (current !== previousValue || fileWasRewritten)) return true;
+    // Give the process one polling interval to start. After that, avoid
+    // waiting for the full timeout when the capture wrapper has already
+    // exited (for example, Stripe rejected an expired API key).
+    if (hasWaited && isRunning !== undefined && !isRunning()) return false;
+    hasWaited = true;
     await sleep(500);
   }
   return false;

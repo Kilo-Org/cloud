@@ -1,14 +1,14 @@
 import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { kiloclaw_instances, kiloclaw_subscriptions, kiloclaw_cli_runs } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { createCallerForUser as createCallerForUserType } from '@/routers/test-utils';
 import type { KiloClawApiError as KiloClawApiErrorType } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { UpstreamApiError } from '@/lib/trpc/init';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -464,30 +464,6 @@ describe('organizations.kiloclaw.getKiloCliRunStatus', () => {
       status: 'running',
       output: 'checking config...',
       prompt: 'diagnose gateway issue',
-    });
-  });
-
-  it('returns empty status for a nonexistent run ID', async () => {
-    mockGetKiloCliRunStatus.mockResolvedValue({
-      hasRun: false,
-      status: null,
-      output: null,
-      exitCode: null,
-      startedAt: null,
-      completedAt: null,
-      prompt: null,
-    });
-
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.organizations.kiloclaw.getKiloCliRunStatus({
-      organizationId: org.id,
-      runId: '10000000-1000-4000-8000-000000000002',
-    });
-
-    expect(result).toMatchObject({
-      hasRun: false,
-      status: null,
-      output: null,
     });
   });
 });

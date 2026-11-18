@@ -2,38 +2,21 @@
  * Internal API endpoint: scheduled-action notification side effects.
  *
  * Called by the kiloclaw worker's notice-sweep cron for the `email`
- * channel. The sweep dispatches `mobile_push` directly via the
- * NOTIFICATIONS service binding (worker-to-worker) and treats `webapp`
- * as a no-op (the banner reads its state from `kiloclaw.getStatus`),
- * so this endpoint only handles email today. The shape is generic
- * enough that future channels can be wired here without API churn.
+ * channel. The sweep treats `webapp` as a no-op (the banner reads its
+ * state from `kiloclaw.getStatus`) and skips the retired `mobile_push`
+ * channel without sending, so this endpoint only handles email today.
+ * The shape is generic enough that future channels can be wired here
+ * without API churn.
  *
  * URL: POST /api/internal/kiloclaw/scheduled-action-side-effects
  * Auth: X-Internal-Secret header.
  */
 
-import { createHmac, timingSafeEqual } from 'crypto';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { send as sendEmail, RawHtml, type TemplateName } from '@/lib/email';
-
-// Constant-time comparison so a public attacker can't probe the
-// internal-api secret via response-timing differences. HMAC both
-// inputs with a fixed key so timingSafeEqual always sees fixed-length
-// (sha256 = 32 bytes) buffers — this avoids any branch on length and
-// any padding-prefix corner case. The HMAC key doesn't need to be
-// secret; it just normalizes both sides to a uniform-distribution
-// 32-byte digest so the byte-by-byte compare is meaningful.
-const SECRET_COMPARE_HMAC_KEY = Buffer.from('kiloclaw-internal-secret-compare');
-
-function secretMatches(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-  const a = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(provided).digest();
-  const b = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(expected).digest();
-  return timingSafeEqual(a, b);
-}
+import { send as sendEmail, RawHtml, type TemplateName } from '@kilocode/web-shared/lib/email';
 
 // Mirrors the body the sweep sends. Defensive but not exhaustive — we
 // only read the fields we need for the email path. Other channels can
@@ -122,7 +105,7 @@ function adminMessageSection(noticeBody: string): RawHtml {
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br />');
   return new RawHtml(
-    `<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">${escaped}</p>`
+    `<p class="kc-box" style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">${escaped}</p>`
   );
 }
 
@@ -139,10 +122,8 @@ function versionChangeSection(body: Body): string {
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(req);
+  if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(rawBody);
@@ -152,9 +133,9 @@ export async function POST(req: NextRequest) {
   const body = parsed.data;
 
   // Only the email channel is dispatched through this endpoint. The
-  // sweep routes mobile_push to the NOTIFICATIONS service binding
-  // directly and treats webapp as a no-op, so any non-email request
-  // is a routing bug. Return 400 (not 200 'skipped') so the sweep
+  // sweep skips the retired mobile_push channel without sending and
+  // treats webapp as a no-op, so any non-email request is a routing
+  // bug. Return 400 (not 200 'skipped') so the sweep
   // marks the row failed with a legible error_message instead of
   // recording a phantom 'sent' for a notification that never went
   // out.

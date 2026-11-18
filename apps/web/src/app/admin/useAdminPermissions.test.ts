@@ -5,6 +5,7 @@ describe('deriveAdminPermissions', () => {
     isSuperadmin: true,
     canViewSessions: true,
     canManageCredits: true,
+    canExportApiRequestLogs: true,
   };
 
   it('retains successful permission data during a background refetch', () => {
@@ -19,6 +20,7 @@ describe('deriveAdminPermissions', () => {
       isSuperadmin: true,
       canViewSessions: true,
       canManageCredits: true,
+      canExportApiRequestLogs: true,
     });
   });
 
@@ -28,6 +30,7 @@ describe('deriveAdminPermissions', () => {
       isSuperadmin: false,
       canViewSessions: false,
       canManageCredits: false,
+      canExportApiRequestLogs: false,
     });
     expect(
       deriveAdminPermissions(false, {
@@ -39,6 +42,7 @@ describe('deriveAdminPermissions', () => {
       isSuperadmin: false,
       canViewSessions: false,
       canManageCredits: false,
+      canExportApiRequestLogs: false,
     });
   });
 });

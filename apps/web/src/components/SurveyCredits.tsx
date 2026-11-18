@@ -1,7 +1,7 @@
-import type { CustomerInfo } from '@/lib/customerInfo';
-import PostHogClient from '@/lib/posthog';
-import { has_used1usd_andHoldOrPayment } from '@/lib/promoCustomerRequirement';
-import { db } from '@/lib/drizzle';
+import type { CustomerInfo } from '@kilocode/web-shared/lib/customerInfo';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { has_used1usd_andHoldOrPayment } from '@kilocode/web-shared/lib/promoCustomerRequirement';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 

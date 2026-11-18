@@ -1,7 +1,8 @@
 // Compact header row for the PR Files tab. Shown above the FlashList
 // with two responsibilities:
-//   1. Navigator entry: "Files · n of m viewed" pressable that opens
-//      the file-navigator sheet route. Always visible.
+//   1. Navigator entry: "n of m viewed" pressable that opens the
+//      file-navigator sheet route. Always visible. The count carries no
+//      "Files" prefix because the Files label sits directly above it.
 //   2. Tablet layout toggle: unified vs side-by-side. Only on tablets
 //      (the `useIsTablet` hook gates it). The selection is local
 //      component state — not persisted across mounts.
@@ -11,13 +12,18 @@
 import { type Href, useRouter } from 'expo-router';
 import { Columns2, Rows3 } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { providerPrChildRoutePath, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 
 type PrDiffFileListHeaderProps = {
@@ -30,8 +36,6 @@ type PrDiffFileListHeaderProps = {
   readonly viewMode: DiffViewMode;
   readonly onViewModeChange: (mode: DiffViewMode) => void;
 };
-
-const FILE_NAVIGATOR_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/file-navigator' as const;
 
 export function PrDiffFileListHeader({
   owner,
@@ -46,41 +50,70 @@ export function PrDiffFileListHeader({
   const router = useRouter();
   const isTablet = useIsTablet();
   const colors = useThemeColors();
+  const { t } = useTranslation();
+  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
+  // navigator row off the sensor, like ScreenHeader/SheetHeader. They go on an
+  // inner wrapper so they ADD to the `px-4` gutter: an inline padding on the
+  // bordered container would beat the className (inline style wins in React
+  // Native) and swallow the gutter. Zero insets collapse the wrapper style to
+  // `undefined`, so portrait pixels are byte-identical.
+  const insets = useSafeAreaInsets();
+  const sideInsetStyle =
+    insets.left > 0 || insets.right > 0
+      ? {
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }
+      : undefined;
 
-  const navigatorHref = useMemo<Href>(
-    () => ({ pathname: FILE_NAVIGATOR_PATH, params: { owner, repo, number } }),
-    [owner, repo, number]
-  );
+  // The sheet is a sibling of the screen it was opened from, so its href is
+  // built from the live scope: a GitHub ref keeps the original
+  // `[owner]/[repo]/[number]/file-navigator` path, a GitLab or Bitbucket ref
+  // opens the sheet inside the provider layout — the only place its scope is
+  // published, and therefore the only place the sheet can query the right
+  // provider.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const navigatorHref = useMemo<Href>(() => providerPrChildRoutePath(ref, 'file-navigator'), [ref]);
 
   const handleOpenNavigator = useCallback(() => {
     router.push(navigatorHref);
   }, [router, navigatorHref]);
 
   return (
-    <View className="flex-row items-center justify-between border-b border-hair-soft bg-background px-4 py-2">
-      <Pressable
-        onPress={handleOpenNavigator}
-        accessibilityRole="button"
-        accessibilityLabel="Open file navigator"
-        className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
-        hitSlop={6}
-      >
-        <Rows3 size={14} color={colors.mutedForeground} />
-        <Text className="text-xs font-medium text-foreground">
-          Files · {viewedCount.toLocaleString()} of {totalListed.toLocaleString()} viewed
-        </Text>
-        {isTruncated ? (
-          <Text
-            variant="muted"
-            className="text-[10px]"
-            // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
-            style={{ color: colors.mutedForeground }}
-          >
-            (listed)
+    <View className="border-b border-hair-soft bg-background px-4 py-4">
+      <View className="flex-1 flex-row items-center justify-between" style={sideInsetStyle}>
+        <Pressable
+          onPress={handleOpenNavigator}
+          accessibilityRole="button"
+          accessibilityLabel={t('prReview.fileList.openNavigator')}
+          testID="pr-files-summary"
+          className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
+          hitSlop={6}
+        >
+          <Rows3 size={14} color={colors.mutedForeground} />
+          <Text className="text-xs font-medium text-foreground">
+            {/* `count` is the listed total: it selects the plural category
+                whose participle agrees with it, while `total` carries the
+                locale-grouped figure the catalogs interpolate. */}
+            {t('prReview.fileNavigator.viewedCount', {
+              count: totalListed,
+              viewed: formatNumber(viewedCount, i18n.language),
+              total: formatNumber(totalListed, i18n.language),
+            })}
           </Text>
-        ) : null}
-      </Pressable>
-      {isTablet ? <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} /> : null}
+          {isTruncated ? (
+            <Text
+              variant="muted"
+              className="text-[10px]"
+              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
+              style={{ color: colors.mutedForeground }}
+            >
+              {t('prReview.fileList.listed')}
+            </Text>
+          ) : null}
+        </Pressable>
+        {isTablet ? <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} /> : null}
+      </View>
     </View>
   );
 }
@@ -93,18 +126,19 @@ function ViewModeToggle({
   onChange: (mode: DiffViewMode) => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center gap-2">
       <Text variant="muted" className="text-xs">
-        Layout
+        {t('prReview.fileList.layout')}
       </Text>
       <RadioGroup
-        label="Layout"
+        label={t('prReview.fileList.layout')}
         className="flex-row overflow-hidden rounded-md border border-border bg-card"
       >
         <ViewModeButton
           active={viewMode === 'unified'}
-          label="Unified"
+          label={t('prReview.fileList.unified')}
           onPress={() => {
             onChange('unified');
           }}
@@ -113,7 +147,7 @@ function ViewModeToggle({
         />
         <ViewModeButton
           active={viewMode === 'side-by-side'}
-          label="Side by side"
+          label={t('prReview.fileList.sideBySide')}
           onPress={() => {
             onChange('side-by-side');
           }}

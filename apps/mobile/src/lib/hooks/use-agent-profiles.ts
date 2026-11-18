@@ -1,0 +1,224 @@
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+
+import { splitProfilesByOwner } from '@/components/profiles/profile-owner-model';
+import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
+import { useTRPC } from '@/lib/trpc';
+
+export type {
+  AgentProfileDetail,
+  AgentProfileInstructionRow,
+  AgentProfileListItem,
+} from '@/lib/hooks/agent-profile-types';
+export { useAgentProfileMutations } from '@/lib/hooks/use-agent-profile-mutations';
+export { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-section-mutations';
+
+/**
+ * Keep the previous rows across a refetch of the SAME query key. React Query's
+ * `keepPreviousData` also keeps them across a query-key change, so switching
+ * organization would render the previous organization's rows while the
+ * actions already use the newly selected scope. Comparing the previous query's
+ * key to the current one drops the placeholder the moment the input changes and
+ * still keeps the rows across a same-input refetch.
+ *
+ * Exported so every context-scoped list hook shares the guard; `useRepoBindings`
+ * has the same organization switch to survive.
+ */
+export function keepPreviousDataForQueryKey<TQueryData>(
+  queryKey: readonly unknown[]
+): (
+  previousData: TQueryData | undefined,
+  previousQuery: { queryKey: readonly unknown[] } | undefined
+) => TQueryData | undefined {
+  const currentKey = JSON.stringify(queryKey);
+  return (previousData, previousQuery) =>
+    previousQuery !== undefined && JSON.stringify(previousQuery.queryKey) === currentKey
+      ? previousData
+      : undefined;
+}
+
+/**
+ * List the profiles for a context. Personal context reads `list`; org context
+ * reads `listCombined`, which groups org and personal profiles and already
+ * resolves `effectiveDefaultId` (personal default > org default).
+ *
+ * `placeholderData` keeps the previous rows across a refetch of the same key,
+ * so the list never blanks while a refetch is in flight; a different key (an
+ * organization switch) starts empty instead of showing another scope's rows.
+ *
+ * `isLoading` is `isPending`, not React Query's `isLoading`: in v5 `isLoading`
+ * is `isPending && isFetching`, which is false while a paused (offline) first
+ * fetch is unsettled. `isPending` stays true until the query settles, so the
+ * screen cannot mistake an unloaded list for an empty one.
+ *
+ * `error` is the active query's error, so a screen can name the cause (an
+ * access denial is not a server fault) instead of reporting every failure the
+ * same way.
+ */
+export function useAgentProfileList(organizationId?: string) {
+  const trpc = useTRPC();
+  const isOrganization = organizationId !== undefined;
+
+  const personalOptions = trpc.agentProfiles.list.queryOptions({});
+  const combinedOptions = trpc.agentProfiles.listCombined.queryOptions({
+    organizationId: organizationId ?? '',
+  });
+
+  const personal = useQuery({
+    ...personalOptions,
+    enabled: !isOrganization,
+    placeholderData: keepPreviousDataForQueryKey(personalOptions.queryKey),
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when the option is undefined), so re-enable it unconditionally:
+    // a connectivity blip must recover the list without waiting for the
+    // freshness window, and a served refetch keeps the cached rows.
+    refetchOnReconnect: 'always',
+  });
+  const combined = useQuery({
+    ...combinedOptions,
+    enabled: isOrganization,
+    placeholderData: keepPreviousDataForQueryKey(combinedOptions.queryKey),
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
+  });
+
+  const query = isOrganization ? combined : personal;
+  // The bucket split lives in the pure ownership model, so the org/personal
+  // rule has one source of truth (`ProfilesListDialog.tsx:95-100`). Memoized on
+  // the query data: consumers memoize on the bucket identity, so a render that
+  // did not change the data must not mint new arrays.
+  const { orgProfiles, personalProfiles } = useMemo(
+    () =>
+      splitProfilesByOwner<AgentProfileListItem>({
+        isOrgContext: isOrganization,
+        combined: combined.data,
+        personal: personal.data,
+      }),
+    [isOrganization, combined.data, personal.data]
+  );
+
+  return {
+    orgProfiles,
+    personalProfiles,
+    effectiveDefaultId: isOrganization
+      ? (combined.data?.effectiveDefaultId ?? null)
+      : (personal.data?.find(profile => profile.isDefault)?.id ?? null),
+    isLoading: query.isPending,
+    isError: query.isError,
+    error: query.error,
+    isRefetching: query.isRefetching,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Options every profile read shares.
+ *
+ * The read must settle even when the online manager is committed offline
+ * (NetInfo can misreport while the backend is reachable); a paused read would
+ * hold the load-failure banner with a Retry that refetches into another pause
+ * and never settles.
+ *
+ * `networkMode: 'always'` also disables the derived reconnect refetch
+ * (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !== 'always'`
+ * when the option is undefined), so re-enable it unconditionally: a
+ * connectivity blip must recover the profile without waiting for the freshness
+ * window, instead of needing a manual Retry.
+ */
+const PROFILE_READ_OPTIONS = {
+  networkMode: 'always',
+  refetchOnReconnect: 'always',
+} as const;
+
+/**
+ * A single profile's metadata and collection counts.
+ *
+ * The Overview screen renders metadata and six counts and nothing else, so it
+ * reads this instead of `get`: a profile may carry every skill's markdown and
+ * companion files, and the caps allow those to dwarf the response that renders
+ * six numbers.
+ */
+export function useAgentProfileOverview(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.overview.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * The profile-editor section reads. Each screen renders one collection, so it
+ * reads that collection alone: the whole-profile `get` validates seven
+ * collections at once, and one row outside a contract in a collection the
+ * screen never renders would otherwise fail the screen for good.
+ */
+export function useAgentProfileVars(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.vars.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileCommands(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.commands.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileMcpServers(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.mcpServers.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileSkills(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.skills.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileKiloCommands(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.kiloCommands.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/** A single profile's instruction files. See `vars`. */
+export function useAgentProfileInstructions(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.instructions.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * A single profile's agents. Both the profile-editor Agents screen and the role
+ * picker's custom modes read this one hook; the picker scopes it with `enabled`
+ * until the profile's ownership lookup resolves.
+ */
+export function useAgentProfileAgents(
+  profileId: string,
+  organizationId: string | undefined,
+  enabled = true
+) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.agents.queryOptions(
+      { profileId, organizationId },
+      { enabled: enabled && Boolean(profileId) }
+    ),
+    ...PROFILE_READ_OPTIONS,
+  });
+}

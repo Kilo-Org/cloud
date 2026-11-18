@@ -1,4 +1,6 @@
+import { CardLoadFailure } from '@/components/CardLoadFailure';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Shield, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
@@ -8,13 +10,18 @@ import { toast } from 'sonner';
 import { usePostHog } from 'posthog-js/react';
 import type {
   OrganizationRole,
-  OrganizationWithMembers,
-} from '@/lib/organizations/organization-types';
+  OrganizationWithMembersResponse,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type SSOSignupCardProps = {
-  organization: OrganizationWithMembers;
+  organization: OrganizationWithMembersResponse;
   role: OrganizationRole;
+  /**
+   * True inside the app shell, whose pages may not send the user to the
+   * marketing site: the setup button becomes a plain statement instead.
+   */
+  shell?: boolean;
 };
 
 // SSO Hooks following the same pattern as hooks.ts
@@ -38,13 +45,14 @@ function useGenerateAdminPortalLink() {
   );
 }
 
-export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
+export function SSOSignupCard({ organization, role, shell = false }: SSOSignupCardProps) {
   const organizationId = organization.id;
   const inheritedPolicy = organization.effectiveSsoPolicy.source === 'direct_parent';
   const {
     data: ssoConfig,
     isLoading,
     error,
+    refetch,
   } = useOrganizationSSOConfig(organizationId, !inheritedPolicy);
   const generatePortalLink = useGenerateAdminPortalLink();
   const posthog = usePostHog();
@@ -90,17 +98,31 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
     );
   }
 
-  // Don't show card if loading or error
-  if (isLoading || error) {
-    return null;
+  // The dashboard hides this card when its status read fails, because the rest
+  // of that page still stands. A shell page is this card, so the same failure is
+  // the whole page: answer it, with the retry the reader would otherwise have to
+  // find by reloading the in-app browser.
+  if (error) {
+    if (!shell) return null;
+    return (
+      <CardLoadFailure
+        title="Could not load SSO settings"
+        description="The request did not complete. Try again, or close this window and reopen it from the Kilo App."
+        onRetry={() => void refetch()}
+      />
+    );
+  }
+  if (isLoading) {
+    // The shell page holds this card alone, so reserve its space instead of
+    // flashing an empty page while the status read settles.
+    return shell ? <Skeleton className="h-40 w-full" /> : null;
   }
 
   // Show existing config if it exists (ssoConfig will be false if no config exists)
   if (ssoConfig && typeof ssoConfig === 'object') {
     const isDomainVerified = ssoConfig.isDomainVerified;
     const hasConnection = ssoConfig.hasConnection;
-    // Extract domain from the domains array
-    const domain = ssoConfig.domains?.[0]?.domain || organization.sso_domain || 'your domain';
+    const domain = ssoConfig.domain || organization.sso_domain || 'your domain';
 
     return (
       <Card>
@@ -157,7 +179,7 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
                       <button
                         onClick={handleDomainVerification}
                         disabled={generatePortalLink.isPending}
-                        className="cursor-pointer text-sm text-yellow-400 underline hover:text-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="cursor-pointer text-sm text-primary underline hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {generatePortalLink.isPending ? 'Opening...' : 'Verify'}
                       </button>
@@ -193,7 +215,7 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
                         <button
                           onClick={handleSSOConfiguration}
                           disabled={generatePortalLink.isPending}
-                          className="cursor-pointer text-sm text-yellow-400 underline hover:text-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="cursor-pointer text-sm text-primary underline hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {generatePortalLink.isPending ? 'Opening...' : 'Complete setup'}
                         </button>
@@ -238,20 +260,26 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
               Seamless user onboarding
             </div>
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="w-full">
-                <Button onClick={handleSetupSSO} disabled={role !== 'owner'} className="w-full">
-                  Set up SSO
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {role !== 'owner' && (
-              <TooltipContent>
-                <p>Contact your organization administrator to set up SSO</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
+          {shell ? (
+            <p className="text-muted-foreground text-sm">
+              SSO is not configured for this organization. Set it up from the Kilo web app.
+            </p>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="w-full">
+                  <Button onClick={handleSetupSSO} disabled={role !== 'owner'} className="w-full">
+                    Set up SSO
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {role !== 'owner' && (
+                <TooltipContent>
+                  <p>Contact your organization administrator to set up SSO</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          )}
         </div>
       </CardContent>
     </Card>

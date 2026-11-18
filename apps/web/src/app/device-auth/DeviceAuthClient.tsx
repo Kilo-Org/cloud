@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CheckCircle2, XCircle, Loader2, Shield, LogOut } from 'lucide-react';
 import {
   closeDeviceAuthWindowIfAppMode,
@@ -14,11 +15,19 @@ import {
   getDeviceAuthShellClassName,
   getDeviceAuthSignInUrl,
 } from './device-auth-url';
+import type { RequestingClient } from '@/lib/device-auth/requesting-client';
+import { displaySafeText } from '@kilocode/app-shared/display-text';
+import type { DeviceAuthPendingLink } from '@/lib/device-auth/device-auth';
+import { getProviderById } from '@/lib/auth/provider-metadata';
 
 type DeviceAuthClientProps = {
   code: string;
   viewerToken: string;
   isAppMode: boolean;
+  /** The OAuth client this request asks to connect, when the request names one. */
+  requestingClient: RequestingClient | null;
+  /** The live pending account link this request carries, when it carries one. */
+  pendingLink: DeviceAuthPendingLink | null;
   user: {
     name: string;
     email: string;
@@ -46,10 +55,24 @@ function getUserInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceAuthClientProps) {
+export function DeviceAuthClient({
+  code,
+  viewerToken,
+  isAppMode,
+  requestingClient,
+  pendingLink,
+  user,
+}: DeviceAuthClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSigningOut, setIsSigningOut] = useState(false);
+  // The approver confirms the client the request names before it is approved;
+  // a request that names none needs no confirmation (unchanged flow).
+  const [clientConfirmed, setClientConfirmed] = useState(false);
+  const needsClientConfirmation = requestingClient !== null;
+  // No preselected attach: the approver chooses whether the pending link is
+  // added, and Authorize stays disabled until they do.
+  const [addPendingLink, setAddPendingLink] = useState<boolean | null>(null);
 
   const displayName = user.name.trim() || user.email;
   const shellClassName = getDeviceAuthShellClassName(isAppMode);
@@ -80,7 +103,11 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({
+          code,
+          ...(requestingClient ? { confirmed_client_id: requestingClient.clientId } : {}),
+          ...(pendingLink ? { add_pending_link: addPendingLink === true } : {}),
+        }),
       });
 
       if (!response.ok) {
@@ -176,23 +203,28 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
           <CardTitle>Authorize Device</CardTitle>
           <CardDescription>A device is requesting access to your Kilo account</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 max-[22rem]:px-2">
           <Alert>
             <AlertDescription className="text-center">
               <div className="text-muted-foreground mb-2 text-sm font-medium">
                 Verification Code
               </div>
-              <div className="text-2xl font-bold tracking-wider">{code}</div>
+              <div className="text-2xl font-bold tracking-wider break-all">{code}</div>
             </AlertDescription>
           </Alert>
 
-          <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border p-3">
-            <div className="flex min-w-0 items-center gap-3">
+          {/* A narrow card has no room for the avatar, the identity, and Sign
+              out on one line: the row overflowed the card and crushed the
+              name. Stack until there is room for the inline row; a very narrow
+              card also tightens its padding and stacks the identity under the
+              avatar. */}
+          <div className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-3 max-[22rem]:flex-col max-[22rem]:items-stretch max-[22rem]:p-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 items-center gap-3 max-[22rem]:flex-col max-[22rem]:items-stretch">
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user.imageUrl} alt={displayName} />
                 <AvatarFallback className="text-xs">{getUserInitials(displayName)}</AvatarFallback>
               </Avatar>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-xs font-medium">Signed in as</p>
                 <p className="truncate text-sm font-medium">{displayName}</p>
                 {user.email !== displayName ? (
@@ -203,7 +235,7 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             <Button
               variant="ghost"
               size="sm"
-              className="shrink-0"
+              className="shrink-0 self-start pointer-coarse:min-h-11 sm:self-auto max-[22rem]:w-full"
               onClick={handleSignOut}
               disabled={isSigningOut || status === 'loading'}
             >
@@ -216,7 +248,102 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             </Button>
           </div>
 
-          <div className="space-y-2 rounded-lg border p-4">
+          {/* What the requester reports about itself, shown before any
+              approval and confirmed here. The details come from the caller,
+              so the block says so rather than implying verification. A request
+              that reports no app keeps the flow to the code and the signed-in
+              account. */}
+          {requestingClient ? (
+            <div
+              className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"
+              data-testid="requesting-client"
+            >
+              <p className="text-sm font-medium">Requesting app</p>
+              <p className="text-sm break-words">{displaySafeText(requestingClient.clientName)}</p>
+              <dl className="text-muted-foreground space-y-1 text-xs">
+                <div className="flex gap-2">
+                  <dt className="shrink-0">Redirects to</dt>
+                  <dd className="font-mono break-all">
+                    {displaySafeText(requestingClient.redirectOrigin)}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0">Client ID</dt>
+                  <dd className="font-mono break-all">
+                    {displaySafeText(requestingClient.clientId)}
+                  </dd>
+                </div>
+              </dl>
+              <p className="text-muted-foreground text-xs">
+                These details come from the app that started this request.
+              </p>
+              <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                <Checkbox
+                  id="confirm-requesting-client"
+                  className="mt-0.5"
+                  checked={clientConfirmed}
+                  onCheckedChange={setClientConfirmed}
+                  disabled={status === 'loading'}
+                />
+                <label
+                  htmlFor="confirm-requesting-client"
+                  className="text-sm leading-5 pointer-coarse:py-2"
+                >
+                  I expect this connection and recognize the destination above.
+                </label>
+              </div>
+            </div>
+          ) : null}
+
+          {pendingLink ? (
+            <div
+              className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"
+              data-testid="pending-link"
+            >
+              <p className="text-sm">
+                This app also asks to add {getProviderById(pendingLink.provider).name} (
+                {pendingLink.displayName || pendingLink.email}) to your account
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                  <input
+                    type="radio"
+                    id="pending-link-add"
+                    name="pending-link-choice"
+                    className="mt-1"
+                    checked={addPendingLink === true}
+                    onChange={() => setAddPendingLink(true)}
+                    disabled={status === 'loading'}
+                  />
+                  <label
+                    htmlFor="pending-link-add"
+                    className="text-sm leading-5 pointer-coarse:py-2"
+                  >
+                    Approve and add it
+                  </label>
+                </div>
+                <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                  <input
+                    type="radio"
+                    id="pending-link-skip"
+                    name="pending-link-choice"
+                    className="mt-1"
+                    checked={addPendingLink === false}
+                    onChange={() => setAddPendingLink(false)}
+                    disabled={status === 'loading'}
+                  />
+                  <label
+                    htmlFor="pending-link-skip"
+                    className="text-sm leading-5 pointer-coarse:py-2"
+                  >
+                    Approve without adding it
+                  </label>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2">
             <p className="text-sm font-medium">This will allow the device to:</p>
             <ul className="text-muted-foreground space-y-1 text-sm">
               <li>• Access your organizations</li>
@@ -225,19 +352,34 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             </ul>
           </div>
 
-          <div className="flex gap-3">
+          {needsClientConfirmation && !clientConfirmed ? (
+            <p className="text-muted-foreground text-xs">
+              Confirm the requesting app above to authorize it.
+            </p>
+          ) : null}
+          {pendingLink && addPendingLink === null ? (
+            <p className="text-muted-foreground text-xs">
+              Choose whether to add the sign-in method above to authorize.
+            </p>
+          ) : null}
+
+          <div className="flex gap-3 max-[22rem]:flex-col">
             <Button
               variant="outline"
-              className="flex-1"
+              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(false)}
               disabled={status === 'loading'}
             >
               Deny
             </Button>
             <Button
-              className="flex-1"
+              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(true)}
-              disabled={status === 'loading'}
+              disabled={
+                status === 'loading' ||
+                (needsClientConfirmation && !clientConfirmed) ||
+                (pendingLink !== null && addPendingLink === null)
+              }
             >
               {status === 'loading' ? (
                 <>

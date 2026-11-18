@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
-import { and, asc, count, desc, eq, gte, inArray, lt, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -13,24 +13,83 @@ import type {
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
 } from '@kilocode/db/schema-types';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { reviewMemoryRetentionCutoff } from './retention';
 
 export type ReviewMemoryOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 export type ReviewMemoryDatabase = typeof db;
 
-const ACTIVE_PROPOSAL_STATUSES = [
+/**
+ * Statuses that still occupy the proposal's scope. A proposal in one of these
+ * statuses holds its scope and can still be superseded.
+ */
+export const ACTIVE_PROPOSAL_STATUSES = [
   'open',
   'edited',
   'opening_change_request',
   'change_request_failed',
 ] as const;
-const EDITABLE_PROPOSAL_STATUSES = ['open', 'edited', 'change_request_failed'] as const;
+/**
+ * Statuses that can still be edited or approved into a change request.
+ */
+export const EDITABLE_PROPOSAL_STATUSES = ['open', 'edited', 'change_request_failed'] as const;
 const TERMINAL_PRUNABLE_PROPOSAL_STATUSES = [
   'rejected',
   'change_request_opened',
   'superseded',
 ] as const;
 const REVIEW_MEMORY_PRUNE_BATCH_SIZE = 1_000;
+
+/** PostgreSQL SQLSTATE for a unique constraint violation. */
+const POSTGRES_UNIQUE_VIOLATION = '23505';
+
+/**
+ * Raised when a proposal write loses a race with another active proposal for
+ * the same owner, platform and repository. Callers turn it into a typed
+ * rejection so the PostgreSQL unique violation never reaches a client.
+ */
+export class ReviewMemoryProposalConflictError extends Error {
+  constructor() {
+    super(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_conflict);
+    this.name = 'ReviewMemoryProposalConflictError';
+  }
+}
+
+/** Raised for an undecodable cursor; the router maps it to a transport status. */
+export class ReviewMemoryInvalidCursorError extends Error {
+  constructor() {
+    super('Invalid Review Memory proposal cursor.');
+    this.name = 'ReviewMemoryInvalidCursorError';
+  }
+}
+
+/**
+ * Whether a write failed on the "one active proposal per scope" unique index.
+ * Drizzle wraps the driver's error in its own query error, so the PostgreSQL
+ * code and constraint name sit on `cause`; both partial index names end this
+ * way, and any other unique violation (or any other error) is somebody's bug
+ * and must keep its own diagnosis.
+ */
+export function isActiveProposalScopeViolation(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth += 1) {
+    const { code, constraint, cause } = current as {
+      code?: unknown;
+      constraint?: unknown;
+      cause?: unknown;
+    };
+    if (
+      code === POSTGRES_UNIQUE_VIOLATION &&
+      typeof constraint === 'string' &&
+      constraint.startsWith('UQ_code_review_memory_proposals_') &&
+      constraint.endsWith('_active_scope')
+    ) {
+      return true;
+    }
+    current = cause;
+  }
+  return false;
+}
 
 export function createReviewMemoryDedupeHash(parts: readonly unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -165,19 +224,55 @@ export async function upsertScopeProposal(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal> {
   const database = input.database ?? db;
-  const existing = await getActiveProposalForScope({
-    owner: input.owner,
-    platform: input.platform,
-    repoFullName: input.repoFullName,
-    database,
-  });
   const now = new Date().toISOString();
 
-  if (existing) {
-    const [updated] = await database
-      .update(code_review_memory_proposals)
-      .set({
-        status: existing.status === 'opening_change_request' ? existing.status : 'open',
+  // A concurrent analysis, rejection or supersession can change the active row
+  // between the read and the write. Every write is guarded on the row it read,
+  // and a lost race re-reads instead of failing, so one analysis never turns
+  // another writer's win into an error. Two attempts: read, write, re-read
+  // once; a third outcome means the database and this code disagree.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const existing = await getActiveProposalForScope({
+      owner: input.owner,
+      platform: input.platform,
+      repoFullName: input.repoFullName,
+      database,
+    });
+
+    if (existing) {
+      const [updated] = await database
+        .update(code_review_memory_proposals)
+        .set({
+          status: existing.status === 'opening_change_request' ? existing.status : 'open',
+          title: input.title,
+          rationale: input.rationale,
+          proposed_markdown: input.proposedMarkdown,
+          evidence: input.evidence,
+          positive_count: input.positiveCount,
+          negative_count: input.negativeCount,
+          neutral_count: input.neutralCount,
+          updated_at: now,
+        })
+        .where(
+          and(
+            eq(code_review_memory_proposals.id, existing.id),
+            // The status that was read, not the whole active set: an approval
+            // that started in between must keep `opening_change_request`, or the
+            // PR it opens would never be recorded on the row.
+            eq(code_review_memory_proposals.status, existing.status)
+          )
+        )
+        .returning();
+      if (updated) return updated;
+      continue;
+    }
+
+    const [inserted] = await database
+      .insert(code_review_memory_proposals)
+      .values({
+        ...ownerInsertValues(input.owner),
+        platform: input.platform,
+        repo_full_name: input.repoFullName,
         title: input.title,
         rationale: input.rationale,
         proposed_markdown: input.proposedMarkdown,
@@ -185,43 +280,59 @@ export async function upsertScopeProposal(input: {
         positive_count: input.positiveCount,
         negative_count: input.negativeCount,
         neutral_count: input.neutralCount,
-        updated_at: now,
       })
-      .where(eq(code_review_memory_proposals.id, existing.id))
+      .onConflictDoNothing()
       .returning();
-    if (!updated) throw new Error('Review Memory active proposal update failed');
-    return updated;
+    if (inserted) return inserted;
   }
 
-  const [inserted] = await database
-    .insert(code_review_memory_proposals)
-    .values({
-      ...ownerInsertValues(input.owner),
-      platform: input.platform,
-      repo_full_name: input.repoFullName,
-      title: input.title,
-      rationale: input.rationale,
-      proposed_markdown: input.proposedMarkdown,
-      evidence: input.evidence,
-      positive_count: input.positiveCount,
-      negative_count: input.negativeCount,
-      neutral_count: input.neutralCount,
-    })
-    .onConflictDoNothing()
-    .returning();
-  if (!inserted) {
-    const conflicted = await getActiveProposalForScope({
-      owner: input.owner,
-      platform: input.platform,
-      repoFullName: input.repoFullName,
-      database,
-    });
-    if (conflicted) return conflicted;
-    throw new Error('Review Memory active proposal conflict lookup failed');
-  }
-  return inserted;
+  // Another writer holds the scope after both attempts. Its proposal is the
+  // scope's active one; this analysis keeps it rather than overwriting a row it
+  // never observed as active.
+  const conflicted = await getActiveProposalForScope({
+    owner: input.owner,
+    platform: input.platform,
+    repoFullName: input.repoFullName,
+    database,
+  });
+  if (conflicted) return conflicted;
+  throw new Error('Review Memory active proposal upsert failed');
 }
 
+export type ReviewMemoryProposalPage = {
+  proposals: CodeReviewMemoryProposal[];
+  nextCursor: string | null;
+};
+
+const PROPOSAL_CURSOR_SEPARATOR = '|';
+const PROPOSAL_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Keyset pagination cursor for `listProposalsPage`. The list orders by
+// `updated_at` desc with `id` desc as the deterministic tie-breaker, so the
+// cursor encodes the last row's `(updated_at, id)`. `updated_at` is a
+// PostgreSQL timestamptz returned as text with microsecond precision (e.g.
+// "2026-04-29 01:16:12.945123+00"). The cursor is opaque and only compared
+// against the database column, never parsed by a client, so it carries the
+// raw value verbatim — normalizing through `new Date(...).toISOString()` would
+// truncate microseconds and silently skip rows that share a millisecond.
+function encodeProposalCursor(row: CodeReviewMemoryProposal): string {
+  return `${row.updated_at}${PROPOSAL_CURSOR_SEPARATOR}${row.id}`;
+}
+
+function decodeProposalCursor(cursor: string): { updatedAt: string; id: string } | null {
+  const separatorIndex = cursor.indexOf(PROPOSAL_CURSOR_SEPARATOR);
+  if (separatorIndex <= 0) return null;
+  const updatedAt = cursor.slice(0, separatorIndex);
+  const id = cursor.slice(separatorIndex + 1);
+  if (!PROPOSAL_ID_PATTERN.test(id)) return null;
+  if (Number.isNaN(new Date(updatedAt).getTime())) return null;
+  return { updatedAt, id };
+}
+
+// Compatibility: the array-shaped `listProposals` is the deployed contract
+// (`origin/main` returns `CodeReviewMemoryProposal[]`); the web panel and
+// stale client bundles call it. Keep it, and serve the paginated shape
+// through the additive `listProposalsPage`.
 export async function listProposals(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
@@ -230,7 +341,21 @@ export async function listProposals(input: {
   limit?: number;
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal[]> {
+  const page = await listProposalsPage(input);
+  return page.proposals;
+}
+
+export async function listProposalsPage(input: {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  repoFullName?: string;
+  statuses?: ReviewMemoryProposalStatus[];
+  limit?: number;
+  cursor?: string;
+  database?: ReviewMemoryDatabase;
+}): Promise<ReviewMemoryProposalPage> {
   const database = input.database ?? db;
+  const limit = Math.min(input.limit ?? 50, 100);
   const conditions: SQL[] = [
     ...proposalOwnerConditions(input.owner),
     eq(code_review_memory_proposals.platform, input.platform),
@@ -241,13 +366,35 @@ export async function listProposals(input: {
   if (input.statuses && input.statuses.length > 0) {
     conditions.push(inArray(code_review_memory_proposals.status, input.statuses));
   }
+  if (input.cursor) {
+    const cursor = decodeProposalCursor(input.cursor);
+    if (!cursor) {
+      throw new ReviewMemoryInvalidCursorError();
+    }
+    const sameTimestamp = and(
+      eq(code_review_memory_proposals.updated_at, cursor.updatedAt),
+      lt(code_review_memory_proposals.id, cursor.id)
+    );
+    const cursorPredicate = or(
+      lt(code_review_memory_proposals.updated_at, cursor.updatedAt),
+      sameTimestamp
+    );
+    if (cursorPredicate) conditions.push(cursorPredicate);
+  }
 
-  return await database
+  const rows = await database
     .select()
     .from(code_review_memory_proposals)
     .where(and(...conditions))
-    .orderBy(desc(code_review_memory_proposals.updated_at))
-    .limit(Math.min(input.limit ?? 50, 100));
+    .orderBy(desc(code_review_memory_proposals.updated_at), desc(code_review_memory_proposals.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const proposals = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor =
+    hasMore && proposals.length > 0 ? encodeProposalCursor(proposals[proposals.length - 1]) : null;
+
+  return { proposals, nextCursor };
 }
 
 export async function getProposal(input: {
@@ -278,24 +425,32 @@ export async function updateProposal(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal | null> {
   const database = input.database ?? db;
-  const [proposal] = await database
-    .update(code_review_memory_proposals)
-    .set({
-      title: input.title,
-      rationale: input.rationale,
-      proposed_markdown: input.proposedMarkdown,
-      status: 'edited',
-      updated_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        ...proposalOwnerConditions(input.owner),
-        eq(code_review_memory_proposals.id, input.proposalId),
-        inArray(code_review_memory_proposals.status, [...EDITABLE_PROPOSAL_STATUSES])
+  try {
+    const [proposal] = await database
+      .update(code_review_memory_proposals)
+      .set({
+        title: input.title,
+        rationale: input.rationale,
+        proposed_markdown: input.proposedMarkdown,
+        status: 'edited',
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          ...proposalOwnerConditions(input.owner),
+          eq(code_review_memory_proposals.id, input.proposalId),
+          inArray(code_review_memory_proposals.status, [...EDITABLE_PROPOSAL_STATUSES])
+        )
       )
-    )
-    .returning();
-  return proposal ?? null;
+      .returning();
+    return proposal ?? null;
+  } catch (error) {
+    // The status change makes this row's scope key active. The unique index
+    // normally guarantees the row already owns that key, so this only happens
+    // on data the index could not see; a caller deserves the reason, not SQL.
+    if (isActiveProposalScopeViolation(error)) throw new ReviewMemoryProposalConflictError();
+    throw error;
+  }
 }
 
 export async function rejectProposal(input: {
@@ -361,7 +516,7 @@ export async function markProposalSuperseded(input: {
 }): Promise<CodeReviewMemoryProposal | null> {
   return await markProposalStatus({
     proposalId: input.proposalId,
-    fromStatuses: ['open', 'edited', 'opening_change_request', 'change_request_failed'],
+    fromStatuses: [...ACTIVE_PROPOSAL_STATUSES],
     set: { status: 'superseded' },
     database: input.database,
   });

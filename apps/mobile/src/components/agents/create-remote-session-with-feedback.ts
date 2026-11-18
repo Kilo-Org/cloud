@@ -1,6 +1,6 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
-export const CREATE_REMOTE_SESSION_FALLBACK_MESSAGE = 'Failed to create remote session';
+import { i18n } from '@/i18n';
 
 /**
  * Run `createRemoteSession()` and surface exactly one actionable toast when it
@@ -17,7 +17,8 @@ export async function createRemoteSessionWithFeedback(
     const sessionId = await create();
     return { success: true, sessionId };
   } catch (error) {
-    const message = error instanceof Error ? error.message : CREATE_REMOTE_SESSION_FALLBACK_MESSAGE;
+    const message =
+      error instanceof Error ? error.message : i18n.t('agentChat.remoteSession.failedToCreate');
     onError(message);
     return { success: false };
   }

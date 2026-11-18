@@ -1,0 +1,4877 @@
+import { environmentReferenceSchema } from '../../environment-build/reference.js';
+import {
+  workspaceSnapshotIdentity,
+  type WorkspaceSnapshotIdentity,
+} from '../sandbox/workspace-snapshot.js';
+import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { DurableObject } from 'cloudflare:workers';
+import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
+import { normalizeGitUrl } from '@kilocode/worker-utils';
+import {
+  renewRuntimeAuthorization,
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
+  unsealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
+  authorizeCloudAgentChild,
+  authorizeCloudAgentWorkspaceSibling,
+  issueCloudAgentMcpGrant,
+  assertCloudAgentParentAuthority,
+  CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
+  type WorkspaceMcpBinding,
+} from '../../cloud-agent-authority.js';
+import {
+  CloudAgentAuthoritySchema,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import { sessionCallbackContext } from './callback-context.js';
+import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
+import {
+  cloudAgentWorktreeIdSchema,
+  cloudAgentWorktreeLocationSchema,
+  type CloudAgentChildSessionLineage,
+  type CloudAgentWorktreeLocation,
+} from '@kilocode/session-ingest-contracts';
+import { asc, eq, gt } from 'drizzle-orm';
+import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import { z } from 'zod';
+import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
+import { resolveSecret } from '../../auth.js';
+import type { CallbackTarget } from '../../callbacks/index.js';
+import type { DurableAdmissionAck } from '../../execution/types.js';
+import { getSandboxProviderBinding } from '../../persistence/session-metadata.js';
+import { sameSandboxProviderBinding } from '../../sandbox-provider-binding.js';
+import { logger } from '../../logger.js';
+import type { WrapperPty } from '../../terminal/types.js';
+import type { OperationResult } from '../../persistence/types.js';
+import {
+  CurrentSessionMetadataSchema,
+  parseSessionMetadata,
+  serializeSessionMetadata,
+  retiredRuntimeMessage,
+  type SessionMetadata,
+} from '../../persistence/session-metadata.js';
+import {
+  issuePersistedRuntimeProxyGrant,
+  resolvePersistedRuntimeProxyCredential,
+} from '../../runtime-credential-proxy-rpc.js';
+import type { ScopeHandleResolution } from '../sandbox/accepted-handles.js';
+import {
+  getRuntimeAuthorizationRecoveryState as readRuntimeAuthorizationRecoveryState,
+  RUNTIME_AUTHORIZATION_KEY,
+  renewStoredRuntimeAuthorization,
+} from '../../session/runtime-authorization-persistence.js';
+import { sessionRuntimeLocator } from '../../sandbox-control/worktree-ownership.js';
+import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
+import { applyControlPlanePreparingEvent } from '../../sandbox-session/control-plane-preparing.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import {
+  applyPendingInteractionEvent,
+  pendingInteractionsSchema,
+  type PendingInteractions,
+} from '../../sandbox-session/sandbox-control-event.js';
+import { handleCommandsAvailable } from '../../session/ingest-handlers/commands-available.js';
+import { createMessageId } from '../../session/message-id.js';
+import { generateSessionTitle } from '../../session/generate-session-title.js';
+import type {
+  SafeMessageResultResponse,
+  MessageResultRPCResponse,
+} from '../../session/message-result.js';
+import { createSessionEventQueries, type SessionEventQueries } from './event-queries.js';
+import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
+import { isControlSession, sessionIdFromDoName } from '../../session-identity.js';
+import {
+  finalizePreparationAttempt,
+  getPreparationSnapshots,
+  listPreparationAttempts,
+  readPreparationAttempt,
+  readPreparationSteps,
+  type PreparationOutcome,
+} from '../../session/preparation-history.js';
+import type {
+  CommandsAvailableData,
+  PreparationAttempt,
+  PreparingStep,
+  SessionStatus,
+} from '../../shared/protocol.js';
+import {
+  CONTROL_PLANE_SETUP_EVENTS,
+  CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
+  controlPlaneAnswerPayloadSchema,
+  controlPlaneCredentialSourceSchema,
+  controlPlaneEventsNotificationSchema,
+  controlPlaneNativeOperationSchema,
+  controlPlaneOutcomeSchema,
+  controlPlanePromptPayloadSchema,
+  controlPlaneRegistrationRouteSpecSchema,
+  controlPlaneRouteUpdateSchema,
+  controlPlaneRouteViewSchema,
+  controlPlaneSetupEventSchema,
+  controlPlaneWorkspaceStoppedPayloadSchema,
+  type ControlPlaneAnswerPayload,
+  type ControlPlaneAnswerReply,
+  type ControlPlaneCancelWorkspacePayload,
+  type ControlPlaneCancelWorkspaceResult,
+  type ControlPlaneControlResult,
+  type ControlPlaneDeliverPayload,
+  type ControlPlaneDeliverResult,
+  type ControlPlaneDispatchResult,
+  type ControlPlaneEventsNotification,
+  type ControlPlaneKiloRequestInput,
+  type ControlPlaneNativeOperation,
+  type ControlPlaneOutcome,
+  type ControlPlanePreparationStep,
+  type ControlPlanePromptPayload,
+  type ControlPlaneRouteUpdate,
+  type ControlPlaneRouteView,
+  type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
+  type ControlPlaneSetupCommandKind,
+  type ControlPlaneSetupEvent,
+  type ControlPlaneStatusResult,
+  type ControlPlaneTerminalInput,
+  type ControlPlaneWorktreeCaptureInput,
+  type ControlPlaneWorkspaceStoppedPayload,
+} from '../../shared/control-plane-protocol.js';
+import {
+  worktreeBranchOperationResultSchema,
+  type ControlPlaneWorktreeGitInput,
+  type WorktreeBranchOperationResult,
+} from '../../shared/worktree-git-operations.js';
+import {
+  matchesExpectedWorktree,
+  nextRepositoryBase,
+  withRepositoryBase,
+  type AdoptWorktreeBaseRequest,
+  type AdoptWorktreeBaseResponse,
+  type WorktreeBranchOperationInput,
+  type WorktreeBranchOperationResponse,
+} from '../../session/worktree-branch-operation.js';
+
+/** Bounded wake for a branch operation: idle sandboxes prepare async. */
+const WORKTREE_GIT_PREPARE_TIMEOUT_MS = 90_000;
+const WORKTREE_GIT_PREPARE_POLL_MS = 500;
+import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
+import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
+import type {
+  WorkspaceBillingProjection,
+  WorkspaceRuntimeStatus,
+} from '../../shared/workspace-runtime-status.js';
+import type { SessionId } from '../../types/ids.js';
+import type { Env } from '../../types.js';
+import { withDORetry } from '../../utils/do-retry.js';
+import type { StreamEvent, StoredEvent } from '../../websocket/types.js';
+import {
+  createStreamHandler,
+  formatStreamEvent,
+  type QueuedMessageSnapshot,
+} from '../../websocket/stream.js';
+import {
+  NATIVE_DELIVERY_LIMITS,
+  toNativePublicEvent,
+} from '../../kilo-facade/native-event-source.js';
+import { sandboxControlPeerNamespace } from '../peer-bindings.js';
+import migrations from './drizzle/migrations';
+import {
+  acceptMessages,
+  dueBackstopMessages,
+  isTerminalMessage,
+  nextBackstopAt,
+  oldestOpenMessage,
+  openMessages,
+  queueMessage,
+  renderQueuedMessageContent,
+  settleAcceptedUpTo,
+  settleMessages,
+  type MessageReduction,
+  type SessionMessage,
+  type SessionMessageState,
+} from './messages.js';
+import { answerMessageIntent } from './answers.js';
+import { messageFailureText } from './failure-messages.js';
+import {
+  createControlPlaneWorktreeChanges,
+  type ControlPlaneWorktreeChanges,
+  type SharedWorktreeChangesPeer,
+  type WorktreeChangeStates,
+} from './worktree-changes.js';
+import {
+  worktreeChangesReadySchema,
+  type WorktreeChangesReady,
+} from '../worktree-changes-ready.js';
+import {
+  WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+  type WorkspaceArtifactsChanged,
+} from '../sandbox/notifications.js';
+import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
+import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+  ResolvedPreviewTarget,
+} from '../sandbox/preview-target.js';
+import { isTerminalSessionEligible } from '../../terminal/access.js';
+import type { ListPreviewServicesOutput } from '../../shared/preview-services.js';
+import { readWorktreeChildSessions } from './worktree-child-sessions.js';
+import {
+  buildControlPlaneMessageReport,
+  reportAnchorForQueue,
+  type ControlPlaneReportFacts,
+} from './reports.js';
+import { createMessageCallbacks, type MessageCallbacks } from './callbacks.js';
+import {
+  createReportOutbox,
+  readReportAnchor,
+  writeReportAnchor,
+  type ReportOutbox,
+} from '../../sandbox-session/report-outbox.js';
+import {
+  CloudAgentRunContainerSchema,
+  type CloudAgentRunContainer,
+} from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type {
+  GetWorktreeChangesOutput,
+  GetWorktreeFileOutput,
+  RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import {
+  cloudAgentChildSessions,
+  controlPlaneMessages,
+  events,
+  historyImport,
+} from './sqlite-schema.js';
+import {
+  decodeSessionHistoryCursor,
+  readSessionMessagesPage,
+  sessionHistoryPageInputSchema,
+  type SessionMessagesPage,
+} from './history.js';
+import {
+  readToolPartDetail,
+  toolPartDetailInputSchema,
+  type ToolPartDetail,
+  type ToolPartDetailInput,
+} from './tool-detail.js';
+import type { ToolDisplayMode } from '../../shared/tool-display-projection.js';
+import {
+  HISTORY_HYDRATION_WAIT_MS,
+  hydrateSessionHistory,
+  markHistoryHydrated,
+  readHistoryHydration,
+} from './history-hydration.js';
+import { persistSessionEvent, readNativeEventPayload } from './native-events.js';
+import { createPartTextBuffer, type PartTextBuffer } from './part-text-buffer.js';
+import { readOwnedHistoryLineage, readStoredHistoryLineage } from './history-lineage.js';
+import { parseWipeLocator, runTransactionalWipe, type WipeLocator } from './transactional-wipe.js';
+import {
+  buildControlPlaneSessionRegistration,
+  controlPlaneSessionCreateInputSchema,
+  controlPlaneSessionRegisterInputSchema,
+  type ControlPlaneSessionCreateInput,
+  type ControlPlaneSessionRegisterInput,
+} from './registration.js';
+import {
+  controlPlaneSandboxSelectionSchema,
+  type ControlPlanePrepareInputWithSelection,
+  type ControlPlaneSandboxSelection,
+} from './sandbox-selection.js';
+import type {
+  ControlRuntimeCredentialProxyFence,
+  ControlRuntimeCredentialProxyFenceScope,
+} from '../sandbox/sandbox-do.js';
+import type { ScopeGrantView } from '../sandbox/scope-view.js';
+import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { readSentryIdentity } from '../../sentry-identity.js';
+
+/** Where a committed message transition came from (legacy diagnostic field). */
+type ControlPlaneMessageSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
+
+const GENERATION_KEY = 'control_plane_generation';
+const GENERATION = 2;
+const REGISTRATION_KEY = 'control_plane_session';
+const SESSION_METADATA_KEY = 'session_metadata';
+const ROUTE_KEY = 'control_plane_route';
+const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
+const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
+const AVAILABLE_COMMANDS_KEY = 'available_commands';
+const ROOT_STATUS_KEY = 'session_root_status';
+/** Workspace Stop authority: newest epoch/at and the attempts it retired. */
+const WORKSPACE_STOP_STATE_KEY = 'control_plane_workspace_stop_state';
+const WORKSPACE_STOPPED_ATTEMPTS_MAX = 8;
+const workspaceStopStateSchema = z
+  .object({
+    epoch: z.number().int().nonnegative(),
+    at: z.number().int().nonnegative(),
+    attempts: z.array(z.string().min(1)).max(WORKSPACE_STOPPED_ATTEMPTS_MAX),
+  })
+  .strict();
+type WorkspaceStopState = z.infer<typeof workspaceStopStateSchema>;
+const EVENT_RECEIPT_PREFIX = 'native_event_receipt/';
+/**
+ * A delivery is retried only until `expiresAt`, but an attempt can wait in this DO's queue past it.
+ * Receipts outlive the deadline so a late attempt still applies once and its retry cannot repeat it.
+ */
+const EVENT_RECEIPT_RETENTION_MS = 5 * 60_000;
+
+/**
+ * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
+ * so a stored `busy` no longer describes Cloud work.
+ */
+const rootStatusSchema = z.object({ type: z.string(), settled: z.boolean() });
+type RootStatus = z.infer<typeof rootStatusSchema>;
+
+const workspaceArtifactsChangedSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
+const rootStatusEventSchema = z.object({
+  sessionID: z.string(),
+  status: z.object({ type: z.string() }),
+});
+/** Tombstone written by the transactional wipe; survives with the generation. */
+export const WIPE_LOCATOR_KEY = 'control_plane_wipe_locator';
+
+/** Wrapper setup-command lifecycle events the Session DO renders itself. */
+const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
+  CONTROL_PLANE_SETUP_EVENTS.started,
+  CONTROL_PLANE_SETUP_EVENTS.output,
+  CONTROL_PLANE_SETUP_EVENTS.finished,
+]);
+
+/**
+ * The command kind a setup event belongs to. Missing on older wrappers, which
+ * only send these events for the fatal, pre-command-policy setup path.
+ */
+type SetupCommandKind = ControlPlaneSetupCommandKind;
+
+const SETUP_COMMAND_PHASES: Record<SetupCommandKind, string> = {
+  build: 'setup_commands',
+  session_setup: 'session_setup_commands',
+  start: 'start_commands',
+};
+const SETUP_COMMAND_PHASE_TITLES: Record<SetupCommandKind, string> = {
+  build: 'Running build commands',
+  session_setup: 'Running session setup',
+  start: 'Running start commands',
+};
+const SETUP_COMMAND_LABELS: Record<SetupCommandKind, string> = {
+  build: 'Build command',
+  session_setup: 'Session setup command',
+  start: 'Start command',
+};
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function setupCommandPhase(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'setup_commands' : SETUP_COMMAND_PHASES[kind];
+}
+
+function setupCommandPhaseTitle(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'Running setup commands' : SETUP_COMMAND_PHASE_TITLES[kind];
+}
+
+function setupCommandLabel(
+  kind: SetupCommandKind | undefined,
+  command: number,
+  commandText: string | undefined
+): string {
+  const name = kind === undefined ? 'Setup command' : SETUP_COMMAND_LABELS[kind];
+  return commandText === undefined
+    ? `${name} ${command}`
+    : `${name} ${command} · \`${commandText}\``;
+}
+
+/** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
+const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
+  sandbox_create: 'sandbox_provision',
+  environment_snapshot: 'environment_snapshot',
+  sandbox_start: 'sandbox_boot',
+  snapshot_fallback: 'snapshot_fallback',
+  clone: 'cloning',
+  restore: 'workspace_restore',
+  checkout: 'branch',
+  setup: 'setup_commands',
+  snapshot: 'workspace_backup',
+  kilo_runtime: 'kilo_server',
+  kilo_session: 'kilo_session',
+};
+
+const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
+  sandbox_create: 'Creating sandbox',
+  environment_snapshot: 'Checking the environment snapshot',
+  sandbox_start: 'Starting sandbox',
+  snapshot_fallback: 'Retrying without a snapshot',
+  clone: 'Cloning repository',
+  restore: 'Updating repository',
+  checkout: 'Checking out branch',
+  setup: 'Running setup commands',
+  snapshot: 'Saving repository for faster starts',
+  kilo_runtime: 'Starting Kilo runtime',
+  kilo_session: 'Preparing Kilo session',
+};
+
+/**
+ * The one owner of the route-step → public-step mapping (spec §10): both the
+ * live `cloud.status` emit and the connect-replay `cloud.status` derive it
+ * here, so the two paths cannot diverge.
+ */
+function publicPreparationStep(step: ControlPlanePreparationStep | undefined): string | undefined {
+  return step === undefined ? undefined : PREPARING_STEP_PUBLIC[step];
+}
+
+/**
+ * The route state to persist for a view. A preparing view's live detail is not
+ * route state, and a preparing view that names no step (a repeated `prepare`)
+ * keeps the step its attempt already reached.
+ */
+function persistedRouteView(
+  view: ControlPlaneRouteView,
+  previous: ControlPlaneRouteView
+): ControlPlaneRouteView {
+  if (view.state !== 'preparing') return view;
+  const step =
+    view.step ??
+    (previous.state === 'preparing' && previous.attemptId === view.attemptId
+      ? previous.step
+      : undefined);
+  return {
+    state: 'preparing',
+    attemptId: view.attemptId,
+    ...(step === undefined ? {} : { step }),
+    ...(view.container === undefined ? {} : { container: view.container }),
+  };
+}
+
+/** DO-only session creation input; the Worker builds it from session metadata. */
+export const controlPlaneSessionRegistrationSchema = z
+  .object({
+    sandboxId: z.string().min(1).max(256),
+    spec: controlPlaneRegistrationRouteSpecSchema,
+    credentials: controlPlaneCredentialSourceSchema,
+    /** Worker-selected provider pin (H1/H2); the DO applies it, never re-decides it. */
+    sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
+    /** The admitted repository environment; DO-private, for snapshot selection only. */
+    environment: environmentReferenceSchema.optional(),
+  })
+  .strict();
+export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
+
+function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
+  return registration === null
+    ? null
+    : workspaceSnapshotIdentity(
+        registration.sandboxId,
+        registration.spec.directory,
+        registration.credentials
+      );
+}
+
+const cloudAgentChildSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+
+const cloudAgentChildSessionRegistrationSchema = z
+  .object({
+    cloudAgentSessionId: cloudAgentChildSessionIdSchema,
+    initialMessageId: z.string().min(1).max(200).optional(),
+    worktreeId: cloudAgentWorktreeIdSchema.optional(),
+  })
+  .strict();
+
+const cloudAgentChildSessionListSchema = z
+  .object({
+    limit: z.number().int().min(1).max(50),
+    cursor: z.uuid().optional(),
+  })
+  .strict();
+
+export type CloudAgentChildSessionPage = {
+  sessions: Array<{
+    cloudAgentSessionId: string;
+    initialMessageId?: string;
+    worktreeId?: string;
+  }>;
+  nextCursor?: string;
+};
+
+export type ControlPlaneSendResult =
+  | { type: 'ok' }
+  | { type: 'session-not-found' }
+  | { type: 'queue-full' };
+
+/**
+ * Create/register failure in the legacy `AdmissionFailure` shape (M2): the
+ * boundary is always `registration`, and only validation failures use
+ * `BAD_REQUEST`. Non-validation errors throw so the Worker retries.
+ */
+export type ControlPlaneSessionCreateFailure = {
+  success: false;
+  code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL';
+  error: string;
+  failureBoundary: 'registration';
+};
+
+/** Result of the Worker-facing create RPC (M2), compatible with C1's consumer. */
+export type ControlPlaneSessionCreateResult =
+  | DurableAdmissionAck
+  | ControlPlaneSessionCreateFailure;
+
+/** Sibling registration result: no message is admitted, so there is no ack shape. */
+export type ControlPlaneSessionRegisterResult =
+  | { success: true }
+  | ControlPlaneSessionCreateFailure;
+
+export type ControlPlaneSessionSnapshot =
+  | { type: 'session-not-found' }
+  | {
+      type: 'found';
+      sessionId: string;
+      route: ControlPlaneRouteView;
+      messages: Array<{
+        messageId: string;
+        state: SessionMessageState;
+        createdAt: number;
+        acceptedAt: number | null;
+        settledAt: number | null;
+        reason: string | null;
+      }>;
+      /** Durability watermark: latest stored event id, or null when none. */
+      latestEventId: number | null;
+      updateCursor: number;
+      totalCostMicrodollars: number;
+      title?: string;
+    };
+
+type FoundSessionSummary = Omit<
+  Extract<ControlPlaneSessionSnapshot, { type: 'found' }>,
+  'messages'
+>;
+
+export type ControlPlaneSessionMetadataSummary = {
+  metadata: SessionMetadata | null;
+  snapshot: { type: 'session-not-found' } | FoundSessionSummary;
+  currentMessage: { messageId: string; state: 'accepted' | 'queued' } | null;
+};
+
+/**
+ * Session DO -> Sandbox DO (spec §10). Resolved from the production
+ * `SANDBOX_CONTROL` binding; tests may inject a fake through `sandboxPeerFor`.
+ */
+export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
+  status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult>;
+  prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
+  deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
+  abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult>;
+  /** Workspace Stop during preparation; returns the durable stop epoch. */
+  cancelWorkspace(
+    payload: ControlPlaneCancelWorkspacePayload
+  ): Promise<ControlPlaneCancelWorkspaceResult>;
+  answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
+  release(payload: ControlPlaneReleasePayload): Promise<void>;
+  /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
+  getRuntimeCredentialProxyFence(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+    handle: string;
+  }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
+  /**
+   * Asks the Sandbox DO to serve the handle on behalf of a surviving member of
+   * the scope when this Session DO cannot resolve it locally.
+   */
+  resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution>;
+  /** The locator a wiped issuer uses to keep resolving through a survivor. */
+  getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
+    scopeId: string;
+    allocationId: string;
+    wrapperInstanceId: string;
+    expiresAt: number;
+  } | null>;
+  /** B10: forwards one worktree-change request to the wrapper. */
+  worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
+  /** Forwards one Sync/Restack branch operation to the wrapper. */
+  worktreeGit(input: ControlPlaneWorktreeGitInput): Promise<ControlPlaneControlResult>;
+  /** B10: forwards one terminal request to the wrapper. */
+  terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
+  /** B10: forwards one allowlisted native read to the live wrapper. */
+  kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
+  /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
+  previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult>;
+  /** Lists live listening services through the bound wrapper (never wakes an allocation). */
+  previewServices(scope: PreviewSandboxScope): Promise<ListPreviewServicesOutput>;
+  /** B10: the wrapper identity bound to the connected allocation. */
+  getWrapperId(): Promise<string | null>;
+  /** B10: the public sandbox status snapshot projected from the allocation. */
+  getStatusSnapshot(identity?: WorkspaceSnapshotIdentity | null): Promise<SandboxStatusSnapshot>;
+  /** Passive billing projection for the workspace that owns this sandbox. */
+  getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null>;
+  /**
+   * Removes the workspace snapshot descriptor for this session's workspace on
+   * explicit user action ("Start fresh"). The Sandbox DO only deletes on this
+   * call, never as a side effect of work; the next start uses the environment
+   * snapshot or the base image.
+   */
+  removeWorkspaceSnapshot(payload: ControlPlaneSessionRefPayload): Promise<{ success: true }>;
+  /**
+   * The capture time of the workspace snapshot descriptor that a "Start fresh"
+   * action would discard, or null when the workspace has none.
+   */
+  getWorkspaceSnapshotRecovery(
+    payload: ControlPlaneSessionRefPayload
+  ): Promise<{ capturedAt: number | null } | null>;
+  fetch(request: Request): Promise<Response>;
+};
+
+/** Native attach snapshot handed to the per-user Kilo facade (spec §10). */
+export type NativeSnapshot = {
+  oversized: boolean;
+  fence: number | null;
+  events: StreamEvent[];
+  continuation?: NativeSnapshotCursor;
+  sessionStatus?: SessionStatus;
+  questions?: unknown[];
+  permissions?: unknown[];
+  /**
+   * The requested root Kilo session is not this DO's registration. `fence: null`
+   * is also an empty log, so a stopped registration needs its own signal.
+   */
+  stopped?: boolean;
+};
+
+export type NativeSnapshotCursor = {
+  fence: number | null;
+  phase: 'log' | 'updates' | 'removals';
+  fromId: number;
+};
+
+export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = NATIVE_DELIVERY_LIMITS.eventBytes;
+
+/**
+ * Cap on the stream rows the first history page appends. The page's own budget
+ * is reduced by their measured size, so the whole response stays inside the
+ * history page bound.
+ */
+const MAX_SNAPSHOT_ROWS_BYTES = 256 * 1024;
+
+type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
+
+type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
+
+function parseStoredRunContainer(raw: string | null): CloudAgentRunContainer | undefined {
+  if (raw == null) return undefined;
+  try {
+    const parsed = CloudAgentRunContainerSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function rowToMessage(row: SessionMessageRow): SessionMessage {
+  const container = parseStoredRunContainer(row.container);
+  return {
+    messageId: row.message_id,
+    intent: controlPlanePromptPayloadSchema.parse(JSON.parse(row.intent)),
+    state: row.state,
+    createdAt: row.created_at,
+    acceptedAt: row.accepted_at,
+    settledAt: row.settled_at,
+    reason: row.reason,
+    ...(row.billing_failure == null
+      ? {}
+      : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
+    ...(container === undefined ? {} : { container }),
+  };
+}
+
+function messageToRow(message: SessionMessage): SessionMessageRow {
+  return {
+    message_id: message.messageId,
+    intent: JSON.stringify(message.intent),
+    state: message.state,
+    created_at: message.createdAt,
+    accepted_at: message.acceptedAt,
+    settled_at: message.settledAt,
+    reason: message.reason,
+    billing_failure:
+      message.billingFailure === undefined ? null : JSON.stringify(message.billingFailure),
+    container: message.container === undefined ? null : JSON.stringify(message.container),
+  };
+}
+
+function createFailure(
+  code: ControlPlaneSessionCreateFailure['code'],
+  error: string
+): ControlPlaneSessionCreateFailure {
+  return { success: false, code, error, failureBoundary: 'registration' };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Invalid session metadata';
+}
+
+/** The stored metadata carries the admitted initial message id for M3 replay. */
+function withInitialMessageId(metadata: SessionMetadata, messageId: string): SessionMetadata {
+  return { ...metadata, initialMessage: { ...(metadata.initialMessage ?? {}), id: messageId } };
+}
+
+/** Repository fingerprint mirroring the legacy register guard (M3). */
+function repositoryFingerprint(repository: SessionMetadata['repository']): string {
+  if (repository === undefined) return 'none';
+  switch (repository.type) {
+    case 'github':
+      return `github:${repository.repo}:${repository.githubIntegrationId ?? ''}:${
+        repository.githubAccessPurpose ?? 'workflow'
+      }:${repository.allowUserAuthorization === true ? 'user' : 'installation'}`;
+    case 'bitbucket':
+      return `bitbucket:${repository.workspaceUuid}:${repository.repositoryUuid}:${
+        repository.bitbucketIntegrationId ?? ''
+      }`;
+    case 'gitlab':
+    case 'git':
+      return `${repository.type}:${normalizeGitUrl(repository.url)}`;
+  }
+}
+
+function sameRepository(
+  a: SessionMetadata['repository'],
+  b: SessionMetadata['repository']
+): boolean {
+  return repositoryFingerprint(a) === repositoryFingerprint(b);
+}
+
+type PendingInteractionCollection = 'questions' | 'permissions';
+
+/** The pending-set entry an answer resolves: its collection and its id. */
+function pendingInteractionTarget(reply: ControlPlaneAnswerReply): {
+  collection: PendingInteractionCollection;
+  id: string;
+} {
+  return reply.action === 'permission'
+    ? { collection: 'permissions', id: reply.permissionId }
+    : { collection: 'questions', id: reply.questionId };
+}
+
+/** The event that removes an answer's interaction from the pending set. */
+function pendingInteractionResolvedEvent(reply: ControlPlaneAnswerReply): {
+  type: string;
+  properties: Record<string, unknown>;
+} {
+  switch (reply.action) {
+    case 'answer':
+      return { type: 'question.replied', properties: { requestID: reply.questionId } };
+    case 'reject':
+      return { type: 'question.rejected', properties: { requestID: reply.questionId } };
+    case 'permission':
+      return { type: 'permission.replied', properties: { requestID: reply.permissionId } };
+  }
+}
+
+/** Static `unknown` presentation when no Sandbox DO can answer (spec Sandbox Status). */
+function unavailableStatusSnapshot(): SandboxStatusSnapshot {
+  return {
+    status: 'unknown',
+    provider: 'Unknown',
+    observedAt: Date.now(),
+    detailCode: 'status_unavailable',
+    inactivityTimeoutMs: null,
+    estimatedSleepAt: null,
+  };
+}
+
+export class SandboxSessionV2 extends DurableObject<Env> {
+  readonly sessionId: SessionId;
+  private readonly db: DrizzleSqliteDODatabase;
+  private readonly eventQueries: SessionEventQueries;
+  /** Streamed part text not yet in its row. Flush it before reading stored history. */
+  private readonly partText: PartTextBuffer;
+  private readonly initialized: Promise<void>;
+  private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
+  private registration: ControlPlaneSessionRegistration | null = null;
+  private metadata: SessionMetadata | null = null;
+  /** Present only after the transactional wipe of an issuer with accepted handles. */
+  private wipeLocator: WipeLocator | null = null;
+  private runtimeAuthorization: RuntimeAuthorization | undefined;
+  private messages: SessionMessage[] = [];
+  private route: ControlPlaneRouteView = { state: 'unknown' };
+  private workspaceStop: WorkspaceStopState = { epoch: 0, at: 0, attempts: [] };
+  private transportRecoveryAt: number | null = null;
+  private pendingInteractions: PendingInteractions | undefined;
+  private availableCommands: CommandsAvailableData = { commands: [] };
+  private rootStatus: RootStatus | undefined;
+  private readonly historyHydrations = new Map<string, Promise<void>>();
+  /** Report obligations for terminal messages (plan B5); repair is best effort. */
+  private readonly reportOutbox: ReportOutbox;
+  private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
+  /** Terminal callback outbox (plan B5); one job per drained batch. */
+  private readonly messageCallbacks: MessageCallbacks;
+  /** Worktree-changes projection from the shared event log (plan B10). */
+  private readonly worktreeChanges: ControlPlaneWorktreeChanges;
+  /** Terminal records and the browser/wrapper bridge (plan B10). */
+  private readonly terminals: ControlPlaneTerminals;
+  /** Preview eligibility and target resolution through the Sandbox DO. */
+  private readonly preview: ControlPlanePreview;
+  /** Generation of the in-flight preparation, for the worktree-change hooks. */
+  private worktreePreparationGeneration: number | undefined;
+  /**
+   * Step-continuity recorders per route attempt. They own only the live step
+   * projection and the materialized attempt snapshots. The row's open/close
+   * transitions are driven by the route view (see `applyView`), so a lost map
+   * on eviction cannot leave a preparation row running: the previous persisted
+   * route still names the attempt to finalize.
+   */
+  private readonly preparationRecorders = new Map<
+    string,
+    ReturnType<typeof createPreparationProgressRecorder>
+  >();
+
+  /**
+   * Sandbox-peer factory. The default resolves the production `SANDBOX_CONTROL`
+   * binding; tests inject a fake to drive the Session DO without a sandbox.
+   */
+  sandboxPeerFor: (sandboxId: string) => ControlPlaneSandboxPeer | null = sandboxId =>
+    this.resolveSandboxPeer(sandboxId);
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.sessionId = sessionIdFromDoName(ctx.id.name ?? ctx.id.toString()) as SessionId;
+    this.db = drizzle(ctx.storage, { logger: false });
+    this.eventQueries = createSessionEventQueries(this.db, ctx.storage);
+    this.partText = createPartTextBuffer({
+      queries: this.eventQueries,
+      onFlushError: error =>
+        logger
+          .withFields({ sessionId: this.sessionId, error: errorMessage(error) })
+          .error('Streamed part text flush failed'),
+    });
+    this.reportOutbox = createReportOutbox({
+      storage: ctx.storage,
+      getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
+    });
+    this.listStatusOutbox = createSessionListStatusOutbox({
+      storage: ctx.storage,
+      publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
+    });
+    this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
+      storage: ctx.storage,
+      record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
+    });
+    this.messageCallbacks = createMessageCallbacks({
+      storage: ctx.storage,
+      getMetadata: () => this.metadata,
+      getCallbackQueue: () => this.env.CALLBACK_QUEUE,
+      getRecentAssistantAnswersForUserMessage: (sessionId, kiloSessionId, parentMessageId) => {
+        this.partText.flush();
+        return this.eventQueries.getRecentAssistantAnswersForUserMessage(
+          sessionId,
+          kiloSessionId,
+          parentMessageId
+        );
+      },
+      getAssistantAnswerForUserMessage: (sessionId, kiloSessionId, parentMessageId) => {
+        this.partText.flush();
+        return this.eventQueries.getAssistantAnswerForUserMessage(
+          sessionId,
+          kiloSessionId,
+          parentMessageId
+        );
+      },
+    });
+    this.worktreeChanges = createControlPlaneWorktreeChanges({
+      storage: ctx.storage,
+      sessionId: this.sessionId,
+      eventQueries: this.eventQueries,
+      broadcast: event => this.broadcast(event),
+      getMetadata: () => this.metadata,
+      getDirectory: () => this.registration?.spec.directory,
+      getSharedPeer: sandboxId => this.sandboxPeerFor(sandboxId),
+      capture: (sandboxId, input) => this.captureWorktreeChanges(sandboxId, input),
+      waitUntil: promise => this.ctx.waitUntil(promise),
+    });
+    this.terminals = createControlPlaneTerminals({
+      state: ctx,
+      sessionId: this.sessionId,
+      getMetadata: () => this.metadata,
+      getDirectory: () => this.registration?.spec.directory,
+      getWrapperId: () => this.currentWrapperId(),
+      isRouteReady: () => this.route.state === 'ready',
+      getSandboxStatus: () => this.getSandboxStatus(),
+      request: (sandboxId, input) => this.terminalRequest(sandboxId, input),
+    });
+    this.preview = createControlPlanePreview({
+      getMetadata: () => this.metadata,
+      resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
+    });
+    this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  [readSentryIdentity]() {
+    if (!this.metadata) return undefined;
+    const { userId, orgId, sessionId } = this.metadata.identity;
+    return {
+      userId,
+      orgId: orgId ?? '(personal)',
+      sessionId,
+      sandboxId: this.metadata.workspace?.sandboxId,
+    };
+  }
+
+  private async terminalRequest(
+    sandboxId: string,
+    input: ControlPlaneTerminalInput
+  ): Promise<ControlPlaneControlResult> {
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return {
+        ok: false,
+        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+      };
+    }
+    return peer.terminal(input);
+  }
+
+  private async previewTargetFor(
+    sandboxId: string,
+    scope: PreviewSandboxScope
+  ): Promise<PreviewTargetResult> {
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return { status: 'not_running' };
+    }
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewTarget(scope),
+      'previewTarget'
+    );
+  }
+
+  private async currentWrapperId(): Promise<string | undefined> {
+    const sandboxId = this.metadata?.workspace?.sandboxId;
+    if (sandboxId === undefined) return undefined;
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) return undefined;
+    return (await peer.getWrapperId()) ?? undefined;
+  }
+
+  private async captureWorktreeChanges(
+    sandboxId: string,
+    input: ControlPlaneWorktreeCaptureInput
+  ): Promise<ControlPlaneControlResult> {
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      // An absent Sandbox DO is "no information" (offline), not a failed
+      // capture: `not_ready` keeps the previous snapshot and retries.
+      return {
+        ok: false,
+        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+      };
+    }
+    return peer.worktreeCapture(input);
+  }
+
+  /**
+   * Runs a Sync or Restack against the worktree's own sandbox.
+   *
+   * The target is derived from this session only: callers cannot name a sandbox
+   * or directory. An idle sandbox is woken through the existing preparation
+   * path (no synthetic turn); preparation is bounded so the caller learns
+   * rather than waiting for the provider. The wrapper owns the active-turn and
+   * directory locks and answers `refused`, so the DO never forces a rewrite
+   * over a running turn.
+   */
+  async syncWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('sync', input);
+  }
+
+  async restackWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('restack', input);
+  }
+
+  private async runWorktreeBranchOperation(
+    operation: 'sync' | 'restack',
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    await this.initialized;
+    const metadata = this.metadata;
+    const registration = this.registration;
+    const worktreeId = metadata?.workspace?.worktreeId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const directory = registration?.spec.directory;
+    if (
+      metadata === null ||
+      registration === null ||
+      worktreeId === undefined ||
+      kiloSessionId === undefined ||
+      directory === undefined ||
+      metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
+      metadata.workspace?.sandboxKind === 'shared' ||
+      metadata.workspace?.sandboxRoute !== undefined
+    ) {
+      return {
+        ok: false,
+        code: 'not_a_worktree_session',
+        message: 'Sync and Restack run only in a browser workspace session with its own sandbox',
+        retryable: false,
+      };
+    }
+
+    const baseBranch = input.baseBranch ?? metadata.repository?.baseBranch;
+    const upstreamSha = input.upstreamSha ?? metadata.repository?.baseSha;
+
+    const ready = await this.ensureReadyForBranchOperation();
+    if (!ready.ok) {
+      return { ok: false, code: 'sandbox_not_ready', message: ready.message, retryable: true };
+    }
+
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    let result: ControlPlaneControlResult;
+    try {
+      result = await peer.worktreeGit({
+        session: {
+          sessionId: this.sessionId,
+          kiloSessionId,
+          directory,
+        },
+        payload: {
+          operation,
+          ...(baseBranch === undefined ? {} : { baseBranch }),
+          ...(upstreamSha === undefined ? {} : { upstreamSha }),
+        },
+      });
+    } catch (error) {
+      // The wrapper may have completed a lease push before the reply was lost.
+      // Surface the ambiguity; the Worker must not retry this mutation.
+      return {
+        ok: false,
+        code: 'operation_outcome_unknown',
+        message: error instanceof Error ? error.message : 'Worktree operation outcome is unknown',
+        retryable: false,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        code:
+          result.error.code === 'operation_outcome_unknown'
+            ? 'operation_outcome_unknown'
+            : 'operation_failed',
+        message: result.error.message,
+        retryable: result.error.retryable,
+      };
+    }
+    const parsed = worktreeBranchOperationResultSchema.safeParse(result.result);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree branch operation returned an invalid result');
+      return {
+        ok: false,
+        code: 'invalid_result',
+        message: 'The sandbox returned an invalid branch operation result',
+        retryable: false,
+      };
+    }
+    const outcome = parsed.data;
+    if (
+      (outcome.status === 'changed' || outcome.status === 'unchanged') &&
+      !(operation === 'restack' && outcome.operation === 'sync')
+    ) {
+      await this.persistWorktreeBranchOperation(outcome);
+    }
+    return { ok: true, result: outcome };
+  }
+
+  private async persistWorktreeBranchOperation(
+    outcome: Extract<WorktreeBranchOperationResult, { status: 'changed' | 'unchanged' }>
+  ): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return;
+    const nextBase = nextRepositoryBase({
+      current: {
+        ...(metadata.repository.baseBranch === undefined
+          ? {}
+          : { baseBranch: metadata.repository.baseBranch }),
+        ...(metadata.repository.baseSha === undefined
+          ? {}
+          : { baseSha: metadata.repository.baseSha }),
+      },
+      result: { baseBranch: outcome.baseBranch, baseSha: outcome.baseSha },
+    });
+    await this.persistAdoptedBase(nextBase, outcome.branch);
+  }
+
+  /**
+   * Internal metadata-only adoption for a sibling session that shares the
+   * worktree. It never wakes the sandbox or creates a turn: the next capture
+   * reads the updated grouped metadata, so a sibling cannot overwrite the
+   * shared Changes snapshot with its old base.
+   */
+  async adoptWorktreeBase(input: AdoptWorktreeBaseRequest): Promise<AdoptWorktreeBaseResponse> {
+    await this.initialized;
+    if (!matchesExpectedWorktree(this.metadata, input.expectedWorktreeId)) {
+      return {
+        ok: false,
+        code: 'worktree_mismatch',
+        message: 'This session does not belong to the expected worktree',
+      };
+    }
+    const persisted = await this.persistAdoptedBase({
+      baseBranch: input.baseBranch,
+      baseSha: input.baseSha,
+    });
+    return persisted
+      ? { ok: true }
+      : {
+          ok: false,
+          code: 'invalid_metadata',
+          message: 'Adopted base did not produce valid session metadata',
+        };
+  }
+
+  /**
+   * Writes a base + effective prompt + route spec through the queue. Callers
+   * have already resolved the effective values; a null result keeps the
+   * current value upstream in `nextRepositoryBase`.
+   */
+  private async persistAdoptedBase(
+    nextBase: { baseBranch?: string; baseSha?: string },
+    fallbackBranch?: string
+  ): Promise<boolean> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return false;
+    const next = withRepositoryBase(metadata, nextBase, fallbackBranch);
+    const validated = CurrentSessionMetadataSchema.safeParse(next);
+    if (!validated.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree base adoption produced invalid session metadata');
+      return false;
+    }
+    await this.enqueue(async () => {
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
+      this.metadata = validated.data;
+      if (this.registration !== null) {
+        const spec = {
+          ...this.registration.spec,
+          ...(validated.data.repository?.baseBranch === undefined
+            ? {}
+            : { baseBranch: validated.data.repository.baseBranch }),
+          ...(validated.data.repository?.baseSha === undefined
+            ? {}
+            : { baseSha: validated.data.repository.baseSha }),
+        };
+        const registration = { ...this.registration, spec };
+        await this.ctx.storage.put(REGISTRATION_KEY, registration);
+        this.registration = registration;
+      }
+    });
+    return true;
+  }
+
+  /** Wakes an idle sandbox through the ordinary preparation path. */
+  private async ensureReadyForBranchOperation(): Promise<
+    { ok: true } | { ok: false; message: string }
+  > {
+    const prepared = await this.prepareSandbox();
+    if (prepared !== null) {
+      await this.applyView(prepared, this.transportPass());
+      if (prepared.state === 'ready') return { ok: true };
+      if (prepared.state === 'failed') return { ok: false, message: prepared.reason };
+    }
+    const deadline = Date.now() + WORKTREE_GIT_PREPARE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (this.route.state === 'ready') return { ok: true };
+      const failed = this.branchOperationRouteFailure();
+      if (failed !== undefined) return { ok: false, message: failed };
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        try {
+          const status = await peer.status({ sessionId: this.sessionId });
+          if (status.view.state !== 'preparing') {
+            await this.applyView(status.view, this.transportPass());
+          }
+        } catch {
+          // A transient Sandbox RPC failure is retried within the bound.
+        }
+        if (this.routeIsReady()) return { ok: true };
+        const afterPoll = this.branchOperationRouteFailure();
+        if (afterPoll !== undefined) return { ok: false, message: afterPoll };
+      }
+      await new Promise(resolve => setTimeout(resolve, WORKTREE_GIT_PREPARE_POLL_MS));
+    }
+    return {
+      ok: false,
+      message: 'Sandbox preparation did not finish within 90 seconds',
+    };
+  }
+
+  private branchOperationRouteFailure(): string | undefined {
+    const route = this.route;
+    return route.state === 'failed' ? route.reason : undefined;
+  }
+
+  private routeIsReady(): boolean {
+    return this.route.state === 'ready';
+  }
+
+  private async initializeStorage(): Promise<void> {
+    const generation = await this.ctx.storage.get<unknown>(GENERATION_KEY);
+    if (generation !== GENERATION) {
+      // Old-plane or first-access instance: wipe before anything reads it, then
+      // write the generation so this is one-time (Contracts, "Storage cutover").
+      await this.ctx.storage.deleteAll();
+      await this.ctx.storage.put(GENERATION_KEY, GENERATION);
+      await migrate(this.db, migrations);
+      return;
+    }
+    await migrate(this.db, migrations);
+    const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
+    const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
+    this.registration = parsed.success ? parsed.data : null;
+    const rawMetadata = await this.ctx.storage.get<unknown>(SESSION_METADATA_KEY);
+    if (rawMetadata === undefined) {
+      this.metadata = null;
+    } else {
+      try {
+        this.metadata = parseSessionMetadata(rawMetadata);
+      } catch {
+        this.metadata = null;
+      }
+    }
+    const storedAuthorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    this.runtimeAuthorization = storedAuthorization.success ? storedAuthorization.data : undefined;
+    const pending = pendingInteractionsSchema.safeParse(
+      await this.ctx.storage.get<unknown>(PENDING_INTERACTIONS_KEY)
+    );
+    this.pendingInteractions = pending.success ? pending.data : undefined;
+    const commands = await this.ctx.storage.get<CommandsAvailableData>(AVAILABLE_COMMANDS_KEY);
+    this.availableCommands = commands?.commands ? commands : { commands: [] };
+    const rootStatus = rootStatusSchema.safeParse(await this.ctx.storage.get(ROOT_STATUS_KEY));
+    this.rootStatus = rootStatus.success ? rootStatus.data : undefined;
+    const stop = workspaceStopStateSchema.safeParse(
+      await this.ctx.storage.get<unknown>(WORKSPACE_STOP_STATE_KEY)
+    );
+    this.workspaceStop = stop.success ? stop.data : { epoch: 0, at: 0, attempts: [] };
+    this.messages = await this.loadMessages();
+    this.route = await this.loadRoute();
+    const recoveryAt = z
+      .number()
+      .int()
+      .nonnegative()
+      .safeParse(await this.ctx.storage.get<unknown>(TRANSPORT_RECOVERY_KEY));
+    this.transportRecoveryAt = recoveryAt.success ? recoveryAt.data : null;
+    const parsedLocator = parseWipeLocator(
+      await this.ctx.storage.get<unknown>(WIPE_LOCATOR_KEY),
+      Date.now()
+    );
+    if (parsedLocator.locator === null) {
+      this.wipeLocator = null;
+    } else if (parsedLocator.expired) {
+      // The handle lease passed: lazily drop the tombstone.
+      await this.ctx.storage.delete(WIPE_LOCATOR_KEY);
+      this.wipeLocator = null;
+    } else {
+      this.wipeLocator = parsedLocator.locator;
+    }
+  }
+
+  /**
+   * Worker-facing create RPC (spec §5, plan B4). Stores grouped metadata and the
+   * registration derived from it (the Worker selected the sandbox), then admits
+   * the initial turn through the normal send path. A repeat with the same
+   * identity/repository/sandbox/message replays the send (M3); any other change
+   * is rejected. Worktree siblings use `registerSessionFromMetadata`.
+   */
+  async createSessionWithInitialAdmission(
+    input: ControlPlaneSessionCreateInput
+  ): Promise<ControlPlaneSessionCreateResult> {
+    await this.initialized;
+    const parsed = controlPlaneSessionCreateInputSchema.safeParse(input);
+    if (!parsed.success) return createFailure('BAD_REQUEST', 'Invalid session create input');
+    const { metadata, message, sandboxSelection, runtimeAuthorizationSeal } = parsed.data;
+
+    if (this.metadata !== null && this.registration !== null) {
+      if (!this.matchesExistingRegistration(metadata, message.messageId, sandboxSelection)) {
+        return createFailure(
+          'BAD_REQUEST',
+          'Registration does not match the existing session intent'
+        );
+      }
+      const sent = await this.send(message);
+      // A replay carries the stored initial message id, so the queued bound
+      // cannot refuse it; if it somehow did, fail as a transport error the
+      // caller retries rather than inventing a create failure code.
+      if (sent.type === 'queue-full') throw new Error('Pending message queue is full');
+      return sent.type === 'session-not-found'
+        ? createFailure('NOT_FOUND', 'Session not found')
+        : this.admissionAck(message.messageId);
+    }
+
+    const storedMetadata = withInitialMessageId(metadata, message.messageId);
+    // Low: validate before storing so `initialMessage.id` cannot bypass its
+    // pattern after eviction and `getMetadata()` can never return null silently.
+    const validated = CurrentSessionMetadataSchema.safeParse(storedMetadata);
+    if (!validated.success) return createFailure('BAD_REQUEST', 'Invalid session metadata');
+    let registration: ControlPlaneSessionRegistration;
+    try {
+      registration = buildControlPlaneSessionRegistration(
+        validated.data,
+        sandboxSelection,
+        this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+        {
+          containmentEnabled: true,
+          workerUrl: this.env.WORKER_URL,
+        }
+      );
+    } catch (error) {
+      return createFailure('BAD_REQUEST', errorMessage(error));
+    }
+    const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, validated.data);
+    if (sealed.type === 'failure') return sealed.failure;
+
+    await this.enqueue(async () => {
+      if (validated.data.clone === undefined) markHistoryHydrated(this.ctx.storage);
+      await this.ctx.storage.put(REGISTRATION_KEY, registration);
+      this.registration = registration;
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
+      this.metadata = validated.data;
+      if (sealed.authorization !== undefined) {
+        await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, sealed.authorization);
+        this.runtimeAuthorization = sealed.authorization;
+      }
+    });
+
+    const sent = await this.send(message);
+    // A fresh session has an empty queue, so the bound cannot refuse its first
+    // message; a refusal is a transport error the caller retries, not a create
+    // failure code.
+    if (sent.type === 'queue-full') throw new Error('Pending message queue is full');
+    if (sent.type === 'session-not-found') {
+      return createFailure('INTERNAL', 'Session registration failed');
+    }
+    return this.admissionAck(message.messageId);
+  }
+
+  /**
+   * Sibling register RPC (H3): the DO builds the registration from grouped
+   * metadata so no caller has to. No message is admitted.
+   */
+  async registerSessionFromMetadata(
+    input: ControlPlaneSessionRegisterInput
+  ): Promise<ControlPlaneSessionRegisterResult> {
+    await this.initialized;
+    const parsed = controlPlaneSessionRegisterInputSchema.safeParse(input);
+    if (!parsed.success) return createFailure('BAD_REQUEST', 'Invalid session register input');
+    const { metadata, sandboxSelection, runtimeAuthorizationSeal, initialCommands } = parsed.data;
+    // N3: a repeated register (for example a `withDORetry` replay carrying the
+    // seal) must not touch the seal again. Match the stored intent and replay
+    // success before unsealing; a different intent is rejected.
+    if (this.metadata !== null && this.registration !== null) {
+      if (!this.matchesExistingRegistration(metadata, undefined, sandboxSelection)) {
+        return createFailure(
+          'BAD_REQUEST',
+          'Registration does not match the existing session intent'
+        );
+      }
+      return { success: true };
+    }
+    let registration: ControlPlaneSessionRegistration;
+    try {
+      registration = buildControlPlaneSessionRegistration(
+        metadata,
+        sandboxSelection,
+        this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+        {
+          containmentEnabled: true,
+          workerUrl: this.env.WORKER_URL,
+        }
+      );
+    } catch (error) {
+      return createFailure('BAD_REQUEST', errorMessage(error));
+    }
+    const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, metadata);
+    if (sealed.type === 'failure') return sealed.failure;
+    await this.enqueue(async () => {
+      // Finish seeding before metadata can make a registration retry return success.
+      if (initialCommands !== undefined) await this.cacheAvailableCommands(initialCommands);
+      if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
+      await this.ctx.storage.put(REGISTRATION_KEY, registration);
+      this.registration = registration;
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(metadata));
+      this.metadata = metadata;
+      if (sealed.authorization !== undefined) {
+        await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, sealed.authorization);
+        this.runtimeAuthorization = sealed.authorization;
+      }
+    });
+    return { success: true };
+  }
+
+  /** Grouped metadata for the worktree and management handlers (H3). */
+  async getMetadata(): Promise<SessionMetadata | null> {
+    await this.initialized;
+    return this.metadata;
+  }
+
+  async getAvailableCommands(): Promise<CommandsAvailableData> {
+    await this.initialized;
+    return this.availableCommands;
+  }
+
+  private async cacheAvailableCommands(data: unknown): Promise<void> {
+    await handleCommandsAvailable(data, {
+      setAvailableCommands: async commands => {
+        await this.ctx.storage.put(AVAILABLE_COMMANDS_KEY, commands);
+        this.availableCommands = commands;
+        this.emitSynthetic('commands.available', commands, 'commands-available');
+      },
+      logger: {
+        info: message => logger.withFields({ sessionId: this.sessionId }).info(message),
+        warn: message => logger.withFields({ sessionId: this.sessionId }).warn(message),
+      },
+    });
+  }
+
+  async assertCloudAgentManagementAuthority(authority: unknown): Promise<void> {
+    await this.initialized;
+    const scope = CloudAgentAuthoritySchema.safeParse(authority);
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!scope.success || !authorization.success) {
+      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    }
+    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
+  }
+
+  async recordCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
+    await this.initialized;
+    const child = cloudAgentChildSessionRegistrationSchema.parse(input);
+    if (this.metadata?.allowSubagentSessions !== true) {
+      throw new Error('Cloud Agent child registry denied');
+    }
+    if (child.cloudAgentSessionId === this.sessionId) {
+      throw new Error('Cloud Agent child registry requires another session');
+    }
+    this.db
+      .insert(cloudAgentChildSessions)
+      .values({
+        child_session_id: child.cloudAgentSessionId,
+        initial_message_id: child.initialMessageId ?? null,
+        worktree_id: child.worktreeId ?? null,
+        created_at: Date.now(),
+      })
+      .onConflictDoNothing()
+      .run();
+    return { success: true };
+  }
+
+  async forgetCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
+    await this.initialized;
+    const childSessionId = cloudAgentChildSessionIdSchema.parse(input);
+    this.db
+      .delete(cloudAgentChildSessions)
+      .where(eq(cloudAgentChildSessions.child_session_id, childSessionId))
+      .run();
+    return { success: true };
+  }
+
+  async listCloudAgentChildSessions(input: unknown): Promise<CloudAgentChildSessionPage> {
+    await this.initialized;
+    const page = cloudAgentChildSessionListSchema.parse(input);
+    const cursorSessionId = page.cursor === undefined ? undefined : `workspace_${page.cursor}`;
+    const rows = this.db
+      .select({
+        cloudAgentSessionId: cloudAgentChildSessions.child_session_id,
+        initialMessageId: cloudAgentChildSessions.initial_message_id,
+        worktreeId: cloudAgentChildSessions.worktree_id,
+      })
+      .from(cloudAgentChildSessions)
+      .where(
+        cursorSessionId === undefined
+          ? undefined
+          : gt(cloudAgentChildSessions.child_session_id, cursorSessionId)
+      )
+      .orderBy(asc(cloudAgentChildSessions.child_session_id))
+      .limit(page.limit + 1)
+      .all();
+    const visible = rows.slice(0, page.limit);
+    const last = visible.at(-1);
+    const nextCursor =
+      rows.length > page.limit && last !== undefined
+        ? last.cloudAgentSessionId.slice('workspace_'.length)
+        : undefined;
+    return {
+      sessions: visible.map(row => ({
+        cloudAgentSessionId: row.cloudAgentSessionId,
+        ...(row.initialMessageId === null ? {} : { initialMessageId: row.initialMessageId }),
+        ...(row.worktreeId === null ? {} : { worktreeId: row.worktreeId }),
+      })),
+      ...(nextCursor === undefined ? {} : { nextCursor }),
+    };
+  }
+
+  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    return (await this.getCloudAgentSpawnContext(authority)).token;
+  }
+
+  async getCloudAgentSpawnContext(
+    authority: CloudAgentAuthority
+  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
+    await this.initialized;
+    const scope = CloudAgentAuthoritySchema.safeParse(authority);
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!scope.success || !authorization.success) {
+      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    }
+    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    const issued = await renewRuntimeAuthorization({
+      authorization: authorization.data,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+    }).catch(error => {
+      if (
+        error instanceof RuntimeAuthorizationRevokedError ||
+        error instanceof RuntimeAuthorizationExpiredError
+      ) {
+        throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+      }
+      throw error;
+    });
+    const current = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!current.success) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    assertCloudAgentParentAuthority(this.metadata, current.data, scope.data);
+    return {
+      token: issued.token,
+      createdOnPlatform: this.metadata?.identity.createdOnPlatform,
+    };
+  }
+
+  async authorizeCloudAgentChild(input: {
+    authority: CloudAgentAuthority;
+    childSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentChild({
+      ...input,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async authorizeCloudAgentWorkspaceSibling(input: {
+    siblingSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentWorkspaceSibling({
+      parentSessionId: this.metadata?.identity.sessionId ?? '',
+      siblingSessionId: input.siblingSessionId,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async issueCloudAgentMcpGrant(
+    workspace?: WorkspaceMcpBinding
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
+    await this.initialized;
+    if (this.metadata?.allowSubagentSessions !== true) return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return issueCloudAgentMcpGrant({
+      workspace,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
+    });
+  }
+
+  /**
+   * H4/R1: mints and persists the runtime credential proxy handle for a connected
+   * route. The Sandbox DO reads its own allocation fence and passes it in, so this
+   * never calls back into the Sandbox DO queue. `null` means no active runtime
+   * authorization (or no backing token); the caller fails the route closed.
+   */
+  async issueRuntimeCredentialProxyGrant(
+    fence: ControlRuntimeCredentialProxyFence
+  ): Promise<string | null> {
+    await this.initialized;
+    // Read the backing token first so metadata/authorization are read after it and
+    // reflect the latest state at issuance time (parity with the legacy
+    // `SandboxSession.ts` token-then-fence read order).
+    const token = await this.getRuntimeToken();
+    const metadata = await this.getMetadata();
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    return issuePersistedRuntimeProxyGrant({
+      env: this.env,
+      storage: this.ctx.storage,
+      metadata,
+      authorization: authorization.success ? authorization.data : null,
+      fence,
+      token,
+      mode: 'contained',
+    });
+  }
+
+  /**
+   * H4: resolves a runtime credential proxy handle for the runtime credential
+   * proxy endpoint. The handle is minted and bound by the Sandbox DO when it
+   * sends `session.prepare` on a connected socket (R1).
+   */
+  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    scopeView?: ScopeGrantView;
+  } | null> {
+    await this.initialized;
+    let local: {
+      token: string;
+      organizationId?: string;
+      runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    } | null = null;
+    let localScopeView: ScopeGrantView | undefined;
+    let localError: unknown = null;
+    try {
+      local = await resolvePersistedRuntimeProxyCredential({
+        env: this.env,
+        storage: this.ctx.storage,
+        handle,
+        metadata: () => this.getMetadata(),
+        authorization: async () => {
+          const parsed = RuntimeAuthorizationSchema.safeParse(
+            await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+          );
+          return parsed.success ? parsed.data : null;
+        },
+        fence: async () => {
+          const metadata = await this.getMetadata();
+          const kiloSessionId = metadata?.auth.kiloSessionId;
+          const sandboxId = metadata?.workspace?.sandboxId;
+          const directory = this.registration?.spec.directory ?? metadata?.workspace?.workspacePath;
+          if (!metadata || !kiloSessionId || !sandboxId || !directory) return null;
+          const peer = this.sandboxPeerFor(sandboxId);
+          if (peer === null) {
+            localScopeView = undefined;
+            return null;
+          }
+          const resolution = await peer.getRuntimeCredentialProxyFence({
+            ownerId: metadata.identity.userId,
+            sessionId: metadata.identity.sessionId,
+            kiloSessionId,
+            directory,
+            handle,
+          });
+          if (resolution?.scopeViewUnavailable !== undefined) {
+            localScopeView = undefined;
+            throw new Error(resolution.scopeViewUnavailable);
+          }
+          localScopeView = resolution?.scopeView;
+          return resolution;
+        },
+        token: (secret, beforeRenew) => this.getStoredRuntimeToken(secret, beforeRenew),
+      });
+    } catch (error) {
+      // A revoked/expired authorization threw. Fall through to scope resolution
+      // so a surviving member can still serve; if none can, the original outcome
+      // (a 503) is preserved below.
+      localError = error;
+    }
+    if (local)
+      return localScopeView === undefined ? local : { ...local, scopeView: localScopeView };
+    if (!this.hasSharedScope()) {
+      // Legacy/non-worktree sessions never have a scope grant, so an ordinary
+      // 401 must not pay for a Sandbox DO round trip.
+      if (localError !== null) throw localError;
+      return null;
+    }
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle);
+    if (fromScope) return fromScope;
+    if (localError !== null) throw localError;
+    return null;
+  }
+
+  /** Whether this Session DO can have a canonical scope grant in the sandbox. */
+  private hasSharedScope(): boolean {
+    if (this.wipeLocator !== null) return true;
+    const worktreeId = this.metadata?.workspace?.worktreeId;
+    return typeof worktreeId === 'string' && worktreeId.length > 0;
+  }
+
+  /**
+   * Asks the Sandbox DO to serve the handle through a surviving member of the
+   * canonical scope when this Session DO cannot serve it locally (revoked or
+   * expired grant, no metadata, fence gone, wipe). `denied` is a 401 as today;
+   * any failure to reach a decision within the total bound throws so the facade
+   * returns its existing retryable 503 `Credential unavailable`.
+   */
+  private async resolveRuntimeCredentialProxyGrantFromScope(handle: string): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    scopeView: ScopeGrantView;
+  } | null> {
+    const peer = this.scopeResolutionPeer();
+    if (peer === null) return null;
+    let outcome: ScopeHandleResolution;
+    try {
+      outcome = await withTimeout(
+        withDORetry(
+          () => this.scopeResolutionPeer() ?? peer,
+          current => current.resolveScopeHandle({ handle }),
+          'resolveScopeHandle'
+        ),
+        this.sessionTimers().scopeResolutionMs,
+        'Scope handle resolution timed out'
+      );
+    } catch {
+      throw new Error('Runtime credential proxy scope resolution unavailable');
+    }
+    if (outcome.type === 'unavailable') {
+      throw new Error('Runtime credential proxy scope resolution unavailable');
+    }
+    if (outcome.type === 'denied') return null;
+    return {
+      token: outcome.token,
+      ...(outcome.organizationId === undefined ? {} : { organizationId: outcome.organizationId }),
+      runtimeAuthorization: outcome.runtimeAuthorization,
+      scopeView: outcome.scopeView,
+    };
+  }
+
+  async hasSessionSyncDescendant(
+    rootKiloSessionId: string,
+    kiloSessionId: string
+  ): Promise<boolean> {
+    await this.initialized;
+    if (this.registration?.spec.kiloSessionId !== rootKiloSessionId) return false;
+    return readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId) != null;
+  }
+
+  /** C1c model preflight: renew and return the backing runtime token. */
+  async getRuntimeToken(): Promise<string | null> {
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return this.getStoredRuntimeToken(secret);
+  }
+
+  private async getStoredRuntimeToken(secret: string, beforeRenew?: () => Promise<boolean>) {
+    const metadata = await this.getMetadata();
+    return renewStoredRuntimeAuthorization({
+      metadata,
+      beforeRenew,
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      putAuthorization: authorization =>
+        this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization),
+      getMetadata: () => this.getMetadata(),
+      putMetadata: async updated => {
+        await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(updated));
+        this.metadata = updated;
+      },
+      renew: authorization =>
+        renewRuntimeAuthorization({
+          authorization,
+          secret,
+          connectionString: this.env.HYPERDRIVE.connectionString,
+          onBindingRejected: reason =>
+            logRuntimeAuthorizationDiagnostic(
+              metadata?.identity.sessionId,
+              'binding_check',
+              reason
+            ),
+        }),
+    });
+  }
+
+  /**
+   * Renews this session's backing runtime token and returns it with the
+   * organization and runtime-authorization identity the Sandbox DO needs for
+   * attestation. Unlike `resolveRuntimeCredentialProxyGrant` it never matches a
+   * presented handle against its own stored grant; the Sandbox DO has already
+   * authorized the scope. It self-validates the expected scope and returns null
+   * on mismatch, so a member whose metadata/registration drifted is skipped.
+   */
+  /** Whether this Session DO is the scope identity the input names. */
+  private runtimeProxyScopeMatches(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): boolean {
+    const metadata = this.metadata;
+    if (metadata === null) return false;
+    const directory = this.registration?.spec.directory ?? metadata.workspace?.workspacePath;
+    const sandboxId = metadata.workspace?.sandboxId;
+    return (
+      sandboxId === input.sandboxId &&
+      directory === input.directory &&
+      metadata.auth.kiloSessionId === input.kiloSessionId
+    );
+  }
+
+  async issueRuntimeProxyBackingToken(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null> {
+    await this.initialized;
+    if (!this.runtimeProxyScopeMatches(input)) return null;
+    let token: string | null;
+    try {
+      token = await this.getRuntimeToken();
+    } catch (error) {
+      // Revoked/expired is a known denial for this member; anything else is a
+      // real failure the Sandbox DO treats as `unavailable`.
+      if (
+        error instanceof RuntimeAuthorizationRevokedError ||
+        error instanceof RuntimeAuthorizationExpiredError
+      ) {
+        return null;
+      }
+      throw error;
+    }
+    if (!token) return null;
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!authorization.success) return null;
+    const current = authorization.data;
+    if (current.state !== 'active' || Date.parse(current.delegationExpiresAt) <= Date.now()) {
+      return null;
+    }
+    const organizationId = this.metadata?.identity.orgId;
+    return {
+      token,
+      ...(organizationId === undefined ? {} : { organizationId }),
+      runtimeAuthorization: {
+        userId: current.userId,
+        authorizationId: current.id,
+        resourceId: current.resourceId,
+      },
+    };
+  }
+
+  /**
+   * A read-only view of this member's live delegation expiry, for the Sandbox
+   * DO's handoff selection. It applies the same scope self-validation as
+   * `issueRuntimeProxyBackingToken` but never renews the backing token, and it
+   * returns null when the authorization is absent, inactive, or already expired.
+   */
+  async getRuntimeProxyDelegationExpiresAt(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<number | null> {
+    await this.initialized;
+    if (!this.runtimeProxyScopeMatches(input)) return null;
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!authorization.success || authorization.data.state !== 'active') return null;
+    const expiresAt = Date.parse(authorization.data.delegationExpiresAt);
+    return Number.isFinite(expiresAt) && expiresAt > Date.now() ? expiresAt : null;
+  }
+
+  /**
+   * The Sandbox DO that can still answer for a wiped issuer: registration first,
+   * then live metadata, then the wipe locator.
+   */
+  private scopeResolutionPeer(): ControlPlaneSandboxPeer | null {
+    const sandboxId =
+      this.registration?.sandboxId ??
+      this.metadata?.workspace?.sandboxId ??
+      this.wipeLocator?.sandboxId;
+    return sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+  }
+
+  private admissionAck(messageId: string): DurableAdmissionAck {
+    const message = this.messages.find(candidate => candidate.messageId === messageId);
+    return {
+      success: true,
+      outcome: 'queued',
+      messageId,
+      compatibilityDelivery: message?.state === 'accepted' ? 'sent' : 'queued',
+    };
+  }
+
+  private matchesExistingRegistration(
+    metadata: SessionMetadata,
+    messageId: string | undefined,
+    sandboxSelection: ControlPlaneSandboxSelection
+  ): boolean {
+    const existing = this.metadata;
+    if (existing === null || this.registration === null) return false;
+    return (
+      existing.identity.userId === metadata.identity.userId &&
+      (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
+      (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
+      existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
+      sameRepository(existing.repository, metadata.repository) &&
+      sameSandboxProviderBinding(
+        getSandboxProviderBinding(existing),
+        getSandboxProviderBinding(metadata)
+      ) &&
+      this.registration.sandboxId === metadata.workspace?.sandboxId &&
+      (existing.workspace?.egressMode ?? 'unrestricted') ===
+        (metadata.workspace?.egressMode ?? 'unrestricted') &&
+      (this.registration.sandboxSelection?.egressMode ?? 'unrestricted') ===
+        (sandboxSelection.egressMode ?? 'unrestricted') &&
+      JSON.stringify(existing.workspace?.egressAllowlist ?? []) ===
+        JSON.stringify(metadata.workspace?.egressAllowlist ?? []) &&
+      JSON.stringify(this.registration.sandboxSelection?.egressAllowlist ?? []) ===
+        JSON.stringify(sandboxSelection.egressAllowlist ?? []) &&
+      (existing.workspace?.egressAudit ?? false) === (metadata.workspace?.egressAudit ?? false) &&
+      (this.registration.sandboxSelection?.egressAudit ?? false) ===
+        (sandboxSelection.egressAudit ?? false) &&
+      (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
+      (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
+    );
+  }
+
+  private async unsealAuthorization(
+    seal: string | undefined,
+    metadata: SessionMetadata
+  ): Promise<
+    | { type: 'ok'; authorization: RuntimeAuthorization | undefined }
+    | { type: 'failure'; failure: ControlPlaneSessionCreateFailure }
+  > {
+    if (seal === undefined) return { type: 'ok', authorization: undefined };
+    if (this.runtimeAuthorization !== undefined) {
+      return {
+        type: 'failure',
+        failure: createFailure('BAD_REQUEST', 'Runtime authorization already installed'),
+      };
+    }
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) {
+      return { type: 'failure', failure: createFailure('INTERNAL', 'Authentication unavailable') };
+    }
+    let authorization: RuntimeAuthorization;
+    try {
+      authorization = await unsealRuntimeAuthorization(seal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return {
+        type: 'failure',
+        failure: createFailure('BAD_REQUEST', 'Invalid runtime authorization'),
+      };
+    }
+    if (authorization.state !== 'active') {
+      return {
+        type: 'failure',
+        failure: createFailure('BAD_REQUEST', 'Runtime authorization revoked'),
+      };
+    }
+    return { type: 'ok', authorization };
+  }
+
+  async send(intent: ControlPlanePromptPayload): Promise<ControlPlaneSendResult> {
+    await this.initialized;
+    if (this.registration === null) return { type: 'session-not-found' };
+    const parsed = controlPlanePromptPayloadSchema.parse(intent);
+    return this.enqueue(async () => {
+      // A delete queued ahead of this task made the session not-found; do not
+      // persist a queued row against wiped storage.
+      if (this.registration === null) return { type: 'session-not-found' };
+      const admitted = await this.admitMessage(await this.withSessionCallbackContext(parsed));
+      return admitted === 'queue-full' ? { type: 'queue-full' } : { type: 'ok' };
+    });
+  }
+
+  /**
+   * Gives an interactive chat the server-signed values it needs to route a
+   * child callback back to itself. The token is derived from the session's
+   * immutable identity, so a retry and a replay produce the same context.
+   */
+  private async withSessionCallbackContext(
+    intent: ControlPlanePromptPayload
+  ): Promise<ControlPlanePromptPayload> {
+    if (intent.turn.type !== 'prompt') return intent;
+    const context = sessionCallbackContext(this.metadata);
+    return context === undefined ? intent : { ...intent, context };
+  }
+
+  /**
+   * The one admission path: confirm an old preparing owner before fresh work,
+   * append it `queued`, then deliver or prepare. `send` and the settled-answer
+   * fallback share it so an answer continues exactly like a sent message. It
+   * reports `queueMessage`'s refusal of a new message over the queued bound; the
+   * reducer owns the count and `admitMessage` does not re-derive it.
+   */
+  private async admitMessage(parsed: ControlPlanePromptPayload): Promise<'ok' | 'queue-full'> {
+    const now = Date.now();
+    let reduction = queueMessage(this.messages, parsed, now);
+    if (reduction.rejected === 'queue-full') return 'queue-full';
+    const pass = this.transportPass();
+    if (
+      reduction.changed.length > 0 &&
+      this.route.state === 'preparing' &&
+      this.messages.some(message => message.state === 'queued')
+    ) {
+      const view = await this.readSandboxView(pass);
+      if (view?.state === 'failed' && view.attemptId === this.currentAttemptId()) {
+        await this.applyView(view, pass);
+      }
+      // Reconciliation can cancel queued work; rebuild against the current set.
+      reduction = queueMessage(this.messages, parsed, now);
+      if (reduction.rejected === 'queue-full') return 'queue-full';
+    }
+    if (reduction.changed.length > 0) {
+      this.messages = reduction.messages;
+      await this.persistMessages(reduction.changed);
+      for (const message of reduction.changed) this.emitQueued(message);
+      this.ensureReportAnchor(reduction.changed[0]);
+      if (this.messages.length === 1 && this.metadata !== null) {
+        this.ctx.waitUntil(generateSessionTitle(this.env, this.metadata, parsed.turn));
+      }
+    }
+    await this.armAlarm();
+    if (!this.messages.some(message => message.state === 'queued')) return 'ok';
+    if (this.route.state === 'ready') {
+      await this.persistQueuedContainer(this.route.container);
+      await this.deliverQueued(pass);
+    } else {
+      const view = await this.prepareSandbox(pass);
+      if (view !== null) await this.applyView(view, pass);
+    }
+    await this.armAlarm();
+    return 'ok';
+  }
+
+  async stop(): Promise<{ interrupted: boolean }> {
+    await this.initialized;
+    if (this.registration === null) return { interrupted: false };
+    return this.enqueue(async () => {
+      const open = openMessages(this.messages).map(m => m.messageId);
+      // A user cancel: mark the interruption so the next idle schedules a
+      // capture that shows the cancelled worktree state.
+      this.worktreeChanges.markInterrupted();
+      const peer = this.sandboxPeer();
+      const pass = this.transportPass();
+      const status = await this.readSandboxStatus(peer, pass);
+      if (status !== null && status.workspaceStopEpoch > this.workspaceStop.epoch) {
+        const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
+        const authoritativeRetired =
+          localAttempt !== undefined &&
+          (status.view.state === 'unknown' || status.view.attemptId !== localAttempt);
+        await this.settleWorkspaceStop(
+          status.workspaceStopEpoch,
+          status.workspaceStopAt,
+          authoritativeRetired ? localAttempt : undefined
+        );
+        const newerWork =
+          this.route.state === 'preparing' ||
+          status.workspacePreparing ||
+          openMessages(this.messages).some(message => message.createdAt > status.workspaceStopAt);
+        if (!newerWork) return { interrupted: open.length > 0 };
+      }
+      const workspacePreparing =
+        this.route.state === 'preparing' || status?.workspacePreparing === true;
+      if (workspacePreparing) {
+        const requestedAt = Math.max(Date.now(), this.workspaceStop.at + 1);
+        const current = openMessages(this.messages).map(message => message.messageId);
+        let result: ControlPlaneCancelWorkspaceResult;
+        try {
+          if (peer === null) throw new Error('Sandbox unavailable');
+          result = await withDORetry(
+            () => this.sandboxPeer() ?? peer,
+            current => current.cancelWorkspace({ sessionId: this.sessionId, requestedAt }),
+            'session.cancel_workspace',
+            this.sandboxRpcConfig(this.transportPass())
+          );
+        } catch {
+          throw new Error('Could not stop workspace preparation. Try Stop again.');
+        }
+        await this.settleWorkspaceStop(
+          result.stopEpoch,
+          result.stopAt,
+          this.route.state === 'unknown' ? undefined : this.route.attemptId
+        );
+        return { interrupted: open.length > 0 || current.length > 0 };
+      }
+      await this.settleMessages(open, 'cancelled', 'interrupted');
+      if (peer !== null) {
+        try {
+          await withDORetry(
+            () => this.sandboxPeer() ?? peer,
+            current => current.abort({ sessionId: this.sessionId }),
+            'session.abort',
+            this.sandboxRpcConfig(this.transportPass())
+          );
+        } catch {
+          // Abort is best effort (spec §5).
+        }
+      }
+      return { interrupted: open.length > 0 };
+    });
+  }
+
+  private async readSandboxStatus(
+    peer: ControlPlaneSandboxPeer | null,
+    pass: TransportPass
+  ): Promise<ControlPlaneStatusResult | null> {
+    if (peer === null) return null;
+    try {
+      return await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.status({ sessionId: this.sessionId }),
+        'session.status',
+        this.sandboxRpcConfig(pass)
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cancel work created before the Stop; work created after it is new intent.
+   * Duplicate or older notification epochs are ignored.
+   */
+  private async settleWorkspaceStop(
+    stopEpoch: number,
+    stopAt: number,
+    retiredAttemptId?: string
+  ): Promise<boolean> {
+    if (stopEpoch <= this.workspaceStop.epoch) return false;
+    const newerIntent = openMessages(this.messages).some(message => message.createdAt > stopAt);
+    this.workspaceStop = {
+      epoch: stopEpoch,
+      at: Math.max(this.workspaceStop.at, stopAt),
+      attempts: this.workspaceStop.attempts,
+    };
+    await this.ctx.storage.put(WORKSPACE_STOP_STATE_KEY, this.workspaceStop);
+    const cancel = openMessages(this.messages)
+      .filter(message => message.createdAt <= stopAt)
+      .map(message => message.messageId);
+    if (cancel.length > 0) await this.settleMessages(cancel, 'cancelled', 'interrupted');
+    if (newerIntent) {
+      await this.armAlarm();
+      return true;
+    }
+    await this.settleCancelledRoute(retiredAttemptId);
+    return true;
+  }
+
+  private async rememberStoppedAttempt(attemptId: string): Promise<void> {
+    if (this.workspaceStop.attempts.includes(attemptId)) return;
+    this.workspaceStop = {
+      ...this.workspaceStop,
+      attempts: [...this.workspaceStop.attempts, attemptId].slice(-WORKSPACE_STOPPED_ATTEMPTS_MAX),
+    };
+    await this.ctx.storage.put(WORKSPACE_STOP_STATE_KEY, this.workspaceStop);
+  }
+
+  private async settleCancelledRoute(retiredAttemptId?: string): Promise<void> {
+    if (retiredAttemptId !== undefined) await this.rememberStoppedAttempt(retiredAttemptId);
+    if (this.route.state === 'preparing') {
+      this.finalizeAttempt(this.route.attemptId, {
+        status: 'failed',
+        safeError: 'preparation_cancelled',
+      });
+    }
+    this.finishWorktreePreparation();
+    this.route = { state: 'unknown' };
+    await this.ctx.storage.put(ROUTE_KEY, this.route);
+    await this.clearPendingInteractions();
+    await this.clearTransportRecovery();
+    this.emitCloudStatus({ type: 'error', message: 'preparation_cancelled' });
+    await this.armAlarm();
+  }
+
+  async onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    const parsed = controlPlaneWorkspaceStoppedPayloadSchema.parse(payload);
+    await this.enqueue(async () => {
+      if (this.registration === null) return;
+      await this.settleWorkspaceStop(parsed.stopEpoch, parsed.requestedAt, parsed.attemptId);
+    });
+  }
+
+  async cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
+    await this.initialized;
+    if (this.registration === null) return { dropped: false };
+    return this.enqueue(async () => {
+      const message = this.messages.find(item => item.messageId === messageId);
+      if (message === undefined || message.state !== 'queued') return { dropped: false };
+      await this.settleMessages([messageId], 'cancelled', 'interrupted');
+      return { dropped: true };
+    });
+  }
+
+  async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult> {
+    await this.initialized;
+    if (this.registration === null) return 'not_connected';
+    const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
+    return this.enqueue(async () => {
+      const target = pendingInteractionTarget(parsed.reply);
+      if (!this.hasPendingInteraction(target.collection, target.id)) return 'not_connected';
+      // A live turn takes the answer directly (spec §5). The route is named by
+      // this DO, never by the caller, so a wrong id cannot reach a sibling.
+      if (this.messages.some(message => message.state === 'accepted')) {
+        const peer = this.sandboxPeer();
+        if (peer === null) return 'not_connected';
+        let result: ControlPlaneDispatchResult;
+        try {
+          result = await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
+        } catch {
+          return 'not_connected';
+        }
+        if (result === 'sent') await this.resolvePendingInteraction(parsed.reply);
+        return result;
+      }
+      // The asking turn already settled: the answer becomes a new message that
+      // continues the chat (spec §5), admitted through the send path. Only a
+      // question/permission this session still waits on may do so, so a retry,
+      // an unknown id or an already-answered one cannot admit another turn.
+      const intent = answerMessageIntent(
+        this.messages,
+        parsed.reply,
+        createMessageId(),
+        this.metadata?.agent?.model
+      );
+      if (intent === null) return 'not_connected';
+      const admitted = await this.admitMessage(intent);
+      if (admitted === 'queue-full') return 'not_connected';
+      await this.resolvePendingInteraction(parsed.reply);
+      return 'sent';
+    });
+  }
+
+  /**
+   * Worker-facing live native read (spec §10). The route identity comes from
+   * this DO's own registration, never from the caller, so a request cannot name
+   * a sibling session or a stale runtime. A route that is not ready returns
+   * `runtime_offline`, which callers can tell apart from the Sandbox DO's
+   * transient `not_ready` wrapper failures, without preparing or waking the
+   * sandbox. The Sandbox DO binds the request to the current wrapper socket as
+   * the generation fence.
+   */
+  async kiloRequest(operation: ControlPlaneNativeOperation): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneNativeOperationSchema.parse(operation);
+    if (this.registration === null) {
+      return {
+        ok: false,
+        error: { code: 'not_found', message: 'Session not found', retryable: false },
+      };
+    }
+    if (this.route.state !== 'ready') {
+      return {
+        ok: false,
+        error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
+      };
+    }
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      return {
+        ok: false,
+        error: { code: 'runtime_offline', message: 'Sandbox is not available', retryable: true },
+      };
+    }
+    const upstreamBranch = this.metadata?.repository?.upstreamBranch;
+    return peer.kiloRequest({
+      session: {
+        sessionId: this.sessionId,
+        kiloSessionId: this.registration.spec.kiloSessionId,
+        directory: this.registration.spec.directory,
+      },
+      operation:
+        parsed.name === 'session.diff'
+          ? {
+              name: 'session.diff',
+              ...(upstreamBranch === undefined || upstreamBranch.startsWith('refs/')
+                ? {}
+                : { baseRef: `refs/remotes/origin/${upstreamBranch}` }),
+            }
+          : parsed,
+    });
+  }
+
+  /**
+   * Native attach snapshot for the per-user Kilo facade (spec §10). Returns the
+   * durable event log from the client's cursor, then the materialized
+   * message/part rows, so the result is complete through `fence`. It never
+   * wakes compute: it reads only this DO's storage. A transcript that cannot
+   * fit one page continues from an exclusive row cursor in the current phase.
+   */
+  async nativeSnapshot(input: {
+    fromId?: number;
+    kiloSessionId: string;
+    continuation?: NativeSnapshotCursor;
+  }): Promise<NativeSnapshot> {
+    await this.initialized;
+    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
+      return { oversized: false, fence: null, events: [], stopped: true };
+    this.partText.flush();
+    const kiloSessionId = this.registration.spec.kiloSessionId;
+    const fence =
+      input.continuation === undefined
+        ? this.eventQueries.getLatestEventId()
+        : input.continuation.fence;
+    const events: StreamEvent[] = [];
+    const encoder = new TextEncoder();
+    const details = {
+      sessionStatus: this.deriveSessionStatus(),
+      questions: this.pendingInteractions?.questions ?? [],
+      permissions: this.pendingInteractions?.permissions ?? [],
+    };
+    const snapshot = { oversized: false, fence, events, ...details };
+    const detailsBytes = encoder.encode(JSON.stringify(snapshot)).byteLength;
+    const envelopeBytes = Math.max(
+      detailsBytes,
+      encoder.encode(
+        JSON.stringify({
+          oversized: false,
+          fence,
+          events,
+          continuation: { fence, phase: 'removals', fromId: Number.MAX_SAFE_INTEGER },
+        })
+      ).byteLength
+    );
+    let eventsBytes = 0;
+    const push = (event: StreamEvent): boolean => {
+      const native = toNativePublicEvent(event, kiloSessionId);
+      if (
+        native !== null &&
+        encoder.encode(JSON.stringify(native)).byteLength > NATIVE_DELIVERY_LIMITS.eventBytes
+      )
+        return false;
+      const eventBytes =
+        encoder.encode(JSON.stringify(event)).byteLength + (events.length > 0 ? 1 : 0);
+      const size = envelopeBytes + eventsBytes + eventBytes;
+      if (
+        size > CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES &&
+        (events.length > 0 || size > NATIVE_DELIVERY_LIMITS.batchBytes)
+      )
+        return false;
+      events.push(event);
+      eventsBytes += eventBytes;
+      return true;
+    };
+    const phases = ['log', 'updates', 'removals'] as const;
+    const startPhase = input.continuation?.phase ?? 'log';
+    for (const phase of phases.slice(phases.indexOf(startPhase))) {
+      let fromId = phase === startPhase ? (input.continuation?.fromId ?? input.fromId ?? 0) : 0;
+      for (const event of this.eventQueries.iterateByFilters({
+        fromId,
+        toId: fence ?? 0,
+        ...(phase === 'log' ? {} : { materialized: phase }),
+      })) {
+        const formatted = formatStreamEvent(event, this.sessionId);
+        if (!push(formatted)) {
+          if (events.length === 0) return { oversized: true, fence, events: [] };
+          return { oversized: false, fence, events, continuation: { fence, phase, fromId } };
+        }
+        fromId = event.id;
+      }
+    }
+    return detailsBytes + eventsBytes > NATIVE_DELIVERY_LIMITS.batchBytes
+      ? { oversized: true, fence, events: [] }
+      : snapshot;
+  }
+
+  /** The pending questions and permissions this session waits on (C1 adapter). */
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    await this.initialized;
+    return this.readPendingInteractions() ?? { questions: [], permissions: [] };
+  }
+
+  /**
+   * Drops every pending question and permission. A new runtime generation can
+   * no longer satisfy an old request, and the stream snapshot is rebuilt from
+   * this state, so keeping it would offer the client an unanswerable prompt.
+   */
+  private async clearPendingInteractions(): Promise<void> {
+    const current = this.pendingInteractions;
+    if (current === undefined) return;
+    if (current.questions.length === 0 && current.permissions.length === 0) return;
+    const next: PendingInteractions = {
+      revision: current.revision + 1,
+      questions: [] as unknown[],
+      permissions: [] as unknown[],
+    };
+    this.pendingInteractions = next;
+    await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+  }
+
+  private hasPendingInteraction(collection: PendingInteractionCollection, id: string): boolean {
+    const items = this.pendingInteractions?.[collection];
+    if (items === undefined) return false;
+    return items.some(
+      item => typeof item === 'object' && item !== null && (item as { id?: unknown }).id === id
+    );
+  }
+
+  private async resolvePendingInteraction(reply: ControlPlaneAnswerReply): Promise<void> {
+    const next = applyPendingInteractionEvent(
+      this.pendingInteractions,
+      pendingInteractionResolvedEvent(reply)
+    );
+    if (next !== undefined && next !== this.pendingInteractions) {
+      this.pendingInteractions = next;
+      await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+    }
+  }
+
+  async onRoute(update: ControlPlaneRouteUpdate): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    const parsed = controlPlaneRouteUpdateSchema.parse(update);
+    await this.enqueue(async () => {
+      // A delete queued ahead of this notification wiped the session.
+      if (this.registration === null) return;
+      // Retired attempts must not revive a route that is now `unknown`.
+      if (parsed.state !== 'unknown' && this.workspaceStop.attempts.includes(parsed.attemptId)) {
+        return;
+      }
+      if (parsed.state !== 'unknown' && this.route.state === 'unknown') {
+        const pass = this.transportPass();
+        const authoritative = await this.readSandboxView(pass);
+        if (authoritative === null) {
+          await this.armAlarm();
+          return;
+        }
+        if (authoritative.state !== 'unknown') {
+          await this.applyView(authoritative, pass);
+        } else if (this.messages.some(message => message.state === 'queued')) {
+          await this.recoverQueued(pass);
+        }
+        await this.armAlarm();
+        return;
+      }
+      if (parsed.state === 'lost' && parsed.attemptId === this.currentAttemptId()) {
+        await this.captureQueuedRouteContainer(parsed);
+      }
+      if (
+        this.messages.some(message => message.state === 'queued') &&
+        (this.route.state === 'failed' ||
+          this.transportRecoveryAt !== null ||
+          (this.route.state === 'preparing' &&
+            parsed.state !== 'unknown' &&
+            (parsed.attemptId !== this.route.attemptId || parsed.state !== 'preparing')))
+      ) {
+        const pass = this.transportPass();
+        pass.scheduleRecovery = this.transportRecoveryAt !== null;
+        await this.recoverQueued(pass, parsed);
+        await this.armAlarm();
+        return;
+      }
+      const pass = this.transportPass();
+      if (parsed.state === 'unknown') {
+        await this.applyView(parsed, pass);
+        return;
+      }
+      // A notification names its route attempt. Ignore one for an older or
+      // different attempt so a late `failed`/`ready` cannot act on a newer one.
+      const current = this.currentAttemptId();
+      if (current !== null && parsed.attemptId !== current) return;
+      if (parsed.state === 'lost') {
+        await this.settleMessages(
+          this.messages.filter(m => m.state === 'accepted').map(m => m.messageId),
+          'failed',
+          parsed.reason,
+          undefined,
+          'coordinator',
+          parsed.billingFailure
+        );
+        await this.applyView({ state: 'unknown' });
+        await this.armAlarm();
+        if (this.messages.some(message => message.state === 'queued')) {
+          const view = await this.prepareSandbox(pass);
+          if (view !== null) await this.applyView(view, pass);
+        }
+        await this.armAlarm();
+        return;
+      }
+      await this.applyView(parsed, pass);
+      await this.armAlarm();
+    });
+  }
+
+  async onEvents(notification: ControlPlaneEventsNotification): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    const parsed = controlPlaneEventsNotificationSchema.parse(notification);
+    await this.enqueue(async () => {
+      // A delete queued ahead of this notification wiped the session.
+      if (this.registration === null) return;
+      const delivery = parsed.delivery;
+      const receiptKey =
+        delivery === undefined
+          ? undefined
+          : `${EVENT_RECEIPT_PREFIX}${String(delivery.expiresAt).padStart(16, '0')}/${delivery.id}`;
+      const retainedFrom = Date.now() - EVENT_RECEIPT_RETENTION_MS;
+      for (const [key] of this.ctx.storage.kv.list({
+        prefix: EVENT_RECEIPT_PREFIX,
+        end: `${EVENT_RECEIPT_PREFIX}${String(retainedFrom).padStart(16, '0')}/`,
+        limit: 100,
+      }))
+        this.ctx.storage.kv.delete(key);
+      if (delivery !== undefined && delivery.expiresAt <= retainedFrom) {
+        logger
+          .withFields({ sessionId: this.sessionId, eventCount: parsed.events.length })
+          .warn('Dropped native event delivery past receipt retention');
+        return;
+      }
+      const nextEvent =
+        receiptKey === undefined
+          ? 0
+          : z
+              .number()
+              .int()
+              .nonnegative()
+              .parse(this.ctx.storage.kv.get(receiptKey) ?? 0);
+      for (const [index, event] of parsed.events.entries()) {
+        if (index < nextEvent) continue;
+        if (event.type === 'commands.available') {
+          await this.cacheAvailableCommands(event.properties);
+          continue;
+        }
+        if (event.type === CONTROL_PLANE_WRAPPER_FINALIZING_EVENT) {
+          // Spec §10 "Finalization running".
+          this.emitCloudStatus({ type: 'finalizing' });
+        }
+        if (SETUP_EVENT_TYPES.has(event.type)) {
+          const setupEvent = controlPlaneSetupEventSchema.safeParse(event);
+          if (setupEvent.success) this.recordSetupEvent(setupEvent.data);
+          continue;
+        }
+        const next = applyPendingInteractionEvent(this.pendingInteractions, event);
+        if (next !== undefined && next !== this.pendingInteractions) {
+          this.pendingInteractions = next;
+          await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+        }
+        await this.recordRootStatus(event);
+        // A retried batch can be partially applied; commit its receipt with the row mutation.
+        const stored = this.partText.transaction(() =>
+          this.ctx.storage.transactionSync(() => {
+            const persisted = persistSessionEvent({
+              sessionId: this.sessionId,
+              event,
+              queries: this.eventQueries,
+              partText: this.partText,
+            });
+            if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
+            return persisted;
+          })
+        );
+        if (stored !== null) this.broadcast(stored);
+        if (event.type === 'session.created' && this.registration !== null) {
+          const info = z
+            .object({ id: z.string(), parentID: z.string() })
+            .safeParse(event.properties.info);
+          if (
+            info.success &&
+            readStoredHistoryLineage(this.db, this.registration.spec.kiloSessionId, info.data.id)
+          )
+            markHistoryHydrated(this.ctx.storage, info.data.id);
+        }
+        this.worktreeChanges.onEvent(event.type, event.properties);
+      }
+    });
+  }
+
+  async onOutcome(outcome: ControlPlaneOutcome): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    const parsed = controlPlaneOutcomeSchema.parse(outcome);
+    await this.enqueue(async () => {
+      // A delete queued ahead of this outcome wiped the session.
+      if (this.registration === null) return;
+      const reduction = settleAcceptedUpTo(
+        this.messages,
+        parsed.lastMessageId,
+        parsed.status,
+        parsed.reason,
+        Date.now()
+      );
+      await this.applySettlement(
+        reduction,
+        {
+          ...(parsed.assistantReason === undefined
+            ? {}
+            : { assistantReason: parsed.assistantReason }),
+          ...(parsed.providerOwnership === undefined
+            ? {}
+            : { providerOwnership: parsed.providerOwnership }),
+          ...(parsed.gateResult === undefined ? {} : { gateResult: parsed.gateResult }),
+        },
+        'wrapper_outcome'
+      );
+      // The turn ended: the route is ready for the next one (spec §10).
+      if (reduction.changed.length > 0) this.emitCloudStatus({ type: 'ready' });
+      // An outcome is a terminal event: capture on it. Interruption is set only
+      // by an explicit user cancel (`stop`).
+      this.worktreeChanges.onOutcome({ ...parsed });
+    });
+  }
+
+  async onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<boolean> {
+    await this.initialized;
+    const parsed = worktreeChangesReadySchema.parse(notification);
+    return this.enqueue(async () => {
+      if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return false;
+      this.worktreeChanges.ready(parsed.revision);
+      return true;
+    });
+  }
+
+  async onWorkspaceArtifactsChanged(notification: WorkspaceArtifactsChanged): Promise<void> {
+    await this.initialized;
+    const parsed = workspaceArtifactsChangedSchema.parse(notification);
+    return this.enqueue(async () => {
+      const payload = JSON.stringify({ revision: parsed.revision });
+      const timestamp = Date.now();
+      const id = this.eventQueries.insertUnique({
+        executionId: '',
+        sessionId: this.sessionId,
+        streamEventType: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+        entityId: `workspace-artifacts/${parsed.revision}`,
+      });
+      if (id === null) return;
+      this.broadcast({
+        id,
+        execution_id: '',
+        session_id: this.sessionId,
+        stream_event_type: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+      });
+    });
+  }
+
+  async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
+    await this.initialized;
+    return this.worktreeChanges.get();
+  }
+
+  async getWorktreeFile(input: unknown): Promise<GetWorktreeFileOutput> {
+    await this.initialized;
+    return this.worktreeChanges.getFile(input);
+  }
+
+  async getWorktreeChangeStates(): Promise<WorktreeChangeStates> {
+    await this.initialized;
+    return this.worktreeChanges.changeStates();
+  }
+
+  async refreshWorktreeChanges(): Promise<RefreshWorktreeChangesOutput> {
+    await this.initialized;
+    return this.worktreeChanges.refresh();
+  }
+
+  async alarm(): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    await this.enqueue(async () => {
+      // The alarm can wake an evicted instance; storage is authoritative.
+      this.messages = await this.loadMessages();
+      // Retry any report/callback obligation a previous attempt could not send.
+      await this.repairOutboxes();
+      const now = Date.now();
+      let due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      let reconciled = false;
+      if (due.length > 0) {
+        // Reconcile a dropped workspace_stopped before applying backstop failure.
+        const epochBefore = this.workspaceStop.epoch;
+        await this.readSandboxView(this.transportPass(false));
+        reconciled = this.workspaceStop.epoch > epochBefore;
+        due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      }
+      if (due.length > 0) {
+        if (due.some(entry => entry.message.state === 'queued')) {
+          await this.captureQueuedRouteContainer(this.route);
+        }
+        const byReason = new Map<string, string[]>();
+        for (const entry of due) {
+          const ids = byReason.get(entry.reason) ?? [];
+          ids.push(entry.message.messageId);
+          byReason.set(entry.reason, ids);
+        }
+        for (const [reason, ids] of byReason) {
+          await this.settleMessages(ids, 'failed', reason);
+        }
+      }
+      if (this.transportRecoveryAt !== null && this.transportRecoveryAt <= now) {
+        await this.clearTransportRecovery();
+        await this.recoverQueued(this.transportPass(false));
+      } else if (reconciled && this.messages.some(message => message.state === 'queued')) {
+        await this.recoverQueued(this.transportPass(false));
+      }
+      await this.armAlarm();
+    });
+  }
+
+  /**
+   * The one place that sets the alarm. It wakes for the earliest backstop
+   * deadline, transport recovery, the next report or callback obligation.
+   * Outbox due times retry failed reporting even once no message is open.
+   */
+  private async armAlarm(): Promise<void> {
+    let statusDueAt: number | null = null;
+    try {
+      if (
+        this.metadata !== null &&
+        this.registration !== null &&
+        this.env.SESSION_INGEST !== undefined
+      ) {
+        const nativeStatus = this.deriveSessionStatus()?.type;
+        const status = deriveSessionListStatus({
+          messages: this.messages,
+          nativeStatus,
+          pendingInteractions: this.pendingInteractions,
+          routeState: this.route.state,
+        });
+        // Registration alone is not a transition. Native work may start without
+        // a Cloud message, so do not gate those updates on message admission.
+        if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          this.listStatusOutbox.record(
+            {
+              sessionId: this.registration.spec.kiloSessionId,
+              kiloUserId: this.metadata.identity.userId,
+              cloudAgentSessionId: this.sessionId,
+            },
+            status
+          );
+        }
+        statusDueAt = this.listStatusOutbox.nextDueAt();
+      }
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Session list status projection failed; execution alarms are unaffected');
+    }
+    if (!this.messages.some(message => message.state === 'queued')) {
+      await this.clearTransportRecovery();
+    }
+    const harnessDueAt = this.runtimeHarnessRecorder.nextDueAt();
+    const candidates = [
+      this.transportRecoveryAt,
+      nextBackstopAt(this.messages, this.sessionTimers()),
+      this.reportOutbox.nextDueAt() ?? null,
+      this.messageCallbacks.nextCallbackDueAt() ?? null,
+      statusDueAt,
+      harnessDueAt,
+    ].filter((value): value is number => value !== null);
+    if (candidates.length === 0) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+    await this.ctx.storage.setAlarm(Math.min(...candidates));
+    if (
+      (statusDueAt !== null && statusDueAt <= Date.now()) ||
+      (harnessDueAt !== null && harnessDueAt <= Date.now())
+    ) {
+      // Metadata publication never holds up preparation, answers, or outcomes.
+      this.ctx.waitUntil(
+        Promise.all([this.listStatusOutbox.repair(), this.runtimeHarnessRecorder.repair()])
+          .then(() =>
+            this.enqueue(async () => {
+              // The serialized finalizer re-arms the alarm after publication.
+            })
+          )
+          .catch(() => {
+            logger
+              .withFields({ sessionId: this.sessionId })
+              .warn('Session list metadata repair failed');
+          })
+      );
+    }
+  }
+
+  async getSession(): Promise<ControlPlaneSessionSnapshot> {
+    await this.initialized;
+    if (this.registration === null) return { type: 'session-not-found' };
+    return {
+      ...this.readSessionSummary(),
+      messages: this.messages.map(message => ({
+        messageId: message.messageId,
+        state: message.state,
+        createdAt: message.createdAt,
+        acceptedAt: message.acceptedAt,
+        settledAt: message.settledAt,
+        reason: message.reason,
+      })),
+    };
+  }
+
+  /** Management reads need queue identity, not the entire admitted-message history. */
+  async getSessionMetadataSummary(): Promise<ControlPlaneSessionMetadataSummary> {
+    await this.initialized;
+    const message =
+      this.messages.find(message => message.state === 'accepted') ??
+      this.messages.find(message => message.state === 'queued');
+    return {
+      metadata: this.metadata,
+      snapshot:
+        this.registration === null ? { type: 'session-not-found' } : this.readSessionSummary(),
+      currentMessage:
+        message && (message.state === 'accepted' || message.state === 'queued')
+          ? { messageId: message.messageId, state: message.state }
+          : null,
+    };
+  }
+
+  private readSessionSummary(): FoundSessionSummary {
+    const registration = this.registration;
+    if (!registration) throw new Error('Session not registered');
+    this.partText.flush();
+    const native = this.eventQueries.findByEntityId(`session/${registration.spec.kiloSessionId}`);
+    const info = z
+      .object({ title: z.string().optional() })
+      .safeParse(
+        native === null ? undefined : readNativeEventPayload(native.payload)?.properties.info
+      );
+    return {
+      type: 'found',
+      sessionId: this.sessionId,
+      route: this.route,
+      latestEventId: this.eventQueries.getLatestEventId(),
+      updateCursor: this.eventQueries.getUpdateCursor(),
+      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+        this.sessionId,
+        registration.spec.kiloSessionId
+      ),
+      ...(info.success && info.data.title !== undefined ? { title: info.data.title } : {}),
+    };
+  }
+
+  async getSessionMessagesPage(
+    input: {
+      cursor?: string;
+      limit?: number;
+      kiloSessionId?: string;
+      expectedRootKiloSessionId?: string;
+      toolDisplay?: ToolDisplayMode;
+    } = {}
+  ): Promise<SessionMessagesPage | null> {
+    await this.initialized;
+    const parsed = sessionHistoryPageInputSchema.parse(input);
+    const registration = this.registration;
+    const rootKiloSessionId = registration?.spec.kiloSessionId;
+    if (
+      rootKiloSessionId === undefined ||
+      registration === null ||
+      (input.expectedRootKiloSessionId !== undefined &&
+        input.expectedRootKiloSessionId !== rootKiloSessionId)
+    )
+      return null;
+    const kiloSessionId = parsed.kiloSessionId ?? rootKiloSessionId;
+    if (parsed.cursor !== undefined) {
+      const cursor = decodeSessionHistoryCursor(parsed.cursor);
+      if (
+        cursor.sessionId !== this.sessionId ||
+        cursor.rootKiloSessionId !== rootKiloSessionId ||
+        cursor.kiloSessionId !== kiloSessionId
+      ) {
+        throw new Error('Session history cursor belongs to another session');
+      }
+    }
+    const isRoot = kiloSessionId === rootKiloSessionId;
+    const lineage = await this.readHistoryLineage(registration, kiloSessionId);
+    if ((!isRoot && lineage == null) || this.registration !== registration) return null;
+    await this.ensureClientHistory(kiloSessionId);
+    if (this.registration !== registration) return null;
+    this.partText.flush();
+    // The first page carries the rows the stream replays on connect, so a
+    // client that cannot reach the socket still shows the preparation attempts
+    // and the run's queued or failed turns. Older pages stay bare: the rows are
+    // current state, not history. Their size is reserved from the page budget so
+    // the response stays inside the page bound.
+    const snapshotRows = parsed.cursor === undefined ? this.readSnapshotRows() : undefined;
+    const page = readSessionMessagesPage({
+      db: this.db,
+      storage: this.ctx.storage,
+      queries: this.eventQueries,
+      sessionId: this.sessionId,
+      rootKiloSessionId,
+      ...parsed,
+      kiloSessionId,
+      metadata: isRoot ? this.metadata : null,
+      parentID: lineage?.parentID,
+      omittedItemCount:
+        readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
+          ?.omittedItemCount ?? 0,
+      reservedBytes: snapshotRows?.bytes,
+    });
+    if (snapshotRows === undefined) return page;
+    return {
+      ...page,
+      preparationAttempts: snapshotRows.preparationAttempts,
+      queuedMessages: snapshotRows.queuedMessages,
+    };
+  }
+
+  /** Returns a descendant's lineage under the registered root; the root has none. */
+  private async readHistoryLineage(
+    registration: ControlPlaneSessionRegistration,
+    kiloSessionId: string
+  ) {
+    const rootKiloSessionId = registration.spec.kiloSessionId;
+    if (kiloSessionId === rootKiloSessionId) return undefined;
+    // `null` is a stored denial; only an unknown lineage needs the owned lookup.
+    const stored = readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId);
+    if (stored !== undefined) return stored;
+    return await withTimeout(
+      readOwnedHistoryLineage({
+        env: this.env,
+        userId: registration.credentials.userId,
+        sessionId: this.sessionId,
+        rootKiloSessionId,
+        kiloSessionId,
+      }),
+      5000,
+      'Session history lineage lookup timed out'
+    );
+  }
+
+  /**
+   * Reads one complete stored tool call for an expanded preview. Uses the same
+   * root and lineage authorization as history pages and never wakes compute.
+   */
+  async getSessionToolPartDetail(input: ToolPartDetailInput): Promise<ToolPartDetail | null> {
+    await this.initialized;
+    const parsed = toolPartDetailInputSchema.parse(input);
+    const registration = this.registration;
+    const rootKiloSessionId = registration?.spec.kiloSessionId;
+    if (
+      registration === null ||
+      rootKiloSessionId === undefined ||
+      (parsed.expectedRootKiloSessionId !== undefined &&
+        parsed.expectedRootKiloSessionId !== rootKiloSessionId)
+    )
+      return null;
+    const kiloSessionId = parsed.kiloSessionId ?? rootKiloSessionId;
+    const lineage = await this.readHistoryLineage(registration, kiloSessionId);
+    if (
+      (kiloSessionId !== rootKiloSessionId && lineage == null) ||
+      this.registration !== registration
+    )
+      return null;
+    await this.ensureClientHistory(kiloSessionId);
+    if (this.registration !== registration) return null;
+    this.partText.flush();
+    return readToolPartDetail({
+      queries: this.eventQueries,
+      sessionId: this.sessionId,
+      kiloSessionId,
+      messageId: parsed.messageId,
+      partId: parsed.partId,
+      ...(parsed.callId === undefined ? {} : { callId: parsed.callId }),
+    });
+  }
+
+  private async ensureClientHistory(
+    kiloSessionId = this.registration?.spec.kiloSessionId
+  ): Promise<void> {
+    const registration = this.registration;
+    const metadata = this.metadata;
+    if (
+      registration === null ||
+      kiloSessionId === undefined ||
+      metadata === null ||
+      readHistoryHydration(
+        this.ctx.storage,
+        kiloSessionId === registration.spec.kiloSessionId ? undefined : kiloSessionId
+      )?.phase === 'complete'
+    )
+      return;
+    // Session-ingest holds only v1 history; native v2 history lives only in this DO.
+    if (
+      this.eventQueries.findByEntityId(`conversation-source/${registration.spec.kiloSessionId}`) !==
+      null
+    )
+      return;
+    let hydration = this.historyHydrations.get(kiloSessionId);
+    if (hydration === undefined) {
+      hydration = (async () => {
+        const internalSecret = await resolveSecret(this.env.INTERNAL_API_SECRET_PROD);
+        if (this.registration !== registration) return;
+        await hydrateSessionHistory({
+          db: this.db,
+          storage: this.ctx.storage,
+          ingest: this.env.SESSION_INGEST,
+          queries: this.eventQueries,
+          partText: this.partText,
+          sessionId: this.sessionId,
+          kiloSessionId,
+          rootKiloSessionId: registration.spec.kiloSessionId,
+          userId: metadata.identity.userId,
+          internalSecret: internalSecret ?? '',
+          isCurrent: () => this.registration === registration,
+          broadcast: event => this.broadcast(event),
+        });
+      })().finally(() => {
+        if (this.historyHydrations.get(kiloSessionId) === hydration)
+          this.historyHydrations.delete(kiloSessionId);
+      });
+      this.historyHydrations.set(kiloSessionId, hydration);
+    }
+    try {
+      // A slow hydration keeps running; the next read joins it rather than restarting it.
+      await withTimeout(
+        hydration,
+        HISTORY_HYDRATION_WAIT_MS,
+        'Session history hydration is still in progress'
+      );
+    } catch (error) {
+      if (this.registration !== null) throw error;
+    }
+  }
+
+  /**
+   * Worker-facing sandbox-status RPC (spec §10, B10 badge). Returns the public
+   * snapshot from the Sandbox DO; without a registered sandbox it reports the
+   * static `unknown`/`status_unavailable` presentation.
+   */
+  async getSandboxStatus(): Promise<SandboxStatusSnapshot> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return unavailableStatusSnapshot();
+    try {
+      return await peer.getStatusSnapshot(statusWorkspaceIdentity(this.registration));
+    } catch {
+      return unavailableStatusSnapshot();
+    }
+  }
+
+  /**
+   * Worker-facing workspace status RPC. Composes the passive sandbox snapshot
+   * with the sandbox's stored billing projection; it never prepares a route,
+   * delivers a message or starts the container.
+   */
+  async getWorkspaceRuntimeStatus(): Promise<WorkspaceRuntimeStatus> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { sandbox: unavailableStatusSnapshot(), billing: null };
+    const [sandbox, billing] = await Promise.all([
+      peer
+        .getStatusSnapshot(statusWorkspaceIdentity(this.registration))
+        .catch(() => unavailableStatusSnapshot()),
+      peer.getWorkspaceBillingProjection().catch(() => null),
+    ]);
+    return { sandbox, billing };
+  }
+
+  /**
+   * Explicit user action ("Start fresh"): remove the workspace snapshot
+   * descriptor so the next start uses the environment snapshot or base image.
+   * The Sandbox DO owns the descriptor and never deletes it on its own.
+   * A session with no registered sandbox has nothing to discard.
+   */
+  async removeWorkspaceSnapshot(): Promise<{ success: true }> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { success: true };
+    return await peer.removeWorkspaceSnapshot({ sessionId: this.sessionId });
+  }
+
+  /**
+   * The capture time a "Start fresh" action would discard, or null when the
+   * workspace has no snapshot descriptor. Mirrors the sandbox's descriptor
+   * read; it never mutates it.
+   */
+  async getWorkspaceSnapshotRecovery(): Promise<{ capturedAt: number | null } | null> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return null;
+    return await peer.getWorkspaceSnapshotRecovery({ sessionId: this.sessionId });
+  }
+
+  /** The preparation attempts the stream replays, for the first transcript page. */
+  async getPreparationAttempts(): Promise<PreparationAttempt[]> {
+    await this.initialized;
+    if (this.registration === null) return [];
+    return listPreparationAttempts(this.eventQueries);
+  }
+
+  async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
+    await this.initialized;
+    if (this.registration === null) return { type: 'session-not-found' };
+    const message = this.messages.find(item => item.messageId === messageId);
+    if (message === undefined) return { type: 'message-not-found' };
+    const result: SafeMessageResultResponse = {
+      messageId: message.messageId,
+      status:
+        message.state === 'queued'
+          ? 'queued'
+          : message.state === 'accepted'
+            ? 'running'
+            : message.state === 'cancelled'
+              ? 'interrupted'
+              : message.state,
+      createdAt: message.createdAt,
+      ...(message.acceptedAt === null ? {} : { acceptedAt: message.acceptedAt }),
+      ...(message.settledAt === null ? {} : { terminalAt: message.settledAt }),
+      cloudAgentSessionId: this.sessionId,
+    };
+    return { type: 'found', result };
+  }
+
+  /**
+   * Stored runtime-authorization status (legacy `getRuntimeAuthorizationStatus`
+   * plus the recovery-state read). One authoritative 4-state read over the
+   * persisted authorization: `legacy`/`active` need no recovery, `expired`
+   * carries the id the Worker needs to mint a replacement, `revoked` is denied.
+   */
+  async getRuntimeAuthorizationStatus(): Promise<{
+    state: 'legacy' | 'active' | 'expired' | 'revoked';
+    id?: string;
+  }> {
+    await this.initialized;
+    return readRuntimeAuthorizationRecoveryState({
+      metadata: this.metadata,
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  /**
+   * C1c expiry recovery (legacy `recoverExpiredRuntimeAuthorization`). Replaces
+   * an expired stored authorization with a freshly minted one. The Sandbox DO
+   * owns physical wrapper retirement, so this releases the current route before
+   * committing; only an idle session with no open work is recovered.
+   */
+  async recoverExpiredRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    runtimeAuthorizationSeal: string;
+    runtimeToken: string;
+  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const metadata = this.metadata;
+      if (metadata === null || metadata.identity.userId !== input.ownerId) {
+        return { status: 'denied' as const };
+      }
+      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      if (!secret) return { status: 'denied' as const };
+      let fresh: RuntimeAuthorization;
+      try {
+        fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+          resourceKind: 'cloud-agent-next',
+          resourceId: metadata.identity.sessionId,
+          userId: metadata.identity.userId,
+          organizationId: metadata.identity.orgId,
+        });
+      } catch {
+        return { status: 'denied' as const };
+      }
+      if (fresh.state !== 'active') return { status: 'denied' as const };
+
+      const state = await this.getRuntimeAuthorizationStatus();
+      if (state.state === 'legacy' || state.state === 'active') {
+        return { status: 'not-needed' as const };
+      }
+      if (state.state !== 'expired' || state.id !== input.expectedOldId) {
+        return { status: 'denied' as const };
+      }
+      if (openMessages(this.messages).length > 0) return { status: 'busy' as const };
+
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        try {
+          // Revoking the route retires the wrapper still holding the expired
+          // credential; the next send prepares a fresh route.
+          await peer.release({ sessionId: this.sessionId });
+        } catch {
+          return { status: 'retry' as const };
+        }
+      }
+
+      const current = RuntimeAuthorizationSchema.safeParse(
+        await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+      );
+      const latest = this.metadata;
+      if (
+        !current.success ||
+        current.data.id !== input.expectedOldId ||
+        current.data.state !== 'active' ||
+        Date.parse(current.data.delegationExpiresAt) > Date.now() ||
+        latest === null ||
+        latest.identity.sessionId !== metadata.identity.sessionId
+      ) {
+        return { status: 'retry' as const };
+      }
+      await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, fresh);
+      const updated: SessionMetadata = {
+        ...latest,
+        auth: { ...latest.auth, kilocodeToken: input.runtimeToken },
+      };
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(updated));
+      this.metadata = updated;
+      return { status: 'recovered' as const };
+    });
+  }
+
+  /**
+   * C1c: closes the browser sockets of this session — the event stream and the
+   * browser side of each bridged terminal — releases its route at the Sandbox DO,
+   * and returns how many sockets it closed. Reads the organization from the same
+   * persisted session metadata and only acts on a match. The release retires the
+   * route and its organization-attributed grant, removes the wrapper path and
+   * ends the running turn, so organization-scoped execution stops instead of
+   * continuing on a grant that outlives the membership.
+   */
+  async closeOrgStreams(organizationId: string): Promise<number> {
+    await this.initialized;
+    const orgId = this.metadata?.identity.orgId;
+    if (!orgId || orgId !== organizationId) return 0;
+    let closed = 0;
+    for (const socket of this.ctx.getWebSockets('stream')) {
+      socket.close(1000, 'session access revoked');
+      closed++;
+    }
+    closed += this.terminals.closeBrowserSockets(1000, 'session access revoked');
+    const peer = this.sandboxPeer();
+    if (peer !== null) {
+      // No route (an unregistered or already released sandbox) makes this a
+      // no-op. A failed release stays visible to the caller, which reports the
+      // failed revocation close instead of assuming the route is gone.
+      await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.release({ sessionId: this.sessionId }),
+        'closeOrgStreams.release'
+      );
+    }
+    return closed;
+  }
+
+  /**
+   * C1c: updates a prepared session's callback target (legacy `tryUpdate`,
+   * retained for `services/code-review-infra`). Stores the same grouped
+   * persisted session metadata.
+   */
+  async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const metadata = this.metadata;
+      if (metadata === null) {
+        return { success: false, error: 'Session metadata is not available' };
+      }
+      const updated: SessionMetadata = { ...metadata };
+      if (updates.callbackTarget === null) {
+        delete updated.callback;
+      } else if (updates.callbackTarget !== undefined) {
+        updated.callback = { target: updates.callbackTarget };
+      }
+      let serialized: SessionMetadata;
+      try {
+        serialized = serializeSessionMetadata(updated);
+      } catch (error) {
+        return {
+          success: false,
+          error: `Invalid metadata after update: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        };
+      }
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serialized);
+      this.metadata = serialized;
+      return { success: true };
+    });
+  }
+
+  /**
+   * Delete the session (legacy `deleteSession`): remove its sandbox route (spec
+   * §6 `release (session deleted)`), then tear the session down. Idempotent: a
+   * second call finds no registration and does nothing. `release` is retried and
+   * a persistent failure aborts before the wipe, so deletion stays retryable.
+   */
+  async deleteSession(): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    await this.enqueue(async () => {
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        const standalone =
+          this.metadata !== null && this.metadata.workspace?.worktreeId === undefined;
+        await withDORetry(
+          () => peer,
+          current =>
+            current.release(
+              standalone
+                ? { sessionId: this.sessionId, reason: 'standalone_session_deleted' }
+                : { sessionId: this.sessionId }
+            ),
+          'release'
+        );
+      }
+      await this.tearDownSession();
+    });
+  }
+
+  /**
+   * Worktree deletion, phase 1 (legacy `beginWorktreeDeletion`): validate the
+   * request against stored metadata, close this session's sockets, and return
+   * the runtime location plus the child Kilo sessions the Worker collects into
+   * the deletion manifest. Sandbox resource cleanup is owned by the Sandbox DO
+   * (`deleteWorktreeResources`); this session-side method holds no per-worktree
+   * deletion state of its own.
+   */
+  async beginWorktreeDeletion(input: {
+    worktreeId: string;
+    kiloSessionId: string;
+    ownerId: string;
+    organizationId?: string;
+  }): Promise<{
+    location: CloudAgentWorktreeLocation | null;
+    children: CloudAgentChildSessionLineage[];
+    directory: string | null;
+  }> {
+    await this.initialized;
+    const worktreeId = cloudAgentWorktreeIdSchema.parse(input.worktreeId);
+    const metadata = this.metadata;
+    if (metadata === null) return { location: null, children: [], directory: null };
+    if (
+      metadata.workspace?.worktreeId !== worktreeId ||
+      metadata.auth.kiloSessionId !== input.kiloSessionId ||
+      metadata.identity.userId !== input.ownerId ||
+      metadata.identity.orgId !== input.organizationId
+    ) {
+      throw new Error('Worktree identity conflict');
+    }
+    for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
+    const location = this.worktreeLocation(metadata);
+    const registration = this.registration;
+    const children =
+      registration === null
+        ? []
+        : readWorktreeChildSessions({
+            db: this.db,
+            sessionId: this.sessionId,
+            ownKiloSessionId: registration.spec.kiloSessionId,
+            directory: registration.spec.directory,
+          });
+    return {
+      location: location === null ? null : cloudAgentWorktreeLocationSchema.parse(location),
+      children,
+      directory: registration?.spec.directory ?? null,
+    };
+  }
+
+  /**
+   * Worktree deletion, phase 2 (legacy `finishWorktreeDeletion`): purge this
+   * session's data once the Sandbox DO confirmed the worktree cleanup. Idempotent
+   * and holds no per-worktree state: the Sandbox DO already removed the routes.
+   */
+  async finishWorktreeDeletion(worktreeId: string): Promise<void> {
+    await this.initialized;
+    cloudAgentWorktreeIdSchema.parse(worktreeId);
+    if (this.registration === null) return;
+    await this.enqueue(async () => {
+      await this.tearDownSession();
+    });
+  }
+
+  /**
+   * The delete tail shared by `deleteSession` and `finishWorktreeDeletion`:
+   * close client sockets, stop worktree capture, settle any open message as
+   * cancelled/interrupted (legacy `snapshotDeletedMessages`, so a delete cannot
+   * drop an open turn without its terminal report/callback), force-flush every
+   * pending report/callback obligation regardless of backoff, then wipe. Always
+   * runs under the serial queue.
+   */
+  private async tearDownSession(): Promise<void> {
+    const parentSessionId = this.metadata?.parentCloudAgentSessionId;
+    const ownerId = this.metadata?.identity.userId;
+    for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Session deleted');
+    // A late capture after this must not write the deleted worktree's diff.
+    this.worktreeChanges.suppress();
+    const openIds = openMessages(this.messages).map(message => message.messageId);
+    if (openIds.length > 0) {
+      await this.settleMessages(openIds, 'cancelled', 'interrupted');
+    }
+    await this.repairOutboxes(Number.MAX_SAFE_INTEGER);
+    this.logDiscardedObligations();
+    await this.resetSessionStorage();
+    if (
+      parentSessionId !== undefined &&
+      parentSessionId !== this.sessionId &&
+      ownerId !== undefined
+    ) {
+      await this.pruneChildRegistryEntry(ownerId, parentSessionId);
+    }
+  }
+
+  private async pruneChildRegistryEntry(ownerId: string, parentSessionId: string): Promise<void> {
+    try {
+      await withDORetry(
+        () => getSandboxSessionStub(this.env, ownerId, parentSessionId),
+        stub => stub.forgetCloudAgentChildSession(this.sessionId),
+        'forgetCloudAgentChildSession'
+      );
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          parentSessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to prune deleted child from parent session registry');
+    }
+  }
+
+  /** Names the obligations a delete could not deliver; never logs secrets. */
+  private logDiscardedObligations(): void {
+    const reports = this.reportOutbox.pendingCount();
+    const callbacks = this.messageCallbacks.pendingCallbackCount();
+    if (reports === 0 && callbacks === 0) return;
+    logger
+      .withFields({ sessionId: this.sessionId, reports, callbacks })
+      .warn('Discarding undelivered report/callback obligations on session deletion');
+  }
+
+  /** The sandbox location projection both runtime-location and deletion use. */
+  private worktreeLocation(metadata: SessionMetadata): CloudAgentWorktreeLocation | null {
+    const locator = sessionRuntimeLocator(metadata);
+    return locator === null ? null : locator.location;
+  }
+
+  /**
+   * Wipe this DO back to its fresh V2 state: no registration, no messages, no
+   * events, no child registry, no outbox, and the V2 migrations re-applied. The
+   * generation key is restored so a later instance runs the normal V2 init
+   * rather than the old-plane wipe.
+   *
+   * An issuer whose handle was accepted on a shared scope keeps a locator
+   * tombstone so the facade can still resolve that handle through a survivor;
+   * every other session keeps the original `deleteAll` wipe unchanged.
+   */
+  private async resetSessionStorage(): Promise<void> {
+    const locator = await this.acceptedHandleLocatorForWipe();
+    // A later flush must not write buffered text back into wiped storage.
+    this.partText.clear();
+    if (locator === null) {
+      await this.resetSessionStorageByDeleteAll();
+      return;
+    }
+    await this.resetSessionStorageWithLocator(locator);
+  }
+
+  private async resetSessionStorageByDeleteAll(): Promise<void> {
+    await this.ctx.storage.deleteAll();
+    await this.ctx.storage.put(GENERATION_KEY, GENERATION);
+    await migrate(this.db, migrations);
+    this.clearSessionInMemoryState();
+  }
+
+  /**
+   * Tombstone-first transactional wipe: write the locator, delete the
+   * application tables through Drizzle, delete every other KV key, and restore
+   * the generation in one synchronous transaction. The schema and the
+   * `__drizzle_migrations` bookkeeping survive, so no re-migration is needed.
+   * A throw rolls the whole transaction back, leaving the live session intact.
+   * The alarm is cleared outside the transaction after the in-memory reset.
+   */
+  private async resetSessionStorageWithLocator(locator: WipeLocator): Promise<void> {
+    runTransactionalWipe({
+      storage: this.ctx.storage,
+      locatorKey: WIPE_LOCATOR_KEY,
+      generationKey: GENERATION_KEY,
+      generation: GENERATION,
+      locator,
+      deleteApplicationTables: () => {
+        this.db.delete(controlPlaneMessages).run();
+        this.db.delete(events).run();
+        this.db.delete(cloudAgentChildSessions).run();
+        this.db.delete(historyImport).run();
+      },
+    });
+    this.clearSessionInMemoryState();
+    this.wipeLocator = locator;
+    await this.ctx.storage.deleteAlarm();
+  }
+
+  /**
+   * The tombstone a wipe must keep, or null when the session issued no accepted
+   * handle (or has no Sandbox to ask). A transport failure propagates so
+   * `deleteSession` aborts before wiping and is retried, rather than wiping an
+   * issuer whose accepted handle survivors still need to resolve.
+   */
+  private async acceptedHandleLocatorForWipe(): Promise<WipeLocator | null> {
+    const sandboxId =
+      this.registration?.sandboxId ??
+      this.metadata?.workspace?.sandboxId ??
+      this.wipeLocator?.sandboxId;
+    if (sandboxId === undefined) return null;
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) return null;
+    const context = await withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      current => current.getAcceptedHandleIssuerLocator(this.sessionId),
+      'getAcceptedHandleIssuerLocator'
+    );
+    if (context === null) return null;
+    return { version: 1, sandboxId, ...context };
+  }
+
+  private clearSessionInMemoryState(): void {
+    this.registration = null;
+    this.metadata = null;
+    this.wipeLocator = null;
+    this.runtimeAuthorization = undefined;
+    this.messages = [];
+    this.route = { state: 'unknown' };
+    this.transportRecoveryAt = null;
+    this.pendingInteractions = undefined;
+    this.availableCommands = { commands: [] };
+    this.rootStatus = undefined;
+    this.workspaceStop = { epoch: 0, at: 0, attempts: [] };
+    this.historyHydrations.clear();
+    this.worktreePreparationGeneration = undefined;
+    this.preparationRecorders.clear();
+  }
+
+  /** Worker-facing terminal RPC (spec §10); routing/handler wiring is C1. */
+  async terminalCreate(input: {
+    operationId: string;
+    cols?: number;
+    rows?: number;
+  }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    await this.initialized;
+    return this.terminals.create(input);
+  }
+
+  async terminalResize(input: {
+    ptyId: string;
+    cols: number;
+    rows: number;
+  }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    await this.initialized;
+    return this.terminals.resize(input);
+  }
+
+  async terminalClose(input: { ptyId: string }): Promise<OperationResult<{ success: boolean }>> {
+    await this.initialized;
+    return this.terminals.close(input);
+  }
+
+  /**
+   * Worker-facing preview resolver (spec §10). Runs on the RPC path, not the
+   * operation queue, so a preview never waits behind queued messages. It owns
+   * only eligibility and routing; the provider coordinates come from the
+   * Sandbox DO's off-queue `previewTarget` read.
+   */
+  async resolvePreviewTarget(): Promise<ResolvedPreviewTarget> {
+    await this.initialized;
+    return this.preview.resolve();
+  }
+
+  /**
+   * Worker-facing live preview discovery. Eligibility and the sandbox owner are
+   * decided here; the Sandbox DO checks route/allocation state and relays the
+   * scan to the bound wrapper. A stopped or idle sandbox is reported as
+   * `not_running`/`not_ready` and is never started or woken.
+   */
+  async listPreviewServices(): Promise<ListPreviewServicesOutput> {
+    await this.initialized;
+    const metadata = this.metadata;
+    if (metadata === null) return { services: [], status: 'not_ready' };
+    if (!isControlSession(metadata.identity.sessionId) || !isTerminalSessionEligible(metadata)) {
+      return { services: [], status: 'unsupported' };
+    }
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined || sandboxId.length === 0) {
+      return { services: [], status: 'not_ready' };
+    }
+    const scope: PreviewSandboxScope = {
+      ownerId: metadata.identity.userId,
+      organizationId: metadata.identity.orgId ?? null,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    };
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { services: [], status: 'not_running' };
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewServices(scope),
+      'previewServices'
+    );
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    await this.initialized;
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    if (pathname === '/terminal/browser') {
+      return this.terminals.handleBrowserUpgrade(request);
+    }
+    if (pathname === '/terminal/wrapper') {
+      return this.terminals.handleWrapperUpgrade(request);
+    }
+    if (pathname !== '/stream') return new Response('Not found', { status: 404 });
+    if (this.registration === null) return new Response('Session not found', { status: 404 });
+    const requestedKiloSessionId = url.searchParams.get('kiloSessionId');
+    if (
+      requestedKiloSessionId !== null &&
+      requestedKiloSessionId !== this.registration.spec.kiloSessionId
+    )
+      return new Response('Session not found', { status: 404 });
+    if (url.searchParams.get('sandboxStatus') === 'true') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      const sandboxId = this.registration.sandboxId;
+      if (this.metadata === null) return new Response('Sandbox unavailable', { status: 503 });
+      const url = new URL('https://sandbox.internal/status-stream');
+      url.searchParams.set('sessionId', this.sessionId);
+      url.searchParams.set('ownerId', this.metadata.identity.userId);
+      const identity = statusWorkspaceIdentity(this.registration);
+      if (identity !== null) {
+        url.searchParams.set('workspaceId', identity.workspaceId);
+        url.searchParams.set('directory', identity.directory);
+        if (identity.orgId !== undefined) url.searchParams.set('orgId', identity.orgId);
+      }
+      try {
+        return await withDORetry(
+          () => {
+            const peer = this.sandboxPeerFor(sandboxId);
+            if (peer === null) throw new Error('Sandbox unavailable');
+            return peer;
+          },
+          peer => peer.fetch(new Request(url, { headers: { Upgrade: 'websocket' } })),
+          'sandboxStatusStream'
+        );
+      } catch {
+        return new Response('Sandbox unavailable', { status: 503 });
+      }
+    }
+    try {
+      // Replay ends with bootstrap.complete, so history must land before the replay starts.
+      await this.ensureClientHistory();
+    } catch (error) {
+      // The live stream does not need old history; hydration resumes on the next read.
+      logger
+        .withFields({ sessionId: this.sessionId, error: errorMessage(error) })
+        .warn('Session history hydration failed before stream connect');
+    }
+    if (this.registration === null) return new Response('Session not found', { status: 404 });
+    // Replay sends the stored part row; later deltas must extend all text sent before it.
+    this.partText.flush();
+    return this.streamHandler().handleStreamRequest(request);
+  }
+
+  /**
+   * The stream is one-way; the hibernatable socket attachment holds the client
+   * filters, so close/error only need to exist for the runtime's lifecycle.
+   * Terminal sockets share these handlers; the bridge ignores attachments it
+   * does not own.
+   */
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    await this.initialized;
+    await this.terminals.handleMessage(ws, message);
+  }
+
+  async webSocketClose(
+    ws: WebSocket,
+    code: number,
+    reason: string,
+    wasClean: boolean
+  ): Promise<void> {
+    await this.initialized;
+    await this.terminals.handleClose(ws, code, reason, wasClean);
+  }
+
+  async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+    await this.initialized;
+    await this.terminals.handleError(ws, error);
+  }
+
+  private streamHandler() {
+    return createStreamHandler(this.ctx, this.eventQueries, this.sessionId, {
+      deriveCloudStatus: async () => this.deriveCloudStatus(),
+      deriveQueuedMessages: async () => this.deriveQueuedMessages(),
+      deriveSessionStatus: async () => this.deriveSessionStatus(),
+      readPendingInteractions: () => this.readPendingInteractions(),
+      getAvailableCommands: async () => this.availableCommands,
+      getPreparationSnapshots: async () => getPreparationSnapshots(this.eventQueries),
+      getUpdateCursor: () => this.eventQueries.getUpdateCursor(),
+      getAncillaryBootstrap: async () => this.eventQueries.readAncillaryBootstrap(),
+    });
+  }
+
+  private async applyView(
+    view: ControlPlaneRouteView,
+    pass = this.transportPass(),
+    allowStopRetry = true
+  ): Promise<void> {
+    const previous = this.route;
+    if (view.state === 'unknown' && view.stopEpoch !== undefined) {
+      const retiredAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
+      if (view.stopEpoch > this.workspaceStop.epoch) {
+        await this.settleWorkspaceStop(view.stopEpoch, view.stopAt ?? Date.now(), retiredAttemptId);
+      }
+      if (allowStopRetry && this.messages.some(message => message.state === 'queued')) {
+        const prepared = await this.prepareSandbox(pass);
+        if (prepared !== null) await this.applyView(prepared, pass, false);
+        return;
+      }
+      if (view.stopEpoch > this.workspaceStop.epoch) return;
+    }
+    if (view.state === 'failed') await this.captureQueuedRouteContainer(view);
+    const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
+    const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
+    if (
+      previous.state !== view.state ||
+      previousAttemptId !== nextAttemptId ||
+      (view.state === 'failed' && (previous.state !== 'failed' || previous.reason !== view.reason))
+    ) {
+      logControlDiagnostic('session_route_view', {
+        sessionId: this.sessionId,
+        from: previous.state,
+        to: view.state,
+        fromAttemptId: previousAttemptId,
+        toAttemptId: nextAttemptId,
+        reason: view.state === 'failed' ? view.reason : undefined,
+        subtype: view.state === 'failed' ? view.subtype : undefined,
+        queuedMessages: this.messages.filter(message => message.state === 'queued').length,
+        acceptedMessages: this.messages.filter(message => message.state === 'accepted').length,
+      });
+    }
+    const route = persistedRouteView(view, previous);
+    await this.persistRoute(route);
+    if (
+      (route.state === 'ready' || route.state === 'failed') &&
+      previousAttemptId !== route.attemptId &&
+      readPreparationAttempt(this.eventQueries, route.attemptId) === null
+    ) {
+      const trigger = oldestOpenMessage(this.messages, 'queued');
+      if (trigger !== undefined) {
+        this.logStartupFinished(
+          route.attemptId,
+          route.state === 'ready'
+            ? { status: 'completed' }
+            : { status: 'failed', safeError: route.reason },
+          Date.now(),
+          trigger.createdAt
+        );
+      }
+    }
+    if (route.state === 'preparing' || route.state === 'reconnecting') {
+      await this.clearTransportRecovery();
+    }
+    switch (route.state) {
+      case 'unknown':
+        this.finalizePreparingRoute(previous, {
+          status: 'failed',
+          safeError: 'Preparation did not complete',
+        });
+        this.finishWorktreePreparation();
+        return;
+      case 'reconnecting':
+        // The route is ready with no socket: prep is done, close the row.
+        this.finalizePreparingRoute(previous, { status: 'completed' });
+        this.finishWorktreePreparation();
+        return;
+      case 'preparing': {
+        // A new route attempt supersedes the previous one's open row.
+        if (previous.state === 'preparing' && previous.attemptId !== route.attemptId) {
+          this.finalizeAttempt(previous.attemptId, {
+            status: 'failed',
+            safeError: 'Preparation did not complete',
+          });
+        }
+        // Suppress captures while the route prepares; a capture runs after
+        // attach (`ready`), like the legacy preparation hooks.
+        this.worktreePreparationGeneration = this.worktreeChanges.beginPreparation();
+        const publicStep = publicPreparationStep(route.step) ?? 'workspace_setup';
+        this.emitCloudStatus({ type: 'preparing', step: publicStep });
+        const head = oldestOpenMessage(this.messages, 'queued');
+        // A stepless repeat of an open attempt (a repeated `prepare`) carries
+        // its step forward and must not overwrite the step's live detail.
+        const stepless = view.state === 'preparing' && view.step === undefined;
+        if (
+          head !== undefined &&
+          (!stepless || readPreparationAttempt(this.eventQueries, route.attemptId) === null)
+        ) {
+          this.preparationRecorder(route.attemptId, head.messageId).onProgress(
+            publicStep,
+            (view.state === 'preparing' ? view.detail : undefined) ??
+              (route.step === undefined
+                ? 'Preparing environment'
+                : PREPARING_STEP_MESSAGE[route.step]),
+            view.state === 'preparing' ? view.snapshotCapturedAt : undefined
+          );
+        }
+        return;
+      }
+      case 'ready': {
+        // Persist before the post-attach capture is scheduled, so the deliver RPC
+        // is not delayed behind a storage write and the prompt still goes first.
+        await this.persistQueuedContainer(route.container);
+        // The attempt's preparation is done before its messages are delivered.
+        if (this.worktreePreparationGeneration !== undefined) {
+          this.worktreeChanges.attached(this.worktreePreparationGeneration);
+          this.worktreePreparationGeneration = undefined;
+        }
+        this.finalizePreparingRoute(previous, { status: 'completed' });
+        this.emitCloudStatus({ type: 'ready' });
+        await this.deliverQueued(pass);
+        return;
+      }
+      case 'failed':
+        this.finishWorktreePreparation();
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            attemptId: route.attemptId,
+            reason: route.reason,
+            ...(route.subtype === undefined ? {} : { subtype: route.subtype }),
+          })
+          .warn('Control-plane workspace preparation failed');
+        this.finalizePreparingRoute(previous, { status: 'failed', safeError: route.reason });
+        this.emitCloudStatus({ type: 'error', message: route.reason });
+        await this.settleMessages(
+          openMessages(this.messages).map(message => message.messageId),
+          'failed',
+          route.reason,
+          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype },
+          'coordinator',
+          route.billingFailure
+        );
+        return;
+    }
+  }
+
+  /** Close the previous route's open preparation row when the route leaves it. */
+  private finalizePreparingRoute(
+    previous: ControlPlaneRouteView,
+    outcome: PreparationOutcome
+  ): void {
+    if (previous.state !== 'preparing') return;
+    this.finalizeAttempt(previous.attemptId, outcome);
+  }
+
+  /** Clears a `preparing` state that did not reach `ready` (spec §10 hooks). */
+  private finishWorktreePreparation(): void {
+    if (this.worktreePreparationGeneration === undefined) return;
+    this.worktreeChanges.finishPreparation(this.worktreePreparationGeneration);
+    this.worktreePreparationGeneration = undefined;
+  }
+
+  private async deliverQueued(pass = this.transportPass()): Promise<void> {
+    if (await this.failRetiredPendingMessages()) return;
+    const queued = this.messages.filter(message => message.state === 'queued');
+    if (queued.length === 0) return;
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      await this.scheduleTransportRecovery(pass);
+      return;
+    }
+    const routeContainer = this.route.state === 'unknown' ? undefined : this.route.container;
+    let result: ControlPlaneDeliverResult;
+    try {
+      result = await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        stub =>
+          stub.deliver({
+            sessionId: this.sessionId,
+            messages: queued.map(message => message.intent),
+            ...(routeContainer?.allocationId === undefined
+              ? {}
+              : { allocationId: routeContainer.allocationId }),
+          }),
+        'session.deliver',
+        this.sandboxRpcConfig(pass)
+      );
+    } catch {
+      await this.scheduleTransportRecovery(pass);
+      return;
+    }
+    if (result === 'sent') {
+      const now = Date.now();
+      const reduction = acceptMessages(
+        this.messages,
+        queued.map(message => message.messageId),
+        now
+      );
+      this.messages = reduction.messages;
+      await this.persistMessages(reduction.changed);
+      for (const message of reduction.changed) {
+        this.emitSent(message);
+        logControlDiagnostic('session_message_committed', {
+          sessionId: this.sessionId,
+          source: 'coordinator',
+          messageId: message.messageId,
+          fromState: 'queued',
+          toState: 'accepted',
+          lifecycleEventInserted: false,
+          runtimeHarness: message.container?.runtimeHarness,
+        });
+      }
+      this.recordDeliveredRuntimeHarness();
+      await this.armAlarm();
+      return;
+    }
+    // `not_ready`: keep them queued and act on the view `prepare` returns
+    // (spec §5). A `ready` view only updates the stored route and returns: it
+    // must not re-enter delivery in this task, or a write that keeps losing to
+    // a ready route would recurse with no exit. The next `send` or `onRoute`
+    // retries, with one transport recovery opportunity if still ready.
+    const view = await this.prepareSandbox(pass);
+    if (view === null) return;
+    if (view.state === 'ready') {
+      await this.persistRoute(view);
+      await this.scheduleTransportRecovery(pass);
+      return;
+    }
+    await this.applyView(view, pass);
+  }
+
+  private recordDeliveredRuntimeHarness(): void {
+    const runtimeHarness =
+      this.route.state === 'ready' ? this.route.container?.runtimeHarness : undefined;
+    if (
+      runtimeHarness === undefined ||
+      this.registration === null ||
+      this.metadata === null ||
+      this.env.SESSION_INGEST === undefined
+    )
+      return;
+    this.runtimeHarnessRecorder.record({
+      sessionId: this.registration.spec.kiloSessionId,
+      kiloUserId: this.metadata.identity.userId,
+      cloudAgentSessionId: this.sessionId,
+      runtimeHarness,
+    });
+  }
+
+  private async persistQueuedContainer(
+    container: CloudAgentRunContainer | undefined
+  ): Promise<void> {
+    if (container === undefined) return;
+    const captured = this.messages
+      .filter(message => message.state === 'queued')
+      .map(message => ({ ...message, container }));
+    if (captured.length === 0) return;
+    await this.persistMessages(captured);
+    const byId = new Map(captured.map(message => [message.messageId, message]));
+    this.messages = this.messages.map(message => byId.get(message.messageId) ?? message);
+  }
+
+  private async captureQueuedRouteContainer(view: ControlPlaneRouteUpdate): Promise<void> {
+    if (view.state === 'unknown') return;
+    const previous = this.route;
+    if (previous.state === 'failed' && previous.attemptId === view.attemptId) return;
+    // A terminal view may describe a replacement, not the allocation that attempted this work.
+    const container =
+      previous.state === 'unknown' || previous.state === 'failed'
+        ? view.container
+        : (previous.container ??
+          (previous.attemptId === view.attemptId ? view.container : undefined));
+    await this.persistQueuedContainer(container);
+  }
+
+  private async failRetiredPendingMessages(): Promise<boolean> {
+    if (this.metadata === null) return false;
+    const reason = retiredRuntimeMessage(this.metadata);
+    if (reason === null) return false;
+    await this.settleMessages(
+      openMessages(this.messages).map(message => message.messageId),
+      'failed',
+      reason
+    );
+    this.finishWorktreePreparation();
+    return true;
+  }
+
+  private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredPendingMessages()) return null;
+    const peer = this.sandboxPeer();
+    const registration = this.registration;
+    if (registration === null) return null;
+    if (peer === null) {
+      await this.scheduleTransportRecovery(pass);
+      return null;
+    }
+    // A Stop refuses work created before its wall clock; a later message is new intent.
+    const intent = oldestOpenMessage(this.messages, 'queued');
+    try {
+      return await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        async stub =>
+          stub.prepare({
+            spec: { ...registration.spec, worktreeRecovery: await this.worktreeChanges.recovery() },
+            credentials: registration.credentials,
+            ...(registration.sandboxSelection
+              ? { sandboxSelection: registration.sandboxSelection }
+              : {}),
+            ...(registration.environment ? { environment: registration.environment } : {}),
+            stopEpoch: this.workspaceStop.epoch,
+            ...(intent === undefined ? {} : { intentAt: intent.createdAt }),
+          }),
+        'session.prepare',
+        this.sandboxRpcConfig(pass)
+      );
+    } catch {
+      // `unknown` must come only from the Sandbox, never from a transport error.
+      await this.scheduleTransportRecovery(pass);
+      return null;
+    }
+  }
+
+  private async recoverQueued(
+    pass: TransportPass,
+    ownerHint?: ControlPlaneRouteUpdate
+  ): Promise<void> {
+    if (await this.failRetiredPendingMessages()) return;
+    if (!this.messages.some(message => message.state === 'queued')) return;
+    let view = await this.readSandboxView(pass);
+    if (view === null) return;
+    if (
+      ownerHint?.state === 'lost' &&
+      ownerHint.attemptId === this.currentAttemptId() &&
+      (view.state === 'unknown' || view.attemptId !== ownerHint.attemptId)
+    ) {
+      await this.settleMessages(
+        this.messages
+          .filter(message => message.state === 'accepted')
+          .map(message => message.messageId),
+        'failed',
+        ownerHint.reason,
+        undefined,
+        'coordinator',
+        ownerHint.billingFailure
+      );
+    }
+    if (ownerHint && view.state !== 'unknown' && view.attemptId !== this.currentAttemptId()) {
+      pass.scheduleRecovery = true;
+    }
+    if (
+      view.state === 'unknown' ||
+      (view.state === 'failed' &&
+        this.route.state === 'failed' &&
+        view.attemptId === this.route.attemptId)
+    ) {
+      const prepared = await this.prepareSandbox(pass);
+      if (prepared === null) return;
+      if (
+        prepared.state === 'failed' &&
+        this.route.state === 'failed' &&
+        prepared.attemptId === this.route.attemptId
+      ) {
+        await this.scheduleTransportRecovery(pass);
+        return;
+      }
+      view = prepared;
+    }
+    if (
+      ownerHint?.state === 'preparing' &&
+      view.state === 'preparing' &&
+      ownerHint.attemptId === view.attemptId
+    ) {
+      view = ownerHint;
+    } else if (
+      ownerHint?.state === 'failed' &&
+      view.state === 'failed' &&
+      ownerHint.attemptId === view.attemptId &&
+      ownerHint.reason === view.reason
+    ) {
+      view = ownerHint;
+    }
+    await this.applyView(view, pass);
+  }
+
+  private async readSandboxView(pass: TransportPass): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredPendingMessages()) return null;
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      await this.scheduleTransportRecovery(pass);
+      return null;
+    }
+    try {
+      const status = await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.status({ sessionId: this.sessionId }),
+        'session.status',
+        this.sandboxRpcConfig(pass)
+      );
+      if (status.workspaceStopEpoch > this.workspaceStop.epoch) {
+        const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
+        const authoritativeRetired =
+          localAttempt !== undefined &&
+          (status.view.state === 'unknown' || status.view.attemptId !== localAttempt);
+        await this.settleWorkspaceStop(
+          status.workspaceStopEpoch,
+          status.workspaceStopAt,
+          authoritativeRetired ? localAttempt : undefined
+        );
+        return this.messages.some(message => message.state === 'queued')
+          ? { state: 'unknown' }
+          : null;
+      }
+      return controlPlaneRouteViewSchema.parse(status.view);
+    } catch {
+      await this.scheduleTransportRecovery(pass);
+      return null;
+    }
+  }
+
+  private transportPass(scheduleRecovery = true): TransportPass {
+    return { deadlineAt: Date.now() + this.sessionTimers().sandboxRpcDeadlineMs, scheduleRecovery };
+  }
+
+  private async scheduleTransportRecovery(pass: TransportPass): Promise<void> {
+    if (
+      !pass.scheduleRecovery ||
+      this.transportRecoveryAt !== null ||
+      !this.messages.some(message => message.state === 'queued')
+    )
+      return;
+    const dueAt = Date.now() + this.sessionTimers().transportRecoveryMs;
+    await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, dueAt);
+    this.transportRecoveryAt = dueAt;
+    await this.armAlarm();
+  }
+
+  private async clearTransportRecovery(): Promise<void> {
+    if (this.transportRecoveryAt === null) return;
+    await this.ctx.storage.delete(TRANSPORT_RECOVERY_KEY);
+    this.transportRecoveryAt = null;
+  }
+
+  private sandboxRpcConfig(pass: TransportPass) {
+    return {
+      ...DEFAULT_DO_RETRY_CONFIG,
+      scope: { deadlineAt: pass.deadlineAt },
+    };
+  }
+
+  private sandboxPeer(): ControlPlaneSandboxPeer | null {
+    const sandboxId = this.registration?.sandboxId;
+    return sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+  }
+
+  private resolveSandboxPeer(sandboxId: string): ControlPlaneSandboxPeer | null {
+    const namespace = sandboxControlPeerNamespace<ControlPlaneSandboxPeer>(this.env);
+    return namespace === undefined ? null : namespace.getByName(sandboxId);
+  }
+
+  /**
+   * The preparation attempt id is the route attempt id (spec §10); the trigger
+   * is the oldest queued message. The recorder owns step continuity and the
+   * materialized attempt snapshots that a stream reconnect replays.
+   */
+  private preparationRecorder(
+    attemptId: string,
+    triggerMessageId: string
+  ): ReturnType<typeof createPreparationProgressRecorder> {
+    let recorder = this.preparationRecorders.get(attemptId);
+    if (recorder === undefined) {
+      recorder = createPreparationProgressRecorder({
+        attemptId,
+        triggerMessageId,
+        sessionId: this.sessionId,
+        eventQueries: this.eventQueries,
+        broadcast: event => this.broadcast(event),
+      });
+      this.preparationRecorders.set(attemptId, recorder);
+    }
+    return recorder;
+  }
+
+  /**
+   * Render a wrapper setup-command lifecycle event into the active preparation
+   * attempt. Each command is its own `setup_command` step under the phase for
+   * its kind (`setup_commands` for builds and legacy events,
+   * `session_setup_commands`, `start_commands`), so the preparation UI shows
+   * the numbered command, its text, its output, and its terminal state. Clients
+   * derive the failed-command rows from these steps.
+   */
+  private recordSetupEvent(event: ControlPlaneSetupEvent): void {
+    if (this.route.state !== 'preparing') return;
+    const attemptId = this.route.attemptId;
+    const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+    if (attempt?.status !== 'running') return;
+    const kind = event.properties.kind;
+    const phaseKey = setupCommandPhase(kind);
+    let steps = readPreparationSteps(this.eventQueries, attemptId);
+    let phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
+    const latestPhase = steps.findLast(step => step.kind === 'phase');
+    if (
+      phase === undefined ||
+      (phase.id !== latestPhase?.id &&
+        (event.type === CONTROL_PLANE_SETUP_EVENTS.started ||
+          event.type === CONTROL_PLANE_SETUP_EVENTS.output))
+    ) {
+      this.preparationRecorder(attemptId, attempt.triggerMessageId).onProgress(
+        phaseKey,
+        setupCommandPhaseTitle(kind)
+      );
+      steps = readPreparationSteps(this.eventQueries, attemptId);
+      phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
+    }
+    if (phase === undefined) return;
+    const command = event.properties.command;
+    const commandId = `setup_command:${command - 1}`;
+    const stepId =
+      phase.id === `phase:${phaseKey}` && phaseKey === 'setup_commands'
+        ? commandId
+        : `${phase.id}:${commandId}`;
+    const existingStep = steps.find(step => step.id === stepId);
+    if (existingStep !== undefined && existingStep.status !== 'running') return;
+    const commandText =
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandText
+        : undefined) ?? nonEmptyString(existingStep?.command);
+    const commandCount =
+      existingStep?.commandCount ??
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandCount
+        : undefined) ??
+      command;
+    const base = {
+      version: 2 as const,
+      attemptId,
+      triggerMessageId: attempt.triggerMessageId,
+      revision:
+        (readPreparationAttempt(this.eventQueries, attemptId)?.revision ?? attempt.revision) + 1,
+      timestamp: Date.now(),
+      step: phaseKey as PreparingStep,
+    };
+    const apply = (data: Record<string, unknown>): boolean =>
+      applyControlPlanePreparingEvent({
+        sessionId: this.sessionId,
+        data,
+        eventQueries: this.eventQueries,
+        broadcast: stored => this.broadcast(stored),
+      });
+
+    if (existingStep === undefined) {
+      const label = setupCommandLabel(kind, command, commandText);
+      if (
+        !apply({
+          ...base,
+          message: label,
+          action: 'step_started',
+          stepId,
+          kind: 'setup_command',
+          label,
+          commandIndex: command - 1,
+          commandCount,
+          parentStepId: phase.id,
+          ...(commandText === undefined ? {} : { command: commandText }),
+        })
+      )
+        return;
+      base.revision += 1;
+    }
+
+    if (event.type === CONTROL_PLANE_SETUP_EVENTS.output) {
+      apply({
+        ...base,
+        message: `${setupCommandLabel(kind, command, undefined)} output`,
+        action: 'step_output',
+        stepId,
+        output: event.properties.output,
+      });
+    }
+
+    if (event.type === CONTROL_PLANE_SETUP_EVENTS.finished) {
+      const { exitCode, safeError } = event.properties;
+      const failed = safeError !== undefined || exitCode !== 0;
+      const failedMessage = safeError ?? `${setupCommandLabel(kind, command, undefined)} failed`;
+      apply({
+        ...base,
+        message: failed ? failedMessage : `${setupCommandLabel(kind, command, undefined)} finished`,
+        action: failed ? 'step_failed' : 'step_completed',
+        stepId,
+        ...(failed ? { safeError: failedMessage } : {}),
+        exitCode,
+      });
+    }
+  }
+
+  /** Close one route attempt's open row by persisted identity, never by a scan. */
+  private finalizeAttempt(attemptId: string, outcome: PreparationOutcome): void {
+    this.preparationRecorders.delete(attemptId);
+    const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+    const timestamp = Date.now();
+    const events = finalizePreparationAttempt(this.eventQueries, attemptId, {
+      ...outcome,
+      timestamp,
+    });
+    if (events.length > 0 && attempt !== null) {
+      const trigger = this.messages.find(message => message.messageId === attempt.triggerMessageId);
+      this.logStartupFinished(attemptId, outcome, timestamp, trigger?.createdAt, attempt.startedAt);
+    }
+    for (const event of events) this.broadcast(event);
+  }
+
+  private logStartupFinished(
+    attemptId: string,
+    outcome: PreparationOutcome,
+    timestamp: number,
+    admittedAt: number | undefined,
+    preparationStartedAt?: number
+  ): void {
+    const container =
+      this.route.state !== 'unknown' && this.route.attemptId === attemptId
+        ? this.route.container
+        : undefined;
+    const reason = outcome.status === 'failed' ? outcome.safeError : undefined;
+    logControlDiagnostic('session_startup_finished', {
+      sessionId: this.sessionId,
+      sandboxId: this.registration?.sandboxId,
+      allocationId: container?.allocationId,
+      attemptId,
+      provider: container?.provider ?? this.registration?.sandboxSelection?.provider,
+      startSource: container?.startSource,
+      outcome:
+        outcome.status === 'completed'
+          ? 'ready'
+          : reason === 'preparation_cancelled'
+            ? 'cancelled'
+            : reason === 'preparation_timeout'
+              ? 'timeout'
+              : 'failed',
+      reason: reason === 'Preparation did not complete' ? 'preparation_incomplete' : reason,
+      durationMs: admittedAt === undefined ? undefined : Math.max(0, timestamp - admittedAt),
+      preparationMs:
+        preparationStartedAt === undefined
+          ? undefined
+          : Math.max(0, timestamp - preparationStartedAt),
+    });
+  }
+
+  /** The route attempt a notification must name (the route-view fence). */
+  private currentAttemptId(): string | null {
+    return this.route.state === 'unknown' ? null : this.route.attemptId;
+  }
+
+  private async settleMessages(
+    messageIds: readonly string[],
+    status: Extract<SessionMessageState, 'completed' | 'failed' | 'cancelled'>,
+    reason: string | undefined,
+    facts?: ControlPlaneReportFacts,
+    source: ControlPlaneMessageSource = 'coordinator',
+    billingFailure?: CustomerBillingFailure
+  ): Promise<void> {
+    await this.applySettlement(
+      settleMessages(this.messages, messageIds, status, reason, Date.now(), billingFailure),
+      facts,
+      source
+    );
+  }
+
+  /**
+   * One owner for the side effects of a terminal transition: durable rows,
+   * terminal stream events, the `session_message_committed` diagnostic the
+   * failure monitors read, the report obligation per message, and the drained
+   * batch callback. Report and callback writes are best effort; a failure there
+   * is logged and never fails the turn (plan B5).
+   */
+  private async applySettlement(
+    reduction: MessageReduction,
+    facts?: ControlPlaneReportFacts,
+    source: ControlPlaneMessageSource = 'coordinator'
+  ): Promise<void> {
+    if (reduction.changed.length === 0) {
+      await this.armAlarm();
+      return;
+    }
+    const previousStates = new Map(
+      this.messages.map(message => [message.messageId, message.state])
+    );
+    this.messages = reduction.messages;
+    await this.persistMessages(reduction.changed);
+    if (reduction.changed.some(message => previousStates.get(message.messageId) === 'accepted'))
+      await this.settleRootStatus();
+    for (const message of reduction.changed) {
+      const lifecycleEventInserted = this.emitTerminal(message);
+      this.recordReport(message, facts);
+      logControlDiagnostic('session_message_committed', {
+        sessionId: this.sessionId,
+        source,
+        messageId: message.messageId,
+        fromState: previousStates.get(message.messageId),
+        toState: message.state,
+        terminalAt: message.settledAt,
+        lifecycleEventInserted,
+        cause: message.reason === null ? undefined : diagnosticCause(message.reason),
+        runtimeHarness: message.container?.runtimeHarness,
+      });
+    }
+    // Persist the callback, attempt delivery now, then arm only what remains:
+    // a failed send keeps its due time and is retried by the alarm.
+    this.persistBatchCallback(reduction.changed, facts);
+    await this.repairOutboxes();
+    await this.armAlarm();
+  }
+
+  /**
+   * Records the first-message report anchor once, from the kept report outbox
+   * (spec §10 report contract). The anchor fields are all-or-none.
+   */
+  private ensureReportAnchor(first: SessionMessage | undefined): void {
+    if (first === undefined || readReportAnchor(this.ctx.storage) !== undefined) return;
+    const kiloSessionId = this.registration?.spec.kiloSessionId;
+    if (kiloSessionId === undefined) return;
+    writeReportAnchor(this.ctx.storage, {
+      kiloSessionId,
+      initialMessageId: first.messageId,
+      createdAt: first.createdAt,
+    });
+  }
+
+  private recordReport(message: SessionMessage, facts?: ControlPlaneReportFacts): void {
+    try {
+      const anchor = readReportAnchor(this.ctx.storage);
+      const report = buildControlPlaneMessageReport({
+        cloudAgentSessionId: this.sessionId,
+        message,
+        ...(anchor === undefined ? {} : { anchor: reportAnchorForQueue(anchor) }),
+        ...(facts === undefined ? {} : { facts }),
+      });
+      if (report !== undefined) this.reportOutbox.record(report);
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId, messageId: message.messageId })
+        .warn('Cloud Agent report write failed; the turn is unaffected');
+    }
+  }
+
+  private persistBatchCallback(
+    changed: readonly SessionMessage[],
+    facts?: ControlPlaneReportFacts
+  ): void {
+    try {
+      const newlyTerminal = new Set(
+        changed
+          .filter(message => isTerminalMessage(message.state))
+          .map(message => message.messageId)
+      );
+      this.messageCallbacks.persistDrainedBatchCallback(
+        this.messages,
+        newlyTerminal,
+        undefined,
+        facts
+      );
+    } catch {
+      logger.withFields({ sessionId: this.sessionId }).warn('Cloud Agent callback write failed');
+    }
+  }
+
+  private async repairOutboxes(now: number = Date.now()): Promise<void> {
+    try {
+      await this.reportOutbox.repair(now);
+    } catch {
+      // Best effort: a later settlement or alarm retries.
+    }
+    try {
+      await this.messageCallbacks.repair(now);
+    } catch {
+      // Best effort: a later settlement or alarm retries.
+    }
+  }
+
+  private emitQueued(message: SessionMessage): void {
+    this.emitSynthetic(
+      'cloud.message.queued',
+      {
+        messageId: message.messageId,
+        content: renderQueuedMessageContent(message),
+        delivery: 'queued',
+      },
+      `cloud-message/queued/${message.messageId}`,
+      message.createdAt
+    );
+  }
+
+  private emitSent(message: SessionMessage): void {
+    this.emitSynthetic(
+      'cloud.message.sent',
+      {
+        messageId: message.messageId,
+        delivery: 'sent',
+        ...(message.intent.turn.type === 'command' ? { turnType: 'command' } : {}),
+      },
+      `cloud-message/sent/${message.messageId}`,
+      message.acceptedAt ?? message.createdAt
+    );
+  }
+
+  /** Inserts the terminal event idempotently; returns whether a row was added. */
+  private emitTerminal(message: SessionMessage): boolean {
+    if (!isTerminalMessage(message.state)) return false;
+    const accepted = message.acceptedAt !== null;
+    const streamEventType =
+      message.state === 'completed' ? 'cloud.message.completed' : 'cloud.message.failed';
+    const payload =
+      message.state === 'completed'
+        ? { messageId: message.messageId, status: 'completed', delivery: 'sent', accepted: true }
+        : message.state === 'cancelled'
+          ? {
+              messageId: message.messageId,
+              status: 'interrupted',
+              delivery: accepted ? 'sent' : 'queued',
+              accepted,
+              reason: 'interrupted',
+              error: 'The message was interrupted',
+            }
+          : {
+              messageId: message.messageId,
+              status: 'failed',
+              delivery: accepted ? 'sent' : 'queued',
+              accepted,
+              ...(message.billingFailure === undefined
+                ? {}
+                : { billingFailure: message.billingFailure }),
+              ...(message.reason === null
+                ? {}
+                : { reason: message.reason, error: messageFailureText(message.reason) }),
+            };
+    const timestamp = message.settledAt ?? Date.now();
+    const id = this.eventQueries.insertUnique({
+      executionId: '',
+      sessionId: this.sessionId,
+      streamEventType,
+      payload: JSON.stringify(payload),
+      timestamp,
+      entityId: `terminal-message/${message.messageId}`,
+    });
+    if (id === null) return false;
+    this.broadcast({
+      id,
+      execution_id: '',
+      session_id: this.sessionId,
+      stream_event_type: streamEventType,
+      payload: JSON.stringify(payload),
+      timestamp,
+    });
+    return true;
+  }
+
+  private emitCloudStatus(status: {
+    type: 'preparing' | 'ready' | 'finalizing' | 'error';
+    step?: string;
+    message?: string;
+  }): void {
+    this.emitSynthetic('cloud.status', { cloudStatus: status }, 'cloud-status');
+  }
+
+  /** One row per entity keeps synthetic state replayable by cursor without unbounded growth. */
+  private emitSynthetic(
+    streamEventType: StoredEvent['stream_event_type'],
+    data: unknown,
+    entityId: string,
+    timestamp: number = Date.now()
+  ): void {
+    const payload = JSON.stringify(data);
+    const id = this.eventQueries.upsert({
+      executionId: '',
+      sessionId: this.sessionId,
+      streamEventType,
+      payload,
+      timestamp,
+      entityId,
+    });
+    this.broadcast({
+      id,
+      execution_id: '',
+      session_id: this.sessionId,
+      stream_event_type: streamEventType,
+      payload,
+      timestamp,
+    });
+  }
+
+  private broadcast(event: StoredEvent): void {
+    const stored =
+      event.id > 0 && event.mutation_cursor === undefined
+        ? this.eventQueries.findById(event.id)
+        : null;
+    this.streamHandler().broadcastEvent(
+      stored === null ? event : { ...event, mutation_cursor: stored.mutation_cursor }
+    );
+  }
+
+  private deriveCloudStatus(): {
+    type: 'preparing' | 'ready' | 'finalizing' | 'error';
+    step?: string;
+    message?: string;
+  } | null {
+    switch (this.route.state) {
+      case 'unknown':
+        return null;
+      case 'preparing': {
+        const step = publicPreparationStep(this.route.step);
+        return { type: 'preparing', ...(step === undefined ? {} : { step }) };
+      }
+      case 'ready':
+      case 'reconnecting':
+        return { type: 'ready' };
+      case 'failed':
+        return { type: 'error', message: this.route.reason };
+    }
+  }
+
+  private async recordRootStatus(event: { type: string; properties: unknown }): Promise<void> {
+    if (event.type !== 'session.status') return;
+    const parsed = rootStatusEventSchema.safeParse(event.properties);
+    if (!parsed.success || parsed.data.sessionID !== this.registration?.spec.kiloSessionId) return;
+    this.rootStatus = { type: parsed.data.status.type, settled: false };
+    await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  private async settleRootStatus(): Promise<void> {
+    if (this.rootStatus === undefined || this.rootStatus.settled) return;
+    this.rootStatus = { ...this.rootStatus, settled: true };
+    await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  /**
+   * Kilo's stored root status can stay `busy` after a hang or kill ends the turn. A busy or
+   * retry status that an accepted message's settlement followed, with no message accepted
+   * since, is stale, so a reconnect starts idle. Otherwise Kilo's replayed status stays the
+   * source, including native work that runs without a Cloud message.
+   */
+  private deriveSessionStatus(): SessionStatus | undefined {
+    const root = this.rootStatus;
+    const accepted = this.messages.some(message => message.state === 'accepted');
+    if (root?.settled && (root.type === 'busy' || root.type === 'retry'))
+      return { type: accepted ? 'busy' : 'idle' };
+    const kiloSessionId = this.registration?.spec.kiloSessionId;
+    const stored =
+      kiloSessionId === undefined ? null : this.eventQueries.getLatestNativeStatus(kiloSessionId);
+    const parsed = z
+      .discriminatedUnion('type', [
+        z.object({ type: z.literal('busy') }),
+        z.object({ type: z.literal('idle') }),
+        z.object({
+          type: z.literal('retry'),
+          attempt: z.number(),
+          message: z.string(),
+          next: z.number(),
+        }),
+        z.object({
+          type: z.literal('offline'),
+          requestID: z.string(),
+          message: z.string(),
+        }),
+      ])
+      .safeParse(
+        stored === null ? undefined : readNativeEventPayload(stored.payload)?.properties.status
+      );
+    if (accepted && (!parsed.success || parsed.data.type === 'idle')) return { type: 'busy' };
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  private deriveQueuedMessages(): QueuedMessageSnapshot[] {
+    return this.messages
+      .filter(
+        message =>
+          message.state === 'queued' ||
+          message.state === 'accepted' ||
+          message.state === 'failed' ||
+          (message.intent.turn.type === 'command' && message.acceptedAt !== null)
+      )
+      .map(message => {
+        const timestamp = message.acceptedAt ?? message.createdAt;
+        const snapshot: QueuedMessageSnapshot = {
+          messageId: message.messageId,
+          content: renderQueuedMessageContent(message),
+          timestamp,
+          ...(message.intent.turn.type === 'command' ? { turnType: 'command' as const } : {}),
+          ...(message.state === 'accepted' ? { delivery: 'sent' as const } : {}),
+        };
+        if (message.state === 'completed') {
+          snapshot.completedAt = message.settledAt ?? timestamp;
+        }
+        if (message.state === 'failed' || message.state === 'cancelled') {
+          snapshot.terminalFailure = {
+            messageId: message.messageId,
+            status: message.state === 'cancelled' ? 'interrupted' : 'failed',
+            delivery: message.acceptedAt === null ? 'queued' : 'sent',
+            accepted: message.acceptedAt !== null,
+            ...(message.billingFailure === undefined
+              ? {}
+              : { billingFailure: message.billingFailure }),
+            ...(message.reason === null
+              ? { error: 'The message failed' }
+              : { reason: message.reason, error: messageFailureText(message.reason) }),
+            timestamp: message.settledAt ?? timestamp,
+          };
+        }
+        return snapshot;
+      });
+  }
+
+  /**
+   * The stream rows the first history page appends, trimmed to
+   * `MAX_SNAPSHOT_ROWS_BYTES` newest first, and their measured size. The page's
+   * own budget is reduced by that size so the response stays inside
+   * `MAX_SESSION_PAGE_BYTES`. Queued turns are reserved first, so a failed run
+   * always keeps the question row it is answering; preparation attempts give way.
+   */
+  private readSnapshotRows(): {
+    preparationAttempts: PreparationAttempt[];
+    queuedMessages: QueuedMessageSnapshot[];
+    bytes: number;
+  } {
+    const encoder = new TextEncoder();
+    const budget = { remaining: MAX_SNAPSHOT_ROWS_BYTES };
+    // Both lists run oldest first, so walking back keeps the newest rows.
+    const keepNewest = <T>(rows: T[]): T[] => {
+      const kept: T[] = [];
+      for (let index = rows.length - 1; index >= 0; index -= 1) {
+        const row = rows.at(index);
+        if (row === undefined) break;
+        const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
+        if (rowBytes > budget.remaining) break;
+        budget.remaining -= rowBytes;
+        kept.push(row);
+      }
+      return kept.reverse();
+    };
+    const queuedMessages = keepNewest(this.deriveQueuedMessages());
+    const preparationAttempts = keepNewest(listPreparationAttempts(this.eventQueries));
+    return {
+      preparationAttempts,
+      queuedMessages,
+      bytes: MAX_SNAPSHOT_ROWS_BYTES - budget.remaining,
+    };
+  }
+
+  private readPendingInteractions(): { questions: unknown[]; permissions: unknown[] } | undefined {
+    return this.pendingInteractions === undefined
+      ? undefined
+      : {
+          questions: this.pendingInteractions.questions,
+          permissions: this.pendingInteractions.permissions,
+        };
+  }
+
+  private async loadMessages(): Promise<SessionMessage[]> {
+    const rows = await this.db
+      .select()
+      .from(controlPlaneMessages)
+      .orderBy(asc(controlPlaneMessages.created_at), asc(controlPlaneMessages.message_id));
+    return rows.map(rowToMessage);
+  }
+
+  /** The route view is the one persisted route state (attempt id included). */
+  private async persistRoute(view: ControlPlaneRouteView): Promise<void> {
+    const previousAttempt = this.currentAttemptId();
+    if (
+      previousAttempt !== null &&
+      view.state !== 'unknown' &&
+      view.attemptId !== previousAttempt
+    ) {
+      await this.settleMessages(
+        this.messages
+          .filter(message => message.state === 'accepted')
+          .map(message => message.messageId),
+        'failed',
+        'agent_restarted'
+      );
+      // A replaced attempt retires its questions and permissions with its
+      // runtime: a stale interaction id must not be answerable on the new one.
+      await this.clearPendingInteractions();
+    }
+    await this.ctx.storage.put(ROUTE_KEY, view);
+    this.route = view;
+  }
+
+  private async loadRoute(): Promise<ControlPlaneRouteView> {
+    const parsed = controlPlaneRouteViewSchema.safeParse(await this.ctx.storage.get(ROUTE_KEY));
+    return parsed.success ? parsed.data : { state: 'unknown' };
+  }
+
+  private async persistMessages(messages: readonly SessionMessage[]): Promise<void> {
+    for (const message of messages) {
+      const row = messageToRow(message);
+      await this.db
+        .insert(controlPlaneMessages)
+        .values(row)
+        .onConflictDoUpdate({ target: controlPlaneMessages.message_id, set: row });
+    }
+  }
+
+  private sessionTimers() {
+    return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
+      .session;
+  }
+
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const withStatus = async () => {
+      try {
+        return await task();
+      } finally {
+        try {
+          await this.armAlarm();
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId })
+            .warn('Session alarm finalization failed; the operation result is unchanged');
+        }
+      }
+    };
+    const run = this.operations.tail.then(withStatus, withStatus);
+    this.operations.tail = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+}

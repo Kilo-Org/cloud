@@ -1,171 +1,318 @@
 import { type Href, useRouter } from 'expo-router';
-import { View } from 'react-native';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Platform, type ScrollViewProps, View } from 'react-native';
 
-import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
-import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
-import { StoredSessionRow } from '@/components/agents/session-row';
-import { SectionHeader } from '@/components/home/section-header';
-import { Text } from '@/components/ui/text';
+import { CenteredState } from '@/components/centered-state';
+import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import {
-  type ActiveSession,
-  type StoredSession,
-  useAgentSessions,
-} from '@/lib/hooks/use-agent-sessions';
-import { parseTimestamp } from '@/lib/utils';
+  liveSessionContent,
+  type LiveSessionContext,
+  type LiveSessions,
+} from '@/components/home/live-session-state';
+import { QueryError, type QueryErrorVariant } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
+import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
+import { createSubmitLock } from '@/lib/submit-lock';
+import { readTrpcErrorField } from '@/lib/trpc-error';
+import { cn } from '@/lib/utils';
 
-const MAX_ROWS = 3;
-const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
+type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
-type Row =
-  | {
-      key: string;
-      kind: 'active';
-      session: ActiveSession;
-    }
-  | {
-      key: string;
-      kind: 'stored';
-      session: StoredSession;
-    };
+/** Pull/retry feedback for the live Agents tab's reserved status line. */
+export type LiveSessionRefreshState = Readonly<{
+  /** A pull or retry is in flight. */
+  busy: boolean;
+  /** The last pull/retry failed or ran past the feedback budget. */
+  failed: boolean;
+  onRetry: () => void;
+  /**
+   * This pull's progress belongs to the surface's centered refreshable body
+   * (the no-match body), which draws it itself while reduced motion is on,
+   * so the reserved line carries the "Updating" copy without a second
+   * spinner: one indicator per pull.
+   */
+  progressInBody?: boolean;
+}>;
 
-function buildRows(params: {
-  activeSessions: ActiveSession[];
-  storedSessions: StoredSession[];
-  activeSessionIds: Set<string>;
-}): Row[] {
-  const { activeSessions, storedSessions, activeSessionIds } = params;
-  const rows: Row[] = [];
-  const seenSessionIds = new Set<string>();
-
-  for (const session of activeSessions) {
-    if (rows.length >= MAX_ROWS) {
-      break;
-    }
-    rows.push({ key: `active:${session.id}`, kind: 'active', session });
-    seenSessionIds.add(session.id);
-  }
-
-  const cloudAgentStored = storedSessions.filter(s =>
-    CLOUD_AGENT_PLATFORMS.has(s.created_on_platform)
-  );
-  const live = cloudAgentStored.filter(s => activeSessionIds.has(s.session_id));
-  const offline = cloudAgentStored.filter(s => !activeSessionIds.has(s.session_id));
-
-  const sortByUpdated = (a: StoredSession, b: StoredSession) =>
-    parseTimestamp(b.status_updated_at ?? b.updated_at).getTime() -
-    parseTimestamp(a.status_updated_at ?? a.updated_at).getTime();
-
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; spread already prevents mutation of the source
-  for (const session of [...live].sort(sortByUpdated)) {
-    if (rows.length >= MAX_ROWS) {
-      break;
-    }
-    if (!seenSessionIds.has(session.session_id)) {
-      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session });
-      seenSessionIds.add(session.session_id);
-    }
-  }
-
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; spread already prevents mutation of the source
-  for (const session of [...offline].sort(sortByUpdated)) {
-    if (rows.length >= MAX_ROWS) {
-      break;
-    }
-    if (!seenSessionIds.has(session.session_id)) {
-      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session });
-      seenSessionIds.add(session.session_id);
-    }
-  }
-
-  return rows;
-}
-
-// Whether the Home "Agent sessions" section has anything to render — mirrors
-// buildRows' inclusion rule (any active session, or a cloud-agent stored
-// session; stored CLI/other-platform sessions live on the Agents tab, not
-// Home). The Home screen gates its section/promo/new-task button on this so a
-// CLI-only account shows the first-use promo instead of an empty section.
-export function hasDisplayableAgentSessions(
-  storedSessions: StoredSession[],
-  activeSessions: ActiveSession[]
-): boolean {
-  return (
-    activeSessions.length > 0 ||
-    storedSessions.some(s => CLOUD_AGENT_PLATFORMS.has(s.created_on_platform))
-  );
-}
-
-type AgentSessionsSectionProps = {
-  organizationId: string | null;
-};
-
-export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
+/** Notices stay outside the rows so refresh and connection changes cannot remount them. */
+export function LiveSessionFeedback({
+  context,
+  sessions,
+  failureLabel,
+  centered = false,
+  refreshControl,
+  refresh,
+  inlineNotices = true,
+  compact: compactSpacing = false,
+}: LiveSessionProps & {
+  failureLabel: string;
+  centered?: boolean;
+  refreshControl?: ScrollViewProps['refreshControl'];
+  refresh?: LiveSessionRefreshState;
+  /**
+   * False when the surface draws the one-line notices (offline, connection
+   * lost, a failed load beside readable rows) itself, as Home does in its
+   * section header so a notice cannot push the card down. The screen-reader
+   * announcements stay here either way.
+   */
+  inlineNotices?: boolean;
+  compact?: boolean;
+}) {
+  const { t } = useTranslation();
   const router = useRouter();
-  const { activeSessions, storedSessions, activeSessionIds, activeIsError } = useAgentSessions({
-    organizationId,
-  });
-  const navigateToSession = useAgentSessionNavigator();
-
-  const rows = buildRows({ activeSessions, storedSessions, activeSessionIds });
-
-  if (rows.length === 0) {
-    return null;
+  const internet = useCommittedConnectivityStatus();
+  const { isConnected, reconnectExhausted } = useUserWebConnectionHealth();
+  const connection = useUserWebConnection();
+  const wasConnected = useRef(false);
+  useEffect(() => {
+    wasConnected.current ||= isConnected;
+  }, [isConnected]);
+  const retryLock = useMemo(createSubmitLock, []);
+  const [retrying, setRetrying] = useState(false);
+  const handleRefreshRetry = () => {
+    refresh?.onRetry();
+  };
+  const handleRetry = () => {
+    if (!retryLock.acquire()) {
+      return;
+    }
+    setRetrying(true);
+    void (async () => {
+      try {
+        await (context.isError ? context.refetch() : sessions.refetch());
+      } finally {
+        retryLock.release();
+        setRetrying(false);
+      }
+    })();
+  };
+  const content = liveSessionContent(context, sessions);
+  // One message speaks while the refresh-status line owns the rows-state
+  // failure: the line announces its own copy instead of a second label.
+  const statusLineOwnsFailure = content === 'rows' && refresh && (refresh.busy || refresh.failed);
+  useStatusAnnouncement(
+    context.isReady && sessions.terminalError?.kind === 'retryable' && !statusLineOwnsFailure
+      ? failureLabel
+      : null
+  );
+  const denied = context.isReady && sessions.terminalError?.kind === 'non-retryable';
+  const unavailable = !context.isResolving && !context.isReady && !context.isError;
+  let failure: ReactNode = null;
+  // A whole-surface load failure (no readable rows) is one outage: the block
+  // owns the surface and draws its own Retry for it, so the connection row
+  // stands down while the block is shown. Otherwise the exhausted connection
+  // row stacked a second "Connection lost / Retry" above the error card, two
+  // affordances for one failure (device defect uxs1). The row returns as soon
+  // as the block clears, so the socket's own recovery stays reachable. Rows
+  // that remain readable keep both: the list is still usable there, and the
+  // query retry and the socket retry are separate actions.
+  let failureOwnsRetry = false;
+  if (context.isError) {
+    failureOwnsRetry = true;
+    failure = (
+      <QueryError
+        placement="top"
+        className={centered ? 'pt-0' : undefined}
+        title={t('organization.boundary.loadErrorTitle')}
+        message={t('organization.boundary.loadErrorMessage')}
+        onRetry={handleRetry}
+        isRetrying={retrying}
+      />
+    );
+  } else if (unavailable || denied) {
+    const code = readTrpcErrorField(sessions.terminalError?.error, 'code');
+    let variant: QueryErrorVariant = 'permission';
+    let title: string | undefined = undefined;
+    let message: string | undefined = undefined;
+    if (unavailable && context.organizationId !== null) {
+      title = t('organization.boundary.organizationUnavailable');
+      message = t('organization.boundary.unavailableSessionsDescription');
+    } else if (denied && code === 'NOT_FOUND') {
+      variant = 'not-found';
+    } else if (denied && code !== 'FORBIDDEN' && code !== 'UNAUTHORIZED') {
+      variant = 'neutral';
+      title = t('home.couldNotLoadSessions');
+      message = failureLabel;
+    }
+    failure = (
+      <>
+        <QueryError
+          placement="top"
+          className={centered ? 'pt-0' : undefined}
+          variant={variant}
+          title={title}
+          message={message}
+        />
+        <Button
+          variant="outline"
+          accessibilityLabel={t('organization.boundary.backToProfile')}
+          onPress={() => {
+            router.replace('/(app)/(tabs)/(3_profile)' as Href);
+          }}
+        >
+          <Text>{t('organization.boundary.backToProfile')}</Text>
+        </Button>
+      </>
+    );
+  } else if (
+    context.isReady &&
+    sessions.terminalError &&
+    // While the live tab's refresh-status line owns the rows-state failure
+    // (in flight or pull failed), one line speaks; a background-only terminal
+    // error still shows the load-failure label.
+    !statusLineOwnsFailure
+  ) {
+    const compact = content === 'rows';
+    // The compact form sits beside rows that are still readable, so the two
+    // retries stay separate there; the card form is the whole surface, so it
+    // is the single recovery action (see `failureOwnsRetry` above).
+    failureOwnsRetry = !compact;
+    failure = (
+      <View className="gap-1">
+        {!compact && (
+          <QueryError placement="top" className={centered ? 'pt-0' : undefined} message="" />
+        )}
+        <View className={cn('items-center', compact ? 'flex-row gap-2' : 'gap-4')}>
+          <Text
+            accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
+            className={cn('text-destructive', compact ? 'flex-1 text-xs' : 'text-center text-sm')}
+          >
+            {failureLabel}
+          </Text>
+          <Button
+            variant={compact ? 'ghost' : 'outline'}
+            size={compact ? 'sm' : 'default'}
+            onPress={handleRetry}
+            loading={retrying}
+            accessibilityLabel={t('common.retry')}
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      </View>
+    );
+    if (compact && !inlineNotices) {
+      failure = null;
+    }
+  }
+  let connectionLabel: string | null = null;
+  if (context.isReady && !isConnected && internet !== 'offline') {
+    if (reconnectExhausted) {
+      // The exhausted fact carries the surface's recovery action, so it yields
+      // while the load-failure block already owns one (see `failureOwnsRetry`).
+      // The passive Connecting…/Reconnecting… facts stay: they duplicate
+      // nothing.
+      connectionLabel = failureOwnsRetry ? null : t('agentChat.sessionConnection.connectionLost');
+    } else if (!sessions.isPaused) {
+      connectionLabel = wasConnected.current
+        ? t('agentChat.sessionConnection.reconnecting')
+        : t('agentChat.sessionConnection.connecting');
+    }
   }
 
-  return (
-    <View>
-      <SectionHeader
-        label="Agent sessions"
-        actionLabel="See all"
-        onActionPress={() => {
-          router.push('/(app)/(tabs)/(2_agents)' as Href);
-        }}
+  // The connection row paints only where the surface reports these inline (the
+  // Agents live tab): the offline line, the visible connection status, or the
+  // retry that backs it. Elsewhere — Home puts the same facts in its section
+  // header notice — the row was an empty child of the Home column's `gap-2`, so
+  // an invisible box still held the card 7 dp below the section label.
+  const offlineLine = inlineNotices && internet === 'offline';
+  const connectionStatus = inlineNotices && reconnectExhausted && connectionLabel !== null;
+  const connectionRetry =
+    inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;
+  const connectionRow = offlineLine || connectionStatus || connectionRetry;
+
+  // Status only the screen reader consumes, mounted here rather than inside the
+  // visible column: the column is drawn and dropped with its content, and a
+  // remount starts the announcement dedupe from nothing and speaks an unchanged
+  // message again. One node per message, one position. When the connection row
+  // paints its own visible status that row is the channel, so this copy clears.
+  const announcements = (
+    <>
+      <AccessibleStatus
+        message={connectionStatus ? null : connectionLabel}
+        tone="status"
+        className="absolute size-px overflow-hidden"
       />
-      {activeIsError ? (
-        <Text variant="muted" className="mx-4 mb-2 text-xs">
-          Showing saved sessions — live status may be out of date
-        </Text>
-      ) : null}
-      <View className="mx-4 gap-2">
-        {rows.map(row => {
-          if (row.kind === 'active') {
-            const { session } = row;
-            return (
-              <View
-                key={row.key}
-                className="overflow-hidden rounded-2xl border border-border bg-card"
-              >
-                <RemoteSessionRow
-                  session={session}
-                  variant="card"
-                  interactive={false}
-                  onPress={() => {
-                    navigateToSession(session.id);
-                  }}
-                />
-              </View>
-            );
-          }
-          const { session } = row;
-          return (
-            <View
-              key={row.key}
-              className="overflow-hidden rounded-2xl border border-border bg-card"
+      <AccessibleStatus
+        message={content === 'pending' ? t('common.loading') : null}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
+        <AccessibleStatus
+          message={t('agents.sessionList.updating')}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
+    </>
+  );
+
+  const feedback = (
+    <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
+      {connectionRow ? (
+        <View className="flex-row items-center gap-2">
+          {/* The app-wide OfflineBanner owns the offline announcement. */}
+          {internet === 'offline' ? (
+            <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
+          ) : (
+            <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
+          )}
+          {connectionRetry && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={STATE_ACTION_CLASS}
+              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
+              onPress={() => {
+                connection.retryConnection();
+              }}
             >
-              <StoredSessionRow
-                session={session}
-                sortBy="updated_at"
-                variant="card"
-                interactive={false}
-                onPress={() => {
-                  navigateToSession(session.session_id, session.organization_id);
-                }}
-              />
-            </View>
-          );
-        })}
-      </View>
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          )}
+        </View>
+      ) : null}
+      {refresh && content === 'rows' && (
+        // The live tab's reserved status line: screen-reader Updating while
+        // the pull is in flight, visible "Couldn't refresh" + Retry when it
+        // failed. Its height is allocated whenever rows are shown: a failure
+        // that arrives while the kept rows are on screen replaces empty space
+        // instead of pushing the rows down.
+        <View className="min-h-5">
+          <SessionListRefreshStatus
+            busy={refresh.busy}
+            failed={refresh.failed}
+            onRetry={handleRefreshRetry}
+            progressInBody={refresh.progressInBody}
+          />
+        </View>
+      )}
+      {failure}
     </View>
+  );
+  // The column is dropped when it would paint nothing: Home's card column then
+  // holds one child, so the card starts on the header's content edge instead of
+  // 7 dp below an invisible box. The announcements above keep their position
+  // either way, so nothing is re-spoken when the column appears or goes.
+  const hasVisibleContent = centered || connectionRow || refresh !== undefined || failure !== null;
+
+  return (
+    <>
+      {announcements}
+      {hasVisibleContent &&
+        (centered ? (
+          <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
+        ) : (
+          feedback
+        ))}
+    </>
   );
 }

@@ -18,6 +18,33 @@ export function requireNumericPlatformRepositories(
 }
 
 /**
+ * Whether a provider repository read must go back to the provider instead of
+ * answering from the integration's cached snapshot.
+ *
+ * A snapshot is the answer for a non-force read even when it is empty: a
+ * connected provider that reports no repositories is the connected-empty
+ * state, and re-fetching on every read turns a provider hiccup into a load
+ * error instead of that state. An integration that has never synced (no
+ * repositories and no `repositories_synced_at`) still syncs here, as does an
+ * explicit `forceRefresh` from the section's refresh affordance.
+ *
+ * When this returns `false`, `cachedRepositories` is a list (never `null`).
+ */
+export function shouldSyncProviderRepositories({
+  forceRefresh,
+  cachedRepositories,
+  repositoriesSyncedAt,
+}: {
+  forceRefresh: boolean;
+  cachedRepositories: PlatformRepository[] | null;
+  repositoriesSyncedAt: string | null;
+}): boolean {
+  if (forceRefresh) return true;
+  if (cachedRepositories === null) return true;
+  return cachedRepositories.length === 0 && repositoriesSyncedAt === null;
+}
+
+/**
  * Represents ownership of an integration
  * Can be either a user or an organization
  */
@@ -38,12 +65,10 @@ export type WebhookEvent = {
 };
 
 /**
- * GitHub requester information
+ * Persisted requester and pending-approval metadata shapes. They are declared
+ * once, by the zod schemas that validate the stored JSON.
  */
-export type GitHubRequester = {
-  id: string;
-  login: string;
-};
+export type { GitHubRequester, KiloRequester, PendingApprovalMetadata } from './schemas';
 
 export type InstallationToken = {
   token: string;
@@ -60,24 +85,4 @@ export type GitHubInstallationData = {
   permissions: Record<string, unknown>;
   events: string[];
   created_at: string;
-};
-
-/**
- * Kilo User requester information
- */
-
-export type KiloRequester = {
-  kilo_user_id: string;
-  kilo_user_email: string;
-  kilo_user_name: string;
-  requested_at: string;
-};
-
-/**
- * Pending approval metadata structure
- */
-export type PendingApprovalMetadata = {
-  status: string;
-  requester?: KiloRequester;
-  github_requester?: GitHubRequester;
 };

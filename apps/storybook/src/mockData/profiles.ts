@@ -137,6 +137,7 @@ export const mockProfiles: ProfileSummary[] = [
     skillCount: 1,
     agentCount: 1,
     kiloCommandCount: 0,
+    instructionCount: 0,
   },
   {
     id: 'profile-2',
@@ -151,6 +152,7 @@ export const mockProfiles: ProfileSummary[] = [
     skillCount: 0,
     agentCount: 0,
     kiloCommandCount: 0,
+    instructionCount: 0,
   },
   {
     id: 'profile-3',
@@ -165,6 +167,7 @@ export const mockProfiles: ProfileSummary[] = [
     skillCount: 0,
     agentCount: 0,
     kiloCommandCount: 1,
+    instructionCount: 0,
   },
   {
     id: 'profile-4',
@@ -179,6 +182,7 @@ export const mockProfiles: ProfileSummary[] = [
     skillCount: 0,
     agentCount: 0,
     kiloCommandCount: 2,
+    instructionCount: 0,
   },
   {
     id: 'profile-5',
@@ -193,6 +197,7 @@ export const mockProfiles: ProfileSummary[] = [
     skillCount: 0,
     agentCount: 0,
     kiloCommandCount: 0,
+    instructionCount: 0,
   },
 ];
 
@@ -203,12 +208,14 @@ export const mockProfileDetails: ProfileDetails = {
   isDefault: true,
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-02T00:00:00Z',
+  lastUsedAt: '2025-01-02T00:00:00Z',
   vars: mockProfileVars,
   commands: mockProfileCommands,
   mcpServers: mockProfileMcpServers,
   skills: mockProfileSkills,
   agents: mockProfileAgents,
   kiloCommands: [],
+  instructions: [],
 };
 
 export const mockEmptyProfileDetails: ProfileDetails = {
@@ -218,12 +225,14 @@ export const mockEmptyProfileDetails: ProfileDetails = {
   isDefault: false,
   createdAt: '2025-01-07T00:00:00Z',
   updatedAt: '2025-01-07T00:00:00Z',
+  lastUsedAt: null,
   vars: [],
   commands: [],
   mcpServers: [],
   skills: [],
   agents: [],
   kiloCommands: [],
+  instructions: [],
 };
 
 export const mockLocalDevProfileDetails: ProfileDetails = {
@@ -233,6 +242,7 @@ export const mockLocalDevProfileDetails: ProfileDetails = {
   isDefault: false,
   createdAt: '2025-01-03T00:00:00Z',
   updatedAt: '2025-01-03T00:00:00Z',
+  lastUsedAt: null,
   vars: [
     {
       key: 'DATABASE_URL',
@@ -261,6 +271,7 @@ export const mockLocalDevProfileDetails: ProfileDetails = {
   skills: [],
   agents: [],
   kiloCommands: [],
+  instructions: [],
 };
 
 export const mockStagingProfileDetails: ProfileDetails = {
@@ -270,6 +281,7 @@ export const mockStagingProfileDetails: ProfileDetails = {
   isDefault: false,
   createdAt: '2025-01-04T00:00:00Z',
   updatedAt: '2025-01-05T00:00:00Z',
+  lastUsedAt: null,
   vars: [
     {
       key: 'NODE_ENV',
@@ -302,4 +314,5 @@ export const mockStagingProfileDetails: ProfileDetails = {
   skills: [],
   agents: [],
   kiloCommands: [],
+  instructions: [],
 };

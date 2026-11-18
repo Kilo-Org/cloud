@@ -17,16 +17,27 @@
 //   - render the four states: loading, retryable (fetch-to-completion
 //     error), empty (0 listed files), happy
 
+/* eslint-disable max-lines -- cohesive navigator component: the four states plus the search and pagination rules */
+
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Platform, Pressable, type TextInput, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
+import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { formatNumber } from '@/lib/format';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
   useFetchToCompletion,
@@ -35,15 +46,15 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
 // are `useCallback`-stable.
 const MemoNavigatorFileRow = memo(NavigatorFileRow);
-
-// Matches the previous ScrollView `contentContainerClassName="pb-8 pt-2"`.
-const LIST_CONTENT_STYLE: ViewStyle = { paddingBottom: 32, paddingTop: 8 };
 
 // Identity-stable per-path row callbacks (the row's `onSelect`/`onToggleViewed`
 // take no args, so the path is bound once and cached in a ref map).
@@ -57,6 +68,7 @@ type PrDiffFileNavigatorProps = {
   /** Overview `changedFiles` count: the authoritative total for progress + truncation. */
   readonly changedFiles: number;
   readonly onDismiss?: () => void;
+  readonly header?: ReactNode;
 };
 
 function countViewed(files: PrReviewFile[], isViewed: (path: string) => boolean): number {
@@ -76,10 +88,19 @@ export function PrDiffFileNavigator({
   headSha,
   changedFiles,
   onDismiss,
+  header,
 }: PrDiffFileNavigatorProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const searchRef = useRef<string>('');
+  // The navigator is a formSheet whose bottom edge sits on the Android system
+  // bar, so the list's bottom content padding carries the system inset.
+  const { bottom } = useSafeAreaInsets();
+  const listContentStyle = useMemo<ViewStyle>(
+    () => ({ paddingBottom: 32 + (Platform.OS === 'android' ? bottom : 0), paddingTop: 8 }),
+    [bottom]
+  );
   // Re-render trigger when the uncontrolled search field changes — refs
   // alone don't cause re-renders, but we don't want to re-mount the
   // TextInput on every keystroke (per iOS rule), so the value lives in
@@ -93,8 +114,17 @@ export function PrDiffFileNavigator({
     number,
     enabled: true,
   });
-  const viewed = usePrReviewViewedFiles({ owner, repo, number }, headSha);
+  // The viewed set is keyed by the live provider ref (s6, identity rule 17),
+  // so the sheet toggling a file here and the diff list behind it read and
+  // write the SAME provider-scoped set — and never a same-numbered PR's.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchAll = useFetchToCompletion(query, changedFiles);
+  // The terminal states speak the scope's provider: a GitLab merge request
+  // never says "pull request", and only GitHub can blame a missing Kilo
+  // GitHub App. Same selector the Files tab uses, so the two surfaces cannot
+  // drift.
+  const copy = usePrDiffStateCopy({ owner, repo, number });
 
   const hasActiveSearch = searchRef.current.trim().length > 0;
 
@@ -112,12 +142,18 @@ export function PrDiffFileNavigator({
       hasActiveSearch &&
       !query.isFetching &&
       query.hasNextPage &&
-      !fetchAll.isRunning &&
-      !fetchAll.error
+      fetchAll.feedback.status !== 'pending' &&
+      fetchAll.failure === null
     ) {
       void runRef.current();
     }
-  }, [hasActiveSearch, query.isFetching, query.hasNextPage, fetchAll.isRunning, fetchAll.error]);
+  }, [
+    hasActiveSearch,
+    query.isFetching,
+    query.hasNextPage,
+    fetchAll.feedback.status,
+    fetchAll.failure,
+  ]);
 
   const filtered = useMemo(
     () => filterNavigatorFiles(files, searchRef.current),
@@ -132,7 +168,7 @@ export function PrDiffFileNavigator({
 
   const handleSelectFile = useCallback(
     (path: string) => {
-      requestScrollToFile({ owner, repo, number, path });
+      requestScrollToFile({ owner, repo, number, ref: scope.ref, path });
       if (onDismiss) {
         onDismiss();
         return;
@@ -141,7 +177,7 @@ export function PrDiffFileNavigator({
         router.back();
       }
     },
-    [owner, repo, number, onDismiss, router]
+    [owner, repo, number, scope.ref, onDismiss, router]
   );
 
   const handleToggleViewed = useCallback(
@@ -193,181 +229,216 @@ export function PrDiffFileNavigator({
     [viewed, getRowCallbacks]
   );
 
+  let body: ReactNode = null;
   if (firstPageErrorState?.kind === 'not-found') {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">Pull request unavailable</Text>
+    // GitLab folds its connection failures into the same NOT_FOUND a deleted
+    // merge request produces, so provider scopes offer the read retry and the
+    // connection check instead of a dead end (GitHub keeps the terminal copy).
+    const isProviderScope = scope.ref.platform !== 'github';
+    body = (
+      <CenteredState>
+        <View className="items-center px-6">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            {copy.unavailableTitle}
+          </Text>
           <Text variant="muted" className="mt-1 text-center">
-            This PR can't be opened. It may have been deleted, the repository is private, or the
-            Kilo GitHub App isn't installed on it.
+            {copy.unavailableMessage}
+          </Text>
+          {isProviderScope ? (
+            <PrReviewUnavailableActions
+              onRetry={() => {
+                void query.refetch();
+              }}
+              isRetrying={query.isFetching}
+            />
+          ) : null}
+        </View>
+      </CenteredState>
+    );
+  } else if (firstPageErrorState?.kind === 'permission') {
+    body = (
+      <CenteredState>
+        <View className="items-center px-6">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            {t('common.accessDenied')}
+          </Text>
+          <Text variant="muted" className="mt-1 text-center">
+            {copy.accessDeniedMessage}
           </Text>
         </View>
-      </View>
+      </CenteredState>
     );
-  }
-  if (firstPageErrorState?.kind === 'permission') {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">Access denied</Text>
-          <Text variant="muted" className="mt-1 text-center">
-            You don't have permission to view this pull request.
+  } else if (firstPageErrorState) {
+    body = (
+      <CenteredState>
+        <View className="items-center gap-3 px-6">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            {t('prReview.fileNavigator.couldNotLoadFiles')}
           </Text>
-        </View>
-      </View>
-    );
-  }
-  if (firstPageErrorState?.kind === 'retryable' || firstPageErrorState?.kind === 'reconnect') {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-3 px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">Couldn't load files</Text>
           <Text variant="muted" className="text-center">
-            Check your connection and try again.
+            {t('organization.boundary.loadErrorMessage')}
           </Text>
           <Pressable
             onPress={() => {
               void query.refetch();
             }}
-            className="mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70"
+            className={cn(
+              STATE_ACTION_CLASS,
+              'mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70'
+            )}
             accessibilityRole="button"
-            accessibilityLabel="Retry loading files"
+            accessibilityLabel={t('prReview.fileNavigator.retryLoadingFiles')}
           >
-            <Text className="text-sm font-medium text-foreground">Retry</Text>
+            <Text className="text-sm font-medium text-foreground">{t('common.retry')}</Text>
           </Pressable>
         </View>
-      </View>
+      </CenteredState>
     );
-  }
-
-  if (query.isLoading && files.length === 0) {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 gap-3 px-4 pt-2">
-          <View className="flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-            <Search size={16} color={colors.mutedForeground} />
-            <TextInput
-              ref={inputRef}
-              defaultValue=""
-              editable={false}
-              placeholder="Filter files by path"
-              placeholderTextColor={colors.mutedForeground}
-              accessibilityLabel="Filter files by path"
-              className="flex-1 text-sm leading-[normal] text-foreground"
-            />
-          </View>
-          {[0, 1, 2, 3, 4].map(index => (
-            <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
-              <Skeleton className="h-5 w-5 rounded-md" />
-              <View className="flex-1 gap-1.5">
-                <Skeleton className="h-3.5 w-3/4 rounded-md" />
-                <Skeleton className="h-3 w-1/4 rounded-md" />
-              </View>
+  } else if (query.isLoading && files.length === 0) {
+    body = (
+      <View className="flex-1 gap-3 px-4 pt-2">
+        {[0, 1, 2, 3, 4].map(index => (
+          <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
+            <Skeleton className="h-5 w-5 rounded-md" />
+            <View className="flex-1 gap-1.5">
+              <Skeleton className="h-3.5 w-3/4 rounded-md" />
+              <Skeleton className="h-3 w-1/4 rounded-md" />
             </View>
-          ))}
-        </View>
-      </View>
-    );
-  }
-
-  if (!query.isLoading && files.length === 0) {
-    return (
-      <View className="flex-1 bg-background">
-        <EmptyState
-          icon={Search}
-          title="No files changed"
-          description="This pull request has no file changes."
-        />
-      </View>
-    );
-  }
-
-  const showLoadAllRetry = Boolean(fetchAll.error) && !fetchAll.isRunning && query.hasNextPage;
-  // A scroll-triggered later-page failure (no search) retries just that page.
-  // `!fetchAll.error` keeps it mutually exclusive with the load-all banner.
-  const showLaterPageRetry = laterPageError && !hasActiveSearch && !fetchAll.error;
-  const showRetry = showLoadAllRetry || showLaterPageRetry;
-  const retryMessage = showLoadAllRetry ? 'Failed to load all files' : "Couldn't load more files";
-  const retryLabel = showLoadAllRetry ? 'Retry loading all files' : 'Retry loading more files';
-  const retryAction = showLoadAllRetry ? fetchAll.run : query.fetchNextPage;
-  // Truncated when pagination hasn't finished, errored, or GitHub's 3,000-file
-  // listing cap left fewer listed files than the overview's changed-file count.
-  const isTruncated = query.hasNextPage || Boolean(fetchAll.error) || changedFiles > files.length;
-
-  return (
-    <View className="flex-1 bg-background">
-      <View className="mx-4 mt-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-        <Search size={16} color={colors.mutedForeground} />
-        <TextInput
-          ref={inputRef}
-          defaultValue=""
-          placeholder="Filter files by path"
-          placeholderTextColor={colors.mutedForeground}
-          accessibilityLabel="Filter files by path"
-          onChangeText={value => {
-            searchRef.current = value;
-            setSearchVersion(version => version + 1);
-          }}
-          className="flex-1 text-sm leading-[normal] text-foreground"
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-          clearButtonMode="while-editing"
-        />
-      </View>
-
-      <View className="mx-4 mt-2 flex-row items-center justify-between">
-        <Text variant="muted" className="text-xs">
-          {viewedCount.toLocaleString()} of {files.length.toLocaleString()} viewed
-          {isTruncated ? ' of listed files' : ''}
-        </Text>
-        {fetchAll.isRunning ? (
-          <View className="flex-row items-center gap-1.5">
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-            <Text variant="muted" className="text-xs">
-              Loading {fetchAll.loadedFiles.toLocaleString()} of {changedFiles.toLocaleString()}…
-            </Text>
           </View>
-        ) : null}
+        ))}
       </View>
-
-      {showRetry ? (
-        <View className="mx-4 mt-2 flex-row items-center justify-between rounded-md border border-border bg-card px-3 py-2">
-          <Text className="text-xs text-destructive">{retryMessage}</Text>
-          <Pressable
-            onPress={() => void retryAction()}
-            className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel={retryLabel}
-          >
-            <Text className="text-xs font-medium text-foreground">Retry</Text>
-          </Pressable>
+    );
+  } else if (files.length === 0) {
+    body = (
+      <EmptyState
+        icon={Search}
+        title={t('prReview.noFilesChanged')}
+        description={t('prReview.noFilesChangedDescription')}
+      />
+    );
+  } else if (filtered.length === 0) {
+    body = (
+      <CenteredState>
+        <View className="px-6">
+          <Text variant="muted" className="text-center text-sm">
+            {t('prReview.fileNavigator.noMatches', { query: searchRef.current })}
+          </Text>
         </View>
-      ) : null}
-
+      </CenteredState>
+    );
+  } else {
+    body = (
       <FlashList
         data={filtered}
         renderItem={renderItem}
         keyExtractor={file => file.path}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={LIST_CONTENT_STYLE}
+        contentContainerStyle={listContentStyle}
         onEndReached={() => {
-          // During a search, fetch-to-completion loads pages; a scroll fetch would race it.
           if (!hasActiveSearch && query.hasNextPage && !query.isFetchingNextPage) {
             void query.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.5}
-        ListEmptyComponent={
-          <View className="px-6 py-12">
-            <Text variant="muted" className="text-center text-sm">
-              No files match "{searchRef.current}"
-            </Text>
-          </View>
-        }
       />
-    </View>
+    );
+  }
+
+  const showLoadAllRetry =
+    fetchAll.failure !== null && fetchAll.feedback.status !== 'pending' && query.hasNextPage;
+  // A scroll-triggered later-page failure (no search) retries just that page.
+  // `fetchAll.failure === null` keeps it mutually exclusive with the load-all banner.
+  const showLaterPageRetry = laterPageError && !hasActiveSearch && fetchAll.failure === null;
+  const showRetry = showLoadAllRetry || showLaterPageRetry;
+  const retryMessage = showLoadAllRetry
+    ? t('prReview.fileNavigator.failedToLoadAllFiles')
+    : t('prReview.fileNavigator.couldNotLoadMoreFiles');
+  const retryLabel = showLoadAllRetry
+    ? t('prReview.fileNavigator.retryLoadingAllFiles')
+    : t('prReview.fileNavigator.retryLoadingMoreFiles');
+  const retryAction = showLoadAllRetry ? fetchAll.run : query.fetchNextPage;
+  // Truncated when pagination hasn't finished, errored, or GitHub's 3,000-file
+  // listing cap left fewer listed files than the overview's changed-file count.
+  const isTruncated = query.hasNextPage || fetchAll.failure !== null || changedFiles > files.length;
+
+  return (
+    <>
+      <View collapsable={false} className="bg-background pb-2">
+        {header}
+        <View className="mx-4 mt-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
+          <Search size={16} color={colors.mutedForeground} />
+          <Input
+            ref={inputRef}
+            defaultValue=""
+            editable={!query.isLoading || files.length > 0}
+            placeholder={t('prReview.fileNavigator.filterPlaceholder')}
+            placeholderTextColor={colors.mutedForeground}
+            accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
+            onChangeText={value => {
+              searchRef.current = value;
+              setSearchVersion(version => version + 1);
+            }}
+            // The shared single-line box supplies the height floor and the one
+            // line box; this field keeps only its own size and text size.
+            className="flex-1 text-sm text-foreground"
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+        </View>
+
+        {files.length > 0 && (
+          <View className="mx-4 mt-2 flex-row items-center justify-between">
+            <Text variant="muted" className="text-xs">
+              {/* `count` is the listed total: it selects the plural category
+                  whose participle agrees with it, while `total` carries the
+                  locale-grouped figure the catalogs interpolate. */}
+              {isTruncated
+                ? t('prReview.fileNavigator.viewedOfListed', {
+                    count: files.length,
+                    viewed: formatNumber(viewedCount, i18n.language),
+                    total: formatNumber(files.length, i18n.language),
+                  })
+                : t('prReview.fileNavigator.viewedCount', {
+                    count: files.length,
+                    viewed: formatNumber(viewedCount, i18n.language),
+                    total: formatNumber(files.length, i18n.language),
+                  })}
+            </Text>
+            {fetchAll.feedback.status === 'pending' ? (
+              <View className="flex-row items-center gap-1.5">
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+                <Text variant="muted" className="text-xs">
+                  {t('prReview.fileNavigator.loadingFiles', {
+                    loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
+                    total: formatNumber(changedFiles, i18n.language),
+                  })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        {showRetry ? (
+          <View className="mx-4 mt-2 flex-row items-center justify-between rounded-md border border-border bg-card px-3 py-2">
+            <Text className="text-xs text-destructive">{retryMessage}</Text>
+            <Pressable
+              onPress={() => void retryAction()}
+              className={cn(
+                STATE_ACTION_CLASS,
+                'rounded-md border border-border bg-card px-3 py-1 active:opacity-70'
+              )}
+              accessibilityRole="button"
+              accessibilityLabel={retryLabel}
+            >
+              <Text className="text-xs font-medium text-foreground">{t('common.retry')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+      {body}
+    </>
   );
 }

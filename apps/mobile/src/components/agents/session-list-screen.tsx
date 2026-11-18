@@ -1,289 +1,571 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Platform, Pressable, useWindowDimensions, View } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+/* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { AppState, Keyboard, Pressable, View } from 'react-native';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
+import { Bot, History } from '@/components/ui/icons';
 
-import { ActiveNowSection } from '@/components/agents/active-now-section';
-import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
+import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { EmptyState } from '@/components/empty-state';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
+import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
 import {
-  AgentSessionListContent,
-  FAB_MARGIN,
-  FAB_SIZE,
-} from '@/components/agents/session-list-content';
-import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
+  filterSessionsByStatusKind,
+  parseStatusFilterKind,
+} from '@/components/agents/live-session-status-filter';
+import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
+import { SessionListHeader } from '@/components/agents/session-list-header';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
-import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { sessionListNoMatchDescription } from '@/components/agents/session-list-empty-copy';
+import { SessionStatusFilterBar } from '@/components/agents/session-status-filter-bar';
+import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
+import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
+import { usePullRefresh } from '@/components/agents/use-pull-refresh';
+import { SessionListFab } from '@/components/agents/session-list-fab';
+import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import {
+  useAgentsBottomBands,
+  useSessionListInsets,
+} from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
-import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
-import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
-import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
-import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
-import { ScreenHeader } from '@/components/screen-header';
-import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
-import { useOrganization } from '@/lib/organization-context';
+import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
+import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
+import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
+import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
+import { getRevisionSnapshot } from '@/lib/session-attention';
+import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
+import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { cn } from '@/lib/utils';
 
-import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import {
+  type Href,
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+  useScrollToTop,
+} from 'expo-router';
 
-export function AgentSessionListScreen() {
+type AgentSessionListScreenProps = { tabHeader?: ReactNode };
+export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListScreenProps> = {}) {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { t } = useTranslation();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const { left, right } = useSafeAreaInsets();
+  // The tabs layout's width-aware label decision rides along, so this screen's
+  // clearance (list frame, FAB and state-surface insets) tracks the bar height.
+  const tabBarHeight = useEffectiveTabBarHeight();
+  // The empty state's own height grows with Dynamic Type, so the list chrome's
+  // presentation decision needs the window's text scale (see
+  // `useAgentsListChrome`).
+  const fontScale = useLiveFontScale();
 
-  const tabBarHeight = useMemo(
-    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
-    [bottom, fontScale]
+  const context = useLiveSessionContext();
+  const { organizationId, isError: isContextError, refetch: refetchContext } = context;
+  const sessions = useLiveAgentSessions({ organizationId, enabled: context.isReady });
+  const { activeSessions, refetch } = sessions;
+  const content = liveSessionContent(context, sessions);
+  const hasLiveRows = content === 'rows';
+  // A status link from the Home `Live now` card narrows the live list to one
+  // state. The parameter is transient: it is not stored, so it cannot silently
+  // narrow a later visit. The active filter is drawn by
+  // `SessionStatusFilterBar`, which clears it through `clearStatusFilter`.
+  const params = useLocalSearchParams<{ status?: string }>();
+  const statusKind = parseStatusFilterKind(params.status);
+  // A failed foreground refresh keeps the cached rows on screen. That failure
+  // must speak through the reserved status line (one inline "Couldn't refresh"
+  // with Retry) instead of the load-failure block, which would push the kept
+  // rows down. Treat it exactly like a failed pull when rows are still shown.
+  const retryableRowsFailure = hasLiveRows && sessions.terminalError?.kind === 'retryable';
+
+  const query = useLiveSessionQuery(activeSessions);
+  const { visibleSessions: filteredSessions, isSearching } = query;
+  // The status narrowing applies after the search and persisted filters, so the
+  // filter picker still offers every option the live set contains and
+  // `canFilter` cannot shrink to the selected status and hide its own control.
+  const visibleSessions = useMemo(
+    () => filterSessionsByStatusKind(filteredSessions, statusKind),
+    [filteredSessions, statusKind]
   );
-
-  const { organizationId, isLoaded: orgLoaded } = useOrganization();
-  const {
-    platformFilter,
-    projectFilter,
-    sortBy,
-    hasLoaded: filtersLoaded,
-    setFilters,
-    setPlatformFilter,
-    setProjectFilter,
-  } = usePersistedAgentSessionFilters();
+  // The no-match body is the state the tab bar's band was reopened for, and its
+  // compact form fills that band down to the corner the FAB floats in. Since
+  // reserving the FAB's band here is what parked the state's second line and
+  // action behind the tab bar in a short landscape window (landscape spot
+  // defect e8), a state that fills the band owns it and the FAB yields: it
+  // must not sit over the description or the Clear action at a large text
+  // scale. The list bodies keep it — they clear it with their own frame inset —
+  // and so does the load-failure body, whose FAB is the only creation
+  // affordance while the list is failing.
+  const noMatchBody = hasLiveRows && visibleSessions.length === 0;
+  // The persisted filters and the transient status filter both narrow the list
+  // as filters: the no-match body names them in one "Clear filters" action that
+  // never touches the search text.
+  const filtersNarrow = query.activeFilterCount > 0 || statusKind !== null;
+  const showFab = context.isReady && content !== 'empty' && !noMatchBody;
+  const keyboard = useOwnedKeyboard();
+  // The pad the body frame takes. It equals the keyboard height whenever the
+  // window can hold the whole band, and only falls short in a window too short
+  // for it — where the FAB's band must not subtract height the body never gave
+  // up. Both read the same value in the same render, so the reserved band
+  // cannot fall a commit behind the pad.
+  const keyboardLift = useKeyboardLiftPad(keyboard.occlusion);
+  const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(
+    tabBarHeight,
+    showFab,
+    keyboardLift.pad
+  );
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const showSearch = searchOpen || query.searchQuery.length > 0;
+  useEffect(() => {
+    if (searchOpen) {
+      query.searchInputRef.current?.focus();
+    }
+  }, [searchOpen, query.searchInputRef]);
 
-  const {
-    searchQuery,
-    searchInputRef,
-    hasText,
-    awaitingCommit,
-    handleSearchInputChange,
-    handleClearSearchInput,
-    clearSearchInput,
-    searchController,
-  } = useSessionSearchInput();
-
-  const ready = filtersLoaded && orgLoaded;
-
-  const {
-    storedSessions,
-    activeSessions,
-    activeIsError,
-    isLoading,
-    paging,
-    refetch,
-    handleRetry,
-    handleRefetch,
-    isSearching,
-    search,
-    projectOptions,
-    contentIsError,
-    pinnedActive,
-    sections,
-  } = useAgentSessionListData({
-    organizationId,
-    platformFilter,
-    projectFilter,
-    sortBy,
-    ready,
-    searchQuery,
-  });
   const refetchRef = useRef(refetch);
   useEffect(() => {
     refetchRef.current = refetch;
   }, [refetch]);
+
+  // The wrapped live refetch resolves `false` when the refresh did not land an
+  // accepted result; the context path reports through its own error state.
+  const refetchRequest = useCallback(async () => {
+    if (isContextError) {
+      await refetchContext();
+      return true;
+    }
+    return refetch();
+  }, [isContextError, refetchContext, refetch]);
+  // The pull owns only gesture feedback: past the budget the spinner stops and
+  // the reserved status line carries "Couldn't refresh" + Retry, so a hung
+  // fetch cannot pin the spinner with no next action.
+  const pull = usePullRefresh(refetchRequest);
+  const handleRefresh = pull.startPull;
+  const { markSettled, startRetry } = pull;
+  // The rows list starts at the list's top edge, where Android's floating
+  // indicator would rest on the first row's text (device defect uxs1):
+  // `RowsRefreshControl` carries the platform rule that keeps it off the rows.
+  const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+  const rowsControl = <RowsRefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+
+  // The reserved status line's Retry replaces the removed in-flow failure
+  // block, so it inherits that block's idempotence: a second tap before the
+  // first refetch settles must not start a second one.
+  const retryLock = useRef(false);
+  useEffect(() => {
+    if (!pull.busy && !pull.refreshing) {
+      retryLock.current = false;
+    }
+  }, [pull.busy, pull.refreshing]);
+  const handleRefreshRetry = useCallback(() => {
+    if (retryLock.current) {
+      return;
+    }
+    retryLock.current = true;
+    startRetry();
+  }, [startRetry]);
+
+  // Focus return and app-foreground refreshes run outside the pull lifecycle.
+  // A failed pull leaves the reserved line on "Couldn't refresh" + Retry; when
+  // one of these refreshes lands an accepted result the list is up to date, so
+  // the stale failure line retires exactly as the query-driven error did.
+  const runForegroundRefresh = useCallback(() => {
+    void (async () => {
+      const accepted = await refetchRef.current();
+      if (accepted) {
+        markSettled();
+      }
+    })();
+  }, [markSettled]);
   useFocusEffect(
     useCallback(() => {
-      void refetchRef.current();
+      runForegroundRefresh();
+    }, [runForegroundRefresh])
+  );
+
+  const listRef = useRef<FlashListRef<ActiveSession>>(null);
+  useScrollToTop(listRef);
+
+  // Each row re-reads the ack store through its own `useSyncExternalStore`
+  // subscription (`useSessionAttentionRevision`). The snapshot taken when the
+  // tab regains focus passes back down as `extraData`, so visible cells
+  // re-render on return without remounting the list — preserving scroll.
+  const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
+  useFocusEffect(
+    useCallback(() => {
+      setAttentionFocusRevision(getRevisionSnapshot());
     }, [])
   );
 
-  // App-foreground refresh for the Agents list. The stored query opts out of
-  // React Query's native window-focus refetch (`refetchOnWindowFocus: false`
-  // from the list hook), so an OS foreground transition must be driven here —
-  // through the same wrapped `refetch` as navigation focus — to keep every
-  // stored refetch serialized by the shared operation coordinator (backfill
-  // and departure never overlap a refetch).
+  // Refresh the focused list through the live-sync owner.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') {
-        void refetchRef.current();
+      if (nextState === 'active' && navigation.isFocused()) {
+        runForegroundRefresh();
       }
     });
     return () => {
       subscription.remove();
     };
-  }, []);
-
-  const showSearchBusy = selectShowSearchBusy({
-    awaitingCommit,
-    isSearching,
-    isFetching: search.isFetching,
-  });
-
-  const hasPinnedActive = pinnedActive.length > 0;
-
-  const organizationIdBySessionId = useMemo(
-    () => new Map(storedSessions.map(s => [s.session_id, s.organization_id])),
-    [storedSessions]
-  );
+  }, [navigation, runForegroundRefresh]);
 
   const navigateToSession = useAgentSessionNavigator();
 
-  const handleEndReached = useCallback(() => {
-    if (shouldLoadMoreSessions(paging)) {
-      void paging.fetchNextPage();
-    }
-  }, [paging]);
+  // Clear the transient status filter the Home card set. It stays separate from
+  // the persisted platform and project filters, which the filter picker owns.
+  const clearStatusFilter = useCallback(() => {
+    router.setParams({ status: undefined });
+  }, [router]);
 
-  const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
-  const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
-
-  // Inline error recomputed here (same pure selector, same inputs) so the
-  // body-model test continues covering it.
-  const showInlineError = useMemo(
-    () =>
-      selectSessionListBodyModel({
-        hasHistoryContent: sections.length > 0,
-        hasStoredSessions: storedSessions.length > 0,
-        hasMoreHistory: paging.hasNextPage,
-        hasPinnedActive,
-        hasActiveQuery: isSearching || hasActiveFilter,
-        isSearching,
-        isError: contentIsError,
-        activeIsError,
-      }).showInlineError,
-    [
-      activeIsError,
-      contentIsError,
-      hasActiveFilter,
-      hasPinnedActive,
-      isSearching,
-      paging.hasNextPage,
-      sections,
-      storedSessions,
-    ]
+  // Both routes into the stored-session list — the header control and the
+  // accepted-empty body link — name that surface: a bare `home.seeAll` here
+  // claimed a longer live list that is not on screen (finding live-now-all),
+  // and two names for one destination read as two different surfaces.
+  const historyLabel = t('agents.sessionList.pastSessions');
+  const openHistory = () => {
+    router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+  };
+  const emptyStateHistoryAction = (
+    <Pressable
+      onPress={openHistory}
+      accessibilityRole="button"
+      accessibilityLabel={historyLabel}
+      testID="agents-view-history-empty"
+      className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
+    >
+      <Text className="text-sm text-primary" numberOfLines={1}>
+        {historyLabel}
+      </Text>
+    </Pressable>
+  );
+  const historyAction = (
+    <IconButton
+      accessibilityLabel={historyLabel}
+      testID="agents-view-history"
+      onPress={openHistory}
+    >
+      <History size={20} color={colors.mutedForeground} />
+    </IconButton>
   );
 
-  const handleClearQuery = useCallback(() => {
-    clearSearchInput();
-    searchController.clearBroadly(setFilters);
-  }, [clearSearchInput, searchController, setFilters]);
+  // One handler shared by every row: with the row memoised, a poll that writes
+  // an unchanged payload leaves each row's props referentially stable and
+  // skips its render entirely. The row's relative timestamp does not come
+  // through these props: the row samples the shared clock itself, so it ages
+  // without a new payload.
+  const handleRowPress = useCallback(
+    (session: ActiveSession) => {
+      navigateToSession(session.id, organizationId);
+    },
+    [navigateToSession, organizationId]
+  );
 
-  const fabStyle = useMemo(
-    () => ({
-      bottom: tabBarHeight + FAB_MARGIN,
-      right: 20,
-      width: FAB_SIZE,
-      height: FAB_SIZE,
-    }),
-    [tabBarHeight]
+  const renderItem = useCallback(
+    ({ item }: { item: ActiveSession }) => (
+      <RemoteSessionRow session={item} onPress={handleRowPress} />
+    ),
+    [handleRowPress]
+  );
+
+  // The FAB style, the side padding, the body measurement, and the centered
+  // states' reserve and presentation come from the list-chrome owner (see
+  // `useAgentsListChrome`). The rows list's bottom split stays here: the FAB
+  // clearance rides on the list's content, so the frame keeps only the tab bar
+  // (see `listInsets` below).
+  const {
+    onBodyLayout,
+    fabStyle,
+    sidePadding,
+    centeredBottomInset,
+    compactEmptyState,
+    compactLiveEmptyState,
+  } = useAgentsListChrome({
+    showFab,
+    tabBarHeight,
+    fontScale,
+    left,
+    right,
+    noMatchSecondaryAction: isSearching && filtersNarrow,
+  });
+
+  // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
+  // content must clear them. The tab bar keeps its viewport inset as the list
+  // frame's `marginBottom` — the same viewport inset `TabScreenScrollView` uses
+  // — so the list's own background runs clean to the tab bar edge with no bare
+  // band between the last row and the bar. The FAB's clearance rides on the
+  // list's content as `paddingBottom` instead: the button floats over the list,
+  // and the end padding still carries the last row clear of it. Frame margin
+  // plus content padding together match the screen's `StateSurfaceInsets`. The
+  // landscape side insets keep row text clear of the sensor housing; portrait
+  // insets are 0, keeping the geometry unchanged.
+  const listInsets = useMemo(() => {
+    const fabPad = showFab ? FAB_SIZE + FAB_MARGIN : 0;
+    return {
+      frame: { marginBottom: tabBarHeight },
+      content: { paddingTop: 0, paddingBottom: fabPad, paddingLeft: left, paddingRight: right },
+    };
+  }, [showFab, tabBarHeight, left, right]);
+
+  // The rows list's total band, mirroring `useAgentsBottomBands`'s `listBand`
+  // (the hook keeps that value private): while the FAB is admitted its overlay
+  // band joins the surface band, otherwise the surface band stands alone. The
+  // keyboard container's padding is exactly what `rowsFrameBand` falls short of
+  // the total, so `rowsFrameBand < rowsListBand` holds exactly while the IME is
+  // up.
+  const rowsListBand = Math.max(surfaceBand, showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : 0);
+  const keyboardUp = rowsFrameBand < rowsListBand;
+
+  // The rows list's frame and content insets. While the keyboard is down the
+  // screen's own split owns them: the frame ends at the tab bar (no bare band)
+  // and the FAB clearance rides on the content, so the button floats over the
+  // list and the last row still scrolls clear of it (see `listInsets` above).
+  // While the keyboard is up the container already pads the IME's occlusion, so
+  // the frame carries only the remainder of the rows band (`rowsFrameBand`) and
+  // the viewport ends at the band's edge instead of a whole IME height above it
+  // (review finding, session-list-screen.tsx:418). The landscape side insets
+  // keep row text clear of the sensor housing.
+  const keyboardRowsInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
+  const rowsInsets = keyboardUp ? keyboardRowsInsets : listInsets;
+
+  // Every no-match clear branch replaces the body in place, so the press holds
+  // the list for the settle window: the rows mount under the finger that
+  // released the action, and a repeat tap would open the row there.
+  const { handleClearSearch, handleClearFilters } = query;
+  const clearNoMatchSearch = useCallback(() => {
+    holdSessionListTouch();
+    handleClearSearch();
+  }, [handleClearSearch]);
+  const clearNoMatchFilters = useCallback(() => {
+    holdSessionListTouch();
+    handleClearFilters();
+    clearStatusFilter();
+  }, [handleClearFilters, clearStatusFilter]);
+  // The status bar's own Clear control sits above the list, so the rows it
+  // brings back land under the point it released too: it holds the list for the
+  // same window as the no-match action.
+  const handleClearStatusFilter = useCallback(() => {
+    holdSessionListTouch();
+    clearStatusFilter();
+  }, [clearStatusFilter]);
+
+  // The search field and the filter badge stay visible above this body, so the
+  // copy names every cause the way the actions do.
+  const noMatchDescription = sessionListNoMatchDescription(t, {
+    isSearching,
+    hasActiveFilters: filtersNarrow,
+  });
+  const noMatchActions = (
+    <View className="flex-row flex-wrap items-center justify-center gap-2">
+      {isSearching ? (
+        <Button
+          variant="outline"
+          size={compactEmptyState ? 'sm' : 'default'}
+          testID="agents-clear-search"
+          onPress={clearNoMatchSearch}
+          className={STATE_ACTION_CLASS}
+        >
+          <Text>{t('common.clearSearch')}</Text>
+        </Button>
+      ) : null}
+      {filtersNarrow ? (
+        <Button
+          variant="outline"
+          size={compactEmptyState ? 'sm' : 'default'}
+          testID="agents-clear-filters"
+          onPress={clearNoMatchFilters}
+          className={STATE_ACTION_CLASS}
+        >
+          <Text>{t('common.clearFilters')}</Text>
+        </Button>
+      ) : null}
+    </View>
+  );
+
+  let body: ReactNode = null;
+  if (!query.hasLoaded || content === 'pending') {
+    body = <SessionListSkeletonRows insets={{ left, right }} />;
+  } else if (hasLiveRows && visibleSessions.length === 0) {
+    // The reserved band is mounted here too (the sessions exist behind the
+    // filter), so the native control gets the same treatment as the rows
+    // list: on Android the band carries the in-flight spinner and the
+    // platform disc is parked off the body, so no second spinner is drawn
+    // over it (device defect uxs1). That body is centered, so it draws the
+    // pull's own progress while reduced motion is on, and the band then
+    // yields its spinner to it (`progressInBody` on the reserved line).
+    // The centered body clears the fixed tab bar through the surface
+    // reservation this screen already sets: `CenteredState`'s pending-layout
+    // fallback pads by `surface.bottomReservation` (the tab bar plus the FAB
+    // band) and its measured layout clamps by the same inset. Adding that band
+    // as a frame clearance here too reserved it twice and pushed the centered
+    // copy roughly half the band above the centre of the area above the bar.
+    body = (
+      <EmptyState
+        icon={Bot}
+        title={t('agents.sessionList.noMatches')}
+        compact={compactEmptyState}
+        refreshControl={rowsControl}
+        description={noMatchDescription}
+        action={noMatchActions}
+      />
+    );
+  } else if (content === 'empty') {
+    body = (
+      <LiveSessionListEmptyState
+        organizationId={organizationId}
+        refreshControl={refreshControl}
+        compact={compactLiveEmptyState}
+        historyAction={emptyStateHistoryAction}
+      />
+    );
+  } else if (hasLiveRows) {
+    // The tab-bar inset rides on the list frame, so the viewport ends at the tab
+    // bar; the FAB clearance rides on the content's `paddingBottom`, so the
+    // button floats over the list and the last row still scrolls clear of it.
+    body = (
+      // FlashList v2 recycles rows and keeps scroll position; the rows are
+      // homogeneous, so one item type is enough. `style` stays the frame object
+      // (FlashList's own root already carries `flex: 1`), where a `className`
+      // would be ignored.
+      <FlashList
+        ref={listRef}
+        data={visibleSessions}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        extraData={attentionFocusRevision}
+        getItemType={() => 'session'}
+        style={rowsInsets.frame}
+        contentContainerStyle={rowsInsets.content}
+        // Same contract as the history list: the compact search field above
+        // this list holds the keyboard, and a row must answer the first tap
+        // instead of the list consuming it to close the keyboard.
+        keyboardShouldPersistTaps="handled"
+        refreshControl={rowsControl}
+        maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
+      />
+    );
+  }
+
+  // The feedback band and the body share one keyboard container so every
+  // centered state (no-match, live-empty, skeletons, load failure) re-measures
+  // against the viewport the keyboard leaves, not the full window. The header
+  // and search field stay outside it and never move.
+  const region = (
+    <>
+      <View
+        className={query.hasLoaded && content === 'error' ? 'flex-1' : 'min-h-5'}
+        style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
+      >
+        <LiveSessionFeedback
+          context={context}
+          sessions={sessions}
+          failureLabel={t('agents.sessionList.couldNotLoadActive')}
+          compact
+          centered={query.hasLoaded && content === 'error'}
+          refresh={{
+            busy: pull.refreshing || pull.busy,
+            failed: pull.failed || retryableRowsFailure,
+            onRetry: handleRefreshRetry,
+            // The pull's progress belongs to the centered no-match body (the
+            // same state that mounts it), so the band does not draw a second
+            // spinner while that body shows one.
+            progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
+          }}
+          refreshControl={refreshControl}
+        />
+      </View>
+      {/* The body's wrapper measures the height the list can use; the error
+          state renders no body (its centered surface owns the space), so the
+          wrapper is skipped there to keep that layout unchanged. */}
+      {body ? (
+        <View className="flex-1" onLayout={onBodyLayout}>
+          {body}
+        </View>
+      ) : null}
+    </>
   );
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title="Agents"
-        size="large"
-        showBackButton={false}
-        className="px-[22px]"
-        headerRight={
-          <SessionListHeaderActions
-            hasActiveFilter={hasActiveFilter}
-            showNewSession={hasAnySessions}
-            onNewSession={() => {
-              router.push(getNewAgentSessionPath(organizationId) as Href);
-            }}
-            onOpenFilters={() => {
-              setShowFilterModal(true);
-            }}
-          />
-        }
-      />
-      <Animated.View layout={LinearTransition}>
-        <SessionFilterChips
-          platformFilter={platformFilter}
-          projectFilter={projectFilter}
-          projectOptions={projectOptions}
-          onRemovePlatform={platform => {
-            setPlatformFilter(prev => prev.filter(p => p !== platform));
+    <StateSurfaceInsets bottomInset={centeredBottomInset}>
+      <View className="flex-1 bg-background">
+        <SessionListHeader
+          title={t('common.agents')}
+          tabHeader={tabHeader}
+          headerAction={historyAction}
+          searchOpen={showSearch}
+          onOpenSearch={() => {
+            if (showSearch) {
+              query.searchInputRef.current?.focus();
+            } else {
+              setSearchOpen(true);
+            }
           }}
-          onRemoveProject={selectedGitUrl => {
-            setProjectFilter(prev => prev.filter(gitUrlValue => gitUrlValue !== selectedGitUrl));
+          canFilter={query.canFilter}
+          activeFilterCount={query.activeFilterCount}
+          onOpenFilters={() => {
+            Keyboard.dismiss();
+            setShowFilterModal(true);
           }}
-        />
-      </Animated.View>
-      {hasAnySessions ? (
-        <SessionListSearchHeader
-          inputRef={searchInputRef}
-          hasText={hasText}
-          showSearchBusy={showSearchBusy}
-          showInlineError={showInlineError}
-          onChangeText={handleSearchInputChange}
-          onClearSearch={handleClearSearchInput}
-        />
-      ) : null}
-      <Animated.View layout={LinearTransition} className="flex-1">
-        <AgentSessionListContent
-          searchInputRef={searchInputRef}
-          sections={sections}
-          hasAnySessions={hasAnySessions}
-          hasPinnedActive={hasPinnedActive}
-          isLoading={isLoading || !ready}
-          isError={contentIsError}
-          activeIsError={activeIsError}
-          hasStoredSessions={storedSessions.length > 0}
-          hasMoreHistory={paging.hasNextPage}
-          isFetchingNextPage={paging.isFetchingNextPage}
-          refetch={handleRefetch}
-          onRetry={handleRetry}
-          onEndReached={handleEndReached}
-          onSessionPress={navigateToSession}
-          hasActiveQuery={isSearching || hasActiveFilter}
-          isSearching={isSearching}
-          searchQuery={searchQuery}
-          onClearQuery={handleClearQuery}
-          onCreateSession={() => {
-            router.push(getNewAgentSessionPath(organizationId) as Href);
-          }}
-          sortBy={sortBy}
-          activeNowSection={
-            <ActiveNowSection
-              pinned={pinnedActive}
-              organizationIdBySessionId={organizationIdBySessionId}
-              onSessionPress={navigateToSession}
+          search={
+            <SessionListSearchHeader
+              inputRef={query.searchInputRef}
+              hasText={query.searchQuery.length > 0}
+              showSearchBusy={false}
+              onChangeText={query.handleSearchChange}
+              defaultValue={query.searchQuery}
+              compact
+              onClearSearch={query.handleClearSearch}
+              onFocus={keyboard.handleInputFocus}
+              onBlur={keyboard.handleInputBlur}
             />
           }
         />
-      </Animated.View>
-      {showFilterModal && (
+        {/* The Home card's status link shows the list narrowed to one state.
+            The bar names the state and the count and clears the parameter. */}
+        {hasLiveRows && statusKind !== null ? (
+          <SessionStatusFilterBar
+            kind={statusKind}
+            count={visibleSessions.length}
+            onClear={handleClearStatusFilter}
+          />
+        ) : null}
+        {/* Android runs edge-to-edge and never resizes the window for the IME,
+            so the body clears the IME natively: the shared lift pads by the
+            keyboard this screen's own field raised. The pad is clamped in a
+            window too short to hold the whole band, and the FAB's band above
+            reads the same value in this render. */}
+        <SessionListTouchGate>
+          <OwnedKeyboardLift pad={keyboardLift.pad} onLayout={keyboardLift.handleLayout}>
+            {region}
+          </OwnedKeyboardLift>
+        </SessionListTouchGate>
+        {/* Empty content owns its creation action; the no-match body owns the band. */}
+        {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         <SessionFilterModal
-          selectedPlatforms={platformFilter}
-          selectedProjects={projectFilter}
-          selectedSortBy={sortBy}
-          projectOptions={projectOptions}
+          visible={showFilterModal}
+          selectedPlatforms={query.platformFilter}
+          selectedProjects={query.projectFilter}
+          projectOptions={query.options.projectOptions}
+          platformOptions={query.options.platformOptions}
           onClose={() => {
             setShowFilterModal(false);
           }}
-          onApply={filters => {
-            setFilters(filters);
-          }}
+          onApply={query.handleApplyFilters}
         />
-      )}
-      {/* FAB visible when there are sessions — empty state already owns the creation CTA. */}
-      {hasAnySessions && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="New session"
-          testID="agents-new-session-fab"
-          onPress={() => {
-            router.push(getNewAgentSessionPath(organizationId) as Href);
-          }}
-          className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80"
-          style={fabStyle}
-        >
-          <Plus size={24} color={colors.primaryForeground} />
-        </Pressable>
-      )}
-    </View>
+      </View>
+    </StateSurfaceInsets>
   );
 }

@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Seanca juaj e agjentit ka një përditësim",
+      "lowBalance": "Bilanci juaj ka nevojë për vëmendje",
+      "spendAlert": "Shpenzimi juaj ka nevojë për vëmendje",
+      "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje",
+      "securityUpdate": "Një kontroll sigurie ka një përditësim",
+      "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alarmi i bilancit të ulët",
+      "body": "Bilanci i {{organizationName}} ra nën ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Alarmi i shpenzimit",
+      "body": "Shpenzimi i {{scopeName}} kaloi ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} në {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Gjetje e re sigurie ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Paralajmërim SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Shkelje SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Seanca juaj Kilo është gati për ta kontrolluar nga telefoni juaj"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

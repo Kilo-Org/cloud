@@ -44,13 +44,13 @@ describe('impact referral utils', () => {
   it('parses referral touches and applies a 30 day expiry window', () => {
     const now = new Date('2026-04-23T10:00:00.000Z');
     const touch = parseImpactReferralTouchFromUrl(
-      'https://kilo.ai/get-started?_saasquatch=sq-cookie&rsCode=abc&rsShareMedium=email&rsEngagementMedium=link&utm_source=impact',
+      'https://kilo.ai/subscriptions/kilo-pass/refer?_saasquatch=sq-cookie&rsCode=abc&rsShareMedium=email&rsEngagementMedium=link&utm_source=impact',
       now
     );
 
     expect(touch).toEqual({
-      product: 'kiloclaw',
-      programKey: 'kiloclaw',
+      product: 'kilo_pass',
+      programKey: 'kilo_pass',
       opaqueTrackingValue: 'sq-cookie',
       trackingValueLength: 9,
       isTrackingValueAccepted: true,
@@ -58,7 +58,7 @@ describe('impact referral utils', () => {
       rsShareMedium: 'email',
       rsEngagementMedium: 'link',
       landingPath:
-        '/get-started?_saasquatch=sq-cookie&rsCode=abc&rsShareMedium=email&rsEngagementMedium=link&utm_source=impact',
+        '/subscriptions/kilo-pass/refer?_saasquatch=sq-cookie&rsCode=abc&rsShareMedium=email&rsEngagementMedium=link&utm_source=impact',
       utmSource: 'impact',
       utmMedium: null,
       utmCampaign: null,
@@ -67,6 +67,17 @@ describe('impact referral utils', () => {
       touchedAt: now,
       expiresAt: new Date(now.getTime() + IMPACT_REFERRAL_TOUCH_VALIDITY_MS),
     });
+  });
+
+  it('does not record referral touches that target no live referral program', () => {
+    expect(
+      parseImpactReferralTouchFromUrl('https://kilo.ai/get-started?_saasquatch=sq-cookie')
+    ).toBeNull();
+    expect(
+      parseImpactReferralTouchFromUrl(
+        'https://kilo.ai/users/after-sign-in?callbackPath=%2Fclaw%2Fnew&_saasquatch=sq-cookie'
+      )
+    ).toBeNull();
   });
 
   it('marks Kilo Pass callback paths as Kilo Pass referral touches', () => {
@@ -81,7 +92,7 @@ describe('impact referral utils', () => {
 
   it('keeps referral metadata for diagnostics when _saasquatch is missing', () => {
     const touch = parseImpactReferralTouchFromUrl(
-      'https://kilo.ai/get-started?rsCode=abc&rsShareMedium=email'
+      'https://kilo.ai/subscriptions/kilo-pass/refer?rsCode=abc&rsShareMedium=email'
     );
 
     expect(touch?.opaqueTrackingValue).toBeNull();
@@ -93,7 +104,7 @@ describe('impact referral utils', () => {
   it('ignores over-limit referral values for attribution and metadata', () => {
     const tooLongValue = 'x'.repeat(IMPACT_OPAQUE_TRACKING_VALUE_MAX_LENGTH + 1);
     const touch = parseImpactReferralTouchFromUrl(
-      `https://kilo.ai/get-started?_saasquatch=${tooLongValue}&rsCode=${tooLongValue}&rsShareMedium=email`
+      `https://kilo.ai/subscriptions/kilo-pass/refer?_saasquatch=${tooLongValue}&rsCode=${tooLongValue}&rsShareMedium=email`
     );
 
     expect(touch?.opaqueTrackingValue).toBeNull();

@@ -1,20 +1,38 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
-import { auto_top_up_configs, organizations } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  auto_top_up_configs,
+  bouncer_credit_event_outbox,
+  organization_service_fee_exemptions,
+  organizations,
+  stripe_service_fee_assessments,
+} from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS } from '@/lib/autoTopUpConstants';
+import { eq, inArray } from 'drizzle-orm';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
+import type Stripe from 'stripe';
 
 // Mock Stripe client to avoid API calls in tests
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     checkout: {
       sessions: {
         create: jest.fn().mockResolvedValue({
+          id: 'cs_test_org_auto_topup',
+          created: 1_700_000_000,
           url: 'https://checkout.stripe.com/test-session',
         }),
+        listLineItems: jest.fn().mockResolvedValue({ data: [], has_more: false }),
+        expire: jest.fn().mockResolvedValue({}),
       },
     },
   },
@@ -62,6 +80,12 @@ describe('organization auto-top-up router', () => {
     await db
       .delete(auto_top_up_configs)
       .where(eq(auto_top_up_configs.owned_by_organization_id, testOrg.id));
+    await db
+      .delete(stripe_service_fee_assessments)
+      .where(eq(stripe_service_fee_assessments.organization_id, testOrg.id));
+    await db
+      .delete(organization_service_fee_exemptions)
+      .where(eq(organization_service_fee_exemptions.organization_id, testOrg.id));
     await db.delete(organizations).where(eq(organizations.id, testOrg.id));
   });
 
@@ -74,6 +98,17 @@ describe('organization auto-top-up router', () => {
     await db
       .delete(auto_top_up_configs)
       .where(eq(auto_top_up_configs.owned_by_organization_id, testOrg.id));
+    // The durable bouncer outbox persists charge attempts across tests; clear only this suite's
+    // fixture owners so concurrent suites' rows are untouched.
+    await db
+      .delete(bouncer_credit_event_outbox)
+      .where(
+        inArray(bouncer_credit_event_outbox.user_id, [
+          ownerUser.id,
+          memberUser.id,
+          nonMemberUser.id,
+        ])
+      );
   });
 
   describe('getConfig', () => {
@@ -86,6 +121,7 @@ describe('organization auto-top-up router', () => {
       expect(result).toEqual({
         enabled: false,
         amountCents: DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+        thresholdCents: DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
         paymentMethod: null,
       });
     });
@@ -97,6 +133,7 @@ describe('organization auto-top-up router', () => {
         owned_by_user_id: null,
         stripe_payment_method_id: 'pm_test_config_123',
         amount_cents: 10000,
+        threshold_cents: 10000,
       });
 
       const caller = await createCallerForUser(ownerUser.id);
@@ -105,6 +142,7 @@ describe('organization auto-top-up router', () => {
       });
 
       expect(result.amountCents).toBe(10000);
+      expect(result.thresholdCents).toBe(10000);
       // paymentMethod will be null because Stripe API call will fail in test
       // but the structure is correct
     });
@@ -190,6 +228,87 @@ describe('organization auto-top-up router', () => {
       expect(result.enabled).toBe(false);
       expect(result.redirectUrl).toBeDefined();
       expect(typeof result.redirectUrl).toBe('string');
+
+      // `reportChargeAttempted` is awaited by the mutation, so the durable outbox row is
+      // already committed when the mutation resolves.
+      const rows = await db
+        .select()
+        .from(bouncer_credit_event_outbox)
+        .where(eq(bouncer_credit_event_outbox.user_id, ownerUser.id));
+      expect(rows).toHaveLength(1);
+      expect(rows[0].event_type).toBe('charge.attempted');
+      expect(rows[0].user_id).toBe(ownerUser.id);
+      expect(rows[0].payload).toEqual(
+        expect.objectContaining({
+          type: 'charge.attempted',
+          flow: 'auto_topup',
+          userId: ownerUser.id,
+          orgId: testOrg.id,
+          amountCents: 50000,
+          accountCreatedAt: new Date(testOrg.created_at).toISOString(),
+          accountUsedMicrodollars: testOrg.microdollars_used,
+        })
+      );
+    });
+
+    it('saves the threshold when enabling with an existing payment method', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_enable_threshold',
+        amount_cents: 100000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.toggle({
+        organizationId: testOrg.id,
+        currentEnabled: false,
+        thresholdCents: 50000,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.threshold_cents).toBe(50000);
+      expect(config?.amount_cents).toBe(100000);
+    });
+
+    it('rejects enabling when the saved amount is below the requested threshold', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_enable_invalid',
+        amount_cents: 10000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.toggle({
+          organizationId: testOrg.id,
+          currentEnabled: false,
+          thresholdCents: 50000,
+        })
+      ).rejects.toThrow(/at least the balance threshold/);
+
+      const org = await db.query.organizations.findFirst({
+        where: eq(organizations.id, testOrg.id),
+      });
+      expect(org?.auto_top_up_enabled).toBe(false);
+    });
+
+    it('sends the threshold to the setup checkout when no payment method exists', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.toggle({
+        organizationId: testOrg.id,
+        currentEnabled: false,
+        amountCents: 100000,
+        thresholdCents: 50000,
+      });
+
+      const [params] = jest.mocked(client.checkout.sessions.create).mock.calls.at(-1) as [
+        Stripe.Checkout.SessionCreateParams,
+      ];
+      expect(params.payment_intent_data?.metadata).toEqual(
+        expect.objectContaining({ amountCents: '100000', thresholdCents: '50000' })
+      );
     });
 
     it('throws UNAUTHORIZED for non-owner members', async () => {
@@ -226,6 +345,91 @@ describe('organization auto-top-up router', () => {
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.amount_cents).toBe(10000);
+    });
+
+    it('accepts the $5,000 amount', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_amount',
+        amount_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.updateAmount({
+        organizationId: testOrg.id,
+        amountCents: 500000,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.amount_cents).toBe(500000);
+    });
+
+    it('rejects an amount below the configured threshold', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_amount',
+        amount_cents: 50000,
+        threshold_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.updateAmount({
+          organizationId: testOrg.id,
+          amountCents: 10000,
+        })
+      ).rejects.toThrow(/at least the balance threshold/);
+    });
+  });
+
+  describe('updateThreshold', () => {
+    it('updates the threshold', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_threshold',
+        amount_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      const result = await caller.organizations.autoTopUp.updateThreshold({
+        organizationId: testOrg.id,
+        thresholdCents: 50000,
+      });
+
+      expect(result.success).toBe(true);
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.threshold_cents).toBe(50000);
+    });
+
+    it('rejects a threshold above the top up amount', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_threshold',
+        amount_cents: 10000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.updateThreshold({
+          organizationId: testOrg.id,
+          thresholdCents: 50000,
+        })
+      ).rejects.toThrow(/at least the balance threshold/);
+    });
+
+    it('rejects unsupported thresholds', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.updateThreshold({
+          organizationId: testOrg.id,
+          // @ts-expect-error testing runtime validation with an unsupported threshold
+          thresholdCents: 2500,
+        })
+      ).rejects.toThrow(/thresholdCents/i);
     });
   });
 
@@ -284,6 +488,25 @@ describe('organization auto-top-up router', () => {
         amountCents: 1234,
       });
       await expect(promise).rejects.toThrow(/amountCents/i);
+    });
+
+    it('keeps the saved amount and threshold in the new setup checkout', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_change',
+        amount_cents: 100000,
+        threshold_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.changePaymentMethod({ organizationId: testOrg.id });
+
+      const [params] = jest.mocked(client.checkout.sessions.create).mock.calls.at(-1) as [
+        Stripe.Checkout.SessionCreateParams,
+      ];
+      expect(params.payment_intent_data?.metadata).toEqual(
+        expect.objectContaining({ amountCents: '100000', thresholdCents: '50000' })
+      );
     });
   });
 });

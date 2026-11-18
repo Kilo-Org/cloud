@@ -1,12 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type MessageDeliveryState,
+  type PreparationAttempt,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import {
   countInFlightMessages,
   resolveRetryPrompt,
-  retryMessageAndClear,
+  resolveRetryTarget,
+  retryFailedMessage,
+  unansweredPromptMessageId,
 } from './session-detail-content-helpers';
+import { getSessionTranscriptItemKey, mergeSessionTranscript } from './session-transcript';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
+
+/** The assistant row that answers `parentID`, as server data links them. */
+function withParent(message: StoredMessage, parentID: string): StoredMessage {
+  if (message.info.role !== 'assistant') {
+    return message;
+  }
+  return { ...message, info: { ...message.info, parentID } };
+}
 
 describe('countInFlightMessages', () => {
   it('excludes a failed pending row from the in-flight count', () => {
@@ -33,23 +48,227 @@ describe('countInFlightMessages', () => {
   });
 });
 
-describe('retryMessageAndClear', () => {
-  it('clears the failed row when the retry send succeeds', async () => {
+describe('retryFailedMessage', () => {
+  it('clears the original delivery failure once the re-send is accepted', async () => {
     const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const clearFailed = vi.fn<() => void>();
-    await retryMessageAndClear(send, clearFailed);
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(clearFailed).toHaveBeenCalledTimes(1);
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await retryFailedMessage({ replacedMessageIds: ['m-failed'], send, clearFailedMessage });
+    expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('m-failed');
   });
 
-  it('does not clear the failed row when the retry send fails', async () => {
+  it('leaves the failed delivery state alone when the re-send rejects', async () => {
     const send = vi
       .fn<() => Promise<void>>()
       .mockRejectedValue(new Error('Failed to send message'));
-    const clearFailed = vi.fn<() => void>();
-    await retryMessageAndClear(send, clearFailed);
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await expect(
+      retryFailedMessage({ replacedMessageIds: ['m-failed'], send, clearFailedMessage })
+    ).resolves.toBeUndefined();
     expect(send).toHaveBeenCalledTimes(1);
-    expect(clearFailed).not.toHaveBeenCalled();
+    expect(clearFailedMessage).not.toHaveBeenCalled();
+  });
+
+  it('resolves every row an assistant retry replaces once the re-send is accepted', async () => {
+    // The retried turn's own user row carries the prompt; the failed response
+    // and the user row it re-sent both stop showing.
+    const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await retryFailedMessage({
+      replacedMessageIds: ['m-asst', 'm-prompt'],
+      send,
+      clearFailedMessage,
+    });
+    expect(clearFailedMessage.mock.calls).toEqual([['m-asst'], ['m-prompt']]);
+  });
+
+  it('swallows a rejected re-send so the caller never sees the rejection', async () => {
+    const send = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValue(new Error('Failed to send message'));
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await expect(
+      retryFailedMessage({ replacedMessageIds: ['m1'], send, clearFailedMessage })
+    ).resolves.toBeUndefined();
+  });
+
+  it('stops the delivery failure showing in the transcript once the retry lands', async () => {
+    // A client-materialised submission with no renderable parts appears at all
+    // only because its run failed; clearing the entry drops it, and no row
+    // keeps a failure footer.
+    const submission = userMessage('m-retried');
+    submission.parts = [];
+    (submission.info as { synthetic?: boolean }).synthetic = true;
+    const deliveryStates = new Map<string, MessageDeliveryState>([
+      ['m-retried', { status: 'failed', error: 'boom', reason: 'execution' }],
+    ]);
+
+    // The marker folds onto the message row as `timeMarker`, so the failed
+    // submission is the only item and its key no longer carries a `time:` row.
+    expect(
+      mergeSessionTranscript([submission], [], { deliveryStates }).map(item =>
+        getSessionTranscriptItemKey(item)
+      )
+    ).toEqual(['m-retried']);
+
+    await retryFailedMessage({
+      replacedMessageIds: [submission.info.id],
+      send: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      clearFailedMessage: messageId => {
+        deliveryStates.delete(messageId);
+      },
+    });
+
+    expect(deliveryStates.has('m-retried')).toBe(false);
+    expect(mergeSessionTranscript([submission], [], { deliveryStates })).toEqual([]);
+  });
+
+  it('keeps the failure showing when the re-send itself fails', async () => {
+    const submission = userMessage('m-kept');
+    const deliveryStates = new Map<string, MessageDeliveryState>([
+      ['m-kept', { status: 'failed', error: 'boom', reason: 'execution' }],
+    ]);
+
+    await retryFailedMessage({
+      replacedMessageIds: [submission.info.id],
+      send: vi.fn<() => Promise<void>>().mockRejectedValue(new Error('Failed to send message')),
+      clearFailedMessage: messageId => {
+        deliveryStates.delete(messageId);
+      },
+    });
+
+    expect(deliveryStates.get('m-kept')).toEqual({
+      status: 'failed',
+      error: 'boom',
+      reason: 'execution',
+    });
+  });
+});
+
+describe('unansweredPromptMessageId', () => {
+  /** No live transport: a stored transcript's rows carry no delivery state. */
+  const noDeliveryStates = new Map<string, MessageDeliveryState>();
+
+  function answer(): StoredMessage {
+    const message = withParent(assistantMessage('m-answer'), 'm-prompt');
+    message.parts = [
+      { id: 'm-answer-text', sessionID: 'ses_1', messageID: 'm-answer', type: 'text', text: 'ok' },
+    ];
+    return message;
+  }
+
+  function attemptAfter(triggerMessageId: string): PreparationAttempt {
+    return {
+      id: 'prep-1',
+      triggerMessageId,
+      status: 'failed',
+      startedAt: 1_761_000_000_000,
+      revision: 1,
+      steps: [],
+    };
+  }
+
+  it('names the prompt a stored transcript ends on with nothing answering it', () => {
+    const rows = [userMessage('m-prompt')];
+    expect(
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
+    ).toBe('m-prompt');
+  });
+
+  it('names nothing once an assistant row answers the prompt', () => {
+    const rows = [userMessage('m-prompt'), answer()];
+    expect(
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
+    ).toBeNull();
+  });
+
+  it('names nothing when the response recorded after the prompt renders nothing', () => {
+    // A reasoning-only or hidden answer is still a recorded response. The
+    // transcript drops its row, but the stored rows say the turn was answered.
+    const rows = [userMessage('m-prompt'), withParent(assistantMessage('m-reasoning'), 'm-prompt')];
+    expect(mergeSessionTranscript(rows, [])).toHaveLength(1);
+    expect(
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
+    ).toBeNull();
+  });
+
+  it('names nothing when the turn ended in a preparation group', () => {
+    const rows = [userMessage('m-prompt')];
+    const transcript = mergeSessionTranscript(rows, [attemptAfter('m-prompt')]);
+    expect(unansweredPromptMessageId(rows, transcript, noDeliveryStates)).toBeNull();
+  });
+
+  it('names nothing for a prompt that carries a delivery state', () => {
+    // A queued or failed row already states itself through the badge or the
+    // failure footer, so a second statement would describe the same turn twice.
+    const rows = [userMessage('m-prompt')];
+    const queued = new Map<string, MessageDeliveryState>([['m-prompt', { status: 'queued' }]]);
+    expect(unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), queued)).toBeNull();
+  });
+
+  it('names nothing for an empty stored transcript', () => {
+    expect(unansweredPromptMessageId([], [], noDeliveryStates)).toBeNull();
+  });
+});
+
+describe('resolveRetryTarget', () => {
+  it('replaces only a failed user row', () => {
+    const message = userMessage('m1');
+    expect(resolveRetryTarget(message, [message])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m1'],
+    });
+  });
+
+  it('replaces the failed response and the user row it re-sends', () => {
+    const user = userMessage('m3');
+    const assistant = withParent(assistantMessage('m4'), 'm3');
+
+    expect(resolveRetryTarget(assistant, [user, assistant])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m4', 'm3'],
+    });
+  });
+
+  it('re-sends the row the failed response answers, not the nearest preceding row', () => {
+    // A second prompt can be materialised before the first turn's response
+    // exists, so order alone would re-send (and hide) the wrong prompt.
+    const answered = userMessage('m-answered');
+    const queued = userMessage('m-queued');
+    const assistant = withParent(assistantMessage('m-asst'), 'm-answered');
+
+    expect(resolveRetryTarget(assistant, [answered, queued, assistant])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m-asst', 'm-answered'],
+    });
+  });
+
+  it('keeps a prompt row that carries content the re-send would drop', () => {
+    const user = userMessage('m-with-file');
+    user.parts = [
+      ...user.parts,
+      {
+        id: 'm-with-file-file',
+        sessionID: 'ses_1',
+        messageID: 'm-with-file',
+        type: 'file',
+        mime: 'text/plain',
+        url: 'x',
+      },
+    ] as typeof user.parts;
+    const assistant = withParent(assistantMessage('m-asst'), 'm-with-file');
+
+    expect(resolveRetryTarget(assistant, [user, assistant])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m-asst'],
+    });
+  });
+
+  it('returns null when no user row can be identified as the prompt', () => {
+    const assistant = assistantMessage('m5');
+    expect(resolveRetryTarget(assistant, [assistant])).toBeNull();
+    // Order alone must not pair the response with an unrelated later prompt.
+    const other = userMessage('m-other');
+    expect(resolveRetryTarget(withParent(assistant, 'm-missing'), [other, assistant])).toBeNull();
   });
 });
 
@@ -109,16 +328,10 @@ describe('resolveRetryPrompt', () => {
     expect(resolveRetryPrompt(message, [message])).toBeNull();
   });
 
-  it('returns the preceding user row human text for an assistant failure', () => {
+  it('resolves the prompt through the same target the tap uses', () => {
     const user = userMessage('m3');
-    const assistant = assistantMessage('m4');
-    const messages: StoredMessage[] = [user, assistant];
-
-    expect(resolveRetryPrompt(assistant, messages)).toBe('hi');
-  });
-
-  it('returns null for an assistant row with no preceding user row', () => {
-    const assistant = assistantMessage('m5');
-    expect(resolveRetryPrompt(assistant, [assistant])).toBeNull();
+    const assistant = withParent(assistantMessage('m4'), 'm3');
+    expect(resolveRetryPrompt(assistant, [user, assistant])).toBe('hi');
+    expect(resolveRetryPrompt(withParent(assistantMessage('m6'), 'm-missing'), [user])).toBeNull();
   });
 });

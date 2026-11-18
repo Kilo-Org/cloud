@@ -6,7 +6,7 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConfigureOrganizationDefaultBehavior } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { LockableContainer } from '../LockableContainer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,14 +26,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   hasActiveOrganizationModelPolicy,
   isOrganizationAutoTargetModel,
-  ORGANIZATION_AUTO_MODEL_FLAG,
-} from '@/lib/organizations/organization-auto-model-shared';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+  isOrganizationCustomRouterTarget,
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { ORGANIZATION_AUTO_MODEL_FLAG } from '@kilocode/app-shared/feature-flags';
 import { cn } from '@/lib/utils';
 
 type DefaultModelDialogProps = {
@@ -181,7 +184,8 @@ export function DefaultModelDialog({
   const autoTargetModels = useMemo(
     () =>
       availableModels.filter(model => {
-        if (model.id.startsWith(CUSTOM_LLM_PREFIX)) return false;
+        if (model.isCustomLlm) return false;
+        if (isOrganizationCustomRouterTarget(model.id)) return true;
         if (model.id.startsWith('kilo-auto/')) {
           return !hasActiveModelPolicy && isOrganizationAutoTargetModel(model.id);
         }

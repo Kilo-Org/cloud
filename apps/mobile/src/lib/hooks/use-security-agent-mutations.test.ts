@@ -1,28 +1,54 @@
-// P1-A-08e wiring tests for `useTriggerSecuritySync`.
+// Tests for the security-agent mutation hooks and their helpers.
 //
-// The dashboard owns the sync button and its toasts; these tests assert the
-// HOOK WIRING: the `mutationFn` delegates to the matching
+// The dashboard owns the sync button and its toasts; the sync suite asserts
+// the HOOK WIRING: the `mutationFn` delegates to the matching
 // `trpcClient.(organizations.)securityAgent.triggerSync.mutate`, the hoisted
 // operation key is merged into the input, and the key rotation policy (real
 // `isSecuritySyncRetryable` + `mapSecuritySyncOperationError`) runs inside
 // `mutationFn`. Only `useHoistedOperationKey` is mocked (it holds React ref
 // state that needs a mounted renderer).
-/* eslint-disable max-lines -- cohesive suite for sync wiring, retryability matrix, and the reconcile-first outbox path */
+//
+// Suites: `useTriggerSecuritySync` wiring, retryability, and reconcile-first
+// outbox; `useSaveSecurityAgentConfig` expectedRevision and generation
+// guard+scope; `useSetSecurityAgentEnabled` generation guard+scope; `scope.id`
+// network serialization (real MutationCache); `securitySyncIntentFingerprint`;
+// `isSecuritySyncRetryable`; in-progress copy per surface; and the ledger
+// marker copy mapping.
+/* eslint-disable max-lines -- one file for the useTriggerSecuritySync wiring/retryability/outbox, useSaveSecurityAgentConfig expectedRevision + generation-guard/scope, useSetSecurityAgentEnabled generation-guard/scope, scope.id serialization (real MutationCache), securitySyncIntentFingerprint, isSecuritySyncRetryable, in-progress copy per surface, and the ledger marker copy mapping suites */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake outbox factories settle without await because they resolve immediately */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
+
+import type * as ReactQuery from '@tanstack/react-query';
+
 import type * as OperationKeyModule from '@/lib/operation-key';
 import {
-  isSecurityConfigurationError,
+  isSecuritySyncInProgress,
   isSecuritySyncRetryable,
+  localizedSecurityMarkerMessage,
   mapSecurityDismissOperationError,
   mapSecuritySyncOperationError,
+  SECURITY_AMBIGUOUS_MESSAGE,
+  SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+  SECURITY_LEDGER_SETTLE_FAILED_MESSAGE,
+  SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+  SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
+  securityMutationCopyKey,
+  securityRetainsOperationKey,
   securitySyncIntentFingerprint,
+  securitySyncPreconditionFor,
+} from '@/lib/security-agent-ledger';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
+import {
   useSaveSecurityAgentConfig,
+  useSetSecurityAgentEnabled,
   useTriggerSecuritySync,
 } from './use-security-agent-mutations';
+import { reportAppError } from '@/lib/telemetry/app-error-reporting';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const hoistedKeys = vi.hoisted(() => ({
   getKey: vi.fn(() => 'hoisted-op-key'),
@@ -33,9 +59,7 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
-vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
-}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
 
 vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
@@ -52,7 +76,8 @@ vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outboxMock,
 }));
 
-vi.mock('@kilocode/app-shared/security-agent', () => ({
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => ({
+  ...(await importOriginal<typeof SecurityAgentModule>()),
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
 
@@ -62,9 +87,11 @@ vi.mock('@/lib/hooks/use-security-agent-commands', () => ({
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
-  onError?: (error: unknown) => void;
+  onMutate?: (vars: unknown) => Promise<unknown> | unknown;
+  onError?: (error: unknown, vars?: unknown, context?: unknown) => void;
   onSuccess?: (result: unknown, vars: unknown) => void;
   onSettled?: (data?: unknown, error?: unknown, vars?: unknown) => Promise<void> | void;
+  scope?: { id: string };
 };
 
 let lastCapturedOptions: MutationOptions | null = null;
@@ -78,6 +105,7 @@ const setQueryDataMock = vi.fn();
 const cancelQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 const trackCommandMock = vi.hoisted(() => vi.fn());
+const announcingSuccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
@@ -92,6 +120,8 @@ vi.mock('@tanstack/react-query', () => ({
     setQueryData: (...args: unknown[]) => setQueryDataMock(...args),
     cancelQueries: (...args: unknown[]) => cancelQueriesMock(...args),
   }),
+  hashKey: (key: unknown) => JSON.stringify(key),
+  CancelledError: class CancelledError extends Error {},
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -120,12 +150,16 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {
     error: (msg: string) => toastErrorMock(msg),
-    success: vi.fn(),
+    success: (msg: string) => announcingSuccessMock(msg),
     warning: vi.fn(),
   },
 }));
 
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+// The English catalog sentence for a lapsed organization plan.
+const TRIAL_ENDED_COPY =
+  "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.";
 
 describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
   beforeEach(() => {
@@ -222,14 +256,63 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
+  it('regenerates the key when the Worker was unreachable, and still offers a retry', async () => {
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({
+      message: 'The security service is unavailable. Try again.',
+    });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
   it('onError toasts the mapped message through the existing toast path', () => {
     useTriggerSecuritySync('personal');
     lastCapturedOptions?.onError?.(
-      mapSecuritySyncOperationError(new Error('operation_in_progress'))
+      mapSecuritySyncOperationError(new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE))
     );
-    expect(toastErrorMock).toHaveBeenCalledWith(
-      'A security sync is already in progress. Please try again.'
-    );
+    expect(toastErrorMock).toHaveBeenCalledWith('The security service is unavailable. Try again.');
+  });
+
+  it('onError explains a lapsed organization trial instead of the generic line', () => {
+    useTriggerSecuritySync(ORG_ID);
+    const rejection = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN' },
+    });
+    lastCapturedOptions?.onError?.(mapSecuritySyncOperationError(rejection));
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+
+  it('stays silent for the in-progress conflict, whose screen shows the running sync', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const server = Object.assign(new Error('operation_in_progress'), {
+      name: 'TRPCClientError',
+      data: { code: 'CONFLICT', httpStatus: 409 },
+    });
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(server);
+    useTriggerSecuritySync('personal');
+
+    const rejection = await lastCapturedOptions?.mutationFn?.({}).catch((error: unknown) => error);
+    // The global MutationCache onError runs this reporter after the hook's onError.
+    lastCapturedOptions?.onError?.(rejection);
+    reportAppError(rejection, { source: 'mutation' });
+    setTelemetrySink(null);
+
+    // The conflict copy still reaches the screen's own classification, but an
+    // error toast over a control that is showing progress would contradict it.
+    expect(rejection).toMatchObject({
+      message: 'A security sync is already in progress. Please try again.',
+    });
+    expect(toastErrorMock).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
   });
 
   it('onSuccess tracks the accepted command', () => {
@@ -292,6 +375,18 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(outboxMock.remove).not.toHaveBeenCalled();
   });
 
+  it('removes the reconcile-first row when the Worker was unreachable', async () => {
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({ message: 'The security service is unavailable. Try again.' });
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+  });
+
   it('removes the reconcile-first row on a terminal failure', async () => {
     const replayFailed = new Error('This action did not complete. Please try again.');
     Object.assign(replayFailed, { data: { code: 'BAD_REQUEST' } });
@@ -346,6 +441,279 @@ describe('useSaveSecurityAgentConfig (expectedRevision)', () => {
   });
 });
 
+describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+    announcingSuccessMock.mockReset();
+  });
+
+  it('confirms a successful save instead of relying on the screen it returns to', () => {
+    // The save pops the settings screen, and on a flaky connection that screen
+    // can fail to load. Without this confirmation a persisted save reads as a
+    // lost one.
+    useSaveSecurityAgentConfig('personal');
+    lastCapturedOptions?.onSuccess?.({}, { slaEnabled: false });
+
+    expect(announcingSuccessMock).toHaveBeenCalledTimes(1);
+    const announced = announcingSuccessMock.mock.calls[0]?.[0] as string;
+    expect(announced).toBeTruthy();
+    expect(announced).not.toBe('securityAgent.settingsSave.saved');
+  });
+
+  it('leaves the confirmation to a caller that has a more specific outcome', () => {
+    // Automation announces the queued count itself; two toasts for one save
+    // would read as two outcomes.
+    useSaveSecurityAgentConfig('personal', { announceSaved: false });
+    lastCapturedOptions?.onSuccess?.({ existingFindingsQueuedCount: 2 }, { slaEnabled: false });
+
+    expect(announcingSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it('scopes the mutation to serialize against a toggle on the same config', () => {
+    useSaveSecurityAgentConfig('personal');
+    expect(lastCapturedOptions?.scope).toEqual({ id: 'security-agent-config:personal' });
+  });
+
+  it('a failing older save does not roll back while a newer save owns the config', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, slaEnabled: false });
+    useSaveSecurityAgentConfig('personal');
+    const older = await lastCapturedOptions?.onMutate?.({ slaEnabled: true });
+    const newer = await lastCapturedOptions?.onMutate?.({ slaEnabled: false });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: true }, older);
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+
+    lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: false }, newer);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    // The toast fires regardless of which generation failed.
+    expect(toastErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failing latest save rolls back its snapshot', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, slaEnabled: false });
+    useSaveSecurityAgentConfig('personal');
+    const context = await lastCapturedOptions?.onMutate?.({ slaEnabled: true });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: true }, context);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
+  });
+
+  it('rolls back without a toast when the caller renders the refusal inline', async () => {
+    // The settings screens put the refusal on the screen itself, below the
+    // header; that line is their announcement owner, so a toast would say the
+    // same sentence a second time. The optimistic rollback is not the caller's:
+    // it runs on every failure, announced or not.
+    getQueryDataMock.mockReturnValue({ isEnabled: false, slaEnabled: false });
+    useSaveSecurityAgentConfig('personal', { announceFailed: false });
+    const context = await lastCapturedOptions?.onMutate?.({ slaEnabled: true });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(
+      new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+      { slaEnabled: true },
+      context
+    );
+
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('toasts the refusal by default, in the catalog’s own words', () => {
+    useSaveSecurityAgentConfig('personal');
+
+    lastCapturedOptions?.onError?.(
+      new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+      { slaEnabled: true },
+      undefined
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+  });
+});
+
+describe('useSetSecurityAgentEnabled (generation guard + scope)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it('scopes the mutation to serialize against a save on the same config', () => {
+    useSetSecurityAgentEnabled('personal');
+    expect(lastCapturedOptions?.scope).toEqual({ id: 'security-agent-config:personal' });
+  });
+
+  it('a failing older toggle does not roll back while a newer toggle owns the config', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, configRevision: 1 });
+    useSetSecurityAgentEnabled('personal');
+    const older = await lastCapturedOptions?.onMutate?.({ isEnabled: true });
+    const newer = await lastCapturedOptions?.onMutate?.({ isEnabled: false });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: true }, older);
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+
+    lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: false }, newer);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failing latest toggle rolls back its snapshot', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, configRevision: 1 });
+    useSetSecurityAgentEnabled('personal');
+    const context = await lastCapturedOptions?.onMutate?.({ isEnabled: true });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: true }, context);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
+  });
+});
+
+describe('config-write onError copy', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it('shows the reauthorize copy when enabling is refused for the missing permission', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error('GitHub App does not have vulnerability_alerts permission'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_missing_permission' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.'
+    );
+    // The server's sentence carries the raw snake_case permission key.
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('vulnerability_alerts')
+    );
+  });
+
+  it('shows the repository picker sentence when enabling has no repository in scope', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error('Select at least one repository before enabling Security Agent.'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_no_repositories' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith('Select at least one repository.');
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('Select at least one repository before enabling')
+    );
+  });
+
+  it('shows the conflict copy when the stored config changed elsewhere', () => {
+    useSaveSecurityAgentConfig('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(
+        new Error(
+          'This configuration changed in another tab. Review the latest settings and save again.'
+        ),
+        { data: { code: 'CONFLICT', upstreamCode: 'security_config_conflict' } }
+      )
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Security Agent settings changed elsewhere. Review the latest settings and save again.'
+    );
+  });
+
+  it('shows the generic sentence instead of an unmarked server message', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(new Error('GitHub integration not found or inactive'));
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('GitHub integration not found')
+    );
+  });
+
+  it('explains a lapsed organization trial on a settings save', () => {
+    useSaveSecurityAgentConfig(ORG_ID);
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+
+  it('explains a lapsed organization trial on the enable toggle too', () => {
+    useSetSecurityAgentEnabled(ORG_ID);
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+  });
+});
+
+describe('scope.id network serialization (real MutationCache)', () => {
+  it('starts the second same-scope mutationFn only after the first settles', async () => {
+    const { MutationCache, QueryClient } =
+      await vi.importActual<typeof ReactQuery>('@tanstack/react-query');
+    const cache = new MutationCache();
+    const client = new QueryClient({ mutationCache: cache });
+    const order: string[] = [];
+    const gate = Promise.withResolvers<null>();
+
+    const first = cache.build(client, {
+      mutationFn: async () => {
+        order.push('first-start');
+        await gate.promise;
+        order.push('first-end');
+        return 'first';
+      },
+      scope: { id: 'security-agent-config:personal' },
+    });
+    const second = cache.build(client, {
+      mutationFn: async () => {
+        order.push('second-start');
+        return 'second';
+      },
+      scope: { id: 'security-agent-config:personal' },
+    });
+
+    const p1 = first.execute({});
+    const p2 = second.execute({});
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual(['first-start']);
+
+    gate.resolve(null);
+    await Promise.all([p1, p2]);
+    expect(order).toEqual(['first-start', 'first-end', 'second-start']);
+  });
+});
+
 describe('securitySyncIntentFingerprint (P1-A-08e changed-input)', () => {
   it('stays stable for a retry of the same scope+repo and rotates when the repo or scope changes', () => {
     const original = securitySyncIntentFingerprint(ORG_ID, 'kilo/repo');
@@ -354,6 +722,29 @@ describe('securitySyncIntentFingerprint (P1-A-08e changed-input)', () => {
     expect(securitySyncIntentFingerprint(ORG_ID, 'kilo/other')).not.toBe(original);
     expect(securitySyncIntentFingerprint(ORG_ID, undefined)).not.toBe(original);
     expect(securitySyncIntentFingerprint('personal', 'kilo/repo')).not.toBe(original);
+  });
+});
+
+describe('isSecuritySyncInProgress (a duplicate of a sync that is still running)', () => {
+  it('recognises the in-progress marker raw and after the surface mapping', () => {
+    expect(isSecuritySyncInProgress(new Error('operation_in_progress'))).toBe(true);
+    expect(
+      isSecuritySyncInProgress(mapSecuritySyncOperationError(new Error('operation_in_progress')))
+    ).toBe(true);
+  });
+
+  it('leaves every other security failure as a failure', () => {
+    // A dismissal conflict is another surface's in-progress copy, not a sync.
+    expect(
+      isSecuritySyncInProgress(mapSecurityDismissOperationError(new Error('operation_in_progress')))
+    ).toBe(false);
+    expect(
+      isSecuritySyncInProgress(
+        mapSecuritySyncOperationError(new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE))
+      )
+    ).toBe(false);
+    expect(isSecuritySyncInProgress(new Error('Network request failed'))).toBe(false);
+    expect(isSecuritySyncInProgress(null)).toBe(false);
   });
 });
 
@@ -400,38 +791,179 @@ describe('isSecuritySyncRetryable (P1-A-08e key-rotation policy)', () => {
     Object.assign(byCode, { data: { code: 'PRECONDITION_FAILED' } });
     expect(isSecuritySyncRetryable(byCode)).toBe(false);
   });
+
+  it('keeps a retry available when the Worker was unreachable but ends the intent', () => {
+    const unavailable = new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE);
+    // A later attempt can succeed, so the surface keeps its retry.
+    expect(isSecuritySyncRetryable(unavailable)).toBe(true);
+    // The server settled that intent's row, so its key can never be replayed.
+    expect(securityRetainsOperationKey(unavailable)).toBe(false);
+    expect(securityRetainsOperationKey(new Error(SECURITY_AMBIGUOUS_MESSAGE))).toBe(true);
+  });
+
+  it('keeps the key-retention decision on the mapped error, after its text is replaced', () => {
+    const mapped = mapSecurityDismissOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+
+    expect(mapped.message).toBe('The security service is unavailable. Try again.');
+    expect(isSecuritySyncRetryable(mapped)).toBe(true);
+    expect(securityRetainsOperationKey(mapped)).toBe(false);
+    expect(
+      securityRetainsOperationKey(
+        mapSecurityDismissOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE))
+      )
+    ).toBe(true);
+  });
 });
 
-describe('in-progress copy per surface (same server marker)', () => {
-  it('maps the marker onto sync copy for a sync', () => {
+describe('ledger marker copy per surface', () => {
+  it('maps the in-progress marker onto each surface copy', () => {
     expect(mapSecuritySyncOperationError(new Error('operation_in_progress'))).toMatchObject({
       message: 'A security sync is already in progress. Please try again.',
     });
-  });
-
-  it('maps the marker onto dismissal copy for a dismissal', () => {
     expect(mapSecurityDismissOperationError(new Error('operation_in_progress'))).toMatchObject({
       message: 'This dismissal is already in progress. Please try again.',
     });
   });
 
-  it('passes any other error through unchanged on both paths', () => {
-    const other = new Error('Network request failed');
-    expect(mapSecuritySyncOperationError(other)).toBe(other);
-    expect(mapSecurityDismissOperationError(other)).toBe(other);
+  it('maps every ledger marker onto its copy and keeps its retryability', () => {
+    const cases = [
+      [
+        SECURITY_AMBIGUOUS_MESSAGE,
+        "Couldn't confirm — check the security review before retrying.",
+        true,
+      ],
+      [
+        SECURITY_LEDGER_SETTLE_FAILED_MESSAGE,
+        'The action completed, but we could not record the result. Please try again.',
+        true,
+      ],
+      [
+        SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+        'We could not record this action. Please try again later.',
+        false,
+      ],
+      [
+        SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
+        'This action did not complete. Please try again.',
+        false,
+      ],
+      [
+        SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
+        'The security service is unavailable. Try again.',
+        true,
+      ],
+    ] as const;
+    for (const [marker, copy, retryable] of cases) {
+      const mapped = mapSecuritySyncOperationError(new Error(marker));
+      expect(mapped.message).toBe(copy);
+      expect(isSecuritySyncRetryable(mapped)).toBe(retryable);
+    }
   });
-});
 
-describe('isSecurityConfigurationError', () => {
-  it('recognizes the server missing-configuration message', () => {
-    expect(isSecurityConfigurationError(new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE))).toBe(
-      true
+  it('maps the missing-configuration rejection onto its copy, still non-retryable', () => {
+    const mapped = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE)
     );
+    expect(mapped.message).toBe(
+      'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
+    );
+    expect(isSecuritySyncRetryable(mapped)).toBe(false);
   });
 
-  it('rejects unrelated errors and non-Error values', () => {
-    expect(isSecurityConfigurationError(new Error('Network request failed'))).toBe(false);
-    expect(isSecurityConfigurationError(null)).toBe(false);
-    expect(isSecurityConfigurationError('Security service is not configured')).toBe(false);
+  it('maps the remediation service rejection onto its copy, still non-retryable', () => {
+    const rejection = Object.assign(
+      new Error('Security remediation service request was rejected'),
+      {
+        data: { code: 'PRECONDITION_FAILED' },
+      }
+    );
+    // The surface contract: the remediation toasts render this localizer's
+    // result and keep the raw sentence only when it returns null. Asserting on
+    // the localizer is what guards the new marker case — the generic mapped
+    // copy equals this sentence even without the marker.
+    expect(localizedSecurityMarkerMessage(rejection)).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
+    );
+    const mapped = mapSecuritySyncOperationError(rejection);
+    expect(mapped.message).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
+    );
+    expect(isSecuritySyncRetryable(mapped)).toBe(false);
+  });
+
+  it('maps a server sync precondition onto the copy that names its fix', () => {
+    const PRECONDITION_BY_CODE = {
+      security_sync_no_repositories: 'noRepositories',
+      security_sync_integration_inactive: 'integrationInactive',
+      security_sync_missing_permission: 'missingPermission',
+    } as const;
+    const cases = [
+      [
+        'security_sync_no_repositories',
+        'No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.',
+      ],
+      [
+        'security_sync_integration_inactive',
+        'The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.',
+      ],
+      [
+        'security_sync_missing_permission',
+        'The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.',
+      ],
+    ] as const;
+    for (const [upstreamCode, copy] of cases) {
+      const rejection = Object.assign(new Error('server sentence'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode },
+      });
+      const mapped = mapSecuritySyncOperationError(rejection);
+      expect(mapped.message).toBe(copy);
+      expect(securitySyncPreconditionFor(mapped)).toBe(PRECONDITION_BY_CODE[upstreamCode]);
+      // The fix is applied by the reader, not by resubmitting: the rejection
+      // ends this intent and the next attempt needs a fresh operation key.
+      expect(isSecuritySyncRetryable(mapped)).toBe(false);
+      expect(securityRetainsOperationKey(mapped)).toBe(false);
+    }
+  });
+
+  it('finds the precondition on a server-shaped error too', () => {
+    const shaped = {
+      shape: {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_no_repositories' },
+      },
+    };
+    expect(securitySyncPreconditionFor(shaped)).toBe('noRepositories');
+    expect(securitySyncPreconditionFor(new Error('Network request failed'))).toBeNull();
+  });
+
+  it('maps an unrecognised message onto the generic copy and carries its retryability', () => {
+    const transport = mapSecuritySyncOperationError(new Error('Network request failed'));
+    expect(transport.message).toBe('Could not complete this action. Please try again.');
+    expect(isSecuritySyncRetryable(transport)).toBe(true);
+
+    const forbidden = Object.assign(new Error('no permission'), {
+      data: { code: 'FORBIDDEN' },
+    });
+    const mappedForbidden = mapSecurityDismissOperationError(forbidden);
+    expect(mappedForbidden.message).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
+    );
+    expect(isSecuritySyncRetryable(mappedForbidden)).toBe(false);
+  });
+
+  it('keeps the lapsed-trial reason on a sync and a dismissal, and stores it by key', () => {
+    for (const mapError of [mapSecuritySyncOperationError, mapSecurityDismissOperationError]) {
+      const rejection = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      });
+      const mapped = mapError(rejection);
+      expect(mapped.message).toBe(TRIAL_ENDED_COPY);
+      // The dismissal draft stores the key and re-translates after a language
+      // change; freezing one language's sentence is the defect it avoids.
+      expect(securityMutationCopyKey(mapped)).toBe('common.organizationTrialEnded');
+      // The plan has to be fixed first, so a retry cannot succeed.
+      expect(isSecuritySyncRetryable(mapped)).toBe(false);
+    }
   });
 });

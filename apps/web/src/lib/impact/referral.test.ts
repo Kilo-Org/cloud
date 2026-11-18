@@ -1,11 +1,10 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
-process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq, sql } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   impact_advocate_participants,
   impact_advocate_registration_attempts,
@@ -21,10 +20,8 @@ describe('impact referral participant registration dispatch', () => {
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-advocate-account-sid';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'impact-advocate-auth-token';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
-    delete process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID;
-    delete process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID;
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
   });
 
   afterEach(async () => {
@@ -46,7 +43,7 @@ describe('impact referral participant registration dispatch', () => {
           id: 'sq-hash-id',
           accountId: 'sq-hash-id',
           email: 'participant@example.com',
-          referralCodes: { '51699': 'PARTICIPANT9001' },
+          referralCodes: { '52766': 'PARTICIPANT9001' },
           referable: true,
         }),
         { status: 200 }
@@ -99,7 +96,7 @@ describe('impact referral participant registration dispatch', () => {
     expect(participant.registered_at).toBeTruthy();
     expect(participant.last_error_code).toBeNull();
     // The advocate's program-scoped SaaSquatch code is now persisted so the
-    // attribution lookup in kiloclaw-referrals.ts can resolve referrerUserId.
+    // attribution lookup in kilo-pass-referrals.ts can resolve referrerUserId.
     expect(participant.opaque_referral_identifier).toBe('PARTICIPANT9001');
 
     const [attempt] = await db.select().from(impact_advocate_registration_attempts);
@@ -568,6 +565,7 @@ describe('impact referral participant registration dispatch', () => {
         normalized_email: 'incumbent@example.com',
       });
       await db.insert(impact_advocate_participants).values({
+        program_key: 'kilo_pass',
         user_id: incumbent.id,
         advocate_id: incumbent.google_user_email,
         advocate_account_id: incumbent.google_user_email,
@@ -580,7 +578,7 @@ describe('impact referral participant registration dispatch', () => {
           JSON.stringify({
             id: 'sq-hash-id-other',
             email: 'other@example.com',
-            referralCodes: { '51699': 'COLLIDING_CODE' },
+            referralCodes: { '52766': 'COLLIDING_CODE' },
             referable: true,
           }),
           { status: 200 }
@@ -650,7 +648,7 @@ describe('impact referral participant registration dispatch', () => {
           JSON.stringify({
             id: 'sq-self-id',
             email: 'advocate@example.com',
-            referralCodes: { '51699': 'ADVOCATE7777' },
+            referralCodes: { '52766': 'ADVOCATE7777' },
             referable: true,
           }),
           { status: 200 }
@@ -709,7 +707,7 @@ describe('impact referral participant registration dispatch', () => {
           JSON.stringify({
             id: 'sq-id',
             email: 'advocate@example.com',
-            referralCodes: { '51699': 'ADVOCATE7777' },
+            referralCodes: { '52766': 'ADVOCATE7777' },
             referable: true,
           }),
           { status: 200 }
@@ -742,6 +740,7 @@ describe('impact referral participant registration dispatch', () => {
       });
       // Pretend SaaSquatch has already registered them and we have the code.
       await db.insert(impact_advocate_participants).values({
+        program_key: 'kilo_pass',
         user_id: user.id,
         advocate_id: user.google_user_email,
         advocate_account_id: user.google_user_email,

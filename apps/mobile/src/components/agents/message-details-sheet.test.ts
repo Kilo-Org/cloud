@@ -13,11 +13,26 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { formatMessageSentTime, getMessageDetailsContent } from './message-details-content';
 
-const performCopyMock = vi.fn().mockResolvedValue(undefined);
+const setStringAsync = vi.fn();
+const notificationAsync = vi.fn();
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
 const showActionSheetWithOptions = vi.fn();
 
-vi.mock('./use-message-copy', () => ({
-  performCopy: (...args: unknown[]) => performCopyMock(...args),
+// `message-details-copy` imports the native Expo modules directly; without these
+// stubs its module graph cannot load under the mobile-pure node project.
+vi.mock('expo-clipboard', () => ({
+  setStringAsync: (...args: unknown[]) => setStringAsync(...args),
+}));
+vi.mock('expo-haptics', () => ({
+  notificationAsync: (...args: unknown[]) => notificationAsync(...args),
+  NotificationFeedbackType: { Success: 'success' },
+}));
+vi.mock('sonner-native', () => ({
+  toast: {
+    success: (...args: unknown[]) => toastSuccess(...args),
+    error: (...args: unknown[]) => toastError(...args),
+  },
 }));
 
 vi.mock('react-native', () => ({
@@ -176,7 +191,7 @@ describe('getMessageDetailsContent — happy', () => {
     expect(content.copyableText).toBe('assistant reply');
     // Routed stamp preferred; catalog-friendly name.
     expect(content.modelLabel).toBe('Claude Sonnet 4');
-    expect(content.costLabel).toBe('$0.0123');
+    expect(content.costLabel).toBe('\u2066$0.0123\u2069');
     expect(content.tokenRows).toEqual([
       { label: 'Input', value: 100 },
       { label: 'Output', value: 50 },
@@ -245,12 +260,30 @@ describe('getMessageDetailsContent — empty', () => {
     expect(content.copyableText).toBe('aborted');
   });
 
-  it('hides Copy when there is no copyable text', () => {
-    const message = storedMessage(userInfo(), []);
-    const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).toBeNull();
-    expect(content.roleLabel).toBe('User');
-  });
+  it.each([
+    { name: 'empty', parts: [] },
+    {
+      name: 'file-only',
+      parts: [
+        {
+          id: 'file-1',
+          sessionID: 'ses-1',
+          messageID: 'u-1',
+          type: 'file',
+          mime: 'text/plain',
+          url: 'file:///attachment.txt',
+        },
+      ],
+    },
+  ] satisfies { name: string; parts: Part[] }[])(
+    'keeps user details without Copy for $name parts',
+    ({ parts }) => {
+      const message = storedMessage(userInfo(), parts);
+      const content = getMessageDetailsContent(message, catalogOptions);
+      expect(content.copyableText).toBeNull();
+      expect(content.roleLabel).toBe('User');
+    }
+  );
 
   it('hides Sent when the created timestamp is missing', () => {
     const info = userInfo({
@@ -345,9 +378,11 @@ describe('getMessageDetailsContent — canSelectText', () => {
   });
 
   it('hides selection while an assistant tool part is running', () => {
-    const message = storedMessage(assistantInfo(), [runningToolPart()]);
+    const message = storedMessage(assistantInfo(), [textPart('finished text'), runningToolPart()]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).not.toBeNull();
+    expect(content.copyText).toBe('finished text');
+    // The select view still carries the tool invocation; only Copy is scoped.
+    expect(content.copyableText).toContain('bash');
     expect(content.canSelectText).toBe(false);
   });
 
@@ -367,36 +402,126 @@ describe('getMessageDetailsContent — canSelectText', () => {
     expect(content.copyableText).toBeNull();
     expect(content.canSelectText).toBe(false);
   });
+
+  it('appends the raw transport text to the copy payload only when delivery failed', () => {
+    // The failure footer never renders transport text; the details Copy action
+    // is where the untranslated original stays reachable (terminal-error split).
+    // The select-text view renders `copyableText`, so it never shows the raw
+    // string either.
+    const message = storedMessage(userInfo(), [textPart('Continue')]);
+    const content = getMessageDetailsContent(message, catalogOptions, {
+      status: 'failed',
+      error: 'Unauthorized: Unauthorized',
+      reason: 'exhausted',
+    });
+    expect(content.copyText).toBe('Continue\n\nUnauthorized: Unauthorized');
+    expect(content.copyableText).toBe('Continue');
+
+    // Without a failed delivery state the copy payload stays the prompt alone.
+    const delivered = getMessageDetailsContent(message, catalogOptions);
+    expect(delivered.copyText).toBe('Continue');
+
+    // A queued state is not a failure either.
+    const queued = getMessageDetailsContent(message, catalogOptions, { status: 'queued' });
+    expect(queued.copyText).toBe('Continue');
+    expect(queued.copyableText).toBe('Continue');
+  });
 });
 
-describe('MessageDetailsSheet copy button wiring (retryable unhappy)', () => {
+describe('getMessageDetailsContent — Copy message payload', () => {
+  it('copies the message text without the thinking block above it', () => {
+    const message = storedMessage(assistantInfo(), [
+      reasoningPart('Let me think about this first.', { start: 1, end: 2 }),
+      textPart('Here is the answer.', 'p-answer'),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyText).toBe('Here is the answer.');
+    // Select text is a separate affordance: it keeps the thinking block so a
+    // manual selection is not narrowed by the Copy-message scope.
+    expect(content.copyableText).toBe('Let me think about this first.\n\nHere is the answer.');
+  });
+
+  it('drops a tool call that sits between two reply paragraphs', () => {
+    const message = storedMessage(assistantInfo(), [
+      textPart('First paragraph.', 'p-first'),
+      runningToolPart(),
+      textPart('Second paragraph.', 'p-second'),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyText).toBe('First paragraph.\n\nSecond paragraph.');
+  });
+
+  it('hides Copy when the only parts are thinking and a tool call', () => {
+    const message = storedMessage(assistantInfo(), [
+      reasoningPart('thinking...', { start: 1, end: 2 }),
+      runningToolPart(),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyText).toBeNull();
+    // The thinking block is still selectable content, but the running tool part
+    // keeps selection unavailable and Copy hidden.
+    expect(content.copyableText).not.toBeNull();
+    expect(content.canSelectText).toBe(false);
+  });
+});
+
+describe('handleMessageDetailsCopy inline clipboard contract', () => {
   beforeEach(() => {
-    performCopyMock.mockReset().mockResolvedValue(undefined);
+    setStringAsync.mockReset();
+    notificationAsync.mockReset();
+    toastSuccess.mockReset();
+    toastError.mockReset();
     showActionSheetWithOptions.mockReset();
   });
 
-  it('forwards copyable text to shared performCopy (no ActionSheet)', async () => {
-    // Contract: details Copy uses handleMessageDetailsCopy → shared performCopy.
-    // No ActionSheet (that path is for long-press message copy on iOS).
-    // Sheet onPress wires to this handler (see message-details-sheet.tsx).
+  it('writes copyable text straight to the clipboard and reports success', async () => {
+    // Contract: details Copy writes to expo-clipboard directly. No shared
+    // performCopy, no ActionSheet (that path is for long-press message copy on
+    // iOS), and no app-root toast: the sheet renders the outcome inline.
+    setStringAsync.mockResolvedValue(true);
     const message = storedMessage(userInfo(), [textPart('copy me')]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).toBe('copy me');
+    expect(content.copyText).toBe('copy me');
 
     const { handleMessageDetailsCopy } = await import('./message-details-copy');
-    handleMessageDetailsCopy(content.copyableText);
+    await expect(handleMessageDetailsCopy(content.copyText)).resolves.toBe(true);
 
-    expect(performCopyMock).toHaveBeenCalledWith('copy me');
-    expect(performCopyMock).toHaveBeenCalledTimes(1);
+    expect(setStringAsync).toHaveBeenCalledWith('copy me');
+    expect(setStringAsync).toHaveBeenCalledTimes(1);
+    expect(notificationAsync).toHaveBeenCalledWith('success');
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('no-ops when copyable text is absent', async () => {
+  it('returns false without touching the clipboard when the text is absent', async () => {
     const { handleMessageDetailsCopy } = await import('./message-details-copy');
-    handleMessageDetailsCopy(null);
-    handleMessageDetailsCopy(undefined);
-    handleMessageDetailsCopy('');
-    expect(performCopyMock).not.toHaveBeenCalled();
+    await expect(handleMessageDetailsCopy(null)).resolves.toBe(false);
+    await expect(handleMessageDetailsCopy(undefined)).resolves.toBe(false);
+    await expect(handleMessageDetailsCopy('')).resolves.toBe(false);
+
+    expect(setStringAsync).not.toHaveBeenCalled();
+    expect(notificationAsync).not.toHaveBeenCalled();
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('returns false for an absent or rejected clipboard write', async () => {
+    const { handleMessageDetailsCopy } = await import('./message-details-copy');
+
+    setStringAsync.mockResolvedValueOnce(undefined);
+    await expect(handleMessageDetailsCopy('copy me')).resolves.toBe(false);
+
+    setStringAsync.mockResolvedValueOnce(false);
+    await expect(handleMessageDetailsCopy('copy me')).resolves.toBe(false);
+
+    setStringAsync.mockRejectedValueOnce(new Error('denied'));
+    await expect(handleMessageDetailsCopy('copy me')).resolves.toBe(false);
+
+    expect(notificationAsync).not.toHaveBeenCalled();
+    expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

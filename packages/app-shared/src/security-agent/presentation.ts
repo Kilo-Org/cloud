@@ -33,7 +33,23 @@ type FindingStatusPresentation = {
   tooltip?: string | null;
 };
 
-type FindingDeadlinePresentation = FindingStatusPresentation & { detail: string };
+// Stable code describing which deadline branch produced the copy, so mobile
+// can map it to its own translated strings instead of parsing the English
+// label/detail. `fixedAt` is null when the fixed-at timestamp is missing
+// (the shared copy then reads "Resolution recorded").
+export type FindingDeadlineState =
+  | { kind: 'fixed'; beforeDeadline: boolean; fixedAt: Date | null }
+  | { kind: 'closed'; superseded: boolean; at: Date }
+  | { kind: 'no-deadline' }
+  | { kind: 'overdue'; days: number; deadline: Date }
+  | { kind: 'due-today'; deadline: Date }
+  | { kind: 'due-tomorrow'; deadline: Date }
+  | { kind: 'due-in'; days: number; deadline: Date };
+
+type FindingDeadlinePresentation = FindingStatusPresentation & {
+  detail: string;
+  state: FindingDeadlineState;
+};
 
 // Structural shape of a finding's `analysis` column — permissive so it's
 // satisfied by both web's SecurityFinding (from @kilocode/db/schema) and
@@ -257,8 +273,52 @@ function isSupersededFinding(finding: SecurityFinding): boolean {
   return finding.status === 'ignored' && getSupersedingFindingId(finding) !== null;
 }
 
+// Reused instead of building a DateTimeFormat per call
+// (toLocaleDateString with options constructs one every time): the deadline
+// helpers run once per finding row, so a full page is N constructions per
+// render. Construction is deferred to first use — mobile imports this module
+// before its Intl polyfill warm-up, and the native Intl that exists at import
+// time must not own the cached formatter. The zone guard keeps the reused
+// formatter honest: a formatter resolves its zone when built, so a device that
+// moves time zones must rebuild it or keep writing the old wall clock.
+const FINDING_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+};
+let findingDateFormatValue: Intl.DateTimeFormat | null = null;
+let findingDateDeviceZone: string | null = null;
+let findingDateZoneCheckedAt = 0;
+const FINDING_DATE_ZONE_CHECK_MS = 1000;
+
 function formatFindingDate(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // toLocaleDateString's spec path renders an invalid Date as its "Invalid
+  // Date" string instead of throwing; a row whose timestamp does not parse
+  // keeps that behavior here rather than aborting its render.
+  if (Number.isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
+  // One Intl read per second, matching the mobile intl-cache convention
+  // (dropDateFormattersForNewDeviceZone) so a row render cannot re-probe Intl
+  // on every keystroke. A clock that stepped backwards reads as a stale check
+  // rather than a negative age, so it re-probes instead of waiting for the
+  // wall clock to catch up.
+  const zoneProbeAt = Date.now();
+  const sinceLastCheck = zoneProbeAt - findingDateZoneCheckedAt;
+  if (
+    findingDateDeviceZone === null ||
+    sinceLastCheck < 0 ||
+    sinceLastCheck >= FINDING_DATE_ZONE_CHECK_MS
+  ) {
+    findingDateZoneCheckedAt = zoneProbeAt;
+    const deviceZone = new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+    if (deviceZone !== findingDateDeviceZone) {
+      findingDateDeviceZone = deviceZone;
+      findingDateFormatValue = null;
+    }
+  }
+  findingDateFormatValue ??= new Intl.DateTimeFormat('en-US', FINDING_DATE_OPTIONS);
+  return findingDateFormatValue.format(date);
 }
 
 function startOfDay(date: Date): number {
@@ -289,6 +349,7 @@ export function getSecurityDeadlinePresentation(
       label: fixedBeforeDeadline ? 'Fixed before deadline' : 'Fixed',
       detail: fixedAt ? `Fixed ${formatFindingDate(fixedAt)}` : 'Resolution recorded',
       tone: fixedBeforeDeadline ? 'success' : 'neutral',
+      state: { kind: 'fixed', beforeDeadline: fixedBeforeDeadline, fixedAt },
     };
   }
 
@@ -300,6 +361,7 @@ export function getSecurityDeadlinePresentation(
       label,
       detail: `${label} ${formatFindingDate(updatedAt)}`,
       tone: 'neutral',
+      state: { kind: 'closed', superseded: isSupersededFinding(finding), at: updatedAt },
     };
   }
 
@@ -309,6 +371,7 @@ export function getSecurityDeadlinePresentation(
       label: 'Deadline not set',
       detail: 'No SLA deadline',
       tone: 'neutral',
+      state: { kind: 'no-deadline' },
     };
   }
 
@@ -325,19 +388,33 @@ export function getSecurityDeadlinePresentation(
           : `${overdueDays} ${overdueDays === 1 ? 'day' : 'days'} overdue`,
       detail,
       tone: 'danger',
+      state: { kind: 'overdue', days: overdueDays, deadline },
     };
   }
   if (calendarDays === 0) {
-    return { icon: 'clock', label: 'Due today', detail, tone: 'warning' };
+    return {
+      icon: 'clock',
+      label: 'Due today',
+      detail,
+      tone: 'warning',
+      state: { kind: 'due-today', deadline },
+    };
   }
   if (calendarDays === 1) {
-    return { icon: 'clock', label: 'Due tomorrow', detail, tone: 'warning' };
+    return {
+      icon: 'clock',
+      label: 'Due tomorrow',
+      detail,
+      tone: 'warning',
+      state: { kind: 'due-tomorrow', deadline },
+    };
   }
   return {
     icon: 'clock',
     label: `Due in ${calendarDays} days`,
     detail,
     tone: calendarDays <= 3 ? 'warning' : 'neutral',
+    state: { kind: 'due-in', days: calendarDays, deadline },
   };
 }
 
@@ -382,19 +459,25 @@ export function getFindingLifecycleStatusPresentation(finding: SecurityFinding):
   return { label: finding.status, tone: 'neutral' };
 }
 
-const DISMISSAL_REASON_LABELS: Record<string, string> = {
+const DISMISSAL_REASON_LABELS = {
   fix_started: 'a fix has already started',
   no_bandwidth: 'no bandwidth is available',
   tolerable_risk: 'the risk is tolerable',
   inaccurate: 'the finding is inaccurate',
   not_used: 'vulnerable code is not used',
-};
+} as const;
+
+type DismissalReason = keyof typeof DISMISSAL_REASON_LABELS;
 
 export function getDismissalReasonLabel(reason: string | null): string {
   if (!reason) {
     return 'after review';
   }
-  return DISMISSAL_REASON_LABELS[reason] ?? reason.replaceAll('_', ' ');
+  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
+  // through to the humanized code instead of leaking prototype members.
+  return Object.hasOwn(DISMISSAL_REASON_LABELS, reason)
+    ? DISMISSAL_REASON_LABELS[reason as DismissalReason]
+    : reason.replaceAll('_', ' ');
 }
 
 export function getFindingSourceLabel(source: string): string {
@@ -648,8 +731,13 @@ export function formatValidationEvidenceEntry(
 // from this table's own keys rather than importing
 // SecurityRemediationAdmissionRejectionReason — this table is still the only
 // copy in the mobile tree (use-security-findings.ts imports it from here).
-const REMEDIATION_UNAVAILABLE_COPY = {
+// Exported so the mobile security-agent copy test derives its expected reasons
+// from this table instead of a hand-maintained fixture that cannot notice a
+// reason added here.
+export const REMEDIATION_UNAVAILABLE_COPY = {
   finding_not_found: 'Security finding no longer exists.',
+  approval_required:
+    'Auto Remediation requires approval. Start remediation manually to approve it.',
   finding_not_open: 'Finding is no longer open.',
   repo_not_in_scope: 'Repository is not selected for Security Agent.',
   analysis_required: 'Run codebase analysis before starting remediation.',

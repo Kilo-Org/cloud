@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Agentti-istunnossasi on päivitys",
+      "lowBalance": "Saldosi vaatii huomiota",
+      "spendAlert": "Kulutuksesi vaatii huomiota",
+      "securityFinding": "Tietoturvalöydös vaatii huomiota",
+      "securityUpdate": "Tietoturvatarkistuksella on päivitys",
+      "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Matalan saldon hälytys",
+      "body": "Organisaation {{organizationName}} saldo laski alle ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Kulutushälytys",
+      "body": "{{scopeName}}n kulutus ylitti ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} kohteessa {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Uusi tietoturvalöydös ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-varoitus"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-rikkomus"
+    }
+  },
+  "sessionReady": {
+    "body": "Kilo-istuntosi on valmis hallittavaksi puhelimestasi"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

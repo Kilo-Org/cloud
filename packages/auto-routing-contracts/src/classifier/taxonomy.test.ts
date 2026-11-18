@@ -24,16 +24,6 @@ const AxisSchema = z.object({
 
 const TaxonomySchema = z.object({
   version: z.literal(1),
-  outputContract: z.object({
-    taskType: z.string(),
-    subtaskType: z.string(),
-    contextComplexity: z.string(),
-    reasoningComplexity: z.string(),
-    riskLevel: z.string(),
-    executionMode: z.string(),
-    requiresTools: z.string(),
-    confidence: z.string(),
-  }),
   decisionRules: z.array(z.string().min(1)).min(1),
   taskTypes: z.array(TaskTypeSchema).min(1),
   axes: z.object({

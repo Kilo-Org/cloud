@@ -1,29 +1,34 @@
+import { GitHubIdentityConflictError } from '@kilocode/db/github-identity';
 import { disconnectStoredGitHubUserAuthorization } from './user-authorization-client';
 
+const expected = { authorizationId: null, credentialVersion: null };
 const mockConfig = {
   apiUrl: 'https://git-token-service.example.com',
 };
-const mockGenerateInternalServiceToken = jest.fn(
-  (userId: string, _options?: { expiresIn?: number }) => `short-lived-user-token:${userId}`
+const mockGenerateBoundedInternalServiceToken = jest.fn(
+  (userId: string, _options?: { audience: string; expiresIn: number }) =>
+    `short-lived-user-token:${userId}`
 );
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GIT_TOKEN_SERVICE_API_URL() {
     return mockConfig.apiUrl;
   },
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
-  generateInternalServiceToken: (userId: string, options?: { expiresIn?: number }) =>
-    mockGenerateInternalServiceToken(userId, options),
+  generateBoundedInternalServiceToken: (
+    userId: string,
+    options: { audience: string; expiresIn: number }
+  ) => mockGenerateBoundedInternalServiceToken(userId, options),
 }));
 
 describe('disconnectStoredGitHubUserAuthorization', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
     mockConfig.apiUrl = 'https://git-token-service.example.com';
-    mockGenerateInternalServiceToken.mockClear();
+    mockGenerateBoundedInternalServiceToken.mockClear();
   });
 
   it('authenticates disconnect using a short-lived user-scoped token', async () => {
@@ -31,16 +36,22 @@ describe('disconnectStoredGitHubUserAuthorization', () => {
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({ disconnected: true }), { status: 200 }));
 
-    await disconnectStoredGitHubUserAuthorization('kilo-user-1');
+    await disconnectStoredGitHubUserAuthorization('kilo-user-1', expected);
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('kilo-user-1', {
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('kilo-user-1', {
+      audience: 'git-token-service:github-user-authorizations:disconnect',
       expiresIn: 5 * 60,
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://git-token-service.example.com/internal/github-user-authorizations/disconnect',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer short-lived-user-token:kilo-user-1' },
+        headers: {
+          Authorization: 'Bearer short-lived-user-token:kilo-user-1',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(expected),
+        signal: expect.any(AbortSignal),
       }
     );
   });
@@ -49,7 +60,7 @@ describe('disconnectStoredGitHubUserAuthorization', () => {
     mockConfig.apiUrl = '';
     const fetchMock = jest.spyOn(global, 'fetch');
 
-    await expect(disconnectStoredGitHubUserAuthorization('kilo-user-1')).rejects.toThrow(
+    await expect(disconnectStoredGitHubUserAuthorization('kilo-user-1', expected)).rejects.toThrow(
       'Git token service disconnect is not configured'
     );
 
@@ -59,7 +70,7 @@ describe('disconnectStoredGitHubUserAuthorization', () => {
   it('sanitizes transport failures without propagating internal request details', async () => {
     jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('internal service URL failed'));
 
-    await expect(disconnectStoredGitHubUserAuthorization('kilo-user-1')).rejects.toThrow(
+    await expect(disconnectStoredGitHubUserAuthorization('kilo-user-1', expected)).rejects.toThrow(
       'GitHub authorization disconnect request failed'
     );
   });
@@ -72,8 +83,18 @@ describe('disconnectStoredGitHubUserAuthorization', () => {
       })
     );
 
-    await expect(disconnectStoredGitHubUserAuthorization('kilo-user-1')).rejects.toThrow(
+    await expect(disconnectStoredGitHubUserAuthorization('kilo-user-1', expected)).rejects.toThrow(
       'GitHub authorization disconnect failed (503)'
     );
+  });
+
+  it('reports a stale precondition as an identity conflict', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(Response.json({ error: 'connection_conflict' }, { status: 409 }));
+
+    await expect(
+      disconnectStoredGitHubUserAuthorization('kilo-user-1', expected)
+    ).rejects.toBeInstanceOf(GitHubIdentityConflictError);
   });
 });

@@ -5,13 +5,14 @@ import {
   createScheduledJobRun,
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
-import { db } from '@/lib/drizzle';
-import { api_request_log } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { api_request_log_2 } from '@kilocode/db/schema';
 import { asc, inArray, lt } from 'drizzle-orm';
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { deleteExpiredRequestLoggingOptIns } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 
 const RETENTION_DAYS = 30;
-const BATCH_SIZE = 1_000;
+const BATCH_SIZE = 10_000;
 
 function getDaysAgo(days: number) {
   const date = new Date();
@@ -32,23 +33,25 @@ export async function GET(request: Request) {
   try {
     const cutoffDate = getDaysAgo(RETENTION_DAYS).toISOString();
     const expiredRows = await db
-      .select({ id: api_request_log.id })
-      .from(api_request_log)
-      .where(lt(api_request_log.created_at, cutoffDate))
-      .orderBy(asc(api_request_log.created_at))
+      .select({ id: api_request_log_2.id })
+      .from(api_request_log_2)
+      .where(lt(api_request_log_2.created_at, cutoffDate))
+      .orderBy(asc(api_request_log_2.created_at))
       .limit(BATCH_SIZE + 1);
 
     const batchIds = expiredRows.slice(0, BATCH_SIZE).map(row => row.id);
     const result =
       batchIds.length > 0
-        ? await db.delete(api_request_log).where(inArray(api_request_log.id, batchIds))
+        ? await db.delete(api_request_log_2).where(inArray(api_request_log_2.id, batchIds))
         : null;
 
+    const deletedOptInCount = await deleteExpiredRequestLoggingOptIns();
     const deletedApiRequestLogCount = result?.rowCount ?? 0;
     const hasMore = expiredRows.length > BATCH_SIZE;
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         deleted_api_request_log_count: deletedApiRequestLogCount,
+        deleted_request_logging_opt_in_count: deletedOptInCount,
         deleted_count: deletedApiRequestLogCount,
         batch_size: BATCH_SIZE,
         has_more: hasMore,
@@ -57,6 +60,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       deletedCount: deletedApiRequestLogCount,
+      deletedOptInCount,
       batchSize: BATCH_SIZE,
       hasMore,
       cutoffDate,

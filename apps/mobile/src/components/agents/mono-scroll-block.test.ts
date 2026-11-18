@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_MONO_SCROLL_MAX_LENGTH,
   MONO_SCROLL_GESTURE_OFFSETS,
   MONO_SCROLL_TEXT_MODE_OPTIONS,
   MONO_SCROLL_VIEW_PROPS,
   nextMonoScrollHeightPin,
   prepareMonoScrollContent,
+  resolveMonoScrollMaxLength,
   resolveMonoScrollPinnedHeight,
 } from './mono-scroll-block-model';
 
@@ -46,6 +48,19 @@ describe('prepareMonoScrollContent', () => {
   });
 });
 
+describe('resolveMonoScrollMaxLength — a block is never unbounded', () => {
+  it('keeps a caller budget below the default', () => {
+    expect(resolveMonoScrollMaxLength(500)).toBe(500);
+  });
+
+  it('falls back to the default so a multi-megabyte output cannot be laid out', () => {
+    // The default is the whole point: `undefined` used to mean "render it all",
+    // and a 2 182 790-character output crashed the sheet and the app.
+    expect(resolveMonoScrollMaxLength(undefined)).toBe(DEFAULT_MONO_SCROLL_MAX_LENGTH);
+    expect(DEFAULT_MONO_SCROLL_MAX_LENGTH).toBeGreaterThan(0);
+  });
+});
+
 describe('height pin — content growth must remeasure', () => {
   it('applies pinned height only while pin text matches display text', () => {
     const pin = { text: 'line1', height: 16 };
@@ -75,10 +90,10 @@ describe('height pin — content growth must remeasure', () => {
 });
 
 describe('MONO_SCROLL_TEXT_MODE_OPTIONS — segmented-control order matches the sheet default', () => {
-  it('is exactly wrap then scroll, with stable labels', () => {
+  it('is exactly wrap then scroll, with stable label keys', () => {
     expect(MONO_SCROLL_TEXT_MODE_OPTIONS).toEqual([
-      { value: 'wrap', label: 'Wrap' },
-      { value: 'scroll', label: 'Scroll' },
+      { value: 'wrap', labelKey: 'monoScrollBlock.wrap' },
+      { value: 'scroll', labelKey: 'monoScrollBlock.scroll' },
     ]);
   });
 });

@@ -1,11 +1,13 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { createHash, randomUUID } from 'node:crypto';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   eq,
   and,
   or,
+  asc,
   desc,
   lt,
   isNull,
@@ -14,71 +16,201 @@ import {
   gte,
   isNotNull,
   sql,
+  getTableColumns,
   type SQL,
 } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
 import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
+  cloud_agent_session_runs,
+  cloud_agent_user_settings,
+  cloud_agent_workspace_folders,
+  cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
+  type CliSessionV2,
+  type CloudAgentSessionRunStatus,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken } from '@/lib/tokens';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
+import {
+  readFirstPageStreamState,
+  type FirstPageStreamState,
+} from '@/lib/cloud-agent-next/first-page-stream-state';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
+  fetchSessionDiff,
   deleteSession as deleteSessionIngest,
+  fetchSharedSession,
   shareSession as shareSessionIngest,
+  SessionShareTooLargeError,
+  sessionIngestTrpcError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
-  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
-  validateKiloSdkMessagesCursor,
+  cloudAgentWorktreeIdSchema,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+  isDefaultSessionTitle,
+  sessionShareOptionsSchema,
+  projectPrivateWorktreePaths,
+  projectKnownCloudAgentPath,
+  getSessionMessagesPageInputSchema,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
+import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
+import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { recordKiloAdminElevation, UNSCOPED_TARGET } from '@/lib/admin/admin-access-log';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
+import {
+  recordKiloAdminElevation,
+  UNSCOPED_TARGET,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   fetchPullRequestByNumber,
-  fetchPullRequestReviewDecision,
-  GitHubRateLimitError,
+  toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
+import { parseGitHubOwnerRepo } from '@/lib/integrations/platforms/github/repository-coordinates';
+import {
+  pullRequestUrlMatchesRepo,
+  verifySessionPullRequestLink,
+} from '@/lib/integrations/platforms/github/pr-link-identity';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
+import {
+  createEmptyPrObservations,
+  prObservationsSchema,
+} from '@/lib/integrations/platforms/github/pr-observations';
+import { fetchPullRequestObservations } from '@/lib/integrations/platforms/github/pr-status';
+import {
+  claimPrRefresh,
+  deferPrRefresh,
+} from '@/lib/integrations/platforms/github/pr-refresh-budget';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
+import {
+  DEFAULT_WORKSPACE_ORDER,
+  WORKSPACE_LIST_SEARCH_MAX_LENGTH,
+  workspaceOrderSchema,
+  type WorkspaceOrder,
+} from '@/lib/cloud-agent/workspace-folders';
 import { after } from 'next/server';
+import {
+  sessionAssociatedPr,
+  associatedPrSchema,
+  formatAssociatedPr,
+  parseGitHubPrUrl,
+  samePullRequest,
+  type AssociatedPrRow,
+  type SessionPrFields,
+} from '@/lib/session-associated-pr';
 
-/**
- * Check if an error indicates the session was not found in the cloud-agent DO.
- * This is expected for legacy sessions created before the new DO-based system.
- */
-function isSessionNotFoundError(err: unknown): boolean {
-  if (err instanceof TRPCClientError) {
-    const data = err.data as { code?: string; httpStatus?: number } | undefined;
-    const shape = err.shape as { data?: { code?: string; httpStatus?: number } } | undefined;
-    // Check TRPC error code
-    const code = data?.code ?? shape?.data?.code;
-    if (code === 'NOT_FOUND') {
-      return true;
+import {
+  changeWatchPr,
+  enableWatchPr,
+  getWatchPr,
+  getPrWatchOptions,
+  recheckWatchPr,
+  watchPrEnableSchema,
+  watchPrMutationSchema,
+  watchPrQuerySchema,
+} from '@/lib/cloud-agent/watch-pr';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
+import {
+  isSessionNotFoundError,
+  isTransientRuntimeError,
+  sessionTrpcErrorCode,
+} from '@/lib/session-trpc-errors';
+
+function isSessionConflictError(err: unknown): boolean {
+  return sessionTrpcErrorCode(err) === 'CONFLICT';
+}
+
+function isParentLookupUnavailableError(err: unknown): boolean {
+  return sessionTrpcErrorCode(err) === 'FORBIDDEN' || isSessionNotFoundError(err);
+}
+
+const privateTranscriptPathFields = new Set([
+  'directory',
+  'cwd',
+  'root',
+  'path',
+  'file',
+  'activeFile',
+  'pattern',
+  'absolutePath',
+  'filePath',
+  'filepath',
+  'file_path',
+  'workdir',
+  'movePath',
+]);
+const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
+
+function isPrivateTranscriptPath(value: string, directory: string): boolean {
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value) && !value.startsWith(`${directory}/`);
+}
+
+function projectGroupedTranscriptPaths(value: unknown, directory: string): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      projectGroupedTranscriptPaths(item, directory);
     }
-    // Also check HTTP status 404
-    const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
-    if (httpStatus === 404) {
-      return true;
-    }
+    return;
   }
-  return false;
+
+  if (typeof value !== 'object' || value === null) {
+    return;
+  }
+
+  for (const [key, current] of Object.entries(value)) {
+    if (typeof current === 'string') {
+      if (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory)) {
+        Reflect.set(value, key, projectKnownCloudAgentPath(current, directory) ?? directory);
+      } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
+        Reflect.set(value, key, '');
+      }
+      continue;
+    }
+
+    if (Array.isArray(current) && privateTranscriptPathArrays.has(key)) {
+      for (let index = 0; index < current.length; index += 1) {
+        const path = current[index];
+        if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
+          current[index] = projectKnownCloudAgentPath(path, directory) ?? directory;
+        } else {
+          projectGroupedTranscriptPaths(path, directory);
+        }
+      }
+      continue;
+    }
+
+    projectGroupedTranscriptPaths(current, directory);
+  }
+}
+
+function projectGroupedSessionTranscript<T extends object>(
+  value: T,
+  kiloSessionId: string,
+  metadata: readonly unknown[]
+): T {
+  const directory = `/cloud-agent/sessions/${kiloSessionId}`;
+  const projected = projectPrivateWorktreePaths(value, metadata, directory);
+  projectGroupedTranscriptPaths(projected, directory);
+  return projected;
 }
 
 const PAGE_SIZE = 10;
 const RECENT_DAYS_LIMIT = 200;
+/** Upper bound of PostgreSQL `integer`; a larger needle cannot be a `pr_number`. */
+const PG_MAX_INTEGER = 2_147_483_647;
 
 /**
  * If a refresh was performed within this window, the mutation short-circuits
@@ -89,76 +221,25 @@ const RECENT_DAYS_LIMIT = 200;
 export const REFRESH_THROTTLE_MS = 60_000;
 
 /**
- * Parse a git URL into `{ owner, repo }` when it points at GitHub. Returns
- * `null` for non-GitHub hosts or URLs that cannot be parsed into exactly
- * `owner/repo`. Handles https, ssh:// and SCP-style
- * (`git@github.com:owner/repo.git`) URLs, plus trailing `.git` suffixes.
+ * Parse a git URL into `{ owner, repo }` when it points at GitHub and both
+ * parts stay inside GitHub's name charset. The canonical implementation lives
+ * in the GitHub platform module so the batch review-decision path and this
+ * router share one rule.
  */
-export function parseGitHubOwnerRepo(url: string): { owner: string; repo: string } | null {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  let host: string;
-  let path: string;
-  if (sshMatch) {
-    host = sshMatch[1].toLowerCase();
-    path = sshMatch[2];
-  } else {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
-      return null;
-    }
-    host = parsed.hostname.toLowerCase();
-    path = parsed.pathname.replace(/^\/+/, '');
-  }
+export { parseGitHubOwnerRepo };
 
-  if (host !== 'github.com' && host !== 'www.github.com') {
-    return null;
-  }
-
-  const cleaned = path.replace(/\.git$/i, '').replace(/\/+$/, '');
-  const segments = cleaned.split('/').filter(Boolean);
-  if (segments.length !== 2) {
-    return null;
-  }
-  const [owner, repo] = segments;
-  if (!owner || !repo) {
-    return null;
-  }
-  return { owner, repo };
-}
-
-const associatedPrSchema = z.object({
-  url: z.string(),
-  number: z.number(),
-  state: z.string(),
-  title: z.string().nullable(),
-  headSha: z.string().nullable(),
-  lastSyncedAt: z.string(),
-  reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
-  // True when the server has flagged this PR for an async review-decision
-  // fetch (see batch-review-decisions.ts) and the result has not landed yet.
-  // Clients can poll the list endpoint while any row reports pending=true to
-  // surface review-decision badges shortly after they become available.
-  reviewDecisionPending: z.boolean(),
-  // Host platform of the linked PR (e.g. 'github'). Always present when an
-  // associatedPr is returned.
-  platform: z.string(),
-});
-
-type AssociatedPrRow = {
-  pr_url: string | null;
-  pr_number: number | null;
-  pr_state: string | null;
-  pr_title: string | null;
-  pr_head_sha: string | null;
-  pr_last_synced_at: string | null;
-  pr_review_decision: string | null;
-  review_decision_pending: boolean | null;
-};
+/**
+ * The associated-PR wire schema and formatters live in
+ * `@/lib/session-associated-pr` (which owns the associated-PR query);
+ * re-exported here for the router's callers.
+ */
+export {
+  associatedPrSchema,
+  formatAssociatedPr,
+  parseGitHubPrUrl,
+  type AssociatedPrRow,
+  type SessionPrFields,
+} from '@/lib/session-associated-pr';
 
 /**
  * Flat aliases for the session's own stored PR link, produced by
@@ -168,172 +249,96 @@ type SessionPrRow = {
   session_pr_platform: string | null;
   session_pr_url: string | null;
   session_pr_number: number | null;
+  session_pr_head_ref: string | null;
+  session_pr_head_sha: string | null;
+  /**
+   * `cli_sessions_v2.pr_link_verified_at`. Non-null means the link passed
+   * GitHub identity verification, so it may be shown at all (and the cache's
+   * live fields may be served for it). Null means the link is a guess and is
+   * never surfaced.
+   */
+  session_pr_verified_at: string | null;
 };
 
-/**
- * The session's stored PR link (cli_sessions_v2.platform / pr_url / pr_number)
- * plus its updated_at, used for the pending-partial lastSyncedAt.
- */
-type SessionPrFields = {
-  platform: string | null;
-  pr_url: string | null;
-  pr_number: number | null;
-  updated_at: string | null;
-};
-
-/**
- * Parse a GitHub pull-request URL into `{ owner, repo, number }`. Returns
- * `null` for non-GitHub hosts or URLs that do not resolve to
- * `owner/repo/pull/N`. Accepts a trailing subpath (e.g. `/files`), query
- * string, and fragment, matching the mobile parser so a pasted PR URL is
- * never skipped during refresh. A PR URL has more than two path segments,
- * so `parseGitHubOwnerRepo` cannot parse it.
- */
-export function parseGitHubPrUrl(
-  url: string
-): { owner: string; repo: string; number: number } | null {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  let host: string;
-  let path: string;
-  if (sshMatch) {
-    host = sshMatch[1].toLowerCase();
-    path = sshMatch[2];
-  } else {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
-      return null;
-    }
-    host = parsed.hostname.toLowerCase();
-    path = parsed.pathname.replace(/^\/+/, '');
-  }
-
-  if (host !== 'github.com' && host !== 'www.github.com') {
-    return null;
-  }
-
-  const segments = path.replace(/\/+$/, '').split('/').filter(Boolean);
-  if (segments.length < 4 || segments[2] !== 'pull') {
-    return null;
-  }
-  const [owner, repo, , numberStr] = segments;
-  const number = Number(numberStr);
-  if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
-    return null;
-  }
-  return { owner, repo, number };
-}
-
-/**
- * Format a cache row into the associatedPr shape. Returns null when the cache
- * row has no PR. `platform` is supplied by the caller.
- */
-function formatCacheRow(
-  cache: AssociatedPrRow,
-  platform: string
-): z.infer<typeof associatedPrSchema> | null {
+export function getPrLinkVerificationKey(
+  session: Pick<
+    CliSessionV2,
+    | 'platform'
+    | 'pr_url'
+    | 'pr_number'
+    | 'pr_link_verified_at'
+    | 'git_url'
+    | 'pr_head_ref'
+    | 'pr_head_sha'
+  >
+): string | undefined {
   if (
-    cache.pr_url === null ||
-    cache.pr_number === null ||
-    cache.pr_state === null ||
-    cache.pr_last_synced_at === null
+    session.platform !== 'github' ||
+    session.pr_link_verified_at !== null ||
+    session.pr_url === null ||
+    session.pr_number === null ||
+    !Number.isInteger(session.pr_number) ||
+    session.pr_number <= 0 ||
+    session.pr_number > PG_MAX_INTEGER ||
+    !pullRequestUrlMatchesRepo(session.pr_url, session.git_url)
   ) {
-    return null;
+    return undefined;
   }
-  const rd = cache.pr_review_decision;
-  const reviewDecision =
-    rd === 'approved' || rd === 'changes_requested' || rd === 'review_required' ? rd : null;
-  return {
-    url: cache.pr_url,
-    number: cache.pr_number,
-    state: cache.pr_state,
-    title: cache.pr_title,
-    headSha: cache.pr_head_sha,
-    lastSyncedAt: cache.pr_last_synced_at,
-    reviewDecision,
-    reviewDecisionPending: cache.review_decision_pending === true,
-    platform,
-  };
-}
-
-/**
- * Build the pending partial for a session whose stored link has not yet been
- * synced into the branch cache. Carries only the session's own link fields;
- * never the other PR's cache fields. Returns `null` when the session has no
- * `pr_url` (callers only reach this with a stored link, but the schema allows
- * null).
- */
-function pendingPartialFromSession(
-  session: SessionPrFields,
-  reviewDecisionPending: boolean
-): z.infer<typeof associatedPrSchema> | null {
-  if (session.pr_url === null) {
-    return null;
+  const parsed = parseGitHubPrUrl(session.pr_url);
+  if (
+    !parsed ||
+    parsed.number !== session.pr_number ||
+    !parseGitHubOwnerRepo(session.git_url ?? '')
+  ) {
+    return undefined;
   }
-  const url = session.pr_url;
-  const parsed = parseGitHubPrUrl(url);
-  return {
-    url,
-    number: session.pr_number ?? parsed?.number ?? 0,
-    state: 'unknown',
-    title: null,
-    headSha: null,
-    lastSyncedAt: session.updated_at
-      ? new Date(session.updated_at).toISOString()
-      : new Date().toISOString(),
-    reviewDecision: null,
-    reviewDecisionPending,
-    platform: session.platform ?? 'github',
-  };
-}
-
-/**
- * Compare two PR URLs as the same pull request, ignoring trailing subpath,
- * query, fragment, and trailing slash. A stored link like
- * `.../pull/7/files` names the same PR as the canonical cache URL
- * `.../pull/7`. Returns `false` when either URL is not a parseable GitHub PR
- * URL.
- */
-function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
-  if (sessionUrl === cacheUrl) return true;
-  const s = parseGitHubPrUrl(sessionUrl);
-  const c = parseGitHubPrUrl(cacheUrl);
-  return (
-    s !== null &&
-    c !== null &&
-    s.owner.toLowerCase() === c.owner.toLowerCase() &&
-    s.repo.toLowerCase() === c.repo.toLowerCase() &&
-    s.number === c.number
-  );
-}
-
-/**
- * Format the associated PR for a session, preferring the session's stored link
- * over the branch cache. Three rules:
- *   1. Session link matches the cache PR → live cache fields.
- *   2. Session link present but cache missing/different → pending partial.
- *   3. No session link → branch fallback (cache-only).
- */
-function formatAssociatedPr(
-  session: SessionPrFields,
-  cache: AssociatedPrRow,
-  opts?: { partialReviewDecisionPending?: boolean }
-): z.infer<typeof associatedPrSchema> | null {
-  if (session.pr_url) {
-    if (cache.pr_url !== null && samePullRequest(session.pr_url, cache.pr_url)) {
-      return formatCacheRow(cache, session.platform ?? 'github');
-    }
-    return pendingPartialFromSession(session, opts?.partialReviewDecisionPending ?? true);
-  }
-  // No session link: branch fallback. A cache PR only exists for GitHub.
-  return formatCacheRow(cache, 'github');
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        session.pr_url,
+        session.git_url,
+        session.pr_number,
+        session.pr_head_ref,
+        session.pr_head_sha,
+      ])
+    )
+    .digest('hex');
 }
 
 const createdOnPlatformField = z.string().min(1).max(100);
+
+type LatestRunOutcome = {
+  latest_run_status: CloudAgentSessionRunStatus | null;
+  latest_run_failure_kind: 'failed' | 'system_interrupted' | null;
+  latest_run_terminal_at: string | null;
+};
+
+function latestRunField<T>(field: SQL<T>): SQL<T | null> {
+  return sql<T | null>`(
+    SELECT ${field}
+    FROM ${cloud_agent_session_runs}
+    WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
+    ORDER BY ${cloud_agent_session_runs.queued_at} DESC NULLS LAST,
+      ${cloud_agent_session_runs.message_id} DESC
+    LIMIT 1
+  )`;
+}
+
+const latestRunFields = {
+  latest_run_status: latestRunField(
+    sql<CloudAgentSessionRunStatus>`${cloud_agent_session_runs.status}`
+  ),
+  latest_run_failure_kind: latestRunField(sql<LatestRunOutcome['latest_run_failure_kind']>`CASE
+    WHEN ${cloud_agent_session_runs.status} = 'failed' THEN 'failed'
+    WHEN ${cloud_agent_session_runs.status} = 'interrupted'
+      AND ${cloud_agent_session_runs.failure_code} IN ('system_interrupt', 'container_shutdown')
+      THEN 'system_interrupted'
+    ELSE NULL
+  END`),
+  latest_run_terminal_at: latestRunField(
+    sql<string>`${cloud_agent_session_runs.terminal_at}`
+  ).mapWith((value: string | null) => (value === null ? null : new Date(value).toISOString())),
+};
 
 /**
  * Fields to select for session list/get operations
@@ -342,6 +347,7 @@ const commonSessionFields = {
   session_id: cli_sessions_v2.session_id,
   title: cli_sessions_v2.title,
   cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+  cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
   parent_session_id: cli_sessions_v2.parent_session_id,
   organization_id: cli_sessions_v2.organization_id,
   created_on_platform: cli_sessions_v2.created_on_platform,
@@ -351,63 +357,54 @@ const commonSessionFields = {
   status_updated_at: cli_sessions_v2.status_updated_at,
   created_at: cli_sessions_v2.created_at,
   updated_at: cli_sessions_v2.updated_at,
+  last_activity_at: cli_sessions_v2.last_activity_at,
   version: cli_sessions_v2.version,
+  ...latestRunFields,
 } as const;
 
 /**
  * Common session fields plus the per-tenant PR cache columns. Used for the
- * list/search endpoints that LEFT JOIN `github_branch_pull_requests` so each
+ * list/search endpoints that LEFT JOIN LATERAL `sessionAssociatedPr` so each
  * row can carry an `associatedPr` summary.
  */
 const commonSessionFieldsWithPr = {
   ...commonSessionFields,
-  pr_url: github_branch_pull_requests.pr_url,
-  pr_number: github_branch_pull_requests.pr_number,
-  pr_state: github_branch_pull_requests.pr_state,
-  pr_title: github_branch_pull_requests.pr_title,
-  pr_head_sha: github_branch_pull_requests.pr_head_sha,
-  pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-  pr_review_decision: github_branch_pull_requests.pr_review_decision,
-  review_decision_pending: github_branch_pull_requests.review_decision_pending,
+  pr_url: sessionAssociatedPr.pr_url,
+  pr_number: sessionAssociatedPr.pr_number,
+  pr_state: sessionAssociatedPr.pr_state,
+  pr_title: sessionAssociatedPr.pr_title,
+  pr_head_sha: sessionAssociatedPr.pr_head_sha,
+  pr_observations: sessionAssociatedPr.pr_observations,
+  pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+  pr_review_decision: sessionAssociatedPr.pr_review_decision,
+  review_decision_pending: sessionAssociatedPr.review_decision_pending,
+  pr_base_ref: sessionAssociatedPr.pr_base_ref,
+  stack_number: sessionAssociatedPr.stack_number,
+  stack_position: sessionAssociatedPr.stack_position,
+  stack_size: sessionAssociatedPr.stack_size,
+  pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
   // Session's own stored PR link (distinct names so they never collide with
   // the cache aliases above).
   session_pr_platform: cli_sessions_v2.platform,
   session_pr_url: cli_sessions_v2.pr_url,
   session_pr_number: cli_sessions_v2.pr_number,
+  session_pr_head_ref: cli_sessions_v2.pr_head_ref,
+  session_pr_head_sha: cli_sessions_v2.pr_head_sha,
+  session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
   total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
 } as const;
-
-/**
- * LEFT JOIN predicate that links a session to its per-tenant PR cache row,
- * matching `(git_url, git_branch)` plus the tenant column that corresponds to
- * the session's `organization_id` nullability. Identical shape to
- * `getWithRuntimeState` so the planner can reuse the partial unique indexes.
- */
-const sessionPrJoinPredicate = and(
-  eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
-  eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
-  or(
-    and(
-      isNotNull(cli_sessions_v2.organization_id),
-      eq(github_branch_pull_requests.owned_by_organization_id, cli_sessions_v2.organization_id)
-    ),
-    and(
-      isNull(cli_sessions_v2.organization_id),
-      eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
-    )
-  )
-);
 
 /**
  * Strip the flat `pr_*` columns produced by `commonSessionFieldsWithPr` and
  * fold them into a single `associatedPr` field on each row.
  */
-function projectAssociatedPr<
-  T extends AssociatedPrRow & SessionPrRow & { updated_at: string | null },
+export function projectAssociatedPr<
+  T extends AssociatedPrRow & SessionPrRow & { updated_at: string | null; git_url: string | null },
 >(
   row: T
 ): Omit<T, keyof AssociatedPrRow | keyof SessionPrRow> & {
   associatedPr: z.infer<typeof associatedPrSchema> | null;
+  prLinkVerificationKey?: string;
 } {
   const {
     pr_url,
@@ -415,22 +412,46 @@ function projectAssociatedPr<
     pr_state,
     pr_title,
     pr_head_sha,
+    pr_observations,
     pr_last_synced_at,
     pr_review_decision,
     review_decision_pending,
+    pr_base_ref,
+    stack_number,
+    stack_position,
+    stack_size,
+    pr_from_workspace,
     session_pr_platform,
     session_pr_url,
     session_pr_number,
+    session_pr_head_ref,
+    session_pr_head_sha,
+    session_pr_verified_at,
     ...rest
   } = row;
+  const prLinkVerificationKey =
+    pr_from_workspace === true
+      ? undefined
+      : getPrLinkVerificationKey({
+          platform: session_pr_platform,
+          pr_url: session_pr_url,
+          pr_number: session_pr_number,
+          pr_link_verified_at: session_pr_verified_at,
+          git_url: rest.git_url,
+          pr_head_ref: session_pr_head_ref,
+          pr_head_sha: session_pr_head_sha,
+        });
   return {
     ...rest,
+    ...(prLinkVerificationKey === undefined ? {} : { prLinkVerificationKey }),
     associatedPr: formatAssociatedPr(
       {
         platform: session_pr_platform,
         pr_url: session_pr_url,
         pr_number: session_pr_number,
         updated_at: rest.updated_at,
+        git_url: rest.git_url,
+        pr_link_verified_at: session_pr_verified_at,
       },
       {
         pr_url,
@@ -438,46 +459,78 @@ function projectAssociatedPr<
         pr_state,
         pr_title,
         pr_head_sha,
+        pr_observations,
         pr_last_synced_at,
         pr_review_decision,
         review_decision_pending,
+        pr_base_ref,
+        stack_number,
+        stack_position,
+        stack_size,
+        pr_from_workspace,
       },
       { partialReviewDecisionPending: false }
     ),
   };
 }
 
+type WorktreeDetail = {
+  name: string | null;
+  defaultTitle: string | null;
+  branch: string | null;
+  folderId: string | null;
+  sidebarPosition: string | null;
+  parentWorktreeId: string | null;
+  baseBranch: string | null;
+  baseSha: string | null;
+  createdAt: string;
+  sessions: (LatestRunOutcome & {
+    sessionId: string;
+    sessionStatus: string | null;
+    sessionStatusUpdatedAt: string | null;
+    updatedAt: string;
+  })[];
+  prSession:
+    | (Pick<
+        CliSessionV2,
+        | Exclude<keyof typeof commonSessionFields, keyof LatestRunOutcome>
+        | 'total_cost_microdollars'
+      > &
+        LatestRunOutcome & {
+          associatedPr: z.infer<typeof associatedPrSchema> | null;
+        })
+    | null;
+};
+
+const WorktreeInputSchema = z.object({
+  worktreeId: cloudAgentWorktreeIdSchema,
+  organizationId: z.uuid().nullable(),
+});
+
+function workspaceAnchorSessionId(worktreeId: string): string {
+  return `workspace_${worktreeId.slice('worktree_'.length)}`;
+}
+
+const WorktreeDetailsInputSchema = z.object({
+  worktreeIds: z
+    .array(cloudAgentWorktreeIdSchema)
+    .max(200)
+    .transform(ids => [...new Set(ids)]),
+  organizationId: z.uuid().nullable(),
+});
+
+function worktreeMembershipCondition(userId: string, organizationId: string | null) {
+  return organizationId === null
+    ? undefined
+    : sql`EXISTS (
+        SELECT 1 FROM ${organization_memberships}
+        WHERE ${organization_memberships.kilo_user_id} = ${userId}
+          AND ${organization_memberships.organization_id} = ${organizationId}
+      )`;
+}
+
 const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
-
-/**
- * Input for the paginated `getSessionMessagesPage` endpoint. Mirrors the
- * worker-bound contract in `@kilocode/session-ingest-contracts` so tRPC-level
- * input validation matches the worker's access-checked RPC and HTTP route.
- * The `limit` default is applied here so the procedure body always sees a
- * positive page size and the client receives a bounded request.
- */
-const GetSessionMessagesPageInputSchema = z
-  .object({
-    session_id: sessionIdField,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).optional(),
-  })
-  .superRefine((params, ctx) => {
-    if (params.cursor === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid message cursor',
-      });
-    }
-  });
 
 /**
  * Verify the user owns the session and still has access to its organization.
@@ -508,16 +561,108 @@ async function getSessionWithAccessCheck(
   return session;
 }
 
+const sessionActivityTime = sql<string>`coalesce(${cli_sessions_v2.last_activity_at}, ${cli_sessions_v2.created_at})`;
+
+function sessionOrderColumn(orderBy: 'created_at' | 'updated_at' | 'activity'): SQL<string> {
+  if (orderBy === 'activity') return sessionActivityTime;
+  if (orderBy === 'created_at') return sql<string>`${cli_sessions_v2.created_at}`;
+  return sql<string>`${cli_sessions_v2.updated_at}`;
+}
+
+type WorkspaceSessionStatusRow = {
+  sessionId: string;
+  sessionStatus: string | null;
+  sessionStatusUpdatedAt: string | null;
+  latestRunStatus: CloudAgentSessionRunStatus | null;
+  latestRunFailureKind: 'failed' | 'system_interrupted' | null;
+  latestRunTerminalAt: string | null;
+  updatedAt: string;
+};
+
+type WorkspaceStatusKind = 'attention' | 'failed' | 'running' | 'idle';
+
+function aggregateWorkspaceStatus(sessions: readonly WorkspaceSessionStatusRow[]) {
+  const normalize = (value: string | null) =>
+    value === null ? null : new Date(value).toISOString();
+  const rows = sessions.map(session => ({
+    ...session,
+    sessionStatusUpdatedAt: normalize(session.sessionStatusUpdatedAt),
+    latestRunTerminalAt: normalize(session.latestRunTerminalAt),
+    updatedAt: normalize(session.updatedAt) ?? session.updatedAt,
+  }));
+  const attention = rows.find(
+    session => session.sessionStatus === 'question' || session.sessionStatus === 'permission'
+  );
+  const failed = rows.find(session => session.latestRunFailureKind !== null);
+  const running = rows.find(
+    session =>
+      session.sessionStatus === 'busy' ||
+      session.sessionStatus === 'retry' ||
+      session.latestRunStatus === 'queued' ||
+      session.latestRunStatus === 'accepted'
+  );
+  const selected =
+    attention ??
+    failed ??
+    running ??
+    [...rows].sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime() ||
+        b.sessionId.localeCompare(a.sessionId)
+    )[0];
+  const kind: WorkspaceStatusKind = attention
+    ? 'attention'
+    : failed
+      ? 'failed'
+      : running
+        ? 'running'
+        : 'idle';
+  return {
+    kind,
+    sessionStatus: selected?.sessionStatus ?? null,
+    statusUpdatedAt: selected?.sessionStatusUpdatedAt ?? null,
+    latestRunStatus: selected?.latestRunStatus ?? null,
+    latestRunFailureKind: selected?.latestRunFailureKind ?? null,
+    latestRunTerminalAt: selected?.latestRunTerminalAt ?? null,
+  };
+}
+
+const WorkspaceListInputSchema = z.object({
+  organizationId: z.uuid().nullable(),
+  createdOnPlatform: z
+    .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
+    .optional(),
+  gitUrl: z.union([z.string(), z.array(z.string()).min(1).max(100)]).optional(),
+  sortMode: workspaceOrderSchema.optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+  cursor: z.number().int().min(0).optional(),
+  search: z.string().max(WORKSPACE_LIST_SEARCH_MAX_LENGTH).optional(),
+});
+
+async function resolveWorkspaceSortMode(
+  userId: string,
+  requested: WorkspaceOrder | undefined
+): Promise<WorkspaceOrder> {
+  if (requested) return requested;
+  const [settings] = await db
+    .select({ workspaceOrder: cloud_agent_user_settings.workspace_order })
+    .from(cloud_agent_user_settings)
+    .where(eq(cloud_agent_user_settings.kilo_user_id, userId))
+    .limit(1);
+  return settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER;
+}
+
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(RECENT_DAYS_LIMIT).optional().default(PAGE_SIZE),
-  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
+  orderBy: z.enum(['created_at', 'updated_at', 'activity']).optional().default('updated_at'),
   includeChildren: z.boolean().optional().default(false),
   sharedOnly: z.boolean().optional().default(false),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
   organizationId: z.uuid().nullable().optional(),
+  worktreeId: cloudAgentWorktreeIdSchema.optional(),
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   updatedSince: z.iso.datetime().optional(),
   version: z.number().optional(),
@@ -534,11 +679,12 @@ const SearchInputSchema = z.object({
    * name it that. Takes precedence over `offset` when both arrive.
    */
   cursor: z.number().int().min(0).optional(),
-  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
+  orderBy: z.enum(['created_at', 'updated_at', 'activity']).optional().default('updated_at'),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
   organizationId: z.uuid().nullable().optional(),
+  worktreeId: cloudAgentWorktreeIdSchema.optional(),
   includeChildren: z.boolean().optional().default(false),
   sharedOnly: z.boolean().optional().default(false),
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
@@ -554,6 +700,7 @@ const GetByCloudAgentSessionIdInputSchema = z.object({
 
 const DeleteSessionInputSchema = z.object({
   session_id: sessionIdField,
+  operationKey: z.uuid().optional(),
 });
 
 const RenameSessionInputSchema = z.object({
@@ -561,8 +708,18 @@ const RenameSessionInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
 });
 
-const ShareSessionInputSchema = z.object({
+const UnshareSessionInputSchema = z.object({
   session_id: sessionIdField,
+});
+const ShareSessionInputSchema = UnshareSessionInputSchema.extend(sessionShareOptionsSchema.shape);
+
+/**
+ * A public share token is an opaque signed capability. It is only ever an
+ * input to the worker read; the length bound keeps a garbage segment from
+ * reaching the upstream request.
+ */
+const GetSharedSessionInputSchema = z.object({
+  share_token: z.string().min(1).max(4096),
 });
 
 function addCreatedOnPlatformConditions(
@@ -628,7 +785,7 @@ async function addOrganizationCondition(
   organizationId: string | null | undefined
 ): Promise<void> {
   if (organizationId === undefined) {
-    if (ctx.user.is_admin) {
+    if (ctx.user.is_admin && !isSupportAccessEnabled()) {
       // No membership predicate is added at all, so the query spans every
       // organization's sessions. This is the broadest read in the file and it
       // never touches `adminProcedure`, so it must be recorded here.
@@ -637,15 +794,9 @@ async function addOrganizationCondition(
         target: UNSCOPED_TARGET,
       });
     } else {
-      whereConditions.push(sql`(
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${ctx.user.id}
-        )
-      )`);
+      whereConditions.push(
+        activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id)
+      );
     }
     return;
   }
@@ -699,22 +850,6 @@ function joinWithAnd(fragments: SQL[]): SQL {
 }
 
 /**
- * Compute the cursor (next page offset) for search paging.
- *
- * Returns `null` on the last page or when the current page is empty.
- * An empty page with a stale `total` larger than `pageOffset` would return
- * the same cursor under the naive `nextOffset < total` formula and loop
- * loading. The `resultsLength > 0` guard prevents this.
- */
-export function computeSearchNextCursor(
-  resultsLength: number,
-  nextOffset: number,
-  total: number
-): number | null {
-  return resultsLength > 0 && nextOffset < total ? nextOffset : null;
-}
-
-/**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
  *
@@ -722,6 +857,842 @@ export function computeSearchNextCursor(
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  getPrWatchOptions: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
+  enableWatchPr: baseProcedure
+    .input(watchPrEnableSchema)
+    .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),
+  getWatchPr: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getWatchPr(ctx, input)),
+  pauseWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'pause')),
+  resumeWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'resume')),
+  stopWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'stop')),
+  recheckWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => recheckWatchPr(ctx, input)),
+  worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
+    const worktrees: Record<string, WorktreeDetail> = {};
+    if (input.worktreeIds.length === 0) {
+      return { worktrees };
+    }
+
+    const scopeCondition = and(
+      eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+      input.organizationId === null
+        ? isNull(cli_sessions_v2.organization_id)
+        : eq(cli_sessions_v2.organization_id, input.organizationId),
+      worktreeMembershipCondition(ctx.user.id, input.organizationId),
+      inArray(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeIds),
+      isNull(cli_sessions_v2.parent_session_id),
+      or(
+        isNull(cloud_agent_worktrees.worktree_id),
+        and(
+          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+          sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`
+        )
+      ),
+      isNull(cloud_agent_worktrees.deletion_started_at),
+      isNull(cloud_agent_worktrees.deletion_completed_at)
+    );
+    const metadataJoin = eq(
+      cloud_agent_worktrees.worktree_id,
+      cli_sessions_v2.cloud_agent_worktree_id
+    );
+
+    const [firstSessions, prRows, activityRows] = await Promise.all([
+      db
+        .selectDistinctOn([cli_sessions_v2.cloud_agent_worktree_id], {
+          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+          title: cli_sessions_v2.title,
+          gitBranch: cli_sessions_v2.git_branch,
+          sessionCreatedAt: cli_sessions_v2.created_at,
+          name: cloud_agent_worktrees.name,
+          folderId: cloud_agent_worktrees.folder_id,
+          sidebarPosition: cloud_agent_worktrees.sidebar_position,
+          parentWorktreeId: cloud_agent_worktrees.parent_worktree_id,
+          baseBranch: cloud_agent_worktrees.base_branch,
+          baseSha: cloud_agent_worktrees.base_sha,
+          worktreeCreatedAt: cloud_agent_worktrees.created_at,
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(cloud_agent_worktrees, metadataJoin)
+        .where(scopeCondition)
+        .orderBy(
+          asc(cli_sessions_v2.cloud_agent_worktree_id),
+          asc(cli_sessions_v2.created_at),
+          asc(cli_sessions_v2.session_id)
+        ),
+      db
+        .selectDistinctOn([cli_sessions_v2.cloud_agent_worktree_id], commonSessionFieldsWithPr)
+        .from(cli_sessions_v2)
+        .leftJoin(cloud_agent_worktrees, metadataJoin)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
+        .where(
+          and(
+            scopeCondition,
+            or(
+              isNotNull(sessionAssociatedPr.pr_number),
+              and(isNotNull(cli_sessions_v2.pr_url), isNotNull(cli_sessions_v2.pr_link_verified_at))
+            )
+          )
+        )
+        .orderBy(
+          asc(cli_sessions_v2.cloud_agent_worktree_id),
+          sql`${sessionAssociatedPr.pr_from_workspace} DESC NULLS LAST`,
+          desc(cli_sessions_v2.updated_at),
+          asc(cli_sessions_v2.session_id)
+        ),
+      db
+        .select({
+          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+          sessions: sql<WorktreeDetail['sessions']>`json_agg(json_build_object(
+            'sessionId', ${cli_sessions_v2.session_id},
+            'sessionStatus', ${cli_sessions_v2.status},
+            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'latest_run_status', ${latestRunFields.latest_run_status},
+            'latest_run_failure_kind', ${latestRunFields.latest_run_failure_kind},
+            'latest_run_terminal_at', ${latestRunFields.latest_run_terminal_at},
+            'updatedAt', ${cli_sessions_v2.updated_at}
+          ) ORDER BY ${cli_sessions_v2.session_id})`,
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(cloud_agent_worktrees, metadataJoin)
+        .where(scopeCondition)
+        .groupBy(cli_sessions_v2.cloud_agent_worktree_id),
+    ]);
+
+    const activityByWorktree = new Map(
+      activityRows.map(row => [
+        row.worktreeId,
+        row.sessions.map(session => ({
+          ...session,
+          updatedAt: new Date(session.updatedAt).toISOString(),
+          latest_run_terminal_at: session.latest_run_terminal_at
+            ? new Date(session.latest_run_terminal_at).toISOString()
+            : null,
+          sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
+            ? new Date(session.sessionStatusUpdatedAt).toISOString()
+            : null,
+        })),
+      ])
+    );
+    const prSessions = new Map<string, NonNullable<WorktreeDetail['prSession']>>();
+    for (const row of prRows) {
+      const session = projectAssociatedPr(row);
+      if (session.cloud_agent_worktree_id === null || session.associatedPr === null) {
+        continue;
+      }
+      prSessions.set(session.cloud_agent_worktree_id, {
+        ...session,
+        created_at: new Date(session.created_at).toISOString(),
+        updated_at: new Date(session.updated_at).toISOString(),
+        status_updated_at: session.status_updated_at
+          ? new Date(session.status_updated_at).toISOString()
+          : null,
+        associatedPr: {
+          ...session.associatedPr,
+          lastSyncedAt: new Date(session.associatedPr.lastSyncedAt).toISOString(),
+        },
+      });
+    }
+
+    for (const session of firstSessions) {
+      if (session.worktreeId === null) {
+        continue;
+      }
+      worktrees[session.worktreeId] = {
+        name: session.name,
+        defaultTitle:
+          session.title?.trim() && !isDefaultSessionTitle(session.title) ? session.title : null,
+        branch: session.gitBranch ?? prSessions.get(session.worktreeId)?.git_branch ?? null,
+        folderId: session.folderId,
+        sidebarPosition: session.sidebarPosition,
+        parentWorktreeId: session.parentWorktreeId,
+        baseBranch: session.baseBranch,
+        baseSha: session.baseSha,
+        createdAt: new Date(session.worktreeCreatedAt ?? session.sessionCreatedAt).toISOString(),
+        sessions: activityByWorktree.get(session.worktreeId) ?? [],
+        prSession: prSessions.get(session.worktreeId) ?? null,
+      };
+    }
+    const hasPendingPrRows = Object.values(worktrees).some(
+      worktree => worktree.prSession?.associatedPr?.reviewDecisionPending === true
+    );
+    if (hasPendingPrRows) {
+      after(() =>
+        triggerBatchReviewDecisionFetchIfNeeded(hasPendingPrRows, {
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        })
+      );
+    }
+    return { worktrees };
+  }),
+
+  worktreeParent: baseProcedure.input(WorktreeInputSchema).query(async ({ ctx, input }) => {
+    if (input.organizationId !== null) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+    }
+
+    const anchorSessionId = workspaceAnchorSessionId(input.worktreeId);
+    const organizationCondition =
+      input.organizationId === null
+        ? isNull(cli_sessions_v2.organization_id)
+        : eq(cli_sessions_v2.organization_id, input.organizationId);
+    const worktreeJoin = eq(
+      cloud_agent_worktrees.worktree_id,
+      cli_sessions_v2.cloud_agent_worktree_id
+    );
+    const worktreeScope = or(
+      isNull(cloud_agent_worktrees.worktree_id),
+      and(
+        eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+        sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`
+      )
+    );
+
+    const [anchor] = await db
+      .select({ sessionId: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .leftJoin(cloud_agent_worktrees, worktreeJoin)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+          eq(cli_sessions_v2.cloud_agent_session_id, anchorSessionId),
+          eq(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeId),
+          worktreeMembershipCondition(ctx.user.id, input.organizationId),
+          organizationCondition,
+          worktreeScope,
+          isNull(cloud_agent_worktrees.deletion_started_at),
+          isNull(cloud_agent_worktrees.deletion_completed_at)
+        )
+      )
+      .limit(1);
+
+    if (!anchor) return null;
+
+    let parentCloudAgentSessionId: string | undefined;
+    try {
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: input.organizationId ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
+      const anchorMetadata =
+        await createCloudAgentNextClient(authToken).getSession(anchorSessionId);
+      parentCloudAgentSessionId = anchorMetadata.parentCloudAgentSessionId;
+    } catch (error) {
+      if (isParentLookupUnavailableError(error)) return null;
+      throw error;
+    }
+
+    if (
+      !parentCloudAgentSessionId ||
+      parentCloudAgentSessionId === anchorSessionId ||
+      !parentCloudAgentSessionId.startsWith('workspace_')
+    ) {
+      return null;
+    }
+
+    const [parent] = await db
+      .select({
+        sessionId: cli_sessions_v2.session_id,
+        title: cli_sessions_v2.title,
+        organizationId: cli_sessions_v2.organization_id,
+        worktreeName: cloud_agent_worktrees.name,
+      })
+      .from(cli_sessions_v2)
+      .leftJoin(cloud_agent_worktrees, worktreeJoin)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+          eq(cli_sessions_v2.cloud_agent_session_id, parentCloudAgentSessionId),
+          worktreeMembershipCondition(ctx.user.id, input.organizationId),
+          organizationCondition,
+          worktreeScope,
+          isNull(cloud_agent_worktrees.deletion_started_at),
+          isNull(cloud_agent_worktrees.deletion_completed_at)
+        )
+      )
+      .limit(1);
+
+    if (!parent) return null;
+
+    const worktreeName = parent.worktreeName?.trim();
+    return {
+      session_id: parent.sessionId,
+      title: worktreeName ? worktreeName : parent.title,
+      organization_id: parent.organizationId ?? null,
+    };
+  }),
+
+  listWorkspaces: baseProcedure.input(WorkspaceListInputSchema).query(async ({ ctx, input }) => {
+    const rawSearch = input.search?.trim().toLowerCase() ?? '';
+    const needle = rawSearch.startsWith('#') ? rawSearch.slice(1) : rawSearch;
+    const searchActive = needle.length > 0;
+    const sortMode = await resolveWorkspaceSortMode(ctx.user.id, input.sortMode);
+    const limit = input.limit ?? 100;
+    const offset = input.cursor ?? 0;
+
+    const scopeConditions: SQL[] = [
+      eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+      isNotNull(cli_sessions_v2.cloud_agent_worktree_id),
+      isNull(cli_sessions_v2.parent_session_id),
+      or(
+        isNull(cloud_agent_worktrees.worktree_id),
+        and(
+          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+          sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`,
+          isNull(cloud_agent_worktrees.deletion_started_at),
+          isNull(cloud_agent_worktrees.deletion_completed_at)
+        )
+      ) as SQL,
+    ];
+    await addOrganizationCondition(scopeConditions, ctx, input.organizationId);
+    const membership = worktreeMembershipCondition(ctx.user.id, input.organizationId);
+    if (membership) scopeConditions.push(membership);
+    addCreatedOnPlatformConditions(scopeConditions, input.createdOnPlatform);
+    addGitUrlConditions(scopeConditions, input.gitUrl);
+    addHideUningestedPlaceholderCondition(scopeConditions);
+
+    const scoped = db.$with('workspace_scoped').as(
+      db
+        .select({
+          sessionId: sql<string>`${cli_sessions_v2.session_id}`.as('session_id'),
+          worktreeId: sql<string>`${cli_sessions_v2.cloud_agent_worktree_id}`.as('worktree_id'),
+          doneFolderEnabled: sql<boolean>`exists (
+            select 1 from ${cloud_agent_workspace_folders}
+            where ${cloud_agent_workspace_folders.kilo_user_id} = ${ctx.user.id}
+              and ${cloud_agent_workspace_folders.organization_id}
+                is not distinct from ${cli_sessions_v2.organization_id}
+              and ${cloud_agent_workspace_folders.kind} = 'smart'
+              and ${cloud_agent_workspace_folders.smart_preset} = 'done'
+          )`.as('done_folder_enabled'),
+          gitUrl: sql<string | null>`${cli_sessions_v2.git_url}`.as('session_git_url'),
+          gitBranch: sql<string | null>`${cli_sessions_v2.git_branch}`.as('git_branch'),
+          title: sql<string | null>`${cli_sessions_v2.title}`.as('title'),
+          createdAt: sql<string>`${cli_sessions_v2.created_at}`.as('session_created_at'),
+          lastActivityAt: sql<string | null>`${cli_sessions_v2.last_activity_at}`.as(
+            'last_activity_at'
+          ),
+          updatedAt: sql<string>`${cli_sessions_v2.updated_at}`.as('session_updated_at'),
+          status: sql<string | null>`${cli_sessions_v2.status}`.as('session_status'),
+          statusUpdatedAt: sql<string | null>`${cli_sessions_v2.status_updated_at}`.as(
+            'session_status_updated_at'
+          ),
+          platform: sql<string | null>`${cli_sessions_v2.platform}`.as('session_platform'),
+          sessionPrUrl: sql<string | null>`${cli_sessions_v2.pr_url}`.as('session_pr_url'),
+          sessionPrNumber: sql<number | null>`${cli_sessions_v2.pr_number}`.as('session_pr_number'),
+          sessionPrVerifiedAt: sql<string | null>`${cli_sessions_v2.pr_link_verified_at}`.as(
+            'session_pr_verified_at'
+          ),
+          cachePrUrl: sql<string | null>`${sessionAssociatedPr.pr_url}`.as('cache_pr_url'),
+          cachePrNumber: sql<number | null>`${sessionAssociatedPr.pr_number}`.as('cache_pr_number'),
+          cachePrState: sql<string | null>`${sessionAssociatedPr.pr_state}`.as('cache_pr_state'),
+          cachePrTitle: sql<string | null>`${sessionAssociatedPr.pr_title}`.as('cache_pr_title'),
+          cachePrHeadSha: sql<string | null>`${sessionAssociatedPr.pr_head_sha}`.as(
+            'cache_pr_head_sha'
+          ),
+          cachePrLastSyncedAt: sql<string | null>`${sessionAssociatedPr.pr_last_synced_at}`.as(
+            'cache_pr_last_synced_at'
+          ),
+          cachePrReviewDecision: sql<string | null>`${sessionAssociatedPr.pr_review_decision}`.as(
+            'cache_pr_review_decision'
+          ),
+          cacheReviewDecisionPending: sql<
+            boolean | null
+          >`${sessionAssociatedPr.review_decision_pending}`.as('cache_review_decision_pending'),
+          cachePrBaseRef: sql<string | null>`${sessionAssociatedPr.pr_base_ref}`.as(
+            'cache_pr_base_ref'
+          ),
+          cacheStackNumber: sql<number | null>`${sessionAssociatedPr.stack_number}`.as(
+            'cache_stack_number'
+          ),
+          cacheStackPosition: sql<number | null>`${sessionAssociatedPr.stack_position}`.as(
+            'cache_stack_position'
+          ),
+          cacheStackSize: sql<number | null>`${sessionAssociatedPr.stack_size}`.as(
+            'cache_stack_size'
+          ),
+          cachePrFromWorkspace: sql<boolean | null>`${sessionAssociatedPr.pr_from_workspace}`.as(
+            'cache_pr_from_workspace'
+          ),
+          worktreeName: sql<string | null>`${cloud_agent_worktrees.name}`.as('worktree_name'),
+          folderId: sql<string | null>`${cloud_agent_worktrees.folder_id}`.as('folder_id'),
+          sidebarPosition: sql<string | null>`${cloud_agent_worktrees.sidebar_position}`.as(
+            'sidebar_position'
+          ),
+          parentWorktreeId: sql<string | null>`case
+            when ${cloud_agent_worktrees.parent_worktree_id} is null then null
+            when exists (
+              select 1
+              from cloud_agent_worktrees parent
+              where parent.worktree_id = ${cloud_agent_worktrees.parent_worktree_id}
+                and parent.kilo_user_id = ${ctx.user.id}
+                and parent.organization_id is not distinct from ${cli_sessions_v2.organization_id}
+                and parent.deletion_started_at is null
+                and parent.deletion_completed_at is null
+            ) then ${cloud_agent_worktrees.parent_worktree_id}
+            else null
+          end`.as('parent_worktree_id'),
+          baseBranch: sql<string | null>`${cloud_agent_worktrees.base_branch}`.as('base_branch'),
+          worktreeCreatedAt: sql<string | null>`${cloud_agent_worktrees.created_at}`.as(
+            'worktree_created_at'
+          ),
+          latest_run_status: latestRunFields.latest_run_status.as('latest_run_status'),
+          latest_run_failure_kind:
+            latestRunFields.latest_run_failure_kind.as('latest_run_failure_kind'),
+          latest_run_terminal_at:
+            latestRunFields.latest_run_terminal_at.as('latest_run_terminal_at'),
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(
+          cloud_agent_worktrees,
+          eq(cloud_agent_worktrees.worktree_id, cli_sessions_v2.cloud_agent_worktree_id)
+        )
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
+        .where(and(...scopeConditions))
+    );
+
+    const grouped = db.$with('workspace_grouped').as(
+      db
+        .select({
+          worktreeId: sql<string>`${scoped.worktreeId}`.as('worktree_id'),
+          doneFolderEnabled: sql<boolean>`bool_or(${scoped.doneFolderEnabled})`.as(
+            'done_folder_enabled'
+          ),
+          name: sql<string | null>`${scoped.worktreeName}`.as('name'),
+          folderId: sql<string | null>`${scoped.folderId}`.as('folder_id'),
+          sidebarPosition: sql<string | null>`${scoped.sidebarPosition}`.as('sidebar_position'),
+          parentWorktreeId: sql<string | null>`${scoped.parentWorktreeId}`.as('parent_worktree_id'),
+          baseBranch: sql<string | null>`${scoped.baseBranch}`.as('base_branch'),
+          createdAt:
+            sql<string>`coalesce(max(${scoped.worktreeCreatedAt}), min(${scoped.createdAt}))`.as(
+              'created_at'
+            ),
+          lastActivityAt:
+            sql<string>`max(coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}))`.as(
+              'last_activity_at'
+            ),
+          firstTitle: sql<
+            string | null
+          >`(array_agg(${scoped.title} ORDER BY ${scoped.createdAt} ASC, ${scoped.sessionId} ASC))[1]`.as(
+            'first_title'
+          ),
+          rootSessionId:
+            sql<string>`(array_agg(${scoped.sessionId} ORDER BY ${scoped.createdAt} ASC, ${scoped.sessionId} ASC))[1]`.as(
+              'root_session_id'
+            ),
+          latestSessionId:
+            sql<string>`(array_agg(${scoped.sessionId} ORDER BY coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}) DESC, ${scoped.sessionId} DESC))[1]`.as(
+              'latest_session_id'
+            ),
+          gitUrl: sql<
+            string | null
+          >`(array_agg(${scoped.gitUrl} ORDER BY coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}) DESC, ${scoped.sessionId} DESC) FILTER (WHERE ${scoped.gitUrl} IS NOT NULL))[1]`.as(
+            'git_url'
+          ),
+          branch: sql<
+            string | null
+          >`(array_agg(${scoped.gitBranch} ORDER BY coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}) DESC, ${scoped.sessionId} DESC) FILTER (WHERE ${scoped.gitBranch} IS NOT NULL))[1]`.as(
+            'branch'
+          ),
+          chatCount: sql<number>`count(*)::int`.as('chat_count'),
+          sessions: sql<WorkspaceSessionStatusRow[]>`json_agg(json_build_object(
+              'sessionId', ${scoped.sessionId},
+              'sessionStatus', ${scoped.status},
+              'sessionStatusUpdatedAt', ${scoped.statusUpdatedAt},
+              'latestRunStatus', ${scoped.latest_run_status},
+              'latestRunFailureKind', ${scoped.latest_run_failure_kind},
+              'latestRunTerminalAt', ${scoped.latest_run_terminal_at},
+              'updatedAt', ${scoped.updatedAt}
+            ) ORDER BY ${scoped.sessionId})`.as('sessions'),
+        })
+        .from(scoped)
+        .groupBy(
+          scoped.worktreeId,
+          scoped.worktreeName,
+          scoped.folderId,
+          scoped.sidebarPosition,
+          scoped.parentWorktreeId,
+          scoped.baseBranch
+        )
+    );
+
+    const prSessions = db.$with('workspace_pr_sessions').as(
+      db
+        .selectDistinctOn([scoped.worktreeId], {
+          worktreeId: sql<string>`${scoped.worktreeId}`.as('worktree_id'),
+          sessionId: sql<string>`${scoped.sessionId}`.as('session_id'),
+          prSessionUpdatedAt: sql<string>`${scoped.updatedAt}`.as('pr_session_updated_at'),
+          sessionPrPlatform: sql<string | null>`${scoped.platform}`.as('session_pr_platform'),
+          sessionPrUrl: sql<string | null>`${scoped.sessionPrUrl}`.as('session_pr_url'),
+          sessionPrNumber: sql<number | null>`${scoped.sessionPrNumber}`.as('session_pr_number'),
+          sessionPrVerifiedAt: sql<string | null>`${scoped.sessionPrVerifiedAt}`.as(
+            'session_pr_verified_at'
+          ),
+          sessionGitUrl: sql<string | null>`${scoped.gitUrl}`.as('session_git_url'),
+          pr_url: sql<string | null>`${scoped.cachePrUrl}`.as('pr_url'),
+          pr_number: sql<number | null>`${scoped.cachePrNumber}`.as('pr_number'),
+          pr_state: sql<string | null>`${scoped.cachePrState}`.as('pr_state'),
+          pr_title: sql<string | null>`${scoped.cachePrTitle}`.as('pr_title'),
+          pr_head_sha: sql<string | null>`${scoped.cachePrHeadSha}`.as('pr_head_sha'),
+          pr_last_synced_at: sql<string | null>`${scoped.cachePrLastSyncedAt}`.as(
+            'pr_last_synced_at'
+          ),
+          pr_review_decision: sql<string | null>`${scoped.cachePrReviewDecision}`.as(
+            'pr_review_decision'
+          ),
+          review_decision_pending: sql<boolean | null>`${scoped.cacheReviewDecisionPending}`.as(
+            'review_decision_pending'
+          ),
+          pr_base_ref: sql<string | null>`${scoped.cachePrBaseRef}`.as('pr_base_ref'),
+          stack_number: sql<number | null>`${scoped.cacheStackNumber}`.as('stack_number'),
+          stack_position: sql<number | null>`${scoped.cacheStackPosition}`.as('stack_position'),
+          stack_size: sql<number | null>`${scoped.cacheStackSize}`.as('stack_size'),
+          pr_from_workspace: sql<boolean | null>`${scoped.cachePrFromWorkspace}`.as(
+            'pr_from_workspace'
+          ),
+        })
+        .from(scoped)
+        .where(
+          or(
+            isNotNull(scoped.cachePrNumber),
+            and(isNotNull(scoped.sessionPrUrl), isNotNull(scoped.sessionPrVerifiedAt))
+          )
+        )
+        .orderBy(
+          scoped.worktreeId,
+          sql`${scoped.cachePrFromWorkspace} DESC NULLS LAST`,
+          desc(scoped.updatedAt),
+          asc(scoped.sessionId)
+        )
+    );
+
+    const base = db.$with('workspace_base').as(
+      db
+        .select({
+          worktreeId: sql<string>`"workspace_grouped"."worktree_id"`.as('worktree_id'),
+          doneFolderEnabled: grouped.doneFolderEnabled,
+          name: sql<string | null>`${grouped.name}`.as('name'),
+          folderId: sql<string | null>`${grouped.folderId}`.as('folder_id'),
+          sidebarPosition: sql<string | null>`${grouped.sidebarPosition}`.as('sidebar_position'),
+          parentWorktreeId: sql<string | null>`${grouped.parentWorktreeId}`.as(
+            'parent_worktree_id'
+          ),
+          baseBranch: sql<string | null>`${grouped.baseBranch}`.as('base_branch'),
+          createdAt: sql<string>`${grouped.createdAt}`.as('created_at'),
+          lastActivityAt: sql<string>`${grouped.lastActivityAt}`.as('last_activity_at'),
+          firstTitle: sql<string | null>`${grouped.firstTitle}`.as('first_title'),
+          rootSessionId: sql<string>`${grouped.rootSessionId}`.as('root_session_id'),
+          latestSessionId: sql<string>`${grouped.latestSessionId}`.as('latest_session_id'),
+          gitUrl: sql<string | null>`${grouped.gitUrl}`.as('git_url'),
+          branch: sql<string | null>`${grouped.branch}`.as('branch'),
+          chatCount: sql<number>`${grouped.chatCount}`.as('chat_count'),
+          sessions: sql<WorkspaceSessionStatusRow[]>`${grouped.sessions}`.as('sessions'),
+          prSessionUpdatedAt: sql<string>`${prSessions.prSessionUpdatedAt}`.as(
+            'pr_session_updated_at'
+          ),
+          sessionPrPlatform: sql<string | null>`${prSessions.sessionPrPlatform}`.as(
+            'session_pr_platform'
+          ),
+          sessionPrUrl: sql<string | null>`${prSessions.sessionPrUrl}`.as('session_pr_url'),
+          sessionPrNumber: sql<number | null>`${prSessions.sessionPrNumber}`.as(
+            'session_pr_number'
+          ),
+          sessionPrVerifiedAt: sql<string | null>`${prSessions.sessionPrVerifiedAt}`.as(
+            'session_pr_verified_at'
+          ),
+          sessionGitUrl: sql<string | null>`${prSessions.sessionGitUrl}`.as('session_git_url'),
+          pr_url: sql<string | null>`${prSessions.pr_url}`.as('pr_url'),
+          pr_number: sql<number | null>`${prSessions.pr_number}`.as('pr_number'),
+          pr_state: sql<string | null>`${prSessions.pr_state}`.as('pr_state'),
+          pr_title: sql<string | null>`${prSessions.pr_title}`.as('pr_title'),
+          pr_head_sha: sql<string | null>`${prSessions.pr_head_sha}`.as('pr_head_sha'),
+          pr_last_synced_at: sql<string | null>`${prSessions.pr_last_synced_at}`.as(
+            'pr_last_synced_at'
+          ),
+          pr_review_decision: sql<string | null>`${prSessions.pr_review_decision}`.as(
+            'pr_review_decision'
+          ),
+          review_decision_pending: sql<boolean | null>`${prSessions.review_decision_pending}`.as(
+            'review_decision_pending'
+          ),
+          pr_base_ref: sql<string | null>`${prSessions.pr_base_ref}`.as('pr_base_ref'),
+          stack_number: sql<number | null>`${prSessions.stack_number}`.as('stack_number'),
+          stack_position: sql<number | null>`${prSessions.stack_position}`.as('stack_position'),
+          stack_size: sql<number | null>`${prSessions.stack_size}`.as('stack_size'),
+          pr_from_workspace: sql<boolean | null>`${prSessions.pr_from_workspace}`.as(
+            'pr_from_workspace'
+          ),
+        })
+        .from(grouped)
+        .leftJoin(
+          prSessions,
+          sql`"workspace_grouped"."worktree_id" = "workspace_pr_sessions"."worktree_id"`
+        )
+    );
+
+    const searchCondition = searchActive
+      ? sql`(
+            position(${needle} in lower(coalesce(${base.name}, ''))) > 0
+            OR position(${needle} in lower(coalesce(${base.branch}, ''))) > 0
+            OR position(${needle} in lower(coalesce(${base.firstTitle}, ''))) > 0
+            OR position(${needle} in lower(coalesce(${base.pr_title}, ''))) > 0
+            OR cast(${base.pr_number} as text) = ${needle}
+            OR position(${needle} in lower(coalesce(${base.worktreeId}, ''))) > 0
+          )`
+      : null;
+
+    const orderBy: SQL[] =
+      sortMode === 'manual'
+        ? [
+            sql`case when ${base.sidebarPosition} is null then 0 else 1 end`,
+            sql`${base.sidebarPosition} collate "C"`,
+            desc(base.createdAt),
+            asc(base.worktreeId),
+          ]
+        : sortMode === 'created'
+          ? [desc(base.createdAt), asc(base.worktreeId)]
+          : [desc(base.lastActivityAt), desc(base.createdAt), asc(base.worktreeId)];
+
+    const rows = await db
+      .with(scoped, grouped, prSessions, base)
+      .select({
+        matchingCount: sql<number>`count(*) over ()`.mapWith(Number),
+        worktreeId: base.worktreeId,
+        name: base.name,
+        folderId: base.folderId,
+        sidebarPosition: base.sidebarPosition,
+        parentWorktreeId: base.parentWorktreeId,
+        baseBranch: base.baseBranch,
+        createdAt: base.createdAt,
+        lastActivityAt: base.lastActivityAt,
+        firstTitle: base.firstTitle,
+        rootSessionId: base.rootSessionId,
+        latestSessionId: base.latestSessionId,
+        gitUrl: base.gitUrl,
+        branch: base.branch,
+        chatCount: base.chatCount,
+        sessions: base.sessions,
+        prSessionUpdatedAt: base.prSessionUpdatedAt,
+        sessionPrPlatform: base.sessionPrPlatform,
+        sessionPrUrl: base.sessionPrUrl,
+        sessionPrNumber: base.sessionPrNumber,
+        sessionPrVerifiedAt: base.sessionPrVerifiedAt,
+        sessionGitUrl: base.sessionGitUrl,
+        pr_url: base.pr_url,
+        pr_number: base.pr_number,
+        pr_state: base.pr_state,
+        pr_title: base.pr_title,
+        pr_head_sha: base.pr_head_sha,
+        pr_last_synced_at: base.pr_last_synced_at,
+        pr_review_decision: base.pr_review_decision,
+        review_decision_pending: base.review_decision_pending,
+        pr_base_ref: base.pr_base_ref,
+        stack_number: base.stack_number,
+        stack_position: base.stack_position,
+        stack_size: base.stack_size,
+        pr_from_workspace: base.pr_from_workspace,
+      })
+      .from(base)
+      .where(
+        searchCondition ??
+          (or(
+            isNull(base.pr_state),
+            inArray(base.pr_state, ['open', 'draft']),
+            base.doneFolderEnabled,
+            sql`${base.lastActivityAt} >= now() - interval '5 days'`
+          ) as SQL)
+      )
+      .orderBy(...orderBy)
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const workspaces = pageRows.map(row => {
+      const associatedPr = formatAssociatedPr(
+        {
+          platform: row.sessionPrPlatform,
+          pr_url: row.sessionPrUrl,
+          pr_number: row.sessionPrNumber,
+          updated_at: row.prSessionUpdatedAt,
+          git_url: row.sessionGitUrl,
+          pr_link_verified_at: row.sessionPrVerifiedAt,
+        },
+        {
+          pr_url: row.pr_url,
+          pr_number: row.pr_number,
+          pr_state: row.pr_state,
+          pr_title: row.pr_title,
+          pr_head_sha: row.pr_head_sha,
+          pr_last_synced_at: row.pr_last_synced_at,
+          pr_review_decision: row.pr_review_decision,
+          review_decision_pending: row.review_decision_pending,
+          pr_base_ref: row.pr_base_ref,
+          stack_number: row.stack_number,
+          stack_position: row.stack_position,
+          stack_size: row.stack_size,
+          pr_from_workspace: row.pr_from_workspace,
+        }
+      );
+      const createdAt = new Date(row.createdAt).toISOString();
+      return {
+        worktreeId: row.worktreeId,
+        name: row.name,
+        defaultTitle:
+          row.firstTitle && !isDefaultSessionTitle(row.firstTitle) ? row.firstTitle : null,
+        branch: row.branch,
+        createdAt,
+        lastActivityAt: new Date(row.lastActivityAt).toISOString(),
+        folderId: row.folderId,
+        sidebarPosition: row.sidebarPosition,
+        parentWorktreeId: row.parentWorktreeId,
+        baseBranch: row.baseBranch,
+        rootSessionId: row.rootSessionId,
+        latestSessionId: row.latestSessionId,
+        gitUrl: row.gitUrl,
+        pr: associatedPr
+          ? {
+              ...associatedPr,
+              lastSyncedAt: new Date(associatedPr.lastSyncedAt).toISOString(),
+            }
+          : null,
+        status: aggregateWorkspaceStatus(row.sessions),
+        chatCount: row.chatCount,
+      };
+    });
+
+    return {
+      workspaces,
+      nextCursor: hasMore ? offset + limit : null,
+      // The banner tells the user to search, so only the open list reports truncation.
+      truncated: !searchActive && (rows[0]?.matchingCount ?? 0) > 200,
+    };
+  }),
+
+  renameWorktree: baseProcedure
+    .input(WorktreeInputSchema.extend({ name: z.string().trim().min(1).max(200) }))
+    .mutation(async ({ ctx, input }) =>
+      db.transaction(async tx => {
+        const membershipCondition = worktreeMembershipCondition(ctx.user.id, input.organizationId);
+        const [session] = await tx
+          .select({ createdAt: cli_sessions_v2.created_at })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              input.organizationId === null
+                ? isNull(cli_sessions_v2.organization_id)
+                : eq(cli_sessions_v2.organization_id, input.organizationId),
+              membershipCondition
+            )
+          )
+          .orderBy(asc(cli_sessions_v2.created_at))
+          .limit(1);
+
+        if (session) {
+          await tx
+            .insert(cloud_agent_worktrees)
+            .values({
+              worktree_id: input.worktreeId,
+              kilo_user_id: ctx.user.id,
+              organization_id: input.organizationId,
+              created_at: session.createdAt,
+            })
+            .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
+        }
+
+        const scopeCondition = and(
+          eq(cloud_agent_worktrees.worktree_id, input.worktreeId),
+          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+          input.organizationId === null
+            ? isNull(cloud_agent_worktrees.organization_id)
+            : eq(cloud_agent_worktrees.organization_id, input.organizationId),
+          membershipCondition
+        );
+        const [worktree] = await tx
+          .select({
+            deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+            deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
+          })
+          .from(cloud_agent_worktrees)
+          .where(scopeCondition)
+          .for('update');
+
+        if (!worktree) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+        }
+        if (worktree.deletionStartedAt !== null || worktree.deletionCompletedAt !== null) {
+          throw new TRPCError({ code: 'CONFLICT', message: 'Worktree is being deleted' });
+        }
+
+        const [updated] = await tx
+          .update(cloud_agent_worktrees)
+          .set({ name: input.name, updated_at: sql`now()` })
+          .where(scopeCondition)
+          .returning({ worktreeId: cloud_agent_worktrees.worktree_id });
+        if (!updated) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+        }
+        return { name: input.name };
+      })
+    ),
+
+  deleteWorktree: baseProcedure
+    .input(WorktreeInputSchema.extend({ onlyIfSoleSessionId: sessionIdField.optional() }))
+    .output(
+      z.object({
+        success: z.literal(true),
+        deletedSessionIds: z.array(z.string()),
+        cleanup: z.enum(['complete', 'pending']).default('complete'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const client = createCloudAgentNextClient(
+        (
+          await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+            headers: ctx.headersList,
+            organizationId: input.organizationId ?? undefined,
+            tokenSource: 'cloud-agent',
+          })
+        ).token
+      );
+      try {
+        return await client.deleteWorktree({
+          worktreeId: input.worktreeId,
+          ...(input.onlyIfSoleSessionId ? { onlyIfSoleSessionId: input.onlyIfSoleSessionId } : {}),
+          ...(input.organizationId === null
+            ? {}
+            : { kilocodeOrganizationId: input.organizationId }),
+        });
+      } catch (error) {
+        if (error instanceof TRPCClientError) {
+          const code: unknown = error.data?.code ?? error.shape?.data?.code;
+          if (typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code)) {
+            throw new TRPCError({
+              code: code as keyof typeof TRPC_ERROR_CODES_BY_KEY,
+              message: error.message,
+              cause: error,
+            });
+          }
+        }
+        throw error;
+      }
+    }),
+
   /**
    * List sessions for the current user with cursor-based pagination.
    */
@@ -734,17 +1705,20 @@ export const cliSessionsV2Router = createTRPCRouter({
       sharedOnly,
       createdOnPlatform,
       organizationId,
+      worktreeId,
       gitUrl,
       updatedSince,
       version,
     } = input;
 
-    const orderColumn =
-      orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
+    const orderColumn = sessionOrderColumn(orderBy);
 
     const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
 
     await addOrganizationCondition(whereConditions, ctx, organizationId);
+    if (worktreeId) {
+      whereConditions.push(eq(cli_sessions_v2.cloud_agent_worktree_id, worktreeId));
+    }
     addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
     addGitUrlConditions(whereConditions, gitUrl);
     addHideUningestedPlaceholderCondition(whereConditions);
@@ -762,7 +1736,12 @@ export const cliSessionsV2Router = createTRPCRouter({
     }
 
     if (updatedSince) {
-      whereConditions.push(gte(cli_sessions_v2.updated_at, updatedSince));
+      whereConditions.push(
+        gte(
+          orderBy === 'activity' ? sessionActivityTime : sql<string>`${cli_sessions_v2.updated_at}`,
+          updatedSince
+        )
+      );
     }
 
     if (version !== undefined) {
@@ -774,7 +1753,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     const rawResults = await db
       .select(commonSessionFieldsWithPr)
       .from(cli_sessions_v2)
-      .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+      .leftJoinLateral(sessionAssociatedPr, sql`true`)
       .where(and(...whereConditions))
       .orderBy(desc(orderColumn))
       .limit(effectiveLimit + 1);
@@ -797,9 +1776,12 @@ export const cliSessionsV2Router = createTRPCRouter({
     const nextCursor =
       resultSessions.length > 0
         ? new Date(
-            orderBy === 'updated_at'
-              ? resultSessions[resultSessions.length - 1].updated_at
-              : resultSessions[resultSessions.length - 1].created_at
+            orderBy === 'activity'
+              ? (resultSessions[resultSessions.length - 1].last_activity_at ??
+                  resultSessions[resultSessions.length - 1].created_at)
+              : orderBy === 'updated_at'
+                ? resultSessions[resultSessions.length - 1].updated_at
+                : resultSessions[resultSessions.length - 1].created_at
           ).toISOString()
         : null;
 
@@ -821,6 +1803,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       orderBy,
       createdOnPlatform,
       organizationId,
+      worktreeId,
       includeChildren,
       sharedOnly,
       gitUrl,
@@ -828,12 +1811,14 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     const pageOffset = cursor ?? offset;
 
-    const orderColumn =
-      orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
+    const orderColumn = sessionOrderColumn(orderBy);
 
     const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
 
     await addOrganizationCondition(whereConditions, ctx, organizationId);
+    if (worktreeId) {
+      whereConditions.push(eq(cli_sessions_v2.cloud_agent_worktree_id, worktreeId));
+    }
     addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
     addGitUrlConditions(whereConditions, gitUrl);
     addHideUningestedPlaceholderCondition(whereConditions);
@@ -849,41 +1834,68 @@ export const cliSessionsV2Router = createTRPCRouter({
     // Use position() for a case-insensitive substring match. This avoids LIKE
     // wildcard semantics entirely, so %, _, and \ in user input are matched
     // literally without any escaping dance.
-    const needle = search_string.toLowerCase();
-    whereConditions.push(
-      sql`(
-        position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0
-        OR position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0
-      )`
-    );
+    const trimmed = search_string.trim().toLowerCase();
+    const needle = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+    // `SearchInputSchema` only enforces `min(1)`, so `'#'` and `'  '` reduce
+    // to an empty needle after the trim and leading-`#` strip. In PostgreSQL
+    // `position('' in …)` is always > 0, so an empty needle would match every
+    // stored session. Match zero rows instead.
+    if (needle.length === 0) {
+      whereConditions.push(sql`false`);
+    } else {
+      const matchArms: SQL[] = [
+        sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0`,
+        sql`position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0`,
+        sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0`,
+        sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
+        sql`position(${needle} in lower(COALESCE(${sessionAssociatedPr.pr_title}, ''))) > 0`,
+        sql`EXISTS (
+          SELECT 1 FROM ${cloud_agent_worktrees}
+          WHERE ${cloud_agent_worktrees.worktree_id} = ${cli_sessions_v2.cloud_agent_worktree_id}
+            AND ${cloud_agent_worktrees.kilo_user_id} = ${cli_sessions_v2.kilo_user_id}
+            AND ${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}
+            AND ${cloud_agent_worktrees.deletion_started_at} IS NULL
+            AND ${cloud_agent_worktrees.deletion_completed_at} IS NULL
+            AND position(${needle} in lower(COALESCE(${cloud_agent_worktrees.name}, ''))) > 0
+        )`,
+      ];
+      // `#1234` and a bare `1234` name one pull request; they are not a
+      // substring search over every stored number. An equality test on the
+      // integer column costs one comparison, while the previous
+      // `position(needle in pr_number::text)` cast the joined cache row for
+      // every session the user owns.
+      const prNumber = Number(needle);
+      if (/^\d+$/.test(needle) && prNumber <= PG_MAX_INTEGER) {
+        matchArms.push(eq(sessionAssociatedPr.pr_number, prNumber));
+      }
+      whereConditions.push(sql`(${sql.join(matchArms, sql` OR `)})`);
+    }
 
     const baseWhere = and(...whereConditions);
 
-    const [rawResults, countResult] = await Promise.all([
-      db
-        .select(commonSessionFieldsWithPr)
-        .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
-        .where(baseWhere)
-        .orderBy(desc(orderColumn))
-        .limit(limit)
-        .offset(pageOffset),
-      db
-        .select({ count: sql<string>`COUNT(*)` })
-        .from(cli_sessions_v2)
-        .where(baseWhere),
-    ]);
+    // Fetch one row past the page to learn whether another page exists, the
+    // same way `list` does. The previous companion `COUNT(*)` had to walk and
+    // join every session the user owns on every keystroke — it could never
+    // stop early the way this ordered LIMIT does — and its `total` was never
+    // rendered anywhere.
+    const rawResults = await db
+      .select(commonSessionFieldsWithPr)
+      .from(cli_sessions_v2)
+      .leftJoinLateral(sessionAssociatedPr, sql`true`)
+      .where(baseWhere)
+      .orderBy(desc(orderColumn))
+      .limit(limit + 1)
+      .offset(pageOffset);
 
-    const results = rawResults.map(projectAssociatedPr);
-    const total = countResult.length > 0 ? Number(countResult[0].count) : 0;
-    const nextOffset = pageOffset + results.length;
+    const hasMore = rawResults.length > limit;
+
+    const results = (hasMore ? rawResults.slice(0, limit) : rawResults).map(projectAssociatedPr);
 
     return {
       results,
-      total,
       limit,
       offset: pageOffset,
-      nextCursor: computeSearchNextCursor(results.length, nextOffset, total),
+      nextCursor: hasMore ? pageOffset + results.length : null,
     };
   }),
 
@@ -930,29 +1942,55 @@ export const cliSessionsV2Router = createTRPCRouter({
   get: baseProcedure.input(GetSessionInputSchema).query(async ({ ctx, input }) => {
     const { session_id } = input;
 
-    const [session] = await db
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, session_id),
-          eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
-        )
-      )
-      .limit(1);
+    // Look the rows up without the owner filter first, so a session that exists
+    // but belongs to another account is distinguishable from one that does not
+    // exist. The session-resume gate (web) and the mobile session route render
+    // the two denials differently ("Not found" vs "Access denied"), which is
+    // only possible when the lookup says which one happened. Session ids are
+    // high-entropy, so the existence signal is not enumerable; the row itself
+    // is never returned to a non-owner.
+    //
+    // `session_id` alone is not unique — the primary key is
+    // `(session_id, kilo_user_id)` — so the lookup cannot take the first row:
+    // that could pick another account's row for the same id and deny the owner
+    // their own session. Read the rows for the id and prefer the caller's.
+    //
+    // The read is one primary-key lookup plus the three latest-run subqueries,
+    // each of which walks its own `(cloud_agent_session_id, queued_at)` index,
+    // so a slow answer is the database, not the plan. It is bounded for the
+    // mobile client, whose procedure has a 10s budget the read must not
+    // consume.
+    const sessions = await withControlPlaneReadBudget({
+      clock: ctx,
+      message: 'Session details took too long to load. Try again.',
+      read: () =>
+        db
+          .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, session_id)),
+    });
+
+    const session = sessions.find(row => row.kilo_user_id === ctx.user.id);
 
     if (!session) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Session not found',
-      });
+      throw new TRPCError(
+        sessions.length > 0
+          ? {
+              code: 'UNAUTHORIZED',
+              message: 'You do not have access to this session',
+            }
+          : {
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            }
+      );
     }
 
     if (session.organization_id) {
       await ensureOrganizationAccess(ctx, session.organization_id);
     }
 
-    return session;
+    return { ...session, prLinkVerificationKey: getPrLinkVerificationKey(session) };
   }),
 
   /**
@@ -995,21 +2033,25 @@ export const cliSessionsV2Router = createTRPCRouter({
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
     .query(async ({ ctx, input }) => {
-      await getSessionWithAccessCheck(input.session_id, ctx);
+      const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
       try {
         const snapshot = await fetchSessionSnapshot(input.session_id, ctx.user.id);
-        return snapshot ?? { info: {}, messages: [] };
+        if (!snapshot) {
+          return { info: {}, messages: [] };
+        }
+        return session.cloud_agent_worktree_id
+          ? projectGroupedSessionTranscript(snapshot, input.session_id, [
+              snapshot.info,
+              ...snapshot.messages.map(message => message.info),
+            ])
+          : snapshot;
       } catch (error) {
         console.error(
           `Failed to fetch messages for session ${input.session_id}:`,
           error instanceof Error ? error.message : error
         );
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session messages',
-          cause: error,
-        });
+        throw sessionIngestTrpcError('Failed to fetch session messages', error);
       }
     }),
 
@@ -1022,53 +2064,52 @@ export const cliSessionsV2Router = createTRPCRouter({
    * retryable from non-retryable failures without inferring retry semantics.
    */
   getSessionMessagesPage: baseProcedure
-    .input(GetSessionMessagesPageInputSchema)
+    .input(getSessionMessagesPageInputSchema)
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
-      // Read the event-log watermark from the existing getSession response
-      // before the initial history page, so the transport can use `fromId`
-      // on its first WebSocket connect instead of `replay=false`. Cursor
-      // pages skip the Cloud Agent read — the watermark is only seeded once.
-      // Failures are swallowed and return null so the page endpoint is
-      // never blocked on an optional watermark read.
-      let watermarkEventId: number | null = null;
-      if (!input.cursor && session.cloud_agent_session_id) {
+      // The first page also carries what the stream would replay first: the
+      // event-log watermark, so the transport can use `fromId` on its first
+      // WebSocket connect instead of `replay=false`, and the preparation
+      // attempts, so the transcript shows those rows before the stream does.
+      // Cursor pages skip the Cloud Agent reads. Each read fails open to an
+      // empty value, so these optional reads never block the page, and they
+      // run concurrently with the worker page fetch rather than serially.
+      const cloudAgentSessionId = !input.cursor ? session.cloud_agent_session_id : null;
+      const streamStatePromise: Promise<FirstPageStreamState> = cloudAgentSessionId
+        ? readFirstPageStreamState(ctx, session.organization_id, cloudAgentSessionId)
+        : Promise.resolve({ watermarkEventId: null, preparationAttempts: [] });
+
+      // Start the page fetch first so it is in flight before the optional
+      // stream-state reads above resolve.
+      const pagePromise = (async () => {
         try {
-          const authToken = generateApiToken(ctx.user);
-          const client = createCloudAgentNextClient(authToken);
-          const sessionState = await client.getSession(session.cloud_agent_session_id);
-          watermarkEventId = sessionState.latestEventId ?? null;
+          return await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
+            limit: input.limit,
+            ...(input.cursor !== undefined ? { before: input.cursor } : {}),
+          });
         } catch (error) {
-          console.warn(
-            `Failed to fetch watermark for session ${input.session_id}:`,
+          // Match the existing `getSessionMessages` error contract: surface a
+          // stable code the mobile client can map without inferring retry
+          // semantics from the worker's text — the budget expiry as the
+          // retryable `SERVICE_UNAVAILABLE`, anything else as
+          // `INTERNAL_SERVER_ERROR`. The client already calls
+          // `captureException`; we do not double-capture here.
+          console.error(
+            `Failed to fetch session messages page for session ${input.session_id}:`,
             error instanceof Error ? error.message : error
           );
+          throw sessionIngestTrpcError('Failed to fetch session messages page', error);
         }
-      }
+      })();
 
-      let result;
-      try {
-        result = await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
-          limit: input.limit,
-          ...(input.cursor !== undefined ? { before: input.cursor } : {}),
-        });
-      } catch (error) {
-        // Match the existing `getSessionMessages` error contract: surface a
-        // stable INTERNAL_SERVER_ERROR so the mobile client can map the
-        // outcome without inferring retry semantics from the worker's
-        // text. The client already calls `captureException`; we do not
-        // double-capture here.
-        console.error(
-          `Failed to fetch session messages page for session ${input.session_id}:`,
-          error instanceof Error ? error.message : error
-        );
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session messages page',
-          cause: error,
-        });
-      }
+      // The stream-state promise never rejects (each read resolves to an empty
+      // value on failure), so a rejecting page promise cannot leave it as an
+      // unhandled rejection.
+      const [result, { watermarkEventId, preparationAttempts }] = await Promise.all([
+        pagePromise,
+        streamStatePromise,
+      ]);
 
       // The worker returns `null` only for sessions the user cannot read; the
       // router's own access check above already enforces this, so the only
@@ -1082,7 +2123,65 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      return { ...result, watermarkEventId };
+      // Project the session goal from the snapshot metadata so clients can
+      // restore the fixed goal section on open and on reconnect. The raw
+      // session metadata stays server-side; only the validated goal is
+      // returned, so no private CLI metadata leaks to the client.
+      const { sessionMetadata, ...pageResult } = result;
+      const sessionGoal = projectSessionGoal(sessionMetadata);
+
+      return {
+        ...(session.cloud_agent_worktree_id
+          ? projectGroupedSessionTranscript(
+              pageResult,
+              input.session_id,
+              pageResult.history && 'messages' in pageResult.history
+                ? pageResult.history.messages.map(message => message.info)
+                : []
+            )
+          : pageResult),
+        watermarkEventId,
+        preparationAttempts,
+        // The access check already read the row, so the page can answer the
+        // session's parent without a second full-session query. Always
+        // present: `null` means a root session, and a client that opens this
+        // session has no further read to make.
+        parentSessionId: session.parent_session_id,
+        ...(sessionGoal === undefined ? {} : { sessionGoal }),
+      };
+    }),
+
+  /**
+   * The cumulative file diff for a V2 Kilo session, from session start to its
+   * latest step, as stored by session ingest. File paths are workspace
+   * relative. A budget expiry surfaces as SERVICE_UNAVAILABLE and any other
+   * read failure as INTERNAL_SERVER_ERROR (both retryable on the client); an
+   * oversized diff is a typed `too_large` result.
+   */
+  getSessionDiff: baseProcedure
+    .input(z.object({ session_id: sessionIdField }))
+    .query(async ({ ctx, input }) => {
+      await getSessionWithAccessCheck(input.session_id, ctx);
+
+      let diff: SessionDiffRead | null;
+      try {
+        diff = await fetchSessionDiff(input.session_id, ctx.user.id);
+      } catch (error) {
+        throw sessionIngestTrpcError('Failed to fetch session diff', error);
+      }
+      if (diff === null) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      }
+      if (diff.kind === 'value') {
+        return { kind: 'files' as const, files: diff.files };
+      }
+      if (diff.kind === 'too_large') {
+        return { kind: 'too_large' as const };
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Session diff read failed: ${diff.kind}`,
+      });
     }),
 
   /**
@@ -1091,9 +2190,9 @@ export const cliSessionsV2Router = createTRPCRouter({
    * This combines the DB fetch (ownership check + metadata) with the DO fetch
    * (mode, model, repository, execution state) in a single call.
    *
-   * For V2 sessions (those with cloud_agent_session_id), this also fetches
-   * runtime state from the cloud-agent DO. For CLI sessions without a
-   * cloud_agent_session_id, runtimeState will be null.
+   * Runtime state is null when no cloud runtime is recorded, its stored ID
+   * is unsupported by the current runtime, or the runtime no longer exists.
+   * Failures reading a supported runtime ID still propagate to the caller.
    */
   getWithRuntimeState: baseProcedure
     .input(GetSessionInputSchema)
@@ -1103,6 +2202,8 @@ export const cliSessionsV2Router = createTRPCRouter({
         session_id: z.string(),
         title: z.string().nullable(),
         cloud_agent_session_id: z.string().nullable(),
+        cloud_agent_worktree_id: cloudAgentWorktreeIdSchema.nullable(),
+        profile_id: z.string().nullable(),
         organization_id: z.string().nullable(),
         git_url: z.string().nullable(),
         git_branch: z.string().nullable(),
@@ -1111,54 +2212,42 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: z.coerce.date(),
         version: z.number(),
         total_cost_microdollars: z.number().nullable(),
+        latest_run_status: z
+          .enum(['queued', 'accepted', 'completed', 'failed', 'interrupted'])
+          .nullable(),
+        latest_run_failure_kind: z.enum(['failed', 'system_interrupted']).nullable(),
+        latest_run_terminal_at: z.string().datetime().nullable(),
         // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
         // Associated GitHub pull request for this session's branch, if any.
         // Populated by the pull_request webhook handler or a manual refresh.
         associatedPr: associatedPrSchema.nullable(),
+        prLinkVerificationKey: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       const { session_id } = input;
 
-      // 1. Fetch from DB with ownership check, LEFT JOINing the per-tenant
-      //    PR cache on (normalized git_url, git_branch, tenant). The OR
-      //    branches are mutually exclusive by the session's organization_id
-      //    nullability and by the XOR ownership CHECK on the cache table, so
-      //    the planner uses whichever partial unique index applies.
+      // 1. Fetch from DB with ownership check, LEFT JOINing the PR cache by PR
+      //    identity through the shared predicate. A session with no verified
+      //    stored link joins nothing and shows no PR.
       const [row] = await db
         .select({
           session: cli_sessions_v2,
-          pr_url: github_branch_pull_requests.pr_url,
-          pr_number: github_branch_pull_requests.pr_number,
-          pr_state: github_branch_pull_requests.pr_state,
-          pr_title: github_branch_pull_requests.pr_title,
-          pr_head_sha: github_branch_pull_requests.pr_head_sha,
-          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-          pr_review_decision: github_branch_pull_requests.pr_review_decision,
-          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          ...latestRunFields,
+          pr_url: sessionAssociatedPr.pr_url,
+          pr_number: sessionAssociatedPr.pr_number,
+          pr_state: sessionAssociatedPr.pr_state,
+          pr_title: sessionAssociatedPr.pr_title,
+          pr_head_sha: sessionAssociatedPr.pr_head_sha,
+          pr_observations: sessionAssociatedPr.pr_observations,
+          pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+          pr_review_decision: sessionAssociatedPr.pr_review_decision,
+          review_decision_pending: sessionAssociatedPr.review_decision_pending,
+          pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
         })
         .from(cli_sessions_v2)
-        .leftJoin(
-          github_branch_pull_requests,
-          and(
-            eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
-            eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
-            or(
-              and(
-                isNotNull(cli_sessions_v2.organization_id),
-                eq(
-                  github_branch_pull_requests.owned_by_organization_id,
-                  cli_sessions_v2.organization_id
-                )
-              ),
-              and(
-                isNull(cli_sessions_v2.organization_id),
-                eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
-              )
-            )
-          )
-        )
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(
           and(
             eq(cli_sessions_v2.session_id, session_id),
@@ -1187,9 +2276,15 @@ export const cliSessionsV2Router = createTRPCRouter({
       // 2. If session has cloud_agent_session_id, fetch runtime state from DO
       let runtimeState: z.infer<typeof baseGetSessionNextOutputSchema> | null = null;
 
-      if (session.cloud_agent_session_id) {
+      if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
         try {
-          const authToken = generateApiToken(ctx.user);
+          const authToken = (
+            await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+              headers: ctx.headersList,
+              organizationId: session.organization_id ?? undefined,
+              tokenSource: 'cloud-agent',
+            })
+          ).token;
           const client = createCloudAgentNextClient(authToken);
           runtimeState = await client.getSession(session.cloud_agent_session_id);
         } catch (error) {
@@ -1200,6 +2295,16 @@ export const cliSessionsV2Router = createTRPCRouter({
               `Session ${session_id} not found in cloud-agent DO - treating as legacy session`
             );
             // runtimeState stays null
+          } else if (isTransientRuntimeError(error)) {
+            console.error(
+              `Session runtime state temporarily unavailable for session ${session_id}:`,
+              error instanceof Error ? error.message : error
+            );
+            throw new TRPCError({
+              code: 'SERVICE_UNAVAILABLE',
+              message: 'Session runtime state is temporarily unavailable',
+              cause: error,
+            });
           } else {
             console.error(
               `Failed to fetch runtime state for session ${session_id}:`,
@@ -1212,27 +2317,40 @@ export const cliSessionsV2Router = createTRPCRouter({
             });
           }
         }
+      } else if (session.cloud_agent_session_id) {
+        console.debug('Stored runtime identifier is unsupported; returning historical metadata');
       }
 
       return {
         session_id: session.session_id,
         title: session.title,
         cloud_agent_session_id: session.cloud_agent_session_id,
+        cloud_agent_worktree_id: session.cloud_agent_worktree_id
+          ? cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id)
+          : null,
         organization_id: session.organization_id ?? null,
+        profile_id: session.profile_id ?? null,
         git_url: session.git_url ?? null,
-        git_branch: session.git_branch ?? null,
+        git_branch: session.git_branch ?? runtimeState?.branchName ?? null,
         created_on_platform: session.created_on_platform,
         created_at: session.created_at,
         updated_at: session.updated_at,
         version: session.version,
         total_cost_microdollars: session.total_cost_microdollars,
+        latest_run_status: row.latest_run_status,
+        latest_run_failure_kind: row.latest_run_failure_kind,
+        latest_run_terminal_at: row.latest_run_terminal_at,
         runtimeState,
+        prLinkVerificationKey:
+          row.pr_from_workspace === true ? undefined : getPrLinkVerificationKey(session),
         associatedPr: formatAssociatedPr(
           {
             platform: session.platform,
             pr_url: session.pr_url,
             pr_number: session.pr_number,
             updated_at: session.updated_at,
+            git_url: session.git_url,
+            pr_link_verified_at: session.pr_link_verified_at,
           },
           {
             pr_url: row.pr_url,
@@ -1240,9 +2358,11 @@ export const cliSessionsV2Router = createTRPCRouter({
             pr_state: row.pr_state,
             pr_title: row.pr_title,
             pr_head_sha: row.pr_head_sha,
+            pr_observations: row.pr_observations,
             pr_last_synced_at: row.pr_last_synced_at,
             pr_review_decision: row.pr_review_decision,
             review_decision_pending: row.review_decision_pending,
+            pr_from_workspace: row.pr_from_workspace,
           }
         ),
       };
@@ -1252,14 +2372,21 @@ export const cliSessionsV2Router = createTRPCRouter({
    * Refresh the associated PR for a session by querying GitHub directly.
    *
    * Invoked when the user explicitly asks for a refresh (e.g. "Refresh PR info"
-   * action in the UI). The webhook handler is the primary path; this mutation
-   * exists to recover from missed webhooks.
+   * action in the UI). The webhook handler keeps the state cache fresh; this
+   * mutation exists to recover from missed webhooks.
    *
-   * Stored-link-first: when the session carries `platform`/`pr_url`/`pr_number`
-   * (set by the CLI when it links a PR), this fetches that PR by number and
-   * only writes the branch cache when the branch identity is complete and the
-   * cache does not already hold a different PR. Sessions without a stored link
-   * fall back to the branch cache.
+   * Evidence-only. The session must carry its own stored link
+   * (`platform`/`pr_url`/`pr_number` plus `pr_head_ref`/`pr_head_sha`). The
+   * fetched PR is accepted only when `verifySessionPullRequestLink` confirms
+   * the link names the session's repo, the PR base and head repositories are
+   * that same repo, the PR head ref is the branch the session reported pushing
+   * (its `pr_head_ref`, or the stored session branch when the link carries no
+   * head ref), and (when reported) the session head SHA is the PR head or one
+   * of its commits. On failure the link is left unverified and no live PR is
+   * returned (the read path still shows the session's own pending partial);
+   * there is no branch-name fallback. On success `pr_link_verified_at` is set
+   * and the state cache is upserted by PR identity `(git_url, pr_number,
+   * tenant)`.
    */
   refreshAssociatedPullRequest: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
@@ -1267,22 +2394,32 @@ export const cliSessionsV2Router = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { sessionId } = input;
 
-      // 1. Load session with ownership check, LEFT JOINing the per-tenant PR
-      //    cache so we can evaluate the throttle without a second query.
+      // 1. Load session with ownership check, LEFT JOINing the PR cache by PR
+      //    identity so the throttle can be evaluated without a second query.
+      //    The join only matches when the session already has a verified link.
       const [row] = await db
         .select({
           session: cli_sessions_v2,
-          pr_url: github_branch_pull_requests.pr_url,
-          pr_number: github_branch_pull_requests.pr_number,
-          pr_state: github_branch_pull_requests.pr_state,
-          pr_title: github_branch_pull_requests.pr_title,
-          pr_head_sha: github_branch_pull_requests.pr_head_sha,
-          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-          pr_review_decision: github_branch_pull_requests.pr_review_decision,
-          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          pr_url: sessionAssociatedPr.pr_url,
+          pr_number: sessionAssociatedPr.pr_number,
+          pr_state: sessionAssociatedPr.pr_state,
+          pr_title: sessionAssociatedPr.pr_title,
+          pr_head_sha: sessionAssociatedPr.pr_head_sha,
+          pr_observations: sessionAssociatedPr.pr_observations,
+          pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+          pr_review_decision: sessionAssociatedPr.pr_review_decision,
+          review_decision_pending: sessionAssociatedPr.review_decision_pending,
+          pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
+          cache_updated_at: sessionAssociatedPr.updated_at,
+          cache_git_url: sessionAssociatedPr.git_url,
+          cache_git_branch: sessionAssociatedPr.git_branch,
+          pr_base_ref: sessionAssociatedPr.pr_base_ref,
+          stack_number: sessionAssociatedPr.stack_number,
+          stack_position: sessionAssociatedPr.stack_position,
+          stack_size: sessionAssociatedPr.stack_size,
         })
         .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(
           and(
             eq(cli_sessions_v2.session_id, sessionId),
@@ -1310,37 +2447,98 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_url: session.pr_url,
         pr_number: session.pr_number,
         updated_at: session.updated_at,
+        git_url: session.git_url,
+        pr_link_verified_at: session.pr_link_verified_at,
       };
 
-      const cacheRow: AssociatedPrRow = {
+      let cacheRow: AssociatedPrRow = {
         pr_url: row.pr_url,
         pr_number: row.pr_number,
         pr_state: row.pr_state,
         pr_title: row.pr_title,
         pr_head_sha: row.pr_head_sha,
+        pr_observations: row.pr_observations,
         pr_last_synced_at: row.pr_last_synced_at,
         pr_review_decision: row.pr_review_decision,
         review_decision_pending: row.review_decision_pending,
+        pr_base_ref: row.pr_base_ref,
+        stack_number: row.stack_number,
+        stack_position: row.stack_position,
+        stack_size: row.stack_size,
+        pr_from_workspace: row.pr_from_workspace,
       };
+      let cacheUpdatedAt = row.cache_updated_at;
 
-      // Non-GitHub sessions never call GitHub. Return the pending partial (or
-      // the branch fallback when there is no stored link).
-      if (session.platform !== 'github') {
+      // The PR of the session's Cloud Agent workspace (a PR on the branch the
+      // workspace has checked out) is refreshed by number. It needs no link of
+      // the session's own, so the session link is neither verified nor revoked.
+      const fromWorkspace = row.pr_from_workspace === true && row.pr_url !== null;
+
+      // Non-GitHub sessions never call GitHub. A verified link (if any) comes
+      // from the cache; an unverified one shows nothing.
+      if (session.platform !== 'github' && !fromWorkspace) {
         return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
       }
 
-      // Fetch-by-number requires a parseable PR URL. Sessions without one fall
-      // back to the branch cache / pending partial without a GitHub call.
-      const sessionPrUrl = session.pr_url;
+      const sessionPrUrl = fromWorkspace ? row.pr_url : session.pr_url;
       const parsed = sessionPrUrl ? parseGitHubPrUrl(sessionPrUrl) : null;
-      if (!sessionPrUrl || !parsed) {
+      const gitUrl = fromWorkspace ? row.cache_git_url : session.git_url;
+      const branch = fromWorkspace ? row.cache_git_branch : session.git_branch;
+
+      // No candidate without a stored link, a parseable PR URL, and the repo +
+      // branch identity the evidence contract requires.
+      if (!sessionPrUrl || !parsed || gitUrl == null || branch == null) {
         return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
       }
 
-      // Throttle: skip the fetch only when the cache row already matches the
-      // session's stored link and was synced recently. A mismatched cache row
-      // must not short-circuit.
+      // The stored link itself must name the session's repository. A link that
+      // names another repo is rejected without a GitHub call and its stale
+      // verification is revoked.
+      if (!fromWorkspace && !pullRequestUrlMatchesRepo(sessionPrUrl, gitUrl)) {
+        if (session.pr_link_verified_at !== null) {
+          await db
+            .update(cli_sessions_v2)
+            .set({ pr_link_verified_at: null })
+            .where(
+              and(
+                eq(cli_sessions_v2.session_id, sessionId),
+                eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+              )
+            );
+        }
+        return { associatedPr: null };
+      }
+
+      const cacheIdentity = and(
+        eq(github_branch_pull_requests.git_url, normalizeGitUrl(gitUrl)),
+        eq(github_branch_pull_requests.pr_number, parsed.number),
+        session.organization_id
+          ? and(
+              eq(github_branch_pull_requests.owned_by_organization_id, session.organization_id),
+              isNull(github_branch_pull_requests.owned_by_user_id)
+            )
+          : and(
+              eq(github_branch_pull_requests.owned_by_user_id, ctx.user.id),
+              isNull(github_branch_pull_requests.owned_by_organization_id)
+            )
+      );
+      // An unverified session is excluded from the join even if another session cached this PR.
+      if (cacheUpdatedAt === null) {
+        const [existingCache] = await db
+          .select()
+          .from(github_branch_pull_requests)
+          .where(cacheIdentity)
+          .limit(1);
+        if (existingCache) {
+          cacheRow = existingCache;
+          cacheUpdatedAt = existingCache.updated_at;
+        }
+      }
+
+      // Throttle: skip the fetch only when the session's link is already
+      // verified and the matching cache row was synced recently.
       if (
+        (fromWorkspace || session.pr_link_verified_at !== null) &&
         cacheRow.pr_url !== null &&
         samePullRequest(sessionPrUrl, cacheRow.pr_url) &&
         cacheRow.pr_last_synced_at !== null
@@ -1369,6 +2567,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'No GitHub integration configured for this session',
+          cause: { reason: 'no_integration' },
         });
       }
 
@@ -1377,11 +2576,40 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'GitHub installation ID is malformed',
+          cause: { reason: 'malformed_installation' },
         });
       }
       const appType = integration.github_app_type ?? 'standard';
+      const refreshBudget = await claimPrRefresh({
+        appType,
+        installationId: String(installationId),
+        owner: session.organization_id
+          ? { type: 'org', id: session.organization_id }
+          : { type: 'user', id: ctx.user.id },
+        repo: `${parsed.owner}/${parsed.repo}`,
+        number: parsed.number,
+      });
+      if (!refreshBudget.allowed) {
+        throw new TRPCError({
+          code:
+            refreshBudget.reason === 'unavailable' ? 'SERVICE_UNAVAILABLE' : 'TOO_MANY_REQUESTS',
+          message:
+            refreshBudget.reason === 'unavailable'
+              ? 'PR refresh is temporarily unavailable. Cached PR data is unchanged.'
+              : refreshBudget.reason === 'rate_limited'
+                ? `GitHub rate limit reached; try again after ${refreshBudget.retryAt.toISOString()}`
+                : `PR refresh was already attempted; try again after ${refreshBudget.retryAt.toISOString()}`,
+          cause: {
+            reason: refreshBudget.reason,
+            retryAt: refreshBudget.retryAt.toISOString(),
+          },
+        });
+      }
+      const signal = AbortSignal.timeout(45_000);
 
-      // Fetch the PR by number from the stored link.
+      // Fetch the PR by number from the stored link. When the session reported
+      // a head SHA that may not be the current PR head, also fetch the PR's
+      // commits so the SHA can be matched against them.
       let fetched;
       try {
         fetched = await fetchPullRequestByNumber({
@@ -1390,13 +2618,22 @@ export const cliSessionsV2Router = createTRPCRouter({
           repo: parsed.repo,
           number: parsed.number,
           appType,
+          includeCommits: !fromWorkspace && session.pr_head_sha != null,
+          expectedHeadSha: fromWorkspace ? null : session.pr_head_sha,
+          signal,
         });
       } catch (error) {
-        if (error instanceof GitHubRateLimitError) {
+        const rateLimit = toGitHubRateLimitError(error);
+        if (rateLimit) {
+          await deferPrRefresh({
+            appType,
+            installationId: String(installationId),
+            resetAt: rateLimit.resetAt,
+          });
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
-            message: `GitHub rate limit reached; try again after ${error.resetAt.toISOString()}`,
-            cause: error,
+            message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
         captureException(error, {
@@ -1409,180 +2646,287 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch pull request from GitHub',
+          cause: { reason: 'fetch_failed' },
         });
       }
 
-      // Fetch the rolled-up review decision when we have a PR.
-      // Failures are swallowed so a GraphQL hiccup doesn't break the refresh.
-      let reviewDecision: string | null = null;
+      // Hard evidence: the link is accepted only when GitHub agrees it is this
+      // session's PR. A wrong link is worse than no link.
+      const verification = !fetched
+        ? ({ verified: false } as const)
+        : fromWorkspace
+          ? {
+              verified:
+                fetched.headRef === branch &&
+                !!fetched.baseRepoFullName &&
+                fetched.baseRepoFullName.toLowerCase() ===
+                  (fetched.headRepoFullName ?? '').toLowerCase(),
+            }
+          : verifySessionPullRequestLink({
+              sessionRepo: { gitUrl, gitBranch: branch },
+              link: {
+                prUrl: sessionPrUrl,
+                prNumber: session.pr_number,
+                headRef: session.pr_head_ref,
+                headSha: session.pr_head_sha,
+              },
+              pullRequest: {
+                number: fetched.number,
+                baseRepoFullName: fetched.baseRepoFullName,
+                headRepoFullName: fetched.headRepoFullName,
+                headRef: fetched.headRef,
+                headSha: fetched.headSha,
+                commitShas: fetched.commitShas,
+              },
+            });
+
+      if (!verification.verified || !fetched) {
+        // Revoke any stale verification; show nothing rather than a guess.
+        if (!fromWorkspace && session.pr_link_verified_at !== null) {
+          await db
+            .update(cli_sessions_v2)
+            .set({ pr_link_verified_at: null })
+            .where(
+              and(
+                eq(cli_sessions_v2.session_id, sessionId),
+                eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+              )
+            );
+        }
+        return { associatedPr: null };
+      }
+
+      const previousObservations = prObservationsSchema.safeParse(cacheRow.pr_observations);
+      let observations = previousObservations.success
+        ? previousObservations.data
+        : createEmptyPrObservations();
+      let reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null = null;
       let reviewDecisionFetched = false;
-      if (fetched && fetched.number > 0) {
-        try {
-          reviewDecision = await fetchPullRequestReviewDecision({
+      try {
+        ({ observations, reviewDecision, reviewDecisionFetched } =
+          await fetchPullRequestObservations({
             installationId: String(installationId),
+            integrationId: integration.id,
             owner: parsed.owner,
             repo: parsed.repo,
             number: fetched.number,
             appType,
+            pullRequest: fetched,
+            existing: cacheRow.pr_observations,
+            signal,
+          }));
+      } catch (error) {
+        const rateLimit = toGitHubRateLimitError(error);
+        if (rateLimit) {
+          await deferPrRefresh({
+            appType,
+            installationId: String(installationId),
+            resetAt: rateLimit.resetAt,
           });
-          reviewDecisionFetched = true;
-        } catch {
-          // Non-fatal.
-        }
-      }
-      const hasPrToRefresh = fetched !== null && fetched.number > 0;
-
-      // Map the fetched payload to the schema. Never return the raw adapter object.
-      const mapped: z.infer<typeof associatedPrSchema> | null = fetched
-        ? {
-            url: fetched.htmlUrl,
-            number: fetched.number,
-            state: fetched.state,
-            title: fetched.title,
-            headSha: fetched.headSha,
-            lastSyncedAt: new Date().toISOString(),
-            reviewDecision: reviewDecision as z.infer<typeof associatedPrSchema>['reviewDecision'],
-            reviewDecisionPending: false,
-            platform: 'github',
-          }
-        : null;
-
-      // Write the cache only when the branch identity is complete and the
-      // existing cache row (if any) matches the session's stored link. A
-      // mismatched cache row holds a different PR and must not be clobbered.
-      const gitUrl = session.git_url;
-      const branch = session.git_branch;
-      if (
-        gitUrl != null &&
-        branch != null &&
-        (cacheRow.pr_url == null || samePullRequest(sessionPrUrl, cacheRow.pr_url))
-      ) {
-        const prColumns = {
-          pr_url: fetched?.htmlUrl ?? null,
-          pr_number: fetched?.number ?? null,
-          pr_state: fetched?.state ?? null,
-          pr_title: fetched?.title ?? null,
-          pr_head_sha: fetched?.headSha ?? null,
-          pr_review_decision: reviewDecision,
-        };
-
-        // On conflict: only overwrite pr_review_decision when the fetch succeeded.
-        // A transient GraphQL failure must not erase an existing approved/changes_requested badge.
-        const prReviewDecisionConflictSet = reviewDecisionFetched
-          ? sql`excluded.pr_review_decision`
-          : github_branch_pull_requests.pr_review_decision;
-
-        const normalizedGitUrl = normalizeGitUrl(gitUrl);
-
-        const ownerValues = session.organization_id
-          ? {
-              owned_by_organization_id: session.organization_id,
-              owned_by_user_id: null,
-            }
-          : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
-
-        const conflictTarget = session.organization_id
-          ? [
-              github_branch_pull_requests.git_url,
-              github_branch_pull_requests.git_branch,
-              github_branch_pull_requests.owned_by_organization_id,
-            ]
-          : [
-              github_branch_pull_requests.git_url,
-              github_branch_pull_requests.git_branch,
-              github_branch_pull_requests.owned_by_user_id,
-            ];
-
-        const conflictTargetWhere = session.organization_id
-          ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL`
-          : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL`;
-
-        // Only mark pending when there is a PR whose review decision we still
-        // need. Writing a sentinel (no-PR) row with pending=true would cause the
-        // batch worker to repeatedly claim it and skip it (it filters out rows
-        // without pr_number), never clearing the flag.
-        const [persisted] = await db
-          .insert(github_branch_pull_requests)
-          .values({
-            git_url: normalizedGitUrl,
-            git_branch: branch,
-            ...ownerValues,
-            ...prColumns,
-            review_decision_pending: hasPrToRefresh && !reviewDecisionFetched,
-            review_decision_fetching_at: null,
-            pr_last_synced_at: sql`now()`,
-          })
-          .onConflictDoUpdate({
-            target: conflictTarget,
-            targetWhere: conflictTargetWhere,
-            set: {
-              pr_url: sql`excluded.pr_url`,
-              pr_number: sql`excluded.pr_number`,
-              pr_state: sql`excluded.pr_state`,
-              pr_title: sql`excluded.pr_title`,
-              pr_head_sha: sql`excluded.pr_head_sha`,
-              pr_review_decision: prReviewDecisionConflictSet,
-              review_decision_pending: reviewDecisionFetched
-                ? false
-                : github_branch_pull_requests.review_decision_pending,
-              review_decision_fetching_at: reviewDecisionFetched
-                ? null
-                : github_branch_pull_requests.review_decision_fetching_at,
-              pr_last_synced_at: sql`now()`,
-              updated_at: sql`now()`,
-            },
-          })
-          .returning({
-            pr_url: github_branch_pull_requests.pr_url,
-            pr_number: github_branch_pull_requests.pr_number,
-            pr_state: github_branch_pull_requests.pr_state,
-            pr_title: github_branch_pull_requests.pr_title,
-            pr_head_sha: github_branch_pull_requests.pr_head_sha,
-            pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-            pr_review_decision: github_branch_pull_requests.pr_review_decision,
-            review_decision_pending: github_branch_pull_requests.review_decision_pending,
-          });
-
-        if (!persisted) {
           throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Upsert did not return a row',
+            code: 'TOO_MANY_REQUESTS',
+            message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
-
-        return { associatedPr: formatAssociatedPr(sessionPr, persisted) };
+        observations = {
+          ...observations,
+          checksComplete: false,
+          threadsComplete: false,
+          mergeability: undefined,
+          unavailable: ['checks', 'statuses', 'reviews'],
+        };
+        captureException(error, {
+          tags: { source: 'cli-sessions-v2-router', endpoint: 'refreshPullRequestObservations' },
+          extra: { sessionId },
+        });
       }
 
-      // Cannot write the cache: return the fetched payload or the pending
-      // partial for this session only.
-      if (mapped) {
-        return { associatedPr: mapped };
-      }
-      return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
+      // On conflict: only overwrite pr_review_decision when the fetch
+      // succeeded. A transient GraphQL failure must not erase an existing
+      // approved/changes_requested badge.
+      const prReviewDecisionConflictSet = reviewDecisionFetched
+        ? sql`excluded.pr_review_decision`
+        : github_branch_pull_requests.pr_review_decision;
+
+      const normalizedGitUrl = normalizeGitUrl(gitUrl);
+
+      const ownerValues = session.organization_id
+        ? {
+            owned_by_organization_id: session.organization_id,
+            owned_by_user_id: null,
+          }
+        : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
+
+      // Cache keyed by PR identity (git_url, pr_number, owner), never by branch.
+      const conflictTarget = session.organization_id
+        ? [
+            github_branch_pull_requests.git_url,
+            github_branch_pull_requests.pr_number,
+            github_branch_pull_requests.owned_by_organization_id,
+          ]
+        : [
+            github_branch_pull_requests.git_url,
+            github_branch_pull_requests.pr_number,
+            github_branch_pull_requests.owned_by_user_id,
+          ];
+
+      const conflictTargetWhere = sql`${github_branch_pull_requests.pr_number} IS NOT NULL`;
+
+      const [persisted] = await db
+        .insert(github_branch_pull_requests)
+        .values({
+          git_url: normalizedGitUrl,
+          git_branch: branch,
+          ...ownerValues,
+          pr_url: fetched.htmlUrl,
+          pr_number: fetched.number,
+          pr_state: fetched.state,
+          pr_title: fetched.title,
+          pr_head_sha: fetched.headSha,
+          pr_observations: observations,
+          pr_review_decision: reviewDecision,
+          review_decision_pending: !reviewDecisionFetched,
+          review_decision_fetching_at: null,
+          pr_last_synced_at: sql`now()`,
+          pr_base_ref: fetched.baseRef ?? null,
+          stack_number: fetched.stackNumber ?? null,
+          stack_position: fetched.stackPosition ?? null,
+          stack_size: fetched.stackSize ?? null,
+        })
+        .onConflictDoUpdate({
+          target: conflictTarget,
+          targetWhere: conflictTargetWhere,
+          // Do not overwrite a webhook or observation accepted during the GitHub reads.
+          setWhere:
+            cacheUpdatedAt === null
+              ? sql`false`
+              : eq(github_branch_pull_requests.updated_at, cacheUpdatedAt),
+          set: {
+            pr_url: sql`excluded.pr_url`,
+            pr_number: sql`excluded.pr_number`,
+            pr_state: sql`excluded.pr_state`,
+            pr_title: sql`excluded.pr_title`,
+            pr_head_sha: sql`excluded.pr_head_sha`,
+            pr_observations: sql`excluded.pr_observations`,
+            pr_review_decision: prReviewDecisionConflictSet,
+            review_decision_pending: reviewDecisionFetched
+              ? false
+              : github_branch_pull_requests.review_decision_pending,
+            review_decision_fetching_at: reviewDecisionFetched
+              ? null
+              : github_branch_pull_requests.review_decision_fetching_at,
+            pr_last_synced_at: sql`now()`,
+            updated_at: sql`now()`,
+            pr_base_ref: sql`excluded.pr_base_ref`,
+            stack_number: sql`excluded.stack_number`,
+            stack_position: sql`excluded.stack_position`,
+            stack_size: sql`excluded.stack_size`,
+          },
+        })
+        .returning({
+          pr_url: github_branch_pull_requests.pr_url,
+          pr_number: github_branch_pull_requests.pr_number,
+          pr_state: github_branch_pull_requests.pr_state,
+          pr_title: github_branch_pull_requests.pr_title,
+          pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
+          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+          pr_review_decision: github_branch_pull_requests.pr_review_decision,
+          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          pr_base_ref: github_branch_pull_requests.pr_base_ref,
+          stack_number: github_branch_pull_requests.stack_number,
+          stack_position: github_branch_pull_requests.stack_position,
+          stack_size: github_branch_pull_requests.stack_size,
+        });
+
+      // The link passed verification; record it so the read path can show it.
+      if (!fromWorkspace)
+        await db
+          .update(cli_sessions_v2)
+          .set({ pr_link_verified_at: sql`now()` })
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              eq(cli_sessions_v2.pr_url, sessionPrUrl),
+              eq(cli_sessions_v2.git_url, gitUrl),
+              sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
+              sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
+              sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
+            )
+          );
+
+      const verifiedSessionPr: SessionPrFields = {
+        ...sessionPr,
+        pr_link_verified_at: new Date().toISOString(),
+      };
+      const winningCache =
+        persisted ??
+        (await db.select().from(github_branch_pull_requests).where(cacheIdentity).limit(1))[0];
+      return {
+        associatedPr: formatAssociatedPr(verifiedSessionPr, {
+          ...(winningCache ?? cacheRow),
+          pr_from_workspace: fromWorkspace,
+        }),
+      };
     }),
 
-  /**
-   * Delete a V2 session.
-   *
-   * Cleans up the cloud-agent-next DO/sandbox if applicable, then delegates
-   * all DB deletion and ingest DO/cache cleanup to the session-ingest worker.
-   */
   delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
     const session = await getSessionWithAccessCheck(session_id, ctx);
+    let cleanup: 'complete' | 'pending' = 'complete';
 
-    if (session.cloud_agent_session_id) {
-      const authToken = generateApiToken(ctx.user);
+    const hostedCloudSessionId =
+      session.cloud_agent_session_id !== null &&
+      SESSION_ID_RE.test(session.cloud_agent_session_id) &&
+      session.cloud_agent_worktree_id !== null &&
+      session.parent_session_id === null
+        ? session.cloud_agent_session_id
+        : null;
+    if (hostedCloudSessionId !== null) {
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: session.organization_id ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
       const client = createCloudAgentNextClient(authToken);
       try {
-        await client.deleteSession(session.cloud_agent_session_id);
+        const result = await client.deleteHostedWorkspaceSession({
+          workspaceId: cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id),
+          sessionId: hostedCloudSessionId,
+          operationKey: input.operationKey ?? randomUUID(),
+        });
+        return { success: true, session_id, cleanup: result.cleanup ?? 'complete' };
       } catch (err) {
+        const code = sessionTrpcErrorCode(err);
+        if (
+          code === 'CONFLICT' ||
+          code === 'FORBIDDEN' ||
+          code === 'UNAUTHORIZED' ||
+          code === 'PRECONDITION_FAILED' ||
+          code === 'BAD_REQUEST'
+        ) {
+          throw new TRPCError({
+            code,
+            message:
+              err instanceof Error && err.message === WORKSPACE_REQUIRES_ROOT_SESSION
+                ? WORKSPACE_REQUIRES_ROOT_SESSION
+                : err instanceof Error
+                  ? err.message
+                  : 'session_deletion_conflict',
+            cause: err,
+          });
+        }
         if (!isSessionNotFoundError(err)) {
           captureException(err, {
-            tags: { source: 'cli-sessions-v2-router', endpoint: 'delete' },
+            tags: { source: 'cli-sessions-v2-router', endpoint: 'delete-hosted-workspace-session' },
             extra: {
               session_id,
               cloud_agent_session_id: session.cloud_agent_session_id,
+              cloud_agent_worktree_id: session.cloud_agent_worktree_id,
             },
           });
           throw new TRPCError({
@@ -1591,15 +2935,75 @@ export const cliSessionsV2Router = createTRPCRouter({
             cause: err,
           });
         }
+      }
+    } else if (
+      session.cloud_agent_session_id &&
+      SESSION_ID_RE.test(session.cloud_agent_session_id)
+    ) {
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: session.organization_id ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
+      const client = createCloudAgentNextClient(authToken);
+      try {
+        const result = await client.deleteSession(session.cloud_agent_session_id);
+        if (!result.success) {
+          throw new Error('Cloud-agent session deletion was not confirmed');
+        }
+      } catch (err) {
+        if (isSessionConflictError(err)) {
+          const message =
+            err instanceof Error && err.message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+              ? WORKSPACE_REQUIRES_ROOT_SESSION
+              : 'session_deletion_conflict';
+          throw new TRPCError({ code: 'CONFLICT', message, cause: err });
+        }
+        const code = sessionTrpcErrorCode(err);
+        if (
+          code === 'FORBIDDEN' ||
+          code === 'UNAUTHORIZED' ||
+          code === 'PRECONDITION_FAILED' ||
+          code === 'BAD_REQUEST'
+        ) {
+          throw new TRPCError({
+            code,
+            message: err instanceof Error ? err.message : 'Session access denied',
+            cause: err,
+          });
+        }
+        if (!isSessionNotFoundError(err)) {
+          captureException(err, {
+            tags: { source: 'cli-sessions-v2-router', endpoint: 'delete' },
+            extra: {
+              session_id,
+              cloud_agent_session_id: session.cloud_agent_session_id,
+            },
+          });
+          cleanup = 'pending';
+        }
         // Session not found in cloud-agent DO — already gone, continue with DB cleanup.
       }
     }
 
     // Delegate DB deletion (including child sessions) and ingest DO/cache cleanup
-    // to the session-ingest worker.
-    await deleteSessionIngest(session_id, ctx.user.id);
+    // to the session-ingest worker. The call is mapped like every other
+    // session-ingest call: a budget expiry is a retryable upstream answer, not
+    // an internal defect.
+    try {
+      await deleteSessionIngest(session_id, ctx.user.id);
+    } catch (err) {
+      // `deleteSession` raises its own `TRPCError` for the worker's workspace
+      // conflicts (409). The client reads that code and message to cascade into
+      // deleting the workspace, so forward it unchanged; only a transport
+      // failure is mapped.
+      if (err instanceof TRPCError) throw err;
+      throw sessionIngestTrpcError('Failed to delete session', err);
+    }
 
-    return { success: true, session_id };
+    return { success: true, session_id, cleanup };
   }),
 
   /**
@@ -1653,17 +3057,24 @@ export const cliSessionsV2Router = createTRPCRouter({
   /**
    * Share a V2 session by issuing an opaque JWT share token.
    *
-   * Delegates to the session-ingest worker which is idempotent — if the session
-   * already has an active share generation, the existing one is reused.
+   * Delegates to the session-ingest worker, which rotates the public
+   * capability. Each call issues a fresh share generation and invalidates the
+   * previous link.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
-    const { session_id } = input;
+    const { session_id, ...shareOptions } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
     try {
-      const result = await shareSessionIngest(session_id, ctx.user.id);
-      return { share_token: result.share_token };
+      const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
+      /* Both the token and the capability: the app compares the capability it
+         created with the one a later read reports, so a client can tell its own
+         link from one made elsewhere. */
+      return { share_token: result.share_token, public_id: result.public_id };
     } catch (error) {
+      if (error instanceof SessionShareTooLargeError) {
+        throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });
+      }
       captureException(error, {
         tags: { source: 'cli-sessions-v2-router', endpoint: 'share' },
         extra: { session_id },
@@ -1682,7 +3093,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * Owner-only, matching the session-ingest worker. A missing or inaccessible
    * session is NOT_FOUND. Worker 404 is mapped the same way.
    */
-  unshare: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
+  unshare: baseProcedure.input(UnshareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
@@ -1706,49 +3117,24 @@ export const cliSessionsV2Router = createTRPCRouter({
   }),
 
   /**
-   * Share a v2 CLI session from a webhook trigger request.
-   * Creates a read-only public snapshot via the session-ingest worker.
+   * Read a publicly shared session by its share token.
    *
-   * For org triggers, any org member can share; for personal triggers, only the owner.
+   * The token is the capability: every caller holding it may read the
+   * transcript, which is exactly the rule the public `/s/<token>` web page
+   * applies. The read is therefore not owner-scoped — an owned session id is
+   * never accepted here, only the opaque token issued by `share`.
+   *
+   * An expired, revoked, rotated-out, or unknown token is NOT_FOUND. Clients
+   * treat that code as terminal: it is the dead-link state, not a failure to
+   * retry. A token whose snapshot read fails keeps its metadata and reports
+   * `transcriptUnavailable`, so a transient upstream fault never reads as a
+   * revoked link.
    */
-  shareForWebhookTrigger: baseProcedure
-    .input(
-      z.object({
-        kilo_session_id: z.string().startsWith('ses_'),
-        trigger_id: z.string().min(1),
-        organization_id: z.string().uuid().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      await verifyWebhookTriggerAccess(ctx, input.trigger_id, input.organization_id);
-
-      // For org triggers, verify the session belongs to the same org.
-      // For personal triggers, verify the session belongs to the requesting user.
-      const ownerCondition = input.organization_id
-        ? eq(cli_sessions_v2.organization_id, input.organization_id)
-        : eq(cli_sessions_v2.kilo_user_id, ctx.user.id);
-
-      const [session] = await db
-        .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
-        .from(cli_sessions_v2)
-        .where(and(eq(cli_sessions_v2.session_id, input.kilo_session_id), ownerCondition))
-        .limit(1);
-
-      if (!session) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Session not found',
-        });
-      }
-
-      try {
-        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
-        return { share_token: result.share_token, session_id: input.kilo_session_id };
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Session not found') {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
-        }
-        throw error;
-      }
-    }),
+  getSharedSession: baseProcedure.input(GetSharedSessionInputSchema).query(async ({ input }) => {
+    const shared = await fetchSharedSession(input.share_token);
+    if (!shared) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Shared session not found' });
+    }
+    return shared;
+  }),
 });

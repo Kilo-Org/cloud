@@ -11,7 +11,6 @@ dev/seed/
     preflight.ts           Import FIRST; mutates process.env from argv.
     db.ts                  Lazy drizzle client.
     stripe.ts              Lazy Stripe test-mode client/customer helpers.
-    kiloclaw-referrals.ts  KiloClaw referral fixtures/helpers.
   <scope>/<topic>.ts       Topic module. Scope = folder; topic = filename.
 ```
 
@@ -41,7 +40,7 @@ Topic files MUST:
   - `type SeedResult = Record<string, string | number | boolean | null>`: flat JSON primitives only; no nested objects; stringify Dates.
   - Return every id/email/handle/balance needed by follow-up commands; the runner formats all output from this object.
 - Support `--help`/`-h` via local `printUsage()` and early return.
-- Reset only their own data at start for idempotent reruns. Referral seeds use `cleanupKiloClawReferralSeedScenario`; ad-hoc topics delete by stable ids/emails, stable sandbox prefixes, or `dev-seed:` category prefixes.
+- Reset only their own data at start for idempotent reruns. Ad-hoc topics delete by stable ids/emails, stable sandbox prefixes, or `dev-seed:` category prefixes.
 - Avoid module-level side effects (DB writes/network); no-args listing imports modules.
 
 Topic files SHOULD:
@@ -60,12 +59,13 @@ Topic files MUST NOT:
 ## Helpers
 
 - `getSeedDb()`: lazy singleton drizzle client, safe from any topic; pool cap 1.
+- `assertLocalSeedDatabase(fixture)`: refuses the topic unless the database `getSeedDb()` connects to is loopback, and returns its hostname. A fixture that creates users, organizations, memberships or agent configuration calls it before its first statement that reads or writes.
+- `createByokEnvelope(context, plaintext)` (`lib/byok.ts`): wraps a key through the local `byok-kms` service (`pnpm dev:start` or `pnpm dev:byok-kms` must be running). It reads `BYOK_KMS_SERVICE_URL`/`_TOKEN`, falling back to `localByokKmsServiceConfig()` from `dev/local/infra-env.ts` when blank; never send the dev token to a non-loopback URL.
 - `closeSeedDb()`: runner calls in `finally`; topics should not.
 - `createSeedStripeCustomer({ email, name, kiloUserId })`: creates real Stripe test-mode customer with `metadata: { kiloUserId, source: 'dev-seed' }`.
 - `deleteSeedStripeCustomer(id)`: rollback helper; swallows "no such customer".
 - `lib/stripe.ts` rejects missing/non-`sk_test_...` `STRIPE_SECRET_KEY`.
 - For seeded users used by Stripe-touching app code (`/profile`, billing pages, KiloClaw subscriptions), create a real Stripe customer. Never use `cus_seed_...`: it causes `StripeInvalidRequestError: No such customer` 400s. Order matches `createUserOnSignIn`: create Stripe customer, insert DB row, delete Stripe customer in `catch` on insert failure.
-- `lib/kiloclaw-referrals.ts`: deterministic id/email/payment-id factories (`seedUserId`, `seedEmail`, `seedOpaqueReferralIdentifier`, ...), `cleanupKiloClawReferralSeedScenario`, and `insertSeedUsers`. Use for new referral scenarios so cleanup stays consistent.
 
 ## Direct user inserts
 
@@ -80,7 +80,7 @@ Canonical example: `app/create-user.ts`. Gate code: `apps/web/src/lib/stytch.ts`
 
 1. Add `<scope>/<topic>.ts` (new top-level dirs become scopes).
 2. Export `run()` and usually `usage`.
-3. Use `getSeedDb()`; use `createSeedStripeCustomer` for app users needing Stripe.
+3. Use `getSeedDb()`; use `createSeedStripeCustomer` for app users needing Stripe. Call `assertLocalSeedDatabase('<scope>:<topic>')` before the topic's first read or write.
 4. Reset only own fixtures idempotently.
 5. Return flat `SeedResult` with every follow-up id.
 6. Verify both modes:

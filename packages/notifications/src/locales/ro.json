@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sesiunea ta de agent are o actualizare",
+      "lowBalance": "Soldul tău necesită atenție",
+      "spendAlert": "Cheltuiala ta necesită atenție",
+      "securityFinding": "O constatare de securitate necesită atenție",
+      "securityUpdate": "O verificare de securitate are o actualizare",
+      "activeAgentsGlanceable": "Agenții activi au o actualizare"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alertă de sold scăzut",
+      "body": "Soldul {{organizationName}} a scăzut sub ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Alertă de cheltuială",
+      "body": "Cheltuiala pentru {{scopeName}} a depășit ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} în {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Constatare de securitate nouă ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Avertisment SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Încălcare SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Sesiunea ta Kilo este gata să fie controlată de pe telefon"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

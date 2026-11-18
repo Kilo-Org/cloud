@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner-native';
 
-import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
 
 const SESSIONS_ROUTE = '/(app)/(tabs)/(2_agents)';
 
@@ -18,7 +21,9 @@ function createHarness() {
   const onAccepted = vi.fn(() => {
     order.push('accepted');
   });
-  const router = { replace: vi.fn(() => order.push('replace')) };
+  const router = {
+    dismissTo: vi.fn(() => order.push('dismissTo')),
+  };
   const lock = createLock();
   return { order, onAccepted, router, lock };
 }
@@ -28,7 +33,7 @@ describe('exitRemoteSessionWithFeedback — happy path', () => {
     vi.clearAllMocks();
   });
 
-  it('shows "Session exited", calls onAccepted, and replaces with the sessions route', async () => {
+  it('shows "Session exited", calls onAccepted, and navigates to the sessions route', async () => {
     const { order, onAccepted, router, lock } = createHarness();
     const exit = vi.fn(async () => {
       order.push('exit');
@@ -41,9 +46,9 @@ describe('exitRemoteSessionWithFeedback — happy path', () => {
     expect(toast.success).toHaveBeenCalledWith('Session exited');
     expect(toast.error).not.toHaveBeenCalled();
     expect(onAccepted).toHaveBeenCalledTimes(1);
-    expect(router.replace).toHaveBeenCalledTimes(1);
-    expect(router.replace).toHaveBeenCalledWith(SESSIONS_ROUTE);
-    expect(order).toEqual(['exit', 'accepted', 'replace']);
+    expect(router.dismissTo).toHaveBeenCalledTimes(1);
+    expect(router.dismissTo).toHaveBeenCalledWith(SESSIONS_ROUTE);
+    expect(order).toEqual(['exit', 'accepted', 'dismissTo']);
     expect(lock.current).toBe(false);
   });
 });
@@ -71,7 +76,7 @@ describe('exitRemoteSessionWithFeedback — retryable error', () => {
     });
     expect(toast.success).not.toHaveBeenCalled();
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
     expect(lock.current).toBe(false);
   });
 
@@ -97,7 +102,7 @@ describe('exitRemoteSessionWithFeedback — retryable error', () => {
     });
     expect(lock.current).toBe(false);
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it('does not start a second exit mutation while a retry is pending', async () => {
@@ -137,7 +142,7 @@ describe('exitRemoteSessionWithFeedback — retryable error', () => {
     expect(lock.current).toBe(true);
     expect(exit).toHaveBeenCalledTimes(2);
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
 
     exitPromiseRef.resolve?.();
     await vi.waitFor(() => {
@@ -171,6 +176,110 @@ describe('exitRemoteSessionWithFeedback — retryable error', () => {
   });
 });
 
+describe('exitRemoteSessionWithFeedback — host-owned retryable failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hands the failure to onRetryableFailure instead of a toast and retries to success', async () => {
+    const { onAccepted, router, lock } = createHarness();
+    const exit = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('connection reset'))
+      .mockResolvedValue(undefined);
+    const onRetryableFailure = vi.fn<(failure: RetryableExitFailure) => void>();
+
+    await expect(
+      exitRemoteSessionWithFeedback({ exit, onAccepted, router, lock, onRetryableFailure })
+    ).rejects.toThrow('connection reset');
+
+    // The durable surface owns the feedback: no transient toast, no CTA toast.
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(onRetryableFailure).toHaveBeenCalledTimes(1);
+    const failure = onRetryableFailure.mock.calls[0]?.[0];
+    if (!failure) {
+      throw new Error('Expected the retryable failure');
+    }
+    expect(failure.message).toBe('connection reset');
+
+    await failure.retry();
+
+    expect(exit).toHaveBeenCalledTimes(2);
+    expect(toast.success).toHaveBeenCalledWith('Session exited');
+    expect(onAccepted).toHaveBeenCalledTimes(1);
+    expect(router.dismissTo).toHaveBeenCalledWith(SESSIONS_ROUTE);
+    expect(lock.current).toBe(false);
+  });
+
+  it('reports a repeated retry failure back through onRetryableFailure', async () => {
+    const { onAccepted, router, lock } = createHarness();
+    const exit = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('still down'));
+    const onRetryableFailure = vi.fn<(failure: RetryableExitFailure) => void>();
+
+    await expect(
+      exitRemoteSessionWithFeedback({ exit, onAccepted, router, lock, onRetryableFailure })
+    ).rejects.toThrow('still down');
+
+    const first = onRetryableFailure.mock.calls[0]?.[0];
+    if (!first) {
+      throw new Error('Expected the retryable failure');
+    }
+    // The retry swallows the rethrow so callers never see an unhandled
+    // rejection; a repeated failure arrives through the callback again.
+    await first.retry();
+
+    expect(exit).toHaveBeenCalledTimes(2);
+    expect(onRetryableFailure).toHaveBeenCalledTimes(2);
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(lock.current).toBe(false);
+  });
+
+  it('clears the host surface when a retry turns non-retryable', async () => {
+    const { onAccepted, router, lock } = createHarness();
+    const exit = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('connection reset'))
+      .mockRejectedValueOnce(
+        new Error('Remote session exit is not supported for the current session')
+      );
+    const onRetryableFailure = vi.fn<(failure: RetryableExitFailure) => void>();
+    const onNonRetryableFailure = vi.fn<() => void>();
+
+    await expect(
+      exitRemoteSessionWithFeedback({
+        exit,
+        onAccepted,
+        router,
+        lock,
+        onRetryableFailure,
+        onNonRetryableFailure,
+      })
+    ).rejects.toThrow('connection reset');
+
+    expect(onRetryableFailure).toHaveBeenCalledTimes(1);
+    expect(onNonRetryableFailure).not.toHaveBeenCalled();
+
+    const failure = onRetryableFailure.mock.calls[0]?.[0];
+    if (!failure) {
+      throw new Error('Expected the retryable failure');
+    }
+    await failure.retry();
+
+    expect(exit).toHaveBeenCalledTimes(2);
+    // A permanent failure must release the durable surface instead of leaving
+    // a stale message and a retry button that can never succeed.
+    expect(onNonRetryableFailure).toHaveBeenCalledTimes(1);
+    expect(onRetryableFailure).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Remote session exit is not supported for the current session'
+    );
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(lock.current).toBe(false);
+  });
+});
+
 describe('exitRemoteSessionWithFeedback — non-retryable error', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -197,7 +306,7 @@ describe('exitRemoteSessionWithFeedback — non-retryable error', () => {
     expect(options?.action).toBeUndefined();
     expect(toast.success).not.toHaveBeenCalled();
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
     expect(lock.current).toBe(false);
   });
 });

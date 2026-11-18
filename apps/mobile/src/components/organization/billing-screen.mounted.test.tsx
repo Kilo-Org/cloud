@@ -1,0 +1,393 @@
+// Billing screen failure contract: a rejected read renders that block's error
+// card with a Retry, and the Retry refetches only the query that failed — not
+// its siblings. The query layer is mocked so each block's state is driven
+// directly through the screen JSX.
+
+import { createElement } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+import '@/i18n';
+import { OrganizationBillingScreen } from './billing-screen';
+
+const queries = vi.hoisted(() => ({
+  subscription: {
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    data: undefined as unknown,
+    refetch: vi.fn(),
+  },
+  seats: {
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    data: undefined as unknown,
+    refetch: vi.fn(),
+  },
+  autoTopUp: {
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    data: undefined as unknown,
+    refetch: vi.fn(),
+  },
+  kiloPass: {
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    data: undefined as unknown,
+    refetch: vi.fn(),
+  },
+}));
+
+/** The boundary's own seat numbers, which the seats read corrects once it lands. */
+const boundary = vi.hoisted(() => ({
+  requireSeats: true,
+  seatCount: { used: 3, total: 3 },
+  isTrialExpiredForEnforcement: false,
+}));
+
+/** Whether the storefront rule lets this surface link to the web page. */
+const platform = vi.hoisted(() => ({ linkAllowed: true }));
+
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  isMoneyRole: () => true,
+  useOrgBoundary: () => ({
+    organizationId: 'org-1',
+    role: 'owner',
+    org: {
+      id: 'org-1',
+      name: 'Acme',
+      plan: 'enterprise',
+      seatCount: boundary.seatCount,
+      requireSeats: boundary.requireSeats,
+      isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+      parentOrganizationId: null,
+    },
+    isResolving: false,
+  }),
+  useOrgParentLink: () => ({ parentLink: null }),
+  useOrgKiloPassSummary: () => queries.kiloPass,
+}));
+
+vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
+  useOrgSeatSubscription: () => queries.subscription,
+  useOrgSeats: () => queries.seats,
+  useOrgAutoTopUpConfig: () => queries.autoTopUp,
+}));
+
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'http://localhost:3000' }));
+
+vi.mock('@/lib/credits/add-credits-destination', () => ({
+  organizationBillingUrl: (organizationId: string) => `http://localhost:3000/${organizationId}`,
+}));
+
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => platform.linkAllowed,
+}));
+
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+
+vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'state-action' }));
+
+vi.mock('@/components/organization/external-billing-link', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    // The settings block owns the storefront gate, so this control is always
+    // the control it was asked for.
+    ExternalBillingLink: (props: { label?: string }) => h('ExternalBillingLink', props),
+  };
+});
+
+vi.mock('@/components/organization/organization-boundary', async () => {
+  const { createElement: h } = await import('react');
+  return { OrganizationBoundary: (props: { title?: string }) => h('OrganizationBoundary', props) };
+});
+
+vi.mock('@/components/organization/permission-denied', async () => {
+  const { createElement: h } = await import('react');
+  return { PermissionDenied: (props: { description?: string }) => h('PermissionDenied', props) };
+});
+
+vi.mock('@/components/organization/plan-refusal', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    OrganizationPlanRefusal: (props: { message?: string }) => h('OrganizationPlanRefusal', props),
+  };
+});
+
+vi.mock('@/components/organization/org-kilo-pass-row-state', () => ({
+  getOrgKiloPassRowState: () => null,
+}));
+
+vi.mock('@/components/screen-header', async () => {
+  const { createElement: h } = await import('react');
+  return { ScreenHeader: (props: { title?: string }) => h('ScreenHeader', props) };
+});
+
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+
+vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
+
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
+vi.mock('@/components/ui/button', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    Button: (props: Record<string, unknown> & { children?: unknown }) =>
+      h('Button', props, props.children as never),
+  };
+});
+
+vi.mock('@/components/ui/text', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    Text: (props: Record<string, unknown> & { children?: unknown }) =>
+      h('Text', props, props.children as never),
+  };
+});
+
+vi.mock('react-native', () => ({ View: 'View' }));
+
+function mount() {
+  return renderWithProviders(createElement(OrganizationBillingScreen));
+}
+
+type Handler = () => void;
+
+/** The element's callback, narrowed out of the renderer's untyped props. */
+function handlerOf(node: ReactTestInstance, name: 'onPress'): Handler | undefined {
+  const handler: unknown = node.props[name];
+  return typeof handler === 'function' ? (handler as Handler) : undefined;
+}
+
+function texts(renderer: ReactTestRenderer): unknown[] {
+  return renderer.root.findAllByType('Text').flatMap(node => node.props.children);
+}
+
+function onlyButton(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.findByType('Button');
+}
+
+function subscriptionReadout() {
+  return {
+    subscription: {
+      status: 'active',
+      cancel_at_period_end: false,
+      items: { data: [{ id: 'si_1', current_period_end: 1_767_225_600 }] },
+    },
+    seatsUsed: 3,
+    totalSeats: 3,
+    nextSeatCount: null,
+    nextSeatCountEffectiveAt: null,
+    paidSeatItemId: 'si_1',
+  };
+}
+
+/** The seats row's rendered value, as the screen hands it to `KvRow`. */
+function seatsReadout(renderer: ReactTestRenderer): unknown {
+  const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'In use');
+  return row?.props.value;
+}
+
+/** The manage-on-web destinations, as the screen builds them from `org-1`. */
+const SUBSCRIPTIONS_URL = 'http://localhost:3000/organizations/org-1/subscriptions';
+/** The auto top-up link's page: the billing page the destination mock returns. */
+const AUTO_TOP_UP_URL = 'http://localhost:3000/org-1';
+
+/** A manage-on-web link, found by the page it opens. */
+function manageOnWebLink(renderer: ReactTestRenderer, url: string): ReactTestInstance | undefined {
+  return renderer.root
+    .findAllByType('ExternalBillingLink' as never)
+    .find(node => node.props.url === url);
+}
+
+/** The lapsed-plan banner's action, narrowed out of the renderer's untyped props. */
+function bannerAction(renderer: ReactTestRenderer): { label?: string } | undefined {
+  const banner = renderer.root.findByType('OrganizationPlanRefusal' as never);
+  const action: unknown = banner.props.action;
+  return action as { label?: string } | undefined;
+}
+
+beforeEach(() => {
+  for (const query of Object.values(queries)) {
+    query.isPending = false;
+    query.isError = false;
+    query.isFetching = false;
+    query.data = undefined;
+    query.refetch.mockClear();
+  }
+  boundary.requireSeats = true;
+  boundary.seatCount = { used: 3, total: 3 };
+  boundary.isTrialExpiredForEnforcement = false;
+  platform.linkAllowed = true;
+  queries.seats.data = { usedSeats: 3, totalSeats: 3 };
+  queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
+});
+
+describe('OrganizationBillingScreen failure states', () => {
+  it('offers Retry when the subscription read fails, and refetches only that read', async () => {
+    queries.subscription.isError = true;
+    const { renderer, unmount } = await mount();
+
+    const copy = texts(renderer);
+    expect(copy).toContain('Something went wrong');
+    expect(copy).toContain('Retry');
+
+    await act(() => {
+      handlerOf(onlyButton(renderer), 'onPress')?.();
+    });
+
+    expect(queries.subscription.refetch).toHaveBeenCalledTimes(1);
+    expect(queries.seats.refetch).not.toHaveBeenCalled();
+    expect(queries.autoTopUp.refetch).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('offers Retry when the auto top-up read fails, and refetches only that read', async () => {
+    queries.subscription.data = subscriptionReadout();
+    queries.autoTopUp.isError = true;
+    const { renderer, unmount } = await mount();
+
+    const copy = texts(renderer);
+    expect(copy).toContain('Retry');
+    // The subscription block painted its card, so the only error card is the
+    // auto top-up one, and its Retry asks that read again.
+    expect(renderer.root.findAllByType('KvRow').length).toBeGreaterThan(0);
+
+    await act(() => {
+      handlerOf(onlyButton(renderer), 'onPress')?.();
+    });
+
+    expect(queries.autoTopUp.refetch).toHaveBeenCalledTimes(1);
+    expect(queries.subscription.refetch).not.toHaveBeenCalled();
+    expect(queries.seats.refetch).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen seats row', () => {
+  it('holds an unenforced organization at seats used-only, before and after the read', async () => {
+    boundary.requireSeats = false;
+    // A legacy organization has never bought seats, and the seats read answers
+    // `seat_count || 0` — so `3 / 0` is exactly the row it must not paint.
+    boundary.seatCount = { used: 3, total: 0 };
+    queries.subscription.data = subscriptionReadout();
+
+    queries.seats.data = undefined;
+    const firstFrame = await mount();
+    expect(seatsReadout(firstFrame.renderer)).toBe('3');
+    firstFrame.unmount();
+
+    queries.seats.data = { usedSeats: 3, totalSeats: 0 };
+    const settled = await mount();
+    expect(seatsReadout(settled.renderer)).toBe('3');
+    settled.unmount();
+  });
+
+  it('appends the total once a seat-enforcing organization has a positive one', async () => {
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 3, total: 0 };
+    queries.subscription.data = subscriptionReadout();
+    queries.seats.data = { usedSeats: 3, totalSeats: 4 };
+
+    const { renderer, unmount } = await mount();
+    // Shared readout: the fraction runs inside a left-to-right isolate, so a
+    // right-to-left layout cannot mirror either number.
+    expect(seatsReadout(renderer)).toBe('\u20663 / 4\u2069');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen manage-on-web links', () => {
+  it('offers to manage auto top-up once the read answers enabled', async () => {
+    queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
+    const { renderer, unmount } = await mount();
+
+    const autoTopUpLink = manageOnWebLink(renderer, AUTO_TOP_UP_URL);
+    expect(autoTopUpLink?.props.label).toBe('Manage auto top-up');
+    expect(autoTopUpLink?.props.url).toBe('http://localhost:3000/org-1');
+    // The wording change belongs to this link alone: the block's other two
+    // destinations keep the copy they had.
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
+    expect(manageOnWebLink(renderer, `${SUBSCRIPTIONS_URL}/seats`)?.props.label).toBe('Buy seats');
+    unmount();
+  });
+
+  it('keeps the set-up wording when the read answers disabled', async () => {
+    queries.autoTopUp.data = { enabled: false, amountCents: 5000, thresholdCents: 1000 };
+    const { renderer, unmount } = await mount();
+
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+
+  it('keeps the set-up wording while the read is pending', async () => {
+    // A pending read has no state to manage, so the block cannot claim one.
+    queries.autoTopUp.isPending = true;
+    queries.autoTopUp.data = undefined;
+    const { renderer, unmount } = await mount();
+
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+
+  it('keeps the set-up wording when the read failed', async () => {
+    // A first read that rejected carries no data, and the error card above
+    // already asks for the retry.
+    queries.autoTopUp.isError = true;
+    queries.autoTopUp.data = undefined;
+    const { renderer, unmount } = await mount();
+
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen change plan placement', () => {
+  it('leads a lapsed plan from the banner and keeps its row neutral', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+    queries.subscription.data = subscriptionReadout();
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)?.label).toBe('Change plan');
+    // The banner above already holds this destination, so the card's own copy
+    // is gone; the block's other destinations stay.
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)).toBeUndefined();
+    expect(manageOnWebLink(renderer, `${SUBSCRIPTIONS_URL}/seats`)?.props.label).toBe('Buy seats');
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.url).toBe(AUTO_TOP_UP_URL);
+    // The banner carries the ended state, so the plan value keeps the row's
+    // own neutral tone instead of a second danger colour.
+    const plan = renderer.root
+      .findAllByType('KvRow' as never)
+      .find(node => node.props.label === 'Organization plan');
+    expect(plan).toBeDefined();
+    expect(plan?.props.valueTone).toBeUndefined();
+    unmount();
+  });
+
+  it('states where the settings live when the storefront rule refuses the link', async () => {
+    // Outside the US storefront nothing links, so the banner has no action and
+    // the card states where the settings live: one line, no heading naming the
+    // web, and no purchase call to action.
+    boundary.isTrialExpiredForEnforcement = true;
+    platform.linkAllowed = false;
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)).toBeUndefined();
+    expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toHaveLength(0);
+    expect(texts(renderer)).toContain('The plan, seats and auto top-up are managed on the web.');
+    unmount();
+  });
+
+  it('renders no banner and keeps the card copy while the plan is active', async () => {
+    const { renderer, unmount } = await mount();
+
+    expect(renderer.root.findAllByType('OrganizationPlanRefusal' as never).length).toBe(0);
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
+    unmount();
+  });
+});

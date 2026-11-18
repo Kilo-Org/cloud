@@ -1,16 +1,25 @@
 import * as z from 'zod';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import {
+  organizationWorkflowGitHubConnectionSql,
+  organizationWorkflowGitHubPreferenceSql,
+} from '@kilocode/db';
+import {
   platform_integrations,
   organization_memberships,
   kilocode_users,
+  organizations,
+  github_app_installations,
 } from '@kilocode/db/schema';
-import { eq, and, exists, isNull, isNotNull, or, sql } from 'drizzle-orm';
+import { eq, and, desc, exists, isNull, isNotNull, notExists, or, sql } from 'drizzle-orm';
+import { availableAccountCondition } from './account-availability';
 
 export type FindInstallationParams = {
   githubRepo: string;
   userId: string;
   orgId?: string;
+  expectedIntegrationId?: string;
+  accessPurpose?: 'workflow' | 'agent';
 };
 
 const InstallationLookupResultSchema = z.object({
@@ -36,6 +45,12 @@ const ManagedInstallationLookupResultSchema = InstallationLookupResultSchema.ext
   permissions: z.record(z.string(), z.unknown()).nullable(),
 });
 
+const ExactManagedInstallationLookupResultSchema = ManagedInstallationLookupResultSchema.extend({
+  id: z.string().uuid(),
+  integration_status: z.string(),
+  owned_by_user_id: z.string().nullable(),
+});
+
 const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
 
 export type InstallationLookupSuccess = {
@@ -52,7 +67,8 @@ export type InstallationLookupFailure = {
     | 'invalid_repo_format'
     | 'no_installation_found'
     | 'ambiguous_installation'
-    | 'invalid_org_id';
+    | 'invalid_org_id'
+    | 'integration_mismatch';
 };
 
 export type InstallationLookupResult = InstallationLookupSuccess | InstallationLookupFailure;
@@ -78,15 +94,23 @@ export type ManagedInstallationLookupResult =
   | InstallationLookupFailure
   | { success: false; reason: 'repository_not_installed' };
 
+export class GitHubInstallationAccessDeniedError extends Error {
+  constructor() {
+    super('GitHub installation is not available through one active association');
+    this.name = 'GitHubInstallationAccessDeniedError';
+  }
+}
+
 function buildAuthorizedInstallationsQuery(
   db: WorkerDb,
   params: FindInstallationParams,
-  repoOwner?: string
+  repoOwner: string | undefined,
+  authorizationMode: 'generic' | 'managed'
 ) {
   const accountLoginFilter =
     repoOwner === undefined
       ? undefined
-      : sql`lower(${platform_integrations.platform_account_login}) = lower(${repoOwner})`;
+      : sql`lower(COALESCE(${github_app_installations.account_login}, ${platform_integrations.platform_account_login})) = lower(${repoOwner})`;
   const requestedOrganizationMembership =
     params.orgId === undefined
       ? undefined
@@ -101,19 +125,59 @@ function buildAuthorizedInstallationsQuery(
               )
             )
         );
+  const exactIntegrationOwner =
+    params.expectedIntegrationId === undefined
+      ? undefined
+      : params.orgId === undefined
+        ? and(
+            eq(platform_integrations.owned_by_user_id, params.userId),
+            isNull(platform_integrations.owned_by_organization_id)
+          )
+        : and(
+            isNotNull(platform_integrations.owned_by_organization_id),
+            eq(platform_integrations.owned_by_organization_id, sql`${params.orgId}::uuid`),
+            isNull(platform_integrations.owned_by_user_id),
+            isNotNull(organization_memberships.id)
+          );
+  const legacyAuthorizedOwner =
+    params.expectedIntegrationId === undefined
+      ? or(
+          and(
+            isNotNull(platform_integrations.owned_by_organization_id),
+            eq(platform_integrations.owned_by_organization_id, sql`${params.orgId ?? null}::uuid`),
+            isNotNull(organization_memberships.id)
+          ),
+          and(
+            isNotNull(platform_integrations.owned_by_user_id),
+            eq(platform_integrations.owned_by_user_id, params.userId)
+          )
+        )
+      : undefined;
 
   return db
     .select({
       id: platform_integrations.id,
-      platform_installation_id: platform_integrations.platform_installation_id,
-      platform_account_login: platform_integrations.platform_account_login,
-      github_app_type: platform_integrations.github_app_type,
+      platform_installation_id: sql<string>`COALESCE(${github_app_installations.installation_id}, ${platform_integrations.platform_installation_id})`,
+      platform_account_login: sql<
+        string | null
+      >`COALESCE(${github_app_installations.account_login}, ${platform_integrations.platform_account_login})`,
+      github_app_type: sql<
+        'standard' | 'lite' | null
+      >`COALESCE(${github_app_installations.github_app_type}, ${platform_integrations.github_app_type})`,
+      integration_status: platform_integrations.integration_status,
       owned_by_organization_id: platform_integrations.owned_by_organization_id,
-      repository_access: platform_integrations.repository_access,
-      repositories: platform_integrations.repositories,
-      permissions: platform_integrations.permissions,
+      owned_by_user_id: platform_integrations.owned_by_user_id,
+      repository_access: sql<
+        string | null
+      >`COALESCE(${github_app_installations.repository_access}, ${platform_integrations.repository_access})`,
+      repositories: sql`COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories})`,
+      permissions: sql`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})`,
     })
     .from(platform_integrations)
+    .leftJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
+    )
     .leftJoin(
       organization_memberships,
       and(
@@ -126,55 +190,117 @@ function buildAuthorizedInstallationsQuery(
     )
     .innerJoin(
       kilocode_users,
-      and(eq(kilocode_users.id, params.userId), isNull(kilocode_users.blocked_reason))
+      and(eq(kilocode_users.id, params.userId), availableAccountCondition())
     )
+    .leftJoin(organizations, eq(platform_integrations.owned_by_organization_id, organizations.id))
     .where(
       and(
         eq(platform_integrations.platform, 'github'),
+        or(
+          eq(platform_integrations.github_connection_role, 'workflow'),
+          and(
+            isNotNull(platform_integrations.owned_by_organization_id),
+            organizationWorkflowGitHubConnectionSql()
+          ),
+          authorizationMode === 'managed' &&
+            params.accessPurpose === 'agent' &&
+            params.expectedIntegrationId !== undefined
+            ? eq(platform_integrations.github_connection_role, 'agent_only')
+            : undefined
+        ),
         eq(platform_integrations.integration_type, 'app'),
         eq(platform_integrations.integration_status, 'active'),
+        isNull(platform_integrations.suspended_at),
+        isNull(platform_integrations.auth_invalid_at),
+        isNull(platform_integrations.github_disconnected_at),
+        or(
+          and(
+            isNull(platform_integrations.github_installation_id),
+            notExists(
+              db
+                .select({ id: github_app_installations.id })
+                .from(github_app_installations)
+                .where(
+                  and(
+                    eq(
+                      github_app_installations.github_app_type,
+                      sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+                    ),
+                    eq(
+                      github_app_installations.installation_id,
+                      platform_integrations.platform_installation_id
+                    )
+                  )
+                )
+            )
+          ),
+          and(
+            eq(github_app_installations.lifecycle_state, 'active'),
+            eq(
+              github_app_installations.installation_id,
+              platform_integrations.platform_installation_id
+            ),
+            eq(
+              github_app_installations.github_app_type,
+              sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+            ),
+            isNull(github_app_installations.suspended_at),
+            isNull(github_app_installations.deleted_at),
+            isNull(github_app_installations.auth_invalid_at)
+          )
+        ),
+        or(
+          isNotNull(platform_integrations.owned_by_user_id),
+          and(
+            isNotNull(platform_integrations.owned_by_organization_id),
+            isNull(organizations.deleted_at)
+          )
+        ),
         accountLoginFilter,
         isNotNull(platform_integrations.platform_installation_id),
         requestedOrganizationMembership,
-        or(
-          and(
-            isNotNull(platform_integrations.owned_by_organization_id),
-            eq(platform_integrations.owned_by_organization_id, sql`${params.orgId ?? null}::uuid`),
-            isNotNull(organization_memberships.id)
-          ),
-          and(
-            isNotNull(platform_integrations.owned_by_user_id),
-            eq(platform_integrations.owned_by_user_id, params.userId)
-          )
-        )
+        params.expectedIntegrationId === undefined
+          ? undefined
+          : eq(platform_integrations.id, params.expectedIntegrationId),
+        exactIntegrationOwner,
+        legacyAuthorizedOwner
       )
     )
     .orderBy(
-      sql`CASE WHEN ${platform_integrations.owned_by_organization_id} IS NOT NULL THEN 0 ELSE 1 END`
+      sql`CASE WHEN ${platform_integrations.owned_by_organization_id} IS NOT NULL THEN 0 ELSE 1 END`,
+      desc(organizationWorkflowGitHubPreferenceSql())
     );
 }
 
 export function buildInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(2);
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner, 'generic').limit(
+    params.expectedIntegrationId === undefined ? 2 : 1
+  );
 }
 
 export function buildInstallationRefreshCandidatesQuery(
   db: WorkerDb,
-  params: FindInstallationParams
+  params: FindInstallationParams,
+  authorizationMode: 'generic' | 'managed' = 'generic'
 ) {
-  return buildAuthorizedInstallationsQuery(db, params).limit(
+  return buildAuthorizedInstallationsQuery(db, params, undefined, authorizationMode).limit(
     MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES
   );
 }
 
 export function buildManagedInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(2);
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner, 'managed').limit(
+    params.expectedIntegrationId === undefined ? 2 : 1
+  );
 }
 
 export class InstallationLookupService {
-  constructor(private env: CloudflareEnv) {}
+  constructor(
+    private env: { HYPERDRIVE?: { connectionString: string } },
+    private database?: WorkerDb
+  ) {}
 
   isConfigured(): boolean {
     return Boolean(this.env.HYPERDRIVE);
@@ -184,7 +310,10 @@ export class InstallationLookupService {
     if (!this.env.HYPERDRIVE) {
       throw new Error('Hyperdrive not configured');
     }
-    return getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
+    return (
+      this.database ??
+      getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 })
+    );
   }
 
   private validateParams(params: FindInstallationParams): InstallationLookupFailure | null {
@@ -194,6 +323,13 @@ export class InstallationLookupService {
 
     if (params.orgId !== undefined && !z.string().uuid().safeParse(params.orgId).success) {
       return { success: false, reason: 'invalid_org_id' };
+    }
+
+    if (
+      params.expectedIntegrationId !== undefined &&
+      !z.string().uuid().safeParse(params.expectedIntegrationId).success
+    ) {
+      return { success: false, reason: 'integration_mismatch' };
     }
 
     const repoParts = params.githubRepo.split('/');
@@ -211,6 +347,20 @@ export class InstallationLookupService {
     }
 
     const rows = await buildInstallationLookupQuery(this.getDb(), params);
+
+    if (params.expectedIntegrationId !== undefined) {
+      const selected = ExactManagedInstallationLookupResultSchema.safeParse(rows[0]);
+      if (!selected.success || !this.matchesExpectedIntegration(selected.data, params)) {
+        return { success: false, reason: 'integration_mismatch' };
+      }
+
+      return {
+        success: true,
+        installationId: selected.data.platform_installation_id,
+        accountLogin: selected.data.platform_account_login ?? '',
+        githubAppType: selected.data.github_app_type ?? 'standard',
+      };
+    }
 
     if (rows.length === 0) {
       return { success: false, reason: 'no_installation_found' };
@@ -239,14 +389,19 @@ export class InstallationLookupService {
   }
 
   async findRefreshCandidates(
-    params: FindInstallationParams
+    params: FindInstallationParams,
+    authorizationMode: 'generic' | 'managed' = 'generic'
   ): Promise<InstallationRefreshCandidatesResult> {
     const validationFailure = this.validateParams(params);
     if (validationFailure) {
       return validationFailure;
     }
 
-    const rows = await buildInstallationRefreshCandidatesQuery(this.getDb(), params);
+    const rows = await buildInstallationRefreshCandidatesQuery(
+      this.getDb(),
+      params,
+      authorizationMode
+    );
     return {
       success: true,
       candidates: rows.map(row => {
@@ -262,16 +417,262 @@ export class InstallationLookupService {
   }
 
   async updateAccountLogin(integrationId: string, accountLogin: string): Promise<boolean> {
-    const updatedRows = await this.getDb()
-      .update(platform_integrations)
-      .set({
-        platform_account_login: accountLogin,
-        updated_at: new Date().toISOString(),
-      })
-      .where(eq(platform_integrations.id, integrationId))
-      .returning({ id: platform_integrations.id });
+    return this.getDb().transaction(async tx => {
+      const [integration] = await tx
+        .select({ canonicalId: platform_integrations.github_installation_id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integrationId))
+        .for('update');
+      if (!integration) return false;
+      const now = new Date().toISOString();
+      if (integration.canonicalId) {
+        await tx
+          .update(github_app_installations)
+          .set({ account_login: accountLogin, observed_at: now, updated_at: now })
+          .where(eq(github_app_installations.id, integration.canonicalId));
+      }
+      const updatedRows = await tx
+        .update(platform_integrations)
+        .set({ platform_account_login: accountLogin, updated_at: now })
+        .where(
+          and(
+            eq(platform_integrations.id, integrationId),
+            eq(platform_integrations.integration_status, 'active'),
+            isNull(platform_integrations.github_disconnected_at),
+            isNull(platform_integrations.suspended_at),
+            isNull(platform_integrations.auth_invalid_at)
+          )
+        )
+        .returning({ id: platform_integrations.id });
+      return updatedRows.length > 0;
+    });
+  }
 
-    return updatedRows.length > 0;
+  async assertActiveAssociationForInstallation(
+    installationId: string,
+    appType: 'standard' | 'lite',
+    expectedIntegrationId?: string,
+    allowAuthenticationRecovery = false
+  ): Promise<void> {
+    if (!this.isConfigured() || !/^[1-9]\d*$/.test(installationId)) {
+      throw new GitHubInstallationAccessDeniedError();
+    }
+
+    const appTypeCondition =
+      appType === 'standard'
+        ? or(
+            eq(platform_integrations.github_app_type, 'standard'),
+            isNull(platform_integrations.github_app_type)
+          )
+        : eq(platform_integrations.github_app_type, 'lite');
+    const db = this.getDb();
+    const rows = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .leftJoin(
+        github_app_installations,
+        eq(platform_integrations.github_installation_id, github_app_installations.id)
+      )
+      .leftJoin(kilocode_users, eq(platform_integrations.owned_by_user_id, kilocode_users.id))
+      .leftJoin(organizations, eq(platform_integrations.owned_by_organization_id, organizations.id))
+      .where(
+        and(
+          eq(platform_integrations.platform, 'github'),
+          or(
+            eq(platform_integrations.github_connection_role, 'workflow'),
+            and(
+              isNotNull(platform_integrations.owned_by_organization_id),
+              organizationWorkflowGitHubConnectionSql()
+            )
+          ),
+          eq(platform_integrations.integration_type, 'app'),
+          eq(platform_integrations.integration_status, 'active'),
+          isNull(platform_integrations.suspended_at),
+          allowAuthenticationRecovery ? undefined : isNull(platform_integrations.auth_invalid_at),
+          eq(platform_integrations.platform_installation_id, installationId),
+          appTypeCondition,
+          isNull(platform_integrations.github_disconnected_at),
+          or(
+            and(
+              isNull(platform_integrations.github_installation_id),
+              notExists(
+                db
+                  .select({ id: github_app_installations.id })
+                  .from(github_app_installations)
+                  .where(
+                    and(
+                      eq(
+                        github_app_installations.github_app_type,
+                        sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+                      ),
+                      eq(
+                        github_app_installations.installation_id,
+                        platform_integrations.platform_installation_id
+                      )
+                    )
+                  )
+              )
+            ),
+            and(
+              eq(github_app_installations.installation_id, installationId),
+              eq(github_app_installations.github_app_type, appType),
+              eq(github_app_installations.lifecycle_state, 'active'),
+              isNull(github_app_installations.suspended_at),
+              isNull(github_app_installations.deleted_at),
+              allowAuthenticationRecovery
+                ? undefined
+                : isNull(github_app_installations.auth_invalid_at)
+            )
+          ),
+          expectedIntegrationId === undefined
+            ? undefined
+            : eq(platform_integrations.id, expectedIntegrationId),
+          or(
+            and(isNotNull(platform_integrations.owned_by_user_id), availableAccountCondition()),
+            and(
+              isNotNull(platform_integrations.owned_by_organization_id),
+              isNull(organizations.deleted_at)
+            )
+          )
+        )
+      )
+      .limit(2);
+
+    if (rows.length !== 1) {
+      throw new GitHubInstallationAccessDeniedError();
+    }
+  }
+
+  /**
+   * Resolves an active workflow integration that belongs to `owner`: a
+   * personal integration of `owner.userId`, or, with `owner.orgId`, an
+   * organization integration of an org that `owner.userId` belongs to.
+   *
+   * This lookup backs the id-based mint RPC and keeps the stored workflow role:
+   * its caller already holds the integration id it authorized. Every product
+   * path that resolves an organization's installation — the Security Agent
+   * operations and the repository-scoped mint — uses
+   * `assertActiveAssociationForInstallation` or the authorized-installations
+   * query, which follow the shared organization workflow connection definition.
+   */
+  async findActiveAssociationById(
+    integrationId: string,
+    owner: { userId: string; orgId?: string }
+  ): Promise<
+    | { success: true; installationId: string; githubAppType: 'standard' | 'lite' }
+    | { success: false }
+  > {
+    if (
+      !this.isConfigured() ||
+      !z.string().uuid().safeParse(integrationId).success ||
+      owner.userId.length === 0 ||
+      (owner.orgId !== undefined && !z.string().uuid().safeParse(owner.orgId).success)
+    ) {
+      return { success: false };
+    }
+    const db = this.getDb();
+    const integrationOwner =
+      owner.orgId === undefined
+        ? and(
+            eq(platform_integrations.owned_by_user_id, owner.userId),
+            isNull(platform_integrations.owned_by_organization_id)
+          )
+        : and(
+            eq(platform_integrations.owned_by_organization_id, sql`${owner.orgId}::uuid`),
+            isNull(platform_integrations.owned_by_user_id),
+            exists(
+              db
+                .select({ id: organization_memberships.id })
+                .from(organization_memberships)
+                .where(
+                  and(
+                    eq(organization_memberships.organization_id, sql`${owner.orgId}::uuid`),
+                    eq(organization_memberships.kilo_user_id, owner.userId)
+                  )
+                )
+            )
+          );
+    const rows = await db
+      .select({
+        installationId: sql<
+          string | null
+        >`COALESCE(${github_app_installations.installation_id}, ${platform_integrations.platform_installation_id})`,
+        githubAppType: sql<
+          'standard' | 'lite' | null
+        >`COALESCE(${github_app_installations.github_app_type}, ${platform_integrations.github_app_type})`,
+      })
+      .from(platform_integrations)
+      .leftJoin(
+        github_app_installations,
+        eq(platform_integrations.github_installation_id, github_app_installations.id)
+      )
+      .leftJoin(kilocode_users, eq(platform_integrations.owned_by_user_id, kilocode_users.id))
+      .leftJoin(organizations, eq(platform_integrations.owned_by_organization_id, organizations.id))
+      .where(
+        and(
+          eq(platform_integrations.id, integrationId),
+          integrationOwner,
+          eq(platform_integrations.github_connection_role, 'workflow'),
+          eq(platform_integrations.platform, 'github'),
+          eq(platform_integrations.integration_type, 'app'),
+          eq(platform_integrations.integration_status, 'active'),
+          isNull(platform_integrations.suspended_at),
+          isNull(platform_integrations.auth_invalid_at),
+          isNull(platform_integrations.github_disconnected_at),
+          isNotNull(platform_integrations.platform_installation_id),
+          or(
+            and(
+              isNull(platform_integrations.github_installation_id),
+              notExists(
+                db
+                  .select({ id: github_app_installations.id })
+                  .from(github_app_installations)
+                  .where(
+                    and(
+                      eq(
+                        github_app_installations.github_app_type,
+                        sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+                      ),
+                      eq(
+                        github_app_installations.installation_id,
+                        platform_integrations.platform_installation_id
+                      )
+                    )
+                  )
+              )
+            ),
+            and(
+              eq(github_app_installations.lifecycle_state, 'active'),
+              eq(
+                github_app_installations.installation_id,
+                platform_integrations.platform_installation_id
+              ),
+              eq(
+                github_app_installations.github_app_type,
+                sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+              ),
+              isNull(github_app_installations.suspended_at),
+              isNull(github_app_installations.deleted_at),
+              isNull(github_app_installations.auth_invalid_at)
+            )
+          ),
+          or(
+            and(isNotNull(platform_integrations.owned_by_user_id), availableAccountCondition()),
+            and(
+              isNotNull(platform_integrations.owned_by_organization_id),
+              isNull(organizations.deleted_at)
+            )
+          )
+        )
+      )
+      .limit(1);
+    const row = rows[0];
+    if (!row?.installationId) return { success: false };
+    return {
+      success: true,
+      installationId: row.installationId,
+      githubAppType: row.githubAppType ?? 'standard',
+    };
   }
 
   async findManagedInstallationForRepo(
@@ -288,6 +689,22 @@ export class InstallationLookupService {
     }
 
     const rows = await buildManagedInstallationLookupQuery(this.getDb(), params);
+    if (params.expectedIntegrationId !== undefined) {
+      const selected = ExactManagedInstallationLookupResultSchema.safeParse(rows[0]);
+      if (!selected.success || !this.matchesExpectedIntegration(selected.data, params)) {
+        return { success: false, reason: 'integration_mismatch' };
+      }
+
+      return {
+        success: true,
+        installationId: selected.data.platform_installation_id,
+        accountLogin: selected.data.platform_account_login ?? '',
+        githubAppType: selected.data.github_app_type ?? 'standard',
+        repoName,
+        permissions: selected.data.permissions,
+      };
+    }
+
     if (rows.length === 0) {
       return { success: false, reason: 'no_installation_found' };
     }
@@ -323,5 +740,31 @@ export class InstallationLookupService {
       repoName,
       permissions: selected.permissions,
     };
+  }
+
+  private matchesExpectedIntegration(
+    selected: z.infer<typeof ExactManagedInstallationLookupResultSchema>,
+    params: FindInstallationParams
+  ): boolean {
+    if (
+      selected.id !== params.expectedIntegrationId ||
+      selected.integration_status !== 'active' ||
+      (params.orgId === undefined
+        ? selected.owned_by_user_id !== params.userId || selected.owned_by_organization_id !== null
+        : selected.owned_by_organization_id !== params.orgId ||
+          selected.owned_by_user_id !== null) ||
+      selected.platform_account_login?.toLowerCase() !==
+        params.githubRepo.split('/')[0]?.toLowerCase()
+    ) {
+      return false;
+    }
+
+    if (selected.repository_access === 'all') return true;
+    if (selected.repository_access !== 'selected') return false;
+    return Boolean(
+      selected.repositories?.some(
+        repository => repository.full_name.toLowerCase() === params.githubRepo.toLowerCase()
+      )
+    );
   }
 }

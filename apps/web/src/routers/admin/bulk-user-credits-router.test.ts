@@ -1,6 +1,6 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { credit_transactions } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
@@ -72,5 +72,39 @@ describe('bulk user credits router', () => {
         }))
       )
     );
+  });
+
+  it('distinguishes an invalid expiration date from a past one', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    const caller = await createCallerForUser(admin.id);
+
+    async function refusalMessage(expirationDate: string): Promise<string> {
+      let message = '';
+      await caller.admin.bulkUserCredits
+        .grantBulkCredits({
+          emails: [recipient.google_user_email],
+          amountUsd: 5,
+          expirationDate,
+        })
+        .catch((error: unknown) => {
+          message = error instanceof Error ? error.message : String(error);
+        });
+      return message;
+    }
+
+    const invalidMessage = await refusalMessage('2026-13-01');
+    expect(invalidMessage).toContain('Invalid date');
+    expect(invalidMessage).not.toContain('must be in the future');
+
+    const pastMessage = await refusalMessage('2024-01-01');
+    expect(pastMessage).toContain('Expiration date must be in the future');
+    expect(pastMessage).not.toContain('Invalid date');
+
+    const transactions = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, recipient.id));
+    expect(transactions).toHaveLength(0);
   });
 });

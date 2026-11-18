@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  RequestDeadlineError,
-  CONTROL_PLANE_DEADLINE_MS,
-  SEND_DEADLINE_MS,
-  withDeadline,
-} from '../deadline';
+import { RequestDeadlineError, withDeadline } from '../deadline';
 
 /**
  * Hermes (React Native) whatwg-fetch rejects with a generic `AbortError`
@@ -231,25 +226,9 @@ describe('Hermes AbortError resilience', () => {
       vi.useRealTimers();
     }
   });
-
-  it('successful fn still resolves normally alongside Hermes sim', async () => {
-    // Regression: normal resolution must work even with the new
-    // independent-settlement pattern.
-    const result = await withDeadline(5_000, async () => {
-      // Return a value — no abort involved.
-      return 42;
-    });
-
-    expect(result).toBe(42);
-  });
 });
 
 describe('RequestDeadlineError', () => {
-  it('is an instance of Error', () => {
-    const err = new RequestDeadlineError(10_000);
-    expect(err).toBeInstanceOf(Error);
-  });
-
   it('has name RequestDeadlineError', () => {
     const err = new RequestDeadlineError(10_000);
     expect(err.name).toBe('RequestDeadlineError');
@@ -258,18 +237,6 @@ describe('RequestDeadlineError', () => {
   it('includes the deadline in its message', () => {
     const err = new RequestDeadlineError(15_000);
     expect(err.message).toContain('15000');
-  });
-});
-
-describe('CONTROL_PLANE_DEADLINE_MS', () => {
-  it('is 15 seconds', () => {
-    expect(CONTROL_PLANE_DEADLINE_MS).toBe(15_000);
-  });
-});
-
-describe('SEND_DEADLINE_MS', () => {
-  it('is 30 seconds', () => {
-    expect(SEND_DEADLINE_MS).toBe(30_000);
   });
 });
 

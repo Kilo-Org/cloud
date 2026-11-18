@@ -2,6 +2,15 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { resolveFakeAdminToken } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
+import { resolveE2eInternalSecret } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
+import { caBundlePath } from '../mock-snowflake/tls-env';
+import { readEnvFile } from './env-sync/parse';
+import { shellQuote } from './shell';
+
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
+const CLOUD_AGENT_DEV_VARS_PATH = path.join(REPO_ROOT, 'services/cloud-agent-next/.dev.vars');
+
 type ServiceType = 'infra' | 'nextjs' | 'worker' | 'process';
 
 type ServiceGroup = {
@@ -23,6 +32,7 @@ const groups: ServiceGroup[] = [
   },
   { id: 'notifications', label: 'Notifications', alwaysOn: false },
   { id: 'data-export', label: 'Data Export', alwaysOn: false },
+  { id: 'session-sync', label: 'Session Sync', alwaysOn: false },
   { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
@@ -30,29 +40,30 @@ const groups: ServiceGroup[] = [
     alwaysOn: false,
     groupDependsOn: ['git-token-service', 'notifications'],
   },
-  { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
-    id: 'auto-triage',
-    label: 'Auto Triage',
+    id: 'cloud-agent-next-http',
+    label: 'Cloud Agent (HTTP e2e)',
     alwaysOn: false,
-    groupDependsOn: ['cloud-agent'],
-    sectionBreakBefore: true,
+    groupDependsOn: ['git-token-service', 'notifications'],
   },
-  { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
+  { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
     alwaysOn: false,
     groupDependsOn: ['cloud-agent'],
   },
-  { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
   { id: 'deletion-mock', label: 'Deletion Mock', alwaysOn: false, sectionBreakBefore: true },
+  {
+    id: 'cloud-agent-public-tunnels',
+    label: 'Cloud Agent Public Tunnels',
+    alwaysOn: false,
+    sectionBreakBefore: true,
+  },
 ];
 
 type ServiceDef = {
@@ -74,21 +85,61 @@ type ServiceMeta = {
 };
 
 const serviceMeta: Record<string, ServiceMeta> = {
-  // core
+  // The web app mints web tickets from Session Ingest
+  // (`activeSessions.createWebTicket` / `getToken` in
+  // apps/web/src/routers/active-sessions-router.ts), so starting the web app
+  // must pull the worker in transitively — otherwise the mutation's fetch hits
+  // a dead `SESSION_INGEST_WORKER_URL` and every run that asks for a web ticket
+  // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
+  // The web app rewrites its AI gateway routes to the ai-gateway app (see
+  // apps/web/ai-gateway-rewrites.mjs), so it pulls that app in too.
+  // Every code-review read and write reaches git-token-service for the caller's
+  // provider credential (apps/web/src/lib/integrations/platforms/{github,gitlab,
+  // bitbucket}/ plus lib/provider-review/), so the web stack must pull the
+  // worker in transitively — otherwise those fetches hit a dead
+  // `GIT_TOKEN_SERVICE_API_URL` and a connected GitHub account renders as a
+  // service outage with no pull requests.
   nextjs: {
     group: 'core',
-    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'],
+    dependsOn: [
+      'postgres',
+      'redis',
+      'redis-http',
+      'stripe',
+      'cloudflare-session-ingest',
+      'ai-gateway',
+      'cloudflare-git-token-service',
+      'byok-kms',
+      'mock-snowflake',
+    ],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
+  'local-kms': { group: 'core', dependsOn: [] },
+  'byok-kms': { group: 'core', dependsOn: ['local-kms'] },
   stripe: { group: 'core', dependsOn: [] },
+  'ai-gateway': {
+    group: 'core',
+    dependsOn: ['postgres', 'redis', 'redis-http'],
+    dir: 'apps/ai-gateway',
+  },
+  // Applies WorkOS directory events by calling the app's internal SCIM
+  // endpoints, so it needs Next.js up and Postgres behind it — the same
+  // dependencies `user-data-export` declares for the same reason. Without a
+  // `WORKOS_API_KEY` in `services/scim-sync/.dev.vars` the poll fails and
+  // reports the failure, which is harmless: the alarm retries and nothing is
+  // applied.
+  'cloudflare-scim-sync': {
+    group: 'core',
+    dependsOn: ['postgres', 'nextjs'],
+    dir: 'services/scim-sync',
+  },
   'user-data-export': {
     group: 'data-export',
     dependsOn: ['postgres', 'nextjs'],
     dir: 'services/user-data-export',
   },
-  // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
     group: 'auto-routing',
     dependsOn: [],
@@ -99,7 +150,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/auto-routing-benchmark',
   },
-  // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
     dependsOn: [
@@ -107,6 +157,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'nextjs',
       'cloudflare-session-ingest',
       'cloudflare-git-token-service',
+      'cloudflare-session-sync',
       'container-usage-meter',
       'notifications',
     ],
@@ -128,31 +179,44 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
   },
+  'cloudflare-session-sync': {
+    group: 'session-sync',
+    dependsOn: ['postgres'],
+    dir: 'services/session-sync',
+  },
   'fake-llm': {
     group: 'cloud-agent',
     dependsOn: [],
     dir: 'services/cloud-agent-next/test/e2e',
   },
-  // git-token-service (shared by cloud-agent, app-builder, gastown)
+  // HTTP e2e profile: the Worker runs the rendered e2e config and the fake LLM
+  // runs as a Worker (same core, different adapter) instead of the Node server.
+  'cloud-agent-next-http': {
+    group: 'cloud-agent-next-http',
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloudflare-session-ingest',
+      'cloudflare-git-token-service',
+      'container-usage-meter',
+      'notifications',
+      'fake-llm-worker',
+      'cloud-agent-public-tunnels',
+    ],
+    dir: 'services/cloud-agent-next',
+    useLanIp: true,
+  },
+  'fake-llm-worker': {
+    group: 'cloud-agent-next-http',
+    dependsOn: [],
+    dir: 'services/cloud-agent-next',
+  },
+  'cloud-agent-public-tunnels': { group: 'cloud-agent-public-tunnels', dependsOn: [] },
   'cloudflare-git-token-service': {
     group: 'git-token-service',
     dependsOn: ['postgres'],
     dir: 'services/git-token-service',
   },
-  // app-builder
-  'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
-  'cloudflare-app-builder': {
-    group: 'app-builder',
-    dependsOn: ['cloudflare-db-proxy', 'cloudflare-git-token-service', 'app-builder-tunnel'],
-    dir: 'services/app-builder',
-    useLanIp: true,
-  },
-  'cloudflare-db-proxy': {
-    group: 'app-builder',
-    dependsOn: ['postgres'],
-    dir: 'services/db-proxy',
-  },
-  // code-review
   'bitbucket-webhook-tunnel': {
     group: 'code-review',
     dependsOn: ['nextjs'],
@@ -162,19 +226,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/code-review-infra',
   },
-  // auto-triage
-  'cloudflare-auto-triage-infra': {
-    group: 'auto-triage',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-triage-infra',
-  },
-  // auto-fix
-  'cloudflare-auto-fix-infra': {
-    group: 'auto-fix',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-fix-infra',
-  },
-  // security-agent
   'cloudflare-security-sync': {
     group: 'security-agent',
     dependsOn: ['postgres', 'cloudflare-git-token-service'],
@@ -191,18 +242,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     ],
     dir: 'services/security-auto-analysis',
   },
-  // deploy
-  'cloudflare-deploy-builder': {
-    group: 'deploy',
-    dependsOn: ['nextjs'],
-    dir: 'services/deploy-infra/builder',
-  },
-  'cloudflare-deploy-dispatcher': {
-    group: 'deploy',
-    dependsOn: [],
-    dir: 'services/deploy-infra/dispatcher',
-  },
-  // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
@@ -230,12 +269,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/event-service',
   },
+  'kilo-mcp': {
+    group: 'cloud-agent',
+    dependsOn: [],
+    dir: 'services/kilo-mcp',
+  },
   'kilo-chat': {
     group: 'kiloclaw',
     dependsOn: ['kiloclaw', 'event-service'],
     dir: 'services/kilo-chat',
   },
-  // observability
   'cloudflare-o11y': {
     group: 'observability',
     dependsOn: ['nextjs'],
@@ -246,32 +289,40 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/model-eval-ingest',
   },
+  'latency-ingest': {
+    group: 'observability',
+    dependsOn: [],
+    dir: 'services/latency-ingest',
+  },
   'cloudflare-ai-attribution': {
     group: 'observability',
     dependsOn: [],
     dir: 'services/ai-attribution',
   },
   grafana: { group: 'observability', dependsOn: [] },
-  // mobile
-  mobile: { group: 'mobile', dependsOn: [], dir: 'apps/mobile' },
-  // storybook
+  // The app POSTs its client-observed latency batches to the latency-ingest
+  // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points
+  // at its wrangler port), so a stack started for mobile work runs it;
+  // otherwise the app POSTs to a dead listener and the ingest path cannot be
+  // observed locally.
+  mobile: { group: 'mobile', dependsOn: ['latency-ingest'], dir: 'apps/mobile' },
   storybook: { group: 'storybook', dependsOn: [] },
-  // deletion-mock
   'deletion-mock': {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
   },
-  // gastown
-  'cloudflare-gastown': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
-    dir: 'services/gastown',
-  },
-  'cloudflare-wasteland': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'nextjs'],
-    dir: 'services/wasteland',
+  // Dev-only Snowflake stand-in for the usage screens (dev/mock-snowflake/
+  // README.md). Core is always on, so every `dev:start` gains it; its entry
+  // keeps the SNOWFLAKE_* block and the CA bundle that the managed section of
+  // .env.local names current, and `serviceCommand` exports that bundle to
+  // `next dev` when this service is selected. A real SNOWFLAKE_ACCOUNT_HOST in
+  // .env.local is never replaced — the entry takes its own section back out
+  // instead; run without the mock with `pnpm dev:start app --without=mock-snowflake`.
+  'mock-snowflake': {
+    group: 'core',
+    dependsOn: [],
+    dir: 'dev/mock-snowflake',
   },
 };
 
@@ -426,9 +477,57 @@ export function resolveDeletionMockSessionEnv(args: {
   return sessionEnv;
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler config discovery
-// ---------------------------------------------------------------------------
+// The E2E driver resolves `FAKE_LLM_ADMIN_TOKEN` from its own process
+// environment and the spawned fake server must agree, but a tmux pane only
+// receives the curated session environment. Publish the token here rather than
+// in the service command string, which tmux mirrors into `dev/logs/*`. The HTTP
+// e2e profile's fake *Worker* also needs `NEXTAUTH_SECRET` for the same reason;
+// it is delivered the same way so neither secret is written to a log.
+export function resolveFakeLlmSessionEnv(args: {
+  serviceNames: string[];
+  env?: NodeJS.ProcessEnv;
+  devVars?: Map<string, string>;
+}): Record<string, string> | undefined {
+  const env = args.env ?? process.env;
+  const wantsNodeFake = args.serviceNames.includes('fake-llm');
+  const wantsWorkerFake = args.serviceNames.includes('fake-llm-worker');
+  if (!wantsNodeFake && !wantsWorkerFake) return undefined;
+
+  const sessionEnv: Record<string, string> = {
+    FAKE_LLM_ADMIN_TOKEN: resolveFakeAdminToken(env),
+  };
+  if (wantsWorkerFake) {
+    // The fake Worker verifies the same Kilo JWTs as the main Worker, so it
+    // needs the identical NEXTAUTH_SECRET. It is not in the dev shell's
+    // process env; read the package `.dev.vars` the main Worker also loads.
+    const devVars = args.devVars ?? readEnvFile(CLOUD_AGENT_DEV_VARS_PATH);
+    const secret = env.NEXTAUTH_SECRET?.trim() || devVars.get('NEXTAUTH_SECRET')?.trim();
+    if (secret) sessionEnv.NEXTAUTH_SECRET = secret;
+  }
+  return sessionEnv;
+}
+
+/**
+ * The HTTP e2e Worker reads its `INTERNAL_API_SECRET` binding from the generated
+ * `.wrangler/.dev.vars`, which the render command writes from this variable.
+ * Publish the resolved value into the tmux session environment so the render can
+ * see it; the renderer rejects the development default, so an unexported value
+ * fails the group start loudly instead of publishing a known secret.
+ *
+ * Provisioning is active, not inert: once the value reaches the Worker its
+ * holder can call internal tRPC procedures and `/internal/*` directly, so it must
+ * be e2e-scoped and must never be production's value. It is published through
+ * the session environment, never through the service command string, which tmux
+ * mirrors into `dev/logs/*`.
+ */
+export function resolveE2eInternalSecretSessionEnv(args: {
+  serviceNames: string[];
+  env?: NodeJS.ProcessEnv;
+}): Record<string, string> | undefined {
+  const env = args.env ?? process.env;
+  if (!args.serviceNames.includes('cloud-agent-next-http')) return undefined;
+  return { E2E_INTERNAL_API_SECRET: resolveE2eInternalSecret(env) };
+}
 
 function stripJsonComments(text: string): string {
   let result = '';
@@ -465,10 +564,10 @@ function stripJsonComments(text: string): string {
   return result.replace(/,(\s*[}\]])/g, '$1');
 }
 
-function readWranglerPort(dir: string): number {
-  const configPath = path.join(dir, 'wrangler.jsonc');
+function readWranglerPort(dir: string, fileName = 'wrangler.jsonc'): number {
+  const configPath = path.join(dir, fileName);
   if (!fs.existsSync(configPath)) {
-    throw new Error(`No wrangler.jsonc found in ${dir}`);
+    throw new Error(`No ${fileName} found in ${dir}`);
   }
   const text = fs.readFileSync(configPath, 'utf-8');
   const config = JSON.parse(stripJsonComments(text));
@@ -479,9 +578,15 @@ function readWranglerPort(dir: string): number {
   return port;
 }
 
-// ---------------------------------------------------------------------------
-// Build service definitions from serviceMeta + wrangler.jsonc
-// ---------------------------------------------------------------------------
+/** Host port of the fake-LLM Worker under the active offset. */
+export function resolveFakeLlmWorkerPort(): number {
+  return (
+    readWranglerPort(
+      path.join(REPO_ROOT, 'services/cloud-agent-next'),
+      'test/e2e/wrangler.fake-llm.jsonc'
+    ) + portOffset
+  );
+}
 
 // Base host ports for the Compose stack. A worktree with a port offset runs its
 // own Compose project on offset host ports, so its database, its data, and its
@@ -492,8 +597,20 @@ const INFRA_PORTS: Record<string, number> = {
   postgres: 5432,
   redis: 6379,
   'redis-http': 8079,
+  'local-kms': 8900,
   grafana: 4000,
 };
+
+const BYOK_KMS_SERVICE_BASE_PORT = 8901;
+
+// Base host port of dev/mock-snowflake; must agree with the fallback in
+// dev/mock-snowflake/tls-env.ts. An offset worktree runs its own mock so the
+// SNOWFLAKE_ACCOUNT_HOST its entry wires into .env.local matches its stack.
+const MOCK_SNOWFLAKE_BASE_PORT = 4792;
+
+export function byokKmsServicePort(offset: number = portOffset): number {
+  return BYOK_KMS_SERVICE_BASE_PORT + offset;
+}
 
 export function getInfraBasePort(serviceName: string): number | undefined {
   return INFRA_PORTS[serviceName];
@@ -524,15 +641,8 @@ export function getAllInfraProfiles(): string[] {
   return [...new Set(Object.values(INFRA_PROFILES))];
 }
 
-// Wrangler always pulls its container egress-interceptor sidecar
-// (cloudflare/proxy-everything) with --platform linux/amd64. On Apple Silicon
-// the emulated amd64 proxy crashes at startup ("setsockopt: protocol not
-// available" — its transparent-proxy socket options don't survive Rosetta),
-// which surfaces as "Failed to start container" for every local container.
-// Point wrangler at the same proxy version's linux/arm64 manifest instead:
-// pulling a single-platform manifest digest with --platform amd64 only warns.
-// Keep the digest in sync with DEFAULT_CONTAINER_EGRESS_INTERCEPTOR_IMAGE in
-// the pinned wrangler/miniflare version (tag 3cb1195).
+// Wrangler's amd64 egress proxy crashes under Apple Silicon emulation. Pin its
+// arm64 manifest; keep aligned with the pinned Wrangler/Miniflare proxy version.
 const CONTAINER_EGRESS_IMAGE_ARM64 =
   'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
 
@@ -554,8 +664,15 @@ function workerEnvPrefix(): string[] {
   return vars.length > 0 ? ['env', ...vars] : [];
 }
 
+// Clear of the 3000-3009 range the web app's dev script probes.
+const AI_GATEWAY_BASE_PORT = 3010;
+
+function aiGatewayPort(): number {
+  return AI_GATEWAY_BASE_PORT + portOffset;
+}
+
 function buildServiceDefs(): ServiceDef[] {
-  const repoRoot = path.resolve(import.meta.dirname, '../..');
+  const repoRoot = REPO_ROOT;
   const defs: ServiceDef[] = [];
 
   for (const [name, meta] of Object.entries(serviceMeta)) {
@@ -568,7 +685,38 @@ function buildServiceDefs(): ServiceDef[] {
         dir: 'apps/web',
         port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'run', 'dev'],
+        command: [
+          'env',
+          `AI_GATEWAY_URL=http://localhost:${aiGatewayPort()}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'ai-gateway') {
+      // The port is passed as AI_GATEWAY_PORT because the session exports PORT
+      // for the web app. The gateway starts before the web app writes
+      // `.dev-port`, so it gets the web port that dev:start already verified
+      // is free.
+      const port = aiGatewayPort();
+      defs.push({
+        name,
+        type: 'nextjs',
+        dir: meta.dir ?? name,
+        port,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `AI_GATEWAY_PORT=${port}`,
+          `AI_GATEWAY_WEB_PORT=${nextjsTargetPort}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
         group: meta.group,
       });
       continue;
@@ -615,6 +763,76 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'fake-llm-worker') {
+      const fakeLlmWorkerPort = resolveFakeLlmWorkerPort();
+      // The secrets are referenced through shell variables, never inlined, so
+      // the command string does not carry them into `dev/logs/*`. The session
+      // environment (see `resolveFakeLlmSessionEnv`) supplies the values.
+      defs.push({
+        name,
+        type: 'worker',
+        dir: meta.dir ?? name,
+        port: fakeLlmWorkerPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'pnpm',
+          'exec',
+          'wrangler',
+          'dev',
+          '--config',
+          'test/e2e/wrangler.fake-llm.jsonc',
+          '--var',
+          'NEXTAUTH_SECRET:$NEXTAUTH_SECRET',
+          '--var',
+          'FAKE_LLM_ADMIN_TOKEN:$FAKE_LLM_ADMIN_TOKEN',
+          '--port',
+          String(fakeLlmWorkerPort),
+          '--inspector-port',
+          String(fakeLlmWorkerPort + 10000),
+          '--ip',
+          '0.0.0.0',
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'cloud-agent-next-http') {
+      const basePort = readWranglerPort(path.join(repoRoot, dir));
+      const port = basePort + portOffset;
+      defs.push({
+        name,
+        type: 'worker',
+        dir,
+        port,
+        dependsOn: meta.dependsOn,
+        command: [
+          'node',
+          'test/e2e/deploy/render-e2e-worker-config.mjs',
+          '--local',
+          '&&',
+          ...workerEnvPrefix(),
+          'pnpm',
+          'run',
+          'dev',
+          '--config',
+          '.wrangler/wrangler.e2e-local.jsonc',
+          // `--env dev` is supplied by the package `dev` script
+          // (`.wrangler/wrangler.e2e-local.jsonc` keeps `env.dev`), so it must
+          // not be repeated here.
+          '--port',
+          String(port),
+          '--inspector-port',
+          String(port + 10000),
+          '--ip',
+          '0.0.0.0',
+        ],
+        group: meta.group,
+        ...(meta.useLanIp ? { useLanIp: true } : {}),
+      });
+      continue;
+    }
+
     if (name === 'deletion-mock') {
       const deletionMockPort = 4010 + portOffset;
       defs.push({
@@ -636,6 +854,27 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'mock-snowflake') {
+      const mockSnowflakePort = MOCK_SNOWFLAKE_BASE_PORT + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: meta.dir ?? name,
+        port: mockSnowflakePort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `MOCK_SNOWFLAKE_PORT=${mockSnowflakePort}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'stack-service.ts',
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name in INFRA_PORTS) {
       defs.push({
         name,
@@ -644,6 +883,28 @@ function buildServiceDefs(): ServiceDef[] {
         port: INFRA_PORTS[name] + portOffset,
         dependsOn: meta.dependsOn,
         command: dockerComposeUp(name),
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'byok-kms') {
+      const byokKmsPort = byokKmsServicePort();
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: byokKmsPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `BYOK_KMS_SERVICE_PORT=${byokKmsPort}`,
+          `BYOK_KMS_ENDPOINT=http://127.0.0.1:${INFRA_PORTS['local-kms'] + portOffset}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'dev/byok-kms/server.ts',
+        ],
         group: meta.group,
       });
       continue;
@@ -717,16 +978,27 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
-    if (name === 'app-builder-tunnel') {
-      const appBuilderPort =
-        readWranglerPort(path.join(repoRoot, 'services/app-builder')) + portOffset;
+    if (name === 'cloud-agent-public-tunnels') {
+      const workerPort =
+        readWranglerPort(path.join(repoRoot, 'services/cloud-agent-next')) + portOffset;
+      const sessionIngestPort =
+        readWranglerPort(path.join(repoRoot, 'services/session-ingest')) + portOffset;
+      // The optional fake-LLM port is omitted here and added by
+      // `serviceCommand` only when the fake Worker is part of the same
+      // selection, so a standalone tunnels start never requires it.
       defs.push({
         name,
         type: 'process',
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-app-builder-tunnel.ts', String(appBuilderPort)],
+        command: [
+          'tsx',
+          'dev/local/scripts/start-public-tunnels.ts',
+          String(workerPort),
+          String(nextjsTargetPort),
+          String(sessionIngestPort),
+        ],
         group: meta.group,
       });
       continue;
@@ -769,20 +1041,20 @@ let serviceDefs = buildServiceDefs();
 
 export const services = new Map<string, ServiceDef>(serviceDefs.map(s => [s.name, s]));
 
+// Services that are reachable only by asking for them (or their group) by
+// name. `all` must not start them implicitly: the public tunnels and the HTTP
+// e2e profile are opt-in, and the HTTP worker shares the plain worker's port.
+const SERVICES_EXCLUDED_FROM_ALL = new Set([
+  'cloud-agent-public-tunnels',
+  'cloud-agent-next-http',
+  'fake-llm-worker',
+]);
+
 export const shortcuts: Record<string, string[]> = {
   app: ['nextjs'],
   'data-export': ['nextjs', 'user-data-export'],
-  'app-builder': [
-    'nextjs',
-    'cloud-agent-next',
-    'cloudflare-session-ingest',
-    'cloudflare-db-proxy',
-    'cloudflare-git-token-service',
-    'app-builder-tunnel',
-    'cloudflare-app-builder',
-  ],
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],
-  all: serviceDefs.map(s => s.name),
+  all: serviceDefs.map(s => s.name).filter(name => !SERVICES_EXCLUDED_FROM_ALL.has(name)),
 };
 
 // Rebuild every port-derived service definition (ports, commands) for a new
@@ -794,7 +1066,9 @@ export function applyPortOffset(offset: number): void {
   serviceDefs = buildServiceDefs();
   services.clear();
   for (const def of serviceDefs) services.set(def.name, def);
-  shortcuts.all = serviceDefs.map(s => s.name);
+  shortcuts.all = serviceDefs
+    .map(s => s.name)
+    .filter(name => !SERVICES_EXCLUDED_FROM_ALL.has(name));
 }
 
 // Successive +100 candidate offsets through the same (0, 5000] range the slug
@@ -905,10 +1179,106 @@ export function resolveTargets(targets: string[]): string[] {
   return topologicalSort(resolveTransitiveDeps(allNames));
 }
 
+export type ServiceExclusion = {
+  serviceNames: string[];
+  skipped: string[];
+  /** Selected services that declare a dependency on a skipped service. */
+  dependents: Map<string, string[]>;
+};
+
+/**
+ * Drop explicitly unwanted services from a resolved selection, for memory-
+ * constrained environments that run only what they exercise. Unknown names
+ * throw so a typo cannot silently start the full stack.
+ */
+export function excludeServices(
+  serviceNames: readonly string[],
+  excluded: readonly string[]
+): ServiceExclusion {
+  for (const name of excluded) getService(name);
+  const excludedSet = new Set(excluded);
+  const kept = serviceNames.filter(name => !excludedSet.has(name));
+  const dependents = new Map<string, string[]>();
+  for (const name of kept) {
+    const missing = getService(name).dependsOn.filter(dep => excludedSet.has(dep));
+    if (missing.length > 0) dependents.set(name, missing);
+  }
+  return {
+    serviceNames: kept,
+    skipped: serviceNames.filter(name => excludedSet.has(name)),
+    dependents,
+  };
+}
+
+export function parseServiceList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map(name => name.trim())
+    .filter(name => name !== '');
+}
+
 export function getService(name: string): ServiceDef {
   const svc = services.get(name);
   if (!svc) throw new Error(`Unknown service: ${name}`);
   return svc;
+}
+
+/**
+ * Resolve a service's start command for a concrete selection. The public
+ * tunnels optionally publish the fake-LLM tunnel; that only makes sense when
+ * the fake Worker is in the same selection, and including the port
+ * unconditionally would make a standalone tunnels start depend on a running
+ * fake Worker. The web app is handed the Snowflake mock's CA bundle the same
+ * way: exporting it here is what makes the mock's certificate trusted.
+ *
+ * The export is also the only defence against a value the developer's own shell
+ * exits with: `scripts/dev.sh` resolves `NODE_EXTRA_CA_CERTS` as the shell's
+ * value first and only then reads `.env.local`, and Node keeps the exported
+ * value over anything Next.js loads later. Setting it on this command beats
+ * both, so every relaunch path must pass the session's selection — a restart or
+ * a recreate without one falls back to the bare command and silently un-trusts
+ * the mock.
+ */
+export function serviceCommand(serviceName: string, serviceNames: readonly string[]): string[] {
+  const command = getService(serviceName).command;
+  if (serviceName === 'cloud-agent-public-tunnels' && serviceNames.includes('fake-llm-worker')) {
+    return [...command, String(resolveFakeLlmWorkerPort())];
+  }
+  if (serviceName === 'nextjs' && serviceNames.includes('mock-snowflake')) {
+    // `env` opens the web app's command, so the variable joins that prefix.
+    // `buildStartCommand` joins argv with spaces and the pane runs the string
+    // through `/bin/sh -lc`, so the absolute path has to be one quoted word: an
+    // unquoted one splits at the first space in the checkout path.
+    const [env, ...prefixAndArgs] = command;
+    return [env, `NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`, ...prefixAndArgs];
+  }
+  return command;
+}
+
+/**
+ * The decision every tunnel restart/capture path shares, derived from the
+ * active service selection:
+ *
+ * - `selection` is forwarded to `restartServiceInTmux` so a relaunch or a
+ *   recreate keeps the fake-LLM Worker port (`serviceCommand` appends the
+ *   fourth tunnel port only when the fake Worker is selected);
+ * - `reloadTarget` is the cloud-agent Worker whose renderer bakes the captured
+ *   tunnel URLs into its own config. The HTTP e2e profile also refreshes its
+ *   `.wrangler/.dev.vars` copy, so the reload must follow the running variant.
+ *   The two share a port and are mutually exclusive; HTTP wins if both appear.
+ */
+export type TunnelRestartPlan = {
+  selection: string[];
+  reloadTarget: string | undefined;
+};
+
+export function planTunnelRestart(serviceNames: readonly string[]): TunnelRestartPlan {
+  const reloadTarget = serviceNames.includes('cloud-agent-next-http')
+    ? 'cloud-agent-next-http'
+    : serviceNames.includes('cloud-agent-next')
+      ? 'cloud-agent-next'
+      : undefined;
+  return { selection: [...serviceNames], reloadTarget };
 }
 
 export function getPortMap(): Map<string, number> {

@@ -1,0 +1,312 @@
+import { describe, test, expect } from '@jest/globals';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+
+import {
+  getCreditTransactionsSummaryByUserId,
+  summarizeUserPayments,
+} from '@kilocode/web-shared/lib/creditTransactions';
+import { db } from './drizzle';
+import {
+  credit_transactions,
+  kilo_pass_issuance_items,
+  kilo_pass_issuances,
+  kilo_pass_subscriptions,
+} from '@kilocode/db/schema';
+import {
+  KiloPassCadence,
+  KiloPassIssuanceItemKind,
+  KiloPassIssuanceSource,
+  KiloPassTier,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { retireCreditBalance, transferCreditLots } from './creditAdjustments';
+
+describe('Credit Transactions', () => {
+  describe('getCreditTransactionsSummaryByUserId', () => {
+    test('should calculate correct summary for mixed transaction types', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        is_free: true,
+        amount_microdollars: 5000000, // 5.0 USD in microdollars
+        description: 'Promo 1',
+        original_baseline_microdollars_used: user.microdollars_used,
+      });
+
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        is_free: true,
+        amount_microdollars: 15500000, // 15.5 USD in microdollars
+        description: 'Promo 2',
+        original_baseline_microdollars_used: user.microdollars_used,
+      });
+
+      // Create purchased transactions
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        is_free: false,
+        amount_microdollars: 25000000, // 25.0 USD in microdollars
+        description: 'Purchase 1',
+        original_baseline_microdollars_used: user.microdollars_used,
+      });
+
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        is_free: false,
+        amount_microdollars: 10750000, // 10.75 USD in microdollars
+        description: 'Purchase 2',
+        original_baseline_microdollars_used: user.microdollars_used,
+      });
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+
+      expect(summary.total_promotional_musd).toBe(20500000); // 5.00 + 15.50
+      expect(summary.total_purchased_musd).toBe(35750000); // 25.00 + 10.75
+      expect(summary.credit_transaction_count).toBe(4);
+    });
+
+    test('reports refund principal without counting expiration or internal movements as payments', async () => {
+      const user = await insertTestUser();
+      await db.insert(credit_transactions).values([
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 100_000_000,
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: -60_000_000,
+          credit_category: 'credits_expired',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 0,
+          refund_principal_microdollars: -10_000_000,
+          source_transaction_id: crypto.randomUUID(),
+          credit_category: 'store-credit-refund:google_play:synthetic',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 100_000_000,
+          paid_credit_policy: 'settlement',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: true,
+          amount_microdollars: 100_000_000,
+          paid_credit_policy: 'one_year',
+          source_transaction_id: crypto.randomUUID(),
+          credit_category: 'parent_to_child_transfer_in',
+        },
+      ]);
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+      expect(summary.total_purchased_musd).toBe(90_000_000);
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(5);
+    });
+
+    test('does not report untracked legacy balance movements as negative purchases', async () => {
+      const source = await insertTestUser({ total_microdollars_acquired: 100_000_000 });
+      const target = await insertTestUser();
+      await db.transaction(tx =>
+        transferCreditLots(tx, {
+          from: { type: 'user', id: source.id },
+          to: { type: 'user', id: target.id },
+          actorId: source.id,
+          amountMicrodollars: 40_000_000,
+          incomingCategory: 'parent_to_child_transfer_in',
+          outgoingCategory: 'parent_to_child_transfer_out',
+          incomingDescription: 'Incoming legacy credit',
+          outgoingDescription: 'Outgoing legacy credit',
+        })
+      );
+      await db.transaction(tx =>
+        retireCreditBalance(tx, {
+          owner: { type: 'user', id: source.id },
+          actorId: source.id,
+          creditCategory: 'organization_custom',
+          description: 'Retire remaining legacy credit',
+        })
+      );
+      expect((await getCreditTransactionsSummaryByUserId(source.id)).total_purchased_musd).toBe(0);
+      expect((await getCreditTransactionsSummaryByUserId(target.id)).total_purchased_musd).toBe(0);
+    });
+
+    test('should return zeros for user with no transactions', async () => {
+      const user = await insertTestUser();
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.total_purchased_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(0);
+    });
+
+    test('should only include transactions for specified user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user1.id,
+        is_free: true,
+        amount_microdollars: 10000000, // 10.0 USD in microdollars
+        description: 'User 1 promo',
+        original_baseline_microdollars_used: user1.microdollars_used,
+      });
+
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user2.id,
+        is_free: false,
+        amount_microdollars: 20000000, // 20.0 USD in microdollars
+        description: 'User 2 purchase',
+        original_baseline_microdollars_used: user2.microdollars_used,
+      });
+
+      const user1Summary = await getCreditTransactionsSummaryByUserId(user1.id);
+      const user2Summary = await getCreditTransactionsSummaryByUserId(user2.id);
+
+      expect(user1Summary.total_promotional_musd).toBe(10000000);
+      expect(user1Summary.total_purchased_musd).toBe(0);
+      expect(user1Summary.credit_transaction_count).toBe(1);
+
+      expect(user2Summary.total_promotional_musd).toBe(0);
+      expect(user2Summary.total_purchased_musd).toBe(20000000);
+      expect(user2Summary.credit_transaction_count).toBe(1);
+    });
+  });
+
+  describe('summarizeUserPayments', () => {
+    test('should ignore Kilo Pass credit transactions', async () => {
+      const user = await insertTestUser();
+
+      const [kiloPassPaidCreditTx] = await db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 19000000,
+          stripe_payment_id: `in_${crypto.randomUUID()}`,
+          description: 'Kilo Pass base credits',
+          original_baseline_microdollars_used: user.microdollars_used,
+        })
+        .returning({ id: credit_transactions.id });
+
+      if (!kiloPassPaidCreditTx) throw new Error('Failed to create Kilo Pass credit transaction');
+
+      const stripeSubscriptionId = `sub_${crypto.randomUUID()}`;
+      const [subscriptionRow] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          provider_subscription_id: stripeSubscriptionId,
+          stripe_subscription_id: stripeSubscriptionId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+        })
+        .returning({ id: kilo_pass_subscriptions.id });
+
+      if (!subscriptionRow) throw new Error('Failed to create kilo_pass_subscriptions row');
+
+      const [issuanceRow] = await db
+        .insert(kilo_pass_issuances)
+        .values({
+          kilo_pass_subscription_id: subscriptionRow.id,
+          issue_month: '2026-01-01',
+          source: KiloPassIssuanceSource.StripeInvoice,
+          stripe_invoice_id: `in_${crypto.randomUUID()}`,
+        })
+        .returning({ id: kilo_pass_issuances.id });
+
+      if (!issuanceRow) throw new Error('Failed to create kilo_pass_issuances row');
+
+      await db.insert(kilo_pass_issuance_items).values({
+        kilo_pass_issuance_id: issuanceRow.id,
+        kind: KiloPassIssuanceItemKind.Base,
+        credit_transaction_id: kiloPassPaidCreditTx.id,
+        amount_usd: 19,
+      });
+
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        is_free: false,
+        amount_microdollars: 5000000,
+        stripe_payment_id: `pi_${crypto.randomUUID()}`,
+        description: 'Normal top-up',
+        original_baseline_microdollars_used: user.microdollars_used,
+      });
+
+      const summary = await summarizeUserPayments(user.id);
+
+      expect(summary.payments_count).toBe(1);
+      expect(summary.payments_total_microdollars).toBe(5000000);
+    });
+  });
+
+  describe('personal payment scope', () => {
+    async function insertOrganizationCredits(
+      ownerId: string,
+      rows: { amount_microdollars: number; is_free: boolean }[]
+    ) {
+      const organization = await createTestOrganization(
+        `Payment scope ${crypto.randomUUID()}`,
+        ownerId,
+        0
+      );
+      await db.insert(credit_transactions).values(
+        rows.map(row => ({
+          kilo_user_id: ownerId,
+          organization_id: organization.id,
+          is_free: row.is_free,
+          amount_microdollars: row.amount_microdollars,
+          description: 'Organization credit',
+          original_baseline_microdollars_used: 0,
+        }))
+      );
+    }
+
+    test('ignores organization-funded rows in personal payments and credit totals', async () => {
+      const user = await insertTestUser();
+      await insertOrganizationCredits(user.id, [
+        { amount_microdollars: 50000000, is_free: false },
+        { amount_microdollars: 5000000, is_free: true },
+      ]);
+
+      const payments = await summarizeUserPayments(user.id);
+      expect(payments.payments_count).toBe(0);
+      expect(payments.payments_total_microdollars).toBe(0);
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+      expect(summary.total_purchased_musd).toBe(0);
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(0);
+    });
+
+    test('counts only personal rows when the user also funded an organization', async () => {
+      const user = await insertTestUser();
+      await insertOrganizationCredits(user.id, [{ amount_microdollars: 50000000, is_free: false }]);
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        is_free: false,
+        amount_microdollars: 20000000,
+        description: 'Personal top-up',
+        stripe_payment_id: `pi_${crypto.randomUUID()}`,
+        original_baseline_microdollars_used: 0,
+      });
+
+      const payments = await summarizeUserPayments(user.id);
+      expect(payments.payments_count).toBe(1);
+      expect(payments.payments_total_microdollars).toBe(20000000);
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+      expect(summary.total_purchased_musd).toBe(20000000);
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(1);
+    });
+  });
+});

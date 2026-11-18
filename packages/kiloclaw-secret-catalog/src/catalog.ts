@@ -288,11 +288,6 @@ export const FIELD_KEY_TO_ENTRY: ReadonlyMap<string, SecretCatalogEntry> = new M
   SECRET_CATALOG.flatMap(entry => entry.fields.map(field => [field.key, entry]))
 );
 
-/** Largest maxLength across all catalog fields (for blanket Zod schema caps) */
-export const MAX_SECRET_FIELD_LENGTH: number = Math.max(
-  ...SECRET_CATALOG.flatMap(entry => entry.fields.map(field => field.maxLength))
-);
-
 /** Set of all env var names from catalog entries (for SENSITIVE_KEYS classification) */
 export const ALL_SECRET_ENV_VARS: ReadonlySet<string> = new Set(
   SECRET_CATALOG.flatMap(entry => entry.fields.map(field => field.envVar))
@@ -590,11 +585,4 @@ export function isValidConfigPath(path: string): boolean {
 
   // Must match at least one allowed pattern
   return ALLOWED_CONFIG_PATH_PATTERNS.some(pattern => matchesPattern(path, pattern));
-}
-
-/**
- * Return all allowed config path patterns for UI display (e.g. autocomplete).
- */
-export function getAllowedConfigPathPatterns(): readonly string[] {
-  return ALLOWED_CONFIG_PATH_PATTERNS;
 }

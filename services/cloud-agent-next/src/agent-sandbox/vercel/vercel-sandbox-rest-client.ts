@@ -1,0 +1,1052 @@
+import {
+  vercelSandboxResourcesSchema,
+  type VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import { z } from 'zod';
+
+const VERCEL_SANDBOX_API_BASE_URL = 'https://api.vercel.com';
+/** Names this service creates: legacy isolated `ses-` keys and placed control-plane `sbx-` keys. */
+const VERCEL_SANDBOX_NAME = /^(ses|sbx)-[A-Za-z0-9_-]+$/;
+const MAX_JSON_RESPONSE_BYTES = 1024 * 1024;
+const MAX_NDJSON_RESPONSE_BYTES = 1024 * 1024;
+const MAX_NDJSON_LINE_BYTES = 256 * 1024;
+const MAX_NDJSON_LINES = 2;
+const OBSERVATION_CONTROL_DEADLINE_MS = 30_000;
+const STANDARD_REQUEST_DEADLINE_MS = 120_000;
+const WAITED_COMMAND_TRANSPORT_ALLOWANCE_MS = 10_000;
+const MAX_PROVIDER_REQUEST_DEADLINE_MS = 300_000;
+const DEFAULT_SNAPSHOT_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export const VERCEL_CLOUD_AGENT_RESOURCE_TAG = 'kilo-managed-by';
+export const VERCEL_CLOUD_AGENT_RESOURCE_TAG_VALUE = 'cloud-agent-session';
+export const VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG = 'kilo-create-operation';
+export const VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG = 'kilo-runtime-build';
+
+const runtimeSchema = z.enum(['node22', 'node24', 'node26', 'python3.13']);
+const statusSchema = z.enum([
+  'failed',
+  'aborted',
+  'pending',
+  'stopping',
+  'snapshotting',
+  'running',
+  'stopped',
+]);
+const sandboxResourceSchema = z.object({
+  name: z.string(),
+  currentSessionId: z.string(),
+  status: z.enum(['stopping', 'running', 'stopped']),
+  persistent: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  tags: z.record(z.string(), z.string()).optional().default({}),
+});
+const sessionSchema = z.object({
+  id: z.string(),
+  sourceSandboxName: z.string(),
+  projectId: z.string(),
+  sourceSnapshotId: z.string().optional(),
+  runtime: z.string(),
+  status: statusSchema,
+  memory: z.number(),
+  vcpus: z.number(),
+  region: z.string(),
+  timeout: z.number(),
+  requestedAt: z.number(),
+  startedAt: z.number().optional(),
+  requestedStopAt: z.number().optional(),
+  stoppedAt: z.number().optional(),
+  abortedAt: z.number().optional(),
+  duration: z.number().optional(),
+  cwd: z.string(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+const routeSchema = z.object({
+  url: z.string(),
+  subdomain: z.string(),
+  port: z.number(),
+});
+const commandSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  sessionId: z.string(),
+  exitCode: z.number().nullable(),
+  startedAt: z.number(),
+});
+const finishedCommandSchema = commandSchema.extend({ exitCode: z.number() });
+const sandboxEnvelopeSchema = z.object({
+  sandbox: sandboxResourceSchema,
+  session: sessionSchema,
+  routes: z.array(routeSchema),
+});
+const inspectedSandboxEnvelopeSchema = sandboxEnvelopeSchema.extend({ resumed: z.literal(false) });
+const sessionEnvelopeSchema = z.object({ session: sessionSchema });
+const sessionAndRoutesEnvelopeSchema = sessionEnvelopeSchema.extend({
+  routes: z.array(routeSchema),
+});
+const commandEnvelopeSchema = z.object({ command: commandSchema });
+const finishedCommandEnvelopeSchema = z.object({ command: finishedCommandSchema });
+const commandsEnvelopeSchema = z.object({ commands: z.array(commandSchema) });
+const snapshotSchema = z
+  .object({
+    id: z.string().min(1),
+    sourceSessionId: z.string().min(1),
+    status: z.string().min(1),
+    createdAt: z.number().optional(),
+    expiresAt: z.number().optional(),
+  })
+  .passthrough();
+const snapshotEnvelopeSchema = z.object({ snapshot: snapshotSchema });
+const snapshotsEnvelopeSchema = z.object({
+  snapshots: z.array(snapshotSchema),
+  pagination: z.object({ next: z.string().min(1).nullable() }),
+});
+const teamDetailsSchema = z
+  .object({ id: z.string().min(1), slug: z.string().min(1) })
+  .passthrough();
+const projectDetailsSchema = z
+  .object({ id: z.string().min(1), name: z.string().min(1), accountId: z.string().min(1) })
+  .passthrough();
+
+export type VercelSandboxRuntime = z.infer<typeof runtimeSchema>;
+export type VercelSandboxResource = z.infer<typeof sandboxResourceSchema>;
+export type VercelSandboxSession = z.infer<typeof sessionSchema>;
+export type VercelSandboxRoute = z.infer<typeof routeSchema>;
+export type VercelSandboxCommand = z.infer<typeof commandSchema>;
+export type VercelSandboxSnapshot = z.infer<typeof snapshotSchema>;
+
+export type VercelSandboxMatcher = { exact: string } | { startsWith: string };
+
+export type VercelSandboxInjectionRule = {
+  domain: string;
+  headers: Record<string, string>;
+  match: {
+    headers: Array<{ key: { exact: string }; value: { exact: string } }>;
+    path?: VercelSandboxMatcher;
+    method?: string[];
+  };
+};
+
+export type VercelSandboxNetworkPolicy = {
+  allow: Record<
+    string,
+    Array<
+      | {
+          match: VercelSandboxInjectionRule['match'];
+          transform: Array<{ headers: Record<string, string> }>;
+        }
+      | { forwardURL: string }
+    >
+  >;
+};
+
+export type VercelSandboxRestClientConfig = {
+  accessToken: string;
+  projectId?: string;
+  teamId: string;
+  scope?: 'team' | 'project';
+  fetch: typeof fetch;
+};
+
+type CreateSandboxInputBase = {
+  name: string;
+  operationId: string;
+  runtimeBuildId: string;
+  runtime: VercelSandboxRuntime;
+  timeoutMs: number;
+  resources?: VercelSandboxResources;
+  networkPolicy?: VercelSandboxNetworkPolicy;
+};
+
+/** Source is explicit so a builder cannot accidentally boot from a runtime snapshot. */
+export type CreateSandboxInput =
+  | (CreateSandboxInputBase & {
+      source: { type: 'runtime' };
+      /** Compatibility-only input for older callers; ignored when source is present. */
+      snapshotId?: never;
+    })
+  | (CreateSandboxInputBase & {
+      source: { type: 'snapshot'; snapshotId: string };
+      /** Compatibility-only input for older callers; ignored when source is present. */
+      snapshotId?: never;
+    })
+  | (CreateSandboxInputBase & {
+      /** Legacy snapshot form retained for existing platform sessions. */
+      snapshotId: string;
+      source?: never;
+    });
+
+export type CreateSandboxInspectInput = Omit<CreateSandboxInputBase, 'timeoutMs'> &
+  (
+    | { source: { type: 'runtime' }; snapshotId?: never }
+    | { source: { type: 'snapshot'; snapshotId: string }; snapshotId?: never }
+    | { snapshotId: string; source?: never }
+  );
+
+export type VercelSandboxCreateEnvelope = {
+  sandbox: VercelSandboxResource;
+  session: VercelSandboxSession;
+  routes: VercelSandboxRoute[];
+  runtime: { sandboxName: string; sessionId: string };
+};
+
+export type ExecuteCommandInput = {
+  command: string;
+  args: string[];
+  cwd?: string;
+  env: Record<string, string>;
+  sudo: boolean;
+  timeoutMs?: number;
+  wait: boolean;
+};
+
+export type WaitedCommandResult = {
+  command: VercelSandboxCommand;
+  finished: VercelSandboxCommand & { exitCode: number };
+};
+
+export type VercelSandboxFile = {
+  path: string;
+  content: string | Uint8Array;
+};
+
+type VercelSandboxOperation =
+  | 'inspect'
+  | 'create'
+  | 'get-session'
+  | 'execute-command'
+  | 'list-commands'
+  | 'get-command'
+  | 'kill-command'
+  | 'write-files'
+  | 'read-file'
+  | 'extend-timeout'
+  | 'update-network-policy'
+  | 'stop-session'
+  | 'create-snapshot'
+  | 'delete-snapshot'
+  | 'list-snapshots'
+  | 'get-snapshot'
+  | 'get-team'
+  | 'get-project';
+export type VercelSandboxErrorKind =
+  | 'invalid_configuration'
+  | 'invalid_request'
+  | 'request_failed'
+  | 'invalid_response'
+  | 'response_too_large'
+  | 'correlation_mismatch';
+
+export class VercelSandboxRestError extends Error {
+  constructor(
+    public readonly kind: VercelSandboxErrorKind,
+    public readonly operation: VercelSandboxOperation,
+    public readonly status?: number
+  ) {
+    super(
+      status === undefined
+        ? `Vercel Sandbox ${operation} failed (${kind})`
+        : `Vercel Sandbox ${operation} failed (${kind}, status ${status})`
+    );
+    this.name = 'VercelSandboxRestError';
+  }
+}
+
+function requireValue(value: string, operation: VercelSandboxOperation): void {
+  if (value.length === 0) throw new VercelSandboxRestError('invalid_configuration', operation);
+}
+
+function requireIdentifier(value: string, operation: VercelSandboxOperation): void {
+  if (value.length === 0 || value.length > 256) {
+    throw new VercelSandboxRestError('invalid_request', operation);
+  }
+}
+
+function requireSandboxName(name: string, operation: VercelSandboxOperation): void {
+  if (name.length > 128 || !VERCEL_SANDBOX_NAME.test(name)) {
+    throw new VercelSandboxRestError('invalid_request', operation);
+  }
+}
+
+function requirePositiveDuration(value: number, operation: VercelSandboxOperation): void {
+  if (!Number.isInteger(value) || value < 1000) {
+    throw new VercelSandboxRestError('invalid_request', operation);
+  }
+}
+
+function writeTarString(header: Uint8Array, offset: number, length: number, value: string): void {
+  const bytes = new TextEncoder().encode(value);
+  if (bytes.byteLength >= length)
+    throw new VercelSandboxRestError('invalid_request', 'write-files');
+  header.set(bytes, offset);
+}
+
+function writeTarOctal(header: Uint8Array, offset: number, length: number, value: number): void {
+  writeTarString(header, offset, length, value.toString(8).padStart(length - 1, '0'));
+}
+
+async function createGzipTar(files: VercelSandboxFile[]): Promise<Uint8Array> {
+  const encoder = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  for (const file of files) {
+    if (!file.path || file.path.startsWith('/') || file.path.includes('..')) {
+      throw new VercelSandboxRestError('invalid_request', 'write-files');
+    }
+    const content = typeof file.content === 'string' ? encoder.encode(file.content) : file.content;
+    const header = new Uint8Array(512);
+    writeTarString(header, 0, 100, file.path);
+    writeTarOctal(header, 100, 8, 0o600);
+    writeTarOctal(header, 108, 8, 0);
+    writeTarOctal(header, 116, 8, 0);
+    writeTarOctal(header, 124, 12, content.byteLength);
+    writeTarOctal(header, 136, 12, 0);
+    header.fill(0x20, 148, 156);
+    header[156] = 0x30;
+    writeTarString(header, 257, 8, 'ustar  ');
+    const checksum = header.reduce((sum, byte) => sum + byte, 0);
+    writeTarOctal(header, 148, 8, checksum);
+    chunks.push(header, content);
+    const padding = (512 - (content.byteLength % 512)) % 512;
+    if (padding) chunks.push(new Uint8Array(padding));
+  }
+  chunks.push(new Uint8Array(1024));
+  const stream = new Blob(chunks).stream().pipeThrough(new CompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function correlateSession(
+  session: VercelSandboxSession,
+  expectedSessionId: string,
+  expectedSandboxName: string | undefined,
+  operation: VercelSandboxOperation
+): void {
+  if (
+    session.id !== expectedSessionId ||
+    (expectedSandboxName !== undefined && session.sourceSandboxName !== expectedSandboxName)
+  ) {
+    throw new VercelSandboxRestError('correlation_mismatch', operation);
+  }
+}
+
+function correlateCommand(
+  command: VercelSandboxCommand,
+  expectedSessionId: string,
+  expectedCommandId: string | undefined,
+  operation: VercelSandboxOperation
+): void {
+  if (
+    command.sessionId !== expectedSessionId ||
+    (expectedCommandId !== undefined && command.id !== expectedCommandId)
+  ) {
+    throw new VercelSandboxRestError('correlation_mismatch', operation);
+  }
+}
+
+export class VercelSandboxRestClient {
+  private readonly responseSignals = new WeakMap<Response, AbortSignal>();
+
+  constructor(private readonly config: VercelSandboxRestClientConfig) {}
+
+  async createSandbox(input: CreateSandboxInput): Promise<VercelSandboxCreateEnvelope> {
+    const operation = 'create';
+    const projectId = this.requireProjectConfiguration(operation);
+    requireSandboxName(input.name, operation);
+    requireIdentifier(input.operationId, operation);
+    requireIdentifier(input.runtimeBuildId, operation);
+    requirePositiveDuration(input.timeoutMs, operation);
+    if (
+      !runtimeSchema.safeParse(input.runtime).success ||
+      !vercelSandboxResourcesSchema.optional().safeParse(input.resources).success
+    ) {
+      throw new VercelSandboxRestError('invalid_request', operation);
+    }
+    const source = sourceForInput(input, operation);
+
+    const response = await this.fetchProvider(operation, this.collectionUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId,
+        name: input.name,
+        ...(source.type === 'snapshot' ? { source } : {}),
+        runtime: input.runtime,
+        timeout: input.timeoutMs,
+        persistent: false,
+        tags: {
+          [VERCEL_CLOUD_AGENT_RESOURCE_TAG]: VERCEL_CLOUD_AGENT_RESOURCE_TAG_VALUE,
+          [VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG]: input.operationId,
+          [VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG]: input.runtimeBuildId,
+        },
+        ...(input.resources === undefined ? {} : { resources: input.resources }),
+        ...(input.networkPolicy === undefined ? {} : { networkPolicy: input.networkPolicy }),
+      }),
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, sandboxEnvelopeSchema, operation);
+    this.correlateCreateEnvelope(envelope, input, operation);
+    return this.withRuntime(envelope);
+  }
+
+  async inspectByName(
+    input: CreateSandboxInspectInput
+  ): Promise<VercelSandboxCreateEnvelope | null> {
+    const operation = 'inspect';
+    const projectId = this.requireProjectConfiguration(operation);
+    requireSandboxName(input.name, operation);
+    requireIdentifier(input.operationId, operation);
+    requireIdentifier(input.runtimeBuildId, operation);
+    if (
+      !runtimeSchema.safeParse(input.runtime).success ||
+      !vercelSandboxResourcesSchema.optional().safeParse(input.resources).success
+    ) {
+      throw new VercelSandboxRestError('invalid_request', operation);
+    }
+    sourceForInput(input, operation);
+    const url = this.namedSandboxUrl(input.name, projectId);
+    url.searchParams.set('resume', 'false');
+    const response = await this.fetchProvider(operation, url, { method: 'GET' });
+    if (response.status === 404) return null;
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, inspectedSandboxEnvelopeSchema, operation);
+    this.correlateCreateEnvelope(envelope, input, operation);
+    return this.withRuntime(envelope);
+  }
+
+  async createSnapshot(
+    sessionId: string,
+    expiration = DEFAULT_SNAPSHOT_EXPIRATION_MS
+  ): Promise<VercelSandboxSnapshot> {
+    const operation = 'create-snapshot';
+    this.validateConfiguration(operation);
+    requireIdentifier(sessionId, operation);
+    this.requireProjectConfiguration(operation);
+    if (!Number.isInteger(expiration) || expiration < 0) {
+      throw new VercelSandboxRestError('invalid_request', operation);
+    }
+    const response = await this.fetchProvider(
+      operation,
+      this.sessionActionUrl(sessionId, 'snapshot'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiration }),
+      },
+      STANDARD_REQUEST_DEADLINE_MS
+    );
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, snapshotEnvelopeSchema, operation);
+    if (envelope.snapshot.sourceSessionId !== sessionId || envelope.snapshot.status !== 'created') {
+      throw new VercelSandboxRestError('correlation_mismatch', operation);
+    }
+    return envelope.snapshot;
+  }
+
+  async deleteSnapshot(snapshotId: string): Promise<void> {
+    const operation = 'delete-snapshot';
+    this.validateConfiguration(operation);
+    requireIdentifier(snapshotId, operation);
+    const url = new URL(
+      `/v2/sandboxes/snapshots/${encodeURIComponent(snapshotId)}`,
+      VERCEL_SANDBOX_API_BASE_URL
+    );
+    this.applyTeamScope(url);
+    const response = await this.fetchProvider(operation, url, { method: 'DELETE' });
+    if (response.status === 404 || response.status === 410) {
+      await response.body?.cancel().catch(() => undefined);
+      return;
+    }
+    await this.requireSuccessfulResponse(response, operation);
+    const snapshot = (await this.parseJson(response, snapshotEnvelopeSchema, operation)).snapshot;
+    if (snapshot.id !== snapshotId || snapshot.status !== 'deleted') {
+      throw new VercelSandboxRestError('correlation_mismatch', operation);
+    }
+  }
+
+  async listSnapshots(): Promise<VercelSandboxSnapshot[]> {
+    const operation = 'list-snapshots';
+    const projectId = this.requireProjectConfiguration(operation);
+    const url = new URL('/v2/sandboxes/snapshots', VERCEL_SANDBOX_API_BASE_URL);
+    this.applyTeamScope(url);
+    url.searchParams.set('project', projectId);
+    url.searchParams.set('limit', '50');
+    const snapshots: VercelSandboxSnapshot[] = [];
+    const cursors = new Set<string>();
+    for (let page = 0; page < 100; page++) {
+      const response = await this.fetchProvider(operation, url, { method: 'GET' });
+      await this.requireSuccessfulResponse(response, operation);
+      const result = await this.parseJson(response, snapshotsEnvelopeSchema, operation);
+      snapshots.push(...result.snapshots);
+      const cursor = result.pagination.next;
+      if (cursor === null) return snapshots;
+      if (cursors.has(cursor)) throw new VercelSandboxRestError('invalid_response', operation);
+      cursors.add(cursor);
+      url.searchParams.set('cursor', cursor);
+    }
+    throw new VercelSandboxRestError('invalid_response', operation);
+  }
+
+  /** One snapshot in any status. A deleted or unknown ID fails with status 404. */
+  async getSnapshot(snapshotId: string): Promise<VercelSandboxSnapshot> {
+    const operation = 'get-snapshot';
+    this.validateConfiguration(operation);
+    requireIdentifier(snapshotId, operation);
+    const url = new URL(
+      `/v2/sandboxes/snapshots/${encodeURIComponent(snapshotId)}`,
+      VERCEL_SANDBOX_API_BASE_URL
+    );
+    this.applyTeamScope(url);
+    const response = await this.fetchProvider(operation, url, { method: 'GET' });
+    await this.requireSuccessfulResponse(response, operation);
+    const snapshot = (await this.parseJson(response, snapshotEnvelopeSchema, operation)).snapshot;
+    if (snapshot.id !== snapshotId) {
+      throw new VercelSandboxRestError('correlation_mismatch', operation);
+    }
+    return snapshot;
+  }
+
+  /** One snapshot that must already be created. */
+  async inspectSnapshot(snapshotId: string): Promise<VercelSandboxSnapshot> {
+    const snapshot = await this.getSnapshot(snapshotId);
+    if (snapshot.status !== 'created') {
+      throw new VercelSandboxRestError('correlation_mismatch', 'get-snapshot');
+    }
+    return snapshot;
+  }
+
+  async inspectTeam(): Promise<{ id: string; slug: string }> {
+    const operation = 'get-team';
+    this.validateConfiguration(operation);
+    const response = await this.fetchProvider(
+      operation,
+      new URL(`/v2/teams/${encodeURIComponent(this.config.teamId)}`, VERCEL_SANDBOX_API_BASE_URL),
+      { method: 'GET' }
+    );
+    await this.requireSuccessfulResponse(response, operation);
+    const team = await this.parseJson(response, teamDetailsSchema, operation);
+    if (team.id !== this.config.teamId) {
+      throw new VercelSandboxRestError('correlation_mismatch', operation);
+    }
+    return team;
+  }
+
+  async inspectProject(): Promise<{ id: string; name: string; accountId: string }> {
+    const operation = 'get-project';
+    const projectId = this.requireProjectConfiguration(operation);
+    const url = new URL(
+      `/v9/projects/${encodeURIComponent(projectId)}`,
+      VERCEL_SANDBOX_API_BASE_URL
+    );
+    this.applyTeamScope(url);
+    const response = await this.fetchProvider(operation, url, { method: 'GET' });
+    await this.requireSuccessfulResponse(response, operation);
+    const project = await this.parseJson(response, projectDetailsSchema, operation);
+    if (project.id !== projectId || project.accountId !== this.config.teamId) {
+      throw new VercelSandboxRestError('correlation_mismatch', operation);
+    }
+    return project;
+  }
+
+  async getSession(
+    sessionId: string,
+    expectedSandboxName: string
+  ): Promise<{ session: VercelSandboxSession; routes: VercelSandboxRoute[] }> {
+    const operation = 'get-session';
+    this.validateSessionTarget(sessionId, expectedSandboxName, operation);
+    const response = await this.fetchProvider(operation, this.sessionUrl(sessionId), {
+      method: 'GET',
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, sessionAndRoutesEnvelopeSchema, operation);
+    correlateSession(envelope.session, sessionId, expectedSandboxName, operation);
+    return envelope;
+  }
+
+  async executeCommand(
+    sessionId: string,
+    input: ExecuteCommandInput & { wait: true }
+  ): Promise<WaitedCommandResult>;
+  async executeCommand(
+    sessionId: string,
+    input: ExecuteCommandInput & { wait: false }
+  ): Promise<VercelSandboxCommand>;
+  async executeCommand(
+    sessionId: string,
+    input: ExecuteCommandInput
+  ): Promise<VercelSandboxCommand | WaitedCommandResult> {
+    const operation = 'execute-command';
+    this.validateConfiguration(operation);
+    requireIdentifier(sessionId, operation);
+    requireIdentifier(input.command, operation);
+    if (input.timeoutMs !== undefined) requirePositiveDuration(input.timeoutMs, operation);
+    const response = await this.fetchProvider(
+      operation,
+      this.commandsUrl(sessionId),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          command: input.command,
+          args: input.args,
+          cwd: input.cwd,
+          env: input.env,
+          sudo: input.sudo,
+          ...(input.wait ? { wait: true } : {}),
+          timeout: input.timeoutMs,
+        }),
+      },
+      input.wait ? this.waitedCommandDeadlineMs(input.timeoutMs) : undefined
+    );
+    await this.requireSuccessfulResponse(response, operation);
+    if (input.wait) return this.parseWaitedCommand(response, sessionId, operation);
+    const envelope = await this.parseJson(response, commandEnvelopeSchema, operation);
+    correlateCommand(envelope.command, sessionId, undefined, operation);
+    return envelope.command;
+  }
+
+  async listCommands(sessionId: string): Promise<VercelSandboxCommand[]> {
+    const operation = 'list-commands';
+    this.validateConfiguration(operation);
+    requireIdentifier(sessionId, operation);
+    const response = await this.fetchProvider(operation, this.commandsUrl(sessionId), {
+      method: 'GET',
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, commandsEnvelopeSchema, operation);
+    for (const command of envelope.commands) {
+      correlateCommand(command, sessionId, undefined, operation);
+    }
+    return envelope.commands;
+  }
+
+  async getCommand(sessionId: string, commandId: string): Promise<VercelSandboxCommand> {
+    const operation = 'get-command';
+    this.validateCommandTarget(sessionId, commandId, operation);
+    const response = await this.fetchProvider(operation, this.commandUrl(sessionId, commandId), {
+      method: 'GET',
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, commandEnvelopeSchema, operation);
+    correlateCommand(envelope.command, sessionId, commandId, operation);
+    return envelope.command;
+  }
+
+  async killCommand(
+    sessionId: string,
+    commandId: string,
+    signal: number
+  ): Promise<VercelSandboxCommand> {
+    const operation = 'kill-command';
+    this.validateCommandTarget(sessionId, commandId, operation);
+    if (!Number.isInteger(signal) || signal < 1 || signal > 64) {
+      throw new VercelSandboxRestError('invalid_request', operation);
+    }
+    const url = new URL(
+      `${this.commandUrl(sessionId, commandId).pathname}/kill`,
+      VERCEL_SANDBOX_API_BASE_URL
+    );
+    this.applyTeamScope(url);
+    const response = await this.fetchProvider(operation, url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signal }),
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, commandEnvelopeSchema, operation);
+    correlateCommand(envelope.command, sessionId, commandId, operation);
+    return envelope.command;
+  }
+
+  async writeFiles(sessionId: string, cwd: string, files: VercelSandboxFile[]): Promise<void> {
+    const operation = 'write-files';
+    this.validateConfiguration(operation);
+    requireIdentifier(sessionId, operation);
+    if (!cwd.startsWith('/') || files.length === 0) {
+      throw new VercelSandboxRestError('invalid_request', operation);
+    }
+    const response = await this.fetchProvider(operation, this.fileActionUrl(sessionId, 'write'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/gzip', 'x-cwd': cwd },
+      body: await createGzipTar(files),
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    await response.body?.cancel().catch(() => undefined);
+  }
+
+  async readFile(sessionId: string, path: string, maxBytes: number): Promise<Uint8Array> {
+    const operation = 'read-file';
+    this.validateConfiguration(operation);
+    requireIdentifier(sessionId, operation);
+    if (!path.startsWith('/') || !Number.isInteger(maxBytes) || maxBytes < 1) {
+      throw new VercelSandboxRestError('invalid_request', operation);
+    }
+    const response = await this.fetchProvider(operation, this.fileActionUrl(sessionId, 'read'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    return this.readBoundedBytes(response, maxBytes, operation);
+  }
+
+  async updateNetworkPolicy(
+    sessionId: string,
+    expectedSandboxName: string,
+    networkPolicy: VercelSandboxNetworkPolicy
+  ): Promise<VercelSandboxSession> {
+    const operation = 'update-network-policy';
+    this.validateSessionTarget(sessionId, expectedSandboxName, operation);
+    const response = await this.fetchProvider(
+      operation,
+      this.sessionActionUrl(sessionId, 'network-policy'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(networkPolicy),
+      }
+    );
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, sessionEnvelopeSchema, operation);
+    correlateSession(envelope.session, sessionId, expectedSandboxName, operation);
+    return envelope.session;
+  }
+
+  async extendSessionTimeout(
+    sessionId: string,
+    expectedSandboxName: string,
+    durationMs: number
+  ): Promise<VercelSandboxSession> {
+    const operation = 'extend-timeout';
+    this.validateSessionTarget(sessionId, expectedSandboxName, operation);
+    requirePositiveDuration(durationMs, operation);
+    const response = await this.fetchProvider(
+      operation,
+      this.sessionActionUrl(sessionId, 'extend-timeout'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration: durationMs }),
+      }
+    );
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, sessionEnvelopeSchema, operation);
+    correlateSession(envelope.session, sessionId, expectedSandboxName, operation);
+    return envelope.session;
+  }
+
+  async stopSession(sessionId: string, expectedSandboxName: string): Promise<VercelSandboxSession> {
+    const operation = 'stop-session';
+    this.validateSessionTarget(sessionId, expectedSandboxName, operation);
+    const response = await this.fetchProvider(operation, this.sessionActionUrl(sessionId, 'stop'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, sessionEnvelopeSchema, operation);
+    correlateSession(envelope.session, sessionId, expectedSandboxName, operation);
+    return envelope.session;
+  }
+
+  private correlateCreateEnvelope(
+    envelope: z.infer<typeof sandboxEnvelopeSchema>,
+    input: CreateSandboxInspectInput,
+    operation: VercelSandboxOperation
+  ): void {
+    const tags = envelope.sandbox.tags;
+    if (
+      envelope.sandbox.name !== input.name ||
+      envelope.sandbox.persistent ||
+      envelope.sandbox.currentSessionId !== envelope.session.id ||
+      envelope.session.sourceSandboxName !== input.name ||
+      envelope.session.projectId !== this.config.projectId ||
+      envelope.session.sourceSnapshotId !== sourceSnapshotId(input, operation) ||
+      envelope.session.runtime !== input.runtime ||
+      (input.resources !== undefined &&
+        (envelope.session.vcpus !== input.resources.vcpus ||
+          envelope.session.memory !== input.resources.memory)) ||
+      tags[VERCEL_CLOUD_AGENT_RESOURCE_TAG] !== VERCEL_CLOUD_AGENT_RESOURCE_TAG_VALUE ||
+      tags[VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG] !== input.operationId ||
+      tags[VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG] !== input.runtimeBuildId
+    ) {
+      throw new VercelSandboxRestError('correlation_mismatch', operation);
+    }
+  }
+
+  private withRuntime(
+    envelope: z.infer<typeof sandboxEnvelopeSchema>
+  ): VercelSandboxCreateEnvelope {
+    return {
+      ...envelope,
+      runtime: { sandboxName: envelope.sandbox.name, sessionId: envelope.session.id },
+    };
+  }
+
+  private validateConfiguration(operation: VercelSandboxOperation): void {
+    requireValue(this.config.accessToken, operation);
+    requireValue(this.config.teamId, operation);
+  }
+
+  private requireProjectConfiguration(operation: VercelSandboxOperation): string {
+    this.validateConfiguration(operation);
+    const projectId = this.config.projectId;
+    if (!projectId) throw new VercelSandboxRestError('invalid_configuration', operation);
+    return projectId;
+  }
+
+  private validateSessionTarget(
+    sessionId: string,
+    sandboxName: string,
+    operation: VercelSandboxOperation
+  ): void {
+    this.validateConfiguration(operation);
+    requireIdentifier(sessionId, operation);
+    requireSandboxName(sandboxName, operation);
+  }
+
+  private validateCommandTarget(
+    sessionId: string,
+    commandId: string,
+    operation: VercelSandboxOperation
+  ): void {
+    this.validateConfiguration(operation);
+    requireIdentifier(sessionId, operation);
+    requireIdentifier(commandId, operation);
+  }
+
+  private collectionUrl(): URL {
+    const url = new URL('/v2/sandboxes', VERCEL_SANDBOX_API_BASE_URL);
+    this.applyTeamScope(url);
+    return url;
+  }
+
+  private namedSandboxUrl(name: string, projectId: string): URL {
+    const url = new URL(`/v2/sandboxes/${encodeURIComponent(name)}`, VERCEL_SANDBOX_API_BASE_URL);
+    url.searchParams.set('projectId', projectId);
+    this.applyTeamScope(url);
+    return url;
+  }
+
+  private sessionUrl(sessionId: string): URL {
+    const url = new URL(
+      `/v2/sandboxes/sessions/${encodeURIComponent(sessionId)}`,
+      VERCEL_SANDBOX_API_BASE_URL
+    );
+    this.applyTeamScope(url);
+    return url;
+  }
+
+  private commandsUrl(sessionId: string): URL {
+    const url = new URL(`${this.sessionUrl(sessionId).pathname}/cmd`, VERCEL_SANDBOX_API_BASE_URL);
+    this.applyTeamScope(url);
+    return url;
+  }
+
+  private commandUrl(sessionId: string, commandId: string): URL {
+    const url = new URL(
+      `${this.commandsUrl(sessionId).pathname}/${encodeURIComponent(commandId)}`,
+      VERCEL_SANDBOX_API_BASE_URL
+    );
+    this.applyTeamScope(url);
+    return url;
+  }
+
+  private sessionActionUrl(sessionId: string, action: string): URL {
+    const url = new URL(
+      `${this.sessionUrl(sessionId).pathname}/${action}`,
+      VERCEL_SANDBOX_API_BASE_URL
+    );
+    this.applyTeamScope(url);
+    return url;
+  }
+
+  private fileActionUrl(sessionId: string, action: 'read' | 'write'): URL {
+    return this.sessionActionUrl(sessionId, `fs/${action}`);
+  }
+
+  private applyTeamScope(url: URL): void {
+    if (this.config.scope !== 'project') url.searchParams.set('teamId', this.config.teamId);
+  }
+
+  private requestDeadlineMs(operation: VercelSandboxOperation): number {
+    switch (operation) {
+      case 'create':
+      case 'execute-command':
+      case 'write-files':
+      case 'read-file':
+        return STANDARD_REQUEST_DEADLINE_MS;
+      default:
+        return OBSERVATION_CONTROL_DEADLINE_MS;
+    }
+  }
+
+  private waitedCommandDeadlineMs(commandTimeoutMs: number | undefined): number {
+    if (commandTimeoutMs === undefined) return STANDARD_REQUEST_DEADLINE_MS;
+    return Math.min(
+      commandTimeoutMs + WAITED_COMMAND_TRANSPORT_ALLOWANCE_MS,
+      MAX_PROVIDER_REQUEST_DEADLINE_MS
+    );
+  }
+
+  private async fetchProvider(
+    operation: VercelSandboxOperation,
+    url: URL,
+    init: RequestInit,
+    deadlineMs = this.requestDeadlineMs(operation)
+  ): Promise<Response> {
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${this.config.accessToken}`);
+    const deadlineSignal = AbortSignal.timeout(deadlineMs);
+    const signal = init.signal ? AbortSignal.any([init.signal, deadlineSignal]) : deadlineSignal;
+    try {
+      const fetchImpl = this.config.fetch;
+      const response = await fetchImpl(url.toString(), {
+        ...init,
+        headers,
+        signal,
+        redirect: 'manual',
+      });
+      this.responseSignals.set(response, signal);
+      return response;
+    } catch {
+      throw new VercelSandboxRestError('request_failed', operation);
+    }
+  }
+
+  private async requireSuccessfulResponse(
+    response: Response,
+    operation: VercelSandboxOperation
+  ): Promise<void> {
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new VercelSandboxRestError('request_failed', operation, response.status);
+    }
+  }
+
+  private async parseJson<T>(
+    response: Response,
+    schema: z.ZodType<T>,
+    operation: VercelSandboxOperation
+  ): Promise<T> {
+    const text = await this.readBoundedText(response, MAX_JSON_RESPONSE_BYTES, operation);
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      throw new VercelSandboxRestError('invalid_response', operation);
+    }
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) throw new VercelSandboxRestError('invalid_response', operation);
+    return parsed.data;
+  }
+
+  private async parseWaitedCommand(
+    response: Response,
+    sessionId: string,
+    operation: VercelSandboxOperation
+  ): Promise<WaitedCommandResult> {
+    const contentType = response.headers.get('content-type')?.split(';', 1)[0].trim();
+    if (contentType !== 'application/x-ndjson') {
+      throw new VercelSandboxRestError('invalid_response', operation);
+    }
+    const text = await this.readBoundedText(response, MAX_NDJSON_RESPONSE_BYTES, operation);
+    const lines = text.split('\n').filter(line => line.length > 0);
+    if (
+      lines.length !== MAX_NDJSON_LINES ||
+      lines.some(line => new TextEncoder().encode(line).byteLength > MAX_NDJSON_LINE_BYTES)
+    ) {
+      throw new VercelSandboxRestError('invalid_response', operation);
+    }
+    let startedBody: unknown;
+    let finishedBody: unknown;
+    try {
+      startedBody = JSON.parse(lines[0]);
+      finishedBody = JSON.parse(lines[1]);
+    } catch {
+      throw new VercelSandboxRestError('invalid_response', operation);
+    }
+    const started = commandEnvelopeSchema.safeParse(startedBody);
+    const finished = finishedCommandEnvelopeSchema.safeParse(finishedBody);
+    if (!started.success || !finished.success) {
+      throw new VercelSandboxRestError('invalid_response', operation);
+    }
+    correlateCommand(started.data.command, sessionId, undefined, operation);
+    correlateCommand(finished.data.command, sessionId, started.data.command.id, operation);
+    return { command: started.data.command, finished: finished.data.command };
+  }
+
+  private async readBoundedText(
+    response: Response,
+    maxBytes: number,
+    operation: VercelSandboxOperation
+  ): Promise<string> {
+    return new TextDecoder().decode(await this.readBoundedBytes(response, maxBytes, operation));
+  }
+
+  private async readBoundedBytes(
+    response: Response,
+    maxBytes: number,
+    operation: VercelSandboxOperation
+  ): Promise<Uint8Array> {
+    const declaredLength = response.headers.get('content-length');
+    if (declaredLength !== null && Number(declaredLength) > maxBytes) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new VercelSandboxRestError('response_too_large', operation);
+    }
+    if (response.body === null) throw new VercelSandboxRestError('invalid_response', operation);
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let bytesRead = 0;
+    try {
+      while (true) {
+        const chunk: ReadableStreamReadResult<Uint8Array> = await reader.read();
+        if (chunk.done) break;
+        bytesRead += chunk.value.byteLength;
+        if (bytesRead > maxBytes) {
+          await reader.cancel().catch(() => undefined);
+          throw new VercelSandboxRestError('response_too_large', operation);
+        }
+        chunks.push(chunk.value);
+      }
+      const bytes = new Uint8Array(bytesRead);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return bytes;
+    } catch (error) {
+      if (error instanceof VercelSandboxRestError) throw error;
+      if (this.responseSignals.get(response)?.aborted) {
+        throw new VercelSandboxRestError('request_failed', operation);
+      }
+      throw new VercelSandboxRestError('invalid_response', operation);
+    } finally {
+      reader.releaseLock();
+    }
+  }
+}
+
+type CreateSandboxSourceInput = {
+  source?: { type: 'runtime' } | { type: 'snapshot'; snapshotId: string };
+  snapshotId?: string;
+};
+
+function sourceForInput(
+  input: CreateSandboxSourceInput,
+  operation: VercelSandboxOperation
+): { type: 'runtime' } | { type: 'snapshot'; snapshotId: string } {
+  const source = input.source ?? { type: 'snapshot', snapshotId: input.snapshotId ?? '' };
+  if (source.type === 'snapshot') requireIdentifier(source.snapshotId, operation);
+  return source;
+}
+
+function sourceSnapshotId(
+  input: CreateSandboxSourceInput,
+  operation: VercelSandboxOperation
+): string | undefined {
+  const source = sourceForInput(input, operation);
+  return source.type === 'snapshot' ? source.snapshotId : undefined;
+}

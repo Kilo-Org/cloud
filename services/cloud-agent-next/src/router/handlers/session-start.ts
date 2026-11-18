@@ -11,21 +11,13 @@
  * session ownership state is created.
  */
 import { protectedProcedure } from '../auth.js';
-import type { WorkerDb } from '@kilocode/db/client';
 import { logger, withLogTags } from '../../logger.js';
-import { getPgDb } from '../../db/pg.js';
 import type * as z from 'zod';
 import { StartSessionInput, StartSessionOutput } from '../schemas.js';
-import { startNewSession } from '../../session/session-registration.js';
-import {
-  assertModeAvailableForProfile,
-  profileResolutionPolicyForSessionCreateOrigin,
-  resolveEffectiveSessionConfiguration,
-} from './session-prepare.js';
+import type { ProfileInput, RepositoryInput } from '../schemas.js';
+import { createSessionWithLedger, startNewSession } from '../../session/session-registration.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
-import { assertKiloModelAvailable } from '../../model-validation.js';
-import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
-import { assertOrganizationMembership } from './organization-membership.js';
+import { preflightSessionCreation } from './session-creation-preflight.js';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
@@ -35,22 +27,22 @@ export function createSessionStartHandlers(): SessionStartHandlers {
   return { start: startSessionHandler };
 }
 
-function startInputToSessionCreateRequest(
-  input: z.infer<typeof StartSessionInput>
-): SessionCreateRequest {
-  const repo = input.repository;
-  const profile = input.profile;
-
-  let repository: SessionCreateRequest['repository'];
+export function repositoryInputToSessionRepository(
+  repo: RepositoryInput
+): SessionCreateRequest['repository'] {
   switch (repo.type) {
     case 'github':
-      repository = { type: 'github', repo: repo.repo, branch: repo.branch };
-      break;
+      return {
+        type: 'github',
+        repo: repo.repo,
+        githubAccessPurpose: 'workflow',
+        ...(repo.githubIntegrationId ? { githubIntegrationId: repo.githubIntegrationId } : {}),
+        branch: repo.branch,
+      };
     case 'gitlab':
-      repository = { type: 'gitlab', url: repo.url, branch: repo.branch };
-      break;
+      return { type: 'gitlab', url: repo.url, branch: repo.branch };
     case 'bitbucket':
-      repository = {
+      return {
         type: 'bitbucket',
         url: repo.url,
         workspaceUuid: repo.workspaceUuid,
@@ -58,27 +50,39 @@ function startInputToSessionCreateRequest(
         bitbucketIntegrationId: repo.bitbucketIntegrationId,
         branch: repo.branch,
       };
-      break;
     case 'git':
-      repository = { type: 'git', url: repo.url, token: repo.token, branch: repo.branch };
-      break;
+      return { type: 'git', url: repo.url, token: repo.token, branch: repo.branch };
   }
+}
+
+export function profileInputToSessionProfile(
+  profile: ProfileInput
+): SessionCreateRequest['profile'] {
+  return profile ? { id: profile.id, overrides: profile.overrides } : undefined;
+}
+
+function startInputToSessionCreateRequest(
+  input: z.infer<typeof StartSessionInput>
+): SessionCreateRequest {
+  const profile = input.profile;
+  const repository = {
+    ...repositoryInputToSessionRepository(input.repository),
+    ...(input.baseBranch === undefined ? {} : { baseBranch: input.baseBranch }),
+    ...(input.baseSha === undefined ? {} : { baseSha: input.baseSha }),
+  };
 
   return {
     initialTurn: {
       type: 'prompt',
       id: input.message.id,
       prompt: input.message.prompt,
-      attachments: input.message.attachments ?? input.message.images,
+      attachments: input.message.attachments,
     },
     agent: input.agent,
     repository,
-    profile: profile
-      ? {
-          id: profile.id,
-          overrides: profile.overrides,
-        }
-      : undefined,
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
+    ...(input.runtime ? { runtime: input.runtime } : {}),
+    profile: profileInputToSessionProfile(profile),
     finalization: input.finalization,
     options: input.options
       ? {
@@ -94,44 +98,43 @@ const startSessionHandler = protectedProcedure
   .output(StartSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'start' }, async () => {
-      const request = startInputToSessionCreateRequest(input);
-      const organizationId = request.options?.kilocodeOrganizationId;
-      let db: WorkerDb | undefined;
-      if (organizationId) {
-        db = getPgDb(ctx.env);
-        await assertOrganizationMembership(db, ctx.userId, organizationId);
-      }
-      await assertBitbucketRepositoryAccessBeforeSessionCreation({
-        env: ctx.env,
-        userId: ctx.userId,
-        orgId: organizationId,
-        repository: request.repository,
-      });
-
-      const policy = profileResolutionPolicyForSessionCreateOrigin(
-        input.options?.createdOnPlatform
-      );
-      const requestWithProfile = await resolveEffectiveSessionConfiguration(
+      const request = await preflightSessionCreation(
+        startInputToSessionCreateRequest(input),
         ctx,
-        request,
-        policy,
-        db
+        'start'
       );
-      assertModeAvailableForProfile(
-        requestWithProfile.agent.mode,
-        requestWithProfile.profile?.resolved ?? {}
-      );
-      await assertKiloModelAvailable({
-        env: ctx.env,
-        submittedModel: requestWithProfile.agent.model,
-        originalToken: ctx.authToken,
-        originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
-        createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
-        procedure: 'start',
-      });
+
+      if (input.operationKey !== undefined) {
+        const registration = await createSessionWithLedger(
+          request,
+          {
+            env: ctx.env,
+            userId: ctx.userId,
+            authToken: ctx.authToken,
+            botId: ctx.botId,
+          },
+          {
+            billingOrigin: 'cloud-agent',
+            operationKey: input.operationKey,
+            includeInitialMessage: true,
+            resolveSavedAllocationBeforeAdmission: true,
+            startedAt: Date.now(),
+          }
+        );
+        if (!registration.messageId) {
+          throw new Error('Session create completed without an initial message ID');
+        }
+        return {
+          cloudAgentSessionId: registration.cloudAgentSessionId,
+          kiloSessionId: registration.kiloSessionId,
+          messageId: registration.messageId,
+          replayed: registration.replayed === true,
+          delivery: registration.delivery ?? 'queued',
+        };
+      }
 
       const registration = await startNewSession(
-        requestWithProfile,
+        request,
         {
           env: ctx.env,
           userId: ctx.userId,

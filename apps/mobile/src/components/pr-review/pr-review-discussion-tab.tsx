@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the tab is the one surface that owns the Discussion state machine (merge/sort, expansion settle, pagination, reply-focus scroll) AND the single own-comment write path (edit route push + one-step delete confirm) this slice defines; moving the write out would scatter the one path the design keeps in one place. */
 // PR review Discussion tab body.
 //
 // State matrix (per S7b §6 Discussion + Batch F item 2):
@@ -6,8 +7,19 @@
 //                   "Load more" paginates threads. Full re-sort of
 //                   the entire loaded set on every update (R4: a
 //                   later page can insert rows mid-list).
+//   - filtered-empty: every row the page returned belongs to a
+//                   blocked or muted author (the list owns the
+//                   hidden-user filter). The list body renders the
+//                   empty state this tab hands it and keeps its
+//                   Load more / later-page retry footer, so the body
+//                   never reads as blank. A distinct message needs a
+//                   catalog key the translation slice owns.
 //   - loading:      first page in flight; render `Skeleton`
-//                   placeholders matching the row dimensions.
+//                   placeholders matching the row dimensions. A first
+//                   page that is pending but PAUSED (offline, or a fetch
+//                   that will never start) is not "in flight": it falls
+//                   to the retryable state below so the tab never sits
+//                   on a skeleton with no escape (spot check e7).
 //   - retryable:    first page failed with a transient error;
 //                   render `QueryError` with the standard Retry
 //                   CTA wired to `refetch()`.
@@ -28,6 +40,13 @@
 //                   kinds and a "Review files" CTA that switches
 //                   to the Files tab via `onRequestFiles`.
 //
+//   - bottom CTA:   the happy and empty views render a static
+//                   "Comment on this pull request" bar under the
+//                   body (`PrCommentCta`) that pushes the
+//                   conversation-comment formSheet. The loading
+//                   skeleton and the four terminal/error states
+//                   render full-body with no bar.
+//
 //   - later-page error: a per-page refetch failure during a
 //                       "Load more" tap. The current loaded
 //                       items are kept and a small retry row
@@ -43,23 +62,36 @@
 
 import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
+import { type Href, useIsFocused, useRouter } from 'expo-router';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
+import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import {
+  type ConversationComment,
   type DiscussionListItem,
   isDiscussionEmpty,
-  mergeDiscussionListItems,
+  type PrCommentKind,
+  type ReviewComment,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   expandedForThread,
   expandThread,
@@ -68,7 +100,13 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
+import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
+import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -83,6 +121,39 @@ type PrReviewDiscussionTabProps = {
 
 const SKELETON_ROW_COUNT = 4;
 
+// One shared empty reference for the common "first page carries no
+// conversation comments" case. `retainConversationAcrossMounts` falls back to
+// a brand-new `[]` literal on every call when nothing was retained, so a memo
+// keyed on the raw `conversation` would re-merge and re-sort on every render of
+// such a PR. Substituting this reference keeps the key stable when the set is
+// empty; a non-empty conversation is already identity-stable (it is read from
+// the memoized first page).
+const EMPTY_CONVERSATION: readonly ConversationComment[] = [];
+
+// The GitHub conversation-comment formSheet. GitLab and Bitbucket reach their
+// own sibling route inside the provider layout (providerPrSheetHref) so
+// the sheet mounts under the live provider scope; GitHub keeps the exact
+// object-form push it shipped with (PR 6023).
+const CONVERSATION_COMMENT_PATH =
+  '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment' as const;
+
+// The own-comment edit formSheet (s3/s4). The tab pushes it with the posted
+// comment's body, so the sheet opens as the READ surface and Save is the
+// UPDATE surface.
+const COMMENT_EDIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit' as const;
+
+/**
+ * The not-found message names the object in the reader's own provider terms, so
+ * a merge request is never called a pull request or the reverse. GitHub keeps
+ * the terminal copy; the two provider scopes name the connection, because both
+ * fold a connection failure into the same NOT_FOUND a removed item produces.
+ */
+const DISCUSSION_UNAVAILABLE_MESSAGE = {
+  github: 'prReview.discussion.unavailableMessage',
+  gitlab: 'prReview.terms.discussionUnavailableMessage',
+  bitbucket: 'prReview.pullRequestDiscussionUnavailableMessage',
+} as const satisfies Record<ProviderPrPlatform, string>;
+
 export function PrReviewDiscussionTab({
   owner,
   repo,
@@ -96,6 +167,20 @@ export function PrReviewDiscussionTab({
       number,
     });
 
+  const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
+  // GitLab calls this a merge request; GitHub and Bitbucket both say pull
+  // request, so the three provider-named strings below switch on that term
+  // alone rather than forking the tab per provider.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const isMergeRequest = ref.platform === 'gitlab';
+  const router = useRouter();
+
+  // s4: the tab is the only place that owns the own-comment writes. Edit pushes
+  // the `comment-edit` formSheet (which reads the body and saves the update);
+  // delete asks exactly one confirmation, then runs the optimistic mutation.
+  const deleteComment = useDeletePrCommentMutation();
+
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
   const [suppressContentPosition, setSuppressContentPosition] = useState(false);
   const expansionRef = useRef(expansion);
@@ -103,6 +188,43 @@ export function PrReviewDiscussionTab({
   const settleGenerationRef = useRef(0);
   const settleThreadIdRef = useRef<string | null>(null);
   const { scrollAnimated } = useMotionPolicy();
+  // Keyboard-open reply focus: scroll the focused thread row above the
+  // keyboard-lifted CTA bar so the reply input and its submit button stay
+  // usable (the CTA must stay visible and tappable above the keyboard). The
+  // scroll anchors on the list's viewport commit, not a guessed frame
+  // (useReplyFocusScroll).
+  const replyScroll = useReplyFocusScroll(listRef);
+  // Handler wiring for the list's focus-scroll props (the hook's own method
+  // names follow its protocol, the JSX handlers follow the handle* rule).
+  const handleReplyInputFocus = replyScroll.markFocus;
+  const handleViewportLayout = replyScroll.onViewportLayout;
+  // The CTA bar lifts on GLOBAL keyboard events; while another surface owns
+  // the keyboard (the conversation-comment formSheet) that lift only shrinks
+  // the list viewport behind the sheet and parks the last thread's reply
+  // field under the bar (uxs3 spot check, e4-confirm-discard). Lift only
+  // while this tab's screen is focused.
+  const isFocused = useIsFocused();
+  // Bottom clearance for the non-list chrome (loading, empty, and every
+  // first-page error state) so the last control clears the system bar.
+  const bottomPadding = useDetailScreenBottomPadding();
+  // Landscape: side insets keep the loading skeleton cards clear of the
+  // sensor housing. Spread only when nonzero: the skeleton wrapper's `px-4`
+  // className gutter must survive portrait untouched (inline style wins over
+  // className). Same treatment as the diff floating-actions bar.
+  const insets = useSafeAreaInsets();
+
+  // Full re-sort of every loaded thread + first-page conversation comments
+  // (R4: "Load more" may insert rows mid-list; accepted). Both inputs are
+  // identity-stable (`threads` is memoized on `pages`; `conversation` is the
+  // retained first page, or EMPTY_CONVERSATION when the PR has none), so
+  // memoize the merge: an expand tap, optimistic reaction or reply focus must
+  // not re-merge and re-sort the whole loaded set.
+  // The merge parses each item's timestamp once (merge-discussion-list-items.ts).
+  const stableConversation = conversation.length === 0 ? EMPTY_CONVERSATION : conversation;
+  const listItems = useMemo(
+    () => mergeDiscussionListItemsBySortKey(threads, stableConversation),
+    [threads, stableConversation]
+  );
 
   // Single write path: the ref is the tap-time source of truth (render-closure
   // state can lag a queued update on rapid taps).
@@ -201,55 +323,219 @@ export function PrReviewDiscussionTab({
   };
 
   // ── First-page error / terminal states ─────────────────────────────
+  const isEmpty = isDiscussionEmpty(threads, conversation);
+  // A retryable gateway-class failure (retryable or service-unavailable)
+  // with already-loaded rows keeps them: the error renders as a later-page
+  // retry footer, not a tab-level blank.
+  const retainedContentError =
+    !isEmpty &&
+    (firstPageErrorState?.kind === 'retryable' ||
+      firstPageErrorState?.kind === 'service-unavailable');
   const view = selectDiscussionTabView({
-    firstPageErrorState,
-    isPending: query.isPending,
-    isEmpty: isDiscussionEmpty(threads, conversation),
+    firstPageErrorState: retainedContentError ? null : firstPageErrorState,
+    isPending: query.isPending && isEmpty,
+    // A pending page whose fetch is paused (offline, or a fetch that will
+    // never start) has no end — the retryable state, not the skeleton (spot
+    // check e7).
+    isPaused: query.isPaused,
+    isEmpty,
   });
+
+  const openConversationComment = () => {
+    // The provider route registers its own `conversation-comment` sheet: the
+    // GitHub literal would leave the provider scope and mount the GitHub
+    // layout with the GitHub-shaped triple (a GitLab project path has no
+    // `owner`/`repo` split).
+    if (ref.platform !== 'github') {
+      router.push(providerPrSheetHref(ref, 'conversation-comment'));
+      return;
+    }
+    const href: Href = {
+      pathname: CONVERSATION_COMMENT_PATH,
+      params: { owner, repo, number },
+    };
+    router.push(href);
+  };
+
+  // Own-comment edit / delete are GitHub-only: the two procedures live on
+  // `githubPrReview` and no provider note-edit seam exists, so the provider
+  // arms withhold the callbacks entirely and their rows keep today's
+  // read-only affordances (s4).
+  const canWriteOwnComments = ref.platform === 'github';
+
+  const handleEditComment = (comment: ReviewComment, kind: PrCommentKind) => {
+    const href: Href = {
+      pathname: COMMENT_EDIT_PATH,
+      params: {
+        owner,
+        repo,
+        number,
+        commentId: String(comment.commentId),
+        kind,
+        body: comment.bodyMarkdown,
+      },
+    };
+    router.push(href);
+  };
+
+  const handleDeleteComment = (comment: ReviewComment, kind: PrCommentKind) => {
+    confirm({
+      title: t('prReview.discussion.deleteCommentTitle'),
+      message: t('prReview.discussion.deleteCommentMessage'),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        // Confirmed offline: fail the confirmed destructive action at once
+        // with the retryable copy instead of starting a write React Query
+        // pauses. Without this the row is optimistically removed while the
+        // write is paused (a false success, lost if the app is killed
+        // before reconnect, and the row reappears later), and the user gets
+        // no failure feedback from a confirmed delete (ux2 spot check).
+        // The row stays, nothing is pending, and the same row action
+        // retries once the banner clears.
+        if (connectionRefusesWrites()) {
+          announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
+          return;
+        }
+        deleteComment.mutate({ owner, repo, number, commentId: comment.commentId, kind });
+      },
+    });
+  };
+
+  // The bottom CTA bar is static chrome for the two content-bearing views
+  // only (happy list + empty). The loading skeleton and the four
+  // terminal/error states render exactly as before — full-body, no bar.
+  const withCommentCta = (body: ReactNode) => (
+    <View className="flex-1">
+      <View className="flex-1">{body}</View>
+      <PrCommentCta onPress={openConversationComment} keyboardLift={isFocused} />
+      {dialog}
+    </View>
+  );
+
+  // The tab owns the empty copy for both the empty view and the list, whose
+  // blocked / muted filter can remove every row the page returned. The list
+  // renders this node instead of its rows when that happens, so the body never
+  // reads as blank.
+  const emptyState = (
+    <EmptyState
+      icon={MessageSquarePlus}
+      title={t('prReview.discussion.noDiscussion')}
+      description={
+        isMergeRequest
+          ? t('prReview.terms.noDiscussionDescription')
+          : t('prReview.discussion.noDiscussionDescription')
+      }
+      action={
+        onRequestFiles ? (
+          <Button
+            className={STATE_ACTION_CLASS}
+            variant="outline"
+            onPress={onRequestFiles}
+            accessibilityLabel={t('prReview.discussion.reviewFiles')}
+          >
+            <Text>{t('prReview.discussion.reviewFiles')}</Text>
+          </Button>
+        ) : null
+      }
+    />
+  );
 
   if (view.kind === 'permission') {
     return (
-      <QueryError
-        variant="permission"
-        title="Access denied"
-        message="You don't have permission to view this PR's discussion."
-      />
+      <>
+        <QueryError
+          variant="permission"
+          message={
+            isMergeRequest
+              ? t('prReview.terms.discussionAccessDenied')
+              : t('prReview.discussion.accessDeniedMessage')
+          }
+        />
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'not-found') {
+    // GitLab folds its connection failures into the same NOT_FOUND a deleted
+    // merge request produces, so provider scopes offer the read retry and the
+    // connection check instead of a dead end (GitHub keeps the terminal copy).
+    const isProviderScope = ref.platform !== 'github';
+    const unavailableMessage = t(DISCUSSION_UNAVAILABLE_MESSAGE[ref.platform]);
     return (
-      <QueryError
-        variant="not-found"
-        title="Discussion unavailable"
-        message="This pull request may have been removed."
-      />
+      <>
+        <QueryError
+          variant="not-found"
+          title={t('prReview.discussion.unavailable')}
+          message={unavailableMessage}
+          action={
+            isProviderScope ? (
+              <PrReviewUnavailableActions
+                onRetry={() => {
+                  void query.refetch();
+                }}
+                isRetrying={query.isFetching}
+              />
+            ) : undefined
+          }
+        />
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'reconnect') {
     return (
-      <View className="flex-1 items-center justify-center px-6 py-12">
-        <PrReviewReconnectNotice />
-      </View>
+      <>
+        <CenteredState contentContainerClassName="px-6">
+          <PrReviewReconnectNotice />
+        </CenteredState>
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'retryable') {
     return (
-      <QueryError
-        variant="server"
-        title="Could not load discussion"
-        message="Something went wrong on our end. Please try again."
-        onRetry={() => {
-          void query.refetch();
-        }}
-        isRetrying={query.isFetching}
-      />
+      <>
+        <QueryError
+          variant="server"
+          title={t('prReview.discussion.couldNotLoad')}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+        {dialog}
+      </>
+    );
+  }
+  if (view.kind === 'service-unavailable') {
+    return (
+      <>
+        <QueryError
+          variant="server"
+          title={t('prReview.reviewServiceUnavailable')}
+          message={t('prReview.reviewServiceUnavailableDescription')}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+        {dialog}
+      </>
     );
   }
 
   // ── Loading (first page in flight) ─────────────────────────────────
   if (view.kind === 'loading') {
     return (
-      <View accessibilityLabel="Loading discussion" className="flex-1 gap-3 px-4 pb-6 pt-3">
+      <View
+        accessibilityLabel={t('prReview.discussion.loading')}
+        className="flex-1 gap-3 px-4 pt-3"
+        style={{
+          paddingBottom: bottomPadding,
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }}
+      >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
           <View key={index} className="gap-2 rounded-xl border border-border bg-card p-3.5">
@@ -259,55 +545,52 @@ export function PrReviewDiscussionTab({
             <Skeleton className="h-6 w-2/3" />
           </View>
         ))}
+        {dialog}
       </View>
     );
   }
 
-  // ── Empty (neither threads nor conversation comments) ──────────────
-  if (view.kind === 'empty') {
-    return (
-      <View className="flex-1 px-4 pb-6">
-        <EmptyState
-          icon={MessageSquarePlus}
-          title="No discussion yet"
-          description="No review threads or conversation comments on this pull request."
-          action={
-            onRequestFiles ? (
-              <Button variant="outline" onPress={onRequestFiles} accessibilityLabel="Review files">
-                <Text>Review files</Text>
-              </Button>
-            ) : null
-          }
-        />
-      </View>
-    );
+  // An empty normalized page can still have more discussion to load. Keep
+  // the list's empty message and pagination footer reachable in that case.
+  // The node is the same `emptyState` this tab owns and hands to the list, so
+  // the copy stays on one surface instead of being duplicated inline.
+  if (view.kind === 'empty' && !query.hasNextPage && !query.isFetchingNextPage && !laterPageError) {
+    return withCommentCta(emptyState);
   }
 
   // ── Happy / paginated list ─────────────────────────────────────────
-  // Full re-sort of every loaded thread + first-page conversation
-  // comments (R4: "Load more" may insert rows mid-list; accepted).
-  const listItems = mergeDiscussionListItems(threads, conversation);
-
-  return (
-    <PrReviewDiscussionList
-      owner={owner}
-      repo={repo}
-      number={number}
-      listItems={listItems}
-      listRef={listRef}
-      expansion={expansion}
-      suppressContentPosition={suppressContentPosition}
-      onToggleExpand={handleToggleExpand}
-      onScrollBeginDrag={invalidateSettle}
-      hasNextPage={query.hasNextPage}
-      isFetchingNextPage={query.isFetchingNextPage}
-      laterPageError={laterPageError}
-      onLoadMore={() => {
-        void query.fetchNextPage();
-      }}
-      onRetryLoadMore={() => {
-        void query.refetch();
-      }}
-    />
+  return withCommentCta(
+    <CommentModerationProvider>
+      <PrReviewDiscussionList
+        owner={owner}
+        repo={repo}
+        number={number}
+        listItems={listItems}
+        listRef={listRef}
+        emptyState={emptyState}
+        expansion={expansion}
+        suppressContentPosition={suppressContentPosition}
+        onToggleExpand={handleToggleExpand}
+        onScrollBeginDrag={() => {
+          invalidateSettle();
+          // A user drag wins over the keyboard-open reply park: drop the
+          // pending focus scroll (useReplyFocusScroll).
+          replyScroll.invalidate();
+        }}
+        hasNextPage={query.hasNextPage}
+        isFetchingNextPage={query.isFetchingNextPage}
+        laterPageError={laterPageError || retainedContentError}
+        onLoadMore={() => {
+          void query.fetchNextPage();
+        }}
+        onRetryLoadMore={() => {
+          void query.refetch();
+        }}
+        onReplyInputFocus={handleReplyInputFocus}
+        onViewportLayout={handleViewportLayout}
+        onEditComment={canWriteOwnComments ? handleEditComment : undefined}
+        onDeleteComment={canWriteOwnComments ? handleDeleteComment : undefined}
+      />
+    </CommentModerationProvider>
   );
 }

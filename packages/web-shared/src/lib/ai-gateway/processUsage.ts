@@ -1,0 +1,1968 @@
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import { randomUUID } from 'crypto';
+import { db, isUSRegion } from '../drizzle';
+import { recordUsageInPrimaryRegion } from './usage-record-client';
+import { after } from 'next/server';
+import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
+import {
+  describeDatabaseError,
+  isUsageRowConflict,
+  observeUsageRecordCompletion,
+  type UsageRecordObservationContext,
+  stackFramesUnderHeader,
+} from './usage-record-diagnostics';
+import type { MicrodollarUsage } from '@kilocode/db/schema';
+import { microdollar_usage } from '@kilocode/db/schema';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
+import { createTimer } from '@kilocode/web-shared/lib/timer';
+import { z } from 'zod';
+import type { EventSourceMessage } from 'eventsource-parser';
+import type {
+  OpenRouterChatCompletionRequest,
+  OpenRouterGeneration,
+} from './providers/openrouter/types';
+import { fetchGeneration } from './providers/upstream-request';
+import { OPENROUTER } from './providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { isStagingDeployment } from '@kilocode/web-shared/lib/constants';
+import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
+import type { Span } from '@sentry/nextjs';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { hasPaymentMethod } from '@kilocode/web-shared/lib/admin-utils-serverside';
+import type { SQL } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import {
+  mutateOrganizationUsage,
+  scheduleOrganizationLowBalanceAlert,
+  scheduleOrganizationUsageAutoTopUp,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { Provider, ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
+import {
+  runBestEffortPostCommitTasks,
+  type BestEffortPostCommitTask,
+} from './usage-post-commit-work';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type {
+  BalanceUpdateResult,
+  CoreUsageWithMetaData,
+  JustTheCostsUsageStats,
+  Message,
+  MicrodollarUsageContext,
+  MicrodollarUsageStats,
+  NotYetCostedUsageStats,
+  PromptInfo,
+  UsageMetaData,
+  UsageRecordInsertResult,
+  UsageRecordWriteOutcome,
+  UsageAccountingResult,
+  VercelProviderMetaData,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import {
+  parseResponsesMicrodollarUsageFromStream,
+  parseResponsesMicrodollarUsageFromString,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.responses';
+import {
+  parseMessagesMicrodollarUsageFromStream,
+  parseMessagesMicrodollarUsageFromString,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
+import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
+import {
+  boundedMetadataValue,
+  clientIpLiteral,
+} from '@kilocode/web-shared/lib/ai-gateway/header-limits';
+import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import {
+  byokNonInferenceCost_mUsd,
+  computeOpenRouterCostFields,
+  providerReportsIsByok,
+  drainSseStream,
+  contentPartSchema,
+  arrayContainingSchema,
+  nonEmptyStringSchema,
+  extractVercelIsByok,
+  extractVercelUpstreamId,
+  parseUsageWithRecovery,
+  reportUpstreamStreamError,
+  readResponseText,
+  REPORTED_MODEL_MAX_LENGTH,
+  usageContextReportFields,
+  openRouterUsageSchema,
+  upstreamStreamErrorSchema,
+  vercelProviderMetadataSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
+import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
+import {
+  normalizeJa4,
+  reportUsageEvent,
+  usageEventWireBody,
+  type UsageEvent,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
+import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
+import type { BouncerUsageEventEnqueue, LlmUsageQueueMessage } from '@kilocode/usage-contracts';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+
+const posthogClient = PostHogClient();
+
+/**
+ * The request fields a prompt-extraction failure reports. The body is untrusted
+ * at this point, because a malformed one is what threw, so the model is read
+ * through a runtime type check and its length is bounded.
+ */
+function promptExtractionReportFields(body: unknown) {
+  if (typeof body !== 'object' || body === null || !('model' in body)) return {};
+  const { model } = body;
+  return typeof model === 'string' ? { model: model.slice(0, REPORTED_MODEL_MAX_LENGTH) } : {};
+}
+
+export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {
+  try {
+    const messages = body.messages ?? [];
+
+    const systemPrompt = messages
+      .filter(m => m.role === 'system' || m.role === 'developer')
+      .map(extractMessageTextContent)
+      .join('\n');
+
+    const system_prompt_prefix = systemPrompt.slice(0, 100);
+    const system_prompt_length = systemPrompt.length;
+
+    const lastUserMessage =
+      messages
+        .filter(m => m.role === 'user')
+        .slice(-1)
+        .map(extractMessageTextContent)[0] ?? '';
+
+    const user_prompt_prefix = lastUserMessage.slice(0, 100);
+
+    return { system_prompt_prefix, system_prompt_length, user_prompt_prefix };
+  } catch (e) {
+    captureException(e, {
+      level: 'warning',
+      tags: { source: 'prompt_extraction' },
+      extra: promptExtractionReportFields(body),
+    });
+    return { system_prompt_prefix: '', system_prompt_length: -1, user_prompt_prefix: '' };
+  }
+}
+
+const extractMessageTextContent = (m: Message) =>
+  typeof m.content === 'string'
+    ? m.content
+    : Array.isArray(m.content)
+      ? m.content
+          .filter((c): c is { type?: string; text?: string } => c != null && c.type === 'text')
+          .map(c => c.text)
+          .join('\n')
+      : '';
+
+export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
+
+export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
+  return {
+    id: usageContext.usageId ?? randomUUID(),
+    kilo_user_id: usageContext.kiloUserId,
+    organization_id: usageContext.organizationId ?? null,
+    ...usageContext.fraudHeaders,
+    provider: usageContext.provider,
+    ...usageContext.promptInfo,
+    max_tokens: usageContext.max_tokens,
+    has_middle_out_transform: usageContext.has_middle_out_transform,
+    project_id: usageContext.project_id,
+    requested_model: usageContext.requested_model,
+    is_free: usageContext.is_free,
+    status_code: usageContext.status_code,
+    editor_name: usageContext.editor_name,
+    api_kind: usageContext.api_kind,
+    machine_id: usageContext.machine_id,
+    is_user_byok:
+      usageContext.user_byok ||
+      usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+      usageContext.provider === CLAUDE_BILLING_PROVIDER_ID,
+    has_tools: usageContext.has_tools,
+    feature: usageContext.feature,
+    session_id: usageContext.session_id,
+    mode: usageContext.mode,
+    auto_model: usageContext.auto_model,
+    reasoning_setting: usageContext.reasoning_setting,
+    inference_region: usageContext.inference_region,
+    ttfb_ms: usageContext.ttfb_ms,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
+  };
+}
+
+/**
+ * Strip NUL bytes (\u0000) in place from every string-typed field on `obj`.
+ *
+ * Postgres `text` columns reject NUL bytes with `22021 invalid byte sequence
+ * for encoding "UTF8": 0x00`, which crashes the `microdollar_usage` CTE insert
+ * and leaves the request un-billed (see Sentry KILOCODE-WEB-1G3Z).
+ *
+ * NULs have been observed in client-populated fields on the LLM gateway hot
+ * path: HTTP headers from the VS Code extension (machine_id, session_id,
+ * http_user_agent) and prompt-derived fields (system_prompt_prefix,
+ * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
+ * the upstream source is identified via the `console.warn` in
+ * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
+ * and remove this.
+ *
+ * Any sanitized field names are appended to `dirtyFields` so the caller can
+ * log them for source attribution.
+ */
+export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: string[]): void {
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.indexOf('\u0000') >= 0) {
+      // Using split/join rather than a regex avoids the no-control-regex
+      // lint rule; the NUL byte is the intended match here.
+      obj[key] = value.split('\u0000').join('');
+      dirtyFields.push(key);
+    }
+  }
+}
+
+type UnrecordableMetadataValue = {
+  field: 'max_tokens' | 'finish_reason';
+  /** A `typeof` result, or for numbers why the value is not a safe integer. */
+  received:
+    | 'fractional'
+    | 'non_finite'
+    | 'unsafe_integer'
+    | 'string'
+    | 'number'
+    | 'bigint'
+    | 'boolean'
+    | 'symbol'
+    | 'undefined'
+    | 'object'
+    | 'function';
+};
+
+/**
+ * `max_tokens` echoes the client request and `finish_reason` the upstream response, and
+ * neither is validated at runtime. The usage contract types them as a safe integer
+ * (PostgreSQL `bigint` read as a JS number) and a string, and ingress rejects the whole
+ * record, billing fields included, when either is outside that type. A value the contract
+ * cannot represent is therefore recorded as null, meaning not recorded: rounding would
+ * invent a limit, and a number past the safe range already lost precision in `JSON.parse`.
+ * Only the usage record changes; the request forwarded upstream and the billing fields do not.
+ */
+function recordableMaxTokens(
+  value: unknown,
+  unrecordable: UnrecordableMetadataValue[]
+): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
+  const received =
+    typeof value !== 'number'
+      ? typeof value
+      : !Number.isFinite(value)
+        ? 'non_finite'
+        : Number.isInteger(value)
+          ? 'unsafe_integer'
+          : 'fractional';
+  unrecordable.push({ field: 'max_tokens', received });
+  return null;
+}
+
+function recordableFinishReason(
+  value: unknown,
+  unrecordable: UnrecordableMetadataValue[]
+): string | null {
+  if (value == null) return null;
+  if (typeof value === 'string') return value;
+  unrecordable.push({ field: 'finish_reason', received: typeof value });
+  return null;
+}
+
+export async function toInsertableDbUsageRecord(
+  usageStats: MicrodollarUsageStats,
+  usageContextInfo: UsageContextInfo
+): Promise<CoreUsageWithMetaData> {
+  const created_at = new Date().toISOString();
+
+  const {
+    id,
+    kilo_user_id,
+    organization_id,
+    project_id,
+    provider,
+    ttfb_ms,
+    ...metadataFromContext
+  } = usageContextInfo;
+
+  const core: MicrodollarUsage = {
+    id,
+    kilo_user_id,
+    organization_id,
+    provider,
+    cost: usageStats.cost_mUsd,
+    input_tokens: usageStats.inputTokens,
+    output_tokens: usageStats.outputTokens,
+    cache_write_tokens: usageStats.cacheWriteTokens,
+    cache_hit_tokens: usageStats.cacheHitTokens,
+    created_at,
+    model: usageStats.model,
+    requested_model: usageContextInfo.requested_model,
+    cache_discount: usageStats.cacheDiscount_mUsd ?? null,
+    has_error: usageStats.hasError,
+    abuse_classification: 0,
+    inference_provider: usageStats.inference_provider,
+    project_id,
+  };
+
+  const unrecordable: UnrecordableMetadataValue[] = [];
+  const metadata: UsageMetaData = {
+    ...metadataFromContext,
+    id,
+    created_at,
+    message_id: usageStats.messageId ?? '<missing>',
+    max_tokens: recordableMaxTokens(metadataFromContext.max_tokens, unrecordable),
+    upstream_id: usageStats.upstream_id,
+    finish_reason: recordableFinishReason(usageStats.finish_reason, unrecordable),
+    latency: usageStats.latency ?? ttfb_ms,
+    moderation_latency: usageStats.moderation_latency,
+    generation_time: usageStats.generation_time,
+    is_byok: usageStats.is_byok,
+    streamed: usageStats.streamed,
+    cancelled: usageStats.cancelled,
+    market_cost: usageStats.market_cost ?? null,
+    non_inference_cost: usageStats.nonInferenceCost_mUsd ?? null,
+    abuse_delay: metadataFromContext.abuse_delay,
+    abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
+  };
+
+  if (unrecordable.length > 0) {
+    // Field names and type labels only: never log the client or upstream value itself.
+    console.warn('usage metadata value outside the usage contract; recorded as null', {
+      source: 'toInsertableDbUsageRecord',
+      usageId: id,
+      fields: unrecordable,
+      requested_model: usageContextInfo.requested_model,
+      provider,
+    });
+  }
+
+  if (organization_id) {
+    //never log any sensitive data for orgs
+    metadata.user_prompt_prefix = null;
+    metadata.system_prompt_prefix = null;
+  }
+
+  // Strip NUL bytes before returning. Postgres `text` columns reject them
+  // (error 22021) and crash the microdollar_usage CTE insert, leaving the
+  // request un-billed. See KILOCODE-WEB-1G3Z.
+  const dirtyFields: string[] = [];
+  stripNulBytesInPlace(core, dirtyFields);
+  stripNulBytesInPlace(metadata, dirtyFields);
+  if (dirtyFields.length > 0) {
+    // Log to Axiom (not Sentry) — this is a one-off source-attribution probe,
+    // not an issue to triage. Once the dominant field is identified via
+    // `summarize count() by fields`, sanitize at the source and remove both
+    // this log and the sanitizer above.
+    console.warn('microdollar_usage string field contained NUL bytes; sanitized before insert', {
+      source: 'toInsertableDbUsageRecord',
+      fields: dirtyFields,
+      kilo_user_id,
+      requested_model: usageContextInfo.requested_model,
+      provider,
+    });
+  }
+
+  // The five header-derived columns below are persisted through lookup tables, so each
+  // value is kept within the shared bound: the forward chain as one public IP literal,
+  // and every other value at the shared maximum or the oversized sentinel. `fraudHeaders`
+  // itself stays as received, because bouncer, the ja4 check and the log queries read it.
+  metadata.http_x_forwarded_for = clientIpLiteral(metadata.http_x_forwarded_for);
+  metadata.http_user_agent = boundedMetadataValue(metadata.http_user_agent);
+  metadata.http_x_vercel_ip_country = boundedMetadataValue(metadata.http_x_vercel_ip_country);
+  metadata.http_x_vercel_ip_city = boundedMetadataValue(metadata.http_x_vercel_ip_city);
+  metadata.http_x_vercel_ja4_digest = boundedMetadataValue(metadata.http_x_vercel_ja4_digest);
+
+  return { core, metadata };
+}
+
+const PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS = 60_000;
+let lastPublisherNotConfiguredReportAt = Number.NEGATIVE_INFINITY;
+
+/** Every selected event fails the same way, so report once per interval per instance. */
+function reportPublisherNotConfigured(usageId: string): void {
+  const now = Date.now();
+  if (now - lastPublisherNotConfiguredReportAt < PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS) {
+    return;
+  }
+  lastPublisherNotConfiguredReportAt = now;
+  captureMessage('usage accounting queue publisher is not configured', {
+    level: 'error',
+    tags: { source: 'logMicrodollarUsage' },
+    extra: { usageId },
+  });
+}
+
+async function enqueueUsageWithinLifetime(
+  payload: LlmUsageQueueMessage
+): Promise<UsageEnqueueOutcome> {
+  const start = Promise.withResolvers<boolean>();
+  const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
+    if (!registered) return { kind: 'unavailable', reason: 'registration_failed' };
+    try {
+      return await enqueueUsage(payload, { retryTransientFailures: true });
+    } catch {
+      return { kind: 'unavailable', reason: 'unexpected_rejection' };
+    }
+  });
+  try {
+    // Track a promise even if an earlier after() callback queue has already drained.
+    after(publication);
+    start.resolve(true);
+  } catch {
+    // No request lifetime means no network I/O; let the accounting mode handle the failure.
+    start.resolve(false);
+  }
+  return publication;
+}
+
+type UsageAccountingTransport = 'queue' | 'direct';
+
+function usageAccountingTransport(): UsageAccountingTransport {
+  const production =
+    process.env.VERCEL_ENV === 'production' && process.env.VERCEL_TARGET_ENV === 'production';
+  return isStagingDeployment() || production ? 'queue' : 'direct';
+}
+
+export async function logMicrodollarUsage(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
+): Promise<UsageAccountingResult | null> {
+  return logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    bouncerUsageEvent,
+    usageAccountingTransport()
+  );
+}
+
+async function logMicrodollarUsageWithTransport(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null,
+  transport: UsageAccountingTransport
+): Promise<UsageAccountingResult | null> {
+  usageContext.status_code = usageStats.status_code;
+  const contextInfo = extractUsageContextInfo(usageContext);
+  const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
+
+  const payload: LlmUsageQueueMessage = {
+    core,
+    metadata,
+    prior_microdollar_usage: usageContext.prior_microdollar_usage,
+    posthog_distinct_id: usageContext.posthog_distinct_id ?? null,
+    bouncer_usage_event: bouncerUsageEvent,
+  };
+
+  if (transport === 'queue') {
+    const outcome = await enqueueUsageWithinLifetime(payload);
+    if (outcome.kind === 'accepted') {
+      console.info('usage accounting queued', {
+        usageId: core.id,
+        execution_region: getVercelExecutionRegion(),
+      });
+      return { status: 'queued', usageId: core.id, createdAt: core.created_at };
+    }
+    if (outcome.reason === 'publisher_not_configured') {
+      // Nothing was attempted, so a direct write cannot duplicate the event.
+      reportPublisherNotConfigured(core.id);
+      console.warn('usage accounting queue publisher not configured', {
+        usageId: core.id,
+        execution_region: getVercelExecutionRegion(),
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
+    if (outcome.reason === 'registration_failed') {
+      // No request scope or `waitUntil`, so `after()` could not track the publication.
+      // Nothing was published, so the direct write cannot duplicate it.
+      console.warn('usage accounting queue unavailable without a request lifetime', {
+        usageId: core.id,
+        execution_region: getVercelExecutionRegion(),
+        reason: outcome.reason,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
+    console.error('usage accounting publication failed', {
+      usageId: core.id,
+      execution_region: getVercelExecutionRegion(),
+      reason: outcome.reason,
+    });
+    return null;
+  }
+
+  return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+}
+
+async function recordUsageDirectly(
+  core: MicrodollarUsage,
+  metadata: UsageMetaData,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
+): Promise<UsageAccountingResult | null> {
+  const inserted = await saveUsageRelatedData(
+    core,
+    metadata,
+    usageContext.prior_microdollar_usage,
+    usageContext.posthog_distinct_id ?? null,
+    bouncerUsageEvent
+  );
+
+  // `insertUsageRecord` swallows DB errors and returns null; surface that
+  // failure to callers so dependent FK writes don't dangle on a row that
+  // was never persisted.
+  // Use the JS-side identity values we constructed in toInsertableDbUsageRecord
+  // rather than the DB-returned ones. The DB round-trip for created_at returns a
+  // Postgres timestamp string (e.g. "2026-04-29 01:16:12.945+00") which is not
+  // strict ISO 8601 and will fail downstream datetime validators. core.created_at
+  // is always new Date().toISOString() so the format is guaranteed.
+  return inserted ? { status: 'recorded', usageId: core.id, createdAt: core.created_at } : null;
+}
+
+/**
+ * Direct (unselected or safe before-send fallback) usage write dispatch.
+ *
+ * Selected usage normally goes through `enqueueUsage` and the configured queue
+ * transport; the production Cloudflare consumer then calls the existing
+ * Frankfurt `/api/internal/usage/record` writer. This path is for unselected
+ * accounting, plus the two pre-publication fallbacks where nothing was sent:
+ * missing/unparseable publisher configuration and failed lifetime registration.
+ * It is not used after any publication attempt, because the event may already
+ * be queued.
+ *
+ * SFO instances hand this write to Frankfurt through
+ * `recordUsageInPrimaryRegion`; Frankfurt instances write locally.
+ *
+ * `kilocode-ai-gateway` executes in both Frankfurt and SFO while the primary is
+ * Frankfurt-only. This write holds row locks on `kilocode_users`,
+ * `organizations` and `organization_user_usage` across several sequential
+ * statements, so from SFO the lock hold is dominated by transatlantic round
+ * trips rather than by database work — which is what turns a contended counter
+ * row into a lock backlog and, downstream, exhausts the connection pool.
+ *
+ * Frankfurt instances keep writing directly: a Frankfurt-to-Frankfurt HTTP hop
+ * would be pure overhead and a pointless new failure mode.
+ */
+async function saveUsageRelatedData(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData,
+  prior_microdollar_usage: number,
+  posthog_distinct_id: string | null,
+  bouncer_usage_event: BouncerUsageEventEnqueue | null
+): Promise<UsageRecordInsertResult | null> {
+  if (isUSRegion()) {
+    const outcome = await recordUsageInPrimaryRegion({
+      core: coreUsageFields,
+      metadata: metadataFields,
+      prior_microdollar_usage,
+      posthog_distinct_id,
+      bouncer_usage_event,
+    });
+    // On `unavailable` fall through to the local write. It is slow from here,
+    // but a slow billing record beats a lost one. `recordUsageInPrimaryRegion`
+    // has already reported the failure.
+    if (outcome.kind === 'ok') return outcome.result;
+  }
+
+  return saveUsageRelatedDataLocally(
+    coreUsageFields,
+    metadataFields,
+    prior_microdollar_usage,
+    posthog_distinct_id,
+    bouncer_usage_event,
+    { entrypoint: 'gateway', writer_caller: 'unknown' }
+  );
+}
+
+/**
+ * The write itself, always executed against the primary from wherever it runs.
+ * Exported so `POST /api/internal/usage/record` can invoke it in Frankfurt.
+ */
+export async function saveUsageRelatedDataLocally(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData,
+  prior_microdollar_usage: number,
+  posthog_distinct_id: string | null,
+  bouncer_usage_event: BouncerUsageEventEnqueue | null = null,
+  observationContext: UsageRecordObservationContext = {
+    entrypoint: 'unknown',
+    writer_caller: 'unknown',
+  }
+): Promise<UsageRecordWriteOutcome | null> {
+  return observeUsageRecordCompletion(
+    coreUsageFields,
+    async () => {
+      // `isFirst` must be evaluated before the insert — afterwards this record is
+      // itself prior usage — but the event it drives is only emitted once the insert
+      // has committed. A redelivery that arrives while the first delivery's
+      // transaction is still open cannot see the uncommitted row either, so it also
+      // computes `isFirst`; emitting here would double-count `first_usage`.
+      const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
+      const inserted = await insertUsageRecord(
+        coreUsageFields,
+        metadataFields,
+        bouncer_usage_event
+      );
+      if (!inserted) return null;
+      if (posthog_distinct_id && !inserted.wasRedelivery) {
+        if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
+        await sendFirstMicrodollarUsageEventIfNeeded(
+          inserted.newMicrodollarsUsed === null
+            ? null
+            : { newMicrodollarsUsed: inserted.newMicrodollarsUsed },
+          coreUsageFields,
+          posthog_distinct_id,
+          isFirst
+        );
+      }
+      return inserted;
+    },
+    observationContext
+  );
+}
+
+async function isFirstUsage(
+  usage: MicrodollarUsage,
+  prior_microdollar_usage: number
+): Promise<boolean> {
+  if (prior_microdollar_usage || usage.organization_id) return false;
+  //perf: we only pay the costs for querying prior microdollar usage for non-org users that have incurred zero cost so far.
+  return !(await db.query.microdollar_usage.findFirst({
+    where: eq(microdollar_usage.kilo_user_id, usage.kilo_user_id),
+    columns: { created_at: true },
+  }));
+}
+
+async function sendFirstUsageEvent(usage: MicrodollarUsage, posthog_distinct_id: string) {
+  try {
+    const userHasPaymentMethod = await hasPaymentMethod(usage.kilo_user_id);
+    posthogClient.capture({
+      distinctId: posthog_distinct_id,
+      event: 'first_usage',
+      properties: {
+        model: usage.model,
+        cost_mUsd: usage.cost,
+        has_payment_method: userHasPaymentMethod,
+      },
+    });
+    console.log('first_usage');
+  } catch (e) {
+    captureException(e, {
+      tags: { source: 'posthog_capture' },
+      extra: { usage },
+    });
+  }
+}
+
+async function sendFirstMicrodollarUsageEventIfNeeded(
+  balanceUpdateResult: BalanceUpdateResult,
+  usage: MicrodollarUsage,
+  posthog_distinct_id: string,
+  isFirst: boolean
+) {
+  if (!balanceUpdateResult) return;
+  const prior_total_usage_at_request_end = Math.abs(
+    balanceUpdateResult.newMicrodollarsUsed - usage.cost
+  );
+  if (prior_total_usage_at_request_end >= 1) return; //already sent event.
+
+  try {
+    // TODO: Once available on the user entity, remove extra db query
+    const userHasPaymentMethod = await hasPaymentMethod(usage.kilo_user_id);
+    posthogClient.capture({
+      distinctId: posthog_distinct_id,
+      event: 'first_microdollar_usage',
+      properties: {
+        model: usage.model,
+        cost_mUsd: usage.cost,
+        has_payment_method: userHasPaymentMethod,
+        has_prior_free_usage: !isFirst,
+      },
+    });
+  } catch (e) {
+    captureException(e, {
+      tags: { source: 'posthog_capture' },
+      extra: { usage },
+    });
+  }
+}
+
+/**
+ * Creates CTE fragments for upserting a metadata value into a lookup table.
+ *
+ * Returns CTEs: `{name}_value`, `{name}_existing`, `{name}_ins`, `{name}_cte`
+ * The final `{name}_cte` contains the ID of the (possibly newly inserted) row.
+ *
+ * Uses `WHERE NOT EXISTS` to skip the INSERT when the value already exists,
+ * avoiding WAL writes in the common case. The `ON CONFLICT DO UPDATE` handles
+ * rare concurrent insert races where two transactions both see no existing row
+ * (due to CTE snapshot semantics) and both attempt to insert.
+ */
+const createUpsertCTE = (metaDataKindName: SQL, value: string | null): SQL => sql`
+${metaDataKindName}_value AS (
+  SELECT value
+  FROM (VALUES (${value})) v(value)
+  WHERE value IS NOT NULL
+),
+${metaDataKindName}_existing AS (
+  SELECT ${metaDataKindName}_id
+  FROM ${metaDataKindName}, ${metaDataKindName}_value
+  WHERE ${metaDataKindName}.${metaDataKindName} = ${metaDataKindName}_value.value
+),
+${metaDataKindName}_ins AS (
+  INSERT INTO ${metaDataKindName} (${metaDataKindName})
+  SELECT ${metaDataKindName}_value.value FROM ${metaDataKindName}_value
+  WHERE NOT EXISTS (SELECT 1 FROM ${metaDataKindName}_existing)
+  ON CONFLICT (${metaDataKindName}) DO UPDATE SET ${metaDataKindName} = EXCLUDED.${metaDataKindName}
+  RETURNING ${metaDataKindName}_id
+),
+${metaDataKindName}_cte AS (
+  SELECT ${metaDataKindName}_id FROM ${metaDataKindName}_existing
+  UNION ALL
+  SELECT ${metaDataKindName}_id FROM ${metaDataKindName}_ins
+)`;
+
+type UsageStatementExecutor = Pick<DrizzleTransaction, 'execute'>;
+
+type UsageStatementResult = UsageRecordInsertResult & {
+  kiloPassThreshold: number | null;
+  organizationUsage?: OrganizationUsageMutationResult;
+  autoTopUpUser?: UserForBalance | null;
+};
+
+type UsageTransactionResult = {
+  inserted: UsageStatementResult;
+};
+
+export const USAGE_TRANSACTION_IDLE_TIMEOUT_MS = 60_000;
+
+export function usageTransactionIdleTimeoutQuery(): SQL {
+  return sql`
+    SELECT pg_catalog.set_config(
+      'idle_in_transaction_session_timeout',
+      ${`${USAGE_TRANSACTION_IDLE_TIMEOUT_MS}ms`},
+      true
+    )
+  `;
+}
+
+export async function setUsageTransactionIdleTimeout(tx: UsageStatementExecutor): Promise<void> {
+  // This only bounds idle time between statements while the transaction is open.
+  await tx.execute(usageTransactionIdleTimeoutQuery());
+}
+
+async function insertUsageTransaction(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
+): Promise<UsageTransactionResult> {
+  return db.transaction(async tx => {
+    await setUsageTransactionIdleTimeout(tx);
+    const inserted = await insertUsageAndMetadataWithBalanceUpdate(
+      tx,
+      coreUsageFields,
+      metadataFields
+    );
+    if (coreUsageFields.organization_id) {
+      if (coreUsageFields.cost > 0) {
+        const consumption = await recordOrganizationConsumption(tx, {
+          organizationId: coreUsageFields.organization_id,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          amountMicrodollars: coreUsageFields.cost,
+          occurredAt: coreUsageFields.created_at,
+          source: 'ai-gateway',
+          sourceId: coreUsageFields.id,
+        });
+        inserted.organizationUsage = consumption.organizationUsage;
+      } else if (coreUsageFields.cost < 0) {
+        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
+      }
+    }
+    if (coreUsageFields.cost !== 0) {
+      await enqueueDailyUsageRollupRepair(tx, {
+        usageId: coreUsageFields.id,
+        kiloUserId: coreUsageFields.kilo_user_id,
+        organizationId: coreUsageFields.organization_id,
+        createdAt: coreUsageFields.created_at,
+      });
+    }
+    // A spend-watched request's usage event commits with its billing row, so a Bouncer outage
+    // cannot lose the spend it reports. A PK collision rolls this back together with the usage.
+    if (bouncerUsageEvent) {
+      await enqueueBouncerUsageEvent(tx, {
+        requestId: bouncerUsageEvent.request_id,
+        userId: coreUsageFields.kilo_user_id,
+        payload: bouncerUsageEvent.payload,
+      });
+    }
+    return { inserted };
+  });
+}
+
+function getPostgresErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  if ('code' in error && typeof error.code === 'string' && /^[0-9A-Z]{5}$/.test(error.code)) {
+    return error.code;
+  }
+  return 'cause' in error ? getPostgresErrorCode(error.cause) : null;
+}
+
+function reportPostCommitFailure(
+  message: string,
+  error: unknown,
+  tags: Record<string, string>,
+  usageId: string
+): void {
+  const databaseErrorCode = getPostgresErrorCode(error);
+  console.error(message, { databaseErrorCode });
+  captureException(new Error(message), {
+    tags,
+    extra: { usageId, databaseErrorCode },
+  });
+}
+
+function organizationUsageMutationTask(
+  usage: MicrodollarUsage,
+  result: UsageStatementResult
+): BestEffortPostCommitTask | null {
+  const organizationId = usage.organization_id;
+  const organizationUsage = result.organizationUsage;
+  if (!organizationId || !organizationUsage) return null;
+
+  return {
+    run: async () => scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage),
+    reportError: error => {
+      reportPostCommitFailure(
+        'post-commit organization usage mutation failed',
+        error,
+        { source: 'postCommitOrganizationUsageMutation' },
+        usage.id
+      );
+    },
+  };
+}
+
+function scheduleUsageAutoTopUp(usage: MicrodollarUsage, result: UsageStatementResult): void {
+  if (usage.cost <= 0) return;
+  try {
+    if (result.organizationUsage) {
+      scheduleOrganizationUsageAutoTopUp(result.organizationUsage);
+    } else if (result.autoTopUpUser) {
+      const user = result.autoTopUpUser;
+      after(() => maybePerformAutoTopUp(user));
+    }
+  } catch {
+    console.warn('usage auto-top-up unavailable', {
+      usageId: usage.id,
+      reason: 'registration_failed',
+    });
+  }
+}
+
+async function runPostCommitUsageWork(
+  usage: MicrodollarUsage,
+  result: UsageStatementResult,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
+): Promise<void> {
+  const tasks = [organizationUsageMutationTask(usage, result)].filter(task => task !== null);
+  if (bouncerUsageEvent) {
+    tasks.push({
+      run: async () => {
+        await deliverBouncerUsageEventNow(bouncerUsageEvent.request_id);
+      },
+      reportError: error => {
+        reportPostCommitFailure(
+          'post-commit bouncer usage delivery failed',
+          error,
+          { source: 'postCommitBouncerUsageDelivery' },
+          usage.id
+        );
+      },
+    });
+  }
+  await runBestEffortPostCommitTasks(tasks);
+  scheduleUsageAutoTopUp(usage, result);
+}
+
+function scheduleKiloPassBonusIfNeeded(
+  usage: MicrodollarUsage,
+  result: UsageStatementResult
+): void {
+  if (result.newMicrodollarsUsed === null) return;
+  const effectiveKiloPassThreshold = getEffectiveKiloPassThreshold(result.kiloPassThreshold);
+  if (
+    effectiveKiloPassThreshold === null ||
+    result.newMicrodollarsUsed < effectiveKiloPassThreshold
+  ) {
+    return;
+  }
+
+  void maybeIssueKiloPassBonusFromUsageThreshold({
+    kiloUserId: usage.kilo_user_id,
+    nowIso: usage.created_at,
+  }).catch(async error => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await appendKiloPassAuditLog(db, {
+      action: KiloPassAuditLogAction.BonusCreditsIssued,
+      result: KiloPassAuditLogResult.Failed,
+      kiloUserId: usage.kilo_user_id,
+      payload: {
+        source: 'usage_threshold',
+        error: errorMessage,
+      },
+    });
+  });
+}
+
+/**
+ * Identity of an already-persisted usage row, or null if it is not there.
+ *
+ * The same record can still reach this write twice. `recordUsageInPrimaryRegion`
+ * no longer retries an attempt timeout — doing so was the dominant source of
+ * collisions — but on timeout it falls back to writing locally with the same
+ * `core.id` while the remote delivery may still be committing. The losing
+ * transaction then collides on the `microdollar_usage` primary key and rolls back
+ * in full, so the usage is billed exactly once. Reporting that as a failure would
+ * make callers treat billed usage as unrecorded and skip dependent writes.
+ *
+ * The row's presence under this user is the proof, not the PostgreSQL error code:
+ * `id` is generated once per usage record, and the row can only be visible if a
+ * delivery of this exact record committed its whole
+ * transaction. A deadlock victim that is retried into the collision therefore
+ * recovers the same way a plain primary-key violation does.
+ *
+ * `newMicrodollarsUsed` is not reconstructable here and is only consumed by
+ * best-effort PostHog attribution and the Kilo Pass threshold, both of which run
+ * on the delivery that committed.
+ */
+async function findAlreadyRecordedUsage(
+  coreUsageFields: MicrodollarUsage
+): Promise<UsageRecordWriteOutcome | null> {
+  const existing = await db
+    .select({ id: microdollar_usage.id })
+    .from(microdollar_usage)
+    .where(
+      and(
+        eq(microdollar_usage.id, coreUsageFields.id),
+        eq(microdollar_usage.kilo_user_id, coreUsageFields.kilo_user_id)
+      )
+    )
+    .limit(1);
+  if (existing.length === 0) return null;
+
+  // Report the JS-side identity, not the DB-returned timestamp: PostgreSQL
+  // renders `created_at` as "2026-04-29 01:16:12.945+00", which is not strict
+  // ISO 8601 and fails downstream datetime validators.
+  return {
+    usageId: coreUsageFields.id,
+    createdAt: coreUsageFields.created_at,
+    newMicrodollarsUsed: null,
+    wasRedelivery: true,
+  };
+}
+
+export async function insertUsageRecord(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
+): Promise<UsageRecordWriteOutcome | null> {
+  try {
+    const result = await startSpan(
+      {
+        name: 'db.insert_microdollar_usage_and_update_balance',
+        op: 'db.query',
+      },
+      async () => {
+        let attempt = 0;
+        while (true) {
+          try {
+            // This can fail if new deduplicated values are inserted simultaneously.
+            // Every retry opens a fresh transaction for the usage and balance write.
+            return await insertUsageTransaction(coreUsageFields, metadataFields, bouncerUsageEvent);
+          } catch (error) {
+            // A collision on this record's own id can never be resolved by
+            // retrying — `id` is fixed for the delivery — so stop immediately and
+            // let the outer handler recover the committed row's identity. Retrying
+            // it burned three attempts and rebuilt the statement each time.
+            if (attempt >= 2 || isUsageRowConflict(error)) throw error;
+            // Never log the raw error: its message is the interpolated statement,
+            // roughly 30KB including prompt prefixes and the client IP.
+            sentryLogger('insertUsageRecord', 'warning')('insertUsageRecord concurrency failure', {
+              usageId: coreUsageFields.id,
+              attempt,
+              error: describeDatabaseError(error),
+            });
+            await new Promise(r => setTimeout(r, Math.random() * 100));
+            attempt++;
+          }
+        }
+      }
+    );
+
+    await runPostCommitUsageWork(coreUsageFields, result.inserted, bouncerUsageEvent);
+    scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
+    return {
+      usageId: result.inserted.usageId,
+      createdAt: result.inserted.createdAt,
+      newMicrodollarsUsed: result.inserted.newMicrodollarsUsed,
+      wasRedelivery: false,
+    };
+  } catch (error) {
+    // The lookup itself is best-effort: it must never mask the original failure,
+    // and it throws for a malformed `id`, which is a genuine failed write.
+    const alreadyRecorded = await findAlreadyRecordedUsage(coreUsageFields).catch(() => null);
+    if (alreadyRecorded) {
+      // Not an exception: this is the designed outcome of a redelivered write.
+      sentryLogger('insertUsageRecord', 'warning')(
+        'insertUsageRecord received a redelivery of an already-recorded usage id',
+        { usageId: coreUsageFields.id }
+      );
+      return alreadyRecorded;
+    }
+    // Report the redacted description rather than `error`, whose message carries
+    // the interpolated statement and its parameters. Only the original stack's
+    // frames are carried over: `error.stack` begins with `name: message`, so
+    // copying it verbatim would put the message straight back into the event.
+    const described = describeDatabaseError(error);
+    console.error('insertUsageRecord failed', { usageId: coreUsageFields.id, error: described });
+    const summary = `insertUsageRecord failed (code=${described.code ?? 'unknown'} constraint=${described.constraint ?? 'none'})`;
+    const redacted = new Error(summary);
+    redacted.stack = stackFramesUnderHeader(error, `Error: ${summary}`);
+    captureException(redacted, {
+      tags: {
+        source: 'insertUsageRecord',
+        spendCategory: 'variable',
+        spendSource: 'ai_gateway',
+        ownerType: coreUsageFields.organization_id ? 'organization' : 'user',
+        databaseErrorCode: described.code ?? 'unknown',
+      },
+      extra: { sourceRecordId: coreUsageFields.id, databaseError: described },
+    });
+    return null;
+  }
+}
+
+async function insertUsageAndMetadataWithBalanceUpdate(
+  executor: UsageStatementExecutor,
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData
+): Promise<UsageStatementResult> {
+  // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip.
+  // The contended daily rollup is deliberately maintained after this transaction commits.
+  // This ensures atomicity: microdollar_usage insert and kilocode_users.microdollars_used update happen together
+  const result = await executor.execute<{
+    usage_id: string;
+    usage_created_at: string;
+    new_microdollars_used: string | null;
+    kilo_pass_threshold: string | null;
+    auto_top_up_user: UserForBalance | null;
+  }>(sql`
+          WITH microdollar_usage_ins AS (
+            INSERT INTO microdollar_usage (
+              id, kilo_user_id, organization_id, provider, cost,
+              input_tokens, output_tokens, cache_write_tokens, cache_hit_tokens,
+              created_at, model, requested_model, cache_discount, has_error, abuse_classification,
+              inference_provider, project_id
+            ) VALUES (
+              ${coreUsageFields.id},
+              ${coreUsageFields.kilo_user_id},
+              ${coreUsageFields.organization_id},
+              ${coreUsageFields.provider},
+              ${coreUsageFields.cost},
+              ${coreUsageFields.input_tokens},
+              ${coreUsageFields.output_tokens},
+              ${coreUsageFields.cache_write_tokens},
+              ${coreUsageFields.cache_hit_tokens},
+              ${coreUsageFields.created_at},
+              ${coreUsageFields.model},
+              ${coreUsageFields.requested_model},
+              ${coreUsageFields.cache_discount},
+              ${coreUsageFields.has_error},
+              ${coreUsageFields.abuse_classification},
+              ${coreUsageFields.inference_provider},
+              ${coreUsageFields.project_id}
+            )
+            RETURNING id, created_at
+          )
+          , ${createUpsertCTE(sql`http_user_agent`, metadataFields.http_user_agent)}
+          , ${createUpsertCTE(sql`http_ip`, metadataFields.http_x_forwarded_for)}
+          , ${createUpsertCTE(sql`vercel_ip_country`, metadataFields.http_x_vercel_ip_country)}
+          , ${createUpsertCTE(sql`vercel_ip_city`, metadataFields.http_x_vercel_ip_city)}
+          , ${createUpsertCTE(sql`ja4_digest`, metadataFields.http_x_vercel_ja4_digest)}
+          , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
+          , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
+          , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
+          , ${createUpsertCTE(sql`api_kind`, metadataFields.api_kind)}
+          , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
+          , ${createUpsertCTE(sql`mode`, metadataFields.mode)}
+          , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
+          , ${createUpsertCTE(sql`reasoning_setting`, metadataFields.reasoning_setting)}
+          , ${createUpsertCTE(sql`inference_region`, metadataFields.inference_region)}
+          , metadata_ins AS (
+            INSERT INTO microdollar_usage_metadata (
+              id,
+              message_id,
+              created_at,
+              user_prompt_prefix,
+              vercel_ip_latitude,
+              vercel_ip_longitude,
+              system_prompt_length,
+              max_tokens,
+              has_middle_out_transform,
+              status_code,
+              upstream_id,
+              latency,
+              moderation_latency,
+              generation_time,
+              is_byok,
+              is_user_byok,
+              streamed,
+              cancelled,
+              has_tools,
+              machine_id,
+              session_id,
+              market_cost,
+              non_inference_cost,
+              is_free,
+              abuse_delay,
+              abuse_downgraded_from,
+
+              http_user_agent_id,
+              http_ip_id,
+              vercel_ip_country_id,
+              vercel_ip_city_id,
+              ja4_digest_id,
+              system_prompt_prefix_id,
+              finish_reason_id,
+              editor_name_id,
+              api_kind_id,
+              feature_id,
+              mode_id,
+              auto_model_id,
+              reasoning_setting_id,
+              inference_region_id
+            )
+            SELECT
+              ${metadataFields.id},
+              ${metadataFields.message_id ?? '<missing>'},
+              ${metadataFields.created_at},
+              ${metadataFields.user_prompt_prefix},
+              ${metadataFields.http_x_vercel_ip_latitude},
+              ${metadataFields.http_x_vercel_ip_longitude},
+              ${metadataFields.system_prompt_length},
+              ${metadataFields.max_tokens},
+              ${metadataFields.has_middle_out_transform},
+              ${metadataFields.status_code},
+              ${metadataFields.upstream_id},
+              ${metadataFields.latency},
+              ${metadataFields.moderation_latency},
+              ${metadataFields.generation_time},
+              ${metadataFields.is_byok},
+              ${metadataFields.is_user_byok},
+              ${metadataFields.streamed},
+              ${metadataFields.cancelled},
+              ${metadataFields.has_tools},
+              ${metadataFields.machine_id},
+              ${metadataFields.session_id},
+              ${metadataFields.market_cost},
+              ${metadataFields.non_inference_cost},
+              ${metadataFields.is_free},
+              ${metadataFields.abuse_delay},
+              ${metadataFields.abuse_downgraded_from},
+
+              (SELECT http_user_agent_id FROM http_user_agent_cte),
+              (SELECT http_ip_id FROM http_ip_cte),
+              (SELECT vercel_ip_country_id FROM vercel_ip_country_cte),
+              (SELECT vercel_ip_city_id FROM vercel_ip_city_cte),
+              (SELECT ja4_digest_id FROM ja4_digest_cte),
+              (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
+              (SELECT finish_reason_id FROM finish_reason_cte),
+              (SELECT editor_name_id FROM editor_name_cte),
+              (SELECT api_kind_id FROM api_kind_cte),
+              (SELECT feature_id FROM feature_cte),
+              (SELECT mode_id FROM mode_cte),
+              (SELECT auto_model_id FROM auto_model_cte),
+              (SELECT reasoning_setting_id FROM reasoning_setting_cte),
+              (SELECT inference_region_id FROM inference_region_cte)
+          )
+          , balance_update AS (
+            UPDATE kilocode_users
+            SET microdollars_used = microdollars_used + ${coreUsageFields.cost}
+            WHERE id = ${coreUsageFields.kilo_user_id}
+              AND ${coreUsageFields.organization_id}::uuid IS NULL
+              AND ${coreUsageFields.cost} > 0
+            RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold,
+              CASE WHEN auto_top_up_enabled THEN jsonb_build_object(
+                'id', id,
+                'total_microdollars_acquired', total_microdollars_acquired,
+                'microdollars_used', microdollars_used,
+                'next_credit_expiration_at', next_credit_expiration_at,
+                'updated_at', updated_at,
+                'auto_top_up_enabled', auto_top_up_enabled
+              ) END AS auto_top_up_user
+          )
+          SELECT
+            microdollar_usage_ins.id AS usage_id,
+            microdollar_usage_ins.created_at AS usage_created_at,
+            balance_update.new_microdollars_used,
+            balance_update.kilo_pass_threshold,
+            balance_update.auto_top_up_user
+          FROM microdollar_usage_ins
+          LEFT JOIN balance_update ON true
+        `);
+
+  const inserted = result.rows[0];
+  if (!inserted) {
+    throw new Error('microdollar_usage insert returned no identity');
+  }
+
+  // Missing balance update is expected for org usage and zero-cost rows, but
+  // suspicious for positive-cost personal usage.
+  if (
+    inserted.new_microdollars_used === null &&
+    !coreUsageFields.organization_id &&
+    coreUsageFields.cost > 0
+  ) {
+    captureMessage('impossible: missing user', {
+      level: 'fatal',
+      tags: { source: 'insertUsageAndUpdateBalance' },
+      extra: { coreUsageFields },
+    });
+  }
+
+  const newMicrodollarsUsed =
+    inserted.new_microdollars_used === null ? null : Number(inserted.new_microdollars_used);
+
+  const kiloPassThreshold =
+    inserted.kilo_pass_threshold == null ? null : Number(inserted.kilo_pass_threshold);
+
+  return {
+    usageId: inserted.usage_id,
+    createdAt: inserted.usage_created_at,
+    newMicrodollarsUsed,
+    kiloPassThreshold,
+    autoTopUpUser: inserted.auto_top_up_user,
+  };
+}
+
+export function countAndStoreUsage(
+  clonedReponse: Response,
+  usageContext: MicrodollarUsageContext,
+  openrouterRequestSpan: Span | undefined,
+  servingProvider?: Provider
+) {
+  let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
+  const { requestStartedAt } = usageContext;
+  const metadataCapture =
+    usageContext.provider === 'vercel' ? usageContext.providerMetadataCapture : undefined;
+  const contentType = clonedReponse.headers.get('content-type');
+  const isStreaming = contentType?.includes('application/json')
+    ? false
+    : contentType?.includes('text/event-stream') || usageContext.isStreaming;
+
+  const parseResponseText = async (
+    body: ReadableStream<Uint8Array>,
+    parse: (content: string) => MicrodollarUsageStats
+  ): Promise<MicrodollarUsageStats> => {
+    const { text, timing } = await readResponseText(body, requestStartedAt);
+    return { ...parse(text), ...timing };
+  };
+
+  const usesUserCredentials =
+    usageContext.user_byok ||
+    usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+    usageContext.provider === CLAUDE_BILLING_PROVIDER_ID;
+
+  if (clonedReponse.body) {
+    if (usageContext.api_kind === 'responses') {
+      usageStatsPromise = isStreaming
+        ? parseResponsesMicrodollarUsageFromStream(
+            clonedReponse.body,
+            usageContext.kiloUserId,
+            openrouterRequestSpan,
+            usageContext.provider,
+            clonedReponse.status,
+            usesUserCredentials,
+            requestStartedAt,
+            metadataCapture
+          )
+        : parseResponseText(clonedReponse.body, content =>
+            parseResponsesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider,
+              metadataCapture
+            )
+          );
+    }
+    if (usageContext.api_kind === 'chat_completions') {
+      usageStatsPromise = isStreaming
+        ? parseMicrodollarUsageFromStream(
+            clonedReponse.body,
+            usageContext.kiloUserId,
+            openrouterRequestSpan,
+            usageContext.provider,
+            clonedReponse.status,
+            usesUserCredentials,
+            requestStartedAt,
+            metadataCapture
+          )
+        : parseResponseText(clonedReponse.body, content =>
+            parseMicrodollarUsageFromString(
+              content,
+              usageContext.kiloUserId,
+              clonedReponse.status,
+              usageContext.provider,
+              metadataCapture
+            )
+          );
+    }
+    if (usageContext.api_kind === 'messages') {
+      usageStatsPromise = isStreaming
+        ? parseMessagesMicrodollarUsageFromStream(
+            clonedReponse.body,
+            usageContext.kiloUserId,
+            openrouterRequestSpan,
+            usageContext.provider,
+            clonedReponse.status,
+            usesUserCredentials,
+            requestStartedAt,
+            metadataCapture
+          )
+        : parseResponseText(clonedReponse.body, content =>
+            parseMessagesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider,
+              metadataCapture
+            )
+          );
+    }
+  }
+
+  const recoveredUsageStats = parseUsageWithRecovery(
+    clonedReponse,
+    usageContext,
+    () => usageStatsPromise
+  );
+  metadataCapture?.waitFor(recoveredUsageStats);
+  const statsPromise = recoveredUsageStats.then(usageStats => {
+    usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
+    return usageStats;
+  });
+  return {
+    statsPromise,
+    usagePromise: statsPromise.then(usageStats =>
+      processTokenData(usageStats, usageContext, servingProvider)
+    ),
+  };
+}
+
+export function processOpenRouterUsage(
+  usage: z.infer<typeof openRouterUsageSchema> | null | undefined,
+  coreProps: NotYetCostedUsageStats,
+  provider: ProviderType,
+  vercelProviderMetadata?: VercelProviderMetaData | null
+): JustTheCostsUsageStats {
+  // usage may be null when there's no response (e.g. error), so default to empty object
+  const { cost_mUsd, nonInferenceCost_mUsd, is_byok } = computeOpenRouterCostFields(
+    usage ?? {},
+    coreProps,
+    'sse_processing',
+    providerReportsIsByok(provider),
+    provider
+  );
+
+  return {
+    inputTokens: usage?.prompt_tokens ?? 0,
+    cacheHitTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    cacheWriteTokens:
+      usage?.prompt_tokens_details?.cache_write_tokens ??
+      usage?.prompt_tokens_details?.cache_creation_input_tokens ??
+      0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    cost_mUsd,
+    nonInferenceCost_mUsd,
+    is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
+  };
+}
+
+const chatUsageFieldsSchema = z.looseObject({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  provider: z.string().nullish(),
+  usage: openRouterUsageSchema.nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+// Reasoning models such as Mistral's send content as `text` and `thinking` chunks.
+const chatMessageSchema = z.looseObject({
+  content: z.union([z.string(), z.array(contentPartSchema('text'))]).nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
+});
+
+function chatContentText(content: z.infer<typeof chatMessageSchema>['content']): string {
+  if (typeof content === 'string') return content;
+  return (content ?? [])
+    .filter(chunk => chunk.type === 'text')
+    .map(chunk => chunk.text)
+    .join('');
+}
+
+const generatedReasoningDetailSchema = z.union([
+  z.looseObject({ text: nonEmptyStringSchema }),
+  z.looseObject({ summary: nonEmptyStringSchema }),
+]);
+
+const generatedToolCallSchema = z.looseObject({
+  function: z.union([
+    z.looseObject({ name: nonEmptyStringSchema }),
+    z.looseObject({ arguments: nonEmptyStringSchema }),
+  ]),
+});
+
+// Mistral nests reasoning text in `thinking` content parts.
+const generatedContentPartSchema = z.union([
+  z.looseObject({ text: nonEmptyStringSchema }),
+  z.looseObject({ thinking: arrayContainingSchema(z.looseObject({ text: nonEmptyStringSchema })) }),
+]);
+
+// Role-only, finish, and usage chunks carry no generated tokens, and neither
+// does encrypted reasoning.
+const generatedOutputDeltaSchema = z.union([
+  z.looseObject({
+    content: z.union([nonEmptyStringSchema, arrayContainingSchema(generatedContentPartSchema)]),
+  }),
+  z.looseObject({ reasoning: nonEmptyStringSchema }),
+  z.looseObject({ reasoning_content: nonEmptyStringSchema }),
+  z.looseObject({ reasoning_details: arrayContainingSchema(generatedReasoningDetailSchema) }),
+  z.looseObject({ refusal: nonEmptyStringSchema }),
+  z.looseObject({ tool_calls: arrayContainingSchema(generatedToolCallSchema) }),
+  z.looseObject({ images: z.array(z.unknown()).min(1) }),
+  z.looseObject({
+    audio: z.union([
+      z.looseObject({ transcript: nonEmptyStringSchema }),
+      z.looseObject({ data: nonEmptyStringSchema }),
+    ]),
+  }),
+]);
+
+const chatUsageChunkSchema = chatUsageFieldsSchema.extend({
+  choices: z
+    .array(
+      z.looseObject({
+        delta: chatMessageSchema.nullish(),
+        finish_reason: z.unknown().optional(),
+      })
+    )
+    .nullish(),
+});
+
+const chatUsageResponseSchema = chatUsageFieldsSchema.extend({
+  choices: z
+    .array(
+      z.looseObject({
+        message: chatMessageSchema,
+        finish_reason: z.unknown().optional(),
+      })
+    )
+    .nullish(),
+});
+
+export async function parseMicrodollarUsageFromStream(
+  stream: ReadableStream<Uint8Array>,
+  kiloUserId: string,
+  openrouterRequestSpan: Span | undefined,
+  provider: ProviderType,
+  statusCode: number,
+  usesUserCredentials: boolean,
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
+): Promise<MicrodollarUsageStats> {
+  // End the request span immediately as this function starts
+  openrouterRequestSpan?.end();
+  const streamProcessingSpan = startInactiveSpan({
+    name: 'openrouter-stream-processing',
+    op: 'performance',
+  });
+  let messageId: string | null = null;
+  let model: string | null = null;
+  let responseContent = ''; // for abuse investigation
+  let reportedError = statusCode >= 400;
+  let effectiveStatusCode = statusCode;
+  let usage: z.infer<typeof openRouterUsageSchema> | null = null;
+  let inference_provider: string | null = null;
+  let finish_reason: unknown = null;
+  let vercelProviderMetadata: VercelProviderMetaData | null = null;
+
+  const onEvent = (event: EventSourceMessage) => {
+    if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
+      return false;
+    }
+
+    const rawJson: unknown = JSON.parse(event.data);
+    metadataCapture?.captureVercelMetadata(rawJson);
+    const json = chatUsageChunkSchema.parse(rawJson);
+
+    const choice = json.choices?.[0];
+    const chunkProviderMetadata = choice?.delta?.provider_metadata;
+
+    if (json.error != null) {
+      const error = json.error;
+      reportedError = true;
+      if (typeof error.code === 'number') {
+        effectiveStatusCode = error.code;
+      }
+      reportUpstreamStreamError({
+        label: 'OpenRouter error',
+        source: 'sse_processing',
+        error,
+        usesUserCredentials,
+        logContext: {
+          provider,
+          inference_provider: json.provider ?? inference_provider,
+          messageId: json.id ?? messageId,
+          model: json.model ?? model,
+        },
+        sentryExtra: {
+          kiloUserId,
+          provider,
+          messageId: json.id ?? messageId,
+          model: json.model ?? model,
+        },
+      });
+    }
+
+    model = json.model ?? model;
+    messageId = json.id ?? messageId;
+    usage = json.usage ?? usage;
+    if (chunkProviderMetadata) {
+      vercelProviderMetadata = chunkProviderMetadata;
+    }
+    inference_provider =
+      json.provider ?? chunkProviderMetadata?.gateway?.routing?.finalProvider ?? inference_provider;
+    finish_reason = choice?.finish_reason ?? finish_reason;
+
+    responseContent += chatContentText(choice?.delta?.content);
+
+    return json.choices?.some(c => generatedOutputDeltaSchema.safeParse(c.delta).success) ?? false;
+  };
+
+  const { wasAborted, malformedEventCount, timing } = await drainSseStream(
+    stream,
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt,
+    'openrouter.time_to_first_token_ms',
+    () => ({ kiloUserId, provider, messageId, model })
+  );
+
+  if (!reportedError && !usage) {
+    captureMessage('SUSPICIOUS: No usage chunk in stream', {
+      level: 'warning',
+      tags: { source: 'usage_processing' },
+      extra: { kiloUserId, provider, messageId, model },
+    });
+  }
+
+  const coreProps = {
+    kiloUserId,
+    messageId,
+    hasError:
+      reportedError || wasAborted || malformedEventCount > 0 || isErrorFinishReason(finish_reason),
+    model,
+    responseContent,
+    inference_provider,
+    finish_reason,
+    upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
+    latency: timing.latency,
+    moderation_latency: null,
+    generation_time: timing.generation_time,
+    streamed: true,
+    cancelled: null,
+    status_code: effectiveStatusCode,
+  };
+
+  const costs = processOpenRouterUsage(usage, coreProps, provider, vercelProviderMetadata);
+
+  return { ...coreProps, ...costs };
+}
+
+export function parseMicrodollarUsageFromString(
+  fullResponse: string,
+  kiloUserId: string,
+  statusCode: number,
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
+): MicrodollarUsageStats {
+  const rawJson: unknown = JSON.parse(fullResponse);
+  metadataCapture?.captureVercelMetadata(rawJson);
+  const responseJson = chatUsageResponseSchema.parse(rawJson);
+  const choice = responseJson.choices?.[0];
+  const vercelProviderMetadata = choice?.message.provider_metadata ?? null;
+
+  if (
+    providerReportsIsByok(provider) &&
+    responseJson.usage?.is_byok == null &&
+    responseJson.usage?.cost
+  ) {
+    captureException(new Error('SUSPICIOUS: is_byok is null'), {
+      tags: { source: 'string_processing' },
+      extra: { kiloUserId, provider, messageId: responseJson.id, model: responseJson.model },
+    });
+  }
+  const finish_reason = choice?.finish_reason ?? null;
+  const coreProps = {
+    kiloUserId,
+    messageId: responseJson.id ?? null,
+    hasError:
+      !responseJson.model ||
+      responseJson.error != null ||
+      statusCode >= 400 ||
+      isErrorFinishReason(finish_reason),
+    model: responseJson.model ?? null,
+    responseContent: chatContentText(choice?.message.content),
+    inference_provider:
+      responseJson.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
+    upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
+    finish_reason,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: null,
+    status_code: statusCode,
+  };
+
+  const costs = processOpenRouterUsage(
+    responseJson.usage,
+    coreProps,
+    provider,
+    vercelProviderMetadata
+  );
+
+  return { ...coreProps, ...costs };
+}
+
+/**
+ * `servingProvider` is the provider that served the request. Its key looks up
+ * the generation, so a request made with a user's own gateway key is looked up
+ * in that user's account.
+ */
+export async function processTokenData(
+  usageStats: MicrodollarUsageStats | null,
+  usageContext: MicrodollarUsageContext,
+  servingProvider?: Provider
+): Promise<UsageAccountingResult | null> {
+  if (!usageStats) {
+    captureMessage('SUSPICIOUS: No usage information', {
+      level: 'error',
+      tags: { source: 'usage_processing' },
+      extra: { usageContext: usageContextReportFields(usageContext) },
+    });
+    return null;
+  }
+
+  usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
+
+  const timer = createTimer();
+  const generationProvider = getGenerationLookupProvider(usageStats, usageContext, servingProvider);
+  const generation =
+    generationProvider &&
+    usageStats.messageId &&
+    (await fetchGeneration(usageStats.messageId, generationProvider));
+  if (usageStats.messageId) {
+    timer.log(`fetch generation for message ${usageStats.messageId}`);
+  }
+  if (generation) {
+    const genStats = mapToUsageStats(
+      generation,
+      usageStats.responseContent,
+      usageContext.kiloUserId,
+      usageContext.provider
+    );
+
+    if (usageContext.provider === 'vercel' && usageStats.inputTokens > 0) {
+      // It seems Vercel's /generation result does not include cache hit tokens in input tokens, unlike OpenRouter.
+      // Since it's not completely clear this is the case and in the past the numbers were inconsistent
+      // we keep the response usage data if we have it.
+      genStats.inputTokens = usageStats.inputTokens;
+      genStats.outputTokens = usageStats.outputTokens;
+      genStats.cacheHitTokens = usageStats.cacheHitTokens;
+      genStats.cacheWriteTokens = usageStats.cacheWriteTokens;
+    }
+
+    // Prefer the response alias over a dated generation ID, but keep a recovered model.
+    genStats.model = usageStats.model || genStats.model;
+    genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
+    genStats.latency = usageStats.latency;
+    genStats.generation_time = usageStats.generation_time;
+    genStats.finish_reason ??= usageStats.finish_reason;
+    genStats.hasError = usageStats.hasError; // retain by choice
+    genStats.status_code = usageStats.status_code; // retain by choice
+    genStats.streamed ??= usageContext.isStreaming;
+    // OpenRouter BYOK transcriptions report neither is_byok nor the upstream cost,
+    // so their response cost is only the BYOK fee and is expected to differ.
+    const responseCostIsOnlyByokFee = usageStats.is_byok == null && genStats.is_byok === true;
+    if (genStats.cost_mUsd !== usageStats.cost_mUsd && !responseCostIsOnlyByokFee) {
+      // The provider's generation lookup and the response's own usage payload should
+      // yield the same cost. A mismatch means inconsistent token or pricing data from
+      // the provider; the generation lookup values win (see assignment below).
+      console.warn(
+        'Cost from provider generation lookup differs from cost computed from response usage data:',
+        {
+          model: genStats.model,
+          cost_mUsd: { generation: genStats.cost_mUsd, response: usageStats.cost_mUsd },
+          cacheDiscount_mUsd: {
+            generation: genStats.cacheDiscount_mUsd,
+            response: usageStats.cacheDiscount_mUsd,
+          },
+        }
+      );
+    }
+    usageStats = genStats;
+  } else if (
+    generationProvider === OPENROUTER &&
+    usageStats.messageId &&
+    usageStats.is_byok == null &&
+    usageStats.cost_mUsd > 0
+  ) {
+    // OpenRouter transcriptions never report is_byok, so only the generation
+    // lookup can say whether their cost is the full cost or the BYOK fee.
+    captureMessage(
+      'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
+      {
+        level: 'error',
+        tags: { source: 'generation_lookup_fallback' },
+        extra: {
+          messageId: usageStats.messageId,
+          model: usageStats.model,
+          requested_model: usageContext.requested_model,
+          api_kind: usageContext.api_kind,
+          cost_mUsd: usageStats.cost_mUsd,
+        },
+      }
+    );
+  }
+
+  if (
+    !usageStats.model || // fallback for failure cases
+    usageContext.provider === 'custom' ||
+    usageContext.provider === 'custom-public' // custom LLMs do not reveal their upstream model
+  ) {
+    usageStats.model = usageContext.requested_model;
+  }
+
+  applyUsagePricing(usageStats, usageContext, await getCustomPricingConfig());
+
+  return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+}
+
+/**
+ * Records or queues usage and reports the same request to bouncer's usage ledger, after the billing
+ * cost is final. Chat and transcription reach it through `processTokenData`; FIM, edit,
+ * embeddings, and SystemOne call it directly.
+ *
+ * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
+ * transaction and attempts delivery right after commit; the cron drainer retries a failure.
+ * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
+ * retains the existing best-effort fallback. Every other request also keeps the
+ * independent best-effort send, which never rejects.
+ * Ordinary queued reporting starts alongside publication and both are awaited by the caller's
+ * existing lifetime. Its queue payload has no Bouncer event, so the writer cannot send it again.
+ */
+export async function logMicrodollarUsageAndReportToBouncer(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): Promise<UsageAccountingResult | null> {
+  const event = bouncerUsageEvent(usageStats, usageContext);
+  const transport = usageAccountingTransport();
+  if (!event || usageContext.bouncer?.spendWatch !== true) {
+    const accounting = logMicrodollarUsageWithTransport(usageStats, usageContext, null, transport);
+    if (event && transport === 'queue') {
+      const [record] = await Promise.all([accounting, reportUsageEvent(event)]);
+      return record;
+    }
+    const record = await accounting;
+    if (event) await reportUsageEvent(event);
+    return record;
+  }
+  const record = await logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    { request_id: event.requestId, payload: usageEventWireBody(event) },
+    transport
+  );
+  if (!record) await reportUsageEvent(event);
+  return record;
+}
+
+/**
+ * This request's bouncer usage event, or null when it has no bouncer context or is an anonymous
+ * request without an IP (a telemetry gap, never a failure to serve the request). The caller
+ * computes the prompt SimHash, so the raw prompt never reaches this context.
+ */
+function bouncerUsageEvent(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): UsageEvent | null {
+  const bouncer = usageContext.bouncer;
+  if (!bouncer) return null;
+  const fields = {
+    requestId: bouncer.requestId,
+    occurredAt: bouncer.occurredAt,
+    apiKind: usageContext.api_kind,
+    // The client fingerprint comes from the raw fraud headers already carried on
+    // this context; it is bounded here so an invalid header cannot fail the event.
+    ja4: normalizeJa4(usageContext.fraudHeaders.http_x_vercel_ja4_digest),
+    inputTokens: usageStats.inputTokens,
+    outputTokens: usageStats.outputTokens,
+    clientAttributed: bouncer.clientAttributed,
+    feature: usageContext.feature,
+    hasTools: usageContext.has_tools,
+    requestedLogprobs: bouncer.requestedLogprobs,
+    samples: bouncer.samples,
+    promptSimHash: bouncer.promptSimHash,
+    // The charged cost, after free-model and BYOK zeroing.
+    costMicrodollars: usageStats.cost_mUsd,
+  };
+  if (bouncer.accountId === null) {
+    // Anonymous usage is keyed on the IP and carries no payer key, so bouncer
+    // cannot turn it into a payer-sharing row.
+    if (bouncer.clientIp == null) return null;
+    return { ...fields, tier: 'anonymous', ip: bouncer.clientIp };
+  }
+  return {
+    ...fields,
+    accountId: bouncer.accountId,
+    ip: bouncer.clientIp,
+    // Only set for a request served on the person's delegated ChatGPT connection.
+    ...(usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ? { siwc: true } : {}),
+  };
+}
+
+function getGenerationLookupProvider(
+  usageStats: MicrodollarUsageStats | null,
+  usageContext: MicrodollarUsageContext,
+  servingProvider: Provider | undefined
+): Provider | undefined {
+  const gatewayProvider =
+    usageContext.provider === 'openrouter'
+      ? OPENROUTER
+      : usageContext.provider === 'vercel'
+        ? VERCEL_AI_GATEWAY
+        : undefined;
+  const provider =
+    gatewayProvider && servingProvider?.type === gatewayProvider.type
+      ? servingProvider
+      : gatewayProvider;
+  const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  if (!provider || !isSuccessStatusCode) {
+    return undefined;
+  }
+  const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
+  const hasCostWhenPaid =
+    usageContext.is_free || usageContext.user_byok || (usageStats?.cost_mUsd ?? 0) > 0;
+  const hasInferenceProvider = Boolean(usageStats?.inference_provider);
+  if (!hasOutputTokens) {
+    console.debug('[getGenerationLookupProvider] token stats are missing');
+    return provider;
+  }
+  if (!hasCostWhenPaid) {
+    console.debug('[getGenerationLookupProvider] cost is missing');
+    return provider;
+  }
+  if (!hasInferenceProvider) {
+    console.debug('[getGenerationLookupProvider] inference provider is missing');
+    return provider;
+  }
+  return undefined;
+}
+
+export const mapToUsageStats = (
+  { data }: OpenRouterGeneration,
+  responseContent: string,
+  kiloUserId: string,
+  provider: ProviderType
+): MicrodollarUsageStats => {
+  let llmCostUsd;
+  let nonInferenceCost_mUsd: number | undefined;
+  if (!data.is_byok) {
+    llmCostUsd = data.total_cost;
+  } else if (data.upstream_inference_cost == undefined) {
+    captureMessage('SUSPICIOUS: openrouter missing upstream_inference_cost', {
+      level: 'error',
+      tags: { source: 'openrouter-generation-processing' },
+      extra: { ...data, kiloUserId },
+    });
+    llmCostUsd = data.total_cost * OPENROUTER_BYOK_COST_MULTIPLIER; // this is the cost we charge for BYOK, so we multiply by 20 to get the actual cost
+    // openrouter bug, see
+  } else {
+    llmCostUsd = data.upstream_inference_cost;
+    nonInferenceCost_mUsd = byokNonInferenceCost_mUsd(
+      provider,
+      data.total_cost,
+      data.upstream_inference_cost
+    );
+  }
+
+  return {
+    messageId: data.id,
+    hasError: false,
+    model: data.model,
+    responseContent,
+    inputTokens:
+      provider === 'vercel'
+        ? (data.native_tokens_prompt ?? 0) +
+          (data.native_tokens_cached ?? 0) +
+          (data.native_tokens_cache_creation ?? 0)
+        : (data.native_tokens_prompt ?? 0),
+    cacheHitTokens: data.native_tokens_cached ?? 0,
+    cacheWriteTokens: data.native_tokens_cache_creation ?? 0,
+    outputTokens:
+      provider === 'vercel'
+        ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
+        : (data.native_tokens_completion ?? 0),
+    cost_mUsd: toMicrodollars(llmCostUsd) + (nonInferenceCost_mUsd ?? 0),
+    nonInferenceCost_mUsd,
+    is_byok: data.is_byok ?? null,
+    cacheDiscount_mUsd:
+      data.cache_discount == undefined ? undefined : toMicrodollars(data.cache_discount),
+    inference_provider: data.provider_name ?? null,
+    upstream_id: data.upstream_id ?? null,
+    finish_reason: data.finish_reason ?? null,
+    // The gateway measures latency and generation_time itself; see drainSseStream and readResponseText.
+    latency: null,
+    moderation_latency: data.moderation_latency ?? null,
+    generation_time: null,
+    streamed: data.streamed ?? null,
+    cancelled: data.cancelled ?? null,
+    status_code: 200,
+  };
+};

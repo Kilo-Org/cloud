@@ -18,7 +18,7 @@ export function MobileSidebarToggle({
       type="button"
       onClick={toggleMobileSidebar}
       className={cn(
-        'text-muted-foreground hover:text-foreground border-border hover:bg-accent cursor-pointer rounded-md border px-2.5 py-1 text-sm transition-colors lg:hidden',
+        'text-muted-foreground hover:text-foreground border-border hover:bg-accent cursor-pointer rounded-md border px-2.5 py-1 text-sm transition-colors lg:hidden [@media(any-pointer:coarse)]:min-h-11',
         variant === 'floating' ? 'absolute left-3 top-3 z-10' : 'shrink-0'
       )}
     >

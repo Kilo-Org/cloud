@@ -4,7 +4,7 @@ import { decode as decodeCbor } from 'cbor2';
 import { AsnParser } from '@peculiar/asn1-schema';
 import { Certificate } from '@peculiar/asn1-x509';
 import * as asn1js from 'asn1js';
-import { APPLE_APP_BUNDLE_ID, APPLE_TEAM_ID } from '@/lib/config.server';
+import { APPLE_APP_BUNDLE_ID, APPLE_TEAM_ID } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 
 /**
@@ -130,10 +130,22 @@ export async function verifyAppleAttestation(
   const authData = asBuffer(attestMap.get('authData'));
   if (!authData || authData.length < 55) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
 
+  // RP ID hash check — authData bytes 0-31.
+  // The RP ID is the full Apple App ID: TeamID.BundleID.
+  const appId = `${APPLE_TEAM_ID}.${bundleId}`;
+  const expectedRpIdHash = createHash('sha256').update(appId).digest();
+  if (!authData.subarray(0, 32).equals(expectedRpIdHash)) {
+    return { ok: false, error: 'RP_ID_MISMATCH' };
+  }
+
   const attStmt = attestMap.get('attStmt');
   if (!(attStmt instanceof Map)) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   const x5c = attStmt.get('x5c');
-  if (!Array.isArray(x5c) || x5c.length < 2) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
+  // Apple emits x5c as either [leaf, intermediate, root] or [leaf, intermediate];
+  // those two shapes are accepted and nothing else.
+  if (!Array.isArray(x5c) || x5c.length < 2 || x5c.length > 3) {
+    return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
+  }
   const chainDer = x5c.map(entry => asBuffer(entry));
   if (chainDer.some(entry => entry === null)) {
     return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
@@ -143,9 +155,8 @@ export async function verifyAppleAttestation(
 
   // Certificate chain verification. Every certificate must be signed by the
   // next one in the array (leaf → intermediate → … → root) and the chain must
-  // terminate at Apple's pinned App Attest root. Apple emits x5c as either
-  // [leaf, intermediate, root] or [leaf, intermediate], so the terminal
-  // certificate must either be the pinned root itself or be signed by it.
+  // terminate at Apple's pinned App Attest root. The terminal certificate must
+  // either be the pinned root itself or be signed by it.
   let chain: X509Certificate[];
   try {
     chain = chainBuffers.map(der => new X509Certificate(der));
@@ -175,14 +186,6 @@ export async function verifyAppleAttestation(
       captureMessage(`apple_attest_unknown_ca: ${terminalFingerprint}`);
       return { ok: false, error: 'CERT_CHAIN_INVALID' };
     }
-  }
-
-  // RP ID hash check — authData bytes 0-31
-  // The RP ID is the full Apple App ID: TeamID.BundleID.
-  const appId = `${APPLE_TEAM_ID}.${bundleId}`;
-  const expectedRpIdHash = createHash('sha256').update(appId).digest();
-  if (!authData.subarray(0, 32).equals(expectedRpIdHash)) {
-    return { ok: false, error: 'RP_ID_MISMATCH' };
   }
 
   // Extract credential ID from authData
@@ -216,7 +219,6 @@ export async function verifyAppleAttestation(
   // The challenge is base64url ASCII, so the string is the wire form.
   const clientDataHash = appAttestClientDataHash(challenge);
 
-  // Apple nonce = SHA256(authData || clientDataHash)
   const expectedNonce = createHash('sha256')
     .update(Buffer.concat([authData, clientDataHash]))
     .digest('hex');
@@ -336,7 +338,6 @@ function coseKeyToPublicKey(coseKeyBuf: Buffer) {
  * enforce a strictly increasing counter.
  */
 export async function verifyAppleAssertion(
-  keyId: string,
   clientDataHash: Buffer,
   assertionBase64: string,
   publicKeySpkiBase64: string
@@ -363,11 +364,17 @@ export async function verifyAppleAssertion(
   }
   const signCount = authenticatorData.readUInt32BE(33);
 
-  // Verify: signature over (authenticatorData || clientDataHash)
+  // Apple: nonce = SHA256(authenticatorData || clientDataHash), and the
+  // signature must be valid for nonce. The Secure Enclave signs nonce as the
+  // message with ECDSA-SHA256, so the verifier hashes nonce once more. Feeding
+  // the unhashed concatenation drops one hash and rejects every real assertion.
+  const nonce = createHash('sha256')
+    .update(Buffer.concat([authenticatorData, clientDataHash]))
+    .digest();
   try {
     const publicKeyDer = Buffer.from(publicKeySpkiBase64, 'base64');
     const verify = createVerify('sha256');
-    verify.update(Buffer.concat([authenticatorData, clientDataHash]));
+    verify.update(nonce);
     verify.end();
     if (!verify.verify({ key: publicKeyDer, format: 'der', type: 'spki' }, signature)) {
       return { ok: false, error: 'INVALID_ASSERTION' };

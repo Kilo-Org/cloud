@@ -1,0 +1,207 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner-native';
+
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import {
+  type AuthorizationWait,
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
+
+import { isPersonal } from './use-code-reviewer';
+
+/**
+ * The longest the control draws its own busy state. The install state is one
+ * request and the launch is local, so this bounds only a platform that drops the
+ * browser's report after the page opened: the wait keeps running and still
+ * resyncs on its own return edge, but the control must not stay disabled on
+ * the user's screen, which would be the inert-control symptom this action is
+ * fixing, made permanent.
+ */
+const HANDOFF_WATCHDOG_MS = 20_000;
+
+/**
+ * The shared Manage access control — the code-reviewer repository picker's and
+ * the Security Agent dashboard's — as the tap handler plus the busy state the
+ * tap itself owes.
+ */
+export type ManageRepositoryAccess = {
+  /** Mints a hand-off token and hands the user to the provider's settings page. */
+  handlePress: () => void;
+  /**
+   * True from the tap until the browser wait settles. The control draws its
+   * busy state from it, so a slow mint is never an inert button, and a second
+   * tap in that window starts nothing.
+   */
+  pending: boolean;
+};
+
+type ManageRepositoryAccessHandlers = {
+  /** A launch is starting, before the install state is minted. */
+  onOpen?: () => void;
+  /**
+   * The browser wait settled. `opened` is false when the mint or the launch
+   * failed, so a caller that explains a fix in place can keep that explanation
+   * up instead of clearing it for a page the reader never saw.
+   */
+  onReturn?: (opened: boolean) => void;
+};
+
+/**
+ * Which attempt owns the Manage-access control. `busy` draws the busy state and
+ * refuses a tap; `waiting` has released the control at the watchdog while its
+ * browser wait is still open, so a new tap may supersede it — and only the
+ * attempt id in the phase may deliver that attempt's return edge.
+ */
+type HandoffPhase =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'busy'; readonly attempt: number }
+  | { readonly kind: 'waiting'; readonly attempt: number };
+
+/**
+ * Opens the provider settings page where installation access is widened. The
+ * code-reviewer picker only ever shows what the integration may read, so this
+ * action is the way to make more repositories appear there; the Security Agent
+ * dashboard uses it for the rejections that a broken GitHub connection causes.
+ * Bitbucket has no such page and gets `undefined`.
+ *
+ * The wait settles when the user is back from the page: Android opens a custom
+ * tab that returns on the next foreground, while iOS presents the page in an
+ * in-app browser that never leaves the foreground and reports its own
+ * dismissal. `onReturn` covers that edge, so a caller resyncs even when no
+ * foreground event arrives.
+ *
+ * Every step reports itself: the busy state covers the mint, a launch that
+ * fails to open toasts, and a launch that fails after the app's own return edge
+ * ended the wait toasts too, because that is the one case where the user would
+ * otherwise watch nothing happen.
+ */
+export function useManageRepositoryAccess(
+  scope: string,
+  platform: ReviewerPlatform,
+  handlers: ManageRepositoryAccessHandlers = {}
+): ManageRepositoryAccess | undefined {
+  const { t } = useTranslation();
+  const orgScope = isPersonal(scope) ? undefined : scope;
+  const [phase, setPhase] = useState<HandoffPhase>({ kind: 'idle' });
+  const phaseRef = useRef<HandoffPhase>(phase);
+  // The attempt ids grow monotonically, so a settled attempt is recognised by id.
+  const attempts = useRef(0);
+  const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { onOpen, onReturn } = handlers;
+
+  const move = useCallback((next: HandoffPhase) => {
+    phaseRef.current = next;
+    setPhase(next);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (watchdog.current) {
+        clearTimeout(watchdog.current);
+      }
+    },
+    []
+  );
+
+  const open = useCallback(async (): Promise<boolean> => {
+    const label = t('codeReviewer.repos.repositoryAccess');
+    const couldNotOpen = () => {
+      toast.error(t('common.couldNotOpen', { label }));
+    };
+    const launch = async (url: string): Promise<AuthorizationWait | undefined> => {
+      try {
+        return await openAuthorizationAndWaitForReturn(url);
+      } catch {
+        // A failed launch is reported here, and the caller still resyncs: the
+        // settings page may have been changed in an earlier visit.
+        couldNotOpen();
+        return undefined;
+      }
+    };
+    const openSettings = async (url: string): Promise<boolean> => {
+      const wait = await launch(url);
+      if (!wait) {
+        return false;
+      }
+      // A foreground return can settle the wait before the browser reports. A
+      // launch that failed after that point never reached the catch above.
+      reportLateLaunchFailure(wait, { onFailure: couldNotOpen });
+      return true;
+    };
+
+    if (platform === 'github') {
+      try {
+        const url = await appShellHandoffUrl({
+          page: 'github-app',
+          ...(orgScope ? { organizationId: orgScope } : {}),
+        });
+        return await openSettings(url);
+      } catch {
+        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
+        return false;
+      }
+    }
+    if (platform === 'gitlab') {
+      try {
+        const url = await appShellHandoffUrl({
+          page: 'integration',
+          platform: 'gitlab',
+          ...(orgScope ? { organizationId: orgScope } : {}),
+        });
+        return await openSettings(url);
+      } catch {
+        couldNotOpen();
+        return false;
+      }
+    }
+    return false;
+  }, [orgScope, platform, t]);
+
+  const handlePress = useCallback(() => {
+    if (phaseRef.current.kind === 'busy') {
+      return;
+    }
+    attempts.current += 1;
+    const attempt = attempts.current;
+    const ownsAttempt = (): boolean => {
+      const current = phaseRef.current;
+      return current.kind !== 'idle' && current.attempt === attempt;
+    };
+    move({ kind: 'busy', attempt });
+    onOpen?.();
+    /** Returns false for an attempt the watchdog already released or a newer tap superseded. */
+    const settle = (): boolean => {
+      if (!ownsAttempt()) {
+        return false;
+      }
+      if (watchdog.current !== null) {
+        clearTimeout(watchdog.current);
+      }
+      watchdog.current = null;
+      move({ kind: 'idle' });
+      return true;
+    };
+    watchdog.current = setTimeout(() => {
+      if (!ownsAttempt()) {
+        return;
+      }
+      // The wait stays open and still owns `onReturn`; only the control is offered again.
+      move({ kind: 'waiting', attempt });
+    }, HANDOFF_WATCHDOG_MS);
+    void (async () => {
+      let opened = false;
+      try {
+        opened = await open();
+      } finally {
+        if (settle()) {
+          onReturn?.(opened);
+        }
+      }
+    })();
+  }, [move, onOpen, onReturn, open]);
+
+  return platform === 'bitbucket' ? undefined : { handlePress, pending: phase.kind === 'busy' };
+}

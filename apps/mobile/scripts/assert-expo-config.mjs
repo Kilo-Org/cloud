@@ -1,0 +1,427 @@
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { ENV_KEYS } from '../src/lib/env-keys.js';
+import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-notification-channels.js';
+
+// Contract values mirrored from app.config.ts (bundle id, package, scheme,
+// orientation, associated domain, blocked and requested permissions, and
+// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and
+// the silent channel list from src/lib/android-notification-channels.js. The
+// script runs the full evaluated config, so these must match the resolved
+// build-time output, not the raw app.config.ts source.
+const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
+const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
+const SCHEME = 'kiloapp';
+// The one host this app claims on the web. The universal-link claim, the
+// passkey relying-party claim and the Expo Head origin below derive from it, so
+// the three forms cannot name different hosts.
+const APP_HOST = 'app.kilo.ai';
+const ASSOCIATED_DOMAIN = `applinks:${APP_HOST}`;
+// The passkey relying-party claim on iOS. The claim is split by platform: iOS
+// carries its half here (the Associated Domains entitlement the platform
+// authenticator reads), Android carries its half in the served Digital Asset
+// Links file, whose `delegate_permission/common.get_login_creds` relation
+// apps/web/src/lib/app-site-association.test.ts pins. Both halves name the one
+// relying-party host, app.kilo.ai.
+const PASSKEY_ASSOCIATED_DOMAIN = `webcredentials:${APP_HOST}`;
+// Expo Head's handoff origin (extra.router.headOrigin). It is the origin of
+// ASSOCIATED_DOMAIN above: the session link the app advertises and the
+// universal link the app claims have to be the same URL.
+const HEAD_ORIGIN = `https://${APP_HOST}`;
+// Time Sensitive Notifications capability: the iOS half of the needs-input
+// raise's `interruptionLevel: 'timeSensitive'` break-through contract.
+const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';
+const BLOCKED_PERMISSIONS = [
+  'android.permission.READ_MEDIA_IMAGES',
+  'android.permission.READ_MEDIA_VIDEO',
+  'android.permission.READ_MEDIA_AUDIO',
+];
+// Permissions the app itself must request. Android only offers the Do Not
+// Disturb access grant (Settings > Special app access) to an app declaring this
+// normal-protection marker, and without that grant AOSP resets a channel's
+// app-requested `bypassDnd` to false. Checked as a subset: plugins add their own
+// permissions (RECORD_AUDIO, USE_BIOMETRIC, USE_FINGERPRINT, ACCESS_COARSE/
+// FINE_LOCATION, AD_ID), so the evaluated array is never exactly this list.
+const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
+const SENTRY_PLUGIN = '@sentry/react-native/expo';
+const BUILD_PROPERTIES_PLUGIN = 'expo-build-properties';
+const NOTIFICATIONS_PLUGIN = 'expo-notifications';
+// The Android channel Firebase falls back to when an FCM message omits
+// `channel_id`, mirrored from app.config.ts. It must be a channel the app
+// creates (src/lib/notifications.ts), or Android drops the fallback push, and
+// it must be created with sound: the fallback carries needs-input/chat alerts,
+// so the silent progress channel must never be named here.
+const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
+// expo-task-manager instantiates its headless app loader by name from
+// AndroidManifest metadata. R8 does not keep it (its `@DoNotStrip` is on the
+// constructor, not the class), so without this rule a minified release removes
+// the class and a background FCM data message crashes TaskService.executeTask.
+const HEADLESS_APP_LOADER_KEEP_RULE =
+  '-keep class expo.modules.adapters.react.apploader.RNHeadlessAppLoader { <init>(); }';
+// One entry configures Expo's native splash on both platforms. Its internal
+// Android backing-surface adapter is a documented native capability exception,
+// not a separate launch lifecycle. The wrapper owns the mod ordering.
+const BRANDED_SPLASH_PLUGIN = './plugins/withBrandedSplash';
+// The native plugin registrations this app cannot ship without, in the order
+// they are checked. Each reason names the failure the registration prevents.
+const REQUIRED_PLUGINS = [
+  {
+    name: SENTRY_PLUGIN,
+    reason:
+      'Without it the app has no Sentry native integration, so crash reports and symbol upload never register.',
+  },
+  {
+    name: './plugins/withAndroidRotationSurface',
+    reason:
+      "The rotation surface plugin pins the Android window background to the theme background; without it a rotation paints the AppCompat DayNight default until React's first frame lands in the new orientation.",
+  },
+  {
+    name: './plugins/withAndroidManifestFix',
+    reason:
+      "The manifest fix plugin writes the native alert title override (plus the backup rules and optional hardware features); without it React Native's bundled `viewStart` title layout returns and the Arabic discard confirm's title no longer shares its message's start edge.",
+  },
+  {
+    name: './plugins/withAndroidAlertDialogButtonCase',
+    reason:
+      "Android alert-dialog actions must render in the app's sentence case: the AppCompat button bar draws them ALL-CAPS, which contradicts the app's copy (DESIGN.md:350). The plugin re-cases them from the activity theme.",
+  },
+  {
+    name: './plugins/withAndroidAlertDialogTheme',
+    reason:
+      "The alert dialog theme repaints AppCompat's stock dialog surface and accent with the app's own tokens; without it the sign-out confirmation (and every other Alert.alert) is the DayNight default grey/teal.",
+  },
+  {
+    name: './plugins/withArtifactFileProvider',
+    reason:
+      'The iOS File Provider extension target and the Pods integration behind it are created by this plugin alone; without it the Files-app location has no extension to serve it.',
+  },
+  {
+    name: './plugins/withAppIntentLocalizations',
+    reason:
+      "The app target's one `Localizable.strings` (the App Intent copy plus the appended Focus-filter catalog) is written by this plugin; without it the Shortcuts actions and the Focus filter stay English on a localized device.",
+  },
+];
+// The developer menu is not the product. On iOS `DevMenuManager` auto-shows it
+// over the app at launch while onboarding is unfinished or EXDevMenuShowsAtLaunch
+// is set, and its SwiftUI icons carry raw SF Symbol names as accessibility labels
+// (`chevron.left.chevron.right` on "Open DevTools", `gearshape.fill` on the
+// floating tool button), so a scene dump of the product screen under it reads
+// them aloud as-is. These options keep it off the product screens; a developer
+// still opens it with Ctrl + d or a shake. Mirrored from
+// src/lib/dev-client-plugin.js -- asserted on the EVALUATED config, because a
+// config that stopped handing the plugin the options would still evaluate to the
+// dev-menu defaults (auto-show on, onboarding on).
+const DEV_CLIENT_PLUGIN = 'expo-dev-client';
+const DEV_CLIENT_PLUGIN_OPTIONS = {
+  toolsButton: false,
+  showMenuAtLaunch: false,
+  skipOnboarding: true,
+};
+const PERMISSION_PROMPT_PLIST_KEYS = [
+  'NSCameraUsageDescription',
+  'NSPhotoLibraryUsageDescription',
+  'NSLocalNetworkUsageDescription',
+  'NSMicrophoneUsageDescription',
+  'NSSpeechRecognitionUsageDescription',
+  'NSFaceIDUsageDescription',
+  'NSUserTrackingUsageDescription',
+];
+
+const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+let raw;
+try {
+  raw = execFileSync('npx', ['expo', 'config', '--json'], {
+    cwd: mobileDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+} catch (error) {
+  console.error(`Failed to run "npx expo config --json" from ${mobileDir}: ${error.message}`);
+  process.exit(1);
+}
+
+let config;
+try {
+  config = JSON.parse(raw);
+} catch (error) {
+  console.error(`"npx expo config --json" returned invalid JSON: ${error.message}`);
+  process.exit(1);
+}
+
+const failures = [];
+
+function check(condition, message) {
+  if (!condition) {
+    failures.push(message);
+  }
+}
+
+/** True when `actual` holds exactly the members of `expected`, in any order. */
+const sameMembers = (actual, expected) =>
+  actual.length === expected.length && expected.every(value => actual.includes(value));
+
+check(
+  config.ios?.bundleIdentifier === BUNDLE_IDENTIFIER,
+  `ios.bundleIdentifier must be "${BUNDLE_IDENTIFIER}"`
+);
+check(config.android?.package === ANDROID_PACKAGE, `android.package must be "${ANDROID_PACKAGE}"`);
+check(config.scheme === SCHEME, `scheme must be "${SCHEME}"`);
+
+// Rotation and resizing contract: all device orientations enabled (portrait +
+// both landscapes on iOS, all orientations on Android) and continuous window
+// resizing. `UIRequiresFullScreen` is deprecated in iOS 27 and asks only for
+// discrete resizing, so the app must not require it; Expo then also emits the
+// four iPad orientations that App Store validation needs of a resizable app.
+check(config.orientation === 'default', `orientation must be "default"`);
+check(
+  config.ios?.requireFullScreen !== true,
+  'ios.requireFullScreen must not be true (it requests discrete resizing; the iOS 27 SDK resizes windows regardless)'
+);
+
+// Platforms contract: the app is iOS and Android only (apps/mobile/AGENTS.md).
+// Expo detects the platform set when the config does not declare one
+// (getSupportedPlatforms): `react-native` resolving adds ios and android, and
+// `react-dom` resolving adds web. The dev server recorded in
+// dev/logs/mobile.log had web in its manifest platforms, so it answered a
+// browser request with the web index.html; that page requests a web bundle of
+// apps/mobile/index.js, where babel-preset-expo rewrites `react-native` to
+// `react-native-web` (not installed), and Metro logs
+// `Unable to resolve "react-native-web/dist/exports/AppRegistry"` into the app
+// console — a JavaScript error the app never causes. Declaring the two
+// platforms makes ManifestMiddleware.checkBrowserRequestAsync false, so a
+// browser request falls through to the manifest response instead.
+const PLATFORMS = ['ios', 'android'];
+check(
+  Array.isArray(config.platforms) && sameMembers(config.platforms, PLATFORMS),
+  `platforms must be exactly [${PLATFORMS.join(', ')}] (web is not a product target; it bundles an unsupported platform and logs a Metro resolve error into the app console)`
+);
+
+const associatedDomains = config.ios?.associatedDomains ?? [];
+check(
+  associatedDomains.includes(ASSOCIATED_DOMAIN),
+  `ios.associatedDomains must contain "${ASSOCIATED_DOMAIN}"`
+);
+check(
+  associatedDomains.includes(PASSKEY_ASSOCIATED_DOMAIN),
+  `ios.associatedDomains must contain "${PASSKEY_ASSOCIATED_DOMAIN}"`
+);
+
+// Session handoff: expo-router's Head builds the advertised NSUserActivity URL
+// from extra.router.headOrigin and throws in development when it is missing
+// (expo-router/build/head/url.js), so an empty `router` silently disables every
+// session handoff on iOS.
+check(
+  config.extra?.router?.headOrigin === HEAD_ORIGIN,
+  `extra.router.headOrigin must be "${HEAD_ORIGIN}"`
+);
+
+// iOS honors `UNNotificationInterruptionLevel.timeSensitive` only when the app
+// carries the Time Sensitive Notifications capability; without it the
+// needs-input raise is demoted to the platform default and stays quiet in Focus.
+check(
+  config.ios?.entitlements?.[TIME_SENSITIVE_ENTITLEMENT] === true,
+  `ios.entitlements must enable the Time Sensitive Notifications capability (${TIME_SENSITIVE_ENTITLEMENT})`
+);
+
+const blockedPermissions = config.android?.blockedPermissions ?? [];
+check(
+  sameMembers(blockedPermissions, BLOCKED_PERMISSIONS),
+  `android.blockedPermissions must equal exactly [${BLOCKED_PERMISSIONS.join(', ')}]`
+);
+
+const requestedPermissions = config.android?.permissions ?? [];
+const missingRequestedPermissions = REQUESTED_PERMISSIONS.filter(
+  permission => !requestedPermissions.includes(permission)
+);
+check(
+  missingRequestedPermissions.length === 0,
+  `android.permissions must include [${missingRequestedPermissions.join(', ')}]`
+);
+
+// iOS permission prompts: Expo's built-in `withLocales` reads the top-level
+// `locales` field at prebuild and writes one InfoPlist.strings per tag. The
+// evaluated config is the integration guard the unit test cannot give: it
+// exercises app.config.ts's real module resolution and the JSON import.
+const localizations = config.ios?.infoPlist?.CFBundleLocalizations ?? [];
+const locales = config.locales ?? {};
+const localeTags = Object.keys(locales);
+// The loop below is the assertion set. A config that stopped emitting the list
+// would run none of the per-locale checks and still print "OK", so the list has
+// to stand on its own before the loop starts.
+check(
+  localizations.length > 0,
+  'ios.infoPlist.CFBundleLocalizations must list the supported language tags'
+);
+// Exact tags, not a count: swapping one tag for another keeps the length equal
+// while dropping one language's prompts and checking another's. The two filters
+// only name the offending tags in the failure message. The comparison itself
+// runs on the distinct tags, because a repeat names no extra language: the
+// assertion asks which languages are named, not how often.
+const unlocalizedTags = localeTags.filter(tag => !localizations.includes(tag));
+const unlistedTags = localizations.filter(tag => !localeTags.includes(tag));
+check(
+  sameMembers([...new Set(localizations)], localeTags),
+  `ios.infoPlist.CFBundleLocalizations must name exactly the top-level locales tags (without a CFBundleLocalization: [${unlocalizedTags.join(', ')}]; without a locales entry: [${unlistedTags.join(', ')}])`
+);
+for (const tag of localizations) {
+  check(
+    Boolean(locales[tag]?.ios) && typeof locales[tag].ios === 'object',
+    `locales["${tag}"].ios must be an object`
+  );
+  // The app target's `<tag>.lproj/Localizable.strings` has exactly one writer:
+  // `withAppIntentLocalizations`, which also carries the Focus-filter catalog.
+  // Expo's `withLocales` registers a second file at the same bundle path when
+  // this key is present, and Xcode fails the build with "Multiple commands
+  // produce …/Localizable.strings".
+  check(
+    !Object.hasOwn(locales[tag]?.ios ?? {}, 'Localizable.strings'),
+    `locales["${tag}"].ios must not declare Localizable.strings — Expo would register a second copy beside the App Intent catalog`
+  );
+  for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
+    const value = locales[tag]?.ios?.[key];
+    check(
+      typeof value === 'string' && value.length > 0,
+      `locales["${tag}"].ios["${key}"] must be a non-empty string`
+    );
+  }
+}
+
+const pluginEntries = (config.plugins ?? []).map(plugin =>
+  Array.isArray(plugin)
+    ? { name: plugin[0], options: plugin[1] }
+    : { name: plugin, options: undefined }
+);
+const pluginNames = pluginEntries.map(entry => entry.name);
+/** The first entry for a plugin name, with the options it was configured with. */
+const pluginEntry = name => pluginEntries.find(entry => entry.name === name);
+for (const { name, reason } of REQUIRED_PLUGINS) {
+  check(pluginNames.includes(name), `plugins must include "${name}": ${reason}`);
+}
+// Without the Sentry Android Gradle Plugin a release build uploads no NDK
+// symbols or R8 mapping, and Android native crashes reach Sentry unsymbolicated.
+const sentryPlugin = pluginEntry(SENTRY_PLUGIN);
+check(
+  sentryPlugin?.options?.experimental_android?.enableAndroidGradlePlugin === true,
+  `"${SENTRY_PLUGIN}" must set experimental_android.enableAndroidGradlePlugin`
+);
+const splashEntries = pluginEntries.filter(entry => entry.name === BRANDED_SPLASH_PLUGIN);
+check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
+check(
+  !pluginNames.includes('expo-splash-screen') &&
+    !pluginNames.includes('./plugins/withAndroidSplashWindowBackground'),
+  'the shared branded splash must own native splash registration and mod ordering'
+);
+const splashOptions = splashEntries[0]?.options;
+check(
+  splashOptions?.image === './assets/images/logo-mark.png' &&
+    splashOptions.backgroundColor === '#FFDD00' &&
+    splashOptions.imageWidth === 100,
+  'the shared native splash must match AnimatedSplashOverlay: yellow with the 100dp Kilo mark'
+);
+check(
+  splashOptions?.ios === undefined && splashOptions?.android === undefined,
+  'the branded splash must not fork its options by platform'
+);
+// The `./plugins/withArtifactFileProvider` registration is only the first
+// layer: EAS builds and signs the extension from its `appExtensions` entry, and
+// the evaluated config is the only place that shows the entry the plugin
+// composed.
+const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+check(
+  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
+);
+// Dev-only capability, asserted where it would break a release: Apple rejects
+// the capability sync for `FILEPROVIDER_TESTINGMODE` on the extension's App ID,
+// and App Store review rejects the entitlement itself. The release build and
+// this assertion share one evaluation, so a production config that carried it
+// would fail here before Apple sees it.
+if (process.env.EAS_BUILD_PROFILE === 'production') {
+  const FILE_PROVIDER_TESTING_MODE = 'com.apple.developer.fileprovider.testing-mode';
+  const fileProviderExtension = appExtensions.find(
+    extension => extension.targetName === 'ArtifactsFileProvider'
+  );
+  check(
+    !(FILE_PROVIDER_TESTING_MODE in (config.ios?.entitlements ?? {})),
+    `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} app entitlement`
+  );
+  check(
+    !('KiloArtifactsFileProviderTesting' in (config.ios?.infoPlist ?? {})),
+    'a production build must not carry the KiloArtifactsFileProviderTesting Info.plist key'
+  );
+  check(
+    !(FILE_PROVIDER_TESTING_MODE in (fileProviderExtension?.entitlements ?? {})),
+    `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} extension entitlement`
+  );
+}
+
+// Asserted on the EVALUATED config, not on app.config.ts's source: options that
+// never reach the plugin still evaluate to the dev-menu defaults (auto-show on,
+// onboarding on), and the menu then sits over the product screen carrying the
+// raw SF Symbol names a scene dump reads aloud.
+const devClientPlugin = pluginEntry(DEV_CLIENT_PLUGIN);
+for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
+  check(
+    devClientPlugin?.options?.[option] === expected,
+    `plugins "${DEV_CLIENT_PLUGIN}" must set ${option}: ${JSON.stringify(expected)}`
+  );
+}
+
+// Android release minification: the prebuild reads `extraProguardRules` from
+// this option, so a dropped entry silently reintroduces the headless crash.
+const buildPropertiesPlugin = pluginEntry(BUILD_PROPERTIES_PLUGIN);
+const extraProguardRules = buildPropertiesPlugin?.options?.android?.extraProguardRules;
+check(
+  typeof extraProguardRules === 'string' &&
+    extraProguardRules.includes(HEADLESS_APP_LOADER_KEEP_RULE),
+  `plugins "${BUILD_PROPERTIES_PLUGIN}" must keep expo-task-manager's headless app loader (${HEADLESS_APP_LOADER_KEEP_RULE})`
+);
+
+// FCM falls back to this channel for a message without `channel_id`; naming a
+// channel the app creates stops FirebaseMessaging from logging "Missing Default
+// Notification Channel metadata" on every message.
+const notificationsPlugin = pluginEntry(NOTIFICATIONS_PLUGIN);
+check(
+  notificationsPlugin?.options?.defaultChannel === ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
+  `plugins "${NOTIFICATIONS_PLUGIN}" must set defaultChannel: "${ANDROID_DEFAULT_NOTIFICATION_CHANNEL}"`
+);
+// The fallback carries needs-input/chat alerts for an unversioned token, so it
+// must not name a channel the app creates silent. The list is the same one
+// src/lib/notifications.ts writes its channels from.
+check(
+  !SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
+  `the FCM default channel must not be silent (${SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`
+);
+
+const extra = config.extra ?? {};
+for (const key of Object.keys(ENV_KEYS)) {
+  const value = extra[key];
+  check(
+    value !== undefined && value !== null && value !== '',
+    `extra.${key} must be present and non-empty`
+  );
+}
+
+// Admission contract: the server issues native credentials only to an attested
+// device, and Play Integrity is the Android proof. An optional key would
+// otherwise bake an empty value into a release that then cannot sign in.
+if (process.env.EAS_BUILD_PROFILE === 'production') {
+  check(
+    typeof extra.playIntegrityProjectNumber === 'string' &&
+      extra.playIntegrityProjectNumber.length > 0,
+    'a production build must carry extra.playIntegrityProjectNumber (Android cannot attest without it)'
+  );
+}
+
+if (failures.length > 0) {
+  console.error('Expo config contract violations:');
+  for (const failure of failures) {
+    console.error(`  - ${failure}`);
+  }
+  process.exit(1);
+}
+
+console.log('Expo config contract OK');

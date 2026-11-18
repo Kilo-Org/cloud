@@ -1,7 +1,7 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { fetchExpiringTransactions } from '@/lib/creditExpiration';
+import { fetchExpiringTransactions } from '@kilocode/web-shared/lib/creditExpiration';
 
 export type RecomputeNextCreditExpirationResult = {
   oldValue: string | null;

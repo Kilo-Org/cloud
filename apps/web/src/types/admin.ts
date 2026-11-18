@@ -6,10 +6,11 @@ import type {
   OrganizationMembership,
   AutoTopUpConfig,
 } from '@kilocode/db/schema';
-import type { describePaymentMethods } from '@/lib/admin-utils-serverside';
-import { OrganizationSchema } from '@/lib/organizations/organization-types';
-import { type BalanceForUser } from '@/lib/user/balance';
-import type { PaginationMetadata } from '@/types/pagination';
+import type { describePaymentMethods } from '@kilocode/web-shared/lib/admin-utils-serverside';
+import { OrganizationSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { type BalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import type { PaginationMetadata } from '@kilocode/web-shared/types/pagination';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 
 export type PaymentMethodStatus = Awaited<ReturnType<typeof describePaymentMethods>>;
 
@@ -35,11 +36,20 @@ export type HasAutoTopUpConfig = {
 export type HasSSOProtectedDomain = {
   is_sso_protected_domain: boolean;
 };
+export type HasLoginMethods = {
+  login_methods: {
+    provider: AuthProviderId;
+    email: string;
+    source: 'linked' | 'inferred';
+    email_relation: 'primary' | 'different' | 'conflict';
+  }[];
+};
 export type UserDetailProps = UserTableProps &
   HasCreditInfo &
   UserOrganizationMembershipProps &
   HasAutoTopUpConfig &
-  HasSSOProtectedDomain;
+  HasSSOProtectedDomain &
+  HasLoginMethods;
 export type UsersApiResponse = {
   users: UserTableProps[];
   pagination: PaginationMetadata;
@@ -83,6 +93,8 @@ export const AdminCreditTransactionSchema = z.object({
   stripe_payment_id: z.string().nullable(),
   credit_category: z.string().nullable(),
   expiry_date: z.string().datetime().nullable(),
+  paid_credit_policy: z.string().nullable().optional(),
+  credit_source: z.string().nullable().optional(),
   created_at: z.string().datetime(),
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
@@ -98,6 +110,7 @@ export type AddCreditRequest = {
   description?: string | null;
   credit_category?: string;
   credit_expiry_date?: string;
+  creditKind?: 'paid' | 'promotional';
   expiry_hours?: number | null;
   // Legacy names (for backward compatibility)
   // ref, e.g.: https://www.val.town/x/kilocode/stream-github-superstars/code/issue-credits.ts is still using old names.

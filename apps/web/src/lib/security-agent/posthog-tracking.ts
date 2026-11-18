@@ -6,11 +6,31 @@
  */
 
 import 'server-only';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import { captureException } from '@sentry/nextjs';
 
 const posthogClient = PostHogClient();
+
+function captureSecurityAgentEvent(
+  event: string,
+  distinctId: string,
+  properties: Record<string, unknown>,
+  sentrySource: string
+): void {
+  try {
+    posthogClient.capture({
+      distinctId,
+      event,
+      properties,
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { source: sentrySource },
+      extra: { properties },
+    });
+  }
+}
 
 type BaseSecurityAgentEvent = {
   distinctId: string;
@@ -119,18 +139,12 @@ export function trackSecurityAgentUiInteraction(properties: SecurityAgentUiInter
       : {}),
   };
 
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_ui_interaction',
-      properties: eventProperties,
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_ui_interaction' },
-      extra: { properties: eventProperties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_ui_interaction',
+    properties.distinctId,
+    eventProperties,
+    'posthog_security_agent_ui_interaction'
+  );
 }
 
 export function trackSecurityAgentRemediationAction(
@@ -147,84 +161,60 @@ export function trackSecurityAgentRemediationAction(
       : {}),
   };
 
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_remediation_action',
-      properties: eventProperties,
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_remediation_action' },
-      extra: { properties: eventProperties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_remediation_action',
+    properties.distinctId,
+    eventProperties,
+    'posthog_security_agent_remediation_action'
+  );
 }
 
 /**
  * Track security agent enabled/disabled
  */
 export function trackSecurityAgentEnabled(properties: SecurityAgentEnabledEvent): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_enabled',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'set_enabled',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_enabled' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_enabled',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'set_enabled',
+    },
+    'posthog_security_agent_enabled'
+  );
 }
 
 /**
  * Track security agent configuration saved
  */
 export function trackSecurityAgentConfigSaved(properties: SecurityAgentConfigSavedEvent): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_config_saved',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'save_config',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_config_saved' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_config_saved',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'save_config',
+    },
+    'posthog_security_agent_config_saved'
+  );
 }
 
 /**
  * Track security agent sync operation
  */
 export function trackSecurityAgentSync(properties: SecurityAgentSyncEvent): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_sync',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'sync',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_sync' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_sync',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'sync',
+    },
+    'posthog_security_agent_sync'
+  );
 }
 
 /**
@@ -233,22 +223,16 @@ export function trackSecurityAgentSync(properties: SecurityAgentSyncEvent): void
 export function trackSecurityAgentAnalysisStarted(
   properties: SecurityAgentAnalysisStartedEvent
 ): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_analysis_started',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'start_analysis',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_analysis_started' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_analysis_started',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'start_analysis',
+    },
+    'posthog_security_agent_analysis_started'
+  );
 }
 
 /**
@@ -257,22 +241,16 @@ export function trackSecurityAgentAnalysisStarted(
 export function trackSecurityAgentAnalysisCompleted(
   properties: SecurityAgentAnalysisCompletedEvent
 ): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_analysis_completed',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'analysis_completed',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_analysis_completed' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_analysis_completed',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'analysis_completed',
+    },
+    'posthog_security_agent_analysis_completed'
+  );
 }
 
 /**
@@ -281,64 +259,46 @@ export function trackSecurityAgentAnalysisCompleted(
 export function trackSecurityAgentFindingDismissed(
   properties: SecurityAgentFindingDismissedEvent
 ): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_finding_dismissed',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'dismiss_finding',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_finding_dismissed' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_finding_dismissed',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'dismiss_finding',
+    },
+    'posthog_security_agent_finding_dismissed'
+  );
 }
 
 /**
  * Track security finding auto-dismissed
  */
 export function trackSecurityAgentAutoDismiss(properties: SecurityAgentAutoDismissEvent): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_auto_dismiss',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'auto_dismiss',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_auto_dismiss' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_auto_dismiss',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'auto_dismiss',
+    },
+    'posthog_security_agent_auto_dismiss'
+  );
 }
 
 /**
  * Track security agent full sync (cron job)
  */
 export function trackSecurityAgentFullSync(properties: SecurityAgentFullSyncEvent): void {
-  try {
-    posthogClient.capture({
-      distinctId: properties.distinctId,
-      event: 'security_agent_full_sync',
-      properties: {
-        ...properties,
-        feature: 'security-agent',
-        operation: 'full_sync',
-      },
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'posthog_security_agent_full_sync' },
-      extra: { properties },
-    });
-  }
+  captureSecurityAgentEvent(
+    'security_agent_full_sync',
+    properties.distinctId,
+    {
+      ...properties,
+      feature: 'security-agent',
+      operation: 'full_sync',
+    },
+    'posthog_security_agent_full_sync'
+  );
 }

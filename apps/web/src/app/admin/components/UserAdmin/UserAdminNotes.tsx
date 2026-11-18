@@ -68,13 +68,11 @@ export function UserAdminNotes(user: UserDetailProps) {
     const blockReason = noteContent.trim();
 
     try {
-      // First create the admin note
       await addNoteMutation.mutateAsync({
         kilo_user_id: user.id,
         noteContent: `User blocked: ${blockReason}`,
       });
 
-      // Then block the user
       await updateUserMutation.mutateAsync({
         userId: user.id,
         blocked_reason: blockReason,
@@ -90,13 +88,11 @@ export function UserAdminNotes(user: UserDetailProps) {
     const unblockNote = noteContent.trim() || 'No reason provided';
 
     try {
-      // First create the admin note
       await addNoteMutation.mutateAsync({
         kilo_user_id: user.id,
         noteContent: `User unblocked: ${unblockNote}`,
       });
 
-      // Then unblock the user
       await updateUserMutation.mutateAsync({
         userId: user.id,
         blocked_reason: null,

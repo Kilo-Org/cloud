@@ -1,4 +1,5 @@
 import {
+  Brain,
   FileSliders,
   FolderGit2,
   Gauge,
@@ -6,11 +7,37 @@ import {
   MessageSquareText,
   ScrollText,
   ShieldCheck,
+  Users,
 } from '@/components/ui/icons';
 
+import { i18n } from '@/i18n';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
+import { formatList, formatNumber } from '@/lib/format';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
-import { capitalize } from '@/lib/utils';
+
+const reviewStyleLabels = {
+  strict: 'codeReviewer.reviewStyle.strict',
+  balanced: 'common.balanced',
+  lenient: 'codeReviewer.reviewStyle.lenient',
+  roast: 'codeReviewer.reviewStyle.roast',
+} as const;
+
+const focusAreaLabels = {
+  security: 'codeReviewer.focusArea.security',
+  performance: 'common.performance',
+  bugs: 'codeReviewer.focusArea.bugs',
+  style: 'codeReviewer.focusArea.style',
+  testing: 'codeReviewer.focusArea.testing',
+  documentation: 'codeReviewer.focusArea.documentation',
+} as const;
+
+const gateThresholdLabels = {
+  off: 'common.off',
+  all: 'common.all',
+  warning: 'codeReviewer.gateThreshold.warning',
+  critical: 'common.critical',
+} as const;
 
 type OverviewRow = {
   field: string;
@@ -18,12 +45,19 @@ type OverviewRow = {
   title: string;
   subtitle: string;
   onPress?: () => void;
+  // A row members may open read-only even when they cannot edit config.
+  readOnlyAccessible?: boolean;
 };
 
 /**
  * Config-derived rows shown on a connected provider's overview screen.
  * Pulled out of platform-overview-screen.tsx purely to keep that file under
  * the repo's max-lines limit — no behavior change.
+ *
+ * Every row names its destination screen with that screen's own title key
+ * (`codeReviewer.style.title`, `codeReviewer.gate.title`, …), so the list
+ * keeps one case convention and the entry point and the header it opens
+ * cannot drift apart in wording or case.
  */
 export function buildOverviewRows({
   data,
@@ -31,44 +65,62 @@ export function buildOverviewRows({
   models,
   modelsLoading,
   onOpenModelPicker,
+  onOpenReviewMemory,
+  onOpenCouncil,
 }: {
   data: ReviewConfigData;
   capabilities: (typeof PLATFORM_CAPABILITIES)[keyof typeof PLATFORM_CAPABILITIES];
   models: ModelOption[];
   modelsLoading: boolean;
   onOpenModelPicker: () => void;
+  onOpenReviewMemory?: () => void;
+  /** Organizations only, and only when the council gate (entitlement + flag) passes. */
+  onOpenCouncil?: () => void;
 }): OverviewRow[] {
   return [
     {
       field: 'style',
       icon: MessageSquareText,
-      title: 'Review Style',
-      subtitle: capitalize(data.reviewStyle),
+      title: i18n.t('codeReviewer.style.title'),
+      subtitle: i18n.t(reviewStyleLabels[data.reviewStyle]),
     },
     {
       field: 'focus-areas',
       icon: ShieldCheck,
-      title: 'Focus Areas',
+      title: i18n.t('codeReviewer.focusAreas.title'),
       subtitle:
-        data.focusAreas.length > 0 ? data.focusAreas.map(capitalize).join(', ') : 'All areas',
+        data.focusAreas.length > 0
+          ? formatList(
+              // A stored area the app does not know still names itself, wrapped
+              // in localized copy so no bare English code leaks into the list.
+              data.focusAreas.map(area =>
+                Object.hasOwn(focusAreaLabels, area)
+                  ? i18n.t(focusAreaLabels[area as keyof typeof focusAreaLabels])
+                  : i18n.t('codeReviewer.focusArea.unknown', { area })
+              ),
+              i18n.language
+            )
+          : i18n.t('codeReviewer.overview.allAreas'),
     },
-    // Custom Instructions is deprecated in favour of REVIEW.md, so the row is
-    // only offered to configs that already have something stored in it.
-    ...(data.customInstructions?.trim()
-      ? [
-          {
-            field: 'instructions',
-            icon: ScrollText,
-            title: 'Custom Instructions',
-            subtitle: 'Set',
-          },
-        ]
-      : []),
+    // Custom instructions is deprecated in favour of REVIEW.md, but the row
+    // stays on the overview for every config: it is the only way into the
+    // editor, so hiding it while nothing is stored would leave a reader who
+    // cleared the field with no way back to it. The row names the screen with
+    // the screen's own title, so the entry point and the header cannot drift
+    // apart in wording or case.
+    {
+      field: 'instructions',
+      icon: ScrollText,
+      title: i18n.t('codeReviewer.instructions.title'),
+      subtitle: data.customInstructions?.trim()
+        ? i18n.t('codeReviewer.overview.set')
+        : i18n.t('codeReviewer.overview.notSet'),
+    },
     {
       field: 'model',
       icon: FileSliders,
-      title: 'Model',
-      subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
+      title: i18n.t('common.model'),
+      subtitle: modelLabelFromCatalogue(models, data.modelSlug),
       onPress: modelsLoading || models.length === 0 ? undefined : onOpenModelPicker,
     },
     ...(capabilities.gateRow
@@ -76,32 +128,70 @@ export function buildOverviewRows({
           {
             field: 'gate',
             icon: Gauge,
-            title: 'Merge gate',
-            subtitle: capitalize(data.gateThreshold),
+            title: i18n.t('codeReviewer.gate.title'),
+            subtitle: i18n.t(gateThresholdLabels[data.gateThreshold]),
           },
         ]
       : []),
     {
       field: 'repos',
       icon: FolderGit2,
-      title: 'Repositories',
+      title: i18n.t('common.repositories'),
       subtitle:
         capabilities.selectionModePicker && data.repositorySelectionMode === 'all'
-          ? 'All repositories'
-          : `${data.selectedRepositoryIds.length} selected`,
+          ? i18n.t('common.allRepositories')
+          : i18n.t('codeReviewer.overview.nSelected', {
+              count: data.selectedRepositoryIds.length,
+              displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
+            }),
     },
+    // Council review is an organization entitlement behind a rollout flag; the
+    // caller only wires this row when both hold. It reports only whether any
+    // repository opted in, because that opt-in — not the specialist list — is
+    // what makes a run a council run.
+    ...(onOpenCouncil
+      ? [
+          {
+            field: 'council',
+            icon: Users,
+            title: i18n.t('codeReviewer.council.title'),
+            subtitle:
+              data.council != null && data.councilEnabledRepositoryIds.length > 0
+                ? i18n.t('codeReviewer.overview.set')
+                : i18n.t('codeReviewer.overview.notSet'),
+            onPress: onOpenCouncil,
+          },
+        ]
+      : []),
+    // Review memory is GitHub-only and only offered when the caller wires the
+    // navigation callback (the overview screen pushes the scope-level route,
+    // not a per-platform settings field). Members may open it read-only: the
+    // server allows member reads and the screen ships a member off-state.
+    ...(onOpenReviewMemory
+      ? [
+          {
+            field: 'review-memory',
+            icon: Brain,
+            title: i18n.t('codeReviewer.reviewMemory.title'),
+            subtitle: i18n.t('codeReviewer.overview.proposedReviewMdGuidance'),
+            onPress: onOpenReviewMemory,
+            readOnlyAccessible: true,
+          },
+        ]
+      : []),
   ];
 }
 
-/** Shared onPress resolution for an overview row: no-op when read-only, the
- * row's own handler (e.g. the model picker) when it has one, otherwise a
- * push to its settings field. */
+/** Shared onPress resolution for an overview row: no-op when read-only unless
+ * the row is marked read-only-accessible, the row's own handler (e.g. the
+ * model picker or review memory) when it has one, otherwise a push to its
+ * settings field. */
 export function resolveRowOnPress(
   row: OverviewRow,
   canEdit: boolean,
   pushField: (field: string) => void
 ): (() => void) | undefined {
-  if (!canEdit) {
+  if (!canEdit && !row.readOnlyAccessible) {
     return undefined;
   }
   if ('onPress' in row) {

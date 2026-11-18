@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
@@ -8,27 +8,100 @@ import { Bell, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-type SyncResult = {
-  id: number;
-  generated_at: string;
-  completed_at?: string;
-  total_providers: number;
-  total_models: number;
-  direct_byok_model_counts: Record<string, number>;
-  time: number;
-};
+type SyncJob = 'metadata_cache' | 'providers' | 'direct_byok';
+
+function formatDuration(ms: number) {
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function CompletedAt({ completedAt }: { completedAt: string | null | undefined }) {
+  if (!completedAt) {
+    return <span className="text-muted-foreground">Not recorded</span>;
+  }
+  const date = new Date(completedAt);
+  return (
+    <span title={date.toLocaleString()}>{formatDistanceToNow(date, { addSuffix: true })}</span>
+  );
+}
+
+function JobRow({
+  name,
+  description,
+  status,
+  manualResult,
+  run,
+  testAlert,
+}: {
+  name: string;
+  description: string;
+  status: ReactNode;
+  manualResult: string | null;
+  run: { onClick: () => void; pending: boolean; disabled: boolean };
+  testAlert: { onClick: () => void; pending: boolean; disabled: boolean };
+}) {
+  return (
+    <TableRow>
+      <TableCell className="whitespace-normal">
+        <div className="font-medium">{name}</div>
+        <div className="text-muted-foreground text-xs">{description}</div>
+      </TableCell>
+      <TableCell className="whitespace-normal">
+        <div>{status}</div>
+        {manualResult && <div className="text-muted-foreground text-xs">{manualResult}</div>}
+      </TableCell>
+      <TableCell>
+        <div className="flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={run.onClick}
+            disabled={run.disabled || run.pending}
+            aria-label={`Run ${name.toLowerCase()}`}
+          >
+            <RefreshCw className={run.pending ? 'animate-spin' : undefined} />
+            {run.pending ? 'Running...' : 'Run'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={testAlert.onClick}
+            disabled={testAlert.disabled}
+            aria-label={`Post test alert for ${name.toLowerCase()}`}
+          >
+            <Bell />
+            {testAlert.pending ? 'Posting...' : 'Test alert'}
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 export function SyncProvidersContent() {
   const trpc = useTRPC();
-  const [lastResult, setLastResult] = useState<SyncResult | null>(null);
+  const [manualResults, setManualResults] = useState<Partial<Record<SyncJob, string>>>({});
+  const setManualResult = (job: SyncJob, result: string) =>
+    setManualResults(previous => ({ ...previous, [job]: result }));
 
   const lastSyncQuery = useQuery(trpc.admin.syncProviders.getLastSync.queryOptions());
+  const manualSyncEnabledQuery = useQuery(
+    trpc.admin.syncProviders.getManualSyncEnabled.queryOptions()
+  );
+  const manualSyncDisabled = manualSyncEnabledQuery.data !== true;
 
   const testAlertMutation = useMutation(
     trpc.admin.syncProviders.postTestStaleAlert.mutationOptions({
       onSuccess: () => {
-        toast.success('Posted a test stale-sync alert to the Cloud alerts channel');
+        toast.success('Posted a test alert to the Cloud alerts channel');
       },
       onError: error => {
         toast.error(error.message || 'Could not post the test alert');
@@ -36,10 +109,30 @@ export function SyncProvidersContent() {
     })
   );
 
+  const metadataCacheRefreshMutation = useMutation(
+    trpc.admin.syncProviders.triggerMetadataCacheRefresh.mutationOptions({
+      onSuccess: result => {
+        const refreshed = result.source_count - result.failed_count;
+        setManualResult(
+          'metadata_cache',
+          `Manual run: ${refreshed} of ${result.source_count} sources refreshed, ${result.stale_count} over a day old`
+        );
+        toast.success(`Refreshed ${refreshed} of ${result.source_count} metadata sources`);
+        void lastSyncQuery.refetch();
+      },
+      onError: error => {
+        toast.error(error.message || 'Metadata cache refresh failed');
+      },
+    })
+  );
+
   const syncMutation = useMutation(
     trpc.admin.syncProviders.triggerSync.mutationOptions({
       onSuccess: result => {
-        setLastResult(result);
+        setManualResult(
+          'providers',
+          `Manual run: ${result.total_providers} providers, ${result.total_models} models in ${formatDuration(result.time)}`
+        );
         toast.success(
           `Synced ${result.total_providers} providers with ${result.total_models} total models`
         );
@@ -51,122 +144,118 @@ export function SyncProvidersContent() {
     })
   );
 
+  const directByokSyncMutation = useMutation(
+    trpc.admin.syncProviders.triggerDirectByokSync.mutationOptions({
+      onSuccess: result => {
+        const counts = Object.entries(result.direct_byok_model_counts)
+          .map(([provider, count]) => `${provider} ${count}`)
+          .join(', ');
+        setManualResult(
+          'direct_byok',
+          `Manual run: ${counts || 'no providers'} in ${formatDuration(result.time)}`
+        );
+        toast.success(
+          `Synced ${result.total_providers} direct BYOK providers with ${result.total_models} total models`
+        );
+        void lastSyncQuery.refetch();
+      },
+      onError: error => {
+        toast.error(error.message || 'Direct BYOK sync failed');
+      },
+    })
+  );
+
   const lastSync = lastSyncQuery.data;
+  const pendingTestAlertJob = testAlertMutation.isPending
+    ? testAlertMutation.variables.job
+    : undefined;
+  const testAlert = (job: SyncJob) => ({
+    onClick: () => testAlertMutation.mutate({ job }),
+    pending: pendingTestAlertJob === job,
+    disabled: testAlertMutation.isPending,
+  });
 
   return (
-    <div className="flex w-full flex-col gap-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Sync Provider and Model data</h2>
-      </div>
-
-      <p className="text-muted-foreground">
-        Fetches provider and model data from OpenRouter and the Vercel AI Gateway, then stores the
-        result in the database. In production this runs automatically via cron; the manual trigger
-        below is intended for local development only.
-      </p>
-
-      {lastSync && (
-        <div className="text-muted-foreground flex flex-col gap-1 text-sm">
-          {lastSync.completed_at ? (
-            <p>
-              Last full sync completed{' '}
-              <span
-                className="font-medium text-foreground"
-                title={new Date(lastSync.completed_at).toLocaleString()}
-              >
-                {formatDistanceToNow(new Date(lastSync.completed_at), { addSuffix: true })}
-              </span>{' '}
-              ({new Date(lastSync.completed_at).toLocaleString()})
-            </p>
-          ) : (
-            <p className="text-amber-500">No completed full run timestamp recorded in Redis yet.</p>
-          )}
-          {lastSync.generated_at && (
-            <p>
-              Database snapshot generated{' '}
-              <span title={new Date(lastSync.generated_at).toLocaleString()}>
-                {formatDistanceToNow(new Date(lastSync.generated_at), { addSuffix: true })}
-              </span>{' '}
-              — {lastSync.total_providers} providers, {lastSync.total_models} models.
-            </p>
-          )}
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <RefreshCw className="h-5 w-5" />
-            Manual Sync
-          </CardTitle>
-          <CardDescription>
-            Trigger a full sync of providers and models. This may take a minute. Use this in local
-            development only — production syncs are handled by cron.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Button
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className="w-fit"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            {syncMutation.isPending ? 'Syncing...' : 'Run Sync'}
-          </Button>
-
-          {lastResult && (
-            <div className="rounded-lg border p-4 text-sm">
-              <p className="font-medium">Last sync result</p>
-              <ul className="text-muted-foreground mt-2 space-y-1">
-                <li>Row ID: {lastResult.id}</li>
-                <li>
-                  Database snapshot generated at:{' '}
-                  {new Date(lastResult.generated_at).toLocaleString()}
-                </li>
-                {lastResult.completed_at && (
-                  <li>
-                    Full sync completed at: {new Date(lastResult.completed_at).toLocaleString()}
-                  </li>
-                )}
-                <li>Providers: {lastResult.total_providers}</li>
-                <li>Models: {lastResult.total_models}</li>
-                {Object.entries(lastResult.direct_byok_model_counts).map(([provider, count]) => (
-                  <li key={provider}>
-                    Direct BYOK {provider}: {count} models
-                  </li>
-                ))}
-                <li>Duration: {(lastResult.time / 1000).toFixed(1)}s</li>
-              </ul>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            Test stale-sync alert
-          </CardTitle>
-          <CardDescription>
-            Posts a clearly labeled test message to the Cloud alerts channel in every environment.
-            Automatic stale-sync alerts still post only from production Vercel. Tests do not
-            suppress later automatic alerts.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => testAlertMutation.mutate()}
-            disabled={testAlertMutation.isPending}
-            className="w-fit"
-          >
-            <Bell className="h-4 w-4" />
-            {testAlertMutation.isPending ? 'Posting test alert...' : 'Post test alert'}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Sync jobs</CardTitle>
+        <CardDescription>
+          Crons run each job every 5 minutes, so manual runs are for local development
+          {manualSyncEnabledQuery.data === false && ' and are disabled here'}. Test alerts post a
+          labeled message to the Cloud alerts channel from any environment; real stale alerts post
+          only from production.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Job</TableHead>
+              <TableHead>Last run</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <JobRow
+              name="Metadata cache refresh"
+              description="Stores the raw upstream catalogs that the syncs and the gateway read."
+              status={
+                <>
+                  <CompletedAt completedAt={lastSync?.metadata_cache_newest_updated_at} />
+                  {lastSync?.metadata_cache_oldest_updated_at && (
+                    <span className="text-muted-foreground">
+                      {' '}
+                      · oldest source{' '}
+                      <CompletedAt completedAt={lastSync.metadata_cache_oldest_updated_at} />
+                    </span>
+                  )}
+                </>
+              }
+              manualResult={manualResults.metadata_cache ?? null}
+              run={{
+                onClick: () => metadataCacheRefreshMutation.mutate(),
+                pending: metadataCacheRefreshMutation.isPending,
+                disabled: manualSyncDisabled,
+              }}
+              testAlert={testAlert('metadata_cache')}
+            />
+            <JobRow
+              name="Provider and model sync"
+              description="Builds the OpenRouter and Vercel AI Gateway provider and model catalog."
+              status={
+                <>
+                  <CompletedAt completedAt={lastSync?.completed_at} />
+                  {lastSync?.total_providers != null && (
+                    <span className="text-muted-foreground">
+                      {' '}
+                      · {lastSync.total_providers} providers, {lastSync.total_models} models
+                    </span>
+                  )}
+                </>
+              }
+              manualResult={manualResults.providers ?? null}
+              run={{
+                onClick: () => syncMutation.mutate(),
+                pending: syncMutation.isPending,
+                disabled: manualSyncDisabled,
+              }}
+              testAlert={testAlert('providers')}
+            />
+            <JobRow
+              name="Direct BYOK model list sync"
+              description="Stores the model list of each direct BYOK provider."
+              status={<CompletedAt completedAt={lastSync?.direct_byok_completed_at} />}
+              manualResult={manualResults.direct_byok ?? null}
+              run={{
+                onClick: () => directByokSyncMutation.mutate(),
+                pending: directByokSyncMutation.isPending,
+                disabled: manualSyncDisabled,
+              }}
+              testAlert={testAlert('direct_byok')}
+            />
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

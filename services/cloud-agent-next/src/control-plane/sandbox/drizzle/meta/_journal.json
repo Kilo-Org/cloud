@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790455891314,
+      "tag": "0000_sandbox_control_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790793579352,
+      "tag": "0001_scope_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790860790832,
+      "tag": "0002_naive_deadpool",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792104724546,
+      "tag": "0003_route_environment",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793713237356,
+      "tag": "0004_young_inhumans",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794145671968,
+      "tag": "0005_create_attempt_budget",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794258032795,
+      "tag": "0006_third_silhouette",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794406959569,
+      "tag": "0007_workspace_artifacts",
+      "breakpoints": true
+    }
+  ]
+}

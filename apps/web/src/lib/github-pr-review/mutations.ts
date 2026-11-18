@@ -115,6 +115,40 @@ export function buildReplyToCommentParams(input: ReplyToCommentInput) {
   };
 }
 
+// `pulls.updateReviewComment` / `issues.updateComment` body. Both endpoints
+// take the same field names, so ONE builder feeds both call sites.
+export type UpdateCommentParamsInput = {
+  owner: string;
+  repo: string;
+  commentId: number;
+  body: string;
+};
+
+export function buildUpdateCommentParams(input: UpdateCommentParamsInput) {
+  return {
+    owner: input.owner,
+    repo: input.repo,
+    comment_id: input.commentId,
+    body: input.body,
+  };
+}
+
+// `pulls.deleteReviewComment` / `issues.deleteComment` body. Same reasoning:
+// one builder for both endpoints.
+export type DeleteCommentParamsInput = {
+  owner: string;
+  repo: string;
+  commentId: number;
+};
+
+export function buildDeleteCommentParams(input: DeleteCommentParamsInput) {
+  return {
+    owner: input.owner,
+    repo: input.repo,
+    comment_id: input.commentId,
+  };
+}
+
 // `pulls.createReview` body. The mobile client queues a small batch of
 // comments and submits them in one call together with an event.
 export type SubmitReviewInput = {

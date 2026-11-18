@@ -1,9 +1,12 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/pr-review/pending-review-provider.mounted.test.tsx */
+/* eslint-disable promise/prefer-await-to-callbacks -- exercises work scheduled through the native idle callback */
+/* eslint-disable max-lines -- the submit suite covers queue retention, the footer preference, and the refused-submit wording wiring in one cohesive file */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutation and drafts factories settle without await because they resolve immediately */
-import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewSubmit } from './pr-review-submit';
+import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import {
   type PendingReviewItem,
   PendingReviewProvider,
@@ -12,20 +15,66 @@ import {
 
 const submitMutationMock = vi.hoisted(() => ({
   mutateAsync: vi.fn(async (): Promise<unknown> => undefined),
+  error: null as Error | null,
+}));
+
+const feedbackMock = vi.hoisted(() => ({
+  maybeAskAfterSuccessfulOutcome: vi.fn(async (): Promise<void> => undefined),
 }));
 
 vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
   useSubmitReviewMutation: () => ({
     mutateAsync: submitMutationMock.mutateAsync,
     isPending: false,
-    error: null,
+    error: submitMutationMock.error,
   }),
+  // Mirrors the real mapper (pure field routing, tested in
+  // use-pr-review-mutations.test.ts): anchored items ride the `comments`
+  // batch, an item without a side keeps the text-anchored body fallback.
+  buildProviderSubmitInput: (
+    summary: string,
+    items: readonly {
+      path: string;
+      side?: 'LEFT' | 'RIGHT';
+      line: number;
+      startLine?: number;
+      body: string;
+    }[]
+  ) => {
+    const comments: {
+      path: string;
+      side: 'LEFT' | 'RIGHT';
+      line: number;
+      startLine?: number;
+      body: string;
+    }[] = [];
+    const folded: string[] = [];
+    for (const item of items) {
+      if (item.side === undefined) {
+        folded.push(`${item.path}:L${item.line}\n\n${item.body}`);
+      } else {
+        const { path, side, line, startLine, body } = item;
+        comments.push({ path, side, line, startLine, body });
+      }
+    }
+    return {
+      body: [summary.trim(), ...folded].filter(part => part.length > 0).join('\n\n'),
+      comments,
+    };
+  },
+}));
+
+const footerPreferenceMock = vi.hoisted(() => ({
+  hasLoaded: true,
+  prReviewFooter: false,
+}));
+
+vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
+  usePrReviewFooterPreference: () => footerPreferenceMock,
 }));
 
 vi.mock('@/components/pr-review/discussion/reply-input', () => ({
   ensureTermsAcceptedOutcome: vi.fn(async () => ({ kind: 'accepted' as const })),
-  TERMS_CHECK_RETRY_COPY: 'terms-check-retry',
-  TERMS_OUTDATED_COPY: 'terms-outdated',
 }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
@@ -51,6 +100,7 @@ vi.mock('expo-crypto', () => ({
 
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
+  NotificationFeedbackType: { Success: 'success' },
 }));
 
 vi.mock('expo-router', () => ({
@@ -60,6 +110,7 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   Keyboard: { addListener: () => ({ remove: vi.fn() }) },
+  Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
@@ -74,7 +125,12 @@ vi.mock('@/components/pr-review/review-event-chips', () => ({
   ReviewEventChips: 'ReviewEventChips',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/pr-review/pr-review-pending-comment-row', () => ({
   focusAfterPendingCommentRemoval: vi.fn(),
@@ -84,6 +140,13 @@ vi.mock('@/components/pr-review/pr-review-pending-comment-row', () => ({
 }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
+}));
+vi.mock('@/lib/feedback', () => ({
+  maybeAskAfterSuccessfulOutcome: feedbackMock.maybeAskAfterSuccessfulOutcome,
+  showFeedbackPrompt: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
 }));
 
 const ITEM_FRESH_A: PendingReviewItem = {
@@ -121,22 +184,36 @@ function Consumer() {
   return null;
 }
 
-function mount(): TestRenderer.ReactTestRenderer {
+const SUBMIT_TITLE = 'Submit review';
+
+const GITLAB_REF: ProviderPrRef = {
+  platform: 'gitlab',
+  projectPath: 'acme/kilo',
+  mrIid: 42,
+};
+
+function mount(prRef?: ProviderPrRef): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   act(() => {
     renderer = TestRenderer.create(
-      <PendingReviewProvider>
-        <Consumer />
-        <PrReviewSubmit
-          owner="acme"
-          repo="kilo"
-          number={42}
-          headSha="head-1"
-          title="Submit review"
-          eyebrow="acme/kilo#42"
-          onDismiss={vi.fn(() => undefined)}
-        />
-      </PendingReviewProvider>
+      // The sheet requests the post-submit prompt through the
+      // FeedbackPromptProvider host mounted by the PR-review layout, so the
+      // mount mirrors that wiring.
+      <FeedbackPromptProvider>
+        <PendingReviewProvider>
+          <Consumer />
+          <PrReviewSubmit
+            owner="acme"
+            repo="kilo"
+            number={42}
+            headSha="head-1"
+            title={SUBMIT_TITLE}
+            eyebrow="acme/kilo#42"
+            prRef={prRef}
+            onDismiss={vi.fn(() => undefined)}
+          />
+        </PendingReviewProvider>
+      </FeedbackPromptProvider>
     );
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
@@ -154,22 +231,49 @@ async function flush(): Promise<void> {
   });
 }
 
-function submitOnPress(renderer: TestRenderer.ReactTestRenderer): () => void {
-  const button = renderer.root.findAll(
-    node => node.props.accessibilityLabel === 'Submit 2 of 3 comments'
-  )[0];
+function submitOnPress(
+  renderer: TestRenderer.ReactTestRenderer,
+  label = 'Submit 2 of 3 comments'
+): () => void {
+  const button = renderer.root.findAll(node => node.props.accessibilityLabel === label)[0];
   if (!button) {
-    throw new Error('Submit button not found');
+    throw new Error(`Submit button not found: ${label}`);
   }
   return button.props.onPress as () => void;
 }
 
+function findSubmitButton(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const button = renderer.root.findAll(node => Object.hasOwn(node.props, 'loading'))[0];
+  if (!button) {
+    throw new Error('Submit button not found');
+  }
+  return button.props as Record<string, unknown>;
+}
+
+function findSummaryField(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const summary = renderer.root.findAll(node => Object.hasOwn(node.props, 'defaultValue'))[0];
+  if (!summary) {
+    throw new Error('Summary field not found');
+  }
+  return summary.props as Record<string, unknown>;
+}
+
 beforeEach(() => {
+  vi.stubGlobal('requestIdleCallback', (callback: () => void) => {
+    callback();
+    return 1;
+  });
   latestItems = [];
   addCommentFn = null;
   submitMutationMock.mutateAsync.mockReset();
   submitMutationMock.mutateAsync.mockResolvedValue(undefined);
+  submitMutationMock.error = null;
+  feedbackMock.maybeAskAfterSuccessfulOutcome.mockReset();
+  feedbackMock.maybeAskAfterSuccessfulOutcome.mockResolvedValue(undefined);
+  footerPreferenceMock.hasLoaded = true;
+  footerPreferenceMock.prReviewFooter = false;
 });
+afterEach(() => vi.unstubAllGlobals());
 
 describe('PrReviewSubmit queue retention', () => {
   it('keeps every queued item when a submit fails', async () => {
@@ -192,6 +296,7 @@ describe('PrReviewSubmit queue retention', () => {
     // and stale items all stay queued, with no optimistic removal.
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
     expect(latestItems.map(item => item.id)).toEqual(['fresh-a', 'fresh-b', 'stale-c']);
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).not.toHaveBeenCalled();
   });
 
   it('removes only the fresh items on success, leaving stale items queued', async () => {
@@ -208,8 +313,203 @@ describe('PrReviewSubmit queue retention', () => {
     });
     await flush();
 
-    // Success removes exactly the fresh ids; the stale item stays queued.
+    // Success removes exactly the fresh ids; the stale item stays queued and
+    // no feedback prompt fires (stale still needs attention).
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
     expect(latestItems.map(item => item.id)).toEqual(['stale-c']);
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).not.toHaveBeenCalled();
+  });
+
+  it('a full submit asks for feedback once', async () => {
+    const renderer = mount();
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_A);
+      addCommentFn?.(ITEM_FRESH_B);
+    });
+
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    // No stale items, so the sheet dismisses and the feedback prompt fires once.
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(latestItems.map(item => item.id)).toEqual([]);
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).toHaveBeenCalledTimes(1);
+    // The second argument is the platform prompt surface the claim presents
+    // through (`useFeedbackPrompt`): the native alert on iOS, the in-app dialog
+    // on Android.
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).toHaveBeenCalledWith(
+      'user-1',
+      expect.any(Function)
+    );
+  });
+});
+
+describe('PrReviewSubmit footer preference', () => {
+  it('prefills the platform footer and enables submit when the setting is on', () => {
+    footerPreferenceMock.prReviewFooter = true;
+    const renderer = mount();
+
+    expect(findSummaryField(renderer).defaultValue).toBe(
+      '\n\n---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)'
+    );
+
+    // hasSummary was set from the prefilled footer, so a comment review with no
+    // queued comments is not blocked: the submit button is enabled.
+    expect(findSubmitButton(renderer).disabled).toBe(false);
+  });
+
+  it('leaves the body empty and blocks submit when the setting is off', () => {
+    footerPreferenceMock.prReviewFooter = false;
+    const renderer = mount();
+
+    expect(findSummaryField(renderer).defaultValue).toBe('');
+
+    // No prefilled footer and no queued comments: the comment review is
+    // blocked, so the submit button is disabled.
+    expect(findSubmitButton(renderer).disabled).toBe(true);
+  });
+});
+
+// ── c3: provider arm submits anchored comments ───────────────────────
+
+describe('PrReviewSubmit provider arm (c3)', () => {
+  const ITEM_FRESH_RANGE: PendingReviewItem = {
+    id: 'fresh-r',
+    path: 'src/r.ts',
+    side: 'LEFT',
+    line: 8,
+    startLine: 5,
+    body: 'R',
+    commitSha: 'head-1',
+  };
+
+  it('submits fresh pending items as a real anchored comments batch', async () => {
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_A);
+      addCommentFn?.(ITEM_FRESH_B);
+      addCommentFn?.(ITEM_STALE);
+    });
+    act(() => {
+      submitOnPress(renderer)();
+    });
+    await flush();
+
+    // The tapped positions ride the `comments` batch (event + items, no
+    // summary typed); stale items are never sent and stay queued.
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      comments: [
+        { path: 'src/a.ts', side: 'RIGHT', line: 1, body: 'A' },
+        { path: 'src/b.ts', side: 'RIGHT', line: 2, body: 'B' },
+      ],
+    });
+    expect(latestItems.map(item => item.id)).toEqual(['stale-c']);
+  });
+
+  it('carries a multi-line range into the comment item', async () => {
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_RANGE);
+    });
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      comments: [{ path: 'src/r.ts', side: 'LEFT', line: 8, startLine: 5, body: 'R' }],
+    });
+  });
+
+  it('posts the summary alone when nothing is queued (empty state, no comments key)', async () => {
+    footerPreferenceMock.prReviewFooter = true;
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      body: '---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
+    });
+  });
+
+  it('keeps the summary as the review body beside the anchored batch', async () => {
+    footerPreferenceMock.prReviewFooter = true;
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_A);
+    });
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      body: '---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
+      comments: [{ path: 'src/a.ts', side: 'RIGHT', line: 1, body: 'A' }],
+    });
+  });
+});
+
+// ── s6f: refused-submit wording ──────────────────────────────────────
+
+/** Every string the mounted tree rendered inside a Text element. */
+function renderedTexts(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => typeof node.props.children === 'string')
+    .map(node => node.props.children as string);
+}
+
+function badRequestError(): Error {
+  return Object.assign(new Error('You cannot perform the requested action'), {
+    data: { code: 'BAD_REQUEST' },
+  });
+}
+
+describe('PrReviewSubmit refused-submit wording (s6f)', () => {
+  it('words a rejected provider submit after the merge-request noun', () => {
+    submitMutationMock.error = badRequestError();
+    const renderer = mount(GITLAB_REF);
+    const texts = renderedTexts(renderer);
+    // A rejected review submit on a GitLab merge request must never read
+    // "your own pull request".
+    expect(
+      texts.some(
+        text =>
+          text ===
+          "This review can't be submitted as is. The merge request may have changed, or you can't review your own merge request."
+      )
+    ).toBe(true);
+    expect(
+      texts.some(
+        text =>
+          text ===
+          "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request."
+      )
+    ).toBe(false);
+  });
+
+  it('keeps the exact pre-s6 submit copy on the GitHub arm', () => {
+    submitMutationMock.error = badRequestError();
+    const renderer = mount();
+    expect(
+      renderedTexts(renderer).some(
+        text =>
+          text ===
+          "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request."
+      )
+    ).toBe(true);
   });
 });

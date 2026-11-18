@@ -1,0 +1,270 @@
+import { createElement, useEffect } from 'react';
+import { act, type TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import '@/i18n';
+import { ProfileScreen } from '@/components/profile-screen';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+// ── Hoisted mocks ──────────────────────────────────────────────────────────
+
+const signOutFn = vi.hoisted(() => vi.fn());
+const alertFn = vi.hoisted(() => vi.fn());
+const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
+const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
+vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
+  Alert: { alert: alertFn },
+  Modal: 'Modal',
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  FadeIn: { duration: vi.fn() },
+  FadeOut: { duration: vi.fn() },
+  LinearTransition: {},
+}));
+
+// ProfileScreen reads its landscape side insets through `@/lib/screen-insets`,
+// which imports `react-native-safe-area-context`; that package's React Native
+// source is Flow-typed and this transform cannot parse it (see
+// `test/render-with-providers.tsx`), so the harness mocks it exactly as
+// `profile-screen.queries.mounted.test.tsx` does. The sign-out confirmation
+// does not depend on the inset values, so stub the hook with the hoisted
+// `insets` above.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insets,
+}));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  // The account picker closes itself on the owning screen's focus loss; this
+  // suite keeps the screen focused, so the effect lives as long as the tree.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
+}));
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.0',
+  nativeBuildVersion: '1',
+}));
+vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: undefined }));
+
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    user: {
+      getAuthProviders: {
+        queryOptions: () => ({ queryKey: ['user', 'getAuthProviders'], queryFn: vi.fn() }),
+      },
+    },
+    organizations: {
+      list: { queryOptions: () => ({ queryKey: ['organizations', 'list'], queryFn: vi.fn() }) },
+    },
+  }),
+}));
+
+vi.mock('@/lib/auth/auth-context', () => ({
+  useAuth: () => ({ signOut: signOutFn, token: 'token-1' }),
+}));
+
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: null, isLoaded: true }),
+}));
+
+vi.mock('@/components/use-delete-account', () => ({
+  useDeleteAccount: () => ({
+    phase: 'idle',
+    isPending: false,
+    devCode: null,
+    canSubmitCode: false,
+    beginDelete: vi.fn(),
+    submitCode: vi.fn(),
+    setCode: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => 'online',
+  useOfflineBannerState: () => false,
+}));
+
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ destructive: '#B0483A', mutedForeground: '#000000' }),
+}));
+
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+  useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
+}));
+
+vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
+  attemptPushRegistrationReconciliation: vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/use-after-idle', () => ({ useAfterIdle: () => false }));
+
+vi.mock('@/lib/profile-agent-navigation', () => ({
+  getCodeReviewerProfilePath: () => '/code-reviewer',
+  getProfileAgentScope: () => undefined,
+  getPrReviewEntryPath: () => '/pr-review',
+}));
+
+vi.mock('@/lib/security-agent', () => ({ getSecurityAgentPath: () => '/security-agent' }));
+vi.mock('@/lib/feedback', () => ({ showFeedbackPrompt: vi.fn() }));
+
+// ProfileScreen now renders the What's New row, so it imports
+// `@/lib/external-link`; that module pulls in `expo-web-browser`, whose Expo
+// modules read the build-time `__DEV__` global this node test project does not
+// define. Stub the helper, as the other external-link consumers' suites do.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+
+vi.mock('@/components/ui/icons', () => ({
+  BookOpenCheck: 'BookOpenCheck',
+  Building2: 'Building2',
+  GitMerge: 'GitMerge',
+  GitPullRequest: 'GitPullRequest',
+  Globe: 'Globe',
+  KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
+  Lock: 'Lock',
+  MessageSquare: 'MessageSquare',
+  Plus: 'Plus',
+  Plug: 'Plug',
+  ShieldCheck: 'ShieldCheck',
+  SlidersHorizontal: 'SlidersHorizontal',
+  Sparkles: 'Sparkles',
+  Smartphone: 'Smartphone',
+  Trash2: 'Trash2',
+  Users: 'Users',
+  Workflow: 'Workflow',
+}));
+
+vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
+vi.mock('@/components/language-picker-sheet', () => ({
+  LanguagePickerSheet: 'LanguagePickerSheet',
+}));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
+vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
+  return typeof node.type === 'string' && node.type === type;
+}
+
+describe('ProfileScreen sign-out confirmation', () => {
+  beforeEach(() => {
+    vi.stubGlobal('__DEV__', false);
+    signOutFn.mockReset();
+    alertFn.mockReset();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /**
+   * Calls one of a mounted element's own props inside `act`. The test renderer
+   * leaves `props` untyped, and this suite only ever calls handlers it would
+   * otherwise fire by hand, so the shape is guarded here instead of assumed.
+   */
+  function callProp(node: TestRenderer.ReactTestInstance, name: string): void {
+    const prop = node.props[name] as (() => void) | undefined;
+    if (typeof prop !== 'function') {
+      throw new TypeError(`The element has no callable ${name}`);
+    }
+    act(() => {
+      prop();
+    });
+  }
+
+  function pressSignOutTile(renderer: TestRenderer.ReactTestRenderer) {
+    const tile = renderer.root.find(
+      node => isType(node, 'ActionTile') && node.props.label === 'Sign out'
+    );
+    callProp(tile, 'onPress');
+  }
+
+  function dialogButton(
+    renderer: TestRenderer.ReactTestRenderer,
+    variant: 'outline' | 'destructive'
+  ) {
+    return renderer.root.find(node => isType(node, 'Button') && node.props.variant === variant);
+  }
+
+  /**
+   * Reports the native sheet's own dismissal. The confirm is a native sheet, so
+   * a press only starts the dismissal and the chosen action runs when the sheet
+   * reports it, exactly as it does on device.
+   */
+  function dismissDialogSheet(renderer: TestRenderer.ReactTestRenderer) {
+    const sheet = renderer.root.find(node => isType(node, 'BottomSheet'));
+    callProp(sheet, 'onDismiss');
+  }
+
+  // The request names no platform, so one destructive confirm serves both: the
+  // in-app dialog renders on iOS and Android alike, and its sign-out control
+  // carries the destructive (red) variant. The native alert cannot be the
+  // shared implementation — Android's `AlertDialog` paints every button with
+  // the theme accent, ignoring `style: 'destructive'`.
+  it.each(['android', 'ios'] as const)(
+    'opens the in-app dialog whose destructive control signs out on %s',
+    async os => {
+      platform.os = os;
+      const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
+
+      pressSignOutTile(renderer);
+
+      // One implementation for both platforms: the confirmation is the in-app
+      // dialog everywhere; no native alert replaces it on either side.
+      expect(alertFn).not.toHaveBeenCalled();
+      // Opening the confirmation signs nobody out.
+      expect(signOutFn).not.toHaveBeenCalled();
+
+      // Cancel keeps the user signed in. The confirm stays on screen while the
+      // sheet dismisses, and the safe choice runs only once that dismissal
+      // reports.
+      callProp(dialogButton(renderer, 'outline'), 'onPress');
+      expect(signOutFn).not.toHaveBeenCalled();
+
+      dismissDialogSheet(renderer);
+      expect(signOutFn).not.toHaveBeenCalled();
+
+      // Reopen: only the destructive control signs out, and only after the
+      // native sheet has finished dismissing the confirmation.
+      pressSignOutTile(renderer);
+      callProp(dialogButton(renderer, 'destructive'), 'onPress');
+      expect(dialogButton(renderer, 'destructive')).toBeDefined();
+      expect(signOutFn).not.toHaveBeenCalled();
+
+      dismissDialogSheet(renderer);
+      expect(signOutFn).toHaveBeenCalledTimes(1);
+
+      unmount();
+    }
+  );
+});

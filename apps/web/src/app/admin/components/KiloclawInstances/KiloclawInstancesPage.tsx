@@ -87,8 +87,6 @@ function formatLifespan(minutes: number | null): string {
   return `${Math.round(minutes / 1440)}d`;
 }
 
-// --- Overview Stats Cards ---
-
 type OverviewData = {
   totalInstances: number;
   activeInstances: number;
@@ -143,8 +141,6 @@ function OverviewStatsCards({ data }: { data: OverviewData }) {
     </Card>
   );
 }
-
-// --- Daily Chart ---
 
 type DailyChartData = {
   date: string;
@@ -313,8 +309,6 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
   );
 }
 
-// --- Dev Nuke All Button ---
-
 type NukeResult = {
   destroyed: number;
   total: number;
@@ -407,8 +401,6 @@ function DevNukeAllButton() {
     </>
   );
 }
-
-// --- Main Page ---
 
 export function KiloclawInstancesPage() {
   const router = useRouter();

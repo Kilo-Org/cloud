@@ -1,5 +1,6 @@
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -16,14 +17,22 @@ type MessageTextSelectSheetProps = {
  */
 export function MessageTextSelectSheet({ text, onClose }: Readonly<MessageTextSelectSheetProps>) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   return (
     <View className="flex-1 bg-background">
-      <SheetHeader title="Select text" onDone={onClose} doneLabel="Done" />
+      <SheetHeader
+        title={t('agentChat.messageDetails.selectText')}
+        onDone={onClose}
+        doneLabel={t('common.done')}
+        topInset="ios-page-sheet"
+      />
 
       {text.length > 0 ? (
         <ScrollView contentContainerClassName="px-6 pb-6 pt-3">
-          <SelectableText className="text-base leading-6 text-foreground">{text}</SelectableText>
+          <SelectableText className="text-base leading-[1.5rem] text-foreground">
+            {text}
+          </SelectableText>
         </ScrollView>
       ) : null}
 

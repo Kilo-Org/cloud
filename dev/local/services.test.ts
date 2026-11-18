@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,16 +10,30 @@ import {
   candidatePortOffsets,
   clearDevLogs,
   computePortOffset,
+  excludeServices,
   getAlwaysOnGroupIds,
   getService,
+  parseServiceList,
   portOffset,
   readPersistedPortOffset,
   resolveGroups,
   resolveDeletionMockSessionEnv,
+  resolveE2eInternalSecretSessionEnv,
+  resolveFakeLlmWorkerPort,
+  resolveFakeLlmSessionEnv,
   resolveSessionNextAuthUrl,
   resolveTargets,
+  serviceCommand,
+  planTunnelRestart,
   writePersistedPortOffset,
 } from './services';
+
+import { buildStartCommand } from './runner';
+import { restartSelection } from './manifest';
+import { shellQuote } from './shell';
+import { caBundlePath } from '../mock-snowflake/tls-env';
+import { LOCAL_FAKE_LLM_ADMIN_TOKEN } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
+import { LOCAL_E2E_INTERNAL_API_SECRET } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
 
 test('uses an automatic port offset for secondary worktrees by default', () => {
   assert.equal(
@@ -155,6 +170,22 @@ test('skips NEXTAUTH_URL when the web app is not being started', () => {
   assert.equal(url, undefined);
 });
 
+test('keeps public tunnels out of default and agents starts', () => {
+  const service = getService('cloud-agent-public-tunnels');
+  assert.equal(service.group, 'cloud-agent-public-tunnels');
+  assert.equal(service.type, 'process');
+  assert.equal(service.port, 0);
+  assert.match(service.command.join(' '), /start-public-tunnels\.ts/);
+  assert.equal(service.command.includes(String(8811 + portOffset)), false);
+
+  const alwaysOn = resolveGroups(getAlwaysOnGroupIds());
+  assert.ok(!alwaysOn.includes('cloud-agent-public-tunnels'));
+  assert.ok(!resolveTargets(['agents']).includes('cloud-agent-public-tunnels'));
+  assert.ok(!resolveTargets(['cloud-agent']).includes('cloud-agent-public-tunnels'));
+  assert.ok(!resolveTargets(['all']).includes('cloud-agent-public-tunnels'));
+  assert.ok(resolveTargets(['cloud-agent-public-tunnels']).includes('cloud-agent-public-tunnels'));
+});
+
 test('keeps auto routing workers in their own opt-in group', () => {
   const service = getService('auto-routing');
 
@@ -175,6 +206,276 @@ test('keeps auto routing workers in their own opt-in group', () => {
   assert.ok(!alwaysOn.includes('auto-routing-benchmark'));
 });
 
+test('runs the AI gateway app with the core services', () => {
+  const service = getService('ai-gateway');
+
+  assert.equal(service.group, 'core');
+  assert.equal(service.type, 'nextjs');
+  assert.equal(service.dir, 'apps/ai-gateway');
+  assert.equal(service.port, 3010 + portOffset);
+  assert.deepEqual(service.command, [
+    'env',
+    `AI_GATEWAY_PORT=${3010 + portOffset}`,
+    `AI_GATEWAY_WEB_PORT=${getService('nextjs').port}`,
+    'pnpm',
+    'run',
+    'dev',
+  ]);
+  assert.deepEqual(service.dependsOn, ['postgres', 'redis', 'redis-http']);
+  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+});
+
+test('starts the Snowflake mock before the web app on the offset port', () => {
+  const service = getService('mock-snowflake');
+
+  assert.equal(service.group, 'core');
+  assert.equal(service.type, 'process');
+  assert.equal(service.dir, 'dev/mock-snowflake');
+  assert.equal(service.port, 4792 + portOffset);
+  assert.deepEqual(service.command, [
+    'env',
+    `MOCK_SNOWFLAKE_PORT=${4792 + portOffset}`,
+    'pnpm',
+    'exec',
+    'tsx',
+    'stack-service.ts',
+  ]);
+  assert.deepEqual(service.dependsOn, []);
+  assert.ok(getService('nextjs').dependsOn.includes('mock-snowflake'));
+
+  const appTargets = resolveTargets(['app']);
+  assert.ok(appTargets.includes('mock-snowflake'));
+  assert.ok(appTargets.indexOf('mock-snowflake') < appTargets.indexOf('nextjs'));
+});
+
+/**
+ * The value the pane's shell ends up with when it runs `env <assignment>
+ * <command>`, which is the shape `buildStartCommand` produces for the web app.
+ */
+function exportedCaValue(assignment: string): string {
+  return execFileSync('sh', ['-c', `env ${assignment} sh -c 'printf %s "$NODE_EXTRA_CA_CERTS"'`], {
+    encoding: 'utf8',
+  });
+}
+
+test('exports the mock CA bundle to the web app only when the mock is selected', () => {
+  const withMock = serviceCommand('nextjs', ['mock-snowflake', 'nextjs']);
+  const trusted = withMock.find(arg => arg.startsWith('NODE_EXTRA_CA_CERTS='));
+  assert.ok(trusted);
+  const exported = exportedCaValue(trusted);
+  assert.equal(path.isAbsolute(exported), true);
+  assert.equal(exported, caBundlePath());
+  // `buildStartCommand` joins argv with spaces and tmux runs the result through
+  // `/bin/sh -lc`, so the assignment is one quoted shell word.
+  assert.equal(trusted, `NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`);
+  // The variable joins the `env` prefix the web app command already has.
+  assert.deepEqual(withMock.slice(0, 2), ['env', trusted]);
+  assert.ok(withMock.includes('pnpm'));
+
+  const withoutMock = serviceCommand('nextjs', ['nextjs']);
+  assert.equal(
+    withoutMock.some(arg => arg.startsWith('NODE_EXTRA_CA_CERTS=')),
+    false
+  );
+  assert.deepEqual(withoutMock, getService('nextjs').command);
+});
+
+test('the quoted CA export survives a checkout path with a space in it', () => {
+  // The bundle this checkout ships sits under a path without a space; this one
+  // stands in for a checkout directory that has one, which is the case the
+  // unquoted export broke (`env NODE_EXTRA_CA_CERTS=/Users/kilo work/...`).
+  const spaced = path.join(os.tmpdir(), 'kilo checkout', 'ca-bundle.pem');
+  assert.equal(exportedCaValue(`NODE_EXTRA_CA_CERTS=${shellQuote(spaced)}`), spaced);
+});
+
+test('a restart derives the web app command from the manifest the stack wrote', () => {
+  // Covers `restartSelection` — the derivation `dev:restart` uses — and the
+  // command it feeds: the same `buildStartCommand` output a relaunch types into
+  // the pane and a recreate rebuilds from. What stays at the call site is
+  // forwarding that selection to `restartServiceInTmux`, which needs a live tmux
+  // session. Without the mock in the selection the web app comes back without
+  // the CA export: Node reads `NODE_EXTRA_CA_CERTS` at startup, `scripts/dev.sh`
+  // lets an exported value win over every `.env*` line, and a shell that exports
+  // its own CA leaves the mock's certificate untrusted.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-selection-'));
+  const withoutMockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-no-mock-'));
+  try {
+    for (const [repoRoot, names] of [
+      [root, ['mock-snowflake', 'nextjs']],
+      [withoutMockRoot, ['nextjs']],
+    ] as const) {
+      fs.mkdirSync(path.join(repoRoot, 'dev', 'logs'), { recursive: true });
+      fs.writeFileSync(
+        path.join(repoRoot, 'dev', 'logs', 'manifest.json'),
+        JSON.stringify({
+          session: 'kilo-dev-test',
+          portOffset,
+          wranglerRegistryPath: path.join(repoRoot, 'dev', 'logs', 'wrangler-registry.json'),
+          services: names.map(name => ({
+            name,
+            port: (name === 'nextjs' ? 3000 : 4792) + portOffset,
+            group: 'core',
+            type: name === 'nextjs' ? 'nextjs' : 'process',
+          })),
+        })
+      );
+    }
+
+    assert.deepEqual(restartSelection(root), ['mock-snowflake', 'nextjs']);
+
+    const restarted = buildStartCommand('nextjs', restartSelection(root));
+    assert.ok(restarted.includes(`NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`));
+    // The selection a `dev:start app` really records builds that same command,
+    // whatever else the group adds around it.
+    assert.equal(buildStartCommand('nextjs', resolveTargets(['app'])), restarted);
+
+    // A stack started with `--without=mock-snowflake` restarts bare, which is
+    // the command that was correct for its own start.
+    assert.deepEqual(restartSelection(withoutMockRoot), ['nextjs']);
+    assert.equal(
+      buildStartCommand('nextjs', restartSelection(withoutMockRoot)).includes(
+        'NODE_EXTRA_CA_CERTS='
+      ),
+      false
+    );
+    // The omission this guards against: the command a restart used to build.
+    assert.equal(buildStartCommand('nextjs').includes('NODE_EXTRA_CA_CERTS='), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(withoutMockRoot, { recursive: true, force: true });
+  }
+});
+
+test('a restart without a manifest derives the always-on core selection', () => {
+  // A start interrupted before `writeManifest` (dev/logs cleared, crash) leaves
+  // a live session with no record of what it started. Every start runs the
+  // always-on core group, so the fallback derives that selection: the web app
+  // keeps its mock CA export instead of silently losing it, and `dashboard`'s
+  // per-service rebuild keeps targeting the group's own services.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-missing-'));
+  try {
+    const fallback = restartSelection(root);
+    assert.ok(Array.isArray(fallback));
+    assert.ok(fallback.length > 0);
+    assert.deepEqual(fallback, resolveGroups(getAlwaysOnGroupIds()));
+
+    // The core group carries the mock (always on) and `nextjs` depends on it,
+    // so the derived web app command carries the CA export exactly as a real
+    // start's selection does.
+    assert.ok(fallback.includes('mock-snowflake'));
+    assert.ok(fallback.includes('nextjs'));
+    const command = buildStartCommand('nextjs', fallback);
+    assert.equal(command, buildStartCommand('nextjs', resolveTargets(['app'])));
+    assert.ok(command.includes(`NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a restart keeps the manifest selection when the manifest exists', () => {
+  // The fallback must not outrank the real record: a start narrowed with
+  // `--without=mock-snowflake` recorded that narrower selection, and a restart
+  // has to rebuild exactly what that start ran.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-narrow-'));
+  try {
+    fs.mkdirSync(path.join(root, 'dev', 'logs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'dev', 'logs', 'manifest.json'),
+      JSON.stringify({
+        session: 'kilo-dev-test',
+        portOffset,
+        wranglerRegistryPath: path.join(root, 'dev', 'logs', 'wrangler-registry.json'),
+        services: [{ name: 'nextjs', port: 3000 + portOffset, group: 'core', type: 'nextjs' }],
+      })
+    );
+    // Narrower than the always-on core group, so a group fallback would show.
+    assert.notDeepEqual(restartSelection(root), resolveGroups(getAlwaysOnGroupIds()));
+    assert.deepEqual(restartSelection(root), ['nextjs']);
+    assert.equal(
+      buildStartCommand('nextjs', restartSelection(root)).includes('NODE_EXTRA_CA_CERTS='),
+      false
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('an empty manifest services list derives the fallback like a missing file', () => {
+  // `readManifest` accepts `{ services: [] }`; an empty selection is just as
+  // useless to command-building as no manifest — and a start interrupted after
+  // mkdir but before the entries were appended can leave one. Take the core
+  // selection then too.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-empty-'));
+  try {
+    fs.mkdirSync(path.join(root, 'dev', 'logs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'dev', 'logs', 'manifest.json'),
+      JSON.stringify({ session: 'kilo-dev-test', portOffset, services: [] })
+    );
+    assert.deepEqual(restartSelection(root), resolveGroups(getAlwaysOnGroupIds()));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('starts the BYOK KMS service on its own port before the web app', () => {
+  const kms = getService('local-kms');
+  const service = getService('byok-kms');
+
+  assert.equal(kms.type, 'infra');
+  assert.equal(kms.port, 8900 + portOffset);
+  assert.equal(service.group, 'core');
+  assert.equal(service.type, 'process');
+  assert.equal(service.port, 8901 + portOffset);
+  assert.deepEqual(service.dependsOn, ['local-kms']);
+  assert.deepEqual(service.command, [
+    'env',
+    `BYOK_KMS_SERVICE_PORT=${8901 + portOffset}`,
+    `BYOK_KMS_ENDPOINT=http://127.0.0.1:${8900 + portOffset}`,
+    'pnpm',
+    'exec',
+    'tsx',
+    'dev/byok-kms/server.ts',
+  ]);
+  assert.ok(getService('nextjs').dependsOn.includes('byok-kms'));
+});
+
+test('starts the AI gateway app before the web app that rewrites to it', () => {
+  const web = getService('nextjs');
+  const gateway = getService('ai-gateway');
+
+  assert.ok(web.dependsOn.includes('ai-gateway'));
+  assert.deepEqual(web.command, [
+    'env',
+    `AI_GATEWAY_URL=http://localhost:${gateway.port}`,
+    'pnpm',
+    'run',
+    'dev',
+  ]);
+
+  const appTargets = resolveTargets(['app']);
+  assert.ok(appTargets.includes('ai-gateway'));
+  assert.ok(appTargets.indexOf('ai-gateway') < appTargets.indexOf('nextjs'));
+});
+
+test('moves the web app and gateway cross-references with the port offset', () => {
+  const originalOffset = portOffset;
+  const originalPort = process.env.PORT;
+  try {
+    delete process.env.PORT;
+    applyPortOffset(4200);
+    assert.deepEqual(getService('nextjs').command.slice(0, 2), [
+      'env',
+      'AI_GATEWAY_URL=http://localhost:7210',
+    ]);
+    assert.ok(getService('ai-gateway').command.includes('AI_GATEWAY_WEB_PORT=7200'));
+  } finally {
+    if (originalPort === undefined) delete process.env.PORT;
+    else process.env.PORT = originalPort;
+    applyPortOffset(originalOffset);
+  }
+});
+
 test('registers user data export with worktree-aware ports and dependencies', () => {
   const service = getService('user-data-export');
 
@@ -183,14 +484,107 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.dir, 'services/user-data-export');
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
+  // `cloudflare-scim-sync` now resolves after `nextjs` rather than before the
+  // core workers: it applies directory events by calling the app's internal
+  // SCIM endpoints, so it declares `postgres` and `nextjs` and the topological
+  // order places it accordingly.
   assert.deepEqual(resolveTargets(['data-export']), [
-    'stripe',
-    'redis',
+    'mock-snowflake',
+    'local-kms',
     'postgres',
+    'redis',
+    'stripe',
+    'byok-kms',
+    'cloudflare-git-token-service',
+    'cloudflare-session-ingest',
     'redis-http',
+    'ai-gateway',
     'nextjs',
     'user-data-export',
+    'cloudflare-scim-sync',
   ]);
+});
+
+test('starts the session-ingest worker whenever the web app starts', () => {
+  // The web app mints web tickets through Session Ingest
+  // (`activeSessions.createWebTicket` / `getToken`), so starting the web stack
+  // must pull the worker in transitively — otherwise the mutation fetches a
+  // dead SESSION_INGEST_WORKER_URL and every web-ticket run gets a 412
+  // PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
+  const appTargets = resolveTargets(['app']);
+
+  assert.ok(
+    appTargets.includes('cloudflare-session-ingest'),
+    `expected cloudflare-session-ingest in app start targets, got: ${appTargets.join(', ')}`
+  );
+
+  const worker = getService('cloudflare-session-ingest');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/session-ingest');
+  assert.equal(worker.port, 8800 + portOffset);
+});
+
+test('registers native session sync as an optional local service with an isolated database target', () => {
+  const worker = getService('cloudflare-session-sync');
+  assert.equal(worker.group, 'session-sync');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/session-sync');
+  assert.equal(worker.port, 8817 + portOffset);
+  assert.deepEqual(worker.dependsOn, ['postgres']);
+  assert.deepEqual(resolveTargets(['cloudflare-session-sync']), [
+    'postgres',
+    'cloudflare-session-sync',
+  ]);
+  assert.ok(resolveTargets(['session-sync']).includes('cloudflare-session-sync'));
+  assert.ok(resolveTargets(['agents']).includes('cloudflare-session-sync'));
+  const originalOffset = portOffset;
+  try {
+    applyPortOffset(4200);
+    const offsetWorker = getService('cloudflare-session-sync');
+    assert.equal(offsetWorker.port, 13017);
+    assert.ok(
+      offsetWorker.command.includes(
+        'CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgres://postgres:postgres@localhost:9632/postgres'
+      )
+    );
+  } finally {
+    applyPortOffset(originalOffset);
+  }
+});
+
+test('starts the git-token worker whenever the web app starts', () => {
+  // Every code-review read and write resolves the caller's provider credential
+  // through git-token-service, so starting the web stack must pull the worker in
+  // transitively — otherwise the fetch hits a dead GIT_TOKEN_SERVICE_API_URL and
+  // a connected provider renders as a service outage with no rows.
+  const appTargets = resolveTargets(['app']);
+
+  assert.ok(
+    appTargets.includes('cloudflare-git-token-service'),
+    `expected cloudflare-git-token-service in app start targets, got: ${appTargets.join(', ')}`
+  );
+  assert.ok(
+    appTargets.indexOf('cloudflare-git-token-service') < appTargets.indexOf('nextjs'),
+    `expected cloudflare-git-token-service before nextjs, got: ${appTargets.join(', ')}`
+  );
+
+  const worker = getService('cloudflare-git-token-service');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/git-token-service');
+  assert.equal(worker.port, 8802 + portOffset);
+});
+
+test('runs kilo-mcp with the cloud-agent group on its wrangler port', () => {
+  const targets = resolveTargets(['cloud-agent']);
+  assert.ok(
+    targets.includes('kilo-mcp'),
+    `expected kilo-mcp in cloud-agent start targets, got: ${targets.join(', ')}`
+  );
+
+  const worker = getService('kilo-mcp');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/kilo-mcp');
+  assert.equal(worker.port, 8815 + portOffset);
 });
 
 test('points both user data export Hyperdrive bindings at the offset database', () => {
@@ -225,14 +619,14 @@ test('keeps auto routing package dev script compatible with local launcher flags
   assert.equal(launcherFlags.filter(part => part === '--ip').length, 1);
 });
 
-test('starts the container usage meter whenever Gastown starts', () => {
-  // Gastown's TownContainerDO binds container-usage-meter via a service binding,
-  // which only connects when the meter is registered in the same local Wrangler
-  // dev registry. Starting Gastown must therefore always launch the meter.
-  const gastownTargets = resolveTargets(['gastown']);
+test('starts the container usage meter whenever the cloud-agent group starts', () => {
+  // Cloud Agent binds container-usage-meter via a service binding, which only
+  // connects when the meter is registered in the same local Wrangler dev
+  // registry. Starting the cloud-agent group must therefore always launch it.
+  const cloudAgentTargets = resolveTargets(['cloud-agent']);
   assert.ok(
-    gastownTargets.includes('container-usage-meter'),
-    `expected container-usage-meter in gastown start targets, got: ${gastownTargets.join(', ')}`
+    cloudAgentTargets.includes('container-usage-meter'),
+    `expected container-usage-meter in cloud-agent start targets, got: ${cloudAgentTargets.join(', ')}`
   );
 
   const meter = getService('container-usage-meter');
@@ -242,8 +636,7 @@ test('starts the container usage meter whenever Gastown starts', () => {
 });
 
 test('binds the container usage meter under its unsuffixed Wrangler name', () => {
-  // Gastown binds CONTAINER_USAGE to service "container-usage-meter" with no
-  // "-dev" suffix. The meter's dev script must not pass --env (which would
+  // Producers bind to service "container-usage-meter" with no "-dev" suffix. The meter's dev script must not pass --env (which would
   // register it as a different name) and must accept the launcher's flags.
   const meter = getService('container-usage-meter');
   const packageJson = JSON.parse(fs.readFileSync(`${meter.dir}/package.json`, 'utf-8')) as {
@@ -254,6 +647,26 @@ test('binds the container usage meter under its unsuffixed Wrangler name', () =>
   assert.equal(scriptFlags.filter(part => part === '--env').length, 0);
   assert.equal(scriptFlags.filter(part => part === '-e').length, 0);
   assert.equal(meter.command.filter(part => part === '--ip').length, 1);
+});
+
+test('starts the latency-ingest worker whenever the mobile stack starts', () => {
+  // The mobile app POSTs its client-observed latency batches to the
+  // latency-ingest worker in every dev session (LATENCY_INGEST_URL in the
+  // mobile env resolves to its wrangler port), so starting the mobile service
+  // must pull the worker in transitively — otherwise the app POSTs to a dead
+  // listener and the ingest path cannot be observed locally.
+  const mobileTargets = resolveTargets(['mobile']);
+
+  assert.ok(
+    mobileTargets.includes('latency-ingest'),
+    `expected latency-ingest in mobile start targets, got: ${mobileTargets.join(', ')}`
+  );
+
+  const worker = getService('latency-ingest');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/latency-ingest');
+  assert.equal(worker.port, 8816 + portOffset);
+  assert.deepEqual(worker.dependsOn, []);
 });
 
 test('starts Storybook with Storybook v10 port flags', () => {
@@ -328,6 +741,83 @@ test('keeps existing deletion provider keys when injecting deletion-mock hosts',
   assert.equal(env?.POSTHOG_HOST, 'http://127.0.0.1:4010');
 });
 
+test('propagates the fake-llm admin token through the session environment', () => {
+  assert.equal(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['nextjs'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' },
+    }),
+    undefined
+  );
+
+  assert.deepEqual(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['fake-llm'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' },
+    }),
+    { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' }
+  );
+
+  assert.deepEqual(resolveFakeLlmSessionEnv({ serviceNames: ['fake-llm'], env: {} }), {
+    FAKE_LLM_ADMIN_TOKEN: LOCAL_FAKE_LLM_ADMIN_TOKEN,
+  });
+});
+
+test('gives the fake-llm Worker the same NEXTAUTH_SECRET as the main Worker', () => {
+  assert.deepEqual(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['fake-llm-worker'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'worker-admin-token' },
+      devVars: new Map([['NEXTAUTH_SECRET', 'worker-nextauth-secret']]),
+    }),
+    {
+      FAKE_LLM_ADMIN_TOKEN: 'worker-admin-token',
+      NEXTAUTH_SECRET: 'worker-nextauth-secret',
+    }
+  );
+
+  // The shell environment wins when it already carries a secret.
+  assert.deepEqual(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['fake-llm-worker'],
+      env: { NEXTAUTH_SECRET: 'shell-secret' },
+      devVars: new Map([['NEXTAUTH_SECRET', 'file-secret']]),
+    }),
+    {
+      FAKE_LLM_ADMIN_TOKEN: LOCAL_FAKE_LLM_ADMIN_TOKEN,
+      NEXTAUTH_SECRET: 'shell-secret',
+    }
+  );
+});
+
+test('publishes the e2e internal secret into the HTTP e2e session environment only', () => {
+  assert.equal(
+    resolveE2eInternalSecretSessionEnv({
+      serviceNames: ['nextjs'],
+      env: { E2E_INTERNAL_API_SECRET: 'e2e-internal-secret-0123456789' },
+    }),
+    undefined
+  );
+  assert.deepEqual(
+    resolveE2eInternalSecretSessionEnv({
+      serviceNames: ['cloud-agent-next-http'],
+      env: { E2E_INTERNAL_API_SECRET: 'e2e-internal-secret-0123456789' },
+    }),
+    { E2E_INTERNAL_API_SECRET: 'e2e-internal-secret-0123456789' }
+  );
+  // The development default is published too; the renderer rejects it, so an
+  // unexported value fails the group start loudly instead of silently.
+  assert.deepEqual(
+    resolveE2eInternalSecretSessionEnv({ serviceNames: ['cloud-agent-next-http'], env: {} }),
+    { E2E_INTERNAL_API_SECRET: LOCAL_E2E_INTERNAL_API_SECRET }
+  );
+});
+
+test('keeps the e2e internal secret out of the HTTP worker command string', () => {
+  const command = getService('cloud-agent-next-http').command.join(' ');
+  assert.doesNotMatch(command, /E2E_INTERNAL_API_SECRET/);
+});
+
 test('preserves auto routing backend auth secret name', () => {
   const service = getService('auto-routing');
   const wranglerConfig = fs.readFileSync(`${service.dir}/wrangler.jsonc`, 'utf-8');
@@ -335,4 +825,110 @@ test('preserves auto routing backend auth secret name', () => {
   assert.match(wranglerConfig, /"binding": "INTERNAL_API_SECRET_PROD"/);
   assert.match(wranglerConfig, /"secret_name": "INTERNAL_API_SECRET_PROD"/);
   assert.doesNotMatch(wranglerConfig, /BACKEND_AUTH_TOKEN/);
+});
+
+test('runs the HTTP e2e Worker from the rendered local config', () => {
+  const service = getService('cloud-agent-next-http');
+  assert.equal(service.group, 'cloud-agent-next-http');
+  const command = service.command.join(' ');
+  assert.match(command, /render-e2e-worker-config\.mjs --local/);
+  assert.match(command, /--config \.wrangler\/wrangler\.e2e-local\.jsonc/);
+  // `--env dev` must come from the package `dev` script only: the launcher
+  // passing it too made wrangler reject the duplicate `--env dev --env dev`.
+  assert.equal(service.command.includes('--env'), false);
+  const packageJson = JSON.parse(fs.readFileSync(`${service.dir}/package.json`, 'utf-8')) as {
+    scripts?: { dev?: string };
+  };
+  assert.match(packageJson.scripts?.dev ?? '', /--env dev/);
+});
+
+test('starts the fake LLM as a Worker with shell-referenced secrets', () => {
+  const service = getService('fake-llm-worker');
+  const command = service.command.join(' ');
+  assert.match(command, /wrangler dev --config test\/e2e\/wrangler\.fake-llm\.jsonc/);
+  // The secret values are shell references, so they never enter the command
+  // string (which tmux mirrors into dev/logs).
+  assert.match(command, /--var NEXTAUTH_SECRET:\$NEXTAUTH_SECRET/);
+  assert.match(command, /--var FAKE_LLM_ADMIN_TOKEN:\$FAKE_LLM_ADMIN_TOKEN/);
+});
+
+test('publishes the fake-LLM tunnel only when the fake Worker is selected', () => {
+  const tunnels = getService('cloud-agent-public-tunnels');
+  const scriptIndex = tunnels.command.findIndex(part => part.endsWith('start-public-tunnels.ts'));
+  assert.notEqual(scriptIndex, -1);
+
+  // A standalone tunnels start must not require a running fake Worker.
+  const standalone = tunnels.command.slice(scriptIndex + 1);
+  assert.equal(standalone.length, 3);
+  for (const arg of standalone) assert.match(String(arg), /^\d+$/);
+  assert.equal(tunnels.command.includes(String(resolveFakeLlmWorkerPort())), false);
+
+  const withFake = serviceCommand('cloud-agent-public-tunnels', [
+    'cloud-agent-public-tunnels',
+    'fake-llm-worker',
+  ]);
+  const withFakeArgs = withFake.slice(scriptIndex + 1);
+  assert.equal(withFakeArgs.length, 4);
+  for (const arg of withFakeArgs) assert.match(String(arg), /^\d+$/);
+  assert.equal(withFakeArgs[3], String(resolveFakeLlmWorkerPort()));
+
+  const withoutFake = serviceCommand('cloud-agent-public-tunnels', ['cloud-agent-public-tunnels']);
+  assert.equal(withoutFake.length, tunnels.command.length);
+});
+
+test('a tunnels restart keeps the live selection and reloads the HTTP worker', () => {
+  const httpSelection = ['cloud-agent-next-http', 'fake-llm-worker', 'cloud-agent-public-tunnels'];
+  const plan = planTunnelRestart(httpSelection);
+
+  // `restartServiceInTmux` types this exact command into the pane, and the same
+  // selection is forwarded when it has to recreate a vanished pane. Passing it
+  // is what keeps the fourth (fake-LLM) tunnel port; without the selection the
+  // restart falls back to the three-port form and publishes no fake tunnel.
+  const command = buildStartCommand('cloud-agent-public-tunnels', plan.selection);
+  const tokens = command.split(/\s+/);
+  const scriptIndex = tokens.findIndex(token => token.endsWith('start-public-tunnels.ts'));
+  assert.notEqual(scriptIndex, -1);
+  const args = tokens.slice(scriptIndex + 1);
+  assert.equal(args.length, 4);
+  assert.equal(args[3], String(resolveFakeLlmWorkerPort()));
+
+  // The post-capture reload must follow the selection too. The HTTP profile
+  // renders the tunnel URLs into `.wrangler/.dev.vars`; reloading the plain
+  // worker instead would leave the running HTTP Worker on dead copies.
+  assert.equal(plan.reloadTarget, 'cloud-agent-next-http');
+  assert.equal(
+    planTunnelRestart(['cloud-agent-next', 'cloud-agent-public-tunnels']).reloadTarget,
+    'cloud-agent-next'
+  );
+  assert.equal(planTunnelRestart(['cloud-agent-public-tunnels']).reloadTarget, undefined);
+});
+
+test('excludes unwanted services and reports dependents that lose them', () => {
+  const selection = resolveTargets(['agents', 'fake-llm']);
+  const exclusion = excludeServices(selection, ['notifications', 'event-service']);
+
+  assert.ok(!exclusion.serviceNames.includes('notifications'));
+  assert.ok(!exclusion.serviceNames.includes('event-service'));
+  assert.ok(exclusion.serviceNames.includes('cloud-agent-next'));
+  assert.deepEqual(exclusion.skipped.toSorted(), ['event-service', 'notifications']);
+  assert.deepEqual(exclusion.dependents.get('cloud-agent-next'), ['notifications']);
+});
+
+test('ignores excluded services that are not selected', () => {
+  const exclusion = excludeServices(['postgres', 'nextjs'], ['notifications']);
+
+  assert.deepEqual(exclusion.serviceNames, ['postgres', 'nextjs']);
+  assert.deepEqual(exclusion.skipped, []);
+});
+
+test('rejects unknown excluded services instead of starting everything', () => {
+  assert.throws(() => excludeServices(['postgres'], ['notifcations']), /Unknown service/);
+});
+
+test('parses comma-separated service lists', () => {
+  assert.deepEqual(parseServiceList(' notifications, event-service ,,'), [
+    'notifications',
+    'event-service',
+  ]);
+  assert.deepEqual(parseServiceList(undefined), []);
 });

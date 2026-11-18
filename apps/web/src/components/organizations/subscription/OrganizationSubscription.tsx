@@ -1,9 +1,10 @@
 'use client';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import {
   useOrganizationSubscription,
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -124,7 +125,7 @@ export function OrganizationSubscription({
                     <Button
                       variant="outline"
                       className="w-64 justify-center"
-                      onClick={() => (window.location.href = 'mailto:teams@kilocode.ai')}
+                      onClick={() => (window.location.href = `mailto:${SUPPORT_EMAIL}`)}
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       Contact Support

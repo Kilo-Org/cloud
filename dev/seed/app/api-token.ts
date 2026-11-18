@@ -2,14 +2,43 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { signKiloToken } from '@kilocode/worker-utils';
 import { eq, or } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { seedTokenSigningParams } from '../lib/token-signing';
+import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email> [options]';
 
-const DEFAULT_EXPIRES_DAYS = 7;
+// Five years, matching generateApiToken()'s default in
+// packages/web-shared/src/lib/tokens.ts (TOKEN_EXPIRY.default / FIVE_YEARS_IN_SECONDS).
+// The resource-delegation policy (createControlTokenForRequest →
+// isKiloCredentialExchangeEligible, LEGACY_API_TOKEN_LIFETIMES_SECONDS in
+// @kilocode/worker-utils) only accepts legacy five-year API tokens for
+// credential exchange, so any other lifetime is rejected by control-token
+// routes such as cloudAgentNext.prepareSession with 403 "Unsupported legacy
+// credential context" — the 2026-09-12 failure of the delegation-protected
+// prepareSession probe.
+export const DEFAULT_EXPIRES_DAYS = 1825;
 const SECONDS_PER_DAY = 24 * 60 * 60;
+
+/**
+ * The exact signing shape `generateApiToken()` mints in production, as the
+ * local dev stack's policy expects it:
+ *
+ * - `expiresInSeconds` must be one of LEGACY_API_TOKEN_LIFETIMES_SECONDS, or
+ *   control-token routes (cloudAgentNext.prepareSession and every other
+ *   createControlTokenForRequest caller) reject the token with 403
+ *   "Unsupported legacy credential context".
+ * - `env` comes from `seedTokenSigningParams`, the helper every dev seed topic
+ *   signs with, so a seed token names the local dev stack.
+ */
+export function apiTokenSigningParams(expiresDays: number): {
+  expiresInSeconds: number;
+  env: string;
+} {
+  return seedTokenSigningParams(expiresDays * SECONDS_PER_DAY);
+}
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:api-token ${usage}`);
@@ -18,23 +47,26 @@ function printUsage(): void {
   console.log('development user, signed with this worktree NEXTAUTH_SECRET. Use it to');
   console.log('authenticate a local kilo CLI or API client as that user.');
   console.log('');
+  console.log('The token carries the shape generateApiToken() mints in production: a');
+  console.log('five-year legacy user API token with env="development" — the shape the');
+  console.log('resource-delegation policy accepts for control-token minting on the');
+  console.log('local dev stack. Override the lifetime with --expires-days only when the');
+  console.log('consumer never mints resource control tokens.');
+  console.log('');
   console.log('Matches either google_user_email exactly or normalized_email.');
   console.log('');
   console.log('Options:');
   console.log(
     `  --expires-days=<number>   Token lifetime in days (default: ${DEFAULT_EXPIRES_DAYS})`
   );
-  console.log('  --admin                   Include isAdmin=true in the token payload');
+  console.log(
+    '  --admin                   Include isAdmin=true in the token payload (control-token exchange rejects it)'
+  );
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:api-token ada@example.com');
   console.log('  pnpm -s dev:seed app:api-token ada@example.com --json | jq -r .token');
   console.log('  pnpm dev:seed app:api-token ada@example.com --expires-days=30 --admin');
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function parsePositiveInteger(value: string, flagName: string): number {
@@ -104,6 +136,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
+  assertLocalSeedDatabase('app:api-token');
   const normalizedEmail = normalizeSeedEmail(options.email);
   const db = getSeedDb();
   const matches = await db
@@ -140,9 +173,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.userId,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: options.expiresDays * SECONDS_PER_DAY,
-    env: process.env.NODE_ENV ?? 'development',
-    extra: options.isAdmin || user.isAdmin ? { isAdmin: true } : undefined,
+    ...apiTokenSigningParams(options.expiresDays),
+    extra: options.isAdmin ? { isAdmin: true } : undefined,
   });
 
   console.log('');
@@ -152,7 +184,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   return {
     userId: user.userId,
     email: user.email,
-    isAdmin: options.isAdmin || user.isAdmin,
+    isAdmin: options.isAdmin,
     expiresAt,
     expiresDays: options.expiresDays,
     token,

@@ -1,14 +1,5 @@
-function timeOfDay(hour: number): 'morning' | 'afternoon' | 'evening' {
-  if (hour < 12) {
-    return 'morning';
-  }
-  if (hour < 17) {
-    return 'afternoon';
-  }
-  return 'evening';
-}
+import { i18n } from '@/i18n';
 
 export function buildTimedGreeting(): string {
-  const period = timeOfDay(new Date().getHours());
-  return `Good ${period}`;
+  return i18n.t('consent.kilo');
 }

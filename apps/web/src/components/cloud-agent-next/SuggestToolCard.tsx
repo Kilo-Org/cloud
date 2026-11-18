@@ -1,9 +1,11 @@
 'use client';
 
+import React from 'react';
 import { useAtomValue } from 'jotai';
 import { Sparkles } from 'lucide-react';
+import type { SessionManager } from '@kilocode/cloud-agent-sdk';
 
-import { useManager } from './CloudAgentProvider';
+import { useOptionalManager } from './CloudAgentProvider';
 import { SuggestionCard } from './SuggestionCard';
 import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
@@ -24,8 +26,27 @@ import type { ToolPart } from './types';
  * replaces the interactive UI.
  */
 export function SuggestToolCard({ toolPart }: { toolPart: ToolPart }) {
+  const manager = useOptionalManager();
+  if (!manager) {
+    return <SuggestSummaryCard toolPart={toolPart} />;
+  }
+  return <SuggestToolCardLive toolPart={toolPart} manager={manager} />;
+}
+
+function SuggestSummaryCard({ toolPart }: { toolPart: ToolPart }) {
+  const { status } = toolPart.state;
+  const subtitle = status === 'error' ? 'Suggestion dismissed' : 'Suggestion';
+  return <ToolCardShell icon={Sparkles} title="Suggestion" subtitle={subtitle} status={status} />;
+}
+
+function SuggestToolCardLive({
+  toolPart,
+  manager,
+}: {
+  toolPart: ToolPart;
+  manager: SessionManager;
+}) {
   const { state } = toolPart;
-  const manager = useManager();
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
 
   const isPending = state.status === 'pending' || state.status === 'running';
@@ -42,9 +63,5 @@ export function SuggestToolCard({ toolPart }: { toolPart: ToolPart }) {
     );
   }
 
-  // Resolved states (or pending without a matching activeSuggestion) — compact summary.
-  const subtitle = state.status === 'error' ? 'Suggestion dismissed' : 'Suggestion';
-  return (
-    <ToolCardShell icon={Sparkles} title="Suggestion" subtitle={subtitle} status={state.status} />
-  );
+  return <SuggestSummaryCard toolPart={toolPart} />;
 }

@@ -1,16 +1,16 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getSecurityAgentRepositorySyncState } from '@kilocode/db';
 import { security_findings, agent_configs } from '@kilocode/db/schema';
-import { eq, and, desc, count, sql, max, or, type SQL } from 'drizzle-orm';
+import { eq, and, desc, count, sql, max, or, inArray, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import type { SecurityFinding, NewSecurityFinding } from '@kilocode/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
 } from '@kilocode/db/schema-types';
 import {
   deriveSecurityFindingAuditEventKey,
-  insertSecurityFindingAuditEvent,
+  insertSecurityFindingAuditEvents,
   type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
@@ -95,7 +95,6 @@ export async function createSecurityFinding(params: CreateFindingParams): Promis
         dependabot_html_url: params.dependabot_html_url,
         raw_data: params.raw_data,
         first_detected_at: params.first_detected_at,
-        // Additional metadata
         cwe_ids: params.cwe_ids,
         cvss_score: params.cvss_score?.toString() || null,
         dependency_scope: params.dependency_scope,
@@ -207,6 +206,7 @@ export async function upsertSecurityFinding(
         LEFT JOIN existing_match ON true
         ON CONFLICT ${ownerConflictTarget(owner)} DO UPDATE
         SET
+          ${sql.identifier(security_findings.platform_integration_id.name)} = COALESCE(EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)}, ${security_findings.platform_integration_id}),
           ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
           ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
           ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
@@ -508,7 +508,7 @@ export async function listSecurityFindings(
           // finding triaged as "dismiss" but sandbox-confirmed as exploitable
           // would appear under "Safe to Dismiss" yet display as "Exploitable".
           conditions.push(
-            sql`(${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown'`
+            sql`((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')`
           );
           break;
         case 'needs_review':
@@ -519,7 +519,7 @@ export async function listSecurityFindings(
           );
           // Same as safe_to_dismiss: exclude findings where sandbox overrides triage.
           conditions.push(
-            sql`(${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown'`
+            sql`((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')`
           );
           break;
         case 'triage_complete':
@@ -545,7 +545,6 @@ export async function listSecurityFindings(
 
     const whereClause = and(...conditions);
 
-    // Sort order
     const severityOrder = sql`CASE ${security_findings.severity}
       WHEN 'critical' THEN 1
       WHEN 'high' THEN 2
@@ -575,7 +574,6 @@ export async function listSecurityFindings(
       orderByClause = [severityOrder, desc(security_findings.created_at)];
     }
 
-    // Run paginated query and count query in parallel
     const [findings, countResult] = await Promise.all([
       db
         .select()
@@ -609,14 +607,12 @@ export async function countSecurityFindings(params: {
 
     const conditions: Array<SQL | undefined> = [];
 
-    // Owner condition
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
     } else {
       conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
     }
 
-    // Optional filters
     if (status) {
       if (status === 'closed') {
         conditions.push(
@@ -734,41 +730,6 @@ export async function getSecurityFindingsSummary(params: {
   }
 }
 
-export async function updateSecurityFindingStatus(
-  findingId: string,
-  status: SecurityFindingStatus,
-  updates: {
-    ignoredReason?: string;
-    ignoredBy?: string;
-    fixedAt?: Date;
-  } = {}
-): Promise<void> {
-  try {
-    const updateData: Partial<NewSecurityFinding> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (updates.ignoredReason !== undefined) {
-      updateData.ignored_reason = updates.ignoredReason;
-    }
-    if (updates.ignoredBy !== undefined) {
-      updateData.ignored_by = updates.ignoredBy;
-    }
-    if (updates.fixedAt !== undefined) {
-      updateData.fixed_at = updates.fixedAt.toISOString();
-    }
-
-    await db.update(security_findings).set(updateData).where(eq(security_findings.id, findingId));
-  } catch (error) {
-    captureException(error, {
-      tags: { operation: 'updateSecurityFindingStatus' },
-      extra: { findingId, status, updates },
-    });
-    throw error;
-  }
-}
-
 export async function getRepositoriesWithFindings(owner: SecurityReviewOwner): Promise<string[]> {
   try {
     const ownerConverted = toOwner(owner);
@@ -788,34 +749,6 @@ export async function getRepositoriesWithFindings(owner: SecurityReviewOwner): P
     captureException(error, {
       tags: { operation: 'getRepositoriesWithFindings' },
       extra: { owner },
-    });
-    throw error;
-  }
-}
-
-export async function findSecurityFindingBySource(
-  repoFullName: string,
-  source: string,
-  sourceId: string
-): Promise<SecurityFinding | null> {
-  try {
-    const [finding] = await db
-      .select()
-      .from(security_findings)
-      .where(
-        and(
-          eq(security_findings.repo_full_name, repoFullName),
-          eq(security_findings.source, source),
-          eq(security_findings.source_id, sourceId)
-        )
-      )
-      .limit(1);
-
-    return finding || null;
-  } catch (error) {
-    captureException(error, {
-      tags: { operation: 'findSecurityFindingBySource' },
-      extra: { repoFullName, source, sourceId },
     });
     throw error;
   }
@@ -899,7 +832,6 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
 
     const conditions: SQL[] = [];
 
-    // Owner condition
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
     } else {
@@ -929,6 +861,10 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
   }
 }
 
+/** Findings selected, audited, and deleted per round trip. Keeps memory bounded and
+ * keeps each audit insert inside PostgreSQL's bind-parameter limit. */
+export const DELETE_FINDINGS_CHUNK_SIZE = 500;
+
 export async function deleteFindingsByRepository(params: {
   owner: SecurityReviewOwner;
   repoFullName: string;
@@ -940,51 +876,73 @@ export async function deleteFindingsByRepository(params: {
 
     const conditions: SQL[] = [];
 
-    // Owner condition
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
     } else {
       conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
     }
 
-    // Repository condition
     conditions.push(eq(security_findings.repo_full_name, repoFullName));
 
     const ownerForAudit = toSecurityFindingAuditOwner(ownerConverted);
     const ownerKeyPart = ownerAuditKeyPart(ownerConverted);
 
+    // One transaction for the whole delete: either every finding of the repository
+    // is removed with its audit event, or none is. Findings are processed in chunks
+    // so memory stays bounded and the audit trail costs one insert per chunk instead
+    // of one awaited insert per finding.
     const deletedCount = await db.transaction(async tx => {
-      const findings = await tx
-        .select()
-        .from(security_findings)
-        .where(and(...conditions));
       const occurredAt = new Date().toISOString();
+      let deleted = 0;
 
-      for (const finding of findings) {
-        await insertSecurityFindingAuditEvent(tx, {
-          owner: ownerForAudit,
-          finding,
-          actor: params.actor,
-          action: SecurityAuditLogAction.FindingDeleted,
-          occurredAt,
-          eventKey: deriveSecurityFindingAuditEventKey([
-            ownerKeyPart,
-            finding.id,
-            SecurityAuditLogAction.FindingDeleted,
-          ]),
-          sourceContext: SecurityFindingAuditSourceContext.Web,
-          beforeState: { status: finding.status },
-          afterState: { deleted: true },
-          metadata: { repo_full_name: repoFullName },
-        });
+      for (;;) {
+        const findings = await tx
+          .select()
+          .from(security_findings)
+          .where(and(...conditions))
+          .limit(DELETE_FINDINGS_CHUNK_SIZE);
+
+        if (findings.length === 0) break;
+
+        await insertSecurityFindingAuditEvents(
+          tx,
+          findings.map(finding => ({
+            owner: ownerForAudit,
+            finding,
+            actor: params.actor,
+            action: SecurityAuditLogAction.FindingDeleted,
+            occurredAt,
+            eventKey: deriveSecurityFindingAuditEventKey([
+              ownerKeyPart,
+              finding.id,
+              SecurityAuditLogAction.FindingDeleted,
+            ]),
+            sourceContext: SecurityFindingAuditSourceContext.Web,
+            beforeState: { status: finding.status },
+            afterState: { deleted: true },
+            metadata: { repo_full_name: repoFullName },
+          }))
+        );
+
+        const deletedRows = await tx
+          .delete(security_findings)
+          .where(
+            and(
+              ...conditions,
+              inArray(
+                security_findings.id,
+                findings.map(finding => finding.id)
+              )
+            )
+          )
+          .returning({ id: security_findings.id });
+
+        deleted += deletedRows.length;
+
+        if (findings.length < DELETE_FINDINGS_CHUNK_SIZE) break;
       }
 
-      const deleted = await tx
-        .delete(security_findings)
-        .where(and(...conditions))
-        .returning({ id: security_findings.id });
-
-      return deleted.length;
+      return deleted;
     });
 
     return { deletedCount };

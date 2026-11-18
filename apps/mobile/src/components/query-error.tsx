@@ -6,50 +6,86 @@ import {
   ServerCrash,
   WifiOff,
 } from '@/components/ui/icons';
+import { type TFunction } from 'i18next';
+import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { type ScrollViewProps } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
+export type QueryErrorVariant =
+  | 'neutral'
+  | 'offline'
+  | 'permission'
+  | 'not-found'
+  | 'server'
+  | 'timeout';
 
-const VARIANT_META = {
-  neutral: {
-    icon: AlertCircle,
-    title: 'Something went wrong',
-    description: 'Please try again.',
-  },
-  offline: {
-    icon: WifiOff,
-    title: 'Failed to load',
-    description: 'Something went wrong',
-  },
+const VARIANT_ICONS = {
+  neutral: AlertCircle,
+  offline: WifiOff,
+  permission: Lock,
+  'not-found': SearchX,
+  server: ServerCrash,
+  // The slow-response state is named by its copy; it shares the generic icon.
+  timeout: AlertCircle,
+} satisfies Record<QueryErrorVariant, LucideIcon>;
+
+const VARIANT_META_KEYS = {
+  neutral: { title: 'common.somethingWentWrong', description: 'queryError.neutralDescription' },
+  offline: { title: 'queryError.offlineTitle', description: 'common.somethingWentWrong' },
   permission: {
-    icon: Lock,
-    title: 'Access denied',
-    description: "You don't have permission to view this.",
+    title: 'common.accessDenied',
+    description: 'queryError.permissionDescription',
   },
   'not-found': {
-    icon: SearchX,
-    title: 'Not found',
-    description: 'This item may have been removed or is no longer available.',
+    title: 'common.notFound',
+    description: 'queryError.notFoundDescription',
   },
-  server: {
-    icon: ServerCrash,
-    title: 'Could not load',
-    description: 'Something went wrong on our end. Please try again.',
+  server: { title: 'queryError.serverTitle', description: 'queryError.serverDescription' },
+  timeout: {
+    title: 'queryError.timeoutTitle',
+    description: 'queryError.timeoutDescription',
   },
-} satisfies Record<QueryErrorVariant, { icon: LucideIcon; title: string; description: string }>;
+} as const;
+
+function variantMeta(t: TFunction, variant: QueryErrorVariant) {
+  const meta = VARIANT_META_KEYS[variant];
+  return { title: t(meta.title), description: t(meta.description) };
+}
 
 type QueryErrorProps = {
   variant?: QueryErrorVariant;
   title?: string;
   message?: string;
   onRetry?: () => void;
+  /**
+   * The retry action's label. A caller whose refresh action has a more precise
+   * name than "Retry" passes it here, so the visible label and the
+   * accessibility label stay the same string; the default is the generic
+   * `common.retry`.
+   */
+  retryLabel?: string;
   isRetrying?: boolean;
+  /**
+   * Replaces the built-in retry button entirely. A caller that composes its
+   * own recovery row (multiple actions) uses this and leaves `onRetry` unset.
+   */
+  action?: ReactNode;
   className?: string;
-  placement?: 'center' | 'top';
+  /**
+   * Constrains the description's own box. A caller whose copy is long enough to
+   * leave one word alone on its last line caps the measure here so the text
+   * breaks into balanced lines instead.
+   */
+  descriptionClassName?: string;
+  placement?: 'center' | 'top' | 'static';
+  refreshControl?: ScrollViewProps['refreshControl'];
 };
 
 export function QueryError({
@@ -60,38 +96,58 @@ export function QueryError({
   title,
   message,
   onRetry,
+  retryLabel,
   isRetrying = false,
+  action,
   className,
+  descriptionClassName,
   placement = 'center',
+  refreshControl,
 }: Readonly<QueryErrorProps>) {
-  const meta = VARIANT_META[variant];
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const meta = variantMeta(t, variant);
   const titleText = title ?? meta.title;
   const descriptionText = message ?? meta.description;
+  const retryText = retryLabel ?? t('common.retry');
 
   return (
     <EmptyState
-      icon={meta.icon}
+      icon={VARIANT_ICONS[variant]}
       title={titleText}
       description={
-        <AccessibleStatus message={descriptionText} tone="error" className="text-center text-sm" />
+        <AccessibleStatus
+          message={descriptionText}
+          tone="status"
+          className={
+            descriptionClassName === undefined
+              ? 'text-center text-sm'
+              : `text-center text-sm ${descriptionClassName}`
+          }
+        />
       }
       className={className}
       placement={placement}
+      refreshControl={refreshControl}
       iconContainerClassName="rounded-full bg-muted p-4"
+      iconColor={colors.destructive}
       iconSize={32}
       iconStrokeWidth={2}
       titleAccessibilityRole="header"
+      compactTitleClassName="text-destructive"
       action={
-        onRetry && (
+        action ??
+        (onRetry && (
           <Button
+            className={STATE_ACTION_CLASS}
             variant="outline"
             onPress={onRetry}
             loading={isRetrying}
-            accessibilityLabel="Retry"
+            accessibilityLabel={retryText}
           >
-            <Text>Retry</Text>
+            <Text>{retryText}</Text>
           </Button>
-        )
+        ))
       }
     />
   );

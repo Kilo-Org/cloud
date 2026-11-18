@@ -1,17 +1,25 @@
 import type { Part } from '@kilocode/app-shared/opencode';
+import type { ReadonlyPart } from '../types';
 import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
 import {
+  clearStorage,
+  deleteMessageFromStorage,
+  deletePartFromStorage,
+  type StorageContainers,
+} from './lifecycle';
+import type { PartsSnapshot } from './helpers';
+import {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
-  createSeedTextPart,
-  insertPartSorted,
-  insertSorted,
+  createSubscriberRegistry,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
-  upsertPartDroppingStaleSyntheticTextParts,
+  messageIdKey,
+  publishPartsChanged,
+  upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
 function createMemoryStorage(): SessionStorage {
@@ -19,19 +27,53 @@ function createMemoryStorage(): SessionStorage {
   let messageIds: string[] = [];
 
   const parts = new Map<string, Part[]>();
-  const partsSnapshot = new Map<string, Part[] | null>();
+  const partsSnapshot: PartsSnapshot = new Map<string, readonly ReadonlyPart[] | null>();
+  // Ordering evidence of the last accepted update per part, owned next to the
+  // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
+  const partEvidence = new Map<string, number>();
 
-  const subscribers = new Map<string, Set<() => void>>();
+  const subscribers = createSubscriberRegistry();
 
-  return {
+  const containers: StorageContainers = {
+    messages: {
+      has: messageId => messages.has(messageId),
+      remove: messageId => {
+        messages.delete(messageId);
+      },
+      clear: () => messages.clear(),
+      ids: () => messageIds,
+      setIds: ids => {
+        messageIds = ids;
+      },
+    },
+    parts: {
+      get: messageId => parts.get(messageId),
+      set: (messageId, arr) => {
+        parts.set(messageId, arr);
+      },
+      has: messageId => parts.has(messageId),
+      remove: messageId => {
+        parts.delete(messageId);
+      },
+      messageIds: () => [...parts.keys()],
+      clear: () => parts.clear(),
+    },
+    snapshot: partsSnapshot,
+    evidence: partEvidence,
+    subscribers,
+    beforeStructuralChange: () => {},
+    publishPartsRevision: () => {},
+  };
+
+  const storage: SessionStorage = {
     upsertMessage(info) {
       const existing = messages.get(info.id);
       messages.set(info.id, info);
       if (existing) {
-        notify(subscribers, `message:${info.id}`);
+        subscribers.notifyMessage(info.id);
       } else {
-        messageIds = insertSorted(messageIds, info.id);
-        notify(subscribers, 'messageIds');
+        messageIds = insertSortedBy(messageIds, info.id, messageIdKey);
+        subscribers.notifyMessageIds();
       }
     },
 
@@ -43,11 +85,13 @@ function createMemoryStorage(): SessionStorage {
       return messages.get(messageId);
     },
 
-    upsertPart(messageId, part) {
+    upsertPart(messageId, part, eventTime, authoritative) {
       const arr = parts.get(messageId) ?? [];
-      parts.set(messageId, upsertPartDroppingStaleSyntheticTextParts(arr, part));
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      parts.set(
+        messageId,
+        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence, authoritative)
+      );
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     applyPartDelta(messageId, partId, field, delta) {
@@ -56,42 +100,16 @@ function createMemoryStorage(): SessionStorage {
       }
 
       const arr = parts.get(messageId);
-
-      if (!arr) {
-        // First delta for this message — bootstrap a minimal text part
-        parts.set(messageId, [createSeedTextPart(messageId, partId, delta)]);
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
+      const nextArr = appendPartTextChunks(arr, messageId, partId, [delta]);
+      if (nextArr === arr) {
         return;
       }
-      const idx = arr.findIndex(p => p.id === partId);
-      const existing = idx >= 0 ? arr[idx] : undefined;
-      if (!existing) {
-        // Part not yet known for this message — create it with the delta as seed
-        parts.set(messageId, insertPartSorted(arr, createSeedTextPart(messageId, partId, delta)));
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
-        return;
-      }
-
-      const updatedPart = applyTextDelta(existing, delta);
-      if (updatedPart === existing) {
-        return;
-      }
-      const nextArr = [...arr];
-      nextArr[idx] = updatedPart;
       parts.set(messageId, nextArr);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     deletePart(messageId, partId) {
-      const arr = parts.get(messageId);
-      if (!arr) return;
-      const filtered = arr.filter(p => p.id !== partId);
-      parts.set(messageId, filtered);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      deletePartFromStorage(storage, containers, messageId, partId);
     },
 
     getParts(messageId) {
@@ -106,53 +124,26 @@ function createMemoryStorage(): SessionStorage {
       return snapshot;
     },
 
-    subscribe(key, callback) {
-      let set = subscribers.get(key);
-      if (!set) {
-        set = new Set();
-        subscribers.set(key, set);
-      }
-      set.add(callback);
-      return () => {
-        set.delete(callback);
-        if (set.size === 0) subscribers.delete(key);
-      };
+    getPart(messageId, partId) {
+      const part = parts.get(messageId)?.find(item => item.id === partId);
+      return part ? createReadonlyPartView(part) : undefined;
     },
 
+    getPartIds(messageId) {
+      return (parts.get(messageId) ?? []).map(p => p.id);
+    },
+
+    subscribe: subscribers.subscribe,
+
     clear() {
-      const existingMessageIds = [...messageIds];
-      const existingPartMessageIds = [...parts.keys()];
-
-      messages.clear();
-      messageIds = [];
-      parts.clear();
-      partsSnapshot.clear();
-
-      for (const messageId of existingMessageIds) {
-        notify(subscribers, `message:${messageId}`);
-      }
-      for (const messageId of existingPartMessageIds) {
-        notify(subscribers, `parts:${messageId}`);
-      }
-      notify(subscribers, 'messageIds');
+      clearStorage(storage, containers);
     },
 
     deleteMessage(messageId) {
-      if (!messages.has(messageId)) return;
-
-      messages.delete(messageId);
-      messageIds = messageIds.filter(id => id !== messageId);
-
-      if (parts.has(messageId)) {
-        parts.delete(messageId);
-        partsSnapshot.delete(messageId);
-        notify(subscribers, `parts:${messageId}`);
-      }
-
-      notify(subscribers, `message:${messageId}`);
-      notify(subscribers, 'messageIds');
+      deleteMessageFromStorage(storage, containers, messageId);
     },
   };
+  return storage;
 }
 
 export { createMemoryStorage };

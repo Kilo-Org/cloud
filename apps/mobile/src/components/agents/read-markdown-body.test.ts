@@ -3,6 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ReadMarkdownBody } from './read-markdown-body';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
+
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./bubble-text-selection-context', () => ({

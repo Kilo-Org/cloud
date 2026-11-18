@@ -1,12 +1,11 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureMessage } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { native_admission_challenges, native_attested_keys } from '@kilocode/db/schema';
 import { eq, and, lt, isNull, gt } from 'drizzle-orm';
-import { checkRateLimit } from '@vercel/firewall';
 import type { NextRequest } from 'next/server';
 import {
   appAttestClientDataHash,
@@ -14,16 +13,76 @@ import {
   verifyAppleAssertion,
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
+import { checkFirewallRateLimit } from './firewall-rate-limit';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+
+// ── Expected-condition telemetry ───────────────────────────────────────────
+
+/**
+ * Interval-aggregated counter for expected, traffic-scaled admission
+ * conditions (legacy clients, malformed shapes). Emits one structured log
+ * line per 60 s window carrying the count observed in that window instead of
+ * one event per request, so rollout traffic cannot flood telemetry. The
+ * window start is carried on each line so a burst after a traffic pause is
+ * attributed to the window it was counted in.
+ */
+const AGGREGATE_INTERVAL_MS = 60_000;
+const admissionCounters = new Map<string, number>();
+let admissionCountersWindowStart = 0;
+
+function flushAdmissionCounters(now: number): void {
+  if (admissionCounters.size === 0) return;
+  for (const [metric, count] of admissionCounters) {
+    warnExceptInTest(
+      JSON.stringify({
+        event: 'native_admission_aggregate',
+        metric,
+        count,
+        intervalMs: AGGREGATE_INTERVAL_MS,
+        // Window the counts were accumulated in, not the flush time.
+        windowStart: new Date(admissionCountersWindowStart).toISOString(),
+        at: new Date(now).toISOString(),
+      })
+    );
+  }
+  admissionCounters.clear();
+}
+
+/**
+ * Roll the window forward when it has elapsed. Called on every admission
+ * check, so the window closes on any later traffic rather than only when
+ * another counted condition arrives — the last window of a sparse traffic
+ * pattern is not silently dropped.
+ */
+function rollAdmissionWindowIfNeeded(now: number): void {
+  if (now - admissionCountersWindowStart >= AGGREGATE_INTERVAL_MS) {
+    flushAdmissionCounters(now);
+    admissionCountersWindowStart = now;
+  }
+}
+
+/**
+ * Count an expected, traffic-scaled admission outcome. Refusals are the normal
+ * shape of hostile traffic, so they aggregate per window instead of emitting
+ * one event each. Unexpected provider faults keep their per-event message.
+ */
+export function countAdmissionCondition(metric: string): void {
+  const now = Date.now();
+  rollAdmissionWindowIfNeeded(now);
+  admissionCounters.set(metric, (admissionCounters.get(metric) ?? 0) + 1);
+}
+
+/** Exported for tests: flush any pending counters and reset the interval. */
+export function resetAdmissionCountersForTests(): void {
+  admissionCounters.clear();
+  admissionCountersWindowStart = 0;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
-
-export type NativeAdmissionMode = 'off' | 'report' | 'enforce';
 
 export type AdmissionPlatform = 'ios' | 'android';
 
 export type AdmissionKind = 'attestation' | 'assertion';
-
-export type NativeAdmissionResult = { ok: true } | { ok: false; errorCode: 'ADMISSION_REQUIRED' };
 
 // ── Wire contract ──────────────────────────────────────────────────────────
 
@@ -52,19 +111,24 @@ const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
 /**
  * Issue a server-side challenge for native admission.
  *
- * Uses @vercel/firewall checkRateLimit per client IP, matching the email
- * sign-in rate-limit pattern.
+ * Runs the shared `checkFirewallRateLimit` per client IP, matching the email
+ * sign-in rate-limit pattern, so the whole app keeps one check-and-report path.
+ * Only an answer that permits the caller issues a challenge: a limited caller
+ * is refused, and so is a limiter that could not be consulted. The shared
+ * helper reports both an unconfigured rule and a limiter that could not be
+ * evaluated through one throttled reporter.
  */
 export async function issueAdmissionChallenge(
   request: NextRequest,
   ipAddress: string
 ): Promise<{ challenge: string; expiresIn: number }> {
-  const { rateLimited } = await checkRateLimit(CHALLENGE_RATE_LIMIT_ID, {
+  const limit = await checkFirewallRateLimit(CHALLENGE_RATE_LIMIT_ID, {
+    source: 'native_admission_challenge',
     request,
     rateLimitKey: `native-challenge:${ipAddress}`,
   });
 
-  if (rateLimited) {
+  if (limit !== 'allowed') {
     throw new ChallengeRateLimitError();
   }
 
@@ -89,6 +153,22 @@ export class ChallengeRateLimitError extends Error {
 // ── Admission payload validation ───────────────────────────────────────────
 
 /**
+ * Longest `payload` string the admission wire contract accepts, in characters
+ * of the base64 form the client sends.
+ *
+ * Chosen from the size of a real device proof plus headroom: an App Attest
+ * attestation object with either documented certificate chain shape stays well
+ * inside this limit, and a Play Integrity verdict is a JWE of similar size.
+ */
+export const MAX_ADMISSION_PAYLOAD_CHARS = 16 * 1024;
+
+/** Whether an admission object carries a payload longer than the contract accepts. */
+function payloadExceedsMaxLength(obj: Record<string, unknown>): boolean {
+  const payload = obj['payload'];
+  return typeof payload === 'string' && payload.length > MAX_ADMISSION_PAYLOAD_CHARS;
+}
+
+/**
  * Validate the shape of the admission payload received from the client.
  * Returns a sanitized AdmissionPayload on success, undefined on failure.
  */
@@ -96,19 +176,13 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   if (typeof raw !== 'object' || raw === null) return undefined;
   const obj = raw as Record<string, unknown>;
 
-  // platform: 'ios' | 'android'
   if (obj['platform'] !== 'ios' && obj['platform'] !== 'android') return undefined;
-
-  // kind: 'attestation' | 'assertion'
   if (obj['kind'] !== 'attestation' && obj['kind'] !== 'assertion') return undefined;
-
-  // challenge: non-empty string
   if (typeof obj['challenge'] !== 'string' || !obj['challenge']) return undefined;
-
-  // payload: non-empty string (base64)
+  // payload: non-empty base64 string within MAX_ADMISSION_PAYLOAD_CHARS
   if (typeof obj['payload'] !== 'string' || !obj['payload']) return undefined;
+  if (payloadExceedsMaxLength(obj)) return undefined;
 
-  // keyId: optional string (required for iOS assertion)
   const kind = obj['kind'] as AdmissionKind;
   const platform = obj['platform'] as AdmissionPlatform;
   const keyId = obj['keyId'];
@@ -127,62 +201,49 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   };
 }
 
-// ── Admission gate (sync) ──────────────────────────────────────────────────
+// ── Admission gate ─────────────────────────────────────────────────────────
 
 /**
- * Evaluate admission for a native auth request body.
- *
- * Mode behaviour:
- * - 'off':      admit everything.
- * - 'report':   evaluate and log, always admit.
- * - 'enforce':  validate admission. Absent field = legacy admit + count.
- *               Present invalid = refuse. Provider fault = 5xx via throw.
- *
- * Returns whether async verification is needed ('report' and 'enforce' modes
- * with a valid admission payload).
+ * The proof a native request must carry. Token issuance is attested-device
+ * only: a missing or malformed `admission` field is refused, never admitted.
+ * There is no legacy, report, or disabled mode — the only exception is the
+ * non-production sentinel below, which no production request can reach.
  */
-export function checkNativeAdmission(body: Record<string, unknown>): {
-  admission: NativeAdmissionResult;
-  /** True when async crypto verification is needed (enforce or report). */
-  verifyAsync: boolean;
-} {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
+export function requireAdmissionPayload(
+  body: Record<string, unknown>
+): AdmissionPayload | undefined {
+  // Roll the telemetry window on any native auth request, so the final window
+  // of a sparse traffic pattern still flushes.
+  rollAdmissionWindowIfNeeded(Date.now());
 
-  // off mode (or unset) always admits with no async verification
-  if (!mode || mode === 'off') {
-    return { admission: { ok: true }, verifyAsync: false };
+  const raw = body['admission'];
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    payloadExceedsMaxLength(raw as Record<string, unknown>)
+  ) {
+    // A payload longer than the contract accepts is aggregated as
+    // native_admission_oversized.
+    countAdmissionCondition('native_admission_oversized');
   }
 
-  const hasAdmission = 'admission' in body && body['admission'] !== undefined;
-
-  if (!hasAdmission) {
-    if (mode === 'enforce') {
-      captureMessage('native_admission_legacy_count: 1');
-    }
-    return { admission: { ok: true }, verifyAsync: false };
-  }
-
-  // Validate the admission payload shape synchronously.
-  const admission = validateAdmissionPayload(body['admission']);
-  if (!admission) {
-    if (mode === 'report') {
-      captureMessage('native_admission_invalid_shape');
-      return { admission: { ok: true }, verifyAsync: false };
-    }
-    return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };
-  }
-
-  // Valid payload — async verification needed for enforce and report modes.
-  return { admission: { ok: true }, verifyAsync: mode === 'enforce' || mode === 'report' };
+  return validateAdmissionPayload(raw);
 }
 
 /**
- * Whether to refuse admission when the async verify fails.
- * Only true under enforce mode; report mode evaluates but always admits.
+ * Proof a non-production device sends when it cannot attest at all (simulator,
+ * emulator without Play Services). Accepted only when the process is not
+ * production and `NATIVE_ADMISSION_DEV_SENTINEL` is `true`; the branch skips
+ * the platform verifier and persists no key.
  */
-export function shouldRefuseAsyncFailure(): boolean {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
-  return mode === 'enforce';
+export const DEV_SENTINEL_PAYLOAD = 'native-admission-dev-sentinel';
+
+function isDevSentinel(admission: AdmissionPayload): boolean {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    getEnvVariable('NATIVE_ADMISSION_DEV_SENTINEL') === 'true' &&
+    admission.payload === DEV_SENTINEL_PAYLOAD
+  );
 }
 
 // ── Async attestation / assertion verification ─────────────────────────────
@@ -191,7 +252,7 @@ export function shouldRefuseAsyncFailure(): boolean {
  * Perform full async admission verification BEFORE user settlement.
  *
  * Must be called before createOrUpdateUser in the token route so that:
- * - Failed admission under enforce never leaves a settled user.
+ * - Failed admission never leaves a settled user.
  * - Keys are written after the user id exists (via the token route after
  *   successful settlement).
  *
@@ -204,13 +265,19 @@ export type VerifyAdmissionOk = {
   ok: true;
   /** Platform that verified */
   platform: AdmissionPlatform;
-  /** The keyId for the attested/asserted key */
-  keyId: string;
+  /**
+   * The keyId for the attested/asserted key. Absent when the platform has no
+   * persistent key to track, which means the caller persists nothing.
+   */
+  keyId?: string;
   /** DER-encoded SPKI public key (base64) — set on attestation only */
   publicKey?: string;
   /** Sign count from the assertion authenticator data — set on assertion only */
   signCount?: number;
-  /** The userId that owns this key (from DB row) — set on assertion only */
+  /**
+   * The userId that owns this key (from DB row) — set when the key id is already
+   * bound to an account (attestation or assertion)
+   */
   existingKeyUserId?: string;
 };
 
@@ -233,6 +300,12 @@ export async function verifyAdmissionAsync(
 
   if (!consumed) {
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+  }
+
+  if (isDevSentinel(admission)) {
+    // Android shape on purpose: no key id means nothing is persisted and the
+    // device session is created without an attested-key binding.
+    return { ok: true, platform: 'android' };
   }
 
   // Route to platform-specific verifier
@@ -297,7 +370,6 @@ async function verifyAppleAdmission(
   // (we return the existing user id for that check)
 
   const assertionResult = await verifyAppleAssertion(
-    keyId,
     appAttestClientDataHash(challenge),
     payload,
     existingKey.public_key
@@ -368,12 +440,8 @@ async function verifyAndroidAdmission(
   }
 
   // Android Play Integrity tokens are per-request — no persistent key
-  // tracking. We return an empty keyId so the caller skips persistence.
-  return {
-    ok: true,
-    platform: 'android',
-    keyId: '',
-  };
+  // tracking. The result carries no key id, so the caller persists nothing.
+  return { ok: true, platform: 'android' };
 }
 
 // ── Key persistence (after settlement) ─────────────────────────────────────
@@ -387,20 +455,29 @@ async function verifyAndroidAdmission(
  *
  * Cross-user collision: if the keyId already exists for a different user,
  * refuses the insert/update.
+ *
+ * `executor` defaults to `db`. Pass a transaction when key persistence must be
+ * atomic with device session creation.
  */
 export async function persistAttestedKey(
   userId: string,
-  verification: VerifyAdmissionOk
+  verification: VerifyAdmissionOk,
+  executor: typeof db | DrizzleTransaction = db
 ): Promise<void> {
   // Android has no persistent key tracking — skip.
   if (verification.platform === 'android') return;
 
+  // A result without a key id has nothing to persist. Every verifier that
+  // reaches here carries one.
+  const { keyId } = verification;
+  if (keyId === undefined) return;
+
   if (verification.publicKey !== undefined) {
     // Attestation: insert new key
-    await db
+    await executor
       .insert(native_attested_keys)
       .values({
-        key_id: verification.keyId,
+        key_id: keyId,
         kilo_user_id: userId,
         platform: verification.platform,
         public_key: verification.publicKey,
@@ -410,9 +487,9 @@ export async function persistAttestedKey(
       .onConflictDoNothing();
 
     // Verify the inserted key belongs to this user (cross-user collision check)
-    const inserted = await db.query.native_attested_keys.findFirst({
+    const inserted = await executor.query.native_attested_keys.findFirst({
       where: and(
-        eq(native_attested_keys.key_id, verification.keyId),
+        eq(native_attested_keys.key_id, keyId),
         eq(native_attested_keys.platform, verification.platform)
       ),
     });
@@ -427,14 +504,14 @@ export async function persistAttestedKey(
     // assertion cannot regress a newer count. The ownership predicate is
     // preserved.
     const now = new Date().toISOString();
-    await db
+    await executor
       .update(native_attested_keys)
       .set({
         last_used_at: now,
       })
       .where(
         and(
-          eq(native_attested_keys.key_id, verification.keyId),
+          eq(native_attested_keys.key_id, keyId),
           eq(native_attested_keys.platform, verification.platform),
           eq(native_attested_keys.kilo_user_id, userId)
         )
@@ -446,67 +523,6 @@ export class KeyCollisionError extends Error {
   constructor() {
     super('Attested key already belongs to a different user');
     this.name = 'KeyCollisionError';
-  }
-}
-
-/**
- * Persist an attested key within an existing Drizzle transaction.
- *
- * Same semantics as `persistAttestedKey` but uses the supplied transaction
- * instead of the default `db` instance. Used when key persistence must be
- * atomic with device session creation.
- */
-export async function persistAttestedKeyTx(
-  tx: DrizzleTransaction,
-  userId: string,
-  verification: VerifyAdmissionOk
-): Promise<void> {
-  if (verification.platform === 'android') return;
-
-  if (verification.publicKey !== undefined) {
-    // Attestation: insert new key
-    await tx
-      .insert(native_attested_keys)
-      .values({
-        key_id: verification.keyId,
-        kilo_user_id: userId,
-        platform: verification.platform,
-        public_key: verification.publicKey,
-        sign_count: 0,
-        attested_at: new Date().toISOString(),
-      })
-      .onConflictDoNothing();
-
-    // Verify the inserted key belongs to this user (cross-user collision check)
-    const inserted = await tx.query.native_attested_keys.findFirst({
-      where: and(
-        eq(native_attested_keys.key_id, verification.keyId),
-        eq(native_attested_keys.platform, verification.platform)
-      ),
-    });
-
-    if (!inserted || inserted.kilo_user_id !== userId) {
-      captureMessage('native_attested_key_cross_user_collision');
-      throw new KeyCollisionError();
-    }
-  } else if (verification.signCount !== undefined) {
-    // Assertion: refresh last_used_at only. The sign count was already bumped
-    // atomically during verification; never rewrite it here so a stale
-    // assertion cannot regress a newer count. The ownership predicate is
-    // preserved.
-    const now = new Date().toISOString();
-    await tx
-      .update(native_attested_keys)
-      .set({
-        last_used_at: now,
-      })
-      .where(
-        and(
-          eq(native_attested_keys.key_id, verification.keyId),
-          eq(native_attested_keys.platform, verification.platform),
-          eq(native_attested_keys.kilo_user_id, userId)
-        )
-      );
   }
 }
 

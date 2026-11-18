@@ -1,0 +1,549 @@
+import { describe, expect, it } from 'vitest';
+import { CONTROL_PLANE_TIMERS } from '../../shared/control-plane-timers.js';
+import {
+  CREATE_ATTEMPT_LIMIT,
+  initialAllocationState,
+  nextAllocationAlarmAt,
+  reduceAllocation,
+  type AllocationState,
+} from './allocation.js';
+
+const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
+const MAX_ATTEMPTS = TIMERS.providerStopLadderMs.length + 1;
+
+/** A socket lost after activity, with the two deadlines pinned for a case. */
+function disconnectedState(lastActivityAt: number, lastFrameAt: number): AllocationState {
+  return {
+    ...initialAllocationState(),
+    kind: 'disconnected',
+    allocationId: 'alloc-1',
+    providerRef: 'ref-1',
+    lastActivityAt,
+    lastFrameAt,
+  };
+}
+
+/** The last allowed stop attempt; one more retryable result exhausts the ladder. */
+function stoppingState(): AllocationState {
+  return {
+    ...initialAllocationState(),
+    kind: 'stopping',
+    allocationId: 'alloc-1',
+    providerRef: 'ref-1',
+    stopAttempt: MAX_ATTEMPTS,
+    stopPending: false,
+    stopAt: 0,
+  };
+}
+
+describe('allocation stop-ladder exhaustion', () => {
+  it('keeps the provider ref when a retryable result exhausts the ladder', () => {
+    const state = stoppingState();
+    const { state: next } = reduceAllocation(
+      state,
+      {
+        type: 'stop-result',
+        at: 0,
+        allocationId: 'alloc-1',
+        stopAttempt: MAX_ATTEMPTS,
+        confirmed: false,
+      },
+      TIMERS
+    );
+    expect(next.kind).toBe('stopped');
+    expect(next.providerRef).toBeNull();
+    expect(next.unconfirmedProviderRef).toBe('ref-1');
+  });
+
+  it('keeps the provider ref when the backstop supersedes the last attempt', () => {
+    const state = stoppingState();
+    const { state: next } = reduceAllocation(
+      state,
+      { type: 'tick', at: 1, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(next.kind).toBe('stopped');
+    expect(next.providerRef).toBeNull();
+    expect(next.unconfirmedProviderRef).toBe('ref-1');
+  });
+
+  it('does not keep the ref for a confirmed stop', () => {
+    const state = stoppingState();
+    const { state: next } = reduceAllocation(
+      state,
+      {
+        type: 'stop-result',
+        at: 0,
+        allocationId: 'alloc-1',
+        stopAttempt: MAX_ATTEMPTS,
+        confirmed: true,
+      },
+      TIMERS
+    );
+    expect(next).toEqual(initialAllocationState());
+    expect(next.unconfirmedProviderRef).toBeNull();
+  });
+
+  it('clears the preserved ref once the provider reports gone', () => {
+    const stopped: AllocationState = {
+      ...initialAllocationState(),
+      unconfirmedProviderRef: 'ref-1',
+    };
+    const { state: next } = reduceAllocation(stopped, { type: 'provider-gone', at: 0 }, TIMERS);
+    expect(next.kind).toBe('stopped');
+    expect(next.unconfirmedProviderRef).toBeNull();
+  });
+});
+
+describe('allocation snapshot launch retry', () => {
+  const creating: AllocationState = {
+    ...initialAllocationState(),
+    kind: 'creating',
+    allocationId: 'alloc-1',
+    providerRef: 'ref-1',
+    createDeadlineAt: 300_000,
+    createAttempt: 1,
+  };
+
+  it('moves the create deadline to the retry bound', () => {
+    const reduction = reduceAllocation(
+      creating,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    expect(reduction.state).toEqual({ ...creating, createDeadlineAt: 610_000 });
+    expect(reduction.effects).toEqual([]);
+  });
+
+  it('keeps the retry from expiring at the first attempt deadline', () => {
+    const { state } = reduceAllocation(
+      creating,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    const tick = reduceAllocation(
+      state,
+      { type: 'tick', at: 320_000, nextAllocationId: 'alloc-2', retryAllowed: true },
+      TIMERS
+    );
+    expect(tick.state).toBe(state);
+    expect(tick.effects).toEqual([]);
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(610_000);
+  });
+
+  it.each([
+    ['another allocation', { ...creating, allocationId: 'alloc-2' }],
+    ['a connected allocation', { ...creating, kind: 'connected' as const }],
+  ])('ignores a retry for %s', (_name, state) => {
+    const reduction = reduceAllocation(
+      state,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    expect(reduction.state).toBe(state);
+  });
+});
+
+describe('allocation idle deadline while disconnected', () => {
+  it('stops on the idle deadline when it is the earlier deadline', () => {
+    // Activity at 0, so the idle deadline is 10 min. The socket closed at 9 min
+    // (1 min before it), so the reconnect wait would not end until 14 min. The
+    // idle deadline governs.
+    const state = disconnectedState(0, TIMERS.idleMs - 60_000);
+    const reduction = reduceAllocation(
+      state,
+      { type: 'tick', at: TIMERS.idleMs, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(reduction.state.kind).toBe('stopping');
+    expect(reduction.stopReason).toBe('sandbox_stopped');
+    expect(reduction.effects).toEqual([{ type: 'stop', stopAttempt: 1 }]);
+  });
+
+  it('waits for the reconnect deadline when it is the earlier deadline', () => {
+    // Activity at 0, socket closed at 0, reconnect at 90 s, idle at 10 min.
+    const state = disconnectedState(0, 0);
+    const early = reduceAllocation(
+      state,
+      {
+        type: 'tick',
+        at: TIMERS.reconnectMs - 1,
+        nextAllocationId: 'alloc-2',
+        retryAllowed: false,
+      },
+      TIMERS
+    );
+    expect(early.state.kind).toBe('disconnected');
+    const due = reduceAllocation(
+      state,
+      {
+        type: 'tick',
+        at: TIMERS.reconnectMs,
+        nextAllocationId: 'alloc-2',
+        retryAllowed: false,
+      },
+      TIMERS
+    );
+    expect(due.state.kind).toBe('stopping');
+    expect(due.stopReason).toBe('connection_lost');
+  });
+
+  it('arms the alarm at the earlier of the idle and reconnect deadlines', () => {
+    // Socket closed at 9 min: idle (10 min) is earlier than reconnect (10.5 min).
+    expect(nextAllocationAlarmAt(disconnectedState(0, TIMERS.idleMs - 60_000), TIMERS)).toBe(
+      TIMERS.idleMs
+    );
+    // Socket closed at 0: reconnect (90 s) is earlier than idle (10 min).
+    expect(nextAllocationAlarmAt(disconnectedState(0, 0), TIMERS)).toBe(TIMERS.reconnectMs);
+  });
+});
+
+describe('allocation recovery after delivery', () => {
+  it('keeps the reconnect window when delivery advances activity past the last frame', () => {
+    const state = disconnectedState(1_000, 0);
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(TIMERS.reconnectMs);
+    const early = reduceAllocation(
+      state,
+      { type: 'tick', at: 61_000, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(early.state.kind).toBe('disconnected');
+    const due = reduceAllocation(
+      state,
+      { type: 'tick', at: TIMERS.reconnectMs, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(due.stopReason).toBe('connection_lost');
+  });
+
+  it('preserves the activity clock and heartbeat deadline after a late reconnect', () => {
+    const reconnectAt = 70_000;
+    const connected = reduceAllocation(
+      disconnectedState(1_000, 0),
+      {
+        type: 'hello-accepted',
+        at: reconnectAt,
+        allocationId: 'alloc-1',
+        connectionId: 'conn-2',
+        wrapperId: 'wr-2',
+      },
+      TIMERS
+    ).state;
+    expect(connected.kind).toBe('connected');
+    expect(connected.lastActivityAt).toBe(1_000);
+    expect(nextAllocationAlarmAt(connected, TIMERS)).toBe(reconnectAt + TIMERS.heartbeatMs);
+    const reduction = reduceAllocation(
+      connected,
+      { type: 'tick', at: reconnectAt, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(reduction.state.kind).toBe('connected');
+  });
+
+  it.each(['wr-1', 'wr-2'])(
+    'does not reset activity or extend the idle window when %s reconnects',
+    wrapperId => {
+      const lastActivityAt = 1_000;
+      const idleDeadlineAt = lastActivityAt + TIMERS.idleMs;
+      const reconnectAt = idleDeadlineAt - 10_000;
+      const reconnected = reduceAllocation(
+        {
+          ...disconnectedState(lastActivityAt, reconnectAt - 5_000),
+          connectionId: 'conn-1',
+          wrapperId: 'wr-1',
+        },
+        {
+          type: 'hello-accepted',
+          at: reconnectAt,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-2',
+          wrapperId,
+        },
+        TIMERS
+      );
+      expect(reconnected.state.kind).toBe('connected');
+      expect(reconnected.state.lastFrameAt).toBe(reconnectAt);
+      expect(reconnected.state.lastActivityAt).toBe(lastActivityAt);
+      expect(reconnected.effects).toEqual([]);
+      expect(nextAllocationAlarmAt(reconnected.state, TIMERS)).toBe(idleDeadlineAt);
+
+      const heartbeat = reduceAllocation(
+        reconnected.state,
+        {
+          type: 'heartbeat',
+          at: idleDeadlineAt - 1,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-2',
+          active: false,
+        },
+        TIMERS
+      );
+      expect(heartbeat.state.lastFrameAt).toBe(idleDeadlineAt - 1);
+      expect(heartbeat.state.lastActivityAt).toBe(lastActivityAt);
+      expect(heartbeat.effects).toEqual([]);
+      expect(nextAllocationAlarmAt(heartbeat.state, TIMERS)).toBe(idleDeadlineAt);
+
+      const early = reduceAllocation(
+        heartbeat.state,
+        {
+          type: 'tick',
+          at: idleDeadlineAt - 1,
+          nextAllocationId: 'alloc-2',
+          retryAllowed: false,
+        },
+        TIMERS
+      );
+      expect(early.state.kind).toBe('connected');
+      expect(early.effects).toEqual([]);
+
+      const due = reduceAllocation(
+        heartbeat.state,
+        { type: 'tick', at: idleDeadlineAt, nextAllocationId: 'alloc-2', retryAllowed: false },
+        TIMERS
+      );
+      expect(due.state.kind).toBe('stopping');
+      expect(due.stopReason).toBe('sandbox_stopped');
+      expect(due.effects).toEqual([{ type: 'stop', stopAttempt: 1 }]);
+    }
+  );
+});
+
+describe('allocation create retry', () => {
+  const CREATE_FAILED_AT = TIMERS.providerCreateMs;
+
+  function creatingState(): AllocationState {
+    return {
+      ...initialAllocationState(),
+      kind: 'creating',
+      allocationId: 'alloc-1',
+      createDeadlineAt: CREATE_FAILED_AT,
+      createAttempt: 1,
+    };
+  }
+
+  function failCreate(retryAllowed: boolean) {
+    return reduceAllocation(
+      creatingState(),
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT,
+        allocationId: 'alloc-1',
+        nextAllocationId: 'alloc-2',
+        retryAllowed,
+      },
+      TIMERS
+    );
+  }
+
+  it('retries a failed create after the short pause, not a full create deadline', () => {
+    const { state: waiting, effects } = failCreate(true);
+    expect(effects).toEqual([]);
+    expect(waiting.kind).toBe('creating');
+    expect(waiting.allocationId).toBe('alloc-2');
+    expect(waiting.providerRef).toBeNull();
+    const retryAt = CREATE_FAILED_AT + TIMERS.providerCreateRetryMs;
+    expect(nextAllocationAlarmAt(waiting, TIMERS)).toBe(retryAt);
+
+    const early = reduceAllocation(
+      waiting,
+      { type: 'tick', at: retryAt - 1, nextAllocationId: 'alloc-3', retryAllowed: true },
+      TIMERS
+    );
+    expect(early.state).toEqual(waiting);
+    expect(early.effects).toEqual([]);
+
+    const due = reduceAllocation(
+      waiting,
+      { type: 'tick', at: retryAt, nextAllocationId: 'alloc-3', retryAllowed: true },
+      TIMERS
+    );
+    expect(due.effects).toEqual([{ type: 'create', allocationId: 'alloc-3' }]);
+    expect(due.state.createDeadlineAt).toBe(retryAt + TIMERS.providerCreateMs);
+  });
+
+  it('does not wait beyond an admission deadline during the create retry pause', () => {
+    const retryDeadlineAt = CREATE_FAILED_AT + 5_000;
+    const { state } = reduceAllocation(
+      creatingState(),
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT,
+        allocationId: 'alloc-1',
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+        retryDeadlineAt,
+      },
+      TIMERS
+    );
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(retryDeadlineAt);
+  });
+
+  it('stops instead of retrying when no route attempt time remains', () => {
+    const { state, effects } = failCreate(false);
+    expect(state).toEqual(initialAllocationState());
+    expect(effects).toEqual([]);
+  });
+
+  it('retries exactly once inside the attempt budget', () => {
+    // Attempt 1 fails: the budget allows the one retry.
+    const first = failCreate(true);
+    expect(first.state.createAttempt).toBe(1);
+    expect(first.routeFailure).toBeUndefined();
+
+    // The retry (attempt 2) fails: the budget is spent, so the routes are told
+    // now instead of waiting out the attempt deadline.
+    const retrying: AllocationState = {
+      ...first.state,
+      allocationId: 'alloc-2',
+      createAttempt: 2,
+      createDeadlineAt: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+    };
+    const second = reduceAllocation(
+      retrying,
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+        allocationId: 'alloc-2',
+        nextAllocationId: 'alloc-3',
+        retryAllowed: true,
+      },
+      TIMERS
+    );
+    expect(second.state).toEqual(initialAllocationState());
+    expect(second.routeFailure).toBe('sandbox_create_failed');
+
+    // A deadline tick after the budget is spent does not start a third create
+    // either, even before the failed create is dispatched.
+    const third = reduceAllocation(
+      retrying,
+      {
+        type: 'tick',
+        at: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+        nextAllocationId: 'alloc-3',
+        retryAllowed: true,
+      },
+      TIMERS
+    );
+    expect(third.state).toEqual(initialAllocationState());
+    expect(third.routeFailure).toBe('sandbox_create_failed');
+  });
+
+  it('reports the route failure only while the routes still had attempt time', () => {
+    const state = { ...creatingState(), createAttempt: CREATE_ATTEMPT_LIMIT };
+    const expired = reduceAllocation(
+      state,
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT,
+        allocationId: 'alloc-1',
+        nextAllocationId: 'alloc-2',
+        retryAllowed: false,
+      },
+      TIMERS
+    );
+    expect(expired.state).toEqual(initialAllocationState());
+    expect(expired.routeFailure).toBeUndefined();
+
+    const tickExpired = reduceAllocation(
+      state,
+      { type: 'tick', at: CREATE_FAILED_AT, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(tickExpired.state).toEqual(initialAllocationState());
+    expect(tickExpired.routeFailure).toBeUndefined();
+  });
+
+  it('denies a third create even before its result could arrive', () => {
+    // The budget's second create is in flight (attempt 2, retry pause over).
+    const retrying: AllocationState = {
+      ...creatingState(),
+      allocationId: 'alloc-2',
+      createAttempt: 2,
+      createDeadlineAt: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+    };
+    // The budget denies the third create and ends the episode without waiting
+    // for the in-flight result.
+    const due = reduceAllocation(
+      retrying,
+      {
+        type: 'tick',
+        at: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+        nextAllocationId: 'alloc-3',
+        retryAllowed: true,
+      },
+      TIMERS
+    );
+    expect(due.effects).toEqual([]);
+    expect(due.state.kind).toBe('stopped');
+    expect(due.routeFailure).toBe('sandbox_create_failed');
+  });
+});
+
+describe('allocation socket close origin', () => {
+  function connectedState(): AllocationState {
+    return {
+      ...initialAllocationState(),
+      kind: 'connected',
+      allocationId: 'alloc-1',
+      connectionId: 'conn-1',
+      providerRef: 'ref-1',
+      wrapperId: 'wr-1',
+      lastFrameAt: 0,
+    };
+  }
+
+  it.each(['peer', 'heartbeat_timeout'] as const)(
+    'reduces a %s close to the same disconnected state without storing the origin',
+    origin => {
+      const { state, effects } = reduceAllocation(
+        connectedState(),
+        {
+          type: 'socket-closed',
+          at: 123,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-1',
+          origin,
+        },
+        TIMERS
+      );
+      expect(state).toEqual({ ...connectedState(), kind: 'disconnected' });
+      expect(effects).toEqual([]);
+      expect('origin' in state).toBe(false);
+      for (const event of [
+        {
+          type: 'heartbeat',
+          at: 124,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-1',
+          active: true,
+        },
+        {
+          type: 'socket-closed',
+          at: 124,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-1',
+          origin,
+        },
+      ] as const) {
+        expect(reduceAllocation(state, event, TIMERS)).toEqual({ state, effects: [] });
+      }
+    }
+  );
+
+  it('ignores a close from a superseded connection regardless of origin', () => {
+    const state = connectedState();
+    const { state: next, effects } = reduceAllocation(
+      state,
+      {
+        type: 'socket-closed',
+        at: 123,
+        allocationId: 'alloc-1',
+        connectionId: 'conn-other',
+        origin: 'peer',
+      },
+      TIMERS
+    );
+    expect(next).toBe(state);
+    expect(effects).toEqual([]);
+  });
+});

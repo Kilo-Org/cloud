@@ -1,0 +1,276 @@
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+
+import { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
+
+const originalCa = process.env.DATABASE_CA;
+const originalEnv = {
+  NODE_ENV: process.env.NODE_ENV,
+  JEST_WORKER_ID: process.env.JEST_WORKER_ID,
+  POSTGRES_URL: process.env.POSTGRES_URL,
+  POSTGRES_URL_PRODUCTION: process.env.POSTGRES_URL_PRODUCTION,
+  USE_PRODUCTION_DB: process.env.USE_PRODUCTION_DB,
+};
+
+function withEnv(name: string, value: string | undefined): void {
+  // Next augments several process.env keys as readonly, so assignment through
+  // Reflect keeps the restore path type-safe.
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, name);
+  } else {
+    Reflect.set(process.env, name, value);
+  }
+}
+
+afterEach(() => {
+  if (originalCa === undefined) {
+    delete process.env.DATABASE_CA;
+  } else {
+    process.env.DATABASE_CA = originalCa;
+  }
+  withEnv('NODE_ENV', originalEnv.NODE_ENV);
+  withEnv('JEST_WORKER_ID', originalEnv.JEST_WORKER_ID);
+  withEnv('POSTGRES_URL', originalEnv.POSTGRES_URL);
+  withEnv('POSTGRES_URL_PRODUCTION', originalEnv.POSTGRES_URL_PRODUCTION);
+  withEnv('USE_PRODUCTION_DB', originalEnv.USE_PRODUCTION_DB);
+});
+
+describe('computeDatabaseUrl', () => {
+  beforeEach(() => {
+    withEnv('NODE_ENV', 'development');
+    withEnv('USE_PRODUCTION_DB', undefined);
+    withEnv('POSTGRES_URL_PRODUCTION', undefined);
+  });
+
+  it('appends the jest worker id to the database name, not the query string', () => {
+    withEnv('NODE_ENV', 'test');
+    withEnv('JEST_WORKER_ID', '3');
+    withEnv('POSTGRES_URL', 'postgres://user:secret@db.example.com:5432/mydb?sslmode=require');
+
+    expect(computeDatabaseUrl()).toBe(
+      'postgres://user:secret@db.example.com:5432/mydb-3?sslmode=require'
+    );
+  });
+
+  it('returns the configured URL untouched outside test runs', () => {
+    withEnv('NODE_ENV', 'development');
+    withEnv('POSTGRES_URL', 'postgres://user:secret@db.example.com:5432/mydb?sslmode=require');
+
+    expect(computeDatabaseUrl()).toBe(
+      'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+    );
+  });
+
+  it('uses POSTGRES_URL_PRODUCTION and ignores POSTGRES_URL in production mode', () => {
+    withEnv('USE_PRODUCTION_DB', 'true');
+    withEnv('POSTGRES_URL', 'postgres://dev:secret@db.example.com:5432/dev');
+    withEnv('POSTGRES_URL_PRODUCTION', 'postgres://prod:secret@prod.example.com:5432/prod');
+
+    expect(computeDatabaseUrl()).toBe('postgres://prod:secret@prod.example.com:5432/prod');
+  });
+
+  it('names POSTGRES_URL when the default mode has no URL', () => {
+    withEnv('POSTGRES_URL', undefined);
+
+    expect(() => computeDatabaseUrl()).toThrow('POSTGRES_URL not configured');
+  });
+
+  it('names POSTGRES_URL_PRODUCTION when production mode has no URL', () => {
+    withEnv('USE_PRODUCTION_DB', 'true');
+    withEnv('POSTGRES_URL', 'postgres://dev:secret@db.example.com:5432/dev');
+    withEnv('POSTGRES_URL_PRODUCTION', undefined);
+
+    expect(() => computeDatabaseUrl()).toThrow('POSTGRES_URL_PRODUCTION not configured');
+  });
+});
+
+describe('getDatabaseClientConfig', () => {
+  describe('ssl derivation without DATABASE_CA', () => {
+    beforeEach(() => {
+      delete process.env.DATABASE_CA;
+    });
+
+    it('keeps TLS off when the URL carries no sslmode', () => {
+      const config = getDatabaseClientConfig('postgres://user:secret@db.example.com:5432/mydb');
+
+      expect(config.ssl).toBe(false);
+    });
+
+    it('encrypts without a certificate check for sslmode=require', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('encrypts without a certificate check for sslmode=prefer', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=prefer'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('accepts sslmode=no-verify as an encrypted mode', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=no-verify'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('verifies the certificate against the system trust store for sslmode=verify-full', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=verify-full'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: true });
+    });
+
+    it('verifies the certificate for sslmode=verify-ca', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=verify-ca'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: true });
+    });
+
+    it('keeps TLS off for sslmode=disable', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=disable'
+      );
+
+      expect(config.ssl).toBe(false);
+    });
+
+    it('keeps TLS off for sslmode=allow because pg cannot negotiate an upgrade', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=allow'
+      );
+
+      expect(config.ssl).toBe(false);
+    });
+
+    it('accepts only the documented mode values', () => {
+      expect(() =>
+        getDatabaseClientConfig(
+          'postgres://user:secret@db.example.com:5432/mydb?sslmode=constructor'
+        )
+      ).toThrow(/Unsupported sslmode/);
+    });
+
+    it('matches sslmode values case-insensitively and trims whitespace', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=REQUIRE'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('rejects an unrecognized sslmode value', () => {
+      expect(() =>
+        getDatabaseClientConfig(
+          'postgres://user:secret@db.example.com:5432/mydb?sslmode=re escalat'
+        )
+      ).toThrow(/Unsupported sslmode/);
+    });
+
+    it('preserves credentials and host parts alongside the ssl decision', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'user',
+        password: 'secret',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'mydb',
+      });
+    });
+  });
+
+  describe('with percent-encoded credentials', () => {
+    beforeEach(() => {
+      delete process.env.DATABASE_CA;
+    });
+
+    it('decodes escaped characters in the user, password and database name', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://us%40er:p%40ss@db.example.com:5432/db%2Fname?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'us@er',
+        password: 'p@ss',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'db/name',
+      });
+    });
+
+    it('decodes escaped characters in the host', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://us%40er:p%40ss@db%2Eexample.com:5432/db%2Fname?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'us@er',
+        password: 'p@ss',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'db/name',
+      });
+    });
+
+    it('rejects a malformed escape instead of passing it through', () => {
+      expect(() =>
+        getDatabaseClientConfig('postgres://us%40er:p%zz@db.example.com:5432/mydb')
+      ).toThrow(URIError);
+    });
+  });
+
+  describe('with DATABASE_CA set', () => {
+    const pem = '-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----';
+
+    it('prefers the configured CA over any URL sslmode', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+      );
+
+      expect(config.ssl).toEqual({
+        ca: pem.replace(/\\n/g, '\n'),
+        rejectUnauthorized: true,
+        servername: 'db.example.com',
+      });
+    });
+
+    it('prefers the configured CA even when the URL disables TLS', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=disable'
+      );
+
+      expect(config.ssl).toMatchObject({ rejectUnauthorized: true });
+    });
+
+    it('uses the decoded host as the TLS servername', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig('postgres://user:secret@db%2Eexample.com:5432/mydb');
+
+      expect(config.ssl).toMatchObject({ servername: 'db.example.com' });
+    });
+
+    it('expands escaped newlines in the CA', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig('postgres://user:secret@db.example.com:5432/mydb');
+
+      expect(config.ssl).toMatchObject({ ca: pem.replace(/\\n/g, '\n') });
+    });
+  });
+});

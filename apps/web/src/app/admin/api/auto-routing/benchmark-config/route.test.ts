@@ -3,55 +3,23 @@ import type { User } from '@kilocode/db';
 import {
   getBenchmarkConfig,
   updateBenchmarkConfig,
-} from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { getUserFromAuth } from '@/lib/user/server';
-import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/reserved-ids';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type * as ModelsModule from '@/lib/ai-gateway/models';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkConfig: jest.fn(),
   updateBenchmarkConfig: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/experiments/reserved-ids', () => ({
-  findExperimentReservedModelIds: jest.fn(),
-}));
-
-// Stub the catalog so tests don't depend on any specific provider file.
-// 'test-exclusive/alibaba-only' maps to the alibaba gateway, which lacks Messages support.
-jest.mock('@/lib/ai-gateway/models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
-  const stubModel: KiloExclusiveModel = {
-    public_id: 'test-exclusive/alibaba-only',
-    display_name: 'Test Alibaba-only',
-    description: 'stub for unit tests',
-    context_length: 8192,
-    max_completion_tokens: 4096,
-    status: 'public',
-    flags: [],
-    gateway: 'alibaba',
-    internal_id: 'stub-internal',
-    pricing: null,
-    inference_provider_restriction: [],
-  };
-  return {
-    ...actual,
-    findKiloExclusiveModel: (id: string) =>
-      id === 'test-exclusive/alibaba-only' ? stubModel : actual.findKiloExclusiveModel(id),
-  };
-});
-
-import { PUT } from './route';
+import { GET, PUT } from './route';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockGetBenchmarkConfig = jest.mocked(getBenchmarkConfig);
 const mockUpdateBenchmarkConfig = jest.mocked(updateBenchmarkConfig);
-const mockFindExperimentReservedModelIds = jest.mocked(findExperimentReservedModelIds);
 
 // Test-fixture boundary: only the fields the route actually reads.
 function adminUserFixture(): User {
@@ -67,23 +35,31 @@ function putRequest(body: unknown) {
 }
 
 const validConfig = {
+  router: 'efficient' as const,
+  accuracyNoiseBand: 0.05,
   classifierModels: ['google/gemini-2.5-flash-lite'],
-  deciderModels: [{ id: 'openai/gpt-5-mini', reasoningEffort: null }],
+  deciderModels: [{ id: 'openai/gpt-5-mini' }],
   minAccuracy: 0.7,
-  switchCostFactor: 3,
-  bestAccuracySwitchThreshold: 0.05,
-  maxConcurrency: 4,
-  userMaxConcurrency: 100,
+  productionTokenProfile: null,
+  switchHorizonTurns: null,
   benchmarkUserId: null,
   benchmarkOrgId: null,
-  classifierRepetitions: 1,
-  deciderRepetitions: 1,
-  classifierMaxP95LatencyMs: 1000,
-  autoDeciderMinCostUsd: 15,
-  autoDeciderMaxCostUsd: 25,
   updatedAt: null,
   updatedBy: null,
 };
+
+// Fixed policy settings a previously deployed admin UI still sends. The
+// contract has no field for them, so a PUT body carrying them parses with the
+// keys stripped before the config is forwarded.
+const LEGACY_FIXED_POLICY_KEYS = [
+  'frontierMinAccuracyDelta',
+  'switchCostFactor',
+  'bestAccuracySwitchThreshold',
+  'lowConfidenceThreshold',
+  'classifierRepetitions',
+  'deciderRepetitions',
+  'classifierMaxP95LatencyMs',
+] as const;
 
 describe('PUT /admin/api/auto-routing/benchmark-config', () => {
   beforeEach(() => {
@@ -97,61 +73,68 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
       body: { config: validConfig },
     });
     mockGetBenchmarkConfig.mockResolvedValue({ status: 200, body: { config: null } });
-    mockFindExperimentReservedModelIds.mockResolvedValue([]);
   });
 
-  it('forwards a config whose decider models all serve every gateway chat API', async () => {
-    const response = await PUT(putRequest(validConfig));
+  it('defaults config reads to efficient', async () => {
+    await GET();
+    expect(mockGetBenchmarkConfig).toHaveBeenCalledWith('efficient');
+  });
+
+  it('forwards frontier config reads', async () => {
+    await GET(
+      new NextRequest(
+        'http://localhost:3000/admin/api/auto-routing/benchmark-config?router=frontier'
+      )
+    );
+    expect(mockGetBenchmarkConfig).toHaveBeenCalledWith('frontier');
+  });
+
+  it('rejects an unknown router before proxying', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/admin/api/auto-routing/benchmark-config?router=unknown'
+      )
+    );
+    expect(response.status).toBe(400);
+    expect(mockGetBenchmarkConfig).not.toHaveBeenCalled();
+  });
+
+  it('forwards frontier config updates and accuracy settings', async () => {
+    await PUT(
+      putRequest({
+        ...validConfig,
+        router: 'frontier',
+        accuracyNoiseBand: 0.02,
+      })
+    );
+    expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        router: 'frontier',
+        accuracyNoiseBand: 0.02,
+      }),
+      'admin@kilocode.ai'
+    );
+  });
+
+  it('strips the legacy fixed policy keys from a PUT body and still returns 200', async () => {
+    const response = await PUT(
+      putRequest({
+        ...validConfig,
+        frontierMinAccuracyDelta: 0,
+        switchCostFactor: 3,
+        bestAccuracySwitchThreshold: 0.05,
+        lowConfidenceThreshold: 0.8,
+        classifierRepetitions: 1,
+        deciderRepetitions: 1,
+        classifierMaxP95LatencyMs: 1000,
+      })
+    );
     expect(response.status).toBe(200);
-    expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(validConfig, 'admin@kilocode.ai');
-  });
-
-  it('rejects with 400 listing decider models not servable on all gateway chat APIs', async () => {
-    const response = await PUT(
-      putRequest({
-        ...validConfig,
-        deciderModels: [
-          { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: 'test-exclusive/alibaba-only', reasoningEffort: null },
-        ],
-      })
-    );
-
-    expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string };
-    expect(body.error).toContain('test-exclusive/alibaba-only');
-    expect(body.error).toContain('chat_completions');
-    expect(body.error).toContain('responses');
-    expect(body.error).not.toContain('openai/gpt-5-mini (');
-    expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();
-  });
-
-  it('rejects decider models reserved by a model experiment (any status)', async () => {
-    // Ownership is status-independent per .specs/model-experiments.md: a public
-    // id with a draft/active/paused/completed experiment is reserved for
-    // explicit user selection and must not enter kilo-auto candidate sets.
-    mockFindExperimentReservedModelIds.mockResolvedValue(['preview/experimental-model']);
-
-    const response = await PUT(
-      putRequest({
-        ...validConfig,
-        deciderModels: [
-          { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: 'preview/experimental-model', reasoningEffort: null },
-        ],
-      })
-    );
-
-    expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string };
-    expect(body.error).toContain('preview/experimental-model');
-    expect(body.error).toContain('model-experiment');
-    expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();
-    // The check runs against the decider model ids.
-    expect(mockFindExperimentReservedModelIds).toHaveBeenCalledWith([
-      'openai/gpt-5-mini',
-      'preview/experimental-model',
-    ]);
+    const forwarded = mockUpdateBenchmarkConfig.mock.calls[0]?.[0];
+    expect(forwarded).toMatchObject({ router: 'efficient', accuracyNoiseBand: 0.05 });
+    for (const key of LEGACY_FIXED_POLICY_KEYS) {
+      expect(forwarded).not.toHaveProperty(key);
+    }
   });
 
   it('rejects a schema-invalid config with 400', async () => {

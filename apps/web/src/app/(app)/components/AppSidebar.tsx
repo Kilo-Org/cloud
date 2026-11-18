@@ -9,25 +9,12 @@ import { useUser } from '@/hooks/useUser';
 import { useTRPC } from '@/lib/trpc/utils';
 import PersonalAppSidebar from './PersonalAppSidebar';
 import OrganizationAppSidebar from './OrganizationAppSidebar';
-import { GastownTownSidebar } from '@/components/gastown/GastownTownSidebar';
-import { WastelandSidebar } from '@/components/wasteland/WastelandSidebar';
+import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
 
 const UUID = '[0-9a-f-]{36}';
 
 // Routes linked from the footer user menu (see SidebarUserFooter). Keep in sync.
-const FOOTER_MENU_ROUTES = ['/connected-accounts', '/data-exports', '/install', '/learn'];
-
-/** Extract the townId from a /gastown/[townId] pathname, or null. */
-function extractGastownTownId(pathname: string): string | null {
-  const match = pathname.match(new RegExp(`^/gastown/(${UUID})`));
-  return match ? match[1] : null;
-}
-
-/** Extract {orgId, townId} from an /organizations/[id]/gastown/[townId] pathname, or null. */
-function extractOrgGastownTownId(pathname: string): { orgId: string; townId: string } | null {
-  const match = pathname.match(new RegExp(`^/organizations/(${UUID})/gastown/(${UUID})`));
-  return match ? { orgId: match[1], townId: match[2] } : null;
-}
+const FOOTER_MENU_ROUTES = ['/connected-accounts', '/data-exports'];
 
 function isKiloClawNewPath(pathname: string): boolean {
   return pathname === '/claw/new' || new RegExp(`^/organizations/${UUID}/claw/new$`).test(pathname);
@@ -35,18 +22,6 @@ function isKiloClawNewPath(pathname: string): boolean {
 
 function isOrganizationSetupStep(pathname: string, step: string | null): boolean {
   return new RegExp(`^/organizations/${UUID}/welcome$`).test(pathname) && step !== 'complete';
-}
-
-/** Extract the wastelandId from a /wasteland/[wastelandId] pathname, or null. */
-function extractWastelandId(pathname: string): string | null {
-  const match = pathname.match(new RegExp(`^/wasteland/(${UUID})`));
-  return match ? match[1] : null;
-}
-
-/** Extract {orgId, wastelandId} from an /organizations/[id]/wasteland/[wastelandId] pathname, or null. */
-function extractOrgWastelandId(pathname: string): { orgId: string; wastelandId: string } | null {
-  const match = pathname.match(new RegExp(`^/organizations/(${UUID})/wasteland/(${UUID})`));
-  return match ? { orgId: match[1], wastelandId: match[2] } : null;
 }
 
 export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
@@ -72,13 +47,10 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
       trpc: { context: { skipBatch: true } },
     })
   );
-  // Match the server-side default (oldest org) so the sidebar org is consistent
-  // with getProfileRedirectPath.
+  // Match the server-side default (sales demo org, then oldest org) so the
+  // sidebar org is consistent with getProfileRedirectPath.
   const defaultOrganizationId = organizations?.length
-    ? [...organizations].sort((a, b) => {
-        const byCreatedAt = a.created_at.localeCompare(b.created_at);
-        return byCreatedAt !== 0 ? byCreatedAt : a.organizationId.localeCompare(b.organizationId);
-      })[0].organizationId
+    ? [...organizations].sort(compareOrganizationsForDefault)[0].organizationId
     : null;
   const previousSidebarOpen = useRef<boolean | null>(null);
   const currentSidebarOpen = useRef(open);
@@ -107,46 +79,6 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
       previousSidebarOpen.current = null;
     }
   }, [pathname, setupStep]);
-
-  // Personal gastown town — show the town-specific sidebar
-  const gastownTownId = extractGastownTownId(pathname);
-  if (gastownTownId) {
-    return <GastownTownSidebar townId={gastownTownId} {...props} />;
-  }
-
-  // Org gastown town — show the same sidebar with org-prefixed paths
-  const orgGastown = extractOrgGastownTownId(pathname);
-  if (orgGastown) {
-    const orgBase = `/organizations/${orgGastown.orgId}`;
-    return (
-      <GastownTownSidebar
-        townId={orgGastown.townId}
-        basePath={`${orgBase}/gastown/${orgGastown.townId}`}
-        backHref={`${orgBase}/gastown`}
-        {...props}
-      />
-    );
-  }
-
-  // Personal wasteland — show the wasteland-specific sidebar
-  const wastelandId = extractWastelandId(pathname);
-  if (wastelandId) {
-    return <WastelandSidebar wastelandId={wastelandId} {...props} />;
-  }
-
-  // Org wasteland — show the same sidebar with org-prefixed paths
-  const orgWasteland = extractOrgWastelandId(pathname);
-  if (orgWasteland) {
-    const orgBase = `/organizations/${orgWasteland.orgId}`;
-    return (
-      <WastelandSidebar
-        wastelandId={orgWasteland.wastelandId}
-        basePath={`${orgBase}/wasteland/${orgWasteland.wastelandId}`}
-        backHref={`${orgBase}/wasteland`}
-        {...props}
-      />
-    );
-  }
 
   // Render organization sidebar if viewing an organization
   if (currentOrgId) {

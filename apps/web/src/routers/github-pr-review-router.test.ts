@@ -2,9 +2,11 @@
  * @jest-environment node
  */
 import { TRPCError } from '@trpc/server';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import { CHECKS_MAX_PAGES, CHECKS_PAGE_SIZE } from '@/lib/github-pr-review/dtos';
 import { INBOX_SEARCH_QUERY, prLedgerResourceKey } from './github-pr-review-router';
+import { FILE_READ_MAX_BYTES, FILE_READ_TOO_LARGE_MESSAGE } from '@/lib/github-pr-review/dtos';
 
 const getGitHubUserAccessToken = jest.fn();
 
@@ -14,7 +16,7 @@ jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({
 
 // P1-A-08c: the PR operation ledger. The router admits / settles /
 // marks-reconcile-pending through `@kilocode/db/operation-ledger`. Both it and
-// `@/lib/drizzle` are mocked so the ledger tests can assert admission, settle,
+// `@kilocode/web-shared/lib/drizzle` are mocked so the ledger tests can assert admission, settle,
 // replay, and reconcile orchestration without a database. The analytics
 // identity comes from `ctx.user`, which carries no email here, so it falls
 // back to the user id.
@@ -36,7 +38,7 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
 // tests that assert the missing-terms rejection override it to resolve [].
 const mockTermsLookup = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({
@@ -59,6 +61,8 @@ type OctokitMock = {
     createReview: jest.Mock;
     createReviewComment: jest.Mock;
     createReplyForReviewComment: jest.Mock;
+    updateReviewComment: jest.Mock;
+    deleteReviewComment: jest.Mock;
     getReviewComment: jest.Mock;
     getReview: jest.Mock;
     updateBranch: jest.Mock;
@@ -66,14 +70,23 @@ type OctokitMock = {
     get: jest.Mock;
   };
   git: { deleteRef: jest.Mock };
+  issues: {
+    createComment: jest.Mock;
+    getComment: jest.Mock;
+    updateComment: jest.Mock;
+    deleteComment: jest.Mock;
+  };
   repos: {
     get: jest.Mock;
+    getContent: jest.Mock;
     listCommitStatusesForRef: jest.Mock;
   };
   checks: {
     listForRef: jest.Mock;
   };
-  paginate: jest.Mock;
+  users: {
+    getAuthenticated: jest.Mock;
+  };
   request: jest.Mock;
 };
 
@@ -102,7 +115,14 @@ const tokenOctokits = new Map<string, OctokitMock>();
 function buildOctokit(token: string): OctokitMock {
   const existing = tokenOctokits.get(token);
   if (existing) return existing;
-  const checks = { listForRef: jest.fn() };
+  // listChecks reads each listing one page at a time. The defaults answer with
+  // a single short page and no Link header, so a leg stops after page 1.
+  const checks = {
+    listForRef: jest.fn(async () => ({
+      headers: {},
+      data: { total_count: checkRunsFixture.length, check_runs: checkRunsFixture },
+    })),
+  };
   const octokit: OctokitMock = {
     __token: token,
     pulls: {
@@ -110,6 +130,8 @@ function buildOctokit(token: string): OctokitMock {
       createReview: jest.fn(),
       createReviewComment: jest.fn(),
       createReplyForReviewComment: jest.fn(),
+      updateReviewComment: jest.fn(),
+      deleteReviewComment: jest.fn(),
       getReviewComment: jest.fn(),
       getReview: jest.fn(),
       updateBranch: jest.fn(),
@@ -117,16 +139,22 @@ function buildOctokit(token: string): OctokitMock {
       get: jest.fn(),
     },
     git: { deleteRef: jest.fn() },
+    issues: {
+      createComment: jest.fn(),
+      getComment: jest.fn(),
+      updateComment: jest.fn(),
+      deleteComment: jest.fn(),
+    },
     repos: {
       get: jest.fn(),
-      listCommitStatusesForRef: jest.fn(),
+      getContent: jest.fn(),
+      listCommitStatusesForRef: jest.fn(async () => ({
+        headers: {},
+        data: commitStatusesFixture,
+      })),
     },
     checks,
-    // listChecks calls paginate(checks.listForRef, …) then
-    // paginate(repos.listCommitStatusesForRef, …); dispatch on the method.
-    paginate: jest.fn(async (method: unknown) =>
-      method === checks.listForRef ? checkRunsFixture : commitStatusesFixture
-    ),
+    users: { getAuthenticated: jest.fn() },
     request: jest.fn(),
   };
   tokenOctokits.set(token, octokit);
@@ -494,6 +522,24 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
     await expect(
       caller.listFiles({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
     ).resolves.toMatchObject({ files: [] });
+  });
+
+  it('listFiles pages on when the REST response carries Link: rel="next"', async () => {
+    // GitHub's own pagination signal decides, so a first page holding fewer
+    // files than the page size still has a next cursor. The Files tab's
+    // partial-load row depends on that cursor.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').pulls.listFiles.mockResolvedValueOnce({
+      data: [{ filename: 'src/a.ts', status: 'modified', additions: 1, deletions: 0 }],
+      headers: {
+        link: '<https://api.github.com/repos/octocat/hello/pulls/1/files?per_page=50&page=2>; rel="next"',
+      },
+    });
+
+    await expect(
+      caller.listFiles({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
+    ).resolves.toMatchObject({ nextCursor: 2 });
   });
 
   it('listReviewThreads accepts direction: "forward"', async () => {
@@ -1038,6 +1084,22 @@ describe('githubPrReviewRouter.listInbox', () => {
     });
   }
 
+  it('answers a spent mobile budget retryably before asking GitHub', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1' } as User,
+      controlPlaneStartedAt: performance.now() - 9_900,
+    });
+    const octokit = buildOctokit('t1');
+
+    await expect(caller.listInbox({ direction: 'forward' })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Your review inbox took too long to load. Try again.',
+    });
+
+    expect(octokit.request).not.toHaveBeenCalled();
+    expect(getGitHubUserAccessToken).not.toHaveBeenCalled();
+  });
+
   it('maps search nodes to inbox items and returns nextCursor from pageInfo', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
@@ -1206,6 +1268,8 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
     mergeable: true,
     mergeable_state: 'clean',
     auto_merge: null,
+    created_at: '2026-03-01T12:00:00Z',
+    updated_at: '2026-03-02T09:30:00Z',
   };
 
   const overviewRepoData = {
@@ -1275,13 +1339,13 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
     await expect(resultPromise).resolves.toMatchObject({ number: 1, title: 'Fix the thing' });
   });
 
-  it('listChecks starts both paginate calls before either resolves', async () => {
+  it('listChecks starts both listing walks before either first page resolves', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const octokit = buildOctokit('t1');
 
     let resolveChecks!: (value: unknown) => void;
-    octokit.paginate.mockImplementationOnce(
+    octokit.checks.listForRef.mockImplementationOnce(
       () =>
         new Promise(resolve => {
           resolveChecks = resolve;
@@ -1290,9 +1354,16 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
 
     const resultPromise = caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
 
-    await waitFor(() => expect(octokit.paginate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(octokit.checks.listForRef).toHaveBeenCalledTimes(1));
 
-    resolveChecks(checkRunsFixture);
+    // The commit-status walk asked for its first page before the check-run
+    // page resolved.
+    expect(octokit.repos.listCommitStatusesForRef).toHaveBeenCalledTimes(1);
+
+    resolveChecks({
+      headers: {},
+      data: { total_count: checkRunsFixture.length, check_runs: checkRunsFixture },
+    });
 
     await expect(resultPromise).resolves.toMatchObject({
       rollup: { total: 2, success: 2, failure: 0, pending: 0, skipped: 0 },
@@ -1359,6 +1430,155 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
   });
 });
 
+describe('githubPrReviewRouter.listChecks page ceiling', () => {
+  function filledCheckRun(name: string) {
+    return {
+      name,
+      status: 'completed',
+      conclusion: 'success',
+      details_url: null,
+      html_url: null,
+      app: { name: 'CI' },
+    };
+  }
+
+  function nextPageHeader(page: number) {
+    return { link: `<https://api.github.com/...?page=${page + 1}>; rel="next"` };
+  }
+
+  function fullCheckRunsPage(page: number) {
+    return {
+      data: {
+        total_count: CHECKS_PAGE_SIZE,
+        check_runs: Array.from({ length: CHECKS_PAGE_SIZE }, (_, index) =>
+          filledCheckRun(`run-${page}-${index}`)
+        ),
+      },
+      headers: nextPageHeader(page),
+    };
+  }
+
+  function fullStatusesPage(page: number) {
+    return {
+      data: Array.from({ length: CHECKS_PAGE_SIZE }, (_, index) => ({
+        context: `context-${page}-${index}`,
+        state: 'success',
+        target_url: null,
+        updated_at: '2026-01-01T00:00:00Z',
+      })),
+      headers: nextPageHeader(page),
+    };
+  }
+
+  it('caps both listing walks and reports a partial result', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => {
+      expect(params.per_page).toBe(CHECKS_PAGE_SIZE);
+      return fullCheckRunsPage(params.page);
+    });
+    octokit.repos.listCommitStatusesForRef.mockImplementation(async params =>
+      fullStatusesPage(params.page)
+    );
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    expect(octokit.repos.listCommitStatusesForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    const expectedPages = Array.from({ length: CHECKS_MAX_PAGES }, (_, index) => index + 1);
+    expect(octokit.checks.listForRef.mock.calls.map(([params]) => params.page)).toEqual(
+      expectedPages
+    );
+    expect(result.truncated).toBe(true);
+    expect(result.checkRuns).toHaveLength(CHECKS_PAGE_SIZE * CHECKS_MAX_PAGES * 2);
+    expect(result.rollup.total).toBe(CHECKS_PAGE_SIZE * CHECKS_MAX_PAGES * 2);
+  });
+
+  it('keeps the frozen result shape for a ref under the ceiling', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => ({
+      data: {
+        total_count: 3,
+        check_runs: Array.from({ length: 3 }, (_, index) =>
+          filledCheckRun(`run-${params.page}-${index}`)
+        ),
+      },
+      // A short page with no next link: the listing ends here.
+      headers: {},
+    }));
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(1);
+    expect(result.truncated).toBeUndefined();
+    expect(Object.keys(result).sort()).toEqual(['checkRuns', 'rollup']);
+    expect(result.checkRuns).toHaveLength(4);
+  });
+
+  it('uses page length when the response has no next link', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => ({
+      data: {
+        total_count: CHECKS_PAGE_SIZE,
+        check_runs: Array.from({ length: CHECKS_PAGE_SIZE }, (_, index) =>
+          filledCheckRun(`run-${params.page}-${index}`)
+        ),
+      },
+      headers: {},
+    }));
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('continues after a short page that carries a next link', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => ({
+      data: {
+        total_count: 2,
+        check_runs: [filledCheckRun(`run-${params.page}`)],
+      },
+      headers: params.page === 1 ? nextPageHeader(params.page) : {},
+    }));
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef.mock.calls.map(([params]) => params.page)).toEqual([1, 2]);
+    expect(result.checkRuns).toHaveLength(3);
+    expect(result.truncated).toBeUndefined();
+  });
+
+  it('marks a partial result when the status listing reaches its page budget', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.repos.listCommitStatusesForRef.mockImplementation(async params =>
+      fullStatusesPage(params.page)
+    );
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(1);
+    expect(octokit.repos.listCommitStatusesForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    expect(result.truncated).toBe(true);
+    expect(result.rollup.total).toBe(1 + CHECKS_PAGE_SIZE * CHECKS_MAX_PAGES);
+  });
+});
+
 describe('githubPrReviewRouter mutations go through withGitHubUserTokenRetry', () => {
   it('rotates the credential and retries on a raw 401', async () => {
     getGitHubUserAccessToken
@@ -1415,6 +1635,307 @@ describe('githubPrReviewRouter mutations go through withGitHubUserTokenRetry', (
     ).rejects.toMatchObject({ code: 'CONFLICT' });
     // Only the initial fetch — no rotate, since the error was not 401.
     expect(getGitHubUserAccessToken).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('githubPrReviewRouter.updateComment / deleteComment', () => {
+  const updateCommentInput = {
+    owner: 'octocat',
+    repo: 'hello',
+    number: 1,
+    commentId: 77,
+    kind: 'review' as const,
+    body: 'edited',
+  };
+
+  /**
+   * Stubs the own-comment guard's two reads: the target comment's author and
+   * the credential's own viewer identity. `authorLogin` defaults to the viewer,
+   * so a test that wants the guard to refuse passes another login.
+   */
+  function mockCommentOwnership(
+    octokit: OctokitMock,
+    kind: 'review' | 'conversation',
+    options: { authorLogin?: string | null; viewerLogin?: string } = {}
+  ) {
+    const authorLogin = options.authorLogin === undefined ? 'octocat' : options.authorLogin;
+    const comment = {
+      data: { id: 77, node_id: 'N_77', user: authorLogin === null ? null : { login: authorLogin } },
+    };
+    if (kind === 'review') {
+      octokit.pulls.getReviewComment.mockResolvedValueOnce(comment);
+    } else {
+      octokit.issues.getComment.mockResolvedValueOnce(comment);
+    }
+    octokit.users.getAuthenticated.mockResolvedValueOnce({
+      data: { login: options.viewerLogin ?? 'octocat' },
+    });
+  }
+
+  it('updateComment kind review calls pulls.updateReviewComment with the REST field names', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review');
+    t1Octokit.pulls.updateReviewComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77', body: 'edited' },
+    });
+
+    const result = await caller.updateComment(updateCommentInput);
+
+    expect(result).toEqual({ commentId: 77, nodeId: 'N_77', body: 'edited' });
+    expect(t1Octokit.pulls.updateReviewComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+      body: 'edited',
+    });
+    expect(t1Octokit.issues.updateComment).not.toHaveBeenCalled();
+  });
+
+  it('updateComment kind conversation calls issues.updateComment', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation');
+    t1Octokit.issues.updateComment.mockResolvedValueOnce({
+      data: { id: 88, node_id: 'N_88', body: 'edited' },
+    });
+
+    const result = await caller.updateComment({ ...updateCommentInput, kind: 'conversation' });
+
+    expect(result).toEqual({ commentId: 88, nodeId: 'N_88', body: 'edited' });
+    expect(t1Octokit.issues.updateComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+      body: 'edited',
+    });
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('deleteComment kind review calls pulls.deleteReviewComment and reports deleted', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review');
+    t1Octokit.pulls.deleteReviewComment.mockResolvedValueOnce({ data: {} });
+
+    const result = await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'review',
+    });
+
+    expect(result).toEqual({ commentId: 77, deleted: true });
+    expect(t1Octokit.pulls.deleteReviewComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+    });
+    expect(t1Octokit.issues.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('deleteComment kind conversation calls issues.deleteComment', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation');
+    t1Octokit.issues.deleteComment.mockResolvedValueOnce({ data: {} });
+
+    const result = await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'conversation',
+    });
+
+    expect(result).toEqual({ commentId: 77, deleted: true });
+    expect(t1Octokit.issues.deleteComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+    });
+    expect(t1Octokit.pulls.deleteReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('maps a 403 from the provider to FORBIDDEN', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review');
+    t1Octokit.pulls.updateReviewComment.mockRejectedValueOnce({
+      status: 403,
+      message: 'Resource not accessible by integration',
+    });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('treats a 404 on delete as success when the PR is still reachable (idempotent delete)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    // The guard's comment read 404s as well (the comment is already gone).
+    // That is not an ownership verdict, so the idempotent-delete path decides.
+    t1Octokit.pulls.getReviewComment.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+    t1Octokit.users.getAuthenticated.mockResolvedValueOnce({ data: { login: 'octocat' } });
+    t1Octokit.pulls.deleteReviewComment.mockRejectedValueOnce({
+      status: 404,
+      message: 'Not Found',
+    });
+    // The 404 only proves the comment is gone once the PR read shows the repo
+    // is reachable — GitHub 404s a missing PR / missing App access the same way.
+    t1Octokit.pulls.get.mockResolvedValueOnce({ data: { id: 1 } });
+
+    const result = await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'review',
+    });
+
+    expect(result).toEqual({ commentId: 77, deleted: true });
+    expect(t1Octokit.pulls.get).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      pull_number: 1,
+    });
+  });
+
+  it('surfaces NOT_FOUND when the delete 404s and the PR is not reachable', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.getComment.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+    t1Octokit.users.getAuthenticated.mockResolvedValueOnce({ data: { login: 'octocat' } });
+    t1Octokit.issues.deleteComment.mockRejectedValueOnce({
+      status: 404,
+      message: 'Not Found',
+    });
+    // Same provider status for a missing PR / repo the App cannot see: that is
+    // a real failure, not an already-deleted comment.
+    t1Octokit.pulls.get.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+
+    await expect(
+      caller.deleteComment({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        commentId: 77,
+        kind: 'conversation',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('does not call the PR read when the delete succeeds', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation');
+    t1Octokit.issues.deleteComment.mockResolvedValueOnce({ data: {} });
+
+    await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'conversation',
+    });
+
+    expect(t1Octokit.pulls.get).not.toHaveBeenCalled();
+  });
+
+  // The "own comment" rule is enforced server-side, not only by the mobile
+  // row: a caller that skips the app must not write over another author's
+  // comment through a bare comment id.
+  it('refuses to edit another author’s comment and writes nothing', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review', { authorLogin: 'someone-else' });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'You can only edit or delete your own comments.',
+    });
+
+    expect(t1Octokit.users.getAuthenticated).toHaveBeenCalledTimes(1);
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete another author’s comment and writes nothing', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation', { authorLogin: 'someone-else' });
+
+    await expect(
+      caller.deleteComment({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        commentId: 77,
+        kind: 'conversation',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(t1Octokit.issues.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('accepts the viewer’s own comment when the login differs only in case', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review', { authorLogin: 'OctoCat' });
+    t1Octokit.pulls.updateReviewComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77', body: 'edited' },
+    });
+
+    await expect(caller.updateComment(updateCommentInput)).resolves.toEqual({
+      commentId: 77,
+      nodeId: 'N_77',
+      body: 'edited',
+    });
+  });
+
+  it('refuses a comment whose author account is gone', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review', { authorLogin: null });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('lets the edit proceed when the guard read 404s and surfaces the provider NOT_FOUND', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    // A missing comment is not an ownership verdict: the edit still runs and
+    // reports the provider 404, which the edit surface renders as terminal.
+    t1Octokit.pulls.getReviewComment.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+    t1Octokit.users.getAuthenticated.mockResolvedValueOnce({ data: { login: 'octocat' } });
+    t1Octokit.pulls.updateReviewComment.mockRejectedValueOnce({
+      status: 404,
+      message: 'Not Found',
+    });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    expect(t1Octokit.pulls.updateReviewComment).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1533,6 +2054,8 @@ const PR_LEDGER_SETTLE_FAILED_MESSAGE =
   'The action completed, but we could not record the result. Please try again.';
 const PR_LEDGER_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
+const PR_LEDGER_RESULT_UNREADABLE_MESSAGE =
+  'We could not read the recorded result of this action. Please try again.';
 
 function ledgerRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -1582,6 +2105,15 @@ const reviewResourceKey = prLedgerResourceKey('submit_review', {
   commitSha: '0'.repeat(40),
   comments: [{ path: 'src/foo.ts', line: 5, side: 'RIGHT', body: 'fix me' }],
 });
+
+const ledgerAddCommentInput = {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+  body: 'conversation comment body',
+  operationKey: 'key-add-comment-1',
+};
+const addCommentResourceKey = prLedgerResourceKey('add_pr_comment', ledgerAddCommentInput);
 
 // The stored `resource_key` is the dedupe identity for up to 30 days. Every
 // other ledger test builds both sides with `prLedgerResourceKey`, so a change
@@ -1692,6 +2224,101 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
         canonicalResult: { commentId: 9, nodeId: 'N_9' },
       })
     );
+  });
+
+  it('admits addIssueComment under domain pr, posts an issue comment, and settles completed', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: ledgerRow({ intent: 'add_pr_comment', resource_key: addCommentResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.createComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77' },
+    });
+
+    const result = await caller.addIssueComment(ledgerAddCommentInput);
+
+    expect(result).toEqual({ commentId: 77, nodeId: 'N_77' });
+    // A REGULAR PR conversation comment targets the issue endpoint, not the
+    // review-comment endpoints.
+    expect(t1Octokit.issues.createComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'octocat',
+        repo: 'hello',
+        issue_number: 1,
+        body: 'conversation comment body',
+      })
+    );
+    expect(mockAdmitOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'user-1',
+        domain: 'pr',
+        intent: 'add_pr_comment',
+        operationKey: 'key-add-comment-1',
+        resourceKey: addCommentResourceKey,
+        taxonomy: 'reconcile-first',
+        leaseSeconds: 120,
+      })
+    );
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: { commentId: 77, nodeId: 'N_77' },
+      })
+    );
+    // The comment body never enters the outbox event (enum-only properties).
+    const settleCall = mockSettleOperation.mock.calls[0][1] as {
+      outboxEvent: { eventName: string; properties: Record<string, unknown> };
+    };
+    expect(settleCall.outboxEvent.eventName).toBe('pr_operation_settled');
+    expect(settleCall.outboxEvent.properties).toEqual(
+      expect.objectContaining({
+        intent: 'add_pr_comment',
+        outcome: 'completed',
+      })
+    );
+    expect(JSON.stringify(settleCall.outboxEvent.properties)).not.toContain(
+      'conversation comment body'
+    );
+  });
+
+  it('replays the canonical addIssueComment result on a same-key retry with a single GitHub write', async () => {
+    // Two submissions under one operationKey = one GitHub write: the retry is
+    // served from the ledger's canonical result, not by posting again.
+    getGitHubUserAccessToken.mockResolvedValue(connected('t1', 'auth_1', 1));
+    mockAdmitOperation
+      .mockResolvedValueOnce({
+        admission: 'admitted',
+        row: ledgerRow({ intent: 'add_pr_comment', resource_key: addCommentResourceKey }),
+      })
+      .mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          intent: 'add_pr_comment',
+          resource_key: addCommentResourceKey,
+          status: 'completed',
+          canonical_result: { commentId: 77, nodeId: 'N_77' },
+        }),
+      });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.createComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77' },
+    });
+
+    const first = await caller.addIssueComment(ledgerAddCommentInput);
+    const second = await caller.addIssueComment(ledgerAddCommentInput);
+
+    expect(first).toEqual({ commentId: 77, nodeId: 'N_77' });
+    expect(second).toEqual({ commentId: 77, nodeId: 'N_77', replayed: true });
+    expect(t1Octokit.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
   });
 
   it('admits and settles submitReview and keeps free text out of the canonical result', async () => {
@@ -1807,6 +2434,29 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 
+  it('surfaces an unreadable canonical result instead of replaying a partial success', async () => {
+    // A settled row whose stored result lacks the intent's fields cannot be
+    // replayed: returning the loose spread would tell the client the comment
+    // was posted with an id it never received.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        status: 'completed',
+        canonical_result: { nodeId: 'N_7' },
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_RESULT_UNREADABLE_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
   it('rejects a replayed settled-failed row as a non-retryable fresh-intent signal', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     mockAdmitOperation.mockResolvedValueOnce({
@@ -1830,6 +2480,21 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
       admission: 'duplicate_settled',
       row: ledgerRow({ intent: 'merge', resource_key: mergeResourceKey }),
     });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('refuses an admission stored in another organization scope (no effect, no replay)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'organization_mismatch' });
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
 
@@ -2467,5 +3132,150 @@ describe('githubPrReviewRouter UGC terms gate', () => {
     });
     expect(mockAdmitOperation).not.toHaveBeenCalled();
     expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects addIssueComment with PRECONDITION_FAILED terms_required before any ledger row or GitHub write', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockTermsLookup.mockResolvedValueOnce([]);
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.addIssueComment(ledgerAddCommentInput)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'terms_required',
+    });
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
+    expect(t1Octokit.issues.createComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects updateComment with PRECONDITION_FAILED terms_required before any GitHub write', async () => {
+    // An edit publishes new text, so it goes through the same UGC gate as the
+    // comment-creating mutations.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockTermsLookup.mockResolvedValueOnce([]);
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(
+      caller.updateComment({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        commentId: 77,
+        kind: 'review',
+        body: 'edited',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'terms_required',
+    });
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+    expect(t1Octokit.issues.updateComment).not.toHaveBeenCalled();
+  });
+});
+
+describe('githubPrReviewRouter.getFileLines', () => {
+  const fileLinesInput = {
+    owner: 'octocat',
+    repo: 'hello',
+    ref: 'feature/x',
+    path: 'src/app.ts',
+    startLine: 2,
+    endLine: 3,
+  };
+
+  function connectedCaller() {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    return createCaller({ user: { id: 'user-1' } as User });
+  }
+
+  it('serves the window from the inline body of one contents request', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    const body = 'one\ntwo\nthree\nfour';
+    octokit.repos.getContent.mockResolvedValueOnce({
+      data: {
+        type: 'file',
+        size: Buffer.byteLength(body),
+        sha: 'blob-sha',
+        encoding: 'base64',
+        content: Buffer.from(body, 'utf8').toString('base64'),
+      },
+    });
+
+    const result = await caller.getFileLines(fileLinesInput);
+
+    expect(result).toEqual({ lines: ['two', 'three'], totalLines: 4 });
+    expect(octokit.repos.getContent).toHaveBeenCalledTimes(1);
+    expect(octokit.repos.getContent).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      path: 'src/app.ts',
+      ref: 'feature/x',
+    });
+  });
+
+  it('reads the raw body when the metadata leaves it out', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent
+      .mockResolvedValueOnce({
+        data: { type: 'file', size: 17, sha: 'blob-sha', encoding: 'none', content: '' },
+      })
+      .mockResolvedValueOnce({ data: 'one\ntwo\nthree\nfour' });
+
+    const result = await caller.getFileLines(fileLinesInput);
+
+    expect(result).toEqual({ lines: ['two', 'three'], totalLines: 4 });
+    // The metadata `sha` is the blob id, not a commit-ish the contents
+    // endpoint accepts as `ref`, so both reads use the caller's ref.
+    expect(octokit.repos.getContent).toHaveBeenNthCalledWith(2, {
+      owner: 'octocat',
+      repo: 'hello',
+      path: 'src/app.ts',
+      ref: 'feature/x',
+      mediaType: { format: 'raw' },
+    });
+  });
+
+  it('rejects a file above the read budget before the raw download', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent.mockResolvedValueOnce({
+      data: { type: 'file', size: FILE_READ_MAX_BYTES + 1, sha: 'blob-sha', encoding: 'none' },
+    });
+
+    await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: FILE_READ_TOO_LARGE_MESSAGE,
+    });
+    expect(octokit.repos.getContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the budget to the delivered body when the metadata under-reports its size', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent
+      .mockResolvedValueOnce({ data: { type: 'file', size: 4, sha: 'blob-sha', encoding: 'none' } })
+      .mockResolvedValueOnce({ data: 'x'.repeat(FILE_READ_MAX_BYTES + 1) });
+
+    await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: FILE_READ_TOO_LARGE_MESSAGE,
+    });
+  });
+
+  it('keeps a directory answer a BAD_REQUEST not-a-file without a raw download', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent.mockResolvedValueOnce({
+      data: [{ type: 'file', path: 'src/app.ts' }],
+    });
+
+    await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Requested path is not a file',
+    });
+    expect(octokit.repos.getContent).toHaveBeenCalledTimes(1);
   });
 });

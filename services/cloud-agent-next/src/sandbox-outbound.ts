@@ -1,780 +1,109 @@
-import { Buffer } from 'node:buffer';
-import { ContainerProxy } from '@cloudflare/sandbox';
-import { logger } from './logger.js';
-import { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
-import type { GitTokenService } from './types.js';
-import { MeteredSandbox } from './container-usage.js';
-import type { SandboxClassName } from './container-usage-context.js';
+import { z } from 'zod';
 import {
-  cloudAgentSessionScopeHeaders,
-  cloudAgentSessionScopeProtocolVersion,
-} from '@kilocode/session-ingest-contracts';
+  isControlPlaneCredential,
+  parseControlPlaneCredential,
+} from './sandbox-control/managed-credential.js';
+import { withDORetry } from './utils/do-retry.js';
+import {
+  classifyScmAuthorization,
+  type ResolvedScmCapability,
+} from './scm-broker/authorization.js';
+import { getSafeRequestLogFields, logDiagnostic } from './scm-broker/diagnostics.js';
+import { forwardResolvedScmCapability } from './scm-broker/managed-forwarding.js';
+import { CURRENT_CAPABILITY_PREFIX } from '@kilocode/worker-utils/scm-capability-contract';
 
 export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
-const GITHUB_CAPABILITY_PREFIXES = ['kgh1.', 'kgh2.'];
-const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
-const KILO_CAPABILITY_PREFIXES = ['kka1.'];
-const BITBUCKET_CAPABILITY_PREFIXES = ['kbb1.'];
-const MAX_KILO_SESSION_BOOTSTRAP_BYTES = 16_000;
+const resolvedControlCredentialSchema = z.object({ credential: z.string().min(1) }).strict();
 
-type GitHubTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitHubSessionCapability'>;
-type GitLabTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitLabSessionCapability'>;
-type KiloTokenRedemptionBinding = Pick<GitTokenService, 'redeemKiloSessionCapability'>;
-type BitbucketTokenRedemptionBinding = {
-  redeemBitbucketSessionCapability: NonNullable<
-    GitTokenService['redeemBitbucketSessionCapability']
-  >;
+type ControlCredentialResolutionBinding = {
+  resolveCredential(input: {
+    credential: string;
+    outboundContainerId: string;
+    url: string;
+    method: string;
+  }): Promise<unknown>;
 };
+
 type ManagedScmOutboundContext = { containerId: string };
-type RedeemableAuthorization = {
-  provider: 'github' | 'gitlab' | 'kilo' | 'bitbucket';
-  capability: string;
-};
-type AuthorizationExtraction =
-  | { type: 'none' }
-  | { type: 'capability'; value: RedeemableAuthorization }
-  | { type: 'unsupported_capability' };
 
-const NO_AUTHORIZATION_CAPABILITY = { type: 'none' } satisfies AuthorizationExtraction;
-
-type ScmClient = 'github-cli' | 'gitlab-cli' | 'git-lfs' | 'git' | 'other';
-type ScmMethod = 'GET' | 'HEAD' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' | 'OPTIONS' | 'other';
-type ScmTarget = 'github-api' | 'github-git' | 'gitlab' | 'bitbucket' | 'other';
-type AuthorizationClass =
-  | 'github-managed'
-  | 'gitlab-managed'
-  | 'bitbucket-managed'
-  | 'unsupported-managed'
-  | 'mixed'
-  | 'unmanaged'
-  | 'none';
-type DiagnosticLevel = 'debug' | 'info' | 'warn';
-type LocalKiloUrlDiagnosticsEnvironment = { LOG_REJECTED_KILO_URLS?: string };
-
-function isLocalKiloUrlDiagnosticsEnabled(
-  env: Cloudflare.Env & LocalKiloUrlDiagnosticsEnvironment
-): boolean {
-  return env.LOG_REJECTED_KILO_URLS === '1';
-}
-
-function logDiagnostic(
-  level: DiagnosticLevel,
-  fields: Record<string, string | number | boolean | null | undefined>,
-  message: string
-): void {
-  try {
-    const scopedLogger = logger.withFields(fields);
-    scopedLogger[level](message);
-  } catch {
-    // Diagnostics must never change outbound request behavior.
-  }
-}
-
-function classifyScmClient(userAgent: string | null): ScmClient {
-  const normalized = userAgent?.toLowerCase() ?? '';
-  if (normalized.includes('github cli') || normalized.startsWith('gh/')) return 'github-cli';
-  if (normalized.includes('glab')) return 'gitlab-cli';
-  if (normalized.includes('git-lfs')) return 'git-lfs';
-  if (normalized.includes('git/')) return 'git';
-  return 'other';
-}
-
-function classifyScmMethod(method: string): ScmMethod {
-  const normalized = method.toUpperCase();
-  if (
-    normalized === 'GET' ||
-    normalized === 'HEAD' ||
-    normalized === 'POST' ||
-    normalized === 'PATCH' ||
-    normalized === 'PUT' ||
-    normalized === 'DELETE' ||
-    normalized === 'OPTIONS'
-  ) {
-    return normalized;
-  }
-  return 'other';
-}
-
-function classifyScmTarget(url: URL): ScmTarget {
-  if (url.hostname === 'api.github.com') return 'github-api';
-  if (url.hostname === 'github.com') return 'github-git';
-  if (url.hostname === 'gitlab.com') return 'gitlab';
-  if (url.hostname === 'bitbucket.org') return 'bitbucket';
-  return 'other';
-}
-
-function classifyScmRoute(url: URL, target: ScmTarget): string {
-  if (target === 'github-api') {
-    if (url.pathname === '/graphql') return 'graphql';
-    if (url.pathname === '/user') return 'user';
-    if (url.pathname.startsWith('/repos/')) return 'repository-api';
-    return 'github-api-other';
-  }
-  if (target === 'github-git') {
-    if (url.pathname.includes('/info/lfs/')) return 'git-lfs';
-    if (url.pathname.endsWith('/info/refs')) return 'git-info-refs';
-    if (url.pathname.endsWith('/git-upload-pack')) return 'git-upload-pack';
-    if (url.pathname.endsWith('/git-receive-pack')) return 'git-receive-pack';
-    return 'github-git-other';
-  }
-  if (target === 'gitlab') return 'gitlab';
-  if (target === 'bitbucket') return 'bitbucket';
-  return 'other';
-}
-
-function getSafeRequestLogFields(request: Request) {
-  const url = new URL(request.url);
-  const target = classifyScmTarget(url);
-  return {
-    client: classifyScmClient(request.headers.get('User-Agent')),
-    method: classifyScmMethod(request.method),
-    target,
-    route: classifyScmRoute(url, target),
-  };
-}
-
-function getCapabilityVersion(capability: string): string {
-  const separator = capability.indexOf('.');
-  return separator === -1 ? 'unknown' : capability.slice(0, separator);
-}
-
-function isKiloSessionBootstrapRequest(request: Request): boolean {
-  if (request.method.toUpperCase() !== 'POST') return false;
-  try {
-    return new URL(request.url).pathname.endsWith('/api/session');
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Reads a clone of the request body, stopping as soon as it exceeds maxBytes
- * so an unbounded (or under-declared) body is never fully buffered.
- */
-async function readBoundedRequestBody(
-  request: Request,
-  maxBytes: number
-): Promise<string | undefined> {
-  const body: ReadableStream<Uint8Array> | null = request.clone().body;
-  if (!body) return undefined;
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) return undefined;
-      chunks.push(value);
-    }
-  } finally {
-    reader.cancel().catch(() => {});
-  }
-  const buffer = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(buffer);
-}
-
-async function getKiloSessionBootstrapId(request: Request): Promise<string | undefined> {
-  if (!isKiloSessionBootstrapRequest(request)) return undefined;
-  const contentType = request.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase();
-  if (contentType !== 'application/json') return undefined;
-
-  const contentLength = request.headers.get('Content-Length');
-  if (
-    contentLength &&
-    (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > MAX_KILO_SESSION_BOOTSTRAP_BYTES)
-  ) {
-    return undefined;
-  }
-
-  try {
-    const body = await readBoundedRequestBody(request, MAX_KILO_SESSION_BOOTSTRAP_BYTES);
-    if (body === undefined) {
-      return undefined;
-    }
-    const parsed: unknown = JSON.parse(body);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      !Array.isArray(parsed) &&
-      'sessionId' in parsed &&
-      typeof parsed.sessionId === 'string' &&
-      parsed.sessionId.length > 0
-    ) {
-      return parsed.sessionId;
-    }
-  } catch {
-    // The broker rejects a bootstrap route without a matching session identity.
-  }
-  return undefined;
-}
-
-function classifyDiagnosticError(error: unknown): 'error' | 'unknown' {
-  return error instanceof Error ? 'error' : 'unknown';
-}
-
-/** Query strings can carry credentials — even local diagnostics log only origin + path. */
-function redactUrlQuery(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    return 'invalid-url';
-  }
-}
-
-function supportsGitHubSessionCapabilityRedemption(
+function supportsControlCredentialResolution(
   service: unknown
-): service is GitHubTokenRedemptionBinding {
+): service is ControlCredentialResolutionBinding {
   return (
     typeof service === 'object' &&
     service !== null &&
-    'redeemGitHubSessionCapability' in service &&
-    typeof service.redeemGitHubSessionCapability === 'function'
+    'resolveCredential' in service &&
+    typeof service.resolveCredential === 'function'
   );
 }
 
-function supportsGitLabSessionCapabilityRedemption(
-  service: unknown
-): service is GitLabTokenRedemptionBinding {
-  return (
-    typeof service === 'object' &&
-    service !== null &&
-    'redeemGitLabSessionCapability' in service &&
-    typeof service.redeemGitLabSessionCapability === 'function'
-  );
+function sanitizedCredentialResolutionError(error: unknown): Error {
+  return Object.assign(new Error('Control-plane authorization unavailable'), {
+    retryable: error instanceof Error && 'retryable' in error && error.retryable === true,
+  });
 }
 
-function supportsKiloSessionCapabilityRedemption(
-  service: unknown
-): service is KiloTokenRedemptionBinding {
-  return (
-    typeof service === 'object' &&
-    service !== null &&
-    'redeemKiloSessionCapability' in service &&
-    typeof service.redeemKiloSessionCapability === 'function'
-  );
-}
-
-function supportsBitbucketSessionCapabilityRedemption(
-  service: unknown
-): service is BitbucketTokenRedemptionBinding {
-  return (
-    typeof service === 'object' &&
-    service !== null &&
-    'redeemBitbucketSessionCapability' in service &&
-    typeof service.redeemBitbucketSessionCapability === 'function'
-  );
-}
-
-function classifyCapability(capability: string): AuthorizationExtraction {
-  if (GITHUB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
-    return { type: 'capability', value: { provider: 'github', capability } };
-  }
-  if (GITLAB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
-    return { type: 'capability', value: { provider: 'gitlab', capability } };
-  }
-  if (KILO_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
-    return { type: 'capability', value: { provider: 'kilo', capability } };
-  }
-  if (BITBUCKET_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
-    return { type: 'capability', value: { provider: 'bitbucket', capability } };
-  }
-  return /^(?:kgh|kgl|kka|kbb)\d+\./.test(capability)
-    ? { type: 'unsupported_capability' }
-    : NO_AUTHORIZATION_CAPABILITY;
-}
-
-function extractGitCapability(authorization: string | null): AuthorizationExtraction {
-  if (!authorization) return NO_AUTHORIZATION_CAPABILITY;
-  const match = /^Basic[ \t]+(.+)$/i.exec(authorization);
-  if (!match) return NO_AUTHORIZATION_CAPABILITY;
-  const encodedCredential = match[1];
-  if (!encodedCredential) return NO_AUTHORIZATION_CAPABILITY;
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encodedCredential)) return NO_AUTHORIZATION_CAPABILITY;
-  const decodedCredential = Buffer.from(encodedCredential, 'base64');
-  if (decodedCredential.toString('base64') !== encodedCredential)
-    return NO_AUTHORIZATION_CAPABILITY;
-  const credential = decodedCredential.toString('utf8');
-  const separator = credential.indexOf(':');
-  if (separator === -1) return NO_AUTHORIZATION_CAPABILITY;
-  const username = credential.slice(0, separator);
-  const extraction = classifyCapability(credential.slice(separator + 1));
-  if (extraction.type !== 'capability') return extraction;
-  if (username === 'x-access-token' && extraction.value.provider === 'github') {
-    return extraction;
-  }
-  if (username === 'oauth2' && extraction.value.provider === 'gitlab') {
-    return extraction;
-  }
-  if (username === 'x-token-auth' && extraction.value.provider === 'bitbucket') {
-    return extraction;
-  }
-  return { type: 'unsupported_capability' };
-}
-
-function extractApiCapability(authorization: string | null): AuthorizationExtraction {
-  if (!authorization) return NO_AUTHORIZATION_CAPABILITY;
-  const match = /^(token|Bearer)[ \t]+(.+)$/i.exec(authorization);
-  if (!match?.[2]) return NO_AUTHORIZATION_CAPABILITY;
-  const extraction = classifyCapability(match[2]);
-  if (extraction.type !== 'capability') return extraction;
-  if (extraction.value.provider === 'gitlab' && match[1]?.toLowerCase() !== 'bearer') {
-    return { type: 'unsupported_capability' };
-  }
-  return extraction;
-}
-
-function extractGitLabPrivateTokenCapability(privateToken: string | null): AuthorizationExtraction {
-  if (!privateToken) return NO_AUTHORIZATION_CAPABILITY;
-  const extraction = classifyCapability(privateToken.trim());
-  if (extraction.type !== 'capability') return extraction;
-  return extraction.value.provider === 'gitlab' ? extraction : { type: 'unsupported_capability' };
-}
-
-function getAuthorizationClass(
-  extractions: AuthorizationExtraction[],
-  hasUnmanagedAuthorization: boolean
-): AuthorizationClass {
-  if (extractions.some(extraction => extraction.type === 'unsupported_capability')) {
-    return 'unsupported-managed';
-  }
-  const capabilities = extractions.flatMap(extraction =>
-    extraction.type === 'capability' ? [extraction.value] : []
-  );
-  const capability = capabilities[0];
-  if (!capability) return hasUnmanagedAuthorization ? 'unmanaged' : 'none';
-  if (
-    hasUnmanagedAuthorization ||
-    capabilities.some(
-      candidate =>
-        candidate.provider !== capability.provider || candidate.capability !== capability.capability
-    )
-  ) {
-    return 'mixed';
-  }
-  return capability.provider === 'github'
-    ? 'github-managed'
-    : capability.provider === 'bitbucket'
-      ? 'bitbucket-managed'
-      : 'gitlab-managed';
-}
-
-async function forwardRedeemedRequest(
-  request: Request,
-  headersToApply: Record<string, string | undefined>,
-  removeGitLabPrivateToken = false,
-  headersToRemove: readonly string[] = []
-): Promise<Response> {
-  const headers = new Headers(request.headers);
-  headers.delete('Authorization');
-  if (removeGitLabPrivateToken) headers.delete('PRIVATE-TOKEN');
-  for (const name of headersToRemove) headers.delete(name);
-  for (const [name, value] of Object.entries(headersToApply)) {
-    if (value !== undefined) headers.set(name, value);
-  }
-  return fetch(
-    new Request(request, {
-      headers,
-      redirect: 'manual',
-    })
-  );
-}
-
-function getCloudAgentSessionScopeInternalUrl(requestUrl: string): URL | null {
-  const url = new URL(requestUrl);
-  if (url.pathname.endsWith('/api/session')) {
-    url.pathname = '/internal/cloud-agent/v1/session';
-    return url;
-  }
-  if (/\/api\/session\/[^/]+\/ingest$/.test(url.pathname)) {
-    const sessionId = url.pathname.split('/').at(-2);
-    if (!sessionId) return null;
-    url.pathname = `/internal/cloud-agent/v1/session/${encodeURIComponent(sessionId)}/ingest`;
-    return url;
-  }
-  return null;
-}
-
-async function forwardCloudAgentSessionScopeRequest(
+async function handleControlPlaneOutbound(
   request: Request,
   env: Cloudflare.Env,
-  result: {
-    authorization: string;
-    sessionIngestScope: { cloudAgentSessionId: string; rootKiloSessionId: string };
-  }
+  capability: ResolvedScmCapability,
+  ctx: ManagedScmOutboundContext
 ): Promise<Response> {
-  const url = getCloudAgentSessionScopeInternalUrl(request.url);
-  if (!url) throw new Error('Unsupported Cloud Agent session scope route');
-
-  const internalSecret = await env.INTERNAL_API_SECRET_PROD.get();
-  if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
-
-  const headers = new Headers(request.headers);
-  headers.delete('Authorization');
-  headers.delete('X-Internal-Secret');
-  for (const headerName of [...headers.keys()]) {
-    if (headerName.toLowerCase().startsWith('x-kilo-')) headers.delete(headerName);
-  }
-  headers.set('Authorization', result.authorization);
-  headers.set('X-Internal-Secret', internalSecret);
-  headers.set(
-    cloudAgentSessionScopeHeaders.cloudAgentSessionId,
-    result.sessionIngestScope.cloudAgentSessionId
-  );
-  headers.set(
-    cloudAgentSessionScopeHeaders.rootKiloSessionId,
-    result.sessionIngestScope.rootKiloSessionId
-  );
-  headers.set(cloudAgentSessionScopeHeaders.protocolVersion, cloudAgentSessionScopeProtocolVersion);
-
-  const internalRequest = new Request(url, request);
-  return env.SESSION_INGEST.fetch(
-    new Request(internalRequest, {
-      headers,
-      redirect: 'manual',
-    })
-  );
-}
-
-async function handleManagedGitHubOutbound(
-  request: Request,
-  env: Cloudflare.Env,
-  capability: { capability: string },
-  outboundContainerId: string
-): Promise<Response> {
-  const logFields = {
-    ...getSafeRequestLogFields(request),
-    provider: 'github',
-    capabilityVersion: getCapabilityVersion(capability.capability),
-    outboundContainerId,
-  };
-  logDiagnostic('debug', logFields, 'Redeeming managed GitHub outbound request');
-
-  const tokenService = env.GIT_TOKEN_SERVICE;
-  if (!supportsGitHubSessionCapabilityRedemption(tokenService)) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-binding' },
-      'Managed GitHub outbound redemption unavailable'
-    );
-    return new Response('GitHub authorization unavailable', { status: 502 });
+  const parsed = parseControlPlaneCredential(capability.capability);
+  const namespace = env.SANDBOX_CONTROL;
+  if (!parsed || !namespace) {
+    return new Response('SCM authorization unavailable', { status: 502 });
   }
 
-  let result: Awaited<ReturnType<GitHubTokenRedemptionBinding['redeemGitHubSessionCapability']>>;
   try {
-    result = await tokenService.redeemGitHubSessionCapability({
-      capability: capability.capability,
-      outboundContainerId,
-      requestMethod: request.method,
-      requestUrl: request.url,
-    });
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      {
-        ...logFields,
-        failureStage: 'redemption-rpc',
-        errorClass: classifyDiagnosticError(error),
-      },
-      'Managed GitHub outbound redemption failed'
-    );
-    return new Response('GitHub authorization unavailable', { status: 502 });
-  }
-
-  if (!result.success) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
-      'Managed GitHub outbound redemption rejected'
-    );
-    return new Response('GitHub authorization unavailable', { status: 502 });
-  }
-
-  let response: Response;
-  try {
-    response = await forwardRedeemedRequest(request, { authorization: result.authorization });
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      {
-        ...logFields,
-        failureStage: 'upstream-forward',
-        errorClass: classifyDiagnosticError(error),
-      },
-      'Managed GitHub outbound forwarding failed'
-    );
-    return new Response('GitHub authorization unavailable', { status: 502 });
-  }
-
-  logDiagnostic(
-    'info',
-    { ...logFields, upstreamStatus: response.status },
-    'Managed GitHub outbound request forwarded'
-  );
-  return response;
-}
-
-async function handleManagedKiloOutbound(
-  request: Request,
-  env: Cloudflare.Env,
-  capability: { capability: string },
-  outboundContainerId: string
-): Promise<Response> {
-  const logFields = {
-    ...getSafeRequestLogFields(request),
-    provider: 'kilo',
-    capabilityVersion: getCapabilityVersion(capability.capability),
-    outboundContainerId,
-  };
-  logDiagnostic('debug', logFields, 'Redeeming managed Kilo outbound request');
-
-  const tokenService = env.GIT_TOKEN_SERVICE;
-  if (!supportsKiloSessionCapabilityRedemption(tokenService)) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-binding' },
-      'Managed Kilo outbound redemption unavailable'
-    );
-    return new Response('Kilo authorization unavailable', { status: 502 });
-  }
-
-  let result: Awaited<ReturnType<KiloTokenRedemptionBinding['redeemKiloSessionCapability']>>;
-  try {
-    const bootstrapKiloSessionId = await getKiloSessionBootstrapId(request);
-    result = await tokenService.redeemKiloSessionCapability({
-      capability: capability.capability,
-      outboundContainerId,
-      requestMethod: request.method,
-      requestUrl: request.url,
-      bootstrapKiloSessionId,
-      sessionIngestProxyVersion: 1,
-    });
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      {
-        ...logFields,
-        failureStage: 'redemption-rpc',
-        errorClass: classifyDiagnosticError(error),
-      },
-      'Managed Kilo outbound redemption failed'
-    );
-    return new Response('Kilo authorization unavailable', { status: 502 });
-  }
-
-  if (!result.success) {
-    if (isLocalKiloUrlDiagnosticsEnabled(env)) {
-      logDiagnostic(
-        'debug',
-        {
-          ...logFields,
-          failureStage: 'redemption-policy',
-          reason: result.reason,
-          rejectedRequestUrl: redactUrlQuery(request.url),
+    const resolved = resolvedControlCredentialSchema.safeParse(
+      await withDORetry(
+        () => {
+          try {
+            return namespace.getByName(parsed.sandboxId);
+          } catch (error) {
+            throw sanitizedCredentialResolutionError(error);
+          }
         },
-        'Managed Kilo outbound redemption rejected with local URL diagnostics'
-      );
+        async stub => {
+          try {
+            if (!supportsControlCredentialResolution(stub)) return null;
+            return await stub.resolveCredential({
+              credential: capability.capability,
+              outboundContainerId: ctx.containerId,
+              url: request.url,
+              method: request.method,
+            });
+          } catch (error) {
+            throw sanitizedCredentialResolutionError(error);
+          }
+        },
+        'resolveControlPlaneCredential'
+      )
+    );
+    if (!resolved.success) {
+      return new Response('SCM authorization unavailable', { status: 502 });
     }
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
-      'Managed Kilo outbound redemption rejected'
+    const { credential } = resolved.data;
+    const expectedPrefix = CURRENT_CAPABILITY_PREFIX[capability.provider];
+    if (
+      !credential.startsWith(expectedPrefix) ||
+      credential.length === expectedPrefix.length ||
+      /\s/.test(credential)
+    ) {
+      return new Response('SCM authorization unavailable', { status: 502 });
+    }
+
+    return await forwardResolvedScmCapability(
+      request,
+      env.GIT_TOKEN_SERVICE,
+      { provider: capability.provider, capability: credential },
+      ctx.containerId
     );
-    return new Response('Kilo authorization unavailable', { status: 502 });
+  } catch {
+    return new Response('SCM authorization unavailable', { status: 502 });
   }
-
-  let response: Response;
-  try {
-    response = result.sessionIngestScope
-      ? await forwardCloudAgentSessionScopeRequest(request, env, {
-          authorization: result.authorization,
-          sessionIngestScope: result.sessionIngestScope,
-        })
-      : await forwardRedeemedRequest(request, { authorization: result.authorization }, false, [
-          'X-Internal-Secret',
-          ...Object.values(cloudAgentSessionScopeHeaders),
-        ]);
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      {
-        ...logFields,
-        failureStage: 'upstream-forward',
-        errorClass: classifyDiagnosticError(error),
-      },
-      'Managed Kilo outbound forwarding failed'
-    );
-    return new Response('Kilo authorization unavailable', { status: 502 });
-  }
-
-  logDiagnostic(
-    'info',
-    { ...logFields, upstreamStatus: response.status, routeClass: result.routeClass },
-    'Managed Kilo outbound request forwarded'
-  );
-  return response;
-}
-
-async function handleManagedGitLabOutbound(
-  request: Request,
-  env: Cloudflare.Env,
-  capability: { capability: string },
-  outboundContainerId: string
-): Promise<Response> {
-  const logFields = {
-    ...getSafeRequestLogFields(request),
-    provider: 'gitlab',
-    capabilityVersion: getCapabilityVersion(capability.capability),
-    outboundContainerId,
-  };
-  logDiagnostic('debug', logFields, 'Redeeming managed GitLab outbound request');
-
-  const tokenService = env.GIT_TOKEN_SERVICE;
-  if (!supportsGitLabSessionCapabilityRedemption(tokenService)) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-binding' },
-      'Managed GitLab outbound redemption unavailable'
-    );
-    return new Response('GitLab authorization unavailable', { status: 502 });
-  }
-
-  let result: Awaited<ReturnType<GitLabTokenRedemptionBinding['redeemGitLabSessionCapability']>>;
-  try {
-    result = await tokenService.redeemGitLabSessionCapability({
-      capability: capability.capability,
-      outboundContainerId,
-      requestMethod: request.method,
-      requestUrl: request.url,
-    });
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      {
-        ...logFields,
-        failureStage: 'redemption-rpc',
-        errorClass: classifyDiagnosticError(error),
-      },
-      'Managed GitLab outbound redemption failed'
-    );
-    return new Response('GitLab authorization unavailable', { status: 502 });
-  }
-
-  if (!result.success) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
-      'Managed GitLab outbound redemption rejected'
-    );
-    return new Response('GitLab authorization unavailable', { status: 502 });
-  }
-
-  let response: Response;
-  try {
-    response = await forwardRedeemedRequest(request, result.headers, true);
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      {
-        ...logFields,
-        failureStage: 'upstream-forward',
-        errorClass: classifyDiagnosticError(error),
-      },
-      'Managed GitLab outbound forwarding failed'
-    );
-    return new Response('GitLab authorization unavailable', { status: 502 });
-  }
-
-  logDiagnostic(
-    'info',
-    { ...logFields, upstreamStatus: response.status },
-    'Managed GitLab outbound request forwarded'
-  );
-  return response;
-}
-
-async function handleManagedBitbucketOutbound(
-  request: Request,
-  env: Cloudflare.Env,
-  capability: { capability: string },
-  outboundContainerId: string
-): Promise<Response> {
-  const logFields = {
-    ...getSafeRequestLogFields(request),
-    provider: 'bitbucket',
-    capabilityVersion: getCapabilityVersion(capability.capability),
-    outboundContainerId,
-  };
-  logDiagnostic('debug', logFields, 'Redeeming managed Bitbucket outbound request');
-
-  const tokenService = env.GIT_TOKEN_SERVICE;
-  if (!supportsBitbucketSessionCapabilityRedemption(tokenService)) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-binding' },
-      'Managed Bitbucket outbound redemption unavailable'
-    );
-    return new Response('Bitbucket authorization unavailable', { status: 502 });
-  }
-
-  let result: Awaited<
-    ReturnType<BitbucketTokenRedemptionBinding['redeemBitbucketSessionCapability']>
-  >;
-  try {
-    result = await tokenService.redeemBitbucketSessionCapability({
-      capability: capability.capability,
-      outboundContainerId,
-      requestMethod: request.method,
-      requestUrl: request.url,
-    });
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-rpc', errorClass: classifyDiagnosticError(error) },
-      'Managed Bitbucket outbound redemption failed'
-    );
-    return new Response('Bitbucket authorization unavailable', { status: 502 });
-  }
-
-  if (!result.success) {
-    logDiagnostic(
-      'warn',
-      { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
-      'Managed Bitbucket outbound redemption rejected'
-    );
-    return new Response('Bitbucket authorization unavailable', { status: 502 });
-  }
-
-  let response: Response;
-  try {
-    response = await forwardRedeemedRequest(request, result.headers);
-  } catch (error) {
-    logDiagnostic(
-      'warn',
-      {
-        ...logFields,
-        failureStage: 'upstream-forward',
-        errorClass: classifyDiagnosticError(error),
-      },
-      'Managed Bitbucket outbound forwarding failed'
-    );
-    return new Response('Bitbucket authorization unavailable', { status: 502 });
-  }
-
-  logDiagnostic(
-    'info',
-    { ...logFields, upstreamStatus: response.status },
-    'Managed Bitbucket outbound request forwarded'
-  );
-  return response;
 }
 
 export function handleManagedScmOutbound(
@@ -782,126 +111,29 @@ export function handleManagedScmOutbound(
   env: Cloudflare.Env,
   ctx: ManagedScmOutboundContext
 ): Promise<Response> {
-  const authorization = request.headers.get('Authorization');
-  const gitCapability = extractGitCapability(authorization);
-  const apiCapability = extractApiCapability(authorization);
-  const privateTokenCapability = extractGitLabPrivateTokenCapability(
-    request.headers.get('PRIVATE-TOKEN')
-  );
-  const extractions = [gitCapability, apiCapability, privateTokenCapability];
-  const hasUnmanagedAuthorization =
-    (authorization !== null && gitCapability.type === 'none' && apiCapability.type === 'none') ||
-    (request.headers.has('PRIVATE-TOKEN') && privateTokenCapability.type === 'none');
+  const authorization = classifyScmAuthorization({
+    authorization: request.headers.get('Authorization'),
+    privateToken: request.headers.get('PRIVATE-TOKEN'),
+  });
   const safeRequestLogFields = getSafeRequestLogFields(request);
   if (safeRequestLogFields.client === 'github-cli') {
     logDiagnostic(
       'debug',
       {
         ...safeRequestLogFields,
-        authorizationClass: getAuthorizationClass(extractions, hasUnmanagedAuthorization),
+        authorizationClass: authorization.authorizationClass,
         outboundContainerId: ctx.containerId,
       },
       'Observed GitHub CLI outbound request'
     );
   }
-  if (
-    gitCapability.type === 'unsupported_capability' ||
-    apiCapability.type === 'unsupported_capability' ||
-    privateTokenCapability.type === 'unsupported_capability'
-  ) {
+  if (authorization.type === 'denied') {
     return Promise.resolve(new Response('SCM authorization unavailable', { status: 502 }));
   }
-  const authorizationCapability =
-    gitCapability.type === 'capability'
-      ? gitCapability.value
-      : apiCapability.type === 'capability'
-        ? apiCapability.value
-        : null;
-  const gitLabPrivateTokenCapability =
-    privateTokenCapability.type === 'capability' ? privateTokenCapability.value : null;
-  if (
-    authorizationCapability &&
-    gitLabPrivateTokenCapability &&
-    (authorizationCapability.provider !== 'gitlab' ||
-      authorizationCapability.capability !== gitLabPrivateTokenCapability.capability)
-  ) {
-    return Promise.resolve(new Response('GitLab authorization unavailable', { status: 502 }));
+  if (authorization.type === 'unmanaged') return fetch(request);
+  const capability = authorization.value;
+  if (isControlPlaneCredential(capability.capability)) {
+    return handleControlPlaneOutbound(request, env, capability, ctx);
   }
-  const capability = authorizationCapability ?? gitLabPrivateTokenCapability;
-  if (!capability) return fetch(request);
-  if (capability.provider === 'github') {
-    return handleManagedGitHubOutbound(request, env, capability, ctx.containerId);
-  }
-  if (capability.provider === 'kilo') {
-    return handleManagedKiloOutbound(request, env, capability, ctx.containerId);
-  }
-  if (capability.provider === 'bitbucket') {
-    return handleManagedBitbucketOutbound(request, env, capability, ctx.containerId);
-  }
-  return handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
+  return forwardResolvedScmCapability(request, env.GIT_TOKEN_SERVICE, capability, ctx.containerId);
 }
-
-const managedScmOutboundHandlers = {
-  [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-};
-
-export class Sandbox extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'Sandbox';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxSmall extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxSmall';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxDIND extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxDIND';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxCodeReview extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxCodeReview';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxContainment extends Sandbox {
-  protected override get sandboxClassName(): SandboxClassName {
-    return 'SandboxContainment';
-  }
-  interceptHttps = true;
-}
-// Assignment (not a static class field) so it invokes the inherited Container.outboundHandlers
-// setter and registers into @cloudflare/containers' internal outboundHandlersRegistry. A static
-// class field here would shadow the inherited accessor and silently no-op the registration.
-SandboxContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export class SandboxSmallContainment extends SandboxSmall {
-  protected override get sandboxClassName(): SandboxClassName {
-    return 'SandboxSmallContainment';
-  }
-  interceptHttps = true;
-}
-SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export class SandboxCodeReviewContainment extends SandboxCodeReview {
-  protected override get sandboxClassName(): SandboxClassName {
-    return 'SandboxCodeReviewContainment';
-  }
-  interceptHttps = true;
-}
-SandboxCodeReviewContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export { ContainerProxy };

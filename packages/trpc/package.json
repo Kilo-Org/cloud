@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsgo -p tsconfig.json && rollup -c rollup.config.mjs",
-    "typecheck": "tsgo --noEmit"
+    "build": "GOMEMLIMIT=${GOMEMLIMIT:-2GiB} tsgo -p tsconfig.build.json --checkers 1 && rollup -c rollup.config.mjs",
+    "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit"
   },
   "exports": {
     ".": {
@@ -16,9 +16,11 @@
     }
   },
   "dependencies": {
+    "@kilocode/cloud-agent-sdk": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
+    "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@trpc/server": "catalog:",
     "@workos-inc/node": "catalog:",
@@ -30,10 +32,12 @@
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
-    "@sentry/nextjs": "10.69.0",
+    "@sentry/nextjs": "11.12.0",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "rollup": "4.59.1",
-    "rollup-plugin-dts": "6.4.1",
+    "@typescript/typescript6": "6.0.2",
+    "rollup": "4.68.2",
+    "rollup-plugin-dts": "6.5.1",
     "server-only": "0.0.1",
     "typescript": "catalog:"
   }

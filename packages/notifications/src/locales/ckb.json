@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "دانیشتنی ئەجێنتەکەت نوێکراوەتەوە",
+      "lowBalance": "تەوازنەکەت پێویستی بە سەرنجە",
+      "spendAlert": "خەرجەکەت پێویستی بە سەرنجە",
+      "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە",
+      "securityUpdate": "پشکنینێکی ئاسایش نوێکارییەکی هەیە",
+      "activeAgentsGlanceable": "ئەجێنتە چالاکەکان نوێکارییەکیان هەیە"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ئاگادارکردنەوەی تەوازنی نزم",
+      "body": "تەوازنی {{organizationName}} لە ${{minimumBalanceUsd}} خوارتر کەوت"
+    },
+    "spendAlert": {
+      "title": "ئاگادارکردنەوەی خەرج",
+      "body": "خەرجی {{scopeName}} لە ${{amountUsd}} تێپەڕی"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} لە {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "دۆزینەوەی ئاسایشی نوێ ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "ئاگادارکردنەوەی SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "پێشێلکردنی SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "دانیشتنی Kiloـی تۆ ئامادەیە بۆ کۆنترۆڵکردن لە مۆبایلەکەتەوە"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

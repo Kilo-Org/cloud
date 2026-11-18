@@ -1,75 +1,48 @@
 import { Mic, Square } from '@/components/ui/icons';
-import { ActivityIndicator, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Pressable } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 import { resolveVoiceInputControlState } from '@/lib/voice-input/voice-input-view-state';
 
-type VoiceInputButtonSize = 'sm' | 'md';
-
 type VoiceInputButtonProps = {
   disabled: boolean;
   onPress(): void;
   status: VoiceInputStatus;
-  size?: VoiceInputButtonSize;
 };
-
-// Visual class and hitSlop travel as a coupled pair so the effective touch
-// target stays >=44pt (visual size + 2 * hitSlop per side) at every size.
-const SIZE_STYLES = {
-  sm: {
-    className: 'h-8 w-8 rounded-full',
-    hitSlop: { top: 6, bottom: 6, left: 6, right: 6 },
-  },
-  md: {
-    className: 'h-9 w-9 rounded-full',
-    hitSlop: { top: 4, bottom: 4, left: 4, right: 4 },
-  },
-} satisfies Record<
-  VoiceInputButtonSize,
-  {
-    className: string;
-    hitSlop: { top: number; bottom: number; left: number; right: number };
-  }
->;
-
-// Default (no prop) preserves the original kilo-chat look.
-const DEFAULT_STYLE = {
-  className: 'h-10 w-10 rounded-md',
-  hitSlop: { top: 2, bottom: 2, left: 2, right: 2 },
-} as const;
 
 const ICON_SIZE = 18;
 const LISTENING_BG = 'bg-red-600 dark:bg-red-500';
-const RESTING_BG = 'bg-secondary';
 
 /**
- * Compact voice-input toggle for composer toolbars. Visual size is controlled
- * by `size`; the default renders a 10x10 square that expands to a 44pt touch
- * target via `hitSlop`. While the controller is in `starting` or `stopping`,
- * an ActivityIndicator replaces the icon and the press is ignored. While
- * `listening`, a destructive treatment signals the active session.
+ * Voice-input toggle for composer toolbars and the voice test field. It has
+ * one geometry: the pressable's own node is the shared 48dp box, which
+ * carries the 44pt design target and the 48dp platform minimum, so a
+ * control-size audit reads the target itself. Slop is not used — the box is
+ * the whole reach — so the toggle cannot reach into a neighbour. A bare icon
+ * sits on the box, because a resting circle smaller than the send control's
+ * filled circle beside it reads as a mismatched dot, while a live session
+ * fills the whole box, which is the destructive treatment that signals the
+ * active session. While the controller is in `starting` or `stopping`, an
+ * ActivityIndicator replaces the icon and the press is ignored.
  */
 export function VoiceInputButton({
   disabled,
   onPress,
-  size,
   status,
 }: Readonly<VoiceInputButtonProps>): React.ReactElement {
   const colors = useThemeColors();
   const control = resolveVoiceInputControlState(status, disabled);
-  const isListeningOrStopping = status === 'listening' || status === 'stopping';
+  const isListeningOrStopping =
+    status === 'listening' || status === 'stopping' || status === 'transcribing';
   const showSpinner = control.busy;
   const iconColor = isListeningOrStopping ? colors.destructiveForeground : colors.foreground;
-  const restingBg = isListeningOrStopping ? LISTENING_BG : RESTING_BG;
-  const sizeStyle = size ? SIZE_STYLES[size] : DEFAULT_STYLE;
-  const containerClass = cn(
-    sizeStyle.className,
-    'items-center justify-center active:opacity-70',
-    restingBg
-  );
+  const activeBg = isListeningOrStopping && LISTENING_BG;
   const renderIcon = (): React.ReactElement => {
     if (showSpinner) {
       return <ActivityIndicator color={iconColor} size="small" />;
@@ -85,9 +58,8 @@ export function VoiceInputButton({
       accessibilityRole="button"
       accessibilityLabel={control.accessibilityLabel}
       accessibilityState={{ busy: control.busy, disabled: control.disabled }}
-      className={containerClass}
+      className={cn(ICON_TARGET_BOX_CLASS, 'rounded-full', 'active:opacity-70', activeBg)}
       disabled={control.disabled}
-      hitSlop={sizeStyle.hitSlop}
       onPress={onPress}
     >
       {renderIcon()}
@@ -107,8 +79,16 @@ type VoiceInputStatusProps = {
 export function VoiceInputStatus({
   status,
 }: Readonly<VoiceInputStatusProps>): React.ReactElement | null {
-  if (status !== 'listening') {
-    return null;
+  const { t } = useTranslation();
+  if (status === 'listening') {
+    return (
+      <AccessibleStatus message={t('voiceInput.listening')} tone="status" className="text-xs" />
+    );
   }
-  return <AccessibleStatus message="Listening..." tone="status" className="text-xs" />;
+  if (status === 'transcribing') {
+    return (
+      <AccessibleStatus message={t('voiceInput.transcribing')} tone="status" className="text-xs" />
+    );
+  }
+  return null;
 }

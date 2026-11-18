@@ -1,6 +1,10 @@
 import { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { Hono } from 'hono';
+import {
+  getSessionShareExpiresAt,
+  sessionShareDurationSchema,
+} from '@kilocode/session-ingest-contracts';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { api } from './api';
@@ -11,6 +15,7 @@ vi.mock('@kilocode/db/client', () => ({
 
 vi.mock('../dos/SessionIngestDO', () => ({
   getSessionIngestDO: vi.fn(),
+  SHARE_INFO_TOO_LARGE_ERROR: 'Share snapshot is too large',
 }));
 
 vi.mock('../dos/SessionAccessCacheDO', () => ({
@@ -29,8 +34,19 @@ vi.mock('../services/session-access', () => ({
   resolveAccessibleKiloSession: vi.fn(),
 }));
 
+const { TEST_STAGING_MAX_BYTES } = vi.hoisted(() => ({ TEST_STAGING_MAX_BYTES: 8 * 1024 * 1024 }));
+
+// Real limit constants, except the staging ceiling: an 8 MiB test value
+// covers the declared cases, so the limit fixtures stay small.
+vi.mock('../util/ingest-limits', async importOriginal => {
+  const actual = await importOriginal<typeof IngestLimitsModule>();
+  return { ...actual, STAGING_MAX_BYTES: TEST_STAGING_MAX_BYTES };
+});
+
 import { getWorkerDb } from '@kilocode/db/client';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
+import type * as IngestLimitsModule from '../util/ingest-limits';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { applyMetadataChanges } from '../ingest/metadata';
@@ -59,7 +75,7 @@ type TestBindings = {
   };
   CONNECTION_TICKET_DO: {
     get: ReturnType<typeof vi.fn>;
-    idFromName: ReturnType<typeof vi.fn>;
+    newUniqueId: ReturnType<typeof vi.fn>;
   };
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_USER_IDS: string;
@@ -82,7 +98,7 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
     },
     CONNECTION_TICKET_DO: {
       get: vi.fn(),
-      idFromName: vi.fn(),
+      newUniqueId: vi.fn(),
     },
     DIRECT_INGEST_PERCENT: '0',
     DIRECT_INGEST_USER_IDS: '',
@@ -121,13 +137,71 @@ function ingestRequest(body: string, contentLength = new TextEncoder().encode(bo
   });
 }
 
+function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
+  return {
+    isDeleted: async () => false,
+    stageR2Object: async (
+      params: { key: string },
+      body: ReadableStream<Uint8Array> | Uint8Array
+    ) => {
+      await env.SESSION_INGEST_R2.put(params.key, body);
+      return true;
+    },
+    stageBoundedR2Object: async (
+      params: { key: string },
+      body: ReadableStream<Uint8Array> | Uint8Array,
+      maxBytes: number
+    ) => {
+      if (body instanceof Uint8Array) {
+        if (body.byteLength > maxBytes) return 'too_large' as const;
+        await env.SESSION_INGEST_R2.put(params.key, body);
+        return true;
+      }
+      const reader = body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      try {
+        while (true) {
+          const result = await reader.read();
+          if (result.done) break;
+          total += result.value.byteLength;
+          if (total > maxBytes) {
+            await reader.cancel();
+            return 'too_large' as const;
+          }
+          chunks.push(result.value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      await env.SESSION_INGEST_R2.put(params.key, bytes);
+      return true;
+    },
+  };
+}
+
+function shareIngestStub() {
+  return {
+    captureShareInfo: vi.fn(async (_publicId: string, _duration: string) => Date.now()),
+    deleteShareInfo: vi.fn(async (_publicId: string) => undefined),
+  };
+}
+
 function prepareIngestRoute(
   ingest: ReturnType<typeof vi.fn> = vi.fn(async () => ({ accepted: true, changes: [] }))
 ) {
   const { db } = makeDbFakes();
   vi.mocked(getWorkerDb).mockReturnValue(db);
   vi.mocked(getSessionAccessCacheDO).mockReturnValue({ has: vi.fn(async () => true) } as never);
-  vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+  vi.mocked(getSessionIngestDO).mockImplementation(
+    env => ({ ...r2StagingStub(env), ingest }) as never
+  );
   vi.mocked(getUserConnectionDO).mockReturnValue({
     hasActiveCliSession: vi.fn(async () => true),
   } as never);
@@ -156,6 +230,7 @@ function makeDbFakes() {
     from: vi.fn(() => select),
     leftJoin: vi.fn(() => select),
     where: vi.fn((_condition: unknown) => select),
+    orderBy: vi.fn(() => select),
     limit: vi.fn(() => select),
     for: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
@@ -230,6 +305,10 @@ function makeDbFakes() {
 describe('api routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(getSessionIngestDO).mockImplementation(env => r2StagingStub(env) as never);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      clearSession: vi.fn(async () => undefined),
+    } as never);
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
@@ -299,10 +378,110 @@ describe('api routes', () => {
     expect(unshareRes.status).toBe(400);
   });
 
+  it('POST /session answers a conflict for an id the ingest plane rejects', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const isDeleted = vi.fn(async () => true);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ isDeleted } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ success: false, error: 'session_retired' });
+    expect(isDeleted).toHaveBeenCalledOnce();
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('POST /session probes ingest availability before the insert transaction', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const probeOrder: string[] = [];
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([]);
+    fns.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      probeOrder.push('insert-transaction');
+      return fn(db);
+    });
+    vi.mocked(getSessionIngestDO).mockImplementation(
+      () =>
+        ({
+          isDeleted: vi.fn(async () => {
+            probeOrder.push('availability-probe');
+            return false;
+          }),
+        }) as never
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(probeOrder).toEqual(['availability-probe', 'insert-transaction', 'availability-probe']);
+  });
+
+  it('POST /session recovers when the initial ingest probe fails but the final check succeeds', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    vi.mocked(getSessionIngestDO).mockImplementationOnce(() => {
+      throw new Error('probe unavailable');
+    });
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    warn.mockRestore();
+    expect(res.status).toBe(200);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      'usr_test',
+      expect.objectContaining({ type: 'session.created' })
+    );
+  });
+
   it('POST /session emits created only for newly inserted rows', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -353,7 +532,7 @@ describe('api routes', () => {
   it('POST /session does not emit created when row already exists', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
 
     const sessionCache = {
@@ -381,10 +560,168 @@ describe('api routes', () => {
     expect(env.NOTIFICATIONS.sendSessionReadyNotification).not.toHaveBeenCalled();
   });
 
+  it('POST /session rejects a tombstoned session and removes the resurrected row', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => true).mockResolvedValueOnce(false),
+    } as never);
+    const sessionCache = { putValidated: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(sessionCache as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'session_deleted' });
+    expect(fns.delete).toHaveBeenCalledTimes(1);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(sessionCache.putValidated).not.toHaveBeenCalled();
+  });
+
+  it('POST /session rejects an existing tombstoned parent without deleting its row', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([]);
+    fns.delete.mockImplementation(() => {
+      throw new Error('parent row is still referenced by descendants');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => true).mockResolvedValueOnce(false),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'session_deleted' });
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('POST /session keeps a newly created row when the ingest tombstone is absent', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    const isDeleted = vi.fn(async () => false);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ isDeleted } as never);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({
+      putValidated: vi.fn(async () => undefined),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(isDeleted).toHaveBeenCalledTimes(2);
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      'usr_test',
+      expect.objectContaining({ type: 'session.created' })
+    );
+  });
+
+  it('POST /session removes a newly created row when the tombstone check fails', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => {
+        throw new Error('DO unavailable');
+      }),
+    } as never);
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      const res = await makeApiApp().fetch(
+        new Request('http://local/session', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+        }),
+        makeTestEnv()
+      );
+      expect(res.status).toBe(500);
+    } finally {
+      consoleWarn.mockRestore();
+      consoleError.mockRestore();
+    }
+
+    expect(fns.delete).toHaveBeenCalledTimes(1);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
   it('POST /session caches a newly created personal session', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -436,7 +773,7 @@ describe('api routes', () => {
   it('POST /session succeeds when cache warming is unavailable during rollout', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -494,6 +831,27 @@ describe('api routes', () => {
     expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
   });
 
+  it('POST /session returns 403 and does not insert when the block timestamp is set', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([
+      { blocked_at: '2026-01-15T12:00:00.000Z', blocked_reason: null },
+    ]);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
   it('POST /session returns 403 and does not insert when the user is missing', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -539,7 +897,6 @@ describe('api routes', () => {
     expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
     expect(env.INGEST_QUEUE.send).toHaveBeenCalledTimes(1);
 
-    // Verify queue message shape
     const queueMsg = env.INGEST_QUEUE.send.mock.calls[0][0] as Record<string, unknown>;
     expect(queueMsg).toMatchObject({
       kiloUserId: 'usr_test',
@@ -595,6 +952,100 @@ describe('api routes', () => {
     expect(response.status).toBe(500);
     const r2Key = env.SESSION_INGEST_R2.put.mock.calls[0][0];
     expect(env.SESSION_INGEST_R2.delete).toHaveBeenCalledWith(r2Key);
+  });
+
+  it('POST /session/:sessionId/share removes only the retired snapshot', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: 'previous-generation' }]);
+    fns.executeResult.mockImplementation(async query => {
+      if (!(query instanceof SQL)) throw new Error('Expected share query');
+      return { rows: [{ public_id: new PgDialect().sqlToQuery(query).params[0] }] };
+    });
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', { method: 'POST' }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(200);
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledExactlyOnceWith('previous-generation');
+    expect(fns.selectFor).toHaveBeenCalledWith('update');
+  });
+
+  it('POST /session/:sessionId/share returns 413 before rotation for an oversized snapshot', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    ingestStub.captureShareInfo.mockRejectedValue(new Error('Share snapshot is too large'));
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', { method: 'POST' }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ success: false, error: 'share_snapshot_too_large' });
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(fns.executeResult).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending share snapshot when unshare commits before the share', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    let currentPublicId: string | null = 'previous-generation';
+    const snapshots = new Set([currentPublicId]);
+    const captured = Promise.withResolvers<string>();
+    const resumeCapture = Promise.withResolvers<void>();
+    fns.selectResult.mockImplementation(async () => [{ publicId: currentPublicId }]);
+    fns.updateResult.mockImplementation(async () => {
+      currentPublicId = null;
+    });
+    fns.executeResult.mockImplementation(async query => {
+      if (!(query instanceof SQL)) throw new Error('Expected share query');
+      currentPublicId = String(new PgDialect().sqlToQuery(query).params[0]);
+      return { rows: [{ public_id: currentPublicId }] };
+    });
+    const ingestStub = {
+      captureShareInfo: async (publicId: string) => {
+        snapshots.add(publicId);
+        captured.resolve(publicId);
+        await resumeCapture.promise;
+        return Date.now();
+      },
+      deleteShareInfo: async (publicId: string) => {
+        snapshots.delete(publicId);
+      },
+      clearShareInfo: async () => {
+        snapshots.clear();
+      },
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const app = makeApiApp();
+    const env = makeTestEnv();
+    const pendingShare = app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', { method: 'POST' }),
+      env
+    );
+    const pendingPublicId = await captured.promise;
+    try {
+      const unshare = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/unshare', {
+          method: 'POST',
+        }),
+        env
+      );
+      expect(unshare.status).toBe(200);
+      expect(currentPublicId).toBeNull();
+      expect(snapshots).toEqual(new Set([pendingPublicId]));
+    } finally {
+      resumeCapture.resolve();
+    }
+    const response = await pendingShare;
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { share_token: string };
+    const token = await verifySessionShareToken(env, body.share_token);
+    expect(currentPublicId).toBe(token?.jti);
+    expect(snapshots).toEqual(new Set([token?.jti]));
   });
 
   it('POST /session/:sessionId/unshare denies a removed organization member before mutations', async () => {
@@ -796,7 +1247,7 @@ describe('api routes', () => {
     it.each([
       ['invalid config', { DIRECT_INGEST_PERCENT: 'invalid' }, 'gate_config'],
       ['percent miss', { DIRECT_INGEST_USER_IDS: '' }, 'gate_percent'],
-    ] as const)('uses the streaming legacy path for %s', async (_name, overrides, reason) => {
+    ] as const)('uses the legacy path for %s', async (_name, overrides, reason) => {
       const { app, ingest } = prepareIngestRoute();
       const env = makeTestEnv(overrides);
       const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
@@ -821,27 +1272,183 @@ describe('api routes', () => {
       ['negative', '-1', 'invalid_content_length'],
       ['fractional', '1.5', 'invalid_content_length'],
       ['non-numeric', 'abc', 'invalid_content_length'],
-      ['zero', '0', 'empty_body'],
-      ['over cap', '4194305', 'oversized_body'],
-    ])('uses the legacy path for %s Content-Length', async (_name, contentLength, reason) => {
+    ] as const)(
+      'uses the legacy path for %s Content-Length',
+      async (_name, contentLength, reason) => {
+        const { app, ingest } = prepareIngestRoute();
+        const env = directIngestEnv();
+        const headers =
+          contentLength === undefined ? undefined : { 'content-length': contentLength };
+        const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+        const request = new Request(
+          'http://local/session/ses_12345678901234567890123456/ingest?v=1',
+          { method: 'POST', headers, body: '{}' }
+        );
+
+        const response = await app.fetch(request, env);
+
+        expect(response.status).toBe(200);
+        expect(ingest).not.toHaveBeenCalled();
+        expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+        const staged = env.SESSION_INGEST_R2.put.mock.calls[0][1];
+        const stagedText =
+          staged instanceof Uint8Array
+            ? new TextDecoder().decode(staged)
+            : await new Response(staged).text();
+        expect(stagedText).toBe('{}');
+        expect(info).toHaveBeenCalledWith(
+          expect.objectContaining({ event: 'direct_ingest_legacy', reason })
+        );
+        info.mockRestore();
+      }
+    );
+
+    it('answers a declared zero-length body with a no-op that writes nothing', async () => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
-      const headers = contentLength === undefined ? undefined : { 'content-length': contentLength };
       const info = vi.spyOn(console, 'info').mockImplementation(() => {});
       const request = new Request(
         'http://local/session/ses_12345678901234567890123456/ingest?v=1',
-        { method: 'POST', headers, body: '{}' }
+        { method: 'POST', headers: { 'content-length': '0' }, body: '{}' }
       );
 
       const response = await app.fetch(request, env);
 
       expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true });
       expect(ingest).not.toHaveBeenCalled();
-      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
       expect(info).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'direct_ingest_legacy', reason })
+        expect.objectContaining({
+          event: 'direct_ingest_noop',
+          reason: 'empty_body',
+          declaredBytes: 0,
+        })
       );
       info.mockRestore();
+    });
+
+    it.each([
+      ['malformed JSON', '{"data":[{"type":"message","data":{"id":"msg_1"}},broken'],
+      ['unterminated object', '{"data":['],
+    ] as const)(
+      'answers a buffered legacy body the format cannot parse with a client error',
+      async (_name, body) => {
+        const { app, ingest } = prepareIngestRoute();
+        const env = makeTestEnv();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const response = await app.fetch(ingestRequest(body), env);
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ success: false, error: 'malformed_json' });
+        expect(ingest).not.toHaveBeenCalled();
+        expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+        expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'direct_ingest_parse_reject',
+            reason: 'gate_percent',
+            declaredBytes: new TextEncoder().encode(body).byteLength,
+          })
+        );
+        warn.mockRestore();
+      }
+    );
+
+    it.each([
+      ['declared over cap', '4194305'],
+      ['declared far over cap', String(TEST_STAGING_MAX_BYTES)],
+    ] as const)('stages a %s body through the queue', async (_name, contentLength) => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const body = JSON.stringify({ data: [] });
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          headers: { 'content-length': contentLength },
+          body,
+        }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+      expect(env.INGEST_QUEUE.send).toHaveBeenCalledTimes(1);
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'oversized_body' })
+      );
+      info.mockRestore();
+    });
+
+    it('enforces the staging ceiling without staging', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          headers: { 'content-length': String(TEST_STAGING_MAX_BYTES + 1) },
+          body: 'x'.repeat(8),
+        }),
+        env
+      );
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ success: false, error: 'payload_too_large' });
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_reject',
+          reason: 'staging_budget_exceeded',
+        })
+      );
+      warn.mockRestore();
+    });
+
+    it('enforces the staging ceiling for a streamed body without staging', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const drained: Uint8Array[] = [];
+      env.SESSION_INGEST_R2.put.mockImplementationOnce(async (_key, body) => {
+        try {
+          drained.push(await new Response(body).arrayBuffer().then(b => new Uint8Array(b)));
+        } catch {
+          drained.length = 0;
+        }
+        return undefined;
+      });
+      const chunk = new Uint8Array(TEST_STAGING_MAX_BYTES / 4).fill(1);
+      const body = new Blob([chunk, chunk, chunk, chunk, chunk]).stream();
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          body,
+          duplex: 'half',
+        } as RequestInit),
+        env
+      );
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ success: false, error: 'payload_too_large' });
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_reject',
+          reason: 'staging_budget_exceeded',
+        })
+      );
+      warn.mockRestore();
     });
 
     it('keeps gate-miss staging failures out of the direct fallback denominator', async () => {
@@ -1002,8 +1609,9 @@ describe('api routes', () => {
       expect(ingest).not.toHaveBeenCalled();
       expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledWith(
         expect.stringMatching(/\/ses_12345678901234567890123456\//),
-        new TextEncoder().encode(body)
+        expect.any(Uint8Array)
       );
+      expect(await new Response(env.SESSION_INGEST_R2.put.mock.calls[0][1]).text()).toBe(body);
       expect(info).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'oversized_item' })
       );
@@ -1056,8 +1664,9 @@ describe('api routes', () => {
       expect(ingest).toHaveBeenCalledTimes(1);
       expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledWith(
         'ingest/usr_test/ses_12345678901234567890123456/11111111-1111-4111-8111-111111111111',
-        new TextEncoder().encode(body)
+        expect.any(Uint8Array)
       );
+      expect(await new Response(env.SESSION_INGEST_R2.put.mock.calls[0][1]).text()).toBe(body);
       expect(env.INGEST_QUEUE.send).toHaveBeenCalledWith(
         expect.objectContaining({ ingestedAt: 4567 })
       );
@@ -1175,7 +1784,7 @@ describe('api routes', () => {
     vi.mocked(getWorkerDb).mockReturnValue(db);
 
     const app = makeApiApp();
-    const invalid = 'not-a-session';
+    const invalid = 'not%20a%20session';
     const res = await app.fetch(
       new Request(`http://local/session/${invalid}/export`, {
         method: 'GET',
@@ -1185,6 +1794,28 @@ describe('api routes', () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid sessionId' });
+  });
+
+  it('GET /session/:sessionId/export serves a session created before the canonical id shape', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'xmw2l780h18' }]);
+
+    const payload = JSON.stringify({ success: true, events: [] });
+    const ingestStub = {
+      getAllStream: vi.fn(async () => new Response(payload).body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/xmw2l780h18/export', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(payload);
   });
 
   it('GET /session/:sessionId/export returns 404 when access is denied', async () => {
@@ -1234,14 +1865,126 @@ describe('api routes', () => {
     expect(ingestStub.getAllStream).toHaveBeenCalled();
   });
 
+  it('GET /session/:sessionId/diff returns 404 without reading the DO when access is denied', async () => {
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce(null);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/diff', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ success: false, error: 'session_not_found' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('GET /session/:sessionId/export passes an upToMessageId cut to the DO export', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const payload = JSON.stringify({ info: {}, messages: [], sessionDiff: [] });
+    const ingestStub = {
+      hasMessageItem: vi.fn(async () => true),
+      getAllStream: vi.fn(async () => new Response(payload).body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=msg_02',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(payload);
+    expect(ingestStub.hasMessageItem).toHaveBeenCalledWith('msg_02');
+    expect(ingestStub.getAllStream).toHaveBeenCalledWith('msg_02');
+  });
+
+  it('GET /session/:sessionId/export returns 404 clone_cut_not_found for an absent cut message', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const ingestStub = {
+      hasMessageItem: vi.fn(async () => false),
+      getAllStream: vi.fn(),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=msg_99',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'clone_cut_not_found' });
+    expect(ingestStub.getAllStream).not.toHaveBeenCalled();
+  });
+
+  it('GET /session/:sessionId/export returns 400 for an invalid upToMessageId', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=not-a-message',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid upToMessageId' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
   it('GET /session/:sessionId/messages returns 400 for invalid sessionId', async () => {
     const app = makeApiApp();
     const res = await app.fetch(
-      new Request('http://local/session/not-a-session/messages', { method: 'GET' }),
+      new Request('http://local/session/not%20a%20session/messages', { method: 'GET' }),
       makeTestEnv()
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid sessionId' });
+  });
+
+  it('GET /session/:sessionId/messages serves the page of a session created before the canonical id shape', async () => {
+    // The store still holds sessions minted before `ses_` + 26 became the only
+    // issued shape. Its row and its transcript are addressed by that id, and
+    // the access check — not the id shape — decides who may read it.
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'xmw2l780h18' }]);
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/xmw2l780h18/messages?limit=50', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      kiloSessionId: 'xmw2l780h18',
+      history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
   });
 
   it('GET /session/:sessionId/messages returns 400 for an invalid limit', async () => {
@@ -1291,6 +2034,22 @@ describe('api routes', () => {
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid paging input' });
+  });
+
+  it('GET /session/:sessionId/messages returns 400 for an over-length before cursor', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        `http://local/session/ses_12345678901234567890123456/messages?limit=50&before=${'A'.repeat(
+          MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1
+        )}`,
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid before' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
   it('GET /session/:sessionId/messages returns 404 when the user does not own the session', async () => {
@@ -1362,6 +2121,146 @@ describe('api routes', () => {
     expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
   });
 
+  it('does not let a stalled session-metadata read hold the page open', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const history = { messages: [], nextCursor: null, omittedItemCount: 0 };
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => history),
+        // The best-effort metadata read never answers.
+        readKiloSdkSessionSnapshot: vi.fn(() => Promise.withResolvers<unknown>().promise),
+      } as never);
+
+      const pending = makeApiApp().fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      // Flush the request to the metadata deadline, then run past it: the page
+      // must answer with the history and no metadata rather than wait.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5_000);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        success: true,
+        kiloSessionId: 'ses_12345678901234567890123456',
+        history,
+        sessionMetadata: null,
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to fetch session snapshot for session ses_12345678901234567890123456:',
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('requires a live organization when authorizing message reads', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => null),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    const condition = fns.selectWhere.mock.calls[0]?.[0];
+    if (!(condition instanceof SQL)) {
+      throw new Error('Expected where condition');
+    }
+    const generated = new PgDialect().sqlToQuery(condition);
+    expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
+    expect(generated.sql).toMatch(/"organization_memberships"\."id" is not null/i);
+  });
+
+  it('GET /session/:sessionId/messages forwards the ingest snapshot metadata alongside the page', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const sessionMetadata = { 'kilo.goal': { text: 'Ship p7 objective', status: 'paused' } };
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    const readKiloSdkSessionSnapshot = vi.fn(async () => ({
+      kind: 'value',
+      info: { id: 'ses_12345678901234567890123456', metadata: sessionMetadata },
+      byteLength: 64,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages,
+      readKiloSdkSessionSnapshot,
+    } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      sessionMetadata,
+    });
+  });
+
+  it('GET /session/:sessionId/messages degrades to null metadata when the snapshot read fails', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    const readKiloSdkSessionSnapshot = vi.fn(async () => {
+      throw new Error('snapshot unavailable');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages,
+      readKiloSdkSessionSnapshot,
+    } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      sessionMetadata: null,
+    });
+  });
+
   it('GET /session/:sessionId/messages defaults an omitted limit to the shared page size', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -1419,6 +2318,631 @@ describe('api routes', () => {
     }
   });
 
+  it('answers a transient Durable Object read failure as retryable rather than as a defect', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const reset = Object.assign(
+      new Error("Durable Object's isolate exceeded its memory limit and was reset."),
+      { retryable: true }
+    );
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => {
+        throw reset;
+      }),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    warn.mockRestore();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+      sessionMetadata: null,
+    });
+  });
+
+  it('answers an unreadable read outcome as retryable instead of claiming the history is gone', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // An outcome this worker does not know (a newer version's failure kind, a
+    // lost body) is not a page and says nothing about the stored history.
+    const readKiloSdkMessages = vi.fn(async () => ({ kind: 'future_failure_kind' }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a messages-only body as retryable instead of claiming the history is gone', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // No `nextCursor`: this is not a page the contract rejected, so nothing
+    // here is evidence the stored page is unreadable.
+    const readKiloSdkMessages = vi.fn(async () => ({ messages: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps invalid_data for a page the contract rejects on both reads', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // Page-shaped but unreadable: the stored page itself, which a retry cannot
+    // fix, so the terminal kind survives.
+    const readKiloSdkMessages = vi.fn(async () => ({ messages: [], nextCursor: 42 }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, history: { kind: 'invalid_data' } });
+    expect(readKiloSdkMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves the page when the same read answers it on the confirming read', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // Ingest rewrote the rows between the reads: the first read saw identities
+    // that did not line up, the second read answers the page.
+    const readKiloSdkMessages = vi
+      .fn()
+      .mockResolvedValueOnce({ messages: [], nextCursor: 42 })
+      .mockResolvedValueOnce({ messages: [], nextCursor: null, omittedItemCount: 0 });
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+    });
+  });
+
+  describe('GET /session/:sessionId/messages read-outcome logging', () => {
+    it('logs outcome ok for a page and invalid_data for a page the contract rejects, without changing the response', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const app = makeApiApp();
+
+      const sdkStoredMessage = {
+        info: {
+          id: 'msg_user_01',
+          sessionID: 'ses_12345678901234567890123456',
+          role: 'user',
+          time: { created: 1761000000100 },
+          agent: 'build',
+          model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+        },
+        parts: [
+          {
+            id: 'prt_user_01',
+            sessionID: 'ses_12345678901234567890123456',
+            messageID: 'msg_user_01',
+            type: 'text',
+            text: 'hello',
+          },
+        ],
+      };
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => ({
+          messages: [sdkStoredMessage],
+          nextCursor: 'opaque-cursor',
+          omittedItemCount: 2,
+        })),
+      } as never);
+
+      const pageRes = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=10', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      expect(pageRes.status).toBe(200);
+      expect(log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'kilo_sdk_history_read',
+          sessionId: 'ses_12345678901234567890123456',
+          limit: 10,
+          hasCursor: false,
+          outcome: 'ok',
+          messageCount: 1,
+          omittedItemCount: 2,
+          hasNextCursor: true,
+        })
+      );
+
+      log.mockClear();
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => ({ kind: 'invalid_data' })),
+      } as never);
+
+      const invalidRes = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=10', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      expect(invalidRes.status).toBe(200);
+      expect(await invalidRes.json()).toMatchObject({
+        success: true,
+        kiloSessionId: 'ses_12345678901234567890123456',
+        history: { kind: 'invalid_data' },
+      });
+      expect(log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'kilo_sdk_history_read',
+          sessionId: 'ses_12345678901234567890123456',
+          limit: 10,
+          outcome: 'invalid_data',
+          messageCount: 0,
+          omittedItemCount: 0,
+          hasNextCursor: false,
+        })
+      );
+      log.mockRestore();
+    });
+
+    it('logs a thrown read at warn with its error and still surfaces the failure', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => {
+          throw new Error('Durable Object is overloaded');
+        }),
+      } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=10', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(500);
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'kilo_sdk_history_read_failed',
+          sessionId: 'ses_12345678901234567890123456',
+          limit: 10,
+          hasCursor: false,
+          error: 'Durable Object is overloaded',
+        })
+      );
+      expect(log).not.toHaveBeenCalled();
+      log.mockRestore();
+      warn.mockRestore();
+    });
+  });
+
+  it('GET /session/:sessionId/messages normalizes a persisted textless reasoning part instead of degrading to invalid_data', async () => {
+    // Mirrors the e1 device seed (e1-seed.log): the DO holds a reasoning part
+    // with NO text field. Before the read-seam normalization the strict part
+    // schema rejected it, this endpoint answered `history: {kind:
+    // 'invalid_data'}`, and the agent chat screen showed "Couldn't load this
+    // session" instead of the transcript.
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: 'ses_12345678901234567890123456',
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'msg_user_01',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    const textlessReasoningPart = {
+      id: 'prt_r_bad',
+      sessionID: 'ses_12345678901234567890123456',
+      messageID: 'msg_asst_01',
+      type: 'reasoning',
+      time: { start: 1, end: 2 },
+    };
+    const whitespaceReasoningPart = {
+      ...textlessReasoningPart,
+      id: 'prt_r_ws',
+      time: { start: 2, end: 3 },
+      text: '   \n\t  ',
+    };
+    const answerPart = {
+      id: 'prt_t_ok',
+      sessionID: 'ses_12345678901234567890123456',
+      messageID: 'msg_asst_01',
+      type: 'text',
+      text: 'Release ships on Tuesday',
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        messages: [
+          {
+            info: {
+              id: 'msg_user_01',
+              sessionID: 'ses_12345678901234567890123456',
+              role: 'user',
+              time: { created: 1 },
+              agent: 'build',
+              model: { providerID: 'anthropic', modelID: 'claude' },
+            },
+            parts: [
+              {
+                id: 'prt_q',
+                sessionID: 'ses_12345678901234567890123456',
+                messageID: 'msg_user_01',
+                type: 'text',
+                text: 'Question about the queue',
+              },
+            ],
+          },
+          {
+            info: assistantInfo,
+            parts: [textlessReasoningPart, whitespaceReasoningPart, answerPart],
+          },
+        ],
+        nextCursor: null,
+        omittedItemCount: 0,
+      })),
+    } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      history: {
+        messages: [
+          {
+            info: { id: 'msg_user_01' },
+            parts: [{ id: 'prt_q', type: 'text', text: 'Question about the queue' }],
+          },
+          {
+            info: { id: 'msg_asst_01' },
+            parts: [
+              { id: 'prt_r_bad', type: 'reasoning', text: '' },
+              { id: 'prt_r_ws', type: 'reasoning', text: '   \n\t  ' },
+              { id: 'prt_t_ok', type: 'text', text: 'Release ships on Tuesday' },
+            ],
+          },
+        ],
+        nextCursor: null,
+        omittedItemCount: 0,
+      },
+    });
+  });
+
+  it('keeps the newest messages when a persisted part cannot be parsed while the session keeps streaming', async () => {
+    // A CLI-driven session keeps writing parts after the app has read the page
+    // once. The ingest seam (`SessionItemSchema`) deliberately enforces only
+    // `id` + `messageID` on a part, so a later part can carry a shape this read
+    // contract cannot parse. One such part must not degrade the WHOLE page to
+    // `invalid_data`: the app would keep its older transcript (its context %
+    // stuck with it) while the separately projected session cost kept updating.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: sessionId,
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'msg_user_01',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    const questionPart = {
+      id: 'prt_q',
+      sessionID: sessionId,
+      messageID: 'msg_user_01',
+      type: 'text',
+      text: 'Question about the queue',
+    };
+    // Both shapes carry a well-formed persisted identity but a body this
+    // client cannot parse: a known type whose required `state` never arrived,
+    // and a part type this build does not know yet.
+    const toolPartWithoutState = {
+      id: 'prt_tool_no_state',
+      sessionID: sessionId,
+      messageID: 'msg_asst_01',
+      type: 'tool',
+      callID: 'call_1',
+      tool: 'bash',
+    };
+    const unknownTypePart = {
+      id: 'prt_future_01',
+      sessionID: sessionId,
+      messageID: 'msg_asst_01',
+      type: 'future-safe-part',
+    };
+
+    const readKiloSdkMessages = vi.fn();
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+    const app = makeApiApp();
+
+    // First read: the app loads the transcript once, before the new parts land.
+    readKiloSdkMessages.mockResolvedValueOnce({
+      messages: [{ info: userInfo, parts: [questionPart] }],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+    const first = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({
+      success: true,
+      history: {
+        messages: [{ info: { id: 'msg_user_01' } }],
+        omittedItemCount: 0,
+      },
+    });
+
+    // The session keeps receiving parts: the newest assistant message now
+    // carries parts the read contract cannot parse alongside a parseable text
+    // part. The page must still render the newest messages.
+    readKiloSdkMessages.mockResolvedValueOnce({
+      messages: [
+        { info: userInfo, parts: [questionPart] },
+        {
+          info: assistantInfo,
+          parts: [
+            toolPartWithoutState,
+            unknownTypePart,
+            {
+              id: 'prt_t_ok',
+              sessionID: sessionId,
+              messageID: 'msg_asst_01',
+              type: 'text',
+              text: 'latest answer',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+    const second = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({
+      success: true,
+      history: {
+        messages: [
+          { info: { id: 'msg_user_01' } },
+          {
+            info: { id: 'msg_asst_01' },
+            parts: [{ id: 'prt_t_ok', type: 'text', text: 'latest answer' }],
+          },
+        ],
+        omittedItemCount: 2,
+      },
+    });
+  });
+
+  it('drops-and-counts a part whose persisted identity is well-formed but carries no sessionID', async () => {
+    // The ingest seam (`SessionItemSchema` needs `id` + `messageID` on a part)
+    // and the Durable Object's own part reader (`readPartIdentity`) both define
+    // a persisted part's identity without `sessionID`
+    // (services/session-ingest/src/util/compaction.ts keys a part by its message
+    // id and part id). A
+    // stored part that omits `sessionID` is therefore well-formed persisted
+    // data; its body still fails this read contract's union (every variant
+    // declares `sessionID`). It must be dropped and counted, not pushed back
+    // through to degrade the whole page to `invalid_data`.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: sessionId,
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'msg_user_01',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [
+        {
+          info: userInfo,
+          parts: [
+            {
+              id: 'prt_q',
+              sessionID: sessionId,
+              messageID: 'msg_user_01',
+              type: 'text',
+              text: 'Question about the queue',
+            },
+          ],
+        },
+        {
+          info: assistantInfo,
+          parts: [
+            // Persisted identity `id` + `messageID`, no `sessionID`, unknown body.
+            { id: 'prt_future_01', messageID: 'msg_asst_01', type: 'future-safe-part' },
+            {
+              id: 'prt_t_ok',
+              sessionID: sessionId,
+              messageID: 'msg_asst_01',
+              type: 'text',
+              text: 'latest answer',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: {
+        messages: [
+          { info: { id: 'msg_user_01' } },
+          {
+            info: { id: 'msg_asst_01' },
+            parts: [{ id: 'prt_t_ok', type: 'text', text: 'latest answer' }],
+          },
+        ],
+        omittedItemCount: 1,
+      },
+    });
+  });
+
+  it('still degrades the page to invalid_data when a part has no persisted identity', async () => {
+    // `SessionItemSchema` rejects a part without both `id` and `messageID`, so
+    // such a part is corrupt rather than merely unreadable by this build: the
+    // page keeps surfacing it as `invalid_data` instead of dropping it.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [
+        {
+          info: userInfo,
+          parts: [{ id: 'prt_orphan', type: 'text', text: 'orphan messageID' }],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'invalid_data' },
+    });
+  });
+
   it('DELETE /session/:sessionId revokes cache, clears DO, and deletes descendants child-first', async () => {
     const parentSessionId = 'ses_12345678901234567890123456';
     const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
@@ -1429,13 +2953,15 @@ describe('api routes', () => {
       organizationId: null,
       cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
     });
-    // Recursive CTE
     fns.executeResult.mockResolvedValueOnce({
       rows: [
         { session_id: childSessionId, has_access: true },
         { session_id: parentSessionId, has_access: true },
       ],
     });
+    fns.selectResult
+      .mockResolvedValueOnce([{ worktreeId: null, scopeId: 'cloud-agent-session-scope-1' }])
+      .mockResolvedValueOnce([{ worktreeId: null }]);
     // Rows selected for session.deleted events
     fns.selectResult.mockResolvedValueOnce([
       {
@@ -1471,6 +2997,8 @@ describe('api routes', () => {
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
     );
+    const connectionStub = { clearSession: vi.fn(async () => undefined) };
+    vi.mocked(getUserConnectionDO).mockReturnValue(connectionStub as never);
 
     const app = makeApiApp();
     const env = makeTestEnv();
@@ -1483,7 +3011,13 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
 
-    const deletedRowsPredicate = fns.selectWhere.mock.calls[0]?.[0];
+    const deletedRowsPredicate = fns.selectWhere.mock.calls
+      .map(([predicate]) => predicate)
+      .find(
+        predicate =>
+          predicate instanceof SQL &&
+          new PgDialect().sqlToQuery(predicate).sql.includes('"session_id" in')
+      );
     if (!(deletedRowsPredicate instanceof SQL)) {
       throw new Error('Expected pre-delete predicate');
     }
@@ -1517,6 +3051,8 @@ describe('api routes', () => {
       sessionId: parentSessionId,
     });
     expect(ingestStub.clear).toHaveBeenCalledTimes(2);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(env, { kiloUserId: 'usr_test' });
+    expect(connectionStub.clearSession.mock.calls).toEqual([[childSessionId], [parentSessionId]]);
     expect(notifyUserSessionEvent).toHaveBeenNthCalledWith(1, env, 'usr_test', {
       type: 'session.deleted',
       data: {
@@ -1565,7 +3101,6 @@ describe('api routes', () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ success: false, error: 'session_not_found' });
-    expect(fns.select).not.toHaveBeenCalled();
     expect(fns.delete).not.toHaveBeenCalled();
     expect(fns.transaction).not.toHaveBeenCalled();
   });
@@ -1621,8 +3156,12 @@ describe('api routes', () => {
       git_branch: null,
       created_on_platform: null,
       cloud_agent_session_scope_id: null,
+      cloud_agent_session_id: 'workspace_12345678-1234-4234-9234-123456789abc',
+      cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc',
     };
     fns.selectResult
+      .mockResolvedValueOnce([{ worktreeId: orgSession.cloud_agent_worktree_id, scopeId: null }])
+      .mockResolvedValueOnce([{ started: null }])
       .mockResolvedValueOnce([orgSession])
       .mockResolvedValueOnce([orgSession])
       .mockResolvedValueOnce([]);
@@ -1674,6 +3213,7 @@ describe('api routes', () => {
     fns.selectResult
       .mockResolvedValueOnce([parentRow])
       .mockResolvedValueOnce([parentRow])
+      .mockResolvedValueOnce([parentRow])
       .mockResolvedValueOnce([{ session_id: childSessionId }]);
 
     const sessionCache = { remove: vi.fn(async () => undefined) };
@@ -1714,6 +3254,7 @@ describe('api routes', () => {
     fns.selectResult
       .mockResolvedValueOnce([childRow])
       .mockResolvedValueOnce([childRow])
+      .mockResolvedValueOnce([childRow])
       .mockResolvedValueOnce([]);
 
     const sessionCache = { remove: vi.fn(async () => undefined) };
@@ -1747,6 +3288,71 @@ describe('api routes', () => {
       kiloUserId: 'usr_test',
       sessionId: childSessionId,
     });
+  });
+
+  it('DELETE /session/:sessionId service audience refuses a session whose worktree is deleting', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult
+      .mockResolvedValueOnce([
+        { worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc', scopeId: null },
+      ])
+      .mockResolvedValueOnce([{ started: '2026-11-06T00:00:00.000Z' }]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'worktree_deleting' });
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(sessionCache.remove).not.toHaveBeenCalled();
+    expect(ingestStub.clear).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /session/:sessionId service audience refuses a scoped session whose root worktree is deleting', async () => {
+    const sessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult
+      .mockResolvedValueOnce([
+        { worktreeId: null, scopeId: 'workspace_12345678-1234-4234-9234-123456789abc' },
+      ])
+      .mockResolvedValueOnce([{ worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc' }])
+      .mockResolvedValueOnce([{ started: '2026-11-06T00:00:00.000Z' }]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'worktree_deleting' });
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(sessionCache.remove).not.toHaveBeenCalled();
+    expect(ingestStub.clear).not.toHaveBeenCalled();
   });
 
   it('DELETE /session/:sessionId service audience clears DO/cache when the row is already gone', async () => {
@@ -1783,11 +3389,96 @@ describe('api routes', () => {
     expect(ingestStub.clear).toHaveBeenCalledTimes(1);
   });
 
-  it('POST /session/:sessionId/share returns a JWT for an existing generation', async () => {
+  it.each(
+    sessionShareDurationSchema.options.flatMap(duration =>
+      [false, true].map(include_new_messages => ({ duration, include_new_messages }))
+    )
+  )('creates a share with $duration / $include_new_messages', async shareOptions => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.executeResult.mockResolvedValueOnce({
-      rows: [{ public_id: '11111111-1111-4111-8111-111111111111' }],
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    fns.executeResult.mockImplementation(async query => {
+      if (!(query instanceof SQL)) throw new Error('Expected share query');
+      return { rows: [{ public_id: new PgDialect().sqlToQuery(query).params[0] }] };
+    });
+    const ingestStub = shareIngestStub();
+    const capturedAt = Date.now() - 10000;
+    ingestStub.captureShareInfo.mockResolvedValue(capturedAt);
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shareOptions),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { share_token: string };
+    const token = await verifySessionShareToken(makeTestEnv(), body.share_token);
+    expect(token).toMatchObject(shareOptions);
+    if (token?.version !== 2) throw new Error('Expected current token');
+    expect(token.exp).toBe(getSessionShareExpiresAt(shareOptions.duration, token.iat) ?? undefined);
+    if (shareOptions.include_new_messages) {
+      expect(ingestStub.captureShareInfo).not.toHaveBeenCalled();
+    } else {
+      expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(token.jti, shareOptions.duration);
+      expect(token.shared_at).toBe(capturedAt);
+    }
+  });
+
+  it.each([
+    '{"duration":"100d"}',
+    '{"duration":null}',
+    '{"include_new_messages":"true"}',
+    'null',
+    '{',
+  ])('rejects invalid share options before mutation: %s', async body => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+        body,
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(400);
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized share options before reading JSON or mutating state', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+        body: JSON.stringify({ padding: 'x'.repeat(2048) }),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(413);
+    expect(fns.transaction).not.toHaveBeenCalled();
+  });
+
+  it('POST /session/:sessionId/share rotates the generation and returns a JWT', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+    let sharedPublicId: string | undefined;
+    fns.executeResult.mockImplementationOnce(async query => {
+      if (!(query instanceof SQL)) {
+        throw new Error('Expected share query');
+      }
+      const generated = new PgDialect().sqlToQuery(query);
+      expect(generated.sql).not.toContain('COALESCE');
+      sharedPublicId = generated.params[0] as string;
+      return { rows: [{ public_id: sharedPublicId }] };
     });
 
     const app = makeApiApp();
@@ -1799,23 +3490,41 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { share_token: string };
+    const body = (await res.json()) as { share_token: string; public_id: string };
     expect(body).toMatchObject({ success: true });
     expect(body).toHaveProperty('share_token', expect.any(String));
-    expect(body).not.toHaveProperty('public_id');
+    /* The capability it wrote, so the app can tell its own link from one a later
+       rotation made. */
+    expect(body.public_id).toBe(sharedPublicId);
+    expect(sharedPublicId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(sharedPublicId, '7d');
     await expect(verifySessionShareToken(makeTestEnv(), body.share_token)).resolves.toMatchObject({
       sub: 'ses_12345678901234567890123456',
-      jti: '11111111-1111-4111-8111-111111111111',
+      jti: sharedPublicId,
     });
   });
 
-  it('POST /session/:sessionId/share reuses the generation while minting a current token', async () => {
+  it('POST /session/:sessionId/share invalidates the previous generation', async () => {
     vi.useFakeTimers();
     try {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);
-      fns.executeResult.mockResolvedValue({
-        rows: [{ public_id: '11111111-1111-4111-8111-111111111111' }],
+      fns.selectResult.mockResolvedValue([{ publicId: null }]);
+      const ingestStub = shareIngestStub();
+      vi.mocked(getSessionIngestDO).mockReturnValue(
+        ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+      );
+      const issuedPublicIds: string[] = [];
+      fns.executeResult.mockImplementation(async query => {
+        if (!(query instanceof SQL)) {
+          throw new Error('Expected share query');
+        }
+        const generated = new PgDialect().sqlToQuery(query);
+        const publicId = generated.params[0] as string;
+        issuedPublicIds.push(publicId);
+        return { rows: [{ public_id: publicId }] };
       });
 
       const app = makeApiApp();
@@ -1838,20 +3547,25 @@ describe('api routes', () => {
       );
       const second = (await secondResponse.json()) as { share_token: string };
 
-      expect(first.share_token).not.toBe(second.share_token);
+      expect(issuedPublicIds).toHaveLength(2);
+      expect(issuedPublicIds[0]).not.toBe(issuedPublicIds[1]);
+      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(1, issuedPublicIds[0], '7d');
+      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(2, issuedPublicIds[1], '7d');
       await expect(
         verifySessionShareToken(makeTestEnv(), first.share_token)
       ).resolves.toMatchObject({
         sub: 'ses_12345678901234567890123456',
-        jti: '11111111-1111-4111-8111-111111111111',
+        jti: issuedPublicIds[0],
         iat: Math.floor(firstIssuedAt.getTime() / 1000),
+        shared_at: firstIssuedAt.getTime(),
       });
       await expect(
         verifySessionShareToken(makeTestEnv(), second.share_token)
       ).resolves.toMatchObject({
         sub: 'ses_12345678901234567890123456',
-        jti: '11111111-1111-4111-8111-111111111111',
-        iat: Math.floor(firstIssuedAt.getTime() / 1000) + 1,
+        jti: issuedPublicIds[1],
+        iat: Math.floor((firstIssuedAt.getTime() + 1000) / 1000),
+        shared_at: firstIssuedAt.getTime() + 1000,
       });
       expect(fns.executeResult).toHaveBeenCalledTimes(2);
     } finally {
@@ -1859,17 +3573,24 @@ describe('api routes', () => {
     }
   });
 
-  it('POST /session/:sessionId/share sets public_id when missing and returns a JWT', async () => {
+  it('POST /session/:sessionId/share sets a fresh public_id and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
     fns.executeResult.mockImplementationOnce(async query => {
       if (!(query instanceof SQL)) {
         throw new Error('Expected share query');
       }
       const generated = new PgDialect().sqlToQuery(query);
       expect(generated.sql).toContain('INNER JOIN "organizations"');
-      expect(generated.sql).toContain('"organizations"."deleted_at" IS NULL');
+      expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
       expect(generated.sql).toContain('"organization_memberships"."kilo_user_id" = $4');
+      expect(generated.sql).not.toContain('COALESCE');
+      expect(generated.sql).toContain('SET public_id = $1');
       return { rows: [{ public_id: generated.params[0] }] };
     });
 
@@ -1885,12 +3606,24 @@ describe('api routes', () => {
     const json: unknown = await res.json();
     expect(json).toMatchObject({ success: true });
     expect(json).toHaveProperty('share_token', expect.any(String));
-    expect(json).not.toHaveProperty('public_id');
+    expect(json).toHaveProperty('public_id', expect.any(String));
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      ),
+      '7d'
+    );
   });
 
   it('POST /session/:sessionId/share rejects an authoritative access failure', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
     fns.executeResult.mockResolvedValueOnce({ rows: [] });
 
     const app = makeApiApp();
@@ -1903,13 +3636,95 @@ describe('api routes', () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ success: false, error: 'session_not_found' });
-    expect(resolveAccessibleKiloSession).not.toHaveBeenCalled();
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    );
+  });
+
+  it('POST /session/:sessionId/share returns 404 before capture when the session is not accessible', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue(null);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+    expect(fns.executeResult).not.toHaveBeenCalled();
+  });
+
+  it('POST /session/:sessionId/share maps a deleted DO to session_not_found', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    const ingestStub = shareIngestStub();
+    ingestStub.captureShareInfo.mockRejectedValue(new Error('Session deleted'));
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it('POST /session/:sessionId/share does not rotate when signing fails', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+      }),
+      makeTestEnv({
+        SESSION_SHARE_JWT_SECRET_PROD: {
+          get: vi.fn(async () => {
+            throw new Error('secret unavailable');
+          }),
+        },
+      })
+    );
+
+    expect(res.status).toBe(500);
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledTimes(1);
+    error.mockRestore();
   });
 
   it('POST /session/:sessionId/unshare clears public_id when session exists', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+    fns.selectResult.mockResolvedValueOnce([{ publicId: 'retired-generation' }]);
 
     const app = makeApiApp();
     const res = await app.fetch(
@@ -1921,6 +3736,8 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
     expect(fns.updateSet).toHaveBeenCalled();
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledWith('retired-generation');
+    expect(fns.selectFor).toHaveBeenCalledWith('update');
   });
 
   it('GET /sessions/active returns sessions from UserConnectionDO', async () => {
@@ -2148,6 +3965,49 @@ describe('api routes', () => {
       );
       warn.mockRestore();
     });
+
+    it('falls back to heartbeat titles when the overlay query outlives its budget', async () => {
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const connectionStub = {
+          getActiveSessions: vi.fn(async () => [
+            baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
+          ]),
+        };
+        vi.mocked(getUserConnectionDO).mockReturnValue(
+          connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+        );
+        const { db, fns } = makeDbFakes();
+        vi.mocked(getWorkerDb).mockReturnValue(db);
+        // A Postgres hop that never answers. The overlay is an embellishment on
+        // an answer that is already complete, so the route must return the
+        // heartbeat titles instead of holding the caller open until its own
+        // budget expires — which is what made this route a client timeout.
+        fns.selectResult.mockImplementationOnce(() => Promise.withResolvers<unknown[]>().promise);
+
+        const app = makeApiApp();
+        const pending = app.fetch(
+          new Request('http://local/sessions/active', { method: 'GET' }),
+          makeTestEnv()
+        );
+        // Flush the request to its budget timer, then run past it.
+        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(5_000);
+        const res = await pending;
+
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+        expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A']);
+        expect(warn).toHaveBeenCalledWith(
+          'Failed to overlay active-session titles from Postgres (non-fatal)',
+          expect.objectContaining({ error: expect.stringContaining('exceeded its') })
+        );
+      } finally {
+        warn.mockRestore();
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('GET /user/cli returns 426 without Upgrade header', async () => {
@@ -2227,7 +4087,8 @@ describe('api routes', () => {
     const mint = vi.fn(async () => undefined);
     const ticketStub = { mint };
     const env = makeTestEnv();
-    env.CONNECTION_TICKET_DO.idFromName.mockReturnValue('ticket-do-id');
+    const objectId = 'a'.repeat(64);
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => objectId });
     env.CONNECTION_TICKET_DO.get.mockReturnValue(ticketStub);
 
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
@@ -2242,19 +4103,55 @@ describe('api routes', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ticket: string; expiresAt: number };
     expect(body).toEqual({
-      ticket: expect.any(String),
+      ticket: expect.stringMatching(new RegExp(`^${objectId}\\.[0-9a-f-]{36}$`)),
       expiresAt: 1_700_000_060,
     });
     expect(Number.isInteger(body.expiresAt)).toBe(true);
     expect(mint).toHaveBeenCalledWith({
       userId: 'usr_test',
       expiresAt: 1_700_000_060_000,
+      secret: body.ticket.split('.')[1],
     });
   });
 
-  // -------------------------------------------------------------------------
-  // GET /api/instances/active (W3)
-  // -------------------------------------------------------------------------
+  it('POST /user/web-ticket retries a retryable Durable Object error', async () => {
+    const reset = Object.assign(new Error('Durable Object reset because its code was updated.'), {
+      retryable: true,
+    });
+    const mint = vi.fn().mockRejectedValueOnce(reset).mockResolvedValueOnce(undefined);
+    const env = makeTestEnv();
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => 'b'.repeat(64) });
+    env.CONNECTION_TICKET_DO.get.mockReturnValue({ mint });
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/user/web-ticket', { method: 'POST' }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(mint).toHaveBeenCalledTimes(2);
+    expect(env.CONNECTION_TICKET_DO.newUniqueId).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /user/web-ticket answers 503 when the mint hop is transiently unavailable', async () => {
+    const overloaded = new Error('Durable Object is overloaded. Too much data queued.');
+    const mint = vi.fn().mockRejectedValue(overloaded);
+    const env = makeTestEnv();
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => 'c'.repeat(64) });
+    env.CONNECTION_TICKET_DO.get.mockReturnValue({ mint });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/user/web-ticket', { method: 'POST' }),
+      env
+    );
+    warn.mockRestore();
+
+    // Nothing was minted, so the caller can retry instead of receiving a 500
+    // it cannot classify.
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ success: false, error: 'ticket_mint_unavailable' });
+  });
 
   describe('GET /instances/active', () => {
     it('returns connected instances from the UserConnectionDO', async () => {
@@ -2262,6 +4159,16 @@ describe('api routes', () => {
         instances: [
           { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
           { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+          {
+            connectionId: 'cli-remote',
+            name: 'remote-host',
+            projectName: 'kilo',
+            version: '1.0.0',
+            kind: 'remote',
+            startedAt: '2026-08-28T12:34:56.789Z',
+            gitBranch: 'feature/identity',
+            capabilities: { attachments: true, sessionClone: true },
+          },
         ],
       }));
       vi.mocked(getUserConnectionDO).mockReturnValue({
@@ -2280,8 +4187,32 @@ describe('api routes', () => {
         instances: [
           { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
           { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+          {
+            connectionId: 'cli-remote',
+            name: 'remote-host',
+            projectName: 'kilo',
+            version: '1.0.0',
+            kind: 'remote',
+            startedAt: '2026-08-28T12:34:56.789Z',
+            gitBranch: 'feature/identity',
+            capabilities: { attachments: true, sessionClone: true },
+          },
         ],
       });
+    });
+
+    it('keeps a failed instance lookup distinct from an empty list', async () => {
+      vi.mocked(getUserConnectionDO).mockReturnValue({
+        getConnectedInstances: vi.fn(async () => {
+          throw new Error('instance lookup failed');
+        }),
+      } as never);
+      const res = await makeApiApp().fetch(
+        new Request('http://local/instances/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+      expect(res.status).toBe(500);
+      expect(await res.text()).toBe('Internal Server Error');
     });
 
     it('returns 200 with an empty `instances` array when no CLIs are connected', async () => {
@@ -2367,6 +4298,48 @@ describe('api routes', () => {
       );
       expect(badBody.status).toBe(400);
     });
+
+    it('returns 400 for a title over 200 characters', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(201) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(400);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
+
+    it('bounds the body the route parses', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /session/:sessionId/title', () => {
@@ -2436,6 +4409,24 @@ describe('api routes', () => {
           }),
         })
       );
+    });
+
+    it('bounds the body the route parses', async () => {
+      const { db } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000), generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     });
 
     it('generated applies over a default-pattern title', async () => {
@@ -2578,6 +4569,56 @@ describe('api routes', () => {
           data: expect.objectContaining({ changedAt: existingUpdatedAt }),
         })
       );
+    });
+
+    it('non-generated placeholder does not clobber a real title', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: 'Generated Title' })]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: defaultTitle, generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.update).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('non-generated placeholder cannot win against a concurrently committed real title', async () => {
+      // The select still sees the placeholder, but a real title commits before
+      // this UPDATE; the write predicate must refuse rather than clobber it.
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: defaultTitle })]);
+      fns.updateResult.mockResolvedValueOnce([]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: defaultTitle, generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.updateWhere).toHaveBeenCalled();
+      const whereArg = fns.updateWhere.mock.calls[0]?.[0] as SQL | undefined;
+      expect(whereArg).toBeInstanceOf(SQL);
+      const compiled = new PgDialect().sqlToQuery(whereArg!);
+      expect(compiled.sql).toMatch(/"title"\s+is\s+null/i);
+      expect(compiled.sql).toContain('~');
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     });
 
     it('preserves existing updated_at on title writes', async () => {

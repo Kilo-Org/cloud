@@ -1,0 +1,100 @@
+import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { type TextInput, View } from 'react-native';
+
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Button } from '@/components/ui/button';
+import { Plus } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Text } from '@/components/ui/text';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
+
+type AddFailure = { readonly kind: 'add-failed'; readonly message: string };
+
+/**
+ * The add row at the top of a list. Submitting adds the to-do and clears the
+ * field once the add is confirmed, so a failed add keeps the typed title in
+ * place with its error while several to-dos go in one after another.
+ */
+export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Promise<void> }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
+  const inputRef = useRef<TextInput>(null);
+  const textRef = useRef('');
+  const [hasText, setHasText] = useState(false);
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<AddFailure>();
+
+  async function submit() {
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
+    const title = textRef.current.trim();
+    if (title.length === 0) {
+      // Done on an empty field is not an attempt: nothing failed, so the line
+      // stays silent instead of claiming a connection error.
+      attempt.abandon();
+      return;
+    }
+    try {
+      await onAdd(title);
+      attempt.succeed();
+      // The user may have kept typing for the next to-do while this one was in
+      // flight; only the submitted title leaves the field.
+      if (textRef.current.trim() === title) {
+        textRef.current = '';
+        setHasText(false);
+        inputRef.current?.clear();
+      }
+    } catch {
+      // The title stays in the field, so the row's status line below is the
+      // only report the retry needs.
+      attempt.fail({ kind: 'add-failed', message: t('todos.list.addFailed') });
+    }
+  }
+
+  // The one disabled condition: the row cannot add without a title, and a
+  // second press while the add is in flight would duplicate it. The mark takes
+  // the ink that reads on the muted fill the disabled Button paints.
+  const addDisabled = !hasText || feedback.status === 'pending';
+
+  return (
+    <View className="mx-4 my-2 gap-1">
+      <View className="flex-row items-center gap-2 rounded-lg border border-border bg-secondary pr-1">
+        <Input
+          ref={inputRef}
+          placeholder={t('todos.list.addPlaceholder')}
+          accessibilityLabel={t('todos.list.addPlaceholder')}
+          onChangeText={text => {
+            textRef.current = text;
+            const next = text.trim().length > 0;
+            setHasText(current => (current === next ? current : next));
+            clearWhere(() => true);
+          }}
+          onSubmitEditing={() => {
+            void submit();
+          }}
+          submitBehavior="submit"
+          returnKeyType="done"
+          maxLength={TODO_TITLE_MAX_LENGTH}
+          className="min-w-0 flex-1 text-base text-foreground"
+        />
+        <Button
+          size="sm"
+          disabled={addDisabled}
+          onPress={() => {
+            void submit();
+          }}
+          accessibilityLabel={t('todos.list.add')}
+        >
+          <Plus size={16} color={addDisabled ? mutedDisabledInk : colors.primaryForeground} />
+          <Text>{t('todos.list.add')}</Text>
+        </Button>
+      </View>
+      <AccessibleStatus message={failure?.message ?? null} className="px-1 text-sm" />
+    </View>
+  );
+}

@@ -1,6 +1,7 @@
 import type { Env } from '../types.js';
 import { getPgDb } from '../db/pg.js';
 import { createCloudAgentReportStore } from './report-store.js';
+import type { CloudAgentAdmissionFailureCode } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export type CloudAgentSessionFailure =
   | { stage: 'sandbox_identity'; code: 'sandbox_id_derivation_failed' }
@@ -8,18 +9,26 @@ export type CloudAgentSessionFailure =
   | {
       stage: 'initial_admission';
       code: 'initial_admission_rejected' | 'initial_queue_full' | 'invalid_initial_intent';
+      admissionCode: CloudAgentAdmissionFailureCode;
     }
   | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
 
 type ReportingEnv = Pick<Env, 'HYPERDRIVE'>;
 
 export async function createCloudAgentSessionReport(
-  params: { cloudAgentSessionId: string; kiloSessionId: string; initialMessageId: string },
+  params: {
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+    initialMessageId: string;
+    occurredAt?: string;
+  },
   env: ReportingEnv
 ): Promise<void> {
   await createCloudAgentReportStore(getPgDb(env)).createSessionReport({
-    ...params,
-    occurredAt: new Date().toISOString(),
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    kiloSessionId: params.kiloSessionId,
+    initialMessageId: params.initialMessageId,
+    occurredAt: params.occurredAt ?? new Date().toISOString(),
   });
 }
 

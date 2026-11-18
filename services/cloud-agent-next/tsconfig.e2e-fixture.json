@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "worker-configuration.d.ts",
+    "test/e2e/fixture-contract.ts",
+    "test/e2e/fixture-stack.ts",
+    "test/e2e/fixture-resources.ts",
+    "test/e2e/fixture-provider.ts",
+    "test/unit/e2e/fixture-*.test.ts"
+  ]
+}

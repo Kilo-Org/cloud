@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "የወኪል ክፍለ-ጊዜዎ ማዘመኛ አለው",
+      "lowBalance": "ቀሪ ሂሳብዎ ትኩረት ይፈልጋል",
+      "spendAlert": "ወጪዎ ትኩረት ይፈልጋል",
+      "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል",
+      "securityUpdate": "የደህንነት ፍተሻ ማዘመኛ አለው",
+      "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ዝቅተኛ ቀሪ-ሂሳብ ማንቂያ",
+      "body": "የ{{organizationName}} ቀሪ ሂሳብ ከ${{minimumBalanceUsd}} በታች ወርዷል"
+    },
+    "spendAlert": {
+      "title": "የወጪ ማንቂያ",
+      "body": "የ{{scopeName}} ወጪ ${{amountUsd}} አልፏል"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} በ{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "አዲስ የደህንነት ግኝት ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "የSLA ማስጠንቀቂያ"
+    },
+    "securityFindingSlaBreach": {
+      "title": "የSLA ጥሰት"
+    }
+  },
+  "sessionReady": {
+    "body": "የKilo ክፍለ-ጊዜዎ ከስልክዎ ለመቆጣጠር ዝግጁ ነው"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

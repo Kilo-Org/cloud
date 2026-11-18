@@ -136,68 +136,6 @@ describe('isValidDayCount', () => {
   });
 });
 
-// Proves each of Task 9's three settings screens submits only the fields it
-// owns — the backend merges partial patches, so a screen accidentally
-// pulling in another screen's field would silently overwrite it on save.
-describe('Task 9 settings screens each own a disjoint field set', () => {
-  it('Automation screen patch contains exactly its 8 fields', () => {
-    const patch = {
-      autoAnalysisEnabled: true,
-      autoAnalysisMinSeverity: 'high',
-      autoAnalysisIncludeExisting: false,
-      autoRemediationEnabled: true,
-      autoRemediationMinSeverity: 'critical',
-      autoRemediationIncludeExisting: false,
-      autoDismissEnabled: true,
-      autoDismissConfidenceThreshold: 'medium',
-    };
-    expect(new Set(Object.keys(patch))).toEqual(
-      new Set([
-        'autoAnalysisEnabled',
-        'autoAnalysisMinSeverity',
-        'autoAnalysisIncludeExisting',
-        'autoRemediationEnabled',
-        'autoRemediationMinSeverity',
-        'autoRemediationIncludeExisting',
-        'autoDismissEnabled',
-        'autoDismissConfidenceThreshold',
-      ])
-    );
-  });
-
-  it('Notifications screen patch contains exactly its 5 fields', () => {
-    const patch = {
-      newFindingNotificationsEnabled: true,
-      newFindingNotificationMinSeverity: 'high',
-      slaNotificationsEnabled: true,
-      slaNotificationMinSeverity: 'low',
-      slaNotificationWarningDays: 3,
-    };
-    expect(new Set(Object.keys(patch))).toEqual(
-      new Set([
-        'newFindingNotificationsEnabled',
-        'newFindingNotificationMinSeverity',
-        'slaNotificationsEnabled',
-        'slaNotificationMinSeverity',
-        'slaNotificationWarningDays',
-      ])
-    );
-  });
-
-  it('SLA screen patch contains exactly its 5 fields', () => {
-    const patch = {
-      slaEnabled: true,
-      slaCriticalDays: 1,
-      slaHighDays: 7,
-      slaMediumDays: 30,
-      slaLowDays: 90,
-    };
-    expect(new Set(Object.keys(patch))).toEqual(
-      new Set(['slaEnabled', 'slaCriticalDays', 'slaHighDays', 'slaMediumDays', 'slaLowDays'])
-    );
-  });
-});
-
 // Proves the notification screen's SLA warning lead time and the SLA
 // screen's four day fields can never reach the backend when the typed text
 // isn't a valid 1-365 whole number — dirty-invalid omits "Save" from the

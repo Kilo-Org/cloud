@@ -1,34 +1,39 @@
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
+import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import {
-  isSecurityConfigurationError,
-  isSecuritySyncRetryable,
-  SECURITY_CONFIGURATION_COPY,
-} from '@/lib/hooks/use-security-agent-mutations';
+  type DismissFailure,
+  isDismissFailureRetryable,
+  resolveDismissFailure,
+} from '@/components/security-agent/dismiss-finding-failure';
+import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
+import { securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
 // pairs from the task brief, matching web's dismissal reason picker.
 const DISMISS_REASONS = [
-  { value: 'fix_started', label: 'A fix has already started' },
-  { value: 'no_bandwidth', label: 'No bandwidth is available' },
-  { value: 'tolerable_risk', label: 'The risk is tolerable' },
-  { value: 'inaccurate', label: 'The finding is inaccurate' },
-  { value: 'not_used', label: 'Vulnerable code is not used' },
+  { value: 'fix_started', labelKey: 'securityAgent.dismiss.reasonFixStarted' },
+  { value: 'no_bandwidth', labelKey: 'securityAgent.dismiss.reasonNoBandwidth' },
+  { value: 'tolerable_risk', labelKey: 'securityAgent.dismiss.reasonTolerableRisk' },
+  { value: 'inaccurate', labelKey: 'securityAgent.dismiss.reasonInaccurate' },
+  { value: 'not_used', labelKey: 'securityAgent.dismiss.reasonNotUsed' },
 ] as const;
 
 type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
@@ -42,22 +47,14 @@ type DismissFindingScreenProps = {
   findingId: string;
 };
 
-function DismissFindingSkeleton() {
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Dismiss finding" modal />
-      <View className="gap-6 px-6 pt-4">
-        <Skeleton className="h-[224px] w-full rounded-lg" />
-        <Skeleton className="h-24 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-md" />
-      </View>
-    </View>
-  );
-}
-
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
+  // This header is inside a formSheet route: the sheet edge owns the top
+  // clearance unless the sheet is the stack's first screen.
+  const modalTopInset = useFormSheetHeaderTopInset();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
@@ -90,7 +87,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     const comment = commentRef.current.trim();
     // Record the intent before the request so a pre-accept failure (no
     // command id) leaves a durable draft the retry card can restore.
-    dismissDraft.persist({ reason, comment, lastError: null, retryable: null });
+    dismissDraft.persist({ reason, comment, lastError: null, retryable: null, lastErrorKey: null });
     dismissFinding.mutate(
       { findingId, reason, comment: comment || undefined },
       {
@@ -106,10 +103,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           dismissDraft.persist({
             reason,
             comment,
-            lastError: isSecurityConfigurationError(error)
-              ? SECURITY_CONFIGURATION_COPY
-              : error.message,
-            retryable: isSecuritySyncRetryable(error),
+            lastError: error.message,
+            lastErrorKey: securityMutationCopyKey(error),
+            retryable: isDismissFailureRetryable(error),
           });
         },
       }
@@ -118,14 +114,15 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   // Persist the reason and comment as the user types (debounced by the drafts
   // module), so a typed draft survives leave and reopen without a submit. The
-  // existing `lastError`/`retryable` are preserved: editing an unresolved
-  // failure must not clear the retry card until the user re-submits.
+  // existing `lastError`/`lastErrorKey`/`retryable` are preserved: editing an
+  // unresolved failure must not clear the retry card until the user re-submits.
   const persistOnType = (nextReason: DismissReason | null, nextComment: string) => {
     const existing = dismissDraft.draft;
     dismissDraft.persist({
       reason: nextReason ?? '',
       comment: nextComment,
       lastError: existing?.lastError ?? null,
+      lastErrorKey: existing?.lastErrorKey ?? null,
       retryable: existing?.retryable ?? null,
     });
   };
@@ -140,37 +137,49 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset={modalTopInset}
+        />
         <EmptyState
           icon={ShieldOff}
-          className="flex-1"
-          title="Finding not found"
-          description="This finding may have been removed, or you no longer have access to it."
+          title={t('securityAgent.dismiss.notFoundTitle')}
+          description={t('securityAgent.dismiss.notFoundDescription')}
         />
       </View>
     );
   }
 
-  if (findingQuery.isError) {
+  if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset={modalTopInset}
+        />
         <QueryError
-          className="flex-1"
-          message="Could not load this finding"
+          message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </View>
     );
   }
 
-  if (capability.isError) {
+  if (capability.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset={modalTopInset}
+        />
         <QueryError
-          className="flex-1"
-          message="Could not check dismiss permissions"
+          message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />
       </View>
@@ -191,12 +200,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset={modalTopInset}
+        />
         <EmptyState
           icon={ShieldOff}
-          className="flex-1"
-          title="Can't dismiss this finding"
-          description="Only organization owners and billing managers can dismiss findings."
+          title={t('securityAgent.dismiss.cannotDismissTitle')}
+          description={t('securityAgent.dismiss.cannotDismissDescription')}
         />
       </View>
     );
@@ -205,33 +218,77 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset={modalTopInset}
+        />
         <EmptyState
           icon={ShieldOff}
-          className="flex-1"
-          title="Can't dismiss this finding"
-          description="This finding has already been resolved and no longer accepts a dismissal."
+          title={t('securityAgent.dismiss.cannotDismissTitle')}
+          description={t('securityAgent.dismiss.alreadyResolvedDescription')}
         />
       </View>
     );
   }
 
+  const dismissFailure: DismissFailure | null = resolveDismissFailure(
+    dismissFinding.isError ? dismissFinding.error : null,
+    dismissDraft.draft
+  );
   // A terminal rejection ended the intent, so disable the CTA and let the
   // inline copy explain the outcome.
-  const dismissBlocked = dismissFinding.isError && !isSecuritySyncRetryable(dismissFinding.error);
+  const dismissBlocked = dismissFailure?.kind === 'terminal';
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Dismiss finding" modal />
+      <ScreenHeader
+        className="px-6"
+        title={t('securityAgent.dismiss.title')}
+        modal
+        modalTopInset={modalTopInset}
+      />
       <ScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pb-8 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
+        {/* The dismissal is irreversible on GitHub, so the form names its
+            target the way finding-details-panel.tsx does: the title, then the
+            repository, then the package. Every line wraps instead of
+            truncating — a long title must stay readable to confirm the
+            finding. */}
+        <View className="gap-1 rounded-lg bg-secondary p-3">
+          <Text className="text-base font-medium">{finding.title}</Text>
+          <Text variant="muted" className="text-xs">
+            {finding.repo_full_name}
+          </Text>
+          <Text variant="muted" className="text-xs">
+            {finding.package_name} ({finding.package_ecosystem})
+          </Text>
+        </View>
+        {findingQuery.isError ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.dismiss.couldNotLoad')}
+            isRetrying={findingQuery.isFetching}
+            onRetry={() => void findingQuery.refetch()}
+          />
+        ) : null}
+        {capability.isError ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.dismiss.couldNotCheckPermissions')}
+            isRetrying={capability.isFetching}
+            onRetry={() => void capability.refetch()}
+          />
+        ) : null}
         <PillGroup
-          label="Reason"
-          options={DISMISS_REASONS}
+          label={t('securityAgent.dismiss.reason')}
+          options={DISMISS_REASONS.map(option => ({
+            value: option.value,
+            label: t(option.labelKey),
+          }))}
           value={reason}
           disabled={false}
           onChange={value => {
@@ -240,16 +297,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           }}
         />
 
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Comment (optional)
+        <View className="gap-1.5">
+          <Text className="text-sm font-medium text-muted-foreground">
+            {t('securityAgent.dismiss.commentLabel')}
           </Text>
           <TextInput
-            accessibilityLabel="Dismissal comment"
-            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+            accessibilityLabel={t('securityAgent.dismiss.commentLabel')}
+            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
             multiline
             textAlignVertical="top"
-            placeholder="Add context for this dismissal…"
+            placeholder={t('securityAgent.dismiss.commentPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={dismissDraft.draft?.comment ?? ''}
             onChangeText={value => {
@@ -259,19 +316,15 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           />
         </View>
 
-        {dismissFinding.isError && (
-          <Text className="text-sm text-destructive">
-            {isSecurityConfigurationError(dismissFinding.error)
-              ? SECURITY_CONFIGURATION_COPY
-              : dismissFinding.error.message}
-          </Text>
+        {dismissFailure === null ? null : (
+          <Text className="text-sm text-destructive">{dismissFailure.message}</Text>
         )}
 
         <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
           {dismissFinding.isPending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
+            <ActivityIndicator size="small" color={mutedDisabledInk} />
           ) : null}
-          <Text className="text-primary-foreground">Dismiss finding</Text>
+          <Text>{t('securityAgent.dismiss.title')}</Text>
         </Button>
       </ScrollView>
     </View>

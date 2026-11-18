@@ -1,4 +1,3 @@
-/** Dialog for managing repo-profile bindings with repo picker. */
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -40,6 +39,7 @@ import {
   useProfiles,
   useCombinedProfiles,
 } from '@/hooks/useCloudAgentProfiles';
+import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
 
 type Platform = 'github' | 'gitlab';
 
@@ -74,13 +74,19 @@ export function RepoProfileBindingsDialog({
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
 
-  // Fetch repo bindings
   const { data: bindings, isLoading: isBindingsLoading } = useRepoBindings({
     organizationId,
     enabled: open,
   });
 
-  // Fetch profiles
+  const { data: permissions } = useCloudAgentSettingsCanManage({
+    organizationId,
+    enabled: open,
+  });
+  // Locked only once the server says so. While the query loads or if it fails,
+  // the controls stay enabled and the server still rejects a non-manager.
+  const canManage = permissions?.canManage !== false;
+
   const { data: personalProfiles } = useProfiles({
     enabled: open && !organizationId,
   });
@@ -91,7 +97,6 @@ export function RepoProfileBindingsDialog({
 
   const profiles = organizationId ? combinedProfiles?.orgProfiles : personalProfiles;
 
-  // Fetch repositories (same pattern as NewSessionPanel)
   const { data: githubRepoData, isLoading: isLoadingGitHubRepos } = useQuery(
     organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
@@ -214,6 +219,11 @@ export function RepoProfileBindingsDialog({
         </DialogHeader>
 
         <div className="max-h-[50vh] overflow-y-auto py-4">
+          {!canManage && (
+            <p className="text-muted-foreground mb-4 text-sm" role="note">
+              Only organization owners and admins can change repository defaults.
+            </p>
+          )}
           {isBindingsLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -375,7 +385,7 @@ export function RepoProfileBindingsDialog({
                           variant="ghost"
                           size="icon"
                           className="text-destructive hover:text-destructive h-7 w-7 shrink-0"
-                          disabled={unbindRepo.isPending}
+                          disabled={unbindRepo.isPending || !canManage}
                           onClick={() => handleUnbind(binding.repoFullName, binding.platform)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -391,7 +401,7 @@ export function RepoProfileBindingsDialog({
 
         <DialogFooter className="flex justify-between sm:justify-between">
           {!isAdding && (
-            <Button variant="outline" onClick={() => setIsAdding(true)}>
+            <Button variant="outline" disabled={!canManage} onClick={() => setIsAdding(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add default
             </Button>
@@ -404,10 +414,6 @@ export function RepoProfileBindingsDialog({
     </Dialog>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Internal sub-component for repo items in the Command list
-// ---------------------------------------------------------------------------
 
 function RepoCommandItem({
   repo,

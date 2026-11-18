@@ -1,19 +1,23 @@
-import type { TRPCContext } from '@/lib/trpc/init';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+import { createHash } from 'crypto';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationTarget,
   recordKiloAdminElevation,
   userTarget,
-} from '@/lib/admin/admin-access-log';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
 import {
   type getIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
-import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import {
+  shouldSyncProviderRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
-  upsertSecurityAgentConfig,
   saveSecurityAgentConfigWithRevision,
   setSecurityAgentEnabled,
 } from '@/lib/security-agent/db/security-config';
@@ -28,15 +32,22 @@ import {
 import { getDashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import {
   getSecurityAgentCommandStatus,
+  getSecurityAgentCommandStatuses,
   listActiveSecurityAgentCommands,
   markApplyAutoRemediationCommandAdmissionFailed,
   type SecurityAgentCommandStatusResponse,
 } from '@/lib/security-agent/db/security-commands';
-import { canStartAnalysis } from '@/lib/security-agent/db/security-analysis';
+import {
+  canStartAnalysis,
+  releaseAnalysisStartReservation,
+  tryReserveAnalysisRestartSlot,
+  tryReserveAnalysisStartSlot,
+} from '@/lib/security-agent/db/security-analysis';
 import {
   decorateFindingWithRemediation,
   decorateFindingsWithRemediation,
   getRemediationAttemptHistory,
+  type SecurityFindingWithRemediation,
 } from '@/lib/security-agent/db/security-remediation';
 import {
   SecurityAgentAuditReportInputSchema,
@@ -66,12 +77,21 @@ import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
   operation_ledgers,
   organizations,
+  security_audit_log,
   type OperationLedgerRow,
   type SecurityFinding,
 } from '@kilocode/db/schema';
-import { buildSecurityFindingAuditHumanActor } from '@kilocode/worker-utils/security-finding-audit';
-import { db } from '@/lib/drizzle';
-import { and, eq } from 'drizzle-orm';
+import {
+  buildSecurityFindingAuditHumanActor,
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+} from '@kilocode/worker-utils/security-finding-audit';
+import {
+  SECURITY_SYNC_PRECONDITION_CODES,
+  type SecuritySyncPreconditionCode,
+} from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,
   ListFindingsInputSchema,
@@ -85,6 +105,7 @@ import {
   CancelRemediationInputSchema,
   GetAnalysisInputSchema,
   GetCommandStatusInputSchema,
+  GetCommandStatusesInputSchema,
   DeleteFindingsByRepoInputSchema,
   GetDashboardStatsInputSchema,
   TrackSecurityAgentUiInteractionInputSchema,
@@ -100,6 +121,7 @@ import {
   type CancelRemediationInput,
   type GetAnalysisInput,
   type GetCommandStatusInput,
+  type GetCommandStatusesInput,
   type DeleteFindingsByRepoInput,
   type GetDashboardStatsInput,
   type TrackSecurityAgentUiInteractionInput,
@@ -132,13 +154,9 @@ import {
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
 
-// ---------------------------------------------------------------------------
-// Strategy types
-// ---------------------------------------------------------------------------
-
 type Owner = { type: 'user' | 'org'; id: string; userId: string };
 
-type Integration = Awaited<ReturnType<typeof getIntegrationForOwner>>;
+type Integration = Awaited<ReturnType<typeof getIntegrationForOwner>> | null;
 
 /**
  * TExtra represents additional input fields injected by the tRPC procedure middleware.
@@ -151,14 +169,64 @@ type SecurityAgentDeps<TExtra = {}> = {
   resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
   verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
   getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
+  getStatusIntegration?: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
   trackingExtras: (ctx: TRPCContext, input: TExtra) => { organizationId?: string };
 };
 
+/**
+ * What this router can read out of the owner's cached repository snapshot.
+ *
+ * `platform_integrations.repositories` is shared with other providers and is
+ * typed `number | string` ids, while the Security Agent matches a repository
+ * against `selected_repository_ids` by numeric id. The strict reader other
+ * modules use throws on an id it cannot match, and every procedure in this
+ * router that decorates a finding reads the snapshot, so one unreadable entry
+ * answered 500 for the whole findings surface at that owner: the list, the
+ * detail and the analysis panel. Read the snapshot once here, report what
+ * could not be matched, and let a damaged entry cost only that repository's
+ * id-scoped membership.
+ */
+type RepositorySnapshot = {
+  /** Entries this router can match against a selected repository id. */
+  repositories: PlatformRepository[];
+  /** Every full name in the snapshot, whatever its id. Reading a name never
+   * needs an id, so an unreadable id does not remove a repository here. */
+  fullNames: string[];
+  /** Entries whose id this router cannot match. */
+  unreadableCount: number;
+};
+
+function readRepositorySnapshot(owner: Owner, integration: Integration): RepositorySnapshot {
+  const snapshot = integration?.repositories ?? null;
+  if (!snapshot) {
+    return { repositories: [], fullNames: [], unreadableCount: 0 };
+  }
+  const repositories = snapshot.filter(
+    (repository): repository is PlatformRepository => typeof repository.id === 'number'
+  );
+  const unreadableCount = snapshot.length - repositories.length;
+  if (unreadableCount > 0) {
+    console.error('Security Agent could not match cached repository ids', {
+      ownerType: owner.type,
+      ownerId: owner.id,
+      unreadableCount,
+    });
+  }
+  return {
+    repositories,
+    fullNames: snapshot
+      .map(repository => repository.full_name)
+      .filter((name): name is string => !!name),
+    unreadableCount,
+  };
+}
+
 function getRepoFullNamesInScope(
+  owner: Owner,
   integration: Integration,
   config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
 ): string[] {
-  const repositories = requireNumericPlatformRepositories(integration?.repositories ?? null) ?? [];
+  const { repositories } = readRepositorySnapshot(owner, integration);
   if (config.repository_selection_mode === 'all') {
     return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
   }
@@ -198,13 +266,22 @@ async function resolveAuditReportOwner(
   };
 }
 
+/**
+ * When support access is ON the platform-admin unmask is removed, even for a
+ * real member admin; OFF preserves today's behavior.
+ */
+function platformAdminUnmaskEnabled(ctx: TRPCContext): boolean {
+  if (isSupportAccessEnabled()) return false;
+  return ctx.user.is_admin;
+}
+
 async function logPlatformAdminAuditReportAccess(params: {
   ctx: TRPCContext;
   owner: SecurityAgentAuditReportOwner;
   periodStart: string;
   periodEndExclusive: string;
 }): Promise<void> {
-  if (!params.ctx.user.is_admin) return;
+  if (!platformAdminUnmaskEnabled(params.ctx)) return;
 
   const securityOwner =
     params.owner.type === 'organization'
@@ -241,7 +318,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
     params.deps.resolveOwner(params.ctx, params.input)
   );
 
-  if (params.ctx.user.is_admin) {
+  if (platformAdminUnmaskEnabled(params.ctx)) {
     // `isRequestingUserKiloAdmin` below unmasks Kilo-admin and unattributed
     // actors that a customer would see as "Kilo Admin"/"Masked user". Recorded
     // before the query so an over-budget or failed report still attributes the
@@ -256,7 +333,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
     const report = await getSecurityAgentAuditReport({
       owner,
       input: params.input,
-      isRequestingUserKiloAdmin: params.ctx.user.is_admin,
+      isRequestingUserKiloAdmin: platformAdminUnmaskEnabled(params.ctx),
     });
     await logPlatformAdminAuditReportAccess({
       ctx: params.ctx,
@@ -273,10 +350,6 @@ async function assembleAuditReportResponse<TExtra>(params: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Security operation ledger (P1-A-08e)
-// ---------------------------------------------------------------------------
-//
 // The manual sync and finding dismissal procedures accept an optional
 // `operationKey`. When present, the handler admits a `security`-domain ledger
 // row BEFORE submitting to the security-sync Worker, and only then runs the
@@ -290,14 +363,30 @@ async function assembleAuditReportResponse<TExtra>(params: {
 // (network/5xx/lost correlation ids) marks the row `reconcile_pending` so a
 // same-key retry re-submits instead of re-executing blind.
 
-type SecurityLedgerIntent = 'manual_sync' | 'dismiss_finding';
+type SecurityLedgerIntent =
+  | 'manual_sync'
+  | 'dismiss_finding'
+  | 'start_analysis'
+  | 'apply_auto_remediation';
+
+const SECURITY_LEDGER_INTENTS: readonly SecurityLedgerIntent[] = [
+  'manual_sync',
+  'dismiss_finding',
+  'start_analysis',
+  'apply_auto_remediation',
+];
+
+function isSecurityLedgerIntent(value: string): value is SecurityLedgerIntent {
+  return (SECURITY_LEDGER_INTENTS as readonly string[]).includes(value);
+}
 
 /** The Worker's acceptance receipt and correlation ids. */
 type AcceptedCommandIds = {
   accepted: true;
   commandId: string;
-  runId: string;
-  messageId: string;
+  /** Correlation ids are absent for intents without a queue run (analysis). */
+  runId?: string;
+  messageId?: string;
 };
 
 type SecurityCommandResult =
@@ -336,6 +425,18 @@ function securitySyncLedgerResourceKey(owner: SecurityReviewOwner, repoFullName?
   return `security:manual_sync:${securityOwnerScopeKey(owner)}:${repoFullName ?? '*'}`;
 }
 
+/**
+ * Stable per-config-revision key for the enable-triggered sync: one stored
+ * configuration revision admits at most one sync command. A later enable
+ * transition or new scope produces a new revision, and therefore a new key.
+ */
+function enableSyncOperationKey(owner: SecurityReviewOwner, configRevision: number): string {
+  const digest = createHash('sha256')
+    .update(`security:enable_sync:${securityOwnerScopeKey(owner)}:${configRevision}`)
+    .digest('hex');
+  return `enable_sync:${digest}`;
+}
+
 /** Trimmed, whitespace-collapsed comment, so cosmetic spacing is not a key-reuse mismatch. */
 function normalizeDismissComment(comment?: string): string {
   return (comment ?? '').trim().replace(/\s+/g, ' ');
@@ -349,6 +450,11 @@ function securityDismissLedgerResourceKey(
   comment?: string
 ): string {
   return `security:dismiss_finding:${securityOwnerScopeKey(owner)}:${findingId}:${reason}:${normalizeDismissComment(comment)}`;
+}
+
+/** Security ledger resource identity for a manual analysis start. */
+function securityAnalysisLedgerResourceKey(owner: SecurityReviewOwner, findingId: string): string {
+  return `security:start_analysis:${securityOwnerScopeKey(owner)}:${findingId}`;
 }
 
 /**
@@ -398,10 +504,15 @@ function replayedSecurityResponse(canonical: Record<string, unknown>) {
 /**
  * Runs the Worker submission under an already-admitted row:
  * - acceptance records the provider reference durably, then returns accepted;
- * - a definitive pre-acceptance rejection settles the row `failed`;
+ * - a definitive pre-acceptance rejection settles the row `failed` and marks
+ *   the thrown error with `PRE_ACCEPTANCE_REJECTION` so callers can recover
+ *   admission-time state;
  * - an ambiguous transport outcome (BAD_GATEWAY) marks the row
  *   `reconcile_pending` and surfaces a retryable CONFLICT.
  */
+const PRE_ACCEPTANCE_REJECTION = Symbol('security.pre-acceptance-rejection');
+
+type PreAcceptanceTaggableError = Error & { [PRE_ACCEPTANCE_REJECTION]?: true };
 async function executeSecurityCommandSubmit(args: {
   row: OperationLedgerRow;
   intent: SecurityLedgerIntent;
@@ -422,7 +533,7 @@ async function executeSecurityCommandSubmit(args: {
     accepted = await args.submit();
   } catch (error) {
     if (error instanceof TRPCError && error.code === 'BAD_GATEWAY') {
-      // The ambiguous CONFLICT promises same-key reconciliation, so it is
+      // An ambiguous outcome promises same-key reconciliation, so it is
       // surfaced only once `reconcile_pending` is durable.
       await requireLedgerWrite(
         'We could not record this action. Please try again later.',
@@ -451,6 +562,10 @@ async function executeSecurityCommandSubmit(args: {
     } catch (settleError) {
       console.error('Failed to settle the security operation ledger row', settleError);
     }
+    const taggable = error as PreAcceptanceTaggableError;
+    if (taggable instanceof Error && Object.isExtensible(taggable)) {
+      taggable[PRE_ACCEPTANCE_REJECTION] = true;
+    }
     throw error;
   }
   // The Worker accepted, so an unrecorded provider reference must never yield a
@@ -465,8 +580,8 @@ async function executeSecurityCommandSubmit(args: {
         providerRef: accepted.commandId,
         canonicalResult: {
           commandId: accepted.commandId,
-          runId: accepted.runId,
-          messageId: accepted.messageId,
+          ...(accepted.runId !== undefined ? { runId: accepted.runId } : {}),
+          ...(accepted.messageId !== undefined ? { messageId: accepted.messageId } : {}),
         },
       })) !== null
   );
@@ -479,7 +594,8 @@ async function executeSecurityCommandSubmit(args: {
  * re-submit (the Worker owns the sync state, so reconciliation is a re-enqueue
  * under the same key); `duplicate_settled` replays the canonical result;
  * in-flight admissions conflict. Cross-intent key reuse is rejected before any
- * outcome is honored.
+ * outcome is honored, as is a row admitted in another organization scope
+ * (`organization_mismatch`).
  */
 async function runSecurityLedgerSubmit(args: {
   ctx: TRPCContext;
@@ -505,6 +621,12 @@ async function runSecurityLedgerSubmit(args: {
     // While an `admitted` row holds this lease, same-key retries conflict.
     leaseSeconds: 120,
   });
+
+  // A row stored in another organization scope belongs to a different
+  // operation, so it is refused before any outcome is honored.
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
@@ -575,7 +697,7 @@ async function settleSecurityLedgerForTerminalCommand(params: {
       )
       .limit(1);
     if (!row || isTerminalOperationStatus(row.status)) return;
-    if (row.intent !== 'manual_sync' && row.intent !== 'dismiss_finding') return;
+    if (!isSecurityLedgerIntent(row.intent)) return;
 
     await settleOperation(db, {
       rowId: row.id,
@@ -596,9 +718,76 @@ async function settleSecurityLedgerForTerminalCommand(params: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
+// The list response nulls `raw_data`, the raw Dependabot alert JSON. It is the
+// only heavy field no list UI reads. The detail procedure `getFinding` still
+// returns it. The web detail dialog is fed from the list
+// and reads `analysis` and `remediationSummary` (including `latestAttempt`),
+// so both stay fully intact. The decorator needs the full row, so the SQL
+// select stays untouched and the response nulls `raw_data` after decoration.
+
+function toFindingListItem(
+  finding: SecurityFindingWithRemediation
+): SecurityFindingWithRemediation {
+  return { ...finding, raw_data: null };
+}
+
+// The remediation panel renders the ordered remediation audit events for one
+// finding. The list decorator stays lean (P2-GH-45a); this detail-only query
+// reads the audit log directly. Only the remediation members of
+// REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS are timeline events — finding
+// lifecycle events are not.
+
+// The remediation members of REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS are the
+// timeline events. Filtered from the worker-utils constant (not the
+// audit-log-service enum, which tests mock with a partial object) so the six
+// remediation action strings stay real.
+const REMEDIATION_TIMELINE_ACTIONS = REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS.filter(action =>
+  action.startsWith('security.remediation.')
+);
+
+type RemediationTimelineEvent = {
+  action: string;
+  occurredAt: string;
+};
+
+async function getRemediationTimeline(findingId: string): Promise<RemediationTimelineEvent[]> {
+  const effectiveAt = sql<string>`COALESCE(${security_audit_log.occurred_at}, ${security_audit_log.created_at})`;
+  const rows = await db
+    .select({
+      action: security_audit_log.action,
+      occurredAt: effectiveAt,
+    })
+    .from(security_audit_log)
+    .where(
+      and(
+        eq(security_audit_log.finding_id, findingId),
+        inArray(security_audit_log.action, [...REMEDIATION_TIMELINE_ACTIONS])
+      )
+    )
+    .orderBy(asc(effectiveAt));
+
+  return rows.map(row => ({
+    action: row.action,
+    occurredAt: new Date(row.occurredAt).toISOString(),
+  }));
+}
+
+/**
+ * A Security Agent precondition rejection: a manual sync, or enabling the agent
+ * with no repository in scope. The English message stays the web surface's
+ * copy; `upstreamCode` is the stable marker the mobile ledger maps onto
+ * translated catalog copy, so the device never parses server prose.
+ */
+function securityAgentPreconditionError(
+  precondition: SecuritySyncPreconditionCode,
+  message: string
+): TRPCError {
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message,
+    cause: new UpstreamApiError(precondition),
+  });
+}
 
 export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps<TExtra>) {
   // tRPC passes `undefined` for no-input procedures.  For the personal router
@@ -630,17 +819,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 1. getPermissionStatus
-    // -----------------------------------------------------------------------
     getPermissionStatus: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
-      const integration = await deps.getIntegration(ctx, extra);
+      const integration = await (deps.getStatusIntegration ?? deps.getIntegration)(ctx, extra);
 
       if (!integration || integration.integration_status !== 'active') {
         return {
           hasIntegration: false,
           hasPermissions: false,
+          integrationId: null,
           reauthorizeUrl: null,
           authInvalidAt: integration?.auth_invalid_at ?? null,
           authInvalidReason: integration?.auth_invalid_reason ?? null,
@@ -654,6 +841,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       return {
         hasIntegration: true,
+        integrationId: integration.id,
         hasPermissions: hasEffectivePermissions,
         reauthorizeUrl: hasEffectivePermissions
           ? null
@@ -665,9 +853,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 2. getConfig
-    // -----------------------------------------------------------------------
     getConfig: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const owner = deps.resolveOwner(ctx, extra);
@@ -698,6 +883,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoRemediationEnabled: false,
           autoRemediationMinSeverity: 'high' as const,
           autoRemediationIncludeExisting: false,
+          autoRemediationRequireApproval: true,
           autoRemediationEnabledAt: null,
           remediationModelSlug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
           slaNotificationsEnabled: DEFAULT_SECURITY_AGENT_CONFIG.sla_notifications_enabled,
@@ -721,10 +907,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         result.config.analysis_model_slug ??
         DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL;
       const remediationModelSlug =
-        result.storedConfig.remediation_model_slug ??
-        result.config.remediation_model_slug ??
-        analysisModelSlug ??
-        DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
+        result.config.remediation_model_slug ?? DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
       return {
         hasConfig: true,
@@ -750,6 +933,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         autoRemediationEnabled: result.config.auto_remediation_enabled ?? false,
         autoRemediationMinSeverity: result.config.auto_remediation_min_severity ?? 'high',
         autoRemediationIncludeExisting: result.config.auto_remediation_include_existing ?? false,
+        autoRemediationRequireApproval: result.config.auto_remediation_require_approval ?? true,
         autoRemediationEnabledAt: result.config.auto_remediation_enabled_at ?? null,
         remediationModelSlug,
         slaNotificationsEnabled: result.config.sla_notifications_enabled,
@@ -760,9 +944,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 3. saveConfig
-    // -----------------------------------------------------------------------
     saveConfig: {
       inputSchema: SaveSecurityConfigInputSchema,
       handler: async ({
@@ -804,7 +985,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                 existingConfig.config.auto_remediation_include_existing,
               autoRemediationEnabledAt: existingConfig.config.auto_remediation_enabled_at,
               remediationModelSlug:
-                existingConfig.config.remediation_model_slug ?? existingAnalysisModelSlug,
+                existingConfig.config.remediation_model_slug ??
+                DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
               modelSlug: existingConfig.config.model_slug,
               triageModelSlug: existingTriageModelSlug,
               analysisModelSlug: existingAnalysisModelSlug,
@@ -841,12 +1023,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const remediationModelSlug =
           input.remediationModelSlug ??
           existingConfig?.storedConfig.remediation_model_slug ??
-          existingConfig?.config.remediation_model_slug ??
-          analysisModelSlug;
+          DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
-        // Enqueue backlog findings when include_existing becomes active — either
-        // because it was just toggled ON, or because auto-analysis was re-enabled
-        // while include_existing was already ON.
         const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
         const isAutoAnalysisOn =
           input.autoAnalysisEnabled ?? existingConfig?.config.auto_analysis_enabled ?? false;
@@ -876,16 +1054,23 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           isNowRemediationIncludeExisting &&
           !!input.autoRemediationMinSeverity &&
           input.autoRemediationMinSeverity !== existingConfig?.config.auto_remediation_min_severity;
+        const wasApprovalRequired =
+          existingConfig?.config.auto_remediation_require_approval ?? false;
+        const isNowApprovalRequired = input.autoRemediationRequireApproval ?? wasApprovalRequired;
+        const approvalJustTurnedOff = !isNowApprovalRequired && wasApprovalRequired;
 
         const shouldEnqueueRemediation =
           isAutoRemediationOn &&
           (remediationIncludeExistingJustTurnedOn ||
             autoRemediationReEnabled ||
-            remediationThresholdChanged);
+            remediationThresholdChanged ||
+            approvalJustTurnedOff);
 
         // Compare-and-set save: the config write, the include-existing analysis
         // enqueue, and the include-existing remediation command all commit in one
-        // transaction. A stale revision or an enqueue failure rolls back.
+        // transaction. A stale revision or an enqueue failure rolls back. The
+        // save carries no enable flag, so a settings save leaves the stored
+        // enabled state exactly as it is.
         const saveOutcome = await saveSecurityAgentConfigWithRevision({
           owner,
           config: {
@@ -909,6 +1094,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             auto_remediation_enabled: input.autoRemediationEnabled,
             auto_remediation_min_severity: input.autoRemediationMinSeverity,
             auto_remediation_include_existing: input.autoRemediationIncludeExisting,
+            auto_remediation_require_approval: input.autoRemediationRequireApproval,
             remediation_model_slug: remediationModelSlug,
             sla_notifications_enabled: input.slaNotificationsEnabled,
             sla_notification_min_severity: input.slaNotificationMinSeverity,
@@ -1024,9 +1210,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 4. setEnabled
-    // -----------------------------------------------------------------------
     setEnabled: {
       inputSchema: SetEnabledInputSchema,
       handler: async ({
@@ -1041,20 +1224,19 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const resourceId = deps.resolveResourceId(ctx, input);
 
-        // Get integration (needed for both permission check and sync)
         const integration = await deps.getIntegration(ctx, input);
 
-        // Check permissions before enabling
         if (input.isEnabled) {
           if (!integration || !hasSecurityReviewPermissions(integration)) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'GitHub App does not have vulnerability_alerts permission',
-            });
+            // Same stable code as the manual-sync refusal below, so a device maps
+            // it onto catalog copy instead of showing this English sentence.
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+              'GitHub App does not have vulnerability_alerts permission'
+            );
           }
         }
 
-        // Determine repository selection
         const existingConfig = await getSecurityAgentConfigWithStatus(owner);
         const selectionMode =
           input.repositorySelectionMode ??
@@ -1063,105 +1245,107 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const selectedIds =
           input.selectedRepositoryIds ?? existingConfig?.config.selected_repository_ids ?? [];
 
+        // Canonical selection and effective-repository keys, so ordering and
+        // duplicate ids never look like a scope change.
+        const requestedSelectionKey = `${selectionMode}:${[...new Set(selectedIds)]
+          .sort((a, b) => a - b)
+          .join(',')}`;
+        const storedSelectionKey = existingConfig
+          ? `${existingConfig.config.repository_selection_mode}:${[
+              ...new Set(existingConfig.config.selected_repository_ids),
+            ]
+              .sort((a, b) => a - b)
+              .join(',')}`
+          : null;
+
+        const repositoriesToSync = getRepoFullNamesInScope(owner, integration, {
+          repository_selection_mode: selectionMode,
+          selected_repository_ids: selectedIds,
+        });
+        const storedRepositories = existingConfig
+          ? getRepoFullNamesInScope(owner, integration, existingConfig.config)
+          : null;
+        const repositoriesToSyncChanged =
+          storedRepositories === null ||
+          [...new Set(storedRepositories)].sort().join('\n') !==
+            [...new Set(repositoriesToSync)].sort().join('\n');
+
         // Refuse enabling with an empty effective repo set: no repository would
-        // be synced or analyzed, so an enabled state would be misleading.
+        // be synced or analyzed, so an enabled state would be misleading. The
+        // sync path's no-repositories code marks it, so a device tells the user
+        // to pick repositories instead of showing this English sentence.
         if (input.isEnabled) {
-          const effectiveRepos = getRepoFullNamesInScope(integration, {
-            repository_selection_mode: selectionMode,
-            selected_repository_ids: selectedIds,
-          });
-          if (effectiveRepos.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Select at least one repository before enabling Security Agent.',
-            });
+          if (repositoriesToSync.length === 0) {
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'Select at least one repository before enabling Security Agent.'
+            );
           }
         }
 
-        // Always upsert the config when enabling to ensure it exists with the correct selection
+        const enableTransition = input.isEnabled && !existingConfig?.isEnabled;
+        const scopeConfigChanged = storedSelectionKey !== requestedSelectionKey;
+
+        // An enable that matches the stored configuration leaves existing state
+        // untouched: no write, no command, no event.
+        if (input.isEnabled && !enableTransition && !scopeConfigChanged) {
+          return { success: true };
+        }
+
+        let initialSync:
+          | { accepted: true; commandId: string; runId?: string; messageId?: string }
+          | undefined;
+        let initialSyncAdmissionFailed = false;
+
         if (input.isEnabled) {
-          await upsertSecurityAgentConfig(
+          // The enable flag is written in the same CAS transaction as the
+          // selection above it: enabling is this guarded transition, never a
+          // settings save.
+          const { newRevision } = await saveSecurityAgentConfigWithRevision({
             owner,
-            {
+            config: {
               repository_selection_mode: selectionMode,
               selected_repository_ids: selectedIds,
             },
-            ctx.user.id
-          );
-        }
+            isEnabled: true,
+            createdBy: ctx.user.id,
+            expectedRevision: existingConfig?.configRevision ?? null,
+          });
 
-        await setSecurityAgentEnabled(owner, input.isEnabled);
-
-        // When enabling, trigger an initial sync of repositories
-        if (input.isEnabled && integration) {
-          const installationId = integration.platform_installation_id;
-          if (installationId) {
-            const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-
-            let repositoriesToSync: string[];
-
-            if (selectionMode === 'all') {
-              repositoriesToSync = allRepos
-                .map(r => r.full_name)
-                .filter((name): name is string => !!name);
-            } else {
-              repositoriesToSync = allRepos
-                .filter(r => selectedIds.includes(r.id))
-                .map(r => r.full_name)
-                .filter((name): name is string => !!name);
-            }
-
-            if (repositoriesToSync.length > 0) {
-              let initialSync: Awaited<ReturnType<typeof submitManualSecuritySync>> | undefined;
-              let initialSyncAdmissionFailed = false;
-              try {
-                initialSync = await submitManualSecuritySync({
-                  owner: securityOwner,
-                  actor: {
-                    id: ctx.user.id,
-                    email: ctx.user.google_user_email,
-                    name: ctx.user.google_user_name,
-                  },
-                  origin: 'enable_initial_sync',
-                });
-              } catch (error) {
-                initialSyncAdmissionFailed = true;
-                console.error('Security Agent enabled but initial sync admission failed', error);
-              }
-
-              trackSecurityAgentEnabled({
-                distinctId: ctx.user.id,
-                userId: ctx.user.id,
-                ...deps.trackingExtras(ctx, input),
-                isEnabled: input.isEnabled,
-                repositorySelectionMode: selectionMode,
-                selectedRepoCount: repositoriesToSync.length,
-              });
-
-              logSecurityAudit({
+          if (
+            (enableTransition || repositoriesToSyncChanged) &&
+            integration?.platform_installation_id &&
+            repositoriesToSync.length > 0
+          ) {
+            const operationKey = enableSyncOperationKey(securityOwner, newRevision);
+            try {
+              const result = await runSecurityLedgerSubmit({
+                ctx,
                 owner: securityOwner,
-                actor_id: ctx.user.id,
-                actor_email: ctx.user.google_user_email,
-                actor_name: ctx.user.google_user_name,
-                action: SecurityAuditLogAction.ConfigEnabled,
-                resource_type: 'agent_config',
-                resource_id: resourceId,
-                after_state: { isEnabled: true, repositorySelectionMode: selectionMode },
+                intent: 'manual_sync',
+                operationKey,
+                resourceKey: securitySyncLedgerResourceKey(securityOwner),
+                submit: () =>
+                  submitManualSecuritySync({
+                    owner: securityOwner,
+                    actor: {
+                      id: ctx.user.id,
+                      email: ctx.user.google_user_email,
+                      name: ctx.user.google_user_name,
+                    },
+                    origin: 'enable_initial_sync',
+                    operationKey,
+                  }),
               });
-
-              return {
-                success: true,
-                initialSync,
-                initialSyncAdmissionFailed,
-              };
+              initialSync = result.kind === 'accepted' ? result.accepted : undefined;
+            } catch (error) {
+              initialSyncAdmissionFailed = true;
+              console.error('Security Agent enabled but initial sync admission failed', error);
             }
           }
+        } else {
+          await setSecurityAgentEnabled(owner, false);
         }
-
-        const effectiveRepoCount =
-          selectionMode === 'all'
-            ? (integration?.repositories || []).filter(r => !!r.full_name).length
-            : selectedIds.length;
 
         trackSecurityAgentEnabled({
           distinctId: ctx.user.id,
@@ -1169,7 +1353,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           ...deps.trackingExtras(ctx, input),
           isEnabled: input.isEnabled,
           repositorySelectionMode: selectionMode,
-          selectedRepoCount: effectiveRepoCount,
+          selectedRepoCount: integration ? repositoriesToSync.length : selectedIds.length,
         });
 
         logSecurityAudit({
@@ -1185,31 +1369,61 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           after_state: { isEnabled: input.isEnabled, repositorySelectionMode: selectionMode },
         });
 
-        return { success: true };
+        return input.isEnabled
+          ? { success: true, initialSync, initialSyncAdmissionFailed }
+          : { success: true };
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 5. getRepositories
-    // -----------------------------------------------------------------------
     getRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
+      const owner = deps.resolveOwner(ctx, extra);
       const integration = await deps.getIntegration(ctx, extra);
 
       if (!integration || integration.integration_status !== 'active') {
         return [];
       }
 
-      // Auto-fetch repositories from GitHub if not cached
-      let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-      if (repos.length === 0 && integration.platform_installation_id) {
-        const appType = integration.github_app_type || 'standard';
-        const fetchedRepos = await fetchGitHubRepositories(
-          integration.platform_installation_id,
-          appType
-        );
-        await updateRepositoriesForIntegration(integration.id, fetchedRepos);
-        repos = fetchedRepos;
+      const snapshot = readRepositorySnapshot(owner, integration);
+      let repos = snapshot.repositories;
+      // A snapshot this router cannot fully read is rebuilt from the provider, so
+      // the dropped repositories do not stay invisible in every repository
+      // picker. Otherwise the shared snapshot policy decides: a synchronized
+      // snapshot answers the list as-is, including an empty one, and only a
+      // snapshot that was never synchronized is read from the provider.
+      const cachedRepositories = integration.repositories ? snapshot.repositories : null;
+      if (
+        integration.platform_installation_id &&
+        (snapshot.unreadableCount > 0 ||
+          shouldSyncProviderRepositories({
+            forceRefresh: false,
+            cachedRepositories,
+            repositoriesSyncedAt: integration.repositories_synced_at ?? null,
+          }))
+      ) {
+        const readableCount = repos.length;
+        try {
+          const appType = integration.github_app_type || 'standard';
+          const fetchedRepos = await fetchGitHubRepositories(
+            integration.platform_installation_id,
+            appType,
+            integration.id
+          );
+          await updateRepositoriesForIntegration(integration.id, fetchedRepos);
+          repos = fetchedRepos;
+        } catch (error) {
+          // A snapshot nothing could be read from has no answer of its own, so
+          // it keeps the provider error. A partially read one still lists the
+          // entries it could read, and the next read retries the refresh.
+          if (readableCount === 0) {
+            throw error;
+          }
+          console.error('Could not refresh the cached GitHub repositories', {
+            ownerType: owner.type,
+            ownerId: owner.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       const repositoryDetails = repos.map(repo => ({
@@ -1232,7 +1446,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         availability = await checkDependabotAlertsAvailability(
           installationId,
           appType,
-          repositoryDetails
+          repositoryDetails,
+          integration.id
         );
       } catch (error) {
         console.error('Failed to check Dependabot alerts availability', {
@@ -1251,9 +1466,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       }));
     },
 
-    // -----------------------------------------------------------------------
-    // 6. listFindings
-    // -----------------------------------------------------------------------
     listFindings: {
       inputSchema: ListFindingsInputSchema,
       handler: async ({
@@ -1279,6 +1491,21 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           offset: input.offset,
         });
 
+        const foreignFindingIds = findings
+          .filter(finding => !deps.verifyFindingOwnership(finding, ctx, input))
+          .map(finding => finding.id);
+        if (foreignFindingIds.length > 0) {
+          console.error('Security finding list returned rows outside the requested owner scope', {
+            ownerType: owner.type,
+            ownerId: owner.id,
+            foreignFindingIds,
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Unable to list security findings',
+          });
+        }
+
         const concurrencyCheck = await canStartAnalysis(securityOwner);
         const [configWithStatus, integration] = await Promise.all([
           getSecurityAgentConfigWithStatus(owner),
@@ -1289,11 +1516,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           findings,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
 
         return {
-          findings: decoratedFindings,
+          findings: decoratedFindings.map(toFindingListItem),
           totalCount,
           runningCount: concurrencyCheck.currentCount,
           concurrencyLimit: concurrencyCheck.limit,
@@ -1301,9 +1528,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 7. getFinding
-    // -----------------------------------------------------------------------
     getFinding: {
       inputSchema: GetFindingInputSchema,
       handler: async ({
@@ -1340,23 +1564,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 8. getStats
-    // -----------------------------------------------------------------------
     getStats: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
       return await getSecurityFindingsSummary({ owner: securityOwner });
     },
 
-    // -----------------------------------------------------------------------
-    // 9. getLastSyncTime
-    // -----------------------------------------------------------------------
     getLastSyncTime: {
       inputSchema: ListFindingsInputSchema.pick({ repoFullName: true }),
       handler: async ({
@@ -1376,9 +1594,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 10. triggerSync
-    // -----------------------------------------------------------------------
     triggerSync: {
       inputSchema: TriggerSyncInputSchema,
       handler: async ({
@@ -1393,34 +1608,33 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const resourceId = deps.resolveResourceId(ctx, input);
 
-        // Get integration
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub integration not found or inactive',
-          });
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub integration not found or inactive'
+          );
         }
 
-        // Check permissions
         if (!hasSecurityReviewPermissions(integration)) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub App does not have vulnerability_alerts permission',
-          });
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+            'GitHub App does not have vulnerability_alerts permission'
+          );
         }
 
         const installationId = integration.platform_installation_id;
         if (!installationId) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub installation ID not found',
-          });
+          // Same reader-visible state as an inactive integration: the Kilo
+          // GitHub App is not usable for this owner until it is reconnected.
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub installation ID not found'
+          );
         }
 
-        const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+        const allRepos = readRepositorySnapshot(owner, integration).repositories;
 
-        // Resolve the sync scope (a specific repo, or every enabled repo).
         let syncScope:
           | { syncType: 'single_repo'; repoCount: number; repoFullName: string }
           | { syncType: 'all_repos'; repoCount: number };
@@ -1451,10 +1665,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                   .filter((name): name is string => !!name);
 
           if (repositoriesToSync.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'No repositories configured for security reviews',
-            });
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'No repositories configured for security reviews'
+            );
           }
           syncScope = { syncType: 'all_repos', repoCount: repositoriesToSync.length };
         }
@@ -1524,9 +1738,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 11. dismissFinding
-    // -----------------------------------------------------------------------
     dismissFinding: {
       inputSchema: DismissFindingInputSchema,
       handler: async ({
@@ -1539,7 +1750,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const input = rawInput;
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
 
-        // Get the finding
         const finding = await getSecurityFindingById(input.findingId);
         if (!finding) {
           throw new TRPCError({
@@ -1548,7 +1758,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Verify ownership
         if (!deps.verifyFindingOwnership(finding, ctx, input)) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -1556,7 +1765,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Get integration for GitHub API call
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
           throw new TRPCError({
@@ -1620,9 +1828,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 12. startAnalysis
-    // -----------------------------------------------------------------------
     startAnalysis: {
       inputSchema: StartAnalysisInputSchema,
       handler: async ({
@@ -1644,7 +1849,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Verify ownership
         if (!deps.verifyFindingOwnership(finding, ctx, input)) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -1659,38 +1863,78 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        if (!input.restartActive) {
-          const concurrencyCheck = await canStartAnalysis(securityOwner);
+        // Admission reserves the owner slot and the per-finding lease in one
+        // transaction, so concurrent starts cannot all pass a stale count. A
+        // restart keeps the finding's own running slot and only validates the
+        // owner cap under the same lock.
+        const reservation = input.restartActive
+          ? await tryReserveAnalysisRestartSlot(securityOwner, input.findingId)
+          : await tryReserveAnalysisStartSlot(securityOwner, input.findingId);
 
-          if (!concurrencyCheck.allowed) {
+        if (!reservation.reserved) {
+          if (reservation.reason === 'cap') {
             throw new TRPCError({
               code: 'TOO_MANY_REQUESTS',
-              message: `Maximum concurrent analyses reached (${concurrencyCheck.currentCount}/${concurrencyCheck.limit}). Please wait for existing analyses to complete.`,
+              message: `Maximum concurrent analyses reached (${reservation.currentCount}/${reservation.limit}). Please wait for existing analyses to complete.`,
             });
           }
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Analysis already in progress',
+          });
         }
 
-        const queued = await submitManualAnalysisStart({
-          findingId: input.findingId,
-          owner: securityOwner,
-          actorUserId: ctx.user.id,
-          requestedModels: {
-            model: input.model,
-            triageModel: input.triageModel,
-            analysisModel: input.analysisModel,
-          },
-          forceSandbox: input.forceSandbox,
-          retrySandboxOnly: input.retrySandboxOnly,
-          restartActive: input.restartActive,
-        });
+        // Analysis has no client `operationKey`, so each start attempt gets a
+        // fresh UUID key. The ledger row is admitted before submission and the
+        // Worker `commandId` is recorded as the provider reference, which the
+        // web observation settle later joins on to emit
+        // `security_command_settled` with the `start_analysis` intent.
+        let result: SecurityCommandResult;
+        try {
+          result = await runSecurityLedgerSubmit({
+            ctx,
+            owner: securityOwner,
+            intent: 'start_analysis',
+            operationKey: crypto.randomUUID(),
+            resourceKey: securityAnalysisLedgerResourceKey(securityOwner, input.findingId),
+            submit: async () => {
+              const { commandId } = await submitManualAnalysisStart({
+                findingId: input.findingId,
+                owner: securityOwner,
+                actorUserId: ctx.user.id,
+                requestedModels: {
+                  model: input.model,
+                  triageModel: input.triageModel,
+                  analysisModel: input.analysisModel,
+                },
+                forceSandbox: input.forceSandbox,
+                retrySandboxOnly: input.retrySandboxOnly,
+                restartActive: input.restartActive,
+              });
+              return { accepted: true, commandId };
+            },
+          });
+        } catch (error) {
+          // Release only for a definitive pre-acceptance rejection, tagged by
+          // the ledger submit after settling the row. Ambiguous outcomes and
+          // post-acceptance ledger-write failures keep the reservation while
+          // the ledger reconciles or the Worker owns the lifecycle.
+          const taggable = error as PreAcceptanceTaggableError;
+          if (!input.restartActive && taggable[PRE_ACCEPTANCE_REJECTION] === true) {
+            await releaseAnalysisStartReservation(input.findingId);
+          }
+          throw error;
+        }
 
-        return { success: true, ...queued };
+        if (result.kind === 'replayed') {
+          const commandId =
+            typeof result.canonical.commandId === 'string' ? result.canonical.commandId : undefined;
+          return { success: true, queued: true, commandId };
+        }
+        return { success: true, queued: true, commandId: result.accepted.commandId };
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 13. startRemediation
-    // -----------------------------------------------------------------------
     startRemediation: {
       inputSchema: StartRemediationInputSchema,
       handler: async ({
@@ -1725,6 +1969,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
         if (!queued.queued) return { success: false, ...queued };
 
+        // The Worker admits the remediation ledger row before the queue
+        // hand-off, so the terminal settle can never precede the admit.
+
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
           userId: ctx.user.id,
@@ -1736,9 +1983,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 14. retryRemediation
-    // -----------------------------------------------------------------------
     retryRemediation: {
       inputSchema: RetryRemediationInputSchema,
       handler: async ({
@@ -1774,6 +2018,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
         if (!queued.queued) return { success: false, ...queued };
 
+        // The Worker admits the remediation ledger row before the queue
+        // hand-off, so the terminal settle can never precede the admit.
+
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
           userId: ctx.user.id,
@@ -1785,9 +2032,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 15. cancelRemediation
-    // -----------------------------------------------------------------------
     cancelRemediation: {
       inputSchema: CancelRemediationInputSchema,
       handler: async ({
@@ -1816,9 +2060,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 16. getAnalysis
-    // -----------------------------------------------------------------------
     getAnalysis: {
       inputSchema: GetAnalysisInputSchema,
       handler: async ({
@@ -1838,7 +2079,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Verify ownership
         if (!deps.verifyFindingOwnership(finding, ctx, input)) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -1847,17 +2087,19 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         }
 
         const owner = deps.resolveOwner(ctx, input);
-        const [configWithStatus, integration, remediationAttempts] = await Promise.all([
-          getSecurityAgentConfigWithStatus(owner),
-          deps.getIntegration(ctx, input),
-          getRemediationAttemptHistory(input.findingId),
-        ]);
+        const [configWithStatus, integration, remediationAttempts, remediationTimeline] =
+          await Promise.all([
+            getSecurityAgentConfigWithStatus(owner),
+            deps.getIntegration(ctx, input),
+            getRemediationAttemptHistory(input.findingId),
+            getRemediationTimeline(input.findingId),
+          ]);
         const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
         const decoratedFinding = await decorateFindingWithRemediation({
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
 
         return {
@@ -1878,13 +2120,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           remediationSummary: decoratedFinding.remediationSummary ?? null,
           remediationCapability: decoratedFinding.remediationCapability,
           remediationAttempts,
+          remediationTimeline,
         };
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 17. getCommandStatus
-    // -----------------------------------------------------------------------
     getCommandStatus: {
       inputSchema: GetCommandStatusInputSchema,
       handler: async ({
@@ -1905,36 +2145,46 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 18. listActiveCommands
-    // -----------------------------------------------------------------------
+    // Compatibility: getCommandStatus (single) kept for older mobile clients; remove when all shipped clients call getCommandStatuses.
+    getCommandStatuses: {
+      inputSchema: GetCommandStatusesInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: GetCommandStatusesInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const commands = await getSecurityAgentCommandStatuses(securityOwner, input.commandIds);
+        for (const command of commands) {
+          await settleSecurityLedgerForTerminalCommand({ ctx, command });
+        }
+        return commands;
+      },
+    },
+
     listActiveCommands: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       return listActiveSecurityAgentCommands(deps.resolveSecurityOwner(ctx, extra));
     },
 
-    // -----------------------------------------------------------------------
-    // 19. getOrphanedRepositories
-    // -----------------------------------------------------------------------
     getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
+      const owner = deps.resolveOwner(ctx, extra);
 
-      // Get the current GitHub integration
       const integration = await deps.getIntegration(ctx, extra);
 
-      // Get list of accessible repository full names
-      const accessibleRepoFullNames: string[] = [];
-      if (integration && integration.integration_status === 'active') {
-        const repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-        for (const repo of repos) {
-          if (repo.full_name) {
-            accessibleRepoFullNames.push(repo.full_name);
-          }
-        }
-      }
+      // Orphan detection compares names, never ids: a repository whose cached
+      // id could not be matched is still connected, and calling its findings
+      // orphaned would offer them for deletion.
+      const accessibleRepoFullNames: string[] =
+        integration && integration.integration_status === 'active'
+          ? readRepositorySnapshot(owner, integration).fullNames
+          : [];
 
-      // Get orphaned repositories with finding counts
       const orphanedRepos = await getOrphanedRepositoriesWithFindingCounts({
         owner: securityOwner,
         accessibleRepoFullNames,
@@ -1943,9 +2193,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       return orphanedRepos;
     },
 
-    // -----------------------------------------------------------------------
-    // 15. deleteFindingsByRepository
-    // -----------------------------------------------------------------------
     deleteFindingsByRepository: {
       inputSchema: DeleteFindingsByRepoInputSchema,
       handler: async ({
@@ -1976,9 +2223,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 16. getAutoDismissEligible
-    // -----------------------------------------------------------------------
     getAutoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
@@ -1990,9 +2234,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 17. autoDismissEligible
-    // -----------------------------------------------------------------------
     autoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
@@ -2013,9 +2254,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 18. getAuditReport
-    // -----------------------------------------------------------------------
     getAuditReport: {
       inputSchema: SecurityAgentAuditReportInputSchema,
       handler: async ({
@@ -2033,9 +2271,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 19. getDashboardStats
-    // -----------------------------------------------------------------------
     getDashboardStats: {
       inputSchema: GetDashboardStatsInputSchema,
       handler: async ({
@@ -2049,7 +2284,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const owner = deps.resolveOwner(ctx, input);
 
-        // Get config for SLA targets
         const config = await getSecurityAgentConfigWithStatus(owner);
         const slaConfig = {
           slaCriticalDays: config?.config.sla_critical_days ?? 15,

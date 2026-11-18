@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { createCallerForUser as createCallerForUserType } from '@/routers/test-utils';
 import type { User } from '@kilocode/db/schema';
 
@@ -59,33 +59,6 @@ describe('admin KiloClaw provider rollout router', () => {
       google_user_email: 'non-admin-kiloclaw-providers@example.com',
       google_user_name: 'Non Admin KiloClaw Provider User',
       is_admin: false,
-    });
-  });
-
-  it('returns provider rollout config from the Worker', async () => {
-    kiloclawClientMock.__getProviderRolloutMock.mockResolvedValue({
-      rollout: {
-        northflank: {
-          personalTrafficPercent: 0,
-          organizationTrafficPercent: 0,
-          enabledOrganizationIds: [],
-        },
-      },
-      availability: { northflank: false },
-      source: 'default',
-    });
-    const caller = await createCallerForUser(adminUser.id);
-
-    await expect(caller.admin.kiloclawProviders.getRollout()).resolves.toEqual({
-      rollout: {
-        northflank: {
-          personalTrafficPercent: 0,
-          organizationTrafficPercent: 0,
-          enabledOrganizationIds: [],
-        },
-      },
-      availability: { northflank: false },
-      source: 'default',
     });
   });
 

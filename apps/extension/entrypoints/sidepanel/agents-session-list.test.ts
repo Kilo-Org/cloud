@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeSessionsQueryKey,
   historyEmptyMessage,
   mapActiveSessionRow,
   mapHistorySessionRow,
-  sessionHistoryQueryKey,
-  sessionSearchQueryKey,
+  queryErrorStatus,
   sessionStatusBadge,
 } from './agents-session-list';
-
-// ---- sessionStatusBadge ----
 
 describe('sessionStatusBadge()', () => {
   it('returns null for null status', () => {
@@ -86,8 +82,6 @@ describe('sessionStatusBadge()', () => {
   });
 });
 
-// ---- mapActiveSessionRow ----
-
 describe('mapActiveSessionRow()', () => {
   const baseSession = {
     connectionId: 'cli-owner-1',
@@ -138,8 +132,6 @@ describe('mapActiveSessionRow()', () => {
   });
 });
 
-// ---- mapHistorySessionRow ----
-
 describe('mapHistorySessionRow()', () => {
   const wireRow = {
     session_id: 'ses_history12345678901234567',
@@ -157,58 +149,6 @@ describe('mapHistorySessionRow()', () => {
   it('passes through null title', () => {
     const row = mapHistorySessionRow({ ...wireRow, title: null });
     expect(row.title).toBeNull();
-  });
-});
-
-// ---- Query key functions ----
-
-describe('query key functions', () => {
-  describe('activeSessionsQueryKey()', () => {
-    it('produces the expected key for personal (null org)', () => {
-      expect(activeSessionsQueryKey(null)).toStrictEqual(['agents', 'active-sessions', null]);
-    });
-
-    it('produces the expected key for an organization', () => {
-      expect(activeSessionsQueryKey('org-123')).toStrictEqual([
-        'agents',
-        'active-sessions',
-        'org-123',
-      ]);
-    });
-  });
-
-  describe('sessionHistoryQueryKey()', () => {
-    it('produces the expected key for personal (null org)', () => {
-      expect(sessionHistoryQueryKey(null)).toStrictEqual(['agents', 'session-history', null]);
-    });
-
-    it('produces the expected key for an organization', () => {
-      expect(sessionHistoryQueryKey('org-456')).toStrictEqual([
-        'agents',
-        'session-history',
-        'org-456',
-      ]);
-    });
-  });
-
-  describe('sessionSearchQueryKey()', () => {
-    it('produces the expected key for personal (null org) with a query string', () => {
-      expect(sessionSearchQueryKey(null, 'test query')).toStrictEqual([
-        'agents',
-        'session-search',
-        null,
-        'test query',
-      ]);
-    });
-
-    it('produces the expected key for an organization with a query string', () => {
-      expect(sessionSearchQueryKey('org-789', 'search term')).toStrictEqual([
-        'agents',
-        'session-search',
-        'org-789',
-        'search term',
-      ]);
-    });
   });
 });
 
@@ -232,5 +172,21 @@ describe('historyEmptyMessage()', () => {
     expect(historyEmptyMessage({ hasActiveSessions: false, isSearching: false })).toBe(
       'No sessions yet. Start your first session above.'
     );
+  });
+});
+
+describe('queryErrorStatus()', () => {
+  it('reads the status a tRPC client error carries on data', () => {
+    expect(queryErrorStatus({ data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 } })).toBe(402);
+  });
+
+  it('reads the status a tRPC client error carries on shape.data', () => {
+    expect(queryErrorStatus({ message: 'boom', shape: { data: { httpStatus: 500 } } })).toBe(500);
+  });
+
+  it('returns undefined when the error carries no status', () => {
+    expect(queryErrorStatus(new TypeError('Failed to fetch'))).toBeUndefined();
+    expect(queryErrorStatus(null)).toBeUndefined();
+    expect(queryErrorStatus({ message: 'Failed to fetch' })).toBeUndefined();
   });
 });

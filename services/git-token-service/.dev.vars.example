@@ -6,6 +6,10 @@ GITHUB_APP_ID=
 GITHUB_APP_PRIVATE_KEY=
 GITHUB_APP_CLIENT_ID=
 GITHUB_APP_CLIENT_SECRET=
+# Optional REST API base override for the user-token repo-access probe; the
+# local e2e GitHub stub sets GITHUB_API_BASE_URL in the root .env.local. Leave
+# unset in production so the probe uses real api.github.com.
+GITHUB_API_BASE_URL=
 # Dedicated active RSA/AES envelope keypair for persisted GitHub user tokens.
 # Generate once per environment outside the repository; store private.pem and private.env securely
 # and never commit them:

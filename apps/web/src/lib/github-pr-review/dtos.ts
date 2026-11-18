@@ -9,6 +9,29 @@ export const GitHubPrReviewAuthorSchema = z
   })
   .strict();
 
+/** A reviewer's latest state on the PR, or PENDING when only a request exists. */
+export const GitHubPrReviewReviewerSchema = GitHubPrReviewAuthorSchema.extend({
+  state: z.enum(['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING']),
+});
+
+/** A repository label. `color` is GitHub's 6-digit hex WITHOUT the leading `#`. */
+export const GitHubPrReviewLabelSchema = z
+  .object({
+    name: z.string().min(1),
+    color: z.string(),
+  })
+  .strict();
+
+/** An issue this PR closes when it merges — GitHub's "Development" sidebar box. */
+export const GitHubPrReviewLinkedIssueSchema = z
+  .object({
+    number: z.number().int().positive(),
+    title: z.string(),
+    url: z.string().url(),
+    closed: z.boolean(),
+  })
+  .strict();
+
 export const GitHubPrReviewOverviewSchema = z
   .object({
     number: z.number().int().positive(),
@@ -39,6 +62,19 @@ export const GitHubPrReviewOverviewSchema = z
       })
       .nullable(),
     reviewDecision: z.enum(['REVIEW_REQUIRED', 'APPROVED', 'CHANGES_REQUESTED']).nullable(),
+    labels: z.array(GitHubPrReviewLabelSchema),
+    assignees: z.array(GitHubPrReviewAuthorSchema),
+    // Empty when the GraphQL enrichment leg degraded — the overview still
+    // renders, it just omits the reviewer and linked-issue rows.
+    reviewers: z.array(GitHubPrReviewReviewerSchema),
+    linkedIssues: z.array(GitHubPrReviewLinkedIssueSchema),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+    closedAt: z.string().nullable(),
+    mergedAt: z.string().nullable(),
+    mergedBy: GitHubPrReviewAuthorSchema.nullable(),
+    /** Conversation comments plus review comments — the Discussion tab badge. */
+    commentCount: z.number().int().nonnegative(),
     repo: z
       .object({
         allowMergeCommit: z.boolean(),
@@ -78,6 +114,9 @@ export const GitHubPrReviewChecksResultSchema = z
         skipped: z.number().int().nonnegative(),
       })
       .strict(),
+    // Present only when the result is partial; omitted for complete listings
+    // so refs under the ceiling keep the existing result shape.
+    truncated: z.boolean().optional(),
   })
   .strict();
 export type GitHubPrReviewChecksResult = z.infer<typeof GitHubPrReviewChecksResultSchema>;
@@ -186,6 +225,19 @@ export const INBOX_PAGE_SIZE = 25;
 export const FILES_PAGE_SIZE = 50;
 export const FILES_MAX_PAGES = 60;
 export const FILE_LINES_MAX = 500;
+/**
+ * Byte ceiling for one file read behind the PR-review line procedures. GitHub's
+ * contents API inlines a body only up to this size, so it is the cut-off for a
+ * file the review surface serves. A larger file answers `too_large`, which the
+ * procedures surface as tRPC `PAYLOAD_TOO_LARGE`.
+ */
+export const FILE_READ_MAX_BYTES = 1024 * 1024;
+/** Fixed copy for a file above FILE_READ_MAX_BYTES; safe to show to a caller. */
+export const FILE_READ_TOO_LARGE_MESSAGE = `The file exceeds the ${FILE_READ_MAX_BYTES}-byte review read limit.`;
+// One listChecks leg reads at most CHECKS_MAX_PAGES × CHECKS_PAGE_SIZE entries
+// (5 × 100, GitHub's maximum page size).
+export const CHECKS_PAGE_SIZE = 100;
+export const CHECKS_MAX_PAGES = 5;
 export const REVIEW_THREADS_PAGE_SIZE = 50;
 export const REVIEW_THREAD_COMMENTS_PAGE_SIZE = 50;
 // Conversation (issue) comments on the first listReviewThreads page only.

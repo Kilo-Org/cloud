@@ -1,11 +1,11 @@
 import { type ReactElement } from 'react';
-import { Cloud, Code, Terminal } from '@/components/ui/icons';
+import { Cloud, Code, Monitor, Terminal } from '@/components/ui/icons';
 
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { SlackIcon } from '@/components/icons/slack-icon';
 import { repoNameFromGitUrl } from './session-list-helpers';
 
-type SessionPlatformIconKind = 'cloud' | 'terminal' | 'code' | 'slack' | 'github';
+type SessionPlatformIconKind = 'cloud' | 'terminal' | 'code' | 'desktop' | 'slack' | 'github';
 
 const PLATFORM_TO_KIND = {
   'cloud-agent': 'cloud',
@@ -13,6 +13,7 @@ const PLATFORM_TO_KIND = {
   cli: 'terminal',
   vscode: 'code',
   'agent-manager': 'code',
+  desktop: 'desktop',
   slack: 'slack',
   github: 'github',
 } satisfies Record<string, SessionPlatformIconKind>;
@@ -37,6 +38,15 @@ type RowPlatformPresentationInput = Readonly<{
   platform: string | null | undefined;
   variant: 'list' | 'card';
   needsInput: boolean;
+  /**
+   * True when the eyebrow draws the live status glyph (the row is live and
+   * not needs-input). The eyebrow decision
+   * (`selectSessionRowEyebrowRight`) suppresses the platform glyph there —
+   * a glyph beside the status mark reads as a stray second mark — so the
+   * spoken platform is withheld with it: VoiceOver must not name an icon
+   * the row does not draw.
+   */
+  statusGlyph: boolean;
   gitUrl: string | null | undefined;
 }>;
 
@@ -47,21 +57,27 @@ type RowPlatformPresentation = Readonly<{
 
 /**
  * Shared list/card platform glyph + VoiceOver rule for stored and live rows.
- * Icon only for `variant === 'list'` with a mapped platform. Platform is
- * spoken only when an icon is shown, the row is not needs-input, and the
- * eyebrow is a repo name (so the badge does not already speak the platform).
+ * Icon only for `variant === 'list'`, while the eyebrow draws no status glyph
+ * and names a repository: a row without a repository renders the platform
+ * label as its eyebrow, so the glyph would repeat the word beside it. Platform
+ * is spoken only when an icon is shown and the row is not needs-input.
  */
 export function selectRowPlatformPresentation({
   platform,
   variant,
   needsInput,
+  statusGlyph,
   gitUrl,
 }: RowPlatformPresentationInput): RowPlatformPresentation {
-  const iconKind = variant === 'list' ? sessionPlatformIconKind(platform) : null;
-  const spokenPlatform =
-    iconKind != null && !needsInput && repoNameFromGitUrl(gitUrl) != null
-      ? (platform ?? undefined)
-      : undefined;
+  // Truthiness, not a null check: a git URL whose project segment is empty
+  // yields `''`, and the label helpers fall back to the platform label there.
+  // The glyph must fall back with them, or the row states its type twice.
+  const eyebrowNamesRepo = Boolean(repoNameFromGitUrl(gitUrl));
+  const iconKind =
+    variant === 'list' && !statusGlyph && eyebrowNamesRepo
+      ? sessionPlatformIconKind(platform)
+      : null;
+  const spokenPlatform = iconKind != null && !needsInput ? (platform ?? undefined) : undefined;
   return {
     iconKind,
     spokenPlatform: spokenPlatform === '' ? undefined : spokenPlatform,
@@ -93,6 +109,9 @@ export function SessionPlatformIcon({
   }
   if (kind === 'code') {
     return <Code size={size} color={color} />;
+  }
+  if (kind === 'desktop') {
+    return <Monitor size={size} color={color} />;
   }
   if (kind === 'slack') {
     return <SlackIcon size={size} color={color} />;

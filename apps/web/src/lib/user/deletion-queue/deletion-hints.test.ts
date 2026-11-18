@@ -1,4 +1,35 @@
-import { deletionAttentionHint } from '@/lib/user/deletion-queue/deletion-hints';
+import {
+  deletionAttentionHint,
+  deletionManualSearchHref,
+} from '@/lib/user/deletion-queue/deletion-hints';
+
+describe('deletionManualSearchHref', () => {
+  it('preserves exact opaque user IDs in PostHog search links', () => {
+    expect(
+      deletionManualSearchHref({
+        stepKey: 'posthog',
+        userId: 'oauth/GitHub/Opaque ID+42',
+        email: 'ignored@example.com',
+      })
+    ).toEqual({
+      href: 'https://us.posthog.com/persons?search=oauth%2FGitHub%2FOpaque%20ID%2B42',
+      label: 'Open PostHog persons',
+    });
+  });
+
+  it.each([
+    ['posthog', 'https://us.posthog.com/persons?search=customer%40example.com'],
+    ['substack', 'https://kilocode.substack.com/publish/subscribers?s=customer%40example.com'],
+  ])('retains email normalization for ordinary %s searches', (stepKey, href) => {
+    expect(deletionManualSearchHref({ stepKey, email: ' Customer@Example.com ' })?.href).toBe(href);
+  });
+
+  it('leaves the PostHog search unfiltered when a user ID was scrubbed', () => {
+    expect(deletionManualSearchHref({ stepKey: 'posthog', userId: null })?.href).toBe(
+      'https://us.posthog.com/persons'
+    );
+  });
+});
 
 describe('deletionAttentionHint', () => {
   it('returns operator copy for known codes', () => {
@@ -14,6 +45,30 @@ describe('deletionAttentionHint', () => {
     expect(deletionAttentionHint('posthog_ambiguous')?.action).toMatch(/Mark done/);
     expect(deletionAttentionHint('already_active')?.title).toMatch(/already in the queue/);
     expect(deletionAttentionHint('usage_prefix_progress_invalid')?.action).not.toMatch(/Mark done/);
+    expect(deletionAttentionHint('delete_ready_missing')?.action).toMatch(/delete-ready/);
+    expect(deletionAttentionHint('completion_email_unavailable')).toEqual({
+      title: 'Completion email provider is not configured',
+      action: 'Repair the Mailgun configuration, then use Retry to send the completion email.',
+    });
+    expect(deletionAttentionHint('completion_email_rejected')?.action).toMatch(/Mark done/);
+    expect(deletionAttentionHint('completion_email_ambiguous')?.action).toMatch(
+      /without resending/
+    );
+    expect(deletionAttentionHint('session_worktree_deleting')?.title).toBe(
+      'A worktree deletion keeps refusing session deletes'
+    );
+  });
+
+  it('distinguishes 403 permission from expiration and explains TOTP reauth', () => {
+    expect(deletionAttentionHint('substack_forbidden')?.action).toMatch(/permission/);
+    expect(deletionAttentionHint('substack_forbidden')?.title).not.toMatch(/expired/i);
+    expect(deletionAttentionHint('substack_totp_invalid')?.action).toMatch(/base32/);
+    expect(deletionAttentionHint('substack_reauth_required')?.action).toMatch(/TOTP secret/);
+    expect(deletionAttentionHint('substack_reauth_method_unsupported')?.title).toMatch(/TOTP/);
+    expect(deletionAttentionHint('substack_reauth_rejected')?.action).toMatch(/TOTP secret/);
+    expect(deletionAttentionHint('substack_reauth_incomplete')?.action).toMatch(/Retry/);
+    expect(deletionAttentionHint('substack_cookie_persist_failed')?.action).toMatch(/fresh cookie/);
+    expect(deletionAttentionHint('substack_credential_changed')?.action).toMatch(/replaced/);
   });
 
   it('falls back for other HTTP statuses', () => {

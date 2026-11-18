@@ -35,7 +35,7 @@ const mockCredentialEncryptionConfig: {
   publicKey: Buffer.from(testKeyPair.publicKey).toString('base64'),
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID() {
     return mockCredentialEncryptionConfig.keyId;
   },

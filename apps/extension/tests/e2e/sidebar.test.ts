@@ -98,7 +98,7 @@ test('native side panel is outside the page DOM', async () => {
   }
 });
 
-test('dangerous mode conversation can eval against a normal tab', async () => {
+test('dangerous mode conversation can evaluate against a normal tab', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
   const seenChatBodies: { messages?: { role?: string }[] }[] = [];
@@ -122,7 +122,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
 
     const conversation = sidePanel.getByLabel('Agent conversation');
-    const emptyHint = conversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    const emptyHint = conversation.getByText(/Ask Kilo about /u);
     await expect(emptyHint).toBeVisible();
     const hintBox = await emptyHint.boundingBox();
     expect(hintBox).not.toBeNull();
@@ -139,16 +139,18 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await messageInput.fill('Inspect this tab and tell me the HTML length');
     await messageInput.press('Enter');
 
-    await expect(sidePanel.getByText('eval completed')).toBeVisible();
-    await expect(sidePanel.getByText('Code')).toBeHidden();
+    await expect(sidePanel.getByText('Evaluate JavaScript completed')).toBeVisible();
+    await expect(sidePanel.getByText('Arguments')).toBeHidden();
     await expect(sidePanel.getByText(/The selected tab HTML length is [0-9]+\./u)).toBeVisible();
-    const evalPanel = sidePanel.getByText('eval completed').locator('xpath=ancestor::details[1]');
+    const evalPanel = sidePanel
+      .getByText('Evaluate JavaScript completed')
+      .locator('xpath=ancestor::details[1]');
     await expectNonErrorToolPanel(evalPanel);
-    const evalBox = sidePanel.getByText('eval completed').locator('..');
+    const evalBox = sidePanel.getByText('Evaluate JavaScript completed').locator('..');
     const evalBoxRect = await requireBoundingBox(evalBox);
 
     await sidePanel.mouse.click(evalBoxRect.left + 4, evalBoxRect.top + 4);
-    await expect(sidePanel.getByText('Code')).toBeVisible();
+    await expect(sidePanel.getByText('Arguments')).toBeVisible();
     await expectEvalToolBoxNoHorizontalOverflow(sidePanel);
 
     await expect.poll(() => seenChatBodies.length).toBeGreaterThan(0);
@@ -158,9 +160,9 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     expect(roles.filter(role => role === 'assistant')).toHaveLength(0);
 
     await sidePanel.getByLabel('New conversation').click();
-    await expect(sidePanel.getByText('eval completed')).toBeHidden();
+    await expect(sidePanel.getByText('Evaluate JavaScript completed')).toBeHidden();
     const newConversation = sidePanel.getByLabel('Agent conversation');
-    const newEmptyHint = newConversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    const newEmptyHint = newConversation.getByText(/Ask Kilo about /u);
     await expect(newEmptyHint).toBeVisible();
     const newHintBox = await newEmptyHint.boundingBox();
     expect(newHintBox).not.toBeNull();

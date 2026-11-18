@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isProtectedDataAvailable } from '@/lib/protected-data';
+
 type TrpcUnauthorizedHandler = () => Promise<void> | void;
 
 // Sign out only on the server's context-level auth failure (invalid/missing
@@ -26,6 +28,18 @@ export function isUnauthorizedTrpcError(error: unknown): boolean {
   }
 
   return ShapedUnauthorizedErrorSchema.safeParse(error).success;
+}
+
+/**
+ * True when a failed authenticated call is an expected state rather than a
+ * defect: the keychain refused the credential read because the device is locked
+ * (the documented locked state), or the server refused the request's session
+ * credential, which the auth layer refreshes or ends itself. Neither proves
+ * anything about a credential the caller owns, so a caller must not latch a
+ * refusal or file an event for it.
+ */
+export function isExpectedAuthFailure(error: unknown): boolean {
+  return !isProtectedDataAvailable() || isUnauthorizedTrpcError(error);
 }
 
 export function setTrpcUnauthorizedHandler(handler: TrpcUnauthorizedHandler): () => void {

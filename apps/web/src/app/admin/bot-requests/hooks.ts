@@ -2,7 +2,7 @@
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
-import type { PageSize } from '@/types/pagination';
+import type { PageSize } from '@kilocode/web-shared/types/pagination';
 
 export function useWeeklyActiveUsers(days: number) {
   const trpc = useTRPC();

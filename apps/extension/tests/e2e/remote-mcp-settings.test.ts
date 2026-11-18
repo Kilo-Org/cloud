@@ -6,7 +6,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { z } from 'zod';
-import { mockKiloApi, workflowToolNames } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -208,26 +208,8 @@ const turnMockConfig = {
   secondCompletionEvents: [{ choices: [{ delta: { content: 'The weather in Skopje is 21C.' } }] }],
   // Both turns offer the safe tools plus the mapped MCP tool.
   toolNamesByCall: [
-    [
-      'get_page_snapshot',
-      'get_element_details',
-      'find_in_page',
-      'web_search',
-      'search_memories',
-      'get_memory',
-      ...workflowToolNames,
-      MAPPED_TOOL_NAME,
-    ],
-    [
-      'get_page_snapshot',
-      'get_element_details',
-      'find_in_page',
-      'web_search',
-      'search_memories',
-      'get_memory',
-      ...workflowToolNames,
-      MAPPED_TOOL_NAME,
-    ],
+    [...safeToolNames, MAPPED_TOOL_NAME],
+    [...safeToolNames, MAPPED_TOOL_NAME],
   ],
 };
 

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { isHomeFixtureConnectionLost, subscribeHomeFixture } from '@/lib/home-fixture';
 
 /**
  * Reactive binding to the shared user-web-connection transport
@@ -16,4 +17,33 @@ export function useUserWebConnectionState(): boolean {
     listener => connection.onConnectionChange(listener),
     () => connection.isConnected()
   );
+}
+
+type UserWebConnectionHealth = {
+  isConnected: boolean;
+  reconnectExhausted: boolean;
+};
+
+/**
+ * Reactive binding to both user-web transport signals: readiness and
+ * reconnect exhaustion. Readiness keeps driving the automatic
+ * `Reconnecting…` / `Connecting…` labels; exhaustion drives the explicit
+ * recovery UI (`Connection lost` + `Retry`).
+ */
+export function useUserWebConnectionHealth(): UserWebConnectionHealth {
+  const connection = useUserWebConnection();
+  const isConnected = useSyncExternalStore(
+    listener => connection.onConnectionChange(listener),
+    () => connection.isConnected()
+  );
+  const reconnectExhausted = useSyncExternalStore(
+    listener => connection.onReconnectExhaustionChange(listener),
+    () => connection.isReconnectExhausted()
+  );
+  // Dev-only `home-fixture/connection-lost` link (`home-fixture.ts`).
+  const fixtureLost = useSyncExternalStore(subscribeHomeFixture, isHomeFixtureConnectionLost);
+  if (fixtureLost) {
+    return { isConnected: false, reconnectExhausted: true };
+  }
+  return { isConnected, reconnectExhausted };
 }

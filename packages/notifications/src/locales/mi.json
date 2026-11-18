@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "He whakahoutanga tā tō wātū kaihoko",
+      "lowBalance": "Me aro ki tō toenga",
+      "spendAlert": "Me aro ki tō whakapaunga",
+      "securityFinding": "Me aro ki tētahi kitenga haumaru",
+      "securityUpdate": "He whakahoutanga tā tētahi whakamātautau haumaru",
+      "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Te whakatūpato toenga iti",
+      "body": "Kua heke te toenga o {{organizationName}} ki raro i te ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Te whakatūpato whakapaunga",
+      "body": "Kua eke te whakapaunga a {{scopeName}} ki runga ake i te ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "He kitenga haumaru hōu ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Te whakatūpato SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Te takahitanga SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Kua rite tō wātū Kilo kia whakahaere mai i tō waea"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

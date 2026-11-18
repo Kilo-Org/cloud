@@ -64,16 +64,13 @@ function parseCsvEmails(text: string): { emails: string[]; skippedLines: string[
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Skip header row if it looks like one
     if (i === 0 && line.toLowerCase().includes('email')) {
       continue;
     }
 
-    // Handle CSV with multiple columns - take first column or find email column
     const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g, ''));
     const email = parts.find(p => p.includes('@')) || parts[0];
 
-    // Basic email validation
     if (!email || !email.includes('@') || !email.includes('.')) {
       skippedLines.push(`Line ${i + 1}: Invalid email "${line}"`);
       continue;
@@ -116,22 +113,21 @@ function BulkCreditsTab() {
   const trpc = useTRPC();
   const { canManageCredits } = useAdminCreditManagementPermission();
 
-  // CSV upload state
   const [isDragging, setIsDragging] = useState(false);
   const [parsedEmails, setParsedEmails] = useState<string[]>([]);
   const [skippedLines, setSkippedLines] = useState<string[]>([]);
 
-  // User matching state
   const [matchedUsers, setMatchedUsers] = useState<MatchedUser[]>([]);
   const [unmatchedEmails, setUnmatchedEmails] = useState<UnmatchedEmail[]>([]);
   const [hasMatched, setHasMatched] = useState(false);
 
-  // Credit form state
   const [amountUsd, setAmountUsd] = useState<string>('');
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [description, setDescription] = useState<string>('');
 
-  // Results state
+  // A YYYY-MM-DD value is midnight UTC, so the earliest acceptable date is the next UTC day.
+  const minExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const [creditResults, setCreditResults] = useState<CreditResult[] | null>(null);
 
   const matchUsersMutation = useMutation(
@@ -490,6 +486,7 @@ function BulkCreditsTab() {
                         type="date"
                         value={expirationDate}
                         onChange={e => setExpirationDate(e.target.value)}
+                        min={minExpiryDate}
                         disabled={!canManageCredits}
                       />
                     </div>

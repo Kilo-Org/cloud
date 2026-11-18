@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
 import {
   useWebhookTriggers,
+  useInvokeWebhookTrigger,
   useGitHubIntegration,
   WebhookTriggersHeader,
   StatusFilter,
@@ -14,6 +15,7 @@ import {
   TriggersErrorState,
   GitHubIntegrationRequired,
   DeleteTriggerDialog,
+  InvokeTriggerDialog,
   type StatusFilterValue,
   type DeleteTarget,
 } from '@/components/webhook-triggers';
@@ -27,6 +29,7 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all');
   const [copiedTriggerId, setCopiedTriggerId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [invokeTargetId, setInvokeTargetId] = useState<string | null>(null);
 
   // Routes
   const routes = getWebhookRoutes(organizationId);
@@ -38,6 +41,7 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
   const { isIntegrationMissing, errorMessage } = useGitHubIntegration(organizationId);
   const { triggers, isLoading, isError, error, refetch, deleteTrigger, isDeleting } =
     useWebhookTriggers(organizationId);
+  const { invokeTrigger, isInvoking, invokingTriggerId } = useInvokeWebhookTrigger(organizationId);
 
   // Filter triggers based on status
   const filteredTriggers = useMemo(() => {
@@ -83,6 +87,19 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
     deleteTrigger(deleteTarget.triggerId);
     setDeleteTarget(null);
   }, [deleteTarget, deleteTrigger]);
+
+  const invokeTarget = useMemo(
+    () => triggers.find(trigger => trigger.triggerId === invokeTargetId),
+    [invokeTargetId, triggers]
+  );
+  const canInvokeTarget =
+    !isDeleting && invokeTarget?.activationMode === 'scheduled' && invokeTarget.isActive === true;
+
+  const handleConfirmInvoke = useCallback(async () => {
+    if (!invokeTarget || !canInvokeTarget || isInvoking) return false;
+
+    return (await invokeTrigger(invokeTarget.triggerId)) !== undefined;
+  }, [canInvokeTarget, invokeTarget, invokeTrigger, isInvoking]);
 
   return (
     <>
@@ -134,6 +151,10 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
           onDelete={handleDeleteClick}
           copiedTriggerId={copiedTriggerId}
           getEditUrl={routes.edit}
+          onInvoke={setInvokeTargetId}
+          isInvoking={isInvoking}
+          invokingTriggerId={invokingTriggerId}
+          isInvokeDisabled={isDeleting}
         />
       )}
 
@@ -144,6 +165,14 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
         isDeleting={isDeleting}
+      />
+      <InvokeTriggerDialog
+        open={invokeTargetId !== null}
+        triggerId={invokeTargetId}
+        isInvokable={canInvokeTarget}
+        isInvoking={isInvoking}
+        onClose={() => setInvokeTargetId(null)}
+        onConfirm={handleConfirmInvoke}
       />
     </>
   );

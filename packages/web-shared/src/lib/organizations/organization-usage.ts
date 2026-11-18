@@ -1,0 +1,450 @@
+import type {
+  MicrodollarUsage,
+  Organization,
+  OrganizationUserLimitType,
+  User,
+} from '@kilocode/db/schema';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  organization_user_limits,
+  organizations,
+  organization_memberships,
+  microdollar_usage,
+  sharedCliSessions,
+  cloud_agent_code_reviews,
+  kilocode_users,
+} from '@kilocode/db/schema';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { and, eq, sql, gte, lte, not, inArray, count } from 'drizzle-orm';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
+import { startInactiveSpan } from '@sentry/nextjs';
+import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
+import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
+import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { after } from 'next/server';
+import { subHours } from 'date-fns';
+
+import {
+  maybePerformAutoTopUp,
+  maybePerformOrganizationAutoTopUp,
+} from '@kilocode/web-shared/lib/autoTopUp';
+import {
+  accountBalanceMicrodollars,
+  findOrganizationMemberBalanceRow,
+  organizationMemberBalance,
+} from '@kilocode/worker-utils/account-access';
+
+/**
+ * The paying account's row as the balance check read it: the user for a personal request, the
+ * organization for an org request. The top-level facts are always the payer's own, so the guardrail
+ * admission reads them as that organization's balance. An organization payer also carries the
+ * organization family that bouncer reports.
+ */
+export type BalancePayer = {
+  createdAt: string;
+  microdollarsUsed: number;
+  totalMicrodollarsAcquired: number;
+  /**
+   * The organization family bouncer reports for an org payer: the root organization, with the sums
+   * over it and its children. Absent for a personal payer.
+   */
+  bouncer?: {
+    rootOrganizationId: string;
+    createdAt: string;
+    microdollarsUsed: number;
+    totalMicrodollarsAcquired: number;
+  };
+};
+
+export type BalanceAndOrgSettings = {
+  balance: number;
+  settings?: OrganizationSettings;
+  plan?: OrganizationPlan;
+  balanceLimitedByUserAllowance?: boolean;
+  /** Absent when the user is not a member of the organization. */
+  payer?: BalancePayer;
+};
+
+/**
+ * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
+ */
+export async function getBalanceAndOrgSettings(
+  organizationId: string | undefined,
+  user: User,
+  fromDb: typeof db = db,
+  funding?: 'usage'
+): Promise<BalanceAndOrgSettings> {
+  const balanceSpan = startInactiveSpan({ name: 'balance-check' });
+  let result: BalanceAndOrgSettings;
+  if (organizationId) {
+    result = await getBalanceForOrganizationUser(organizationId, user.id, { fromDb, funding });
+  } else {
+    const { balance, microdollars_used, total_microdollars_acquired } =
+      await getBalanceForUser(user);
+    result = {
+      balance,
+      balanceLimitedByUserAllowance: false,
+      payer: {
+        createdAt: user.created_at,
+        microdollarsUsed: microdollars_used,
+        totalMicrodollarsAcquired: total_microdollars_acquired,
+      },
+    };
+    if (funding === 'usage' && user.auto_top_up_enabled) {
+      after(() =>
+        maybePerformAutoTopUp({ ...user, microdollars_used, total_microdollars_acquired })
+      );
+    }
+  }
+  balanceSpan.end();
+  return result;
+}
+
+export async function getBalanceForOrganizationUser(
+  organizationId: Organization['id'],
+  userId: User['id'],
+  options: {
+    /** Limit type to check (defaults to 'daily') */
+    limitType?: OrganizationUserLimitType;
+    /** Database instance to use (defaults to primary db, pass readDb for replica) */
+    fromDb?: typeof db;
+    funding?: 'usage';
+    /** Instant the expiry cut-off is measured from. Defaults to the current time. */
+    now?: Date;
+    /** How many hours the cut-off trails `now` by. Defaults to no jitter. */
+    expiryJitterHours?: number;
+  } = {}
+): Promise<BalanceAndOrgSettings> {
+  const {
+    limitType = 'daily',
+    fromDb = db,
+    funding,
+    now = new Date(),
+    expiryJitterHours = 0,
+  } = options;
+  const startTime = performance.now();
+  logExceptInTest(
+    `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
+  );
+
+  const row = await findOrganizationMemberBalanceRow(fromDb, organizationId, userId, limitType);
+
+  if (!row) {
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    logExceptInTest(
+      `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: 0 (not a member)`
+    );
+
+    return { balance: 0, settings: {}, balanceLimitedByUserAllowance: false };
+  }
+
+  const {
+    microdollar_limit,
+    microdollar_usage,
+    settings,
+    require_seats,
+    plan,
+    auto_top_up_enabled,
+    next_credit_expiration_at,
+  } = row;
+
+  let { microdollars_used, total_microdollars_acquired } = row;
+
+  // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
+  const expireBefore = subHours(now, expiryJitterHours);
+  const needsExpirationComputation =
+    next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
+
+  if (needsExpirationComputation) {
+    const expiryResult = await processOrganizationExpirations(organizationId, expireBefore);
+    microdollars_used = expiryResult.microdollars_used;
+    total_microdollars_acquired = expiryResult.total_microdollars_acquired;
+  }
+
+  if (
+    funding === 'usage' &&
+    auto_top_up_enabled &&
+    (require_seats || microdollar_limit == null || microdollar_limit > (microdollar_usage || 0))
+  ) {
+    after(() =>
+      maybePerformOrganizationAutoTopUp({
+        id: organizationId,
+        auto_top_up_enabled,
+        total_microdollars_acquired,
+        microdollars_used,
+      })
+    );
+  }
+
+  // The family sums were read before any expiry above; the bouncer facts swap in this
+  // organization's current totals.
+  const payer: BalancePayer = {
+    createdAt: row.created_at,
+    microdollarsUsed: microdollars_used,
+    totalMicrodollarsAcquired: total_microdollars_acquired,
+    bouncer: {
+      rootOrganizationId: row.payerRootOrganizationId,
+      createdAt: row.payerRootCreatedAt,
+      microdollarsUsed: row.payerMicrodollarsUsed - row.microdollars_used + microdollars_used,
+      totalMicrodollarsAcquired:
+        row.payerTotalMicrodollarsAcquired -
+        row.total_microdollars_acquired +
+        total_microdollars_acquired,
+    },
+  };
+
+  const organization_balance = accountBalanceMicrodollars({
+    total_microdollars_acquired,
+    microdollars_used,
+  });
+  const { balanceMicrodollars, limitedByUserAllowance } = organizationMemberBalance({
+    ...row,
+    total_microdollars_acquired,
+    microdollars_used,
+  });
+
+  const endTime = performance.now();
+  const duration = endTime - startTime;
+  const detail = require_seats
+    ? 'require_seats: ignoring limits'
+    : microdollar_limit == null
+      ? 'no limits'
+      : `allowance: ${fromMicrodollars(microdollar_limit - (microdollar_usage ?? 0))}, org balance: ${fromMicrodollars(organization_balance)}`;
+  logExceptInTest(
+    `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(balanceMicrodollars)} (${detail})`
+  );
+
+  return {
+    balance: fromMicrodollars(balanceMicrodollars),
+    settings,
+    plan,
+    balanceLimitedByUserAllowance: limitedByUserAllowance,
+    payer,
+  };
+}
+
+export { mutateOrganizationUsage } from '@kilocode/worker-utils/organization-usage';
+import {
+  mutateOrganizationUsage,
+  type OrganizationUsageMutationResult,
+} from '@kilocode/worker-utils/organization-usage';
+export type {
+  OrganizationUsageMutationResult,
+  OrganizationUsageMutationInput,
+} from '@kilocode/worker-utils/organization-usage';
+
+export function scheduleOrganizationLowBalanceAlert(
+  organizationId: Organization['id'],
+  result: OrganizationUsageMutationResult
+): void {
+  const { crossedMinimumBalance, minimumBalanceMicrodollars, recipients } = result;
+  if (!crossedMinimumBalance || minimumBalanceMicrodollars == null) return;
+  after(() =>
+    sendOrganizationLowBalanceAlert(organizationId, minimumBalanceMicrodollars, recipients)
+  );
+}
+
+export async function sendOrganizationLowBalanceAlert(
+  organizationId: Organization['id'],
+  minimumBalanceMicrodollars: number,
+  recipients: string[]
+): Promise<void> {
+  logExceptInTest(
+    `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organizationId}: threshold=${fromMicrodollars(minimumBalanceMicrodollars)} recipients=${recipients.length}`
+  );
+  await sendBalanceAlertEmail({
+    organizationId,
+    minimum_balance: fromMicrodollars(minimumBalanceMicrodollars),
+    to: recipients,
+  }).catch(err => {
+    console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
+  });
+
+  // Best-effort mobile push: never block or fail the email path.
+  try {
+    const [org] = await db
+      .select({ name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1);
+    if (!org) {
+      console.error(
+        `[ingestOrganizationTokenUsage] Skipping low-balance push: org ${organizationId} not found`
+      );
+      return;
+    }
+
+    if (recipients.length === 0) return;
+
+    const memberUsers = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .innerJoin(
+        organization_memberships,
+        and(
+          eq(organization_memberships.kilo_user_id, kilocode_users.id),
+          eq(organization_memberships.organization_id, organizationId)
+        )
+      )
+      .where(inArray(kilocode_users.google_user_email, recipients));
+
+    const recipientUserIds = [...new Set(memberUsers.map(u => u.id))];
+    if (recipientUserIds.length === 0) return;
+
+    await dispatchLowBalancePush({
+      recipientUserIds,
+      organizationId,
+      organizationName: org.name,
+      minimumBalanceUsd: fromMicrodollars(minimumBalanceMicrodollars),
+    }).catch(err => {
+      console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
+    });
+  } catch (err) {
+    console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
+  }
+}
+export function scheduleOrganizationUsageAutoTopUp(result: OrganizationUsageMutationResult): void {
+  const organization = result.autoTopUpOrganization;
+  if (organization) {
+    after(() => maybePerformOrganizationAutoTopUp(organization));
+  }
+}
+
+export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
+  if (!usage.organization_id) return;
+  const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+  scheduleOrganizationLowBalanceAlert(usage.organization_id, result);
+  scheduleOrganizationUsageAutoTopUp(result);
+}
+
+const MAX_DAILY_LIMIT_USD = 2000;
+
+export async function updateOrganizationUserLimit(
+  organizationId: Organization['id'],
+  userId: User['id'],
+  dailyUsageLimitUsd: number | null,
+  limitType: OrganizationUserLimitType = 'daily',
+  txn?: DrizzleTransaction
+): Promise<void> {
+  const dbInstance = txn || db;
+
+  if (dailyUsageLimitUsd === null) {
+    // Delete existing limit for unlimited usage
+    await dbInstance
+      .delete(organization_user_limits)
+      .where(
+        and(
+          eq(organization_user_limits.organization_id, organizationId),
+          eq(organization_user_limits.kilo_user_id, userId),
+          eq(organization_user_limits.limit_type, limitType)
+        )
+      );
+  } else {
+    if (dailyUsageLimitUsd < 0 || dailyUsageLimitUsd > MAX_DAILY_LIMIT_USD) {
+      throw new Error(`Daily usage limit must be between $0 and $${MAX_DAILY_LIMIT_USD}`);
+    }
+
+    // Insert or update limit (including 0 for no usage allowed)
+    const microdollarLimit = toMicrodollars(dailyUsageLimitUsd);
+    await dbInstance
+      .insert(organization_user_limits)
+      .values({
+        organization_id: organizationId,
+        kilo_user_id: userId,
+        limit_type: limitType,
+        microdollar_limit: microdollarLimit,
+      })
+      .onConflictDoUpdate({
+        target: [
+          organization_user_limits.organization_id,
+          organization_user_limits.kilo_user_id,
+          organization_user_limits.limit_type,
+        ],
+        set: { microdollar_limit: microdollarLimit },
+      });
+  }
+}
+
+/**
+ * Fetch agent interactions (non-autocomplete usage) per day for given users
+ */
+export async function getAgentInteractionsPerDay(
+  organizationId: Organization['id'],
+  userIds: string[],
+  startDate: string,
+  endDate: string
+) {
+  return await db
+    .select({
+      userId: microdollar_usage.kilo_user_id,
+      date: sql<string>`DATE(${microdollar_usage.created_at})`.as('date'),
+      requestCount: count(microdollar_usage.id),
+    })
+    .from(microdollar_usage)
+    .where(
+      and(
+        eq(microdollar_usage.organization_id, organizationId),
+        gte(microdollar_usage.created_at, startDate),
+        lte(microdollar_usage.created_at, endDate),
+        not(eq(microdollar_usage.model, AUTOCOMPLETE_MODEL)),
+        inArray(microdollar_usage.kilo_user_id, userIds)
+      )
+    )
+    .groupBy(microdollar_usage.kilo_user_id, sql`DATE(${microdollar_usage.created_at})`);
+}
+
+export async function getCloudAgentSessionsPerDay(
+  userIds: string[],
+  startDate: string,
+  endDate: string
+) {
+  return await db
+    .select({
+      userId: sharedCliSessions.kilo_user_id,
+      date: sql<string>`DATE(${sharedCliSessions.created_at})`.as('date'),
+      sessionCount: count(sharedCliSessions.share_id),
+    })
+    .from(sharedCliSessions)
+    .where(
+      and(
+        gte(sharedCliSessions.created_at, startDate),
+        lte(sharedCliSessions.created_at, endDate),
+        inArray(sharedCliSessions.kilo_user_id, userIds)
+      )
+    )
+    .groupBy(sharedCliSessions.kilo_user_id, sql`DATE(${sharedCliSessions.created_at})`);
+}
+
+export async function getCodeReviewsPerDay(
+  organizationId: Organization['id'],
+  userIds: string[],
+  startDate: string,
+  endDate: string
+) {
+  return await db
+    .select({
+      userId: cloud_agent_code_reviews.owned_by_user_id,
+      date: sql<string>`DATE(${cloud_agent_code_reviews.created_at})`.as('date'),
+      reviewCount: count(cloud_agent_code_reviews.id),
+    })
+    .from(cloud_agent_code_reviews)
+    .where(
+      and(
+        eq(cloud_agent_code_reviews.owned_by_organization_id, organizationId),
+        gte(cloud_agent_code_reviews.created_at, startDate),
+        lte(cloud_agent_code_reviews.created_at, endDate),
+        inArray(cloud_agent_code_reviews.owned_by_user_id, userIds)
+      )
+    )
+    .groupBy(
+      cloud_agent_code_reviews.owned_by_user_id,
+      sql`DATE(${cloud_agent_code_reviews.created_at})`
+    );
+}

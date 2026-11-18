@@ -8,7 +8,8 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 export async function disableUserAccessForDeletion(
   tx: DrizzleTransaction,
@@ -28,6 +29,8 @@ export async function disableUserAccessForDeletion(
       web_session_pepper: randomUUID(),
     })
     .where(eq(kilocode_users.id, params.userId));
+
+  await revokeStepUpProofs(params.userId, 'deletion', tx);
 
   await tx
     .update(device_auth_requests)

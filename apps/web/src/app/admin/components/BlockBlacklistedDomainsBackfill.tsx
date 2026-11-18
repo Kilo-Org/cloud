@@ -1,14 +1,14 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import type {
-  BlockBlacklistedDomainsCountsResponse,
-  BlockBlacklistedDomainsBackfillResponse,
-} from '../api/backfills/block-blacklisted-domains/route';
+import type { BlockBlacklistedDomainsCountsResponse } from '../api/backfills/block-blacklisted-domains/route';
+import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
 
 type BatchLog = {
   processed: number;
@@ -22,7 +22,7 @@ export function BlockBlacklistedDomainsBackfill() {
   const { data: counts, isLoading } = useQuery<BlockBlacklistedDomainsCountsResponse>({
     queryKey: ['block-blacklisted-domains-counts'],
     queryFn: async () => {
-      const res = await fetch('/admin/api/backfills/block-blacklisted-domains');
+      const res = await adminFetch('/admin/api/backfills/block-blacklisted-domains');
       return res.json() as Promise<BlockBlacklistedDomainsCountsResponse>;
     },
     refetchInterval: false,
@@ -30,7 +30,7 @@ export function BlockBlacklistedDomainsBackfill() {
 
   const mutation = useMutation<BlockBlacklistedDomainsBackfillResponse, Error>({
     mutationFn: async () => {
-      const res = await fetch('/admin/api/backfills/block-blacklisted-domains', {
+      const res = await adminFetch('/admin/api/backfills/block-blacklisted-domains', {
         method: 'POST',
       });
       if (!res.ok) {

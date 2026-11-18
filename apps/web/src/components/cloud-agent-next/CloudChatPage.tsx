@@ -1,183 +1,182 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
-import { ArrowDown, GitBranch } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
+import { ArrowDown, MessageSquare, RotateCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { useManager } from './CloudAgentProvider';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
+import { useCloudAgent, useManager } from './CloudAgentProvider';
+import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
-import { ChatInput } from './ChatInput';
-import type { ModeOption } from '@/components/shared/ModeCombobox';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
-import { MessageBubble } from './MessageBubble';
+import { ParentSessionLink } from './ParentSessionLink';
+import { worktreeParentQueryOptions } from './worktree-parent-query';
+import { sessionResumeHref } from '@/lib/cloud-agent/session-resume-target';
+import { useChatStackInfo } from './useChatStackInfo';
+import {
+  getWorkspaceControlSession,
+  getWorktreeBranch,
+  resolveWorkspaceControlSession,
+} from './worktree-chat-tabs';
+import { isSandboxStatusEligible } from './sandbox-status';
+import { resolveSessionBranch } from './session-context-display';
+import { CloudComposer } from './assistant-ui/CloudComposer';
+import { CloudChatRuntimeProvider } from './assistant-ui/CloudChatRuntimeProvider';
+import { CloudThread } from './assistant-ui/CloudThread';
+import { MessageNotSentError } from '@assistant-ui/react';
+import { useSessionComposerFocus } from './useSessionComposerFocus';
+import {
+  dedupeCustomModeOptions,
+  ensureSelectedCustomOption,
+  filterSessionCustomModeOptions,
+  modeControlValue,
+  resolveSendSelection,
+  type CustomModeOption,
+} from './session-config';
+import { useCloudAgentEnvironment } from '@/hooks/useCloudAgentEnvironments';
+import {
+  formatSessionTotalCost,
+  getSessionCostBreakdown,
+  getSessionTotalCostUsd,
+} from './session-cost-breakdown';
+import { getSessionUsage } from './session-token-usage';
+import { useSessionSwitch } from './use-session-switch';
+import { useCachedTranscriptPage } from './use-cached-transcript-page';
+import { LocalChatFailure } from './local-sessions/LocalChatFailure';
+import { localSessionSourceId } from './local-sessions/local-session';
+import { useLocalChatView } from './local-sessions/use-local-chat-view';
+import { useLocalComposer } from './local-sessions/use-local-composer';
+import { TranscriptStatusSlot } from './TranscriptStatusSlot';
+import { ComposerContextLine } from './ComposerContextLine';
+import { CurrentTaskList } from './CurrentTaskList';
+import { SessionBackgroundActivityStrip } from './BackgroundActivityStrip';
+import { getCurrentTodos } from './current-todos';
+import { useCloudThreadScroll } from './assistant-ui/use-cloud-thread-scroll';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
-import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
-import { SessionStatusIndicator } from './SessionStatusIndicator';
-import { PreparationRow } from './PreparationRow';
+import type { ChildSessionDrawerEntry } from './ChildSessionSection';
+import { SessionErrorNotice } from './SessionErrorNotice';
+import { readableSessionError } from './session-error-copy';
 import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
-import { WorkingIndicator } from './WorkingIndicator';
+import { WorkspaceSnapshotRecovery } from './WorkspaceSnapshotRecovery';
+import { EnvironmentBuildRecovery } from './EnvironmentBuildRecovery';
+import { environmentBuildRecoveryOffered } from './environment-build-recovery';
+import { workspaceSnapshotRecoveryOffered } from './workspace-snapshot-recovery';
+import { failedMessageRetryTarget, type FailedMessageRetryTarget } from './failed-message-retry';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
+import { PermissionUnreadableNotice } from './PermissionUnreadableNotice';
 import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
-import { CloudAgentTerminalPane } from './CloudAgentTerminalDock';
+import { CloudAgentBillingError } from './CloudAgentBillingError';
+import { OlderMessagesHeader } from './OlderMessagesHeader';
+import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-switch';
+
+import { billingPayerPresentation } from './billing-payer-presentation';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
+import { WorktreeChangesView } from './WorktreeChanges';
+import { WorkspaceArtifactsView } from './WorkspaceArtifacts';
+import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
+import { WorktreeReviewDialog } from './WorktreeReviewDialog';
+import { useWorktreeReview } from './useWorktreeReview';
+import { selectTerminalOwner } from './terminal-owner';
+import type { WorktreeReviewComment } from './worktree-review';
+import {
+  worktreeFileIdentity,
+  type WorktreeFileQuery,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { canOpenWorktreeChanges } from './worktree-changes';
 import {
   CHAT_TAB_ID,
   addTerminalTab,
+  closeFileTab,
   closeTerminalTab,
-  createWorkspaceTabsState,
-  resetWorkspaceTabs,
+  fileTabId,
+  getWorkspaceTabScope,
+  openFileTab,
   selectWorkspaceTab,
+  setFileTabMode,
+  terminalIdFromTabId,
   terminalTabId,
-} from './terminal-tabs';
-import { isMessageStreaming } from './types';
+} from './workspace-tabs';
+import { getWorkspaceTabsStorageKey } from './workspace-tabs-storage';
+import { usePersistedWorkspaceTabs } from './hooks/usePersistedWorkspaceTabs';
+import { PreviewLinksContext } from './use-preview';
+import { ToolDetailScopeProvider } from './ToolPartDetail';
+import { usePreviewController } from './use-preview-controller';
 import {
   createRemoteModelOverride,
   useSessionModels,
   validateRemoteModelOverride,
 } from './hooks/useSessionModels';
-import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { resolveContextWindow } from './model-context-lengths';
+import type { KnownModel } from './known-models';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
+import { useCollapseToolsPreference } from './collapse-tools-preference';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
+import { cn } from '@/lib/utils';
+import { getChatDisplayTitle } from './utils/session-title';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
-import type { AgentMode } from './types';
-import type {
-  MessageDeliveryState,
-  PreparationAttempt,
-  StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
-import type { WorkspaceTabId } from './terminal-tabs';
+import type { AgentMode, StoredMessage } from './types';
+import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
+import type { WorkspaceTabId } from './workspace-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
 
-// ---------------------------------------------------------------------------
-// Static messages — memoized, never re-renders during streaming
-// ---------------------------------------------------------------------------
-const StaticMessages = memo(
-  ({
-    messages,
-    pendingMessages,
-    preparationByMessageId,
-    getChildMessages,
-    onOpenChildSession,
-    onOpenPreparationDetails,
-  }: {
-    messages: StoredMessage[];
-    pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
-    preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
-    getChildMessages?: (sessionId: string) => StoredMessage[];
-    onOpenChildSession?: OpenChildSession;
-    onOpenPreparationDetails: (attemptId: string) => void;
-  }) => (
-    <>
-      {messages.map(msg => (
-        <MessageErrorBoundary key={msg.info.id}>
-          <MessageBubble
-            message={msg}
-            deliveryState={pendingMessages.get(msg.info.id)}
-            getChildMessages={getChildMessages}
-            onOpenChildSession={onOpenChildSession}
-          />
-          {preparationByMessageId.get(msg.info.id)?.map(attempt => (
-            <PreparationRow
-              key={attempt.id}
-              attempt={attempt}
-              onOpenDetails={onOpenPreparationDetails}
-            />
-          ))}
-        </MessageErrorBoundary>
-      ))}
-    </>
-  )
-);
-StaticMessages.displayName = 'StaticMessages';
-
-// ---------------------------------------------------------------------------
-// Dynamic messages — re-renders as streaming progresses while chat is visible
-// ---------------------------------------------------------------------------
-type DynamicMessagesProps = {
-  active: boolean;
-  isStreaming: boolean;
-  messages: StoredMessage[];
-  pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
-  preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  onOpenChildSession?: OpenChildSession;
-  onOpenPreparationDetails: (attemptId: string) => void;
-};
-
-const DynamicMessages = memo(
-  function DynamicMessages({
-    isStreaming,
-    messages,
-    pendingMessages,
-    preparationByMessageId,
-    getChildMessages,
-    onOpenChildSession,
-    onOpenPreparationDetails,
-  }: DynamicMessagesProps) {
-    return (
-      <>
-        {messages.map(msg => {
-          const streaming = isStreaming && isMessageStreaming(msg);
-          return (
-            <MessageErrorBoundary key={msg.info.id}>
-              <MessageBubble
-                message={msg}
-                isStreaming={streaming}
-                deliveryState={pendingMessages.get(msg.info.id)}
-                getChildMessages={getChildMessages}
-                onOpenChildSession={onOpenChildSession}
-              />
-              {preparationByMessageId.get(msg.info.id)?.map(attempt => (
-                <PreparationRow
-                  key={attempt.id}
-                  attempt={attempt}
-                  onOpenDetails={onOpenPreparationDetails}
-                />
-              ))}
-            </MessageErrorBoundary>
-          );
-        })}
-      </>
-    );
-  },
-  (previous, next) => {
-    if (!previous.active && !next.active) return true;
-
-    return (
-      previous.active === next.active &&
-      previous.isStreaming === next.isStreaming &&
-      previous.messages === next.messages &&
-      previous.pendingMessages === next.pendingMessages &&
-      previous.preparationByMessageId === next.preparationByMessageId &&
-      previous.getChildMessages === next.getChildMessages &&
-      previous.onOpenChildSession === next.onOpenChildSession &&
-      previous.onOpenPreparationDetails === next.onOpenPreparationDetails
-    );
+const CloudAgentTerminalPane = dynamic(
+  () => import('./CloudAgentTerminalDock').then(module => module.CloudAgentTerminalPane),
+  {
+    loading: () => (
+      <div role="status" className="text-muted-foreground p-4 text-sm">
+        Loading terminal…
+      </div>
+    ),
   }
 );
-DynamicMessages.displayName = 'DynamicMessages';
+const WorktreeFilePane = dynamic(
+  () => import('./WorktreeFilePane').then(module => module.WorktreeFilePane),
+  {
+    loading: () => (
+      <div role="status" className="text-muted-foreground p-4 text-sm">
+        Loading file…
+      </div>
+    ),
+  }
+);
 
-// ---------------------------------------------------------------------------
-// CloudChatPage
-// ---------------------------------------------------------------------------
 const emptyQuestionRequestIds = new Map<string, string>();
 
-type CloudChatPageProps = { organizationId?: string };
+/** Older pages the resume fetches while looking for a not-yet-loaded anchor. */
+type CloudChatPageProps = {
+  /** The signed-in user: caches are partitioned by user, never shared. */
+  currentUserId: string;
+  organizationId?: string;
+  organizationName?: string;
+  organizationRole?: OrganizationRole;
+  knownModels?: readonly KnownModel[];
+};
 
 type TerminalStatusSummary = { status: TerminalStatus; statusText: string };
 
@@ -213,56 +212,123 @@ function TerminalPaneSlot({
   );
 }
 
-export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
+const NO_KNOWN_MODELS: readonly KnownModel[] = [];
+
+export default function CloudChatPage({
+  currentUserId,
+  organizationId,
+  organizationName,
+  organizationRole,
+  knownModels = NO_KNOWN_MODELS,
+}: CloudChatPageProps) {
   const manager = useManager();
+  const reviewApi = useCloudAgent();
+  const { createWorktreeChat } = useWorktreeChatCreation();
+  const {
+    selectedWorktreeId,
+    worktreeChats,
+    openWorktreeChats,
+    closedWorktreeChats,
+    openSession,
+    composerFocusRequest,
+    closeSession,
+    renameSession,
+    deletingSessionIds,
+    retryLocalChat,
+    discardLocalChat,
+  } = useWorktreeChatTabs();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
+  const { data: parentSession } = useQuery(
+    worktreeParentQueryOptions({
+      trpc,
+      client: trpcClient,
+      userId: currentUserId,
+      worktreeId: selectedWorktreeId,
+      organizationId: organizationId ?? null,
+    })
+  );
+  const parentSessionHref = parentSession ? sessionResumeHref(parentSession, null) : undefined;
   const { mutateAsync: personalUploadUrl } = useMutation(
     trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
   const { mutateAsync: orgUploadUrl } = useMutation(
     trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
+  const [sessionInfoOpen, setSessionInfoOpen] = useState(false);
+  const sessionInfoTriggerRef = useRef<HTMLElement | null>(null);
   const [childSessionStack, setChildSessionStack] = useState<ChildSessionDrawerEntry[]>([]);
   const [childSessionDrawerContainer, setChildSessionDrawerContainer] =
     useState<HTMLDivElement | null>(null);
   const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
   const [preparationDrawerAttemptId, setPreparationDrawerAttemptId] = useState<string | null>(null);
   const preparationDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
+  const [changesViewScope, setChangesViewScope] = useState<string | null>(null);
+  const changesViewFocusTargetRef = useRef<HTMLElement | null>(null);
+  const changesViewOpenedTabRef = useRef<WorkspaceTabId | null>(null);
+  const [artifactsViewScope, setArtifactsViewScope] = useState<string | null>(null);
+  const artifactsViewFocusTargetRef = useRef<HTMLElement | null>(null);
+  const artifactsViewOpenedTabRef = useRef<WorkspaceTabId | null>(null);
+  const activeWorkspaceTabRef = useRef<HTMLButtonElement | null>(null);
+  const closeChangesView = useCallback(() => {
+    changesViewOpenedTabRef.current = null;
+    changesViewFocusTargetRef.current = null;
+    setChangesViewScope(null);
+  }, []);
+  const closeArtifactsView = useCallback(() => {
+    artifactsViewOpenedTabRef.current = null;
+    artifactsViewFocusTargetRef.current = null;
+    setArtifactsViewScope(null);
+  }, []);
 
-  // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
+  const anchorMessageIdFromParams = searchParams?.get('at') ?? null;
+  const { localSession, lastStartedSessionId } = useSessionSwitch(manager, sessionIdFromParams);
+  // A known Cloud Agent chat (seeded by the server, or seen recently) skips the loading state.
+  const cachedPage = useCachedTranscriptPage(
+    currentUserId,
+    organizationId ?? null,
+    sessionIdFromParams
+  );
   useEffect(() => {
-    if (sessionIdFromParams) {
-      childSessionDrawerFocusTargetRef.current = null;
-      setChildSessionStack([]);
-      preparationDrawerFocusTargetRef.current = null;
-      setPreparationDrawerAttemptId(null);
-      void manager.switchSession(sessionIdFromParams as KiloSessionId);
-    }
-  }, [sessionIdFromParams, manager]);
+    childSessionDrawerFocusTargetRef.current = null;
+    setChildSessionStack([]);
+    preparationDrawerFocusTargetRef.current = null;
+    setPreparationDrawerAttemptId(null);
+    closeChangesView();
+    closeArtifactsView();
+  }, [sessionIdFromParams, closeChangesView, closeArtifactsView]);
 
-  // -- Manager atoms --------------------------------------------------------
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const isLoading = useAtomValue(manager.atoms.isLoading);
+  const isRefreshingCachedTranscript = useAtomValue(manager.atoms.isRefreshingCachedTranscript);
+  const cachedTranscriptSessionId = useAtomValue(manager.atoms.cachedTranscriptSessionId);
+  const isReplayingLiveHistory = useAtomValue(manager.atoms.isReplayingLiveHistory);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const canSend = useAtomValue(manager.atoms.canSend);
+  const canInterrupt = useAtomValue(manager.atoms.canInterrupt);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
+  const billingFailure = useAtomValue(manager.atoms.billingFailure);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
   const sessionId = useAtomValue(manager.atoms.sessionId);
   const activity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
+  const commits = useAtomValue(manager.atoms.commits);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
+  const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
-  const totalCost = useAtomValue(manager.atoms.totalCost);
+  const sendingMessageIds = useAtomValue(manager.atoms.sendingMessageIds);
+  const liveTotalCostUsd = useAtomValue(manager.atoms.totalCost);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
@@ -270,34 +336,322 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
+  const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
+  const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
+  const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
+  const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
+  const isCurrentSession =
+    sessionIdFromParams === null || fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+  // Sidebar data can name a chat before its session loads; an unknown title
+  // stays empty rather than flashing a placeholder name.
+  const storedChat = worktreeChats.find(chat => chat.sessionId === sessionIdFromParams);
+  const displayedChatTitle =
+    isCurrentSession && fetchedSessionData
+      ? getChatDisplayTitle(fetchedSessionData.title)
+      : storedChat?.prompt;
+  const totalCostUsd = isCurrentSession
+    ? getSessionTotalCostUsd(fetchedSessionData?.totalCostMicrodollars, liveTotalCostUsd)
+    : 0;
+  const transcriptMessageCount = staticMessages.length + dynamicMessages.length;
+  const terminalOpenFailure = statusIndicator?.type === 'error';
+  const transcriptPhase = resolveTranscriptPhase({
+    requestedSessionId: sessionIdFromParams,
+    lastStartedSessionId,
+    ownerSessionId: fetchedSessionData?.kiloSessionId ?? null,
+    cachedSessionId: cachedTranscriptSessionId,
+    isLoading,
+    hasMessages: transcriptMessageCount > 0,
+    terminalOpenFailure,
+    localMessageCount: localSession ? (localSession.firstMessage ? 1 : 0) : null,
+    isReplayingLiveHistory,
+    hasKnownSettings: Boolean(cachedPage?.sessionConfig),
+  });
+  const transcriptVisible = transcriptReadyForEffects(transcriptPhase);
+  const transcriptReady = transcriptVisible && !isRefreshingCachedTranscript;
+
+  const getCurrentSessionCostBreakdown = useCallback(
+    () =>
+      getSessionCostBreakdown(
+        isCurrentSession ? [...staticMessages, ...dynamicMessages] : [],
+        isCurrentSession ? fetchedSessionData?.totalCostMicrodollars : null,
+        isCurrentSession ? liveTotalCostUsd : 0
+      ),
+    [
+      dynamicMessages,
+      fetchedSessionData?.totalCostMicrodollars,
+      isCurrentSession,
+      liveTotalCostUsd,
+      staticMessages,
+    ]
+  );
+
+  const getCurrentSessionUsage = useCallback(
+    () => getSessionUsage(isCurrentSession ? [...staticMessages, ...dynamicMessages] : []),
+    [isCurrentSession, staticMessages, dynamicMessages]
+  );
 
   useCliSessionPresence(fetchedSessionData?.kiloSessionId ?? null);
 
+  const sessionBranch = resolveSessionBranch({
+    scope: {
+      displayedKiloSessionId: sessionIdFromParams,
+      displayedWorktreeId: selectedWorktreeId,
+    },
+    metadata: fetchedSessionData
+      ? {
+          kiloSessionId: fetchedSessionData.kiloSessionId,
+          worktreeId: fetchedSessionData.worktreeId ?? null,
+          branch: fetchedSessionData.gitBranch,
+        }
+      : null,
+  });
+
+  // The composer's repository line reserves its row and shows the sidebar's copy
+  // until the session loads, so the composer does not move when it resolves.
+  const composerRepository = sessionConfig?.repository || storedChat?.repository;
+  const composerBranch =
+    sessionBranch ??
+    storedChat?.branch ??
+    getWorktreeBranch(selectedWorktreeId, worktreeChats) ??
+    undefined;
+  const { data: environment } = useCloudAgentEnvironment(
+    isCurrentSession ? (fetchedSessionData?.environmentId ?? null) : null,
+    { organizationId }
+  );
+
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
+  const { composer: localComposer, updateComposer: updateLocalComposer } = useLocalComposer(
+    manager,
+    localSession
+  );
+  const composerSettings =
+    localComposer ?? sessionConfig ?? localSession?.composer ?? cachedPage?.sessionConfig ?? null;
 
   const [attachmentMessageUuid] = useState(() => uuidv4());
-  const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
   >({});
-  const chatTabActive = workspaceTabs.activeTabId === CHAT_TAB_ID;
+  const preserveTerminalSelectionRef = useRef(false);
+  const previousSessionIdRef = useRef<string | null>(sessionIdFromParams);
+  const workspaceTabScope = getWorkspaceTabScope(selectedWorktreeId, sessionIdFromParams);
+  const workspaceIdentityResolved =
+    !sessionIdFromParams ||
+    selectedWorktreeId !== null ||
+    (fetchedSessionData?.kiloSessionId === sessionIdFromParams &&
+      fetchedSessionData.organizationId === (organizationId ?? null));
+  const [resolvedWorkspaceScope, setResolvedWorkspaceScope] = useState({
+    currentUserId,
+    organizationId,
+    scope: workspaceTabScope,
+  });
+  const [workspaceTabs, setWorkspaceTabs] = usePersistedWorkspaceTabs(
+    getWorkspaceTabsStorageKey(
+      resolvedWorkspaceScope.currentUserId,
+      resolvedWorkspaceScope.organizationId
+    ),
+    resolvedWorkspaceScope.scope
+  );
+  const workspaceControlSession = resolveWorkspaceControlSession({
+    requestedSessionId: sessionIdFromParams,
+    requestedSessionLoaded: isCurrentSession,
+    local: localSession ? { sourceSessionId: localSessionSourceId(localSession) } : null,
+    worktreeId: selectedWorktreeId,
+    chats: worktreeChats,
+    deletingSessionIds,
+  });
+  const workspaceCloudSessionId = workspaceControlSession?.cloudAgentSessionId ?? sessionId;
+  const workspaceSnapshotRecovery = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+          organizationId,
+        })
+      : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+        })),
+    enabled: Boolean(workspaceCloudSessionId) && cloudStatus?.type === 'error',
+    staleTime: 0,
+    retry: false,
+  });
+  const removeWorkspaceSnapshot = useMutation({
+    mutationFn: async () => {
+      if (!workspaceCloudSessionId) throw new Error('Session is not ready');
+      if (organizationId) {
+        return await trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+          sessionId: workspaceCloudSessionId,
+          organizationId,
+        });
+      }
+      return await trpcClient.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+        sessionId: workspaceCloudSessionId,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries(
+        organizationId
+          ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+          : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+      );
+    },
+  });
+  const workspaceSnapshotRecoveryState = workspaceSnapshotRecoveryOffered({
+    cloudStatus,
+    recovery: workspaceSnapshotRecovery.data,
+    recoveryIsFresh: workspaceSnapshotRecovery.isSuccess && !workspaceSnapshotRecovery.isFetching,
+    isReadOnly,
+  });
+  const environmentBuildRecoveryId = environmentBuildRecoveryOffered({
+    cloudStatus,
+    attempts: preparationAttempts,
+    environmentId: isCurrentSession ? fetchedSessionData?.environmentId : null,
+  });
+  const currentSessionCanOpenChanges =
+    sessionIdFromParams !== null &&
+    isCurrentSession &&
+    canOpenWorktreeChanges(sessionId, isReadOnly) &&
+    fetchedSessionData?.organizationId === (organizationId ?? null);
+  const changesControlSession = getWorkspaceControlSession(
+    selectedWorktreeId,
+    worktreeChats,
+    deletingSessionIds
+  );
+  const changesCloudSessionId = currentSessionCanOpenChanges
+    ? sessionId
+    : changesControlSession?.cloudAgentSessionId;
+  const canOpenChanges =
+    Boolean(currentUserId) && canOpenWorktreeChanges(changesCloudSessionId, isReadOnly);
+  const fileScope = JSON.stringify([currentUserId, organizationId, workspaceTabScope]);
+  const changesViewOpen = canOpenChanges && changesViewScope === fileScope;
+  const canOpenArtifacts = canOpenChanges;
+  const artifactsViewOpen = canOpenArtifacts && artifactsViewScope === fileScope;
+  const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
+  const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
+  // Commits come from the loaded chat, so they follow its own access, not the workspace's.
+  const commitsVisible = filesVisible && currentSessionCanOpenChanges;
+  const [commitsCache, setCommitsCache] = useState<{
+    infos: StoredMessage['info'][];
+    commits: readonly SessionCommit[];
+    commitsVisible: boolean;
+    value: ReadonlyMap<string, readonly SessionCommit[]>;
+  } | null>(null);
+  const messageInfosForCommits = [...staticMessages, ...dynamicMessages].map(
+    message => message.info
+  );
+  let commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
+  if (
+    commitsCache !== null &&
+    commitsCache.commitsVisible === commitsVisible &&
+    commitsCache.commits === commits &&
+    commitsCache.infos.length === messageInfosForCommits.length &&
+    commitsCache.infos.every((info, index) => info === messageInfosForCommits[index])
+  ) {
+    commitsAfterMessage = commitsCache.value;
+  } else {
+    commitsAfterMessage = commitsByMessageAnchor(
+      [...staticMessages, ...dynamicMessages],
+      commitsVisible ? commits : []
+    );
+    setCommitsCache({
+      infos: messageInfosForCommits,
+      commits,
+      commitsVisible,
+      value: commitsAfterMessage,
+    });
+  }
+  const currentTodos = useMemo(
+    () => (isCurrentSession ? getCurrentTodos([...staticMessages, ...dynamicMessages]) : null),
+    [dynamicMessages, isCurrentSession, staticMessages]
+  );
+  const activeWorkspaceTabId =
+    !filesVisible && workspaceTabs.activeTabId.startsWith('file:')
+      ? CHAT_TAB_ID
+      : workspaceTabs.activeTabId;
+  const chatTabValue =
+    selectedWorktreeId && sessionIdFromParams ? `chat:${sessionIdFromParams}` : CHAT_TAB_ID;
+  const chatTabActive =
+    activeWorkspaceTabId === CHAT_TAB_ID &&
+    (sessionIdFromParams !== null || selectedWorktreeId === null);
+  const terminalTabActive = terminalIdFromTabId(activeWorkspaceTabId) !== null;
+
+  if (resolvedFileScope !== fileScope) {
+    setResolvedFileScope(fileScope);
+  }
+
+  if (
+    resolvedWorkspaceScope.currentUserId !== currentUserId ||
+    resolvedWorkspaceScope.organizationId !== organizationId ||
+    (workspaceIdentityResolved && resolvedWorkspaceScope.scope !== workspaceTabScope)
+  ) {
+    setResolvedWorkspaceScope({
+      currentUserId,
+      organizationId,
+      scope: workspaceIdentityResolved ? workspaceTabScope : null,
+    });
+    setTerminalStatuses({});
+  }
 
   useEffect(() => {
-    setWorkspaceTabs(resetWorkspaceTabs);
-    setTerminalStatuses({});
-  }, [sessionId]);
+    const previousSessionId = previousSessionIdRef.current;
+    previousSessionIdRef.current = sessionIdFromParams;
+    if (previousSessionId === sessionIdFromParams) return;
+    if (preserveTerminalSelectionRef.current) {
+      preserveTerminalSelectionRef.current = false;
+      return;
+    }
+    if (sessionIdFromParams) {
+      setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+    }
+  }, [sessionIdFromParams, setWorkspaceTabs]);
 
-  // -- Session models -------------------------------------------------------
+  useEffect(() => {
+    closeChangesView();
+    closeArtifactsView();
+  }, [fileScope, canOpenChanges, closeChangesView, closeArtifactsView]);
+
+  useEffect(() => {
+    const openedTab = changesViewOpenedTabRef.current;
+    if (!changesViewOpen || openedTab === null || activeWorkspaceTabId === openedTab) return;
+    closeChangesView();
+  }, [activeWorkspaceTabId, changesViewOpen, closeChangesView]);
+
+  useEffect(() => {
+    const openedTab = artifactsViewOpenedTabRef.current;
+    if (!artifactsViewOpen || openedTab === null || activeWorkspaceTabId === openedTab) return;
+    closeArtifactsView();
+  }, [activeWorkspaceTabId, artifactsViewOpen, closeArtifactsView]);
+
+  const previousChangesViewOpenRef = useRef(false);
+  useEffect(() => {
+    const wasOpen = previousChangesViewOpenRef.current;
+    previousChangesViewOpenRef.current = changesViewOpen;
+    if (!wasOpen || changesViewOpen) return;
+    const target = changesViewFocusTargetRef.current;
+    changesViewFocusTargetRef.current = null;
+    if (target?.isConnected) target.focus({ preventScroll: true });
+  }, [changesViewOpen]);
+
+  const [modelCatalogRequested, setModelCatalogRequested] = useState(false);
+  const requestModelCatalog = useCallback(() => setModelCatalogRequested(true), []);
+
   const sessionModels = useSessionModels({
     activeSessionType,
     remoteModelState,
     observedModel,
     remoteModelOverride,
-    gatewayModelId: sessionConfig?.model,
-    gatewayVariant: sessionConfig?.variant,
-    fetchedSessionData,
+    cloudAgentModelOverride,
+    gatewayModelId: composerSettings?.model,
+    gatewayVariant: composerSettings?.variant,
+    // A chat listed under this route belongs to its organization, so its models load at once.
+    fetchedSessionData:
+      fetchedSessionData ??
+      localSession ??
+      (storedChat ? { organizationId: organizationId ?? null } : null),
     routeOrganizationId: organizationId,
     sessionIdFromParams,
+    knownModels,
+    currentUserId,
+    loadGatewayCatalog: modelCatalogRequested,
   });
   const { modelOptions, isLoadingModels } = sessionModels;
 
@@ -321,8 +675,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   );
   const { availableCommands } = useSlashCommandSets();
 
-  // -- Sound effects --------------------------------------------------------
-  const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
+  const { play: playCelebrationSound } = useCelebrationSound();
+  const { collapseTools } = useCollapseToolsPreference();
 
   const prevActivityRef = useRef<string | null>(null);
   useEffect(() => {
@@ -333,217 +687,473 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     prevActivityRef.current = activity.type;
   }, [activity.type, playCelebrationSound, queryClient, trpc]);
 
-  // -- Scroll ---------------------------------------------------------------
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const messagesContentRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const chatUI = useAtomValue(manager.atoms.chatUI);
-  const setChatUI = useSetAtom(manager.atoms.chatUI);
-
-  // Flag to distinguish programmatic scrolls from user scrolls.
-  // Without this, auto-scroll's scrollTo fires handleScroll which re-enables
-  // shouldAutoScroll, making it impossible for the user to scroll away during streaming.
-  const isAutoScrollingRef = useRef(false);
-  const autoScrollRunRef = useRef(0);
-  const lastScrollTopRef = useRef(0);
-
-  const autoScrollFrameRef = useRef(0);
-  const followUpAutoScrollFrameRef = useRef(0);
-  const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const cancelScheduledAutoScroll = useCallback(() => {
-    cancelAnimationFrame(autoScrollFrameRef.current);
-    cancelAnimationFrame(followUpAutoScrollFrameRef.current);
-    autoScrollFrameRef.current = 0;
-    followUpAutoScrollFrameRef.current = 0;
-    if (delayedAutoScrollRef.current !== null) {
-      clearTimeout(delayedAutoScrollRef.current);
-      delayedAutoScrollRef.current = null;
+  const preparationByMessageId = useMemo(() => {
+    const byMessageId = new Map<string, readonly PreparationAttempt[]>();
+    for (const attempt of preparationAttempts) {
+      if (isNoOpCompletedPreparationAttempt(attempt)) continue;
+      const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
+      byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
     }
-  }, []);
+    return byMessageId;
+  }, [preparationAttempts]);
 
-  const scrollToBottomNow = useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (!el || el.hidden) return;
-
-    const scrollRun = autoScrollRunRef.current + 1;
-    autoScrollRunRef.current = scrollRun;
-    isAutoScrollingRef.current = true;
-    el.scrollTop = el.scrollHeight;
-    lastScrollTopRef.current = el.scrollTop;
-    setShowScrollButton(false);
-
-    requestAnimationFrame(() => {
-      if (autoScrollRunRef.current === scrollRun) {
-        isAutoScrollingRef.current = false;
-      }
-    });
-  }, []);
-
-  const scheduleScrollToBottom = useCallback(() => {
-    cancelScheduledAutoScroll();
-
-    autoScrollFrameRef.current = requestAnimationFrame(() => {
-      autoScrollFrameRef.current = 0;
-      scrollToBottomNow();
-      followUpAutoScrollFrameRef.current = requestAnimationFrame(() => {
-        followUpAutoScrollFrameRef.current = 0;
-        scrollToBottomNow();
-      });
-      delayedAutoScrollRef.current = setTimeout(() => {
-        delayedAutoScrollRef.current = null;
-        scrollToBottomNow();
-      }, 100);
-    });
-  }, [cancelScheduledAutoScroll, scrollToBottomNow]);
-
-  useEffect(() => cancelScheduledAutoScroll, [cancelScheduledAutoScroll]);
-
-  useEffect(() => {
-    if (!chatTabActive) cancelScheduledAutoScroll();
-  }, [cancelScheduledAutoScroll, chatTabActive]);
-
-  useEffect(() => {
-    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
-    scheduleScrollToBottom();
-  }, [
+  const {
+    scrollContainerRef,
+    messagesContentRef,
+    messagesEndRef,
+    showScrollButton,
+    olderArrivalAnnouncement,
+    requestOlderMessages,
+    handleScroll,
+    scrollToBottom,
+    scheduleScrollToBottom,
+    captureSendPosition,
+    followAcceptedSend,
+  } = useCloudThreadScroll({
+    manager,
+    sessionIdFromParams,
+    anchorMessageIdFromParams,
+    chatTabActive,
+    transcriptVisible,
+    transcriptReady,
     staticMessages,
     dynamicMessages,
-    chatTabActive,
-    chatUI.shouldAutoScroll,
-    scheduleScrollToBottom,
-  ]);
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    olderMessagesError,
+    isLoading,
+    preparationByMessageId,
+    commitsAfterMessage,
+  });
 
-  useEffect(() => {
-    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
-    if (typeof ResizeObserver === 'undefined') return;
-
-    const content = messagesContentRef.current;
-    if (!content) return;
-
-    const observer = new ResizeObserver(() => {
-      scheduleScrollToBottom();
+  const worktreeChatSourceSessionId =
+    sessionIdFromParams && !localSession
+      ? activeSessionType === 'cloud-agent' &&
+        fetchedSessionData?.worktreeId &&
+        fetchedSessionData.kiloSessionId === sessionIdFromParams
+        ? sessionIdFromParams
+        : null
+      : (worktreeChats.find(chat => !chat.localSync)?.sessionId ?? null);
+  const canCreateWorktreeChat = worktreeChatSourceSessionId !== null;
+  const newChatComposer = composerSettings
+    ? {
+        mode: composerSettings.mode,
+        model: sessionModels.selectedValue ?? composerSettings.model,
+        variant: sessionModels.selectedVariant ?? null,
+        runtimeAgents: composerSettings.runtimeAgents,
+      }
+    : null;
+  const handleCreateWorktreeChat = useCallback(() => {
+    if (!worktreeChatSourceSessionId) return;
+    setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+    createWorktreeChat(worktreeChatSourceSessionId, { composer: newChatComposer });
+  }, [createWorktreeChat, newChatComposer, worktreeChatSourceSessionId]);
+  const handleReplaceWorktreeChat = useCallback(() => {
+    if (!canCreateWorktreeChat || !sessionIdFromParams) return false;
+    return createWorktreeChat(sessionIdFromParams, {
+      placement: 'replace',
+      composer: newChatComposer,
     });
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, [chatTabActive, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+  }, [canCreateWorktreeChat, createWorktreeChat, newChatComposer, sessionIdFromParams]);
 
-  useEffect(() => {
-    if (!sessionIdFromParams) return;
-
-    setChatUI({ shouldAutoScroll: true });
-    lastScrollTopRef.current = 0;
-    setShowScrollButton(false);
-    scheduleScrollToBottom();
-  }, [sessionIdFromParams, setChatUI, scheduleScrollToBottom]);
-
-  const handleScroll = useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowScrollButton(distanceFromBottom > 20);
-
-    if (isAutoScrollingRef.current) {
-      lastScrollTopRef.current = el.scrollTop;
-      return;
-    }
-
-    const scrolledUp = el.scrollTop < lastScrollTopRef.current;
-    lastScrollTopRef.current = el.scrollTop;
-
-    if (scrolledUp) {
-      setChatUI({ shouldAutoScroll: false });
-    } else if (distanceFromBottom < 100) {
-      setChatUI({ shouldAutoScroll: true });
-    }
-  }, [setChatUI]);
-
-  const scrollToBottom = useCallback(() => {
-    setChatUI({ shouldAutoScroll: true });
-    scheduleScrollToBottom();
-  }, [scheduleScrollToBottom, setChatUI]);
-
-  // -- Handlers -------------------------------------------------------------
   const handleSendMessage = useCallback(
-    async (prompt: string, attachments?: CloudAgentAttachments) => {
-      setChatUI({ shouldAutoScroll: true });
-      const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
-        a => a.slug === sessionConfig?.mode
-      );
-      const agentModelOverrideForSend = selectedRuntimeAgentForSend?.model?.trim() || undefined;
-      // An agent's variant only applies when it also pins a model — variants
-      // are model-specific (validated at write time in AgentConfigSchema). When
-      // an agent pins a model, its variant (if any) wins; otherwise the
-      // user-selected session variant applies.
-      const agentVariantOverrideForSend = agentModelOverrideForSend
-        ? selectedRuntimeAgentForSend?.variant?.trim() || undefined
-        : undefined;
+    async (prompt: string, attachments?: CloudAgentAttachments, onOptimisticSend?: () => void) => {
+      // Sending takes the position over only once the send is accepted: end a
+      // resume that is still looking for its anchor, or its effect re-pauses
+      // follow and cancels this scroll when the message lands. A rejected send
+      // produces no output, so the resume keeps the position instead of being
+      // abandoned at the bottom.
+      const resumeStateAtSend = captureSendPosition();
+      const selection = resolveSendSelection(sessionConfig, {
+        model: sessionModels.selectedValue,
+        variant: sessionModels.selectedVariant,
+      });
       const acceptedPromise = manager.send({
         payload: {
           type: 'prompt',
           prompt,
-          mode: sessionConfig?.mode ?? 'code',
-          model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
-          variant: agentModelOverrideForSend
-            ? agentVariantOverrideForSend
-            : (sessionConfig?.variant ?? undefined),
+          mode: selection.mode,
+          model: selection.model,
+          variant: selection.variant,
         },
         attachments: supportsAttachments ? attachments : undefined,
+        onOptimisticSend,
       });
+      // Pins the tail when the list already follows. While a resume has the
+      // follow off this is a no-op, so a refused send never moves the reader
+      // off the anchor.
       scheduleScrollToBottom();
 
       const accepted = await acceptedPromise;
-      if (accepted) {
-        scheduleScrollToBottom();
+      if (!accepted) {
+        return false;
       }
-      return accepted;
+      // Take the position over for the output this send produces — but only
+      // from the attempt that was live at send time. A `?at=` link that arrived
+      // while the send was in flight owns the position now: its layout effect
+      // already landed its anchor and marked that attempt done, so re-arming
+      // follow here would move the viewport to the bottom and abandon it.
+      followAcceptedSend(resumeStateAtSend);
+      return true;
     },
-    [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
+    [
+      manager,
+      scheduleScrollToBottom,
+      sessionConfig,
+      sessionModels.selectedValue,
+      sessionModels.selectedVariant,
+      supportsAttachments,
+      captureSendPosition,
+      followAcceptedSend,
+    ]
+  );
+
+  const handleRetryFailedMessage = useCallback(
+    async (target: FailedMessageRetryTarget) => {
+      // Captured before the await: the user can switch chats while the re-send
+      // is in flight, and the resolution belongs to the chat that owns the row.
+      const ownerSessionId = fetchedSessionData?.kiloSessionId;
+      if (!ownerSessionId) return;
+      let accepted = false;
+      try {
+        // The re-send is a new user turn with its own optimistic row. Hide the
+        // failed row in the same tap, or the prompt shows twice for the whole
+        // round-trip. Once accepted, the failed row and its error are resolved.
+        accepted = await handleSendMessage(target.prompt, undefined, () =>
+          manager.markMessageSuperseded(target.messageId, ownerSessionId)
+        );
+        if (accepted) manager.clearFailedMessage(target.messageId, ownerSessionId);
+      } finally {
+        // A rejected re-send delivered nothing: show the failed row and its Retry again.
+        if (!accepted) manager.unmarkMessageSuperseded(target.messageId, ownerSessionId);
+      }
+    },
+    [fetchedSessionData?.kiloSessionId, handleSendMessage, manager]
   );
 
   const handleSendSlashCommand = useCallback(
     async (command: string, args: string, attachments?: CloudAgentAttachments) => {
-      setChatUI({ shouldAutoScroll: true });
+      // A command send takes the position over exactly as a message send does,
+      // and only once it is accepted: end a resume still looking for its anchor,
+      // or the effect re-pauses follow and cancels the scroll for this
+      // command's output. A refused command leaves the resume in place.
+      const resumeStateAtSend = captureSendPosition();
+      const selection = resolveSendSelection(sessionConfig, {
+        model: sessionModels.selectedValue,
+        variant: sessionModels.selectedVariant,
+      });
       const acceptedPromise = manager.send({
-        payload: { type: 'command', command, arguments: args },
+        payload: {
+          type: 'command',
+          command,
+          arguments: args,
+          mode: selection.mode,
+          ...(selection.model ? { model: selection.model } : {}),
+          ...(selection.variant ? { variant: selection.variant } : {}),
+        },
         attachments: supportsAttachments ? attachments : undefined,
       });
+      // Pins the tail when the list already follows; a no-op under a resume.
       scheduleScrollToBottom();
       const accepted = await acceptedPromise;
-      if (accepted) {
-        scheduleScrollToBottom();
+      if (!accepted) {
+        return false;
       }
-      return accepted;
+      // As with a message send: the command takes the position over only from
+      // the resume that was live when it was sent. A newer `?at=` link owns the
+      // position and must not be abandoned at the bottom.
+      followAcceptedSend(resumeStateAtSend);
+      return true;
     },
-    [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]
+    [
+      manager,
+      scheduleScrollToBottom,
+      sessionConfig,
+      sessionModels.selectedValue,
+      sessionModels.selectedVariant,
+      supportsAttachments,
+      captureSendPosition,
+      followAcceptedSend,
+    ]
   );
 
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
   }, [manager]);
 
-  const handleToggleSound = useCallback(() => {
-    setSoundEnabled(prev => !prev);
-  }, [setSoundEnabled]);
+  const fetchRouteReady = useCallback(
+    async (kiloSessionId: string): Promise<boolean | undefined> => {
+      try {
+        const data = await queryClient.query({
+          ...trpc.cliSessionsV2.getWithRuntimeState.queryOptions({ session_id: kiloSessionId }),
+          staleTime: 0,
+          retry: false,
+          networkMode: 'always',
+        });
+        return data.runtimeState?.routeReady;
+      } catch {
+        return undefined;
+      }
+    },
+    [queryClient, trpc]
+  );
+
+  const resolveTerminalOwner = useCallback(async (): Promise<string | null> => {
+    const loadedIsCurrent =
+      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+    const loadedRouteReady = loadedIsCurrent ? fetchedSessionData?.routeReady : undefined;
+
+    const candidates = worktreeChats.flatMap(chat =>
+      chat.cloudAgentSessionId
+        ? [
+            {
+              kiloSessionId: chat.sessionId,
+              cloudAgentSessionId: chat.cloudAgentSessionId,
+              routeReady: chat.sessionId === sessionIdFromParams ? loadedRouteReady : undefined,
+            },
+          ]
+        : []
+    );
+    if (candidates.length === 0) return null;
+
+    // Only the viewed session's route is known without a read; resolve the
+    // siblings' routes before choosing so a stopped sibling is never picked
+    // ahead of a ready one.
+    if (candidates.some(candidate => candidate.routeReady === undefined)) {
+      await Promise.all(
+        candidates.map(async candidate => {
+          if (candidate.routeReady === undefined) {
+            candidate.routeReady = await fetchRouteReady(candidate.kiloSessionId);
+          }
+        })
+      );
+    }
+
+    return selectTerminalOwner({
+      loadedKiloSessionId: sessionIdFromParams,
+      candidates,
+    });
+  }, [
+    fetchRouteReady,
+    fetchedSessionData?.kiloSessionId,
+    fetchedSessionData?.routeReady,
+    sessionIdFromParams,
+    worktreeChats,
+  ]);
+
+  const openTerminalTabForSession = useCallback(
+    (cloudAgentSessionId: string) => {
+      const terminalId = uuidv4();
+      setWorkspaceTabs(state => addTerminalTab(state, terminalId, cloudAgentSessionId));
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleCreateTerminalTab = useCallback(() => {
-    const terminalId = uuidv4();
-    setWorkspaceTabs(state => addTerminalTab(state, terminalId));
-  }, []);
+    // Standalone sessions own their own route; the server reports readiness.
+    if (!selectedWorktreeId) {
+      if (sessionId) openTerminalTabForSession(sessionId);
+      return;
+    }
 
-  const handleSelectWorkspaceTab = useCallback((tabId: WorkspaceTabId) => {
-    setWorkspaceTabs(state => selectWorkspaceTab(state, tabId));
-  }, []);
+    const loadedIsCurrent =
+      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+    const loadedRouteReady = loadedIsCurrent ? fetchedSessionData?.routeReady : undefined;
 
-  const handleCloseTerminalTab = useCallback((terminalId: string) => {
-    setWorkspaceTabs(state => closeTerminalTab(state, terminalId));
-    setTerminalStatuses(current => {
-      const next = { ...current };
-      delete next[terminalId];
-      return next;
+    // Any session with a ready route can own the worktree terminal. Prefer the
+    // viewed session while its route is not known to be unready; otherwise
+    // resolve the sibling whose route is ready.
+    if (sessionId && loadedRouteReady !== false) {
+      openTerminalTabForSession(sessionId);
+      return;
+    }
+
+    void resolveTerminalOwner().then(owner => {
+      if (owner) openTerminalTabForSession(owner);
     });
-  }, []);
+  }, [
+    fetchedSessionData?.kiloSessionId,
+    fetchedSessionData?.routeReady,
+    openTerminalTabForSession,
+    resolveTerminalOwner,
+    selectedWorktreeId,
+    sessionId,
+    sessionIdFromParams,
+  ]);
+
+  const handleSelectWorkspaceTab = useCallback(
+    (tabId: WorkspaceTabId) => setWorkspaceTabs(state => selectWorkspaceTab(state, tabId)),
+    [setWorkspaceTabs]
+  );
+
+  const handleWorkspaceValueChange = (value: string) => {
+    startTransition(() => {
+      const chat = openWorktreeChats.find(chat => value === `chat:${chat.sessionId}`);
+      if (chat) {
+        setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+        if (chat.sessionId !== sessionIdFromParams) openSession(chat.sessionId);
+      } else {
+        setWorkspaceTabs(state => selectWorkspaceTab(state, value));
+      }
+    });
+  };
+
+  const handleReviewAccepted = useCallback(
+    (destinationKiloSessionId: string) => {
+      closeChangesView();
+      closeArtifactsView();
+      setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+      openSession(destinationKiloSessionId);
+    },
+    [closeArtifactsView, closeChangesView, openSession, setWorkspaceTabs]
+  );
+  const review = useWorktreeReview({
+    userId: currentUserId,
+    organizationId,
+    worktreeId: selectedWorktreeId,
+    activeKiloSessionId: sessionIdFromParams,
+    activeSessionConfig:
+      isCurrentSession &&
+      activeSessionType === 'cloud-agent' &&
+      sessionConfig?.sessionId === sessionId
+        ? sessionConfig
+        : null,
+    enabled: Boolean(
+      currentUserId &&
+      selectedWorktreeId &&
+      (!sessionIdFromParams ||
+        (canOpenChanges &&
+          activeSessionType === 'cloud-agent' &&
+          fetchedSessionData?.worktreeId === selectedWorktreeId &&
+          !deletingSessionIds.includes(sessionIdFromParams)))
+    ),
+    worktreeChats,
+    deletingSessionIds,
+    api: reviewApi,
+    onAccepted: handleReviewAccepted,
+  });
+  const reviewCommentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!workspaceCloudSessionId) return counts;
+    for (const comment of review.draft?.comments ?? []) {
+      if (comment.anchor.capture.sourceCloudAgentSessionId !== workspaceCloudSessionId) continue;
+      const identity = worktreeFileIdentity({
+        path: comment.anchor.path,
+        scope: comment.anchor.capture.scope,
+      });
+      counts.set(identity, (counts.get(identity) ?? 0) + 1);
+    }
+    return counts;
+  }, [review.draft?.comments, workspaceCloudSessionId]);
+  const reviewAgainFile = useRef<{
+    userId: string;
+    organizationId?: string;
+    workspaceScope: string;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+    path: string;
+    scope?: WorktreeFileQuery['scope'];
+  } | null>(null);
+  const handleOpenReviewComment = (comment: WorktreeReviewComment) => {
+    if (!review.scope || review.locked) return;
+    const source = review.destinations.find(
+      destination =>
+        destination.cloudAgentSessionId === comment.anchor.capture.sourceCloudAgentSessionId
+    );
+    if (!source) return;
+    review.setOpen(false);
+    if (source.sessionId === sessionIdFromParams && canOpenChanges) {
+      closeChangesView();
+      closeArtifactsView();
+      setWorkspaceTabs(state =>
+        setFileTabMode(
+          openFileTab(state, comment.anchor.path, comment.anchor.capture.scope),
+          comment.anchor.path,
+          'diff',
+          comment.anchor.capture.scope
+        )
+      );
+    } else {
+      reviewAgainFile.current = {
+        ...review.scope,
+        kiloSessionId: source.sessionId,
+        cloudAgentSessionId: source.cloudAgentSessionId,
+        path: comment.anchor.path,
+        scope: comment.anchor.capture.scope,
+      };
+      openSession(source.sessionId);
+    }
+  };
+  useEffect(() => {
+    const file = reviewAgainFile.current;
+    if (!file) return;
+    if (
+      file.userId !== currentUserId ||
+      file.organizationId !== organizationId ||
+      file.workspaceScope !== workspaceTabScope
+    ) {
+      reviewAgainFile.current = null;
+      return;
+    }
+    if (
+      !canOpenChanges ||
+      sessionIdFromParams !== file.kiloSessionId ||
+      sessionId !== file.cloudAgentSessionId
+    )
+      return;
+    reviewAgainFile.current = null;
+    setWorkspaceTabs(state =>
+      setFileTabMode(openFileTab(state, file.path, file.scope), file.path, 'diff', file.scope)
+    );
+  }, [
+    canOpenChanges,
+    currentUserId,
+    organizationId,
+    sessionId,
+    sessionIdFromParams,
+    setWorkspaceTabs,
+    workspaceTabScope,
+  ]);
+
+  const handleCloseFileTab = useCallback(
+    (path: string, scope?: WorktreeFileQuery['scope']) => {
+      setWorkspaceTabs(state => closeFileTab(state, path, scope));
+    },
+    [setWorkspaceTabs]
+  );
+
+  const handleCloseChat = useCallback(
+    (closingSessionId: string) => {
+      if (closingSessionId === sessionIdFromParams) {
+        preserveTerminalSelectionRef.current = !chatTabActive;
+        const fallbackTerminal = workspaceTabs.terminals.at(-1);
+        if (chatTabActive && openWorktreeChats.length === 1 && fallbackTerminal) {
+          setWorkspaceTabs(state => selectWorkspaceTab(state, terminalTabId(fallbackTerminal.id)));
+        }
+      }
+      closeSession(closingSessionId);
+    },
+    [
+      chatTabActive,
+      closeSession,
+      openWorktreeChats.length,
+      sessionIdFromParams,
+      setWorkspaceTabs,
+      workspaceTabs.terminals,
+    ]
+  );
+
+  const handleCloseTerminalTab = useCallback(
+    (terminalId: string) => {
+      setWorkspaceTabs(state => closeTerminalTab(state, terminalId));
+      setTerminalStatuses(current => {
+        const next = { ...current };
+        delete next[terminalId];
+        return next;
+      });
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleTerminalStatusChange = useCallback(
     (terminalId: string, status: TerminalStatusSummary) => {
@@ -559,7 +1169,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         key={tab.id}
         terminalId={tab.id}
         active={active}
-        sessionId={sessionId}
+        sessionId={tab.cloudAgentSessionId}
         organizationId={organizationId}
         onStatusChange={handleTerminalStatusChange}
       />
@@ -592,15 +1202,19 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     [manager]
   );
 
-  const handleOpenTopLevelChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
-    const activeElement = document.activeElement;
-    childSessionDrawerFocusTargetRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    // The two drawers overlay the same chat pane — only one may be open.
-    preparationDrawerFocusTargetRef.current = null;
-    setPreparationDrawerAttemptId(null);
-    setChildSessionStack([entry]);
-  }, []);
+  const handleOpenTopLevelChildSession = useCallback(
+    (entry: ChildSessionDrawerEntry) => {
+      const activeElement = document.activeElement;
+      childSessionDrawerFocusTargetRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
+      closeChangesView();
+      closeArtifactsView();
+      setChildSessionStack([entry]);
+    },
+    [closeArtifactsView, closeChangesView]
+  );
 
   const handleOpenNestedChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
     setChildSessionStack(currentStack => [...currentStack, entry]);
@@ -622,15 +1236,19 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     focusTarget.focus();
   }, []);
 
-  const handleOpenPreparationDetails = useCallback((attemptId: string) => {
-    const activeElement = document.activeElement;
-    preparationDrawerFocusTargetRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    // The two drawers overlay the same chat pane — only one may be open.
-    childSessionDrawerFocusTargetRef.current = null;
-    setChildSessionStack([]);
-    setPreparationDrawerAttemptId(attemptId);
-  }, []);
+  const handleOpenPreparationDetails = useCallback(
+    (attemptId: string) => {
+      const activeElement = document.activeElement;
+      preparationDrawerFocusTargetRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
+      closeChangesView();
+      closeArtifactsView();
+      setPreparationDrawerAttemptId(attemptId);
+    },
+    [closeArtifactsView, closeChangesView]
+  );
 
   const handlePreparationDrawerOpenChange = useCallback((open: boolean) => {
     if (!open) setPreparationDrawerAttemptId(null);
@@ -644,31 +1262,88 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     focusTarget.focus();
   }, []);
 
-  // Expose the session's custom agents to the chat picker. Slug + name only;
-  // the full config stays server-side. `GetSessionOutput.runtimeAgents`
-  // already filters to enabled & non-hidden at send time, so we just pass
-  // through.
-  const customModeOptions: ModeOption<AgentMode>[] | undefined = sessionConfig?.runtimeAgents
-    ?.length
-    ? sessionConfig.runtimeAgents.map(a => ({
-        value: a.slug as AgentMode,
-        label: a.name,
-        description: '',
-      }))
-    : undefined;
+  const handleToggleChanges = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      changesViewFocusTargetRef.current = event.currentTarget;
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
+      closeArtifactsView();
+      if (changesViewOpen) {
+        changesViewOpenedTabRef.current = null;
+        setChangesViewScope(null);
+      } else {
+        changesViewOpenedTabRef.current = activeWorkspaceTabId;
+        setChangesViewScope(fileScope);
+      }
+    },
+    [activeWorkspaceTabId, changesViewOpen, closeArtifactsView, fileScope]
+  );
+
+  const handleToggleArtifacts = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      artifactsViewFocusTargetRef.current = event.currentTarget;
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
+      closeChangesView();
+      if (artifactsViewOpen) {
+        artifactsViewOpenedTabRef.current = null;
+        setArtifactsViewScope(null);
+      } else {
+        artifactsViewOpenedTabRef.current = activeWorkspaceTabId;
+        setArtifactsViewScope(fileScope);
+      }
+    },
+    [activeWorkspaceTabId, artifactsViewOpen, closeChangesView, fileScope]
+  );
+
+  const handleArtifactsDrawerOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+    artifactsViewOpenedTabRef.current = null;
+    setArtifactsViewScope(null);
+  }, []);
+
+  const handleArtifactsDrawerCloseAutoFocus = useCallback((event: Event) => {
+    const focusTarget = artifactsViewFocusTargetRef.current;
+    artifactsViewFocusTargetRef.current = null;
+    if (!focusTarget?.isConnected) return;
+    event.preventDefault();
+    focusTarget.focus();
+  }, []);
+
+  const runtimeCustomOptions: CustomModeOption[] = (composerSettings?.runtimeAgents ?? []).map(
+    a => ({
+      value: a.slug,
+      label: a.name,
+      description: '',
+    })
+  );
+  const combinedCustomOptions = filterSessionCustomModeOptions(
+    ensureSelectedCustomOption(
+      dedupeCustomModeOptions(runtimeCustomOptions),
+      composerSettings?.mode ?? ''
+    ),
+    composerSettings?.runtimeAgents
+  );
+  const customModeOptions: CustomModeOption[] | undefined =
+    combinedCustomOptions.length > 0 ? combinedCustomOptions : undefined;
 
   // If the selected custom agent pins a model, the chat model picker must
   // reflect + lock that value. The agent's `variant` is only meaningful when
   // it also pins a model (variants are model-specific, validated at write
   // time in AgentConfigSchema), so we surface it alongside the locked model.
-  const selectedRuntimeAgent = sessionConfig?.runtimeAgents?.find(
-    a => a.slug === sessionConfig?.mode
+  const selectedRuntimeAgent = composerSettings?.runtimeAgents?.find(
+    a => a.slug === composerSettings?.mode
   );
   const agentModelOverride = selectedRuntimeAgent?.model?.trim() || undefined;
   const agentVariantOverride = agentModelOverride
     ? selectedRuntimeAgent?.variant?.trim() || undefined
     : undefined;
-  const modelPickerLocked = activeSessionType === 'cloud-agent' && !!agentModelOverride;
+  const modelPickerLocked =
+    (activeSessionType === 'cloud-agent' || localComposer !== null) && !!agentModelOverride;
   const displayModel = modelPickerLocked ? agentModelOverride : sessionModels.selectedValue;
   const lockTooltip = modelPickerLocked
     ? `Locked by agent "${selectedRuntimeAgent?.name}"`
@@ -678,9 +1353,13 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const handleModeChange = useCallback(
     (mode: AgentMode) => {
+      if (localComposer) {
+        updateLocalComposer({ ...localComposer, mode });
+        return;
+      }
       if (sessionConfig) setSessionConfig({ ...sessionConfig, mode });
     },
-    [sessionConfig, setSessionConfig]
+    [localComposer, sessionConfig, setSessionConfig, updateLocalComposer]
   );
 
   const handleModelChange = useCallback(
@@ -692,63 +1371,81 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         );
         return;
       }
-      if (!sessionConfig) return;
+      if (!sessionConfig && !localComposer) return;
 
       const newModelVariants =
         modelOptions.find(candidate => candidate.id === model)?.variants ?? [];
       const validVariant =
-        sessionConfig.variant && newModelVariants.includes(sessionConfig.variant)
-          ? sessionConfig.variant
+        sessionModels.selectedVariant && newModelVariants.includes(sessionModels.selectedVariant)
+          ? sessionModels.selectedVariant
           : newModelVariants[0];
+      if (localComposer) {
+        updateLocalComposer({ ...localComposer, model, variant: validVariant ?? null });
+        return;
+      }
+      if (!sessionConfig) return;
+      manager.setCloudAgentModelOverride({ model, variant: validVariant });
       setSessionConfig({ ...sessionConfig, model, variant: validVariant });
     },
     [
       activeSessionType,
+      localComposer,
       manager,
       modelOptions,
       sessionConfig,
       sessionModels.selectedVariant,
       setSessionConfig,
+      updateLocalComposer,
     ]
   );
 
   const handleVariantChange = useCallback(
     (variant: string) => {
+      if (localComposer) {
+        updateLocalComposer({ ...localComposer, variant });
+        return;
+      }
       if (activeSessionType === 'remote') {
         const option = modelOptions.find(candidate => candidate.id === sessionModels.selectedValue);
         manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
         return;
       }
-      if (sessionConfig) setSessionConfig({ ...sessionConfig, variant });
+      if (!sessionConfig || !sessionModels.selectedValue) return;
+      manager.setCloudAgentModelOverride({ model: sessionModels.selectedValue, variant });
+      setSessionConfig({ ...sessionConfig, model: sessionModels.selectedValue, variant });
     },
     [
       activeSessionType,
+      localComposer,
       manager,
       modelOptions,
       sessionConfig,
       sessionModels.selectedValue,
+      updateLocalComposer,
       setSessionConfig,
     ]
   );
 
-  // -- Delayed loading indicator (avoid flash for fast switches) ------------
+  // Delay the loading indicator to avoid flashing for fast switches.
+  const isTranscriptLoading =
+    transcriptPhase === 'opening' || isRefreshingCachedTranscript || isLoading;
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
   useEffect(() => {
-    if (!isLoading) {
-      setShowLoadingIndicator(false);
-      return;
-    }
+    setShowLoadingIndicator(false);
+    if (!isTranscriptLoading) return;
     const timer = setTimeout(() => setShowLoadingIndicator(true), 1000);
     return () => clearTimeout(timer);
-  }, [isLoading]);
+  }, [isTranscriptLoading, sessionIdFromParams]);
+  const currentChatLoadingLabel =
+    isTranscriptLoading && showLoadingIndicator
+      ? isRefreshingCachedTranscript
+        ? 'Refreshing session…'
+        : 'Loading session…'
+      : null;
 
-  // -- Derived state --------------------------------------------------------
-  const showChatInterface = Boolean(sessionConfig) || Boolean(sessionIdFromParams);
-  const currentModelOption = modelOptions.find(model =>
-    activeSessionType === 'remote'
-      ? model.id === sessionModels.selectedValue
-      : model.id === sessionConfig?.model
-  );
+  const showChatInterface =
+    Boolean(selectedWorktreeId) || Boolean(sessionConfig) || Boolean(sessionIdFromParams);
+  const currentModelOption = modelOptions.find(model => model.id === displayModel);
   const modelDisplayName = currentModelOption?.name
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
@@ -762,50 +1459,217 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // free to pick their own model.
   const displayVariant = modelPickerLocked ? agentVariantOverride : sessionModels.selectedVariant;
   const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
-  const preparationByMessageId = useMemo(() => {
-    const byMessageId = new Map<string, readonly PreparationAttempt[]>();
-    for (const attempt of preparationAttempts) {
-      if (isNoOpCompletedPreparationAttempt(attempt)) continue;
-      const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
-      byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
-    }
-    return byMessageId;
-  }, [preparationAttempts]);
   // A running preparation row already shows live progress inline, so the
   // trailing progress row would repeat the same message beneath it.
+  const preparationRowShowsProgress = preparationAttempts.some(
+    attempt => attempt.status === 'running'
+  );
   const visibleStatusIndicator =
-    statusIndicator?.type === 'progress' &&
-    preparationAttempts.some(attempt => attempt.status === 'running')
+    (statusIndicator?.type === 'progress' && preparationRowShowsProgress) ||
+    isCommitSummaryRepresented(statusIndicator, commitsAfterMessage)
       ? null
       : statusIndicator;
+  // A chat created here shows what is known locally until its live transcript loads.
+  const {
+    failure: localFailure,
+    transcript: shownTranscript,
+    statusIndicator: slotStatusIndicator,
+    billingFailure: shownBillingFailure,
+  } = useLocalChatView({
+    localSession,
+    transcriptPhase,
+    live: {
+      staticMessages,
+      dynamicMessages,
+      pendingMessages,
+      sendingMessageIds,
+      statusIndicator: visibleStatusIndicator,
+      billingFailure,
+    },
+  });
+  // A failed row that a Retry re-sent stays hidden while the re-send is in
+  // flight and after it is accepted, also across a chat switch and a relaunch.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const shownMessages = useMemo(() => {
+    const messages = [...shownTranscript.staticMessages, ...shownTranscript.dynamicMessages];
+    if (resolvedDeliveryFailures.size === 0 && supersededInFlightMessageIds.size === 0) {
+      return messages;
+    }
+    return messages.filter(
+      message =>
+        !resolvedDeliveryFailures.has(message.info.id) &&
+        !supersededInFlightMessageIds.has(message.info.id)
+    );
+  }, [
+    shownTranscript.staticMessages,
+    shownTranscript.dynamicMessages,
+    resolvedDeliveryFailures,
+    supersededInFlightMessageIds,
+  ]);
+  const currentChatProgress =
+    statusIndicator?.type === 'progress' && isCurrentSession && sessionIdFromParams
+      ? { sessionId: sessionIdFromParams, message: statusIndicator.message }
+      : null;
 
-  const placeholder = isLoading
-    ? 'Loading session…'
-    : cloudStatus?.type === 'preparing'
-      ? 'Setting up environment…'
-      : cloudStatus?.type === 'finalizing'
-        ? 'Wrapping up…'
-        : 'Ask anything…';
+  const sessionErrorMessage =
+    transcriptPhase !== 'opening' && !billingFailure && statusIndicator?.type === 'error'
+      ? readableSessionError(statusIndicator.message)
+      : null;
+  const failedMessageRetry =
+    sessionErrorMessage !== null && !isReadOnly && canSend
+      ? failedMessageRetryTarget(shownMessages, shownTranscript.pendingMessages)
+      : null;
+  const failedPreparationAttemptId =
+    cloudStatus?.type === 'error'
+      ? (preparationAttempts.filter(attempt => attempt.status === 'failed').at(-1)?.id ?? null)
+      : null;
 
-  const canOpenTerminal = Boolean(sessionId) && !isReadOnly;
+  const chatOpening = transcriptPhase === 'opening' || (isLoading && transcriptPhase !== 'local');
 
+  // The worktree's sandbox stays reachable through its control chat while a chat loads.
+  const canOpenTerminal =
+    !sessionIdFromParams && selectedWorktreeId
+      ? worktreeChats.some(chat => Boolean(chat.cloudAgentSessionId))
+      : workspaceControlSession
+        ? Boolean(workspaceControlSession.cloudAgentSessionId)
+        : Boolean(sessionId) && !isReadOnly;
+
+  const preview = usePreviewController({
+    selectedWorktreeId,
+    sessionId: workspaceCloudSessionId,
+    canOpenPreview: selectedWorktreeId
+      ? worktreeChats.some(chat => Boolean(chat.cloudAgentSessionId))
+      : canOpenTerminal,
+    organizationId,
+  });
+
+  // A chat takes typing at once, also while it is created or opens; sending waits for it.
+  const composerTextareaDisabled =
+    transcriptPhase === 'local' || chatOpening
+      ? false
+      : activeSessionType === 'cloud-agent'
+        ? isReadOnly
+        : !canSend;
+  const composerInputRef = useSessionComposerFocus(
+    composerFocusRequest,
+    sessionIdFromParams,
+    transcriptPhase === 'local' ||
+      (isCurrentSession && !isLoading && transcriptPhase !== 'opening'),
+    isReadOnly ||
+      Boolean(activeQuestion || activePermission) ||
+      !chatTabActive ||
+      changesViewOpen ||
+      artifactsViewOpen,
+    composerTextareaDisabled
+  );
+
+  // Feedback context carries the session the server resolved for this route.
+  const headerRepository = workspaceControlSession?.repository ?? sessionConfig?.repository ?? '';
+  const headerBranch = workspaceControlSession
+    ? (workspaceControlSession.branch ?? undefined)
+    : fetchedSessionData?.isPreparingAsync &&
+        cloudStatus?.type !== 'ready' &&
+        !preparationAttempts.some(attempt => attempt.status === 'completed')
+      ? undefined
+      : (sessionBranch ?? undefined);
+  const headerGitUrl = workspaceControlSession ? undefined : fetchedSessionData?.gitUrl;
+  const [stackRefreshToken, setStackRefreshToken] = useState(0);
+  const chatStackInfo = useChatStackInfo({
+    enabled: Boolean(selectedWorktreeId),
+    userId: currentUserId,
+    currentWorktreeId: selectedWorktreeId,
+    cloudAgentSessionId: workspaceCloudSessionId ?? '',
+    organizationId,
+    repository: headerRepository,
+    branch: headerBranch,
+    gitUrl: fetchedSessionData?.gitUrl,
+    refreshToken: stackRefreshToken,
+    openSession,
+  });
   const sessionActions = (
     <ChatHeader
-      cloudAgentSessionId={sessionId ?? 'Starting session…'}
-      kiloSessionId={sessionIdFromParams ?? undefined}
+      currentUserId={currentUserId}
+      parentSessionHref={parentSessionHref}
+      cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
+      changesCloudAgentSessionId={changesCloudSessionId ?? undefined}
+      worktreeId={selectedWorktreeId ?? undefined}
+      sandboxScopeId={selectedWorktreeId ?? workspaceCloudSessionId ?? 'Starting session…'}
+      kiloSessionId={
+        sessionIdFromParams
+          ? fetchedSessionData?.kiloSessionId === sessionIdFromParams
+            ? sessionIdFromParams
+            : undefined
+          : workspaceControlSession?.sessionId
+      }
       organizationId={organizationId}
-      repository={sessionConfig?.repository ?? ''}
-      branch={fetchedSessionData?.gitBranch ?? undefined}
-      gitUrl={fetchedSessionData?.gitUrl}
-      model={sessionConfig?.model}
-      modelDisplayName={modelDisplayName}
-      totalCost={totalCost}
-      soundEnabled={soundEnabled}
-      onToggleSound={handleToggleSound}
+      repository={headerRepository}
+      branch={headerBranch}
+      gitUrl={headerGitUrl}
+      model={workspaceControlSession?.model ?? displayModel}
+      modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
+      getSessionCostBreakdown={
+        !workspaceControlSession && isCurrentSession && fetchedSessionData
+          ? getCurrentSessionCostBreakdown
+          : undefined
+      }
+      getSessionUsage={
+        !workspaceControlSession && isCurrentSession && transcriptReady
+          ? getCurrentSessionUsage
+          : undefined
+      }
+      hasIncompleteHistory={
+        isCurrentSession && (hasOlderMessages || olderMessagesOmittedItemCount > 0)
+      }
+      sessionInfoOpen={sessionInfoOpen}
+      onSessionInfoOpenChange={setSessionInfoOpen}
+      sessionInfoTriggerRef={sessionInfoTriggerRef}
+      preview={preview}
+      changesOpen={changesViewOpen}
+      onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
+      artifactsOpen={artifactsViewOpen}
+      onToggleArtifacts={canOpenArtifacts ? handleToggleArtifacts : undefined}
+      sessionActive={
+        !workspaceControlSession &&
+        (isStreaming || activity.type === 'busy' || activity.type === 'retrying')
+      }
+      canForkToCloud={
+        Boolean(workspaceControlSession) ||
+        (!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId))
+      }
+      stack={chatStackInfo}
+      onSendStackInstruction={handleSendMessage}
+      onStackOperationCompleted={() => setStackRefreshToken(token => token + 1)}
+      sandboxStatusEligible={isSandboxStatusEligible({
+        currentUserId,
+        sessionId: workspaceCloudSessionId,
+        sessionIdFromParams: workspaceControlSession?.sessionId ?? sessionIdFromParams,
+        organizationId,
+        activeSessionType: workspaceControlSession ? 'cloud-agent' : activeSessionType,
+        isReadOnly: workspaceControlSession ? false : isReadOnly,
+        fetchedSessionData: workspaceControlSession
+          ? {
+              kiloSessionId: workspaceControlSession.sessionId,
+              cloudAgentSessionId: workspaceCloudSessionId,
+              organizationId: organizationId ?? null,
+            }
+          : fetchedSessionData,
+      })}
     />
   );
 
-  // -- Render ---------------------------------------------------------------
+  const toolDetailScope = useMemo(
+    () =>
+      sessionId
+        ? {
+            userId: currentUserId,
+            organizationId: organizationId ?? null,
+            cloudAgentSessionId: sessionId,
+          }
+        : null,
+    [currentUserId, organizationId, sessionId]
+  );
+
   return (
     <QuestionContextProvider
       questionRequestIds={emptyQuestionRequestIds}
@@ -823,234 +1687,588 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
           acceptSuggestion={handleAcceptSuggestion}
           dismissSuggestion={handleDismissSuggestion}
         >
-          <div className="flex h-full w-full flex-col overflow-hidden">
-            <SetPageTitle
-              title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
-            >
-              {totalCost > 0 && (
-                <span className="text-muted-foreground text-sm">${totalCost.toFixed(4)}</span>
-              )}
-            </SetPageTitle>
-            {showChatInterface ? (
-              <>
-                {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
-
-                <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
-                  <MobileSidebarToggle variant="inline" label="Sessions" />
-                  <div className="min-w-0 flex-1">
-                    {canOpenTerminal && (
-                      <CloudAgentWorkspaceTabs
-                        activeTabId={workspaceTabs.activeTabId}
-                        terminals={workspaceTabs.terminals}
-                        terminalStatuses={terminalStatuses}
-                        canCreateTerminal={canOpenTerminal}
-                        onSelectTab={handleSelectWorkspaceTab}
-                        onCreateTerminal={handleCreateTerminalTab}
-                        onCloseTerminal={handleCloseTerminalTab}
-                      />
-                    )}
-                  </div>
-                  <div className="shrink-0">{sessionActions}</div>
-                </div>
-
-                <div
-                  ref={setChildSessionDrawerContainer}
-                  className="relative flex min-h-0 flex-1 flex-col"
+          <ToolDetailScopeProvider scope={toolDetailScope}>
+            <div className="flex h-full min-w-0 w-full flex-col overflow-hidden">
+              <SetPageTitle
+                subtitle={
+                  parentSession && parentSessionHref ? (
+                    <ParentSessionLink href={parentSessionHref} title={parentSession.title} />
+                  ) : null
+                }
+                title={
+                  !sessionIdFromParams && selectedWorktreeId
+                    ? 'Worktree'
+                    : sessionIdFromParams
+                      ? (displayedChatTitle ?? '')
+                      : 'Cloud Agent'
+                }
+              >
+                {sessionIdFromParams && isCurrentSession && fetchedSessionData && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground h-11 gap-1 px-2 text-sm font-normal"
+                    aria-haspopup="dialog"
+                    aria-expanded={sessionInfoOpen}
+                    aria-label={`Session cost ${formatSessionTotalCost(totalCostUsd)}. View cost and token usage`}
+                    onClick={event => {
+                      sessionInfoTriggerRef.current = event.currentTarget;
+                      setSessionInfoOpen(true);
+                    }}
+                  >
+                    Cost{' '}
+                    <span className="font-mono tabular-nums">
+                      {formatSessionTotalCost(totalCostUsd)}
+                    </span>
+                  </Button>
+                )}
+              </SetPageTitle>
+              {showChatInterface ? (
+                <CloudChatRuntimeProvider
+                  active={chatTabActive}
+                  projection={{
+                    messages: shownMessages,
+                    isStreaming,
+                    pendingMessages: shownTranscript.pendingMessages,
+                    sendingMessageIds: shownTranscript.sendingMessageIds,
+                    preparationByMessageId,
+                    commitsAfterMessage,
+                  }}
+                  state={{
+                    isLoading,
+                    isRunning: isStreaming,
+                    isReadOnly,
+                    isSendDisabled: !canSend,
+                    canInterrupt,
+                  }}
+                  onCancel={async () => {
+                    await manager.interrupt();
+                  }}
+                  onNew={async message => {
+                    const text = message.content
+                      .flatMap(part => (part.type === 'text' ? [part.text] : []))
+                      .join('');
+                    if (!(await handleSendMessage(text)))
+                      throw new MessageNotSentError('Message was not accepted');
+                  }}
                 >
-                  <div
-                    inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
+                  <Tabs
+                    value={
+                      activeWorkspaceTabId === CHAT_TAB_ID ? chatTabValue : activeWorkspaceTabId
+                    }
+                    onValueChange={handleWorkspaceValueChange}
                     className="flex min-h-0 flex-1 flex-col"
                   >
-                    <div className="relative min-h-0 flex-1">
-                      <>
-                        <div
-                          ref={scrollContainerRef}
-                          hidden={!chatTabActive}
-                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
-                          onScroll={handleScroll}
-                        >
-                          <div ref={messagesContentRef}>
-                            <StaticMessages
-                              messages={staticMessages}
-                              pendingMessages={pendingMessages}
-                              preparationByMessageId={preparationByMessageId}
-                              getChildMessages={getChildMessages}
-                              onOpenChildSession={handleOpenTopLevelChildSession}
-                              onOpenPreparationDetails={handleOpenPreparationDetails}
-                            />
-                            <DynamicMessages
-                              active={chatTabActive}
-                              isStreaming={isStreaming}
-                              messages={dynamicMessages}
-                              pendingMessages={pendingMessages}
-                              preparationByMessageId={preparationByMessageId}
-                              getChildMessages={getChildMessages}
-                              onOpenChildSession={handleOpenTopLevelChildSession}
-                              onOpenPreparationDetails={handleOpenPreparationDetails}
-                            />
-
-                            {chatTabActive && (
-                              <WorkingIndicator
-                                messages={dynamicMessages}
-                                isStreaming={isStreaming}
-                              />
-                            )}
-                            {visibleStatusIndicator && (
-                              <SessionStatusIndicator indicator={visibleStatusIndicator} />
-                            )}
-
-                            <div ref={messagesEndRef} />
-                          </div>
-                        </div>
-
-                        {chatTabActive && showScrollButton && (
-                          <button
-                            type="button"
-                            onClick={scrollToBottom}
-                            className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                          </button>
-                        )}
-                      </>
-
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-2 border-b px-3 py-2 sm:flex-nowrap">
+                      <MobileSidebarToggle variant="inline" label="Worktrees" />
                       <div
-                        className={
-                          chatTabActive
-                            ? 'hidden'
-                            : 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
-                        }
+                        className={cn(
+                          'order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto',
+                          // Hold the tab strip's height while the session resolves its worktree.
+                          (sessionIdFromParams || selectedWorktreeId) &&
+                            'min-h-10 [@media(any-pointer:coarse)]:min-h-14'
+                        )}
                       >
-                        {terminalPaneMap}
+                        {(canOpenTerminal || selectedWorktreeId) && (
+                          <CloudAgentWorkspaceTabs
+                            activeTabId={activeWorkspaceTabId}
+                            activeTabRef={activeWorkspaceTabRef}
+                            files={filesVisible ? workspaceTabs.files : []}
+                            onCloseFile={handleCloseFileTab}
+                            chatSessions={worktreeChats}
+                            currentChatProgress={currentChatProgress}
+                            currentChatLoadingLabel={currentChatLoadingLabel}
+                            openChatSessionIds={openWorktreeChats.map(chat => chat.sessionId)}
+                            closedChatSessionIds={closedWorktreeChats.map(chat => chat.sessionId)}
+                            currentSessionId={sessionIdFromParams}
+                            worktreeId={selectedWorktreeId}
+                            onSelectChat={openSession}
+                            onCloseChat={handleCloseChat}
+                            onCreateChat={selectedWorktreeId ? handleCreateWorktreeChat : undefined}
+                            canCreateChat={canCreateWorktreeChat}
+                            onRenameChat={renameSession}
+                            deletingSessionIds={deletingSessionIds}
+                            terminals={workspaceTabs.terminals}
+                            terminalStatuses={terminalStatuses}
+                            canCreateTerminal={canOpenTerminal}
+                            onSelectTab={handleSelectWorkspaceTab}
+                            onCreateTerminal={handleCreateTerminalTab}
+                            onCloseTerminal={handleCloseTerminalTab}
+                            onActivateTab={() => {
+                              closeChangesView();
+                              closeArtifactsView();
+                            }}
+                            selectionSuppressed={changesViewOpen}
+                          />
+                        )}
                       </div>
+                      <WorktreeReviewDialog
+                        review={review}
+                        onOpenComment={handleOpenReviewComment}
+                      />
+                      {(sessionIdFromParams || workspaceControlSession || preview.dialog) && (
+                        <div className="ml-auto flex min-h-8 shrink-0 items-center justify-end pointer-coarse:min-h-11">
+                          {sessionActions}
+                        </div>
+                      )}
                     </div>
 
-                    {chatTabActive && (
-                      <>
-                        {isReadOnly ? (
-                          !isLoading && sessionIdFromParams && fetchedSessionData ? (
-                            <SessionContinuationPanel sessionId={sessionIdFromParams} />
-                          ) : null
-                        ) : (
-                          <>
-                            {activeQuestion && (
-                              <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
-                                <QuestionToolCard
-                                  key={activeQuestion.requestId}
-                                  questions={activeQuestion.questions}
-                                  requestId={activeQuestion.requestId}
-                                  status="running"
-                                />
-                              </div>
-                            )}
-                            {activePermission && (
-                              <div className="flex items-center border-t p-4">
-                                <PermissionCard
-                                  key={activePermission.requestId}
-                                  requestId={activePermission.requestId}
-                                  permission={activePermission.permission}
-                                  patterns={activePermission.patterns}
-                                  metadata={activePermission.metadata}
-                                  always={activePermission.always}
-                                />
-                              </div>
-                            )}
-                            <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                              <ChatInput
-                                onSend={handleSendMessage}
-                                onSendCommand={handleSendSlashCommand}
-                                onStop={handleStopExecution}
-                                disabled={!canSend}
-                                isStreaming={isStreaming && !activeSuggestion}
-                                placeholder={placeholder}
-                                slashCommands={availableCommands}
-                                mode={sessionConfig?.mode as AgentMode | undefined}
-                                model={displayModel}
-                                modelOptions={modelOptions}
-                                isLoadingModels={isLoadingModels}
-                                onModeChange={handleModeChange}
-                                onModelChange={handleModelChange}
-                                variant={displayVariant}
-                                onVariantChange={handleVariantChange}
-                                availableVariants={displayAvailableVariants}
-                                showToolbar={Boolean(sessionIdFromParams)}
-                                initialValue={failedPrompt ?? undefined}
-                                customModeOptions={customModeOptions}
-                                modelPickerDisabled={
-                                  modelPickerLocked || sessionModels.modelPickerDisabled
-                                }
-                                modelPickerTooltip={lockTooltip}
-                                variantPickerDisabled={
-                                  modelPickerLocked || sessionModels.modelPickerDisabled
-                                }
-                                variantPickerTooltip={lockTooltip}
-                                attachmentsEnabled={supportsAttachments}
-                                attachmentUploadOptions={{
-                                  messageUuid: attachmentMessageUuid,
-                                  organizationId,
-                                  getUploadUrl: {
-                                    personal: personalUploadUrl,
-                                    organization: orgUploadUrl,
-                                  },
-                                }}
-                              />
-                              {(sessionConfig?.repository ||
-                                (contextUsage !== undefined && contextWindow !== undefined)) && (
-                                <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
-                                  {sessionConfig?.repository && (
-                                    <div className="flex min-w-0 items-center gap-1.5">
-                                      <GitBranch className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{sessionConfig.repository}</span>
-                                      {fetchedSessionData?.gitBranch && (
-                                        <>
-                                          <span>·</span>
-                                          <span className="truncate">
-                                            {fetchedSessionData.gitBranch}
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                  {contextUsage !== undefined && contextWindow !== undefined && (
-                                    <div className="ml-auto shrink-0">
-                                      <ContextUsageIndicator
-                                        contextTokens={contextUsage.contextTokens}
-                                        contextWindow={contextWindow}
-                                      />
-                                    </div>
+                    <div
+                      ref={setChildSessionDrawerContainer}
+                      className="relative flex min-h-0 flex-1 flex-col"
+                    >
+                      <div
+                        inert={
+                          childSessionStack.length > 0 ||
+                          preparationDrawerAttemptId !== null ||
+                          artifactsViewOpen
+                        }
+                        className={changesViewOpen ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
+                      >
+                        <TabsContent
+                          value={chatTabValue}
+                          forceMount
+                          hidden={activeWorkspaceTabId !== CHAT_TAB_ID}
+                          className={
+                            activeWorkspaceTabId === CHAT_TAB_ID
+                              ? 'm-0 flex min-h-0 flex-1 flex-col'
+                              : 'hidden'
+                          }
+                        >
+                          <div className="relative min-h-0 flex-1">
+                            {!sessionIdFromParams &&
+                              selectedWorktreeId &&
+                              workspaceTabs.activeTabId === CHAT_TAB_ID && (
+                                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                                  <MessageSquare
+                                    className="text-muted-foreground h-6 w-6"
+                                    aria-hidden="true"
+                                  />
+                                  <div className="space-y-1">
+                                    <p className="text-sm font-medium">
+                                      {openWorktreeChats.length > 0
+                                        ? 'Select a chat'
+                                        : 'No open chats'}
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                      Reopen a saved session from Sessions in the tab options menu
+                                      {canCreateWorktreeChat ? ' or start a new chat.' : '.'}
+                                    </p>
+                                  </div>
+                                  {canCreateWorktreeChat && (
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={handleCreateWorktreeChat}
+                                    >
+                                      New chat
+                                    </Button>
                                   )}
                                 </div>
                               )}
+                            <>
+                              <div
+                                ref={scrollContainerRef}
+                                hidden={!chatTabActive}
+                                className="absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2"
+                                onScroll={handleScroll}
+                              >
+                                <div ref={messagesContentRef}>
+                                  <div className="sr-only" aria-live="polite">
+                                    {olderArrivalAnnouncement}
+                                  </div>
+                                  {transcriptPhase !== 'opening' && (
+                                    <OlderMessagesHeader
+                                      hasOlderMessages={hasOlderMessages}
+                                      isLoadingOlderMessages={isLoadingOlderMessages}
+                                      olderMessagesError={olderMessagesError}
+                                      olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+                                      onRetry={requestOlderMessages}
+                                    />
+                                  )}
+                                  {transcriptPhase === 'opening' ? (
+                                    <div
+                                      role="status"
+                                      aria-busy="true"
+                                      className="flex flex-col gap-3 py-2"
+                                    >
+                                      <span className="sr-only">Loading session…</span>
+                                      <Skeleton className="h-3 w-2/3 motion-reduce:animate-none" />
+                                      <Skeleton className="h-3 w-1/2 motion-reduce:animate-none" />
+                                    </div>
+                                  ) : transcriptPhase === 'failed' ? null : (
+                                    <PreviewLinksContext.Provider value={preview.links}>
+                                      <CloudThread
+                                        active={chatTabActive}
+                                        collapseTools={collapseTools}
+                                        getChildMessages={getChildMessages}
+                                        onOpenChildSession={handleOpenTopLevelChildSession}
+                                        onOpenPreparationDetails={handleOpenPreparationDetails}
+                                      />
+
+                                      {localFailure ? (
+                                        <LocalChatFailure
+                                          session={localFailure}
+                                          onRetry={() => retryLocalChat(localFailure.kiloSessionId)}
+                                          onDiscard={() =>
+                                            discardLocalChat(localFailure.kiloSessionId)
+                                          }
+                                        />
+                                      ) : (
+                                        <TranscriptStatusSlot
+                                          yieldToPreparationRow={preparationRowShowsProgress}
+                                          workingMessages={
+                                            chatTabActive &&
+                                            isStreaming &&
+                                            visibleStatusIndicator?.type !== 'warning'
+                                              ? dynamicMessages
+                                              : null
+                                          }
+                                          indicator={
+                                            shownBillingFailure ||
+                                            slotStatusIndicator?.type === 'error'
+                                              ? null
+                                              : slotStatusIndicator
+                                          }
+                                        />
+                                      )}
+                                    </PreviewLinksContext.Provider>
+                                  )}
+
+                                  <div ref={messagesEndRef} />
+                                </div>
+                              </div>
+
+                              {chatTabActive && showScrollButton && (
+                                <button
+                                  type="button"
+                                  onClick={scrollToBottom}
+                                  className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
+                                >
+                                  <ArrowDown className="h-4 w-4" />
+                                </button>
+                              )}
+                            </>
+                          </div>
+
+                          <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
+                            {transcriptPhase !== 'opening' && (
+                              <div className="flex min-w-0 items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] has-[button]:mb-1">
+                                <CurrentTaskList
+                                  todos={
+                                    isReadOnly || activeQuestion || activePermission
+                                      ? null
+                                      : currentTodos
+                                  }
+                                />
+                                <SessionBackgroundActivityStrip
+                                  onOpenChildSession={handleOpenTopLevelChildSession}
+                                />
+                              </div>
+                            )}
+                            {isReadOnly &&
+                              (!isLoading &&
+                              sessionIdFromParams &&
+                              fetchedSessionData &&
+                              transcriptPhase !== 'opening' ? (
+                                <SessionContinuationPanel sessionId={sessionIdFromParams} />
+                              ) : null)}
+                            <div hidden={isReadOnly}>
+                              {unreadablePermissions.length > 0 &&
+                                transcriptPhase !== 'opening' && (
+                                  <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                                    <PermissionUnreadableNotice />
+                                  </div>
+                                )}
+                              {activeQuestion && transcriptPhase !== 'opening' && (
+                                <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                                  <QuestionToolCard
+                                    key={activeQuestion.requestId}
+                                    questions={activeQuestion.questions}
+                                    requestId={activeQuestion.requestId}
+                                    status="running"
+                                  />
+                                </div>
+                              )}
+                              {activePermission && transcriptPhase !== 'opening' && (
+                                <div className="flex items-center border-t p-4">
+                                  <PermissionCard
+                                    key={activePermission.requestId}
+                                    requestId={activePermission.requestId}
+                                    permission={activePermission.permission}
+                                    patterns={activePermission.patterns}
+                                    metadata={activePermission.metadata}
+                                    always={activePermission.always}
+                                  />
+                                </div>
+                              )}
+                              <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                                {transcriptPhase !== 'opening' && shownBillingFailure && (
+                                  <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2">
+                                    <CloudAgentBillingError
+                                      failure={shownBillingFailure}
+                                      presentation={billingPayerPresentation(shownBillingFailure, {
+                                        currentUserId,
+                                        organization:
+                                          organizationId && organizationName && organizationRole
+                                            ? {
+                                                id: organizationId,
+                                                name: organizationName,
+                                                role: organizationRole,
+                                              }
+                                            : undefined,
+                                      })}
+                                    />
+                                  </div>
+                                )}
+                                {sessionErrorMessage !== null && (
+                                  <div className="-mb-2 px-[max(1rem,calc(50%_-_27rem))]">
+                                    <SessionErrorNotice
+                                      message={sessionErrorMessage}
+                                      hint={
+                                        workspaceSnapshotRecoveryState !== null
+                                          ? failedMessageRetry !== null
+                                            ? 'Retry usually fixes this. Start fresh discards the snapshot.'
+                                            : 'Send your message again to retry. Start fresh discards the snapshot.'
+                                          : environmentBuildRecoveryId !== null
+                                            ? 'Send your message again once the environment snapshot is ready.'
+                                            : undefined
+                                      }
+                                      actions={
+                                        failedMessageRetry !== null ||
+                                        environmentBuildRecoveryId !== null ||
+                                        workspaceSnapshotRecoveryState !== null ||
+                                        failedPreparationAttemptId !== null ? (
+                                          <>
+                                            {failedMessageRetry !== null && (
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() =>
+                                                  void handleRetryFailedMessage(failedMessageRetry)
+                                                }
+                                              >
+                                                <RotateCw className="size-4" />
+                                                Retry
+                                              </Button>
+                                            )}
+                                            {environmentBuildRecoveryId !== null && (
+                                              <EnvironmentBuildRecovery
+                                                environmentId={environmentBuildRecoveryId}
+                                                organizationId={organizationId}
+                                              />
+                                            )}
+                                            {workspaceSnapshotRecoveryState !== null && (
+                                              <WorkspaceSnapshotRecovery
+                                                capturedAt={
+                                                  workspaceSnapshotRecoveryState.capturedAt
+                                                }
+                                                isRemoving={removeWorkspaceSnapshot.isPending}
+                                                onRemove={async () => {
+                                                  await removeWorkspaceSnapshot.mutateAsync();
+                                                  toast.success(
+                                                    'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
+                                                  );
+                                                }}
+                                              />
+                                            )}
+                                            {failedPreparationAttemptId !== null && (
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                  handleOpenPreparationDetails(
+                                                    failedPreparationAttemptId
+                                                  )
+                                                }
+                                              >
+                                                View details
+                                              </Button>
+                                            )}
+                                          </>
+                                        ) : undefined
+                                      }
+                                    />
+                                  </div>
+                                )}
+                                <CloudComposer
+                                  inputRef={composerInputRef}
+                                  onSend={handleSendMessage}
+                                  onSendCommand={handleSendSlashCommand}
+                                  onNewChat={
+                                    canCreateWorktreeChat ? handleReplaceWorktreeChat : undefined
+                                  }
+                                  onStop={handleStopExecution}
+                                  canInterrupt={canInterrupt}
+                                  conversationKey={sessionIdFromParams ?? 'new'}
+                                  disabled={
+                                    !canSend ||
+                                    isLoading ||
+                                    transcriptPhase === 'opening' ||
+                                    activeSessionType === null
+                                  }
+                                  sendUnavailableReason={
+                                    transcriptPhase === 'local'
+                                      ? localFailure
+                                        ? undefined
+                                        : 'Creating session…'
+                                      : chatOpening
+                                        ? 'Loading session…'
+                                        : undefined
+                                  }
+                                  textareaDisabled={composerTextareaDisabled}
+                                  toolbarDisabled={localComposer ? isReadOnly : undefined}
+                                  isStreaming={
+                                    (isStreaming || activity.type === 'retrying') &&
+                                    !activeSuggestion
+                                  }
+                                  isPreparing={cloudStatus?.type === 'preparing'}
+                                  placeholder="Ask anything…"
+                                  slashCommands={availableCommands}
+                                  mode={modeControlValue(composerSettings?.mode ?? null)}
+                                  model={displayModel}
+                                  modelOptions={modelOptions}
+                                  isLoadingModels={isLoadingModels}
+                                  onModelPickerIntent={requestModelCatalog}
+                                  onModeChange={handleModeChange}
+                                  onModelChange={handleModelChange}
+                                  variant={displayVariant}
+                                  onVariantChange={handleVariantChange}
+                                  availableVariants={displayAvailableVariants}
+                                  showToolbar={Boolean(sessionIdFromParams)}
+                                  initialValue={failedPrompt ?? undefined}
+                                  withdrawnFailedPrompt={deliveredFailedPrompt}
+                                  customModeOptions={customModeOptions}
+                                  modelPickerDisabled={
+                                    modelPickerLocked || sessionModels.modelPickerDisabled
+                                  }
+                                  modelPickerTooltip={lockTooltip}
+                                  variantPickerDisabled={
+                                    modelPickerLocked || sessionModels.modelPickerDisabled
+                                  }
+                                  variantPickerTooltip={lockTooltip}
+                                  attachmentsEnabled={
+                                    !isReadOnly &&
+                                    (supportsAttachments || transcriptPhase === 'local')
+                                  }
+                                  attachmentUploadOptions={{
+                                    messageUuid: attachmentMessageUuid,
+                                    organizationId,
+                                    getUploadUrl: {
+                                      personal: personalUploadUrl,
+                                      organization: orgUploadUrl,
+                                    },
+                                  }}
+                                  favorites
+                                />
+                                <ComposerContextLine
+                                  userId={currentUserId}
+                                  reserve={Boolean(sessionIdFromParams)}
+                                  cloudAgentSessionId={workspaceCloudSessionId ?? undefined}
+                                  organizationId={organizationId}
+                                  worktreeId={selectedWorktreeId ?? undefined}
+                                  repository={composerRepository}
+                                  branch={composerBranch}
+                                  environmentName={environment?.name}
+                                  contextTokens={contextUsage?.contextTokens}
+                                  contextWindow={contextWindow}
+                                />
+                              </div>
                             </div>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
+                          </div>
+                        </TabsContent>
+                        <div
+                          className={
+                            terminalTabActive
+                              ? 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
+                              : 'hidden'
+                          }
+                        >
+                          {terminalPaneMap}
+                        </div>
+                        {filesVisible &&
+                          changesCloudSessionId &&
+                          workspaceTabs.files.map(tab => {
+                            const tabId = fileTabId(tab.path, tab.scope);
+                            const active = activeWorkspaceTabId === tabId;
+                            return (
+                              <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
+                                {active && !changesViewOpen && (
+                                  <WorktreeFilePane
+                                    userId={currentUserId}
+                                    cloudAgentSessionId={changesCloudSessionId}
+                                    organizationId={organizationId}
+                                    worktreeId={selectedWorktreeId ?? undefined}
+                                    path={tab.path}
+                                    scope={tab.scope}
+                                    mode={tab.mode}
+                                    review={review.scope ? review.bindings : undefined}
+                                    reviewScope={review.scope ?? undefined}
+                                    onModeChange={mode =>
+                                      setWorkspaceTabs(state =>
+                                        setFileTabMode(state, tab.path, mode, tab.scope)
+                                      )
+                                    }
+                                  />
+                                )}
+                              </TabsContent>
+                            );
+                          })}
+                      </div>
+                      {canOpenChanges && changesCloudSessionId && (
+                        <WorktreeChangesView
+                          key={fileScope}
+                          userId={currentUserId}
+                          cloudAgentSessionId={changesCloudSessionId}
+                          organizationId={organizationId}
+                          worktreeId={selectedWorktreeId ?? undefined}
+                          open={changesViewOpen}
+                          commentCounts={reviewCommentCounts}
+                          review={review.scope ? review.bindings : undefined}
+                          reviewScope={review.scope ?? undefined}
+                        />
+                      )}
+                    </div>
+                  </Tabs>
+                </CloudChatRuntimeProvider>
+              ) : (
+                <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
+                  <MobileSidebarToggle />
+                  <p className="text-sm">No active session</p>
+                  <p className="text-xs">Select a session from the sidebar or create a new one</p>
                 </div>
-              </>
-            ) : (
-              <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
-                <MobileSidebarToggle />
-                <p className="text-sm">No active session</p>
-                <p className="text-xs">Select a session from the sidebar or create a new one</p>
-              </div>
-            )}
-            <ChildSessionDrawer
-              stack={childSessionStack}
-              onBack={handleChildSessionDrawerBack}
-              onOpenChange={handleChildSessionDrawerOpenChange}
-              onOpenChildSession={handleOpenNestedChildSession}
-              onCloseAutoFocus={handleChildSessionDrawerCloseAutoFocus}
-              portalContainer={childSessionDrawerContainer}
-            />
-            <PreparationDrawer
-              attemptId={preparationDrawerAttemptId}
-              onOpenChange={handlePreparationDrawerOpenChange}
-              onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
-              portalContainer={childSessionDrawerContainer}
-            />
-          </div>
+              )}
+              <ChildSessionDrawer
+                stack={childSessionStack}
+                onBack={handleChildSessionDrawerBack}
+                onOpenChange={handleChildSessionDrawerOpenChange}
+                onOpenChildSession={handleOpenNestedChildSession}
+                onCloseAutoFocus={handleChildSessionDrawerCloseAutoFocus}
+                portalContainer={childSessionDrawerContainer}
+              />
+              <PreparationDrawer
+                attemptId={preparationDrawerAttemptId}
+                onOpenChange={handlePreparationDrawerOpenChange}
+                onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
+                portalContainer={childSessionDrawerContainer}
+              />
+              {canOpenArtifacts && changesCloudSessionId && (
+                <WorkspaceArtifactsView
+                  key={`workspace-artifacts:${fileScope}`}
+                  userId={currentUserId}
+                  cloudAgentSessionId={changesCloudSessionId}
+                  organizationId={organizationId}
+                  open={artifactsViewOpen}
+                  readOnly={isReadOnly}
+                  onOpenChange={handleArtifactsDrawerOpenChange}
+                  onCloseAutoFocus={handleArtifactsDrawerCloseAutoFocus}
+                  portalContainer={childSessionDrawerContainer}
+                />
+              )}
+            </div>
+          </ToolDetailScopeProvider>
         </SuggestionContextProvider>
       </PermissionContextProvider>
     </QuestionContextProvider>

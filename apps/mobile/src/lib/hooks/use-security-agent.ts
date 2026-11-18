@@ -2,9 +2,14 @@ import {
   canManageSecurityAgent,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import {
+  getSecurityAnalysisCapacityState,
+  SECURITY_ANALYSIS_CAPACITY_POLL_MS,
+} from '@/lib/security-analysis-capacity';
 import { useTRPC } from '@/lib/trpc';
 
 // Mutation hooks (save config, set enabled, trigger sync, track interaction)
@@ -66,6 +71,67 @@ export function useSecurityAgentRepositories(scope: string) {
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
+export function useRetrySecurityAgentSettings(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [isRetrying, setIsRetrying] = useState(false);
+  // Whether the last deliberate attempt still ended in a failed fetch. The
+  // entry screen turns that into a distinguishable "still failing" state: an
+  // identical error screen after a retry is indistinguishable from a retry
+  // that never ran.
+  const [lastAttemptFailed, setLastAttemptFailed] = useState(false);
+  const retry = async () => {
+    if (isRetrying) {
+      return;
+    }
+    setIsRetrying(true);
+    setLastAttemptFailed(false);
+    const keys = isPersonalSecurityScope(scope)
+      ? [
+          trpc.securityAgent.getPermissionStatus.queryKey(),
+          trpc.securityAgent.getConfig.queryKey(),
+          trpc.securityAgent.getRepositories.queryKey(),
+        ]
+      : [
+          trpc.organizations.securityAgent.getPermissionStatus.queryKey({ organizationId: scope }),
+          trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope }),
+          trpc.organizations.securityAgent.getRepositories.queryKey({ organizationId: scope }),
+          trpc.organizations.list.queryKey(),
+        ];
+    const attempts = await Promise.allSettled(
+      keys.map(async queryKey => {
+        const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+        if (!query) {
+          return;
+        }
+        const options = query.options;
+        // An uncached refetch reuses its paused promise, even with cancelRefetch.
+        // Cancel first, then bypass NetInfo for this deliberate attempt only.
+        await queryClient.cancelQueries({ queryKey, exact: true });
+        try {
+          await queryClient.query({
+            ...options,
+            queryKey,
+            networkMode: 'always',
+            retry: false,
+            staleTime: 0,
+          });
+        } finally {
+          query.setOptions(options);
+        }
+      })
+    );
+    // Each query retains its own error; wait for every request to settle before
+    // allowing another attempt. The existing tRPC transport bounds request time.
+    setLastAttemptFailed(attempts.some(attempt => attempt.status === 'rejected'));
+    setIsRetrying(false);
+  };
+  const clearLastAttemptFailed = useCallback(() => {
+    setLastAttemptFailed(false);
+  }, []);
+  return { retry, isRetrying, lastAttemptFailed, clearLastAttemptFailed };
+}
+
 export function useSecurityAgentDashboardStats(scope: string, repoFullName?: string) {
   const trpc = useTRPC();
   const personal = useQuery({
@@ -98,8 +164,8 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
-// Personal scope always has full access; for an organization, only owner and
-// billing_manager can manage config. `organizations.list` is already fetched
+// Personal scope always has full access; `canManageSecurityAgent` owns the
+// organization role policy. `organizations.list` is already fetched
 // app-wide for the org switcher, so this reuses that cache rather than adding
 // a new procedure (mirrors useCanEditReviewer in use-code-reviewer.ts:234).
 //
@@ -121,58 +187,121 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
     // can never block the personal Security Agent.
     return {
       role: undefined,
+      error: undefined,
       isLoading: false,
       isError: false,
       isFetching: false,
       refetch: query.refetch,
+      hasData: true,
+      isPending: false,
+      fetchStatus: 'idle' as const,
     };
   }
   return {
     role: query.data?.find(org => org.organizationId === scope)?.role,
+    error: query.error,
     isLoading: query.isLoading,
     isError: query.isError,
     isFetching: query.isFetching,
     refetch: query.refetch,
+    hasData: query.data !== undefined,
+    isPending: query.isPending,
+    fetchStatus: query.fetchStatus,
   };
 }
 
 // Discriminated capability state for consumers (e.g. audit-report access)
 // that must distinguish "still loading"/"failed to load" from "resolved:
 // no access" instead of treating an undefined role as permission-denied.
+type SecurityAgentCapabilityStatus = 'loading' | 'error' | 'denied' | 'allowed';
+
 export function useSecurityAgentCapability(scope: string) {
-  const { role, isLoading, isError, isFetching, refetch } = useSecurityAgentOrgRoleQuery(scope);
+  const { role, error, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
+    useSecurityAgentOrgRoleQuery(scope);
+  const canManage = canManageSecurityAgent(scope, role);
+
+  let status: SecurityAgentCapabilityStatus = 'loading';
+  if (isPersonalSecurityScope(scope)) {
+    status = 'allowed';
+  } else if (hasData) {
+    // A settled role stays authoritative: a failed background refetch must
+    // never demote an already-resolved capability to 'error'.
+    status = canManage ? 'allowed' : 'denied';
+  } else if (isError) {
+    status = 'error';
+  } else if (isPending) {
+    // Covers an offline-paused cold launch: pending with no data yet.
+    status = 'loading';
+  }
+  // Any other unresolved combination keeps the initial 'loading'.
+
   return {
-    canManage: canManageSecurityAgent(scope, role),
+    canManage,
+    status,
+    /** The unread role list's own error, so a load-failure surface can name its cause. */
+    error,
     isLoading,
     isError,
     isFetching,
     refetch,
+    fetchStatus,
   };
 }
 
 // Reuses listFindings (status: 'open', limit 1) instead of a dedicated
 // procedure — the concurrency numbers ride along on every findings fetch.
-// `isLoading`/`isError` are exposed alongside the counts so callers can tell
-// "still loading" and "failed to load" apart from "loaded: capacity full" —
-// all three previously collapsed into the same undefined counts.
-export function useSecurityAnalysisCapacity(scope: string) {
+// `state` is the derived, single-source answer every action surface reads
+// ("still loading" / "failed to load" / "full" / "available"); the raw counts
+// and flags stay for callers that need them.
+// Pass `enabled: false` when the caller offers no start action: the read polls
+// while the owner is at the limit, which no other state needs.
+export function useSecurityAnalysisCapacity(scope: string, enabled = true) {
   const trpc = useTRPC();
   const capacityInput = { status: 'open' as const, limit: 1, offset: 0 };
+  // While the owner is at the limit nothing on this screen changes when a
+  // running analysis finishes, and the list does not poll its own result set —
+  // so re-read the counters until a slot frees up, then stop.
+  const refetchInterval = (query: {
+    state: {
+      data?: { runningCount?: number; concurrencyLimit?: number };
+      error?: unknown;
+    };
+  }) =>
+    getSecurityAnalysisCapacityState({
+      runningCount: query.state.data?.runningCount,
+      concurrencyLimit: query.state.data?.concurrencyLimit,
+      isLoading: false,
+      // A failed read keeps the last counts, so the full state must not win
+      // here: the notice's explicit retry owns recovery, not a silent poll.
+      isError: Boolean(query.state.error),
+    }) === 'full'
+      ? SECURITY_ANALYSIS_CAPACITY_POLL_MS
+      : false;
   const personal = useQuery({
     ...trpc.securityAgent.listFindings.queryOptions(capacityInput),
-    enabled: isPersonalSecurityScope(scope),
+    enabled: enabled && isPersonalSecurityScope(scope),
+    refetchInterval,
   });
   const organization = useQuery({
     ...trpc.organizations.securityAgent.listFindings.queryOptions({
       organizationId: scope,
       ...capacityInput,
     }),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: enabled && !isPersonalSecurityScope(scope),
+    refetchInterval,
   });
   const active = isPersonalSecurityScope(scope) ? personal : organization;
+  const runningCount = active.data?.runningCount;
+  const concurrencyLimit = active.data?.concurrencyLimit;
   return {
-    runningCount: active.data?.runningCount,
-    concurrencyLimit: active.data?.concurrencyLimit,
+    runningCount,
+    concurrencyLimit,
+    state: getSecurityAnalysisCapacityState({
+      runningCount,
+      concurrencyLimit,
+      isLoading: active.isLoading,
+      isError: active.isError,
+    }),
     isLoading: active.isLoading,
     isError: active.isError,
     refetch: active.refetch,

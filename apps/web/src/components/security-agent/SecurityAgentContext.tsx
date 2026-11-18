@@ -12,7 +12,10 @@ import {
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
-import { getSecurityCommandFailureMessage } from '@kilocode/app-shared/security-agent';
+import {
+  getSecurityCommandFailureMessage,
+  type SecurityCommandType,
+} from '@kilocode/app-shared/security-agent';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
@@ -37,6 +40,7 @@ type SecurityAgentContextValue = {
   // Permission & config state
   hasIntegration: boolean;
   hasPermission: boolean;
+  integrationId: string | null;
   isLoadingPermission: boolean;
   isLoadingConfig: boolean;
   reauthorizeUrl: string | undefined;
@@ -65,6 +69,7 @@ type SecurityAgentContextValue = {
         autoRemediationEnabled: boolean;
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
+        autoRemediationRequireApproval: boolean;
         autoRemediationEnabledAt: string | null;
         remediationModelSlug?: string;
         slaNotificationsEnabled: boolean;
@@ -118,6 +123,7 @@ type SecurityAgentContextValue = {
       autoRemediationEnabled: boolean;
       autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       autoRemediationIncludeExisting: boolean;
+      autoRemediationRequireApproval: boolean;
       remediationModelSlug: string;
       slaNotificationsEnabled: boolean;
       slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
@@ -203,7 +209,7 @@ const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositori
 
 export type SecurityAgentCommand = {
   id: string;
-  commandType: 'sync' | 'dismiss_finding' | 'start_analysis' | 'apply_auto_remediation';
+  commandType: SecurityCommandType;
   findingId: string | null;
   status: 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
   resultCode: string | null;
@@ -391,6 +397,18 @@ function securityAgentProviderReducer(
 
 function commandFailureDescription(command: SecurityAgentCommand): string {
   return getSecurityCommandFailureMessage(command);
+}
+
+export function getSecurityAgentCommandGitHubError(
+  command: SecurityAgentCommand
+): string | undefined {
+  if (
+    command.resultCode !== 'GITHUB_AUTH_INVALID' &&
+    command.resultCode !== 'GITHUB_TOKEN_UNAVAILABLE'
+  ) {
+    return undefined;
+  }
+  return commandFailureDescription(command);
 }
 
 type SecurityAgentProviderProps = {
@@ -728,9 +746,7 @@ function useSecurityAgentProviderValue(
       commandSuccessCallbacksRef.current?.delete(command.id);
       if (command.status === 'failed') {
         const title = getSecurityAgentCommandFailureTitle(command.commandType);
-        if (command.resultCode === 'GITHUB_AUTH_INVALID') {
-          terminalGitHubError = commandFailureDescription(command);
-        }
+        terminalGitHubError = getSecurityAgentCommandGitHubError(command) ?? terminalGitHubError;
         toast.error(title, { description: commandFailureDescription(command), duration: 8000 });
       } else if (shouldRunSecurityAgentCommandSuccessCallback(command)) {
         successCallback?.();
@@ -1188,6 +1204,7 @@ function useSecurityAgentProviderValue(
         autoRemediationEnabled: boolean;
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
+        autoRemediationRequireApproval: boolean;
         remediationModelSlug: string;
         slaNotificationsEnabled: boolean;
         slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
@@ -1225,6 +1242,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: config.autoRemediationEnabled,
             autoRemediationMinSeverity: config.autoRemediationMinSeverity,
             autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            autoRemediationRequireApproval: config.autoRemediationRequireApproval,
             slaNotificationsEnabled: config.slaNotificationsEnabled,
             slaNotificationMinSeverity: config.slaNotificationMinSeverity,
             slaNotificationWarningDays: config.slaNotificationWarningDays,
@@ -1254,6 +1272,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: config.autoRemediationEnabled,
             autoRemediationMinSeverity: config.autoRemediationMinSeverity,
             autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            autoRemediationRequireApproval: config.autoRemediationRequireApproval,
             slaNotificationsEnabled: config.slaNotificationsEnabled,
             slaNotificationMinSeverity: config.slaNotificationMinSeverity,
             slaNotificationWarningDays: config.slaNotificationWarningDays,
@@ -1374,6 +1393,7 @@ function useSecurityAgentProviderValue(
 
   const hasIntegration = permissionData?.hasIntegration ?? false;
   const hasPermission = permissionData?.hasPermissions ?? false;
+  const integrationId = permissionData?.integrationId ?? null;
   const reauthorizeUrl = permissionData?.reauthorizeUrl ?? undefined;
   const isEnabled = configData ? configData.isEnabled : undefined;
   const hasConfig = configData?.hasConfig ?? false;
@@ -1399,6 +1419,7 @@ function useSecurityAgentProviderValue(
       isOrg,
       hasIntegration,
       hasPermission,
+      integrationId,
       isLoadingPermission,
       isLoadingConfig,
       reauthorizeUrl,
@@ -1421,6 +1442,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: configData.autoRemediationEnabled ?? false,
             autoRemediationMinSeverity: configData.autoRemediationMinSeverity ?? 'high',
             autoRemediationIncludeExisting: configData.autoRemediationIncludeExisting ?? false,
+            autoRemediationRequireApproval: configData.autoRemediationRequireApproval ?? true,
             autoRemediationEnabledAt: configData.autoRemediationEnabledAt ?? null,
             remediationModelSlug,
           }
@@ -1461,6 +1483,7 @@ function useSecurityAgentProviderValue(
       isOrg,
       hasIntegration,
       hasPermission,
+      integrationId,
       isLoadingPermission,
       isLoadingConfig,
       reauthorizeUrl,

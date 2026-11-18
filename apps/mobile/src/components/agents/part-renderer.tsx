@@ -1,4 +1,13 @@
-import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type MessageInfo, type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+
+import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
+import { formatNumber } from '@/lib/format';
+
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
@@ -8,6 +17,7 @@ import {
   isCompactionPart,
   isFilePart,
   isPartStreaming,
+  isPatchPart,
   isReasoningPart,
   isTextPart,
   isToolPart,
@@ -19,19 +29,24 @@ import { type OpenChildSession } from './child-session-section';
 
 type PartRendererProps = {
   part: Part;
+  messageInfo?: MessageInfo;
   isStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 };
 
 export function PartRenderer({
   part,
+  messageInfo,
   isStreaming,
   getChildMessages,
   defaultReasoningExpanded,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<PartRendererProps>) {
+  const { t } = useTranslation();
   if (!partRendersContent(part)) {
     return null;
   }
@@ -50,6 +65,7 @@ export function PartRenderer({
           getChildMessages={getChildMessages}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={onOpenChildSession}
+          modelOptions={modelOptions}
         />
       </MessageErrorBoundary>
     );
@@ -74,8 +90,36 @@ export function PartRenderer({
     );
   }
   if (isCompactionPart(part)) {
-    return <CompactionSeparator />;
+    return <CompactionSeparator info={messageInfo} isStreaming={isStreaming} />;
   }
-  // step-start, step-finish, patch, snapshot, agent, retry, subtask — not rendered
+  // Standalone PatchPart (`type: 'patch'`) carries only file paths — no diff
+  // text — so the diff engine cannot apply. The web renderer renders null for
+  // it (apps/web/src/components/cloud-agent-next/PartRenderer.tsx:398-404).
+  // If OpenCode ever ships diff text on the part, render it through `DiffLine`.
+  if (isPatchPart(part)) {
+    const fileCount = part.files.length;
+    const summary = t('agentChat.partRenderer.updatedFileCount', {
+      count: fileCount,
+      displayCount: formatNumber(fileCount, i18n.language),
+    });
+    return (
+      <MessageErrorBoundary>
+        <View className="my-1 gap-1">
+          <Text className="text-xs text-muted-foreground">{summary}</Text>
+          {part.files.map(file => (
+            <Text
+              key={file}
+              className="font-mono text-xs text-muted-foreground"
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {cloudAgentFileLabel(file)}
+            </Text>
+          ))}
+        </View>
+      </MessageErrorBoundary>
+    );
+  }
+  // step-start, step-finish, snapshot, agent, retry, subtask — not rendered
   return null;
 }

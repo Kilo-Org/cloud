@@ -1,11 +1,11 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import * as gitlabService from '@/lib/integrations/gitlab-service';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   resolveOwner,
   resolveAuthorizedOwner,
@@ -23,7 +23,7 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { randomBytes } from 'node:crypto';
 
 export const gitlabRouter = createTRPCRouter({
@@ -130,7 +130,7 @@ export const gitlabRouter = createTRPCRouter({
       return { success: false, message: 'Integration not found' };
     }
 
-    return gitlabService.disconnectGitLabIntegration(owner);
+    return gitlabService.disconnectGitLabIntegration(owner, ctx.user.id);
   }),
 
   refreshRepositories: baseProcedure
@@ -187,6 +187,13 @@ export const gitlabRouter = createTRPCRouter({
       );
     }),
 
+  /**
+   * List branches for one project of a connected GitLab integration. The
+   * project must be in the integration's cached repository set: the service
+   * resolves the integration for the caller's owner, refuses a project
+   * outside that set before any token is minted, and fetches with the
+   * integration's canonical project path.
+   */
   listBranches: baseProcedure
     .input(
       z.object({
@@ -247,10 +254,14 @@ export const gitlabRouter = createTRPCRouter({
     // No Kilo-managed webhooks → skip the network round-trip and just
     // persist + return the new secret for manual reconfiguration.
     if (Object.keys(configuredWebhooks).length === 0) {
-      await updateIntegrationMetadataForOwner(owner, 'gitlab', {
-        ...existingMetadata,
-        webhook_secret: newSecret,
-      });
+      await updateIntegrationMetadataForOwner(
+        owner,
+        'gitlab',
+        {
+          webhook_secret: newSecret,
+        },
+        integration.id
+      );
       return {
         webhookSecret: newSecret,
         webhookSync: {
@@ -321,11 +332,15 @@ export const gitlabRouter = createTRPCRouter({
       };
     }
 
-    await updateIntegrationMetadataForOwner(owner, 'gitlab', {
-      ...existingMetadata,
-      webhook_secret: newSecret,
-      configured_webhooks: updatedWebhooks,
-    });
+    await updateIntegrationMetadataForOwner(
+      owner,
+      'gitlab',
+      {
+        webhook_secret: newSecret,
+        configured_webhooks: updatedWebhooks,
+      },
+      integration.id
+    );
 
     return {
       webhookSecret: newSecret,

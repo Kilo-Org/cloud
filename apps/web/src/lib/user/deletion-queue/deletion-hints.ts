@@ -1,6 +1,10 @@
+import { humanizeToken } from '@/lib/admin/queue-format';
+
 export type DeletionAttentionHint = {
   title: string;
   action: string;
+  href?: string;
+  hrefLabel?: string;
 };
 
 const HTTP_STATUS_RE = /^http_(\d+)$/;
@@ -47,6 +51,31 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
   missing_target_email: {
     title: 'Request is missing the target email',
     action: 'Cancel this request and enqueue it again with the target email.',
+  },
+  delete_ready_missing: {
+    title: 'Pylon ticket is missing the delete-ready tag',
+    action: 'Add the delete-ready tag in Pylon, then Retry preflight.',
+  },
+  relay_or_internal_email: {
+    title: 'Target is a relay or internal email',
+    action:
+      'Enter the real customer email. Do not delete @app.kilocode.ai or Pylon relay addresses.',
+  },
+  duplicate_of_active_request: {
+    title: 'Another active request already targets this email',
+    action: 'Open the existing request. Cancel one of them before retrying this ticket.',
+  },
+  app_relay_reply_to_missing: {
+    title: 'App-relay ticket has no external reply-to',
+    action: 'Add the customer reply-to on the first Pylon message, or paste the customer email.',
+  },
+  app_relay_reply_to_ambiguous: {
+    title: 'App-relay ticket has multiple external reply-to emails',
+    action: 'Paste the customer email explicitly, then Retry or re-enqueue.',
+  },
+  resolves_at_preflight: {
+    title: 'Customer email will be resolved at preflight',
+    action: 'The worker will read the Pylon ticket after you submit. No action needed now.',
   },
   kilo_pass_active: {
     title: 'Kilo Pass subscription is still active',
@@ -119,6 +148,46 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Substack credential expired',
     action: 'Replace the Substack session credential, then Retry.',
   },
+  substack_forbidden: {
+    title: 'Substack denied access (HTTP 403)',
+    action:
+      'This is a publication permission or access problem, not proof the session expired. Confirm the service account can access the publication, then Retry.',
+  },
+  substack_totp_invalid: {
+    title: 'Stored Substack TOTP secret is invalid',
+    action:
+      'Store a new Substack credential with a valid base32 TOTP secret, or leave TOTP blank for cookie-only, then Retry.',
+  },
+  substack_reauth_required: {
+    title: 'Substack requires reauthentication',
+    action:
+      'Configure the service account TOTP secret, or sign in manually and store a fresh cookie, then Retry. If reauthentication still fails, confirm the service account settings.',
+  },
+  substack_reauth_method_unsupported: {
+    title: 'Substack did not offer TOTP reauthentication',
+    action:
+      'Substack returned an unsupported reauthentication method. Sign in to the service account manually, store a fresh cookie, then Retry.',
+  },
+  substack_reauth_rejected: {
+    title: 'Substack rejected the reauthentication code',
+    action:
+      'Check the service account TOTP secret and clock, store a corrected credential, then Retry.',
+  },
+  substack_reauth_incomplete: {
+    title: 'Substack did not confirm reauthentication',
+    action:
+      'Retry. If the service account requires manual verification, sign in manually, store a fresh cookie, then Retry.',
+  },
+  substack_cookie_persist_failed: {
+    title: 'Refreshed Substack cookie was not saved',
+    action:
+      'Test the credential again to persist the refreshed cookie, or store a fresh cookie, then Retry.',
+  },
+  substack_credential_changed: {
+    title: 'Substack credential changed during test',
+    action:
+      'Another admin replaced the credential while it was tested. Test the current credential again before Retry.',
+  },
   posthog_checkpoint_invalid: {
     title: 'PostHog deletion checkpoint is invalid',
     action:
@@ -134,10 +203,28 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     action:
       'Open PostHog, delete or merge the matching people, then Retry or Mark done with evidence.',
   },
+  posthog_manual_required: {
+    title: 'PostHog deletion needs a manual search',
+    action:
+      'Open PostHog and search by user ID for ID-only requests, or email otherwise. Delete the matching person, then Retry or Mark done with evidence.',
+  },
+  posthog_acceptance_incomplete: {
+    title: 'PostHog did not accept the full deletion',
+    action:
+      'Open PostHog and confirm the person, events, and recordings deletion. Then Retry or Mark done with evidence.',
+  },
   posthog_verify_timeout: {
     title: 'PostHog deletion did not confirm in time',
     action:
       'Check the PostHog deletion task. If it finished, Mark done with evidence. Otherwise Retry.',
+  },
+  substack_publication_invalid: {
+    title: 'Substack publication URL is invalid',
+    action: 'Set SUBSTACK_PUBLICATION_URL to blog.kilo.ai or a substack.com host, then Retry.',
+  },
+  substack_redirect_blocked: {
+    title: 'Substack redirected instead of deleting',
+    action: 'Replace the Substack session credential, then Retry.',
   },
   substack_lookup_incomplete: {
     title: 'Substack subscriber lookup returned an incomplete payload',
@@ -153,6 +240,11 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Multiple Pylon contacts match this target',
     action:
       'Open Pylon, delete or merge the matching contacts, then Retry or Mark done with evidence.',
+  },
+  pylon_contact_shared_identity: {
+    title: 'Pylon contact is shared with another Kilo user',
+    action:
+      'Do not delete this Pylon contact from this request. Split the shared contact, then Retry or Mark done with evidence.',
   },
   pylon_ticket_invalid: {
     title: 'Pylon ticket on this request is invalid',
@@ -185,6 +277,20 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Could not confirm the Pylon deletion reply',
     action: 'Open the ticket, check for the deletion reply, then Retry or Mark done with evidence.',
   },
+  completion_email_unavailable: {
+    title: 'Completion email provider is not configured',
+    action: 'Repair the Mailgun configuration, then use Retry to send the completion email.',
+  },
+  completion_email_rejected: {
+    title: 'Completion email recipient was rejected',
+    action:
+      'Investigate the recipient address and NeverBounce result, then Mark done with evidence when appropriate.',
+  },
+  completion_email_ambiguous: {
+    title: 'Completion email delivery is ambiguous',
+    action:
+      'Check Mailgun delivery records without resending, then Mark done with evidence when the outcome is confirmed.',
+  },
   ownership_mismatch: {
     title: 'KiloClaw instance is not owned by this user',
     action:
@@ -215,6 +321,11 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
   session_cleanup_unconfirmed: {
     title: 'Session cleanup was not confirmed',
     action: 'Retry. If the sessions are already gone, Mark done with evidence.',
+  },
+  session_worktree_deleting: {
+    title: 'A worktree deletion keeps refusing session deletes',
+    action:
+      'Check the hosted worktree deletion for these sessions. Once it finishes or is repaired, Retry. If the sessions are already gone, Mark done with evidence.',
   },
   teardown_incomplete: {
     title: 'Teardown tasks are not finished',
@@ -262,6 +373,14 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Task claim was lost',
     action: 'Retry. Another worker may have taken the claim.',
   },
+  anonymize_page_timeout: {
+    title: 'Cloud user row cleanup timed out',
+    action: 'Retry. The next attempt will resume from the last committed page.',
+  },
+  anonymize_page_failed: {
+    title: 'Cloud user row cleanup failed',
+    action: 'Retry. If the page keeps failing, investigate the database before retrying.',
+  },
   usage_prefix_page_timeout: {
     title: 'Usage prompt cleanup timed out',
     action: 'Retry. The next attempt will resume from the last committed page.',
@@ -290,11 +409,31 @@ export function deletionAttentionHint(
     };
   }
   return {
-    title: humanizeCode(code),
+    title: humanizeToken(code),
     action: UNKNOWN_ACTION,
   };
 }
 
-function humanizeCode(code: string): string {
-  return code.replaceAll(/[_-]+/g, ' ').replace(/^./, char => char.toUpperCase());
+export function deletionManualSearchHref(params: {
+  stepKey: string;
+  email?: string | null;
+  userId?: string | null;
+}): { href: string; label: string } | null {
+  const email = params.email?.trim().toLowerCase();
+  if (params.stepKey === 'posthog') {
+    const target = params.userId ?? email;
+    const search = target ? `?search=${encodeURIComponent(target)}` : '';
+    return {
+      href: `https://us.posthog.com/persons${search}`,
+      label: 'Open PostHog persons',
+    };
+  }
+  if (params.stepKey === 'substack') {
+    const search = email ? `?s=${encodeURIComponent(email)}` : '';
+    return {
+      href: `https://kilocode.substack.com/publish/subscribers${search}`,
+      label: 'Open Substack subscribers',
+    };
+  }
+  return null;
 }

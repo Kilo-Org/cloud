@@ -1,51 +1,37 @@
 import { Buffer } from 'node:buffer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
+  GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS,
+} from './github-rate-limit-diagnostics.js';
 
-const sdk = vi.hoisted(() => {
-  class StockSandbox {}
-  class ContainerProxy {}
-  return { StockSandbox, ContainerProxy };
-});
 const logging = vi.hoisted(() => {
   const logger = {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
+    error: vi.fn(),
     withFields: vi.fn(),
   };
   logger.withFields.mockReturnValue(logger);
   return { logger };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: sdk.StockSandbox,
-  ContainerProxy: sdk.ContainerProxy,
-}));
-vi.mock('./container-usage.js', () => ({ MeteredSandbox: sdk.StockSandbox }));
 vi.mock('./logger.js', () => ({ logger: logging.logger }));
 
+import { handleManagedScmOutbound } from './sandbox-outbound.js';
 import {
-  ContainerProxy,
-  Sandbox,
-  SandboxContainment,
-  SandboxDIND,
-  SandboxSmall,
-  SandboxSmallContainment,
-  SandboxCodeReview,
-  SandboxCodeReviewContainment,
-  MANAGED_SCM_OUTBOUND_HANDLER,
-  handleManagedScmOutbound,
-} from './sandbox-outbound.js';
+  createControlPlaneCredential,
+  type ControlCredentialPurpose,
+} from './sandbox-control/managed-credential.js';
 
 const CAPABILITY = 'kgh2.opaque';
 const LEGACY_CAPABILITY = 'kgh1.opaque';
 const GITLAB_CAPABILITY = 'kgl2.opaque';
 const LEGACY_GITLAB_CAPABILITY = 'kgl1.opaque';
-const KILO_CAPABILITY = 'kka1.opaque';
 const OUTBOUND_CONTEXT = { containerId: 'container-test', className: 'SandboxContainment' };
 const REDEEMED_GIT_AUTHORIZATION = `Basic ${Buffer.from('x-access-token:upstream-token').toString('base64')}`;
 const REDEEMED_GITLAB_AUTHORIZATION = `Basic ${Buffer.from('oauth2:upstream-token').toString('base64')}`;
-const REDEEMED_KILO_AUTHORIZATION = 'Bearer upstream-kilo-token';
 
 function basicCredential(password: string, scheme = 'Basic', username = 'x-access-token'): string {
   return `${scheme} ${Buffer.from(`${username}:${password}`).toString('base64')}`;
@@ -53,20 +39,10 @@ function basicCredential(password: string, scheme = 'Basic', username = 'x-acces
 
 function createEnv(
   redeemGitHubSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
-  redeemGitLabSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
-  redeemKiloSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
-  logRejectedKiloUrls?: string,
-  sessionIngestFetch: ReturnType<typeof vi.fn> = vi.fn(async () => new Response('forwarded'))
+  redeemGitLabSessionCapability: ReturnType<typeof vi.fn> = vi.fn()
 ) {
   return {
-    GIT_TOKEN_SERVICE: {
-      redeemGitHubSessionCapability,
-      redeemGitLabSessionCapability,
-      redeemKiloSessionCapability,
-    },
-    LOG_REJECTED_KILO_URLS: logRejectedKiloUrls,
-    INTERNAL_API_SECRET_PROD: { get: vi.fn(async () => 'trusted-internal-secret') },
-    SESSION_INGEST: { fetch: sessionIngestFetch },
+    GIT_TOKEN_SERVICE: { redeemGitHubSessionCapability, redeemGitLabSessionCapability },
   } as unknown as Cloudflare.Env;
 }
 
@@ -80,82 +56,9 @@ function serializedLogCalls(): string {
     debug: logging.logger.debug.mock.calls,
     info: logging.logger.info.mock.calls,
     warn: logging.logger.warn.mock.calls,
+    error: logging.logger.error.mock.calls,
   });
 }
-
-describe('managed GitHub sandbox outbound configuration', () => {
-  it('enables HTTPS interception and the named handler only on containment sandboxes', () => {
-    // Existing sandboxes keep internet access but must not intercept HTTPS.
-    expect(new Sandbox({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new Sandbox({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxSmall({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxSmall({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxDIND({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxDIND({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxCodeReview({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxCodeReview({} as never, {} as never).interceptHttps).toBeFalsy();
-
-    // Containment sandboxes intercept HTTPS so the outbound handler can run.
-    expect(new SandboxContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxSmallContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxCodeReviewContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(ContainerProxy).toBe(sdk.ContainerProxy);
-    expect(Sandbox.outbound).toBeUndefined();
-    expect(SandboxContainment.outbound).toBeUndefined();
-    expect(SandboxSmall.outbound).toBeUndefined();
-    expect(SandboxSmallContainment.outbound).toBeUndefined();
-    expect(SandboxDIND.outbound).toBeUndefined();
-    expect(SandboxContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxSmallContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(Sandbox.outboundHandlers).toBeUndefined();
-    expect(SandboxSmall.outboundHandlers).toBeUndefined();
-    expect(SandboxDIND.outboundHandlers).toBeUndefined();
-    expect(SandboxCodeReviewContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxCodeReview.outboundHandlers).toBeUndefined();
-  });
-
-  it('wires the named handler to Git and API redemption behavior', async () => {
-    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
-      success: false,
-      reason: 'invalid_capability',
-    });
-    const env = createEnv(redeemGitHubSessionCapability);
-    const handler = SandboxSmallContainment.outboundHandlers?.[MANAGED_SCM_OUTBOUND_HANDLER];
-    if (!handler) throw new Error('Expected configured outbound handler');
-
-    await handler(
-      new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
-        headers: { Authorization: basicCredential(CAPABILITY) },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-    await handler(
-      new Request('https://api.github.com/user', {
-        headers: { Authorization: `token ${CAPABILITY}` },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-
-    expect(redeemGitHubSessionCapability).toHaveBeenCalledTimes(2);
-  });
-});
 
 describe('handleManagedScmOutbound', () => {
   beforeEach(() => {
@@ -232,6 +135,8 @@ describe('handleManagedScmOutbound', () => {
   });
 
   it('logs mixed managed and unmanaged GitHub CLI authorization without credential values', async () => {
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: false,
       reason: 'invalid_upstream_request',
@@ -253,11 +158,16 @@ describe('handleManagedScmOutbound', () => {
     expect(logging.logger.withFields).toHaveBeenCalledWith(
       expect.objectContaining({ authorizationClass: 'mixed' })
     );
+    expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
     expect(serializedLogCalls()).not.toContain('explicit-private-secret');
     expect(serializedLogCalls()).not.toContain(CAPABILITY);
   });
 
   it('logs conflicting managed GitHub CLI capabilities as mixed', async () => {
+    const redeemGitHubSessionCapability = vi.fn();
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
     const response = await handleOutbound(
       new Request('https://api.github.com/graphql', {
         method: 'POST',
@@ -268,13 +178,15 @@ describe('handleManagedScmOutbound', () => {
         },
         body: '{}',
       }),
-      createEnv()
+      createEnv(redeemGitHubSessionCapability)
     );
 
     expect(response.status).toBe(502);
     expect(logging.logger.withFields).toHaveBeenCalledWith(
       expect.objectContaining({ authorizationClass: 'mixed' })
     );
+    expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
     expect(serializedLogCalls()).not.toContain(CAPABILITY);
     expect(serializedLogCalls()).not.toContain(GITLAB_CAPABILITY);
   });
@@ -307,8 +219,27 @@ describe('handleManagedScmOutbound', () => {
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       authorization: REDEEMED_GIT_AUTHORIZATION,
+      installationId: 'installation-123',
+      source: 'installation',
+      appType: 'standard',
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('forbidden', { status: 403 })));
+    const body = 'upstream-body-secret: permission denied';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          status: 403,
+          headers: {
+            'x-ratelimit-limit': '5000',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-used': '5000',
+            'x-ratelimit-reset': '1700000000',
+            'x-ratelimit-resource': 'core',
+            'retry-after': '60',
+          },
+        })
+      )
+    );
 
     const response = await handleOutbound(
       new Request('https://api.github.com/repos/acme/repo/pulls/1', {
@@ -324,7 +255,87 @@ describe('handleManagedScmOutbound', () => {
     expect(logging.logger.withFields).toHaveBeenCalledWith(
       expect.objectContaining({ upstreamStatus: 403 })
     );
-    expect(serializedLogCalls()).not.toContain('upstream-token');
+    expect(logging.logger.withFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubInstallationId: 'installation-123',
+        githubAuthSource: 'installation',
+        githubAppType: 'standard',
+        upstreamStatus: 403,
+        githubRateLimitLimit: '5000',
+        githubRateLimitRemaining: '0',
+        githubRateLimitUsed: '5000',
+        githubRateLimitReset: '1700000000',
+        githubRateLimitResource: 'core',
+        githubRetryAfter: '60',
+        quotaClass: 'primary_exhausted',
+        bodySignal: 'none',
+      })
+    );
+    expect(logging.logger.warn).toHaveBeenCalledWith('Managed GitHub upstream rate-limit response');
+    await expect(response.text()).resolves.toBe(body);
+    const logs = serializedLogCalls();
+    expect(logs).not.toContain('upstream-body-secret');
+    expect(logs).not.toContain('upstream-token');
+  });
+
+  it('forwards a request that needs no credential', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: null,
+      installationId: 'installation-123',
+      source: 'user',
+      appType: 'standard',
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response('Not Found', { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await handleOutbound(
+      new Request('https://github.com/other/project.git/info/refs?service=git-upload-pack', {
+        headers: {
+          Authorization: basicCredential(CAPABILITY),
+          'User-Agent': 'git/2.43.0',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(404);
+    expect(redeemGitHubSessionCapability).toHaveBeenCalledOnce();
+    const forwarded = fetchMock.mock.calls[0]?.[0];
+    if (!(forwarded instanceof Request)) throw new Error('Expected a forwarded request');
+    expect(forwarded.headers.get('Authorization')).toBeNull();
+    expect(forwarded.headers.get('User-Agent')).toBe('git/2.43.0');
+  });
+
+  it('keeps forwarding and logs null correlation fields for an older redemption response', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const body = 'Too Many Requests';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 429 })));
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(429);
+    expect(logging.logger.withFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubInstallationId: null,
+        githubAuthSource: null,
+        githubAppType: null,
+        quotaClass: 'unknown',
+        bodySignal: 'too_many_requests',
+      })
+    );
+    await expect(response.text()).resolves.toBe(body);
   });
 
   it('keeps diagnostics failures from changing a successful forwarded response', async () => {
@@ -348,6 +359,88 @@ describe('handleManagedScmOutbound', () => {
     );
 
     expect(response.status).toBe(204);
+    expect(logging.logger.warn).not.toHaveBeenCalledWith(
+      'Managed GitHub upstream rate-limit response'
+    );
+  });
+
+  it('keeps a 429 response when rate-limit diagnostics fail', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const upstreamResponse = new Response('Too Many Requests', { status: 429 });
+    vi.spyOn(upstreamResponse, 'clone').mockImplementation(() => {
+      throw new Error('clone unavailable');
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(upstreamResponse));
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.text()).resolves.toBe('Too Many Requests');
+    expect(logging.logger.withFields).toHaveBeenCalledWith(
+      expect.objectContaining({ quotaClass: 'unknown', bodySignal: 'none' })
+    );
+  });
+
+  it('keeps a 429 response when the rate-limit warning logger fails', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const body = 'Too Many Requests';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 429 })));
+    logging.logger.warn.mockImplementationOnce(() => {
+      throw new Error('warning logger unavailable');
+    });
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.text()).resolves.toBe(body);
+  });
+
+  it('does not inspect or warn for a successful GitHub response', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const clone = vi.spyOn(Response.prototype, 'clone');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('forwarded', { status: 200 })));
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(200);
+    expect(clone).not.toHaveBeenCalled();
+    expect(logging.logger.warn).not.toHaveBeenCalledWith(
+      'Managed GitHub upstream rate-limit response'
+    );
+    clone.mockRestore();
   });
 
   it('distinguishes upstream forwarding failures without logging their messages', async () => {
@@ -386,7 +479,6 @@ describe('handleManagedScmOutbound', () => {
       method: 'POST',
       headers: {
         Authorization: basicCredential(CAPABILITY),
-        'PRIVATE-TOKEN': 'explicit-unrelated-token',
       },
       body: 'git-body',
     });
@@ -401,7 +493,7 @@ describe('handleManagedScmOutbound', () => {
     });
     const forwarded = forward.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_GIT_AUTHORIZATION);
-    expect(forwarded.headers.get('PRIVATE-TOKEN')).toBe('explicit-unrelated-token');
+    expect(forwarded.headers.get('PRIVATE-TOKEN')).toBeNull();
     expect(forwarded.redirect).toBe('manual');
     expect(await forwarded.text()).toBe('git-body');
   });
@@ -499,6 +591,26 @@ describe('handleManagedScmOutbound', () => {
 
     expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
     expect(forward).toHaveBeenCalledWith(request);
+  });
+
+  it('preserves native interceptor manual redirects through generic credential-free forwarding', async () => {
+    const forward = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { Location: 'https://disallowed.test/' },
+      })
+    );
+    vi.stubGlobal('fetch', forward);
+    const request = new Request('https://example.com/resource', { redirect: 'manual' });
+
+    const response = await handleOutbound(request, createEnv());
+
+    expect(forward).toHaveBeenCalledTimes(1);
+    expect(forward).toHaveBeenCalledWith(request);
+    const forwarded = forward.mock.calls[0]?.[0] as Request | undefined;
+    expect(forwarded?.redirect).toBe('manual');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://disallowed.test/');
   });
 
   it.each([
@@ -835,6 +947,32 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     expect(forward).not.toHaveBeenCalled();
   });
 
+  it.each([`Bearer ${GITLAB_CAPABILITY}`, basicCredential(GITLAB_CAPABILITY, 'Basic', 'oauth2')])(
+    'redeems matching duplicate GitLab carriers once: %s',
+    async authorization => {
+      const redeem = vi.fn().mockResolvedValue({
+        success: true,
+        headers: { 'PRIVATE-TOKEN': 'upstream-project-token' },
+      });
+      const forward = vi.fn(async (_request: Request) => new Response('forwarded'));
+      vi.stubGlobal('fetch', forward);
+
+      await handleOutbound(
+        new Request('https://gitlab.com/api/v4/projects/acme%2Frepo/issues', {
+          headers: { Authorization: authorization, 'PRIVATE-TOKEN': GITLAB_CAPABILITY },
+        }),
+        createEnv(vi.fn(), redeem)
+      );
+
+      expect(redeem).toHaveBeenCalledOnce();
+      expect(forward).toHaveBeenCalledOnce();
+      expect(forward.mock.calls[0]?.[0].headers.get('Authorization')).toBeNull();
+      expect(forward.mock.calls[0]?.[0].headers.get('PRIVATE-TOKEN')).toBe(
+        'upstream-project-token'
+      );
+    }
+  );
+
   it.each([
     `token ${GITLAB_CAPABILITY}`,
     `ToKeN   ${GITLAB_CAPABILITY}`,
@@ -1004,302 +1142,6 @@ describe('handleManagedScmOutbound API authorization', () => {
   });
 });
 
-describe('handleManagedScmOutbound Kilo authorization', () => {
-  beforeEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('redeems a managed Kilo capability, rewrites authorization and uses manual redirects', async () => {
-    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
-      success: true,
-      authorization: REDEEMED_KILO_AUTHORIZATION,
-      routeClass: 'backend_api',
-    });
-    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
-    vi.stubGlobal('fetch', forward);
-
-    await handleOutbound(
-      new Request('https://api.kilo.ai/api/users/me', {
-        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
-      }),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
-    );
-
-    expect(redeemKiloSessionCapability).toHaveBeenCalledWith({
-      capability: KILO_CAPABILITY,
-      outboundContainerId: OUTBOUND_CONTEXT.containerId,
-      requestMethod: 'GET',
-      requestUrl: 'https://api.kilo.ai/api/users/me',
-      bootstrapKiloSessionId: undefined,
-      sessionIngestProxyVersion: 1,
-    });
-    const forwarded = forward.mock.calls[0]?.[0] as Request;
-    expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_KILO_AUTHORIZATION);
-    expect(forwarded.redirect).toBe('manual');
-  });
-
-  it('passes a matching session identity when redeeming Kilo session-ingest bootstrap', async () => {
-    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
-      success: true,
-      authorization: REDEEMED_KILO_AUTHORIZATION,
-      routeClass: 'session_ingest',
-    });
-    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
-    vi.stubGlobal('fetch', forward);
-
-    await handleOutbound(
-      new Request('https://ingest.kilosessions.ai/api/session', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${KILO_CAPABILITY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sessionId: 'kilo-session-1' }),
-      }),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
-    );
-
-    expect(redeemKiloSessionCapability).toHaveBeenCalledWith({
-      capability: KILO_CAPABILITY,
-      outboundContainerId: OUTBOUND_CONTEXT.containerId,
-      requestMethod: 'POST',
-      requestUrl: 'https://ingest.kilosessions.ai/api/session',
-      bootstrapKiloSessionId: 'kilo-session-1',
-      sessionIngestProxyVersion: 1,
-    });
-  });
-
-  it('routes session-scoped ingest through the internal binding and treats 404 as terminal', async () => {
-    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
-      success: true,
-      authorization: REDEEMED_KILO_AUTHORIZATION,
-      routeClass: 'session_ingest',
-      sessionIngestScope: {
-        cloudAgentSessionId: 'cloud-agent-session-1',
-        rootKiloSessionId: 'ses_12345678901234567890123456',
-      },
-    });
-    const scopedFetch = vi.fn(
-      async (_request: Request) => new Response('not deployed', { status: 404 })
-    );
-    const publicFetch = vi.fn();
-    vi.stubGlobal('fetch', publicFetch);
-
-    const response = await handleOutbound(
-      new Request(
-        'https://ingest.kilosessions.ai/api/session/ses_abcdefghijklmnopqrstuvwxyz/ingest?v=2',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${KILO_CAPABILITY}`,
-            'Content-Type': 'application/json',
-            'X-Internal-Secret': 'forged',
-            'X-Kilo-Cloud-Agent-Session': 'forged',
-            'X-Kilo-User-Id': 'forged-user',
-            'X-Kilo-Future-Identity': 'forged-future-value',
-          },
-          body: JSON.stringify({ data: [] }),
-        }
-      ),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
-    );
-
-    expect(response.status).toBe(404);
-    expect(publicFetch).not.toHaveBeenCalled();
-    expect(scopedFetch).toHaveBeenCalledTimes(1);
-    const forwarded = scopedFetch.mock.calls[0]?.[0] as Request;
-    expect(new URL(forwarded.url)).toMatchObject({
-      pathname: '/internal/cloud-agent/v1/session/ses_abcdefghijklmnopqrstuvwxyz/ingest',
-      search: '?v=2',
-    });
-    expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_KILO_AUTHORIZATION);
-    expect(forwarded.headers.get('X-Internal-Secret')).toBe('trusted-internal-secret');
-    expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('cloud-agent-session-1');
-    expect(forwarded.headers.get('X-Kilo-Root-Session')).toBe('ses_12345678901234567890123456');
-    expect(forwarded.headers.get('X-Kilo-User-Id')).toBeNull();
-    expect(forwarded.headers.get('X-Kilo-Future-Identity')).toBeNull();
-    await expect(forwarded.json()).resolves.toEqual({ data: [] });
-  });
-
-  it('keeps exact-root export on the public path', async () => {
-    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
-      success: true,
-      authorization: REDEEMED_KILO_AUTHORIZATION,
-      routeClass: 'session_ingest',
-    });
-    const scopedFetch = vi.fn();
-    const publicFetch = vi.fn(async (_request: Request) => new Response('exported'));
-    vi.stubGlobal('fetch', publicFetch);
-
-    await handleOutbound(
-      new Request(
-        'https://ingest.kilosessions.ai/api/session/ses_12345678901234567890123456/export',
-        {
-          headers: {
-            Authorization: `Bearer ${KILO_CAPABILITY}`,
-            'X-Internal-Secret': 'forged',
-            'X-Kilo-Cloud-Agent-Session': 'forged',
-          },
-        }
-      ),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
-    );
-
-    expect(publicFetch).toHaveBeenCalledTimes(1);
-    expect(scopedFetch).not.toHaveBeenCalled();
-    const forwarded = publicFetch.mock.calls[0]?.[0] as Request;
-    expect(forwarded.headers.get('X-Internal-Secret')).toBeNull();
-    expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBeNull();
-  });
-
-  it('fails closed when session scope claims are present but the internal proxy is unavailable', async () => {
-    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
-      success: true,
-      authorization: REDEEMED_KILO_AUTHORIZATION,
-      routeClass: 'session_ingest',
-      sessionIngestScope: {
-        cloudAgentSessionId: 'cloud-agent-session-1',
-        rootKiloSessionId: 'ses_12345678901234567890123456',
-      },
-    });
-    const publicFetch = vi.fn();
-    vi.stubGlobal('fetch', publicFetch);
-    const baseEnv = createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability);
-    const env = { ...baseEnv, SESSION_INGEST: undefined } as never;
-
-    const response = await handleOutbound(
-      new Request(
-        'https://ingest.kilosessions.ai/api/session/ses_abcdefghijklmnopqrstuvwxyz/ingest',
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
-          body: JSON.stringify({ data: [] }),
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(502);
-    expect(publicFetch).not.toHaveBeenCalled();
-  });
-
-  it('fails closed without logging a rejected Kilo URL by default', async () => {
-    const forward = vi.fn();
-    vi.stubGlobal('fetch', forward);
-    const rejectedUrl =
-      'https://api.kilo.ai/api/openrouter/v1/chat/completions?access_token=query-secret';
-
-    const response = await handleOutbound(
-      new Request(rejectedUrl, {
-        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
-      }),
-      createEnv(
-        vi.fn(),
-        vi.fn(),
-        vi.fn().mockResolvedValue({ success: false, reason: 'upstream_not_allowed' })
-      )
-    );
-
-    expect(response.status).toBe(502);
-    expect(forward).not.toHaveBeenCalled();
-    expect(serializedLogCalls()).not.toContain(rejectedUrl);
-    expect(serializedLogCalls()).not.toContain('query-secret');
-  });
-
-  it('logs a rejected Kilo URL without its query string when local diagnostics are enabled', async () => {
-    const forward = vi.fn();
-    vi.stubGlobal('fetch', forward);
-    const rejectedUrl =
-      'https://api.kilo.ai/api/openrouter/v1/chat/completions?access_token=query-secret';
-
-    const response = await handleOutbound(
-      new Request(rejectedUrl, {
-        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
-      }),
-      createEnv(
-        vi.fn(),
-        vi.fn(),
-        vi.fn().mockResolvedValue({ success: false, reason: 'upstream_not_allowed' }),
-        '1'
-      )
-    );
-
-    expect(response.status).toBe(502);
-    expect(forward).not.toHaveBeenCalled();
-    expect(logging.logger.withFields).toHaveBeenCalledWith(
-      expect.objectContaining({
-        rejectedRequestUrl: 'https://api.kilo.ai/api/openrouter/v1/chat/completions',
-      })
-    );
-    expect(serializedLogCalls()).not.toContain('query-secret');
-    expect(logging.logger.debug).toHaveBeenCalledWith(
-      'Managed Kilo outbound redemption rejected with local URL diagnostics'
-    );
-    expect(logging.logger.warn).toHaveBeenCalledWith('Managed Kilo outbound redemption rejected');
-  });
-
-  it('fails closed without forwarding when Kilo redemption throws', async () => {
-    const forward = vi.fn();
-    vi.stubGlobal('fetch', forward);
-
-    const response = await handleOutbound(
-      new Request('https://api.kilo.ai/api/users/me', {
-        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
-      }),
-      createEnv(vi.fn(), vi.fn(), vi.fn().mockRejectedValue(new Error('rpc unavailable')))
-    );
-
-    expect(response.status).toBe(502);
-    expect(forward).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when the Kilo redemption binding is unavailable', async () => {
-    const forward = vi.fn();
-    vi.stubGlobal('fetch', forward);
-
-    const response = await handleOutbound(
-      new Request('https://api.kilo.ai/api/users/me', {
-        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
-      }),
-      { GIT_TOKEN_SERVICE: {} } as never
-    );
-
-    expect(response.status).toBe(502);
-    expect(forward).not.toHaveBeenCalled();
-  });
-
-  it('fails closed for an unsupported Kilo capability version', async () => {
-    const redeemKiloSessionCapability = vi.fn();
-    const forward = vi.fn();
-    vi.stubGlobal('fetch', forward);
-
-    const response = await handleOutbound(
-      new Request('https://api.kilo.ai/api/users/me', {
-        headers: { Authorization: 'Bearer kka2.opaque' },
-      }),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
-    );
-
-    expect(response.status).toBe(502);
-    expect(redeemKiloSessionCapability).not.toHaveBeenCalled();
-    expect(forward).not.toHaveBeenCalled();
-  });
-
-  it('passes an ordinary unrelated outbound request through unchanged', async () => {
-    const redeemKiloSessionCapability = vi.fn();
-    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
-    vi.stubGlobal('fetch', forward);
-
-    await handleOutbound(
-      new Request('https://example.com/unrelated'),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
-    );
-
-    expect(redeemKiloSessionCapability).not.toHaveBeenCalled();
-    expect(forward).toHaveBeenCalledOnce();
-  });
-});
-
 describe('handleManagedScmOutbound Bitbucket', () => {
   const BITBUCKET_CAPABILITY = 'kbb1.opaque';
   const REDEEMED_BITBUCKET_AUTHORIZATION = `Basic ${Buffer.from('x-token-auth:upstream-token').toString('base64')}`;
@@ -1311,11 +1153,8 @@ describe('handleManagedScmOutbound Bitbucket', () => {
       GIT_TOKEN_SERVICE: {
         redeemGitHubSessionCapability: vi.fn(),
         redeemGitLabSessionCapability: vi.fn(),
-        redeemKiloSessionCapability: vi.fn(),
         redeemBitbucketSessionCapability,
       },
-      INTERNAL_API_SECRET_PROD: { get: vi.fn(async () => 'trusted-internal-secret') },
-      SESSION_INGEST: { fetch: vi.fn() },
     } as unknown as Cloudflare.Env;
   }
 
@@ -1362,5 +1201,785 @@ describe('handleManagedScmOutbound Bitbucket', () => {
     );
     expect(redeem).not.toHaveBeenCalled();
     expect(response.status).toBe(502);
+  });
+});
+
+describe('handleManagedScmOutbound control-plane aliases', () => {
+  const capabilities = {
+    github: CAPABILITY,
+    gitlab: GITLAB_CAPABILITY,
+    bitbucket: 'kbb1.opaque',
+  } satisfies Record<Exclude<ControlCredentialPurpose, 'kilo'>, string>;
+
+  function fixture() {
+    const resolveCredential = vi.fn().mockResolvedValue(null);
+    const getByName = vi.fn(() => ({ resolveCredential }));
+    const redemptions = {
+      github: vi.fn().mockResolvedValue({
+        success: true,
+        authorization: REDEEMED_GIT_AUTHORIZATION,
+      }),
+      gitlab: vi.fn().mockResolvedValue({
+        success: true,
+        headers: { authorization: REDEEMED_GITLAB_AUTHORIZATION },
+      }),
+      bitbucket: vi.fn().mockResolvedValue({
+        success: true,
+        headers: { authorization: basicCredential('upstream-token', 'Basic', 'x-token-auth') },
+      }),
+    };
+    const env: Cloudflare.Env = {
+      ...createEnv(redemptions.github, redemptions.gitlab),
+      GIT_TOKEN_SERVICE: {
+        redeemGitHubSessionCapability: redemptions.github,
+        redeemGitLabSessionCapability: redemptions.gitlab,
+        redeemBitbucketSessionCapability: redemptions.bitbucket,
+      } as never,
+      SANDBOX_CONTROL: { getByName } as never,
+    };
+    const forward = vi.fn(async (_request: Request) => new Response('forwarded'));
+    vi.stubGlobal('fetch', forward);
+    return { env, resolveCredential, getByName, redemptions, forward };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { purpose: 'github', scheme: 'bEaReR', username: undefined },
+    { purpose: 'github', scheme: 'ToKeN', username: undefined },
+    { purpose: 'github', scheme: 'bAsIc', username: 'x-access-token' },
+    { purpose: 'gitlab', scheme: 'Bearer', username: undefined },
+    { purpose: 'gitlab', scheme: 'Basic', username: 'oauth2' },
+    { purpose: 'bitbucket', scheme: 'Bearer', username: undefined },
+    { purpose: 'bitbucket', scheme: 'token', username: undefined },
+    { purpose: 'bitbucket', scheme: 'Basic', username: 'x-token-auth' },
+  ] as const)(
+    'resolves $purpose aliases carried by $scheme and redeems exactly once',
+    async ({ purpose, scheme, username }) => {
+      const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', purpose);
+      resolveCredential.mockResolvedValue({ credential: capabilities[purpose] });
+      const authorization = username
+        ? basicCredential(credential, `${scheme}\t `, username)
+        : `${scheme}\t ${credential}`;
+      const request = new Request('https://example.test:8443/managed/resource?key=query-secret', {
+        method: 'POST',
+        headers: { Authorization: authorization, Host: 'guest-supplied.invalid' },
+        body: 'request-body',
+      });
+
+      const response = await handleOutbound(request, env);
+
+      expect(response.status).toBe(200);
+      expect(getByName).toHaveBeenCalledExactlyOnceWith('sbx_1');
+      expect(resolveCredential).toHaveBeenCalledExactlyOnceWith({
+        credential,
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
+        url: request.url,
+        method: request.method,
+      });
+      expect(redemptions[purpose]).toHaveBeenCalledExactlyOnceWith({
+        capability: capabilities[purpose],
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
+        requestUrl: request.url,
+        requestMethod: request.method,
+      });
+      for (const [provider, redeem] of Object.entries(redemptions)) {
+        if (provider !== purpose) expect(redeem).not.toHaveBeenCalled();
+      }
+      expect(forward).toHaveBeenCalledOnce();
+      const forwarded = forward.mock.calls[0]?.[0];
+      expect(forwarded?.headers.get('Authorization')).not.toContain(credential);
+      expect(forwarded?.headers.get('Authorization')).not.toContain(capabilities[purpose]);
+      expect(forwarded?.headers.get('Host')).toBe('example.test:8443');
+      expect(forwarded?.redirect).toBe('manual');
+      expect(await forwarded?.text()).toBe('request-body');
+      expect(request.headers.get('Authorization')).toBe(authorization);
+      const logs = serializedLogCalls();
+      expect(logs).not.toContain(credential);
+      expect(logs).not.toContain(capabilities[purpose]);
+      expect(logs).not.toContain('query-secret');
+      expect(logs).not.toContain('upstream-token');
+    }
+  );
+
+  it.each([false, true])(
+    'preserves GitHub attachment uploads through managed authorization (alias=%s)',
+    async alias => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = alias ? createControlPlaneCredential('sbx_1', 'github') : CAPABILITY;
+      resolveCredential.mockResolvedValue({ credential: CAPABILITY });
+      redemptions.github.mockResolvedValue({
+        success: true,
+        authorization: 'Bearer upstream-token',
+      });
+      const url =
+        'https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=screenshot.png&repository_id=1145038391';
+      const body = new Uint8Array([137, 80, 78, 71, 0, 255]);
+      const response = await handleOutbound(
+        new Request(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `token ${credential}`,
+            'Content-Type': 'image/png',
+            'User-Agent': 'GitHub CLI 2.103.3',
+          },
+          body,
+        }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(resolveCredential).toHaveBeenCalledTimes(alias ? 1 : 0);
+      expect(redemptions.github).toHaveBeenCalledExactlyOnceWith({
+        capability: CAPABILITY,
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
+        requestUrl: url,
+        requestMethod: 'POST',
+      });
+      expect(forward).toHaveBeenCalledOnce();
+      const forwarded = forward.mock.calls[0]?.[0];
+      if (!forwarded) throw new Error('Expected forwarded attachment request');
+      expect(forwarded.url).toBe(url);
+      expect(forwarded.method).toBe('POST');
+      expect(forwarded.headers.get('Authorization')).toBe('Bearer upstream-token');
+      expect(forwarded.headers.get('Content-Type')).toBe('image/png');
+      expect(forwarded.redirect).toBe('manual');
+      expect(new Uint8Array(await forwarded.arrayBuffer())).toEqual(body);
+      expect(serializedLogCalls()).not.toContain(credential);
+      expect(serializedLogCalls()).not.toContain('upstream-token');
+      expect(serializedLogCalls()).not.toContain('screenshot.png');
+    }
+  );
+
+  it.each(['repository_mismatch', 'source_unavailable'])(
+    'does not forward GitHub attachment bytes when redemption fails with %s',
+    async reason => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', 'github');
+      resolveCredential.mockResolvedValue({ credential: CAPABILITY });
+      redemptions.github.mockResolvedValue({ success: false, reason });
+
+      const response = await handleOutbound(
+        new Request('https://uploads.github.com/user-attachments/assets?repository_id=42', {
+          method: 'POST',
+          headers: { Authorization: `token ${credential}` },
+          body: 'attachment-bytes',
+        }),
+        env
+      );
+
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('GitHub authorization unavailable');
+      expect(redemptions.github).toHaveBeenCalledOnce();
+      expect(forward).not.toHaveBeenCalled();
+      expect(logging.logger.withFields).toHaveBeenCalledWith(
+        expect.objectContaining({ failureStage: 'redemption-policy', reason })
+      );
+    }
+  );
+
+  it.each([false, true])(
+    'resolves GitLab PRIVATE-TOKEN aliases once with duplicate bearer=%s',
+    async duplicate => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', 'gitlab');
+      resolveCredential.mockResolvedValue({ credential: GITLAB_CAPABILITY });
+      const headers = new Headers({ 'PRIVATE-TOKEN': credential });
+      if (duplicate) headers.set('Authorization', `Bearer ${credential}`);
+
+      const response = await handleOutbound(
+        new Request('https://gitlab.com/api/v4/projects/1/merge_requests', { headers }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(resolveCredential).toHaveBeenCalledOnce();
+      expect(redemptions.gitlab).toHaveBeenCalledOnce();
+      expect(forward.mock.calls[0]?.[0].headers.get('PRIVATE-TOKEN')).toBeNull();
+      expect(forward.mock.calls[0]?.[0].headers.get('Authorization')).toBe(
+        REDEEMED_GITLAB_AUTHORIZATION
+      );
+    }
+  );
+
+  it.each(['Bearer', 'token'])('never resolves Kilo aliases carried by %s', async scheme => {
+    const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'kilo');
+    const response = await handleOutbound(
+      new Request('https://api.kilo.ai/api/profile', {
+        headers: { Authorization: `${scheme} ${credential}` },
+      }),
+      env
+    );
+    expect(response.status).toBe(502);
+    expect(getByName).not.toHaveBeenCalled();
+    expect(resolveCredential).not.toHaveBeenCalled();
+    for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'kcp1',
+    'kcp1.',
+    'kcp1-invalid',
+    'kcp1.invalid',
+    `kcp1.YR.github.${'a'.repeat(64)}`,
+    `kcp1.${Buffer.from('../other').toString('base64url')}.github.${'a'.repeat(64)}`,
+    `kcp1.${'x'.repeat(10_000)}`,
+  ])('never forwards malformed aliases in supported carriers', async credential => {
+    const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+    const carriers: HeadersInit[] = [
+      { Authorization: `Bearer ${credential}` },
+      { Authorization: `token ${credential}` },
+      { Authorization: basicCredential(credential) },
+      { 'PRIVATE-TOKEN': credential },
+    ];
+    for (const headers of carriers) {
+      const response = await handleOutbound(new Request('https://example.test/', { headers }), env);
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('SCM authorization unavailable');
+    }
+    expect(getByName).not.toHaveBeenCalled();
+    expect(resolveCredential).not.toHaveBeenCalled();
+    for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('rejects noncanonical Basic aliases and aliases in the Basic username', async () => {
+    const { env, resolveCredential, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_12', 'github');
+    const authorization = basicCredential(credential);
+    for (const value of [
+      `${authorization}!`,
+      authorization.replace(/=+$/, ''),
+      basicCredential('unused', 'Basic', credential),
+      `Basic ${Buffer.from(credential).toString('base64')}`,
+    ]) {
+      const response = await handleOutbound(
+        new Request('https://example.test/', { headers: { Authorization: value } }),
+        env
+      );
+      expect(response.status).toBe(502);
+    }
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported or conflicting alias carriers before resolution', async () => {
+    const { env, resolveCredential, forward } = fixture();
+    const github = createControlPlaneCredential('sbx_1', 'github');
+    const gitlab = createControlPlaneCredential('sbx_1', 'gitlab');
+    const carriers: HeadersInit[] = [
+      { Authorization: basicCredential(github, 'Basic', 'oauth2') },
+      { Authorization: `token ${gitlab}` },
+      { 'PRIVATE-TOKEN': github },
+      { Authorization: `Bearer ${github}`, 'PRIVATE-TOKEN': gitlab },
+      {
+        Authorization: `Bearer ${gitlab}`,
+        'PRIVATE-TOKEN': createControlPlaneCredential('sbx_1', 'gitlab'),
+      },
+      { Authorization: `Bearer ${gitlab}`, 'PRIVATE-TOKEN': GITLAB_CAPABILITY },
+    ];
+    for (const headers of carriers) {
+      const response = await handleOutbound(new Request('https://example.test/', { headers }), env);
+      expect(response.status).toBe(502);
+    }
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'rejects raw, recursive, legacy, malformed, and cross-purpose %s resolution results',
+    async purpose => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', purpose);
+      const otherCapabilities = Object.entries(capabilities)
+        .filter(([provider]) => provider !== purpose)
+        .map(([, capability]) => ({ credential: capability }));
+      for (const resolved of [
+        null,
+        undefined,
+        'raw-upstream-token',
+        {},
+        { credential: null },
+        { credential: 'raw-upstream-token' },
+        { credential: 'Bearer raw-upstream-token' },
+        { credential },
+        { credential: 'kgh1.legacy' },
+        { credential: 'kgl1.legacy' },
+        { credential: 'kka2.future' },
+        { credential: capabilities[purpose], organizationId: 42 },
+        { credential: capabilities[purpose].slice(0, 5) },
+        { credential: `${capabilities[purpose]} secret` },
+        ...otherCapabilities,
+      ]) {
+        resolveCredential.mockResolvedValue(resolved);
+        const response = await handleOutbound(
+          new Request('https://example.test/', {
+            headers: { Authorization: `Bearer ${credential}` },
+          }),
+          env
+        );
+        expect(response.status).toBe(502);
+        expect(await response.text()).toBe('SCM authorization unavailable');
+      }
+      for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
+      expect(forward).not.toHaveBeenCalled();
+    }
+  );
+
+  it('fails closed when the control namespace or resolution RPC is unavailable', async () => {
+    const { env, resolveCredential, getByName, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'github');
+    for (const control of [undefined, {}, { getByName: () => ({}) }]) {
+      const response = await handleOutbound(
+        new Request('https://api.github.com/user', {
+          headers: { Authorization: `Bearer ${credential}` },
+        }),
+        { ...env, SANDBOX_CONTROL: control } as never
+      );
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('SCM authorization unavailable');
+    }
+    expect(getByName).not.toHaveBeenCalled();
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it.each(['lookup', 'resolution', 'retry-exhausted'] as const)(
+    'fails closed and sanitizes %s errors before retry diagnostics',
+    async failure => {
+      const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', 'github');
+      const error = Object.assign(new Error(`sensitive-error ${credential} upstream-secret`), {
+        retryable: failure === 'retry-exhausted',
+      });
+      vi.stubGlobal('scheduler', { wait: vi.fn().mockResolvedValue(undefined) });
+      if (failure === 'lookup')
+        getByName.mockImplementation(() => {
+          throw error;
+        });
+      else resolveCredential.mockRejectedValue(error);
+
+      const response = await handleOutbound(
+        new Request('https://api.github.com/user', {
+          headers: { Authorization: `Bearer ${credential}` },
+        }),
+        env
+      );
+
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('SCM authorization unavailable');
+      expect(getByName).toHaveBeenCalledTimes(failure === 'retry-exhausted' ? 3 : 1);
+      for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
+      expect(forward).not.toHaveBeenCalled();
+      const logs = serializedLogCalls();
+      expect(logs).not.toContain(credential);
+      expect(logs).not.toContain('upstream-secret');
+      expect(logs).not.toContain('sensitive-error');
+    }
+  );
+
+  it('retries resolution using a fresh stub without duplicating broker redemption', async () => {
+    const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'github');
+    vi.stubGlobal('scheduler', { wait: vi.fn().mockResolvedValue(undefined) });
+    resolveCredential
+      .mockRejectedValueOnce(Object.assign(new Error(credential), { retryable: true }))
+      .mockResolvedValueOnce({ credential: CAPABILITY });
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/user', {
+        headers: { Authorization: `Bearer ${credential}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(getByName).toHaveBeenCalledTimes(2);
+    expect(resolveCredential).toHaveBeenCalledTimes(2);
+    expect(redemptions.github).toHaveBeenCalledOnce();
+    expect(forward).toHaveBeenCalledOnce();
+    expect(serializedLogCalls()).not.toContain(credential);
+  });
+
+  it('does not bypass the existing broker when a resolved capability is rejected', async () => {
+    const { env, resolveCredential, redemptions, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'github');
+    resolveCredential.mockResolvedValue({ credential: CAPABILITY });
+    redemptions.github.mockResolvedValue({ success: false, reason: 'upstream_not_allowed' });
+
+    const response = await handleOutbound(
+      new Request('https://untrusted.test/', {
+        headers: { Authorization: `Bearer ${credential}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(502);
+    expect(resolveCredential).toHaveBeenCalledOnce();
+    expect(redemptions.github).toHaveBeenCalledOnce();
+    expect(forward).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleManagedScmOutbound bounded GitHub git rate-limit retry', () => {
+  const FAKE_NOW = Date.parse('2026-01-01T00:00:00.000Z');
+  const GITHUB_GIT_GET_URL = 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack';
+  const GITHUB_GIT_POST_URL = 'https://github.com/acme/repo.git/git-upload-pack';
+
+  function githubRedeem() {
+    return vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+  }
+
+  function githubGitGetRequest(): Request {
+    return new Request(GITHUB_GIT_GET_URL, {
+      headers: { Authorization: basicCredential(CAPABILITY) },
+    });
+  }
+
+  function githubGitPostRequest(body: BodyInit): Request {
+    return new Request(GITHUB_GIT_POST_URL, {
+      method: 'POST',
+      headers: { Authorization: basicCredential(CAPABILITY) },
+      body,
+    });
+  }
+
+  function resetHeader(delaySeconds: number): Record<string, string> {
+    return { 'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + delaySeconds) };
+  }
+
+  function stubResponseSequence(factories: ReadonlyArray<() => Response>) {
+    let index = 0;
+    const fetchMock = vi.fn(async (_request: Request): Promise<Response> => {
+      const factory = factories[Math.min(index, factories.length - 1)];
+      index += 1;
+      return factory ? factory() : new Response(null, { status: 500 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  async function settle<T>(pending: Promise<T>): Promise<T> {
+    await vi.runAllTimersAsync();
+    return pending;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    vi.useFakeTimers();
+    vi.setSystemTime(FAKE_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('waits the retry-after delta-seconds delay before re-issuing', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '30' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('waits the retry-after HTTP-date delay before re-issuing', async () => {
+    const retryAfter = new Date(FAKE_NOW + 30_000).toUTCString();
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': retryAfter } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('clamps an oversized retry-after to the per-wait maximum', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '999999' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('waits the observed retry-after value rather than the per-wait maximum', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '7' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(6_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('re-issues repeatedly while the observed resets fit the total-wait budget', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: resetHeader(5) }),
+      () => new Response('rate limited', { status: 429, headers: resetHeader(5) }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('returns the 429 when the next observed wait exceeds the remaining budget', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: resetHeader(25) }),
+      () => new Response('rate limited', { status: 429, headers: resetHeader(25) }),
+      () => new Response('rate limited', { status: 429, headers: resetHeader(20) }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await expect(pending).resolves.toMatchObject({ status: 429 });
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops at the attempt cap and returns the final 429', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await expect(settle(pending)).resolves.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(1 + GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS);
+  });
+
+  it('retries immediately when the observed delay is zero', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await expect(settle(pending)).resolves.toMatchObject({ status: 200 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('replays an eligible POST body byte-for-byte on retry', async () => {
+    const binaryBody = new Uint8Array([0x00, 0xff, 0x50, 0x41, 0x43, 0x4b, 0x0a, 0x80, 0x7f]);
+    const seen: Uint8Array[] = [];
+    const fetchMock = vi.fn(async (request: Request): Promise<Response> => {
+      seen.push(new Uint8Array(await request.arrayBuffer()));
+      if (seen.length === 1) {
+        return new Response('rate limited', { status: 429, headers: resetHeader(5) });
+      }
+      return new Response('ok', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const pending = handleOutbound(githubGitPostRequest(binaryBody), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(Array.from(seen[0] ?? [])).toEqual(Array.from(binaryBody));
+    expect(Array.from(seen[1] ?? [])).toEqual(Array.from(binaryBody));
+  });
+
+  it('replays an eligible POST of exactly 1 MiB byte-for-byte', async () => {
+    const body = new Uint8Array(1_048_576).fill(0xa5);
+    body[body.length - 1] = 0x3f;
+    const forwardedBodies: Uint8Array[] = [];
+    const fetchMock = vi.fn(async (request: Request) => {
+      forwardedBodies.push(new Uint8Array(await request.arrayBuffer()));
+      return forwardedBodies.length === 1
+        ? new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } })
+        : new Response('ok');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await settle(
+      handleOutbound(githubGitPostRequest(body), createEnv(githubRedeem()))
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(forwardedBodies).toHaveLength(2);
+    for (const forwardedBody of forwardedBodies) {
+      expect(Buffer.from(forwardedBody).equals(Buffer.from(body))).toBe(true);
+    }
+  });
+
+  it('forwards an over-cap eligible POST once and returns its response', async () => {
+    const overCapBody = new Uint8Array(1_048_577);
+    const fetchMock = vi.fn(async (request: Request): Promise<Response> => {
+      await request.arrayBuffer();
+      return new Response('ok', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await settle(
+      handleOutbound(githubGitPostRequest(overCapBody), createEnv(githubRedeem()))
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry an over-cap eligible POST that receives a 429', async () => {
+    const overCapBody = new Uint8Array(1_048_577);
+    const fetchMock = vi.fn(async (request: Request): Promise<Response> => {
+      await request.arrayBuffer();
+      return new Response('rate limited', { status: 429, headers: { 'retry-after': '7' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await settle(
+      handleOutbound(githubGitPostRequest(overCapBody), createEnv(githubRedeem()))
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('7');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  const excludedRequests: ReadonlyArray<[string, () => Request]> = [
+    [
+      'POST git-receive-pack',
+      () =>
+        new Request('https://github.com/acme/repo.git/git-receive-pack', {
+          method: 'POST',
+          headers: { Authorization: basicCredential(CAPABILITY) },
+          body: 'pack-body',
+        }),
+    ],
+    [
+      'GET info/refs for git-receive-pack',
+      () =>
+        new Request('https://github.com/acme/repo.git/info/refs?service=git-receive-pack', {
+          headers: { Authorization: basicCredential(CAPABILITY) },
+        }),
+    ],
+    [
+      'GitHub API route',
+      () =>
+        new Request('https://api.github.com/repos/acme/repo', {
+          headers: { Authorization: `Bearer ${CAPABILITY}` },
+        }),
+    ],
+  ];
+
+  it.each(excludedRequests)(
+    'does not retry %s even with an observable reset',
+    async (_label, makeRequest) => {
+      const fetchMock = stubResponseSequence([
+        () => new Response('rate limited', { status: 429, headers: { 'retry-after': '30' } }),
+      ]);
+
+      const response = await settle(handleOutbound(makeRequest(), createEnv(githubRedeem())));
+
+      expect(response.status).toBe(429);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not retry an eligible read route without an observable reset', async () => {
+    const fetchMock = stubResponseSequence([() => new Response('rate limited', { status: 429 })]);
+
+    const response = await settle(handleOutbound(githubGitGetRequest(), createEnv(githubRedeem())));
+
+    expect(response.status).toBe(429);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry an initial 403', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('forbidden', { status: 403, headers: { 'retry-after': '30' } }),
+    ]);
+
+    const response = await settle(handleOutbound(githubGitGetRequest(), createEnv(githubRedeem())));
+
+    expect(response.status).toBe(403);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces the existing 502 when a retry forward fails', async () => {
+    let calls = 0;
+    const fetchMock = vi.fn(async (_request: Request): Promise<Response> => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } });
+      }
+      throw new Error('network unavailable');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await settle(handleOutbound(githubGitGetRequest(), createEnv(githubRedeem())));
+
+    expect(response.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

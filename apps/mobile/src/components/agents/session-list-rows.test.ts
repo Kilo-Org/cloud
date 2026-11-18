@@ -1,0 +1,175 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  flattenSessionSections,
+  SESSION_LIST_SKELETON_COUNT,
+  SESSION_LIST_SKELETON_HEADER_KEY,
+  type SessionListRow,
+  skeletonSessionRows,
+} from './session-list-rows';
+import { type SessionSection } from './session-list-helpers';
+import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
+
+function session(id: string): StoredSession {
+  return { session_id: id } as unknown as StoredSession;
+}
+
+function section(title: string, ids: string[], timeZone = 'UTC'): SessionSection {
+  return { title, data: ids.map(id => session(id)), timeZone };
+}
+
+function titles(rows: readonly SessionListRow[]): string[] {
+  const result: string[] = [];
+  for (const row of rows) {
+    if (row.kind === 'section-header') {
+      result.push(row.title);
+    }
+  }
+  return result;
+}
+
+function counts(rows: readonly SessionListRow[]): number[] {
+  const result: number[] = [];
+  for (const row of rows) {
+    if (row.kind === 'section-header') {
+      result.push(row.count);
+    }
+  }
+  return result;
+}
+
+function sessionIds(rows: readonly SessionListRow[]): string[] {
+  const result: string[] = [];
+  for (const row of rows) {
+    if (row.kind === 'session') {
+      result.push(row.session.session_id);
+    }
+  }
+  return result;
+}
+
+describe('flattenSessionSections', () => {
+  it('preserves section order (Today then Older)', () => {
+    const rows = flattenSessionSections([section('Today', ['a']), section('Older', ['b'])]);
+    expect(titles(rows)).toEqual(['Today', 'Older']);
+  });
+
+  it('sets each header count to its section length, including multi-session and empty sections', () => {
+    const rows = flattenSessionSections([
+      section('Today', ['a', 'b', 'c']),
+      section('Yesterday', ['d']),
+      section('Older', []),
+    ]);
+    expect(counts(rows)).toEqual([3, 1, 0]);
+  });
+
+  it('keeps session source order within a section and across sections', () => {
+    const rows = flattenSessionSections([
+      section('Today', ['a', 'b']),
+      section('Older', ['c', 'd']),
+    ]);
+    expect(sessionIds(rows)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('produces unique keys and a stable array across two calls on the same input', () => {
+    const sections = [section('Today', ['a', 'b']), section('Older', ['c'])];
+    const first = flattenSessionSections(sections);
+    const second = flattenSessionSections(sections);
+    expect(first).toEqual(second);
+    const keys = first.map(row => row.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toEqual(['header:Today', 'a', 'b', 'header:Older', 'c']);
+  });
+
+  it('keys each session row by its session_id', () => {
+    const rows = flattenSessionSections([section('Today', ['a', 'b'])]);
+    const keys: string[] = [];
+    for (const row of rows) {
+      if (row.kind === 'session') {
+        expect(row.key).toBe(row.session.session_id);
+        keys.push(row.key);
+      }
+    }
+    expect(keys).toEqual(['a', 'b']);
+  });
+
+  it('flattens empty input to an empty array', () => {
+    expect(flattenSessionSections([])).toEqual([]);
+  });
+
+  it('does not mutate the input sections or their sessions', () => {
+    const first = section('Today', ['a', 'b']);
+    const sections = [first];
+    const snapshot = { title: first.title, data: [...first.data], timeZone: first.timeZone };
+    flattenSessionSections(sections);
+    expect(sections).toHaveLength(1);
+    expect(sections[0]).toBe(first);
+    expect(first.title).toBe(snapshot.title);
+    expect(first.data).toEqual(snapshot.data);
+    expect(first.data[0]).toBe(snapshot.data[0]);
+  });
+
+  it('carries each section heading onto its session rows', () => {
+    const rows = flattenSessionSections([
+      section('Today', ['a']),
+      section('Yesterday', ['b', 'c']),
+    ]);
+    const carried = rows.flatMap(row => (row.kind === 'session' ? [row.sectionTitle] : []));
+    expect(carried).toEqual(['Today', 'Yesterday', 'Yesterday']);
+  });
+
+  it('interleaves each header immediately before its section rows', () => {
+    const rows = flattenSessionSections([section('Today', ['a']), section('Older', ['b', 'c'])]);
+    expect(rows.map(row => row.kind)).toEqual([
+      'section-header',
+      'session',
+      'section-header',
+      'session',
+      'session',
+    ]);
+  });
+});
+
+describe('skeletonSessionRows', () => {
+  it('defaults to the reserved cold-open row count plus the header placeholder', () => {
+    const rows = skeletonSessionRows();
+    expect(SESSION_LIST_SKELETON_COUNT).toBe(8);
+    expect(rows).toHaveLength(SESSION_LIST_SKELETON_COUNT + 1);
+  });
+
+  it('starts with the date-header placeholder, then a skeleton kind per slot with a unique key', () => {
+    const rows = skeletonSessionRows(8);
+    expect(rows[0]).toEqual({
+      kind: 'section-header-skeleton',
+      key: SESSION_LIST_SKELETON_HEADER_KEY,
+    });
+    for (const row of rows.slice(1)) {
+      expect(row.kind).toBe('skeleton');
+    }
+    expect(rows.map(row => row.key).slice(1)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `skeleton:${index}`)
+    );
+    const keys = rows.map(row => row.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('keeps keys stable across calls so the swap to real rows is a plain data update', () => {
+    expect(skeletonSessionRows(3)).toEqual(skeletonSessionRows(3));
+    expect(skeletonSessionRows(3).map(row => row.key)).toEqual([
+      'skeleton:header',
+      'skeleton:0',
+      'skeleton:1',
+      'skeleton:2',
+    ]);
+  });
+
+  it('matches the loaded row shapes item for item for a single-section history', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    // The placeholder must be one list item per real item, or a cell is
+    // measured at the placeholder's composite height and then corrected.
+    const loadedKinds = flattenSessionSections([section('Today', ids)]).map(row =>
+      row.kind === 'section-header' ? 'section-header-skeleton' : 'skeleton'
+    );
+    expect(skeletonSessionRows(ids.length).map(row => row.kind)).toEqual(loadedKinds);
+  });
+});

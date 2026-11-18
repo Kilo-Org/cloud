@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "May update ang iyong agent session",
+      "lowBalance": "Kailangan ng atensyon ang iyong balance",
+      "spendAlert": "Kailangan ng atensyon ang iyong gastos",
+      "securityFinding": "Kailangan ng atensyon ang isang security finding",
+      "securityUpdate": "May update ang isang security check",
+      "activeAgentsGlanceable": "May update ang mga aktibong agent"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alerto sa mababang balance",
+      "body": "Bumaba sa ibaba ng ${{minimumBalanceUsd}} ang balance ng {{organizationName}}"
+    },
+    "spendAlert": {
+      "title": "Alerto sa gastos",
+      "body": "Lumampas ang gastos ng {{scopeName}} sa ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} sa {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Bagong security finding ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Babala sa SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Paglabag sa SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Handa nang kontrolin mula sa iyong telepono ang iyong Kilo session"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

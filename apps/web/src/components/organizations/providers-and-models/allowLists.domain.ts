@@ -1,4 +1,4 @@
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 export type OpenRouterModelSlugSnapshot = {
   slug: string;
@@ -130,5 +130,23 @@ export function toggleModelAllowed(params: {
     return sortUniqueStrings([...denied]);
   }
   denied.add(normalizeModelId(modelId));
+  return sortUniqueStrings([...denied]);
+}
+
+export function setModelsAllowed(params: {
+  modelIds: ReadonlyArray<string>;
+  nextAllowed: boolean;
+  draftModelDenyList: ReadonlyArray<string>;
+}): string[] {
+  const { modelIds, nextAllowed, draftModelDenyList } = params;
+  const denied = new Set(draftModelDenyList.map(entry => normalizeModelId(entry)));
+  for (const modelId of modelIds) {
+    const normalizedModelId = normalizeModelId(modelId);
+    if (nextAllowed) {
+      denied.delete(normalizedModelId);
+    } else {
+      denied.add(normalizedModelId);
+    }
+  }
   return sortUniqueStrings([...denied]);
 }

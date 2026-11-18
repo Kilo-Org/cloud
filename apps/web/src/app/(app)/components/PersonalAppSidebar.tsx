@@ -10,24 +10,17 @@ import {
   Receipt,
   User,
   Building2,
-  Plus,
-  Rocket,
   Cable,
   Cloud,
   Bot,
-  Database,
   List,
   Shield,
-  ListChecks,
   Key,
-  Wrench,
   Webhook,
-  Factory,
   Settings,
   CreditCard,
   MessageSquare,
   Sparkles,
-  Gift,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -36,9 +29,6 @@ import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarPromoBanner from './SidebarPromoBanner';
 import SidebarUserFooter from './SidebarUserFooter';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
-import { isEnabledForUser } from '@/lib/code-indexing/util';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -55,12 +45,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
     })
   );
-
-  // Feature flags
-  const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
-  const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
-  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group
   const dashboardItems: Array<{
@@ -125,13 +109,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Sparkles,
       url: '/claw/changelog',
     },
-    {
-      title: 'Refer & Earn',
-      subtitle: 'Get 1 Month Free',
-      badge: 'NEW',
-      icon: Gift,
-      url: '/claw/refer',
-    },
   ];
 
   // Cloud group
@@ -141,15 +118,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     url: string;
     className?: string;
   }> = [
-    ...(isAppBuilderEnabled || isDevelopment
-      ? [
-          {
-            title: 'App Builder',
-            icon: Plus,
-            url: '/app-builder',
-          },
-        ]
-      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -175,48 +143,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Shield,
       url: '/security-agent',
     },
-    ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          { title: 'Auto Triage', icon: ListChecks, url: '/auto-triage' },
-          { title: 'Auto Fix', icon: Wrench, url: '/auto-fix' },
-        ]
-      : []),
-    ...(ENABLE_DEPLOY_FEATURE
-      ? [
-          {
-            title: 'Deploy',
-            icon: Rocket,
-            url: '/deploy',
-          },
-        ]
-      : []),
-    ...(isGastownEnabled || isDevelopment
-      ? [
-          {
-            title: 'Gas Town',
-            icon: Factory,
-            url: '/gastown',
-          },
-        ]
-      : []),
-    ...(user && isEnabledForUser(user)
-      ? [
-          {
-            title: 'Managed Indexing',
-            icon: Database,
-            url: '/code-indexing',
-          },
-        ]
-      : []),
-    ...(user?.is_admin
-      ? [
-          {
-            title: 'MCP Gateway',
-            icon: Cable,
-            url: '/cloud/mcp-gateway',
-          },
-        ]
-      : []),
   ];
 
   // Account group
@@ -231,15 +157,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: CreditCard,
       url: '/subscriptions',
     },
-    ...(ENABLE_DEPLOY_FEATURE
-      ? [
-          {
-            title: 'Integrations',
-            icon: Cable,
-            url: '/integrations',
-          },
-        ]
-      : []),
+    {
+      title: 'Integrations',
+      icon: Cable,
+      url: '/integrations',
+    },
     {
       title: 'Invoices',
       icon: Receipt,

@@ -1,0 +1,175 @@
+import type OpenAI from 'openai';
+import type { GatewayProviderOptions } from '@ai-sdk/gateway';
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import type { ReasoningDetailUnion } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import type {
+  AzureCredentials,
+  BedrockCredentials,
+  VertexCredentials,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type Anthropic from '@anthropic-ai/sdk';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+
+// Base types for OpenRouter API that don't depend on other lib files
+// This breaks circular dependencies with mistral.ts, minimax.ts, etc.
+
+export type OpenRouterProviderConfig = {
+  order?: string[];
+  sort?: 'price' | 'throughput' | 'latency';
+  only?: string[];
+  ignore?: string[];
+  /**
+   * `deny` excludes providers that store prompts for feedback or training. Providers may still
+   * store prompts for compliance; only `zdr` excludes all retention.
+   */
+  data_collection?: 'allow' | 'deny';
+  /** `true` excludes providers that store prompts at all, so it also excludes training. */
+  zdr?: boolean;
+  require_parameters?: boolean;
+  allow_fallbacks?: boolean;
+  max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
+};
+
+export type VercelInferenceProviderConfig =
+  | { apiKey: string; baseURL?: string }
+  | AzureCredentials
+  | BedrockCredentials
+  | VertexCredentials;
+
+export type VercelProviderConfig = {
+  gateway?: GatewayProviderOptions & {
+    byok?: Record<string, VercelInferenceProviderConfig[]>;
+    // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
+    sessionId?: string;
+    sessionAffinity?: boolean;
+    // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+    inferenceRegion?: { scope: 'zone'; geoRegion: OrganizationDataRegion } | { scope: 'global' };
+  };
+  anthropic?: AnthropicProviderOptions;
+};
+
+/** True when prompts must not be used for training. Does not mean prompts are not retained. */
+export function isDataCollectionExplicitlyDisallowed(
+  provider: OpenRouterProviderConfig | undefined
+) {
+  return provider?.data_collection === 'deny' || provider?.zdr === true;
+}
+
+// https://openrouter.ai/docs/guides/features/plugins
+export type OpenRouterPlugin = {
+  id: string;
+  enabled?: boolean;
+  [option: string]: unknown;
+};
+
+export type OpenRouterReasoningConfig = {
+  effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort;
+  max_tokens?: number;
+  exclude?: boolean;
+  enabled?: boolean;
+};
+
+// OpenCode sometimes adds these non-standard properties
+export type OpenCodeSpecificProperties = {
+  description?: string;
+  usage?: { include?: boolean };
+  reasoningEffort?: string;
+};
+
+export type SharedGatewayRequestProperties = {
+  // https://openrouter.ai/docs/features/provider-routing#requiring-providers-to-comply-with-data-policies
+  provider?: OpenRouterProviderConfig;
+  providerOptions?: VercelProviderConfig;
+
+  // Forwarded as providerOptions.gateway.models on the Vercel path
+  // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
+  models?: string[];
+
+  // Messages API fallback models we do not support: OpenRouter tries them when the requested
+  // model fails, not only on Anthropic safety refusals
+  // https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback
+  fallbacks?: unknown;
+
+  // OpenRouter plugins (web search, PDF parsing with OCR, ...), stripped from free requests
+  plugins?: OpenRouterPlugin[];
+
+  // Non-standard reasoning configuration
+  enable_thinking?: boolean; // Alibaba
+  thinking?: { type?: 'enabled' | 'adaptive' | 'disabled' }; // ByteDance, Z.ai
+};
+
+export type GatewayResponsesRequest = SharedGatewayRequestProperties &
+  OpenAI.Responses.ResponseCreateParams;
+
+// https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
+export type ThinkingBlockBinding = {
+  prefix_mismatch_behavior?: 'error' | 'drop_block';
+  /** Deprecated alias of `prefix_mismatch_behavior`; sending both is rejected. */
+  mismatch_behavior?: 'error' | 'drop_block';
+};
+
+export type GatewayMessagesRequest = SharedGatewayRequestProperties &
+  Anthropic.MessageCreateParams & {
+    user?: string;
+    session_id?: string;
+    thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
+  };
+
+/**
+ * Approximately OpenRouter API request type. Actually based on OpenAI's, but the differences aren't huge.
+ */
+export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreateParams &
+  SharedGatewayRequestProperties & {
+    max_tokens?: number;
+    transforms?: string[];
+
+    // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
+    reasoning?: OpenRouterReasoningConfig;
+
+    include_reasoning?: boolean;
+  };
+
+export type MessageWithReasoning = {
+  reasoning?: string;
+  reasoning_content?: string;
+  reasoning_details?: ReasoningDetailUnion[];
+};
+
+export type GatewayRequest =
+  | { kind: 'chat_completions'; body: OpenRouterChatCompletionRequest }
+  | { kind: 'responses'; body: GatewayResponsesRequest }
+  | { kind: 'messages'; body: GatewayMessagesRequest };
+
+export type OpenRouterGeneration = {
+  data: {
+    id: string;
+    is_byok?: boolean | null;
+    total_cost: number;
+    upstream_inference_cost?: number | null;
+    created_at: string;
+    model: string;
+    origin: string;
+    usage: number;
+    upstream_id?: string | null;
+    cache_discount?: number | null;
+    app_id?: number | null;
+    streamed?: boolean | null;
+    cancelled?: boolean | null;
+    provider_name?: string | null;
+    latency?: number | null;
+    moderation_latency?: number | null;
+    generation_time?: number | null;
+    finish_reason?: string | null;
+    native_finish_reason?: string | null;
+    tokens_prompt?: number | null;
+    tokens_completion?: number | null;
+    native_tokens_prompt?: number | null;
+    native_tokens_completion?: number | null;
+    native_tokens_reasoning?: number | null;
+    native_tokens_cached?: number | null; //missing from docs
+    native_tokens_cache_creation?: number | null; //vercel specific
+    num_media_prompt?: number | null;
+    num_media_completion?: number | null;
+    num_search_results?: number | null;
+  };
+};

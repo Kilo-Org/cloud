@@ -9,14 +9,16 @@ jest.mock('@/lib/session-ingest-client', () => ({
   fetchSessionSnapshot: (...args: unknown[]) => mockFetchSessionSnapshot(...args),
 }));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import {
   getSessionContainerMetrics,
   getSessionContainerMetricsForInfo,
 } from '@/routers/admin/session-container-telemetry';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { eq } from 'drizzle-orm';
 import {
+  admin_action_audit_logs,
   cliSessions,
   cli_sessions_v2,
   cloud_agent_sessions,
@@ -153,6 +155,22 @@ describe('admin.sessionTraces authorization', () => {
     ).resolves.toEqual({ history: [{ role: 'user', content: 'hello' }] });
     expect(mockGetBlobContent).toHaveBeenNthCalledWith(1, 'sessions/messages.json');
     expect(mockGetBlobContent).toHaveBeenNthCalledWith(2, 'sessions/history.json');
+
+    const audits = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, viewer.id));
+    expect(audits.map(audit => audit.action).sort()).toEqual([
+      'cloud_agent_session.api_history.view',
+      'cloud_agent_session.messages.view',
+    ]);
+    for (const audit of audits) {
+      expect(audit).toMatchObject({
+        target_type: 'user',
+        target_id: owner.id,
+        metadata: { sessionId: session.session_id },
+      });
+    }
   });
 
   test('a session viewer can resolve and read v2 metadata and messages', async () => {
@@ -190,6 +208,39 @@ describe('admin.sessionTraces authorization', () => {
       format: 'v2',
     });
     expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(sessionId, owner.id);
+
+    // v2 has no API history, so only the messages view is recorded; metadata
+    // reads (get, resolve) are not content views.
+    const audits = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, viewer.id));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      action: 'cloud_agent_session.messages.view',
+      target_id: owner.id,
+      metadata: { sessionId },
+    });
+  });
+
+  test('a session viewer can resolve a control-plane workspace_ session ID', async () => {
+    const owner = await insertTestUser();
+    const viewer = await insertAdmin({ can_view_sessions: true });
+    const sessionId = `ses_${crypto.randomUUID()}`;
+    const cloudAgentSessionId = `workspace_${crypto.randomUUID()}`;
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: owner.id,
+      cloud_agent_session_id: cloudAgentSessionId,
+      cloud_agent_session_scope_id: cloudAgentSessionId,
+    });
+
+    const caller = await createCallerForUser(viewer.id);
+    await expect(
+      caller.admin.sessionTraces.resolveCloudAgentSession({
+        cloud_agent_session_id: cloudAgentSessionId,
+      })
+    ).resolves.toEqual({ session_id: sessionId });
   });
 
   test('getMessages sorts v2 messages and parts by time-ordered ID like the cloud-agent-next UI', async () => {
@@ -234,7 +285,7 @@ describe('admin.sessionTraces authorization', () => {
     const viewer = await insertAdmin({ can_view_sessions: true });
     const sessionId = `ses_${crypto.randomUUID()}`;
     const cloudAgentSessionId = `agent_${crypto.randomUUID()}`;
-    const sandboxId = `ses-${'a'.repeat(48)}`;
+    const sandboxId = `istd-${'a'.repeat(48)}`;
     await db.insert(cli_sessions_v2).values({
       session_id: sessionId,
       kilo_user_id: owner.id,
@@ -250,17 +301,17 @@ describe('admin.sessionTraces authorization', () => {
       created_at: '2026-07-31T08:43:36.040Z',
     });
     await db.insert(cloud_billing_sku).values({
-      id: 'cloud-agent-small-test',
-      name: 'Cloud Agent Small',
+      id: 'cloud-agent-standard-test',
+      name: 'Cloud Agent Standard',
       unit: 'second',
       rate_cents_per_unit: '0.001',
     });
     await db.insert(container_usage_interval).values({
-      id: `cloud-agent-next-sandbox-small-containment:${sandboxId}:1`,
-      service: 'cloud-agent-next-sandbox-small-containment',
+      id: `cloud-agent-next-sandbox-containment:${sandboxId}:1`,
+      service: 'cloud-agent-next-sandbox-containment',
       instance_id: sandboxId,
       start_epoch_ms: 1,
-      cloud_billing_sku_id: 'cloud-agent-small-test',
+      cloud_billing_sku_id: 'cloud-agent-standard-test',
       context_fingerprint: 'b'.repeat(64),
       subject_type: 'user',
       subject_id: owner.id,
@@ -271,10 +322,10 @@ describe('admin.sessionTraces authorization', () => {
       last_seen_at: '2026-07-31T09:30:00.000Z',
       metadata: {
         durable_object_id: 'durable-object-id',
-        container_class: 'SandboxSmallContainment',
-        vcpu: '2',
-        memory_mib: '6144',
-        disk_mb: '10000',
+        container_class: 'SandboxContainment',
+        vcpu: '4',
+        memory_mib: '12288',
+        disk_mb: '20000',
       },
     });
 
@@ -288,9 +339,9 @@ describe('admin.sessionTraces authorization', () => {
       intervals: [
         {
           cloudflareInstanceId: 'durable-object-id',
-          containerClass: 'SandboxSmallContainment',
-          sku: { id: 'cloud-agent-small-test', name: 'Cloud Agent Small' },
-          capacity: { vcpu: 2, memoryBytes: 6_442_450_944, diskBytes: 10_000_000_000 },
+          containerClass: 'SandboxContainment',
+          sku: { id: 'cloud-agent-standard-test', name: 'Cloud Agent Standard' },
+          capacity: { vcpu: 4, memoryBytes: 12_884_901_888, diskBytes: 20_000_000_000 },
           capacitySource: 'recorded',
         },
       ],
@@ -305,7 +356,7 @@ describe('admin.sessionTraces authorization', () => {
     ).resolves.toMatchObject({ available: true });
     expect(providerWindows).toEqual([
       {
-        key: `cloud-agent-next-sandbox-small-containment:${sandboxId}:1`,
+        key: `cloud-agent-next-sandbox-containment:${sandboxId}:1`,
         instanceId: 'durable-object-id',
         start: '2026-07-31T08:33:36.040Z',
         end: '2026-07-31T09:05:07.000Z',

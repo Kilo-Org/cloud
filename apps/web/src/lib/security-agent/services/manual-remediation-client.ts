@@ -1,31 +1,37 @@
 import 'server-only';
-import { INTERNAL_API_SECRET, SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@/lib/config.server';
+import { TRPCError } from '@trpc/server';
+import {
+  INTERNAL_API_SECRET,
+  SECURITY_AUTO_ANALYSIS_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import {
   SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS,
   type SecurityRemediationAdmissionRejectionReason,
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { z } from 'zod';
-
-type RemediationOwner =
-  | { organizationId: string; userId?: never }
-  | { userId: string; organizationId?: never };
+import {
+  SECURITY_REMEDIATION_REJECTED_MESSAGE,
+  SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+} from '@kilocode/app-shared/security-agent';
+import { postSecurityWorkerJson } from './security-worker-request';
+import type { SecurityReviewOwner } from '../core/types';
 
 type ManualRemediationStartParams = {
   findingId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
   retry?: boolean;
 };
 
 type RemediationCancellationParams = {
   attemptId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
 };
 
 type ApplyAutoRemediationParams = {
   commandId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
 };
 
@@ -45,8 +51,6 @@ const ManualRemediationStartResponseSchema = z.discriminatedUnion('admitted', [
     reason: z.enum(SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS),
   }),
 ]);
-
-const WorkerErrorResponseSchema = z.object({ error: z.string() });
 
 export type ManualRemediationStartResult =
   | {
@@ -73,17 +77,67 @@ type ApplyAutoRemediationResponse = {
   error?: string;
 };
 
-function requireWorkerConfig() {
-  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL) {
-    throw new Error('SECURITY_AUTO_ANALYSIS_WORKER_URL is not configured');
+/**
+ * Logs a definitive non-5xx Worker rejection before it becomes the stable
+ * client error: the status is what separates an internal-secret mismatch (401)
+ * or a request-schema drift (400) from a policy rejection (409) once the body
+ * is no longer echoed. The Worker's `error` body is notes-only and length-capped.
+ *
+ * Rejection classes at the throw sites: an auth/config rejection (401/403)
+ * means the deployment is misconfigured, so the client gets the
+ * service-not-configured sentence (`SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE`).
+ * Any other rejection keeps the remediation-rejection sentence. Both go out as
+ * `PRECONDITION_FAILED`; the sentences are shared with the mobile ledger
+ * (stable-error-messages).
+ */
+function logDefinitiveRejection(route: string, status: number, body: unknown): void {
+  let notes: string | null = null;
+  if (body !== null && typeof body === 'object' && 'error' in body) {
+    const raw = body.error;
+    if (typeof raw === 'string') {
+      notes = raw.slice(0, 200);
+    }
   }
-  if (!INTERNAL_API_SECRET) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
+  console.error('Security remediation Worker rejected the request', {
+    route,
+    status,
+    ...(notes !== null ? { notes } : {}),
+  });
+}
+
+/**
+ * The stable error for a definitive non-5xx Worker rejection: a 401/403 is the
+ * Worker refusing the server's own credentials, i.e. the same misconfiguration
+ * as an unset URL or secret, so it reuses the not-configured sentence. Every
+ * other rejection keeps the remediation-rejection sentence.
+ */
+function definitiveRejectionError(status: number): TRPCError {
+  const authRejection = status === 401 || status === 403;
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message: authRejection
+      ? SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE
+      : SECURITY_REMEDIATION_REJECTED_MESSAGE,
+  });
+}
+
+function requireWorkerConfig() {
+  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !INTERNAL_API_SECRET) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+    });
   }
 }
 
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  return (await response.json()) as T;
+/**
+ * Ambiguous transport: a 5xx (including a gateway 503) can arrive after the
+ * Worker admitted the work, and a stalled or non-JSON response resolves through
+ * `postSecurityWorkerJson` to the same class. Both are retryable, and neither
+ * may be recorded as a definitive rejection.
+ */
+function ambiguousTransportError(message: string): TRPCError {
+  return new TRPCError({ code: 'BAD_GATEWAY', message: `${message}. Try again.` });
 }
 
 export async function submitManualRemediationStart(
@@ -91,21 +145,17 @@ export async function submitManualRemediationStart(
 ): Promise<ManualRemediationStartResult> {
   requireWorkerConfig();
 
-  const response = await fetch(`${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/remediation/start`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify({
+  const { response, body } = await postSecurityWorkerJson({
+    url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/remediation/start`,
+    service: 'remediation',
+    body: {
       schemaVersion: 1,
       findingId: params.findingId,
       owner: params.owner,
       actorUserId: params.actorUserId,
       retry: params.retry,
-    }),
+    },
   });
-  const body: unknown = await response.json();
   const parsedBody = ManualRemediationStartResponseSchema.safeParse(body);
   if (!response.ok) {
     if (parsedBody.success && !parsedBody.data.admitted) {
@@ -114,15 +164,16 @@ export async function submitManualRemediationStart(
         return { queued: false, reason: parsedBody.data.reason };
       }
     }
-    const parsedError = WorkerErrorResponseSchema.safeParse(body);
-    throw new Error(
-      parsedError.success
-        ? parsedError.data.error
-        : `Remediation request failed with ${response.status}`
-    );
+    if (response.status >= 500) {
+      throw ambiguousTransportError(`Remediation request failed with ${response.status}`);
+    }
+    logDefinitiveRejection('remediation/start', response.status, body);
+    throw definitiveRejectionError(response.status);
   }
   if (!parsedBody.success || !parsedBody.data.admitted) {
-    throw new Error('Security remediation Worker returned an invalid accepted response');
+    // Admitted, but without a readable attempt the outcome cannot be recorded,
+    // so it is ambiguous rather than a definitive rejection.
+    throw ambiguousTransportError('Security remediation Worker returned an unexpected response');
   }
   return {
     queued: true,
@@ -137,27 +188,28 @@ export async function submitRemediationCancellation(
 ): Promise<{ success: true; status: 'cancelled' | 'cancellation_requested' }> {
   requireWorkerConfig();
 
-  const response = await fetch(`${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/remediation/cancel`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify({
+  const { response, body } = await postSecurityWorkerJson({
+    url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/remediation/cancel`,
+    service: 'remediation',
+    body: {
       schemaVersion: 1,
       attemptId: params.attemptId,
       owner: params.owner,
       actorUserId: params.actorUserId,
-    }),
+    },
   });
-  const body = await parseJsonResponse<RemediationCancellationResponse>(response);
+  const workerBody = body as RemediationCancellationResponse | undefined;
   if (!response.ok) {
-    throw new Error(body.error ?? `Remediation cancellation failed with ${response.status}`);
+    if (response.status >= 500) {
+      throw ambiguousTransportError(`Remediation cancellation failed with ${response.status}`);
+    }
+    logDefinitiveRejection('remediation/cancel', response.status, body);
+    throw definitiveRejectionError(response.status);
   }
-  if (body.success !== true || !body.status) {
-    throw new Error('Security remediation Worker returned an invalid cancellation response');
+  if (workerBody?.success !== true || !workerBody.status) {
+    throw ambiguousTransportError('Security remediation Worker returned an unexpected response');
   }
-  return { success: true, status: body.status };
+  return { success: true, status: workerBody.status };
 }
 
 export async function submitApplyAutoRemediation(
@@ -165,28 +217,30 @@ export async function submitApplyAutoRemediation(
 ): Promise<{ queued: true; commandId: string }> {
   requireWorkerConfig();
 
-  const response = await fetch(
-    `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/apply-auto-remediation`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_SECRET,
-      },
-      body: JSON.stringify({
-        schemaVersion: 1,
-        commandId: params.commandId,
-        owner: params.owner,
-        actorUserId: params.actorUserId,
-      }),
-    }
-  );
-  const body = await parseJsonResponse<ApplyAutoRemediationResponse>(response);
+  const { response, body } = await postSecurityWorkerJson({
+    url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/apply-auto-remediation`,
+    service: 'remediation',
+    body: {
+      schemaVersion: 1,
+      commandId: params.commandId,
+      owner: params.owner,
+      actorUserId: params.actorUserId,
+    },
+  });
+  const workerBody = body as ApplyAutoRemediationResponse | undefined;
   if (!response.ok) {
-    throw new Error(body.error ?? `Apply auto-remediation failed with ${response.status}`);
+    if (response.status >= 500) {
+      throw ambiguousTransportError(`Apply auto-remediation failed with ${response.status}`);
+    }
+    logDefinitiveRejection('apply-auto-remediation', response.status, body);
+    throw definitiveRejectionError(response.status);
   }
-  if (body.success !== true || body.accepted !== true || body.commandId !== params.commandId) {
-    throw new Error('Security remediation Worker returned an invalid command response');
+  if (
+    workerBody?.success !== true ||
+    workerBody?.accepted !== true ||
+    workerBody.commandId !== params.commandId
+  ) {
+    throw ambiguousTransportError('Security remediation Worker returned an unexpected response');
   }
-  return { queued: true, commandId: body.commandId };
+  return { queued: true, commandId: workerBody.commandId };
 }

@@ -1,0 +1,167 @@
+/**
+ * Pure bootstrap routing decision, extracted from the inline if-chain in
+ * `_layout.tsx`'s auth effect. Consumed by BOTH the routing effect and the
+ * render gating derivations. Keep in lockstep with that effect — do not
+ * refactor either in isolation.
+ */
+
+type BootstrapDecisionTag =
+  | 'settle-language-error'
+  | 'wait-loading'
+  | 'redirect-force-update'
+  | 'settle-force-update'
+  | 'exit-force-update'
+  | 'settle-restore-error'
+  | 'settle-login'
+  | 'redirect-login'
+  | 'settle-user-error'
+  | 'settle-consent-error'
+  | 'wait-user-consent'
+  | 'settle-consent'
+  | 'redirect-consent'
+  | 'redirect-app'
+  | 'settle-app';
+
+export type BootstrapDecisionInput = {
+  isLoading: boolean;
+  updateRequired: boolean;
+  inForceUpdate: boolean;
+  inAuthGroup: boolean;
+  hasToken: boolean;
+  userIdLoading: boolean;
+  userIdError: boolean;
+  consentCheckError: boolean;
+  consentChecked: boolean;
+  needsConsent: boolean;
+  onConsentRoute: boolean;
+  onConsentReviewRoute: boolean;
+  /** A legal document screen. The consent surfaces open it, so while consent is
+   *  still needed it counts as a consent route: the reader has to be able to
+   *  read the policy before deciding. */
+  onLegalRoute: boolean;
+  languageReloadFailed: boolean;
+  /** Every retried startup credential read failed: the stored session could
+   *  not be read, so it is not known to be gone. */
+  restoreFailed: boolean;
+};
+
+export type BootstrapDecision = {
+  tag: BootstrapDecisionTag;
+  hasUserBootstrapError: boolean;
+  hasConsentBootstrapError: boolean;
+  hasLanguageReloadError: boolean;
+  hasRestoreError: boolean;
+  hasBootstrapError: boolean;
+  hidden: boolean;
+};
+
+// Order mirrors the auth effect's if-chain exactly: earlier branches win.
+function resolveBootstrapTag(input: BootstrapDecisionInput): BootstrapDecisionTag {
+  if (input.languageReloadFailed) {
+    return 'settle-language-error';
+  }
+  if (input.isLoading) {
+    return 'wait-loading';
+  }
+  if (input.updateRequired) {
+    return input.inForceUpdate ? 'settle-force-update' : 'redirect-force-update';
+  }
+  if (input.inForceUpdate) {
+    return 'exit-force-update';
+  }
+  // Ahead of the login branch on purpose: a failed credential read leaves
+  // `hasToken` false, so `redirect-login` must not fire under the error
+  // screen and route a still-signed-in person to login.
+  if (input.restoreFailed) {
+    return 'settle-restore-error';
+  }
+  if (!input.hasToken) {
+    return input.inAuthGroup ? 'settle-login' : 'redirect-login';
+  }
+  if (input.userIdError) {
+    return 'settle-user-error';
+  }
+  if (input.consentCheckError) {
+    return 'settle-consent-error';
+  }
+  if (input.userIdLoading || !input.consentChecked) {
+    return 'wait-user-consent';
+  }
+  if (input.needsConsent) {
+    // A legal document opened from the consent card must survive the gate: the
+    // card reads the policy before the decision, and redirecting it back to the
+    // card made the link look dead.
+    return input.onConsentRoute || input.onLegalRoute ? 'settle-consent' : 'redirect-consent';
+  }
+  if ((input.onConsentRoute && !input.onConsentReviewRoute) || input.inAuthGroup) {
+    return 'redirect-app';
+  }
+  return 'settle-app';
+}
+
+/**
+ * Whether the tree needs the loading surface painted over it.
+ *
+ * `hidden` is true during the initial launch too, but the native splash and
+ * `AnimatedSplashOverlay` cover that window. Once startup has settled (the
+ * splash has handed over), a hidden tree is an exposed empty background: the
+ * post-sign-in redirect/consent window is the reported case
+ * (app-blank-after-oauth). `startupFinished` is the splash handover signal, so
+ * the surface is only requested for the windows the splash no longer covers.
+ *
+ * `signingOut` covers the teardown before that redirect: the session revoke,
+ * push unregister and credential deletes run over the network for seconds,
+ * while the token — and so the whole signed-in tree — is still published. The
+ * screen being left is already stale (the account is being revoked) and the
+ * window ended on a bare background or the previous screen (explorer
+ * signout-loading), so the wait surface owns it until the login screen mounts.
+ */
+export function shouldShowBootstrapLoading(input: {
+  readonly startupFinished: boolean;
+  readonly hidden: boolean;
+  readonly signingOut: boolean;
+}): boolean {
+  return input.startupFinished && (input.hidden || input.signingOut);
+}
+
+export function resolveBootstrapDecision(input: BootstrapDecisionInput): BootstrapDecision {
+  const hasUserBootstrapError = input.hasToken && input.userIdError;
+  const hasConsentBootstrapError = input.hasToken && input.consentCheckError;
+  const hasLanguageReloadError = input.languageReloadFailed;
+  const hasRestoreError = input.restoreFailed;
+  const hasBootstrapError =
+    hasUserBootstrapError || hasConsentBootstrapError || hasLanguageReloadError || hasRestoreError;
+  const consentLoading =
+    input.hasToken &&
+    !input.consentChecked &&
+    !input.inAuthGroup &&
+    !input.inForceUpdate &&
+    !input.onConsentRoute &&
+    !input.onLegalRoute;
+  const needsForceUpdate = input.updateRequired && !input.inForceUpdate;
+  const showingForceUpdate = input.updateRequired && input.inForceUpdate;
+  const needsAuth = !input.hasToken && !input.inAuthGroup;
+  const needsAppRedirect = input.hasToken && input.inAuthGroup;
+  const needsConsentRedirect =
+    input.consentChecked && input.needsConsent && !input.onConsentRoute && !input.onLegalRoute;
+  const needsRedirect =
+    !input.isLoading &&
+    (needsForceUpdate ||
+      (!showingForceUpdate && (needsAuth || needsAppRedirect || needsConsentRedirect)));
+  const hidden =
+    !hasLanguageReloadError &&
+    !hasRestoreError &&
+    !hasUserBootstrapError &&
+    !hasConsentBootstrapError &&
+    (input.isLoading || needsRedirect || consentLoading);
+
+  return {
+    tag: resolveBootstrapTag(input),
+    hasUserBootstrapError,
+    hasConsentBootstrapError,
+    hasLanguageReloadError,
+    hasRestoreError,
+    hasBootstrapError,
+    hidden,
+  };
+}

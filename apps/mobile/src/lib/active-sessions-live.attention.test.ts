@@ -84,23 +84,146 @@ describe('sticky attention on snapshot / heartbeat merge', () => {
 describe('applySessionStatusUpdated', () => {
   it('applies a transition out of attention', () => {
     const current = [makeCached({ id: 'a', status: 'question' })];
-    expect(applySessionStatusUpdated(current, 'a', 'idle')[0]?.status).toBe('idle');
+    expect(applySessionStatusUpdated(current, { sessionId: 'a', status: 'idle' })[0]?.status).toBe(
+      'idle'
+    );
   });
 
   it('applies a transition into attention', () => {
     const current = [makeCached({ id: 'a', status: 'busy' })];
-    expect(applySessionStatusUpdated(current, 'a', 'permission')[0]?.status).toBe('permission');
+    expect(
+      applySessionStatusUpdated(current, { sessionId: 'a', status: 'permission' })[0]?.status
+    ).toBe('permission');
   });
 
   it('ignores unknown session ids', () => {
     const current = [makeCached({ id: 'a', status: 'question' })];
-    const result = applySessionStatusUpdated(current, 'other', 'idle');
+    const result = applySessionStatusUpdated(current, { sessionId: 'other', status: 'idle' });
     expect(result).toEqual(current);
     expect(result[0]?.status).toBe('question');
   });
 
   it('accepts an empty status string to clear attention', () => {
     const current = [makeCached({ id: 'a', status: 'question' })];
-    expect(applySessionStatusUpdated(current, 'a', '')[0]?.status).toBe('');
+    expect(applySessionStatusUpdated(current, { sessionId: 'a', status: '' })[0]?.status).toBe('');
+  });
+
+  it('sets a scheduled wake time and clears it when the session leaves scheduled', () => {
+    const current = [makeCached({ id: 'a', status: 'idle' })];
+    const scheduled = applySessionStatusUpdated(current, {
+      sessionId: 'a',
+      status: 'scheduled',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    expect(scheduled[0]?.status).toBe('scheduled');
+    expect(scheduled[0]?.scheduledAt).toBe('2026-09-24T09:00:00.000Z');
+
+    const noTime = applySessionStatusUpdated(scheduled, { sessionId: 'a', status: 'scheduled' });
+    expect(noTime[0]?.status).toBe('scheduled');
+    expect(noTime[0]?.scheduledAt).toBeUndefined();
+
+    const busy = applySessionStatusUpdated(scheduled, { sessionId: 'a', status: 'busy' });
+    expect(busy[0]?.status).toBe('busy');
+    expect(busy[0]?.scheduledAt).toBeUndefined();
+  });
+
+  it('takes the transition time so the newest session does not wait for a poll', () => {
+    const current = [makeCached({ id: 'a', statusUpdatedAt: '2026-01-01T00:00:00.000Z' })];
+    const result = applySessionStatusUpdated(current, {
+      sessionId: 'a',
+      status: 'question',
+      statusUpdatedAt: '2026-01-02T00:00:00.000Z',
+    });
+    expect(result[0]?.statusUpdatedAt).toBe('2026-01-02T00:00:00.000Z');
+  });
+
+  it.each([
+    ['idle', 'question'],
+    ['busy', 'permission'],
+    ['question', 'permission'],
+    ['permission', 'idle'],
+  ])('drops the previous status time on an undated %s to %s transition', (status, nextStatus) => {
+    const current = [makeCached({ id: 'a', status, statusUpdatedAt: '2026-01-01T00:00:00.000Z' })];
+    const result = applySessionStatusUpdated(current, { sessionId: 'a', status: nextStatus });
+    expect(result[0]?.status).toBe(nextStatus);
+    expect(result[0]).not.toHaveProperty('statusUpdatedAt');
+  });
+
+  it('keeps the cached time and row for an undated same-status update', () => {
+    const current = [
+      makeCached({ id: 'a', status: 'question', statusUpdatedAt: '2026-01-01T00:00:00.000Z' }),
+    ];
+    const result = applySessionStatusUpdated(current, { sessionId: 'a', status: 'question' });
+    expect(result[0]).toBe(current[0]);
+    expect(result[0]?.statusUpdatedAt).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('keeps the same-status time when an undated update clears a scheduled wake time', () => {
+    const current = [
+      makeCached({
+        id: 'a',
+        status: 'scheduled',
+        scheduledAt: '2026-01-02T00:00:00.000Z',
+        statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    ];
+    const result = applySessionStatusUpdated(current, { sessionId: 'a', status: 'scheduled' });
+    expect(result[0]?.scheduledAt).toBeUndefined();
+    expect(result[0]?.statusUpdatedAt).toBe('2026-01-01T00:00:00.000Z');
+  });
+});
+
+describe('statusUpdatedAt through socket merges', () => {
+  it('keeps the status-change time through heartbeat and snapshot merges', () => {
+    // Socket rows never carry it; an unchanged status retains its known time.
+    const statusUpdatedAt = '2026-01-01T00:00:00.000Z';
+    const current = [makeCached({ id: 'a', statusUpdatedAt })];
+    const afterHeartbeat = mergeHeartbeatForActiveSessions(current, {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: 'running', title: 'A' }],
+    });
+    const afterSnapshot = mergeSnapshotForActiveSessions(current, [
+      { id: 'a', status: 'running', title: 'A', connectionId: 'c1' },
+    ]);
+    expect(afterHeartbeat[0]?.statusUpdatedAt).toBe(statusUpdatedAt);
+    expect(afterSnapshot[0]?.statusUpdatedAt).toBe(statusUpdatedAt);
+  });
+
+  it.each([
+    ['idle', 'question'],
+    ['busy', 'permission'],
+    ['idle', 'busy'],
+  ])('drops stale %s time when heartbeat and snapshot resolve to %s', (status, liveStatus) => {
+    const current = [makeCached({ id: 'a', status, statusUpdatedAt: '2026-01-01T00:00:00.000Z' })];
+    const afterHeartbeat = mergeHeartbeatForActiveSessions(current, {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: liveStatus, title: 'A' }],
+    });
+    const afterSnapshot = mergeSnapshotForActiveSessions(current, [
+      { id: 'a', status: liveStatus, title: 'A', connectionId: 'c1' },
+    ]);
+    for (const result of [afterHeartbeat, afterSnapshot]) {
+      expect(result[0]?.status).toBe(liveStatus);
+      expect(result[0]?.statusUpdatedAt).toBeUndefined();
+    }
+  });
+
+  it.each([
+    ['question', 'busy'],
+    ['permission', 'idle'],
+  ])('keeps held %s time when heartbeat and snapshot report %s', (status, liveStatus) => {
+    const statusUpdatedAt = '2026-01-01T00:00:00.000Z';
+    const current = [makeCached({ id: 'a', status, statusUpdatedAt })];
+    const afterHeartbeat = mergeHeartbeatForActiveSessions(current, {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: liveStatus, title: 'A' }],
+    });
+    const afterSnapshot = mergeSnapshotForActiveSessions(current, [
+      { id: 'a', status: liveStatus, title: 'A', connectionId: 'c1' },
+    ]);
+    for (const result of [afterHeartbeat, afterSnapshot]) {
+      expect(result[0]?.status).toBe(status);
+      expect(result[0]?.statusUpdatedAt).toBe(statusUpdatedAt);
+    }
   });
 });

@@ -1,7 +1,8 @@
 import { TRPCError } from '@trpc/server';
+import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 import { submitManualSecuritySync } from './manual-sync-client';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
   SECURITY_SYNC_WORKER_URL: 'https://security-sync.test',
 }));
@@ -137,6 +138,25 @@ describe('submitManualSecuritySync', () => {
     expect(captured).toBeInstanceOf(TRPCError);
     expect((captured as TRPCError).message).not.toContain('security-sync.test');
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('classifies a refused connection as a definitive pre-acceptance rejection', async () => {
+    mockFetch.mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      })
+    );
+
+    await expect(
+      submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      })
+    ).rejects.toMatchObject({
+      name: 'TRPCError',
+      code: 'PRECONDITION_FAILED',
+      message: 'Security service is unavailable',
+    });
   });
 
   it('throws a TRPCError when the response body is not valid JSON (e.g. gateway HTML)', async () => {
@@ -308,6 +328,41 @@ describe('submitManualSecuritySync', () => {
     expect((captured as TRPCError).message).not.toContain('security-sync.test');
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
   });
+
+  it('bounds the Worker call at the shared upstream budget when it never answers', async () => {
+    jest.useFakeTimers();
+    try {
+      // The platform errors a fetch (and its body) when the request signal
+      // aborts; emulate that so the bound behaves as in production.
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal;
+        return new Promise<Response>((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason))
+        );
+      });
+
+      let settled = false;
+      const outcome = submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      }).catch((error: unknown) => {
+        settled = true;
+        return error;
+      });
+
+      await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS - 1);
+      expect(settled).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      const error = await outcome;
+      expect(error).toBeInstanceOf(TRPCError);
+      expect((error as TRPCError).code).toBe('BAD_GATEWAY');
+      expect((error as TRPCError).message).not.toContain('security-sync.test');
+      expect((error as TRPCError).message).not.toContain('test-internal-secret');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('submitManualSecuritySync env configuration', () => {
@@ -317,7 +372,7 @@ describe('submitManualSecuritySync env configuration', () => {
 
   it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
     jest.resetModules();
-    jest.doMock('@/lib/config.server', () => ({
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
       INTERNAL_API_SECRET: 'test-internal-secret',
       SECURITY_SYNC_WORKER_URL: '',
     }));
@@ -340,7 +395,7 @@ describe('submitManualSecuritySync env configuration', () => {
 
   it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
     jest.resetModules();
-    jest.doMock('@/lib/config.server', () => ({
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
       INTERNAL_API_SECRET: '',
       SECURITY_SYNC_WORKER_URL: 'https://security-sync.test',
     }));

@@ -5,7 +5,7 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { catalogForVersion, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
 import {
   advanceDeletionGates,
@@ -13,39 +13,39 @@ import {
 } from '@/lib/user/deletion-queue/deletion-completion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcomes';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('deletion completion gates', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
   });
 
-  it('advances an email-only request to completed when teardowns and anonymize are not_applicable', async () => {
+  it('moves a v2 request to finalizing after teardown and anonymize succeed', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.InProgress);
-    await setStepsStatus(requestId, [...teardownStepKeys(), UserDeletionStepKey.Anonymize], {
+    await setStepsStatus(requestId, [...teardownStepKeys(2), UserDeletionStepKey.Anonymize], {
       status: UserDeletionStepStatus.NotApplicable,
     });
 
     await advanceDeletionGates(requestId);
 
     const request = await loadRequest(requestId);
-    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Finalizing);
     expect(request?.anonymized_at).toBeNull();
   });
 
-  it('completes a finalizing request after the last catalog task is persisted', async () => {
+  it('completes a finalizing v2 request after every catalog task is persisted', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
     await setStepsStatus(
       requestId,
-      catalogForVersion(1)
+      catalogForVersion(2)
         .map(entry => entry.stepKey)
-        .filter(key => key !== UserDeletionStepKey.Anonymize),
+        .filter(key => key !== UserDeletionStepKey.PylonContact),
       { status: UserDeletionStepStatus.NotApplicable }
     );
     const claimToken = crypto.randomUUID();
-    await setStepsStatus(requestId, [UserDeletionStepKey.Anonymize], {
+    await setStepsStatus(requestId, [UserDeletionStepKey.PylonContact], {
       status: UserDeletionStepStatus.Running,
       claim_token: claimToken,
       claimed_until: new Date(Date.now() + 60_000).toISOString(),
@@ -53,7 +53,7 @@ describe('deletion completion gates', () => {
 
     const persisted = await persistHandlerOutcome({
       requestId,
-      stepKey: UserDeletionStepKey.Anonymize,
+      stepKey: UserDeletionStepKey.PylonContact,
       claimToken,
       outcome: { kind: 'not_applicable' },
     });
@@ -63,12 +63,134 @@ describe('deletion completion gates', () => {
     expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
   });
 
+  it.each([
+    UserDeletionStepStatus.Pending,
+    UserDeletionStepStatus.RetryWait,
+    UserDeletionStepStatus.NeedsAttention,
+    UserDeletionStepStatus.Running,
+  ])('completes without waiting for a historical CSA row in %s status', async status => {
+    const requestId = await enqueueEmailOnly();
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2).map(entry => entry.stepKey),
+      { status: UserDeletionStepStatus.Succeeded }
+    );
+    const claimToken = status === UserDeletionStepStatus.Running ? crypto.randomUUID() : null;
+    const claimedUntil = claimToken ? new Date(Date.now() + 60_000).toISOString() : null;
+    await db.insert(user_deletion_steps).values({
+      request_id: requestId,
+      step_key: UserDeletionStepKey.CsaSupportDb,
+      status,
+      claim_token: claimToken,
+      claimed_until: claimedUntil,
+    });
+
+    await advanceDeletionGates(requestId);
+
+    const request = await loadRequest(requestId);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.target_email).toBeNull();
+    const [legacyStep] = await db
+      .select()
+      .from(user_deletion_steps)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.CsaSupportDb)
+        )
+      );
+    expect(legacyStep).toMatchObject({ status, claim_token: claimToken });
+    if (claimedUntil) {
+      expect(new Date(legacyStep.claimed_until ?? '').toISOString()).toBe(claimedUntil);
+    }
+  });
+
+  it('does not scrub or complete a new v2 request while completion email is pending', async () => {
+    const requestId = await enqueueEmailOnly();
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2)
+        .map(entry => entry.stepKey)
+        .filter(key => key !== UserDeletionStepKey.CompletionEmail),
+      { status: UserDeletionStepStatus.NotApplicable }
+    );
+
+    await advanceDeletionGates(requestId);
+
+    const blocked = await loadRequest(requestId);
+    expect(blocked?.status).toBe(UserDeletionRequestStatus.Finalizing);
+    expect(blocked?.target_email).toBeTruthy();
+
+    await setStepsStatus(requestId, [UserDeletionStepKey.CompletionEmail], {
+      status: UserDeletionStepStatus.NotApplicable,
+    });
+    await advanceDeletionGates(requestId);
+
+    const completed = await loadRequest(requestId);
+    expect(completed?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(completed?.target_email).toBeNull();
+  });
+
+  it('completes a pre-deployment v2 request without a completion email row', async () => {
+    const requestId = await enqueueEmailOnly();
+    await db
+      .delete(user_deletion_steps)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.CompletionEmail)
+        )
+      );
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2)
+        .map(entry => entry.stepKey)
+        .filter(key => key !== UserDeletionStepKey.CompletionEmail),
+      { status: UserDeletionStepStatus.Succeeded }
+    );
+
+    await advanceDeletionGates(requestId);
+
+    const request = await loadRequest(requestId);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.target_email).toBeNull();
+  });
+
+  it('does not scrub or complete a request missing a required finalization task', async () => {
+    const requestId = await enqueueEmailOnly();
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2).map(entry => entry.stepKey),
+      { status: UserDeletionStepStatus.Succeeded }
+    );
+    await db
+      .delete(user_deletion_steps)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.PylonContact)
+        )
+      );
+
+    await expect(advanceDeletionGates(requestId)).rejects.toThrow(
+      `missing required step ${UserDeletionStepKey.PylonContact}`
+    );
+
+    const request = await loadRequest(requestId);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Finalizing);
+    expect(request?.target_email).toBeTruthy();
+  });
+
   it('recovers a stuck finalizing request via the unclaimable sweep', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
     await setStepsStatus(
       requestId,
-      catalogForVersion(1).map(entry => entry.stepKey),
+      catalogForVersion(2).map(entry => entry.stepKey),
       { status: UserDeletionStepStatus.Succeeded }
     );
 
@@ -78,17 +200,17 @@ describe('deletion completion gates', () => {
     expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
   });
 
-  it('recovers an email-only anonymize not_applicable persist via the sweep', async () => {
+  it('recovers an in-progress v2 request to finalizing via the sweep', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.InProgress);
-    await setStepsStatus(requestId, [...teardownStepKeys(), UserDeletionStepKey.Anonymize], {
+    await setStepsStatus(requestId, [...teardownStepKeys(2), UserDeletionStepKey.Anonymize], {
       status: UserDeletionStepStatus.NotApplicable,
     });
 
     await sweepUnclaimableDeletionGates(Date.now() + 40_000);
 
     const request = await loadRequest(requestId);
-    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Finalizing);
   });
 });
 

@@ -1,10 +1,12 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useQuery } from '@tanstack/react-query';
 import type {
   GuiCreditCategoryStatistics,
   CreditCategoriesApiResponse,
-} from '@/lib/PromoCreditCategoryConfig';
+} from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 
 interface CreditCategoryStatsProps {
   creditCategoryKey: string;
@@ -13,7 +15,7 @@ interface CreditCategoryStatsProps {
 const fetchCreditCategoryStats = async (
   creditCategoryKey: string
 ): Promise<GuiCreditCategoryStatistics | null> => {
-  const response = await fetch(
+  const response = await adminFetch(
     `/admin/api/credit-categories?key=${encodeURIComponent(creditCategoryKey)}`
   );
 

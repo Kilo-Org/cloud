@@ -1,22 +1,32 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
-import { ScrollView, Switch, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   emailsError,
+  emailsErrorMessages,
   parseEmails,
   parseThreshold,
+  saveErrorCopy,
   thresholdError,
+  thresholdErrorMessages,
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { formatNumber } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -33,12 +43,15 @@ type LowBalanceAlertFormProps = Readonly<{
 
 function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const { email: myEmail } = useCurrentUserId();
 
   const [enabled, setEnabled] = useState(settings.minimum_balance !== undefined);
   const thresholdRef = useRef(
-    settings.minimum_balance != null ? String(settings.minimum_balance) : ''
+    settings.minimum_balance == null
+      ? ''
+      : formatNumber(settings.minimum_balance, i18n.language, { useGrouping: false })
   );
   // Default to the signer's own email when no alert email is stored yet, so
   // the field starts pre-filled with a real, savable value rather than a
@@ -52,10 +65,33 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       (thresholdError(thresholdRef.current) == null && emailsError(emailsRef.current) == null)
   );
 
+  // The field's own rule runs on blur, and on change only once it has
+  // something to say. Save follows every keystroke, so an amount pasted above
+  // the ceiling would otherwise sit under a disabled Save with nothing under the
+  // field explaining it. Seeding the same rule on change keeps the sentence with
+  // the draft; an empty field still waits for blur, so a form that opens empty
+  // does not greet the reader with a required error.
+  const fieldThresholdError = (value: string) =>
+    value.trim() === '' ? null : thresholdError(value);
+  const [draftThresholdError, setDraftThresholdError] = useState(() =>
+    fieldThresholdError(thresholdRef.current)
+  );
+
   const revalidate = (nextEnabled: boolean, thresholdValue: string, emailsValue: string) => {
     setCanSave(
       !nextEnabled || (thresholdError(thresholdValue) == null && emailsError(emailsValue) == null)
     );
+  };
+
+  // A rejected save belongs to the field that caused it; correcting either
+  // field drops the rejection so Save no longer sits under a stale sentence.
+  const saveError = mutations.updateMinimumBalanceAlert.isError
+    ? saveErrorCopy(mutations.updateMinimumBalanceAlert.error)
+    : null;
+  const clearSaveError = () => {
+    if (mutations.updateMinimumBalanceAlert.isError) {
+      mutations.updateMinimumBalanceAlert.reset();
+    }
   };
 
   const onSave = () => {
@@ -73,7 +109,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       },
       {
         onSuccess: () => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
           router.back();
         },
       }
@@ -83,14 +119,27 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">Enabled</Text>
+        {/* The slot wraps the label and carries the gutter (`pe-3`) instead of
+            the label, so a wrapped catalog line stays clear of the switch's
+            own 44 dp box — the shape sibling toggle rows use. The label keeps
+            the hidden-label props: hiding the wrapper's own node would leave
+            the inner text in the tree (`no` hides one view,
+            `no-hide-descendants` hides a subtree), so the props sit on the
+            text itself. The switch below already names the row. */}
+        <View className="min-w-0 flex-1 pe-3">
+          <Text {...HIDDEN_LABEL_PROPS} className="text-sm font-medium">
+            {t('organization.lowBalanceAlert.enableA11y')}
+          </Text>
+        </View>
         <Switch
-          accessibilityLabel="Enable low balance alert"
+          accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}
           onValueChange={value => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             setEnabled(value);
+            setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
             revalidate(value, thresholdRef.current, emailsRef.current);
+            clearSaveError();
           }}
         />
       </View>
@@ -98,49 +147,58 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       {enabled && (
         <>
           <FormField
-            label="Alert below (USD)"
+            label={t('organization.lowBalanceAlert.thresholdLabel')}
             required
-            placeholder="10.00"
+            placeholder={t('organization.lowBalanceAlert.thresholdPlaceholder')}
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            reserveErrorMessages={thresholdErrorMessages()}
+            error={draftThresholdError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
+              setDraftThresholdError(fieldThresholdError(value));
               revalidate(enabled, value, emailsRef.current);
+              clearSaveError();
             }}
           />
 
           <View className="gap-1.5">
             <FormField
-              label="Notify emails"
+              label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
-              placeholder="name@company.com"
+              validateWhileTyping
+              placeholder={t('organization.inviteMember.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
               validate={emailsError}
+              reserveErrorMessages={emailsErrorMessages()}
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);
+                clearSaveError();
               }}
             />
             <Text variant="muted" className="text-xs">
-              Separate multiple emails with commas.
+              {t('organization.lowBalanceAlert.separateEmailsHint')}
             </Text>
+            <AccessibleStatus
+              message={saveError?.field === 'emails' ? saveError.message : null}
+              className="text-sm"
+            />
           </View>
         </>
       )}
 
       {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
           P2), so AccessibleStatus is the single announcement owner here: one
-          announcement per platform, visuals preserved (tone error). */}
+          announcement per platform, visuals preserved (tone error). A rejected
+          save names itself in localized copy — the server's schema message is
+          a JSON array, never a sentence a person should read. */}
       <AccessibleStatus
-        message={
-          mutations.updateMinimumBalanceAlert.isError
-            ? mutations.updateMinimumBalanceAlert.error.message
-            : null
-        }
+        message={saveError?.field === 'form' ? saveError.message : null}
         className="text-sm"
       />
 
@@ -149,13 +207,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         loading={mutations.updateMinimumBalanceAlert.isPending}
         onPress={onSave}
       >
-        <Text className="text-primary-foreground">Save</Text>
+        <Text>{t('common.save')}</Text>
       </Button>
     </>
   );
 }
 
 export function LowBalanceAlertSheet() {
+  const { t } = useTranslation();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
 
@@ -166,7 +225,10 @@ export function LowBalanceAlertSheet() {
   // forever) falling through to OrganizationBoundary below.
   if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      >
         <Skeleton className="h-[52px] rounded-lg" />
         <View className="gap-1.5">
           <Skeleton className="h-3.5 w-28 rounded" />
@@ -177,44 +239,50 @@ export function LowBalanceAlertSheet() {
           <Skeleton className="h-11 rounded-md" />
         </View>
         <Skeleton className="h-11 rounded-md" />
-      </ScrollView>
+      </SheetScrollView>
     );
   }
   if (organizationId == null || org == null) {
     return <OrganizationBoundary />;
   }
   if (!isMoneyRole(role)) {
-    return <PermissionDenied description="You don't have permission to manage billing alerts." />;
+    return <PermissionDenied description={t('organization.lowBalanceAlert.permissionDenied')} />;
   }
 
-  let body: ReactNode = null;
-  if (orgWithMembers.data) {
-    body = (
-      <LowBalanceAlertForm
-        organizationId={organizationId}
-        settings={orgWithMembers.data.settings}
-      />
-    );
-  } else if (orgWithMembers.isError) {
-    body = (
-      <QueryError
-        onRetry={() => void orgWithMembers.refetch()}
-        isRetrying={orgWithMembers.isFetching}
-        placement="top"
-      />
+  if (orgWithMembers.isError && !orgWithMembers.data) {
+    return (
+      <>
+        <View collapsable={false} className="bg-background px-6 pt-4">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            {t('organization.lowBalanceAlert.title')}
+          </Text>
+        </View>
+        <QueryError
+          className="bg-background"
+          onRetry={() => void orgWithMembers.refetch()}
+          isRetrying={orgWithMembers.isFetching}
+        />
+      </>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
+    <SheetScrollView
+      className="flex-1 bg-background"
+      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-center text-lg font-semibold text-foreground">Low balance alert</Text>
+      <Text className="text-center text-lg font-semibold text-foreground">
+        {t('organization.lowBalanceAlert.title')}
+      </Text>
 
-      {body}
-    </ScrollView>
+      {orgWithMembers.data && (
+        <LowBalanceAlertForm
+          organizationId={organizationId}
+          settings={orgWithMembers.data.settings}
+        />
+      )}
+    </SheetScrollView>
   );
 }

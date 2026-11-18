@@ -2,17 +2,30 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET, SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { TRPCError } from '@trpc/server';
+import {
+  INTERNAL_API_SECRET,
+  SESSION_INGEST_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
+import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import {
+  toSharedTranscriptMessages,
+  type SharedTranscriptMessage,
+} from '@/lib/shared-session-transcript';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
 import {
   kiloSdkMessageHistorySchema,
+  sessionDiffReadSchema,
+  sessionShareOptionsSchema,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+  WORKSPACE_DELETING,
+  WORKSPACE_IDENTITY_CONFLICT,
+  type SessionShareOptions,
   type KiloSdkMessageHistory,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
-
-// ---------------------------------------------------------------------------
-// Zod schema (mirrors cloudflare-session-ingest SharedSessionSnapshotSchema)
-// ---------------------------------------------------------------------------
 
 // Mirrors SharedSessionSnapshotSchema from cloudflare-session-ingest/src/util/share-output.ts.
 // Kept in sync manually (same pattern as cloud-agent-client.ts).
@@ -44,10 +57,6 @@ const SessionSnapshotSchema = z.object({
   ),
 });
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /**
  * Snapshot returned by the session-ingest export endpoint.
  * Contains the final compacted state of all messages — NOT streaming deltas.
@@ -56,9 +65,96 @@ export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 
 export type SessionMessage = SessionSnapshot['messages'][number];
 
-// ---------------------------------------------------------------------------
-// Fetch
-// ---------------------------------------------------------------------------
+/**
+ * Redact a request URL to an allow-listed route label for logging: the
+ * pathname with its dynamic segment (session id or share token) replaced by a
+ * placeholder, and never the query string.
+ *
+ * The route marker is matched anywhere in the pathname, not anchored to its
+ * start: every call site concatenates `SESSION_INGEST_WORKER_URL` as-is
+ * (`config.server.ts:479` returns the env value unchanged), so a configured
+ * trailing slash or path prefix yields `//api/session/<id>/...` or
+ * `/prefix/api/session/<id>/...`. Anchoring here would let the dynamic segment
+ * through unredacted. The label is rebuilt from the matched route, so the
+ * configured base — including any path prefix — never reaches the log. Anything
+ * that is not an allow-listed route shape falls back to a constant, so an
+ * unrecognised path can never emit a session id or share token.
+ */
+function redactedRouteForLog(requestUrl: string): string {
+  try {
+    const pathname = new URL(requestUrl).pathname;
+    const sessionRoute = pathname.match(/\/api\/session\/[^/]+/);
+    if (sessionRoute) {
+      return `/api/session/:sessionId${pathname.slice(
+        (sessionRoute.index ?? 0) + sessionRoute[0].length
+      )}`;
+    }
+    const shareRoute = pathname.match(/\/session\/[^/]+/);
+    if (shareRoute) {
+      return `/session/:shareToken${pathname.slice(
+        (shareRoute.index ?? 0) + shareRoute[0].length
+      )}`;
+    }
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Bound one session-ingest worker fetch with the shared control-plane upstream
+ * budget.
+ *
+ * A worker that never answers rejects with `ServiceFetchTimeoutError` inside
+ * `CONTROL_PLANE_UPSTREAM_BUDGET_MS` (strictly under the mobile app's 15s
+ * `CONTROL_PLANE_DEADLINE_MS`) instead of holding the calling control-plane
+ * procedure open until the client deadline fires or the gateway answers 504.
+ * Call sites propagate the timeout to their router, and
+ * `sessionIngestTrpcError` maps it to `SERVICE_UNAVAILABLE`: a stalled
+ * upstream is retryable on the client, never reported as a defect here. Other
+ * transport failures keep `INTERNAL_SERVER_ERROR`.
+ *
+ * On a budget expiry exactly one allow-listed line is emitted. It carries the
+ * redacted route, the elapsed time and a fixed outcome — never the
+ * Authorization header, the internal-service token, the session id, the share
+ * token or a query string.
+ */
+async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): Promise<Response> {
+  const startedAt = Date.now();
+  try {
+    return await fetchWithinBudget(requestUrl, init);
+  } catch (error) {
+    if (error instanceof ServiceFetchTimeoutError) {
+      console.log(
+        JSON.stringify({
+          type: 'session_ingest_timeout',
+          route: redactedRouteForLog(requestUrl),
+          durationMs: Date.now() - startedAt,
+          outcome: 'timeout',
+        })
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * The tRPC error one session-ingest call failure becomes.
+ *
+ * A budget expiry is an upstream that did not answer in time, not a fault in
+ * this control plane, so it must stay retryable: `SERVICE_UNAVAILABLE`. Every
+ * other failure keeps the `INTERNAL_SERVER_ERROR` contract the routers already
+ * publish for an unexpected worker answer. `cause` is preserved so the
+ * original timeout stays attributable in logs and Sentry.
+ */
+export function sessionIngestTrpcError(message: string, cause: unknown): TRPCError {
+  return new TRPCError({
+    code:
+      cause instanceof ServiceFetchTimeoutError ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR',
+    message,
+    cause,
+  });
+}
 
 /**
  * Fetch the session snapshot from the session-ingest service.
@@ -75,10 +171,13 @@ export async function fetchSessionSnapshot(
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/export`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -113,14 +212,13 @@ export async function fetchSessionMessages(
   return snapshot?.messages ?? null;
 }
 
-// ---------------------------------------------------------------------------
-// Paginated authorized session-message history
-// ---------------------------------------------------------------------------
-
 const SessionMessagesPageResponseSchema = z.object({
   success: z.literal(true),
   kiloSessionId: z.string().min(1),
   history: kiloSdkMessageHistorySchema.nullable(),
+  // Session-level metadata (records keyed by `kilo.<feature>`, e.g.
+  // `kilo.goal`). Optional so an older worker response stays parseable.
+  sessionMetadata: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 export type SessionMessagesPageOptions = {
@@ -133,6 +231,8 @@ export type SessionMessagesPageOptions = {
 export type SessionMessagesPageResult = {
   kiloSessionId: string;
   history: KiloSdkMessageHistory | null;
+  /** Session-level metadata from the ingest snapshot, when available. */
+  sessionMetadata?: Record<string, unknown> | null;
   watermarkEventId?: number | null;
 };
 
@@ -167,8 +267,11 @@ export async function fetchSessionMessagesPage(
     query ? `?${query}` : ''
   }`;
 
-  const token = generateInternalServiceToken(userId);
-  const response = await fetch(url, {
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
+  const response = await fetchSessionIngest(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -202,17 +305,81 @@ export async function fetchSessionMessagesPage(
     throw error;
   }
 
-  return { kiloSessionId: parsed.data.kiloSessionId, history: parsed.data.history };
+  return {
+    kiloSessionId: parsed.data.kiloSessionId,
+    history: parsed.data.history,
+    ...(parsed.data.sessionMetadata === undefined
+      ? {}
+      : { sessionMetadata: parsed.data.sessionMetadata }),
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Share
-// ---------------------------------------------------------------------------
+const SessionDiffResponseSchema = z.object({
+  success: z.literal(true),
+  diff: sessionDiffReadSchema,
+});
+
+/**
+ * Fetch the stored cumulative diff for a Kilo session the user can read.
+ * Returns `null` for sessions the user cannot read.
+ */
+export async function fetchSessionDiff(
+  sessionId: string,
+  userId: string
+): Promise<SessionDiffRead | null> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
+  const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/diff`;
+  const response = await fetchSessionIngest(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    const error = new Error(
+      `Session ingest diff failed: ${response.status} ${response.statusText}${
+        errorText ? ` - ${errorText}` : ''
+      }`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'diff' },
+      extra: { sessionId, status: response.status },
+    });
+    throw error;
+  }
+
+  const parsed = SessionDiffResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    const error = new Error(
+      `Session ingest diff returned an unexpected response: ${parsed.error.message}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'diff' },
+      extra: { sessionId, issues: parsed.error.issues },
+    });
+    throw error;
+  }
+  return parsed.data.diff;
+}
 
 const ShareResponseSchema = z
   .object({
     success: z.literal(true),
     share_token: z.string().min(1),
+    /* The capability the worker wrote. Optional because a worker older than this
+       client answers with the token alone; the caller then keeps today's
+       behaviour, which is showing the link without rotation detection. */
+    public_id: z.string().min(1).optional(),
   })
   .strict();
 
@@ -221,32 +388,54 @@ const SharedSessionMetadataResponseSchema = z
     success: z.literal(true),
     title: z.string().nullable(),
     owner_name: z.string().nullable(),
+    git_url: z.string().nullable().optional(),
+    git_branch: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
   })
   .strict();
+
+export class SessionShareTooLargeError extends Error {
+  constructor() {
+    super('Session details are too large to share. Existing links are unchanged.');
+    this.name = 'SessionShareTooLargeError';
+  }
+}
 
 /**
  * Share a session via the session-ingest worker.
  *
- * Calls POST /session/:sessionId/share which is idempotent — if the session
- * already has an active share generation, the existing one is reused.
+ * Calls POST /session/:sessionId/share, which rotates the public capability.
+ * Each call issues a fresh share generation and invalidates the previous link.
  *
- * @returns The opaque JWT used to construct the /s/{share_token} share URL.
+ * @returns The opaque JWT used to construct the /s/{share_token} share URL, and
+ *   the capability the worker created, which is what tells this link from a
+ *   later one. `public_id` is null only while a worker older than this client
+ *   answers.
  */
 export async function shareSession(
   sessionId: string,
-  userId: string
-): Promise<{ share_token: string }> {
+  userId: string,
+  options: Partial<SessionShareOptions> = {}
+): Promise<{ share_token: string; public_id: string | null }> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/share`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(sessionShareOptionsSchema.parse(options)),
   });
+
+  if (response.status === 413) {
+    throw new SessionShareTooLargeError();
+  }
 
   if (response.status === 404) {
     throw new Error('Session not found');
@@ -265,7 +454,7 @@ export async function shareSession(
   }
 
   const body = ShareResponseSchema.parse(await response.json());
-  return { share_token: body.share_token };
+  return { share_token: body.share_token, public_id: body.public_id ?? null };
 }
 
 /**
@@ -279,10 +468,13 @@ export async function unshareSession(sessionId: string, userId: string): Promise
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/unshare`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -304,6 +496,14 @@ export async function unshareSession(sessionId: string, userId: string): Promise
   }
 }
 
+export type SharedSessionMetadata = {
+  title: string | null;
+  ownerName: string | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  createdAt: string | null;
+};
+
 /**
  * Resolve the metadata for a public session share token without downloading
  * the session snapshot. The token is intentionally never included in errors
@@ -311,13 +511,13 @@ export async function unshareSession(sessionId: string, userId: string): Promise
  */
 export async function fetchSharedSessionMetadata(
   shareToken: string
-): Promise<{ title: string | null; ownerName: string | null } | null> {
+): Promise<SharedSessionMetadata | null> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
   const url = `${SESSION_INGEST_WORKER_URL}/session/${encodeURIComponent(shareToken)}/metadata`;
-  const response = await fetch(url, { cache: 'no-store' });
+  const response = await fetchSessionIngest(url, { cache: 'no-store' });
 
   if (response.status === 404) {
     return null;
@@ -346,12 +546,110 @@ export async function fetchSharedSessionMetadata(
     throw error;
   }
 
-  return { title: parsed.data.title, ownerName: parsed.data.owner_name };
+  return {
+    title: parsed.data.title,
+    ownerName: parsed.data.owner_name,
+    gitUrl: parsed.data.git_url ?? null,
+    gitBranch: parsed.data.git_branch ?? null,
+    createdAt: parsed.data.created_at ?? null,
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Authorization cache invalidation
-// ---------------------------------------------------------------------------
+/**
+ * Fetch the public session snapshot for a share token. The token is
+ * intentionally never included in errors or Sentry context.
+ */
+export async function fetchSharedSessionSnapshot(
+  shareToken: string
+): Promise<SessionSnapshot | null> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+
+  const url = `${SESSION_INGEST_WORKER_URL}/session/${encodeURIComponent(shareToken)}`;
+  const response = await fetchSessionIngest(url, { cache: 'no-store' });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      `Session ingest snapshot failed: ${response.status} ${response.statusText}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+      extra: { status: response.status },
+    });
+    throw error;
+  }
+
+  const parsed = SessionSnapshotSchema.safeParse(await response.json().catch(() => undefined));
+  if (!parsed.success) {
+    const error = new Error('Session ingest snapshot response was malformed');
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+      extra: { status: response.status, issues: parsed.error.issues },
+    });
+    throw error;
+  }
+
+  return parsed.data;
+}
+
+/** A public share as the read-only viewer needs it: who shared it, and what it says. */
+export type SharedSessionRead = {
+  metadata: SharedSessionMetadata;
+  messages: SharedTranscriptMessage[];
+  /**
+   * The link is valid but the snapshot behind it could not be read. The viewer
+   * still shows the session's identity and says the transcript is unavailable,
+   * exactly like the public web page does.
+   */
+  transcriptUnavailable: boolean;
+};
+
+/**
+ * Read a publicly shared session by its share token.
+ *
+ * Returns null when the token names no live share — expired, revoked, rotated
+ * out by a newer link, or never valid. That is the one answer the viewer treats
+ * as terminal, because retrying it cannot succeed.
+ *
+ * The snapshot is validated into renderable messages here, so every client of
+ * this capability receives the same transcript the public web page shows. The
+ * token is intentionally never included in errors or Sentry context.
+ */
+export async function fetchSharedSession(shareToken: string): Promise<SharedSessionRead | null> {
+  // Both reads are capped by the same upstream budget, and the control-plane
+  // procedure budget is only slightly larger, so issuing them in sequence can
+  // fail a link that is valid. The public page reads them together too. A
+  // snapshot rejection is folded into a settled result so a dead link still
+  // answers null below rather than surfacing the snapshot's error.
+  const [metadata, snapshotRead] = await Promise.all([
+    fetchSharedSessionMetadata(shareToken),
+    fetchSharedSessionSnapshot(shareToken).then(
+      snapshot => ({ ok: true as const, snapshot }),
+      () => ({ ok: false as const, snapshot: null })
+    ),
+  ]);
+  if (!metadata) {
+    return null;
+  }
+
+  if (!snapshotRead.ok || snapshotRead.snapshot === null) {
+    // A valid capability whose snapshot read failed is not a dead link: the
+    // metadata above resolved, so the viewer keeps the session and reports the
+    // transcript as unavailable rather than claiming the link expired.
+    return { metadata, messages: [], transcriptUnavailable: true };
+  }
+
+  return {
+    metadata,
+    messages: toSharedTranscriptMessages(snapshotRead.snapshot.messages),
+    transcriptUnavailable: false,
+  };
+}
 
 export async function invalidateOrganizationSessionAccess(
   kiloUserId: string,
@@ -364,15 +662,21 @@ export async function invalidateOrganizationSessionAccess(
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
 
-  const response = await fetch(`${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'X-Internal-Secret': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify({ kiloUserId, organizationId }),
-    signal: AbortSignal.timeout(30_000),
-  });
+  const response = await fetchSessionIngest(
+    `${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-Internal-Secret': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify({ kiloUserId, organizationId }),
+      // Caller deadline, composed with the shared upstream budget by
+      // `fetchWithinBudget`; the shorter budget wins, so a hung worker cannot
+      // hold this past `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+      signal: AbortSignal.timeout(30_000),
+    }
+  );
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
@@ -387,10 +691,6 @@ export async function invalidateOrganizationSessionAccess(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Delete
-// ---------------------------------------------------------------------------
-
 /**
  * Delete a session via the session-ingest worker.
  *
@@ -402,10 +702,13 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -413,6 +716,27 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
   if (response.status === 404) {
     // Session already deleted or was never ingested — treat as success (idempotent delete).
     return;
+  }
+
+  if (response.status === 409) {
+    const parsed = z
+      .object({
+        error: z.enum([
+          WORKSPACE_REQUIRES_ROOT_SESSION,
+          WORKSPACE_DELETING,
+          WORKSPACE_IDENTITY_CONFLICT,
+          'worktree_deleting',
+        ]),
+      })
+      .safeParse(
+        await response
+          .clone()
+          .json()
+          .catch(() => null)
+      );
+    if (parsed.success) {
+      throw new TRPCError({ code: 'CONFLICT', message: parsed.data.error });
+    }
   }
 
   if (!response.ok) {

@@ -13,8 +13,10 @@ import PersonalAccountDisabledToggle from './PersonalAccountDisabledToggle';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
-import { Info, SquareArrowOutUpRight, Webhook } from 'lucide-react';
+import { AlertTriangle, Info, SquareArrowOutUpRight, Webhook } from 'lucide-react';
 import { createHash } from 'crypto';
+import { getProviderById } from '@/lib/auth/provider-metadata';
+import { Badge } from '@/components/ui/badge';
 
 function getGravatarUrl(email: string, size: number = 80): string {
   const hash = createHash('md5').update(email.toLowerCase().trim()).digest('hex');
@@ -109,6 +111,9 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
           <Field label="Email">
             {user.google_user_email} <CopyTextButton text={user.google_user_email} />
           </Field>
+          <Field label="Login Methods">
+            <UserLoginMethods methods={user.login_methods} />
+          </Field>
           <Field label="Normalized Email">
             {user.normalized_email ?? <span className="text-muted-foreground">N/A</span>}
             {user.normalized_email ? <CopyTextButton text={user.normalized_email} /> : null}
@@ -167,6 +172,64 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
       </CardContent>
     </Card>
   );
+}
+
+export function UserLoginMethods({ methods }: { methods: UserDetailProps['login_methods'] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {getLoginMethods(methods).map(({ metadata, email, source, emailRelation }) => {
+        const diagnostic = getLoginMethodDiagnostic(emailRelation);
+        return (
+          <Badge
+            key={`${metadata.id}:${email}`}
+            variant={diagnostic.variant}
+            className="max-w-full gap-1.5 font-normal"
+            title={diagnostic.title}
+          >
+            {diagnostic.hasConflict ? <AlertTriangle className="size-3.5 shrink-0" /> : null}
+            <span className="flex size-3.5 items-center justify-center [&>svg]:size-3.5">
+              {metadata.icon}
+            </span>
+            <span>{metadata.name}</span>
+            <span aria-hidden className="text-muted-foreground">
+              ·
+            </span>
+            <span className="text-muted-foreground min-w-0 truncate font-mono" title={email}>
+              {email}
+            </span>
+            {source === 'inferred' ? (
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                inferred
+              </span>
+            ) : null}
+            {diagnostic.hasConflict ? (
+              <span className="sr-only">Cross-account conflict</span>
+            ) : null}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+}
+
+export function getLoginMethods(methods: UserDetailProps['login_methods']) {
+  return methods.map(method => ({
+    metadata: getProviderById(method.provider),
+    email: method.email,
+    source: method.source,
+    emailRelation: method.email_relation,
+  }));
+}
+
+export function getLoginMethodDiagnostic(emailRelation: 'primary' | 'different' | 'conflict') {
+  const hasConflict = emailRelation === 'conflict';
+  return {
+    hasConflict,
+    variant: hasConflict ? ('destructive' as const) : ('secondary' as const),
+    title: hasConflict
+      ? 'This email also resolves to another Kilo account. Email-first discovery will fail closed.'
+      : undefined,
+  };
 }
 
 function Field({

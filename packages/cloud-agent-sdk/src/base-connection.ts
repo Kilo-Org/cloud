@@ -16,6 +16,10 @@ export type ConnectionLifecycleHooks = {
   onPageshow?: ((handler: (e: { persisted: boolean }) => void) => () => void) | undefined;
   /** Called when the browser comes back online */
   onOnline?: ((handler: () => void) => () => void) | undefined;
+  /** Close the socket this long after `onHidden`, and open no socket and mint no
+   *  auth until `onResume`. A socket that drops while hidden is not replaced.
+   *  Omit to keep the socket open and reconnecting while hidden. */
+  hiddenPauseDelayMs?: number | undefined;
 };
 
 export type BaseConnectionConfig<T = unknown> = {
@@ -43,16 +47,25 @@ export type BaseConnectionConfig<T = unknown> = {
    *  For browser usage, use `createBrowserLifecycleHooks()`.
    *  For CLI usage, omit this or provide custom hooks. */
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
+  /** Cap on automatic reconnect attempts before the connection is considered
+   *  exhausted. Defaults to `MAX_RECONNECT_ATTEMPTS`. */
+  maxReconnectAttempts?: number | undefined;
+  /** Fires on both edges of the reconnect-exhaustion state: `true` when the
+   *  automatic retry cap is reached (or a terminal auth failure stops retries),
+   *  and `false` when any recovery path resets the state. */
+  onReconnectExhaustionChange?: ((exhausted: boolean) => void) | undefined;
 };
 
 export type Connection = {
   connect: () => void;
   disconnect: () => void;
   reconnectWithRefreshedAuth?: () => void;
+  retryReconnect: () => void;
+  recoverAfterSuccessfulMutation: () => void;
   destroy: () => void;
 };
 
-const MAX_RECONNECT_ATTEMPTS = 8;
+export const MAX_RECONNECT_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
 export const DEFAULT_STALENESS_TIMEOUT_MS = 30_000;
@@ -72,15 +85,23 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let authRefreshAttempted = false;
   let connected = false;
   let reconnectAttempt = 0;
+  let exhaustionReason: 'retry-limit' | 'auth-failure' | null = null;
   let generation = 0;
   let hasConnectedOnce = false;
   let stalenessTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let lastMessageTime = 0;
   let hiddenAt = 0;
+  // Both stay false unless `lifecycleHooks.hiddenPauseDelayMs` is set.
+  let hidden = false;
+  let paused = false;
+  let hiddenPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let preconnectAuthRefreshAttempted = false;
+  // Coalesce successful mutations into one retry budget at a time. A later mutation may
+  // request another bounded cycle after that budget exhausts without any inbound event.
+  let mutationRecovery: 'idle' | 'pending' | 'active' = 'idle';
   const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
+  const maxReconnectAttempts = config.maxReconnectAttempts ?? MAX_RECONNECT_ATTEMPTS;
 
-  // Cleanup functions returned by lifecycle hooks
   const cleanupFns: Array<() => void> = [];
   let lifecycleListenersRegistered = false;
 
@@ -98,13 +119,51 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
+  function clearHiddenPause(): void {
+    hidden = false;
+    paused = false;
+    if (hiddenPauseTimeoutId !== null) {
+      clearTimeout(hiddenPauseTimeoutId);
+      hiddenPauseTimeoutId = null;
+    }
+  }
+
+  // Close the socket and stop every reconnect path until the next resume.
+  function pauseWhileHidden(): void {
+    if (destroyed || intentionalDisconnect) return;
+    paused = true;
+    if (hiddenPauseTimeoutId !== null) {
+      clearTimeout(hiddenPauseTimeoutId);
+      hiddenPauseTimeoutId = null;
+    }
+    clearReconnectTimer();
+    clearStalenessTimeout();
+    const pausedWs = ws;
+    if (pausedWs !== null) {
+      if (!notifyReplacingConnection()) return;
+      ws = null;
+      pausedWs.close();
+    }
+    if (connected) {
+      connected = false;
+      config.onDisconnected();
+    }
+  }
+
+  function clearExhausted(): void {
+    if (exhaustionReason !== null) {
+      exhaustionReason = null;
+      config.onReconnectExhaustionChange?.(false);
+    }
+  }
+
   function notifyReplacingConnection(expectedGeneration = generation): boolean {
     config.onReplacingConnection?.();
     return !destroyed && !intentionalDisconnect && expectedGeneration === generation;
   }
 
   async function refreshAuthAndReconnect(expectedGeneration: number) {
-    if (!config.refreshAuth) {
+    if (!config.refreshAuth || paused) {
       return;
     }
 
@@ -129,7 +188,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  async function refreshAndConnect(expectedGeneration: number): Promise<void> {
+  async function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
+    if (paused) return;
     preconnectAuthRefreshAttempted = true;
 
     try {
@@ -149,7 +209,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         // refresh resolves.
         if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
       }
-      connectInternal(0, expectedGeneration, true);
+      connectInternal(attempt, expectedGeneration, true);
     } finally {
       if (expectedGeneration === generation) {
         preconnectAuthRefreshAttempted = false;
@@ -158,9 +218,19 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   function scheduleReconnect(attempt: number, expectedGeneration: number) {
-    if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+    if (destroyed || intentionalDisconnect || paused || expectedGeneration !== generation) return;
 
-    if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+    if (attempt >= maxReconnectAttempts) {
+      if (mutationRecovery === 'pending') {
+        mutationRecovery = 'active';
+        retryReconnect();
+        return;
+      }
+      mutationRecovery = 'idle';
+      if (exhaustionReason === null) {
+        exhaustionReason = 'retry-limit';
+        config.onReconnectExhaustionChange?.(true);
+      }
       return;
     }
 
@@ -176,7 +246,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   function connectInternal(attempt = 0, expectedGeneration = generation, skipAuthRefresh = false) {
-    if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+    if (destroyed || intentionalDisconnect || paused || expectedGeneration !== generation) return;
 
     if (
       config.refreshAuth &&
@@ -184,7 +254,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       !skipAuthRefresh &&
       !preconnectAuthRefreshAttempted
     ) {
-      void refreshAndConnect(expectedGeneration);
+      void refreshAndConnect(expectedGeneration, attempt);
       return;
     }
 
@@ -217,7 +287,13 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
 
     newWs.onmessage = (messageEvent: MessageEvent) => {
-      // Any incoming message cancels an active staleness check
+      // Ignore messages from replaced sockets: a late event from a socket we
+      // already closed must not re-anchor the staleness clock, clear
+      // exhaustion, or report the transport recovered.
+      if (ws !== newWs) {
+        return;
+      }
+
       clearStalenessTimeout();
       lastMessageTime = Date.now();
 
@@ -231,9 +307,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         return;
       }
 
-      // Reset auth refresh flag on successful message
       authRefreshAttempted = false;
       reconnectAttempt = 0;
+      mutationRecovery = 'idle';
+      clearExhausted();
 
       if (!connected) {
         connected = true;
@@ -251,7 +328,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     newWs.onerror = () => {};
 
     newWs.onclose = (event: CloseEvent) => {
-      // Ignore close events from replaced sockets
       if (ws !== newWs) {
         return;
       }
@@ -273,6 +349,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         config.onDisconnected();
       }
 
+      if (hidden) {
+        config.onUnexpectedDisconnect?.();
+        pauseWhileHidden();
+        return;
+      }
+
       const isAuthFailure = config.isAuthFailure?.(event) ?? false;
 
       if (isAuthFailure && !authRefreshAttempted && config.refreshAuth) {
@@ -284,13 +366,17 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // Already tried refreshing auth and still failing - stop retrying.
       // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
+        mutationRecovery = 'idle';
         notifyReplacingConnection(expectedGeneration);
+        if (exhaustionReason === null) {
+          exhaustionReason = 'auth-failure';
+          config.onReconnectExhaustionChange?.(true);
+        }
         return;
       }
 
       config.onUnexpectedDisconnect?.();
 
-      // Reset attempt counter if we were connected, otherwise continue count
       if (wasConnected || attempt === 0) {
         scheduleReconnect(0, expectedGeneration);
       } else {
@@ -299,9 +385,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
   }
 
-  function replaceStaleSocketAndReconnect(currentGeneration: number): void {
-    if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
-    if (!notifyReplacingConnection(currentGeneration)) return;
+  // Single owner of the replacement order: notify route loss, close the old
+  // socket, report the disconnection, then re-auth and open a fresh connection.
+  // Callers reset only the state that is specific to their recovery path.
+  function replaceSocketAndReconnect(expectedGeneration: number): void {
+    if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+    if (!notifyReplacingConnection(expectedGeneration)) return;
     const staleWs = ws;
     if (staleWs !== null) {
       ws = null;
@@ -311,14 +400,15 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       connected = false;
       config.onDisconnected();
     }
-    void refreshAndConnect(currentGeneration);
+    void refreshAndConnect(expectedGeneration);
   }
 
   function handleVisibilityResume(): void {
     if (destroyed || intentionalDisconnect) return;
+    clearHiddenPause();
 
-    // Tab became visible
     reconnectAttempt = 0;
+    clearExhausted();
     const wasHiddenSince = hiddenAt;
     hiddenAt = 0;
 
@@ -339,7 +429,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     // timeout for a heartbeat that will never arrive on a zombie socket just
     // freezes the UI — reconnect immediately instead.
     if (wasHiddenSince !== 0 && Date.now() - wasHiddenSince >= stalenessTimeoutMs) {
-      replaceStaleSocketAndReconnect(generation);
+      replaceSocketAndReconnect(generation);
       return;
     }
 
@@ -348,7 +438,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     const currentGeneration = generation;
     stalenessTimeoutId = setTimeout(() => {
       stalenessTimeoutId = null;
-      replaceStaleSocketAndReconnect(currentGeneration);
+      replaceSocketAndReconnect(currentGeneration);
     }, stalenessTimeoutMs);
   }
 
@@ -356,6 +446,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (destroyed || intentionalDisconnect) return;
     hiddenAt = Date.now();
     clearStalenessTimeout();
+    const pauseDelayMs = config.lifecycleHooks?.hiddenPauseDelayMs;
+    if (pauseDelayMs === undefined || hidden) return;
+    hidden = true;
+    hiddenPauseTimeoutId = setTimeout(pauseWhileHidden, pauseDelayMs);
   }
 
   function handlePageshow(event: { persisted: boolean }): void {
@@ -365,29 +459,19 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     // BFCache restore - WebSocket is guaranteed dead
     reconnectAttempt = 0;
+    clearExhausted();
     clearReconnectTimer();
     clearStalenessTimeout();
-    if (!notifyReplacingConnection()) return;
-
-    const staleWs = ws;
-    if (staleWs !== null) {
-      ws = null;
-      staleWs.close();
-    }
-    if (connected) {
-      connected = false;
-      config.onDisconnected();
-    }
-    void refreshAndConnect(generation);
+    replaceSocketAndReconnect(generation);
   }
 
   function handleOnline(): void {
-    if (destroyed || intentionalDisconnect) return;
+    if (destroyed || intentionalDisconnect || hidden) return;
 
-    // If already connected with an open socket, nothing to do
     if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
 
     reconnectAttempt = 0;
+    clearExhausted();
     clearReconnectTimer();
     void refreshAndConnect(generation);
   }
@@ -421,13 +505,16 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     destroyed = false;
     authRefreshAttempted = false;
     preconnectAuthRefreshAttempted = false;
+    mutationRecovery = 'idle';
     connected = false;
     reconnectAttempt = 0;
+    clearExhausted();
     hasConnectedOnce = false;
     lastMessageTime = 0;
     generation += 1;
     clearReconnectTimer();
     clearStalenessTimeout();
+    clearHiddenPause();
     addEventListeners();
     connectInternal(0, generation);
   }
@@ -436,9 +523,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     intentionalDisconnect = true;
     generation += 1;
     preconnectAuthRefreshAttempted = false;
+    mutationRecovery = 'idle';
 
     clearReconnectTimer();
     clearStalenessTimeout();
+    clearHiddenPause();
     removeEventListeners();
 
     if (ws !== null) {
@@ -456,29 +545,47 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (destroyed || intentionalDisconnect) return;
 
     reconnectAttempt = 0;
+    clearExhausted();
     clearReconnectTimer();
     clearStalenessTimeout();
-    if (!notifyReplacingConnection()) return;
+    replaceSocketAndReconnect(generation);
+  }
 
-    const staleWs = ws;
-    if (staleWs !== null) {
-      ws = null;
-      staleWs.close();
-    }
-    if (connected) {
-      connected = false;
-      config.onDisconnected();
-    }
+  function retryReconnect() {
+    if (destroyed || intentionalDisconnect) return;
+
+    clearReconnectTimer();
+    reconnectAttempt = 0;
+    clearExhausted();
     void refreshAndConnect(generation);
+  }
+
+  function recoverAfterSuccessfulMutation() {
+    if (
+      destroyed ||
+      intentionalDisconnect ||
+      connected ||
+      exhaustionReason === 'auth-failure' ||
+      mutationRecovery !== 'idle'
+    )
+      return;
+    if (exhaustionReason === 'retry-limit') {
+      mutationRecovery = 'active';
+      retryReconnect();
+      return;
+    }
+    mutationRecovery = 'pending';
   }
 
   function destroy() {
     destroyed = true;
     generation += 1;
     preconnectAuthRefreshAttempted = false;
+    mutationRecovery = 'idle';
 
     clearReconnectTimer();
     clearStalenessTimeout();
+    clearHiddenPause();
     removeEventListeners();
 
     if (ws !== null) {
@@ -490,7 +597,14 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     connected = false;
   }
 
-  return { connect, disconnect, reconnectWithRefreshedAuth, destroy };
+  return {
+    connect,
+    disconnect,
+    reconnectWithRefreshedAuth,
+    retryReconnect,
+    recoverAfterSuccessfulMutation,
+    destroy,
+  };
 }
 
 export function createBrowserLifecycleHooks(): ConnectionLifecycleHooks {

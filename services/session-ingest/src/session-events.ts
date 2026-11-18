@@ -16,6 +16,7 @@ export type SessionEventDbRow = {
   git_url: string | null;
   git_branch: string | null;
   parent_session_id: string | null;
+  cloud_agent_worktree_id: string | null;
   status: string | null;
   status_updated_at: string | Date | null;
 };
@@ -40,6 +41,7 @@ export function mapSessionEventRow(row: SessionEventDbRow): SessionEventV2Row {
     gitUrl: row.git_url,
     gitBranch: row.git_branch,
     parentSessionId: row.parent_session_id,
+    worktreeId: row.cloud_agent_worktree_id ?? null,
     status: SessionStatusSchema.nullable().parse(row.status),
     statusUpdatedAt: toNullableIsoString(row.status_updated_at),
   };

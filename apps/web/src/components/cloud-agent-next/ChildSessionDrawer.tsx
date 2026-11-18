@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from 'react';
 import { useAtomValue } from 'jotai';
 import { AlertCircle, ArrowDown, ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,15 +19,34 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ChildSessionHydrationState } from '@kilocode/cloud-agent-sdk';
+import type { ChildSessionHydrationState, OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
-import { MessageBubble } from './MessageBubble';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { isMessageStreaming } from './types';
+import { CloudReadOnlyThread } from './assistant-ui/CloudThread';
 import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
+import { OlderMessagesHeader } from './OlderMessagesHeader';
+import {
+  shouldAnnounceOlderMessagesArrival,
+  useOlderMessagesPagination,
+} from './older-messages-scroll';
 
 const IDLE_HYDRATION_STATE: ChildSessionHydrationState = { status: 'idle' };
 const AUTO_SCROLL_PAUSE_DISTANCE_PX = 20;
 const AUTO_SCROLL_RESUME_DISTANCE_PX = 100;
+
+type ReadyPagination = {
+  hasOlder: boolean;
+  isLoadingOlder: boolean;
+  olderError: OlderMessagesError | null;
+  omittedItemCount: number;
+};
+
+const IDLE_PAGINATION: ReadyPagination = {
+  hasOlder: false,
+  isLoadingOlder: false,
+  olderError: null,
+  omittedItemCount: 0,
+};
 
 type ChildSessionDrawerProps = {
   stack: ChildSessionDrawerEntry[];
@@ -39,11 +66,17 @@ export function ChildSessionDrawer({
   portalContainer,
 }: ChildSessionDrawerProps) {
   const manager = useManager();
+  const useStreaming = useAtomValue(manager.atoms.isStreaming);
+  const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const selectedEntry = stack[stack.length - 1];
   const selectedSessionId = selectedEntry?.sessionId;
-  const messages = selectedSessionId ? getChildMessages(selectedSessionId) : [];
+  const messages = useMemo(
+    () => (selectedSessionId ? getChildMessages(selectedSessionId) : []),
+    [getChildMessages, selectedSessionId]
+  );
+  const messageGroups = useMemo(() => messages.map(message => [message]), [messages]);
   const hydrationState = selectedSessionId
     ? getChildSessionHydrationState(selectedSessionId)
     : IDLE_HYDRATION_STATE;
@@ -58,11 +91,43 @@ export function ChildSessionDrawer({
   const isAutoScrollingRef = useRef(false);
   const autoScrollRunRef = useRef(0);
   const lastScrollTopRef = useRef(0);
+  const olderArrivalInitializedRef = useRef(false);
+  const olderArrivalCountRef = useRef(0);
+  const olderArrivalNewestKeyRef = useRef<string | null>(null);
+  const [olderArrivalAnnouncement, setOlderArrivalAnnouncement] = useState('');
+  const readyPagination: ReadyPagination =
+    hydrationState.status === 'ready'
+      ? {
+          hasOlder: hydrationState.hasOlder,
+          isLoadingOlder: hydrationState.isLoadingOlder,
+          olderError: hydrationState.olderError,
+          omittedItemCount: hydrationState.omittedItemCount,
+        }
+      : IDLE_PAGINATION;
+
+  const loadOlderChildMessages = useCallback(() => {
+    if (!selectedSessionId) return;
+    void manager.loadOlderChildMessages(selectedSessionId);
+  }, [manager, selectedSessionId]);
+  const { requestOlderMessages, tryLoadOlderFromScroll } = useOlderMessagesPagination({
+    scrollElementRef: scrollContainerRef,
+    scrollContentRef: messagesContentRef,
+    hasOlderMessages: readyPagination.hasOlder,
+    isLoadingOlderMessages: readyPagination.isLoadingOlder,
+    olderMessagesError: readyPagination.olderError,
+    onLoad: loadOlderChildMessages,
+    isProgrammaticScrollRef: isAutoScrollingRef,
+    lastScrollTopRef,
+    resetKey: selectedSessionId,
+    overflowCheckKey: messages.length,
+    ready: hydrationState.status === 'ready',
+  });
   const autoScrollFrameRef = useRef(0);
   const followUpAutoScrollFrameRef = useRef(0);
   const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottomNow = useCallback(() => {
+    if (!shouldAutoScrollRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
 
@@ -114,10 +179,17 @@ export function ChildSessionDrawer({
     void manager.hydrateChildSession(selectedSessionId);
   }, [manager, selectedSessionId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!shouldAutoScroll) return;
+    scrollToBottomNow();
     scheduleScrollToBottom();
-  }, [hydrationState.status, messages, scheduleScrollToBottom, shouldAutoScroll]);
+  }, [
+    hydrationState.status,
+    messages,
+    scheduleScrollToBottom,
+    scrollToBottomNow,
+    shouldAutoScroll,
+  ]);
 
   useEffect(() => {
     if (!shouldAutoScroll || typeof ResizeObserver === 'undefined') return;
@@ -138,9 +210,32 @@ export function ChildSessionDrawer({
     shouldAutoScrollRef.current = true;
     setShouldAutoScroll(true);
     lastScrollTopRef.current = 0;
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+    setOlderArrivalAnnouncement('');
     setShowScrollButton(false);
     scheduleScrollToBottom();
   }, [selectedSessionId, scheduleScrollToBottom]);
+
+  useEffect(() => {
+    const newest = messages.at(-1)?.info.id ?? null;
+    const nextCount = messages.length;
+    if (
+      shouldAnnounceOlderMessagesArrival({
+        wasInitialized: olderArrivalInitializedRef.current,
+        previousCount: olderArrivalCountRef.current,
+        nextCount,
+        previousNewestKey: olderArrivalNewestKeyRef.current,
+        nextNewestKey: newest,
+      })
+    ) {
+      setOlderArrivalAnnouncement('Earlier messages loaded');
+    }
+    olderArrivalInitializedRef.current = true;
+    olderArrivalCountRef.current = nextCount;
+    olderArrivalNewestKeyRef.current = newest;
+  }, [messages]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -165,7 +260,9 @@ export function ChildSessionDrawer({
       shouldAutoScrollRef.current = true;
       setShouldAutoScroll(true);
     }
-  }, [cancelScheduledAutoScroll]);
+
+    tryLoadOlderFromScroll(el.scrollTop);
+  }, [cancelScheduledAutoScroll, tryLoadOlderFromScroll]);
 
   const scrollToBottom = useCallback(() => {
     shouldAutoScrollRef.current = true;
@@ -233,6 +330,11 @@ export function ChildSessionDrawer({
                 <span>
                   {selectedEntry?.agent ? `Agent: ${selectedEntry.agent}` : 'Sub-agent session'}
                 </span>
+                {selectedEntry?.model && (
+                  <span className="truncate" title={selectedEntry.model}>
+                    Model: {selectedEntry.model}
+                  </span>
+                )}
                 {selectedSessionId && (
                   <span className="truncate font-mono text-xs">{selectedSessionId}</span>
                 )}
@@ -244,10 +346,22 @@ export function ChildSessionDrawer({
         <div className="relative min-h-0 flex-1">
           <div
             ref={scrollContainerRef}
-            className="h-full overflow-y-auto px-4 py-4 sm:px-6"
+            className="h-full overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-6"
             onScroll={handleScroll}
           >
             <div ref={messagesContentRef}>
+              <div className="sr-only" aria-live="polite">
+                {olderArrivalAnnouncement}
+              </div>
+              {hydrationState.status === 'ready' && (
+                <OlderMessagesHeader
+                  hasOlderMessages={readyPagination.hasOlder}
+                  isLoadingOlderMessages={readyPagination.isLoadingOlder}
+                  olderMessagesError={readyPagination.olderError}
+                  olderMessagesOmittedItemCount={readyPagination.omittedItemCount}
+                  onRetry={requestOlderMessages}
+                />
+              )}
               {hydrationState.status === 'loading' && (
                 <div className="border-border bg-muted/20 text-muted-foreground mb-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
                   <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -282,15 +396,18 @@ export function ChildSessionDrawer({
 
               {hasMessages ? (
                 <div>
-                  {messages.map(message => (
-                    <MessageErrorBoundary key={message.info.id}>
-                      <MessageBubble
-                        message={message}
-                        getChildMessages={getChildMessages}
-                        onOpenChildSession={onOpenChildSession}
-                      />
-                    </MessageErrorBoundary>
-                  ))}
+                  <CloudReadOnlyThread
+                    messages={messages}
+                    isStreaming={messages.some(isMessageStreaming)}
+                    messageGroups={messageGroups}
+                    getChildMessages={getChildMessages}
+                    onOpenChildSession={onOpenChildSession}
+                    presentationMode="live"
+                    questionState={{
+                      isStreaming: useStreaming,
+                      hasActiveQuestion: Boolean(activeQuestion),
+                    }}
+                  />
                 </div>
               ) : hydrationState.status === 'loading' ||
                 hydrationState.status === 'error' ? null : (

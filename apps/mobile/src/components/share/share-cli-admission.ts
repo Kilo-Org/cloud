@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 import { type SharePayloadValidation } from './share-payload-validation';
 
 export type ShareDestinationAdmission =
@@ -26,14 +28,17 @@ export function resolveShareHasFiles(
 /**
  * Decide whether a share payload may be committed to a destination row.
  * Non-CLI platforms pass through; CLI rows require a live session, and
- * file payloads additionally require `capabilities.attachments`.
+ * file payloads additionally require the CLI not to have denied the
+ * `attachments` capability. Call sites pass an optimistic value: an unknown
+ * capability counts as capable; only an explicit `attachments: false` is
+ * incapable.
  */
 export function resolveShareDestinationAdmission(input: {
   /** `created_on_platform` of the stored row. */
   createdOnPlatform: string | null;
   /** True when the row's session id is in the active-sessions set. */
   live: boolean;
-  /** `capabilities.attachments === true` for the live row; false otherwise. */
+  /** False only when the live row reported `capabilities.attachments: false`. */
   attachmentsCapable: boolean;
   /** True when the share payload carries at least one file. */
   hasFiles: boolean;
@@ -45,18 +50,16 @@ export function resolveShareDestinationAdmission(input: {
   if (!input.live) {
     return {
       ok: false,
-      title: 'Session not connected',
-      message:
-        "This session runs on a Kilo CLI that isn't connected, so it can't receive messages right now. Reconnect the CLI on that machine, or pick another session.",
+      title: i18n.t('share.cliNotConnectedTitle'),
+      message: i18n.t('share.cliNotConnectedMessage'),
     };
   }
 
   if (input.hasFiles && !input.attachmentsCapable) {
     return {
       ok: false,
-      title: "This session can't receive files",
-      message:
-        "The Kilo CLI running this session can't receive files. Update the CLI on that machine, or share to a new session instead.",
+      title: i18n.t('share.cliCantReceiveFilesTitle'),
+      message: i18n.t('share.cliCantReceiveFilesMessage'),
     };
   }
 

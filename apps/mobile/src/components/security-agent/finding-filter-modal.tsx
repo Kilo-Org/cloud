@@ -9,52 +9,54 @@ import {
   selectSecurityFindingStatus,
 } from '@kilocode/app-shared/security-agent';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { hasRtlScript } from '@/lib/rtl-text';
 
-const STATUS_OPTIONS: { value: SecurityFindingStatusFilter; label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'fixed', label: 'Fixed' },
-  { value: 'ignored', label: 'Ignored' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'all', label: 'All' },
-];
+const STATUS_OPTIONS = [
+  { value: 'all', labelKey: 'common.all' },
+  { value: 'open', labelKey: 'securityAgent.filter.statusOpen' },
+  { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
+  { value: 'ignored', labelKey: 'securityAgent.filter.statusIgnored' },
+  { value: 'closed', labelKey: 'common.closed' },
+] as const satisfies readonly { value: SecurityFindingStatusFilter; labelKey: string }[];
 
-const SEVERITY_OPTIONS: { value: SecuritySeverityFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'critical', label: 'Critical' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-];
+const SEVERITY_OPTIONS = [
+  { value: 'all', labelKey: 'common.all' },
+  { value: 'critical', labelKey: 'common.critical' },
+  { value: 'high', labelKey: 'securityAgent.filter.severityHigh' },
+  { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
+  { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
+] as const satisfies readonly { value: SecuritySeverityFilter; labelKey: string }[];
 
-const OUTCOME_OPTIONS: { value: SecurityOutcomeFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'not_analyzed', label: 'Not analyzed' },
-  { value: 'analyzing', label: 'Analyzing' },
-  { value: 'failed', label: 'Analysis failed' },
-  { value: 'exploitable', label: 'Exploitable' },
-  { value: 'not_exploitable', label: 'Not exploitable' },
-  { value: 'safe_to_dismiss', label: 'Safe to dismiss' },
-  { value: 'needs_review', label: 'Needs review' },
-  { value: 'triage_complete', label: 'Triage complete' },
-  { value: 'fixed', label: 'Fixed' },
-  { value: 'dismissed', label: 'Dismissed' },
-];
+const OUTCOME_OPTIONS = [
+  { value: 'all', labelKey: 'common.all' },
+  { value: 'not_analyzed', labelKey: 'securityAgent.analysisState.notAnalyzed' },
+  { value: 'analyzing', labelKey: 'securityAgent.analysisState.analyzing' },
+  { value: 'failed', labelKey: 'securityAgent.analysisState.failed' },
+  { value: 'exploitable', labelKey: 'securityAgent.analysis.exploitable' },
+  { value: 'not_exploitable', labelKey: 'securityAgent.dashboard.notExploitable' },
+  { value: 'safe_to_dismiss', labelKey: 'securityAgent.analysisState.safeToDismiss' },
+  { value: 'needs_review', labelKey: 'securityAgent.analysisState.unknown' },
+  { value: 'triage_complete', labelKey: 'securityAgent.filter.outcomeTriageComplete' },
+  { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
+  { value: 'dismissed', labelKey: 'common.dismissed' },
+] as const satisfies readonly { value: SecurityOutcomeFilter; labelKey: string }[];
 
-const SORT_OPTIONS: { value: SecurityFindingSortBy; label: string }[] = [
-  { value: 'severity_desc', label: 'Severity: high to low' },
-  { value: 'severity_asc', label: 'Severity: low to high' },
-  { value: 'sla_due_at_asc', label: 'SLA due date' },
-];
+const SORT_OPTIONS = [
+  { value: 'severity_desc', labelKey: 'securityAgent.filter.sortSeverityDesc' },
+  { value: 'severity_asc', labelKey: 'securityAgent.filter.sortSeverityAsc' },
+  { value: 'sla_due_at_asc', labelKey: 'securityAgent.filter.sortSlaDue' },
+] as const satisfies readonly { value: SecurityFindingSortBy; labelKey: string }[];
 
-const SLA_STATUS_OPTIONS: { value: boolean; label: string }[] = [
-  { value: false, label: 'All' },
-  { value: true, label: 'Overdue only' },
-];
+const SLA_STATUS_OPTIONS = [
+  { value: false, labelKey: 'common.all' },
+  { value: true, labelKey: 'securityAgent.filter.overdueOnly' },
+] as const satisfies readonly { value: boolean; labelKey: string }[];
 
 type FindingRepositoryOption = {
   fullName: string;
@@ -84,20 +86,33 @@ function FilterOptionRow({ label, isSelected, onPress }: Readonly<FilterOptionRo
 
 function FilterSection<T>({
   title,
+  description,
   options,
   selected,
   onSelect,
 }: Readonly<{
   title: string;
+  /** Explains a section whose option list is shorter than the reader expects. */
+  description?: string;
   options: { value: T; label: string }[];
   selected: T;
   onSelect: (value: T) => void;
 }>) {
   return (
     <View className="gap-1">
-      <Text variant="eyebrow" className="px-3">
+      {/* The eyebrow's 10 px capitals treatment is a Latin display device: a
+          joined script cannot take the tracking (the shared Text primitive
+          drops it), and at that size the Arabic glyphs are too small to read
+          against the sheet. RTL-script headings take the secondary text size
+          and colour instead, while Latin headings keep the eyebrow. */}
+      <Text variant={hasRtlScript(title) ? 'muted' : 'eyebrow'} className="px-3">
         {title}
       </Text>
+      {description === undefined ? null : (
+        <Text variant="muted" className="px-3 text-xs">
+          {description}
+        </Text>
+      )}
       <RadioGroup label={title}>
         {options.map(option => (
           <FilterOptionRow
@@ -119,25 +134,55 @@ export function FindingFilterModal({
   repositories,
   onChange,
 }: Readonly<FindingFilterModalProps>) {
+  const { t } = useTranslation();
+  const statusOptions = STATUS_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const severityOptions = SEVERITY_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const outcomeOptions = OUTCOME_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const sortOptions = SORT_OPTIONS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }));
+  const slaStatusOptions = SLA_STATUS_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
   const repoOptions: { value: string | null; label: string }[] = [
-    { value: null, label: 'All repositories' },
+    { value: null, label: t('common.allRepositories') },
     ...repositories.map(repo => ({ value: repo.fullName, label: repo.fullName })),
   ];
 
   return (
     <View className="gap-6 bg-background px-6 pb-8 pt-4">
+      {/* Reset is a secondary action, not the sheet's heading: at the default
+          label size and foreground ink it outweighed the section labels below
+          it. It takes the rows' inset and the muted secondary text so it reads
+          as the least of the sheet's controls while keeping a 44 dp target. */}
       <Button
         variant="ghost"
-        className="self-start"
+        className="self-start px-3"
         onPress={() => {
           onChange(DEFAULT_SECURITY_FINDING_FILTERS);
         }}
       >
-        <Text>Reset</Text>
+        <Text className="text-sm font-medium text-muted-foreground">
+          {t('securityAgent.filter.reset')}
+        </Text>
       </Button>
       <View className="gap-4">
         <FilterSection
-          title="Repository"
+          title={t('common.repository')}
+          // A successful read with nothing in scope leaves only the "All
+          // repositories" row, which reads the same as a list that silently
+          // failed. The note says why the one option is the whole set.
+          description={
+            repositories.length === 0 ? t('securityAgent.filter.noRepositories') : undefined
+          }
           options={repoOptions}
           selected={filters.repoFullName}
           onSelect={repoFullName => {
@@ -145,40 +190,40 @@ export function FindingFilterModal({
           }}
         />
         <FilterSection
-          title="Status"
-          options={STATUS_OPTIONS}
+          title={t('common.status')}
+          options={statusOptions}
           selected={filters.status}
           onSelect={status => {
             onChange(selectSecurityFindingStatus(filters, status));
           }}
         />
         <FilterSection
-          title="Severity"
-          options={SEVERITY_OPTIONS}
+          title={t('securityAgent.filter.severity')}
+          options={severityOptions}
           selected={filters.severity}
           onSelect={severity => {
             onChange({ ...filters, severity });
           }}
         />
         <FilterSection
-          title="Outcome"
-          options={OUTCOME_OPTIONS}
+          title={t('securityAgent.filter.outcome')}
+          options={outcomeOptions}
           selected={filters.outcome}
           onSelect={outcome => {
             onChange(selectSecurityFindingOutcome(filters, outcome));
           }}
         />
         <FilterSection
-          title="SLA status"
-          options={SLA_STATUS_OPTIONS}
+          title={t('securityAgent.filter.slaStatus')}
+          options={slaStatusOptions}
           selected={Boolean(filters.overdue)}
           onSelect={overdue => {
             onChange({ ...filters, overdue: overdue ? true : undefined });
           }}
         />
         <FilterSection
-          title="Sort by"
-          options={SORT_OPTIONS}
+          title={t('securityAgent.filter.sortBy')}
+          options={sortOptions}
           selected={filters.sortBy}
           onSelect={sortBy => {
             onChange({ ...filters, sortBy });

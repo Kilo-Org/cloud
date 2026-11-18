@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { dispatchQueuedAffiliateEvents } from '@/lib/impact/affiliate-events';
 import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact/referral';
 import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
-  processQueuedKiloClawReferralRewards,
-} from '@/lib/impact/kiloclaw-referrals';
-import { sentryLogger } from '@/lib/utils.server';
+} from '@/lib/impact/referral-delivery';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
@@ -32,13 +31,11 @@ export async function GET(request: Request) {
     affiliateSummary,
     impactAdvocateRegistrationSummary,
     impactConversionSummary,
-    referralRewardSummary,
     impactAdvocateRewardRedemptionSummary,
   ] = await Promise.all([
     dispatchQueuedAffiliateEvents(),
     dispatchQueuedImpactAdvocateRegistrationAttempts(),
     dispatchQueuedImpactConversionReports(),
-    processQueuedKiloClawReferralRewards(),
     dispatchQueuedImpactAdvocateRewardRedemptions(),
   ]);
 
@@ -49,7 +46,6 @@ export async function GET(request: Request) {
         affiliateEvents: affiliateSummary,
         impactAdvocateRegistrations: impactAdvocateRegistrationSummary,
         impactConversionReports: impactConversionSummary,
-        referralRewards: referralRewardSummary,
         impactAdvocateRewardRedemptions: impactAdvocateRewardRedemptionSummary,
       },
       timestamp: new Date().toISOString(),

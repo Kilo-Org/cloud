@@ -4,20 +4,21 @@ import {
   UserDeletionAuditEventType,
   UserDeletionRequestStatus,
   UserDeletionStepStatus,
-  type UserDeletionStepKey,
+  UserDeletionStepKey,
 } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   catalogEntryFor,
-  catalogForVersion,
   preReplyStepKeys,
+  validateMaterializedStepKeys,
 } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_STOP_STARTING_RESERVE_MS } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_STOP_STARTING_RESERVE_MS } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   writeDeletionActivity,
   writeDeletionAudit,
 } from '@/lib/user/deletion-queue/deletion-audit';
 import { scrubControlPlanePii } from '@/lib/user/deletion-queue/deletion-enqueue';
+import { deletionRequestAuditHmac } from '@/lib/user/deletion-queue/deletion-hmac';
 import { selectNextTaskForRequest } from '@/lib/user/deletion-queue/deletion-task-selector';
 import { SUCCESSFUL_TASK_STATUSES } from '@/lib/user/deletion-queue/deletion-types';
 
@@ -36,24 +37,25 @@ export async function tryAdvancePreReplyGate(requestId: string): Promise<boolean
     if (!request || request.status !== UserDeletionRequestStatus.InProgress) {
       return false;
     }
-    if (request.catalog_version !== 1) {
-      return false;
-    }
-
     const steps = await tx
       .select()
       .from(user_deletion_steps)
       .where(eq(user_deletion_steps.request_id, requestId))
       .for('update');
 
-    if (!catalogTasksReady(request.catalog_version, steps, preReplyStepKeys())) {
+    if (
+      !catalogTasksReady(request.catalog_version, steps, preReplyStepKeys(request.catalog_version))
+    ) {
       return false;
     }
 
     await writeDeletionAudit(tx, {
       requestId: request.id,
       eventType: UserDeletionAuditEventType.ReadyForCustomerReply,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: deletionRequestAuditHmac({
+        targetEmailHmac: request.target_email_hmac,
+        pylonTicketRef: request.pylon_ticket_ref,
+      }),
       subjectKey: 'request',
     });
     await writeDeletionActivity(tx, {
@@ -81,15 +83,15 @@ export async function tryCompleteRequest(requestId: string): Promise<boolean> {
     if (!request || request.status !== UserDeletionRequestStatus.Finalizing) {
       return false;
     }
-    if (request.catalog_version !== 1) return false;
-
     const steps = await tx
       .select()
       .from(user_deletion_steps)
       .where(eq(user_deletion_steps.request_id, requestId))
       .for('update');
 
-    const required = catalogForVersion(request.catalog_version).map(entry => entry.stepKey);
+    const required = steps
+      .map(step => step.step_key)
+      .filter(stepKey => stepKey !== UserDeletionStepKey.CsaSupportDb);
     if (!catalogTasksReady(request.catalog_version, steps, required)) {
       return false;
     }
@@ -97,7 +99,10 @@ export async function tryCompleteRequest(requestId: string): Promise<boolean> {
     await writeDeletionAudit(tx, {
       requestId: request.id,
       eventType: UserDeletionAuditEventType.Completed,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: deletionRequestAuditHmac({
+        targetEmailHmac: request.target_email_hmac,
+        pylonTicketRef: request.pylon_ticket_ref,
+      }),
       subjectKey: 'request',
     });
     await writeDeletionActivity(tx, {
@@ -114,9 +119,10 @@ function catalogTasksReady(
   steps: (typeof user_deletion_steps.$inferSelect)[],
   requiredKeys: readonly UserDeletionStepKey[]
 ): boolean {
-  if (new Set(steps.map(step => step.step_key)).size !== steps.length) {
-    return false;
-  }
+  validateMaterializedStepKeys(
+    catalogVersion,
+    steps.map(step => step.step_key)
+  );
   for (const key of requiredKeys) {
     const matches = steps.filter(step => step.step_key === key);
     if (matches.length !== 1) return false;

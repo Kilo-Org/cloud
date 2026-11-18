@@ -1,6 +1,19 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import type { KiloClient as SDKClient } from '@kilocode/sdk';
-import { createWrapperKiloClient, isKiloServerUnreachableError } from './kilo-api';
+import { Database } from 'bun:sqlite';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createServer, type IncomingMessage } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createKiloClient } from '@kilocode/sdk';
+import type { QuestionRequest } from '@kilocode/sdk/v2';
+import {
+  createWrapperKiloClient,
+  KILO_ACTIVITY_DISCOVERY_LIMIT,
+  KILO_ACTIVITY_MESSAGE_LIMIT,
+  DrainSessionError,
+  isKiloServerUnreachableError,
+  type WrapperKiloClient,
+} from './kilo-api';
 
 describe('isKiloServerUnreachableError', () => {
   it('matches a raw ECONNREFUSED error', () => {
@@ -96,11 +109,12 @@ describe('isKiloServerUnreachableError', () => {
   });
 });
 
-describe('createWrapperKiloClient().answerPermission', () => {
+describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
   type RecordedRequest = {
     method: string;
     pathname: string;
-    body: Record<string, unknown>;
+    directory: string | null;
+    body: unknown;
   };
 
   const startedServers: ReturnType<typeof Bun.serve>[] = [];
@@ -109,7 +123,10 @@ describe('createWrapperKiloClient().answerPermission', () => {
     await Promise.all(startedServers.splice(0).map(server => server.stop()));
   });
 
-  async function startStub(status: number): Promise<{ url: string; requests: RecordedRequest[] }> {
+  function startStub(
+    status: number,
+    body: unknown = true
+  ): { url: string; requests: RecordedRequest[] } {
     const requests: RecordedRequest[] = [];
     const server = Bun.serve({
       port: 0,
@@ -118,22 +135,929 @@ describe('createWrapperKiloClient().answerPermission', () => {
         requests.push({
           method: req.method,
           pathname: url.pathname,
-          body: (await req.json()) as Record<string, unknown>,
+          directory: url.searchParams.get('directory'),
+          body: req.body ? await req.json() : undefined,
         });
-        return new Response('{}', { status });
+        return status === 204 ? new Response(null, { status }) : Response.json(body, { status });
       },
     });
     startedServers.push(server);
-    // Bun 1.3.14 exposes `server.url` as a URL object; normalize to a string.
     return { url: server.url.toString(), requests };
   }
 
   function createClient(serverUrl: string) {
-    return createWrapperKiloClient({} as SDKClient, serverUrl, '/workspace');
+    return createWrapperKiloClient(
+      createKiloClient({ baseUrl: serverUrl }),
+      { url: serverUrl },
+      '/workspace'
+    );
   }
 
+  it('replaces the running CLI MCP connection using the generated directory-scoped SDK API', async () => {
+    const stub = startStub(200, { 'kilo-cloud-agent': { status: 'connected' } });
+    await createClient(stub.url).updateCloudAgentMcp({
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-session-mcp-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    });
+    expect(stub.requests).toEqual([
+      {
+        method: 'POST',
+        pathname: '/mcp',
+        directory: '/workspace',
+        body: {
+          name: 'kilo-cloud-agent',
+          config: {
+            type: 'remote',
+            url: 'https://mcp.kiloapps.io/mcp',
+            oauth: false,
+            headers: { Authorization: 'Bearer renewed-session-mcp-token' },
+          },
+        },
+      },
+    ]);
+  });
+
+  it('does not leak scoped MCP credentials in configuration refresh failures', async () => {
+    const stub = startStub(400, { message: 'private-scoped-mcp-token' });
+    const error: unknown = await createClient(stub.url)
+      .updateCloudAgentMcp({
+        url: 'https://mcp.kiloapps.io/mcp',
+        token: 'private-scoped-mcp-token',
+        expiresAt: 123,
+      })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    if (!(error instanceof Error)) throw new Error('Expected credential refresh failure');
+    expect(error.message).toBe('Cloud Agent MCP credential refresh failed');
+    expect(stub.requests).toHaveLength(2);
+  });
+
+  it.each(['failed', 'needs_auth', 'disabled'])(
+    'rejects an HTTP-successful but unavailable MCP status %s after bounded retry',
+    async status => {
+      const stub = startStub(200, {
+        'kilo-cloud-agent': { status, error: 'private-scoped-mcp-token' },
+      });
+      const error: unknown = await createClient(stub.url)
+        .updateCloudAgentMcp({
+          url: 'https://mcp.kiloapps.io/mcp',
+          token: 'private-scoped-mcp-token',
+          expiresAt: 123,
+        })
+        .catch(cause => cause);
+      expect(error).toMatchObject({ message: 'Cloud Agent MCP credential refresh failed' });
+      expect(stub.requests).toHaveLength(2);
+    }
+  );
+
+  it('retries a transient MCP connection failure without changing the issued credential', async () => {
+    let attempts = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        attempts++;
+        return Response.json({
+          'kilo-cloud-agent': { status: attempts === 1 ? 'failed' : 'connected' },
+        });
+      },
+    });
+    startedServers.push(server);
+    await createClient(server.url.toString()).updateCloudAgentMcp({
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-session-mcp-token',
+      expiresAt: 123,
+    });
+    expect(attempts).toBe(2);
+  });
+
+  it('discovers directory and ancestry across the process without retaining session history', async () => {
+    let query: URL | undefined;
+    let header: string | null = null;
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        query = new URL(request.url);
+        header = request.headers.get('x-kilo-directory');
+        return Response.json([
+          {
+            id: 'ses_child',
+            directory: '/another',
+            parentID: 'ses_parent',
+            title: 'private title',
+            metadata: { secret: 'private' },
+          },
+        ]);
+      },
+    });
+    startedServers.push(server);
+    const sessions = await createClient(server.url.toString()).listSessionMetadata(
+      AbortSignal.timeout(1000)
+    );
+    expect(sessions).toEqual([{ id: 'ses_child', directory: '/another', parentID: 'ses_parent' }]);
+    expect(query?.pathname).toBe('/experimental/session');
+    expect(query?.searchParams.get('directory')).toBeNull();
+    expect(header).toBeNull();
+    expect(query?.searchParams.get('limit')).toBe(String(KILO_ACTIVITY_DISCOVERY_LIMIT));
+    expect(query?.searchParams.get('archived')).toBe('true');
+  });
+
+  it('rejects incomplete discovery instead of silently treating undiscovered directories as idle', async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => Response.json([], { headers: { 'x-next-cursor': '123' } }),
+    });
+    startedServers.push(server);
+    const error = await createClient(server.url.toString())
+      .listSessionMetadata(AbortSignal.timeout(1000))
+      .catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: 'Activity session discovery exceeded its bounded complete window',
+    });
+  });
+
+  it('bounds activity message reads and passes the owned directory and cancellation signal', async () => {
+    let query: URL | undefined;
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        query = new URL(request.url);
+        return Response.json([]);
+      },
+    });
+    startedServers.push(server);
+    await createClient(server.url.toString()).getRecentSessionMessages(
+      'ses_1',
+      '/other',
+      AbortSignal.timeout(1000)
+    );
+    expect(query?.pathname).toBe('/session/ses_1/message');
+    expect(query?.searchParams.get('directory')).toBe('/other');
+    expect(query?.searchParams.get('limit')).toBe(String(KILO_ACTIVITY_MESSAGE_LIMIT));
+    const controller = new AbortController();
+    controller.abort();
+    const error = await createClient(server.url.toString())
+      .getRecentSessionMessages('ses_1', '/other', controller.signal)
+      .catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: 'Activity session messages failed: request error' });
+  });
+
+  it('keeps skill-sourced rows in the catalog so the composer can list and invoke them', async () => {
+    const stub = startStub(200, [
+      { name: 'review', description: 'Review', hints: [], source: 'command', template: 'x' },
+      {
+        name: 'kilo-config',
+        description: 'Guide for Kilo configuration',
+        hints: [],
+        source: 'skill',
+        template: 'y',
+      },
+    ]);
+
+    const catalog = await createClient(stub.url).listCommands();
+
+    expect(catalog).toEqual({
+      commands: [
+        { name: 'review', description: 'Review', source: 'command', hints: [] },
+        {
+          name: 'kilo-config',
+          description: 'Guide for Kilo configuration',
+          source: 'skill',
+          hints: [],
+        },
+      ],
+      dropped: 0,
+      overLimit: false,
+    });
+  });
+
+  it('keeps every skill row when a full catalog is bounded', async () => {
+    const stub = startStub(200, [
+      ...Array.from({ length: 260 }, (_, index) => ({
+        name: `cmd-${index}`,
+        description: 'Command',
+        hints: [],
+        source: 'command',
+        template: 'x',
+      })),
+      ...Array.from({ length: 3 }, (_, index) => ({
+        name: `skill-${index}`,
+        description: 'Guide',
+        hints: [],
+        source: 'skill',
+        template: 'y',
+      })),
+    ]);
+
+    const catalog = await createClient(stub.url).listCommands();
+
+    expect(catalog.commands).toHaveLength(256);
+    expect(catalog.commands.filter(command => command.source === 'skill')).toEqual([
+      { name: 'skill-0', description: 'Guide', source: 'skill', hints: [] },
+      { name: 'skill-1', description: 'Guide', source: 'skill', hints: [] },
+      { name: 'skill-2', description: 'Guide', source: 'skill', hints: [] },
+    ]);
+    // 260 non-skill rows plus 3 skill rows against a 256-command bound: the
+    // skill rows survive and 7 non-skill rows do not.
+    expect(catalog.dropped).toBe(7);
+    expect(catalog.overLimit).toBe(false);
+  });
+
+  it('reports the full catalog when skill rows alone exceed a bound', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'kilo-api-catalog-'));
+    const logPath = join(directory, 'wrapper.log');
+    const originalLogPath = process.env.WRAPPER_LOG_PATH;
+    process.env.WRAPPER_LOG_PATH = logPath;
+    try {
+      const stub = startStub(
+        200,
+        Array.from({ length: 300 }, (_, index) => ({
+          name: `skill-${index}`,
+          description: 'Guide',
+          hints: [],
+          source: 'skill',
+          template: 'y',
+        }))
+      );
+
+      const catalog = await createClient(stub.url).listCommands();
+
+      // Skill rows are never truncated: the over-limit catalog is returned as
+      // the CLI reported it, and the wrapper says so instead of hiding skills.
+      expect(catalog.commands).toHaveLength(300);
+      expect(catalog.dropped).toBe(0);
+      expect(catalog.overLimit).toBe(true);
+      expect(readFileSync(logPath, 'utf8')).toContain('slash command catalog over limit');
+    } finally {
+      if (originalLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = originalLogPath;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  const questions: QuestionRequest[] = [
+    {
+      id: 'question_1',
+      sessionID: 'ses_1',
+      questions: [
+        {
+          question: 'Which changes should be applied?',
+          header: 'Changes',
+          options: [
+            {
+              label: 'All',
+              description: 'Apply every change',
+              labelKey: 'all',
+              descriptionKey: 'applyAll',
+              mode: 'code',
+            },
+          ],
+          multiple: true,
+          custom: false,
+          questionKey: 'changesQuestion',
+          headerKey: 'changesHeader',
+        },
+      ],
+      blocking: true,
+      tool: { messageID: 'msg_1', callID: 'call_1' },
+    },
+  ];
+
+  const operations: Array<{
+    name: string;
+    method: string;
+    pathname: string;
+    response: unknown;
+    body?: unknown;
+    invoke: (client: WrapperKiloClient, directory?: string) => Promise<unknown>;
+  }> = [
+    {
+      name: 'abort',
+      method: 'POST',
+      pathname: '/session/ses_1/abort',
+      response: true,
+      invoke: (client, directory) => client.abortSession({ sessionId: 'ses_1', directory }),
+    },
+    {
+      name: 'session summarize',
+      method: 'POST',
+      pathname: '/session/ses_1/summarize',
+      response: true,
+      body: { providerID: 'kilo', modelID: 'vendor/Team/Model:free~Alias' },
+      invoke: (client, directory) =>
+        client.summarizeSession({
+          sessionId: 'ses_1',
+          model: { modelID: 'vendor/Team/Model:free~Alias' },
+          directory,
+        }),
+    },
+    {
+      name: 'question answer',
+      method: 'POST',
+      pathname: '/question/question_1/reply',
+      response: true,
+      body: { answers: [['All']] },
+      invoke: (client, directory) => client.answerQuestion('question_1', [['All']], directory),
+    },
+    {
+      name: 'question rejection',
+      method: 'POST',
+      pathname: '/question/question_1/reject',
+      response: true,
+      invoke: (client, directory) => client.rejectQuestion('question_1', directory),
+    },
+    {
+      name: 'permission reply',
+      method: 'POST',
+      pathname: '/permission/perm_1/reply',
+      response: true,
+      body: { reply: 'once', message: 'approved', interactive: true },
+      invoke: (client, directory) =>
+        client.answerPermission('perm_1', 'once', 'approved', true, directory),
+    },
+    {
+      name: 'session status',
+      method: 'GET',
+      pathname: '/session/status',
+      response: { ses_1: { type: 'busy' } },
+      invoke: (client, directory) => client.getSessionStatuses(directory),
+    },
+    {
+      name: 'session diff',
+      method: 'GET',
+      pathname: '/session/ses_1/diff',
+      response: [
+        {
+          file: 'src/file.ts',
+          patch:
+            'diff --git a/src/file.ts b/src/file.ts\n--- a/src/file.ts\n+++ b/src/file.ts\n@@ -1 +1 @@\n-before\n+after\n',
+          additions: 1,
+          deletions: 1,
+          status: 'modified',
+        },
+      ],
+      invoke: (client, directory) => client.getSessionDiff('ses_1', directory),
+    },
+    {
+      name: 'question list',
+      method: 'GET',
+      pathname: '/question',
+      response: questions,
+      invoke: (client, directory) => client.getQuestions(directory),
+    },
+    {
+      name: 'permission list',
+      method: 'GET',
+      pathname: '/permission',
+      response: [
+        {
+          id: 'perm_1',
+          sessionID: 'ses_1',
+          permission: 'bash',
+          patterns: ['ls'],
+          metadata: { skill: 'review' },
+          always: ['ls *'],
+          tool: { messageID: 'msg_1', callID: 'call_1' },
+        },
+      ],
+      invoke: (client, directory) => client.getPermissions(directory),
+    },
+  ];
+
+  for (const operation of operations) {
+    for (const directory of [undefined, '/workspace/attached repo & tests']) {
+      it(`${operation.name} serializes ${directory ? 'attached' : 'default'} directory and preserves its response`, async () => {
+        const stub = startStub(200, operation.response);
+        const client = createClient(stub.url);
+
+        expect(await operation.invoke(client, directory)).toEqual(operation.response);
+        expect(stub.requests).toEqual([
+          {
+            method: operation.method,
+            pathname: operation.pathname,
+            directory: directory ?? '/workspace',
+            body: operation.body,
+          },
+        ]);
+      });
+    }
+
+    it(`${operation.name} rejects missing required response data`, async () => {
+      const stub = startStub(204);
+      const error: unknown = await operation.invoke(createClient(stub.url)).catch(cause => cause);
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw new Error('Expected missing response failure');
+      expect(error.message).toContain('returned no data');
+    });
+
+    if (operation.response === true) {
+      it(`${operation.name} preserves a negative acknowledgement`, async () => {
+        const stub = startStub(200, false);
+        expect(await operation.invoke(createClient(stub.url))).toBe(false);
+      });
+    }
+  }
+
+  it('reads directory-scoped status without treating another checkout as empty', async () => {
+    const directory = '/workspace/shared checkout & tools';
+    const requests: Array<{ method: string; pathname: string; directory: string | null }> = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: request => {
+        const url = new URL(request.url);
+        requests.push({
+          method: request.method,
+          pathname: url.pathname,
+          directory: url.searchParams.get('directory'),
+        });
+        return Response.json(
+          url.searchParams.get('directory') === directory
+            ? { root_a: { type: 'busy', waitingOn: 'tool' } }
+            : {}
+        );
+      },
+    });
+    startedServers.push(server);
+    const client = createClient(server.url.toString());
+
+    expect(await client.getSessionStatuses(directory)).toEqual({
+      root_a: { type: 'busy', waitingOn: 'tool' },
+    });
+    expect(requests).toEqual([{ method: 'GET', pathname: '/session/status', directory }]);
+    expect(await client.getSessionStatuses()).toEqual({});
+  });
+
+  it('rejects a non-boolean abort acknowledgement', async () => {
+    const stub = startStub(200, {});
+    const error: unknown = await createClient(stub.url)
+      .abortSession({ sessionId: 'ses_1' })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    if (!(error instanceof Error)) throw new Error('Expected invalid abort response failure');
+    expect(error.message).toBe('Session abort for ses_1 returned no boolean result');
+  });
+
+  it('treats a 404 cleanup abort as success without retrying', async () => {
+    const stub = startStub(404, {});
+    await createClient(stub.url).abortSessionForCleanup({
+      sessionId: 'ses_1',
+      directory: '/workspace',
+    });
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0]).toMatchObject({
+      method: 'POST',
+      pathname: '/session/ses_1/abort',
+      directory: '/workspace',
+    });
+  });
+
+  it('validates cleanup child rows before walking them', async () => {
+    const valid = 'ses_22222222222222222222222222';
+    const good = startStub(200, [{ id: valid, directory: '/workspace' }]);
+    expect(
+      await createClient(good.url).children({ sessionId: 'ses_1', directory: '/workspace' })
+    ).toEqual([{ id: valid, directory: '/workspace' }]);
+
+    const malformed = startStub(200, [{ id: 'not-a-session', directory: '/workspace' }]);
+    const error: unknown = await createClient(malformed.url)
+      .children({ sessionId: 'ses_1', directory: '/workspace' })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+  });
+
+  const errorOperations: Array<{
+    name: string;
+    invoke: (client: WrapperKiloClient) => Promise<unknown>;
+  }> = [
+    ...operations,
+    { name: 'session create', invoke: client => client.createSession() },
+    { name: 'session get', invoke: client => client.getSession('ses_1') },
+    {
+      name: 'session ensure',
+      invoke: client => client.ensureSession('ses_1', '/workspace/attached'),
+    },
+    {
+      name: 'prompt completion',
+      invoke: client =>
+        client.sendPrompt({ sessionId: 'ses_1', messageId: 'msg_1', prompt: 'hello' }),
+    },
+    {
+      name: 'async prompt',
+      invoke: client =>
+        client.sendPromptAsync({ sessionId: 'ses_1', messageId: 'msg_1', prompt: 'hello' }),
+    },
+    {
+      name: 'command completion',
+      invoke: client => client.sendCommand({ sessionId: 'ses_1', command: 'review' }),
+    },
+    { name: 'command list', invoke: client => client.listCommands() },
+    { name: 'network list', invoke: client => client.getNetworkWaits() },
+    { name: 'network reply', invoke: client => client.resumeNetworkWait('net_1') },
+    { name: 'model list', invoke: client => client.listEffectiveModels('kilo') },
+    {
+      name: 'commit message generation',
+      invoke: client => client.generateCommitMessage({ path: '/workspace' }),
+    },
+    {
+      name: 'PTY create',
+      invoke: client => client.createPty({ cwd: '/workspace', title: 'Terminal', env: {} }),
+    },
+    { name: 'PTY resize', invoke: client => client.resizePty('pty_1', { cols: 80, rows: 24 }) },
+    { name: 'PTY delete', invoke: client => client.deletePty('pty_1') },
+  ];
+
+  for (const operation of errorOperations) {
+    it(`${operation.name} rejects an HTTP failure without exposing the SDK error body`, async () => {
+      const stub = startStub(500, {
+        message: 'upstream fetch failed with sensitive response data',
+        credentials: 'private test value',
+      });
+      const error: unknown = await operation.invoke(createClient(stub.url)).catch(cause => cause);
+
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw new Error('Expected SDK failure');
+      expect(error.message).toMatch(/failed: HTTP 500$/);
+      expect(error.message).not.toContain('sensitive');
+      expect(error.message).not.toContain('private test value');
+      expect(isKiloServerUnreachableError(error)).toBe(false);
+      expect(stub.requests).toHaveLength(1);
+    });
+  }
+
+  it('aborts an in-flight commit-message HTTP request without waiting for a response', async () => {
+    const received = Promise.withResolvers<IncomingMessage>();
+    const server = createServer(request => {
+      request.resume();
+      received.resolve(request);
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Expected HTTP listener');
+    const serverUrl = `http://127.0.0.1:${address.port}`;
+    const controller = new AbortController();
+    const reason = new Error('Task cancelled');
+    const watchdog = setTimeout(() => server.closeAllConnections(), 1_000);
+    try {
+      const pending = createClient(serverUrl)
+        .generateCommitMessage({ path: '/workspace', signal: controller.signal })
+        .catch((error: unknown) => error);
+      const request = await received.promise;
+      expect(request.method).toBe('POST');
+      const url = new URL(request.url ?? '', serverUrl);
+      expect(url.pathname).toBe('/commit-message');
+      expect(url.searchParams.get('directory')).toBe('/workspace');
+
+      controller.abort(reason);
+      const error = await pending;
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw new Error('Expected cancellation failure');
+      expect(error.cause).toBe(reason);
+      expect(error.message).toBe('Commit message generation failed: request error');
+    } finally {
+      clearTimeout(watchdog);
+      controller.abort();
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
+  it('imports a missing session into its native directory project without requiring a global project row', async () => {
+    const sessionId = 'ses_fba796140fffo6EPOZajyerVqP';
+    const projectId = '57ccd1e3429a492e139d0882b4767d0830996221';
+    const directory = '/workspace/attached repo & tests';
+    const database = new Database(':memory:');
+    database.run('PRAGMA foreign_keys = ON');
+    database.run('CREATE TABLE project (id TEXT PRIMARY KEY)');
+    database.run(
+      'CREATE TABLE session (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES project(id), directory TEXT NOT NULL)'
+    );
+    database.run('INSERT INTO project (id) VALUES (?)', [projectId]);
+    const requests: Array<{ method: string; pathname: string; directory: string | null }> = [];
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        requests.push({
+          method: request.method,
+          pathname: url.pathname,
+          directory: url.searchParams.get('directory'),
+        });
+        if (url.searchParams.get('directory') !== directory)
+          return new Response(null, { status: 400 });
+        if (request.method === 'GET' && url.pathname === `/session/${sessionId}`) {
+          const row = database
+            .query<{ id: string; projectID: string; directory: string }, [string]>(
+              'SELECT id, project_id AS projectID, directory FROM session WHERE id = ?'
+            )
+            .get(sessionId);
+          return row
+            ? Response.json(row)
+            : Response.json(
+                { name: 'NotFoundError', data: { message: `Session not found: ${sessionId}` } },
+                { status: 404 }
+              );
+        }
+        if (url.pathname === '/project/current') {
+          return Response.json({
+            id: projectId,
+            worktree: directory,
+            vcs: 'git',
+            time: { created: 1, updated: 1 },
+            sandboxes: [],
+          });
+        }
+        if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
+          const body = (await request.json()) as {
+            id: string;
+            projectID: string;
+            directory: string;
+          };
+          try {
+            database.run('INSERT INTO session (id, project_id, directory) VALUES (?, ?, ?)', [
+              body.id,
+              body.projectID,
+              body.directory,
+            ]);
+          } catch {
+            return Response.json(
+              {
+                name: 'UnknownError',
+                data: { message: 'Unexpected server error. Check server logs for details.' },
+              },
+              { status: 500 }
+            );
+          }
+          return Response.json({ ok: true, id: body.id });
+        }
+        if (request.method === 'POST' && url.pathname === `/session/${sessionId}/abort`)
+          return Response.json(true);
+        return new Response(null, { status: 404 });
+      },
+    });
+    try {
+      const url = server.url.toString();
+      const client = createWrapperKiloClient(
+        createKiloClient({ baseUrl: url }),
+        { url },
+        directory
+      );
+      await client.ensureSession(sessionId, directory);
+      expect(await client.getSession(sessionId)).toEqual({ id: sessionId });
+      expect(await client.abortSession({ sessionId, directory })).toBe(true);
+      await client.ensureSession(sessionId, directory);
+      expect(database.query('SELECT id FROM project WHERE id = ?').get('global')).toBeNull();
+      expect(
+        database.query('SELECT id, project_id AS projectID, directory FROM session').all()
+      ).toEqual([{ id: sessionId, projectID: projectId, directory }]);
+      expect(requests.map(({ method, pathname }) => `${method} ${pathname}`)).toEqual([
+        `GET /session/${sessionId}`,
+        'GET /project/current',
+        'POST /kilocode/session-import/session',
+        `GET /session/${sessionId}`,
+        `POST /session/${sessionId}/abort`,
+        `GET /session/${sessionId}`,
+      ]);
+      expect(requests.every(request => request.directory === directory)).toBe(true);
+    } finally {
+      await server.stop(true);
+      database.close();
+    }
+  });
+
+  it.each([
+    { status: 500, body: { message: 'private fake diagnostic' } },
+    { status: 200, body: {} },
+    { status: 200, body: { id: '' } },
+  ])(
+    'does not import a session when current project lookup is invalid: %j',
+    async ({ status, body }) => {
+      let imports = 0;
+      const server = Bun.serve({
+        port: 0,
+        fetch(request) {
+          const url = new URL(request.url);
+          if (url.pathname === '/project/current') return Response.json(body, { status });
+          if (request.method === 'POST') imports += 1;
+          return Response.json(
+            { name: 'NotFoundError', data: { message: 'Session not found' } },
+            { status: 404 }
+          );
+        },
+      });
+      try {
+        const error: unknown = await createClient(server.url.toString())
+          .ensureSession('ses_1', '/workspace/attached')
+          .catch(error => error);
+        expect(error).toBeInstanceOf(Error);
+        if (!(error instanceof Error)) throw new Error('Expected project lookup failure');
+        expect(error.message).toContain('project');
+        expect(error.message).not.toContain('private fake diagnostic');
+        expect(imports).toBe(0);
+      } finally {
+        await server.stop(true);
+      }
+    }
+  );
+
+  it.each(
+    [null, [], '', { ses_1: null }, { ses_1: {} }, { ses_1: { type: 1 } }].map(body => ({ body }))
+  )('rejects malformed successful session status maps: %j', async ({ body }) => {
+    const result: unknown = await createClient(startStub(200, body).url)
+      .getSessionStatuses()
+      .catch(error => error);
+    expect(result).toBeInstanceOf(Error);
+  });
+
+  it.each([
+    { status: 204, body: undefined },
+    { status: 500, body: {} },
+  ])('rejects unavailable session status: %j', async ({ status, body }) => {
+    const result: unknown = await createClient(startStub(status, body).url)
+      .getSessionStatuses()
+      .catch(error => error);
+    expect(result).toBeInstanceOf(Error);
+  });
+
+  it('validates exact session existence for cleanup without importing', async () => {
+    const directory = '/workspace/exact';
+    const client = createClient(startStub(200, { id: 'ses_1', directory }).url);
+    expect(await client.getSessionDetails('ses_1', directory)).toEqual({ id: 'ses_1', directory });
+    for (const lookup of [
+      () => client.getSessionDetails('ses_other', directory),
+      () => client.getSessionDetails('ses_1', '/other'),
+      () => createClient(startStub(404, {}).url).getSessionDetails('ses_1', directory),
+    ]) {
+      const result: unknown = await lookup().catch(error => error);
+      expect(result).toBeInstanceOf(Error);
+    }
+  });
+
+  it('sends server context as a synthetic part before the prompt', async () => {
+    const stub = startStub(200, true);
+    await createClient(stub.url).sendPromptAsync({
+      sessionId: 'ses_1',
+      messageId: 'msg_1',
+      prompt: 'hello',
+      context: '<cloud-agent-context session-id="workspace_1" />',
+    });
+    expect(stub.requests[0]?.body).toMatchObject({
+      parts: [
+        {
+          type: 'text',
+          text: '<cloud-agent-context session-id="workspace_1" />',
+          synthetic: true,
+        },
+        { type: 'text', text: 'hello' },
+      ],
+    });
+  });
+
+  it('probes one tool part and returns only metadata', async () => {
+    const stub = startStub(200, {
+      info: { id: 'assistant_1', role: 'assistant' },
+      parts: [
+        {
+          id: 'part_1',
+          type: 'tool',
+          sessionID: 'ses_1',
+          messageID: 'assistant_1',
+          tool: 'bash',
+          state: { status: 'completed', input: { command: 'secret' }, output: 'é', title: 'run' },
+        },
+      ],
+    });
+    const result = await createClient(stub.url).probeMessagePart?.(
+      'ses_1',
+      '/workspace/exact',
+      'assistant_1',
+      'part_1',
+      new AbortController().signal
+    );
+    expect(result).toEqual({ status: 'completed', outputBytes: 2 });
+    expect(stub.requests[0]).toMatchObject({
+      method: 'GET',
+      pathname: '/session/ses_1/message/assistant_1',
+      directory: '/workspace/exact',
+    });
+  });
+
+  it('accepts genuinely empty successful session status and pending-input results', async () => {
+    expect(await createClient(startStub(200, {}).url).getSessionStatuses()).toEqual({});
+    expect(await createClient(startStub(200, []).url).getQuestions()).toEqual([]);
+    expect(await createClient(startStub(200, []).url).getPermissions()).toEqual([]);
+    expect(await createClient(startStub(200, []).url).getSessionDiff('ses_1')).toEqual([]);
+  });
+
+  it('cancels a native diff HTTP read without treating it as an empty result', async () => {
+    const stub = startStub(200, []);
+    const controller = new AbortController();
+    controller.abort(new Error('Diff request cancelled'));
+    const error: unknown = await createClient(stub.url)
+      .getSessionDiff('ses_1', '/attached', controller.signal)
+      .catch(error => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: 'Session diff ses_1 failed: request error' });
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it('scopes question lists, answers, and rejections to the owning checkout directory', async () => {
+    const directory = '/workspace/shared checkout & tools';
+    const pending = new Map(questions.map(question => [question.id, question]));
+    const requests: Array<{ pathname: string; directory: string | null }> = [];
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        requests.push({ pathname: url.pathname, directory: url.searchParams.get('directory') });
+        if (url.searchParams.get('directory') !== directory) {
+          return Response.json({ message: 'Wrong checkout' }, { status: 404 });
+        }
+        if (url.pathname === '/question') return Response.json([...pending.values()]);
+        if (url.pathname === '/question/question_1/reply') {
+          expect(await request.json()).toEqual({ answers: [['All']] });
+          pending.delete('question_1');
+          return Response.json(true);
+        }
+        if (url.pathname === '/question/question_1/reject') {
+          pending.delete('question_1');
+          return Response.json(true);
+        }
+        return new Response(null, { status: 404 });
+      },
+    });
+    startedServers.push(server);
+    const client = createClient(server.url.toString());
+
+    expect(await client.getQuestions(directory)).toEqual(questions);
+    expect(await client.answerQuestion('question_1', [['All']], directory)).toBe(true);
+    expect(await client.getQuestions(directory)).toEqual([]);
+    pending.set(questions[0].id, questions[0]);
+    expect(await client.rejectQuestion('question_1', directory)).toBe(true);
+    expect(await client.getQuestions(directory)).toEqual([]);
+    expect(requests).toEqual([
+      { pathname: '/question', directory },
+      { pathname: '/question/question_1/reply', directory },
+      { pathname: '/question', directory },
+      { pathname: '/question/question_1/reject', directory },
+      { pathname: '/question', directory },
+    ]);
+  });
+
+  it.each(['prompt', 'command'] as const)(
+    'preserves the durable message ID and terminal assistant response for a synchronous %s',
+    async operation => {
+      const completion: Awaited<ReturnType<WrapperKiloClient['sendPrompt']>> = {
+        info: {
+          id: 'assistant_1',
+          sessionID: 'ses_1',
+          parentID: 'message_durable',
+          role: 'assistant',
+          time: { created: 1, completed: 2 },
+          modelID: 'example',
+          providerID: 'kilo',
+          mode: 'code',
+          agent: 'code',
+          path: { cwd: '/checkout', root: '/checkout' },
+          cost: 0,
+          tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+          error: { name: 'MessageAbortedError', data: { message: 'Cancelled' } },
+        },
+        parts: [],
+      };
+      const stub = startStub(200, completion);
+      const client = createClient(stub.url);
+      const options = { sessionId: 'ses_1', messageId: 'message_durable', directory: '/checkout' };
+      const result =
+        operation === 'prompt'
+          ? await client.sendPrompt({ ...options, prompt: 'hello' })
+          : await client.sendCommand({ ...options, command: 'review' });
+
+      expect(result).toEqual(completion);
+      expect(stub.requests).toEqual([
+        {
+          method: 'POST',
+          pathname: operation === 'prompt' ? '/session/ses_1/message' : '/session/ses_1/command',
+          directory: '/checkout',
+          body:
+            operation === 'prompt'
+              ? { messageID: 'message_durable', parts: [{ type: 'text', text: 'hello' }] }
+              : { messageID: 'message_durable', command: 'review', arguments: '' },
+        },
+      ]);
+    }
+  );
+
+  it('retains complete typed pending question contents', async () => {
+    const stub = startStub(200, questions);
+    const result = await createClient(stub.url).getQuestions();
+    expect(result[0]?.questions[0]?.options[0]?.description).toBe('Apply every change');
+    expect(result).toEqual(questions);
+  });
+
   it('POSTs an interactive reply to /permission/<id>/reply on a trailing-slash URL', async () => {
-    const stub = await startStub(200);
+    const stub = startStub(200);
     const client = createClient(stub.url);
 
     const result = await client.answerPermission('perm_1', 'once', undefined, true);
@@ -141,11 +1065,12 @@ describe('createWrapperKiloClient().answerPermission', () => {
     expect(stub.requests).toHaveLength(1);
     expect(stub.requests[0].method).toBe('POST');
     expect(stub.requests[0].pathname).toBe('/permission/perm_1/reply');
+    expect(stub.requests[0].directory).toBe('/workspace');
     expect(stub.requests[0].body).toEqual({ reply: 'once', interactive: true });
   });
 
   it('omits interactive and message for the non-interactive auto-approve shape', async () => {
-    const stub = await startStub(200);
+    const stub = startStub(200);
     const client = createClient(stub.url);
 
     const result = await client.answerPermission('perm_2', 'always');
@@ -156,8 +1081,17 @@ describe('createWrapperKiloClient().answerPermission', () => {
     expect(stub.requests[0].body).toEqual({ reply: 'always' });
   });
 
+  it('serializes an explicitly non-interactive permission reply', async () => {
+    const stub = startStub(200);
+    const client = createClient(stub.url);
+
+    await client.answerPermission('perm_2', 'always', undefined, false, '/workspace/attached');
+    expect(stub.requests[0]?.body).toEqual({ reply: 'always', interactive: false });
+    expect(stub.requests[0]?.directory).toBe('/workspace/attached');
+  });
+
   it('threads the message through an interactive reply on a stripped URL', async () => {
-    const stub = await startStub(200);
+    const stub = startStub(200);
     const client = createClient(stub.url.replace(/\/+$/, ''));
 
     const result = await client.answerPermission('perm_3', 'reject', 'continue read-only', true);
@@ -173,7 +1107,7 @@ describe('createWrapperKiloClient().answerPermission', () => {
   });
 
   it('throws on a non-2xx reply', async () => {
-    const stub = await startStub(500);
+    const stub = startStub(500);
     const client = createClient(stub.url.replace(/\/+$/, ''));
 
     let caught: Error | undefined;
@@ -186,5 +1120,99 @@ describe('createWrapperKiloClient().answerPermission', () => {
     expect(stub.requests).toHaveLength(1);
     expect(stub.requests[0].method).toBe('POST');
     expect(stub.requests[0].pathname).toBe('/permission/perm_4/reply');
+  });
+
+  it('returns true and serializes the default and attached drain directory', async () => {
+    for (const directory of [undefined, '/workspace/attached repo & tests']) {
+      const stub = startStub(200, true);
+      const client = createClient(stub.url);
+
+      expect(
+        await client.drainSession({ sessionId: 'ses_1', directory, token: 'drain-token' })
+      ).toBe(true);
+      expect(stub.requests).toEqual([
+        {
+          method: 'POST',
+          pathname: '/kilocode/session/ses_1/drain',
+          directory: directory ?? '/workspace',
+          body: { token: 'drain-token' },
+        },
+      ]);
+    }
+  });
+
+  it('classifies a 404 without leaking the response body', async () => {
+    const stub = startStub(404, { message: 'secret-drain-token' });
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('definitive');
+    expect(drainError.status).toBe(404);
+    expect(drainError.message).toBe('HTTP 404');
+    expect(drainError.message).not.toContain('secret-drain-token');
+  });
+
+  it.each([408, 429, 503])('classifies HTTP %i as transient', async status => {
+    const stub = startStub(status, { message: 'transient-body' });
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('transient');
+    expect(drainError.status).toBe(status);
+    expect(drainError.message).toBe(`HTTP ${status}`);
+  });
+
+  it('classifies a refused connection as a transient request error', async () => {
+    const error = await createClient('http://127.0.0.1:1/')
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('transient');
+    expect(drainError.message).toBe('request error');
+  });
+
+  it('treats a boolean false as an anomalous failure with the exact message', async () => {
+    const stub = startStub(200, false);
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('anomalous');
+    expect(drainError.message).toBe('Session drain returned false');
+  });
+
+  it('treats 204 and a 200 non-boolean as anomalous with no boolean result', async () => {
+    for (const stub of [startStub(204), startStub(200, { ok: true })]) {
+      const error = await createClient(stub.url)
+        .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+        .catch(cause => cause);
+
+      expect(error).toBeInstanceOf(DrainSessionError);
+      const drainError = error as DrainSessionError;
+      expect(drainError.kind).toBe('anomalous');
+      expect(drainError.message).toBe('returned no boolean result');
+    }
+  });
+
+  it('rejects an already-aborted caller signal without a DrainSessionError', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const stub = startStub(200, true);
+
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token', signal: controller.signal })
+      .catch(cause => cause);
+
+    expect(error).not.toBeInstanceOf(DrainSessionError);
   });
 });

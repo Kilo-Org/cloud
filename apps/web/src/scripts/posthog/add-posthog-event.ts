@@ -1,5 +1,5 @@
 import '@/lib/load-env';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { PostHog } from 'posthog-node';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

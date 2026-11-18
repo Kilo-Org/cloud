@@ -1,40 +1,49 @@
+/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard inset, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
-import { ExternalLink } from '@/components/ui/icons';
-import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  AppState,
-  Keyboard,
-  KeyboardAvoidingView,
-  type KeyboardEvent,
-  Platform,
-  ScrollView,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { type Href } from 'expo-router';
+import { Globe } from '@/components/ui/icons';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import logo from '@/../assets/images/logo.png';
-import {
-  resolveAppAwareKeyboardPadding,
-  resolveKeyboardPaddingEventsForPlatform,
-} from '@/components/kilo-chat/app-aware-keyboard-padding-state';
+import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
+import { CenteredState } from '@/components/centered-state';
 import { IdleAuth } from '@/components/login/idle-auth';
-import { errorMessage } from '@/components/login-screen-state';
+import {
+  errorMessage,
+  resolveBottomChromePadding,
+  resolveFieldActionReserve,
+} from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
+import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
+import { announcePendingLinkOutcome, pendingLinkOutcome } from '@/lib/auth/pending-link';
+import {
+  readPendingLinkOffer,
+  recordPendingLinkOutcome,
+  setPendingLinkOffer,
+  takePendingLinkOutcome,
+} from '@/lib/auth/pending-link-state';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-function keyboardHeightFromEvent(event: KeyboardEvent): number {
-  return event.endCoordinates.height;
-}
+import { persistLoginDrafts, restoreLoginDrafts, type SsoRecoveryDraft } from '@/lib/login-draft';
+import { setLanguagePickerBridge } from '@/lib/picker-bridge';
+import { useScreenInsets } from '@/lib/screen-insets';
 
 export function LoginScreen() {
-  const { sessionEnded, signIn } = useAuth();
+  const { sessionEnded, signIn, token: publishedToken } = useAuth();
+  const pushOnce = useSinglePushRoute();
   const {
     status,
     token,
@@ -43,33 +52,137 @@ export function LoginScreen() {
     expiresIn,
     error,
     verificationUrl,
+    resumed,
+    pendingLink: pendingLinkResult,
+    expiredPendingLinkToken,
     start,
     cancel,
     openBrowser,
+    clearError,
   } = useDeviceAuth();
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
-  const [persistError, setPersistError] = useState<string | undefined>(undefined);
-  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+  const insets = useScreenInsets();
+  const { t } = useTranslation();
+  const fontScale = useLiveFontScale();
+  // The space the keyboard reveal keeps below a focused field is the height of
+  // what the form renders under that field, reported by the form itself: a
+  // refusal that wraps in a long catalog is measured instead of assumed. The
+  // action-and-gaps floor covers the first frame, before anything reported a
+  // height, and the provider rows above the field never count.
+  const [belowFieldHeight, setBelowFieldHeight] = useState(0);
+  const fieldActionReserve = resolveFieldActionReserve({ fontScale, belowFieldHeight });
+  const [persistFailed, setPersistFailed] = useState(false);
+  const [authFormBusy, setAuthFormBusy] = useState(false);
+  const [draft, setDraft] = useState<{
+    email: string;
+    ssoRecovery: SsoRecoveryDraft | null;
+  } | null>(null);
+  // Held in the module rather than in this screen: the screen unmounts while a
+  // browser sign-in is pending and right after the device approved one, and a
+  // remount must return to the same link instead of the plain landing.
+  const [pendingLink, setPendingLink] = useState<PendingLinkOffer | null>(readPendingLinkOffer);
+  const updatePendingLink = useCallback((offer: PendingLinkOffer | null) => {
+    setPendingLinkOffer(offer);
+    setPendingLink(offer);
+  }, []);
+
+  // Set once this mount completes a sign-in: the unmount persistence then
+  // stays off, because the signed-in session owns the screen and a typed
+  // email from the abandoned attempt must not survive into the next login.
+  const signedInRef = useRef(false);
+
+  // The outcome of the last link-resolution survives a remount the same way the
+  // offer does, so a mount that follows an activity restart still tells the
+  // person what happened — once, then the record is gone. Past the link's own
+  // deadline the notice would describe a link nobody can still resolve.
+  useEffect(() => {
+    const offer = readPendingLinkOffer();
+    const outcome = takePendingLinkOutcome();
+    if (!offer || Date.now() < offer.expiresAt) {
+      announcePendingLinkOutcome(outcome, offer);
+    }
+  }, []);
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
-      setPersistError(undefined);
+      setPersistFailed(false);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
       } catch {
-        setPersistError('Could not complete sign in. Please try again.');
+        // The message renders from the catalog at draw time, so a language
+        // switch re-renders it in the new language.
+        setPersistFailed(true);
+        return;
       }
+      announcePendingLinkOutcome(takePendingLinkOutcome(), pendingLink);
+      // The link is resolved: a later login must not restore it.
+      updatePendingLink(null);
     },
-    [signIn]
+    [pendingLink, signIn, updatePendingLink]
   );
+
+  // Every provider's completed sign-in — device code, email code, Apple,
+  // Google, passkey — publishes its token through the auth context, so this
+  // one watch covers them all: `signIn` drops the module drafts, and this
+  // flag keeps the unmount persistence off, or the next login mount would
+  // pre-fill the previous account's address.
+  useEffect(() => {
+    if (publishedToken !== undefined) {
+      signedInRef.current = true;
+    }
+  }, [publishedToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const restoreDrafts = async () => {
+      try {
+        const restored = await restoreLoginDrafts();
+        if (!cancelled) {
+          setDraft(restored);
+        }
+      } catch {
+        if (!cancelled) {
+          setDraft({ email: '', ssoRecovery: null });
+        }
+      }
+    };
+    void restoreDrafts();
+    return () => {
+      cancelled = true;
+      // Write the module-level drafts back before this mount's state dies, so
+      // the next mount restores what the user had typed — a device rotation
+      // that recreates the activity must not blank the email field. A failed
+      // write leaves the field empty on the next mount; the restore path
+      // already tolerates missing drafts. After a completed sign-in the
+      // drafts were cleared on purpose, so persistence stays off.
+      if (signedInRef.current) {
+        return;
+      }
+      void (async () => {
+        try {
+          await persistLoginDrafts();
+        } catch {
+          // Swallow: nothing to show on an unmounting screen.
+        }
+      })();
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionEnded) {
       // id dedupes the toast if the login route remounts while still signed out
-      announcingToast.warning('Your session ended. Please sign in again.', { id: 'session-ended' });
+      announcingToast.warning(t('login.sessionEnded'), { id: 'session-ended' });
     }
-  }, [sessionEnded]);
+  }, [sessionEnded, t]);
+
+  // The approved code carries the outcome of the link it resolved. Record it here, before the
+  // effect below persists the token and announces it, so a mount that follows an activity
+  // restart can still reach it.
+  useEffect(() => {
+    if (status === 'approved' && pendingLink) {
+      recordPendingLinkOutcome(pendingLinkOutcome(pendingLinkResult));
+    }
+  }, [pendingLink, pendingLinkResult, status]);
 
   useEffect(() => {
     if (status === 'approved' && token) {
@@ -78,196 +191,233 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // Android shell keyboard pad: under API 35+ EDGE_TO_EDGE_ENFORCED the window
-  // never resizes for the IME, so KeyboardAvoidingView is inert. keyboardDidShow
-  // still fires with real heights; consume them here (r0b: zero layout shift for
-  // the email IME when only KAV was present).
-  useEffect(() => {
-    if (Platform.OS !== 'android') {
-      return undefined;
-    }
-
-    const keyboardEvents = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
-    if (keyboardEvents === null) {
-      setAndroidKeyboardHeight(0);
-      return undefined;
-    }
-
-    const keyboardShowSubscription = Keyboard.addListener(keyboardEvents.show, event => {
-      setAndroidKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: {
-            type: 'keyboard-visible',
-            keyboardHeight: keyboardHeightFromEvent(event),
-          },
-        })
-      );
-    });
-    const keyboardHideSubscription = Keyboard.addListener(keyboardEvents.hide, () => {
-      setAndroidKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'keyboard-hidden' },
-        })
-      );
-    });
-    const appStateSubscription = AppState.addEventListener('change', appState => {
-      setAndroidKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'app-state-change', appState },
-        })
-      );
-    });
-
-    return () => {
-      keyboardShowSubscription.remove();
-      keyboardHideSubscription.remove();
-      appStateSubscription.remove();
-    };
-  }, []);
+  // The keyboard is reserved by the scroll view below: `KeyboardAwareScrollView`
+  // owns the IME inset and scrolls the focused field into view, so this screen
+  // neither reads the height nor pads for it.
 
   if (status === 'approved') {
-    if (persistError) {
+    if (persistFailed) {
       return (
-        <View className="flex-1 items-center justify-center gap-3 bg-background px-6">
-          <Text className="text-center text-sm text-destructive">{persistError}</Text>
-          <Button
-            onPress={() => {
-              if (token) {
-                void persistToken(token, refreshToken, expiresIn);
-              }
-            }}
-            accessibilityLabel="Retry sign in"
-          >
-            <Text>Retry</Text>
-          </Button>
-        </View>
+        <CenteredState className="bg-background">
+          <View className="items-center gap-3 px-6">
+            <Text className="text-center text-sm text-destructive">
+              {t('login.couldNotCompleteSignIn')}
+            </Text>
+            <Button
+              onPress={() => {
+                if (token) {
+                  void persistToken(token, refreshToken, expiresIn);
+                }
+              }}
+              accessibilityLabel={t('login.retrySignIn')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        </CenteredState>
       );
     }
-    return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color={colors.mutedForeground} />
-      </View>
-    );
+    // The approved hold: the device authorized, and the token write plus the
+    // root layout's redirect are still in flight. Reuse the one branded wait
+    // surface — a bare spinner on an empty background read as an unbranded
+    // blank page (explorer signin-language).
+    return <BootstrapLoadingSurface />;
   }
 
-  // RN 0.86 Android (ReactRootView.java) reports endCoordinates.height =
-  // imeInsets.bottom − barInsets.bottom (excludes the nav bar). endCoordinates.screenY
-  // is NOT the IME top under adjustResize, so full occlusion is
-  // endCoordinates.height + useSafeAreaInsets().bottom (= WindowInsets.ime().bottom;
-  // verified 704px + 63px = 767px on pixel9). Pad only when the keyboard is up so
-  // the resting layout is untouched.
-  const androidKeyboardPad = androidKeyboardHeight > 0 ? androidKeyboardHeight + insets.bottom : 0;
+  // One padded wrapper for both platforms: the bottom inset is reserved at
+  // rest, and the scroll view reserves the keyboard itself. The scroll content
+  // then stays clear of the navigation bar, the home indicator, and the IME.
+  const bottomPadding = resolveBottomChromePadding({ bottomInset: insets.bottom });
+  // The Globe stays enabled on idle, denied, expired, and error (those render
+  // an interactive IdleAuth form); it is disabled while a device-auth flow
+  // (pending/approved) or a busy auth action owns the screen.
+  const globeDisabled = status === 'pending' || authFormBusy;
+  // The globe owns the screen's first row, and the scroll content starts below
+  // it: the logo used to share the control's band on a compact screen because
+  // the scroller began at the window top while the globe was an absolute overlay.
+  // The root's side paddings already carry `insets.left`/`insets.right`, so
+  // `paddingEnd` keeps the same RTL-aware clearance from the cutout that the old
+  // absolute `end` offset measured.
+  const headerRowStyle = { paddingTop: insets.top + 8, paddingEnd: 16 } as const;
+  // A terminal device-auth error — an expired code, denied access, or the poll
+  // timing out — renders its message above the idle form. Idle, every terminal
+  // error, and a start that has not answered yet share the same single IdleAuth
+  // slot below, so dismissing the error when a new attempt starts preserves the
+  // form's in-flight state.
+  // A start that has not answered yet (`pending` with no code yet) keeps the
+  // idle form on screen too: beginning a new attempt dismisses the old error,
+  // and the form stays in place while the attempt runs, with the starting
+  // indicator below instead of a wholesale swap to the spinner.
+  const startInFlight = status === 'pending' && !code;
+  const showTerminalError = status === 'denied' || status === 'expired' || status === 'error';
+  // The idle form paints on the first frame, before the stored draft resolves.
+  // A shorter placeholder instead of the form would grow the centered column
+  // into its place and lift the logo and the heading off the position they had
+  // already painted; painting the form reserves that space by construction.
+  const showIdleForm = status === 'idle' || showTerminalError || startInFlight;
+  // The form reads its seed once, so a stored address or SSO recovery reaches
+  // it through one remount when the restore lands. The module draft keeps the
+  // value a person already typed, so that remount cannot replace it.
+  const restoredDraft = draft !== null && (draft.email !== '' || draft.ssoRecovery !== null);
 
   return (
-    // iOS: automaticallyAdjustKeyboardInsets only made the ScrollView scrollable,
-    // it never scrolls, and iOS only auto-reveals the focused field — so the
-    // centered form kept "Send code" under the keyboard on shorter devices
-    // (verified: iPhone 17 Pro, button centre 568pt vs keyboard window top 566pt,
-    // taps swallowed by UIRemoteKeyboardWindow). "padding" shrinks the ScrollView
-    // so the whole form re-centres in the space above the keyboard.
-    //
-    // Android: on API 35+ EDGE_TO_EDGE_ENFORCED the window never resizes for the
-    // IME, so KeyboardAvoidingView is inert (r0b: zero layout shift for the email
-    // IME). keyboardDidShow fires with real heights; the shell consumes them via
-    // the padding wrapper below.
-    <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === 'ios'} className="flex-1">
-      <View
-        className="flex-1"
-        // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard padding
-        style={{ paddingBottom: androidKeyboardPad }}
-      >
-        <ScrollView
-          className="flex-1 bg-background"
-          contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
-          keyboardShouldPersistTaps="handled"
+    // One wrapper owns the vertical space on both platforms: it paints the
+    // screen background and reserves the bottom chrome resolved above, so the
+    // centered form stays clear of the navigation bar and the home indicator.
+    // The keyboard inset belongs to the scroll view inside it.
+    <View
+      className="flex-1 bg-background"
+      // eslint-disable-next-line react-native/no-inline-styles -- dynamic chrome and safe-area padding
+      style={{
+        paddingBottom: bottomPadding,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }}
+    >
+      <View className="flex-row justify-end" style={headerRowStyle}>
+        <Pressable
+          onPress={() => {
+            setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
+            pushOnce('/(auth)/language-picker' as Href);
+          }}
+          disabled={globeDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.language')}
+          accessibilityState={{ disabled: globeDisabled }}
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            'rounded-full active:opacity-70 disabled:opacity-50'
+          )}
         >
-          <View className="w-full max-w-sm items-center gap-2">
-            <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel="Kilo logo" />
-            <Text className="text-center text-lg">Welcome to Kilo Code</Text>
-          </View>
-
-          {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
-              iOS logout→login remounts washed out at ~50% alpha for 3+ minutes,
-              recovering only on relaunch — so these branches render without
-              animation; status swaps are instant. */}
-          <View className="w-full max-w-sm gap-3">
-            {status === 'idle' && <IdleAuth start={start} />}
-
-            {status === 'pending' && code && (
-              <View className="w-full items-center gap-4">
-                <Text variant="muted" className="text-center">
-                  Your sign-in code:
-                </Text>
-                <Text
-                  variant="h2"
-                  className="border-b-0 pb-0 text-center tracking-widest"
-                  // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
-                  accessibilityLabel={`Sign in code: ${[...code].join(' ')}`}
-                  selectable
-                >
-                  {code}
-                </Text>
-                {/* Stack actions full-width so labels never clip side-by-side at max text */}
-                <View className="w-full gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full flex-row flex-wrap gap-1"
-                    onPress={() => {
-                      void openBrowser();
-                    }}
-                    accessibilityLabel="Open sign-in page in browser"
-                  >
-                    <ExternalLink size={14} color={colors.foreground} />
-                    <Text className="text-center">Open in browser</Text>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onPress={() => {
-                      if (verificationUrl) {
-                        void Clipboard.setStringAsync(verificationUrl);
-                        toast('Copied to clipboard');
-                      }
-                    }}
-                    accessibilityLabel="Copy sign-in link"
-                  >
-                    <Text className="text-center">Copy link</Text>
-                  </Button>
-                </View>
-                <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
-                  <Text>Cancel</Text>
-                </Button>
-              </View>
-            )}
-
-            {status === 'pending' && !code && (
-              <View className="w-full items-center gap-3">
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-                <Text variant="muted" className="text-center">
-                  Starting sign in...
-                </Text>
-                <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
-                  <Text>Cancel</Text>
-                </Button>
-              </View>
-            )}
-
-            {(status === 'denied' || status === 'expired' || status === 'error') && (
-              <View className="w-full gap-3">
-                <Text className="text-center text-sm text-destructive">
-                  {errorMessage(status, error)}
-                </Text>
-                <IdleAuth start={start} />
-              </View>
-            )}
-          </View>
-        </ScrollView>
+          <Globe size={22} color={colors.foreground} />
+        </Pressable>
       </View>
-    </KeyboardAvoidingView>
+      <KeyboardAwareScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
+        keyboardShouldPersistTaps="handled"
+        // The space the form keeps below the focused field while the keyboard is
+        // up: its own measured height, floored at the primary action plus the
+        // form gaps at the current text scale. Nothing below the field — a
+        // refusal that wraps, the action, the remaining controls — can then end
+        // on the keyboard edge. Layout mode grows the scroll length by the IME
+        // height, which is what lets that position sit on the keyboard's top.
+        bottomOffset={fieldActionReserve}
+        mode="layout"
+      >
+        <View className="w-full max-w-sm items-center gap-2">
+          <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
+          {/* DESIGN.md's title step (1.5rem / 600), not body size: `text-lg`
+              alone renders 15.75pt medium, which reads weaker than the 17pt
+              button labels under it and leaves the screen without a heading. */}
+          <Text variant="h3" className="text-center">
+            {t('login.welcome')}
+          </Text>
+        </View>
+
+        {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
+            iOS logout→login remounts washed out at ~50% alpha for 3+ minutes,
+            recovering only on relaunch — so these branches render without
+            animation; status swaps are instant. */}
+        <View className="w-full max-w-sm gap-3">
+          {/* A terminal device-auth error keeps the idle form on screen so the
+              user can retry. The banner is a sibling above one IdleAuth at one
+              JSX slot, so clearing the error when a new attempt starts does not
+              remount the form and lose an in-flight OTP challenge. */}
+          {showTerminalError && (
+            <Text className="text-center text-sm text-destructive">
+              {errorMessage(status, error)}
+            </Text>
+          )}
+
+          {showIdleForm && (
+            <IdleAuth
+              key={restoredDraft ? 'restored-draft' : 'blank-draft'}
+              start={start}
+              initialEmail={draft?.email ?? ''}
+              initialSsoRecovery={draft?.ssoRecovery ?? null}
+              onBusyChange={setAuthFormBusy}
+              onBelowFieldHeightChange={setBelowFieldHeight}
+              onSignInStart={clearError}
+              pendingLink={pendingLink}
+              pendingLinkRefused={
+                pendingLink !== null && pendingLink.token === expiredPendingLinkToken
+              }
+              onPendingLink={updatePendingLink}
+              onClearPendingLink={() => {
+                updatePendingLink(null);
+              }}
+            />
+          )}
+
+          {status === 'pending' && code && (
+            <View className="w-full items-center gap-4">
+              {resumed && (
+                <Text variant="muted" className="text-center">
+                  {t('login.continuingSignIn')}
+                </Text>
+              )}
+              <Text variant="muted" className="text-center">
+                {t('login.signInCode')}
+              </Text>
+              <Text
+                variant="h2"
+                className="border-b-0 pb-0 text-center tracking-widest"
+                accessibilityLabel={t('login.signInCodeAccessibility', {
+                  // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
+                  code: [...code].join(' '),
+                })}
+                selectable
+              >
+                {code}
+              </Text>
+              {/* Stack actions full-width so labels never clip side-by-side at max text */}
+              <View className="w-full gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onPress={() => {
+                    void openBrowser();
+                  }}
+                  accessibilityLabel={t('login.openSignInPageInBrowser')}
+                >
+                  <Text className="text-center">{t('common.openInBrowser')}</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onPress={() => {
+                    if (verificationUrl) {
+                      void Clipboard.setStringAsync(verificationUrl);
+                      toast(t('common.copiedToClipboard'));
+                    }
+                  }}
+                  accessibilityLabel={t('login.copySignInLink')}
+                >
+                  <Text className="text-center">{t('common.copyLink')}</Text>
+                </Button>
+              </View>
+              <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
+                <Text>{t('common.cancel')}</Text>
+              </Button>
+            </View>
+          )}
+
+          {status === 'pending' && !code && (
+            <View className="w-full items-center gap-3">
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+              <Text variant="muted" className="text-center">
+                {t('login.startingSignIn')}
+              </Text>
+              <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
+                <Text>{t('common.cancel')}</Text>
+              </Button>
+            </View>
+          )}
+        </View>
+      </KeyboardAwareScrollView>
+    </View>
   );
 }

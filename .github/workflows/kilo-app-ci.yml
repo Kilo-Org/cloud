@@ -1,51 +1,80 @@
 name: kilo-app CI
 
+# The mobile suite runs on every PR and every main push (no path filters), and
+# the `mobile-changes` job gates the work. An unrelated PR or push still reports
+# the suite checks as skipped (a skipped job satisfies a required check) instead
+# of leaving them "Expected". A push that starts a release is inside the
+# detection below and carries an app path, so its run executes the suite, and
+# that release consumes this run's conclusion for the commit. A change that only
+# edits a lint plugin skips the suite jobs (the Detect step marks it lint-only),
+# and a release that finds such a run for its commit falls back to running the
+# suite in its own workflow. The notifications copy of the catalog audit reads
+# the services tree beside the push package, and the `i18n-catalogs` job runs
+# the audit and its test for exactly those paths when no mobile family selected
+# them; `i18n-leftover` runs the same audit for a mobile change. The hourly
+# schedule and a
+# manual run of main stand on the tip of main and reuse that commit's push run
+# as well, but only a run that passed and whose shard job proves the suite
+# executed. The release calls the suite through `workflow_call` for any reuse it
+# cannot prove: no run for the commit, a run that ended without a pass (a
+# cancelled run carries no verdict about its commit), a run still in flight, and
+# a run for a commit that touched no app path and so skipped the suite.
+#
+# Check names must stay unique across workflows: the `main-tests` ruleset
+# matches a required context by name and app, so two workflows publishing the
+# same name let the wrong workflow's pass satisfy it. The mobile jobs that
+# mirror a required context owned by ci.yml therefore carry a `mobile-` prefix
+# (`mobile-typecheck`, `mobile-lint`, `mobile-test-result`). `i18n-leftover` and
+# `check-unused` keep their unprefixed names: this workflow is their only
+# publisher, so a rename would leave those required contexts unreported.
+# `i18n-catalogs` keeps its unprefixed name because it is not required: it
+# reports only on the paths no mobile family selects, where `i18n-leftover`
+# already satisfies the required contexts.
+# `scripts/typecheck-ci.test.mjs` pins both rules.
+#
+# The app's formatting is gated by the repo-wide `format-check` job in ci.yml:
+# `oxfmt --list-different .` covers apps/mobile on every PR, merge-queue entry
+# and main push, so this workflow needs no formatter job of its own.
+
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/mobile/**'
-      - 'packages/trpc/**'
-      - 'apps/web/src/routers/**'
-      - 'packages/app-shared/**'
-      - 'packages/kilo-chat/**'
-      - 'packages/kilo-chat-hooks/**'
-      - 'packages/event-service/**'
-      - 'packages/notifications/**'
-      - 'packages/cloud-agent-sdk/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/kilo-app-ci.yml'
   pull_request:
-    branches: [main]
-    paths:
-      - 'apps/mobile/**'
-      - 'packages/trpc/**'
-      - 'apps/web/src/routers/**'
-      - 'packages/app-shared/**'
-      - 'packages/kilo-chat/**'
-      - 'packages/kilo-chat-hooks/**'
-      - 'packages/event-service/**'
-      - 'packages/notifications/**'
-      - 'packages/cloud-agent-sdk/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/kilo-app-ci.yml'
+  merge_group:
   workflow_call:
 
+# Cancel in-progress runs when a new commit is pushed to the same PR. A main
+# push must reach a conclusion instead: the release reuses that conclusion for
+# the commit, and a cancelled run leaves it running the suite again. GitHub
+# still drops a run that is only pending when a third run enters the group, and
+# such a run never started, so it costs no work.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  typecheck:
+  # Always runs: `i18n-leftover` and `check-unused` are required contexts and
+  # must report on every PR and every main push. The detection step diffs against
+  # the PR's base sha or, on a main push, `github.event.before`; when neither is
+  # available (a release's schedule or manual call), the suite runs (a release
+  # must validate) and the catalog audit runs under `i18n-catalogs` unless this
+  # job marks the change mobile, where `i18n-leftover` already carries it.
+  mobile-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 5
+    outputs:
+      mobile: ${{ steps.detect.outputs.mobile }}
+      lint_only: ${{ steps.detect.outputs.lint_only }}
+      catalogs: ${{ steps.detect.outputs.catalogs }}
     steps:
+      # Full history so the change-detection step can diff against the PR's
+      # base sha or the pushed commit's parent.
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
-          lfs: true
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -54,115 +83,479 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
+      # The suite jobs always report: `i18n-leftover` and `check-unused` are
+      # required contexts published only here, so every PR must receive them;
+      # only the suite's own paths justify the heavy work. The patterns are pinned
+      # by scripts/stacked-ci.test.mjs, which ci.yml's `ci-wiring` job runs.
+      # tools/oxlint is detected on its own, because the app's oxlint configs
+      # load those plugins: a change there must run the app's own lint and i18n
+      # checks, and the workspace selection treats those paths as lint-only.
+      # That step also publishes `lint_only`: true when every changed path is
+      # such a plugin, so the shards and the typecheck stand down while the
+      # lint, i18n and unused-export checks still run.
+      # The notifications catalog audit also scans the services tree beside the
+      # push package, and the checker test changes with the audit. No mobile
+      # path family covers a services change, so the step publishes `catalogs`:
+      # true for either family — the audit's own tree under tools/i18n is the
+      # app's in the workspace selection (`OWNED` in
+      # scripts/affected-workspaces.mjs), but the families above decide the
+      # suite jobs, and real attribution still reports `mobile: true` for many
+      # such diffs, which holds the `i18n-catalogs` job down while
+      # `i18n-leftover` runs the audit.
+      # A lockfile change matches the patterns first, so the detector below
+      # never parses the lockfile and needs no installed dependencies.
+      - name: Detect mobile-relevant changes
+        id: detect
+        run: |
+          set -euo pipefail
+          # On a PR, diff against the base sha; on a main push (or a
+          # workflow_call riding a push event), diff against
+          # `github.event.before`. If neither object is available, run the
+          # suite rather than skip it: a false "no changes" would break the
+          # required checks' promise, while a redundant run is harmless.
+          # A merge queue entry diffs against the group's base: the PRs in the
+          # group passed the suite on their own branches.
+          base="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+          if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
+            base="${{ github.event.before }}"
+          fi
+          if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+            echo "lint_only=false" >> "$GITHUB_OUTPUT"
+            # This path already runs every check, so the catalog job must stand
+            # down: its audit executes under `mobile=true` in `i18n-leftover`.
+            echo "catalogs=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Rename detection reports only the destination of a rename, so a
+          # move out of an app path into tools/oxlint would list only the
+          # destination and read as lint-only, skipping the suite after app
+          # code was removed. `--no-renames` lists both sides, so such a move
+          # keeps `lint_only=false`, while a rename between two tools/oxlint
+          # paths stays lint-only.
+          changed=$(git diff --name-only --no-renames "$base" HEAD)
+          # Lint-only: the whole changed-path set is under tools/oxlint, so no
+          # type program or test reads this commit. Derived from the complete
+          # list, never from a second any-match grep: a change that also carries
+          # an app path must keep `lint_only=false`, because a release reuses a
+          # push run only when that run's shard job proves the suite executed.
+          if [ -n "$changed" ] && ! grep -qv '^tools/oxlint/' <<< "$changed"; then
+            echo "lint_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "lint_only=false" >> "$GITHUB_OUTPUT"
+          fi
+          # Both audit families detect separately from the suite: a change in
+          # either selects no mobile job, so this output is the only gate that
+          # reaches them.
+          if grep -Eq '^services/|^tools/i18n/' <<< "$changed"; then
+            echo "catalogs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "catalogs=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -Eq '^tools/oxlint/' <<< "$changed"; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$' <<< "$changed"; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+          # The app also reads every workspace it depends on, directly or
+          # through a relative import, and its tests may read other
+          # workspaces' files as data. A detection error runs the suite.
+          elif ! affected=$(node scripts/affected-workspaces.mjs "$(git rev-parse "${base}^{commit}")") \
+            || ! selected=$(jq -r '.full or (.packages + .test_only_packages | index("kilo-app") != null)' <<< "$affected") \
+            || [ "$selected" != false ]; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mobile=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # One harness SDK build per run. The four suites below read
+  # packages/harness-sdk/dist: the shard jobs import it at run time, and the
+  # type-aware checks resolve its declarations. Building it inside each job made
+  # a cache miss pay the typia compile once per job, because the shards start
+  # together and actions/cache saves at the end of a job, so no job can hit
+  # another's save. The action still runs here, so its cache serves a later run
+  # with the same inputs, and the `mobile-test-result` aggregator needs this
+  # one, so a failed build fails the gate instead of leaving the suites skipped.
+  #
+  # One tRPC declaration build per run, for the same reason: typecheck and lint
+  # both need packages/trpc/dist, they start together, and both used to run the
+  # action, so on a cache miss they compiled the same declaration program twice
+  # and raced to save the one key (the loser logged "Unable to reserve cache").
+  # Here the build happens once and both checks download the tree.
+  #
+  # The two producers are separate jobs, not two steps of one job, because
+  # neither build reads the other's output: one job made every consumer wait for
+  # both in sequence, so a declaration miss delayed the shards that never open
+  # packages/trpc/dist. `mobile-typecheck` and `mobile-lint` read both trees and
+  # wait for both producers; `check-unused` and the four `mobile-test` shards
+  # import only the harness SDK build, so they wait for `prepare-harness-sdk`
+  # alone.
+  prepare-harness-sdk:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # Only the harness SDK's dependency closure and the root project are
+      # installed. The composite action below builds `@kilocode/harness-sdk`
+      # alone, and that package has no workspace dependency: its build program
+      # reads its own sources and, through the key script, the root `tsgo`.
+      # Widen the filter when a step here imports a workspace outside the
+      # closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
+
+      # A directory path makes the directory the artifact root, so a consumer
+      # that unpacks into packages/harness-sdk/dist gets the tree the build
+      # wrote, with no extra path segment.
+      - name: Upload the harness SDK build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  prepare-trpc:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # Only the two dependency closures this job reads and the root project are
+      # installed. The composite action below builds `@kilocode/trpc` alone, but
+      # that declaration program also reads web-shared and apps/web sources
+      # through their path aliases. Widen the filter when a step here imports a
+      # workspace outside these closures.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter '@kilocode/trpc...' --filter 'web...' --filter kilocode-monorepo
+
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      # Same directory-root rule as the harness SDK artifact in the job above.
+      - name: Upload the tRPC declarations
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+          retention-days: 1
+          # A cache hit that restored nothing must fail here, not in a consumer.
+          if-no-files-found: error
+
+  # A lint-only change (every path under tools/oxlint) skips this job: a lint
+  # plugin cannot change the app's type program, and `mobile-lint` still loads
+  # it. The job stays in the workflow so the required `mobile-typecheck` context
+  # reports on every run.
+  mobile-typecheck:
+    needs: [mobile-changes, prepare-harness-sdk, prepare-trpc]
+    if: needs.mobile-changes.outputs.mobile == 'true' && needs.mobile-changes.outputs.lint_only != 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # Only the workspaces the app depends on and the root one are installed:
+      # `tsgo` resolves the app's sources and the declarations of its workspace
+      # dependencies, and the two trees it needs from the builders arrive as
+      # artifacts below. Widen the filter when a step here imports a workspace
+      # outside the closure.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
+
+      - name: Download the tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+
+      - name: Download the harness SDK build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       - name: Typecheck
         run: pnpm --filter kilo-app run typecheck
 
-  lint:
+      # The release preflight is the only other job that evaluates app.config.ts,
+      # and it runs nightly. Read the config here so a broken import fails the PR.
+      - name: Read Expo config
+        run: pnpm --filter kilo-app exec expo config --type public > /dev/null
+
+  mobile-lint:
+    needs: [mobile-changes, prepare-harness-sdk, prepare-trpc]
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # the lint runs the app config's oxlint against its own sources.
+      # Widen the filter when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      - name: Download the tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+
+      - name: Download the harness SDK build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       - name: Lint
         run: pnpm --filter kilo-app run lint
 
-  format-check:
+  # Required check `i18n-leftover` on main, so this job keeps its name: it is
+  # the only workflow that publishes that context, and a rename would leave a
+  # required check unreported. Uniqueness is about colliding names, not this.
+  i18n-leftover:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
+
+      # No step here reads types or built output, so only the workspaces the
+      # tools come from are installed: the root one carries oxlint and the
+      # parser the audits read the tree with, and the app one carries
+      # react-native-css, whose compiler the class checker probes. The i18n
+      # oxlint config is not type-aware.
+      - name: Install dependencies
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
+
+      - name: Check i18n catalogs and leftover copy
+        run: pnpm --filter kilo-app run check:i18n
+      - name: Check for silently-dropped NativeWind classes
+        run: pnpm --filter kilo-app run check:classes
+      - name: Test the NativeWind class checker
+        run: node --test tools/nativewind/check-classes.test.mjs
+      - name: Test the i18n catalog checker
+        run: node --test tools/i18n/check-catalogs.test.mjs
+
+  # `i18n-leftover` runs the same catalog audit for a mobile change; this job
+  # covers the services half of the push catalog's scan, which no mobile family
+  # selects, so a push `translatePush` key that appears only under services/
+  # still cannot slip past CI. The workspace selection usually reports
+  # `mobile: true` for a tools/i18n change (OWNED in
+  # scripts/affected-workspaces.mjs), so the second term keeps this job from
+  # paying for the audit twice on one change. It installs only the root
+  # project, because the audit reads JSON catalogs and the oxc parser and no
+  # app dependency.
+  i18n-catalogs:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.catalogs == 'true' && needs.mobile-changes.outputs.mobile != 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      - name: Format check
-        run: |
-          pnpm --filter kilo-app run format:check || {
-            echo "::error::oxfmt formatting check failed. Run 'cd apps/mobile && pnpm format' locally and commit the changes."
-            exit 1
-          }
+      - name: Check i18n catalogs
+        run: node tools/i18n/check-catalogs.mjs
+      - name: Test the i18n catalog checker
+        run: node --test tools/i18n/check-catalogs.test.mjs
 
+  # The unused-export check reads the harness SDK build only, so it starts when
+  # that producer finishes instead of waiting for the declaration build.
+  # Required check `check-unused` on main, so this job keeps its name for the
+  # same reason as `i18n-leftover`: no other workflow publishes it.
   check-unused:
+    needs: [mobile-changes, prepare-harness-sdk]
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # the check reads the app's own knip config and exports.
+      # Widen the filter when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
+
+      - name: Download the harness SDK build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 
-  test:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
+  # Four shards run the mobile Vitest suite in parallel; the `mobile-test-result`
+  # job below reports the combined result under that check name. The name is
+  # prefixed because ci.yml publishes the required `test` context and two
+  # publishers of one required name would mask each other's failure.
+  #
+  # The shard's `Test` step is CPU-bound and the jobs start together, so against
+  # a ~15 s fixed setup (checkout, install, artifact download) that does not
+  # change, four shards pay that setup four times instead of eight: the row
+  # gives up eight 4-vCPU jobs for four and the p50 wall of the whole row is
+  # little different — each remaining shard runs the test share twice.
+  #
+  # A lint-only change skips the shards with the typecheck: a lint plugin cannot
+  # change what the suite imports. `mobile-test-result` still runs and reports
+  # the required context.
+  #
+  # The label is `vars.RUNNER_MEDIUM_LABEL` (blacksmith-4vcpu-ubuntu-2404, 4 vCPU
+  # and 16 GB; a shard peaks at 0.6 GB). Repo variables are not exposed to fork
+  # pull requests, so the job falls back to `ubuntu-latest` there.
+  mobile-test:
+    needs: [mobile-changes, prepare-harness-sdk]
+    if: needs.mobile-changes.outputs.mobile == 'true' && needs.mobile-changes.outputs.lint_only != 'true'
+    name: mobile-test (${{ matrix.shard }}/4)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # the suite imports the app and its workspace dependencies, and the
+      # harness SDK build arrives as an artifact. Dependency postinstalls stay
+      # enabled. Widen the filter when a test imports a workspace outside the
+      # closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      # The tests import the harness SDK build at run time. The tRPC build
+      # holds only type declarations, which Vitest does not read.
+      - name: Download the harness SDK build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       - name: Test
-        run: pnpm --filter kilo-app run test
+        run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/4
+
+  # Skipped shards (no mobile change) pass; a failed or cancelled shard fails
+  # this job. It needs both producers for the same reason: a failed producer
+  # only skips the jobs that consume it, and a skipped check passes, so this job
+  # carries that failure to the gate. The catalog job belongs here too: its
+  # paths never select a shard, so without this needs entry a failed audit
+  # would leave the required check green.
+  mobile-test-result:
+    needs: [mobile-changes, prepare-harness-sdk, prepare-trpc, mobile-test, i18n-catalogs]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Check test results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            exit 1
+          fi

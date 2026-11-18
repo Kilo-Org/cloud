@@ -1,0 +1,2 @@
+ALTER TABLE "auto_routing_custom_routers" DROP CONSTRAINT "auto_routing_custom_routers_mode_check";--> statement-breakpoint
+ALTER TABLE "auto_routing_custom_routers" ADD CONSTRAINT "auto_routing_custom_routers_mode_check" CHECK ("auto_routing_custom_routers"."mode" IN ('cost_per_accuracy', 'best_accuracy', 'cheapest'));

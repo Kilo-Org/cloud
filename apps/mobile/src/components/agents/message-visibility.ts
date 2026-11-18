@@ -1,14 +1,27 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { isCompactionSummaryPart } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 
 import {
+  hasNonWhitespaceText,
+  humanTextParts,
   isCompactionPart,
   isFilePart,
+  isPatchPart,
   isReasoningPart,
   isSnapshotProgressPart,
   isTextPart,
   isToolPart,
   shouldRenderReasoningPart,
 } from './part-types';
+import { htmlSanitizesToEmpty } from './markdown-html-sanitization';
+
+// Parts are immutable: the session storage replaces a part object on every
+// change and keeps the object of an unchanged part. The transcript builders ask
+// this predicate for every part on every streamed frame, and for text it scans
+// the whole text (and runs the HTML sanitizer when the text holds a `<`), so a
+// cache per part object turns that per-frame scan of the whole transcript into
+// one scan per part version.
+const rendersContentByPart = new WeakMap<Part, boolean>();
 
 /**
  * Whether `PartRenderer` renders visible content for this part.
@@ -18,12 +31,29 @@ import {
  * builder drops a message that has no content and never puts a time marker above it.
  */
 export function partRendersContent(part: Part): boolean {
+  let rendersContent = rendersContentByPart.get(part);
+  if (rendersContent === undefined) {
+    rendersContent = computePartRendersContent(part);
+    rendersContentByPart.set(part, rendersContent);
+  }
+  return rendersContent;
+}
+
+function computePartRendersContent(part: Part): boolean {
+  // Mobile keeps compaction as a separator rather than displaying the saved summary inline.
+  if (isCompactionSummaryPart(part)) {
+    return false;
+  }
   if (isTextPart(part)) {
     // Snapshot-init progress shows only in the fixed WorkingIndicator row, and
     // TextPartRenderer renders nothing for blank text. Whitespace-only text is
     // blank: markdown draws no ink for it, so counting it as content adds a
     // zero-height row that eats a transcript gap and doubles the visible one.
-    return !isSnapshotProgressPart(part) && part.text.trim() !== '';
+    return (
+      !isSnapshotProgressPart(part) &&
+      hasNonWhitespaceText(part.text) &&
+      !htmlSanitizesToEmpty(part.text)
+    );
   }
   if (isToolPart(part)) {
     // ToolPartRenderer renders nothing for the plan-mode transition tools.
@@ -34,13 +64,41 @@ export function partRendersContent(part: Part): boolean {
     // property of the part, not of the stream.
     return shouldRenderReasoningPart(part, false);
   }
-  return isFilePart(part) || isCompactionPart(part);
+  // A patch part whose `files` the wire omitted means the same as an empty one:
+  // nothing to draw. The generated type declares the array unconditionally
+  // (the live per-event schemas are `.passthrough()`), so the runtime shape is
+  // read through a declared optional. The chat processor fills the array, but a
+  // part can still reach a reader unfixed (a unit caller, a stored part from an
+  // older build), and a throw here replaces the whole app with the error
+  // boundary (Sentry KILO-APP-BZ).
+  const files = (part as { files?: readonly string[] }).files;
+  return (
+    isFilePart(part) || isCompactionPart(part) || (isPatchPart(part) && (files ?? []).length > 0)
+  );
 }
 
 /**
- * Whether the message renders anything in the transcript. A user message always
- * renders its bubble; an assistant message renders only what its parts render.
+ * Whether the message renders anything in the transcript. Keep the transient
+ * zero-part user row, but drop a user row whose parts sanitize to no content.
  */
 export function messageRendersContent(message: StoredMessage): boolean {
-  return message.info.role === 'user' || message.parts.some(partRendersContent);
+  return (
+    (message.info.role === 'user' && message.parts.length === 0) ||
+    message.parts.some(partRendersContent)
+  );
+}
+
+/**
+ * Whether the user bubble draws visible content: a human text part with ink, or
+ * a file part. The bubble renders its text through `humanTextParts`, so a row
+ * whose only part is the server's synthetic `cloud-agent-context` wrapper draws
+ * no text even though that part renders content elsewhere. Judging the bubble by
+ * this predicate keeps the row and the bubble on one answer, so a row that draws
+ * nothing renders no bubble and no long-press surface either.
+ */
+export function userBubbleRendersContent(parts: readonly Part[]): boolean {
+  return (
+    humanTextParts(parts).some(part => partRendersContent(part)) ||
+    parts.some(part => isFilePart(part) && partRendersContent(part))
+  );
 }

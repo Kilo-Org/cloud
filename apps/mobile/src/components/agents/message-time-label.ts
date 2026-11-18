@@ -1,9 +1,15 @@
-const TIME_ONLY = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
+import { i18n } from '@/i18n';
+import { dateTimeFormat } from '@/lib/intl-cache';
 
-const DATE_TIME = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
+// Read at call time, not at import: the active language can change after this
+// module loads, and `undefined` would pin the device locale instead.
+const timeOnly = () => dateTimeFormat(i18n.language, { timeStyle: 'short' });
+
+const dateTime = () =>
+  dateTimeFormat(i18n.language, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 
 /** The Date for a transcript timestamp, or null when it is absent or unusable. */
 function toTranscriptDate(created: number | undefined | null): Date | null {
@@ -46,7 +52,7 @@ export function formatTranscriptTimeLabel(
   if (date === null) {
     return null;
   }
-  return isSameLocalDay(date.getTime(), now) ? TIME_ONLY.format(date) : DATE_TIME.format(date);
+  return isSameLocalDay(date.getTime(), now) ? timeOnly().format(date) : dateTime().format(date);
 }
 
 /**
@@ -67,7 +73,7 @@ export function formatTranscriptMarkerLabel(
     return null;
   }
   if (dayChanged) {
-    return DATE_TIME.format(date);
+    return dateTime().format(date);
   }
   return formatTranscriptTimeLabel(created, now);
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "ai_gateway_config" ADD COLUMN "vercel_model_id_overrides" jsonb;

@@ -6,11 +6,13 @@ describe('redactSensitiveHeaders', () => {
     const input = {
       authorization: 'Bearer secret-jwt',
       'proxy-authorization': 'Basic cHJveHk6c2VjcmV0',
+      'x-api-key': 'provider-secret',
       cookie: 'session=abc123',
       'set-cookie': 'session=abc123; Path=/',
       'x-gitlab-token': 'glpat-secret',
       'x-hub-signature': 'sha1=abc',
       'x-hub-signature-256': 'sha256=def',
+      'x-kilo-briefing-settlement': 'generation-capability',
       'content-type': 'application/json',
       'x-request-id': '123',
     };
@@ -20,11 +22,13 @@ describe('redactSensitiveHeaders', () => {
     expect(result).toEqual({
       authorization: '[REDACTED]',
       'proxy-authorization': '[REDACTED]',
+      'x-api-key': '[REDACTED]',
       cookie: '[REDACTED]',
       'set-cookie': '[REDACTED]',
       'x-gitlab-token': '[REDACTED]',
       'x-hub-signature': '[REDACTED]',
       'x-hub-signature-256': '[REDACTED]',
+      'x-kilo-briefing-settlement': '[REDACTED]',
       'content-type': 'application/json',
       'x-request-id': '123',
     });

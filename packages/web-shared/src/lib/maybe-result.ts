@@ -1,0 +1,87 @@
+import { TRPCError } from '@trpc/server';
+
+// Monadic Result type
+
+// A result that carries no fields of its own.
+type NoFields = Record<never, never>;
+
+export type SuccessResult<TOk = NoFields> = { success: true } & TOk;
+export type CustomFailureResult<TErr> = { success: false } & TErr;
+export type FailureResult<TErr = void> = { success: false; error: TErr };
+
+/**
+ *  equivalent to CustomResult<TOk, {error:TErr}>
+ */
+export type Result<TOk, TErr> = SuccessResult<TOk> | FailureResult<TErr>;
+
+export type CustomResult<TOk, TErr> = SuccessResult<TOk> | CustomFailureResult<TErr>;
+export type OptionalError<TErr> = Result<NoFields, TErr>;
+export type OptionalValue<TOk> = Result<TOk, void>;
+
+export function failureResult(): FailureResult<undefined>;
+export function failureResult<TErr>(error: TErr): FailureResult<TErr>;
+export function failureResult<TErr = void>(error?: TErr): FailureResult<TErr | undefined> {
+  return { error, success: false };
+}
+export function verifyOrError(ok: boolean): OptionalError<void>;
+export function verifyOrError<TErr>(ok: boolean, error: TErr): OptionalError<TErr>;
+export function verifyOrError<TErr = void>(
+  ok: boolean,
+  error?: TErr
+): OptionalError<TErr | undefined> {
+  return ok ? { success: true } : { error, success: false };
+}
+
+export function trpcFailure(
+  ...opts: ConstructorParameters<typeof TRPCError>
+): FailureResult<TRPCError> {
+  return failureResult(new TRPCError(...opts));
+}
+
+export function successResult(): SuccessResult<NoFields>;
+export function successResult<TOk>(okValue: TOk): SuccessResult<TOk>;
+export function successResult<TOk>(okValue?: TOk): SuccessResult<TOk | NoFields> {
+  return { ...okValue, success: true };
+}
+
+export function assertNoTrpcError<TOk>(result: Result<TOk, TRPCError>): SuccessResult<TOk> {
+  if (result.success) return result;
+  else throw result.error;
+}
+export function assertNoError<TOk, TErr>(result: CustomResult<TOk, TErr>): SuccessResult<TOk> {
+  if (result.success) return result;
+  throw result instanceof Error
+    ? result
+    : 'error' in result && result.error instanceof Error
+      ? result.error
+      : new Error('Not OK:' + serializeError(result));
+}
+
+function serializeError(error: unknown) {
+  try {
+    return JSON.stringify(error);
+  } catch {
+    /* ignore */
+  }
+  try {
+    return String(error);
+  } catch {
+    /* ignore */
+  }
+  return typeof error;
+}
+
+export function whenOkTry<TOk, TOk2, TErr>(
+  result: Result<TOk, TErr>,
+  map: (val: TOk) => Result<TOk2, TErr>
+): Result<TOk2, TErr> {
+  if (!result.success) return result;
+  return map(result);
+}
+export function whenOk<TOk, TOk2, TErr>(
+  result: Result<TOk, TErr>,
+  map: (val: TOk) => TOk2
+): Result<TOk2, TErr> {
+  if (!result.success) return result;
+  return successResult(map(result));
+}

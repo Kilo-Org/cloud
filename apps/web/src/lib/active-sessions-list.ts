@@ -1,0 +1,822 @@
+import 'server-only';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { timestampToIso } from '@kilocode/app-shared/utils';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { fetchWithinBudget, readJsonWithinBudget } from '@/lib/bounded-service-fetch';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { cli_sessions_v2, cloud_agent_session_runs } from '@kilocode/db/schema';
+import { sessionAssociatedPr } from '@/lib/session-associated-pr';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
+import { associatedPrSchema, formatAssociatedPr } from '@/lib/session-associated-pr';
+
+export const activeSessionSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  title: z.string(),
+  connectionId: z.string(),
+  gitUrl: z.string().optional(),
+  gitBranch: z.string().optional(),
+  createdOnPlatform: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  /**
+   * Latest agent activity timestamp from `cli_sessions_v2.last_activity_at`
+   * (raw DB text, same treatment as `createdAt`/`updatedAt`). Omitted when
+   * the column is NULL or the row was never enriched.
+   */
+  lastActivityAt: z.string().optional(),
+  /**
+   * When this session's status last changed, from
+   * `cli_sessions_v2.status_updated_at`, normalized to ISO 8601. Omitted when
+   * the column is NULL, unparseable, dates a different status than the resolved
+   * status, or the row was never enriched. The glanceable snapshot reads it to
+   * report how long the longest-waiting agent has needed input, and Hermes only
+   * parses the ISO form.
+   */
+  statusUpdatedAt: z.string().optional(),
+  /**
+   * Wake time for a `scheduled` session, as an ISO 8601 string relayed on the
+   * live worker row. `z.object` strips undeclared keys, so the field must be
+   * declared here or the worker's value never reaches the client or the
+   * server-built glanceable snapshot. The cloud-agent candidate path has no
+   * wake time and omits the key; a `scheduled` row without one omits it too.
+   */
+  scheduledAt: z.string().optional(),
+  /**
+   * Capabilities advertised by the CLI connection that owns this session.
+   * Omitted when the owning connection's latest heartbeat did not include a
+   * capabilities object (legacy CLI, or a CLI that predates the field).
+   */
+  capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
+  // Optional: legacy CLIs (predating the `kilo remote` spawner) never
+  // report a platform. Only present in the response when the CLI supplied it.
+  platform: z.string().optional(),
+  /**
+   * Optional total session cost from `cli_sessions_v2.total_cost_microdollars`
+   * (microdollars, bigint). Only present when the DB row carries a non-null
+   * value — null never goes on the wire. Unenriched heartbeat rows (no
+   * `cli_sessions_v2` join) omit the key. The wire may legitimately carry
+   * zero; display still omits it via `formatSessionTotalCost`.
+   */
+  totalCostMicrodollars: z.number().optional(),
+  /**
+   * Associated pull request for this session's branch, merged from the
+   * per-tenant PR cache during enrichment. Old clients omit this key;
+   * remove optional when every client is past this release.
+   */
+  associatedPr: associatedPrSchema.optional(),
+});
+
+const activeSessionsResponseSchema = z.object({
+  sessions: z.array(activeSessionSchema),
+});
+
+/**
+ * A live session as this router returns it: the worker's wire row plus the
+ * fields enriched from `cli_sessions_v2`.
+ */
+export type ActiveSession = z.infer<typeof activeSessionSchema> & {
+  /**
+   * Owning organization from `cli_sessions_v2`; `null` = personal, which
+   * also covers a live session with no `cli_sessions_v2` row (an
+   * unattributable session — the server attributes it to personal).
+   */
+  organizationId?: string | null;
+};
+
+/** Sentinel `connectionId` for cloud-agent rows merged when the flag is on. */
+export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
+
+/**
+ * Recency window shared by the two time-bounded liveness proofs for a cloud
+ * session: a warm `idle` session that just finished, and session activity that
+ * session-ingest recorded in `last_activity_at`. Recent cloud sessions stay
+ * visible in the tray for 15 minutes.
+ */
+const CLOUD_AGENT_LIVE_CUTOFF = sql`now() - interval '15 minutes'`;
+
+/**
+ * Ceiling on the cloud-candidate rows the tray returns: 5x the product target
+ * of 100 live agents, i.e. far above the largest set the app is expected to
+ * render. It is a backstop against an unbounded query, NOT a bound that
+ * guarantees every live row survives — see the accepted tradeoff below.
+ *
+ * A ceiling is needed because not every branch of `livePredicate` is
+ * time-bounded: the warm-idle and recorded-activity branches are bounded by
+ * `CLOUD_AGENT_LIVE_CUTOFF`, but the open-run branch
+ * (`cloud_agent_session_runs.terminal_at IS NULL`) by nothing — an orphaned run
+ * keeps its session a candidate until the 90-day session cascade, so the
+ * candidate set can exceed this ceiling.
+ *
+ * Accepted tradeoff: past the ceiling the dropped tail is the oldest
+ * *candidates*, which the newest-first order makes the orphaned-run
+ * accumulation in practice — but not by construction. A session with an open
+ * run older than 500 newer candidates is dropped while live. Ranking open-run
+ * rows ahead of the warm-idle ones does not close that either: a live row lost
+ * to a ceiling this size competes against newer rows of its own class (open
+ * runs), which the predicate cannot tell apart from orphaned ones, and an
+ * `ORDER BY` on that `EXISTS` gives up the ordered `LIMIT` — the
+ * `(kilo_user_id, created_at)` index serves `desc(created_at)`, so the cap
+ * stops the index walk after 500 matches instead of sorting every candidate.
+ * The former `LIMIT 50` was the real defect: 50 is below the live set a user
+ * can have.
+ */
+export const CLOUD_AGENT_CANDIDATE_LIMIT = 500;
+
+type EnrichmentRow = {
+  session_id: string;
+  created_on_platform: string | null;
+  created_at: string;
+  updated_at: string;
+  status: string | null;
+  title: string | null;
+  organization_id: string | null;
+  /**
+   * Whether the caller may still read this row's organization. Personal rows
+   * are always accessible. Selected as a column so enrichment can drop
+   * former-organization heartbeat rows even when the worker's live feed does
+   * not know about organizations.
+   */
+  organization_is_accessible?: boolean;
+  git_url: string | null;
+  last_activity_at: string | null;
+  status_updated_at: string | null;
+  total_cost_microdollars: number | null;
+  // Session's own stored PR link, aliased so it never collides with the
+  // cache keys below.
+  session_pr_platform: string | null;
+  session_pr_url: string | null;
+  session_pr_number: number | null;
+  // Set only after the session's own link passed GitHub identity verification.
+  // Null means the link must not be shown.
+  session_pr_verified_at: string | null;
+  // Per-tenant PR cache columns from the LEFT JOIN.
+  pr_url: string | null;
+  pr_number: number | null;
+  pr_state: string | null;
+  pr_title: string | null;
+  pr_head_sha: string | null;
+  pr_observations?: unknown;
+  pr_last_synced_at: string | null;
+  pr_review_decision: string | null;
+  review_decision_pending: boolean | null;
+  pr_from_workspace: boolean | null;
+};
+
+type CloudCandidateRow = EnrichmentRow & {
+  git_url: string | null;
+  git_branch: string | null;
+  cloud_agent_session_id: string | null;
+  /**
+   * The tray's own liveness proof, selected alongside the candidate columns
+   * with the same EXISTS clause the WHERE liveness predicate uses: true when
+   * the session has a run with no `terminal_at` — the agent is working right
+   * now, whatever the asynchronously-synced stored status says.
+   */
+  run_open: boolean;
+};
+
+/**
+ * Fold an enriched row's flat PR columns into the `associatedPr` shape.
+ * Returns `null` when there is no cache PR and no stored session link, so
+ * callers can omit the key entirely instead of emitting `associatedPr: null`.
+ */
+function associatedPrFromRow(row: EnrichmentRow): z.infer<typeof associatedPrSchema> | null {
+  return formatAssociatedPr(
+    {
+      platform: row.session_pr_platform,
+      pr_url: row.session_pr_url,
+      pr_number: row.session_pr_number,
+      updated_at: row.updated_at,
+      git_url: row.git_url,
+      pr_link_verified_at: row.session_pr_verified_at,
+    },
+    {
+      pr_url: row.pr_url,
+      pr_number: row.pr_number,
+      pr_state: row.pr_state,
+      pr_title: row.pr_title,
+      pr_head_sha: row.pr_head_sha,
+      pr_observations: row.pr_observations,
+      pr_last_synced_at: row.pr_last_synced_at,
+      pr_review_decision: row.pr_review_decision,
+      review_decision_pending: row.review_decision_pending,
+      pr_from_workspace: row.pr_from_workspace,
+    }
+  );
+}
+
+/**
+ * Overlay stored attention (question/permission) onto a live heartbeat
+ * status. Non-attention DB values yield to live so busy/idle remain
+ * authoritative while the CLI is connected.
+ *
+ * Must run in the router: client fetchQuery replaces the cache wholesale,
+ * so sticky attention held only in client helpers is wiped on every
+ * enrichment / reconnect / cli.connected refresh.
+ */
+export function resolveActiveSessionStatus(
+  liveStatus: string,
+  storedStatus: string | null | undefined
+): string {
+  if (storedStatus === 'question' || storedStatus === 'permission') {
+    return storedStatus;
+  }
+  return liveStatus;
+}
+
+/**
+ * Resolve a cloud candidate's status. `cli_sessions_v2.status` syncs
+ * asynchronously and reads `idle` (or null) while the agent works, so the
+ * open run — the tray's own liveness proof (`cloud_agent_session_runs.
+ * terminal_at IS NULL`) — wins: a non-attention stored status reports `busy`
+ * while the run is open. Attention statuses pass through unchanged (a run
+ * open while the agent waits on the user must still show needs-input), and a
+ * row without an open run keeps its stored status, so the finished state
+ * (terminal run + fresh idle) still reads idle in the warm-idle window.
+ */
+export function resolveCloudCandidateStatus(
+  storedStatus: string | null | undefined,
+  runOpen: boolean
+): string {
+  if (storedStatus === 'question' || storedStatus === 'permission' || storedStatus === 'retry') {
+    return storedStatus;
+  }
+  if (runOpen) {
+    return 'busy';
+  }
+  return storedStatus ?? '';
+}
+
+function mapEnrichedHeartbeatSession(
+  session: ActiveSession,
+  row: EnrichmentRow | undefined
+): ActiveSession {
+  if (!row) {
+    // Always emit the field, `null` included: an absent `organizationId` on
+    // a client-cached row must mean "never server-attributed" and nothing
+    // else, or the client filter cannot tell a heartbeat-inserted row apart
+    // from a server-attributed personal one (D4/D6).
+    return { ...session, organizationId: null };
+  }
+  const mapped: ActiveSession = {
+    ...session,
+    status: resolveActiveSessionStatus(session.status, row.status),
+    // The tray title must be what a rename wrote, not what the CLI still
+    // reports: nothing propagates a cloud rename back to the CLI, so the
+    // heartbeat title stays stale forever. A NULL title (never-ingested
+    // placeholder row) falls back to the live one.
+    title: row.title ?? session.title,
+    organizationId: row.organization_id,
+    createdOnPlatform: row.created_on_platform ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+  if (row.last_activity_at != null) {
+    mapped.lastActivityAt = row.last_activity_at;
+  }
+  delete mapped.statusUpdatedAt;
+  const statusUpdatedAt =
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : timestampToIso(row.status_updated_at);
+  if (statusUpdatedAt !== null) {
+    mapped.statusUpdatedAt = statusUpdatedAt;
+  }
+  if (row.total_cost_microdollars != null) {
+    mapped.totalCostMicrodollars = row.total_cost_microdollars;
+  }
+  const associatedPr = associatedPrFromRow(row);
+  if (associatedPr) {
+    mapped.associatedPr = associatedPr;
+  }
+  return mapped;
+}
+
+function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
+  const mapped: ActiveSession = {
+    id: row.session_id,
+    // Cloud rows have no live heartbeat source (do NOT run
+    // resolveActiveSessionStatus): the stored status is synced
+    // asynchronously, so an open run upgrades a non-attention stored status
+    // to busy — a working session must never render idle.
+    status: resolveCloudCandidateStatus(row.status, row.run_open),
+    title: row.title ?? '',
+    connectionId: CLOUD_AGENT_CONNECTION_ID,
+    gitUrl: row.git_url ?? undefined,
+    gitBranch: row.git_branch ?? undefined,
+    createdOnPlatform: row.created_on_platform ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    // Key ALWAYS emitted, null included (D21) — mobile filter treats an
+    // absent key as never-attributed and would hide personal cloud rows.
+    organizationId: row.organization_id ?? null,
+  };
+  if (row.last_activity_at != null) {
+    mapped.lastActivityAt = row.last_activity_at;
+  }
+  const statusUpdatedAt =
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : timestampToIso(row.status_updated_at);
+  if (statusUpdatedAt !== null) {
+    mapped.statusUpdatedAt = statusUpdatedAt;
+  }
+  if (row.total_cost_microdollars != null) {
+    mapped.totalCostMicrodollars = row.total_cost_microdollars;
+  }
+  const associatedPr = associatedPrFromRow(row);
+  if (associatedPr) {
+    mapped.associatedPr = associatedPr;
+  }
+  return mapped;
+}
+
+export type ListActiveSessionsInput = {
+  userId: string;
+  /**
+   * Personal/organization context. `undefined` = no context filter (the
+   * liveness-resolution callers), `null` = personal only, a uuid = that
+   * organization. Mirrors `addOrganizationCondition` in
+   * `cli-sessions-v2-router.ts`.
+   */
+  organizationId: string | null | undefined;
+  /** When true, also merge live cloud-agent root sessions from Postgres. */
+  includeCloudAgentSessions: boolean;
+  /** Snapshot refreshes must fail rather than confirm partial/empty work on an upstream outage. */
+  requireCompleteSnapshot?: boolean;
+  /** Caller deadline; aborts the session-ingest fetch. */
+  signal?: AbortSignal;
+};
+
+/**
+ * Total budget for one answer, from the worker read through the Postgres merge.
+ *
+ * Every phase used to be unbounded except the worker fetch, so a slow merge ran
+ * past the point where the caller could still use the answer and the request
+ * died without a response body. The answer is therefore built inside this
+ * budget: each phase gets what is left, and a phase that runs out is degraded
+ * (or reported as retryable) instead of holding the request open.
+ */
+const ACTIVE_SESSIONS_LIST_BUDGET_MS = 7_000;
+
+/**
+ * Share of the budget the session-ingest read may use before the merge stops
+ * waiting on it. The heartbeat rows are only one half of the answer and the
+ * cloud-agent rows come from Postgres, so a stalled worker must not be able to
+ * spend the whole budget and leave the merge nothing: the remainder is what
+ * makes a partial answer possible.
+ */
+const SESSION_INGEST_READ_BUDGET_MS = 4_500;
+
+/** Raised when a merge phase runs out of the answer's budget. */
+class ActiveSessionsBudgetError extends Error {
+  constructor(label: string) {
+    super(`${label} exceeded the active-sessions budget`);
+    this.name = 'ActiveSessionsBudgetError';
+  }
+}
+
+/**
+ * Await one Postgres read inside the answer's remaining budget.
+ *
+ * `work` is a thunk, not the built query: building a Drizzle query can throw
+ * before any SQL runs, and that failure belongs to this phase, so it must
+ * degrade like a rejected read instead of escaping the answer. The abandoned
+ * query keeps its handlers, so a late settle is consumed instead of surfacing
+ * as an unhandled rejection.
+ */
+async function withinRemainingBudget<T>(
+  work: () => PromiseLike<T>,
+  deadlineAt: number,
+  label: string
+): Promise<T> {
+  const budgetMs = deadlineAt - Date.now();
+  const budgetError = new ActiveSessionsBudgetError(label);
+  if (budgetMs <= 0) throw budgetError;
+  const expired = Promise.withResolvers<never>();
+  const timer = setTimeout(() => expired.reject(budgetError), budgetMs);
+  try {
+    return await Promise.race([Promise.resolve(work()), expired.promise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** One read's result: the rows it returned, or the error that kept it from answering. */
+type PhaseOutcome<T> = { ok: true; rows: T } | { ok: false; error: unknown };
+
+/**
+ * Start one read and settle it into a {@link PhaseOutcome}. This is what lets
+ * two independent reads run concurrently: neither failure is a rejection its
+ * caller must catch at the same await, and a phase that already decided the
+ * answer never leaves the other read's rejection unhandled.
+ */
+async function startPhase<T>(
+  work: () => PromiseLike<T>,
+  deadlineAt: number,
+  label: string
+): Promise<PhaseOutcome<T>> {
+  try {
+    return { ok: true, rows: await withinRemainingBudget(work, deadlineAt, label) };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+function throwOrgContextFailure(error: unknown): never {
+  // A phase that ran out of the answer's budget has not answered at all, so it
+  // is retried rather than reported as a defect this control plane is unsure
+  // about.
+  if (error instanceof ActiveSessionsBudgetError) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Active sessions took too long to resolve',
+      cause: error,
+    });
+  }
+  throw new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'Failed to resolve the organization context for active sessions',
+    cause: error,
+  });
+}
+
+/**
+ * Fetch + parse + enrich the active sessions list for a user. This is the
+ * extracted core of the tRPC `activeSessions.list` procedure: it takes no
+ * tRPC context so the snapshot builder and other server-side callers can use
+ * it directly. The router owns `ensureOrganizationAccess` before calling.
+ */
+export async function listActiveSessions({
+  userId,
+  organizationId,
+  includeCloudAgentSessions,
+  requireCompleteSnapshot = false,
+  signal,
+}: ListActiveSessionsInput): Promise<{ sessions: ActiveSession[] }> {
+  const mergeDeadlineAt = Date.now() + ACTIVE_SESSIONS_LIST_BUDGET_MS;
+  // Normal list callers retain best-effort behavior. Background snapshots
+  // require an authoritative read so outages never erase last-known work.
+  let parsed: { sessions: ActiveSession[] } = { sessions: [] };
+  /**
+   * The worker read could not answer. The full merge is still built (an empty
+   * heartbeat part is a real part of it), but the caller learns about the read
+   * failure at the end instead of receiving a bare `{ sessions: [] }` — that
+   * body is indistinguishable on the wire from a user with nothing running,
+   * and the tray must not report live work as gone.
+   */
+  let upstreamReadFailed = false;
+
+  if (!SESSION_INGEST_WORKER_URL) {
+    if (requireCompleteSnapshot) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Session ingest is not configured',
+      });
+    }
+    if (!includeCloudAgentSessions) {
+      return { sessions: [] as ActiveSession[] };
+    }
+    // An unconfigured source cannot have live CLI rows at all, so the empty
+    // heartbeat part is complete; the cloud merge below still runs.
+  } else {
+    const token = generateBoundedInternalServiceToken(userId, {
+      audience: SESSION_INGEST_AUDIENCE,
+      expiresIn: 60 * 60,
+    });
+    const url = `${SESSION_INGEST_WORKER_URL}/api/sessions/active`;
+
+    try {
+      // Bounded: a session-ingest worker that never answers aborts inside
+      // `SESSION_INGEST_READ_BUDGET_MS` and rejects with
+      // `ServiceFetchTimeoutError`, which the catch below already degrades
+      // exactly as any other upstream failure does. The cap leaves the merge
+      // its own share of the answer's budget, and the body is read inside what
+      // the headers left of it: a worker that sends headers and then stalls the
+      // body must not hold the answer open either.
+      const readDeadlineAt = Date.now() + SESSION_INGEST_READ_BUDGET_MS;
+      const response = await fetchWithinBudget(
+        url,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          signal,
+        },
+        { budgetMs: SESSION_INGEST_READ_BUDGET_MS }
+      );
+
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
+        if (requireCompleteSnapshot) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to fetch active sessions',
+          });
+        }
+        console.warn(`[active-sessions] fetch failed: ${response.status} ${response.statusText}`);
+        if (!includeCloudAgentSessions) {
+          return { sessions: [] as ActiveSession[] };
+        }
+        // The merged answer decides at the end of this function (see
+        // `upstreamReadFailed`): an empty one here would read as "nothing
+        // runs".
+        upstreamReadFailed = true;
+      } else {
+        const raw = await readJsonWithinBudget(
+          response,
+          readDeadlineAt - Date.now(),
+          SESSION_INGEST_READ_BUDGET_MS
+        );
+        parsed = activeSessionsResponseSchema.parse(raw);
+      }
+    } catch (error) {
+      if (requireCompleteSnapshot) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch active sessions',
+          cause: error,
+        });
+      }
+      console.warn('[active-sessions] error:', error);
+      if (!includeCloudAgentSessions) {
+        return { sessions: [] as ActiveSession[] };
+      }
+      // Same reason as the non-OK branch above: an unreachable worker must not
+      // read as "nothing runs".
+      upstreamReadFailed = true;
+    }
+  }
+
+  // Phases 2a (heartbeat enrichment) and 2b (cloud candidates) are independent
+  // Postgres reads over the same user's rows: neither consumes the other's
+  // output, and the one merge dependency — `heartbeatIds`, which keeps a
+  // CLI-adopted row from being merged twice — is applied after both settle.
+  // They therefore run concurrently under the answer's single deadline.
+  // Sequentially, the enrichment read spent that deadline first and the cloud
+  // read started with whatever was left; at ~0 ms it failed as a budget
+  // timeout before its (fast) query could answer, which turned an
+  // organization-filtered list into SERVICE_UNAVAILABLE for a reason the user
+  // could not act on.
+  //
+  // Concurrency costs one extra pool connection per answer while both run. The
+  // alternative — reserving a slice for the second read — only bounds the loss
+  // and would still add the two reads' latencies together.
+  const ids = parsed.sessions.map(s => s.id);
+
+  if (ids.length === 0 && !includeCloudAgentSessions) {
+    // Flag-off empty heartbeats: today's short-circuit (no DB).
+    return parsed;
+  }
+
+  // Phase 2a — Query 1: enrich heartbeat sessions from cli_sessions_v2.
+  // Independent outcome from Query 2 (D16). Skipped when there are no
+  // heartbeat ids (never an empty inArray).
+  const enrichmentRead =
+    ids.length > 0
+      ? startPhase(
+          () =>
+            db
+              .select({
+                session_id: cli_sessions_v2.session_id,
+                created_on_platform: cli_sessions_v2.created_on_platform,
+                created_at: cli_sessions_v2.created_at,
+                updated_at: cli_sessions_v2.updated_at,
+                status: cli_sessions_v2.status,
+                title: cli_sessions_v2.title,
+                organization_id: cli_sessions_v2.organization_id,
+                organization_is_accessible: activeOrganizationAccessSql(
+                  cli_sessions_v2.organization_id,
+                  userId
+                ),
+                git_url: cli_sessions_v2.git_url,
+                last_activity_at: cli_sessions_v2.last_activity_at,
+                status_updated_at: cli_sessions_v2.status_updated_at,
+                total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
+                session_pr_platform: cli_sessions_v2.platform,
+                session_pr_url: cli_sessions_v2.pr_url,
+                session_pr_number: cli_sessions_v2.pr_number,
+                session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
+                pr_url: sessionAssociatedPr.pr_url,
+                pr_number: sessionAssociatedPr.pr_number,
+                pr_state: sessionAssociatedPr.pr_state,
+                pr_title: sessionAssociatedPr.pr_title,
+                pr_head_sha: sessionAssociatedPr.pr_head_sha,
+                pr_observations: sessionAssociatedPr.pr_observations,
+                pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+                pr_review_decision: sessionAssociatedPr.pr_review_decision,
+                review_decision_pending: sessionAssociatedPr.review_decision_pending,
+                pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
+              })
+              .from(cli_sessions_v2)
+              .leftJoinLateral(sessionAssociatedPr, sql`true`)
+              .where(
+                and(
+                  eq(cli_sessions_v2.kilo_user_id, userId),
+                  inArray(cli_sessions_v2.session_id, ids)
+                )
+              ),
+          mergeDeadlineAt,
+          'active-session enrichment'
+        )
+      : undefined;
+
+  // Phase 2b — Query 2: live cloud-agent candidates (flag-on only). Started
+  // here, before phase 2a is awaited, so neither read queues behind the other.
+  // Own outcome; failure semantics mirror Query 1 (D16).
+  let cloudRead: Promise<PhaseOutcome<CloudCandidateRow[]>> | undefined;
+  if (includeCloudAgentSessions) {
+    const orgPredicate =
+      organizationId === null
+        ? isNull(cli_sessions_v2.organization_id)
+        : typeof organizationId === 'string'
+          ? eq(cli_sessions_v2.organization_id, organizationId)
+          : undefined;
+
+    // Three proofs of life, because no single one covers a cloud session's
+    // whole working life:
+    // 1. An open run. `cloud_agent_session_runs` is written per message turn,
+    //    so this is the strongest proof, and it is unbounded in time.
+    // 2. A warm `idle` status. The status syncs asynchronously and reads
+    //    `idle` while the agent works, so it is only a proof once the session
+    //    has settled and within the recency window.
+    // 3. Recorded session activity. A session between turns — or one whose
+    //    current turn never got a run row — keeps a non-idle status (`busy`,
+    //    `question`, `permission`) with no open run, so proofs 1 and 2 both
+    //    fail while the agent is demonstrably working: `last_activity_at` is
+    //    seconds old. Without this branch Active now drops such a session
+    //    until it flips to idle and reappears in the warm-idle window, i.e.
+    //    it shows up only "temporarily when finished".
+    const livePredicate = or(
+      sql`EXISTS (
+        SELECT 1 FROM ${cloud_agent_session_runs}
+        WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
+          AND ${cloud_agent_session_runs.terminal_at} IS NULL
+      )`,
+      and(
+        eq(cli_sessions_v2.status, 'idle'),
+        gt(cli_sessions_v2.status_updated_at, CLOUD_AGENT_LIVE_CUTOFF)
+      ),
+      gt(cli_sessions_v2.last_activity_at, CLOUD_AGENT_LIVE_CUTOFF)
+    );
+
+    cloudRead = startPhase(
+      () =>
+        db
+          .select({
+            session_id: cli_sessions_v2.session_id,
+            created_on_platform: cli_sessions_v2.created_on_platform,
+            created_at: cli_sessions_v2.created_at,
+            updated_at: cli_sessions_v2.updated_at,
+            status: cli_sessions_v2.status,
+            title: cli_sessions_v2.title,
+            organization_id: cli_sessions_v2.organization_id,
+            git_url: cli_sessions_v2.git_url,
+            git_branch: cli_sessions_v2.git_branch,
+            last_activity_at: cli_sessions_v2.last_activity_at,
+            status_updated_at: cli_sessions_v2.status_updated_at,
+            total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
+            cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+            // The open-run proof alone, carried into the mapping: it is what
+            // upgrades a non-attention stored status to `busy`
+            // (`resolveCloudCandidateStatus`). The recency branches of
+            // `livePredicate` admit rows whose stored status already reads busy.
+            run_open: sql<boolean>`EXISTS (
+            SELECT 1 FROM ${cloud_agent_session_runs}
+            WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
+              AND ${cloud_agent_session_runs.terminal_at} IS NULL
+          )`,
+            session_pr_platform: cli_sessions_v2.platform,
+            session_pr_url: cli_sessions_v2.pr_url,
+            session_pr_number: cli_sessions_v2.pr_number,
+            session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
+            pr_url: sessionAssociatedPr.pr_url,
+            pr_number: sessionAssociatedPr.pr_number,
+            pr_state: sessionAssociatedPr.pr_state,
+            pr_title: sessionAssociatedPr.pr_title,
+            pr_head_sha: sessionAssociatedPr.pr_head_sha,
+            pr_observations: sessionAssociatedPr.pr_observations,
+            pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+            pr_review_decision: sessionAssociatedPr.pr_review_decision,
+            review_decision_pending: sessionAssociatedPr.review_decision_pending,
+            pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
+          })
+          .from(cli_sessions_v2)
+          .leftJoinLateral(sessionAssociatedPr, sql`true`)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, userId),
+              isNull(cli_sessions_v2.parent_session_id),
+              isNotNull(cli_sessions_v2.cloud_agent_session_id),
+              orgPredicate,
+              organizationId === undefined
+                ? activeOrganizationAccessSql(cli_sessions_v2.organization_id, userId)
+                : undefined,
+              livePredicate
+            )
+          )
+          // Newest-first, then capped at a ceiling far above the 100-agent
+          // target (`CLOUD_AGENT_CANDIDATE_LIMIT`; its doc comment states the
+          // accepted tradeoff). The warm-idle and recorded-activity branches are
+          // time-bounded, but an open `cloud_agent_session_runs` row with no
+          // `terminal_at` keeps its session a candidate until the 90-day session
+          // cascade, so the tail this drops is the oldest candidates — in
+          // practice the orphaned-run accumulation, which the order does not
+          // guarantee. The `(kilo_user_id, created_at)` index backs both the
+          // filter and this order, so the cap also stops the scan once it has 500
+          // matches instead of walking every orphaned candidate.
+          .orderBy(desc(cli_sessions_v2.created_at))
+          .limit(CLOUD_AGENT_CANDIDATE_LIMIT),
+      mergeDeadlineAt,
+      'live cloud-agent candidates'
+    );
+  }
+
+  // Phase 2a outcome: enrich the heartbeat rows, or degrade exactly as before.
+  let enrichmentRows: EnrichmentRow[] = [];
+  let enrichmentFailed = false;
+  if (enrichmentRead) {
+    const enrichment = await enrichmentRead;
+    if (enrichment.ok) {
+      enrichmentRows = enrichment.rows;
+    } else {
+      console.warn('[active-sessions] enrichment db query failed:', enrichment.error);
+      // Attribution is unknowable without the join. An unfiltered caller (web,
+      // `resolveSession`) keeps the existing best-effort unenriched passthrough —
+      // a DB blip must not collapse its list. A filtered caller cannot be
+      // answered at all: calling every row personal would lie (breaking AC 1)
+      // and returning an empty list would silently blank the tray with no
+      // explanation. So fail the query and let the client's already-shipped
+      // retryable state handle it (D11).
+      if (organizationId === undefined) {
+        enrichmentFailed = true;
+        if (!includeCloudAgentSessions) {
+          return parsed;
+        }
+      } else {
+        throwOrgContextFailure(enrichment.error);
+      }
+    }
+  }
+
+  let sessions: ActiveSession[];
+  if (enrichmentFailed) {
+    // Unfiltered + flag on: keep wire rows unenriched, still attempt cloud.
+    sessions = [...parsed.sessions];
+  } else {
+    const byId = new Map(enrichmentRows.map(r => [r.session_id, r]));
+    sessions = [];
+    for (const session of parsed.sessions) {
+      const row = byId.get(session.id);
+      // No `cli_sessions_v2` row → unattributable → personal. Filtering in SQL
+      // cannot tell that case apart from "belongs to an organization the caller
+      // can no longer access", so the access decision is made after enrichment:
+      // a former-organization row must be dropped, not relabelled personal.
+      const rowOrganizationId = row?.organization_id ?? null;
+      if (organizationId !== undefined && rowOrganizationId !== organizationId) {
+        continue;
+      }
+      if (organizationId === undefined && row && !row.organization_is_accessible) {
+        continue;
+      }
+      sessions.push(mapEnrichedHeartbeatSession(session, row));
+    }
+  }
+
+  // Phase 2b outcome: merge the candidates read started before phase 2a was
+  // awaited. An unfiltered caller keeps its heartbeat rows when this read
+  // fails; a filtered caller cannot be answered without it (D16).
+  if (cloudRead) {
+    const cloud = await cloudRead;
+    if (!cloud.ok) {
+      console.warn('[active-sessions] cloud candidates db query failed:', cloud.error);
+      if (organizationId !== undefined) {
+        throwOrgContextFailure(cloud.error);
+      }
+      // Unfiltered: skip cloud merge, return heartbeat rows as built.
+    } else {
+      const heartbeatIds = new Set(sessions.map(s => s.id));
+      for (const row of cloud.rows) {
+        // CLI adoption wins: keep the worker row's real connectionId/status.
+        if (heartbeatIds.has(row.session_id)) continue;
+        sessions.push(mapCloudCandidateRow(row));
+      }
+    }
+  }
+
+  // The merged list is built now, so an empty answer is only authoritative
+  // when the worker read succeeded. Snapshot callers already threw on the
+  // failed read above, so this decides the remaining best-effort callers: an
+  // empty merged list is not proof that nothing runs.
+  if (upstreamReadFailed && sessions.length === 0) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session ingest is unavailable',
+    });
+  }
+
+  return { sessions };
+}

@@ -1,0 +1,169 @@
+import 'server-only';
+
+import {
+  organization_group_memberships,
+  organization_group_policy_settings,
+  organization_groups,
+  organization_memberships,
+  organizations,
+  type Organization,
+} from '@kilocode/db/schema';
+import { type OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import {
+  DEFAULT_ORGANIZATION_GROUP_POLICIES,
+  parseOrganizationGroupPolicies,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
+import { and, eq, isNull } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+
+export type OrganizationPolicySubject =
+  | {
+      type: 'member';
+      kiloUserId: string;
+      /**
+       * Kilo admins and parent-organization owners are authorized for an
+       * organization without holding a membership row, so they belong to no
+       * group. Set this when the caller has already been authorized by another
+       * path: they are then evaluated against organization-level policy instead
+       * of being rejected. Enforcement paths must leave it unset so a caller
+       * without direct access still fails closed.
+       */
+      allowNonMember?: boolean;
+    }
+  | { type: 'defaultAccess' };
+
+export type OrganizationGroupPolicyContext = {
+  organization: Organization;
+  defaultPolicies: OrganizationGroupPolicies;
+  groupIds: string[];
+  groupPolicies: OrganizationGroupPolicies[];
+  policyRevision: number;
+};
+
+/**
+ * Resolve the organization the policy is evaluated against.
+ *
+ * Callers that already loaded and authorized the row pass it in, so the policy
+ * reflects the same organization the request authorized instead of a second read
+ * that could disagree with it.
+ */
+async function resolveOrganization(
+  client: DrizzleTransaction,
+  params: { organizationId: string; organization?: Organization }
+): Promise<Organization> {
+  if (params.organization) {
+    if (params.organization.id !== params.organizationId) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Organization group policy context received a mismatched organization',
+      });
+    }
+    // Soft-deleted organizations must fail closed here too.
+    if (params.organization.deleted_at) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
+    return params.organization;
+  }
+  const [organization] = await client
+    .select()
+    .from(organizations)
+    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  return organization;
+}
+
+export async function getOrganizationGroupPolicyContext(params: {
+  organizationId: string;
+  subject: OrganizationPolicySubject;
+  /** Organization row the caller already loaded; avoids re-reading it. */
+  organization?: Organization;
+  tx?: DrizzleTransaction;
+  /** Ignored when `tx` is given. AI gateway callers pass `readDb`. */
+  fromDb?: typeof db;
+}): Promise<OrganizationGroupPolicyContext> {
+  if (!params.tx) {
+    return await (params.fromDb ?? db).transaction(
+      async tx => await getOrganizationGroupPolicyContext({ ...params, tx }),
+      { isolationLevel: 'repeatable read', accessMode: 'read only' }
+    );
+  }
+  const client = params.tx;
+  const organization = await resolveOrganization(client, params);
+
+  let isDirectMember = false;
+  if (params.subject.type === 'member') {
+    const [membership] = await client
+      .select({ userId: organization_memberships.kilo_user_id })
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, params.organizationId),
+          eq(organization_memberships.kilo_user_id, params.subject.kiloUserId)
+        )
+      )
+      .limit(1);
+    isDirectMember = Boolean(membership);
+    if (!isDirectMember && !params.subject.allowNonMember) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have direct access to this organization',
+      });
+    }
+  }
+
+  const [settings] = await client
+    .select()
+    .from(organization_group_policy_settings)
+    .where(eq(organization_group_policy_settings.organization_id, params.organizationId))
+    .limit(1);
+
+  const defaultPolicies = settings
+    ? parseOrganizationGroupPolicies(settings.default_policies, {
+        organizationId: params.organizationId,
+        source: 'default',
+      })
+    : DEFAULT_ORGANIZATION_GROUP_POLICIES;
+
+  let groupIds: string[] = [];
+  let groupPolicies: OrganizationGroupPolicies[] = [];
+  // A non-member caller belongs to no group, so only organization-level policy
+  // applies to them.
+  if (params.subject.type === 'member' && isDirectMember) {
+    const groups = await client
+      .select({ id: organization_groups.id, policies: organization_groups.policies })
+      .from(organization_group_memberships)
+      .innerJoin(
+        organization_groups,
+        and(
+          eq(organization_groups.organization_id, organization_group_memberships.organization_id),
+          eq(organization_groups.id, organization_group_memberships.group_id)
+        )
+      )
+      .where(
+        and(
+          eq(organization_group_memberships.organization_id, params.organizationId),
+          eq(organization_group_memberships.kilo_user_id, params.subject.kiloUserId)
+        )
+      );
+    groupIds = groups.map(group => group.id);
+    groupPolicies = groups.map(group =>
+      parseOrganizationGroupPolicies(group.policies, {
+        organizationId: params.organizationId,
+        groupId: group.id,
+        source: 'group',
+      })
+    );
+  }
+
+  return {
+    organization,
+    defaultPolicies,
+    groupIds,
+    groupPolicies,
+    policyRevision: settings?.policy_revision ?? 0,
+  };
+}

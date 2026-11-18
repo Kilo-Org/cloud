@@ -8,7 +8,7 @@
  *   pnpm script src/scripts/db/backfill-free-trial-end-at.ts
  */
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { sql, isNull } from 'drizzle-orm';
 

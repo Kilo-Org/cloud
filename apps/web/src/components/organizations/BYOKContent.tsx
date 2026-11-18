@@ -1,13 +1,48 @@
 'use client';
 
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { ReactNode } from 'react';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationContextProvider } from './OrganizationContext';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { BYOKKeysManager } from './byok/BYOKKeysManager';
+import { OpenAiChatGptCard, OpenAiChatGptCardView } from './byok/OpenAiChatGptCard';
+import {
+  canManageSharedServices,
+  ChatGptSharedServicesCard,
+  ChatGptSharedServicesCardView,
+} from '@/components/chatgpt/ChatGptSharedServicesCard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { CHATGPT_ACCESS_FLAG } from '@kilocode/app-shared/feature-flags';
+import { ClaudeBillingCard } from './byok/ClaudeBillingCard';
+
+/**
+ * A titled group of connection cards. The cards decide for themselves whether
+ * to render (release flags, existing links), so the group hides in CSS when
+ * none of them did instead of repeating each card's gate here.
+ */
+function ConnectionSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="@container space-y-3 has-[>div:empty]:hidden">
+      <header className="space-y-1">
+        <h2 className="type-heading">{title}</h2>
+        <p className="type-body text-muted-foreground">{description}</p>
+      </header>
+      <div className="grid gap-4 *:only:col-span-full @3xl:grid-cols-2">{children}</div>
+    </section>
+  );
+}
 
 export function BYOKContent({
   organizationId,
@@ -17,6 +52,7 @@ export function BYOKContent({
   role?: OrganizationRole;
 }) {
   const { assumedRole } = useRoleTesting();
+  const chatGptEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
 
   // Use assumed role if available, otherwise use actual role
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role || 'member';
@@ -33,17 +69,47 @@ export function BYOKContent({
           title="Bring Your Own Key"
           showBackButton={false}
         />
-        {!hasPermission ? (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>
-              You must be an organization owner to access BYOK settings.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <BYOKKeysManager organizationId={organizationId} />
-        )}
+        <div className="space-y-8">
+          <ConnectionSection
+            title="Your connections"
+            description="Used only for the requests you make in this organization. Every member links their own."
+          >
+            {chatGptEnabled === true ? (
+              <OpenAiChatGptCard organizationId={organizationId} />
+            ) : chatGptEnabled === undefined ? (
+              <OpenAiChatGptCardView status={undefined} isOrganization />
+            ) : null}
+          </ConnectionSection>
+          <ConnectionSection
+            title="Claude billing"
+            description="Members’ requests and Kilo services such as code review bill through one Claude organization. Only owners and admins can link or remove it."
+          >
+            <ClaudeBillingCard organizationId={organizationId} scope="organization" />
+          </ConnectionSection>
+          {hasPermission ? (
+            <>
+              <ConnectionSection
+                title="Shared services"
+                description="Used by Kilo shared services in this organization, such as code review. Only owners and admins can manage these."
+              >
+                {!canManageSharedServices(currentRole) ? null : chatGptEnabled === true ? (
+                  <ChatGptSharedServicesCard organizationId={organizationId} />
+                ) : chatGptEnabled === undefined ? (
+                  <ChatGptSharedServicesCardView status={undefined} />
+                ) : null}
+              </ConnectionSection>
+              <BYOKKeysManager organizationId={organizationId} />
+            </>
+          ) : chatGptEnabled === false ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Access Denied</AlertTitle>
+              <AlertDescription>
+                You must be an organization owner to manage organization API keys.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
       </div>
     </OrganizationContextProvider>
   );

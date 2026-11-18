@@ -10,7 +10,6 @@ export const SECURITY_AGENT_MODELS = [
   { id: 'x-ai/grok-code-fast-1', name: 'Grok Code Fast 1 (free)', free: true },
 ] as const;
 
-export const DEFAULT_SECURITY_AGENT_MODEL = SECURITY_AGENT_MODELS[0].id;
 export const DEFAULT_SECURITY_AGENT_TRIAGE_MODEL = SECURITY_AGENT_MODELS[0].id;
 export const DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL = SECURITY_AGENT_MODELS[0].id;
 export const DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL = SECURITY_AGENT_MODELS[0].id;
@@ -34,6 +33,7 @@ export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
   auto_remediation_enabled: false,
   auto_remediation_min_severity: 'high',
   auto_remediation_include_existing: false,
+  auto_remediation_require_approval: false,
   auto_remediation_enabled_at: null,
   remediation_model_slug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
   ...DEFAULT_SECURITY_NOTIFICATION_POLICY,
@@ -43,22 +43,19 @@ export const SECURITY_ANALYSIS_OWNER_CAP = 3;
 
 const SecurityAgentConfigPartialSchema = SecurityAgentConfigSchema.partial().passthrough();
 
-/** Parse a raw (possibly partial) config into a full SecurityAgentConfig. */
+/**
+ * Parse a raw (possibly partial) config into a full SecurityAgentConfig.
+ *
+ * Every model role is independent: a stored `remediation_model_slug` wins, and
+ * without one the role keeps `DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL` from
+ * `DEFAULT_SECURITY_AGENT_CONFIG`. It never follows the analysis model.
+ */
 export function parseSecurityAgentConfig(rawConfig: unknown): SecurityAgentConfig {
   const partial = SecurityAgentConfigPartialSchema.parse(rawConfig ?? {});
-  const parsed = SecurityAgentConfigSchema.parse({
+  return SecurityAgentConfigSchema.parse({
     ...DEFAULT_SECURITY_AGENT_CONFIG,
     ...partial,
   });
-  return {
-    ...parsed,
-    remediation_model_slug:
-      partial.remediation_model_slug ??
-      parsed.remediation_model_slug ??
-      parsed.analysis_model_slug ??
-      parsed.model_slug ??
-      DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
-  };
 }
 
 export function mergeSecurityAgentConfigPatch(

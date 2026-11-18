@@ -1,7 +1,7 @@
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import { db } from '@/lib/drizzle';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { agent_configs, kilocode_users, organizations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
@@ -92,9 +92,37 @@ describe('Code Reviewer analytics settings', () => {
         selected_repository_ids: [],
         manually_added_repositories: [],
         disable_review_md: true,
+        review_guideline_source_repositories: [],
         review_memory_enabled: false,
         review_analytics_enabled: true,
       });
+    });
+
+    it('inserts the selected repository mode for a GitLab row', async () => {
+      const owner = { type: 'org' as const, id: organizationId };
+
+      await setReviewAnalyticsEnabled({
+        owner,
+        platform: 'gitlab',
+        enabled: true,
+        createdBy: userId,
+      });
+
+      const stored = await db.query.agent_configs.findFirst({
+        where: and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'gitlab'),
+          eq(agent_configs.owned_by_organization_id, organizationId)
+        ),
+      });
+
+      expect(stored?.config).toEqual(
+        expect.objectContaining({
+          repository_selection_mode: 'selected',
+          selected_repository_ids: [],
+          review_analytics_enabled: true,
+        })
+      );
     });
 
     it('atomically updates only analytics state on an existing row', async () => {

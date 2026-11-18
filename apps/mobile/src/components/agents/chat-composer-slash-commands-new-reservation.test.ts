@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 
 import {
-  LOCAL_NEW_SLASH_COMMAND,
+  getLocalNewSlashCommand,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 
@@ -26,7 +26,7 @@ describe('parseChatComposerSubmission — /new reserved only for remote sessions
     expect(
       parseChatComposerSubmission(
         '/new extra args',
-        [...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND],
+        [...SAMPLE_COMMANDS, getLocalNewSlashCommand()],
         {
           hasAttachments: false,
           sessionType: 'cloud-agent',
@@ -38,7 +38,7 @@ describe('parseChatComposerSubmission — /new reserved only for remote sessions
 
   it('applies ordinary command attachment semantics to reported /new in cloud-agent sessions', () => {
     expect(
-      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND], {
+      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, getLocalNewSlashCommand()], {
         hasAttachments: true,
         sessionType: 'cloud-agent',
         remoteCommandState: null,

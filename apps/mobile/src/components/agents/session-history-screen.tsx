@@ -1,0 +1,299 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Keyboard, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useFocusEffect, useNavigation } from 'expo-router';
+
+import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { type SessionListClearAction } from '@/components/agents/session-list-body-model';
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
+import { AgentSessionListContent } from '@/components/agents/session-list-content';
+import { SessionListHeader } from '@/components/agents/session-list-header';
+import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
+import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
+import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
+import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
+import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
+import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
+import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
+import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
+import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
+import { SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
+import { useOrganization } from '@/lib/organization-context';
+import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
+
+/**
+ * Pushed sibling of the live Agents tab. Owns the stored session history with
+ * search, filters, sort, and pagination, but never renders the live tray, the
+ * new-session FAB, or any active-session surface.
+ */
+export function SessionHistoryScreen() {
+  const { t } = useTranslation();
+  const navigation = useNavigation();
+
+  const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  const {
+    platformFilter,
+    projectFilter,
+    activeFilterCount,
+    hasLoaded: filtersLoaded,
+    setFilters,
+    clearFilters,
+  } = usePersistedAgentSessionFilters(SESSION_FILTERS_KEY);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Durable session-list search draft. The input mounts immediately — typing
+  // never waits on the account query — and the stored draft settles behind it
+  // (same pattern as the new-session prompt draft in agent-chat/new.tsx).
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const searchDraftState = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: SESSION_SEARCH_DRAFT_KEY,
+  });
+
+  const {
+    searchQuery,
+    restorePending,
+    searchInputRef,
+    hasText,
+    awaitingCommit,
+    handleSearchInputChange,
+    handleClearSearchInput,
+    clearSearchInput,
+    searchController,
+    searchInputKey,
+    searchDefaultValue,
+  } = useSessionSearchInput({
+    userId,
+    restoredQuery: searchDraftState.value,
+    restoreSettled: searchDraftState.settled,
+  });
+  const keyboard = useOwnedKeyboard();
+  const keyboardLift = useKeyboardLiftPad(keyboard.occlusion);
+
+  const ready = filtersLoaded && orgLoaded;
+
+  const {
+    storedSessions,
+    activeSessionIds,
+    storedIsPending,
+    storedFetchedSinceMount,
+    paging,
+    handleRetry: retryHistory,
+    handleRefetch,
+    isSearching,
+    search,
+    projectOptions,
+    contentIsError,
+    sections,
+  } = useAgentSessionListData({
+    organizationId,
+    platformFilter,
+    projectFilter,
+    ready,
+    searchQuery,
+  });
+
+  const [isRetrying, setIsRetrying] = useState(false);
+  const handleRetry = useCallback(() => {
+    setIsRetrying(true);
+    void (async () => {
+      try {
+        await retryHistory();
+      } catch {
+        setIsRetrying(false);
+        return;
+      }
+      setIsRetrying(false);
+    })();
+  }, [retryHistory]);
+
+  const showSearchBusy = selectShowSearchBusy({
+    awaitingCommit,
+    isSearching,
+    isFetching: search.isFetching,
+  });
+
+  // Pushed-sibling focus refetch: fires on first push and on return from a
+  // pushed detail screen, so a session that ended on the live tab appears in
+  // history without a manual pull. Runs through the wrapped stored refetch.
+  const handleRefetchRef = useRef(handleRefetch);
+  useEffect(() => {
+    handleRefetchRef.current = handleRefetch;
+  }, [handleRefetch]);
+  // Focus return and app-foreground refreshes run outside the pull lifecycle
+  // (the pull state lives inside the content). Count each settlement so the
+  // content can retire a stale pull-failure line once a later refresh lands;
+  // persistent failures keep surfacing through the query error state.
+  const [nonPullRefreshes, setNonPullRefreshes] = useState(0);
+  const refetchOutsidePull = useCallback(() => {
+    void (async () => {
+      await handleRefetchRef.current();
+      setNonPullRefreshes(count => count + 1);
+    })();
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      refetchOutsidePull();
+    }, [refetchOutsidePull])
+  );
+
+  // App-foreground refresh for stored history. `navigation.isFocused()` is
+  // read live because a focus value carried through React state or a ref lags
+  // the navigation state. History shows no tray, so only stored queries are
+  // touched.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active' && navigation.isFocused()) {
+        refetchOutsidePull();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [navigation, refetchOutsidePull]);
+
+  const navigateToSession = useAgentSessionNavigator();
+  const { openNewSession } = useNewSessionNavigator();
+
+  // The empty history's next step is a real session, in the current
+  // organization: the same destination the Agents tab's "New session" action
+  // opens, so history never dead-ends at a message.
+  const handleCreateSession = useCallback(() => {
+    openNewSession(organizationId);
+  }, [openNewSession, organizationId]);
+
+  const handleEndReached = useCallback(() => {
+    if (shouldLoadMoreSessions(paging)) {
+      void paging.fetchNextPage();
+    }
+  }, [paging]);
+
+  // The footer's own retry: it bypasses the end-reach gate, which stays shut
+  // while the last attempt failed.
+  const handleRetryNextPage = useCallback(() => {
+    void paging.fetchNextPage();
+  }, [paging]);
+
+  const hasActiveQuery = isSearching || activeFilterCount > 0;
+  // History has no live tray, so "any sessions" means stored rows or an active
+  // query — never the active set.
+  const hasAnySessions = storedSessions.length > 0 || hasActiveQuery;
+
+  // Every empty-state clear control names the one narrowing input it retires,
+  // so it clears exactly that. A search and a filter can both hide the session;
+  // clearing the filter under a "Clear search" label would leave the search in
+  // place and land on the same empty body.
+  // Either branch replaces the body in place, so the gate holds this screen's
+  // list for the settle window: the rows mount under the finger that just
+  // released the action, and a repeat tap would open the row there.
+  const handleClearAction = useCallback(
+    (action: SessionListClearAction) => {
+      holdSessionListTouch();
+      if (action === 'clear-search') {
+        clearSearchInput();
+        searchController.clearSearchOnly();
+        return;
+      }
+      clearFilters();
+    },
+    [clearSearchInput, searchController, clearFilters]
+  );
+
+  // The durable draft is the saved search this screen reopens with. Until the
+  // hook has applied it, the body cannot know whether a search applies, so it
+  // shows the loading body: painting the unfiltered list or "No past sessions"
+  // first claims a result the saved search is about to replace.
+  const isLoading =
+    restorePending ||
+    selectSessionListIsLoading({
+      ready,
+      isSearching,
+      searchIsPending: search.isPending,
+      storedIsPending,
+    });
+
+  // One permanently mounted body inside one keyboard container: the empty-state
+  // subtitle, the rows, the skeletons and the reserved refresh band all lift
+  // with the keyboard, so the no-match copy is never drawn half-behind it. The
+  // container lives outside AgentSessionListContent's `FadeIn` early returns,
+  // which mount after the keyboard is already up and would never read its
+  // height (same contract as session-detail-content.tsx:1923-1931).
+  const sessionListBody = (
+    <AgentSessionListContent
+      searchInputRef={searchInputRef}
+      sections={sections}
+      activeSessionIds={activeSessionIds}
+      hasAnySessions={hasAnySessions}
+      isLoading={isLoading}
+      isError={contentIsError}
+      hasFreshHistory={storedFetchedSinceMount}
+      isFetchingNextPage={paging.isFetchingNextPage}
+      isFetchNextPageError={paging.isFetchNextPageError}
+      onRetryNextPage={handleRetryNextPage}
+      refetch={handleRefetch}
+      onRetry={handleRetry}
+      onEndReached={handleEndReached}
+      onSessionPress={navigateToSession}
+      nonPullRefreshes={nonPullRefreshes}
+      hasActiveQuery={hasActiveQuery}
+      hasActiveFilters={activeFilterCount > 0}
+      isSearching={isSearching}
+      searchQuery={searchQuery}
+      isRetrying={isRetrying}
+      onClearAction={handleClearAction}
+      onCreateSession={handleCreateSession}
+    />
+  );
+
+  return (
+    <View className="flex-1 bg-background">
+      <SessionListHeader
+        title={t('agents.sessionList.pastSessions')}
+        showBackButton
+        backFallback="/(app)/(tabs)/(2_agents)"
+        searchOpen
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => {
+          Keyboard.dismiss();
+          setShowFilterModal(true);
+        }}
+        search={
+          <SessionListSearchHeader
+            inputRef={searchInputRef}
+            hasText={hasText}
+            showSearchBusy={showSearchBusy}
+            onChangeText={handleSearchInputChange}
+            onClearSearch={handleClearSearchInput}
+            onFocus={keyboard.handleInputFocus}
+            onBlur={keyboard.handleInputBlur}
+            defaultValue={searchDefaultValue}
+            inputKey={searchInputKey}
+            compact
+            inline
+          />
+        }
+      />
+      <SessionListTouchGate>
+        <OwnedKeyboardLift pad={keyboardLift.pad} onLayout={keyboardLift.handleLayout}>
+          {sessionListBody}
+        </OwnedKeyboardLift>
+      </SessionListTouchGate>
+      <SessionFilterModal
+        visible={showFilterModal}
+        selectedPlatforms={platformFilter}
+        selectedProjects={projectFilter}
+        projectOptions={projectOptions}
+        onClose={() => {
+          setShowFilterModal(false);
+        }}
+        onApply={setFilters}
+      />
+    </View>
+  );
+}

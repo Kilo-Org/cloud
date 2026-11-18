@@ -1,4 +1,4 @@
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { UNIVERSAL_LINK_ROUTES } from '@kilocode/app-shared/universal-links';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 
@@ -9,15 +9,18 @@ describe('smartAppBannerItunes', () => {
     expect(result).not.toHaveProperty('appArgument');
   });
 
-  it.each(['/profile', '/code-reviews', '/security-agent/findings', '/cloud/sessions'] as const)(
-    'sets appArgument for surface path %s',
-    path => {
-      expect(smartAppBannerItunes(path)).toEqual({
-        appId: '6761193135',
-        appArgument: `${APP_URL}${path}`,
-      });
-    }
-  );
+  it.each([
+    '/profile',
+    '/code-reviews',
+    '/security-agent/findings',
+    '/cloud/sessions',
+    '/s/sess_1',
+  ] as const)('sets appArgument for surface path %s', path => {
+    expect(smartAppBannerItunes(path)).toEqual({
+      appId: '6761193135',
+      appArgument: `${APP_URL}${path}`,
+    });
+  });
 
   it('accepts every literal UNIVERSAL_LINK_ROUTES webPath', () => {
     const literalPaths = UNIVERSAL_LINK_ROUTES.map(route => route.webPath).filter(
@@ -32,7 +35,7 @@ describe('smartAppBannerItunes', () => {
     }
   });
 
-  it.each(['/admin', '/s/sess_1', '/code-reviews/review-md', '/login'] as const)(
+  it.each(['/admin', '/claw', '/code-reviews/review-md', '/login'] as const)(
     'throws for unmapped path %s',
     path => {
       expect(() => smartAppBannerItunes(path)).toThrow(

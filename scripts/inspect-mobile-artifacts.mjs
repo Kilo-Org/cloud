@@ -1,0 +1,516 @@
+#!/usr/bin/env node
+/**
+ * Inspect signed kilo-app mobile artifacts before submission.
+ *
+ * Usage:
+ *   node scripts/inspect-mobile-artifacts.mjs <ipa> <aab> <build.json>
+ *   node scripts/inspect-mobile-artifacts.mjs --select <build.json>
+ *
+ * The full mode unzips the IPA, parses its Info.plist, dumps the AAB manifest
+ * with bundletool, checks debug symbols, and prints a signed-artifact size
+ * table (JS bundles, fonts, and grammar modules). The --select mode validates
+ * the EAS build.json (every build FINISHED, one IOS and one ANDROID entry with
+ * an applicationArchiveUrl, and an IOS buildArtifactsUrl) and prints three
+ * lines: the iOS archive URL, the Android archive URL, and the iOS build
+ * artifacts URL (the archive eas.json `buildArtifactPaths` uploads, which
+ * carries the build's Podfile.lock).
+ *
+ * Exits 1 with a clear message on any contract violation.
+ */
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
+const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
+const SKADNETWORK_ENDPOINT = 'https://appsflyer-skadnetwork.com/';
+const INTENT_FILTER_HOST = 'app.kilo.ai';
+const BUNDLETOOL_URL =
+  'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar';
+const BUNDLETOOL_SHA256 = 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29';
+const DEBUGSYMBOLS_PREFIX = 'BUNDLE-METADATA/com.android.tools.build.debugsymbols/';
+const SHRINK_SENTINEL = 'zz_unused_shrink_sentinel';
+const REQUIRED_USAGE_DESCRIPTIONS = [
+  'NSMicrophoneUsageDescription',
+  'NSSpeechRecognitionUsageDescription',
+  'NSUserTrackingUsageDescription',
+];
+const BLOCKED_PERMISSIONS = [
+  'android.permission.READ_MEDIA_IMAGES',
+  'android.permission.READ_MEDIA_VIDEO',
+  'android.permission.READ_MEDIA_AUDIO',
+];
+const FONT_RE = /\.(otf|ttf)$/i;
+const JS_BUNDLE_RE = /\.(jsbundle|bundle|hbc)$/i;
+const GRAMMAR_RE = /highlight\.js|lowlight|refractor|prism|shiki|grammar/i;
+const GRAMMAR_FILE_RE = /\.(c|m)?js$/i;
+
+// Markers that must be compiled into every signed JS bundle. A missing marker
+// fails the inspect, because each one proves a privacy or analytics gate is
+// present in the shipped bundle.
+export const INSPECT_JS_NEEDLES = [
+  // maskAll* from Sentry mobileReplayIntegration in the extracted sentry-init module.
+  'maskAllText',
+  'maskAllImages',
+  'maskAllVectors',
+  // consent-accepted- from CONSENT_USER_KEY_PREFIX in apps/mobile/src/lib/storage-keys.ts
+  // (proves consent storage is compiled in; runtime gating is the transport-spy suite).
+  'consent-accepted-',
+  // PostHog US host from initPostHog.
+  'us.i.posthog.com',
+  // app_startup from APP_STARTUP_EVENT.
+  'app_startup',
+];
+
+const failures = [];
+
+function check(condition, message) {
+  if (!condition) {
+    failures.push(message);
+  }
+}
+
+function run(cmd, args) {
+  return execFileSync(cmd, args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+}
+
+function reportAndExit() {
+  if (failures.length === 0) {
+    process.exit(0);
+  }
+  console.error('Mobile artifact inspection failed:');
+  for (const failure of failures) {
+    console.error(`  - ${failure}`);
+  }
+  process.exit(1);
+}
+
+function parseBuildJson(path) {
+  let raw;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (error) {
+    failures.push(`cannot read build.json: ${error.message}`);
+    reportAndExit();
+  }
+  let builds;
+  try {
+    builds = JSON.parse(raw);
+  } catch (error) {
+    failures.push(`build.json is not valid JSON: ${error.message}`);
+    reportAndExit();
+  }
+  if (!Array.isArray(builds)) {
+    failures.push('build.json must be a JSON array of build objects');
+    reportAndExit();
+  }
+  return builds;
+}
+
+function assertAllFinished(builds) {
+  const unfinished = builds.filter(build => build && build.status !== 'FINISHED');
+  if (unfinished.length > 0) {
+    const detail = unfinished
+      .map(build => `${build.platform ?? 'unknown'}=${build.status ?? 'missing'}`)
+      .join(', ');
+    failures.push(`every EAS build must be FINISHED, got: ${detail}`);
+  }
+}
+
+function selectBuild(builds, platform) {
+  return builds.find(build => build && build.platform === platform);
+}
+
+function artifactUrl(build) {
+  return build?.artifacts?.applicationArchiveUrl ?? '';
+}
+
+function buildArtifactsUrl(build) {
+  return build?.artifacts?.buildArtifactsUrl ?? '';
+}
+
+function selectMode(buildJsonPath) {
+  const builds = parseBuildJson(buildJsonPath);
+  assertAllFinished(builds);
+  const ios = selectBuild(builds, 'IOS');
+  const android = selectBuild(builds, 'ANDROID');
+  if (!ios) {
+    failures.push('build.json has no IOS build');
+  }
+  if (!android) {
+    failures.push('build.json has no ANDROID build');
+  }
+  const iosUrl = artifactUrl(ios);
+  const androidUrl = artifactUrl(android);
+  if (!iosUrl) {
+    failures.push('IOS build has no artifacts.applicationArchiveUrl');
+  }
+  if (!androidUrl) {
+    failures.push('ANDROID build has no artifacts.applicationArchiveUrl');
+  }
+  const iosBuildArtifactsUrl = buildArtifactsUrl(ios);
+  if (!iosBuildArtifactsUrl) {
+    failures.push(
+      'IOS build has no artifacts.buildArtifactsUrl (eas.json build.production.ios.buildArtifactPaths must upload ios/Podfile.lock)'
+    );
+  }
+  if (failures.length > 0) {
+    reportAndExit();
+  }
+  process.stdout.write(`${iosUrl}\n${androidUrl}\n${iosBuildArtifactsUrl}\n`);
+  process.exit(0);
+}
+
+function parseInfoPlist(plistPath) {
+  // A signed IPA's Info.plist is binary. Python's plistlib stdlib handles both
+  // XML and binary formats and is preinstalled on the ubuntu-latest runner.
+  const script = [
+    'import plistlib, json, sys',
+    'with open(sys.argv[1], "rb") as f:',
+    '    data = plistlib.load(f)',
+    'json.dump(data, sys.stdout)',
+  ].join('\n');
+  const out = run('python3', ['-c', script, plistPath]);
+  return JSON.parse(out);
+}
+
+function inspectIos(ipaPath) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspect-ios-'));
+  try {
+    const extractDir = join(work, 'ipa');
+    mkdirSync(extractDir, { recursive: true });
+    try {
+      run('unzip', ['-q', '-o', ipaPath, '-d', extractDir]);
+    } catch (error) {
+      failures.push(`cannot unzip IPA ${ipaPath}: ${error.message}`);
+      return;
+    }
+
+    const payloadDir = join(extractDir, 'Payload');
+    let appName;
+    try {
+      appName = readdirSync(payloadDir).find(entry => entry.endsWith('.app'));
+    } catch {
+      appName = undefined;
+    }
+    if (!appName) {
+      failures.push(`IPA has no Payload/*.app bundle (checked ${payloadDir})`);
+      return;
+    }
+    const appPath = join(payloadDir, appName);
+
+    let plist;
+    try {
+      plist = parseInfoPlist(join(appPath, 'Info.plist'));
+    } catch (error) {
+      failures.push(`cannot parse Info.plist: ${error.message}`);
+      return;
+    }
+
+    check(
+      plist.CFBundleIdentifier === BUNDLE_IDENTIFIER,
+      `CFBundleIdentifier must be "${BUNDLE_IDENTIFIER}", got "${plist.CFBundleIdentifier}"`
+    );
+    check(
+      existsSync(join(appPath, 'PrivacyInfo.xcprivacy')),
+      'PrivacyInfo.xcprivacy must exist in the .app bundle'
+    );
+    for (const key of REQUIRED_USAGE_DESCRIPTIONS) {
+      check(
+        typeof plist[key] === 'string' && plist[key].length > 0,
+        `Info.plist must contain a non-empty ${key}`
+      );
+    }
+    check(
+      plist.NSAdvertisingAttributionReportEndpoint === SKADNETWORK_ENDPOINT,
+      `NSAdvertisingAttributionReportEndpoint must be "${SKADNETWORK_ENDPOINT}"`
+    );
+    check(
+      plist.AttributionCopyEndpoint === SKADNETWORK_ENDPOINT,
+      `AttributionCopyEndpoint must be "${SKADNETWORK_ENDPOINT}"`
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+function listZipEntries(zipPath) {
+  try {
+    return run('unzip', ['-Z1', zipPath])
+      .split('\n')
+      .filter(entry => entry.length > 0);
+  } catch (error) {
+    failures.push(`cannot list zip entries of ${zipPath}: ${error.message}`);
+    return [];
+  }
+}
+
+export function assertFileSha256(filePath, expectedSha256) {
+  const actualSha256 = createHash('sha256').update(readFileSync(filePath)).digest('hex');
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(`SHA-256 must be ${expectedSha256}, got ${actualSha256}`);
+  }
+}
+
+function inspectAndroid(aabPath) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspect-android-'));
+  try {
+    const jarPath = join(work, 'bundletool.jar');
+    try {
+      run('curl', [
+        '-fsSL',
+        '--proto',
+        '=https',
+        '--proto-redir',
+        '=https',
+        BUNDLETOOL_URL,
+        '-o',
+        jarPath,
+      ]);
+    } catch (error) {
+      failures.push(`cannot download bundletool: ${error.message}`);
+      return;
+    }
+    try {
+      assertFileSha256(jarPath, BUNDLETOOL_SHA256);
+    } catch (error) {
+      failures.push(`cannot verify bundletool: ${error.message}`);
+      return;
+    }
+
+    let manifest;
+    try {
+      manifest = run('java', ['-jar', jarPath, 'dump', 'manifest', '--bundle', aabPath]);
+    } catch (error) {
+      failures.push(`bundletool dump manifest failed: ${error.message}`);
+      return;
+    }
+
+    const packageMatch = manifest.match(/package="([^"]+)"/);
+    check(
+      packageMatch?.[1] === ANDROID_PACKAGE,
+      `android package must be "${ANDROID_PACKAGE}", got "${packageMatch?.[1] ?? 'none'}"`
+    );
+    for (const permission of BLOCKED_PERMISSIONS) {
+      check(
+        !manifest.includes(`android:name="${permission}"`),
+        `${permission} must be absent from the manifest`
+      );
+    }
+    check(
+      !manifest.includes('usesCleartextTraffic="true"'),
+      'usesCleartextTraffic="true" must be absent from the manifest'
+    );
+    check(
+      manifest.includes(`android:host="${INTENT_FILTER_HOST}"`),
+      `intent-filter host must be "${INTENT_FILTER_HOST}"`
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+function checkSymbols(aabPath) {
+  const entries = listZipEntries(aabPath);
+  const aabHasDebugSymbols = entries.some(entry => entry.startsWith(DEBUGSYMBOLS_PREFIX));
+  check(aabHasDebugSymbols, `no debug symbols: the AAB has no ${DEBUGSYMBOLS_PREFIX} entries`);
+}
+
+/**
+ * Returns true when the AAB zip has no zz_unused_shrink_sentinel entry
+ * (resource shrinking stripped the unused raw resource) and false when it does.
+ * Kept side-effect free so tests can import it without touching `failures`.
+ */
+export function checkResourceShrinking(aabPath) {
+  const entries = listZipEntries(aabPath);
+  const sentinelPresent = entries.some(entry => entry.includes(SHRINK_SENTINEL));
+  return !sentinelPresent;
+}
+
+function classify(path) {
+  if (FONT_RE.test(path)) {
+    return 'font';
+  }
+  if (JS_BUNDLE_RE.test(path)) {
+    return 'jsbundle';
+  }
+  if (GRAMMAR_FILE_RE.test(path) && GRAMMAR_RE.test(path)) {
+    return 'grammar';
+  }
+  return null;
+}
+
+function walkFiles(dir, base) {
+  const results = [];
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    const relPath = base ? `${base}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      results.push(...walkFiles(fullPath, relPath));
+    } else if (entry.isFile()) {
+      results.push({ fullPath, relPath });
+    }
+  }
+  return results;
+}
+
+function measureArtifactSizes(artifactPath, label) {
+  const rows = [];
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspect-size-'));
+  try {
+    const extractDir = join(work, 'extracted');
+    mkdirSync(extractDir, { recursive: true });
+    try {
+      run('unzip', ['-q', '-o', artifactPath, '-d', extractDir]);
+    } catch (error) {
+      console.error(`size table: cannot unzip ${artifactPath}: ${error.message}`);
+      return rows;
+    }
+    for (const { fullPath, relPath } of walkFiles(extractDir)) {
+      const category = classify(relPath);
+      if (!category) {
+        continue;
+      }
+      let bytes;
+      try {
+        bytes = statSync(fullPath).size;
+      } catch {
+        continue;
+      }
+      rows.push({ bytes, artifact: label, category, path: relPath });
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  return rows;
+}
+
+export function bundleBufferContains(buffer, needle) {
+  return buffer.toString('utf8').includes(needle) || buffer.toString('utf16le').includes(needle);
+}
+
+// `getSentryExpoConfig` in apps/mobile/metro.config.js injects a Sentry debug-id
+// into the JS bundle; it is the symbolication signal, so either marker must be
+// present. Do not check IPA dSYM files.
+export function bundleBufferHasDebugId(buffer) {
+  return bundleBufferContains(buffer, 'debugId') || bundleBufferContains(buffer, 'debug_id');
+}
+
+export function inspectJsBundles(artifactPath) {
+  const needlesFound = [];
+  let hasDebugId = false;
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspect-js-'));
+  try {
+    const extractDir = join(work, 'extracted');
+    mkdirSync(extractDir, { recursive: true });
+    try {
+      run('unzip', ['-q', '-o', artifactPath, '-d', extractDir]);
+    } catch (error) {
+      console.error(`JS bundle inspection: cannot unzip ${artifactPath}: ${error.message}`);
+      return { needlesFound, hasDebugId };
+    }
+    for (const { fullPath, relPath } of walkFiles(extractDir)) {
+      if (!JS_BUNDLE_RE.test(relPath)) {
+        continue;
+      }
+      const buffer = readFileSync(fullPath);
+      for (const needle of INSPECT_JS_NEEDLES) {
+        if (!needlesFound.includes(needle) && bundleBufferContains(buffer, needle)) {
+          needlesFound.push(needle);
+        }
+      }
+      if (!hasDebugId && bundleBufferHasDebugId(buffer)) {
+        hasDebugId = true;
+      }
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  return { needlesFound, hasDebugId };
+}
+
+export function assertJsBundlePrivacy(artifactPath, label) {
+  const { needlesFound, hasDebugId } = inspectJsBundles(artifactPath);
+  for (const needle of INSPECT_JS_NEEDLES) {
+    check(needlesFound.includes(needle), `${label} JS bundle is missing needle: ${needle}`);
+  }
+  check(hasDebugId, `${label} JS bundle must contain a Sentry debug-id marker`);
+}
+
+function printSizeTable(ipaPath, aabPath) {
+  const rows = [
+    ...measureArtifactSizes(ipaPath, basename(ipaPath)),
+    ...measureArtifactSizes(aabPath, basename(aabPath)),
+  ];
+  rows.sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path));
+
+  const groups = [
+    ['jsbundle', 'JS bundles'],
+    ['font', 'Fonts'],
+    ['grammar', 'Grammar modules'],
+  ];
+  console.log('\nSigned artifact sizes:');
+  for (const [key, label] of groups) {
+    const matches = rows.filter(row => row.category === key);
+    if (matches.length === 0) {
+      console.log(`\n${label}: (none found)`);
+      continue;
+    }
+    console.log(`\n${label}:`);
+    for (const row of matches) {
+      console.log(`  ${String(row.bytes).padStart(10)}  ${row.artifact}  ${row.path}`);
+    }
+  }
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  if (args[0] === '--select') {
+    if (args.length !== 2) {
+      console.error('Usage: node inspect-mobile-artifacts.mjs --select <build.json>');
+      process.exit(2);
+    }
+    selectMode(args[1]);
+    return;
+  }
+  if (args.length !== 3) {
+    console.error('Usage: node inspect-mobile-artifacts.mjs <ipa> <aab> <build.json>');
+    console.error('       node inspect-mobile-artifacts.mjs --select <build.json>');
+    process.exit(2);
+  }
+  const [ipaPath, aabPath, buildJsonPath] = args;
+  const builds = parseBuildJson(buildJsonPath);
+  assertAllFinished(builds);
+  inspectIos(ipaPath);
+  inspectAndroid(aabPath);
+  checkSymbols(aabPath);
+  check(checkResourceShrinking(aabPath), 'unused shrink sentinel still in the AAB');
+  assertJsBundlePrivacy(ipaPath, 'IPA');
+  assertJsBundlePrivacy(aabPath, 'AAB');
+  printSizeTable(ipaPath, aabPath);
+  reportAndExit();
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

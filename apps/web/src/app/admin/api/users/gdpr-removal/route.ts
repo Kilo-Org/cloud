@@ -2,8 +2,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import type { UserDeletionRequest, UserDeletionStep } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
-import { findUserById } from '@/lib/user';
-import { getUserFromAuth } from '@/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getUserDeletionRequestById, getUserDeletionRequestForUser } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';
@@ -77,6 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
     const [result] = await enqueueUserDeletionTargets({
       actor: { kiloUserId: admin.id, email: admin.google_user_email },
       targets: [{ email: user.google_user_email, trustedUserId: user.id }],
+      catalogVersion: 2,
     });
 
     if (!result) {

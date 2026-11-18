@@ -1,0 +1,520 @@
+import type { User } from '@kilocode/db/schema';
+import {
+  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+  SESSION_INGEST_USER_DELETION_AUDIENCE,
+  USER_DATA_EXPORT_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION, kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
+import {
+  buildModernKiloTokenPayload,
+  isKiloResourceAudienceAllowed,
+} from '@kilocode/worker-utils/kilo-token-policy';
+import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import {
+  isCloudAgentAuthorityHttpPathAllowed,
+  validateCloudAgentAuthorityClaims,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { z } from 'zod';
+import jwt from 'jsonwebtoken';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  isBoundedInternalServiceTokenIssuanceEnabled,
+  isResourceTokenIssuanceEnabled,
+  NEXTAUTH_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
+
+export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+
+/**
+ * @deprecated Use `KILO_TOKEN_VERSION`. One test file outside this change holds
+ * the only remaining caller, so the name stays until that file moves.
+ */
+export { KILO_TOKEN_VERSION as JWT_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
+
+const jwtSigningAlgorithm = 'HS256';
+
+/**
+ * The bearer a Kilo client sends when nobody is signed in.
+ *
+ * The clients set `apiKey: "anonymous"` rather than omitting the header
+ * (`ANONYMOUS_API_KEY` in `packages/kilo-gateway/src/api/constants.ts` of the
+ * kilocode repository), so the header arrives present and its value is not a
+ * token. It means "no credential", not "a credential that failed", and must be
+ * treated as the former. Delete this constant once no released client sends it.
+ */
+const ANONYMOUS_BEARER_SENTINEL = 'anonymous';
+
+export const BOUNDED_INTERNAL_SERVICE_AUDIENCES = [
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
+  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+  USER_DATA_EXPORT_AUDIENCE,
+  SESSION_INGEST_USER_DELETION_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+] as const;
+
+export type BoundedInternalServiceAudience = (typeof BOUNDED_INTERNAL_SERVICE_AUDIENCES)[number];
+
+const boundedInternalServiceAudienceSet: ReadonlySet<string> = new Set(
+  BOUNDED_INTERNAL_SERVICE_AUDIENCES
+);
+
+const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
+const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
+const ONE_HOUR_IN_SECONDS = 60 * 60;
+const FIVE_MINUTES_IN_SECONDS = 5 * 60;
+
+export const TOKEN_EXPIRY = {
+  default: FIVE_YEARS_IN_SECONDS,
+  thirtyDays: THIRTY_DAYS_IN_SECONDS,
+  oneHour: ONE_HOUR_IN_SECONDS,
+  fiveMinutes: FIVE_MINUTES_IN_SECONDS,
+} as const;
+
+/**
+ * Generate a short-lived JWT for authenticating with internal Cloudflare Worker services
+ * (e.g. session-ingest). Carries the minimal fields the workers require: kiloUserId and
+ * version, plus an organizationId claim when the caller supplies one. Defaults to a
+ * 1-hour expiry.
+ */
+export function generateInternalServiceToken(
+  userId: string,
+  options?: { expiresIn?: number; audience?: string; organizationId?: string }
+): string {
+  return jwt.sign(
+    {
+      kiloUserId: userId,
+      version: KILO_TOKEN_VERSION,
+      ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
+    },
+    NEXTAUTH_SECRET,
+    {
+      algorithm: jwtSigningAlgorithm,
+      expiresIn: options?.expiresIn ?? ONE_HOUR_IN_SECONDS,
+      ...(options?.audience ? { audience: options.audience } : {}),
+    }
+  );
+}
+
+export function generateBoundedInternalServiceToken(
+  userId: string,
+  options: {
+    audience: BoundedInternalServiceAudience;
+    expiresIn: number;
+    organizationId?: string;
+  }
+): string {
+  if (!boundedInternalServiceAudienceSet.has(options.audience)) {
+    throw new Error('Unsupported bounded internal service token audience');
+  }
+  const maximumLifetime =
+    options.audience === SESSION_INGEST_AUDIENCE ? ONE_HOUR_IN_SECONDS : FIVE_MINUTES_IN_SECONDS;
+  if (options.expiresIn > maximumLifetime) {
+    throw new Error('Bounded internal service token lifetime exceeds its audience limit');
+  }
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId,
+    audience: options.audience,
+    issuedAt,
+    expiresAt: issuedAt + options.expiresIn,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
+    extra: options.organizationId ? { organizationId: options.organizationId } : undefined,
+  });
+
+  if (isBoundedInternalServiceTokenIssuanceEnabled()) {
+    return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
+  }
+
+  return generateInternalServiceToken(userId, {
+    expiresIn: options.expiresIn,
+    audience:
+      options.audience === SESSION_INGEST_AUDIENCE ||
+      options.audience === GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE
+        ? undefined
+        : options.audience,
+    organizationId: options.organizationId,
+  });
+}
+
+export function generateApiToken(
+  { id, api_token_pepper }: User,
+  extraPayload?: JWTTokenExtraPayload,
+  options?: { expiresIn?: number }
+) {
+  return jwt.sign(
+    {
+      env: process.env.NODE_ENV,
+      kiloUserId: id,
+      apiTokenPepper: api_token_pepper,
+      version: KILO_TOKEN_VERSION,
+      ...extraPayload,
+    },
+    NEXTAUTH_SECRET,
+    {
+      algorithm: jwtSigningAlgorithm,
+      expiresIn: options?.expiresIn ?? FIVE_YEARS_IN_SECONDS,
+    }
+  );
+}
+
+export function generateOrganizationApiToken(
+  user: User,
+  organizationId: string,
+  organizationRole: OrganizationRole
+) {
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+
+  const token = jwt.sign(
+    {
+      env: process.env.NODE_ENV,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      version: KILO_TOKEN_VERSION,
+      organizationId,
+      organizationRole,
+    },
+    NEXTAUTH_SECRET,
+    {
+      algorithm: jwtSigningAlgorithm,
+      expiresIn: '15m',
+    }
+  );
+
+  return {
+    token,
+    expiresAt: expiresAt.toISOString(),
+  };
+}
+
+/**
+ * The claims a verified Kilo bearer carries, taken from the shared payload
+ * schema so the claim list has one source.
+ *
+ * `version` is widened to any number: the version refusal must stay reachable
+ * for a token issued by an older version. The object is loose because
+ * `validateCloudAgentAuthorityClaims` strict-parses the claim set and denies any
+ * claim name it does not know.
+ */
+const kiloTokenClaims = z.looseObject({
+  ...kiloTokenPayload.omit({ version: true }).shape,
+  version: z.number(),
+  /**
+   * The audience stays unvalidated. `isKiloResourceAudienceAllowed` owns the
+   * audience refusal and its tolerance for legacy, null, blank and array
+   * audiences.
+   */
+  aud: z.unknown().optional(),
+});
+
+/** Claims an issued Kilo token carries; the schema is the single source. */
+export type JWTTokenPayload = z.infer<typeof kiloTokenClaims>;
+
+export type JWTTokenExtraPayload = Pick<
+  JWTTokenPayload,
+  | 'deviceAuthRequestCode'
+  | 'deviceSessionId'
+  | 'botId'
+  | 'organizationId'
+  | 'organizationRole'
+  | 'internalApiUse'
+  | 'isAdmin'
+  | 'createdOnPlatform'
+  | 'tokenSource'
+  | 'orgMemberships'
+>;
+
+function tryJwtVerify(token: string) {
+  try {
+    const verified = jwt.verify(token, NEXTAUTH_SECRET, {
+      algorithms: [jwtSigningAlgorithm],
+    });
+    const parsed = kiloTokenClaims.safeParse(verified);
+    if (!parsed.success) {
+      warnExceptInTest('Token payload does not match the Kilo token schema:', parsed.error);
+      return null;
+    }
+    return parsed.data;
+  } catch (error) {
+    warnExceptInTest('Token verification failed:', error);
+    return null;
+  }
+}
+
+/**
+ * The one refusal reason that may continue anonymously: the request presented no
+ * credential at all.
+ *
+ * Every other reason means the caller presented a credential that could not be
+ * accepted — `invalid_token`, `token_version_outdated`,
+ * `runtime_attestation_required`, or a valid token sent to an endpoint it is not
+ * scoped for (`audience_not_allowed`). Such a request must not be answered as an
+ * anonymous caller. The caller believes it is authenticated, so downgrading it
+ * silently drops the account, its organization, its BYOK keys and its credits,
+ * and hides the broken credential from the client that sent it.
+ */
+const ANONYMOUS_FALL_THROUGH_REASON = 'missing_credentials';
+
+/**
+ * True when the request presented a credential that failed verification, rather
+ * than presenting none.
+ *
+ * Fails closed. Only `missing_credentials` returns false, so a reason added to
+ * `validateAuthorizationHeader` later — or a failure that carries no reason at
+ * all — counts as a rejected credential.
+ */
+export function isRejectedCredentialReason(reason: string | undefined): boolean {
+  return reason !== ANONYMOUS_FALL_THROUGH_REASON;
+}
+
+export function validateAuthorizationHeader(
+  headers: Headers,
+  options?: {
+    expectedAudience?: string;
+    runtimeProxyAttestationVerified?: boolean;
+    // Derive from an actual Request URL or fixed route path, never a request header.
+    requestPathname?: string;
+  }
+) {
+  const traceability_logging_id = crypto.randomUUID();
+  const authHeader = headers.get('authorization');
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+    warnExceptInTest('Authorization header missing or invalid');
+    return {
+      error: 'Unauthorized - authentication required',
+      reason: 'missing_credentials',
+    };
+  }
+
+  const token = authHeader.substring(7);
+
+  if (token === ANONYMOUS_BEARER_SENTINEL) {
+    return {
+      error: 'Unauthorized - authentication required',
+      reason: 'missing_credentials',
+    };
+  }
+
+  const payload = tryJwtVerify(token);
+
+  if (!payload) {
+    warnExceptInTest(`Invalid token (${traceability_logging_id})`);
+    return {
+      error: `Invalid token (${traceability_logging_id})`,
+      reason: 'invalid_token',
+    };
+  }
+
+  if (
+    !isKiloResourceAudienceAllowed(payload.aud, {
+      audience: options?.expectedAudience ?? KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    })
+  ) {
+    warnExceptInTest(`Invalid token (${traceability_logging_id})`);
+    return {
+      error: `Invalid token (${traceability_logging_id})`,
+      reason: 'audience_not_allowed',
+    };
+  }
+
+  if (payload.version !== KILO_TOKEN_VERSION) {
+    warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
+      version: payload.version,
+      kiloUserId: payload.kiloUserId,
+    });
+    return {
+      error: `Token version outdated, please re-authenticate (${traceability_logging_id})`,
+      reason: 'token_version_outdated',
+    };
+  }
+
+  let cloudAgentAuthority: CloudAgentAuthority | undefined;
+  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
+    try {
+      cloudAgentAuthority = validateCloudAgentAuthorityClaims(payload);
+      if (
+        payload.env !== process.env.NODE_ENV ||
+        typeof payload.iat !== 'number' ||
+        payload.iat > Math.floor(Date.now() / 1000) ||
+        !isCloudAgentAuthorityHttpPathAllowed(cloudAgentAuthority, options?.requestPathname)
+      ) {
+        throw new Error('Cloud Agent authority is not allowed on this request');
+      }
+    } catch {
+      return { error: 'Invalid scoped API token', reason: 'cloud_agent_authority_denied' };
+    }
+  }
+
+  if (
+    typeof payload.runtimeAuthorization === 'object' &&
+    payload.runtimeAuthorization !== null &&
+    'resourceKind' in payload.runtimeAuthorization &&
+    payload.runtimeAuthorization.resourceKind === 'cloud-agent-next'
+  ) {
+    const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
+      payload.runtimeAuthorization
+    );
+    if (!runtimeAuthorization.success || !options?.runtimeProxyAttestationVerified) {
+      warnExceptInTest(`Invalid token (${traceability_logging_id})`);
+      return {
+        error: `Invalid token (${traceability_logging_id})`,
+        reason: 'runtime_attestation_required',
+      };
+    }
+  }
+
+  return {
+    kiloUserId: payload.kiloUserId,
+    apiTokenPepper: payload.apiTokenPepper,
+    organizationId: payload.organizationId,
+    organizationRole: payload.organizationRole,
+    internalApiUse: payload.internalApiUse,
+    createdOnPlatform: payload.createdOnPlatform,
+    botId: payload.botId,
+    tokenSource: payload.tokenSource,
+    deviceSessionId: payload.deviceSessionId,
+    cloudAgentAuthority,
+  };
+}
+
+export function generateCloudAgentToken(user: User) {
+  return generateApiToken(user, { tokenSource: 'cloud-agent' });
+}
+
+/**
+ * Refuse to mint a token while the current pepper is the empty string. A `null`
+ * pepper means the account has no pepper, and stays accepted.
+ */
+function assertMintablePepper(pepper: string | null, message: string): void {
+  if (pepper !== null && !pepper) {
+    throw new Error(message);
+  }
+}
+
+export function generateCloudAgentWorkflowToken(
+  user: User,
+  options: {
+    organizationId?: string;
+    tokenSource: string;
+    botId?: string;
+    createdOnPlatform?: string;
+    expiresIn: number;
+    authorizationUser?: User;
+  }
+): string {
+  if (!isResourceTokenIssuanceEnabled('cloud-agent-next')) {
+    return generateApiToken(
+      user,
+      {
+        organizationId: options.organizationId,
+        tokenSource: options.tokenSource,
+        botId: options.botId,
+        createdOnPlatform: options.createdOnPlatform,
+      },
+      { expiresIn: options.expiresIn }
+    );
+  }
+  assertMintablePepper(
+    user.api_token_pepper,
+    'Workflow control tokens require a current user pepper'
+  );
+  const expiresIn = Math.min(options.expiresIn, 60 * 60);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow control token expiry must be positive');
+  }
+  const authorizationUser = options.authorizationUser ?? user;
+  assertMintablePepper(
+    authorizationUser.api_token_pepper,
+    'Workflow control tokens require a current authorization pepper'
+  );
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: 'cloud-agent-next',
+    issuedAt,
+    expiresAt: issuedAt + expiresIn,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
+    extra: {
+      organizationId: options.organizationId,
+      tokenSource: options.tokenSource,
+      botId: options.botId,
+      createdOnPlatform: options.createdOnPlatform,
+      runtimeAdmission: {
+        source: 'automation',
+        authorizationUserId: authorizationUser.id,
+        authorizationPepper: authorizationUser.api_token_pepper,
+      },
+    },
+  });
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
+}
+
+/**
+ * Generates a gateway credential for a server-side workflow. Unlike resource
+ * delegation from an HTTP request, queued workflows have no browser bearer
+ * token to delegate from. The workflow owner is therefore the authority and
+ * the token is deliberately limited to the gateway and one hour.
+ */
+export function generateWorkflowGatewayToken(
+  user: User,
+  options: {
+    organizationId?: string;
+    tokenSource: string;
+    expiresIn?: number;
+  }
+): string {
+  const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow gateway token expiry must be positive');
+  }
+  if (!isResourceTokenIssuanceEnabled('workflow-gateway')) {
+    // The audience-less payload keeps its compatibility shape. The one-hour
+    // bound and the organization claim apply to both payloads.
+    return generateApiToken(
+      user,
+      { organizationId: options.organizationId, tokenSource: options.tokenSource },
+      { expiresIn }
+    );
+  }
+  assertMintablePepper(
+    user.api_token_pepper,
+    'Workflow gateway tokens require a current user pepper'
+  );
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: KILO_GATEWAY_AUDIENCE,
+    issuedAt,
+    expiresAt: issuedAt + expiresIn,
+    tokenPurpose: 'delegated-workload',
+    credentialExchange: false,
+    extra: {
+      organizationId: options.organizationId,
+      tokenSource: options.tokenSource,
+    },
+  });
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
+}

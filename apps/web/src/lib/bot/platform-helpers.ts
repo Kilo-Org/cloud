@@ -1,26 +1,61 @@
 import { type PlatformIdentity } from '@/lib/bot-identity';
-import { db } from '@/lib/drizzle';
-import { eq, and, sql } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+
+function isAvailableForBot(integration: PlatformIntegration): boolean {
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return false;
+  }
+
+  return integration.platform !== 'github' || integration.github_connection_role === 'workflow';
+}
+
+export class PlatformIntegrationUnavailableError extends Error {
+  constructor(platformIntegrationId: string) {
+    super(`Platform integration ${platformIntegrationId} is unavailable`);
+    this.name = 'PlatformIntegrationUnavailableError';
+  }
+}
+
+export class PlatformIntegrationNotFoundError extends Error {
+  constructor(platformIntegrationId: string) {
+    super(`Could not find platform integration ${platformIntegrationId}`);
+    this.name = 'PlatformIntegrationNotFoundError';
+  }
+}
 
 /**
  * Look up the platform integration row for a given identity.
  * Platform-agnostic: queries by identity.platform + identity.teamId.
  */
 export async function getPlatformIntegration(identity: PlatformIdentity) {
-  const [integration] = await db
+  const integrations = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         eq(platform_integrations.platform, identity.platform),
-        eq(platform_integrations.platform_installation_id, identity.teamId)
+        identity.platform === 'github'
+          ? eq(platform_integrations.github_connection_role, 'workflow')
+          : undefined,
+        eq(platform_integrations.platform_installation_id, identity.teamId),
+        identity.platform === 'github'
+          ? identity.githubAppType === 'lite'
+            ? eq(platform_integrations.github_app_type, 'lite')
+            : or(
+                eq(platform_integrations.github_app_type, 'standard'),
+                isNull(platform_integrations.github_app_type)
+              )
+          : undefined
       )
     )
-    .limit(1);
+    .limit(identity.platform === 'github' ? 2 : 1);
 
-  return integration ?? null;
+  const integration = integrations.length === 1 ? integrations[0] : undefined;
+  return integration && isAvailableForBot(integration) ? integration : null;
 }
 
 export async function canKiloUserAccessPlatformIntegration(
@@ -28,7 +63,7 @@ export async function canKiloUserAccessPlatformIntegration(
   kiloUserId: string
 ): Promise<boolean> {
   if (integration.owned_by_organization_id) {
-    return await isOrganizationMember(integration.owned_by_organization_id, kiloUserId);
+    return await isOrganizationMember(db, integration.owned_by_organization_id, kiloUserId);
   }
 
   if (integration.owned_by_user_id) {
@@ -46,7 +81,11 @@ export async function getPlatformIntegrationById(platformIntegrationId: string) 
     .limit(1);
 
   if (!integration) {
-    throw new Error(`Could not find platform integration ${platformIntegrationId}`);
+    throw new PlatformIntegrationNotFoundError(platformIntegrationId);
+  }
+
+  if (!isAvailableForBot(integration)) {
+    throw new PlatformIntegrationUnavailableError(platformIntegrationId);
   }
 
   return integration;
@@ -69,5 +108,5 @@ export async function getPlatformIntegrationByBotUserId(
     )
     .limit(1);
 
-  return integration ?? null;
+  return integration && isAvailableForBot(integration) ? integration : null;
 }

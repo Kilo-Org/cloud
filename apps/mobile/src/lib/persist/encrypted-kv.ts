@@ -6,9 +6,15 @@ import { and, asc, eq, like, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/expo-sqlite/driver';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as SQLite from 'expo-sqlite';
 import migrations from '../../../drizzle/migrations';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import {
+  isProtectedDataAvailable,
+  ProtectedDataUnavailableError,
+  whenProtectedDataAvailable,
+} from '@/lib/protected-data';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
 import { kv } from './schema';
 
@@ -19,10 +25,12 @@ import { kv } from './schema';
  * SecureStore. All plaintext lives only inside the encrypted database file;
  * no unencrypted store is created.
  *
- * Every statement runs through Drizzle: the table lives in `./schema.ts`, the
- * `drizzle/` migrations are generated from it, and the pragmas and probes use
- * Drizzle's `sql` template. Only the database lifecycle (open, close, delete)
- * stays on expo-sqlite, which has no Drizzle equivalent. Drizzle's expo driver
+ * Connection setup stays on the raw synchronous expo-sqlite handle: the
+ * SQLCipher probe, `PRAGMA key`, and the busy-timeout and journal-mode
+ * pragmas must all run before anything reads the schema, and Drizzle would
+ * prepare a statement that itself reads it. Once the connection is keyed, the
+ * table lives in `./schema.ts`, the `drizzle/` migrations are generated from
+ * it, and this module's queries go through Drizzle. Drizzle's expo driver
  * wraps the *synchronous* handle, so the statements themselves block the JS
  * thread; the exported API stays async because opening and keying do not.
  *
@@ -35,6 +43,12 @@ import { kv } from './schema';
 
 const DATABASE_NAME = 'kilo-persist.db';
 const KEY_BYTE_COUNT = 32;
+
+// How long a statement waits for another connection's lock before it fails
+// with SQLITE_BUSY. Without it, SQLite's default rollback-journal behaviour
+// fails a synchronous write the moment a lock is held, which is the reported
+// `database is locked` rejection (KILO-APP-7K / KILO-APP-5J / KILO-APP-5H).
+const BUSY_TIMEOUT_MS = 5000;
 
 // SQLCipher key format: exactly 64 lowercase hex chars (32 bytes). A stored
 // key that does not match is treated as tampered: it must never reach PRAGMA
@@ -86,7 +100,10 @@ async function generateHexKey(): Promise<string> {
 }
 
 async function readOrCreateKey(): Promise<string> {
-  const existing = await SecureStore.getItemAsync(PERSIST_DB_KEY);
+  // A transient keychain rejection must not be read as "no key": retrying it
+  // keeps one rejection from failing the open, which is memoized for the rest
+  // of the process.
+  const existing = await readStoredValueWithRetry(PERSIST_DB_KEY);
   if (existing) {
     return existing;
   }
@@ -128,13 +145,66 @@ function assertSQLCipher(client: SQLite.SQLiteDatabase): void {
   }
 }
 
-/** Closes the native handle, best-effort: a failed close must not mask the cause. */
-async function closeQuietly(client: SQLite.SQLiteDatabase): Promise<void> {
+/**
+ * Open failures whose native handle could not be closed. Delete-and-recreate
+ * must not run over such a handle, so recovery reports the cause and rethrows
+ * it instead of opening a second connection to the same file. The error
+ * identity is the signal, so no wrapper type is needed.
+ */
+const unclosedOpenErrors = new WeakSet<Error>();
+
+/** Closes the native handle, best-effort. The return value is load-bearing: a
+ * handle that did not close must not be replaced by a second connection to the
+ * same file, because that is the `old connection still open` shape behind the
+ * reported `database is locked` rejection. */
+async function closeQuietly(client: SQLite.SQLiteDatabase): Promise<boolean> {
   try {
     await client.closeAsync();
+    return true;
   } catch {
-    // Close is best-effort; the delete in the recovery path removes the file.
+    // Close is best-effort here; the caller decides whether it can proceed.
+    return false;
   }
+}
+
+/**
+ * Configures the single connection to wait out a lock and to prefer WAL. Both
+ * pragmas must run after `PRAGMA key` and before any statement reads the
+ * schema, so a concurrent writer waits instead of failing immediately.
+ *
+ * WAL is a preference, not a precondition. Some engines and files refuse the
+ * switch (a held lock, a read-only file, a build without WAL), and a refusal
+ * says nothing about whether the database works: the row reports the mode the
+ * connection is in after the request, and any supported mode is usable. An
+ * open that failed here would be read as a corrupt file, so the store would be
+ * deleted and recreated on every launch, losing its cache and drafts. The
+ * `sqlite_master` probe that follows is the real usability test.
+ */
+function configureConnection(client: SQLite.SQLiteDatabase): void {
+  client.execSync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
+  let journalMode = 'unknown';
+  let pragmaFailed = false;
+  try {
+    const row = client.getFirstSync<{ journal_mode?: string }>('PRAGMA journal_mode = WAL');
+    journalMode = row?.journal_mode?.toLowerCase() ?? journalMode;
+  } catch {
+    // Rejected by the engine (for example SQLITE_BUSY). The connection keeps
+    // the mode it already had; nothing about the store is decided here.
+    pragmaFailed = true;
+  }
+  if (!pragmaFailed && journalMode === 'wal') {
+    return;
+  }
+  // A breadcrumb, not an event: it rides on the next captured event, so a
+  // device that never reaches WAL does not file an issue on every launch.
+  Sentry.addBreadcrumb({
+    category: 'encrypted-kv',
+    level: 'warning',
+    message: pragmaFailed
+      ? 'PRAGMA journal_mode = WAL was rejected'
+      : 'journal_mode did not switch to WAL',
+    data: { journal_mode: journalMode },
+  });
 }
 
 async function openWithKey(key: string): Promise<KVDatabase> {
@@ -153,11 +223,15 @@ async function openWithKey(key: string): Promise<KVDatabase> {
   try {
     assertSQLCipher(client);
     client.execSync(`PRAGMA key = "x'${key}'"`);
+    configureConnection(client);
     return drizzle(client);
   } catch (error) {
-    // The PRAGMA failed after the handle opened. Close it before rethrowing
-    // so the delete-and-recreate recovery never runs with an open handle.
-    await closeQuietly(client);
+    // The setup failed after the handle opened. Close it before rethrowing so
+    // the delete-and-recreate recovery never runs with an open handle. If the
+    // handle will not close, mark the error: recovery must not replace it.
+    if (!(await closeQuietly(client)) && error instanceof Error) {
+      unclosedOpenErrors.add(error);
+    }
     throw error;
   }
 }
@@ -170,6 +244,18 @@ async function probeAndMigrate(db: KVDatabase): Promise<void> {
   await migrate(db, migrations);
 }
 
+/**
+ * Reports an open failure that could not be recovered, because the previous
+ * handle is still open, then rethrows the original error.
+ */
+function reportAbortedReset(cause: unknown): never {
+  Sentry.captureException(cause, {
+    level: 'error',
+    tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+  });
+  throw cause;
+}
+
 async function openEncryptedDatabase(): Promise<KVDatabase> {
   const key = await readOrCreateKey();
   let db: KVDatabase | undefined = undefined;
@@ -178,12 +264,21 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     await probeAndMigrate(db);
     return db;
   } catch (openError) {
+    // The device locked during the open, so the failure says nothing about the
+    // key or the file. Never delete the database for it.
+    if (!isProtectedDataAvailable()) {
+      if (db) {
+        await closeQuietly(db.$client);
+      }
+      throw new ProtectedDataUnavailableError();
+    }
     if (openError instanceof MissingSQLCipherError) {
       // Deleting and recreating cannot add SQLCipher to the build, and the
       // existing file may hold the user's drafts. Fail loud, touch nothing.
       Sentry.captureException(openError, {
         level: 'error',
-        extra: { database: DATABASE_NAME, reason: 'encrypted-kv build has no SQLCipher' },
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+        fingerprint: ['encrypted-kv-missing-sqlcipher'],
       });
       throw openError;
     }
@@ -191,7 +286,15 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     // recoverable losses. Close, delete the file, regenerate the key, and
     // reopen (DEC-01 step 4).
     if (db) {
-      await closeQuietly(db.$client);
+      // The probe or migration failed after the handle opened. A handle that
+      // will not close must not be replaced by a second connection to the same
+      // file: abort the reset and report the original open error instead.
+      if (!(await closeQuietly(db.$client))) {
+        reportAbortedReset(openError);
+      }
+    } else if (openError instanceof Error && unclosedOpenErrors.has(openError)) {
+      // The failed open never returned a handle, and its handle is still open.
+      reportAbortedReset(openError);
     }
     let reopened: KVDatabase | undefined = undefined;
     try {
@@ -201,7 +304,7 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       await probeAndMigrate(reopened);
       Sentry.captureException(openError, {
         level: 'warning',
-        extra: { database: DATABASE_NAME, reason: 'encrypted-kv reset after failed probe' },
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
       });
       return reopened;
     } catch (resetError) {
@@ -215,7 +318,7 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       }
       Sentry.captureException(resetError, {
         level: 'error',
-        extra: { database: DATABASE_NAME, reason: 'encrypted-kv reset failed' },
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
       });
       throw resetError;
     }
@@ -223,6 +326,26 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
 }
 
 let openPromise: Promise<KVDatabase> | null = null;
+
+/**
+ * The key lives in the keychain, which refuses every call while the device is
+ * locked. A background run waits for unlock instead of failing the open, and
+ * a lock during the open drops the memo so the next caller opens again.
+ */
+async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
+  await whenProtectedDataAvailable();
+  try {
+    return await openEncryptedDatabase();
+  } catch (error) {
+    // The key read and write sit outside the open's own lock check, and the
+    // keychain refuses them with a raw native error, not the typed one. Any
+    // failure while locked drops the memo.
+    if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
+      openPromise = null;
+    }
+    throw error;
+  }
+}
 
 // eslint-disable-next-line require-await, @typescript-eslint/require-await -- single-flight must memoize the open synchronously before any await; the awaits live inside the memoized open chain (same pattern as chainSave in save-chain.ts)
 async function openDatabase(): Promise<KVDatabase> {
@@ -232,8 +355,9 @@ async function openDatabase(): Promise<KVDatabase> {
   // database, regenerate the key, and report to Sentry once per call — and
   // the read cache calls on every query settle. Nothing an open failure hits
   // is transient: a wrong key, a corrupt file, and a build without SQLCipher
-  // all need a relaunch or a rebuild.
-  openPromise ??= openEncryptedDatabase();
+  // all need a relaunch or a rebuild. A locked device is the one exception
+  // (see `openWhenProtectedDataAvailable`).
+  openPromise ??= openWhenProtectedDataAvailable();
   return openPromise;
 }
 
@@ -241,6 +365,19 @@ async function openDatabase(): Promise<KVDatabase> {
 // (the same pattern as `inFlightSaveCount` in save-chain.ts).
 export function resetEncryptedKvOpenForTests(): void {
   openPromise = null;
+}
+
+/**
+ * The encrypted database itself, for a caller that owns tables of its own.
+ *
+ * The chat store is the one: it hands this handle to the harness SDK, which
+ * keeps the conversations in tables of its own on the same file. One file
+ * means one key, one SQLCipher probe, and one delete-and-recreate recovery
+ * rather than a second copy of all three.
+ */
+export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
+  const db = await openDatabase();
+  return db.$client;
 }
 
 /** Reads one value; returns null when the key is absent. */
@@ -255,11 +392,24 @@ export async function getItem(scope: string, k: string): Promise<string | null> 
   return row?.v ?? null;
 }
 
+type KvWrite = { readonly value: string; readonly signal?: AbortSignal };
+
 /** Writes or overwrites one value, recording `Date.now()`. */
-export async function setItem(scope: string, k: string, v: string): Promise<void> {
+export async function setItem(scope: string, k: string, value: string): Promise<void> {
+  await setItemWithSignal(scope, k, { value });
+}
+
+export async function setItemWithSignal(
+  scope: string,
+  k: string,
+  { value: v, signal }: KvWrite
+): Promise<void> {
   validateItemKey(scope, k);
   validateValue(v);
   const db = await openDatabase();
+  if (signal?.aborted) {
+    throw new Error('The storage operation was cancelled');
+  }
   const updatedAt = Date.now();
   db.insert(kv)
     .values({ scope, k, v, updatedAt })
@@ -268,12 +418,34 @@ export async function setItem(scope: string, k: string, v: string): Promise<void
 }
 
 /** Removes one value; a missing key is not an error. */
-export async function removeItem(scope: string, k: string): Promise<void> {
+export async function removeItem(scope: string, k: string, signal?: AbortSignal): Promise<void> {
   validateItemKey(scope, k);
   const db = await openDatabase();
+  if (signal?.aborted) {
+    throw new Error('The storage operation was cancelled');
+  }
   db.delete(kv)
     .where(and(eq(kv.scope, scope), eq(kv.k, k)))
     .run();
+}
+
+/**
+ * Removes one value only while it still equals `v`, in one statement.
+ *
+ * A read followed by {@link removeItem} is two store calls, so a newer write
+ * under the same key can commit in the gap and be deleted by the stale caller.
+ * Comparing the value inside the `DELETE` closes that window: a newer value
+ * never matches `v` and survives. Returns `true` when a row was removed.
+ */
+export async function removeItemIfValue(scope: string, k: string, v: string): Promise<boolean> {
+  validateItemKey(scope, k);
+  validateValue(v);
+  const db = await openDatabase();
+  const result = db
+    .delete(kv)
+    .where(and(eq(kv.scope, scope), eq(kv.k, k), eq(kv.v, v)))
+    .run();
+  return result.changes > 0;
 }
 
 /** Removes every entry in exactly one scope. */
@@ -305,4 +477,17 @@ export async function listEntries(scope: string): Promise<KVPair[]> {
     .where(eq(kv.scope, scope))
     .orderBy(asc(kv.updatedAt))
     .all();
+}
+
+/** Reads one scope's values oldest-first in one statement, for cache hydration. */
+export async function listValues(scope: string): Promise<string[]> {
+  validateScope(scope);
+  const db = await openDatabase();
+  return db
+    .select({ v: kv.v })
+    .from(kv)
+    .where(eq(kv.scope, scope))
+    .orderBy(asc(kv.updatedAt))
+    .all()
+    .map(row => row.v);
 }

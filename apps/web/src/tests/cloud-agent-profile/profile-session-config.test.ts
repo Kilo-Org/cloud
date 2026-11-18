@@ -4,7 +4,9 @@
  * harness because that's where the Drizzle migrations, seed helpers, and
  * Jest setup already live.
  */
-import { db } from '@/lib/drizzle';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from '@kilocode/db/schema';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -13,9 +15,11 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   agent_environment_profile_agents,
+  agent_environment_profile_instructions,
+  cloud_agent_environments,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   mergeProfileConfiguration,
   ProfileNotFoundError,
@@ -151,8 +155,24 @@ async function addAgent(
   });
 }
 
+async function addInstruction(
+  profileId: string,
+  name: string,
+  content: string,
+  opts: { enabled?: boolean } = {}
+): Promise<void> {
+  await db.insert(agent_environment_profile_instructions).values({
+    profile_id: profileId,
+    name,
+    content,
+    enabled: opts.enabled ?? true,
+  });
+}
+
 describe('mergeProfileConfiguration', () => {
   afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(cloud_agent_environments);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_repo_bindings);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -161,6 +181,8 @@ describe('mergeProfileConfiguration', () => {
     await db.delete(agent_environment_profile_skills);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_agents);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(agent_environment_profile_instructions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_commands);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -180,6 +202,7 @@ describe('mergeProfileConfiguration', () => {
       setupCommands: undefined,
       encryptedSecrets: undefined,
     });
+    expect(result.resolvedProfileId).toBeUndefined();
   });
 
   test('passes through manual envVars only', async () => {
@@ -265,6 +288,7 @@ describe('mergeProfileConfiguration', () => {
 
     expect(result.envVars).toEqual({ REPO_VAR: 'bound' });
     expect(result.setupCommands).toEqual(['repo-setup']);
+    expect(result.resolvedProfileId).toBe(profileId);
   });
 
   test('merges repo binding (base) with explicit override and manual args', async () => {
@@ -302,6 +326,7 @@ describe('mergeProfileConfiguration', () => {
     });
     // Commands: base, override, manual (concatenated)
     expect(result.setupCommands).toEqual(['base-cmd', 'override-cmd', 'manual-cmd']);
+    expect(result.resolvedProfileId).toBe(overrideProfileId);
   });
 
   test('repo binding (base) and effective default (top) are co-applied; default wins on collision', async () => {
@@ -329,6 +354,7 @@ describe('mergeProfileConfiguration', () => {
       DEFAULT_ONLY: 'default-val',
       FROM: 'default',
     });
+    expect(result.resolvedProfileId).toBe(defaultProfileId);
   });
 
   test('explicit pick suppresses the default (default is only a fallback)', async () => {
@@ -344,6 +370,7 @@ describe('mergeProfileConfiguration', () => {
     const result = await mergeProfileConfiguration(db, { owner, profileId: pickedProfileId });
 
     expect(result.envVars).toEqual({ FROM: 'picked' });
+    expect(result.resolvedProfileId).toBe(pickedProfileId);
   });
 
   test('deduplicates when explicit override equals the repo binding', async () => {
@@ -364,6 +391,7 @@ describe('mergeProfileConfiguration', () => {
     // Should not duplicate vars/commands
     expect(result.envVars).toEqual({ KEY: 'val' });
     expect(result.setupCommands).toEqual(['cmd']);
+    expect(result.resolvedProfileId).toBe(profileId);
   });
 
   test('handles secret vars as encryptedSecrets', async () => {
@@ -421,6 +449,266 @@ describe('mergeProfileConfiguration', () => {
     expect(result.encryptedSecrets).toEqual({
       BASE_SECRET: JSON.parse(baseEnvelope),
       SHARED_SECRET: JSON.parse(overrideEnvelope), // override wins
+    });
+  });
+
+  describe('environment layer', () => {
+    test('applies the environment under repo binding, selected profile, and manual args', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+
+      const repoProfileId = await createProfile(owner, 'repo-profile');
+      await addVar(repoProfileId, 'SHARED', 'from-repo');
+      await addVar(repoProfileId, 'REPO_ONLY', 'repo-val');
+      await addCommands(repoProfileId, ['repo-cmd']);
+      await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: {
+          envVars: { SHARED: 'from-env', REPO: 'from-env' },
+          setupCommands: ['env-cmd'],
+        },
+        envVars: { SHARED: 'from-manual' },
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.envVars).toEqual({
+        REPO: 'from-env',
+        REPO_ONLY: 'repo-val',
+        SHARED: 'from-manual',
+      });
+      // Profile setup commands stay: they are session setup and run beside the
+      // environment's build commands.
+      expect(result.setupCommands).toEqual(['env-cmd', 'repo-cmd', 'manual-cmd']);
+      expect(result.environmentSetupCommandCount).toBe(1);
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        setupCommands: ['manual-cmd'],
+      });
+      expect(withoutEnvironment.setupCommands).toEqual(['repo-cmd', 'manual-cmd']);
+      expect(withoutEnvironment.environmentSetupCommandCount).toBeUndefined();
+    });
+
+    test('keeps environment start commands apart from setup and from profile layers', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+      await addCommands(defaultProfileId, ['default-cmd']);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: { setupCommands: ['install'], startCommands: ['serve'] },
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.setupCommands).toEqual(['install', 'default-cmd', 'manual-cmd']);
+      expect(result.startCommands).toEqual(['serve']);
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+      });
+      expect(withoutEnvironment.startCommands).toBeUndefined();
+    });
+
+    test('keeps an explicit zero environment setup boundary for inline commands', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: {},
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.setupCommands).toEqual(['manual-cmd']);
+      expect(result.environmentSetupCommandCount).toBe(0);
+    });
+
+    test('an empty environment keeps profile setup commands, not profile vars', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const repoProfileId = await createProfile(owner, 'repo-profile');
+      await addCommands(repoProfileId, ['repo-cmd']);
+      await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+      const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+      await addCommands(defaultProfileId, ['default-cmd']);
+
+      const withEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: {},
+      });
+      expect(withEnvironment.setupCommands).toEqual(['repo-cmd', 'default-cmd']);
+      expect(withEnvironment.envVars).toEqual({ FROM_DEFAULT: 'default-val' });
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+      });
+      expect(withoutEnvironment.setupCommands).toEqual(['repo-cmd', 'default-cmd']);
+    });
+
+    test('a profile plaintext var deletes an environment secret of the same key', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(profileId, 'API_KEY', 'plain-from-profile');
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: { encryptedSecrets: { API_KEY: fakeEnvelopeObject } },
+      });
+
+      expect(result.envVars).toEqual({ API_KEY: 'plain-from-profile' });
+      expect(result.encryptedSecrets).toBeUndefined();
+    });
+
+    test('a profile secret deletes an environment plaintext var of the same key', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(profileId, 'API_KEY', fakeEnvelope, true);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: { envVars: { API_KEY: 'plain-from-env' } },
+      });
+
+      expect(result.envVars).toBeUndefined();
+      expect(result.encryptedSecrets).toEqual({ API_KEY: fakeEnvelopeObject });
+    });
+
+    describe('a V2 environment', () => {
+      // Any V2 environment skips the repository binding, but the implicit
+      // default profile still applies.
+      const v2Environment = {
+        envVars: { FROM_ENV: 'env' },
+        setupCommands: ['env-cmd'],
+        repositories: [
+          {
+            identity: { platform: 'github' as const, repoFullName: 'org/repo' },
+            repoFullName: 'org/repo',
+            leaf: 'repo',
+          },
+        ],
+      };
+
+      test('keeps the implicit default but ignores the repository binding', async () => {
+        const user = await insertTestUser();
+        const owner: ProfileOwner = { type: 'user', id: user.id };
+        const repoProfileId = await createProfile(owner, 'repo-profile');
+        await addVar(repoProfileId, 'FROM_BINDING', 'bound');
+        await addCommands(repoProfileId, ['binding-cmd']);
+        await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+        const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+        await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+        await addCommands(defaultProfileId, ['default-cmd']);
+
+        const result = await mergeProfileConfiguration(db, {
+          owner,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+        });
+
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_DEFAULT: 'default-val' });
+        // The default profile's setup commands run as session setup after the
+        // environment's build commands; the binding's never apply.
+        expect(result.setupCommands).toEqual(['env-cmd', 'default-cmd']);
+        expect(result.resolvedProfileId).toBe(defaultProfileId);
+      });
+
+      test('applies the personal default over the org default for an organization owner', async () => {
+        const user = await insertTestUser();
+        const org = await createTestOrganization('v2-org', user.id, 0);
+        const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
+        const userOwner: ProfileOwner = { type: 'user', id: user.id };
+        const orgDefaultId = await createProfile(orgOwner, 'org-default', { isDefault: true });
+        await addVar(orgDefaultId, 'FROM_ORG_DEFAULT', 'org');
+        const personalDefaultId = await createProfile(userOwner, 'personal-default', {
+          isDefault: true,
+        });
+        await addVar(personalDefaultId, 'FROM_PERSONAL_DEFAULT', 'personal');
+        const bindingProfileId = await createProfile(orgOwner, 'org-binding');
+        await addVar(bindingProfileId, 'FROM_BINDING', 'bound');
+        await bindRepo(orgOwner, 'org/repo', 'github', bindingProfileId);
+
+        const result = await mergeProfileConfiguration(db, {
+          owner: orgOwner,
+          userId: user.id,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+        });
+
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_PERSONAL_DEFAULT: 'personal' });
+        expect(result.resolvedProfileId).toBe(personalDefaultId);
+      });
+
+      test('falls back to the org default when the user has no personal default', async () => {
+        const user = await insertTestUser();
+        const org = await createTestOrganization('v2-org', user.id, 0);
+        const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
+        const orgDefaultId = await createProfile(orgOwner, 'org-default', { isDefault: true });
+        await addVar(orgDefaultId, 'FROM_ORG_DEFAULT', 'org');
+
+        const result = await mergeProfileConfiguration(db, {
+          owner: orgOwner,
+          userId: user.id,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+        });
+
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_ORG_DEFAULT: 'org' });
+        expect(result.resolvedProfileId).toBe(orgDefaultId);
+      });
+
+      test('applies an explicitly selected profile over the default and keeps request overrides', async () => {
+        const user = await insertTestUser();
+        const owner: ProfileOwner = { type: 'user', id: user.id };
+        const repoProfileId = await createProfile(owner, 'repo-profile');
+        await addVar(repoProfileId, 'FROM_BINDING', 'bound');
+        await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+        const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+        await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+        const pickedProfileId = await createProfile(owner, 'picked');
+        await addVar(pickedProfileId, 'FROM_PICKED', 'picked-val');
+        await addCommands(pickedProfileId, ['picked-cmd']);
+
+        const result = await mergeProfileConfiguration(db, {
+          owner,
+          profileId: pickedProfileId,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+          envVars: { FROM_MANUAL: 'manual-val' },
+          setupCommands: ['manual-cmd'],
+        });
+
+        expect(result.envVars).toEqual({
+          FROM_ENV: 'env',
+          FROM_PICKED: 'picked-val',
+          FROM_MANUAL: 'manual-val',
+        });
+        // Profile setup commands are session setup and run beside the
+        // environment's build commands.
+        expect(result.setupCommands).toEqual(['env-cmd', 'picked-cmd', 'manual-cmd']);
+        expect(result.resolvedProfileId).toBe(pickedProfileId);
+      });
     });
   });
 
@@ -636,7 +924,32 @@ describe('mergeProfileConfiguration', () => {
     });
 
     expect(result.skills?.map(s => s.name).sort()).toEqual(['alpha', 'beta']);
-    expect(result.skills?.find(s => s.name === 'alpha')?.rawMarkdown).toContain('override body');
+    const alpha = result.skills?.find(s => s.name === 'alpha');
+    expect(alpha && 'rawMarkdown' in alpha ? alpha.rawMarkdown : null).toContain('override body');
+  });
+
+  test('includes only enabled instructions, merged by name across profile layers', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+
+    const baseProfileId = await createProfile(owner, 'base');
+    await addInstruction(baseProfileId, 'shared', 'base body');
+    await addInstruction(baseProfileId, 'disabled', 'disabled body', { enabled: false });
+    await bindRepo(owner, 'org/repo', 'github', baseProfileId);
+
+    const overrideId = await createProfile(owner, 'override');
+    await addInstruction(overrideId, 'shared', 'override body');
+    await addInstruction(overrideId, 'beta', 'beta body');
+
+    const result = await mergeProfileConfiguration(db, {
+      owner,
+      profileId: overrideId,
+      repoFullName: 'org/repo',
+      platform: 'github',
+    });
+
+    expect(result.instructions?.map(i => i.name).sort()).toEqual(['beta', 'shared']);
+    expect(result.instructions?.find(i => i.name === 'shared')?.content).toBe('override body');
   });
 
   test('MCP env values travel as encrypted envelopes in the client record', async () => {
@@ -750,10 +1063,14 @@ describe('mergeProfileConfiguration', () => {
         'profile-only',
         'shared',
       ]);
-      expect(result.skills?.find(s => s.name === 'shared')?.rawMarkdown).toBe(
+      const shared = result.skills?.find(s => s.name === 'shared');
+      expect(shared && 'rawMarkdown' in shared ? shared.rawMarkdown : null).toBe(
         'inline body for shared'
       );
-      expect(result.skills?.find(s => s.name === 'inline-only')?.files).toEqual({ 'a.md': 'a' });
+      const inlineOnly = result.skills?.find(s => s.name === 'inline-only');
+      expect(inlineOnly && 'files' in inlineOnly ? inlineOnly.files : null).toEqual({
+        'a.md': 'a',
+      });
     });
 
     test('inline runtimeAgents layer on top of profile — inline wins on slug', async () => {
@@ -803,6 +1120,99 @@ describe('mergeProfileConfiguration', () => {
         API_KEY: inlineEnvelope, // inline wins over profile envelope
         INLINE_ONLY: inlineEnvelope,
       });
+    });
+  });
+
+  describe('profile collection reads', () => {
+    const profileCollectionTables = [
+      'agent_environment_profiles',
+      'agent_environment_profile_vars',
+      'agent_environment_profile_commands',
+      'agent_environment_profile_mcp_servers',
+      'agent_environment_profile_skills',
+      'agent_environment_profile_agents',
+      'agent_environment_profile_kilo_commands',
+      'agent_environment_profile_instructions',
+    ] as const;
+
+    /**
+     * A drizzle client over the shared test pool whose query logger records
+     * every SQL statement, so a test can count how often the merge reads
+     * each profile collection table.
+     */
+    function createQueryCountingDb() {
+      const statements: string[] = [];
+      const countingDb = drizzle(pool, {
+        schema,
+        logger: {
+          logQuery: (query: string) => {
+            statements.push(query);
+          },
+        },
+      });
+      return { countingDb, statements };
+    }
+
+    /** Drizzle inlines the table name as a quoted identifier, e.g. `from "t"`. */
+    function countTableReads(statements: string[], tableName: string): number {
+      const fromClause = `from "${tableName}"`;
+      let matches = 0;
+      for (const statement of statements) {
+        if (statement.includes(fromClause)) {
+          matches += 1;
+        }
+      }
+      return matches;
+    }
+
+    test('resolving the implicit default reads the profile and its collections once', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default-with-content', { isDefault: true });
+      await addVar(profileId, 'PROFILE_VAR', 'profile-var-value');
+      await addCommands(profileId, ['profile-setup-command']);
+      await addSkill(profileId, 'reviewer-skill', 'profile skill body', { enabled: true });
+      await addAgent(profileId, 'reviewer', 'Reviewer', 'profile reviewer prompt');
+
+      const { countingDb, statements } = createQueryCountingDb();
+
+      const result = await mergeProfileConfiguration(countingDb, { owner });
+
+      expect(result.skills?.map(s => s.name)).toEqual(['reviewer-skill']);
+      expect(
+        result.skills?.[0] && 'rawMarkdown' in result.skills[0]
+          ? result.skills[0].rawMarkdown
+          : null
+      ).toBe('profile skill body');
+      expect(result.envVars).toEqual({ PROFILE_VAR: 'profile-var-value' });
+      expect(result.setupCommands).toEqual(['profile-setup-command']);
+      expect(result.agents?.map(a => a.slug)).toEqual(['reviewer']);
+
+      // The default resolution reads each profile table exactly once: the
+      // session layer transaction holds the only collection reads.
+      for (const name of profileCollectionTables) {
+        expect(`${name}: ${countTableReads(statements, name)}`).toBe(`${name}: 1`);
+      }
+      expect(statements.length).toBeGreaterThanOrEqual(profileCollectionTables.length);
+    });
+
+    test('an explicit profileId reads its collections once', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const defaultId = await createProfile(owner, 'unused-default', { isDefault: true });
+      await addSkill(defaultId, 'default-skill', 'default skill body');
+      const selectedId = await createProfile(owner, 'selected-profile');
+      await addSkill(selectedId, 'selected-skill', 'selected skill body', { enabled: true });
+
+      const { countingDb, statements } = createQueryCountingDb();
+
+      const result = await mergeProfileConfiguration(countingDb, { owner, profileId: selectedId });
+
+      expect(result.skills?.map(s => s.name)).toEqual(['selected-skill']);
+
+      for (const name of profileCollectionTables) {
+        expect(`${name}: ${countTableReads(statements, name)}`).toBe(`${name}: 1`);
+      }
     });
   });
 });

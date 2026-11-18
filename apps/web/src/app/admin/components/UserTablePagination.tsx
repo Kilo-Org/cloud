@@ -14,7 +14,7 @@ import {
   getPaginationHelpers,
   type PaginationMetadata,
   type PageSize,
-} from '@/types/pagination';
+} from '@kilocode/web-shared/types/pagination';
 
 interface UserTablePaginationProps {
   pagination: PaginationMetadata;

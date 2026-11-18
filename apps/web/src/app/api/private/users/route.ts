@@ -1,14 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 type UserLookupResponse = {
   users: {

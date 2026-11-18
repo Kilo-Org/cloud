@@ -3,21 +3,8 @@ import {
   CLOUD_AGENT_FAILURE_CODES,
   WORKSPACE_FAILURE_SUBTYPES,
 } from '@kilocode/worker-utils/cloud-agent-failure';
-import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
 import { CODE_REVIEW_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import { terminalReasonFromCloudAgentFailure } from './terminal-reason-from-failure';
-
-describe('terminal reason list parity', () => {
-  // These two lists live in separate packages that cannot import each other, so
-  // drift is only caught here. A mismatch makes the orchestrator send a reason
-  // the callback allowlist rejects, or makes the worker's zod enum silently
-  // coerce a valid reason to undefined via its `.catch(undefined)`.
-  it('keeps the db and worker-utils terminal reason lists identical', () => {
-    expect([...CLOUD_AGENT_TERMINAL_REASONS].sort()).toEqual(
-      [...CODE_REVIEW_TERMINAL_REASONS].sort()
-    );
-  });
-});
 
 describe('terminalReasonFromCloudAgentFailure', () => {
   it('returns undefined without a structured failure', () => {
@@ -47,12 +34,39 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     );
   });
 
+  it.each(['base_branch_changed', 'base_branch_missing', 'base_branch_stale'] as const)(
+    'classifies %s as a repository checkout failure',
+    subtype => {
+      expect(terminalReasonFromCloudAgentFailure({ code: 'workspace_setup_failed', subtype })).toBe(
+        'repository_checkout_failed'
+      );
+    }
+  );
+
   it('maps the codes behind the largest uncategorized buckets', () => {
     expect(terminalReasonFromCloudAgentFailure({ code: 'assistant_error' })).toBe(
       'assistant_failed'
     );
     expect(terminalReasonFromCloudAgentFailure({ code: 'wrapper_error_after_activity' })).toBe(
       'wrapper_failed'
+    );
+  });
+
+  it('does not treat a billing admission outage as a user payment failure', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'admission_billing_unavailable' })).toBe(
+      'sandbox_connection'
+    );
+  });
+
+  it('does not treat container concurrency denial as a wrapper or model provider failure', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'container_limit_reached' })).toBe(
+      'delivery_failed'
+    );
+  });
+
+  it('does not report a blocked account as insufficient credit', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'account_blocked' })).toBe(
+      'account_blocked'
     );
   });
 
@@ -71,6 +85,38 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     expect(terminalReasonFromCloudAgentFailure(rateLimited)).toBe('assistant_rate_limited');
   });
 
+  it('splits provider authentication by whose key was rejected', () => {
+    const unauthenticated = {
+      code: 'assistant_error',
+      assistantReason: 'provider_authentication',
+    } as const;
+
+    // The projected callback message drops the raw '[BYOK]' sentence, so
+    // ownership is the only signal left that routes this onto the actionable
+    // (disable + email) path instead of generic unauthorized.
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...unauthenticated, providerOwnership: 'byok' })
+    ).toBe('byok_invalid_key');
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...unauthenticated, providerOwnership: 'managed' })
+    ).toBe('assistant_unauthorized');
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...unauthenticated, providerOwnership: 'unknown' })
+    ).toBe('assistant_unauthorized');
+    expect(terminalReasonFromCloudAgentFailure(unauthenticated)).toBe('assistant_unauthorized');
+  });
+
+  it('keeps a BYOK timeout in the existing timeout category rather than invalid-request rejection', () => {
+    expect(
+      terminalReasonFromCloudAgentFailure({
+        code: 'assistant_error',
+        assistantReason: 'timeout',
+        providerOwnership: 'byok',
+        message: 'Assistant request timed out',
+      })
+    ).toBe('assistant_timeout');
+  });
+
   it('prefers the structured assistant reason over the safe message', () => {
     // A message that would map elsewhere via the legacy text path must not win.
     expect(
@@ -82,14 +128,55 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     ).toBe('assistant_unavailable');
   });
 
-  it('resolves every assistant reason to a valid terminal reason', () => {
-    const valid = new Set<string>(CODE_REVIEW_TERMINAL_REASONS);
-    const resolved = CLOUD_AGENT_ASSISTANT_FAILURE_REASONS.map(assistantReason => [
-      assistantReason,
-      terminalReasonFromCloudAgentFailure({ code: 'assistant_error', assistantReason }),
-    ]);
+  it.each([
+    ['byok', 'assistant_invalid_request_byok'],
+    ['managed', 'assistant_invalid_request'],
+    ['unknown', 'assistant_invalid_request'],
+    [undefined, 'assistant_invalid_request'],
+  ] as const)(
+    'splits invalid requests with %s ownership into %s',
+    (providerOwnership, expected) => {
+      expect(
+        terminalReasonFromCloudAgentFailure({
+          code: 'assistant_error',
+          assistantReason: 'invalid_request',
+          providerOwnership,
+          message: 'Assistant request was rate limited',
+        })
+      ).toBe(expected);
+    }
+  );
 
-    expect(resolved.filter(([, reason]) => !valid.has(reason as string))).toEqual([]);
+  it.each(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS)(
+    'resolves assistant reason %s to a defined, valid terminal reason',
+    assistantReason => {
+      const reason = terminalReasonFromCloudAgentFailure({
+        code: 'assistant_error',
+        assistantReason,
+      });
+
+      expect(reason).toBeDefined();
+      expect(CODE_REVIEW_TERMINAL_REASONS).toContain(reason);
+    }
+  );
+
+  it.each([
+    ['context_limit', 'assistant_context_limit'],
+    ['output_limit', 'assistant_output_limit'],
+    ['content_filter', 'assistant_content_filter'],
+    ['structured_output', 'assistant_structured_output'],
+    ['timeout', 'assistant_timeout'],
+    ['invalid_request', 'assistant_invalid_request'],
+    ['provider_disconnect', 'assistant_provider_disconnect'],
+    ['gateway_unavailable', 'assistant_gateway_unavailable'],
+  ] as const)('maps assistant reason %s to %s', (assistantReason, expected) => {
+    expect(
+      terminalReasonFromCloudAgentFailure({
+        code: 'assistant_error',
+        assistantReason,
+        message: 'Assistant request was rate limited',
+      })
+    ).toBe(expected);
   });
 
   it('splits assistant failures by their safe message', () => {

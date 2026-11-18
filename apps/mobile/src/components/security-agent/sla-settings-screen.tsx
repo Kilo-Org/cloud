@@ -1,22 +1,25 @@
-import {
-  getSettingsDirtyState,
-  isValidDayCount,
-  parseDayCount,
-} from '@kilocode/app-shared/security-agent';
+import { getSettingsDirtyState, isValidDayCount } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -28,9 +31,10 @@ import { type SecurityAgentConfig } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
 
 function SlaSettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="SLA policy" />
+      <ScreenHeader className="px-6" title={t('securityAgent.sla.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -44,21 +48,36 @@ function SlaSettingsSkeleton() {
 
 type SlaSeverity = 'critical' | 'high' | 'medium' | 'low';
 
-const SLA_ROWS: { key: SlaSeverity; label: string; description: string }[] = [
+const SLA_ROWS = [
   {
     key: 'critical',
-    label: 'Critical',
-    description: 'Remote exploitation without authentication.',
+    labelKey: 'common.critical',
+    descriptionKey: 'securityAgent.sla.criticalDescription',
   },
-  { key: 'high', label: 'High', description: 'Potential significant data exposure.' },
-  { key: 'medium', label: 'Medium', description: 'Limited impact or specific conditions.' },
-  { key: 'low', label: 'Low', description: 'Minimal security impact.' },
-];
+  {
+    key: 'high',
+    labelKey: 'securityAgent.sla.high',
+    descriptionKey: 'securityAgent.sla.highDescription',
+  },
+  {
+    key: 'medium',
+    labelKey: 'securityAgent.sla.medium',
+    descriptionKey: 'securityAgent.sla.mediumDescription',
+  },
+  {
+    key: 'low',
+    labelKey: 'securityAgent.sla.low',
+    descriptionKey: 'securityAgent.sla.lowDescription',
+  },
+] as const satisfies readonly {
+  key: SlaSeverity;
+  labelKey: string;
+  descriptionKey: string;
+}[];
 
 // Uncontrolled numeric TextInput — never pass `value` back on iOS (see
 // apps/mobile/AGENTS.md). The ref holds the raw typed text; `days` holds
-// the parsed number (or NaN while invalid) purely to drive dirty/validity,
-// mirroring the derived-state pattern in kiloclaw/settings-card.tsx.
+// the parsed number (or NaN while invalid) purely to drive dirty/validity.
 function SlaDayRow({
   label,
   description,
@@ -73,7 +92,8 @@ function SlaDayRow({
   onChangeValue: (value: number) => void;
 }>) {
   const colors = useThemeColors();
-  const rawRef = useRef(String(initialValue));
+  const { t } = useTranslation();
+  const rawRef = useRef(formatNumber(initialValue, i18n.language, { useGrouping: false }));
   const [days, setDays] = useState(initialValue);
 
   return (
@@ -83,21 +103,23 @@ function SlaDayRow({
         disabled && 'opacity-50'
       )}
     >
-      <View className="flex-1 pr-3">
+      <View className="min-w-0 flex-1 pe-3">
         <Text className="text-sm font-medium">{label}</Text>
         <Text variant="muted" className="text-xs">
           {description}
         </Text>
         {!isValidDayCount(days) && (
-          <Text className="mt-1 text-xs text-destructive">1-365 days, whole numbers only.</Text>
+          <Text className="mt-1 text-xs text-destructive">
+            {t('securityAgent.sla.invalidDayCount')}
+          </Text>
         )}
       </View>
-      <TextInput
-        accessibilityLabel={`${label} remediation deadline in days`}
+      <Input
+        accessibilityLabel={t('securityAgent.sla.remediationDeadlineA11y', { label })}
         accessibilityHint={
-          isValidDayCount(days) ? undefined : 'Enter a whole number between 1 and 365'
+          isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
         }
-        className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-[normal] text-foreground"
+        className="w-16 rounded-lg border border-input bg-background pl-2 pr-2 text-sm text-foreground"
         textAlign="center"
         editable={!disabled}
         accessibilityState={{ disabled }}
@@ -106,7 +128,8 @@ function SlaDayRow({
         placeholderTextColor={colors.mutedForeground}
         onChangeText={text => {
           rawRef.current = text;
-          const parsed = parseDayCount(text);
+          const value = parseLocalizedNumber(text, i18n.language);
+          const parsed = value !== null && Number.isInteger(value) ? value : Number.NaN;
           setDays(parsed);
           onChangeValue(parsed);
         }}
@@ -116,10 +139,13 @@ function SlaDayRow({
 }
 
 export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [slaEnabled, setSlaEnabled] = useState(false);
   const [slaDays, setSlaDays] = useState<Record<SlaSeverity, number>>({
@@ -128,8 +154,10 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     medium: Number.NaN,
     low: Number.NaN,
   });
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<SecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -137,11 +165,10 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // read below) until this has run, so they never mount with the NaN
   // placeholder as their initial value.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setSlaEnabled(config.data.slaEnabled);
     setSlaDays({
       critical: config.data.slaCriticalDays,
@@ -149,9 +176,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       medium: config.data.slaMediumDays,
       low: config.data.slaLowDays,
     });
-  }, [config.data]);
-
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
+  }, [baseline, config.data]);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -182,32 +207,56 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     slaEnabled,
     slaCriticalDays: daysValid.critical
       ? slaDays.critical
-      : (initialConfigRef.current.slaCriticalDays ?? slaDays.critical),
-    slaHighDays: daysValid.high
-      ? slaDays.high
-      : (initialConfigRef.current.slaHighDays ?? slaDays.high),
-    slaMediumDays: daysValid.medium
-      ? slaDays.medium
-      : (initialConfigRef.current.slaMediumDays ?? slaDays.medium),
-    slaLowDays: daysValid.low ? slaDays.low : (initialConfigRef.current.slaLowDays ?? slaDays.low),
+      : (baseline?.slaCriticalDays ?? slaDays.critical),
+    slaHighDays: daysValid.high ? slaDays.high : (baseline?.slaHighDays ?? slaDays.high),
+    slaMediumDays: daysValid.medium ? slaDays.medium : (baseline?.slaMediumDays ?? slaDays.medium),
+    slaLowDays: daysValid.low ? slaDays.low : (baseline?.slaLowDays ?? slaDays.low),
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  // `patch` is the save payload, so it carries the saved value in place of an
+  // invalid day. The back guard must read the draft the user can see instead:
+  // an invalid-only edit would compare equal to the baseline and read as
+  // clean, and Back would discard it with no confirmation. While the toggle is
+  // off the rows are unmounted, so a hidden invalid day stays out of the
+  // comparison.
+  const draft = slaEnabled
+    ? {
+        ...patch,
+        slaCriticalDays: slaDays.critical,
+        slaHighDays: slaDays.high,
+        slaMediumDays: slaDays.medium,
+        slaLowDays: slaDays.low,
+      }
+    : patch;
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
+  });
 
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="SLA policy"
-        variant="offline"
-        message="Could not load SLA settings"
+        title={t('securityAgent.sla.title')}
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
+        message={t('securityAgent.sla.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -215,14 +264,22 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (config.isLoading || !config.data) {
     return <SlaSettingsSkeleton />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
+  }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default toggle and then push the day rows down when they
+  // appear.
+  if (baseline === null) {
+    return <SlaSettingsSkeleton />;
   }
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="SLA policy"
+        className="px-6"
+        title={t('securityAgent.sla.title')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -236,34 +293,36 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
+      {feedback.node}
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pt-4"
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
         <ToggleRow
-          title="Enable SLA tracking"
-          subtitle="Set remediation deadlines based on finding severity."
+          title={t('securityAgent.sla.enableTracking')}
+          subtitle={t('securityAgent.sla.enableTrackingSubtitle')}
           value={slaEnabled}
           disabled={!canManage}
           onValueChange={setSlaEnabled}
         />
 
-        {hydratedRef.current && slaEnabled && (
+        {slaEnabled && (
           <View className="gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Remediation deadlines (days)
+              {t('securityAgent.sla.deadlinesHeading')}
             </Text>
             {SLA_ROWS.map(row => (
               <SlaDayRow
                 key={row.key}
-                label={row.label}
-                description={row.description}
+                label={t(row.labelKey)}
+                description={t(row.descriptionKey)}
                 initialValue={slaDays[row.key]}
                 disabled={!canManage}
                 onChangeValue={value => {
@@ -274,6 +333,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         )}
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

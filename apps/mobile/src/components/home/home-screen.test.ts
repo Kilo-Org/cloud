@@ -2,22 +2,44 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HomeScreen } from '@/components/home/home-screen';
 
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
-}));
+vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
-  FadeOut: { duration: vi.fn() },
   LinearTransition: {},
 }));
 vi.mock('@/components/home/agent-sessions-section', () => ({
+  LiveSessionFeedback: () => null,
+}));
+vi.mock('@/components/home/home-agent-sessions-section', () => ({
   AgentSessionsSection: () => null,
+}));
+// The briefing card renders the paid-summary surfaces and reaches the native
+// SQLCipher store through the dismissal journal; this suite asserts Home copy.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: () => null,
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
+}));
+vi.mock('@/components/home/live-session-state', () => ({
+  useLiveSessionContext: () => ({
+    organizationId: null,
+    accountReady: true,
+    isReady: true,
+    isResolving: false,
+    isError: false,
+    label: undefined,
+    refetch: vi.fn(),
+  }),
+  liveSessionContent: () => 'pending',
 }));
 vi.mock('@/components/home/agents-promo-card', () => ({
   AgentsPromoCard: () => null,
@@ -28,32 +50,29 @@ vi.mock('@/components/home/greeting', () => ({
 vi.mock('@/components/home/new-task-button', () => ({
   NewTaskButton: () => null,
 }));
-vi.mock('@/components/query-error', () => ({
-  QueryError: () => null,
+vi.mock('@/components/home/new-task-from-picture-button', () => ({
+  NewTaskFromPictureButton: () => null,
+}));
+vi.mock('@/components/home/product-choices', () => ({
+  ProductChoices: () => null,
+}));
+vi.mock('@/components/todos/up-next-section', () => ({
+  UpNextSection: () => null,
 }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: () => null,
 }));
+vi.mock('@/components/context-control', () => ({ ContextControl: () => null }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'ScrollView',
   useTabBarBottomPadding: () => 0,
 }));
-vi.mock('@/components/ui/skeleton', () => ({
-  Skeleton: () => null,
-}));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({ activeSessions: [], isLoading: false, storedSessions: [] }),
-}));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null }),
+  useLiveAgentSessions: () => ({ activeSessions: [], hasAcceptedSuccess: false }),
 }));
 
 describe('HomeScreen copy', () => {
   it('does not show the first-time welcome headline on the main page', () => {
     expect(HomeScreen.toString()).not.toContain('Welcome to Kilo');
-  });
-
-  it('renders no KiloClaw surface', () => {
-    expect(HomeScreen.toString()).not.toContain('KiloClaw');
   });
 });

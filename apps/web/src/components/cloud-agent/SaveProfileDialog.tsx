@@ -1,10 +1,3 @@
-/**
- * SaveProfileDialog - Dialog to save current session config as a new profile
- *
- * Captures profile name, description, and whether to set as default.
- * Accepts current envVars and setupCommands to save with the profile.
- */
-
 'use client';
 
 import { useState } from 'react';
@@ -26,6 +19,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useProfileMutations } from '@/hooks/useCloudAgentProfiles';
+import { profileVarKeyError } from '@/lib/profile-var-key';
+import { TRPCClientError } from '@trpc/client';
 
 const profileFormSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
@@ -99,6 +94,11 @@ export function SaveProfileDialog({
       return false;
     }
     setErrors({});
+    const invalidVar = envVars.find(envVar => profileVarKeyError(envVar.key) !== null);
+    if (invalidVar !== undefined) {
+      toast.error(profileVarKeyError(invalidVar.key));
+      return false;
+    }
     return true;
   };
 
@@ -107,14 +107,12 @@ export function SaveProfileDialog({
 
     setIsSaving(true);
     try {
-      // 1. Create the profile
       const { id: profileId } = await createProfile.mutateAsync({
         name: formData.name,
         description: formData.description || undefined,
         organizationId,
       });
 
-      // 2. Set all environment variables (including secrets) in parallel
       await Promise.all(
         envVars.map(envVar =>
           setVar.mutateAsync({
@@ -127,7 +125,6 @@ export function SaveProfileDialog({
         )
       );
 
-      // 3. Set commands if any
       if (setupCommands.length > 0) {
         await setCommands.mutateAsync({
           profileId,
@@ -136,7 +133,6 @@ export function SaveProfileDialog({
         });
       }
 
-      // 4. Set as default if requested
       if (formData.setAsDefault) {
         await setDefaultMutation.mutateAsync({
           profileId,
@@ -150,7 +146,13 @@ export function SaveProfileDialog({
       onSaved?.(profileId);
     } catch (error) {
       console.error('Failed to save profile:', error);
-      toast.error('Failed to save profile. Please try again.');
+      // A refusal the server words, such as the profile limit, explains itself.
+      // Anything else keeps the generic sentence instead of raw error text.
+      toast.error(
+        error instanceof TRPCClientError && error.data?.code === 'PRECONDITION_FAILED'
+          ? error.message
+          : 'Failed to save profile.'
+      );
     } finally {
       setIsSaving(false);
     }

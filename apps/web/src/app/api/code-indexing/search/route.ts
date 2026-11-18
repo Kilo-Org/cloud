@@ -1,10 +1,27 @@
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
+import { INVALID_JSON, readJsonBody } from '@/lib/invalid-json-body';
+import {
+  codeIndexingGoneResponse,
+  isCodeIndexingEnabled,
+} from '@/lib/code-indexing/availability.server';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  if (!isCodeIndexingEnabled()) {
+    return codeIndexingGoneResponse();
+  }
+
+  const body = await readJsonBody(request);
+  if (body === INVALID_JSON) {
+    return NextResponse.json(
+      { error: 'Invalid JSON body', message: 'Invalid JSON body' },
+      { status: 400 }
+    );
+  }
 
   return handleTRPCRequest(request, async caller => {
-    return caller.codeIndexing.search(body);
+    // Targeted cast: body is untrusted JSON input, tRPC validates shape.
+    return caller.codeIndexing.search(body as never);
   });
 }

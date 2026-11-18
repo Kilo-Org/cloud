@@ -52,3 +52,26 @@ export function multiplyCloudBillingRate(rate: string, quantity: number): string
   const remainder = padded.slice(-12).replace(/0+$/, '');
   return remainder ? `${whole}.${remainder}` : whole;
 }
+
+/** Calculates the ledger's whole-microdollar debit with decimal string arithmetic. */
+export function cloudBillingAmountMicrodollars(rate: string, quantity: number): number {
+  const cents = multiplyCloudBillingRate(rate, quantity);
+  const [whole, fraction = ''] = cents.split('.');
+  const amount = Number(`${whole}${fraction.padEnd(4, '0').slice(0, 4)}`);
+  if (!Number.isSafeInteger(amount)) throw new Error('Calculated microdollar amount is unsafe');
+  return amount;
+}
+
+/** Formats an integer microdollar amount without converting it through a float. */
+export function formatMicrodollars(amount: number): string {
+  if (!Number.isSafeInteger(amount)) {
+    throw new Error('Microdollar amount must be a safe integer');
+  }
+  const sign = amount < 0 ? '-' : '';
+  const absolute = Math.abs(amount);
+  const dollars = Math.trunc(absolute / 1_000_000);
+  const fractional = String(absolute % 1_000_000)
+    .padStart(6, '0')
+    .replace(/0+$/, '');
+  return `${sign}$${dollars}${fractional ? `.${fractional}` : ''}`;
+}

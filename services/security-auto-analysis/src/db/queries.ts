@@ -364,19 +364,6 @@ export async function updateQueueFromPending(
   };
 }
 
-export async function countOwnerInflightAnalyses(db: WorkerDb, owner: QueueOwner): Promise<number> {
-  const rows = await db
-    .select({ total: count() })
-    .from(security_findings)
-    .where(
-      and(
-        ownerWhereFindings(owner),
-        inArray(security_findings.analysis_status, ['pending', 'running'])
-      )
-    );
-  return rows[0]?.total ?? 0;
-}
-
 export async function ensureManualAnalysisQueueRow(
   db: WorkerDb,
   params: { finding: SecurityFindingRecord; claimToken: string; jobId: string }
@@ -389,9 +376,11 @@ export async function ensureManualAnalysisQueueRow(
         : params.finding.severity === 'medium'
           ? 2
           : 3;
-  // Insert a fresh manual-analysis claim, revive a terminal row, or let an
-  // explicit user retry supersede an unclaimed scheduled retry. Pending and
-  // running rows remain untouched because another launch already owns them.
+  // Insert a fresh manual-analysis claim, revive a terminal row, let an
+  // explicit user retry supersede an unclaimed scheduled retry, or let a
+  // re-delivered command take back the pending row its earlier delivery
+  // claimed. A pending or running row owned by any other job remains untouched
+  // because another launch already owns it.
   const rows = await db
     .insert(security_analysis_queue)
     .values({
@@ -421,7 +410,13 @@ export async function ensureManualAnalysisQueueRow(
         last_error_redacted: null,
         updated_at: sql`now()`,
       },
-      setWhere: inArray(security_analysis_queue.queue_status, ['queued', 'completed', 'failed']),
+      setWhere: or(
+        inArray(security_analysis_queue.queue_status, ['queued', 'completed', 'failed']),
+        and(
+          eq(security_analysis_queue.queue_status, 'pending'),
+          eq(security_analysis_queue.claimed_by_job_id, params.jobId)
+        )
+      ),
     })
     .returning({ id: security_analysis_queue.id });
   return rows.length > 0;
@@ -567,7 +562,13 @@ export async function getAnalysisActorById(
       is_admin: kilocode_users.is_admin,
     })
     .from(kilocode_users)
-    .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason)))
+    .where(
+      and(
+        eq(kilocode_users.id, userId),
+        isNull(kilocode_users.blocked_at),
+        isNull(kilocode_users.blocked_reason)
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -585,7 +586,13 @@ export async function resolveAutoAnalysisActor(
         api_token_pepper: kilocode_users.api_token_pepper,
       })
       .from(kilocode_users)
-      .where(and(eq(kilocode_users.id, owner.id), isNull(kilocode_users.blocked_reason)))
+      .where(
+        and(
+          eq(kilocode_users.id, owner.id),
+          isNull(kilocode_users.blocked_at),
+          isNull(kilocode_users.blocked_reason)
+        )
+      )
       .limit(1);
 
     const user = rows[0];
@@ -604,6 +611,7 @@ export async function resolveAutoAnalysisActor(
       and(
         eq(organization_memberships.organization_id, owner.id),
         eq(organization_memberships.role, 'owner'),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
     )
@@ -627,6 +635,7 @@ export async function resolveAutoAnalysisActor(
       and(
         eq(organization_memberships.organization_id, owner.id),
         eq(organization_memberships.role, 'member'),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
     )
@@ -750,8 +759,10 @@ export async function getActiveAnalysisAttemptToken(
   return rows[0]?.claimToken ?? null;
 }
 
+type AnalysisLeaseDb = WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
 export async function tryAcquireAnalysisStartLease(
-  db: WorkerDb,
+  db: AnalysisLeaseDb,
   findingId: string
 ): Promise<boolean> {
   const rows = await db
@@ -804,17 +815,68 @@ export async function setFindingPending(
 }
 
 /**
- * Clear analysis_status so a superseded finding no longer counts against
- * the owner's concurrency cap in countRunningAnalyses().
+ * Clear analysis_status so a superseded finding no longer counts against the
+ * owner's concurrency cap in claimRowsForOwner(), while the start it aborted
+ * still owns the finding.
+ *
+ * Guarded by this attempt's claim token: the reset only lands while the queue
+ * row named by `claimToken` is still active. A newer claim that already owns
+ * the finding's `pending`/`running` state keeps it, so the reset cannot
+ * undercount inflight work.
  */
-export async function clearAnalysisStatus(db: WorkerDb, findingId: string): Promise<void> {
+export async function clearSupersededAnalysisStatus(
+  db: WorkerDb,
+  params: { findingId: string; claimToken: string }
+): Promise<void> {
   await db
     .update(security_findings)
     .set({
       analysis_status: null,
       updated_at: sql`now()`.mapWith(String),
     })
-    .where(eq(security_findings.id, findingId));
+    .where(
+      and(
+        eq(security_findings.id, params.findingId),
+        inArray(security_findings.analysis_status, ['pending', 'running']),
+        sql`EXISTS (
+          SELECT 1
+          FROM ${security_analysis_queue}
+          WHERE ${security_analysis_queue.finding_id} = ${security_findings.id}
+            AND ${security_analysis_queue.claim_token} = ${params.claimToken}
+            AND ${security_analysis_queue.queue_status} IN ('pending', 'running')
+        )`
+      )
+    );
+}
+
+/**
+ * Clears a pending start reservation when a manual launch failed before any
+ * lifecycle transition owns the finding. Guarded like the scheduled-path
+ * cleanup: only a `pending` status is cleared, and only when no queue row is
+ * active, so a Worker that received the command keeps lifecycle control.
+ */
+export async function releaseOrphanedStartReservation(
+  db: WorkerDb,
+  findingId: string
+): Promise<void> {
+  await db
+    .update(security_findings)
+    .set({
+      analysis_status: null,
+      updated_at: sql`now()`.mapWith(String),
+    })
+    .where(
+      and(
+        eq(security_findings.id, findingId),
+        eq(security_findings.analysis_status, 'pending'),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${security_analysis_queue}
+          WHERE ${security_analysis_queue.finding_id} = ${security_findings.id}
+            AND ${security_analysis_queue.queue_status} IN ('pending', 'running')
+        )`
+      )
+    );
 }
 
 export async function reconcileStaleAnalysisQueueRows(db: WorkerDb): Promise<{

@@ -1,3 +1,10 @@
+/* eslint-disable max-lines -- routing fixtures and mounted completion regression */
+import { QueryClientProvider } from '@tanstack/react-query';
+import { act } from 'react';
+import { Pressable } from 'react-native';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
+import { Text } from '@/components/ui/text';
+import { renderWithProviders } from '@/test/render-with-providers';
 import {
   type Part,
   type StoredMessage,
@@ -7,12 +14,30 @@ import {
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+
 import { ChildSessionMessage, ChildSessionSection } from './child-session-section';
+import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
+
+import { i18n as i18nInstance } from '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
+  I18nManager: { isRTL: false },
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
@@ -34,6 +59,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('./message-error-boundary', () => ({
   MessageErrorBoundary: ({ children }: { children?: unknown }) => children,
+}));
+// Two cases below invoke `ChildSessionSection` directly (outside React); stub the
+// translation hook so the direct call does not trip the rules of hooks.
+vi.mock('@/lib/tool-summary-translation/use-translated-tool-summary', () => ({
+  useTranslatedToolSummary: (text: string) => text,
 }));
 
 const taskCompletedState: Extract<ToolPart['state'], { status: 'completed' }> = {
@@ -80,6 +110,17 @@ function makeMessage(parts: Part[]): StoredMessage {
     parts,
   };
 }
+
+const modelOption: SessionModelOption = {
+  id: 'kilo/model',
+  name: 'Test Model',
+  displayId: 'model',
+  variants: [],
+  isPreferred: false,
+  showGatewayMetadata: false,
+  provider: { id: 'kilo', name: 'Kilo' },
+  modelRef: { providerID: 'kilo', modelID: 'model' },
+};
 
 function findAll(
   node: unknown,
@@ -204,9 +245,144 @@ describe('ChildSessionMessage routing seam', () => {
 
     const limitTexts = findAll(
       root,
-      el => el.type === 'Text' && textChildren(el) === 'Maximum nesting depth reached.'
+      el => el.type === Text && textChildren(el) === 'Maximum nesting depth reached.'
     );
     expect(limitTexts).toHaveLength(1);
     expect(renderPart).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChildSessionMessage completion', () => {
+  it('removes activity on a running-to-completed update with unchanged child messages', async () => {
+    const childMessages = [
+      makeMessage([
+        {
+          id: 'step',
+          sessionID: 'child-1',
+          messageID: 'child-message',
+          type: 'step-start',
+        },
+      ]),
+    ];
+    const openedChildren: [string, string][] = [];
+    const props = {
+      depth: 1,
+      getChildMessages: (id: string) => (id === 'child-1' ? childMessages : []),
+      renderPart: () => null,
+      onOpenChildSession: (id: string, title: string) => {
+        openedChildren.push([id, title]);
+      },
+      modelOptions: [modelOption],
+    };
+    const runningPart = makeToolPart('task', {
+      status: 'running',
+      input: taskCompletedState.input,
+      metadata: taskCompletedState.metadata,
+      time: { start: 1 },
+    });
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      React.createElement(ChildSessionMessage, { ...props, message: makeMessage([runningPart]) })
+    );
+    try {
+      const texts = () => renderer.root.findAllByType(Text).map(node => node.props.children);
+      const button = () => renderer.root.findByType(Pressable);
+      expect(texts()).toContain('Considering next steps');
+      expect(button().props.accessibilityLabel).toContain('Considering next steps');
+      expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(1);
+
+      await act(async () => {
+        renderer.update(
+          React.createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            React.createElement(ChildSessionMessage, {
+              ...props,
+              message: makeMessage([makeToolPart('task', taskCompletedState)]),
+            })
+          )
+        );
+        await Promise.resolve();
+      });
+
+      expect(texts()).toEqual([
+        'General',
+        'child task',
+        'Test Model',
+        i18nInstance.t('common.completed'),
+      ]);
+      expect(button().props.accessibilityLabel).toContain(i18nInstance.t('common.completed'));
+      expect(button().props.accessibilityLabel).not.toContain('Considering next steps');
+      expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(0);
+      const { onPress } = button().props as { onPress: () => void };
+      onPress();
+      expect(openedChildren).toEqual([['child-1', 'child task']]);
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe('ChildSessionSection model label', () => {
+  it('renders the model label when child messages carry model data', () => {
+    const childMessages = [makeMessage([makeTextPart('child text')])];
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+    const part = makeToolPart('task', taskCompletedState);
+
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ChildSessionSection({
+      part,
+      childMessages,
+      modelOptions: [modelOption],
+      onOpenChildSession,
+    });
+
+    const labels = findByType(root, ChildSessionModelLabel);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({ modelLabel: 'Test Model' });
+  });
+
+  it('hides the model label when child messages are empty and still renders the card', () => {
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+    const part = makeToolPart('task', taskCompletedState);
+
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ChildSessionSection({
+      part,
+      childMessages: [],
+      modelOptions: [modelOption],
+      onOpenChildSession,
+    });
+
+    expect(findByType(root, ChildSessionModelLabel)).toHaveLength(0);
+    const taskNameTexts = findAll(
+      root,
+      el => el.type === Text && textChildren(el) === 'child task'
+    );
+    expect(taskNameTexts).toHaveLength(1);
+  });
+
+  it('passes modelOptions through to the nested ChildSessionSection', () => {
+    const childMessages = [makeMessage([makeTextPart('child text')])];
+    const getChildMessages = vi.fn((id: string) => (id === 'child-1' ? childMessages : []));
+    const renderPart = vi.fn();
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ChildSessionMessage({
+      message: makeMessage([makeToolPart('task', taskCompletedState)]),
+      depth: 0,
+      getChildMessages,
+      renderPart,
+      onOpenChildSession,
+      modelOptions: [modelOption],
+    });
+
+    const sections = findByType(root, ChildSessionSection);
+    expect(sections).toHaveLength(1);
+    const section = sections[0];
+    if (!section) {
+      throw new Error('expected ChildSessionSection');
+    }
+    expect(section.props).toMatchObject({ modelOptions: [modelOption] });
   });
 });

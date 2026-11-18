@@ -115,7 +115,7 @@ start_service "$CLOUD_DIR/services/session-ingest" "session" "$YELLOW" \
 start_service "$CLOUD_DIR/services/code-review-infra" "review" "$BLUE" \
   pnpm exec wrangler dev --inspector-port 9231
 
-# agent-next needs its predev (build:wrapper) step before starting wrangler
+# agent-next: build the wrapper artifacts before starting wrangler
 start_service_sh "$CLOUD_DIR/services/cloud-agent-next" "agent-next" "$RED" \
   "pnpm run build:wrapper && exec pnpm exec wrangler dev --env dev --inspector-port 9232"
 

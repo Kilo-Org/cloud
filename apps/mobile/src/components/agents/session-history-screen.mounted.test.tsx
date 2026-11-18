@@ -1,0 +1,1317 @@
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
+import { createElement, type ReactNode } from 'react';
+import { act, type TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
+import { i18n } from '@/i18n';
+import {
+  type StoredSession,
+  type useAgentSessions,
+  type useAgentSessionSearch,
+  type useRecentAgentRepositories,
+} from '@/lib/hooks/use-agent-sessions';
+import {
+  __resetSessionListTouchGateForTests,
+  isSessionListTouchHeld,
+} from '@/lib/session-list-touch-gate';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
+import type * as PlatformFilterModule from './platform-filter-modal';
+import { AGENT_SESSION_NAV_GUARD_MS } from './agent-session-nav-guard';
+import { OwnedKeyboardLift } from './owned-keyboard-lift';
+import { SessionHistoryScreen } from './session-history-screen';
+
+type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
+  Partial<Pick<StoredSession, 'git_url' | 'created_on_platform'>>;
+
+const listState = vi.hoisted(() => ({
+  storedSessions: [] as MockStoredSession[],
+  isSearching: false,
+  // Mirrors the hook's restorePending: the saved search has not reached the
+  // search state yet, so the body must load instead of claiming a result.
+  restorePending: false,
+  isError: false,
+  // Mirrors the real hook's stored-query flags so the screen's loading
+  // decision can be exercised on the first render, before the request
+  // settles (isFetching false, isPending true).
+  storedIsPending: false,
+  storedIsFetching: false,
+  storedFetchedSinceMount: true,
+  storedLoadedPageCount: 1,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  isFetchNextPageError: false,
+  fetchNextPage: vi.fn<() => Promise<void>>(),
+  organization: { organizationId: null as string | null, isLoaded: true },
+  organizations: [] as { organizationId: string; organizationName: string }[],
+  storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
+  searchQuery: vi.fn<(options: Parameters<typeof useAgentSessionSearch>[0]) => void>(),
+  repositoryQuery: vi.fn<(options: Parameters<typeof useRecentAgentRepositories>[0]) => void>(),
+}));
+
+const appState = vi.hoisted(() => {
+  const listeners = new Set<(state: string) => void>();
+  return {
+    listeners,
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      listeners.add(listener);
+      return {
+        remove: () => {
+          listeners.delete(listener);
+        },
+      };
+    },
+    emit: (state: string): void => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+
+const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
+
+const keyboardState = vi.hoisted(() => {
+  const listeners = new Map<string, Set<(payload: unknown) => void>>();
+  return {
+    addListener: (event: string, listener: (payload: unknown) => void) => {
+      const set = listeners.get(event) ?? new Set<(payload: unknown) => void>();
+      set.add(listener);
+      listeners.set(event, set);
+      return {
+        remove: () => {
+          set.delete(listener);
+        },
+      };
+    },
+    emit: (event: string, payload: unknown): void => {
+      for (const listener of listeners.get(event) ?? []) {
+        listener(payload);
+      }
+    },
+    clear: (): void => {
+      listeners.clear();
+    },
+  };
+});
+
+const focusState = vi.hoisted(() => ({ current: true as boolean }));
+
+// The window the screen is laid out in. A rotation replaces it, and the lift
+// must not reuse a frame height it measured in the previous one.
+const windowState = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const state = {
+    snapshot: { width: 402, height: 874, scale: 3, fontScale: 1 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    set: (height: number, width: number) => {
+      state.snapshot = { width, height, scale: 3, fontScale: 1 };
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+  return state;
+});
+
+// The screen reads the keyboard from `react-native-keyboard-controller`'s
+// provider, so this suite drives that store: a lift is only observable when the
+// keyboard it owns is actually up.
+const keyboardLift = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboardLift.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardLift.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    useKeyboardState: (selector?: (snapshot: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardLift.subscribe, heightOf, heightOf);
+      const snapshot = { height, isVisible: height > 0, progress: height > 0 ? 1 : 0, duration: 0 };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
+
+const focusCallbacks = vi.hoisted(() => ({
+  current: new Set<() => void>(),
+}));
+const handleRefetchSpy = vi.hoisted(() => vi.fn());
+const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
+
+vi.mock('react-native', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  return {
+    View: 'View',
+    Modal: 'Modal',
+    Pressable: 'Pressable',
+    ScrollView: 'ScrollView',
+    Platform: platformState,
+    Keyboard: { dismiss: vi.fn(), addListener: keyboardState.addListener },
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    AppState: { addEventListener: appState.addEventListener },
+    ActivityIndicator: 'ActivityIndicator',
+    // The real hook re-renders on a window change; a rotation test needs that,
+    // and a snapshot object must keep its identity between calls.
+    useWindowDimensions: () =>
+      React.useSyncExternalStore(
+        windowState.subscribe,
+        () => windowState.snapshot,
+        () => windowState.snapshot
+      ),
+  };
+});
+// The modal mock below still loads the real module through `importOriginal`,
+// which imports `react-native-safe-area-context`; that package's `react-native`
+// entry points at its untranspiled `src/` TypeScript, which vitest cannot parse,
+// so stub the hook here.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  X: 'X',
+  ChevronDown: 'ChevronDown',
+  Search: 'Search',
+}));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    accentSoftForeground: '#1a1a10',
+    mutedForeground: '#666666',
+    primary: '#0055ff',
+  }),
+}));
+const routerPush = vi.hoisted(() => vi.fn());
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ isFocused: () => focusState.current }),
+  useRouter: () => ({ push: routerPush }),
+  useFocusEffect: (effect: () => void) => {
+    focusCallbacks.current.add(effect);
+  },
+}));
+vi.mock('@/components/agents/session-list-content', () => ({
+  AgentSessionListContent: 'AgentSessionListContent',
+}));
+vi.mock('@/components/agents/session-filter-button', () => ({
+  SessionFilterButton: 'SessionFilterButton',
+}));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
+vi.mock('@/components/agents/session-list-search-header', () => ({
+  SessionListSearchHeader: 'SessionListSearchHeader',
+}));
+vi.mock('@/components/agents/platform-filter-modal', async importOriginal => ({
+  ...(await importOriginal<typeof PlatformFilterModule>()),
+  SessionFilterModal: 'SessionFilterModal',
+}));
+vi.mock('@/components/agents/active-now-section', () => ({
+  ActiveNowSection: 'ActiveNowSection',
+}));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { inlineActions?: ReactNode }) =>
+    createElement('ScreenHeader', props, props.inlineActions),
+}));
+vi.mock('@/components/agents/use-session-search-input', () => ({
+  useSessionSearchInput: () => ({
+    searchQuery: listState.isSearching ? 'no matching sessions' : '',
+    restorePending: listState.restorePending,
+    searchInputRef: { current: null },
+    hasText: listState.isSearching,
+    awaitingCommit: false,
+    searchInputKey: 'session-search-empty',
+    searchDefaultValue: undefined,
+    handleSearchInputChange: vi.fn(),
+    handleClearSearchInput: vi.fn(),
+    clearSearchInput: () => {
+      listState.isSearching = false;
+    },
+    searchController: { clearSearchOnly: vi.fn() },
+  }),
+}));
+vi.mock('@/components/agents/use-agent-session-navigator', () => ({
+  useAgentSessionNavigator: () => vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-agent-sessions', async () => {
+  const { useQuery } = await import('@tanstack/react-query');
+  return {
+    useAgentSessions: (options: Parameters<typeof useAgentSessions>[0] = {}) => {
+      listState.storedQuery(options);
+      const { gitUrl, createdOnPlatform } = options;
+      const active = useQuery({
+        queryKey: ['existing-active-sessions'],
+        queryFn: () => new Set<string>(),
+        initialData: () => new Set<string>(),
+      });
+      const storedSessions = listState.storedSessions.filter(
+        session =>
+          (!gitUrl || gitUrl.includes(session.git_url ?? '')) &&
+          (!createdOnPlatform || createdOnPlatform.includes(session.created_on_platform ?? ''))
+      );
+      return {
+        storedSessions,
+        activeSessionIds: active.data,
+        dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
+        activeIsError: false,
+        storedIsError: listState.isError,
+        storedIsPending: listState.storedIsPending,
+        storedIsFetching: listState.storedIsFetching,
+        storedFetchedSinceMount: listState.storedFetchedSinceMount,
+        storedLoadedPageCount: listState.storedLoadedPageCount,
+        hasNextPage: listState.hasNextPage,
+        isFetchingNextPage: listState.isFetchingNextPage,
+        isFetchNextPageError: listState.isFetchNextPageError,
+        fetchNextPage: listState.fetchNextPage,
+        refetch: handleRefetchSpy,
+      };
+    },
+    useAgentSessionSearch: (options: Parameters<typeof useAgentSessionSearch>[0]) => {
+      listState.searchQuery(options);
+      return {
+        dateGroups: [],
+        isError: listState.isError,
+        isFetching: false,
+        isPending: false,
+        hasNextPage: listState.hasNextPage,
+        isFetchingNextPage: listState.isFetchingNextPage,
+        isFetchNextPageError: listState.isFetchNextPageError,
+        isPlaceholderData: false,
+        fetchNextPage: listState.fetchNextPage,
+        refetch: handleRefetchSpy,
+      };
+    },
+    useRecentAgentRepositories: (options: Parameters<typeof useRecentAgentRepositories>[0]) => {
+      listState.repositoryQuery(options);
+      return {
+        data: {
+          repositories: listState.storedSessions.flatMap(session =>
+            session.git_url ? [{ gitUrl: session.git_url }] : []
+          ),
+        },
+      };
+    },
+  };
+});
+vi.mock('expo-secure-store', () => ({ getItemAsync: readFilterRecord }));
+vi.mock('@/lib/auth/account-metadata-write', () => ({
+  setAccountMetadata: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'u1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/use-draft-load', () => ({
+  useFencedDraftLoad: () => ({ value: null, settled: true }),
+}));
+vi.mock('@/lib/persist/drafts', () => ({
+  SESSION_SEARCH_DRAFT_KEY: 'session-search-query',
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => listState.organization,
+}));
+// The scope control reads the account list from the tRPC options it is handed;
+// keep the mobile client (and its expo imports) out of this suite.
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations', 'list'],
+          queryFn: () => Promise.resolve(listState.organizations),
+        }),
+      },
+    },
+  }),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'account' }) }));
+// The shared scope control reaches the skeleton (expo-linear-gradient) and the
+// theme colors (expo-router themes); neither is the subject of this suite.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
+
+const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
+
+function findNodesByType(
+  renderer: TestRenderer.ReactTestRenderer,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+function findNodeByType(
+  renderer: TestRenderer.ReactTestRenderer,
+  type: string
+): TestRenderer.ReactTestInstance {
+  return renderer.root.find(node => typeof node.type === 'string' && node.type === type);
+}
+
+function historyHeaderActions(renderer: TestRenderer.ReactTestRenderer) {
+  const filter = findNodeByType(renderer, 'SessionFilterButton');
+  return {
+    activeFilterCount: filter.props.activeCount as number,
+    onOpenFilters: filter.props.onPress as () => void,
+  };
+}
+
+function applyFilters(
+  renderer: TestRenderer.ReactTestRenderer,
+  projectFilter: string[],
+  platformFilter: string[]
+) {
+  act(() => {
+    historyHeaderActions(renderer).onOpenFilters();
+  });
+  const modal = findNodeByType(renderer, 'SessionFilterModal');
+  act(() => {
+    (modal.props.onApply as (filters: unknown) => void)({ projectFilter, platformFilter });
+    (modal.props.onClose as () => void)();
+  });
+  expect(modal.props.visible).toBe(false);
+}
+
+/** The pad the lift actually writes on the body frame; 0 means full height. */
+function liftPad(renderer: TestRenderer.ReactTestRenderer): number {
+  const style: unknown = renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.style;
+  if (typeof style !== 'object' || style === null || !('paddingBottom' in style)) {
+    throw new TypeError('The keyboard lift wrote no paddingBottom');
+  }
+  const pad: unknown = style.paddingBottom;
+  if (typeof pad !== 'number') {
+    throw new TypeError('The keyboard lift wrote a non-numeric paddingBottom');
+  }
+  return pad;
+}
+
+function storedSessionIds(renderer: TestRenderer.ReactTestRenderer) {
+  const sections = findNodeByType(renderer, 'AgentSessionListContent').props.sections as {
+    data: MockStoredSession[];
+  }[];
+  return sections.flatMap(section => section.data.map(session => session.session_id));
+}
+
+function fireFocus(): void {
+  for (const effect of focusCallbacks.current) {
+    effect();
+  }
+}
+
+async function renderScreen(
+  queryClient: QueryClient = createTestQueryClient()
+): Promise<TestRenderer.ReactTestRenderer> {
+  const { renderer } = await renderWithProviders(createElement(SessionHistoryScreen), {
+    queryClient,
+  });
+  mountedRenderers.push(renderer);
+  return renderer;
+}
+
+describe('SessionHistoryScreen', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    platformState.OS = 'ios';
+    keyboardState.clear();
+    keyboardLift.setHeight(0);
+    listState.storedSessions = [];
+    listState.isSearching = false;
+    listState.isError = false;
+    listState.storedIsPending = false;
+    listState.storedIsFetching = false;
+    listState.storedFetchedSinceMount = true;
+    listState.storedLoadedPageCount = 1;
+    listState.hasNextPage = false;
+    listState.isFetchingNextPage = false;
+    listState.isFetchNextPageError = false;
+    listState.fetchNextPage.mockClear();
+    Object.assign(listState.organization, { organizationId: null, isLoaded: true });
+    listState.organizations = [];
+    listState.storedQuery.mockClear();
+    listState.searchQuery.mockClear();
+    listState.repositoryQuery.mockClear();
+    listState.restorePending = false;
+    readFilterRecord.mockReset();
+    readFilterRecord.mockResolvedValue(null);
+    focusState.current = true;
+    windowState.set(874, 402);
+    focusCallbacks.current = new Set();
+    handleRefetchSpy.mockClear();
+    handleRefetchSpy.mockResolvedValue(undefined);
+    routerPush.mockClear();
+  });
+
+  afterEach(() => {
+    act(() => {
+      for (const renderer of mountedRenderers) {
+        renderer.unmount();
+      }
+    });
+    mountedRenderers.length = 0;
+    appState.listeners.clear();
+    __resetSessionListTouchGateForTests();
+    vi.restoreAllMocks();
+  });
+
+  const workflow = 'https://github.com/iscekic/kilo-workflow.git';
+  const code = 'https://github.com/Kilo-Org/kilocode.git';
+  const sessions: MockStoredSession[] = [
+    {
+      session_id: 'workflow',
+      organization_id: null,
+      git_url: workflow,
+      created_on_platform: 'cloud-agent-web',
+    },
+    {
+      session_id: 'code-cloud',
+      organization_id: null,
+      git_url: code,
+      created_on_platform: 'cloud-agent',
+    },
+    { session_id: 'code-cli', organization_id: null, git_url: code, created_on_platform: 'cli' },
+    {
+      session_id: 'other',
+      organization_id: null,
+      git_url: 'https://github.com/example/other.git',
+      created_on_platform: 'cloud-agent',
+    },
+  ];
+
+  it('updates filters and counts through the modal without pills or moving search', async () => {
+    listState.storedSessions = sessions;
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+    for (const step of [
+      {
+        projects: [workflow, code],
+        platforms: ['cloud-agent'],
+        count: 3,
+        ids: ['workflow', 'code-cloud'],
+      },
+      {
+        projects: [code],
+        platforms: ['cloud-agent'],
+        count: 2,
+        ids: ['code-cloud'],
+      },
+      {
+        projects: [code],
+        platforms: [],
+        count: 1,
+        ids: ['code-cloud', 'code-cli'],
+      },
+      {
+        projects: [],
+        platforms: [],
+        count: 0,
+        ids: ['workflow', 'code-cloud', 'code-cli', 'other'],
+      },
+    ]) {
+      applyFilters(renderer, step.projects, step.platforms);
+      expect(historyHeaderActions(renderer).activeFilterCount).toBe(step.count);
+      expect(storedSessionIds(renderer)).toEqual(step.ids);
+      expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+      expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
+    }
+  });
+
+  it('offers a filter row for every recent repository, not only the first three', async () => {
+    const gitUrls = [
+      'https://github.com/kilo/alpha.git',
+      'https://github.com/kilo/beta.git',
+      'https://github.com/kilo/gamma.git',
+      'https://github.com/kilo/delta.git',
+      'https://github.com/kilo/epsilon.git',
+    ];
+    listState.storedSessions = [
+      ...gitUrls.map((git_url, index) => ({
+        session_id: `s${index}`,
+        organization_id: null,
+        git_url,
+        created_on_platform: 'cloud-agent',
+      })),
+      // The same repository again: the sheet must not render a duplicate row.
+      {
+        session_id: 'alpha-again',
+        organization_id: null,
+        git_url: gitUrls[0],
+        created_on_platform: 'cli',
+      },
+    ];
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
+  });
+
+  it('keeps Retry busy until the history refetch settles', async () => {
+    const { promise: pendingRefetch, resolve: settleRefetch } = Promise.withResolvers<undefined>();
+    handleRefetchSpy.mockReturnValueOnce(pendingRefetch);
+    listState.isError = true;
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isRetrying).toBe(false);
+
+    act(() => {
+      (content.props.onRetry as () => void)();
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isRetrying).toBe(true);
+
+    await act(async () => {
+      settleRefetch(undefined);
+      await pendingRefetch;
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isRetrying).toBe(false);
+  });
+
+  it('keeps a selected project row that is no longer in the recent repositories', async () => {
+    const recent = 'https://github.com/kilo/alpha.git';
+    const stale = 'https://github.com/kilo/removed.git';
+    listState.storedSessions = [
+      {
+        session_id: 's0',
+        organization_id: null,
+        git_url: recent,
+        created_on_platform: 'cloud-agent',
+      },
+    ];
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [stale], platformFilter: [] })
+    );
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual([recent, stale]);
+  });
+
+  it('opens the new-session composer from the empty history body', async () => {
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasAnySessions).toBe(false);
+    act(() => {
+      (content.props.onCreateSession as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/agent-chat/new');
+  });
+
+  it('keeps the current organization when the empty history starts a session', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    act(() => {
+      (content.props.onCreateSession as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-drain');
+  });
+  it('drops the second press while history opens a session', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const renderer = await renderScreen();
+    const onCreateSession = findNodeByType(renderer, 'AgentSessionListContent').props
+      .onCreateSession as () => void;
+
+    act(() => {
+      onCreateSession();
+      onCreateSession();
+    });
+
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith(
+      '/(app)/agent-chat/new?organizationId=org-drain'
+    );
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    act(() => {
+      onCreateSession();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(2);
+  });
+  it('opens a new session after history regains focus', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const renderer = await renderScreen();
+    const onCreateSession = findNodeByType(renderer, 'AgentSessionListContent').props
+      .onCreateSession as () => void;
+
+    act(() => {
+      onCreateSession();
+    });
+    expect(routerPush).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(now + 50);
+    act(() => {
+      fireFocus();
+      onCreateSession();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps saved repository and platform selections after a successful history retry', async () => {
+    readFilterRecord.mockImplementation(async storageKey => {
+      await Promise.resolve();
+      return storageKey === 'agent-session-filters'
+        ? JSON.stringify({ projectFilter: [code], platformFilter: ['cloud-agent'] })
+        : null;
+    });
+    listState.isError = true;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isError).toBe(true);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
+    handleRefetchSpy.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      listState.isError = false;
+      listState.storedSessions = sessions;
+    });
+    await act(async () => {
+      (content.props.onRetry as () => void)();
+      await Promise.resolve();
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isError).toBe(false);
+    expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+    expect(findNodeByType(renderer, 'SessionFilterModal').props).toMatchObject({
+      selectedProjects: [code],
+      selectedPlatforms: ['cloud-agent'],
+    });
+  });
+
+  it('renders a persisted platform variant as the single bucket row it matches', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [], platformFilter: ['cloud-agent-web'] })
+    );
+    listState.storedSessions = sessions;
+    const renderer = await renderScreen();
+    // The sheet shows one checked Cloud Agent row, so the badge counts 1 and
+    // the history query covers both raw platforms of that row.
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(1);
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'other']);
+  });
+
+  it('clears no-result filters and resets platform-only filtering through the modal', async () => {
+    listState.storedSessions = sessions;
+    const renderer = await renderScreen();
+    applyFilters(renderer, [workflow], ['slack']);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasActiveQuery).toBe(true);
+    expect(content.props.isSearching).toBe(false);
+    expect(storedSessionIds(renderer)).toEqual([]);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
+    act(() => {
+      (content.props.onClearAction as (action: string) => void)('clear-filters');
+    });
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(0);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+
+    applyFilters(renderer, [], ['cloud-agent']);
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'other']);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(1);
+    applyFilters(renderer, [], []);
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(0);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+  });
+
+  it('clears only the search when no-result recovery says Clear search', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [code], platformFilter: ['cloud-agent'] })
+    );
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isSearching).toBe(true);
+    expect(storedSessionIds(renderer)).toEqual([]);
+    act(() => {
+      (content.props.onClearAction as (action: string) => void)('clear-search');
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isSearching).toBe(false);
+    expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+  });
+
+  // A search and a filter can both hide the session, so each control retires
+  // only its own cause: clearing the filters must not silently drop the term the
+  // user typed, and must leave the search body in place.
+  it('keeps the search when no-result recovery says Clear filters', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [], platformFilter: ['cloud-agent'] })
+    );
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasActiveFilters).toBe(true);
+    expect(content.props.isSearching).toBe(true);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(1);
+    expect(storedSessionIds(renderer)).toEqual([]);
+    act(() => {
+      (content.props.onClearAction as (action: string) => void)('clear-filters');
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+    const cleared = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(cleared.props.hasActiveFilters).toBe(false);
+    // The term stays, so the search body keeps owning the screen.
+    expect(cleared.props.isSearching).toBe(true);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(0);
+    expect(storedSessionIds(renderer)).toEqual([]);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+  });
+
+  it('holds the list through the body swap after Clear search so a row cannot take the press that follows', async () => {
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const gateProps = renderer.root
+      .findByType(SessionListTouchGate)
+      .findByType('View' as unknown as React.ElementType).props as {
+      onStartShouldSetResponderCapture: () => boolean;
+    };
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(false);
+
+    act(() => {
+      (
+        findNodeByType(renderer, 'AgentSessionListContent').props.onClearAction as (
+          action: string
+        ) => void
+      )('clear-search');
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+
+    // The clear swaps the empty state for the rows in the same commit, so the
+    // row now under the finger is a target for the next touch; the gate claims
+    // that touch instead of delivering it to the row.
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isSearching).toBe(false);
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
+    expect(isSessionListTouchHeld()).toBe(true);
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(true);
+  });
+
+  it.each([false, true])(
+    'scopes history queries to the selected organization with readiness=%s',
+    async loaded => {
+      listState.organization = { organizationId: 'org-1', isLoaded: loaded };
+      listState.isSearching = true;
+      const renderer = await renderScreen();
+      for (const query of [
+        listState.storedQuery,
+        listState.searchQuery,
+        listState.repositoryQuery,
+      ]) {
+        expect(query).toHaveBeenLastCalledWith(
+          expect.objectContaining({ organizationId: 'org-1', enabled: loaded })
+        );
+      }
+      expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(!loaded);
+    }
+  );
+
+  // The history list is scoped to the selected account, so the scope is named
+  // above it: an organization scope with no rows otherwise reads as "no past
+  // sessions" while the user's personal CLI sessions sit in another scope.
+  it.each([
+    { organizationId: 'org-1', expected: 'Engineering' },
+    { organizationId: null, expected: 'Personal' },
+  ])('names the account the history is scoped to ($expected)', async test => {
+    listState.organizations = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    listState.organization = { organizationId: test.organizationId, isLoaded: true };
+    const renderer = await renderScreen();
+    const scopeLabel = () =>
+      findNodesByType(renderer, 'Text').find(node => node.children.includes(test.expected));
+    await waitFor(() => scopeLabel() !== undefined);
+    expect(
+      findNodesByType(renderer, 'Pressable').filter(
+        node => node.props.accessibilityHint === 'Select account'
+      )
+    ).toHaveLength(1);
+  });
+
+  // Regression: the empty state ("No past sessions") must not flash on the
+  // cold-open render. React Query v5 reports `isFetching: false` until the
+  // observer subscribes and starts the first fetch, while `isPending` stays
+  // true until the query settles — the screen must treat that first frame as
+  // loading, not as a settled empty list.
+  it('shows loading on the cold-open render before the request settles', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = true;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 0;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(true);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  it('stops loading and renders cached rows during a background refetch', async () => {
+    listState.storedSessions = [{ session_id: 'cached', organization_id: null }];
+    listState.storedIsPending = false;
+    listState.storedIsFetching = true;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.sections).toHaveLength(1);
+  });
+
+  it('shows the settled empty state once the request completes with no rows', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  it('keeps the loading body until the saved search draft settles, then hands the search body over', async () => {
+    // Reopen with a saved search: the durable draft is the only source of the
+    // search text, and it settles after the mount. Painting the unfiltered
+    // list, or "No past sessions", before that claims a result the saved search
+    // is about to replace, and the replacement used to land on an unpainted
+    // body.
+    listState.restorePending = true;
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedLoadedPageCount = 1;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(true);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.hasActiveQuery).toBe(false);
+
+    listState.restorePending = false;
+    listState.isSearching = true;
+    act(() => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props).toMatchObject({
+      isLoading: false,
+      isSearching: true,
+      hasActiveQuery: true,
+      hasAnySessions: true,
+      sections: [],
+    });
+  });
+
+  it('names history and keeps back navigation available for direct entry', async () => {
+    const renderer = await renderScreen();
+    const header = findNodeByType(renderer, 'ScreenHeader');
+
+    expect(header.props.title).toBe(i18n.t('agents.sessionList.pastSessions'));
+    expect(header.props.showBackButton).toBe(true);
+    expect(header.props.backFallback).toBe('/(app)/(tabs)/(2_agents)');
+  });
+
+  it('does not offer new-session creation in the header', async () => {
+    const renderer = await renderScreen();
+    expect(
+      findNodesByType(renderer, 'Pressable').filter(
+        node => node.props.accessibilityLabel === i18n.t('common.newSession')
+      )
+    ).toHaveLength(0);
+  });
+
+  it('never renders the active tray or the new-session FAB', async () => {
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'ActiveNowSection').length).toBe(0);
+    expect(
+      renderer.root.findAll(node => node.props.testID === 'agents-new-session-fab').length
+    ).toBe(0);
+  });
+
+  it('keeps search available when there are no stored rows and no active query', async () => {
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+  });
+
+  it('keeps the same search field and keyboard container as history loads, empties, and is searched', async () => {
+    listState.storedIsPending = true;
+    listState.storedLoadedPageCount = 0;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+    const container = renderer.root.findByType(OwnedKeyboardLift);
+    for (const state of [
+      { storedIsPending: false, isSearching: false, storedSessions: [] },
+      {
+        storedIsPending: false,
+        isSearching: false,
+        storedSessions: [{ session_id: 'stored-1', organization_id: null }],
+      },
+      { storedIsPending: false, isSearching: true, storedSessions: [] },
+      { storedIsPending: false, isSearching: false, storedSessions: [] },
+    ]) {
+      Object.assign(listState, state);
+      act(() => {
+        renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(SessionHistoryScreen)
+          )
+        );
+      });
+      expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
+      expect(renderer.root.findByType(OwnedKeyboardLift)).toBe(container);
+    }
+  });
+
+  it('mounts the search header once stored rows exist', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+  });
+
+  it('keeps the search header and an active query while searching with no stored rows', async () => {
+    listState.isSearching = true;
+    listState.storedSessions = [];
+
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasActiveQuery).toBe(true);
+    expect(content.props.hasAnySessions).toBe(true);
+  });
+
+  it('hands the existing live query set through data and screen without another subscription', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    const queryKey = ['existing-active-sessions'];
+    const activeQuery = queryClient.getQueryCache().find({ queryKey });
+
+    expect(content.props.activeSessionIds).toEqual(new Set());
+    expect(activeQuery?.getObserversCount()).toBe(1);
+    const liveIds = new Set(['stored-1']);
+    act(() => {
+      queryClient.setQueryData(queryKey, liveIds);
+    });
+    await waitFor(() => content.props.activeSessionIds === liveIds);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBe(content);
+    expect(content.props.activeSessionIds).toBe(liveIds);
+
+    const nextIds = new Set(['stored-2']);
+    act(() => {
+      queryClient.setQueryData(queryKey, nextIds);
+    });
+    await waitFor(() => content.props.activeSessionIds === nextIds);
+    expect(content.props.activeSessionIds).toBe(nextIds);
+    expect(activeQuery?.getObserversCount()).toBe(1);
+    // One active-session cache entry, however many account-scoped queries the
+    // screen also mounts.
+    expect(queryClient.getQueryCache().findAll({ queryKey })).toHaveLength(1);
+  });
+
+  it('refetches stored sessions through the wrapped refetch on route focus', async () => {
+    await renderScreen();
+
+    act(() => {
+      fireFocus();
+    });
+    expect(handleRefetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches stored sessions on foreground while focused', async () => {
+    await renderScreen();
+
+    act(() => {
+      fireFocus();
+    });
+    expect(handleRefetchSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      appState.emit('background');
+    });
+    act(() => {
+      appState.emit('active');
+    });
+
+    expect(handleRefetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not refetch stored sessions on foreground while unfocused', async () => {
+    focusState.current = false;
+    await renderScreen();
+
+    act(() => {
+      appState.emit('background');
+    });
+    act(() => {
+      appState.emit('active');
+    });
+
+    expect(handleRefetchSpy).not.toHaveBeenCalled();
+  });
+
+  // Regression: the finding's empty-state subtitle sat half-drawn behind the
+  // on-screen keyboard. The whole body (empty state, list, refresh band) must
+  // live inside one permanently mounted keyboard container so it lifts with the
+  // keyboard while the header and search field above it stay put.
+  it('mounts the history body inside the owned keyboard lift', async () => {
+    const renderer = await renderScreen();
+
+    const container = renderer.root.findByType(OwnedKeyboardLift);
+    expect(container.props.pad).toBe(0);
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  // Regression: the list kept its keyboard-open height after the search keyboard
+  // closed, so only a few rows stayed visible above a blank band and a swipe in
+  // that band did nothing. The lift must give the pad back every time, including
+  // after the field regains focus when the user returns to the screen.
+  it('gives the keyboard pad back when the search keyboard closes', async () => {
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    act(() => {
+      keyboardLift.setHeight(0);
+    });
+    expect(liftPad(renderer)).toBe(0);
+
+    // iOS restores the field's focus on return, and the pad must stay at 0: the
+    // ownership claim alone never lifts the body.
+    act(() => {
+      (searchHeader.props.onBlur as () => void)();
+    });
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    expect(liftPad(renderer)).toBe(0);
+  });
+
+  // A keyboard height belongs to the window it was measured in. Rotating the
+  // history to a window shorter than that band used to pad the whole body away:
+  // the header, search field, filter and tab bar stayed, and the list rendered
+  // nothing — no rows, no skeleton, no empty state, no error. The lift keeps a
+  // minimum body viewport instead, so the rows stay on screen and scrollable.
+  it('keeps the history body rendered when the window is shorter than the keyboard band', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    // The rotation leaves less room than the band the field raised.
+    act(() => {
+      (
+        renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.onLayout as (event: {
+          nativeEvent: { layout: { height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { height: 253 } } });
+    });
+
+    expect(liftPad(renderer)).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBeDefined();
+  });
+
+  // The rotation render runs before the new layout pass reports the landscape
+  // frame, so the pad must not reuse the portrait measurement: 336 points of pad
+  // inside a 298-point frame fills the body for that frame.
+  it('releases the stale portrait frame for the render a rotation produces', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    act(() => {
+      (
+        renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.onLayout as (event: {
+          nativeEvent: { layout: { height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { height: 708 } } });
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    act(() => {
+      windowState.set(402, 874);
+    });
+
+    expect(liftPad(renderer)).toBe(0);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBeDefined();
+  });
+
+  it('pads nothing for a keyboard another screen raised', async () => {
+    const renderer = await renderScreen();
+
+    act(() => {
+      keyboardLift.setHeight(320);
+    });
+    expect(liftPad(renderer)).toBe(0);
+  });
+
+  it('keeps the history body in one permanently mounted keyboard container on Android', async () => {
+    platformState.OS = 'android';
+    const renderer = await renderScreen();
+
+    // The body lives in the single container on this platform too, and the
+    // container is the sole owner of the pad.
+    const container = renderer.root.findByType(OwnedKeyboardLift);
+    expect(container.props.pad).toBe(0);
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+
+    // The container is permanent, not swapped per render: a state change (here
+    // opening the filter modal) reuses the same container and body instances.
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    expect(renderer.root.findByType(OwnedKeyboardLift)).toBe(container);
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  it('hands a failed next page to the body and retries it from there', async () => {
+    listState.storedSessions = sessions;
+    listState.hasNextPage = true;
+    listState.isFetchNextPageError = true;
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isFetchNextPageError).toBe(true);
+    // The loaded rows stay rendered: a failed older page never replaces them.
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
+
+    act(() => {
+      (content.props.onRetryNextPage as () => void)();
+    });
+    expect(listState.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('stops auto-loading at the end of the list while the failed page stands', async () => {
+    listState.storedSessions = sessions;
+    listState.hasNextPage = true;
+    listState.isFetchNextPageError = true;
+    const renderer = await renderScreen();
+
+    // The end of a list is reached again on every content-size change, and the
+    // footer's retry line changes it. Re-firing there would replace the retry
+    // with another failing request before the reader could tap it.
+    act(() => {
+      (findNodeByType(renderer, 'AgentSessionListContent').props.onEndReached as () => void)();
+    });
+    expect(listState.fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('loads the next page on end-reach once the previous attempt succeeded', async () => {
+    listState.storedSessions = sessions;
+    listState.hasNextPage = true;
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isFetchNextPageError).toBe(false);
+    act(() => {
+      (content.props.onEndReached as () => void)();
+    });
+    expect(listState.fetchNextPage).toHaveBeenCalledOnce();
+  });
+});

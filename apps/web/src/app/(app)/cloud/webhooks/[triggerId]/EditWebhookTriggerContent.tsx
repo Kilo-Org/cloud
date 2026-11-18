@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useMemo } from 'react';
+import { use, useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useRouter } from 'next/navigation';
@@ -16,11 +16,11 @@ import {
   type TriggerFormData,
   type TriggerFormProps,
 } from '@/components/webhook-triggers/TriggerForm';
+import { useInvokeWebhookTrigger } from '@/components/webhook-triggers';
 import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import type { AgentMode } from '@/components/cloud-agent/types';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Webhook, ExternalLink, RefreshCw } from 'lucide-react';
 
@@ -37,6 +37,9 @@ export function EditWebhookTriggerContent({
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { invokeTrigger, isInvoking, invokingTriggerId } = useInvokeWebhookTrigger(organizationId);
+  const saveAndInvokeInFlightRef = useRef(false);
+  const [isSaveAndInvoking, setIsSaveAndInvoking] = useState(false);
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
@@ -52,6 +55,21 @@ export function EditWebhookTriggerContent({
       triggerId,
       organizationId: organizationId ?? undefined,
     })
+  );
+
+  const {
+    data: capabilities,
+    isPending: isLoadingCapabilities,
+    isError: hasCapabilitiesError,
+    refetch: refetchCapabilities,
+  } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions(
+      {
+        organizationId,
+        githubRepo: triggerData?.githubRepo || undefined,
+      },
+      { enabled: triggerData !== undefined }
+    )
   );
 
   // Fetch GitHub repositories (use org-scoped query when in org context)
@@ -71,7 +89,11 @@ export function EditWebhookTriggerContent({
   );
 
   // Fetch models
-  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    true,
+    'shared_services'
+  );
 
   // Transform repositories to RepositoryOption format
   const repositories = useMemo<RepositoryOption[]>(() => {
@@ -93,6 +115,7 @@ export function EditWebhookTriggerContent({
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
       })),
     [modelsData?.data]
   );
@@ -102,14 +125,22 @@ export function EditWebhookTriggerContent({
     if (!triggerData) return undefined;
     return {
       triggerId: triggerData.triggerId,
+      targetType:
+        triggerData.targetType === 'cloud_agent_chat' ? 'cloud_agent_chat' : 'cloud_agent',
+      cloudAgentSessionId: triggerData.cloudAgentSessionId,
+      executionUserId: triggerData.executionUserId,
       activationMode: triggerData.activationMode === 'scheduled' ? 'scheduled' : 'webhook',
       cronExpression: triggerData.cronExpression,
       cronTimezone: triggerData.cronTimezone,
       githubRepo: triggerData.githubRepo ?? '',
-      mode: (triggerData.mode ?? 'code') as AgentMode,
+      mode: triggerData.mode ?? 'code',
       model: triggerData.model ?? '',
+      variant: triggerData.variant ?? undefined,
+      sandboxAllocation: triggerData.sandboxAllocation ?? undefined,
       promptTemplate: triggerData.promptTemplate,
       profileId: triggerData.profileId ?? undefined,
+      environmentId: triggerData.environmentId,
+      bodySchema: triggerData.bodySchema,
       autoCommit: triggerData.autoCommit ?? undefined,
       condenseOnComplete: triggerData.condenseOnComplete ?? undefined,
       isActive: triggerData.isActive,
@@ -159,8 +190,12 @@ export function EditWebhookTriggerContent({
         cronTimezone: formData.cronTimezone,
         mode: formData.mode,
         model: formData.model,
+        variant: formData.variant,
+        sandboxAllocation: formData.sandboxAllocation,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
+        environmentId: formData.environmentId,
+        bodySchema: formData.bodySchema,
         autoCommit: formData.autoCommit ?? null,
         condenseOnComplete: formData.condenseOnComplete ?? null,
         isActive: formData.isActive,
@@ -174,6 +209,25 @@ export function EditWebhookTriggerContent({
       });
     },
     [updateTrigger, organizationId]
+  );
+
+  const handleSaveAndInvoke = useCallback(
+    async (formData: TriggerFormData) => {
+      if (saveAndInvokeInFlightRef.current) return;
+
+      saveAndInvokeInFlightRef.current = true;
+      setIsSaveAndInvoking(true);
+      try {
+        await handleSubmit(formData);
+        await invokeTrigger(formData.triggerId);
+      } catch {
+        return;
+      } finally {
+        saveAndInvokeInFlightRef.current = false;
+        setIsSaveAndInvoking(false);
+      }
+    },
+    [handleSubmit, invokeTrigger]
   );
 
   // Handle cancel
@@ -268,7 +322,91 @@ export function EditWebhookTriggerContent({
     );
   }
 
+  if (triggerData?.canEdit === false) {
+    const creatorRunLock = triggerData.canEditReason === 'creator_run';
+    return (
+      <>
+        <div className="mb-6">
+          <div className="mb-4">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={routes.list}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Webhooks / Triggers
+              </Link>
+            </Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <Webhook className="h-8 w-8" />
+            <h1 className="text-3xl font-bold">{triggerId}</h1>
+          </div>
+          <p className="text-muted-foreground mt-2">
+            {creatorRunLock
+              ? 'This trigger runs as its creator. Only the creator, an organization owner, or an admin can edit it.'
+              : 'Your organization role does not allow editing webhook triggers.'}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={routes.requests(triggerId)}>
+                <ExternalLink className="mr-2 h-4 w-4" />
+                View Captured Requests
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Trigger Details</CardTitle>
+            <CardDescription>
+              {creatorRunLock
+                ? 'Editing is restricted to the trigger creator, organization owners, and admins.'
+                : 'Ask an organization owner or admin if this trigger needs a change.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-muted-foreground text-xs font-medium uppercase">Webhook URL</p>
+              <code className="bg-muted mt-1 block truncate rounded-md px-3 py-2 text-xs">
+                {triggerData.inboundUrl}
+              </code>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs font-medium uppercase">Status</p>
+              <p className="mt-1 text-sm">
+                {triggerData.isActive ? (
+                  <Badge
+                    variant="outline"
+                    className="border-green-500/30 bg-green-500/15 text-green-400"
+                  >
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/30 bg-amber-500/15 text-amber-400"
+                  >
+                    Paused
+                  </Badge>
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs font-medium uppercase">Prompt Template</p>
+              <pre className="bg-muted mt-1 whitespace-pre-wrap rounded-md px-3 py-2 text-xs">
+                {triggerData.promptTemplate}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      </>
+    );
+  }
+
   const isKiloclawChat = triggerData?.targetType === 'kiloclaw_chat';
+  const isScheduled = triggerData?.activationMode === 'scheduled';
+  const isInvokePending = isInvoking && invokingTriggerId === triggerId;
+  const isActionPending =
+    isUpdatePending || isDeletePending || isInvokePending || isSaveAndInvoking;
 
   return (
     <>
@@ -301,7 +439,7 @@ export function EditWebhookTriggerContent({
         </p>
 
         {/* Link to view captured requests */}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href={routes.requests(triggerId)}>
               <ExternalLink className="mr-2 h-4 w-4" />
@@ -311,6 +449,23 @@ export function EditWebhookTriggerContent({
           {isKiloclawChat && (
             <Button variant="outline" size="sm" asChild>
               <Link href="/claw/settings">Manage in KiloClaw Settings</Link>
+            </Button>
+          )}
+          {triggerData?.targetType === 'cloud_agent_chat' && triggerData.isActive && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isActionPending}
+              onClick={() => {
+                if (!window.confirm('Pause this trigger? Unsaved changes will be discarded.')) {
+                  return;
+                }
+                void updateTrigger({ triggerId, organizationId, isActive: false }).catch(
+                  () => undefined
+                );
+              }}
+            >
+              Pause trigger
             </Button>
           )}
         </div>
@@ -378,10 +533,18 @@ export function EditWebhookTriggerContent({
           repositoriesError={repoError?.message}
           models={modelOptions}
           isLoadingModels={isLoadingModels}
+          canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+          sandboxSelection={capabilities?.sandboxSelection}
+          isLoadingCapabilities={isLoadingCapabilities}
+          hasCapabilitiesError={hasCapabilitiesError}
+          onRetryCapabilities={() => void refetchCapabilities()}
           onSubmit={handleSubmit}
+          onSaveAndInvoke={
+            !isKiloclawChat && isScheduled && triggerData?.canRun ? handleSaveAndInvoke : undefined
+          }
           onCancel={handleCancel}
           onDelete={handleDelete}
-          isLoading={isUpdatePending || isDeletePending}
+          isLoading={isActionPending}
           inboundUrl={triggerData?.inboundUrl}
         />
       )}

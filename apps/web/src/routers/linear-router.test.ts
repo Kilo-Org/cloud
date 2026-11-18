@@ -1,8 +1,10 @@
 // Stub the Linear config module before the router imports linear-service,
 // which reads these values at module load time.
-import type * as ConfigServerModule from '@/lib/config.server';
-jest.mock('@/lib/config.server', () => {
-  const actual = jest.requireActual<typeof ConfigServerModule>('@/lib/config.server');
+import type * as ConfigServerModule from '@kilocode/web-shared/lib/config.server';
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual = jest.requireActual<typeof ConfigServerModule>(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     LINEAR_CLIENT_ID: 'linear-client-id-test',
@@ -13,12 +15,12 @@ jest.mock('@/lib/config.server', () => {
 
 import { describe, test, expect, beforeAll } from '@jest/globals';
 import type { User, Organization } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
 describe('linearRouter authorization', () => {
   let owner: User;

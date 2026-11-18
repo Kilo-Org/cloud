@@ -1,0 +1,22 @@
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  apiKeyUpstream,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+
+export default {
+  id: 'zai-coding',
+  openrouter_inference_provider_id: 'z-ai',
+  models_dev_id: 'zai-coding-plan',
+  ...apiKeyUpstream({
+    apiUrl: 'https://api.z.ai/api/coding/paas/v4',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
+  transformRequest(context) {
+    applyThinkingToggleAndReasoningEffort(context.request);
+  },
+  models: cachedDirectByokModelList('zai-coding'),
+} satisfies DirectByokProvider;

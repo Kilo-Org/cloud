@@ -1,61 +1,69 @@
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Bell, Clock, Cpu, FolderGit2, Zap } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
-import { Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { SettingsOverviewSkeleton } from '@/components/security-agent/settings-overview-skeleton';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
+import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
+import {
+  getDisabledCopy,
+  repoCountCopy,
+  settingsEnabledCounts,
+} from '@/components/security-agent/settings-overview-copy';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import {
+  useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { capitalize } from '@/lib/utils';
 
-function SettingsOverviewSkeleton() {
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Settings" />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-      </View>
-    </View>
-  );
-}
+const ANALYSIS_MODE_KEYS = {
+  auto: 'securityAgent.analysisMode.auto',
+  shallow: 'securityAgent.analysisMode.shallow',
+  deep: 'securityAgent.analysisMode.deep',
+};
 
-type SettingsOverviewPresentation = 'inline' | 'route';
-
-function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string {
-  if (!canManage) {
-    return 'Security Agent is disabled. Only organization owners and billing managers can turn it on.';
-  }
-  if (!hasEffectiveRepo) {
-    return 'Select at least one repository before enabling Security Agent.';
-  }
-  return 'Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation.';
-}
+// The loading state lives in its own module (`settings-overview-skeleton`) so
+// the settled screen keeps under the file-length cap; the settled subtitles
+// live in `settings-overview-copy` for the same cap.
 
 export function SettingsOverviewScreen({
   scope,
   presentation = 'inline',
-}: Readonly<{ scope: string; presentation?: SettingsOverviewPresentation }>) {
+  permissionError = false,
+}: Readonly<{
+  scope: string;
+  presentation?: 'inline' | 'route';
+  permissionError?: boolean;
+}>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
+  const { t } = useTranslation();
   const config = useSecurityAgentConfig(scope);
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  const connectivity = useCommittedConnectivityStatus();
+  const isConnectivityKnown = connectivity !== 'unknown';
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const repositories = useSecurityAgentRepositories(scope);
+  const recovery = useRetrySecurityAgentSettings(scope);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -72,26 +80,71 @@ export function SettingsOverviewScreen({
     trackRef.current({ interaction: 'settings_config_viewed' });
   }, []);
 
-  if (config.isError && !config.data) {
+  // A successful probe can confirm online while NetInfo still pauses queries.
+  const configUnavailable =
+    !config.data &&
+    (recovery.isRetrying ||
+      config.isError ||
+      (config.fetchStatus === 'paused' && isConnectivityKnown));
+  const capabilityUnavailable =
+    capability.status === 'error' ||
+    (capability.status === 'loading' &&
+      (recovery.isRetrying || (capability.fetchStatus === 'paused' && isConnectivityKnown)));
+  const repositoriesLoading = repositories.isLoading || recovery.isRetrying;
+  const repositoriesError =
+    repositories.isError ||
+    (!repositories.data && repositories.fetchStatus === 'paused' && isConnectivityKnown);
+  let recoveryError: string | undefined = undefined;
+  if (configUnavailable || config.isError) {
+    recoveryError = t('securityAgent.settingsOverview.couldNotLoadSettings');
+  } else if (capabilityUnavailable || permissionError || capability.isError) {
+    recoveryError = t('securityAgent.settingsOverview.couldNotLoadPermissions');
+  } else if (repositoriesError) {
+    recoveryError = t('common.couldNotLoadRepositories');
+  }
+  // The failed read determines the branch, so each failure reads only its own
+  // error. A retry of a no-data read downgrades it back to pending and clears
+  // its error (v5, see `use-available-models`), so deriving from an in-flight
+  // read would flip the presentation mid-retry. Only a settled failure — an
+  // errored read, or a read paused by a connectivity the app has confirmed —
+  // re-derives the variant; every other state (a retry in flight, a loading
+  // read) keeps the last settled answer, and a first render before any settled
+  // failure paints the server default.
+  const settledFailure = (error: unknown, fetchStatus: string) =>
+    classifyReadFailureVariant({
+      errors: error ? [error] : [],
+      isPaused: fetchStatus === 'paused',
+      connectivity,
+    }) as 'offline' | 'server';
+  const settledVariantRef = useRef<'offline' | 'server' | null>(null);
+  if (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown)) {
+    settledVariantRef.current = settledFailure(config.error, config.fetchStatus);
+  } else if (capability.isError || (capability.fetchStatus === 'paused' && isConnectivityKnown)) {
+    settledVariantRef.current = settledFailure(capability.error, capability.fetchStatus);
+  }
+  const variant = settledVariantRef.current ?? 'server';
+  if (configUnavailable || capabilityUnavailable) {
     return (
       <PlatformErrorScreen
-        title="Settings"
-        variant="offline"
-        message="Could not load Security Agent settings"
-        onRetry={() => void config.refetch()}
+        title={t('securityAgent.dashboard.settings')}
+        variant={variant}
+        message={recoveryError}
+        onRetry={() => void recovery.retry()}
+        isRetrying={recovery.isRetrying}
       />
     );
   }
-  if (config.isLoading || !config.data) {
-    return <SettingsOverviewSkeleton />;
+  if (config.isLoading || !config.data || capability.status === 'loading') {
+    return <SettingsOverviewSkeleton scope={scope} />;
   }
 
   const data = config.data;
-  // Distinguish a settled-empty repo set from a still-loading or failed one:
-  // a loading or failed query must not read as "zero repositories".
+  // A loading or failed repository query must not read as zero repositories.
   const repositoriesEmpty = repositories.data?.length === 0;
-  const repositoriesLoading = repositories.isLoading;
-  const repositoriesError = repositories.isError;
+  // Only a settled empty answer names the grant as the next step: a stale `[]`
+  // under a failed refetch, or a read still in flight, keeps the recovery
+  // status and the generic picker copy instead.
+  const repositoriesSettledEmpty = repositoriesEmpty && !repositoriesLoading && !repositoriesError;
   // An enable attempt with no effective repository would be refused by the
   // server, so the switch is disabled up front under the same rule: `selected`
   // mode with zero selected ids, or `all` mode with zero integration repos.
@@ -99,29 +152,29 @@ export function SettingsOverviewScreen({
     data.repositorySelectionMode === 'all'
       ? (repositories.data?.length ?? 0) > 0
       : data.selectedRepositoryIds.length > 0;
-  // A disabled agent with integration repos but no effective selection is the
-  // first-enable deadlock: the switch is disabled (the server would refuse an
-  // empty effective set) and the Repositories row only renders when enabled, so
-  // offer a direct path to the repo picker. Hide the CTA only when the repo set
-  // is settled and empty (nothing to select); a loading or failed repo query
-  // keeps the CTA reachable.
-  const showRepoCta = !data.isEnabled && canManage && !hasEffectiveRepo && !repositoriesEmpty;
-  const repoCountLabel =
-    data.repositorySelectionMode === 'all'
-      ? 'All repositories'
-      : `${data.selectedRepositoryIds.length} ${data.selectedRepositoryIds.length === 1 ? 'repository' : 'repositories'} selected`;
-  const automationEnabledCount = [
-    data.autoAnalysisEnabled,
-    data.autoRemediationEnabled,
-    data.autoDismissEnabled,
-  ].filter(Boolean).length;
-  const notificationsEnabledCount = [
-    data.newFindingNotificationsEnabled,
-    data.slaNotificationsEnabled,
-  ].filter(Boolean).length;
+  // A disabled agent with no effective selection is the first-enable deadlock:
+  // the switch is disabled (the server would refuse an empty effective set) and
+  // the Repositories row only renders when enabled, so offer a direct path to
+  // the repo picker. That path must stay reachable when the GitHub App grant is
+  // settled and empty — there is nothing to select yet, and widening the grant
+  // is the only way out, so hiding the CTA there left the page with no way to
+  // grant repositories and no way to turn the agent back on.
+  const showRepoCta = !data.isEnabled && capability.canManage && !hasEffectiveRepo;
+  const repoCountLabel = repoCountCopy({
+    selectionMode: data.repositorySelectionMode,
+    selectionCount: data.selectedRepositoryIds.length,
+    language: i18n.language,
+    grantsSettledEmpty: repositoriesSettledEmpty,
+  });
+  const { automation: automationEnabledCount, notifications: notificationsEnabledCount } =
+    settingsEnabledCounts(data);
+  const analysisModeLabel = Object.hasOwn(ANALYSIS_MODE_KEYS, data.analysisMode)
+    ? t(ANALYSIS_MODE_KEYS[data.analysisMode])
+    : data.analysisMode;
 
+  // The haptic on toggle belongs to `ToggleRow`, which owns the press for this
+  // row — firing one here too would fire it twice for a single tap.
   const handleToggle = (value: boolean) => {
-    void Haptics.selectionAsync();
     // When this screen is the PUSHED settings route (reached from the
     // Dashboard's Settings button), toggling OFF makes the base
     // `[scope]/index` re-derive to `disabled-settings` too — leaving two
@@ -155,128 +208,157 @@ export function SettingsOverviewScreen({
   // connected-but-disabled counterpart: settings-overview-screen is where
   // scope-entry redirects once the agent is disabled, so the same action
   // needs to be reachable here too.
-  const auditAction = canManage ? <AuditReportButton scope={scope} /> : null;
+  const auditAction = capability.canManage ? <AuditReportButton scope={scope} /> : null;
 
-  // Render the disabled-agent copy in three states: a still-loading repo set
-  // (skeleton), a failed repo set (error + Retry), or a settled set (copy).
+  // Keep progress and Retry visible without hiding cached settings when any
+  // settings query fails, even if repositories recover during that attempt.
   const renderRepositoryStatus = () => {
-    if (data.repositorySelectionMode === 'all' && repositoriesLoading) {
-      return <Skeleton className="h-4 w-56 rounded" />;
-    }
-    if (data.repositorySelectionMode === 'all' && repositoriesError) {
+    if (recoveryError || recovery.isRetrying) {
       return (
-        <View className="flex-row items-center gap-2">
-          <Text variant="muted" className="text-xs">
-            Could not load repositories
-          </Text>
-          <Text
-            className="text-xs font-medium text-primary"
-            onPress={() => void repositories.refetch()}
-          >
-            Retry
-          </Text>
-        </View>
+        <SettingsRecoveryStatus
+          message={recoveryError}
+          isRetrying={recovery.isRetrying}
+          onRetry={() => void recovery.retry()}
+        />
       );
+    }
+    if (repositoriesLoading) {
+      return <Skeleton className="h-4 w-56 rounded" />;
     }
     return (
       <Text variant="muted" className="text-xs">
-        {getDisabledCopy(canManage, hasEffectiveRepo)}
+        {getDisabledCopy(capability.canManage, hasEffectiveRepo)}
       </Text>
     );
   };
 
+  // The settings card is a control surface, not an empty state, so it stays
+  // top-aligned in both enabled and disabled states — matching the Account
+  // settings list and the loading skeleton. Centring it left a large void
+  // above the card (explorer security-agent-settings, 2026-09-20).
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Settings" headerRight={auditAction} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
-        <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-          <View className="flex-1 pr-3">
-            <Text className="text-sm font-medium">Security Agent</Text>
-            <Text variant="muted" className="text-xs">
-              {data.isEnabled ? repoCountLabel : 'Disabled'}
-            </Text>
-          </View>
-          {canManage ? (
-            <Switch
-              accessibilityLabel="Security Agent"
+      <ScreenHeader
+        className="px-6"
+        title={t('securityAgent.dashboard.settings')}
+        // One size-11 (44dp) audit icon; declaring it keeps the one-line
+        // title's readable minimum when the row is narrow.
+        headerRightWidth={44}
+        headerRight={auditAction}
+      />
+      <TabScreenScrollView className="flex-1">
+        <View className="gap-6 px-6 py-4">
+          {capability.canManage ? (
+            <ToggleRow
+              title={t('common.securityAgent')}
               value={data.isEnabled}
               disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
               onValueChange={handleToggle}
             />
           ) : (
-            <Text variant="muted" className="text-xs">
-              {data.isEnabled ? 'Enabled' : 'Disabled'}
-            </Text>
+            <View className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-4">
+              {/* The gap between the title and the state comes from the row, not
+                  from a padding on the title's own side: a physical padding
+                  lands on the title's inline start under RTL, where the text
+                  then hangs past the box it was reserved for. */}
+              <View className="flex-1">
+                <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
+              </View>
+              <Text variant="muted" className="text-xs">
+                {data.isEnabled ? t('common.enabled') : t('common.disabled')}
+              </Text>
+            </View>
           )}
-        </View>
 
-        {!data.isEnabled && (
-          <View className="gap-3">
-            {renderRepositoryStatus()}
-            {showRepoCta ? (
+          {(!data.isEnabled || repositoriesLoading || recoveryError) && (
+            <View className="gap-3">
+              {renderRepositoryStatus()}
+              {showRepoCta ? (
+                <ConfigureRow
+                  icon={FolderGit2}
+                  title={t('common.selectRepositories')}
+                  // No count subtitle: this row renders only without an
+                  // effective selection, so a saved count would always read
+                  // zero. A settled empty grant is the one state that names the
+                  // real next step instead — there is nothing to select, so
+                  // widening the GitHub App grant is the only way out.
+                  subtitle={
+                    repositoriesSettledEmpty
+                      ? t('securityAgent.repositories.noRepositoriesDescription')
+                      : undefined
+                  }
+                  onPress={() => {
+                    pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+                  }}
+                />
+              ) : null}
+            </View>
+          )}
+
+          {data.isEnabled && (
+            <View>
               <ConfigureRow
                 icon={FolderGit2}
-                title="Select repositories"
-                subtitle="Choose which repositories Security Agent monitors"
+                title={t('common.repositories')}
+                subtitle={repoCountLabel}
                 onPress={() => {
-                  router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+                  pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                 }}
               />
-            ) : null}
-          </View>
-        )}
-
-        {data.isEnabled && (
-          <View>
-            <ConfigureRow
-              icon={FolderGit2}
-              title="Repositories"
-              subtitle={repoCountLabel}
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/repositories'));
-              }}
-            />
-            <ConfigureRow
-              icon={Cpu}
-              title="Models & analysis"
-              subtitle={`${capitalize(data.analysisMode)} analysis`}
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/analysis'));
-              }}
-            />
-            <ConfigureRow
-              icon={Zap}
-              title="Automation"
-              subtitle={
-                automationEnabledCount === 0 ? 'All off' : `${automationEnabledCount} of 3 enabled`
-              }
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/automation'));
-              }}
-            />
-            <ConfigureRow
-              icon={Bell}
-              title="Notifications"
-              subtitle={
-                notificationsEnabledCount === 0
-                  ? 'Off'
-                  : `${notificationsEnabledCount} of 2 enabled`
-              }
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/notifications'));
-              }}
-            />
-            <ConfigureRow
-              icon={Clock}
-              title="SLA policy"
-              subtitle={data.slaEnabled ? 'On' : 'Off'}
-              last
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/sla'));
-              }}
-            />
-          </View>
-        )}
+              <ConfigureRow
+                icon={Cpu}
+                title={t('securityAgent.analysisSettings.title')}
+                subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
+                  mode: analysisModeLabel,
+                })}
+                onPress={() => {
+                  pushOnce(getSecurityAgentPath(scope, 'settings/analysis'));
+                }}
+              />
+              <ConfigureRow
+                icon={Zap}
+                title={t('securityAgent.automation.title')}
+                subtitle={
+                  automationEnabledCount === 0
+                    ? t('securityAgent.settingsOverview.automationAllOff')
+                    : t('securityAgent.settingsOverview.automationCount', {
+                        count: automationEnabledCount,
+                        displayCount: formatNumber(automationEnabledCount, i18n.language),
+                      })
+                }
+                onPress={() => {
+                  pushOnce(getSecurityAgentPath(scope, 'settings/automation'));
+                }}
+              />
+              <ConfigureRow
+                icon={Bell}
+                title={t('common.notifications')}
+                subtitle={
+                  notificationsEnabledCount === 0
+                    ? t('common.off')
+                    : t('securityAgent.settingsOverview.notificationsCount', {
+                        count: notificationsEnabledCount,
+                        displayCount: formatNumber(notificationsEnabledCount, i18n.language),
+                      })
+                }
+                onPress={() => {
+                  pushOnce(getSecurityAgentPath(scope, 'settings/notifications'));
+                }}
+              />
+              <ConfigureRow
+                icon={Clock}
+                title={t('securityAgent.sla.title')}
+                subtitle={
+                  data.slaEnabled ? t('securityAgent.settingsOverview.on') : t('common.off')
+                }
+                last
+                onPress={() => {
+                  pushOnce(getSecurityAgentPath(scope, 'settings/sla'));
+                }}
+              />
+            </View>
+          )}
+        </View>
       </TabScreenScrollView>
     </View>
   );

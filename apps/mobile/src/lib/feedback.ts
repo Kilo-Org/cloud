@@ -1,14 +1,14 @@
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import * as Application from 'expo-application';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as StoreReview from 'expo-store-review';
 import { Alert, Linking, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { captureEvent, FEEDBACK_SUBMITTED_EVENT } from '@/lib/analytics/posthog';
 import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
-import { REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
-
-const SUPPORT_EMAIL = 'hi@kilo.ai';
+import { FEEDBACK_LAST_ASKED_AT_KEY, REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
 
 const STORE_REVIEW_URL = Platform.select({
   ios: 'https://apps.apple.com/app/id6761193135?action=write-review',
@@ -22,11 +22,11 @@ async function openSupportEmail(userId: string | undefined) {
     `OS: ${Platform.OS} ${Platform.Version}`,
   ].join('\n');
   const body = `\n\n---\n${envDetails}`;
-  const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('mobile app feedback')}&body=${encodeURIComponent(body)}`;
+  const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(i18n.t('feedback.emailSubject'))}&body=${encodeURIComponent(body)}`;
   try {
     await Linking.openURL(url);
   } catch {
-    toast.error(`No email app available. You can reach us at ${SUPPORT_EMAIL}`);
+    toast.error(i18n.t('feedback.noEmailApp', { email: SUPPORT_EMAIL }));
   }
 }
 
@@ -64,50 +64,86 @@ async function rateApp() {
   try {
     await Linking.openURL(STORE_REVIEW_URL);
   } catch {
-    toast.error('Could not open the store.');
+    toast.error(i18n.t('feedback.couldNotOpenStore'));
   }
 }
 
-export function showFeedbackPrompt(userId: string | undefined) {
-  Alert.alert('How are you liking the Kilo app?', undefined, [
-    { text: 'Cancel', style: 'cancel' },
-    {
-      text: 'I like it',
-      onPress: () => {
-        captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'positive' });
-        Alert.alert(
-          "We're glad to hear that!",
-          'A store review would help us out immensely. Thanks for using Kilo!',
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Rate Kilo',
-              onPress: () => {
-                void rateApp();
-              },
-            },
-          ]
-        );
+/** The prompt's positive answer: record it and open the store review flow. */
+export function requestAppRating() {
+  captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'positive' });
+  void rateApp();
+}
+
+/** The prompt's negative answer: record it and open the support email draft. */
+export function sendAppFeedback(userId: string | undefined) {
+  captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'negative' });
+  void openSupportEmail(userId);
+}
+
+/**
+ * The native alert. It presents regardless of whether the caller's tree is
+ * still mounted, so it reports `true` — `maybeAskAfterSuccessfulOutcome` takes
+ * this as the prompt's default surface.
+ */
+export function showFeedbackPrompt(userId: string | undefined): boolean {
+  Alert.alert(
+    i18n.t('feedback.neutralTitle'),
+    undefined,
+    [
+      { text: i18n.t('common.notNow'), style: 'cancel' },
+      {
+        text: i18n.t('feedback.rateTheApp'),
+        onPress: requestAppRating,
       },
-    },
-    {
-      text: 'Needs work',
-      onPress: () => {
-        captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'negative' });
-        Alert.alert(
-          "We're sorry to hear that!",
-          'Please let us know what needs to be better. The engineer in charge of the app reads every single report!',
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Email us',
-              onPress: () => {
-                void openSupportEmail(userId);
-              },
-            },
-          ]
-        );
+      {
+        text: i18n.t('feedback.sendFeedback'),
+        onPress: () => {
+          sendAppFeedback(userId);
+        },
       },
-    },
-  ]);
+    ],
+    // Android back dismisses, which equals Not now: nothing opens, and the
+    // one-time marker is already consumed either way.
+    { cancelable: true }
+  );
+  return true;
+}
+
+// One-time neutral prompt after an authoritative success (for example, a full
+// PR review submit). The last-asked marker absent-check and write run inside
+// one per-key chain, so concurrent calls observe the marker atomically: only
+// the first call presents and later calls skip it.
+//
+// `present` is where the prompt appears — the native alert by default, or the
+// caller's in-app surface on Android (`feedback-prompt-platform.ts`). It is
+// invoked inside the claim, so only the call that wins the marker presents, and
+// it reports whether it actually presented. The answer may be deferred: the
+// in-app dialog reports `true` only once its `Modal` confirms it is shown, and
+// reports `false` when its host unmounts first. A `false` leaves the marker
+// unset, and the next successful outcome asks again instead of losing the
+// one-time prompt silently.
+//
+// Best effort: the caller fires this without awaiting, so a stored-marker
+// failure (reported at warning level by the metadata helper) must not surface
+// as an unhandled rejection — the prompt is a convenience and the next success
+// asks again.
+export async function maybeAskAfterSuccessfulOutcome(
+  userId: string | undefined,
+  present: (userId: string | undefined) => boolean | Promise<boolean> = showFeedbackPrompt
+): Promise<void> {
+  try {
+    await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
+      const alreadyAsked = await SecureStore.getItemAsync(FEEDBACK_LAST_ASKED_AT_KEY);
+      if (alreadyAsked != null) {
+        return;
+      }
+      if (!(await present(userId))) {
+        return;
+      }
+      await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());
+    });
+  } catch {
+    // Reported by the account-metadata write; the prompt is not user-actionable
+    // here and the next successful outcome asks again.
+  }
 }

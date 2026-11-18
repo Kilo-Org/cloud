@@ -20,8 +20,6 @@ import {
 } from '@/src/shared/agent-workflows-storage';
 import type { AgentWorkflowsStorageArea } from '@/src/shared/agent-workflows-storage';
 
-// ---------- types ----------
-
 /* AutoApproved is true only for saves applied without a card, enabled by the
    per-kind auto-approve setting. Every card approval reports false. */
 export type ApprovalOutcome =
@@ -46,23 +44,17 @@ export type PendingApprovalEntry =
       settle: (outcome: ApprovalOutcome) => void;
     };
 
-// ---------- atom ----------
-
 export const pendingApprovalAtom = atom<PendingApprovalEntry | undefined>();
 
 // Synchronous single-flight lock set before persisting, cleared on settle or persist failure.
 const pendingLockAtom = atom<boolean>(false);
 export { pendingLockAtom };
 
-// ---------- shared storage type ----------
-
 /* Unified storage area that satisfies the memory, memory-settings, and
    workflow storage contracts. */
 type UnifiedStorage = AgentMemoriesStorageArea &
   AgentMemorySettingsStorageArea &
   AgentWorkflowsStorageArea;
-
-// ---------- draft persistence helpers ----------
 
 const isMemoryDraft = (
   draft: ApprovalDraft | Record<string, unknown>
@@ -95,8 +87,6 @@ const clearDraft = async (storage: UnifiedStorage, kind: ApprovalKind): Promise<
   }
   await clearPendingWorkflowDraft(storage);
 };
-
-// ---------- public API ----------
 
 /**
  * Persist a save decision.
@@ -154,7 +144,6 @@ export const applyApprovalDecision = async (
     }
   }
 
-  // Workflow persistence.
   if (!isWorkflowDraft(draft)) {
     return { reason: 'Approval draft does not match its kind.', status: 'failed' };
   }
@@ -182,13 +171,11 @@ export const applyApprovalDecision = async (
 
   try {
     if (workflowDraft.workflowId !== undefined) {
-      // Update existing workflow.
       const updated = await updateAgentWorkflow(storage, workflowDraft.workflowId, input);
       await clearPendingWorkflowDraft(storage);
       return { autoApproved: false, savedId: updated.id, status: 'approved' };
     }
 
-    // Create new workflow.
     const saved = await addAgentWorkflow(storage, input);
     await clearPendingWorkflowDraft(storage);
     return { autoApproved: false, savedId: saved.id, status: 'approved' };
@@ -229,7 +216,6 @@ export const requestApproval = async (
 ): Promise<ApprovalOutcome> => {
   const atomStore = getDefaultStore();
 
-  // Single-flight check using a synchronous lock.
   if (atomStore.get(pendingLockAtom)) {
     return { reason: 'Another approval is already pending.', status: 'failed' };
   }
@@ -270,7 +256,6 @@ export const requestApproval = async (
     }
   }
 
-  // Persist the draft FIRST. If persist fails, clear the lock and return failed.
   try {
     await persistDraft(storage, kind, draft);
   } catch (error) {
@@ -308,7 +293,6 @@ export const requestApproval = async (
 
     signal.addEventListener('abort', onAbort, { once: true });
 
-    // Set the atom entry synchronously so the card can render it.
     // Branch on kind so TypeScript can narrow the discriminated union.
     if (kind === 'memory' && isMemoryDraft(draft)) {
       const memoryDraft = draft;

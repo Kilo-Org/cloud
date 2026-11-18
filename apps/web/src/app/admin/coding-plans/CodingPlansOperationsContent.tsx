@@ -41,6 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { SubscriptionStatusBadge } from '@/components/subscriptions/SubscriptionStatusBadge';
 import {
   canSubmitExtensionDays,
+  canSubmitReduceCount,
   getCancelSubscriptionDialogCopy,
   getCodingPlanInsights,
   getCodingPlanProviderDisplayName,
@@ -48,11 +49,17 @@ import {
   getInventoryReplacementCompleteToast,
   getInventoryReplacementDialogCopy,
   getPlanPerformanceRows,
+  getReduceInventoryCompleteToast,
+  getReduceInventoryDialogCopy,
   getReplacementCompleteToast,
   getReplacementDialogCopy,
   getRevocationCompleteToast,
   getRevocationDialogCopy,
   getSubscriptionSummaryItems,
+  getSwapCredentialCompleteToast,
+  getSwapCredentialDialogCopy,
+  getTerminateSubscriptionCompleteToast,
+  getTerminateSubscriptionDialogCopy,
   type InsightsRangeDays,
 } from '@/app/admin/coding-plans/coding-plan-operations';
 import {
@@ -62,7 +69,7 @@ import {
   getCodingPlanBillingDate,
   getCodingPlanDisplayStatus,
 } from '@/components/subscriptions/helpers';
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { useTRPC } from '@/lib/trpc/utils';
 
@@ -79,8 +86,12 @@ type OperationsState = {
   inventoryReplacementApiKey: string;
   inventoryReplacementConfirmOpen: boolean;
   cancelSelection: AdminCodingPlanSubscriptionItem | null;
+  terminateSelection: AdminCodingPlanSubscriptionItem | null;
   extendSelection: AdminCodingPlanSubscriptionItem | null;
   extendDays: string;
+  swapSelection: AdminCodingPlanSubscriptionItem | null;
+  reduceSelection: ReduceInventorySelection | null;
+  reduceCount: string;
 };
 
 const EMPTY_SUBSCRIPTION_SUMMARY = {
@@ -118,8 +129,12 @@ const INITIAL_OPERATIONS_STATE: OperationsState = {
   inventoryReplacementApiKey: '',
   inventoryReplacementConfirmOpen: false,
   cancelSelection: null,
+  terminateSelection: null,
   extendSelection: null,
   extendDays: '7',
+  swapSelection: null,
+  reduceSelection: null,
+  reduceCount: '1',
 };
 
 function updateOperationsState(state: OperationsState, update: Partial<OperationsState>) {
@@ -141,8 +156,12 @@ export function CodingPlansOperationsContent() {
     inventoryReplacementApiKey,
     inventoryReplacementConfirmOpen,
     cancelSelection,
+    terminateSelection,
     extendSelection,
     extendDays,
+    swapSelection,
+    reduceSelection,
+    reduceCount,
   } = state;
   const [subscriptionPage, setSubscriptionPage] = useState(1);
   const [subscriptionSearchDraft, setSubscriptionSearchDraft] = useState('');
@@ -166,9 +185,16 @@ export function CodingPlansOperationsContent() {
     updateState({ inventoryReplacementConfirmOpen });
   const setCancelSelection = (cancelSelection: AdminCodingPlanSubscriptionItem | null) =>
     updateState({ cancelSelection });
+  const setTerminateSelection = (terminateSelection: AdminCodingPlanSubscriptionItem | null) =>
+    updateState({ terminateSelection });
   const setExtendSelection = (extendSelection: AdminCodingPlanSubscriptionItem | null) =>
     updateState({ extendSelection });
   const setExtendDays = (extendDays: string) => updateState({ extendDays });
+  const setSwapSelection = (swapSelection: AdminCodingPlanSubscriptionItem | null) =>
+    updateState({ swapSelection });
+  const setReduceSelection = (reduceSelection: ReduceInventorySelection | null) =>
+    updateState({ reduceSelection });
+  const setReduceCount = (reduceCount: string) => updateState({ reduceCount });
 
   const countsQuery = useQuery(trpc.codingPlans.adminKeyInventory.queryOptions({}));
   const queueQuery = useQuery(trpc.codingPlans.adminRevocationQueue.queryOptions({}));
@@ -255,6 +281,16 @@ export function CodingPlansOperationsContent() {
       onError: error => toast.error(error.message || 'Unable to cancel subscription.'),
     })
   );
+  const terminateMutation = useMutation(
+    trpc.codingPlans.adminTerminateSubscription.mutationOptions({
+      onSuccess: async () => {
+        setTerminateSelection(null);
+        toast.success(getTerminateSubscriptionCompleteToast());
+        await refreshOperations();
+      },
+      onError: error => toast.error(error.message || 'Unable to terminate subscription.'),
+    })
+  );
   const extendMutation = useMutation(
     trpc.codingPlans.adminExtendSubscriptionPeriod.mutationOptions({
       onSuccess: async result => {
@@ -268,11 +304,41 @@ export function CodingPlansOperationsContent() {
       onError: error => toast.error(error.message || 'Unable to extend subscription.'),
     })
   );
+  const swapMutation = useMutation(
+    trpc.codingPlans.adminReassignSubscriptionCredential.mutationOptions({
+      onSuccess: async () => {
+        setSwapSelection(null);
+        toast.success(getSwapCredentialCompleteToast());
+        await refreshOperations();
+      },
+      onError: error => toast.error(error.message || 'Unable to swap the subscription credential.'),
+    })
+  );
+  const reduceMutation = useMutation(
+    trpc.codingPlans.adminReduceInventory.mutationOptions({
+      onSuccess: async (result, variables) => {
+        setReduceSelection(null);
+        setReduceCount('1');
+        toast.success(
+          getReduceInventoryCompleteToast(
+            result.queued.length,
+            variables.count,
+            result.queued.map(item => item.upstreamPlanId)
+          )
+        );
+        await refreshOperations();
+      },
+      onError: error => toast.error(error.message || 'Unable to queue inventory for removal.'),
+    })
+  );
   const submittedEntries = entriesText
     .split('\n')
     .map(entry => entry.trim())
     .filter(entry => entry.length > 0);
   const canSubmitExtend = canSubmitExtensionDays(extendDays);
+  const canSubmitReduce = reduceSelection
+    ? canSubmitReduceCount(reduceCount, reduceSelection.availableCount)
+    : false;
 
   useEffect(() => {
     const normalizedPage = subscriptionsQuery.data?.pagination.page;
@@ -313,6 +379,11 @@ export function CodingPlansOperationsContent() {
   const totalCredentialCount = inventoryCounts.reduce((total, item) => total + item.count, 0);
   const countCredentialsByStatus = (status: string) =>
     inventoryCounts.reduce((total, item) => total + (item.status === status ? item.count : 0), 0);
+  const availableCountsByPlan = inventoryCounts.reduce<Record<string, number>>((totals, item) => {
+    if (item.status !== 'available') return totals;
+    totals[item.planId] = (totals[item.planId] ?? 0) + item.count;
+    return totals;
+  }, {});
   const inventorySummary = [
     {
       label: 'Total credentials in system',
@@ -429,10 +500,13 @@ export function CodingPlansOperationsContent() {
             }}
             onPageChange={setSubscriptionPage}
             onCancel={setCancelSelection}
+            onTerminate={setTerminateSelection}
             onExtend={item => {
               setExtendSelection(item);
               setExtendDays('7');
             }}
+            onSwap={setSwapSelection}
+            availableCountsByPlan={availableCountsByPlan}
           />
         </TabsContent>
 
@@ -487,6 +561,17 @@ export function CodingPlansOperationsContent() {
                 entries: submittedEntries,
               });
             }}
+            onReduce={row =>
+              setReduceSelection({
+                providerId: row.providerId,
+                planId: row.planId,
+                providerDisplayName: getCodingPlanProviderDisplayName(
+                  providerOptions,
+                  row.providerId
+                ),
+                availableCount: row.statusCounts.available ?? 0,
+              })
+            }
             inventoryReplacementId={inventoryReplacementId}
             inventoryReplacementApiKey={inventoryReplacementApiKey}
             onInventoryReplacementIdChange={setInventoryReplacementId}
@@ -524,6 +609,10 @@ export function CodingPlansOperationsContent() {
         cancelPending={cancelMutation.isPending}
         onCloseCancel={() => setCancelSelection(null)}
         onCancel={subscriptionId => cancelMutation.mutate({ subscriptionId })}
+        terminateSelection={terminateSelection}
+        terminatePending={terminateMutation.isPending}
+        onCloseTerminate={() => setTerminateSelection(null)}
+        onTerminate={subscriptionId => terminateMutation.mutate({ subscriptionId })}
         extendSelection={extendSelection}
         extendDays={extendDays}
         extendPending={extendMutation.isPending}
@@ -534,6 +623,22 @@ export function CodingPlansOperationsContent() {
         }}
         onExtendDaysChange={setExtendDays}
         onExtend={(subscriptionId, days) => extendMutation.mutate({ subscriptionId, days })}
+        swapSelection={swapSelection}
+        swapPending={swapMutation.isPending}
+        onCloseSwap={() => setSwapSelection(null)}
+        onSwap={subscriptionId => swapMutation.mutate({ subscriptionId })}
+        reduceSelection={reduceSelection}
+        reduceCount={reduceCount}
+        reducePending={reduceMutation.isPending}
+        canSubmitReduce={canSubmitReduce}
+        onCloseReduce={() => {
+          setReduceSelection(null);
+          setReduceCount('1');
+        }}
+        onReduceCountChange={setReduceCount}
+        onReduce={(planId, count) =>
+          reduceMutation.mutate({ planId: planId as CodingPlanId, count })
+        }
         inventoryReplacementId={inventoryReplacementId}
         inventoryReplacementConfirmOpen={inventoryReplacementConfirmOpen}
         inventoryReplacementPending={inventoryReplacementMutation.isPending}
@@ -641,6 +746,16 @@ type RevocationWorkItem = {
 type RevocationSelection = {
   workItem: RevocationWorkItem;
   providerDisplayName: string;
+};
+
+// The Inventory counts row selected for a "Reduce inventory" action. Kept
+// whole (rather than just an ID) so the dialog can show the provider name and
+// cap the requested count at what is actually available for that plan.
+type ReduceInventorySelection = {
+  providerId: string;
+  planId: string;
+  providerDisplayName: string;
+  availableCount: number;
 };
 
 function SummaryCards({
@@ -842,14 +957,16 @@ function InventoryCountsTable({
   items,
   isLoading,
   isError,
+  onReduce,
 }: {
   items: InventoryCountItem[];
   isLoading: boolean;
   isError: boolean;
+  onReduce: (row: InventoryCountRow) => void;
 }) {
   const statusColumns = getInventoryStatusColumns(items);
   const rows = getInventoryCountRows(items);
-  const columnCount = 3 + statusColumns.length;
+  const columnCount = 4 + statusColumns.length;
   const metricColumnKeys = ['loaded', ...statusColumns];
 
   return (
@@ -860,13 +977,14 @@ function InventoryCountsTable({
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto rounded-lg border">
-          <Table className="min-w-[72rem] table-fixed">
+          <Table className="min-w-[80rem] table-fixed">
             <colgroup>
               <col className="w-32" />
               <col className="w-80" />
               {metricColumnKeys.map(key => (
                 <col key={key} />
               ))}
+              <col className="w-44" />
             </colgroup>
             <TableHeader>
               <TableRow>
@@ -878,6 +996,7 @@ function InventoryCountsTable({
                     {formatStatusTitle(status)}
                   </TableHead>
                 ))}
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -897,20 +1016,37 @@ function InventoryCountsTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map(row => (
-                  <TableRow key={`${row.providerId}:${row.planId}`}>
-                    <TableCell className="min-w-32 font-mono text-xs">{row.providerId}</TableCell>
-                    <TableCell className="min-w-64 font-mono text-xs">{row.planId}</TableCell>
-                    <TableCell className="text-center font-mono tabular-nums">
-                      {row.loadedCount}
-                    </TableCell>
-                    {statusColumns.map(status => (
-                      <TableCell key={status} className="text-center font-mono tabular-nums">
-                        {row.statusCounts[status] ?? 0}
+                rows.map(row => {
+                  const availableCount = row.statusCounts.available ?? 0;
+                  return (
+                    <TableRow key={`${row.providerId}:${row.planId}`}>
+                      <TableCell className="min-w-32 font-mono text-xs">{row.providerId}</TableCell>
+                      <TableCell className="min-w-64 font-mono text-xs">{row.planId}</TableCell>
+                      <TableCell className="text-center font-mono tabular-nums">
+                        {row.loadedCount}
                       </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+                      {statusColumns.map(status => (
+                        <TableCell key={status} className="text-center font-mono tabular-nums">
+                          {row.statusCounts[status] ?? 0}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-right">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onReduce(row)}
+                          disabled={availableCount === 0}
+                          aria-label={`Reduce available inventory for ${row.planId}`}
+                          title={
+                            availableCount === 0 ? 'No available credentials to remove' : undefined
+                          }
+                        >
+                          Reduce inventory
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -996,7 +1132,10 @@ function SubscriptionsTable({
   onStatusChange,
   onPageChange,
   onCancel,
+  onTerminate,
   onExtend,
+  onSwap,
+  availableCountsByPlan,
 }: {
   items: AdminCodingPlanSubscriptionItem[];
   pagination?: { page: number; total: number; totalPages: number };
@@ -1011,7 +1150,10 @@ function SubscriptionsTable({
   onStatusChange: (value: SubscriptionDisplayStatus | 'all') => void;
   onPageChange: (page: number) => void;
   onCancel: (item: AdminCodingPlanSubscriptionItem) => void;
+  onTerminate: (item: AdminCodingPlanSubscriptionItem) => void;
   onExtend: (item: AdminCodingPlanSubscriptionItem) => void;
+  onSwap: (item: AdminCodingPlanSubscriptionItem) => void;
+  availableCountsByPlan: Record<string, number>;
 }) {
   const currentPage = pagination?.page ?? 1;
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
@@ -1123,9 +1265,14 @@ function SubscriptionsTable({
                       ? formatLocalDateTimeLabel(billingDate.date)
                       : formatDateLabel(billingDate.date);
                   const canCancel = item.status === 'active' && !item.cancelAtPeriodEnd;
+                  const canTerminate = item.status === 'active' || item.status === 'past_due';
                   const canExtend = item.status === 'active';
                   const inventoryKeyId = item.inventoryKeyId;
                   const upstreamPlanId = item.upstreamPlanId;
+                  const canSwap =
+                    inventoryKeyId !== null &&
+                    (item.status === 'active' || item.status === 'past_due');
+                  const availableForPlan = availableCountsByPlan[item.planId] ?? 0;
 
                   return (
                     <TableRow key={item.id}>
@@ -1212,6 +1359,21 @@ function SubscriptionsTable({
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">
+                          {canSwap ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => onSwap(item)}
+                              disabled={availableForPlan === 0}
+                              title={
+                                availableForPlan === 0
+                                  ? 'No available credential in the pool for this plan'
+                                  : undefined
+                              }
+                            >
+                              Swap key
+                            </Button>
+                          ) : null}
                           {canExtend ? (
                             <Button variant="secondary" size="sm" onClick={() => onExtend(item)}>
                               Extend
@@ -1220,6 +1382,15 @@ function SubscriptionsTable({
                           {canCancel ? (
                             <Button variant="destructive" size="sm" onClick={() => onCancel(item)}>
                               Cancel
+                            </Button>
+                          ) : null}
+                          {canTerminate ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => onTerminate(item)}
+                            >
+                              Terminate now
                             </Button>
                           ) : null}
                         </div>
@@ -1298,6 +1469,7 @@ function OperationsTabs({
   onPlanChange,
   onEntriesTextChange,
   onUpload,
+  onReduce,
   inventoryReplacementId,
   inventoryReplacementApiKey,
   onInventoryReplacementIdChange,
@@ -1327,6 +1499,7 @@ function OperationsTabs({
   onPlanChange: (planId: string) => void;
   onEntriesTextChange: (entriesText: string) => void;
   onUpload: () => void;
+  onReduce: (row: InventoryCountRow) => void;
   inventoryReplacementId: string;
   inventoryReplacementApiKey: string;
   onInventoryReplacementIdChange: (inventoryKeyId: string) => void;
@@ -1357,6 +1530,7 @@ function OperationsTabs({
           items={inventoryCounts}
           isLoading={inventoryLoading}
           isError={inventoryError}
+          onReduce={onReduce}
         />
       </TabsContent>
 
@@ -1546,8 +1720,8 @@ function OperationsTabs({
               <AlertDescription>
                 API keys are encrypted after validation and are never returned or displayed. The
                 upstream identifier is retained for provider-side operations and appears in the
-                Pending Key Rotation queue. BytePlus usernames are used to verify the assigned seat
-                and are not displayed after upload.
+                Pending Key Rotation queue. For BytePlus, the assigned username is shown there so
+                staff can map the inventory item to the provider-side seat.
               </AlertDescription>
             </Alert>
             <Button
@@ -1629,6 +1803,10 @@ function OperationsDialogs({
   cancelPending,
   onCloseCancel,
   onCancel,
+  terminateSelection,
+  terminatePending,
+  onCloseTerminate,
+  onTerminate,
   extendSelection,
   extendDays,
   extendPending,
@@ -1636,6 +1814,17 @@ function OperationsDialogs({
   onCloseExtend,
   onExtendDaysChange,
   onExtend,
+  swapSelection,
+  swapPending,
+  onCloseSwap,
+  onSwap,
+  reduceSelection,
+  reduceCount,
+  reducePending,
+  canSubmitReduce,
+  onCloseReduce,
+  onReduceCountChange,
+  onReduce,
   inventoryReplacementId,
   inventoryReplacementConfirmOpen,
   inventoryReplacementPending,
@@ -1656,6 +1845,10 @@ function OperationsDialogs({
   cancelPending: boolean;
   onCloseCancel: () => void;
   onCancel: (subscriptionId: string) => void;
+  terminateSelection: AdminCodingPlanSubscriptionItem | null;
+  terminatePending: boolean;
+  onCloseTerminate: () => void;
+  onTerminate: (subscriptionId: string) => void;
   extendSelection: AdminCodingPlanSubscriptionItem | null;
   extendDays: string;
   extendPending: boolean;
@@ -1663,10 +1856,22 @@ function OperationsDialogs({
   onCloseExtend: () => void;
   onExtendDaysChange: (days: string) => void;
   onExtend: (subscriptionId: string, days: number) => void;
+  swapSelection: AdminCodingPlanSubscriptionItem | null;
+  swapPending: boolean;
+  onCloseSwap: () => void;
+  onSwap: (subscriptionId: string) => void;
+  reduceSelection: ReduceInventorySelection | null;
+  reduceCount: string;
+  reducePending: boolean;
+  canSubmitReduce: boolean;
+  onCloseReduce: () => void;
+  onReduceCountChange: (count: string) => void;
+  onReduce: (planId: string, count: number) => void;
   inventoryReplacementId: string;
   inventoryReplacementConfirmOpen: boolean;
   inventoryReplacementPending: boolean;
   onCloseInventoryReplacement: () => void;
+
   onReplaceInventoryCredential: () => void;
 }) {
   // Copy derives from the retained selection. The null fallback only applies
@@ -1678,9 +1883,15 @@ function OperationsDialogs({
     replacementSelection?.providerDisplayName ?? 'the provider'
   );
   const cancelCopy = getCancelSubscriptionDialogCopy(cancelSelection?.userName ?? 'this user');
+  const terminateCopy = getTerminateSubscriptionDialogCopy(
+    terminateSelection?.userName ?? 'this user'
+  );
   const extendCopy = getExtendSubscriptionDialogCopy(extendSelection?.userName ?? 'this user');
+  const swapCopy = getSwapCredentialDialogCopy(swapSelection?.userName ?? 'this user');
   const parsedExtendDays = Number(extendDays);
   const inventoryReplacementCopy = getInventoryReplacementDialogCopy(inventoryReplacementId);
+  const reduceCopy = getReduceInventoryDialogCopy(reduceSelection?.planId ?? 'this plan');
+  const parsedReduceCount = Number(reduceCount);
 
   return (
     <>
@@ -1778,6 +1989,32 @@ function OperationsDialogs({
       </Dialog>
 
       <Dialog
+        open={terminateSelection !== null}
+        onOpenChange={open => {
+          if (!open && !terminatePending) onCloseTerminate();
+        }}
+      >
+        <DialogContent showCloseButton={!terminatePending}>
+          <DialogHeader>
+            <DialogTitle>{terminateCopy.title}</DialogTitle>
+            <DialogDescription>{terminateCopy.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={onCloseTerminate} disabled={terminatePending}>
+              Keep subscription
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => terminateSelection && onTerminate(terminateSelection.id)}
+              disabled={terminatePending}
+            >
+              {terminatePending ? 'Terminating...' : 'Terminate now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={extendSelection !== null}
         onOpenChange={open => {
           if (!open && !extendPending) onCloseExtend();
@@ -1816,6 +2053,86 @@ function OperationsDialogs({
               disabled={!canSubmitExtend || extendPending}
             >
               {extendPending ? 'Extending period...' : 'Extend period'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={swapSelection !== null}
+        onOpenChange={open => {
+          if (!open && !swapPending) onCloseSwap();
+        }}
+      >
+        <DialogContent showCloseButton={!swapPending}>
+          <DialogHeader>
+            <DialogTitle>{swapCopy.title}</DialogTitle>
+            <DialogDescription>{swapCopy.description}</DialogDescription>
+          </DialogHeader>
+          {swapSelection ? (
+            <p className="text-muted-foreground font-mono text-xs">
+              Current inventory key: {swapSelection.inventoryKeyId ?? '—'}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="secondary" onClick={onCloseSwap} disabled={swapPending}>
+              Keep current credential
+            </Button>
+            <Button
+              onClick={() => swapSelection && onSwap(swapSelection.id)}
+              disabled={swapPending}
+            >
+              {swapPending ? 'Swapping...' : 'Swap key'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={reduceSelection !== null}
+        onOpenChange={open => {
+          if (!open && !reducePending) onCloseReduce();
+        }}
+      >
+        <DialogContent showCloseButton={!reducePending}>
+          <DialogHeader>
+            <DialogTitle>{reduceCopy.title}</DialogTitle>
+            <DialogDescription>{reduceCopy.description}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="reduce-inventory-count">Credentials to remove</Label>
+            <Input
+              id="reduce-inventory-count"
+              type="number"
+              min={1}
+              max={reduceSelection?.availableCount ?? 1}
+              value={reduceCount}
+              onChange={event => onReduceCountChange(event.target.value)}
+              disabled={reducePending}
+            />
+            {reduceSelection ? (
+              <p className="text-muted-foreground text-xs">
+                {reduceSelection.availableCount} available for {reduceSelection.providerDisplayName}{' '}
+                {reduceSelection.planId}.
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={onCloseReduce} disabled={reducePending}>
+              Keep inventory
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                reduceSelection &&
+                canSubmitReduce &&
+                onReduce(reduceSelection.planId, parsedReduceCount)
+              }
+              disabled={!canSubmitReduce || reducePending}
+            >
+              {reducePending
+                ? 'Queuing...'
+                : `Queue ${Number.isFinite(parsedReduceCount) ? parsedReduceCount : ''} credential${parsedReduceCount === 1 ? '' : 's'}`}
             </Button>
           </DialogFooter>
         </DialogContent>

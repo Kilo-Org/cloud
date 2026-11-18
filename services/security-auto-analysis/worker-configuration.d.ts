@@ -2,11 +2,15 @@ declare type Hyperdrive = {
   connectionString: string;
 };
 
+declare type QueueRetryOptions = {
+  delaySeconds?: number;
+};
+
 declare type Message<T> = {
   body: T;
   attempts: number;
   ack(): void;
-  retry(): void;
+  retry(options?: QueueRetryOptions): void;
 };
 
 declare type MessageBatch<T> = {
@@ -45,8 +49,13 @@ declare type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GitTokenForRepoResult>;
-  getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+  getToken(
+    installationId: string,
+    appType?: 'standard' | 'lite',
+    expectedIntegrationId?: string
+  ): Promise<string>;
 };
 
 declare type SecretBinding = {
@@ -86,6 +95,7 @@ declare type CloudflareEnv = {
   SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: string;
   SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED: string | undefined;
   MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED: string | undefined;
+  SHARED_RESOURCE_TOKENS_ENABLED: string | boolean | undefined;
   NEXT_PUBLIC_POSTHOG_KEY: string | undefined;
 };
 

@@ -12,10 +12,6 @@ import type {
 import { createCliHistoricalTransport } from './cli-historical-transport';
 import { kiloId, makeSnapshot, stubUserMessage, stubTextPart } from './test-helpers';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const SES_ID = 'ses-1';
 
 function createTransportWithSinks(
@@ -38,10 +34,6 @@ function createTransportWithSinks(
 
   return { transport, chatEvents, serviceEvents };
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('CliHistoricalTransport', () => {
   it('replays snapshot in correct order', async () => {
@@ -68,7 +60,6 @@ describe('CliHistoricalTransport', () => {
     transport.connect();
     await Promise.resolve();
 
-    // Chat events: msg1, part1a, part1b, msg2, part2a
     expect(chatEvents).toHaveLength(5);
     expect(chatEvents[0]).toEqual(
       expect.objectContaining({ type: 'message.updated', info: snapshot.messages[0].info })
@@ -86,12 +77,48 @@ describe('CliHistoricalTransport', () => {
       expect.objectContaining({ type: 'message.part.updated', part: snapshot.messages[1].parts[0] })
     );
 
-    // Service events: session.created, stopped(complete)
     expect(serviceEvents).toHaveLength(2);
     expect(serviceEvents[0]).toEqual(
       expect.objectContaining({ type: 'session.created', info: snapshot.info })
     );
     expect(serviceEvents[1]).toEqual({ type: 'stopped', reason: 'complete' });
+
+    transport.destroy();
+  });
+
+  it('threads a settled tool part settle time through the snapshot replay', async () => {
+    const taskPart = {
+      id: 'part-task-1',
+      sessionID: SES_ID,
+      messageID: 'msg-1',
+      type: 'tool' as const,
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status: 'completed' as const,
+        input: {},
+        output: 'done',
+        title: 'task',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+    const snapshot: SessionSnapshot = {
+      info: { id: SES_ID },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: SES_ID }),
+          parts: [taskPart],
+        },
+      ],
+    };
+
+    const { transport, chatEvents } = createTransportWithSinks(() => Promise.resolve(snapshot));
+
+    transport.connect();
+    await Promise.resolve();
+
+    expect(chatEvents).toContainEqual({ type: 'message.part.updated', part: taskPart, time: 2 });
 
     transport.destroy();
   });
@@ -147,7 +174,6 @@ describe('CliHistoricalTransport', () => {
     transport.connect();
     transport.disconnect();
 
-    // Resolve after disconnect — should be discarded
     resolveSnapshot?.(
       makeSnapshot({ id: SES_ID }, [
         {
@@ -174,7 +200,6 @@ describe('CliHistoricalTransport', () => {
     transport.connect();
     transport.destroy();
 
-    // Resolve after destroy — should be discarded
     resolveSnapshot?.(
       makeSnapshot({ id: SES_ID }, [
         {
@@ -203,11 +228,9 @@ describe('CliHistoricalTransport', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Page-seam: transport uses fetchSnapshotPage when provided so the manager can
 // record the cursor and the user can load older pages later. Legacy
 // `fetchSnapshot` is preserved for callers that haven't migrated.
-// ---------------------------------------------------------------------------
 
 type FetchPage = (
   kiloSessionId: KiloSessionId,

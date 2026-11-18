@@ -8,7 +8,7 @@
  */
 
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import type { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
+import { UserKiloFacade as RealUserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
   KILO_FACADE_GLOBAL_FEED_PATH,
@@ -19,7 +19,15 @@ import type {
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
 } from '../src/notifications-binding.js';
-import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
+import { createTestSessionIngestDouble } from './integration/helpers/session-ingest-double.js';
+import { isSandboxControlId } from '../src/sandbox-control/stub';
+import { admitSandboxWrapperUpgrade } from '../src/sandbox-control/socket-admission.js';
+import { SandboxControlV2 } from '../src/control-plane/sandbox/sandbox-do';
+import { SandboxSessionV2 } from '../src/control-plane/session/session-do';
+import { getSandboxSessionStub } from '../src/sandbox-session/session-stub';
+import { SESSION_ID_RE } from '../src/shared/protocol.js';
+import { terminalPtyIdSchema } from '../src/shared/sandbox-control-protocol.js';
+import type { Env } from '../src/types';
 
 type RecordedPushCall = SendCloudAgentSessionNotificationParams;
 
@@ -55,20 +63,36 @@ function createNotificationsStub(): NotificationsBinding {
 
 const notificationsStub = createNotificationsStub();
 
-// Re-export CloudAgentSession with the service binding replaced by the stub
-// so tests observe push dispatches without requiring the real Worker.
-export class CloudAgentSession extends RealCloudAgentSession {
+// The Workers-runtime suite binds no `SESSION_INGEST` service and no Postgres,
+// so replace the binding with a storage-backed double. Integration tests seed it
+// through `runInDurableObject` on this same Durable Object.
+export class UserKiloFacade extends RealUserKiloFacade {
   constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, { ...env, NOTIFICATIONS: notificationsStub });
+    super(ctx, { ...env, SESSION_INGEST: createTestSessionIngestDouble(ctx.storage) });
   }
 }
 
-export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
+// The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
+// names to the control-plane V2 classes, matching production after the C1c flip.
+export { SandboxControlV2, SandboxSessionV2 };
+export { EnvironmentBuild } from '../src/environment-build/environment-build-do.js';
+export { SandboxContainers } from '../src/sandbox-containers/SandboxContainers.js';
+export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
+export {
+  SentryBillingAdmissionContainer,
+  SentrySessionProbe,
+  SentryLegacySessionProbe,
+  SentrySandboxControlProbe,
+  SentrySandboxContainerProbe,
+  SentryDisabledProbe,
+} from './integration/helpers/sentry-durable-object.js';
 
 type TestEnv = {
-  CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
+  SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
+  SANDBOX_SESSION: Env['SANDBOX_SESSION'];
+  NEXTAUTH_SECRET: Env['NEXTAUTH_SECRET'];
 };
 
 function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): Promise<Response> {
@@ -79,9 +103,96 @@ function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): 
   return facade.fetch(new Request(request, { headers }));
 }
 
+function createTerminalUpgradeRequest(
+  request: Request,
+  role: 'browser' | 'wrapper',
+  ptyId: string
+): Request {
+  const url = new URL(request.url);
+  url.pathname = `/terminal/${role}`;
+  url.search = '';
+  url.searchParams.set('ptyId', ptyId);
+  const headers = new Headers({ Upgrade: 'websocket' });
+  if (role === 'wrapper') {
+    const authorization = request.headers.get('Authorization');
+    if (authorization !== null) headers.set('Authorization', authorization);
+  }
+  return new Request(url, { method: 'GET', headers });
+}
+
+function isTerminalRouteIdentity(ownerId: string, sessionId: string, ptyId: string): boolean {
+  return (
+    ownerId.length > 0 &&
+    sessionId.startsWith('workspace_') &&
+    SESSION_ID_RE.test(sessionId) &&
+    terminalPtyIdSchema.safeParse(ptyId).success
+  );
+}
+
 export default {
   async fetch(request: Request, env: TestEnv): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith('/sandbox-control/')) {
+      const sandboxId = decodeURIComponent(url.pathname.slice('/sandbox-control/'.length));
+      return admitSandboxWrapperUpgrade(request, env, sandboxId);
+    }
+
+    if (url.pathname.startsWith('/sandbox-control-v2/')) {
+      const upgradeHeader = request.headers.get('Upgrade');
+      if (upgradeHeader?.toLowerCase() !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const sandboxId = decodeURIComponent(url.pathname.slice('/sandbox-control-v2/'.length));
+      if (!sandboxId || sandboxId.includes('/') || !isSandboxControlId(sandboxId)) {
+        return new Response('Invalid sandboxId', { status: 400 });
+      }
+      return env.SANDBOX_CONTROL.getByName(sandboxId).fetch(request);
+    }
+
+    if (url.pathname === '/terminal-test') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const ownerId = url.searchParams.get('ownerId');
+      const sessionId = url.searchParams.get('sessionId');
+      const ptyId = url.searchParams.get('ptyId');
+      if (
+        ownerId === null ||
+        sessionId === null ||
+        ptyId === null ||
+        !isTerminalRouteIdentity(ownerId, sessionId, ptyId)
+      ) {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      return getSandboxSessionStub(env, ownerId, sessionId).fetch(
+        createTerminalUpgradeRequest(request, 'browser', ptyId)
+      );
+    }
+
+    if (url.pathname.startsWith('/sandbox-terminal/')) {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const segments = url.pathname.split('/');
+      if (segments.length !== 5 || !segments[2] || !segments[3] || !segments[4]) {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      let ownerId: string;
+      try {
+        ownerId = decodeURIComponent(segments[2]);
+      } catch {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      const sessionId = segments[3];
+      const ptyId = segments[4];
+      if (!isTerminalRouteIdentity(ownerId, sessionId, ptyId)) {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      return getSandboxSessionStub(env, ownerId, sessionId).fetch(
+        createTerminalUpgradeRequest(request, 'wrapper', ptyId)
+      );
+    }
 
     if (url.pathname === '/stream') {
       const upgradeHeader = request.headers.get('Upgrade');
@@ -96,10 +207,20 @@ export default {
         return new Response('Missing sessionId parameter', { status: 400 });
       }
 
-      const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-      const stub = env.CLOUD_AGENT_SESSION.get(doId);
+      return getSandboxSessionStub(env, userId, sessionId).fetch(request);
+    }
 
-      return stub.fetch(request);
+    if (url.pathname === '/stream-v2') {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const sessionId = url.searchParams.get('sessionId');
+      if (!sessionId) {
+        return new Response('Missing sessionId parameter', { status: 400 });
+      }
+      const streamUrl = new URL(request.url);
+      streamUrl.pathname = '/stream';
+      return env.SANDBOX_SESSION.getByName(sessionId).fetch(new Request(streamUrl, request));
     }
 
     if (url.pathname === '/test/notification-jobs/fail-next' && request.method === 'POST') {

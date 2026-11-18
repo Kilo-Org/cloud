@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner-native';
 
 import { openExternalUrl } from '@/lib/external-link';
@@ -8,8 +8,10 @@ import { openExternalUrl } from '@/lib/external-link';
 import {
   buildChatLinkActionSheet,
   buildPrLinkTapActionSheet,
+  CHAT_LINK_SHEET_DISMISS_DELAY_MS,
   getSelectedChatLinkAction,
   performChatLinkAction,
+  performChatLinkActionAfterSheet,
 } from './chat-link-actions';
 
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
@@ -54,14 +56,15 @@ describe('chat link actions', () => {
     expect(getSelectedChatLinkAction(sheet, 4)).toBeNull();
   });
 
-  it('builds the tap sheet with exactly Review PR / Open in browser / Cancel', () => {
+  it('builds the tap sheet with Review PR / Open in browser / Share / Cancel', () => {
     const sheet = buildPrLinkTapActionSheet();
 
-    expect(sheet.options).toEqual(['Review PR', 'Open in browser', 'Cancel']);
-    expect(sheet.cancelButtonIndex).toBe(2);
+    expect(sheet.options).toEqual(['Review PR', 'Open in browser', 'Share', 'Cancel']);
+    expect(sheet.cancelButtonIndex).toBe(3);
     expect(getSelectedChatLinkAction(sheet, 0)).toBe('review-pr');
     expect(getSelectedChatLinkAction(sheet, 1)).toBe('open');
-    expect(getSelectedChatLinkAction(sheet, 2)).toBeNull();
+    expect(getSelectedChatLinkAction(sheet, 2)).toBe('share');
+    expect(getSelectedChatLinkAction(sheet, 3)).toBeNull();
     expect(getSelectedChatLinkAction(sheet, undefined)).toBeNull();
   });
 
@@ -83,7 +86,6 @@ describe('chat link actions', () => {
     await performChatLinkAction('open', 'https://kilo.ai/docs?source=chat#links');
 
     expect(openExternalUrl).toHaveBeenCalledWith('https://kilo.ai/docs?source=chat#links', {
-      label: 'link',
       retryOnError: true,
     });
   });
@@ -94,7 +96,16 @@ describe('chat link actions', () => {
     await performChatLinkAction('copy', 'https://kilo.ai/docs');
 
     expect(Clipboard.setStringAsync).toHaveBeenCalledWith('https://kilo.ai/docs');
-    expect(toast.success).toHaveBeenCalledWith('Link copied');
+    // Longer than the Sonner default: on Android the system clipboard preview
+    // covers the bottom-center toast for its full default life.
+    expect(toast.success).toHaveBeenCalledWith('Link copied', {
+      duration: expect.any(Number),
+    });
+    const options = vi.mocked(toast.success).mock.calls[0]?.[1];
+    if (!options || typeof options.duration !== 'number') {
+      throw new Error('Expected a toast duration');
+    }
+    expect(options.duration).toBeGreaterThan(6000);
   });
 
   it('retries only copying after a clipboard failure', async () => {
@@ -132,7 +143,7 @@ describe('chat link actions', () => {
   });
 
   it('shares the exact URL without treating dismissal as failure', async () => {
-    mockedShare.mockResolvedValue({ action: Share.dismissedAction });
+    mockedShare.mockResolvedValue({ action: Share.dismissedAction, activityType: undefined });
 
     await performChatLinkAction('share', 'https://kilo.ai/docs');
 
@@ -143,7 +154,7 @@ describe('chat link actions', () => {
   it('retries only sharing after a share failure', async () => {
     mockedShare
       .mockRejectedValueOnce(new Error('share unavailable'))
-      .mockResolvedValueOnce({ action: Share.sharedAction });
+      .mockResolvedValueOnce({ action: Share.sharedAction, activityType: undefined });
 
     await performChatLinkAction('share', 'https://kilo.ai/docs');
 
@@ -162,4 +173,36 @@ describe('chat link actions', () => {
     expect(openExternalUrl).not.toHaveBeenCalled();
     expect(Clipboard.setStringAsync).not.toHaveBeenCalled();
   });
+});
+
+describe('performChatLinkActionAfterSheet', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  it('opens the browser only after the sheet dismiss delay', async () => {
+    performChatLinkActionAfterSheet('open', 'https://example.com/pr/42');
+
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(CHAT_LINK_SHEET_DISMISS_DELAY_MS);
+    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/pr/42', {
+      retryOnError: true,
+    });
+  });
+
+  it('defers share and runs copy at once', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    performChatLinkActionAfterSheet('share', 'https://example.com/pr/42');
+    performChatLinkActionAfterSheet('copy', 'https://example.com/pr/42');
+
+    expect(mockedShare).not.toHaveBeenCalled();
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('https://example.com/pr/42');
+    await vi.advanceTimersByTimeAsync(CHAT_LINK_SHEET_DISMISS_DELAY_MS);
+    expect(mockedShare).toHaveBeenCalledWith({ message: 'https://example.com/pr/42' });
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });

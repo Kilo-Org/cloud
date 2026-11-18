@@ -218,6 +218,21 @@ describe('classifyAttachment', () => {
     });
   });
 
+  it('classifies HEIC and HEIF names as images', () => {
+    expect(classifyAttachment({ name: 'photo.HEIC', size: 10 })).toEqual({
+      ok: true,
+      kind: 'image',
+      extension: 'heic',
+      size: 10,
+    });
+    expect(classifyAttachment({ name: 'photo.heif', size: 10 })).toEqual({
+      ok: true,
+      kind: 'image',
+      extension: 'heif',
+      size: 10,
+    });
+  });
+
   it('accepts an extension outside the image/document allow-list as a generic binary', () => {
     expect(classifyAttachment({ name: 'archive.zip', size: 10 })).toEqual({
       ok: true,
@@ -316,6 +331,8 @@ describe('mimeForExtension (cross-surface parity)', () => {
     expect(mimeForExtension('jpeg')).toBe('image/jpeg');
     expect(mimeForExtension('webp')).toBe('image/webp');
     expect(mimeForExtension('gif')).toBe('image/gif');
+    expect(mimeForExtension('heic')).toBe('image/heic');
+    expect(mimeForExtension('heif')).toBe('image/heif');
     expect(mimeForExtension('pdf')).toBe('application/pdf');
     expect(mimeForExtension('txt')).toBe('text/plain');
     expect(mimeForExtension('md')).toBe('text/plain');

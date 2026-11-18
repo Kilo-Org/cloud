@@ -1,5 +1,45 @@
-import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
+import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
+import {
+  COUNCIL_AGGREGATION_STRATEGIES,
+  COUNCIL_MAX_REQUIRED_LABELS,
+  COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
+  COUNCIL_SPECIALIST_ROLES,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
+  GATE_THRESHOLDS,
+  REVIEW_STYLES,
+} from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
+
+export const watchPrPolicySchema = z
+  .object({
+    version: z.literal(1),
+    model: z.string().trim().min(1).max(200),
+    profileId: z.string().uuid().nullable(),
+    categories: z.object({
+      reviews: z.boolean(),
+      failedChecks: z.boolean(),
+      baseUpdates: z.boolean(),
+    }),
+    branchStrategy: z.enum(['merge', 'rebase']),
+    historyRewriteConsent: z.boolean(),
+    maxAttemptsPerProblem: z.number().int().min(1).max(2),
+    maxTotalAttempts: z.number().int().min(1).max(10),
+    observationOnlyConsent: z.literal(true),
+    futureEventsOnlyConsent: z.literal(true),
+    noHardSpendCapConsent: z.literal(true),
+  })
+  .strict()
+  .refine(value => value.branchStrategy !== 'rebase' || value.historyRewriteConsent, {
+    message: 'Rebase requires explicit history-rewrite consent',
+    path: ['historyRewriteConsent'],
+  })
+  .refine(value => value.maxAttemptsPerProblem <= value.maxTotalAttempts, {
+    message: 'Per-problem attempts cannot exceed total attempts',
+    path: ['maxAttemptsPerProblem'],
+  });
+
+export type WatchPrPolicy = z.infer<typeof watchPrPolicySchema>;
+export type WatchPrStatus = 'watching' | 'paused' | 'finished';
 
 // =============================================================================
 // A. Runtime Values (used in enumCheck() or .default())
@@ -181,6 +221,27 @@ export enum CliSessionSharedState {
   Public = 'public',
   Organization = 'organization',
 }
+
+export const WorkspaceFolderColor = {
+  Default: 'default',
+  Red: 'red',
+  Orange: 'orange',
+  Yellow: 'yellow',
+  Green: 'green',
+  Teal: 'teal',
+  Blue: 'blue',
+  Purple: 'purple',
+} as const;
+
+export type WorkspaceFolderColor = (typeof WorkspaceFolderColor)[keyof typeof WorkspaceFolderColor];
+
+export const TodoItemSessionOrigin = {
+  Started: 'started',
+  Linked: 'linked',
+} as const;
+
+export type TodoItemSessionOrigin =
+  (typeof TodoItemSessionOrigin)[keyof typeof TodoItemSessionOrigin];
 
 // --- SecurityAuditLogAction ---
 
@@ -512,7 +573,10 @@ export const UserDeletionStepKey = {
   Substack: 'substack',
   Anonymize: 'anonymize',
   PylonReply: 'pylon_reply',
+  PylonFinalize: 'pylon_finalize',
+  CompletionEmail: 'completion_email',
   PylonContact: 'pylon_contact',
+  CsaSupportDb: 'csa_support_db',
 } as const;
 
 export type UserDeletionStepKey = (typeof UserDeletionStepKey)[keyof typeof UserDeletionStepKey];
@@ -522,6 +586,7 @@ export const UserDeletionCloudSubjectResolution = {
   AuthoritativeAbsence: 'authoritative_absence',
   PriorQueueCleanup: 'prior_queue_cleanup',
   LegacyIdentityUnresolved: 'legacy_identity_unresolved',
+  Unresolved: 'unresolved',
 } as const;
 
 export type UserDeletionCloudSubjectResolution =
@@ -553,6 +618,7 @@ export const UserDeletionProviderScope = {
   Posthog: 'posthog',
   Substack: 'substack',
   Pylon: 'pylon',
+  Csa: 'csa',
 } as const;
 
 export type UserDeletionProviderScope =
@@ -567,6 +633,16 @@ export const UserDeletionPylonReplyState = {
 export type UserDeletionPylonReplyState =
   (typeof UserDeletionPylonReplyState)[keyof typeof UserDeletionPylonReplyState];
 
+export const UserDeletionCompletionEmailState = {
+  NotSent: 'not_sent',
+  Sending: 'sending',
+  Sent: 'sent',
+  Ambiguous: 'ambiguous',
+} as const;
+
+export type UserDeletionCompletionEmailState =
+  (typeof UserDeletionCompletionEmailState)[keyof typeof UserDeletionCompletionEmailState];
+
 export type UserDeletionTaskProgress = {
   processed_count?: number;
   scanned_count?: number;
@@ -578,7 +654,9 @@ export type UserDeletionTaskProgress = {
   checkpoint_at?: string;
   reply_state?: UserDeletionPylonReplyState;
   reply_message_id?: string;
+  completion_email_state?: UserDeletionCompletionEmailState;
   close_confirmed?: boolean;
+  verify_attempt_count?: number;
 };
 
 export type UserDeletionManualEvidence = {
@@ -746,6 +824,26 @@ export const ImpactAdvocateRewardRedemptionState = {
 export type ImpactAdvocateRewardRedemptionState =
   (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
 
+// --- Claude billing connections ---
+
+/**
+ * - `pending`: the owner's Anthropic user profile exists; no approval completed yet.
+ * - `connected`: Anthropic issued a connection; Claude requests bill the customer.
+ * - `billing_unavailable`: Anthropic answered `user_profile_not_billable` or
+ *   `user_profile_billing_not_authorized`; requests fail without an upstream
+ *   call until an admin reconnects or removes it.
+ * - `removed`: removed in Kilo; the profile is kept so a reconnect reuses it.
+ */
+export const ClaudeBillingConnectionStatus = {
+  Pending: 'pending',
+  Connected: 'connected',
+  BillingUnavailable: 'billing_unavailable',
+  Removed: 'removed',
+} as const;
+
+export type ClaudeBillingConnectionStatus =
+  (typeof ClaudeBillingConnectionStatus)[keyof typeof ClaudeBillingConnectionStatus];
+
 // --- Coding Plan enums ---
 
 export const BYOKManagementSource = {
@@ -819,6 +917,71 @@ export const KiloClawAdminAuditAction = z.enum([
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
+
+// Platform admin actions recorded in admin_action_audit_logs. Stored as plain
+// text without a DB check constraint, so adding a value needs no migration.
+// Do not rename existing values; rows keep the name they were written with.
+export const AdminActionAuditAction = z.enum([
+  'user.api_key.reset',
+  'user.browser_sessions.revoke',
+  'user.login.reset_to_magic_link',
+  'user.email.release',
+  'user.personal_account.set_disabled',
+  'user.unblock',
+  'organization.create',
+  'organization.delete',
+  'organization.parent.set',
+  'organization.created_by.set',
+  'organization.free_trial_end.set',
+  'organization.trial_messaging.set',
+  'organization.kilo_encrypt.set',
+  'organization.sso.config.create',
+  'organization.sso.config.delete',
+  'organization.sso.admin_portal_link.generate',
+  'internal_bot_user.create',
+  'sales_demo.create',
+  'sales_demo.reset',
+  'oss_sponsorship.enroll',
+  'email_test.send',
+  'admin.platform_access.set',
+  'admin.permissions.set',
+  'admin.step_up.verified',
+  'admin.passkey.enrolled',
+  'cloud_agent_session.messages.view',
+  'cloud_agent_session.api_history.view',
+  'webhook_trigger.request_logs.view',
+  'request_logging_opt_in.create',
+  'request_logging_opt_in.delete',
+  'api_request_log.download',
+  'provider_metadata.download',
+  'organization.member.invite',
+  'organization.member.role.update',
+  'organization.member.remove',
+  'organization.child_memberships.set',
+  'organization.token.mint',
+  'organization.gitlab_webhook_secret.rotate',
+  'organization.bitbucket.update',
+  'organization.webhook_session.share',
+  'credit_campaign.create',
+  'credit_campaign.update',
+  'credit_campaign.set_active',
+  'support_access.request',
+  'support_access.approve',
+  'support_access.deny',
+  'support_access.cancel',
+  'support_access.revoke',
+  'support_access.emergency_issue',
+  'support_access.review',
+  'service_fee.rollback_refund',
+  'service_fee.rollback_reconcile',
+  'kilo_pass.cancel_refund',
+]);
+
+export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
+
+export const AdminActionAuditTargetType = z.enum(['user', 'organization']);
+
+export type AdminActionAuditTargetType = z.infer<typeof AdminActionAuditTargetType>;
 
 // --- KiloClaw scheduled action status enums ---
 
@@ -923,6 +1086,9 @@ export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
 export const ORGANIZATION_AUTO_MODEL_ID = 'kilo-auto/org';
 export const MAX_ORGANIZATION_AUTO_ROUTES = 100;
+// Custom router model ID prefixes from @kilocode/auto-routing-contracts (ADR 0005).
+const CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/';
+const ORG_CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/org/';
 
 const OrganizationAutoModelRouteSlugSchema = z
   .string()
@@ -942,7 +1108,13 @@ const OrganizationAutoModelTargetSchema = z
   })
   .refine(value => value !== ORGANIZATION_AUTO_MODEL_ID, {
     message: 'Organization Auto cannot target itself',
-  });
+  })
+  .refine(
+    value =>
+      !value.startsWith(CUSTOM_ROUTER_MODEL_PREFIX) ||
+      value.startsWith(ORG_CUSTOM_ROUTER_MODEL_PREFIX),
+    { message: 'Organization Auto can only target organization custom routers' }
+  );
 
 export const OrganizationAutoModelSettingsSchema = z.object({
   routes: z
@@ -955,7 +1127,503 @@ export const OrganizationAutoModelSettingsSchema = z.object({
 
 export type OrganizationAutoModelSettings = z.infer<typeof OrganizationAutoModelSettingsSchema>;
 
+export const ENKRYPT_PII_ENTITIES = ['pii', 'secrets', 'ip_address', 'url'] as const;
+
+export const EnkryptPiiEntitySchema = z.enum(ENKRYPT_PII_ENTITIES);
+
+export type EnkryptPiiEntity = z.infer<typeof EnkryptPiiEntitySchema>;
+
+export const ENKRYPT_RULE_RISK_CATEGORIES = [
+  'security_fraud',
+  'safety_harm',
+  'privacy_data_protection',
+  'brand_reputation_trust',
+  'bias_fairness_ethical',
+  'legal_ip_liability',
+  'product_misuse_abuse',
+  'performance_reliability_quality',
+] as const;
+
+/** Only rules that apply to user input matter while the guardrail scans inputs alone. */
+export const ENKRYPT_RULE_APPLICABILITIES = ['user', 'user_assistant'] as const;
+
+export const ENKRYPT_RULE_SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
+
+export const ENKRYPT_RULE_FRAMEWORKS = [
+  'hipaa',
+  'finra',
+  'gdpr',
+  'ccpa',
+  'owasp_llm_2025',
+  'nist_ai_rmf',
+  'eu_ai_act',
+  'iso_42001',
+] as const;
+
+export const ENKRYPT_POLICY_FORMATS = ['policy_text', 'rules'] as const;
+
+/**
+ * What a revise-type input detector, a configurable input detector, or any output detector does
+ * when it fires. The gateway decides from Enkrypt's verdict whether a detection blocks, so the
+ * organization can choose to only log any of them.
+ */
+export const ENKRYPT_REVISE_DETECTOR_ACTIONS = ['log', 'block'] as const;
+
+export const ENKRYPT_DETECTOR_LIMITS = {
+  topics: 50,
+  topicLength: 100,
+  keywords: 200,
+  keywordLength: 100,
+  policyTextLength: 10_000,
+  rules: 5,
+  ruleIdLength: 64,
+  ruleDisplayTextLength: 120,
+  ruleTextLength: 1_000,
+  serializedLength: 64_000,
+} as const;
+
+const enkryptLimits = ENKRYPT_DETECTOR_LIMITS;
+
+/**
+ * Policies saved before rules were capped at `ENKRYPT_DETECTOR_LIMITS.rules` can hold up to this
+ * many. Saved detectors accept them so the gateway keeps enforcing those policies instead of
+ * rejecting every request; only a save applies the lower cap.
+ */
+const ENKRYPT_SAVED_RULES_LIMIT = 50;
+
+const EnkryptToggleDetectorSchema = z.strictObject({ enabled: z.boolean() });
+
+const EnkryptReviseDetectorActionSchema = z.enum(ENKRYPT_REVISE_DETECTOR_ACTIONS);
+
+/**
+ * Prompt injection and policy violation detections always blocked before admins could choose Log
+ * only, so detectors saved without an action keep blocking.
+ */
+const EnkryptConfigurableInputDetectorActionSchema =
+  EnkryptReviseDetectorActionSchema.default('block');
+
+function enkryptListItemSchema(noun: string, maxLength: number) {
+  return z
+    .string()
+    .trim()
+    .min(1, `Remove empty ${noun}s.`)
+    .max(maxLength, `Each ${noun} can be up to ${maxLength} characters.`);
+}
+
+export const EnkryptPolicyRuleSchema = z.strictObject({
+  id: z
+    .string()
+    .trim()
+    .min(1, 'Enter a rule ID.')
+    .max(
+      enkryptLimits.ruleIdLength,
+      `Rule IDs can be up to ${enkryptLimits.ruleIdLength} characters.`
+    )
+    .regex(
+      /^[A-Za-z0-9._-]+$/,
+      'Rule IDs can only contain letters, numbers, dots, dashes, and underscores.'
+    ),
+  display_text: z
+    .string()
+    .trim()
+    .max(
+      enkryptLimits.ruleDisplayTextLength,
+      `Rule names can be up to ${enkryptLimits.ruleDisplayTextLength} characters.`
+    ),
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Describe what the rule forbids or requires.')
+    .max(
+      enkryptLimits.ruleTextLength,
+      `Rules can be up to ${enkryptLimits.ruleTextLength} characters.`
+    ),
+  risk_category: z.enum(ENKRYPT_RULE_RISK_CATEGORIES),
+  applicability: z.enum(ENKRYPT_RULE_APPLICABILITIES),
+  severity: z.enum(ENKRYPT_RULE_SEVERITIES),
+  frameworks: z.array(z.enum(ENKRYPT_RULE_FRAMEWORKS)).max(ENKRYPT_RULE_FRAMEWORKS.length),
+});
+
+export type EnkryptPolicyRule = z.infer<typeof EnkryptPolicyRuleSchema>;
+
+const enkryptPiiEntitiesSchema = z.array(EnkryptPiiEntitySchema).max(ENKRYPT_PII_ENTITIES.length);
+
+const enkryptBannedKeywordsSchema = z
+  .array(enkryptListItemSchema('keyword', enkryptLimits.keywordLength))
+  .max(enkryptLimits.keywords, `Add up to ${enkryptLimits.keywords} keywords.`);
+
+const enkryptTopicsSchema = z
+  .array(enkryptListItemSchema('topic', enkryptLimits.topicLength))
+  .max(enkryptLimits.topics, `Add up to ${enkryptLimits.topics} topics.`);
+
+const enkryptPolicyFields = {
+  format: z.enum(ENKRYPT_POLICY_FORMATS),
+  policy_text: z
+    .string()
+    .trim()
+    .max(
+      enkryptLimits.policyTextLength,
+      `Policy text can be up to ${enkryptLimits.policyTextLength.toLocaleString('en-US')} characters.`
+    ),
+  rules: z
+    .array(EnkryptPolicyRuleSchema)
+    .max(ENKRYPT_SAVED_RULES_LIMIT, `Add up to ${enkryptLimits.rules} rules.`),
+};
+
+const EnkryptPiiDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+  entities: enkryptPiiEntitiesSchema,
+});
+
+const EnkryptKeywordDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+  banned_keywords: enkryptBannedKeywordsSchema,
+});
+
+const EnkryptActionDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+});
+
+type EnkryptConfigurableDetectors = {
+  pii: { enabled: boolean; entities: EnkryptPiiEntity[] };
+  keyword_detector: { enabled: boolean; banned_keywords: string[] };
+  topic_detector: { enabled: boolean; topic: string[] };
+  policy_violation: {
+    enabled: boolean;
+    format: (typeof ENKRYPT_POLICY_FORMATS)[number];
+    policy_text: string;
+    rules: EnkryptPolicyRule[];
+  };
+};
+
+function refineEnkryptDetectors(
+  detectors: EnkryptConfigurableDetectors,
+  ctx: z.core.$RefinementCtx
+) {
+  const { pii, keyword_detector, topic_detector, policy_violation } = detectors;
+  if (pii.enabled && pii.entities.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pii', 'entities'],
+      message: 'Select at least one type of data to detect.',
+    });
+  }
+  if (new Set(pii.entities).size !== pii.entities.length) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pii', 'entities'],
+      message: 'Select each type of data once.',
+    });
+  }
+  if (keyword_detector.enabled && keyword_detector.banned_keywords.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['keyword_detector', 'banned_keywords'],
+      message: 'Add at least one keyword.',
+    });
+  }
+  if (topic_detector.enabled && topic_detector.topic.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['topic_detector', 'topic'],
+      message: 'Add at least one topic.',
+    });
+  }
+  if (policy_violation.enabled) {
+    if (policy_violation.format === 'policy_text' && !policy_violation.policy_text) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'policy_text'],
+        message: 'Enter the policy text.',
+      });
+    }
+    if (policy_violation.format === 'rules' && policy_violation.rules.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'rules'],
+        message: 'Add at least one rule.',
+      });
+    }
+  }
+  const seenRuleIds = new Set<string>();
+  policy_violation.rules.forEach((rule, index) => {
+    if (seenRuleIds.has(rule.id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'rules', index, 'id'],
+        message: 'Rule IDs must be unique.',
+      });
+    }
+    seenRuleIds.add(rule.id);
+  });
+  if (JSON.stringify(detectors).length > enkryptLimits.serializedLength) {
+    ctx.addIssue({
+      code: 'custom',
+      path: [],
+      message: 'This detector configuration is too large. Remove some keywords, topics, or rules.',
+    });
+  }
+}
+
+/**
+ * An organization's Enkrypt input detectors, stored in `settings.enkrypt.input_guardrail.detectors`
+ * and turned into the `detectors` object of `POST /guardrails/detect` by the gateway. Disabled detectors keep
+ * their settings so admins can toggle them without losing work. Block messages, explanations, and
+ * saved Code of Conduct policy names are deliberately absent: Kilo owns the user-facing message.
+ */
+export const EnkryptInputDetectorsSchema = z
+  .strictObject({
+    injection_attack: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptConfigurableInputDetectorActionSchema,
+    }),
+    pii: EnkryptPiiDetectorSchema,
+    keyword_detector: EnkryptKeywordDetectorSchema,
+    topic_detector: z.strictObject({ enabled: z.boolean(), topic: enkryptTopicsSchema }),
+    policy_violation: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptConfigurableInputDetectorActionSchema,
+      ...enkryptPolicyFields,
+    }),
+    toxicity: EnkryptToggleDetectorSchema,
+    nsfw: EnkryptToggleDetectorSchema,
+    bias: EnkryptActionDetectorSchema,
+    sponge_attack: EnkryptToggleDetectorSchema,
+  })
+  .superRefine(refineEnkryptDetectors);
+
+export type EnkryptInputDetectors = z.infer<typeof EnkryptInputDetectorsSchema>;
+
+export type EnkryptDetectorId = keyof EnkryptInputDetectors;
+
+export const ENKRYPT_DETECTOR_IDS = [
+  'injection_attack',
+  'pii',
+  'keyword_detector',
+  'topic_detector',
+  'policy_violation',
+  'toxicity',
+  'nsfw',
+  'bias',
+  'sponge_attack',
+] as const satisfies readonly EnkryptDetectorId[];
+
+/**
+ * An organization's Enkrypt output detectors, stored in `settings.enkrypt.output_guardrail.detectors`.
+ * They are the input detectors that apply to model output: prompt injection and sponge attacks
+ * describe prompts, and a response is scanned as input on the next request anyway. Every output
+ * detector chooses block or log, because a blocking detector makes the gateway hold back the whole
+ * response until it is scanned.
+ */
+export const EnkryptOutputDetectorsSchema = z
+  .strictObject({
+    pii: EnkryptPiiDetectorSchema,
+    keyword_detector: EnkryptKeywordDetectorSchema,
+    topic_detector: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      topic: enkryptTopicsSchema,
+    }),
+    policy_violation: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      ...enkryptPolicyFields,
+    }),
+    toxicity: EnkryptActionDetectorSchema,
+    nsfw: EnkryptActionDetectorSchema,
+    bias: EnkryptActionDetectorSchema,
+  })
+  .superRefine(refineEnkryptDetectors);
+
+export type EnkryptOutputDetectors = z.infer<typeof EnkryptOutputDetectorsSchema>;
+
+export type EnkryptOutputDetectorId = keyof EnkryptOutputDetectors;
+
+export const ENKRYPT_OUTPUT_DETECTOR_IDS = [
+  'pii',
+  'keyword_detector',
+  'topic_detector',
+  'policy_violation',
+  'toxicity',
+  'nsfw',
+  'bias',
+] as const satisfies readonly (EnkryptOutputDetectorId & EnkryptDetectorId)[];
+
+function refineEnkryptRuleCount(
+  detectors: { policy_violation: { rules: EnkryptPolicyRule[] } },
+  ctx: z.core.$RefinementCtx
+) {
+  if (detectors.policy_violation.rules.length > enkryptLimits.rules) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['policy_violation', 'rules'],
+      message: `Add up to ${enkryptLimits.rules} rules.`,
+    });
+  }
+}
+
+/** Input detectors as an admin saves them, with policies capped at `ENKRYPT_DETECTOR_LIMITS.rules`. */
+export const EnkryptInputDetectorsUpdateSchema =
+  EnkryptInputDetectorsSchema.superRefine(refineEnkryptRuleCount);
+
+/** Output detectors as an admin saves them, with policies capped at `ENKRYPT_DETECTOR_LIMITS.rules`. */
+export const EnkryptOutputDetectorsUpdateSchema =
+  EnkryptOutputDetectorsSchema.superRefine(refineEnkryptRuleCount);
+
+/**
+ * Enkrypt AI input scan of each gateway chat request. Requests flagged by a blocking detector are
+ * blocked. Blocking scans fail closed while Enkrypt is unavailable; log-only scans do not gate
+ * requests. Without `detectors` the gateway applies Kilo Default. The gateway checks every input,
+ * including tool results.
+ * With `group_id`, only members of that organization group are scanned; without it, every member.
+ *
+ * `detectors` is validated with `EnkryptInputDetectorsSchema` where it is written and read, not
+ * here: organization settings are parsed on every settings write and on some reads, and a stored
+ * detector configuration that no longer matches the schema must only affect the guardrail.
+ */
+export const EnkryptInputGuardrailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  detectors: z.unknown().optional(),
+  group_id: z.string().nullable().optional(),
+});
+
+export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
+
+/**
+ * Enkrypt AI scan of each gateway chat response, off unless an admin enables it. While a detector
+ * blocks, the gateway holds back the whole upstream response until the scan allows it, so a
+ * streamed response arrives all at once. Log-only detectors scan a copy without delaying it.
+ * Without saved `detectors` no detector applies. `detectors` is validated with
+ * `EnkryptOutputDetectorsSchema` where it is written and read, like the input guardrail's.
+ */
+export const EnkryptOutputGuardrailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  detectors: z.unknown().optional(),
+});
+
+export type EnkryptOutputGuardrailSettings = z.infer<typeof EnkryptOutputGuardrailSettingsSchema>;
+
+export const OrganizationEnkryptSettingsSchema = z.object({
+  input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+  output_guardrail: EnkryptOutputGuardrailSettingsSchema.optional(),
+});
+
+export const ORGANIZATION_GUARDRAIL_TYPES = ['mcp'] as const;
+export type OrganizationGuardrailType = (typeof ORGANIZATION_GUARDRAIL_TYPES)[number];
+
+/** Matches the `organization_guardrails_name_check` constraint. */
+export const MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH = 500;
+
+export const ORGANIZATION_GUARDRAIL_STATUSES = ['enabled', 'disabled'] as const;
+export type OrganizationGuardrailStatus = (typeof ORGANIZATION_GUARDRAIL_STATUSES)[number];
+
+export const ORGANIZATION_GUARDRAIL_ENFORCEMENT_MODES = ['off', 'shadow', 'enforce'] as const;
+export const OrganizationGuardrailEnforcementSchema = z.enum(
+  ORGANIZATION_GUARDRAIL_ENFORCEMENT_MODES
+);
+export type OrganizationGuardrailEnforcement = z.infer<
+  typeof OrganizationGuardrailEnforcementSchema
+>;
+
+export const OrganizationSkillGuardrailsSchema = z.object({
+  enabled: z.boolean(),
+  scan_before_use: z.boolean(),
+});
+export type OrganizationSkillGuardrails = z.infer<typeof OrganizationSkillGuardrailsSchema>;
+
+export const OrganizationGuardrailsSettingsSchema = z.object({
+  mcp: z.object({ enforcement: OrganizationGuardrailEnforcementSchema }).optional(),
+  skill: OrganizationSkillGuardrailsSchema.optional(),
+});
+
+export type OrganizationGuardrailsSettings = z.infer<typeof OrganizationGuardrailsSettingsSchema>;
+
+export type OrganizationMcpGuardrailConfig =
+  | { kind: 'remote'; url: string }
+  | {
+      kind: 'package';
+      ecosystem: 'npm' | 'pypi';
+      identifier: string;
+      version_spec: string | null;
+      /** True when a stored range or legacy minimum cannot be parsed. */
+      version_spec_invalid?: boolean;
+      /** Transitional floor for clients deployed before version ranges. */
+      min_version?: string | null;
+    };
+
+export type OrganizationGuardrailConfig = OrganizationMcpGuardrailConfig;
+
+export type OrganizationGuardrailSource = {
+  registry: 'kilo_marketplace' | 'mcp_registry' | 'custom';
+  id: string | null;
+};
+
+export const ORGANIZATION_MCP_CONNECT_DECISIONS = ['allowed', 'denied'] as const;
+export type OrganizationMcpConnectDecision = (typeof ORGANIZATION_MCP_CONNECT_DECISIONS)[number];
+
+export type OrganizationMcpConnectTarget =
+  | { kind: 'remote'; url: string }
+  | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
+
+// The Vercel AI Gateway inference regions: https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
+export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
+
+// How Kilo clients may drive a browser for this organization's members: anything the
+// member configured, the bundled Playwright browser only, or no browser tools at all.
+export const ORGANIZATION_BROWSER_CONTROL_MODES = ['allow', 'playwright_only', 'off'] as const;
+export const OrganizationBrowserControlSchema = z.enum(ORGANIZATION_BROWSER_CONTROL_MODES);
+export type OrganizationBrowserControl = z.infer<typeof OrganizationBrowserControlSchema>;
+
+export const MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS = 200;
+export const MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH = 2048;
+
+function parseHttpOrigin(value: string): URL | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return null;
+  }
+  if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
+    return null;
+  }
+  if (url.pathname !== '/') {
+    return null;
+  }
+  return url;
+}
+
+/**
+ * The canonical origin for an allow-list entry, or null when the value is not a
+ * bare http(s) origin. Clients grant `<class>:<origin>`, so a path or query in a
+ * stored value would silently grant nothing usable.
+ */
+export function normalizeOrganizationBrowserOrigin(value: string): string | null {
+  return parseHttpOrigin(value.trim())?.origin ?? null;
+}
+
+export const OrganizationBrowserAllowedOriginSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH)
+  .refine(
+    value => normalizeOrganizationBrowserOrigin(value) !== null,
+    'Expected an http or https origin such as https://example.com'
+  );
+
 const OrganizationSettingsSchema = z.object({
+  // The default model and provider access for organization members. Group
+  // policies set the access of their own members. Organization admins manage
+  // both. See `evaluateEffectiveModelAccessPolicy` in
+  // `packages/web-shared/src/lib/organizations/group-policies/model-access/model-access.server.ts`.
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
@@ -988,6 +1656,30 @@ const OrganizationSettingsSchema = z.object({
   oss_credits_last_reset_at: z.string().nullable().optional(),
   // Full GitHub URL for OSS sponsored repos (e.g., https://github.com/org/repo)
   oss_github_url: z.string().url().nullable().optional(),
+  // Marks an organization as a sales demo org
+  is_sales_demo: z.boolean().optional(),
+  // When sales demo credits were last reset (ISO timestamp string)
+  sales_demo_last_reset_at: z.string().nullable().optional(),
+  // Seeded usage microdollars written by the sales demo populate step. Used to
+  // separate seeded usage from real spend when computing the ledger entry.
+  sales_demo_seeded_microdollars: z.number().optional(),
+  // Set by Kilo admins: lets the organization configure Enkrypt AI guardrails in Kilo Cloud
+  kilo_encrypt: z.boolean().optional(),
+  enkrypt: OrganizationEnkryptSettingsSchema.optional(),
+  guardrails: OrganizationGuardrailsSettingsSchema.optional(),
+  // Browser automation policy. Absent means `allow`, which leaves the choice of
+  // backend and origins to each member's client.
+  browserControl: OrganizationBrowserControlSchema.optional(),
+  // Origins every member's client treats as granted for browser read, act, and navigate.
+  browserAllowedOrigins: z
+    .array(OrganizationBrowserAllowedOriginSchema)
+    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS)
+    .optional(),
+  // Advanced policies. These apply only to an enterprise organization while the `gateway_settings`
+  // organization feature is enabled in the gateway configuration. A null or absent data_region
+  // routes Vercel AI Gateway requests globally; a set one also disables OpenRouter.
+  disable_openrouter: z.boolean().optional(),
+  data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -1158,12 +1850,21 @@ export const AuditLogAction = z.enum([
   'organization.member.remove', // ✅
   'organization.member.change_role', // ✅
   'organization.member.admin_add',
+  'organization.member.auto_join',
   'organization.sso.auto_provision', // ✅
   'organization.sso.set_domain', // ✅
   'organization.sso.remove_domain', // ✅
+  'organization.domain_claim.create',
+  'organization.domain_claim.verify',
+  'organization.domain_claim.lose_verification',
+  'organization.domain_claim.remove',
+  'organization.domain_claim.cleanup_started',
+  'organization.domain_claim.cleanup_completed',
+  'organization.domain_claim.cleanup_failed',
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
+  'organization.webhook_trigger.update',
   'organization.group.create',
   'organization.group.update',
   'organization.group.delete',
@@ -1178,6 +1879,9 @@ export const AuditLogAction = z.enum([
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
+  'organization.guardrail.add',
+  'organization.guardrail.update',
+  'organization.guardrail.remove',
 ]);
 
 // --- EncryptedData ---
@@ -1188,43 +1892,71 @@ export type EncryptedData = {
   authTag: string;
 };
 
+export type BYOKApiKeyEnvelope = {
+  encrypted_data: EncryptedData;
+  wrapped_dek: string;
+  kms_key_id: string;
+  kms_key_version: string;
+  algorithm: 'aes-256-gcm';
+  envelope_version: 1;
+};
+
+/**
+ * RSA + AES envelope stored for secrets that are encrypted by the web app
+ * and decrypted by a Worker. Kept structural here so the schema package does
+ * not need to depend on the runtime encryption implementation.
+ */
+export type ByocCredentialEnvelope = {
+  scheme: string;
+  version: 1;
+  keyId: string;
+  ciphertext: {
+    encryptedData: string;
+    encryptedDEK: string;
+    algorithm: 'rsa-aes-256-gcm';
+    version: 1;
+  };
+};
+
+export type VercelComputeCredentialEnvelope = ByocCredentialEnvelope & {
+  scheme: 'byoc-vercel-credential-rsa-aes-256-gcm';
+};
+
+export type ByocSetupStatus = 'pending' | 'building' | 'ready' | 'failed';
+export type ByocUpgradeStatus = 'pending' | 'building' | 'failed';
+export type VercelComputeSetupStatus = ByocSetupStatus;
+export type VercelComputeUpgradeStatus = ByocUpgradeStatus;
+
+export type VercelComputeTokenScope = 'team' | 'project';
+
+export type VercelComputeSetupStep =
+  | 'validating_access'
+  | 'create_builder'
+  | 'install_system_dependencies'
+  | 'install_node_dependencies'
+  | 'snapshot_builder'
+  | 'create_validator'
+  | 'launch_validator_wrapper'
+  | 'verify_validator_call_home'
+  | 'stop_validator'
+  | 'confirm_terminal';
+
 // --- AuthProviderId ---
 
 export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'passkey'
   | 'anaconda'
   | 'github'
   | 'gitlab'
   | 'linkedin'
   | 'discord'
+  | 'openai'
+  | 'claude'
   | 'fake-login'
   | 'workos';
-
-// --- AbuseClassification ---
-
-export type AbuseClassification = (typeof ABUSE_CLASSIFICATION)[keyof typeof ABUSE_CLASSIFICATION];
-export const ABUSE_CLASSIFICATION = {
-  NOT_ABUSE: -100,
-  CLASSIFICATION_ERROR: -50,
-  NOT_CLASSIFIED: 0,
-  LIKELY_ABUSE: 200,
-} as const;
-
-// --- Microdollar Usage --
-
-export const GatewayApiKindSchema = z.enum([
-  'chat_completions',
-  'embeddings',
-  'fim_completions',
-  'edit_completions',
-  'messages',
-  'responses',
-  'audio_transcriptions',
-]);
-
-export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
 
 // --- Integration types ---
 
@@ -1254,23 +1986,6 @@ export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES
 
 export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
 
-// --- Deployment types ---
-
-export const providerSchema = z.enum(['github', 'git', 'app-builder']);
-
-export type Provider = z.infer<typeof providerSchema>;
-
-export const buildStatusSchema = z.enum([
-  'queued',
-  'building',
-  'deploying',
-  'deployed',
-  'failed',
-  'cancelled',
-]);
-
-export type BuildStatus = z.infer<typeof buildStatusSchema>;
-
 // --- Code Reviewer analytics ---
 
 export const CODE_REVIEW_ANALYTICS_SCHEMA_VERSION = 1;
@@ -1285,6 +2000,17 @@ export const CodeReviewAnalyticsCaptureStatus = {
 
 export type CodeReviewAnalyticsCaptureStatus =
   (typeof CodeReviewAnalyticsCaptureStatus)[keyof typeof CodeReviewAnalyticsCaptureStatus];
+
+export const CodeReviewPublicationStatus = {
+  Published: 'published',
+  Unchanged: 'unchanged',
+  Missing: 'missing',
+  Unknown: 'unknown',
+  NotApplicable: 'not_applicable',
+} as const;
+
+export type CodeReviewPublicationStatus =
+  (typeof CodeReviewPublicationStatus)[keyof typeof CodeReviewPublicationStatus];
 
 export const CodeReviewAnalyticsChangeType = {
   BugFix: 'bug_fix',
@@ -1386,15 +2112,13 @@ export type ManuallyAddedRepository = z.infer<typeof ManuallyAddedRepositorySche
 
 // --- Code Reviewer Council (enterprise multi-specialist review) ---
 
-export const COUNCIL_SPECIALIST_ROLES = [
-  'security',
-  'performance',
-  'testing',
-  'correctness',
-  'docs',
-  'custom',
-] as const;
-export type CouncilSpecialistRole = (typeof COUNCIL_SPECIALIST_ROLES)[number];
+// The role vocabulary and the governance choices are plain data the config UI
+// paints, so they live in @kilocode/app-shared/code-review and are re-exported
+// here: the web form, the mobile screen and the persisted schema cannot drift.
+export {
+  COUNCIL_SPECIALIST_ROLES,
+  type CouncilSpecialistRole,
+} from '@kilocode/app-shared/code-review';
 
 // Council decision model v2: a vote is BINARY (yes/no). "warn"/"abstain" are NOT votes —
 // a warning is a finding severity (see COUNCIL_FINDING_SEVERITIES), and a specialist that
@@ -1427,6 +2151,14 @@ export const CODE_REVIEW_TRIGGER_SOURCES = ['manual', 'webhook'] as const;
 export const CodeReviewTriggerSourceSchema = z.enum(CODE_REVIEW_TRIGGER_SOURCES);
 export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSchema>;
 
+export {
+  COUNCIL_AGGREGATION_STRATEGIES,
+  COUNCIL_MAX_REQUIRED_LABELS,
+  COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
+  type CouncilAggregationStrategy,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
+} from '@kilocode/app-shared/code-review';
+
 // Governance mode (v2). Field is still named `aggregation_strategy` for continuity, but the
 // values are the three DISTINCT modes under binary votes:
 // - 'advisory'  — report votes/findings only; compute NO aggregate decision and NO merge gate.
@@ -1434,14 +2166,7 @@ export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSche
 // - 'majority'  — block only when block votes outnumber pass votes. Lenient.
 // (v1's 'any_blocking_member' is dropped: with no abstain, it is mathematically identical to
 // 'unanimous'. 'advisory' is the safe default so a new council never blocks a merge unasked.)
-export const COUNCIL_AGGREGATION_STRATEGIES = ['advisory', 'unanimous', 'majority'] as const;
 export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRATEGIES);
-export type CouncilAggregationStrategy = z.infer<typeof CouncilAggregationStrategySchema>;
-
-// The safe default governance mode: report only, never gate a merge unasked. Single source of
-// truth — referenced by the schema default, the manual-job UI state, dispatch, and the label
-// fallback, so the default can't drift between the backend and what the UI initializes to.
-export const DEFAULT_COUNCIL_AGGREGATION_STRATEGY: CouncilAggregationStrategy = 'advisory';
 
 // A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
 // execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
@@ -1493,19 +2218,13 @@ export const CouncilSpecialistSchema = z.object({
   // model; unset falls back to the review's default model. Bounded to the downstream
   // runtime-agent model limit so a valid council request can't fail at session prep.
   model_slug: z.string().max(MAX_RUNTIME_AGENT_MODEL_LENGTH).optional(),
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
 
-// Caps for the council `required_labels` selection gate. Exported so the config UI can enforce the
-// same limits client-side and keep frontend/backend validation in sync.
-export const COUNCIL_MAX_REQUIRED_LABELS = 20;
-export const COUNCIL_REQUIRED_LABEL_MAX_LENGTH = 100;
+// Caps for the council `required_labels` selection gate live in
+// @kilocode/app-shared/code-review (re-exported above) so the config UI can
+// enforce the same limits client-side and keep frontend/backend validation in sync.
 
 // The council definition: what the council IS (specialists + how their votes
 // aggregate). It carries no trigger/selection logic — whether a given run is a
@@ -1627,14 +2346,34 @@ export const RepositoryModelOverrideSchema = z.object({
   model_slug: z.string().max(512),
   // Thinking effort variant name (e.g. "high", "max") — null means model default,
   // matching the global `thinking_effort` field below.
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type RepositoryModelOverride = z.infer<typeof RepositoryModelOverrideSchema>;
+
+export const ReviewGuidelineSourceRepositoriesSchema = z
+  .array(
+    z
+      .string()
+      .max(140)
+      .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/)
+  )
+  .max(100);
+
+export type ReviewGuidelineImport = {
+  source: string;
+  sha: string | null;
+  status:
+    | 'imported'
+    | 'invalid'
+    | 'not_allowed'
+    | 'not_accessible'
+    | 'not_found'
+    | 'self_import'
+    | 'entry_limit'
+    | 'unsupported_platform'
+    | 'fetch_error'
+    | 'dropped_budget';
+};
 
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(REVIEW_STYLES),
@@ -1645,12 +2384,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   custom_instructions: z.string().nullable().optional(),
   model_slug: z.string(),
   // Thinking effort variant name (e.g. "high", "max", "thinking") — null means model default
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
   selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
@@ -1671,6 +2405,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   // effect there yet.
   skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
+  review_guideline_source_repositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)
@@ -1849,11 +2584,30 @@ export type SecurityFindingAnalysis = {
 
 // --- OpenRouter types ---
 
+/**
+ * Time-of-day prices. OpenRouter lists the prices of each UTC window in `overrides`; Vercel AI
+ * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
+ */
+export const PriceOverrideSchema = z.looseObject({
+  prompt: z.string().optional().catch(undefined),
+  completion: z.string().optional().catch(undefined),
+  input_cache_read: z.string().optional().catch(undefined),
+  input_cache_write: z.string().optional().catch(undefined),
+});
+
+export const PeakPricingSchema = z.looseObject({ multiplier: z.number() });
+
+const TimeOfDayPricingFields = {
+  overrides: z.array(PriceOverrideSchema).optional().catch(undefined),
+  peak_pricing: PeakPricingSchema.optional().catch(undefined),
+};
+
 export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
   prompt: z.string(),
   completion: z.string(),
   discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
 });
 
 export type OpenRouterBaseModel = z.infer<typeof OpenRouterBaseModel>;
@@ -1872,6 +2626,7 @@ export const OpenRouterBaseModel = z.object({
 export type OpenRouterEndpoint = z.infer<typeof OpenRouterEndpoint>;
 export const OpenRouterEndpoint = z.object({
   provider_display_name: z.string(),
+  variant: z.string().nullish(),
   is_free: z.boolean(),
   pricing: OpenRouterPricing,
   data_policy: z
@@ -1880,6 +2635,12 @@ export const OpenRouterEndpoint = z.object({
       retainsPrompts: z.boolean().optional(),
     })
     .nullish(),
+  /**
+   * The inference regions Vercel AI Gateway can pin the model to at this provider, in a fixed
+   * order. Absent when Vercel does not serve the model through the provider or has no regional
+   * inference for it there.
+   */
+  vercel_inference_regions: z.array(OrganizationDataRegionSchema).optional().catch(undefined),
 });
 
 export type OpenRouterModel = z.infer<typeof OpenRouterModel>;
@@ -1903,6 +2664,8 @@ export const OpenRouterProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -1931,6 +2694,8 @@ export const NormalizedProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -1940,6 +2705,11 @@ export const NormalizedProvider = z.object({
       className: z.string().optional(),
     })
     .optional(),
+  /**
+   * Set on a direct BYOK provider that only serves an organization's own keys in catalog mode.
+   * Provider allow-lists can name it, but Kilo's own routes never use it.
+   */
+  byokOnly: z.literal(true).optional(),
   models: z.array(OpenRouterModel),
 });
 
@@ -1950,6 +2720,88 @@ export const NormalizedOpenRouterResponse = z.object({
   total_models: z.number(),
   generated_at: z.string(),
 });
+
+export const EnkryptScoreSchema = z.object({
+  model_name: z.string().min(1),
+  provider: z.string().min(1),
+  source: z.string().nullish(),
+  risk_score: z.number().nullable().optional(),
+  bias_score: z.number().nullable().optional(),
+  cbrn_score: z.number().nullable().optional(),
+  harmful_score: z.number().nullable().optional(),
+  insecure_code_score: z.number().nullable().optional(),
+  toxicity_score: z.number().nullable().optional(),
+  robustness_score: z.number().nullable().optional(),
+  jailbreak_score: z.number().nullable().optional(),
+  evasion_score: z.number().nullable().optional(),
+  safety_score: z.number().nullable().optional(),
+  nist_score: z.number().nullable().optional(),
+  owasp_score: z.number().nullable().optional(),
+});
+
+export type EnkryptScore = z.infer<typeof EnkryptScoreSchema>;
+
+export const EnkryptBenchmarkSchema = EnkryptScoreSchema.extend({
+  ingestedAt: z.string().datetime(),
+  evaluatedAt: z.null(),
+});
+
+export type EnkryptBenchmark = z.infer<typeof EnkryptBenchmarkSchema>;
+
+export const EnkryptVerificationSchema = z.object({
+  checkedAt: z.string().datetime(),
+  scoreHash: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
+export type EnkryptVerification = z.infer<typeof EnkryptVerificationSchema>;
+
+export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVerificationSchema);
+
+export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
+
+export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
+
+export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
+
+/** Which guardrail made an Enkrypt call: the request scan or the response scan. */
+export type EnkryptGuardrailDirection = 'input' | 'output';
+
+export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
+
+export const EnkryptPublishedBenchmarkSchema = EnkryptBenchmarkSchema.extend({
+  lastCheckedAt: z.string().datetime(),
+  staleAfter: z.string().datetime(),
+  freshness: z.enum(['fresh', 'stale']),
+});
+
+export type EnkryptPublishedBenchmark = z.infer<typeof EnkryptPublishedBenchmarkSchema>;
+
+export const EnkryptSyncCountsSchema = z.object({
+  fetchedCount: z.number().int().nonnegative(),
+  rejectedCount: z.number().int().nonnegative(),
+  matchedCount: z.number().int().nonnegative(),
+  unmatchedCount: z.number().int().nonnegative(),
+  ambiguousCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative(),
+});
+
+export type EnkryptSyncCounts = z.infer<typeof EnkryptSyncCountsSchema>;
+
+export const EnkryptFailureCategorySchema = z.enum([
+  'configuration',
+  'authentication',
+  'rate_limited',
+  'response_validation',
+  'timeout',
+  'network',
+  'upstream',
+  'database',
+  'coverage',
+  'superseded',
+  'unexpected',
+]);
+
+export type EnkryptFailureCategory = z.infer<typeof EnkryptFailureCategorySchema>;
 
 export const OpenCodePromptSchema = z.enum([
   'codex',
@@ -1987,7 +2839,6 @@ export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 export const CustomLlmProviderSchema = z.enum([
   'anthropic', // uses Messages API
   'openai', // uses Responses API
-  'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 
@@ -2005,11 +2856,80 @@ export const OpenCodeVariantSchema = z.object({
 
 export type OpenCodeVariant = z.infer<typeof OpenCodeVariantSchema>;
 
+// models.dev `reasoning_options` format, consumed by Kilo CLI v2 to build its own
+// per-protocol reasoning variants.
+export const ReasoningOptionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('toggle') }),
+  z.object({
+    type: z.literal('effort'),
+    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
+  }),
+]);
+
+export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
+
+/**
+ * Per-key BYOK settings. Every field is optional so new settings need no backfill.
+ * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
+ * ids, so organization model policies apply to it.
+ * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
+ * same request. Keys without one keep their default order after every prioritized key.
+ */
+export const ByokApiKeySettingsSchema = z.object({
+  serve_catalog_models: z.boolean().optional(),
+  priority: z.number().int().nonnegative().optional(),
+});
+
+export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
+
+export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
+
+export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
+
+/** The upstream endpoint of a direct BYOK model, for providers that serve models from several. */
+export const DirectByokModelEndpointSchema = z.enum([
+  // Amazon Bedrock
+  'mantle-chat',
+  'mantle-openai',
+  'runtime-anthropic',
+  'runtime-openai',
+  'runtime-responses',
+  // Google Vertex AI
+  'openapi',
+  'openapi-responses',
+  'anthropic',
+  'mistral',
+]);
+
+export type DirectByokModelEndpoint = z.infer<typeof DirectByokModelEndpointSchema>;
+
+export const DirectByokModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
+  context_length: z.number(),
+  max_completion_tokens: z.number(),
+  reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
+  catalog_model_id: z.string().optional(),
+  /**
+   * Provider-specific upstream endpoint for providers whose models are served
+   * by different endpoints, such as Amazon Bedrock runtime versus mantle.
+   */
+  endpoint: DirectByokModelEndpointSchema.optional(),
+});
+
+export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+
+export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
+
 export const OpenCodeSettingsSchema = z.object({
   ai_sdk_provider: CustomLlmProviderSchema.optional(),
   family: OpenCodeFamilySchema.optional(),
   prompt: OpenCodePromptSchema.optional(),
   variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+  reasoning_options: z.array(ReasoningOptionSchema).optional(),
 });
 
 export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
@@ -2022,17 +2942,6 @@ export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
 
-// All price fields are in dollars per token (e.g. "0.000001" = $1 per million tokens),
-// matching the OpenRouter pricing convention.
-export const CustomLlmPricingSchema = z.object({
-  prompt: z.string(),
-  completion: z.string(),
-  input_cache_read: z.string().optional(),
-  input_cache_write: z.string().optional(),
-});
-
-export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
-
 export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
@@ -2042,15 +2951,49 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
+export const ReasoningDetailsTransform = {
+  GeminiThought: 'gemini-thought',
+  /** The upstream sends reasoning as a DeepSeek-style `reasoning_content` string. */
+  ReasoningContent: 'reasoning-content',
+  /** The upstream sends reasoning as a plain `reasoning` string, without `reasoning_details`. */
+  Reasoning: 'reasoning',
+} as const;
+
+export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
+
+export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
+
+export const CustomLlmApiKindSchema = z.enum(['chat_completions', 'messages', 'responses']);
+
+export type CustomLlmApiKind = z.infer<typeof CustomLlmApiKindSchema>;
+
+/** The API that clients use for a custom LLM, given its `opencode_settings.ai_sdk_provider`. */
+export function getCustomLlmClientApiKind(
+  aiSdkProvider: CustomLlmProvider | undefined
+): CustomLlmApiKind {
+  switch (aiSdkProvider) {
+    case 'anthropic':
+      return 'messages';
+    case 'openai':
+      return 'responses';
+    default:
+      return 'chat_completions';
+  }
+}
+
 export const CustomLlmApiConfigSchema = z.object({
-  internal_id: z.string().min(1),
+  internal_id: z.string().min(1).optional(),
+  /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
+  api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   base_url: z.url(),
+  disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
+  user_hash_as_mt_user_id: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  use_gemini_reasoning_transform: z.boolean().optional(),
+  reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -2071,6 +3014,13 @@ export const GoogleServiceAccountKeySchema = z.object({
 
 export type GoogleServiceAccountKey = z.infer<typeof GoogleServiceAccountKeySchema>;
 
+export const GoogleServiceAccountSigningKeySchema = GoogleServiceAccountKeySchema.pick({
+  client_email: true,
+  private_key: true,
+});
+
+export type GoogleServiceAccountSigningKey = z.infer<typeof GoogleServiceAccountSigningKeySchema>;
+
 export const CustomLlmApiKeyCredentialsSchema = z.object({
   type: z.literal('api_key'),
   api_key: z.string().min(1),
@@ -2078,30 +3028,434 @@ export const CustomLlmApiKeyCredentialsSchema = z.object({
 
 export type CustomLlmApiKeyCredentials = z.infer<typeof CustomLlmApiKeyCredentialsSchema>;
 
+export const CustomLlmXApiKeyCredentialsSchema = z.object({
+  type: z.literal('x-api-key'),
+  api_key: z.string().min(1),
+});
+
+export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredentialsSchema>;
+
+/**
+ * Routes requests through apps/ai-gateway-secure-proxy. The definition's
+ * `base_url` is the proxy's `/api/proxy` URL, used as-is; `config.url` takes the
+ * role `base_url` has for direct custom LLMs, including `disable_url_suffix`.
+ */
+export const CustomLlmSecureProxyCredentialsSchema = z.object({
+  type: z.literal('secure_proxy'),
+  proxy_secret: z.string().min(1),
+  config: z.object({
+    url: SecureProxyUpstreamUrlSchema,
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+  }),
+});
+
+export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
+
+/**
+ * Signs requests with AWS Signature Version 4 using IAM access keys, for Amazon
+ * Bedrock's OpenAI-compatible and Anthropic Messages endpoints on
+ * `bedrock-runtime` or `bedrock-mantle`. Bedrock API keys need no signing and
+ * use `api_key` (or `x-api-key` on Anthropic routes).
+ */
+export const CustomLlmAwsBedrockCredentialsSchema = z.object({
+  type: z.literal('aws_bedrock'),
+  region: z.string().min(1),
+  access_key_id: z.string().min(1),
+  secret_access_key: z.string().min(1),
+});
+
+export type CustomLlmAwsBedrockCredentials = z.infer<typeof CustomLlmAwsBedrockCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
+  CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
+  CustomLlmSecureProxyCredentialsSchema,
+  CustomLlmAwsBedrockCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  ...CustomLlmMetadataSchema.shape,
-  ...CustomLlmApiConfigSchema.shape,
-  display_name: z.string(),
-  organization_ids: z.array(z.uuid()),
-  group_ids: z.array(z.uuid()).optional(),
-  pricing: CustomLlmPricingSchema.optional(),
+export const GatewayModelIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9./:~-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / : ~ -');
+
+/** Kilo-owned model namespaces; mirrors the prefixes in web-shared `model-utils.ts`. */
+const RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES = ['kilo/', 'kilo-auto/', 'kilocode/'];
+
+/** `:` selects a gateway variant and `~` an OpenRouter alias, so neither may appear. */
+export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(
+  id => !id.includes(':') && !id.includes('~'),
+  { message: 'public_id must not contain ":" or "~"' }
+).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
+  message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
 });
+
+export const CustomLlmInferenceProviderSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
+
+/**
+ * Makes a custom LLM available to every user, including anonymous ones when it
+ * is free. Unlike private ones it is subject to organization provider allow
+ * lists.
+ */
+export const CustomLlmPublicSchema = z.object({
+  /** Provider slugs the upstream may serve this model from. They are listed in
+   * the models-by-provider snapshot and enforced against provider allow lists.
+   * A slug that OpenRouter does not know becomes a synthesized provider. */
+  inference_providers: z.array(CustomLlmInferenceProviderSlugSchema).min(1),
+  /** Shown in model pickers instead of the private custom LLM disclaimer. */
+  description: z.string().trim().min(1),
+});
+
+export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
+
+/** An ISO 3166-1 alpha-2 code as sent in Vercel's `x-vercel-ip-country` header. */
+export const VercelCountryCodeSchema = z
+  .string()
+  .regex(/^[A-Z]{2}$/, 'must be an uppercase two-letter country code such as "US"');
+
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+const CustomPricingTierSchema = z.object({
+  start_context_length: z.number().int().nonnegative(),
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+});
+
+export const CustomPricingTiersSchema = z
+  .tuple([CustomPricingTierSchema], CustomPricingTierSchema)
+  .superRefine((tiers, ctx) => {
+    if (tiers[0].start_context_length !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The first pricing tier must start at context length 0',
+        path: [0, 'start_context_length'],
+      });
+    }
+    let previousStart = tiers[0].start_context_length;
+    for (const [index, { start_context_length }] of tiers.entries()) {
+      if (index > 0 && start_context_length <= previousStart) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pricing tiers must be ordered by ascending start context length',
+          path: [index, 'start_context_length'],
+        });
+      }
+      previousStart = start_context_length;
+    }
+  });
+
+export type CustomPricingTiers = z.infer<typeof CustomPricingTiersSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    ...CustomLlmMetadataSchema.shape,
+    ...CustomLlmApiConfigSchema.shape,
+    display_name: z.string(),
+    /** Without organization or group grants, a private custom LLM is stored but reachable by nobody. */
+    organization_ids: z.array(z.uuid()).optional(),
+    group_ids: z.array(z.uuid()).optional(),
+    public: CustomLlmPublicSchema.optional(),
+    /** Hidden from model lists and refused by the gateway for requests from these countries.
+     * A request without a known country is not restricted. */
+    country_deny_list: z.array(VercelCountryCodeSchema).optional(),
+    /** What Kilo bills users, in the custom pricing tier format. Must be unset when the
+     * public id matches the free model id rules, and should be set otherwise. */
+    pricing: CustomPricingTiersSchema.optional(),
+    /** Whether the upstream may train on prompts. Only allowed with pricing; without it,
+     * or when unset, the model is assumed to train on prompts. Set it to false only for
+     * an upstream with zero data retention. */
+    may_train_on_prompts: z.boolean().optional(),
+  })
+  .superRefine((definition, ctx) => {
+    const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
+    if (definition.api_kinds && !definition.api_kinds.includes(clientApiKind)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['api_kinds'],
+        message: `api_kinds must include ${clientApiKind}, the API clients use for this ai_sdk_provider`,
+      });
+    }
+    if (definition.may_train_on_prompts !== undefined && !definition.pricing) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['may_train_on_prompts'],
+        message: 'may_train_on_prompts must not be set without pricing',
+      });
+    }
+    if (!definition.public) return;
+    for (const key of ['organization_ids', 'group_ids'] as const) {
+      if (definition[key] !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `${key} must not be set when public is set`,
+        });
+      }
+    }
+  });
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
-// --- StoredModel ---
+export const AutoFreeModelSchema = z.object({
+  model: GatewayModelIdSchema,
+  weight: z.number().int().positive(),
+  reasoning: z.object({
+    enabled: z.boolean().optional(),
+    effort: ReasoningEffortSchema.optional(),
+  }),
+});
+
+export type AutoFreeModelConfig = z.infer<typeof AutoFreeModelSchema>;
+
+export const AutoFreeConfigSchema = z.object({
+  models: z.array(AutoFreeModelSchema).superRefine((models, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { model }] of models.entries()) {
+      if (seen.has(model)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate model "${model}"`,
+          path: [index, 'model'],
+        });
+      }
+      seen.add(model);
+    }
+  }),
+});
+
+export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
+
+export const GATEWAY_MODEL_LIST_MAX_COUNT = 200;
+
+export const GatewayModelListConfigSchema = z.object({
+  models: z
+    .array(GatewayModelIdSchema)
+    .max(GATEWAY_MODEL_LIST_MAX_COUNT)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, model] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({ code: 'custom', message: `Duplicate model "${model}"`, path: [index] });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
+
+export const VercelModelIdOverrideSchema = z.object({
+  openrouter_model_id: GatewayModelIdSchema,
+  vercel_model_id: GatewayModelIdSchema,
+});
+
+export type VercelModelIdOverride = z.infer<typeof VercelModelIdOverrideSchema>;
+
+export const VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT = 200;
+
+export const VercelModelIdOverridesConfigSchema = z.object({
+  overrides: z
+    .array(VercelModelIdOverrideSchema)
+    .max(VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT)
+    .superRefine((overrides, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { openrouter_model_id }] of overrides.entries()) {
+        if (seen.has(openrouter_model_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate OpenRouter model "${openrouter_model_id}"`,
+            path: [index, 'openrouter_model_id'],
+          });
+        }
+        seen.add(openrouter_model_id);
+      }
+    }),
+});
+
+export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
+
+export const LatestAliasTargetSchema = z.object({
+  alias: z.string().startsWith('~'),
+  target: z.string().min(1),
+  /** A newer target the alias switches to once `effective_at` passes. */
+  pending: z
+    .object({
+      target: z.string().min(1),
+      effective_at: z.iso.datetime(),
+    })
+    .optional(),
+});
+
+export type LatestAliasTarget = z.infer<typeof LatestAliasTargetSchema>;
+
+export const LatestAliasTargetsConfigSchema = z.object({
+  aliases: z.array(LatestAliasTargetSchema).superRefine((aliases, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { alias }] of aliases.entries()) {
+      if (seen.has(alias)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate alias "${alias}"`,
+          path: [index, 'alias'],
+        });
+      }
+      seen.add(alias);
+    }
+  }),
+});
+
+export type LatestAliasTargetsConfig = z.infer<typeof LatestAliasTargetsConfigSchema>;
+
+export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
+export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;
+
+/** An OpenRouter provider slug, optionally with an endpoint variant such as `minimax/fp8`. */
+export const PreferredProviderSlugSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9.-]+(\/[a-z0-9.-]+)?$/,
+    'Provider slugs may only contain lowercase letters, digits, . and -, with at most one /'
+  );
+
+const PreferredProviderOrderSubstringSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9./:~-]+$/,
+    'Substrings may only contain lowercase letters, digits, and . / : ~ -'
+  );
+
+function uniqueStringArray<T extends z.ZodString>(item: T, label: string) {
+  return z.array(item).superRefine((values, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, value] of values.entries()) {
+      if (seen.has(value)) {
+        ctx.addIssue({ code: 'custom', message: `Duplicate ${label} "${value}"`, path: [index] });
+      }
+      seen.add(value);
+    }
+  });
+}
+
+/**
+ * Matches a model ID that contains at least one `includes` substring and no
+ * `excludes` substring.
+ */
+export const PreferredProviderOrderRuleSchema = z
+  .object({
+    includes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').min(1),
+    excludes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').optional(),
+    providers: uniqueStringArray(PreferredProviderSlugSchema, 'provider')
+      .min(1)
+      .max(PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS),
+  })
+  .superRefine(({ includes, excludes }, ctx) => {
+    for (const [index, exclude] of (excludes ?? []).entries()) {
+      if (includes.includes(exclude)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `"${exclude}" is both included and excluded`,
+          path: ['excludes', index],
+        });
+      }
+    }
+  });
+
+export type PreferredProviderOrderRule = z.infer<typeof PreferredProviderOrderRuleSchema>;
+
+/**
+ * Ordered rules: the first matching rule decides the provider order. Stored as
+ * an array because jsonb does not keep object key order.
+ */
+export const PreferredProviderOrderConfigSchema = z.object({
+  rules: z.array(PreferredProviderOrderRuleSchema).max(PREFERRED_PROVIDER_ORDER_MAX_RULES),
+});
+
+export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;
+
+export const CUSTOM_PRICING_MAX_MODELS = 500;
+
+export const CustomPricingSchema = z.object({
+  model: GatewayModelIdSchema,
+  pricing: CustomPricingTiersSchema,
+  /** Human-readable discount shown in the model name; never used in calculations. */
+  discountPercentage: z.number().gt(0).lte(100).optional(),
+  /** Only use this pricing when the upstream response does not report a market cost. */
+  fallbackOnly: z.boolean().optional(),
+});
+
+export type CustomPricing = z.infer<typeof CustomPricingSchema>;
+
+/** Stored as an array because jsonb does not keep object key order. */
+export const CustomPricingConfigSchema = z.object({
+  models: z
+    .array(CustomPricingSchema)
+    .max(CUSTOM_PRICING_MAX_MODELS)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { model }] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
+            path: [index, 'model'],
+          });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
+
+// --- Gateway models ---
+
+export const ModelArchitectureSchema = z.object({
+  output_modalities: z.array(z.string()),
+});
 
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  // The model types listed by Vercel AI Gateway; OpenRouter does not set a type.
+  type: z
+    .enum([
+      'language',
+      'embedding',
+      'image',
+      'video',
+      'speech',
+      'transcription',
+      'reranking',
+      'realtime',
+      'evaluation',
+    ])
+    .optional()
+    .catch(undefined),
+  alias_target: z
+    .object({
+      slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
+  architecture: ModelArchitectureSchema.optional().catch(undefined),
   reasoning: z
     .object({
       mandatory: z.boolean(),
@@ -2111,25 +3465,86 @@ export const ModelSchema = z.object({
     .catch(undefined),
 });
 
+/**
+ * The fields Vercel AI Gateway's model list adds to describe a model, which Kilo needs to list
+ * models that only Vercel serves. OpenRouter's list lacks them or uses other shapes, so its models
+ * parse with `ModelSchema` alone.
+ */
+export const VercelModelSchema = ModelSchema.extend({
+  description: z.string().optional().catch(undefined),
+  /** Seconds since the epoch: when Vercel added the model, often a shared backfill date. */
+  created: z.number().optional().catch(undefined),
+  /** Seconds since the epoch. */
+  released: z.number().optional().catch(undefined),
+  context_window: z.number().optional().catch(undefined),
+  max_tokens: z.number().optional().catch(undefined),
+  modalities: z
+    .object({ input: z.array(z.string()), output: z.array(z.string()) })
+    .optional()
+    .catch(undefined),
+  supported_parameters: z.array(z.string()).optional().catch(undefined),
+  pricing: z
+    .object({
+      input: z.string(),
+      output: z.string(),
+      input_cache_read: z.string().optional().catch(undefined),
+      input_cache_write: z.string().optional().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+  /** Milliseconds since the epoch. */
+  deprecated_at: z
+    .number()
+    .int()
+    .min(0)
+    .max(Date.UTC(9999, 11, 31))
+    .optional()
+    .catch(undefined),
+  reasoning_options: z
+    .array(
+      z.object({
+        type: z.string(),
+        values: z.array(z.string()).optional().catch(undefined),
+      })
+    )
+    .optional()
+    .catch(undefined),
+});
+
+/** A gateway model list entry. The Vercel-only fields are never set on OpenRouter models. */
+export type GatewayModel = z.infer<typeof VercelModelSchema>;
+
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
+
+export const VercelModelsSchema = z.object({ data: z.array(VercelModelSchema) });
+
+export const EndpointPricingSchema = z.object({
+  prompt: z.string(),
+  completion: z.string(),
+  image: z.string().optional(),
+  request: z.string().optional(),
+  input_cache_read: z.string().optional(),
+  input_cache_write: z.string().optional(),
+  web_search: z.string().optional(),
+  internal_reasoning: z.string().optional(),
+  discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
+});
+
+export const EndpointInferenceRegionSchema = z.object({
+  geo_region: z.string().optional().catch(undefined),
+});
 
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
   context_length: z.number().optional(),
-  pricing: z
-    .object({
-      prompt: z.string(),
-      completion: z.string(),
-      image: z.string().optional(),
-      request: z.string().optional(),
-      input_cache_read: z.string().optional(),
-      input_cache_write: z.string().optional(),
-      web_search: z.string().optional(),
-      internal_reasoning: z.string().optional(),
-      discount: z.number().optional(),
-    })
-    .optional(),
+  pricing: EndpointPricingSchema.optional(),
+  // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
+  has_zdr: z.boolean().optional().catch(undefined),
+  has_no_training: z.boolean().optional().catch(undefined),
+  /** Vercel AI Gateway: the regions the endpoint can be pinned to; OpenRouter does not set it. */
+  inference_regions: z.array(EndpointInferenceRegionSchema).optional().catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;
@@ -2138,18 +3553,14 @@ export const EndpointsSchema = z.object({
   data: z.object({ endpoints: z.array(EndpointSchema) }),
 });
 
-export const StoredModelSchema = ModelSchema.and(
-  z.object({
-    endpoints: z.array(EndpointSchema),
-  })
-);
-
-export type StoredModel = z.infer<typeof StoredModelSchema>;
-
 // =============================================================================
 // C. Stripe type (inline)
 // =============================================================================
 
+// Stripe treats subscription statuses as an open set: the SDK types every
+// generated enum as its documented values plus an arbitrary string, because the
+// provider can return a value a pinned SDK version does not list. The column
+// stores the provider's value unchanged, so the domain type mirrors that.
 export type StripeSubscriptionStatus =
   | 'incomplete'
   | 'incomplete_expired'
@@ -2158,18 +3569,23 @@ export type StripeSubscriptionStatus =
   | 'past_due'
   | 'canceled'
   | 'unpaid'
-  | 'paused';
+  | 'paused'
+  | (string & {});
 
 // --- Code review terminal reasons ---
 
 /**
  * Valid values for cloud_agent_code_reviews.terminal_reason.
- * KEEP IN SYNC with CloudAgentTerminalReason in
- * packages/worker-utils/src/cloud-agent-next-client.ts — both lists must
- * contain the same literal values.
+ *
+ * Single source of truth for the code review terminal reason enum. Worker-side
+ * consumers re-export this as CLOUD_AGENT_TERMINAL_REASONS in
+ * packages/worker-utils/src/cloud-agent-next-client.ts rather than maintaining
+ * a second copy.
  */
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',
+  // The billed or acting user is blocked (abuse, ToS, deletion), not short on credit.
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',
@@ -2199,9 +3615,22 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_rate_limited_byok',
   'assistant_rate_limited_managed',
   'assistant_unavailable',
+  // `assistant_unavailable` collapsed two different gateway outcomes under one
+  // label: a real upstream provider connection failure, and the gateway's own
+  // `temporarily_unavailable` (our over-limit guard or our managed-provider
+  // payment failure). The gateway tags the origin in `error_type` on the
+  // response body; cloud-agent-next now maps it to a distinct reason so the
+  // admin split reflects which component actually failed.
+  'assistant_provider_disconnect',
+  'assistant_gateway_unavailable',
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',
+  'assistant_invalid_request_byok',
+  'assistant_context_limit',
+  'assistant_output_limit',
+  'assistant_content_filter',
+  'assistant_structured_output',
   'assistant_no_reply',
   'wrapper_failed',
   'runtime_startup_failed',
@@ -2234,6 +3663,7 @@ export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[num
  */
 export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'billing',
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',
@@ -2254,6 +3684,7 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
   // ownership could be either.
   'assistant_rate_limited_byok',
+  'assistant_invalid_request_byok',
   // Set only by the stale review reaper, which measures cleanup rather than the
   // fault that stranded the review, so alerting on it would count janitorial work
   // as incidents. Every stranded pending review measured on 2026-08-04 traced to
@@ -2265,118 +3696,3 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];
-
-// --- MCP Gateway enums ---
-
-export const MCPGatewayOwnerScope = {
-  Personal: 'personal',
-  Organization: 'organization',
-} as const;
-
-export type MCPGatewayOwnerScope = (typeof MCPGatewayOwnerScope)[keyof typeof MCPGatewayOwnerScope];
-
-export const MCPGatewayAuthMode = {
-  None: 'none',
-  StaticHeaders: 'static_headers',
-  OAuthDynamic: 'oauth_dynamic',
-  OAuthStatic: 'oauth_static',
-} as const;
-
-export type MCPGatewayAuthMode = (typeof MCPGatewayAuthMode)[keyof typeof MCPGatewayAuthMode];
-
-export const MCPGatewaySharingMode = {
-  SingleUser: 'single_user',
-  MultiUser: 'multi_user',
-} as const;
-
-export type MCPGatewaySharingMode =
-  (typeof MCPGatewaySharingMode)[keyof typeof MCPGatewaySharingMode];
-
-export const MCPGatewayProviderScopeSource = {
-  None: 'none',
-  Discovered: 'discovered',
-  Override: 'override',
-} as const;
-
-export type MCPGatewayProviderScopeSource =
-  (typeof MCPGatewayProviderScopeSource)[keyof typeof MCPGatewayProviderScopeSource];
-
-export const MCPGatewayRouteStatus = {
-  Active: 'active',
-  Rotated: 'rotated',
-  Revoked: 'revoked',
-} as const;
-
-export type MCPGatewayRouteStatus =
-  (typeof MCPGatewayRouteStatus)[keyof typeof MCPGatewayRouteStatus];
-
-export const MCPGatewayInstanceStatus = {
-  Active: 'active',
-  NeedsReauth: 'needs_reauth',
-  Revoked: 'revoked',
-  Removed: 'removed',
-} as const;
-
-export type MCPGatewayInstanceStatus =
-  (typeof MCPGatewayInstanceStatus)[keyof typeof MCPGatewayInstanceStatus];
-
-export const MCPGatewayProviderGrantStatus = {
-  Active: 'active',
-  Revoked: 'revoked',
-} as const;
-
-export type MCPGatewayProviderGrantStatus =
-  (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
-
-export const MCPGatewayOAuthGrantStatus = {
-  Pending: 'pending',
-  Active: 'active',
-  Revoked: 'revoked',
-} as const;
-
-export type MCPGatewayOAuthGrantStatus =
-  (typeof MCPGatewayOAuthGrantStatus)[keyof typeof MCPGatewayOAuthGrantStatus];
-
-export const MCPGatewaySecretKind = {
-  StaticProviderCredentials: 'static_provider_credentials',
-  DynamicRegistration: 'dynamic_registration',
-  StaticHeaders: 'static_headers',
-} as const;
-
-export type MCPGatewaySecretKind = (typeof MCPGatewaySecretKind)[keyof typeof MCPGatewaySecretKind];
-
-export const MCPGatewayOAuthClientAuthMethod = {
-  None: 'none',
-  ClientSecretPost: 'client_secret_post',
-  ClientSecretBasic: 'client_secret_basic',
-} as const;
-
-export type MCPGatewayOAuthClientAuthMethod =
-  (typeof MCPGatewayOAuthClientAuthMethod)[keyof typeof MCPGatewayOAuthClientAuthMethod];
-
-export const MCPGatewayAuthorizationRequestStatus = {
-  Pending: 'pending',
-  Completed: 'completed',
-  Error: 'error',
-} as const;
-
-export type MCPGatewayAuthorizationRequestStatus =
-  (typeof MCPGatewayAuthorizationRequestStatus)[keyof typeof MCPGatewayAuthorizationRequestStatus];
-
-export const MCPGatewayPendingProviderAuthorizationStatus = {
-  Pending: 'pending',
-  Completed: 'completed',
-  Error: 'error',
-} as const;
-
-export type MCPGatewayPendingProviderAuthorizationStatus =
-  (typeof MCPGatewayPendingProviderAuthorizationStatus)[keyof typeof MCPGatewayPendingProviderAuthorizationStatus];
-
-export const MCPGatewayAuditOutcome = {
-  Success: 'success',
-  Failure: 'failure',
-  Blocked: 'blocked',
-} as const;
-
-export type MCPGatewayAuditOutcome =
-  (typeof MCPGatewayAuditOutcome)[keyof typeof MCPGatewayAuditOutcome];

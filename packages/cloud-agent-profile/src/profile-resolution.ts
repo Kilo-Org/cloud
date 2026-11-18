@@ -77,3 +77,16 @@ export function resolveProfileLayers({
 
   return { base, top };
 }
+
+/**
+ * Whether repository bindings apply to a session. A multi-repository (V2)
+ * environment has no single repository to bind, so bindings do not apply. Only
+ * a V2 environment, in a session layer or an API response, carries
+ * `repositories`. The implicit default profile is independent of the
+ * environment version.
+ */
+export function appliesRepoBindings(
+  environment: { repositories?: unknown } | null | undefined
+): boolean {
+  return environment?.repositories === undefined;
+}

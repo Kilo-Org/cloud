@@ -6,6 +6,7 @@ type PlatformIntegrationHealthState = {
   integration_status: string | null;
   suspended_at: string | null;
   auth_invalid_at: string | null;
+  github_disconnected_at?: string | null;
 };
 
 export function isPlatformIntegrationHealthy(
@@ -14,7 +15,8 @@ export function isPlatformIntegrationHealthy(
   return (
     integration?.integration_status === INTEGRATION_STATUS.ACTIVE &&
     integration.suspended_at === null &&
-    integration.auth_invalid_at === null
+    integration.auth_invalid_at === null &&
+    integration.github_disconnected_at == null
   );
 }
 
@@ -32,10 +34,25 @@ export function isPlatformIntegrationSuspended(
   );
 }
 
+/**
+ * Whether an integration may act for its owner. The active status is required,
+ * and the integration must carry no suspension, whether it is recorded as a
+ * status or as a timestamp.
+ */
+export function isPlatformIntegrationActive(
+  integration: PlatformIntegrationSuspensionState | null | undefined
+): boolean {
+  return (
+    integration?.integration_status === INTEGRATION_STATUS.ACTIVE &&
+    !isPlatformIntegrationSuspended(integration)
+  );
+}
+
 export function platformIntegrationHealthSql(): SQL {
   return sql`
     ${platform_integrations.integration_status} = ${INTEGRATION_STATUS.ACTIVE}
     AND ${platform_integrations.suspended_at} IS NULL
     AND ${platform_integrations.auth_invalid_at} IS NULL
+    AND ${platform_integrations.github_disconnected_at} IS NULL
   `;
 }

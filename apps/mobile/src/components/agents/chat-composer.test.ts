@@ -1,12 +1,41 @@
-/* eslint-disable max-lines -- the mocked hook surface and draft-restore contract require a long suite */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
+/* eslint-disable max-lines -- the mocked hook surface, the draft-restore contract, and the attachment-send mocks require a long suite */
 /* eslint-disable new-cap -- ChatComposer is called as a plain function, matching repo test convention */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake hooks and handlers settle without await because they resolve immediately */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type AgentMode } from '@/components/agents/mode-selector';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
+import { Text as renderText } from '@/components/ui/text';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import type * as ReactI18next from 'react-i18next';
+import '@/i18n';
 import { type ChatComposer } from './chat-composer';
+
+// A remote catalog that advertises safe session detach, so /exit and /quit
+// parse locally instead of short-circuiting to upgrade-required.
+const remoteExitState: RemoteCommandState = {
+  ownerConnectionId: null,
+  refresh: 'idle',
+  commands: [],
+  canExitSession: true,
+};
+
+const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
+const voiceStatus = vi.hoisted(() => ({ value: 'idle' }));
+const announceForAccessibility = vi.hoisted(() => vi.fn());
+const TEXT_DIRECTIONS = [
+  { direction: 'LTR', isRTL: false, style: undefined },
+  {
+    direction: 'RTL',
+    isRTL: true,
+    style: [{ writingDirection: 'rtl' }, undefined, undefined],
+  },
+];
+
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
 
 // The composer's uncontrolled input is covered by Appium E2E; this suite pins
 // the draft-restore contract that a native E2E cannot easily prove: a restored
@@ -23,16 +52,38 @@ const onSendMock = vi.fn(async () => undefined);
 // re-render (`rerender`) with the refs — the composer's live text and its
 // applied-draft flag — intact, and start a fresh instance with `mount`.
 const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor: 0 }));
+// `useState` is stateful per call-order slot (mirroring `refSlots`) so the
+// starter/`hasText` gating can be observed across a re-render, not just the
+// mount-time initial value.
+const stateSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const keyboardState = vi.hoisted(() => ({ height: 0 }));
+const keyboardProgress = vi.hoisted(() => ({ value: 0 }));
+const sharedSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const toolbarShown = vi.hoisted(() => ({ value: true }));
+const insidePane = vi.hoisted(() => ({ value: false }));
+const returnSendsPref = vi.hoisted(() => ({ returnSendsMessage: false }));
+const reducedMotionOn = vi.hoisted(() => ({ value: false }));
+
+// The strip wire-lock test asserts the composer forwards the upload hook's
+// move/reorder callbacks by identity, so both mocks must be hoisted and shared.
+const uploadMoveAttachmentMock = vi.hoisted(() => vi.fn());
+const uploadReorderAttachmentsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    useContext: vi.fn(() => undefined),
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
     useImperativeHandle: vi.fn(() => undefined),
+    // The inset the host reserves is published from a layout effect: it must
+    // run before the frame is painted, so the mock runs it like `useEffect`.
+    useLayoutEffect: vi.fn((fn: React.EffectCallback) => {
+      fn();
+    }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
       const index = refSlots.cursor;
@@ -40,18 +91,58 @@ vi.mock('react', async () => {
       refSlots.slots[index] ??= { current: initial };
       return refSlots.slots[index] as React.RefObject<T>;
     }),
-    useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
+    useState: vi.fn(<T>(initial: T) => {
+      const index = stateSlots.cursor;
+      stateSlots.cursor += 1;
+      const slot = (stateSlots.slots[index] ??= { value: initial as unknown });
+      return [
+        slot.value as T,
+        (next: T | ((prev: T) => T)) => {
+          slot.value =
+            typeof next === 'function' ? (next as (prev: T) => T)(slot.value as T) : next;
+        },
+      ] as [T, (value: T | ((prev: T) => T)) => void];
+    }),
   };
 });
 
 // ── react-native and native bridges ────────────────────────────────────────
 vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility },
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
   Keyboard: { dismiss: vi.fn() },
+  I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => safeAreaInsets,
+}));
+
+// The shared counter row reads its phrase through `useTranslation`; the mocked
+// hooks above leave no renderer for the real hook, so serve `t` from the app's
+// initialised instance.
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
+
+// The composer reads the keyboard from the provider, not from a listener of its own.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T>(selector: (state: { height: number }) => T) => selector(keyboardState),
+  useReanimatedKeyboardAnimation: () => ({ progress: keyboardProgress, height: { value: 0 } }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -71,10 +162,49 @@ vi.mock('react-native-gesture-handler', () => ({
   GestureDetector: () => null,
 }));
 
+vi.mock('expo-router', () => ({
+  usePreventRemove: vi.fn(),
+}));
+
+// Identity-matched so tests can read the inline status row's message prop
+// (slash-command rejections, photo-metadata warning) and the goal compose
+// hint. The real component owns the announcement channel; the composer only
+// needs to render it with the right message. Deliberately not
+// `__testMarker`-tagged so `findInputRowProps` cannot mistake it for the
+// input row.
+const MockAccessibleStatus = () => null;
+
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: MockAccessibleStatus,
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T>(initial: T) => {
+    const index = sharedSlots.cursor;
+    sharedSlots.cursor += 1;
+    return (sharedSlots.slots[index] ??= { value: initial as unknown }) as { value: T };
+  },
+  useAnimatedStyle: (style: () => unknown) => style(),
+}));
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  KeyboardMotionProvider: 'KeyboardMotionProvider',
+  useKeyboardMotionProgress: () => keyboardProgress,
+  useKeyboardMotionHeight: () => ({ value: 0 }),
+}));
+vi.mock('@/components/keyboard-follow-pane', () => ({
+  KeyboardFollowPane: 'KeyboardFollowPane',
+  useInsideKeyboardFollowPane: () => insidePane.value,
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  selectReducedMotionEntrance: <T>(reduced: boolean, entrance: T) =>
+    reduced ? undefined : entrance,
+  useMotionPolicy: () => ({
+    reducedMotion: reducedMotionOn.value,
+    scrollAnimated: !reducedMotionOn.value,
+  }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -91,20 +221,26 @@ vi.mock('sonner-native', () => ({
 }));
 
 // ── sub-components (presentation only; the composer logic is under test) ───
+const MockAttachmentPreviewStrip = () => null;
+
 vi.mock('@/components/agents/attachment-preview-strip', () => ({
-  AttachmentPreviewStrip: () => null,
+  AttachmentPreviewStrip: MockAttachmentPreviewStrip,
 }));
 
 vi.mock('@/components/agents/attachment-paste-hint', () => ({
   AttachmentPasteHint: () => null,
 }));
 
-vi.mock('@/components/agents/chat-toolbar', () => ({
-  ChatToolbar: () => null,
-}));
+const MockChatToolbar = () => null;
+vi.mock('@/components/agents/chat-toolbar', () => ({ ChatToolbar: MockChatToolbar }));
 
 vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
+}));
+
+const MockSuggestionCard = () => null;
+vi.mock('@/components/agents/suggestion-card', () => ({
+  SuggestionCard: MockSuggestionCard,
 }));
 
 // Marked so the test can locate the input-row element in the returned tree
@@ -121,15 +257,30 @@ vi.mock('@/components/agents/attachment-picker', () => ({
   pickAgentAttachments: vi.fn(),
 }));
 
+// The exit confirm is a hook now; this suite pins only that a rejected
+// slash-command submission never asks for it.
+const exitConfirmMock = vi.hoisted(() => ({ confirmExit: vi.fn() }));
+
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: exitConfirmMock.confirmExit,
+    exitDialog: null,
+  }),
+}));
+
+// The composer reaches this hook; the suite calls the component as a plain
+// function, so every hook on its path is stubbed.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
   useTextHeight: () => ({
     height: 88,
+    maxHeight: 124,
     measureElement: null,
     reset: vi.fn(),
+    setNativeContentHeight: vi.fn(),
     setText: vi.fn(),
   }),
 }));
@@ -146,20 +297,18 @@ vi.mock('@/components/agents/chat-composer-input-state', () => ({
       inputAccessibilityDisabled: false,
       inputEditable: true,
       paperclipDisabled: false,
-      showToolbar: true,
+      showToolbar: toolbarShown.value,
       toolbarDisabled: false,
       voiceDisabled: false,
     };
   },
 }));
 
-vi.mock('@/components/ui/blur-bar', () => ({
-  BlurBar: () => null,
-}));
+// The composer's root element; located by identity, never by a __testMarker
+// (findInputRowProps treats any marked function as the input row).
+const MockBlurBar = () => null;
 
-vi.mock('@/components/voice-input-control', () => ({
-  VoiceInputStatus: () => null,
-}));
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: MockBlurBar }));
 
 // ── hooks and libs ─────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -180,11 +329,17 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     addCandidates: vi.fn(async () => undefined),
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
+    moveAttachment: uploadMoveAttachmentMock,
+    reorderAttachments: uploadReorderAttachmentsMock,
     reset: vi.fn(() => undefined),
+    commitSent: vi.fn(() => undefined),
     isUploading: false,
     hasFailedAttachments: false,
-    toWirePayload: () => undefined,
-    toSubmissionPayload: () => undefined,
+    uploadPending: vi.fn(async () => ({
+      ok: true,
+      wire: undefined,
+      submission: undefined,
+    })),
   }),
 }));
 
@@ -208,6 +363,10 @@ vi.mock('@/lib/agent-attachments/validate', () => ({
   describeClassificationFailure: vi.fn(),
 }));
 
+vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
+  useAndroidPendingPickerRecovery: () => undefined,
+}));
+
 vi.mock('@/lib/persist/drafts', () => ({
   saveDraft: vi.fn(),
   flushDraft: vi.fn(async () => undefined),
@@ -215,21 +374,38 @@ vi.mock('@/lib/persist/drafts', () => ({
 }));
 
 vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: vi.fn(),
+  useSharePrefill: () => ({ failed: false, retry: () => undefined, dismiss: () => undefined }),
+}));
+
+// The voice hook options (getDraft/onDraftChange) are captured so a test can
+// drive the transcript-into-draft path through the composer's wiring; the
+// draft module stays unmocked (pure logic) so the real splice runs.
+const voiceHookOptions = vi.hoisted(() => ({
+  current: null as {
+    getDraft: () => string;
+    onDraftChange: (draft: string) => void;
+  } | null,
 }));
 
 vi.mock('@/lib/voice-input/use-voice-input', () => ({
-  useVoiceInput: () => ({
-    available: false,
-    isActive: false,
-    settleBeforeSubmit: vi.fn(async () => true),
-    status: 'idle',
-    toggle: vi.fn(),
-  }),
+  useVoiceInput: (options: { getDraft: () => string; onDraftChange: (draft: string) => void }) => {
+    voiceHookOptions.current = options;
+    return {
+      available: false,
+      isActive: false,
+      settleBeforeSubmit: vi.fn(async () => true),
+      status: voiceStatus.value,
+      toggle: vi.fn(),
+    };
+  },
 }));
 
-vi.mock('@/lib/voice-input/voice-input-draft', () => ({
-  applyVoiceDraftToInput: vi.fn(),
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: returnSendsPref.returnSendsMessage,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
 }));
 
 type ComposerProps = Parameters<typeof ChatComposer>[0];
@@ -242,8 +418,6 @@ function makeProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
     onRestartSession: vi.fn(async () => true),
     onExitSession: vi.fn(async () => undefined),
     onStop: vi.fn(async () => undefined),
-    mode: 'code' as AgentMode,
-    onModeChange: vi.fn(() => undefined),
     model: 'anthropic/claude-sonnet-4',
     variant: 'medium',
     modelOptions: [],
@@ -272,6 +446,45 @@ function findInputRowProps(node: Node): Record<string, unknown> | null {
   return null;
 }
 
+function findStripProps(node: Node): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const type = (node as { type?: unknown }).type;
+  if (type === MockAttachmentPreviewStrip) {
+    return (node as { props?: Record<string, unknown> }).props ?? {};
+  }
+  const children = (node as { props?: { children?: unknown } }).props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findStripProps(child as Node);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+// The composer pads the content inside its root BlurBar with the landscape
+// sensor side insets. The container is the only View in the returned tree
+// carrying a style prop, so it is located by that style shape.
+function findComposerInsetContainer(render: React.ReactElement): {
+  type: unknown;
+  props: Record<string, unknown>;
+} {
+  const container = findNode(
+    render,
+    (type, props) =>
+      type === 'View' &&
+      typeof props.style === 'object' &&
+      props.style !== null &&
+      'paddingLeft' in props.style
+  );
+  if (container === null) {
+    throw new Error('composer side-inset container not found in the BlurBar content');
+  }
+  return container;
+}
+
 function requireInputRowOnSubmit(render: React.ReactElement): () => void {
   const rowProps = findInputRowProps(render);
   const onSubmit = rowProps?.onSubmit as (() => void) | undefined;
@@ -290,13 +503,86 @@ function requireInputRowOnChangeText(render: React.ReactElement): (text: string)
   return onChangeText;
 }
 
+function collectNodes(
+  node: Node,
+  predicate: (type: unknown, props: Record<string, unknown>) => boolean,
+  found: { type: unknown; props: Record<string, unknown> }[] = []
+): { type: unknown; props: Record<string, unknown> }[] {
+  if (node === null || typeof node !== 'object') {
+    return found;
+  }
+  const { type, props } = node as {
+    type?: unknown;
+    props?: Record<string, unknown>;
+  };
+  if (props !== undefined && predicate(type, props)) {
+    found.push({ type, props });
+  }
+  if (type === renderText && props !== undefined) {
+    return collectNodes(
+      renderText(props as React.ComponentProps<typeof renderText>),
+      predicate,
+      found
+    );
+  }
+  if (type === RemainingCharactersCounter && props !== undefined) {
+    return collectNodes(
+      RemainingCharactersCounter(props as React.ComponentProps<typeof RemainingCharactersCounter>),
+      predicate,
+      found
+    );
+  }
+  for (const child of Array.isArray(props?.children) ? props.children : [props?.children]) {
+    collectNodes(child as Node, predicate, found);
+  }
+  return found;
+}
+
+function findNode(
+  node: Node,
+  predicate: (type: unknown, props: Record<string, unknown>) => boolean
+): { type: unknown; props: Record<string, unknown>; key?: React.Key | null } | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const { type, props, key } = node as {
+    type?: unknown;
+    props?: Record<string, unknown>;
+    key?: React.Key | null;
+  };
+  if (props !== undefined && predicate(type, props)) {
+    return { type, props, key };
+  }
+  if (type === renderText && props !== undefined) {
+    return findNode(renderText(props as React.ComponentProps<typeof renderText>), predicate);
+  }
+  if (type === RemainingCharactersCounter && props !== undefined) {
+    return findNode(
+      RemainingCharactersCounter(props as React.ComponentProps<typeof RemainingCharactersCounter>),
+      predicate
+    );
+  }
+  const children = props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findNode(child as Node, predicate);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 async function mount(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.slots.length = 0;
+  stateSlots.slots.length = 0;
+  sharedSlots.slots.length = 0;
   return rerender(props);
 }
 
 async function rerender(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.cursor = 0;
+  stateSlots.cursor = 0;
+  sharedSlots.cursor = 0;
   const { ChatComposer } = await import('./chat-composer');
   return ChatComposer(props);
 }
@@ -311,6 +597,20 @@ beforeEach(() => {
   vi.clearAllMocks();
   refSlots.slots.length = 0;
   refSlots.cursor = 0;
+  stateSlots.slots.length = 0;
+  stateSlots.cursor = 0;
+  returnSendsPref.returnSendsMessage = false;
+  reducedMotionOn.value = false;
+  layoutDirection.isRTL = false;
+  keyboardState.height = 0;
+  keyboardProgress.value = 0;
+  insidePane.value = false;
+  toolbarShown.value = true;
+  voiceStatus.value = 'idle';
+  safeAreaInsets.bottom = 0;
+  safeAreaInsets.left = 0;
+  safeAreaInsets.right = 0;
+  safeAreaInsets.top = 0;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -347,7 +647,11 @@ describe('ChatComposer draft restore', () => {
       return;
     }
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith(sent, undefined, undefined);
+    expect(onSendMock).toHaveBeenCalledWith(sent, {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 
   // The host mounts the composer before identity (`user.getMe`) and the draft
@@ -362,7 +666,63 @@ describe('ChatComposer draft restore', () => {
     requireInputRowOnSubmit(settled)();
     await settle();
 
-    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', undefined, undefined);
+    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
+  });
+
+  it('does not apply a stored draft whose message the server confirmed', async () => {
+    const render = await mount(
+      makeProps({
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        deliveredDraft: 'Delivered late',
+      })
+    );
+
+    // The transcript renders the delivered message; applying the stored draft
+    // would show it twice, so nothing is sent and the input stays empty.
+    requireInputRowOnSubmit(render)();
+    await settle();
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('applies a stored draft with the delivered words once the record is consumed', async () => {
+    // The first load is the delivered message: it is consumed, not restored.
+    const delivered = await mount(
+      makeProps({
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        deliveredDraft: 'Delivered late',
+      })
+    );
+    const consumed = vi.fn<() => void>();
+    // The host clears the record once the load it was published for is spent.
+    await rerender(
+      makeProps({
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        deliveredDraft: null,
+        onDeliveredDraftConsumed: consumed,
+      })
+    );
+    requireInputRowOnSubmit(delivered)();
+    await settle();
+    expect(onSendMock).not.toHaveBeenCalled();
+
+    // A draft the reader stored afterwards, with the same words, is theirs.
+    const later = await mount(
+      makeProps({
+        draftKey: 'agent-composer:sess-2',
+        initialDraft: 'Delivered late',
+        deliveredDraft: null,
+      })
+    );
+    requireInputRowOnSubmit(later)();
+    await settle();
+    expect(onSendMock).toHaveBeenCalledWith('Delivered late', expect.anything());
   });
 
   it('keeps text typed before the draft settles instead of restoring over it', async () => {
@@ -377,10 +737,576 @@ describe('ChatComposer draft restore', () => {
     requireInputRowOnSubmit(settled)();
     await settle();
 
-    expect(onSendMock).toHaveBeenCalledWith(
-      'typed while identity was loading',
-      undefined,
-      undefined
-    );
+    expect(onSendMock).toHaveBeenCalledWith('typed while identity was loading', {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
+  });
+
+  // The gateway transcript lands after the Stop tap (the upload resolves
+  // post-stop). The remounted input row must show it: a stop-time snapshot
+  // restored the empty pre-transcript text while the live ref and the durable
+  // draft kept the transcript, so the next dictation appended to the hidden
+  // text and the draft showed the same transcript twice (spot check e12-back).
+  it('restores a transcript that lands after the Stop tap onto the remounted row', async () => {
+    const setNativeProps = vi.fn();
+    const props = makeProps({ draftKey: 'agent-composer:sess-1' });
+    const render = await mount(props);
+    // The first useRef slot is textRef; the second is the TextInput ref.
+    const inputRefSlot = refSlots.slots[1];
+    if (inputRefSlot === undefined) {
+      throw new Error('TextInput ref slot was not mounted');
+    }
+    inputRefSlot.current = { setNativeProps };
+    const voice = voiceHookOptions.current;
+    if (voice === null) {
+      throw new Error('useVoiceInput options were not captured');
+    }
+    voice.getDraft();
+    const onStop = findInputRowProps(render)?.onStop as (() => void) | undefined;
+    if (onStop === undefined) {
+      throw new Error('ChatComposerInputRow element did not carry an onStop handler');
+    }
+
+    onStop();
+    await settle();
+    voice.onDraftChange('Gateway transcription online');
+    expect(setNativeProps).toHaveBeenCalledTimes(1);
+
+    // The first re-render lets the stop-remount machine bump `inputEpoch`
+    // and lets the restore effect write the live text into the (new) row;
+    // the second re-render proves the restore is a one-shot.
+    await rerender(props);
+    await rerender(props);
+
+    expect(setNativeProps).toHaveBeenCalledTimes(2);
+    const restoreCall = setNativeProps.mock.calls[1]?.[0] as { text?: string };
+    expect(restoreCall.text).toBe('Gateway transcription online');
   });
 });
+
+describe('ChatComposer return-sends wiring', () => {
+  it('wires the return-sends preference and an insert-newline handler to the input row', async () => {
+    returnSendsPref.returnSendsMessage = true;
+    const withReturnSend = findInputRowProps(await mount(makeProps({})));
+    expect(withReturnSend?.returnSendsMessage).toBe(true);
+    expect(typeof withReturnSend?.onInsertNewline).toBe('function');
+
+    returnSendsPref.returnSendsMessage = false;
+    const withNewline = findInputRowProps(await mount(makeProps({})));
+    expect(withNewline?.returnSendsMessage).toBe(false);
+  });
+
+  it('inserts a newline into the draft without submitting', async () => {
+    returnSendsPref.returnSendsMessage = true;
+    const render = await mount(makeProps({}));
+    const rowProps = findInputRowProps(render);
+    const onInsertNewline = rowProps?.onInsertNewline as (() => void) | undefined;
+    if (onInsertNewline === undefined) {
+      throw new Error('ChatComposerInputRow element did not carry an onInsertNewline handler');
+    }
+
+    onInsertNewline();
+
+    expect(refSlots.slots[0]?.current).toBe('\n');
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatComposer goal compose mode', () => {
+  const GOAL_COMMAND: SlashCommandInfo = { name: 'goal', description: 'Goal', hints: [] };
+
+  function remoteGoalProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
+    const commandState: RemoteCommandState = {
+      ownerConnectionId: 'conn-1',
+      refresh: 'idle',
+      commands: [GOAL_COMMAND],
+    };
+    return makeProps({
+      activeSessionType: 'remote',
+      commandState,
+      ...overrides,
+    });
+  }
+
+  async function enterGoalComposeMode(
+    props: ComposerProps,
+    draft = '/goal '
+  ): Promise<React.ReactElement> {
+    const render = await mount(props);
+    requireInputRowOnChangeText(render)(draft);
+    await settle();
+    requireInputRowOnSubmit(render)();
+    await settle();
+    return rerender(props);
+  }
+
+  // The composer renders the goal objective hint (tone "status") alongside the
+  // always-present slash-command rejection row and the photo-metadata warning,
+  // both tone "error". Match the hint by tone so the always-present error row
+  // is not mistaken for the goal hint.
+  function goalHint(render: React.ReactElement): { props: Record<string, unknown> } | null {
+    return findNode(
+      render,
+      (type, props) => type === MockAccessibleStatus && props.tone === 'status'
+    );
+  }
+
+  it('enters goal compose mode and shows the objective hint on a bare /goal send', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const after = await enterGoalComposeMode(props);
+
+    const hint = goalHint(after);
+    expect(hint?.props).toMatchObject({ message: 'Describe the goal', tone: 'status' });
+    // The draft is kept so the user can complete the goal command.
+    expect(refSlots.slots[0]?.current).toBe('/goal ');
+    expect(onSendCommand).not.toHaveBeenCalled();
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a separator-less /goal draft so the next keystroke stays a goal command', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const after = await enterGoalComposeMode(props, '/goal');
+
+    // The retained draft ends with the separator, so the next keystroke
+    // continues the goal command instead of producing `/goalShip it`.
+    const retained = refSlots.slots[0]?.current as string;
+    expect(retained).toBe('/goal ');
+
+    requireInputRowOnChangeText(after)(`${retained}Ship it`);
+    await settle();
+    requireInputRowOnSubmit(after)();
+    await settle();
+
+    expect(onSendCommand).toHaveBeenCalledWith('goal', 'Ship it');
+  });
+
+  it('forwards the objective and leaves compose mode on the next send', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const render = await enterGoalComposeMode(props);
+
+    requireInputRowOnChangeText(render)('/goal Ship it');
+    await settle();
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendCommand).toHaveBeenCalledWith('goal', 'Ship it');
+    const after = await rerender(props);
+    expect(goalHint(after)).toBeNull();
+  });
+
+  it('drops the hint when the draft is no longer the goal command', async () => {
+    const props = remoteGoalProps();
+    const render = await enterGoalComposeMode(props);
+
+    requireInputRowOnChangeText(render)('write the docs');
+    const after = await rerender(props);
+    expect(goalHint(after)).toBeNull();
+  });
+});
+
+describe('ChatComposer CLI suggestion', () => {
+  it('renders the suggestion in the composer and wires both actions', async () => {
+    const onAcceptSuggestion = vi.fn(async () => undefined);
+    const onDismissSuggestion = vi.fn(async () => undefined);
+    const render = await mount(
+      makeProps({
+        suggestion: {
+          requestId: 'sug-1',
+          callId: 'call-1',
+          text: 'Review the completed work?',
+          actions: [{ label: 'Review', prompt: '/review branch' }],
+        },
+        onAcceptSuggestion,
+        onDismissSuggestion,
+      })
+    );
+
+    const suggestion = findNode(render, type => type === MockSuggestionCard);
+    expect(findNode(render, type => type === MockChatToolbar)).toBeNull();
+    expect(suggestion?.key).toBe('sug-1');
+    expect(suggestion?.props).toMatchObject({
+      text: 'Review the completed work?',
+      actions: [{ label: 'Review', prompt: '/review branch' }],
+    });
+    if (!suggestion) {
+      throw new Error('suggestion not found');
+    }
+
+    await (suggestion.props.onAccept as (index: number) => Promise<void>)(0);
+    await (suggestion.props.onDismiss as () => Promise<void>)();
+
+    expect(onAcceptSuggestion).toHaveBeenCalledWith('sug-1', 0);
+    expect(onDismissSuggestion).toHaveBeenCalledWith('sug-1');
+  });
+});
+
+describe('ChatComposer counter', () => {
+  function findCounter(render: React.ReactElement) {
+    return findNode(
+      render,
+      (type, props) =>
+        type === 'Text' &&
+        typeof props.children === 'string' &&
+        props.children.endsWith('characters remaining')
+    );
+  }
+
+  it.each(TEXT_DIRECTIONS)(
+    'shows the remaining-character counter only once the draft nears the limit in $direction',
+    async ({ isRTL, style }) => {
+      layoutDirection.isRTL = isRTL;
+      const render = await mount(makeProps({}));
+      expect(findCounter(render)).toBeNull();
+
+      requireInputRowOnChangeText(render)('hello');
+      await settle();
+      expect(findCounter(await rerender(makeProps({})))).toBeNull();
+
+      requireInputRowOnChangeText(render)('x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH - 5));
+      await settle();
+
+      const counter = findCounter(await rerender(makeProps({})));
+      expect(counter).not.toBeNull();
+      expect(counter?.props).toMatchObject({
+        children: '5 characters remaining',
+        className: 'text-xs font-normal text-muted-foreground',
+        style,
+      });
+      expect(counter?.props.accessibilityLabel).toBeUndefined();
+    }
+  );
+});
+
+describe('ChatComposer reduced motion', () => {
+  it('drops the toolbar entrance animation under reduced motion', async () => {
+    reducedMotionOn.value = true;
+    const render = await mount(makeProps({}));
+
+    const toolbarView = findNode(render, type => type === 'Animated.View');
+    expect(toolbarView).not.toBeNull();
+    expect(toolbarView?.props.entering).toBeUndefined();
+  });
+});
+
+describe('ChatComposer toolbar row', () => {
+  function maxHeightOf(style: unknown): number | null {
+    if (typeof style !== 'object' || style === null || !('maxHeight' in style)) {
+      return null;
+    }
+    const value: unknown = style.maxHeight;
+    return typeof value === 'number' ? value : null;
+  }
+
+  function rowOf(render: React.ReactElement) {
+    return findNode(
+      render,
+      (type, props) => type === 'Animated.View' && typeof props.onLayout === 'function'
+    );
+  }
+
+  function toolbarRow(render: React.ReactElement) {
+    const row = rowOf(render);
+    if (row === null) {
+      throw new Error('toolbar row not found');
+    }
+    const { style, onLayout } = row.props;
+    const maxHeight = maxHeightOf(style);
+    if (maxHeight === null) {
+      throw new Error('toolbar row has no clamped style');
+    }
+    const layout = onLayout as (event: { nativeEvent: { layout: { height: number } } }) => void;
+    return {
+      maxHeight,
+      layout: (height: number) => {
+        layout({ nativeEvent: { layout: { height } } });
+      },
+    };
+  }
+
+  it('gives the hidden row height back in step with the keyboard, not after it lands', async () => {
+    const props = makeProps({});
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
+    toolbarRow(await mount(props)).layout(38);
+
+    // Blur: the chip hides while the JS keyboard height still reports open.
+    toolbarShown.value = false;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+
+    keyboardProgress.value = 0.5;
+    const halfway = toolbarRow(await rerender(props));
+    expect(halfway.maxHeight).toBe(19);
+    // A layout pass at the clamped height must not replace the row's natural
+    // height, or an interactive dismiss that reverses would reopen it short.
+    halfway.layout(19);
+    keyboardProgress.value = 1;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+
+    // The keyboard has landed but its JS height has not reached zero yet: the
+    // row already takes no space, so its later unmount moves nothing.
+    keyboardProgress.value = 0;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(0);
+  });
+
+  it('unclamps a row that mounted collapsed once the chip is shown', async () => {
+    const props = makeProps({});
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
+    toolbarShown.value = false;
+    expect(toolbarRow(await mount(props)).maxHeight).toBe(0);
+
+    // Focus lands after the keyboard started: the row must open to its
+    // natural height instead of staying at the collapsed height.
+    toolbarShown.value = true;
+    const shown = toolbarRow(await rerender(props));
+    expect(shown.maxHeight).toBeGreaterThan(1000);
+    shown.layout(38);
+
+    toolbarShown.value = false;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+  });
+
+  it('renders one chip row, never two, in either container', async () => {
+    // The row is the only unclamped, overflow-hidden Animated.View in the
+    // composer, so a second one would be a second row rather than an unrelated
+    // node that happens to carry a layout handler.
+    const isRow = (type: unknown, props: Record<string, unknown>) =>
+      Object.is(type, 'Animated.View') &&
+      maxHeightOf(props.style) === 10_000 &&
+      (props.style as { overflow?: unknown } | null | undefined)?.overflow === 'hidden';
+
+    toolbarShown.value = true;
+    keyboardState.height = 0;
+    insidePane.value = false;
+    const outside = collectNodes(await mount(makeProps({})), isRow);
+    expect(outside).toHaveLength(1);
+
+    insidePane.value = true;
+    const inside = collectNodes(await mount(makeProps({})), isRow);
+    expect(inside).toHaveLength(1);
+  });
+
+  it('holds one height inside the keyboard-follow pane, and follows only the chip', async () => {
+    insidePane.value = true;
+    const props = makeProps({});
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
+
+    // The keyboard rises and falls while the chip stays available: the row's
+    // height never changes, so the pane's children are not re-laid out.
+    toolbarShown.value = true;
+    const mounted = toolbarRow(await mount(props));
+    expect(mounted.maxHeight).toBeGreaterThan(1000);
+    mounted.layout(38);
+
+    keyboardProgress.value = 0.4;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBeGreaterThan(1000);
+
+    keyboardProgress.value = 1;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBeGreaterThan(1000);
+
+    // The chip hides at blur: the row goes then, before the keyboard moves,
+    // rather than waiting for the keyboard flag to land.
+    toolbarShown.value = false;
+    expect(rowOf(await rerender(props))).toBeNull();
+  });
+});
+
+describe('ChatComposer attachment strip wiring', () => {
+  it('wires onMove and onReorder from the upload hook into the attachment strip', async () => {
+    const render = await mount(makeProps({}));
+
+    const stripProps = findStripProps(render);
+    if (stripProps === null) {
+      throw new Error('AttachmentPreviewStrip element not found');
+    }
+    expect(stripProps.onMove).toBe(uploadMoveAttachmentMock);
+    expect(stripProps.onReorder).toBe(uploadReorderAttachmentsMock);
+  });
+});
+
+describe('ChatComposer landscape side insets', () => {
+  it('keeps portrait geometry with zero side padding', async () => {
+    safeAreaInsets.left = 0;
+    safeAreaInsets.right = 0;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 0, paddingRight: 0 });
+    // The unpadded container still hosts the whole composer content.
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+
+  it('pads the composer content by the landscape sensor insets', async () => {
+    // iPhone sensor notch in landscape: a wider left inset than right.
+    safeAreaInsets.left = 59;
+    safeAreaInsets.right = 47;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 59, paddingRight: 47 });
+    // Toolbar, input row, and send control all clear the sensor area because
+    // they live inside the padded container.
+    expect(findNode(container, type => type === MockChatToolbar)).not.toBeNull();
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+});
+
+describe('ChatComposer slash-command rejection feedback', () => {
+  // A rejected /quit submission (arguments) must announce its validation
+  // message through the inline status row — the same surface /exit uses —
+  // instead of a transient toast the accessibility tree never exposes
+  // (device round p6: the rejection was invisible to the reader and to the
+  // automation digest while the rejected draft sat in the input).
+  function statusMessage(render: React.ReactElement): unknown {
+    const status = findNode(render, type => type === MockAccessibleStatus);
+    if (status === null) {
+      throw new Error('AccessibleStatus element not found in the composer tree');
+    }
+    return status.props.message;
+  }
+
+  it('renders the argument-error inline and never submits the rejected draft', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(render)).toBeNull();
+
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    const rejected = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(rejected)).toBe('/quit does not take arguments.');
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(exitConfirmMock.confirmExit).not.toHaveBeenCalled();
+  });
+
+  it('clears the rejection once the input is edited', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    // Removing the arguments is the fix the message asks for; the stale
+    // rejection must not survive the edit.
+    requireInputRowOnChangeText(render)('/quit');
+    const edited = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(edited)).toBeNull();
+  });
+});
+
+describe('ChatComposer placeholder visibility', () => {
+  // A draft of zero-width characters draws nothing and cannot be sent, so the
+  // composer must look like an empty one: hiding the hint while Send is dead
+  // left a field with no glyph, no hint and no action.
+  it('keeps the hint for a draft that draws nothing, and drops it once text does', async () => {
+    const props = makeProps({ placeholder: 'Message the agent' });
+    const mounted = await mount(props);
+    expect(findInputRowProps(mounted)?.inputEmpty).toBe(true);
+
+    requireInputRowOnChangeText(mounted)('\u200B\u200B');
+    await settle();
+    const invisible = await rerender(props);
+    expect(findInputRowProps(invisible)?.inputEmpty).toBe(true);
+
+    requireInputRowOnChangeText(invisible)('Ship it');
+    await settle();
+    const visible = await rerender(props);
+    expect(findInputRowProps(visible)?.inputEmpty).toBe(false);
+  });
+});
+
+// A caption row under the toolbar used to carry the voice status, so starting
+// speech grew the composer and shifted the transcript above it. The status now
+// rides in the input's placeholder slot, which keeps the composer's height.
+describe('ChatComposer voice status', () => {
+  it.each([
+    { status: 'idle', placeholder: 'Message the agent' },
+    { status: 'listening', placeholder: 'Listening...' },
+    { status: 'transcribing', placeholder: 'Transcribing...' },
+  ])('shows "$placeholder" in the input while $status', async ({ status, placeholder }) => {
+    voiceStatus.value = status;
+    const render = await mount(makeProps({ placeholder: 'Message the agent' }));
+
+    expect(findInputRowProps(render)?.placeholder).toBe(placeholder);
+  });
+
+  it('announces transcribing, which no live region carries any more', async () => {
+    voiceStatus.value = 'transcribing';
+    await mount(makeProps({}));
+
+    expect(announceForAccessibility).toHaveBeenCalledWith('Transcribing...');
+  });
+});
+
+describe('ChatComposer transcript inset', () => {
+  // The host reserves exactly the input's growth past its one-line floor, so a
+  // cleared draft must publish zero again and a taller window that raises the
+  // floor must not read as growth.
+  function findMeasureProps(render: React.ReactElement): Record<string, unknown> {
+    const found = findNode(
+      render,
+      type =>
+        typeof type === 'function' && (type as { name?: string }).name === 'ChatComposerMeasure'
+    );
+    if (found === null) {
+      throw new Error('ChatComposerMeasure element not found');
+    }
+    return found.props;
+  }
+
+  it('publishes the input growth above the one-line floor and clears it again', async () => {
+    const onInputBottomInsetChange = vi.fn<(insetDp: number) => void>();
+    const render = await mount(makeProps({ onInputBottomInsetChange }));
+    const floor = requireInputRowMeasureHeight(render);
+    // The mount publishes the floor: a composer remounted under another key
+    // must not leave the previous instance's reservation behind.
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(1);
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(0);
+
+    const taller = findMeasureProps(render).onMeasureChange as (
+      height: number,
+      maxHeight: number
+    ) => void;
+    taller(floor + 40, 124);
+    const grown = await rerender(makeProps({ onInputBottomInsetChange }));
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(40);
+
+    (findMeasureProps(grown).onMeasureChange as (h: number, m: number) => void)(floor, 124);
+    await rerender(makeProps({ onInputBottomInsetChange }));
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(0);
+  });
+
+  it('reports the growth once, not on every render that keeps it', async () => {
+    const onInputBottomInsetChange = vi.fn<(insetDp: number) => void>();
+    const render = await mount(makeProps({ onInputBottomInsetChange }));
+    const floor = requireInputRowMeasureHeight(render);
+    (findMeasureProps(render).onMeasureChange as (h: number, m: number) => void)(floor + 26, 124);
+    await rerender(makeProps({ onInputBottomInsetChange }));
+    // The mount published the floor, the growth published once beside it.
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(2);
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(26);
+    await rerender(makeProps({ onInputBottomInsetChange }));
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(2);
+  });
+});
+
+function requireInputRowMeasureHeight(render: React.ReactElement): number {
+  const height = findInputRowProps(render)?.measureHeight;
+  if (typeof height !== 'number') {
+    throw new TypeError('ChatComposerInputRow element did not carry its measured height');
+  }
+  return height;
+}

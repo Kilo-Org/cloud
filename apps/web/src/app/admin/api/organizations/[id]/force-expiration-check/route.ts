@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { recomputeOrganizationBalances } from '@/lib/recomputeOrganizationBalances';
 
 export async function POST(
@@ -31,19 +31,7 @@ export async function POST(
     );
   }
 
-  // Re-fetch org since balance may have changed
-  const updatedOrg = await getOrganizationById(id);
-  if (updatedOrg) {
-    await processOrganizationExpirations(
-      {
-        id: updatedOrg.id,
-        microdollars_used: updatedOrg.microdollars_used,
-        next_credit_expiration_at: updatedOrg.next_credit_expiration_at,
-        total_microdollars_acquired: updatedOrg.total_microdollars_acquired,
-      },
-      new Date()
-    );
-  }
+  await processOrganizationExpirations(id, new Date(), { force: true });
 
   return NextResponse.json({
     success: true,

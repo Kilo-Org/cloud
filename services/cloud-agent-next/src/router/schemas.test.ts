@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getSandboxAllocationRequest,
+  sandboxAllocationSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  AdoptWorktreeBaseInput,
   ExecutionResponse,
   GetMessageResultInput,
   GetMessageResultOutput,
@@ -11,16 +16,14 @@ import {
   SendMessageV2Input,
   StartSessionOutput,
   StartSessionInput,
+  SyncWorktreeBranchInput,
   branchNameSchema,
 } from './schemas.js';
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
-const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
-const validImages = {
-  path: '123e4567-e89b-12d3-a456-426614174000',
-  files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-};
+const validSessionId = 'workspace_12345678-1234-1234-1234-123456789012';
+const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 const validAttachments = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.csv'],
@@ -46,12 +49,206 @@ const baseStartInput = {
   repository: { type: 'github' as const, repo: 'acme/repo' },
 };
 
+describe('GetSessionOutput runtime agents', () => {
+  it('preserves picker visibility without removing agents used for delegation', () => {
+    const runtimeAgents = [
+      { slug: 'primary', name: 'Primary', mode: 'primary', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', mode: 'all', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+      { slug: 'legacy', name: 'Legacy' },
+    ];
+
+    const response = GetSessionOutput.parse({
+      sessionId: validSessionId,
+      userId: 'user_test',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+      runtimeAgents,
+    });
+
+    expect(response.runtimeAgents).toEqual(runtimeAgents);
+  });
+});
+
 describe('grouped unified session input contracts', () => {
+  it('accepts an optional operation key on start for any client origin', () => {
+    const valid = {
+      ...baseStartInput,
+      operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      options: {
+        kilocodeOrganizationId: '123e4567-e89b-12d3-a456-426614174011',
+        createdOnPlatform: 'desktop',
+      },
+    };
+    expect(StartSessionInput.parse(valid)).toEqual(valid);
+    expect(StartSessionInput.parse(baseStartInput)).toEqual(baseStartInput);
+    for (const input of [
+      { ...valid, operationKey: 'not-a-uuid' },
+      { ...valid, operationKey: null },
+      { ...valid, options: { ...valid.options, clientProvenance: 'browser' } },
+      { ...valid, options: { ...valid.options, skipBalanceCheck: true } },
+    ]) {
+      expect(StartSessionInput.safeParse(input).success).toBe(false);
+    }
+  });
+
+  it('accepts replay metadata and preserves the existing start response contract', () => {
+    const output = {
+      cloudAgentSessionId: validSessionId,
+      kiloSessionId: validKiloSessionId,
+      messageId: validMessageId,
+      delivery: 'queued',
+    };
+    expect(StartSessionOutput.safeParse(output).success).toBe(true);
+    expect(
+      StartSessionOutput.safeParse({
+        ...output,
+        replayed: true,
+      }).success
+    ).toBe(true);
+    expect(
+      StartSessionOutput.safeParse({
+        ...output,
+        replayed: 'true',
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    { egressAudit: false },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: true },
+  ])('preserves audit settings at grouped and legacy boundaries: %j', policy => {
+    expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(policy);
+    const legacy = PrepareSessionInput.parse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(legacy.egressAudit).toBe(policy.egressAudit);
+    expect(legacy.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+    expect(legacy.egressAllowlist).toBeUndefined();
+  });
+
+  it.each(
+    [[], ['Z.Example.COM.', 'example.com', 'EXAMPLE.COM']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )('normalizes grouped and legacy egress allowlists: %j', ({ egressAllowlist }) => {
+    const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
+    expect(
+      StartSessionInput.parse({
+        ...baseStartInput,
+        runtime: { egressMode: 'allowlist', egressAllowlist },
+      }).runtime
+    ).toEqual({ egressMode: 'allowlist', egressAllowlist: expected });
+    expect(
+      PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        egressMode: 'allowlist',
+        egressAllowlist,
+      }).egressAllowlist
+    ).toEqual(expected);
+  });
+
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
+    'preserves omitted lists and explicit modes at both boundaries: %j',
+    policy => {
+      expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(
+        policy
+      );
+      const parsed = PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        ...policy,
+      });
+      expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+      expect(parsed.egressAllowlist).toBeUndefined();
+      expect(StartSessionInput.parse(baseStartInput).runtime).toBeUndefined();
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'deny-all' },
+    { egressMode: null },
+    { egressMode: 'allowlist', egressAudit: null },
+    { egressMode: 'allowlist', egressAudit: 'true' },
+  ])('rejects ambiguous or unsupported egress policies: %j', policy => {
+    const grouped = StartSessionInput.safeParse({ ...baseStartInput, runtime: policy });
+    const legacy = PrepareSessionInput.safeParse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(grouped.success).toBe(false);
+    expect(legacy.success).toBe(false);
+    if ('egressAllowlist' in policy) {
+      if (!grouped.success) {
+        expect(grouped.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['runtime', 'egressAllowlist'] })
+        );
+      }
+      if (!legacy.success) {
+        expect(legacy.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['egressAllowlist'] })
+        );
+      }
+    }
+  });
+
+  it('rejects invalid egress policies at both public boundaries', () => {
+    for (const egressAllowlist of [null, ['*'], ['127.1'], ['https://example.com']]) {
+      expect(
+        StartSessionInput.safeParse({
+          ...baseStartInput,
+          runtime: { egressMode: 'allowlist', egressAllowlist },
+        }).success
+      ).toBe(false);
+      expect(
+        PrepareSessionInput.safeParse({
+          ...basePromptInput,
+          githubRepo: 'acme/repo',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it('rejects retired devcontainer requests at the legacy API boundary', () => {
+    const input = {
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      devcontainer: true,
+    };
+    const result = PrepareSessionInput.safeParse(input);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['devcontainer'],
+          message: 'Devcontainer support has been retired',
+        })
+      );
+    }
+    expect(PrepareSessionInput.safeParse({ ...input, devcontainer: false }).success).toBe(true);
+  });
+
   it('preserves the full grouped start payload shape', () => {
     const input = {
       message: {
         prompt: 'Create the first turn',
-        images: validImages,
         id: validMessageId,
       },
       agent: {
@@ -101,6 +298,15 @@ describe('grouped unified session input contracts', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects client provenance on the public grouped start endpoint', () => {
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        options: { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'browser' },
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts document attachments on grouped start and send messages', () => {
     expect(
       StartSessionInput.parse({
@@ -114,27 +320,6 @@ describe('grouped unified session input contracts', () => {
         message: { prompt: 'Read this document', attachments: validAttachments },
       }).message.attachments
     ).toEqual(validAttachments);
-  });
-
-  it('continues accepting legacy images and rejects ambiguous grouped attachment payloads', () => {
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'Read the image', images: validImages },
-      }).success
-    ).toBe(true);
-    expect(
-      StartSessionInput.safeParse({
-        ...baseStartInput,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
   });
 
   it('preserves the grouped send payload shape', () => {
@@ -189,9 +374,195 @@ describe('grouped unified session input contracts', () => {
       }).success
     ).toBe(true);
   });
+
+  it('accepts a GitHub integration id only on GitHub repository inputs', () => {
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId,
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.com/acme/repo.git',
+          githubIntegrationId,
+        },
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('sandbox preset input boundaries', () => {
+  const prepare = { ...basePromptInput, githubRepo: 'acme/repo' };
+
+  it.each(sandboxAllocationSchema.options)(
+    'normalizes structured %s requests to the existing canonical allocation',
+    allocation => {
+      const sandboxAllocation = getSandboxAllocationRequest(allocation);
+      expect(PrepareSessionInput.parse({ ...prepare, sandboxAllocation })).toEqual(
+        PrepareSessionInput.parse({ ...prepare, sandboxAllocation: allocation })
+      );
+      expect(
+        StartSessionInput.parse({ ...baseStartInput, runtime: { sandboxAllocation } })
+      ).toEqual(
+        StartSessionInput.parse({ ...baseStartInput, runtime: { sandboxAllocation: allocation } })
+      );
+    }
+  );
+
+  it.each(['small', 'large'] as const)(
+    'rejects retired Kilo-paid Vercel %s requests',
+    instanceType => {
+      const sandboxAllocation = { provider: { id: 'vercel', account: 'kilo' }, instanceType };
+      for (const result of [
+        PrepareSessionInput.safeParse({ ...prepare, sandboxAllocation }),
+        StartSessionInput.safeParse({ ...baseStartInput, runtime: { sandboxAllocation } }),
+      ]) {
+        expect(result.success).toBe(false);
+        if (!result.success) expect(result.error.message).toContain('byoc');
+      }
+    }
+  );
+
+  it('keeps omitted allocations omitted', () => {
+    expect(PrepareSessionInput.parse(prepare).sandboxAllocation).toBeUndefined();
+    expect(StartSessionInput.parse(baseStartInput).runtime).toBeUndefined();
+  });
+
+  it.each(['devcontainer', 'code-review'] as const)(
+    'rejects structured allocation combined with %s routing',
+    routing => {
+      const sandboxAllocation = getSandboxAllocationRequest('vercel-small');
+      expect(
+        PrepareSessionInput.safeParse({
+          ...prepare,
+          sandboxAllocation,
+          ...(routing === 'devcontainer' ? { devcontainer: true } : { createdOnPlatform: routing }),
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
+    'preserves the finite %s preset in both prepare and grouped start',
+    sandboxAllocation => {
+      expect(PrepareSessionInput.parse({ ...prepare, sandboxAllocation }).sandboxAllocation).toBe(
+        sandboxAllocation
+      );
+      expect(
+        StartSessionInput.parse({ ...baseStartInput, runtime: { sandboxAllocation } }).runtime
+      ).toEqual({ sandboxAllocation });
+    }
+  );
+
+  it('rejects invalid allocations and specialized prepare allocation combinations', () => {
+    for (const override of [
+      { sandboxAllocation: 'custom' },
+      { sandboxAllocation: 'vercel-large', devcontainer: true },
+      { sandboxAllocation: 'vercel-medium' },
+      { sandboxAllocation: 'isolated-standard', devcontainer: true },
+      { sandboxAllocation: 'cloudflare-single', createdOnPlatform: 'code-review' },
+      { sandboxAllocation: 'isolated-standard', createdOnPlatform: 'code-review' },
+    ]) {
+      expect(PrepareSessionInput.safeParse({ ...prepare, ...override }).success).toBe(false);
+    }
+    for (const runtime of [
+      { sandboxAllocation: 'custom' },
+      { sandboxAllocation: 'vercel-small', resources: { vcpus: 8, memory: 16384 } },
+      { sandboxAllocation: 'cloudflare-single', devcontainer: true },
+      { sandboxAllocation: 'vercel-medium' },
+    ]) {
+      expect(StartSessionInput.safeParse({ ...baseStartInput, runtime }).success).toBe(false);
+    }
+  });
 });
 
 describe('legacy live attachment input compatibility', () => {
+  it('accepts only the supported isolated Standard allocation', () => {
+    const input = {
+      prompt: 'Update the repository',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      githubRepo: 'acme/repo',
+    };
+
+    expect(
+      PrepareSessionInput.safeParse({ ...input, sandboxAllocation: 'isolated-standard' }).success
+    ).toBe(true);
+    expect(PrepareSessionInput.safeParse({ ...input, sandboxAllocation: 'standard' }).success).toBe(
+      false
+    );
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        devcontainer: true,
+        autoInitiate: true,
+        sandboxAllocation: 'isolated-standard',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        createdOnPlatform: 'code-review',
+        sandboxAllocation: 'isolated-standard',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a GitHub integration id only with a legacy GitHub repository', () => {
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const input = {
+      prompt: 'Update the repository',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      githubIntegrationId,
+    };
+
+    expect(PrepareSessionInput.safeParse({ ...input, githubRepo: 'acme/repo' }).success).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        platform: 'gitlab',
+      }).success
+    ).toBe(false);
+  });
+
+  it.each(['browser', 'mobile'] as const)(
+    'retains trusted %s provenance on prepareSession input',
+    clientProvenance => {
+      const result = PrepareSessionInput.parse({
+        prompt: 'Create a session',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        clientProvenance,
+      });
+
+      expect(result.clientProvenance).toBe(clientProvenance);
+    }
+  );
+
+  it('rejects unrecognized prepareSession client provenance', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Create a session',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        clientProvenance: 'automation',
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts shell-safe Git branch punctuation used by current-branch reviews', () => {
     const branch = 'feature/alex+metadata@v2,fix=1#manual';
 
@@ -294,7 +665,7 @@ describe('legacy live attachment input compatibility', () => {
     ).toBe(false);
   });
 
-  it('accepts document attachments on prepareSession while retaining images', () => {
+  it('accepts document attachments on prepareSession', () => {
     const basePrepareInput = {
       prompt: 'Summarize this document',
       mode: 'code',
@@ -305,16 +676,128 @@ describe('legacy live attachment input compatibility', () => {
     expect(
       PrepareSessionInput.safeParse({ ...basePrepareInput, attachments: validAttachments }).success
     ).toBe(true);
-    expect(
-      PrepareSessionInput.safeParse({ ...basePrepareInput, images: validImages }).success
-    ).toBe(true);
+  });
+});
+
+describe('prepareSession clone-only variant', () => {
+  const baseCloneInput = {
+    mode: 'code',
+    model: 'claude-sonnet-4-5-20250929',
+    githubRepo: 'acme/repo',
+    autoInitiate: true,
+    operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+  };
+
+  it('enforces explicit egress mode on clone-only inputs', () => {
+    const input = { ...baseCloneInput, cloneFromKiloSessionId: validKiloSessionId };
+    const parsed = PrepareSessionInput.parse({ ...input, egressMode: 'allowlist' });
+    expect(parsed.egressMode).toBe('allowlist');
+    expect(parsed.egressAllowlist).toBeUndefined();
+    expect(PrepareSessionInput.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
     expect(
       PrepareSessionInput.safeParse({
-        ...basePrepareInput,
-        attachments: validAttachments,
-        images: validImages,
+        ...input,
+        egressMode: 'unrestricted',
+        egressAllowlist: [],
       }).success
     ).toBe(false);
+  });
+
+  it('accepts a clone-only prepare without a prompt', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects a clone-only prepare with a prompt', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        prompt: 'Continue from the cloned session context.',
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone-only prepare with an initialMessageId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        initialMessageId: validMessageId,
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a malformed cloneFromKiloSessionId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: 'workspace_invalid',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects an workspace_ UUID cloneFromKiloSessionId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: validSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a clone cut message ID', () => {
+    const result = PrepareSessionInput.safeParse({
+      ...baseCloneInput,
+      cloneFromKiloSessionId: validKiloSessionId,
+      cloneUpToMessageId: validMessageId,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.cloneUpToMessageId).toBe(validMessageId);
+  });
+
+  it('rejects a malformed clone cut message ID', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: validKiloSessionId,
+        cloneUpToMessageId: 'not-a-message',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone cut without a clone source', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        prompt: 'Continue',
+        cloneUpToMessageId: validMessageId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('still requires a prompt for a non-clone prepare', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Continue from the cloned session context.',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(true);
   });
 });
 
@@ -338,26 +821,60 @@ describe('sendMessageV2 input compatibility', () => {
     });
   });
 
-  it('continues accepting legacy images and rejects ambiguous prompt attachments', () => {
+  it('accepts optional command mode, model, and variant overrides', () => {
+    const result = SendMessageV2Input.safeParse({
+      cloudAgentSessionId: validSessionId,
+      messageId: validMessageId,
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        variant: 'thinking',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data).toMatchObject({
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        variant: 'thinking',
+      },
+    });
+  });
+
+  it('accepts custom mode on a command payload', () => {
+    // Whether the session has the appended system prompt `custom` runs is
+    // decided against the session's stored metadata, not by this input schema:
+    // a client resuming a custom-mode session sends the mode it stored.
     expect(
       SendMessageV2Input.safeParse({
         cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        images: validImages,
+        payload: { type: 'command', command: 'compact', arguments: '', mode: 'custom' },
       }).success
     ).toBe(true);
-    expect(
-      SendMessageV2Input.safeParse({
-        cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        attachments: validAttachments,
-        images: validImages,
-      }).success
-    ).toBe(false);
+  });
+
+  it('accepts a variant key the model catalog may define', () => {
+    for (const variant of ['thinking', 'high-2', 'xhigh_1']) {
+      expect(
+        SendMessageV2Input.safeParse({
+          cloudAgentSessionId: validSessionId,
+          payload: { type: 'prompt', prompt: 'Try again', mode: 'code', model: 'm', variant },
+        }).success
+      ).toBe(true);
+    }
   });
 
   it('rejects attachment descriptors on nested command payloads', () => {
-    for (const descriptor of [{ images: validImages }, { attachments: validAttachments }]) {
+    for (const descriptor of [{ attachments: validAttachments }]) {
       expect(
         SendMessageV2Input.safeParse({
           cloudAgentSessionId: validSessionId,
@@ -567,9 +1084,9 @@ describe('getMessageResult contract', () => {
         messageId: validMessageId,
       }).success
     ).toBe(true);
-    expect(GetMessageResultInput.safeParse({ cloudAgentSessionId: 'agent_invalid' }).success).toBe(
-      false
-    );
+    expect(
+      GetMessageResultInput.safeParse({ cloudAgentSessionId: 'workspace_invalid' }).success
+    ).toBe(false);
     expect(
       GetMessageResultInput.safeParse({ cloudAgentSessionId: validSessionId, messageId: 'msg_bad' })
         .success
@@ -713,5 +1230,120 @@ describe('legacy V2 output schema keeps executionId compatibility', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('stacked workspace inputs', () => {
+  const baseSha = 'a'.repeat(40);
+  const parentWorktreeId = 'worktree_12345678-1234-4123-8123-123456789012';
+
+  it('accepts stacked fields on the flat prepare input', () => {
+    const parsed = PrepareSessionInput.parse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+    expect(parsed).toMatchObject({
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+  });
+
+  it('accepts stacked fields on the grouped start input', () => {
+    const parsed = StartSessionInput.parse({
+      ...baseStartInput,
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+    expect(parsed).toMatchObject({ baseBranch: 'feat/parent', baseSha, parentWorktreeId });
+  });
+
+  it('rejects baseBranch combined with an upstream branch at either boundary', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat/parent',
+        upstreamBranch: 'feat/parent',
+      }).success
+    ).toBe(false);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: { type: 'github', repo: 'acme/repo', branch: 'feat/parent' },
+        baseBranch: 'feat/parent',
+      }).success
+    ).toBe(false);
+  });
+
+  it('requires baseBranch when baseSha or parentWorktreeId is present', () => {
+    for (const input of [
+      { ...basePromptInput, githubRepo: 'acme/repo', baseSha },
+      { ...basePromptInput, githubRepo: 'acme/repo', parentWorktreeId },
+    ]) {
+      expect(PrepareSessionInput.safeParse(input).success).toBe(false);
+    }
+    expect(StartSessionInput.safeParse({ ...baseStartInput, baseSha }).success).toBe(false);
+    expect(StartSessionInput.safeParse({ ...baseStartInput, parentWorktreeId }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects a malformed commit SHA', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat/parent',
+        baseSha: 'abc123',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('worktree branch operation additions', () => {
+  const baseSha = 'a'.repeat(40);
+
+  it('accepts the current fork point on sync as it already does on restack', () => {
+    expect(
+      SyncWorktreeBranchInput.parse({
+        cloudAgentSessionId: validSessionId,
+        baseBranch: 'main',
+        upstreamSha: baseSha,
+      })
+    ).toEqual({
+      cloudAgentSessionId: validSessionId,
+      baseBranch: 'main',
+      upstreamSha: baseSha,
+    });
+  });
+
+  it('accepts an adoptWorktreeBase request with an exact worktree and commit', () => {
+    expect(
+      AdoptWorktreeBaseInput.parse({
+        cloudAgentSessionId: validSessionId,
+        expectedWorktreeId: 'worktree_12345678-1234-4123-8123-123456789012',
+        baseBranch: 'main',
+        baseSha,
+      })
+    ).toMatchObject({ baseBranch: 'main', baseSha });
+  });
+
+  it('rejects a malformed worktree or commit on adoptWorktreeBase', () => {
+    const valid = {
+      cloudAgentSessionId: validSessionId,
+      expectedWorktreeId: 'worktree_12345678-1234-4123-8123-123456789012',
+      baseBranch: 'main',
+      baseSha,
+    };
+    expect(
+      AdoptWorktreeBaseInput.safeParse({ ...valid, expectedWorktreeId: 'worktree_nope' }).success
+    ).toBe(false);
+    expect(AdoptWorktreeBaseInput.safeParse({ ...valid, baseSha: 'abc' }).success).toBe(false);
+    expect(AdoptWorktreeBaseInput.safeParse({ ...valid, baseBranch: '' }).success).toBe(false);
   });
 });

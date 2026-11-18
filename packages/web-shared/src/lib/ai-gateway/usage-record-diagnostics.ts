@@ -1,0 +1,321 @@
+import 'server-only';
+
+import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { pool } from '@kilocode/web-shared/lib/drizzle';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
+import type { MicrodollarUsage } from '@kilocode/db/schema';
+import type { UsageRecordWriteOutcome } from './processUsage.types';
+
+export type UsageRecordObservationContext = {
+  entrypoint: 'gateway' | 'writer_endpoint' | 'unknown';
+  writer_caller: 'queue' | 'queue_vercel' | 'region_handoff' | 'unknown';
+};
+
+function completionSuccessSampleRate(): number {
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (vercelEnv !== 'production') {
+    if (process.env.VERCEL_TARGET_ENV === 'staging' || vercelEnv) return 1;
+    if (process.env.NODE_ENV !== 'production') return 1;
+  }
+  const raw = process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE;
+  if (raw === undefined || raw.trim() === '') return 1;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 1;
+}
+
+/** Persistence completion signals shared by direct gateway writes and the HTTP writer. */
+export async function observeUsageRecordCompletion(
+  usage: Pick<MicrodollarUsage, 'id' | 'created_at'>,
+  write: () => Promise<UsageRecordWriteOutcome | null>,
+  context: UsageRecordObservationContext = { entrypoint: 'unknown', writer_caller: 'unknown' }
+): Promise<UsageRecordWriteOutcome | null> {
+  const startedAt = performance.now();
+  let outcome: 'recorded' | 'duplicate' | 'not_recorded' | 'error' = 'error';
+  try {
+    const result = await write();
+    outcome = result ? (result.wasRedelivery ? 'duplicate' : 'recorded') : 'not_recorded';
+    return result;
+  } finally {
+    // Observability must not turn a completed write into a retry or replace its exception.
+    try {
+      const level = outcome === 'recorded' || outcome === 'duplicate' ? 'info' : 'warn';
+      const sampleRate = level === 'info' ? completionSuccessSampleRate() : 1;
+      if (sampleRate === 1 || Math.random() < sampleRate) {
+        const createdAt = Date.parse(usage.created_at);
+        console[level](
+          JSON.stringify({
+            level,
+            event: 'usage_record_completion',
+            sample_rate: sampleRate,
+            usage_id: usage.id,
+            outcome,
+            entrypoint: context.entrypoint,
+            writer_caller: context.writer_caller,
+            duration_ms: Math.round(performance.now() - startedAt),
+            ...(Number.isFinite(createdAt)
+              ? { event_age_ms: Math.max(0, Date.now() - createdAt) }
+              : {}),
+            execution_region: getVercelExecutionRegion(),
+          })
+        );
+      }
+    } catch {
+      // Preserve both the original result and exception when logging is unavailable.
+    }
+  }
+}
+
+/**
+ * Diagnostics for the Frankfurt-local usage write.
+ *
+ * `POST /api/internal/usage/record` records validation, queue admission (when
+ * applicable), and awaited write phase durations. Its `usage_record_timing` line
+ * includes total duration, the usage ID and outcome, in-process `pg` pool gauges
+ * before and after the write, the sampled peak waiting count, pool capacity, and
+ * process-lifetime event-loop delay. Pool gauges describe this runtime, not
+ * Supavisor or fleet-wide capacity; event-loop delay is not request-scoped.
+ *
+ * The endpoint emits detailed timing for completed writes taking at least one
+ * second, plus a 1% baseline sample of faster writes. These phase/pool diagnostics
+ * are separate from `usage_record_completion` and its configurable success sample
+ * rate. They measure local writer work, not queue delivery or full HTTP latency.
+ * Timing emission must not change the write result or cause a retry.
+ */
+
+/**
+ * Process-lifetime event-loop delay. Deliberately never reset: a sustained stall
+ * is what we are looking for, and per-request windowing would need a timer of its
+ * own on the very loop being measured.
+ */
+const eventLoopDelay = monitorEventLoopDelay({ resolution: 20 });
+eventLoopDelay.enable();
+
+const SLOW_EMIT_THRESHOLD_MS = 1_000;
+const BASELINE_SAMPLE_RATE = 0.01;
+
+export type UsageRecordPhase = { phase: string; ms: number };
+
+export interface PhaseTimer {
+  /** Closes the previous phase and records its duration. */
+  mark(phase: string): void;
+  phases(): UsageRecordPhase[];
+  totalMs(): number;
+}
+
+export function createPhaseTimer(now: () => number = () => Date.now()): PhaseTimer {
+  const start = now();
+  let last = start;
+  const recorded: UsageRecordPhase[] = [];
+  return {
+    mark(phase: string) {
+      const at = now();
+      recorded.push({ phase, ms: at - last });
+      last = at;
+    },
+    phases: () => recorded,
+    totalMs: () => now() - start,
+  };
+}
+
+export type PoolGauges = {
+  /** Connections the pool currently holds, idle or checked out. */
+  total: number;
+  idle: number;
+  /** Requests queued for a connection. Non-zero means the pool is the bottleneck. */
+  waiting: number;
+};
+
+export function readPoolGauges(): PoolGauges {
+  return {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+  };
+}
+
+function eventLoopLagMs() {
+  return {
+    mean_ms: Math.round(eventLoopDelay.mean / 1e6),
+    p99_ms: Math.round(eventLoopDelay.percentile(99) / 1e6),
+    max_ms: Math.round(eventLoopDelay.max / 1e6),
+  };
+}
+
+export type UsageRecordTiming = {
+  usageId: string;
+  outcome: 'recorded' | 'duplicate' | 'not_recorded';
+  totalMs: number;
+  phases: UsageRecordPhase[];
+  poolBefore: PoolGauges;
+  poolAfter: PoolGauges;
+  /** Highest `waitingCount` sampled during the request. */
+  poolWaitingPeak: number;
+};
+
+export function shouldEmitUsageRecordTiming(
+  totalMs: number,
+  random: () => number = Math.random
+): boolean {
+  return totalMs >= SLOW_EMIT_THRESHOLD_MS || random() < BASELINE_SAMPLE_RATE;
+}
+
+/**
+ * One structured line, queryable in Axiom without regex over a message blob.
+ */
+export function emitUsageRecordTiming(timing: UsageRecordTiming): void {
+  console.log(
+    JSON.stringify({
+      type: 'usage_record_timing',
+      usage_id: timing.usageId,
+      outcome: timing.outcome,
+      total_ms: timing.totalMs,
+      phases: Object.fromEntries(timing.phases.map(({ phase, ms }) => [`${phase}_ms`, ms])),
+      pool_before: timing.poolBefore,
+      pool_after: timing.poolAfter,
+      pool_waiting_peak: timing.poolWaitingPeak,
+      pool_max: poolMax(),
+      event_loop_lag: eventLoopLagMs(),
+    })
+  );
+}
+
+/**
+ * `max` is not exposed on `pg.Pool` in the public types but is present on the
+ * options object, and knowing it is what makes `waiting` interpretable.
+ */
+function poolMax(): number | null {
+  const options = (pool as unknown as { options?: { max?: number } }).options;
+  return typeof options?.max === 'number' ? options.max : null;
+}
+
+/**
+ * Redacted description of a database error.
+ *
+ * A drizzle failure stringifies to `Failed query: <SQL>\nparams: <values>`. For
+ * the usage write that is ~30KB and the values include `user_prompt_prefix`,
+ * `system_prompt_prefix`, the client IP, city and JA4 digest — real end-user
+ * prompt text in a log line that fired thousands of times per minute. Never log
+ * or capture the raw error from this path; log this instead.
+ *
+ * `detail` is also omitted: PostgreSQL puts the conflicting key values in it.
+ */
+export type DatabaseErrorDescription = {
+  name: string | null;
+  code: string | null;
+  constraint: string | null;
+  table: string | null;
+  routine: string | null;
+};
+
+type PostgresErrorShape = {
+  name?: unknown;
+  code?: unknown;
+  constraint?: unknown;
+  table?: unknown;
+  routine?: unknown;
+  cause?: unknown;
+};
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+export function describeDatabaseError(error: unknown): DatabaseErrorDescription {
+  // drizzle wraps the driver error, so the fields we want sit on `cause`. Walk a
+  // bounded chain rather than assuming a fixed depth.
+  let current: unknown = error;
+  let name: string | null = null;
+  for (let depth = 0; depth < 5 && current !== null && typeof current === 'object'; depth++) {
+    const candidate = current as PostgresErrorShape;
+    name ??= stringOrNull(candidate.name);
+    const code = stringOrNull(candidate.code);
+    if (code !== null) {
+      return {
+        // The outermost name identifies the failure class (`DrizzleQueryError`);
+        // the driver's own name is just "error" and says nothing.
+        name: name ?? stringOrNull(candidate.name),
+        code,
+        constraint: stringOrNull(candidate.constraint),
+        table: stringOrNull(candidate.table),
+        routine: stringOrNull(candidate.routine),
+      };
+    }
+    current = candidate.cause;
+  }
+  return { name, code: null, constraint: null, table: null, routine: null };
+}
+
+/**
+ * The frames of `error`'s stack under a caller-supplied header.
+ *
+ * V8 renders `error.stack` as `${name}: ${message}` followed by the frames, so
+ * copying a stack verbatim onto a redacted error re-embeds the message it was
+ * redacting — for this path, ~30KB of interpolated statement including prompt
+ * prefixes and the client IP. Dropping the header keeps the throw site, which
+ * `Error.captureStackTrace` on the replacement would lose.
+ *
+ * The header is removed by exact `${name}: ${message}` prefix, never by searching
+ * for the first frame-shaped line. That search is unsafe here because the message
+ * embeds `user_prompt_prefix`: a user pasting a stack trace into their prompt —
+ * routine for a coding assistant — puts a line matching `/^\s+at\s/` inside the
+ * message, and slicing from it carries the rest of the parameters, client IP
+ * included, into the result.
+ *
+ * Fails closed. If the stack does not start with the expected header the message
+ * boundary is unknown, so no frames are emitted at all; `describeDatabaseError`
+ * still supplies the actionable code and constraint. Losing a throw site is
+ * cheaper than leaking a prompt.
+ */
+export function stackFramesUnderHeader(error: unknown, header: string): string {
+  if (!(error instanceof Error) || typeof error.stack !== 'string') return header;
+  const originalHeader = error.message.length > 0 ? `${error.name}: ${error.message}` : error.name;
+  if (!error.stack.startsWith(originalHeader)) return header;
+  // Belt and braces: after an exact strip nothing but frames can remain, but a
+  // message mutated after construction would slip through, so keep only lines
+  // that are actually frames.
+  const frames = error.stack
+    .slice(originalHeader.length)
+    .split('\n')
+    .filter(line => /^\s+at\s/.test(line));
+  return frames.length > 0 ? `${header}\n${frames.join('\n')}` : header;
+}
+
+/** PostgreSQL `unique_violation`. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Tables keyed by the per-delivery usage id. A collision on either means this
+ * record is colliding with itself.
+ */
+const USAGE_IDENTITY_TABLES = new Set(['microdollar_usage', 'microdollar_usage_metadata']);
+
+/**
+ * `microdollar_usage`'s primary key predates the current naming convention, so it
+ * carries a generated name while every deduplicated lookup table uses
+ * `<table>_pkey`. Matched exactly, as a fallback for drivers that report
+ * `constraint` without `table`.
+ */
+const USAGE_PRIMARY_KEY_CONSTRAINTS = new Set([
+  'PK_a71b90d910e7882358c3defe8e2',
+  'microdollar_usage_metadata_pkey',
+]);
+
+/**
+ * True when the failure is this exact usage row colliding with itself.
+ *
+ * Retrying is futile: `id` is fixed for the delivery, so every attempt collides
+ * again, and each one rebuilds and re-logs the same ~30KB statement. The caller
+ * should stop and recover the committed row's identity instead.
+ *
+ * Deliberately narrower than "any unique violation". A collision on one of the
+ * twelve deduplicated lookup tables IS worth retrying — two concurrent writes can
+ * both pass the `WHERE NOT EXISTS` guard for a new value, and on the retry the
+ * value exists and the insert is skipped. That is the race the retry loop was
+ * built for, and it must keep working.
+ */
+export function isUsageRowConflict(error: unknown): boolean {
+  const described = describeDatabaseError(error);
+  if (described.code !== UNIQUE_VIOLATION) return false;
+  if (described.table !== null) return USAGE_IDENTITY_TABLES.has(described.table);
+  return described.constraint !== null && USAGE_PRIMARY_KEY_CONSTRAINTS.has(described.constraint);
+}

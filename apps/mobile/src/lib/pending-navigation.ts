@@ -1,6 +1,7 @@
 type PendingNavigation = {
   href: string;
   method: 'navigate';
+  withAnchor: true;
 };
 
 // `navigate` rather than `replace`: replacing the stack root leaves the target
@@ -10,5 +11,5 @@ export function resolvePendingNavigation(pendingLink: string | null): PendingNav
   if (!pendingLink) {
     return null;
   }
-  return { href: pendingLink, method: 'navigate' };
+  return { href: pendingLink, method: 'navigate', withAnchor: true };
 }

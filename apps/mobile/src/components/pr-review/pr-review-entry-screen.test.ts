@@ -1,0 +1,377 @@
+/* eslint-disable max-lines -- the URL-field suite and the single-push burst case share one harness, so the field's states are asserted against one wiring */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  find,
+  findAll,
+  flush,
+  mocks,
+  propsOf,
+  render,
+  renderLoaded,
+  resetHookSlots,
+  seedRecents,
+} from './pr-review-entry-screen-test-utils';
+import { prLinkDraft } from '@/lib/pr-review/pr-link-draft';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetHookSlots();
+  mocks.clipboard.current = '';
+  mocks.clipboardHasString.current = false;
+  prLinkDraft.text = '';
+  seedRecents([]);
+});
+
+describe('provider-neutral URL field', () => {
+  it('labels and placeholders name both review nouns, no provider host', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    expect(input.props?.accessibilityLabel).toBe('Enter a pull request or merge request URL');
+    expect(String(input.props?.placeholder)).not.toContain('github');
+  });
+
+  it('draws the placeholder as one ellipsized line instead of the wrapping native hint', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    // pr-review-home finding: at font scale 2 the native EditText lays the long
+    // placeholder hint out on two lines while Yoga sizes the field to one line,
+    // so the second line is clipped. `numberOfLines` cannot stop that — RN
+    // never marks a single-line input as single-line, so the hint still wraps —
+    // hence the visible placeholder is the one-line overlay below. The native
+    // hint stays set (the device digest binds the field's text and hint to the
+    // placeholder copy) but is transparent on both platforms so it cannot draw.
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    expect(input.props?.placeholderTextColor).toBe('transparent');
+    expect(input.props?.numberOfLines).toBe(1);
+    const overlay = find(tree, 'PrLinkPlaceholder', () => true);
+    expect(overlay.props?.label).toBe('Pull request or merge request URL');
+  });
+
+  it('hides the placeholder overlay once the field has text', async () => {
+    const before = await renderLoaded();
+    expect(findAll(before, 'PrLinkPlaceholder')).toHaveLength(1);
+    const input = find(before, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)('https://github.com/a/b/pull/1');
+    const after = render();
+    expect(findAll(after, 'PrLinkPlaceholder')).toHaveLength(0);
+  });
+
+  it('opens a GitHub PR URL on the GitHub route', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    const open = render();
+    (
+      propsOf(
+        find(open, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+      ).onPress as () => void
+    )();
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello-world/42');
+  });
+
+  it('opens a self-managed GitLab MR on the provider route with its instance', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://gitlab.example.com/group/sub/repo/-/merge_requests/9'
+    );
+    const open = render();
+    (
+      propsOf(
+        find(open, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+      ).onPress as () => void
+    )();
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/9?instance=https%3A%2F%2Fgitlab.example.com'
+    );
+  });
+
+  it('opens a Bitbucket PR on the provider route', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://bitbucket.org/acme/api/pull-requests/7/overview'
+    );
+    const open = render();
+    (
+      propsOf(
+        find(open, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+      ).onPress as () => void
+    )();
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/bitbucket/acme/api/7');
+  });
+
+  // The defect this pins: a fast double tap on Open used to push the review
+  // route twice, which left the field holding a link while the placeholder
+  // drew over it and Open was disabled. The shared single-push guard keeps one
+  // gesture to one route, so the field stays consistent afterwards.
+  it('opens one review route for two Open presses in one burst and keeps the field consistent', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    const after = render();
+    const open = find(
+      after,
+      'Button',
+      p => p.accessibilityLabel === 'Open pull request or merge request'
+    );
+    const press = propsOf(open).onPress as () => void;
+    // Both presses belong to one burst: the same tick, no render between them.
+    press();
+    press();
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello-world/42');
+
+    const settled = render();
+    expect(findAll(settled, 'PrLinkPlaceholder')).toHaveLength(0);
+    expect(
+      propsOf(
+        find(settled, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+      ).disabled
+    ).toBe(false);
+    expect(
+      findAll(settled, 'Pressable').filter(p => p.props?.accessibilityLabel === 'Clear link')
+    ).toHaveLength(1);
+
+    // This harness runs the focus effect on every render, so this render is the
+    // screen regaining focus: the guard window is gone and Open navigates again.
+    const refocused = render();
+    (
+      propsOf(
+        find(
+          refocused,
+          'Button',
+          p => p.accessibilityLabel === 'Open pull request or merge request'
+        )
+      ).onPress as () => void
+    )();
+    expect(mocks.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('enables Open only for valid links and clears inline feedback after correction or clear', async () => {
+    let tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    const change = propsOf(input).onChangeText as (value: string) => void;
+    const openButton = () =>
+      find(tree, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request');
+    const errors = () => findAll(tree, 'AccessibleStatus').filter(p => p.props?.message != null);
+
+    expect(propsOf(openButton()).disabled).toBe(true);
+    for (const value of ['   ', '\t\n']) {
+      change(value);
+      tree = render();
+      expect(propsOf(openButton()).disabled).toBe(true);
+      expect(errors()).toHaveLength(0);
+    }
+    for (const value of ['not a link', '😀 العربية a\u0301\u202E', 'https://example.com/blog']) {
+      change(value);
+      tree = render();
+      expect(propsOf(openButton()).disabled).toBe(true);
+      expect(errors()).toHaveLength(1);
+      expect(errors()[0]?.props?.message).toBe('Not a pull request or merge request link');
+    }
+    change('  https://github.com/octocat/hello-world/pull/42  ');
+    tree = render();
+    expect(propsOf(openButton()).disabled).toBe(false);
+    expect(errors()).toHaveLength(0);
+    (propsOf(openButton()).onPress as () => void)();
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello-world/42');
+
+    change('invalid again');
+    tree = render();
+    (
+      propsOf(find(tree, 'Pressable', p => p.accessibilityLabel === 'Clear link'))
+        .onPress as () => void
+    )();
+    tree = render();
+    expect(propsOf(openButton()).disabled).toBe(true);
+    expect(errors()).toHaveLength(0);
+  });
+
+  it('rejects invalid keyboard submission without navigating', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)('https://example.com/blog/post');
+    (propsOf(input).onSubmitEditing as () => void)();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('empty clipboard preserves the entered link and reports feedback without opening it', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    mocks.clipboard.current = '   ';
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledTimes(1);
+    expect(mocks.push).not.toHaveBeenCalled();
+    const after = render();
+    const open = find(
+      after,
+      'Button',
+      p => p.accessibilityLabel === 'Open pull request or merge request'
+    );
+    expect(propsOf(open).disabled).toBe(false);
+    (propsOf(open).onPress as () => void)();
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello-world/42');
+  });
+
+  it('paste replaces the field and opens a GitLab MR straight away', async () => {
+    mocks.clipboard.current = 'https://gitlab.com/acme/api/-/merge_requests/3';
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/acme/api/3?instance=https%3A%2F%2Fgitlab.com'
+    );
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it('reports a denied paste instead of an empty clipboard', async () => {
+    mocks.clipboard.current = '';
+    mocks.clipboardHasString.current = true;
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Paste access was denied. Allow paste and try again.'
+    );
+    expect(mocks.toastError).not.toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the empty-clipboard copy when the clipboard has no text either', async () => {
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the pasted link and Open enabled when the entry screen remounts', async () => {
+    const link = 'https://gitlab.com/acme/api/-/merge_requests/3';
+    mocks.clipboard.current = link;
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/acme/api/3?instance=https%3A%2F%2Fgitlab.com'
+    );
+
+    resetHookSlots();
+    const remounted = render();
+    expect(find(remounted, 'Input', () => true).props?.defaultValue).toBe(link);
+    expect(
+      find(remounted, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+        .props?.disabled
+    ).toBe(false);
+    expect(findAll(remounted, 'PrLinkPlaceholder')).toHaveLength(0);
+  });
+
+  it('drops the stored link when the clear control empties the field', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    const withText = render();
+    const clear = find(withText, 'Pressable', p => p.accessibilityLabel === 'Clear link');
+    (propsOf(clear).onPress as () => void)();
+
+    resetHookSlots();
+    const remounted = render();
+    expect(find(remounted, 'Input', () => true).props?.defaultValue).toBe('');
+    expect(
+      find(remounted, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+        .props?.disabled
+    ).toBe(true);
+  });
+
+  it('paste of plain text shows inline feedback without navigating', async () => {
+    mocks.clipboard.current = 'just some notes';
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    const after = render();
+    expect(find(after, 'AccessibleStatus', p => p.message != null).props?.message).toBe(
+      'Not a pull request or merge request link'
+    );
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('shows the clear control only once the field has text', async () => {
+    const before = await renderLoaded();
+    expect(
+      findAll(before, 'Pressable').some(p => p.props?.accessibilityLabel === 'Clear link')
+    ).toBe(false);
+    const input = find(before, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)('anything');
+    const after = render();
+    const clear = find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link');
+    expect(clear).toBeTruthy();
+    // Icon-only like the paste control, so its own box carries Android's 48dp
+    // minimum instead of a smaller frame plus hit slop.
+    expect(String(clear.props?.className)).toContain(
+      'h-[48px] w-[48px] items-center justify-center'
+    );
+    expect(clear.props?.hitSlop).toBeUndefined();
+  });
+
+  it('gives the paste control the shared 48dp icon target with no hit slop', async () => {
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    // The audit reads the node's own rect, so the box — not a hit slop —
+    // carries the 48dp minimum Android requires. The literal matches
+    // ICON_TARGET_BOX_CLASS; importing the module here would pull
+    // react-native into a suite whose harness mocks it wholesale.
+    expect(String(paste.props?.className)).toContain(
+      'h-[48px] w-[48px] items-center justify-center'
+    );
+    expect(String(paste.props?.className)).not.toContain('h-11 w-11');
+    expect(paste.props?.hitSlop).toBeUndefined();
+  });
+});

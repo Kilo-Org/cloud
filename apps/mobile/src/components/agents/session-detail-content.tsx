@@ -1,85 +1,175 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
 import {
-  type CloudStatus,
   type KiloSessionId,
+  type MessageDeliveryState,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import { useActionSheet } from '@expo/react-native-action-sheet';
+import {
+  type Href,
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useNavigationContainerRef,
+  useRouter,
+} from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useKeepAwake } from 'expo-keep-awake';
-import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
+import { Platform, type TextInstance, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
-import { ChatComposer, type ChatComposerControl } from '@/components/agents/chat-composer';
+import {
+  ChatComposer,
+  type ChatComposerControl,
+  type ChatComposerSendOptions,
+} from '@/components/agents/chat-composer';
 import {
   type AgentMode,
-  customModeOptionsFromRuntimeAgents,
-  dedupeCustomModeOptions,
-  ensureSelectedCustomOption,
   lockedModelOption,
   resolvePinnedAgentModel,
+  resolveSessionRoleView,
 } from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
-import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
+import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { addCreditsDestinationFor } from '@/lib/credits/add-credits-destination';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
+import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { QuestionCard } from '@/components/agents/question-card';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
-import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
+import { usePickerAboveLeaveGuard } from '@/components/agents/use-picker-above-guard';
+import {
+  resolveComposerSendDisabledReason,
+  resolveComposerSendDisabledReasonTone,
+} from '@/components/agents/session-composer-send-disabled-reason';
+import {
+  resolveSessionConnectionDisplay,
+  resolveSessionConnectionState,
+} from '@/components/agents/session-connection-indicator-state';
+import {
+  type GoalAction,
+  goalClearsBlockingAfterSend,
+  goalCommandArguments,
+  resolveGoalActions,
+  selectVisibleGoal,
+} from '@/components/agents/session-goal-actions';
+import { SessionGoalSection } from '@/components/agents/session-goal-section';
+import { SessionTodoChip } from '@/components/todos/session-todo-link';
+import {
+  toggleSessionGoalCollapsed,
+  useSessionGoalCollapsed,
+} from '@/components/agents/session-goal-collapse';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { resolveSelectionModelDisplay } from '@/components/agents/session-model-display';
+import { SessionFollowButton } from '@/components/agents/session-follow-button';
+import {
+  canAutoApprovePermissions,
+  canAutoApproveReply,
+  resolveSessionAutoApproveState,
+  setSessionAutoApproveEnabled,
+  useSessionAutoApproveEnabled,
+} from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
+import { SessionTasksChip, SessionTasksRow } from '@/components/agents/session-tasks-indicator';
+import { VisibleSessionPublisher } from '@/components/agents/visible-session-publisher';
+import { selectSessionTodoSummary } from '@/components/agents/session-todo-summary';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
+import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
+import { firstHumanText, isFilePart, withoutReasoningParts } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
 import { useSessionManager } from '@/components/agents/session-provider';
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
+  resolveSessionFooterRowItem,
+  SEND_REASON_MAX_FONT_SCALE,
+  SESSION_FOOTER_ROW_ITEM_PADDING,
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
-  shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  lastVisibleMessageFailure,
   resolveRetryPrompt,
-  retryMessageAndClear,
+  resolveRetryTarget,
+  restoreCanceledQueuedMessages,
+  retryFailedMessage,
+  unansweredPromptMessageId,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
   resolveLoadedCliSessionPresenceId,
   useCliSessionPresence,
-} from '@/components/kilo-chat/hooks/use-cli-session-presence';
+} from '@/lib/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
+import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
-import { SessionMessageList } from '@/components/agents/session-message-list';
+import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
+import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
+import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
+import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import {
+  SessionComposerSkeleton,
+  SessionReadOnlyFooterPlaceholder,
+  SessionSkeletonMessages,
+} from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
+import { PULL_FEEDBACK_MIN_BEAT_MS } from '@/components/agents/use-pull-refresh';
+import {
+  SESSION_SLOW_LOAD_MS,
+  useSessionSlowLoadPhase,
+} from '@/components/agents/session-slow-load';
+import { getLanguageSnapshot } from '@/i18n';
+import { SessionMessageList } from '@/components/agents/session-message-list';
+import { composerInsetForSession } from '@/components/agents/session-message-list-anchor';
+import {
+  collectTranscriptItemKeysByPart,
+  condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
+  getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
+  type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
+import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
+import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+} from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -92,41 +182,71 @@ import {
 } from '@/components/agents/child-session-sheet-state';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
+import { CondensedToolRunRow } from '@/components/agents/tool-run-rows';
+import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
+  type SessionTerminalError,
+  statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
+import { type ContextDisplayScope } from '@/components/context-control';
+import { KeyboardFollowPane } from '@/components/keyboard-follow-pane';
 import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
-import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
-import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import {
   type AnalyticsSurface,
   captureEvent,
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
+import { useMotionPolicy } from '@/lib/a11y/motion';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
+import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { useKeepAwake } from '@/lib/keep-awake';
+import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import {
   createRemoteModelOverride,
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
-import { useContinueSession } from '@/components/agents/use-continue-session';
+import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useAppActiveAndFocused } from '@/lib/hooks/use-app-active-and-focused';
+import { computeChargesMicrodollars, sessionTotalMicrodollars } from '@/lib/session-compute-total';
+import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
+import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
+import {
+  buildContinueHref,
+  buildContinuePrefillParams,
+} from '@/components/agents/new-session-prefill';
+import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
+import {
+  type AgentStackState,
+  openComposerWithOutcome,
+} from '@/components/agents/new-session-navigation-outcome';
+import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -135,9 +255,25 @@ import {
 } from '@/lib/picker-bridge';
 import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+import { SessionHandoffAdvertiser } from '@/lib/session-handoff';
+
+const GOAL_ACTION_LABEL_KEY = {
+  edit: 'agentChat.goal.edit',
+  pause: 'agentChat.goal.pause',
+  resume: 'agentChat.goal.resume',
+  remove: 'agentChat.goal.remove',
+} as const satisfies Record<GoalAction, string>;
+
+/**
+ * How long the live viewport has to settle before it is written to the route's
+ * search params. The transcript list already reports at most once a second; the
+ * debounce keeps a burst of reports from issuing several navigations.
+ */
+const ANCHOR_PUBLISH_DEBOUNCE_MS = 500;
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
+  displayScope: ContextDisplayScope;
   openedVia?: 'push' | 'app';
   /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
   shareId?: string;
@@ -145,12 +281,35 @@ type SessionDetailContentProps = {
   autoSend?: boolean;
   /** Mode picked at spawn; seeds the mode until the session reports its own. */
   spawnedMode?: string;
+  /** Title the route read from the session-list cache, so the header never blinks to a generic label. */
+  cachedTitle?: string;
+  /** Epoch ms the route mounted this open; anchors the slow-load threshold. */
+  openStartedAt?: number;
+  /** Message id the opening `?at=` deep link named; the list scrolls to it. */
+  resumeAt?: string | null;
 };
 
-const COMPOSER_PLACEHOLDERS = {
-  preparing: 'Setting up environment...',
-  finalizing: 'Wrapping up...',
-} satisfies Partial<Record<CloudStatus['type'], string>>;
+type CancelQueuedStatus = {
+  messageId: string;
+  tone: 'status' | 'error';
+  message: string;
+  attempt: number;
+};
+
+/**
+ * How long a held Continue press waits for the session's own row before the
+ * footer states the failure instead of staying busy. The row is one metadata
+ * read that normally lands within the screen's first paint; a read that has not
+ * answered by this bound is not going to place the destination's organization,
+ * and the press already has a Retry.
+ */
+export const CONTINUE_SCOPE_WAIT_MS = 10_000;
+
+/**
+ * The state of the read-only footer's Continue control: idle, waiting for the
+ * composer to appear, or failed with a Retry on offer.
+ */
+type ContinueOpen = 'idle' | 'pending' | 'failed';
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
@@ -160,15 +319,70 @@ export function SessionDetailContent({
   shareId,
   autoSend,
   spawnedMode,
+  cachedTitle,
+  openStartedAt,
+  resumeAt,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
+  const { t } = useTranslation();
   const router = useRouter();
+  // The root container this screen's `setParams` lands on, read at the moment
+  // of the call rather than through state: `setParams` asserts the container is
+  // mounted and throws "Attempted to navigate before mounting the Root Layout
+  // component" otherwise (KILO-APP-6VA). The debounced publish below is the one
+  // call that can outlive the container.
+  const navigationRef = useNavigationContainerRef();
+  // This screen's own navigator, for reading back whether a composer push
+  // landed, and the single-push guard every composer entry point shares.
+  const navigation = useNavigation();
+  const { beginNewSessionNavigation, resetNewSessionGuard } = useNewSessionNavigator();
+  const { confirm, dialog } = useConfirmDialog();
+  // The router behind the failure row's one navigation. Read through a ref so a
+  // callback the memoized rows receive keeps its identity: a router object
+  // captured in that callback's dependencies would re-create it whenever the
+  // caller returns a new one, and every row would re-render with it. Assigned
+  // during render, the same way the live message list below is.
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  // Session-route navigation only: `replace` in one native-stack commit crashes
+  // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
+  const sessionRouter = useStackSafeReplace();
+  // A Back that lands while one of the composer's pickers is still opening is
+  // delivered to this screen by the native stack; it closes the picker instead.
+  usePickerAboveLeaveGuard();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerControlRef = useRef<ChatComposerControl | null>(null);
+  // How far the composer's input grew past its one-line floor. The transcript
+  // holds its bottom edge on that growth in the same commit it lands: the
+  // list's own `onLayout` reaches JS one frame after the viewport shrank, and
+  // the scroll it issues lands later still, which painted the transcript
+  // clipped and then moved it.
+  //
+  // The measurement survives the composer being replaced by other chrome. Only
+  // the reservation is dropped while that chrome is up — the read-only footer
+  // and a blocking card fill the body — so a multi-line draft gets its anchor
+  // back when the composer returns, without waiting for the next line to land.
+  // The measurement is tagged with the session it was taken for, so the previous
+  // session's growth never offsets the new transcript before the new composer
+  // publishes its one-line floor and clears the reservation.
+  const [composerBottomInset, setComposerBottomInset] = useState<{
+    sessionId: KiloSessionId;
+    dp: number;
+  }>({ sessionId, dp: 0 });
+  const handleComposerBottomInsetChange = useCallback(
+    (insetDp: number) => {
+      setComposerBottomInset(current =>
+        current.sessionId === sessionId && current.dp === insetDp
+          ? current
+          : { sessionId, dp: insetDp }
+      );
+    },
+    [sessionId]
+  );
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -178,6 +392,13 @@ export function SessionDetailContent({
   }, []);
 
   const messages = useAtomValue(manager.atoms.messagesList);
+  // The live list behind a stable identity for the callbacks the transcript
+  // hands to its memoized rows. `renderItem` and `handleRetryMessage` read the
+  // current list through this ref instead of capturing `messages`, so neither
+  // changes identity on a streaming publish. Assigned during render, the same
+  // way `liveModelPickerSelectionScopeRef` below is.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const error = useAtomValue(manager.atoms.error);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
@@ -187,27 +408,70 @@ export function SessionDetailContent({
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
+  // A failed preparation row is the run's own failure statement, so it counts as
+  // content: without this the zero-message open would replace it with the
+  // page-load card. Only a failed attempt counts — a running or completed one is
+  // still a load in progress or a loaded run.
+  const hasFailedPreparation = preparationAttempts.some(attempt => attempt.status === 'failed');
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  // A failed row offers Retry only when this session can accept the re-send now.
+  // A read-only stored transcript has no transport send at all, and a remote
+  // session with no CLI owner cannot deliver; both used to fail inside the SDK
+  // and report transient connection trouble for a turn nobody re-sent.
+  const retryAvailable = !isReadOnly && canSend;
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
+  const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
     totalCost
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  // The accessor handed to the transcript's rows must keep one identity across
+  // root streaming publishes: the SDK only re-emits `childMessages` when
+  // non-root rows change or the storage/root session changes, and a changing
+  // prop would defeat `MessageBubble`'s shallow memo for every visible row. The
+  // in-transcript subagent card subscribes to the atom itself
+  // (`LiveChildSessionSection`), so it stays live without this identity changing.
+  const getChildMessagesRef = useRef(getChildMessages);
+  getChildMessagesRef.current = getChildMessages;
+  const getChildMessagesForRows = useCallback(
+    (childSessionId: string) => getChildMessagesRef.current(childSessionId),
+    []
+  );
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
+  const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
+  // Per-session auto-approve lives in an in-memory store keyed by session id.
+  // The setting stays reachable while the transport is unresolved (metadata and
+  // the transcript resolve after it), so only a session known to be read-only
+  // shows it unavailable. Auto-reply eligibility is separate: an unresolved
+  // transport cannot deliver a permission ask.
+  const autoApproveEnabled = useSessionAutoApproveEnabled(sessionId);
+  // Per-session goal disclosure lives in an in-memory store keyed by session
+  // id, so the collapsed/expanded state survives leaving and reopening the
+  // session. Absence means expanded.
+  const goalCollapsed = useSessionGoalCollapsed(sessionId);
+  // The goal block's height transition is gated by the app's motion policy, the
+  // same one the disclosure uses inside.
+  const { reducedMotion } = useMotionPolicy();
+  const autoApproveAvailable = canAutoApprovePermissions({ activeSessionType, isReadOnly });
+  const autoApproveReplyAvailable = canAutoApproveReply({ activeSessionType, isReadOnly });
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const availableCommandsCatalogStatus = useAtomValue(manager.atoms.availableCommandsCatalogStatus);
+  const sessionInfo = useAtomValue(manager.atoms.sessionInfo);
+  const sessionGoal = selectVisibleGoal(sessionInfo, isReadOnly);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
@@ -216,9 +480,106 @@ export function SessionDetailContent({
   const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
-  const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
+  const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
+  const detailsMessageIdRef = useRef<string | null>(null);
+  const [isGoalEditOpen, setIsGoalEditOpen] = useState(false);
+  // The live viewport position (the topmost visible message), reported by the
+  // transcript list. It feeds the OS handoff advertiser and the route's search
+  // params so another device resumes the session where the user left it.
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const handleAnchorChange = useCallback((messageId: string) => {
+    setAnchor(messageId);
+  }, []);
+  // The transcript's open gate holds its rows back until their position is
+  // final and paints the skeleton in the meantime. That verdict decides the
+  // chrome around the transcript too: a finished footer, composer, or header
+  // pill beside a loading body is the screen showing two states at once. Keyed
+  // by session, so a verdict from the previous one cannot leak into this one,
+  // and absent a verdict for this session the chrome stays settled: a host
+  // whose list never reports keeps the behavior it had before this hand-off.
+  const [openSettledReport, setOpenSettledReport] = useState<{
+    sessionId: string;
+    settled: boolean;
+  } | null>(null);
+  const handleOpenSettledChange = useCallback((reportedSessionId: string, settled: boolean) => {
+    setOpenSettledReport(previous =>
+      previous?.sessionId === reportedSessionId && previous.settled === settled
+        ? previous
+        : { sessionId: reportedSessionId, settled }
+    );
+  }, []);
+  const transcriptOpenSettled =
+    openSettledReport === null ||
+    openSettledReport.sessionId !== sessionId ||
+    openSettledReport.settled;
+  // The route's `at` is the position this screen resumes at. A resume link
+  // dedupes onto an already-mounted route and updates its params instead of
+  // remounting, so the position is adopted when the live param changes — unless
+  // the change is the route echoing back the anchor this screen just published.
+  const [resumeAnchor, setResumeAnchor] = useState<string | null>(resumeAt ?? null);
+  const publishedAnchorRef = useRef<string | null>(resumeAnchor);
+  const incomingAnchorRef = useRef<string | null>(resumeAt ?? null);
+  useEffect(() => {
+    const incoming = resumeAt ?? null;
+    if (incoming === incomingAnchorRef.current) {
+      return;
+    }
+    incomingAnchorRef.current = incoming;
+    // The route already carries the position this screen believes in; the
+    // publish below wrote it before `router.setParams`, so no re-arm.
+    if (incoming === publishedAnchorRef.current) {
+      return;
+    }
+    setResumeAnchor(incoming);
+    publishedAnchorRef.current = incoming;
+    // A newer link supersedes the live position this screen was about to
+    // publish. Drop it: the publish effect's cleanup then clears its pending
+    // debounce timer, so the pre-link position can never fire afterwards and
+    // write itself back over the position the reader just navigated to. The
+    // list reports the new top once it lands the incoming anchor, re-arming the
+    // publish from the real viewport.
+    setAnchor(null);
+  }, [resumeAt]);
+  useEffect(() => {
+    if (anchor === null || anchor === publishedAnchorRef.current) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      // The container can go away between this effect and its timer: an
+      // activity recreate, or the bootstrap-error surface that renders no
+      // `Slot`. Dropping the publish costs one resume position; writing it
+      // would throw out of the timer and take the app to the fatal screen.
+      if (!navigationRef.isReady()) {
+        return;
+      }
+      publishedAnchorRef.current = anchor;
+      router.setParams({ at: anchor });
+    }, ANCHOR_PUBLISH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [anchor, navigationRef, router]);
 
+  // A send takes the transcript position over: the sent message and its reply
+  // must be on screen, even when a `?at=` resume left the transcript parked on
+  // an older row with follow off. Bumping this counter is the transcript list's
+  // signal for it; both composer sends (prompt and slash command) bump it
+  // before their transport call, so a resume retry chain still in flight is
+  // cancelled by the take-over instead of yanking the viewport back to the
+  // recorded anchor.
+  const [followTailNonce, setFollowTailNonce] = useState(0);
+  const takeOverTranscriptPositionForSend = useCallback(() => {
+    setFollowTailNonce(count => count + 1);
+  }, []);
+
+  // The strip below the keyboard container reserves the device safe area so the
+  // composer's tail clears the navigation bar / home indicator. The container
+  // above does not add it again (`containerReservesBottomInset`), so the space
+  // is resolved once per screen instead of twice.
   const { bottom } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
+  const themedSheet = useThemedActionSheetOptions();
+  const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
   // never wait on the `user.getMe` query — and the draft load settles behind
@@ -256,6 +617,7 @@ export function SessionDetailContent({
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
     : 'remote-session';
+  const readObservedRaise = useSessionRaiseReader();
 
   const {
     isAnswering,
@@ -271,9 +633,105 @@ export function SessionDetailContent({
     activeQuestion,
     activePermission,
     surface: analyticsSurface,
+    readObservedRaise,
   });
 
-  const organizationId = fetchedData?.organizationId ?? undefined;
+  const autoApproveState = resolveSessionAutoApproveState({
+    enabled: autoApproveEnabled,
+    available: autoApproveAvailable,
+  });
+  // Per-ask auto-reply for the head permission. Only permission request ids
+  // reach the hook, so a clarification question is never auto-answered.
+  const { suppressedRequestId } = useSessionAutoApprove({
+    enabled: autoApproveState === 'on',
+    available: autoApproveReplyAvailable,
+    requestId: activePermission?.requestId ?? null,
+    respond: async () => {
+      const outcome = await handleRespondToPermission('once');
+      return outcome;
+    },
+  });
+
+  // `fetchSession` is the only source of the session's own row, so the recorded
+  // profile id, the title, the cost and the loading flag all apply only once the
+  // row names the session on screen.
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  // The organization scope follows the session on screen. Until that session's
+  // own row is available the scope is unresolved: the org-scoped reads wait for
+  // it, and the create, restart, Continue and fork actions stay unavailable.
+  const organizationId = sessionDataLoaded ? (fetchedData.organizationId ?? undefined) : undefined;
+
+  // Compute cost is part of the session's total wherever the screen paints one:
+  // the header pill and the context sheet. One read serves both, and a session
+  // with no compute scope answers nothing, so the model cost stands alone.
+  //
+  // A session screen stays mounted on the navigation stack after the user
+  // leaves it, so the poll follows this screen's focus and the app's foreground
+  // state rather than its mount; a blurred screen reads the entry another
+  // surface refreshes on its own turn instead of asking every interval from the
+  // background.
+  const cloudAgentSessionId = sessionDataLoaded ? (fetchedData.cloudAgentSessionId ?? null) : null;
+  const computePolling = useAppActiveAndFocused();
+  const computeCharges = useSessionComputeCharges({
+    cloudAgentSessionId,
+    organizationId,
+    poll: computePolling,
+  });
+  const sessionCostMicrodollars = sessionTotalMicrodollars(
+    totalMicrodollars,
+    computeChargesMicrodollars(computeCharges.data)
+  );
+
+  // The session's active-profile chip: the profile this session runs on. It
+  // resolves from the session's own recorded `profileId`, so an explicit
+  // override or a repository-bound profile — not the context's current
+  // effective default — names it. Only a session that recorded none (created
+  // before profile recording, or one whose create resolved no profile) falls
+  // back to the effective default. A recorded id that no longer resolves shows
+  // no chip rather than naming a different profile. Tapping opens that
+  // profile's editor.
+  const {
+    allProfiles: sessionProfiles,
+    effectiveDefaultId,
+    isLoading: isSessionProfileLoading,
+    isError: isSessionProfileError,
+  } = useEffectiveAgentProfile(organizationId, null, { enabled: sessionDataLoaded });
+  // Until the current session's read resolves, the chip stays hidden rather than
+  // briefly naming the context default for a session that recorded a different
+  // profile.
+  const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
+  const activeSessionProfileId = sessionDataLoaded
+    ? (recordedSessionProfileId ?? effectiveDefaultId)
+    : null;
+  const sessionProfile =
+    activeSessionProfileId === null
+      ? null
+      : (sessionProfiles.find(profile => profile.id === activeSessionProfileId) ?? null);
+  const sessionProfileIndicatorState = buildActiveProfileIndicatorState({
+    selectedProfileName: sessionProfile?.name ?? null,
+    repoBoundProfileName: null,
+    hasManualEnvVars: false,
+    hasManualSetupCommands: false,
+    hasSelectedProfileId: sessionProfile !== null,
+    isProfilesLoading: isSessionProfileLoading || !sessionDataLoaded,
+    hasProfileError: isSessionProfileError,
+  });
+  const openSessionProfileEditor = () => {
+    if (sessionProfile) {
+      // The session screen is on the root `(app)` Stack: the profile editor has
+      // to join it there, or Back would land on the Profile tab root instead of
+      // this session. The `openedFrom` marker also keeps Back here rather than
+      // rebuilding the profiles list under a screen the reader reached from a
+      // session (`profile-route-stack.ts`).
+      router.push(
+        getProfileOverviewPath(sessionProfile.id, {
+          organizationId: profileOrganizationId(organizationId, sessionProfile),
+          stack: 'app',
+          openedFrom: 'session',
+        })
+      );
+    }
+  };
 
   const presenceSessionId = resolveLoadedCliSessionPresenceId(
     sessionId,
@@ -282,11 +740,26 @@ export function SessionDetailContent({
   useCliSessionPresence(presenceSessionId);
 
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
-  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId, {
+    enabled: sessionDataLoaded,
+  });
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
-  const { models: gatewayModels, isLoading: gatewayModelsLoading } =
-    useAvailableModels(organizationId);
+  const { condenseToolCalls } = useCondenseToolCallsPreference();
+  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
+    organizationId,
+    'member',
+    { enabled: sessionDataLoaded }
+  );
+  // The picker lists models only once the session's scope is resolved. Until
+  // then it holds its loading state, so it never presents a model list for a
+  // scope the screen has not settled.
+  const gatewayModels = useMemo(
+    () => (sessionDataLoaded ? catalogModels : []),
+    [catalogModels, sessionDataLoaded]
+  );
+  const gatewayModelsLoading = gatewayCatalogLoading || !sessionDataLoaded;
   const sessionModels = useSessionModelOptions({
     activeSessionType,
     remoteModelState,
@@ -296,41 +769,20 @@ export function SessionDetailContent({
     gatewayModelsLoading,
     organizationId,
   });
+  // A remote session's catalog can arrive empty or fail before the CLI is
+  // ready. Re-ask on attach, focus, and app-foreground while it is missing,
+  // empty, or errored; the hook bounds itself to those events.
+  useRemoteModelCatalogRetry({ activeSessionType, manager, remoteModelState });
   const modelOptions = sessionModels.options;
-  const { continueSession, isContinuing } = useContinueSession({
-    organizationId,
-    manager,
-    models: modelOptions,
-    modelsLoading: gatewayModelsLoading,
-  });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
     [contextUsage, sessionModels.options]
   );
-  const contextModelAndProvider = useMemo(() => {
-    if (!contextInfo) {
-      return { model: '', provider: '' };
-    }
-    const match = sessionModels.options.find(
-      option =>
-        (option.modelRef?.providerID === contextInfo.providerID &&
-          option.modelRef.modelID === contextInfo.modelID) ||
-        (contextInfo.providerID === 'kilo' &&
-          option.showGatewayMetadata &&
-          option.id === contextInfo.modelID)
-    );
-    return {
-      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
-      provider:
-        match?.provider?.name ??
-        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
-    };
-  }, [contextInfo, sessionModels.options]);
-  const sheetMountState = getContextSheetMountState(
-    contextInfo,
-    openContextSheetIdentity,
-    sessionId
-  );
+  const sheetMountState = getContextSheetMountState(contextInfo, openContextSheetIdentity, {
+    sessionId,
+    autoApproveAvailable,
+  });
+  const contextSheetVisible = sheetMountState.mounted && sheetMountState.visible;
   const catalogGenerationIdentity =
     remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
   const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
@@ -370,27 +822,45 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    sessionId,
     spawnedMode,
   });
 
-  // Custom modes come from the session's `runtimeAgents` (slug + name). The
-  // selected slug is appended once when it is neither a built-in nor already
-  // listed, so an inherited custom slug stays visible in the picker.
+  // Custom modes: a remote session merges the session profile's visible custom
+  // agents (loaded for the session's own recorded/bound profile, not the
+  // context's effective default) with the agents its CLI reports for the
+  // session's directory, so both the user's profile roles and the project's
+  // `.kilo/agents` show. Cloud-agent and read-only sessions use only
+  // `runtimeAgents`. The selected slug is appended once when it is neither a
+  // built-in nor already listed, so an inherited custom slug stays visible in
+  // the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
-  const customOptions = useMemo(
+  const { agents: cliAgents } = useCliAgents(
+    activeSessionType === 'remote' && remoteModelState.ownerConnectionId !== null
+      ? { sessionId, ownerConnectionId: remoteModelState.ownerConnectionId }
+      : null
+  );
+  const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
+    organizationId,
+    activeSessionProfileId,
+    { enabled: sessionDataLoaded }
+  );
+  const roleView = useMemo(
     () =>
-      ensureSelectedCustomOption(
-        dedupeCustomModeOptions(customModeOptionsFromRuntimeAgents(runtimeAgents)),
-        currentMode
-      ),
-    [runtimeAgents, currentMode]
+      resolveSessionRoleView({
+        sessionType: activeSessionType,
+        runtimeAgents:
+          activeSessionType === 'remote' && cliAgents.length > 0 ? cliAgents : runtimeAgents,
+        profileAgents: effectiveProfileAgents,
+        selectedMode: currentMode,
+      }),
+    [activeSessionType, cliAgents, runtimeAgents, effectiveProfileAgents, currentMode]
   );
-  // A custom agent can pin a model (+ optional variant). Only Cloud Agent
-  // locks from `runtimeAgents`; remote sessions stay unlocked, as web does.
-  const pinned = useMemo(
-    () => resolvePinnedAgentModel({ slug: currentMode, runtimeAgents }),
-    [currentMode, runtimeAgents]
-  );
+  const customOptions = roleView.customOptions;
+  // A custom agent can pin a model (+ optional variant). The pin always comes
+  // from `runtimeAgents`, so a profile agent's pin never locks a cloud-agent
+  // toolbar or the send model, matching web's runtime-only lock.
+  const pinned = roleView.pinned;
   const modelLocked = activeSessionType === 'cloud-agent' && Boolean(pinned.model);
   const displayModel = modelLocked && pinned.model ? pinned.model : currentModel;
   const displayVariant = modelLocked && pinned.model ? (pinned.variant ?? '') : currentVariant;
@@ -404,6 +874,28 @@ export function SessionDetailContent({
       ? modelOptions
       : [...modelOptions, lockedModelOption(pinned)];
   }, [modelLocked, pinned, modelOptions]);
+  // What the context sheet names as the session's model. The reported usage
+  // wins; before it arrives the sheet names the model the composer chip shows,
+  // resolved through the same catalog rows.
+  const contextModelAndProvider = useMemo(() => {
+    if (!contextInfo) {
+      return resolveSelectionModelDisplay(displayModel, modelOptionsForToolbar);
+    }
+    const match = modelOptionsForToolbar.find(
+      option =>
+        (option.modelRef?.providerID === contextInfo.providerID &&
+          option.modelRef.modelID === contextInfo.modelID) ||
+        (contextInfo.providerID === 'kilo' &&
+          option.showGatewayMetadata &&
+          option.id === contextInfo.modelID)
+    );
+    return {
+      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
+      provider:
+        match?.provider?.name ??
+        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
+    };
+  }, [contextInfo, displayModel, modelOptionsForToolbar]);
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
   // Sync the cloud-agent override to the selected agent's pin (or clear it)
@@ -438,13 +930,26 @@ export function SessionDetailContent({
   );
 
   const viewTrackedRef = useRef<string | null>(null);
+  const recordedLastOpenedRef = useRef<{ sessionId: string; userId: string } | null>(null);
   useEffect(() => {
-    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+    if (fetchedData?.kiloSessionId !== sessionId) {
       return;
     }
-    viewTrackedRef.current = sessionId;
-    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
-  }, [fetchedData, sessionId, analyticsSurface, openedVia]);
+    if (viewTrackedRef.current !== sessionId) {
+      viewTrackedRef.current = sessionId;
+      captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
+    }
+    // Record the session the person actually viewed (not one merely fetched) so
+    // the launcher's 'Open last session' reopens it. Its latch is separate from
+    // the analytics one above: `userId` resolves after the first render, so the
+    // analytics event still fires once per session while the record waits for
+    // the identity and lands on the render that has it.
+    const recorded = recordedLastOpenedRef.current;
+    if (userId !== undefined && (recorded?.sessionId !== sessionId || recorded.userId !== userId)) {
+      recordedLastOpenedRef.current = { sessionId, userId };
+      recordLastOpenedSession(sessionId, userId);
+    }
+  }, [fetchedData, sessionId, analyticsSurface, openedVia, userId]);
 
   useEffect(
     () => () => {
@@ -457,10 +962,11 @@ export function SessionDetailContent({
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
 
+  const store = useStore();
+
   // Refetch the linked PR on every focus so a link, unlink, or mid-session
   // decision change surfaces without reopening the session. A pending review
   // decision gets one 4s follow-up refetch — no polling loop.
-  const store = useStore();
   // The first focus on a session id is owned by `manager.switchSession`, which
   // already fetches the session metadata (including `associatedPr`). Every
   // later focus refetches; this ref tracks which id has been seeded.
@@ -543,19 +1049,10 @@ export function SessionDetailContent({
   );
 
   useEffect(() => {
-    setOpenContextSheetIdentity(openIdentity => {
-      if (
-        !openIdentity ||
-        (contextInfo &&
-          openIdentity.sessionId === sessionId &&
-          openIdentity.providerID === contextInfo.providerID &&
-          openIdentity.modelID === contextInfo.modelID)
-      ) {
-        return openIdentity;
-      }
-      return null;
-    });
-  }, [contextInfo, sessionId]);
+    if (!contextSheetVisible) {
+      setOpenContextSheetIdentity(null);
+    }
+  }, [contextSheetVisible]);
 
   useEffect(() => {
     if (
@@ -621,10 +1118,265 @@ export function SessionDetailContent({
     }
   }, [clearChildSheetReleaseTimeout]);
 
-  const transcript = useMemo(
-    () => mergeSessionTranscript(messages, preparationAttempts),
-    [messages, preparationAttempts]
+  // Canceled queued rows: `droppedQueuedIds` filters a canceled (empty-composer)
+  // row out of the transcript before merge; `canceledQueuedMessages` keeps the
+  // full row with a Restore action when the composer was occupied (the SDK
+  // deletes the row on cloud.message.canceled, so the local copy re-inserts it).
+  // Sheet and screen outcomes have separate slots so one cannot erase the other.
+  // The rows and feedback reset on session switch.
+  const EMPTY_CANCELED: ReadonlyMap<string, StoredMessage> = new Map();
+  const [droppedQueuedIds, setDroppedQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const [canceledQueuedMessages, setCanceledQueuedMessages] =
+    useState<ReadonlyMap<string, StoredMessage>>(EMPTY_CANCELED);
+  // Ids whose failed submission a retry accepted, plus the ids a re-send
+  // superseded while it is still in flight. The re-send is a new submission with
+  // its own row, so the original row must stop rendering even when it is
+  // server-confirmed (the SDK can only delete the client-materialised ghost).
+  // The row's preparation attempts go with it, or the filtered row's preparation
+  // would be re-emitted at the end of the transcript.
+  //
+  // Both records live in the manager, keyed by the session that owns the row:
+  // the re-send is awaited, so the user can switch sessions while it is in
+  // flight, and the row must stay hidden when the transcript is opened again —
+  // by another screen instance, or after a relaunch.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const supersededMessageIds = useMemo(() => {
+    if (supersededInFlightMessageIds.size === 0) {
+      return resolvedDeliveryFailures;
+    }
+    if (resolvedDeliveryFailures.size === 0) {
+      return supersededInFlightMessageIds;
+    }
+    const merged = new Set(supersededInFlightMessageIds);
+    for (const id of resolvedDeliveryFailures) {
+      merged.add(id);
+    }
+    return merged;
+  }, [supersededInFlightMessageIds, resolvedDeliveryFailures]);
+  const [cancelQueuedStatus, setCancelQueuedStatus] = useState<CancelQueuedStatus | null>(null);
+  const [cancelQueuedSheetStatus, setCancelQueuedSheetStatus] = useState<CancelQueuedStatus | null>(
+    null
   );
+  const cancelQueuedAttemptRef = useRef(0);
+  const cancelingQueuedIdsRef = useRef(new Set<string>());
+  const [cancelingQueuedIds, setCancelingQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  // A retryable exit transport failure that must stay actionable while the
+  // transport recovers. The transient toast the helper falls back to is gone
+  // long before connectivity returns, so the host owns the durable retry row.
+  const [exitFailure, setExitFailure] = useState<RetryableExitFailure | null>(null);
+  const [isRetryingExit, setIsRetryingExit] = useState(false);
+  // Successful drops stay guarded before React commits and after Restore removes a retained row.
+  const canceledQueuedIdsRef = useRef(new Set<string>());
+  // The SDK owner ID changes when a replacement CLI connection takes over.
+  // Catalog refreshes and temporary owner loss do not prove recovery.
+  const cancelQueuedUpgradeRequiredRef = useRef<{
+    ownerConnectionId: string | null;
+    attempt: number;
+  } | null>(null);
+  const isQueuedCancellationUnsupported = useCallback(() => {
+    const unsupported = cancelQueuedUpgradeRequiredRef.current;
+    const ownerConnectionId = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+    return (
+      unsupported !== null &&
+      (ownerConnectionId === null || ownerConnectionId === unsupported.ownerConnectionId)
+    );
+  }, [manager, store]);
+
+  useEffect(() => {
+    const unsupported = cancelQueuedUpgradeRequiredRef.current;
+    if (
+      unsupported !== null &&
+      remoteModelState.ownerConnectionId !== null &&
+      remoteModelState.ownerConnectionId !== unsupported.ownerConnectionId
+    ) {
+      cancelQueuedUpgradeRequiredRef.current = null;
+      setCancelQueuedStatus(current => (current?.attempt === unsupported.attempt ? null : current));
+      setCancelQueuedSheetStatus(current =>
+        current?.attempt === unsupported.attempt ? null : current
+      );
+    }
+  }, [remoteModelState.ownerConnectionId]);
+
+  const isQueuedCancellationEligible = useCallback(
+    (
+      message: StoredMessage | undefined,
+      delivery: MessageDeliveryState | undefined,
+      busy: boolean
+    ) =>
+      !isQueuedCancellationUnsupported() &&
+      message?.info.role === 'user' &&
+      delivery?.status === 'queued' &&
+      !canceledQueuedIdsRef.current.has(message.info.id) &&
+      !busy,
+    [isQueuedCancellationUnsupported]
+  );
+
+  const handleOpenDetails = useCallback((message: StoredMessage) => {
+    detailsMessageIdRef.current = message.info.id;
+    setDetailsMessageId(message.info.id);
+    setCancelQueuedSheetStatus(null);
+  }, []);
+
+  const handleCloseDetails = useCallback(() => {
+    const messageId = detailsMessageIdRef.current;
+    detailsMessageIdRef.current = null;
+    setDetailsMessageId(null);
+    // A presented sheet failure must not become a second, outer announcement on dismissal.
+    setCancelQueuedSheetStatus(current => (current?.messageId === messageId ? null : current));
+  }, []);
+
+  const visibleMessages = useMemo(() => {
+    const base =
+      droppedQueuedIds.size === 0 && supersededMessageIds.size === 0
+        ? messages
+        : messages.filter(
+            m => !droppedQueuedIds.has(m.info.id) && !supersededMessageIds.has(m.info.id)
+          );
+    if (canceledQueuedMessages.size === 0) {
+      return base;
+    }
+    return restoreCanceledQueuedMessages(base, canceledQueuedMessages);
+  }, [messages, droppedQueuedIds, supersededMessageIds, canceledQueuedMessages]);
+
+  // Visibility-only strip for the "Hide thinking details" option. Applied once
+  // here so the transcript, the message-details sheet, and the subagent views
+  // all lose their thinking rows/text from the same list.
+  // Until the persisted value resolves, reason optimistically that thinking is
+  // hidden: on a cold start with the option on, painting the rows first and
+  // stripping them when the disk read lands would flash the hidden thinking.
+  const hideReasoningRows = !hideThinkingLoaded || hideThinking;
+  const displayedMessages = useMemo(
+    () => (hideReasoningRows ? withoutReasoningParts(visibleMessages) : visibleMessages),
+    [visibleMessages, hideReasoningRows]
+  );
+
+  // Subagent transcript views resolve their rows through this callback, so the
+  // same option hides thinking inside an opened child session.
+  const getDisplayedChildMessages = useCallback(
+    (childSessionId: string) => {
+      const child = getChildMessages(childSessionId);
+      return hideReasoningRows ? withoutReasoningParts(child) : child;
+    },
+    [getChildMessages, hideReasoningRows]
+  );
+
+  // The details lookup runs on every render (including each composer
+  // keystroke), so memoize it against the two inputs that can change it.
+  const detailsMessage = useMemo(
+    () => displayedMessages.find(message => message.info.id === detailsMessageId),
+    [displayedMessages, detailsMessageId]
+  );
+  const detailsDelivery =
+    detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
+  const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);
+  const canCancelSelected = isQueuedCancellationEligible(
+    detailsMessage,
+    detailsDelivery,
+    detailsBusy
+  );
+  const isCancelingSelected =
+    detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
+  const detailsForkCut = useMemo(
+    () =>
+      detailsMessageId === null
+        ? null
+        : resolveForkCut({
+            messages: displayedMessages,
+            messageId: detailsMessageId,
+            pendingMessages,
+            isSessionStreaming: isStreaming,
+          }),
+    [displayedMessages, detailsMessageId, pendingMessages, isStreaming]
+  );
+
+  // While a stored session is read-only, no live writer supplies its parts.
+  // Omit user rows that render nothing; if the manager later resolves a live
+  // transport, the next build restores the normal streaming behavior.
+  const dropUnrenderableUserRows = activeSessionType === 'read-only';
+
+  const { transcript: baseTranscript, preparationFailureTriggers } = useMemo(() => {
+    // A superseded submission's preparation goes with its row: dropping only
+    // the row would leave `mergeSessionTranscript` re-emitting the attempt at
+    // the end (its trigger id is no longer in the message list).
+    const attempts =
+      supersededMessageIds.size === 0
+        ? preparationAttempts
+        : preparationAttempts.filter(
+            attempt => !supersededMessageIds.has(attempt.triggerMessageId)
+          );
+    // A failed attempt states its own failure in the group it renders, with the
+    // stage and the reason. The question that triggered it must not repeat the
+    // generic response failure on top of that statement.
+    const failed = new Set<string>();
+    for (const attempt of attempts) {
+      if (attempt.status === 'failed') {
+        failed.add(attempt.triggerMessageId);
+      }
+    }
+    return {
+      transcript: mergeSessionTranscript(displayedMessages, attempts, {
+        deliveryStates: pendingMessages,
+        dropUnrenderableUserRows,
+      }),
+      preparationFailureTriggers: failed,
+    };
+  }, [
+    displayedMessages,
+    preparationAttempts,
+    pendingMessages,
+    supersededMessageIds,
+    dropUnrenderableUserRows,
+  ]);
+  // Condensing is opt-in: with the preference off the derived transcript is the
+  // same array identity, so nothing below re-renders differently.
+  //
+  // The previous build's part→item-key map. A later build that folds new parts
+  // into an existing run — an older page prepending, or a tool part streaming
+  // into the run — reuses the key the row was already on screen under, so
+  // FlashList's viewport anchor survives. The effect refreshes the map after the
+  // commit, so the render that first shows the change still reads the old one.
+  const carriedTranscriptKeysByPartRef = useRef<TranscriptItemKeysByPart | null>(null);
+  const transcript = useMemo(
+    () =>
+      condenseToolCalls
+        ? condenseTranscriptToolRuns(
+            baseTranscript,
+            carriedTranscriptKeysByPartRef.current ?? undefined
+          )
+        : baseTranscript,
+    [condenseToolCalls, baseTranscript]
+  );
+  // Only the condensed build reads the map back, so while condensing is off the
+  // walk over every content-rendering part and its `Map` allocation would be
+  // dead work on every streaming update. The guard skips both; the map is
+  // refreshed again on the commit after condensing turns back on.
+  useEffect(() => {
+    if (!condenseToolCalls) {
+      return;
+    }
+    carriedTranscriptKeysByPartRef.current = collectTranscriptItemKeysByPart(transcript);
+  }, [condenseToolCalls, transcript]);
+
+  // The list branch must never mount with zero items: a zero-item FlashList
+  // paints blank dead space with no loading and no empty state (mobile-app
+  // spot check, e2-open). `mergeSessionTranscript` drops messages whose parts
+  // render no content, so the branch reads the merged item count.
+  const transcriptView = resolveSessionTranscriptView({
+    transcriptItemCount: transcript.length,
+    hasStatusIndicator: statusIndicator !== null,
+    hasOlderMessages,
+    olderMessagesError,
+  });
+
+  // A zero-item transcript with a live older-page cursor is transient: page
+  // until renderable content arrives or the cursor ends. The manager dedupes
+  // in-flight loads and stops on terminal errors, so this cannot loop.
+  useEffect(() => {
+    if (transcriptView === 'older-loading' && !isLoadingOlderMessages) {
+      void manager.loadOlderMessages();
+    }
+  }, [transcriptView, isLoadingOlderMessages, manager]);
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
   // transitions while streaming so the badge row never unmounts and bubble
@@ -634,6 +1386,21 @@ export function SessionDetailContent({
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
+    setDroppedQueuedIds(EMPTY_IDS);
+    // The superseded ids are not cleared here: the manager keys them by the
+    // session that owns the row, so switching back before an in-flight re-send
+    // settles must still hide the row it superseded.
+    setCanceledQueuedMessages(EMPTY_CANCELED);
+    setCancelQueuedStatus(null);
+    setCancelQueuedSheetStatus(null);
+    detailsMessageIdRef.current = null;
+    setDetailsMessageId(null);
+    cancelingQueuedIdsRef.current = new Set();
+    setCancelingQueuedIds(EMPTY_IDS);
+    canceledQueuedIdsRef.current = new Set();
+    cancelQueuedUpgradeRequiredRef.current = null;
+    setExitFailure(null);
+    setIsRetryingExit(false);
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {
@@ -644,13 +1411,10 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
 
   const handleSend = useCallback(
-    async (
-      text: string,
-      attachments?: AgentAttachmentWire,
-      submission?: AgentAttachmentSubmissionPayload
-    ) => {
+    async (text: string, options?: ChatComposerSendOptions) => {
+      const { attachments, submission, onOptimisticSend } = options ?? {};
       if (requiresModel && !(pinned.model ?? currentModel)) {
-        toast.error('Select a model before sending');
+        toast.error(t('agentChat.composer.selectModelBeforeSending'));
         return;
       }
       // Pick the wire shape via the same pure helper the unit test covers:
@@ -664,8 +1428,7 @@ export function SessionDetailContent({
         attachments !== undefined
       );
       if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
-        const message =
-          "This session can't receive files. Remove the attachments to send your message.";
+        const message = t('agentChat.composer.cannotReceiveFiles');
         toast.error(message);
         throw new Error(message);
       }
@@ -677,9 +1440,9 @@ export function SessionDetailContent({
           buildRemoteAttachmentParts
         );
         if (!result.ok) {
-          // Retryable presign failure: the manager never reached send(), so
-          // its onSendFailed toast does not fire. Surface the retryable message
-          // through the same toast channel and throw so the composer keeps the
+          // Retryable presign failure: the manager never reached send(), so the
+          // SDK set no error status indicator. Surface the retryable message
+          // through the toast channel and throw so the composer keeps the
           // draft/attachments for a retry.
           toast.error(result.message);
           throw new Error(result.message);
@@ -702,11 +1465,12 @@ export function SessionDetailContent({
           sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
         );
       }
-      // manager.send() reports failures via its own return value (and toasts
-      // through the manager's onSendFailed hook) rather than rejecting — it
-      // is the single toast owner for send failures. Throw here, without a
-      // second toast, purely so the composer's `await onSend(...)` sees the
+      // manager.send() reports failures via its own return value rather than
+      // rejecting; the SDK sets the translated error status indicator above the
+      // composer, which is the single failed-send surface. Throw here, without
+      // a toast, purely so the composer's `await onSend(...)` sees the
       // rejection and preserves the draft.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: {
           type: 'prompt',
@@ -717,6 +1481,7 @@ export function SessionDetailContent({
         },
         ...(kind === 'cloud' && attachments ? { attachments } : {}),
         ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
+        ...(onOptimisticSend ? { onOptimisticSend } : {}),
       });
       if (!sent) {
         throw new Error('Failed to send message');
@@ -734,6 +1499,8 @@ export function SessionDetailContent({
       activeSessionType,
       supportsAttachments,
       analyticsSurface,
+      takeOverTranscriptPositionForSend,
+      t,
     ]
   );
 
@@ -741,73 +1508,376 @@ export function SessionDetailContent({
     composerControlRef.current?.setText(text);
   }, []);
 
+  // A failed send the server accepted after all: its response was lost, so the
+  // composer put the text back, and the confirmed message then reached the
+  // transcript. The transcript owns the message now, so the restored draft is
+  // withdrawn — otherwise the same text sits in two places and the next Send
+  // posts it twice. The composer keeps a draft the reader has since edited, and
+  // the record's `sequence` makes this effect run once per delivery.
+  const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
+  const appliedDeliveredFailedPromptSequence = useRef(0);
+  // The load each record was published for. The draft suppression lasts only
+  // until the composer consumes that one load, so a draft the reader stores
+  // afterwards with the same words is never taken for the delivered message.
+  const [consumedDeliveredSequence, setConsumedDeliveredSequence] = useState(0);
+  useEffect(() => {
+    if (deliveredFailedPrompt === null) {
+      return;
+    }
+    if (deliveredFailedPrompt.sequence <= appliedDeliveredFailedPromptSequence.current) {
+      return;
+    }
+    appliedDeliveredFailedPromptSequence.current = deliveredFailedPrompt.sequence;
+    composerControlRef.current?.withdrawRestoredSend(deliveredFailedPrompt.text);
+  }, [deliveredFailedPrompt, setConsumedDeliveredSequence]);
+  const consumableDeliveredDraft =
+    deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence
+      ? deliveredFailedPrompt.text
+      : null;
+  const consumeDeliveredDraft = useCallback(() => {
+    if (deliveredFailedPrompt !== null) {
+      setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
+    }
+  }, [deliveredFailedPrompt]);
+
+  // Where the account settles a turn its balance refused. The action reads no
+  // session state, so it stays wired for a read-only transcript too. It reads
+  // the router through the ref `renderItem` already holds its identity across a
+  // publish with: a router object captured here would re-create the callback on
+  // every render that returns a new one, and with it every memoized row.
+  const handleAddCredits = useCallback(() => {
+    routerRef.current.push('/(app)/credits' as Href);
+  }, []);
+
+  // One destination object for every row: a fresh one per render would
+  // re-create each memoized row's props. The session records the balance that
+  // pays for it, so an organization's session is settled on that organization's
+  // billing page and a personal one on the in-app purchase screen. Until the
+  // CURRENT session's metadata is the loaded one, that record is unknown, so the
+  // row offers no action rather than reading "no organization" from a load that
+  // has not answered yet — the fallback would be the personal balance.
+  const addCredits = useMemo(
+    () =>
+      sessionDataLoaded ? addCreditsDestinationFor(organizationId, handleAddCredits) : undefined,
+    [handleAddCredits, organizationId, sessionDataLoaded]
+  );
+
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
-      const prompt = resolveRetryPrompt(message, messages);
-      if (prompt === null) {
+      // Read the live capability at tap time: a stale row could outlive the
+      // session's writability (a read-only transcript, or a remote session whose
+      // CLI owner went away) and the SDK would report the refusal as connection
+      // trouble for a prompt it never sent.
+      if (store.get(manager.atoms.isReadOnly) || !store.get(manager.atoms.canSend)) {
         return;
       }
+      const target = resolveRetryTarget(message, messagesRef.current);
+      if (target === null) {
+        return;
+      }
+      const { prompt, replacedMessageIds } = target;
+      // A retry is a new user turn: the server never re-admits a final message
+      // id, so the re-send adds its own row. Every row it replaces — the
+      // failed row and, for an assistant failure, the user row whose prompt is
+      // re-sent — is hidden for the lifetime of the re-send instead, so the
+      // transcript never shows the prompt twice.
       // Same guard handleSend opens with: when no model resolves, run the send
       // anyway (the user gets the existing toast) and keep the failed row.
       if (requiresModel && !(pinned.model ?? currentModel)) {
         void handleSend(prompt);
         return;
       }
-      void retryMessageAndClear(
-        async () => {
-          await handleSend(prompt);
+      // The retry's re-send is a new submission; `retryFailedMessage` resolves
+      // every replaced row once it is accepted so the rows stop showing as
+      // failed. They are resolved against this screen's session — the one that
+      // owns them and that the manager opened — because the await above can
+      // outlive it: switching sessions while the re-send is in flight must not
+      // record this resolution under the session the user switched to.
+      const ownerSessionId = sessionId;
+      // The manager records the supersede against the session that owns the
+      // rows. The re-send is awaited, so the user can switch sessions while it
+      // is in flight; a write under the switched-to session would put another
+      // transcript's ids in its set, and a screen-local record would be lost
+      // with the screen that hosted the retry.
+      void retryFailedMessage({
+        replacedMessageIds,
+        send: async () => {
+          try {
+            // Hide the replaced rows in the same tap as the retry. The re-send
+            // inserts its own optimistic row before the transport round-trip
+            // (and fires this hook right after), so waiting for the send to
+            // settle would render the prompt twice for the whole round-trip.
+            await handleSend(prompt, {
+              onOptimisticSend: () => {
+                for (const replacedId of replacedMessageIds) {
+                  manager.markMessageSuperseded(replacedId, ownerSessionId);
+                }
+              },
+            });
+          } catch (retryError) {
+            // A rejected re-send restored nothing: bring the replaced rows and
+            // the failed row's Retry control back. `retryFailedMessage`
+            // swallows the rejection, so its contract is unchanged.
+            for (const replacedId of replacedMessageIds) {
+              manager.unmarkMessageSuperseded(replacedId, ownerSessionId);
+            }
+            throw retryError;
+          }
         },
-        () => {
-          manager.clearFailedMessage(message.info.id);
-        }
-      );
+        clearFailedMessage: clearedMessageId => {
+          // The manager records the resolution for the owning session and
+          // republishes it on `atoms.resolvedDeliveryFailures`, which already
+          // feeds the transcript filter. An accepted re-send therefore needs no
+          // local write, and the accepted ids stay hidden across a switch-back
+          // and a relaunch.
+          manager.clearFailedMessage(clearedMessageId, ownerSessionId);
+        },
+      });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId, store]
   );
+
+  const handleCancelQueued = useCallback(
+    async (selectedMessage: StoredMessage) => {
+      const messageId = selectedMessage.info.id;
+      const message = store
+        .get(manager.atoms.messagesList)
+        .find(item => item.info.id === messageId);
+      const inFlight = cancelingQueuedIdsRef.current;
+      if (
+        !message ||
+        !isQueuedCancellationEligible(
+          message,
+          store.get(manager.atoms.pendingMessages).get(messageId),
+          inFlight.has(messageId)
+        )
+      ) {
+        return;
+      }
+      inFlight.add(messageId);
+      setCancelingQueuedIds(new Set(inFlight));
+      setCancelQueuedStatus(current => (current?.messageId === messageId ? null : current));
+      setCancelQueuedSheetStatus(current => (current?.messageId === messageId ? null : current));
+      // The attempt also resets announcement identity if React batches an immediate retry failure.
+      cancelQueuedAttemptRef.current += 1;
+      const attempt = cancelQueuedAttemptRef.current;
+      const ownerConnectionId = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+      const reportFailure = (feedback: string, upgradeRequired = false) => {
+        if (inFlight !== cancelingQueuedIdsRef.current) {
+          return;
+        }
+        if (upgradeRequired) {
+          cancelQueuedUpgradeRequiredRef.current = { ownerConnectionId, attempt };
+        }
+        const setStatus =
+          detailsMessageIdRef.current === messageId
+            ? setCancelQueuedSheetStatus
+            : setCancelQueuedStatus;
+        setStatus({
+          messageId,
+          tone: 'error',
+          message: feedback,
+          attempt,
+        });
+        notificationHaptic(Haptics.NotificationFeedbackType.Error);
+      };
+      try {
+        let dropped = false;
+        try {
+          ({ dropped } = await manager.cancelQueuedMessage(messageId));
+        } catch (cancelError) {
+          // Old CLI versions without queue drop require an upgrade. Remove only when all
+          // supported CLI versions implement queue drop; never fall back to interrupt.
+          const currentOwner = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+          const upgrade =
+            isCancelQueuedUpgradeRequired(cancelError) &&
+            (currentOwner === null || currentOwner === ownerConnectionId);
+          reportFailure(
+            upgrade
+              ? t('agentChat.session.cancelQueuedUpgradeRequired')
+              : t('agentChat.session.cancelQueuedFailed'),
+            upgrade
+          );
+          return;
+        }
+        if (inFlight !== cancelingQueuedIdsRef.current) {
+          return;
+        }
+        if (!dropped) {
+          // An accepted or missing queue entry must not be hidden or restored as an unsent draft.
+          reportFailure(t('agentChat.session.cancelQueuedFailed'));
+          return;
+        }
+        canceledQueuedIdsRef.current.add(messageId);
+        const composerHasContent = composerControlRef.current?.hasContent() ?? false;
+        const prompt = firstHumanText(message.parts);
+        if (!composerHasContent) {
+          if (prompt !== '') {
+            composerControlRef.current?.setText(prompt);
+          }
+          composerControlRef.current?.restoreAttachments(message.parts.filter(isFilePart));
+          setDroppedQueuedIds(prev => new Set(prev).add(messageId));
+        } else {
+          setCanceledQueuedMessages(prev => new Map(prev).set(messageId, message));
+        }
+        if (detailsMessageIdRef.current === messageId) {
+          handleCloseDetails();
+        }
+        setCancelQueuedStatus(null);
+        announceForA11y(
+          composerHasContent
+            ? t('agentChat.session.cancelQueuedRestoreAvailable')
+            : t('agentChat.session.cancelQueuedRestored')
+        );
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
+      } finally {
+        inFlight.delete(messageId);
+        if (inFlight === cancelingQueuedIdsRef.current) {
+          setCancelingQueuedIds(new Set(inFlight));
+        }
+      }
+    },
+    [manager, store, isQueuedCancellationEligible, handleCloseDetails, t]
+  );
+
+  const handleRestoreQueued = useCallback(
+    (message: StoredMessage) => {
+      const stored = canceledQueuedMessages.get(message.info.id) ?? message;
+      const prompt = firstHumanText(stored.parts);
+      if (prompt !== '') {
+        composerControlRef.current?.setText(prompt);
+      }
+      composerControlRef.current?.restoreAttachments(stored.parts.filter(isFilePart));
+      setDroppedQueuedIds(prev => new Set(prev).add(message.info.id));
+      setCanceledQueuedMessages(prev => {
+        const next = new Map(prev);
+        next.delete(message.info.id);
+        return next;
+      });
+      setCancelQueuedStatus(null);
+      announceForA11y(t('agentChat.session.cancelQueuedRestored'));
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
+    },
+    [canceledQueuedMessages, t]
+  );
+
+  // A stored transcript that ends on a prompt says so: the record holds no
+  // delivery state for that turn and nothing follows it. Only a read-only
+  // session draws it — a live prompt at the end is in flight, and its own
+  // delivery states say what happened to it. The note is bound to the same
+  // resolved kind as the read-only footer, so it withdraws with that footer when
+  // the kind turns out to be live after all.
+  const unansweredPromptId =
+    activeSessionType === 'read-only' && !isStreaming
+      ? unansweredPromptMessageId(displayedMessages, baseTranscript, pendingMessages)
+      : null;
 
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
         return <PreparationGroup attempt={item.attempt} />;
       }
-      if (item.type === 'time') {
-        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
+      if (item.type === 'tool-run') {
+        // Match the inset and row rhythm of a message row so the condensed row
+        // sits flush with its neighbours rather than full-bleed.
+        const run = (
+          <View className="px-4 py-1">
+            <MessageErrorBoundary>
+              <CondensedToolRunRow parts={item.parts} />
+            </MessageErrorBoundary>
+          </View>
+        );
+        // A condensed run can open a burst: its message's marker rides here so
+        // marker and row share one FlashList key and one measured height.
+        return (
+          <View>
+            {item.timeMarker && (
+              <TranscriptTimeMarker
+                created={item.timeMarker.created}
+                dayChanged={item.timeMarker.dayChanged}
+              />
+            )}
+            {run}
+          </View>
+        );
       }
-      // Look up delivery state by message id. The map is keyed by user-message
-      // id and may briefly contain an entry before the bubble has rendered
-      // (ServiceEvents can be applied while chat events are still buffered),
-      // so a plain lookup is enough — no render-order guard.
+      // Delivery events can lag a successful drop. The retained row must expose Restore immediately.
       const deliveryState =
-        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+        item.message.info.role === 'user' && !canceledQueuedMessages.has(item.message.info.id)
+          ? pendingMessages.get(item.message.info.id)
+          : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
-      const retryPrompt = resolveRetryPrompt(item.message, messages);
-      return (
+      // Read the live list through the ref: capturing `messages` here would
+      // change this callback's identity on every streaming publish.
+      const retryPrompt = resolveRetryPrompt(item.message, messagesRef.current);
+      const bubble = (
         <MessageBubble
           message={item.message}
+          {...(item.parts ? { partsOverride: item.parts } : {})}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
           isSessionStreaming={isStreaming}
-          getChildMessages={getChildMessages}
+          // Raw child messages: the in-transcript task card derives its activity
+          // label from the child's latest part (child-session-card-state.ts:94-106),
+          // so feeding it the stripped list would turn a reasoning stream into a
+          // stale activity or "Waiting for activity" instead of "Thinking".
+          // The card renders no child rows, so nothing thinking-related leaks.
+          // `getChildMessagesForRows` is the ref-backed accessor: a stable
+          // identity here is what lets an unchanged row bail out of the memo.
+          // The card itself subscribes to the atom, so it stays live.
+          getChildMessages={getChildMessagesForRows}
+          modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
-          onLongPressDetails={setDetailsMessage}
+          onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          addCredits={addCredits}
+          retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
+          failureStatedByPreparation={preparationFailureTriggers.has(item.message.info.id)}
+          onRestoreQueued={
+            canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
+          }
+          noReplyRecorded={item.message.info.id === unansweredPromptId}
+          condenseToolCalls={condenseToolCalls}
         />
+      );
+      // The burst marker rides on its message row so the row keeps one FlashList
+      // key and one measured height: a prepend that moves the marker to an older
+      // message changes no key that is already on screen. Keep the wrapper and
+      // bubble's child slot stable so moving the marker does not remount it.
+      return (
+        <View>
+          {item.timeMarker && (
+            <TranscriptTimeMarker
+              created={item.timeMarker.created}
+              dayChanged={item.timeMarker.dayChanged}
+            />
+          )}
+          {bubble}
+        </View>
       );
     },
     [
       lastAssistantMessageId,
       isStreaming,
-      getChildMessages,
+      getChildMessagesForRows,
+      modelOptions,
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
-      messages,
+      retryAvailable,
+      preparationFailureTriggers,
       handleRetryMessage,
+      addCredits,
       handleCopyToComposer,
+      handleOpenDetails,
+      handleRestoreQueued,
+      canceledQueuedMessages,
+      unansweredPromptId,
+      condenseToolCalls,
     ]
   );
 
@@ -815,12 +1885,15 @@ export function SessionDetailContent({
     try {
       await manager.interrupt();
     } catch {
-      toast.error('Failed to stop execution');
+      toast.error(t('agentChat.session.failedToStopExecution'));
     }
-  }, [manager]);
+  }, [manager, t]);
 
   const handleBackToSessions = useCallback(() => {
-    router.replace('/(app)/(tabs)/(2_agents)' as Href);
+    // POP_TO reuses the `(tabs)` route under this screen and truncates every
+    // `agent-chat` route above it, so a composer still on the stack under a
+    // missing session is gone with it.
+    router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
   }, [router]);
 
   const handleModelSelect = useCallback(
@@ -864,10 +1937,88 @@ export function SessionDetailContent({
   );
 
   const shouldShowLoading =
-    isLoading ||
-    (fetchedData === null && !statusIndicator && !error) ||
-    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
+    messages.length === 0 &&
+    (isLoading ||
+      (fetchedData === null && !statusIndicator && !error) ||
+      (fetchedData !== null && fetchedData.kiloSessionId !== sessionId));
+  const cachedMetadataRefresh = messages.length > 0 && fetchedData === null;
   const shouldBlockMessages = shouldShowLoading;
+  const { isConnected: userWebConnected, reconnectExhausted } = useUserWebConnectionHealth();
+  const connection = useUserWebConnection();
+  const connectionState = resolveSessionConnectionState({
+    activeSessionType,
+    agentStatusType: agentStatus.type,
+    userWebConnected,
+    reconnectExhausted,
+  });
+  // A committed up latch: a drop after the first up reads "Reconnecting…",
+  // a cold start reads "Connecting…". Only the session's own transport latches
+  // it; the app-wide user-web leg is that transport only once the session type
+  // is resolved (a `none` transport is then a read-only session,
+  // session-connection-indicator-state.ts:39-46), so a remote/cloud-agent
+  // session whose agent never came up must still read "Connecting…". While the
+  // type is still unresolved — the whole window a cached open paints its
+  // transcript in — the leg is not this session's transport yet and must not
+  // latch one, or a first load reads "Reconnecting…" instead of "Connecting…".
+  const [wasConnected, setWasConnected] = useState(false);
+  useEffect(() => {
+    if (
+      connectionState === 'up' ||
+      (connectionState === 'none' && activeSessionType !== null && userWebConnected)
+    ) {
+      setWasConnected(true);
+    }
+  }, [connectionState, userWebConnected, activeSessionType]);
+  const connectionDisplay = resolveSessionConnectionDisplay({
+    transport: connectionState,
+    userWebConnected,
+    reconnectExhausted,
+    everConnected: wasConnected,
+    agentStatusType: agentStatus.type,
+    sessionRefresh: cachedMetadataRefresh ? { isLoading: statusIndicator === null } : undefined,
+  });
+  const retrySessionConnection = useCallback(() => {
+    if (cachedMetadataRefresh) {
+      void manager.switchSession(sessionId);
+    } else {
+      connection.retryConnection();
+    }
+  }, [cachedMetadataRefresh, manager, sessionId, connection]);
+  // A stalled open (the skeleton still up, nothing to show, no error and no
+  // progress indicator to watch) must stop looking like progress after the
+  // threshold: the slow phase swaps the skeleton for a message plus Retry.
+  // The threshold is anchored to the route's open, so a slow metadata round
+  // trip before this screen mounts does not restart the clock.
+  const sessionLoadPhase = useSessionSlowLoadPhase({
+    isLoading: shouldShowLoading,
+    hasContent: messages.length > 0,
+    hasError: error !== null,
+    hasStatusIndicator: statusIndicator !== null,
+    openStartedAt,
+  });
+  // Acknowledge a Retry tap from the slow card immediately: while the retry
+  // is in flight the button shows its spinner and is disabled, so the tap
+  // reads as accepted before any content or error arrives. Leaving the slow
+  // state (content, error, or a settled empty) ends the acknowledgment.
+  //
+  // The acknowledgment is also bounded by the slow-load threshold. Once the
+  // initial threshold has passed the phase stays `slow` on its own, so a
+  // retried open that stalls again would otherwise leave the button disabled
+  // with a spinner forever; after one threshold the user gets the Retry
+  // action back.
+  const [slowRetryPending, setSlowRetryPending] = useState(false);
+  useEffect(() => {
+    if (sessionLoadPhase !== 'slow' || !slowRetryPending) {
+      setSlowRetryPending(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setSlowRetryPending(false);
+    }, SESSION_SLOW_LOAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [sessionLoadPhase, slowRetryPending]);
   // Failed delivery entries must not count as in-flight: after a terminal
   // delivery failure the working spinner and wake lock would otherwise stay on.
   const inFlightMessageCount = useMemo(
@@ -878,8 +2029,161 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: inFlightMessageCount,
   });
+  // One failure owns the screen. The body's terminal error is resolved here,
+  // before the footer rows, so the footer never restates a failure the body
+  // already states and the loading skeleton never paints beside a lost
+  // connection. `connectionLost` is the app-wide leg's answer for a session
+  // whose own status atom carries nothing yet, and it only counts while the
+  // open still has nothing to show: a settled empty session keeps its empty
+  // state instead of a Retry it cannot use.
+  const connectionLost = connectionState === 'exhausted' && shouldShowLoading;
+  const terminalError = useMemo(
+    () =>
+      resolveSessionTerminalError({
+        error,
+        statusIndicator,
+        messageCount: messages.length,
+        hasFailedPreparation,
+        connectionLost,
+      }),
+    [error, statusIndicator, messages.length, hasFailedPreparation, connectionLost]
+  );
+  // Acknowledging a terminal error's Retry. The reopen clears `errorAtom` and
+  // sets the loading flag before its first await, so the card that carries the
+  // action is unmounted by the same tap: without this, a failure that answers
+  // as fast as the transport can ask leaves the screen as it was and the tap
+  // reads as lost. The card keeps the failure it states, with its action busy,
+  // until the reopen's outcome owns the body again — content landed, the
+  // reopened failure is on screen, or the shared transport leg came back.
+  //
+  // The acknowledgment is also bounded by the slow-load threshold, the same
+  // window the slow card's Retry uses: a reopen that never reports an outcome
+  // must not leave the action disabled behind a spinner.
+  const [terminalRetry, setTerminalRetry] = useState<{
+    sessionId: string;
+    error: SessionTerminalError;
+    tappedAt: number;
+  } | null>(null);
+  const terminalRetryPending = terminalRetry?.sessionId === sessionId;
+  useEffect(() => {
+    if (!terminalRetryPending) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setTerminalRetry(null);
+    }, SESSION_SLOW_LOAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [terminalRetryPending]);
+  useEffect(() => {
+    if (!terminalRetryPending) {
+      return undefined;
+    }
+    // The reopen's outcome owns the body again once content landed, the
+    // reopened failure is on screen, or — on the session branch — the open
+    // finished without a failure to show, which is a session that really is
+    // empty. That last case has to release: without it a successful retry on an
+    // empty session would keep the stale failure card up for the whole window.
+    const settled =
+      messages.length > 0 ||
+      (terminalRetry.error.retryWith === 'connection'
+        ? terminalError === null
+        : !isLoading && (terminalError !== null || fetchedData?.kiloSessionId === sessionId));
+    if (!settled) {
+      return undefined;
+    }
+    // The outcome is already on screen, but a refused reopen settles in well
+    // under a second: releasing at once makes the busy state a flash the reader
+    // misses, and the tap reads as lost again — the same device-defect
+    // reasoning the list's pull feedback uses. Hold the acknowledged state
+    // through that beat, then swap.
+    const beat = Math.max(0, PULL_FEEDBACK_MIN_BEAT_MS - (Date.now() - terminalRetry.tappedAt));
+    if (beat === 0) {
+      setTerminalRetry(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setTerminalRetry(null);
+    }, beat);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    terminalRetryPending,
+    terminalRetry,
+    terminalError,
+    isLoading,
+    messages.length,
+    fetchedData,
+    sessionId,
+  ]);
+  // A Retry tapped while the rows were still missing must release once the
+  // failed preparation rows arrive: they are the run's own failure statement,
+  // so the stale page-load failure has nothing left to say.
+  const shownTerminalError =
+    terminalRetryPending && messages.length === 0 && !hasFailedPreparation
+      ? (terminalError ?? terminalRetry.error)
+      : terminalError;
+  const handleTerminalRetry = (failure: SessionTerminalError): void => {
+    if (terminalRetryPending) {
+      return;
+    }
+    setTerminalRetry({ sessionId, error: failure, tappedAt: Date.now() });
+    if (failure.retryWith === 'connection') {
+      retrySessionConnection();
+      return;
+    }
+    void (async () => {
+      try {
+        await manager.switchSession(sessionId);
+      } catch {
+        // A reopen that rejects without clearing the failure never settles on
+        // its own: hand the action back instead of leaving it busy.
+        setTerminalRetry(current => (current?.sessionId === sessionId ? null : current));
+      }
+    })();
+  };
+  // A failed last row states its own failure and carries the action. The fixed
+  // footer's error line must not state the same failure a second time (explorer
+  // finding: the same failure stated three times), so a status error the row
+  // already carries is dropped — a classified one the row does not carry stays.
+  // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
+  // resolves titles through module-level `i18n.t`) when the app language changes
+  // while the session is mounted; the failure is otherwise stable on its message
+  // inputs.
+  const languageSnapshot = getLanguageSnapshot();
+  const footerMessageFailure = useMemo(
+    () =>
+      lastVisibleMessageFailure({
+        displayedMessages,
+        messages,
+        pendingMessages,
+        canceledQueuedMessages,
+        dropUnrenderableUserRows,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the captured copy is language-driven, not message-derived
+    [
+      displayedMessages,
+      messages,
+      pendingMessages,
+      canceledQueuedMessages,
+      dropUnrenderableUserRows,
+      languageSnapshot,
+    ]
+  );
+  const footerStatusIndicator =
+    terminalError === null &&
+    statusIndicator !== null &&
+    !statusIndicatorDuplicatesMessageFailure({
+      indicator: statusIndicator,
+      failure: footerMessageFailure,
+    })
+      ? statusIndicator
+      : null;
   const hasFooterStatusIndicator =
-    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
+    (!cachedMetadataRefresh && footerStatusIndicator !== null) ||
+    (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
     hasStatusIndicator: hasFooterStatusIndicator,
@@ -891,50 +2195,177 @@ export function SessionDetailContent({
     () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
     [transcript]
   );
-  const showSessionFooterRow = shouldShowSessionFooterRow({
+  // Why the send control cannot send, stated by the fixed footer row above the
+  // composer and announced to screen readers. `isComposerDisabled` is a
+  // structural lock on the whole composer; this reason covers the live send
+  // gate, which keeps the input editable. `messageCount` lets a terminal error
+  // on an empty transcript — the load-error state behind the full-screen Retry
+  // — resolve to the load-failure line instead of a runtime failure class.
+  //
+  // The indicator is the deduped one the row's own status line uses: the
+  // transcript's last row owns the failure it states and carries its action, so
+  // the reason must not restate that sentence beside it. Dropping it here keeps
+  // the reason's lower branches alive — a read-only session then names read-only
+  // instead of repeating the failed row.
+  // The body already states this failure once, with the action that resolves
+  // it, so the reason beside send stays silent instead of naming the same
+  // failure a second time (mobile-app gate finding: the load-error card and
+  // "The session could not be loaded. Retry first." on one screen).
+  const sendDisabledReason =
+    terminalError === null
+      ? resolveComposerSendDisabledReason({
+          canSend,
+          isReadOnly,
+          error,
+          statusIndicator: footerStatusIndicator,
+          cloudStatus,
+          messageCount: messages.length,
+        })
+      : null;
+  // The tone rides the same inputs, so a progress phase ("Setting up
+  // environment…") never renders in the destructive error color.
+  const sendDisabledReasonTone =
+    terminalError === null
+      ? resolveComposerSendDisabledReasonTone({
+          canSend,
+          isReadOnly,
+          error,
+          statusIndicator: footerStatusIndicator,
+          cloudStatus,
+          messageCount: messages.length,
+        })
+      : null;
+  // A read-only session ends in the continue section, which states the
+  // read-only fact once and replaces the composer and its send reason. The fact
+  // is the kind the session resolved to, not how many rows its transcript
+  // holds: a stored session with no messages has nowhere to write either, so it
+  // must not mount a composer under the read-only line. `activeSessionType` is
+  // set only by a successful resolve, so a failed open (which may also read
+  // `isReadOnly`) keeps its composer beside the error's Retry. An unresolved
+  // open (`activeSessionType === null`) counts as not writable here; the
+  // pending slot below also reads the metadata that names a cloud-agent
+  // session, which lands before the resolve.
+  const isReadOnlySession = activeSessionType === 'read-only';
+  const isWritableResolved = activeSessionType !== null && activeSessionType !== 'read-only';
+  const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
+    hasSendReason: sendDisabledReason !== null && !isReadOnlySession,
     messageCount: messages.length,
   });
 
-  const emptyStateText = statusIndicator ? null : 'No messages yet';
-
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  // A generated placeholder title (`New session - <ISO>` / `Child session -
+  // <ISO>`) is a storage key, not a name: showing it truncates the header to
+  // "New session - 2026-…". Treat it as absent and let the fallback name (or a
+  // live rename) show instead. The judgement lives in `namedSessionTitle`
+  // rather than here so it can also consult the record of titles the app's own
+  // rename wrote: a user-chosen title that happens to match the placeholder
+  // shape is kept, and a genuine placeholder still reaches
+  // `getSessionDetailRenameState` as absent.
+  const serverTitle = isSessionLoaded
+    ? namedSessionTitle(fetchedData.title ?? undefined, sessionId)
+    : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
-    fallbackTitle: 'Session',
+    // Same seed the route's loading screen used, so the header keeps the
+    // title it opened with instead of blinking back to "Session". A creation
+    // placeholder cached in the list is not a title: fall back to "Session".
+    // The route's cached metadata can hold the backend's ISO placeholder,
+    // which must not paint either, while a title the user's own rename wrote
+    // is kept.
+    fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
+  // The transcript paints a skeleton in two cases: the session's first page has
+  // not arrived, or its rows are mounted but still measuring behind the open
+  // gate. Either way the body is loading, so the chrome around it — the header
+  // pill's value slots and the bottom slot — keeps its loading shape until the
+  // body is painted. A failure, an agent status, or a pending ask is the
+  // session speaking, and each keeps the chrome it already has.
+  const transcriptRowsHidden = transcriptView === 'list' && !transcriptOpenSettled;
+  const isSessionChromePending =
+    (shouldShowLoading || transcriptView === 'older-loading' || transcriptRowsHidden) &&
+    terminalError === null &&
+    activeQuestion === null &&
+    activePermission === null;
+  // A settled stored session with an empty transcript has nothing for the
+  // header pill to show and nothing for its sheet to do: it reports no usage,
+  // and a session opened read-only cannot auto-approve, so the pill would only
+  // paint its two dash placeholders beside the finished empty state (design
+  // gate, empty read-only fixture). The pill hides instead, exactly like the
+  // unresolved placeholder; a failed open keeps the live control, whose sheet
+  // still offers the connection reading and its Retry.
+  const contextPillHasNothingToReport =
+    isReadOnly &&
+    messages.length === 0 &&
+    contextInfo === undefined &&
+    terminalError === null &&
+    !isSessionChromePending;
   const headerRight = (
-    <View className="flex-row items-center gap-2">
-      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+    // The pill leads and the Follow control takes the trailing edge. The pill
+    // grows by one reading when the session starts reporting usage, and a
+    // control after it would move by that width; at the end of the row it keeps
+    // one position instead. The growth comes out of the heading beside it, which
+    // keeps its own line cap and tail ellipsis — the trade this row makes to
+    // leave the title the width up to the pill's painted size.
+    <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionContextMetrics
         info={contextInfo}
-        totalCostMicrodollars={totalMicrodollars}
-        hasMessages={messages.length > 0}
-        loading={shouldShowLoading}
+        totalCostMicrodollars={sessionCostMicrodollars}
+        // The pill's values read as a settled session. While the body is still
+        // a skeleton no reading has arrived, so the pill paints its ring alone.
+        hasMessages={messages.length > 0 && !isSessionChromePending}
+        autoApproveAvailable={autoApproveAvailable}
+        loading={isSessionChromePending}
+        onNothingToReport={contextPillHasNothingToReport}
+        // The sheet is the session's own context/permission surface, so the
+        // control opens it in every state of this screen — including while the
+        // transcript is still loading and after a failed open. A state that
+        // hides the control locks the user out of the settings behind it; the
+        // one state with neither settings nor usage to open is excluded above.
         onPress={
-          contextInfo
-            ? () => {
+          contextPillHasNothingToReport
+            ? undefined
+            : () => {
                 setOpenContextSheetIdentity({
                   sessionId,
-                  providerID: contextInfo.providerID,
-                  modelID: contextInfo.modelID,
+                  providerID: contextInfo?.providerID,
+                  modelID: contextInfo?.modelID,
                 });
               }
-            : undefined
         }
       />
+      <SessionFollowButton sessionId={sessionId} />
     </View>
   );
+  const associatedPr = fetchedData?.associatedPr ?? null;
+  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : null;
+  // The model's latest todo list. With a goal it is a chip under the PR pill;
+  // without one it is a one-line row under the header.
+  const todoSummary = useMemo(() => selectSessionTodoSummary(messages), [messages]);
+  const goalTrailing =
+    prBadge || todoSummary ? (
+      <>
+        {prBadge}
+        {todoSummary ? <SessionTasksChip summary={todoSummary} /> : null}
+      </>
+    ) : undefined;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
-  const hasBlockingInteraction = blockingInteraction !== 'none';
+  // A pending permission ask that the auto-reply is already answering is
+  // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
+  // the composer on that same ask would blank both the card and the input for
+  // the whole reply round trip, so only the actually-rendered card counts as
+  // blocking — the composer (and its in-flight progress) stays put while the
+  // auto-reply resolves.
+  const permissionSuppressed =
+    blockingInteraction === 'permission' && activePermission?.requestId === suppressedRequestId;
+  const hasBlockingInteraction = blockingInteraction !== 'none' && !permissionSuppressed;
   // One number for both kinds: the user must see every waiting request, not
   // only the ones of the kind currently on screen.
   const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
@@ -944,7 +2375,7 @@ export function SessionDetailContent({
   // node that no longer exists. We track the previous blocking kind and
   // only fire on the non-none → none transition (i.e. the user satisfied
   // the card), not on the very first mount.
-  const transcriptRef = useRef<RNText | null>(null);
+  const transcriptRef = useRef<TextInstance | null>(null);
   const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
   useEffect(() => {
     const wasBlocking = previousBlockingInteractionRef.current !== 'none';
@@ -953,24 +2384,92 @@ export function SessionDetailContent({
     if (!wasBlocking || isBlocking) {
       return undefined;
     }
-    if (moveA11yFocus(transcriptRef)) {
+    // `false` means the transcript had no node handle yet; retry once it has
+    // mounted. A dispatched request the platform ignores is not retryable.
+    if (requestA11yFocus(transcriptRef)) {
       return undefined;
     }
     const handle = setTimeout(() => {
-      moveA11yFocus(transcriptRef);
+      requestA11yFocus(transcriptRef);
     }, 50);
     return () => {
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
-  // One condition for the composer and for the bottom BlurBar that reserves
-  // its space: if the bar claimed the space on a condition the composer does
-  // not share, the composer pops in and the layout jumps on every open.
-  const isComposerMounted = !isReadOnly || messages.length === 0;
-  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  // The composer stays mounted for every writable session. A read-only session
+  // replaces it with the continue section, which names the destination it
+  // opens — whether or not its transcript holds a row.
+  // The bottom BlurBar reserves the composer's space and shares its visibility
+  // condition, so a blocking card or the continue section never leaves the bar
+  // claiming space the composer does not fill. The strip is a pure full-bleed
+  // background/spacer: it hosts no controls, so it deliberately carries no
+  // horizontal safe-area padding — the composer's own content clears the
+  // landscape sensor insets.
+  // The bottom slot belongs to the session, and while the open still has
+  // nothing to show and no state of its own has arrived, the session's own
+  // transport has not answered: an editable composer there is a control the
+  // session may not have. Reserve the area in the shape this session's kind
+  // ends in instead, so one state ends where the other begins: a read-only
+  // session keeps the read-only footer's area, and every other session keeps
+  // the composer's. `isReadOnly` is the settled read-only fact, so a writable
+  // session no longer jumps from the footer's block to its composer, and a
+  // read-only one no longer jumps the other way. Both reserves are
+  // placeholders, so neither offers a control. A failure, an agent status or a
+  // pending ask is the session speaking, and each keeps the composer it already
+  // has.
+  // The slot switches from its reserve to the session's own control once the
+  // kind resolves, not once the transcript is painted. The read-only footer
+  // used to wait for the body too, and its own button was the screen's only
+  // control: while the rows were still measuring, the footer swapped between
+  // the live control and the inert placeholder that reserves its shape — a
+  // press in that window landed on a skeleton with no press handler and did
+  // nothing, with no way to tell that apart from a dead button (measured on
+  // the emulator: live at ~0.4 s, inert at ~0.6-2.9 s, live again at ~3 s).
+  // The footer now goes live with the kind and stays live, so the press is
+  // always either answered or stated. The writable composer keeps the reserve
+  // (see `isSessionChromePending`): a composer above skeleton rows would hold a
+  // send the open cannot answer yet.
+  //
+  // Continue opens a new session in this session's organization, so the
+  // destination needs the session's own row the same way the scoped reads do.
+  // The control is live before that row lands and holds the press until it
+  // does (see `heldContinueRef`): the reserve is a shape, and a press on it was
+  // the defect this footer had.
+  const isComposerVisible =
+    !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
+  const isReadOnlyContinueVisible = isReadOnlySession && !hasBlockingInteraction;
+  // A blocking card or the read-only footer replaces the composer with chrome of
+  // another height on purpose, so its measurement only applies while the
+  // composer it was measured for is the chrome on screen.
+  const transcriptChromeGrowth = isComposerVisible
+    ? composerInsetForSession(composerBottomInset, sessionId)
+    : 0;
+  // The pending slot holds the shape its session will end in. The kind is only
+  // set once the transport answers, but the metadata read lands before that and
+  // names a cloud-agent session, which is writable by construction; the id
+  // check keeps another session's cached row out of this open's slot. An open
+  // that will end in the composer holds the composer's placeholder, and every
+  // other open holds the read-only footer's — the bar and the continue control
+  // a stored session ends in — so the footer lands on the area already held
+  // rather than replacing a composer the session may not get.
+  const isPendingComposer =
+    isWritableResolved ||
+    (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
+  // The reserve never shares the slot with a live control: a settled composer
+  // already holds it, and the hold only owns the slot when nothing else does.
+  const isReadOnlyFooterPlaceholderVisible =
+    isSessionChromePending &&
+    !hasBlockingInteraction &&
+    !isPendingComposer &&
+    !isComposerVisible &&
+    !isReadOnlyContinueVisible;
+  const isComposerSkeletonVisible =
+    isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
+  // Structural locks only. The live send capability is passed separately so a
+  // failed turn (or a session that has not resolved yet) keeps the input
+  // editable beside the error's Retry instead of locking the composer.
   const isComposerDisabled = resolveSessionComposerDisabled({
     isReadOnly,
-    canSend,
     shouldShowLoading,
     hasBlockingInteraction,
     requiresModel,
@@ -978,19 +2477,25 @@ export function SessionDetailContent({
     // catalog selection resolves.
     hasModel: Boolean(pinned.model ?? currentModel),
   });
-  const composerPlaceholder =
-    (cloudStatus &&
-      COMPOSER_PLACEHOLDERS[cloudStatus.type as keyof typeof COMPOSER_PLACEHOLDERS]) ??
-    'Message...';
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
+  const composerPlaceholder = useMemo(() => {
+    if (cloudStatus?.type === 'preparing') {
+      return t('agentChat.composer.preparingPlaceholder');
+    }
+    if (cloudStatus?.type === 'finalizing') {
+      return t('agentChat.composer.finalizingPlaceholder');
+    }
+    return t('common.message');
+  }, [cloudStatus, t]);
 
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
       // Slash commands ride the same manager.send() pipeline. The manager
-      // resolves the active remoteModelOverride from its own store and is
-      // the sole transport-toast owner; we throw a stable error on a
-      // false return purely so the composer preserves the draft, and never
-      // emit a duplicate toast of our own.
+      // resolves the active remoteModelOverride from its own store; a failed
+      // send is stated once by the SDK's translated status indicator above the
+      // composer, so we throw a stable error on a false return purely so the
+      // composer preserves the draft, and never emit a duplicate toast of our
+      // own.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: { type: 'command', command, arguments: argumentsText },
       });
@@ -999,10 +2504,139 @@ export function SessionDetailContent({
       }
       return true;
     },
+    [manager, takeOverTranscriptPositionForSend]
+  );
+
+  // Goal controls ride the same `manager.send()` command pipeline as the
+  // composer's slash commands. A failed send is stated once by the SDK's
+  // translated status indicator above the composer, so this helper never adds a
+  // toast of its own. Edit throws instead, so the RenameModal shows the failure
+  // inline and the user can correct the objective. One helper keeps the `/goal`
+  // payload shape in one place.
+  const sendGoalAction = useCallback(
+    async (action: GoalAction, objective = ''): Promise<boolean> => {
+      const sent = await manager.send({
+        payload: {
+          type: 'command',
+          command: 'goal',
+          arguments: goalCommandArguments(action, objective),
+        },
+      });
+      return sent;
+    },
     [manager]
   );
 
+  // The CLI rejects `/goal resume` and `/goal <objective>` while a question or
+  // permission is pending, and it records a *rejected* request as a blocked
+  // goal while a goal is running. Pause and clear are accepted while a request
+  // is pending, so they clear it after the goal stops (the stopped goal no
+  // longer observes the rejection); resume and edit clear it before sending.
+  // Without this a paused goal's pending request is stranded and Resume
+  // silently no-ops. The interaction handlers own their own failure toast, so
+  // a failed clear only aborts the goal command.
+  const clearGoalBlockingInteraction = useCallback(async (): Promise<boolean> => {
+    if (blockingInteraction === 'question') {
+      const cleared = await handleRejectQuestion();
+      return cleared;
+    }
+    if (blockingInteraction === 'permission') {
+      // The permission handler reports a tri-state transport outcome; the goal
+      // flow only needs to know whether the request was cleared, which is the
+      // "ok" reply. A retryable or terminal failure leaves it pending.
+      const outcome = await handleRespondToPermission('reject');
+      return outcome === 'ok';
+    }
+    return true;
+  }, [blockingInteraction, handleRejectQuestion, handleRespondToPermission]);
+
+  const runGoalAction = useCallback(
+    async (action: GoalAction) => {
+      if (!hasBlockingInteraction) {
+        await sendGoalAction(action);
+        return;
+      }
+      if (goalClearsBlockingAfterSend(action)) {
+        // Pause/clear first: the CLI accepts them while a request is pending,
+        // and stopping the goal keeps the later rejection from marking it
+        // blocked.
+        const sent = await sendGoalAction(action);
+        if (sent) {
+          await clearGoalBlockingInteraction();
+        }
+        return;
+      }
+      // Resume/edit are rejected until the request is cleared.
+      if (!(await clearGoalBlockingInteraction())) {
+        return;
+      }
+      await sendGoalAction(action);
+    },
+    [hasBlockingInteraction, clearGoalBlockingInteraction, sendGoalAction]
+  );
+
+  const handleOpenGoalActions = useCallback(() => {
+    if (!sessionGoal) {
+      return;
+    }
+    const actions = resolveGoalActions(sessionGoal);
+    const options = [
+      ...actions.map(action => t(GOAL_ACTION_LABEL_KEY[action])),
+      t('common.cancel'),
+    ];
+    const removeIndex = actions.indexOf('remove');
+    showActionSheetWithOptions(
+      {
+        ...themedSheet,
+        title: t('agentChat.goal.title'),
+        options,
+        cancelButtonIndex: options.length - 1,
+        destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
+      },
+      index => {
+        const action = index === undefined ? undefined : actions[index];
+        if (!action) {
+          return;
+        }
+        if (action === 'edit') {
+          setIsGoalEditOpen(true);
+          return;
+        }
+        if (action === 'remove') {
+          confirm({
+            title: t('agentChat.goal.removeConfirmTitle'),
+            message: t('agentChat.goal.removeConfirmMessage'),
+            confirmLabel: t('agentChat.goal.remove'),
+            onConfirm: () => {
+              void runGoalAction('remove');
+            },
+          });
+          return;
+        }
+        void runGoalAction(action);
+      }
+    );
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction, confirm]);
+
+  const handleGoalEditSave = useCallback(
+    async (objective: string) => {
+      if (!(await clearGoalBlockingInteraction())) {
+        throw new Error(t('agentChat.goal.updateFailed'));
+      }
+      const sent = await sendGoalAction('edit', objective);
+      if (!sent) {
+        throw new Error(t('agentChat.goal.updateFailed'));
+      }
+    },
+    [clearGoalBlockingInteraction, sendGoalAction, t]
+  );
+
   const handleCreateSession = useCallback(async () => {
+    // Start creates a session in the displayed session's organization, so it
+    // requires that session's own row to supply the scope first.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     // The orchestrator surfaces exactly one actionable toast on failure and
     // calls `router.replace` to the new session route on success — the
     // route-keyed `AgentSessionProvider` creates a fresh manager for the new
@@ -1015,27 +2649,32 @@ export function SessionDetailContent({
     // tick, and the agents tab refetches on focus.
     const result = await createAndNavigateAgentSession({
       create: manager.createRemoteSession.bind(manager),
-      router,
+      router: sessionRouter,
       organizationId,
       onError: message => {
         toast.error(message);
       },
     });
     return result.success;
-  }, [manager, router, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleRestartSession = useCallback(async () => {
+    // Restart opens a replacement session in the same organization, so it waits
+    // for the same resolved scope Start does.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     const result = await restartAgentSession({
       create: manager.createRemoteSession.bind(manager),
       exit: manager.exitRemoteSession.bind(manager),
-      router,
+      router: sessionRouter,
       organizationId,
       onError: message => {
         toast.error(message);
       },
     });
     return result.success;
-  }, [manager, router, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleExitSession = useCallback(
     async (
@@ -1043,25 +2682,222 @@ export function SessionDetailContent({
       lock: { current: boolean },
       settleVoiceInput: () => Promise<boolean>
     ) => {
+      // A fresh exit attempt supersedes any failure row the last one left.
+      setExitFailure(null);
+      setIsRetryingExit(false);
       await exitRemoteSessionWithFeedback({
         exit: manager.exitRemoteSession.bind(manager),
-        onAccepted,
+        onAccepted: () => {
+          setExitFailure(null);
+          onAccepted();
+        },
         router,
         lock,
         settleVoiceInput,
+        onRetryableFailure: setExitFailure,
+        onNonRetryableFailure: () => {
+          setExitFailure(null);
+        },
       });
     },
     [manager, router]
   );
 
+  const handleRetryExit = useCallback(() => {
+    if (!exitFailure) {
+      return;
+    }
+    // Keep the row mounted while the retry runs so the spinner replaces the
+    // label instead of the row disappearing and jumping the composer.
+    setIsRetryingExit(true);
+    void (async () => {
+      try {
+        await exitFailure.retry();
+      } finally {
+        setIsRetryingExit(false);
+      }
+    })();
+  }, [exitFailure]);
+
+  // The read-only footer's one control. `pending` covers a press that has not
+  // produced the composer yet: the destination's organization can still be
+  // unresolved, and the push is not a promise. `failed` is a press that
+  // produced no composer while this screen is still the one the person sees.
+  const [continueOpen, setContinueOpen] = useState<ContinueOpen>('idle');
+  // A press that arrived before this session's own row resolved. It is held,
+  // not dropped: the row supplies the destination's organization, so the press
+  // acts as soon as the row lands. Dropping it is the defect the footer had —
+  // the person pressed the only control on the screen and nothing happened.
+  const heldContinueRef = useRef<{ cut: ForkCut | null } | null>(null);
+  // The cut of the press that owns the footer's current state, so Retry repeats
+  // that press: a failed fork retries as a fork, not as a plain Continue.
+  const [continueCut, setContinueCut] = useState<ForkCut | null>(null);
+  // How many times the footer was reset because the composer was the
+  // destination. A press that returns after such a reset (the person opened the
+  // composer and came back) must not paint a failure for a press that already
+  // resolved.
+  const continueResetRef = useRef(0);
+
+  // Open the composer. The destination carries this session's organization, so
+  // it needs the session's own row; every entry point below reaches this only
+  // once that row names the displayed session. The guard states that invariant
+  // for the type system too.
+  const pushContinue = useCallback(
+    async (cut: ForkCut | null) => {
+      const generation = continueResetRef.current;
+      if (!sessionDataLoaded) {
+        return;
+      }
+      const href = buildContinueHref({
+        organizationId,
+        cloneFromKiloSessionId: sessionId,
+        cloneSourceTitle: rename.title,
+        cloneUpToMessageId: cut?.cloneUpToMessageId,
+        forkPrefillText: cut?.forkPrefillText,
+        forkSourceIsCloudAgent: Boolean(fetchedData.cloudAgentSessionId),
+        prefill: buildContinuePrefillParams({
+          gitUrl: fetchedData.gitUrl,
+          mode: currentMode,
+          model: currentModel,
+          variant: currentVariant,
+        }),
+      }) as Href;
+      const outcome = await openComposerWithOutcome({
+        claim: beginNewSessionNavigation,
+        push: () => {
+          router.push(href);
+        },
+        readState: () => navigation.getState() as AgentStackState | undefined,
+      });
+      // A press the single-push guard answered belongs to the press that owns
+      // the window: it owns this state too, and must not have its busy state
+      // cleared under it. An opened composer leaves this screen behind it, and
+      // only a push the navigator dropped leaves the person here with nothing
+      // to show for the press.
+      if (continueResetRef.current !== generation) {
+        return;
+      }
+      if (outcome === 'opened') {
+        setContinueOpen('idle');
+      } else if (outcome === 'failed') {
+        // A push that did not land leaves nothing for the window to protect: a
+        // retry must be able to go straight out.
+        resetNewSessionGuard();
+        setContinueOpen('failed');
+      }
+    },
+    [
+      beginNewSessionNavigation,
+      router,
+      navigation,
+      organizationId,
+      sessionId,
+      rename.title,
+      fetchedData?.gitUrl,
+      fetchedData?.cloudAgentSessionId,
+      currentMode,
+      currentModel,
+      currentVariant,
+      sessionDataLoaded,
+      resetNewSessionGuard,
+    ]
+  );
+
+  /**
+   * Answer one press. `pending` from here to the composer (or its failure), and
+   * the press owns that window: a second tap is the same press, so it opens the
+   * same one composer.
+   */
+  const startContinue = useCallback(
+    (cut: ForkCut | null) => {
+      if (continueOpen === 'pending') {
+        return;
+      }
+      setContinueOpen('pending');
+      setContinueCut(cut);
+      if (!sessionDataLoaded) {
+        heldContinueRef.current = { cut };
+        return;
+      }
+      void pushContinue(cut);
+    },
+    [continueOpen, pushContinue, sessionDataLoaded]
+  );
+
+  // The held press runs the moment the row that carries its destination
+  // resolves, so the footer's busy state ends in the composer.
+  useEffect(() => {
+    if (!sessionDataLoaded) {
+      return;
+    }
+    const held = heldContinueRef.current;
+    if (held === null) {
+      return;
+    }
+    heldContinueRef.current = null;
+    void pushContinue(held.cut);
+  }, [sessionDataLoaded, pushContinue]);
+
+  // A held press is only as good as the row it waits for: one that never lands
+  // must not leave the footer busy for good, so the wait ends in the stated
+  // failure the press already has a Retry for.
+  useEffect(() => {
+    if (continueOpen !== 'pending') {
+      return undefined;
+    }
+    const held = heldContinueRef.current;
+    if (held === null) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      if (heldContinueRef.current !== held) {
+        return;
+      }
+      heldContinueRef.current = null;
+      setContinueOpen('failed');
+    }, CONTINUE_SCOPE_WAIT_MS);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [continueOpen]);
+
   const handleContinueInNewSession = useCallback(() => {
-    void continueSession({
-      gitUrl: fetchedData?.gitUrl,
-      mode: currentMode,
-      model: currentModel,
-      variant: currentVariant,
-    });
-  }, [continueSession, fetchedData?.gitUrl, currentMode, currentModel, currentVariant]);
+    startContinue(null);
+  }, [startContinue]);
+
+  // Retry repeats the press the footer is reporting on: a fork that failed
+  // still opens the composer cut at the message it was forked from.
+  const handleRetryContinue = useCallback(() => {
+    startContinue(continueCut);
+  }, [continueCut, startContinue]);
+
+  const handleForkFromHere = useCallback(() => {
+    if (detailsForkCut === null) {
+      return;
+    }
+    handleCloseDetails();
+    startContinue(detailsForkCut);
+  }, [detailsForkCut, handleCloseDetails, startContinue]);
+
+  // The composer was the destination: coming back here means the press spent
+  // what the footer was reporting, so the footer offers a fresh one. That
+  // includes a press whose composer arrived after the read-back gave up on it —
+  // the navigator can apply a push later than the wait, and the person then sees
+  // the composer, not this screen. A push the navigator really dropped leaves
+  // the person here, so no focus event follows and its error stays until they
+  // retry it or leave.
+  useFocusEffect(
+    useCallback(() => {
+      // Setting the state it already holds is a no-op render, so this is safe
+      // on the mount focus too. The press counter moves with it, so a read-back
+      // that returns after this reset cannot paint a failure for a press the
+      // person already left behind.
+      continueResetRef.current += 1;
+      heldContinueRef.current = null;
+      setContinueCut(null);
+      setContinueOpen('idle');
+    }, [])
+  );
 
   const isFocused = useIsFocused();
   const keepScreenAwake = shouldKeepSessionAwake({
@@ -1090,107 +2926,231 @@ export function SessionDetailContent({
 
   return (
     <PartDetailSheetHost messages={messages}>
-      <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={rename.title}
-          headerRight={headerRight}
-          {...(rename.isTitleInteractive
-            ? {
-                onTitlePress: rename.openModal,
-                onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+      <ToolRunSheetHost messages={messages}>
+        <View className="flex-1 bg-background">
+          {/* Advertise the session and its position to the OS (iOS Handoff,
+              Android launcher entry point). Only once the session is loaded:
+              before that there is no title to advertise and the route is still
+              the skeleton. */}
+          {isSessionLoaded ? (
+            <SessionHandoffAdvertiser
+              sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
+              title={rename.title}
+            />
+          ) : null}
+          <ScreenHeader
+            title={rename.title}
+            // The loaded header, the route's loading header and its error state
+            // all share one cap (`SESSION_HEADER_TITLE_LINES`), and
+            // `reserveTitleSpace` holds exactly that many lines, so a long title
+            // wraps at a word boundary instead of being cut to one tail-ellipsized
+            // line ("Moving-average empty windo…").
+            reserveTitleSpace
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
+            backFallback={AGENTS_SESSIONS_HREF}
+            headerRight={headerRight}
+            headerRightShrinks
+            className="pb-1"
+            {...(rename.isTitleInteractive
+              ? {
+                  onTitlePress: rename.openModal,
+                  onTitlePressAccessibilityHint: t('agentChat.session.renameAccessibility', {
+                    title: rename.title,
+                  }),
+                }
+              : {})}
+          />
+          {sessionProfileIndicatorState ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+              className="px-4 pb-3"
+            >
+              <ActiveProfileIndicator
+                state={sessionProfileIndicatorState}
+                onPress={openSessionProfileEditor}
+              />
+            </Animated.View>
+          ) : null}
+          {sessionGoal !== null ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+            >
+              <SessionGoalSection
+                goal={sessionGoal}
+                collapsed={goalCollapsed}
+                trailing={goalTrailing}
+                onToggleCollapsed={() => {
+                  toggleSessionGoalCollapsed(sessionId);
+                }}
+                onPress={handleOpenGoalActions}
+              />
+            </Animated.View>
+          ) : null}
+          <SessionTodoChip sessionId={sessionId} />
+          {sessionGoal === null && todoSummary ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+            >
+              <SessionTasksRow summary={todoSummary} />
+            </Animated.View>
+          ) : null}
+          {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+          <VisibleSessionPublisher sessionId={sessionId} />
+
+          {/* The transcript and composer keep their layout while the keyboard
+              moves: the pane translates them with the keyboard on the UI
+              thread, so the list is not resized frame by frame and does not
+              re-pin its tail from those layout events. The trailing spacer
+              below still reserves the navigation-bar inset. */}
+          <KeyboardFollowPane>{renderKeyboardBody()}</KeyboardFollowPane>
+
+          {isComposerVisible ? (
+            <BlurBar className="border-t-0">
+              <View style={{ height: bottom }} />
+            </BlurBar>
+          ) : (
+            <View
+              style={{ height: bottom }}
+              className={
+                isReadOnlyContinueVisible || isReadOnlyFooterPlaceholderVisible
+                  ? 'bg-secondary'
+                  : 'bg-background'
               }
-            : {})}
-        />
-        <SessionConnectionIndicator
-          activeSessionType={activeSessionType}
-          agentStatusType={agentStatus.type}
-        />
-        {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+            />
+          )}
 
-        {keyboardContainerKind === 'app-aware-padding' ? (
-          <AppAwareKeyboardPaddingView className="flex-1">
-            {renderKeyboardBody()}
-          </AppAwareKeyboardPaddingView>
-        ) : (
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {renderKeyboardBody()}
-          </KeyboardAvoidingView>
-        )}
+          {sheetMountState.mounted ? (
+            <SessionContextSheet
+              visible={sheetMountState.visible}
+              info={sheetMountState.info}
+              sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
+              sessionTitle={rename.title}
+              activeSessionType={activeSessionType}
+              ownerConnectionId={remoteModelState.ownerConnectionId}
+              modelDisplay={contextModelAndProvider.model}
+              providerDisplay={contextModelAndProvider.provider}
+              totalCostMicrodollars={totalMicrodollars}
+              cloudAgentSessionId={cloudAgentSessionId}
+              organizationId={organizationId}
+              breakdownCostUsd={breakdownCostUsd}
+              messages={messages}
+              modelOptions={modelOptions}
+              connectionDisplay={connectionDisplay}
+              onRetryConnection={retrySessionConnection}
+              cloudStatusType={cloudStatus?.type ?? null}
+              autoApproveState={autoApproveState}
+              onAutoApproveChange={enabled => {
+                // Selection haptic for the commit: a capability iOS and Android
+                // both have, served here by the one cross-platform call.
+                selectionHaptic();
+                setSessionAutoApproveEnabled(sessionId, enabled);
+              }}
+              onClose={() => {
+                setOpenContextSheetIdentity(null);
+              }}
+            />
+          ) : null}
 
-        {isComposerVisible ? (
-          <BlurBar className="border-t-0">
-            <View style={{ height: bottom }} />
-          </BlurBar>
-        ) : (
-          <View style={{ height: bottom }} className="bg-background" />
-        )}
-
-        {sheetMountState.mounted ? (
-          <SessionContextSheet
-            visible={sheetMountState.visible}
-            info={sheetMountState.info}
-            modelDisplay={contextModelAndProvider.model}
-            providerDisplay={contextModelAndProvider.provider}
-            totalCostMicrodollars={totalMicrodollars}
-            breakdownCostUsd={breakdownCostUsd}
-            messages={messages}
+          <MessageDetailsSheet
+            visible={detailsMessageId !== null}
+            message={detailsMessage ?? null}
             modelOptions={modelOptions}
-            onClose={() => {
-              setOpenContextSheetIdentity(null);
-            }}
+            deliveryState={detailsDelivery}
+            onClose={handleCloseDetails}
+            canCancelQueued={canCancelSelected}
+            isCancelingQueued={isCancelingSelected}
+            onCancelQueued={handleCancelQueued}
+            cancelQueuedFeedback={
+              cancelQueuedSheetStatus?.messageId === detailsMessageId
+                ? cancelQueuedSheetStatus
+                : null
+            }
+            cancelQueuedGuidance={
+              isQueuedCancellationUnsupported() &&
+              detailsMessage?.info.role === 'user' &&
+              detailsDelivery?.status === 'queued'
+                ? t('agentChat.session.cancelQueuedUpgradeRequired')
+                : null
+            }
+            onForkFromHere={
+              detailsForkCut !== null && sessionDataLoaded ? handleForkFromHere : undefined
+            }
           />
-        ) : null}
 
-        <MessageDetailsSheet
-          visible={detailsMessage !== null}
-          message={detailsMessage}
-          modelOptions={modelOptions}
-          onClose={() => {
-            setDetailsMessage(null);
-          }}
-        />
+          {childSessionSheet.sheet ? (
+            <ChildSessionSheet
+              visible={childSessionSheet.visible}
+              sessionId={childSessionSheet.sheet.sessionId}
+              title={childSessionSheet.sheet.title}
+              getChildMessages={getDisplayedChildMessages}
+              getIndicatorMessages={getChildMessages}
+              hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+              sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
+              isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+              hasOlderMessages={childHasOlderMessages}
+              isLoadingOlderMessages={childIsLoadingOlderMessages}
+              olderMessagesError={childOlderMessagesError}
+              olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
+              onLoadOlderMessages={() => {
+                if (openChildSessionId !== null) {
+                  void manager.loadOlderChildMessages(openChildSessionId);
+                }
+              }}
+              renderPart={props => <PartRenderer {...props} />}
+              onOpenChildSession={handleOpenChildSession}
+              onRetry={() => {
+                const openSheet = childSessionSheet.sheet;
+                if (!openSheet) {
+                  return;
+                }
+                void manager.hydrateChildSession(openSheet.sessionId);
+              }}
+              onClose={handleCloseChildSession}
+              onDismiss={handleChildSheetDismiss}
+              modelOptions={modelOptions}
+            />
+          ) : null}
 
-        {childSessionSheet.sheet ? (
-          <ChildSessionSheet
-            visible={childSessionSheet.visible}
-            sessionId={childSessionSheet.sheet.sessionId}
-            title={childSessionSheet.sheet.title}
-            getChildMessages={getChildMessages}
-            hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
-            isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
-            hasOlderMessages={childHasOlderMessages}
-            isLoadingOlderMessages={childIsLoadingOlderMessages}
-            olderMessagesError={childOlderMessagesError}
-            olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
-            onLoadOlderMessages={() => {
-              if (openChildSessionId !== null) {
-                void manager.loadOlderChildMessages(openChildSessionId);
-              }
-            }}
-            renderPart={props => <PartRenderer {...props} />}
-            onOpenChildSession={handleOpenChildSession}
-            onRetry={() => {
-              const openSheet = childSessionSheet.sheet;
-              if (!openSheet) {
-                return;
-              }
-              void manager.hydrateChildSession(openSheet.sessionId);
-            }}
-            onClose={handleCloseChildSession}
-            onDismiss={handleChildSheetDismiss}
-          />
-        ) : null}
+          {rename.isTitleInteractive && rename.isModalOpen ? (
+            <RenameModal
+              title={t('agentChat.session.renameSession')}
+              placeholder={t('agentChat.session.renamePlaceholder')}
+              initialValue={rename.modalInitialValue}
+              // The server accepts a title this long; the modal's 50-character
+              // default would cut a longer title mid-word and the header would
+              // then show the fragment.
+              maxLength={SESSION_TITLE_MAX_LENGTH}
+              onSave={handleRenameSave}
+              onClose={handleRenameClose}
+            />
+          ) : null}
 
-        {rename.isTitleInteractive && rename.isModalOpen ? (
-          <RenameModal
-            title="Rename session"
-            placeholder="Session name"
-            initialValue={rename.modalInitialValue}
-            onSave={handleRenameSave}
-            onClose={handleRenameClose}
-          />
-        ) : null}
-      </View>
+          {sessionGoal && isGoalEditOpen ? (
+            <RenameModal
+              title={t('agentChat.goal.edit')}
+              placeholder={t('agentChat.goal.editPlaceholder')}
+              initialValue={sessionGoal.text}
+              maxLength={500}
+              // Goal text is prose and can hold a long unbroken line; the dialog
+              // must wrap it instead of clipping its start.
+              multiline
+              onSave={handleGoalEditSave}
+              onClose={() => {
+                setIsGoalEditOpen(false);
+              }}
+            />
+          ) : null}
+        </View>
+      </ToolRunSheetHost>
+      {dialog}
     </PartDetailSheetHost>
   );
 
@@ -1201,29 +3161,71 @@ export function SessionDetailContent({
           <Text
             ref={transcriptRef}
             accessible
-            accessibilityLabel="Session transcript"
+            accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
             pointerEvents="none"
             className="absolute inset-0 opacity-0"
           />
           {renderContent()}
         </View>
 
+        <AccessibleStatus
+          key={cancelQueuedStatus?.attempt}
+          message={cancelQueuedStatus?.message ?? null}
+          tone={cancelQueuedStatus?.tone ?? 'status'}
+          className="px-4 text-center text-sm"
+        />
+
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
-            Gated on has-messages so the empty/connecting path (which
-            renders the centered status indicator inside `renderContent`)
-            does not double-render. While preparing, suppressed when the
-            transcript already shows PreparationGroup (no duplicate). */}
-        {showSessionFooterRow ? (
+            It carries no position layout transition: while the list resizes it
+            would animate this row's position lag and paint it over the
+            transcript rows it passes (profile-screen.tsx:275-277). It snaps in
+            the same frame and stays opaque via `bg-background`, so a future
+            layout change covers a transcript row instead of overprinting it.
+            One item renders at a time (working, then status, then the send
+            reason) and every item carries the same padding and text style, so a
+            swap between the one-line items cannot resize the flex-1 transcript
+            above it. The reason keeps its full copy — it wraps instead of
+            truncating — so a long translation can still add a line. The reason
+            outlives the has-messages and preparation gates: it states a send
+            gate no transcript surface carries, including the failed load on an
+            empty transcript. */}
+        {sessionFooterItem !== null ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            layout={LinearTransition.duration(150)}
+            className="bg-background"
           >
-            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+            {sessionFooterItem === 'working' ? (
+              /* Raw list on purpose: working-indicator.tsx derives the label
+                 from the last assistant part, and compute-status.ts maps a
+                 reasoning part to agentChat.partDetail.thinking, so the spinner
+                 reads Thinking during a reasoning stream in both modes. Feeding
+                 it displayedMessages would drop that label. A pending ask takes
+                 the label instead: the blocked tool part has not run, and
+                 `blockingInteraction` already excludes an ask the auto-approve
+                 reply answers, so that ask keeps the activity label. */
+              <WorkingIndicator
+                messages={messages}
+                isStreaming={shouldShowFooterWorking}
+                blockingInteraction={hasBlockingInteraction ? blockingInteraction : 'none'}
+              />
+            ) : null}
+            {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
+              <SessionStatusIndicator indicator={footerStatusIndicator} />
+            ) : null}
+            {sessionFooterItem === 'reason' && sendDisabledReason !== null ? (
+              <AccessibleStatus
+                message={sendDisabledReason}
+                tone={sendDisabledReasonTone === 'neutral' ? 'status' : 'error'}
+                maxFontSizeMultiplier={SEND_REASON_MAX_FONT_SCALE}
+                className={cn(SESSION_FOOTER_ROW_ITEM_PADDING, 'text-right text-sm')}
+              />
+            ) : null}
           </Animated.View>
         ) : null}
+
+        {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
@@ -1242,7 +3244,9 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {blockingInteraction === 'permission' && activePermission ? (
+        {blockingInteraction === 'permission' &&
+        activePermission &&
+        activePermission.requestId !== suppressedRequestId ? (
           <PermissionCard
             key={activePermission.requestId}
             permission={activePermission.permission}
@@ -1258,29 +3262,82 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
-          <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
-            <Text className="text-center text-sm text-muted-foreground">
-              This is a read-only session
-            </Text>
-            <Button
-              variant="outline"
-              size="sm"
-              accessibilityLabel="Continue in a new session"
-              disabled={isContinuing}
-              onPress={handleContinueInNewSession}
-            >
-              <Text>Continue in a new session</Text>
-            </Button>
+        {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
+
+        {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}
+
+        {isReadOnlyContinueVisible ? (
+          <View className="border-t border-border bg-secondary">
+            <View style={sideInsetStyle}>
+              <View className="gap-3 px-4 py-3">
+                <Text className="text-center text-sm text-muted-foreground">
+                  {t('agentChat.session.readOnly')}
+                </Text>
+                {/* A push the navigator dropped leaves the person on this screen.
+                    Say so, and keep the action: the same control retries it. */}
+                {continueOpen === 'failed' ? (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <AccessibleStatus
+                      message={t('common.somethingWentWrong')}
+                      tone="error"
+                      className="shrink text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="action"
+                      className="shrink-0"
+                      accessibilityLabel={t('common.retry')}
+                      onPress={handleRetryContinue}
+                    >
+                      <Text>{t('common.retry')}</Text>
+                    </Button>
+                  </View>
+                ) : null}
+                {/* The footer's one action, and the only control on this screen:
+                    a filled primary. Light already fills it with the palette's
+                    muted olive; dark's primary (#ffdd00) is the full brand accent
+                    and glares as a full-width fill under the near-black page. Dark
+                    takes `--selection` instead — the same olive hue lifted to stand
+                    off the page — with its own label tone, so the control keeps the
+                    light mode's weight in both schemes. While the composer is
+                    opening, the button is busy in place: a press is never a
+                    no-op. */}
+                <Button
+                  variant="default"
+                  size="action"
+                  className="bg-primary dark:bg-selection"
+                  loading={continueOpen === 'pending'}
+                  accessibilityLabel={t('agentChat.session.continueInNewSession')}
+                  onPress={handleContinueInNewSession}
+                >
+                  <Text className="text-primary-foreground dark:text-selection-foreground">
+                    {t('agentChat.session.continueInNewSession')}
+                  </Text>
+                </Button>
+              </View>
+            </View>
           </View>
         ) : null}
 
-        {isComposerMounted ? (
+        {isReadOnlySession || isSessionChromePending ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
             importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
           >
+            {exitFailure ? (
+              <Animated.View
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(150)}
+                layout={LinearTransition.duration(150)}
+              >
+                <RemoteSessionExitFailure
+                  message={exitFailure.message}
+                  onRetry={handleRetryExit}
+                  isRetrying={isRetryingExit}
+                />
+              </Animated.View>
+            ) : null}
             <ModelPickerSelectionScopeProvider
               selectionScope={modelPickerSelectionScope}
               isSelectionCurrent={isModelPickerSelectionCurrent}
@@ -1294,14 +3351,18 @@ export function SessionDetailContent({
                 onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
+                sendDisabled={!canSend}
+                sendDisabledReason={sendDisabledReason}
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
-                mode={currentMode}
-                onModeChange={handleModeChange}
+                modeControl={{
+                  mode: currentMode,
+                  onModeChange: handleModeChange,
+                  customOptions,
+                }}
                 model={displayModel}
                 variant={displayVariant}
                 modelOptions={modelOptionsForToolbar}
-                customOptions={customOptions}
                 modelLocked={modelLocked}
                 modelLockLabel={pinned.agentName}
                 onModelSelect={handleModelSelect}
@@ -1309,88 +3370,198 @@ export function SessionDetailContent({
                 attachmentsEnabled={supportsAttachments}
                 activeSessionType={activeSessionType}
                 commands={availableCommands}
+                commandCatalogStatus={availableCommandsCatalogStatus}
                 commandState={remoteCommandState}
                 shareId={shareId}
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                deliveredDraft={consumableDeliveredDraft}
+                onDeliveredDraftConsumed={consumeDeliveredDraft}
+                sessionId={sessionId}
+                suggestion={activeSuggestion}
+                onAcceptSuggestion={async (requestId, index) => {
+                  await manager.acceptSuggestion(requestId, index);
+                }}
+                onDismissSuggestion={async requestId => {
+                  await manager.dismissSuggestion(requestId);
+                }}
                 controlRef={composerControlRef}
+                onInputBottomInsetChange={handleComposerBottomInsetChange}
               />
             </ModelPickerSelectionScopeProvider>
           </View>
-        ) : null}
+        )}
       </>
     );
   }
 
   function renderContent() {
-    const terminalError = resolveSessionTerminalError({
-      error,
-      statusIndicator,
-      messageCount: messages.length,
-    });
-    if (terminalError) {
-      const copyText = buildTerminalErrorCopyText(
+    if (shownTerminalError) {
+      const copyText = buildTerminalErrorCopyText({
         sessionId,
-        terminalError.title,
-        terminalError.message
-      );
+        title: shownTerminalError.title,
+        message: shownTerminalError.message,
+        detail: shownTerminalError.detail,
+      });
       return (
-        <View className="flex-1 items-center justify-center gap-3 px-6">
-          <QueryError
-            variant={terminalError.variant}
-            placement="top"
-            className="px-0 pt-0"
-            title={terminalError.title}
-            message={terminalError.message}
-            onRetry={
-              terminalError.retryable
-                ? () => {
-                    void manager.switchSession(sessionId);
-                  }
-                : undefined
-            }
-            isRetrying={isLoading}
-          />
-          <View className="flex-row gap-3">
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <QueryError
+              variant={shownTerminalError.variant}
+              placement="top"
+              className="px-0 pt-0"
+              title={shownTerminalError.title}
+              message={shownTerminalError.message}
+              onRetry={
+                shownTerminalError.retryable
+                  ? () => {
+                      handleTerminalRetry(shownTerminalError);
+                    }
+                  : undefined
+              }
+              isRetrying={terminalRetryPending}
+            />
+            {/* One primary action per surface (DESIGN.md): Back is the recovery
+                action, so it fills; Copy stays outlined as the utility. A
+                read-only transcript keeps its footer beside this card, and that
+                footer's Continue in a new session is the surface's filled
+                primary, so Back steps back to the outline there instead. Dark
+                takes the lifted olive `--selection` with its own label tone
+                instead of the glare of #ffdd00, so both themes give the control
+                the light mode's weight. */}
+            <View className="flex-row gap-3">
+              <Button
+                variant="outline"
+                size="action"
+                accessibilityLabel={t('agentChat.session.copyErrorDetails')}
+                onPress={() => {
+                  void performCopy(copyText);
+                }}
+              >
+                <Text>{t('common.copy')}</Text>
+              </Button>
+              <Button
+                variant={isReadOnlyContinueVisible ? 'outline' : undefined}
+                size="action"
+                className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
+                onPress={handleBackToSessions}
+              >
+                <Text
+                  className={cn(
+                    !isReadOnlyContinueVisible &&
+                      'text-primary-foreground dark:text-selection-foreground'
+                  )}
+                >
+                  {t('agentChat.session.backToSessions')}
+                </Text>
+              </Button>
+            </View>
+          </View>
+        </CenteredState>
+      );
+    }
+    if (sessionLoadPhase === 'slow') {
+      // The skeleton has outlived the threshold with nothing to show. Occupy
+      // the same flex-1 region (CenteredState) so the header and composer do
+      // not move, and give the user the only useful action: retry.
+      return (
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <Text className="text-center text-sm text-muted-foreground">
+              {t('common.takingLonger')}
+            </Text>
             <Button
-              variant="ghost"
-              accessibilityLabel="Copy error details"
+              variant="outline"
+              size="action"
+              accessibilityLabel={t('common.retry')}
+              loading={slowRetryPending}
               onPress={() => {
-                void performCopy(copyText);
+                setSlowRetryPending(true);
+                void manager.switchSession(sessionId);
               }}
             >
-              <Text>Copy</Text>
-            </Button>
-            <Button variant="ghost" onPress={handleBackToSessions}>
-              <Text>Back to sessions</Text>
+              <Text>{t('common.retry')}</Text>
             </Button>
           </View>
-        </View>
+        </CenteredState>
       );
     }
-    if (shouldBlockMessages) {
-      return <SessionSkeletonMessages />;
+    if (shouldBlockMessages || transcriptView === 'older-loading') {
+      return <SessionSkeletonMessages sessionId={sessionId} />;
     }
-    if (messages.length === 0) {
+    if (transcriptView !== 'list') {
+      if (transcriptView === 'status' && statusIndicator !== null) {
+        return (
+          <CenteredState>
+            <View className="items-center px-6">
+              <SessionStatusIndicator indicator={statusIndicator} />
+            </View>
+          </CenteredState>
+        );
+      }
+      if (transcriptView === 'older-error') {
+        // A retryable older-page failure is a retryable state, not the empty
+        // state: the history load can be reattempted, so the body mounts the
+        // same pagination Retry the list header carries (mobile-app gate r3,
+        // session-transcript-view finding). Terminal older-page errors keep
+        // the action-less empty state below.
+        return (
+          <EmptyState
+            icon={MessageSquare}
+            title={t('agentChat.session.emptyTitle')}
+            description={
+              <AccessibleStatus
+                message={t('agentChat.olderMessages.couldNotLoad')}
+                tone="status"
+                className="text-center text-sm"
+              />
+            }
+            action={
+              <Button
+                variant="outline"
+                size="action"
+                onPress={() => {
+                  void manager.loadOlderMessages();
+                }}
+                loading={isLoadingOlderMessages}
+                accessibilityLabel={t('common.retry')}
+                accessibilityHint={t('agentChat.olderMessages.retryHint')}
+                className={STATE_ACTION_CLASS}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            }
+          />
+        );
+      }
       return (
-        <View className="flex-1 items-center justify-center px-6">
-          {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
-          {emptyStateText ? (
-            <EmptyState
-              icon={MessageSquare}
-              title={emptyStateText}
-              description="Send a message below to get started."
-            />
-          ) : null}
-        </View>
+        <EmptyState
+          icon={MessageSquare}
+          title={
+            isReadOnly
+              ? t('agentChat.session.emptyReadOnlyTitle')
+              : t('agentChat.session.emptyTitle')
+          }
+          description={isReadOnly ? undefined : t('agentChat.session.emptyDescription')}
+        />
       );
     }
     return (
+      // No entrance animation: the transcript body must paint on its own, not
+      // after a `FadeIn` (which starts at `opacity: 0`) completes. The
+      // skeleton is swapped for the rows in one commit, so it needs none.
+      // The composer's input growth reaches the list as a paint offset on its
+      // content, applied in the same commit that grows the composer, so the
+      // transcript's bottom edge stays on the composer's top edge. Correcting
+      // from the list's own `onLayout` painted the transcript clipped for the
+      // frames before that callback reached JS, then moved it.
       <SessionMessageList
         sessionId={sessionId}
+        chromeGrowthDp={transcriptChromeGrowth}
         items={transcript}
         keyExtractor={getSessionTranscriptItemKey}
+        getItemType={getSessionTranscriptItemType}
         hasOlderMessages={hasOlderMessages}
         isLoadingOlderMessages={isLoadingOlderMessages}
         olderMessagesError={olderMessagesError}
@@ -1401,7 +3572,11 @@ export function SessionDetailContent({
         onReachedBottom={() => {
           manager.trimRetainedHistory();
         }}
+        onAnchorChange={handleAnchorChange}
+        onOpenSettledChange={handleOpenSettledChange}
         renderItem={renderItem}
+        resumeAt={resumeAnchor}
+        followTailNonce={followTailNonce}
       />
     );
   }
@@ -1412,23 +3587,4 @@ function ActiveSessionKeepAwake({ sessionId }: Readonly<{ sessionId: KiloSession
   // does not release the wake lock another visible session still needs.
   useKeepAwake(`session-${sessionId}`);
   return null;
-}
-
-// Mirrors MessageBubble's bubble geometry (px-4 py-1 wrapper,
-// rounded-2xl with an asymmetric "tail" corner, self-start/self-end
-// alignment) so the loading state reads as a message list, not a spinner.
-export function SessionSkeletonMessages() {
-  return (
-    <View className="flex-1 pt-2">
-      <View className="items-start px-4 py-1">
-        <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
-      </View>
-      <View className="items-end px-4 py-1">
-        <Skeleton className="h-10 w-1/2 rounded-2xl rounded-tr-sm" />
-      </View>
-      <View className="items-start px-4 py-1">
-        <Skeleton className="h-24 w-2/3 rounded-2xl rounded-tl-sm" />
-      </View>
-    </View>
-  );
 }

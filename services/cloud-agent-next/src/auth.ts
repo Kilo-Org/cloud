@@ -1,21 +1,68 @@
 import jwt from 'jsonwebtoken';
-import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
+import { z } from 'zod';
+import { extractBearerToken } from '@kilocode/worker-utils';
+import { previewTargetSchema } from './shared/preview-target.js';
 
-type StreamTicketPayload = {
-  type: 'stream_ticket';
-  purpose?: 'stream' | 'terminal';
-  userId?: string;
-  kiloSessionId?: string;
-  cloudAgentSessionId?: string;
-  sessionId?: string;
-  organizationId?: string;
-  ptyId?: string;
-  nonce?: string;
-  aud?: string;
-};
+/**
+ * The claims an entry ticket carries. The parse keeps only the declared
+ * fields, so declare a claim here before reading it.
+ */
+const streamTicketPayloadSchema = z.object({
+  type: z.literal('stream_ticket'),
+  exp: z.number(),
+  aud: z.string().optional(),
+  purpose: z.enum(['stream', 'terminal', 'preview']).optional(),
+  userId: z.string().optional(),
+  kiloSessionId: z.string().optional(),
+  cloudAgentSessionId: z.string().optional(),
+  sessionId: z.string().optional(),
+  worktreeId: z.string().optional(),
+  organizationId: z.string().optional(),
+  ptyId: z.string().optional(),
+  port: z.number().optional(),
+  nonce: z.string().optional(),
+});
+
+type StreamTicketPayload = z.infer<typeof streamTicketPayloadSchema>;
 
 export const STREAM_TICKET_AUDIENCE = 'cloud-agent-stream';
 export const TERMINAL_TICKET_AUDIENCE = 'cloud-agent-terminal';
+export const PREVIEW_TICKET_AUDIENCE = 'cloud-agent-preview';
+export const PREVIEW_SESSION_AUDIENCE = 'cloud-agent-preview-session';
+
+/** The claims an entry ticket carries: who may open which target on which port. */
+const previewEntryClaimsSchema = z.intersection(
+  z.object({
+    userId: z.string().min(1),
+    port: z.number().int(),
+    organizationId: z.string().optional(),
+  }),
+  previewTargetSchema
+);
+
+export type PreviewEntryClaims = z.infer<typeof previewEntryClaimsSchema>;
+
+/**
+ * A minted preview cookie is bound to the exact allocation it was opened
+ * against. The shared target is mutually exclusive, so a token cannot name both
+ * a worktree and a session.
+ */
+const previewClaimsSchema = z.intersection(
+  previewEntryClaimsSchema,
+  z.object({
+    provider: z.literal('cloudflare-containers'),
+    logicalSandboxId: z.string().min(1),
+    allocationRef: z.string().min(1),
+  })
+);
+
+export type PreviewClaims = z.infer<typeof previewClaimsSchema>;
+
+/** A preview token must expire; `jwt.verify` accepts a token without `exp`. */
+const previewTokenPayloadSchema = z.intersection(
+  previewClaimsSchema,
+  z.object({ exp: z.number() })
+);
 
 export type WrapperDispatchTicketClaims = {
   type: 'wrapper_dispatch_ticket';
@@ -26,20 +73,6 @@ export type WrapperDispatchTicketClaims = {
   wrapperGeneration: number;
   wrapperConnectionId: string;
 };
-
-/**
- * A pre-migration raw Kilo user JWT presented as a workerAuthToken. Accepted
- * only so wrapper processes already bound before wrapper dispatch tickets
- * shipped can keep talking to the Worker until their next session/ready
- * dispatch mints a real ticket. Carries no fence claims — callers must treat
- * it as exempt from ticketClaimsMismatchRequestFence.
- */
-export type LegacyKiloTokenClaims = {
-  type: 'legacy_kilo_token';
-  userId: string;
-};
-
-export type WrapperAuthClaims = WrapperDispatchTicketClaims | LegacyKiloTokenClaims;
 
 const WRAPPER_DISPATCH_TICKET_MAX_LIFETIME_SECONDS = 4 * 60 * 60;
 
@@ -75,19 +108,20 @@ export function validateStreamTicket(
   }
 
   try {
-    const payload = jwt.verify(ticket, secret, {
+    const verified: unknown = jwt.verify(ticket, secret, {
       algorithms: ['HS256'],
-    }) as StreamTicketPayload;
+    });
 
-    if (payload.type !== 'stream_ticket') {
-      return { success: false, error: 'Invalid ticket type' };
+    const parsed = streamTicketPayloadSchema.safeParse(verified);
+    if (!parsed.success) {
+      return { success: false, error: 'Invalid ticket payload' };
     }
 
-    if (payload.aud !== expectedAudience) {
+    if (parsed.data.aud !== expectedAudience) {
       return { success: false, error: 'Invalid ticket audience' };
     }
 
-    return { success: true, payload };
+    return { success: true, payload: parsed.data };
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       return { success: false, error: 'Ticket expired' };
@@ -109,6 +143,87 @@ export function mintWrapperDispatchTicket(
   });
 }
 
+export const PREVIEW_SESSION_LIFETIME_SECONDS = 3600;
+
+export function mintPreviewSessionToken(
+  claims: PreviewClaims,
+  secret: string,
+  nowSeconds = Math.floor(Date.now() / 1000)
+): string {
+  return jwt.sign(
+    { ...claims, type: 'preview_session', exp: nowSeconds + PREVIEW_SESSION_LIFETIME_SECONDS },
+    secret,
+    { algorithm: 'HS256', noTimestamp: true, audience: PREVIEW_SESSION_AUDIENCE }
+  );
+}
+
+export type PreviewTokenValidation =
+  | { success: true; claims: PreviewClaims }
+  | { success: false; error: string };
+
+const INVALID_PREVIEW_CLAIMS = { success: false, error: 'Invalid preview claims' } as const;
+
+/** The object strips every other field, so `aud`, `exp` and `type` never reach the claims. */
+function previewClaimsFrom(payload: unknown): PreviewTokenValidation {
+  const parsed = previewTokenPayloadSchema.safeParse(payload);
+  if (!parsed.success) return INVALID_PREVIEW_CLAIMS;
+  const { exp: _exp, ...claims } = parsed.data;
+  return { success: true, claims };
+}
+
+export type PreviewEntryTicketValidation =
+  | { success: true; claims: PreviewEntryClaims; nonce: string; expiresAtMs: number }
+  | { success: false; error: string };
+
+/** The entry carries the single-use `nonce` and its expiry apart from the claims. */
+const previewEntryTicketSchema = z.intersection(
+  previewEntryClaimsSchema,
+  z.object({ exp: z.number(), nonce: z.string().min(1) })
+);
+
+/** The 60-second entry ticket the web app mints (a `stream_ticket` with purpose `preview`). */
+export function validatePreviewEntryTicket(
+  ticket: string | null,
+  secret: string | null | undefined
+): PreviewEntryTicketValidation {
+  const validated = validateStreamTicket(ticket, secret, PREVIEW_TICKET_AUDIENCE);
+  if (!validated.success) return validated;
+  if (validated.payload.purpose !== 'preview') {
+    return { success: false, error: 'Invalid ticket purpose' };
+  }
+  const parsed = previewEntryTicketSchema.safeParse(validated.payload);
+  if (!parsed.success) return INVALID_PREVIEW_CLAIMS;
+  const { exp, nonce, ...claims } = parsed.data;
+  return { success: true, claims, nonce, expiresAtMs: exp * 1000 };
+}
+
+/** The host-bound session token the Worker sets as the preview cookie. */
+export function validatePreviewSessionToken(
+  token: string | null,
+  secret: string | null | undefined
+): PreviewTokenValidation {
+  if (!token) return { success: false, error: 'Missing preview session' };
+  if (!secret) {
+    return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
+  }
+  let payload: string | jwt.JwtPayload;
+  try {
+    payload = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+      audience: PREVIEW_SESSION_AUDIENCE,
+    });
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return { success: false, error: 'Preview session expired' };
+    }
+    return { success: false, error: 'Invalid preview session' };
+  }
+  if (typeof payload === 'string' || payload.type !== 'preview_session') {
+    return { success: false, error: 'Invalid preview session type' };
+  }
+  return previewClaimsFrom(payload);
+}
+
 function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDispatchTicketClaims {
   if (typeof payload !== 'object' || payload === null) return false;
   const claims = payload as Record<string, unknown>;
@@ -123,28 +238,12 @@ function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDisp
   );
 }
 
-/**
- * Re-verifies the token through the canonical verifyKiloToken so the legacy
- * path enforces the same version/audience/shape guards as validateKiloToken —
- * in particular, audience-scoped tokens (e.g. internal service tokens) must
- * not be accepted as wrapper auth.
- */
-async function legacyKiloTokenClaims(
-  ticket: string,
-  secret: string
-): Promise<LegacyKiloTokenClaims | undefined> {
-  try {
-    const payload = await verifyKiloToken(ticket, secret);
-    return { type: 'legacy_kilo_token', userId: payload.kiloUserId };
-  } catch {
-    return undefined;
-  }
-}
-
 export async function validateWrapperDispatchTicket(
   authHeader: string | null,
   secret: string | null | undefined
-): Promise<{ success: true; claims: WrapperAuthClaims } | { success: false; error: string }> {
+): Promise<
+  { success: true; claims: WrapperDispatchTicketClaims } | { success: false; error: string }
+> {
   if (!secret) {
     return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
   }
@@ -168,10 +267,6 @@ export async function validateWrapperDispatchTicket(
   }
 
   if (!isWrapperDispatchTicketClaims(payload)) {
-    const legacyClaims = await legacyKiloTokenClaims(ticket, secret);
-    if (legacyClaims) {
-      return { success: true, claims: legacyClaims };
-    }
     return { success: false, error: 'Invalid ticket type' };
   }
 

@@ -1,0 +1,1 @@
+ALTER TABLE "user_push_tokens" ADD COLUMN "locale" text;

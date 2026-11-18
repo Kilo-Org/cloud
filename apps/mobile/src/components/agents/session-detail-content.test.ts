@@ -1,9 +1,3937 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines -- Keep the detail trigger and real SDK request regressions with their shared screen fixture. */
+import {
+  type ComponentProps,
+  createElement,
+  type ElementType,
+  Fragment,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+} from 'react';
+import { createStore, Provider } from 'jotai';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
+import { type Pressable } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import {
+  type AssociatedPrData,
+  type CloudAgentSessionId,
+  type CloudStatus,
+  createSessionManager,
+  createUserWebConnection,
+  type DeliveredFailedPrompt,
+  type FetchedSessionData,
+  type KiloSessionId,
+  type MessageDeliveryState,
+  type PreparationAttempt,
+  type ReasoningPart,
+  type SessionGoal,
+  type SessionManager,
+  type SessionSnapshotPageOutcome,
+  type SessionStatusIndicator,
+  type StandalonePermission,
+  type StoredMessage,
+  type ToolPart,
+  type UnreadablePermissionState,
+} from '@kilocode/cloud-agent-sdk';
+import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
+import { ChildSessionSection } from '@/components/agents/child-session-section';
+import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
+import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
+import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
+import { SessionManagerContext } from '@/components/agents/session-manager-context';
+import { MessageBubble } from '@/components/agents/message-bubble';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
+import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
+import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
+import { PermissionCard } from '@/components/agents/permission-card';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
+import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
+import {
+  isSessionGoalCollapsed,
+  setSessionGoalCollapsed,
+} from '@/components/agents/session-goal-collapse';
+import {
+  CONTINUE_SCOPE_WAIT_MS,
+  SessionDetailContent,
+} from '@/components/agents/session-detail-content';
+import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
+import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
+import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { formatSessionCostBadge } from '@/components/agents/session-list-helpers';
+import { SessionGoalSection } from '@/components/agents/session-goal-section';
+import {
+  SessionComposerSkeleton,
+  SessionReadOnlyFooterPlaceholder,
+  SessionSkeletonMessages,
+} from '@/components/agents/session-detail-skeleton';
+import { PULL_FEEDBACK_MIN_BEAT_MS } from '@/components/agents/use-pull-refresh';
+import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
+import { SessionMessageList } from '@/components/agents/session-message-list';
+import type * as SessionTranscript from '@/components/agents/session-transcript';
+import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
+import type * as UseEffectiveAgentProfileModule from '@/components/agents/use-effective-agent-profile';
+import type * as UseEffectiveProfileCustomModesModule from '@/components/agents/use-effective-profile-custom-modes';
+import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
+import { restartAgentSession } from '@/components/agents/restart-agent-session';
+import { WorkingIndicator } from '@/components/agents/working-indicator';
+import {
+  SEND_REASON_MAX_FONT_SCALE,
+  SESSION_FOOTER_ROW_ITEM_PADDING,
+} from '@/components/agents/session-working-state';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import {
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
+import { ContextControl } from '@/components/context-control';
+import { type Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
+import { i18n } from '@/i18n';
+import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+
+const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+// The open gate's verdict the list mock publishes. `true` is the settled open
+// these cases describe; a test that needs the still-measuring window sets it to
+// `false`, and `null` models a list that never reports.
+const openSettledReport = vi.hoisted(() => ({ value: true as boolean | null }));
+// The props the host hands the transcript list, so the bottom inset it reserves
+// for the composer's growth is readable even though the stub renders nothing.
+const listPropsSlot = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
+const connectionHealth = vi.hoisted(() => ({
+  isConnected: true,
+  reconnectExhausted: false,
+  retryConnection: vi.fn(),
+}));
+const hideThinking = vi.hoisted(() => ({ current: false, loaded: true }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/agents/session-provider', () => ({
+  useSessionManager: () => {
+    if (!managerSlot.current) {
+      throw new Error('Missing test session manager');
+    }
+    return managerSlot.current;
+  },
+}));
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => connectionHealth.isConnected,
+  useUserWebConnectionHealth: () => ({
+    isConnected: connectionHealth.isConnected,
+    reconnectExhausted: connectionHealth.reconnectExhausted,
+  }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: connectionHealth.retryConnection }),
+}));
+
+// Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
+// rendering and unrelated composer, account, model-picker, and router dependencies.
+const navigationRoutes = vi.hoisted(() => ['session-detail']);
+// A navigator that drops one kind of push, the way it drops an action issued
+// while the calling route is still settling: the call returns and nothing lands.
+const routerDropsPush = vi.hoisted(() => ({ value: false }));
+// The personal `agentProfiles.list` rows the header's active-profile chip
+// reads; tests set it before mounting to drive the chip's presence.
+const profileRowsState = vi.hoisted(() => {
+  // profileId -> `agentProfiles.agents` rows, so a test can prove the session's
+  // own profile agents are the ones offered by the in-session role picker.
+  const agentsById: Record<string, unknown[]> = {};
+  return {
+    personal: [] as unknown[],
+    combined: {
+      orgProfiles: [] as unknown[],
+      personalProfiles: [] as unknown[],
+      effectiveDefaultId: null as string | null,
+    },
+    agentsById,
+  };
+});
+const routerSetParams = vi.hoisted(() => vi.fn());
+// The root container ref, which is one module-level singleton in expo-router.
+// A test flips `ready` to model the container going away (an activity recreate)
+// between arming the publish and its timer firing.
+const navigationContainer = vi.hoisted(() => ({
+  ready: true,
+  addListener: () => () => undefined,
+  isReady: () => navigationContainer.ready,
+}));
+const handoffAdvertiserCalls = vi.hoisted(() => ({
+  props: [] as { anchorMessageId?: string | null }[],
+}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+// The header's offline-banner reservation reads the committed connectivity
+// hook; these states are online, and the hook module pulls NetInfo (unmocked
+// in the pure project).
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => false,
+}));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
+  Switch: 'Switch',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
+  // The header reads the window to decide whether its actions share the title
+  // row; this phone is wide enough for them to.
+  useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'AnimatedView' },
+  FadeIn: { duration: () => ({}) },
+  FadeOut: { duration: () => ({}) },
+  LinearTransition: { duration: () => ({}) },
+  // The goal row's chevron rotation; the disclosure animation itself is
+  // covered by session-goal-section.mounted.test.tsx.
+  useSharedValue: (value: unknown) => ({ value }),
+  useAnimatedStyle: () => ({}),
+  withTiming: (value: number) => value,
+}));
+const motionPolicy = vi.hoisted(() => ({ reducedMotion: false }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: motionPolicy.reducedMotion,
+    scrollAnimated: !motionPolicy.reducedMotion,
+  }),
+  selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
+}));
+const screenSideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 16,
+    left: screenSideInsets.left,
+    right: screenSideInsets.right,
+  }),
+}));
+// The on-screen entity publisher reaches the app-action bridge, which imports
+// the root `expo` entry and does not parse under the node test environment.
+vi.mock('@/lib/app-actions/native-bridge', () => ({
+  setNativeVisibleSession: vi.fn(() => Promise.resolve()),
+}));
+// The publisher reads the privacy lock's status; outside a provider it would
+// throw, and the status is not the subject of these assertions.
+vi.mock('@/lib/app-unlock-context', () => ({
+  useAppUnlock: () => ({ status: 'unlocked' }),
+}));
+vi.mock('expo-router', () => ({
+  useFocusEffect: vi.fn(),
+  useIsFocused: () => true,
+  useNavigationContainerRef: () => navigationContainer,
+  usePreventRemove: vi.fn(),
+  useNavigation: () => ({
+    // The state the navigator would hold after the router calls above: the
+    // composer's push is only "opened" once it is the route on top.
+    getState: () => ({
+      index: navigationRoutes.length - 1,
+      routes: navigationRoutes.map(name => ({ name })),
+    }),
+    addListener: () => () => undefined,
+  }),
+  useRouter: () => ({
+    canGoBack: () => navigationRoutes.length > 1,
+    back: () => {
+      navigationRoutes.pop();
+    },
+    replace: (href: string) => {
+      navigationRoutes.splice(-1, 1, href);
+    },
+    // The POP_TO end state "Back to sessions" relies on: find the destination
+    // at or below the current index, truncate everything above it; with no
+    // match, drop the current route and land on the destination.
+    dismissTo: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? (href.split('?')[0] ?? href) : href.pathname;
+      const index = navigationRoutes.lastIndexOf(path);
+      if (index === -1) {
+        navigationRoutes.splice(0, navigationRoutes.length, path);
+      } else {
+        navigationRoutes.splice(index + 1);
+      }
+    },
+    push: (href: string) => {
+      if (routerDropsPush.value) {
+        return;
+      }
+      navigationRoutes.push(href);
+    },
+    setParams: routerSetParams,
+  }),
+}));
+// `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
+// Android Fabric alive (KILO-APP-25); its own mechanics are covered in
+// src/lib/navigation/stack-safe-replace.mounted.test.tsx. Here it stands in for
+// the navigation call so these assertions stay about the resulting route list.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({
+    replace: (href: string) => {
+      navigationRoutes.splice(-1, 1, href);
+    },
+  }),
+}));
+vi.mock('@/lib/keep-awake', () => ({ useKeepAwake: vi.fn() }));
+const hapticsSelection = vi.hoisted(() => vi.fn());
+vi.mock('expo-haptics', () => ({
+  selectionAsync: hapticsSelection,
+  notificationAsync: vi.fn(),
+  NotificationFeedbackType: { Error: 'error', Success: 'success' },
+}));
+vi.mock('@/components/agents/mobile-session-manager', () => ({
+  isCancelQueuedUpgradeRequired: vi.fn(),
+}));
+// The Follow control reads ActivityKit and the token graph; this suite renders none.
+vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButton: () => null }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  Bot: 'Bot',
+  ChevronDown: 'ChevronDown',
+  CircleDot: 'CircleDot',
+  Clock: 'Clock',
+  Link2: 'Link2',
+  Loader2: 'Loader2',
+  MessageSquare: 'MessageSquare',
+  SlidersHorizontal: 'SlidersHorizontal',
+}));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronLeft: 'ChevronLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
+vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
+// The goal-removal confirm renders through this surface; the stub keeps the
+// destructive variant out of this suite's react-native stub while still letting
+// the test read the request it carries.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
+}));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
+vi.mock('@/components/agents/part-detail-sheet-host', () => ({
+  PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+}));
+vi.mock('@/components/agents/message-error-boundary', () => ({
+  MessageErrorBoundary: 'MessageErrorBoundary',
+}));
+vi.mock('@/components/agents/message-details-sheet', () => ({
+  MessageDetailsSheet: 'MessageDetailsSheet',
+}));
+vi.mock('@/components/agents/chat-composer', () => ({ ChatComposer: 'ChatComposer' }));
+vi.mock('@/components/agents/model-selector', () => ({
+  ModelPickerSelectionScopeProvider: 'ModelPickerSelectionScopeProvider',
+}));
+vi.mock('@/components/agents/permission-card', () => ({ PermissionCard: 'PermissionCard' }));
+vi.mock('@/components/agents/question-card', () => ({ QuestionCard: 'QuestionCard' }));
+vi.mock('@/components/agents/preparation-group', () => ({ PreparationGroup: 'PreparationGroup' }));
+vi.mock('@/components/agents/context-usage-ring', () => ({
+  ContextUsageRing: 'ContextUsageRing',
+}));
+// The real context sheet (rendered so the auto-approve row can be asserted)
+// reaches `copySessionId`/`copySessionLink`, which import the native
+// `expo-clipboard` module that cannot load in this DOM-free node suite. Mock
+// the boundary, as the mounted context-sheet suite does.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
+vi.mock('@/components/agents/session-row-actions', () => ({
+  copySessionId: vi.fn(),
+  copySessionLink: vi.fn(),
+}));
+// The copy-link path reaches the browser helper; its native module cannot load here.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+// The handoff advertiser owns the OS entry point (Head plus Android's launcher
+// module) and has its own mounted suite; recording its props here proves the
+// screen hands it the live position.
+vi.mock('@/lib/session-handoff', () => ({
+  SessionHandoffAdvertiser: (props: { anchorMessageId?: string | null }) => {
+    handoffAdvertiserCalls.props.push(props);
+    return null;
+  },
+}));
+vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
+vi.mock('@/components/agents/session-tasks-indicator', () => ({
+  SessionTasksChip: 'SessionTasksChip',
+  SessionTasksRow: 'SessionTasksRow',
+}));
+vi.mock('@/components/agents/session-status-indicator', () => ({
+  SessionStatusIndicator: 'SessionStatusIndicator',
+}));
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+  SessionReadOnlyFooterPlaceholder: 'SessionReadOnlyFooterPlaceholder',
+  SessionComposerSkeleton: 'SessionComposerSkeleton',
+}));
+vi.mock('@/components/agents/transcript-time-marker', () => ({
+  TranscriptTimeMarker: 'TranscriptTimeMarker',
+}));
+vi.mock('@/components/agents/compaction-separator', () => ({
+  CompactionSeparator: 'CompactionSeparator',
+}));
+vi.mock('@/components/agents/file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
+vi.mock('@/components/agents/reasoning-part-renderer', () => ({
+  ReasoningPartRenderer: ({ text }: { text: string }) =>
+    createElement('ReasoningPartRenderer', null, createElement('Text', null, text)),
+}));
+vi.mock('@/components/agents/text-part-renderer', () => ({
+  TextPartRenderer: ({ text }: { text: string }) => createElement('Text', null, text),
+}));
+vi.mock('@/components/agents/chat-markdown-text', () => ({
+  ChatMarkdownText: ({ value }: { value: string }) => createElement('Text', null, value),
+}));
+vi.mock('@/components/agents/tool-cards', () => ({
+  TaskToolCard: 'TaskToolCard',
+  ReadToolCard: 'ReadToolCard',
+  TodoToolCard: 'TodoToolCard',
+}));
+vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
+vi.mock('@/components/agents/session-message-list', () => ({
+  SessionMessageList: function MessageList<T>(props: ComponentProps<typeof SessionMessageList<T>>) {
+    // The real list publishes its open gate's verdict to the host. These cases
+    // describe an open that has settled, so the mock reports it; a test that
+    // needs the still-measuring window sets `openSettledReport.value = false`.
+    const { onOpenSettledChange, sessionId } = props;
+    listPropsSlot.current = props as unknown as Record<string, unknown>;
+    useEffect(() => {
+      const report = openSettledReport.value;
+      if (report === null) {
+        return;
+      }
+      onOpenSettledChange?.(sessionId, report);
+    }, [onOpenSettledChange, sessionId]);
+    return createElement(
+      'MessageList',
+      null,
+      props.items.map((item, index) =>
+        createElement(
+          Fragment,
+          { key: props.keyExtractor(item) },
+          props.renderItem({ item, index, target: 'Cell' })
+        )
+      ),
+      props.ListFooterComponent as ReactNode
+    );
+  },
+}));
+vi.mock('@/lib/hooks/use-cli-session-presence', () => ({
+  resolveLoadedCliSessionPresenceId: vi.fn(),
+  useCliSessionPresence: vi.fn(),
+}));
+vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
+  createAndNavigateAgentSession: vi.fn(),
+}));
+vi.mock('@/components/agents/exit-remote-session-with-feedback', () => ({
+  exitRemoteSessionWithFeedback: vi.fn(),
+}));
+vi.mock('@/components/agents/restart-agent-session', () => ({ restartAgentSession: vi.fn() }));
+vi.mock('@/components/agents/mobile-session-manager-helpers', () => ({
+  buildRemoteAttachmentParts: vi.fn(),
+}));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
+  performCopy: vi.fn(),
+}));
+vi.mock('@/components/agents/use-interaction-handlers', () => ({
+  useInteractionHandlers: ({
+    manager,
+    activePermission,
+  }: {
+    manager: Pick<SessionManager, 'respondToPermission'>;
+    activePermission: { requestId: string } | null;
+  }) => ({
+    isAnswering: false,
+    isRespondingToPermission: false,
+    questionSubmissionError: null,
+    permissionSubmissionError: null,
+    handleAnswerQuestion: vi.fn(),
+    handleRejectQuestion: vi.fn(),
+    // Mirrors the real hook's contract: reply "once" to the active permission
+    // and report the transport outcome the auto-approve hook reacts to.
+    handleRespondToPermission: async (response: 'once' | 'always' | 'reject') => {
+      if (!activePermission) {
+        return 'ok' as const;
+      }
+      await manager.respondToPermission(activePermission.requestId, response);
+      return 'ok' as const;
+    },
+  }),
+}));
+// The selected model the mocked config-sync hook reports; the default '' keeps
+// every other test on the no-model path. A cloud-agent retry needs a Kilo model
+// for its transport payload to normalise.
+const sessionConfigSync = vi.hoisted(() => ({ currentModel: '' }));
+vi.mock('@/components/agents/use-session-config-sync', () => ({
+  useSessionConfigSync: () => ({
+    currentMode: 'code',
+    currentModel: sessionConfigSync.currentModel,
+    currentVariant: '',
+  }),
+}));
+const openRenameModal = vi.hoisted(() => vi.fn());
+// Mirrors the real hook's modal fields; a test opens the dialog by flipping
+// `isOpen` so it can inspect the RenameModal the screen renders.
+const renameModalState = vi.hoisted(() => ({ isOpen: false, initialValue: '' }));
+vi.mock('@/components/agents/use-session-detail-rename', async () => {
+  // Mirror the real hook's title derivation (the shared pure helper) instead of
+  // re-stating a simpler rule, so the header assertions below exercise the
+  // production placeholder handling. Only the mutation/connection wiring the
+  // component does not touch here is stubbed out; the modal fields come from
+  // `renameModalState` so a test can open the dialog directly.
+  const { getSessionDetailRenameState, initialRenameState } =
+    await import('@/components/agents/session-detail-rename-state');
+  return {
+    useSessionDetailRename: ({
+      isLoaded = true,
+      serverTitle,
+      fallbackTitle,
+    }: {
+      isLoaded?: boolean;
+      serverTitle?: string;
+      fallbackTitle: string;
+    }) => {
+      const state = getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded,
+        serverTitle,
+        renameState: initialRenameState(),
+      });
+      return {
+        title: state.title,
+        isTitleInteractive: state.isTitleInteractive,
+        isModalOpen: renameModalState.isOpen,
+        modalInitialValue: renameModalState.initialValue,
+        openModal: openRenameModal,
+        closeModal: vi.fn(),
+        submit: vi.fn().mockResolvedValue(undefined),
+      };
+    },
+  };
+});
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: vi.fn(),
+  MESSAGE_SENT_EVENT: 'sent',
+  SESSION_VIEWED_EVENT: 'viewed',
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  requestA11yFocus: () => false,
+  announceForA11y: vi.fn(),
+}));
+// `test-user` by default; the last-opened test flips it to `undefined` to model
+// the identity resolving after the session's first render.
+const currentUserId = vi.hoisted(() => ({ value: 'test-user' as string | undefined }));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: currentUserId.value, isLoading: false }),
+}));
+vi.mock('@/lib/last-opened-session', () => ({
+  recordLastOpenedSession: vi.fn(),
+}));
+// The organization each org-scoped read on the screen is asked for. The screen
+// derives that scope from the session row, so the recorded arguments are the
+// assertion surface for it.
+const scopeReads = vi.hoisted(() => ({
+  models: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  /** What the mocked catalog read reports; a model here must not reach the picker. */
+  catalogModels: [] as unknown[],
+  preferences: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  profiles: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  modes: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+}));
+vi.mock('@/lib/hooks/use-available-models', () => ({
+  useAvailableModels: (
+    organizationId: string | undefined,
+    _audience: unknown,
+    options?: { enabled?: boolean }
+  ) => {
+    scopeReads.models.push({ organizationId, enabled: options?.enabled });
+    return { models: scopeReads.catalogModels, isLoading: false };
+  },
+}));
+vi.mock('@/lib/hooks/use-model-preferences', () => ({
+  useModelPreferences: (organizationId: string | undefined, options?: { enabled?: boolean }) => {
+    scopeReads.preferences.push({ organizationId, enabled: options?.enabled });
+    return { setLastSelected: vi.fn() };
+  },
+}));
+// Keep the real profile hook (the chip tests below assert its behavior) and
+// record the scope it is asked for.
+vi.mock('@/components/agents/use-effective-agent-profile', async importOriginal => {
+  const actual = await importOriginal<typeof UseEffectiveAgentProfileModule>();
+  return {
+    ...actual,
+    useEffectiveAgentProfile: (
+      organizationId?: string,
+      overrideProfileId?: string | null,
+      options?: { enabled?: boolean }
+    ) => {
+      scopeReads.profiles.push({ organizationId, enabled: options?.enabled });
+      return actual.useEffectiveAgentProfile(organizationId, overrideProfileId, options);
+    },
+  };
+});
+// Keep the real custom-mode read (its own suite asserts the resolution rules)
+// and record the scope it is asked for, like the profile hook above.
+vi.mock('@/components/agents/use-effective-profile-custom-modes', async importOriginal => {
+  const actual = await importOriginal<typeof UseEffectiveProfileCustomModesModule>();
+  return {
+    ...actual,
+    useEffectiveProfileCustomModes: (
+      organizationId?: string,
+      profileId?: string | null,
+      options?: { enabled?: boolean }
+    ) => {
+      scopeReads.modes.push({ organizationId, enabled: options?.enabled });
+      return actual.useEffectiveProfileCustomModes(organizationId, profileId, options);
+    },
+  };
+});
+vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
+  usePersistedAgentModel: () => ({ saveModel: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
+  useReasoningPreference: () => ({ defaultExpanded: false }),
+}));
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => ({
+    hideThinking: hideThinking.current,
+    hasLoaded: hideThinking.loaded,
+  }),
+}));
+vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
+  useKeepScreenOnPreference: () => ({ keepScreenOn: false, hasLoaded: true }),
+}));
+const condensePreference = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: condensePreference.value,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
+}));
+// The part→item-key map is only read back by the condensed build, so the
+// component must not walk the transcript for it while condensing is off.
+const transcriptKeyCollection = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('@/components/agents/session-transcript', async importOriginal => {
+  const actual = await importOriginal<typeof SessionTranscript>();
+  return {
+    ...actual,
+    collectTranscriptItemKeysByPart: (
+      ...args: Parameters<typeof actual.collectTranscriptItemKeysByPart>
+    ) => {
+      transcriptKeyCollection.calls += 1;
+      return actual.collectTranscriptItemKeysByPart(...args);
+    },
+  };
+});
+// The session's model catalogue rows. Empty unless a test names the model the
+// session ran on, so every other screen keeps its previous option list; the
+// array keeps one identity between renders, like the real projection.
+const sessionModelOptions = vi.hoisted(() => ({ rows: [] as SessionModelOption[] }));
+vi.mock('@/lib/hooks/use-session-model-options', () => ({
+  useSessionModelOptions: () => ({
+    options: sessionModelOptions.rows,
+    selectedValue: '',
+    selectedVariant: '',
+  }),
+}));
+// The retry hook owns the app-foreground/focus subscriptions and the SDK
+// transport call; its mounted suite covers that wiring, so this screen test
+// stands it in as a no-op.
+vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
+  useRemoteModelCatalogRetry: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
+  useSessionRaiseReader: () => () => null,
+}));
+// The header pill adds the session's compute charges to its total; this screen
+// test supplies the model cost only, so the read is pinned to "nothing recorded"
+// while its arguments are recorded for the polling test.
+const computeReadArgs = vi.hoisted(() => ({ calls: [] as { poll?: boolean }[] }));
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: (args: { poll?: boolean } = {}) => {
+    computeReadArgs.calls.push(args);
+    return { data: undefined, isError: false, refetch: vi.fn() };
+  },
+  useComputeRates: () => ({ data: undefined }),
+}));
+// The poll follows the screen's focus and the app's foreground state; that hook
+// has its own mounted suite, so this screen test supplies the reading.
+const computePolling = vi.hoisted(() => ({ focusedAndActive: true }));
+vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
+  useAppActiveAndFocused: () => computePolling.focusedAndActive,
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
+  useThemeColors: () => ({}),
+}));
+vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
+vi.mock('@/lib/persist/use-draft-load', () => ({
+  useFencedDraftLoad: () => ({ settled: true, value: null }),
+}));
+const organizations = vi.hoisted(() => [
+  { organizationId: 'org-a', organizationName: 'Session organization' },
+]);
+vi.mock('@/components/todos/session-todo-link', () => ({
+  SessionTodoChip: () => null,
+  SessionTodoLinkRow: () => null,
+}));
+const sandboxTrpc = vi.hoisted(() => {
+  const options = { queryOptions: () => ({}), queryKey: () => [] };
+  return { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+});
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    cloudAgentNext: { removeWorkspaceSnapshot: { mutate: () => Promise.resolve({}) } },
+    organizations: {
+      cloudAgentNext: { removeWorkspaceSnapshot: { mutate: () => Promise.resolve({}) } },
+    },
+  },
+  useTRPC: () => ({
+    cloudAgentNext: sandboxTrpc,
+    organizations: {
+      cloudAgentNext: sandboxTrpc,
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations'],
+          queryFn: () => organizations,
+          initialData: organizations,
+        }),
+      },
+    },
+    // The context sheet mounts its share section here, so the section's read must
+    // resolve: these tests assert the header and the sheet's other rows, so the
+    // read reports no live link and nothing presses the share mutations.
+    cliSessionsV2: {
+      get: {
+        queryOptions: () => ({
+          queryKey: ['cliSessionsV2', 'get'],
+          queryFn: () => Promise.resolve({ public_id: null }),
+          initialData: { public_id: null },
+        }),
+        queryKey: () => ['cliSessionsV2', 'get'],
+      },
+      share: { mutationOptions: () => ({}) },
+      unshare: { mutationOptions: () => ({}) },
+    },
+    // The session header's active-profile chip reads the context profiles; the
+    // hoisted rows let a test resolve a default, and the empty default keeps
+    // the chip absent so the existing header assertions hold.
+    agentProfiles: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'list'],
+          queryFn: () => profileRowsState.personal,
+          initialData: profileRowsState.personal,
+        }),
+      },
+      listCombined: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'listCombined'],
+          queryFn: () => profileRowsState.combined,
+          initialData: profileRowsState.combined,
+        }),
+      },
+      agents: {
+        queryOptions: (input: { profileId?: string } = {}) => {
+          const agents = profileRowsState.agentsById[input.profileId ?? ''] ?? [];
+          return {
+            queryKey: ['agentProfiles', 'agents', input.profileId ?? ''],
+            queryFn: () => agents,
+            initialData: agents,
+          };
+        },
+      },
+    },
+    // The real context sheet resolves the "running on" row from the connected
+    // CLI instances; the row is inert here, so an empty instance list keeps the
+    // sheet rendering without a network read.
+    activeSessions: {
+      listInstances: {
+        queryOptions: () => ({
+          queryKey: ['activeSessions', 'listInstances'],
+          queryFn: () => ({ instances: [] }),
+          initialData: { instances: [] },
+        }),
+      },
+    },
+  }),
+}));
+// Captured so the goal tests can open the action sheet and pick a control.
+const showActionSheetWithOptions = vi.hoisted(() =>
+  vi.fn<(options: Record<string, unknown>, callback: (index?: number) => void) => void>()
+);
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions }),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
+const globalContext = vi.hoisted(() => ({
+  organizationId: 'global-org',
+  isLoaded: true,
+  error: null,
+  retry: vi.fn(),
+  setOrganizationId: vi.fn(),
+}));
+vi.mock('@/lib/organization-context', () => ({ useOrganization: () => globalContext }));
+
+const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
+/**
+ * Goal/type overrides for the goal-visibility tests. A module-level slot keeps
+ * the shared `mountDetails` fixture at its existing three-parameter signature.
+ */
+let goalMountOptions: {
+  goal?: SessionGoal;
+  resolvedType?: 'read-only' | 'remote' | 'cloud-agent';
+} = {};
+/** The PR `fetchSession` reports; `null` keeps the PR row off the screen. */
+let associatedPrMountOption: AssociatedPrData | null = null;
+/** The cloud-agent id `fetchSession` reports; `null` keeps the metadata kindless. */
+let fetchedCloudAgentSessionId: CloudAgentSessionId | null = null;
+const ASSOCIATED_PR: AssociatedPrData = {
+  url: 'https://github.com/acme/repo/pull/42',
+  number: 42,
+  state: 'open',
+  title: 'Harden the header',
+  headSha: 'abc123',
+  lastSyncedAt: '2026-01-01T00:00:00.000Z',
+  reviewDecision: null,
+  reviewDecisionPending: false,
+};
+const ROOT_ID = kiloId('ses-root');
+const NEXT_ROOT_ID = kiloId('ses-next-root');
+const SELECTED_ID = kiloId('ses-selected');
+const NESTED_ID = kiloId('ses-nested');
+const CHILD_IDS = [
+  SELECTED_ID,
+  ...Array.from({ length: 23 }, (_, index) => kiloId(`ses-sibling-${index}`)),
+];
+
+function taskMessage(parentId: KiloSessionId, childIds: KiloSessionId[]): StoredMessage {
+  const message = assistantMessage(`msg-${parentId}`);
+  return {
+    info: { ...message.info, sessionID: parentId },
+    parts: childIds.map((childId, index): ToolPart => {
+      const input = { description: `Task ${childId}`, subagent_type: 'Researcher' };
+      const metadata = { sessionId: childId };
+      let state: ToolPart['state'] = {
+        status: 'completed',
+        input,
+        metadata,
+        output: 'Done',
+        title: 'Task',
+        time: { start: 1, end: 2 },
+      };
+      if (index % 3 === 1) {
+        state = { status: 'running', input, metadata, time: { start: 1 } };
+      } else if (index % 3 === 2) {
+        state = {
+          status: 'error',
+          input,
+          metadata,
+          error: 'Task failed',
+          time: { start: 1, end: 2 },
+        };
+      }
+      return {
+        id: `part-${childId}`,
+        sessionID: parentId,
+        messageID: message.info.id,
+        type: 'tool',
+        tool: 'task',
+        callID: `call-${childId}`,
+        state,
+      };
+    }),
+  };
+}
+
+function childMessage(sessionId: KiloSessionId, text: string): StoredMessage {
+  const message = assistantMessage(`msg-${sessionId}`);
+  return {
+    info: { ...message.info, sessionID: sessionId },
+    parts: [
+      stubTextPart({
+        id: `text-${sessionId}`,
+        sessionID: sessionId,
+        messageID: message.info.id,
+        text,
+      }),
+    ],
+  };
+}
+
+/** An assistant message of consecutive `read` tool parts that condense into one run. */
+function toolRunMessage(
+  sessionId: KiloSessionId,
+  messageId: string,
+  partIds: readonly string[]
+): StoredMessage {
+  const message = assistantMessage(messageId);
+  message.info = { ...message.info, sessionID: sessionId };
+  message.parts = partIds.map((partId, index): ToolPart => ({
+    id: partId,
+    sessionID: sessionId,
+    messageID: messageId,
+    type: 'tool',
+    callID: `call-${partId}`,
+    tool: 'read',
+    state: {
+      status: 'completed',
+      input: { filePath: `/repo/${partId}.ts` },
+      output: '',
+      title: 'read',
+      metadata: {},
+      time: { start: index, end: index + 1 },
+    },
+  }));
+  return message;
+}
+
+function page(
+  sessionId: KiloSessionId,
+  messages: StoredMessage[],
+  options: { goal?: SessionGoal; nextCursor?: string | null } = {}
+): SessionSnapshotPageOutcome {
+  return {
+    kind: 'success',
+    info: { id: sessionId, ...(options.goal ? { goal: options.goal } : {}) },
+    messages,
+    nextCursor: options.nextCursor ?? null,
+    omittedItemCount: 0,
+  };
+}
+
+// Set before `mountDetails` by the zero-render guard tests; the root page
+// resolves with this cursor instead of the default `null`.
+let rootPageNextCursor: string | null = null;
+
+// Set before `mountDetails` by the long-title header tests; `fetchSession`
+// reports this session title instead of the short default.
+let sessionTitleOverride: string | null = null;
+
+/**
+ * A gate the cloud-agent `api.send` mock awaits, so a retry's transport
+ * round-trip can be held open while its in-flight transcript is asserted.
+ * `null` resolves immediately.
+ */
+let pendingSend: Promise<unknown> | null = null;
+
+function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
+  return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
+}
+
+/** The send-gate props the screen hands the mounted composer. */
+function composerProps(view: { renderer: ReactTestRenderer }) {
+  return view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer')).props as {
+    sendDisabled?: boolean;
+    sendDisabledReason?: string | null;
+  };
+}
+
+/** The read-only footer's only control, found by the label a person reads. */
+function continueControlOf(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'Button') &&
+      node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+  );
+}
+
+/**
+ * The FlashList keys the first message list would mount rows under. The list is
+ * stubbed, so read the props the stub was handed: the same `keyExtractor` the
+ * real FlashList uses for its viewport anchor.
+ */
+function transcriptKeys(renderer: ReactTestRenderer): string[] {
+  const list = renderer.root.findAllByType(SessionMessageList)[0];
+  if (!list) {
+    return [];
+  }
+  const { items, keyExtractor } = list.props as {
+    items: readonly SessionTranscriptItem[];
+    keyExtractor: (item: SessionTranscriptItem) => string;
+  };
+  return items.map(item => keyExtractor(item));
+}
+
+beforeEach(() => {
+  navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerDropsPush.value = false;
+  routerSetParams.mockClear();
+  navigationContainer.ready = true;
+  profileRowsState.personal = [];
+  profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
+  profileRowsState.agentsById = {};
+  openRenameModal.mockClear();
+  renameModalState.isOpen = false;
+  renameModalState.initialValue = '';
+  showActionSheetWithOptions.mockClear();
+  hideThinking.current = false;
+  hideThinking.loaded = true;
+  goalMountOptions = {};
+  associatedPrMountOption = null;
+  fetchedCloudAgentSessionId = null;
+  globalContext.organizationId = 'global-org';
+  globalContext.setOrganizationId.mockClear();
+  rootPageNextCursor = null;
+  sessionTitleOverride = null;
+  pendingSend = null;
+  condensePreference.value = false;
+  currentUserId.value = 'test-user';
+  sessionConfigSync.currentModel = '';
+  openSettledReport.value = true;
+  connectionHealth.isConnected = true;
+  connectionHealth.reconnectExhausted = false;
+  connectionHealth.retryConnection.mockClear();
+  scopeReads.models.length = 0;
+  scopeReads.preferences.length = 0;
+  scopeReads.profiles.length = 0;
+  scopeReads.modes.length = 0;
+  scopeReads.catalogModels = [];
+  vi.mocked(createAndNavigateAgentSession).mockReset();
+  vi.mocked(restartAgentSession).mockReset();
+});
+
+type MountDetailsOptions = {
+  metadataReady?: Promise<undefined>;
+  displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
+  cachedRows?: StoredMessage[] | null;
+  /**
+   * The route's cached list title, seeded before the session record loads, as
+   * `[session-id].tsx` passes it.
+   */
+  cachedTitle?: string;
+  /** The route's `?at=` param the screen mounts with. */
+  resumeAt?: string | null;
+  sessionOrganizationId?: string;
+  /** The profile id the session row recorded, as `fetchSession` reports it. */
+  sessionProfileId?: string | null;
+  /**
+   * Keep one mounted screen across `switchRoot`, the way the route's screen
+   * instance receives a new `sessionId` prop. The default remounts, as the
+   * route-keyed provider does.
+   */
+  keepInstanceOnSwitch?: boolean;
+};
+
+async function mountDetails(
+  rootMessages: StoredMessage[] | null = [taskMessage(ROOT_ID, CHILD_IDS)],
+  options: MountDetailsOptions = {}
+) {
+  const {
+    metadataReady,
+    displayScope = PERSONAL_DISPLAY_SCOPE,
+    cachedRows = null,
+    cachedTitle,
+    resumeAt,
+  } = options;
+  const store = createStore();
+  // `null` stalls the root page: the request never resolves, so the open never
+  // receives first content (the endless-skeleton case).
+  const rootPages = new Map<KiloSessionId, StoredMessage[]>(
+    rootMessages === null ? [] : [[ROOT_ID, rootMessages]]
+  );
+  const requests: {
+    id: KiloSessionId;
+    response: ReturnType<typeof Promise.withResolvers<SessionSnapshotPageOutcome | null>>;
+  }[] = [];
+  const connection = createUserWebConnection({
+    websocketUrl: 'wss://example.test',
+    getAuthToken: vi.fn(),
+  });
+  const manager = createSessionManager({
+    store,
+    userWebConnection: connection,
+    resolveSession: async id => {
+      await Promise.resolve();
+      if (goalMountOptions.resolvedType === 'remote') {
+        return { type: 'remote', kiloSessionId: id };
+      }
+      if (goalMountOptions.resolvedType === 'cloud-agent') {
+        // A cloud-agent session is the only harness type whose `api.send` the
+        // test can resolve, so a real `manager.send` materialises the retry's
+        // optimistic row instead of throwing for a missing transport.
+        return {
+          type: 'cloud-agent',
+          kiloSessionId: id,
+          cloudAgentSessionId: cloudAgentId('cag-1'),
+        };
+      }
+      return { type: 'read-only', kiloSessionId: id };
+    },
+    getTicket: vi.fn(),
+    fetchSnapshot: vi.fn(),
+    // Required by the cloud-agent transport factory; unused by read-only and
+    // remote sessions.
+    websocketBaseUrl: 'wss://example.test',
+    fetchSnapshotPage: async id => {
+      const response = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
+      requests.push({ id, response });
+      const messages = rootPages.get(id);
+      if (messages) {
+        // Serve only the first request per id; a re-fetch (e.g. the older-page
+        // load a zero-render transcript triggers) stays pending for `respond`.
+        rootPages.delete(id);
+        response.resolve(
+          page(id, messages, { goal: goalMountOptions.goal, nextCursor: rootPageNextCursor })
+        );
+      }
+      const outcome = await response.promise;
+      return outcome;
+    },
+    readCachedSnapshotPage: cachedRows
+      ? vi.fn().mockResolvedValue({
+          info: { id: ROOT_ID },
+          messages: cachedRows,
+          nextCursor: null,
+          omittedItemCount: 0,
+        })
+      : undefined,
+    api: {
+      send: vi.fn(async () => {
+        await pendingSend;
+      }),
+      interrupt: vi.fn(),
+      answer: vi.fn(),
+      reject: vi.fn(),
+      respondToPermission: vi.fn(),
+    },
+    prepare: vi.fn(),
+    initiate: vi.fn(),
+    fetchSession: async id => {
+      await metadataReady;
+      return {
+        kiloSessionId: id,
+        cloudAgentSessionId: fetchedCloudAgentSessionId,
+        title: sessionTitleOverride ?? `Root ${id}`,
+        organizationId: options.sessionOrganizationId ?? null,
+        profileId: options.sessionProfileId ?? null,
+        gitUrl: null,
+        gitBranch: null,
+        mode: null,
+        model: null,
+        variant: null,
+        repository: null,
+        isInitiated: true,
+        isPreparingAsync: false,
+        prompt: null,
+        initialMessageId: null,
+        associatedPr: associatedPrMountOption,
+      };
+    },
+  });
+  managerSlot.current = manager;
+  onTestFinished(() => {
+    manager.destroy();
+    connection.destroy();
+  });
+  let currentRootId: KiloSessionId = ROOT_ID;
+  const element = (id: KiloSessionId, at: string | null | undefined = resumeAt) =>
+    createElement(
+      // The real screen publishes the manager so the in-transcript subagent
+      // card can subscribe to the child transcript; `session-provider` is mocked
+      // in this suite, so the scope is provided here directly.
+      SessionManagerContext.Provider,
+      { value: manager },
+      createElement(
+        Provider,
+        { store },
+        createElement(SessionDetailContent, {
+          ...(options.keepInstanceOnSwitch ? {} : { key: id }),
+          sessionId: id,
+          displayScope,
+          ...(cachedTitle === undefined ? {} : { cachedTitle }),
+          ...(at === undefined ? {} : { resumeAt: at }),
+        })
+      )
+    );
+  const view = await renderWithProviders(element(ROOT_ID));
+  onTestFinished(view.unmount);
+  const requestFor = (id: KiloSessionId) => {
+    const request = requests.findLast(candidate => candidate.id === id);
+    if (!request) {
+      throw new Error(`No page request for ${id}`);
+    }
+    return request.response;
+  };
+  return {
+    ...view,
+    manager,
+    store,
+    rootPages,
+    requestedIds: () => requests.map(request => request.id),
+    respond: async (id: KiloSessionId, messages: StoredMessage[]) => {
+      await act(async () => {
+        requestFor(id).resolve(page(id, messages, { goal: goalMountOptions.goal }));
+        await Promise.resolve();
+      });
+    },
+    respondOutcome: async (id: KiloSessionId, outcome: SessionSnapshotPageOutcome) => {
+      await act(async () => {
+        requestFor(id).resolve(outcome);
+        await Promise.resolve();
+      });
+    },
+    fail: async (id: KiloSessionId, error: unknown) => {
+      await act(async () => {
+        requestFor(id).reject(error);
+        await Promise.resolve();
+      });
+    },
+    switchRoot: async (id: KiloSessionId) => {
+      await act(async () => {
+        currentRootId = id;
+        view.renderer.update(
+          createElement(QueryClientProvider, { client: view.queryClient }, element(id))
+        );
+        await Promise.resolve();
+      });
+    },
+    /**
+     * Deliver a new route `at` to the already-mounted screen (the `withAnchor`
+     * dedupe path updates params instead of remounting the route).
+     */
+    updateResumeAt: async (next: string | null) => {
+      await act(async () => {
+        view.renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: view.queryClient },
+            element(currentRootId, next)
+          )
+        );
+        await Promise.resolve();
+      });
+    },
+  };
+}
+
+function cardFor(renderer: ReactTestRenderer, sessionId: KiloSessionId): ReactTestInstance {
+  const card = renderer.root.findAllByType(ChildSessionSection).find(node => {
+    const props = node.props as ComponentProps<typeof ChildSessionSection>;
+    return getTaskToolSessionId(props.part) === sessionId;
+  });
+  if (!card) {
+    throw new Error(`No card for ${sessionId}`);
+  }
+  return card;
+}
+
+function pressCard(renderer: ReactTestRenderer, sessionId: KiloSessionId) {
+  const { onPress } = cardFor(renderer, sessionId).findByProps({ accessibilityRole: 'button' })
+    .props as { onPress: () => void };
+  act(() => {
+    onPress();
+  });
+}
+
+function sheetProps(renderer: ReactTestRenderer) {
+  return renderer.root.findByType(ChildSessionSheet).props as ComponentProps<
+    typeof ChildSessionSheet
+  >;
+}
+
+function renderedText(node: ReactTestInstance) {
+  return node
+    .findAll(child => typeof child.type === 'string' && (child.type as string) === 'Text')
+    .flatMap(child => child.children.filter(value => typeof value === 'string'))
+    .join('\n');
+}
+
+/** How many times `needle` occurs in the rendered transcript text. */
+function occurrencesOf(root: ReactTestInstance, needle: string): number {
+  return renderedText(root).split(needle).length - 1;
+}
+
+/**
+ * Page text outside the context sheet. The sheet stays mounted (invisible) as
+ * soon as usage is known, so a "nothing renders on the page" assertion must not
+ * count the sheet's own rows.
+ */
+function renderedTextOutsideSheet(root: ReactTestInstance): string {
+  const sheetNodes = new Set<ReactTestInstance>(
+    root.findAllByType(SessionContextSheet).flatMap(sheet => sheet.findAll(() => true))
+  );
+  return root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+    .filter(node => !sheetNodes.has(node))
+    .flatMap(node => node.children.filter((value): value is string => typeof value === 'string'))
+    .join('\n');
+}
+
+function reasoningRenderers(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(node => Object.is(node.type, 'ReasoningPartRenderer'));
+}
+
+/**
+ * The fixed footer row wrapper. The row renders one item at a time — the
+ * working spinner, then the status indicator, then the cannot-send reason — so
+ * the wrapper is what the row's own position and opacity contracts hold for,
+ * and its children are the ladder's observable result.
+ */
+function indicatorRowOf(view: { renderer: ReactTestRenderer }) {
+  const rows = view.renderer.root.findAll(
+    node =>
+      Object.is(node.type, 'AnimatedView') && String(node.props.className ?? '') === 'bg-background'
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new Error('Missing the fixed indicator row wrapper');
+  }
+  return row;
+}
+
+function footerRowItems(view: { renderer: ReactTestRenderer }) {
+  return indicatorRowOf(view).children.filter(child => typeof child !== 'string');
+}
+
+/**
+ * The band a reserved header holds its text area's height with: a zero-width
+ * twin of the eyebrow and the title's line cap.
+ */
+function findReservedBand(header: ReactTestInstance) {
+  return header.findByProps({ className: 'w-0 overflow-hidden' });
+}
+
+function pressHeaderBack(renderer: ReactTestRenderer) {
+  const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
+    onPress: () => void;
+  };
+  act(onPress);
+}
+
+describe('SessionDetailContent display scope', () => {
+  it.each([
+    { organizationId: null, isResolved: true, label: i18n.t('common.personal') },
+    { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
+    { organizationId: 'missing-org', isResolved: true, label: i18n.t('common.organization') },
+    { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
+  ])('omits the $label context label and preserves header actions', async state => {
+    const { renderer } = await mountDetails([], {
+      displayScope: {
+        organizationId: state.organizationId,
+        isResolved: state.isResolved,
+      },
+    });
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
+      numberOfLines: SESSION_HEADER_TITLE_LINES,
+      ellipsizeMode: 'tail',
+    });
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
+    expect(header.findAllByType(ContextControl)).toHaveLength(0);
+    // The PR link shares the goal row now, so the header row holds no badge.
+    expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
+    expect(
+      header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
+    ).toHaveLength(0);
+    expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
+    const rename = header.findByProps({
+      accessibilityLabel: `Root ${ROOT_ID}`,
+      accessibilityHint: i18n.t('agentChat.session.renameAccessibility', {
+        title: `Root ${ROOT_ID}`,
+      }),
+    });
+    expect(rename.props.accessibilityLabel).toBe(`Root ${ROOT_ID}`);
+    act(rename.props.onPress as () => void);
+    expect(openRenameModal).toHaveBeenCalledOnce();
+    pressHeaderBack(renderer);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
+    expect(globalContext.organizationId).toBe('global-org');
+    expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  });
+});
+
+describe('session detail active-profile indicator', () => {
+  const PROFILE_ROW = {
+    id: 'p1',
+    name: 'Production',
+    description: null,
+    isDefault: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 2,
+    commandCount: 1,
+    mcpServerCount: 1,
+    skillCount: 1,
+    agentCount: 1,
+    kiloCommandCount: 1,
+  };
+
+  function findChip(renderer: ReactTestRenderer) {
+    return renderer.root.findAll(
+      node =>
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.startsWith(i18n.t('agentChat.newSession.profileActive'))
+    );
+  }
+
+  it('shows the chip for the session context effective default and opens its editor', async () => {
+    profileRowsState.personal = [PROFILE_ROW];
+    const { renderer } = await mountDetails();
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Production');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1?openedFrom=session');
+  });
+
+  it.each(['user', 'organization'] as const)(
+    'opens a %s default from an organization session in its owner scope',
+    async ownerType => {
+      const profile = { ...PROFILE_ROW, ownerType };
+      profileRowsState.combined = {
+        personalProfiles: ownerType === 'user' ? [profile] : [],
+        orgProfiles: ownerType === 'organization' ? [profile] : [],
+        effectiveDefaultId: profile.id,
+      };
+      const { renderer } = await mountDetails([], {
+        sessionOrganizationId: 'org-a',
+        displayScope: { organizationId: 'org-a', isResolved: true },
+      });
+      await waitFor(() => findChip(renderer).length > 0);
+      const [chip] = findChip(renderer);
+      if (!chip) {
+        throw new Error('the active-profile chip did not render');
+      }
+      act(() => {
+        (chip.props.onPress as () => void)();
+      });
+      expect(navigationRoutes.at(-1)).toBe(
+        `/(app)/profile-management/p1${
+          ownerType === 'organization'
+            ? '?organizationId=org-a&openedFrom=session'
+            : '?openedFrom=session'
+        }`
+      );
+    }
+  );
+
+  it('renders no chip when the context has no profiles', async () => {
+    const { renderer } = await mountDetails();
+
+    expect(findChip(renderer)).toHaveLength(0);
+  });
+
+  it('names the profile the session recorded, not the context effective default', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+      { ...PROFILE_ROW, id: 'p-recorded', name: 'Recorded', isDefault: false },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Recorded');
+    expect(chip.props.accessibilityLabel).not.toContain('Default');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded?openedFrom=session');
+  });
+
+  it('falls back to the effective default only when the session recorded no profile', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Default');
+  });
+
+  it('renders no chip when the session profile id no longer resolves', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const view = await mountDetails([], { sessionProfileId: 'p-deleted' });
+
+    // Wait for the session metadata read so the assertion is not merely the
+    // pre-load window; a fallback to the context default would surface here.
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    expect(findChip(view.renderer)).toHaveLength(0);
+  });
+});
+
+/**
+ * The props the screen hands one transcript row's bubble. The list is stubbed,
+ * so read the element the stub renders: the bubble itself is a memo component,
+ * which a rendered-tree lookup does not resolve to the imported symbol.
+ */
+function messageBubbleProps(
+  renderer: ReactTestRenderer,
+  messageId: string
+): { onLongPressDetails: (message: StoredMessage) => void } {
+  const list = renderer.root.findAllByType(SessionMessageList)[0];
+  if (!list) {
+    throw new Error('the transcript list was expected to paint');
+  }
+  const props = list.props as {
+    items: readonly SessionTranscriptItem[];
+    renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{ children: ReactNode }>;
+  };
+  const item = props.items.find(
+    candidate => candidate.type === 'message' && candidate.message.info.id === messageId
+  );
+  if (!item) {
+    throw new Error(`no transcript row for ${messageId}`);
+  }
+  const rendered = props.renderItem({ item });
+  const children = rendered.props.children;
+  const bubble = (Array.isArray(children) ? children : [children]).find(
+    (child: ReactNode): child is ReactElement =>
+      isValidElement(child) && child.type === MessageBubble
+  );
+  if (!bubble) {
+    throw new Error(`no bubble for ${messageId}`);
+  }
+  return bubble.props as { onLongPressDetails: (message: StoredMessage) => void };
+}
+
+function detailsSheetNode(renderer: ReactTestRenderer) {
+  const [sheet] = renderer.root.findAll(node => Object.is(node.type, 'MessageDetailsSheet'));
+  if (!sheet) {
+    throw new Error('the message details sheet was expected to mount');
+  }
+  return sheet;
+}
+
+describe('session detail organization scope', () => {
+  it('uses the displayed session organization once its row resolves', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    // One mounted screen, as the route keeps it: only the `sessionId` prop
+    // changes when another session opens.
+    const view = await mountDetails([], {
+      sessionOrganizationId: 'org-a',
+      keepInstanceOnSwitch: true,
+    });
+    await waitFor(
+      () => view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId === ROOT_ID
+    );
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.preferences.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.profiles.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+
+    const counts = {
+      models: scopeReads.models.length,
+      preferences: scopeReads.preferences.length,
+      profiles: scopeReads.profiles.length,
+      modes: scopeReads.modes.length,
+    };
+    // The manager's read for the new session has not answered yet.
+    vi.spyOn(view.manager, 'switchSession').mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the manager's read for the new session stays pending,
+          // which is the window this test describes.
+        })
+    );
+    await view.switchRoot(NEXT_ROOT_ID);
+    expect(view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId).toBe(ROOT_ID);
+
+    const afterSwitch = {
+      models: scopeReads.models.slice(counts.models),
+      preferences: scopeReads.preferences.slice(counts.preferences),
+      profiles: scopeReads.profiles.slice(counts.profiles),
+      modes: scopeReads.modes.slice(counts.modes),
+    };
+    // No org-scoped read runs for a scope the screen has not settled.
+    for (const reads of Object.values(afterSwitch)) {
+      expect(reads.length).toBeGreaterThan(0);
+      expect(reads.every(read => read.organizationId === undefined)).toBe(true);
+      expect(reads.at(-1)?.enabled).toBe(false);
+    }
+    // Start, Restart, Continue and fork are unavailable in this window.
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    // The Continue control is the read-only session's one action; it stays
+    // unrendered while the scope is unresolved.
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(0);
+    expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
+    expect(restartAgentSession).not.toHaveBeenCalled();
+
+    // The new session's row lands: its organization scopes every read and action
+    // from here on.
+    const staleRow = view.store.get(view.manager.atoms.fetchedSessionData);
+    if (!staleRow) {
+      throw new Error('the stale session row was expected');
+    }
+    await act(async () => {
+      view.store.set<FetchedSessionData | null, [FetchedSessionData | null], unknown>(
+        view.manager.atoms.fetchedSessionData,
+        {
+          ...staleRow,
+          kiloSessionId: NEXT_ROOT_ID,
+          organizationId: 'org-b',
+        }
+      );
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+      await Promise.resolve();
+    });
+
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.preferences.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.profiles.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+
+    vi.mocked(createAndNavigateAgentSession).mockResolvedValue({
+      success: true,
+      sessionId: NEXT_ROOT_ID,
+    });
+    vi.mocked(restartAgentSession).mockResolvedValue({ success: true, sessionId: NEXT_ROOT_ID });
+    const [composer] = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    if (!composer) {
+      throw new Error('the composer was expected for the resolved session');
+    }
+    await act(async () => {
+      await (composer.props.onCreateSession as () => Promise<boolean>)();
+      await (composer.props.onRestartSession as () => Promise<boolean>)();
+      await Promise.resolve();
+    });
+    expect(createAndNavigateAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-b' })
+    );
+    expect(restartAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-b' })
+    );
+  });
+
+  it('holds the reads and the actions while the session row has not arrived', async () => {
+    // A cached transcript paints while the metadata read is still in flight, so
+    // the composer is on screen before the session's own row arrives.
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const cachedRow = cachedRows[0];
+    if (!cachedRow) {
+      throw new Error('the cached row fixture was expected');
+    }
+    scopeReads.catalogModels = [
+      {
+        id: 'deepseek/deepseek-v4.1-flash',
+        name: 'DeepSeek V4.1 Flash',
+        variants: [],
+        isPreferred: false,
+        showGatewayMetadata: true,
+      },
+    ];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+    });
+    expect(view.store.get(view.manager.atoms.fetchedSessionData)).toBeNull();
+
+    // Held: no organization-scoped read has run, and the held catalog is not
+    // presented even though the read reports cached models.
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: undefined, enabled: false });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: undefined, enabled: false });
+    const [composer] = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    if (!composer) {
+      throw new Error('the composer was expected for a cached transcript');
+    }
+    expect(composer.props.modelOptions).toEqual([]);
+    // The bottom slot holds one block: the live composer never shares it with
+    // the read-only reserve.
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
+    ).toHaveLength(0);
+
+    // Start and Restart do nothing while the scope is unresolved.
+    await act(async () => {
+      await (composer.props.onCreateSession as () => Promise<boolean>)();
+      await (composer.props.onRestartSession as () => Promise<boolean>)();
+      await Promise.resolve();
+    });
+    expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
+    expect(restartAgentSession).not.toHaveBeenCalled();
+
+    // The read-only footer's Continue is the same class of action: it needs the
+    // session's own row for the destination's organization. The window before
+    // that row arrives paints the live control, not the inert reserve, and a
+    // press in that window is held rather than dropped: the reserve swallowed
+    // the press the footer exists for.
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
+    ).toHaveLength(0);
+    const heldContinue = continueControlOf(view.renderer);
+    expect(heldContinue.props.loading).toBe(false);
+    await act(async () => {
+      (heldContinue.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    // The press is answered in place, so a second tap cannot open a second
+    // composer, and nothing is opened before the row lands.
+    expect(continueControlOf(view.renderer).props.loading).toBe(true);
+    await act(async () => {
+      (continueControlOf(view.renderer).props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(0);
+
+    // Fork from a message's details is the same held destination, so the sheet
+    // offers no fork entry in this window.
+    act(() => {
+      messageBubbleProps(view.renderer, cachedRow.info.id).onLongPressDetails(cachedRow);
+    });
+    const detailsSheet = detailsSheetNode(view.renderer);
+    expect(detailsSheet.props.visible).toBe(true);
+    expect(detailsSheet.props.onForkFromHere).toBeUndefined();
+
+    // The row lands: the held press opens the composer seeded from this
+    // session, and only once.
+    await act(async () => {
+      metadata.resolve(undefined);
+      await Promise.resolve();
+    });
+    await waitFor(
+      () => navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new')).length === 1
+    );
+    expect(navigationRoutes.at(-1)).toContain(`cloneFromKiloSessionId=${ROOT_ID}`);
+  });
+
+  it('offers the fork entry once the session row resolves', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const row = childMessage(ROOT_ID, 'resolved row');
+    const view = await mountDetails([row], { sessionOrganizationId: 'org-a' });
+    await waitFor(
+      () => view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId === ROOT_ID
+    );
+
+    act(() => {
+      messageBubbleProps(view.renderer, row.info.id).onLongPressDetails(row);
+    });
+    const detailsSheet = detailsSheetNode(view.renderer);
+    const fork = detailsSheet.props.onForkFromHere;
+    expect(typeof fork).toBe('function');
+
+    act(() => {
+      (fork as () => void)();
+    });
+    const destination = navigationRoutes.at(-1) ?? '';
+    expect(destination.startsWith('/(app)/agent-chat/new?organizationId=org-a')).toBe(true);
+    expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
+  });
+
+  it('retries a failed fork as the same fork, not as a plain continue', async () => {
+    // The footer reports one failure with one Retry, so Retry must repeat the
+    // press that failed. A fork retried as a plain Continue would open a
+    // composer that is not cut at the message the person chose.
+    //
+    // Real timers on purpose: the read-back that decides the press failed runs
+    // on the clock, and the held-press release waits for the session row through
+    // this suite's own settled waits.
+    goalMountOptions = { resolvedType: 'remote' };
+    const row = childMessage(ROOT_ID, 'forked row');
+    const view = await mountDetails([row], { sessionOrganizationId: 'org-a' });
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    // The footer that reports the failure belongs to a stored session.
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+
+    act(() => {
+      messageBubbleProps(view.renderer, row.info.id).onLongPressDetails(row);
+    });
+    const fork = detailsSheetNode(view.renderer).props.onForkFromHere;
+    expect(typeof fork).toBe('function');
+
+    routerDropsPush.value = true;
+    await act(async () => {
+      (fork as () => void)();
+      await new Promise(resolve => {
+        setTimeout(resolve, 1500);
+      });
+    });
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('common.somethingWentWrong')
+    );
+
+    routerDropsPush.value = false;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await new Promise(resolve => {
+        setTimeout(resolve, 1500);
+      });
+    });
+
+    const destination = navigationRoutes.at(-1) ?? '';
+    expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
+    expect(destination).toContain('organizationId=org-a');
+  });
+});
+
+function roleProfileRow(id: string, name: string, isDefault: boolean) {
+  return {
+    id,
+    name,
+    description: null,
+    isDefault,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 0,
+    commandCount: 0,
+    mcpServerCount: 0,
+    skillCount: 0,
+    agentCount: 1,
+    kiloCommandCount: 0,
+  };
+}
+
+function roleAgent(slug: string, name: string) {
+  return {
+    slug,
+    name,
+    config: { description: null, mode: 'primary' },
+  };
+}
+
+function composerCustomValues(renderer: ReactTestRenderer): string[] {
+  const composer = renderer.root.findByType('ChatComposer');
+  const { modeControl } = composer.props as {
+    modeControl?: { customOptions?: { value: string }[] };
+  };
+  return (modeControl?.customOptions ?? []).map(option => option.value);
+}
+
+describe('session detail role picker profile source', () => {
+  it("offers the session profile's own custom agents, not the context default's", async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    profileRowsState.personal = [
+      roleProfileRow('p-default', 'Default', true),
+      roleProfileRow('p-recorded', 'Recorded', false),
+    ];
+    profileRowsState.agentsById = {
+      'p-default': [roleAgent('default-role', 'Default role')],
+      'p-recorded': [roleAgent('session-role', 'Session role')],
+    };
+
+    const view = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => composerCustomValues(view.renderer).includes('session-role'));
+    const values = composerCustomValues(view.renderer);
+    expect(values).toContain('session-role');
+    expect(values).not.toContain('default-role');
+  });
+
+  it("falls back to the effective default profile's agents when the session recorded none", async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    profileRowsState.personal = [roleProfileRow('p-default', 'Default', true)];
+    profileRowsState.agentsById = {
+      'p-default': [roleAgent('default-role', 'Default role')],
+    };
+
+    const view = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => composerCustomValues(view.renderer).includes('default-role'));
+  });
+});
+
+describe('SessionDetailContent header title', () => {
+  // The title shares its row with a 44pt context pill and a copy action, so on
+  // a narrow phone the title column is a fraction of the row width. The header
+  // and this screen share the three-line cap (`SESSION_HEADER_TITLE_LINES`), so
+  // a long name wraps onto the extra line instead of being cut short mid-word
+  // the way the previous one-line clamp did ("Moving-average empty windo…");
+  // the tail ellipsis only applies past the cap. The placeholder header keeps
+  // the same cap, so the reserved title box does not move the body when the
+  // loaded name replaces "Session".
+  it('shows a long session title across the shared reserved lines without clipping mid-word', async () => {
+    sessionTitleOverride = 'Moving-average rage empty baseline';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    const title = header.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
+    expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  // The ingest service names a session `New session - <ISO>` at creation, so a
+  // freshly started session has no user-readable name. The header must show the
+  // same localized `Session` label a title-less session shows, and the title
+  // stays pressable so the user can still rename it.
+  it('shows the localized fallback when the loaded server title is the machine placeholder', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T16:37:00.000Z';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(header.props.onTitlePress).toBeTypeOf('function');
+  });
+
+  // The route seeds the header from the session-list cache before the metadata
+  // read settles (and the metadata read can fail with a Retry). A placeholder
+  // cached title must never be painted on either path.
+  it('never paints a placeholder cached list title, even after the metadata read fails', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+      cachedTitle: 'New session - 2026-09-22T16:37:00.000Z',
+    });
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The retryable failure keeps the same fallback name on screen.
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+  });
+
+  it('shows the fallback name instead of the generated placeholder title', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T02:05:22.778Z';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe(i18n.t('agentChat.session.title'));
+  });
+
+  it('renders a real server title unchanged', async () => {
+    sessionTitleOverride = 'Fix the session header';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe('Fix the session header');
+  });
+
+  // The rename dialog inherited RenameModal's 50-character default, below the
+  // 200-character cap the rename endpoint accepts. A longer title was dropped
+  // after character 50, and the header then rendered the leftover fragment
+  // ("Moving-average empty window rollup verification pa") as if it were the
+  // whole title.
+  it('lets the rename dialog hold a title as long as the server accepts', async () => {
+    renameModalState.isOpen = true;
+    renameModalState.initialValue = 'Moving-average rage empty baseline';
+    const { renderer } = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const modal = renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      maxLength: SESSION_TITLE_MAX_LENGTH,
+      initialValue: renameModalState.initialValue,
+    });
+    expect(SESSION_TITLE_MAX_LENGTH).toBe(200);
+  });
+
+  it('shows the localized unnamed name instead of the backend placeholder cached title', async () => {
+    // The route passes its cached metadata title as `cachedTitle`, and that
+    // cache can hold the backend's ISO placeholder. It must not become the
+    // header's identity line while the session metadata is still loading.
+    const metadata = Promise.withResolvers<undefined>();
+    const { renderer } = await mountDetails([], {
+      cachedTitle: 'New session - 2026-09-22T02:05:22.778Z',
+      metadataReady: metadata.promise,
+    });
+    expect(renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+  });
+
+  // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
+  // flexShrink is 0: unless the cluster and the pill opt in, their children
+  // keep their natural width and paint past the row's right edge, off-screen.
+  // The route seeds the header with the cached list title it opened from. A
+  // session created through cloud-agent-next carries the creation placeholder
+  // `New session - <ISO instant>` there, and the header must fall back to its
+  // own title rather than paint the machine string while the record loads.
+  it('shows the fallback title instead of a placeholder cached title', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], {
+      metadataReady: metadata.promise,
+      cachedTitle: 'New session - 2026-09-22T17:26:31.465Z',
+    });
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(String(header.props.title)).not.toContain('2026-09-22');
+  });
+
+  it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
+    const { renderer } = await mountDetails();
+    const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {
+      props: { className: string };
+    };
+    expect(headerRight.props.className).toContain('min-w-0');
+    expect(headerRight.props.className).toContain('shrink');
+    const metricsClassName = (
+      renderer.root.findByProps({ testID: 'session-context-metrics' }).props as {
+        className?: string;
+      }
+    ).className;
+    expect(metricsClassName).toContain('shrink');
+    expect(metricsClassName).toContain('min-w-0');
+  });
+});
+
+describe('session detail header right cluster', () => {
+  it('caps the right cluster inside the header slot and renders no copy control', async () => {
+    const { renderer } = await mountDetails([]);
+    const header = renderer.root.findByType(ScreenHeader);
+    // The copy-link action left the header in #6343 (7fad4e808) and now lives
+    // in the context sheet, so the sliced chain-link control the explorer
+    // captured cannot paint here any more.
+    expect(header.findAll(node => Object.is(node.type, 'Link2'))).toHaveLength(0);
+
+    // The header caps its right slot at half the row...
+    const slot = header.findAll(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('max-w-[50%]')
+    );
+    expect(slot).toHaveLength(1);
+    expect(slot[0]?.props.className).toContain('min-w-0');
+    expect(slot[0]?.props.className).toContain('shrink');
+
+    // ...and the cluster inside it shrinks into that cap, so it can never paint
+    // past the slot edge. It holds the context pill and the Follow control and
+    // nothing else: the PR badge now shares the goal row instead. The pill
+    // leads and the Follow control ends the row, so a reading that arrives
+    // widens the pill into the header's free space instead of moving the
+    // control beside it.
+    const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
+    expect(cluster?.props.className).toContain('min-w-0');
+    expect(cluster?.props.className).toContain('shrink');
+    expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
+    expect(cluster?.children).toHaveLength(2);
+    const [leading] = cluster?.children ?? [];
+    expect(typeof leading).toBe('object');
+    expect((leading as ReactTestInstance | undefined)?.type).toBe(SessionContextMetrics);
+
+    // The pill is the flexible part of the cluster: it shrinks into the cap
+    // with it, so the cluster can never paint past the slot edge.
+    const metrics = header.findByProps({ testID: 'session-context-metrics' });
+    expect(metrics.props.className).toContain('min-w-0');
+    expect(metrics.props.className).toContain('shrink');
+  });
+
+  // The cost is the only unbounded string in the cluster: a long total must
+  // truncate inside the capped pill instead of crossing the gutter.
+  it('truncates a long cost inside the capped pill', async () => {
+    const priced = assistantMessage('msg-priced');
+    if (priced.info.role !== 'assistant') {
+      throw new Error('expected an assistant message');
+    }
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 123_456.78 };
+    const { renderer } = await mountDetails([priced]);
+    const expected = formatSessionCostBadge(123_456.78 * 1_000_000);
+    if (expected === null) {
+      throw new Error('expected a formatted cost badge');
+    }
+    const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
+    // The cost is its own value text, so it truncates on its own one line inside
+    // the capped pill instead of pushing the percentage beside it.
+    const [cost] = metrics.findAll(
+      node =>
+        Object.is(node.type, 'Text') &&
+        node.children.some(child => typeof child === 'string' && child.includes(expected))
+    );
+    if (cost === undefined) {
+      throw new Error('expected the cost text');
+    }
+    expect(cost.props.numberOfLines).toBe(1);
+    expect(cost.props.className).toContain('shrink');
+    expect(cost.props.className).toContain('min-w-0');
+  });
+});
+
+describe('session detail status placement', () => {
+  it.each(['progress', 'info'] as const)(
+    'centers a %s status without transcript rows',
+    async type => {
+      const view = await mountDetails([]);
+      act(() => {
+        view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+          view.manager.atoms.statusIndicator,
+          {
+            type,
+            message: 'Session status',
+            timestamp: 0,
+          }
+        );
+      });
+      const centered = view.renderer.root.findAll(node => Object.is(node.type, 'CenteredState'));
+      expect(centered).toHaveLength(1);
+      expect(
+        centered[0]?.findAll(node => Object.is(node.type, 'SessionStatusIndicator'))
+      ).toHaveLength(1);
+      expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+    }
+  );
+});
+
+describe('session detail failed delivery retry', () => {
+  it('stops showing the failed delivery once the retry is accepted', async () => {
+    // A failed row offers Retry only when the session can send; the re-send is
+    // mocked below, so the mount only has to be a writable kind.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: 'Continue',
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.messageFailure.assistantTitle')
+    );
+
+    const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    // The clear carries the session that owns the retried row, so the
+    // resolution is never recorded under a session the user switched to while
+    // the re-send was in flight.
+    expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('msg-failed', ROOT_ID);
+  });
+
+  it('shows the retried prompt once: the superseded failed row stops rendering', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    // A Kilo model is required to normalise a cloud-agent transport payload.
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    // The failed row is the prompt's only surface before the retry.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Wait for the re-send to materialise its own row; only then is the
+    // duplicate the retry used to leave observable.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+
+    // The retry's row carries the prompt; the superseded failed row must not
+    // render a second copy of it.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+
+  it('hides the failed row in the same tap, while the re-send is still in flight', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    // A Kilo model is required to normalise a cloud-agent transport payload.
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    // Hold the transport round-trip open. The retry's own row lands before
+    // `api.send` settles, so the window the explorer captured is observable.
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The retry's optimistic row is present while the send is unresolved, yet
+    // the prompt has a single surface: the original failed row was superseded
+    // with the same tap instead of waiting for the round-trip.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+
+  it('restores the failed row and its Retry when the re-send is rejected', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // In flight the original row is superseded, so the prompt is stated once.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.reject(new Error('network down'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Nothing was delivered: the retry's optimistic row is gone and the original
+    // failed row is back, so the transcript is again its single surface.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 1);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    const restoredRetry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(typeof restoredRetry.props.onPress).toBe('function');
+  });
+
+  it('keeps the superseded row hidden across a session switch while the re-send is pending', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    // Hold the transport round-trip open: the retry is still in flight when the
+    // user leaves the session and comes straight back.
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The retry's optimistic row landed, and the row it superseded with the same
+    // tap is already hidden.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // What the second open of this session serves: the failed row the retry
+    // superseded beside the retry's own row.
+    const rows = [...view.store.get(view.manager.atoms.messagesList)];
+
+    await view.switchRoot(NEXT_ROOT_ID);
+    await view.switchRoot(ROOT_ID);
+    await view.respond(ROOT_ID, rows);
+
+    // The hide belongs to the session that owns the row, so coming back before
+    // the send settles still shows only the retry's copy of the prompt.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The accepted re-send records the resolution for the same session, so the
+    // superseded row stays hidden after the round-trip lands.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+});
+
+describe('session detail assistant response retry', () => {
+  type AssistantInfo = Extract<StoredMessage['info'], { role: 'assistant' }>;
+
+  function failedResponse(
+    id: string,
+    parentID: string,
+    error: NonNullable<AssistantInfo['error']>
+  ): StoredMessage {
+    const info: AssistantInfo = {
+      ...(assistantMessage(id).info as AssistantInfo),
+      id,
+      sessionID: ROOT_ID,
+      parentID,
+      error,
+    };
+    return {
+      info,
+      parts: [
+        stubTextPart({
+          id: `text-${id}`,
+          sessionID: ROOT_ID,
+          messageID: id,
+          text: 'Partial answer',
+        }),
+      ],
+    };
+  }
+
+  function promptRow(id: string, text: string): StoredMessage {
+    const base = userMessage(id);
+    return {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [stubTextPart({ id: `text-${id}`, sessionID: ROOT_ID, messageID: id, text })],
+    };
+  }
+
+  it('shows the prompt once and replaces the failed response once the retry is accepted', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const messages = [
+      promptRow('msg-prompt', prompt),
+      failedResponse('msg-response', 'msg-prompt', {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
+      }),
+    ];
+    const view = await mountDetails(messages);
+    // The failed response states its classified reason, not only the title.
+    expect(renderedText(view.renderer.root)).toContain('The provider returned an error.');
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    // Call through: the real send materialises the retry's own row, which is the
+    // duplicate the supersede must keep off screen.
+    const send = vi.spyOn(view.manager, 'send');
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 3);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({ payload: { prompt } });
+    // Both the failed response and the user row whose prompt it re-sent are
+    // resolved, so neither renders next to the retry's own row.
+    expect(clearFailedMessage.mock.calls).toEqual([
+      ['msg-response', ROOT_ID],
+      ['msg-prompt', ROOT_ID],
+    ]);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // The replaced response is gone, not merely outnumbered by the retry's row.
+    expect(renderedText(view.renderer.root)).not.toContain('Partial answer');
+    expect(renderedText(view.renderer.root)).not.toContain('Response failed');
+  });
+
+  it('restores the failed response and its Retry when the re-send is rejected', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const messages = [
+      promptRow('msg-prompt', prompt),
+      failedResponse('msg-response', 'msg-prompt', {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
+      }),
+    ];
+    const view = await mountDetails(messages);
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // In flight the replaced rows are hidden, so the prompt is stated once.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 3);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.reject(new Error('network down'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Nothing was delivered: the retry's own row is gone, and the failed
+    // response is back with its Retry control.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    expect(clearFailedMessage).not.toHaveBeenCalled();
+    expect(renderedText(view.renderer.root)).toContain('Response failed');
+    const restoredRetry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(typeof restoredRetry.props.onPress).toBe('function');
+  });
+});
+
+describe('session detail stored-session retry availability', () => {
+  type AssistantInfo = Extract<StoredMessage['info'], { role: 'assistant' }>;
+  const PROMPT = 'Audit the release pipeline';
+
+  function promptRow(): StoredMessage {
+    const base = userMessage('msg-stored-prompt');
+    return {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-stored-prompt',
+          sessionID: ROOT_ID,
+          messageID: 'msg-stored-prompt',
+          text: PROMPT,
+        }),
+      ],
+    };
+  }
+
+  function failedResponse(): StoredMessage {
+    const info: AssistantInfo = {
+      ...(assistantMessage('msg-stored-failed').info as AssistantInfo),
+      id: 'msg-stored-failed',
+      sessionID: ROOT_ID,
+      parentID: 'msg-stored-prompt',
+      error: { name: 'APIError', data: { message: 'raw provider text', isRetryable: true } },
+    };
+    return {
+      info,
+      parts: [
+        stubTextPart({
+          id: 'text-msg-stored-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-stored-failed',
+          text: 'Partial answer',
+        }),
+      ],
+    };
+  }
+
+  function retryButtons(view: { renderer: ReactTestRenderer }) {
+    return view.renderer.root.findAll(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+  }
+
+  it('states the failure and offers only Continue in a new session on a read-only transcript', async () => {
+    const view = await mountDetails([promptRow(), failedResponse()]);
+
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(true);
+    expect(view.store.get(view.manager.atoms.canSend)).toBe(false);
+    // The failed row keeps its copy: the reader still learns what happened.
+    expect(renderedText(view.renderer.root)).toContain('Response failed');
+    expect(renderedText(view.renderer.root)).toContain('The provider returned an error.');
+    expect(retryButtons(view)).toHaveLength(0);
+    // Continue in a new session is the recovery path the read-only footer owns.
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+    const continueButton = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(typeof continueButton.props.onPress).toBe('function');
+  });
+
+  // The surface states one filled primary at most: while the read-only footer
+  // is on screen its Continue in a new session is that primary, so the card's
+  // Back beside it keeps the outline instead of competing for the fill.
+  it('keeps the fill on the read-only footer while the error card offers Back', async () => {
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+    });
+    // The transcript read fails before any row arrives, so the terminal card
+    // and the read-only footer paint on the same screen.
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'Session history temporarily unavailable'
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+
+    const filled = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .filter(node => node.props.variant === undefined || node.props.variant === 'default');
+    expect(filled).toHaveLength(1);
+    expect(filled[0]?.props.accessibilityLabel).toBe(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
+
+    const back = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+    );
+    expect(back.props.variant).toBe('outline');
+    // An outline control paints no fill of its own, so the dark primary fill
+    // never reaches this branch: only the surface's one filled primary carries
+    // it.
+    expect(String(back.props.className)).not.toContain('dark:bg-selection');
+  });
+
+  // A writable session has no read-only footer owning the surface's primary, so
+  // the card's Back is the filled one and it takes the same muted dark tone the
+  // read-only footer's Continue does.
+  it('fills the error card back control with the muted tone in dark mode', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+    });
+    // The transcript read fails before any row arrives, so the terminal card
+    // paints as the whole body.
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'Session history temporarily unavailable'
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
+
+    const back = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+    );
+    expect(String(back.props.className)).toContain('bg-primary');
+    expect(String(back.props.className)).toContain('dark:bg-selection');
+    const label = back.find(node => Object.is(node.type, 'Text'));
+    expect(String(label.props.className)).toContain('text-primary-foreground');
+    expect(String(label.props.className)).toContain('dark:text-selection-foreground');
+  });
+
+  it('drops Retry while a writable session has no transport that can deliver', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([promptRow(), failedResponse()]);
+
+    // A remote session is writable, but no CLI owner is connected, so a re-send
+    // has nowhere to go and would only produce the connection failure.
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
+    expect(view.store.get(view.manager.atoms.canSend)).toBe(false);
+    expect(renderedText(view.renderer.root)).toContain('Response failed');
+    expect(retryButtons(view)).toHaveLength(0);
+  });
+
+  it('refuses a retry that would be tapped after the session stopped accepting sends', async () => {
+    goalMountOptions = { resolvedType: 'cloud-agent' };
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const view = await mountDetails([promptRow(), failedResponse()]);
+
+    const retry = retryButtons(view)[0];
+    if (!retry) {
+      throw new Error('Missing Retry for a session that can send');
+    }
+    const onRetryPress = retry.props.onPress as () => void;
+    const send = vi.spyOn(view.manager, 'send');
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    // The capability drops while the row is still on screen (a lost transport).
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+    });
+    await act(async () => {
+      onRetryPress();
+      await Promise.resolve();
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(clearFailedMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('session detail stored transcript with no reply recorded', () => {
+  const PROMPT = 'Deploy the fix to staging';
+  const PROMPT_ID = 'msg-stored-unanswered';
+  const NOTE = i18n.t('agentChat.messageBubble.noReplyRecorded');
+
+  function storedPrompt(): StoredMessage {
+    const base = userMessage(PROMPT_ID);
+    return {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: `text-${PROMPT_ID}`,
+          sessionID: ROOT_ID,
+          messageID: PROMPT_ID,
+          text: PROMPT,
+        }),
+      ],
+    };
+  }
+
+  function storedAnswer(parentID: string): StoredMessage {
+    const base = assistantMessage('msg-stored-answer');
+    // The fixture builder returns the stored union, so the assistant shape has
+    // to be named before the row can link itself to the prompt it answers.
+    const info: Extract<StoredMessage['info'], { role: 'assistant' }> = {
+      ...(base.info as Extract<StoredMessage['info'], { role: 'assistant' }>),
+      sessionID: ROOT_ID,
+      parentID,
+    };
+    return {
+      info,
+      parts: [
+        stubTextPart({
+          id: 'text-msg-stored-answer',
+          sessionID: ROOT_ID,
+          messageID: base.info.id,
+          text: 'Deployed.',
+        }),
+      ],
+    };
+  }
+
+  it('states under the prompt that the stored record holds no reply for it', async () => {
+    const view = await mountDetails([storedPrompt()]);
+
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(true);
+    // The record carries no delivery state, so the row must not claim the send
+    // failed; it states only that nothing follows the prompt.
+    expect(renderedText(view.renderer.root)).toContain(NOTE);
+    expect(renderedText(view.renderer.root)).not.toContain('Message not sent');
+    expect(renderedText(view.renderer.root)).not.toContain('Response failed');
+    // Continue in a new session stays the read-only transcript's one action.
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      )
+    ).toHaveLength(0);
+  });
+
+  it('draws no note once an answer follows the prompt', async () => {
+    const view = await mountDetails([storedPrompt(), storedAnswer(PROMPT_ID)]);
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+
+  it('draws no note when the recorded answer renders nothing', async () => {
+    // Reasoning is not transcript copy, so with the thinking setting on the
+    // answer row leaves no visible part and the merged transcript drops it. The
+    // stored record still holds a response to the prompt, so the note must stay
+    // away; a decision taken from the rendered rows would show it here.
+    hideThinking.current = true;
+    const answerId = 'msg-stored-reasoning';
+    const base = assistantMessage(answerId);
+    const reasoning: StoredMessage = {
+      info: {
+        ...(base.info as Extract<StoredMessage['info'], { role: 'assistant' }>),
+        sessionID: ROOT_ID,
+        parentID: PROMPT_ID,
+      },
+      parts: [
+        {
+          id: `reasoning-${answerId}`,
+          sessionID: ROOT_ID,
+          messageID: answerId,
+          type: 'reasoning',
+          text: 'Checking the deploy target.',
+          time: { start: 1_761_000_000_000, end: 1_761_000_000_500 },
+        },
+      ],
+    };
+    const view = await mountDetails([storedPrompt(), reasoning]);
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+
+  it('draws no note for a live session whose prompt is still in flight', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([storedPrompt()]);
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+});
+
+describe('session detail slow load', () => {
+  it('swaps the endless skeleton for taking-longer copy and a working Retry', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.takingLonger'));
+
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+
+      expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.takingLonger'));
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      const switchSession = vi.spyOn(view.manager, 'switchSession');
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+      expect(switchSession).toHaveBeenCalledWith(ROOT_ID);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The explorer finding this suite guards: the skeleton and a "Connection
+  // lost" line painted in the same frame, with the last bubble sliced by the
+  // row. A lost transport now owns the body, so the skeleton is gone and the
+  // failure is stated once, with the Retry that resolves it.
+  it('replaces the skeleton with one retryable error when the agent transport is lost', async () => {
+    // A writable session: the composer this case inspects is a writable
+    // session's control.
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails(null);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+          timestamp: 0,
+        }
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(error.onRetry).toBeDefined();
+    // The failure is stated once: no footer status line and no send reason
+    // naming the same thing beside the card.
+    expect(indicatorNodes(view)).toHaveLength(0);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+    // The session's own transport dropped, so its Retry reopens the session;
+    // the shared leg is not the cause here.
+    const switchSession = vi.spyOn(view.manager, 'switchSession').mockResolvedValue(undefined);
+    act(() => {
+      (error.onRetry as () => void)();
+    });
+    expect(switchSession).toHaveBeenCalledWith(ROOT_ID);
+    expect(connectionHealth.retryConnection).not.toHaveBeenCalled();
+  });
+
+  it('resolves a lost transport whose indicator carries no error type', async () => {
+    // The SDK's own code names the failure; the indicator's type must not decide
+    // whether the skeleton keeps painting beside the connection-lost line.
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'progress',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+          timestamp: 0,
+        }
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(indicatorNodes(view)).toHaveLength(0);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.title).toBe(i18n.t('agentChat.session.couldNotLoadThisSession'));
+  });
+
+  it('holds the read-only footer area, not a composer, while a read-only open has nothing to show', async () => {
+    // The kind is not known yet, so the area is still the reserve. The reserve
+    // exists to keep the slot out of a composer the session may never get.
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The kind resolves to read-only while the transport is still stalled: the
+    // footer goes live instead of keeping the reserve — it is the one control
+    // on this screen, and an inert one is what the explorer measured.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(1);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The transcript lands, and the footer is the same control in the same
+    // slot: the transcript never moves under it.
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'read-only row')]);
+    expect(renderedText(view.renderer.root)).toContain('read-only row');
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+  });
+
+  it('holds the composer while the metadata names a cloud-agent session', async () => {
+    // The metadata read lands before the transport resolves, and it names the
+    // one kind that is writable by construction. The slot then holds the
+    // composer the screen ends in instead of the read-only footer it would
+    // replace.
+    fetchedCloudAgentSessionId = cloudAgentId('cag-fixture');
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+  });
+
+  it('holds the read-only footer area while the open has not resolved the kind', async () => {
+    const view = await mountDetails(null);
+    // The transport has not answered, so no kind is known and the read-only
+    // fact is not set: the bottom slot must not offer a composer the session
+    // may never get.
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The stored session resolves read-only, so the footer lands on the area
+    // the loading state held instead of replacing a composer.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'resolved read-only row')]);
+    expect(renderedText(view.renderer.root)).toContain('resolved read-only row');
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+  });
+
+  it('holds the composer area, not the read-only footer, while a writable open has nothing to show', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails(null);
+    // The session resolved to a kind that reads and writes, so its bottom slot
+    // is the composer's: the reserve is the composer's own placeholder, and no
+    // read-only footer area is painted for it.
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The composer takes the held area, so the transcript never moves under it.
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'writable row')]);
+    expect(renderedText(view.renderer.root)).toContain('writable row');
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      1
+    );
+  });
+
+  it('holds a writable session composer back until the mounted rows are painted', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    openSettledReport.value = false;
+    const view = await mountDetails([childMessage(ROOT_ID, 'writable row')]);
+    // The rows are mounted but the open gate still hides them behind its
+    // skeleton, so the bottom slot keeps the composer's reserve: an input over a
+    // loading body is the same two states at once the read-only side avoids.
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    const list = view.renderer.root.findByType(SessionMessageList);
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
+        ROOT_ID,
+        true
+      );
+    });
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      1
+    );
+  });
+
+  it('resolves an exhausted app-wide leg into the same retryable error', async () => {
+    connectionHealth.isConnected = false;
+    connectionHealth.reconnectExhausted = true;
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'remote');
+    });
+
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(error.onRetry).toBeDefined();
+    // A spent reconnect budget is only cleared by resetting the shared
+    // transport leg; reopening over the same dead socket would return here.
+    const switchSession = vi.spyOn(view.manager, 'switchSession');
+    act(() => {
+      (error.onRetry as () => void)();
+    });
+    expect(connectionHealth.retryConnection).toHaveBeenCalledTimes(1);
+    expect(switchSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps a terminal error ahead of the slow state', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.takingLonger'));
+
+      act(() => {
+        view.store.set<string | null, [string | null], unknown>(
+          view.manager.atoms.error,
+          'fetch failed'
+        );
+      });
+
+      const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+        typeof QueryError
+      >;
+      expect(error.title).toBe(i18n.t('agentChat.session.couldNotLoadThisSession'));
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.takingLonger'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('acknowledges a slow-state Retry tap with a disabled spinner until content lands', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      const findRetry = () =>
+        view.renderer.root.find(
+          node =>
+            Object.is(node.type, 'Button') &&
+            node.props.accessibilityLabel === i18n.t('common.retry')
+        );
+      const before = findRetry();
+      expect(before.props.loading).toBe(false);
+
+      act(() => {
+        (before.props.onPress as () => void)();
+      });
+      // The tap is acknowledged immediately: the control shows its retrying
+      // (loading + disabled) state before any content or error arrives.
+      expect(findRetry().props.loading).toBe(true);
+
+      // Let the retry's open settle through metadata + resolve so the fresh
+      // transport's page request is the newest one, then answer it.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'recovered row')]);
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+        await Promise.resolve();
+      });
+      // Content ends the acknowledgment: the slow card is gone and the
+      // transcript paints.
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.takingLonger'));
+      expect(renderedText(view.renderer.root)).toContain('recovered row');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hands the Retry action back when the retried open also stalls', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      const findRetry = () =>
+        view.renderer.root.find(
+          node =>
+            Object.is(node.type, 'Button') &&
+            node.props.accessibilityLabel === i18n.t('common.retry')
+        );
+      act(() => {
+        (findRetry().props.onPress as () => void)();
+      });
+      expect(findRetry().props.loading).toBe(true);
+
+      // The retried open stalls again: no content and no error arrive. The
+      // acknowledgment is bounded, so after one more threshold the button is
+      // usable again instead of spinning in its disabled state forever.
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      expect(findRetry().props.loading).toBe(false);
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.takingLonger'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('session detail terminal load failure retry', () => {
+  // What the transport writes into `errorAtom` when a session's own page read
+  // fails: the reopen answers the same way until the read recovers.
+  const TRANSPORT_FAILURE = 'Session history temporarily unavailable';
+
+  function errorCard(view: { renderer: ReactTestRenderer }) {
+    return view.renderer.root.findByType(QueryError).props as ComponentProps<typeof QueryError>;
+  }
+
+  function showTransportFailure(view: {
+    store: ReturnType<typeof createStore>;
+    manager: SessionManager;
+  }) {
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        TRANSPORT_FAILURE
+      );
+    });
+  }
+
+  it('keeps the failed card and its busy Retry until the reopen that fails again settles', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const view = await mountDetails(null);
+      showTransportFailure(view);
+      const card = errorCard(view);
+      expect(card.message).toBe(i18n.t('agentChat.session.failedToLoadDetails'));
+      expect(card.isRetrying).toBe(false);
+
+      act(() => {
+        (errorCard(view).onRetry as () => void)();
+      });
+
+      // The tap is acknowledged on the card itself: it stays on screen, stating
+      // the failure it already stated, with the action busy. The skeleton never
+      // replaces it, which is what made a fast re-failure read as a lost tap.
+      expect(errorCard(view).isRetrying).toBe(true);
+      expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+      expect(renderedText(view.renderer.root)).toContain(
+        i18n.t('agentChat.session.backToSessions')
+      );
+
+      // The reopen reaches its fresh transcript request while the card still
+      // holds the action.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID]);
+      expect(errorCard(view).isRetrying).toBe(true);
+
+      // The reopen fails the same way. The action is handed back only once that
+      // outcome is on screen and the anti-flicker beat has passed, so the busy
+      // state outlasts the whole round trip.
+      await view.respondOutcome(ROOT_ID, { kind: 'retryable_failure' });
+      expect(errorCard(view).isRetrying).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_MIN_BEAT_MS);
+        await Promise.resolve();
+      });
+      expect(errorCard(view).isRetrying).toBe(false);
+      expect(errorCard(view).message).toBe(i18n.t('agentChat.session.failedToLoadDetails'));
+      expect(errorCard(view).onRetry).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('replaces the failed card with the transcript once a retry succeeds', async () => {
+    const view = await mountDetails(null);
+    showTransportFailure(view);
+
+    act(() => {
+      (errorCard(view).onRetry as () => void)();
+    });
+    expect(errorCard(view).isRetrying).toBe(true);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'recovered row')]);
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('recovered row');
+  });
+
+  it('offers no Retry for a permanent failure the transport forwarded', async () => {
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'You are not authorized to use the Cloud Agent.'
+      );
+    });
+
+    const card = errorCard(view);
+    expect(card.variant).toBe('permission');
+    expect(card.title).toBe(i18n.t('common.accessDenied'));
+    expect(card.onRetry).toBeUndefined();
+    expect(card.isRetrying).toBe(false);
+  });
+
+  it('holds the busy state through the anti-flicker beat after a fast re-failure', async () => {
+    // A refused reopen settles in tens of milliseconds. Releasing the
+    // acknowledgment at that speed makes the busy state a flash the reader
+    // misses, so the card holds it through the same beat the list's pull
+    // feedback uses before the failure is stated again.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const view = await mountDetails(null);
+      showTransportFailure(view);
+      act(() => {
+        (errorCard(view).onRetry as () => void)();
+      });
+      expect(errorCard(view).isRetrying).toBe(true);
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await view.respondOutcome(ROOT_ID, { kind: 'retryable_failure' });
+      // The reopened failure is on screen, yet the action is still busy: the
+      // beat has not elapsed.
+      expect(errorCard(view).isRetrying).toBe(true);
+
+      await act(async () => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_MIN_BEAT_MS);
+        await Promise.resolve();
+      });
+      expect(errorCard(view).isRetrying).toBe(false);
+      expect(errorCard(view).onRetry).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('releases the acknowledgment when a retry opens an empty session successfully', async () => {
+    // An existing session with zero messages is a supported state, not a
+    // failure. The reopen finishes with no error and no content, so the stale
+    // failure card must not keep a spinner for the whole slow-load window.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const view = await mountDetails(null);
+      showTransportFailure(view);
+      act(() => {
+        (errorCard(view).onRetry as () => void)();
+      });
+      expect(errorCard(view).isRetrying).toBe(true);
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      // The page answers with an empty transcript, and the open clears its
+      // loading flag, which is the completed open the release keys on.
+      await view.respond(ROOT_ID, []);
+      act(() => {
+        view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isLoading, false);
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_MIN_BEAT_MS);
+        await Promise.resolve();
+      });
+      expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('session detail cached metadata refresh', () => {
+  it('paints cached rows and offers a refresh Retry when the metadata read fails', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+
+    // The persisted transcript paints before the metadata read settles: no
+    // skeleton, and the rows are on screen.
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A retryable metadata failure keeps the rows mounted and repoints the
+    // connection status at a metadata refresh Retry instead of blanking them.
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    // The connection status has no row under the header any more: with the
+    // context sheet closed, no connection copy renders on the page.
+    const pageText = renderedTextOutsideSheet(view.renderer.root);
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.connecting'));
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.reconnecting'));
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.connectionLost'));
+  });
+
+  it('shows Connection lost in the sheet and retries the socket when reconnects are exhausted', async () => {
+    connectionHealth.isConnected = false;
+    connectionHealth.reconnectExhausted = true;
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('lost');
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.sessionConnection.connectionLost')
+    );
+
+    const retry = view.renderer.root.findByProps({
+      testID: 'session-context-sheet-connection-retry',
+    });
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(connectionHealth.retryConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes the Connection lost Retry to the metadata refresh when the transcript is cached', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+    const switchSession = vi.spyOn(view.manager, 'switchSession').mockResolvedValue(undefined);
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('lost');
+    const retry = view.renderer.root.findByProps({
+      testID: 'session-context-sheet-connection-retry',
+    });
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(switchSession).toHaveBeenCalledTimes(1);
+    expect(connectionHealth.retryConnection).not.toHaveBeenCalled();
+  });
+});
+
+describe('session detail connection latch', () => {
+  it('reads Connecting, not Reconnecting, when the app-wide leg is up but the session transport never came up', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    connectionHealth.isConnected = false;
+    const view = await mountDetails([]);
+    // The app-wide user-web leg comes up while the remote agent reports
+    // disconnected: the session's own transport has still never been up, so the
+    // latch must not inherit the unrelated user-web leg and claim a reconnect.
+    act(() => {
+      connectionHealth.isConnected = true;
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.agentStatus, { type: 'disconnected' });
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
+  });
+
+  it('reads Connecting, not Reconnecting, while a cached first load still refreshes its metadata', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+
+    // The cached transcript paints while the session type and metadata are
+    // still resolving, and the app-wide user-web leg is already up. The leg is
+    // not this session's transport yet, so it must not latch the session as
+    // ever connected: the first load reads "Connecting…", not "Reconnecting…".
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
+  });
+
+  it('still reads Reconnecting after a live session transport drops', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    // The session's own transport comes up: the latch commits.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    // Then it drops. The committed latch is what separates this from a first
+    // load, so the sheet reads "Reconnecting…".
+    act(() => {
+      connectionHealth.isConnected = false;
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('reconnecting');
+  });
+});
+
+describe('session detail bottom strip', () => {
+  it('keeps the home-indicator strip full-bleed (pure background, no side padding)', async () => {
+    // The strip backs the composer's area, so this is a writable session.
+    goalMountOptions = { resolvedType: 'remote' };
+    const { renderer } = await mountDetails([]);
+    const strips = renderer.root.findAll(node => Object.is(node.type, 'BlurBar'));
+    expect(strips).toHaveLength(1);
+    // The spacer pads only the bottom inset: it hosts no controls, so it
+    // stays full-bleed in landscape while the composer content carries the
+    // sensor side insets.
+    const spacer = strips[0]?.findAll(node => Object.is(node.type, 'View'))[0];
+    expect(spacer).toBeDefined();
+    const spacerStyle = spacer?.props.style as { height: number } | undefined;
+    expect(spacerStyle).toEqual({ height: 16 });
+    expect(Object.keys(spacerStyle ?? {})).toEqual(['height']);
+  });
+});
+
+describe('session detail per-session auto-approve', () => {
+  // The in-memory toggle store is module-global; clear this session so a
+  // preceding test cannot leave auto-approve on for the next one.
+  beforeEach(() => {
+    setSessionAutoApproveEnabled(ROOT_ID, false);
+  });
+
+  function makeSessionAnswerable(view: Awaited<ReturnType<typeof mountDetails>>) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+      view.store.set<StandalonePermission | null, [StandalonePermission | null], unknown>(
+        view.manager.atoms.activePermission,
+        {
+          requestId: 'perm-1',
+          permission: 'bash',
+          patterns: [],
+          metadata: {},
+          always: [],
+        }
+      );
+    });
+  }
+
+  function composerNode(renderer: ReactTestRenderer): ReactTestInstance {
+    const found = renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    expect(found).toHaveLength(1);
+    const composer = found[0];
+    if (!composer) {
+      throw new Error('composer was not rendered');
+    }
+    return composer;
+  }
+
+  // The composer's own wrapper is the only node that carries the
+  // `hidden` + `accessibilityElementsHidden` gating in the detail body.
+  function composerWrapper(renderer: ReactTestRenderer): ReactTestInstance {
+    const wrapper = composerNode(renderer).parent?.parent;
+    if (!wrapper) {
+      throw new Error('composer wrapper was not rendered');
+    }
+    return wrapper;
+  }
+
+  it('names the session model and provider on the sheet before usage arrives', async () => {
+    const modelRow: SessionModelOption = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek V4.1 Flash 1017',
+      displayId: 'deepseek/deepseek-v4.1-flash-1017',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: true,
+    };
+    sessionModelOptions.rows = [modelRow];
+    // A writable empty session: no live transport reported context usage yet,
+    // and the sheet lists the model the live session runs on. A stored session
+    // with an empty transcript hides this pill instead (its sheet has no
+    // permission settings to offer); the naming sheet stays for a session that
+    // can still send.
+    sessionConfigSync.currentModel = modelRow.id;
+    onTestFinished(() => {
+      sessionModelOptions.rows = [];
+      sessionConfigSync.currentModel = '';
+    });
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      await Promise.resolve();
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { onPress: () => void };
+    await act(async () => {
+      metricsProps.onPress();
+      await Promise.resolve();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.info).toBeUndefined();
+    expect(contextSheet.props.modelDisplay).toBe('DeepSeek V4.1 Flash 1017');
+    expect(contextSheet.props.providerDisplay).toBe('Kilo');
+  });
+
+  it('opens the header sheet before usage arrives and resolves the pending permission through its toggle', async () => {
+    const view = await mountDetails([]);
+    makeSessionAnswerable(view);
+    const respondToPermission = vi
+      .spyOn(view.manager, 'respondToPermission')
+      .mockResolvedValue(undefined);
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole: string; onPress: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    expect(contextSheet.props.info).toBeUndefined();
+    const toggle = view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' });
+    const { onValueChange } = toggle.props as { onValueChange: (enabled: boolean) => void };
+    act(() => {
+      onValueChange(true);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(respondToPermission).toHaveBeenCalledWith('perm-1', 'once');
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    // One cross-platform selection haptic fires per toggle commit.
+    expect(hapticsSelection).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      onValueChange(false);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
+    expect(respondToPermission).toHaveBeenCalledTimes(1);
+    expect(hapticsSelection).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the header sheet while an answerable session is still loading', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      // No message has landed yet: the header control is the only way to the
+      // session's permission settings, so it must still register a tap.
+      view.store.set(view.manager.atoms.isLoading, true);
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+    };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress?.();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    expect(view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' })).toBeDefined();
+  });
+
+  it('opens the header sheet with usable settings after a failed open left the transport unresolved', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      // A failed session open leaves the transport unresolved and puts the
+      // screen on its terminal error. The settings still live behind the
+      // header control, so it must open the sheet instead of going dead.
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'connect ECONNREFUSED 127.0.0.1:12000'
+      );
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+    };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress?.();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    const toggle = view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' });
+    expect((toggle.props as { disabled?: boolean }).disabled).toBe(false);
+  });
+
+  it('keeps the composer mounted, visible, and enabled while the auto-reply is in flight', async () => {
+    const view = await mountDetails([]);
+    makeSessionAnswerable(view);
+    // With the card actually rendered, the wrapper is gated out as before.
+    expect(composerWrapper(view.renderer).props.accessibilityElementsHidden).toBe(true);
+
+    // Hold the reply open so the assertion runs mid-round-trip, not after it.
+    const reply = Promise.withResolvers<undefined>();
+    const respondToPermission = vi
+      .spyOn(view.manager, 'respondToPermission')
+      .mockReturnValue(reply.promise);
+    act(() => {
+      setSessionAutoApproveEnabled(ROOT_ID, true);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(respondToPermission).toHaveBeenCalledWith('perm-1', 'once');
+
+    // The card is suppressed, so nothing on screen blocks the input: the
+    // composer must stay visible and enabled for the whole round trip.
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    const wrapper = composerWrapper(view.renderer);
+    expect(wrapper.props.className ?? '').not.toContain('hidden');
+    expect(wrapper.props.accessibilityElementsHidden).toBe(false);
+    expect(composerNode(view.renderer).props.disabled).toBe(false);
+
+    await act(async () => {
+      reply.resolve(undefined);
+      await Promise.resolve();
+    });
+  });
+
+  it('shows the card while the toggle is off without replying', async () => {
+    const view = await mountDetails([]);
+    makeSessionAnswerable(view);
+    const respondToPermission = vi
+      .spyOn(view.manager, 'respondToPermission')
+      .mockResolvedValue(undefined);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
+    expect(respondToPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe('session detail unreadable permission notice', () => {
+  const waiting: readonly UnreadablePermissionState[] = [{ requestId: 'perm-1' }];
+  const none: readonly UnreadablePermissionState[] = [];
+
+  /** An answerable session, so the composer claim is about the notice, not read-only mode. */
+  function makeAnswerable(view: Awaited<ReturnType<typeof mountDetails>>): void {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  it('explains the waiting request and leaves the composer usable', async () => {
+    const view = await mountDetails([]);
+    makeAnswerable(view);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(
+      'waiting on a permission request this app cannot show'
+    );
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer).toHaveLength(1);
+    expect(composer[0]?.parent?.parent?.props.className ?? '').not.toContain('hidden');
+    expect(composer[0]?.parent?.parent?.props.accessibilityElementsHidden).toBe(false);
+  });
+
+  it('renders nothing once the request is answered', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, none);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(0);
+  });
+});
+
+describe.each([true, false])('session detail return with history=%s', hasHistory => {
+  beforeEach(() => {
+    if (hasHistory) {
+      navigationRoutes.unshift('previous-screen');
+    }
+  });
+
+  it.each(['loaded after child dismissal', 'empty'] as const)('leaves %s content', async state => {
+    const view = await mountDetails(state === 'empty' ? [] : undefined);
+    if (state === 'empty') {
+      // The fixture resolves read-only, so the empty title states a fact rather
+      // than a wait: a stored transcript can never gain a row.
+      expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+        title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
+      });
+    } else {
+      pressCard(view.renderer, SELECTED_ID);
+      await view.respond(SELECTED_ID, [childMessage(SELECTED_ID, 'Selected child row')]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      act(() => {
+        sheetProps(view.renderer).onClose();
+      });
+      act(() => {
+        sheetProps(view.renderer).onDismiss?.();
+      });
+      expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+      expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
+    }
+
+    pressHeaderBack(view.renderer);
+    expect(navigationRoutes).toEqual(
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+    );
+  });
+
+  it.each([
+    { state: 'pending metadata', code: undefined },
+    { state: 'retryable metadata failure', code: 'INTERNAL_SERVER_ERROR' },
+    { state: 'terminal access denial', code: 'UNAUTHORIZED' },
+  ] as const)('leaves $state without changing its feedback', async ({ code }) => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], { metadataReady: metadata.promise });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    if (code) {
+      await act(async () => {
+        metadata.reject({ data: { code } });
+        await Promise.resolve();
+      });
+      const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+        typeof QueryError
+      >;
+      expect(
+        view.renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))
+      ).toHaveLength(1);
+      expect(error.placement).toBe('top');
+      expect(error.variant).toBe(code === 'UNAUTHORIZED' ? 'permission' : 'server');
+      expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
+      expect(renderedText(view.renderer.root)).toContain('Back to sessions');
+      expect(renderedText(view.renderer.root)).toContain('Copy');
+      // The card's Back returns to the sessions list through the same POP_TO
+      // the session route's not-found card uses, so the two cards cannot drift.
+      const backToSessions = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') &&
+          renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+      );
+      const routesBeforeCardBack = [...navigationRoutes];
+      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)/', 'agent-chat/x'];
+      navigationRoutes.splice(0, navigationRoutes.length, ...plantedRoutes);
+      act(() => {
+        (backToSessions.props.onPress as () => void)();
+      });
+      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)/']);
+      navigationRoutes.splice(0, navigationRoutes.length, ...routesBeforeCardBack);
+    }
+
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
+      numberOfLines: SESSION_HEADER_TITLE_LINES,
+      ellipsizeMode: 'tail',
+    });
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
+    pressHeaderBack(view.renderer);
+    expect(navigationRoutes).toEqual(
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+    );
+  });
+});
 
 describe('resolveSendAttachmentKind', () => {
   it.each([
@@ -38,4 +3966,2727 @@ describe('shouldRefuseSilentAttachmentDrop', () => {
       expect(shouldRefuseSilentAttachmentDrop(kind, hasAttachments)).toBe(expected);
     }
   );
+});
+
+// These tests run in the existing detail suite with the DOM-free renderer.
+// Request order and rendered state are deterministic; native paint timing is not.
+/** The card's visible and announced state, in the active language. */
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'common.running',
+  completed: 'common.completed',
+  error: 'common.failed',
+} satisfies Record<'pending' | 'running' | 'completed' | 'error', string>;
+
+describe('child transcript requests', () => {
+  it.each([
+    {
+      sessionId: SELECTED_ID,
+      status: 'completed',
+      textRows: 3,
+      activity: null,
+    },
+    {
+      sessionId: kiloId('ses-sibling-0'),
+      status: 'running',
+      textRows: 4,
+      activity: 'Thinking',
+    },
+    {
+      sessionId: kiloId('ses-sibling-1'),
+      status: 'error',
+      textRows: 3,
+      activity: null,
+    },
+  ] as const)(
+    'renders the $status card without fetching a child transcript for labels',
+    async ({ sessionId, status, textRows, activity }) => {
+      const statusLabel = i18n.t(STATUS_LABEL_KEY[status]);
+      const text = `Researcher\nTask ${sessionId}${activity ? `\n${activity}` : ''}\n${statusLabel}`;
+      const view = await mountDetails();
+      const card = cardFor(view.renderer, sessionId);
+      const button = card.findByProps({ accessibilityRole: 'button' }).props as ComponentProps<
+        typeof Pressable
+      >;
+
+      expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
+      expect(renderedText(card)).toBe(text);
+      expect(card.findAll(node => (node.type as string) === 'Text')).toHaveLength(textRows);
+      expect(button).toMatchObject({
+        disabled: false,
+        accessibilityState: { disabled: false },
+        accessibilityHint: i18n.t('agentChat.childSession.openHint'),
+      });
+      expect(button.accessibilityLabel).toContain('Researcher');
+      expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
+      expect(button.accessibilityLabel).toContain(statusLabel);
+      expect(button.accessibilityLabel).not.toContain(status);
+      expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
+      if (activity) {
+        expect(button.accessibilityLabel).toContain(activity);
+      }
+      expect(view.renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
+      expect(view.requestedIds()).toEqual([ROOT_ID]);
+    }
+  );
+
+  it.each([
+    [SELECTED_ID, NESTED_ID, 'completed'],
+    [kiloId('ses-sibling-0'), kiloId('ses-nested-sibling'), 'running'],
+    [kiloId('ses-sibling-1'), kiloId('ses-nested-failed'), 'error'],
+  ] as const)(
+    'opens %s and its nested sheet immediately without requesting siblings',
+    async (selectedId, nestedId, status) => {
+      const isRunning = status === 'running';
+      const view = await mountDetails();
+      pressCard(view.renderer, selectedId);
+      pressCard(view.renderer, selectedId);
+
+      expect(sheetProps(view.renderer)).toMatchObject({
+        visible: true,
+        sessionId: selectedId,
+        title: `Task ${selectedId}`,
+        hydrationState: { status: 'loading' },
+      });
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
+
+      const selected = taskMessage(selectedId, [
+        NESTED_ID,
+        kiloId('ses-nested-sibling'),
+        kiloId('ses-nested-failed'),
+      ]);
+      selected.parts.push(...childMessage(selectedId, 'Selected child row').parts);
+      await view.respond(selectedId, [selected]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      const selectedCard = cardFor(view.renderer, selectedId);
+      expect(renderedText(selectedCard)).toContain(`Task ${selectedId}`);
+      expect(renderedText(selectedCard).includes('Writing response')).toBe(isRunning);
+      const selectedButton = selectedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(selectedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
+      expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
+      const nestedCard = cardFor(view.renderer, nestedId);
+      expect(renderedText(nestedCard)).toBe(
+        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${i18n.t(STATUS_LABEL_KEY[status])}`
+      );
+      expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(
+        isRunning ? 4 : 3
+      );
+      const nestedButton = nestedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(nestedButton).toMatchObject({
+        disabled: false,
+        accessibilityState: { disabled: false },
+        accessibilityHint: i18n.t('agentChat.childSession.openHint'),
+      });
+      expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
+      expect(nestedButton.accessibilityLabel).toContain(i18n.t(STATUS_LABEL_KEY[status]));
+      expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
+      if (isRunning) {
+        expect(nestedButton.accessibilityLabel).toContain('Thinking');
+      }
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
+
+      pressCard(view.renderer, nestedId);
+      expect(sheetProps(view.renderer)).toMatchObject({
+        visible: true,
+        sessionId: nestedId,
+        title: `Task ${nestedId}`,
+        hydrationState: { status: 'loading' },
+      });
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId, nestedId]);
+      await view.respond(nestedId, [childMessage(nestedId, 'Nested child row')]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Nested child row'
+      );
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).not.toContain(
+        'Selected child row'
+      );
+
+      pressCard(view.renderer, selectedId);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      const hydratedNestedCard = cardFor(view.renderer, nestedId);
+      expect(renderedText(hydratedNestedCard)).toContain(`Task ${nestedId}`);
+      expect(renderedText(hydratedNestedCard).includes('Writing response')).toBe(isRunning);
+      expect(hydratedNestedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
+      const hydratedNestedButton = hydratedNestedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(hydratedNestedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId, nestedId]);
+    }
+  );
+
+  it('keeps metadata after a retryable failure and retries only on explicit Retry', async () => {
+    const view = await mountDetails();
+    pressCard(view.renderer, SELECTED_ID);
+    await view.fail(SELECTED_ID, new Error('fetch failed'));
+
+    const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(errorProps.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+
+    act(() => {
+      errorProps.onRetry?.();
+      errorProps.onRetry?.();
+    });
+    expect(sheetProps(view.renderer).hydrationState.status).toBe('loading');
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID, SELECTED_ID]);
+    await view.respond(SELECTED_ID, [childMessage(SELECTED_ID, 'Recovered child row')]);
+    expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+      'Recovered child row'
+    );
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+  });
+
+  it('preserves access-error copy and dismissal without automatic retry', async () => {
+    const view = await mountDetails();
+    pressCard(view.renderer, SELECTED_ID);
+    await view.fail(SELECTED_ID, { data: { code: 'FORBIDDEN' } });
+
+    const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(errorProps.message).toBe(i18n.t('queryError.permissionDescription'));
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+    act(() => {
+      sheetProps(view.renderer).onClose();
+    });
+    expect(sheetProps(view.renderer).visible).toBe(false);
+    act(() => {
+      sheetProps(view.renderer).onDismiss?.();
+    });
+    expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+    expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
+    expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
+  });
+
+  it.each(['failure', 'success'] as const)(
+    'does not publish or retry old child work after a root change and late %s',
+    async outcome => {
+      const view = await mountDetails();
+      pressCard(view.renderer, SELECTED_ID);
+      view.rootPages.set(NEXT_ROOT_ID, [taskMessage(NEXT_ROOT_ID, [kiloId('ses-next-child')])]);
+      await view.switchRoot(NEXT_ROOT_ID);
+      await (outcome === 'failure'
+        ? view.fail(SELECTED_ID, new Error('fetch failed'))
+        : view.respond(SELECTED_ID, [childMessage(SELECTED_ID, 'Old scope row')]));
+
+      expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID, NEXT_ROOT_ID]);
+      expect(view.store.get(view.manager.atoms.childMessages)(SELECTED_ID)).toEqual([]);
+      expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+      expect(renderedText(view.renderer.root)).toContain('Task ses-next-child');
+      expect(renderedText(view.renderer.root)).not.toContain('Old scope row');
+      expect(renderedText(view.renderer.root)).not.toContain('Task ses-selected');
+    }
+  );
+
+  it('shows confirmed empty history without fetching it again for labels or reopening', async () => {
+    const view = await mountDetails();
+    pressCard(view.renderer, SELECTED_ID);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.childSessionSheet.loading'),
+    });
+    await view.respond(SELECTED_ID, []);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.childSessionSheet.noMessages'),
+    });
+
+    act(() => {
+      sheetProps(view.renderer).onClose();
+    });
+    act(() => {
+      sheetProps(view.renderer).onDismiss?.();
+    });
+    pressCard(view.renderer, SELECTED_ID);
+    expect(sheetProps(view.renderer)).toMatchObject({
+      visible: true,
+      hydrationState: { status: 'ready' },
+    });
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.childSessionSheet.noMessages'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+    expect(cardFor(view.renderer, SELECTED_ID).findAllByType(ChildSessionModelLabel)).toHaveLength(
+      0
+    );
+  });
+
+  it('renders no child card or sheet when the root has no children', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'Root-only row')]);
+    expect(renderedText(view.renderer.root)).toContain('Root-only row');
+    expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+});
+
+describe('session detail zero-render transcript guard (mobile-app e2-open)', () => {
+  function blankAssistantMessage(id: string): StoredMessage {
+    const message = assistantMessage(id);
+    return { info: { ...message.info, sessionID: ROOT_ID }, parts: [] };
+  }
+
+  it('shows the empty state instead of an empty user bubble for a stored session', async () => {
+    // A stored session opened read-only has no live writer. A user message whose
+    // parts never reached session ingest rendered as an empty bubble under a time
+    // marker (stored-session finding); the row must not exist at all.
+    const phantom: StoredMessage = {
+      info: { ...userMessage('msg-phantom').info, sessionID: ROOT_ID },
+      parts: [],
+    };
+    const view = await mountDetails([phantom]);
+
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+
+  it('shows the empty state instead of a zero-item list when no stored message renders', async () => {
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+
+  it('keeps the live empty title, with its prompt, for a writable session', async () => {
+    // A session that can still receive a message reads the wait, not the fact:
+    // the title stays "No messages yet" and the composer's prompt comes with it.
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+      description: i18n.t('agentChat.session.emptyDescription'),
+    });
+  });
+
+  it('keeps the header pill live so the stored session still names its model', async () => {
+    // The sheet stays reachable in the pill's other states: its rows name the
+    // model the stored session ran on before any usage arrives.
+    const modelRow: SessionModelOption = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek V4.1 Flash 1017',
+      displayId: 'deepseek/deepseek-v4.1-flash-1017',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: true,
+    };
+    sessionModelOptions.rows = [modelRow];
+    sessionConfigSync.currentModel = modelRow.id;
+    onTestFinished(() => {
+      sessionModelOptions.rows = [];
+      sessionConfigSync.currentModel = '';
+    });
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      await Promise.resolve();
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole: string; onPress: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    await act(async () => {
+      metricsProps.onPress();
+      await Promise.resolve();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.modelDisplay).toBe('DeepSeek V4.1 Flash 1017');
+    expect(contextSheet.props.providerDisplay).toBe('Kilo');
+  });
+
+  it('hides the header pill for a stored session with no transcript and no reported usage', async () => {
+    // A settled empty stored session never reports usage, and a read-only
+    // session has no permission settings to open: the pill keeps its reserved
+    // box instead of painting dash placeholders beside the empty state.
+    const view = await mountDetails([]);
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      className?: string;
+      onPress?: () => void;
+      accessibilityElementsHidden?: boolean;
+      importantForAccessibility?: string;
+    };
+    expect(metricsProps.onPress).toBeUndefined();
+    expect(metricsProps.className).toContain('opacity-0');
+    expect(metricsProps.accessibilityElementsHidden).toBe(true);
+    expect(metricsProps.importantForAccessibility).toBe('no');
+    // The box stays reserved so the header does not shift when the pill hides.
+    expect(metricsProps.className).toContain('h-[44px]');
+  });
+
+  it('keeps the header pill after a failed stored open leaves nothing to show', async () => {
+    // The sheet still offers the connection reading and its Retry, so a failed
+    // open keeps the live control instead of hiding the pill.
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'connect ECONNREFUSED 127.0.0.1:12000'
+      );
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole?: string; onPress?: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    expect(metricsProps.onPress).toBeTypeOf('function');
+  });
+
+  it('pages older messages into the reserved skeleton while a zero-render transcript has a cursor', async () => {
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    // Old defect: the blank zero-item list mounted here (no loading, no empty
+    // state). New: the skeleton holds the space and the host pages older rows.
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID]);
+    // The older page renders nothing either: the cursor ends, the defined
+    // empty state takes over.
+    await view.respond(ROOT_ID, [blankAssistantMessage('msg-blank-older')]);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
+    });
+  });
+
+  it('mounts the pagination Retry when a zero-render transcript fails to page older history', async () => {
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID]);
+    // Old defect: the retryable failure collapsed into the action-less empty
+    // state. New: the body keeps the empty title but carries a working Retry.
+    await view.fail(ROOT_ID, new Error('fetch failed'));
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    const empty = view.renderer.root.findByType(EmptyState);
+    expect(empty.props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+    // The action mounts on the EmptyState (the component is a test stub, so
+    // the Retry button is inspected through the prop element).
+    const action = (empty.props.action as ReactElement<ComponentProps<typeof Button>>).props;
+    expect(action.accessibilityLabel).toBe(i18n.t('common.retry'));
+    expect(action.accessibilityHint).toBe(i18n.t('agentChat.olderMessages.retryHint'));
+    await act(async () => {
+      (action.onPress as () => void)();
+      await Promise.resolve();
+    });
+    // Retry reissues the older-page load through the manager.
+    expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID, ROOT_ID]);
+  });
+
+  it('keeps the action-less empty state when the zero-render transcript pages into a terminal outcome', async () => {
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    await view.respondOutcome(ROOT_ID, { kind: 'invalid_data' });
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    const empty = view.renderer.root.findByType(EmptyState);
+    expect(empty.props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
+    });
+    expect(empty.props.action).toBeUndefined();
+  });
+});
+
+describe('SessionDetailContent condensed tool runs', () => {
+  it('wraps the condensed run row in MessageErrorBoundary like the per-part path', async () => {
+    condensePreference.value = true;
+    const view = await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    const runRows = view.renderer.root.findAll(node => Object.is(node.type, 'CondensedToolRunRow'));
+    expect(runRows).toHaveLength(1);
+    expect(runRows[0]?.parent?.type).toBe('MessageErrorBoundary');
+  });
+
+  it('keeps the condensed row key when an older tool-only page prepends', async () => {
+    condensePreference.value = true;
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([toolRunMessage(ROOT_ID, 'm2', ['t2'])]);
+    // A lone tool part condenses to its message row, keyed by the message id.
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+
+    // Loading older messages prepends an older tool-only message whose part
+    // joins the run. The row FlashList anchored on must keep its key, or the
+    // viewport jumps (the reported defect).
+    await act(async () => {
+      void view.manager.loadOlderMessages();
+      await Promise.resolve();
+    });
+    await view.respond(ROOT_ID, [toolRunMessage(ROOT_ID, 'm1', ['t1'])]);
+
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+  });
+});
+
+describe('SessionDetailContent transcript key collection', () => {
+  it('does not walk the transcript for part keys while condensing is off', async () => {
+    condensePreference.value = false;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBe(0);
+  });
+
+  it('collects part keys once condensing is on', async () => {
+    condensePreference.value = true;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBeGreaterThan(0);
+  });
+});
+
+describe('session detail exit retry row', () => {
+  it('drops the row when a retry fails with a non-retryable SDK message', async () => {
+    const failureHandlers: {
+      retryable?: (failure: RetryableExitFailure) => void;
+      nonRetryable?: () => void;
+    } = {};
+    vi.mocked(exitRemoteSessionWithFeedback).mockImplementation(async input => {
+      failureHandlers.retryable = input.onRetryableFailure;
+      failureHandlers.nonRetryable = input.onNonRetryableFailure;
+      input.onRetryableFailure?.({ message: 'connection reset', retry: vi.fn() });
+      await Promise.resolve();
+    });
+
+    // Exit lives on the composer, so this case needs a writable session.
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    const onExitSession = composer.props.onExitSession as (
+      onAccepted: () => void,
+      lock: { current: boolean },
+      settleVoiceInput: () => Promise<boolean>
+    ) => Promise<void>;
+
+    await act(async () => {
+      await onExitSession(vi.fn<() => void>(), { current: false }, async () => {
+        await Promise.resolve();
+        return true;
+      });
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(1);
+
+    // A retry that lands on a permanent SDK error must release the durable row
+    // instead of leaving a stale message and a retry that can never succeed.
+    act(() => {
+      failureHandlers.nonRetryable?.();
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(0);
+  });
+});
+
+describe('transcript time markers', () => {
+  it.each(['message', 'tool-run'] as const)(
+    'keeps the %s subtree mounted when a prepend moves its marker',
+    async kind => {
+      condensePreference.value = kind === 'tool-run';
+      rootPageNextCursor = 'older-cursor';
+      const message =
+        kind === 'tool-run'
+          ? toolRunMessage(ROOT_ID, 'm2', ['t2a', 't2b'])
+          : childMessage(ROOT_ID, 'Existing answer');
+      message.info.time.created = 1_000_000_000;
+      const view = await mountDetails([message]);
+      const findRow = () =>
+        kind === 'tool-run'
+          ? view.renderer.root.find(node => Object.is(node.type, 'CondensedToolRunRow'))
+          : view.renderer.root.findByProps({ children: 'Existing answer' });
+      const before = findRow();
+      expect(before).toBeDefined();
+      const keys = transcriptKeys(view.renderer);
+
+      await act(async () => {
+        void view.manager.loadOlderMessages();
+        await Promise.resolve();
+      });
+      const older = childMessage(ROOT_ID, 'Older answer');
+      older.info = { ...older.info, id: 'm1', time: { created: 999_999_000 } };
+      older.parts = [
+        stubTextPart({ id: 'text-m1', sessionID: ROOT_ID, messageID: 'm1', text: 'Older answer' }),
+      ];
+      await view.respond(ROOT_ID, [older]);
+
+      expect(transcriptKeys(view.renderer)).toEqual(['m1', ...keys]);
+      expect(
+        view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+      ).toHaveLength(1);
+      expect(findRow() === before).toBe(true);
+    }
+  );
+
+  it('renders the marker in the same row as the message that opens the burst', async () => {
+    const message: StoredMessage = {
+      info: { ...assistantMessage('msg-marker').info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-marker',
+          sessionID: ROOT_ID,
+          messageID: 'msg-marker',
+          text: 'Marked answer',
+        }),
+      ],
+    };
+
+    const view = await mountDetails([message]);
+
+    // The first message of the page opens the burst, so its row carries the
+    // marker above the bubble instead of the marker being an item of its own.
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+    ).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain('Marked answer');
+  });
+});
+
+describe('hide thinking preference', () => {
+  function partMessage(id: string, parts: StoredMessage['parts']): StoredMessage {
+    return { info: { ...assistantMessage(id).info, sessionID: ROOT_ID }, parts };
+  }
+
+  function reasoningPart(id: string, messageID: string): ReasoningPart {
+    return {
+      id,
+      sessionID: ROOT_ID,
+      messageID,
+      type: 'reasoning',
+      text: 'hidden chain of thought',
+      time: { start: 1, end: 2 },
+    };
+  }
+
+  function reasoningAndTextMessage(): StoredMessage {
+    const id = 'msg-think';
+    return partMessage(id, [
+      reasoningPart('reasoning-1', id),
+      stubTextPart({ id: `text-${id}`, sessionID: ROOT_ID, messageID: id, text: 'Visible answer' }),
+    ]);
+  }
+
+  it('renders thinking when the option is off', async () => {
+    hideThinking.current = false;
+    const view = await mountDetails([reasoningAndTextMessage()]);
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain('Visible answer');
+  });
+
+  it('hides thinking but keeps the text when the option is on', async () => {
+    hideThinking.current = true;
+    const view = await mountDetails([reasoningAndTextMessage()]);
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('Visible answer');
+  });
+
+  it('does not paint thinking before the preference resolves on cold start', async () => {
+    hideThinking.current = false;
+    hideThinking.loaded = false;
+    const view = await mountDetails([reasoningAndTextMessage()]);
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('Visible answer');
+  });
+
+  it('drops a reasoning-only message from the transcript while a status line holds the row', async () => {
+    hideThinking.current = true;
+    const message = partMessage('msg-think-only', [
+      reasoningPart('reasoning-only', 'msg-think-only'),
+    ]);
+    const view = await mountDetails([message]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'info', message: 'Session status', timestamp: 0 }
+      );
+    });
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(MessageBubble)).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+    ).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+    // The dropped reasoning row still reaches the transcript's status surface,
+    // so the row is not empty; the ladder shows that status line, not a spinner.
+    expect(indicatorNodes(view).length).toBeGreaterThan(0);
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+  });
+
+  it('hands the raw message list to the working spinner, not the displayed list', async () => {
+    hideThinking.current = true;
+    const message = partMessage('msg-think-only', [
+      reasoningPart('reasoning-only', 'msg-think-only'),
+    ]);
+    const view = await mountDetails([message]);
+    // The spinner's label derives from the last assistant part, so a hidden
+    // reasoning row must still reach it. The ladder mounts the spinner only
+    // while no status line outranks it, so this mount streams with none.
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
+    const indicator = view.renderer.root.findByType(WorkingIndicator);
+    const indicatorMessages = indicator.props.messages as StoredMessage[];
+    expect(indicatorMessages.some(candidate => candidate.info.id === 'msg-think-only')).toBe(true);
+    expect(
+      indicatorMessages.some(candidate => candidate.parts.some(part => part.type === 'reasoning'))
+    ).toBe(true);
+  });
+
+  // The running child's sheet is the surface the composer spinner rule also
+  // covers: the option hides the thinking row inside the sheet without changing
+  // the spinner label, which still derives from the reasoning part.
+  const RUNNING_CHILD = kiloId('ses-sibling-0');
+
+  function childReasoningMessage(sessionId: KiloSessionId): StoredMessage {
+    const id = `msg-${sessionId}`;
+    return {
+      info: { ...assistantMessage(id).info, sessionID: sessionId },
+      parts: [
+        {
+          id: `reasoning-${sessionId}`,
+          sessionID: sessionId,
+          messageID: id,
+          type: 'reasoning',
+          text: 'hidden chain of thought',
+          time: { start: 1, end: 2 },
+        },
+      ],
+    };
+  }
+
+  function childTextMessage(sessionId: KiloSessionId, text: string): StoredMessage {
+    const id = `msg-${sessionId}`;
+    return {
+      info: { ...assistantMessage(id).info, sessionID: sessionId },
+      parts: [stubTextPart({ id: `text-${sessionId}`, sessionID: sessionId, messageID: id, text })],
+    };
+  }
+
+  async function openRunningChildSheet(hide: boolean) {
+    hideThinking.current = hide;
+    const view = await mountDetails();
+    pressCard(view.renderer, RUNNING_CHILD);
+    return view;
+  }
+
+  function childSheetText(view: Awaited<ReturnType<typeof mountDetails>>) {
+    return renderedText(view.renderer.root.findByType(ChildSessionSheet));
+  }
+
+  it('keeps the subagent sheet spinner on Thinking while the reasoning row is hidden', async () => {
+    const view = await openRunningChildSheet(true);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    const sheetText = childSheetText(view);
+    expect(sheetText).toContain('Thinking');
+    expect(sheetText).not.toContain('hidden chain of thought');
+  });
+
+  it('keeps the in-transcript task card on Thinking while the reasoning row is hidden', async () => {
+    const view = await openRunningChildSheet(true);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    expect(renderedText(cardFor(view.renderer, RUNNING_CHILD))).toContain('Thinking');
+  });
+
+  it('keeps renderItem and the row callbacks one identity across a streaming publish', async () => {
+    // A user row so the bubble actually carries `onRetryMessage`; the task row
+    // carries `getChildMessages`. Both props are compared by identity below.
+    const retryUserId = 'msg_1761000000000_retry';
+    const retryRow = userMessage(retryUserId);
+    const rootUser: StoredMessage = {
+      info: { ...retryRow.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: `${retryUserId}-text`,
+          sessionID: ROOT_ID,
+          messageID: retryUserId,
+          text: 'retry me',
+        }),
+      ],
+    };
+    const view = await mountDetails([rootUser, taskMessage(ROOT_ID, CHILD_IDS)]);
+    pressCard(view.renderer, RUNNING_CHILD);
+
+    const listProps = () => {
+      const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+      if (!list) {
+        throw new Error('Missing SessionMessageList');
+      }
+      return list.props as {
+        items: readonly SessionTranscriptItem[];
+        renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{
+          children: ReactNode;
+        }>;
+      };
+    };
+    const bubblePropsFor = (messageId: string) => {
+      const props = listProps();
+      const item = props.items.find(
+        candidate => candidate.type === 'message' && candidate.message.info.id === messageId
+      );
+      if (!item) {
+        throw new Error(`No transcript item for ${messageId}`);
+      }
+      const bubble = (props.renderItem({ item }).props as { children: ReactNode[] }).children.find(
+        (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+      );
+      if (!bubble) {
+        throw new Error(`No bubble for ${messageId}`);
+      }
+      return bubble.props as Record<string, unknown>;
+    };
+
+    const renderItemBefore = listProps().renderItem;
+    const bubbleBefore = bubblePropsFor(retryUserId);
+    expect(typeof bubbleBefore.onRetryMessage).toBe('function');
+    expect(typeof bubbleBefore.getChildMessages).toBe('function');
+
+    // The child's rows arrive through the same storage publication a streaming
+    // token uses: one `partsRevision` bump that re-emits every derived atom.
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    expect(listProps().renderItem).toBe(renderItemBefore);
+    const bubbleAfter = bubblePropsFor(retryUserId);
+    expect(bubbleAfter.onRetryMessage).toBe(bubbleBefore.onRetryMessage);
+    expect(bubbleAfter.getChildMessages).toBe(bubbleBefore.getChildMessages);
+  });
+
+  // The row's Add credits settles the balance the session records. Until the
+  // current session's metadata is the loaded one, that record is unknown: the
+  // cached transcript still paints, so reading no organization there would send
+  // an organization's refusal to the person's own purchase screen.
+  it('withholds Add credits until the session metadata is the loaded one', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const row: StoredMessage = {
+      info: { ...userMessage('msg_1761000000002_credits').info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'msg_1761000000002_credits-text',
+          sessionID: ROOT_ID,
+          messageID: 'msg_1761000000002_credits',
+          text: 'a refused question',
+        }),
+      ],
+    };
+    const view = await mountDetails([row], {
+      metadataReady: metadata.promise,
+      cachedRows: [row],
+      sessionOrganizationId: 'org-a',
+    });
+
+    const creditsOf = () => {
+      const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+      if (!list) {
+        throw new Error('No transcript list');
+      }
+      const props = list.props as {
+        items: readonly SessionTranscriptItem[];
+        renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{
+          children: ReactNode;
+        }>;
+      };
+      const item = props.items.find(
+        candidate => candidate.type === 'message' && candidate.message.info.id === row.info.id
+      );
+      if (!item) {
+        throw new Error('No transcript item for the question');
+      }
+      const bubble = (props.renderItem({ item }).props as { children: ReactNode[] }).children.find(
+        (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+      );
+      if (!bubble) {
+        throw new Error('No bubble for the question');
+      }
+      return (bubble.props as { addCredits?: { kind: string; url?: string } }).addCredits;
+    };
+
+    expect(creditsOf()).toBeUndefined();
+
+    await act(async () => {
+      metadata.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => creditsOf() !== undefined);
+
+    expect(creditsOf()).toEqual({ kind: 'organization', url: organizationBillingUrl('org-a') });
+  });
+
+  it('renders no empty padded row for a reasoning-only child message', async () => {
+    const view = await openRunningChildSheet(true);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    const sheet = view.renderer.root.findByType(ChildSessionSheet);
+    const list = sheet.findByType(SessionMessageList);
+    expect(list.props.items).toHaveLength(0);
+    expect(sheet.findAllByType(EmptyState)).toHaveLength(0);
+    expect(list.props.ListFooterComponent).toBeDefined();
+  });
+
+  it('keeps a nested task card on Thinking while the reasoning row is hidden', async () => {
+    const runningNested = kiloId('ses-nested-running');
+    const view = await openRunningChildSheet(true);
+    const selected = taskMessage(RUNNING_CHILD, [NESTED_ID, runningNested]);
+    selected.parts.push(...childMessage(RUNNING_CHILD, 'Selected child row').parts);
+    await view.respond(RUNNING_CHILD, [selected]);
+
+    pressCard(view.renderer, runningNested);
+    await view.respond(runningNested, [childReasoningMessage(runningNested)]);
+    pressCard(view.renderer, RUNNING_CHILD);
+
+    expect(renderedText(cardFor(view.renderer, runningNested))).toContain('Thinking');
+  });
+
+  it('shows the subagent reasoning row and the Thinking spinner when the option is off', async () => {
+    const view = await openRunningChildSheet(false);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    const sheetText = childSheetText(view);
+    expect(sheetText).toContain('Thinking');
+    expect(sheetText).toContain('hidden chain of thought');
+  });
+
+  it.each([true, false])(
+    'shows no reasoning row and the non-thinking spinner label in the subagent sheet (option %s)',
+    async hide => {
+      const view = await openRunningChildSheet(hide);
+      await view.respond(RUNNING_CHILD, [childTextMessage(RUNNING_CHILD, 'Only text')]);
+
+      const sheetText = childSheetText(view);
+      expect(sheetText).not.toContain('hidden chain of thought');
+      expect(sheetText).toContain('Writing response');
+    }
+  );
+});
+
+describe('session detail composer after a failed turn', () => {
+  /**
+   * The Pylon 28248 record: a session open/turn failure lands as the SDK's
+   * generic transient status ("Something went wrong. Please retry in a
+   * moment."), the transcript is empty and the manager cannot send. The user
+   * must still be able to type the next message, with Retry kept beside it.
+   */
+  it('keeps the composer editable while the terminal error keeps its Retry', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+    });
+
+    // Retry stays available in the error card.
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(error.onRetry).toBeDefined();
+
+    // The composer stays mounted and editable; only sending waits on the
+    // session being able to accept a message again.
+    const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
+    expect(node.props.disabled).toBe(false);
+    expect(node.props.sendDisabled).toBe(true);
+  });
+
+  it('withdraws the restored draft when the SDK reports the failed send was delivered', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    const control = {
+      setText: vi.fn(),
+      hasContent: vi.fn(() => true),
+      restoreAttachments: vi.fn(),
+      withdrawRestoredSend: vi.fn(),
+    };
+    act(() => {
+      (composer.props.controlRef as { current: typeof control | null }).current = control;
+    });
+
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith('Delivered late');
+
+    // A re-render of the same record changes nothing: one delivery, one
+    // withdrawal.
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    expect(control.withdrawRestoredSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the composer sendable after a non-retryable turn failure', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'cloud-agent');
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    // The non-retryable class keeps no Retry: the reader continues in the
+    // session instead, so the composer must stay fully usable.
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.onRetry).toBeUndefined();
+    const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
+    expect(node.props.disabled).toBe(false);
+    expect(node.props.sendDisabled).toBe(false);
+  });
+});
+
+describe('session detail composer cannot-send reason', () => {
+  it('leaves the load-failure statement to the error card in the body', async () => {
+    // The open fails, the transcript is empty and the manager cannot send. The
+    // body states the failure once with the Retry that resolves it, so the
+    // reason beside send does not name the same failure a second time.
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    const props = composerProps(view);
+    expect(props.sendDisabled).toBe(true);
+    expect(props.sendDisabledReason).toBeNull();
+    expect(view.renderer.root.findByType(QueryError).props.message).toBe(
+      i18n.t('agentChat.session.connectionTrouble')
+    );
+  });
+
+  it('states the class reason for a running session that cannot send', async () => {
+    // A non-empty transcript means a terminal failure is a runtime class, not
+    // the load failure behind the full-screen Retry, so its own copy is shown.
+    const view = await mountDetails([childMessage(ROOT_ID, 'hello')]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'cloud-agent');
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBe(
+      i18n.t('agentChat.session.notEnoughCredits')
+    );
+  });
+
+  it('passes no reason while the session can send', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        null
+      );
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+  });
+});
+
+describe('SessionDetailContent goal visibility', () => {
+  const activeGoal: SessionGoal = { text: 'Ship p7 objective', status: 'active' };
+  const pausedGoal: SessionGoal = { text: 'Ship p7 objective', status: 'paused' };
+  const mergedPr: AssociatedPrData = { ...ASSOCIATED_PR, state: 'merged' };
+
+  // The store is module-level and outlives every mount here, so each case
+  // starts from expanded (there is no test-only reset export).
+  beforeEach(() => {
+    setSessionGoalCollapsed(ROOT_ID, false);
+    motionPolicy.reducedMotion = false;
+  });
+
+  function goalSectionOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (section === undefined) {
+      throw new Error('Missing SessionGoalSection');
+    }
+    return section;
+  }
+
+  /** The Animated.View the screen draws around the fixed goal row. */
+  function goalWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    let node: ReactTestInstance | null = goalSectionOf(view);
+    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
+      node = node.parent;
+    }
+    if (node === null) {
+      throw new Error('Missing the goal wrapper');
+    }
+    return node;
+  }
+
+  it('shows the fixed goal row for a live session whose snapshot carries a goal', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection);
+    expect(section).toHaveLength(1);
+    expect(section[0]?.props.goal).toEqual(pausedGoal);
+  });
+
+  it('sits the goal row a small margin under the header', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    // The screen shrinks the shared header padding for this screen only; the
+    // override replaces the ScreenHeader default `pb-3` through twMerge.
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.className).toContain('pb-1');
+    expect(header.props.className).not.toContain('pb-3');
+
+    // The goal row still renders directly below the header.
+    const ordered = view.renderer.root.findAll(
+      node => Object.is(node.type, ScreenHeader) || Object.is(node.type, SessionGoalSection)
+    );
+    expect(ordered.map(node => node.type)).toEqual([ScreenHeader, SessionGoalSection]);
+  });
+
+  it('hides the fixed goal row for a read-only session whose snapshot carries a goal', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('hands the PR badge to the active goal row and keeps it out of the header', async () => {
+    goalMountOptions = { goal: activeGoal, resolvedType: 'remote' };
+    associatedPrMountOption = ASSOCIATED_PR;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    // The badge lives on the goal row now, not beside the context pill.
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
+
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toEqual(activeGoal);
+    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+  });
+
+  it('keeps the paused goal row and displays its associated PR badge', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    associatedPrMountOption = ASSOCIATED_PR;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    // The context sheet owns its own PR pill, so scope this assertion to the goal row.
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toEqual(pausedGoal);
+    expect(section.props.onPress).toBeTypeOf('function');
+    expect(section.findByType('SessionPrBadge' as ElementType).props.pr).toEqual(ASSOCIATED_PR);
+  });
+
+  it('displays the merged PR badge in the active goal row', async () => {
+    goalMountOptions = { goal: activeGoal, resolvedType: 'remote' };
+    associatedPrMountOption = mergedPr;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toEqual(activeGoal);
+    expect(section.findByType('SessionPrBadge' as ElementType).props.pr).toEqual(mergedPr);
+  });
+
+  it('shows open tasks under the PR pill with a goal, and as a row without one', async () => {
+    const todoMessage: StoredMessage = {
+      info: { ...assistantMessage('msg-todo').info, sessionID: ROOT_ID },
+      parts: [
+        {
+          id: 'part-todo',
+          sessionID: ROOT_ID,
+          messageID: 'msg-todo',
+          type: 'tool',
+          callID: 'call-todo',
+          tool: 'todowrite',
+          state: {
+            status: 'completed',
+            input: { todos: [{ content: 'Write tests', status: 'in_progress' }] },
+            output: '',
+            title: 'todowrite',
+            metadata: {},
+            time: { start: 0, end: 1 },
+          },
+        },
+      ],
+    };
+    const summary = { partId: 'part-todo', completed: 0, total: 1 };
+
+    goalMountOptions = { goal: activeGoal, resolvedType: 'remote' };
+    associatedPrMountOption = mergedPr;
+    const withGoal = await mountDetails([todoMessage], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = goalSectionOf(withGoal);
+    expect(section.findByType('SessionTasksChip' as ElementType).props.summary).toMatchObject(
+      summary
+    );
+    expect(withGoal.renderer.root.findAllByType('SessionTasksRow' as ElementType)).toHaveLength(0);
+    withGoal.renderer.unmount();
+
+    goalMountOptions = { resolvedType: 'remote' };
+    const withoutGoal = await mountDetails([todoMessage], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(
+      withoutGoal.renderer.root.findByType('SessionTasksRow' as ElementType).props.summary
+    ).toMatchObject(summary);
+  });
+
+  it.each(['open', 'merged'] as const)(
+    'omits the goal row for a PR-only session with PR state %s',
+    async state => {
+      associatedPrMountOption = { ...ASSOCIATED_PR, state };
+      const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+      expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+      expect(view.renderer.root.findAllByType('SessionPrBadge')).toHaveLength(0);
+    }
+  );
+
+  it('omits the goal row when it holds neither a goal nor a PR', async () => {
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('omits the goal row while a no-goal, no-PR session is still loading', async () => {
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    act(() => {
+      view.store.set(view.manager.atoms.isLoading, true);
+    });
+
+    // The fetch is in flight and the session has neither a goal nor a PR, so
+    // row 2 has nothing to hold. It must not reserve a min-h-12 box for a
+    // phantom PR skeleton that unmounts (and jumps the transcript 48px) the
+    // moment the fetch lands with no PR.
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType('SessionPrBadge')).toHaveLength(0);
+  });
+
+  it('persists the goal disclosure through the per-session store', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalSectionOf(view).props.collapsed).toBe(false);
+
+    act(() => {
+      (goalSectionOf(view).props.onToggleCollapsed as () => void)();
+    });
+
+    expect(goalSectionOf(view).props.collapsed).toBe(true);
+    expect(isSessionGoalCollapsed(ROOT_ID)).toBe(true);
+  });
+
+  it('keeps the collapsed goal after leaving and reopening the session', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const first = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    act(() => {
+      (goalSectionOf(first).props.onToggleCollapsed as () => void)();
+    });
+    expect(isSessionGoalCollapsed(ROOT_ID)).toBe(true);
+
+    // A fresh tree for the same session id reads the module store, which
+    // outlives the component tree.
+    const reopened = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalSectionOf(reopened).props.collapsed).toBe(true);
+  });
+
+  it('drops the goal wrapper height transition under reduced motion', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+
+    const animated = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(animated).props.layout).toBeDefined();
+
+    motionPolicy.reducedMotion = true;
+    const reduced = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(reduced).props.layout).toBeUndefined();
+  });
+});
+
+describe('SessionDetailContent transcript entrance', () => {
+  beforeEach(() => {
+    motionPolicy.reducedMotion = false;
+  });
+
+  /** The wrapper the screen draws around the transcript list. */
+  function transcriptWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (list === undefined) {
+      throw new Error('Missing SessionMessageList');
+    }
+    const wrapper = list.parent;
+    if (wrapper === null) {
+      throw new Error('Missing the transcript wrapper');
+    }
+    return wrapper;
+  }
+
+  it('paints the transcript without an entrance animation', async () => {
+    const animated = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    // The transcript body must never depend on an entrance animation to become
+    // visible: Reanimated's `FadeIn` carries `initialValues: { opacity: 0 }`, so
+    // a device that drops or never runs the entrance paints the whole body
+    // blank while the header already shows the loaded token count.
+    expect(transcriptWrapperOf(animated).props.entering).toBeUndefined();
+  });
+});
+
+describe('SessionDetailContent last-opened record', () => {
+  it('records the viewed session when the identity resolves after the first render', async () => {
+    // A cold start: the session renders before `user.getMe` answers, so the
+    // first visit sees no `userId`.
+    currentUserId.value = undefined;
+    const record = vi.mocked(recordLastOpenedSession);
+    const capture = vi.mocked(captureEvent);
+    record.mockClear();
+    capture.mockClear();
+    onTestFinished(() => {
+      currentUserId.value = 'test-user';
+    });
+
+    const view = await mountDetails();
+
+    // The view event proves the once-per-session latch already closed while the
+    // identity was unknown.
+    await waitFor(() => capture.mock.calls.some(call => call[0] === SESSION_VIEWED_EVENT));
+    expect(record).not.toHaveBeenCalled();
+
+    // The identity resolves: the record must still land for this session.
+    currentUserId.value = 'test-user';
+    await view.switchRoot(ROOT_ID);
+
+    await waitFor(() => record.mock.calls.length > 0);
+    expect(record).toHaveBeenCalledExactlyOnceWith(ROOT_ID, 'test-user');
+
+    // A later render of the same viewed session must not record again.
+    capture.mockClear();
+    await view.switchRoot(ROOT_ID);
+    expect(record).toHaveBeenCalledOnce();
+    expect(capture).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionDetailContent goal edit dialog', () => {
+  // The reported goal shape: one very long unbroken word plus a long sentence.
+  const longGoal: SessionGoal = {
+    text:
+      'the_number_of_consecutive_days_the_workflow_has_not_failed_for_the_first_time_due_to' +
+      '_workflow_issues_is_0_for_3_consecutive_days and the scheduled cleanup job keeps reporting',
+    status: 'active',
+  };
+
+  it('opens the goal text in a wrapping field', async () => {
+    goalMountOptions = { goal: longGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (!section) {
+      throw new Error('goal section did not render');
+    }
+    const { onPress } = section.props as { onPress: () => void };
+    act(onPress);
+
+    // Pick "Edit goal" out of the goal action sheet.
+    const sheetCall = showActionSheetWithOptions.mock.calls.at(-1);
+    expect(sheetCall).toBeDefined();
+    const sheet = sheetCall?.[0] as { options: string[] } | undefined;
+    const onSelect = sheetCall?.[1];
+    const editIndex = sheet?.options.indexOf(i18n.t('agentChat.goal.edit')) ?? -1;
+    expect(editIndex).toBeGreaterThanOrEqual(0);
+    act(() => {
+      onSelect?.(editIndex);
+    });
+
+    // The dialog must hand the goal text to the modal's wrapping field, not a
+    // single-line one that clips its start.
+    const modal = view.renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      multiline: true,
+      maxLength: 500,
+      initialValue: longGoal.text,
+    });
+  });
+});
+
+describe('SessionDetailContent goal removal', () => {
+  it('confirms the removal in the in-app dialog', async () => {
+    goalMountOptions = {
+      goal: { text: 'Ship the release', status: 'active' },
+      resolvedType: 'remote',
+    };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (!section) {
+      throw new Error('goal section did not render');
+    }
+    const { onPress } = section.props as { onPress: () => void };
+    act(onPress);
+
+    // Pick "Remove goal" out of the goal action sheet.
+    const sheetCall = showActionSheetWithOptions.mock.calls.at(-1);
+    const sheet = sheetCall?.[0] as { options: string[] } | undefined;
+    const onSelect = sheetCall?.[1];
+    const removeIndex = sheet?.options.indexOf(i18n.t('agentChat.goal.remove')) ?? -1;
+    expect(removeIndex).toBeGreaterThanOrEqual(0);
+    act(() => {
+      onSelect?.(removeIndex);
+    });
+
+    const confirmation = view.renderer.root.findAllByType('DestructiveConfirmDialog')[0];
+    expect(confirmation?.props).toMatchObject({
+      title: i18n.t('agentChat.goal.removeConfirmTitle'),
+      message: i18n.t('agentChat.goal.removeConfirmMessage'),
+      confirmLabel: i18n.t('agentChat.goal.remove'),
+    });
+  });
+});
+
+// The screen's live position: the transcript list reports the topmost visible
+// message, and the screen publishes it to the OS handoff and the route's
+// search params.
+describe('SessionDetailContent live position', () => {
+  it('publishes the transcript position to the handoff and the route', async () => {
+    routerSetParams.mockClear();
+    handoffAdvertiserCalls.props.length = 0;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-77');
+    });
+
+    // The handoff advertises the position the transcript is showing.
+    expect(handoffAdvertiserCalls.props.at(-1)?.anchorMessageId).toBe('msg-77');
+
+    // The route's search params carry it after the publish debounce.
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+    expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-77' });
+  });
+
+  it('drops the publish when the container is gone before the debounce fires', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-77');
+    });
+
+    // The container leaves before the timer fires — an activity recreate, or
+    // the bootstrap-error surface that renders no `Slot`. `setParams` asserts
+    // the container is mounted and throws out of this callback otherwise; the
+    // resume position is simply dropped.
+    navigationContainer.ready = false;
+
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+
+    expect(routerSetParams).not.toHaveBeenCalled();
+  });
+});
+
+// A resume link delivered onto a screen that already shows the session arrives
+// as a new `resumeAt` param (dedupe updates params, it does not remount): the
+// screen must adopt the link's position, while the route echoing back what this
+// screen itself published must not re-scroll the viewport.
+describe('SessionDetailContent resume link', () => {
+  function resumeAnchorOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    return (list.props as ComponentProps<typeof SessionMessageList>).resumeAt;
+  }
+
+  it('adopts a resume link delivered to the already-mounted screen', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    expect(resumeAnchorOf(view)).toBe('msg-a');
+
+    await view.updateResumeAt('msg-b');
+
+    expect(resumeAnchorOf(view)).toBe('msg-b');
+  });
+
+  it('cancels a pending position publish when a newer resume link is adopted', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    const onAnchorChange = (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange;
+    // The viewport moves, arming the debounced publish...
+    act(() => {
+      onAnchorChange?.('msg-c');
+    });
+    // ...and a resume link lands before the debounce fires.
+    await view.updateResumeAt('msg-b');
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+
+    expect(resumeAnchorOf(view)).toBe('msg-b');
+    // The pre-link position must not overwrite the link's position on the route.
+    expect(routerSetParams).not.toHaveBeenCalledWith({ at: 'msg-c' });
+  });
+
+  it('keeps the current position when the route echoes the anchor this screen published', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-c');
+    });
+
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+    expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-c' });
+
+    await view.updateResumeAt('msg-c');
+
+    expect(resumeAnchorOf(view)).toBe('msg-a');
+  });
+});
+
+// A send takes the transcript position over: both composer send paths must
+// tell the list to follow the output the send produces, so a transcript parked
+// on a `?at=` anchor with follow off never strands the sent message and its
+// reply off-screen (mobile-app e2e e1).
+describe('SessionDetailContent send transcript take-over', () => {
+  function makeSendable(view: Awaited<ReturnType<typeof mountDetails>>) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  function followTailNonceOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    return (list.props as ComponentProps<typeof SessionMessageList>).followTailNonce;
+  }
+
+  it('takes the position over when a prompt is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+    expect(followTailNonceOf(view)).toBe(0);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSend = composer.props.onSend as (text: string) => Promise<void>;
+    await act(async () => {
+      // The transport outcome does not gate the take-over: the viewport must
+      // follow the send as soon as the user commits it.
+      await onSend('follow-after-resume').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
+  });
+
+  it('takes the position over when a slash command is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSendCommand = composer.props.onSendCommand as (
+      command: string,
+      argumentsText: string
+    ) => Promise<boolean>;
+    await act(async () => {
+      await onSendCommand('review', '').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
+  });
+});
+
+// The fixed indicator row sits outside the transcript list. A position layout
+// transition would paint it over the transcript rows it passes while the list
+// resizes (profile-screen.tsx:275-277), so it must snap and stay opaque.
+describe('SessionDetailContent fixed indicator row', () => {
+  const footerMessage: StoredMessage = {
+    info: { ...assistantMessage('msg-footer').info, sessionID: ROOT_ID },
+    parts: [
+      stubTextPart({
+        id: 'text-msg-footer',
+        sessionID: ROOT_ID,
+        messageID: 'msg-footer',
+        text: 'Visible answer',
+      }),
+    ],
+  };
+
+  // The shared fixture's goal slot is module-level; clear it so these cases
+  // mount the plain transcript.
+  beforeEach(() => {
+    goalMountOptions = {};
+  });
+
+  it.each([
+    { type: 'error', message: 'simulated error' },
+    { type: 'warning', message: 'Retrying… simulated error' },
+  ] as const)(
+    'keeps the $type indicator row from animating its position over the transcript',
+    async indicator => {
+      const view = await mountDetails([footerMessage]);
+      act(() => {
+        view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+          view.manager.atoms.statusIndicator,
+          { ...indicator, timestamp: 0 }
+        );
+      });
+      const row = indicatorRowOf(view);
+      // A position layout transition paints this row over the transcript rows it
+      // passes (profile-screen.tsx:275-277); the opacity fades stay.
+      expect(row.props.layout).toBeUndefined();
+      expect(row.props.entering).toBeDefined();
+      expect(row.props.exiting).toBeDefined();
+      expect(String(row.props.className)).toContain('bg-background');
+    }
+  );
+
+  it('renders no footer item while the error card owns the empty transcript', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+    // One failure, one statement: the body states it with the Retry that
+    // resolves it, so the row states neither the progress nor the send reason.
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+    expect(indicatorNodes(view)).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'AnimatedView') &&
+          String(node.props.className ?? '') === 'bg-background'
+      )
+    ).toHaveLength(0);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+  });
+
+  it('states the cannot-send reason in the row with the row item typography', async () => {
+    // A writable session names the phase it is in beside the composer it keeps.
+    // (A read-only session has no composer to carry it: its continue section
+    // states the read-only fact instead.)
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'progress', message: 'Committing changes', code: 'committing', timestamp: 0 }
+      );
+    });
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    const reason = items[0];
+    expect(Object.is(reason?.type, AccessibleStatus)).toBe(true);
+    expect(reason?.props.message).toBe(i18n.t('agentChat.session.committing'));
+    expect(reason?.props.maxFontSizeMultiplier).toBe(SEND_REASON_MAX_FONT_SCALE);
+    const className = String(reason?.props.className ?? '');
+    // The row's own typography, not the composer's narrower one: a shorter item
+    // would shift the row every time the ladder swaps to or from it.
+    expect(className).toContain(SESSION_FOOTER_ROW_ITEM_PADDING);
+    expect(className).toContain('text-sm');
+    // The reason must not be clipped: a longer translation keeps its actionable
+    // tail ("Retry first.") on a phone width.
+    expect(reason?.props.numberOfLines).toBeUndefined();
+    expect(reason?.props.ellipsizeMode).toBeUndefined();
+  });
+
+  it('lets the status indicator outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, 'SessionStatusIndicator')).toBe(true);
+  });
+
+  it('lets the working spinner outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, WorkingIndicator)).toBe(true);
+  });
+
+  /** A writable session streaming on a blocked bash call. */
+  function mountBlockedOnPermission() {
+    goalMountOptions = { resolvedType: 'remote' };
+    return mountDetails([footerMessage]);
+  }
+
+  function pendingBashPermission(
+    view: Awaited<ReturnType<typeof mountDetails>>,
+    requestId: string
+  ) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isStreaming, true);
+      view.store.set<StandalonePermission | null, [StandalonePermission | null], unknown>(
+        view.manager.atoms.activePermission,
+        { requestId, permission: 'bash', patterns: [], metadata: {}, always: [] }
+      );
+    });
+  }
+
+  it('names the pending permission ask in the row and hands the label back after the answer', async () => {
+    const view = await mountBlockedOnPermission();
+    vi.spyOn(view.manager, 'respondToPermission').mockResolvedValue(undefined);
+    pendingBashPermission(view, 'perm-row');
+
+    // A blocked command has not run, so the row states the wait instead.
+    expect(view.renderer.root.findByType(WorkingIndicator).props.blockingInteraction).toBe(
+      'permission'
+    );
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.computeStatus.waitingForPermission')
+    );
+
+    act(() => {
+      view.store.set<StandalonePermission | null, [StandalonePermission | null], unknown>(
+        view.manager.atoms.activePermission,
+        null
+      );
+    });
+    expect(view.renderer.root.findByType(WorkingIndicator).props.blockingInteraction).toBe('none');
+    expect(renderedText(view.renderer.root)).not.toContain(
+      i18n.t('agentChat.computeStatus.waitingForPermission')
+    );
+  });
+
+  it('keeps the activity label for a permission ask the auto-reply answers', async () => {
+    setSessionAutoApproveEnabled(ROOT_ID, true);
+    onTestFinished(() => {
+      setSessionAutoApproveEnabled(ROOT_ID, false);
+    });
+    const view = await mountBlockedOnPermission();
+    vi.spyOn(view.manager, 'respondToPermission').mockResolvedValue(undefined);
+    pendingBashPermission(view, 'perm-auto');
+
+    // The card is gated out while the auto-reply settles, so the row keeps
+    // stating the work that resumes the moment the ask clears.
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    expect(view.renderer.root.findByType(WorkingIndicator).props.blockingInteraction).toBe('none');
+    expect(renderedText(view.renderer.root)).not.toContain(
+      i18n.t('agentChat.computeStatus.waitingForPermission')
+    );
+  });
+});
+
+describe('session detail read-only composer', () => {
+  // A read-only transcript has nowhere to write, so the continue section
+  // replaces the composer and states read-only once. The continue affordance
+  // names the destination it opens rather than a bare "Continue" that reads as
+  // an in-place action.
+  it('replaces the composer and send reason with the destination-named continue section', async () => {
+    // The default fixture resolves `read-only` (cloud_agent_session_id NULL and
+    // no live CLI presence) and this mount carries messages.
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    // The continue section states read-only once; the footer reason row must
+    // not repeat it.
+    const readOnlyCopy = renderedTextOutsideSheet(view.renderer.root)
+      .split('\n')
+      .filter(text => text === i18n.t('agentChat.session.readOnly'));
+    expect(readOnlyCopy).toHaveLength(1);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(renderedText(continueControl)).toContain(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
+  });
+
+  it('keeps the continue section inside the landscape side insets', async () => {
+    screenSideInsets.left = 47;
+    screenSideInsets.right = 59;
+    onTestFinished(() => {
+      screenSideInsets.left = 0;
+      screenSideInsets.right = 0;
+    });
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    // The bar keeps its own full-bleed background, so the padding lands on the
+    // content wrapper around the control rather than on the bar.
+    const paddedContent = continueControl.parent?.parent;
+    expect(paddedContent?.props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    if (paddedContent == null) {
+      throw new Error('the continue control has no side-inset wrapper');
+    }
+    const controlLabels = paddedContent
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(controlLabels).toContain(i18n.t('agentChat.session.continueInNewSession'));
+  });
+
+  // The transcript paints a skeleton until its rows stop measuring. The footer
+  // does not wait for that verdict: it holds the session's one control from the
+  // moment the kind resolves, and the pill's box holds its own row. Both stay
+  // where they are while the body fills in.
+  it('keeps the continue control on screen while the rows are still measuring', async () => {
+    // The transcript paints in two steps and the list reports its settle from
+    // its own measurement, which lands after the rows it just rendered. The
+    // footer used to follow that report: the live control was replaced by the
+    // inert placeholder that reserves its shape, and a press in the window
+    // landed on nothing. The control is the screen's one action, so it stays —
+    // busy while the body is still measuring, live once the rows have settled.
+    openSettledReport.value = false;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    // The pill paints its ring alone in every unresolved state, and the box
+    // around it holds the row its values will take, so nothing shrinks when the
+    // values arrive.
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(1);
+
+    // The rows settle, and the footer is the same slot with the live control.
+    const list = view.renderer.root.findByType(SessionMessageList);
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
+        ROOT_ID,
+        true
+      );
+    });
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('agentChat.session.readOnly')
+    );
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+  });
+
+  it('keeps the footer live when the mounted list never reports its open state', async () => {
+    openSettledReport.value = null;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    // A list that stays silent must not leave the bottom slot in its reserve:
+    // the session's own footer replaces the placeholder.
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('agentChat.session.readOnly')
+    );
+  });
+
+  it('replaces the composer on an empty read-only transcript too', async () => {
+    // A stored session with no rows has nowhere to write either. The read-only
+    // fact is the resolved kind, so the composer must not mount beside it and
+    // the continue affordance must still be offered.
+    const view = await mountDetails([]);
+    await view.respond(ROOT_ID, []);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    const readOnlyCopy = renderedTextOutsideSheet(view.renderer.root)
+      .split('\n')
+      .filter(text => text === i18n.t('agentChat.session.readOnly'));
+    expect(readOnlyCopy).toHaveLength(1);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(renderedText(continueControl)).toContain(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
+  });
+
+  it('fills the continue control with the muted tone in dark mode', async () => {
+    // The footer's action is the only control on the screen: light fills it
+    // with the palette's olive, and dark must not fill it with the full brand
+    // accent, which glares as a full-width bar under the near-black page. Dark
+    // takes the lifted olive and its own label tone.
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(String(continueControl.props.className)).toContain('bg-primary');
+    expect(String(continueControl.props.className)).toContain('dark:bg-selection');
+    const label = continueControl.find(node => Object.is(node.type, 'Text'));
+    expect(String(label.props.className)).toContain('text-primary-foreground');
+    expect(String(label.props.className)).toContain('dark:text-selection-foreground');
+  });
+  it('opens the new-session composer once on a repeated continue press', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    onTestFinished(() => {
+      nowSpy.mockRestore();
+    });
+
+    await act(async () => {
+      (continueControl.props.onPress as () => void)();
+      (continueControl.props.onPress as () => void)();
+      // Flush the verification the press started before asserting on it.
+      await Promise.resolve();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(1);
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    await act(async () => {
+      (continueControl.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(2);
+  });
+
+  it('states a failed open and retries it from the same footer', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      routerDropsPush.value = true;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      // The press is acknowledged in place while the open is read back: the
+      // footer is busy, not unchanged.
+      expect(continueControlOf(view.renderer).props.loading).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      // The push never landed, so the screen says so beside the control that
+      // can retry it.
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+
+      routerDropsPush.value = false;
+      await act(async () => {
+        (retry.props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('offers a fresh press instead of the old failure once the screen is focused again', async () => {
+    // The wait for the composer is bounded, so a push the navigator applies
+    // later still leaves the failure behind. The person then sees the composer,
+    // and returning here must offer one press: a stale error would carry a Retry
+    // that opens a second composer.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      routerDropsPush.value = true;
+      const focusEffectsBefore = vi.mocked(useFocusEffect).mock.calls.length;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+
+      // The navigator applies the push after the wait gave up on it, and the
+      // person comes back: this is the focus event the screen receives.
+      const focusEffects = vi
+        .mocked(useFocusEffect)
+        .mock.calls.slice(0, focusEffectsBefore)
+        .map(([effect]) => effect);
+      await act(async () => {
+        for (const effect of focusEffects) {
+          effect();
+        }
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('paints no failure for a press the focus reset already answered', async () => {
+    // The read-back is bounded but the navigator can answer later. A person who
+    // saw the composer and came back must not find an error about a press that
+    // actually worked.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      const focusEffectsBefore = vi.mocked(useFocusEffect).mock.calls.length;
+      routerDropsPush.value = true;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      // The composer was the destination and the person is back: the screen's
+      // focus effect runs before the read-back's answer.
+      const focusEffects = vi
+        .mocked(useFocusEffect)
+        .mock.calls.slice(0, focusEffectsBefore)
+        .map(([effect]) => effect);
+      await act(async () => {
+        for (const effect of focusEffects) {
+          effect();
+        }
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('states the failure when the row a held press waits for never arrives', async () => {
+    // A press before the session's own row resolves is held, not dropped. The
+    // wait is bounded: a row that never lands must end in the stated failure
+    // with a Retry, never in a footer that stays busy for good.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const metadata = Promise.withResolvers<undefined>();
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+        metadataReady: metadata.promise,
+        cachedRows: [childMessage(ROOT_ID, 'shown row')],
+      });
+      await act(async () => {
+        view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      expect(continueControlOf(view.renderer).props.loading).toBe(true);
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CONTINUE_SCOPE_WAIT_MS);
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(0);
+
+      // The row finally lands and the same footer retries: the press opens the
+      // composer it was always meant to open. (No `waitFor` here: it polls on
+      // the timers this test fakes.)
+      await act(async () => {
+        metadata.resolve(undefined);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId).toBe(ROOT_ID);
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('session detail composer placeholder (explorer session-detail)', () => {
+  // The explorer's `session-detail.png` shows the composer field rendering the
+  // literal developer string 'undefined'. Every placeholder the detail screen
+  // can pass is catalog copy, so the proof is that the mounted composer always
+  // receives a non-empty catalog string — never 'undefined' and never a raw key.
+  it('passes catalog copy to the composer, never the literal undefined', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.placeholder).toBe(i18n.t('common.message'));
+    expect(typeof composer.props.placeholder).toBe('string');
+    expect(composer.props.placeholder).not.toBe('undefined');
+  });
+
+  it('resolves the preparing and finalizing placeholders to catalog copy too', () => {
+    for (const key of [
+      'agentChat.composer.preparingPlaceholder',
+      'agentChat.composer.finalizingPlaceholder',
+    ]) {
+      const copy = i18n.t(key);
+      expect(copy).not.toBe(key);
+      expect(copy).not.toBe('undefined');
+      expect(copy.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('session detail composer mode chip', () => {
+  it('hands the composer a mode control, because a session has modes', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.modeControl).toMatchObject({
+      mode: expect.any(String),
+      onModeChange: expect.any(Function),
+    });
+  });
+});
+
+describe('session detail duplicate failure state', () => {
+  // Stored messages are ordered by id, which is time-sortable ascending, so the
+  // user row must sort before the assistant row for the Retry prompt to resolve.
+  const USER_ID = 'msg_1761000000000_user';
+  const ASSISTANT_ID = 'msg_1761000000010_assistant';
+
+  function rootUserMessage(text: string): StoredMessage {
+    const message = userMessage(USER_ID);
+    return {
+      info: { ...message.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({ id: `${USER_ID}-text`, sessionID: ROOT_ID, messageID: USER_ID, text }),
+      ],
+    };
+  }
+
+  function rootFailedAssistantMessage(text: string): StoredMessage {
+    const message = assistantMessage(ASSISTANT_ID);
+    const info = message.info;
+    if (info.role !== 'assistant') {
+      throw new Error('fixture must be an assistant message');
+    }
+    message.info = { ...info, sessionID: ROOT_ID, parentID: USER_ID };
+    (message.info as { error?: { name: string; data: unknown } }).error = {
+      name: 'APIError',
+      data: { message: 'raw provider text', isRetryable: true },
+    };
+    return {
+      info: message.info,
+      parts: [
+        stubTextPart({
+          id: `${ASSISTANT_ID}-text`,
+          sessionID: ROOT_ID,
+          messageID: ASSISTANT_ID,
+          text,
+        }),
+      ],
+    };
+  }
+
+  async function mountFailedTurn(indicator: SessionStatusIndicator) {
+    const view = await mountDetails([
+      rootUserMessage('please refactor'),
+      rootFailedAssistantMessage('matching the requested refactor.'),
+    ]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        indicator
+      );
+    });
+    return view;
+  }
+
+  it('states the failure once: no repeated detail line and no repeated footer error', async () => {
+    const view = await mountFailedTurn({ type: 'error', message: 'simulated error', timestamp: 0 });
+    const text = renderedText(view.renderer.root);
+    expect(text).toContain('Response failed');
+    expect(text).not.toContain('The response failed.');
+    expect(indicatorNodes(view)).toHaveLength(0);
+  });
+
+  it('states a generation the person stopped as one neutral status line', async () => {
+    // The runtime writes `MessageAbortedError` when the person stops a
+    // generation (`kilo2-source-messages.ts`), so the row that follows a Stop is
+    // this message.
+    const stopped = rootFailedAssistantMessage('');
+    stopped.parts = [];
+    const info = stopped.info;
+    if (info.role !== 'assistant') {
+      throw new Error('fixture must be an assistant message');
+    }
+    stopped.info = {
+      ...info,
+      error: { name: 'MessageAbortedError', data: { message: 'Interrupted' } },
+    };
+
+    const view = await mountDetails([rootUserMessage('please refactor'), stopped]);
+    const text = renderedText(view.renderer.root);
+    const neutral = i18n.t('agentChat.messageFailure.assistantStopped');
+    // The stop is stated once and only as a status: no error heading, no
+    // second line repeating it, and nothing to retry because the person's own
+    // action ended the run.
+    expect(text).toContain(neutral);
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    const buttons = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(buttons).not.toContain(i18n.t('common.retry'));
+
+    const status = view.renderer.root.find(
+      node => Object.is(node.type, 'Text') && node.children.some(child => child === neutral)
+    );
+    expect(status.props.className).toContain('text-muted-foreground');
+    expect(status.props.className).not.toContain('text-destructive');
+    expect(status.props.accessibilityLabel).toBe(neutral);
+
+    // The row carries no destructive marker: the footer is the only surface a
+    // failure marker is drawn on, and it draws none.
+    const footers = view.renderer.root.findAll(
+      node => Object.is(node.type, 'View') && String(node.props.className).includes('pb-[24px]')
+    );
+    expect(footers).toHaveLength(1);
+    expect(footers[0]?.findAllByType('AlertCircle')).toHaveLength(0);
+    expect(indicatorNodes(view)).toHaveLength(0);
+  });
+
+  it('keeps a classified session error the message row does not carry', async () => {
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.props).toMatchObject({
+      indicator: { message: expect.stringContaining('Insufficient credits') },
+    });
+  });
+
+  it('states a failed delivery once: the row keeps Retry/Copy and the footer drops the generic line', async () => {
+    // Retry is offered only where the session can send; this row's subject is
+    // the single statement of the failure beside its two actions.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const view = await mountDetails([rootUserMessage('please refactor')]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          [USER_ID, { status: 'failed', error: 'Unauthorized: Unauthorized', reason: 'execution' }],
+        ])
+      );
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+
+    const text = renderedText(view.renderer.root);
+    // An agent-execution delivery failure renders the base's assistant-failure
+    // title with no second line (message-failure-state.ts); this branch's rule
+    // drops the footer's delivery-flavoured line, so the row states it once.
+    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    // The footer row that would restate the generic assistant line is gone: the
+    // delivery block is the single failed-send surface.
+    expect(indicatorNodes(view)).toHaveLength(0);
+    const labels = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(labels).toContain(i18n.t('common.retry'));
+    expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
+  });
+
+  it('states a failed preparation once: the group names the failed stage and the row keeps its actions', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const question = 'please refactor';
+    const view = await mountDetails([rootUserMessage(question)]);
+    const placeholder = () =>
+      view.renderer.root.find(node => Object.is(node.type, 'ChatComposer')).props.placeholder;
+
+    // While the sandbox is still being prepared the composer states the setup
+    // phase and its send control is locked: the state the reader was stuck in.
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
+        view.manager.atoms.cloudStatus,
+        {
+          type: 'preparing',
+          step: 'sandbox_create',
+          message: 'Retrying sandbox creation',
+        }
+      );
+    });
+    expect(placeholder()).toBe(i18n.t('agentChat.composer.preparingPlaceholder'));
+    expect(composerProps(view).sendDisabled).toBe(true);
+
+    // Setup gave up: the queued question carries the failure, the send control
+    // is usable, and the composer no longer claims the environment is being set
+    // up.
+    const failedAttempt: PreparationAttempt = {
+      id: 'attempt-1',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+      startedAt: 0,
+      completedAt: 1,
+      safeError: 'invalid_configuration',
+      revision: 2,
+      steps: [
+        {
+          id: 'step-sandbox',
+          key: 'sandbox_provision',
+          kind: 'phase',
+          label: 'sandbox provision',
+          status: 'failed',
+          startedAt: 0,
+          completedAt: 1,
+          revision: 1,
+          latestDetail: 'Creating sandbox',
+          safeError: 'invalid_configuration',
+        },
+      ],
+    };
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
+        view.manager.atoms.cloudStatus,
+        { type: 'error', message: 'invalid_configuration' }
+      );
+      view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
+        view.manager.atoms.preparationAttempts,
+        [failedAttempt]
+      );
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          [
+            USER_ID,
+            { status: 'failed', error: 'The sandbox could not be created', reason: 'execution' },
+          ],
+        ])
+      );
+    });
+
+    const text = renderedText(view.renderer.root);
+    // The failed attempt is what the group renders; its own copy (the failed
+    // stage and the reason) is covered by the group's suite.
+    const group = view.renderer.root.find(node => Object.is(node.type, 'PreparationGroup'));
+    expect(group.props.attempt).toMatchObject({
+      id: 'attempt-1',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+    });
+    // The generic response-failure statement above it is gone, so the same
+    // failed turn is not read as two competing errors.
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
+    expect(placeholder()).toBe(i18n.t('common.message'));
+    expect(composerProps(view).sendDisabled).toBe(false);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+    // The turn keeps the recovery PR 9887 gave it.
+    const labels = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(labels).toContain(i18n.t('common.retry'));
+    expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
+
+    // The queued question is recoverable: Retry re-sends that prompt.
+    const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+      payload: { type: 'prompt', prompt: question },
+    });
+  });
+
+  it('opens a run whose preparation failed to its own failure, not the page-load card', async () => {
+    // The run never produced a message: the sandbox preparation failed before a
+    // turn could run, so the open has zero messages and an error indicator. The
+    // failed group is the run's own statement of what went wrong, with the failed
+    // stage and the reason; the page-load card would replace it with a failure
+    // that did not happen and would take the question row's Retry and Copy with
+    // it.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    const view = await mountDetails([]);
+    const failedAttempt: PreparationAttempt = {
+      id: 'attempt-failed-open',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+      startedAt: 0,
+      completedAt: 1,
+      safeError: 'invalid_configuration',
+      revision: 2,
+      steps: [
+        {
+          id: 'step-sandbox',
+          key: 'sandbox_provision',
+          kind: 'phase',
+          label: 'sandbox provision',
+          status: 'failed',
+          startedAt: 0,
+          completedAt: 1,
+          revision: 1,
+          latestDetail: 'Creating sandbox',
+          safeError: 'invalid_configuration',
+        },
+      ],
+    };
+    act(() => {
+      view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
+        view.manager.atoms.preparationAttempts,
+        [failedAttempt]
+      );
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+    });
+
+    const group = view.renderer.root.find(node => Object.is(node.type, 'PreparationGroup'));
+    expect(group.props.attempt).toMatchObject({
+      id: 'attempt-failed-open',
+      status: 'failed',
+    });
+    // The full-screen card is the failed-open surface, and this open is not one.
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    const text = renderedText(view.renderer.root);
+    expect(text).not.toContain(i18n.t('agentChat.session.couldNotLoadThisSession'));
+    expect(text).not.toContain(i18n.t('agentChat.session.failedToLoadDetails'));
+  });
+
+  it.each([false, true])(
+    'keeps a response that failed before producing content recoverable after reopen (condensed: %s)',
+    async condensed => {
+      goalMountOptions.resolvedType = 'cloud-agent';
+      sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+      condensePreference.value = condensed;
+      const prompt = 'أجب بكلمة جاهز. لا تستخدم الأدوات.';
+      const failed = rootFailedAssistantMessage('');
+      failed.parts = [];
+      const view = await mountDetails([rootUserMessage(prompt), failed]);
+
+      expect(renderedText(view.renderer.root)).toContain(
+        i18n.t('agentChat.messageFailure.assistantTitle')
+      );
+      expect(indicatorNodes(view)).toHaveLength(0);
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+      await waitFor(
+        () =>
+          view.store.get(view.manager.atoms.messagesList).filter(row => row.info.role === 'user')
+            .length === 2
+      );
+      const prompts = view.store
+        .get(view.manager.atoms.messagesList)
+        .filter(row => row.info.role === 'user')
+        .map(row =>
+          row.parts
+            .filter(part => part.type === 'text')
+            .map(part => part.text)
+            .join('')
+        );
+      expect(prompts).toEqual([prompt, prompt]);
+      expect(
+        view.store.get(view.manager.atoms.messagesList).find(row => row.info.id === ASSISTANT_ID)
+          ?.info
+      ).toMatchObject({ role: 'assistant', error: { name: 'APIError' } });
+    }
+  );
+
+  it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
+    // Explorer `session-working` showed the fixed footer line printed over the
+    // scrolling transcript row it covers. The footer must be an opaque
+    // `bg-background` sibling in the column flow, never an `absolute` overlay.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    const footer = nodes[0]?.parent;
+    const className = String(footer?.props.className ?? '');
+    expect(className).toContain('bg-background');
+    expect(className).not.toContain('absolute');
+  });
+
+  it('renders the fixed footer error row without a position transition', async () => {
+    // A Reanimated layout transition on the footer wrapper animates its Y
+    // across the keyboard show/hide and blocking-card mount/unmount resizes.
+    // An entry measured inside that resize storm can strand the row at its
+    // pre-change position — floating mid-screen over the transcript, where
+    // the red error line drew on top of a transcript row (question-kb-down
+    // capture). The footer's position must always be plain layout.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const node = indicatorNodes(view)[0];
+    if (!node) {
+      throw new Error('footer indicator did not render');
+    }
+    let wrapper = node.parent;
+    while (wrapper && wrapper.props.layout === undefined) {
+      wrapper = wrapper.parent;
+    }
+    expect(wrapper).toBeNull();
+  });
+});
+
+function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
+  return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
+}
+
+describe('SessionDetailContent transcript chrome growth', () => {
+  /** The growth the host hands the transcript, or null when it hands none. */
+  function chromeGrowth(view: { renderer: ReactTestRenderer }): number {
+    const list = view.renderer.root.find(node => Object.is(node.type, SessionMessageList));
+    return (list.props as { chromeGrowthDp?: number }).chromeGrowthDp ?? 0;
+  }
+
+  it('hands the composer input growth to the transcript in the same commit and gives it back', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
+    // Nothing rides up while the input sits on its one-line floor.
+    expect(chromeGrowth(view)).toBe(0);
+
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
+    });
+    // The list shifts its content by the growth, so its newest row keeps the
+    // composer's top edge without a scroll command.
+    expect(chromeGrowth(view)).toBe(64);
+
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(0);
+    });
+    expect(chromeGrowth(view)).toBe(0);
+  });
+
+  it('withholds the growth when the composer is replaced by other chrome', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
+    });
+    expect(chromeGrowth(view)).toBe(64);
+
+    // The read-only footer is chrome of another height, so nothing rides up
+    // while it is on screen.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(
+      view.renderer.root.findAll(candidate => Object.is(candidate.type, 'ChatComposer'))
+    ).toHaveLength(0);
+    expect(chromeGrowth(view)).toBe(0);
+
+    // The measurement survives the swap: once the composer is back, a
+    // multi-line draft keeps its anchor without waiting for another line.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(chromeGrowth(view)).toBe(64);
+  });
+});
+
+function composerPropsWithInset(view: { renderer: ReactTestRenderer }) {
+  return view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer')).props as {
+    onInputBottomInsetChange?: (dp: number) => void;
+  };
+}
+describe('session detail compute polling', () => {
+  it('polls the compute read only while the screen is focused and the app is active', async () => {
+    computeReadArgs.calls.length = 0;
+    computePolling.focusedAndActive = true;
+    await mountDetails();
+    expect(computeReadArgs.calls.at(-1)?.poll).toBe(true);
+
+    // A screen left on the navigation stack keeps mounting its reads; a blurred
+    // one must leave the shared timer to whichever surface is on screen.
+    computeReadArgs.calls.length = 0;
+    computePolling.focusedAndActive = false;
+    await mountDetails();
+    expect(computeReadArgs.calls.at(-1)?.poll).toBe(false);
+  });
 });

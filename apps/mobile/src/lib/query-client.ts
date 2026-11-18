@@ -1,7 +1,182 @@
-import { MutationCache, type Query, QueryCache, QueryClient } from '@tanstack/react-query';
+import {
+  CancelledError,
+  MutationCache,
+  type Query,
+  QueryCache,
+  QueryClient,
+  type QueryFunction,
+  type QueryKey,
+} from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
+import { reportTrpcError } from '@/lib/force-update-signal';
+import { reportAppError } from '@/lib/telemetry/app-error-reporting';
+import {
+  isPermissionDeniedError,
+  isTerminalTrpcCode,
+  isTrpcClientError,
+  readTrpcErrorField,
+} from '@/lib/trpc-error';
+
+const acceptedActiveSessionsDataSchema = z.object({
+  sessions: z.array(z.looseObject({ id: z.string() })),
+});
+
+/**
+ * The session ids of one accepted (non-manual) `activeSessions.list` result,
+ * read defensively: a later refactor of the router's output shape must leave
+ * the metadata without provenance (surfaces resolve empty) instead of
+ * crashing every observer of the query cache.
+ */
+function acceptedActiveSessionsRowIds(data: unknown): readonly string[] {
+  const parsed = acceptedActiveSessionsDataSchema.safeParse(data);
+  if (parsed.success) {
+    return parsed.data.sessions.map(row => row.id);
+  }
+  return [];
+}
+
+export type ActiveSessionsQueryMetadata = Readonly<{
+  acceptedRevision: number;
+  /**
+   * The session ids the last accepted (non-manual) server answer listed. A
+   * later manual cache write (a socket write, the floor poll) replaces the
+   * cache without a server answer, so this set is what an empty live cache is
+   * compared against: cache empty while these are still listed means the
+   * emptiness was never confirmed by the server, and the surface keeps its
+   * last rows from the query cache until the confirmation answer lands.
+   */
+  acceptedSessionIds: ReadonlySet<string>;
+  terminalError: Readonly<{
+    error: unknown;
+    kind: 'retryable' | 'non-retryable';
+  }> | null;
+}>;
+
+// Old/manual-only cache entries have no server provenance. They cannot establish
+// empty success; keep this fallback while those entries can occur.
+const EMPTY_SESSION_ID_SET: ReadonlySet<string> = new Set();
+const EMPTY_ACTIVE_SESSIONS_METADATA: ActiveSessionsQueryMetadata = {
+  acceptedRevision: 0,
+  acceptedSessionIds: EMPTY_SESSION_ID_SET,
+  terminalError: null,
+};
+const activeSessionsMetadata = new WeakMap<Query, ActiveSessionsQueryMetadata>();
+const activeSessionsListeners = new WeakMap<Query, Set<() => void>>();
+const activeSessionsQueryKeySchema = z.tuple([
+  z.tuple([z.literal('activeSessions'), z.literal('list')]),
+  z.object({ type: z.literal('query'), input: z.unknown().optional() }),
+]);
+
+export function getActiveSessionsQueryMetadata(
+  query: Query | undefined
+): ActiveSessionsQueryMetadata {
+  return (query && activeSessionsMetadata.get(query)) ?? EMPTY_ACTIVE_SESSIONS_METADATA;
+}
+
+export function subscribeActiveSessionsQueryMetadata(
+  query: Query | undefined,
+  listener: () => void
+): () => void {
+  if (!query) {
+    return () => undefined;
+  }
+  const listeners = activeSessionsListeners.get(query) ?? new Set<() => void>();
+  activeSessionsListeners.set(query, listeners);
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function captureActiveSessionsQueryRefresh(client: QueryClient, queryKey: QueryKey) {
+  const query = client.getQueryCache().build(client, { queryKey });
+  const revision = getActiveSessionsQueryMetadata(query).acceptedRevision;
+  const isCurrent = () => client.getQueryCache().get(query.queryHash) === query;
+  return {
+    isCurrent,
+    hasAcceptedResult: () =>
+      isCurrent() && getActiveSessionsQueryMetadata(query).acceptedRevision > revision,
+  };
+}
+
+/**
+ * True once this scope settled on something the server said: an accepted
+ * `activeSessions.list` result, or a failure its surface can retry. A socket
+ * write alone establishes neither — it is a manual cache write, so a scope
+ * whose only traffic is socket writes has no outcome and keeps painting its
+ * loading placeholder.
+ */
+export function hasActiveSessionsServerOutcome(client: QueryClient, queryKey: QueryKey): boolean {
+  const metadata = getActiveSessionsQueryMetadata(
+    client.getQueryCache().build(client, { queryKey })
+  );
+  return metadata.acceptedRevision > 0 || metadata.terminalError !== null;
+}
+
+/** Keep canceled account/attachment work out of Query's success reducer. */
+export function fenceActiveSessionsQuery<TData, TKey extends QueryKey>(
+  queryFn: QueryFunction<TData, TKey>,
+  isCurrent: () => boolean
+): QueryFunction<TData, TKey> {
+  return async context => {
+    if (!isCurrent()) {
+      throw new CancelledError({ revert: true });
+    }
+    const result = await queryFn(context);
+    if (!isCurrent()) {
+      throw new CancelledError({ revert: true });
+    }
+    return result;
+  };
+}
+
+function observeActiveSessionsQueryOutcomes(queryCache: QueryCache): void {
+  // This client-lifetime subscription survives QueryClient.clear().
+  queryCache.subscribe(event => {
+    const query: Query = event.query;
+    if (!activeSessionsQueryKeySchema.safeParse(query.queryKey).success) {
+      return;
+    }
+    const previous = getActiveSessionsQueryMetadata(query);
+    if (event.type === 'removed') {
+      activeSessionsMetadata.delete(query);
+    } else if (
+      event.type === 'updated' &&
+      event.action.type === 'success' &&
+      !event.action.manual
+    ) {
+      activeSessionsMetadata.set(query, {
+        acceptedRevision: previous.acceptedRevision + 1,
+        acceptedSessionIds: new Set(acceptedActiveSessionsRowIds(event.action.data)),
+        terminalError: null,
+      });
+    } else if (
+      event.type === 'updated' &&
+      event.action.type === 'error' &&
+      !(event.action.error instanceof CancelledError)
+    ) {
+      if (previous.terminalError?.error === event.action.error) {
+        return;
+      }
+      activeSessionsMetadata.set(query, {
+        ...previous,
+        terminalError: {
+          error: event.action.error,
+          kind: isTerminalTrpcCode(readTrpcErrorField(event.action.error, 'code'))
+            ? 'non-retryable'
+            : 'retryable',
+        },
+      });
+    } else {
+      return;
+    }
+    for (const listener of activeSessionsListeners.get(query) ?? []) {
+      listener();
+    }
+  });
+}
 
 // tRPC error codes that retrying can never fix — surface these immediately
 // instead of sitting on a skeleton through the default retry backoff.
@@ -11,49 +186,8 @@ const PERMANENT_CODES = new Set([
   'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
+  'UNPROCESSABLE_CONTENT',
 ]);
-
-type TrpcErrorData = {
-  code?: string;
-  authRequired?: boolean;
-};
-
-const trpcErrorDataSchema = z.object({
-  code: z.string().optional(),
-  authRequired: z.boolean().optional(),
-});
-const trpcErrorShapeSchema = z.object({
-  data: z.unknown().optional(),
-  shape: z.object({ data: z.unknown().optional() }).optional(),
-});
-
-/** The serialized tRPC error data, from either the direct or shaped variant. */
-function trpcErrorData(error: unknown): TrpcErrorData | undefined {
-  const parsedError = trpcErrorShapeSchema.safeParse(error);
-  if (!parsedError.success) {
-    return undefined;
-  }
-  const direct = trpcErrorDataSchema.safeParse(parsedError.data.data);
-  if (direct.success) {
-    return direct.data;
-  }
-  const shaped = trpcErrorDataSchema.safeParse(parsedError.data.shape?.data);
-  return shaped.success ? shaped.data : undefined;
-}
-
-/**
- * True when the error is a permission loss: a `FORBIDDEN`, or a procedure-level
- * `UNAUTHORIZED` without the context-level `authRequired` flag (which the
- * unauthorized handler signs the user out on). Permission loss must drop the
- * affected cache, not the session.
- */
-function isPermissionDeniedError(error: unknown): boolean {
-  const data = trpcErrorData(error);
-  if (data?.code === 'FORBIDDEN') {
-    return true;
-  }
-  return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
-}
 
 type QueryKeyInput = { organizationId?: unknown };
 
@@ -70,11 +204,14 @@ function queryKeyInput(queryKey: unknown): QueryKeyInput | undefined {
 
 /**
  * Drops a permission-denied query from the cache so the next persister save
- * omits it. An org-scoped query is removed by its org prefix (procedure path +
+ * omits it. An org-scoped query is dropped by its org prefix (procedure path +
  * `input.organizationId`), which also covers every sibling variant of that
- * procedure for the same org; a non-org query is removed by its exact key.
+ * procedure for the same org; a non-org query is dropped by its exact key. A
+ * sibling a screen observes keeps its slot — removing it rebuilds and refetches,
+ * which fails again for as long as its error screen mounts — and loses only the
+ * denied rows, so every other sibling leaves the cache.
  */
-function removePermissionDeniedQueries(
+function dropPermissionDeniedQuery(
   queryClient: QueryClient,
   error: unknown,
   query: Query<unknown, unknown, unknown>
@@ -84,23 +221,83 @@ function removePermissionDeniedQueries(
   }
   const input = queryKeyInput(query.queryKey);
   const organizationId = input?.organizationId;
-  if (organizationId !== undefined && organizationId !== null) {
-    queryClient.removeQueries({
-      queryKey: [query.queryKey[0], { input: { organizationId } }],
-    });
+  if (organizationId === undefined || organizationId === null) {
+    if (query.isActive()) {
+      return;
+    }
+    queryClient.removeQueries({ queryKey: query.queryKey });
     return;
   }
-  queryClient.removeQueries({ queryKey: query.queryKey });
+  const orgPrefix = [query.queryKey[0], { input: { organizationId } }];
+  queryClient.removeQueries({ queryKey: orgPrefix, type: 'inactive' });
+  for (const observed of queryClient.getQueryCache().findAll({
+    queryKey: orgPrefix,
+    type: 'active',
+  })) {
+    observed.setState({ data: undefined });
+  }
 }
+
+/**
+ * A permission denial on an org-scoped query can mean the membership itself is
+ * gone (the host removed the member) while the cached `organizations.list`
+ * still names the org — the provider's reconciliation then has nothing to act
+ * on. Invalidate the shared list so it refetches despite its freshness window;
+ * when the fresh list drops the org, `OrganizationProvider` switches to the
+ * remaining context. A list still holding the org (role-scoped denial, org
+ * intact) changes nothing: the fresh snapshot matches the selection's own.
+ */
+function refreshOrganizationsListOnPermissionLoss(
+  queryClient: QueryClient,
+  error: unknown,
+  query: Query<unknown, unknown, unknown>
+): void {
+  if (!isPermissionDeniedError(error)) {
+    return;
+  }
+  const organizationId = queryKeyInput(query.queryKey)?.organizationId;
+  if (organizationId === undefined || organizationId === null) {
+    return;
+  }
+  // `cancelRefetch: false` keeps one in-flight list fetch alive when several
+  // org-scoped queries fail around the same time, instead of cancelling and
+  // restarting the shared fetch once per denial.
+  void queryClient.invalidateQueries(
+    { queryKey: [['organizations', 'list']] },
+    { cancelRefetch: false }
+  );
+}
+
+/**
+ * Default freshness for app queries. Screens paint persisted-cache rows before
+ * the network answers (U4); this keeps a mount or focus regain from re-requesting
+ * the same payload for 30 s. Explicit `staleTime: 0` call sites still override it.
+ */
+const DEFAULT_QUERY_STALE_TIME_MS = 30_000;
 
 export function createKiloAppQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
+        // Keep the persisted-cache first paint: cached rows are fresh for the
+        // default window, so a mount or focus regain does not immediately
+        // re-request what is already on screen. Every explicit invalidation path
+        // (invalidateQueries, refetchQueries, refetchInterval, pull-to-refresh)
+        // still refetches, and call sites that pass `staleTime: 0` still override.
+        staleTime: DEFAULT_QUERY_STALE_TIME_MS,
+        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also refetched unfocused tabs.
+        refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
-          const code = (error as { data?: { code?: string } } | null)?.data?.code;
-          if (code !== undefined && PERMANENT_CODES.has(code)) {
-            return false;
+          // Only a real tRPC envelope carries a server verdict: a client error
+          // has `data.code`, a server-shaped one `shape.data.code`, and a
+          // validation failure is permanent either way. A bare top-level `code`
+          // also appears on filesystem, transport and domain errors, so it never
+          // stops a retry.
+          if (isTrpcClientError(error)) {
+            const code = readTrpcErrorField(error, 'code');
+            if (code !== undefined && PERMANENT_CODES.has(code)) {
+              return false;
+            }
           }
           return failureCount < 2;
         },
@@ -110,20 +307,23 @@ export function createKiloAppQueryClient(): QueryClient {
     queryCache: new QueryCache({
       onError: (error, query) => {
         void handleTrpcQueryError(error);
-        // Removing a still-observed query rebuilds it on the next render and
-        // refetches, which fails FORBIDDEN again and loops for as long as the
-        // error screen stays mounted. Only drop queries nothing is observing.
-        if (!query.isActive()) {
-          removePermissionDeniedQueries(queryClient, error, query);
-        }
+        reportTrpcError(error);
+        reportAppError(error, { source: 'query', queryKey: query.queryKey });
+        // A denied query drops its cached rows even while a screen observes it;
+        // only the query object survives, so the screen can show the denial.
+        dropPermissionDeniedQuery(queryClient, error, query);
+        refreshOrganizationsListOnPermissionLoss(queryClient, error, query);
       },
     }),
     mutationCache: new MutationCache({
       onError: error => {
         void handleTrpcQueryError(error);
+        reportTrpcError(error);
+        reportAppError(error, { source: 'mutation' });
       },
     }),
   });
+  observeActiveSessionsQueryOutcomes(queryClient.getQueryCache());
   return queryClient;
 }
 

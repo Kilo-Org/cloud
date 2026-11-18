@@ -1,14 +1,17 @@
-// Module-level bridge for the file-navigator's "scroll to file" request.
+// Route-scoped bridge for the file-navigator's "scroll to file" request.
 // The file navigator subscribes via `subscribeFileNavigatorRequest` and
 // navigates the diff list when the user picks a file from the navigator
 // sheet. `requestScrollToFile` is the producer side, called by the
-// navigator sheet on selection. S6c implements both ends.
+// navigator sheet on selection.
 //
-// Every request carries its owning PR identity, and subscribers register
-// for a specific PR, so a navigation request emitted for one PR is never
-// delivered to another PR's diff list if both remain mounted.
+// Every request carries its owning PR identity, and subscribers register for
+// a specific PR's route key in the route registry, so a navigation request
+// emitted for one PR is never delivered to another PR's diff list if both
+// remain mounted.
 
 import { type PrIdentity } from './diff-selection-bridge';
+import { prFileNavSlot, prRouteKey, type RouteKey } from '../route-registry';
+import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 export type FileNavigatorRequest = PrIdentity & {
   path: string;
@@ -16,28 +19,45 @@ export type FileNavigatorRequest = PrIdentity & {
 
 type Listener = (request: FileNavigatorRequest) => void;
 
-const listeners = new Set<{ pr: PrIdentity; listener: Listener }>();
-
-function samePr(a: PrIdentity, b: PrIdentity): boolean {
-  return (
-    a.owner.toLowerCase() === b.owner.toLowerCase() &&
-    a.repo.toLowerCase() === b.repo.toLowerCase() &&
-    a.number === b.number
-  );
+/**
+ * The bridge slot key for one PR identity: the same provider-scoped key the
+ * diff-selection bridge uses, so every slot resolves under the full provider
+ * identity (rule 17).
+ */
+function navigatorRouteKey(pr: PrIdentity): RouteKey {
+  const legacy = prRouteKey(pr);
+  if (!pr.ref || pr.ref.platform === 'github') {
+    return legacy;
+  }
+  return `${legacy}@${providerPrRefKey(pr.ref)}`;
 }
 
 export function requestScrollToFile(request: FileNavigatorRequest) {
-  for (const entry of listeners) {
-    if (samePr(entry.pr, request)) {
-      entry.listener(request);
-    }
+  const listeners = prFileNavSlot.get(navigatorRouteKey(request));
+  if (!listeners) {
+    return;
+  }
+  for (const listener of listeners) {
+    listener(request);
   }
 }
 
 export function subscribeFileNavigatorRequest(pr: PrIdentity, listener: Listener): () => void {
-  const entry = { pr, listener };
-  listeners.add(entry);
+  const routeKey = navigatorRouteKey(pr);
+  const existing = prFileNavSlot.get(routeKey);
+  if (existing) {
+    existing.add(listener);
+  } else {
+    prFileNavSlot.set(routeKey, new Set([listener]));
+  }
   return () => {
-    listeners.delete(entry);
+    const listeners = prFileNavSlot.get(routeKey);
+    if (!listeners) {
+      return;
+    }
+    listeners.delete(listener);
+    if (listeners.size === 0) {
+      prFileNavSlot.clear(routeKey);
+    }
   };
 }

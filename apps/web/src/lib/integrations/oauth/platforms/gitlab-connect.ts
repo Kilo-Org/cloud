@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException } from '@sentry/nextjs';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
@@ -14,19 +14,30 @@ import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import {
+  appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthConnectErrorPath,
+  organizationAccessDenialErrorCode,
   redirectToSignInForOAuthConnect,
 } from '@/lib/integrations/oauth/common';
+import {
+  APP_SHELL_FLOW_COOKIE,
+  appShellFlowCookieOptions,
+  createAppShellFlowToken,
+} from '@/lib/integrations/oauth/app-shell-flow';
+import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
+import { appShellRedirect } from '@/lib/app-shell/redirect';
+import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { Owner } from '@/lib/integrations/core/types';
 
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
 const GitLabOAuthConnectPostBodySchema = z.object({
-  organizationId: z.string().optional(),
-  instanceUrl: z.string().optional(),
-  clientId: z.string().optional(),
-  clientSecret: z.string().optional(),
-  returnTo: z.string().optional(),
+  organizationId: z.string().max(128).optional(),
+  instanceUrl: z.string().max(2048).optional(),
+  clientId: z.string().max(512).optional(),
+  clientSecret: z.string().max(512).optional(),
+  returnTo: z.string().max(2048).optional(),
 });
 
 type GitLabOAuthConnectOptions = {
@@ -35,6 +46,14 @@ type GitLabOAuthConnectOptions = {
   clientId?: string;
   clientSecret?: string;
   returnTo?: string | null;
+  /** Set when the app shell started the flow; see `VerifiedOAuthState.appShell`. */
+  appShell?: boolean;
+};
+
+type GitLabConnectCaller = {
+  user: AuthenticatedOAuthUser;
+  /** The app shell supplies its own session, and every redirect stays on its page. */
+  appShell?: boolean;
 };
 
 /**
@@ -50,7 +69,6 @@ type GitLabOAuthConnectOptions = {
  */
 export async function handleGitLabOAuthConnect(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const organizationId = searchParams.get('organizationId');
 
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -60,88 +78,181 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
 
       return redirectToSignInForOAuthConnect(
         request,
-        hasLegacyQueryCredentials ? buildGitLabDetailCallbackPath(organizationId) : undefined
+        hasLegacyQueryCredentials
+          ? buildGitLabDetailCallbackPath(searchParams.get('organizationId'))
+          : undefined
       );
     }
 
-    const instanceUrl = searchParams.get('instanceUrl') || undefined;
-    const returnToParam = searchParams.get('returnTo') || undefined;
-    const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
-
-    const oauthUrl = await buildGitLabConnectOAuthUrl(user, {
-      organizationId,
-      instanceUrl,
-      returnTo,
-    });
-
-    return NextResponse.redirect(oauthUrl);
+    return await startGitLabOAuthConnect(request, { user });
   } catch (error) {
-    console.error('Error initiating GitLab OAuth:', error);
+    return gitLabConnectFailure(request, error);
+  }
+}
 
+/**
+ * Starts the GitLab dance for an already-identified caller. The web entry point
+ * supplies the web session's user; the app shell supplies its own session and
+ * `appShell`, which pins the callback to the shell page.
+ */
+export async function startGitLabOAuthConnect(
+  request: NextRequest,
+  { user, appShell }: GitLabConnectCaller
+): Promise<Response> {
+  const searchParams = request.nextUrl.searchParams;
+  const organizationId = searchParams.get('organizationId');
+  const instanceUrl = searchParams.get('instanceUrl') || undefined;
+  const returnToParam = searchParams.get('returnTo') || undefined;
+  const returnTo = appShell
+    ? buildAppShellIntegrationPath(PLATFORM.GITLAB, organizationId ?? undefined)
+    : returnToParam
+      ? validateReturnPath(returnToParam)
+      : null;
+
+  const { url, state } = await buildGitLabConnectOAuthUrl(user, {
+    organizationId,
+    instanceUrl,
+    returnTo,
+    appShell,
+  });
+
+  const response = NextResponse.redirect(url);
+  if (appShell) {
+    response.cookies.set(
+      APP_SHELL_FLOW_COOKIE,
+      createAppShellFlowToken({ userId: user.id, state }),
+      appShellFlowCookieOptions()
+    );
+  }
+  return response;
+}
+
+/** The redirect an aborted connect lands on: the shell page when the shell started it. */
+function gitLabConnectFailure(request: NextRequest, error: unknown): Response {
+  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  console.error('Error initiating GitLab OAuth:', error);
+
+  const denialCode = organizationAccessDenialErrorCode(error);
+  if (!denialCode) {
     captureException(error, {
       tags: {
         endpoint: 'gitlab/connect',
         source: 'gitlab_oauth',
       },
     });
+  }
 
-    return NextResponse.redirect(
-      new URL(
-        buildIntegrationOAuthConnectErrorPath(PLATFORM.GITLAB, organizationId, 'oauth_init_failed'),
-        request.url
+  const errorCode = denialCode ?? 'oauth_init_failed';
+  if (request.nextUrl.pathname.startsWith(APP_SHELL_PREFIX)) {
+    return appShellRedirect(
+      appendIntegrationOAuthRedirectQuery(
+        buildAppShellIntegrationPath(PLATFORM.GITLAB, organizationId ?? undefined),
+        `error=${encodeURIComponent(errorCode)}`
       )
     );
   }
+
+  return NextResponse.redirect(
+    new URL(
+      buildIntegrationOAuthConnectErrorPath(PLATFORM.GITLAB, organizationId, errorCode),
+      request.url
+    )
+  );
 }
 
 export async function handleGitLabOAuthConnectPost(request: NextRequest): Promise<Response> {
-  const rawBody = await request.json().catch(() => null);
-  const parsedBody = GitLabOAuthConnectPostBodySchema.safeParse(rawBody);
-
-  if (!parsedBody.success) {
-    return NextResponse.json({ error: 'Invalid GitLab OAuth request' }, { status: 400 });
-  }
-
-  const {
-    organizationId,
-    instanceUrl,
-    clientId,
-    clientSecret,
-    returnTo: rawReturnTo,
-  } = parsedBody.data;
-  const returnTo = rawReturnTo ? validateReturnPath(rawReturnTo) : null;
-
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const oauthUrl = await buildGitLabConnectOAuthUrl(user, {
-      organizationId: organizationId ?? null,
+    return await startGitLabOAuthConnectPost(request, { user });
+  } catch (error) {
+    return gitLabConnectPostFailure(request, error);
+  }
+}
+
+/**
+ * The self-hosted GitLab connect the shell can call: same body, but the caller
+ * is the shell session and the state it mints stays inside the shell.
+ */
+export async function startGitLabOAuthConnectPost(
+  request: NextRequest,
+  { user, appShell }: GitLabConnectCaller
+): Promise<Response> {
+  let organizationId: string | null = null;
+  let hasCustomCredentials = false;
+
+  try {
+    const rawBody = await request.json().catch(() => null);
+    const parsedBody = GitLabOAuthConnectPostBodySchema.safeParse(rawBody);
+
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: 'Invalid GitLab OAuth request' }, { status: 400 });
+    }
+
+    const { instanceUrl, clientId, clientSecret, returnTo: rawReturnTo } = parsedBody.data;
+    organizationId = parsedBody.data.organizationId ?? null;
+    hasCustomCredentials = Boolean(clientId && clientSecret);
+    const returnTo = appShell
+      ? buildAppShellIntegrationPath(PLATFORM.GITLAB, organizationId ?? undefined)
+      : rawReturnTo
+        ? validateReturnPath(rawReturnTo)
+        : null;
+
+    const { url, state } = await buildGitLabConnectOAuthUrl(user, {
+      organizationId,
       instanceUrl,
       clientId,
       clientSecret,
       returnTo,
+      appShell,
     });
 
-    return NextResponse.json({ url: oauthUrl });
+    const response = NextResponse.json({ url });
+    if (appShell) {
+      response.cookies.set(
+        APP_SHELL_FLOW_COOKIE,
+        createAppShellFlowToken({ userId: user.id, state }),
+        appShellFlowCookieOptions()
+      );
+    }
+    return response;
   } catch (error) {
-    console.error('Error initiating GitLab OAuth:', error);
+    return gitLabConnectPostFailure(request, error, {
+      organizationId: organizationId,
+      hasCustomCredentials,
+    });
+  }
+}
 
+function gitLabConnectPostFailure(
+  request: NextRequest,
+  error: unknown,
+  context: { organizationId: string | null; hasCustomCredentials: boolean } = {
+    organizationId: request.nextUrl.searchParams.get('organizationId'),
+    hasCustomCredentials: false,
+  }
+): Response {
+  console.error('Error initiating GitLab OAuth:', error);
+
+  const denialCode = organizationAccessDenialErrorCode(error);
+  if (!denialCode) {
     captureException(error, {
       tags: {
         endpoint: 'gitlab/connect',
         source: 'gitlab_oauth',
       },
-      extra: {
-        organizationId,
-        hasCustomCredentials: Boolean(clientId && clientSecret),
-      },
+      extra: context,
     });
-
-    return NextResponse.json({ error: 'oauth_init_failed' }, { status: 500 });
   }
+
+  if (denialCode) {
+    return NextResponse.json({ error: denialCode }, { status: 403 });
+  }
+
+  return NextResponse.json({ error: 'oauth_init_failed' }, { status: 500 });
 }
 
 function buildGitLabDetailCallbackPath(organizationId: string | null): string {
@@ -154,8 +265,15 @@ function buildGitLabDetailCallbackPath(organizationId: string | null): string {
 
 async function buildGitLabConnectOAuthUrl(
   user: AuthenticatedOAuthUser,
-  { organizationId, instanceUrl, clientId, clientSecret, returnTo }: GitLabOAuthConnectOptions
-): Promise<string> {
+  {
+    organizationId,
+    instanceUrl,
+    clientId,
+    clientSecret,
+    returnTo,
+    appShell,
+  }: GitLabOAuthConnectOptions
+): Promise<{ url: string; state: string }> {
   const owner = await resolveGitLabOAuthOwner(user, organizationId);
   const customCredentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;
   const normalizedInstanceUrl = instanceUrl ? normalizeGitLabInstanceUrl(instanceUrl) : undefined;
@@ -174,17 +292,22 @@ async function buildGitLabConnectOAuthUrl(
     throw new Error('GitLab OAuth credentials cache is unavailable');
   }
 
-  const state = createGitLabOAuthState(
-    {
-      owner,
-      ...(usesCustomInstance ? { instanceUrl: normalizedInstanceUrl } : {}),
-      ...(customCredentialsRef ? { customCredentialsRef } : {}),
-      ...(returnTo ? { returnTo } : {}),
-    },
-    user.id
-  );
+  const statePayload = {
+    owner,
+    ...(usesCustomInstance ? { instanceUrl: normalizedInstanceUrl } : {}),
+    ...(customCredentialsRef ? { customCredentialsRef } : {}),
+    ...(returnTo ? { returnTo } : {}),
+  };
+  // The web entry point has no shell to pin; passing the option only for a shell
+  // start keeps the signed payload of a plain web connect identical.
+  const state = appShell
+    ? createGitLabOAuthState(statePayload, user.id, { appShell: true })
+    : createGitLabOAuthState(statePayload, user.id);
 
-  return buildGitLabOAuthUrl(state, normalizedInstanceUrl, customCredentials);
+  return {
+    url: buildGitLabOAuthUrl(state, normalizedInstanceUrl, customCredentials),
+    state,
+  };
 }
 
 async function resolveGitLabOAuthOwner(
@@ -195,6 +318,13 @@ async function resolveGitLabOAuthOwner(
     return { type: 'user', id: user.id };
   }
 
-  await ensureOrganizationAccess({ user }, organizationId);
+  // Replacing an existing org GitLab integration is a billing-scoped action;
+  // a first-time connect keeps member-level access.
+  const existingIntegration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
+  await ensureOrganizationAccess(
+    { user },
+    organizationId,
+    existingIntegration ? ORGANIZATION_BILLING_ROLES : undefined
+  );
   return { type: 'org', id: organizationId };
 }

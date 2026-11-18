@@ -1,0 +1,1855 @@
+import { after, NextResponse, type NextRequest } from 'next/server';
+import * as z from 'zod';
+import { FEATURE_HEADER, type FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
+import {
+  countAndStoreUsage,
+  logMicrodollarUsageAndReportToBouncer,
+  processTokenData,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { startInactiveSpan, captureMessage } from '@sentry/nextjs';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
+import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
+import { type User } from '@kilocode/db/schema';
+import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+
+import type { Span } from '@sentry/nextjs';
+import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { ManagedGatewayId } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import type {
+  OpenRouterChatCompletionRequest,
+  OpenRouterProviderConfig,
+  GatewayRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { limitHeaderValue } from '@kilocode/web-shared/lib/ai-gateway/header-limits';
+import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
+import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import type { EventSourceMessage } from 'eventsource-parser';
+import type {
+  MicrodollarUsageContext,
+  MicrodollarUsageStats,
+  PromptInfo,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_FREE_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import type {
+  GatewayChatApiKind,
+  Provider,
+  ProviderType,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  computeOpenRouterCostFields,
+  drainSseStream,
+  parseJson,
+  parseUsageWithRecovery,
+  providerReportsIsByok,
+  readResponseText,
+  reportUpstreamStreamError,
+  selectUsageCostFields,
+  type ParsedJson,
+  type ReadResponseBody,
+  upstreamStreamErrorSchema,
+  usageCostSchema,
+  vercelProviderMetadataSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  DIRECT_BYOK_PROVIDERS_META,
+  type DirectByokProviderMetaId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import {
+  AUTO_DECISION_HEADER,
+  CUSTOM_ROUTER_ERROR_HTTP_STATUS,
+  type CustomRouterErrorCode,
+} from '@kilocode/auto-routing-contracts';
+import type { AutoDecisionRejection } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
+
+// FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
+// This allows FIM requests to be tracked consistently with chat requests
+const fimSuffixFakeSysPrompMarkers = { begin: '[FIM_SUFFIX:', end: ']' } as const;
+
+const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
+// Kilo clients show a sign-up prompt for this code and do not retry the request.
+const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
+
+export function invalidPathResponse() {
+  return NextResponse.json(
+    {
+      error: 'Invalid path',
+      error_type: ProxyErrorType.invalid_path,
+      message:
+        'This endpoint only accepts the paths `/chat/completions`, `/responses` and `/messages`.',
+    },
+    { status: 400 }
+  );
+}
+
+export function invalidRequestResponse() {
+  return NextResponse.json(
+    {
+      error: 'Invalid request',
+      error_type: ProxyErrorType.invalid_request,
+      message: 'Could not parse request body. Please ensure it is valid JSON.',
+    },
+    { status: 400 }
+  );
+}
+
+export function malformedJsonResponse(parseError: unknown) {
+  const detail = parseError instanceof Error ? parseError.message : String(parseError);
+  return NextResponse.json(
+    {
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+      message: `Request body is not valid JSON: ${detail}`,
+    },
+    { status: 400 }
+  );
+}
+
+/**
+ * Error code a client matches on to detect a credential it has to replace.
+ *
+ * It is carried in `error.code` rather than inferred from the status, because
+ * the same status also carries the sign-in prompts served to anonymous callers.
+ */
+export const INVALID_TOKEN_CODE = 'INVALID_TOKEN';
+
+/**
+ * Response for a request that presented a credential which failed verification.
+ *
+ * Such a request must not be answered as an anonymous caller. The caller
+ * believes it is authenticated, so downgrading it silently drops the account,
+ * its organization, its BYOK keys and its credits, and hides the broken
+ * credential from the client that sent it. Fail loudly so the client can
+ * re-authenticate.
+ */
+export function invalidTokenResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: INVALID_TOKEN_CODE,
+        message: 'Your authentication token is invalid. Please sign in again.',
+      },
+      error_type: ProxyErrorType.authentication_required,
+    },
+    {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Bearer error="invalid_token"' },
+    }
+  );
+}
+
+export function temporarilyUnavailableResponse() {
+  return NextResponse.json(
+    {
+      error: 'Service Unavailable',
+      error_type: ProxyErrorType.temporarily_unavailable,
+      message: 'The service is temporarily unavailable. Please try again later.',
+    },
+    { status: 503 }
+  );
+}
+
+export async function usageLimitExceededResponse(user: User, balance?: number) {
+  const payments = await summarizeUserPayments(user.id);
+
+  const title = !payments.payments_count ? 'Paid Model - Credits Required' : 'Low Credit Warning!';
+
+  const message =
+    !payments.payments_count && FIRST_TOPUP_BONUS_AMOUNT > 0
+      ? `This is a paid model. To use paid models, you need to add credits. Get $${FIRST_TOPUP_BONUS_AMOUNT} free on your first topup!`
+      : 'Add credits to continue, or switch to a free model';
+
+  return NextResponse.json(
+    {
+      error: {
+        // https://github.com/Kilo-Org/kilocode/blob/d34b562041b5ef823d9f6b4bd96448750576b340/src/core/task/Task.ts#L2868
+        title,
+        message,
+        balance,
+        buyCreditsUrl: APP_URL + '/profile',
+      },
+      error_type: ProxyErrorType.usage_limit_exceeded,
+    },
+    { status: 402 }
+  );
+}
+
+/**
+ * Returned when a paid request is blocked at a non-positive balance while an
+ * auto-top-up is in flight. The balance is expected to recover when the
+ * `invoice.paid` webhook posts credits, so this is a transient, retryable
+ * condition rather than a terminal no-credits state.
+ *
+ * The message must not contain "credit", "payment", "balance", or "quota":
+ * agent runtimes classify those words as a terminal insufficient-credits error.
+ */
+export function topUpInProgressResponse() {
+  const message = 'Your top-up is processing. Please retry in a few seconds.';
+  return NextResponse.json(
+    {
+      error: message,
+      error_type: ProxyErrorType.top_up_in_progress,
+      message,
+    },
+    { status: 503, headers: { 'Retry-After': '5' } }
+  );
+}
+
+/**
+ * Builds the response for a request that is blocked because the billing
+ * entity has no available balance. If an auto-top-up is in flight, the block is
+ * transient and reported as retryable; otherwise it is the terminal
+ * low-credits response.
+ *
+ * A block caused by an exhausted per-user allowance is never retryable: an
+ * organization top-up restores the organization balance, not the member's
+ * allowance, so the retry would not resolve.
+ */
+export async function creditsBlockedResponse(params: {
+  user: User;
+  balance?: number;
+  organizationId?: string;
+  balanceLimitedByUserAllowance?: boolean;
+}) {
+  if (
+    !params.balanceLimitedByUserAllowance &&
+    (await isAutoTopUpInFlight({ userId: params.user.id, organizationId: params.organizationId }))
+  ) {
+    return topUpInProgressResponse();
+  }
+  return await usageLimitExceededResponse(params.user, params.balance);
+}
+
+export function dataCollectionRequiredResponse() {
+  const error =
+    'Data collection is required for this model. Please enable data collection to use this model or choose another model.';
+  return NextResponse.json(
+    {
+      error: error, // this field is shown in the extension
+      error_type: ProxyErrorType.data_collection_required,
+      message: error,
+    },
+    { status: 400 }
+  );
+}
+
+/** The inference providers that every given provider config's only/ignore lists allow. */
+export function allowedInferenceProviders(
+  inferenceProviders: readonly string[],
+  ...providerConfigs: ReadonlyArray<OpenRouterProviderConfig | undefined>
+): string[] {
+  return inferenceProviders.filter(inferenceProvider =>
+    providerConfigs.every(
+      provider =>
+        !provider ||
+        ((!provider.only || provider.only.includes(inferenceProvider)) &&
+          (!provider.ignore || !provider.ignore.includes(inferenceProvider)))
+    )
+  );
+}
+
+export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonly string[]) {
+  const error =
+    inferenceProviders.length > 0
+      ? `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`
+      : 'No eligible provider can serve the selected model.';
+  return NextResponse.json(
+    {
+      error: error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: error,
+    },
+    { status: 403 }
+  );
+}
+
+/**
+ * Clients route with OpenRouter's `provider` object. The gateway builds the Vercel
+ * `providerOptions` itself, so a client value could bypass provider and region policies.
+ */
+export function providerOptionsNotSupportedResponse() {
+  const error = 'The providerOptions field is not supported. Use provider instead.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unsupported_field, message: error },
+    { status: 400 }
+  );
+}
+
+const MANAGED_GATEWAY_NAMES = {
+  openrouter: 'OpenRouter',
+} as const satisfies Record<ManagedGatewayId, string>;
+
+const ADVANCED_POLICIES_HINT =
+  'Select a model the Vercel AI Gateway offers, add your own key (BYOK), or ask an organization admin to review the Advanced policies on the Providers & Models page.';
+
+export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
+  const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} ${ADVANCED_POLICIES_HINT}`,
+    },
+    { status: 403 }
+  );
+}
+
+export function inferenceRegionRefusedResponse(region: OrganizationDataRegion) {
+  const error = `Your organization requires inference in the ${ORGANIZATION_DATA_REGION_NAMES[region]} region, which this request cannot use.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} In that region, requests paid with Kilo credits run only through the Vercel AI Gateway. ${ADVANCED_POLICIES_HINT}`,
+    },
+    { status: 403 }
+  );
+}
+
+const DIRECT_BYOK_PROVIDER_NAMES = new Map<string, string>(
+  Object.entries(DIRECT_BYOK_PROVIDERS_META)
+);
+
+/** `directByokProviderId` names the caller's direct BYOK key that serves the model. */
+export function apiKindNotSupportedResponse(
+  apiKind: GatewayChatApiKind,
+  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
+  directByokProviderId?: string
+) {
+  const providerName =
+    directByokProviderId &&
+    (DIRECT_BYOK_PROVIDER_NAMES.get(directByokProviderId) ?? directByokProviderId);
+  const through = providerName ? ` through your ${providerName} key` : '';
+  const error = `This model does not support the ${apiKind} API${through}, please use any of: ${supportedApiKinds.join()}`;
+  warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
+    { status: 400 }
+  );
+}
+
+const BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
+  '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.';
+
+const OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
+  '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.';
+
+// Vercel's explanation for a rejected key tells developers to set the
+// AI_GATEWAY_API_KEY environment variable, which does not apply to a key saved
+// in Kilo, so it is not appended.
+const VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE =
+  '[BYOK] Vercel AI Gateway rejected your API key. Check that the key is correct and has not been revoked.';
+
+function isRejectedVercelAiGatewayKey(status: number, userByokProviderIds: UserByokProviderId[]) {
+  return status === 401 && userByokProviderIds.includes('vercel-ai-gateway');
+}
+
+const byokErrorMessages: Record<number, string> = {
+  401: '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
+  402: '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
+  403: BYOK_MODEL_PERMISSION_DENIED_MESSAGE,
+  429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
+};
+
+const byokUpstreamErrorSchema = z.object({
+  error: z.object({ message: z.string() }).optional().catch(undefined),
+  message: z.string().optional().catch(undefined),
+});
+
+async function readByokProviderMessage(response: Response): Promise<string | undefined> {
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  const parsed = byokUpstreamErrorSchema.safeParse(body);
+  if (!parsed.success) return undefined;
+  const providerMessage = parsed.data.error?.message ?? parsed.data.message;
+  return (
+    providerMessage
+      ?.replace(/\p{Cc}/gu, ' ')
+      .trim()
+      .slice(0, 300) || undefined
+  );
+}
+
+function specificByokErrorMessage(
+  status: number,
+  userByokProviderIds: UserByokProviderId[]
+): string | undefined {
+  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
+  }
+  if (isRejectedVercelAiGatewayKey(status, userByokProviderIds)) {
+    return VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE;
+  }
+  return byokErrorMessages[status];
+}
+
+async function byokErrorMessage(
+  response: Response,
+  userByokProviderIds: UserByokProviderId[]
+): Promise<string | undefined> {
+  const specificMessage = specificByokErrorMessage(response.status, userByokProviderIds);
+  if (!specificMessage && (response.status < 400 || response.status >= 500)) return undefined;
+  if (isRejectedVercelAiGatewayKey(response.status, userByokProviderIds)) {
+    return VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE;
+  }
+
+  // The provider's own explanation (for example an expired rather than revoked
+  // key) is often more actionable than our status-based summary.
+  const providerMessage = await readByokProviderMessage(response);
+  if (specificMessage) {
+    return providerMessage
+      ? `${specificMessage} Provider message: ${providerMessage}`
+      : specificMessage;
+  }
+  return providerMessage
+    ? `[BYOK] ${providerMessage}`
+    : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
+}
+
+function vertexByokModelNotFoundResponse(
+  response: Response,
+  userByokProviderIds: UserByokProviderId[] | null
+) {
+  if (
+    userByokProviderIds === null ||
+    !userByokProviderIds.includes('vertex') ||
+    response.status !== 404
+  ) {
+    return undefined;
+  }
+
+  const error =
+    '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.';
+  warnExceptInTest(`Responding with ${response.status} ${error}`);
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: response.status }
+  );
+}
+
+const NO_ALLOWED_PROVIDERS_MESSAGE_PREFIX =
+  'No allowed providers are available for the selected model.';
+
+const noAllowedProvidersErrorSchema = z.object({
+  message: z.string().startsWith(NO_ALLOWED_PROVIDERS_MESSAGE_PREFIX),
+  code: z.literal(404),
+  metadata: z.object({
+    available_providers: z.array(z.string()),
+    requested_providers: z.array(z.string()),
+  }),
+});
+
+const openRouterErrorResponseSchema = z.object({
+  error: z.unknown().optional(),
+  message: z.string().optional(),
+  code: z.number().optional(),
+  metadata: z.unknown().optional(),
+});
+
+async function providerNotAllowedResponse(provider: ProviderType, response: Response) {
+  if (provider !== 'openrouter' || response.status !== 404) return undefined;
+
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return undefined;
+  }
+
+  const parsedBody = openRouterErrorResponseSchema.safeParse(body);
+  if (!parsedBody.success) return undefined;
+
+  const upstreamError =
+    parsedBody.data.error === undefined ? parsedBody.data : parsedBody.data.error;
+  if (!noAllowedProvidersErrorSchema.safeParse(upstreamError).success) return undefined;
+
+  const error = 'No eligible provider can serve the selected model.';
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} Select another model or update the provider routing settings.`,
+    },
+    { status: response.status }
+  );
+}
+
+export async function makeErrorReadable({
+  provider,
+  requestedModel,
+  request,
+  response,
+  userByokProviderIds,
+}: {
+  provider: ProviderType;
+  requestedModel: string;
+  /** Null on the routes that do not send a chat request. */
+  request: GatewayRequest | null;
+  response: Response;
+  userByokProviderIds: UserByokProviderId[] | null;
+}) {
+  if (response.status < 400) {
+    return undefined;
+  }
+
+  const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
+  if (vertexByokResponse) return vertexByokResponse;
+
+  const specificByokMessage =
+    userByokProviderIds === null
+      ? undefined
+      : specificByokErrorMessage(response.status, userByokProviderIds);
+  if (specificByokMessage === undefined) {
+    const providerErrorResponse = await providerNotAllowedResponse(provider, response);
+    if (providerErrorResponse) return providerErrorResponse;
+
+    const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
+    if (overflowResponse) return overflowResponse;
+  }
+
+  if (userByokProviderIds !== null) {
+    const byokMessage = await byokErrorMessage(response, userByokProviderIds);
+    if (byokMessage) {
+      if (specificByokMessage !== undefined) {
+        // Log only the fixed text so this line stays stable to search on;
+        // captureProxyError already logs the upstream body.
+        warnExceptInTest(`Responding with ${response.status} ${specificByokMessage}`);
+      }
+      return NextResponse.json(
+        {
+          error: byokMessage,
+          error_type: ProxyErrorType.byok_error,
+          message: byokMessage,
+        },
+        { status: response.status }
+      );
+    }
+  }
+
+  return undefined;
+}
+
+export function modelNotAllowedResponse() {
+  return NextResponse.json(
+    {
+      error: 'Model not allowed for your team.',
+      error_type: ProxyErrorType.model_not_allowed,
+      message: 'The requested model is not allowed for your team.',
+    },
+    { status: 404 }
+  );
+}
+
+export function efficientPoolBlockedResponse() {
+  const error = 'Auto-routing could not select an eligible model for this request.';
+  const message = `${error} Please try again or contact support if the problem persists.`;
+  const logMessage = `[efficientPoolBlockedResponse] ${message}`;
+  warnExceptInTest(logMessage);
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.model_not_allowed,
+      message,
+    },
+    { status: 503 }
+  );
+}
+
+export function unavailableModelResponse() {
+  const error = 'The requested model is currently unavailable. Please choose a different model.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unavailable_model, message: error },
+    { status: 404 }
+  );
+}
+
+export function modelDoesNotExistResponse() {
+  return NextResponse.json(
+    {
+      error: 'Model not found',
+      error_type: ProxyErrorType.model_not_found,
+      message: 'The requested model could not be found.',
+    },
+    { status: 404 }
+  );
+}
+
+/**
+ * Returned when an enabled "Sign in with ChatGPT" connection can no longer be
+ * refreshed. The stored credential is terminal: the connection has been cleared
+ * and disabled, so this is never a retryable condition and must not be served
+ * by another billing path. The person is told what happened and what to do.
+ */
+export function chatGptReconnectResponse(message: string) {
+  const error = `${message} Reconnect your ChatGPT connection at ${APP_URL}/byok, or choose a different model.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
+  );
+}
+
+/**
+ * Returned when the owner's Claude billing connection cannot bill. The request
+ * was refused before any upstream call, and it must not be served on another
+ * payer's allowance. The owner is told what happened and what an admin can do.
+ */
+export function claudeBillingUnavailableResponse(message: string, retryable = false) {
+  const error = `${message} Manage the connection at ${APP_URL}/byok.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: retryable ? 503 : 400, headers: retryable ? { 'Retry-After': '1' } : undefined }
+  );
+}
+
+/**
+ * Returned when the organization's Claude connection was linked by a person who
+ * is gone. The reconnect action lives on the organization's billing page, so an
+ * owner following the message can perform it there. Only an organization owner
+ * can reconnect it, so the request fails instead of moving to another billing
+ * path, and no retry helps.
+ */
+export function claudeBillingReconnectResponse(
+  message: string,
+  organizationId: string | undefined
+) {
+  const settings = organizationId
+    ? `${APP_URL}/organizations/${organizationId}/byok`
+    : `${APP_URL}/byok`;
+  const error = `${message} An organization owner must link Claude billing again at ${settings}.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
+  );
+}
+
+export function unknownModelResponse(model: string) {
+  const error =
+    `The requested model '${model}' does not exist. ` +
+    `Please use an exact model id as listed on /api/gateway/models. ` +
+    `If this is a newly released model, please try again in a few minutes.`;
+  errorExceptInTest(`[unknownModelResponse] ${error}`);
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.model_not_found,
+      message: error,
+    },
+    { status: 404 }
+  );
+}
+
+export function noFreeModelsAvailableResponse() {
+  const error = `No free models are currently available for ${KILO_AUTO_FREE_MODEL.id}. Please try again later, or switch to ${KILO_AUTO_BALANCED_MODEL.id} for affordable paid inference.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.no_free_models_available, message: error },
+    { status: 503 }
+  );
+}
+
+export function directByokCatalogOnlyMessage(params: {
+  model: string;
+  providerId: DirectByokProviderMetaId;
+  catalogModelId: string | null;
+}) {
+  const reason = `'${params.model}' is disabled because the ${DIRECT_BYOK_PROVIDERS_META[params.providerId]} key uses Kilo catalog model IDs.`;
+  return params.catalogModelId
+    ? `${reason} Use '${params.catalogModelId}' instead.`
+    : `${reason} This model has no catalog ID; turn off catalog mode for the key to use it.`;
+}
+
+export function directByokCatalogOnlyResponse(message: string) {
+  return NextResponse.json(
+    {
+      error: message,
+      error_type: ProxyErrorType.direct_byok_catalog_only,
+      message,
+    },
+    { status: 400 }
+  );
+}
+
+export function organizationAutoConfigurationResponse(message: string) {
+  return NextResponse.json(
+    {
+      error: 'Organization Auto configuration error',
+      error_type: ProxyErrorType.organization_auto_configuration,
+      message,
+    },
+    { status: 400 }
+  );
+}
+
+export function paidModelAuthRequiredResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: PAID_MODEL_AUTH_REQUIRED,
+        message: 'You need to sign in to use this model.',
+      },
+      error_type: ProxyErrorType.paid_model_auth_required,
+    },
+    { status: 401 }
+  );
+}
+
+// The free-model limits use hour-long windows, so an immediate client retry
+// only spends more of the caller's allowance. Kilo CLI v2 and the OpenAI SDKs
+// honor this header.
+const DO_NOT_RETRY_HEADERS = { 'x-should-retry': 'false' };
+
+export function gatewayAccountRateLimitResponse() {
+  return NextResponse.json(
+    {
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    },
+    { status: 429 }
+  );
+}
+
+export function anonymousFreeModelLimitResponse() {
+  const message =
+    'Sign up for free to continue and explore 500 other models. ' +
+    'Takes 2 minutes, no credit card required. Or come back later.';
+  return NextResponse.json(
+    {
+      error: { code: PROMOTION_MODEL_LIMIT_REACHED, message },
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message,
+    },
+    { status: 429, headers: DO_NOT_RETRY_HEADERS }
+  );
+}
+
+export function accountFreeModelLimitResponse() {
+  const message =
+    'Free model usage limit reached. Please try again later, or switch to a paid model or your own API key.';
+  return NextResponse.json(
+    { error: 'Rate limit exceeded', error_type: ProxyErrorType.rate_limit_exceeded, message },
+    { status: 429, headers: DO_NOT_RETRY_HEADERS }
+  );
+}
+
+export function customRouterErrorResponse(code: CustomRouterErrorCode, message: string) {
+  return NextResponse.json(
+    { error: { code, message }, error_type: ProxyErrorType.custom_router, message },
+    { status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[code] }
+  );
+}
+
+// A custom router never falls back outside its pool, so a worker that cannot decide fails the
+// request with a retryable status instead of serving another model.
+export function autoRoutingUnavailableResponse(model: string) {
+  const error = `Auto-routing for ${model} is temporarily unavailable. Please retry.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.auto_routing_unavailable, message: error },
+    { status: 503, headers: { 'Retry-After': '1' } }
+  );
+}
+
+export function invalidAutoDecisionResponse(reason: AutoDecisionRejection) {
+  const message = `The ${AUTO_DECISION_HEADER} header is not valid for this request (${reason}). Request a new routing decision.`;
+  return NextResponse.json(
+    {
+      error: { code: ProxyErrorType.invalid_auto_decision, reason, message },
+      error_type: ProxyErrorType.invalid_auto_decision,
+      message,
+    },
+    { status: reason === 'malformed' ? 400 : 403 }
+  );
+}
+
+export function storeAndPreviousResponseIdIsNotSupported() {
+  const error = 'The store and previous_response_id fields are not supported.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unsupported_field, message: error },
+    { status: 400 }
+  );
+}
+
+export function getOutputHeaders(response: Response) {
+  const outputHeaders = new Headers();
+
+  for (const headerKey of ['date', 'content-type', 'request-id']) {
+    const value = response.headers.get(headerKey);
+    if (value) outputHeaders.set(headerKey, value);
+  }
+  outputHeaders.set('Content-Encoding', 'identity');
+  // Content-Encoding: identity is here because Vercel modifies encoding/compression and causes issues
+  // no-transform keeps a proxy in front of the gateway, such as the web app's rewrite to the
+  // ai-gateway app in local dev, from compressing a stream and holding it until the end.
+  outputHeaders.set('Cache-Control', 'no-cache, no-transform');
+
+  return outputHeaders;
+}
+
+export function wrapInSafeNextResponse(response: Response) {
+  return new NextResponse(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: getOutputHeaders(response),
+  });
+}
+
+export function accountForMicrodollarUsage(
+  clonedReponse: Response,
+  usageContext: MicrodollarUsageContext,
+  openrouterRequestSpan: Span | undefined,
+  servingProvider: Provider
+) {
+  const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
+  debugSaveProxyResponseStream(clonedReponse, logFileExtension);
+  const accounting = countAndStoreUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    servingProvider
+  );
+  after(accounting.usagePromise);
+  return accounting;
+}
+
+/**
+ * Field names, never values, of the request as sent upstream, so rejections
+ * such as "unknown field" can be attributed from logs alone.
+ */
+function describeRequestFields(request: unknown): Record<string, string> {
+  if (!isRecord(request)) {
+    return {};
+  }
+  const fields: Record<string, string> = {
+    requestFields: Object.keys(request).sort().join(',').slice(0, 512),
+  };
+  if (Array.isArray(request.messages)) {
+    const messageFields = new Set(
+      request.messages.filter(isRecord).flatMap(message => Object.keys(message))
+    );
+    fields.messageFields = [...messageFields].sort().join(',').slice(0, 512);
+  }
+  if (Array.isArray(request.input)) {
+    const itemFields = new Map<string, Set<string>>();
+    const contentPartTypes = new Set<string>();
+    for (const item of request.input) {
+      const type =
+        typeof item === 'string'
+          ? 'string'
+          : isRecord(item) && typeof item.type === 'string'
+            ? item.type
+            : isRecord(item) && 'role' in item
+              ? 'message'
+              : 'unknown';
+      let keys = itemFields.get(type);
+      if (!keys) {
+        keys = new Set<string>();
+        itemFields.set(type, keys);
+      }
+      if (!isRecord(item)) continue;
+      for (const key of Object.keys(item)) keys.add(key);
+      if (type === 'message' && Array.isArray(item.content)) {
+        for (const part of item.content) {
+          if (isRecord(part) && typeof part.type === 'string') {
+            contentPartTypes.add(part.type);
+          }
+        }
+      }
+    }
+    const itemTypes = [...itemFields.keys()].sort().slice(0, 12);
+    fields.inputItemTypes = itemTypes.join(',').slice(0, 512);
+    fields.inputItemFields = itemTypes
+      .map(type => `${type}:${[...(itemFields.get(type) ?? [])].sort().join(',')}`)
+      .join(';')
+      .slice(0, 512);
+    fields.inputContentPartTypes = [...contentPartTypes].sort().join(',').slice(0, 512);
+  }
+  return fields;
+}
+
+export async function captureProxyError(params: {
+  errorMessage: string;
+  user: { id: string };
+  request: unknown;
+  response: Response;
+  organizationId: string | undefined;
+  model: string;
+  gatewayModel?: string;
+  byokProviderIds?: ReadonlyArray<string> | null;
+  trackInSentry: boolean;
+}) {
+  const {
+    errorMessage,
+    user,
+    request,
+    response,
+    organizationId,
+    model,
+    gatewayModel,
+    byokProviderIds,
+    trackInSentry,
+  } = params;
+  after(
+    (async () => {
+      const extraErrorData: Record<string, string | number> = {
+        kiloUserId: user.id,
+        model,
+        ...(gatewayModel && gatewayModel !== model ? { gatewayModel } : {}),
+        ...(byokProviderIds && byokProviderIds.length > 0
+          ? { byokProviderIds: byokProviderIds.join(',') }
+          : {}),
+        status: response.status,
+        statusText: response.statusText,
+        responseContentType: response.headers.get('content-type') || '',
+        ...(organizationId && { organizationId }),
+        ...describeRequestFields(request),
+      };
+
+      const clonedReponse = response.clone();
+      try {
+        const responseText = await clonedReponse.text();
+        extraErrorData.first4kOfResponse = responseText.slice(0, 4096);
+        const parsed = parseJson(responseText.slice(0, 16 * 1024));
+        if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
+          const { param, code } = parsed.value.error;
+          if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);
+          if (typeof code === 'string') extraErrorData.upstreamErrorCode = code.slice(0, 512);
+        }
+      } catch {
+        // ignore errors when already handling errors...
+      }
+
+      errorExceptInTest(errorMessage, extraErrorData);
+      if (trackInSentry) {
+        captureMessage(errorMessage, {
+          level: 'error',
+          extra: extraErrorData,
+          tags: { source: 'openrouter-proxy' },
+          user: { id: user.id },
+        });
+      }
+    })()
+  );
+}
+
+// ============================================================================
+// Shared Helper Functions
+// ============================================================================
+
+/**
+ * The organization's data collection setting as an upstream provider config.
+ * Enterprise model and provider restrictions are not applied here: the member
+ * model-access decision enforces them, including group grants that extend the
+ * organization baseline.
+ */
+export function getOrganizationProviderPrivacy(
+  settings: OrganizationSettings | undefined
+): OpenRouterProviderConfig | undefined {
+  if (!settings) return undefined;
+  const providerConfig = getEffectiveProviderPrivacy(undefined, settings.data_collection);
+  return Object.keys(providerConfig).length > 0 ? providerConfig : undefined;
+}
+
+export function extractHeaderAndLimitLength(request: NextRequest, name: string) {
+  return limitHeaderValue(request.headers.get(name));
+}
+
+export function extractFraudAndProjectHeaders(request: NextRequest) {
+  return {
+    fraudHeaders: getFraudDetectionHeaders(request.headers),
+    xKiloCodeVersion: request.headers.get('X-KiloCode-Version'),
+    projectId: normalizeProjectId(request.headers.get('X-KiloCode-ProjectId')),
+    numericKiloCodeVersion:
+      getXKiloCodeVersionNumber(request.headers.get('X-KiloCode-Version')) || 0,
+  };
+}
+
+const wrapFimSuffixIntoSystemPrompt = (() => {
+  const { begin, end } = fimSuffixFakeSysPrompMarkers;
+  const wrapperLen = begin.length + end.length;
+  return (suffix: string) => begin + suffix.slice(0, 100 - wrapperLen) + end;
+})();
+
+export function extractFimPromptInfo(body: { prompt: string; suffix?: string | null }): PromptInfo {
+  return {
+    system_prompt_prefix: wrapFimSuffixIntoSystemPrompt(body.suffix || ''), // suffix = context
+    system_prompt_length: (body.suffix || '').length + body.prompt.length,
+    user_prompt_prefix: body.prompt.slice(0, 100), // prompt = user input
+  };
+}
+
+/** An input item with a role, as both the chat and the responses APIs use. */
+function isRoleMessage(value: unknown): value is { role?: unknown; content?: unknown } {
+  return typeof value === 'object' && value !== null && 'role' in value;
+}
+
+/** Joins the text of a message content, which is a string or a list of content parts. */
+function textFromPromptContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  const parts: unknown[] = content;
+  const texts: string[] = [];
+  for (const part of parts) {
+    // The text payload field is always `text`; its part type differs per API
+    // (`text` for chat and messages, `input_text` for responses). Non-text
+    // parts (images, tool output) carry no `text` field.
+    if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+      texts.push(part.text);
+    }
+  }
+  return texts.join('\n');
+}
+
+/** The text of the last `user` turn, scanning from the end of the input list. */
+function lastUserTurnText(input: unknown): string | null {
+  if (typeof input === 'string') return input; // responses accepts a plain prompt string
+  if (!Array.isArray(input)) return null;
+  const messages: unknown[] = input;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (isRoleMessage(message) && message.role === 'user') {
+      return textFromPromptContent(message.content);
+    }
+  }
+  return null;
+}
+
+/**
+ * The request shapes that carry a user prompt. The body is typed structurally
+ * because only the three gateway kinds pass through here, and FIM's `prompt`
+ * body is not part of `GatewayRequest`.
+ */
+type PromptBearingRequest = {
+  kind: GatewayChatApiKind | 'fim_completions';
+  body: { messages?: unknown; input?: unknown; prompt?: unknown };
+};
+
+/**
+ * The last user turn's text, which bouncer hashes into a prompt SimHash.
+ * Chat Completions and Messages carry it in `messages`, Responses in `input`
+ * (a prompt string or an input-item list), FIM in `prompt`. Null when the
+ * request carries no user text.
+ */
+export function lastUserPromptText(request: PromptBearingRequest): string | null {
+  if (request.kind === 'responses') return lastUserTurnText(request.body.input);
+  if (request.kind === 'fim_completions') {
+    return typeof request.body.prompt === 'string' ? request.body.prompt : null;
+  }
+  return lastUserTurnText(request.body.messages);
+}
+
+/**
+ * True when the request asked for token-level probabilities, which bouncer
+ * reads as a distillation signal. No gateway request type declares all three
+ * fields (Messages declares none), so read them structurally.
+ */
+export function requestedLogprobs(body: unknown): boolean {
+  if (typeof body !== 'object' || body === null) return false;
+  const logitBias = 'logit_bias' in body ? body.logit_bias : undefined;
+  return (
+    ('logprobs' in body && Boolean(body.logprobs)) ||
+    ('top_logprobs' in body && Boolean(body.top_logprobs)) ||
+    (typeof logitBias === 'object' && logitBias !== null && Object.keys(logitBias).length > 0)
+  );
+}
+
+/** The `n` sampling parameter, or null when the request did not set one. */
+export function requestedSamples(body: unknown): number | null {
+  if (typeof body !== 'object' || body === null || !('n' in body)) return null;
+  return typeof body.n === 'number' ? body.n : null;
+}
+
+function reasoningBudgetBucket(value: unknown): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value <= 1_000) return 'le1k';
+  if (value <= 4_000) return 'le4k';
+  if (value <= 16_000) return 'le16k';
+  if (value <= 64_000) return 'le64k';
+  return 'gt64k';
+}
+
+/**
+ * The Vercel inference region set on the upstream request. Clients cannot send `providerOptions`,
+ * so the value always comes from `applyVercelSettings` and stays within the known regions.
+ */
+export function extractInferenceRegion(body: GatewayRequest['body']): string | null {
+  const inferenceRegion = body.providerOptions?.gateway?.inferenceRegion;
+  return inferenceRegion?.scope === 'zone' ? inferenceRegion.geoRegion : null;
+}
+
+/**
+ * Bounded labels for requested thinking, effort, and reasoning (in that order).
+ * Never persist client-provided strings. When effort aliases coexist, prefer
+ * Anthropic output_config, then Chat Completions, then the reasoning object.
+ */
+export function extractReasoningSetting(body: unknown): string | null {
+  if (!isRecord(body)) return null;
+  const labels: string[] = [];
+  const thinking = isRecord(body.thinking) ? body.thinking : undefined;
+  if (
+    thinking?.type === 'enabled' ||
+    thinking?.type === 'adaptive' ||
+    thinking?.type === 'disabled'
+  ) {
+    const bucket = reasoningBudgetBucket(thinking.budget_tokens);
+    labels.push(`thinking:${thinking.type}${bucket ? `:${bucket}` : ''}`);
+  }
+
+  const outputConfig = isRecord(body.output_config) ? body.output_config : undefined;
+  const reasoning = isRecord(body.reasoning) ? body.reasoning : undefined;
+  const effort = outputConfig?.effort ?? body.reasoning_effort ?? reasoning?.effort;
+  if (typeof effort === 'string') {
+    switch (effort) {
+      case 'none':
+      case 'minimal':
+      case 'low':
+      case 'medium':
+      case 'high':
+      case 'xhigh':
+      case 'max':
+        labels.push(`effort:${effort}`);
+        break;
+      default:
+        labels.push('effort:other');
+    }
+  }
+
+  if (reasoning?.enabled === false) labels.push('reasoning:disabled');
+  const bucket = reasoningBudgetBucket(reasoning?.max_tokens);
+  if (bucket) labels.push(`reasoning:budget:${bucket}`);
+  return labels.length > 0 ? labels.join('+') : null;
+}
+
+// ============================================================================
+// FIM-Specific Code
+// ============================================================================
+
+export type FimUsage = {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+};
+
+const fimUsageSchema = z.object({
+  prompt_tokens: z.number(),
+  completion_tokens: z.number(),
+  total_tokens: z.number().optional(),
+});
+
+const fimResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  usage: fimUsageSchema.nullish(),
+  choices: z
+    .array(
+      z.object({
+        delta: z.object({ content: z.string().nullish() }).nullish(),
+        text: z.string().nullish(),
+      })
+    )
+    .nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+function computeInceptionFimMicrodollarCost(
+  usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>
+): number {
+  return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
+}
+
+function computeFimMicrodollarCost(
+  usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>,
+  provider: ProviderType
+): number {
+  switch (provider) {
+    case 'mistral':
+      return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
+    case 'inception':
+      return computeInceptionFimMicrodollarCost(usage);
+    default:
+      console.error('Unknown provider for FIM cost calculation', provider);
+      return 0;
+  }
+}
+
+function parseMistralFimUsageFromString(
+  response: string,
+  provider: ProviderType,
+  statusCode: number
+): MicrodollarUsageStats {
+  const json = fimResponseSchema.parse(parseUsageResponse(response, statusCode));
+  const usage = json.usage;
+  if (!usage && statusCode < 400) {
+    throw new Error('SUSPICIOUS: No FIM usage information');
+  }
+
+  return {
+    messageId: json.id ?? null,
+    model: json.model ?? null,
+    responseContent: json.choices?.[0]?.text || '',
+    hasError: !json.model || json.error != null || statusCode >= 400,
+    inference_provider: provider,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: 0,
+    is_byok: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: statusCode,
+  };
+}
+
+async function parseMistralFimUsageFromStream(
+  stream: ReadableStream<Uint8Array>,
+  requestSpan: Span | undefined,
+  provider: ProviderType,
+  statusCode: number,
+  usesUserCredentials: boolean,
+  requestStartedAt: number | undefined
+): Promise<MicrodollarUsageStats> {
+  requestSpan?.end();
+  const streamProcessingSpan = startInactiveSpan({
+    name: 'fim-stream-processing',
+    op: 'performance',
+  });
+  let messageId: string | null = null;
+  let model: string | null = null;
+  let responseContent = '';
+  let reportedError = statusCode >= 400;
+  let effectiveStatusCode = statusCode;
+  let usage: z.infer<typeof fimUsageSchema> | undefined;
+
+  const onEvent = (event: EventSourceMessage) => {
+    if (event.data === '[DONE]') return false;
+
+    const json = fimResponseSchema.parse(JSON.parse(event.data));
+
+    if (json.error != null) {
+      reportedError = true;
+      if (typeof json.error.code === 'number') effectiveStatusCode = json.error.code;
+      reportUpstreamStreamError({
+        label: 'FIM upstream error',
+        source: 'fim_sse_processing',
+        error: json.error,
+        usesUserCredentials,
+        logContext: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
+        sentryExtra: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
+      });
+    }
+
+    model = json.model ?? model;
+    messageId = json.id ?? messageId;
+    usage = json.usage ?? usage;
+
+    const choice = json.choices?.[0];
+    const contentDelta = choice?.delta?.content ?? choice?.text;
+    if (contentDelta) {
+      responseContent += contentDelta;
+    }
+    return !!contentDelta;
+  };
+
+  const { wasAborted, malformedEventCount, timing } = await drainSseStream(
+    stream,
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt,
+    'fim.time_to_first_token_ms',
+    () => ({ messageId, model })
+  );
+
+  if (!usage && !reportedError && !wasAborted && malformedEventCount === 0) {
+    captureMessage('SUSPICIOUS: No usage info in FIM stream', {
+      level: 'error',
+      tags: { source: 'fim_usage_processing' },
+      extra: { messageId, model },
+    });
+  }
+
+  return {
+    messageId,
+    model,
+    responseContent,
+    hasError: reportedError || wasAborted || malformedEventCount > 0,
+    inference_provider: provider,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: 0,
+    is_byok: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: timing.latency,
+    moderation_latency: null,
+    generation_time: timing.generation_time,
+    streamed: null,
+    cancelled: null,
+    status_code: effectiveStatusCode,
+  };
+}
+
+export function countAndStoreFimUsage(
+  clonedResponse: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined
+) {
+  const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
+  debugSaveProxyResponseStream(clonedResponse, logFileExtension);
+
+  const statusCode = clonedResponse.status;
+  const { requestStartedAt } = usageContext;
+  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, () => {
+    if (!clonedResponse.body) return null;
+    return usageContext.isStreaming
+      ? parseMistralFimUsageFromStream(
+          clonedResponse.body,
+          requestSpan,
+          usageContext.provider,
+          statusCode,
+          usageContext.user_byok,
+          requestStartedAt
+        )
+      : readResponseText(clonedResponse.body, requestStartedAt).then(({ text, timing }) => ({
+          ...parseMistralFimUsageFromString(text, usageContext.provider, statusCode),
+          ...timing,
+        }));
+  });
+
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    usageStats.cost_mUsd =
+      usageStats.inputTokens || usageStats.outputTokens
+        ? computeFimMicrodollarCost(
+            { prompt_tokens: usageStats.inputTokens, completion_tokens: usageStats.outputTokens },
+            usageContext.provider
+          )
+        : 0;
+    usageStats.market_cost = usageStats.cost_mUsd;
+
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+      usageStats.cacheDiscount_mUsd = 0;
+    }
+
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
+}
+
+// ============================================================================
+// Edit-Specific Code
+// ============================================================================
+
+type EditMessage = { role: string; content: string };
+
+export function extractEditPromptInfo(body: { messages: EditMessage[] }): PromptInfo {
+  const lastUser = [...body.messages].reverse().find(m => m.role === 'user');
+  const content = lastUser?.content ?? '';
+  return {
+    system_prompt_prefix: '', // /v1/edit/completions bakes its system prompt in server-side
+    system_prompt_length: 0,
+    user_prompt_prefix: content.slice(0, 100),
+  };
+}
+
+const editUsageSchema = fimUsageSchema.extend({ cached_input_tokens: z.number().optional() });
+
+const editResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  usage: editUsageSchema.nullish(),
+  choices: z
+    .array(z.object({ message: z.object({ content: z.string().nullish() }).nullish() }))
+    .nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+type EditUsage = z.infer<typeof editUsageSchema>;
+
+function getEditCacheHitTokens(usage: EditUsage): number {
+  return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
+}
+
+function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderType): number {
+  switch (provider) {
+    case 'inception': {
+      // Inception Mercury Edit 2 published rates (per 1M tokens):
+      //   $0.25 input  →  0.25 mUSD/token
+      //   $0.025 cached input  →  0.025 mUSD/token
+      //   $0.75 output  →  0.75 mUSD/token
+      // Sources:
+      //   https://www.inceptionlabs.ai/models
+      //   https://www.inceptionlabs.ai/blog/introducing-mercury-edit-2
+      // Mercury 2 (chat) shares the same per-token rates.
+      const cacheHitTokens = getEditCacheHitTokens(usage);
+      const uncachedInputTokens = usage.prompt_tokens - cacheHitTokens;
+      return Math.round(
+        uncachedInputTokens * 0.25 + cacheHitTokens * 0.025 + usage.completion_tokens * 0.75
+      );
+    }
+    default:
+      console.error('Unknown provider for edit cost calculation', provider);
+      return 0;
+  }
+}
+
+export function parseEditUsageFromResponse(
+  response: string,
+  provider: ProviderType,
+  statusCode: number
+): MicrodollarUsageStats {
+  const json = editResponseSchema.parse(parseUsageResponse(response, statusCode));
+  const stats = extractEditUsage(json, provider, statusCode);
+  priceEditUsage(stats, json.usage, provider);
+  return stats;
+}
+
+function extractEditUsage(
+  json: z.infer<typeof editResponseSchema>,
+  provider: ProviderType,
+  statusCode: number
+): MicrodollarUsageStats {
+  if (!json.model && !json.error && !json.usage && statusCode < 400) {
+    throw new Error('Unexpected edit response');
+  }
+  const usage = json.usage;
+  const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
+  return {
+    messageId: json.id ?? null,
+    model: json.model ?? null,
+    responseContent: json.choices?.[0]?.message?.content || '',
+    hasError: !json.model || json.error != null || statusCode >= 400,
+    inference_provider: provider,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    cacheHitTokens,
+    cacheWriteTokens: 0,
+    cost_mUsd: 0,
+    is_byok: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: statusCode,
+  };
+}
+
+function priceEditUsage(
+  stats: MicrodollarUsageStats,
+  usage: EditUsage | null | undefined,
+  provider: ProviderType
+) {
+  stats.cost_mUsd = usage ? computeEditMicrodollarCost(usage, provider) : 0;
+  stats.cacheDiscount_mUsd =
+    usage && provider === 'inception'
+      ? Math.round(getEditCacheHitTokens(usage) * (0.25 - 0.025))
+      : undefined;
+}
+
+export function countAndStoreEditUsage(
+  clonedResponse: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined
+) {
+  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
+
+  const statusCode = clonedResponse.status;
+  let usage: EditUsage | null | undefined;
+  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
+    if (!clonedResponse.body) return null;
+    const { text, timing } = await readResponseText(
+      clonedResponse.body,
+      usageContext.requestStartedAt
+    );
+    const json = editResponseSchema.parse(parseUsageResponse(text, statusCode));
+    const stats = extractEditUsage(json, usageContext.provider, statusCode);
+    usage = json.usage;
+    return { ...stats, ...timing };
+  });
+
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    priceEditUsage(usageStats, usage, usageContext.provider);
+    usageStats.market_cost = usageStats.cost_mUsd;
+
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+      usageStats.cacheDiscount_mUsd = 0;
+    }
+
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
+}
+
+// ============================================================================
+// Embedding-Specific Code
+// ============================================================================
+
+const embeddingResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  provider: z.string().nullish(),
+  usage: usageCostSchema
+    .extend({ prompt_tokens: z.number(), total_tokens: z.number().optional() })
+    .nullish(),
+  providerMetadata: vercelProviderMetadataSchema.nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+const transcriptionResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  text: z.string().nullish(),
+  usage: usageCostSchema
+    .extend({
+      input_tokens: z.number().nullish(),
+      output_tokens: z.number().nullish(),
+      total_tokens: z.number().nullish(),
+    })
+    .nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+// An upstream error can arrive without a JSON body, such as an empty 429 or an
+// HTML error page from an edge proxy. It still carries no usage, so treat it like
+// a JSON error body. A successful response that is not JSON stays a parse failure.
+function parseUsageResponse(responseText: string, statusCode: number): unknown {
+  return usageResponseJson(parseJson(responseText), statusCode);
+}
+
+function usageResponseJson(json: ParsedJson, statusCode: number): unknown {
+  if ('value' in json) return json.value;
+  if (statusCode >= 400) return {};
+  throw json.error;
+}
+
+export function parseEmbeddingUsageFromResponse(
+  responseText: string,
+  statusCode: number,
+  provider: ProviderType
+): MicrodollarUsageStats {
+  const json = embeddingResponseSchema.parse(parseUsageResponse(responseText, statusCode));
+  const stats = extractEmbeddingUsage(json, statusCode);
+  priceEmbeddingUsage(stats, json, provider);
+  return stats;
+}
+
+function extractEmbeddingUsage(
+  json: z.infer<typeof embeddingResponseSchema>,
+  statusCode: number
+): MicrodollarUsageStats {
+  if (json.model == null && !json.error && !json.usage && statusCode < 400) {
+    throw new Error('Unexpected embedding response');
+  }
+  const usage = json.usage;
+  const hasError = !json.model || json.error != null || statusCode >= 400;
+
+  if (!usage && !hasError) {
+    captureMessage('SUSPICIOUS: No embedding usage information', {
+      level: 'error',
+      tags: { source: 'embedding_usage_processing' },
+      extra: { model: json.model, statusCode },
+    });
+  }
+
+  return {
+    messageId: json.id ?? null,
+    model: json.model ?? null,
+    responseContent: '',
+    hasError,
+    inference_provider: json.provider ?? null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: false,
+    status_code: statusCode,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: 0,
+    is_byok: null,
+  };
+}
+
+function priceEmbeddingUsage(
+  stats: MicrodollarUsageStats,
+  json: z.infer<typeof embeddingResponseSchema>,
+  provider: ProviderType
+) {
+  // Vercel reports embedding costs in camelCase `providerMetadata`. The response rewrite also reads
+  // chat's snake_case `provider_metadata`, so the ledger bills from the same metadata.
+  Object.assign(
+    stats,
+    selectUsageCostFields(
+      json.usage,
+      json.provider_metadata ?? json.providerMetadata,
+      stats,
+      'embedding_usage_processing',
+      provider
+    )
+  );
+}
+
+/**
+ * OpenRouter transcriptions report only `usage.cost`, without `is_byok` or
+ * `cost_details`, so a BYOK-served transcription reports just the 5% BYOK fee.
+ * The generation id from the `x-generation-id` response header lets
+ * `processTokenData` look up the generation, which reports `is_byok` and the
+ * upstream inference cost.
+ */
+export function parseTranscriptionUsageFromResponse(
+  responseText: string,
+  statusCode: number,
+  requestedModel: string,
+  provider: ProviderType,
+  generationId: string | null
+): MicrodollarUsageStats {
+  const json = transcriptionResponseSchema.parse(parseUsageResponse(responseText, statusCode));
+  const stats = extractTranscriptionUsage(json, statusCode, requestedModel, generationId);
+  priceTranscriptionUsage(stats, json, provider);
+  return stats;
+}
+
+function extractTranscriptionUsage(
+  json: z.infer<typeof transcriptionResponseSchema>,
+  statusCode: number,
+  requestedModel: string,
+  generationId: string | null
+): MicrodollarUsageStats {
+  if (json.text == null && json.model == null && !json.error && statusCode < 400) {
+    throw new Error('Unexpected transcription response');
+  }
+  const messageId = json.id ?? generationId;
+  return {
+    messageId,
+    model: json.model ?? requestedModel,
+    responseContent: json.text ?? '',
+    hasError: statusCode >= 400 || json.error != null || typeof json.text !== 'string',
+    inference_provider: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: false,
+    status_code: statusCode,
+    inputTokens: json.usage?.input_tokens ?? 0,
+    outputTokens: json.usage?.output_tokens ?? 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: 0,
+    is_byok: null,
+  };
+}
+
+function priceTranscriptionUsage(
+  stats: MicrodollarUsageStats,
+  json: z.infer<typeof transcriptionResponseSchema>,
+  provider: ProviderType
+) {
+  const cost = computeOpenRouterCostFields(
+    json.usage ?? {},
+    stats,
+    'transcription_usage_processing',
+    stats.messageId === null && providerReportsIsByok(provider),
+    provider
+  );
+  Object.assign(stats, cost);
+}
+
+export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo {
+  const inputStr =
+    body.input == null
+      ? ''
+      : typeof body.input === 'string'
+        ? body.input
+        : Array.isArray(body.input) && typeof body.input[0] === 'string'
+          ? body.input[0]
+          : JSON.stringify(body.input).slice(0, 100);
+  return {
+    system_prompt_prefix: '',
+    system_prompt_length: 0,
+    user_prompt_prefix: inputStr.slice(0, 100),
+  };
+}
+
+/**
+ * Reads the upstream response body once, for both the ledger and the response: `bodyPromise`
+ * hands the body to the response and rejects with the read error. `pricedStatsPromise` resolves
+ * to the stats the ledger bills, or null when the body cannot be priced and the ledger falls back
+ * to the generation lookup.
+ */
+export function countAndStoreEmbeddingUsage(
+  response: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined,
+  servingProvider?: Provider
+) {
+  debugSaveProxyResponseStream(response, '.log.resp.json');
+
+  const statusCode = response.status;
+  const readPromise = response.body
+    ? readResponseText(response.body, usageContext.requestStartedAt)
+    : Promise.resolve(null);
+  const bodyPromise: Promise<ReadResponseBody | null> = readPromise.then(
+    read => read && { text: read.text, json: parseJson(read.text) }
+  );
+  let json: z.infer<typeof embeddingResponseSchema> | undefined;
+  const usageStatsPromise = parseUsageWithRecovery(response, usageContext, async () => {
+    const [read, body] = await Promise.all([readPromise, bodyPromise]);
+    if (!read || !body) return null;
+    const parsed = embeddingResponseSchema.parse(usageResponseJson(body.json, statusCode));
+    const stats = extractEmbeddingUsage(parsed, statusCode);
+    json = parsed;
+    return { ...stats, ...read.timing };
+  });
+
+  const pricedStatsPromise = usageStatsPromise.then(async usageStats => {
+    requestSpan?.end();
+    if (!json) return null;
+    priceEmbeddingUsage(usageStats, json, usageContext.provider);
+
+    // Keeps the real upstream cost as `market_cost`, then applies custom pricing and the free-model
+    // or BYOK zeroing, as chat does.
+    applyUsagePricing(usageStats, usageContext, await getCustomPricingConfig());
+    return usageStats;
+  });
+
+  const usagePromise = Promise.all([usageStatsPromise, pricedStatsPromise]).then(
+    ([usageStats, pricedStats]) =>
+      pricedStats
+        ? logMicrodollarUsageAndReportToBouncer(pricedStats, usageContext)
+        : processTokenData(usageStats, usageContext, servingProvider)
+  );
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise, bodyPromise, pricedStatsPromise };
+}
+
+export function countAndStoreTranscriptionUsage(
+  clonedResponse: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined,
+  servingProvider?: Provider
+) {
+  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
+
+  const statusCode = clonedResponse.status;
+  let json: z.infer<typeof transcriptionResponseSchema> | undefined;
+  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
+    if (!clonedResponse.body) return null;
+    const { text, timing } = await readResponseText(
+      clonedResponse.body,
+      usageContext.requestStartedAt
+    );
+    const parsed = transcriptionResponseSchema.parse(parseUsageResponse(text, statusCode));
+    const stats = extractTranscriptionUsage(
+      parsed,
+      statusCode,
+      usageContext.requested_model,
+      clonedResponse.headers.get('x-generation-id')
+    );
+    json = parsed;
+    return { ...stats, ...timing };
+  });
+
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    if (json) {
+      priceTranscriptionUsage(usageStats, json, usageContext.provider);
+    }
+    return processTokenData(usageStats, usageContext, servingProvider);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
+}
+
+// ============================================================================
+// Proxied Chat Completion Helper
+// ============================================================================
+
+export type ProxiedChatCompletionRequest = {
+  authToken: string;
+  version: string;
+  userAgent: string;
+  body: OpenRouterChatCompletionRequest;
+  organizationId?: string;
+  /** Feature attribution value for microdollar usage tracking. */
+  feature?: FeatureValue;
+};
+
+export type ProxiedChatCompletionResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Send a non-streaming chat completion request through the internal proxy endpoint.
+ * This is useful for server-side code that needs to make LLM requests (e.g., Slack bot).
+ */
+export async function sendProxiedChatCompletion<T>(
+  request: ProxiedChatCompletionRequest
+): Promise<ProxiedChatCompletionResult<T>> {
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${request.authToken}`,
+    'X-KiloCode-Version': request.version,
+    'User-Agent': request.userAgent,
+  });
+
+  if (request.organizationId) {
+    headers.set('X-KiloCode-OrganizationId', request.organizationId);
+  }
+
+  if (request.feature) {
+    headers.set(FEATURE_HEADER, request.feature);
+  }
+
+  const response = await fetch(`${APP_URL}/api/openrouter/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      ...request.body,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return { ok: false, status: response.status, error: errorText };
+  }
+
+  const data = (await response.json()) as T;
+  return { ok: true, data };
+}

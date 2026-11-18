@@ -17,10 +17,6 @@ import {
   textPart,
 } from './__fixtures__/helpers';
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('session pipeline integration', () => {
   const { createEvent, kilocode, resetCounter } = createEventHelpers();
 
@@ -32,39 +28,30 @@ describe('session pipeline integration', () => {
     it('user message → assistant streaming → complete', () => {
       const { storage, serviceState, feedEvent } = createTestSession();
 
-      // Session created
       feedEvent(kilocode('session.created', { info: sessionInfo('ses-1') }));
 
-      // Session goes busy
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
       expect(serviceState.getActivity()).toEqual({ type: 'busy' });
 
-      // User message
       feedEvent(kilocode('message.updated', { info: userMsg('msg-1') }));
       expect(storage.getMessageIds()).toEqual(['msg-1']);
 
-      // User message part
       feedEvent(kilocode('message.part.updated', { part: textPart('p-1', 'msg-1', 'hello') }));
       expect(storage.getParts('msg-1')).toHaveLength(1);
 
-      // Assistant message
       feedEvent(kilocode('message.updated', { info: assistantMsg('msg-2', 'msg-1') }));
       expect(storage.getMessageIds()).toEqual(['msg-1', 'msg-2']);
 
-      // Streaming part updates
       feedEvent(kilocode('message.part.updated', { part: textPart('p-2', 'msg-2', 'Hi') }));
       feedEvent(kilocode('message.part.updated', { part: textPart('p-2', 'msg-2', 'Hi there') }));
 
-      // Check final text
       const parts = storage.getParts('msg-2');
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ text: 'Hi there' }));
 
-      // Session goes idle — activity transitions to idle
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
 
-      // Complete after idle is a no-op for activity (already idle)
       feedEvent(createEvent('complete', { currentBranch: 'main' }));
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
     });
@@ -98,12 +85,10 @@ describe('session pipeline integration', () => {
         })
       );
 
-      // Deltas accumulated
       const parts = storage.getParts('msg-1');
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ text: 'Hello world' }));
 
-      // Final full snapshot replaces accumulated text
       feedEvent(
         kilocode('message.part.updated', {
           part: textPart('p-1', 'msg-1', 'Hello world!'),
@@ -127,10 +112,8 @@ describe('session pipeline integration', () => {
         })
       );
 
-      // Root message
       feedEvent(kilocode('message.updated', { info: userMsg('msg-1', 'ses-1') }));
 
-      // Child message
       feedEvent(
         kilocode('message.updated', {
           info: assistantMsg('msg-2', 'msg-1', 'child-1'),
@@ -174,7 +157,11 @@ describe('session pipeline integration', () => {
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
       feedEvent(createEvent('error', { fatal: true }));
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
-      expect(serviceState.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(serviceState.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
     });
 
     it('non-fatal error (warning) does not stop activity', () => {
@@ -190,7 +177,6 @@ describe('session pipeline integration', () => {
 
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
-      // Idle status transitions activity to idle
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
 
       // Complete is redundant but harmless
@@ -208,6 +194,88 @@ describe('session pipeline integration', () => {
     });
   });
 
+  describe('immutable commit facts', () => {
+    const completion = {
+      messageId: 'assistant-1',
+      userMessageId: 'user-1',
+      success: true,
+      commitHash: 'a'.repeat(40),
+      commitMessage: 'fix: actual message\n\nFull body',
+      committedAt: '2026-09-01T10:00:00.000Z',
+      pushStatus: 'failed',
+      commitMessageTruncated: true,
+    };
+
+    it.each([true, false])(
+      'retains the local commit on failed push with operation success %s',
+      success => {
+        const { storage, serviceState, feedEvent } = createTestSession();
+        const event = createEvent('autocommit_completed', { ...completion, success });
+        feedEvent(event);
+        expect(serviceState.getCommits()).toEqual([
+          {
+            commitHash: completion.commitHash,
+            commitMessage: completion.commitMessage,
+            messageId: completion.messageId,
+            userMessageId: completion.userMessageId,
+            committedAt: completion.committedAt,
+            pushStatus: 'failed',
+            commitMessageTruncated: true,
+            timestamp: event.timestamp,
+          },
+        ]);
+        expect(storage.getMessageIds()).toEqual([]);
+      }
+    );
+
+    it('deduplicates live and materialized replay by full SHA and preserves the first metadata', () => {
+      const { serviceState, feedEvent } = createTestSession();
+      feedEvent(createEvent('autocommit_completed', completion));
+      const original = serviceState.getCommits()[0];
+      const replay = kilocode('autocommit_completed', {
+        ...completion,
+        commitMessage: 'duplicate',
+      });
+      feedEvent({ ...replay, eventId: 0 });
+      feedEvent(createEvent('connected', {}));
+      feedEvent({ ...replay, eventId: 0 });
+      feedEvent({
+        ...kilocode('autocommit_completed', {
+          ...completion,
+          commitHash: 'b'.repeat(40),
+          committedAt: '2026-09-01T09:00:00.000Z',
+        }),
+        eventId: 0,
+      });
+      expect(serviceState.getCommits()).toHaveLength(2);
+      expect(serviceState.getCommits()[0]).toBe(original);
+    });
+
+    it.each([
+      { success: false, commitHash: undefined },
+      { skipped: true },
+      { commitHash: 'abc1234' },
+      { commitHash: 'not-a-sha' },
+    ])('does not promote skipped or unproven completions: %j', override => {
+      const { serviceState, feedEvent } = createTestSession();
+      feedEvent(createEvent('autocommit_completed', { ...completion, ...override }));
+      expect(serviceState.getCommits()).toEqual([]);
+    });
+
+    it('clears the local collection without resurrecting it on replay; reset permits a fresh load', () => {
+      const { serviceState, feedEvent } = createTestSession();
+      const event = createEvent('autocommit_completed', completion);
+      feedEvent(event);
+      serviceState.clearCommits();
+      feedEvent({ ...event, eventId: 0 });
+      expect(serviceState.getCommits()).toEqual([]);
+      serviceState.reset();
+      expect(serviceState.snapshot().commits).toEqual([]);
+      feedEvent(event);
+      expect(serviceState.getCommits()).toHaveLength(1);
+    });
+  });
+
   describe('autocommit lifecycle', () => {
     it('tracks autocommit started and completed', () => {
       const { serviceState, feedEvent } = createTestSession();
@@ -218,7 +286,6 @@ describe('session pipeline integration', () => {
         })
       );
 
-      // Autocommit started
       feedEvent(
         createEvent('autocommit_started', { messageId: 'msg-1', message: 'Committing...' })
       );
@@ -228,19 +295,18 @@ describe('session pipeline integration', () => {
         message: 'Committing...',
       });
 
-      // Autocommit completed
       feedEvent(
         createEvent('autocommit_completed', {
           messageId: 'msg-1',
           success: true,
-          commitHash: 'abc123',
+          commitHash: 'a'.repeat(40),
           commitMessage: 'fix: bug',
         })
       );
       expect(serviceState.getStatus()).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: 'abc123 fix: bug',
+        message: `${'a'.repeat(40)} fix: bug`,
       });
     });
 
@@ -313,7 +379,6 @@ describe('session pipeline integration', () => {
           partID: 'p-nonexistent',
         })
       );
-      // Original part still present
       expect(storage.getParts('msg-1')).toHaveLength(1);
     });
   });
@@ -335,7 +400,6 @@ describe('session pipeline integration', () => {
     it('messages are sorted by ID', () => {
       const { storage, feedEvent } = createTestSession();
 
-      // Insert out of order
       feedEvent(kilocode('message.updated', { info: userMsg('msg-3') }));
       feedEvent(kilocode('message.updated', { info: userMsg('msg-1') }));
       feedEvent(kilocode('message.updated', { info: userMsg('msg-2') }));
@@ -375,6 +439,9 @@ describe('remote session transport state', () => {
       destroy: jest.fn(),
       isConnected: jest.fn(() => false),
       onConnectionChange: jest.fn(() => jest.fn()),
+      isReconnectExhausted: jest.fn(() => false),
+      onReconnectExhaustionChange: jest.fn(() => jest.fn()),
+      retryConnection: jest.fn(),
       subscribeToCliSession: jest.fn(() => jest.fn()),
       sendCommand: jest.fn(() =>
         Promise.resolve({
@@ -426,11 +493,13 @@ describe('remote session transport state', () => {
 
     expect(session.canSend).toBe(true);
     expect(onTransportCapabilityChange).toHaveBeenCalled();
+    // An empty catalog is not a successful load: the transport self-heals it
+    // (error refresh) instead of publishing an empty `idle` catalog.
     expect(onRemoteModelStateChange).toHaveBeenLastCalledWith({
       ownerConnectionId: 'owner',
       protocol: 'v1',
-      catalog: { protocolVersion: 1, providers: [], truncated: false },
-      refresh: 'idle',
+      refresh: 'error',
+      error: 'Remote model catalog is empty',
     });
     session.destroy();
   });
@@ -448,8 +517,11 @@ describe('remote session create and retry commands', () => {
       destroy: jest.fn(),
       isConnected: jest.fn(() => false),
       onConnectionChange: jest.fn(() => jest.fn()),
+      isReconnectExhausted: jest.fn(() => false),
+      onReconnectExhaustionChange: jest.fn(() => jest.fn()),
+      retryConnection: jest.fn(),
       subscribeToCliSession: jest.fn(() => jest.fn()),
-      sendCommand: jest.fn<Promise<unknown>, [string, string, unknown, string?]>(() =>
+      sendCommand: jest.fn<Promise<unknown>, [string, string, unknown, string?, string?]>(() =>
         Promise.resolve({
           all: [],
           default: {},
@@ -510,8 +582,7 @@ describe('remote session create and retry commands', () => {
       kiloId('ses-remote'),
       'create_session',
       { protocolVersion: 1 },
-      'owner',
-      expect.any(String) as string
+      'owner'
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     session.destroy();
@@ -545,8 +616,7 @@ describe('remote session create and retry commands', () => {
         model: { providerID: 'kilo', modelID: 'kilo-auto' },
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       },
-      'owner',
-      expect.any(String) as string
+      'owner'
     );
     session.destroy();
   });
@@ -576,6 +646,44 @@ describe('remote session create and retry commands', () => {
       })
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    session.destroy();
+  });
+
+  it('replays the stored create result when the caller retries the intent', async () => {
+    const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
+
+    session.connect();
+    await Promise.resolve();
+    emitOwner(systemListener(), kiloId('ses-remote'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Relay-shaped durable dedupe: one stored terminal result per mutation id,
+    // and the first reply never reaches the client.
+    const stored = new Map<string, unknown>();
+    const provisioned: string[] = [];
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockImplementation(async (_sessionId, command, _data, _owner, mutationId) => {
+        if (command !== 'create_session') return { ok: true };
+        const key = mutationId ?? '<none>';
+        const existing = stored.get(key);
+        if (existing !== undefined) return existing;
+        const result = { protocolVersion: 1, sessionID: REMOTE_CREATED_SESSION_ID };
+        stored.set(key, result);
+        provisioned.push(key);
+        throw new Error('Command timed out');
+      });
+
+    await expect(session.createRemoteSession({ mutationId: 'intent-7' })).rejects.toThrow(
+      'Command timed out'
+    );
+    await expect(session.createRemoteSession({ mutationId: 'intent-7' })).resolves.toBe(
+      REMOTE_CREATED_SESSION_ID
+    );
+
+    expect(provisioned).toEqual(['intent-7:ext']);
     session.destroy();
   });
 

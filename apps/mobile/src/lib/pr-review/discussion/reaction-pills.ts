@@ -4,6 +4,8 @@
 // (pill + picker) and human a11y labels. `selectReactionPills` keeps
 // only known contents with count > 0, preserving DTO order.
 
+import { i18n } from '@/i18n';
+
 import {
   REVIEW_REACTION_CONTENTS,
   type ReviewReactionContent,
@@ -20,16 +22,20 @@ export const REACTION_EMOJI = {
   EYES: '👀',
 } satisfies Record<ReviewReactionContent, string>;
 
-export const REACTION_LABEL = {
-  THUMBS_UP: 'Thumbs up',
-  THUMBS_DOWN: 'Thumbs down',
-  LAUGH: 'Laugh',
-  HOORAY: 'Hooray',
-  CONFUSED: 'Confused',
-  HEART: 'Heart',
-  ROCKET: 'Rocket',
-  EYES: 'Eyes',
+const REACTION_LABEL_KEYS = {
+  THUMBS_UP: 'prReview.discussion.reactions.thumbsUp',
+  THUMBS_DOWN: 'prReview.discussion.reactions.thumbsDown',
+  LAUGH: 'prReview.discussion.reactions.laugh',
+  HOORAY: 'prReview.discussion.reactions.hooray',
+  CONFUSED: 'prReview.discussion.reactions.confused',
+  HEART: 'prReview.discussion.reactions.heart',
+  ROCKET: 'prReview.discussion.reactions.rocket',
+  EYES: 'prReview.discussion.reactions.eyes',
 } satisfies Record<ReviewReactionContent, string>;
+
+export function reactionLabel(content: ReviewReactionContent): string {
+  return i18n.t(REACTION_LABEL_KEYS[content]);
+}
 
 const KNOWN_CONTENTS = new Set<string>(REVIEW_REACTION_CONTENTS);
 

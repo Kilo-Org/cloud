@@ -1,11 +1,15 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutate factories settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the creator, operation-key, and generation-fenced draft-load suites share one mock harness in this file */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import {
+  type NewSessionRepository,
+  resetSelectedBranchOverrides,
+  setSelectedBranchOverride,
+} from './new-session-repository-state';
 import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
@@ -25,6 +29,14 @@ const hapticsMock = vi.hoisted(() => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: routerReplace }),
+}));
+
+// `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
+// Android Fabric alive (KILO-APP-25); its own mechanics are covered in
+// src/lib/navigation/stack-safe-replace.mounted.test.tsx. Here it stands in for
+// the navigation call so these assertions stay about the destination href.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: routerReplace }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -118,8 +130,10 @@ vi.mock('expo-crypto', () => {
 
 const outboxMock = vi.hoisted(() => ({
   getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
-  writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
-  remove: vi.fn(async (): Promise<void> => undefined),
+  writeSafeRetry: vi.fn(
+    async (_row: { operationKey: string; fingerprint: string }): Promise<void> => undefined
+  ),
+  remove: vi.fn(async (_fingerprint: string): Promise<void> => undefined),
   whenLoaded: vi.fn(async (): Promise<boolean> => true),
 }));
 
@@ -131,7 +145,7 @@ type CreatorInput = Parameters<typeof useNewSessionCreator>[0];
 type CreatorResult = ReturnType<typeof useNewSessionCreator>;
 
 // Simulated attachment wire payload (`{path, files}`). Each test sets this
-// before a submit; the fake `toWirePayload` below reads it at call time so a
+// before a submit; the fake `uploadPending` below reads it at call time so a
 // test can change attachments between two submits.
 let attachmentsWire: { path: string; files: string[] } | null = null;
 
@@ -140,11 +154,22 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   addCandidates: vi.fn(async () => undefined),
   removeAttachment: vi.fn(() => undefined),
   retryAttachment: vi.fn(() => undefined),
+  moveAttachment: vi.fn(() => undefined),
+  reorderAttachments: vi.fn(() => undefined),
   reset: vi.fn(() => undefined),
+  releaseUnclaimedUploads: vi.fn(() => undefined),
+  restoreFileParts: vi.fn(() => undefined),
+  clearOptimistic: vi.fn(() => undefined),
+  restoreChips: vi.fn(() => undefined),
+  commitSent: vi.fn(() => undefined),
   isUploading: false,
   hasFailedAttachments: false,
-  toWirePayload: () => undefined,
-  toSubmissionPayload: () => undefined,
+  hasUnclaimedAttachments: false,
+  uploadPending: vi.fn(async () => ({
+    ok: true as const,
+    wire: undefined,
+    submission: undefined,
+  })),
 };
 
 function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
@@ -153,7 +178,7 @@ function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
     mode: 'code' as AgentMode,
     model: 'anthropic/claude-sonnet-4',
     organizationId: undefined,
-    selectedRepo: '',
+    selectedRepository: null,
     setIsCreating: vi.fn(() => undefined),
     variant: 'medium',
     autoCommit: false,
@@ -187,6 +212,40 @@ function requireResult(resultRef: { current: CreatorResult | null }): CreatorRes
     throw new Error('useNewSessionCreator did not run');
   }
   return result;
+}
+
+// The same mount as `mountCreator`, but it hands back the renderer so a test
+// can re-render the harness with a changed attachment list while a create is
+// still in flight (the composer's strip stays interactive during a create).
+function mountCreatorWithRenderer(input: CreatorInput): {
+  renderer: TestRenderer.ReactTestRenderer | undefined;
+  resultRef: { current: CreatorResult | null };
+} {
+  const resultRef: { current: CreatorResult | null } = { current: null };
+  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  act(() => {
+    renderer = TestRenderer.create(React.createElement(Harness, { input, resultRef }));
+  });
+  return { renderer, resultRef };
+}
+
+type AttachmentChip = CreatorInput['attachments']['attachments'][number];
+
+/** A minimal uploaded chip: only its `id` and order reach the create guard. */
+function attachmentChip(id: string): AttachmentChip {
+  return {
+    id,
+    filename: `${id}.png`,
+    remoteFilename: `${id}.png`,
+    remoteKey: `user-1/cloud-agent/msg-1/${id}.png`,
+    kind: 'image',
+    extension: 'png',
+    mimeType: 'image/png',
+    size: 10,
+    localUri: `file:///tmp/${id}.png`,
+    status: 'uploaded',
+    progress: 1,
+  };
 }
 
 // Counts the frames the hook schedules and fires them synchronously. The
@@ -274,9 +333,11 @@ function runCreator(args: {
   model?: string;
   variant?: string;
   organizationId?: string;
-  selectedRepo?: string;
+  selectedRepository?: NewSessionRepository | null;
   autoCommit?: boolean;
   profileId?: string | null;
+  manualEnvVars?: Record<string, string>;
+  setupCommands?: string[];
 }): CreatorResult {
   const reactInternals = React as typeof React & ReactInternals;
   const refs: { current: unknown }[] = [];
@@ -302,20 +363,31 @@ function runCreator(args: {
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- fake dispatcher drives the hook in a plain vitest run
     return useNewSessionCreator({
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape, never read by the create path
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape; only `attachments`, `uploadPending`, and `reset` are read by the create path
       attachments: {
         attachments: [],
-        toWirePayload: () => attachmentsWire,
+        reset: vi.fn(() => undefined),
+        uploadPending: async () => ({
+          ok: true as const,
+          wire: attachmentsWire,
+          submission: undefined,
+        }),
       } as never,
       mode: (args.mode ?? 'code') as never,
       model: args.model ?? 'model-1',
       organizationId: args.organizationId,
-      selectedRepo: args.selectedRepo ?? 'owner/repo',
+      selectedRepository: args.selectedRepository ?? {
+        platform: 'github' as const,
+        fullName: 'owner/repo',
+        isPrivate: false,
+      },
       // eslint-disable-next-line no-empty-function -- no-op state setter
       setIsCreating: () => {},
       variant: args.variant ?? 'v1',
       autoCommit: args.autoCommit ?? false,
       profileId: args.profileId,
+      manualEnvVars: args.manualEnvVars,
+      setupCommands: args.setupCommands,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -617,7 +689,9 @@ describe('useNewSessionCreator onCreated', () => {
 
     expect(onCreated).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith('boom');
+    // The raw rejection text never reaches the toast: the failure shows the
+    // localized generic copy.
+    expect(toastError).toHaveBeenCalledWith('Something went wrong on our end. Please try again.');
   });
 
   it('does not prepare (and never fires onCreated) when the draft is empty', async () => {
@@ -633,6 +707,357 @@ describe('useNewSessionCreator onCreated', () => {
     expect(prepareSessionMutate).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
+  });
+});
+
+describe('useNewSessionCreator upload gate', () => {
+  it('does not prepare and resets the creating flag when uploadPending reports a blocked chip', async () => {
+    const setIsCreating = vi.fn(() => undefined);
+    const blockedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      // A failed (retryable or terminal) or in-flight chip reports `{ ok: false }`
+      // from the upload hook; the creator must treat both as "not ready".
+      uploadPending: vi.fn(async () => ({ ok: false as const })),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', setIsCreating, attachments: blockedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'Hello agent';
+
+    await act(async () => {
+      await createSessionFromDraft();
+    });
+
+    expect(blockedAttachments.uploadPending).toHaveBeenCalledTimes(1);
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    // The Start button un-blocks: the creating flag is cleared on the blocked path.
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('useNewSessionCreator in-flight draft edit', () => {
+  // The composer stays editable while a create is in flight (locking a focused
+  // Android input drops the IME and collapses the pinned footer), so the
+  // attempt must not silently discard a draft the user changed behind it.
+  it('cancels the attempt before dispatch when the draft changes during the upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const setIsCreating = vi.fn(() => undefined);
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', setIsCreating, attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // The create is still in flight; the user keeps typing.
+    promptRef.current = 'first draft, plus detail';
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    // The attempt never reached the server, so no session was created from the
+    // stale snapshot, and the edited draft is still the composer's text.
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+    expect(promptRef.current).toBe('first draft, plus detail');
+  });
+
+  it('creates normally when the draft is unchanged across the in-flight upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cancel a create whose trimmed body is unchanged by a whitespace-only edit', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // An IME/autocorrect composition commit that only adds trailing
+    // whitespace leaves the dispatched (trimmed) prompt identical, so it must
+    // not cancel a create whose body did not change.
+    promptRef.current = 'first draft ';
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the unsent attempt when the draft changes during the outbox load', async () => {
+    // The guard before dispatch only covers the upload; `prepareAgentSession`
+    // then awaits the outbox load and the safe-retry write while the composer
+    // stays editable. An edit in that window must abandon the still-unsent
+    // request instead of creating from the stale snapshot and clearing it.
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const setIsCreating = vi.fn(() => undefined);
+    const resultRef = mountCreator(createInput({ organizationId: 'org-1', setIsCreating }));
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    // Let the immediate upload settle so the flow parks on the gated load.
+    await flushMicrotasks();
+
+    promptRef.current = 'first draft, plus detail';
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+    // The edited draft is the composer's text for the next Start.
+    expect(promptRef.current).toBe('first draft, plus detail');
+  });
+
+  it('does not abandon the unsent attempt for a whitespace-only edit during the outbox load', async () => {
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const resultRef = mountCreator(createInput({ organizationId: 'org-1' }));
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    await flushMicrotasks();
+
+    promptRef.current = 'first draft ';
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  // The strip keeps taking removes, reorders and (through an already-open
+  // picker) adds while a create is in flight, exactly like the prompt stays
+  // editable. `uploadPending()` builds its wire from the chip list it read
+  // *before* its awaits, so the create must re-check the visible chips before
+  // dispatching: an attachment the user removed must never ride the wire.
+  it('cancels the attempt before dispatch when the visible attachments change during the upload', async () => {
+    const uploadGate = deferred<{
+      ok: true;
+      wire: { path: string; files: string[] } | undefined;
+      submission: undefined;
+    }>();
+    const firstChip = attachmentChip('chip-1');
+    const secondChip = attachmentChip('chip-2');
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      attachments: [firstChip, secondChip],
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const setIsCreating = vi.fn(() => undefined);
+    const input = createInput({
+      organizationId: 'org-1',
+      setIsCreating,
+      attachments: gatedAttachments,
+    });
+    const { renderer, resultRef } = mountCreatorWithRenderer(input);
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // The create is parked on the upload; the user removes the second chip.
+    act(() => {
+      renderer?.update(
+        React.createElement(Harness, {
+          input: {
+            ...input,
+            attachments: { ...gatedAttachments, attachments: [firstChip] },
+          },
+          resultRef,
+        })
+      );
+    });
+
+    await act(async () => {
+      // The snapshot the upload read still carries both files.
+      uploadGate.resolve({
+        ok: true,
+        wire: { path: 'p-1', files: ['chip-1.png', 'chip-2.png'] },
+        submission: undefined,
+      });
+      await attempt;
+    });
+
+    // No session may be created from a payload that disagrees with the chips
+    // the user is looking at; their strip stays for the next Start.
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+  });
+
+  it('cancels the unsent attempt when the visible attachments change during the outbox load', async () => {
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const firstChip = attachmentChip('chip-1');
+    const secondChip = attachmentChip('chip-2');
+    const attachmentsInput: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      attachments: [firstChip, secondChip],
+    };
+    const setIsCreating = vi.fn(() => undefined);
+    const input = createInput({
+      organizationId: 'org-1',
+      setIsCreating,
+      attachments: attachmentsInput,
+    });
+    const { renderer, resultRef } = mountCreatorWithRenderer(input);
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    // Let the immediate upload settle so the flow parks on the gated load.
+    await flushMicrotasks();
+
+    // The request is still unsent: the user reorders down to one chip.
+    act(() => {
+      renderer?.update(
+        React.createElement(Harness, {
+          input: {
+            ...input,
+            attachments: { ...attachmentsInput, attachments: [secondChip] },
+          },
+          resultRef,
+        })
+      );
+    });
+
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+  });
+
+  // Only the chip identity and order are the visible draft: an upload that
+  // advances progress while it runs must not cancel the create behind it.
+  it('creates normally when the chips only change upload status across the in-flight upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const firstChip = attachmentChip('chip-1');
+    const secondChip = attachmentChip('chip-2');
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      attachments: [firstChip, secondChip],
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const input = createInput({ organizationId: 'org-1', attachments: gatedAttachments });
+    const { renderer, resultRef } = mountCreatorWithRenderer(input);
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      renderer?.update(
+        React.createElement(Harness, {
+          input: {
+            ...input,
+            attachments: {
+              ...gatedAttachments,
+              attachments: [
+                { ...firstChip, progress: 1 },
+                { ...secondChip, status: 'uploading', progress: 0.5 },
+              ],
+            },
+          },
+          resultRef,
+        })
+      );
+    });
+
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -658,6 +1083,36 @@ describe('useNewSessionCreator profileId', () => {
   });
 });
 
+describe('useNewSessionCreator manual configuration', () => {
+  it('sends the manual env vars and setup commands with the create', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      manualEnvVars: { API_KEY: 'sk-1' },
+      setupCommands: ['pnpm install'],
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      envVars: { API_KEY: 'sk-1' },
+      setupCommands: ['pnpm install'],
+    });
+  });
+
+  it('omits the manual config fields when the draft is empty', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ manualEnvVars: {}, setupCommands: [] });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('envVars');
+    expect(payload).not.toHaveProperty('setupCommands');
+  });
+});
+
 describe('useNewSessionCreator autoCommit', () => {
   it('sends autoCommit false (Leave changes) by default', async () => {
     prepareSessionMutate.mockResolvedValue(sessionResult());
@@ -677,6 +1132,182 @@ describe('useNewSessionCreator autoCommit', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: true });
+  });
+});
+
+describe('useNewSessionCreator repository platform payload', () => {
+  it('sends only githubRepo for a GitHub row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ githubRepo: 'owner/repo' });
+    expect(payload).not.toHaveProperty('gitlabProject');
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+  });
+
+  it('sends only gitlabProject for a GitLab row and never githubRepo', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'group/project', isPrivate: true },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ gitlabProject: 'group/project' });
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+  });
+
+  it('sends only bitbucketRepo with workspace and repository uuids for a Bitbucket row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      organizationId: 'org-1',
+      selectedRepository: {
+        platform: 'bitbucket',
+        fullName: 'workspace/repo',
+        isPrivate: true,
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      bitbucketRepo: {
+        fullName: 'workspace/repo',
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('gitlabProject');
+  });
+});
+
+describe('useNewSessionCreator intentFingerprint repo identity', () => {
+  // Two same-name repos on different providers must marshal distinct retry
+  // identities, otherwise a GitHub and a GitLab create for `owner/repo` would
+  // share one safe-retry key and dedupe/replay each other's session.
+  it('mints distinct retry fingerprints for same-name GitHub and GitLab intents', async () => {
+    const githubCreator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+    const gitlabCreator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'owner/repo', isPrivate: false },
+    });
+
+    githubCreator.promptRef.current = 'hello';
+    await githubCreator.createSessionFromDraft();
+    gitlabCreator.promptRef.current = 'hello';
+    await gitlabCreator.createSessionFromDraft();
+
+    const writtenFingerprints = outboxMock.writeSafeRetry.mock.calls.map(
+      call => call[0].fingerprint
+    );
+    const githubFingerprint = writtenFingerprints[0] ?? '';
+    const gitlabFingerprint = writtenFingerprints[1] ?? '';
+    expect(githubFingerprint).not.toBe(gitlabFingerprint);
+    expect(
+      (JSON.parse(githubFingerprint) as { repo: { platform: string; fullName: string } }).repo
+    ).toEqual({ platform: 'github', fullName: 'owner/repo' });
+    expect(
+      (JSON.parse(gitlabFingerprint) as { repo: { platform: string; fullName: string } }).repo
+    ).toEqual({ platform: 'gitlab', fullName: 'owner/repo' });
+  });
+
+  it('includes Bitbucket workspace and repository uuids in the fingerprint', async () => {
+    const creator = runCreator({
+      selectedRepository: {
+        platform: 'bitbucket',
+        fullName: 'workspace/repo',
+        isPrivate: true,
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const fingerprint =
+      outboxMock.writeSafeRetry.mock.calls.map(call => call[0].fingerprint)[0] ?? '';
+    expect((JSON.parse(fingerprint) as { repo: unknown }).repo).toEqual({
+      platform: 'bitbucket',
+      fullName: 'workspace/repo',
+      workspaceUuid: 'ws-1234',
+      repositoryUuid: 'repo-5678',
+    });
+  });
+
+  // The deployed app persisted safe-retry rows with the bare `fullName` as
+  // `repo`. A GitHub relaunch-retry must still reuse that legacy key (and
+  // migrate the row to the scoped fingerprint) instead of minting a duplicate
+  // session.
+  it('reuses a persisted legacy bare-name key for a GitHub intent', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' && parsed.repo === 'owner/repo'
+        ? 'legacy-stored-key'
+        : null;
+    });
+
+    const creator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'legacy-stored-key' })
+    );
+    const removedFingerprints = outboxMock.remove.mock.calls.map(call => call[0]);
+    const legacyRemovalIndex = removedFingerprints.findIndex(fingerprint => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return parsed.repo === 'owner/repo';
+    });
+    expect(legacyRemovalIndex).toBeGreaterThanOrEqual(0);
+    // The legacy row goes only after the scoped row is on disk, so a crash
+    // between the two always leaves the key readable under one fingerprint.
+    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      outboxMock.remove.mock.invocationCallOrder[legacyRemovalIndex] ?? 0
+    );
+  });
+
+  // A GitLab intent must never reuse a legacy bare-name key: the bare name is
+  // ambiguous across providers, so the GitLab request stays scoped and mints
+  // its own identity.
+  it('does not fall back to a legacy bare-name key for a GitLab intent', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' ? 'legacy-stored-key' : null;
+    });
+
+    const creator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'owner/repo', isPrivate: false },
+    });
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    // The only looked-up fingerprints are the scoped one (repo is an object),
+    // never the bare name.
+    const lookedUpRepos = outboxMock.getStoredOperationKey.mock.calls.map(
+      call => (JSON.parse(call[0]) as { repo: unknown }).repo
+    );
+    expect(lookedUpRepos.every(repo => typeof repo === 'object')).toBe(true);
+    expect(prepareSessionMutate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'legacy-stored-key' })
+    );
   });
 });
 
@@ -992,6 +1623,23 @@ describe('useRemoteSpawnDraftCleanup remote-spawn clear', () => {
     expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
   });
 
+  it('flushes the draft when the screen unmounts after a failed remote spawn — the failure disarms the attempt marker', async () => {
+    const { renderer, resultRef } = mountRemoteSpawnDraftCleanup('u1');
+    act(() => {
+      resultRef.current?.markRemoteSpawnAttempted();
+    });
+    // The spawn failed: the dispatch's onSpawnFailed disarms the marker so
+    // the draft survives the failure and the leave to Home.
+    act(() => {
+      resultRef.current?.markRemoteSpawnFailed();
+    });
+    act(() => {
+      renderer?.unmount();
+    });
+    expect(vi.mocked(flushDraft)).toHaveBeenCalledWith('u1', 'agent-composer:new');
+    expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
+  });
+
   it('never clears or flushes when the userId is unknown', async () => {
     const { renderer, resultRef } = mountRemoteSpawnDraftCleanup(undefined);
     act(() => {
@@ -1002,5 +1650,136 @@ describe('useRemoteSpawnDraftCleanup remote-spawn clear', () => {
     });
     expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
     expect(vi.mocked(flushDraft)).not.toHaveBeenCalled();
+  });
+});
+
+describe('useNewSessionCreator upstream branch', () => {
+  const githubRow: NewSessionRepository = {
+    platform: 'github',
+    fullName: 'owner/repo',
+    isPrivate: false,
+  };
+  const gitlabRow: NewSessionRepository = {
+    platform: 'gitlab',
+    fullName: 'group/project',
+    isPrivate: true,
+  };
+  const bitbucketRow: NewSessionRepository = {
+    platform: 'bitbucket',
+    fullName: 'workspace/repo',
+    isPrivate: true,
+    workspaceUuid: 'ws-1234',
+    repositoryUuid: 'repo-5678',
+  };
+
+  beforeEach(() => {
+    resetSelectedBranchOverrides();
+  });
+
+  it('omits upstreamBranch when the provider default is in effect', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ selectedRepository: githubRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('sends the chosen branch for a GitHub row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(githubRow, 'release/2.0');
+    const creator = runCreator({ selectedRepository: githubRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      githubRepo: 'owner/repo',
+      upstreamBranch: 'release/2.0',
+    });
+  });
+
+  it('sends the chosen branch for a GitLab row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(gitlabRow, 'feature/x');
+    const creator = runCreator({ selectedRepository: gitlabRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      gitlabProject: 'group/project',
+      upstreamBranch: 'feature/x',
+    });
+  });
+
+  it('sends the chosen branch for a Bitbucket row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(bitbucketRow, 'develop');
+    const creator = runCreator({ organizationId: 'org-1', selectedRepository: bitbucketRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      bitbucketRepo: { fullName: 'workspace/repo' },
+      upstreamBranch: 'develop',
+    });
+  });
+
+  // A Bitbucket row without uuids cannot be written as a repository field, so
+  // it must not carry the branch chosen for it either (the branch is only
+  // meaningful alongside the repository it belongs to).
+  it('omits both the repository field and upstreamBranch for a Bitbucket row missing its uuids', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const rowWithoutUuids: NewSessionRepository = {
+      platform: 'bitbucket',
+      fullName: 'workspace/repo',
+      isPrivate: true,
+    };
+    setSelectedBranchOverride(rowWithoutUuids, 'develop');
+    const creator = runCreator({ organizationId: 'org-1', selectedRepository: rowWithoutUuids });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('gitlabProject');
+    expect(payload).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('never carries a branch chosen for another repository', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(gitlabRow, 'feature/x');
+    const creator = runCreator({ selectedRepository: githubRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('keeps the retry fingerprint repository-scoped when the branch changes', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const first = runCreator({ selectedRepository: githubRow });
+    first.promptRef.current = 'hello';
+    await first.createSessionFromDraft();
+    const defaultBranchFingerprint = outboxMock.writeSafeRetry.mock.calls[0]?.[0].fingerprint;
+
+    setSelectedBranchOverride(githubRow, 'release/2.0');
+    const second = runCreator({ selectedRepository: githubRow });
+    second.promptRef.current = 'hello';
+    await second.createSessionFromDraft();
+    const overrideFingerprint = outboxMock.writeSafeRetry.mock.calls[1]?.[0].fingerprint;
+
+    // Same intent, same retry key: a branch change must not fork the safe-retry
+    // row, or one submit could replay as two sessions.
+    expect(overrideFingerprint).toBe(defaultBranchFingerprint);
+    expect(prepareSessionMutate.mock.calls[1]?.[0]).toMatchObject({
+      upstreamBranch: 'release/2.0',
+    });
   });
 });

@@ -14,10 +14,6 @@ type ActionsBlock = z.infer<typeof actionsBlockSchema>;
 import { createKiloChatClient } from './client.js';
 import { resolveControllerUrl, resolveGatewayToken } from './env.js';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Extract the conversationId from a session key.
  *
@@ -45,10 +41,6 @@ function makeClient() {
     gatewayToken: resolveGatewayToken(),
   });
 }
-
-// ---------------------------------------------------------------------------
-// Content-block builders
-// ---------------------------------------------------------------------------
 
 function buildMetadataText(
   view: PendingApprovalView | ResolvedApprovalView | ExpiredApprovalView
@@ -115,10 +107,6 @@ function hasResolvedActionsBlock(payload: ContentBlock[]): boolean {
   return payload.some(block => block.type === 'actions' && block.resolved !== undefined);
 }
 
-// ---------------------------------------------------------------------------
-// Pending entry tracking
-// ---------------------------------------------------------------------------
-
 type PendingEntry = {
   messageId: string;
   conversationId: string;
@@ -128,10 +116,6 @@ type PendingEntry = {
 type PreparedTarget = {
   conversationId: string;
 };
-
-// ---------------------------------------------------------------------------
-// Native runtime adapter
-// ---------------------------------------------------------------------------
 
 const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
   ContentBlock[], // TPendingPayload
@@ -204,10 +188,6 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
     },
   },
 };
-
-// ---------------------------------------------------------------------------
-// Public factory
-// ---------------------------------------------------------------------------
 
 export function createKiloChatApprovalCapability(): ChannelApprovalCapability {
   return createChannelApprovalCapability({

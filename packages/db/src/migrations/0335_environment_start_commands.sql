@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_environments" ADD COLUMN "start_commands" text[] DEFAULT '{}' NOT NULL;

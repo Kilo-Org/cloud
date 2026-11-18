@@ -17,7 +17,15 @@ type StartupMark =
 
 // Why the splash hid — the startup path this launch actually took. Stable enum
 // strings only, per the payload rules in src/lib/analytics/posthog.ts.
-type StartupOutcome = 'app' | 'login' | 'consent' | 'force-update' | 'user-error' | 'consent-error';
+type StartupOutcome =
+  | 'app'
+  | 'login'
+  | 'consent'
+  | 'force-update'
+  | 'user-error'
+  | 'consent-error'
+  | 'language-error'
+  | 'restore-error';
 
 let origin: number | undefined = undefined;
 const marks = new Map<StartupMark, number>();

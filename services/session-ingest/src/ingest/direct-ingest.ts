@@ -15,6 +15,7 @@ import {
   INGEST_CHUNK_MAX_BYTES,
   INGEST_CHUNK_MAX_ITEMS,
   MAX_INGEST_ITEM_BYTES,
+  STAGING_MAX_BYTES,
 } from '../util/ingest-limits';
 import { readBoundedStream } from './bounded-stream-reader';
 import { parseDirectIngestConfig, selectDirectIngestUser } from './direct-ingest-rollout';
@@ -22,6 +23,7 @@ import { applyMetadataChanges } from './metadata';
 import {
   StageAndEnqueueError,
   stageAndEnqueue,
+  StagingOverflowError,
   type StageAndEnqueueFailureStage,
 } from './stage-and-enqueue';
 import { validateAndParseIngestPayload } from './validate';
@@ -68,6 +70,7 @@ type LegacyOptions = {
   reason: LegacyReason;
   metrics: DirectIngestMetrics;
   startedAt: number;
+  stagingMaxBytes?: number;
 };
 
 type DirectIngestResult =
@@ -92,14 +95,95 @@ export async function handleDirectIngestRequest(
   const startedAt = performance.now();
   const r2Key = `ingest/${request.kiloUserId}/${request.sessionId}/${request.ingestRequestId}`;
   const configResult = parseDirectIngestConfig(request.env);
+  // Bodies entering staging are measured against a staging ceiling. When the
+  // rollout config is unreadable, the same ceiling applies. Declared lengths
+  // above the direct cap still stage, measured against this ceiling, and the
+  // queue consumer splits them into chunks. The ceiling matches the queue's
+  // per-item cap; bodies are counted during bounded multipart storage, keeping
+  // memory flat as the request is staged.
+  const stagingCeiling = STAGING_MAX_BYTES;
+  const stagingBudget = configResult.ok ? configResult.config.maxBytes : stagingCeiling;
+
+  const tooLarge = (declaredBytes: number | null): DirectIngestResponse => {
+    logEvent('warn', {
+      event: 'direct_ingest_reject',
+      ...eventBase(request, startedAt, {
+        declaredBytes,
+        actualBytes: null,
+        items: null,
+      }),
+      reason: 'staging_budget_exceeded',
+    });
+    return { status: 413, body: { success: false, error: 'payload_too_large' } };
+  };
+
+  const emptyBody = (reason: LegacyReason): DirectIngestResponse => {
+    logEvent('info', {
+      event: 'direct_ingest_noop',
+      ...eventBase(request, startedAt, { declaredBytes: 0, actualBytes: 0, items: 0 }),
+      reason,
+    });
+    return { status: 200, body: { success: true } };
+  };
+
+  const malformedBody = (
+    metrics: DirectIngestMetrics,
+    reason?: LegacyReason
+  ): DirectIngestResponse => {
+    logEvent('warn', {
+      event: 'direct_ingest_parse_reject',
+      ...eventBase(request, startedAt, metrics),
+      ...(reason === undefined ? {} : { reason }),
+    });
+    return { status: 400, body: { success: false, error: 'malformed_json' } };
+  };
+
+  const legacyWithBoundedBody = async (
+    reason: LegacyReason,
+    metrics: DirectIngestMetrics
+  ): Promise<DirectIngestResponse> => {
+    const declared = parseContentLength(request.contentLength);
+    if (typeof declared === 'number' && declared > stagingCeiling) {
+      return tooLarge(declared);
+    }
+    if (declared === 'empty') {
+      return emptyBody('empty_body');
+    }
+    if (typeof declared === 'number' && declared <= INGEST_CHUNK_MAX_BYTES) {
+      const buffered = await readBoundedStream(request.body, declared);
+      if (!buffered.ok) return tooLarge(declared);
+      const validation = validateAndParseIngestPayload(buffered.bytes);
+      if (!validation.ok) {
+        return malformedBody(
+          { declaredBytes: declared, actualBytes: buffered.bytes.byteLength, items: null },
+          reason
+        );
+      }
+      return legacy(request, r2Key, buffered.bytes, {
+        reason,
+        metrics,
+        startedAt,
+        stagingMaxBytes: stagingCeiling,
+      });
+    }
+    try {
+      return await legacy(request, r2Key, request.body, {
+        reason,
+        metrics,
+        startedAt,
+        stagingMaxBytes: stagingCeiling,
+      });
+    } catch (error) {
+      if (error instanceof StagingOverflowError) {
+        return tooLarge(typeof declared === 'number' ? declared : null);
+      }
+      throw error;
+    }
+  };
 
   if (!configResult.ok) {
     console.error({ event: 'direct_ingest_config_error', reason: configResult.reason });
-    return legacy(request, r2Key, request.body, {
-      reason: 'gate_config',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('gate_config', unknownMetrics());
   }
 
   let selection;
@@ -111,47 +195,39 @@ export async function handleDirectIngestRequest(
       reason: 'bucket_failure',
       error: errorMessage(error),
     });
-    return legacy(request, r2Key, request.body, {
-      reason: 'gate_config',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('gate_config', unknownMetrics());
   }
   if (!selection.selected) {
-    return legacy(request, r2Key, request.body, {
-      reason: 'gate_percent',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('gate_percent', unknownMetrics());
   }
 
   const contentLength = parseContentLength(request.contentLength);
   if (contentLength === 'missing') {
-    return legacy(request, r2Key, request.body, {
-      reason: 'no_content_length',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('no_content_length', unknownMetrics());
   }
   if (contentLength === 'invalid') {
-    return legacy(request, r2Key, request.body, {
-      reason: 'invalid_content_length',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('invalid_content_length', unknownMetrics());
   }
   if (contentLength === 'empty') {
-    return legacy(request, r2Key, request.body, {
-      reason: 'empty_body',
-      metrics: { declaredBytes: 0, actualBytes: null, items: null },
-      startedAt,
-    });
+    return emptyBody('empty_body');
   }
-  if (contentLength > configResult.config.maxBytes) {
-    return legacy(request, r2Key, request.body, {
-      reason: 'oversized_body',
-      metrics: { declaredBytes: contentLength, actualBytes: null, items: null },
-      startedAt,
+  if (contentLength > stagingCeiling) {
+    logEvent('warn', {
+      event: 'direct_ingest_reject',
+      ...eventBase(request, startedAt, {
+        declaredBytes: contentLength,
+        actualBytes: null,
+        items: null,
+      }),
+      reason: 'staging_budget_exceeded',
+    });
+    return { status: 413, body: { success: false, error: 'payload_too_large' } };
+  }
+  if (contentLength > stagingBudget) {
+    return legacyWithBoundedBody('oversized_body', {
+      declaredBytes: contentLength,
+      actualBytes: null,
+      items: null,
     });
   }
 
@@ -187,11 +263,7 @@ export async function handleDirectIngestRequest(
   const actualBytes = buffered.bytes.byteLength;
   const validation = validateAndParseIngestPayload(buffered.bytes);
   if (!validation.ok) {
-    logEvent('warn', {
-      event: 'direct_ingest_parse_reject',
-      ...eventBase(request, startedAt, { declaredBytes: contentLength, actualBytes, items: null }),
-    });
-    return { status: 400, body: { success: false, error: 'malformed_json' } };
+    return malformedBody({ declaredBytes: contentLength, actualBytes, items: null });
   }
 
   if (validation.skippedItemCount > 0) {
@@ -316,8 +388,26 @@ async function legacy(
   options: LegacyOptions
 ): Promise<DirectIngestResponse> {
   try {
-    await stageAndEnqueue(request.env, legacyQueueParams(request, r2Key), body);
+    if (
+      !(await stageAndEnqueue(
+        request.env,
+        legacyQueueParams(request, r2Key),
+        body,
+        declaredBodyBytes(request),
+        options.stagingMaxBytes
+      ))
+    ) {
+      return { status: 404, body: { success: false, error: 'session_not_found' } };
+    }
   } catch (error) {
+    if (error instanceof StagingOverflowError) {
+      logEvent('warn', {
+        event: 'direct_ingest_reject',
+        ...eventBase(request, options.startedAt, options.metrics),
+        reason: 'staging_budget_exceeded',
+      });
+      return { status: 413, body: { success: false, error: 'payload_too_large' } };
+    }
     logEvent('warn', {
       event: 'direct_ingest_legacy',
       ...eventBase(request, options.startedAt, options.metrics),
@@ -344,7 +434,9 @@ async function fallbackAfterDirectFailure(
   directError: unknown
 ): Promise<DirectIngestResponse> {
   try {
-    await stageAndEnqueue(request.env, directFallbackQueueParams(request, r2Key), bytes);
+    if (!(await stageAndEnqueue(request.env, directFallbackQueueParams(request, r2Key), bytes))) {
+      return { status: 404, body: { success: false, error: 'session_not_found' } };
+    }
   } catch (error) {
     logFallback(request, metrics, startedAt, error, undefined, directError);
     throw error;
@@ -544,6 +636,17 @@ function parseContentLength(value: string | undefined): number | 'missing' | 'in
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) return 'invalid';
   return parsed === 0 ? 'empty' : parsed;
+}
+
+/**
+ * The length `toRpcBody` may treat as measured. `missing` and `invalid` leave the
+ * body unmeasured, so it stays a stream rather than counting against the RPC
+ * payload limit; `empty` is a measured zero.
+ */
+function declaredBodyBytes(request: DirectIngestRequest): number | undefined {
+  const parsed = parseContentLength(request.contentLength);
+  if (parsed === 'missing' || parsed === 'invalid') return undefined;
+  return parsed === 'empty' ? 0 : parsed;
 }
 
 function legacyQueueParams(request: DirectIngestRequest, r2Key: string) {

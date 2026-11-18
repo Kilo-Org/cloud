@@ -4,10 +4,11 @@ import Script from 'next/script';
 import './globals.css';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { Providers } from '../components/Providers';
+import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { DataLayerProvider } from '../components/DataLayerProvider';
 import { ImpactIdentify } from '@/components/ImpactIdentify';
 import { StagingEnvironmentBanner } from '@/components/shared/StagingEnvironmentBanner';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 
 const inter = Inter({
@@ -119,7 +120,7 @@ export default function RootLayout({
       <head />
       <body>
         {isStagingEnvironment ? <StagingEnvironmentBanner /> : null}
-        <Providers>
+        <Providers stepUpEnabled={isAdminStepUpEnabled()}>
           <DataLayerProvider />
           <ImpactIdentify />
           <PostHogProvider>{children}</PostHogProvider>

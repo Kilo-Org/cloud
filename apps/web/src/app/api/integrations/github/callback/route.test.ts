@@ -2,27 +2,55 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
-import { failureResult } from '@/lib/maybe-result';
-import { consumeInstallState } from '@/lib/integrations/github/install-state';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import {
+  checkInstallState,
+  consumeInstallState,
+  consumeInstallStateWithoutSession,
+} from '@/lib/integrations/github/install-state';
+import { createAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
+import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  connectVerifiedGitHubInstallation,
+  observeGitHubInstallationLifecycle,
+} from '@/lib/integrations/db/github-installations';
+import type * as InstallStateModule from '@/lib/integrations/github/install-state';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  github_install_states,
+  kilocode_users,
+  organizations,
+  platform_integrations,
+  type GitHubInstallState,
+} from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import type { Owner } from '@/lib/integrations/core/types';
+import type * as PlatformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
+import {
+  findGitHubBotLinkIntegrations,
   findIntegrationByInstallationId,
+  findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
-import { parseStateReturn } from '@/lib/integrations/validate-return-path';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  isUserBlacklistedByDomain: jest.fn(async () => false),
+}));
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot-identity');
 jest.mock('@/lib/integrations/platforms/github/adapter');
@@ -44,7 +72,6 @@ jest.mock('@octokit/auth-app', () => ({
   createAppAuth: jest.fn(),
 }));
 jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
-  getGitHubAppTypeForOrganization: jest.fn(async () => 'standard'),
   getGitHubAppCredentials: jest.fn(() => ({
     appId: 'app-id',
     privateKey: 'private-key',
@@ -55,16 +82,39 @@ jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
   })),
   assertUserAdministersInstallation: jest.fn(async () => true),
 }));
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@/lib/integrations/github/installation-authorization', () => ({
+  verifyGitHubInstallationAuthorization: jest.fn(async () => ({
+    identity: { id: GITHUB_USER_ID, login: 'octocat' },
+    candidate: {
+      installationId: INSTALLATION_ID,
+      accountId: '1',
+      accountLogin: 'octocat',
+      accountType: 'Organization',
+    },
+  })),
+}));
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   createPendingIntegration: jest.fn(),
+  findGitHubBotLinkIntegrations: jest.fn(),
   findIntegrationByInstallationId: jest.fn(),
-  findPendingInstallationByRequesterId: jest.fn(),
+  findIntegrationByInstallationIdForOwner: jest.fn(),
   upsertPlatformIntegrationForOwner: jest.fn(async () => ({ ok: true })),
 }));
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  connectVerifiedGitHubInstallation: jest.fn(),
+  observeGitHubInstallationLifecycle: jest.fn(),
+  bindGitHubIntegrationToCanonicalInstallation: jest.fn(),
+  updateGitHubInstallationRepositories: jest.fn(),
+  lockGitHubInstallationIdentity: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/integrations/db/predicates', () => ({
+  effectiveAppTypeCondition: jest.fn(() => undefined),
+}));
+jest.mock('@kilocode/worker-utils/account-access', () => ({
+  ...jest.requireActual('@kilocode/worker-utils/account-access'),
   isOrganizationMember: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -72,24 +122,10 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 jest.mock('@/lib/integrations/github/install-state', () => ({
+  checkInstallState: jest.fn(),
   consumeInstallState: jest.fn(),
+  consumeInstallStateWithoutSession: jest.fn(),
 }));
-jest.mock('@/lib/dotenvx', () => ({
-  getEnvVariable: jest.fn((key: string) => process.env[key] ?? ''),
-  requireEnv: (name: string, value: string | undefined) => {
-    if (!value) throw new Error(`Missing required environment variable ${name}`);
-    return value;
-  },
-}));
-jest.mock('@/lib/integrations/validate-return-path', () => {
-  const actual = jest.requireActual('@/lib/integrations/validate-return-path');
-  return {
-    ...actual,
-    // Wrapped so tests can force the invalid-owner branch while every other
-    // path keeps the real return-path parsing.
-    parseStateReturn: jest.fn(actual.parseStateReturn),
-  };
-});
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedVerifyGitHubBotLinkState = jest.mocked(verifyGitHubBotLinkState);
@@ -97,21 +133,91 @@ const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedBot = jest.mocked(bot);
 const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
+const mockedFindGitHubBotLinkIntegrations = jest.mocked(findGitHubBotLinkIntegrations);
+const mockedFindIntegrationByInstallationIdForOwner = jest.mocked(
+  findIntegrationByInstallationIdForOwner
+);
 const mockedCreateAppAuth = jest.mocked(createAppAuth);
 const mockedOctokit = jest.mocked(Octokit);
 const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegrationForOwner);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 const mockedConsumeInstallState = jest.mocked(consumeInstallState);
-const mockedGetEnvVariable = jest.mocked(getEnvVariable);
-const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
+const mockedCheckInstallState = jest.mocked(checkInstallState);
+const mockedConsumeWithoutSession = jest.mocked(consumeInstallStateWithoutSession);
+const mockedVerifyGitHubInstallationAuthorization = jest.mocked(
+  verifyGitHubInstallationAuthorization
+);
 const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
-const mockedParseStateReturn = jest.mocked(parseStateReturn);
+const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
+const mockedObserveGitHubInstallationLifecycle = jest.mocked(observeGitHubInstallationLifecycle);
+const mockedConnectVerifiedGitHubInstallation = jest.mocked(connectVerifiedGitHubInstallation);
+const mockedBindGitHubIntegrationToCanonicalInstallation = jest.mocked(
+  bindGitHubIntegrationToCanonicalInstallation
+);
 
-const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
-const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
+function mockConsumedInstallState(state: GitHubInstallState) {
+  mockedConsumeInstallState.mockResolvedValue({ status: 'success', state });
+}
+
+const USER_ID = 'oauth/test-callback-alice';
+const OTHER_USER_ID = 'test-callback-bob';
 const GITHUB_USER_ID = '12345';
 const INSTALLATION_ID = '98765';
+const INSTALL_STATE_TOKEN = 'valid-database-token-for-callback-tests';
+
+beforeEach(() => {
+  let writtenOwner: Owner = { type: 'user', id: USER_ID };
+  mockedConsumeInstallState.mockReset();
+  mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
+  mockedUpsertPlatformIntegrationForOwner.mockImplementation(async owner => {
+    writtenOwner = owner;
+    return { ok: true };
+  });
+  mockedFindIntegrationByInstallationId.mockImplementation(
+    async () =>
+      ({
+        id: '00000000-0000-4000-8000-000000000099',
+        owned_by_user_id: writtenOwner.type === 'user' ? writtenOwner.id : null,
+        owned_by_organization_id: writtenOwner.type === 'org' ? writtenOwner.id : null,
+        github_app_type: 'standard',
+      }) as never
+  );
+  mockedFindGitHubBotLinkIntegrations.mockImplementation(
+    async () =>
+      [
+        {
+          id: '00000000-0000-4000-8000-000000000099',
+          owned_by_user_id: writtenOwner.type === 'user' ? writtenOwner.id : null,
+          owned_by_organization_id: writtenOwner.type === 'org' ? writtenOwner.id : null,
+          platform_installation_id: INSTALLATION_ID,
+          github_app_type: 'standard',
+        },
+      ] as never
+  );
+  mockedFindIntegrationByInstallationIdForOwner.mockImplementation(
+    async () =>
+      ({
+        id: '00000000-0000-4000-8000-000000000099',
+      }) as never
+  );
+  mockedExchangeGitHubOAuthCode.mockResolvedValue({
+    id: GITHUB_USER_ID,
+    login: 'octocat',
+    accessToken: 'ghu_test-token',
+  });
+  mockedVerifyGitHubInstallationAuthorization.mockResolvedValue({
+    identity: { id: GITHUB_USER_ID, login: 'octocat' },
+    candidate: {
+      installationId: INSTALLATION_ID,
+      accountId: '1',
+      accountLogin: 'octocat',
+      accountType: 'Organization',
+    },
+  });
+  mockedAssertUserAdministersInstallation.mockResolvedValue(true);
+});
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -127,6 +233,8 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
 describe('GET /api/integrations/github/callback bot link flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
 
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: USER_ID },
@@ -136,6 +244,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       userId: USER_ID,
       installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
     });
     mockedExchangeGitHubOAuthCode.mockResolvedValue({
       id: GITHUB_USER_ID,
@@ -148,6 +257,15 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       github_app_type: 'standard',
       metadata: null,
     } as never);
+    mockedFindGitHubBotLinkIntegrations.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000099',
+        owned_by_organization_id: 'org_1',
+        owned_by_user_id: null,
+        platform_installation_id: INSTALLATION_ID,
+        github_app_type: 'standard',
+      } as never,
+    ]);
     mockedIsOrganizationMember.mockResolvedValue(true);
   });
 
@@ -176,7 +294,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
@@ -211,7 +329,11 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     await expect(response.text()).resolves.toContain(
       'not a member of the organization that owns this GitHub integration'
     );
-    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith('github', INSTALLATION_ID);
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'standard',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
+    });
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
@@ -225,28 +347,117 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain('GitHub account octocat has been linked');
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
-    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith('github', INSTALLATION_ID);
-    expect(mockedIsOrganizationMember).toHaveBeenCalledWith('org_1', USER_ID);
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'standard',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
+    });
+    expect(mockedIsOrganizationMember).toHaveBeenCalledWith(expect.anything(), 'org_1', USER_ID);
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(
       mockState,
-      { platform: 'github', teamId: INSTALLATION_ID, userId: GITHUB_USER_ID },
+      {
+        platform: 'github',
+        teamId: INSTALLATION_ID,
+        userId: GITHUB_USER_ID,
+        githubAppType: 'standard',
+      },
       USER_ID
     );
   });
 
-  test("exchanges the OAuth code against the integration's github_app_type", async () => {
-    mockedFindIntegrationByInstallationId.mockResolvedValue({
-      owned_by_organization_id: 'org_1',
-      owned_by_user_id: null,
-      github_app_type: 'lite',
-      metadata: null,
-    } as never);
+  test('allows one healthy legacy no-ID state while management and sharing are disabled', async () => {
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(200);
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'standard',
+      platformIntegrationId: undefined,
+    });
+  });
+
+  test('rejects a no-ID state after connection management is enabled', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(404);
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('rejects a no-ID state after shared-installation admission is enabled', async () => {
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS =
+      '00000000-0000-4000-8000-000000000001';
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(404);
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('routes a Lite bot-link callback through the Lite app identity', async () => {
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+      githubAppType: 'lite',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
+    });
+    mockedFindGitHubBotLinkIntegrations.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000099',
+        owned_by_organization_id: 'org_1',
+        github_app_type: 'lite',
+      } as never,
+    ]);
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(200);
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'lite',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
+    });
+    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
+    expect(mockedLinkKiloUser).toHaveBeenCalledWith(
+      mockState,
+      expect.objectContaining({ githubAppType: 'lite' }),
+      USER_ID
+    );
+  });
+
+  test('rejects an integration whose app type does not match signed state', async () => {
+    mockedFindGitHubBotLinkIntegrations.mockResolvedValue([]);
 
     const { GET } = await import('./route');
-    await GET(makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never);
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
 
-    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
+    expect(response.status).toBe(404);
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
   });
 });
 
@@ -282,13 +493,24 @@ describe('GET /api/integrations/github/callback installation flow', () => {
           },
         }) as never
     );
+    mockConsumedInstallState({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/github-app',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
   });
 
   test('associates an existing installation after GitHub updates its configuration', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=update&state=user_${USER_ID}%7Creturn%3D%252Fgithub-app`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=update&state=${INSTALL_STATE_TOKEN}&code=abc`
       ) as never
     );
 
@@ -301,7 +523,8 @@ describe('GET /api/integrations/github/callback installation flow', () => {
         integrationType: 'app',
         platformInstallationId: INSTALLATION_ID,
         platformAccountLogin: 'securexg',
-      })
+      }),
+      expect.anything()
     );
   });
 });
@@ -321,7 +544,6 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       authFailedResponse: null,
     } as never);
     mockedVerifyGitHubBotLinkState.mockReturnValue(null);
-    mockedGetEnvVariable.mockReturnValue('true');
     mockedCreateAppAuth.mockReturnValue(
       jest.fn(async () => ({ token: 'github-app-token' })) as never
     );
@@ -345,7 +567,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('completes a callback using a valid database-minted token', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -360,7 +582,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -369,21 +591,22 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     // The token consumed by the callback must be bare — no return suffix.
     expect(DB_TOKEN).not.toContain('|');
     expect(DB_TOKEN).not.toContain('return');
-    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN);
+    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN, USER_ID);
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
       { type: 'user', id: USER_ID },
       expect.objectContaining({
         platform: 'github',
         integrationType: 'app',
         platformInstallationId: INSTALLATION_ID,
-      })
+      }),
+      expect.anything()
     );
   });
 
   test('consumes a bare token and rejects suffixed tokens (producer-shaped state)', async () => {
     // Simulate the real DB: only the bare token returns a row.
     // A suffixed token never matches the stored bare token.
-    const mockRow: Awaited<ReturnType<typeof consumeInstallState>> = {
+    const mockRow: GitHubInstallState = {
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -395,15 +618,13 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     };
     mockedConsumeInstallState.mockImplementation(async (token: string) => {
-      return token === DB_TOKEN ? mockRow : null;
+      return token === DB_TOKEN
+        ? { status: 'success', state: mockRow }
+        : { status: 'unusable', reason: 'not_found' };
     });
 
     const { GET } = await import('./route');
 
-    // If a producer erroneously sends a suffixed state, consumeInstallState
-    // receives the full suffix. The real DB returns null because it stores
-    // only the bare token. The callback must redirect to the home page
-    // instead of proceeding with the install.
     const suffixed = `${DB_TOKEN}|return=${encodeURIComponent('/github-app')}`;
     const response = await GET(
       makeRequest(
@@ -412,22 +633,16 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
-    expect(mockedConsumeInstallState).toHaveBeenCalledWith(suffixed);
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
+    expect(mockedConsumeInstallState).toHaveBeenCalledWith(suffixed, USER_ID);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('rejects a token consumed by a different user (foreign state)', async () => {
+  test('rejects foreign state before any GitHub or integration side effects', async () => {
     mockedConsumeInstallState.mockResolvedValue({
-      token: DB_TOKEN,
-      kilo_user_id: OTHER_USER_ID,
-      owner_type: 'org',
-      owner_id: 'org-123',
-      github_app_type: 'standard',
-      return_to: null,
-      expires_at: new Date(Date.now() + 300_000).toISOString(),
-      consumed_at: null,
-      created_at: new Date().toISOString(),
+      status: 'user_mismatch',
+      organizationId: 'test-organization',
+      returnTo: null,
     });
 
     const { GET } = await import('./route');
@@ -439,22 +654,30 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/github-app?error=install_state_user_mismatch');
-    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN);
+    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN, USER_ID);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+    expect(mockedOctokit).not.toHaveBeenCalled();
+    expect(mockedVerifyGitHubInstallationAuthorization).not.toHaveBeenCalled();
+    expect(mockedVerifyGitHubBotLinkState).not.toHaveBeenCalled();
+    const { createPendingIntegration } =
+      await import('@/lib/integrations/db/platform-integrations');
+    expect(createPendingIntegration).not.toHaveBeenCalled();
+    expect(mockedCaptureMessage).toHaveBeenCalledWith(
+      'GitHub install state presented by different user',
+      {
+        level: 'warning',
+        tags: { endpoint: 'github/callback', source: 'install_state_user_mismatch' },
+      }
+    );
   });
 
   test('redirects with fromApp=1 when user mismatch on app-initiated state', async () => {
     mockedConsumeInstallState.mockResolvedValue({
-      token: DB_TOKEN,
-      kilo_user_id: OTHER_USER_ID,
-      owner_type: 'user',
-      owner_id: OTHER_USER_ID,
-      github_app_type: 'standard',
-      // App-initiated: return_to is /cloud/sessions (starts with /cloud/)
-      return_to: '/cloud/sessions',
-      expires_at: new Date(Date.now() + 300_000).toISOString(),
-      consumed_at: null,
-      created_at: new Date().toISOString(),
+      status: 'user_mismatch',
+      organizationId: null,
+      returnTo: '/cloud/sessions',
     });
 
     const { GET } = await import('./route');
@@ -466,32 +689,120 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/github-app?error=install_state_user_mismatch&fromApp=1');
-    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN);
+    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN, USER_ID);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('rejects a replayed (already consumed) token', async () => {
-    mockedConsumeInstallState.mockResolvedValue(null);
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
-      ) as never
+  test('a callback after a session switch leaves real state usable by its initiator', async () => {
+    const stateModule = jest.requireActual<typeof InstallStateModule>(
+      '@/lib/integrations/github/install-state'
     );
+    const initiatorId = `oauth/callback-db-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: initiatorId,
+      google_user_email: `callback-db-${randomUUID()}@example.com`,
+      google_user_name: 'Test Initiator',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_test_callback',
+    });
+    try {
+      const token = await stateModule.createInstallState({
+        kiloUserId: initiatorId,
+        ownerType: 'user',
+        ownerId: initiatorId,
+        githubAppType: 'standard',
+        returnTo: '/cloud/sessions',
+      });
+      await expect(stateModule.checkInstallState(token, initiatorId)).resolves.toEqual({
+        status: 'valid',
+      });
+      mockedConsumeInstallState.mockImplementation(stateModule.consumeInstallState);
+      const { GET } = await import('./route');
+      const callbackPath = `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${token}&code=test-code`;
+      const rejected = await GET(makeRequest(callbackPath));
+      expectRedirectLocation(rejected, '/github-app?error=install_state_user_mismatch&fromApp=1');
+      const [state] = await db
+        .select({ consumedAt: github_install_states.consumed_at })
+        .from(github_install_states)
+        .where(eq(github_install_states.token, token));
+      expect(state).toEqual({ consumedAt: null });
+      expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+      expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+      expect(mockedOctokit).not.toHaveBeenCalled();
 
-    // Replayed tokens fall through to unrecognized state
-    expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
-    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN);
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: initiatorId, google_user_email: 'test@example.com', google_user_name: 'Test' },
+        authFailedResponse: null,
+      } as never);
+      const accepted = await GET(makeRequest(callbackPath));
+      expectRedirectLocation(accepted, '/github-app?fromApp=1&github_install=success');
+      expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledTimes(1);
+      expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+        { type: 'user', id: initiatorId },
+        expect.anything(),
+        expect.anything()
+      );
+      const replayed = await GET(makeRequest(callbackPath));
+      expectRedirectLocation(replayed, '/github-app?error=install_state_invalid');
+      expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledTimes(1);
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, initiatorId));
+    }
+  });
+
+  test('preserves organization recovery context for an app-initiated mismatch', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      status: 'user_mismatch',
+      organizationId: 'test-organization',
+      returnTo: '/cloud/sessions',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(makeRequest(`/api/integrations/github/callback?state=${DB_TOKEN}`));
+    expectRedirectLocation(
+      response,
+      '/github-app?error=install_state_user_mismatch&fromApp=1&organizationId=test-organization'
+    );
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('consumes a DB-minted token before legacy prefix dispatch (unambiguous routing)', async () => {
-    // A token whose base64url shape begins with the legacy user_ prefix must
-    // still route through the database flow, never the legacy plaintext flow.
+  test.each(['consumed', 'expired', 'not_found', 'unavailable'] as const)(
+    'recovers a %s token without OAuth or installation writes',
+    async reason => {
+      mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason });
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=synthetic-oauth-code&organizationId=untrusted-org&fromApp=1`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?error=install_state_invalid');
+      expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN, USER_ID);
+      expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+      expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+      expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+      const { createPendingIntegration } =
+        await import('@/lib/integrations/db/platform-integrations');
+      expect(createPendingIntegration).not.toHaveBeenCalled();
+      expect(mockedCaptureMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          level: reason === 'expired' || reason === 'consumed' ? 'info' : 'warning',
+          extra: expect.objectContaining({ stateClass: 'install_token', rejectionReason: reason }),
+        })
+      );
+      const diagnostics = JSON.stringify(mockedCaptureMessage.mock.calls);
+      for (const value of [DB_TOKEN, USER_ID, INSTALLATION_ID]) {
+        expect(diagnostics).not.toContain(value);
+      }
+    }
+  );
+
+  test('treats a prefixed state as opaque when it matches a database token', async () => {
     const PREFIXED_DB_TOKEN = `user_${DB_TOKEN}`;
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: PREFIXED_DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'org',
@@ -506,22 +817,53 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${PREFIXED_DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${PREFIXED_DB_TOKEN}&code=abc`
       ) as never
     );
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/github-app?github_install=success');
-    expect(mockedConsumeInstallState).toHaveBeenCalledWith(PREFIXED_DB_TOKEN);
-    // The owner comes from the DB row (org), not from a legacy user_ parse.
+    expect(mockedConsumeInstallState).toHaveBeenCalledWith(PREFIXED_DB_TOKEN, USER_ID);
+    // The owner always comes from the database row, never from token contents.
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
       { type: 'org', id: 'org-db-owner' },
-      expect.objectContaining({ platform: 'github' })
+      expect.objectContaining({ platform: 'github' }),
+      expect.anything()
+    );
+    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.objectContaining({ id: USER_ID }) }),
+      'org-db-owner',
+      ['owner', 'admin']
     );
   });
 
+  test('revalidates organization management access before storing an installation', async () => {
+    mockConsumedInstallState({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: 'org-demoted',
+      github_app_type: 'standard',
+      return_to: '/organizations/org-demoted/integrations/github',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedEnsureOrganizationAccess.mockRejectedValueOnce(new Error('Organization role required'));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expectRedirectLocation(response, '/?error=installation_failed');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
   test('handles a database-minted token with returnTo', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'org',
@@ -534,14 +876,14 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     });
 
     // Override to return the matching org owner
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -553,7 +895,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('redirects to /github-app fallback (not /cloud/sessions) for app-initiated success', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -569,7 +911,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -580,7 +922,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('redirects to /github-app fallback for app-initiated pending approval', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -611,7 +953,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
 
   test('rejects non-/cloud/ returnTo as non-app (no fallback redirect)', async () => {
     // A non-app returnTo must not trigger the /github-app fallback.
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'org',
@@ -623,14 +965,14 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     });
 
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -643,7 +985,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('app-initiated installation_already_claimed redirects to /github-app fallback', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -662,7 +1004,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -671,7 +1013,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('app-initiated missing_installation_id redirects to /github-app fallback', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -696,7 +1038,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('app-initiated installation_not_found redirects to /github-app fallback', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -723,7 +1065,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -732,8 +1074,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('app-initiated pending_setup_failed redirects to /github-app fallback', async () => {
-    mockedConsumeInstallState.mockResolvedValue({
+  test('ambiguous app-initiated pending request returns successful pending no-op', async () => {
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -745,11 +1087,6 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     });
 
-    const { createPendingIntegration } =
-      await import('@/lib/integrations/db/platform-integrations');
-    const mockedCreatePending = jest.mocked(createPendingIntegration);
-    mockedCreatePending.mockRejectedValue(new Error('DB error') as never);
-
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
@@ -758,13 +1095,13 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/github-app?fromApp=1&error=pending_setup_failed');
+    expectRedirectLocation(response, '/github-app?fromApp=1&github_pending_approval=true');
   });
 
   test('app-initiated org success preserves organizationId on redirect', async () => {
     const ORG_ID = 'org-789';
     mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'org',
@@ -776,14 +1113,14 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     });
 
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -797,7 +1134,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
 
   test('app-initiated user success omits organizationId', async () => {
     mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -812,18 +1149,30 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
     expect(response.status).toBe(307);
     // No organizationId for user-scoped install.
     expectRedirectLocation(response, '/github-app?fromApp=1&github_install=success');
+    expect(mockedObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: INSTALLATION_ID, state: 'active' }),
+      expect.anything()
+    );
+    expect(mockedBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith(
+      {
+        integrationId: '00000000-0000-4000-8000-000000000099',
+        installationId: INSTALLATION_ID,
+        appType: 'standard',
+      },
+      expect.anything()
+    );
   });
 
   test('app-initiated org pending approval preserves organizationId', async () => {
     const ORG_ID = 'org-pending';
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'org',
@@ -840,7 +1189,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const mockedCreatePending = jest.mocked(createPendingIntegration);
     mockedCreatePending.mockResolvedValue(undefined as never);
 
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 
@@ -857,13 +1206,224 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       `/github-app?fromApp=1&github_pending_approval=true&organizationId=${ORG_ID}`
     );
   });
+
+  test('does not block a management-enabled install when a shared tenant already owns the installation', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    const competitorId = `oauth/cb-shared-competitor-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: competitorId,
+      google_user_email: `cb-shared-competitor-${randomUUID()}@example.com`,
+      google_user_name: 'Shared Competitor',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_cb_shared_competitor',
+    });
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: competitorId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: INSTALLATION_ID,
+        github_app_type: 'standard',
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    const competitor = inserted[0];
+    if (!competitor) throw new Error('Expected the competing association');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      // The verified writer already admitted this association (including
+      // sharing admission), so the legacy competing-tenant guard must not
+      // run and report the connection as already claimed.
+      mockedConnectVerifiedGitHubInstallation.mockResolvedValue({
+        ok: true,
+        integrationId: '00000000-0000-4000-8000-0000000000aa',
+      });
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?github_install=success');
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, competitor.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, competitorId));
+    }
+  });
+
+  test('refuses the legacy bind when a competitor of the other owner type owns the installation', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+    const organizationRows = await db
+      .insert(organizations)
+      .values({ name: `Callback guard org ${randomUUID()}` })
+      .returning();
+    const organization = organizationRows[0];
+    if (!organization) throw new Error('Expected the competing organization');
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: INSTALLATION_ID,
+        github_app_type: 'standard',
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    const competitor = inserted[0];
+    if (!competitor) throw new Error('Expected the competing association');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?error=installation_already_claimed');
+      expect(mockedBindGitHubIntegrationToCanonicalInstallation).not.toHaveBeenCalled();
+      // The guard runs before the write, so nothing was committed for the
+      // caller either.
+      await expect(
+        db
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, USER_ID),
+              eq(platform_integrations.platform_installation_id, INSTALLATION_ID)
+            )
+          )
+      ).resolves.toHaveLength(0);
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, competitor.id));
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  test('rolls back the legacy write when the canonical bind fails', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+    const actualPlatformIntegrations = jest.requireActual<typeof PlatformIntegrationsModule>(
+      '@/lib/integrations/db/platform-integrations'
+    );
+    mockedUpsertPlatformIntegrationForOwner.mockImplementation(
+      actualPlatformIntegrations.upsertPlatformIntegrationForOwner
+    );
+    mockedBindGitHubIntegrationToCanonicalInstallation.mockRejectedValueOnce(
+      new Error('bind failed')
+    );
+
+    const legacyOwnerId = `oauth/cb-legacy-bind-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: legacyOwnerId,
+      google_user_email: `cb-legacy-bind-${randomUUID()}@example.com`,
+      google_user_name: 'Legacy Bind Owner',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_cb_legacy_bind',
+    });
+
+    try {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: legacyOwnerId,
+          google_user_email: 'cb-legacy-bind@example.com',
+          google_user_name: 'Legacy Bind Owner',
+        },
+        authFailedResponse: null,
+      } as never);
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: legacyOwnerId,
+        owner_type: 'user',
+        owner_id: legacyOwnerId,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+      // The failed bind surfaces through the callback's generic error path...
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/?error=installation_failed');
+      expect(mockedBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything()
+      );
+
+      // The write ran inside the caller's transaction (not its own), which is
+      // what makes the rollback below possible.
+      expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ platformInstallationId: INSTALLATION_ID }),
+        expect.anything()
+      );
+
+      // The write and the bind share one transaction, so the failed bind
+      // leaves no committed active-but-unbound association behind.
+      await expect(
+        db
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, legacyOwnerId),
+              eq(platform_integrations.platform_installation_id, INSTALLATION_ID)
+            )
+          )
+      ).resolves.toHaveLength(0);
+    } finally {
+      mockedUpsertPlatformIntegrationForOwner.mockImplementation(async () => ({ ok: true }));
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, legacyOwnerId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, legacyOwnerId));
+    }
+  });
 });
 
-describe('GET /api/integrations/github/callback legacy flag gating', () => {
+describe('GET /api/integrations/github/callback plaintext state rejection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: USER_ID,
@@ -873,7 +1433,56 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
       authFailedResponse: null,
     } as never);
     mockedVerifyGitHubBotLinkState.mockReturnValue(null);
-    mockedConsumeInstallState.mockResolvedValue(null);
+    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
+  });
+
+  test.each(['org_', 'user_'])('always rejects %s prefixed plaintext state', async prefix => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${prefix}${USER_ID}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
+    expect(serializedMessage).not.toContain(`${prefix}${USER_ID}`);
+    expect(serializedMessage).toContain('state_not_bot_link_or_install_token');
+  });
+});
+
+describe('GET /api/integrations/github/callback admin proof', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Most tests in this describe exercise the legacy access-list admin
+    // check; the connection-management-enabled test below opts back in
+    // explicitly so it does not leak into the tests that follow it.
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: USER_ID,
+        google_user_email: 'mobile-e2e@example.com',
+        google_user_name: 'Mobile E2E',
+      },
+      authFailedResponse: null,
+    } as never);
+    mockedVerifyGitHubBotLinkState.mockReturnValue(null);
+    mockConsumedInstallState({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: null,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
     mockedCreateAppAuth.mockReturnValue(
       jest.fn(async () => ({ token: 'github-app-token' })) as never
     );
@@ -894,124 +1503,16 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
           },
         }) as never
     );
-  });
-
-  test('accepts legacy org_ prefixed state when flag is enabled', async () => {
-    mockedGetEnvVariable.mockReturnValue('true');
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=org_${USER_ID}`
-      ) as never
-    );
-
-    expect(response.status).toBe(307);
-    expectRedirectLocation(
-      response,
-      `/organizations/${USER_ID}/integrations/github?success=installed`
-    );
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
-  });
-
-  test('refuses legacy org_ prefixed state when flag is disabled', async () => {
-    mockedGetEnvVariable.mockReturnValue('false');
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=org_${USER_ID}`
-      ) as never
-    );
-
-    expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
-    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
-  });
-
-  test('accepts legacy user_ prefixed state when flag is enabled', async () => {
-    mockedGetEnvVariable.mockReturnValue('true');
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
-      ) as never
-    );
-
-    expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
-  });
-
-  test('refuses legacy user_ prefixed state when flag is disabled', async () => {
-    mockedGetEnvVariable.mockReturnValue('false');
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
-      ) as never
-    );
-
-    expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
-    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
-  });
-
-  test('accepts legacy state when flag is unset (default enabled)', async () => {
-    mockedGetEnvVariable.mockReturnValue(undefined as unknown as string);
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
-      ) as never
-    );
-
-    expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
-  });
-});
-
-describe('GET /api/integrations/github/callback admin proof (report mode)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: USER_ID,
-        google_user_email: 'mobile-e2e@example.com',
-        google_user_name: 'Mobile E2E',
-      },
-      authFailedResponse: null,
-    } as never);
-    mockedVerifyGitHubBotLinkState.mockReturnValue(null);
-    mockedConsumeInstallState.mockResolvedValue(null);
-    mockedGetEnvVariable.mockReturnValue('true');
-    mockedCreateAppAuth.mockReturnValue(
-      jest.fn(async () => ({ token: 'github-app-token' })) as never
-    );
-    mockedOctokit.mockImplementation(
-      () =>
-        ({
-          apps: {
-            getInstallation: jest.fn(async () => ({
-              data: {
-                account: { id: 12_345, login: 'securexg' },
-                created_at: '2026-07-09T19:00:00.000Z',
-                events: ['issues'],
-                permissions: { contents: 'write' },
-                repository_selection: 'all',
-              },
-            })),
-            listReposAccessibleToInstallation: jest.fn(),
-          },
-        }) as never
-    );
     mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
-    mockedAssertUserAdministersInstallation.mockResolvedValue(true);
+    mockedVerifyGitHubInstallationAuthorization.mockResolvedValue({
+      identity: { id: GITHUB_USER_ID, login: 'octocat' },
+      candidate: {
+        installationId: INSTALLATION_ID,
+        accountId: '1',
+        accountLogin: 'octocat',
+        accountType: 'Organization',
+      },
+    });
     mockedExchangeGitHubOAuthCode.mockResolvedValue({
       id: GITHUB_USER_ID,
       login: 'octocat',
@@ -1019,27 +1520,27 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     });
   });
 
-  test('completes an install when code is absent (report mode)', async () => {
+  test('rejects an install when code is absent', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}`
       ) as never
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
-    // Admin proof was not run.
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
-    expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+    expect(mockedVerifyGitHubInstallationAuthorization).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 
-  test('completes an install when code is present and user is admin (report mode)', async () => {
+  test('completes an install when code is present and user is admin', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
       ) as never
     );
 
@@ -1051,40 +1552,96 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
       installationId: INSTALLATION_ID,
     });
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+    // Even on the legacy access-list admin check path, the OAuth code
+    // exchange resolved a real GitHub identity — it must still be recorded
+    // as authorization provenance rather than left null.
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        kiloUserId: USER_ID,
+        githubUserId: GITHUB_USER_ID,
+      }),
+      expect.anything()
+    );
   });
 
-  test('still completes install when admin check returns false (report mode does not block non-admin)', async () => {
+  test('routes a management-enabled install through the verified writer with both identities', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedConnectVerifiedGitHubInstallation.mockResolvedValue({
+      ok: true,
+      integrationId: '00000000-0000-4000-8000-0000000000aa',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockedVerifyGitHubInstallationAuthorization).toHaveBeenCalled();
+    expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedConnectVerifiedGitHubInstallation).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
+      expect.objectContaining({
+        kiloUserId: USER_ID,
+        githubUserId: GITHUB_USER_ID,
+      })
+    );
+  });
+
+  test('redirects with installation_unavailable when the installation itself refuses completion', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedConnectVerifiedGitHubInstallation.mockResolvedValue({
+      ok: false,
+      reason: 'installation_unavailable',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_unavailable`);
+  });
+
+  test('rejects an install when admin check returns false', async () => {
     mockedAssertUserAdministersInstallation.mockResolvedValue(false);
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
       ) as never
     );
 
-    // Report mode: non-admin is logged but the install proceeds.
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalled();
     expect(mockedAssertUserAdministersInstallation).toHaveBeenCalled();
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 
-  test('still completes install when code exchange fails (report mode)', async () => {
+  test('rejects an install when code exchange fails', async () => {
     mockedExchangeGitHubOAuthCode.mockRejectedValue(new Error('Token exchange failed'));
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
       ) as never
     );
 
-    // API failure in admin proof does not block the install.
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 
   test('redirects with installation_already_claimed when upsert detects cross-owner claim', async () => {
@@ -1096,7 +1653,7 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
       ) as never
     );
 
@@ -1104,14 +1661,46 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     expectRedirectLocation(response, `/integrations/github?error=installation_already_claimed`);
   });
 
-  test('logs distinct messages for code-absent vs non-admin (report mode distinguishes)', async () => {
+  test('redirects when multiple installations are disabled for the organization', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000001';
+    mockConsumedInstallState({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: organizationId,
+      github_app_type: 'standard',
+      return_to: null,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({
+      ok: false,
+      reason: 'multiple_installations_disabled',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(
+      response,
+      `/organizations/${organizationId}/integrations/github?error=multiple_installations_disabled`
+    );
+  });
+
+  test('logs distinct messages for code-absent vs non-admin', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
     // Case 1: code absent — should log code_absent.
     const { GET } = await import('./route');
     await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}`
       ) as never
     );
 
@@ -1129,7 +1718,7 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     mockedAssertUserAdministersInstallation.mockResolvedValue(false);
     await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
       ) as never
     );
 
@@ -1158,8 +1747,7 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
       authFailedResponse: null,
     } as never);
     mockedVerifyGitHubBotLinkState.mockReturnValue(null);
-    mockedConsumeInstallState.mockResolvedValue(null);
-    mockedGetEnvVariable.mockReturnValue('true');
+    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
     mockedCreateAppAuth.mockReturnValue(
       jest.fn(async () => ({ token: 'github-app-token' })) as never
     );
@@ -1185,30 +1773,30 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
 
   test('unrecognized-state warning does not include the raw state token', async () => {
     const RAW_TOKEN = `sentry-redaction-unknown-${Date.now()}`;
-    mockedConsumeInstallState.mockResolvedValue(null);
+    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}&code=abc`
       ) as never
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
     expect(mockedCaptureMessage).toHaveBeenCalled();
     const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
     // The raw state is a bearer token and must never reach Sentry.
     expect(serializedMessage).not.toContain(RAW_TOKEN);
-    // Safe diagnostics survive: state class, reason, and the callback ids.
     expect(serializedMessage).toContain('install_token');
     expect(serializedMessage).toContain('state_not_bot_link_or_install_token');
-    expect(serializedMessage).toContain(INSTALLATION_ID);
+    expect(serializedMessage).not.toContain(INSTALLATION_ID);
+    expect(serializedMessage).toContain('not_found');
   });
 
   test('catch-path exception does not include the raw state token', async () => {
     const RAW_TOKEN = `sentry-redaction-catch-${Date.now()}`;
-    mockedConsumeInstallState.mockResolvedValue({
+    mockConsumedInstallState({
       token: RAW_TOKEN,
       kilo_user_id: USER_ID,
       owner_type: 'user',
@@ -1234,7 +1822,7 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}&code=abc`
       ) as never
     );
 
@@ -1250,54 +1838,19 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
     expect(serializedException).toContain(INSTALLATION_ID);
   });
 
-  test('legacy-enabled warning does not include the raw state token', async () => {
-    const RAW_TOKEN = `org_sentry-redaction-legacy-${Date.now()}`;
-    mockedGetEnvVariable.mockReturnValue('true');
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
-      ) as never
-    );
-
-    expect(response.status).toBe(307);
-    expect(mockedCaptureMessage).toHaveBeenCalled();
-    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
-    // The raw state is a bearer token and must never reach Sentry.
-    expect(serializedMessage).not.toContain(RAW_TOKEN);
-    // Safe diagnostics survive: state class and the callback id.
-    expect(serializedMessage).toContain('legacy_org');
-    expect(serializedMessage).toContain('legacy_install_state');
-    expect(serializedMessage).toContain(INSTALLATION_ID);
-  });
-
-  test('legacy-refused warning does not include the raw state token', async () => {
-    const RAW_TOKEN = `user_sentry-redaction-refused-${Date.now()}`;
-    mockedGetEnvVariable.mockReturnValue('false');
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
-      ) as never
-    );
-
-    expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
-    expect(mockedCaptureMessage).toHaveBeenCalled();
-    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
-    // The raw state is a bearer token and must never reach Sentry.
-    expect(serializedMessage).not.toContain(RAW_TOKEN);
-    // Safe diagnostics survive: state class and the callback id.
-    expect(serializedMessage).toContain('legacy_user');
-    expect(serializedMessage).toContain('legacy_install_state_disabled');
-    expect(serializedMessage).toContain(INSTALLATION_ID);
-  });
-
   test('missing-installation diagnostic does not include the raw state token or params', async () => {
-    const RAW_TOKEN = `user_${USER_ID}`;
-    mockedGetEnvVariable.mockReturnValue('true');
+    const RAW_TOKEN = `missing-installation-${Date.now()}`;
+    mockConsumedInstallState({
+      token: RAW_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: null,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
 
     const { GET } = await import('./route');
     const response = await GET(
@@ -1313,43 +1866,176 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
     // The raw state is a bearer token and must never reach Sentry.
     expect(serializedMessage).not.toContain(RAW_TOKEN);
     // Safe diagnostics survive: state class, reason, and the setup action.
-    expect(serializedMessage).toContain('legacy_user');
+    expect(serializedMessage).toContain('install_token');
     expect(serializedMessage).toContain('missing_installation_id');
     expect(serializedMessage).toContain('setupAction');
   });
+});
 
-  test('invalid-owner diagnostic does not include the raw state token or params', async () => {
-    const RAW_TOKEN = `user_sentry-redaction-invalid-owner-${Date.now()}`;
-    mockedGetEnvVariable.mockReturnValue('true');
-    // Force the defensive invalid-owner branch inside handleLegacyInstallFlow,
-    // which is unreachable through the legacy prefix gate alone.
-    mockedParseStateReturn.mockReturnValue({ ownerToken: 'unrecognized', returnTo: null });
+describe('GET /api/integrations/github/callback app shell flow', () => {
+  const stateModule = jest.requireActual<typeof InstallStateModule>(
+    '@/lib/integrations/github/install-state'
+  );
 
+  async function createShellUser(): Promise<string> {
+    const id = `oauth/callback-shell-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id,
+      google_user_email: `callback-shell-${randomUUID()}@example.com`,
+      google_user_name: 'Test Shell User',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_test_callback_shell',
+    });
+    return id;
+  }
+
+  function shellRequest(pathWithQuery: string, cookie?: string) {
+    return new NextRequest(`http://localhost:3000${pathWithQuery}`, {
+      headers: cookie ? { cookie } : undefined,
+    });
+  }
+
+  function callbackPath(token: string, action: string) {
+    return `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=${action}&state=${token}`;
+  }
+
+  async function deleteShellState(token: string) {
+    await db.delete(github_install_states).where(eq(github_install_states.token, token));
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // The in-app browser has no web session: identity can only come from the
+    // install state plus the shell's per-attempt binding cookie.
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('unauthenticated'), { status: 401 }),
+    });
+    mockedCheckInstallState.mockImplementation(stateModule.checkInstallState);
+    mockedConsumeWithoutSession.mockImplementation(stateModule.consumeInstallStateWithoutSession);
+  });
+
+  test('a leaked install-state URL alone does not complete an install', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
     try {
       const { GET } = await import('./route');
-      const response = await GET(
-        makeRequest(
-          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
-        ) as never
-      );
+      const response = await GET(shellRequest(callbackPath(token, 'delete')));
 
-      expect(response.status).toBe(307);
       expectRedirectLocation(response, '/');
-      expect(mockedCaptureMessage).toHaveBeenCalled();
-      const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
-      // The raw state is a bearer token and must never reach Sentry.
-      expect(serializedMessage).not.toContain(RAW_TOKEN);
-      // Safe diagnostics survive: state class, reason, and the callback id.
-      expect(serializedMessage).toContain('legacy_user');
-      expect(serializedMessage).toContain('owner_not_org_or_user_prefix');
-      expect(serializedMessage).toContain(INSTALLATION_ID);
+      expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+      // The state survives, so the browser that started the flow can finish it.
+      await expect(stateModule.checkInstallState(token, userId)).resolves.toEqual({
+        status: 'valid',
+      });
     } finally {
-      const realParseStateReturn = jest.requireActual('@/lib/integrations/validate-return-path')
-        .parseStateReturn as (rawState: string | null) => {
-        ownerToken: string;
-        returnTo: string | null;
-      };
-      mockedParseStateReturn.mockImplementation(realParseStateReturn);
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a flow cookie minted for another state does not identify the caller', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    try {
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({
+        userId,
+        state: 'a-different-attempt-token',
+      })}`;
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      // The cookie says this browser is in the app, so it stays there.
+      expectRedirectLocation(response, '/app-shell/expired');
+      expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a matched flow cookie with an expired install state lands on the shell terminal page', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+    await deleteShellState(token);
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/expired');
+      expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a shell install state naming a blocked account ends in the shell', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: new Date().toISOString(), blocked_reason: 'abuse' })
+      .where(eq(kilocode_users.id, userId));
+    try {
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/account-unavailable');
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('the matching flow cookie completes the install and consumes the state', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    try {
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/github-app?github_action=delete');
+      const [state] = await db
+        .select({ consumedAt: github_install_states.consumed_at })
+        .from(github_install_states)
+        .where(eq(github_install_states.token, token));
+      expect(state.consumedAt).not.toBeNull();
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
     }
   });
 });

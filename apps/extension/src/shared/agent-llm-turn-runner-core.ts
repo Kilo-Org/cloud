@@ -2,9 +2,11 @@
 import {
   createAssistantMessage,
   createThinkingBlock,
+  createToolResult,
   createUserMessage,
 } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
+import { createTurnErrorEvent } from './agent-turn-error';
 import { runToolCalls } from './agent-tool-results';
 import type { FetchLike } from './auth';
 import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
@@ -17,6 +19,7 @@ import {
 import type { EvalTabResult } from './tab-debugger';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 
 export interface TurnUsage {
   readonly costUsd?: number;
@@ -30,7 +33,6 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
   readonly conversationEvents: AgentConversationEvent[];
   readonly executeToolCall: (toolCall: ToolCall) => Promise<EvalTabResult>;
-  readonly failureMessage: (error: unknown) => string;
   readonly fetch: FetchLike;
   readonly maxToolRounds: number;
   readonly model: string;
@@ -44,7 +46,9 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly token: string;
   readonly tools: KiloGatewayToolDefinition[];
   readonly tooManyToolRoundsMessage: string;
-  readonly toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) => ToolCall[];
+  readonly toToolCallEvents: (
+    toolCalls: KiloGatewayToolCallRequest[]
+  ) => (ToolCall | ToolResultEvent)[];
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
   /** Fires with the assistant event id on first content delta; fires undefined when that stream ends. */
@@ -154,7 +158,6 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   appendEvents,
   conversationEvents,
   executeToolCall,
-  failureMessage,
   fetch,
   maxToolRounds,
   model,
@@ -241,6 +244,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   ): Promise<{
     completionEvents: AgentConversationEvent[];
     finishReason: string | undefined;
+    resolvedToolResultEvents: ToolResultEvent[];
     toolCallEvents: ToolCall[];
   }> => {
     const completionEvents: AgentConversationEvent[] = [];
@@ -388,11 +392,20 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         completionEvents.push(createThinkingBlock(completion.reasoning));
       }
 
-      const toolCallEvents = withReasoningDetails(
-        toToolCallEvents(completion.toolCalls),
+      const turnEvents = toToolCallEvents(completion.toolCalls);
+      // A converter can answer a call itself (a safe-mode browser refusal): the exchange is shown and replayed, and the call never executes.
+      const resolvedToolResultEvents = turnEvents.filter(
+        (event): event is ToolResultEvent => event.type === 'tool-result'
+      );
+      const resolvedToolCallIds = new Set(resolvedToolResultEvents.map(event => event.toolCallId));
+      // The reasoning attaches to the first call of the assistant tool_calls message and must reach the persisted events, so replay carries it.
+      const turnToolCallEvents = withReasoningDetails(
+        turnEvents.filter((event): event is ToolCall => event.type === 'tool-call'),
         completion.reasoningDetails
       );
-      completionEvents.push(...toolCallEvents);
+      const toolCallEvents = turnToolCallEvents.filter(event => !resolvedToolCallIds.has(event.id));
+      // Calls first, then resolved results: an interleaved refusal would split the assistant tool_calls message and leave a call unanswered.
+      completionEvents.push(...turnToolCallEvents, ...resolvedToolResultEvents);
 
       appendEvents(
         completionEvents.filter(
@@ -400,7 +413,12 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         )
       );
 
-      return { completionEvents, finishReason: completion.finishReason, toolCallEvents };
+      return {
+        completionEvents,
+        finishReason: completion.finishReason,
+        resolvedToolResultEvents,
+        toolCallEvents,
+      };
     } finally {
       if (didStartAssistantStreaming) {
         // Explicit clear: callers key collapse chrome off this id being undefined.
@@ -422,7 +440,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         return;
       }
 
-      const { completionEvents, finishReason, toolCallEvents } =
+      const { completionEvents, finishReason, resolvedToolResultEvents, toolCallEvents } =
         await appendCompletion(nextConversationEvents);
 
       if (completionEvents.length === 0) {
@@ -432,7 +450,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       nextConversationEvents.push(...completionEvents);
 
-      if (toolCallEvents.length === 0) {
+      if (toolCallEvents.length === 0 && resolvedToolResultEvents.length === 0) {
         const lastAssistantText =
           completionEvents
             .toReversed()
@@ -463,19 +481,36 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         return;
       }
 
-      const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
+      const executedResultEvents = await runToolCalls(
         toolCallEvents,
         guardedExecuteToolCall,
         signal
       );
 
+      // Every call needs a result: a stopped turn leaves the rest unanswered, and a provider rejects a replayed call that never got one.
+      const answeredToolCallIds = new Set(executedResultEvents.map(event => event.toolCallId));
+      const toolResultEvents: AgentConversationEvent[] = [
+        ...executedResultEvents,
+        ...toolCallEvents
+          .filter(toolCall => !answeredToolCallIds.has(toolCall.id))
+          .map(toolCall =>
+            createToolResult({
+              error: 'Stopped before this tool ran.',
+              ok: false,
+              toolCallId: toolCall.id,
+            })
+          ),
+      ];
+
+      if (toolResultEvents.length > 0) {
+        appendEvents(toolResultEvents);
+        nextConversationEvents.push(...toolResultEvents);
+      }
+
       if (isSignalAborted(signal)) {
         appendEvents([createAssistantMessage('Stopped.')]);
         return;
       }
-
-      appendEvents(toolResultEvents);
-      nextConversationEvents.push(...toolResultEvents);
 
       if (streakStopMessage !== undefined) {
         appendEvents([createAssistantMessage(streakStopMessage)]);
@@ -487,8 +522,11 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
     await continueConversation([...conversationEvents], maxToolRounds);
   } catch (error) {
-    appendEvents([
-      createAssistantMessage(isAbortError(error) ? 'Stopped.' : failureMessage(error)),
-    ]);
+    if (isAbortError(error)) {
+      appendEvents([createAssistantMessage('Stopped.')]);
+      return;
+    }
+
+    appendEvents([createTurnErrorEvent(error)]);
   }
 };

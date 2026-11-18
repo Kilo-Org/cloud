@@ -1,8 +1,9 @@
 import 'server-only';
 
 import { z } from 'zod';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const RenameNotifyResponseSchema = z.object({
   delivered: z.boolean(),
@@ -30,7 +31,10 @@ export async function notifyCliSessionRenamed({
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/rename-notify`;
 
   const response = await fetch(url, {

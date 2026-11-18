@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Input } from '@/components/ui/input';
@@ -11,11 +11,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Cloud, Terminal, Puzzle, Bot, Workflow } from 'lucide-react';
+import {
+  Search,
+  Cloud,
+  Terminal,
+  Puzzle,
+  Bot,
+  Monitor,
+  Workflow,
+  Loader2,
+  Trash2,
+} from 'lucide-react';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
-import { extractRepoFromGitUrl } from '@/components/cloud-agent/store/db-session-atoms';
+import { extractRepoFromGitUrl } from '@/components/cloud-agent-next/utils/git-utils';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +41,10 @@ import Link from 'next/link';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm';
+import { useCloudSessionFork } from '@/components/cloud-agent-next/use-cloud-session-fork';
+import { ShareSessionDialog } from '@/components/cloud-agent-next/ShareSessionDialog';
+import { useSessionDeletion } from '@/components/cloud-agent-next/hooks/useSessionDeletion';
+import type { SessionDeletionEvent } from '@/components/cloud-agent-next/session-deletion';
 
 /** Platform filter options matching the badge logic in SessionsList */
 const PLATFORM_OPTIONS: readonly {
@@ -42,11 +56,19 @@ const PLATFORM_OPTIONS: readonly {
   { value: 'cloud-agent', label: 'Cloud', icon: Cloud },
   { value: 'cli', label: 'CLI', icon: Terminal },
   { value: 'agent-manager', label: 'Agent Manager', icon: Bot },
+  { value: 'desktop', label: 'Desktop', icon: Monitor },
   { value: 'gastown', label: 'Gastown', icon: Workflow },
   { value: 'other', label: 'Other', icon: Puzzle },
 ];
 
-type PlatformFilterValue = 'all' | 'cloud-agent' | 'cli' | 'agent-manager' | 'gastown' | 'other';
+type PlatformFilterValue =
+  | 'all'
+  | 'cloud-agent'
+  | 'cli'
+  | 'agent-manager'
+  | 'desktop'
+  | 'gastown'
+  | 'other';
 type SessionFilterValue = 'all' | 'shared';
 
 export function SessionsPageContent() {
@@ -59,9 +81,14 @@ export function SessionsPageContent() {
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
   const [sessionFilter, setSessionFilter] = useState<SessionFilterValue>('all');
   const [pendingSessionIds, setPendingSessionIds] = useState(() => new Set<string>());
-  type SessionWithSource = SessionsListItem & { source: 'v2' };
+  type SessionWithSource = SessionsListItem & {
+    source: 'v2';
+    cloudAgentSessionId?: string | null;
+    worktreeId: string | null;
+  };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [sharingSession, setSharingSession] = useState<SessionWithSource | null>(null);
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -73,6 +100,27 @@ export function SessionsPageContent() {
 
   // Determine if we're in an organization context
   const organizationId = pathname.match(/^\/organizations\/([^/]+)/)?.[1];
+
+  const handleSessionsDeleted = useCallback(
+    (event: SessionDeletionEvent) => {
+      if (!selectedSession || !event.deletedSessionIds.includes(selectedSession.sessionId)) return;
+      setIsDialogOpen(false);
+      setSelectedSession(null);
+      setSharingSession(null);
+    },
+    [selectedSession]
+  );
+
+  const {
+    deleteSession,
+    deletingSessionIds,
+    isDeleting: deletionInProgress,
+  } = useSessionDeletion({
+    organizationId,
+    onDeleted: handleSessionsDeleted,
+  });
+
+  const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
 
   // When in organization context, OrganizationTrialWrapper already provides PageContainer
   const shouldUsePageContainer = !organizationId;
@@ -119,8 +167,6 @@ export function SessionsPageContent() {
     })
   );
 
-  const shareMutation = useMutation(trpc.cliSessionsV2.share.mutationOptions());
-
   const setSessionPending = (sessionId: string, pending: boolean) => {
     setPendingSessionIds(prev => {
       const next = new Set(prev);
@@ -131,19 +177,6 @@ export function SessionsPageContent() {
       }
       return next;
     });
-  };
-
-  const handleCopyLink = async (sessionId: string) => {
-    setSessionPending(sessionId, true);
-    try {
-      const result = await shareMutation.mutateAsync({ session_id: sessionId });
-      await navigator.clipboard.writeText(`${window.location.origin}/s/${result.share_token}`);
-      toast.success('Link copied to clipboard');
-    } catch {
-      toast.error('Could not copy the share link');
-    } finally {
-      setSessionPending(sessionId, false);
-    }
   };
 
   const handleUnshare = async (sessionId: string) => {
@@ -176,6 +209,7 @@ export function SessionsPageContent() {
     updated_at: string;
     created_on_platform: string;
     cloud_agent_session_id: string | null;
+    cloud_agent_worktree_id: string | null;
   }): SessionWithSource => {
     const repository = extractRepoFromGitUrl(session.git_url) ?? null;
     const prompt = session.title || 'Untitled';
@@ -183,6 +217,8 @@ export function SessionsPageContent() {
     return {
       createdAt: session.created_at,
       createdOnPlatform: session.created_on_platform,
+      cloudAgentSessionId: session.cloud_agent_session_id,
+      worktreeId: session.cloud_agent_worktree_id,
       prompt,
       repository,
       sessionId: session.session_id,
@@ -201,6 +237,22 @@ export function SessionsPageContent() {
   const handleSessionClick = (session: SessionWithSource) => {
     setSelectedSession(session);
     setIsDialogOpen(true);
+  };
+
+  const handleForkToCloud = async () => {
+    if (!selectedSession) return;
+    const forked = await forkSessionToNewCloudSession(selectedSession.sessionId);
+    if (forked) {
+      setIsDialogOpen(false);
+    }
+  };
+
+  const handleDeleteSession = (session: SessionWithSource) => {
+    void deleteSession({
+      sessionId: session.sessionId,
+      title: session.prompt,
+      worktreeId: session.worktreeId,
+    });
   };
 
   const content = (
@@ -274,35 +326,68 @@ export function SessionsPageContent() {
         <SessionsList
           sessions={sessions}
           onSessionClick={handleSessionClick}
-          rowActions={
-            sharedOnly
-              ? session => {
-                  const isPending = pendingSessionIds.has(session.sessionId);
-                  return (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isPending}
-                        onClick={() => void handleCopyLink(session.sessionId)}
-                      >
-                        Copy link
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isPending}
-                        onClick={() => void handleUnshare(session.sessionId)}
-                      >
-                        Unshare
-                      </Button>
-                    </>
-                  );
-                }
-              : undefined
-          }
+          rowActions={session => {
+            const isUnsharing = pendingSessionIds.has(session.sessionId);
+            const isDeleting = deletingSessionIds.has(session.sessionId);
+            const isPending = isUnsharing || isDeleting;
+            return (
+              <>
+                {sharedOnly && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => setSharingSession(session)}
+                    >
+                      Create new link
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => void handleUnshare(session.sessionId)}
+                    >
+                      Unshare
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending || deletionInProgress}
+                  onClick={event => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    handleDeleteSession(session);
+                  }}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </Button>
+              </>
+            );
+          }}
+        />
+      )}
+
+      {sharingSession && (
+        <ShareSessionDialog
+          key={sharingSession.sessionId}
+          open
+          onOpenChange={open => {
+            if (!open) setSharingSession(null);
+          }}
+          kiloSessionId={sharingSession.sessionId}
+          cloudAgentSessionId={sharingSession.cloudAgentSessionId}
+          organizationId={organizationId}
         />
       )}
 
@@ -352,8 +437,30 @@ export function SessionsPageContent() {
               <div className="space-y-3">
                 <h3 className="text-sm font-medium">Fork Session</h3>
                 <p className="text-muted-foreground text-xs">
-                  Fork this session to continue working on it in your editor or CLI
+                  {selectedSession.cloudAgentSessionId
+                    ? 'Fork this session to continue working on it in your editor, CLI, or a new Cloud Agent session'
+                    : 'Fork this session to continue working on it in your editor or CLI'}
                 </p>
+
+                {/* Fork into a new Cloud Agent session */}
+                {selectedSession.cloudAgentSessionId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    disabled={forkingSessionId === selectedSession.sessionId}
+                    onClick={() => void handleForkToCloud()}
+                  >
+                    {forkingSessionId === selectedSession.sessionId ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Cloud className="h-4 w-4" />
+                    )}
+                    {forkingSessionId === selectedSession.sessionId
+                      ? 'Forking to a new Cloud Agent session...'
+                      : 'Fork to a new Cloud Agent session'}
+                  </Button>
+                )}
 
                 {/* Open in Editor */}
                 <div className="flex justify-center">

@@ -82,6 +82,21 @@ export function getCancelSubscriptionDialogCopy(userName: string): {
   };
 }
 
+export function getTerminateSubscriptionDialogCopy(userName: string): {
+  title: string;
+  description: string;
+} {
+  return {
+    title: `Terminate ${userName}'s subscription now?`,
+    description:
+      "Immediately ends access instead of waiting for the current period to finish. Revokes the installed credential, queues it for removal from the provider, and frees this provider so the user can add their own BYOK key right away. This can't be undone.",
+  };
+}
+
+export function getTerminateSubscriptionCompleteToast(): string {
+  return 'Subscription terminated immediately.';
+}
+
 export function getExtendSubscriptionDialogCopy(userName: string): {
   title: string;
   description: string;
@@ -90,6 +105,52 @@ export function getExtendSubscriptionDialogCopy(userName: string): {
     title: `Extend ${userName}'s current period?`,
     description: 'Adds days to the current period end and renewal date without charging credits.',
   };
+}
+
+export function getSwapCredentialDialogCopy(userName: string): {
+  title: string;
+  description: string;
+} {
+  return {
+    title: `Swap ${userName}'s credential?`,
+    description:
+      "Moves this subscription onto the next available credential from the pool and queues the current one for manual revocation. Billing, renewal dates, and status are unaffected, and the user doesn't need to do anything.",
+  };
+}
+
+export function getSwapCredentialCompleteToast(): string {
+  return 'Subscription moved to a new pooled credential.';
+}
+
+export function getReduceInventoryDialogCopy(planId: string): {
+  title: string;
+  description: string;
+} {
+  return {
+    title: `Queue ${planId} inventory for removal?`,
+    description:
+      'This will add the desired number of plans to the Pending Key Removal queue. After this, the admin must remove the key from the provider, and then mark the key as revoked',
+  };
+}
+
+export function canSubmitReduceCount(value: string, availableCount: number): boolean {
+  const count = Number(value);
+  return Number.isInteger(count) && count >= 1 && count <= availableCount;
+}
+
+export function getReduceInventoryCompleteToast(
+  queuedCount: number,
+  requestedCount: number,
+  upstreamPlanIds: readonly string[]
+): string {
+  if (queuedCount === 0) {
+    return 'No credentials were queued. They may have just been claimed by a subscription; refresh and try again.';
+  }
+  const idList = upstreamPlanIds.join(', ');
+  if (queuedCount < requestedCount) {
+    return `Queued ${queuedCount} of ${requestedCount} requested credentials for removal (the rest were claimed before queuing). Find them in Pending Key Rotation and deprovision using upstream plan IDs: ${idList}`;
+  }
+  return `Queued ${queuedCount} credential${queuedCount === 1 ? '' : 's'} for removal in Pending Key Rotation. Deprovision using upstream plan IDs: ${idList}`;
 }
 
 export type InsightsRangeDays = 7 | 14 | 30;

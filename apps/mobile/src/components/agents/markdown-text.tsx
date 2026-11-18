@@ -1,74 +1,189 @@
-import { useMemo } from 'react';
-import { useColorScheme, View } from 'react-native';
-import { useMarkdown } from 'react-native-marked';
+import { useMemo, useRef } from 'react';
+import { View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { getMarkdownStyles, getPalette, type MarkdownVariant } from './markdown-palette';
+import { MarkdownCodeFence } from './markdown-code-fence';
+import { MarkdownEnriched } from './markdown-enriched';
+import { splitMarkdownFences } from './markdown-fences';
 import {
+  type MarkdownCopyCodeHandler,
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
-  MarkdownRenderer,
-} from './markdown-renderer';
+} from './markdown-handlers';
+import { convertHtmlToMarkdown } from './markdown-html-convert';
+import {
+  MarkdownHtml,
+  type MarkdownHtmlSnapshot,
+  splitMarkdownHtmlIncremental,
+} from './markdown-html';
+import { MarkdownMermaid } from './markdown-mermaid';
+import { getPalette, type MarkdownPalette, type MarkdownVariant } from './markdown-palette';
+import { markdownHtmlSplitCache } from './markdown-parse-cache';
 
 export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
+  /**
+   * Base direction of the document body, when it has one of its own: a legal
+   * document is English in every interface language, so its prose keeps a
+   * left-to-right base direction and the left edge while the screen around it
+   * mirrors. Chat omits this and follows the interface.
+   */
+  documentDirection?: 'ltr';
   selectable?: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   /**
    * Optional tap handler invoked when a rendered link is pressed. When this
-   * callback is omitted, or when it returns a falsy value, the link is opened
-   * with `openExternalUrl`. Returning `true` signals that the caller has
-   * fully handled the press and the default browser open should be skipped.
+   * callback is omitted, or when it returns a falsy value, the renderer runs
+   * the default confirm-and-open flow. Returning `true` signals that the
+   * caller has fully handled the press and the default open should be skipped.
    */
   onPressLink?: MarkdownLinkPressHandler;
+  /**
+   * Optional handler that hands a rendered code fence's source to the caller.
+   * A fence this renderer draws always offers copy; without a handler the
+   * button copies through the shared clipboard helper. A fence left on the
+   * native renderer's path (indented into a list or a blockquote) shows its
+   * own copy button only when this handler is supplied.
+   */
+  onCopyCode?: MarkdownCopyCodeHandler;
 };
 
 export function MarkdownText({
   value,
   variant = 'assistant',
+  documentDirection,
   selectable = true,
   onLongPressLink,
   onPressLink,
+  onCopyCode,
 }: Readonly<MarkdownTextProps>) {
-  const colorScheme = useColorScheme();
   const colors = useThemeColors();
 
   const palette = useMemo(() => getPalette(variant, colors), [variant, colors]);
 
-  const styles = useMemo(() => getMarkdownStyles(palette), [palette]);
+  // Re-lex only past the previous snapshot's tail boundary (its last block run
+  // and any list or blockquote that can still absorb it): a streaming append can
+  // only change that region, so the head segments (and the elements keyed by
+  // index) stay stable while the message grows. The memo keeps an unrelated
+  // re-render from re-lexing an unchanged value; the ref survives it so the
+  // next value still extends the snapshot.
+  const snapshotRef = useRef<MarkdownHtmlSnapshot | undefined>(undefined);
+  const { segments, snapshot } = useMemo(() => {
+    // A remount (a FlashList row re-entering the window) starts without a
+    // snapshot, so the incremental parser can only rebuild the whole value.
+    // Completed values were cached on the previous mount — including the last
+    // streaming publish, which is the value a remount sees — so reuse that
+    // parse instead of lexing and segmenting the same source again.
+    const cached =
+      snapshotRef.current === undefined ? markdownHtmlSplitCache.get(value) : undefined;
+    // HTML that markdown can express becomes markdown first, so it renders
+    // natively; only the rest reaches the HTML engine.
+    const result =
+      cached ?? splitMarkdownHtmlIncremental(convertHtmlToMarkdown(value), snapshotRef.current);
+    markdownHtmlSplitCache.set(value, result);
+    return result;
+  }, [value]);
+  snapshotRef.current = snapshot;
 
-  const theme = useMemo(
-    () => ({
-      colors: {
-        text: palette.textColor,
-        code: palette.textColor,
-        link: palette.textColor,
-        border: palette.borderColor,
-      },
-    }),
-    [palette]
+  // Always render through the same wrapping View with index keys: switching to
+  // a bare markdown element when no HTML token exists would change the root
+  // element type, remounting the markdown prefix as soon as the first HTML
+  // token streams in.
+  return (
+    <View>
+      {segments.map((segment, index) =>
+        segment.type === 'html' ? (
+          <MarkdownHtml
+            key={`md-html-${index}`}
+            html={segment.raw}
+            palette={palette}
+            documentDirection={documentDirection}
+            selectable={selectable}
+            onLongPressLink={onLongPressLink}
+            onPressLink={onPressLink}
+          />
+        ) : (
+          <MarkdownRun
+            key={`md-content-${index}`}
+            raw={segment.raw}
+            palette={palette}
+            documentDirection={documentDirection}
+            selectable={selectable}
+            onLongPressLink={onLongPressLink}
+            onPressLink={onPressLink}
+            onCopyCode={onCopyCode}
+          />
+        )
+      )}
+    </View>
   );
+}
 
-  // react-native-marked keys elements with a per-instance monotonic slugger;
-  // reusing one instance across re-parses re-keys every element and remounts
-  // the subtree, resetting local state such as MarkdownTable's open modal
-  // during streaming. A fresh instance per `value` change yields identical
-  // keys for identical parse prefixes, so element state survives while
-  // streaming updates flow in as props.
-  const renderer = useMemo(
-    () => new MarkdownRenderer(palette, selectable, { onLongPressLink, onPressLink }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `value` intentionally recreates the renderer per markdown-source change so element keys stay stable across streaming re-parses
-    [palette, selectable, onLongPressLink, onPressLink, value]
+type MarkdownRunProps = {
+  raw: string;
+  palette: MarkdownPalette;
+  documentDirection?: 'ltr';
+  selectable: boolean;
+  onLongPressLink?: MarkdownLinkLongPressHandler;
+  onPressLink?: MarkdownLinkPressHandler;
+  onCopyCode?: MarkdownCopyCodeHandler;
+};
+
+/**
+ * One markdown run: its fenced code blocks are drawn by this app (wrapping, so
+ * a long line stays readable inside the bubble) and everything between them by
+ * the native renderer. A mermaid fence keeps the diagram renderer once it is
+ * closed; while a streamed append is still open the source shows as code, as the
+ * fence regex it replaces did.
+ */
+function MarkdownRun({
+  raw,
+  palette,
+  documentDirection,
+  selectable,
+  onLongPressLink,
+  onPressLink,
+  onCopyCode,
+}: Readonly<MarkdownRunProps>) {
+  const runs = useMemo(() => splitMarkdownFences(raw), [raw]);
+  return (
+    <>
+      {runs.map((run, index) => {
+        if (run.type === 'text') {
+          return (
+            <MarkdownEnriched
+              key={`md-text-${index}`}
+              value={run.raw}
+              palette={palette}
+              documentDirection={documentDirection}
+              selectable={selectable}
+              onLongPressLink={onLongPressLink}
+              onPressLink={onPressLink}
+              onCopyCode={onCopyCode}
+            />
+          );
+        }
+        return run.language === 'mermaid' && run.closed ? (
+          <MarkdownMermaid
+            key={`md-fence-${index}`}
+            source={run.code}
+            palette={palette}
+            selectable={selectable}
+            onCopyCode={onCopyCode}
+          />
+        ) : (
+          <MarkdownCodeFence
+            key={`md-fence-${index}`}
+            code={run.code}
+            language={run.language}
+            palette={palette}
+            selectable={selectable}
+            onCopyCode={onCopyCode}
+          />
+        );
+      })}
+    </>
   );
-
-  const elements = useMarkdown(value, {
-    colorScheme,
-    theme,
-    styles,
-    renderer,
-  });
-
-  return <View>{elements}</View>;
 }

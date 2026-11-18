@@ -103,25 +103,79 @@ describe('toCodeReviewDisplayEvent', () => {
     ).toBeNull();
   });
 
-  it('skips streaming text parts until they complete', () => {
-    expect(
-      toCodeReviewDisplayEvent(
-        kilocode('message.part.updated', {
-          part: { type: 'text', text: 'Looking at the diff now.' },
-        })
-      )
-    ).toBeNull();
-  });
-
-  it('does not drop completed text parts whose state is an object', () => {
+  it('shows canonical text parts while the review is running', () => {
     expect(
       toCodeReviewDisplayEvent(
         kilocode('message.part.updated', {
           part: {
             id: 'prt_text',
+            sessionID: 'ses-1',
+            messageID: 'msg-1',
+            type: 'text',
+            text: 'Looking at the diff now.',
+            time: { start: 1787054400000 },
+          },
+        })
+      )
+    ).toEqual({
+      timestamp: '2026-08-18T12:00:00.000Z',
+      message: 'Looking at the diff now.',
+      eventType: 'text',
+      key: 'prt_text',
+    });
+  });
+
+  it('preserves the full multiline text of long live responses', () => {
+    const text = `${'Reviewing the changed files. '.repeat(20)}\nFinal finding after the preview limit.`;
+
+    expect(
+      toCodeReviewDisplayEvent(
+        kilocode('message.part.updated', {
+          part: { id: 'prt_text', type: 'text', text },
+        })
+      )
+    ).toEqual({
+      timestamp: '2026-08-18T12:00:00.000Z',
+      message: text,
+      eventType: 'text',
+      key: 'prt_text',
+    });
+  });
+
+  it('preserves long tool commands without dropping their arguments', () => {
+    const command = `pnpm test ${'src/components/code-reviews/review.test.ts '.repeat(5)}--runInBand`;
+
+    expect(
+      toCodeReviewDisplayEvent(
+        kilocode('message.part.updated', {
+          part: {
+            id: 'prt_bash',
+            type: 'tool',
+            tool: 'bash',
+            state: { status: 'completed', input: { command } },
+          },
+        })
+      )
+    ).toEqual({
+      timestamp: '2026-08-18T12:00:00.000Z',
+      message: 'Tool: bash',
+      content: command,
+      eventType: 'tool',
+      key: 'prt_bash',
+    });
+  });
+
+  it('shows completed canonical text parts without a tool state', () => {
+    expect(
+      toCodeReviewDisplayEvent(
+        kilocode('message.part.updated', {
+          part: {
+            id: 'prt_text',
+            sessionID: 'ses-1',
+            messageID: 'msg-1',
             type: 'text',
             text: 'Review summary',
-            state: { status: 'completed' },
+            time: { start: 1787054400000, end: 1787054401000 },
           },
         })
       )
@@ -131,6 +185,33 @@ describe('toCodeReviewDisplayEvent', () => {
       eventType: 'text',
       key: 'prt_text',
     });
+  });
+
+  it.each(['', '   '])('skips empty text parts: %j', text => {
+    expect(
+      toCodeReviewDisplayEvent(
+        kilocode('message.part.updated', {
+          part: { id: 'prt_text', type: 'text', text },
+        })
+      )
+    ).toBeNull();
+  });
+
+  it('updates a text part in place as new text arrives', () => {
+    const partial = toCodeReviewDisplayEvent(
+      kilocode('message.part.updated', {
+        part: { id: 'prt_text', type: 'text', text: 'Looking at' },
+      })
+    );
+    const updated = toCodeReviewDisplayEvent(
+      kilocode('message.part.updated', {
+        part: { id: 'prt_text', type: 'text', text: 'Looking at the diff now.' },
+      })
+    );
+    expect(partial).not.toBeNull();
+    expect(updated).not.toBeNull();
+    if (!partial || !updated) return;
+    expect(appendCodeReviewDisplayEvent([partial], updated)).toEqual([updated]);
   });
 
   it('shows session.status when status is an object', () => {

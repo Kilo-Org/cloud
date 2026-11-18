@@ -1,19 +1,23 @@
 import { Pressable } from 'react-native';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
-import { getModeIcon, MODE_OPTIONS } from '@/components/agents/mode-options';
+import { getBuiltinModeLabelKey, getModeIcon } from '@/components/agents/mode-options';
 import {
   type AgentMode,
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
+  isBuiltinAgentMode,
   type ModeOption,
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
+import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { setModePickerBridge } from '@/lib/picker-bridge';
-import { cn } from '@/lib/utils';
+import { parseParam } from '@/lib/route-params';
+import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 
 export type { AgentMode };
 
@@ -30,42 +34,51 @@ export function ModeSelector({
   disabled = false,
   customOptions = [],
 }: Readonly<ModeSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
+  const { t } = useTranslation();
+  const { 'session-id': rawSessionId } = useLocalSearchParams<{ 'session-id'?: string }>();
   const selectedValue = normalizeAgentMode(value);
-  const allOptions = [...MODE_OPTIONS, ...dedupeCustomModeOptions(customOptions)];
-  const selectedOption = ensureSelectedCustomOption(allOptions, selectedValue).find(
+  const customOptionsDeduped = dedupeCustomModeOptions(customOptions);
+  const selectedCustomOption = ensureSelectedCustomOption(customOptionsDeduped, selectedValue).find(
     m => m.value === selectedValue
   );
-  const selectedLabel = selectedOption?.label ?? selectedValue;
+  const selectedLabel = isBuiltinAgentMode(selectedValue)
+    ? t(getBuiltinModeLabelKey(selectedValue) ?? '')
+    : (selectedCustomOption?.label ?? selectedValue);
   const ModeIcon = getModeIcon(selectedValue);
 
   function handlePress() {
     if (disabled) {
       return;
     }
-    setModePickerBridge({
+    const routeKey = parseParam(rawSessionId) ?? UNFENCED_ROUTE_KEY;
+    modePickerSlot.set(routeKey, {
       currentValue: selectedValue,
       onSelect: onChange,
       customOptions,
     });
-    router.push('/(app)/agent-chat/mode-picker' as Href);
+    pushOnce(`/(app)/agent-chat/mode-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
   }
 
   return (
     <Pressable
       onPress={handlePress}
       disabled={disabled}
+      // The pill's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
+      hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
-      accessibilityLabel={`Mode: ${selectedLabel}`}
+      accessibilityLabel={t('agentChat.modeSelector.accessibility', { label: selectedLabel })}
       accessibilityState={{ disabled }}
-      className={cn(
-        'flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
-        disabled && 'opacity-50'
-      )}
+      className="shrink-0 flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
-      <ModeIcon size={14} color={colors.foreground} />
-      <Text className="text-sm font-medium text-foreground">{selectedLabel}</Text>
+      {/* The label stays at full theme contrast; a disabled chip dims only its
+       * icon so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
+      <ModeIcon size={14} color={disabled ? colors.mutedForeground : colors.foreground} />
+      <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+        {selectedLabel}
+      </Text>
       <ChevronDown size={14} color={colors.mutedForeground} />
     </Pressable>
   );

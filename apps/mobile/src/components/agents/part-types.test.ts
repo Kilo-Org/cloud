@@ -1,7 +1,24 @@
-import { type ReasoningPart, type TextPart } from '@kilocode/cloud-agent-sdk';
+import {
+  type FilePart,
+  type PatchPart,
+  type ReasoningPart,
+  type StoredMessage,
+  type TextPart,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { isPartStreaming, isSnapshotProgressPart, shouldRenderReasoningPart } from './part-types';
+import { assistantMessage } from './message-bubble-test-utils';
+import {
+  firstHumanText,
+  hasNonWhitespaceText,
+  humanTextParts,
+  isPartStreaming,
+  isPatchPart,
+  isSnapshotProgressPart,
+  shouldRenderReasoningPart,
+  withoutReasoningParts,
+} from './part-types';
 
 function makeReasoningPart(text: string, ended = true): ReasoningPart {
   return {
@@ -29,6 +46,40 @@ function makeTextPart(text: string, synthetic?: boolean): TextPart {
   return part;
 }
 
+function makeToolPart(): ToolPart {
+  return {
+    id: 'tool-1',
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'tool',
+    tool: 'read',
+    callID: 'call-1',
+    state: {
+      status: 'completed',
+      input: { filePath: 'src/a.ts' },
+      output: 'contents',
+      title: 'Read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+function makeFilePart(): FilePart {
+  return {
+    id: 'file-1',
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'file',
+    mime: 'text/plain',
+    url: 'file:///a.txt',
+  };
+}
+
+function storedMessage(id: string, parts: StoredMessage['parts']): StoredMessage {
+  return { info: assistantMessage(id).info, parts };
+}
+
 describe('isSnapshotProgressPart', () => {
   it('is true for a synthetic text part whose text includes Initializing snapshot', () => {
     const part = makeTextPart('⠋ Initializing snapshot…', true);
@@ -48,6 +99,70 @@ describe('isSnapshotProgressPart', () => {
   it('is false for non-text parts', () => {
     const part = makeReasoningPart('thinking');
     expect(isSnapshotProgressPart(part)).toBe(false);
+  });
+});
+
+describe('humanTextParts', () => {
+  const contextText =
+    'Cloud Agent session context.\n<cloud-agent-context session-id="workspace_123" />';
+
+  it('skips a synthetic server context part when a human prompt exists', () => {
+    const context = { ...makeTextPart(contextText, true), id: 'context' };
+    const prompt = { ...makeTextPart('Fix the bug'), id: 'prompt' };
+    expect(humanTextParts([context, prompt]).map(part => part.text)).toEqual(['Fix the bug']);
+    expect(firstHumanText([context, prompt])).toBe('Fix the bug');
+  });
+
+  it('does not fall back to server context for an attachment-only row', () => {
+    const context = { ...makeTextPart(contextText, true), id: 'context' };
+    expect(humanTextParts([context, makeFilePart()])).toEqual([]);
+    expect(firstHumanText([context, makeFilePart()])).toBe('');
+  });
+
+  it('keeps a synthetic-only optimistic prompt', () => {
+    const prompt = makeTextPart('Fix the bug', true);
+    expect(humanTextParts([prompt]).map(part => part.text)).toEqual(['Fix the bug']);
+    expect(firstHumanText([prompt])).toBe('Fix the bug');
+  });
+
+  it('skips ignored text parts', () => {
+    const ignored = { ...makeTextPart('hidden'), ignored: true };
+    const prompt = makeTextPart('Fix the bug');
+    expect(humanTextParts([ignored, prompt]).map(part => part.text)).toEqual(['Fix the bug']);
+  });
+});
+
+describe('isPatchPart', () => {
+  it('is true for a patch part', () => {
+    const part: PatchPart = {
+      id: 'p1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'patch',
+      hash: 'abc',
+      files: ['src/a.ts'],
+    };
+    expect(isPatchPart(part)).toBe(true);
+  });
+
+  it('is false for a file part', () => {
+    const part: FilePart = {
+      id: 'p1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'file',
+      mime: 'text/plain',
+      url: 'file:///a.txt',
+    };
+    expect(isPatchPart(part)).toBe(false);
+  });
+});
+
+describe('isPartStreaming', () => {
+  it('does not treat a reasoning part with no time as streaming', () => {
+    const part = makeReasoningPart('thinking');
+    delete (part as { time?: unknown }).time;
+    expect(isPartStreaming(part)).toBe(false);
   });
 });
 
@@ -94,5 +209,105 @@ describe('shouldRenderReasoningPart', () => {
     const part = makeReasoningPart('', false);
     expect(isPartStreaming(part)).toBe(true);
     expect(shouldRenderReasoningPart(part, false)).toBe(false);
+  });
+
+  it('does not render a reasoning part with no text', () => {
+    const part = makeReasoningPart('thinking');
+    delete (part as { text?: unknown }).text;
+    expect(shouldRenderReasoningPart(part, false)).toBe(false);
+  });
+});
+
+describe('hasNonWhitespaceText', () => {
+  it('matches String.prototype.trim emptiness for every whitespace class', () => {
+    const samples = [
+      '',
+      ' ',
+      '\t',
+      '\n',
+      '\r',
+      '\f',
+      '\v',
+      ' \t\n\r ',
+      '\u00A0',
+      '\u1680',
+      '\u2003',
+      '\u2028',
+      '\u2029',
+      '\u202F',
+      '\u205F',
+      '\u3000',
+      '\uFEFF',
+      ' \u00A0\u3000\t',
+    ];
+    for (const sample of samples) {
+      expect(hasNonWhitespaceText(sample)).toBe(sample.trim() !== '');
+    }
+  });
+
+  it('is true for ordinary streamed text', () => {
+    expect(hasNonWhitespaceText('thinking')).toBe(true);
+    expect(hasNonWhitespaceText('a')).toBe(true);
+    expect(hasNonWhitespaceText('  leading then text')).toBe(true);
+  });
+
+  it('is false for undefined-equivalent empty input', () => {
+    expect(hasNonWhitespaceText('')).toBe(false);
+  });
+});
+
+describe('withoutReasoningParts', () => {
+  it('removes reasoning while keeping text and tool parts', () => {
+    const text = makeTextPart('answer');
+    const tool = makeToolPart();
+    const message = storedMessage('m1', [makeReasoningPart('thinking'), text, tool]);
+
+    const result = withoutReasoningParts([message]);
+
+    expect(result[0]?.parts).toEqual([text, tool]);
+    expect(result[0]?.parts.some(part => part.type === 'reasoning')).toBe(false);
+  });
+
+  it('returns the same array reference when no message has reasoning', () => {
+    const messages: StoredMessage[] = [
+      storedMessage('m1', [makeTextPart('a')]),
+      storedMessage('m2', [makeToolPart()]),
+    ];
+
+    expect(withoutReasoningParts(messages)).toBe(messages);
+  });
+
+  it('keeps message identity for unchanged messages', () => {
+    const unchanged = storedMessage('m1', [makeTextPart('a')]);
+    const changed = storedMessage('m2', [makeReasoningPart('thinking'), makeTextPart('b')]);
+
+    const result = withoutReasoningParts([unchanged, changed]);
+
+    expect(result[0]).toBe(unchanged);
+    expect(result[1]).not.toBe(changed);
+    expect(result[1]?.info).toBe(changed.info);
+    expect(result[1]?.parts.map(part => part.type)).toEqual(['text']);
+  });
+
+  it('reuses the derived message object for the same reasoning-bearing input', () => {
+    const message = storedMessage('m1', [makeReasoningPart('thinking'), makeTextPart('a')]);
+
+    const first = withoutReasoningParts([message]);
+    const second = withoutReasoningParts([message]);
+
+    expect(first[0]).not.toBe(message);
+    expect(second[0]).toBe(first[0]);
+  });
+
+  it('keeps every unchanged derived identity when only the last message changes', () => {
+    const stripped = storedMessage('m1', [makeReasoningPart('thinking'), makeTextPart('a')]);
+    const passThrough = storedMessage('m2', [makeTextPart('b')]);
+    const before = withoutReasoningParts([stripped, passThrough]);
+
+    const changed = storedMessage('m2', [makeTextPart('b changed')]);
+    const after = withoutReasoningParts([stripped, changed]);
+
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(changed);
   });
 });

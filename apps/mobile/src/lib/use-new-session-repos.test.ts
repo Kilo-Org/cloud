@@ -1,0 +1,880 @@
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake query factories settle without await because they resolve immediately */
+/* eslint-disable max-lines -- one mock harness serves the force-fresh suite and the branch-query suite; splitting it would duplicate every tRPC and react-query fake */
+import * as React from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  getSelectedBranchOverride,
+  type NewSessionRepository,
+  setSelectedBranchOverride,
+} from '@/components/agents/new-session-repository-state';
+import {
+  PROVIDER_QUERY_SETTLE_BOUND_MS,
+  useNewSessionRepos,
+  useRepositoryBranches,
+} from './use-new-session-repos';
+
+const mocks = vi.hoisted(() => ({
+  query: vi.fn(async (_opts: unknown): Promise<unknown> => ({})),
+  setQueryData: vi.fn(() => undefined),
+  toastError: vi.fn(),
+  refreshGitHubForceFresh: vi.fn(async () => undefined),
+  openGithub: vi.fn(async (): Promise<void> => undefined),
+  listBranches: vi.fn(async (_input: unknown): Promise<unknown> => ({
+    defaultBranch: 'main',
+    branches: ['main'],
+  })),
+  /** Every `useQuery` call in mount order, so a test can read the branch query's options. */
+  queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean; staleTime?: number }[],
+  /** Result the branch query (the one with a `queryFn`) reports. */
+  branchQueryResult: emptyQueryResult(),
+  /** Provider list queries, by their key's first element, still in their first load. */
+  pendingProviders: [] as string[],
+  /** The browser launch every provider's connect flow waits on. */
+  openAuthorization: vi.fn(async (_url: string): Promise<void> => undefined),
+  /** The route push that opens the app's own Bitbucket connect sheet. */
+  routerPush: vi.fn(),
+}));
+
+function emptyQueryResult(): Record<string, unknown> {
+  return {};
+}
+
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
+// The hook pushes the Bitbucket connect sheet through `useSinglePushRoute`,
+// which reads `useRouter` and resets its guard on focus; the real module's
+// expo-runtime import cannot load in the pure project.
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mocks.routerPush }),
+  useFocusEffect: () => undefined,
+}));
+
+vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
+
+vi.mock('@tanstack/react-query', () => ({
+  // Records every call so the branch query's key and `enabled` can be asserted.
+  // The provider queries have no `queryFn`; the branch query does, and only it
+  // reads `branchQueryResult`.
+  useQuery: (options: {
+    queryKey?: unknown[];
+    enabled?: boolean;
+    staleTime?: number;
+    queryFn?: unknown;
+  }) => {
+    mocks.queryCalls.push(options);
+    const base = {
+      data: undefined,
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      isRefetching: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    if (options.queryFn) {
+      return { ...base, ...mocks.branchQueryResult };
+    }
+    // A provider list query: a case holds the providers it names in their first
+    // load, which is what a throttled link does to all three at once.
+    const pending = mocks.pendingProviders.includes(String(options.queryKey?.[0]));
+    return { ...base, isLoading: pending, isPending: pending };
+  },
+  useQueryClient: () => ({ query: mocks.query, setQueryData: mocks.setQueryData }),
+}));
+
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.com' }));
+
+vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  useRecentAgentRepositories: () => ({ data: undefined }),
+}));
+
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: vi.fn(() => Promise.resolve('gitlab-handoff-url')),
+}));
+
+vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
+  openAuthorizationAndWaitForReturn: mocks.openAuthorization,
+  reportLateLaunchFailure: vi.fn(),
+}));
+
+vi.mock('@/lib/use-github-repos-refresh', () => ({
+  useGitHubReposRefresh: () => ({
+    openGitHubIntegration: mocks.openGithub,
+    refreshReposForceFresh: mocks.refreshGitHubForceFresh,
+    isRefreshingRepos: false,
+    connectCheckFailed: false,
+  }),
+}));
+
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    cloudAgentNext: { listRepositoryBranches: { query: mocks.listBranches } },
+    organizations: { cloudAgentNext: { listRepositoryBranches: { query: mocks.listBranches } } },
+  },
+  useTRPC: () => ({
+    cloudAgentNext: {
+      listGitHubRepositories: {
+        queryOptions: (_input: unknown, opts?: Record<string, unknown>) => ({
+          queryKey: ['github'],
+          ...opts,
+        }),
+        queryKey: () => ['github'],
+      },
+      listGitLabRepositories: {
+        queryOptions: (
+          { forceRefresh }: { forceRefresh: boolean },
+          opts?: Record<string, unknown>
+        ) => ({
+          queryKey: ['gitlab', forceRefresh],
+          ...opts,
+        }),
+        queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['gitlab', forceRefresh],
+      },
+      listRepositoryBranches: {
+        queryKey: (input: unknown) => ['branches', input],
+      },
+    },
+    organizations: {
+      cloudAgentNext: {
+        listGitHubRepositories: {
+          queryOptions: (_input: unknown, opts?: Record<string, unknown>) => ({
+            queryKey: ['github'],
+            ...opts,
+          }),
+          queryKey: () => ['github'],
+        },
+        listGitLabRepositories: {
+          queryOptions: (
+            { forceRefresh }: { forceRefresh: boolean },
+            opts?: Record<string, unknown>
+          ) => ({
+            queryKey: ['gitlab', forceRefresh],
+            ...opts,
+          }),
+          queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['gitlab', forceRefresh],
+        },
+        listBitbucketRepositories: {
+          queryOptions: (
+            { forceRefresh }: { forceRefresh: boolean },
+            opts?: Record<string, unknown>
+          ) => ({
+            queryKey: ['bitbucket', forceRefresh],
+            ...opts,
+          }),
+          queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['bitbucket', forceRefresh],
+        },
+        listRepositoryBranches: {
+          queryKey: (input: unknown) => ['org-branches', input],
+        },
+      },
+    },
+  }),
+}));
+
+type ReposResult = ReturnType<typeof useNewSessionRepos>;
+
+function Harness({
+  organizationId,
+  resultRef,
+}: {
+  organizationId: string | undefined;
+  resultRef: { current: ReposResult | null };
+}) {
+  const result = useNewSessionRepos({ organizationId });
+  resultRef.current = result;
+  return null;
+}
+
+function mountRepos(organizationId: string | undefined) {
+  const resultRef: { current: ReposResult | null } = { current: null };
+  act(() => {
+    TestRenderer.create(React.createElement(Harness, { organizationId, resultRef }));
+  });
+  return resultRef;
+}
+
+function requireResult(resultRef: { current: ReposResult | null }): ReposResult {
+  const result = resultRef.current;
+  if (result === null) {
+    throw new Error('useNewSessionRepos did not run');
+  }
+  return result;
+}
+
+/** Mount the hook and keep the renderer, so a case can change the organization prop or re-render. */
+function mountReposScoped(initialOrganizationId: string | undefined) {
+  const resultRef: { current: ReposResult | null } = { current: null };
+  const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+  let organizationId = initialOrganizationId;
+  act(() => {
+    renderer.current = TestRenderer.create(
+      React.createElement(Harness, { organizationId, resultRef })
+    );
+  });
+  return {
+    result: () => requireResult(resultRef),
+    /**
+     * Render the same props again with whatever the fakes now report. The
+     * provider queries are the fake's own state, so this is how a case moves
+     * them — a retry of a list that is still in flight, or a list that answered.
+     */
+    rerender() {
+      act(() => {
+        renderer.current?.update(React.createElement(Harness, { organizationId, resultRef }));
+      });
+      return requireResult(resultRef);
+    },
+    changeScope(nextOrganizationId: string | undefined) {
+      organizationId = nextOrganizationId;
+      act(() => {
+        renderer.current?.update(React.createElement(Harness, { organizationId, resultRef }));
+      });
+      return requireResult(resultRef);
+    },
+  };
+}
+
+// Every provider's force-fresh reads `query` with a `queryKey` whose first
+// element names the provider, so the fake can answer Bitbucket and GitLab
+// differently from one call site.
+function mockFetchQuery(resultForBitbucket: unknown, gitlabAndGithub: unknown) {
+  mocks.query.mockImplementation(async (opts: unknown) => {
+    const queryKey = (opts as { queryKey?: unknown[] }).queryKey;
+    return Array.isArray(queryKey) && queryKey[0] === 'bitbucket'
+      ? resultForBitbucket
+      : gitlabAndGithub;
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.query.mockImplementation(async (_opts: unknown) => ({ repositories: [] }));
+  mocks.queryCalls.length = 0;
+  mocks.branchQueryResult = {};
+  mocks.pendingProviders = [];
+});
+
+describe('useNewSessionRepos force-fresh Bitbucket cache write', () => {
+  it('does not overwrite the normal cache and toasts when a force-fresh is temporarily unavailable', async () => {
+    mockFetchQuery(
+      { status: 'temporarily_unavailable', repositories: [] },
+      { repositories: [], integrationInstalled: true }
+    );
+    const resultRef = mountRepos('org-1');
+
+    await act(async () => {
+      await requireResult(resultRef).refreshReposForceFresh();
+    });
+
+    // The Bitbucket forceRefresh:false key must stay untouched so an existing
+    // `available` cache survives a transient outage.
+    expect(mocks.setQueryData).not.toHaveBeenCalledWith(['bitbucket', false], expect.anything());
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Could not refresh repositories. Please try again.'
+    );
+  });
+
+  it('writes the normal cache and stays silent when a force-fresh is available', async () => {
+    const available = {
+      status: 'available',
+      repositories: [
+        { fullName: 'workspace/repo', private: false, workspaceUuid: 'ws-1', id: 'id-1' },
+      ],
+    };
+    mockFetchQuery(available, { repositories: [], integrationInstalled: true });
+    const resultRef = mountRepos('org-1');
+
+    await act(async () => {
+      await requireResult(resultRef).refreshReposForceFresh();
+    });
+
+    expect(mocks.setQueryData).toHaveBeenCalledWith(['bitbucket', false], available);
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+});
+
+describe('useNewSessionRepos provider staleTime', () => {
+  // The three provider list queries are expensive, so they must not refetch on
+  // every mount of the new-session form. The force-fresh flows above write
+  // fresh results into these same keys.
+  function expectProviderStaleTime() {
+    expect(mocks.queryCalls.map(options => options.queryKey?.[0])).toEqual([
+      'github',
+      'gitlab',
+      'bitbucket',
+    ]);
+    for (const options of mocks.queryCalls) {
+      expect(options.staleTime).toBe(300_000);
+    }
+  }
+
+  it('gives every provider repository query a five-minute staleTime (personal)', () => {
+    mountRepos(undefined);
+
+    expectProviderStaleTime();
+  });
+
+  it('gives every provider repository query a five-minute staleTime (organization)', () => {
+    mountRepos('org-1');
+
+    expectProviderStaleTime();
+  });
+});
+
+// The form paints its Ambiente row on the repository region's settled signal, so
+// a provider list that never lands must not withhold it: the wait is bounded,
+// and a scope change re-arms the bound for the scope it now asks about.
+describe('useNewSessionRepos provider settle bound', () => {
+  const ALL_PROVIDERS = ['github', 'gitlab', 'bitbucket'];
+
+  it('stops waiting for provider lists that outlive the bound and keeps them settled', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+
+      expect(mounted.result().providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+
+      // The lists are still in flight, so the bound — not their answer —
+      // released the region, and the same wait stays released.
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles on the provider answers that arrive before the bound', () => {
+    const mounted = mountReposScoped('org-1');
+
+    // Every list answered, so no timer had to run for the region to be final.
+    expect(mounted.result().providerQueriesResolved).toBe(true);
+  });
+
+  it('settles at the bound even when the lists are still loading', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+
+      // Every list is in its first load and none has answered: without the bound
+      // the region would wait for all of them, and the form's rows with it.
+      expect(mounted.result().providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the region settled across a retry of the same lists', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+
+      // A retry re-issues the same lists. It is the same question, so the rows
+      // that are already on screen must stay: a bound keyed to the request
+      // re-armed here and dropped them again.
+      mocks.pendingProviders = [];
+      expect(mounted.rerender().providerQueriesResolved).toBe(true);
+      mocks.pendingProviders = ALL_PROVIDERS;
+      expect(mounted.rerender().providerQueriesResolved).toBe(true);
+
+      // No timer ran for either render: the scope was already settled.
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits out the bound again after an organization change', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+
+      // The new scope asks its own question, so the previous scope's expiry
+      // cannot settle it: the region waits again from the change.
+      expect(mounted.changeScope('org-2').providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS - 1);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the repositories-settled flag to the provider answers', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+      expect(mounted.result().reposSettled).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+
+      // The bound releases the form's rows; it never reports that a repository
+      // list arrived, so the picker's own content waits for a real answer.
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+      expect(mounted.result().reposSettled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('useNewSessionRepos connect busy state', () => {
+  // The connect flow's first step is a network round trip (GitHub mints an
+  // install state), so the control that starts it has to show the flow running
+  // from the tap; a caller reading only `isRetrying` sees nothing until the
+  // round trip settles, which is what made the tap look inert.
+  function deferred(): { promise: Promise<void>; resolve: () => void } {
+    let settle: (() => void) | undefined = undefined;
+    const promise = new Promise<void>(resolve => {
+      settle = resolve;
+    });
+
+    return { promise, resolve: () => settle?.() };
+  }
+
+  it('reports the provider whose connect flow is running and clears it after', async () => {
+    const pending = deferred();
+    mocks.openGithub.mockImplementation(async () => pending.promise);
+    const resultRef = mountRepos(undefined);
+
+    act(() => {
+      requireResult(resultRef).openIntegration('github');
+    });
+    expect(requireResult(resultRef).connectingProvider).toBe('github');
+
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('reports a GitLab flow, which mints the shell hand-off before opening the browser', async () => {
+    const pending = deferred();
+    mocks.openAuthorization.mockImplementation(async () => pending.promise);
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('gitlab');
+    });
+    expect(requireResult(resultRef).connectingProvider).toBe('gitlab');
+
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
+    expect(mocks.openAuthorization).toHaveBeenCalledWith('gitlab-handoff-url');
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('opens the app connect sheet instead of the browser for Bitbucket', () => {
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('bitbucket');
+    });
+
+    // The token is pasted in the app's own sheet, so the tap is synchronous:
+    // there is no browser wait to report as a running flow.
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
+    expect(mocks.openAuthorization).not.toHaveBeenCalled();
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('opens the Bitbucket connect sheet once for a double tap', () => {
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('bitbucket');
+      requireResult(resultRef).openIntegration('bitbucket');
+    });
+
+    expect(mocks.routerPush).toHaveBeenCalledTimes(1);
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
+  });
+
+  it('ignores a second tap while a connect flow runs', () => {
+    const pending = deferred();
+    mocks.openGithub.mockImplementation(async () => pending.promise);
+    const resultRef = mountRepos(undefined);
+
+    act(() => {
+      requireResult(resultRef).openIntegration('github');
+    });
+    act(() => {
+      requireResult(resultRef).openIntegration('github');
+      requireResult(resultRef).openIntegration('gitlab');
+    });
+
+    // One mint, one browser: the second tap never reaches another flow.
+    expect(mocks.openGithub).toHaveBeenCalledTimes(1);
+    expect(mocks.openAuthorization).not.toHaveBeenCalled();
+    expect(requireResult(resultRef).connectingProvider).toBe('github');
+  });
+
+  it('clears the busy state when the flow fails', async () => {
+    mocks.openAuthorization.mockImplementationOnce(async () => {
+      throw new Error('no browser');
+    });
+    const resultRef = mountRepos('org-1');
+
+    await act(async () => {
+      requireResult(resultRef).openIntegration('gitlab');
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith('Could not open GitLab setup. Please try again.');
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+});
+
+// ── Branches of the selected repository ──────────────────────────────
+
+type BranchesResult = ReturnType<typeof useRepositoryBranches>;
+
+const githubRepo: NewSessionRepository = {
+  platform: 'github',
+  fullName: 'owner/repo',
+  isPrivate: false,
+};
+const bitbucketRepo: NewSessionRepository = {
+  platform: 'bitbucket',
+  fullName: 'team/repo',
+  isPrivate: true,
+  workspaceUuid: 'ws-1',
+  repositoryUuid: 'id-1',
+};
+
+function BranchHarness({
+  repository,
+  organizationId,
+  resultRef,
+}: {
+  repository: NewSessionRepository | null;
+  organizationId: string | undefined;
+  resultRef: { current: BranchesResult | null };
+}) {
+  resultRef.current = useRepositoryBranches(repository, organizationId);
+  return null;
+}
+
+function mountBranches(repository: NewSessionRepository | null, organizationId?: string) {
+  const resultRef: { current: BranchesResult | null } = { current: null };
+  act(() => {
+    TestRenderer.create(
+      React.createElement(BranchHarness, { repository, organizationId, resultRef })
+    );
+  });
+  const result = resultRef.current;
+  if (result === null) {
+    throw new Error('useRepositoryBranches did not run');
+  }
+  return result;
+}
+
+/** The recorded branch query — the only `useQuery` call that carries a `queryFn`. */
+function branchQueryOptions() {
+  const options = mocks.queryCalls.at(-1);
+  if (!options) {
+    throw new Error('no query was issued');
+  }
+  return options;
+}
+
+describe('useRepositoryBranches', () => {
+  it('does not query until a repository is selected', () => {
+    const result = mountBranches(null);
+
+    expect(branchQueryOptions().enabled).toBe(false);
+    expect(result.isEnabled).toBe(false);
+    expect(result.isLoading).toBe(false);
+  });
+
+  it('queries the personal procedure for a selected repository', () => {
+    const result = mountBranches(githubRepo);
+
+    expect(result.isEnabled).toBe(true);
+    expect(branchQueryOptions().enabled).toBe(true);
+    expect(branchQueryOptions().queryKey?.[0]).toBe('branches');
+  });
+
+  it('queries the organization procedure inside an organization', () => {
+    mountBranches(githubRepo, 'org-1');
+
+    expect(branchQueryOptions().queryKey?.[0]).toBe('org-branches');
+    expect(branchQueryOptions().queryKey?.[1]).toMatchObject({
+      organizationId: 'org-1',
+      platform: 'github',
+      repository: { fullName: 'owner/repo' },
+    });
+  });
+
+  it('keys the cache by the full repository identity, uuids included', () => {
+    mountBranches(bitbucketRepo, 'org-1');
+    const first = branchQueryOptions().queryKey;
+    mountBranches({ ...bitbucketRepo, workspaceUuid: 'ws-2', repositoryUuid: 'id-2' }, 'org-1');
+    const second = branchQueryOptions().queryKey;
+
+    expect(first).not.toEqual(second);
+  });
+
+  it('never queries a personal Bitbucket repository (organizations only)', () => {
+    const result = mountBranches(bitbucketRepo);
+
+    expect(result.isEnabled).toBe(false);
+    expect(branchQueryOptions().enabled).toBe(false);
+  });
+
+  it('moves the query to the new organization on the render that changes the prop', () => {
+    // The scope is a PROP, so an in-place org change must never leave a render
+    // in which the branch query still targets the previous organization.
+    const resultRef: { current: BranchesResult | null } = { current: null };
+    const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+    act(() => {
+      renderer.current = TestRenderer.create(
+        React.createElement(BranchHarness, {
+          repository: githubRepo,
+          organizationId: 'org-1',
+          resultRef,
+        })
+      );
+    });
+    expect(branchQueryOptions().queryKey?.[1]).toMatchObject({ organizationId: 'org-1' });
+
+    mocks.queryCalls.length = 0;
+    act(() => {
+      renderer.current?.update(
+        React.createElement(BranchHarness, {
+          repository: githubRepo,
+          organizationId: 'org-2',
+          resultRef,
+        })
+      );
+    });
+
+    expect(resultRef.current?.isEnabled).toBe(true);
+    const afterChange = mocks.queryCalls.filter(options => options.enabled !== false);
+    expect(afterChange.length).toBeGreaterThan(0);
+    for (const options of afterChange) {
+      expect(options.queryKey?.[1]).toMatchObject({ organizationId: 'org-2' });
+    }
+  });
+
+  it('reports a transient failure as retryable', () => {
+    mocks.branchQueryResult = {
+      isError: true,
+      error: { data: { code: 'BAD_GATEWAY' } },
+    };
+    const result = mountBranches(githubRepo);
+
+    expect(result.isRetryableError).toBe(true);
+    expect(result.isPermanentError).toBe(false);
+  });
+
+  it('reports a refusal a retry cannot fix as permanent', () => {
+    mocks.branchQueryResult = { isError: true, error: { data: { code: 'FORBIDDEN' } } };
+    const result = mountBranches(githubRepo);
+
+    expect(result.isPermanentError).toBe(true);
+    expect(result.isRetryableError).toBe(false);
+  });
+
+  it('reports a refused provider connection as permanent, not retryable', () => {
+    // The selector has no reconnect control, so a refused connection takes the
+    // same note as a permission refusal instead of a retry that cannot work.
+    mocks.branchQueryResult = { isError: true, error: { data: { code: 'PRECONDITION_FAILED' } } };
+    const result = mountBranches(githubRepo);
+
+    expect(result.isPermanentError).toBe(true);
+    expect(result.isRetryableError).toBe(false);
+  });
+
+  it('reports the provider default and an empty list without an override', () => {
+    mocks.branchQueryResult = { data: { defaultBranch: null, branches: [] } };
+    const result = mountBranches(githubRepo);
+
+    expect(result.branches).toEqual([]);
+    expect(result.defaultBranch).toBeNull();
+    expect(getSelectedBranchOverride(githubRepo)).toBeNull();
+  });
+
+  it('carries the partial-listing flag so the selector can say the list is incomplete', () => {
+    mocks.branchQueryResult = {
+      data: { defaultBranch: 'main', branches: ['main', 'release'], truncated: true },
+    };
+    expect(mountBranches(githubRepo).truncated).toBe(true);
+
+    mocks.branchQueryResult = { data: { defaultBranch: 'main', branches: ['main'] } };
+    expect(mountBranches(githubRepo).truncated).toBe(false);
+  });
+
+  it('fetches through the organization procedure when the query runs', async () => {
+    mountBranches(githubRepo, 'org-1');
+    const queryFn = (branchQueryOptions() as { queryFn?: () => Promise<unknown> }).queryFn;
+
+    await queryFn?.();
+
+    expect(mocks.listBranches).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      platform: 'github',
+      repository: { fullName: 'owner/repo' },
+    });
+  });
+});
+
+// A request that never answers must not present as progress forever: after the
+// settle bound the row offers the retry while the query keeps running.
+describe('useRepositoryBranches settle bound', () => {
+  const SETTLE_BOUND_MS = 15_000;
+
+  function mountBound(repository: NewSessionRepository) {
+    const resultRef: { current: BranchesResult | null } = { current: null };
+    const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+    act(() => {
+      renderer.current = TestRenderer.create(
+        React.createElement(BranchHarness, {
+          repository,
+          organizationId: undefined,
+          resultRef,
+        })
+      );
+    });
+    function rerender(next: NewSessionRepository) {
+      act(() => {
+        renderer.current?.update(
+          React.createElement(BranchHarness, {
+            repository: next,
+            organizationId: undefined,
+            resultRef,
+          })
+        );
+      });
+      return resultRef.current;
+    }
+    return { result: resultRef.current, rerender, resultRef };
+  }
+
+  it('replaces a request that outlives the bound with the retry', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.branchQueryResult = { isPending: true, isFetching: true };
+      const mounted = mountBound(githubRepo);
+
+      expect(mounted.result?.isLoading).toBe(true);
+      expect(mounted.result?.isRetryableError).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(SETTLE_BOUND_MS);
+      });
+
+      const settled = mounted.resultRef.current;
+      expect(settled?.isLoading).toBe(false);
+      expect(settled?.isRetryableError).toBe(true);
+      expect(settled?.isPermanentError).toBe(false);
+      // The stuck request is still in flight, so the retry stays pressable
+      // rather than reporting progress it cannot make; a refetch cancels it.
+      expect(settled?.isRetrying).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports retry progress only for a retry after a real failure', () => {
+    mocks.branchQueryResult = { isError: true, isFetching: true, error: { data: {} } };
+    const result = mountBound(githubRepo).result;
+
+    expect(result?.isRetryableError).toBe(true);
+    expect(result?.isRetrying).toBe(true);
+  });
+
+  it('re-arms the bound for a different repository', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.branchQueryResult = { isPending: true, isFetching: true };
+      const mounted = mountBound(githubRepo);
+
+      act(() => {
+        vi.advanceTimersByTime(SETTLE_BOUND_MS);
+      });
+      expect(mounted.resultRef.current?.isRetryableError).toBe(true);
+
+      const next = mounted.rerender({ ...githubRepo, fullName: 'owner/other' });
+
+      expect(next?.isLoading).toBe(true);
+      expect(next?.isRetryableError).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the branches, not the bound, once the request lands', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.branchQueryResult = { isPending: true, isFetching: true };
+      const mounted = mountBound(githubRepo);
+      act(() => {
+        vi.advanceTimersByTime(SETTLE_BOUND_MS);
+      });
+      expect(mounted.resultRef.current?.isRetryableError).toBe(true);
+
+      mocks.branchQueryResult = { data: { defaultBranch: 'main', branches: ['main'] } };
+      const landed = mounted.rerender(githubRepo);
+
+      expect(landed?.isLoading).toBe(false);
+      expect(landed?.isRetryableError).toBe(false);
+      expect(landed?.branches).toEqual(['main']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('branch overrides across a repository change', () => {
+  it('drops a branch chosen for another repository', () => {
+    setSelectedBranchOverride(githubRepo, 'release/2.0');
+    expect(getSelectedBranchOverride(githubRepo)).toBe('release/2.0');
+    expect(getSelectedBranchOverride({ ...githubRepo, platform: 'gitlab' })).toBeNull();
+  });
+});

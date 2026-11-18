@@ -1,4 +1,6 @@
-// P0-B-08 wiring tests for `useMergePullRequestMutation`.
+/* eslint-disable max-lines -- the merge and auto-merge suites share one mock harness for the merge seam */
+// P0-B-08 + s6 wiring tests for `useMergePullRequestMutation` and the
+// auto-merge hooks.
 //
 // The pure gate / store / error class are covered by their own unit
 // tests. These tests assert the WIRING: the hook's `mutationFn`
@@ -7,17 +9,45 @@
 // `merged: false` reply throws `MergeNotCompletedError` and lands in
 // React Query's `onError` (NOT `onSuccess`).
 //
-// P1-A-08c wiring: the hoisted operation key is merged into the mutate
-// input and the key rotation policy (real `isPrMutationRetryable`) runs
-// inside `mutationFn`; only `useHoistedOperationKey` is mocked (it holds
-// React ref state that needs a mounted renderer).
+// P1-A-08c wiring: the operation key is merged into the mutate input and the
+// retirement policy (real `isPrMutationRetryable`) runs inside `mutationFn`.
+// The merge arm reads the merge domain's retained store, so this suite mocks
+// that store's key pair; the store's persistence across a remount is pinned in
+// `use-pr-merge-mutations.mounted.test.tsx`. The auto-merge arms still hoist a
+// per-mount key, so `useHoistedOperationKey` is mocked for them.
+//
+// s6: the provider arms route the same intents through
+// `providerReview.*` with the s1 provider identity, normalize the
+// `{done, replayed}` answer onto the gate's result shape (a `done:
+// false` never celebrates, with provider wording), and fence every
+// merge/auto-merge write on `expectedHeadSha`. Auto-merge is
+// GitLab-only: the server answers Bitbucket with `{supported: false,
+// reason}` and the hook must NOT announce a success for it.
+//
+// The update-branch arm is GitHub's alone: its procedure and caches live in
+// the `githubPrReview` namespace, so the hook takes a GitHub pull request ref
+// and a provider ref does not type-check into it.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import type * as OperationKeyModule from '@/lib/operation-key';
+import type * as AnnounceModule from '@/lib/a11y/announce';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { PR_OPERATION_AMBIGUOUS_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
-import { useMergePullRequestMutation } from './use-pr-merge-mutations';
+import {
+  type BitbucketPrRef,
+  type GitHubPrRef,
+  type GitLabMrRef,
+} from '@kilocode/app-shared/provider-review';
+import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrRef, type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
+import {
+  useEnableAutoMergeMutation,
+  useMergePullRequestMutation,
+  useUpdateBranchMutation,
+} from './use-pr-merge-mutations';
 import { MergeNotCompletedError } from './merge-result-error';
 
 const hoistedKeys = vi.hoisted(() => ({
@@ -25,23 +55,58 @@ const hoistedKeys = vi.hoisted(() => ({
   rotateKey: vi.fn(),
 }));
 
+// The merge hook keys its intent through the merge domain's retained store, so
+// the fingerprint bytes and the retirement policy are asserted here; the store's
+// own persistence is pinned in `use-pr-merge-mutations.mounted.test.tsx`. The
+// hoisted mock above still serves the auto-merge arms.
+const mergeKeys = vi.hoisted(() => ({
+  mergeOperationKey: vi.fn<() => string | null>(() => 'retained-merge-key'),
+  retireMergeOperationKey: vi.fn(),
+}));
+
+const announceMock = vi.hoisted(() => ({ announceForA11y: vi.fn() }));
+
 vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
+
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => mergeKeys);
 
 vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };
 });
 
+vi.mock('@/lib/a11y/announce', async importOriginal => {
+  const actual = await importOriginal<typeof AnnounceModule>();
+  return { ...actual, announceForA11y: (message: string) => announceMock.announceForA11y(message) };
+});
+
+// See the review-mutations test: the scope context hook is replaced by a
+// settable override so the hooks run without a renderer.
+let scopeOverride: { ref: ProviderPrRef; organizationId: string | null } | null = null;
+
+vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
+  const actual = await importOriginal<typeof ProviderPrRefModule>();
+  return {
+    ...actual,
+    useProviderPrScope: (fallback: ProviderPrTriple) =>
+      scopeOverride ?? { ref: { platform: 'github', ...fallback }, organizationId: null },
+  };
+});
+
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
+  onSuccess?: (data: unknown) => void;
   onError?: (error: unknown) => void;
-  onSettled?: (data: unknown, error: unknown, vars: unknown) => Promise<void> | void;
+  onSettled?: (data?: unknown, error?: unknown, vars?: unknown) => Promise<void> | void;
 };
 
 let lastCapturedOptions: MutationOptions | null = null;
+let updateBranchOptions: MutationOptions | null = null;
 const mutateMock = vi.fn();
+const providerMergeMutateMock = vi.fn();
+const providerEnableAutoMergeMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 
@@ -63,12 +128,29 @@ vi.mock('@/lib/trpc', () => ({
       getPullRequest: { queryKey: () => ['githubPrReview', 'getPullRequest'] },
       listChecks: { pathFilter: () => ['githubPrReview', 'listChecks'] },
       listFiles: { pathFilter: () => ['githubPrReview', 'listFiles'] },
+      updateBranch: {
+        mutationOptions: (opts: MutationOptions) => {
+          updateBranchOptions = opts;
+          return opts;
+        },
+      },
+    },
+    providerReview: {
+      getPullRequest: { queryKey: () => ['providerReview', 'getPullRequest'] },
+      listChecks: { pathFilter: () => ['providerReview', 'listChecks'] },
+      listFiles: { pathFilter: () => ['providerReview', 'listFiles'] },
     },
   }),
   trpcClient: {
     githubPrReview: {
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mergePullRequest: { mutate: (vars: unknown) => mutateMock(vars) },
+    },
+    providerReview: {
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      mergePullRequest: { mutate: (vars: unknown) => providerMergeMutateMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      enableAutoMerge: { mutate: (vars: unknown) => providerEnableAutoMergeMutateMock(vars) },
     },
   },
 }));
@@ -99,14 +181,63 @@ const INPUT = {
   expectedHeadSha: 'a'.repeat(40),
 };
 
+const GITLAB_REF: ProviderPrRef = {
+  platform: 'gitlab',
+  projectPath: 'group/sub/app',
+  mrIid: 12,
+  instanceHint: 'https://gl.example.com',
+};
+
+const BITBUCKET_REF: ProviderPrRef = {
+  platform: 'bitbucket',
+  workspace: 'acme',
+  repoSlug: 'widgets',
+  prId: 77,
+};
+
+const GITLAB_IDENTITY = {
+  platform: 'gitlab',
+  projectPath: 'group/sub/app',
+  mrIid: 12,
+  instanceHint: 'https://gl.example.com',
+  organizationId: 'org-9',
+};
+
+const BITBUCKET_IDENTITY = {
+  platform: 'bitbucket',
+  workspace: 'acme',
+  repoSlug: 'widgets',
+  prId: 77,
+  organizationId: 'org-9',
+};
+
+const PROVIDER_MERGE_VARS = {
+  expectedHeadSha: 'a'.repeat(40),
+  squash: true,
+  deleteBranch: true,
+  commitTitle: 'My title',
+  commitMessage: 'My message',
+};
+
+function resetMocks() {
+  lastCapturedOptions = null;
+  updateBranchOptions = null;
+  scopeOverride = null;
+  mutateMock.mockReset();
+  providerMergeMutateMock.mockReset();
+  providerEnableAutoMergeMutateMock.mockReset();
+  invalidateQueriesMock.mockReset();
+  toastErrorMock.mockReset();
+  announceMock.announceForA11y.mockReset();
+  hoistedKeys.getKey.mockClear();
+  hoistedKeys.rotateKey.mockClear();
+  mergeKeys.mergeOperationKey.mockClear();
+  mergeKeys.retireMergeOperationKey.mockClear();
+}
+
 describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
   beforeEach(() => {
-    lastCapturedOptions = null;
-    mutateMock.mockReset();
-    invalidateQueriesMock.mockReset();
-    toastErrorMock.mockReset();
-    hoistedKeys.getKey.mockClear();
-    hoistedKeys.rotateKey.mockClear();
+    resetMocks();
   });
 
   afterEach(() => {
@@ -182,7 +313,7 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith('boom');
   });
 
-  it('merges the hoisted operation key into the merge input (P1-A-08c)', async () => {
+  it('stamps the pinned merge fingerprint on the retained key and sends it (P1-A-08c)', async () => {
     mutateMock.mockResolvedValueOnce({ merged: true, sha: 's1', branchDeleted: true });
     useMergePullRequestMutation(REF);
 
@@ -191,11 +322,11 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     // The fingerprint is the dedupe identity the server hashes into
     // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
     // field list must fail here instead of silently rotating in-flight keys.
-    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+    expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
       '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
     );
     expect(mutateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ operationKey: 'hoisted-op-key' })
+      expect.objectContaining({ operationKey: 'retained-merge-key' })
     );
     expect(mutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -208,16 +339,33 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     );
   });
 
-  it('regenerates the key after a successful merge (fresh intent next)', async () => {
+  it('retires the intent after a successful merge (a fresh one next)', async () => {
     mutateMock.mockResolvedValueOnce({ merged: true, sha: 's1', branchDeleted: true });
     useMergePullRequestMutation(REF);
 
     await lastCapturedOptions?.mutationFn?.(INPUT);
 
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(mergeKeys.retireMergeOperationKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+      'retained-merge-key'
+    );
   });
 
-  it('keeps the key when GitHub declines the merge (merged:false is retryable)', async () => {
+  it('sends nothing when the retained store refuses a new intent (its bound is full)', async () => {
+    mergeKeys.mergeOperationKey.mockReturnValueOnce(null);
+    useMergePullRequestMutation(REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toThrow(
+      i18n.t('prReview.merge.couldNotMerge')
+    );
+
+    // Without a key there is no ledger identity to dedupe the write against, so
+    // the merge must not be sent at all.
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
+  });
+
+  it('keeps the intent when GitHub declines the merge (merged:false is retryable)', async () => {
     mutateMock.mockResolvedValueOnce({ merged: false, sha: 's1', branchDeleted: false });
     useMergePullRequestMutation(REF);
 
@@ -225,12 +373,12 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
       MergeNotCompletedError
     );
 
-    // The key stays stable so the next same-intent retry reconciles on the
-    // server instead of admitting a brand-new operation.
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    // The key stays, so the next same-intent retry reconciles on the server
+    // instead of admitting a brand-new operation.
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
   });
 
-  it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
+  it('retires the intent on a non-retryable failure (bad-request ends it)', async () => {
     const badRequest = new Error('Cannot approve your own pull request');
     Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
     mutateMock.mockRejectedValueOnce(badRequest);
@@ -239,23 +387,273 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toMatchObject({
       message: 'Cannot approve your own pull request',
     });
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(mergeKeys.retireMergeOperationKey).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the key on an in-progress CONFLICT and maps it onto the merge retryable copy', async () => {
+  it('keeps the intent on an in-progress CONFLICT and maps it onto the merge retryable copy', async () => {
     mutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
     useMergePullRequestMutation(REF);
 
     await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toMatchObject({
       message: 'Could not merge pull request.',
     });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
   });
 
-  it('maps the ambiguous ledger marker onto the verify-before-retrying copy in onError', () => {
-    useMergePullRequestMutation(REF);
-    lastCapturedOptions?.onError?.(new Error("Couldn't confirm — check the PR before retrying."));
-    expect(toastErrorMock).toHaveBeenCalledWith("Couldn't confirm — check the PR before retrying.");
+  it('maps the ambiguous ledger marker onto the verify-before-retrying copy in onError', async () => {
+    // The raw marker is the English constant, so a toast in the active
+    // catalog's copy can only come from the ambiguous branch mapping it.
+    await i18n.changeLanguage('fi');
+    try {
+      useMergePullRequestMutation(REF);
+      lastCapturedOptions?.onError?.(new Error(PR_OPERATION_AMBIGUOUS_MESSAGE));
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        'Toiminnon onnistumista ei voitu vahvistaa. Tarkista PR ennen kuin yrität uudelleen.'
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+});
+
+describe('useMergePullRequestMutation (s6 gitlab arm)', () => {
+  beforeEach(() => {
+    resetMocks();
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('routes the fenced merge through providerReview.mergePullRequest and normalizes the result', async () => {
+    providerMergeMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).resolves.toEqual({
+      merged: true,
+      sha: 'a'.repeat(40),
+      branchDeleted: false,
+    });
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(providerMergeMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      expectedHeadSha: 'a'.repeat(40),
+      squash: true,
+      deleteBranch: true,
+      commitTitle: 'My title',
+      commitMessage: 'My message',
+      operationKey: 'retained-merge-key',
+    });
+    // Pinned bytes mirroring the server's gitlab merge fingerprint input:
+    // method folds the squash toggle, and the fence rides the identity.
+    expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"method":"squash","commitTitle":"My title","commitMessage":"My message","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    );
+    expect(mergeKeys.retireMergeOperationKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('never celebrates done:false: throws MergeNotCompletedError with merge-request wording, key kept', async () => {
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    let thrown: unknown = null;
+    try {
+      await lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(MergeNotCompletedError);
+    expect((thrown as Error).message).toBe(
+      'The merge request was not merged. Check its state and try again.'
+    );
+    expect(classifyPrReviewMutationError(thrown)).toEqual({ kind: 'retryable' });
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the server stale-head CONFLICT message unchanged (the sheet keeps it inline)', async () => {
+    const staleHead = new Error(
+      'The merge request changed since it was loaded. Reload the merge request and try again.'
+    );
+    Object.assign(staleHead, { data: { code: 'CONFLICT' } });
+    providerMergeMutateMock.mockRejectedValueOnce(staleHead);
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message:
+        'The merge request changed since it was loaded. Reload the merge request and try again.',
+    });
+  });
+
+  it('onSettled invalidates the provider caches (overview + checks + files)', async () => {
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.onSettled?.();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['providerReview', 'getPullRequest'],
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['providerReview', 'listChecks']);
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['providerReview', 'listFiles']);
+  });
+});
+
+describe('useMergePullRequestMutation (s6 bitbucket arm)', () => {
+  beforeEach(() => {
+    resetMocks();
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sends no squash/commitTitle (Bitbucket has only the merge commit) and pins the merge method', async () => {
+    providerMergeMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useMergePullRequestMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS);
+    const sent = providerMergeMutateMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(sent).toEqual({
+      ...BITBUCKET_IDENTITY,
+      expectedHeadSha: 'a'.repeat(40),
+      deleteBranch: true,
+      commitMessage: 'My message',
+      operationKey: 'retained-merge-key',
+    });
+    expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
+      '{"resource":["bitbucket","acme","widgets",77],"method":"merge","commitMessage":"My message","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    );
+  });
+
+  it('uses pull-request wording when the provider declines the merge', async () => {
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(BITBUCKET_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message: 'The pull request was not merged. Check its state and try again.',
+    });
+  });
+});
+
+describe('merge failure wording (localized provider noun)', () => {
+  beforeEach(() => {
+    resetMocks();
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+    vi.clearAllMocks();
+  });
+
+  it('renders the Finnish sentence from the catalog with its own merge-request noun', async () => {
+    await i18n.changeLanguage('fi');
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message:
+        'Yhdistäminen ei onnistunut: yhdistämispyyntö jäi yhdistämättä. Tarkista sen tila ja yritä uudelleen.',
+    });
+  });
+
+  it('capitalizes the noun when the catalog opens the sentence with it', async () => {
+    await i18n.changeLanguage('ru');
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message: 'Запрос на слияние не был слит. Проверьте его состояние и повторите попытку.',
+    });
+  });
+});
+
+describe('useEnableAutoMergeMutation (s6 provider arms)', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('gitlab: arms merge-when-pipeline-succeeds fenced on the head and announces success', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerEnableAutoMergeMutateMock.mockResolvedValueOnce({
+      supported: true,
+      reason: '',
+      done: true,
+      replayed: false,
+    });
+    useEnableAutoMergeMutation(GITLAB_REF);
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ expectedHeadSha: 'a'.repeat(40) })
+    ).resolves.toMatchObject({ supported: true });
+    expect(providerEnableAutoMergeMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      expectedHeadSha: 'a'.repeat(40),
+      operationKey: 'hoisted-op-key',
+    });
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    );
+    lastCapturedOptions?.onSuccess?.({ supported: true, reason: '', done: true, replayed: false });
+    expect(announceMock.announceForA11y).toHaveBeenCalledWith('Auto-merge enabled');
+  });
+
+  it('bitbucket: the supported:false answer resolves as a reason, not a success — no announcement', async () => {
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+    const refusal = {
+      supported: false,
+      reason: 'Bitbucket Cloud does not expose auto-merge in its API',
+      done: false,
+      replayed: false,
+    };
+    providerEnableAutoMergeMutateMock.mockResolvedValueOnce(refusal);
+    useEnableAutoMergeMutation(BITBUCKET_REF);
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ expectedHeadSha: 'a'.repeat(40) })
+    ).resolves.toEqual(refusal);
+    lastCapturedOptions?.onSuccess?.(refusal);
+    expect(announceMock.announceForA11y).not.toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateBranchMutation (github-only arm)', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('drops the GitHub pull request, checks and files caches on settle', async () => {
+    useUpdateBranchMutation({ platform: 'github', ...REF });
+
+    // Captured only by the GitHub options mock: the provider mock exposes no
+    // update hook, so an arm that read that namespace could not have reached
+    // here.
+    expect(updateBranchOptions).not.toBeNull();
+
+    await updateBranchOptions?.onSettled?.();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['githubPrReview', 'getPullRequest'],
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['githubPrReview', 'listChecks']);
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['githubPrReview', 'listFiles']);
+  });
+
+  it('types the ref as a GitHub pull request, so no other provider ref fits', () => {
+    type UpdateBranchRef = Parameters<typeof useUpdateBranchMutation>[0];
+    expectTypeOf<UpdateBranchRef>().toEqualTypeOf<GitHubPrRef>();
+    expectTypeOf<GitLabMrRef>().not.toExtend<UpdateBranchRef>();
+    expectTypeOf<BitbucketPrRef>().not.toExtend<UpdateBranchRef>();
+    expectTypeOf<ProviderPrTriple>().not.toExtend<UpdateBranchRef>();
   });
 });
 

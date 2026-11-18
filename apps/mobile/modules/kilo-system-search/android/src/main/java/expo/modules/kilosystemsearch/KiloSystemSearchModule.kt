@@ -1,0 +1,965 @@
+package expo.modules.kilosystemsearch
+
+import android.app.appsearch.AppSearchBatchResult
+import android.app.appsearch.AppSearchManager
+import android.app.appsearch.AppSearchResult
+import android.app.appsearch.AppSearchSchema
+import android.app.appsearch.AppSearchSession
+import android.app.appsearch.BatchResultCallback
+import android.app.appsearch.GenericDocument
+import android.app.appsearch.PackageIdentifier
+import android.app.appsearch.PutDocumentsRequest
+import android.app.appsearch.RemoveByDocumentIdRequest
+import android.app.appsearch.SearchResult
+import android.app.appsearch.SearchSpec
+import android.app.appsearch.SetSchemaRequest
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Process
+import android.os.SystemClock
+import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.appsearch.app.AppSearchBatchResult as JetpackBatchResult
+import androidx.appsearch.app.AppSearchSchema as JetpackSchema
+import androidx.appsearch.app.AppSearchSession as JetpackSession
+import androidx.appsearch.app.GenericDocument as JetpackDocument
+import androidx.appsearch.app.PutDocumentsRequest as JetpackPutRequest
+import androidx.appsearch.app.RemoveByDocumentIdRequest as JetpackRemoveRequest
+import androidx.appsearch.app.SearchSpec as JetpackSearchSpec
+import androidx.appsearch.app.SetSchemaRequest as JetpackSetSchemaRequest
+import androidx.appsearch.localstorage.LocalStorage
+import androidx.appsearch.util.DocumentIdUtil
+import com.google.common.util.concurrent.ListenableFuture
+import expo.modules.kotlin.exception.CodedException
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.records.Field
+import expo.modules.kotlin.records.Record
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.security.MessageDigest
+import java.util.function.Consumer
+import kotlin.math.abs
+
+private const val NAMESPACE = "kilo"
+private const val TAG = "KiloSystemSearch"
+private const val SCHEMA_TYPE = "KiloSystemSearchEntity"
+private const val DATABASE_NAME = "kilo-system-search"
+private const val PREFERENCES_NAME = "kilo-system-search"
+private const val PENDING_ROUTE_KEY = "kilo-system-search-pending-route"
+private const val PENDING_ROUTE_WRITTEN_AT_KEY = "kilo-system-search-pending-route-written-at"
+private const val PENDING_ROUTE_WRITTEN_WALL_KEY = "kilo-system-search-pending-route-written-wall"
+private const val PENDING_ROUTE_BOOT_AT_KEY = "kilo-system-search-pending-route-boot-at"
+
+// Two instants that name the same boot agree exactly; this tolerance only
+// absorbs the milliseconds a wall-clock correction moves one of them by.
+private const val BOOT_INSTANT_MATCH_MS = 1_000L
+
+// How long a picked tap may wait for its resolution. The slot outlives the
+// process, and a tap that could not be resolved is kept for a retry, so without
+// a bound an identifier could stay here across restarts and open a screen long
+// after the reader tapped it. A retry within minutes is the case the retention
+// exists for; anything older is treated as no tap at all.
+private const val PENDING_ROUTE_MAX_AGE_MS = 5 * 60 * 1000L
+private const val PROPERTY_ID = "id"
+private const val PROPERTY_TITLE = "title"
+private const val PROPERTY_DESCRIPTION = "description"
+private const val PROPERTY_KEYWORDS = "keywords"
+private const val PROPERTY_FINGERPRINT = "fingerprint"
+private const val PROPERTY_ROUTE = "route"
+private const val APP_SCHEME_PREFIX = "kiloapp://"
+private const val GLOBAL_SEARCH_PACKAGE = "com.google.android.googlequicksearchbox"
+private const val PAGE_SIZE = 100
+private const val TIMEOUT_SECONDS = 30L
+private const val TIMEOUT_MESSAGE = "The system search index did not respond."
+
+// The iOS module rejects a timed-out index call with the same code, so
+// JavaScript can tell an index that did not answer from a call that failed.
+private const val TIMEOUT_CODE = "ERR_SYSTEM_SEARCH_TIMEOUT"
+
+// A picked identifier that could not be resolved because the index could not be
+// read. Its own code, not a null answer, so JavaScript can tell "the tap could
+// not be opened yet" from "nothing was tapped" and keep the tap for a retry.
+private const val UNRESOLVED_CODE = "ERR_SYSTEM_SEARCH_UNRESOLVED"
+private const val UNRESOLVED_MESSAGE = "The system search index could not resolve this result."
+
+/**
+ * One indexed entity, as JavaScript hands it across.
+ *
+ * `route` is `SystemSearchDocument.route` in `src/lib/native-system-search.ts`:
+ * the entry's own `kiloapp://` link. It is the value the pending slot carries,
+ * so the JS side receives one identifier no matter which platform delivered the
+ * tap. The record id remains the fallback for a bundle that predates the field.
+ */
+class SystemSearchRecord : Record {
+  @Field val id: String = ""
+  @Field val title: String = ""
+  @Field val description: String = ""
+  @Field val keywords: List<String> = emptyList()
+  @Field val fingerprint: String = ""
+  @Field val route: String = ""
+}
+
+/** A record in the shape the index stores, independent of the AppSearch build in use. */
+private data class IndexedDocument(
+  val id: String,
+  val title: String,
+  val description: String,
+  val keywords: List<String>,
+  val fingerprint: String,
+  val route: String
+)
+
+/** One stored document, as the index answers with it. */
+private data class StoredDocument(
+  val id: String,
+  val fingerprint: String,
+  val route: String
+)
+
+/**
+ * The single-shot slot's contents: the picked identifier, and whether an
+ * earlier process wrote it.
+ */
+private data class PendingRoute(val identifier: String, val fromEarlierProcess: Boolean)
+
+/**
+ * What the launch Intent answers now: its identifier, that it is spent, or that
+ * the activity carrying it is not up yet.
+ */
+private sealed interface LaunchTap {
+  data class Picked(val identifier: String) : LaunchTap
+
+  data object Spent : LaunchTap
+
+  data object Unavailable : LaunchTap
+}
+
+/** The tap one consume routes, and the taps it spends so a single consume never navigates twice. */
+private data class Route(val identifier: String, val dropSlot: PendingRoute?, val spendLaunch: Boolean)
+
+/**
+ * The newer of the two taps. The slot itself says which of them is newer; only
+ * the launch read can be unknown.
+ */
+private fun routeOf(slot: PendingRoute?, launch: LaunchTap): Route? = when {
+  slot == null -> when (launch) {
+    is LaunchTap.Picked -> Route(launch.identifier, dropSlot = null, spendLaunch = true)
+    // Nothing to route: Unavailable is retried, Spent is finished.
+    LaunchTap.Spent, LaunchTap.Unavailable -> null
+  }
+  // The slot predates this process, so the launch tap is the newer request.
+  slot.fromEarlierProcess -> when (launch) {
+    is LaunchTap.Picked -> Route(launch.identifier, dropSlot = slot, spendLaunch = true)
+    LaunchTap.Spent -> Route(slot.identifier, dropSlot = slot, spendLaunch = false)
+    // The newer tap exists but cannot be read yet: route neither, so the older
+    // tap cannot win a later consume.
+    LaunchTap.Unavailable -> null
+  }
+  // The slot was parked after this process started, so it is the newer request.
+  // The launch tap is spent in every case, readable or not: it is the older one.
+  else -> Route(slot.identifier, dropSlot = slot, spendLaunch = true)
+}
+
+/**
+ * The subset of an AppSearch session this module uses, so the platform store
+ * (API 31+) and the Jetpack local store (below 31) can both back it.
+ */
+private interface SearchBackend {
+  fun put(documents: List<IndexedDocument>)
+  fun remove(ids: List<String>)
+  fun clear()
+
+  /** Every stored document: the ledger the JS side diffs against. */
+  fun stored(): List<StoredDocument>
+
+  /** Releases the AppSearch session and any thread this backend owns. */
+  fun close()
+}
+
+class KiloSystemSearchModule : Module() {
+  // Created on the first call so the database only opens when the app indexes
+  // something, and kept in a field so `OnDestroy` can close a backend that was
+  // opened without opening one that was never needed. `appContext.reactContext`
+  // is the long-lived application context.
+  private var openedBackend: SearchBackend? = null
+
+  private val backend: SearchBackend
+    get() = openedBackend ?: openBackend().also { openedBackend = it }
+
+  private fun openBackend(): SearchBackend {
+    val context = appContext.reactContext?.applicationContext
+      ?: throw CodedException("A React context is required to use the system search index.")
+    return createSearchBackend(context)
+  }
+
+  // The launching Intent is the tap on a cold start, and it is delivered once:
+  // every later delivery comes from `OnNewIntent` instead.
+  private var launchIntentRead = false
+
+  // When this process started, on the boot-relative clock the slot's arrival is
+  // recorded with. A slot older than this came from an earlier process, so the
+  // tap that launched this one is the newer of the two.
+  private val processStartedAt = Process.getStartElapsedRealtime()
+
+  // Serializes the single-shot slot's write against its read-and-clear: the
+  // write runs on the main thread that delivers the Intent, the read on the
+  // module queue that answers JavaScript.
+  private val pendingRouteLock = Any()
+
+  override fun definition() = ModuleDefinition {
+    Name("KiloSystemSearch")
+
+    // A tap on one of our results in the phone's search surface reaches the app
+    // as an Intent carrying the picked entry's identifier. The JS side already
+    // consumes that identifier through the single-shot slot below, so a tap
+    // while the app is alive is delivered there and announced; the launch
+    // Intent of a cold tap is delivered by `consumePendingRoute`.
+    Events("onSystemSearchOpen")
+    OnNewIntent { intent -> deliverPickedResult(intent) }
+
+    AsyncFunction("applyUpdate") { add: List<SystemSearchRecord>, removeIds: List<String> ->
+      backend.put(add.map(::toIndexedDocument))
+      backend.remove(removeIds)
+      Unit
+    }
+
+    AsyncFunction("indexedFingerprints") { ->
+      backend.stored().associate { it.id to it.fingerprint }
+    }
+
+    AsyncFunction("clear") {
+      backend.clear()
+      Unit
+    }
+
+    // An `AsyncFunction` on purpose: resolving the identifier reads the index,
+    // and that read must not run on the JavaScript thread that consumes the
+    // slot. The module queue performs it instead (see `consumePendingRoute`).
+    AsyncFunction("consumePendingRoute") { -> consumePendingRoute() }
+
+    OnDestroy {
+      // Each backend owns an AppSearch session, and the platform one owns its
+      // executor thread as well, so a module instance must not outlive them: a
+      // reload would otherwise leak one thread and one session per instance.
+      // A module that never opened the index has nothing to close.
+      openedBackend?.close()
+      openedBackend = null
+    }
+  }
+
+  /**
+   * The route of the last search result the user opened, or null when there is
+   * none.
+   *
+   * Resolving the identifier reads the index, so it runs here — on the module
+   * queue, because this is an `AsyncFunction` — rather than on the main thread
+   * that delivers `OnNewIntent` or the JavaScript thread that consumes the
+   * slot.
+   *
+   * The picked identifier is consumed only once its resolution is known to have
+   * succeeded: a read that fails rejects this call and leaves the slot — and
+   * the launch Intent — untouched, so the caller can retry the same tap
+   * instead of losing it. A resolution that answers null (the index does not
+   * hold the identifier) is a finished refusal, so that tap is still consumed.
+   *
+   * A tap that launched this process has no event to announce — JavaScript is
+   * still booting — so the launch Intent is read here, on the first consume and
+   * only once.
+   *
+   * A slot written before this process started was left by an earlier process,
+   * so the tap that launched this process is the newer request: the launch tap
+   * is resolved and the leftover is dropped, rather than resolving an old
+   * identifier first and opening its screen on a launch the reader made for
+   * something else. When that newer tap cannot be read yet — `currentActivity`
+   * is still coming up — neither is routed, because routing the older one would
+   * win a later consume the newer tap is owed.
+   */
+  private fun consumePendingRoute(): String? {
+    val route = routeOf(readPendingRoute(), readLaunchTap()) ?: return null
+    val resolved = resolveRoute(route.identifier)
+    route.dropSlot?.let { clearPendingRoute(it.identifier) }
+    if (route.spendLaunch) {
+      launchIntentRead = true
+    }
+    return resolved
+  }
+
+  /**
+   * What the launch Intent answers now, which is not always its identifier: a
+   * cold start can make its first consume before `currentActivity` is up, and
+   * giving up then would forfeit the launch tap for the rest of the process's
+   * life.
+   */
+  private fun readLaunchTap(): LaunchTap {
+    if (launchIntentRead) {
+      return LaunchTap.Spent
+    }
+    val intent = appContext.currentActivity?.intent ?: return LaunchTap.Unavailable
+    return pickedIdentifier(intent)?.let { LaunchTap.Picked(it) } ?: LaunchTap.Spent
+  }
+
+  /**
+   * Records one Intent the system raised for a picked result: the entry's
+   * identifier goes into the single-shot slot and only then is the open event
+   * announced, so the slot — not the event — carries the identifier. The
+   * identifier is stored as the platform handed it back and resolved when the
+   * slot is consumed, so this runs no index read on the main thread that
+   * delivered the Intent. An Intent whose identifier the index does not hold —
+   * the launcher Intent, a share, an ordinary deep link — resolves to nothing
+   * when the slot is consumed and never navigates as a search tap.
+   */
+  private fun deliverPickedResult(intent: Intent?) {
+    val identifier = pickedIdentifier(intent) ?: return
+    if (!writePendingRoute(identifier)) {
+      return
+    }
+    sendEvent("onSystemSearchOpen")
+  }
+
+  /**
+   * The identifier this Intent carries for one of our entries: the entry's
+   * `kiloapp://` link, or the qualified id of one of the documents the index
+   * stores. Null for an Intent that carries neither.
+   *
+   * The link form is not proof by itself — `kiloapp://` is also the scheme the
+   * app's ordinary deep links use — so it is only honoured once the index is
+   * seen to hold it (see `resolveRoute`).
+   */
+  private fun pickedIdentifier(intent: Intent?): String? {
+    val identifier = intent?.dataString?.takeIf { it.isNotBlank() } ?: return null
+    if (identifier.startsWith(APP_SCHEME_PREFIX)) {
+      return identifier
+    }
+    // The qualified-prefix form: `<package>$<database>/<namespace>#`.
+    val prefix = qualifiedDocumentId("")
+    return if (prefix != null && identifier.startsWith(prefix)) identifier else null
+  }
+
+  /**
+   * The route the index holds for the picked entry, so the slot carries the
+   * stored route whichever identifier form the platform handed back. Null when
+   * the index does not hold the identifier.
+   *
+   * The index is the authority on which identifiers are ours: the app writes
+   * one route per entry it indexes, so a `kiloapp://` link the index does not
+   * carry is an ordinary deep link — the app's own scheme is what its deep
+   * links use — and must not open as a search tap. The qualified-id form is
+   * matched against the same stored entries.
+   *
+   * This is only ever called from an `AsyncFunction`, so the index read runs on
+   * the module queue, never on the main thread that delivers the Intent or the
+   * JavaScript thread that consumes the slot.
+   */
+  private fun resolveRoute(identifier: String): String? {
+    val stored = try {
+      backend.stored()
+    } catch (error: Throwable) {
+      // Fail closed: the index is the only authority on which identifiers are
+      // ours, and `kiloapp://` is also the scheme the app's ordinary deep links
+      // use. Without the read there is no evidence this Intent came from our
+      // index, so the identifier is refused rather than opened as a search tap.
+      // The JavaScript allowlist only checks a route shape; it cannot prove the
+      // Intent originated here. Every read failure is reported with one code —
+      // the store's own exceptions and its timeout alike — so the app can tell
+      // it from "nothing was tapped" and offer the tap again.
+      Log.w(TAG, "Could not read the system search index to resolve a picked result.", error)
+      throw CodedException(UNRESOLVED_CODE, UNRESOLVED_MESSAGE, error)
+    }
+    if (identifier.startsWith(APP_SCHEME_PREFIX)) {
+      return identifier.takeIf { link -> stored.any { it.route == link } }
+    }
+    val matched = stored.firstOrNull { it.id == identifier || it.route == identifier }
+      ?: stored.firstOrNull { qualifiedDocumentId(it.id) == identifier }
+    return matched?.route?.takeIf { it.isNotEmpty() } ?: matched?.id ?: identifier
+  }
+
+  /**
+   * The qualified id of one stored document, or null without a context.
+   *
+   * The Jetpack helper is used rather than `android.app.appsearch.util
+   * .DocumentIdUtil`: it ships with this module's own dependency, so the
+   * qualified form resolves on every API level the module runs on, and it
+   * builds the same `<package>$<database>/<namespace>#<id>` string the platform
+   * store's helper does.
+   */
+  private fun qualifiedDocumentId(documentId: String): String? {
+    val packageName = appContext.reactContext?.packageName ?: return null
+    return DocumentIdUtil.createQualifiedId(packageName, DATABASE_NAME, NAMESPACE, documentId)
+  }
+
+  /**
+   * Writes the single-shot slot; false when there is no context to write it in.
+   * The slot carries the identifier exactly as the platform handed it back,
+   * with the clocks the age check below needs, so a tap that outlives its
+   * welcome can be dropped instead of opening a screen long after the reader
+   * tapped it.
+   *
+   * Runs on the main thread that delivers `OnNewIntent`, which is why it shares
+   * `pendingRouteLock` with the read and the clear below.
+   */
+  private fun writePendingRoute(identifier: String): Boolean {
+    val context = appContext.reactContext ?: return false
+    val uptime = SystemClock.elapsedRealtime()
+    val wall = System.currentTimeMillis()
+    synchronized(pendingRouteLock) {
+      context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        .edit()
+        .putString(PENDING_ROUTE_KEY, identifier)
+        .putLong(PENDING_ROUTE_WRITTEN_AT_KEY, uptime)
+        .putLong(PENDING_ROUTE_WRITTEN_WALL_KEY, wall)
+        .putLong(PENDING_ROUTE_BOOT_AT_KEY, wall - uptime)
+        .apply()
+    }
+    return true
+  }
+
+  /**
+   * The slot's contents, without clearing them, or null when the slot is empty
+   * or its tap has waited past `PENDING_ROUTE_MAX_AGE_MS`.
+   *
+   * The write above happens on the main thread and `SharedPreferences` has no
+   * read-and-clear operation, so this read shares `pendingRouteLock` with it.
+   * The slot is cleared only after the identifier resolved (see
+   * `clearPendingRoute`), because resolving it reads the index and a failure
+   * there must leave the tap for a retry.
+   *
+   * The age is measured on the boot-relative clock, which is monotonic but
+   * restarts at zero on a reboot while the slot survives it. Only a write from
+   * the same boot can be compared with it, and the boot instant recorded with
+   * the slot is what decides that. Across a reboot the wall clock is the only
+   * reference that spans both, so it measures the age then; a slot whose
+   * wall-clock age is negative or too large, and one written before this
+   * version recorded a boot instant, counts as expired.
+   */
+  private fun readPendingRoute(): PendingRoute? {
+    val context = appContext.reactContext ?: return null
+    val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    return synchronized(pendingRouteLock) {
+      val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return@synchronized null
+      val writtenUptime = preferences.getLong(PENDING_ROUTE_WRITTEN_AT_KEY, 0L)
+      val writtenWall = preferences.getLong(PENDING_ROUTE_WRITTEN_WALL_KEY, 0L)
+      val writtenBootAt = preferences.getLong(PENDING_ROUTE_BOOT_AT_KEY, 0L)
+      val uptime = SystemClock.elapsedRealtime()
+      val wall = System.currentTimeMillis()
+      val sameBoot = abs(wall - uptime - writtenBootAt) <= BOOT_INSTANT_MATCH_MS
+      val age = if (sameBoot) uptime - writtenUptime else wall - writtenWall
+      if (age < 0 || age > PENDING_ROUTE_MAX_AGE_MS) {
+        preferences.edit().removePendingRoute().apply()
+        Log.w(TAG, "Dropped a picked result the index could not resolve in time.")
+        return@synchronized null
+      }
+      PendingRoute(identifier, fromEarlierProcess = !sameBoot || writtenUptime < processStartedAt)
+    }
+  }
+
+  /**
+   * Clears the slot when it still holds the identifier that was just resolved.
+   *
+   * The check and the remove are atomic under `pendingRouteLock`: a tap written
+   * while the index read was in flight holds a newer identifier and must
+   * survive, where an unconditional remove would discard it and that tap would
+   * never navigate.
+   */
+  private fun clearPendingRoute(identifier: String) {
+    val context = appContext.reactContext ?: return
+    val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    synchronized(pendingRouteLock) {
+      if (preferences.getString(PENDING_ROUTE_KEY, null) != identifier) {
+        return@synchronized
+      }
+      preferences.edit().removePendingRoute().apply()
+    }
+  }
+}
+
+/** Removes every field the slot is written with, as one edit. */
+private fun SharedPreferences.Editor.removePendingRoute() = this
+  .remove(PENDING_ROUTE_KEY)
+  .remove(PENDING_ROUTE_WRITTEN_AT_KEY)
+  .remove(PENDING_ROUTE_WRITTEN_WALL_KEY)
+  .remove(PENDING_ROUTE_BOOT_AT_KEY)
+
+private fun toIndexedDocument(record: SystemSearchRecord) = IndexedDocument(
+  id = record.id,
+  title = record.title,
+  description = record.description,
+  keywords = record.keywords,
+  fingerprint = record.fingerprint,
+  // The record's own link; the record id stays the fallback for a bundle that
+  // predates `SystemSearchDocument.route`.
+  route = record.route.ifEmpty { record.id }
+)
+
+private fun createSearchBackend(context: Context): SearchBackend =
+  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    // API 31+ owns an AppSearch store; nothing below it may be reached.
+    PlatformSearchBackend(context)
+  } else {
+    // Below 31 the same AppSearchSession contract is served locally.
+    JetpackSearchBackend(context)
+  }
+
+/**
+ * Opens the platform AppSearch session, releasing what it opened when either
+ * step fails.
+ *
+ * `openBackend` keeps a backend only once its constructor returns, so a throw
+ * here — an unavailable service, a failed `createSearchSession` or `setSchema`
+ * — would otherwise leave the executor's non-daemon thread running, and any
+ * session already created with it, once per retry of the lazy open.
+ */
+@RequiresApi(Build.VERSION_CODES.S)
+private fun openPlatformSession(context: Context, executor: ExecutorService): AppSearchSession {
+  var opened: AppSearchSession? = null
+  try {
+    val manager = context.getSystemService(AppSearchManager::class.java)
+      ?: throw CodedException("The system search index is unavailable on this device.")
+    val searchContext = AppSearchManager.SearchContext.Builder(DATABASE_NAME).build()
+    val created = awaitPlatformResult { callback ->
+      manager.createSearchSession(searchContext, executor, callback)
+    }
+    opened = created
+    awaitPlatformResult { callback ->
+      created.setSchema(platformSchemaRequest(context), executor, executor, callback)
+    }
+    return created
+  } catch (error: Throwable) {
+    opened?.close()
+    executor.shutdown()
+    throw error
+  }
+}
+
+/** The platform `android.app.appsearch` store, available from API 31. */
+@RequiresApi(Build.VERSION_CODES.S)
+private class PlatformSearchBackend(context: Context) : SearchBackend {
+  private val executor = Executors.newSingleThreadExecutor()
+  private val session: AppSearchSession = openPlatformSession(context, executor)
+
+  override fun put(documents: List<IndexedDocument>) {
+    if (documents.isEmpty()) return
+    val request = PutDocumentsRequest.Builder()
+      .addGenericDocuments(documents.map(::platformDocument))
+      .build()
+    awaitPlatformBatch { callback -> session.put(request, executor, callback) }
+  }
+
+  override fun remove(ids: List<String>) {
+    if (ids.isEmpty()) return
+    val request = RemoveByDocumentIdRequest.Builder(NAMESPACE).addIds(ids).build()
+    awaitPlatformBatch { callback -> session.remove(request, executor, callback) }
+  }
+
+  override fun clear() {
+    // The remove-by-query callback carries an `AppSearchResult<Void>`, whose
+    // `resultValue` is null even on success, so this awaits completion only.
+    awaitPlatformCompletion { callback -> session.remove("", platformNamespaceSpec(), executor, callback) }
+  }
+
+  override fun stored(): List<StoredDocument> {
+    val stored = mutableListOf<StoredDocument>()
+    session.search("", platformNamespaceSpec()).use { results ->
+      var page = awaitPlatformResult<List<SearchResult>> { callback ->
+        results.getNextPage(executor, callback)
+      }
+      while (page.isNotEmpty()) {
+        for (result in page) {
+          storedPlatformDocument(result.genericDocument)?.let { stored += it }
+        }
+        if (page.size < PAGE_SIZE) break
+        page = awaitPlatformResult { callback -> results.getNextPage(executor, callback) }
+      }
+    }
+    return stored
+  }
+
+  override fun close() {
+    session.close()
+    executor.shutdown()
+  }
+}
+
+/**
+ * Opens the Jetpack local store's session, releasing it when the schema write
+ * fails.
+ *
+ * As on the platform store, `openBackend` keeps a backend only once its
+ * constructor returns, so a failed `setSchema` would otherwise leave this
+ * session open once per retry of the lazy open.
+ */
+private fun openJetpackSession(context: Context): JetpackSession {
+  val session = LocalStorage
+    .createSearchSessionAsync(LocalStorage.SearchContext.Builder(context, DATABASE_NAME).build())
+    .awaitFuture()
+  try {
+    session.setSchemaAsync(jetpackSchemaRequest()).awaitFuture()
+  } catch (error: Throwable) {
+    session.close()
+    throw error
+  }
+  return session
+}
+
+/** The Jetpack local store that backs the same session contract below API 31. */
+private class JetpackSearchBackend(context: Context) : SearchBackend {
+  private val session: JetpackSession = openJetpackSession(context)
+
+  override fun put(documents: List<IndexedDocument>) {
+    if (documents.isEmpty()) return
+    val request = JetpackPutRequest.Builder()
+      .addGenericDocuments(documents.map(::jetpackDocument))
+      .build()
+    checkBatch(session.putAsync(request).awaitFuture())
+  }
+
+  override fun remove(ids: List<String>) {
+    if (ids.isEmpty()) return
+    val request = JetpackRemoveRequest.Builder(NAMESPACE).addIds(ids).build()
+    checkBatch(session.removeAsync(request).awaitFuture())
+  }
+
+  override fun clear() {
+    // Unlike `put` and `remove` by id, a remove-by-query answers with the wipe's
+    // own completion rather than a batch result: `removeAsync(queryExpression,
+    // searchSpec)` resolves to `Void` and fails the future when the store cannot
+    // finish the wipe, so awaiting it — not `checkBatch` — is what makes a
+    // failed clear throw instead of resolving as success. The platform store's
+    // remove-by-query answers a completion too.
+    session.removeAsync("", jetpackNamespaceSpec()).awaitFuture()
+  }
+
+  override fun stored(): List<StoredDocument> {
+    val stored = mutableListOf<StoredDocument>()
+    session.search("", jetpackNamespaceSpec()).use { results ->
+      var page = results.getNextPageAsync().awaitFuture()
+      while (page.isNotEmpty()) {
+        for (result in page) {
+          storedJetpackDocument(result.genericDocument)?.let { stored += it }
+        }
+        if (page.size < PAGE_SIZE) break
+        page = results.getNextPageAsync().awaitFuture()
+      }
+    }
+    return stored
+  }
+
+  override fun close() {
+    session.close()
+  }
+}
+
+private fun checkBatch(result: JetpackBatchResult<String, Void>) {
+  if (result.isSuccess) return
+  val failure = result.failures.values.firstOrNull()
+  throw CodedException(failure?.errorMessage ?: "The system search index rejected a document.")
+}
+
+private fun platformNamespaceSpec(): SearchSpec = SearchSpec.Builder()
+  .addFilterNamespaces(NAMESPACE)
+  .setResultCountPerPage(PAGE_SIZE)
+  .build()
+
+private fun jetpackNamespaceSpec(): JetpackSearchSpec = JetpackSearchSpec.Builder()
+  .addFilterNamespaces(NAMESPACE)
+  .setResultCountPerPage(PAGE_SIZE)
+  .build()
+
+// The type is displayed on the system search surfaces on purpose: this index
+// exists to be read there, so the request states it rather than relying on the
+// API's default. Documented at
+// `SetSchemaRequest.Builder.setSchemaTypeDisplayedBySystem`.
+private fun platformSchemaRequest(context: Context?): SetSchemaRequest {
+  val builder = SetSchemaRequest.Builder()
+    .addSchemas(platformSchema())
+    .setSchemaTypeDisplayedBySystem(SCHEMA_TYPE, true)
+    .setForceOverride(true)
+  // From API 35 the schema is additionally made publicly visible to the
+  // phone's own search surface. A surface without
+  // `READ_GLOBAL_APP_SEARCH_DATA` — the launcher's Google search holds none on
+  // the images seen here — can only read a foreign database the owner has
+  // named this way, and the platform honours the name only against the
+  // installed app (`VisibilityCheckerImpl` re-checks the named certificate
+  // against the installed package at query time). Google ships that app signed
+  // differently per image family — GMS release keys, OEM keys, the emulator's
+  // platform test key — so no single hardcoded certificate can name it, and
+  // the surface's own installed certificate is read instead. On a device
+  // without the surface the grant is simply not made.
+  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+    globalSearchSurfaceCertificate(context)?.let { certificate ->
+      builder.setPubliclyVisibleSchema(
+        SCHEMA_TYPE,
+        PackageIdentifier(GLOBAL_SEARCH_PACKAGE, certificate)
+      )
+    }
+  }
+  return builder.build()
+}
+
+/**
+ * The signing certificate of the phone's own search surface, as the SHA-256
+ * digest the visibility grant names, or null when the surface is not installed
+ * or not visible to this app.
+ */
+private fun globalSearchSurfaceCertificate(context: Context?): ByteArray? {
+  if (context == null) return null
+  return try {
+    val info = context.packageManager.getPackageInfo(
+      GLOBAL_SEARCH_PACKAGE,
+      PackageManager.GET_SIGNING_CERTIFICATES
+    )
+    val signer = info.signingInfo?.apkContentsSigners?.firstOrNull() ?: return null
+    MessageDigest.getInstance("SHA-256").digest(signer.toByteArray())
+  } catch (error: Exception) {
+    null
+  }
+}
+
+private fun jetpackSchemaRequest(): JetpackSetSchemaRequest = JetpackSetSchemaRequest.Builder()
+  .addSchemas(jetpackSchema())
+  .setSchemaTypeDisplayedBySystem(SCHEMA_TYPE, true)
+  .setForceOverride(true)
+  .build()
+
+private fun platformSchema(): AppSearchSchema = AppSearchSchema.Builder(SCHEMA_TYPE)
+  .addProperty(
+    platformStringProperty(
+      PROPERTY_ID,
+      AppSearchSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_NONE
+    )
+  )
+  .addProperty(
+    platformStringProperty(
+      PROPERTY_TITLE,
+      AppSearchSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_PREFIXES
+    )
+  )
+  .addProperty(
+    platformStringProperty(
+      PROPERTY_DESCRIPTION,
+      AppSearchSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_PREFIXES
+    )
+  )
+  .addProperty(
+    platformStringProperty(
+      PROPERTY_KEYWORDS,
+      AppSearchSchema.PropertyConfig.CARDINALITY_REPEATED,
+      AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_PREFIXES
+    )
+  )
+  .addProperty(
+    platformStringProperty(
+      PROPERTY_FINGERPRINT,
+      AppSearchSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_NONE
+    )
+  )
+  .addProperty(
+    platformStringProperty(
+      PROPERTY_ROUTE,
+      AppSearchSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_NONE
+    )
+  )
+  .build()
+
+private fun jetpackSchema(): JetpackSchema = JetpackSchema.Builder(SCHEMA_TYPE)
+  .addProperty(
+    jetpackStringProperty(
+      PROPERTY_ID,
+      JetpackSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      JetpackSchema.StringPropertyConfig.INDEXING_TYPE_NONE
+    )
+  )
+  .addProperty(
+    jetpackStringProperty(
+      PROPERTY_TITLE,
+      JetpackSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      JetpackSchema.StringPropertyConfig.INDEXING_TYPE_PREFIXES
+    )
+  )
+  .addProperty(
+    jetpackStringProperty(
+      PROPERTY_DESCRIPTION,
+      JetpackSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      JetpackSchema.StringPropertyConfig.INDEXING_TYPE_PREFIXES
+    )
+  )
+  .addProperty(
+    jetpackStringProperty(
+      PROPERTY_KEYWORDS,
+      JetpackSchema.PropertyConfig.CARDINALITY_REPEATED,
+      JetpackSchema.StringPropertyConfig.INDEXING_TYPE_PREFIXES
+    )
+  )
+  .addProperty(
+    jetpackStringProperty(
+      PROPERTY_FINGERPRINT,
+      JetpackSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      JetpackSchema.StringPropertyConfig.INDEXING_TYPE_NONE
+    )
+  )
+  .addProperty(
+    jetpackStringProperty(
+      PROPERTY_ROUTE,
+      JetpackSchema.PropertyConfig.CARDINALITY_OPTIONAL,
+      JetpackSchema.StringPropertyConfig.INDEXING_TYPE_NONE
+    )
+  )
+  .build()
+
+// A searchable property must name its tokenizer: the platform builder defaults
+// it to TOKENIZER_TYPE_NONE and `build()` rejects any indexing type other than
+// INDEXING_TYPE_NONE with it, which fails `setSchema` for the whole database.
+// (`IllegalStateException: Cannot set TOKENIZER_TYPE_NONE with an indexing type
+// other than INDEXING_TYPE_NONE.`, seen on the API 35 emulator.)
+private fun platformStringProperty(name: String, cardinality: Int, indexingType: Int): AppSearchSchema.PropertyConfig {
+  val builder = AppSearchSchema.StringPropertyConfig.Builder(name)
+    .setCardinality(cardinality)
+    .setIndexingType(indexingType)
+  if (indexingType != AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_NONE) {
+    builder.setTokenizerType(AppSearchSchema.StringPropertyConfig.TOKENIZER_TYPE_PLAIN)
+  }
+  return builder.build()
+}
+
+private fun jetpackStringProperty(name: String, cardinality: Int, indexingType: Int): JetpackSchema.PropertyConfig {
+  val builder = JetpackSchema.StringPropertyConfig.Builder(name)
+    .setCardinality(cardinality)
+    .setIndexingType(indexingType)
+  if (indexingType != JetpackSchema.StringPropertyConfig.INDEXING_TYPE_NONE) {
+    builder.setTokenizerType(JetpackSchema.StringPropertyConfig.TOKENIZER_TYPE_PLAIN)
+  }
+  return builder.build()
+}
+
+/** The stored shape of one platform document, or null without a fingerprint. */
+private fun storedPlatformDocument(document: GenericDocument): StoredDocument? {
+  val fingerprint = document.getPropertyString(PROPERTY_FINGERPRINT) ?: return null
+  return StoredDocument(
+    id = document.getPropertyString(PROPERTY_ID) ?: document.id,
+    fingerprint = fingerprint,
+    route = document.getPropertyString(PROPERTY_ROUTE) ?: ""
+  )
+}
+
+/** The stored shape of one Jetpack document, or null without a fingerprint. */
+private fun storedJetpackDocument(document: JetpackDocument): StoredDocument? {
+  val fingerprint = document.getPropertyString(PROPERTY_FINGERPRINT) ?: return null
+  return StoredDocument(
+    id = document.getPropertyString(PROPERTY_ID) ?: document.id,
+    fingerprint = fingerprint,
+    route = document.getPropertyString(PROPERTY_ROUTE) ?: ""
+  )
+}
+
+private fun platformDocument(document: IndexedDocument): GenericDocument {
+  val builder = GenericDocument.Builder<GenericDocument.Builder<*>>(NAMESPACE, document.id, SCHEMA_TYPE)
+  builder.setPropertyString(PROPERTY_ID, document.id)
+  builder.setPropertyString(PROPERTY_TITLE, document.title)
+  builder.setPropertyString(PROPERTY_DESCRIPTION, document.description)
+  if (document.keywords.isNotEmpty()) {
+    builder.setPropertyString(PROPERTY_KEYWORDS, *document.keywords.toTypedArray())
+  }
+  builder.setPropertyString(PROPERTY_FINGERPRINT, document.fingerprint)
+  builder.setPropertyString(PROPERTY_ROUTE, document.route)
+  return builder.build()
+}
+
+private fun jetpackDocument(document: IndexedDocument): JetpackDocument {
+  val builder =
+    JetpackDocument.Builder<JetpackDocument.Builder<*>>(NAMESPACE, document.id, SCHEMA_TYPE)
+  builder.setPropertyString(PROPERTY_ID, document.id)
+  builder.setPropertyString(PROPERTY_TITLE, document.title)
+  builder.setPropertyString(PROPERTY_DESCRIPTION, document.description)
+  if (document.keywords.isNotEmpty()) {
+    builder.setPropertyString(PROPERTY_KEYWORDS, *document.keywords.toTypedArray())
+  }
+  builder.setPropertyString(PROPERTY_FINGERPRINT, document.fingerprint)
+  builder.setPropertyString(PROPERTY_ROUTE, document.route)
+  return builder.build()
+}
+
+private fun platformFailure(code: Int, message: String?): Throwable =
+  CodedException(message ?: "The system search index failed with code $code.")
+
+private fun timeoutFailure(): CodedException = CodedException(TIMEOUT_CODE, TIMEOUT_MESSAGE, null)
+
+private fun <T> awaitPlatformResult(start: (Consumer<AppSearchResult<T>>) -> Unit): T {
+  val latch = CountDownLatch(1)
+  var value: T? = null
+  var failure: Throwable? = null
+  start { result ->
+    if (result.isSuccess) {
+      value = result.resultValue
+    } else {
+      failure = platformFailure(result.resultCode, result.errorMessage)
+    }
+    latch.countDown()
+  }
+  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw timeoutFailure()
+  failure?.let { throw it }
+  return value ?: throw CodedException("The system search index returned no result.")
+}
+
+// A remove-by-query callback carries an `AppSearchResult<Void>`: the result has
+// no value even when it succeeds, so only success and failure are observed.
+private fun awaitPlatformCompletion(start: (Consumer<AppSearchResult<Void>>) -> Unit) {
+  val latch = CountDownLatch(1)
+  var failure: Throwable? = null
+  start { result ->
+    if (!result.isSuccess) {
+      failure = platformFailure(result.resultCode, result.errorMessage)
+    }
+    latch.countDown()
+  }
+  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw timeoutFailure()
+  failure?.let { throw it }
+}
+
+private fun awaitPlatformBatch(start: (BatchResultCallback<String, Void>) -> Unit) {
+  val latch = CountDownLatch(1)
+  var failure: Throwable? = null
+  start(object : BatchResultCallback<String, Void> {
+    override fun onResult(result: AppSearchBatchResult<String, Void>) {
+      if (!result.isSuccess) {
+        val rejected = result.failures.values.firstOrNull()
+        failure = platformFailure(
+          rejected?.resultCode ?: AppSearchResult.RESULT_UNKNOWN_ERROR,
+          rejected?.errorMessage
+        )
+      }
+      latch.countDown()
+    }
+
+    override fun onSystemError(error: Throwable?) {
+      // AppSearch can report a system error without a throwable. A null is
+      // still a failure: leaving `failure` unset would let the latch return and
+      // the caller treat the batch as applied even though the index never
+      // completed it. The Jetpack path's `awaitFuture` throws here, so this
+      // keeps the two stores answering the same way.
+      failure = error ?: platformFailure(AppSearchResult.RESULT_UNKNOWN_ERROR, null)
+      latch.countDown()
+    }
+  })
+  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw timeoutFailure()
+  failure?.let { throw it }
+}
+
+private fun <T> ListenableFuture<T>.awaitFuture(): T = try {
+  get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+} catch (error: ExecutionException) {
+  throw error.cause ?: error
+} catch (error: TimeoutException) {
+  throw timeoutFailure()
+}

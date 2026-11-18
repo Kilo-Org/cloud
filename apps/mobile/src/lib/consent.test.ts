@@ -1,6 +1,35 @@
+/* oxlint-disable max-lines */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = vi.hoisted(() => new Map<string, string>());
+
+const posthogMock = vi.hoisted(() => {
+  const captureEvent = vi.fn();
+  const flushLastPostHogEvent = vi.fn().mockResolvedValue(undefined);
+  let isReady = false;
+  let readyListener: (() => void) | null = null;
+  const isPostHogReady = vi.fn(() => isReady);
+  const subscribeToPostHogReady = vi.fn((listener: () => void) => {
+    readyListener = listener;
+    return () => {
+      if (readyListener === listener) {
+        readyListener = null;
+      }
+    };
+  });
+  return {
+    captureEvent,
+    flushLastPostHogEvent,
+    isPostHogReady,
+    subscribeToPostHogReady,
+    setReady(value: boolean) {
+      isReady = value;
+    },
+    fireReady() {
+      readyListener?.();
+    },
+  };
+});
 
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(async (key: string) => {
@@ -15,6 +44,14 @@ vi.mock('expo-secure-store', () => ({
     await Promise.resolve();
     store.delete(key);
   }),
+}));
+
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: posthogMock.captureEvent,
+  flushLastPostHogEvent: posthogMock.flushLastPostHogEvent,
+  isPostHogReady: posthogMock.isPostHogReady,
+  subscribeToPostHogReady: posthogMock.subscribeToPostHogReady,
+  CONSENT_OUTCOME_EVENT: 'consent_outcome',
 }));
 
 /* eslint-disable import/first */
@@ -41,6 +78,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: false,
       optional: false,
+      previousOptional: undefined,
     });
   });
 
@@ -81,6 +119,8 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: false,
       optional: false,
+      // The record is from an older version, so its choice seeds the new screen.
+      previousOptional: false,
     });
   });
 
@@ -103,6 +143,8 @@ describe('consent storage', () => {
     expect(await readConsent('oauth/google:foo')).toEqual({
       mandatory: false,
       optional: false,
+      // A legacy key carries no record the new screen may read a choice from.
+      previousOptional: undefined,
     });
     // Legacy key is removed
     expect(store.has('consent-accepted-oauthgooglefoo')).toBe(false);
@@ -116,11 +158,18 @@ describe('consent storage', () => {
   });
 
   it('revokes acceptance and deletes both hex and legacy keys', async () => {
-    const { hasAcceptedConsent, revokeConsent } = await import('./consent');
+    const { CURRENT_CONSENT_VERSION, hasAcceptedConsent, revokeConsent } =
+      await import('./consent');
 
     // Set up hex and legacy keys for the revoked user
-    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: false }));
-    store.set('consent-accepted-user1', JSON.stringify({ v: 2, optional: false }));
+    store.set(
+      'consent-accepted-757365722d31',
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false })
+    );
+    store.set(
+      'consent-accepted-user1',
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false })
+    );
 
     // Set up keys for a different user to prove they survive
     store.set('consent-accepted-757365722d32', 'stale');
@@ -137,7 +186,7 @@ describe('consent storage', () => {
     expect(store.has('consent-accepted-user2')).toBe(true);
   });
 
-  it('round-trips optional consent in a v2 record', async () => {
+  it('round-trips optional consent in a current-version record', async () => {
     const { acceptConsent, readConsent, hasAcceptedConsent } = await import('./consent');
 
     await acceptConsent('user-1', true);
@@ -146,6 +195,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: true,
       optional: true,
+      previousOptional: undefined,
     });
   });
 
@@ -157,6 +207,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: true,
       optional: false,
+      previousOptional: undefined,
     });
 
     // Hex of "user-1"
@@ -175,6 +226,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: true,
       optional: false,
+      previousOptional: undefined,
     });
 
     const raw = store.get('consent-accepted-757365722d31');
@@ -193,6 +245,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: false,
       optional: false,
+      previousOptional: undefined,
     });
     // user-2 untouched
     expect(await hasAcceptedConsent('user-2')).toBe(true);
@@ -345,5 +398,216 @@ describe('consent storage', () => {
     // Revoke is authoritative: the queued optional update must not recreate it.
     expect(await hasAcceptedConsent('user-1')).toBe(false);
     expect(store.has('consent-accepted-757365722d31')).toBe(false);
+  });
+});
+
+describe('consent version migration', () => {
+  beforeEach(() => {
+    store.clear();
+  });
+
+  it('requires re-consent for an older record and keeps its declined choice', async () => {
+    const { CURRENT_CONSENT_VERSION, hasAcceptedConsent, readConsent } = await import('./consent');
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: false }));
+
+    expect(CURRENT_CONSENT_VERSION).toBe(3);
+    expect(await hasAcceptedConsent('user-1')).toBe(false);
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: false,
+      optional: false,
+      previousOptional: false,
+    });
+  });
+
+  it('carries an accepted optional choice across the update', async () => {
+    const { readConsent } = await import('./consent');
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: true }));
+
+    const state = await readConsent('user-1');
+    expect(state.previousOptional).toBe(true);
+  });
+
+  it('accepting the updated screen writes the current version and drops the carried choice', async () => {
+    const { CURRENT_CONSENT_VERSION, acceptConsent, readConsent } = await import('./consent');
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: true }));
+
+    await acceptConsent('user-1', true);
+
+    expect(store.get('consent-accepted-757365722d31')).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true })
+    );
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: true,
+      optional: true,
+      previousOptional: undefined,
+    });
+  });
+
+  it('treats an unreadable older record as no record', async () => {
+    const { readConsent } = await import('./consent');
+    // No optional field: the record cannot seed a choice.
+    store.set('consent-accepted-757365722d31', '{"v":2}');
+
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: false,
+      optional: false,
+      previousOptional: undefined,
+    });
+  });
+});
+
+describe('consent outcome analytics', () => {
+  beforeEach(() => {
+    store.clear();
+    posthogMock.captureEvent.mockClear();
+    posthogMock.flushLastPostHogEvent.mockClear();
+    posthogMock.setReady(false);
+    // Drain any pending outcome left by a previous test so this test starts clean.
+    posthogMock.setReady(true);
+    posthogMock.fireReady();
+    posthogMock.setReady(false);
+    posthogMock.captureEvent.mockClear();
+    posthogMock.flushLastPostHogEvent.mockClear();
+  });
+
+  it('queues an accept outcome until the ready listener fires ready', async () => {
+    const { acceptConsent } = await import('./consent');
+    await acceptConsent('user-1', true);
+
+    // Not ready: nothing captured yet.
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+
+    posthogMock.setReady(true);
+    posthogMock.fireReady();
+
+    expect(posthogMock.captureEvent).toHaveBeenCalledTimes(1);
+    expect(posthogMock.captureEvent).toHaveBeenCalledWith('consent_outcome', {
+      action: 'accepted',
+      optional: true,
+    });
+  });
+
+  it('clears a queued outcome so a later ready transition cannot emit it', async () => {
+    const { acceptConsent, clearPendingConsentOutcome } = await import('./consent');
+    await acceptConsent('user-1', true);
+
+    // Not ready: the accept outcome is queued and nothing captured yet.
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+
+    // Sign-out clears the queued outcome during teardown.
+    clearPendingConsentOutcome();
+
+    posthogMock.setReady(true);
+    posthogMock.fireReady();
+
+    // The stale payload must not drain onto a later account's client.
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not capture when the ready listener fires while not ready', async () => {
+    const { acceptConsent } = await import('./consent');
+    await acceptConsent('user-1', true);
+
+    posthogMock.fireReady();
+
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not re-queue a duplicate accept with the same optional value', async () => {
+    const { acceptConsent } = await import('./consent');
+    await acceptConsent('user-1', true);
+    await acceptConsent('user-1', true);
+
+    posthogMock.setReady(true);
+    posthogMock.fireReady();
+
+    expect(posthogMock.captureEvent).toHaveBeenCalledTimes(1);
+    expect(posthogMock.captureEvent).toHaveBeenCalledWith('consent_outcome', {
+      action: 'accepted',
+      optional: true,
+    });
+  });
+
+  it('queues setOptionalConsent(true) until the ready listener fires', async () => {
+    const { acceptConsent, setOptionalConsent } = await import('./consent');
+    await acceptConsent('user-1', false);
+    posthogMock.captureEvent.mockClear();
+
+    await setOptionalConsent('user-1', true);
+
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+
+    posthogMock.setReady(true);
+    posthogMock.fireReady();
+
+    expect(posthogMock.captureEvent).toHaveBeenCalledTimes(1);
+    expect(posthogMock.captureEvent).toHaveBeenCalledWith('consent_outcome', {
+      action: 'optional_changed',
+      optional: true,
+    });
+  });
+
+  it('setOptionalConsent(false) captures, flushes, then notifies listeners', async () => {
+    const { acceptConsent, setOptionalConsent, subscribeToConsentChanges } =
+      await import('./consent');
+    await acceptConsent('user-1', true);
+    posthogMock.captureEvent.mockClear();
+    posthogMock.flushLastPostHogEvent.mockClear();
+
+    const listener = vi.fn<() => void>();
+    subscribeToConsentChanges(listener);
+
+    await setOptionalConsent('user-1', false);
+
+    expect(posthogMock.captureEvent).toHaveBeenCalledWith('consent_outcome', {
+      action: 'optional_changed',
+      optional: false,
+    });
+    expect(posthogMock.flushLastPostHogEvent).toHaveBeenCalledTimes(1);
+
+    const captureCall = posthogMock.captureEvent.mock.invocationCallOrder[0];
+    const flushCall = posthogMock.flushLastPostHogEvent.mock.invocationCallOrder[0];
+    const listenerCall = listener.mock.invocationCallOrder[0];
+    if (captureCall === undefined || flushCall === undefined || listenerCall === undefined) {
+      throw new Error('expected consent change call order to be recorded');
+    }
+    expect(captureCall).toBeLessThan(flushCall);
+    expect(flushCall).toBeLessThan(listenerCall);
+  });
+
+  it('revokeConsent captures revoked then flushes', async () => {
+    const { acceptConsent, revokeConsent } = await import('./consent');
+    await acceptConsent('user-1', true);
+    posthogMock.captureEvent.mockClear();
+    posthogMock.flushLastPostHogEvent.mockClear();
+
+    await revokeConsent('user-1');
+
+    expect(posthogMock.captureEvent).toHaveBeenCalledWith('consent_outcome', {
+      action: 'revoked',
+      optional: false,
+    });
+    expect(posthogMock.flushLastPostHogEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not capture when the optional value is unchanged', async () => {
+    const { acceptConsent, setOptionalConsent } = await import('./consent');
+    await acceptConsent('user-1', true);
+    posthogMock.captureEvent.mockClear();
+    posthogMock.flushLastPostHogEvent.mockClear();
+
+    await setOptionalConsent('user-1', true);
+
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+    expect(posthogMock.flushLastPostHogEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not capture when setOptionalConsent has no prior accept', async () => {
+    const { setOptionalConsent } = await import('./consent');
+
+    await setOptionalConsent('user-1', true);
+
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+    expect(posthogMock.flushLastPostHogEvent).not.toHaveBeenCalled();
   });
 });

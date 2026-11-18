@@ -1,4 +1,4 @@
-import { describe, expect, it, type Mock } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   ActiveSessionsLiveSync,
@@ -88,7 +88,7 @@ describe('ActiveSessionsLiveSync — session.status.updated', () => {
     qc.__setCached({
       sessions: [makeCached({ id: 'ses-1', status: 'question' })],
     });
-    const setQueryDataCalls = qc.setQueryData as Mock;
+    const setQueryDataCalls = vi.spyOn(qc, 'setQueryData');
     setQueryDataCalls.mockClear();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
@@ -97,13 +97,16 @@ describe('ActiveSessionsLiveSync — session.status.updated', () => {
       queryFn: makeQueryFn(),
     });
     sync.attach();
+    const seeded = qc.__getCached()?.sessions[0];
     conn.__fireSystem({
       event: 'session.status.updated',
       data: { sessionId: 'ses-1' },
     });
-    await Promise.resolve();
+    await sync.getWriteQueue();
     expect(setQueryDataCalls).not.toHaveBeenCalled();
+    expect(qc.__getCached()?.sessions[0]).toBe(seeded);
     expect(qc.__getCached()?.sessions[0]?.status).toBe('question');
+    expect(sync.getPendingReasons()).toEqual(new Set());
   });
 
   it('keeps attention sticky across a busy heartbeat after status.updated sets it', async () => {

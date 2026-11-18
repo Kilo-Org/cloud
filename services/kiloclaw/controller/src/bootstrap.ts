@@ -58,8 +58,6 @@ const GATEWAY_CLIENT_OPERATOR_SCOPES = [
   'operator.write',
 ];
 
-// ---- Types ----
-
 type EnvLike = Record<string, string | undefined>;
 
 type JsonRecord = Record<string, unknown>;
@@ -110,8 +108,6 @@ const defaultDeps: BootstrapDeps = {
       input: opts?.input,
     }),
 };
-
-// ---- Controller state type ----
 
 export type ControllerState =
   | { state: 'bootstrapping'; phase: string }
@@ -170,8 +166,6 @@ function roleList(record: JsonRecord): string[] {
 function hasOperatorRole(record: JsonRecord): boolean {
   return roleList(record).includes(OPERATOR_TOKEN_ROLE);
 }
-
-// ---- Step 1: Env decryption ----
 
 /**
  * Decrypt KILOCLAW_ENC_* environment variables using the KILOCLAW_ENV_KEY.
@@ -249,8 +243,6 @@ export function decryptEnvVars(env: EnvLike): void {
   }
 }
 
-// ---- Step 2: Directory setup ----
-
 /**
  * Create required directories, set working directory, and configure
  * environment variables needed by the gateway process.
@@ -290,8 +282,6 @@ export function setupDirectories(env: EnvLike, deps: BootstrapDeps = defaultDeps
     env.KILO_API_URL = new URL(env.KILOCODE_API_BASE_URL).origin;
   }
 }
-
-// ---- Step 3: Feature flags ----
 
 /**
  * Apply instance feature flags from KILOCLAW_* env vars.
@@ -357,8 +347,6 @@ export function cleanNpmCache(env: EnvLike, deps: BootstrapDeps = defaultDeps): 
     console.warn('[controller] npm cache clean failed, continuing:', message);
   }
 }
-
-// ---- Step 4: Hooks token ----
 
 /** Generate a per-boot random hooks token for local gateway hook delivery. */
 export function generateHooksToken(env: EnvLike): void {
@@ -610,8 +598,6 @@ export function ensureWeatherSkillInstalled(
   deps.copyFileSync(WEATHER_SKILL_SOURCE, WEATHER_SKILL_DEST);
 }
 
-// ---- Step 5: GitHub config ----
-
 /**
  * Extract a human-readable, secret-scrubbed message from an execFileSync
  * failure. `execFileSync` errors expose the child's stderr (string when the
@@ -745,8 +731,6 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
   }
 }
 
-// ---- Step 6: Linear config ----
-
 /**
  * Configure or clean up Linear MCP access.
  * Linear access is provided via the Linear MCP server configured in mcporter.
@@ -761,8 +745,6 @@ export function configureLinear(env: EnvLike): void {
     console.log('Linear: not configured');
   }
 }
-
-// ---- Step 7: Onboard / doctor + config patching ----
 
 /**
  * Run openclaw onboard (first boot) or openclaw doctor (subsequent boots),
@@ -976,8 +958,6 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   ensureWeatherSkillInstalled(env, deps);
 }
 
-// ---- exec-approvals.json seeder ----
-
 export function seedExecApprovalsDefaults(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
   const security = env.KILOCLAW_EXEC_SECURITY || 'allowlist';
   const ask = env.KILOCLAW_EXEC_ASK || 'on-miss';
@@ -1011,8 +991,6 @@ export function seedExecApprovalsDefaults(env: EnvLike, deps: BootstrapDeps = de
     console.warn('[controller] Failed to seed exec-approvals.json defaults:', err);
   }
 }
-
-// ---- gateway-client paired device remediation ----
 
 export type GatewayClientDeviceScopeRemediationResult = {
   checked: number;
@@ -1164,8 +1142,6 @@ export function runGatewayClientDeviceScopeRemediation(
   }
 }
 
-// ---- TOOLS.md bounded-section helper ----
-
 export type ToolsMdSectionConfig = {
   name: string;
   beginMarker: string;
@@ -1213,8 +1189,6 @@ export function updateToolsMdSection(
     }
   }
 }
-
-// ---- TOOLS.md section configs ----
 
 export const GOG_SECTION_CONFIG: ToolsMdSectionConfig = {
   name: 'Google Workspace',
@@ -1391,8 +1365,6 @@ When installing an OpenClaw plugin on the user's behalf:
 <!-- END:plugin-install -->`,
 };
 
-// ---- Step 11: Gateway args ----
-
 /**
  * Build the gateway CLI arguments array.
  * Pure function — no side effects.
@@ -1404,8 +1376,6 @@ export function buildGatewayArgs(env: EnvLike): string[] {
   }
   return args;
 }
-
-// ---- Orchestrator ----
 
 /**
  * Run all bootstrap steps in order, reporting progress via setPhase.

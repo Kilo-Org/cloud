@@ -1,0 +1,144 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TokenExchangeCallbackOptions } from '@cloudflare/workers-oauth-provider';
+import { onError, tokenExchangeCallback, type OAuthProviderError } from './provider-hooks';
+import type { McpAnalytics, OAuthSignInInput } from '../analytics';
+
+const hook = tokenExchangeCallback;
+const errorHook = onError;
+
+// The library's GrantType values, as plain strings (no runtime library import).
+const AUTHORIZATION_CODE = 'authorization_code' as TokenExchangeCallbackOptions['grantType'];
+const REFRESH_TOKEN = 'refresh_token' as TokenExchangeCallbackOptions['grantType'];
+
+function fakeAnalytics(): { analytics: McpAnalytics; calls: OAuthSignInInput[] } {
+  const calls: OAuthSignInInput[] = [];
+  return {
+    calls,
+    analytics: {
+      oauthSignIn: vi.fn((input: OAuthSignInInput) => {
+        calls.push(input);
+      }),
+    } as unknown as McpAnalytics,
+  };
+}
+
+function exchangeOptions(
+  overrides: Partial<TokenExchangeCallbackOptions> = {}
+): TokenExchangeCallbackOptions {
+  return {
+    grantType: AUTHORIZATION_CODE,
+    clientId: 'client-abc',
+    userId: 'u-1',
+    grantId: 'grant-1',
+    scope: ['mcp'],
+    requestedScope: ['mcp'],
+    props: { kiloUserId: 'u-1', organizationId: 'org-1', kiloToken: 'kilo-tok' },
+    ...overrides,
+  };
+}
+
+describe('tokenExchangeCallback', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('emits oauthSignIn succeeded with the identity from the grant props', () => {
+    const { analytics, calls } = fakeAnalytics();
+    hook(exchangeOptions(), { analytics });
+    expect(calls).toEqual([
+      { phase: 'succeeded', identity: { kiloUserId: 'u-1', organizationId: 'org-1' } },
+    ]);
+  });
+
+  it('reports a personal grant with a null organization', () => {
+    const { analytics, calls } = fakeAnalytics();
+    hook(
+      exchangeOptions({
+        props: { kiloUserId: 'u-2', organizationId: null, kiloToken: 'k' },
+      }),
+      { analytics }
+    );
+    expect(calls).toEqual([
+      { phase: 'succeeded', identity: { kiloUserId: 'u-2', organizationId: null } },
+    ]);
+  });
+
+  it('reports anonymously when the props carry no usable Kilo user id', () => {
+    const { analytics, calls } = fakeAnalytics();
+    hook(exchangeOptions({ props: null }), { analytics });
+    hook(exchangeOptions({ props: { organizationId: 'org-1' } }), { analytics });
+    hook(exchangeOptions({ props: { kiloUserId: '' } }), { analytics });
+    expect(calls).toEqual([
+      { phase: 'succeeded', identity: null },
+      { phase: 'succeeded', identity: null },
+      { phase: 'succeeded', identity: null },
+    ]);
+  });
+
+  it('does not emit for a refresh-token exchange', () => {
+    const { analytics, calls } = fakeAnalytics();
+    hook(exchangeOptions({ grantType: REFRESH_TOKEN }), { analytics });
+    expect(calls).toEqual([]);
+  });
+
+  it('is a no-op without an analytics emitter and never throws', () => {
+    expect(() => hook(exchangeOptions())).not.toThrow();
+    expect(() => tokenExchangeCallback(exchangeOptions())).not.toThrow();
+  });
+});
+
+describe('onError', () => {
+  it('emits oauthSignIn failed with the OAuth error code as reason', () => {
+    const { analytics, calls } = fakeAnalytics();
+    const error: OAuthProviderError = {
+      code: 'invalid_grant',
+      description: 'bad',
+      status: 400,
+      headers: {},
+    };
+    errorHook(error, { analytics });
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, reason: 'invalid_grant', detail: 'other' },
+    ]);
+  });
+
+  it('names the library cause as a fixed-vocabulary detail', () => {
+    const cases: Array<[string, string, string]> = [
+      ['invalid_grant', 'Client ID mismatch', 'client_id_mismatch'],
+      ['invalid_grant', 'Grant not found', 'grant_not_found'],
+      ['invalid_grant', 'Invalid refresh token', 'invalid_refresh_token'],
+      ['invalid_grant', 'Refresh token has expired', 'refresh_token_expired'],
+      ['invalid_client', 'Client not found', 'client_not_found'],
+      ['invalid_token', 'Access token expired', 'access_token_expired'],
+      [
+        'invalid_token',
+        'Token audience does not match resource server',
+        'resource_audience_mismatch',
+      ],
+    ];
+    for (const [code, description, detail] of cases) {
+      const { analytics, calls } = fakeAnalytics();
+      onError({ code, description, status: 400, headers: {} }, { analytics });
+      expect(calls).toEqual([{ phase: 'failed', identity: null, reason: code, detail }]);
+    }
+  });
+
+  it('reports a description outside the vocabulary as other, never the raw text', () => {
+    for (const description of [
+      'Request parameter "x" must not be repeated',
+      'constructor',
+      '__proto__',
+      'toString',
+    ]) {
+      const { analytics, calls } = fakeAnalytics();
+      onError({ code: 'invalid_request', description, status: 400, headers: {} }, { analytics });
+      expect(calls).toEqual([
+        { phase: 'failed', identity: null, reason: 'invalid_request', detail: 'other' },
+      ]);
+    }
+  });
+
+  it('is a no-op without an analytics emitter and never throws', () => {
+    expect(() =>
+      onError({ code: 'server_error', description: 'x', status: 500, headers: {} })
+    ).not.toThrow();
+  });
+});

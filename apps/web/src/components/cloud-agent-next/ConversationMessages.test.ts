@@ -1,0 +1,2001 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createRequire } from 'node:module';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { atom } from 'jotai';
+import type {
+  PreparationAttempt,
+  SessionCommit,
+  SessionManager,
+  StandaloneQuestion,
+  StandaloneSuggestion,
+} from '@kilocode/cloud-agent-sdk';
+import type { AssistantMessage } from '@/types/opencode.gen';
+import type { Part, ReasoningPart, StoredMessage, TextPart, ToolPart } from './types';
+import type * as ToolCardShellModule from './ToolCardShell';
+import { useOptionalManager } from './CloudAgentProvider';
+import { CommitDetails } from './CommitCard';
+
+let mockExpanded = false;
+
+jest.mock('./ToolCardShell', () => {
+  const actual = jest.requireActual<typeof ToolCardShellModule>('./ToolCardShell');
+  return {
+    ToolCardShell: (props: React.ComponentProps<typeof actual.ToolCardShell>) =>
+      React.createElement(actual.ToolCardShell, {
+        ...props,
+        defaultExpanded: mockExpanded ? true : props.defaultExpanded,
+      }),
+  };
+});
+jest.mock('./CloudAgentProvider', () => ({ useOptionalManager: jest.fn() }));
+jest.mock('@/components/shared/TimeAgo', () => ({
+  TimeAgo: ({ timestamp }: { timestamp: number | string }) =>
+    React.createElement('time', { 'data-timestamp': timestamp }, 'Message timestamp'),
+}));
+jest.mock('@/components/shared/CopyMessageButton', () => ({ CopyMessageButton: () => null }));
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children?: React.ReactNode }) => {
+    recordMarkdownRender(typeof children === 'string' ? children : '');
+    return React.createElement('p', null, children);
+  },
+}));
+jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
+jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
+  iterateOverDiff: () => [],
+}));
+
+import { ConversationMessages } from './assistant-ui/test-renderers';
+import { commitsByMessageAnchor } from './message-presentation';
+import { PartRenderer } from './assistant-ui/test-renderers';
+
+Object.assign(globalThis, { React });
+
+function markdownRenders(): string[] {
+  const globals = globalThis as { __markdownRenders?: string[] };
+  return (globals.__markdownRenders ??= []);
+}
+
+function recordMarkdownRender(text: string): void {
+  markdownRenders().push(text);
+}
+
+function installDom() {
+  const requireFromHere = createRequire(__filename);
+  const requireFromNext = createRequire(requireFromHere.resolve('next/package.json'));
+  const { window, document } = (
+    requireFromNext('linkedom') as {
+      parseHTML: (html: string) => { window: Record<string, unknown>; document: Document };
+    }
+  ).parseHTML('<!doctype html><html><body><div id="root"></div></body></html>');
+  const globals = globalThis as typeof globalThis & Record<string, unknown>;
+  const values = {
+    React,
+    window,
+    document,
+    HTMLElement: window.HTMLElement,
+    Element: window.Element,
+    Node: window.Node,
+    Event: window.Event,
+    getComputedStyle: () => ({ animationName: 'none', display: 'block' }),
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    },
+    cancelAnimationFrame: () => undefined,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  };
+  const previous = new Map(Object.keys(values).map(name => [name, globals[name]]));
+  Object.assign(globals, values);
+  const container = document.getElementById('root');
+  if (!container) throw new Error('ConversationMessages test root missing');
+  return {
+    container,
+    cleanup: () => previous.forEach((value, name) => (globals[name] = value)),
+  };
+}
+
+function assistantMessage(
+  id: string,
+  parts: Part[],
+  overrides: Partial<AssistantMessage> = {}
+): StoredMessage {
+  const info: AssistantMessage = {
+    id,
+    sessionID: 'ses-1',
+    role: 'assistant',
+    time: { created: 1, completed: 2 },
+    parentID: 'user-1',
+    modelID: 'test-model',
+    providerID: 'test-provider',
+    mode: 'code',
+    agent: 'test-agent',
+    path: { cwd: '/', root: '/' },
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    ...overrides,
+  };
+  return {
+    info,
+    parts: parts.map(part => ({ ...part, messageID: id, sessionID: info.sessionID })),
+  };
+}
+
+function textPart(id: string, text: string): TextPart {
+  return { id, sessionID: 'ses-1', messageID: 'assistant-1', type: 'text', text };
+}
+
+function reasoningPart(id: string, overrides: Partial<ReasoningPart> = {}): ReasoningPart {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID: 'assistant-1',
+    type: 'reasoning',
+    text: `Reasoning details for ${id}`,
+    time: { start: 1, end: 2 },
+    ...overrides,
+  };
+}
+
+function toolPart(
+  id: string,
+  tool = 'bash',
+  state: ToolPart['state'] = {
+    status: 'completed',
+    input: { command: `pnpm test -- ${id}` },
+    output: `Output for ${id}`,
+    title: tool,
+    metadata: {},
+    time: { start: 1, end: 2 },
+  }
+): ToolPart {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID: 'assistant-1',
+    type: 'tool',
+    callID: id,
+    tool,
+    state,
+  };
+}
+
+function renderConversation(
+  staticMessages: StoredMessage[],
+  overrides: Partial<React.ComponentProps<typeof ConversationMessages>> & {
+    commits?: readonly SessionCommit[];
+  } = {}
+): string {
+  const { commits = [], ...props } = overrides;
+  const commitsAfterMessage =
+    props.commitsAfterMessage ??
+    commitsByMessageAnchor([...staticMessages, ...(props.dynamicMessages ?? [])], commits);
+  return renderToStaticMarkup(
+    React.createElement(ConversationMessages, {
+      active: true,
+      isStreaming: false,
+      staticMessages,
+      dynamicMessages: [],
+      pendingMessages: new Map(),
+      preparationByMessageId: new Map(),
+      onOpenPreparationDetails: jest.fn(),
+      commitsAfterMessage,
+      ...props,
+    })
+  );
+}
+
+function buttons(html: string): string[] {
+  return html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [];
+}
+
+beforeEach(() => {
+  mockExpanded = false;
+  jest.mocked(useOptionalManager).mockReturnValue(null);
+});
+
+describe('ConversationMessages', () => {
+  const commit: SessionCommit = {
+    commitHash: 'a'.repeat(40),
+    commitMessage: 'Fix the actual issue\n\nKeep the complete body accessible.',
+    messageId: 'assistant-1',
+    userMessageId: 'user-1',
+    committedAt: '2026-09-01T10:00:00.000Z',
+    pushStatus: 'failed',
+  };
+
+  it('renders one compact commit line at its anchor without diff actions, preserving later rows', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [textPart('first', 'First answer')])],
+      {
+        dynamicMessages: [assistantMessage('assistant-2', [textPart('second', 'Later answer')])],
+        commits: [commit, { ...commit }],
+      }
+    );
+    expect(html.match(/data-commit-hash=/g)).toHaveLength(1);
+    const trigger = buttons(html).find(button => button.includes('data-commit-hash='));
+    expect(trigger).toContain(`data-commit-hash="${commit.commitHash}"`);
+    expect(trigger).toContain('Fix the actual issue');
+    expect(trigger).toContain('truncate');
+    expect(trigger).toContain('aria-label="Commit aaaaaaa details"');
+    expect(trigger).toContain('aria-haspopup="dialog"');
+    expect(trigger).toContain('aria-expanded="false"');
+    expect(trigger).toContain('focus-visible:ring-2');
+    expect(trigger).toContain('[@media(any-pointer:coarse)]:min-h-11');
+    expect(trigger).not.toMatch(/\b(?:border|bg-|flex-wrap)/);
+    expect(html).not.toContain('View diff');
+    expect(html).not.toContain('Keep the complete body accessible.');
+    expect(html).not.toContain('Push failed');
+    expect(html).not.toContain('may include changes from other chats');
+    expect(html.indexOf('First answer')).toBeLessThan(html.indexOf('data-commit-hash='));
+    expect(html.indexOf('data-commit-hash=')).toBeLessThan(html.indexOf('Later answer'));
+    expect(html.match(/data-message-role="assistant"/g)).toHaveLength(2);
+  });
+
+  it('shares one combined anchor map across transcript chunks without fallback duplicates', () => {
+    const staticMessages: StoredMessage[] = [
+      {
+        info: {
+          id: 'user-1',
+          role: 'user',
+          sessionID: 'ses-1',
+          time: { created: 0 },
+          agent: 'code',
+          model: { providerID: 'test', modelID: 'test' },
+        },
+        parts: [],
+      },
+      assistantMessage('assistant-1', [textPart('first', 'First answer')]),
+    ];
+    const dynamicMessages = [
+      assistantMessage('assistant-2', [textPart('second', 'Second answer')]),
+    ];
+    const anchoredCommit = { ...commit, messageId: 'assistant-2' };
+    const commitsAfterMessage = commitsByMessageAnchor(
+      [...staticMessages, ...dynamicMessages],
+      [anchoredCommit]
+    );
+    const staticHtml = renderConversation(staticMessages, { commitsAfterMessage });
+    const dynamicHtml = renderConversation([], { dynamicMessages, commitsAfterMessage });
+    expect(staticHtml).not.toContain('data-commit-hash=');
+    expect(dynamicHtml.match(/data-commit-hash=/g)).toHaveLength(1);
+    expect(dynamicHtml.indexOf('Second answer')).toBeLessThan(
+      dynamicHtml.indexOf('data-commit-hash=')
+    );
+    expect(commitsAfterMessage.get('assistant-2')).toEqual([anchoredCommit]);
+  });
+
+  it.each([
+    ['pushed', false],
+    ['failed', true],
+    ['not_attempted', true],
+    ['unknown', false],
+  ] as const)(
+    'keeps commit metadata and shows only a confirmed non-push for %s',
+    (pushStatus, showsNotPushed) => {
+      const html = renderToStaticMarkup(
+        React.createElement(CommitDetails, { commit: { ...commit, pushStatus } })
+      );
+      expect(html).toContain('Fix the actual issue</p>');
+      expect(html).toContain('Keep the complete body accessible.</p>');
+      expect(html).toContain(commit.commitHash);
+      expect(html).toContain(`dateTime="${commit.committedAt}"`);
+      expect(html.includes('>Not pushed<')).toBe(showsNotPushed);
+      expect(html).not.toContain('Workspace commit');
+      expect(html).not.toContain('Push status');
+      expect(html).not.toContain('>Pushed<');
+      expect(html).not.toContain('may include changes from other chats');
+      expect(html).not.toContain('text-destructive');
+      expect(html).not.toContain('View diff');
+    }
+  );
+
+  it('reflows hard-wrapped commit bodies while preserving paragraph breaks', () => {
+    const wrappedCommit = {
+      ...commit,
+      commitMessage:
+        'feat: add thing\n\nAdd `repoSnapshotLogIdentity` to generate a bounded, sanitized, and\nlog-safe identity for repository snapshots.\n\nSecond paragraph line one\nline two.',
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(CommitDetails, { commit: wrappedCommit })
+    );
+    expect(html).toContain(
+      'Add `repoSnapshotLogIdentity` to generate a bounded, sanitized, and log-safe identity for repository snapshots.'
+    );
+    expect(html).not.toContain('sanitized, and\nlog-safe');
+    expect(html).toContain('snapshots.\n\nSecond paragraph line one line two.');
+  });
+
+  it('keeps long commit messages as plain text in details without embedding them in the trigger name', () => {
+    const longCommit = {
+      ...commit,
+      commitMessage: `${'Long subject '.repeat(100)}\n\n<script>not markup</script>\n${'Body '.repeat(1000)}`,
+    };
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [textPart('answer', 'Answer')])],
+      { commits: [longCommit] }
+    );
+    expect(html).toContain('aria-label="Commit aaaaaaa details"');
+    expect(html).not.toContain('Body ');
+    const details = renderToStaticMarkup(
+      React.createElement(CommitDetails, { commit: longCommit })
+    );
+    expect(details).toContain('Body '.repeat(1000));
+    expect(details).toContain('&lt;script&gt;not markup&lt;/script&gt;');
+    expect(details).not.toContain('<script>');
+  });
+
+  it('does not append a commit whose known assistant anchor is unloaded', () => {
+    const html = renderConversation(
+      [
+        {
+          info: {
+            id: 'user-1',
+            role: 'user',
+            sessionID: 'ses-1',
+            time: { created: 0 },
+            agent: 'code',
+            model: { providerID: 'test', modelID: 'test' },
+          },
+          parts: [],
+        },
+        assistantMessage('assistant-2', [textPart('later', 'Unrelated later answer')]),
+      ],
+      { commits: [commit] }
+    );
+    expect(html).not.toContain('data-commit-hash=');
+    expect(html).toContain('Unrelated later answer');
+  });
+
+  it('keeps different full SHAs with the same display prefix and defers saved-message truncation to details', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [textPart('answer', 'Answer')])],
+      {
+        commits: [
+          commit,
+          {
+            ...commit,
+            commitHash: `${'a'.repeat(39)}b`,
+            pushStatus: 'not_attempted',
+            commitMessageTruncated: true,
+          },
+        ],
+      }
+    );
+    expect(html.match(/data-commit-hash=/g)).toHaveLength(2);
+    expect(html).not.toContain('Not pushed');
+    expect(html).not.toContain('Message truncated.');
+    const details = renderToStaticMarkup(
+      React.createElement(CommitDetails, { commit: { ...commit, commitMessageTruncated: true } })
+    );
+    expect(details).toContain('Message truncated.');
+    expect(renderToStaticMarkup(React.createElement(CommitDetails, { commit }))).not.toContain(
+      'Message truncated.'
+    );
+  });
+
+  it('shows individual rows in transcript order with collapsed details and metadata after the answer', () => {
+    const html = renderConversation([
+      assistantMessage('assistant-1', [
+        reasoningPart('reasoning-1'),
+        toolPart('bash-1'),
+        textPart('progress', 'First check passed.'),
+        toolPart('bash-2'),
+        textPart('answer', 'The implementation is ready.'),
+      ]),
+    ]);
+    const renderedButtons = buttons(html);
+
+    expect(renderedButtons).toEqual([
+      expect.stringContaining('Thought'),
+      expect.stringContaining('pnpm test -- bash-1'),
+      expect.stringContaining('pnpm test -- bash-2'),
+    ]);
+    for (const button of renderedButtons) {
+      expect(button).toContain('aria-expanded="false"');
+      expect(button).not.toContain('aria-controls=');
+    }
+    expect(html).not.toContain('Reasoning details');
+    expect(html).not.toContain('Output for');
+    expect(html).toContain('First check passed.');
+    expect(html).toContain('The implementation is ready.');
+    expect(html).toContain('Message timestamp');
+    expect(html.indexOf('pnpm test -- bash-1')).toBeLessThan(html.indexOf('First check passed.'));
+    expect(html.indexOf('First check passed.')).toBeLessThan(html.indexOf('pnpm test -- bash-2'));
+    expect(html.indexOf('pnpm test -- bash-2')).toBeLessThan(
+      html.indexOf('The implementation is ready.')
+    );
+    expect(html.indexOf('Message timestamp')).toBeGreaterThan(
+      html.indexOf('The implementation is ready.')
+    );
+  });
+
+  it('uses the last assistant creation time for a long-running turn while retaining its first identity', () => {
+    const firstCreated = Date.parse('2026-10-05T09:19:53Z');
+    const lastCreated = Date.parse('2026-10-05T09:43:07Z');
+    const first = assistantMessage('assistant-first', [textPart('progress', 'Watching CI.')], {
+      time: { created: firstCreated, completed: firstCreated + 16_000 },
+    });
+    const last = assistantMessage('assistant-last', [textPart('answer', 'CI passed.')], {
+      time: { created: lastCreated, completed: lastCreated + 7_000 },
+    });
+
+    const html = renderConversation([first, last]);
+
+    expect(html.match(/data-message-role="assistant"/g)).toHaveLength(1);
+    expect(html).toContain('data-message-id="assistant-first"');
+    expect(html).toContain(`data-timestamp="${lastCreated}"`);
+    expect(html).not.toContain(`data-timestamp="${firstCreated}"`);
+    expect(html).toContain('data-message-id="assistant-first"');
+  });
+
+  it('groups tools and reasoning between visible messages when collapse tools is enabled', () => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          textPart('intro', 'I will check the implementation.'),
+          reasoningPart('reasoning-1'),
+          toolPart('bash-1'),
+          textPart('empty', '  '),
+          toolPart('hidden', 'todoread'),
+        ]),
+        assistantMessage('assistant-2', [
+          toolPart('bash-2'),
+          textPart('progress', 'The checks passed.'),
+          toolPart('bash-3'),
+          textPart('answer', 'The implementation is ready.'),
+        ]),
+      ],
+      { collapseTools: true }
+    );
+
+    expect(buttons(html)).toEqual([
+      expect.stringContaining('2 tool calls · reasoning'),
+      expect.stringContaining('1 tool call'),
+    ]);
+    for (const button of buttons(html)) {
+      expect(button).toContain('aria-expanded="false"');
+      expect(button).not.toContain('aria-controls=');
+    }
+    expect(html).not.toContain('pnpm test');
+    expect(html).not.toContain('Reasoning details');
+    expect(html.indexOf('I will check')).toBeLessThan(html.indexOf('2 tool calls'));
+    expect(html.indexOf('2 tool calls')).toBeLessThan(html.indexOf('The checks passed.'));
+    expect(html.indexOf('The checks passed.')).toBeLessThan(html.indexOf('1 tool call'));
+    expect(html.indexOf('1 tool call')).toBeLessThan(html.indexOf('The implementation is ready.'));
+    expect(html).toContain('data-message-id="assistant-2"');
+  });
+
+  it.each([false, true])('shows running group status only while streaming=%s', isStreaming => {
+    const html = renderConversation(
+      [
+        assistantMessage(
+          'assistant-1',
+          [
+            toolPart('completed'),
+            toolPart('running', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm lint' },
+              time: { start: 3 },
+            }),
+          ],
+          { time: { created: 1 } }
+        ),
+      ],
+      { collapseTools: true, isStreaming }
+    );
+
+    expect(buttons(html)).toEqual([
+      expect.stringContaining(
+        isStreaming ? 'Working · 2 tool calls' : 'Worked for 1s · 2 tool calls'
+      ),
+    ]);
+    if (isStreaming) expect(html).toContain('animate-spin');
+    else expect(html).not.toContain('animate-spin');
+    if (isStreaming) expect(buttons(html)[0]).toContain('bash: pnpm lint');
+    else expect(html).not.toContain('pnpm lint');
+    expect(html).not.toContain('Output for');
+  });
+
+  it.each([
+    {
+      tool: 'read',
+      input: { filePath: '/workspace/app/src/index.ts' },
+      activity: 'read: src/index.ts',
+    },
+    { tool: 'grep', input: { pattern: 'render.*Tool' }, activity: 'grep: render.*Tool' },
+    { tool: 'glob', input: { pattern: '**/*.tsx' }, activity: 'glob: **/*.tsx' },
+    { tool: 'websearch', input: { query: 'tool grouping' }, activity: 'websearch: tool grouping' },
+    {
+      tool: 'bash',
+      input: { command: 'pnpm test\n  --runInBand' },
+      activity: 'bash: pnpm test --runInBand',
+    },
+    {
+      tool: 'mcp',
+      input: { server_name: 'github', tool_name: 'search', arguments: { query: 'tool grouping' } },
+      activity: 'github/search: tool grouping',
+    },
+    { tool: 'custom_tool', input: {}, activity: 'custom_tool' },
+    {
+      tool: 'custom_tool',
+      input: { command: {}, pattern: '  ', description: 'Preparing tools' },
+      activity: 'custom_tool: Preparing tools',
+    },
+  ])('previews pending $tool activity without expanding the group', ({ tool, input, activity }) => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('pending', tool, { status: 'pending', input, raw: '' }),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)).toEqual([expect.stringContaining(activity)]);
+    expect(buttons(html)[0]).toContain('aria-expanded="false"');
+    expect(html).toContain(`title="${activity}"`);
+    expect(html).toContain('truncate');
+    expect(html).toContain('Working · 1 tool call');
+  });
+
+  it('shows only the latest active tool even when a later parallel tool has completed', () => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('earlier', 'read', {
+            status: 'running',
+            input: { filePath: '/workspace/app/src/earlier.ts' },
+            time: { start: 1 },
+          }),
+          toolPart('running', 'read', {
+            status: 'running',
+            input: { filePath: '/workspace/app/src/current.ts' },
+            time: { start: 3 },
+          }),
+          toolPart('completed'),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain('read: src/current.ts');
+    expect(html).not.toContain('src/earlier.ts');
+    expect(html).not.toContain('pnpm test');
+  });
+
+  it('bounds activity previews for long commands, including their accessible text', () => {
+    const command = 'x'.repeat(500);
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('pending', 'bash', { status: 'pending', input: { command }, raw: '' }),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain(`bash: ${'x'.repeat(197)}...`);
+    expect(html).not.toContain('x'.repeat(198));
+  });
+
+  it('shows thinking without exposing reasoning text in a collapsed group', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [reasoningPart('active', { time: { start: 1 } })])],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain('Thinking');
+    expect(html).not.toContain('Reasoning details');
+  });
+
+  it('keeps assistant errors and snapshot progress visible while collapsing failed tools', () => {
+    const html = renderConversation(
+      [
+        assistantMessage(
+          'assistant-1',
+          [
+            { ...textPart('snapshot', 'Initializing snapshot'), synthetic: true },
+            toolPart('completed'),
+            toolPart('failed', 'bash', {
+              status: 'error',
+              input: { command: 'pnpm test' },
+              error: 'Verification failed',
+              time: { start: 3, end: 4 },
+            }),
+          ],
+          { error: { name: 'UnknownError', data: { message: 'Model unavailable' } } }
+        ),
+      ],
+      { collapseTools: true }
+    );
+
+    expect(html).toContain('Initializing snapshot');
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toContain('Verification failed');
+    expect(html).toContain('Model unavailable');
+    expect(buttons(html)).toEqual([expect.stringContaining('2 tool calls · 1 failed')]);
+  });
+
+  it('dispatches the new tool cards as independent rows without a group disclosure', () => {
+    const parts = [
+      { tool: 'background_process', input: { action: 'start', command: 'pnpm dev' } },
+      {
+        tool: 'apply_patch',
+        input: { patchText: '*** Begin Patch\n*** Add File: result.txt\n+Updated\n*** End Patch' },
+      },
+      { tool: 'webfetch', input: { url: 'https://example.com/docs' } },
+      { tool: 'codesearch', input: { query: 'findParser' } },
+    ].map(({ tool, input }) =>
+      toolPart(tool, tool, {
+        status: 'completed',
+        input,
+        output: `Output for ${tool}`,
+        title: tool,
+        metadata: {},
+        time: { start: 1, end: 2 },
+      })
+    );
+    const html = renderConversation([
+      assistantMessage('assistant-1', [...parts, textPart('answer', 'The tools finished.')]),
+    ]);
+    const renderedButtons = buttons(html);
+
+    expect(renderedButtons).toEqual([
+      expect.stringContaining('Start background process'),
+      expect.stringContaining('Apply patch'),
+      expect.stringContaining('CodeSearch'),
+    ]);
+    expect(renderedButtons[0]).toContain('pnpm dev');
+    expect(renderedButtons[2]).toContain('findParser');
+    for (const button of renderedButtons) {
+      expect(button).toContain('aria-expanded="false"');
+      expect(button).not.toContain('aria-controls=');
+      expect(button).not.toContain('disabled=');
+    }
+    // Every disclosure on this page is collapsed, so no element advertises a
+    // controlled region here.
+    expect(html.match(/aria-controls="[^"]+"/g) ?? []).toHaveLength(0);
+    expect(html.match(/data-tool-card=/g)).toHaveLength(4);
+    expect(html).toContain('WebFetch');
+    expect(html).toContain('href="https://example.com/docs"');
+    expect(html).not.toContain('Output for');
+    expect(html.indexOf('Apply patch')).toBeLessThan(html.indexOf('WebFetch'));
+    expect(html.indexOf('WebFetch')).toBeLessThan(html.indexOf('CodeSearch'));
+    expect(html.indexOf('CodeSearch')).toBeLessThan(html.indexOf('The tools finished.'));
+  });
+
+  it('keeps every row visible across static and dynamic messages in the same assistant turn', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [reasoningPart('reasoning-1'), toolPart('bash-1')])],
+      {
+        dynamicMessages: [
+          assistantMessage('assistant-2', [reasoningPart('reasoning-2'), toolPart('bash-2')]),
+          assistantMessage('assistant-3', [textPart('answer', 'Both checks passed.')]),
+        ],
+      }
+    );
+    const renderedButtons = buttons(html);
+
+    expect(renderedButtons).toEqual([
+      expect.stringContaining('Thought'),
+      expect.stringContaining('pnpm test -- bash-1'),
+      expect.stringContaining('Thought'),
+      expect.stringContaining('pnpm test -- bash-2'),
+    ]);
+    for (const button of renderedButtons) {
+      expect(button).toContain('aria-expanded="false"');
+    }
+    expect(html).toContain('Both checks passed.');
+    expect(html).not.toContain('Reasoning details');
+    expect(html).not.toContain('Output for');
+    expect(html.match(/data-message-role="assistant"/g)).toHaveLength(1);
+    expect(html.match(/<time\b/g)).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      name: 'failure',
+      error: { name: 'UnknownError', data: { message: 'Request was rate limited' } },
+      status: 'Failed',
+      detail: 'Request was rate limited',
+      absent: 'Interrupted',
+    },
+    {
+      name: 'interruption',
+      error: { name: 'MessageAbortedError', data: { message: 'aborted' } },
+      status: 'Interrupted',
+      detail: 'Partial answer',
+      absent: 'Failed',
+    },
+  ] satisfies {
+    name: string;
+    error: NonNullable<AssistantMessage['error']>;
+    status: string;
+    detail: string;
+    absent: string;
+  }[])('keeps assistant $name visible while a neighboring message streams', testCase => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [toolPart('bash-1')]),
+        assistantMessage(
+          'assistant-2',
+          [
+            reasoningPart('unfinished', { time: { start: 1 } }),
+            textPart('partial-answer', 'Partial answer'),
+          ],
+          { time: { created: 3 }, error: testCase.error }
+        ),
+      ],
+      {
+        isStreaming: true,
+        dynamicMessages: [
+          assistantMessage(
+            'assistant-3',
+            [
+              toolPart('active', 'bash', {
+                status: 'running',
+                input: { command: 'pnpm test' },
+                time: { start: 4 },
+              }),
+            ],
+            { time: { created: 4 } }
+          ),
+        ],
+      }
+    );
+
+    expect(html).toContain(testCase.status);
+    expect(html).toContain(testCase.detail);
+    expect(html).toContain('Partial answer');
+    expect(html).not.toContain(testCase.absent);
+    expect(html.match(/data-message-role="assistant"/g)).toHaveLength(3);
+    expect(buttons(html)).toEqual([
+      expect.stringContaining('Shell'),
+      expect.stringContaining('Thought'),
+      expect.stringContaining('Shell'),
+    ]);
+  });
+
+  it('keeps pending tools, running tools, and streaming reasoning individually collapsed', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [reasoningPart('reasoning-1'), toolPart('bash-1')])],
+      {
+        isStreaming: true,
+        dynamicMessages: [
+          assistantMessage(
+            'assistant-2',
+            [
+              toolPart('pending', 'bash', {
+                status: 'pending',
+                input: { command: 'pnpm lint' },
+                raw: '',
+              }),
+              toolPart('active', 'bash', {
+                status: 'running',
+                input: { command: 'pnpm typecheck' },
+                time: { start: 3 },
+              }),
+              reasoningPart('active-reasoning', { time: { start: 3 } }),
+            ],
+            { time: { created: 3 } }
+          ),
+        ],
+      }
+    );
+    const renderedButtons = buttons(html);
+
+    expect(renderedButtons).toEqual([
+      expect.stringContaining('Thought'),
+      expect.stringContaining('pnpm test -- bash-1'),
+      expect.stringContaining('pnpm lint'),
+      expect.stringContaining('pnpm typecheck'),
+      expect.stringContaining('Thinking'),
+    ]);
+    for (const button of renderedButtons) {
+      expect(button).toContain('aria-expanded="false"');
+    }
+    expect(html).not.toContain('Reasoning details');
+    expect(html).not.toContain('Output for');
+    expect(html).not.toContain('Waiting to execute');
+    expect(html).not.toContain('Running command');
+  });
+
+  it('hides completed-answer metadata while the last message is streaming', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [reasoningPart('completed-reasoning')])],
+      {
+        isStreaming: true,
+        dynamicMessages: [
+          assistantMessage(
+            'assistant-2',
+            [{ ...textPart('answer', 'Here is the result so far'), time: { start: 3 } }],
+            { time: { created: 3 } }
+          ),
+        ],
+      }
+    );
+
+    expect(buttons(html)).toHaveLength(1);
+    expect(buttons(html)[0]).toContain('Thought: 1ms');
+    expect(buttons(html)[0]).toContain('aria-expanded="false"');
+    expect(html).toContain('Here is the result so far');
+    // The metadata row keeps its height hidden while streaming so it cannot push
+    // the transcript when the answer completes.
+    expect(html).toMatch(/<div class="[^"]*\binvisible\b[^"]*">(?:(?!<\/div>).)*Message timestamp/);
+    expect(html).not.toContain('Reasoning details');
+  });
+
+  it('keeps a completed answer idle when an older tool is stale and a later turn starts', () => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('stale-read', 'read', {
+            status: 'running',
+            input: { filePath: 'README' },
+            time: { start: 1 },
+          }),
+        ]),
+        assistantMessage('assistant-2', [textPart('answer', 'The previous turn is complete.')]),
+      ],
+      {
+        isStreaming: true,
+        dynamicMessages: [
+          {
+            info: {
+              id: 'user-2',
+              role: 'user',
+              sessionID: 'ses-1',
+              time: { created: 4 },
+              agent: 'code',
+              model: { providerID: 'test', modelID: 'test' },
+            },
+            parts: [],
+          },
+          assistantMessage(
+            'assistant-3',
+            [reasoningPart('active-reasoning', { time: { start: 5 } })],
+            { parentID: 'user-2', time: { created: 5 } }
+          ),
+        ],
+      }
+    );
+
+    expect(html).toContain('The previous turn is complete.');
+    expect(buttons(html)).toEqual([
+      expect.stringContaining('Read'),
+      expect.stringContaining('Thinking'),
+    ]);
+    expect(html.match(/data-message-role="assistant"/g)).toHaveLength(2);
+    // The completed answer's timestamp and the later prompt's timestamp.
+    expect(html.match(/<time\b/g)).toHaveLength(2);
+    expect(html.indexOf('Message timestamp')).toBeGreaterThan(
+      html.indexOf('The previous turn is complete.')
+    );
+    expect(html.indexOf('Message timestamp')).toBeLessThan(html.indexOf('Thinking'));
+  });
+
+  it.each([false, true])(
+    'shows a failed tool alert with the full normalized error despite missing input (streaming=%s)',
+    isStreaming => {
+      const details = Array.from(
+        { length: 40 },
+        (_, index) => `Failure detail ${index + 1}: the verification command could not finish.`
+      ).join('\n');
+      const html = renderConversation(
+        [
+          assistantMessage('assistant-1', [
+            reasoningPart('reasoning-1'),
+            toolPart('bash-1'),
+            toolPart('failed', 'bash', {
+              status: 'error',
+              input: {},
+              error: `\u001b[31mRetrying\rThe verification command failed\u001b[0m\r\n${details}`,
+              time: { start: 3, end: 4 },
+            }),
+            textPart('answer', 'The check needs attention.'),
+          ]),
+        ],
+        {
+          isStreaming,
+          dynamicMessages: [
+            assistantMessage(
+              'assistant-2',
+              [{ ...textPart('next-answer', 'Checking the next step.'), time: { start: 5 } }],
+              { time: { created: 5 } }
+            ),
+          ],
+        }
+      );
+      const renderedButtons = buttons(html);
+
+      expect(renderedButtons).toEqual([
+        expect.stringContaining('Thought'),
+        expect.stringContaining('Shell'),
+      ]);
+      for (const button of renderedButtons) {
+        expect(button).toContain('aria-expanded="false"');
+      }
+      expect(html.match(/role="alert"/g)).toHaveLength(1);
+      expect(html.replace(/<[^>]*>/g, '')).toContain('Failed: bash');
+      expect(html).toContain(`The verification command failed\n${details}`);
+      expect(html).not.toContain('Retrying');
+      expect(html).not.toContain('\u001b');
+      expect(html).not.toContain('\r');
+      expect(html).not.toContain('Output for');
+      expect(html).not.toContain('Reasoning details');
+      expect(html).toContain('The check needs attention.');
+      expect(html).toContain('Checking the next step.');
+      expect(html.indexOf('The verification command failed')).toBeLessThan(
+        html.indexOf('The check needs attention.')
+      );
+    }
+  );
+
+  it.each([false, true])('keeps live actions visible with collapse tools=%s', collapseTools => {
+    const atoms: Pick<
+      SessionManager['atoms'],
+      'activeQuestion' | 'isStreaming' | 'activeSuggestion'
+    > = {
+      activeQuestion: atom<StandaloneQuestion | null, [StandaloneQuestion | null], void>(
+        null,
+        (_get, set, value) => {
+          set(atoms.activeQuestion, value);
+        }
+      ),
+      isStreaming: atom<boolean, [boolean], void>(true, (_get, set, value) => {
+        set(atoms.isStreaming, value);
+      }),
+      activeSuggestion: atom<StandaloneSuggestion | null, [StandaloneSuggestion | null], void>(
+        {
+          requestId: 'suggestion-1',
+          callId: 'suggest-1',
+          text: 'Run the focused checks next?',
+          actions: [{ label: 'Run checks', prompt: 'Run the focused verification' }],
+        },
+        (_get, set, value) => {
+          set(atoms.activeSuggestion, value);
+        }
+      ),
+    };
+    jest.mocked(useOptionalManager).mockReturnValue({ atoms } as SessionManager);
+    const childSessionId = `ses_${'a'.repeat(26)}`;
+    const childMessages = [
+      assistantMessage(
+        'child-1',
+        [
+          reasoningPart('child-reasoning'),
+          toolPart('child-completed'),
+          textPart('child-answer', 'Child transcript stays in the drawer.'),
+          toolPart('child-running', 'read', {
+            status: 'running',
+            input: { filePath: `/cloud-agent/sessions/${childSessionId}/src/parser.ts` },
+            time: { start: 4 },
+          }),
+        ],
+        { sessionID: childSessionId, time: { created: 3 } }
+      ),
+    ];
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          reasoningPart('reasoning-1'),
+          toolPart('bash-1'),
+          toolPart('question-1', 'question', { status: 'pending', input: {}, raw: '' }),
+          toolPart('suggest-1', 'suggest', { status: 'pending', input: {}, raw: '' }),
+          toolPart('task-1', 'task', {
+            status: 'running',
+            input: { description: 'Inspect the parser', subagent_type: 'explore' },
+            metadata: { sessionId: childSessionId },
+            time: { start: 3 },
+          }),
+          {
+            id: 'report',
+            sessionID: 'ses-1',
+            messageID: 'assistant-1',
+            type: 'file',
+            mime: 'text/plain',
+            filename: 'report.txt',
+            url: 'https://example.com/report.txt',
+          },
+          {
+            id: 'subtask',
+            sessionID: 'ses-1',
+            messageID: 'assistant-1',
+            type: 'subtask',
+            agent: 'explore',
+            description: 'Review the results',
+            prompt: 'Review the parser checks',
+          },
+        ]),
+      ],
+      {
+        collapseTools,
+        isStreaming: true,
+        onOpenChildSession: jest.fn(),
+        getChildMessages: sessionId => (sessionId === childSessionId ? childMessages : []),
+      }
+    );
+    const renderedButtons = buttons(html);
+    const disclosures = renderedButtons.filter(button => button.includes('aria-expanded='));
+
+    expect(html).toContain('Waiting for answer');
+    expect(html).toContain('Run the focused checks next?');
+    for (const label of ['Run checks', 'Dismiss', 'Inspect the parser']) {
+      const control = renderedButtons.find(button => button.includes(label));
+      expect(control).toBeDefined();
+      expect(control).not.toContain('disabled=');
+    }
+    const childControl = renderedButtons.find(button => button.includes('Inspect the parser'));
+    expect(childControl).toContain('>Explore<');
+    expect(childControl).not.toContain('explore Agent');
+    expect(childControl).toMatch(/<title>Working<\/title>[\s\S]*Inspect the parser/);
+    expect(childControl).toContain('>Read src/parser.ts<');
+    expect(childControl).not.toContain('Latest:');
+    expect(childControl).toContain('2 tool calls');
+    expect(childControl).toContain('aria-busy="true"');
+    expect(childControl).not.toContain('aria-expanded=');
+    expect(html).not.toContain('Child transcript stays in the drawer.');
+    expect(html).not.toContain('Reasoning details for child-reasoning');
+    expect(html).toContain('href="https://example.com/report.txt"');
+    expect(html).toContain('report.txt');
+    if (!collapseTools) expect(html).toContain('Review the results');
+    expect(disclosures).toEqual(
+      collapseTools
+        ? [expect.stringContaining('1 tool call · reasoning'), expect.stringContaining('1 subtask')]
+        : [expect.stringContaining('Thought'), expect.stringContaining('Shell')]
+    );
+    for (const disclosure of disclosures) {
+      expect(disclosure).toContain('aria-expanded="false"');
+    }
+    expect(html).not.toContain('Reasoning details');
+    expect(html).not.toContain('Output for');
+  });
+
+  it.each(['pending', 'running', 'completed', 'error'] as const)(
+    'keeps latest child activity visible after its state becomes %s',
+    status => {
+      const sessionId = `ses_${'c'.repeat(26)}`;
+      const input = { filePath: `/cloud-agent/sessions/${sessionId}/package.json` };
+      const state: ToolPart['state'] =
+        status === 'pending'
+          ? { status, input, raw: '' }
+          : status === 'running'
+            ? { status, input, time: { start: 2 } }
+            : status === 'error'
+              ? { status, input, error: 'Read failed', time: { start: 2, end: 3 } }
+              : {
+                  status,
+                  input,
+                  output: '{}',
+                  title: 'Read package',
+                  metadata: {},
+                  time: { start: 2, end: 3 },
+                };
+      const childMessages = [
+        assistantMessage('child-1', [
+          toolPart('older-running', 'bash', {
+            status: 'running',
+            input: { command: 'pnpm test' },
+            time: { start: 1 },
+          }),
+          toolPart('latest-read', 'read', state),
+          reasoningPart('between-tools'),
+        ]),
+      ];
+      const parent = assistantMessage('parent', [
+        toolPart('task', 'task', {
+          status: 'running',
+          input: { description: 'Explore repository', subagent_type: 'explore' },
+          metadata: { sessionId },
+          time: { start: 1 },
+        }),
+      ]);
+      const render = () =>
+        renderConversation([parent], {
+          isStreaming: true,
+          onOpenChildSession: jest.fn(),
+          getChildMessages: () => childMessages,
+        });
+      const html = render();
+
+      expect(html).toContain(`>Read package.json${status === 'error' ? ' (failed)' : ''}<`);
+      expect(html).not.toContain('Shell pnpm');
+      expect(html).not.toContain('Working...');
+      expect(html).toContain('2 tool calls');
+      expect(html).toContain('aria-busy="true"');
+      expect(html.indexOf('Explore repository')).toBeLessThan(html.indexOf('>Explore<'));
+
+      childMessages.push(
+        assistantMessage('child-2', [
+          toolPart('next-read', 'read', {
+            status: 'running',
+            input: { filePath: `/cloud-agent/sessions/${sessionId}/README.md` },
+            time: { start: 4 },
+          }),
+        ])
+      );
+      const next = render();
+      expect(next).toContain('>Read README.md<');
+      expect(next).not.toContain('Read package.json');
+      expect(next).toContain('3 tool calls');
+      expect(next).toContain('aria-busy="true"');
+    }
+  );
+
+  it.each(['pending', 'running'] as const)(
+    'keeps the header status before %s child activity arrives',
+    status => {
+      const state: ToolPart['state'] =
+        status === 'pending'
+          ? { status, input: { description: 'Explore repository' }, raw: '' }
+          : { status, input: { description: 'Explore repository' }, time: { start: 1 } };
+      const html = renderConversation([
+        assistantMessage('parent', [toolPart('task', 'task', state)]),
+      ]);
+
+      expect(html).toContain(`<span>${status === 'pending' ? 'Delegating' : 'Working'}</span>`);
+      expect(html).not.toContain('ml-6');
+      expect(html).toContain(`<title>${status === 'pending' ? 'Delegating' : 'Working'}</title>`);
+      expect(html).toContain('aria-busy="true"');
+      expect(html).not.toContain('0 tool calls');
+      expect(html).not.toContain('Completed');
+    }
+  );
+
+  it('retains an enabled inline child-session control when no drawer callback is provided', () => {
+    const sessionId = `ses_${'b'.repeat(26)}`;
+    const childMessages = [
+      assistantMessage(
+        'child-1',
+        [toolPart('child-tool'), textPart('child-answer', 'The child session result.')],
+        { sessionID: sessionId }
+      ),
+    ];
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('task-1', 'task', {
+            status: 'completed',
+            input: { description: 'Inspect the parser', subagent_type: 'explore' },
+            output: '',
+            title: 'Parser inspection',
+            metadata: { sessionId },
+            time: { start: 1, end: 2 },
+          }),
+        ]),
+      ],
+      { getChildMessages: childSessionId => (childSessionId === sessionId ? childMessages : []) }
+    );
+
+    expect(buttons(html)).toEqual([expect.stringContaining('Inspect the parser')]);
+    expect(buttons(html)[0]).toContain('>Explore<');
+    expect(buttons(html)[0]).toContain('Completed');
+    expect(buttons(html)[0]).not.toContain('<title>Working</title>');
+    expect(buttons(html)[0]).not.toContain('>Shell pnpm<');
+    expect(buttons(html)[0]).toContain('1 tool call');
+    expect(buttons(html)[0]).not.toContain('1 tool calls');
+    expect(buttons(html)[0]).not.toContain('aria-busy="true"');
+    expect(buttons(html)[0]).not.toContain('disabled=');
+    expect(html).not.toContain('The child session result.');
+  });
+
+  it.each([false, true])(
+    'renders no disclosure or spacing for a hidden-only reasoning transcript (streaming=%s)',
+    isStreaming => {
+      const hidden = [
+        reasoningPart('empty', { text: '', time: { start: 1 } }),
+        reasoningPart('blank', { text: ' \n\t ' }),
+        reasoningPart('redacted', { text: '[REDACTED]' }),
+        reasoningPart('repeated-redactions', { text: ' [REDACTED]\n[REDACTED][REDACTED]\t ' }),
+        reasoningPart('comment-placeholder', { text: '<!-- reasoning unavailable -->' }),
+        reasoningPart('comment-and-redaction', { text: '[REDACTED]<!-- placeholder -->' }),
+        reasoningPart('unfinished-comment', { text: '<!--', time: { start: 1 } }),
+        reasoningPart('openai-encrypted', {
+          text: '',
+          metadata: { openai: { reasoningEncryptedContent: 'encrypted-reasoning' } },
+        }),
+        reasoningPart('copilot-encrypted', {
+          text: '',
+          metadata: { copilot: { reasoningEncryptedContent: 'encrypted-reasoning' } },
+        }),
+        reasoningPart('openrouter-encrypted', {
+          text: ' \n\t ',
+          metadata: {
+            openrouter: {
+              reasoning_details: [{ type: 'reasoning.encrypted', data: 'encrypted-reasoning' }],
+            },
+          },
+        }),
+        reasoningPart('anthropic-redacted', {
+          text: '',
+          metadata: { anthropic: { redactedData: 'redacted-reasoning' } },
+        }),
+      ];
+      const html = renderConversation([assistantMessage('assistant-1', hidden.slice(0, 4))], {
+        isStreaming,
+        dynamicMessages: [
+          assistantMessage('assistant-2', hidden.slice(4), { time: { created: 3 } }),
+        ],
+      });
+
+      expect(html).toBe('<div data-aui-thread-root=""></div>');
+      for (const part of hidden) {
+        expect(renderToStaticMarkup(React.createElement(PartRenderer, { part, isStreaming }))).toBe(
+          '<div data-aui-thread-root=""></div>'
+        );
+      }
+    }
+  );
+
+  it.each([
+    {
+      name: 'OpenAI encrypted content',
+      metadata: { openai: { reasoningEncryptedContent: 'encrypted-reasoning' } },
+    },
+    {
+      name: 'Copilot encrypted content',
+      metadata: { copilot: { reasoningEncryptedContent: 'encrypted-reasoning' } },
+    },
+    {
+      name: 'OpenRouter encrypted-only details',
+      metadata: {
+        openrouter: {
+          reasoning_details: [{ type: 'reasoning.encrypted', data: 'encrypted-reasoning' }],
+        },
+      },
+    },
+    {
+      name: 'Anthropic signature',
+      metadata: { anthropic: { signature: 'reasoning-signature' } },
+    },
+  ])('previews and expands readable reasoning without changing $name metadata', ({ metadata }) => {
+    const text =
+      '## Check [REDACTED] the parser\n\nI checked [REDACTED] before choosing the next step.';
+    const part = reasoningPart('readable', { text, metadata });
+    const original = structuredClone(part);
+    const message = assistantMessage('assistant-1', [part]);
+    const html = renderConversation([message]);
+
+    expect(buttons(html)).toHaveLength(1);
+    expect(buttons(html)[0]).toContain('Thought: Check the parser · 1ms');
+    expect(buttons(html)[0]).toContain('aria-expanded="false"');
+    expect(html).not.toContain('I checked');
+    expect(html).not.toContain('[REDACTED]');
+
+    mockExpanded = true;
+    const expanded = renderConversation([message]);
+
+    const trigger = buttons(expanded).find(button => button.includes('aria-expanded="true"'));
+    expect(trigger).toBeDefined();
+    // An open trigger must advertise a controlled element rendered in the same markup.
+    const contentId = trigger?.match(/aria-controls="([^"]+)"/)?.[1];
+    expect(typeof contentId === 'string' && contentId.length > 0).toBe(true);
+    if (!contentId) throw new Error('Open reasoning trigger must advertise aria-controls');
+    expect(expanded).toContain(`id="${contentId}"`);
+    expect(expanded).toContain('I checked  before choosing the next step.');
+    expect(expanded).not.toContain('[REDACTED]');
+    expect(expanded).not.toContain('encrypted-reasoning');
+    expect(expanded).not.toContain('reasoning-signature');
+    expect(part).toEqual(original);
+    expect(message.parts[0]).toEqual(original);
+    expect(part.metadata).toBe(metadata);
+  });
+
+  it.each([undefined, 1300])(
+    'uses the reasoning end time while the assistant is still streaming (end=%s)',
+    end => {
+      const html = renderConversation([], {
+        isStreaming: true,
+        dynamicMessages: [
+          assistantMessage(
+            'assistant-1',
+            [
+              reasoningPart('reasoning-1', {
+                text: '**Inspect the parser**\n\nRead the implementation.',
+                time: { start: 100, end },
+              }),
+            ],
+            { time: { created: 100 } }
+          ),
+        ],
+      });
+      const header = buttons(html)[0];
+
+      expect(header).toContain(
+        end === undefined ? 'Thinking: Inspect the parser' : 'Thought: Inspect the parser · 1.2s'
+      );
+      expect(header.includes('animate-spin')).toBe(end === undefined);
+      expect(header).toContain('aria-expanded="false"');
+      expect(html).not.toContain('Read the implementation.');
+    }
+  );
+
+  it('does not invent elapsed time for stopped reasoning without an end timestamp', () => {
+    const html = renderConversation([
+      assistantMessage('assistant-1', [reasoningPart('stopped', { time: { start: 100 } })]),
+    ]);
+
+    expect(buttons(html)[0]).toContain('>Thought</span>');
+    expect(html).not.toContain('animate-spin');
+  });
+
+  it.each([false, true])(
+    'renders heading-only reasoning as a non-disclosure row (streaming=%s)',
+    isStreaming => {
+      const html = renderConversation(
+        [
+          assistantMessage(
+            'assistant-1',
+            [
+              reasoningPart('heading-only', {
+                text: '## Inspect the parser\n\n[REDACTED]<!-- placeholder -->',
+                time: { start: 1, end: isStreaming ? undefined : 2 },
+              }),
+            ],
+            { time: { created: 1, completed: isStreaming ? undefined : 2 } }
+          ),
+        ],
+        { isStreaming }
+      );
+
+      expect(html).toContain(
+        isStreaming ? 'Thinking: Inspect the parser' : 'Thought: Inspect the parser · 1ms'
+      );
+      expect(html.match(/data-message-role="assistant"/g)).toHaveLength(1);
+      expect(buttons(html)).toHaveLength(0);
+      expect(html).not.toContain('aria-expanded=');
+      expect(html).not.toContain('[REDACTED]');
+      expect(html).not.toContain('placeholder');
+      expect(html).not.toContain('Message timestamp');
+    }
+  );
+
+  it('keeps preparation details between their triggering message and the next answer', () => {
+    const first = assistantMessage('assistant-1', [textPart('first-answer', 'First answer')]);
+    const second = assistantMessage('assistant-2', [textPart('second-answer', 'Second answer')]);
+    const attempt: PreparationAttempt = {
+      id: 'preparation-1',
+      triggerMessageId: first.info.id,
+      status: 'failed',
+      safeError: 'Workspace setup failed',
+      startedAt: 1,
+      revision: 1,
+      steps: [],
+    };
+    const html = renderConversation([first, second], {
+      preparationByMessageId: new Map([[first.info.id, [attempt]]]),
+    });
+
+    expect(html).toContain('First answer');
+    expect(html).toContain('Second answer');
+    expect(html).toContain('Workspace setup failed');
+    expect(html.indexOf('Preparation failed')).toBeGreaterThan(html.indexOf('First answer'));
+    expect(html.indexOf('Preparation failed')).toBeLessThan(html.indexOf('Second answer'));
+    expect(buttons(html).find(button => button.includes('View details'))).toBeDefined();
+  });
+});
+
+describe('PartRenderer tool lifecycle', () => {
+  const pendingState: ToolPart['state'] = { status: 'pending', input: {}, raw: '' };
+  const runningState: ToolPart['state'] = {
+    status: 'running',
+    input: {},
+    time: { start: 1 },
+  };
+  const completedState: ToolPart['state'] = {
+    status: 'completed',
+    input: {},
+    output: 'Stored tool result',
+    title: '',
+    metadata: {},
+    time: { start: 1, end: 2 },
+  };
+  const errorState: ToolPart['state'] = {
+    status: 'error',
+    input: {},
+    error: 'The tool could not finish.',
+    time: { start: 1, end: 2 },
+  };
+
+  it.each([
+    { tool: 'read', title: 'Read' },
+    { tool: 'edit', title: 'Edit' },
+    { tool: 'write', title: 'Write' },
+    { tool: 'bash', title: 'Shell' },
+    { tool: 'glob', title: 'Glob' },
+    { tool: 'grep', title: 'Grep' },
+    { tool: 'list', title: 'List' },
+    { tool: 'websearch', title: 'WebSearch' },
+    { tool: 'codesearch', title: 'CodeSearch' },
+    { tool: 'webfetch', title: 'WebFetch' },
+    { tool: 'background_process', title: 'Check background process' },
+    { tool: 'schedule_wakeup', title: 'Schedule wakeup' },
+    { tool: 'apply_patch', title: 'Apply patch' },
+    { tool: 'mcp', title: 'mcp' },
+    { tool: 'custom-tool', title: 'custom-tool' },
+  ])('waits for missing $tool input only while pending or running', ({ tool, title }) => {
+    for (const state of [pendingState, runningState]) {
+      const html = renderToStaticMarkup(
+        React.createElement(PartRenderer, { part: toolPart(tool, tool, state) })
+      );
+
+      expect(html).toContain(tool);
+      expect(html).toContain('...');
+      expect(buttons(html)).toHaveLength(0);
+      expect(html).not.toContain('data-tool-card');
+    }
+
+    const html = renderToStaticMarkup(
+      React.createElement(PartRenderer, { part: toolPart(tool, tool, completedState) })
+    );
+
+    expect(html).toContain(title);
+    expect(html).toContain('data-tool-card');
+    expect(html).not.toContain('animate-spin');
+    expect(html).not.toContain('Failed to render');
+    for (const button of buttons(html)) {
+      expect(button).toContain('aria-expanded="false"');
+    }
+  });
+
+  it.each([
+    'read',
+    'edit',
+    'write',
+    'bash',
+    'background_process',
+    'schedule_wakeup',
+    'cron_list',
+    'apply_patch',
+    'webfetch',
+    'codesearch',
+    'task',
+    'skill',
+    'mcp',
+    'custom-tool',
+  ])('surfaces %s errors even when the input object is missing', tool => {
+    const part = toolPart(tool, tool, { ...errorState });
+    Object.defineProperty(part.state, 'input', { value: undefined, enumerable: true });
+    const html = renderToStaticMarkup(
+      React.createElement(PartRenderer, { part, isStreaming: true })
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html.replace(/<[^>]*>/g, '')).toContain(`Failed: ${tool}`);
+    expect(html).toContain(errorState.error);
+    expect(buttons(html)).toHaveLength(0);
+    expect(html).not.toContain('animate-spin');
+  });
+
+  it('renders a completed native scheduler tool with no input', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PartRenderer, {
+        part: toolPart('schedule_wakeup', 'Schedule wakeup', completedState),
+      })
+    );
+
+    expect(html).toContain('Schedule wakeup');
+    expect(html).toContain('data-tool-card');
+    expect(html).not.toContain('Failed to render');
+  });
+
+  it.each([
+    { tool: 'question', title: 'Questions dismissed' },
+    { tool: 'suggest', title: 'Suggestion dismissed' },
+    { tool: 'chart', title: 'chart' },
+    { tool: 'permission', title: 'permission' },
+  ])(
+    'preserves the existing $tool error UI instead of an ordinary tool alert',
+    ({ tool, title }) => {
+      const part = toolPart(tool, tool, errorState);
+      const html = renderToStaticMarkup(React.createElement(PartRenderer, { part }));
+
+      expect(buttons(html)).toHaveLength(1);
+      expect(buttons(html)[0]).toContain(title);
+      expect(buttons(html)[0]).toContain('aria-expanded="false"');
+      expect(html).not.toContain('role="alert"');
+      expect(html).not.toContain('Failed:');
+      expect(html).not.toContain(errorState.error);
+
+      mockExpanded = true;
+      const expanded = renderToStaticMarkup(React.createElement(PartRenderer, { part }));
+
+      expect(expanded).toContain(title);
+      if (tool === 'chart' || tool === 'permission') {
+        expect(expanded).toContain(errorState.error);
+      }
+    }
+  );
+
+  it('omits hidden tool rows and empty assistant messages while retaining completed todos', () => {
+    const hidden = [
+      toolPart('read-todos', 'todoread', completedState),
+      toolPart('enter-plan', 'plan_enter', completedState),
+      toolPart('exit-plan', 'plan_exit', completedState),
+      toolPart('pending-todos', 'todowrite', pendingState),
+      toolPart('running-todos', 'todowrite', runningState),
+      toolPart('failed-todos', 'todowrite', errorState),
+    ];
+
+    expect(renderConversation([assistantMessage('assistant-1', hidden)])).toBe(
+      '<div data-aui-thread-root=""></div>'
+    );
+    for (const part of hidden) {
+      expect(renderToStaticMarkup(React.createElement(PartRenderer, { part }))).toBe(
+        '<div data-aui-thread-root=""></div>'
+      );
+    }
+
+    const html = renderConversation([
+      assistantMessage('assistant-1', [
+        ...hidden,
+        toolPart('completed-todos', 'todowrite', completedState),
+      ]),
+    ]);
+
+    expect(buttons(html)).toEqual([expect.stringContaining('Todos')]);
+    expect(buttons(html)[0]).toContain('aria-expanded="false"');
+    expect(html).not.toContain('role="alert"');
+  });
+});
+
+describe('ConversationMessages memoization', () => {
+  let root: Root | undefined;
+  let container: HTMLElement;
+  let cleanup: () => void;
+
+  beforeAll(() => {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+  });
+
+  afterAll(() => cleanup());
+
+  beforeEach(() => {
+    markdownRenders().length = 0;
+    jest.mocked(useOptionalManager).mockReturnValue(null);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+  });
+
+  function renderConversationMessages(
+    props: React.ComponentProps<typeof ConversationMessages>
+  ): void {
+    act(() => {
+      root?.render(createElement(ConversationMessages, props));
+    });
+  }
+
+  function baseProps(
+    overrides: Partial<React.ComponentProps<typeof ConversationMessages>> = {}
+  ): React.ComponentProps<typeof ConversationMessages> {
+    return {
+      active: true,
+      isStreaming: false,
+      staticMessages: [],
+      dynamicMessages: [],
+      pendingMessages: new Map(),
+      preparationByMessageId: new Map(),
+      onOpenPreparationDetails: jest.fn(),
+      ...overrides,
+    };
+  }
+
+  function parsesOf(text: string): number {
+    return markdownRenders().filter(rendered => rendered === text).length;
+  }
+
+  it('updates collapsed activity as tools and reasoning finish without reopening the group', () => {
+    const props = baseProps({ collapseTools: true, isStreaming: true });
+    function renderParts(parts: Part[], isStreaming = true) {
+      renderConversationMessages({
+        ...props,
+        isStreaming,
+        dynamicMessages: [assistantMessage('assistant-1', parts, { time: { created: 1 } })],
+      });
+    }
+    renderParts([
+      toolPart('read', 'read', {
+        status: 'running',
+        input: { filePath: '/workspace/app/src/index.ts' },
+        time: { start: 1 },
+      }),
+    ]);
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group?.textContent).toContain('read: src/index.ts');
+
+    const completed = toolPart('read', 'read', {
+      status: 'completed',
+      input: { filePath: '/workspace/app/src/index.ts' },
+      output: 'Hidden file contents',
+      title: 'Read file',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    });
+    renderParts([
+      completed,
+      toolPart('grep', 'grep', {
+        status: 'running',
+        input: { pattern: 'getToolActivity' },
+        time: { start: 3 },
+      }),
+    ]);
+    expect(group?.textContent).toContain('grep: getToolActivity');
+    expect(group?.textContent).not.toContain('read:');
+    expect(container.textContent).not.toContain('Hidden file contents');
+
+    renderParts([completed, reasoningPart('thinking', { time: { start: 4 } })]);
+    expect(group?.textContent).toContain('Thinking');
+    expect(group?.textContent).not.toContain('grep:');
+
+    renderParts([completed, reasoningPart('thinking')], false);
+    expect(container.contains(group)).toBe(true);
+    expect(group?.getAttribute('aria-expanded')).toBe('false');
+    expect(group?.textContent).toContain('Worked for');
+    expect(group?.textContent).not.toContain('Thinking');
+    expect(group?.querySelector('[title]')).toBeNull();
+  });
+
+  it('expands grouped parts at their projected indices and preserves expansion while streaming', () => {
+    const props = baseProps({
+      collapseTools: true,
+      isStreaming: true,
+      staticMessages: [
+        assistantMessage(
+          'assistant-1',
+          [
+            toolPart('hidden', 'todoread'),
+            textPart('empty', ''),
+            reasoningPart('reasoning-1'),
+            toolPart('bash-1', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm test -- bash-1' },
+              time: { start: 1 },
+            }),
+          ],
+          { time: { created: 1 } }
+        ),
+      ],
+    });
+    renderConversationMessages(props);
+    expect(container.textContent).toContain('Working');
+    expect(container.textContent).toContain('1 tool call');
+    expect(container.textContent).toContain('bash: pnpm test -- bash-1');
+    expect(container.querySelector('[data-tool-card]')).toBeNull();
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group).not.toBeNull();
+    act(() => group?.click());
+    expect(container.textContent).toContain('Thought');
+    expect(container.textContent).toContain('pnpm test -- bash-1');
+    expect(container.textContent).not.toContain('Output for');
+    // An open trigger must advertise a controlled element that actually exists.
+    const groupContentId = group?.getAttribute('aria-controls');
+    expect(typeof groupContentId === 'string' && groupContentId.length > 0).toBe(true);
+    if (!groupContentId) throw new Error('Open group trigger must advertise aria-controls');
+    const groupContent = document.getElementById(groupContentId);
+    expect(groupContent).not.toBeNull();
+    expect(groupContent?.getAttribute('role')).toBe('region');
+    expect(groupContent?.getAttribute('aria-label')).toContain('1 tool call');
+    expect(groupContent?.getAttribute('tabindex')).toBe('0');
+    expect(groupContent?.classList.contains('max-h-[min(24rem,50vh)]')).toBe(true);
+    expect(groupContent?.classList.contains('overflow-y-auto')).toBe(true);
+    expect(groupContent?.classList.contains('overscroll-y-contain')).toBe(true);
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage(
+          'assistant-2',
+          [
+            toolPart('bash-2', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm test -- bash-2' },
+              time: { start: 3 },
+            }),
+          ],
+          { time: { created: 3 } }
+        ),
+      ],
+    });
+    expect(container.textContent).toContain('Working');
+    expect(container.textContent).toContain('2 tool calls');
+    expect(container.textContent).toContain('pnpm test -- bash-2');
+    expect(group?.textContent).toContain('bash: pnpm test -- bash-2');
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+    expect(groupContent?.getAttribute('aria-label')).toContain('2 tool calls');
+    expect(groupContent?.querySelectorAll('[data-tool-card]')).toHaveLength(3);
+
+    renderConversationMessages({ ...props, isStreaming: false });
+    expect(group?.textContent).not.toContain('bash:');
+    expect(group?.textContent).not.toContain('Working');
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+
+    renderConversationMessages({ ...props, collapseTools: false });
+    expect(container.textContent).not.toContain('1 tool call');
+    expect(container.textContent).toContain('pnpm test -- bash-1');
+  });
+
+  it.each([false, true])(
+    'preserves expanded work when paging prepends the same turn (intro=%s)',
+    withIntro => {
+      const latest = assistantMessage('assistant-2', [toolPart('bash-2')]);
+      const props = baseProps({ collapseTools: true, staticMessages: [latest] });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+      act(() => group?.click());
+      const tool = container.querySelector<HTMLButtonElement>('[data-tool-card] button');
+      act(() => tool?.click());
+      expect(container.textContent).toContain('Output for bash-2');
+
+      renderConversationMessages({
+        ...props,
+        staticMessages: [
+          assistantMessage('assistant-1', [
+            ...(withIntro ? [textPart('intro', 'Inspecting the code')] : []),
+            toolPart('bash-1'),
+          ]),
+          latest,
+        ],
+      });
+
+      expect(container.textContent).toContain('2 tool calls');
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.contains(tool)).toBe(true);
+      expect(tool?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Output for bash-2');
+    }
+  );
+
+  it.each(['reasoning', 'todowrite'] as const)(
+    'preserves group and tool expansion when leading %s becomes visible while streaming',
+    type => {
+      const hidden =
+        type === 'reasoning'
+          ? reasoningPart('leading', { text: '', time: { start: 1 } })
+          : toolPart('leading', 'todowrite', {
+              status: 'running',
+              input: { todos: [] },
+              time: { start: 1 },
+            });
+      const visible =
+        type === 'reasoning'
+          ? reasoningPart('leading', { time: { start: 1 } })
+          : toolPart('leading', 'todowrite', {
+              status: 'completed',
+              input: { todos: [] },
+              output: '',
+              title: 'Todos',
+              metadata: {},
+              time: { start: 1, end: 2 },
+            });
+      const parts = [textPart('intro', 'Inspecting the code'), hidden, toolPart('bash-1')];
+      const props = baseProps({
+        collapseTools: true,
+        isStreaming: true,
+        dynamicMessages: [assistantMessage('assistant-1', parts, { time: { created: 1 } })],
+      });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+      act(() => group?.click());
+      const tool = container.querySelector<HTMLButtonElement>('[data-tool-card] button');
+      expect(tool).not.toBeNull();
+      act(() => tool?.click());
+      expect(container.textContent).toContain('Output for bash-1');
+
+      renderConversationMessages({
+        ...props,
+        dynamicMessages: [
+          assistantMessage('assistant-1', [parts[0], visible, parts[2]], {
+            time: { created: 1 },
+          }),
+        ],
+      });
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.contains(tool)).toBe(true);
+      expect(tool?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Output for bash-1');
+      expect(container.textContent).toContain(type === 'reasoning' ? 'Thinking' : 'Todos');
+      expect(container.textContent).toContain(type === 'reasoning' ? 'Working' : '2 tool calls');
+    }
+  );
+
+  it.each([false, true])(
+    'shows a failure count without opening the tool group (streaming=%s)',
+    isStreaming => {
+      const running = toolPart('bash-1', 'bash', {
+        status: 'running',
+        input: { command: 'pnpm test' },
+        time: { start: 1 },
+      });
+      const props = baseProps({
+        collapseTools: true,
+        isStreaming: true,
+        dynamicMessages: [assistantMessage('assistant-1', [running], { time: { created: 1 } })],
+      });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+
+      renderConversationMessages({
+        ...props,
+        isStreaming,
+        dynamicMessages: [
+          assistantMessage('assistant-1', [
+            {
+              ...running,
+              state: {
+                status: 'error',
+                input: running.state.input,
+                error: 'Command failed',
+                time: { start: 1, end: 2 },
+              },
+            },
+            toolPart('bash-2'),
+          ]),
+        ],
+      });
+
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('false');
+      expect(group?.textContent).toContain('2 tool calls · 1 failed');
+      expect(container.querySelectorAll('button')).toHaveLength(1);
+      expect(container.querySelector('[role="alert"]')).toBeNull();
+      expect(container.textContent).not.toContain('Command failed');
+
+      act(() => group?.click());
+      expect(container.querySelector('[role="region"] [role="alert"]')?.textContent).toContain(
+        'Command failed'
+      );
+    }
+  );
+
+  it('preserves group and nested tool expansion when a leading tool errors while streaming', () => {
+    const intro = textPart('intro', 'Inspecting the code');
+    const running = toolPart('bash-1', 'bash', {
+      status: 'running',
+      input: { command: 'pnpm test' },
+      time: { start: 1 },
+    });
+    const completed = toolPart('bash-2');
+    const props = baseProps({
+      collapseTools: true,
+      isStreaming: true,
+      dynamicMessages: [
+        assistantMessage('assistant-1', [intro, running, completed], { time: { created: 1 } }),
+      ],
+    });
+    renderConversationMessages(props);
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group?.textContent).toContain('Working');
+    act(() => group?.click());
+    const tool = container.querySelectorAll<HTMLButtonElement>('[data-tool-card] button')[1];
+    expect(tool).toBeDefined();
+    act(() => tool?.click());
+    expect(container.textContent).toContain('Output for bash-2');
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage(
+          'assistant-1',
+          [
+            intro,
+            {
+              ...running,
+              state: {
+                ...running.state,
+                status: 'error',
+                error: 'Command failed',
+                time: { start: 1, end: 2 },
+              },
+            },
+            completed,
+          ],
+          { time: { created: 1 } }
+        ),
+      ],
+    });
+
+    expect(container.contains(group)).toBe(true);
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.contains(tool)).toBe(true);
+    expect(tool?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Output for bash-2');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Command failed');
+
+    act(() => group?.click());
+    expect(container.textContent).not.toContain('Output for bash-2');
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.textContent).not.toContain('Command failed');
+  });
+
+  it('does not re-render the active list when only getChildMessages changes', () => {
+    const message = assistantMessage('assistant-1', [textPart('text-1', 'Answer one')]);
+    const props = baseProps({
+      staticMessages: [message],
+      getChildMessages: () => [],
+    });
+
+    renderConversationMessages(props);
+    expect(parsesOf('Answer one')).toBe(1);
+
+    renderConversationMessages({ ...props, getChildMessages: () => [] });
+    expect(parsesOf('Answer one')).toBe(1);
+  });
+
+  it('does not re-parse a completed earlier group when the streaming text changes', () => {
+    const completed = assistantMessage(
+      'assistant-completed',
+      [textPart('completed-text', 'Completed text')],
+      { parentID: 'user-1' }
+    );
+    const props = baseProps({
+      isStreaming: true,
+      staticMessages: [completed],
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one')], {
+          parentID: 'user-2',
+          time: { created: 3 },
+        }),
+      ],
+    });
+
+    renderConversationMessages(props);
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one')).toBe(1);
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one more')], {
+          parentID: 'user-2',
+          time: { created: 3 },
+        }),
+      ],
+    });
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one more')).toBe(1);
+  });
+
+  it('re-parses only the streaming text when a completed message is merged into the active group', () => {
+    const completed = assistantMessage('assistant-completed', [
+      textPart('completed-text', 'Completed text'),
+    ]);
+    const props = baseProps({
+      isStreaming: true,
+      staticMessages: [completed],
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one')], {
+          time: { created: 3 },
+        }),
+      ],
+    });
+
+    renderConversationMessages(props);
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one')).toBe(1);
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one more')], {
+          time: { created: 3 },
+        }),
+      ],
+    });
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one more')).toBe(1);
+  });
+});

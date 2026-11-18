@@ -1,15 +1,15 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import {
-  isOperationInProgress,
-  OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
-  useHoistedOperationKey,
-} from '@/lib/operation-key';
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
+import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
@@ -17,97 +17,15 @@ import {
   type SecurityAgentConfig,
   type SecurityAgentConfigPatch,
 } from '@/lib/security-agent';
+import {
+  isSecuritySyncInProgress,
+  mapSecuritySyncOperationError,
+  securityConfigMutationMessage,
+  securityRetainsOperationKey,
+  securitySyncIntentFingerprint,
+} from '@/lib/security-agent-ledger';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
-
-// P1-A-08e ledger markers (server contract, mirrored from shared-handlers.ts).
-// The raw markers are shared in `@/lib/operation-key`; the server sends
-// user-facing copy for every other ledger outcome.
-const SECURITY_OPERATION_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
-// Ambiguous transport outcome: the Worker may have accepted the command, so the
-// server reconciles a same-key retry instead of re-submitting blind.
-const SECURITY_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the security review before retrying.";
-// Confirmed outcome whose settle failed: a same-key retry re-records it.
-const SECURITY_LEDGER_SETTLE_FAILED_MESSAGE =
-  'The action completed, but we could not record the result. Please try again.';
-// The ambiguous outcome could not be recorded as reconcile-pending, so the
-// same-key retry guarantee does not hold; the next submit needs a fresh key.
-const SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE =
-  'We could not record this action. Please try again later.';
-
-// The manual-sync Worker URL or internal secret is unset server-side, so no
-// resubmit can succeed until the deployment is reconfigured.
-export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not configured';
-
-/** Surface copy for the missing-configuration state (dismiss sheet). */
-export const SECURITY_CONFIGURATION_COPY =
-  'Security service is not configured. Resubmitting cannot succeed until this is fixed.';
-
-/**
- * Card copy for a reconcile-first sync row: a crash mid-sync left the outcome
- * uncertain, so the card offers a same-key reconcile retry instead of a blind
- * re-POST.
- */
-export const SECURITY_SYNC_RECONCILE_COPY =
-  'A sync may not have completed. Retry to reconcile it, or discard.';
-
-/** True when the error is the server's missing-Worker-configuration rejection. */
-export function isSecurityConfigurationError(error: unknown): boolean {
-  return error instanceof Error && error.message === SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE;
-}
-
-/** In-progress surface copy: reads like the existing retryable toasts. */
-const SECURITY_SYNC_IN_PROGRESS_COPY = 'A security sync is already in progress. Please try again.';
-/** Same shape, right noun for the dismiss sheet. */
-const SECURITY_DISMISS_IN_PROGRESS_COPY =
-  'This dismissal is already in progress. Please try again.';
-
-/**
- * True when the mutation may be retried under the SAME operation key. Also
- * used for finding dismissal, which shares the ledger markers.
- */
-export function isSecuritySyncRetryable(error: unknown): boolean {
-  if (error instanceof Error) {
-    if (isSecurityConfigurationError(error)) {
-      return false;
-    }
-    if (error.message === OPERATION_KEY_REUSE_MISMATCH_MESSAGE) {
-      return false;
-    }
-    if (error.message === SECURITY_OPERATION_REPLAY_FAILED_MESSAGE) {
-      return false;
-    }
-    if (error.message === SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE) {
-      return false;
-    }
-    if (
-      error.message === SECURITY_AMBIGUOUS_MESSAGE ||
-      error.message === SECURITY_LEDGER_SETTLE_FAILED_MESSAGE
-    ) {
-      return true;
-    }
-  }
-  return classifyPrReviewMutationError(error).kind === 'retryable';
-}
-
-function mapOperationInProgress(error: unknown, copy: string) {
-  return isOperationInProgress(error) ? new Error(copy) : error;
-}
-
-/** Maps the raw in-progress marker onto retryable sync copy; others pass through. */
-export function mapSecuritySyncOperationError(error: unknown) {
-  return mapOperationInProgress(error, SECURITY_SYNC_IN_PROGRESS_COPY);
-}
-
-/** Same marker, dismissal copy: the dismiss sheet must not talk about a sync. */
-export function mapSecurityDismissOperationError(error: unknown) {
-  return mapOperationInProgress(error, SECURITY_DISMISS_IN_PROGRESS_COPY);
-}
-
-/** Intent fingerprint for a manual sync: a changed scope or repo is a new intent. */
-export function securitySyncIntentFingerprint(scope: string, repoFullName?: string): string {
-  return JSON.stringify({ resource: [scope], repoFullName });
-}
 
 // Split out of use-security-agent.ts (mutations only) to stay under the
 // 300-line file limit — these are the write-side hooks, kept alongside the
@@ -119,12 +37,48 @@ function useSecurityAgentConfigQueryKey(scope: string) {
     : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
 }
 
-export function useSaveSecurityAgentConfig(scope: string) {
+export function useSaveSecurityAgentConfig(
+  scope: string,
+  {
+    /**
+     * The success toast. A screen with a more specific saved outcome of its own
+     * (Automation's queued count) turns it off and announces in its place.
+     */
+    announceSaved = true,
+    /**
+     * The failure toast. On by default, where it is a save's only failure
+     * surface. `SettingsSaveButton` screens that render their refusal inline
+     * turn it off: the inline line announces the refusal there, and a toast
+     * would add a second copy of the same sentence. The rollback runs either way.
+     */
+    announceFailed = true,
+  }: Readonly<{ announceSaved?: boolean; announceFailed?: boolean }> = {}
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast the localized config-write copy. The server's own sentence is
+  // English and stays untranslated on the device, so a marked refusal reads
+  // catalog copy and anything else reads the generic sentence.
+  //
+  // The toast owns the refusal for a caller that has no surface of its own
+  // (the default). A settings screen that renders the refusal inline passes
+  // `announceFailed: false`: its inline status line is the single announcement
+  // owner there, and a toast would announce the same sentence a second time and
+  // draw a second copy of it. The rollback runs either way.
   return useMutation({
+    // Reachability is the save's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the connectivity
+    // manager reports the device offline, so the request is never sent, the
+    // caller's `mutateAsync` never settles (the header keeps Save disabled
+    // with its spinner up and the draft stays dirty, with no failure surface),
+    // and the queued save lands silently once the connection returns.
+    // Attempting the request instead lets it fail through the normal path:
+    // onError restores the snapshot and toasts the failure, so Save returns to
+    // an enabled retry state with the draft intact.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: Omit<SecurityAgentConfigPatch, 'expectedRevision'>) => {
       // The server rejects a save whose revision is stale, so send the revision
@@ -141,23 +95,40 @@ export function useSaveSecurityAgentConfig(scope: string) {
     },
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey: configQueryKey });
+      const generation = nextMutationGeneration(hashKey(configQueryKey));
       const previous = queryClient.getQueryData<FlattenedSecurityAgentConfig>(configQueryKey);
       queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
         old ? { ...old, ...patch } : old
       );
-      return { previous, patch };
+      return { previous, patch, generation };
     },
     onError: (error, _patch, context) => {
-      if (context?.previous) {
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(hashKey(configQueryKey), context.generation)
+      ) {
         const keys = Object.keys(context.patch) as (keyof SecurityAgentConfig)[];
         const restoredFields = pick(context.previous, keys);
         queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
           old ? { ...old, ...restoredFields } : old
         );
       }
-      announcingToast.error(error.message);
+      // The rollback above runs on every failure; the announcement follows the
+      // caller's contract (inline status line vs. toast).
+      if (announceFailed) {
+        announcingToast.error(securityConfigMutationMessage(error));
+      }
     },
     onSuccess: result => {
+      // Saving pops the settings screen, and the screen it returns to can fail
+      // to load on a flaky connection. Confirming the write here keeps a
+      // persisted save from reading as a lost one wherever the navigation lands.
+      // A screen with a more specific outcome of its own (Automation's queued
+      // count) turns this off and announces in its place, so one save is one
+      // confirmation.
+      if (announceSaved) {
+        announcingToast.success(i18n.t('securityAgent.settingsSave.saved'));
+      }
       if (result.existingRemediationCommandId) {
         trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
       }
@@ -169,7 +140,7 @@ export function useSaveSecurityAgentConfig(scope: string) {
           queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
         });
         scheduleCacheMaintenance(() => {
-          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+          void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
         });
         return;
       }
@@ -179,12 +150,15 @@ export function useSaveSecurityAgentConfig(scope: string) {
         }),
       });
       scheduleCacheMaintenance(() => {
-        reconcileFirstPage(
+        void reconcileFirstPage(
           queryClient,
           trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
         );
       });
     },
+    // Serialize a save against a toggle on the same config so the network
+    // calls land in order; the generation guard above orders the rollbacks.
+    scope: { id: `security-agent-config:${scope}` },
   });
 }
 
@@ -193,7 +167,16 @@ export function useSetSecurityAgentEnabled(scope: string) {
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast the localized config-write copy. The server's own sentence is
+  // English and stays untranslated on the device, so a marked refusal reads
+  // catalog copy and anything else reads the generic sentence.
   return useMutation({
+    // Same reason as the config save above: pausing while the connectivity
+    // manager reports offline keeps the switch in its optimistic position with
+    // no rollback and no toast, and the queued toggle lands silently after
+    // reconnecting. Attempting the request fails through the normal path.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.setEnabled.mutate>[0]) =>
       isPersonalSecurityScope(scope)
@@ -204,23 +187,28 @@ export function useSetSecurityAgentEnabled(scope: string) {
           }),
     onMutate: async vars => {
       await queryClient.cancelQueries({ queryKey: configQueryKey });
+      const generation = nextMutationGeneration(hashKey(configQueryKey));
       const previous = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
       queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
         old ? { ...old, isEnabled: vars.isEnabled } : old
       );
-      return { previous };
+      return { previous, generation };
     },
     onError: (error, _vars, context) => {
-      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
-        old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
-      );
-      announcingToast.error(error.message);
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(hashKey(configQueryKey), context.generation)
+      ) {
+        const previous = context.previous;
+        queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+          old ? { ...old, isEnabled: previous.isEnabled } : old
+        );
+      }
+      announcingToast.error(securityConfigMutationMessage(error));
     },
     onSuccess: result => {
       if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
-        announcingToast.error(
-          'Security Agent was enabled, but the initial sync could not be queued. Sync again.'
-        );
+        announcingToast.error(i18n.t('securityAgent.initialSyncAdmissionFailed'));
       } else if ('initialSync' in result && result.initialSync) {
         trackSecurityAgentCommand(queryClient, scope, result.initialSync.commandId);
       }
@@ -252,6 +240,9 @@ export function useSetSecurityAgentEnabled(scope: string) {
         }),
       ]);
     },
+    // Serialize a toggle against a save on the same config so the network
+    // calls land in order; the generation guard above orders the rollbacks.
+    scope: { id: `security-agent-config:${scope}` },
   });
 }
 
@@ -263,6 +254,14 @@ export function useTriggerSecuritySync(scope: string) {
   const { writeReconcileFirst, remove: removeOutboxRow, whenLoaded } = useMutationOutbox();
 
   return useMutation({
+    // A manual sync is a tap with a visible pending state, not a background
+    // job: pausing it while the connectivity manager reports offline leaves the
+    // dashboard's sync control spinning with no outcome until the connection
+    // returns. Attempting the request fails through the normal path, bounded by
+    // the transport deadline, and the reconcile-first row written above records
+    // the ambiguous outcome, so a relaunch offers the reconcile retry instead
+    // of blindly re-POSTing.
+    networkMode: 'always',
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}
     ) => {
@@ -273,7 +272,7 @@ export function useTriggerSecuritySync(scope: string) {
       // A failed outbox read reads as no stored rows, so refuse instead of
       // writing a fresh key over a crash row the server may already hold.
       if (!(await whenLoaded())) {
-        throw new Error('Could not read pending syncs. Try again.');
+        throw new Error(i18n.t('securityAgent.mutations.couldNotReadPendingSyncs'));
       }
       // Persist the reconcile-first row BEFORE the POST and resolve the row's
       // own operationKey: a stored row keeps its key, so the wire never POSTs
@@ -297,16 +296,23 @@ export function useTriggerSecuritySync(scope: string) {
         await removeOutboxRow(fingerprint);
         return result;
       } catch (error) {
-        if (!isSecuritySyncRetryable(error)) {
+        if (!securityRetainsOperationKey(error)) {
           rotateKey();
           await removeOutboxRow(fingerprint);
         }
-        // A retryable (ambiguous) failure keeps the row: the server may have
-        // accepted the command, so a relaunch must reconcile, not re-POST.
+        // A retryable failure whose key survives is ambiguous: the server may
+        // have accepted the command, so a relaunch must reconcile, not re-POST.
+        // A settled intent keeps no row — its key can never be replayed.
         throw mapSecuritySyncOperationError(error);
       }
     },
     onError: error => {
+      // The in-progress conflict is the sync already running, not a failed
+      // action: the dashboard shows it as progress, so an error toast would
+      // contradict the control the reader is looking at.
+      if (isSecuritySyncInProgress(error)) {
+        return;
+      }
       announcingToast.error(error.message);
     },
     onSuccess: result => {

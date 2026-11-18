@@ -19,16 +19,20 @@ export type ChildSessionSheetMountState = {
 
 export function getChildSessionSheetState(
   hydrationState: ChildSessionHydrationState,
-  messageCount: number
+  messageCount: number,
+  sessionError?: string | null
 ): ChildSessionSheetState {
   if (messageCount > 0) {
     return 'content';
   }
-  if (hydrationState.status === 'ready') {
-    return 'empty';
-  }
   if (hydrationState.status === 'error') {
     return 'error';
+  }
+  if (sessionError) {
+    return 'error';
+  }
+  if (hydrationState.status === 'ready') {
+    return 'empty';
   }
   return 'loading';
 }

@@ -1,125 +1,145 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. See src/test/render-with-providers.tsx. */
-import { createElement, type RefObject } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useNewSessionDiscardGuard } from '../use-new-session-discard-guard';
-
-const alertMock = vi.hoisted(() => vi.fn());
-const dispatchMock = vi.hoisted(() => vi.fn());
-const toastErrorMock = vi.hoisted(() => vi.fn());
-
-const beforeRemoveHolder = vi.hoisted(() => ({
-  handler: undefined as ((event: BeforeRemoveEvent) => void) | undefined,
-}));
-
-const addListenerMock = vi.hoisted(() =>
-  vi.fn((event: string, handler: (e: BeforeRemoveEvent) => void) => {
-    if (event === 'beforeRemove') {
-      beforeRemoveHolder.handler = handler;
-    }
-    return () => undefined;
-  })
-);
-
-vi.mock('react-native', () => ({
-  Alert: { alert: alertMock },
-}));
-
-vi.mock('sonner-native', () => ({
-  toast: { error: toastErrorMock },
-}));
-
-vi.mock('expo-router', () => ({
-  useNavigation: () => ({ addListener: addListenerMock, dispatch: dispatchMock }),
-}));
-
-type BeforeRemoveEvent = {
-  preventDefault: () => void;
-  data: { action: { type: string } };
-};
-
-type AlertButton = { text: string; style?: string; onPress?: () => void };
-
-function GuardHarness({
-  dirty,
-  onDiscard,
-  skipRef,
-}: {
-  dirty: boolean;
-  onDiscard: () => Promise<void>;
-  skipRef: RefObject<boolean>;
-}) {
-  useNewSessionDiscardGuard({ dirty, onDiscard, skipNextGuardRef: skipRef });
-  return null;
-}
-
-async function noOpDiscard(): Promise<void> {
-  await Promise.resolve();
-}
-
-function mountGuard(dirty: boolean, onDiscard: () => Promise<void>) {
-  const skipRef: RefObject<boolean> = { current: false };
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(createElement(GuardHarness, { dirty, onDiscard, skipRef }));
-  });
-  if (!ref.current) {
-    throw new Error('guard did not render');
-  }
-  return { renderer: ref.current, skipRef };
-}
-
-function triggerBeforeRemove(): { preventDefault: () => void; action: { type: string } } {
-  const preventDefault = vi.fn<() => void>();
-  const action = { type: 'GO_BACK' };
-  beforeRemoveHolder.handler?.({ preventDefault, data: { action } });
-  return { preventDefault, action };
-}
-
-function lastAlertButtons(): AlertButton[] | undefined {
-  return alertMock.mock.calls.at(-1)?.[2] as AlertButton[] | undefined;
-}
-
-async function flushMicrotasks() {
-  await act(async () => {
-    await new Promise(resolve => {
-      setTimeout(resolve, 0);
-    });
-  });
-}
+import {
+  alertMock,
+  backMock,
+  classNameOf,
+  dismissDialogSheet,
+  dispatchMock,
+  flushMicrotasks,
+  isType,
+  mountGuard,
+  mountGuardWithAttachments,
+  mountGuardWithPicker,
+  noOpDiscard,
+  platform,
+  PLATFORMS,
+  pressDialogButton,
+  renderedLabels,
+  resetGuardHarness,
+  setComposerFocused,
+  setPickerTopRoute,
+  toastErrorMock,
+  triggerPreventRemoveInAct,
+  usePreventRemoveHolder,
+  usePreventRemoveMock,
+} from './use-new-session-discard-guard-test-helpers';
 
 describe('useNewSessionDiscardGuard', () => {
   beforeEach(() => {
-    alertMock.mockReset();
-    dispatchMock.mockReset();
-    toastErrorMock.mockReset();
-    addListenerMock.mockReset();
-    beforeRemoveHolder.handler = undefined;
+    resetGuardHarness();
+    dispatchMock.mockImplementation(() => {
+      expect(usePreventRemoveHolder.preventRemove).toBe(false);
+    });
   });
 
-  it('shows the confirm when the prompt is non-empty', () => {
+  it.each(PLATFORMS)('guards the leave while the prompt is non-empty (%s)', os => {
+    platform.os = os;
     const { renderer } = mountGuard(true, noOpDiscard);
 
-    const { preventDefault } = triggerBeforeRemove();
-    expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(alertMock).toHaveBeenCalledTimes(1);
-    expect(alertMock.mock.calls[0]?.[0]).toBe('Discard draft?');
-    expect(lastAlertButtons()?.map(button => button.text)).toEqual(['Keep editing', 'Discard']);
+    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('leaves with no alert when the prompt is empty', () => {
+  // The requested behaviour: one implementation for both platforms. Neither
+  // platform falls back to the native `Alert.alert`; both open the in-app
+  // destructive confirm, which paints the discard choice with the red fill.
+  it.each(PLATFORMS)('opens the in-app destructive confirm on %s', os => {
+    platform.os = os;
+    const { renderer } = mountGuard(true, noOpDiscard);
+
+    triggerPreventRemoveInAct();
+
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).toEqual(
+      expect.arrayContaining(['Discard draft?', 'Discard', 'Keep editing'])
+    );
+    // The destructive choice carries the red fill, the safe one a neutral outline.
+    expect(
+      renderer.root.findAll(
+        node => isType(node, 'Pressable') && classNameOf(node).includes('bg-destructive')
+      )
+    ).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each(PLATFORMS)('shows the upload-specific confirm for an attachment-only state (%s)', os => {
+    platform.os = os;
+    const { renderer } = mountGuardWithAttachments();
+
+    // An unsent upload makes the screen dirty even with an empty prompt, so
+    // the leave is still intercepted.
+    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
+
+    triggerPreventRemoveInAct();
+
+    expect(alertMock).not.toHaveBeenCalled();
+    // The copy names the unclaimed uploads instead of the prompt-only message.
+    expect(renderedLabels(renderer)).toContain(
+      'Your prompt and any unclaimed uploads will be deleted.'
+    );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each(PLATFORMS)('leaves an empty composer without cancelling native Back (%s)', os => {
+    platform.os = os;
     const { renderer } = mountGuard(false, noOpDiscard);
 
-    const { preventDefault } = triggerBeforeRemove();
-    expect(preventDefault).not.toHaveBeenCalled();
-    expect(alertMock).not.toHaveBeenCalled();
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('protects an opening picker and restores native Back after it closes', () => {
+    const { renderer } = mountGuard(false, noOpDiscard);
+
+    setPickerTopRoute('agent-chat/model-picker');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
+    triggerPreventRemoveInAct();
+    expect(backMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).not.toHaveBeenCalled();
 
+    setPickerTopRoute('agent-chat/new');
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
+
+    setPickerTopRoute('agent-chat/repo-picker');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
+    triggerPreventRemoveInAct();
+    expect(backMock).toHaveBeenCalledTimes(2);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps protecting a draft after closing its picker', () => {
+    const { renderer } = mountGuardWithPicker(true);
+
+    triggerPreventRemoveInAct();
+    expect(backMock).toHaveBeenCalledTimes(1);
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+    setPickerTopRoute('agent-chat/new');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
+    triggerPreventRemoveInAct();
+    expect(renderedLabels(renderer)).toContain('Discard draft?');
+    expect(dispatchMock).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });
@@ -129,85 +149,234 @@ describe('useNewSessionDiscardGuard', () => {
     const { renderer, skipRef } = mountGuard(true, noOpDiscard);
     skipRef.current = true;
 
-    const { preventDefault } = triggerBeforeRemove();
-    expect(preventDefault).not.toHaveBeenCalled();
+    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
+
+    const action = triggerPreventRemoveInAct();
+    // The removal was already prevented, so the guard replays the action.
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
     expect(alertMock).not.toHaveBeenCalled();
-    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
     // The bypass is one-shot: consumed on the removal it armed.
     expect(skipRef.current).toBe(false);
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('Discard runs onDiscard before dispatching the captured action', async () => {
-    const order: string[] = [];
-    dispatchMock.mockImplementation(() => {
-      order.push('dispatch');
-    });
-    const onDiscard = vi.fn(async () => {
-      await Promise.resolve();
-      order.push('discard');
-    });
-    const { renderer } = mountGuard(true, onDiscard);
-    triggerBeforeRemove();
+  it.each(['PUSH', 'NAVIGATE', 'JUMP_TO'])(
+    'replays a forward %s removal unconfirmed — the durable draft survives it',
+    actionType => {
+      const { renderer } = mountGuard(true, noOpDiscard);
 
-    const discard = lastAlertButtons()?.find(button => button.text === 'Discard');
-    expect(discard?.onPress).toBeDefined();
+      // Tapping another screen (e.g. Preferences from the tab bar) can remove
+      // this screen as a side effect; that is forward navigation, not an
+      // abandon, so the discard confirm must not hijack it (spot check
+      // e12-tap-prefs: the dialog blocked the Preferences screen from opening).
+      const action = { type: actionType };
+      act(() => {
+        usePreventRemoveHolder.callback?.({
+          data: { action },
+          repeat: () => {
+            dispatchMock(action);
+          },
+        });
+      });
 
-    act(() => {
-      discard?.onPress?.();
-    });
-    await flushMicrotasks();
+      expect(alertMock).not.toHaveBeenCalled();
+      expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+      expect(dispatchMock).toHaveBeenCalledTimes(1);
+      expect(dispatchMock).toHaveBeenCalledWith(action);
+      expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
-    expect(onDiscard).toHaveBeenCalledTimes(1);
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
+  // The session route's not-found card sits above this composer and its "Back
+  // to sessions" truncates the stack with `POP_TO`. The confirm this screen
+  // would open is behind that card, so refusing the removal left the person on
+  // a screen whose Back did nothing.
+  it('replays a removal another screen asked for unconfirmed', () => {
+    const { renderer } = mountGuard(true, noOpDiscard);
+    setComposerFocused(false);
+
+    const action = triggerPreventRemoveInAct({ type: 'POP_TO' });
+
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
     expect(dispatchMock).toHaveBeenCalledTimes(1);
-    // onDiscard (clear the draft) must run before navigation (dispatch).
-    expect(order).toEqual(['discard', 'dispatch']);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('stays and toasts when the draft clear fails', async () => {
-    const onDiscard = vi.fn(async () => {
-      await Promise.reject(new Error('storage failure'));
-    });
-    const { renderer } = mountGuard(true, onDiscard);
-    triggerBeforeRemove();
+  it('still asks when this screen is the one the person is on', () => {
+    const { renderer } = mountGuard(true, noOpDiscard);
 
-    const discard = lastAlertButtons()?.find(button => button.text === 'Discard');
-    expect(discard?.onPress).toBeDefined();
+    triggerPreventRemoveInAct({ type: 'POP_TO' });
 
-    act(() => {
-      discard?.onPress?.();
-    });
-    await flushMicrotasks();
-
-    expect(onDiscard).toHaveBeenCalledTimes(1);
-    // The failed clear must not navigate: the screen stays and the draft is kept.
+    expect(renderedLabels(renderer)).toContain('Discard draft?');
     expect(dispatchMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith('Could not discard the draft. Please try again.');
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('Keep editing leaves the draft intact', () => {
+  it.each(PLATFORMS)(
+    'runs onDiscard before dispatching when Discard is accepted (%s)',
+    async os => {
+      platform.os = os;
+      const order: string[] = [];
+      dispatchMock.mockImplementation(() => {
+        order.push('dispatch');
+      });
+      const onDiscard = vi.fn(async () => {
+        await Promise.resolve();
+        order.push('discard');
+      });
+      const { renderer } = mountGuard(true, onDiscard);
+
+      const action = triggerPreventRemoveInAct();
+      pressDialogButton(renderer, 'bg-destructive');
+
+      // The choice is made, but the request stays on screen through the native
+      // dismissal and nothing is cleared or replayed yet.
+      expect(renderedLabels(renderer)).toContain('Discard draft?');
+      expect(onDiscard).not.toHaveBeenCalled();
+      expect(dispatchMock).not.toHaveBeenCalled();
+
+      dismissDialogSheet(renderer);
+
+      // The completed dismissal ends the confirm; the clear runs behind it.
+      expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+      await flushMicrotasks();
+
+      expect(onDiscard).toHaveBeenCalledTimes(1);
+      expect(dispatchMock).toHaveBeenCalledTimes(1);
+      expect(dispatchMock).toHaveBeenCalledWith(action);
+      // The draft clear must finish before the captured leave is replayed.
+      expect(order).toEqual(['discard', 'dispatch']);
+      expect(usePreventRemoveHolder.preventRemove).toBe(false);
+
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
+  it.each(PLATFORMS)(
+    'closes the confirm, stays, and toasts when the clear fails (%s)',
+    async os => {
+      platform.os = os;
+      const onDiscard = vi.fn(async () => {
+        await Promise.reject(new Error('storage failure'));
+      });
+      const { renderer } = mountGuard(true, onDiscard);
+
+      triggerPreventRemoveInAct();
+      expect(renderedLabels(renderer)).toContain('Discard draft?');
+
+      pressDialogButton(renderer, 'bg-destructive');
+      // The clear starts only once the native dismissal reports.
+      expect(onDiscard).not.toHaveBeenCalled();
+
+      dismissDialogSheet(renderer);
+      await flushMicrotasks();
+
+      expect(onDiscard).toHaveBeenCalledTimes(1);
+      expect(dispatchMock).not.toHaveBeenCalled();
+      expect(toastErrorMock).toHaveBeenCalledWith('Could not discard the draft. Please try again.');
+      expect(usePreventRemoveHolder.preventRemove).toBe(true);
+      // Closed, so the user can retry by leaving again with the draft intact.
+      expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
+  it('keeps a Back that lands while a picker is presenting with that picker', () => {
+    // Clean prompt: the picker rule is the only reason the removal is held.
+    const { renderer } = mountGuardWithPicker();
+
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
+
+    const action = { type: 'GO_BACK' };
+    act(() => {
+      usePreventRemoveHolder.callback?.({
+        data: { action },
+        repeat: () => {
+          dispatchMock(action);
+        },
+      });
+    });
+
+    // The picker route is the top of the stack, so closing it is the removal
+    // the Back asked for; the composer is never replayed away.
+    expect(backMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('replays a forward removal that happens while a picker is above', () => {
+    const { renderer } = mountGuardWithPicker();
+
+    const action = { type: 'RESET' };
+    act(() => {
+      usePreventRemoveHolder.callback?.({
+        data: { action },
+        repeat: () => {
+          dispatchMock(action);
+        },
+      });
+    });
+
+    expect(backMock).not.toHaveBeenCalled();
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each(PLATFORMS)('keeps the draft and stays when the confirm is dismissed (%s)', os => {
+    platform.os = os;
     const onDiscard = vi.fn(async () => {
       await Promise.resolve();
     });
     const { renderer } = mountGuard(true, onDiscard);
-    triggerBeforeRemove();
 
-    const keep = lastAlertButtons()?.find(button => button.text === 'Keep editing');
-    // The cancel button carries no handler: dismissing it must not clear or leave.
-    expect(keep?.onPress).toBeUndefined();
+    triggerPreventRemoveInAct();
+    pressDialogButton(renderer, 'border-border');
+
+    // Keep editing: the request stays on screen until the native dismissal
+    // reports, and the draft is never cleared.
+    expect(renderedLabels(renderer)).toContain('Discard draft?');
+
+    dismissDialogSheet(renderer);
+
     expect(onDiscard).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
 
     act(() => {
       renderer.unmount();

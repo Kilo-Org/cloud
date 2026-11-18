@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one file testing the whole ported security-agent
    presentation module (list/deadline + details/analysis/remediation); the
    coverage is the point, splitting by describe block would just scatter it. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   formatRemediationOrigin,
@@ -250,7 +250,13 @@ describe('getSecurityAnalysisPresentation', () => {
 });
 
 describe('getSecurityDeadlinePresentation', () => {
-  const now = new Date('2026-07-08 12:00:00+00');
+  // Build fixtures from local calendar components so the calendar-day branches
+  // (startOfDay/calendarDaysDiff in presentation.ts) hold in every host timezone.
+  function localTimestamp(year: number, monthIndex: number, day: number, hour = 12): string {
+    return new Date(year, monthIndex, day, hour, 0, 0, 0).toISOString();
+  }
+
+  const now = new Date(2026, 6, 8, 12, 0, 0, 0);
 
   it('marks a finding fixed before its deadline as success', () => {
     const finding = makeFinding({
@@ -288,6 +294,14 @@ describe('getSecurityDeadlinePresentation', () => {
     expect(getSecurityDeadlinePresentation(dismissed, now)).toMatchObject({ label: 'Dismissed' });
   });
 
+  it('renders the dismissed detail with an Invalid Date label for an unparseable timestamp', () => {
+    const dismissed = makeFinding({ status: 'ignored', updated_at: '' });
+    expect(getSecurityDeadlinePresentation(dismissed, now)).toMatchObject({
+      label: 'Dismissed',
+      detail: 'Dismissed Invalid Date',
+    });
+  });
+
   it('reports no deadline set when sla_due_at is null', () => {
     const finding = makeFinding({ status: 'open', sla_due_at: null });
     expect(getSecurityDeadlinePresentation(finding, now)).toMatchObject({
@@ -296,22 +310,110 @@ describe('getSecurityDeadlinePresentation', () => {
     });
   });
 
-  it.each<[string, string, string]>([
-    ['1 day overdue', '2026-07-07 12:00:00+00', '1 day overdue'],
-    ['plural days overdue', '2026-07-04 12:00:00+00', '4 days overdue'],
-    ['due today', '2026-07-08 20:00:00+00', 'Due today'],
-    ['due tomorrow', '2026-07-09 12:00:00+00', 'Due tomorrow'],
-    ['due in 3 days (within warning window)', '2026-07-11 12:00:00+00', 'Due in 3 days'],
-    ['due in 12 days (beyond warning window)', '2026-07-20 12:00:00+00', 'Due in 12 days'],
-  ])('reports %s', (_description, slaDueAt, expectedLabel) => {
+  it('writes the deadline detail with the reused short-date formatter', () => {
+    // formatFindingDate is a memoized short-date formatter reused across rows.
+    // The reference string comes from the same zone and options, so this holds
+    // in every host timezone, like the local-component fixtures above.
+    const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
+    const expected = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(new Date('2026-07-01T12:00:00Z'));
+    expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(`Fixed ${expected}`);
+  });
+
+  it('rebuilds the memoized date formatter after a device zone move', () => {
+    // The memoized formatter resolves its zone when built; a device that moves
+    // zones must rebuild it or keep writing the old wall clock (the same guard
+    // the mobile intl-cache describes). Drive the probe inputs the helper
+    // reads — the wall clock and the zone the no-argument probe resolves —
+    // then flip the zone between two renders of the same fixed date.
+    const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
+    const RealDateTimeFormat = Intl.DateTimeFormat;
+    // Zones whose wall clock puts the Jul 1 noon-UTC fixed date on a different
+    // calendar day: UTC-11 midday reads Jul 1, UTC+14 midnight reads Jul 2.
+    const zoneAt = { value: 'Pacific/Midway' };
+    const formatIn = (at: Date): string =>
+      `Fixed ${new RealDateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: zoneAt.value,
+      }).format(at)}`;
+    const mock = vi
+      .spyOn(Intl, 'DateTimeFormat')
+      // The zone probe constructs with an undefined locale; every other call
+      // keeps the real behavior so the memoized formatter renders real bits.
+      // Bound through Reflect.construct so the mock stays constructible.
+      .mockImplementation(function (...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+        // A real device resolves its zone inside every unzoned construction:
+        // both the guard's probe `(undefined, {})` and the memoized rebuild
+        // `(en-US, FINDING_DATE_OPTIONS)` must read `zoneAt.value`, or the
+        // rebuilt formatter would render the host zone, not the moved zone.
+        return Reflect.construct(RealDateTimeFormat, [
+          args[0],
+          { ...(args[1] as Intl.DateTimeFormatOptions), timeZone: zoneAt.value },
+        ]);
+      } as unknown as typeof Intl.DateTimeFormat);
+    // Module state from the preceding tests is live: a formatter built in the
+    // host zone is cached and the probe clock is fresh. Own the wall clock for
+    // the whole test and stage it past the probe window between renders, so
+    // each render re-probes and the zone move is really observed.
+    const t0 = Date.now();
+    const advance = vi.spyOn(Date, 'now').mockReturnValue(t0 + 2000);
+    try {
+      // The fixed-at instant is noon UTC; Pacific/Midway (UTC-11) reads Jul 1.
+      expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
+        formatIn(new Date('2026-07-01T12:00:00Z'))
+      );
+
+      // Move the device zone to UTC+14, whose midnight already reads Jul 2,
+      // and step the clock past the one-second probe window again; the next
+      // call must rebuild and re-render the day boundary.
+      advance.mockReturnValue(t0 + 4000);
+      zoneAt.value = 'Pacific/Kiritimati';
+      expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
+        formatIn(new Date('2026-07-01T12:00:00Z'))
+      );
+    } finally {
+      advance.mockRestore();
+      mock.mockRestore();
+    }
+  });
+
+  it.each<[string, string, string, string, number?]>([
+    ['1 day overdue', localTimestamp(2026, 6, 7), '1 day overdue', 'overdue', 1],
+    ['plural days overdue', localTimestamp(2026, 6, 4), '4 days overdue', 'overdue', 4],
+    ['overdue earlier today', localTimestamp(2026, 6, 8, 9), 'Overdue', 'overdue', 0],
+    ['due today', localTimestamp(2026, 6, 8, 20), 'Due today', 'due-today'],
+    ['due tomorrow', localTimestamp(2026, 6, 9), 'Due tomorrow', 'due-tomorrow'],
+    [
+      'due in 3 days (within warning window)',
+      localTimestamp(2026, 6, 11),
+      'Due in 3 days',
+      'due-in',
+      3,
+    ],
+    [
+      'due in 12 days (beyond warning window)',
+      localTimestamp(2026, 6, 20),
+      'Due in 12 days',
+      'due-in',
+      12,
+    ],
+  ])('reports %s', (_description, slaDueAt, expectedLabel, expectedKind, expectedDays) => {
     const finding = makeFinding({ status: 'open', sla_due_at: slaDueAt });
-    expect(getSecurityDeadlinePresentation(finding, now).label).toBe(expectedLabel);
+    const presentation = getSecurityDeadlinePresentation(finding, now);
+    expect(presentation.label).toBe(expectedLabel);
+    expect(presentation.state.kind).toBe(expectedKind);
+    expect('days' in presentation.state ? presentation.state.days : undefined).toBe(expectedDays);
   });
 
   it('tones overdue findings as danger and near-term deadlines as warning', () => {
-    const overdue = makeFinding({ status: 'open', sla_due_at: '2026-07-07 12:00:00+00' });
-    const dueToday = makeFinding({ status: 'open', sla_due_at: '2026-07-08 20:00:00+00' });
-    const farOut = makeFinding({ status: 'open', sla_due_at: '2026-07-20 12:00:00+00' });
+    const overdue = makeFinding({ status: 'open', sla_due_at: localTimestamp(2026, 6, 7) });
+    const dueToday = makeFinding({ status: 'open', sla_due_at: localTimestamp(2026, 6, 8, 20) });
+    const farOut = makeFinding({ status: 'open', sla_due_at: localTimestamp(2026, 6, 20) });
     expect(getSecurityDeadlinePresentation(overdue, now)).toMatchObject({
       tone: 'danger',
       icon: 'alert-triangle',
@@ -393,6 +495,17 @@ describe('getDismissalReasonLabel', () => {
     [null, 'after review'],
   ])('labels %s', (reason, label) => {
     expect(getDismissalReasonLabel(reason)).toBe(label);
+  });
+
+  it('humanizes inherited object names instead of returning a prototype member', () => {
+    // A bare table index returns `Object.prototype.constructor` (a function)
+    // or `Object.prototype` itself for these stored values.
+    expect(getDismissalReasonLabel('constructor')).toBe('constructor');
+    expect(getDismissalReasonLabel('toString')).toBe('toString');
+    expect(getDismissalReasonLabel('hasOwnProperty')).toBe('hasOwnProperty');
+    // No letter touches the underscores, so the generic humanizer leaves the
+    // padding; what matters is that it is a string, not Object.prototype.
+    expect(getDismissalReasonLabel('__proto__')).toBe('  proto  ');
   });
 });
 

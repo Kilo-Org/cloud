@@ -1,8 +1,8 @@
 import { AutoRoutingAnalyticsPeriodSchema } from '@kilocode/auto-routing-contracts';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getAutoRoutingClassifierAnalytics } from '@/lib/ai-gateway/auto-routing-admin-client';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getAutoRoutingClassifierAnalytics } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET(request: NextRequest) {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });

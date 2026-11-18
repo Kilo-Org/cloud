@@ -1,18 +1,24 @@
-/* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-member-access @typescript-eslint/no-unsafe-argument -- footer prop inspection walks raw React element tree */
+/* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
-import TestRenderer from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
-import { ConsentDetails } from './consent-details';
+import { TestRenderer } from '@/test/renderer';
+import { toast } from 'sonner-native';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import '@/i18n';
+import {
+  INLINE_LINK_BOX_CLASS,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
 // ---- mocks ----
 
-vi.mock('expo-web-browser', () => ({
-  openBrowserAsync: vi.fn(),
-}));
+const mockedPush = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: mockedPush, back: vi.fn() }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -21,7 +27,10 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Switch: 'Switch',
   View: 'View',
 }));
 
@@ -45,10 +54,90 @@ vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://kilo.ai',
 }));
 
+const useCurrentUserIdMock = vi.hoisted(() => ({
+  useCurrentUserId: vi.fn(() => ({
+    userId: 'u1' as string | undefined,
+    email: 'a@b.c',
+    isLoading: false,
+    isError: false,
+    isFetchError: false,
+    refetch: vi.fn(),
+  })),
+}));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: useCurrentUserIdMock.useCurrentUserId,
+}));
+
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn() },
+}));
+
+const voiceInputControllerMock = vi.hoisted(() => ({
+  supportsOnDevice: vi.fn<() => boolean>(() => true),
+}));
+
+vi.mock('@/lib/voice-input/native-voice-input', () => ({
+  voiceInputController: voiceInputControllerMock,
+}));
+
+// The per-language installed-model gate the row shares with the mic. Values
+// are set per-test with mockResolvedValue; the beforeEach default mirrors the
+// common emulator state: the model is installed, so the "On device" claim
+// stands.
+const voiceLanguageGateMock = vi.hoisted(() => ({
+  resolveVoiceInputSessionLanguageTag:
+    vi.fn<
+      (storedTag: string | null, mode: 'device' | 'gateway', appLanguage: string) => Promise<string>
+    >(),
+  isVoiceInputLanguageInstalledOnDevice: vi.fn<() => Promise<boolean>>(),
+  useVoiceInputLanguage: vi.fn(() => null as string | null),
+  languageLoaded: true,
+}));
+
+vi.mock('@/lib/voice-input/voice-input-language', () => ({
+  resolveVoiceInputSessionLanguageTag: voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag,
+  isVoiceInputLanguageInstalledOnDevice:
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice,
+}));
+
+vi.mock('@/lib/voice-input/voice-input-language-preference', () => ({
+  useVoiceInputLanguage: voiceLanguageGateMock.useVoiceInputLanguage,
+  useVoiceInputLanguageLoaded: () => voiceLanguageGateMock.languageLoaded,
+}));
+
+const voiceNetworkConsentMock = vi.hoisted(() => ({
+  readVoiceNetworkConsent: vi.fn<() => Promise<'granted' | 'declined' | 'unset'>>(),
+  writeVoiceNetworkConsent: vi.fn(),
+  subscribeToVoiceNetworkConsent: vi.fn(() => () => undefined),
+}));
+
+vi.mock('@/lib/voice-input/voice-network-consent', () => voiceNetworkConsentMock);
+
+// The real preference module reads expo-secure-store at import time; the row
+// only needs the hook's three values.
+const gatewayTranscriptionPreferenceMock = vi.hoisted(() => ({
+  gatewayTranscriptionEnabled: false,
+  hasLoaded: true,
+  setGatewayTranscriptionEnabled: vi.fn(),
+}));
+
+vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
+  useGatewayTranscriptionPreference: () => ({
+    gatewayTranscriptionEnabled: gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled,
+    hasLoaded: gatewayTranscriptionPreferenceMock.hasLoaded,
+    setGatewayTranscriptionEnabled:
+      gatewayTranscriptionPreferenceMock.setGatewayTranscriptionEnabled,
+  }),
+}));
+
 // ---- helpers ----
 
 type SectionProps = {
   title?: string;
+  what?: string;
+  why?: string;
+  who?: string;
   footer?: React.ReactElement;
 };
 
@@ -110,6 +199,16 @@ function findTextStrings(root: TestRenderer.ReactTestInstance): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
+function findSwitches(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Switch');
+}
+
+async function flush() {
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 10);
+  });
+}
+
 // ---- tests ----
 
 describe('ConsentDetails copy', () => {
@@ -122,7 +221,21 @@ describe('ConsentDetails copy', () => {
     expect(titles).toContain('Crash reporting');
     expect(titles).toContain('Product analytics');
     expect(titles).toContain('Error screenshots and session replay');
+    expect(titles).toContain('Performance profiling');
     expect(titles).toContain('Install attribution');
+    expect(titles).toContain('Voice transcription');
+    expect(titles).toContain('Feature rollout');
+  });
+
+  it('feature rollout section discloses the email, its purpose, and PostHog', () => {
+    const renderer = mount();
+    const section = findAllSectionProps(renderer.root).find(s => s.title === 'Feature rollout');
+    expect(section).toBeDefined();
+    expect(section?.what).toBe('Your account email.');
+    expect(section?.why).toBe(
+      'To decide which features you see, including ones we are still rolling out.'
+    );
+    expect(section?.who).toBe('PostHog, the feature-flag service.');
   });
 
   it('onboarding heading states the default-on behavior', () => {
@@ -134,7 +247,7 @@ describe('ConsentDetails copy', () => {
   it('review heading does not claim optional telemetry is on', () => {
     const renderer = mount('review');
     const texts = findTextStrings(renderer.root);
-    expect(texts).toContain('Optional — you can change this any time in Settings');
+    expect(texts).toContain('Optional');
     expect(texts).not.toContain('Optional — on unless you turn it off');
   });
 
@@ -185,5 +298,463 @@ describe('ConsentDetails copy', () => {
 
     const texts = collectTextStrings(footer);
     expect(texts.some((t: string) => t.includes('masked on your device'))).toBe(true);
+  });
+
+  it('profiling disclosure names function names and call stacks', () => {
+    const renderer = mount();
+    const sections = findAllSectionProps(renderer.root);
+    const profiling = sections.find(s => s.title === 'Performance profiling');
+    expect(profiling).toBeDefined();
+
+    const footer = profiling?.footer;
+    expect(footer).toBeDefined();
+
+    const texts = collectTextStrings(footer);
+    expect(
+      texts.some(
+        (t: string) =>
+          t.includes('function names and call stacks') &&
+          t.includes('never your prompts or conversation content')
+      )
+    ).toBe(true);
+  });
+
+  it('names the gateway voice-transcription destination and what the gateway carries', () => {
+    const renderer = mount();
+    const sections = findAllSectionProps(renderer.root);
+    const voiceTranscription = sections.find(s => s.title === 'Voice transcription');
+    const gateway = sections.find(s => s.title === 'Kilo Gateway (our backend)');
+    expect(voiceTranscription).toBeDefined();
+    expect(gateway).toBeDefined();
+
+    expect(voiceTranscription?.who).toBe(
+      'Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.'
+    );
+    expect(gateway?.what).toBe(
+      'Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.'
+    );
+  });
+
+  it('gives the retention sentence privacy link a full target and opens the policy natively', async () => {
+    const renderer = mount();
+    const links = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+    );
+    expect(links).toHaveLength(1);
+    const link = links[0];
+    if (!link) {
+      throw new Error('privacy link not found');
+    }
+    // A real 28dp box plus the vertical slop: the control-size audit reads the
+    // node's own rect, and the 14dp text line alone was reported as too small
+    // to tap; the slop carries the 44pt region.
+    // Test renderer props are untyped (`any` from the JSON tree); name them once.
+    const props = link.props as { className?: string; hitSlop?: { top?: number; bottom?: number } };
+    expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(props.hitSlop?.bottom).toBe(props.hitSlop?.top);
+
+    await TestRenderer.act(async () => {
+      await Promise.resolve();
+      (link.props as { onPress: () => void }).onPress();
+    });
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
+  });
+});
+
+describe('Voice transcription section', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag.mockResolvedValue('en-US');
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(true);
+    voiceLanguageGateMock.useVoiceInputLanguage.mockReturnValue(null);
+    voiceLanguageGateMock.languageLoaded = true;
+    gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled = false;
+    gatewayTranscriptionPreferenceMock.hasLoaded = true;
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: 'u1',
+      email: 'a@b.c',
+      isLoading: false,
+      isError: false,
+      isFetchError: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  function mountVoiceControl(): TestRenderer.ReactTestRenderer {
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    TestRenderer.act(() => {
+      renderer = TestRenderer.create(createElement(VoiceTranscriptionControl));
+    });
+    // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- act callback assignment, not statically guaranteed
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  it('shows On device with no switch when on-device is supported and the language model is installed', async () => {
+    const renderer = mountVoiceControl();
+    // The on-device claim now waits for the per-language installed-model gate.
+    await TestRenderer.act(flush);
+
+    const strings = findTextStrings(renderer.root);
+    expect(strings).toContain('On device');
+    // The row label is the neutral section name. "Online transcription" next
+    // to an "On device" value contradicted itself (vr1 review, 2026-09-07).
+    expect(strings).toContain('Voice transcription');
+    expect(strings).not.toContain('Online transcription');
+    expect(findSwitches(renderer.root).length).toBe(0);
+    // The gate resolved the same session tag the mic would use.
+    expect(voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag).toHaveBeenCalledWith(
+      null,
+      'device',
+      'en'
+    );
+    expect(voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice).toHaveBeenCalledWith(
+      'en-US'
+    );
+  });
+
+  it('shows the online consent row instead of On device when the language model is missing', async () => {
+    // Regression (drain 2026-10-19): the row printed "On device" from the
+    // service-level supportsOnDevice() alone, while the mic refined that check
+    // with the offline model of the resolved language and raised the "Speech
+    // is processed online" disclosure for the same state. The row must
+    // present the online choice the start path actually requires.
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(false);
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    const strings = findTextStrings(renderer.root);
+    expect(strings).not.toContain('On device');
+    expect(strings).toContain('Online, not allowed');
+    expect(findSwitches(renderer.root).length).toBe(1);
+  });
+
+  it('re-derives when the stored voice language changes', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(false);
+    voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag.mockResolvedValue('en-US');
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+    expect(findTextStrings(renderer.root)).toContain('Online, not allowed');
+
+    // The user installs the model / the choice changes; the gate re-runs and
+    // resolves the new session tag.
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(true);
+    voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag.mockResolvedValue('de-DE');
+    await TestRenderer.act(async () => {
+      voiceLanguageGateMock.useVoiceInputLanguage.mockReturnValue('de-DE');
+      renderer.update(createElement(VoiceTranscriptionControl));
+      await flush();
+    });
+
+    const strings = findTextStrings(renderer.root);
+    expect(strings).toContain('On device');
+    expect(strings).not.toContain('Online, not allowed');
+    expect(voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice).toHaveBeenCalledWith(
+      'de-DE'
+    );
+  });
+
+  it('shows the loading placeholder while the per-language gate is pending', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockReturnValue(
+      new Promise<boolean>(() => undefined)
+    );
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(texts).not.toContain('Online, not allowed');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('names the Kilo gateway and drops the On device claim when gateway transcription is on', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled = true;
+    const renderer = mountVoiceControl();
+
+    const strings = findTextStrings(renderer.root);
+    // Regression: the row printed "On device" from supportsOnDevice() while
+    // the gateway engine was the one that actually ran.
+    expect(strings).toContain('Via the Kilo gateway');
+    expect(strings).not.toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows the loading placeholder while the gateway preference is read', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    gatewayTranscriptionPreferenceMock.hasLoaded = false;
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(texts).not.toContain('Via the Kilo gateway');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows the loading placeholder while the stored voice-language read resolves', async () => {
+    // The SecureStore read can take seconds on a slow keychain; deriving from
+    // the app-language default in that window would claim a mode for a stored
+    // choice that may exist (vr2 review, 2026-10-19). The gate waits for it.
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.languageLoaded = false;
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(texts).not.toContain('Online, not allowed');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    // Once the read lands, the row derives from the stored tag.
+    voiceLanguageGateMock.languageLoaded = true;
+    await TestRenderer.act(async () => {
+      renderer.update(createElement(VoiceTranscriptionControl));
+      await flush();
+    });
+    expect(findTextStrings(renderer.root)).not.toContain('Loading…');
+  });
+
+  it('shows Online, allowed with the switch on when consent is granted', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    expect(findTextStrings(renderer.root)).toContain('Online, allowed');
+    const switches = findSwitches(renderer.root);
+    expect(switches.length).toBe(1);
+    const sw = switches[0];
+    if (!sw) {
+      throw new Error('expected a Switch');
+    }
+    expect((sw.props as { value?: boolean }).value).toBe(true);
+  });
+
+  it('shows Online, not allowed with the switch off when consent is unset', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    expect(findTextStrings(renderer.root)).toContain('Online, not allowed');
+    const switches = findSwitches(renderer.root);
+    expect(switches.length).toBe(1);
+    const sw = switches[0];
+    if (!sw) {
+      throw new Error('expected a Switch');
+    }
+    expect((sw.props as { value?: boolean }).value).toBe(false);
+  });
+
+  it('rolls back the switch and toasts when the write fails', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    // The real write resolves `false` on a keychain failure (it reports at
+    // warning level and stays total); the row owns the rollback.
+    voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(false);
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    const switches = findSwitches(renderer.root);
+    expect(switches.length).toBe(1);
+    const sw = switches[0];
+    if (!sw) {
+      throw new Error('expected a Switch');
+    }
+    expect((sw.props as { value?: boolean }).value).toBe(false);
+
+    await TestRenderer.act(async () => {
+      (sw.props.onValueChange as (v: boolean) => void)(true);
+      await flush();
+    });
+
+    // Rolled back to the prior value, no stuck optimistic state.
+    const switchesAfter = findSwitches(renderer.root);
+    expect(switchesAfter.length).toBe(1);
+    const swAfter = switchesAfter[0];
+    if (!swAfter) {
+      throw new Error('expected a Switch after rollback');
+    }
+    expect((swAfter.props as { value?: boolean }).value).toBe(false);
+    expect(findTextStrings(renderer.root)).toContain('Online, not allowed');
+    expect(toast.error).toHaveBeenCalledWith('Could not save your choice. Please try again.');
+    expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith('u1', 'granted');
+  });
+
+  it('shows a sign-in message and no switch when there is no user', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: false,
+      isError: false,
+      isFetchError: false,
+      refetch: vi.fn(),
+    });
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    expect(findTextStrings(renderer.root)).toContain('Sign in to manage online transcription.');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows a loading placeholder and no switch while the user loads', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: true,
+      isError: false,
+      isFetchError: false,
+      refetch: vi.fn(),
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('Sign in to manage online transcription.');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows a retry CTA that refetches when loading the user fails', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    const refetch = vi.fn();
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: false,
+      isError: true,
+      isFetchError: true,
+      refetch,
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Could not load your transcription setting.');
+    expect(texts).not.toContain('Sign in to manage online transcription.');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    const buttons = renderer.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Button'
+    );
+    expect(buttons.length).toBe(1);
+    const button = buttons[0];
+    if (!button) {
+      throw new Error('expected a Retry Button');
+    }
+    TestRenderer.act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('shows the retry CTA instead of the on-device claim when loading the user fails', () => {
+    // The device's on-device support is not a substitute for the account read:
+    // with the account unreachable the row must not claim "On device", it must
+    // surface the retryable error and its Retry (vr1 e1 device repro: the
+    // on-device branch shadowed this one).
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    const refetch = vi.fn();
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: false,
+      isError: true,
+      isFetchError: true,
+      refetch,
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Could not load your transcription setting.');
+    expect(texts).not.toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    const buttons = renderer.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Button'
+    );
+    expect(buttons.length).toBe(1);
+    const button = buttons[0];
+    if (!button) {
+      throw new Error('expected a Retry Button');
+    }
+    TestRenderer.act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('shows the loading placeholder instead of the on-device claim while the user loads', () => {
+    // Same precedence while the account read is still in flight: the row waits
+    // for it before claiming an on-device destination.
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: true,
+      isError: false,
+      isFetchError: false,
+      refetch: vi.fn(),
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows the retry CTA instead of a cached on-device claim when the account refetch fails', () => {
+    // Offline with a warm read cache: the identity is still cached, so the
+    // hook's `isError` stays false, but the latest account fetch failed. The
+    // row must not present the cached destination as current — it shows the
+    // retryable error and its Retry (vr1 e1 device repro: the API killed after
+    // the state was restored left the row on "On device").
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    const refetch = vi.fn();
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: 'u1',
+      email: 'a@b.c',
+      isLoading: false,
+      isError: false,
+      isFetchError: true,
+      refetch,
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Could not load your transcription setting.');
+    expect(texts).not.toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    const buttons = renderer.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Button'
+    );
+    expect(buttons.length).toBe(1);
+    const button = buttons[0];
+    if (!button) {
+      throw new Error('expected a Retry Button');
+    }
+    TestRenderer.act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(refetch).toHaveBeenCalled();
   });
 });

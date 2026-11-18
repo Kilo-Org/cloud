@@ -20,6 +20,52 @@ function reportWithRun(run: Record<string, unknown>) {
 }
 
 describe('CloudAgentQueueReportSchema', () => {
+  it.each(['cloudflare', 'vercel', 'cloudflare-containers'])(
+    'accepts bounded runtime metadata for %s containers',
+    provider => {
+      const container = {
+        provider,
+        sandboxId: 'ses-sandbox',
+        allocationId: 'allocation-1',
+        instanceId: 'instance-1',
+        instanceType: 'large',
+        region: 'iad1',
+        imageRef: 'registry.example.com/cloud-agent@sha256:abcdef',
+        snapshotId: 'snapshot-1',
+        runtimeBuildId: 'build-1',
+        startSource: 'snapshot',
+      };
+      const report = CloudAgentQueueReportSchema.parse(
+        reportWithRun({ status: 'completed', terminalAt, container })
+      );
+      expect(report.run.container).toEqual(container);
+    }
+  );
+
+  it.each([
+    { provider: 'unknown', sandboxId: 'sandbox' },
+    { provider: 'vercel' },
+    { provider: 'vercel', sandboxId: '' },
+    { provider: 'vercel', sandboxId: 'sandbox', instanceId: 'x'.repeat(129) },
+    { provider: 'vercel', sandboxId: 'sandbox', imageRef: 'x'.repeat(1025) },
+    { provider: 'vercel', sandboxId: 'sandbox', startSource: 'unknown' },
+    { provider: 'vercel', sandboxId: 'sandbox', accessToken: 'private-fixture' },
+    { provider: 'vercel', sandboxId: 'sandbox', env: { SECRET: 'private-fixture' } },
+  ])('rejects invalid or unapproved container metadata: %j', container => {
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({ status: 'completed', terminalAt, container })
+      ).success
+    ).toBe(false);
+  });
+
+  it('accepts reports without container metadata', () => {
+    const report = CloudAgentQueueReportSchema.parse(
+      reportWithRun({ status: 'completed', terminalAt })
+    );
+    expect(report.run.container).toBeUndefined();
+  });
+
   it('accepts observed milestone and reduced diagnostic fields on failed runs', () => {
     expect(
       CloudAgentQueueReportSchema.safeParse(
@@ -40,6 +86,24 @@ describe('CloudAgentQueueReportSchema', () => {
         })
       ).success
     ).toBe(true);
+  });
+
+  it('rejects unknown diagnostic content at the strict producer boundary', () => {
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({
+          status: 'failed',
+          terminalAt,
+          failureStage: 'unknown',
+          failureCode: 'unclassified',
+          diagnostic: {
+            errorMessageRedacted: 'The agent failed',
+            errorExpiresAt: '2026-06-25T08:04:00.000Z',
+            responseBody: 'private fixture output',
+          },
+        })
+      ).success
+    ).toBe(false);
   });
 
   it('supports retained statuses and typed failure classifications', () => {
@@ -77,6 +141,46 @@ describe('CloudAgentQueueReportSchema', () => {
         ).success
       ).toBe(true);
     }
+  });
+
+  it.each(['wrapper_ping_timeout', 'wrapper_no_output', 'wrapper_disconnected'] as const)(
+    'accepts %s before and after observed agent activity',
+    failureCode => {
+      for (const failureStage of ['post_dispatch_no_activity', 'agent_activity'] as const) {
+        const report = CloudAgentQueueReportSchema.parse(
+          reportWithRun({
+            status: 'failed',
+            dispatchAcceptedAt: '2026-05-26T08:02:00.000Z',
+            ...(failureStage === 'agent_activity'
+              ? { agentActivityObservedAt: '2026-05-26T08:03:00.000Z' }
+              : {}),
+            terminalAt,
+            failureStage,
+            failureCode,
+          })
+        );
+
+        expect(report.run).toMatchObject({ failureStage, failureCode });
+      }
+    }
+  );
+
+  it('accepts payment_required before dispatch without acceptance or activity timestamps', () => {
+    const report = CloudAgentQueueReportSchema.parse(
+      reportWithRun({
+        status: 'failed',
+        terminalAt,
+        failureStage: 'pre_dispatch',
+        failureCode: 'payment_required',
+      })
+    );
+
+    expect(report.run).toMatchObject({
+      failureStage: 'pre_dispatch',
+      failureCode: 'payment_required',
+    });
+    expect(report.run).not.toHaveProperty('dispatchAcceptedAt');
+    expect(report.run).not.toHaveProperty('agentActivityObservedAt');
   });
 
   it('rejects removed lifecycle fields and unsafe transport content', () => {
@@ -177,11 +281,102 @@ describe('CloudAgentQueueReportSchema', () => {
     ).toBe(false);
   });
 
+  it('accepts a provider responsibility pair on a failed run and keeps the existing refines', () => {
+    const providerFailed = {
+      status: 'failed',
+      terminalAt,
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    };
+    const parsed = CloudAgentQueueReportSchema.safeParse(reportWithRun(providerFailed));
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.run).toMatchObject({
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    });
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({ ...providerFailed, failureReason: undefined })
+      ).success
+    ).toBe(false);
+    const interruptedProvider = CloudAgentQueueReportSchema.safeParse(
+      reportWithRun({
+        status: 'interrupted',
+        terminalAt,
+        failureStage: 'interruption',
+        failureCode: 'user_interrupt',
+        failureResponsibility: 'provider',
+        failureReason: 'provider_unavailable',
+      })
+    );
+    expect(interruptedProvider.success).toBe(false);
+    expect(!interruptedProvider.success && interruptedProvider.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ['run', 'failureResponsibility'],
+        message: 'Failure responsibility is permitted only on failed runs',
+      })
+    );
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({ ...providerFailed, failureResponsibility: 'provider_retired' })
+      ).success
+    ).toBe(false);
+  });
+
   it('requires strict ISO timestamps at the queue boundary', () => {
     expect(
       CloudAgentQueueReportSchema.safeParse(
         reportWithRun({ status: 'completed', terminalAt: '2026/05/26 08:04:00' })
       ).success
     ).toBe(false);
+  });
+
+  it('round-trips a complete reporting anchor for a session without an initial turn', () => {
+    const parsed = CloudAgentQueueReportSchema.parse({
+      ...reportWithRun({ status: 'queued', queuedAt: '2026-05-26T08:01:00.000Z' }),
+      session: {
+        cloudAgentSessionId: 'agent_reporting_session',
+        kiloSessionId: 'ses_12345678901234567890123456',
+        initialMessageId: 'msg_anchor_first',
+        reportingCreatedAt: '2026-05-26T07:59:00.000Z',
+      },
+    });
+
+    expect(parsed.session).toEqual({
+      cloudAgentSessionId: 'agent_reporting_session',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      initialMessageId: 'msg_anchor_first',
+      reportingCreatedAt: '2026-05-26T07:59:00.000Z',
+    });
+  });
+
+  it('keeps the legacy anchor-free session shape valid', () => {
+    expect(
+      CloudAgentQueueReportSchema.safeParse({
+        ...reportWithRun({ status: 'queued' }),
+        session: { cloudAgentSessionId: 'agent_reporting_session' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects a partial reporting anchor', () => {
+    for (const partial of [
+      { kiloSessionId: 'ses_12345678901234567890123456' },
+      { initialMessageId: 'msg_anchor_first' },
+      { reportingCreatedAt: '2026-05-26T07:59:00.000Z' },
+      {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        initialMessageId: 'msg_anchor_first',
+      },
+    ]) {
+      expect(
+        CloudAgentQueueReportSchema.safeParse({
+          ...reportWithRun({ status: 'queued' }),
+          session: { cloudAgentSessionId: 'agent_reporting_session', ...partial },
+        }).success
+      ).toBe(false);
+    }
   });
 });

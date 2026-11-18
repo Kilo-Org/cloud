@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Zaman wakilin naka yana da sabuntawa",
+      "lowBalance": "Ma'auninka yana buƙatar kulawa",
+      "spendAlert": "Kashewar ku na buƙatar kulawa",
+      "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
+      "securityUpdate": "Wani duban tsaro yana da sabuntawa",
+      "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Faɗakarwar ƙarancin ma'auni",
+      "body": "Ma'aunin {{organizationName}} ya faɗi ƙasa da ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Faɗakarwar kashewa",
+      "body": "Kashewar {{scopeName}} ta wuce ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} a cikin {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Sabon binciken tsaro ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Faɗakarwar SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Ƙetare SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Zaman Kilo naka a shirye don sarrafawa daga wayarka"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

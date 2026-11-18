@@ -1,0 +1,350 @@
+{
+  "af": {
+    "displayName": "Aktiewe agente",
+    "description": "Sien watter agente insette nodig het, werk of ledig is"
+  },
+  "am": {
+    "displayName": "ንቁ ወኪሎች",
+    "description": "የትኞቹ ወኪሎች ግብዓት እንደሚያስፈልጋቸው፣ እንደሚሠሩ ወይም እንደማይሠሩ ይመልከቱ"
+  },
+  "ar": {
+    "displayName": "الوكلاء النشطون",
+    "description": "اطّلع على الوكلاء الذين يتطلبون إدخالًا أو يعملون أو خاملون"
+  },
+  "az": {
+    "displayName": "Aktiv agentlər",
+    "description": "Hansı agentlərin giriş tələb etdiyini, işlədiyini və ya boş olduğunu görün"
+  },
+  "be": {
+    "displayName": "Актыўныя агенты",
+    "description": "Дазнайцеся, якім агентам патрэбны ўвод, якія працуюць, а якія неактыўныя"
+  },
+  "bg": {
+    "displayName": "Активни агенти",
+    "description": "Вижте кои агенти изискват въвеждане, кои работят и кои са неактивни"
+  },
+  "bn": {
+    "displayName": "সক্রিয় এজেন্ট",
+    "description": "দেখুন কোন এজেন্টগুলির ইনপুট প্রয়োজন, কোনগুলি কাজ করছে বা নিষ্ক্রিয়"
+  },
+  "bs": {
+    "displayName": "Aktivni agenti",
+    "description": "Vidite kojim agentima treba unos, koji rade, a koji su neaktivni"
+  },
+  "ca": {
+    "displayName": "Agents actius",
+    "description": "Mira quins agents necessiten dades, quins treballen i quins estan inactius"
+  },
+  "ckb": {
+    "displayName": "ئەجێنتە چالاکەکان",
+    "description": "ببینە کام ئەجێنت پێویستی بە داخڵکردن هەیە، کام کار دەکات و کام بێکارە"
+  },
+  "cs": {
+    "displayName": "Aktivní agenti",
+    "description": "Podívejte se, kteří agenti potřebují vstup, kteří pracují a kteří jsou nečinní"
+  },
+  "cy": {
+    "displayName": "Asiantau gweithredol",
+    "description": "Gwelwch pa asiantau sydd angen mewnbwn, sy'n gweithio neu sy'n segur"
+  },
+  "da": {
+    "displayName": "Aktive agenter",
+    "description": "Se hvilke agenter der kræver input, hvilke der arbejder, og hvilke der er inaktive"
+  },
+  "de": {
+    "displayName": "Aktive Agenten",
+    "description": "Sieh, welche Agenten eine Eingabe brauchen, welche arbeiten und welche inaktiv sind"
+  },
+  "el": {
+    "displayName": "Ενεργοί πράκτορες",
+    "description": "Δείτε ποιοι πράκτορες χρειάζονται δεδομένα, ποιοι εργάζονται και ποιοι είναι αδρανείς"
+  },
+  "en": {
+    "displayName": "Active Agents",
+    "description": "See which agents need input, are working, or are idle"
+  },
+  "es": {
+    "displayName": "Agentes activos",
+    "description": "Ve qué agentes necesitan datos, cuáles trabajan y cuáles están inactivos"
+  },
+  "et": {
+    "displayName": "Aktiivsed agendid",
+    "description": "Vaadake, millised agendid vajavad sisendit, millised töötavad ja millised on jõude"
+  },
+  "eu": {
+    "displayName": "Agente aktiboak",
+    "description": "Ikusi zein agentek behar duten sarrera, zein ari diren lanean eta zein dauden geldi"
+  },
+  "fa": {
+    "displayName": "عامل‌های فعال",
+    "description": "ببینید کدام عامل‌ها به ورودی نیاز دارند، کدام کار می‌کنند و کدام غیرفعال هستند"
+  },
+  "fi": {
+    "displayName": "Aktiiviset agentit",
+    "description": "Näe, mitkä agentit tarvitsevat syötettä, mitkä työskentelevät ja mitkä ovat vapaana"
+  },
+  "fil": {
+    "displayName": "Mga aktibong agent",
+    "description": "Tingnan kung aling mga agent ang nangangailangan ng input, gumagana, o nakatengga"
+  },
+  "fr": {
+    "displayName": "Agents actifs",
+    "description": "Voyez quels agents attendent une saisie, lesquels travaillent et lesquels sont inactifs"
+  },
+  "ga": {
+    "displayName": "Gníomhairí gníomhacha",
+    "description": "Féach cé na gníomhairí a bhfuil ionchur uathu, cé atá ag obair agus cé atá díomhaoin"
+  },
+  "gl": {
+    "displayName": "Axentes activos",
+    "description": "Mira que axentes precisan datos, cales traballan e cales están inactivos"
+  },
+  "gu": {
+    "displayName": "સક્રિય એજન્ટો",
+    "description": "જુઓ કયા એજન્ટોને ઇનપુટની જરૂર છે, કયા કામ કરે છે અને કયા નિષ્ક્રિય છે"
+  },
+  "ha": {
+    "displayName": "Wakilai da ke aiki",
+    "description": "Duba waɗanne wakilai ke buƙatar bayani, waɗanne ke aiki, da waɗanne ba sa aiki"
+  },
+  "he": {
+    "displayName": "סוכנים פעילים",
+    "description": "ראה אילו סוכנים זקוקים לקלט, אילו עובדים ואילו בטלים"
+  },
+  "hi": {
+    "displayName": "सक्रिय एजेंट",
+    "description": "देखें कि किन एजेंट को इनपुट चाहिए, कौन काम कर रहे हैं और कौन निष्क्रिय हैं"
+  },
+  "hr": {
+    "displayName": "Aktivni agenti",
+    "description": "Vidite kojim agentima treba unos, koji rade, a koji su neaktivni"
+  },
+  "ht": {
+    "displayName": "Ajans aktif yo",
+    "description": "Wè ki ajans ki bezwen antre, ki ap travay, oswa ki poko fè anyen"
+  },
+  "hu": {
+    "displayName": "Aktív ügynökök",
+    "description": "Nézze meg, mely ügynökök várnak bevitelre, melyek dolgoznak és melyek tétlenek"
+  },
+  "hy": {
+    "displayName": "Ակտիվ գործակալներ",
+    "description": "Տեսեք, որ գործակալները մուտքագրման կարիք ունեն, որոնք են աշխատում և որոնք են պարապ"
+  },
+  "id": {
+    "displayName": "Agen aktif",
+    "description": "Lihat agen mana yang perlu masukan, mana yang bekerja, dan mana yang menganggur"
+  },
+  "ig": {
+    "displayName": "Ndị ọrụ na-arụ ọrụ",
+    "description": "Hụ ndị ọrụ chọrọ ntinye, ndị na-arụ ọrụ, na ndị na-anọ nkịtị"
+  },
+  "is": {
+    "displayName": "Virk umboð",
+    "description": "Sjáðu hvaða umboð þurfa inntak, hvaða eru að vinna og hvaða eru óvirk"
+  },
+  "it": {
+    "displayName": "Agenti attivi",
+    "description": "Guarda quali agenti richiedono un input, quali lavorano e quali sono inattivi"
+  },
+  "ja": {
+    "displayName": "アクティブなエージェント",
+    "description": "入力が必要なエージェント、処理中のエージェント、待機中のエージェントを確認できます"
+  },
+  "ka": {
+    "displayName": "აქტიური აგენტები",
+    "description": "ნახეთ, რომელ აგენტს სჭირდება მონაცემი, რომელი მუშაობს და რომელი უქმად არის"
+  },
+  "kk": {
+    "displayName": "Белсенді агенттер",
+    "description": "Қандай агенттерге енгізу қажет, қайсысы жұмыс істейді және қайсысы бос екенін көріңіз"
+  },
+  "km": {
+    "displayName": "ភ្នាក់ងារសកម្ម",
+    "description": "មើលថាភ្នាក់ងារណាត្រូវការការបញ្ចូល ណាកំពុងធ្វើការ និងណាទំនេរ"
+  },
+  "kn": {
+    "displayName": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳು",
+    "description": "ಯಾವ ಏಜೆಂಟ್‌ಗಳಿಗೆ ಇನ್‌ಪುಟ್ ಬೇಕು, ಯಾವುವು ಕೆಲಸ ಮಾಡುತ್ತಿವೆ ಮತ್ತು ಯಾವುವು ನಿಷ್ಕ್ರಿಯವಾಗಿವೆ ಎಂದು ನೋಡಿ"
+  },
+  "ko": {
+    "displayName": "활성 에이전트",
+    "description": "입력이 필요한 에이전트, 작업 중인 에이전트, 대기 중인 에이전트를 확인하세요"
+  },
+  "lo": {
+    "displayName": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກ",
+    "description": "ເບິ່ງວ່າຕົວແທນໃດຕ້ອງການການປ້ອນຂໍ້ມູນ, ໃດກຳລັງເຮັດວຽກ ແລະ ໃດຫວ່າງຢູ່"
+  },
+  "lt": {
+    "displayName": "Aktyvūs agentai",
+    "description": "Pamatykite, kuriems agentams reikia įvesties, kurie dirba ir kurie neveiklūs"
+  },
+  "lv": {
+    "displayName": "Aktīvie aģenti",
+    "description": "Skaties, kuriem aģentiem nepieciešama ievade, kuri strādā un kuri ir dīkstāvē"
+  },
+  "mg": {
+    "displayName": "Agent mavitrika",
+    "description": "Jereo izay agent mila fampidirana, izay miasa, ary izay tsy manao na inona na inona"
+  },
+  "mi": {
+    "displayName": "Ngā māngai hohe",
+    "description": "Tirohia ko ēhea māngai e hiahia ana ki te whakaurunga, ko ēhea e mahi ana, ko ēhea kāore i te mahi"
+  },
+  "mk": {
+    "displayName": "Активни агенти",
+    "description": "Видете кои агенти бараат внес, кои работат и кои се неактивни"
+  },
+  "ml": {
+    "displayName": "സജീവ ഏജന്റുകൾ",
+    "description": "ഏതു ഏജന്റുകൾക്ക് ഇൻപുട്ട് വേണം, ഏതു പ്രവർത്തിക്കുന്നു, ഏതു നിഷ്ക്രിയമാണ് എന്നു കാണുക"
+  },
+  "mn": {
+    "displayName": "Идэвхтэй агентууд",
+    "description": "Ямар агентад оролт шаардлагатай, аль нь ажиллаж, аль нь чөлөөтэй байгааг харна уу"
+  },
+  "mr": {
+    "displayName": "सक्रिय एजंट्स",
+    "description": "कोणत्या एजंट्सना इनपुट हवे, कोणते काम करत आहेत आणि कोणते निष्क्रिय आहेत ते पाहा"
+  },
+  "ms": {
+    "displayName": "Ejen aktif",
+    "description": "Lihat ejen yang memerlukan input, yang sedang bekerja, dan yang tidak aktif"
+  },
+  "mt": {
+    "displayName": "Aġenti attivi",
+    "description": "Ara liema aġenti jeħtieġu input, liema qed jaħdmu u liema huma weqfin"
+  },
+  "my": {
+    "displayName": "လုပ်ဆောင်နေသော agent များ",
+    "description": "မည်သည့် agent သည် ထည့်သွင်းမှု လိုအပ်သည်၊ မည်သည့်သည် လုပ်ဆောင်နေသည်၊ မည်သည့်သည် နားနေသည်ကို ကြည့်ပါ"
+  },
+  "nb": {
+    "displayName": "Aktive agenter",
+    "description": "Se hvilke agenter som trenger inndata, hvilke som arbeider, og hvilke som er inaktive"
+  },
+  "ne": {
+    "displayName": "सक्रिय एजेन्टहरू",
+    "description": "कुन एजेन्टहरूलाई इनपुट चाहिन्छ, कुन काम गर्दै छन् र कुन निष्क्रिय छन् हेर्नुहोस्"
+  },
+  "nl": {
+    "displayName": "Actieve agents",
+    "description": "Zie welke agents invoer nodig hebben, welke werken en welke inactief zijn"
+  },
+  "om": {
+    "displayName": "Eejentoota hojii irra jiran",
+    "description": "Eejentoonni kamiin galtee barbaadan, kamiin hojjetan, kamiin dhaabbatan ilaali"
+  },
+  "or": {
+    "displayName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
+    "description": "କେଉଁ ଏଜେଣ୍ଟଗୁଡ଼ିକୁ ଇନପୁଟ୍ ଆବଶ୍ୟକ, କେଉଁ କାମ କରୁଛନ୍ତି ଓ କେଉଁ ନିଷ୍କ୍ରିୟ ଅଛନ୍ତି ଦେଖନ୍ତୁ"
+  },
+  "pa": {
+    "displayName": "ਸਰਗਰਮ ਏਜੰਟ",
+    "description": "ਦੇਖੋ ਕਿ ਕਿਹੜੇ ਏਜੰਟਾਂ ਨੂੰ ਇਨਪੁਟ ਦੀ ਲੋੜ ਹੈ, ਕਿਹੜੇ ਕੰਮ ਕਰ ਰਹੇ ਹਨ ਅਤੇ ਕਿਹੜੇ ਵਿਹਲੇ ਹਨ"
+  },
+  "pl": {
+    "displayName": "Aktywni agenci",
+    "description": "Zobacz, którzy agenci potrzebują danych, którzy pracują, a którzy są bezczynni"
+  },
+  "ps": {
+    "displayName": "فعال اجنټان",
+    "description": "وګورئ کوم اجنټان ورودي ته اړتیا لري، کوم کار کوي او کوم بې کاره دي"
+  },
+  "pt": {
+    "displayName": "Agentes ativos",
+    "description": "Veja que agentes precisam de dados, quais estão a trabalhar e quais estão inativos"
+  },
+  "pt-BR": {
+    "displayName": "Agentes ativos",
+    "description": "Veja quais agentes precisam de entrada, quais estão trabalhando e quais estão ociosos"
+  },
+  "ro": {
+    "displayName": "Agenți activi",
+    "description": "Vezi ce agenți necesită introducere, care lucrează și care sunt inactivi"
+  },
+  "ru": {
+    "displayName": "Активные агенты",
+    "description": "Посмотрите, каким агентам нужен ввод, какие работают, а какие простаивают"
+  },
+  "si": {
+    "displayName": "සක්‍රිය නියෝජිතයන්",
+    "description": "කුමන නියෝජිතයන්ට ආදානය අවශ්‍යද, කවුරුන් වැඩ කරනවාද සහ කවුරුන් නිෂ්ක්‍රීයද බලන්න"
+  },
+  "sk": {
+    "displayName": "Aktívni agenti",
+    "description": "Pozrite si, ktorí agenti potrebujú vstup, ktorí pracujú a ktorí sú nečinní"
+  },
+  "sl": {
+    "displayName": "Aktivni agenti",
+    "description": "Poglejte, kateri agenti potrebujejo vnos, kateri delajo in kateri so nedejavni"
+  },
+  "so": {
+    "displayName": "Wakiillada firfircoon",
+    "description": "Arag wakiillada u baahan wax-soo-gal, kuwa shaqaynaya, iyo kuwa firfircooni la'aan"
+  },
+  "sq": {
+    "displayName": "Agjentët aktivë",
+    "description": "Shiko cilët agjentë kanë nevojë për të dhëna, cilët punojnë dhe cilët janë të papunë"
+  },
+  "sr": {
+    "displayName": "Aktivni agenti",
+    "description": "Vidite kojim agentima treba unos, koji rade, a koji su neaktivni"
+  },
+  "sv": {
+    "displayName": "Aktiva agenter",
+    "description": "Se vilka agenter som behöver indata, vilka som arbetar och vilka som är inaktiva"
+  },
+  "sw": {
+    "displayName": "Mawakala wanaofanya kazi",
+    "description": "Ona mawakala wanaohitaji maelezo, wanaofanya kazi, na wasiofanya kitu"
+  },
+  "ta": {
+    "displayName": "செயலில் உள்ள முகவர்கள்",
+    "description": "எந்த முகவர்களுக்கு உள்ளீடு தேவை, எவை வேலை செய்கின்றன, எவை செயலற்றுள்ளன என்பதைப் பாருங்கள்"
+  },
+  "te": {
+    "displayName": "చురుకైన ఏజెంట్లు",
+    "description": "ఏ ఏజెంట్లకు ఇన్‌పుట్ కావాలి, ఏవి పని చేస్తున్నాయి, ఏవి ఖాళీగా ఉన్నాయి అని చూడండి"
+  },
+  "th": {
+    "displayName": "เอเจนต์ที่กำลังทำงาน",
+    "description": "ดูว่าเอเจนต์ใดต้องการข้อมูล เอเจนต์ใดกำลังทำงาน และเอเจนต์ใดว่างอยู่"
+  },
+  "tr": {
+    "displayName": "Etkin ajanlar",
+    "description": "Hangi ajanların giriş beklediğini, hangilerinin çalıştığını ve hangilerinin boşta olduğunu görün"
+  },
+  "uk": {
+    "displayName": "Активні агенти",
+    "description": "Дивіться, яким агентам потрібне введення, які працюють, а які неактивні"
+  },
+  "ur": {
+    "displayName": "فعال ایجنٹس",
+    "description": "دیکھیں کن ایجنٹس کو ان پٹ درکار ہے، کون کام کر رہے ہیں اور کون غیر فعال ہیں"
+  },
+  "uz": {
+    "displayName": "Faol agentlar",
+    "description": "Qaysi agentlarga kiritish kerak, qaysilari ishlayapti va qaysilari bo'sh ekanini ko'ring"
+  },
+  "vi": {
+    "displayName": "Tác nhân đang hoạt động",
+    "description": "Xem tác nhân nào cần dữ liệu, tác nhân nào đang làm việc và tác nhân nào đang rảnh"
+  },
+  "yo": {
+    "displayName": "Awọn aṣoju to n ṣiṣẹ",
+    "description": "Wo awọn aṣoju to nilo igbewọle, awọn to n ṣiṣẹ, ati awọn to wa laiṣiṣẹ"
+  },
+  "zh-Hans": {
+    "displayName": "活动代理",
+    "description": "查看哪些代理需要输入、哪些正在工作、哪些空闲"
+  },
+  "zh-Hant": {
+    "displayName": "使用中的代理",
+    "description": "查看哪些代理需要輸入、哪些正在工作、哪些閒置"
+  },
+  "zu": {
+    "displayName": "Ama-agent asebenzayo",
+    "description": "Bona ukuthi ama-agent aphi adinga okokufaka, aphi asebenzayo, futhi aphi angenzi lutho"
+  }
+}

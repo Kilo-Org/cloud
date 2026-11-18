@@ -5,6 +5,18 @@ export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
 
 /**
+ * Precedence when a caller holds more than one role for the same organization,
+ * for example a direct `member` row and an `owner` row on the parent. The first
+ * matching role wins.
+ */
+export const ORGANIZATION_ROLE_PRIORITY = [
+  'owner',
+  'admin',
+  'billing_manager',
+  'member',
+] satisfies OrganizationRole[];
+
+/**
  * Roles with organization-management authority. `admin` matches `owner`
  * everywhere except owner management, which {@link canManageOrganizationOwners}
  * reserves for owners.
@@ -18,6 +30,31 @@ export const ORGANIZATION_MANAGE_ROLES = ['owner', 'admin'] satisfies Organizati
 export const ORGANIZATION_BILLING_ROLES = [
   'owner',
   'admin',
+  'billing_manager',
+] satisfies OrganizationRole[];
+
+// Parent access is separate from billing scope so billing changes cannot widen child inheritance.
+export const ORGANIZATION_PARENT_ACCESS_ROLES = [
+  'owner',
+  'admin',
+  'billing_manager',
+] satisfies OrganizationRole[];
+
+/**
+ * Membership roles that receive an organization-scope spend alert: the
+ * organization's owners and its billing managers. This is deliberately
+ * narrower than {@link ORGANIZATION_BILLING_ROLES}: an `admin` may edit
+ * billing settings but carries no billing duty, so it is not a recipient.
+ *
+ * `owner` is listed so a co-owner — and the owner of an OSS-sponsored
+ * organization whose `created_by_kilo_user_id` is null while the sponsor's
+ * membership role is `owner` — still receives. The recipient query also reads
+ * `organizations.created_by_kilo_user_id`, so an owner whose membership role is
+ * `member` (or who has no membership row at all) receives too; the `UNION`
+ * collapses a user who appears in both sets.
+ */
+export const ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES = [
+  'owner',
   'billing_manager',
 ] satisfies OrganizationRole[];
 

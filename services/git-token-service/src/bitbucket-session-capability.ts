@@ -1,12 +1,13 @@
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 import { z } from 'zod';
 import { hasCanonicalEncryptedValueFormat } from './github-session-capability.js';
+import { CURRENT_CAPABILITY_PREFIX } from '@kilocode/worker-utils/scm-capability-contract';
 
 // Bitbucket session capabilities are always container-bound (there is no legacy
 // unbound form to carry forward), so a single versioned, prefixed format is
 // enough. The opaque capability replaces the raw workspace access token inside
 // the sandbox; the outbound interceptor redeems it for the real credential.
-const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
+const BITBUCKET_CAPABILITY_PREFIX = CURRENT_CAPABILITY_PREFIX.bitbucket;
 const CAPABILITY_PURPOSE = 'bitbucket_scm_session';
 const MAX_BITBUCKET_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
 
@@ -33,10 +34,8 @@ const BitbucketSessionCapabilityClaimsSchema = z
     workspaceSlug: WorkspaceSlugSchema,
     repositoryUuid: z.uuid(),
     repositoryFullName: RepositoryFullNameSchema,
-    // A digest of the resolved token at issue time. The redeem path re-resolves
-    // the current token and compares digests, so a rotated token invalidates the
-    // capability regardless of which Bitbucket auth source backs it.
     tokenDigest: TokenDigestSchema,
+    oauthCredentialId: z.string().min(1).optional(),
     outboundContainerId: z.string().min(1),
     issuedAt: z.number().int().nonnegative(),
     expiresAt: z.number().int().positive(),

@@ -34,6 +34,20 @@ describe('POST /api/kilo-pass/apple/notifications', () => {
     expect(await response.json()).toEqual({ error: 'Missing signedPayload' });
   });
 
+  it('answers 400 for a body that is not JSON, so Apple does not retry forever', async () => {
+    const response = await POST(
+      new Request('https://app.example.com/api/kilo-pass/apple/notifications', {
+        method: 'POST',
+        body: 'not json',
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Missing signedPayload' });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
   it('processes signed App Store notification payloads', async () => {
     const response = await POST(request({ signedPayload: 'payload' }));
 

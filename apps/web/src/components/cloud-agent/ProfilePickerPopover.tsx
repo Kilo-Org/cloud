@@ -1,24 +1,30 @@
 'use client';
 
-import { useState, useMemo, useEffect, useId } from 'react';
-import { Layers, ChevronDown, Check, Plus, FolderCog, X, ArrowLeft, Zap } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import {
+  Layers,
+  ChevronDown,
+  Check,
+  Plus,
+  FolderCog,
+  X,
+  ArrowLeft,
+  Zap,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  useProfiles,
-  useCombinedProfiles,
-  useRepoBindings,
-  type ProfileSummaryWithOwner,
-} from '@/hooks/useCloudAgentProfiles';
-import { resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+  contextSegmentClassName,
+  interactiveContextSegmentClassName,
+  SegmentText,
+} from '@/components/cloud-agent-next/session-context-segments';
+import { type ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
+import { useSessionProfileLayers } from '@/hooks/useSessionProfileLayers';
+import { useCloudAgentSettingsDeepLink } from '@/components/cloud-agent-next/settings/useCloudAgentSettingsDeepLink';
 import { ProfilesListDialog } from './ProfilesListDialog';
-
-type DevcontainerToggleControl = {
-  checked: boolean;
-  disabled?: boolean;
-  onCheckedChange: (checked: boolean) => void;
-};
 
 type ProfilePickerPopoverProps = {
   organizationId?: string;
@@ -26,7 +32,8 @@ type ProfilePickerPopoverProps = {
   onOverrideProfileSelect: (id: string | null) => void;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
-  devcontainerToggle?: DevcontainerToggleControl;
+  /** The session's environment. A V2 environment skips the repo binding; the effective default still applies. */
+  environment?: { repositories?: unknown } | null;
 };
 
 export function ProfilePickerPopover({
@@ -35,81 +42,55 @@ export function ProfilePickerPopover({
   onOverrideProfileSelect,
   repoFullName,
   platform,
-  devcontainerToggle,
+  environment,
 }: ProfilePickerPopoverProps) {
-  const devcontainerToggleId = useId();
-  const devcontainerDescriptionId = `${devcontainerToggleId}-description`;
   const [open, setOpen] = useState(false);
   const [pickingOverride, setPickingOverride] = useState(false);
   const [showManageProfiles, setShowManageProfiles] = useState(false);
   const [openToNewProfile, setOpenToNewProfile] = useState(false);
   const [editProfileId, setEditProfileId] = useState<string | null>(null);
+  const { setSection, clearSection } = useCloudAgentSettingsDeepLink();
 
   // Reset override-picker mode whenever the popover closes.
   useEffect(() => {
     if (!open) setPickingOverride(false);
   }, [open]);
 
+  const openManageProfiles = () => {
+    setShowManageProfiles(true);
+    setSection('profiles');
+  };
+
+  const closeManageProfiles = () => {
+    setShowManageProfiles(false);
+    setOpenToNewProfile(false);
+    setEditProfileId(null);
+    clearSection();
+  };
+
   const openEditDialog = (profileId: string) => {
     setOpen(false);
     setOpenToNewProfile(false);
     setEditProfileId(profileId);
-    setShowManageProfiles(true);
+    openManageProfiles();
   };
 
-  const { data: combinedData } = useCombinedProfiles({
-    organizationId: organizationId ?? '',
-    enabled: !!organizationId,
+  const {
+    allProfiles,
+    profilesData,
+    profilesLoading,
+    profilesError,
+    refetchProfiles,
+    layers,
+    baseProfile,
+    topProfile,
+  } = useSessionProfileLayers({
+    organizationId,
+    selectedOverrideProfileId,
+    repoFullName,
+    platform,
+    environment,
   });
-  const { data: personalProfilesData } = useProfiles({
-    organizationId: undefined,
-    enabled: !organizationId,
-  });
-
-  const allProfiles: ProfileSummaryWithOwner[] = useMemo(
-    () =>
-      organizationId
-        ? (combinedData?.allProfiles ?? [])
-        : (personalProfilesData ?? []).map(p => ({ ...p, ownerType: 'user' as const })),
-    [organizationId, combinedData, personalProfilesData]
-  );
-
-  const effectiveDefaultProfileId = organizationId
-    ? (combinedData?.effectiveDefaultId ?? null)
-    : (personalProfilesData?.find(p => p.isDefault)?.id ?? null);
-
-  const { data: repoBindings } = useRepoBindings({ organizationId });
-
-  const repoBindingProfileId = useMemo(() => {
-    if (!repoFullName || !repoBindings) return null;
-    const binding = repoBindings.find(
-      b =>
-        b.repoFullName.toLowerCase() === repoFullName.toLowerCase() &&
-        (!platform || b.platform === platform)
-    );
-    return binding?.profileId ?? null;
-  }, [repoFullName, repoBindings, platform]);
-
-  // Shared resolution logic — same rules as the server-side merge.
-  const layers = useMemo(
-    () =>
-      resolveProfileLayers({
-        repoBindingProfileId,
-        effectiveDefaultProfileId,
-        explicitOverrideProfileId: selectedOverrideProfileId,
-      }),
-    [repoBindingProfileId, effectiveDefaultProfileId, selectedOverrideProfileId]
-  );
-
-  const baseProfile = useMemo(
-    () => (layers.base ? (allProfiles.find(p => p.id === layers.base?.profileId) ?? null) : null),
-    [allProfiles, layers.base]
-  );
-
-  const topProfile = useMemo(
-    () => (layers.top ? (allProfiles.find(p => p.id === layers.top?.profileId) ?? null) : null),
-    [allProfiles, layers.top]
-  );
   const topSource = layers.top?.source ?? null;
 
   // Profiles offered as override candidates. The base profile is omitted
@@ -120,21 +101,6 @@ export function ProfilePickerPopover({
   );
 
   const chipName = topProfile?.name ?? baseProfile?.name ?? null;
-
-  const chipCounts = useMemo(() => {
-    const vars = Math.max(baseProfile?.varCount ?? 0, topProfile?.varCount ?? 0);
-    const mcps = (baseProfile?.mcpServerCount ?? 0) + (topProfile?.mcpServerCount ?? 0);
-    const skills = (baseProfile?.skillCount ?? 0) + (topProfile?.skillCount ?? 0);
-    const cmds = (baseProfile?.kiloCommandCount ?? 0) + (topProfile?.kiloCommandCount ?? 0);
-    return [
-      vars > 0 && `${vars} vars`,
-      mcps > 0 && `${mcps} MCP`,
-      skills > 0 && `${skills} skills`,
-      cmds > 0 && `${cmds} cmds`,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }, [baseProfile, topProfile]);
 
   function formatCounts(profile: ProfileSummaryWithOwner) {
     return [
@@ -147,30 +113,21 @@ export function ProfilePickerPopover({
       .join(' · ');
   }
 
-  // Two layers are present (repo + something on top). Used for the "+1" hint
-  // and the "on top of …" affordance regardless of whether the top is an
-  // explicit pick or just the default.
-  const hasTwoLayers = !!topProfile && !!baseProfile;
-
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
+            type="button"
             className={cn(
-              'inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
-              'border border-border/50 bg-muted/30 hover:bg-muted/60 hover:border-border',
-              'text-muted-foreground hover:text-foreground',
-              open && 'border-border bg-muted/60 text-foreground'
+              contextSegmentClassName,
+              interactiveContextSegmentClassName,
+              open && 'bg-muted/60 text-foreground'
             )}
           >
-            <Layers className="h-3 w-3 shrink-0" />
+            <Layers className="size-3.5 shrink-0" aria-hidden="true" />
             {chipName ? (
-              <>
-                <span className="font-medium">{chipName}</span>
-                {chipCounts && <span className="opacity-60">· {chipCounts}</span>}
-                {hasTwoLayers && <span className="text-primary/80 ml-0.5">+1</span>}
-              </>
+              <SegmentText className="max-w-48 font-medium">{chipName}</SegmentText>
             ) : (
               <span>No profile</span>
             )}
@@ -196,6 +153,12 @@ export function ProfilePickerPopover({
               topProfile={topProfile}
               topSource={topSource}
               allProfiles={allProfiles}
+              selectedOverrideProfileId={selectedOverrideProfileId}
+              isLoading={profilesLoading}
+              isError={!!profilesError && !profilesData}
+              onRetry={() => {
+                void refetchProfiles();
+              }}
               overrideCandidatesCount={overrideCandidates.length}
               formatCounts={formatCounts}
               onEditProfile={openEditDialog}
@@ -208,42 +171,6 @@ export function ProfilePickerPopover({
             />
           )}
 
-          {devcontainerToggle && (
-            <section
-              className={cn(
-                'bg-accent/10 mt-3 rounded-lg border px-3 py-2.5',
-                devcontainerToggle.disabled && 'opacity-70'
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wider">
-                    Experimental runtime
-                  </p>
-                  <label
-                    htmlFor={devcontainerToggleId}
-                    className={cn(
-                      'block text-xs font-medium',
-                      devcontainerToggle.disabled ? 'cursor-not-allowed' : 'cursor-pointer'
-                    )}
-                  >
-                    Dev container support
-                  </label>
-                  <p id={devcontainerDescriptionId} className="text-muted-foreground mt-1 text-xs">
-                    Experimental. Remembered in this browser.
-                  </p>
-                </div>
-                <Switch
-                  id={devcontainerToggleId}
-                  checked={devcontainerToggle.checked}
-                  onCheckedChange={devcontainerToggle.onCheckedChange}
-                  disabled={devcontainerToggle.disabled}
-                  aria-describedby={devcontainerDescriptionId}
-                />
-              </div>
-            </section>
-          )}
-
           <div className="my-3 border-t" />
 
           <div className="flex gap-2">
@@ -252,7 +179,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(true);
-                setShowManageProfiles(true);
+                openManageProfiles();
               }}
             >
               <Plus className="h-3 w-3 shrink-0" />
@@ -263,7 +190,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(false);
-                setShowManageProfiles(true);
+                openManageProfiles();
               }}
             >
               <FolderCog className="h-3 w-3 shrink-0" />
@@ -276,16 +203,18 @@ export function ProfilePickerPopover({
       <ProfilesListDialog
         organizationId={organizationId}
         open={showManageProfiles}
-        onOpenChange={open => {
-          setShowManageProfiles(open);
-          if (!open) {
-            setOpenToNewProfile(false);
-            setEditProfileId(null);
+        onOpenChange={nextOpen => {
+          if (nextOpen) {
+            setShowManageProfiles(true);
+            setSection('profiles');
+            return;
           }
+          closeManageProfiles();
         }}
+        onSectionChange={setSection}
         onProfileSelect={id => {
           onOverrideProfileSelect(id);
-          setShowManageProfiles(false);
+          closeManageProfiles();
         }}
         openToNewProfile={openToNewProfile}
         initialSelectedProfileId={editProfileId}
@@ -327,12 +256,18 @@ type ActiveProfileViewProps = {
   topProfile: ProfileSummaryWithOwner | null;
   topSource: 'repo-binding' | 'default' | 'explicit' | null;
   allProfiles: ProfileSummaryWithOwner[];
+  selectedOverrideProfileId: string | null;
+  /** The profiles query is still resolving; show a loading row, never the empty state. */
+  isLoading: boolean;
+  /** The profiles query failed; offer a retry instead of the empty state. */
+  isError: boolean;
+  onRetry: () => void;
   overrideCandidatesCount: number;
   formatCounts: (p: ProfileSummaryWithOwner) => string;
   onEditProfile: (id: string) => void;
   onStartPickOverride: () => void;
   onRemoveOverride: () => void;
-  onSelectProfile: (id: string) => void;
+  onSelectProfile: (id: string | null) => void;
 };
 
 function ActiveProfileView({
@@ -340,6 +275,10 @@ function ActiveProfileView({
   topProfile,
   topSource,
   allProfiles,
+  selectedOverrideProfileId,
+  isLoading,
+  isError,
+  onRetry,
   overrideCandidatesCount,
   formatCounts,
   onEditProfile,
@@ -347,6 +286,31 @@ function ActiveProfileView({
   onRemoveOverride,
   onSelectProfile,
 }: ActiveProfileViewProps) {
+  // The list is still resolving — never claim the user has no profiles.
+  if (isLoading) {
+    return (
+      <div className="text-muted-foreground flex min-h-24 items-center justify-center gap-2 text-xs">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Loading profiles…
+      </div>
+    );
+  }
+
+  // A failed list request is retryable — never present it as "no profiles".
+  if (isError) {
+    return (
+      <div className="flex min-h-24 flex-col items-center justify-center gap-2 text-xs">
+        <p className="text-destructive flex items-center gap-1.5">
+          <AlertCircle className="h-3.5 w-3.5" />
+          Could not load profiles.
+        </p>
+        <Button variant="outline" size="sm" onClick={onRetry} className="h-7 px-2 text-xs">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   // Nothing selected at all and no profiles exist.
   if (!baseProfile && !topProfile && allProfiles.length === 0) {
     return (
@@ -357,7 +321,8 @@ function ActiveProfileView({
   }
 
   // No base and no top, but profiles exist — show the picker list directly so
-  // the user can select one with a single click.
+  // the user can select one with a single click. "No profile" stays the first
+  // row so the current (unset) choice is visible and can be kept.
   if (!baseProfile && !topProfile) {
     return (
       <>
@@ -365,12 +330,17 @@ function ActiveProfileView({
           Pick a profile
         </p>
         <div className="max-h-48 space-y-0.5 overflow-y-auto">
+          <PickerRow
+            label="No profile"
+            isSelected={!selectedOverrideProfileId}
+            onClick={() => onSelectProfile(null)}
+          />
           {allProfiles.map(profile => (
             <PickerRow
               key={profile.id}
               label={profile.name}
               meta={formatCounts(profile)}
-              isSelected={false}
+              isSelected={profile.id === selectedOverrideProfileId}
               onClick={() => onSelectProfile(profile.id)}
             />
           ))}

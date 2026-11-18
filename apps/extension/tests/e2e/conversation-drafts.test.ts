@@ -25,7 +25,6 @@ test('per-conversation drafts are preserved when switching tabs', async () => {
 
     const input = sidePanel.getByLabel('Message agent');
 
-    // Wait for the panel to be ready (model loaded)
     await expect(sidePanel.getByLabel('Model')).not.toContainText('Loading');
 
     // Type a draft in conversation 1
@@ -44,7 +43,6 @@ test('per-conversation drafts are preserved when switching tabs', async () => {
     await sidePanel.getByRole('tab', { name: /Conversation 1/u }).click();
     await expect(input).toHaveValue('draft A');
 
-    // Switch to conversation 2 — draft B restored
     await sidePanel.getByRole('tab', { name: /Conversation 2/u }).click();
     await expect(input).toHaveValue('draft B');
   } finally {

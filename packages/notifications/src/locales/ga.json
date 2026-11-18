@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Tá nuashonrú ar do sheisiún ghníomhaire",
+      "lowBalance": "Teastaíonn aird ar do chothromas",
+      "spendAlert": "Teastaíonn aird ar do chaiteachas",
+      "securityFinding": "Teastaíonn aird ar thátal slándála",
+      "securityUpdate": "Tá nuashonrú ar sheiceáil slándála",
+      "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Foláireamh chothromas íseal",
+      "body": "Thit cothromas {{organizationName}} faoi ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Foláireamh caiteachais",
+      "body": "Sháraigh caiteachas {{scopeName}} ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Tátal slándála nua ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Rabhadh SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Sárú SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Tá do sheisiún Kilo réidh le rialú ó do ghuthán"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

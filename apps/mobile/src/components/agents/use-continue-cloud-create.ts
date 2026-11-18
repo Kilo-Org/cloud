@@ -1,31 +1,42 @@
-// The cloud-agent leg of `useContinueSession`: one `prepareSession` call, its
-// hoisted operation key, and the contained post-success UI work. Split out of
-// `use-continue-session.ts` (which keeps the paging drain, destination
-// resolution, and the remote spawn leg) so each file stays under the
-// max-lines limit.
+// Performs one `prepareSession` clone for the Cloud Agent Continue entry
+// through the shared `prepareAgentSession` core: the hoisted operation key,
+// the safe-retry outbox row, and the post-success navigation stay here.
 import { useCallback } from 'react';
-import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
+import { type Href } from 'expo-router';
 
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
-import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { withComposerHandoff } from '@/lib/share-navigation';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { prepareAgentSession } from '@/lib/app-actions/prepare-agent-session';
+import { useTRPC } from '@/lib/trpc';
+
+/** The Continue form's destination, plus the fork cut when forking from a message. */
+type ContinueCloudDestination = {
+  repository: NewSessionRepository | null;
+  model: string;
+  variant: string;
+  /** Inclusive fork cut; absent clones the whole session. */
+  cloneUpToMessageId?: string;
+  /** A forked user message's text, prefilled (never sent) in the new composer. */
+  forkPrefillText?: string;
+};
 
 export function useContinueCloudCreate(
-  organizationId: string | undefined
-): (
-  seed: string,
-  dest: { repo: string; model: string; variant: string },
-  mode: string
-) => Promise<void> {
-  const router = useRouter();
+  organizationId: string | undefined,
+  /** Invoked once the clone settled, right before the success navigation. */
+  onCreated?: () => void
+): (sessionId: KiloSessionId, dest: ContinueCloudDestination, mode: string) => Promise<void> {
+  const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   // P1-A-08b: cloud prepares and remote spawns are different intents, so each
@@ -41,91 +52,71 @@ export function useContinueCloudCreate(
   } = useMutationOutbox();
 
   return useCallback(
-    async (seed: string, dest: { repo: string; model: string; variant: string }, mode: string) => {
-      const intentFingerprint = JSON.stringify({
-        seed,
-        repo: dest.repo,
-        model: dest.model,
-        variant: dest.variant || undefined,
-        mode,
-        organizationId: organizationId ?? null,
-      });
-      // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
-      // fresh key only when no stored row exists. A stored row must never be
-      // replaced by a new in-memory key. Gate on the outbox load first: a
-      // continue that races the launch load would read empty rows and mint a
-      // duplicate.
-      // A failed outbox read reads as no stored rows, so refuse instead of
-      // minting a fresh key over a row whose POST the server may have accepted.
-      if (!(await whenLoaded())) {
-        throw new Error('Could not read pending sessions. Try again.');
+    async (sessionId: KiloSessionId, dest: ContinueCloudDestination, mode: string) => {
+      const outcome = await prepareAgentSession(
+        {
+          kind: 'continue',
+          cloneFromKiloSessionId: sessionId,
+          ...(dest.cloneUpToMessageId ? { cloneUpToMessageId: dest.cloneUpToMessageId } : {}),
+          repository: dest.repository,
+          mode: normalizeAgentMode(mode),
+          model: dest.model,
+          variant: dest.variant,
+          organizationId,
+        },
+        {
+          getKey: (fingerprint: string) => cloudOperationKey.getKey(fingerprint),
+          rotateKey: () => {
+            cloudOperationKey.rotateKey();
+          },
+          getStoredOperationKey,
+          writeSafeRetry,
+          removeOutboxRow,
+          whenLoaded,
+          // Cache invalidation is React Query's; the core owns when it runs.
+          invalidate: async () => {
+            await invalidateAgentSessionQueries(queryClient, trpc);
+          },
+        }
+      );
+
+      if (!outcome.ok) {
+        // The route reports the failure and keeps the form open: a retryable
+        // rejection kept the operation key and the safe-retry row, so the next
+        // Continue replays the same intent instead of minting a duplicate.
+        // Rethrow the rejection the core caught so the route's own
+        // retryable/terminal classification (and the copy it picks) is exactly
+        // what it was before the shared core owned the call.
+        throw outcome.error ?? new Error(outcome.message);
       }
-      const operationKey =
-        getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
-      const initialMessageId = generateMessageId();
-      const baseInput = {
-        prompt: seed,
-        initialMessageId,
-        mode: normalizeAgentMode(mode),
-        model: dest.model,
-        variant: dest.variant || undefined,
-        githubRepo: dest.repo,
-        autoCommit: false,
-        autoInitiate: true,
-        operationKey,
-      };
+
+      // The cloud session already exists, so no post-success UI failure may
+      // report the create as failed or invite a duplicate retry. Each step is
+      // contained on its own so one failure cannot skip the navigation.
       try {
-        // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
-        // reuses the same key on relaunch instead of minting a duplicate.
-        await writeSafeRetry({
-          operationKey,
-          fingerprint: intentFingerprint,
-          input: baseInput,
-        });
-
-        const result = organizationId
-          ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-              ...baseInput,
-              organizationId,
-            })
-          : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
-        // The intent settled; the next submit is a fresh intent. Rotate
-        // before the post-success work so a UI failure cannot keep the
-        // successful key for a retry or rotate it a second time.
-        cloudOperationKey.rotateKey();
-        await removeOutboxRow(intentFingerprint);
-
-        // The cloud session already exists, so no post-success UI failure may
-        // report the create as failed or invite a duplicate retry. Each step is
-        // contained on its own so one failure cannot skip the navigation.
-        try {
-          captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-        } catch {
-          // Analytics is best-effort; stay silent.
-        }
-        try {
-          await invalidateAgentSessionQueries(queryClient, trpc);
-        } catch {
-          // A failed cache invalidation is cosmetic; navigation must still run.
-        }
-        try {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {
-          // A failed haptics call is cosmetic; stay silent and navigate.
-        }
-        try {
-          router.push(getAgentSessionPath(result.kiloSessionId, organizationId));
-        } catch {
-          // A navigation failure is not a create failure.
-        }
-      } catch (error) {
-        // Only `prepareSession` errors reach here; UI failures are contained
-        // above. A typed terminal rejection ends the intent.
-        if (!isCloudPrepareRetryableError(error)) {
-          cloudOperationKey.rotateKey();
-          await removeOutboxRow(intentFingerprint);
-        }
-        throw error;
+        captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
+      } catch {
+        // Analytics is best-effort; stay silent.
+      }
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
+      try {
+        // Arm the route's busy leave-lock bypass right before the replace so
+        // the success navigation is not intercepted as an abandon.
+        onCreated?.();
+      } catch {
+        // The session exists; a host callback failure must not skip navigation.
+      }
+      try {
+        // Replace (not push) the continue form with the cloned session so
+        // back from the new session returns to the source session. A forked
+        // user message only prefills the new composer, never auto-sends.
+        router.replace(
+          withComposerHandoff(getAgentSessionPath(outcome.sessionId, organizationId) as string, {
+            forkPrefillText: dest.forkPrefillText,
+          }) as Href
+        );
+      } catch {
+        // A navigation failure is not a create failure.
       }
     },
     [
@@ -138,6 +129,7 @@ export function useContinueCloudCreate(
       writeSafeRetry,
       removeOutboxRow,
       whenLoaded,
+      onCreated,
     ]
   );
 }

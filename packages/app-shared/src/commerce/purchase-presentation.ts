@@ -9,13 +9,6 @@
 /** Kilo Pass plan title. Consumed by mobile and E2E; keep exact. */
 export const KILO_PASS_TITLE = 'Kilo Pass';
 
-/** Android unavailable description. Consumed by mobile and E2E; keep exact. */
-export const KILO_PASS_UNAVAILABLE_DESCRIPTION =
-  'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.';
-
-/** Web-management description. Consumed by mobile and E2E; keep exact. */
-export const KILO_PASS_WEB_MANAGEMENT_DESCRIPTION = 'This Kilo Pass is managed on the web.';
-
 /** Label for the web-management CTA. Consumed by mobile and E2E; keep exact. */
 export const KILO_PASS_MANAGE_CTA_LABEL = 'Manage';
 
@@ -28,7 +21,7 @@ export type PurchaseStorefront = (typeof PURCHASE_STOREFRONTS)[number];
 export const PURCHASE_PRODUCTS = ['kilo_pass', 'credits'] as const;
 export type PurchaseProduct = (typeof PURCHASE_PRODUCTS)[number];
 
-export const PURCHASE_PRESENTATION_KINDS = ['native_iap', 'web_management', 'unavailable'] as const;
+export const PURCHASE_PRESENTATION_KINDS = ['web_management', 'unavailable'] as const;
 export type PurchasePresentationKind = (typeof PURCHASE_PRESENTATION_KINDS)[number];
 
 export const PURCHASE_STATUS_CLASSES = [
@@ -61,7 +54,7 @@ export type PurchasePresentationCta = {
 
 export type PurchasePresentationReason =
   | 'credits_not_sold_on_ios'
-  | 'kilo_pass_not_available_on_android'
+  | 'kilo_pass_not_sold_in_app'
   | 'unsupported_combination'
   | null;
 
@@ -100,7 +93,7 @@ function webCta(webPath: string): PurchasePresentationCta {
 export function resolvePurchasePresentation(
   input: ResolvePurchasePresentationInput
 ): PurchasePresentation {
-  const { platform, storefront, product, hasStripeManagedPass } = input;
+  const { platform, product, hasStripeManagedPass } = input;
   const program = input.program ?? null;
 
   // Credits are not sold in the iOS app.
@@ -113,27 +106,19 @@ export function resolvePurchasePresentation(
     return { kind: 'web_management', reason: null, cta: webCta('/credits'), program };
   }
 
-  // Kilo Pass native IAP is allowed only for iOS App Store.
-  if (product === 'kilo_pass' && platform === 'ios' && storefront === 'app_store') {
-    return { kind: 'native_iap', reason: null, cta: NO_CTA, program };
-  }
-
-  // Android Kilo Pass is never native IAP.
-  if (product === 'kilo_pass' && platform === 'android') {
-    if (hasStripeManagedPass) {
-      return {
-        kind: 'web_management',
-        reason: null,
-        cta: webCta('/subscriptions/kilo-pass'),
-        program,
-      };
-    }
+  // Kilo Pass is sold on the web only. An Android Stripe subscriber manages it on the web.
+  // iOS gets no web link: App Review restricts links to purchases outside the app.
+  if (product === 'kilo_pass' && platform === 'android' && hasStripeManagedPass) {
     return {
-      kind: 'unavailable',
-      reason: 'kilo_pass_not_available_on_android',
-      cta: NO_CTA,
+      kind: 'web_management',
+      reason: null,
+      cta: webCta('/subscriptions/kilo-pass'),
       program,
     };
+  }
+
+  if (product === 'kilo_pass' && (platform === 'ios' || platform === 'android')) {
+    return { kind: 'unavailable', reason: 'kilo_pass_not_sold_in_app', cta: NO_CTA, program };
   }
 
   // Any other combo, including a missing platform, is unavailable.
@@ -142,10 +127,11 @@ export function resolvePurchasePresentation(
 
 /**
  * Map a Kilo Pass subscription status (plus whether a subscription exists) to
- * a presentation status class.
+ * a presentation status class. `status` accepts the provider's value as-is: the
+ * listed statuses are the known ones and anything else presents as inactive.
  */
 export function mapKiloPassStatusToClass(
-  status: KiloPassSubscriptionStatus,
+  status: string,
   options: { hasSubscription: boolean }
 ): PurchaseStatusClass {
   if (!options.hasSubscription) return 'inactive';
@@ -167,17 +153,4 @@ export function mapKiloPassStatusToClass(
     default:
       return 'inactive';
   }
-}
-
-/**
- * True only for iOS App Store Kilo Pass, the single native IAP combination.
- */
-export function isNativeIapMutationAllowed(input: {
-  platform: PurchasePlatform | null | undefined;
-  storefront: PurchaseStorefront | null | undefined;
-  product: PurchaseProduct;
-}): boolean {
-  return (
-    input.platform === 'ios' && input.storefront === 'app_store' && input.product === 'kilo_pass'
-  );
 }

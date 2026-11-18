@@ -144,7 +144,6 @@ describe('DataExportsTable', () => {
       })
     );
 
-    // Links and navigation targets
     expect(html).toContain('href="/admin/users/user-1"');
     expect(html).toContain('href="/admin/organizations/5f9022b7-424e-4fa8-a0d7-b84cf3fc73ad"');
     expect(html).toContain('href="/admin/data-exports/2c4f8a10-1111-4222-8333-444455556666"');
@@ -161,12 +160,10 @@ describe('DataExportsTable', () => {
     expect(html).toContain('Lease recovery due');
     expect(html).toContain('2 reasons');
 
-    // Status and email badges
     expect(html).toContain('Ready');
     expect(html).toContain('Processing');
     expect(html).toContain('Sent');
 
-    // One-shot and legacy execution state
     expect(html).toContain('One-shot export');
     expect(html).toContain('Legacy generator state');
     expect(html).toContain('Generation 1');

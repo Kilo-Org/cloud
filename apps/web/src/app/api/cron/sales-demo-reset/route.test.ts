@@ -1,0 +1,208 @@
+import { NextRequest } from 'next/server';
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  CRON_SECRET: 'cron-secret',
+}));
+
+// Create + reset each run a full 30-day populate step, so a single test case
+// needs more than the default 5s budget.
+jest.setTimeout(30_000);
+
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  compute_usage_charge,
+  credit_transactions,
+  exa_usage_log,
+  kilocode_users,
+  microdollar_usage,
+  microdollar_usage_daily,
+  microdollar_usage_metadata,
+  organization_groups,
+  organization_group_memberships,
+  organization_memberships,
+  organization_user_limits,
+  organization_user_usage,
+  organizations,
+  sales_demo_spend_ledger,
+} from '@kilocode/db/schema';
+import { eq, inArray, sql } from 'drizzle-orm';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createSalesDemoOrganization, salesDemoMemberId } from '@/lib/organizations/sales-demo';
+import type { User } from '@kilocode/db/schema';
+import { GET } from './route';
+
+async function deleteAllSalesDemoOrgs() {
+  const rows = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(sql`${organizations.settings}->>'is_sales_demo' = 'true'`);
+  const ids = rows.map(row => row.id);
+  if (ids.length === 0) return;
+  const usageIds = db
+    .select({ id: microdollar_usage.id })
+    .from(microdollar_usage)
+    .where(inArray(microdollar_usage.organization_id, ids));
+  await db
+    .delete(microdollar_usage_metadata)
+    .where(inArray(microdollar_usage_metadata.id, usageIds));
+  await db.delete(credit_transactions).where(inArray(credit_transactions.organization_id, ids));
+  await db.delete(microdollar_usage).where(inArray(microdollar_usage.organization_id, ids));
+  await db
+    .delete(microdollar_usage_daily)
+    .where(inArray(microdollar_usage_daily.organization_id, ids));
+  await db
+    .delete(organization_user_usage)
+    .where(inArray(organization_user_usage.organization_id, ids));
+  await db
+    .delete(organization_user_limits)
+    .where(inArray(organization_user_limits.organization_id, ids));
+  await db.delete(exa_usage_log).where(inArray(exa_usage_log.organization_id, ids));
+  await db.delete(compute_usage_charge).where(inArray(compute_usage_charge.organization_id, ids));
+  await db
+    .delete(organization_memberships)
+    .where(inArray(organization_memberships.organization_id, ids));
+  await db
+    .delete(sales_demo_spend_ledger)
+    .where(inArray(sales_demo_spend_ledger.organization_id, ids));
+  await db.delete(organizations).where(inArray(organizations.id, ids));
+}
+
+describe('GET /api/cron/sales-demo-reset', () => {
+  let admin: User;
+  let target: User;
+  let childOrgId: string;
+
+  beforeAll(async () => {
+    await deleteAllSalesDemoOrgs();
+
+    admin = await insertTestUser({
+      google_user_email: 'sales-demo-cron-admin@kilocode.ai',
+      google_user_name: 'Sales Demo Cron Admin',
+      is_admin: true,
+    });
+
+    target = await insertTestUser({
+      google_user_email: 'sales-demo-cron-target@kilocode.ai',
+      google_user_name: 'Sales Demo Cron Target',
+      normalized_email: 'sales-demo-cron-target@kilocode.ai',
+    });
+  });
+
+  afterAll(async () => {
+    if (childOrgId) {
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, childOrgId));
+      await db.delete(organizations).where(eq(organizations.id, childOrgId));
+    }
+    await deleteAllSalesDemoOrgs();
+    const demoIds = Array.from({ length: 25 }, (_, i) => salesDemoMemberId(i + 1));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [admin.id, target.id, ...demoIds]));
+  });
+
+  it('rejects requests without cron authorization', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/cron/sales-demo-reset', { method: 'GET' })
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('rejects requests with invalid cron authorization', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/cron/sales-demo-reset', {
+        method: 'GET',
+        headers: { authorization: 'Bearer wrong-secret' },
+      })
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('refreshes demo credits and usage while preserving membership', async () => {
+    const org = await db.transaction(async tx =>
+      createSalesDemoOrganization({ targetUser: target, adminUser: admin, txn: tx })
+    );
+    const [child] = await db
+      .insert(organizations)
+      .values({
+        name: 'Demo department',
+        parent_organization_id: org.id,
+        created_by_kilo_user_id: target.id,
+      })
+      .returning();
+    childOrgId = child.id;
+    await db.insert(organization_memberships).values([
+      { organization_id: org.id, kilo_user_id: admin.id, role: 'admin' },
+      { organization_id: child.id, kilo_user_id: target.id, role: 'owner' },
+      { organization_id: child.id, kilo_user_id: admin.id, role: 'member' },
+    ]);
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: org.id, name: 'Demo model access' })
+      .returning();
+    await db.insert(organization_group_memberships).values([
+      { organization_id: org.id, group_id: group.id, kilo_user_id: target.id },
+      { organization_id: org.id, group_id: group.id, kilo_user_id: admin.id },
+    ]);
+    const membershipsBefore = await db
+      .select()
+      .from(organization_memberships)
+      .where(inArray(organization_memberships.organization_id, [org.id, child.id]))
+      .orderBy(organization_memberships.id);
+    const groupsBefore = await db
+      .select()
+      .from(organization_group_memberships)
+      .where(eq(organization_group_memberships.organization_id, org.id))
+      .orderBy(organization_group_memberships.kilo_user_id);
+
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: target.id,
+      cost: 2_000_000,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      organization_id: org.id,
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/cron/sales-demo-reset', {
+        method: 'GET',
+        headers: { authorization: 'Bearer cron-secret' },
+      })
+    );
+    const membershipsAfter = await db
+      .select()
+      .from(organization_memberships)
+      .where(inArray(organization_memberships.organization_id, [org.id, child.id]))
+      .orderBy(organization_memberships.id);
+    const groupsAfter = await db
+      .select()
+      .from(organization_group_memberships)
+      .where(eq(organization_group_memberships.organization_id, org.id))
+      .orderBy(organization_group_memberships.kilo_user_id);
+
+    expect(membershipsAfter).toEqual(membershipsBefore);
+    expect(groupsAfter).toEqual(groupsBefore);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ reset: 1, failed: 0 });
+
+    const [reloaded] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, org.id))
+      .limit(1);
+
+    expect(Number(reloaded.microdollars_used)).toBeGreaterThan(0);
+    expect(Number(reloaded.total_microdollars_acquired) - Number(reloaded.microdollars_used)).toBe(
+      25_030_000
+    );
+    expect(Number(reloaded.microdollars_balance)).toBe(25_030_000);
+  });
+});

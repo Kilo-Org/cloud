@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
+import { NETWORK_BODY_CONTEXT, scrubBreadcrumb, scrubEvent } from './sentry-scrub';
 
 describe('scrubEvent', () => {
   it('strips query strings from request.url', () => {
@@ -105,6 +105,151 @@ describe('scrubEvent', () => {
     const result = scrubEvent(event);
 
     expect(result.tags.session).toBe('[redacted]');
+  });
+
+  it('redacts token-shaped runs that mix cases or carry digits', () => {
+    const event = {
+      extra: {
+        upper: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+        hyphenated: 'sk-proj-abc123def456ghi789jkl',
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.upper).toBe('[redacted]');
+    expect(result.extra.hyphenated).toBe('[redacted]');
+  });
+
+  it('redacts token values nested in extra', () => {
+    const event = {
+      extra: { cause: { token: 'abcdefghijklmnopqrst' } },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.cause.token).toBe('[redacted]');
+  });
+
+  it('handles a cyclic extra value without throwing', () => {
+    const cyclic: Record<string, unknown> = { name: 'x' };
+    cyclic.self = cyclic;
+    const event = { extra: cyclic };
+
+    expect(() => scrubEvent(event)).not.toThrow();
+  });
+
+  it('redacts token values in an object reachable through two references', () => {
+    const shared = { token: 'abcdefghijklmnopqrst' };
+    const event = { extra: { first: shared, second: shared } };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.first.token).toBe('[redacted]');
+    expect(result.extra.second.token).toBe('[redacted]');
+  });
+
+  it('redacts token values in a cyclic extra value', () => {
+    const cyclic: Record<string, unknown> = { token: 'abcdefghijklmnopqrst' };
+    cyclic.self = cyclic;
+    const event = { extra: cyclic };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.token).toBe('[redacted]');
+    expect((result.extra.self as Record<string, unknown>).token).toBe('[redacted]');
+  });
+
+  it('redacts token values in the context extraErrorDataIntegration attaches', () => {
+    const event = {
+      exception: { values: [{ type: 'TRPCClientError' }] },
+      contexts: { TRPCClientError: { data: { token: 'abcdefghijklmnopqrst' } } },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts.TRPCClientError.data.token).toBe('[redacted]');
+  });
+
+  it('rebuilds the app payload context from its allow-listed fields', () => {
+    const event = {
+      // The integration replaces `contexts[error.name]`; the payload lives
+      // under a different key, so it survives to be redacted here.
+      exception: { values: [{ type: 'NetworkError' }] },
+      contexts: {
+        NetworkError: {},
+        [NETWORK_BODY_CONTEXT]: {
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'session.list',
+          message: 'alice@example.com signed in twice',
+          email: 'alice@example.com',
+          nested: { token: 'abcdefghijklmnopqrst' },
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'UNAUTHORIZED',
+      httpStatus: 401,
+      path: 'session.list',
+    });
+    expect(JSON.stringify(result.contexts)).not.toContain('alice@example.com');
+    expect(JSON.stringify(result.contexts)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('keeps declared payload fields of the declared type only', () => {
+    const scrub = (payload: Record<string, unknown>) =>
+      scrubEvent({
+        exception: { values: [{ type: 'NetworkError' }] },
+        contexts: { [NETWORK_BODY_CONTEXT]: payload },
+      }).contexts[NETWORK_BODY_CONTEXT];
+
+    expect(
+      scrub({ code: { text: 'UNAUTHORIZED' }, httpStatus: '401 a@b.example', path: ['a.b'] })
+    ).toEqual({});
+    // Word-chain codes and procedure paths stay readable, like the `trpc.*`
+    // tags; a token-shaped run is redacted at any depth.
+    expect(
+      scrub({
+        code: 'INTERNAL_SERVER_ERROR',
+        httpStatus: 500,
+        path: 'cliSessionsV2.getSessionMessagesPage',
+      })
+    ).toEqual({
+      code: 'INTERNAL_SERVER_ERROR',
+      httpStatus: 500,
+      path: 'cliSessionsV2.getSessionMessagesPage',
+    });
+    expect(scrub({ code: 'abcdefghijklmnopqrst', path: 'a.b' })).toEqual({
+      code: '[redacted]',
+      path: 'a.b',
+    });
+  });
+
+  it('leaves structured network and trace contexts intact', () => {
+    const event = {
+      exception: { values: [{ type: 'TypeError' }] },
+      contexts: {
+        TypeError: { data: { code: 'FORBIDDEN' } },
+        network: {
+          url: 'https://api.example.com/api/trpc/cliSessionsV2.getSessionMessagesPage',
+          procedure: 'cliSessionsV2.getSessionMessagesPage',
+          trpcCode: 'INTERNAL_SERVER_ERROR',
+        },
+        trace: { trace_id: 'abcdef0123456789abcdef0123456789' },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts.network.url).toBe(
+      'https://api.example.com/api/trpc/cliSessionsV2.getSessionMessagesPage'
+    );
+    expect(result.contexts.network.trpcCode).toBe('INTERNAL_SERVER_ERROR');
+    expect(result.contexts.trace.trace_id).toBe('abcdef0123456789abcdef0123456789');
   });
 
   it('returns malformed event unchanged without throwing', () => {

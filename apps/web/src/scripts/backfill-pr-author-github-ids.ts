@@ -7,7 +7,7 @@
  * Run with: USE_PRODUCTION_DB=true pnpm script src/scripts/backfill-pr-author-github-ids.ts
  */
 
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { isNull, eq, gt, and, asc } from 'drizzle-orm';
 import { Octokit } from '@octokit/rest';

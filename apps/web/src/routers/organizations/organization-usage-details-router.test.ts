@@ -1,7 +1,10 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   agent_environment_profiles,
@@ -77,7 +80,7 @@ describe('organizations usage details trpc router', () => {
         organizationId: testOrganization.id,
       });
 
-      expect(result.checks).toHaveLength(6);
+      expect(result.checks).toHaveLength(5);
       expect(result.checks.every(check => !check.adopted)).toBe(true);
     });
 

@@ -1,6 +1,9 @@
 import 'server-only';
 
-import { BITBUCKET_CLIENT_ID, BITBUCKET_CLIENT_SECRET } from '@/lib/config.server';
+import {
+  BITBUCKET_CLIENT_ID,
+  BITBUCKET_CLIENT_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
 import { MAX_BITBUCKET_WORKSPACES, type BitbucketWorkspace } from './metadata';
 import { z } from 'zod';
 

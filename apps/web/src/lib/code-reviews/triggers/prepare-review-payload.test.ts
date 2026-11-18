@@ -1,3 +1,5 @@
+import { captureException } from '@sentry/nextjs';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 const mockGenerateGitHubInstallationToken = jest.fn();
 const mockFindKiloReviewComment = jest.fn();
 const mockFetchPRInlineComments = jest.fn();
@@ -37,6 +39,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabRootTextFileAtRef: (...args: unknown[]) => mockFetchGitLabRootTextFileAtRef(...args),
   fetchGitLabRepositorySize: (...args: unknown[]) => mockFetchGitLabRepositorySize(...args),
   GitLabProjectAccessTokenPermissionError: class GitLabProjectAccessTokenPermissionError extends Error {},
+  GitLabAuthenticationError: class GitLabAuthenticationError extends Error {},
 }));
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
@@ -62,8 +65,8 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
@@ -73,6 +76,11 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { eq, or } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import {
+  GitLabAuthenticationError,
+  GitLabProjectAccessTokenPermissionError,
+} from '@/lib/integrations/platforms/gitlab/adapter';
 import { prepareReviewPayload } from './prepare-review-payload';
 
 const REPO = `test-org/prepare-review-payload-${Date.now()}`;
@@ -134,21 +142,54 @@ function defineReview(
 
 describe('prepareReviewPayload', () => {
   let testUser: User;
+  let otherUser: User;
   let testOrganizationId: string;
+  let otherOrganizationId: string;
   let integration: PlatformIntegration;
+  let organizationIntegration: PlatformIntegration;
+  let otherUserIntegration: PlatformIntegration;
+  let otherOrganizationIntegration: PlatformIntegration;
   let gitlabIntegration: PlatformIntegration;
   let bitbucketIntegration: PlatformIntegration;
 
   beforeAll(async () => {
     testUser = await insertTestUser();
+    otherUser = await insertTestUser();
     const [organization] = await db
       .insert(organizations)
       .values({ name: `Prepare Review Payload ${Date.now()}` })
       .returning({ id: organizations.id });
     testOrganizationId = organization.id;
+    const [otherOrganization] = await db
+      .insert(organizations)
+      .values({ name: `Prepare Review Payload Other ${Date.now()}` })
+      .returning({ id: organizations.id });
+    otherOrganizationId = otherOrganization.id;
     [integration] = await db
       .insert(platform_integrations)
       .values(defineIntegration(testUser.id))
+      .returning();
+    [organizationIntegration] = await db
+      .insert(platform_integrations)
+      .values(
+        defineIntegration(testUser.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+        })
+      )
+      .returning();
+    [otherUserIntegration] = await db
+      .insert(platform_integrations)
+      .values(defineIntegration(otherUser.id))
+      .returning();
+    [otherOrganizationIntegration] = await db
+      .insert(platform_integrations)
+      .values(
+        defineIntegration(testUser.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: otherOrganizationId,
+        })
+      )
       .returning();
     [gitlabIntegration] = await db
       .insert(platform_integrations)
@@ -258,9 +299,55 @@ describe('prepareReviewPayload', () => {
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.id, gitlabIntegration.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, otherOrganizationIntegration.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, otherUserIntegration.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, organizationIntegration.id));
     await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+    await db.delete(organizations).where(eq(organizations.id, otherOrganizationId));
     await db.delete(organizations).where(eq(organizations.id, testOrganizationId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUser.id));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('captures explicit runtime rejection diagnostics alongside the review ID', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const diagnostics = {
+      installationId: integration.platform_installation_id ?? 'installation-1',
+      appType: 'standard' as const,
+      integrationIds: [integration.id],
+    };
+    const error = new GitHubRuntimeAuthorizationError('blocked_personal_owner', diagnostics);
+    mockGenerateGitHubInstallationToken.mockRejectedValueOnce(error);
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner,
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toBe(error);
+    expect(captureException).toHaveBeenCalledWith(error, {
+      tags: {
+        operation: 'prepareReviewPayload',
+        githubRuntimeAuthorizationReason: 'blocked_personal_owner',
+      },
+      extra: {
+        reviewId: review.id,
+        owner,
+        platform: 'github',
+        githubRuntimeAuthorization: { reason: 'blocked_personal_owner', ...diagnostics },
+      },
+    });
   });
 
   it('fetches GitHub REVIEW.md from the base ref when enabled and persists used metadata', async () => {
@@ -303,14 +390,17 @@ describe('prepareReviewPayload', () => {
         platform: 'github',
         repoFullName: REPO,
         prNumber: 123,
+        platformIntegrationId: integration.id,
       },
       'headsha123'
     );
     expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
       body: null,
       headSha: null,
+      observed: true,
     });
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: true,
       ref: 'main',
       truncated: false,
@@ -345,9 +435,138 @@ describe('prepareReviewPayload', () => {
     expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
       body: previousSummaryBody,
       headSha: 'previous-head-sha',
+      observed: true,
     });
     expect(mockUpdatePreviousReviewSummary.mock.invocationCallOrder[0]).toBeLessThan(
       mockGenerateReviewPrompt.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('snapshots a resolved GitHub summary when a sibling lookup rejects', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const summaryBody = '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings';
+    mockFindKiloReviewComment.mockResolvedValueOnce({ commentId: 99, body: summaryBody });
+    mockFetchPRInlineComments.mockRejectedValueOnce(new Error('inline lookup failed'));
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockFindKiloReviewComment).toHaveBeenCalledTimes(1);
+    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
+      body: summaryBody,
+      headSha: null,
+      observed: true,
+    });
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({ existingReviewState: null })
+    );
+  });
+
+  it('snapshots observed false when the GitHub summary lookup rejects', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    mockFindKiloReviewComment.mockRejectedValueOnce(new Error('summary lookup failed'));
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockFindKiloReviewComment).toHaveBeenCalledTimes(1);
+    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
+      body: null,
+      headSha: null,
+      observed: false,
+    });
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({ existingReviewState: null })
+    );
+  });
+
+  it('snapshots a resolved GitLab summary when a sibling lookup rejects', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    const summaryBody = '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings';
+    mockFindKiloReviewNote.mockResolvedValueOnce({ noteId: 88, body: summaryBody });
+    mockGetMRDiffRefs.mockRejectedValueOnce(new Error('diff refs lookup failed'));
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'gitlab',
+    });
+
+    expect(mockFindKiloReviewNote).toHaveBeenCalledTimes(1);
+    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
+      body: summaryBody,
+      headSha: null,
+      observed: true,
+    });
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({ existingReviewState: null })
+    );
+  });
+
+  it('snapshots observed false when the GitLab summary lookup rejects', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    mockFindKiloReviewNote.mockRejectedValueOnce(new Error('summary lookup failed'));
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'gitlab',
+    });
+
+    expect(mockFindKiloReviewNote).toHaveBeenCalledTimes(1);
+    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
+      body: null,
+      headSha: null,
+      observed: false,
+    });
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({ existingReviewState: null })
     );
   });
 
@@ -467,6 +686,8 @@ describe('prepareReviewPayload', () => {
       gitToken: 'gitlab-project-token',
       platform: 'gitlab',
     });
+    // GitLab sessions are reused across reviews, so the publication self-check is GitHub-only.
+    expect(payload.sessionInput).not.toHaveProperty('envVars');
     expect(payload.repositorySize).toBe('100 MB');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
     expect(mockFetchGitLabRepositorySize).toHaveBeenCalledWith(
@@ -480,6 +701,7 @@ describe('prepareReviewPayload', () => {
         platform: 'gitlab',
         repoFullName: REPO,
         prNumber: 123,
+        platformIntegrationId: gitlabIntegration.id,
       },
       'headsha123'
     );
@@ -500,6 +722,7 @@ describe('prepareReviewPayload', () => {
       })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: true,
       ref: 'main',
       truncated: false,
@@ -554,6 +777,97 @@ describe('prepareReviewPayload', () => {
         platform: 'gitlab',
       })
     ).rejects.toThrow('is missing its integration');
+  });
+
+  it('reports a rejected GitLab credential as a reconnect problem', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    // The service wraps the adapter refusal, so the cause carries the kind.
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message:
+          'GitLab rejected the connected credential. Reconnect the GitLab integration and try again.',
+        cause: new GitLabAuthenticationError(456, 401, 'GitLab rejected the credential.'),
+      })
+    );
+
+    const failure = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'gitlab',
+    }).catch((error: unknown) => error);
+
+    expect((failure as Error).message).toBe(
+      `GitLab rejected the connected credential while preparing this review of ${REPO}. Reconnect the GitLab integration, then retry.`
+    );
+    expect((failure as Error).message).not.toContain('Maintainer');
+  });
+
+  it('reports a broker reconnect refusal as a reconnect problem', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'GitLab integration must be reconnected',
+      })
+    );
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'gitlab',
+      })
+    ).rejects.toThrow('Reconnect the GitLab integration, then retry.');
+  });
+
+  it('keeps Maintainer-role guidance when GitLab refuses the role', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenPermissionError(
+        456,
+        403,
+        'Insufficient permissions to create Project Access Token for project 456. Requires Maintainer role or higher.'
+      )
+    );
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'gitlab',
+      })
+    ).rejects.toThrow('You need Maintainer role or higher');
   });
 
   it('prepares a fresh tokenless Bitbucket review from exact organization integration identity', async () => {
@@ -727,6 +1041,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -777,6 +1092,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -804,6 +1120,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -836,6 +1153,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -874,6 +1192,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -885,7 +1204,7 @@ describe('prepareReviewPayload', () => {
       .insert(cloud_agent_code_reviews)
       .values(defineReview(testUser.id, integration.id))
       .returning();
-    mockFetchGitHubRootTextFileAtRef.mockResolvedValueOnce('a'.repeat(10_005));
+    mockFetchGitHubRootTextFileAtRef.mockResolvedValueOnce('a'.repeat(20_005));
 
     await prepareReviewPayload({
       reviewId: review.id,
@@ -895,6 +1214,7 @@ describe('prepareReviewPayload', () => {
     });
 
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: true,
       ref: 'main',
       truncated: true,
@@ -905,7 +1225,7 @@ describe('prepareReviewPayload', () => {
       123,
       expect.objectContaining({
         repositoryReviewInstructions: expect.stringContaining(
-          '[REVIEW.md truncated after 10000 characters.]'
+          '[REVIEW.md truncated after 20000 characters.]'
         ),
       })
     );
@@ -939,7 +1259,9 @@ describe('prepareReviewPayload', () => {
       githubRepo: REPO,
       platform: 'github',
       upstreamBranch: 'refs/pull/1234/head',
+      githubPullRequestNumber: 1234,
     });
+    expect(payload.sessionInput).not.toHaveProperty('envVars');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 
@@ -978,5 +1300,165 @@ describe('prepareReviewPayload', () => {
       platform: 'github',
       upstreamBranch: 'refs/pull/1235/head',
     });
+  });
+
+  it('continues the previous GitLab session found within the review integration', async () => {
+    const prNumber = 1236;
+    mockFindPreviousCompletedReview.mockResolvedValueOnce({
+      head_sha: 'gitlab-previous-sha',
+      session_id: 'previous-gitlab-cloud-agent-session',
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          pr_number: prNumber,
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/${prNumber}`,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected inserted review');
+    }
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      agentConfig: {
+        config: baseAgentConfig,
+      },
+      platform: 'gitlab',
+    });
+
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'gitlab',
+        repoFullName: REPO,
+        prNumber,
+        platformIntegrationId: gitlabIntegration.id,
+      },
+      'headsha123'
+    );
+    expect(payload.previousCloudAgentSessionId).toBe('previous-gitlab-cloud-agent-session');
+  });
+
+  it('prepares an organization review with the organization integration', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, organizationIntegration.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+        })
+      )
+      .returning();
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'org', id: testOrganizationId, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(payload.owner).toEqual({ type: 'org', id: testOrganizationId, userId: testUser.id });
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledWith(
+      organizationIntegration.platform_installation_id,
+      'standard',
+      organizationIntegration.id
+    );
+    expect(payload.sessionInput).toMatchObject({
+      githubToken: 'github-token',
+      platform: 'github',
+    });
+  });
+
+  it('prepares a personal review with the personal integration', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledWith(
+      integration.platform_installation_id,
+      'standard',
+      integration.id
+    );
+  });
+
+  it('rejects a review whose integration belongs to another user', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, otherUserIntegration.id))
+      .returning();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toThrow(`Provider Code Reviewer job ${review.id} integration is unavailable`);
+
+    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects an organization review whose integration belongs to another organization', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, otherOrganizationIntegration.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+        })
+      )
+      .returning();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'org', id: testOrganizationId, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toThrow(`Provider Code Reviewer job ${review.id} integration is unavailable`);
+
+    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a personal review whose integration is organization owned', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, organizationIntegration.id))
+      .returning();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toThrow('integration is unavailable');
+
+    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
   });
 });

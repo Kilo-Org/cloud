@@ -1,0 +1,272 @@
+import { modelsByProvider } from '@kilocode/db/schema';
+import type {
+  GatewayModelMap,
+  GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getSnapshotModelVariantId,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  normalizeInferenceProviderId,
+  normalizeVercelInferenceProviderIdForRouting,
+  openRouterToVercelInferenceProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { modelTrains } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
+import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { desc } from 'drizzle-orm';
+
+export type ModelIdToProviderSlugsIndex = ReadonlyMap<string, ReadonlySet<string>>;
+
+type ProviderIndexCacheState = {
+  expiresAtMs: number;
+  index: ModelIdToProviderSlugsIndex;
+  dataCollectionRequiredModelIds: ReadonlySet<string>;
+};
+
+export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
+
+type ProviderIndexLoaderOptions = {
+  fetchSnapshot: FetchModelsByProviderSnapshot;
+  fetchOpenRouterModels: () => Promise<GatewayModelMap>;
+  fetchVercelModels: () => Promise<GatewayModelMap>;
+  ttlMs: number;
+  nowMs: () => number;
+};
+
+/**
+ * Provider slugs that serve one exact model variant, derived from the gateway
+ * endpoint metadata stored in the metadata cache. Endpoint tags have the shape
+ * `<provider-slug>[/<quantization>]`, so their prefix lives in the same slug
+ * namespace as provider allow lists and `provider.only` routing.
+ */
+export function getEndpointProviderSlugs(model: GatewayModelWithEndpoints): Set<string> {
+  return new Set(
+    model.endpoints.flatMap(endpoint =>
+      endpoint.tag ? [normalizeInferenceProviderId(endpoint.tag)] : []
+    )
+  );
+}
+
+/**
+ * The providers-by-model snapshot collapses variants such as `x/y` and
+ * `x/y:free` onto one entry, so each variant inherits providers that only serve
+ * its sibling. When endpoint metadata exists for the exact variant, keep only
+ * the snapshot providers that actually serve it. Ids without such metadata, and
+ * variants whose endpoints cannot be matched to any snapshot provider, keep the
+ * collapsed provider set so behaviour degrades to the current one instead of
+ * hiding a model that may work.
+ */
+export function narrowProviderSlugsToVariant(
+  snapshotProviderSlugs: ReadonlySet<string>,
+  variantModel: GatewayModelWithEndpoints | undefined
+): ReadonlySet<string> {
+  if (!variantModel) return snapshotProviderSlugs;
+  const variantProviderSlugs = getEndpointProviderSlugs(variantModel);
+  if (variantProviderSlugs.size === 0) return snapshotProviderSlugs;
+  const narrowed = new Set(
+    [...snapshotProviderSlugs].filter(slug => variantProviderSlugs.has(slug))
+  );
+  return narrowed.size > 0 ? narrowed : snapshotProviderSlugs;
+}
+
+/**
+ * The snapshot providers Kilo's own routes can use. BYOK-only providers serve only an
+ * organization's own catalog-mode keys, which are decided per key provider instead (see
+ * `isModelAllowedForProviderKey`).
+ */
+export function getKiloRouteProviders(
+  snapshot: NormalizedOpenRouterResponse
+): NormalizedOpenRouterResponse['providers'] {
+  return snapshot.providers.filter(provider => !provider.byokOnly);
+}
+
+export function buildModelIdToProviderSlugsIndex(
+  snapshot: NormalizedOpenRouterResponse
+): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+
+  for (const provider of getKiloRouteProviders(snapshot)) {
+    for (const model of provider.models) {
+      const normalizedModelId = normalizeModelId(model.slug);
+      const existing = index.get(normalizedModelId);
+
+      if (existing) {
+        existing.add(provider.slug);
+        continue;
+      }
+
+      index.set(normalizedModelId, new Set([provider.slug]));
+    }
+  }
+
+  return index;
+}
+
+/**
+ * Exact gateway model ids that every snapshot provider may train on. A request
+ * that denies data collection has no endpoint to route these to.
+ */
+export function buildDataCollectionRequiredModelIds(
+  snapshot: NormalizedOpenRouterResponse
+): Set<string> {
+  const trainsOnEveryProvider = new Map<string, boolean>();
+  for (const provider of getKiloRouteProviders(snapshot)) {
+    for (const model of provider.models) {
+      const modelId = getSnapshotModelVariantId(model);
+      trainsOnEveryProvider.set(
+        modelId,
+        (trainsOnEveryProvider.get(modelId) ?? true) &&
+          modelTrains(model, provider.dataPolicy.training)
+      );
+    }
+  }
+  return new Set(
+    [...trainsOnEveryProvider].filter(([, trains]) => trains).map(([modelId]) => modelId)
+  );
+}
+
+export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOptions) {
+  let cache: ProviderIndexCacheState | undefined;
+  let inFlight: Promise<ProviderIndexCacheState> | undefined;
+
+  async function loadState(): Promise<ProviderIndexCacheState> {
+    const now = options.nowMs();
+    if (cache && cache.expiresAtMs > now) {
+      return cache;
+    }
+
+    if (inFlight) {
+      return await inFlight;
+    }
+
+    inFlight = (async (): Promise<ProviderIndexCacheState> => {
+      try {
+        const snapshot = await options.fetchSnapshot().catch(() => undefined);
+
+        return {
+          // A failed read retries on the next call so an empty data-collection
+          // set does not stick for the TTL; callers fall back to best-effort checks.
+          expiresAtMs: snapshot ? options.nowMs() + options.ttlMs : options.nowMs(),
+          index: snapshot ? buildModelIdToProviderSlugsIndex(snapshot) : new Map(),
+          dataCollectionRequiredModelIds: snapshot
+            ? buildDataCollectionRequiredModelIds(snapshot)
+            : new Set(),
+        };
+      } finally {
+        inFlight = undefined;
+      }
+    })();
+
+    cache = await inFlight;
+    return cache;
+  }
+
+  async function loadIndex(): Promise<ModelIdToProviderSlugsIndex> {
+    return (await loadState()).index;
+  }
+
+  async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
+    return (await loadState()).dataCollectionRequiredModelIds;
+  }
+
+  async function getProviderSlugsForModels(
+    modelIds: readonly string[]
+  ): Promise<ReadonlyMap<string, ReadonlySet<string>>> {
+    const [index, storedModels, vercelModels] = await Promise.all([
+      loadIndex(),
+      options.fetchOpenRouterModels(),
+      options.fetchVercelModels(),
+    ]);
+    const providersByModel = new Map<string, ReadonlySet<string>>();
+    for (const modelId of new Set(modelIds)) {
+      const snapshotProviderSlugs = index.get(normalizeModelId(modelId));
+      if (!snapshotProviderSlugs) {
+        providersByModel.set(modelId, new Set());
+        continue;
+      }
+      const openRouterProviderSlugs = narrowProviderSlugsToVariant(
+        snapshotProviderSlugs,
+        storedModels[modelId]
+      );
+      const vercelModel = vercelModels[await mapModelIdToVercel(modelId)];
+      const vercelProviders = new Set(
+        vercelModel?.endpoints.map(endpoint =>
+          normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)
+        )
+      );
+      providersByModel.set(
+        modelId,
+        new Set(
+          [...snapshotProviderSlugs].filter(
+            slug =>
+              openRouterProviderSlugs.has(slug) ||
+              vercelProviders.has(openRouterToVercelInferenceProviderId(slug))
+          )
+        )
+      );
+    }
+    return providersByModel;
+  }
+
+  /**
+   * Providers that can serve `modelId`. Accepts variant-suffixed ids such as
+   * `x/y:free`; see `narrowProviderSlugsToVariant`.
+   */
+  async function getProviderSlugsForModel(modelId: string): Promise<ReadonlySet<string>> {
+    return (await getProviderSlugsForModels([modelId])).get(modelId) ?? new Set();
+  }
+
+  return {
+    getIndex: loadIndex,
+    getProviderSlugsForModel,
+    getProviderSlugsForModels,
+    getDataCollectionRequiredModelIds,
+  };
+}
+
+export async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
+  NormalizedOpenRouterResponse | undefined
+> {
+  const result = await readDb
+    .select({ data: modelsByProvider.data })
+    .from(modelsByProvider)
+    .orderBy(desc(modelsByProvider.id))
+    .limit(1);
+
+  return result[0]?.data;
+}
+
+const DEFAULT_TTL_MS = 30_000;
+
+const defaultLoader = createModelsByProviderIndexLoader({
+  fetchSnapshot: fetchLatestModelsByProviderSnapshotFromDb,
+  fetchOpenRouterModels: getOpenRouterModelsMetadataFromDatabase,
+  fetchVercelModels: getVercelModelsMetadataFromDatabase,
+  ttlMs: DEFAULT_TTL_MS,
+  nowMs: () => Date.now(),
+});
+
+export async function getProviderSlugsForModel(modelId: string): Promise<ReadonlySet<string>> {
+  return defaultLoader.getProviderSlugsForModel(modelId);
+}
+
+export async function getProviderSlugsForModels(
+  modelIds: readonly string[]
+): Promise<ReadonlyMap<string, ReadonlySet<string>>> {
+  return defaultLoader.getProviderSlugsForModels(modelIds);
+}
+
+export async function getModelIdToProviderSlugsIndex(): Promise<ModelIdToProviderSlugsIndex> {
+  return defaultLoader.getIndex();
+}
+
+export async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
+  return defaultLoader.getDataCollectionRequiredModelIds();
+}

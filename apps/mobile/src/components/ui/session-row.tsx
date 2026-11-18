@@ -1,30 +1,65 @@
 import * as React from 'react';
-import { ChevronRight } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Pressable, View } from 'react-native';
+
+import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { AgentBadge } from '@/components/ui/agent-badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
-import { StatusDot } from '@/components/ui/status-dot';
+import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
-import { agentColor } from '@/lib/agent-color';
+import { agentColor, isPlaceholderTint, stateTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type SessionRowProps = {
-  /** Uppercase label shown in the eyebrow (and hashed for the row hue). */
+  /** Uppercase label shown in the eyebrow, and hashed when no `agentState` is passed. */
   agentLabel: string;
+  /**
+   * The row tint to paint for the label: the word's colour must not drift with
+   * its translation, so the key pins instead of hashing. `unknown` is a
+   * placeholder for a value the row cannot name, `platform` names the kind of
+   * agent the row ran on, and `repository` names the repository it ran in; all
+   * three label the row's context rather than the session, so they take the
+   * muted pair and the title leads. `idle`/`live` keep the ramp entry the
+   * English word already hashed to (sky blue). Omit it for a label that is the
+   * session's own name, such as a chat's model, which hashes.
+   */
+  agentState?: 'unknown' | 'platform' | 'repository' | 'idle' | 'live' | null;
   title: string;
-  /** Small mono line shown below the title (e.g. git branch). */
+  /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;
+  /**
+   * Type style for the subtitle. `mono` (the default) suits an identifier such
+   * as a branch; `default` suits a subtitle that is prose — the newest message
+   * in a chat.
+   */
+  subtitleVariant?: 'mono' | 'default';
   meta?: string;
-  /** When true, renders a good-tone StatusDot in the eyebrow. */
+  /** When true, renders the session's status glyph in the eyebrow. */
   live?: boolean;
   /**
-   * When true, replaces the live dot / meta with a pulsing warn-tone dot
+   * What the session is doing, from the shared status map. Picks between the
+   * working and idle glyphs on a live row; `needsInput` is driven by the flag
+   * below, which the attention-ack rules own. Absent falls back to working,
+   * which is what every live row drew before the idle glyph existed.
+   */
+  statusKind?: GlanceableStatusKind | null;
+  /**
+   * When true, replaces the status glyph / meta with the needs-input glyph
    * and a `NEEDS INPUT` label. Highest priority in the eyebrow row.
    */
   needsInput?: boolean;
+  /**
+   * Clock time of a `scheduled` row's wake, already formatted in the active
+   * language (see `formatScheduledWake`). Only read when `statusKind` is
+   * `'scheduled'`; appended to the `SCHEDULED` label as ` · <wake>` when set,
+   * omitted when null so a scheduled row with no known wake shows the label
+   * alone.
+   */
+  scheduledWake?: string | null;
   /**
    * Opt-in: when true AND `live` AND `meta` are set (and `needsInput` is
    * false), render the live dot AND the meta text side-by-side instead
@@ -36,7 +71,9 @@ type SessionRowProps = {
   /**
    * Optional platform-origin icon rendered in the eyebrow-right cluster.
    * When unset, existing callers (incl. Home `variant='card'`) stay
-   * bit-for-bit identical. Suppressed entirely for needs-input rows.
+   * bit-for-bit identical. Suppressed entirely for needs-input rows and
+   * for live rows, whose eyebrow draws the status glyph — the one mark
+   * the cluster shows there.
    */
   platformIcon?: React.ReactNode;
   onPress?: () => void;
@@ -55,62 +92,98 @@ type SessionRowProps = {
 
 /**
  * Used by Home and Agents list. Composes agent hue strip + eyebrow +
- * ellipsized title + mono meta + chevron. Hue is deterministically hashed
- * from `agentLabel` so the strip, eyebrow and tile always match.
+ * ellipsized title + mono meta + chevron. The strip, eyebrow and tile always
+ * share one tint: the pinned `agentState`, else the hue hashed from
+ * `agentLabel`.
  */
 export function SessionRow({
   agentLabel,
+  agentState = null,
   title,
   subtitle,
   meta,
   live,
+  statusKind = null,
   needsInput = false,
+  scheduledWake = null,
   metaWhileLive = false,
   platformIcon,
   onPress,
   last,
   stripMode = 'edge',
+  subtitleVariant = 'mono',
   className,
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
-  const color = agentColor(agentLabel);
-  const dimStrip = !live && !needsInput;
+  const { t } = useTranslation();
+  const color = agentState ? stateTint(agentState) : agentColor(agentLabel);
+  // A row that is neither live nor waiting recedes behind one that is. The
+  // muted context tint is already the quietest mark a row can carry, and
+  // multiplying it again erased the strip on the dark page, so only an accent
+  // strip dims.
+  const dimStrip = !live && !needsInput && !isPlaceholderTint(color);
+  const liveKind: GlanceableStatusKind = statusKind === 'idle' ? 'idle' : 'running';
 
   const eyebrowDecision = selectSessionRowEyebrowRight({
     needsInput,
+    scheduled: statusKind === 'scheduled',
     live: Boolean(live),
     hasMeta: Boolean(meta),
     metaWhileLive,
     hasPlatformIcon: platformIcon != null,
   });
 
-  // Build the branch content EXACTLY as before (no icon wrapper yet).
-  // When platformIcon is unset the rendered structure stays bit-for-bit
-  // identical to today — no new wrapper around bare Text/StatusDot/null.
   let branchContent: React.ReactNode = null;
   if (eyebrowDecision.kind === 'needs-input') {
     branchContent = (
       <View className="flex-row items-center gap-1.5">
-        <StatusDot tone="warn" pulse />
+        <SessionStatusIcon kind="needsInput" />
         <Text variant="mono" className="shrink text-xs text-warn">
-          NEEDS INPUT
+          {t('sessionRow.needsInput')}
+        </Text>
+      </View>
+    );
+  } else if (eyebrowDecision.kind === 'scheduled') {
+    branchContent = (
+      <View className="min-w-0 shrink flex-row items-center gap-1.5">
+        <SessionStatusIcon kind="scheduled" />
+        <Text
+          variant="mono"
+          className="shrink text-xs text-ink2"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {/* i18n-dup-ok: 'sessionRow.scheduled' is the full-caps mono row badge; 'common.scheduled' is the sentence-case connection label and the spoken a11y word, and each locale cases the badge form itself — the same split as sessionRow.needsInput beside glanceable.needsInput. */}
+          {scheduledWake
+            ? `${t('sessionRow.scheduled')} · ${scheduledWake}`
+            : t('sessionRow.scheduled')}
         </Text>
       </View>
     );
   } else if (eyebrowDecision.kind === 'live-and-meta') {
     branchContent = (
-      <View className="flex-row items-center gap-1.5">
-        <StatusDot tone="good" />
-        <Text variant="mono" className="shrink text-xs text-ink2">
+      <View className="min-w-0 shrink flex-row items-center gap-1.5">
+        <SessionStatusIcon kind={liveKind} />
+        <Text
+          variant="mono"
+          className="shrink text-xs text-ink2"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {meta}
         </Text>
       </View>
     );
   } else if (eyebrowDecision.kind === 'live') {
-    branchContent = <StatusDot tone="good" />;
+    branchContent = <SessionStatusIcon kind={liveKind} />;
   } else if (eyebrowDecision.kind === 'meta' && meta) {
     branchContent = (
-      <Text variant="mono" className="shrink text-xs text-ink2">
+      <Text
+        variant="mono"
+        className="shrink text-xs text-ink2"
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {meta}
       </Text>
     );
@@ -118,7 +191,6 @@ export function SessionRow({
 
   let eyebrowRight: React.ReactNode = null;
   if (eyebrowDecision.kind === 'needs-input') {
-    // Icon suppressed — render exactly as today.
     eyebrowRight = branchContent;
   } else if (eyebrowDecision.showPlatformIcon && platformIcon != null) {
     // `none` kind: icon alone, no extra wrapper. Otherwise wrap icon + branch.
@@ -135,10 +207,16 @@ export function SessionRow({
     eyebrowRight = branchContent;
   }
 
+  const titleNode = (
+    <Text className="font-medium text-sm tracking-tight text-foreground" numberOfLines={2}>
+      {title}
+    </Text>
+  );
+
   const row = (
     <View
       className={cn(
-        'relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3',
+        'relative flex-row items-center gap-3 py-[13px] pl-[18px] pr-3',
         !last && 'border-b-[0.5px] border-hair-soft',
         className
       )}
@@ -146,6 +224,7 @@ export function SessionRow({
       {stripMode === 'edge' ? (
         <AgentBadge
           agent={agentLabel}
+          tint={color}
           variant="strip"
           className={dimStrip ? 'opacity-30' : undefined}
         />
@@ -160,23 +239,35 @@ export function SessionRow({
       )}
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
-          <Eyebrow className={color.hueTextClass}>{agentLabel}</Eyebrow>
+          <Eyebrow
+            className={cn('min-w-0 flex-1', color.hueTextClass)}
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
+            {agentLabel}
+          </Eyebrow>
           {eyebrowRight}
         </View>
-        <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>
-          {title}
-        </Text>
+        {titleNode}
         {subtitle ? (
           <Text
-            variant="mono"
-            className="mt-1 text-xs tracking-[0.3px] text-muted-foreground"
+            variant={subtitleVariant}
+            className={
+              subtitleVariant === 'mono'
+                ? 'mt-1 text-xs tracking-[0.3px] text-muted-foreground'
+                : 'mt-1 text-xs text-muted-foreground'
+            }
             numberOfLines={2}
           >
             {subtitle}
           </Text>
         ) : null}
       </View>
-      <ChevronRight size={14} color={colors.mutedSoft} />
+      {/* The row is top-aligned so a multi-line title keeps its first line in
+          line with the eyebrow; the disclosure mark centers on the row. */}
+      <View className="self-center">
+        <DirectionalChevronRight size={14} color={colors.mutedSoft} />
+      </View>
     </View>
   );
   if (onPress) {

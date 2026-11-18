@@ -1,12 +1,11 @@
+import type { KiloBrowserToolName } from './browser-tool-contract';
+
+export type { KiloBrowserToolName };
+
 export type AgentMode = 'dangerous' | 'safe';
-export type SafeToolName =
-  | 'find_in_page'
-  | 'get_element_details'
-  | 'get_memory'
-  | 'get_page_snapshot'
-  | 'get_viewport_screenshot'
-  | 'search_memories'
-  | 'web_search';
+/** What a retried error re-runs: the failed turn, or the failed compaction. */
+export type ErrorRetryKind = 'compaction' | 'turn';
+export type SafeToolName = 'get_memory' | 'search_memories' | 'web_search';
 export type WorkflowToolName =
   | 'delete_workflow'
   | 'get_workflow'
@@ -15,7 +14,11 @@ export type WorkflowToolName =
   | 'save_workflow'
   | 'search_workflows';
 export type RemoteMcpAgentToolName = `mcp_${string}`;
-export type AgentToolName = 'eval' | RemoteMcpAgentToolName | SafeToolName | WorkflowToolName;
+export type AgentToolName =
+  | KiloBrowserToolName
+  | RemoteMcpAgentToolName
+  | SafeToolName
+  | WorkflowToolName;
 
 export type AgentConversationEvent =
   | {
@@ -29,15 +32,6 @@ export type AgentConversationEvent =
       readonly id: string;
       readonly text: string;
       readonly type: 'thinking';
-    }
-  | {
-      readonly code: string;
-      readonly id: string;
-      readonly name: 'eval';
-      readonly providerToolCallId?: string;
-      readonly reasoningDetails?: readonly unknown[];
-      readonly tabId: number;
-      readonly type: 'tool-call';
     }
   | {
       readonly elementId?: string;
@@ -85,6 +79,16 @@ export type AgentConversationEvent =
       readonly webMcpOrigin: string;
     }
   | {
+      /** The upstream Playwright MCP tool, carried with its arguments verbatim. */
+      readonly arguments: Record<string, unknown>;
+      readonly id: string;
+      readonly name: KiloBrowserToolName;
+      readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
+      readonly tabId: number;
+      readonly type: 'tool-call';
+    }
+  | {
       readonly arguments: Record<string, unknown>;
       readonly id: string;
       /** The agent's own tool name (`read`, `bash`, …), not an extension tool. */
@@ -104,10 +108,22 @@ export type AgentConversationEvent =
       readonly toolCallId: string;
       readonly type: 'tool-result';
       readonly value?: unknown;
+    }
+  | {
+      /** An optional next step, such as the credits page for an exhausted balance. */
+      readonly action?: { readonly href: string; readonly label: string };
+      /** The server's own reason, when it sent one. */
+      readonly detail?: string;
+      readonly id: string;
+      /** Absent when repeating the request cannot help. */
+      readonly retry?: ErrorRetryKind;
+      /** Plain language: what happened, never a raw status code or fetch failure. */
+      readonly title: string;
+      readonly type: 'error';
     };
 
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
-type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
+export type ConversationErrorEvent = Extract<AgentConversationEvent, { readonly type: 'error' }>;
 export type RemoteMcpToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly name: RemoteMcpAgentToolName }
@@ -119,6 +135,10 @@ export type WorkflowToolCallEvent = Extract<
 export type WebMcpToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly webMcpOrigin: string }
+>;
+export type KiloBrowserToolCallEvent = Extract<
+  AgentConversationEvent,
+  { readonly name: KiloBrowserToolName }
 >;
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
@@ -133,12 +153,6 @@ export type GroupedConversationItem =
       readonly toolCall: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
       readonly type: 'tool-exchange';
     };
-
-interface CreateEvalToolCallOptions {
-  readonly code: string;
-  readonly providerToolCallId?: string;
-  readonly tabId: number;
-}
 
 interface CreateSafeToolCallOptions {
   readonly elementId?: string;
@@ -175,6 +189,13 @@ interface CreateWebMcpToolCallOptions {
   readonly providerToolCallId?: string;
   readonly tabId: number;
   readonly webMcpOrigin: string;
+}
+
+interface CreateKiloBrowserToolCallOptions {
+  readonly arguments: Record<string, unknown>;
+  readonly name: KiloBrowserToolName;
+  readonly providerToolCallId?: string;
+  readonly tabId: number;
 }
 
 interface CreateToolResultOptions {
@@ -215,19 +236,6 @@ export const createThinkingBlock = (
   id: createEventId(),
   text,
   type: 'thinking',
-});
-
-export const createEvalToolCall = ({
-  code,
-  providerToolCallId,
-  tabId,
-}: CreateEvalToolCallOptions): EvalToolCallEvent => ({
-  code,
-  id: createEventId(),
-  name: 'eval',
-  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
-  tabId,
-  type: 'tool-call',
 });
 
 export const createSafeToolCall = ({
@@ -304,6 +312,20 @@ export const createWebMcpToolCall = ({
   webMcpOrigin,
 });
 
+export const createToolCall = ({
+  arguments: toolArguments,
+  name,
+  providerToolCallId,
+  tabId,
+}: CreateKiloBrowserToolCallOptions): KiloBrowserToolCallEvent => ({
+  arguments: toolArguments,
+  id: createEventId(),
+  name,
+  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+  tabId,
+  type: 'tool-call',
+});
+
 export const createToolResult = ({
   error,
   ok,
@@ -316,6 +338,25 @@ export const createToolResult = ({
   type: 'tool-result',
   ...(error === undefined ? {} : { error }),
   ...(value === undefined ? {} : { value }),
+});
+
+export const createConversationErrorEvent = ({
+  action,
+  detail,
+  retry,
+  title,
+}: {
+  readonly action?: { readonly href: string; readonly label: string } | undefined;
+  readonly detail?: string | undefined;
+  readonly retry?: ErrorRetryKind | undefined;
+  readonly title: string;
+}): ConversationErrorEvent => ({
+  id: createEventId(),
+  title,
+  type: 'error',
+  ...(action === undefined ? {} : { action }),
+  ...(detail === undefined ? {} : { detail }),
+  ...(retry === undefined ? {} : { retry }),
 });
 
 export const groupConversationEvents = (
@@ -335,7 +376,8 @@ export const groupConversationEvents = (
         );
 
         if (result === undefined) {
-          groupedItems.push({ event, type: 'event' });
+          // A call with no result yet is in flight: render it as a running row, not a bare block.
+          groupedItems.push({ toolCall: event, type: 'tool-exchange' });
         } else {
           consumedEventIds.add(result.id);
           groupedItems.push({ result, toolCall: event, type: 'tool-exchange' });

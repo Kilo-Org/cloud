@@ -1,7 +1,12 @@
 import { type ReasoningPart, type TextPart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { computeStatus, SNAPSHOT_PROGRESS_STATUS } from './compute-status';
+import {
+  computeBlockingAskStatus,
+  computeMessageStatus,
+  computeStatus,
+  SNAPSHOT_PROGRESS_STATUS,
+} from './compute-status';
 
 function makeTextPart(text: string, synthetic?: boolean): TextPart {
   const part: TextPart = {
@@ -67,5 +72,37 @@ describe('computeStatus', () => {
 
   it('maps unknown tool parts to Considering next steps', () => {
     expect(computeStatus(makeToolPart('unknown-tool'))).toBe('Considering next steps');
+  });
+});
+
+describe('computeMessageStatus', () => {
+  it('reads Thinking while the reasoning part streams behind an empty text placeholder', () => {
+    // opencode creates the response text part before any token arrives; its id
+    // sorts after the reasoning part, which used to mask the Thinking label.
+    expect(computeMessageStatus([makeReasoningPart(), makeTextPart('')])).toBe('Thinking');
+  });
+
+  it('reads Writing response once the text part has content', () => {
+    expect(computeMessageStatus([makeReasoningPart(), makeTextPart('Hello')])).toBe(
+      'Writing response'
+    );
+  });
+
+  it('falls back to Considering next steps when only empty placeholders exist', () => {
+    expect(computeMessageStatus([makeTextPart('')])).toBe('Considering next steps');
+    expect(computeMessageStatus([])).toBe('Considering next steps');
+  });
+});
+
+describe('computeBlockingAskStatus', () => {
+  it('names the wait for a permission ask instead of the blocked tool activity', () => {
+    // The ask holds the transcript at the blocked tool part, so the activity
+    // label would claim a command that has not started.
+    expect(computeStatus(makeToolPart('bash'))).toBe('Running commands');
+    expect(computeBlockingAskStatus('permission')).toBe('Waiting for permission');
+  });
+
+  it('names the pending question', () => {
+    expect(computeBlockingAskStatus('question')).toBe('Asking a question');
   });
 });

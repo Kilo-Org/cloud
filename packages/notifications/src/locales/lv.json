@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Tavas aģenta sesijas ir atjauninājums",
+      "lowBalance": "Tava bilancei nepieciešama uzmanība",
+      "spendAlert": "Taviem izdevumiem nepieciešama uzmanība",
+      "securityFinding": "Drošības atradumam nepieciešama uzmanība",
+      "securityUpdate": "Drošības pārbaudei ir atjauninājums",
+      "activeAgentsGlanceable": "Aktīvajiem aģentiem ir atjauninājums"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Zema bilances brīdinājums",
+      "body": "{{organizationName}} bilance nokrita zem ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Izdevumu brīdinājums",
+      "body": "{{scopeName}} izdevumi pārsniedza ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} vietnē {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Jauns drošības atradums ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA brīdinājums"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA pārkāpums"
+    }
+  },
+  "sessionReady": {
+    "body": "Tava Kilo sesija ir gatava vadīšanai no tālruņa"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

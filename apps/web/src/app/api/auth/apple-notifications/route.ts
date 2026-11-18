@@ -1,12 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
-import { user_auth_provider } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { device_refresh_tokens, device_sessions, user_auth_provider } from '@kilocode/db/schema';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest } from '@/lib/utils.server';
-import { APPLE_CLIENT_ID } from '@/lib/config.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { APPLE_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import { AppleJwtClientError, verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 
 type AppleEvent = {
   type: 'consent-revoked' | 'account-delete' | 'email-disabled' | 'email-enabled';
@@ -31,17 +32,107 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
   logExceptInTest(`Apple auth event: ${type} for sub=${sub}`);
 
   if (type === 'consent-revoked' || type === 'account-delete') {
-    await db
-      .delete(user_auth_provider)
-      .where(
-        and(
-          eq(user_auth_provider.provider, 'apple'),
-          eq(user_auth_provider.provider_account_id, sub)
+    // Compatibility: the old handler deleted the provider row only. Keep the
+    // extra web/device revocation until Apple stops sending these events.
+    await db.transaction(async tx => {
+      const deletedProviders = await tx
+        .delete(user_auth_provider)
+        .where(
+          and(
+            eq(user_auth_provider.provider, 'apple'),
+            eq(user_auth_provider.provider_account_id, sub)
+          )
         )
-      );
+        .returning({ kilo_user_id: user_auth_provider.kilo_user_id });
+      if (deletedProviders.length === 0) return;
+
+      const now = new Date().toISOString();
+      for (const { kilo_user_id } of deletedProviders) {
+        await revokeWebSessions(kilo_user_id, tx);
+
+        await tx
+          .update(device_sessions)
+          .set({ revoked_at: now, revoked_reason: 'apple_provider_revoked' })
+          .where(
+            and(eq(device_sessions.kilo_user_id, kilo_user_id), isNull(device_sessions.revoked_at))
+          );
+
+        await tx
+          .delete(device_refresh_tokens)
+          .where(
+            and(
+              inArray(
+                device_refresh_tokens.device_session_id,
+                tx
+                  .select({ id: device_sessions.id })
+                  .from(device_sessions)
+                  .where(eq(device_sessions.kilo_user_id, kilo_user_id))
+              ),
+              isNull(device_refresh_tokens.consumed_at)
+            )
+          );
+      }
+    });
     logExceptInTest(`Removed apple auth provider for sub=${sub} (${type})`);
   }
   // email-disabled and email-enabled are informational — no action needed
+}
+
+const MAX_NOTIFICATION_BODY_BYTES = 64 * 1024;
+
+const FORM_CONTENT_TYPES: Record<string, true> = {
+  'application/x-www-form-urlencoded': true,
+  'multipart/form-data': true,
+};
+
+/** True when the media type of `contentType` is a form encoding, ignoring parameters. */
+function isFormContentType(contentType: string): boolean {
+  const [mediaType] = contentType.split(';', 1);
+  return FORM_CONTENT_TYPES[mediaType.trim().toLowerCase()] === true;
+}
+
+class NotificationBodyTooLargeError extends Error {}
+
+async function readBoundedBody(request: NextRequest): Promise<ArrayBuffer> {
+  const contentLength = request.headers.get('content-length');
+  if (
+    contentLength !== null &&
+    (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_NOTIFICATION_BODY_BYTES)
+  ) {
+    throw new NotificationBodyTooLargeError();
+  }
+  if (!request.body) return new ArrayBuffer(0);
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > MAX_NOTIFICATION_BODY_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The request remains rejected when stream cancellation fails.
+        }
+        throw new NotificationBodyTooLargeError();
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new ArrayBuffer(totalBytes);
+  const view = new Uint8Array(body);
+  let offset = 0;
+  for (const chunk of chunks) {
+    view.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
 }
 
 /**
@@ -52,14 +143,30 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
  * See: https://developer.apple.com/documentation/sign_in_with_apple/processing_changes_for_sign_in_with_apple_accounts
  */
 export async function POST(request: NextRequest) {
+  const contentType = request.headers.get('content-type');
+  if (!contentType || !isFormContentType(contentType)) {
+    return NextResponse.json({ error: 'Unsupported content type' }, { status: 400 });
+  }
+
+  // Form parsing answers a client error on its own, without reaching the
+  // server-fault path below.
+  let formData: FormData;
   try {
-    const formData = await request.formData();
-    const payload = formData.get('payload');
-
-    if (typeof payload !== 'string') {
-      return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
+    const body = await readBoundedBody(request);
+    formData = await new Response(body, { headers: { 'content-type': contentType } }).formData();
+  } catch (error) {
+    if (error instanceof NotificationBodyTooLargeError) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 400 });
     }
+    return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
+  }
 
+  const payload = formData.get('payload');
+  if (typeof payload !== 'string') {
+    return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
+  }
+
+  try {
     const jwtPayload = await verifyAppleJwtWithJwks(payload, APPLE_CLIENT_ID);
     const event = extractAppleEvent(jwtPayload);
     await handleAppleEvent(event);

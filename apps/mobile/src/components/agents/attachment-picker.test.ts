@@ -1,9 +1,14 @@
+/* eslint-disable max-lines -- the source-sheet suite and the picture-entry suite share one module mock harness. */
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { describe, expect, it, vi } from 'vitest';
+import * as SecureStore from 'expo-secure-store';
+import * as Sentry from '@sentry/react-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { pickAgentAttachments } from './attachment-picker';
+import { normalizeImageAsset, pickAgentAttachments, pickAgentPicture } from './attachment-picker';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { PICKER_LAUNCH_CONTEXT_KEY, PICKER_RESTORE_RECORD_KEY } from '@/lib/storage-keys';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -17,6 +22,38 @@ vi.mock('react-native', () => ({
   Linking: { openSettings: reactNativeMock.openSettings },
 }));
 
+const expoFileSystemMock = vi.hoisted(() => {
+  const files = new Map<string, string>();
+  const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {
+    const uri =
+      rest.length > 0 ? `${(_base as { uri: string }).uri}/${String(rest[0])}` : String(_base);
+    return {
+      uri,
+      get exists() {
+        return files.has(uri);
+      },
+      writeSync(content: string) {
+        files.set(uri, content);
+      },
+      textSync() {
+        return files.get(uri) ?? '';
+      },
+      delete() {
+        files.delete(uri);
+      },
+    };
+  });
+  return {
+    File,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
+
+vi.mock('expo-file-system', () => ({
+  File: expoFileSystemMock.File,
+  Paths: expoFileSystemMock.Paths,
+}));
+
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: announcingToastMock.error, success: vi.fn(), warning: vi.fn() },
 }));
@@ -28,13 +65,47 @@ vi.mock('expo-document-picker', () => ({
 vi.mock('expo-image-picker', () => ({
   launchCameraAsync: vi.fn(),
   launchImageLibraryAsync: vi.fn(),
+  PermissionStatus: { GRANTED: 'granted' },
   requestCameraPermissionsAsync: vi.fn(),
+}));
+
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
 }));
 
 const getDocumentAsyncMock = vi.mocked(DocumentPicker.getDocumentAsync);
 
+type OnFrame = (time: number) => void;
+
+beforeEach(() => {
+  // Every source launch waits one frame for the sheet's modal to close; run
+  // that frame at once unless a test holds it.
+  vi.stubGlobal('requestAnimationFrame', (onFrame: OnFrame) => {
+    onFrame(0);
+    return 0;
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 type ShowActionSheet = ActionSheetProps['showActionSheetWithOptions'];
 type SheetButtonHandler = Parameters<ShowActionSheet>[1];
+
+const themedSheet: ThemedActionSheetOptions = {
+  containerStyle: { backgroundColor: '#17171A', paddingBottom: 24 },
+  textStyle: { color: '#F2F0EB' },
+  titleTextStyle: { color: '#8A8680' },
+  messageTextStyle: { color: '#8A8680' },
+  destructiveColor: '#F28B7A',
+};
 
 /**
  * Drive `pickAgentAttachments` by capturing the sheet handler the
@@ -47,12 +118,99 @@ async function pickWithSheetSelection(
   const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
     mock: { calls: [unknown, SheetButtonHandler][] };
   };
-  const resultPromise = pickAgentAttachments(showActionSheet);
+  const resultPromise = pickAgentAttachments(
+    showActionSheet,
+    {
+      userId: 'user-1',
+      surface: 'agent-chat',
+      sessionId: 'sess-1',
+    },
+    themedSheet
+  );
   const registered = showActionSheet.mock.calls[0]?.[1];
   expect(registered).toEqual(expect.any(Function));
   await Promise.resolve(registered?.(buttonIndex));
   return resultPromise;
 }
+
+/** The same driver for the picture entry point (its own surface/session). */
+async function pickPictureWithSheetSelection(
+  buttonIndex: number
+): Promise<Awaited<ReturnType<typeof pickAgentPicture>>> {
+  const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
+    mock: { calls: [unknown, SheetButtonHandler][] };
+  };
+  const resultPromise = pickAgentPicture(
+    showActionSheet,
+    {
+      userId: 'user-1',
+      surface: 'agent-picture',
+      sessionId: null,
+    },
+    themedSheet
+  );
+  const registered = showActionSheet.mock.calls[0]?.[1];
+  expect(registered).toEqual(expect.any(Function));
+  await Promise.resolve(registered?.(buttonIndex));
+  return resultPromise;
+}
+
+function grantedCameraPermission(): ImagePicker.PermissionResponse {
+  return {
+    canAskAgain: true,
+    expires: 'never',
+    granted: true,
+    status: ImagePicker.PermissionStatus.GRANTED,
+  };
+}
+
+describe('normalizeImageAsset', () => {
+  it('keeps the picker fileName when present', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        fileName: 'IMG_0001.HEIC',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('IMG_0001.HEIC');
+  });
+
+  it('treats a whitespace-only fileName as missing and synthesizes from the URI', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        fileName: '   ',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('image.heic');
+  });
+
+  it('synthesizes image.heic from the URI extension when fileName is missing', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('image.heic');
+  });
+
+  it('synthesizes image.jpeg from the MIME subtype for an extension-less URI', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/Camera/uuid',
+        mimeType: 'image/jpeg',
+      }).name
+    ).toBe('image.jpeg');
+  });
+
+  it('falls back to image.png when no signal carries the extension', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/Camera/uuid',
+      }).name
+    ).toBe('image.png');
+  });
+});
 
 describe('agent attachment picker', () => {
   it('opens a native action sheet that keeps all sources and the cancel action', () => {
@@ -60,12 +218,21 @@ describe('agent attachment picker', () => {
       mock: { calls: unknown[][] };
     };
 
-    void pickAgentAttachments(showActionSheet);
+    void pickAgentAttachments(
+      showActionSheet,
+      {
+        userId: 'user-1',
+        surface: 'agent-chat',
+        sessionId: null,
+      },
+      themedSheet
+    );
 
     expect(showActionSheet).toHaveBeenCalledWith(
       {
         options: ['Camera', 'Photo Library', 'Files', 'Cancel'],
         cancelButtonIndex: 3,
+        ...themedSheet,
       },
       expect.any(Function)
     );
@@ -85,6 +252,34 @@ describe('agent attachment picker', () => {
     expect(announcingToastMock.error).toHaveBeenCalledWith(
       'Could not open the photo picker. Restart Kilo and try again.'
     );
+  });
+
+  it('resolves empty when the library picker invocation throws', async () => {
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockImplementationOnce(() => {
+      throw new Error('native launch threw');
+    });
+
+    expect(await pickWithSheetSelection(1)).toEqual([]);
+  });
+
+  it('launches the picker when the launch context write fails', async () => {
+    vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(new Error('store write failed'));
+    const result: Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>> = {
+      canceled: false,
+      assets: [{ uri: 'file:///cache/photo.jpg', width: 100, height: 100 }],
+    };
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickWithSheetSelection(1);
+
+    expect(candidates).toHaveLength(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'write-picker-launch-context',
+      },
+      extra: { source: 'library', surface: 'agent-chat', hasSession: true },
+    });
   });
 });
 
@@ -153,5 +348,171 @@ describe('agent attachment picker (document MIME derivation)', () => {
     // Cancel is button index 3; Files (2) with a canceled document result
     // also yields []. Use Files so the document path is exercised.
     expect(await pickWithSheetSelection(2)).toEqual([]);
+  });
+
+  // DocumentsUI answers a tap on a row it cannot open with the same result a
+  // Back produces, so the picker cannot tell them apart. A launch that fails in
+  // the app — a pending picker, or the copy into the app cache — is the one
+  // Files failure the app still sees, and it must never end in silence.
+  it('announces a retryable failure when the document picker rejects', async () => {
+    announcingToastMock.error.mockClear();
+    const failure = new Error('Different document picking in progress');
+    getDocumentAsyncMock.mockRejectedValueOnce(failure);
+
+    await expect(pickWithSheetSelection(2)).resolves.toEqual([]);
+
+    expect(announcingToastMock.error).toHaveBeenCalledTimes(1);
+    expect(announcingToastMock.error).toHaveBeenCalledWith(
+      'Failed to open file. Please try again.'
+    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(failure, {
+      tags: { 'error.subsystem': 'agent-attachments', 'error.operation': 'pick-agent-documents' },
+    });
+  });
+
+  // KILO-APP-3BF: a picker presented before the sheet's modal closes is
+  // dismissed with the modal, and every later Files tap fails.
+  it('opens the document picker only after the sheet has closed', async () => {
+    const frames: OnFrame[] = [];
+    vi.stubGlobal('requestAnimationFrame', (onFrame: OnFrame) => frames.push(onFrame));
+    getDocumentAsyncMock.mockClear();
+    const canceled: DocumentPicker.DocumentPickerCanceledResult = { canceled: true, assets: null };
+    getDocumentAsyncMock.mockResolvedValueOnce(canceled);
+
+    // The sheet callback runs before the sheet's modal closes.
+    const result = pickWithSheetSelection(2);
+    expect(frames).toHaveLength(1);
+    expect(getDocumentAsyncMock).not.toHaveBeenCalled();
+
+    frames[0]?.(0);
+
+    expect(await result).toEqual([]);
+    expect(getDocumentAsyncMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('agent picture picker', () => {
+  it('offers only the camera and a single-select photo library, with cancel last', () => {
+    const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
+      mock: { calls: unknown[][] };
+    };
+
+    void pickAgentPicture(
+      showActionSheet,
+      {
+        userId: 'user-1',
+        surface: 'agent-picture',
+        sessionId: null,
+      },
+      themedSheet
+    );
+
+    expect(showActionSheet).toHaveBeenCalledWith(
+      {
+        options: ['Camera', 'Photo Library', 'Cancel'],
+        cancelButtonIndex: 2,
+        ...themedSheet,
+      },
+      expect.any(Function)
+    );
+  });
+
+  it('launches the camera through the permission gate on the first option', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    const result: Awaited<ReturnType<typeof ImagePicker.launchCameraAsync>> = {
+      canceled: false,
+      assets: [{ uri: 'file:///cache/camera.jpg', width: 100, height: 100 }],
+    };
+    vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickPictureWithSheetSelection(0);
+
+    expect(ImagePicker.requestCameraPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(ImagePicker.launchCameraAsync).toHaveBeenCalledTimes(1);
+    expect(candidates.map(candidate => candidate.uri)).toEqual(['file:///cache/camera.jpg']);
+  });
+
+  it('launches the photo library single-select on the second option', async () => {
+    const result: Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>> = {
+      canceled: false,
+      assets: [{ uri: 'file:///cache/screenshot.png', width: 100, height: 100 }],
+    };
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickPictureWithSheetSelection(1);
+
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ allowsMultipleSelection: false })
+    );
+    expect(candidates.map(candidate => candidate.uri)).toEqual(['file:///cache/screenshot.png']);
+  });
+
+  it('records the picture surface so Android recovery can match the result', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    const result: Awaited<ReturnType<typeof ImagePicker.launchCameraAsync>> = {
+      canceled: true,
+      assets: null,
+    };
+    vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValueOnce(result);
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+
+    const writes = vi.mocked(SecureStore.setItemAsync).mock.calls;
+    const contextWrite = writes.findLast(([key]) => key === PICKER_LAUNCH_CONTEXT_KEY);
+    expect(JSON.parse(contextWrite?.[1] ?? '')).toMatchObject({
+      userId: 'user-1',
+      surface: 'agent-picture',
+      sessionId: null,
+    });
+    // The composer record is written beside it and retired when the picker
+    // comes back, so the next app start has nothing to reopen.
+    const recordWrite = writes.findLast(([key]) => key === PICKER_RESTORE_RECORD_KEY);
+    expect(recordWrite?.[1]).toEqual(contextWrite?.[1]);
+    expect(vi.mocked(SecureStore.deleteItemAsync)).toHaveBeenCalledWith(PICKER_RESTORE_RECORD_KEY);
+  });
+
+  // A rejected permission request, or a synchronous throw while building the
+  // native launch promise, must settle the public helper instead of leaving it
+  // pending forever with the person stuck on Home.
+  it('resolves empty when the camera permission request rejects', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockRejectedValueOnce(
+      new Error('permission module unavailable')
+    );
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+  });
+
+  it('resolves empty and reports when the camera launch throws synchronously', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    vi.mocked(ImagePicker.launchCameraAsync).mockImplementationOnce(() => {
+      throw new Error('native launch threw');
+    });
+    vi.mocked(Sentry.captureException).mockClear();
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'pick-attachment-source',
+      },
+      extra: { source: 'camera', surface: 'agent-picture', hasSession: false },
+    });
+  });
+
+  it('resolves empty on cancel without launching a picker', async () => {
+    const cameraCalls = vi.mocked(ImagePicker.launchCameraAsync).mock.calls.length;
+    const libraryCalls = vi.mocked(ImagePicker.launchImageLibraryAsync).mock.calls.length;
+
+    expect(await pickPictureWithSheetSelection(2)).toEqual([]);
+
+    expect(vi.mocked(ImagePicker.launchCameraAsync).mock.calls.length).toBe(cameraCalls);
+    expect(vi.mocked(ImagePicker.launchImageLibraryAsync).mock.calls.length).toBe(libraryCalls);
   });
 });

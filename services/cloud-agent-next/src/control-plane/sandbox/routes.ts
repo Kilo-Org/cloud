@@ -1,0 +1,734 @@
+import {
+  environmentReferenceSchema,
+  type SessionEnvironmentReference,
+} from '../../environment-build/reference.js';
+import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { and, eq } from 'drizzle-orm';
+import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
+import type { drizzle } from 'drizzle-orm/durable-sqlite';
+import {
+  controlPlaneCredentialSourceSchema,
+  controlPlaneFailureReasonSchema,
+  controlPlaneRouteSpecSchema,
+  type ControlPlaneCredentialSource,
+  type ControlPlaneFailureReason,
+  type ControlPlanePreparationStep,
+  type ControlPlaneRouteSpec,
+  type ControlPlaneRouteUpdate,
+  type ControlPlaneRouteView,
+  type ControlPlaneWorkspaceFailureSubtype,
+} from '../../shared/control-plane-protocol.js';
+import {
+  SessionCredentialUpgradeRequiredError,
+  type SessionCredentialGrant,
+} from '../../sandbox-control/session-credentials.js';
+import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import {
+  EnvironmentMemberCredentialError,
+  memberCredentialFailureStage,
+} from '../../sandbox-control/session-credential-members.js';
+import {
+  createGrantDiagnostic,
+  pickGrantDiagnosticFields,
+  type GrantDiagnostic,
+  type GrantDiagnosticSnapshot,
+} from '../../sandbox-control/grant-diagnostic.js';
+import { routes as routesTable } from './sqlite-schema.js';
+import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
+import { lastSentHandleKey } from './scope-handle-delivery.js';
+import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
+import { admissionFailureStage } from './scope-handle-adoption.js';
+import {
+  OrganizationAccessRevokedError,
+  OrganizationMembershipUnavailableError,
+} from './organization-membership.js';
+import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
+
+export type RouteDatabase = ReturnType<typeof drizzle>;
+
+export const ROUTE_STATES = ['preparing', 'ready', 'failed'] as const;
+export type RouteState = (typeof ROUTE_STATES)[number];
+
+export type RouteGrant = SessionCredentialGrant;
+
+/**
+ * One session on one sandbox (spec §6 "Route state"). `state` is the single
+ * state value; `attemptId`/`attemptDeadlineAt` belong to the current
+ * preparation attempt and are replaced only when a new attempt starts.
+ * `credentialSource` is the DO-only issue-time snapshot; it is never sent to
+ * the wrapper.
+ */
+export type RouteRecord = {
+  sessionId: string;
+  spec: ControlPlaneRouteSpec;
+  grant: RouteGrant | null;
+  credentialSource: ControlPlaneCredentialSource | null;
+  /**
+   * The repository environment the session admitted, for environment snapshot
+   * selection. DO-private like the credential source; kept across attempts.
+   */
+  environment: SessionEnvironmentReference | null;
+  state: RouteState;
+  attemptId: string;
+  attemptDeadlineAt: number;
+  reason: ControlPlaneFailureReason | null;
+  billingFailure?: CustomerBillingFailure;
+};
+
+/** One preparation step and an optional live detail line within it. */
+export type RoutePreparationProgress = {
+  step: ControlPlanePreparationStep;
+  detail?: string;
+  snapshotCapturedAt?: number;
+};
+
+/** The grant outcome for a route attempt: a re-projected spec plus the grant. */
+export type RouteGrantIssue = {
+  spec: ControlPlaneRouteSpec;
+  grant: RouteGrant;
+};
+
+/**
+ * What the route transitions need from the DO: storage, the attempt length, the
+ * bound wrapper socket, the bounded session notification, and grant issuance.
+ * Keeping them here keeps this the one module that starts an attempt and moves
+ * route state.
+ */
+export type RouteContext = {
+  db: RouteDatabase;
+  /** The Sandbox DO's synchronous KV view for accepted-handle retirement. */
+  acceptedHandles: SyncAcceptedHandleStorage;
+  now: () => number;
+  routePreparationMs: number;
+  /** Sends `session.prepare` when a wrapper socket is bound; a no-op otherwise. */
+  sendPrepare: (route: RouteRecord) => void;
+  /** Short bounded notification to the session's V2 DO; dropped on failure. */
+  notify: (sessionId: string, update: ControlPlaneRouteUpdate) => Promise<void>;
+  /**
+   * Mints the route grant and returns the wrapper-safe spec. Only called when a
+   * credential source is present; a null source means the route has no grant.
+   */
+  issueGrant: (
+    spec: ControlPlaneRouteSpec,
+    source: ControlPlaneCredentialSource,
+    environment: SessionEnvironmentReference | null,
+    diagnostic?: GrantDiagnostic
+  ) => Promise<RouteGrantIssue>;
+  /**
+   * Applies the provider credential policy for the current grants. Resolves
+   * `true` when applied (or not applicable) and `false` on failure; callers must
+   * not send a credential-bearing frame when it returns `false`.
+   */
+  applyPolicy: (candidate?: RouteGrant) => Promise<boolean>;
+  publishGrant: (route: RouteRecord) => void;
+};
+
+type RouteRow = typeof routesTable.$inferSelect;
+
+function parseRouteState(value: string): RouteState {
+  const found = ROUTE_STATES.find(state => state === value);
+  if (found === undefined) throw new Error(`Unknown route state: ${value}`);
+  return found;
+}
+
+export function routeFromRow(db: RouteDatabase, row: RouteRow): RouteRecord {
+  return {
+    sessionId: row.session_id,
+    spec: controlPlaneRouteSpecSchema.parse(JSON.parse(row.spec)),
+    grant: row.grant === null ? null : readScopeGrant(db, row.grant),
+    credentialSource:
+      row.credential_source === null || row.credential_source === undefined
+        ? null
+        : controlPlaneCredentialSourceSchema.parse(JSON.parse(row.credential_source)),
+    environment:
+      row.environment === null || row.environment === undefined
+        ? null
+        : environmentReferenceSchema.parse(JSON.parse(row.environment)),
+    state: parseRouteState(row.state),
+    attemptId: row.attempt_id,
+    attemptDeadlineAt: row.attempt_deadline_at ?? 0,
+    reason: row.reason === null ? null : controlPlaneFailureReasonSchema.parse(row.reason),
+    ...(row.billing_failure == null
+      ? {}
+      : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
+  };
+}
+
+function routeToRow(route: RouteRecord): typeof routesTable.$inferInsert {
+  return {
+    session_id: route.sessionId,
+    spec: JSON.stringify(route.spec),
+    grant: route.grant === null ? null : scopeGrantId(route.grant),
+    credential_source:
+      route.credentialSource === null ? null : JSON.stringify(route.credentialSource),
+    environment: route.environment === null ? null : JSON.stringify(route.environment),
+    state: route.state,
+    attempt_id: route.attemptId,
+    attempt_deadline_at: route.attemptDeadlineAt,
+    reason: route.reason,
+    billing_failure:
+      route.billingFailure === undefined ? null : JSON.stringify(route.billingFailure),
+    updated_at: Date.now(),
+  };
+}
+
+export function newPreparingRoute(
+  spec: ControlPlaneRouteSpec,
+  attemptId: string,
+  attemptDeadlineAt: number,
+  grant: RouteGrant | null,
+  credentialSource: ControlPlaneCredentialSource | null,
+  environment: SessionEnvironmentReference | null
+): RouteRecord {
+  return {
+    sessionId: spec.sessionId,
+    spec,
+    grant,
+    credentialSource,
+    environment,
+    state: 'preparing',
+    attemptId,
+    attemptDeadlineAt,
+    reason: null,
+  };
+}
+
+/**
+ * The view the Sandbox DO notifies and `prepare` returns (spec §6). It is the
+ * route state, except that a `ready` route with no live socket is
+ * `reconnecting` and a missing route is `unknown`. A preparing route carries
+ * the sandbox step when the allocation, not the wrapper, is the one progressing.
+ */
+export function routeView(
+  route: RouteRecord | null,
+  connected: boolean,
+  sandboxProgress?: RoutePreparationProgress
+): ControlPlaneRouteView {
+  if (route === null) return { state: 'unknown' };
+  if (route.state === 'ready') {
+    return connected
+      ? { state: 'ready', attemptId: route.attemptId }
+      : { state: 'reconnecting', attemptId: route.attemptId };
+  }
+  if (route.state === 'failed') {
+    return {
+      state: 'failed',
+      attemptId: route.attemptId,
+      reason: route.reason ?? 'preparation_timeout',
+      ...(route.billingFailure === undefined ? {} : { billingFailure: route.billingFailure }),
+    };
+  }
+  return { state: 'preparing', attemptId: route.attemptId, ...sandboxProgress };
+}
+
+export async function readRoute(db: RouteDatabase, sessionId: string): Promise<RouteRecord | null> {
+  const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+  const row = rows[0];
+  return row === undefined ? null : routeFromRow(db, row);
+}
+
+export async function listRoutes(db: RouteDatabase): Promise<RouteRecord[]> {
+  const rows = await db.select().from(routesTable);
+  return rows.map(row => routeFromRow(db, row));
+}
+
+export function writeRoute(db: Pick<RouteDatabase, 'insert'>, route: RouteRecord): void {
+  const row = routeToRow(route);
+  db.insert(routesTable)
+    .values(row)
+    .onConflictDoUpdate({ target: routesTable.session_id, set: row })
+    .run();
+}
+
+export async function deleteRoute(
+  db: RouteDatabase,
+  acceptedHandles: SyncAcceptedHandleStorage,
+  sessionId: string
+): Promise<void> {
+  db.transaction(tx => {
+    removeScopeMember(tx, acceptedHandles, sessionId);
+    // The per-route credentials marker shares this lifecycle; deleting it here
+    // keeps every removal path (release, wipe, failed admission) from leaking it.
+    acceptedHandles.delete(lastSentHandleKey(sessionId));
+    tx.delete(routesTable).where(eq(routesTable.session_id, sessionId)).run();
+  });
+}
+
+/** Latest attempt deadline among preparing routes, or null when there is none. */
+export async function pendingRouteDeadlineAt(db: RouteDatabase): Promise<number | null> {
+  const rows = await db
+    .select({ at: routesTable.attempt_deadline_at })
+    .from(routesTable)
+    .where(eq(routesTable.state, 'preparing'));
+  const values = rows
+    .map(row => row.at)
+    .filter((value): value is number => typeof value === 'number');
+  return values.length === 0 ? null : Math.max(...values);
+}
+
+/** Earliest attempt deadline among preparing routes, or null when there is none. */
+export async function earliestRouteDeadlineAt(db: RouteDatabase): Promise<number | null> {
+  const rows = await db
+    .select({ at: routesTable.attempt_deadline_at })
+    .from(routesTable)
+    .where(eq(routesTable.state, 'preparing'));
+  const values = rows
+    .map(row => row.at)
+    .filter((value): value is number => typeof value === 'number');
+  return values.length === 0 ? null : Math.min(...values);
+}
+
+/**
+ * A route spec with no issuer material, used only when issuance fails. It is
+ * never sent to a wrapper (the route is `failed`), and it keeps native tokens
+ * and env out of the routes table. The deprecated `runtimeIsolation` field is
+ * dropped: a route keys its runtime by directory.
+ */
+function redactRouteSpec(spec: ControlPlaneRouteSpec): ControlPlaneRouteSpec {
+  return {
+    sessionId: spec.sessionId,
+    kiloSessionId: spec.kiloSessionId,
+    directory: spec.directory,
+    ...(spec.branch === undefined ? {} : { branch: spec.branch }),
+    ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
+    ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
+    ...(spec.startCommands === undefined ? {} : { startCommands: spec.startCommands }),
+    ...(spec.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
+    attemptId: spec.attemptId,
+  };
+}
+
+export async function failRoute(
+  ctx: RouteContext,
+  spec: ControlPlaneRouteSpec,
+  attemptId: string,
+  reason: ControlPlaneFailureReason,
+  stage = 'route',
+  diagnostic?: GrantDiagnosticSnapshot,
+  subtype?: ControlPlaneWorkspaceFailureSubtype,
+  billingFailure?: CustomerBillingFailure
+): Promise<RouteRecord> {
+  const existing = await readRoute(ctx.db, spec.sessionId);
+  const route: RouteRecord = {
+    sessionId: spec.sessionId,
+    spec: redactRouteSpec(spec),
+    grant: existing?.grant ?? null,
+    credentialSource: existing?.credentialSource ?? null,
+    environment: existing?.environment ?? null,
+    state: 'failed',
+    attemptId,
+    attemptDeadlineAt: 0,
+    reason,
+    ...(billingFailure === undefined ? {} : { billingFailure }),
+  };
+  writeRoute(ctx.db, route);
+  logControlDiagnostic('route_failed', {
+    sessionId: spec.sessionId,
+    attemptId,
+    reason,
+    stage,
+    subtype,
+    ...(diagnostic === undefined ? {} : pickGrantDiagnosticFields(diagnostic)),
+  });
+  await ctx.notify(spec.sessionId, {
+    state: 'failed',
+    attemptId,
+    reason,
+    ...(subtype === undefined ? {} : { subtype }),
+    ...(billingFailure === undefined ? {} : { billingFailure }),
+  });
+  return route;
+}
+
+/**
+ * Whether `route` is still the fenced preparation attempt a late async task
+ * belongs to. Shared so every late-mint/route-failure path fences identically.
+ */
+export function isCurrentPreparingAttempt(
+  route: RouteRecord | null,
+  attemptId: string
+): route is RouteRecord {
+  return route !== null && route.state === 'preparing' && route.attemptId === attemptId;
+}
+
+/**
+ * Fails one specific preparation attempt, fenced by its attempt id. Used by the
+ * R1 runtime credential proxy mint: a mint/bind failure that settles after the
+ * attempt moved on must not fail a newer attempt.
+ */
+export async function failCurrentAttempt(
+  ctx: RouteContext,
+  sessionId: string,
+  attemptId: string,
+  reason: ControlPlaneFailureReason,
+  stage = 'attempt',
+  subtype?: ControlPlaneWorkspaceFailureSubtype,
+  billingFailure?: CustomerBillingFailure
+): Promise<void> {
+  const route = await readRoute(ctx.db, sessionId);
+  if (!isCurrentPreparingAttempt(route, attemptId)) return;
+  await failRoute(ctx, route.spec, attemptId, reason, stage, undefined, subtype, billingFailure);
+}
+
+/**
+ * Bounded in-attempt retries for a transient credential-policy failure. Only the
+ * Vercel network-policy refresh is retried, and each call is bounded at ~30 s
+ * inside the Sandbox DO serial queue, so the budget is one retry (two attempts).
+ * Grant issuance is not retried — its validation errors are permanent and a hung
+ * issuer must fail fast rather than hold the queue.
+ */
+const ATTEMPT_POLICY_ATTEMPTS = 2;
+
+/**
+ * The failure reason and diagnostic stage for an error that grant issuance
+ * threw. A repository of the environment that cannot be accessed has its own
+ * reason, and its stage names the repository; an organization membership that
+ * refused or could not answer the read has its own stage; the other errors keep
+ * the generic workspace failure with the caller's stage.
+ */
+export function grantIssueFailure(
+  error: unknown,
+  fallbackStage: string
+): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof OrganizationAccessRevokedError) {
+    // The owner left the organization the session belongs to: the route cannot
+    // run on organization authority, and no retry of the same attempt mints it.
+    return { reason: 'workspace_setup_failed', stage: 'organization_access_revoked' };
+  }
+  if (error instanceof OrganizationMembershipUnavailableError) {
+    // The read that would prove membership did not answer. The grant is denied,
+    // and its own stage keeps that deny distinguishable from a grant-mint fault.
+    return { reason: 'workspace_setup_failed', stage: 'organization_membership_unavailable' };
+  }
+  if (error instanceof SessionCredentialUpgradeRequiredError) {
+    return { reason: 'credential_upgrade_required', stage: 'credential_upgrade_required' };
+  }
+  if (error instanceof EnvironmentMemberCredentialError) {
+    return { reason: 'repository_access_failed', stage: memberCredentialFailureStage(error) };
+  }
+  if (error instanceof VercelScmContainmentError) {
+    return { reason: error.reason, stage: admissionFailureStage(error, fallbackStage) };
+  }
+  return { reason: 'workspace_setup_failed', stage: admissionFailureStage(error, fallbackStage) };
+}
+
+/**
+ * Starts and persists a new preparation attempt: the one place an attempt is
+ * created (spec §6). The stored spec carries the attempt id the wrapper sees.
+ * When a credential source is present the DO mints a fresh grant and the stored
+ * spec is the wrapper-safe projection of it. Issuance failure fails the route
+ * closed at once (permanent validation errors and hung issuers must not be
+ * retried); a transient policy failure is retried in-attempt. Either way the
+ * failure does not throw, so a sibling route still gets its attempt.
+ */
+export async function startAttempt(
+  ctx: RouteContext,
+  spec: ControlPlaneRouteSpec,
+  source: ControlPlaneCredentialSource | null,
+  environment: SessionEnvironmentReference | null
+): Promise<RouteRecord> {
+  const attemptId = crypto.randomUUID();
+  const attemptSpec: ControlPlaneRouteSpec = { ...spec, attemptId };
+  logControlDiagnostic('route_attempt', {
+    sessionId: spec.sessionId,
+    attemptId,
+    credentialSource: source !== null,
+  });
+  if (source === null) {
+    return failRoute(
+      ctx,
+      attemptSpec,
+      attemptId,
+      'workspace_setup_failed',
+      'credential_source_missing'
+    );
+  }
+  const diagnostic = createGrantDiagnostic();
+  let issued: RouteGrantIssue;
+  try {
+    issued = await ctx.issueGrant(attemptSpec, source, environment, diagnostic);
+  } catch (error) {
+    const failure = grantIssueFailure(error, 'credential_grant_failed');
+    return failRoute(
+      ctx,
+      attemptSpec,
+      attemptId,
+      failure.reason,
+      failure.stage,
+      diagnostic.snapshot()
+    );
+  }
+  const route = newPreparingRoute(
+    issued.spec,
+    attemptId,
+    ctx.now() + ctx.routePreparationMs,
+    issued.grant,
+    source,
+    environment
+  );
+  for (let attempt = 1; attempt <= ATTEMPT_POLICY_ATTEMPTS; attempt += 1) {
+    if (await ctx.applyPolicy(issued.grant)) {
+      ctx.publishGrant(route);
+      ctx.sendPrepare(route);
+      return route;
+    }
+  }
+  return failRoute(
+    ctx,
+    attemptSpec,
+    attemptId,
+    'workspace_setup_failed',
+    'credential_policy_unavailable'
+  );
+}
+
+function sameWorktreeRecovery(
+  current: ControlPlaneRouteSpec['worktreeRecovery'],
+  incoming: ControlPlaneRouteSpec['worktreeRecovery']
+): boolean {
+  return JSON.stringify(current) === JSON.stringify(incoming);
+}
+
+/**
+ * Adopts the newest saved worktree recovery on an existing route, so a later
+ * attempt (a wrapper restart) prepares from it. A frame that has not been sent
+ * yet reads the refreshed row in `sendPreparedRouteFrame`; an attempt that
+ * already received its frame is unaffected by the newer value.
+ *
+ * The update is a fenced column write, not a row upsert: a concurrent route
+ * transition (a new attempt, a failure, a deletion) must win over a stale read.
+ * Returns the updated record, or null when the route moved on first.
+ */
+function refreshRouteRecovery(
+  db: RouteDatabase,
+  existing: RouteRecord,
+  worktreeRecovery: ControlPlaneRouteSpec['worktreeRecovery']
+): RouteRecord | null {
+  if (sameWorktreeRecovery(existing.spec.worktreeRecovery, worktreeRecovery)) return existing;
+  const spec: ControlPlaneRouteSpec = { ...existing.spec, worktreeRecovery };
+  let applied = false;
+  db.transaction(tx => {
+    const row = tx
+      .select()
+      .from(routesTable)
+      .where(eq(routesTable.session_id, existing.sessionId))
+      .get();
+    if (row === undefined || row.state === 'failed' || row.attempt_id !== existing.attemptId) {
+      return;
+    }
+    tx.update(routesTable)
+      .set({ spec: JSON.stringify(spec), updated_at: Date.now() })
+      .where(
+        and(
+          eq(routesTable.session_id, existing.sessionId),
+          eq(routesTable.attempt_id, existing.attemptId),
+          eq(routesTable.state, row.state)
+        )
+      )
+      .run();
+    applied = true;
+  });
+  return applied ? { ...existing, spec } : null;
+}
+
+/**
+ * The `prepare` route effect. Starts an attempt when the route is absent or
+ * `failed`; any other route keeps its attempt deadline. `started` tells the
+ * caller whether it must re-arm for the new deadline.
+ */
+export async function ensureRoute(
+  ctx: RouteContext,
+  spec: ControlPlaneRouteSpec,
+  source: ControlPlaneCredentialSource | null,
+  environment: SessionEnvironmentReference | null
+): Promise<{ route: RouteRecord; started: boolean }> {
+  const existing = await readRoute(ctx.db, spec.sessionId);
+  if (existing !== null && existing.state !== 'failed') {
+    const route = refreshRouteRecovery(ctx.db, existing, spec.worktreeRecovery);
+    if (route !== null) return { route, started: false };
+    const current = await readRoute(ctx.db, spec.sessionId);
+    if (current !== null && current.state !== 'failed') {
+      return { route: current, started: false };
+    }
+    return { route: await startAttempt(ctx, spec, source, environment), started: true };
+  }
+  return { route: await startAttempt(ctx, spec, source, environment), started: true };
+}
+
+/** Ready routes after `hello`: a restart starts a new attempt, else re-notify. */
+export async function onWrapperConnected(ctx: RouteContext, restarted: boolean): Promise<void> {
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state === 'ready' && restarted) {
+      // Kilo state died with the old wrapper (spec §6): a new attempt.
+      await ctx.notify(route.sessionId, {
+        state: 'lost',
+        attemptId: route.attemptId,
+        reason: 'agent_restarted',
+      });
+      await startAttempt(ctx, route.spec, route.credentialSource, route.environment);
+      continue;
+    }
+    if (route.state === 'ready') {
+      await ctx.notify(route.sessionId, { state: 'ready', attemptId: route.attemptId });
+      continue;
+    }
+    if (route.state === 'preparing') {
+      // Policy first: the wrapper must not receive aliases the firewall rejects.
+      if (!(await ctx.applyPolicy())) {
+        await onRouteFailed(ctx, route.sessionId, 'workspace_setup_failed', undefined, true);
+        continue;
+      }
+      ctx.sendPrepare(route);
+    }
+  }
+}
+
+/** Notify every ready route that its wrapper socket is reconnecting. */
+export async function notifyReadyRoutes(ctx: RouteContext): Promise<void> {
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state === 'ready') {
+      await ctx.notify(route.sessionId, {
+        state: 'reconnecting',
+        attemptId: route.attemptId,
+      });
+    }
+  }
+}
+
+/** Stop the sandbox: every ready route loses its session and is removed. */
+export async function dropReadyRoutes(
+  ctx: RouteContext,
+  reason: ControlPlaneFailureReason,
+  billingFailure?: CustomerBillingFailure
+): Promise<void> {
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state !== 'ready') continue;
+    await deleteRoute(ctx.db, ctx.acceptedHandles, route.sessionId);
+    await ctx.notify(route.sessionId, {
+      state: 'lost',
+      attemptId: route.attemptId,
+      reason,
+      ...(billingFailure === undefined ? {} : { billingFailure }),
+    });
+  }
+}
+
+/**
+ * Fails every ready route in one scope with the existing `workspace_setup_failed`
+ * mechanism. Used when an accepted scope handle can no longer be served by any
+ * member: the route is already losing its credential, so it fails fast instead of
+ * waiting out a preparation deadline. A route that is not `ready` (or belongs to
+ * another scope) is untouched.
+ */
+export async function failReadyRoutesForScope(
+  ctx: RouteContext,
+  targetScopeGrantId: string,
+  stage: string
+): Promise<void> {
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state !== 'ready') continue;
+    if (route.grant === null || scopeGrantId(route.grant) !== targetScopeGrantId) continue;
+    await failRoute(ctx, route.spec, route.attemptId, 'workspace_setup_failed', stage);
+  }
+}
+
+/** Fail preparing routes whose preparation attempt deadline has passed. */
+export async function failExpiredRoutes(ctx: RouteContext): Promise<void> {
+  const now = ctx.now();
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state !== 'preparing' || route.attemptDeadlineAt > now) continue;
+    writeRoute(ctx.db, { ...route, state: 'failed', reason: 'preparation_timeout' });
+    logControlDiagnostic('route_failed', {
+      sessionId: route.sessionId,
+      attemptId: route.attemptId,
+      reason: 'preparation_timeout',
+      stage: 'attempt_deadline',
+      deadlineAt: route.attemptDeadlineAt,
+      now,
+    });
+    await ctx.notify(route.sessionId, {
+      state: 'failed',
+      attemptId: route.attemptId,
+      reason: 'preparation_timeout',
+    });
+  }
+}
+
+/** Whether any preparing route still has attempt time, so a create may retry. */
+export async function routeRetryAllowed(ctx: RouteContext): Promise<boolean> {
+  const deadline = await pendingRouteDeadlineAt(ctx.db);
+  return deadline !== null && deadline > ctx.now();
+}
+
+export async function onRouteProgress(
+  ctx: RouteContext,
+  sessionId: string,
+  progress: RoutePreparationProgress,
+  current: boolean
+): Promise<void> {
+  if (!current) return;
+  const route = await readRoute(ctx.db, sessionId);
+  if (route === null || route.state !== 'preparing') return;
+  logControlDiagnostic('route_progress', {
+    sessionId,
+    attemptId: route.attemptId,
+    step: progress.step,
+  });
+  await ctx.notify(sessionId, { state: 'preparing', attemptId: route.attemptId, ...progress });
+}
+
+/** Sandbox allocation progress (create, start) for every preparing route. */
+export async function notifyPreparingRoutes(
+  ctx: RouteContext,
+  progress: RoutePreparationProgress
+): Promise<void> {
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state !== 'preparing') continue;
+    await ctx.notify(route.sessionId, {
+      state: 'preparing',
+      attemptId: route.attemptId,
+      ...progress,
+    });
+  }
+}
+
+export async function onRouteReady(
+  ctx: RouteContext,
+  sessionId: string,
+  current: boolean
+): Promise<void> {
+  if (!current) return;
+  const route = await readRoute(ctx.db, sessionId);
+  if (route === null || route.state === 'failed') return;
+  writeRoute(ctx.db, { ...route, state: 'ready', reason: null });
+  logControlDiagnostic('route_ready', { sessionId, attemptId: route.attemptId });
+  await ctx.notify(sessionId, { state: 'ready', attemptId: route.attemptId });
+}
+
+export async function onRouteFailed(
+  ctx: RouteContext,
+  sessionId: string,
+  reason: ControlPlaneFailureReason,
+  subtype: ControlPlaneWorkspaceFailureSubtype | undefined,
+  current: boolean
+): Promise<void> {
+  if (!current) return;
+  const route = await readRoute(ctx.db, sessionId);
+  if (route === null || route.state === 'failed') return;
+  writeRoute(ctx.db, { ...route, state: 'failed', reason });
+  logControlDiagnostic('route_failed', {
+    sessionId,
+    attemptId: route.attemptId,
+    reason,
+    stage: 'wrapper_reported',
+    subtype,
+  });
+  await ctx.notify(sessionId, {
+    state: 'failed',
+    attemptId: route.attemptId,
+    reason,
+    ...(subtype === undefined ? {} : { subtype }),
+  });
+}

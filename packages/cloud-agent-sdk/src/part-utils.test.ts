@@ -1,5 +1,20 @@
-import type { StepFinishPart } from './types';
-import { getStepFinishRoutedModel } from './part-utils';
+import type {
+  FilePart,
+  Part,
+  PatchPart,
+  ReasoningPart,
+  StepFinishPart,
+  TextPart,
+  ToolPart,
+} from './types';
+import {
+  getStepFinishRoutedModel,
+  normalizeMissingPartText,
+  normalizeMissingPatchFiles,
+  normalizeToolPartState,
+  partSettledAt,
+  stripPartContentIfFile,
+} from './part-utils';
 
 function stepFinishPart(overrides: Partial<StepFinishPart> = {}): StepFinishPart {
   return {
@@ -87,5 +102,491 @@ describe('getStepFinishRoutedModel', () => {
     expect(getStepFinishRoutedModel(missing)).toBeUndefined();
     expect(getStepFinishRoutedModel(empty)).toBeUndefined();
     expect(getStepFinishRoutedModel(wrongType)).toBeUndefined();
+  });
+});
+
+describe('normalizeMissingPartText', () => {
+  it('returns the identical object when the text is already a string', () => {
+    const textPart: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hello',
+    };
+    const reasoningPart: ReasoningPart = {
+      id: 'p-reasoning',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'reasoning',
+      text: 'thinking',
+      time: { start: 1, end: 2 },
+    };
+
+    // Identity is preserved so memoized stored messages keep their reference.
+    expect(normalizeMissingPartText(textPart)).toBe(textPart);
+    expect(normalizeMissingPartText(reasoningPart)).toBe(reasoningPart);
+  });
+
+  it('fills an empty string for a text part missing the text field', () => {
+    const part = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+    } as unknown as TextPart;
+
+    const normalized = normalizeMissingPartText(part);
+    expect(normalized).not.toBe(part);
+    expect((normalized satisfies Part as TextPart).text).toBe('');
+    expect(normalized.id).toBe('p-text');
+  });
+
+  it('fills an empty string for a reasoning part missing the text field', () => {
+    const part = {
+      id: 'p-reasoning',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'reasoning',
+      time: { start: 1, end: 2 },
+    } as unknown as ReasoningPart;
+
+    const normalized = normalizeMissingPartText(part);
+    expect((normalized satisfies Part as ReasoningPart).text).toBe('');
+  });
+
+  it('fills an empty string for a part carrying null text', () => {
+    const textPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: null,
+    } as unknown as TextPart;
+    const reasoningPart = {
+      id: 'p-reasoning',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'reasoning',
+      text: null,
+      time: { start: 1, end: 2 },
+    } as unknown as ReasoningPart;
+
+    expect((normalizeMissingPartText(textPart) satisfies Part as TextPart).text).toBe('');
+    expect((normalizeMissingPartText(reasoningPart) satisfies Part as ReasoningPart).text).toBe('');
+  });
+
+  it('passes non-text parts through unchanged', () => {
+    const toolPart: ToolPart = {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: { filePath: '/a.ts' },
+        output: 'ok',
+        title: 'read',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+    const stepFinishPart: StepFinishPart = {
+      id: 'p-finish',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'step-finish',
+      reason: 'stop',
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    expect(normalizeMissingPartText(toolPart)).toBe(toolPart);
+    expect(normalizeMissingPartText(stepFinishPart)).toBe(stepFinishPart);
+  });
+});
+
+describe('partSettledAt', () => {
+  function settledToolPart(status: 'completed' | 'error', time?: { start: number; end: number }) {
+    return {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status,
+        input: {},
+        raw: '',
+        ...(status === 'completed'
+          ? { output: 'ok', title: 'task', metadata: {} }
+          : { error: 'boom' }),
+        ...(time === undefined ? {} : { time }),
+      },
+    } as unknown as Part;
+  }
+
+  it('returns the settle time of a completed tool part', () => {
+    expect(partSettledAt(settledToolPart('completed', { start: 1, end: 2 }))).toBe(2);
+  });
+
+  it('returns the settle time of an errored tool part', () => {
+    expect(partSettledAt(settledToolPart('error', { start: 3, end: 4 }))).toBe(4);
+  });
+
+  // Ingest-frame compaction strips `state.time` down to `state.status`, so a
+  // persisted terminal part can arrive with no settle time at all.
+  it('returns undefined for a compacted terminal tool part with no time', () => {
+    expect(partSettledAt(settledToolPart('completed'))).toBeUndefined();
+    expect(partSettledAt(settledToolPart('error'))).toBeUndefined();
+  });
+
+  // The replay paths settle-order parts BEFORE the chat-processor seam, so a
+  // part with no readable state must not throw here.
+  it('returns undefined for a tool part with no state and for a null state', () => {
+    const missing = {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+    } as unknown as Part;
+
+    expect(partSettledAt(missing)).toBeUndefined();
+    expect(partSettledAt({ ...missing, state: null } as unknown as Part)).toBeUndefined();
+    expect(partSettledAt({ ...missing, state: [] } as unknown as Part)).toBeUndefined();
+  });
+
+  it('returns undefined when the settle time is not a number', () => {
+    const part = settledToolPart('completed') as unknown as { state: { time: unknown } };
+    part.state.time = { start: 1, end: 'later' };
+
+    expect(partSettledAt(part as unknown as Part)).toBeUndefined();
+  });
+
+  it('returns undefined for a running tool part and for non-tool parts', () => {
+    const running: Part = {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: { status: 'running', input: {}, time: { start: 5 } },
+    };
+    const text: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hi',
+    };
+    expect(partSettledAt(running)).toBeUndefined();
+    expect(partSettledAt(text)).toBeUndefined();
+  });
+});
+
+describe('normalizeMissingPatchFiles', () => {
+  function patchPart(overrides: Partial<PatchPart> = {}): PatchPart {
+    return {
+      id: 'p-patch',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'patch',
+      hash: 'abc',
+      files: ['src/a.ts'],
+      ...overrides,
+    };
+  }
+
+  it('returns the identical object when files is already an array', () => {
+    const part = patchPart();
+
+    // Identity is preserved so memoized stored messages keep their reference.
+    expect(normalizeMissingPatchFiles(part)).toBe(part);
+  });
+
+  it('fills an empty array for a patch part the wire sent without files', () => {
+    const part = {
+      id: 'p-patch',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'patch',
+      hash: 'abc',
+    } as unknown as PatchPart;
+
+    const normalized = normalizeMissingPatchFiles(part);
+    expect(normalized).not.toBe(part);
+    expect((normalized satisfies Part as PatchPart).files).toEqual([]);
+    expect(normalized.id).toBe('p-patch');
+  });
+
+  it('fills an empty array for a files field that is not an array', () => {
+    const part = { ...patchPart(), files: null } as unknown as PatchPart;
+
+    expect((normalizeMissingPatchFiles(part) satisfies Part as PatchPart).files).toEqual([]);
+  });
+
+  it('passes non-patch parts through unchanged', () => {
+    const textPart: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hello',
+    };
+
+    expect(normalizeMissingPatchFiles(textPart)).toBe(textPart);
+  });
+});
+
+describe('normalizeToolPartState', () => {
+  // The cast is the fixture: the wire really sends these shapes (the per-event
+  // schema is `.passthrough()`, and a replay hands stored parts to the seam).
+  function toolPart(state: unknown, extra: Record<string, unknown> = {}): Part {
+    return {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'bash',
+      state,
+      ...extra,
+    } as unknown as Part;
+  }
+
+  it('drops a part with no state, a null state, or a non-object state', () => {
+    const missing = { id: 'p-tool', sessionID: 'ses-1', messageID: 'msg-1', type: 'tool' };
+    expect(normalizeToolPartState(missing as unknown as Part)).toBeNull();
+    expect(normalizeToolPartState(toolPart(null))).toBeNull();
+    expect(normalizeToolPartState(toolPart('running'))).toBeNull();
+    expect(normalizeToolPartState(toolPart([]))).toBeNull();
+  });
+
+  it('drops a part whose status is not a non-empty string', () => {
+    expect(normalizeToolPartState(toolPart({}))).toBeNull();
+    expect(normalizeToolPartState(toolPart({ status: 42 }))).toBeNull();
+    expect(normalizeToolPartState(toolPart({ status: '' }))).toBeNull();
+  });
+
+  it('returns the identical object when the state is usable', () => {
+    const part = toolPart({ status: 'running', input: {}, time: { start: 1 } });
+
+    // Identity is preserved so memoized stored messages keep their reference.
+    expect(normalizeToolPartState(part)).toBe(part);
+  });
+
+  it('passes non-tool parts through unchanged', () => {
+    const textPart: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hello',
+    };
+
+    expect(normalizeToolPartState(textPart)).toBe(textPart);
+  });
+
+  it('replaces non-array attachments from a completed state with an empty list', () => {
+    expect(normalizeToolPartState(toolPart({ status: 'completed', attachments: {} }))).toEqual({
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'bash',
+      state: { status: 'completed', attachments: [] },
+    });
+  });
+
+  it('keeps only the attachments a consumer can read', () => {
+    const normalized = normalizeToolPartState(
+      toolPart({
+        status: 'completed',
+        attachments: [
+          { mime: 'image/png', url: 'data:image/png;base64,AAA' },
+          null,
+          'nope',
+          { mime: 42, url: 'data:x' },
+          { mime: 'image/png' },
+          { mime: 'application/pdf', url: 'data:application/pdf;base64,QQ==' },
+        ],
+      })
+    );
+
+    expect(normalized).toMatchObject({
+      state: {
+        status: 'completed',
+        attachments: [
+          { mime: 'image/png', url: 'data:image/png;base64,AAA' },
+          { mime: 'application/pdf', url: 'data:application/pdf;base64,QQ==' },
+        ],
+      },
+    });
+  });
+
+  it('returns the identical object when every attachment is conforming', () => {
+    const part = toolPart({
+      status: 'completed',
+      attachments: [{ mime: 'image/png', url: 'data:image/png;base64,AAA' }],
+    });
+
+    expect(normalizeToolPartState(part)).toBe(part);
+  });
+});
+
+describe('stripPartContentIfFile', () => {
+  function filePart(overrides: Partial<FilePart> = {}): FilePart {
+    return {
+      id: 'p-file',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: 'text/plain',
+      filename: 'readme.txt',
+      url: 'data:text/plain;base64,aGVsbG8=',
+      source: {
+        type: 'file',
+        path: '/readme.txt',
+        text: { value: 'file content here', start: 0, end: 17 },
+      },
+      ...overrides,
+    };
+  }
+
+  function completedToolWith(attachments: unknown): Part {
+    return {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: {},
+        output: 'ok',
+        title: 'read',
+        metadata: {},
+        time: { start: 1, end: 2 },
+        attachments,
+      },
+    } as unknown as Part;
+  }
+
+  function attachmentsOf(part: Part): FilePart[] | undefined {
+    const state = (part satisfies Part as ToolPart).state;
+    if (state.status !== 'completed') return undefined;
+    return state.attachments as FilePart[] | undefined;
+  }
+
+  it('blanks the url and the source text of a top-level file part', () => {
+    const stripped = stripPartContentIfFile(filePart()) satisfies Part as FilePart;
+    const source = stripped.source;
+    if (!source || source.type !== 'file') throw new Error('expected a file source');
+
+    expect(stripped.url).toBe('');
+    expect(source.text.value).toBe('');
+    expect(source.path).toBe('/readme.txt');
+  });
+
+  it('keeps every other field of a top-level file part, including synthetic', () => {
+    const part = filePart({ synthetic: true });
+    const stripped = stripPartContentIfFile(part) satisfies Part as FilePart;
+
+    expect(stripped.id).toBe('p-file');
+    expect(stripped.sessionID).toBe('ses-1');
+    expect(stripped.messageID).toBe('msg-1');
+    expect(stripped.mime).toBe('text/plain');
+    expect(stripped.filename).toBe('readme.txt');
+    expect(stripped.synthetic).toBe(true);
+  });
+
+  it('passes non-file non-tool parts through unchanged', () => {
+    const text: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hi',
+    };
+
+    expect(stripPartContentIfFile(text)).toBe(text);
+  });
+
+  it('blanks the url and source text of each readable attachment', () => {
+    const part = completedToolWith([
+      {
+        id: 'att-1',
+        mime: 'image/png',
+        filename: 'shot.png',
+        url: 'data:image/png;base64,AAA',
+        source: { type: 'file', path: '/shot.png', text: { value: 'bytes', start: 0, end: 5 } },
+      },
+    ]);
+
+    const stored = attachmentsOf(stripPartContentIfFile(part))?.[0];
+    if (!stored) throw new Error('expected one stored attachment');
+
+    expect(stored.url).toBe('');
+    expect(stored.source?.text.value).toBe('');
+    expect(stored.filename).toBe('shot.png');
+    expect(stored.id).toBe('att-1');
+  });
+
+  it('keeps extra attachment fields the seam does not read, including synthetic', () => {
+    const attachment = {
+      id: 'att-1',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAA',
+      synthetic: true,
+    };
+    const stored = attachmentsOf(stripPartContentIfFile(completedToolWith([attachment])))?.[0];
+
+    expect(stored).toEqual({ ...attachment, url: '' });
+  });
+
+  it('gives a malformed attachment source without text an empty text value', () => {
+    const attachment = {
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAA',
+      source: { type: 'file', path: '/shot.png' },
+    };
+    const stored = attachmentsOf(stripPartContentIfFile(completedToolWith([attachment])))?.[0];
+    if (!stored) throw new Error('expected one stored attachment');
+    const source = stored.source;
+    if (!source || source.type !== 'file') throw new Error('expected a file source');
+
+    expect(source.text).toEqual({ value: '' });
+    expect(source.path).toBe('/shot.png');
+  });
+
+  it('leaves an attachment without a source untouched apart from the url', () => {
+    const attachment = { mime: 'image/png', url: 'data:image/png;base64,AAA' };
+    const stored = attachmentsOf(stripPartContentIfFile(completedToolWith([attachment])))?.[0];
+    if (!stored) throw new Error('expected one stored attachment');
+
+    expect(stored.source).toBeUndefined();
+    expect(stored.url).toBe('');
+  });
+
+  it('stores an empty list when no attachment is readable and keeps other tools unchanged', () => {
+    const unreadable = completedToolWith([null, 'nope', { mime: 42, url: 'data:x' }]);
+    expect(attachmentsOf(stripPartContentIfFile(unreadable))).toEqual([]);
+
+    const running: Part = {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'bash',
+      state: { status: 'running', input: {}, time: { start: 1 } },
+    };
+    expect(stripPartContentIfFile(running)).toBe(running);
   });
 });

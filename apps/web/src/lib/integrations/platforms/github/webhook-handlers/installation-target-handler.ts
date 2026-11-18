@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import { updateIntegrationAccountIdentity } from '@/lib/integrations/db/platform-integrations';
+import { updateGitHubInstallationAccountIdentity } from '@/lib/integrations/db/github-installations';
 import type { GitHubAppType } from '../app-selector';
 import { fetchGitHubInstallationDetails } from '@/lib/integrations/platforms/github/adapter';
 import type { InstallationTargetRenamedPayload } from '../webhook-schemas';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export async function handleInstallationTargetRenamed(
   payload: InstallationTargetRenamedPayload,
-  integrationId: string,
   appType: GitHubAppType
 ) {
   const installationId = payload.installation.id.toString();
@@ -17,15 +16,15 @@ export async function handleInstallationTargetRenamed(
     throw new Error('GitHub installation account identity missing after rename event');
   }
 
-  await updateIntegrationAccountIdentity(
-    integrationId,
-    details.account.id.toString(),
-    details.account.login
-  );
+  await updateGitHubInstallationAccountIdentity({
+    installationId,
+    appType,
+    accountId: details.account.id.toString(),
+    accountLogin: details.account.login,
+  });
 
   logExceptInTest('GitHub App installation target renamed:', {
     installation_id: installationId,
-    integration_id: integrationId,
     target_type: payload.target_type,
   });
 

@@ -21,7 +21,9 @@ describe('apple-app-site-association', () => {
         components: ReturnType<typeof aasaComponents>;
       }>;
     };
-    webcredentials?: unknown;
+    webcredentials?: {
+      apps: string[];
+    };
   };
 
   it('parses as JSON with a single applinks.details entry', () => {
@@ -36,8 +38,8 @@ describe('apple-app-site-association', () => {
     expect(parsed.applinks.details[0]?.components).toEqual(aasaComponents());
   });
 
-  it('does not declare webcredentials', () => {
-    expect(parsed).not.toHaveProperty('webcredentials');
+  it('declares webcredentials for the Kilo iOS app ID', () => {
+    expect(parsed.webcredentials?.apps).toEqual(['X96D76J65Z.com.kilocode.kiloapp']);
   });
 });
 
@@ -56,9 +58,10 @@ describe('assetlinks.json', () => {
     expect(parsed).toHaveLength(1);
   });
 
-  it('delegates handle_all_urls to the Android app package', () => {
+  it('delegates handle_all_urls and passkey get_login_creds to the Android app package', () => {
     const entry = parsed[0];
     expect(entry?.relation).toContain('delegate_permission/common.handle_all_urls');
+    expect(entry?.relation).toContain('delegate_permission/common.get_login_creds');
     expect(entry?.target.namespace).toBe('android_app');
     expect(entry?.target.package_name).toBe('com.kilocode.kiloapp');
   });

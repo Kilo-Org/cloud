@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -23,6 +24,7 @@ export function ToolResultRows({
   rows,
   truncated = false,
 }: Readonly<ToolResultRowsProps>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-1">
       {caption ? (
@@ -34,7 +36,7 @@ export function ToolResultRows({
         <View key={index} className="border-b border-hair-soft px-2 py-1.5">
           <SelectableText
             className={cn(
-              'font-mono text-xs leading-4 text-foreground',
+              'font-mono text-xs leading-[1rem] text-foreground',
               row.emphasis && 'font-medium'
             )}
           >
@@ -43,8 +45,11 @@ export function ToolResultRows({
         </View>
       ))}
       {truncated ? (
-        <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">
-          Truncated
+        <Text
+          accessibilityLabel={t('common.contentTruncated')}
+          className="mt-1 text-xs text-muted-foreground"
+        >
+          {t('common.truncated')}
         </Text>
       ) : null}
     </View>

@@ -38,10 +38,15 @@ const WORKSPACE_SUBTYPE_REASONS = {
   git_pack_corrupt: 'repository_checkout_failed',
   git_checkout_conflict: 'repository_checkout_failed',
   git_branch_missing: 'repository_checkout_failed',
+  base_branch_changed: 'repository_checkout_failed',
+  base_branch_missing: 'repository_checkout_failed',
+  base_branch_stale: 'repository_checkout_failed',
   kilo_import_timeout: 'session_import_failed',
   kilo_import_failed: 'session_import_failed',
   setup_command_timeout: 'setup_command_failed',
   setup_command_failed: 'setup_command_failed',
+  workspace_snapshot_start_failed: 'workspace_setup_failed',
+  environment_snapshot_required: 'setup_command_failed',
   workspace_setup_unknown: 'workspace_setup_failed',
 } as const satisfies Record<WorkspaceFailureSubtype, CodeReviewTerminalReason>;
 
@@ -67,6 +72,9 @@ const FAILURE_CODE_REASONS = {
   assistant_error: 'assistant_failed',
   missing_assistant_reply: 'assistant_no_reply',
   payment_required: 'billing',
+  admission_billing_unavailable: 'sandbox_connection',
+  container_limit_reached: 'delivery_failed',
+  account_blocked: 'account_blocked',
   user_interrupt: 'user_cancelled',
   container_shutdown: 'container_shutdown',
   system_interrupt: 'interrupted',
@@ -86,11 +94,18 @@ const FAILURE_CODE_REASONS = {
 const ASSISTANT_REASON_REASONS = {
   rate_limited: 'assistant_rate_limited',
   provider_unavailable: 'assistant_unavailable',
+  provider_disconnect: 'assistant_provider_disconnect',
+  gateway_unavailable: 'assistant_gateway_unavailable',
   timeout: 'assistant_timeout',
   provider_authentication: 'assistant_unauthorized',
   invalid_request: 'assistant_invalid_request',
+  context_limit: 'assistant_context_limit',
+  output_limit: 'assistant_output_limit',
+  content_filter: 'assistant_content_filter',
+  structured_output: 'assistant_structured_output',
   insufficient_credits: 'billing',
   model_unavailable: 'model_not_found',
+  model_catalog_unavailable: 'assistant_failed',
   unknown: 'assistant_failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, CodeReviewTerminalReason>;
 
@@ -103,6 +118,22 @@ const RATE_LIMITED_BY_OWNERSHIP = {
   byok: 'assistant_rate_limited_byok',
   managed: 'assistant_rate_limited_managed',
   unknown: 'assistant_rate_limited',
+} as const satisfies Record<CloudAgentProviderOwnership, CodeReviewTerminalReason>;
+
+/**
+ * A provider authentication failure split by whose key was rejected. A BYOK key
+ * the provider rejects is actionable by the owner — the existing action-required
+ * flow disables the reviewer and emails them to fix the key — whereas a managed
+ * or unattributed 401 is ours to investigate and stays the generic reason.
+ *
+ * The safe callback message is only ever the projected 'Assistant request was not
+ * authorized', so the raw '[BYOK]' sentence never reaches this receiver; ownership
+ * is the only signal that this is the customer's key and not ours.
+ */
+const PROVIDER_AUTHENTICATION_BY_OWNERSHIP = {
+  byok: 'byok_invalid_key',
+  managed: 'assistant_unauthorized',
+  unknown: 'assistant_unauthorized',
 } as const satisfies Record<CloudAgentProviderOwnership, CodeReviewTerminalReason>;
 
 /**
@@ -145,13 +176,20 @@ export function terminalReasonFromCloudAgentFailure(
   }
 
   if (failure.code === 'assistant_error') {
-    // Structured reason wins. Rate limiting refines further by whose key was
-    // throttled, which is the difference between an actionable failure and one
-    // only the customer can resolve.
+    // Structured reason wins. Rate limiting and provider authentication refine
+    // further by whose key failed, which is the difference between an actionable
+    // failure and one only we can investigate.
     if (failure.assistantReason) {
-      return failure.assistantReason === 'rate_limited'
-        ? RATE_LIMITED_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown']
-        : ASSISTANT_REASON_REASONS[failure.assistantReason];
+      if (failure.assistantReason === 'rate_limited') {
+        return RATE_LIMITED_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown'];
+      }
+      if (failure.assistantReason === 'provider_authentication') {
+        return PROVIDER_AUTHENTICATION_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown'];
+      }
+      if (failure.assistantReason === 'invalid_request' && failure.providerOwnership === 'byok') {
+        return 'assistant_invalid_request_byok';
+      }
+      return ASSISTANT_REASON_REASONS[failure.assistantReason];
     }
 
     // Older payloads carry only the flattened text.

@@ -5,25 +5,25 @@ import {
   dispatchEnterpriseRecommendationsDigests,
   getOrganizationOwnerRecipients,
 } from './recommendations-digest';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   organization_memberships,
   organizations,
   transactional_email_log,
 } from '@kilocode/db/schema';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('./recommendations', () => ({
   getOrganizationRecommendations: jest.fn(),
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendRecommendationsDigestEmail: jest.fn(),
 }));
 
-import { sendRecommendationsDigestEmail } from '@/lib/email';
+import { sendRecommendationsDigestEmail } from '@kilocode/web-shared/lib/email';
 import { getOrganizationRecommendations } from './recommendations';
 
 const mockedGetRecommendations = jest.mocked(getOrganizationRecommendations);

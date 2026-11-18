@@ -8,18 +8,18 @@ import {
   KiloPassAuditLogAction,
   KiloPassPaymentProvider,
   type KiloPassTier,
-} from '@/lib/kilo-pass/enums';
-import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   appendKiloPassAuditLog,
-  computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
-} from '@/lib/kilo-pass/issuance';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { computeIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { updateKiloPassThresholdAfterBaseCredits } from './subscription-accounting';
 
 type Db = typeof defaultDb;
@@ -71,6 +71,15 @@ async function issueYearlyCadenceMonthlyBaseOnce(
   const issueMonth = computeIssueMonth(dayjs(nextYearlyIssueAt).utc());
   const nextYearlyIssueAtNewIso = dayjs(nextYearlyIssueAt).utc().add(1, 'month').toISOString();
 
+  // Use GREATEST() to ensure monotonic advancement - prevents regression under overlapping runs.
+  // Persist before the cap check so every step, including a skipped one, leaves the due set.
+  await tx
+    .update(kilo_pass_subscriptions)
+    .set({
+      next_yearly_issue_at: sql`GREATEST(${kilo_pass_subscriptions.next_yearly_issue_at}, ${nextYearlyIssueAtNewIso})`,
+    })
+    .where(eq(kilo_pass_subscriptions.id, subscriptionId));
+
   // Count total issuances since the last invoice-sourced issuance (start of yearly period)
   const lastInvoiceIssuance = await tx
     .select({ issueMonth: kilo_pass_issuances.issue_month })
@@ -98,7 +107,7 @@ async function issueYearlyCadenceMonthlyBaseOnce(
 
     const count = totalIssuances[0]?.count ?? 0;
     if (count >= 12) {
-      // All 12 months issued for this yearly period — skip but still advance cursor
+      // All 12 months issued for this yearly period — cursor already advanced above
       return {
         issueMonth,
         nextYearlyIssueAtNewIso: dayjs(nextYearlyIssueAt).utc().add(1, 'month').toISOString(),
@@ -131,6 +140,7 @@ async function issueYearlyCadenceMonthlyBaseOnce(
     amountUsd: baseAmountUsd,
     stripeInvoiceId: syntheticStripeInvoiceId,
     description: `Kilo Pass base credits (${tier}, yearly, ${issueMonth})`,
+    issuedAt: nextYearlyIssueAt,
   });
 
   if (baseResult.wasIssued) {
@@ -139,14 +149,6 @@ async function issueYearlyCadenceMonthlyBaseOnce(
       baseAmountUsd,
     });
   }
-
-  // Use GREATEST() to ensure monotonic advancement - prevents regression under overlapping runs.
-  await tx
-    .update(kilo_pass_subscriptions)
-    .set({
-      next_yearly_issue_at: sql`GREATEST(${kilo_pass_subscriptions.next_yearly_issue_at}, ${nextYearlyIssueAtNewIso})`,
-    })
-    .where(eq(kilo_pass_subscriptions.id, subscriptionId));
 
   return {
     issueMonth,

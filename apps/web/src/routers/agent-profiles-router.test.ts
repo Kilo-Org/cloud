@@ -1,20 +1,77 @@
 import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
   agent_environment_profile_commands,
+  agent_environment_profile_agents,
+  agent_environment_profile_repo_bindings,
+  cloud_agent_webhook_triggers,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import {
+  bindProfileToRepo,
+  MASKED_SECRET_VALUE,
+  MAX_OWNER_PROFILES,
+  MAX_PROFILE_KILO_COMMANDS,
+  MAX_PROFILE_VARS,
+} from '@kilocode/cloud-agent-profile';
 import type { User, Organization } from '@kilocode/db/schema';
+import type { PoolClient } from 'pg';
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Poll `pg_locks` until `expected` other backends of this test connection are
+ * blocked on a lock. Observing the lock waits proves the operations actually
+ * overlapped instead of assuming it from a fixed sleep.
+ */
+async function waitForBlockedLockWaiters(client: PoolClient, expected: number): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  for (;;) {
+    const { rows } = await client.query<{ n: number }>(
+      `SELECT count(DISTINCT locked.pid)::int AS n
+         FROM pg_locks locked
+         JOIN pg_stat_activity activity ON activity.pid = locked.pid
+        WHERE NOT locked.granted
+          AND activity.datname = current_database()
+          AND activity.application_name = current_setting('application_name')
+          AND locked.pid <> pg_backend_pid()`
+    );
+    if (rows[0].n >= expected) return;
+    if (Date.now() > deadline) {
+      const diagnostics = await client.query<{ wait: string | null; query: string }>(
+        `SELECT wait_event_type || ':' || coalesce(wait_event, '') AS wait, query
+           FROM pg_stat_activity
+          WHERE datname = current_database() AND pid <> pg_backend_pid()`
+      );
+      throw new Error(
+        `timed out waiting for ${expected} lock waiters; activity: ${JSON.stringify(diagnostics.rows)}`
+      );
+    }
+    await sleep(20);
+  }
+}
+
+/** Release a held test transaction even when an assertion failed mid-test. */
+async function rollbackQuietly(client: PoolClient): Promise<void> {
+  try {
+    await client.query('ROLLBACK');
+  } catch {
+    // Already committed or rolled back; nothing left to release.
+  }
+}
 
 describe('Agent Profiles Router', () => {
   let ownerUser: User;
+  let adminUser: User;
   let memberUser: User;
+  let billingManagerUser: User;
   let otherUser: User;
   let organizationA: Organization;
 
@@ -25,9 +82,19 @@ describe('Agent Profiles Router', () => {
       google_user_name: 'Agent Profiles Owner',
     });
 
+    adminUser = await insertTestUser({
+      google_user_email: 'agent-profiles-admin@example.com',
+      google_user_name: 'Agent Profiles Admin',
+    });
+
     memberUser = await insertTestUser({
       google_user_email: 'agent-profiles-member@example.com',
       google_user_name: 'Agent Profiles Member',
+    });
+
+    billingManagerUser = await insertTestUser({
+      google_user_email: 'agent-profiles-billing@example.com',
+      google_user_name: 'Agent Profiles Billing Manager',
     });
 
     otherUser = await insertTestUser({
@@ -38,11 +105,18 @@ describe('Agent Profiles Router', () => {
     // Create test organization
     organizationA = await createTestOrganization('Agent Profiles Test Org', ownerUser.id, 100000);
 
-    // Add member to organization
+    // Add members to organization
+    await addUserToOrganization(organizationA.id, adminUser.id, 'admin');
     await addUserToOrganization(organizationA.id, memberUser.id, 'member');
+    await addUserToOrganization(organizationA.id, billingManagerUser.id, 'billing_manager');
   });
 
   afterEach(async () => {
+    // Trigger rows hold the profile FK (`ON DELETE RESTRICT`), so they go first.
+    await db
+      .delete(cloud_agent_webhook_triggers)
+      .where(eq(cloud_agent_webhook_triggers.user_id, ownerUser.id));
+
     // Clean up profiles after each test
     // First delete vars and commands (due to FK constraints)
     const profiles = await db
@@ -50,6 +124,7 @@ describe('Agent Profiles Router', () => {
       .from(agent_environment_profiles);
 
     for (const profile of profiles) {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.profile_id, profile.id));
       await db
         .delete(agent_environment_profile_vars)
         .where(eq(agent_environment_profile_vars.profile_id, profile.id));
@@ -113,6 +188,22 @@ describe('Agent Profiles Router', () => {
           .where(eq(agent_environment_profiles.id, result.id));
 
         expect(dbProfile.description).toBeNull();
+      });
+
+      test('should allow an organization member to create a personal profile', async () => {
+        const caller = await createCallerForUser(memberUser.id);
+
+        const result = await caller.agentProfiles.create({
+          name: 'Member Personal Profile',
+        });
+
+        const [dbProfile] = await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, result.id));
+
+        expect(dbProfile.owned_by_user_id).toBe(memberUser.id);
+        expect(dbProfile.owned_by_organization_id).toBeNull();
       });
     });
 
@@ -207,6 +298,7 @@ describe('Agent Profiles Router', () => {
         expect(result.id).toBe(profileId);
         expect(result.name).toBe('Full Profile');
         expect(result.description).toBe('A complete profile');
+        expect(result.lastUsedAt).toBeNull();
         expect(result.vars).toHaveLength(2);
         expect(result.commands).toHaveLength(1);
 
@@ -219,6 +311,69 @@ describe('Agent Profiles Router', () => {
         const debugVar = result.vars.find(v => v.key === 'DEBUG');
         expect(debugVar?.value).toBe('true');
         expect(debugVar?.isSecret).toBe(false);
+      });
+
+      test.each(['personal', 'organization'] as const)(
+        'should return the latest session activity for a %s profile',
+        async ownerType => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const organizationId = ownerType === 'organization' ? organizationA.id : undefined;
+          const { id: profileId } = await caller.agentProfiles.create({
+            name: 'Used Profile',
+            organizationId,
+          });
+          const { id: otherProfileId } = await caller.agentProfiles.create({
+            name: 'Other Profile',
+            organizationId,
+          });
+          await db.insert(cli_sessions_v2).values([
+            {
+              session_id: `${profileId}-older`,
+              kilo_user_id: ownerUser.id,
+              profile_id: profileId,
+              organization_id: organizationId,
+              created_at: '2026-04-28 01:16:12.945+00',
+              last_activity_at: '2026-04-29 01:16:12.945+00',
+              updated_at: '2026-05-02 01:16:12.945+00',
+            },
+            {
+              session_id: `${profileId}-latest`,
+              kilo_user_id: ownerType === 'organization' ? memberUser.id : ownerUser.id,
+              profile_id: profileId,
+              organization_id: organizationId,
+              created_at: '2026-04-29 00:00:00+00',
+              last_activity_at: '2026-04-30 01:16:12.945+00',
+            },
+            {
+              session_id: `${otherProfileId}-unrelated`,
+              kilo_user_id: ownerUser.id,
+              profile_id: otherProfileId,
+              created_at: '2026-05-01 01:16:12.945+00',
+            },
+          ]);
+
+          const result = await caller.agentProfiles.get({ profileId, organizationId });
+
+          expect(result.lastUsedAt).toBe('2026-04-30T01:16:12.945Z');
+        }
+      );
+
+      test('should use session creation when activity has not been recorded', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'New Session Profile',
+        });
+        await db.insert(cli_sessions_v2).values({
+          session_id: `${profileId}-new`,
+          kilo_user_id: ownerUser.id,
+          profile_id: profileId,
+          created_at: '2026-04-29 01:16:12.945+00',
+          updated_at: '2026-05-01 01:16:12.945+00',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+
+        expect(result.lastUsedAt).toBe('2026-04-29T01:16:12.945Z');
       });
 
       test('should throw NOT_FOUND for non-existent profile', async () => {
@@ -239,6 +394,276 @@ describe('Agent Profiles Router', () => {
         });
 
         await expect(callerB.agentProfiles.get({ profileId })).rejects.toThrow('Profile not found');
+      });
+    });
+
+    describe('overview', () => {
+      test('should count a profile collection without transferring it', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Heavy Profile',
+          description: 'Counts only',
+        });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'PLAIN',
+          value: 'value',
+          isSecret: false,
+        });
+        await caller.agentProfiles.setCommands({
+          profileId,
+          commands: ['npm install', 'npm test'],
+        });
+        await caller.agentProfiles.createCustomSkill({
+          profileId,
+          name: 'heavy-skill',
+          rawMarkdown: `# Heavy\n\n${'body '.repeat(2000)}`,
+        });
+        await caller.agentProfiles.createAgent({
+          profileId,
+          slug: 'helper',
+          name: 'Helper',
+          config: {},
+        });
+
+        const overview = await caller.agentProfiles.overview({ profileId });
+
+        expect(overview).toMatchObject({
+          id: profileId,
+          name: 'Heavy Profile',
+          description: 'Counts only',
+          varCount: 1,
+          commandCount: 2,
+          skillCount: 1,
+          agentCount: 1,
+          mcpServerCount: 0,
+          kiloCommandCount: 0,
+          instructionCount: 0,
+        });
+        // The overview answers counts; the collection payloads stay behind
+        // `get`, so the response cannot grow with their contents.
+        expect(Object.keys(overview).sort()).toEqual(
+          [
+            'agentCount',
+            'commandCount',
+            'createdAt',
+            'description',
+            'id',
+            'instructionCount',
+            'isDefault',
+            'kiloCommandCount',
+            'mcpServerCount',
+            'name',
+            'skillCount',
+            'updatedAt',
+            'varCount',
+          ].sort()
+        );
+      });
+
+      test('should throw NOT_FOUND when accessing another user profile', async () => {
+        const callerA = await createCallerForUser(ownerUser.id);
+        const callerB = await createCallerForUser(otherUser.id);
+
+        const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private Profile' });
+
+        await expect(callerB.agentProfiles.overview({ profileId })).rejects.toThrow(
+          'Profile not found'
+        );
+      });
+
+      test('should allow org members to read an org profile overview', async () => {
+        const ownerCaller = await createCallerForUser(ownerUser.id);
+        const memberCaller = await createCallerForUser(memberUser.id);
+
+        const { id: profileId } = await ownerCaller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Shared Org Profile',
+        });
+        await ownerCaller.agentProfiles.setCommands({
+          organizationId: organizationA.id,
+          profileId,
+          commands: ['npm ci'],
+        });
+
+        const overview = await memberCaller.agentProfiles.overview({
+          organizationId: organizationA.id,
+          profileId,
+        });
+
+        expect(overview.name).toBe('Shared Org Profile');
+        expect(overview.commandCount).toBe(1);
+      });
+    });
+
+    describe('agents', () => {
+      test('should return only the profile agents', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Agent Profile' });
+        await caller.agentProfiles.createAgent({
+          profileId,
+          slug: 'reviewer',
+          name: 'Reviewer',
+          config: { mode: 'subagent' },
+        });
+        await caller.agentProfiles.createCustomSkill({
+          profileId,
+          name: 'unread-skill',
+          rawMarkdown: '# Body',
+        });
+
+        const agents = await caller.agentProfiles.agents({ profileId });
+
+        expect(agents.map(agent => agent.slug)).toEqual(['reviewer']);
+        expect(agents[0]?.config).toEqual({ mode: 'subagent' });
+      });
+
+      test('should throw NOT_FOUND when accessing another user profile', async () => {
+        const callerA = await createCallerForUser(ownerUser.id);
+        const callerB = await createCallerForUser(otherUser.id);
+
+        const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private Profile' });
+
+        await expect(callerB.agentProfiles.agents({ profileId })).rejects.toThrow(
+          'Profile not found'
+        );
+      });
+    });
+
+    describe('section reads', () => {
+      test('vars returns the masked list for the profile alone', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Vars Profile' });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'PLAIN',
+          value: 'visible',
+          isSecret: false,
+        });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'SECRET',
+          value: 'hidden',
+          isSecret: true,
+        });
+        await caller.agentProfiles.setCommands({ profileId, commands: ['npm ci'] });
+
+        const vars = await caller.agentProfiles.vars({ profileId });
+
+        expect(vars.map(variable => variable.key)).toEqual(['PLAIN', 'SECRET']);
+        expect(vars.find(variable => variable.key === 'PLAIN')?.value).toBe('visible');
+        expect(vars.find(variable => variable.key === 'SECRET')?.value).toBe('***');
+      });
+
+      test.each([
+        'vars',
+        'commands',
+        'mcpServers',
+        'skills',
+        'kiloCommands',
+        'instructions',
+      ] as const)(
+        '%s keeps answering when another collection holds a row the whole-profile read refuses',
+        async procedure => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const { id: profileId } = await caller.agentProfiles.create({ name: 'Mixed Profile' });
+          await caller.agentProfiles.setVar({
+            profileId,
+            key: 'API_BASE',
+            value: 'http://localhost:3000',
+            isSecret: false,
+          });
+          // An agent config the response contract rejects (a variant is
+          // model-specific). It is not part of any other collection's read.
+          await db.insert(agent_environment_profile_agents).values({
+            profile_id: profileId,
+            slug: 'legacy',
+            name: 'Legacy',
+            config: { variant: 'fast' },
+          });
+
+          await expect(caller.agentProfiles.get({ profileId })).rejects.toThrow();
+
+          const result = await caller.agentProfiles[procedure]({ profileId });
+          expect(Array.isArray(result)).toBe(true);
+        }
+      );
+
+      test('vars lists six variables including secrets', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Full Profile' });
+        const keys = ['ALPHA', 'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA'];
+        for (const [index, key] of keys.entries()) {
+          await caller.agentProfiles.setVar({
+            profileId,
+            key,
+            value: `value-${String(index)}`,
+            isSecret: index % 2 === 1,
+          });
+        }
+
+        const vars = await caller.agentProfiles.vars({ profileId });
+
+        expect(vars).toHaveLength(keys.length);
+        expect(
+          vars.map(variable => ({
+            key: variable.key,
+            value: variable.value,
+            isSecret: variable.isSecret,
+          }))
+        ).toEqual([
+          { key: 'ALPHA', value: 'value-0', isSecret: false },
+          { key: 'BETA', value: '***', isSecret: true },
+          { key: 'DELTA', value: '***', isSecret: true },
+          { key: 'EPSILON', value: 'value-4', isSecret: false },
+          { key: 'GAMMA', value: 'value-2', isSecret: false },
+          { key: 'ZETA', value: '***', isSecret: true },
+        ]);
+      });
+
+      test('instructions lists the rules files ordered by name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Rules Profile' });
+        await caller.agentProfiles.createInstruction({
+          profileId,
+          name: 'zeta-rules',
+          content: 'Last alphabetically.',
+        });
+        await caller.agentProfiles.createInstruction({
+          profileId,
+          name: 'alpha-rules',
+          content: 'First alphabetically.',
+        });
+
+        const instructions = await caller.agentProfiles.instructions({ profileId });
+
+        expect(instructions.map(instruction => instruction.name)).toEqual([
+          'alpha-rules',
+          'zeta-rules',
+        ]);
+        expect(instructions.map(instruction => instruction.content)).toEqual([
+          'First alphabetically.',
+          'Last alphabetically.',
+        ]);
+      });
+
+      test.each([
+        'vars',
+        'commands',
+        'mcpServers',
+        'skills',
+        'kiloCommands',
+        'instructions',
+      ] as const)('%s refuses another user profile', async procedure => {
+        const callerA = await createCallerForUser(ownerUser.id);
+        const callerB = await createCallerForUser(otherUser.id);
+        const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private' });
+
+        await expect(callerB.agentProfiles[procedure]({ profileId })).rejects.toThrow(
+          'Profile not found'
+        );
       });
     });
 
@@ -311,6 +736,33 @@ describe('Agent Profiles Router', () => {
           .where(eq(agent_environment_profile_commands.profile_id, profileId));
 
         expect(commands).toHaveLength(0);
+      });
+
+      test('should refuse to delete a profile a webhook trigger references', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Triggered Profile',
+        });
+
+        await db.insert(cloud_agent_webhook_triggers).values({
+          trigger_id: 'agent-profiles-test-trigger',
+          user_id: ownerUser.id,
+          github_repo: 'kilo-org/test-repo',
+          profile_id: profileId,
+        });
+
+        await expect(caller.agentProfiles.delete({ profileId })).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+        });
+
+        // The profile survives the refusal, so the caller can detach the trigger.
+        const profiles = await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, profileId));
+
+        expect(profiles).toHaveLength(1);
       });
     });
 
@@ -424,6 +876,90 @@ describe('Agent Profiles Router', () => {
         expect(result.vars[0].value).toBe('***');
         expect(result.vars[0].isSecret).toBe(true);
       });
+
+      test('should apply the key rules to a new key', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Key Contract Test',
+        });
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'api key',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow('Invalid environment variable key');
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(0);
+      });
+
+      test('should apply the reserved-name rule to a new key', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Reserved Key Test',
+        });
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'KILO_PROFILE',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow('Reserved environment variable key');
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(0);
+      });
+
+      test('should hold a profile at the variable cap', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Var Cap Test',
+        });
+
+        await db.insert(agent_environment_profile_vars).values(
+          Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
+            profile_id: profileId,
+            key: `VAR_${String(index)}`,
+            value: 'value',
+            is_secret: false,
+          }))
+        );
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'OVER_CAP',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow(`Profiles are limited to ${String(MAX_PROFILE_VARS)} variables`);
+
+        const stored = await db
+          .select({ key: agent_environment_profile_vars.key })
+          .from(agent_environment_profile_vars)
+          .where(eq(agent_environment_profile_vars.profile_id, profileId));
+        expect(stored).toHaveLength(MAX_PROFILE_VARS);
+        expect(stored.some(row => row.key === 'OVER_CAP')).toBe(false);
+
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'VAR_0',
+          value: 'rotated',
+          isSecret: false,
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(MAX_PROFILE_VARS);
+        expect(result.vars.find(variable => variable.key === 'VAR_0')?.value).toBe('rotated');
+      });
     });
 
     describe('deleteVar', () => {
@@ -536,6 +1072,240 @@ describe('Agent Profiles Router', () => {
         expect(result.commands).toHaveLength(0);
       });
     });
+
+    describe('reorderKiloCommands', () => {
+      test('persists the requested order', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Reorder Test' });
+
+        const one = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'one',
+          template: 'One',
+        });
+        const two = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'two',
+          template: 'Two',
+        });
+        const three = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'three',
+          template: 'Three',
+        });
+
+        await caller.agentProfiles.reorderKiloCommands({
+          profileId,
+          orderedIds: [three.id, one.id, two.id],
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+
+        expect(result.kiloCommands.map(command => command.id)).toEqual([three.id, one.id, two.id]);
+        expect(result.kiloCommands.map(command => command.sortOrder)).toEqual([0, 1, 2]);
+      });
+
+      test('rejects a list longer than the profile command limit', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Reorder Limit Test' });
+
+        const orderedIds = Array.from(
+          { length: MAX_PROFILE_KILO_COMMANDS + 1 },
+          (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+        );
+
+        await expect(
+          caller.agentProfiles.reorderKiloCommands({ profileId, orderedIds })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      });
+
+      test('rejects a command from another profile and keeps the stored order', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Reorder Owner Test' });
+        const { id: otherProfileId } = await caller.agentProfiles.create({
+          name: 'Reorder Other Test',
+        });
+
+        const first = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'first',
+          template: 'First',
+        });
+        const second = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'second',
+          template: 'Second',
+        });
+        const foreign = await caller.agentProfiles.createKiloCommand({
+          profileId: otherProfileId,
+          name: 'foreign',
+          template: 'Foreign',
+        });
+
+        await caller.agentProfiles.reorderKiloCommands({
+          profileId,
+          orderedIds: [second.id, first.id],
+        });
+
+        await expect(
+          caller.agentProfiles.reorderKiloCommands({
+            profileId,
+            orderedIds: [first.id, foreign.id],
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => command.id)).toEqual([second.id, first.id]);
+      });
+    });
+
+    describe('kiloCommandNameConflicts', () => {
+      test('refuses a second command under a name the profile already uses', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Command Dup Test' });
+
+        await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'release-notes',
+          template: 'Draft the notes',
+        });
+
+        await expect(
+          caller.agentProfiles.createKiloCommand({
+            profileId,
+            name: 'release-notes',
+            template: 'Draft the notes again',
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'A command with this name already exists in this profile',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => command.name)).toEqual(['release-notes']);
+      });
+
+      test('refuses a rename onto a name another command owns and keeps the old name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Command Rename Test',
+        });
+
+        const { id: commandId } = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'release-notes',
+          template: 'Draft the notes',
+        });
+        const { id: otherId } = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'deploy',
+          template: 'Ship it',
+        });
+
+        await expect(
+          caller.agentProfiles.updateKiloCommand({
+            profileId,
+            commandId,
+            name: 'deploy',
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        // Saving a command under its own name stays allowed.
+        await caller.agentProfiles.updateKiloCommand({
+          profileId,
+          commandId,
+          name: 'release-notes',
+          template: 'Draft the notes for the next release',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => [command.id, command.name])).toEqual([
+          [otherId, 'deploy'],
+          [commandId, 'release-notes'],
+        ]);
+        expect(result.kiloCommands.find(command => command.id === commandId)?.template).toBe(
+          'Draft the notes for the next release'
+        );
+      });
+    });
+
+    describe('mcpServers', () => {
+      test('refuses a second server under a name the profile already uses', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'MCP Duplicate Test' });
+
+        const server = {
+          name: 'docs',
+          type: 'remote',
+          enabled: true,
+          config: { url: 'https://docs.example.com/mcp' },
+        } as const;
+
+        await caller.agentProfiles.createMcp({ profileId, server });
+
+        await expect(caller.agentProfiles.createMcp({ profileId, server })).rejects.toMatchObject({
+          code: 'CONFLICT',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.mcpServers.map(item => item.name)).toEqual(['docs']);
+      });
+
+      test('refuses a rename onto a name another server owns and keeps the old name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'MCP Rename Test' });
+
+        const { id: mcpServerId } = await caller.agentProfiles.createMcp({
+          profileId,
+          server: {
+            name: 'docs',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://docs.example.com/mcp' },
+          },
+        });
+        const { id: otherId } = await caller.agentProfiles.createMcp({
+          profileId,
+          server: {
+            name: 'search',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://search.example.com/mcp' },
+          },
+        });
+
+        await expect(
+          caller.agentProfiles.updateMcp({
+            profileId,
+            mcpServerId,
+            server: {
+              name: 'search',
+              type: 'remote',
+              enabled: true,
+              config: { url: 'https://docs.example.com/mcp' },
+            },
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        // Saving a server under its own name stays allowed.
+        await caller.agentProfiles.updateMcp({
+          profileId,
+          mcpServerId,
+          server: {
+            name: 'docs',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://docs.example.com/v2' },
+          },
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.mcpServers.map(item => [item.id, item.name])).toEqual([
+          [mcpServerId, 'docs'],
+          [otherId, 'search'],
+        ]);
+      });
+    });
   });
 
   describe('Organization Profiles', () => {
@@ -560,15 +1330,46 @@ describe('Agent Profiles Router', () => {
         expect(dbProfile.owned_by_user_id).toBeNull();
       });
 
-      test('should allow org members to create profiles', async () => {
-        const caller = await createCallerForUser(memberUser.id);
+      test('should allow org admins to create profiles', async () => {
+        const caller = await createCallerForUser(adminUser.id);
 
         const result = await caller.agentProfiles.create({
           organizationId: organizationA.id,
-          name: 'Member Created Profile',
+          name: 'Admin Created Profile',
         });
 
-        expect(result.id).toBeDefined();
+        const [dbProfile] = await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, result.id));
+
+        expect(dbProfile.owned_by_organization_id).toBe(organizationA.id);
+        expect(dbProfile.owned_by_user_id).toBeNull();
+      });
+
+      test('should deny org members creating profiles', async () => {
+        const caller = await createCallerForUser(memberUser.id);
+        await expect(
+          caller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Member Created Profile',
+          })
+        ).rejects.toThrow(
+          'You do not have the required organizational role to access this feature'
+        );
+      });
+
+      test('should deny billing managers creating profiles', async () => {
+        const caller = await createCallerForUser(billingManagerUser.id);
+
+        await expect(
+          caller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Billing Created Profile',
+          })
+        ).rejects.toThrow(
+          'You do not have the required organizational role to access this feature'
+        );
       });
 
       test('should throw UNAUTHORIZED for non-members', async () => {
@@ -633,7 +1434,7 @@ describe('Agent Profiles Router', () => {
     });
 
     describe('access control', () => {
-      test('should allow all org members to access org profiles', async () => {
+      test('should allow all org members to read org profiles', async () => {
         const ownerCaller = await createCallerForUser(ownerUser.id);
         const memberCaller = await createCallerForUser(memberUser.id);
 
@@ -649,6 +1450,12 @@ describe('Agent Profiles Router', () => {
         });
 
         expect(result.name).toBe('Shared Org Profile');
+
+        // Member can list org profiles
+        const listed = await memberCaller.agentProfiles.list({
+          organizationId: organizationA.id,
+        });
+        expect(listed.some(profile => profile.id === profileId)).toBe(true);
       });
 
       test('should prevent non-members from accessing org profiles', async () => {
@@ -667,6 +1474,969 @@ describe('Agent Profiles Router', () => {
           })
         ).rejects.toThrow('You do not have access to this organization');
       });
+
+      describe('profile mutations are reserved for organization managers', () => {
+        async function createOrgProfile(): Promise<string> {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const { id } = await ownerCaller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Managed Org Profile',
+          });
+          return id;
+        }
+
+        async function expectMemberRejected(attempt: Promise<unknown>): Promise<void> {
+          await expect(attempt).rejects.toThrow(
+            'You do not have the required organizational role to access this feature'
+          );
+        }
+
+        test('update: rejects a member and allows an admin', async () => {
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.update({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'Renamed by member',
+            })
+          );
+        });
+
+        test('delete: rejects a member and allows an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId })
+          );
+
+          await ownerCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
+        });
+
+        test('setAsDefault and clearDefault: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setAsDefault({ organizationId: organizationA.id, profileId })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.clearDefault({
+              organizationId: organizationA.id,
+              profileId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.setAsDefault({
+            organizationId: organizationA.id,
+            profileId,
+          });
+          await ownerCaller.agentProfiles.clearDefault({
+            organizationId: organizationA.id,
+            profileId,
+          });
+        });
+
+        test('setVar and setCommands: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setVar({
+              organizationId: organizationA.id,
+              profileId,
+              key: 'MEMBER_VAR',
+              value: 'member-value',
+              isSecret: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setCommands({
+              organizationId: organizationA.id,
+              profileId,
+              commands: ['echo member'],
+            })
+          );
+
+          await ownerCaller.agentProfiles.setVar({
+            organizationId: organizationA.id,
+            profileId,
+            key: 'ADMIN_VAR',
+            value: 'admin-value',
+            isSecret: false,
+          });
+          await ownerCaller.agentProfiles.setCommands({
+            organizationId: organizationA.id,
+            profileId,
+            commands: ['echo admin'],
+          });
+        });
+
+        test('MCP server create and update: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createMcp({
+              organizationId: organizationA.id,
+              profileId,
+              server: {
+                name: 'member-server',
+                type: 'remote',
+                enabled: true,
+                config: { type: 'remote', url: 'https://member.example.com/mcp' },
+              } as never,
+            })
+          );
+
+          const { id: mcpServerId } = await ownerCaller.agentProfiles.createMcp({
+            organizationId: organizationA.id,
+            profileId,
+            server: {
+              name: 'admin-server',
+              type: 'remote',
+              enabled: true,
+              config: { type: 'remote', url: 'https://admin.example.com/mcp' },
+            } as never,
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'admin-server',
+                type: 'remote',
+                enabled: true,
+                config: { type: 'remote', url: 'https://member.example.com/mcp' },
+              } as never,
+            })
+          );
+        });
+
+        test('MCP masked header values survive an unchanged URL and are refused on a URL change', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const profileId = await createOrgProfile();
+
+          const { id: mcpServerId } = await ownerCaller.agentProfiles.createMcp({
+            organizationId: organizationA.id,
+            profileId,
+            server: {
+              name: 'secret-server',
+              type: 'remote',
+              enabled: true,
+              config: {
+                type: 'remote',
+                url: 'https://gateway.example.com/mcp',
+                headers: { Authorization: 'Bearer original-value' },
+              } as never,
+            },
+          });
+
+          // Same URL with the masked placeholder round-trips the stored value.
+          await ownerCaller.agentProfiles.updateMcp({
+            organizationId: organizationA.id,
+            profileId,
+            mcpServerId,
+            server: {
+              name: 'secret-server',
+              type: 'remote',
+              enabled: true,
+              config: {
+                type: 'remote',
+                url: 'https://gateway.example.com/mcp',
+                headers: { Authorization: MASKED_SECRET_VALUE },
+              } as never,
+            },
+          });
+
+          // A different URL with the masked placeholder is refused; the value
+          // must be submitted again for the new destination.
+          await expect(
+            ownerCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'secret-server',
+                type: 'remote',
+                enabled: true,
+                config: {
+                  type: 'remote',
+                  url: 'https://other.example.com/mcp',
+                  headers: { Authorization: MASKED_SECRET_VALUE },
+                } as never,
+              },
+            })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        });
+
+        test('local command changes and transport changes require fresh MCP values', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const profileId = await createOrgProfile();
+
+          const { id: mcpServerId } = await ownerCaller.agentProfiles.createMcp({
+            organizationId: organizationA.id,
+            profileId,
+            server: {
+              name: 'local-server',
+              type: 'local',
+              enabled: true,
+              config: {
+                type: 'local',
+                command: ['node', 'server.js', '--config', 'my config.json'],
+                environment: { API_KEY: 'original-value' },
+              } as never,
+            },
+          });
+
+          // An unchanged command array keeps the stored value, including an
+          // argument that contains a space.
+          await ownerCaller.agentProfiles.updateMcp({
+            organizationId: organizationA.id,
+            profileId,
+            mcpServerId,
+            server: {
+              name: 'local-server',
+              type: 'local',
+              enabled: false,
+              config: {
+                type: 'local',
+                command: ['node', 'server.js', '--config', 'my config.json'],
+                environment: { API_KEY: MASKED_SECRET_VALUE },
+              } as never,
+            },
+          });
+
+          await expect(
+            ownerCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'local-server',
+                type: 'local',
+                enabled: true,
+                config: {
+                  type: 'local',
+                  command: ['node', 'other.js'],
+                  environment: { API_KEY: MASKED_SECRET_VALUE },
+                } as never,
+              },
+            })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          // Switching transport is a destination change too.
+          await expect(
+            ownerCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'local-server',
+                type: 'remote',
+                enabled: true,
+                config: {
+                  type: 'remote',
+                  url: 'https://gateway.example.com/mcp',
+                  headers: { Authorization: MASKED_SECRET_VALUE },
+                } as never,
+              },
+            })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        });
+
+        test('skills: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createSkillsShSkill({
+              organizationId: organizationA.id,
+              profileId,
+              source: 'anthropics/skills@frontend-design',
+            })
+          );
+          const adminCaller = await createCallerForUser(adminUser.id);
+          await expect(
+            adminCaller.agentProfiles.createSkillsShSkill({
+              organizationId: organizationA.id,
+              profileId,
+              source: 'anthropics/skills@frontend-design',
+            })
+          ).resolves.toEqual({ id: expect.any(String) });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createCustomSkill({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'member-skill',
+              rawMarkdown: '# Member skill\n',
+            })
+          );
+
+          const { id: skillId } = await ownerCaller.agentProfiles.createCustomSkill({
+            organizationId: organizationA.id,
+            profileId,
+            name: 'admin-skill',
+            rawMarkdown: '# Admin skill\n',
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setSkillEnabled({
+              organizationId: organizationA.id,
+              profileId,
+              skillId,
+              enabled: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateSkill({
+              organizationId: organizationA.id,
+              profileId,
+              skillId,
+              name: 'member-renamed-skill',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteSkill({
+              organizationId: organizationA.id,
+              profileId,
+              skillId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.setSkillEnabled({
+            organizationId: organizationA.id,
+            profileId,
+            skillId,
+            enabled: false,
+          });
+          await ownerCaller.agentProfiles.updateSkill({
+            organizationId: organizationA.id,
+            profileId,
+            skillId,
+            name: 'admin-renamed-skill',
+          });
+          await ownerCaller.agentProfiles.deleteSkill({
+            organizationId: organizationA.id,
+            profileId,
+            skillId,
+          });
+        });
+
+        test('agents: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createAgent({
+              organizationId: organizationA.id,
+              profileId,
+              slug: 'member-agent',
+              name: 'Member Agent',
+              config: {},
+            })
+          );
+
+          const { id: agentId } = await ownerCaller.agentProfiles.createAgent({
+            organizationId: organizationA.id,
+            profileId,
+            slug: 'admin-agent',
+            name: 'Admin Agent',
+            config: {},
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateAgent({
+              organizationId: organizationA.id,
+              profileId,
+              agentId,
+              name: 'Member Renamed Agent',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteAgent({
+              organizationId: organizationA.id,
+              profileId,
+              agentId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.updateAgent({
+            organizationId: organizationA.id,
+            profileId,
+            agentId,
+            name: 'Admin Renamed Agent',
+          });
+          await ownerCaller.agentProfiles.deleteAgent({
+            organizationId: organizationA.id,
+            profileId,
+            agentId,
+          });
+        });
+
+        test('agents: authority is decided before a duplicate slug is reported', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await ownerCaller.agentProfiles.createAgent({
+            organizationId: organizationA.id,
+            profileId,
+            slug: 'shared-agent',
+            name: 'Shared Agent',
+            config: {},
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createAgent({
+              organizationId: organizationA.id,
+              profileId,
+              slug: 'shared-agent',
+              name: 'Duplicate Agent',
+              config: {},
+            })
+          );
+        });
+
+        test('kilo commands: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createKiloCommand({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'member-command',
+              template: 'echo member',
+            })
+          );
+
+          const { id: commandId } = await ownerCaller.agentProfiles.createKiloCommand({
+            organizationId: organizationA.id,
+            profileId,
+            name: 'admin-command',
+            template: 'echo admin',
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateKiloCommand({
+              organizationId: organizationA.id,
+              profileId,
+              commandId,
+              template: 'echo member',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setKiloCommandEnabled({
+              organizationId: organizationA.id,
+              profileId,
+              commandId,
+              enabled: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.reorderKiloCommands({
+              organizationId: organizationA.id,
+              profileId,
+              orderedIds: [commandId],
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteKiloCommand({
+              organizationId: organizationA.id,
+              profileId,
+              commandId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.updateKiloCommand({
+            organizationId: organizationA.id,
+            profileId,
+            commandId,
+            template: 'echo admin updated',
+          });
+          await ownerCaller.agentProfiles.setKiloCommandEnabled({
+            organizationId: organizationA.id,
+            profileId,
+            commandId,
+            enabled: false,
+          });
+          await ownerCaller.agentProfiles.reorderKiloCommands({
+            organizationId: organizationA.id,
+            profileId,
+            orderedIds: [commandId],
+          });
+          await ownerCaller.agentProfiles.deleteKiloCommand({
+            organizationId: organizationA.id,
+            profileId,
+            commandId,
+          });
+        });
+
+        test('instructions: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createInstruction({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'member-rules',
+              content: 'Follow the member rules.',
+            })
+          );
+
+          const { id: instructionId } = await ownerCaller.agentProfiles.createInstruction({
+            organizationId: organizationA.id,
+            profileId,
+            name: 'admin-rules',
+            content: 'Follow the admin rules.',
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateInstruction({
+              organizationId: organizationA.id,
+              profileId,
+              instructionId,
+              content: 'Follow the member rules.',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setInstructionEnabled({
+              organizationId: organizationA.id,
+              profileId,
+              instructionId,
+              enabled: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteInstruction({
+              organizationId: organizationA.id,
+              profileId,
+              instructionId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.updateInstruction({
+            organizationId: organizationA.id,
+            profileId,
+            instructionId,
+            content: 'Follow the updated admin rules.',
+          });
+          await ownerCaller.agentProfiles.setInstructionEnabled({
+            organizationId: organizationA.id,
+            profileId,
+            instructionId,
+            enabled: false,
+          });
+          await ownerCaller.agentProfiles.deleteInstruction({
+            organizationId: organizationA.id,
+            profileId,
+            instructionId,
+          });
+        });
+      });
+
+      /**
+       * Every row `listCombined` returns opens with the scope its bucket
+       * implies, and only that scope: the mobile Profiles list navigates with
+       * the scope `ownerType` implies, so a row the list shows must read back
+       * through `get`. The opposite scope is NOT_FOUND rather than a
+       * different profile, which is what the client's stale-row state reports.
+       */
+      test('every listed profile reads back with its own bucket scope', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: orgProfileId } = await caller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Listed Org Profile',
+        });
+        const { id: personalProfileId } = await caller.agentProfiles.create({
+          name: 'Listed Personal Profile',
+        });
+
+        const combined = await caller.agentProfiles.listCombined({
+          organizationId: organizationA.id,
+        });
+        // Each bucket holds only its own owner, tagged so the client can derive
+        // the scope to send.
+        expect(combined.orgProfiles).toHaveLength(1);
+        expect(combined.orgProfiles[0]?.id).toBe(orgProfileId);
+        expect(combined.orgProfiles[0]?.ownerType).toBe('organization');
+        expect(combined.personalProfiles).toHaveLength(1);
+        expect(combined.personalProfiles[0]?.id).toBe(personalProfileId);
+        expect(combined.personalProfiles[0]?.ownerType).toBe('user');
+
+        // A full profile's collections survive the read the list's counts came
+        // from: the overview renders those counts, so a listed profile that
+        // fails to read back is the reported defect.
+        await caller.agentProfiles.setCommands({
+          organizationId: organizationA.id,
+          profileId: orgProfileId,
+          commands: Array.from({ length: 20 }, (_, index) => `${'x'.repeat(480)}-${index}`),
+        });
+
+        // Read back every listed row with the scope its owner tag implies.
+        for (const row of combined.orgProfiles) {
+          const detail = await caller.agentProfiles.get({
+            organizationId: organizationA.id,
+            profileId: row.id,
+          });
+          expect(detail.id).toBe(row.id);
+          expect(detail.name).toBe(row.name);
+        }
+        for (const row of combined.personalProfiles) {
+          const detail = await caller.agentProfiles.get({ profileId: row.id });
+          expect(detail.id).toBe(row.id);
+          expect(detail.name).toBe(row.name);
+        }
+
+        const withCommands = await caller.agentProfiles.get({
+          organizationId: organizationA.id,
+          profileId: orgProfileId,
+        });
+        expect(withCommands.commands).toHaveLength(20);
+
+        // The opposite scope never resolves to that row.
+        await expect(caller.agentProfiles.get({ profileId: orgProfileId })).rejects.toThrow(
+          'Profile not found'
+        );
+        await expect(
+          caller.agentProfiles.get({
+            organizationId: organizationA.id,
+            profileId: personalProfileId,
+          })
+        ).rejects.toThrow('Profile not found');
+      });
     });
+  });
+
+  describe('Repository bindings', () => {
+    async function createOrgProfile(): Promise<string> {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const { id } = await ownerCaller.agentProfiles.create({
+        organizationId: organizationA.id,
+        name: 'Bound Org Profile',
+      });
+      return id;
+    }
+
+    async function orgBindings() {
+      return db
+        .select()
+        .from(agent_environment_profile_repo_bindings)
+        .where(
+          eq(agent_environment_profile_repo_bindings.owned_by_organization_id, organizationA.id)
+        );
+    }
+
+    test('rejects a member bind and allows an admin bind', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const profileId = await createOrgProfile();
+
+      await expect(
+        memberCaller.agentProfiles.bindToRepo({
+          organizationId: organizationA.id,
+          profileId,
+          repoFullName: 'acme/web',
+          platform: 'github',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+      expect(await orgBindings()).toHaveLength(1);
+    });
+
+    test('rejects a member unbind and allows an admin unbind', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const profileId = await createOrgProfile();
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+
+      await expect(
+        memberCaller.agentProfiles.unbindRepo({
+          organizationId: organizationA.id,
+          repoFullName: 'acme/web',
+          platform: 'github',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+      await ownerCaller.agentProfiles.unbindRepo({
+        organizationId: organizationA.id,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+      expect(await orgBindings()).toHaveLength(0);
+    });
+
+    test('denies a member deleting a bound profile but lets an admin', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const profileId = await createOrgProfile();
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+
+      await expect(
+        memberCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+      await ownerCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
+      expect(await orgBindings()).toHaveLength(0);
+      const profile = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, profileId));
+      expect(profile).toHaveLength(0);
+    });
+
+    test('removes the binding when its profile is deleted', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const profileId = await createOrgProfile();
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+      expect(await orgBindings()).toHaveLength(1);
+
+      await ownerCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
+      expect(await orgBindings()).toHaveLength(0);
+    });
+
+    test('serializes an admin delete behind a concurrent bind on the profile row lock', async () => {
+      const adminCaller = await createCallerForUser(ownerUser.id);
+      const profileId = await createOrgProfile();
+      const owner = { type: 'organization' as const, id: organizationA.id };
+
+      let pendingDelete: Promise<unknown> | undefined;
+      await db.transaction(async tx => {
+        // The bind holds the profile row lock for the whole transaction.
+        await bindProfileToRepo(tx, owner, 'acme/race', 'github', profileId);
+        // Start the delete while the binding is still uncommitted; the row
+        // lock makes it wait instead of observing zero bindings.
+        pendingDelete = adminCaller.agentProfiles.delete({
+          organizationId: organizationA.id,
+          profileId,
+        });
+        // Real wall-clock pause, deliberate: the pending delete must observe
+        // the uncommitted binding, and fake timers do not control Postgres.
+        await new Promise(resolve => setTimeout(resolve, 200));
+      });
+
+      await pendingDelete;
+
+      const bindings = await db
+        .select()
+        .from(agent_environment_profile_repo_bindings)
+        .where(eq(agent_environment_profile_repo_bindings.profile_id, profileId));
+      expect(bindings).toHaveLength(0);
+      const profile = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, profileId));
+      expect(profile).toHaveLength(0);
+    });
+  });
+
+  /**
+   * Profile creation is bounded per owner. Rows are seeded directly so each
+   * test starts at the count it needs, and two callers run on their own pool
+   * connections so the owner lock is exercised for real.
+   */
+  describe('profile creation limit', () => {
+    const LIMIT_MESSAGE = `Profiles are limited to ${MAX_OWNER_PROFILES} per user or organization`;
+
+    async function seedProfiles(
+      owner: { userId: string } | { organizationId: string },
+      count: number
+    ): Promise<string[]> {
+      if (count === 0) return [];
+      const rows = await db
+        .insert(agent_environment_profiles)
+        .values(
+          Array.from({ length: count }, (_, index) => ({
+            owned_by_user_id: 'userId' in owner ? owner.userId : null,
+            owned_by_organization_id: 'organizationId' in owner ? owner.organizationId : null,
+            name: `Seeded Profile ${index}`,
+          }))
+        )
+        .returning({ id: agent_environment_profiles.id });
+      return rows.map(row => row.id);
+    }
+
+    async function countProfiles(
+      owner: { userId: string } | { organizationId: string }
+    ): Promise<number> {
+      const rows = await db
+        .select({ id: agent_environment_profiles.id })
+        .from(agent_environment_profiles)
+        .where(
+          'userId' in owner
+            ? eq(agent_environment_profiles.owned_by_user_id, owner.userId)
+            : eq(agent_environment_profiles.owned_by_organization_id, owner.organizationId)
+        );
+      return rows.length;
+    }
+
+    test('rejects a create at the cap without storing a row', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES);
+
+      await expect(caller.agentProfiles.create({ name: 'One Too Many' })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: LIMIT_MESSAGE,
+      });
+
+      expect(await countProfiles({ userId: ownerUser.id })).toBe(MAX_OWNER_PROFILES);
+    }, 30000);
+
+    test('stores a create one below the cap', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES - 1);
+
+      const created = await caller.agentProfiles.create({ name: 'Last Free Slot' });
+
+      const stored = await db
+        .select({ name: agent_environment_profiles.name })
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, created.id));
+      expect(stored).toEqual([{ name: 'Last Free Slot' }]);
+      expect(await countProfiles({ userId: ownerUser.id })).toBe(MAX_OWNER_PROFILES);
+    }, 30000);
+
+    test('lets exactly one of two parallel creates fill the last slot', async () => {
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES - 1);
+      const firstCaller = await createCallerForUser(ownerUser.id);
+      const secondCaller = await createCallerForUser(ownerUser.id);
+
+      const holder = await pool.connect();
+      let results: PromiseSettledResult<{ id: string }>[];
+      try {
+        // Hold the owner's creation lock from a separate connection, so both
+        // creates must queue behind it before either counts. Observing the
+        // queue proves the two creates overlap inside the owner lock instead
+        // of relying on a fixed sleep to catch a race.
+        await holder.query('BEGIN');
+        await holder.query(
+          `SELECT pg_catalog.pg_advisory_xact_lock(
+             pg_catalog.hashtextextended('agent-environment-profile-creation:user:' || $1, 0)
+           )`,
+          [ownerUser.id]
+        );
+
+        const both = Promise.allSettled([
+          firstCaller.agentProfiles.create({ name: 'Parallel First' }),
+          secondCaller.agentProfiles.create({ name: 'Parallel Second' }),
+        ]);
+
+        await waitForBlockedLockWaiters(holder, 2);
+        await holder.query('COMMIT');
+        results = await both;
+      } finally {
+        await rollbackQuietly(holder);
+        holder.release();
+      }
+
+      const fulfilled = results.filter(result => result.status === 'fulfilled');
+      const rejected = results.filter(result => result.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0]).toMatchObject({ reason: { code: 'PRECONDITION_FAILED' } });
+      expect(String(rejected[0]?.reason)).toContain(LIMIT_MESSAGE);
+
+      // The loser stored nothing, so the owner holds exactly the cap.
+      expect(await countProfiles({ userId: ownerUser.id })).toBe(MAX_OWNER_PROFILES);
+      const stored = await db
+        .select({ name: agent_environment_profiles.name })
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.owned_by_user_id, ownerUser.id));
+      const winners = stored.filter(row => row.name.startsWith('Parallel'));
+      expect(winners).toHaveLength(1);
+    }, 30000);
+
+    test('counts the cap per owner, so a full owner does not block another', async () => {
+      const fullOwnerCaller = await createCallerForUser(ownerUser.id);
+      const otherCaller = await createCallerForUser(otherUser.id);
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES);
+
+      await expect(
+        fullOwnerCaller.agentProfiles.create({ name: 'Blocked Profile' })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+      await expect(
+        otherCaller.agentProfiles.create({ name: 'Unaffected Profile' })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+      expect(await countProfiles({ userId: otherUser.id })).toBe(1);
+    }, 30000);
+
+    test('bounds organization profiles at the same cap', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      await seedProfiles({ organizationId: organizationA.id }, MAX_OWNER_PROFILES - 1);
+
+      await expect(
+        ownerCaller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Org Last Free Slot',
+        })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+      expect(await countProfiles({ organizationId: organizationA.id })).toBe(MAX_OWNER_PROFILES);
+
+      await expect(
+        ownerCaller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Org One Too Many',
+        })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: LIMIT_MESSAGE });
+      expect(await countProfiles({ organizationId: organizationA.id })).toBe(MAX_OWNER_PROFILES);
+    }, 30000);
+
+    test('keeps an owner at the cap able to read and update its profiles', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const [profileId] = await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES);
+
+      const overview = await caller.agentProfiles.overview({ profileId: profileId! });
+      expect(overview.id).toBe(profileId);
+
+      const listed = await caller.agentProfiles.list({});
+      expect(listed).toHaveLength(MAX_OWNER_PROFILES);
+
+      await expect(
+        caller.agentProfiles.update({ profileId: profileId!, name: 'Renamed At The Cap' })
+      ).resolves.toEqual({ success: true });
+      const stored = await db
+        .select({ name: agent_environment_profiles.name })
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, profileId!));
+      expect(stored).toEqual([{ name: 'Renamed At The Cap' }]);
+    }, 30000);
   });
 });

@@ -1,0 +1,65 @@
+import { describe, expect, test } from '@jest/globals';
+import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/models';
+import type * as AutoModelModule from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import type * as AnthropicModule from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import type * as GoogleModule from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import type * as QwenModule from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+import type * as StepFunModule from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
+import type * as CustomPricingModule from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import type * as ModelUtilsModule from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+
+jest.mock('server-only', () => {
+  throw new Error('Client-safe model modules must not import server-only modules');
+});
+
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => {
+  throw new Error('Client-safe model modules must not read server credentials');
+});
+
+describe('client-safe model imports', () => {
+  test('loads model helpers, auto-model IDs, vendor helpers and custom pricing without server dependencies', () => {
+    jest.isolateModules(() => {
+      const models = jest.requireActual<typeof ModelsModule>(
+        '@kilocode/web-shared/lib/ai-gateway/models'
+      );
+      const autoModel = jest.requireActual<typeof AutoModelModule>(
+        '@kilocode/web-shared/lib/ai-gateway/auto-model'
+      );
+      const anthropic = jest.requireActual<typeof AnthropicModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model'
+      );
+      const google = jest.requireActual<typeof GoogleModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/google'
+      );
+      const qwen = jest.requireActual<typeof QwenModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/qwen'
+      );
+      const stepfun = jest.requireActual<typeof StepFunModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/stepfun'
+      );
+
+      expect(models.isPdfSupportingModel('anthropic/claude-opus-5.5')).toBe(true);
+      expect(autoModel.AUTO_SMALL_TARGET_MODELS.free).toBe(google.GEMMA_4_26B_A4B_IT_FREE_ID);
+      expect(anthropic.isClaudeModel('anthropic/claude-opus-5.5')).toBe(true);
+      expect(google.isGeminiModel('google/gemini-3.8-flash')).toBe(true);
+      expect(qwen.isQwenModel('qwen/qwen3.7-plus')).toBe(true);
+      expect(stepfun.isStepModel('stepfun/step-3.7-flash')).toBe(true);
+
+      const customPricing = jest.requireActual<typeof CustomPricingModule>(
+        '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants'
+      );
+      const modelUtils = jest.requireActual<typeof ModelUtilsModule>(
+        '@kilocode/web-shared/lib/ai-gateway/model-utils'
+      );
+      expect(
+        customPricing.getCustomPricing(
+          customPricing.EMPTY_CUSTOM_PRICING_CONFIG,
+          'google/gemini-3.8-flash'
+        )
+      ).toBeUndefined();
+      expect(modelUtils.normalizeModelId(google.GEMMA_4_26B_A4B_IT_FREE_ID)).toBe(
+        google.GEMMA_4_26B_A4B_IT_ID
+      );
+    });
+  });
+});

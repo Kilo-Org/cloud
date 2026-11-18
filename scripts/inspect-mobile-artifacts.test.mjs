@@ -1,0 +1,312 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { deflateRawSync } from 'node:zlib';
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  assertFileSha256,
+  checkResourceShrinking,
+  INSPECT_JS_NEEDLES,
+  bundleBufferContains,
+  bundleBufferHasDebugId,
+  inspectJsBundles,
+} from './inspect-mobile-artifacts.mjs';
+
+const SENTINEL_ENTRY = 'base/res/raw/zz_unused_shrink_sentinel';
+// Every needle plus the debug-id marker, joined into one ASCII fixture.
+const BUNDLE_CONTENT = [...INSPECT_JS_NEEDLES, 'debugId'].join(' ');
+
+// Minimal ZIP writer (local headers + central directory + EOCD) so the test is
+// self-contained and only needs the system `unzip` that checkResourceShrinking
+// already relies on to read entries back.
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function writeZip(outputPath, entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  for (const [name, content] of entries) {
+    const nameBuffer = Buffer.from(name, 'utf8');
+    const dataBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+    const compressed = deflateRawSync(dataBuffer);
+    const entryCrc = crc32(dataBuffer);
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(8, 8);
+    localHeader.writeUInt16LE(0, 10);
+    localHeader.writeUInt16LE(0, 12);
+    localHeader.writeUInt32LE(entryCrc, 14);
+    localHeader.writeUInt32LE(compressed.length, 18);
+    localHeader.writeUInt32LE(dataBuffer.length, 22);
+    localHeader.writeUInt16LE(nameBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+    localParts.push(localHeader, nameBuffer, compressed);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x0800, 8);
+    centralHeader.writeUInt16LE(8, 10);
+    centralHeader.writeUInt16LE(0, 12);
+    centralHeader.writeUInt16LE(0, 14);
+    centralHeader.writeUInt32LE(entryCrc, 16);
+    centralHeader.writeUInt32LE(compressed.length, 20);
+    centralHeader.writeUInt32LE(dataBuffer.length, 24);
+    centralHeader.writeUInt16LE(nameBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralParts.push(centralHeader, nameBuffer);
+
+    offset += localHeader.length + nameBuffer.length + compressed.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralDirectory.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  writeFileSync(outputPath, Buffer.concat([...localParts, centralDirectory, eocd]));
+}
+
+function withFixture(entries, run) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-shrink-test-'));
+  const zipPath = join(work, 'fixture.aab');
+  try {
+    writeZip(zipPath, entries);
+    return run(zipPath);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test('assertFileSha256 accepts matching bytes and rejects a different digest', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-checksum-test-'));
+  const filePath = join(work, 'download.jar');
+  const expectedSha256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+  try {
+    writeFileSync(filePath, 'abc');
+    assert.doesNotThrow(() => assertFileSha256(filePath, expectedSha256));
+    writeFileSync(filePath, 'abcd');
+    assert.throws(() => assertFileSha256(filePath, expectedSha256), /SHA-256 must be/);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+function runInspectionWithDownload(downloadScript) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspection-test-'));
+  const artifactPath = join(work, 'fixture.zip');
+  const buildJsonPath = join(work, 'build.json');
+  const javaLogPath = join(work, 'java.log');
+  try {
+    const plist = {
+      CFBundleIdentifier: 'com.kilocode.kiloapp',
+      NSMicrophoneUsageDescription: 'Microphone',
+      NSSpeechRecognitionUsageDescription: 'Speech',
+      NSLocationWhenInUseUsageDescription: 'Location',
+      NSUserTrackingUsageDescription: 'Tracking',
+      NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
+      AttributionCopyEndpoint: 'https://appsflyer-skadnetwork.com/',
+    };
+    writeZip(artifactPath, [
+      [
+        'Payload/Fixture.app/Info.plist',
+        `<plist version="1.0"><dict>${Object.entries(plist)
+          .map(([key, value]) => `<key>${key}</key><string>${value}</string>`)
+          .join('')}</dict></plist>`,
+      ],
+      ['Payload/Fixture.app/PrivacyInfo.xcprivacy', ''],
+      ['Payload/Fixture.app/main.jsbundle', BUNDLE_CONTENT],
+      ['BUNDLE-METADATA/com.android.tools.build.debugsymbols/fixture.sym', 'symbols'],
+    ]);
+    writeFileSync(buildJsonPath, JSON.stringify([{ status: 'FINISHED' }]));
+    writeFileSync(join(work, 'curl'), `#!${process.execPath}\n${downloadScript}\n`, {
+      mode: 0o755,
+    });
+    writeFileSync(
+      join(work, 'java'),
+      `#!${process.execPath}
+import { writeFileSync } from 'node:fs';
+writeFileSync(process.env.JAVA_CALL_LOG, 'called');
+process.stdout.write('<manifest package="com.kilocode.kiloapp"><data android:host="app.kilo.ai"/></manifest>');
+`,
+      { mode: 0o755 }
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL('./inspect-mobile-artifacts.mjs', import.meta.url)),
+        artifactPath,
+        artifactPath,
+        buildJsonPath,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${work}${delimiter}${process.env.PATH}`,
+          JAVA_CALL_LOG: javaLogPath,
+        },
+      }
+    );
+    return { ...result, javaCalled: existsSync(javaLogPath) };
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test('inspection reports bundletool verification results', () => {
+  const result = runInspectionWithDownload(
+    `import { writeFileSync } from 'node:fs';
+writeFileSync(process.argv.at(-1), 'fixture download');`
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /cannot verify bundletool: SHA-256 must be/);
+  assert.equal(result.javaCalled, false);
+});
+
+test('inspection reports unavailable tooling', () => {
+  const result = runInspectionWithDownload('process.exit(0);');
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /cannot verify bundletool:.*ENOENT/);
+  assert.equal(result.javaCalled, false);
+});
+
+test('checkResourceShrinking returns false when the sentinel is present', () => {
+  const result = withFixture(
+    [
+      ['base/manifest/AndroidManifest.xml', '<manifest/>'],
+      [SENTINEL_ENTRY, 'sentinel'],
+    ],
+    checkResourceShrinking
+  );
+  assert.equal(result, false);
+});
+
+test('checkResourceShrinking returns true when the sentinel is absent', () => {
+  const result = withFixture(
+    [['base/manifest/AndroidManifest.xml', '<manifest/>']],
+    checkResourceShrinking
+  );
+  assert.equal(result, true);
+});
+
+test('bundleBufferContains matches UTF-8 and UTF-16LE bytes', () => {
+  const utf16Buffer = Buffer.from(BUNDLE_CONTENT, 'utf16le');
+  assert.equal(bundleBufferContains(Buffer.from(BUNDLE_CONTENT, 'utf8'), 'maskAllText'), true);
+  assert.equal(bundleBufferContains(utf16Buffer, 'maskAllText'), true);
+  assert.equal(bundleBufferContains(utf16Buffer, 'us.i.posthog.com'), true);
+  assert.equal(bundleBufferContains(utf16Buffer, 'absent-marker'), false);
+});
+
+test('bundleBufferHasDebugId detects debugId and debug_id in either encoding', () => {
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debugId', 'utf8')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debug_id', 'utf8')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debugId', 'utf16le')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debug_id', 'utf16le')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('no markers here', 'utf8')), false);
+});
+
+test('inspectJsBundles reports all needles and hasDebugId for a UTF-8 jsbundle', () => {
+  const result = withFixture([['index.jsbundle', BUNDLE_CONTENT]], inspectJsBundles);
+  assert.deepEqual(result.needlesFound.sort(), [...INSPECT_JS_NEEDLES].sort());
+  assert.equal(result.hasDebugId, true);
+});
+
+test('inspectJsBundles reports all needles and hasDebugId for a UTF-16LE jsbundle', () => {
+  const utf16Buffer = Buffer.from(BUNDLE_CONTENT, 'utf16le');
+  const result = withFixture([['index.jsbundle', utf16Buffer]], inspectJsBundles);
+  assert.deepEqual(result.needlesFound.sort(), [...INSPECT_JS_NEEDLES].sort());
+  assert.equal(result.hasDebugId, true);
+});
+
+test('inspectJsBundles lacks maskAllText when the bundle omits it', () => {
+  const content = [
+    ...INSPECT_JS_NEEDLES.filter(needle => needle !== 'maskAllText'),
+    'debugId',
+  ].join(' ');
+  const result = withFixture([['index.jsbundle', content]], inspectJsBundles);
+  assert.equal(result.needlesFound.includes('maskAllText'), false);
+});
+
+test('inspectJsBundles reports hasDebugId false when debug-id markers are absent', () => {
+  const result = withFixture([['index.jsbundle', INSPECT_JS_NEEDLES.join(' ')]], inspectJsBundles);
+  assert.equal(result.hasDebugId, false);
+});
+
+function runSelect(builds) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-select-test-'));
+  const buildJsonPath = join(work, 'build.json');
+  try {
+    writeFileSync(buildJsonPath, JSON.stringify(builds));
+    return spawnSync(
+      'node',
+      [
+        fileURLToPath(new URL('./inspect-mobile-artifacts.mjs', import.meta.url)),
+        '--select',
+        buildJsonPath,
+      ],
+      { encoding: 'utf8' }
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test('--select prints the iOS, Android and iOS build artifacts URLs, and requires the last', () => {
+  const ios = {
+    platform: 'IOS',
+    status: 'FINISHED',
+    artifacts: {
+      applicationArchiveUrl: 'https://example.invalid/app.ipa',
+      buildArtifactsUrl: 'https://example.invalid/build-artifacts.tar.gz',
+    },
+  };
+  const android = {
+    platform: 'ANDROID',
+    status: 'FINISHED',
+    artifacts: { applicationArchiveUrl: 'https://example.invalid/app.aab' },
+  };
+
+  const selected = runSelect([android, ios]);
+  assert.equal(selected.status, 0, selected.stderr);
+  assert.equal(
+    selected.stdout,
+    'https://example.invalid/app.ipa\nhttps://example.invalid/app.aab\nhttps://example.invalid/build-artifacts.tar.gz\n'
+  );
+
+  const missing = runSelect([
+    { ...ios, artifacts: { applicationArchiveUrl: ios.artifacts.applicationArchiveUrl } },
+    android,
+  ]);
+  assert.equal(missing.status, 1);
+  assert.equal(missing.stdout, '');
+  assert.match(missing.stderr, /IOS build has no artifacts\.buildArtifactsUrl/);
+});

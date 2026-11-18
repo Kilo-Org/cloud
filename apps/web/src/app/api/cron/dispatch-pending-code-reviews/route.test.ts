@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 

@@ -2,21 +2,21 @@ import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import {
   createMagicLinkToken,
   type MagicLinkTokenWithPlaintext,
-} from '@/lib/auth/magic-link-tokens';
-import { sendMagicLinkEmail } from '@/lib/email';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { sendMagicLinkEmail } from '@kilocode/web-shared/lib/email';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { MAGIC_LINK_EMAIL_ERRORS } from '@/lib/schemas/email';
 import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
 jest.mock('@vercel/firewall');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
-jest.mock('@/lib/auth/magic-link-tokens');
-jest.mock('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
+jest.mock('@kilocode/web-shared/lib/email');
 jest.mock('@/lib/user');
-jest.mock('@/lib/organizations/organization-sso-policy');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy');
 
 import { POST } from './route';
 
@@ -95,6 +95,40 @@ describe('POST /api/auth/magic-link', () => {
     });
     expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
     expect(mockSendMagicLinkEmail).toHaveBeenCalledWith(mockMagicLinkToken, undefined);
+  });
+
+  describe('while email signups are disabled', () => {
+    beforeEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+    });
+    afterEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+    });
+
+    it('refuses a new user before creating a token', async () => {
+      const response = await POST(createRequest({ email: 'new@example.com' }));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        success: false,
+        error: 'EMAIL-SIGNUP-DISABLED',
+      });
+      expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+      expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+    });
+
+    it('still sends a magic link to an existing user', async () => {
+      mockFindUserByNormalizedEmail.mockResolvedValue({
+        id: 'existing-user',
+        google_user_email: 'user@example.com',
+      } as Awaited<ReturnType<typeof findUserByNormalizedEmail>>);
+
+      const response = await POST(createRequest({ email: 'user@example.com' }));
+
+      expect(response.status).toBe(200);
+      expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
+      expect(mockSendMagicLinkEmail).toHaveBeenCalled();
+    });
   });
 
   it('rejects magic links for an SSO-protected domain before creating a token', async () => {
@@ -191,9 +225,9 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'User@Example.com' }));
     await POST(createRequest({ email: 'user@example.com' }));
 
-    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(4);
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(firstKey).toEqual(expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/));
     expect(secondKey).toBe(firstKey);
   });
@@ -203,7 +237,7 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'test+second@googlemail.com' }));
 
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(secondKey).toBe(firstKey);
   });
 
@@ -239,6 +273,20 @@ describe('POST /api/auth/magic-link', () => {
 
   it('should reject request with missing email', async () => {
     const response = await POST(createRequest({}));
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ success: false, error: 'Invalid request data' });
+    expect(mockVerifyTurnstileJWT).not.toHaveBeenCalled();
+  });
+
+  it('should return 400 for malformed JSON body', async () => {
+    const request = new NextRequest('http://localhost:3000/api/auth/magic-link', {
+      method: 'POST',
+      body: 'not-json{',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(400);

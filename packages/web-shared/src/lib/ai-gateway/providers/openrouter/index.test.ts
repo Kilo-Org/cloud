@@ -1,0 +1,1042 @@
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  buildAutoModelCatalogEntry,
+  formatName,
+  getEnhancedOpenRouterModels,
+  getOpenRouterTranscriptionModels,
+  getRawOpenRouterModels,
+  resetOpenRouterModelsCaches,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import type {
+  GatewayModelMap,
+  GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import {
+  createMockResponse,
+  mockOpenRouterModels,
+} from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  AUTO_MODELS,
+  AUTO_SMALL_TARGET_MODELS,
+  KILO_AUTO_EFFICIENT_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModels,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { resolveCatalogVariant } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+import type * as CustomPricingConfigModule from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import {
+  getCustomPricingConfig,
+  resolveCustomPricingAliases,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import type * as PreferredProviderOrderConfigModule from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import type { CustomPricing } from '@kilocode/db/schema-types';
+import type * as LatestAliasTargetsModule from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+import { getLatestAliasTargets } from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  ...jest.requireActual<typeof CustomPricingConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config'
+  ),
+  getCustomPricingConfig: jest.fn(() => Promise.resolve({ models: [] })),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  ...jest.requireActual<typeof PreferredProviderOrderConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config'
+  ),
+  getPreferredProviderOrderConfig: jest.fn(() => Promise.resolve({ rules: [] })),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
+  const actual = jest.requireActual<typeof UnavailableModelsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/unavailable-models'
+  );
+  return { ...actual, getUnavailableModelIds: jest.fn(actual.getUnavailableModelIds) };
+});
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+  getVercelModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets', () => ({
+  ...jest.requireActual<typeof LatestAliasTargetsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets'
+  ),
+  getLatestAliasTargets: jest.fn(() => Promise.resolve(new Map())),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
+  ...jest.requireActual<typeof MapModelIdToVercelModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+  ),
+  getVercelModelIdOverrides: jest.fn(() => Promise.resolve(new Map())),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models', () => ({
+  getVercelOnlyCatalogModels: jest.fn(() => Promise.resolve([])),
+}));
+
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
+    getProviderSlugsForModels: jest.fn((ids: readonly string[]) =>
+      Promise.resolve(new Map(ids.map(id => [id, new Set<string>()])))
+    ),
+  })
+);
+
+const originalFetch = global.fetch;
+
+beforeEach(() => {
+  resetOpenRouterModelsCaches();
+});
+
+function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
+  return {
+    id: 'vendor/model',
+    name: 'Test Model',
+    created: 1714000000,
+    description: 'A test model',
+    architecture: {
+      input_modalities: ['text'],
+      output_modalities: ['text'],
+      tokenizer: 'other',
+    },
+    top_provider: {
+      is_moderated: false,
+    },
+    pricing: {
+      prompt: '0.000001',
+      completion: '0.000005',
+    },
+    context_length: 32000,
+    ...overrides,
+  };
+}
+
+describe('formatName', () => {
+  const NOT_PREFERRED = -1;
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-17T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('appends ($$$$) for expensive models', () => {
+    const model = buildModel({ pricing: { prompt: '0.00001', completion: '0' } });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
+  });
+
+  it('prioritizes the expensive marker over the expiration marker', () => {
+    const model = buildModel({
+      pricing: { prompt: '0.00002', completion: '0' },
+      expiration_date: '2099-01-15',
+    });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
+  });
+
+  it('leaves names that already end with a parenthesis untouched', () => {
+    const model = buildModel({
+      name: 'Test Model (free)',
+      expiration_date: '2099-01-15',
+    });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (free)');
+  });
+
+  it('appends (new) for recently created preferred models', () => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({ created: recentlyCreated });
+    expect(formatName(model, 0)).toBe('Test Model (new)');
+  });
+
+  it('does not mark recent models as new when they are not preferred', () => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({ created: recentlyCreated });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+
+  it('does not mark older preferred models as new', () => {
+    const createdLongAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+    const model = buildModel({ created: createdLongAgo });
+    expect(formatName(model, 0)).toBe('Test Model');
+  });
+
+  it('appends the retirement date in UTC when it is within one month', () => {
+    const model = buildModel({ expiration_date: '2026-07-01' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (retires Jul 1)');
+  });
+
+  it('does not append the retirement date when it is more than one month away', () => {
+    const model = buildModel({ expiration_date: '2026-07-18' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+
+  it('prefers the (new) marker over the retirement marker', () => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({ created: recentlyCreated, expiration_date: '2026-07-01' });
+    expect(formatName(model, 0)).toBe('Test Model (new)');
+  });
+
+  it('returns the name unchanged when no markers apply', () => {
+    const model = buildModel({ created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+
+  it('prefixes the name with OpenRouter for openrouter/ models without it', () => {
+    const model = buildModel({ id: 'openrouter/auto', created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model');
+  });
+
+  it('does not prefix the name when it already contains OpenRouter', () => {
+    const model = buildModel({ id: 'openrouter/auto', name: 'OpenRouter Test Model', created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model');
+  });
+
+  it('does not prefix the name for non-openrouter/ models', () => {
+    const model = buildModel({ id: 'vendor/model', created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+
+  it('prefixes the name before appending markers', () => {
+    const model = buildModel({
+      id: 'openrouter/auto',
+      pricing: { prompt: '0.00001', completion: '0' },
+    });
+    expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model ($$$$)');
+  });
+});
+
+describe('auto models', () => {
+  beforeEach(() => {
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(async ids => new Map(ids.map(id => [id, new Set<string>()])));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: { data: [] },
+        })
+      )
+    ) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    global.fetch = originalFetch;
+  });
+
+  it('includes kilo-auto/efficient in the public model list', async () => {
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
+  });
+
+  it('caches authenticated catalog requests in memory and bypasses the framework data cache', async () => {
+    await getEnhancedOpenRouterModels({ countryCode: null });
+    await getEnhancedOpenRouterModels({ countryCode: null });
+
+    const catalogCalls = jest
+      .mocked(global.fetch)
+      .mock.calls.filter(([url]) => url === 'https://openrouter.ai/api/v1/models');
+    expect(catalogCalls).toEqual([
+      [
+        'https://openrouter.ai/api/v1/models',
+        expect.objectContaining({
+          method: 'GET',
+          cache: 'no-store',
+          headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }),
+        }),
+      ],
+    ]);
+    expect(catalogCalls[0]?.[1]).not.toHaveProperty('next');
+  });
+
+  it.each([undefined, { name: 'Current model', slug: 'vendor/current' }])(
+    'validates raw upstream models with alias_target %j without falling back to unparsed data',
+    async aliasTarget => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(
+          createMockResponse({
+            jsonData: {
+              data: [
+                {
+                  ...buildModel({ id: '~vendor/latest' }),
+                  alias_target: aliasTarget,
+                  canonical_slug: '~vendor/latest',
+                },
+              ],
+            },
+          })
+        )
+      ) as typeof fetch;
+
+      const response = await getRawOpenRouterModels();
+      expect(response.data[0]?.id).toBe('~vendor/latest');
+      expect(response.data[0]?.alias_target).toBeUndefined();
+      expect(response.data[0]).not.toHaveProperty('canonical_slug');
+    }
+  );
+
+  it.each(['~vendor/latest', 'vendor/concrete'])(
+    'does not publish an upstream alias target for %s without database alias metadata',
+    async modelId => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(
+          createMockResponse({
+            jsonData: {
+              data: [buildModel({ id: modelId, alias_target: 'vendor/upstream-only' })],
+            },
+          })
+        )
+      ) as typeof fetch;
+
+      const response = await getEnhancedOpenRouterModels({ countryCode: null });
+      const model = response.data.find(entry => entry.id === modelId);
+      expect(model).toBeDefined();
+      expect(model?.alias_target).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(model))).not.toHaveProperty('alias_target');
+    }
+  );
+
+  it('publishes database alias targets only for alias entries and preserves them through validation', async () => {
+    const alias = buildModel({ id: '~vendor/latest' });
+    const target = buildModel({ id: 'vendor/current' });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({
+      [alias.id]: {
+        id: alias.id,
+        name: alias.name,
+        endpoints: [],
+        alias_target: { slug: target.id },
+      },
+      [target.id]: {
+        id: target.id,
+        name: target.name,
+        endpoints: [],
+        alias_target: { slug: 'vendor/ignored' },
+      },
+    });
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [
+              id,
+              id === target.id
+                ? new Set(['Google-Vertex', 'google-ai-studio'])
+                : new Set(['deepinfra']),
+            ])
+          )
+      );
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              { ...alias, alias_target: { name: 'Upstream model', slug: 'vendor/upstream' } },
+              { ...target, alias_target: 'vendor/upstream' },
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const response = OpenRouterModelsResponseSchema.parse(
+      await getEnhancedOpenRouterModels({ countryCode: null })
+    );
+    expect(response.data.find(model => model.id === alias.id)?.alias_target).toBe(target.id);
+    expect(response.data.find(model => model.id === target.id)?.alias_target).toBeUndefined();
+    expect(response.data.find(model => model.id === alias.id)?.inference_provider_ids).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+    expect(response.data.find(model => model.id === target.id)?.inference_provider_ids).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+  });
+
+  it('publishes normalized endpoint identities and preserves the public schema field', async () => {
+    jest.mocked(getProviderSlugsForModels).mockClear();
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [id, new Set(['DeepInfra/fp8', 'Fireworks', 'Together', 'deepinfra'])])
+          )
+      );
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as typeof fetch;
+
+    const response = OpenRouterModelsResponseSchema.parse(
+      await getEnhancedOpenRouterModels({ countryCode: null })
+    );
+    expect(
+      response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
+    ).toEqual(['deepinfra', 'fireworks', 'together']);
+    expect(getProviderSlugsForModels).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not infer an upstream from the model author when metadata is missing', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as typeof fetch;
+
+    const response = await getEnhancedOpenRouterModels({ countryCode: null });
+    expect(
+      response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
+    ).toEqual([]);
+  });
+
+  it('hides models reported as unavailable', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set(['vendor/unavailable']));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: { data: [buildModel(), buildModel({ id: 'vendor/unavailable' })] },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
+    expect(models.data.some(model => model.id === 'vendor/unavailable')).toBe(false);
+  });
+
+  it('hides the hard-coded unavailable Gemma model', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: { data: [buildModel({ id: AUTO_SMALL_TARGET_MODELS.free })] },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.some(model => model.id === AUTO_SMALL_TARGET_MODELS.free)).toBe(false);
+  });
+
+  it('excludes OpenRouter batch variants from the public model list', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel(), buildModel({ id: 'vendor/model:batch' })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
+    expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
+  });
+});
+
+describe('Vercel-only models', () => {
+  const vercelOnlyModel = buildModel({ id: 'vendor/vercel-only', name: 'Vendor: Vercel Only' });
+
+  beforeEach(() => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as unknown as typeof fetch;
+    jest.mocked(getVercelOnlyCatalogModels).mockResolvedValueOnce([vercelOnlyModel]);
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [
+              id,
+              new Set(id === vercelOnlyModel.id ? ['amazon-bedrock', 'vendor'] : []),
+            ])
+          )
+      );
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(async ids => new Map(ids.map(id => [id, new Set<string>()])));
+  });
+
+  it('lists them after the OpenRouter models with their snapshot providers', async () => {
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
+      openRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      listedOpenRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      openRouterMetadata: {},
+    });
+    const ids = models.data.map(model => model.id);
+    expect(ids.indexOf('vendor/vercel-only')).toBe(ids.indexOf('vendor/model') + 1);
+    expect(models.data.find(model => model.id === 'vendor/vercel-only')).toMatchObject({
+      name: 'Vendor: Vercel Only',
+      inference_provider_ids: ['amazon-bedrock', 'vendor'],
+      isFree: false,
+    });
+  });
+
+  it('only compares Vercel-only names against the OpenRouter models the catalog lists', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel(), buildModel({ id: 'vendor/model:batch', name: 'Vendor: Batch' })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
+      openRouterModels: [
+        expect.objectContaining({ id: 'vendor/model' }),
+        expect.objectContaining({ id: 'vendor/model:batch' }),
+      ],
+      listedOpenRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      openRouterMetadata: {},
+    });
+  });
+
+  it('advertises Vercel reasoning variants that request-time variant resolution accepts', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      'vendor/model': { id: 'vendor/model', name: 'Test Model', endpoints: [] },
+    });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      [vercelOnlyModel.id]: {
+        id: vercelOnlyModel.id,
+        name: 'Vercel Only',
+        type: 'language',
+        context_window: 32_000,
+        modalities: { input: ['text'], output: ['text'] },
+        pricing: { input: '0.000001', output: '0.000005' },
+        reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high'] }],
+        endpoints: [{ provider_name: 'vendor' }],
+      },
+    });
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    const variants =
+      models.data.find(model => model.id === vercelOnlyModel.id)?.opencode?.variants ?? {};
+
+    expect(Object.keys(variants)).toEqual(['low', 'medium', 'high']);
+    for (const [variant, settings] of Object.entries(variants)) {
+      expect(await resolveCatalogVariant(vercelOnlyModel.id, variant)).toEqual({
+        model: vercelOnlyModel.id,
+        reasoning: settings.reasoning,
+      });
+    }
+  });
+
+  it("prices them at the preferred provider's Vercel endpoint peak price", async () => {
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: ['vendor/'], providers: ['together'] }],
+    });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      [vercelOnlyModel.id]: {
+        id: vercelOnlyModel.id,
+        name: 'Vercel Only',
+        endpoints: [
+          { provider_name: 'deepinfra', pricing: { prompt: '0.000009', completion: '0.000009' } },
+          {
+            provider_name: 'togetherai',
+            pricing: { prompt: '0.000002', completion: '0.00001', peak_pricing: { multiplier: 2 } },
+          },
+        ],
+      },
+    });
+
+    try {
+      const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+      expect(models.data.find(model => model.id === vercelOnlyModel.id)?.pricing).toMatchObject({
+        prompt: '0.000004000000',
+        completion: '0.000020000000',
+      });
+    } finally {
+      jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
+    }
+  });
+
+  it('hides unavailable ones', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([vercelOnlyModel.id]));
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.some(model => model.id === vercelOnlyModel.id)).toBe(false);
+  });
+});
+
+describe('alias pricing', () => {
+  const alias = buildModel({
+    id: '~vendor/family-latest',
+    name: 'Vendor: Family Latest',
+    description: 'Always the newest family model',
+    context_length: 64_000,
+    pricing: { prompt: '0.000003', completion: '0.000006' },
+  });
+  const target = buildModel({
+    id: 'vendor/family-0101',
+    name: 'Vendor: Family',
+    pricing: { prompt: '0.0000025', completion: '0.0000055' },
+  });
+  const firstRoutePricing = { prompt: '0.000002', completion: '0.000004' };
+  const preferredRoutePricing = { prompt: '0.0000005', completion: '0.0000015' };
+
+  function customPricing(
+    model: string,
+    prompt_per_million: number,
+    overrides: Partial<CustomPricing> = {}
+  ): CustomPricing {
+    return {
+      model,
+      pricing: [
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million,
+            completion_per_million: prompt_per_million * 2,
+            input_cache_read_per_million: null,
+            input_cache_write_per_million: null,
+          },
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  async function getCatalog(catalog: OpenRouterModel[] = [alias, target]) {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: catalog } }))
+    ) as unknown as typeof fetch;
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    return (id: string) => models.data.find(model => model.id === id);
+  }
+
+  const aliasMetadata: GatewayModelMap = {
+    [alias.id]: {
+      id: alias.id,
+      name: alias.name,
+      endpoints: [{ tag: 'first-route', pricing: firstRoutePricing }],
+      alias_target: { slug: target.id },
+    },
+    [target.id]: {
+      id: target.id,
+      name: target.name,
+      endpoints: [
+        { tag: 'first-route', pricing: firstRoutePricing },
+        { tag: 'preferred-route', pricing: preferredRoutePricing },
+      ],
+    },
+  };
+
+  /** Serves the stored entries as getCustomPricingConfig does, with aliases resolved. */
+  function mockStoredCustomPricing(...models: CustomPricing[]) {
+    jest
+      .mocked(getCustomPricingConfig)
+      .mockResolvedValue(resolveCustomPricingAliases({ models }, aliasMetadata));
+  }
+
+  beforeEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(aliasMetadata);
+    // The rule matches the target id but not the alias id.
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: [target.id], providers: ['preferred-route'] }],
+    });
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest
+      .mocked(getPreferredProviderOrderConfig)
+      .mockResolvedValue(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(EMPTY_CUSTOM_PRICING_CONFIG);
+  });
+
+  it("shows the target's preferred route price on the alias and keeps the alias identity", async () => {
+    const model = await getCatalog();
+
+    expect(model(target.id)?.pricing).toEqual(preferredRoutePricing);
+    expect(model(alias.id)).toMatchObject({
+      id: alias.id,
+      name: alias.name,
+      description: `${alias.description}\n\nThis alias currently points to ${target.name} (\`${target.id}\`).`,
+      context_length: alias.context_length,
+      alias_target: target.id,
+      pricing: preferredRoutePricing,
+    });
+  });
+
+  it('names the pending target of an alias and roughly when it switches', async () => {
+    jest.mocked(getLatestAliasTargets).mockResolvedValueOnce(
+      new Map([
+        [
+          alias.id,
+          {
+            alias: alias.id,
+            target: target.id,
+            pending: {
+              target: 'vendor/family-0202',
+              effective_at: new Date(Date.now() + 3 * 60 * 60 * 1000 + 60_000).toISOString(),
+            },
+          },
+        ],
+      ])
+    );
+
+    const model = await getCatalog();
+
+    expect(model(alias.id)?.description).toBe(
+      `${alias.description}\n\nThis alias currently points to ${target.name} (\`${target.id}\`). It will switch to \`vendor/family-0202\` in approximately 3 hours.`
+    );
+  });
+
+  it("shows the target's custom price on the alias without the target's discount label", async () => {
+    mockStoredCustomPricing(customPricing(target.id, 0.25, { discountPercentage: 50 }));
+
+    const model = await getCatalog();
+
+    expect(model(target.id)?.name).toBe(`${target.name} (50% off)`);
+    expect(model(alias.id)?.name).toBe(alias.name);
+    expect(model(alias.id)?.pricing).toEqual(model(target.id)?.pricing);
+    expect(model(alias.id)?.pricing).toMatchObject({
+      prompt: '0.000000250000',
+      completion: '0.000000500000',
+    });
+  });
+
+  it("applies the target's custom price to an alias whose target is not listed", async () => {
+    mockStoredCustomPricing(customPricing(target.id, 0.25, { discountPercentage: 50 }));
+
+    const model = await getCatalog([alias]);
+
+    expect(model(alias.id)?.name).toBe(alias.name);
+    expect(model(alias.id)?.pricing).toMatchObject({
+      prompt: '0.000000250000',
+      completion: '0.000000500000',
+    });
+  });
+
+  it("shows the target's route price when the target's custom price is fallback-only", async () => {
+    mockStoredCustomPricing(customPricing(target.id, 0.75, { fallbackOnly: true }));
+
+    const model = await getCatalog();
+
+    expect(model(alias.id)?.pricing).toEqual(preferredRoutePricing);
+  });
+
+  it('keeps the alias price when the target is not in the upstream catalog', async () => {
+    const model = await getCatalog([alias]);
+
+    expect(model(target.id)).toBeUndefined();
+    expect(model(alias.id)).toMatchObject({
+      alias_target: target.id,
+      pricing: firstRoutePricing,
+    });
+  });
+
+  it('keeps the alias price when the target is unavailable', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([target.id]));
+
+    const model = await getCatalog();
+
+    expect(model(target.id)).toBeUndefined();
+    expect(model(alias.id)?.pricing).toEqual(firstRoutePricing);
+  });
+});
+
+describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
+  'OpenRouter catalog inheritance for %s',
+  modelId => {
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('preserves the upstream metadata without duplicating or suppressing the free model', async () => {
+      const catalogModel = buildModel({
+        id: modelId,
+        name: 'OpenRouter catalog name',
+        pricing: { prompt: '0', completion: '0' },
+      });
+      global.fetch = jest.fn(() =>
+        Promise.resolve(createMockResponse({ jsonData: { data: [catalogModel] } }))
+      ) as typeof fetch;
+
+      const models = await getEnhancedOpenRouterModels({ countryCode: null });
+      const matches = models.data.filter(entry => entry.id === modelId);
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toMatchObject({ ...catalogModel, isFree: true });
+    });
+
+    it('does not inject the model when OpenRouter omits it', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(createMockResponse({ jsonData: { data: [] } }))
+      ) as typeof fetch;
+
+      const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+      expect(models.data.some(model => model.id === modelId)).toBe(false);
+    });
+  }
+);
+
+describe('reasoning variants', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('only adds fallback variants when reasoning is supported', async () => {
+    const unsupportedId = 'anthropic/claude-without-reasoning';
+    const supportedId = 'anthropic/claude-with-reasoning';
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              buildModel({
+                id: unsupportedId,
+                supported_parameters: ['max_tokens', 'tools'],
+              }),
+              buildModel({
+                id: supportedId,
+                supported_parameters: ['max_tokens', 'tools', 'reasoning'],
+              }),
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(
+      models.data.find(model => model.id === unsupportedId)?.opencode?.variants
+    ).toBeUndefined();
+    expect(models.data.find(model => model.id === supportedId)?.opencode?.variants).toBeDefined();
+  });
+});
+
+describe('reasoning options', () => {
+  const reasoningSupported = ['max_tokens', 'tools', 'reasoning', 'include_reasoning'];
+  const openRouterReasoning: Record<string, GatewayModelWithEndpoints['reasoning']> = {
+    'anthropic/claude-sonnet-4.6': {
+      mandatory: false,
+      supported_efforts: ['max', 'high', 'medium', 'low'],
+    },
+    'openai/gpt-5.5': {
+      mandatory: false,
+      supported_efforts: ['xhigh', 'high', 'medium', 'low', 'none'],
+    },
+    'google/gemini-3.1-pro-preview': {
+      mandatory: true,
+      supported_efforts: ['high', 'medium', 'low'],
+    },
+    'xiaomi/mimo-v2.5': { mandatory: false },
+    'vendor/no-reasoning': undefined,
+  };
+
+  async function getCatalog() {
+    jest
+      .mocked(getOpenRouterModelsMetadataFromDatabase)
+      .mockResolvedValue(
+        Object.fromEntries(
+          Object.entries(openRouterReasoning).map(([id, reasoning]) => [
+            id,
+            { id, name: id, reasoning, endpoints: [] },
+          ])
+        )
+      );
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: Object.entries(openRouterReasoning).map(([id, reasoning]) =>
+              buildModel({
+                id,
+                supported_parameters: reasoning ? reasoningSupported : ['max_tokens', 'tools'],
+              })
+            ),
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    return (id: string) => models.data.find(model => model.id === id)?.opencode;
+  }
+
+  afterEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    global.fetch = originalFetch;
+  });
+
+  it('serves Anthropic efforts next to unchanged variants', async () => {
+    const opencode = await getCatalog();
+
+    expect(JSON.stringify(opencode('anthropic/claude-sonnet-4.6'))).toBe(
+      JSON.stringify({
+        ai_sdk_provider: 'anthropic',
+        variants: {
+          none: { reasoning: { enabled: false, effort: 'none' } },
+          low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+          medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+          high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+          max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
+        },
+        reasoning_options: [{ type: 'effort', values: ['none', 'low', 'medium', 'high', 'max'] }],
+      })
+    );
+  });
+
+  it('serves OpenAI efforts', async () => {
+    const opencode = await getCatalog();
+
+    expect(opencode('openai/gpt-5.5')?.reasoning_options).toEqual([
+      { type: 'effort', values: ['none', 'low', 'medium', 'high', 'xhigh'] },
+    ]);
+  });
+
+  it('serves Gemini efforts without none when reasoning is mandatory', async () => {
+    const opencode = await getCatalog();
+
+    expect(opencode('google/gemini-3.1-pro-preview')?.reasoning_options).toEqual([
+      { type: 'effort', values: ['low', 'medium', 'high'] },
+    ]);
+  });
+
+  it('serves a toggle for models with on/off reasoning only', async () => {
+    const opencode = await getCatalog();
+
+    expect(Object.keys(opencode('xiaomi/mimo-v2.5')?.variants ?? {})).toEqual([
+      'instant',
+      'thinking',
+    ]);
+    expect(opencode('xiaomi/mimo-v2.5')?.reasoning_options).toEqual([{ type: 'toggle' }]);
+  });
+
+  it('omits reasoning options for models without variants', async () => {
+    const opencode = await getCatalog();
+
+    expect(opencode('vendor/no-reasoning')?.variants).toBeUndefined();
+    expect(opencode('vendor/no-reasoning')?.reasoning_options).toBeUndefined();
+  });
+
+  it('omits reasoning options for kilo-auto models', async () => {
+    const opencode = await getCatalog();
+
+    for (const autoModel of AUTO_MODELS) {
+      expect(opencode(autoModel.id)).toBeDefined();
+      expect(opencode(autoModel.id)?.reasoning_options).toBeUndefined();
+    }
+    expect(buildAutoModelCatalogEntry(ORG_AUTO_MODEL).opencode?.reasoning_options).toBeUndefined();
+  });
+
+  it('pairs every non-auto model that has variants with reasoning options', async () => {
+    const opencode = await getCatalog();
+
+    for (const id of Object.keys(openRouterReasoning)) {
+      const settings = opencode(id);
+      expect(settings?.reasoning_options !== undefined).toBe(settings?.variants !== undefined);
+    }
+  });
+});
+
+describe('mayTrainOnYourPrompts', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('flags free models and models whose every provider trains on prompts', async () => {
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValueOnce(new Set(['meta/muse-spark-1.3-contributor']));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              buildModel({ id: 'meta/muse-spark-1.3-contributor' }),
+              buildModel({ id: 'meta/muse-spark-1.3' }),
+              buildModel({ id: 'vendor/model:free', pricing: { prompt: '0', completion: '0' } }),
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    const mayTrain = (id: string) =>
+      models.data.find(model => model.id === id)?.mayTrainOnYourPrompts;
+
+    expect(mayTrain('meta/muse-spark-1.3-contributor')).toBe(true);
+    expect(mayTrain('meta/muse-spark-1.3')).toBe(false);
+    expect(mayTrain('vendor/model:free')).toBe(true);
+  });
+});
+
+describe('OpenRouter transcription model fetcher', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn(() => {
+      return Promise.resolve(
+        createMockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonData: mockOpenRouterModels,
+        })
+      );
+    }) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('fetches transcription models with output_modalities=transcription', async () => {
+    await getOpenRouterTranscriptionModels();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('output_modalities=transcription'),
+      expect.any(Object)
+    );
+  });
+
+  it('reuses the fetched transcription catalogue from memory', async () => {
+    await getOpenRouterTranscriptionModels();
+    await getOpenRouterTranscriptionModels();
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});

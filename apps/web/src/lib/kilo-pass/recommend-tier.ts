@@ -1,5 +1,5 @@
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 export function recommendKiloPassTierFromAverageMonthlyUsageUsd(params: {
   averageMonthlyUsageUsd: number;

@@ -2,7 +2,9 @@ const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 const mockGetBlobContent = jest.fn();
+const mockFetchSessionSnapshot = jest.fn();
 const mockEnsureBitbucketCodeReviewWorkspaceWebhook = jest.fn();
 const mockDeleteBitbucketCodeReviewWorkspaceWebhooksBestEffort = jest.fn();
 const mockEnsureBotUserForOrg = jest.fn();
@@ -60,11 +62,22 @@ jest.mock('@/lib/bot-users/bot-user-service', () => {
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 jest.mock('@/lib/r2/cli-sessions', () => ({
   getBlobContent: (...args: unknown[]) => mockGetBlobContent(...args),
 }));
+
+// The router only calls `fetchSessionSnapshot` from the session-ingest client;
+// the rest of the module keeps its real implementation via `requireActual`.
+jest.mock('@/lib/session-ingest-client', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/session-ingest-client');
+  return {
+    ...actual,
+    fetchSessionSnapshot: (...args: unknown[]) => mockFetchSessionSnapshot(...args),
+  };
+});
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   createCheckRun: jest.fn(),
@@ -75,20 +88,26 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   setCommitStatus: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
-import type { SuccessResult } from '@/lib/maybe-result';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import type { SessionSnapshot } from '@/lib/session-ingest-client';
+import type { SuccessResult } from '@kilocode/web-shared/lib/maybe-result';
 import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { createOrEnableAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   cliSessions,
+  cli_sessions_v2,
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -261,6 +280,40 @@ describe('codeReviewRouter.cancel', () => {
     expect(storedReview?.completed_at).toBeTruthy();
   });
 
+  it('reports that nothing changed when the review finished before the local cancel', async () => {
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'queued', {
+          platform_integration_id: integration.id,
+          check_run_id: 777,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    // The status read that precedes the cancel saw a queued review; by the time
+    // the guarded cancel runs, the worker path has finished it.
+    mockCancelReview.mockImplementation(async () => {
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'completed', completed_at: new Date().toISOString() })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { success: false, reviewId: review.id };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ success: false, error: 'Code review is no longer running' });
+    expect(storedReview?.status).toBe('completed');
+    expect(storedReview?.error_message).toBeNull();
+    expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+  });
+
   it('cancels pending reviews locally without calling the Worker', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
@@ -385,6 +438,280 @@ describe('codeReviewRouter.cancel', () => {
   });
 });
 
+describe('codeReviewRouter.listForOrganization role-gated ids', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser({
+      google_user_email: 'list-ids-owner@example.com',
+      google_user_name: 'List Ids Owner',
+      is_admin: false,
+    });
+    memberUser = await insertTestUser({
+      google_user_email: 'list-ids-member@example.com',
+      google_user_name: 'List Ids Member',
+      is_admin: false,
+    });
+    organization = await createTestOrganization('List Ids Org', ownerUser.id, 0, {}, false);
+    await addUserToOrganization(organization.id, memberUser.id, 'member');
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organization.id));
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, memberUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, ownerUser.id));
+  });
+
+  it('nulls raw ledger/transaction ids for members and keeps them for owners', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: organization.id,
+        owned_by_user_id: null,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/list-ids-repo',
+        pr_number: 1,
+        pr_url: 'https://github.com/test-org/list-ids-repo/pull/1',
+        pr_title: 'List ids PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/list-ids',
+        head_sha: 'sha-list-ids',
+        status: 'completed',
+        session_id: 'agent-session-list-ids',
+        cli_session_id: 'ses-list-ids',
+        dispatch_reservation_id: 'reservation-list-ids',
+        check_run_id: 12345,
+        total_cost_musd: 500,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    try {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const memberResult = await memberCaller.codeReviews.listForOrganization({
+        organizationId: organization.id,
+      });
+      expect(memberResult.success).toBe(true);
+      if (!memberResult.success) throw new Error('expected member list success');
+      const memberReview = memberResult.reviews.find(r => r.id === review.id);
+      expect(memberReview).toBeDefined();
+      expect(memberReview?.session_id).toBeNull();
+      expect(memberReview?.cli_session_id).toBeNull();
+      expect(memberReview?.dispatch_reservation_id).toBeNull();
+      expect(memberReview?.check_run_id).toBeNull();
+      expect(memberReview?.total_cost_musd).toBe(500);
+
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.listForOrganization({
+        organizationId: organization.id,
+      });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner list success');
+      const ownerReview = ownerResult.reviews.find(r => r.id === review.id);
+      expect(ownerReview).toBeDefined();
+      expect(ownerReview?.session_id).toBe('agent-session-list-ids');
+      expect(ownerReview?.cli_session_id).toBe('ses-list-ids');
+      expect(ownerReview?.dispatch_reservation_id).toBe('reservation-list-ids');
+      expect(ownerReview?.check_run_id).toBe(12345);
+      expect(ownerReview?.total_cost_musd).toBe(500);
+    } finally {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
+});
+
+describe('codeReviewRouter.listForUser budget', () => {
+  it('answers a spent mobile budget retryably instead of an empty list', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'list-for-user-budget@example.com',
+      google_user_name: 'List For User Budget',
+      is_admin: false,
+    });
+
+    try {
+      const caller = await createCallerForUser(user.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(caller.codeReviews.listForUser({})).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Your code reviews took too long to load. Try again.',
+      });
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+    }
+  });
+});
+
+describe('codeReviewRouter.get role-gated ids', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser({
+      google_user_email: 'get-ids-owner@example.com',
+      google_user_name: 'Get Ids Owner',
+      is_admin: false,
+    });
+    memberUser = await insertTestUser({
+      google_user_email: 'get-ids-member@example.com',
+      google_user_name: 'Get Ids Member',
+      is_admin: false,
+    });
+    organization = await createTestOrganization('Get Ids Org', ownerUser.id, 0, {}, false);
+    await addUserToOrganization(organization.id, memberUser.id, 'member');
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organization.id));
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, memberUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, ownerUser.id));
+  });
+
+  it('nulls raw identifiers for members and keeps them for owners', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: organization.id,
+        owned_by_user_id: null,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/get-ids-repo',
+        pr_number: 1,
+        pr_url: 'https://github.com/test-org/get-ids-repo/pull/1',
+        pr_title: 'Get ids PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/get-ids',
+        head_sha: 'sha-get-ids',
+        status: 'completed',
+        session_id: 'agent-session-get-ids',
+        cli_session_id: 'ses-get-ids',
+        dispatch_reservation_id: 'reservation-get-ids',
+        check_run_id: 12345,
+        total_cost_musd: 500,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'completed',
+      session_id: 'agent-attempt-get-ids',
+      cli_session_id: 'ses-attempt-get-ids',
+      execution_id: 'exec-attempt-get-ids',
+    });
+
+    try {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const memberResult = await memberCaller.codeReviews.get({ reviewId: review.id });
+      expect(memberResult.success).toBe(true);
+      if (!memberResult.success) throw new Error('expected member get success');
+      expect(memberResult.review.session_id).toBeNull();
+      expect(memberResult.review.cli_session_id).toBeNull();
+      expect(memberResult.review.dispatch_reservation_id).toBeNull();
+      expect(memberResult.review.check_run_id).toBeNull();
+      expect(memberResult.review.rawIdsRedacted).toBe(true);
+      expect(memberResult.review.total_cost_musd).toBe(500);
+      expect(memberResult.attempts).toHaveLength(1);
+      expect(memberResult.attempts[0]?.session_id).toBeNull();
+      expect(memberResult.attempts[0]?.cli_session_id).toBeNull();
+      expect(memberResult.attempts[0]?.execution_id).toBeNull();
+
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.get({ reviewId: review.id });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner get success');
+      expect(ownerResult.review.session_id).toBe('agent-session-get-ids');
+      expect(ownerResult.review.cli_session_id).toBe('ses-get-ids');
+      expect(ownerResult.review.dispatch_reservation_id).toBe('reservation-get-ids');
+      expect(ownerResult.review.check_run_id).toBe(12345);
+      expect(ownerResult.review.rawIdsRedacted).toBe(false);
+      expect(ownerResult.review.total_cost_musd).toBe(500);
+      expect(ownerResult.attempts).toHaveLength(1);
+      expect(ownerResult.attempts[0]?.session_id).toBe('agent-attempt-get-ids');
+      expect(ownerResult.attempts[0]?.cli_session_id).toBe('ses-attempt-get-ids');
+      expect(ownerResult.attempts[0]?.execution_id).toBe('exec-attempt-get-ids');
+    } finally {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
+
+  it('returns the billing-derived session cost for a terminal review', async () => {
+    const sessionId = `ses_get_cost_${crypto.randomUUID()}`;
+    const usageId = crypto.randomUUID();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: null,
+        owned_by_user_id: ownerUser.id,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/get-cost-repo',
+        pr_number: 2,
+        pr_url: 'https://github.com/test-org/get-cost-repo/pull/2',
+        pr_title: 'Get cost PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/get-cost',
+        head_sha: 'sha-get-cost',
+        status: 'completed',
+        session_id: `agent_${crypto.randomUUID()}`,
+        cli_session_id: sessionId,
+        // The orchestrator never accumulated usage for this review, so the review's
+        // own total is 0 and the billing aggregate is the only cost available.
+        total_cost_musd: 0,
+        created_at: '2026-06-18T09:00:00.000Z',
+        completed_at: '2026-06-18T11:00:00.000Z',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: ownerUser.id,
+      cost: 1234,
+      input_tokens: 1000,
+      output_tokens: 100,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-18T10:00:00.000Z',
+      model: 'anthropic/claude-sonnet-4.6',
+    });
+    await db.insert(microdollar_usage_metadata).values({
+      id: usageId,
+      message_id: `msg_${usageId}`,
+      session_id: sessionId,
+      created_at: '2026-06-18T10:00:00.000Z',
+    });
+
+    try {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.get({ reviewId: review.id });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner get success');
+      expect(ownerResult.sessionCostMusd).toBe(1234);
+      expect(ownerResult.review.total_cost_musd).toBe(0);
+    } finally {
+      await db.delete(microdollar_usage_metadata).where(eq(microdollar_usage_metadata.id, usageId));
+      await db.delete(microdollar_usage).where(eq(microdollar_usage.id, usageId));
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
+});
+
 describe('personalReviewAgent.createManualReviewJob', () => {
   let testUser: User;
   let fetchSpy: jest.SpiedFunction<typeof fetch> | null = null;
@@ -484,6 +811,261 @@ describe('personalReviewAgent.createManualReviewJob', () => {
       id: testUser.id,
       userId: testUser.id,
     });
+  });
+
+  it('replays the review an accepted start created when a retry carries the same operation key', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '0f7b7d0e-9d43-4d8f-9a11-2b0c3d4e5f60';
+
+    const first = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // The retry a stalled start sends: the first attempt was already accepted,
+    // its response lost, so the same key must resolve to the same review.
+    const retry = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    expect(retry).toEqual(first);
+    // The replay repeats no provider read and creates no second row.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        manualOperationKey: cloud_agent_code_reviews.manual_operation_key,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+
+    expect(rows).toEqual([{ id: first.reviewId, manualOperationKey: operationKey }]);
+  });
+
+  it('refuses an operation key that already produced a review for another change', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '4b2b6b0f-1234-4c9a-8f1d-0a1b2c3d4e5f';
+
+    await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: `https://github.com/${repo}/pull/2`,
+        modelSlug: 'test-model',
+        operationKey,
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('CONFLICT');
+    expect(rejection.message).toBe('operation_key_reuse_mismatch');
+  });
+
+  // The local (DEBUG_SHOW_DEV_UI) path reads the pull request from the provider's
+  // public API. A provider failure there used to escape as a raw Error, so tRPC
+  // answered 500 and the client showed a generic failure. Each case below must
+  // resolve to an actionable client error code instead of INTERNAL_SERVER_ERROR.
+  it.each([
+    { status: 404, expectedCode: 'NOT_FOUND', expectedMessage: 'could not find that pull request' },
+    {
+      status: 403,
+      expectedCode: 'TOO_MANY_REQUESTS',
+      expectedMessage: 'rate-limited the request',
+    },
+    { status: 500, expectedCode: 'BAD_GATEWAY', expectedMessage: 'unexpected response' },
+  ])(
+    'maps a public GitHub pull request fetch that fails with $status to $expectedCode',
+    async ({ status, expectedCode, expectedMessage }) => {
+      fetchSpy?.mockImplementation(async () => new Response('provider failure', { status }));
+      const caller = await createCallerForUser(testUser.id);
+
+      const rejection = await caller.personalReviewAgent
+        .createManualReviewJob({
+          platform: 'github',
+          url: prUrl,
+          modelSlug: 'test-model',
+        })
+        .then(
+          () => {
+            throw new Error('Expected createManualReviewJob to reject');
+          },
+          error => error as { code?: string; message?: string }
+        );
+
+      expect(rejection.code).toBe(expectedCode);
+      expect(rejection.code).not.toBe('INTERNAL_SERVER_ERROR');
+      expect(rejection.message).toContain(expectedMessage);
+    }
+  );
+
+  it('maps a missing public GitLab merge request to an actionable GitLab error', async () => {
+    fetchSpy?.mockImplementation(async () => new Response('Not Found', { status: 404 }));
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'gitlab',
+        url: 'https://gitlab.com/group/project/-/merge_requests/1',
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('NOT_FOUND');
+    expect(rejection.message).toContain('GitLab');
+    expect(rejection.message).toContain('merge request');
+    expect(rejection.message).not.toContain('pull request');
+  });
+
+  it('maps a public GitLab rate limit to TOO_MANY_REQUESTS', async () => {
+    fetchSpy?.mockImplementation(async () => new Response('Too Many Requests', { status: 429 }));
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'gitlab',
+        url: 'https://gitlab.com/group/project/-/merge_requests/1',
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('TOO_MANY_REQUESTS');
+    expect(rejection.message).toContain('rate-limited the request');
+  });
+
+  // GitLab returns 429 for rate limits; a 403 is a permission error and must not
+  // be reported to the user as a rate limit.
+  it('does not map a public GitLab 403 to a rate-limit error', async () => {
+    fetchSpy?.mockImplementation(async () => new Response('Forbidden', { status: 403 }));
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'gitlab',
+        url: 'https://gitlab.com/group/project/-/merge_requests/1',
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('BAD_GATEWAY');
+    expect(rejection.message).toContain('unexpected response');
+    expect(rejection.message).not.toContain('rate-limited');
+  });
+
+  // A provider that answers with an unparseable body was reached; the error must
+  // say so rather than claiming the provider was unreachable, and keep the cause.
+  it('reports an unparseable provider response as unexpected, not unreachable', async () => {
+    fetchSpy?.mockImplementation(
+      async () =>
+        new Response('not json', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    );
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: prUrl,
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string; cause?: unknown }
+      );
+
+    expect(rejection.code).toBe('BAD_GATEWAY');
+    expect(rejection.message).toContain('unexpected response');
+    expect(rejection.message).not.toContain('Could not reach');
+    // The original parse error is kept as the cause rather than dropped.
+    expect((rejection.cause as Error | undefined)?.message).toContain('JSON');
+  });
+
+  // A well-formed JSON body that does not match the provider's documented shape
+  // is also a reached-but-unusable response, not an unreachable provider.
+  it('reports a provider response that fails schema validation as unexpected', async () => {
+    fetchSpy?.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ unexpected: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: prUrl,
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string; cause?: unknown }
+      );
+
+    expect(rejection.code).toBe('BAD_GATEWAY');
+    expect(rejection.message).toContain('unexpected response');
+    expect(rejection.message).not.toContain('Could not reach');
+    expect(rejection.cause).toBeDefined();
+  });
+
+  it('maps a provider network failure to a client error instead of a 500', async () => {
+    const networkError = new TypeError('fetch failed');
+    fetchSpy?.mockImplementation(async () => {
+      throw networkError;
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: prUrl,
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string; cause?: unknown }
+      );
+
+    expect(rejection.code).toBe('BAD_GATEWAY');
+    expect(rejection.message).toContain('Could not reach GitHub');
+    expect(rejection.cause).toBe(networkError);
   });
 });
 
@@ -1424,6 +2006,112 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config?.is_enabled).toBe(false);
   });
 
+  it('creates an enabled personal config when enabling with no stored config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    // No pre-existing agent_configs row: enabling must create one. The toggle
+    // used to update zero rows, report success, and leave the switch enabled
+    // locally, so the next save stored the row as disabled.
+    const result = await caller.personalReviewAgent.toggleReviewAgent({
+      platform: 'github',
+      isEnabled: true,
+    });
+
+    expect(result).toEqual({ success: true, isEnabled: true });
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'balanced',
+        repository_selection_mode: 'all',
+        disable_review_md: true,
+        review_guideline_source_repositories: [],
+      })
+    );
+  });
+
+  it('keeps a saved config when a first enable conflicts with an existing row', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { review_style: 'strict', model_slug: 'saved-model' },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    // Simulate the insert branch of a first enable whose earlier read saw no row.
+    await createOrEnableAgentConfigForOwner({
+      owner: { type: 'user', id: testUser.id },
+      agentType: 'code_review',
+      platform: 'github',
+      createdBy: testUser.id,
+      config: createDefaultCodeReviewConfig(),
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({ review_style: 'strict', model_slug: 'saved-model' })
+    );
+  });
+
+  it('stores the selected repository mode when a personal GitLab agent is enabled for the first time', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.toggleReviewAgent({ platform: 'gitlab', isEnabled: true });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+      })
+    );
+  });
+
+  it('does not create a personal config when disabling with no stored config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.toggleReviewAgent({
+      platform: 'github',
+      isEnabled: false,
+    });
+
+    expect(result).toEqual({ success: true, isEnabled: false });
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config).toBeUndefined();
+  });
+
   it('preserves personal review feature settings during a full config save', async () => {
     const caller = await createCallerForUser(testUser.id);
     await db.insert(agent_configs).values({
@@ -1616,6 +2304,69 @@ describe('review agent config REVIEW.md setting', () => {
     expect(refetched).not.toHaveProperty('maxReviewTimeMinutes');
   });
 
+  it.each(['personal', 'organization'] as const)(
+    'persists, patches, preserves, and clears the %s guideline allowlist',
+    async scope => {
+      const caller = await createCallerForUser(testUser.id);
+      const input = {
+        platform: 'github' as const,
+        reviewStyle: 'balanced' as const,
+        focusAreas: [],
+        modelSlug: 'test-model',
+        reviewGuidelineSourceRepositories: ['acme/guidelines'],
+      };
+      if (scope === 'personal') await caller.personalReviewAgent.saveReviewConfig(input);
+      else
+        await caller.organizations.reviewAgent.saveReviewConfig({
+          ...input,
+          organizationId: organization.id,
+        });
+      const get = () =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.getReviewConfig({ platform: 'github' })
+          : caller.organizations.reviewAgent.getReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+            });
+      const patch = (value: {
+        reviewStyle?: 'strict';
+        reviewGuidelineSourceRepositories?: string[];
+      }) =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.patchReviewConfig({ platform: 'github', ...value })
+          : caller.organizations.reviewAgent.patchReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+              ...value,
+            });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewStyle: 'strict' });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewGuidelineSourceRepositories: ['acme/other'] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/other']);
+      const saved = await db.query.agent_configs.findFirst({
+        where: and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'github'),
+          scope === 'personal'
+            ? eq(agent_configs.owned_by_user_id, testUser.id)
+            : eq(agent_configs.owned_by_organization_id, organization.id)
+        ),
+      });
+      expect(saved?.config).toEqual(
+        expect.objectContaining({ review_guideline_source_repositories: ['acme/other'] })
+      );
+      await patch({ reviewGuidelineSourceRepositories: [] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual([]);
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: ['https://example.com/policy'] })
+      ).rejects.toThrow();
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: Array(101).fill('acme/guidelines') })
+      ).rejects.toThrow();
+    }
+  );
+
   it('persists organization disableReviewMd true as disable_review_md true', async () => {
     const caller = await createCallerForUser(testUser.id);
 
@@ -1696,6 +2447,192 @@ describe('review agent config REVIEW.md setting', () => {
 
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode omitted', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      selectedRepositoryIds: [101],
+      autoConfigureWebhooks: false,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101],
+      })
+    );
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode "all"', async () => {
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: { webhook_secret: 'webhook-secret' },
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [202],
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [202],
+      })
+    );
+    // The clamp resolves the saved mode to 'selected', so the GitLab webhook
+    // sync runs for the selection the client sent.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202],
+      [],
+      {},
+      'https://gitlab.com'
+    );
+    expect(result.webhookSync).toEqual({ created: 0, updated: 0, deleted: 0, errors: [] });
+  });
+});
+
+describe('review agent config repository_selection_mode reads', () => {
+  let testUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization('Selection Mode Org', testUser.id, 0, {}, false);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        or(
+          eq(agent_configs.owned_by_user_id, testUser.id),
+          eq(agent_configs.owned_by_organization_id, organization.id)
+        )
+      );
+  });
+
+  afterAll(async () => {
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('reports selected for a personal GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([101]);
+  });
+
+  it('reports selected for the personal GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([]);
+  });
+
+  it('reports all for the personal GitHub default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+
+    expect(returned.repositorySelectionMode).toBe('all');
+  });
+
+  it('reports selected for an organization GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [303],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([303]);
+  });
+
+  it('reports selected for the organization GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+  });
+
+  it('keeps the organization Bitbucket default selected', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'bitbucket',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
   });
 });
 
@@ -1975,6 +2912,38 @@ describe('codeReviewRouter attempts', () => {
     expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
   });
 
+  it('reports a retry whose dispatch left the review failed again', async () => {
+    await insertEnabledAgentConfig();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const dispatchError =
+      'Dispatch failed: could not reach the code review service. ' +
+      'It may be offline — retry the review once it is running.';
+    mockTryDispatchPendingReviews.mockImplementationOnce(async () => {
+      // Real dispatch marks the reservation failed when the worker refuses it.
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'failed', error_message: dispatchError })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { dispatched: 0, notDispatched: 1, activeCount: 0 };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.retrigger({ reviewId: review.id });
+
+    expect(result).toEqual({ success: false, error: dispatchError });
+  });
+
   it('parallel retriggers dispatch once and the second is a conflict', async () => {
     await insertEnabledAgentConfig();
     const [review] = await db
@@ -2120,7 +3089,7 @@ describe('codeReviewRouter attempts', () => {
     expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
   });
 
-  it('rejects stream info attempts from another review', async () => {
+  it('rejects stream info and transcript attempts from another review', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(reviewValues(testUser.id, 'running', { session_id: 'agent-review' }))
@@ -2146,9 +3115,15 @@ describe('codeReviewRouter attempts', () => {
         attemptId: otherAttempt.id,
       })
     ).rejects.toThrow('Code review attempt not found');
+    await expect(
+      caller.codeReviews.getSessionMessages({
+        reviewId: review.id,
+        attemptId: otherAttempt.id,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Code review attempt not found' });
   });
 
-  it('loads a historical V1 review from PostgreSQL and R2 without a worker request', async () => {
+  it('loads historical V1 session messages before and after a V2 retry', async () => {
     const cliSessionId = crypto.randomUUID();
     await db.insert(cliSessions).values({
       session_id: cliSessionId,
@@ -2186,9 +3161,389 @@ describe('codeReviewRouter attempts', () => {
       });
       expect(mockGetBlobContent).toHaveBeenCalledWith(`sessions/${cliSessionId}/ui_messages.json`);
       expect(fetchSpy).not.toHaveBeenCalled();
+
+      const [attempt] = await db
+        .insert(cloud_agent_code_review_attempts)
+        .values({
+          code_review_id: review.id,
+          attempt_number: 1,
+          status: 'completed',
+          cli_session_id: cliSessionId,
+        })
+        .returning();
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ agent_version: 'v2', status: 'running', cli_session_id: null })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+
+      await expect(
+        caller.codeReviews.getSessionMessages({ reviewId: review.id, attemptId: attempt.id })
+      ).resolves.toEqual(result);
+      expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+describe('codeReviewRouter.getSessionMessages V2 authorization', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let outsiderUser: User;
+  let botUser: User;
+  let organization: Organization;
+  let otherOrganization: Organization;
+  const repo = `${REPO}-transcript`;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser();
+    memberUser = await insertTestUser();
+    outsiderUser = await insertTestUser();
+    organization = await createTestOrganization(
+      'Review Transcript Org',
+      ownerUser.id,
+      0,
+      {},
+      false
+    );
+    otherOrganization = await createTestOrganization(
+      'Other Review Transcript Org',
+      ownerUser.id,
+      0,
+      {},
+      false
+    );
+    botUser = await insertTestUser({
+      id: generateBotUserId(organization.id, 'code-review'),
+      is_bot: true,
+    });
+  });
+
+  beforeEach(async () => {
+    await db
+      .insert(organization_memberships)
+      .values([
+        { organization_id: organization.id, kilo_user_id: memberUser.id, role: 'member' },
+        { organization_id: organization.id, kilo_user_id: botUser.id, role: 'member' },
+      ])
+      .onConflictDoNothing();
+    mockFetchSessionSnapshot.mockResolvedValue({
+      info: {},
+      messages: [
+        {
+          info: { id: 'msg_review_progress', role: 'assistant', time: { created: 1 } },
+          parts: [{ id: 'prt_review_progress', type: 'text', text: 'Review in progress' }],
+        },
+      ],
+    } satisfies SessionSnapshot);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+    await db
+      .delete(cli_sessions_v2)
+      .where(
+        inArray(cli_sessions_v2.kilo_user_id, [
+          ownerUser.id,
+          memberUser.id,
+          outsiderUser.id,
+          botUser.id,
+        ])
+      );
+    mockFetchSessionSnapshot.mockReset();
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(organization_memberships)
+      .where(
+        inArray(organization_memberships.organization_id, [organization.id, otherOrganization.id])
+      );
+    await db
+      .delete(organizations)
+      .where(inArray(organizations.id, [organization.id, otherOrganization.id]));
+    await db
+      .delete(kilocode_users)
+      .where(
+        inArray(kilocode_users.id, [ownerUser.id, memberUser.id, outsiderUser.id, botUser.id])
+      );
+  });
+
+  async function insertReviewWithSession(
+    reviewOverrides: Partial<CodeReviewInsert> = {},
+    sessionOverrides: Partial<typeof cli_sessions_v2.$inferInsert> = {}
+  ) {
+    const cloudAgentSessionId = `agent_review_transcript_${crypto.randomUUID()}`;
+    const [session] = await db
+      .insert(cli_sessions_v2)
+      .values({
+        session_id: `ses_review_transcript_${crypto.randomUUID()}`,
+        cloud_agent_session_id: cloudAgentSessionId,
+        kilo_user_id: botUser.id,
+        organization_id: organization.id,
+        ...sessionOverrides,
+      })
+      .returning();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(ownerUser.id, 'running', {
+          repo_full_name: repo,
+          owned_by_user_id: null,
+          owned_by_organization_id: organization.id,
+          session_id: cloudAgentSessionId,
+          cli_session_id: session.session_id,
+          ...reviewOverrides,
+        })
+      )
+      .returning();
+    return { review, session, cloudAgentSessionId };
+  }
+
+  it('reads a running bot-owned org transcript without granting generic session access', async () => {
+    const { review, session, cloudAgentSessionId } = await insertReviewWithSession();
+    const caller = await createCallerForUser(memberUser.id);
+
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toMatchObject({
+      success: true,
+      entries: [{ eventType: 'text', message: 'Review in progress' }],
+    });
+    expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(session.session_id, botUser.id);
+    await expect(
+      verifyOrgOwnsSessionV2ByCloudAgentId(db, organization.id, memberUser.id, cloudAgentSessionId)
+    ).resolves.toBeNull();
+  });
+
+  it('denies outsiders and rechecks viewer membership on every transcript read', async () => {
+    const { review } = await insertReviewWithSession();
+    const memberCaller = await createCallerForUser(memberUser.id);
+    const outsiderCaller = await createCallerForUser(outsiderUser.id);
+    await expect(
+      memberCaller.codeReviews.getSessionMessages({ reviewId: review.id })
+    ).resolves.toMatchObject({ success: true, entries: [{ message: 'Review in progress' }] });
+    mockFetchSessionSnapshot.mockClear();
+
+    await expect(
+      outsiderCaller.codeReviews.getSessionMessages({ reviewId: review.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organization.id),
+          eq(organization_memberships.kilo_user_id, memberUser.id)
+        )
+      );
+
+    await expect(
+      memberCaller.codeReviews.getSessionMessages({ reviewId: review.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('resolves a selected runtime-only continuation to its original session and owner', async () => {
+    const original = await insertReviewWithSession(
+      { status: 'completed' },
+      { kilo_user_id: ownerUser.id }
+    );
+    const { review } = await insertReviewWithSession();
+    const [attempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({
+        code_review_id: review.id,
+        attempt_number: 1,
+        status: 'running',
+        session_id: original.cloudAgentSessionId,
+      })
+      .returning();
+    const caller = await createCallerForUser(memberUser.id);
+
+    const result = await caller.codeReviews.getSessionMessages({
+      reviewId: review.id,
+      attemptId: attempt.id,
+    });
+
+    expect(result).toMatchObject({ success: true, entries: [{ message: 'Review in progress' }] });
+    expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(
+      original.session.session_id,
+      ownerUser.id
+    );
+  });
+
+  it('does not fall back to the review when a selected attempt has no session IDs', async () => {
+    const { review } = await insertReviewWithSession();
+    const [attempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({ code_review_id: review.id, attempt_number: 1, status: 'pending' })
+      .returning();
+    const caller = await createCallerForUser(memberUser.id);
+
+    await expect(
+      caller.codeReviews.getSessionMessages({ reviewId: review.id, attemptId: attempt.id })
+    ).resolves.toEqual({ success: true, entries: [] });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'for a different CLI session'] as const)(
+    'returns no transcript when the runtime mapping is %s',
+    async mapping => {
+      const { review } = await insertReviewWithSession();
+      const cloudAgentSessionId =
+        mapping === 'missing'
+          ? `agent_unmapped_${crypto.randomUUID()}`
+          : (await insertReviewWithSession()).cloudAgentSessionId;
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ session_id: cloudAgentSessionId })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual(
+        { success: true, entries: [] }
+      );
+      expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['another organization', 'personal scope'] as const)(
+    'does not fetch an organization review session mapped to %s',
+    async scope => {
+      const { review } = await insertReviewWithSession(
+        {},
+        {
+          kilo_user_id: ownerUser.id,
+          organization_id: scope === 'personal scope' ? null : otherOrganization.id,
+        }
+      );
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual(
+        { success: true, entries: [] }
+      );
+      expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['another user', 'an organization'] as const)(
+    'does not fetch a personal review session owned by %s',
+    async owner => {
+      const { review } = await insertReviewWithSession(
+        { owned_by_user_id: ownerUser.id, owned_by_organization_id: null },
+        {
+          kilo_user_id: owner === 'another user' ? outsiderUser.id : ownerUser.id,
+          organization_id: owner === 'an organization' ? organization.id : null,
+        }
+      );
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual(
+        { success: true, entries: [] }
+      );
+      expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['organization', 'personal'] as const)(
+    'reads scoped %s CLI-only history despite another owner having the same CLI ID',
+    async scope => {
+      const cliSessionId = `ses_history_${crypto.randomUUID()}`;
+      await db.insert(cli_sessions_v2).values({
+        session_id: cliSessionId,
+        kilo_user_id: outsiderUser.id,
+        organization_id: scope === 'organization' ? otherOrganization.id : null,
+      });
+      const { review, session } = await insertReviewWithSession(
+        {
+          status: 'completed',
+          agent_version: null,
+          session_id: null,
+          owned_by_user_id: scope === 'personal' ? ownerUser.id : null,
+          owned_by_organization_id: scope === 'organization' ? organization.id : null,
+        },
+        {
+          session_id: cliSessionId,
+          kilo_user_id: scope === 'personal' ? ownerUser.id : botUser.id,
+          organization_id: scope === 'organization' ? organization.id : null,
+        }
+      );
+      const caller = await createCallerForUser(scope === 'personal' ? ownerUser.id : memberUser.id);
+
+      const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+      expect(result).toMatchObject({ success: true, entries: [{ message: 'Review in progress' }] });
+      expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(cliSessionId, session.kilo_user_id);
+    }
+  );
+
+  it('returns no transcript for ambiguous organization CLI-only history', async () => {
+    const { review, session } = await insertReviewWithSession({ session_id: null });
+    await db.insert(cli_sessions_v2).values({
+      session_id: session.session_id,
+      kilo_user_id: ownerUser.id,
+      organization_id: organization.id,
+    });
+    const caller = await createCallerForUser(memberUser.id);
+
+    await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual({
+      success: true,
+      entries: [],
+    });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+});
+
+describe('codeReviewRouter.getSessionMessages session-source edge cases', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, testUser.id));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
+    mockFetchSessionSnapshot.mockReset();
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('returns empty entries when both cli ids are missing', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'completed'))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toEqual({ success: true, entries: [] });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('returns success false when the snapshot fetch throws', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'completed', { cli_session_id: 'ses_snapshot_throw' }))
+      .returning({ id: cloud_agent_code_reviews.id });
+    await db.insert(cli_sessions_v2).values({
+      session_id: 'ses_snapshot_throw',
+      kilo_user_id: testUser.id,
+    });
+    mockFetchSessionSnapshot.mockRejectedValue(new Error('Snapshot worker down'));
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toEqual({ success: false, error: 'Snapshot worker down' });
   });
 });
 
@@ -2467,8 +3822,8 @@ describe('personalReviewAgent.patchReviewConfig', () => {
           },
         ],
         disable_review_md: true,
-        // Web-only setting the patch schema never carries; `false` proves
-        // the patch passes it through instead of resetting to the default.
+        // A setting a patch may carry. `false` here proves a patch that omits
+        // it keeps this value instead of resetting to the default.
         skip_bot_pull_requests: false,
         review_memory_enabled: true,
         review_analytics_enabled: true,
@@ -2478,24 +3833,79 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     });
   }
 
-  it('returns NOT_FOUND when no stored personal config exists', async () => {
+  // Seeds a minimal personal config with an explicit selected_repository_ids
+  // array, used by the delta repository save tests (P2-GH-45c).
+  async function seedPersonalSelection(selectedRepositoryIds: number[]) {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: selectedRepositoryIds,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+  }
+
+  it('creates a disabled config from the getReviewConfig defaults when none is stored', async () => {
     const caller = await createCallerForUser(testUser.id);
+    const defaults = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
 
-    await expect(
-      caller.personalReviewAgent.patchReviewConfig({
-        platform: 'github',
-        reviewStyle: 'strict',
-      })
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
 
+    expect(await caller.personalReviewAgent.getReviewConfig({ platform: 'github' })).toEqual({
+      ...defaults,
+      reviewStyle: 'strict',
+      selectedRepositoryIds: [303],
+    });
     const stored = await db.query.agent_configs.findFirst({
       where: and(
         eq(agent_configs.agent_type, 'code_review'),
         eq(agent_configs.owned_by_user_id, testUser.id)
       ),
     });
-    // PATCH must not have created a row.
-    expect(stored).toBeUndefined();
+    expect(stored?.is_enabled).toBe(false);
+  });
+
+  it('persists skipBotPullRequests from a patch and keeps the stored value when a patch omits it', async () => {
+    await seedPersonalGithubConfig();
+    const caller = await createCallerForUser(testUser.id);
+
+    // The mobile overview's toggle sends only this field.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      skipBotPullRequests: true,
+    });
+    expect(
+      (await caller.personalReviewAgent.getReviewConfig({ platform: 'github' })).skipBotPullRequests
+    ).toBe(true);
+
+    // A patch that does not carry it must not reset it to the default.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+    });
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        skip_bot_pull_requests: true,
+      })
+    );
   });
 
   it('preserves manuallyAddedRepositories and repositoryModelOverrides when the patch omits them', async () => {
@@ -2537,7 +3947,7 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         repository_selection_mode: 'all',
         gate_threshold: 'off',
         disable_review_md: true,
-        // Web-only setting preserved by the patch pass-through:
+        // A setting the patch did not carry, preserved by the field-merge:
         skip_bot_pull_requests: false,
         // Feature flags preserved by `preserveCodeReviewFeatureSettings`:
         review_memory_enabled: true,
@@ -2720,6 +4130,157 @@ describe('personalReviewAgent.patchReviewConfig', () => {
       })
     );
   });
+
+  // P2-GH-45c: delta repository save. The mobile delta sender lands later;
+  // these tests pin the server contract: next = (stored ∪ add) \ remove,
+  // remove wins on overlap, both-fields is rejected, and a delta-only patch
+  // drives the GitLab webhook sync with computed next/previous arrays.
+  it('applies a delta add to the stored selection', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202, 303] })
+    );
+  });
+
+  it('applies a delta remove to the stored selection', async () => {
+    await seedPersonalSelection([101, 202, 303]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [], remove: [202] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('lets remove win over add on an overlapping delta', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [202, 303], remove: [202] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('applies a delta add to an empty stored selection', async () => {
+    await seedPersonalSelection([]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [505], remove: [] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [505] }));
+  });
+
+  it('rejects a patch carrying both selectedRepositoryIds and selectedRepositoryDelta', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.personalReviewAgent.patchReviewConfig({
+        platform: 'github',
+        selectedRepositoryIds: [101],
+        selectedRepositoryDelta: { add: [303], remove: [] },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202] })
+    );
+  });
+
+  it('runs GitLab webhook sync with computed next/previous arrays on a delta-only patch', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      selectedRepositoryDelta: { add: [303], remove: [101] },
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
 });
 
 // ============================================================================
@@ -2735,12 +4296,16 @@ describe('personalReviewAgent.patchReviewConfig', () => {
 //      webhooks kept carrying the old secret and stopped validating.
 // ============================================================================
 
-async function seedPersonalGitLabIntegration(userId: string, metadata: Record<string, unknown>) {
+async function seedPersonalGitLabIntegration(
+  userId: string,
+  metadata: Record<string, unknown>,
+  integrationStatus: 'active' | 'pending' | 'suspended' = 'active'
+) {
   await db.insert(platform_integrations).values({
     owned_by_user_id: userId,
     platform: 'gitlab',
     integration_type: 'oauth',
-    integration_status: 'active',
+    integration_status: integrationStatus,
     platform_installation_id: `inst-${crypto.randomUUID()}`,
     metadata: { ...metadata, webhook_secret: 'old-secret-do-not-leak' },
   });
@@ -2782,6 +4347,10 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
   beforeEach(() => {
     mockGetValidGitLabToken.mockReset();
     mockSyncWebhooksForRepositories.mockReset();
+    // The status read consults the credential broker; a usable credential is
+    // the default so the P1-D-32 shape assertions below stay on the healthy
+    // path.
+    mockIsGitLabCredentialConnected.mockReset().mockResolvedValue(true);
   });
 
   afterEach(async () => {
@@ -2794,6 +4363,46 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
+  it('asks for re-authorization when the stored credential is unusable despite an active row', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+    });
+    mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    // The row exists and the account already authorized it, so the gate must
+    // offer a re-authorization, not a first-time connect.
+    expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
+  });
+
+  it.each(['pending', 'suspended'] as const)(
+    'asks for re-authorization when the existing row is %s',
+    async integrationStatus => {
+      await seedPersonalGitLabIntegration(
+        testUser.id,
+        { gitlab_instance_url: 'https://gitlab.example.com' },
+        integrationStatus
+      );
+
+      const caller = await createCallerForUser(testUser.id);
+      const status = await caller.personalReviewAgent.getGitLabStatus();
+
+      expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
+      // A row that cannot serve a review never reaches the credential broker.
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the first-time connect state when the user has no integration', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    expect(status).toEqual({ connected: false, reconnectRequired: false, integration: null });
+    expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+  });
+
   it('returns the integration shape WITHOUT webhookSecret for the self caller', async () => {
     await seedPersonalGitLabIntegration(testUser.id, {
       gitlab_instance_url: 'https://gitlab.example.com',
@@ -2804,6 +4413,7 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     const status = await caller.personalReviewAgent.getGitLabStatus();
 
     expect(status.connected).toBe(true);
+    expect(status.reconnectRequired).toBe(false);
     expect(status.integration).toBeDefined();
     // Regression guard: the secret must NEVER appear in the status
     // payload, even for the secret's owner. If this assertion fails,
@@ -2815,7 +4425,6 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     // stored integration row regardless of their concrete values).
     expect(status.integration).toEqual(
       expect.objectContaining({
-        isValid: true,
         instanceUrl: 'https://gitlab.example.com',
       })
     );
@@ -3016,5 +4625,124 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
     expect(result.webhookSync.errors).toHaveLength(1);
     expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
     expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+});
+
+describe('personalReviewAgent.getGitHubStatus connection rule', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function seedGitHubIntegration(
+    overrides: Partial<typeof platform_integrations.$inferInsert> = {}
+  ) {
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `inst-${crypto.randomUUID()}`,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'active',
+        repository_access: 'all',
+        platform_account_login: 'octocat',
+        installed_at: '2026-01-01T00:00:00Z',
+        ...overrides,
+      })
+      .returning();
+    return row;
+  }
+
+  it('reports the healthy active workflow installation as connected', async () => {
+    await seedGitHubIntegration();
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+      },
+    });
+  });
+
+  it('reports a locally disconnected installation as not connected', async () => {
+    // Regression: the status must use the same health rule as the repository
+    // picker and Security Agent, so a disconnected installation cannot reach
+    // reviewer screens whose every repository call then fails.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports a suspended installation as not connected', async () => {
+    await seedGitHubIntegration({
+      integration_status: 'suspended',
+      suspended_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports an installation awaiting reauthorization as not connected', async () => {
+    await seedGitHubIntegration({ auth_invalid_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports not connected without any installation', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports connected when a healthy row coexists with a retained disconnected row', async () => {
+    // A locally disconnected row is retained, and reconnecting a different
+    // installation inserts another row. The status must resolve the healthy
+    // installation instead of an unordered first row.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+    await seedGitHubIntegration({
+      platform_installation_id: `inst-${crypto.randomUUID()}`,
+      platform_account_login: 'octocat-new',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat-new',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+      },
+    });
   });
 });

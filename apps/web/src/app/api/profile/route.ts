@@ -1,6 +1,6 @@
-import type { ProfileOrganization } from '@/lib/organizations/organizations';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getProfileOrganizations } from '@/lib/organizations/organizations';
+import type { ProfileOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { NextResponse } from 'next/server';
 
 export async function GET(): Promise<

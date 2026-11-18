@@ -1,4 +1,4 @@
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 export function formatIsoDateLabel(params: {
   iso: string | null | undefined;

@@ -22,6 +22,8 @@ Updated 2026-05-29 -- name the Impact-facing Kilo Pass reward unit `Kilo Pass Bo
 Updated 2026-06-05 -- final Commit term reward-extension behavior.
 Updated 2026-06-12 -- clarify subscription-independent Kilo Pass referral sharing and automatic pending reward
 application.
+Updated 2026-08-19 -- retire the KiloClaw Advocate referral program. Kilo Pass is the only live referral program; the
+KiloClaw rules below are retained as history for referral data that still exists.
 
 ## Conventions
 
@@ -81,7 +83,7 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
   `.specs/stripe-early-fraud-warnings.md` after a new Stripe Early Fraud Warning; it is an adverse payment even when no
   later chargeback is created.
 
-### KiloClaw Definitions
+### KiloClaw Definitions (Retired)
 
 - **KiloClaw Advocate Program**: Impact Advocate referral program for KiloClaw. Existing ProgramId is `51699`.
 - **KiloClaw Advocate widget**: Existing Verified Access widget `p/51699/w/referrerWidget`.
@@ -121,9 +123,9 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
   after the referral reward was earned. Annual subscription issuances and already-created issuances are not eligible.
 - **Kilo Pass bonus-like issuance item**: Kilo Pass issuance item of kind `bonus`, `promo_first_month_50pct`, or
   `referral_bonus`. At most one bonus-like item may exist for an issuance.
-- **Referral launch cutoff**: UTC instant configured for the Kilo Pass referral launch. First-time monthly subscribers
-  who started before the cutoff keep legacy month-2 welcome promo behavior; subscribers starting at or after the cutoff
-  receive only the first-month welcome promo.
+- **Kilo Pass welcome-month issuance**: Monthly base issuance that receives the 50% welcome promo under the
+  subscription-start schedule in `.specs/kilo-pass.md`. It is streak month 1 for starts before `2026-10-09T00:00:00Z`
+  and streak month 2 for starts at or after that cutoff.
 
 ## Overview
 
@@ -132,8 +134,10 @@ referral cookies, participant registration, and provider-facing referral reporti
 eligibility, affiliate/referral attribution conflict resolution, first-paid-conversion detection, reward grant
 idempotency, reward caps, reward expiry, adverse-payment handling, and local billing/credit fulfillment.
 
-KiloClaw referrals reward both sides with one free KiloClaw month, fulfilled by delaying an eligible KiloClaw renewal by
-one calendar month. KiloClaw remains scoped to personal KiloClaw subscriptions and preserves existing behavior.
+KiloClaw referrals are retired. They rewarded both sides with one free KiloClaw month, fulfilled by delaying an
+eligible KiloClaw renewal by one calendar month. Because fresh KiloClaw instance provisioning is closed, no account can
+make a first paid KiloClaw subscription payment, so no KiloClaw referral can be earned. See
+`### KiloClaw Referral Program Retirement`.
 
 Kilo Pass referrals reward both sides with a one-time 50% Kilo Pass bonus based on the referee's eligible monthly tier,
 fulfilled as a future monthly `referral_bonus` issuance item after the reward is earned. Pending Kilo Pass rewards stack
@@ -153,12 +157,9 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 1. The system MUST support product-scoped Advocate program configuration for `kiloclaw` and `kilo_pass`.
 
-2. KiloClaw MUST keep compatibility with the existing configuration constants:
-   - Impact Account: `7138521`
-   - Impact Performance CampaignId: `50754`
-   - Impact Advocate ProgramId: `51699`
-   - UTT UUID: `A7138521-9724-4b8f-95f4-1db2fbae81141`
-   - Advocate widget ID: `p/51699/w/referrerWidget`
+2. The retired KiloClaw Advocate program used these constants. Advocate ProgramId `51699` and widget
+   `p/51699/w/referrerWidget` MUST NOT be reused by any live Advocate program. The shared Impact Account `7138521`,
+   Impact Performance CampaignId `50754`, and UTT UUID `A7138521-9724-4b8f-95f4-1db2fbae81141` remain in use.
 
 3. Impact Advocate account SID, auth token, and tenant alias MAY be shared across Advocate programs. KiloClaw and Kilo
    Pass MUST each require explicit product-scoped Advocate program ID and widget ID configuration. Products MUST NOT
@@ -379,7 +380,31 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 69. Fraudulent, test, admin-created, or manually adjusted subscriptions/payments MUST NOT qualify for referral rewards
     unless an authorized operator explicitly marks the conversion as eligible under a documented support process.
 
-### KiloClaw Product Rules
+### KiloClaw Referral Program Retirement
+
+69a. The KiloClaw Advocate referral program is retired. The system MUST NOT create new KiloClaw referral touches,
+     KiloClaw Advocate participants, KiloClaw referral conversions, KiloClaw reward decisions, or KiloClaw referral
+     rewards.
+
+69b. The system MUST NOT resolve Impact Advocate configuration for the KiloClaw program key, and MUST NOT issue KiloClaw
+     Advocate Verified Access tokens.
+
+69c. KiloClaw referral rewards that were pending or earned but never applied MUST be canceled. Already-applied KiloClaw
+     free months MUST NOT be reversed, and the renewal boundaries they moved MUST stand.
+
+69d. Historical KiloClaw referral records MUST be retained for accounting and support history, and MUST remain readable
+     through admin investigation surfaces. Retention does not make them eligible for any reward.
+
+69e. Queued Impact Advocate reward redemptions for KiloClaw rewards MUST terminate rather than retry indefinitely.
+
+69f. Retiring KiloClaw referrals MUST NOT change Impact Performance affiliate tracking for KiloClaw. Affiliate SALE
+     reporting for renewals of existing KiloClaw subscriptions MUST continue under
+     `.specs/impact-affiliate-tracking.md`, and MUST no longer be suppressed by referral attribution.
+
+69g. The KiloClaw rules in this spec are retained as history for the records described in 69d. They MUST NOT be
+     implemented for new conversions.
+
+### KiloClaw Product Rules (Retired)
 
 70. KiloClaw referrals apply only to personal KiloClaw subscriptions. Organization-scoped KiloClaw instances, team
     plans, admin interventions, and non-KiloClaw purchases are out of scope.
@@ -510,8 +535,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 114.  A qualified Kilo Pass referral conversion MUST grant one Kilo Pass referral bonus reward to the referrer unless
       cap-limited or disqualified.
 
-115.  Kilo Pass first-time monthly subscribers MUST keep the first-month welcome promo when otherwise eligible. Referral
-      rewards MUST NOT replace, reduce, or retroactively alter the source conversion's first-month welcome issuance.
+115.  Kilo Pass first-time monthly subscribers MUST keep the welcome promo when otherwise eligible. Referral rewards MUST
+      NOT replace, reduce, or retroactively alter the beneficiary's welcome-month issuance.
 
 116.  Kilo Pass referral reward value MUST be snapshotted at conversion as 50% of the referee's eligible monthly tier.
       Later tier changes by either beneficiary MUST NOT change the reward amount.
@@ -526,7 +551,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
       rewards represent up to five future monthly referral bonus applications.
 
 120.  At eligible Kilo Pass base monthly issuance time, if the beneficiary has one or more pending unexpired Kilo Pass
-      referral rewards and no permanent application blocker applies, the system MUST consume exactly one reward.
+      referral rewards, no permanent application blocker applies, and the issuance is not the beneficiary's welcome-month
+      issuance (Rule 123), the system MUST consume exactly one reward.
 
 121.  At most one pending Kilo Pass referral reward MUST be consumed per eligible monthly Kilo Pass base issuance.
 
@@ -538,6 +564,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 123.  A Kilo Pass referral reward MUST apply only to an eligible monthly base issuance after the reward is earned. It MUST
       NOT apply retroactively to the source conversion's base issuance or to any already-created issuance.
+      If the issuance is the beneficiary's welcome-month issuance, the reward MUST stay pending for a later issuance.
+      This applies to referee and referrer rewards.
 
 124.  A consumed Kilo Pass referral reward MUST create a distinct `referral_bonus` Kilo Pass issuance item.
 
@@ -562,9 +590,10 @@ application, and Kilo Pass redeems after local referral bonus allocation.
       rewards but only an annual Kilo Pass subscription, rewards remain pending until an eligible monthly subscription is
       available or the rewards expire.
 
-132.  Kilo Pass welcome bonus behavior MUST change at referral launch: first-time monthly subscribers who started before
-      the referral launch cutoff keep legacy month-2 promo eligibility; subscribers starting at or after the cutoff MUST
-      receive only the first-month welcome promo.
+132.  The monthly welcome schedule MUST follow the subscription-start cutoff in `.specs/kilo-pass.md`.
+      Eligible first-time subscribers starting before `2026-10-09T00:00:00Z` receive the welcome promo only in month 1.
+      Those starting at or after that cutoff receive the welcome promo only in month 2.
+      Returning subscribers MUST always use the normal monthly ramp.
 
 ### Shared Reward Granting
 
@@ -787,6 +816,27 @@ application, and Kilo Pass redeems after local referral bonus allocation.
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-11-11 -- Redeem rewards only while the local reward stands
+
+A queued Impact Advocate reward redemption now reads the local reward before it contacts Impact Advocate. When the
+local reward can no longer be fulfilled, the redemption ends in a terminal failure with no Impact Advocate call, and a
+redemption that already reached the redeemed state stays redeemed. An adverse payment that leaves applied rewards in
+review now logs and reports the anomaly to Sentry with payment and reward identifiers only, and a repeated delivery for
+the same payment reports nothing new.
+
+### 2026-10-08 -- Keep the welcome month free of referral rewards
+
+Defined the welcome-month issuance from the Kilo Pass subscription-start schedule. A pending referral reward now waits
+for the next eligible issuance when the current issuance is the beneficiary's welcome month, for both referees and
+referrers. This keeps the month-2 welcome promo for subscribers starting at or after `2026-10-09T00:00:00Z`.
+
+### 2026-08-19 -- Retire the KiloClaw referral program
+
+Removed the KiloClaw Advocate referral program. New KiloClaw referral touches, participants, conversions, decisions, and
+rewards are no longer created; KiloClaw Advocate configuration no longer resolves; unapplied KiloClaw rewards are
+canceled while applied free months stand; historical records are retained for support and accounting; and KiloClaw
+affiliate SALE reporting is no longer suppressed by referral attribution. Kilo Pass is the only live referral program.
 
 ### 2026-06-05 -- Extend guarded final Commit terms
 

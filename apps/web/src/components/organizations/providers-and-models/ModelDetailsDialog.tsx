@@ -15,13 +15,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
-import { PolicyPill } from '@/components/organizations/providers-and-models/PolicyPills';
+import {
+  ByokOnlyPriceCell,
+  ByokOnlyTag,
+  PolicyPill,
+} from '@/components/organizations/providers-and-models/PolicyPills';
+import { GatewayAvailabilityList } from '@/components/organizations/providers-and-models/GatewayAvailabilityList';
+import { InferenceRegionFlags } from '@/components/organizations/providers-and-models/InferenceRegionFlags';
 import type {
   ModelRow,
   ProviderOffering,
 } from '@/components/organizations/providers-and-models/providersAndModels.types';
 
 export function ModelDetailsDialog({
+  organizationId,
+  showGatewayAvailability,
   open,
   canEdit,
   infoModel,
@@ -34,6 +42,8 @@ export function ModelDetailsDialog({
   onToggleProviderEnabled,
   onClose,
 }: {
+  organizationId: string;
+  showGatewayAvailability: boolean;
   open: boolean;
   canEdit: boolean;
   infoModel: ModelRow | null;
@@ -117,7 +127,8 @@ export function ModelDetailsDialog({
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>
                 <TableHead>Trains</TableHead>
-                <TableHead>Retains prompts</TableHead>
+                <TableHead>Retains</TableHead>
+                {showGatewayAvailability ? <TableHead>Regions</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,26 +152,45 @@ export function ModelDetailsDialog({
                             <img
                               src={offering.providerIconUrl}
                               alt=""
+                              referrerPolicy="no-referrer"
                               className="h-4 w-4 object-contain"
                             />
                           ) : null}
                         </div>
                         <span>{offering.providerDisplayName}</span>
+                        <ByokOnlyTag value={offering.byokOnly} />
                       </div>
                     </TableCell>
-                    <TableCell>{formatPriceCompact(offering.promptPrice)}</TableCell>
-                    <TableCell>{formatPriceCompact(offering.completionPrice)}</TableCell>
+                    {offering.byokOnly ? (
+                      <TableCell colSpan={2}>
+                        <ByokOnlyPriceCell />
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell>{formatPriceCompact(offering.promptPrice)}</TableCell>
+                        <TableCell>{formatPriceCompact(offering.completionPrice)}</TableCell>
+                      </>
+                    )}
                     <TableCell>
                       <PolicyPill value={offering.trains} variant="trains" />
                     </TableCell>
                     <TableCell>
                       <PolicyPill value={offering.retainsPrompts} variant="retainsPrompts" />
                     </TableCell>
+                    {showGatewayAvailability ? (
+                      <TableCell>
+                        <InferenceRegionFlags regions={offering.vercelInferenceRegions} />
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
+
+          {infoModel && showGatewayAvailability ? (
+            <GatewayAvailabilityList organizationId={organizationId} modelId={infoModel.modelId} />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

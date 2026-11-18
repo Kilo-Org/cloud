@@ -1,0 +1,2 @@
+ALTER TABLE "enkrypt_usage" ADD COLUMN "microdollar_usage_id" uuid;--> statement-breakpoint
+CREATE INDEX "IDX_enkrypt_usage_microdollar_usage_id" ON "enkrypt_usage" USING btree ("microdollar_usage_id");

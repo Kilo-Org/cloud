@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Az ügynök munkameneted frissítést kapott",
+      "lowBalance": "Az egyenleged figyelmet igényel",
+      "spendAlert": "A költésed figyelmet igényel",
+      "securityFinding": "Egy biztonsági találat figyelmet igényel",
+      "securityUpdate": "Egy biztonsági ellenőrzés frissítést kapott",
+      "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Figyelmeztetés alacsony egyenlegre",
+      "body": "{{organizationName}} egyenlege a(z) ${{minimumBalanceUsd}} alá esett"
+    },
+    "spendAlert": {
+      "title": "Költésfigyelmeztetés",
+      "body": "{{scopeName}} költése meghaladta a(z) ${{amountUsd}} összeget"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} itt: {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Új biztonsági találat ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA figyelmeztetés"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA megsértése"
+    }
+  },
+  "sessionReady": {
+    "body": "A Kilo munkameneted készen áll a telefonról történő vezérlésre"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

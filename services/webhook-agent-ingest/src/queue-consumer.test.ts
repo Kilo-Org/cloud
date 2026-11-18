@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PostMessageAsUserParams, PostMessageAsUserResult } from '@kilocode/kilo-chat';
+import type * as TokenMintingModule from './services/token-minting-service.js';
+import type * as SessionAccessModule from '@kilocode/worker-utils/cloud-agent-session-access';
+import { checkWorkspaceChatTarget } from '@kilocode/worker-utils/cloud-agent-session-access';
+
+vi.mock('@kilocode/worker-utils/cloud-agent-session-access', async importOriginal => ({
+  ...(await importOriginal<typeof SessionAccessModule>()),
+  checkWorkspaceChatTarget: vi.fn(),
+}));
 
 // Mock module-level imports before importing the unit under test. These mocks
 // stand in for: DB lookup of sandbox id, the kilo-chat service binding cast
@@ -9,6 +17,12 @@ const mockFindActiveSandboxIdForInstance =
   vi.fn<(db: unknown, instanceId: string, userId: string) => Promise<string | null>>();
 const mockPostMessageAsUser =
   vi.fn<(params: PostMessageAsUserParams) => Promise<PostMessageAsUserResult>>();
+const { mockMintToken } = vi.hoisted(() => ({ mockMintToken: vi.fn() }));
+
+vi.mock('./services/token-minting-service.js', async importOriginal => {
+  const original = await importOriginal<typeof TokenMintingModule>();
+  return { ...original, getTokenMintingService: () => ({ mintToken: mockMintToken }) };
+});
 
 vi.mock('./db/queries', () => ({
   findActiveSandboxIdForInstance: (db: unknown, instanceId: string, userId: string) =>
@@ -34,6 +48,8 @@ vi.mock('./util/do-retry', () => ({
 
 import { handleWebhookDeliveryBatch, processKiloclawChatMessage } from './queue-consumer';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { CreatorExecutionAuthorizationError } from './services/token-minting-service.js';
+import { logger } from './util/logger';
 
 type UpdateCall = { requestId: string; patch: Record<string, unknown> };
 
@@ -55,10 +71,10 @@ function makeWebhook() {
   };
 }
 
-function makeRequest(processStatus = 'captured') {
+function makeRequest(processStatus = 'captured', overrides: Partial<{ method: string }> = {}) {
   return {
     body: '{}',
-    method: 'POST',
+    method: overrides.method ?? 'POST',
     path: '/inbound/user/user-1/trigger-1',
     headers: { 'content-type': 'application/json' },
     queryString: null,
@@ -92,6 +108,335 @@ function makeEnv() {
     KILO_CHAT: {} as unknown,
   } as unknown as Env;
 }
+
+describe('existing Cloud Agent chat delivery', () => {
+  const chatId = 'workspace_00000000-0000-4000-8000-000000000003';
+
+  function harness(method = 'POST') {
+    const webhook = makeWebhook();
+    const request = {
+      ...makeRequest('captured', { method }),
+      id: webhook.requestId,
+      cloudAgentSessionId: null as string | null,
+    };
+    const stub = {
+      getRequest: async () => ({ ...request }),
+      getConfig: async () =>
+        makeTriggerConfig({
+          targetType: 'cloud_agent_chat',
+          cloudAgentSessionId: chatId,
+          mode: 'code',
+          model: 'kilo/fake-deterministic',
+          variant: 'high',
+          promptTemplate: '{{method}} {{body}} {{scheduledTime}}',
+        }),
+      updateRequest: vi.fn(async (_id: string, patch: Record<string, unknown>) => {
+        if (typeof patch.process_status === 'string') request.processStatus = patch.process_status;
+        if (typeof patch.cloud_agent_session_id === 'string')
+          request.cloudAgentSessionId = patch.cloud_agent_session_id;
+        return { success: true };
+      }),
+    };
+    const sendCalls: { path: string; body: unknown }[] = [];
+    const sendStatus = vi.fn(() => 200);
+    const fetch = vi.fn(async (outgoing: Request) => {
+      const body = (await outgoing.json()) as { message: { id: string } };
+      sendCalls.push({ path: new URL(outgoing.url).pathname, body });
+      const status = sendStatus();
+      return status === 200
+        ? Response.json({
+            result: { data: { messageId: body.message.id, cloudAgentSessionId: chatId } },
+          })
+        : new Response(null, { status });
+    });
+    const env = {
+      ...makeEnv(),
+      INTERNAL_API_SECRET: 'internal-secret',
+      TRIGGER_DO: { idFromName: (name: string) => name, get: () => stub },
+      CLOUD_AGENT: { fetch },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const deliver = (attempts = 1) =>
+      handleWebhookDeliveryBatch(
+        {
+          queue: 'webhook-delivery',
+          messages: [{ body: webhook, attempts, ack, retry }],
+        } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>,
+        env
+      );
+    return { stub, sendCalls, sendStatus, ack, retry, deliver };
+  }
+
+  beforeEach(() => {
+    vi.mocked(checkWorkspaceChatTarget).mockReset().mockResolvedValue(null);
+    mockMintToken
+      .mockReset()
+      .mockResolvedValue({ token: 'test-token', userId: 'user-1', isBot: false });
+  });
+
+  it.each([
+    ['POST', 'POST {} '],
+    ['SCHEDULED', 'SCHEDULED {} 2026-05-08T12:00:00Z'],
+  ])('queues a %s follow-up without preparing a session', async (method, prompt) => {
+    const h = harness(method);
+    await h.deliver();
+    expect(h.sendCalls).toEqual([
+      {
+        path: '/trpc/send',
+        body: {
+          cloudAgentSessionId: chatId,
+          message: { id: expect.stringMatching(/^msg_[0-9a-f]{26}$/), prompt },
+          agent: { mode: 'code', model: 'kilo/fake-deterministic', variant: 'high' },
+          finalization: {},
+        },
+      },
+    ]);
+    expect(h.stub.updateRequest).toHaveBeenCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'inprogress', cloud_agent_session_id: chatId })
+    );
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'success' })
+    );
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the same message ID and rechecks ownership on retry', async () => {
+    const h = harness();
+    h.sendStatus.mockReturnValueOnce(503);
+    await h.deliver();
+    expect(h.retry).toHaveBeenCalledOnce();
+    await h.deliver(2);
+    expect(h.sendCalls).toHaveLength(2);
+    expect(h.sendCalls[1]).toEqual(h.sendCalls[0]);
+    expect(checkWorkspaceChatTarget).toHaveBeenCalledTimes(2);
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['not_found', 'The target Cloud Agent chat was not found. It may have been deleted.'],
+    ['not_owner', 'The trigger must run as the owner of the target Cloud Agent chat.'],
+    [
+      'scope_mismatch',
+      'The target Cloud Agent chat must be in the same organization or personal scope as the trigger.',
+    ],
+  ] as const)('fails fast when the target is %s', async (reason, error_message) => {
+    vi.mocked(checkWorkspaceChatTarget).mockResolvedValue(reason);
+    const h = harness();
+    await h.deliver();
+    expect(h.sendCalls).toHaveLength(0);
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'failed', error_message })
+    );
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it('stops retrying a transient failure at the delivery limit', async () => {
+    const h = harness();
+    h.sendStatus.mockReturnValue(503);
+    await h.deliver(3);
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({
+        process_status: 'failed',
+        error_message: 'Cloud Agent could not accept the message temporarily.',
+      })
+    );
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it('reports an unexpected error type without storing or logging its message', async () => {
+    const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    try {
+      vi.mocked(checkWorkspaceChatTarget).mockRejectedValue(new TypeError('private details'));
+      const h = harness();
+      await h.deliver(3);
+      const errorMessage =
+        'Could not confirm delivery to the target Cloud Agent chat. Check the chat before retrying.';
+      expect(log).toHaveBeenCalledWith(
+        'Failed to process webhook',
+        expect.objectContaining({ error: errorMessage, errorType: 'TypeError' })
+      );
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private details');
+      expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+        'req-1',
+        expect.objectContaining({ process_status: 'failed', error_message: errorMessage })
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('records a permanent rejection without guessing its cause', async () => {
+    const h = harness();
+    h.sendStatus.mockReturnValue(400);
+    await h.deliver();
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({
+        process_status: 'failed',
+        error_message: 'Cloud Agent rejected the message (HTTP 400).',
+      })
+    );
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+});
+
+describe('creator Cloud Agent dispatch', () => {
+  function harness(
+    processStatus = 'captured',
+    cloudAgentSessionId: string | null = null,
+    profileId: string | null = 'profile-1',
+    method = 'POST'
+  ) {
+    const config = makeTriggerConfig({
+      userId: null,
+      orgId: 'org-1',
+      executionUserId: 'oauth/creator',
+      targetType: 'cloud_agent',
+      mode: 'code',
+      model: 'model-1',
+      githubRepo: 'owner/repo',
+      profileId,
+    });
+    const stub = {
+      getRequest: vi.fn(async () => ({
+        ...makeRequest(processStatus, { method }),
+        cloudAgentSessionId,
+      })),
+      getConfig: vi.fn(async () => config),
+      updateRequest: vi.fn(async () => ({ success: true })),
+    };
+    const cache = { get: vi.fn(async () => 'cached-bot-token'), put: vi.fn() };
+    const calls: Request[] = [];
+    const fetch = vi.fn(async (request: Request) => {
+      calls.push(request);
+      return request.url.includes('/trpc/prepareSession')
+        ? Response.json({ result: { data: { cloudAgentSessionId: 'session-1' } } })
+        : Response.json({ result: { data: { status: 'running' } } });
+    });
+    const env = {
+      WEBHOOK_AGENT_URL: 'https://hooks.test',
+      WEBHOOK_TOKEN_CACHE: cache,
+      INTERNAL_API_SECRET: 'internal-secret',
+      CALLBACK_TOKEN_SECRET: 'callback-secret',
+      TRIGGER_DO: { idFromName: (name: string) => name, get: () => stub },
+      CLOUD_AGENT: { fetch },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const batch = {
+      queue: 'webhook-delivery',
+      messages: [{ body: { ...makeWebhook(), namespace: 'org/org-1' }, attempts: 1, ack, retry }],
+    } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+    return { env, batch, stub, cache, calls, fetch, ack, retry };
+  }
+
+  beforeEach(() => {
+    mockMintToken.mockReset();
+    mockMintToken.mockResolvedValue({
+      token: 'creator-token',
+      userId: 'oauth/creator',
+      isBot: false,
+    });
+  });
+
+  it('bypasses cached bot tokens and forwards creator authorization with organization billing', async () => {
+    const h = harness();
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(mockMintToken).toHaveBeenCalledWith({
+      userId: null,
+      orgId: 'org-1',
+      executionUserId: 'oauth/creator',
+      triggerId: 'trigger-1',
+    });
+    expect(h.cache.get).not.toHaveBeenCalled();
+    expect(h.cache.put).not.toHaveBeenCalled();
+    expect(h.calls).toHaveLength(2);
+    for (const request of h.calls)
+      expect(request.headers.get('Authorization')).toBe('Bearer creator-token');
+    expect(await h.calls[0].json()).toMatchObject({
+      kilocodeOrganizationId: 'org-1',
+      allowUserAuthorization: true,
+    });
+    expect(h.ack).toHaveBeenCalledOnce();
+    expect(h.retry).not.toHaveBeenCalled();
+  });
+
+  it('dispatches without an explicit profile so runtime defaults can resolve it', async () => {
+    const h = harness('captured', null, null);
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(h.calls).toHaveLength(2);
+    const prepared = await h.calls[0].json();
+    expect(prepared).not.toHaveProperty('profileId');
+    expect(prepared).toMatchObject({ githubRepo: 'owner/repo', createdOnPlatform: 'webhook' });
+    expect(h.ack).toHaveBeenCalledOnce();
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.stub.updateRequest).not.toHaveBeenCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'failed' })
+    );
+  });
+
+  it('allows user GitHub authorization for scheduled creator dispatch', async () => {
+    const h = harness('captured', null, 'profile-1', 'SCHEDULED');
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(h.calls).toHaveLength(2);
+    expect(await h.calls[0].json()).toMatchObject({
+      createdOnPlatform: 'scheduled',
+      allowUserAuthorization: true,
+    });
+  });
+
+  it('mints fresh authorization again for an initiate-only retry', async () => {
+    const h = harness('inprogress', 'session-1');
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(mockMintToken).toHaveBeenCalledOnce();
+    expect(h.calls).toHaveLength(1);
+    expect(h.calls[0].url).toContain('/trpc/initiateFromKilocodeSessionV2');
+    expect(h.calls[0].headers.get('Authorization')).toBe('Bearer creator-token');
+    expect(h.cache.get).not.toHaveBeenCalled();
+  });
+
+  it.each(['captured', 'inprogress'])(
+    'fails %s requests explicitly after membership revocation without fallback or dispatch',
+    async status => {
+      const h = harness(status, status === 'inprogress' ? 'session-1' : null);
+      mockMintToken.mockRejectedValue(
+        new CreatorExecutionAuthorizationError(
+          'Creator execution user is no longer a direct organization member'
+        )
+      );
+      await handleWebhookDeliveryBatch(h.batch, h.env);
+      expect(h.stub.updateRequest).toHaveBeenCalledWith(
+        'req-1',
+        expect.objectContaining({
+          process_status: 'failed',
+          error_message: 'Creator execution user is no longer a direct organization member',
+        })
+      );
+      expect(h.fetch).not.toHaveBeenCalled();
+      expect(h.cache.get).not.toHaveBeenCalled();
+      expect(h.ack).toHaveBeenCalledOnce();
+      expect(h.retry).not.toHaveBeenCalled();
+    }
+  );
+
+  it('still retries transient authorization database failures', async () => {
+    const h = harness();
+    mockMintToken.mockRejectedValue(new Error('database temporarily unavailable'));
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(h.retry).toHaveBeenCalledOnce();
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(h.ack).not.toHaveBeenCalled();
+  });
+});
 
 describe('processKiloclawChatMessage', () => {
   beforeEach(() => {
@@ -264,6 +609,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
           targetType: 'cloud_agent',
           mode: 'code',
           model: 'model-1',
+          variant: 'high',
           githubRepo: 'owner/repo',
           profileId: 'profile-1',
         })
@@ -311,6 +657,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
       resourceParts: [webhook.namespace, webhook.triggerId, webhook.requestId],
     });
     expect(prepareBody).toMatchObject({
+      variant: 'high',
       callbackTarget: {
         url: 'https://hooks.test/api/callbacks/execution',
         headers: {
@@ -327,4 +674,302 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
+
+  it.each([undefined, false, 'false', true, 'true'])(
+    'uses the organization and isolates the token cache for flag %s',
+    async sharedResourceTokensEnabled => {
+      const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const prepareRequests: Request[] = [];
+      const getCachedToken = vi.fn(async () => 'api-token');
+      const stub = {
+        getRequest: vi.fn(async () => makeRequest()),
+        getConfig: vi.fn(async () =>
+          makeTriggerConfig({
+            userId: null,
+            orgId: organizationId,
+            targetType: 'cloud_agent',
+            mode: 'code',
+            model: 'model-1',
+            githubRepo: 'owner/repo',
+            profileId: 'profile-1',
+          })
+        ),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const env = {
+        WEBHOOK_AGENT_URL: 'https://hooks.test',
+        SHARED_RESOURCE_TOKENS_ENABLED: sharedResourceTokensEnabled,
+        WEBHOOK_TOKEN_CACHE: { get: getCachedToken, put: vi.fn() },
+        INTERNAL_API_SECRET: { get: vi.fn(async () => 'test-internal-secret') },
+        CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => 'test-callback-token-secret') },
+        TRIGGER_DO: { idFromName: vi.fn((name: string) => name), get: vi.fn(() => stub) },
+        CLOUD_AGENT: {
+          fetch: vi.fn(async (request: Request) => {
+            prepareRequests.push(request);
+            return request.url.includes('/trpc/prepareSession')
+              ? Response.json({ result: { data: { cloudAgentSessionId: 'cloud-session-1' } } })
+              : Response.json({
+                  result: { data: { executionId: 'execution-1', status: 'running' } },
+                });
+          }),
+        },
+      } as unknown as Env;
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: makeWebhook(), attempts: 1, ack, retry }],
+      } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      expect(await prepareRequests[0]?.json()).toMatchObject({
+        kilocodeOrganizationId: organizationId,
+      });
+      expect(getCachedToken).toHaveBeenCalledWith(
+        `webhook-token:${sharedResourceTokensEnabled === true || sharedResourceTokensEnabled === 'true' ? 'modern' : 'legacy'}:${organizationId}`
+      );
+      expect(prepareRequests).toHaveLength(2);
+      for (const request of prepareRequests)
+        expect(request.headers.get('Authorization')).toBe('Bearer api-token');
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['webhook', undefined, undefined],
+    ['webhook', 'high', undefined],
+    ['webhook', undefined, 'isolated-standard'],
+    ['webhook', 'high', 'isolated-standard'],
+    ['webhook', undefined, 'cloudflare-containers-standard-3'],
+    ['webhook', undefined, 'cloudflare-containers-standard-4'],
+    ['webhook', undefined, 'cloudflare-single'],
+    ['webhook', undefined, 'cloudflare-shared'],
+    ['webhook', undefined, 'vercel-small'],
+    ['scheduled', undefined, undefined],
+    ['scheduled', 'high', undefined],
+    ['scheduled', undefined, 'isolated-standard'],
+    ['scheduled', 'high', 'isolated-standard'],
+    ['scheduled', undefined, 'cloudflare-containers-standard-3'],
+    ['scheduled', undefined, 'cloudflare-containers-standard-4'],
+    ['scheduled', undefined, 'cloudflare-single'],
+    ['scheduled', undefined, 'cloudflare-shared'],
+    ['scheduled', undefined, 'vercel-large'],
+  ] as const)(
+    'forwards configured variant %s/%s and allocation %s only to prepareSession',
+    async (triggerSource, variant, sandboxAllocation) => {
+      const prepareRequests: Request[] = [];
+      const initiateRequests: Request[] = [];
+      const webhook = makeWebhook();
+      const stub = {
+        getRequest: vi.fn(async () =>
+          makeRequest('captured', { method: triggerSource === 'scheduled' ? 'SCHEDULED' : 'POST' })
+        ),
+        getConfig: vi.fn(async () =>
+          makeTriggerConfig({
+            targetType: 'cloud_agent',
+            mode: 'code',
+            model: 'model-1',
+            githubRepo: 'owner/repo',
+            profileId: 'profile-1',
+            activationMode: triggerSource,
+            ...(variant !== undefined ? { variant } : {}),
+            ...(sandboxAllocation !== undefined ? { sandboxAllocation } : {}),
+          })
+        ),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const env = {
+        WEBHOOK_AGENT_URL: 'https://hooks.test',
+        WEBHOOK_TOKEN_CACHE: {
+          get: vi.fn(async () => 'api-token'),
+          put: vi.fn(async () => undefined),
+        },
+        INTERNAL_API_SECRET: { get: vi.fn(async () => 'test-internal-secret') },
+        CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => 'test-callback-token-secret') },
+        TRIGGER_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => stub),
+        },
+        CLOUD_AGENT: {
+          fetch: vi.fn(async (request: Request) => {
+            if (request.url.includes('/trpc/prepareSession')) {
+              prepareRequests.push(request);
+              return Response.json({
+                result: { data: { cloudAgentSessionId: 'cloud-session-1' } },
+              });
+            }
+            initiateRequests.push(request);
+            return Response.json({
+              result: { data: { executionId: 'execution-1', status: 'running' } },
+            });
+          }),
+        },
+      } as unknown as Env;
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: webhook, attempts: 1, ack, retry }],
+      } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      expect(stub.getConfig).toHaveBeenCalledTimes(1);
+      expect(prepareRequests).toHaveLength(1);
+      expect(initiateRequests).toHaveLength(1);
+      const prepareBody = await prepareRequests[0].json<{
+        variant?: string;
+        sandboxAllocation?: string;
+        createdOnPlatform: string;
+      }>();
+      if (variant === undefined) {
+        expect(prepareBody).not.toHaveProperty('variant');
+      } else {
+        expect(prepareBody).toHaveProperty('variant', variant);
+      }
+      if (
+        sandboxAllocation === undefined ||
+        sandboxAllocation === 'cloudflare-shared' ||
+        sandboxAllocation === 'isolated-standard'
+      ) {
+        expect(prepareBody).not.toHaveProperty('sandboxAllocation');
+      } else if (sandboxAllocation === 'cloudflare-single') {
+        expect(prepareBody).toHaveProperty('sandboxAllocation', 'cloudflare-containers-standard-3');
+      } else {
+        expect(prepareBody).toHaveProperty('sandboxAllocation', sandboxAllocation);
+      }
+      expect(prepareBody.createdOnPlatform).toBe(triggerSource);
+      expect(prepareBody).not.toHaveProperty('allowUserAuthorization');
+      expect(await initiateRequests[0].json()).not.toHaveProperty('sandboxAllocation');
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([undefined, null, '44444444-4444-4444-8444-444444444444'] as const)(
+    'forwards environment selection %s only to prepareSession',
+    async environmentId => {
+      const prepareRequests: Request[] = [];
+      const initiateRequests: Request[] = [];
+      const webhook = makeWebhook();
+      const stub = {
+        getRequest: vi.fn(async () => makeRequest()),
+        getConfig: vi.fn(async () =>
+          makeTriggerConfig({
+            targetType: 'cloud_agent',
+            mode: 'code',
+            model: 'model-1',
+            githubRepo: 'owner/repo',
+            ...(environmentId !== undefined ? { environmentId } : {}),
+          })
+        ),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const env = {
+        WEBHOOK_AGENT_URL: 'https://hooks.test',
+        WEBHOOK_TOKEN_CACHE: {
+          get: vi.fn(async () => 'api-token'),
+          put: vi.fn(async () => undefined),
+        },
+        INTERNAL_API_SECRET: { get: vi.fn(async () => 'test-internal-secret') },
+        CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => 'test-callback-token-secret') },
+        TRIGGER_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => stub),
+        },
+        CLOUD_AGENT: {
+          fetch: vi.fn(async (request: Request) => {
+            if (request.url.includes('/trpc/prepareSession')) {
+              prepareRequests.push(request);
+              return Response.json({
+                result: { data: { cloudAgentSessionId: 'cloud-session-1' } },
+              });
+            }
+            initiateRequests.push(request);
+            return Response.json({
+              result: { data: { executionId: 'execution-1', status: 'running' } },
+            });
+          }),
+        },
+      } as unknown as Env;
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: webhook, attempts: 1, ack, retry }],
+      } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      expect(prepareRequests).toHaveLength(1);
+      const prepareBody = await prepareRequests[0].json<{
+        requestedEnvironment?: { id: string };
+      }>();
+      if (environmentId == null) {
+        expect(prepareBody).not.toHaveProperty('requestedEnvironment');
+      } else {
+        expect(prepareBody).toHaveProperty('requestedEnvironment', { id: environmentId });
+      }
+      expect(await initiateRequests[0].json()).not.toHaveProperty('requestedEnvironment');
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'keeps %s KiloClaw dispatch independent of Cloud Agent allocation',
+    async activationMode => {
+      mockFindActiveSandboxIdForInstance.mockReset();
+      mockPostMessageAsUser.mockReset();
+      mockFindActiveSandboxIdForInstance.mockResolvedValue('sandbox-1');
+      mockPostMessageAsUser.mockResolvedValue({
+        ok: true,
+        conversationId: 'conv-1',
+        messageId: 'msg-1',
+        conversationCreated: true,
+      });
+      const stub = {
+        getRequest: vi.fn(async () =>
+          makeRequest('captured', { method: activationMode === 'scheduled' ? 'SCHEDULED' : 'POST' })
+        ),
+        getConfig: vi.fn(async () => makeTriggerConfig({ activationMode })),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const cloudAgentFetch = vi.fn();
+      const env = {
+        ...makeEnv(),
+        TRIGGER_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => stub),
+        },
+        CLOUD_AGENT: { fetch: cloudAgentFetch },
+      } as unknown as Env;
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: makeWebhook(), attempts: 1, ack, retry }],
+      } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      expect(cloudAgentFetch).not.toHaveBeenCalled();
+      expect(mockPostMessageAsUser).toHaveBeenCalledTimes(1);
+      expect(mockPostMessageAsUser.mock.calls[0][0]).toMatchObject({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        source: 'webhook',
+        correlation: { triggerId: 'trigger-1', webhookRequestId: 'req-1' },
+      });
+      expect(mockPostMessageAsUser.mock.calls[0][0]).not.toHaveProperty('sandboxAllocation');
+      expect(stub.updateRequest).toHaveBeenLastCalledWith(
+        'req-1',
+        expect.objectContaining({ process_status: 'success' })
+      );
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+    }
+  );
 });

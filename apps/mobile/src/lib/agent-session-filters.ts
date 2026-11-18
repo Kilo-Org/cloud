@@ -1,23 +1,30 @@
 import { z } from 'zod';
 
-import { type AgentSessionSortBy, parseAgentSessionSortBy } from './agent-session-sort';
+import {
+  normalisePlatformSelection,
+  projectOptionKey,
+} from '@/components/agents/session-list-helpers';
 
 /**
- * Pure contract for the persisted agent-session filter set. Intentionally
- * free of any Expo / SecureStore imports so it can be unit-tested in node
- * and re-used by tests/mocks without touching the native bridge.
+ * Pure contract for the persisted session filter set. Intentionally free of
+ * any Expo / SecureStore / native-bridge imports so it can be unit-tested in
+ * node and re-used by tests/mocks without touching the native bridge. It
+ * imports the visible-label project key (`projectOptionKey`) and the
+ * platform-bucket collapse (`normalisePlatformSelection`) from the session-list
+ * helpers so the badge counts each row the filter sheet renders once; that
+ * module is native-free too, so the node test still runs.
+ *
+ * Both session-list pages persist this shape, under their own storage key.
  */
 export type AgentSessionFilters = {
   platformFilter: string[];
   projectFilter: string[];
-  sortBy: AgentSessionSortBy;
 };
 
 export function createDefaultAgentSessionFilters(): AgentSessionFilters {
   return {
     platformFilter: [],
     projectFilter: [],
-    sortBy: parseAgentSessionSortBy(undefined),
   };
 }
 
@@ -41,15 +48,14 @@ const tolerantStringArraySchema = tolerant(z.array(z.unknown()), []).transform(i
 const storedAgentSessionFiltersSchema = z.object({
   platformFilter: tolerantStringArraySchema,
   projectFilter: tolerantStringArraySchema,
-  sortBy: z.unknown().optional(),
 });
 
 /**
- * Parse the raw SecureStore JSON for the agent-session filter record. Returns
- * `null` only when the JSON itself is malformed or not an object — in every
- * other case the function tolerantly recovers so a partially bad record
- * (e.g. an unknown sortBy or a non-array platformFilter) still produces a
- * usable filter object with the default where applicable.
+ * Parse the raw SecureStore JSON for a session filter record. Returns `null`
+ * only when the JSON itself is malformed or not an object — in every other
+ * case the function tolerantly recovers so a partially bad record (e.g. a
+ * non-array platformFilter, or a legacy record still carrying `sortBy`) still
+ * produces a usable filter object.
  */
 export function parseStoredAgentSessionFilters(raw: string | null): AgentSessionFilters | null {
   if (!raw) {
@@ -71,22 +77,40 @@ export function parseStoredAgentSessionFilters(raw: string | null): AgentSession
   return {
     platformFilter: result.data.platformFilter,
     projectFilter: result.data.projectFilter,
-    sortBy: parseAgentSessionSortBy(result.data.sortBy),
   };
 }
 
+/** How many narrowing filters are applied — drives the header badge count. */
+export function countActiveSessionFilters(filters: AgentSessionFilters): number {
+  // One visible project option can carry several git-URL aliases (https vs ssh,
+  // a `.git` suffix, host case) that render to one label, so the raw array
+  // length over-counts the rows the sheet shows.
+  const projectCount = new Set(filters.projectFilter.map(gitUrl => projectOptionKey(gitUrl))).size;
+  // The sheet collapses a persisted platform variant into its bucket row
+  // (`normalisePlatform` in the filter modal), so a legacy selection holding a
+  // bucket and one of its variants (`cloud-agent` + `cloud-agent-web`) renders
+  // one checked row and must count once. An unknown platform keeps its own row,
+  // so it counts as itself.
+  const platformCount = normalisePlatformSelection(filters.platformFilter).length;
+  return platformCount + projectCount;
+}
+
 /**
- * Reset the narrowing parts of the filter record (platform + project) while
- * leaving `sortBy` untouched — sort is a persistent preference, not a
- * transient filter, and "Clear filters" / "Clear search" must never
- * silently revert it to the default.
+ * Whether two filter sets say the same thing, element by element.
+ *
+ * The arrays are the whole of it: a record read back from storage and the one on
+ * screen are the same filters when every entry matches, which is what lets a
+ * loaded page skip writing back what it just read.
  */
-export function clearAgentSessionNarrowingFilters(
-  filters: AgentSessionFilters
-): AgentSessionFilters {
-  return {
-    platformFilter: [],
-    projectFilter: [],
-    sortBy: filters.sortBy,
-  };
+export function sameAgentSessionFilters(a: AgentSessionFilters, b: AgentSessionFilters): boolean {
+  if (a.platformFilter.length !== b.platformFilter.length) {
+    return false;
+  }
+  if (a.platformFilter.some((value, index) => value !== b.platformFilter[index])) {
+    return false;
+  }
+  if (a.projectFilter.length !== b.projectFilter.length) {
+    return false;
+  }
+  return a.projectFilter.every((value, index) => value === b.projectFilter[index]);
 }

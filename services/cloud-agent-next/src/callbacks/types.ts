@@ -1,7 +1,7 @@
 import type { CloudAgentFailureStage } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { ClientError } from '@kilocode/worker-utils/client-error';
 import type { SafeFailureProjection } from '../session/safe-failure-projection.js';
-import type { ModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
+import type { ModelNotFoundRuntimeDiagnostics } from '@kilocode/worker-utils/runtime-model-diagnostics';
 
 export type CallbackTarget = {
   url: string;
@@ -37,6 +37,8 @@ export type ExecutionCallbackPayload = {
    * Undefined when no assistant message has been recorded yet.
    */
   lastAssistantMessageText?: string;
+  /** Partial chronological activity, at most 12,000 JS chars: assistant text and tool names/statuses only. */
+  recentActivity?: string;
   /** Present when lastAssistantMessageText was omitted to fit the callback queue. */
   lastAssistantMessageTextTruncation?: CallbackTextTruncation;
   /**
@@ -50,4 +52,6 @@ export type ExecutionCallbackPayload = {
 export type CallbackJob = {
   target: CallbackTarget;
   payload: ExecutionCallbackPayload;
+  /** Server-owned routing context. Persisted once so queue retries reuse the same parent turn. */
+  parentSession?: { userId: string; messageId: string };
 };

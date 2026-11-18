@@ -5,18 +5,17 @@
  * `resolveSession` determines the session type and routes to Cloud Agent,
  * CLI live, or CLI historical transport.
  */
+import type { ToolDisplayMode } from './tool-detail-marker';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
-import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
-import type { NormalizedEvent } from './normalizer';
+import type { NormalizedEvent, ServiceEvent } from './normalizer';
 import type { SuggestionAction } from './types';
-import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
+import type { RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
 import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
 import type { ServiceState } from './service-state';
-import { createCloudAgentTransport } from './cloud-agent-transport';
+import { createCloudAgentTransport, type CloudAgentTransportConfig } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
@@ -25,10 +24,9 @@ import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
   CreateRemoteSessionInput,
-  RemoteAttachmentPart,
   TransportFactory,
   TransportSink,
-  TransportSendPayload,
+  TransportSendInput,
   Transport,
 } from './transport';
 import { createMemoryStorage } from './storage/memory';
@@ -48,6 +46,19 @@ const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
   'Remote session creation is not supported for the current session';
 const REMOTE_SESSION_EXIT_NOT_SUPPORTED =
   'Remote session exit is not supported for the current session';
+/**
+ * A create needs the active session's own scope. The manager reports this while
+ * that scope is not available yet. The message reaches a client's toast
+ * verbatim, so it names the reader's situation and their next step.
+ */
+const REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED =
+  'This session is still loading. Try again in a moment.';
+/**
+ * A create must stay in the active session's organization. The message reaches
+ * a client's toast verbatim, so it names the reader's situation and next step.
+ */
+const REMOTE_SESSION_ORGANIZATION_MISMATCH =
+  "A new session stays in this session's organization. Switch organization first.";
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -56,6 +67,7 @@ type CloudAgentSessionConfig = {
   websocketBaseUrl?: string;
   storage?: SessionStorage;
   onError?: (message: string) => void;
+  onChildSessionError?: (sessionId: string, message: string) => void;
   onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
   onQuestionResolved?: (requestId: string) => void;
   onPermissionAsked?: (
@@ -86,11 +98,17 @@ type CloudAgentSessionConfig = {
   onReplayComplete?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
+  onMessageCanceled?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
   onMessageFailed?: (
     messageId: string,
     state: Extract<MessageDeliveryState, { status: 'failed' }>
   ) => void;
+  /**
+   * True when the user already retried this message's delivery failure, so a
+   * replayed `cloud.message.failed` must not restore the cleared footer.
+   */
+  isDeliveryFailureResolved?: (messageId: string) => boolean;
   /**
    * Optional sink for tool attachment bytes, called just before the chat
    * processor strips a completed tool part's attachment data URLs for storage.
@@ -112,21 +130,8 @@ type CloudAgentSessionConfig = {
     | undefined;
 };
 
-type CloudAgentSessionSendInput = {
-  payload: TransportSendPayload;
-  messageId?: string | undefined;
-  attachments?: CloudAgentAttachments | undefined;
-  images?: Images | undefined;
-  remoteModelOverride?: RemoteModelOverride | undefined;
-  /**
-   * Ready file parts to forward to a CAPABLE remote CLI session. The
-   * session-manager gate already enforces that this is only non-empty for
-   * a `remote` session whose CLI has advertised `capabilities.attachments:
-   * true`; transports that don't support the path (cloud-agent, read-only,
-   * non-capable remote) simply ignore it.
-   */
-  attachmentParts?: RemoteAttachmentPart[] | undefined;
-};
+/** The session sends straight through, so its input is the transport contract. */
+type CloudAgentSessionSendInput = TransportSendInput;
 
 type CloudAgentSessionAnswerInput = {
   requestId: string;
@@ -154,7 +159,6 @@ type CloudAgentSessionDismissSuggestionInput = {
 };
 
 type CloudAgentSessionTransport = {
-  // Cloud Agent transport construction
   getTicket?:
     | ((
         sessionId: CloudAgentSessionId
@@ -162,15 +166,14 @@ type CloudAgentSessionTransport = {
     | undefined;
   api?: CloudAgentApi | undefined;
 
-  // Shared
   fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. The transport uses this for its initial
-   * bounded read and any reconnect snapshot replays. After a successful
-   * initial fetch the transport calls `onInitialPageLoaded` so the manager
-   * can record the cursor and `omittedItemCount`; reconnect replays do NOT
+   * bounded read and any reconnect snapshot replays. Once per attach, with the
+   * first page that applies, the transport calls `onInitialPageLoaded` so the
+   * manager can record the cursor and `omittedItemCount`; later replays do NOT
    * fire that callback so the user's already-advanced older-messages cursor
-   * isn't reset to the latest 50 on every reconnect.
+   * isn't reset to the latest 50.
    */
   fetchSnapshotPage?:
     | ((
@@ -178,12 +181,23 @@ type CloudAgentSessionTransport = {
         options: { cursor?: string }
       ) => Promise<SessionSnapshotPageOutcome | null>)
     | undefined;
-  /** Called by the transport after a successful initial bounded page read. */
+  fetchCloudSnapshotPage?:
+    | ((
+        sessionId: CloudAgentSessionId,
+        options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ) => Promise<unknown>)
+    | undefined;
+  initialSnapshotRead?: CloudAgentTransportConfig['initialSnapshotRead'];
+  /**
+   * Called by the transport once per attach, with the first page that applies
+   * after the initial read starts.
+   */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
+  /** Requests bounded completed-tool previews in historical stream replay. */
+  toolDisplay?: ToolDisplayMode | undefined;
 
-  // Remote CLI live transport construction
   userWebConnection?: UserWebConnection | undefined;
 };
 
@@ -191,9 +205,9 @@ type CloudAgentSession = {
   storage: SessionStorage;
   state: ServiceState;
 
-  // Commands
   send: (input: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
   interrupt: () => unknown | Promise<unknown>;
+  cancelQueuedMessage: (messageId: string) => Promise<{ dropped: boolean }>;
   answer: (payload: CloudAgentSessionAnswerInput) => unknown | Promise<unknown>;
   reject: (payload: CloudAgentSessionRejectInput) => unknown | Promise<unknown>;
   respondToPermission: (
@@ -205,14 +219,14 @@ type CloudAgentSession = {
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
+  retryBackgroundActivity?: () => void;
+  observeProjected: (messages: SessionSnapshot['messages']) => void;
   createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
 
-  // Capability checks
   canSend: boolean;
   canInterrupt: boolean;
 
-  // Lifecycle
   connect: () => void;
   disconnect: () => void;
   destroy: () => void;
@@ -229,6 +243,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   const serviceState = createServiceState({
     rootSessionId: config.kiloSessionId,
     onError: config.onError,
+    onChildSessionError: config.onChildSessionError,
     onQuestionAsked: config.onQuestionAsked,
     onQuestionResolved: config.onQuestionResolved,
     onPermissionAsked: config.onPermissionAsked,
@@ -239,11 +254,18 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     onSessionCreated: config.onSessionCreated,
     onSessionUpdated: config.onSessionUpdated,
     onMessageQueued: config.onMessageQueued,
+    onMessageCanceled: config.onMessageCanceled,
     onMessageCompleted: config.onMessageCompleted,
     onMessageFailed: config.onMessageFailed,
+    isDeliveryFailureResolved: config.isDeliveryFailureResolved,
   });
 
   let transport: Transport | null = null;
+  let replaying = false;
+  const replayedQueuedMessages = new Map<
+    string,
+    Extract<ServiceEvent, { type: 'cloud.message.queued' }>
+  >();
   let connectGeneration = 0;
   let disarmUpgradeWatcher: (() => void) | null = null;
 
@@ -288,10 +310,25 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     void resolveAndConnect(connectGeneration);
   }
 
+  function emitEventToListener(event: NormalizedEvent): void {
+    try {
+      config.onEvent?.(event);
+    } catch (error) {
+      console.error(`[Session] Event listener threw on ${event.type}:`, error);
+    }
+  }
+
   const sink: TransportSink = {
     onChatEvent(event) {
-      chatProcessor.process(event);
-      config.onEvent?.(event);
+      // Keep one event's failure from taking the events after it: report and
+      // carry on rather than surfacing a session error for a single chat
+      // event, so the transcript keeps streaming.
+      try {
+        if (!chatProcessor.process(event)) return;
+      } catch (error) {
+        console.error(`[Session] Failed to process ${event.type}:`, error);
+      }
+      emitEventToListener(event);
     },
     onServiceEvent(event) {
       serviceState.process(event);
@@ -299,15 +336,61 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       // synthetic user message when none exists so the UI renders the
       // prompt as soon as the server acknowledges it.
       if (event.type === 'cloud.message.queued') {
+        if (replaying) replayedQueuedMessages.set(event.messageId, event);
+        else {
+          chatProcessor.synthesizeQueuedUserMessage({
+            messageId: event.messageId,
+            sessionId: config.kiloSessionId,
+            content: event.content,
+            createdAt: event.createdAt,
+          });
+        }
+      }
+      if (event.type === 'cloud.message.sent' && event.turnType === 'command') {
+        replayedQueuedMessages.delete(event.messageId);
+        const message = storage.getMessageInfo(event.messageId);
+        if (message?.role === 'user' && message.synthetic === true) {
+          storage.deleteMessage(event.messageId);
+        }
+      }
+      // `cloud.message.canceled` removes the synthetic (or real) local row the
+      // queued event materialized, so a replay of queued then canceled nets empty.
+      if (event.type === 'cloud.message.canceled') {
+        replayedQueuedMessages.delete(event.messageId);
+        storage.deleteMessage(event.messageId);
+      }
+      if (event.type === 'cloud.message.completed') replayedQueuedMessages.delete(event.messageId);
+      emitEventToListener(event);
+    },
+    onReplayStarted: () => {
+      replaying = true;
+      replayedQueuedMessages.clear();
+      serviceState.beginReplay();
+    },
+    onReplayCanceled: () => {
+      replaying = false;
+      replayedQueuedMessages.clear();
+      serviceState.cancelReplay();
+    },
+    onReplayComplete: () => {
+      for (const event of replayedQueuedMessages.values()) {
+        if (
+          !serviceState.getPendingMessages().has(event.messageId) &&
+          serviceState.getActiveMessageId() !== event.messageId
+        )
+          continue;
         chatProcessor.synthesizeQueuedUserMessage({
           messageId: event.messageId,
           sessionId: config.kiloSessionId,
           content: event.content,
+          createdAt: event.createdAt,
         });
       }
-      config.onEvent?.(event);
+      replayedQueuedMessages.clear();
+      replaying = false;
+      serviceState.endReplay();
+      config.onReplayComplete?.();
     },
-    onReplayComplete: () => config.onReplayComplete?.(),
   };
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
@@ -339,7 +422,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
           );
         }
-        if (!config.transport.fetchSnapshot) {
+        if (
+          !config.transport.fetchSnapshot &&
+          !resolved.cloudAgentSessionId.startsWith('workspace_')
+        ) {
           throw new Error(
             'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
           );
@@ -358,6 +444,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchCloudSnapshotPage: config.transport.fetchCloudSnapshotPage,
+          initialSnapshotRead: config.transport.initialSnapshotRead,
           ...(config.transport.fetchSnapshotPage
             ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
             : {}),
@@ -366,6 +454,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           onError: config.onError,
           lifecycleHooks: config.transport.lifecycleHooks,
           websocketHeaders: config.transport.websocketHeaders,
+          toolDisplay: config.transport.toolDisplay,
         });
       }
       case 'read-only': {
@@ -445,17 +534,45 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       return transport.interrupt();
     },
+    cancelQueuedMessage: messageId => {
+      if (!transport?.dropQueuedMessage) {
+        throw new Error('CloudAgentSession transport.dropQueuedMessage is not configured');
+      }
+      return transport.dropQueuedMessage(messageId);
+    },
     answer: payload => {
       if (!transport?.answer) {
         throw new Error('CloudAgentSession transport.answer is not configured');
       }
-      return transport.answer(payload);
+      return Promise.resolve(transport.answer(payload)).then(result => {
+        if (
+          result &&
+          typeof result === 'object' &&
+          'success' in result &&
+          result.success === false
+        ) {
+          throw new Error('Failed to submit answer. Please try again.');
+        }
+        serviceState.process({ type: 'question.replied', requestId: payload.requestId });
+        return result;
+      });
     },
     reject: payload => {
       if (!transport?.reject) {
         throw new Error('CloudAgentSession transport.reject is not configured');
       }
-      return transport.reject(payload);
+      return Promise.resolve(transport.reject(payload)).then(result => {
+        if (
+          result &&
+          typeof result === 'object' &&
+          'success' in result &&
+          result.success === false
+        ) {
+          throw new Error('Failed to dismiss question. Please try again.');
+        }
+        serviceState.process({ type: 'question.rejected', requestId: payload.requestId });
+        return result;
+      });
     },
     respondToPermission: payload => {
       if (!transport?.respondToPermission) {
@@ -502,6 +619,12 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     retryRemoteCommands() {
       transport?.retryRemoteCommands?.();
+    },
+    retryBackgroundActivity() {
+      transport?.retryBackgroundActivity?.();
+    },
+    observeProjected(messages) {
+      transport?.observeProjected?.(messages);
     },
     createRemoteSession: async (input?: CreateRemoteSessionInput) => {
       if (!transport?.createSession) {
@@ -551,6 +674,8 @@ export {
   createCloudAgentSession,
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 };
 export type {
   CloudAgentSession,

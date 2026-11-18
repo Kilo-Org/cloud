@@ -1,17 +1,27 @@
 import { type Part } from '@kilocode/cloud-agent-sdk';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
+import { CenteredState } from '@/components/centered-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 
 import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-scroll-block-model';
 import { MonoScrollSheetProvider } from './mono-scroll-block';
-import { getPartDetailTitle, shouldAutoFollowPartDetail } from './part-detail-model';
+import { SessionPageSheet } from './session-page-sheet';
+import {
+  getPartDetailTitle,
+  shouldAutoFollowPartDetail,
+  shouldCenterPartDetail,
+} from './part-detail-model';
 import { isPartStreaming, isReasoningPart, isToolPart } from './part-types';
+import { useToolCardImageUri } from './tool-card-image-cache';
 import { ToolPartDetailBody } from './tool-part-detail-body';
 import { usePartDetailAutoScroll } from './use-part-detail-auto-scroll';
 
@@ -19,14 +29,17 @@ type PartDetailSheetProps = {
   visible: boolean;
   part: Part | null;
   onClose: () => void;
+  /** Fires after the native dismiss animation completes. */
+  onDismiss?: () => void;
 };
 
 function renderPartContent(part: Part | null): ReactNode {
   if (part === null) {
-    return <Text className="text-sm text-muted-foreground">Details unavailable</Text>;
-  }
-  if (isToolPart(part)) {
-    return <ToolPartDetailBody part={part} />;
+    return (
+      <Text className="text-sm text-muted-foreground">
+        {i18n.t('agentChat.partDetail.detailsUnavailable')}
+      </Text>
+    );
   }
   if (isReasoningPart(part)) {
     // While streaming, plain Text instead of SelectableText: the read-only
@@ -34,10 +47,10 @@ function renderPartContent(part: Part | null): ReactNode {
     // (dropped frames), and UIKit resets any selection on each text change
     // anyway. The finished part swaps back to the selectable path.
     if (isPartStreaming(part)) {
-      return <Text className="text-sm leading-5 text-muted-foreground">{part.text}</Text>;
+      return <Text className="text-sm leading-[1.25rem] text-muted-foreground">{part.text}</Text>;
     }
     return (
-      <SelectableText className="text-sm leading-5 text-muted-foreground">
+      <SelectableText className="text-sm leading-[1.25rem] text-muted-foreground">
         {part.text}
       </SelectableText>
     );
@@ -56,8 +69,10 @@ function renderPartContent(part: Part | null): ReactNode {
  * Mono text display mode: defaults to `wrap`, delivered to mounted mono blocks
  * through `MonoScrollSheetContext` with a presence tracker that shows the
  * `Text display` segmented control only while mono content is mounted. The
- * mode survives stream-driven re-renders and resets to `wrap` when the sheet
- * closes (visible -> false), because the host keeps the sheet mounted.
+ * mode survives stream-driven re-renders and the leave animation
+ * (`visible -> false` only starts it) and resets to `wrap` when the native
+ * dismissal reports through `onDismiss`, because the host keeps the sheet
+ * mounted. The failed-image state resets on the same report.
  *
  * While a reasoning part streams, the sheet auto-follows the growing text:
  * follow stops on drag or momentum and resumes when the user returns to the
@@ -65,21 +80,38 @@ function renderPartContent(part: Part | null): ReactNode {
  * plain `Text` instead of `SelectableText` for frame rate, then swaps back to
  * the selectable path when the part finishes.
  */
-export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
+export function PartDetailSheet({
+  visible,
+  part,
+  onClose,
+  onDismiss,
+}: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const detailTitle = part ? getPartDetailTitle(part) : null;
+  const shownText = useTranslatedToolSummary(
+    detailTitle?.text ?? t('common.details'),
+    detailTitle?.translatable ?? false,
+    part?.id
+  );
+  // The translated summary is the row's own text, so the header opens on the
+  // cached translation; only the separator and the app-copy prefix are added
+  // here. A prefixless title (reasoning, fallback) is the text alone.
+  const shownTitle = detailTitle?.prefix ? `${detailTitle.prefix}: ${shownText}` : shownText;
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);
+  const [failedImage, setFailedImage] = useState<{ partId: string; uri: string } | null>(null);
   const trackMonoBlock = useCallback(() => {
     setMonoCount(count => count + 1);
     return () => {
       setMonoCount(count => count - 1);
     };
   }, []);
-  useEffect(() => {
-    if (!visible) {
-      setTextMode('wrap');
-    }
-  }, [visible]);
+  const handleDismiss = useCallback(() => {
+    setTextMode('wrap');
+    setFailedImage(null);
+    onDismiss?.();
+  }, [onDismiss]);
   const sheetContext = useMemo(
     () => ({ mode: textMode, track: trackMonoBlock }),
     [textMode, trackMonoBlock]
@@ -88,34 +120,57 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
     enabled: visible && shouldAutoFollowPartDetail(part),
     resetKey: visible ? 'open' : 'closed',
   });
+  const attachmentUri = useToolCardImageUri(part?.id ?? '');
+  const imageFailed =
+    failedImage !== null && failedImage.partId === part?.id && failedImage.uri === attachmentUri;
+  const centered = shouldCenterPartDetail(part, attachmentUri !== undefined, imageFailed);
+  const content = (
+    <MonoScrollSheetProvider value={sheetContext}>
+      {part && isToolPart(part) ? (
+        <ToolPartDetailBody
+          part={part}
+          imageFailed={imageFailed}
+          onImageError={uri => {
+            setFailedImage({ partId: part.id, uri });
+          }}
+        />
+      ) : (
+        renderPartContent(part)
+      )}
+    </MonoScrollSheetProvider>
+  );
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={part ? getPartDetailTitle(part) : 'Details'}
-          onDone={onClose}
-          doneLabel="Done"
-        />
+    <SessionPageSheet visible={visible} onClose={onClose} onDismiss={handleDismiss} dismissible>
+      <SheetHeader
+        title={shownTitle}
+        onDone={onClose}
+        doneLabel={t('common.done')}
+        topInset="ios-page-sheet"
+      />
 
-        {monoCount > 0 ? (
-          <View className="px-4 pb-2 pt-3">
-            <SegmentedControl<MonoScrollTextMode>
-              accessibilityLabel="Text display"
-              options={MONO_SCROLL_TEXT_MODE_OPTIONS}
-              value={textMode}
-              onChange={setTextMode}
-            />
-          </View>
-        ) : null}
+      {monoCount > 0 ? (
+        <View className="px-4 pb-2 pt-3">
+          <SegmentedControl<MonoScrollTextMode>
+            accessibilityLabel={t('agentChat.partDetail.textDisplay')}
+            options={MONO_SCROLL_TEXT_MODE_OPTIONS.map(o => ({
+              value: o.value,
+              label: t(o.labelKey),
+            }))}
+            value={textMode}
+            onChange={setTextMode}
+          />
+        </View>
+      ) : null}
 
+      {centered ? (
+        <CenteredState contentContainerClassName="px-4">
+          <View className="items-center py-6">{content}</View>
+        </CenteredState>
+      ) : (
         <ScrollView
           ref={autoFollow.scrollRef}
+          className="flex-1"
           contentContainerClassName="gap-2 px-4 pb-6 pt-3"
           onScroll={autoFollow.handleScroll}
           onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
@@ -126,13 +181,11 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
           onLayout={autoFollow.handleLayout}
           scrollEventThrottle={16}
         >
-          <MonoScrollSheetProvider value={sheetContext}>
-            {renderPartContent(part)}
-          </MonoScrollSheetProvider>
+          {content}
         </ScrollView>
+      )}
 
-        <View style={{ height: insets.bottom }} className="bg-background" />
-      </View>
-    </Modal>
+      <View style={{ height: insets.bottom }} className="bg-background" />
+    </SessionPageSheet>
   );
 }

@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "វគ្គភ្នាក់ងាររបស់អ្នកមានការធ្វើបច្ចុប្បន្នភាព",
+      "lowBalance": "សមតុល្យរបស់អ្នកត្រូវការការយកចិត្តទុកដាក់",
+      "spendAlert": "ការចំណាយរបស់អ្នកត្រូវការការយកចិត្តទុកដាក់",
+      "securityFinding": "ការរកឃើញសុវត្ថិភាពត្រូវការការយកចិត្តទុកដាក់",
+      "securityUpdate": "ការត្រួតពិនិត្យសុវត្ថិភាពមានការធ្វើបច្ចុប្បន្នភាព",
+      "activeAgentsGlanceable": "ភ្នាក់ងារសកម្មមានការធ្វើបច្ចុប្បន្នភាព"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ការជូនដំណឹងសមតុល្យទាប",
+      "body": "សមតុល្យ {{organizationName}} បានធ្លាក់ក្រោម ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "ការជូនដំណឹងការចំណាយ",
+      "body": "ការចំណាយរបស់ {{scopeName}} បានលើស ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "ការព្រមាន SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "ការរំលោភ SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "វគ្គ Kilo របស់អ្នកបានត្រៀមរួចរាល់ដើម្បីគ្រប់គ្រងពីទូរសព្ទរបស់អ្នក"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

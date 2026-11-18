@@ -1,17 +1,18 @@
-import { type MarkedStyles } from 'react-native-marked';
-
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  compositeOver,
+  type TokenScheme,
+  tokenSchemeForSurface,
+} from '@/lib/pr-review/diff/syntax-colors';
 
-export type MarkdownVariant = 'assistant' | 'kilo-chat-user' | 'user';
+export type MarkdownVariant = 'assistant' | 'user';
 
 export type MarkdownPalette = {
   textColor: string;
   mutedTextColor: string;
   codeBackground: string;
   borderColor: string;
-  // The bubble surface this palette's ink is designed to sit on. Needed when
-  // palette-colored content renders outside its bubble (e.g. the table modal).
-  surfaceColor: string;
+  codeTokenScheme?: TokenScheme;
 };
 
 // Derive a translucent variant of a theme token so we can tint dividers and
@@ -35,26 +36,16 @@ function withAlpha(color: string, alpha: number): string {
 }
 
 export function getPalette(variant: MarkdownVariant, colors: ThemeColors): MarkdownPalette {
-  if (variant === 'kilo-chat-user') {
-    // kilo-chat user bubbles sit on bg-primary; use primary-foreground ink.
-    const ink = colors.primaryForeground;
-    return {
-      textColor: ink,
-      mutedTextColor: withAlpha(ink, 0.7),
-      codeBackground: withAlpha(ink, 0.1),
-      borderColor: withAlpha(ink, 0.2),
-      surfaceColor: colors.primary,
-    };
-  }
   if (variant === 'user') {
     // Agent chat user bubbles sit on accent-soft (lime); use ink-on-lime.
     const ink = colors.accentSoftForeground;
+    const codeBackground = withAlpha(ink, 0.1);
     return {
       textColor: ink,
       mutedTextColor: withAlpha(ink, 0.7),
-      codeBackground: withAlpha(ink, 0.1),
+      codeBackground,
       borderColor: withAlpha(ink, 0.2),
-      surfaceColor: colors.accentSoft,
+      codeTokenScheme: tokenSchemeForSurface(compositeOver(codeBackground, colors.accentSoft)),
     };
   }
   return {
@@ -62,59 +53,80 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
     mutedTextColor: colors.mutedForeground,
     codeBackground: colors.muted,
     borderColor: colors.border,
-    surfaceColor: colors.card,
+    codeTokenScheme: tokenSchemeForSurface(colors.muted),
   };
 }
 
-// `react-native-marked`'s `useMarkdown` takes an inline styles map rather than
-// `className`, so we cannot use NativeWind here. Centralizing style creation
-// keeps both variants in sync and makes the color choices reviewable.
-export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
-  const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
-
+export function getMarkdownHeadingStyles(palette: MarkdownPalette) {
+  const { textColor } = palette;
   return {
-    text: { color: textColor, fontSize: 16, lineHeight: 24 },
-    paragraph: { marginVertical: 2, paddingVertical: 0 },
-    strong: { color: textColor, fontWeight: '700' },
-    em: { color: textColor, fontStyle: 'italic' },
-    link: { color: textColor, fontStyle: 'normal', textDecorationLine: 'underline' },
-    h1: { color: textColor, fontSize: 22, fontWeight: '700', marginTop: 8, marginBottom: 4 },
-    h2: { color: textColor, fontSize: 20, fontWeight: '700', marginTop: 8, marginBottom: 4 },
-    h3: { color: textColor, fontSize: 18, fontWeight: '700', marginTop: 6, marginBottom: 4 },
-    h4: { color: textColor, fontSize: 16, fontWeight: '700', marginTop: 6, marginBottom: 4 },
-    h5: { color: textColor, fontSize: 15, fontWeight: '700', marginTop: 4, marginBottom: 2 },
-    h6: { color: textColor, fontSize: 14, fontWeight: '700', marginTop: 4, marginBottom: 2 },
-    // Override the library defaults that set italic + light weight on codespan.
-    codespan: {
+    h1: {
       color: textColor,
-      backgroundColor: codeBackground,
-      fontFamily: 'Menlo',
+      fontSize: 22,
+      fontWeight: '700' as const,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    h2: {
+      color: textColor,
+      fontSize: 20,
+      fontWeight: '700' as const,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    h3: {
+      color: textColor,
+      fontSize: 18,
+      fontWeight: '700' as const,
+      marginTop: 6,
+      marginBottom: 4,
+    },
+    h4: {
+      color: textColor,
+      fontSize: 16,
+      fontWeight: '700' as const,
+      marginTop: 6,
+      marginBottom: 4,
+    },
+    h5: {
+      color: textColor,
+      fontSize: 15,
+      fontWeight: '700' as const,
+      marginTop: 4,
+      marginBottom: 2,
+    },
+    h6: {
+      color: textColor,
       fontSize: 14,
-      fontStyle: 'normal',
-      fontWeight: '400',
+      fontWeight: '700' as const,
+      marginTop: 4,
+      marginBottom: 2,
     },
-    code: {
-      backgroundColor: codeBackground,
-      borderRadius: 8,
-      padding: 12,
-      marginVertical: 4,
-    },
+  };
+}
+
+export function getMarkdownHtmlTagStyles(palette: MarkdownPalette) {
+  const { textColor, borderColor } = palette;
+  // Spell the quote's start edge as the physical left edge. React Native
+  // mirrors physical left/right padding, margin, and borders under RTL
+  // (`doLeftAndRightSwapInRTL` defaults to true), so this rule lands on the
+  // right edge of an RTL layout. Choosing the physical side from `isRTL` here
+  // would double-mirror it back to the left. (`@native-html/css-processor` 2,
+  // under `@native-html/render`, also accepts the logical `borderStart*` and
+  // `paddingStart` properties its 1.x release dropped; the physical spelling
+  // stays because it already mirrors.)
+  const blockquoteStart = {
+    borderLeftWidth: 3,
+    borderLeftColor: borderColor,
+    paddingLeft: 12,
+  };
+  return {
+    a: { color: textColor, fontStyle: 'normal' as const, textDecorationLine: 'underline' as const },
     blockquote: {
-      borderLeftWidth: 3,
-      borderLeftColor: borderColor,
-      paddingLeft: 12,
+      ...blockquoteStart,
       marginVertical: 4,
     },
-    list: { marginVertical: 2 },
-    li: { color: textColor, fontSize: 16, lineHeight: 24 },
-    hr: {
-      borderBottomWidth: 1,
-      borderBottomColor: borderColor,
-      marginVertical: 8,
-    },
-    table: { borderColor, borderWidth: 1, borderRadius: 6, marginVertical: 4 },
-    tableRow: { borderColor },
-    tableCell: { borderColor },
-    strikethrough: { color: mutedTextColor, textDecorationLine: 'line-through' },
+    p: { marginVertical: 2, paddingVertical: 0 },
+    strong: { color: textColor, fontWeight: '700' as const },
   };
 }

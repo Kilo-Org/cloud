@@ -9,9 +9,19 @@ import {
   modelRefsEqual,
   remoteModelCatalogV1Schema,
   remoteModelCatalogWireV1Schema,
+  type RemoteModelCatalogWireV1,
 } from './remote-model-catalog';
 
-function createSdkModel(providerID: string, id: string, variants: string[] = [], name = id) {
+// SdkModelFixture mirrors the wire schema's model shape, so interleaved keeps
+// the boolean | { field } union the schema accepts.
+type SdkModelFixture = RemoteModelCatalogWireV1['all'][number]['models'][string];
+
+function createSdkModel(
+  providerID: string,
+  id: string,
+  variants: string[] = [],
+  name = id
+): SdkModelFixture {
   return {
     id,
     providerID,
@@ -35,13 +45,6 @@ function createSdkModel(providerID: string, id: string, variants: string[] = [],
     variants: Object.fromEntries(variants.map(variant => [variant, {}])),
   };
 }
-
-type SdkModelFixture = ReturnType<typeof createSdkModel> & {
-  recommendedIndex?: number;
-  isFree?: boolean;
-  mayTrainOnYourPrompts?: boolean;
-  hasUserByokAvailable?: boolean;
-};
 
 function createSdkProvider(
   id: string,
@@ -146,6 +149,45 @@ function createUtf8OversizedCatalog() {
 }
 
 describe('remoteModelCatalogV1Schema', () => {
+  it('keeps models available when the CLI reports no provider failures', () => {
+    const catalog = remoteModelCatalogV1Schema.parse({
+      ...createWireCatalog([createSdkProvider('kilo')]),
+      failures: [],
+    });
+
+    expect(catalog.providers[0]?.models[0]?.id).toBe('model-kilo');
+  });
+
+  it.each([
+    { failures: [{ providerID: 'kilo', error: 'unavailable' }] },
+    { failures: ['kilo'] },
+    { failures: null },
+  ])('rejects unsanitized provider failure details: %j', ({ failures }) => {
+    expect(
+      remoteModelCatalogWireV1Schema.safeParse({
+        ...createWireCatalog([createSdkProvider('kilo')]),
+        failures,
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts CLI interleaved field names the picker does not use', () => {
+    const fields = ['reasoning', 'reasoning_content', 'reasoning_details', 'reasoning_text'];
+
+    for (const field of fields) {
+      const model = createSdkModel('kilo', 'muse-spark-1.3-contributor');
+      model.capabilities = { ...model.capabilities, interleaved: { field } };
+      const parsed = remoteModelCatalogV1Schema.safeParse(
+        createWireCatalog([createSdkProvider('kilo', [model])])
+      );
+
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.providers[0]?.models[0]?.id).toBe('muse-spark-1.3-contributor');
+      }
+    }
+  });
+
   it('normalizes the SDK ProviderListResponse shape without rewriting model identities', () => {
     const model: SdkModelFixture = createSdkModel(
       'custom/provider:v1',
@@ -182,7 +224,7 @@ describe('remoteModelCatalogV1Schema', () => {
               name: 'Team model',
               variants: ['reasoning/high'],
               recommendedIndex: 4,
-              isFree: true,
+              isFree: false,
               mayTrainOnYourPrompts: false,
               hasUserByokAvailable: true,
               capabilities: { attachment: true, reasoning: true },
@@ -194,6 +236,36 @@ describe('remoteModelCatalogV1Schema', () => {
       currentModel: wire.currentModel,
       defaultModel: wire.defaultModel,
       truncated: false,
+    });
+  });
+
+  it('forces BYOK-enabled models to be non-free without changing other free flags', () => {
+    const models = [
+      { ...createSdkModel('kilo', 'byok-free'), isFree: true, hasUserByokAvailable: true },
+      { ...createSdkModel('kilo', 'byok-unspecified-free'), hasUserByokAvailable: true },
+      { ...createSdkModel('kilo', 'free-byok-false'), isFree: true, hasUserByokAvailable: false },
+      { ...createSdkModel('kilo', 'free-byok-undefined'), isFree: true },
+      { ...createSdkModel('kilo', 'paid-byok-false'), isFree: false, hasUserByokAvailable: false },
+      { ...createSdkModel('kilo', 'paid-byok-undefined'), isFree: false },
+    ] satisfies SdkModelFixture[];
+    const parsed = remoteModelCatalogV1Schema.parse(
+      createWireCatalog([createSdkProvider('kilo', models)])
+    );
+
+    expect(
+      Object.fromEntries(
+        parsed.providers[0]?.models.map(model => [
+          model.id,
+          [model.isFree, model.hasUserByokAvailable],
+        ]) ?? []
+      )
+    ).toEqual({
+      'byok-free': [false, true],
+      'byok-unspecified-free': [false, true],
+      'free-byok-false': [true, false],
+      'free-byok-undefined': [true, undefined],
+      'paid-byok-false': [false, false],
+      'paid-byok-undefined': [false, undefined],
     });
   });
 

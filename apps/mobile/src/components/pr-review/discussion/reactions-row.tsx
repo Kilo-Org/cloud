@@ -11,14 +11,17 @@
 // makes pills non-pressable and hides the add icon entirely; a
 // zero-pill read-only row renders null.
 
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { SmilePlus } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Pressable, View, type ViewInstance } from 'react-native';
 
 import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { i18n } from '@/i18n';
+import { requestA11yFocus } from '@/lib/a11y/announce';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REACTION_EMOJI, selectReactionPills } from '@/lib/pr-review/discussion/reaction-pills';
 import { type ReviewReactionContent } from '@/lib/pr-review/discussion/review-discussion-types';
@@ -59,8 +62,9 @@ export function ReactionsRow({
   readOnly,
 }: Readonly<ReactionsRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const addReactionRef = useRef<View>(null);
+  const addReactionRef = useRef<ViewInstance>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pills = selectReactionPills(reactions);
   const isDisabled = Boolean(disabled);
@@ -72,7 +76,7 @@ export function ReactionsRow({
   // sheet's `visible` off, then returns screen-reader focus to the trigger
   // once the slide-out has run. Reopening cancels a pending restore, so a
   // fast close-reopen never pulls focus to the trigger behind the sheet. An
-  // unmounted row needs no cleanup: `moveA11yFocus` no-ops on an empty ref.
+  // unmounted row needs no cleanup: `requestA11yFocus` no-ops on an empty ref.
   function openPicker() {
     clearTimeout(focusTimerRef.current);
     setPickerOpen(true);
@@ -81,7 +85,7 @@ export function ReactionsRow({
   function closePicker() {
     setPickerOpen(false);
     focusTimerRef.current = setTimeout(() => {
-      moveA11yFocus(addReactionRef);
+      requestA11yFocus(addReactionRef);
     }, SHEET_DISMISS_ANIMATION_MS);
   }
 
@@ -99,7 +103,7 @@ export function ReactionsRow({
           viewerHasReacted={pill.viewerHasReacted}
           disabled={pillDisabled}
           onPress={() => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             onToggle(pill.content);
           }}
         />
@@ -108,11 +112,11 @@ export function ReactionsRow({
         <Pressable
           ref={addReactionRef}
           accessibilityRole="button"
-          accessibilityLabel="Add reaction"
+          accessibilityLabel={t('prReview.discussion.addReaction')}
           accessibilityState={{ disabled: isDisabled }}
           disabled={isDisabled}
           onPress={() => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             openPicker();
           }}
           hitSlop={ADD_REACTION_HIT_SLOP}
@@ -129,7 +133,7 @@ export function ReactionsRow({
         reactions={reactions}
         onClose={closePicker}
         onPick={content => {
-          void Haptics.selectionAsync();
+          selectionHaptic();
           onToggle(content);
           closePicker();
         }}
@@ -153,6 +157,7 @@ function ReactionPill({
   disabled,
   onPress,
 }: Readonly<ReactionPillProps>) {
+  const { t } = useTranslation();
   // Reacted pills get the accent-soft fill (same as the rest of the
   // product's "active toggle" surface) so they read as selected in
   // both light and dark themes. Unreacted pills use a flat border
@@ -168,7 +173,12 @@ function ReactionPill({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${emoji} reaction, ${count} ${count === 1 ? 'reaction' : 'reactions'}`}
+      accessibilityLabel={t('prReview.discussion.reactionPill', {
+        emoji,
+        count,
+        displayCount: formatNumber(count, i18n.language),
+        countLabel: t('prReview.discussion.reaction', { count }),
+      })}
       accessibilityState={{ selected: viewerHasReacted, disabled }}
       onPress={onPress}
       disabled={disabled}
@@ -186,7 +196,7 @@ function ReactionPill({
           viewerHasReacted ? 'text-accent-soft-foreground' : 'text-muted-foreground'
         )}
       >
-        {count}
+        {formatNumber(count, i18n.language)}
       </Text>
     </Pressable>
   );

@@ -58,8 +58,25 @@ import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from './session-events';
 import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
 import { computeSessionMetadataUpdates } from './ingest/metadata';
+import { INGEST_CHUNK_MAX_BYTES } from './util/ingest-limits';
 
 const encoder = new TextEncoder();
+
+function mockIngestWithR2(ingest: ReturnType<typeof vi.fn>) {
+  vi.mocked(getSessionIngestDO).mockImplementation(
+    env =>
+      ({
+        ingest,
+        stageR2Object: async (
+          params: { key: string },
+          body: ReadableStream<Uint8Array> | Uint8Array
+        ) => {
+          await env.SESSION_INGEST_R2.put(params.key, body);
+          return true;
+        },
+      }) as never
+  );
+}
 
 function feedAll(extractor: ReturnType<typeof createItemExtractor>, json: string) {
   extractor.tokenizer.write(encoder.encode(json));
@@ -93,10 +110,8 @@ describe('createItemExtractor', () => {
   });
 
   it('skips oversized items (byte budget)', () => {
-    // MAX_SINGLE_ITEM_BYTES is mocked to 500
     const ext = createItemExtractor('test-key');
 
-    // Create an item that exceeds 500 bytes
     const bigValue = 'x'.repeat(600);
     const payload = JSON.stringify({
       data: [
@@ -107,13 +122,11 @@ describe('createItemExtractor', () => {
 
     feedAll(ext, payload);
 
-    // The oversized item should be skipped, but the small one should parse
     expect(ext.pending).toHaveLength(1);
     expect(ext.pending[0]).toEqual({ type: 'small', data: { ok: true } });
   });
 
   it('clears skippingItem when oversize item ends on closing brace', () => {
-    // MAX_SINGLE_ITEM_BYTES is mocked to 500
     const ext = createItemExtractor('test-key');
 
     // A flat object (no nested braces) that exceeds budget — the closing }
@@ -125,7 +138,6 @@ describe('createItemExtractor', () => {
 
     feedAll(ext, payload);
 
-    // The first item is oversized and skipped; the second should parse fine
     expect(ext.pending).toHaveLength(1);
     expect(ext.pending[0]).toEqual({ type: 'after', ok: true });
   });
@@ -133,7 +145,6 @@ describe('createItemExtractor', () => {
   it('sets parseError on malformed JSON', () => {
     const ext = createItemExtractor('test-key');
 
-    // Feed invalid JSON
     ext.tokenizer.write(encoder.encode('{ data: ['));
     ext.tokenizer.end();
 
@@ -215,7 +226,7 @@ describe('queue', () => {
 
   it('passes a slim oversized message and its R2 reference into ingest', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_compacted' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -227,7 +238,7 @@ describe('queue', () => {
       content: 'x'.repeat(150),
     };
     const body = JSON.stringify({ data: [{ type: 'message', data }] });
-    const put = vi.fn(async () => undefined);
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
     const deleteObject = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
@@ -262,7 +273,8 @@ describe('queue', () => {
     );
 
     const expectedR2Key = 'items/usr_compacted/ses_compacted/message/msg_compacted/456';
-    expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(data));
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(data));
     expect(ingest).toHaveBeenCalledWith(
       [{ type: 'message', data: { id: 'msg_compacted' } }],
       'usr_compacted',
@@ -276,9 +288,141 @@ describe('queue', () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
+  it('passes a slim oversized kilo_meta and its R2 reference into ingest', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    mockIngestWithR2(ingest);
+    const limit = vi.fn(async () => [{ session_id: 'ses_meta' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+    // Data above MAX_INGEST_ITEM_BYTES (100) but within MAX_SINGLE_ITEM_BYTES (500), so the
+    // item reaches the projection path instead of being skipped during streaming.
+    const data = { platform: 'x'.repeat(100) };
+    const body = JSON.stringify({ data: [{ type: 'kilo_meta', data }] });
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put,
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/meta',
+              kiloUserId: 'usr_meta',
+              sessionId: 'ses_meta',
+              ingestVersion: 1,
+              ingestedAt: 456,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    const expectedR2Key = 'items/usr_meta/ses_meta/kilo_meta/456';
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(data));
+    expect(ingest).toHaveBeenCalledTimes(1);
+    const [sentItems] = ingest.mock.calls[0] as unknown as [Array<{ data: unknown }>];
+    expect(sentItems).toEqual([{ type: 'kilo_meta', data }]);
+    // The DO keeps its metadata source bounded: the projection is the parsed item's
+    // bounded fields, and the RPC payload stays far inside the chunk budget.
+    expect(encoder.encode(JSON.stringify(sentItems)).byteLength).toBeLessThan(
+      INGEST_CHUNK_MAX_BYTES
+    );
+    expect(ingest).toHaveBeenCalledWith(
+      [{ type: 'kilo_meta', data }],
+      'usr_meta',
+      'ses_meta',
+      1,
+      456,
+      { kilo_meta: expectedR2Key }
+    );
+    expect(deleteObject).toHaveBeenCalledWith('staging/meta');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('passes a slim oversized session_status and its R2 reference into ingest', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    mockIngestWithR2(ingest);
+    const limit = vi.fn(async () => [{ session_id: 'ses_status' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+    const data = { status: 'x'.repeat(100), previousStatus: 'busy' };
+    const body = JSON.stringify({ data: [{ type: 'session_status', data }] });
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put,
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/status',
+              kiloUserId: 'usr_status',
+              sessionId: 'ses_status',
+              ingestVersion: 1,
+              ingestedAt: 456,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    const expectedR2Key = 'items/usr_status/ses_status/session_status/456';
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(data));
+    expect(ingest).toHaveBeenCalledTimes(1);
+    const [sentItems] = ingest.mock.calls[0] as unknown as [Array<{ data: unknown }>];
+    expect(sentItems).toEqual([{ type: 'session_status', data }]);
+    expect(encoder.encode(JSON.stringify(sentItems)).byteLength).toBeLessThan(
+      INGEST_CHUNK_MAX_BYTES
+    );
+    expect(ingest).toHaveBeenCalledWith(
+      [{ type: 'session_status', data }],
+      'usr_status',
+      'ses_status',
+      1,
+      456,
+      { session_status: expectedR2Key }
+    );
+    expect(deleteObject).toHaveBeenCalledWith('staging/status');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
   it('splits duplicate item identities so inline updates do not reuse prior R2 refs', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_duplicate' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -289,7 +433,7 @@ describe('queue', () => {
     const oversizedItem = { type: 'message', data: oversizedData };
     const inlineItem = { type: 'message', data: inlineData };
     const body = JSON.stringify({ data: [oversizedItem, inlineItem] });
-    const put = vi.fn(async () => undefined);
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
     const deleteObject = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
@@ -323,7 +467,8 @@ describe('queue', () => {
     );
 
     const expectedR2Key = 'items/usr_duplicate/ses_duplicate/message/msg_same/1';
-    expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(oversizedData));
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(oversizedData));
     expect(ingest).toHaveBeenCalledTimes(2);
     expect(ingest).toHaveBeenNthCalledWith(
       1,
@@ -350,7 +495,7 @@ describe('queue', () => {
 
   it('batches all items in a message into a single DO ingest call', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_batch' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -405,7 +550,7 @@ describe('queue', () => {
     const ingest = vi.fn(
       async () => ({ accepted: false, reason: 'deleted', changes: [] }) as const
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_tombstoned' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -462,7 +607,7 @@ describe('queue', () => {
     const ingest = vi.fn(
       async () => ({ accepted: false, reason: 'deleted', changes: [] }) as const
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_tombstoned_tail' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -515,7 +660,7 @@ describe('queue', () => {
     const ingest = vi.fn(
       async () => ({ accepted: false, reason: 'deleted', changes: [] }) as const
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_tombstoned_duplicate' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -568,7 +713,7 @@ describe('queue', () => {
         ? { changes: [{ name: 'title', value: 'Hello' }] }
         : { changes: [{ name: 'gitBranch', value: 'main' }] }
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     const transaction = vi.fn(async () => null);
     const limit = vi.fn(async () => [{ session_id: 'ses_split' }]);
@@ -643,7 +788,7 @@ describe('queue', () => {
     const ingest = vi.fn(async () => {
       throw new Error('Durable Object is overloaded.');
     });
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_overload' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -691,7 +836,7 @@ describe('queue', () => {
     const ingest = vi.fn(async () => {
       throw new Error('Durable Object is overloaded.');
     });
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     const limit = vi.fn(async () => [{ session_id: 'ses_cancel' }]);
     const where = vi.fn(() => ({ limit }));
@@ -747,9 +892,9 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it('does not flush buffered items when malformed JSON forces a retry', async () => {
+  it('answers a request whose payload is not JSON', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     const transaction = vi.fn(async () => null);
     const limit = vi.fn(async () => [{ session_id: 'ses_malformed' }]);
@@ -770,6 +915,7 @@ describe('queue', () => {
     } as never;
     const ack = vi.fn();
     const retry = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await queue(
       {
@@ -782,6 +928,7 @@ describe('queue', () => {
               ingestVersion: 1,
               ingestedAt: 1,
             },
+            attempts: 2,
             ack,
             retry,
           },
@@ -793,9 +940,14 @@ describe('queue', () => {
 
     expect(ingest).not.toHaveBeenCalled();
     expect(transaction).not.toHaveBeenCalled();
-    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
-    expect(ack).not.toHaveBeenCalled();
-    expect(deleteObject).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(deleteObject).toHaveBeenCalledWith('staging/malformed');
+    expect(error).toHaveBeenCalledWith(
+      'Staged ingest object is not parseable JSON; object removed and message acknowledged',
+      expect.objectContaining({ r2Key: 'staging/malformed' })
+    );
+    error.mockRestore();
   });
 
   it('flushes already-committed metadata changes when a later chunk fails', async () => {
@@ -809,7 +961,7 @@ describe('queue', () => {
       if (ingestCalls === 1) return { changes: [{ name: 'title', value: 'Hello' }] };
       throw new Error('Durable Object is overloaded.');
     });
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     // db.select powers the session-exists guard; db.transaction is the metadata flush.
     const transaction = vi.fn(async () => null);
@@ -848,6 +1000,7 @@ describe('queue', () => {
               ingestVersion: 1,
               ingestedAt: 1,
             },
+            attempts: 2,
             ack,
             retry,
           },
@@ -866,6 +1019,62 @@ describe('queue', () => {
     expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     expect(ack).not.toHaveBeenCalled();
     expect(deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('keeps the staged object when the last attempt fails so a dead-lettered message can be replayed', async () => {
+    const ingest = vi.fn(async () => {
+      throw new Error('Durable Object is overloaded.');
+    });
+    mockIngestWithR2(ingest);
+
+    const transaction = vi.fn(async () => null);
+    const limit = vi.fn(async () => [{ session_id: 'ses_last_attempt' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
+
+    const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/last_attempt',
+              kiloUserId: 'usr_last_attempt',
+              sessionId: 'ses_last_attempt',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            // Past the consumer's configured retry cap: the delivery that
+            // dead-letters the message.
+            attempts: 4,
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(deleteObject).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });
 
@@ -934,7 +1143,7 @@ describe('queue session_pr_link', () => {
     ingestChanges: Array<{ name: string; value: string | null }>;
   }) {
     const ingest = vi.fn(async () => ({ changes: params.ingestChanges }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const transaction = vi.fn(async () => null);
     const limit = vi.fn(async () => [{ session_id: 'ses_prlink' }]);
     const where = vi.fn(() => ({ limit }));
@@ -1252,7 +1461,7 @@ describe('remote session attention notifications', () => {
   }) {
     const ingest =
       params.ingest ?? vi.fn(async () => ({ changes: [], attentionSignals: [attentionSignal] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     // A single session lookup serves both the deleted-session guard and push eligibility.
     const limit = vi.fn(async () => [{ session_id: 'ses_remote', ...params.sessionRow }]);
@@ -1570,7 +1779,6 @@ describe('agent_notification attention signals', () => {
     const { ack } = await runAgentNotificationQueue(env);
 
     expect(ack).toHaveBeenCalledTimes(1);
-    // Invalid item was dropped before reaching the DO ingest.
     expect(ingest).toHaveBeenCalledWith(
       [{ type: 'agent_notification', data: { id: 'note_ok', message: 'OK' } }],
       'usr_agent',

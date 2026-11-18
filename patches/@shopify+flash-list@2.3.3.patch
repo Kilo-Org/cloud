@@ -1,0 +1,413 @@
+diff --git a/dist/recyclerview/RecyclerView.js b/dist/recyclerview/RecyclerView.js
+index 6799c8a61bff4607633196097da35c7a6975f0b6..7199f241b409ba100cbc042ee531249e1a821891 100644
+--- a/dist/recyclerview/RecyclerView.js
++++ b/dist/recyclerview/RecyclerView.js
+@@ -241,7 +241,13 @@ const RecyclerViewComponent = (props, ref) => {
+      */
+     const validateItemSize = useCallback((index, size) => {
+         var _a, _b, _c, _d;
+-        const layout = recyclerViewManager.getLayout(index);
++        // A ViewHolder reports its size after it lays out, which can arrive after
++        // the layout table has shrunk past the index it was rendered with. There
++        // is no layout left to validate the measurement against, so drop it.
++        const layout = recyclerViewManager.tryGetLayout(index);
++        if (layout === undefined) {
++            return;
++        }
+         const width = Math.max(Math.min(layout.width, (_a = layout.maxWidth) !== null && _a !== void 0 ? _a : Infinity), (_b = layout.minWidth) !== null && _b !== void 0 ? _b : 0);
+         const height = Math.max(Math.min(layout.height, (_c = layout.maxHeight) !== null && _c !== void 0 ? _c : Infinity), (_d = layout.minHeight) !== null && _d !== void 0 ? _d : 0);
+         if (areDimensionsNotEqual(width, size.width) ||
+@@ -359,7 +365,7 @@ const RecyclerViewComponent = (props, ref) => {
+                 isHorizontalRTL && viewToMeasureBoundedSize,
+                 renderHeader,
+                 !isHorizontalRTL && viewToMeasureBoundedSize,
+-                React.createElement(ViewHolderCollection, { viewHolderCollectionRef: viewHolderCollectionRef, data: data, horizontal: horizontal, renderStack: recyclerViewManager.getRenderStack(), getLayout: (index) => recyclerViewManager.getLayout(index), getAdjustmentMargin: () => {
++                React.createElement(ViewHolderCollection, { viewHolderCollectionRef: viewHolderCollectionRef, data: data, horizontal: horizontal, renderStack: recyclerViewManager.getRenderStack(), getLayout: (index) => recyclerViewManager.tryGetLayout(index), getAdjustmentMargin: () => {
+                         if (!shouldRenderFromBottom || !recyclerViewManager.hasLayout()) {
+                             return 0;
+                         }
+diff --git a/dist/recyclerview/RecyclerViewManager.js b/dist/recyclerview/RecyclerViewManager.js
+index 1aa651d9d985a36d3c6ef69f20407f51ca0e3e6f..8e1ad7923d29562cfdb9f11a06fa275c88ccd61d 100644
+--- a/dist/recyclerview/RecyclerViewManager.js
++++ b/dist/recyclerview/RecyclerViewManager.js
+@@ -267,7 +267,17 @@ export class RecyclerViewManager {
+     }
+     getDataKey(index) {
+         var _a, _b, _c;
+-        return ((_c = (_b = (_a = this.propsRef).keyExtractor) === null || _b === void 0 ? void 0 : _b.call(_a, this.propsRef.data[index], index)) !== null && _c !== void 0 ? _c : index.toString());
++        // The list reads this key from the engaged range and from the
++        // maintainVisibleContentPosition anchor, and both can still name an
++        // index past the end of a data set that just shrank. Answer with the
++        // index for an item that is not there, like the viewability manager
++        // does, so the list's keyExtractor is never handed an undefined item.
++        const data = this.propsRef.data;
++        const item = data === null || data === void 0 ? void 0 : data[index];
++        if (item === undefined) {
++            return index.toString();
++        }
++        return ((_c = (_b = (_a = this.propsRef).keyExtractor) === null || _b === void 0 ? void 0 : _b.call(_a, item, index)) !== null && _c !== void 0 ? _c : index.toString());
+     }
+     getLayoutManagerClass() {
+         // throw errors for incompatible props
+@@ -333,7 +343,14 @@ export class RecyclerViewManager {
+     }
+     getItemType(index) {
+         var _a, _b, _c;
+-        return ((_c = (_b = (_a = this.propsRef).getItemType) === null || _b === void 0 ? void 0 : _b.call(_a, this.propsRef.data[index], index)) !== null && _c !== void 0 ? _c : "default").toString();
++        // Same stale index as `getDataKey`: an item that is not there has no
++        // type to ask about, and the list's own default is the honest answer.
++        const data = this.propsRef.data;
++        const item = data === null || data === void 0 ? void 0 : data[index];
++        if (item === undefined) {
++            return "default";
++        }
++        return ((_c = (_b = (_a = this.propsRef).getItemType) === null || _b === void 0 ? void 0 : _b.call(_a, item, index)) !== null && _c !== void 0 ? _c : "default").toString();
+     }
+     overrideItemLayout(index, layout) {
+         var _a, _b;
+diff --git a/dist/recyclerview/RenderStackManager.js b/dist/recyclerview/RenderStackManager.js
+index 9cd6cd739bfa8440f8d18f47ddb0d637a15ac5b3..00c2d5855f7cf1e0880492a59854dc57d62bcf9f 100644
+--- a/dist/recyclerview/RenderStackManager.js
++++ b/dist/recyclerview/RenderStackManager.js
+@@ -54,12 +54,28 @@ export class RenderStackManager {
+         });
+         // First pass: process items that already have optimized keys
+         for (const index of engagedIndices) {
++            // The engaged range is computed from the layout manager, so it can
++            // still name indices past the end of a data set that just shrank.
++            // Bound it exactly like the retained-key pass above; otherwise the
++            // stable-id and item-type lookups below read past the data and hand
++            // the list's keyExtractor an undefined item.
++            if (index >= dataLength) {
++                continue;
++            }
+             if (this.hasOptimizedKey(getStableId(index))) {
+                 this.syncItem(index, getItemType(index), getStableId(index));
+             }
+         }
+         // Second pass: process remaining items that need new keys
+         for (const index of engagedIndices) {
++            // The engaged range is computed from the layout manager, so it can
++            // still name indices past the end of a data set that just shrank.
++            // Bound it exactly like the retained-key pass above; otherwise the
++            // stable-id and item-type lookups below read past the data and hand
++            // the list's keyExtractor an undefined item.
++            if (index >= dataLength) {
++                continue;
++            }
+             if (!this.hasOptimizedKey(getStableId(index))) {
+                 this.syncItem(index, getItemType(index), getStableId(index));
+             }
+diff --git a/dist/recyclerview/ViewHolderCollection.d.ts b/dist/recyclerview/ViewHolderCollection.d.ts
+index c37c4f3e90272449a21e499d51c1387416425dc1..57175a4d17432c5c617ba1bbdb14ebf39cb7e666 100644
+--- a/dist/recyclerview/ViewHolderCollection.d.ts
++++ b/dist/recyclerview/ViewHolderCollection.d.ts
+@@ -18,8 +18,12 @@ export interface ViewHolderCollectionProps<TItem> {
+     renderStack: Map<string, {
+         index: number;
+     }>;
+-    /** Function to get layout information for a specific index */
+-    getLayout: (index: number) => RVLayout;
++    /**
++     * Function to get layout information for a specific index.
++     * Undefined when the index is no longer in the layout table: a render stack
++     * entry can outlive a layout table shrink, and reading it must not throw.
++     */
++    getLayout: (index: number) => RVLayout | undefined;
+     /** Ref to control layout updates from parent components */
+     viewHolderCollectionRef: React.Ref<ViewHolderCollectionRef>;
+     /** Map to store refs for each ViewHolder instance */
+diff --git a/dist/recyclerview/ViewHolderCollection.js b/dist/recyclerview/ViewHolderCollection.js
+index 8e3db51b445ff1826368354c355e2c46142b5f3c..dfc5c9fd12dbd8f16abd97d1287604e99c2e1be7 100644
+--- a/dist/recyclerview/ViewHolderCollection.js
++++ b/dist/recyclerview/ViewHolderCollection.js
+@@ -20,6 +20,30 @@ export const ViewHolderCollection = (props) => {
+         ? containerLayout === null || containerLayout === void 0 ? void 0 : containerLayout.height
+         : containerLayout === null || containerLayout === void 0 ? void 0 : containerLayout.width;
+     const recyclerViewContext = useRecyclerViewContext();
++    const hasData = data && data.length > 0;
++    /**
++     * Everything the rendered collection is drawn from: the container's size and
++     * the key, index and box of every row. The parent re-renders this collection
++     * on each of its own commits, so an unchanged description means that commit
++     * would draw the same native tree.
++     */
++    const describeRenderedRows = () => {
++        if (!containerLayout || !hasData) {
++            return "none";
++        }
++        const rows = Array.from(renderStack.entries(), ([reactKey, { index }]) => {
++            const layout = getLayout(index);
++            return layout === undefined
++                ? undefined
++                : `${reactKey}:${index}:${layout.x}:${layout.y}:${layout.width}:${layout.height}`;
++        }).filter((row) => row !== undefined);
++        return `${containerLayout.width}x${containerLayout.height}/${rows.join("|")}`;
++    };
++    // The description the collection drew last, or undefined before it drew one.
++    const committedRowsRef = React.useRef(undefined);
++    useLayoutEffect(() => {
++        committedRowsRef.current = describeRenderedRows();
++    });
+     useLayoutEffect(() => {
+         if (renderId > 0) {
+             // console.log(
+@@ -48,11 +72,21 @@ export const ViewHolderCollection = (props) => {
+     // Expose forceUpdate through ref
+     useImperativeHandle(viewHolderCollectionRef, () => ({
+         commitLayout: () => {
++            // The parent asks for this after its own layout pass, which leaves the
++            // layout table unchanged on most commits. Bumping the render state for
++            // a description this collection already drew only asks the parent for
++            // another commit, and it answers on every pass, so the two effects
++            // re-enter each other until React's nested update limit stops them.
++            // The first commit is still the one that paints the rows and reports
++            // the collection's layout, so it always runs.
++            if (renderId > 0 &&
++                describeRenderedRows() === committedRowsRef.current) {
++                return;
++            }
+             // This will trigger a re-render of the component
+             setRenderId((prev) => prev + 1);
+         },
+-    }), [setRenderId]);
+-    const hasData = data && data.length > 0;
++    }), [renderId, containerLayout, renderStack, getLayout, hasData]);
+     const containerStyle = {
+         width: horizontal ? containerLayout === null || containerLayout === void 0 ? void 0 : containerLayout.width : undefined,
+         height: containerLayout === null || containerLayout === void 0 ? void 0 : containerLayout.height,
+@@ -75,6 +109,13 @@ export const ViewHolderCollection = (props) => {
+     return (React.createElement(CompatView, { style: hasData && containerStyle }, containerLayout &&
+         hasData &&
+         Array.from(renderStack.entries(), ([reactKey, { index }]) => {
++            const layout = getLayout(index);
++            if (layout === undefined) {
++                // The layout table shrank below a render stack entry that still
++                // names its index. The next stack sync reuses the key, and there is
++                // nothing to draw for it now.
++                return null;
++            }
+             const item = data[index];
+             // Suppress separators for items in the last row to prevent
+             // height mismatch. The last data item has no separator (no
+@@ -83,7 +124,7 @@ export const ViewHolderCollection = (props) => {
+                 ? data[index + 1]
+                 : undefined;
+             return (React.createElement(ViewHolder, { key: reactKey, index: index, item: item, trailingItem: trailingItem, layout: {
+-                    ...getLayout(index),
++                    ...layout,
+                 }, refHolder: refHolder, onSizeChanged: onSizeChanged, target: "Cell", renderItem: renderItem, extraData: extraData, CellRendererComponent: CellRendererComponent, ItemSeparatorComponent: ItemSeparatorComponent, horizontal: horizontal, hidden: hideStickyHeaderRelatedCell && currentStickyIndex === index, inverted: inverted }));
+         })));
+ };
+diff --git a/src/recyclerview/RecyclerView.tsx b/src/recyclerview/RecyclerView.tsx
+index 3c25e7e893004932b8a13072e01fe2a940d365d4..a0196ee3aae62dec5a2f0f0a4015b18abcdc60c6 100644
+--- a/src/recyclerview/RecyclerView.tsx
++++ b/src/recyclerview/RecyclerView.tsx
+@@ -374,7 +374,13 @@ const RecyclerViewComponent = <T,>(
+    */
+   const validateItemSize = useCallback(
+     (index: number, size: RVDimension) => {
+-      const layout = recyclerViewManager.getLayout(index);
++      // A ViewHolder reports its size after it lays out, which can arrive after
++      // the layout table has shrunk past the index it was rendered with. There
++      // is no layout left to validate the measurement against, so drop it.
++      const layout = recyclerViewManager.tryGetLayout(index);
++      if (layout === undefined) {
++        return;
++      }
+       const width = Math.max(
+         Math.min(layout.width, layout.maxWidth ?? Infinity),
+         layout.minWidth ?? 0
+@@ -586,7 +592,7 @@ const RecyclerViewComponent = <T,>(
+             data={data}
+             horizontal={horizontal}
+             renderStack={recyclerViewManager.getRenderStack()}
+-            getLayout={(index) => recyclerViewManager.getLayout(index)}
++            getLayout={(index) => recyclerViewManager.tryGetLayout(index)}
+             getAdjustmentMargin={() => {
+               if (!shouldRenderFromBottom || !recyclerViewManager.hasLayout()) {
+                 return 0;
+diff --git a/src/recyclerview/RecyclerViewManager.ts b/src/recyclerview/RecyclerViewManager.ts
+index 41704d03e807f962c17ca8d008738c7a387d9b2a..8af474d8cf080b9b01a6248bf95d20053538800c 100644
+--- a/src/recyclerview/RecyclerViewManager.ts
++++ b/src/recyclerview/RecyclerViewManager.ts
+@@ -352,10 +352,16 @@ export class RecyclerViewManager<T> {
+   }
+ 
+   getDataKey(index: number): string {
+-    return (
+-      this.propsRef.keyExtractor?.(this.propsRef.data![index], index) ??
+-      index.toString()
+-    );
++    // The list reads this key from the engaged range and from the
++    // maintainVisibleContentPosition anchor, and both can still name an index
++    // past the end of a data set that just shrank. Answer with the index for
++    // an item that is not there, like the viewability manager does, so the
++    // list's keyExtractor is never handed an undefined item to dereference.
++    const item = this.propsRef.data?.[index];
++    if (item === undefined) {
++      return index.toString();
++    }
++    return this.propsRef.keyExtractor?.(item, index) ?? index.toString();
+   }
+ 
+   private getLayoutManagerClass() {
+@@ -440,10 +446,13 @@ export class RecyclerViewManager<T> {
+   }
+ 
+   private getItemType(index: number): string {
+-    return (
+-      this.propsRef.getItemType?.(this.propsRef.data![index], index) ??
+-      "default"
+-    ).toString();
++    // Same stale index as `getDataKey`: an item that is not there has no type
++    // to ask about, and the list's own default is the honest answer.
++    const item = this.propsRef.data?.[index];
++    if (item === undefined) {
++      return "default";
++    }
++    return (this.propsRef.getItemType?.(item, index) ?? "default").toString();
+   }
+ 
+   private overrideItemLayout(index: number, layout: SpanSizeInfo) {
+diff --git a/src/recyclerview/RenderStackManager.ts b/src/recyclerview/RenderStackManager.ts
+index a2ccc530f982a99648581a7ad2fe20416f2fd731..f2a69df265e70ebce10d5aed1cf11241768c3817 100644
+--- a/src/recyclerview/RenderStackManager.ts
++++ b/src/recyclerview/RenderStackManager.ts
+@@ -85,6 +85,14 @@ export class RenderStackManager {
+ 
+     // First pass: process items that already have optimized keys
+     for (const index of engagedIndices) {
++      // The engaged range is computed from the layout manager, so it can still
++      // name indices past the end of a data set that just shrank. Bound it
++      // exactly like the retained-key pass above; otherwise the stable-id and
++      // item-type lookups below read past the data and hand the list's
++      // keyExtractor an undefined item.
++      if (index >= dataLength) {
++        continue;
++      }
+       if (this.hasOptimizedKey(getStableId(index))) {
+         this.syncItem(index, getItemType(index), getStableId(index));
+       }
+@@ -92,6 +100,14 @@ export class RenderStackManager {
+ 
+     // Second pass: process remaining items that need new keys
+     for (const index of engagedIndices) {
++      // The engaged range is computed from the layout manager, so it can still
++      // name indices past the end of a data set that just shrank. Bound it
++      // exactly like the retained-key pass above; otherwise the stable-id and
++      // item-type lookups below read past the data and hand the list's
++      // keyExtractor an undefined item.
++      if (index >= dataLength) {
++        continue;
++      }
+       if (!this.hasOptimizedKey(getStableId(index))) {
+         this.syncItem(index, getItemType(index), getStableId(index));
+       }
+diff --git a/src/recyclerview/ViewHolderCollection.tsx b/src/recyclerview/ViewHolderCollection.tsx
+index a652beb166da2f4b8f2bfdb796e06a0501ea09d3..456964c7162482dbc5c92c5fbc4dccfc1842605c 100644
+--- a/src/recyclerview/ViewHolderCollection.tsx
++++ b/src/recyclerview/ViewHolderCollection.tsx
+@@ -22,8 +22,12 @@ export interface ViewHolderCollectionProps<TItem> {
+   data: FlashListProps<TItem>["data"];
+   /** Map of indices to React keys for each rendered item */
+   renderStack: Map<string, { index: number }>;
+-  /** Function to get layout information for a specific index */
+-  getLayout: (index: number) => RVLayout;
++  /**
++   * Function to get layout information for a specific index.
++   * Undefined when the index is no longer in the layout table: a render stack
++   * entry can outlive a layout table shrink, and reading it must not throw.
++   */
++  getLayout: (index: number) => RVLayout | undefined;
+   /** Ref to control layout updates from parent components */
+   viewHolderCollectionRef: React.Ref<ViewHolderCollectionRef>;
+   /** Map to store refs for each ViewHolder instance */
+@@ -108,6 +112,34 @@ export const ViewHolderCollection = <TItem,>(
+ 
+   const recyclerViewContext = useRecyclerViewContext();
+ 
++  const hasData = data && data.length > 0;
++
++  /**
++   * Everything the rendered collection is drawn from: the container's size and
++   * the key, index and box of every row. The parent re-renders this collection
++   * on each of its own commits, so an unchanged description means that commit
++   * would draw the same native tree.
++   */
++  const describeRenderedRows = () => {
++    if (!containerLayout || !hasData) {
++      return "none";
++    }
++    const rows = Array.from(renderStack.entries(), ([reactKey, { index }]) => {
++      const layout = getLayout(index);
++      return layout === undefined
++        ? undefined
++        : `${reactKey}:${index}:${layout.x}:${layout.y}:${layout.width}:${layout.height}`;
++    }).filter((row) => row !== undefined);
++    return `${containerLayout.width}x${containerLayout.height}/${rows.join("|")}`;
++  };
++
++  // The description the collection drew last, or undefined before it drew one.
++  const committedRowsRef = React.useRef<string | undefined>(undefined);
++
++  useLayoutEffect(() => {
++    committedRowsRef.current = describeRenderedRows();
++  });
++
+   useLayoutEffect(() => {
+     if (renderId > 0) {
+       // console.log(
+@@ -141,15 +173,25 @@ export const ViewHolderCollection = <TItem,>(
+     viewHolderCollectionRef,
+     () => ({
+       commitLayout: () => {
++        // The parent asks for this after its own layout pass, which leaves the
++        // layout table unchanged on most commits. Bumping the render state for
++        // a description this collection already drew only asks the parent for
++        // another commit, and it answers on every pass, so the two effects
++        // re-enter each other until React's nested update limit stops them.
++        // The first commit is still the one that paints the rows and reports
++        // the collection's layout, so it always runs.
++        if (
++          renderId > 0 &&
++          describeRenderedRows() === committedRowsRef.current
++        ) {
++          return;
++        }
+         // This will trigger a re-render of the component
+         setRenderId((prev) => prev + 1);
+       },
+     }),
+-    [setRenderId]
++    [renderId, containerLayout, renderStack, getLayout, hasData]
+   );
+-
+-  const hasData = data && data.length > 0;
+-
+   const containerStyle = {
+     width: horizontal ? containerLayout?.width : undefined,
+     height: containerLayout?.height,
+@@ -176,6 +218,13 @@ export const ViewHolderCollection = <TItem,>(
+       {containerLayout &&
+         hasData &&
+         Array.from(renderStack.entries(), ([reactKey, { index }]) => {
++          const layout = getLayout(index);
++          if (layout === undefined) {
++            // The layout table shrank below a render stack entry that still
++            // names its index. The next stack sync reuses the key, and there is
++            // nothing to draw for it now.
++            return null;
++          }
+           const item = data[index];
+           // Suppress separators for items in the last row to prevent
+           // height mismatch. The last data item has no separator (no
+@@ -192,7 +241,7 @@ export const ViewHolderCollection = <TItem,>(
+               item={item}
+               trailingItem={trailingItem}
+               layout={{
+-                ...getLayout(index),
++                ...layout,
+               }}
+               refHolder={refHolder}
+               onSizeChanged={onSizeChanged}

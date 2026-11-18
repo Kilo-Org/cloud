@@ -5,7 +5,7 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 
 import {
   createMobileSlashCommandList,
-  LOCAL_CLEAR_SLASH_COMMAND,
+  getLocalClearSlashCommand,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 
@@ -127,6 +127,6 @@ describe('createMobileSlashCommandList — /clear capability gate', () => {
   });
 
   it('has the updated description', () => {
-    expect(LOCAL_CLEAR_SLASH_COMMAND.description).toBe('End this session and start a new one');
+    expect(getLocalClearSlashCommand().description).toBe('End this session and start a new one');
   });
 });

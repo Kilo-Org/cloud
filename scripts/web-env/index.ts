@@ -1,10 +1,10 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseOptions, type Options } from './options.js';
+import { runCopy } from './copy.js';
+import { parseOptions, type SetOptions } from './options.js';
 import {
   ENVIRONMENTS,
-  PROJECTS,
   confirm,
   findRepoRoot,
   question,
@@ -45,7 +45,7 @@ function normalizeFileValue(value: string): string {
 }
 
 async function collectValues(
-  options: Options,
+  options: SetOptions,
   environments: readonly Environment[]
 ): Promise<Partial<Record<Environment, string>>> {
   const values: Partial<Record<Environment, string>> = {};
@@ -124,8 +124,7 @@ function rejectMatchingTrackedValues(
   }
 }
 
-async function main(): Promise<void> {
-  const options = parseOptions(process.argv.slice(2));
+async function runSet(options: SetOptions): Promise<void> {
   const environments: readonly Environment[] = options.only ? [options.only] : ENVIRONMENTS;
   const sensitive = await askSensitivity(options.name);
   const repoRoot = findRepoRoot();
@@ -138,7 +137,8 @@ async function main(): Promise<void> {
         )
       : [];
     console.log(`Checking Vercel${vaultEnvironments.length > 0 ? ' and 1Password' : ''} access...`);
-    const contexts = resolveVercelContexts(tempDirectory);
+    const { contexts, missingProjects } = resolveVercelContexts(tempDirectory);
+    if (contexts.length === 0) throw new Error('None of the Vercel projects exist.');
     const vault = vaultEnvironments.length > 0 ? resolveVault() : undefined;
     const values = await collectValues(options, environments);
     const defaults = options.only
@@ -155,7 +155,10 @@ async function main(): Promise<void> {
     console.log('\nPlan');
     for (const environment of environments) {
       const type = sensitive && environment !== 'development' ? 'sensitive' : 'encrypted';
-      for (const project of PROJECTS) console.log(`- ${project}/${environment}: ${type}`);
+      for (const context of contexts) console.log(`- ${context.project}/${environment}: ${type}`);
+    }
+    for (const project of missingProjects) {
+      console.log(`- ${project}: skip, the Vercel project does not exist yet`);
     }
     for (const [file, value] of defaults)
       console.log(`- ${file}: ${options.name}=${JSON.stringify(value)}`);
@@ -207,7 +210,7 @@ async function main(): Promise<void> {
       ))
     ) {
       for (const environment of deployableEnvironments) {
-        console.log(`Redeploying ${environment} in both Vercel projects...`);
+        console.log(`Redeploying ${environment} in each Vercel project...`);
         const deployments = await Promise.all(
           contexts.map(async context => ({
             project: context.project,
@@ -215,7 +218,9 @@ async function main(): Promise<void> {
           }))
         );
         for (const deployment of deployments) {
-          console.log(`- ${deployment.project}: ${deployment.url}`);
+          console.log(
+            `- ${deployment.project}: ${deployment.url ?? 'skipped, no ready deployment'}`
+          );
         }
       }
     } else if (deployableEnvironments.length > 0) {
@@ -226,6 +231,12 @@ async function main(): Promise<void> {
   } finally {
     rmSync(tempDirectory, { recursive: true, force: true });
   }
+}
+
+async function main(): Promise<void> {
+  const options = parseOptions(process.argv.slice(2));
+  if (options.command === 'copy') await runCopy(options);
+  else await runSet(options);
 }
 
 main().catch(error => {

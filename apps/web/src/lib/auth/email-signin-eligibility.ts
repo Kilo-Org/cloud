@@ -1,21 +1,68 @@
 import type { NextRequest } from 'next/server';
-import { checkRateLimit } from '@vercel/firewall';
 import { createHmac } from 'node:crypto';
+import { callerAddressFromHeaders } from '@/lib/auth/caller-address';
+import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
-import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
-import type { AuthErrorType } from '@/lib/auth/constants';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
+const SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID = 'sign-in-code-email-ip';
 
+/**
+ * Vercel Firewall rate limits that apply to sign-in code email volume. Each
+ * rule lives in the project's firewall configuration; a send runs only when
+ * every rule answers, so a rule that is not configured refuses the send and
+ * the gap is reported to Sentry at most once a minute through the shared
+ * firewall reporter.
+ *
+ * - `magic-link-email` counts sends per normalized address.
+ * - `sign-in-code-email-ip` counts sends per caller address.
+ */
 function getMagicLinkEmailRateLimitKey(email: string): string {
   const emailHash = createHmac('sha256', NEXTAUTH_SECRET)
     .update(normalizeEmail(email))
     .digest('base64url');
   return `magic-link-email:${emailHash}`;
+}
+
+/**
+ * Applies the per-address and per-caller firewall rules and reports whether the
+ * send is refused. Every rule must answer `allowed`: an exhausted budget, a
+ * rule that is not configured, and a limiter that cannot answer all refuse, so
+ * an email leaves only when the budget was confirmed. The first refusal stops
+ * the checks, leaving the remaining allowances unspent.
+ * Runs before the eligibility rules: these refusals cost nothing downstream.
+ */
+async function isSendBudgetRefused(email: string, request: NextRequest): Promise<boolean> {
+  const checks = [
+    {
+      id: MAGIC_LINK_EMAIL_RATE_LIMIT_ID,
+      key: getMagicLinkEmailRateLimitKey(email),
+    },
+    {
+      id: SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID,
+      key: `${SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID}:${callerAddressFromHeaders(request.headers)}`,
+    },
+  ] as const;
+
+  for (const check of checks) {
+    const result = await checkFirewallRateLimit(check.id, {
+      source: 'email_signin_eligibility',
+      request,
+      rateLimitKey: check.key,
+    });
+    if (result !== 'allowed') {
+      return true;
+    }
+  }
+  return false;
 }
 
 export type DomainSignInEligibility =
@@ -30,10 +77,10 @@ export type DomainSignInEligibility =
 /**
  * Checks whether an email's domain is allowed to sign in at all: not
  * blacklisted, not a blocked TLD (new users only), and not subject to
- * mandatory SSO. This is the shared core enforced for EVERY sign-in path
- * (email code, magic link, and native Apple/Google) — mirrors the checks
- * inline in the NextAuth `signIn` callback (lib/user/server.ts) so that no
- * provider can bypass forced SSO or the domain blacklist.
+ * mandatory SSO. This is the shared core enforced for EVERY sign-in path —
+ * mirrors the checks inline in the NextAuth `signIn` callback
+ * (lib/user/next-auth-options.ts) so that no provider can bypass forced SSO or
+ * the domain blacklist.
  *
  * Does NOT rate limit and does NOT apply magic-link-specific signup email
  * rules (lowercase/no-plus) — those are the caller's concern.
@@ -41,14 +88,14 @@ export type DomainSignInEligibility =
 export async function checkDomainSignInEligibility(
   email: string
 ): Promise<DomainSignInEligibility> {
-  if (await isEmailBlacklistedByDomainAsync(email)) {
+  if (await isEmailBlacklisted(email)) {
     return { ok: false, status: 403, errorCode: 'BLOCKED' };
   }
 
   const existingUser = await findUserByNormalizedEmail(email);
 
   // Block new signups from blocked TLDs (existing users can still sign in)
-  if (!existingUser && isBlockedTLD(email)) {
+  if (!existingUser && (await isBlockedTLD(email))) {
     return { ok: false, status: 403, errorCode: 'BLOCKED' };
   }
 
@@ -83,9 +130,30 @@ export type EmailSignInEligibility =
   | {
       ok: false;
       status: number;
-      errorCode: 'BLOCKED' | 'INVALID_EMAIL' | 'SIGNUP-RATE-LIMITED' | 'SSO_ERROR';
+      errorCode:
+        | 'BLOCKED'
+        | 'EMAIL-SIGNUP-DISABLED'
+        | 'INVALID_EMAIL'
+        | 'SIGNUP-RATE-LIMITED'
+        | 'SSO_ERROR';
       body: Record<string, unknown>;
     };
+
+/**
+ * Applies the static rules for a new account's magic-link option without
+ * creating a token, sending mail, or consuming a rate-limit allowance.
+ */
+export async function isNewAccountEligibleForMagicLink(email: string): Promise<boolean> {
+  if (isEmailSignupDisabled() || !validateMagicLinkSignupEmail(email).valid) {
+    return false;
+  }
+
+  if (await isEmailBlacklisted(email)) {
+    return false;
+  }
+
+  return !(await isBlockedTLD(email));
+}
 
 /**
  * Checks whether an email is eligible for email sign-in: not rate limited,
@@ -93,6 +161,7 @@ export type EmailSignInEligibility =
  * blocked by TLD or signup email rules.
  *
  * For NEW users (signup), enforces:
+ * - Email signup is enabled (EMAIL_SIGNUPS_ENABLED)
  * - Email must be lowercase
  * - Email cannot contain a + character
  *
@@ -102,12 +171,7 @@ export async function checkEmailSignInEligibility(
   email: string,
   request: NextRequest
 ): Promise<EmailSignInEligibility> {
-  const { rateLimited } = await checkRateLimit(MAGIC_LINK_EMAIL_RATE_LIMIT_ID, {
-    request,
-    rateLimitKey: getMagicLinkEmailRateLimitKey(email),
-  });
-
-  if (rateLimited) {
+  if (await isSendBudgetRefused(email, request)) {
     return {
       ok: false,
       status: 429,
@@ -147,8 +211,17 @@ export async function checkEmailSignInEligibility(
     };
   }
 
-  // For new users, enforce stricter email validation
   if (!domainEligibility.existingUser) {
+    if (isEmailSignupDisabled()) {
+      return {
+        ok: false,
+        status: 403,
+        errorCode: 'EMAIL-SIGNUP-DISABLED',
+        body: { success: false, error: 'EMAIL-SIGNUP-DISABLED' },
+      };
+    }
+
+    // For new users, enforce stricter email validation
     const signupValidation = validateMagicLinkSignupEmail(email);
     if (!signupValidation.valid) {
       return {

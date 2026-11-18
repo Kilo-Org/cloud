@@ -1,4 +1,4 @@
-import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
 import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 

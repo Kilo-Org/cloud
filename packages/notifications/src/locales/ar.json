@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "جلسة الوكيل لديك بها تحديث",
+      "lowBalance": "رصيدك يحتاج إلى انتباه",
+      "spendAlert": "إنفاقك يحتاج إلى انتباه",
+      "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
+      "securityUpdate": "فحص أمان به تحديث",
+      "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "تنبيه انخفاض الرصيد",
+      "body": "انخفض رصيد {{organizationName}} إلى أقل من ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "تنبيه الإنفاق",
+      "body": "تجاوز إنفاق {{scopeName}} ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} في {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "نتيجة أمان جديدة ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "تحذير SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "خرق SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "جلسة Kilo الخاصة بك جاهزة للتحكم بها من هاتفك"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

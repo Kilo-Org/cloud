@@ -3,15 +3,15 @@ import {
   DEFAULT_AUTO_ROUTING_MODE,
   UpdateAutoRoutingModeRequestSchema,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type AutoRoutingModeResponse,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import { getConfiguredAutoRoutingMode, setAutoRoutingMode } from './routing-mode';
+import { readConfiguredAutoRoutingMode, setAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 
 function responseBody(params: {
-  ownerType: AutoRoutingModeOwnerType;
+  ownerType: OwnerType;
   ownerId: string;
   configuredMode: AutoRoutingMode | null;
 }): AutoRoutingModeResponse {
@@ -33,8 +33,16 @@ export const getRoutingModeHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing mode owner' }, 400);
   }
 
-  const configuredMode = await getConfiguredAutoRoutingMode(c.env, parsed.data);
-  return c.json(responseBody({ ...parsed.data, configuredMode }));
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const configuredMode = await readConfiguredAutoRoutingMode(c.env, parsed.data);
+      return c.json(responseBody({ ...parsed.data, configuredMode }));
+    } catch {
+      if (attempt === 1) {
+        return c.json({ error: 'Could not load the saved platform mode. Please retry.' }, 503);
+      }
+    }
+  }
 };
 
 export const putRoutingModeHandler: Handler<HonoEnv> = async c => {

@@ -1,26 +1,53 @@
+import { i18n } from '@/i18n';
+
 import { type VoiceInputFeedback, type VoiceInputStatus } from './voice-input-state';
 
 export type VoiceInputFeedbackPresentation =
-  | { kind: 'alert'; title: 'Microphone access is off'; message: string }
+  | {
+      kind: 'alert';
+      title: string;
+      message: string;
+      /** Label of the non-cancel button: the verb phrase that names its tap. */
+      actionLabel: string;
+      /** Where the alert's action button leads. */
+      destination: 'system-settings' | 'transcription-model-picker';
+    }
   | { kind: 'toast'; message: string };
-
-const ALERT_TITLE = 'Microphone access is off' as const;
 
 /**
  * Pure projection of a `VoiceInputFeedback` into the surface that should
- * display it. Open-settings feedback (permanent microphone denial) gets a
- * native alert with a Cancel/Open Settings affordance so the user can
- * recover without re-trying the gesture. Every other case is a transient
- * toast — retryable failures invite the user to try again, non-retryable
- * ones are informational only. Keeping this decision in a pure function
- * makes the policy unit-testable and isolates React Native's `Alert` and
- * `toast` from the rule.
+ * display it. Feedback with a follow-up destination gets a native alert with
+ * a Cancel affordance plus a button that opens that destination: permanent
+ * microphone denial opens the system settings, a gateway transcription
+ * problem that needs a different model opens the transcription model picker.
+ * Every other case is a transient toast — retryable failures invite the user
+ * to try again, non-retryable ones are informational only. Keeping this
+ * decision in a pure function makes the policy unit-testable and isolates
+ * React Native's `Alert` and `toast` from the rule.
  */
 export function resolveVoiceInputFeedbackPresentation(
   feedback: VoiceInputFeedback
 ): VoiceInputFeedbackPresentation {
+  if (feedback.action === 'open-transcription-settings') {
+    return {
+      kind: 'alert',
+      title: i18n.t('transcriptionModel.title'),
+      message: feedback.message,
+      // The title already names the transcription model, so the button must
+      // name the tap instead: it opens the picker to pick a model. The same
+      // label serves the unavailable-model and no-model-chosen states.
+      actionLabel: i18n.t('transcriptionModel.choose'),
+      destination: 'transcription-model-picker',
+    };
+  }
   if (feedback.action === 'open-settings') {
-    return { kind: 'alert', title: ALERT_TITLE, message: feedback.message };
+    return {
+      kind: 'alert',
+      title: i18n.t('voiceInput.micOffTitle'),
+      message: feedback.message,
+      actionLabel: i18n.t('common.openSettings'),
+      destination: 'system-settings',
+    };
   }
   return { kind: 'toast', message: feedback.message };
 }

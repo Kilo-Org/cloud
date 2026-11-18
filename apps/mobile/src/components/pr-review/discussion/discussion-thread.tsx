@@ -8,10 +8,10 @@
 //     is pressable (collapse). The resolve toggle is its own nested
 //     pressable in both states.
 //   - The thread header shows the anchor label ("src/a.ts L10 (RIGHT)"
-//     or "File comment on src/a.ts" or "Outdated on ...") and the
-//     "Outdated" / "Resolved" badges when applicable. The "Resolved"
-//     badge is the sole Resolved text indicator; the resolve control
-//     is an icon-only circular button (a11y: "Resolve thread" /
+//     or "File comment on src/a.ts" or "Outdated on ..."). The anchor
+//     owns file-level and outdated metadata; the "Resolved" badge is
+//     the sole Resolved text indicator. The resolve control is an
+//     icon-only circular button (a11y: "Resolve thread" /
 //     "Unresolve thread").
 //   - Expanded LINE-anchored threads render a capped quoted diff
 //     snippet (from thread.diffHunk) above the comments list. File-
@@ -28,22 +28,27 @@
 //     the mutation hooks own the cache update + rollback, so the
 //     thread just routes the events and lets the cache flow.
 
-import * as Haptics from 'expo-haptics';
-import { Check, CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
+import { selectionHaptic } from '@/lib/haptics';
+import { CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
+import { ResolveToggle } from '@/components/pr-review/discussion/discussion-thread-resolve-toggle';
 import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import {
+  type PrCommentKind,
   type ReviewComment,
   type ReviewReactionContent,
   type ReviewThread,
   selectThreadAnchorLabel,
-  selectThreadBadges,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { commentAuthorRowTopPadding } from '@/lib/pr-review/comment-trailing-controls';
 import { selectThreadDiffSnippet } from '@/lib/pr-review/discussion/thread-diff-snippet';
 import {
   useAddReactionMutation,
@@ -52,8 +57,13 @@ import {
   useResolveThreadMutation,
   useUnresolveThreadMutation,
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+import { providerPrCapabilities, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
+
+// The separator's 14dp (`pt-4`) inset, measured to the next author row's circle.
+const SEPARATED_COMMENT_PADDING = commentAuthorRowTopPadding(14);
 
 type DiscussionThreadProps = {
   readonly owner: string;
@@ -65,6 +75,15 @@ type DiscussionThreadProps = {
   readonly onToggleExpand: () => void;
   /** The viewer's GitHub login, passed to comment rows for self-target gating. */
   readonly viewerLogin?: string | null;
+  /** Invoked when the inline reply field gains focus (see useReplyFocusScroll). */
+  readonly onReplyFocus?: () => void;
+  /**
+   * Own-comment actions (s4), bound per comment with `kind: 'review'` for
+   * every row this card renders. Absent on a read-only provider scope, where
+   * the rows keep today's affordances.
+   */
+  readonly onEditComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
+  readonly onDeleteComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
 };
 
 export function DiscussionThread({
@@ -75,15 +94,31 @@ export function DiscussionThread({
   expanded,
   onToggleExpand,
   viewerLogin = null,
+  onReplyFocus,
+  onEditComment,
+  onDeleteComment,
 }: Readonly<DiscussionThreadProps>) {
+  // s6: the reply and resolve writes route through the `providerReview` seam
+  // on a GitLab MR / Bitbucket PR (the mutation hooks pick the arm from the
+  // provider scope the layout publishes), so what this card offers is decided
+  // by the capability list, not by the platform. Reactions stay behind the
+  // GitHub write path: the seam has no reaction procedure and no provider
+  // read layer returns reaction data, so a provider comment row renders
+  // read-only — the row shows nothing rather than a dead or failing
+  // affordance.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const capabilities = providerPrCapabilities(scope.ref.platform);
+  const isGithub = scope.ref.platform === 'github';
+  const canReply = capabilities.canComment.supported;
+  const canResolve = capabilities.canResolveThreads.supported;
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
   const addReaction = useAddReactionMutation(thread.threadId);
   const removeReaction = useRemoveReactionMutation(thread.threadId);
   const reply = useReplyToCommentMutation();
+  const { t } = useTranslation();
 
   const anchorLabel = selectThreadAnchorLabel(thread);
-  const badges = selectThreadBadges(thread);
   // Parse only when expanded; memoize so DiffLine's memo comparator sees a
   // stable `lines` identity across parent re-renders (e.g. reaction toggles).
   const { diffHunk, subjectType, path } = thread;
@@ -96,7 +131,7 @@ export function DiscussionThread({
   const isReacting = addReaction.isPending || removeReaction.isPending;
 
   const onToggleResolve = () => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     if (thread.isResolved) {
       unresolve.mutate({ threadId: thread.threadId });
     } else {
@@ -120,29 +155,66 @@ export function DiscussionThread({
   );
   const headerCommonProps = {
     anchorLabel,
-    resolved: badges.resolved,
-    outdated: badges.outdated,
-    fileLevel: badges.fileLevel,
+    resolved: thread.isResolved,
     commentCount: thread.comments.length,
     firstTimestamp: firstComment?.createdAt ?? null,
     expanded,
     onToggleResolve,
+    canResolve,
     resolveDisabled: isResolving,
     onToggleExpand,
   } as const;
 
   if (expanded) {
+    // The provider reply target carries the provider-native ids the seam
+    // needs: the thread's discussion/root-comment id and the first comment's
+    // verbatim provider id (kept in `nodeId` by the read layer).
+    const providerReply =
+      !isGithub && firstComment
+        ? {
+            ref: scope.ref,
+            threadId: thread.threadId,
+            commentNodeId: firstComment.nodeId,
+          }
+        : undefined;
     return (
-      <View accessibilityLabel={`Discussion thread ${anchorLabel}`} className={cardClassName}>
+      <View
+        accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
+        className={cardClassName}
+      >
         <ThreadHeader {...headerCommonProps} />
         {diffSnippet ? <ThreadDiffSnippet snippet={diffSnippet} /> : null}
         <View className="gap-4">
           {thread.comments.map((comment, index) => (
-            <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
+            <View
+              key={comment.nodeId}
+              style={index > 0 ? SEPARATED_COMMENT_PADDING : undefined}
+              className={cn(index > 0 && 'border-t border-border')}
+            >
               <CommentRow
                 comment={comment}
+                owner={owner}
+                repo={repo}
+                number={number}
+                commentKind="review"
                 reactionsDisabled={isReacting}
+                readOnly={!isGithub}
+                reactionsSupported={capabilities.reactions.supported}
                 viewerLogin={viewerLogin}
+                onEditComment={
+                  onEditComment
+                    ? () => {
+                        onEditComment(comment, 'review');
+                      }
+                    : undefined
+                }
+                onDeleteComment={
+                  onDeleteComment
+                    ? () => {
+                        onDeleteComment(comment, 'review');
+                      }
+                    : undefined
+                }
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
                 }}
@@ -150,13 +222,15 @@ export function DiscussionThread({
             </View>
           ))}
         </View>
-        {firstComment ? (
+        {firstComment && canReply ? (
           <ReplyInput
             owner={owner}
             repo={repo}
             number={number}
             commentId={firstComment.commentId}
             reply={reply}
+            provider={providerReply}
+            onInputFocus={onReplyFocus}
           />
         ) : null}
       </View>
@@ -166,7 +240,7 @@ export function DiscussionThread({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Discussion thread ${anchorLabel}`}
+      accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
       accessibilityState={{ expanded: false }}
       onPress={onToggleExpand}
       className={cn(cardClassName, 'active:opacity-70')}
@@ -181,41 +255,47 @@ export function DiscussionThread({
 type ThreadHeaderProps = {
   readonly anchorLabel: string;
   readonly resolved: boolean;
-  readonly outdated: boolean;
-  readonly fileLevel: boolean;
   readonly commentCount: number;
   readonly firstTimestamp: string | null;
   readonly expanded: boolean;
   readonly onToggleExpand: () => void;
   readonly onToggleResolve: () => void;
+  /** False on a GitLab/Bitbucket scope: the resolve control is withheld. */
+  readonly canResolve: boolean;
   readonly resolveDisabled: boolean;
 };
 
 function ThreadHeader({
   anchorLabel,
   resolved,
-  outdated,
-  fileLevel,
   commentCount,
   firstTimestamp,
   expanded,
   onToggleExpand,
   onToggleResolve,
+  canResolve,
   resolveDisabled,
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
-  const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp)) : null;
+  const { t } = useTranslation();
+  const now = useRelativeTimeNow();
+  const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp), undefined, now) : null;
   const LabelRow = (expanded ? Pressable : View) as typeof View;
   const labelRowA11y = expanded
     ? ({
         accessibilityRole: 'button',
-        accessibilityLabel: 'Collapse thread',
+        accessibilityLabel: t('prReview.discussion.collapseThread'),
         onPress: onToggleExpand,
       } as const)
     : ({} as const);
   return (
     <View className="gap-2">
-      <View className="flex-row items-start justify-between gap-2">
+      {/* `items-center`: the resolve control's tap frame is taller than the
+          anchor label, and the row holds that frame so the whole target is
+          hittable (a negative margin would push part of it outside the row,
+          where React Native stops delivering touches). Centering keeps the
+          label aligned with the control's visible circle. */}
+      <View className="flex-row items-center justify-between gap-2">
         <LabelRow
           {...labelRowA11y}
           className={cn('flex-1 flex-row items-center gap-2', expanded && 'active:opacity-70')}
@@ -229,71 +309,27 @@ function ThreadHeader({
             {anchorLabel}
           </Text>
         </LabelRow>
-        <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        {canResolve ? (
+          <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        ) : null}
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
-        {resolved ? <Badge tone="good" icon={CheckCheck} label="Resolved" /> : null}
-        {outdated ? <Badge tone="muted" label="Outdated" /> : null}
-        {fileLevel && !resolved ? <Badge tone="muted" label="File" /> : null}
+        {resolved ? (
+          <View className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-good">
+            <CheckCheck size={10} color={colors.good} />
+            <Text className="text-[10px] font-medium uppercase tracking-wide">
+              {t('prReview.discussion.resolved')}
+            </Text>
+          </View>
+        ) : null}
         <Text variant="muted" className="text-xs">
-          {commentCount === 1 ? '1 comment' : `${commentCount} comments`}
-          {relative ? ` · started ${relative}` : ''}
+          {t('prReview.discussion.comment', {
+            count: commentCount,
+            displayCount: formatNumber(commentCount, i18n.language),
+          })}
+          {relative ? t('prReview.discussion.startedRelative', { relative }) : ''}
         </Text>
       </View>
     </View>
-  );
-}
-
-type BadgeProps = {
-  readonly tone: 'good' | 'muted' | 'warn' | 'destructive';
-  readonly icon?: typeof Check;
-  readonly label: string;
-};
-
-const BADGE_TONE_CLASS = {
-  good: 'bg-secondary text-good',
-  warn: 'bg-secondary text-warn',
-  destructive: 'bg-secondary text-destructive',
-  muted: 'bg-secondary text-muted-foreground',
-} satisfies Record<BadgeProps['tone'], string>;
-
-function Badge({ tone, icon: Icon, label }: Readonly<BadgeProps>) {
-  const colors = useThemeColors();
-  const toneClass = BADGE_TONE_CLASS[tone];
-  // Native Lucide icons don't resolve NativeWind text classes, so set the
-  // icon color explicitly per tone from the theme tokens.
-  const iconColor = {
-    good: colors.good,
-    warn: colors.warn,
-    destructive: colors.destructive,
-    muted: colors.mutedForeground,
-  } satisfies Record<BadgeProps['tone'], string>;
-  return (
-    <View className={cn('flex-row items-center gap-1 rounded-full px-2 py-0.5', toneClass)}>
-      {Icon ? <Icon size={10} color={iconColor[tone]} /> : null}
-      <Text className="text-[10px] font-medium uppercase tracking-wide">{label}</Text>
-    </View>
-  );
-}
-
-type ResolveToggleProps = {
-  readonly resolved: boolean;
-  readonly disabled: boolean;
-  readonly onPress: () => void;
-};
-
-function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveToggleProps>) {
-  const colors = useThemeColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={resolved ? 'Unresolve thread' : 'Resolve thread'}
-      onPress={onPress}
-      disabled={disabled}
-      hitSlop={8}
-      className="h-7 w-7 items-center justify-center rounded-full border border-border bg-card"
-    >
-      <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
-    </Pressable>
   );
 }

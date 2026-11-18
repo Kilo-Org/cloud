@@ -3,8 +3,8 @@ import type { Organization } from '@kilocode/db/schema';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { computeSnapshotDiff } from '@/lib/ai-gateway/providers/openrouter/snapshot-diff';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { computeSnapshotDiff } from '@/lib/providers/openrouter/snapshot-diff';
 import {
   buildAutoChangeMessage,
   computeRelevantChangesForOrg,
@@ -67,6 +67,10 @@ function buildEnterpriseOrg(overrides: Partial<Organization> = {}): Organization
     plan: 'enterprise',
     free_trial_end_at: null,
     company_domain: null,
+    directory_id: null,
+    directory_group_id: null,
+    directory_idp_id: null,
+    external_org_id: null,
     ...overrides,
   } satisfies Organization;
 }

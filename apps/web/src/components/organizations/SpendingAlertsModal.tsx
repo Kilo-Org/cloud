@@ -13,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateMinimumBalanceAlert } from '@/app/api/organizations/hooks';

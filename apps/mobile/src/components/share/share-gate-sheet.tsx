@@ -1,9 +1,10 @@
 /* eslint-disable max-lines -- Share gate owns commit, destination admission, and CLI-spawn orchestration in one formSheet body. */
 import { useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -16,16 +17,22 @@ import { getNewAgentSessionPath } from '@/components/agents/session-list-routes'
 import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
+import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
+import { resolveRemoteStartPlan } from '@/lib/remote-spawn-admission';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
-import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
+import {
+  clearPendingShareIdDraft,
+  clearSharePayload,
+  peekSharePayload,
+  type ShareId,
+} from '@/lib/share-payload';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { useTRPC } from '@/lib/trpc';
 
@@ -42,25 +49,34 @@ import {
 import { selectShareDestinations, type ShareDestinationRow } from './share-destinations';
 import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
+import { resolveShareNewSessionOrganization } from './share-new-session-org';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
-import { selectShareReviewPr } from './share-review-pr';
+import { selectShareReviewPr, selectShareReviewPrSubtitle } from './share-review-pr';
 
 type ShareGateSheetProps = {
   shareId: string | undefined;
 };
 
-/**
- * Share gate formSheet body. Exactly two direct children of the screen
- * content: a collapsable={false} header block and the FlatList.
- */
 export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const router = useRouter();
   const colors = useThemeColors();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
-  // Org-scoped stored page only (cloud-agent + cli). Active list is an
-  // id/capability lookup — never a row source.
+  // The account's memberships: the gate commits a new session only into an
+  // organization this list holds (see `resolveShareNewSessionOrganization`).
+  const {
+    data: memberships,
+    isFetched: membershipsFetched,
+    isFetching: membershipsFetching,
+    isError: membershipsFailed,
+    isRefetchError: membershipsRefetchFailed,
+  } = useOrganizationsList();
+  // Org-scoped stored page (cloud-agent + cli) narrowed to live sessions:
+  // a session that is not live cannot receive the share, so it is never
+  // offered. The active list supplies the liveness filter and the
+  // attachments capability — never a row source.
   const sessions = useAgentSessions({
     createdOnPlatform: expandPlatformFilter(['cloud-agent', 'cli']),
     organizationId,
@@ -142,7 +158,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const attachmentsCapableBySessionId = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const session of sessions.activeSessions) {
-      map.set(session.id, session.capabilities?.attachments === true);
+      // Optimistic: only an explicit `attachments: false` marks the row
+      // incapable; an unknown capability stays capable.
+      map.set(session.id, session.capabilities?.attachments !== false);
     }
     return map;
   }, [sessions.activeSessions]);
@@ -155,8 +173,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         validation,
         storedIsError: sessions.storedIsError,
         storedIsSuccess: sessions.storedIsSuccess,
+        storedIsPaused: sessions.storedIsPaused,
         activeIsError: sessions.activeIsError,
-        storedRowCount: destinations.length,
+        activeIsPaused: sessions.activeIsPaused,
+        liveRowCount: destinations.length,
+        storedSessionCount: sessions.storedSessions.length,
         isLoading: sessions.isLoading || !orgLoaded,
       }),
     [
@@ -165,22 +186,23 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       validation,
       sessions.storedIsError,
       sessions.storedIsSuccess,
+      sessions.storedIsPaused,
       sessions.activeIsError,
+      sessions.activeIsPaused,
       sessions.isLoading,
+      sessions.storedSessions.length,
       destinations.length,
       orgLoaded,
     ]
   );
 
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const reviewPr = useMemo(
     () =>
       selectShareReviewPr({
         text: payload?.text ?? '',
-        prReviewEnabled,
         showNewSession: state.showNewSession,
       }),
-    [payload?.text, prReviewEnabled, state.showNewSession]
+    [payload?.text, state.showNewSession]
   );
 
   const instanceRows = useMemo(
@@ -213,9 +235,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (!reviewPr) {
       return;
     }
-    void Haptics.selectionAsync();
+    selectionHaptic();
     setPendingShareNavigation({
-      href: getPrReviewPath(reviewPr.owner, reviewPr.repo, reviewPr.number) as string,
+      href: providerPrRoutePath(reviewPr) as string,
       shareId: null,
     });
     dismiss();
@@ -237,9 +259,13 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       if (!shareId) {
         return;
       }
-      void Haptics.selectionAsync();
+      selectionHaptic();
       committedShareIdRef.current = shareId;
       setPendingShareNavigation({ href, shareId });
+      // Clear only this id's durable pending hint (value-scoped). A kill after
+      // commit restores payload + navigation queue, but no pending id, so the
+      // gate never re-opens and the navigator delivers the destination once.
+      void clearPendingShareIdDraft(shareId);
       router.back();
     },
     [router, shareId]
@@ -249,9 +275,33 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (!shareId || isSpawning) {
       return;
     }
-    const base = getNewAgentSessionPath(organizationId);
+    const selectedOrganizationId = resolveShareNewSessionOrganization({
+      organizationId,
+      membershipIds: memberships?.map(membership => membership.organizationId),
+      // An earlier success is not proof the list is current: a refetch in
+      // flight or a failed background refresh (cached data keeps `isError`
+      // false) is only the previous answer, so it cannot name a target.
+      membershipsSettled: membershipsFetched && !membershipsFetching,
+      membershipsFailed: membershipsFailed || membershipsRefetchFailed,
+      // The selected organization's own org-scoped read is the only proof it is
+      // unusable: the org list can be a stale, earlier-successful page.
+      selectedOrganizationAccessDenied:
+        sessions.storedErrorCode === 'UNAUTHORIZED' || sessions.storedErrorCode === 'FORBIDDEN',
+    });
+    const base = getNewAgentSessionPath(selectedOrganizationId);
     commit(appendShareParams(base, shareId));
-  }, [commit, isSpawning, organizationId, shareId]);
+  }, [
+    commit,
+    isSpawning,
+    memberships,
+    membershipsFailed,
+    membershipsFetching,
+    membershipsFetched,
+    membershipsRefetchFailed,
+    organizationId,
+    sessions.storedErrorCode,
+    shareId,
+  ]);
 
   const commitEnabled = isShareCommitEnabled({ orgLoaded, validation });
   const instanceRowsDisabled = !commitEnabled || isSpawning;
@@ -265,13 +315,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       const admission: ShareDestinationAdmission = resolveShareDestinationAdmission({
         createdOnPlatform: row.created_on_platform,
         live: row.live,
-        attachmentsCapable: attachmentsCapableBySessionId.get(row.session_id) ?? false,
+        // Optimistic fallback: a live row missing from the map is unknown, not
+        // explicitly incapable.
+        attachmentsCapable: attachmentsCapableBySessionId.get(row.session_id) ?? true,
         hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
       });
       if (!admission.ok) {
         // Keep the gate open and the payload staged so the user can pick
         // another destination.
-        Alert.alert(admission.title, admission.message);
+        Alert.alert(admission.title, admission.message, undefined, {
+          // Android back dismisses; the gate stays open for another choice.
+          cancelable: true,
+        });
         return;
       }
       const org = row.organization_id ?? undefined;
@@ -287,14 +342,31 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         return;
       }
 
+      // The remote start is a relay command, so the organization subscription
+      // gate never runs for it and the session would be created before the
+      // model request was refused. Refuse here, before the spawn, in the same
+      // words the cloud start path uses for the same organization state.
+      const plan = resolveRemoteStartPlan({
+        organizationId: organizationId ?? null,
+        organizations: memberships,
+      });
+      if (!plan.allowed) {
+        toast.error(plan.toast);
+        return;
+      }
+
       const admission = resolveShareDestinationAdmission({
         createdOnPlatform: 'cli',
         live: true,
-        attachmentsCapable: instance.capabilities?.attachments === true,
+        // Optimistic: only an explicit `attachments: false` blocks files.
+        attachmentsCapable: instance.capabilities?.attachments !== false,
         hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
       });
       if (!admission.ok) {
-        Alert.alert(admission.title, admission.message);
+        Alert.alert(admission.title, admission.message, undefined, {
+          // Android back dismisses; the gate stays open for another choice.
+          cancelable: true,
+        });
         return;
       }
 
@@ -358,6 +430,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       commitEnabled,
       getKey,
       isSpawning,
+      memberships,
+      organizationId,
       payload,
       refetchInstances,
       rotateKey,
@@ -372,22 +446,21 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   }, [sessions]);
 
   const showNewSession = state.showNewSession;
-  const showTerminalMessage =
-    state.kind === 'stale-share' || state.kind === 'non-retryable-classification';
   const previewPayload = payload !== null && state.kind !== 'stale-share' ? payload : null;
 
-  // Header block: title+close, preview, New session. collapsable={false} is
-  // required so react-native-screens finds it as the formSheet header.
   const header = (
-    <View collapsable={false} className="border-b border-border bg-background pt-4">
-      <View className="h-11 flex-row items-center justify-center px-4">
-        <Text className="text-lg font-semibold text-foreground" accessibilityRole="header">
-          Share to Kilo
+    <View className="border-b border-border bg-background pt-4">
+      <View className="min-h-[48px] flex-row items-center justify-center px-4">
+        <Text
+          className="min-w-0 flex-1 px-12 text-center text-lg font-semibold text-foreground"
+          accessibilityRole="header"
+        >
+          {t('share.title')}
         </Text>
         <Button
           size="icon"
           variant="ghost"
-          accessibilityLabel="Close"
+          accessibilityLabel={t('common.close')}
           onPress={dismiss}
           className="absolute right-2"
         >
@@ -399,18 +472,12 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <SharePayloadPreview payload={previewPayload} validation={validation} />
       ) : null}
 
-      {showTerminalMessage ? (
-        <View className="items-center px-6 pb-6 pt-4">
-          <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
-        </View>
-      ) : null}
-
       {reviewPr ? (
         <DestinationOptionRow
           icon={GitPullRequest}
-          title="Review PR"
-          subtitle={`${reviewPr.owner}/${reviewPr.repo} #${reviewPr.number}`}
-          accessibilityLabel="Review PR"
+          title={t('common.reviewPr')}
+          subtitle={selectShareReviewPrSubtitle(reviewPr)}
+          accessibilityLabel={t('common.reviewPr')}
           onPress={handleReviewPr}
         />
       ) : null}
@@ -420,7 +487,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           onPress={newSessionDisabled ? undefined : handleNewSession}
           disabled={newSessionDisabled}
           accessibilityRole="button"
-          accessibilityLabel="New session"
+          accessibilityLabel={t('common.newSession')}
           accessibilityState={{ disabled: newSessionDisabled }}
           className={`flex-row items-center gap-3 border-t border-border px-4 py-3.5 ${
             newSessionDisabled ? 'opacity-50' : 'active:opacity-70'
@@ -429,27 +496,25 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
             <Plus size={18} color={colors.primaryForeground} />
           </View>
-          <Text className="text-base font-semibold text-foreground">New session</Text>
+          <Text className="text-base font-semibold text-foreground">{t('common.newSession')}</Text>
         </Pressable>
       ) : null}
     </View>
   );
 
-  // Always pair the collapsable header with a FlatList (formSheet constraint).
   return (
-    <>
-      {header}
-      <ShareDestinationList
-        state={state}
-        destinations={destinations}
-        onSelect={handleSelectDestination}
-        onRetry={handleRetry}
-        instances={instanceRows}
-        spawningConnectionId={spawningConnectionId}
-        instanceRowsDisabled={instanceRowsDisabled}
-        destinationsDisabled={isSpawning}
-        onSpawnInstance={handleSpawnInstance}
-      />
-    </>
+    <ShareDestinationList
+      headerContent={header}
+      state={state}
+      destinations={destinations}
+      onSelect={handleSelectDestination}
+      onRetry={handleRetry}
+      onDismiss={dismiss}
+      instances={instanceRows}
+      spawningConnectionId={spawningConnectionId}
+      instanceRowsDisabled={instanceRowsDisabled}
+      destinationsDisabled={isSpawning}
+      onSpawnInstance={handleSpawnInstance}
+    />
   );
 }

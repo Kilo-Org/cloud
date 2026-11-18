@@ -18,6 +18,7 @@ export const DeletionRefusalCode = {
   TicketUnresolved: 'ticket_unresolved',
   TicketAlreadyActive: 'ticket_already_active',
   NoCloudUser: 'no_cloud_user',
+  RelayOrInternalEmail: 'relay_or_internal_email',
 } as const;
 
 export type DeletionRefusalCode = (typeof DeletionRefusalCode)[keyof typeof DeletionRefusalCode];
@@ -77,6 +78,21 @@ export function emailDomainAfterLastAt(email: string): string {
 
 export function isKiloOwnedEmailDomain(domain: string): boolean {
   return KILO_OWNED_DOMAINS.some(owned => domain === owned || domain.endsWith(`.${owned}`));
+}
+
+export function isBlockedDeletionTargetEmail(email: string): boolean {
+  const normalized = normalizeDeletionEmail(email);
+  return normalized.includes('service.usepylon.com') || normalized.endsWith('@app.kilocode.ai');
+}
+
+export function isInternalOrRelayEmail(email: string): boolean {
+  const normalized = normalizeDeletionEmail(email);
+  return (
+    normalized.includes('service.usepylon.com') ||
+    normalized.endsWith('@app.kilocode.ai') ||
+    normalized.endsWith('@kilocode.ai') ||
+    normalized.endsWith('@kilo.ai')
+  );
 }
 
 export function parsePylonTicket(
@@ -165,6 +181,15 @@ export function previewDeletionTargets(entries: DeletionPreviewEntry[]): Deletio
         email: parsedEmail.data,
         pylonTicket: entry.pylonTicket?.trim() || null,
         code: DeletionRefusalCode.MalformedTicket,
+      });
+      continue;
+    }
+    if (isBlockedDeletionTargetEmail(parsedEmail.data)) {
+      rejected.push({
+        ok: false,
+        email: parsedEmail.data,
+        pylonTicket: ticket,
+        code: DeletionRefusalCode.RelayOrInternalEmail,
       });
       continue;
     }

@@ -1,59 +1,107 @@
-import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
-import {
-  ChevronRight,
-  LineChart,
-  MessageSquare,
-  Shield,
-  Smartphone,
-  User,
-} from '@/components/ui/icons';
+import { LineChart, Shield } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConsentRow } from '@/components/consent/consent-row';
+import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
+import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
-import { WEB_BASE_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 type ConsentCardProps = {
   readonly mode?: ConsentMode;
 };
 
+/**
+ * Maximum font scale honoured by the pinned privacy disclosure.
+ *
+ * The disclosure sits in the card's pinned footer with the reserved error
+ * line and two `size="lg"` buttons. Uncapped, the `text-sm` sentence grows
+ * with Dynamic Type to several lines at the largest system text size, and
+ * that height comes out of the sheet, not the scroll region: the footer has
+ * no room left and the second action clips at the sheet bottom.
+ *
+ * 1.4 is the cap that keeps the sentence within two bounded lines on the
+ * smallest supported width (360dp; the card's `px-6` leaves 318dp for the
+ * row) now that the copy is `text-sm`. The sentence's longer segment — the
+ * pt-BR lead-in — measures 209.52dp at scale 1 and the link 169.52dp, so at
+ * 1.4 the lead-in is 293.3dp and each segment still takes its own line. It
+ * also keeps the largest rendered sentence the size it already was: the old
+ * `text-xs` copy at the previous 1.6 cap rendered 16.8dp, and 12.25dp at 1.4
+ * renders 17.15dp. Scales below the cap pass through untouched, so a11y
+ * users keep most of their preferred scale. Same reasoning as the tour
+ * header's cap (see `tour-font-scale`).
+ */
+export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
+
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, top } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const { signOut, token } = useAuth();
   const { userId } = useCurrentUserId({ enabled: token != null });
+  const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const actions = getConsentActions(mode);
-  const rootStyle = { paddingTop: top };
+  const rootStyle = { paddingTop: top, ...sideInsetStyle };
   const contentContainerStyle = {
     paddingTop: 24,
+    paddingBottom: 24,
+  };
+  // The action buttons sit in a pinned footer below the ScrollView, not in
+  // the scroll content: the review modal is shorter than the card, and the
+  // primary CTA was clipping off the sheet bottom (b911 vr1 spot check,
+  // e2-pre-revoke.png / p1-declined-off.png). The footer keeps its own
+  // layout space, so scrolling never moves the actions.
+  const footerStyle = {
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
+  // The catalogue key, not the copy: the card translates it at render, so the
+  // line follows an applied language instead of keeping the words of the
+  // language the action failed under.
   const [error, setError] = useState<string | null>(null);
-  // Onboarding pre-selects optional telemetry. Review mode starts off and the
-  // stored value loads over it, so a stored decline never flashes as on.
+  // Onboarding pre-selects optional telemetry; review mode starts off. The
+  // stored value loads over either default, so a stored decline never flashes
+  // as on.
   const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
+  // The switch must not present a state before the stored value has loaded: in
+  // review mode the pre-load OFF looked like a completed revoke in the b911 vr5
+  // e3 evidence (e3-toggled-off.png showed the switch off while the realm was
+  // still consented — no toggle had landed), and onboarding needs the read
+  // because an older consent record carries the choice it must start from.
+  // Until loaded, the switch slot holds a same-size placeholder, so the card
+  // never claims a choice the user has not made and a tap cannot flip the wrong
+  // way. With no userId there is nothing to load: the switch renders as before
+  // and its toggle path shows the account error.
+  const [storedValueLoaded, setStoredValueLoaded] = useState(false);
+  const optionalControlPending = userId !== undefined && !storedValueLoaded;
   const [savingOptional, setSavingOptional] = useState(false);
   const loadedRef = useRef(false);
   const userToggledRef = useRef(false);
 
-  // Load the stored optional value in review mode only.  The active flag
-  // stops a late resolve from overwriting a value the user just toggled.
+  // Load the stored optional value. Review mode shows the accepted choice; a
+  // record from an older consent version re-opens onboarding, and its choice is
+  // what the switch must show, because an updated disclosure must never
+  // re-enable analytics for someone who turned it off. With nothing to carry,
+  // onboarding keeps its on-by-default. The active flag stops a late resolve
+  // from overwriting a value the user just toggled.
   useEffect(() => {
-    if (mode !== 'review' || !userId || loadedRef.current) {
+    if (!userId || loadedRef.current) {
       return undefined;
     }
     let active = true;
@@ -61,14 +109,22 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     void readConsent(userId).then(
       // eslint-disable-next-line promise/always-return
       stored => {
-        if (active && !userToggledRef.current) {
-          setOptionalToggle(stored.optional);
-          loadedRef.current = true;
+        if (active) {
+          if (!userToggledRef.current) {
+            setOptionalToggle(
+              mode === 'review' ? stored.optional : (stored.previousOptional ?? true)
+            );
+            loadedRef.current = true;
+          }
+          setStoredValueLoaded(true);
         }
       },
       () => {
         if (active) {
-          setError('Could not load your consent settings. Please try again.');
+          // The error names the unreliability, so the switch may show its
+          // default; the placeholder only covers the silent loading window.
+          setStoredValueLoaded(true);
+          setError('consent.couldNotLoadConsentSettings');
         }
       }
     );
@@ -84,7 +140,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     }
 
     if (!userId) {
-      setError('Could not load your account. Please try again.');
+      setError('consent.couldNotLoadAccount');
       return;
     }
 
@@ -94,7 +150,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       await acceptConsent(userId, optionalToggle);
       router.replace('/(app)/(tabs)' as Href);
     } catch {
-      setError('Could not save your consent. Please try again.');
+      setError('consent.couldNotSaveConsent');
       setPendingAction(null);
     }
   };
@@ -105,7 +161,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
     if (mode === 'review') {
       if (!userId) {
-        setError('Could not load your account. Please try again.');
+        setError('consent.couldNotLoadAccount');
         setPendingAction(null);
         return;
       }
@@ -113,7 +169,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       try {
         await revokeConsent(userId);
       } catch {
-        setError('Could not revoke consent. Please try again.');
+        setError('consent.couldNotRevokeConsent');
         setPendingAction(null);
         return;
       }
@@ -122,35 +178,27 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     try {
       await signOut();
     } catch {
-      setError(
-        mode === 'review'
-          ? 'Consent was revoked, but sign-out failed. Please try again.'
-          : 'Could not sign out. Please try again.'
-      );
+      setError(mode === 'review' ? 'consent.revokedSignOutFailed' : 'consent.couldNotSignOut');
       setPendingAction(null);
     }
   };
 
   const handleSecondaryAction = () => {
     const message =
-      mode === 'review'
-        ? 'Kilo Code needs this consent to function. Revoking will sign you out. You can accept again on next sign-in.'
-        : 'Kilo Code needs to share data with AI providers to work. If you decline, you will be signed out.';
+      mode === 'review' ? t('consent.revokeSignOutMessage') : t('consent.declineSignOutMessage');
 
-    Alert.alert(actions.destructiveTitle, message, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: actions.destructiveLabel,
-        style: 'destructive',
-        onPress: () => {
-          void runSecondaryAction();
-        },
+    confirm({
+      title: actions.destructiveTitle,
+      message,
+      confirmLabel: actions.destructiveLabel,
+      onConfirm: () => {
+        void runSecondaryAction();
       },
-    ]);
+    });
   };
 
   const handleOpenPrivacy = () => {
-    void WebBrowser.openBrowserAsync(PRIVACY_URL);
+    router.push({ pathname: '/(app)/legal/[document]', params: { document: 'privacy' } });
   };
 
   const handleToggleOptional = useCallback(
@@ -169,13 +217,18 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           },
           () => {
             setOptionalToggle(!next);
-            setError('Could not save your choice. Please try again.');
+            setError('consent.couldNotSaveChoice');
             setSavingOptional(false);
           }
         );
       } else if (mode === 'review') {
         setOptionalToggle(!next);
-        setError('Could not load your account. Please try again.');
+        setError('consent.couldNotLoadAccount');
+      } else {
+        // Onboarding: the switch is the user's own answer. The stored read can
+        // still land later — the account id may resolve after this render — and
+        // it must not overwrite a choice the user already made.
+        userToggledRef.current = true;
       }
     },
     [mode, userId]
@@ -183,115 +236,138 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
-      <ScrollView
-        className="flex-1 px-6"
-        contentContainerStyle={contentContainerStyle}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="flex-row items-center gap-3">
-          <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+      {/* The body keeps the platform scroll indicator: at a compact window it
+          is taller than the viewport, and the hidden thumb made the rest of it
+          read as missing rather than as one scroll away. */}
+      <ScrollView className="flex-1" contentContainerStyle={contentContainerStyle}>
+        <View className="px-6">
+          {/* The badge alone carries the brand: the title below already states
+              what the screen is about, and repeating the product name beside
+              the mark said nothing a reader did not already see. The mark keeps
+              the name for assistive tech, which cannot read the glyph. */}
+          <View
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={t('consent.kilo')}
+            className="h-10 w-10 items-center justify-center rounded-lg bg-secondary"
+          >
             <Shield size={20} color={colors.foreground} />
           </View>
-          <Text className="text-base font-semibold text-foreground">Kilo Code</Text>
-        </View>
 
-        <Text className="mt-6 text-2xl font-bold text-foreground">Before we get started</Text>
-        <Text className="mt-3 text-base text-muted-foreground">
-          Kilo Code sends your messages to AI providers to generate responses. Here&apos;s
-          what&apos;s shared and with whom.
-        </Text>
-
-        <Text className="mt-6 text-sm font-semibold text-foreground">Required to use Kilo</Text>
-
-        <View className="mt-3 gap-5">
-          <ConsentRow
-            icon={MessageSquare}
-            title="Your prompts and conversations"
-            description="Sent to AI model providers (Anthropic, OpenAI, Google, and others) to generate replies."
-          />
-          <ConsentRow
-            icon={User}
-            title="Account & usage data"
-            description="Your Kilo account ID and request metadata, used to authenticate you and meter usage."
-          />
-          <ConsentRow
-            icon={Smartphone}
-            title="App diagnostics"
-            description="Crash and error reports, with app content removed, used to keep the app stable."
-          />
-        </View>
-
-        <Text className="mt-6 text-sm font-semibold text-foreground">Optional</Text>
-
-        <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
-          <View className="mt-0.5">
-            <LineChart size={18} color={colors.mutedForeground} />
-          </View>
-          <View className="flex-1 shrink gap-1">
-            <Text className="text-base font-semibold text-foreground">Help improve Kilo</Text>
-            <Text className="text-sm text-muted-foreground">
-              Share anonymous product analytics and install source. You can change this any time in
-              Settings.
-            </Text>
-          </View>
-          <Switch
-            value={optionalToggle}
-            disabled={mode === 'review' && savingOptional}
-            accessibilityLabel="Help improve Kilo"
-            onValueChange={handleToggleOptional}
-          />
-        </View>
-
-        <Pressable
-          onPress={() => {
-            router.push(
-              mode === 'review'
-                ? ('/(app)/consent-details?mode=review' as Href)
-                : ('/(app)/consent-details' as Href)
-            );
-          }}
-          hitSlop={8}
-          accessibilityLabel="See full details"
-          className="mt-6 flex-row items-center gap-1 active:opacity-70"
-        >
-          <Text className="text-sm font-semibold text-primary">See full details</Text>
-          <ChevronRight size={16} color={colors.primary} />
-        </Pressable>
-
-        <Text className="mt-6 text-xs text-muted-foreground">
-          Your data is handled per the{' '}
-          <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-            Kilo privacy policy
+          <Text className="mt-6 text-2xl font-bold text-foreground">
+            {mode === 'review' ? t('consent.summaryTitle') : t('consent.beforeWeGetStarted')}
           </Text>
-          .
-        </Text>
+          <Text className="mt-3 text-base text-muted-foreground">
+            {t('consent.introDescription')}
+          </Text>
 
-        <AccessibleStatus message={error} className="mt-6 text-sm" />
+          <Text className="mt-6 text-sm font-semibold text-foreground">
+            {t('consent.required')}
+          </Text>
 
-        <View className="mt-8 gap-3">
-          <Button
+          <ConsentRequiredRows />
+
+          <Text className="mt-6 text-sm font-semibold text-foreground">
+            {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
+          </Text>
+
+          <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
+            <View className="mt-0.5">
+              <LineChart size={18} color={colors.mutedForeground} />
+            </View>
+            <View className="flex-1 shrink gap-1">
+              <Text className="text-base font-semibold text-foreground">
+                {t('consent.helpImprove')}
+              </Text>
+              <Text className="text-sm text-muted-foreground">
+                {t('consent.helpImproveDescription')}
+              </Text>
+            </View>
+            {optionalControlPending ? (
+              // Same footprint as the iOS Switch (51x31), so the real control
+              // swaps in without moving the row.
+              <Skeleton className="h-[31px] w-[51px] shrink-0 rounded-full" />
+            ) : (
+              <Switch
+                value={optionalToggle}
+                disabled={mode === 'review' && savingOptional}
+                accessibilityLabel={t('consent.helpImprove')}
+                onValueChange={handleToggleOptional}
+              />
+            )}
+          </View>
+
+          <Pressable
             onPress={() => {
-              void handlePrimaryAction();
+              router.push(
+                mode === 'review'
+                  ? ('/(app)/consent-details?mode=review' as Href)
+                  : ('/(app)/consent-details' as Href)
+              );
             }}
-            size="lg"
-            accessibilityLabel={actions.primaryLabel}
-            disabled={pendingAction === 'secondary'}
-            loading={pendingAction === 'primary'}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('consent.seeFullDetails')}
+            // The row's own node carries the control-size floor: the link's
+            // text line is 17.5dp, below the audit's 28dp minimum, and the
+            // 8dp slop carries the 44pt region on top of it.
+            className="mt-6 min-h-[28px] flex-row items-center gap-1 active:opacity-70"
           >
-            <Text>{actions.primaryLabel}</Text>
-          </Button>
-          <Button
-            variant={mode === 'review' ? 'destructive' : 'outline'}
-            size="lg"
-            onPress={handleSecondaryAction}
-            accessibilityLabel={actions.secondaryLabel}
-            disabled={pendingAction === 'primary'}
-            loading={pendingAction === 'secondary'}
-          >
-            <Text>{actions.secondaryLabel}</Text>
-          </Button>
+            <Text className="text-sm font-semibold text-primary">
+              {t('consent.seeFullDetails')}
+            </Text>
+            <DirectionalChevronRight size={16} color={colors.primary} />
+          </Pressable>
         </View>
       </ScrollView>
+
+      <View className="gap-3 bg-background px-6 pt-3" style={footerStyle}>
+        {/* The error lives in the pinned footer, not the scroll content: the
+            footer draws over the scroll tail, so a content-placed error was
+            invisible behind the buttons (b911 vr2 device repro — staging
+            error measured at y=792 under the Back/Revoke footer). The
+            one-line slot is always reserved, so an error appears without
+            moving the actions. The privacy disclosure is pinned here too,
+            because at the foot of the scrolling body the footer edge cut the
+            sentence in half. Its font scale is capped so the pinned height
+            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy
+            link's 28dp box overflows its 17.5dp line by 5.25dp, which stays
+            inside this footer's `pt-3` top padding rather than reaching the
+            scroll region above it. */}
+        <ConsentPolicySentence
+          prefix={t('consent.privacyPolicyPrefix')}
+          linkLabel={t('consent.privacyPolicy')}
+          maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
+          onOpenPolicy={handleOpenPrivacy}
+        />
+        <View className="min-h-5 justify-center">
+          <AccessibleStatus message={error ? t(error) : null} className="text-sm" />
+        </View>
+        <Button
+          onPress={() => {
+            void handlePrimaryAction();
+          }}
+          size="lg"
+          accessibilityLabel={actions.primaryLabel}
+          // Accepting before the stored (or carried) choice has loaded would
+          // write the default over a decision the user already made.
+          disabled={pendingAction === 'secondary' || optionalControlPending}
+          loading={pendingAction === 'primary'}
+        >
+          <Text>{actions.primaryLabel}</Text>
+        </Button>
+        <Button
+          variant={mode === 'review' ? 'outline-destructive' : 'outline'}
+          size="lg"
+          onPress={handleSecondaryAction}
+          accessibilityLabel={actions.secondaryLabel}
+          disabled={pendingAction === 'primary'}
+          loading={pendingAction === 'secondary'}
+        >
+          <Text>{actions.secondaryLabel}</Text>
+        </Button>
+      </View>
+      {dialog}
     </View>
   );
 }

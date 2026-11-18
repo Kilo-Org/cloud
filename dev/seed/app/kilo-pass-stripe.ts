@@ -5,8 +5,9 @@ import { kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, or } from 'drizzle-orm';
 import Stripe from 'stripe';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
 
@@ -61,10 +62,6 @@ function printUsage(): void {
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:kilo-pass-stripe e2e-w4b-android-stripe@example.com');
-}
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 async function deleteSeedStripeSubscription(subscriptionId: string): Promise<void> {
@@ -143,6 +140,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (!isValidEmail(email)) {
     throw new Error(`email is not a valid address: ${email}`);
   }
+
+  assertLocalSeedDatabase('app:kilo-pass-stripe');
 
   // Validate Stripe env before any delete so a config error does not cancel a
   // subscription or delete a row first.

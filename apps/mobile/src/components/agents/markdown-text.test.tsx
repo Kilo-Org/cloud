@@ -1,0 +1,1260 @@
+/* eslint-disable max-lines -- the HTML routing, sanitization, and interaction tests share one React Native module mock harness */
+import { type ComponentType, createElement, type ReactElement } from 'react';
+import { type GestureResponderEvent } from 'react-native';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { marked } from 'marked';
+import type * as RenderHtmlExports from '@native-html/render';
+import {
+  buildTREFromConfig,
+  type CustomTagRendererRecord,
+  type DomVisitorCallbacks,
+  type RenderersProps,
+  type TNode,
+} from '@native-html/render';
+
+import { convertHtmlToMarkdown } from './markdown-html-convert';
+import {
+  type MarkdownHtmlSnapshot,
+  splitMarkdownHtml,
+  splitMarkdownHtmlIncremental,
+} from './markdown-html';
+import { isMarkdownImageLoadAllowed, requestMarkdownImageTrust } from './markdown-image-confirm';
+import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
+import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
+import { MarkdownText } from './markdown-text';
+
+const rnStub = vi.hoisted(() => {
+  const stub = {
+    View: 'View',
+    Text: 'Text',
+    Image: 'Image',
+    Pressable: 'Pressable',
+    TouchableHighlight: 'TouchableHighlight',
+    TouchableNativeFeedback: 'TouchableNativeFeedback',
+    Dimensions: { get: () => ({ width: 320, height: 640, scale: 2, fontScale: 1 }) },
+    I18nManager: { isRTL: false },
+    PixelRatio: { get: () => 2 },
+    Platform: { OS: 'ios', select: (values: { ios?: unknown; default?: unknown }) => values.ios },
+    StyleSheet: {
+      create: (styles: Record<string, unknown>) => styles,
+      flatten: (style: unknown) => style,
+      hairlineWidth: 1,
+    },
+    useColorScheme: () => 'light',
+    useWindowDimensions: () => ({ width: 320, height: 640, scale: 2, fontScale: 1 }),
+  };
+  // The real HTML engine requires react-native outside the ESM graph, and the
+  // engine mock below loads it while the imports are evaluated, so the CJS
+  // hook must be installed before any of them (vi.hoisted runs first).
+  const NodeModule = process.getBuiltinModule('module') as unknown as {
+    _load: (request: string, parent: unknown, isMain: boolean) => unknown;
+  };
+  const originalLoad = NodeModule._load.bind(NodeModule);
+  NodeModule._load = (request, parent, isMain) =>
+    request === 'react-native' ? stub : originalLoad(request, parent, isMain);
+  return stub;
+});
+// One stable `t`, like the real hook's: a fresh function per render would
+// recompute every memo that depends on it.
+const translate = vi.hoisted(
+  () => (key: string, options?: { host?: string }) =>
+    options?.host ? `${key}(${options.host})` : key
+);
+
+vi.mock('react-native', () => rnStub);
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronDown: 'ChevronDown',
+}));
+vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+  useTranslation: () => ({ t: translate }),
+}));
+vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: translate } }));
+vi.mock('@native-html/render', async () => ({
+  ...(await vi.importActual<typeof RenderHtmlExports>('@native-html/render')),
+  default: 'RenderHTML',
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => {
+  // One stable object per suite, like the real hook's module-level constants:
+  // a fresh object per call would recreate the palette on every render and
+  // mask remount regressions.
+  const colors = {
+    foreground: '#111111',
+    mutedForeground: '#666666',
+    muted: '#eeeeee',
+    border: '#cccccc',
+    card: '#ffffff',
+    primaryForeground: '#ffffff',
+    primary: '#111111',
+    accentSoftForeground: '#111111',
+    accentSoft: '#eeeeee',
+  };
+  return { useThemeColors: () => colors };
+});
+vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
+  formatTrustedImageHost: (uri: string) => /^https?:\/\/([^/?#]+)/.exec(uri)?.[1] ?? null,
+}));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
+vi.mock('./markdown-code-fence', () => ({ MarkdownCodeFence: 'MarkdownCodeFence' }));
+vi.mock('./markdown-mermaid', () => ({ MarkdownMermaid: 'MarkdownMermaid' }));
+vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
+vi.mock('./markdown-image-confirm', () => ({
+  isMarkdownImageLoadAllowed: vi.fn(() => false),
+  requestMarkdownImageTrust: vi.fn(),
+  subscribeMarkdownImageLoadAllowed: () => () => undefined,
+}));
+vi.mock('./markdown-link', () => ({
+  getLinkAccessibilityActions: (enabled: boolean) =>
+    enabled ? [{ name: 'showLinkActions', label: 'Show link actions' }] : undefined,
+  resolveLinkAccessibilityLabel: (_children: unknown, _href: string, title?: string) =>
+    title ?? 'link',
+}));
+vi.mock('./markdown-link-confirm', () => ({
+  confirmAndOpenMarkdownLink: vi.fn(),
+}));
+
+// Counts the lexes `lexMarkdown` runs; `marked.parse` lexes internally and
+// does not go through this property.
+const lexer = vi.spyOn(marked, 'lexer');
+
+type RenderHtmlHostProps = {
+  baseStyle: Record<string, unknown>;
+  defaultTextProps: { selectable: boolean };
+  domVisitors: DomVisitorCallbacks;
+  enableCSSInlineProcessing: boolean;
+  ignoredDomTags: string[];
+  renderers: CustomTagRendererRecord;
+  renderersProps: Partial<RenderersProps>;
+  source: { html: string };
+  tagsStyles: Record<string, Record<string, unknown>>;
+};
+const RenderHTMLType = 'RenderHTML' as unknown as ComponentType;
+const AnchorType = 'Anchor' as unknown as ComponentType;
+const MarkdownImageType = 'MarkdownImage' as unknown as ComponentType;
+const EnrichedType = 'EnrichedMarkdownText' as unknown as ComponentType;
+const CodeFenceType = 'MarkdownCodeFence' as unknown as ComponentType;
+const MermaidType = 'MarkdownMermaid' as unknown as ComponentType;
+const ImageViewerType = 'ImageViewer' as unknown as ComponentType;
+const TextType = 'Text' as unknown as ComponentType;
+
+type CodeFenceProps = { code: string; language: string | null };
+
+/** The fences the app draws itself, in render order. */
+function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] {
+  return renderer.root.findAllByType(CodeFenceType).map(({ props }) => ({
+    code: (props as CodeFenceProps).code,
+    language: (props as CodeFenceProps).language,
+  }));
+}
+
+type EnrichedHostProps = {
+  markdown: string;
+  markdownStyle: {
+    paragraph: { lineHeight: number; textAlign?: 'right' };
+    h1: { textAlign?: 'right' };
+    list: { lineHeight: number };
+  };
+  onLinkPress: (event: { url: string }) => void;
+  onLinkLongPress?: (event: { url: string }) => void;
+  onImagePress: (event: { url: string; altText: string }) => void;
+};
+
+/** The markdown each native markdown element received, in render order. */
+function markdownSources(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAllByType(EnrichedType)
+    .map(node => (node.props as EnrichedHostProps).markdown);
+}
+
+function enrichedProps(renderer: TestRenderer.ReactTestRenderer): EnrichedHostProps {
+  return renderer.root.findByType(EnrichedType).props as EnrichedHostProps;
+}
+
+async function mount(element: ReactElement): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    await Promise.resolve();
+    ref.current = TestRenderer.create(element);
+  });
+  if (!ref.current) {
+    throw new Error('renderer was not created');
+  }
+  return ref.current;
+}
+
+function htmlProps(renderer: TestRenderer.ReactTestRenderer): RenderHtmlHostProps {
+  return renderer.root.findByType(RenderHTMLType).props as RenderHtmlHostProps;
+}
+
+function visibleText(tnode: TNode): string {
+  if (tnode.type === 'text') {
+    return tnode.data;
+  }
+  return tnode.children.map(visibleText).join('');
+}
+
+async function renderCustom(
+  Renderer: CustomTagRendererRecord[string],
+  tnode: Record<string, unknown>,
+  extra: Record<string, unknown> = {}
+): Promise<TestRenderer.ReactTestRenderer> {
+  const props = { tnode, ...extra };
+  const TestComponent = Renderer as unknown as ComponentType<Record<string, unknown>>;
+  const renderer = await mount(createElement(TestComponent, props));
+  return renderer;
+}
+
+function requiredRenderer(
+  renderers: CustomTagRendererRecord,
+  tag: string
+): CustomTagRendererRecord[string] {
+  const Renderer = renderers[tag];
+  if (!Renderer) {
+    throw new Error(`${tag} renderer was not created`);
+  }
+  return Renderer;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(isMarkdownImageLoadAllowed).mockReturnValue(false);
+  clearMarkdownParseCachesForTests();
+});
+
+describe('MarkdownText HTML routing', () => {
+  it('renders HTML without Array.prototype.toSorted for Hermes clients', async () => {
+    const originalToSorted = Array.prototype.toSorted;
+    // eslint-disable-next-line no-extend-native -- the test reproduces the Hermes runtime without toSorted.
+    Object.defineProperty(Array.prototype, 'toSorted', {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+
+    try {
+      const renderer = await mount(<MarkdownText value="Before <span>HTML</span> after" />);
+
+      expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(1);
+    } finally {
+      // eslint-disable-next-line no-extend-native -- restore the runtime after the Hermes simulation.
+      Object.defineProperty(Array.prototype, 'toSorted', {
+        configurable: true,
+        value: originalToSorted,
+        writable: true,
+      });
+    }
+  });
+
+  it('keeps an empty value on the Markdown path', async () => {
+    const renderer = await mount(<MarkdownText value="" />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(markdownSources(renderer).join('')).toBe('');
+  });
+
+  it('keeps plain Markdown on the Markdown path and hands a fence to the fence renderer', async () => {
+    const value = 'Hello **world**\n\n```html\n<div>code only</div>\n```';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(markdownSources(renderer)).toEqual(['Hello **world**\n\n']);
+    expect(codeFences(renderer)).toEqual([{ code: '<div>code only</div>', language: 'html' }]);
+    expect(lexer).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(<MarkdownText value={value} selectable={false} />);
+    });
+    expect(lexer).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the markdown prefix mounted when the first HTML token arrives', async () => {
+    vi.mocked(isMarkdownImageLoadAllowed).mockReturnValue(true);
+    const renderer = await mount(<MarkdownText value={'![shot](https://example.com/s.png)\n\n'} />);
+    act(() => {
+      enrichedProps(renderer).onImagePress({ url: 'https://example.com/s.png', altText: 'shot' });
+    });
+    expect(renderer.root.findAllByType(ImageViewerType)).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        <MarkdownText
+          value={'![shot](https://example.com/s.png)\n\n<section>HTML block</section>'}
+        />
+      );
+    });
+
+    expect(renderer.root.findAllByType(RenderHTMLType)[0]?.props.source).toEqual({
+      html: '<section>HTML block</section>',
+    });
+    // A root type change would remount the markdown prefix and drop its local
+    // state; streaming must keep the original element so the viewer stays open.
+    expect(renderer.root.findAllByType(ImageViewerType)).toHaveLength(1);
+  });
+
+  it('keeps Markdown blocks on their renderer and keeps inline HTML in one flow', async () => {
+    const image = '<img src="https://example.com/a.png" width="40" height="20">';
+    const value = `# Heading\n\nBefore <span>HTML</span> and **Markdown**.\n\n- one\n- two\n\n[Docs](https://example.com)\n\n${image}`;
+    const renderer = await mount(<MarkdownText value={value} />);
+    const htmlNodes = renderer.root.findAllByType(RenderHTMLType);
+
+    expect(markdownSources(renderer)).toEqual([
+      '# Heading\n\n',
+      '\n\n- one\n- two\n\n[Docs](https://example.com)\n\n',
+    ]);
+    expect(htmlNodes.map(node => node.props.source)).toEqual([
+      { html: '<p>Before <span>HTML</span> and <strong>Markdown</strong>.</p>\n' },
+      { html: image },
+    ]);
+    const props = htmlNodes[0]?.props as RenderHtmlHostProps;
+    expect(props.baseStyle).toMatchObject({ color: '#111111', fontSize: 16, lineHeight: 24 });
+    expect(props.defaultTextProps).toEqual({ selectable: true });
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(<MarkdownText value={value} selectable={false} />);
+    });
+    expect(renderer.root.findAllByType(RenderHTMLType)[0]?.props.source).toBe(props.source);
+  });
+
+  it('routes inline HTML inside a Markdown heading', async () => {
+    const renderer = await mount(<MarkdownText value="# Heading <span>HTML</span>" />);
+
+    expect(markdownSources(renderer)).toEqual([]);
+    expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
+      { html: '<h1>Heading <span>HTML</span></h1>\n' },
+    ]);
+    expect(htmlProps(renderer).tagsStyles).toMatchObject({
+      h1: { fontSize: 22, fontWeight: '700' },
+      h2: { fontSize: 20, fontWeight: '700' },
+      h3: { fontSize: 18, fontWeight: '700' },
+      h4: { fontSize: 16, fontWeight: '700' },
+      h5: { fontSize: 15, fontWeight: '700' },
+      h6: { fontSize: 14, fontWeight: '700' },
+    });
+  });
+
+  it('styles HTML text like equivalent Markdown text', async () => {
+    const renderer = await mount(
+      <MarkdownText value='<p>Body <strong>bold</strong> <a href="https://example.com">link</a></p><blockquote>quote</blockquote>' />
+    );
+
+    expect(htmlProps(renderer).tagsStyles).toMatchObject({
+      a: { color: '#111111', textDecorationLine: 'underline' },
+      blockquote: { borderLeftColor: '#cccccc', borderLeftWidth: 3, paddingLeft: 12 },
+      p: { marginVertical: 2, paddingVertical: 0 },
+      strong: { color: '#111111', fontWeight: '700' },
+    });
+  });
+
+  it('leaves the HTML blockquote start rule to RN physical-edge mirroring in RTL', async () => {
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const renderer = await mount(<MarkdownText value="> <u>quoted</u>" />);
+
+      // RN mirrors physical left/right padding, margin, and borders under RTL
+      // (`doLeftAndRightSwapInRTL` defaults to true), so the rule stays on the
+      // physical left edge and lands on the right edge of an RTL layout.
+      // Choosing the side from `I18nManager.isRTL` here would double-mirror it
+      // back to the left.
+      expect(htmlProps(renderer).tagsStyles.blockquote).toMatchObject({
+        borderLeftColor: '#cccccc',
+        borderLeftWidth: 3,
+        paddingLeft: 12,
+      });
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('borderRightWidth');
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('paddingRight');
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
+  });
+
+  it('does not match raw HTML inside a preceding code span', async () => {
+    const renderer = await mount(<MarkdownText value="Before `<span>` <span>HTML</span> after" />);
+
+    expect(markdownSources(renderer)).toEqual([]);
+    expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
+      { html: '<p>Before <code>&lt;span&gt;</code> <span>HTML</span> after</p>\n' },
+    ]);
+  });
+
+  it('keeps inline HTML inside a blockquote on the Markdown path', async () => {
+    const value = '> <div>quoted</div>';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(markdownSources(renderer)).toEqual([value]);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it('renders HTML links and strong text in a list item natively as markdown', async () => {
+    const value =
+      '- Markdown: [example](https://example.com)\n- HTML: <a href="https://example.com">HTML link</a>\n- <strong>HTML strong</strong>';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(markdownSources(renderer)).toEqual([
+      '- Markdown: [example](https://example.com)\n- HTML: [HTML link](https://example.com)\n- **HTML strong**',
+    ]);
+  });
+
+  it('routes HTML headings nested in a list item to the styled HTML renderer', async () => {
+    const renderer = await mount(<MarkdownText value={'- <h2>HTML heading</h2>\n- text'} />);
+
+    expect(htmlProps(renderer).source.html).toContain('<h2>HTML heading</h2>');
+  });
+
+  it('routes styled inline HTML with no markdown form inside a blockquote to the HTML renderer', async () => {
+    const value = '> Press <u>Ctrl</u> and <a href="https://example.com">HTML link</a>';
+    const renderer = await mount(<MarkdownText value={value} />);
+    const props = htmlProps(renderer);
+
+    expect(props.source.html).toContain('<blockquote>');
+    expect(props.source.html).toContain('<u>Ctrl</u>');
+    expect(props.source.html).toContain('<a href="https://example.com">HTML link</a>');
+    expect(props.tagsStyles).toMatchObject({ a: { textDecorationLine: 'underline' } });
+  });
+
+  it('keeps a list with a fenced code block on the Markdown renderer', async () => {
+    const value =
+      '- item <a href="https://example.com">HTML link</a>\n\n  ```js\n  const a = 1;\n  ```\n';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(markdownSources(renderer)).toEqual([
+      '- item [HTML link](https://example.com)\n\n  ```js\n  const a = 1;\n  ```\n',
+    ]);
+  });
+
+  it.each([
+    ['link', '[<b>bold</b>](https://example.com)', '[**bold**](https://example.com)'],
+    ['emphasis', '*<b>bold</b>*', '***bold***'],
+    ['strong', '**<i>bold</i>**', '***bold***'],
+  ])('converts inline HTML inside Markdown %s to markdown', async (_name, value, markdown) => {
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(markdownSources(renderer)).toEqual([markdown]);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it('keeps a table with inline HTML on the Markdown path', async () => {
+    const value = '| Path | Note |\n| ---- | ---- |\n| a/b | line1<br>line2 |';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(markdownSources(renderer)).toEqual([value]);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it('keeps a table around block HTML on the Markdown path and the fence on its own renderer', async () => {
+    const value =
+      '| Name |\n| --- |\n| Kilo |\n\n<section>safe HTML</section>\n\n```ts\nconst answer = 42;\n```';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
+      { html: '<section>safe HTML</section>' },
+    ]);
+    const sources = markdownSources(renderer);
+    expect(sources[0]).toContain('| Kilo |');
+    expect(sources.join('')).not.toContain('const answer = 42;');
+    expect(codeFences(renderer)).toEqual([{ code: 'const answer = 42;', language: 'ts' }]);
+  });
+
+  it('routes block HTML and removes active, style, form, media, SVG, and metadata nodes', async () => {
+    const value =
+      '<section onclick="run()">safe</section><script>script text</script><style>style text</style><iframe src="https://x">frame text</iframe><object>object text</object><video>media text</video><form>form text</form><svg>svg text</svg><title>meta text</title>';
+    const renderer = await mount(<MarkdownText value={value} />);
+    const props = htmlProps(renderer);
+
+    expect(props.source.html).toContain('safe</section>');
+    expect(props.enableCSSInlineProcessing).toBe(false);
+    expect(props.ignoredDomTags).toEqual(
+      expect.arrayContaining(['link', 'frame', 'embed', 'source', 'track', 'input', 'base', 'meta'])
+    );
+    expect(props.source).not.toHaveProperty('uri');
+
+    const engine = buildTREFromConfig({
+      baseStyle: props.baseStyle,
+      domVisitors: props.domVisitors,
+      enableCSSInlineProcessing: props.enableCSSInlineProcessing,
+      ignoredDomTags: props.ignoredDomTags,
+    });
+    expect(visibleText(engine.buildTTree(props.source.html))).toBe('safe');
+  });
+
+  it('keeps a picture fallback image while clearing its removed children', async () => {
+    const renderer = await mount(
+      <MarkdownText value='<picture><source srcset="https://example.com/a.webp"><script>evil()</script><img src="https://example.com/a.png" alt="shot"></picture>' />
+    );
+    const props = htmlProps(renderer);
+    const engine = buildTREFromConfig({
+      baseStyle: props.baseStyle,
+      domVisitors: props.domVisitors,
+      enableCSSInlineProcessing: props.enableCSSInlineProcessing,
+      ignoredDomTags: props.ignoredDomTags,
+    });
+    const images: TNode[] = [];
+    const visit = (node: TNode): void => {
+      if (node.tagName === 'img') {
+        images.push(node);
+      }
+      for (const child of node.children) {
+        visit(child);
+      }
+    };
+    visit(engine.buildTTree(props.source.html));
+
+    expect(images).toHaveLength(1);
+    expect(images[0]?.attributes.src).toBe('https://example.com/a.png');
+    expect(visibleText(engine.buildTTree(props.source.html))).toBe('');
+  });
+
+  it('renders an active-content-only source as an empty native tree', async () => {
+    const renderer = await mount(<MarkdownText value="<script>alert('bad')</script>" />);
+    const props = htmlProps(renderer);
+    const engine = buildTREFromConfig({
+      domVisitors: props.domVisitors,
+      ignoredDomTags: props.ignoredDomTags,
+    });
+
+    expect(visibleText(engine.buildTTree(props.source.html))).toBe('');
+  });
+});
+
+describe('MarkdownText HTML links and images', () => {
+  it('routes a linked image press with the link accessibility label', async () => {
+    const onPressLink = vi.fn(() => true);
+    const value = 'Text <img src="http://example.com/a.png" alt="shot">';
+    const renderer = await mount(<MarkdownText value={value} />);
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(<MarkdownText value={value} onPressLink={onPressLink} />);
+    });
+    const ImageRenderer = requiredRenderer(htmlProps(renderer).renderers, 'img');
+    const image = await renderCustom(ImageRenderer, {
+      attributes: { src: 'https://example.com/a.png', alt: 'shot' },
+      parent: {
+        tagName: 'a',
+        attributes: { href: 'https://example.com', title: 'Example' },
+        parent: null,
+      },
+    });
+    const imageProps = image.root.findByType(MarkdownImageType).props as Record<string, unknown>;
+
+    expect(imageProps.accessibilityLabel).toBe('Example');
+    expect(imageProps.onPress).toBeTypeOf('function');
+    (imageProps.onPress as () => void)();
+    expect(onPressLink).toHaveBeenCalledWith('https://example.com');
+    expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
+  });
+
+  it('routes anchor press and long press without forwarding executable attributes', async () => {
+    const onPressLink = vi.fn(() => true);
+    const onLongPressLink = vi.fn<(href: string, event?: GestureResponderEvent) => void>();
+    const renderer = await mount(
+      <MarkdownText
+        value='<a href="https://example.com" onclick="run()">Docs</a>'
+        onPressLink={onPressLink}
+        onLongPressLink={onLongPressLink}
+      />
+    );
+    const props = htmlProps(renderer);
+    const onPress = props.renderersProps.a?.onPress;
+    if (!onPress) {
+      throw new Error('anchor press handler was not created');
+    }
+    const event = undefined as never;
+    onPress(event, 'https://example.com', { title: 'Docs' }, '_blank');
+    expect(onPressLink).toHaveBeenCalledWith('https://example.com');
+    expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
+    onPressLink.mockReturnValue(false);
+    onPress(event, 'https://example.com', { title: 'Docs' }, '_blank');
+    expect(confirmAndOpenMarkdownLink).toHaveBeenCalledWith('https://example.com', {
+      label: 'Docs',
+    });
+
+    const anchor = await renderCustom(
+      requiredRenderer(props.renderers, 'a'),
+      { attributes: { href: 'https://example.com', onclick: 'run()' } },
+      { InternalRenderer: 'Anchor', textProps: {} }
+    );
+    const textProps = anchor.root.findByType(AnchorType).props.textProps as Record<string, unknown>;
+    expect(textProps).not.toHaveProperty('onclick');
+    expect(textProps).not.toHaveProperty('onClick');
+    (textProps.onLongPress as (event: never) => void)(event);
+    expect(onLongPressLink).toHaveBeenCalledWith('https://example.com', undefined);
+  });
+
+  it.each([
+    ['missing dimensions', { src: 'https://example.com/a.png' }],
+    ['unparsable dimensions', { src: 'https://example.com/a.png', width: '400px', height: '900' }],
+    ['empty height', { src: 'https://example.com/a.png', width: '400', height: '' }],
+    ['zero width', { src: 'https://example.com/a.png', width: '0', height: '900' }],
+    ['negative width', { src: 'https://example.com/a.png', width: '-400', height: '900' }],
+  ])('leaves the aspect ratio to onLoad measurement: %s', async (_name, attributes) => {
+    const renderer = await mount(<MarkdownText value='<img src="http://example.com/a.png">' />);
+    const ImageRenderer = requiredRenderer(htmlProps(renderer).renderers, 'img');
+    const rendered = await renderCustom(ImageRenderer, { attributes, parent: null });
+    expect(rendered.root.findByType(MarkdownImageType).props.aspectRatio).toBeUndefined();
+  });
+
+  it('keeps a valid portrait dimension pair on the clamped ratio path', async () => {
+    const renderer = await mount(<MarkdownText value='<img src="http://example.com/a.png">' />);
+    const ImageRenderer = requiredRenderer(htmlProps(renderer).renderers, 'img');
+    const portrait = await renderCustom(ImageRenderer, {
+      attributes: { src: 'https://example.com/a.png', width: '1170', height: '2532' },
+      parent: null,
+    });
+    expect(portrait.root.findByType(MarkdownImageType).props.aspectRatio).toBe(0.75);
+  });
+
+  it('routes supported images with a fixed ratio and renders unsupported alt text', async () => {
+    const renderer = await mount(
+      <MarkdownText value='Text <img src="https://example.com/a.png" width="400" height="200">' />
+    );
+    const ImageRenderer = requiredRenderer(htmlProps(renderer).renderers, 'img');
+    const supported = await renderCustom(ImageRenderer, {
+      attributes: {
+        src: 'https://example.com/a.png',
+        alt: 'shot',
+        width: '400',
+        height: '200',
+      },
+      parent: null,
+    });
+    expect(supported.root.findByType(MarkdownImageType).props).toMatchObject({
+      uri: 'https://example.com/a.png',
+      alt: 'shot',
+      aspectRatio: 2,
+    });
+
+    const http = await renderCustom(ImageRenderer, {
+      attributes: { src: 'http://example.com/a.png' },
+      parent: null,
+    });
+    const data = await renderCustom(ImageRenderer, {
+      attributes: { src: 'data:image/png;base64,abc' },
+      parent: null,
+    });
+    expect([
+      http.root.findByType(MarkdownImageType).props.uri,
+      data.root.findByType(MarkdownImageType).props.uri,
+    ]).toEqual(['http://example.com/a.png', 'data:image/png;base64,abc']);
+
+    const unsupported = await renderCustom(ImageRenderer, {
+      attributes: { src: 'file:///secret.png', alt: 'diagram' },
+      parent: null,
+    });
+    const textProps = unsupported.root.findByType(TextType).props;
+    expect(textProps).toMatchObject({
+      children: 'diagram',
+      selectable: true,
+    });
+    expect(textProps).not.toHaveProperty('onPress');
+    expect(unsupported.root.findAllByType(MarkdownImageType)).toHaveLength(0);
+
+    const empty = await renderCustom(ImageRenderer, {
+      attributes: { src: '' },
+      parent: null,
+    });
+    expect(empty.root.findByType(TextType).props.children).toBe('');
+    expect(empty.root.findAllByType(MarkdownImageType)).toHaveLength(0);
+  });
+});
+
+describe('MarkdownText mermaid fences', () => {
+  it('draws a closed mermaid fence as a diagram between its markdown runs', async () => {
+    const renderer = await mount(
+      <MarkdownText value={'Before\n\n```mermaid\ngraph TD\n  A --> B\n```\n\nAfter'} />
+    );
+
+    expect(renderer.root.findAllByType(MermaidType).map(node => node.props.source)).toEqual([
+      'graph TD\n  A --> B',
+    ]);
+    expect(markdownSources(renderer)).toEqual(['Before\n\n', '\nAfter']);
+    expect(codeFences(renderer)).toHaveLength(0);
+  });
+
+  it('draws a streaming (unclosed) mermaid fence as code until it closes', async () => {
+    const value = 'Before\n\n```mermaid\ngraph TD\n  A --> B';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(MermaidType)).toHaveLength(0);
+    expect(codeFences(renderer)).toEqual([{ code: 'graph TD\n  A --> B', language: 'mermaid' }]);
+  });
+});
+
+describe('MarkdownText markdown links and images', () => {
+  it('falls back to confirm-and-open when the host link handler returns falsy', async () => {
+    const onPressLink = vi.fn(() => false);
+    const renderer = await mount(
+      <MarkdownText value="[Docs](https://example.com)" onPressLink={onPressLink} />
+    );
+
+    enrichedProps(renderer).onLinkPress({ url: 'https://example.com' });
+    expect(onPressLink).toHaveBeenCalledWith('https://example.com');
+    expect(confirmAndOpenMarkdownLink).toHaveBeenCalledWith('https://example.com');
+
+    vi.mocked(confirmAndOpenMarkdownLink).mockClear();
+    onPressLink.mockReturnValue(true);
+    enrichedProps(renderer).onLinkPress({ url: 'https://example.com' });
+    expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
+  });
+
+  it('opens the image viewer when a displayed image is pressed', async () => {
+    vi.mocked(isMarkdownImageLoadAllowed).mockReturnValue(true);
+    const renderer = await mount(<MarkdownText value="![shot](https://example.com/a.png)" />);
+
+    expect(renderer.root.findAllByType(ImageViewerType)).toHaveLength(0);
+    act(() => {
+      enrichedProps(renderer).onImagePress({ url: 'https://example.com/a.png', altText: 'shot' });
+    });
+    expect(renderer.root.findByType(ImageViewerType).props).toMatchObject({
+      visible: true,
+      uri: 'https://example.com/a.png',
+      filename: 'shot',
+    });
+  });
+
+  it('never hands an untrusted or non-HTTPS image URL to the native view', async () => {
+    const code = '`![shot](https://tracker.example/pixel.png)`';
+    const value = [
+      'Look: ![shot](https://tracker.example/pixel.png)',
+      '- ![plain](http://plain.example/a.png)',
+      '| a |\n| --- |\n| ![cell](https://cell.example/c.png) |',
+      '[![badge](https://badge.example/b.svg)](https://ci.example)',
+      `Code ${code} stays literal.`,
+    ].join('\n\n');
+    const renderer = await mount(<MarkdownText value={value} />);
+    const [markdown = ''] = markdownSources(renderer);
+    const outsideCode = markdown.replace(code, '');
+
+    for (const url of [
+      'https://tracker.example',
+      'http://plain.example',
+      'https://cell.example',
+      'https://badge.example',
+    ]) {
+      expect(outsideCode).not.toContain(url);
+    }
+    expect(markdown).toContain(code);
+    expect(markdown).toContain('(https://ci.example)');
+  });
+
+  it('turns an untrusted image into a Load link that asks for trust', async () => {
+    const value = '![shot](https://tracker.example/pixel.png)';
+    const onPressLink = vi.fn(() => false);
+    const renderer = await mount(<MarkdownText value={value} onPressLink={onPressLink} />);
+    const loadUrl = /\]\(([^)]+)\)$/.exec(markdownSources(renderer)[0] ?? '')?.[1] ?? '';
+
+    enrichedProps(renderer).onLinkPress({ url: loadUrl });
+    expect(requestMarkdownImageTrust).toHaveBeenCalledWith('https://tracker.example/pixel.png');
+    expect(onPressLink).not.toHaveBeenCalled();
+    expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
+
+    vi.mocked(isMarkdownImageLoadAllowed).mockReturnValue(true);
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(<MarkdownText value={value} onPressLink={onPressLink} />);
+    });
+    expect(markdownSources(renderer)).toEqual([value]);
+  });
+});
+
+describe('MarkdownText HTML converted to markdown', () => {
+  it('gates a converted HTML image like a markdown image', async () => {
+    const renderer = await mount(
+      <MarkdownText value='<img src="https://tracker.example/pixel.png" alt="shot">' />
+    );
+    const markdown = markdownSources(renderer)[0] ?? '';
+    const loadUrl = /\]\(([^)]+)\)$/.exec(markdown)?.[1] ?? '';
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(markdown).not.toContain('![shot](https://tracker.example/pixel.png)');
+    enrichedProps(renderer).onLinkPress({ url: loadUrl });
+    expect(requestMarkdownImageTrust).toHaveBeenCalledWith('https://tracker.example/pixel.png');
+  });
+
+  it('confirms a converted HTML link before opening it', async () => {
+    const renderer = await mount(<MarkdownText value='<a href="https://example.com">Docs</a>' />);
+
+    expect(markdownSources(renderer)).toEqual(['[Docs](https://example.com)']);
+    enrichedProps(renderer).onLinkPress({ url: 'https://example.com' });
+    expect(confirmAndOpenMarkdownLink).toHaveBeenCalledWith('https://example.com');
+  });
+
+  it('keeps a literal tag in a code fence as code', async () => {
+    const value = 'Bold in HTML:\n\n```html\n<b>x</b>\n```';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(markdownSources(renderer)).toEqual(['Bold in HTML:\n\n']);
+    expect(codeFences(renderer)).toEqual([{ code: '<b>x</b>', language: 'html' }]);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it('grows a streamed inline tag as markdown without detouring through the HTML engine', async () => {
+    const renderer = await mount(<MarkdownText value="Say <b>wor" />);
+    const publish = async (value: string) => {
+      await act(async () => {
+        await Promise.resolve();
+        renderer.update(<MarkdownText value={value} />);
+      });
+      return markdownSources(renderer);
+    };
+
+    expect(markdownSources(renderer)).toEqual(['Say **wor**']);
+    expect(await publish('Say <b>word</')).toEqual(['Say **word**']);
+    expect(await publish('Say <b>word</b> done')).toEqual(['Say **word** done']);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it('renders a details element with a markdown body as one HTML block', async () => {
+    const renderer = await mount(
+      <MarkdownText
+        value={'<details>\n<summary>More</summary>\n\n**Body** text\n\n</details>\n\nAfter'}
+      />
+    );
+    const html = renderer.root
+      .findAllByType(RenderHTMLType)
+      .map(node => (node.props as RenderHtmlHostProps).source.html);
+
+    expect(html).toHaveLength(1);
+    expect(html[0]).toContain('<summary>More</summary>');
+    expect(html[0]).toContain('<strong>Body</strong> text');
+    expect(html[0]).toContain('</details>');
+    expect(markdownSources(renderer)).toEqual(['\n\nAfter']);
+  });
+});
+
+// Paragraphs, headings, lists, blockquotes, a fenced code block holding
+// `<div>`, inline `<span>` HTML, a list whose item carries inline HTML, a loose
+// list (blank line between items) whose first item carries inline HTML, an
+// ordered loose list whose second item arrives as a bare number first, a list
+// continuation line, a tab-only separator, a CRLF document, a GFM table, and
+// links. Streamed one character at a time to cover every prefix.
+const INCREMENTAL_CORPUS = [
+  // GitHub-style details with a markdown body: the blank lines split it into
+  // several tokens that render as one HTML segment, and the closing tag regroups
+  // every token after the opener, so an open details element stays in the tail.
+  'Intro\n\n<details>\n<summary>More <b>info</b></summary>\n\nA **markdown** body\n\n- item\n\n</details>\n\n',
+  'A plain opening paragraph with ordinary prose.\n\n',
+  '# A heading with a plain line\n\n',
+  'A paragraph with a [link](https://example.com/page) and **emphasis**.\n\n',
+  '- first item\n- second item\n- third item\n\n',
+  '> a blockquote line\n> continued on a second line\n\n',
+  '```html\n<div>fenced code only</div>\n```\n\n',
+  'Inline <span>HTML</span> inside a paragraph.\n\n',
+  '| Name | Note |\n| ---- | ---- |\n| Kilo | a/b |\n\n',
+  // Duplicate link reference definitions: marked drops the later
+  // definition's raw text, so the value's tokens no longer tile the source
+  // and a raw-length offset is not a source offset. The head must not be
+  // reused for such a value.
+  '[ref]: https://example.com\n\n[ref]: https://other.example\n\nSee [ref].\n\n',
+  '- a list with an <a href="https://example.com/page">inline HTML link</a>\n- and a plain item\n\n',
+  // A loose list is one token whose `loose` flag flips on when the blank line
+  // between items arrives; the head must not freeze the list before that.
+  '- a loose list starting with an <a href="https://example.com/page">inline HTML link</a>\n\n- and a plain second item\n\n',
+  // An ordered loose list whose second item arrives as a bare number first:
+  // `1. Click <b>Save</b>\n\n2.` lexes as a list plus a paragraph, and the
+  // trailing `.` turns that paragraph into the list's second item, growing the
+  // list token retroactively. The head must not have frozen the list.
+  '1. Click <b>Save</b>\n\n2. Restart the app\n\n',
+  // The same shape without the marker: `2` after a blank line stays a paragraph
+  // until a `.` arrives, then joins the list above it.
+  '- ordered items follow\n\n2\n\n2. and the second one\n\n',
+  // A paragraph lazily continues over a line that does not interrupt it, so a
+  // later list line can pull an earlier line back into the paragraph.
+  '<b>x</b>\n2. b\n- x\n\n',
+  // A paragraph directly abutting a list item: `<b>x</b>\n2. b \n-` lexes as a
+  // paragraph, a list, a space, and a list with no stable separator between the
+  // paragraph and the first list. Completing the bullet merges `2. b ` back into
+  // the paragraph, so the boundary must back up over the paragraph's whole run.
+  '<b>x</b>\n2. b \n- i\n\n',
+  // A line holding only a tab does not end a paragraph in marked's GFM
+  // paragraph tokenizer: `…\n\t\n` lexes as a paragraph plus a `space` token
+  // while the next line does not interrupt the paragraph, but as one paragraph
+  // once that line becomes a list item. A boundary drawn after that `space`
+  // token would freeze a paragraph the next append pulls the tab line back
+  // into.
+  'Paragraph <b>bold</b> before a tab separator\n\t\n- item after the tab separator\n\n',
+  // marked normalizes `\r\n` to `\n` inside token raws, so a raw-length offset
+  // is no longer a source offset. A value with a carriage return must never
+  // reuse a head.
+  'Paragraph <b>bold</b> before a CRLF\r\n\r\n- item after the CRLF\r\n\r\n',
+  'Closing paragraph with [Docs](https://example.com/docs).\n\n',
+].join('');
+
+const STREAM_STEPS = 40;
+
+// Block fragments whose token boundaries move when an append arrives: an item
+// marker that only becomes a list item once its dot lands (`2.`), a loose list
+// that flips tight→loose, a paragraph a later line can interrupt or extend, a
+// fence that swallows the rest, and a table whose delimiter row has not
+// arrived. Every ordered pair is streamed prefix by prefix, adjacent and after
+// a blank line, so the adjacency that froze a streamed ordered list is always
+// generated. The corpus above is hand-picked; the boundary bug that froze that
+// list was found by a fuzz, not by a corpus.
+const FUZZ_FRAGMENTS = [
+  'plain paragraph text',
+  '- plain list item',
+  '1. Click <b>Save</b>',
+  '2. Restart the app',
+  '3. <b>third</b>',
+  '2.',
+  '2',
+  '1. first',
+  '<b>bold</b> text',
+  '- item with <b>html</b>',
+  '- <a href="https://example.com/page">link item</a>',
+  '- a loose list with <b>html</b>',
+  '> quoted',
+  '> more quote',
+  '# heading',
+  '---',
+  '```',
+  '<div>code</div>',
+  '```',
+  '<span>inline HTML</span>',
+  '| a | b |',
+  '| --- | --- |',
+  ':-',
+  'continuation line',
+  '  inset continuation',
+  'a | b',
+  '[ref]: https://example.com',
+  '[ref]: https://other.example',
+  '<details><summary>s</summary>',
+  '</details>',
+];
+
+function lexedCharacterCount(): number {
+  return lexer.mock.calls.reduce((total, [source]) => total + source.length, 0);
+}
+
+/** The first prefix of `value` whose incremental split differs from the whole-value split. */
+function firstDivergence(value: string): string {
+  let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+  for (let index = 1; index <= value.length; index += 1) {
+    const prefix = value.slice(0, index);
+    const incremental = splitMarkdownHtmlIncremental(prefix, snapshot);
+    snapshot = incremental.snapshot;
+    const whole = splitMarkdownHtml(prefix);
+    if (JSON.stringify(incremental.segments) !== JSON.stringify(whole)) {
+      return `${JSON.stringify(value)} at ${index}: ${JSON.stringify(incremental.segments)} != ${JSON.stringify(whole)}`;
+    }
+  }
+  return '';
+}
+
+describe('splitMarkdownHtmlIncremental', () => {
+  it('matches the whole-value split for every prefix of the corpus', () => {
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    for (let index = 1; index <= INCREMENTAL_CORPUS.length; index += 1) {
+      const value = INCREMENTAL_CORPUS.slice(0, index);
+      const incremental = splitMarkdownHtmlIncremental(value, snapshot);
+      snapshot = incremental.snapshot;
+      expect(incremental.segments, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toEqual(
+        splitMarkdownHtml(value)
+      );
+    }
+  });
+
+  it('matches the whole-value split for every converted prefix of the corpus', () => {
+    // Converting HTML re-closes an open tag at the end of each prefix, so the
+    // tail is rewritten in place (`**wor**` → `**word**`) instead of growing.
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    for (let index = 1; index <= INCREMENTAL_CORPUS.length; index += 1) {
+      const value = convertHtmlToMarkdown(INCREMENTAL_CORPUS.slice(0, index));
+      const incremental = splitMarkdownHtmlIncremental(value, snapshot);
+      snapshot = incremental.snapshot;
+      expect(incremental.segments, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toEqual(
+        splitMarkdownHtml(value)
+      );
+    }
+  });
+
+  it('keeps the snapshot to the fields the next parse reuses', () => {
+    // The snapshot is the only cross-publish state, so every field must be read
+    // by the next call. `headHasHtml` was written on every snapshot but never
+    // read; the snapshot must not carry a dead field again.
+    const { snapshot } = splitMarkdownHtmlIncremental('<b>bold</b> and text\n\nnext\n\n');
+
+    expect(Object.keys(snapshot).toSorted()).toEqual([
+      'hasDefinition',
+      'headSegments',
+      'tailStart',
+      'value',
+    ]);
+  });
+
+  it('keeps a streamed loose list with an inline-HTML first item in one html segment', () => {
+    // A trailing blank line does not close the list: the new item joins it and
+    // flips it from tight to loose, so the frozen head must not hold the list.
+    const opening = '- <a href="https://example.com/page">inline HTML link</a>\n\n';
+    const completed = `${opening}- a plain second item`;
+
+    const first = splitMarkdownHtmlIncremental(opening);
+    const second = splitMarkdownHtmlIncremental(completed, first.snapshot);
+
+    expect(second.segments).toEqual(splitMarkdownHtml(completed));
+    expect(second.segments).toHaveLength(1);
+    expect(second.segments[0]?.type).toBe('html');
+    // The loose list wraps each item in a paragraph; a frozen tight head would
+    // render `<li>inline HTML link</li>` plus a separate second list.
+    expect(second.segments[0]?.raw).toContain('<li><p>');
+    expect(second.segments[0]?.raw).toContain('a plain second item');
+  });
+
+  it('keeps a streamed ordered loose list in one html segment when the next item starts as a bare number', () => {
+    // `1. Click <b>Save</b>\n\n2.` lexes as a list plus a paragraph; the next
+    // `.` turns that paragraph into the list's second item, so the list token
+    // grows retroactively. A head that froze the tight one-item list would
+    // render `<li>Click <b>Save</b></li>` plus a separate `\n\n2.` markdown
+    // segment instead of the loose two-item list a whole-value lex produces.
+    const opening = '1. Click <b>Save</b>\n\n';
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    for (const value of [opening, `${opening}2.`, `${opening}2. Restart the app`]) {
+      const result = splitMarkdownHtmlIncremental(value, snapshot);
+      snapshot = result.snapshot;
+      expect(result.segments, value).toEqual(splitMarkdownHtml(value));
+    }
+
+    const segments = splitMarkdownHtml(`${opening}2. Restart the app`);
+    expect(segments).toHaveLength(1);
+    expect(segments[0]?.type).toBe('html');
+    expect(segments[0]?.raw).toContain('<li><p>Click <b>Save</b></p>');
+    expect(segments[0]?.raw).toContain('Restart the app');
+  });
+
+  it('keeps a paragraph a later list item merges into out of the frozen head', () => {
+    // `<b>x</b>\n2. b \n-` lexes as a paragraph, a list, a space, and a list; the
+    // paragraph directly abuts the first list with no stable separator between
+    // them, so the paragraph's whole run is still in play. Completing the bullet
+    // (`- i`) merges `2. b ` back into the paragraph: a boundary that stopped on
+    // the list would freeze the truncated paragraph and the stream would keep
+    // the wrong split for the rest of the message.
+    const value = '<b>x</b>\n2. b \n- i';
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    for (let index = 1; index <= value.length; index += 1) {
+      const prefix = value.slice(0, index);
+      const incremental = splitMarkdownHtmlIncremental(prefix, snapshot);
+      snapshot = incremental.snapshot;
+      expect(incremental.segments, `prefix ${index} (${JSON.stringify(prefix)})`).toEqual(
+        splitMarkdownHtml(prefix)
+      );
+    }
+
+    const segments = splitMarkdownHtml(value);
+    expect(segments).toHaveLength(2);
+    expect(segments[0]?.type).toBe('html');
+    expect(segments[0]?.raw).toContain('2. b ');
+    expect(segments[1]).toEqual({ type: 'markdown', raw: '- i' });
+  });
+
+  it('re-lexes the streaming tail, far less than the full prefix length', () => {
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    let value = '<span>start</span>\n\n';
+    let fullPrefixCharacters = 0;
+    for (let index = 1; index <= STREAM_STEPS; index += 1) {
+      value += `## Heading ${index}\n\nParagraph body ${index} with a few words.\n\n- item ${index}\n- item ${index} again\n\n`;
+      snapshot = splitMarkdownHtmlIncremental(value, snapshot).snapshot;
+      fullPrefixCharacters += value.length;
+    }
+    const lexedCharacters = lexedCharacterCount();
+
+    // eslint-disable-next-line no-console -- the request asks the PR to quote these totals
+    console.log(
+      `splitMarkdownHtmlIncremental lexed ${lexedCharacters} chars in ${lexer.mock.calls.length} lexes; the full prefixes total ${fullPrefixCharacters} chars`
+    );
+    expect(lexedCharacters).toBeLessThan(fullPrefixCharacters / 4);
+  });
+
+  it('never lexes a `<`-free stream (whole-value fast path)', () => {
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    let value = '';
+    let fullPrefixCharacters = 0;
+    for (let index = 1; index <= STREAM_STEPS; index += 1) {
+      value += `Paragraph ${index} with a few words.\n\n`;
+      snapshot = splitMarkdownHtmlIncremental(value, snapshot).snapshot;
+      fullPrefixCharacters += value.length;
+    }
+
+    // eslint-disable-next-line no-console -- the request asks the PR to quote these totals
+    console.log(
+      `splitMarkdownHtmlIncremental lexed ${lexedCharacterCount()} chars for a ${fullPrefixCharacters}-char \`<\`-free stream`
+    );
+    expect(lexer).not.toHaveBeenCalled();
+  });
+
+  it('matches the whole-value split for every ordered pair of block fragments', () => {
+    const documents = FUZZ_FRAGMENTS.flatMap(first =>
+      FUZZ_FRAGMENTS.flatMap(second =>
+        (['\n', '\n\n'] as const).map(separator => `${first}${separator}${second}\n`)
+      )
+    );
+    let mismatch = '';
+    for (const document of documents) {
+      mismatch = firstDivergence(document);
+      if (mismatch !== '') {
+        break;
+      }
+    }
+
+    expect(mismatch).toBe('');
+  });
+
+  it('matches the whole-value split across separators marked treats as provisional', () => {
+    // A seeded walk over the same fragments, joined with separators whose
+    // stability differs: a single newline (no separator token), a blank line,
+    // a tab-only line (marked keeps the preceding paragraph open for it), and
+    // CRLF (marked strips the carriage return out of token raws). Every prefix
+    // is checked against the whole-value split, so a boundary drawn after a
+    // provisional separator or a CRLF offset drift shows up here. The LCG is
+    // hand-rolled to keep the walk deterministic without a dependency.
+    const separators = ['\n', '\n\n', '\n\t\n', '\r\n'];
+    let state = 20_260_922;
+    const next = () => {
+      state = (state * 1_664_525 + 1_013_904_223) % 4_294_967_296;
+      return state / 4_294_967_296;
+    };
+    for (let iteration = 0; iteration < 1200; iteration += 1) {
+      const parts = 2 + Math.floor(next() * 3);
+      let document = '';
+      for (let part = 0; part < parts; part += 1) {
+        document += FUZZ_FRAGMENTS[Math.floor(next() * FUZZ_FRAGMENTS.length)] ?? '';
+        document += separators[Math.floor(next() * separators.length)] ?? '\n';
+      }
+      expect(firstDivergence(document), document).toBe('');
+    }
+  });
+
+  it('matches the whole-value split for duplicate link reference definitions', () => {
+    // marked drops a duplicate definition's raw text, so its block tokens do
+    // not tile the source and a raw-length offset is not a source offset. The
+    // head must not be reused for a value whose definitions can collide, and
+    // the value still has to segment exactly like the whole-value split.
+    const documents = [
+      '[ref]: https://a.example\n\n[ref]: https://b.example\n\n- <a href="https://x.example">item</a>',
+      '[ref]: https://a.example\n\n- <a href="https://x.example">item</a>\n\n[ref]: https://b.example',
+      'text\n\n[ref]: https://a.example\n\n[ref]: https://b.example\n\n> <a href="https://x.example">quote</a>',
+      '[ref]: https://a.example\n\n[ref]: https://b.example\n\n[ref]: https://c.example\n\n| a | b |\n| --- | --- |\n| <a href="https://x.example">c</a> | d |',
+    ];
+    for (const document of documents) {
+      expect(firstDivergence(document), document).toBe('');
+    }
+  });
+});
+
+describe('MarkdownText body line height', () => {
+  it('uses the 24 dp body line height', async () => {
+    const renderer = await mount(
+      <MarkdownText value="See [#10334](https://github.com/Kilo-Org/cloud/pull/10334)" />
+    );
+    const { paragraph, list } = enrichedProps(renderer).markdownStyle;
+
+    expect(paragraph.lineHeight).toBe(24);
+    expect(list.lineHeight).toBe(24);
+  });
+});
+
+describe('MarkdownText document direction', () => {
+  const value = '# Heading\n\nBody text\n\n- one\n- two';
+
+  it('aligns chat blocks with a right-to-left interface and marks its list items', async () => {
+    rnStub.I18nManager.isRTL = true;
+    // Only Android resolves a list item from its own first strong character.
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={value} />);
+      const props = enrichedProps(renderer);
+
+      expect(props.markdownStyle.paragraph.textAlign).toBe('right');
+      expect(props.markdownStyle.h1).toMatchObject({ textAlign: 'right' });
+      // `rtlListItems` names the start edge and isolates the item's own text.
+      expect(props.markdown).toContain('\u200F\u2068one\u2069');
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  it('keeps a document body at the left edge without the list-item mark', async () => {
+    rnStub.I18nManager.isRTL = true;
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={value} documentDirection="ltr" />);
+      const props = enrichedProps(renderer);
+
+      expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
+      expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
+      expect(props.markdown).toBe(value);
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  it('leaves a left-to-right interface unchanged', async () => {
+    const renderer = await mount(<MarkdownText value={value} documentDirection="ltr" />);
+    const props = enrichedProps(renderer);
+
+    expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
+    expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
+    expect(props.markdown).toBe(value);
+  });
+
+  it('names the base direction of an HTML body only for a document', async () => {
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const chat = await mount(<MarkdownText value="> <u>quoted</u>" />);
+      expect(htmlProps(chat).baseStyle).not.toHaveProperty('direction');
+
+      const document = await mount(
+        <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
+      );
+      expect(htmlProps(document).baseStyle).toMatchObject({ direction: 'ltr' });
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
+  });
+
+  it('renders an image alt fallback in the body direction on both platforms', async () => {
+    // A scheme the image view cannot draw leaves the alt text as plain text.
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const chatHost = await mount(<MarkdownText value="> <u>quoted</u>" />);
+      const chatImage = requiredRenderer(htmlProps(chatHost).renderers, 'img');
+      const chatAlt = await renderCustom(chatImage, {
+        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
+        parent: null,
+      });
+      const chatProps = chatAlt.root.findByType(TextType).props as {
+        style?: { writingDirection?: string; direction?: string };
+      };
+      expect(chatProps.style).toMatchObject({ writingDirection: 'rtl' });
+      expect(chatProps.style).not.toHaveProperty('direction');
+
+      const documentHost = await mount(
+        <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
+      );
+      const documentImage = requiredRenderer(htmlProps(documentHost).renderers, 'img');
+      const documentAlt = await renderCustom(documentImage, {
+        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
+        parent: null,
+      });
+      const documentProps = documentAlt.root.findByType(TextType).props as {
+        style?: { writingDirection?: string; direction?: string };
+      };
+      expect(documentProps.style).toMatchObject({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+      });
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
+  });
+});

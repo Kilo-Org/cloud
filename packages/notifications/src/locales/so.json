@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Kalfadhigaaga wakiilka ayaa leh cusboonaysiin",
+      "lowBalance": "Dheelitirkaagu wuxuu u baahan yahay feejignaan",
+      "spendAlert": "Kharashkaagu wuxuu u baahan yahay feejignaan",
+      "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan",
+      "securityUpdate": "Hubin ammin ayaa leh cusboonaysiin",
+      "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Digniinta dheelitirka hooseeya",
+      "body": "{{organizationName}} dheelitirku wuxuu hoos u dhacay ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Digniinta kharashka",
+      "body": "Kharashka {{scopeName}} wuxuu dhaafay ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} gudaha {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Natiijo ammin cusub ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Digniin SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Jebinta SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Kalfadhigaaga Kilo waa diyaar in laga xakameeyo taleefankaaga"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

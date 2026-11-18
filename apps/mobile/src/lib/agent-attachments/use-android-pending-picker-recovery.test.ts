@@ -1,0 +1,255 @@
+import { createElement } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
+import { type AttachmentSurface } from './picker-launch-context';
+import { useAndroidPendingPickerRecovery } from './use-android-pending-picker-recovery';
+
+const mocks = vi.hoisted(() => ({
+  userId: undefined as string | undefined,
+  readPickerLaunchContext: vi.fn(),
+  clearPickerLaunchContext: vi.fn(),
+  consumeAndroidPendingPickerResult: vi.fn(),
+  discardAndroidPendingPickerResult: vi.fn(),
+  normalizeImageAsset: vi.fn(),
+  addCandidates: vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: mocks.userId }),
+}));
+
+vi.mock('@/lib/agent-attachments/picker-launch-context', () => ({
+  // The hook reads the shared TTL from this module; the mock has to carry it or
+  // the expiry branch compares against undefined.
+  PICKER_LAUNCH_CONTEXT_TTL_MS: 10 * 60 * 1000,
+  readPickerLaunchContext: mocks.readPickerLaunchContext,
+  clearPickerLaunchContext: mocks.clearPickerLaunchContext,
+}));
+
+vi.mock('@/lib/agent-attachments/pending-picker-result', () => ({
+  consumeAndroidPendingPickerResult: mocks.consumeAndroidPendingPickerResult,
+  discardAndroidPendingPickerResult: mocks.discardAndroidPendingPickerResult,
+}));
+
+vi.mock('@/components/agents/attachment-picker', () => ({
+  normalizeImageAsset: mocks.normalizeImageAsset,
+}));
+
+let appStateListener: ((state: string) => void) | undefined = undefined;
+vi.mock('react-native', () => ({
+  AppState: {
+    // eslint-disable-next-line prefer-await-to-callbacks -- addEventListener is inherently callback-based
+    addEventListener: (event: string, cb: (state: string) => void) => {
+      if (event === 'change') {
+        appStateListener = cb;
+      }
+      return { remove: vi.fn() };
+    },
+  },
+}));
+
+type LaunchContext = {
+  userId: string;
+  surface: AttachmentSurface;
+  sessionId: string | null;
+  launchedAt: number;
+};
+
+function makeContext(overrides: Partial<LaunchContext> = {}) {
+  return {
+    userId: 'user-1',
+    surface: 'agent-new' as const,
+    sessionId: null as string | null,
+    launchedAt: Date.now(),
+    ...overrides,
+  };
+}
+
+function Harness({ surface }: { surface: AttachmentSurface }) {
+  useAndroidPendingPickerRecovery({
+    surface,
+    sessionId: null,
+    addCandidates: mocks.addCandidates,
+  });
+  return null;
+}
+
+async function mount(
+  surface: AttachmentSurface = 'agent-new'
+): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(createElement(Harness, { surface }));
+    await settle();
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+async function settle(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  setTelemetrySink(null);
+  appStateListener = undefined;
+  mocks.userId = undefined;
+  mocks.normalizeImageAsset.mockImplementation((asset: { uri: string }) => ({
+    name: 'photo.jpg',
+    uri: asset.uri,
+  }));
+});
+
+describe('useAndroidPendingPickerRecovery', () => {
+  it('does NOT clear or consume when the current user id is still unknown', async () => {
+    mocks.userId = undefined;
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext());
+
+    await mount();
+
+    expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
+    expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+  });
+
+  it('does NOT discard or clear on a non-expired wrong-account mismatch', async () => {
+    mocks.userId = 'user-2';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ userId: 'user-1' }));
+
+    await mount();
+
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
+    expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.addCandidates).not.toHaveBeenCalled();
+  });
+
+  it('does NOT discard or clear on a non-expired wrong-surface mismatch', async () => {
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ surface: 'agent-chat' }));
+
+    await mount();
+
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
+    expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
+  });
+
+  it('consumes a stored agent-picture context on the matching picture surface', async () => {
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ surface: 'agent-picture' }));
+    mocks.consumeAndroidPendingPickerResult.mockResolvedValue([{ uri: 'file:///photo.jpg' }]);
+
+    await mount('agent-picture');
+
+    expect(mocks.consumeAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
+    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(1);
+    expect(mocks.addCandidates).toHaveBeenCalledWith([
+      { name: 'photo.jpg', uri: 'file:///photo.jpg' },
+    ]);
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+  });
+
+  it('leaves a stored agent-picture context for the matching composer', async () => {
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ surface: 'agent-picture' }));
+
+    await mount('agent-new');
+
+    expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.addCandidates).not.toHaveBeenCalled();
+  });
+
+  it('discards and clears on an expired context', async () => {
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(
+      makeContext({ launchedAt: Date.now() - 11 * 60 * 1000 })
+    );
+
+    await mount();
+
+    expect(mocks.discardAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
+    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(1);
+    expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
+  });
+
+  it('consumes exactly once on a match and never re-adds the same asset', async () => {
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext());
+    mocks.consumeAndroidPendingPickerResult.mockResolvedValue([{ uri: 'file:///photo.jpg' }]);
+
+    await mount();
+
+    expect(mocks.consumeAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
+    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(1);
+    expect(mocks.addCandidates).toHaveBeenCalledTimes(1);
+    expect(mocks.addCandidates).toHaveBeenCalledWith([
+      { name: 'photo.jpg', uri: 'file:///photo.jpg' },
+    ]);
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+
+    // A later AppState activation finds no stored context (cleared above), so
+    // the pending result is never consumed or added a second time.
+    mocks.readPickerLaunchContext.mockResolvedValue(null);
+    await act(async () => {
+      appStateListener?.('active');
+      await settle();
+    });
+
+    expect(mocks.consumeAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
+    expect(mocks.addCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it('contains a failed clear, reports it once, and retries it on the next active edge', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext());
+    mocks.consumeAndroidPendingPickerResult.mockResolvedValue([{ uri: 'file:///photo.jpg' }]);
+    mocks.clearPickerLaunchContext.mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await mount();
+
+    // The rejection is contained instead of escaping the discarded promise,
+    // and it is reported once on the recovery operation.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      level: 'warning',
+      tags: { 'error.subsystem': 'agent_attachments', 'error.operation': 'picker_recovery' },
+    });
+
+    // The picked asset reached the composer before the clear failed, so the
+    // failed clear costs the stored context and nothing else.
+    expect(mocks.addCandidates).toHaveBeenCalledExactlyOnceWith([
+      { name: 'photo.jpg', uri: 'file:///photo.jpg' },
+    ]);
+
+    // The stored context was never cleared, so the next app-active edge runs
+    // the recovery again and the clear lands.
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext());
+    mocks.consumeAndroidPendingPickerResult.mockResolvedValue([]);
+    await act(async () => {
+      appStateListener?.('active');
+      await settle();
+    });
+
+    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(2);
+    expect(events).toHaveLength(1);
+    // The result was consumed on the first pass, so the retry attaches
+    // nothing a second time.
+    expect(mocks.addCandidates).toHaveBeenCalledTimes(1);
+  });
+});

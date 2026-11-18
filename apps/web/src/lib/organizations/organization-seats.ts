@@ -1,5 +1,10 @@
-import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import type { Organization } from '@kilocode/db/schema';
+import {
+  canManageOrganizationBilling,
+  hasInviteSeatCapacity,
+  inviteConsumesSeat,
+  ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+} from '@kilocode/app-shared/organizations';
 import {
   kilocode_users,
   organization_invitations,
@@ -8,7 +13,8 @@ import {
   organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc, and, count, gt, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
@@ -16,26 +22,33 @@ import {
   addUserToOrganization,
   getOrganizationMembers,
   getOrganizationById,
-  isOrganizationMember,
-} from '@/lib/organizations/organizations';
-import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
-import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
-import { captureException } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
-import { findUserById } from '@/lib/user';
-import { after } from 'next/server';
-import { sendOrgCancelledEmail, sendOrgRenewedEmail, sendOrgSubscriptionEmail } from '@/lib/email';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import {
-  OrganizationPlanSchema,
-  billingCycleFromStripeInterval,
-  billingCycleToDb,
-} from '@/lib/organizations/organization-types';
-import { client as stripeClient } from '@/lib/stripe-client';
-import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+  errorExceptInTest,
+  logExceptInTest,
+  sentryLogger,
+} from '@kilocode/web-shared/lib/utils.server';
+import { captureException } from '@sentry/nextjs';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { after } from 'next/server';
+import {
+  sendOrgCancelledEmail,
+  sendOrgRenewedEmail,
+  sendOrgSubscriptionEmail,
+} from '@kilocode/web-shared/lib/email';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
+import type {
+  OrganizationPlan,
+  OrganizationRole,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { OrganizationPlanSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -64,50 +77,13 @@ const SubscriptionMetadataSchema = z.object({
 
 export type SubscriptionMetadata = z.infer<typeof SubscriptionMetadataSchema>;
 
-/**
- * Returns the most recently created seat purchase for an organization.
- *
- * organization_seats_purchases is append-only: every subscription event
- * (creation, renewal, cancellation) inserts a new row.  The most recently
- * created row therefore always reflects the current subscription state.
- */
-export async function getMostRecentSeatPurchase(
-  organizationId: Organization['id']
-): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
-    .select()
-    .from(organization_seats_purchases)
-    .where(eq(organization_seats_purchases.organization_id, organizationId))
-    .orderBy(desc(organization_seats_purchases.created_at))
-    .limit(1);
-
-  return purchase || null;
-}
-
-/** Returns the most recently ended seat purchase by period end. Used for resubscribe flow. */
-export async function getMostRecentEndedSeatPurchase(
-  organizationId: Organization['id']
-): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
-    .select()
-    .from(organization_seats_purchases)
-    .where(
-      and(
-        eq(organization_seats_purchases.organization_id, organizationId),
-        eq(organization_seats_purchases.subscription_status, 'ended')
-      )
-    )
-    .orderBy(desc(organization_seats_purchases.expires_at))
-    .limit(1);
-
-  return purchase || null;
-}
-
 export async function getOrganizationSeatUsage(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  txn?: DrizzleTransaction
 ): Promise<{ used: number; total: number }> {
+  const reader = txn ?? db;
   const [activeMembers, pendingInvitations, organization] = await Promise.all([
-    db
+    reader
       .select({ value: count() })
       .from(organization_memberships)
       .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
@@ -118,7 +94,7 @@ export async function getOrganizationSeatUsage(
           eq(kilocode_users.is_bot, false)
         )
       ),
-    db
+    reader
       .select({ value: count() })
       .from(organization_invitations)
       .where(
@@ -129,11 +105,86 @@ export async function getOrganizationSeatUsage(
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
       ),
-    getOrganizationById(organizationId),
+    reader
+      .select({
+        plan: organizations.plan,
+        requireSeats: organizations.require_seats,
+        seatCount: organizations.seat_count,
+      })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1),
   ]);
   const used = (activeMembers[0]?.value ?? 0) + (pendingInvitations[0]?.value ?? 0);
-  const total = organization?.seat_count || 0;
+  const total = organization[0]?.seatCount || 0;
   return { used, total };
+}
+
+/**
+ * Serializes everything one organization's invitations do: the duplicate
+ * lookup, the seat check and the insert. A caller takes it first, so two
+ * concurrent invites for the same address cannot both pass the duplicate
+ * lookup (there is no unique constraint on `(organization_id, email)`), and
+ * neither can take the last free seat twice.
+ *
+ * `pg_advisory_xact_lock` blocks the second transaction until the first
+ * commits, and the lock releases at commit or rollback. It is advisory rather
+ * than a row lock on `organizations`, so it orders only invitations and leaves
+ * unrelated writes to that row alone.
+ */
+export async function lockOrganizationInvites(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id']
+): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId} || ':invite', 0))`
+  );
+}
+
+/**
+ * Refuses an invitation that would take a seat the organization does not have,
+ * using the same rule the invite dialogs show (`hasInviteSeatCapacity`). A
+ * billing manager takes no seat, so that role is never gated.
+ *
+ * The caller must already hold {@link lockOrganizationInvites}, which is what
+ * makes the read-then-insert safe against a concurrent invite.
+ *
+ * This gates invitations only. Adding a membership directly — SCIM directory
+ * sync (`directory-sync.ts`), SSO sign-in (`user/sso.ts`), the admin add-member
+ * route, a sales-demo seed, or the subscription's owner grant — has never
+ * enforced a seat limit and still does not, so those paths can take the last
+ * seat without this lock. Widening that is a separate behaviour change.
+ */
+export async function assertInviteSeatCapacity(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  role: OrganizationRole
+): Promise<void> {
+  if (!inviteConsumesSeat(role)) {
+    return;
+  }
+  const [organization] = await tx
+    .select({
+      plan: organizations.plan,
+      requireSeats: organizations.require_seats,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!organization) {
+    throw new Error('Organization not found');
+  }
+  const { used, total } = await getOrganizationSeatUsage(organizationId, tx);
+  if (
+    !hasInviteSeatCapacity({
+      plan: organization.plan,
+      requireSeats: organization.requireSeats,
+      usedSeats: used,
+      totalSeats: total,
+    })
+  ) {
+    throw new Error(ORGANIZATION_INVITE_SEAT_LIMIT_REACHED);
+  }
 }
 
 /**
@@ -144,7 +195,6 @@ export async function getOrganizationSeatUsage(
 function getPlanTypeFromSubscription(subscription: Stripe.Subscription): OrganizationPlan | null {
   const planTypeFromSubscriptionMetadata = subscription.metadata?.planType;
   if (!planTypeFromSubscriptionMetadata) {
-    // If planType doesn't exist in metadata, return null (do nothing - works as it used to)
     return null;
   }
 
@@ -153,7 +203,6 @@ function getPlanTypeFromSubscription(subscription: Stripe.Subscription): Organiz
     return validationResult.data;
   }
 
-  // If planType exists but is invalid, log and return null
   sentryError(
     `Invalid planType value in subscription ${subscription.id} metadata: ${planTypeFromSubscriptionMetadata}`,
     {
@@ -212,7 +261,6 @@ async function handleSubscriptionEventInternal(
           existingActive[0].subscription_stripe_id
         );
         if (!existingSub.ended_at) {
-          // Genuinely still active in Stripe — reject the duplicate
           sentryError(
             `Duplicate seat subscription detected: org ${meta.organizationId} already has a non-ended subscription ${existingActive[0].subscription_stripe_id}. Rejecting subscription ${subscription.id}.`
           );
@@ -269,8 +317,10 @@ async function handleSubscriptionEventInternal(
   const billingCycleItem = paidLineItem ?? firstSeatLineItem;
   const stripeInterval = billingCycleItem.price?.recurring?.interval;
   let billingCycleDb: 'monthly' | 'yearly';
-  if (stripeInterval === 'month' || stripeInterval === 'year') {
-    billingCycleDb = billingCycleToDb(billingCycleFromStripeInterval(stripeInterval));
+  if (stripeInterval === 'year') {
+    billingCycleDb = 'yearly';
+  } else if (stripeInterval === 'month') {
+    billingCycleDb = 'monthly';
   } else {
     billingCycleDb = 'monthly';
     sentryError(
@@ -299,7 +349,7 @@ async function handleSubscriptionEventInternal(
       logExceptInTest(
         `Skipping membership for removed user ${meta.kiloUserId} in org ${meta.organizationId} (Subscription Lifecycle 2)`
       );
-    } else if (!(await isOrganizationMember(meta.organizationId, meta.kiloUserId))) {
+    } else if (!(await isOrganizationMember(db, meta.organizationId, meta.kiloUserId))) {
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(meta.organizationId);
       const metadataUserDomain = getLowerDomainFromEmail(metadataUser.google_user_email);
       const protectedHuman =
@@ -326,7 +376,6 @@ async function handleSubscriptionEventInternal(
     );
   }
 
-  // handle subscription deletion
   const isSubscriptionEnded = subscription.ended_at;
   // Only update seat_count when subscription is fully active (payment succeeded).
   // For 'incomplete' or 'past_due' subscriptions, we record the purchase but don't
@@ -334,7 +383,6 @@ async function handleSubscriptionEventInternal(
   const isSubscriptionActive = subscription.status === 'active';
 
   await db.transaction(async tx => {
-    // Insert with conflict handling - will do nothing if idempotency key already exists
     const { rowCount } = await tx
       .insert(organization_seats_purchases)
       .values({
@@ -351,7 +399,6 @@ async function handleSubscriptionEventInternal(
       })
       .onConflictDoNothing({ target: [organization_seats_purchases.idempotency_key] });
 
-    // if there were no rows changed, we hit our idempotency key
     if (rowCount === 0) {
       logExceptInTest(`Skipping update for ${idempotencyKey} - already exists`);
       return;
@@ -363,9 +410,7 @@ async function handleSubscriptionEventInternal(
       await tx.update(organizations).set({ plan }).where(eq(organizations.id, meta.organizationId));
     }
 
-    // if the subscription is ended, set seat count to 0 and do nothing else
     if (isSubscriptionEnded) {
-      // update organization with new seat count only if it differs
       await tx
         .update(organizations)
         .set({ seat_count: 0 })
@@ -375,9 +420,6 @@ async function handleSubscriptionEventInternal(
       return;
     }
 
-    // If subscription is not active (e.g., 'incomplete' due to failed payment),
-    // don't update seat_count yet. The seat_count will be updated when the
-    // subscription becomes active (via customer.subscription.updated webhook).
     if (!isSubscriptionActive) {
       logExceptInTest(
         `Subscription ${subscription.id} is ${subscription.status}, not updating seat_count yet`

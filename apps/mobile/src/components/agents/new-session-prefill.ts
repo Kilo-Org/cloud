@@ -1,11 +1,17 @@
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
+import { i18n } from '@/i18n';
 
 export type NewSessionPrefillParams = {
   repo?: string;
   mode?: string;
   model?: string;
   variant?: string;
+  prompt?: string;
+  /** The to-do the started session links to. */
+  todoId?: string;
+  /** The to-do's title, carried so the create can name the session without a fetch. */
+  todoTitle?: string;
 };
 
 export type NewSessionPrefill = {
@@ -14,6 +20,9 @@ export type NewSessionPrefill = {
   repo?: string;
   model?: string;
   variant?: string;
+  prompt?: string;
+  todoId?: string;
+  todoTitle?: string;
 };
 
 function isValidOwnerRepo(value: string): boolean {
@@ -88,6 +97,15 @@ export function appendNewSessionPrefill(base: string, params: NewSessionPrefillP
   if (params.variant) {
     entries.push(['prefillVariant', params.variant]);
   }
+  if (params.prompt) {
+    entries.push(['prefillPrompt', params.prompt]);
+  }
+  if (params.todoId) {
+    entries.push(['todoId', params.todoId]);
+  }
+  if (params.todoTitle) {
+    entries.push(['prefillTodoTitle', params.todoTitle]);
+  }
 
   if (entries.length === 0) {
     return base;
@@ -107,6 +125,90 @@ function getFirstParam(record: Record<string, string | string[] | undefined>, ke
 }
 
 /**
+ * Build the new-session route `Href` for a Continue entry. Starts at
+ * `/(app)/agent-chat/new`, appends `organizationId` when the source has one
+ * (same pattern as `new-task-button.tsx`), then the prefill keys, then the
+ * clone id and the clone-source title. An empty title is omitted so the form
+ * falls back to the session title. A fork ("Fork from here") adds the
+ * inclusive cut and, for a forked user message, its text for the new composer.
+ */
+export function buildContinueHref(input: {
+  organizationId?: string | null;
+  cloneFromKiloSessionId: string;
+  cloneSourceTitle?: string | null;
+  cloneUpToMessageId?: string | null;
+  forkPrefillText?: string | null;
+  /**
+   * The fork source is a Cloud Agent session. Its transcript carries no
+   * per-message file edits, so the Continue form explains what the cut fork's
+   * files start from.
+   */
+  forkSourceIsCloudAgent?: boolean;
+  prefill: NewSessionPrefillParams;
+}): string {
+  let href = '/(app)/agent-chat/new';
+  if (input.organizationId) {
+    href = `${href}?organizationId=${encodeURIComponent(input.organizationId)}`;
+  }
+  href = appendNewSessionPrefill(href, input.prefill);
+
+  const entries: [string, string][] = [];
+  if (input.cloneFromKiloSessionId) {
+    entries.push(['cloneFromKiloSessionId', input.cloneFromKiloSessionId]);
+  }
+  if (input.cloneSourceTitle) {
+    entries.push(['cloneSourceTitle', input.cloneSourceTitle]);
+  }
+  if (input.cloneUpToMessageId) {
+    entries.push(['cloneUpToMessageId', input.cloneUpToMessageId]);
+    if (input.forkPrefillText) {
+      entries.push(['forkPrefillText', input.forkPrefillText]);
+    }
+    if (input.forkSourceIsCloudAgent) {
+      entries.push(['forkSourceIsCloudAgent', '1']);
+    }
+  }
+  if (entries.length === 0) {
+    return href;
+  }
+  const separator = href.includes('?') ? '&' : '?';
+  const query = entries.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  return `${href}${separator}${query}`;
+}
+
+/** Read the clone source session id from route search params (first array value). */
+export function readCloneFromKiloSessionId(
+  raw: Record<string, string | string[] | undefined>
+): string {
+  return getFirstParam(raw, 'cloneFromKiloSessionId');
+}
+
+/** Read the clone source title from route search params (first array value). */
+export function readCloneSourceTitle(raw: Record<string, string | string[] | undefined>): string {
+  return getFirstParam(raw, 'cloneSourceTitle');
+}
+
+/** Read the inclusive fork cut from route search params; empty for a full Continue. */
+export function readCloneUpToMessageId(raw: Record<string, string | string[] | undefined>): string {
+  return getFirstParam(raw, 'cloneUpToMessageId');
+}
+
+/**
+ * Read the forked user message's text from route search params. Empty when
+ * there is no cut: the text only makes sense beside one.
+ */
+export function readForkPrefillText(raw: Record<string, string | string[] | undefined>): string {
+  return readCloneUpToMessageId(raw) ? getFirstParam(raw, 'forkPrefillText') : '';
+}
+
+/** Whether a fork's source is a Cloud Agent session; false without a cut. */
+export function readForkSourceIsCloudAgent(
+  raw: Record<string, string | string[] | undefined>
+): boolean {
+  return readCloneUpToMessageId(raw) !== '' && getFirstParam(raw, 'forkSourceIsCloudAgent') === '1';
+}
+
+/**
  * Read prefill values from route search params. Each param can be
  * `string | string[]` — take the first element of an array. Mode is
  * always normalized to a valid `AgentMode`. Empty strings are treated
@@ -119,12 +221,18 @@ export function readNewSessionPrefill(
   const rawRepo = getFirstParam(raw, 'prefillRepo');
   const rawModel = getFirstParam(raw, 'prefillModel');
   const rawVariant = getFirstParam(raw, 'prefillVariant');
+  const rawPrompt = getFirstParam(raw, 'prefillPrompt');
+  const rawTodoId = getFirstParam(raw, 'todoId');
+  const rawTodoTitle = getFirstParam(raw, 'prefillTodoTitle');
 
   return {
     mode: normalizeAgentMode(rawMode || undefined),
     ...(rawRepo ? { repo: rawRepo } : {}),
     ...(rawModel ? { model: rawModel } : {}),
     ...(rawVariant ? { variant: rawVariant } : {}),
+    ...(rawPrompt.trim() ? { prompt: rawPrompt } : {}),
+    ...(rawTodoId ? { todoId: rawTodoId } : {}),
+    ...(rawTodoTitle.trim() ? { todoTitle: rawTodoTitle } : {}),
   };
 }
 
@@ -176,6 +284,129 @@ export function resolvePrefillRepo(
 }
 
 /**
+ * Whether a route prefill can still select a repository, so the new-session
+ * form must not treat its repository region as final.
+ *
+ * Only a prefill that names a repository seeds one, and it can only land while
+ * a provider query is still in flight: `useNewSessionPrefillTargets` seeds in
+ * the render `reposSettled` turns true, which needs every query to finish
+ * without error and the lists to have rows. Once the queries resolve, a prefill
+ * the lists cannot satisfy — a failed query, a disconnected provider, an empty
+ * account — never seeds, so the region must settle rather than hold the form's
+ * rows off and leave the repository section without its retry controls.
+ * Without a request in the route, a form with rows and no selection is already
+ * final — nothing will arrive later.
+ *
+ * The signal it reads is the region's BOUNDED one, so a list that never answers
+ * cannot withhold the form's rows on a prefilled entry either. A request the
+ * lists cannot answer before the bound expires is given up instead of deferred;
+ * `shouldAbandonRepoSeed` is that decision, and it runs before the seed so a
+ * late answer cannot mount a repository the region already painted without.
+ */
+export function isRepoSeedPending(input: {
+  /** The repository the route asked for, if any. */
+  prefillRepo: string | undefined;
+  /** Whether the seed has already run for this mount. */
+  applied: boolean;
+  /** The `platform:fullName` selection the form holds, `''` when none. */
+  selectedRepo: string;
+  /**
+   * Whether the repository region may stop withholding its rows: every provider
+   * query finished its first load, or the settle bound expired while one was
+   * still loading. A paused or disabled query counts as resolved.
+   */
+  providerQueriesResolved: boolean;
+}): boolean {
+  return (
+    input.prefillRepo !== undefined &&
+    !input.applied &&
+    input.selectedRepo === '' &&
+    !input.providerQueriesResolved
+  );
+}
+
+/**
+ * Whether a route prefill must be given up because the repository region has
+ * already been declared final without it.
+ *
+ * The seed runs in the one render `reposSettled` turns true, and a provider list
+ * that outlived the settle bound may answer after the region settled. Seeding
+ * then would mount a repository the form already painted without: the branch row
+ * and the Environment row would appear after the rows had settled, and the
+ * prompt would take focus on a screen treated as complete. So a request that is
+ * still unanswered when the bound expires is dropped rather than deferred, and
+ * the caller records it as applied so the seed cannot run later.
+ *
+ * `reposSettled` wins over the bound in the same render: that render is the one
+ * in which the seed runs, so dropping it there would lose a prefill the lists
+ * can satisfy.
+ */
+export function shouldAbandonRepoSeed(input: {
+  /** The repository the route asked for, if any. */
+  prefillRepo: string | undefined;
+  /** Whether the seed has already run, or been abandoned, for this mount. */
+  applied: boolean;
+  /** The `platform:fullName` selection the form holds, `''` when none. */
+  selectedRepo: string;
+  /** The lists answered with rows, so the seed can still run in this render. */
+  reposSettled: boolean;
+  /** The bounded region signal. */
+  providerQueriesResolved: boolean;
+}): boolean {
+  return (
+    input.prefillRepo !== undefined &&
+    !input.applied &&
+    input.selectedRepo === '' &&
+    !input.reposSettled &&
+    input.providerQueriesResolved
+  );
+}
+
+/**
+ * Resolve a prefill repository to a platform-qualified picker key
+ * `platform:fullName`. Continuation prefill is GitHub-only (see
+ * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may
+ * satisfy it: a same-named GitLab/Bitbucket row must never be selected.
+ * Kept separate from `resolvePrefillRepo`, which returns the bare matched
+ * `fullName` and is used where a bare fullName is needed.
+ */
+export function resolvePrefillRepoSelection(
+  repositories: { platform: string; fullName: string }[],
+  prefill: NewSessionPrefill
+): string | null {
+  if (!prefill.repo) {
+    return null;
+  }
+
+  const lower = prefill.repo.toLowerCase();
+  const match = repositories.find(
+    repository => repository.platform === 'github' && repository.fullName.toLowerCase() === lower
+  );
+  return match ? `github:${match.fullName}` : null;
+}
+
+/**
+ * The repository a new-session form seeds from its durable draft, as the
+ * picker's `platform:fullName` key, or null while the form must keep what it
+ * has.
+ *
+ * Only a form that arrived without a repository request takes it: an explicit
+ * route prefill names where the person chose to go, so it outranks the last
+ * selection, and a form that already holds one (the person picked while the
+ * draft was still loading) is never overwritten.
+ */
+export function resolveStoredRepoSelection(input: {
+  prefill: NewSessionPrefill;
+  selectedRepo: string;
+  storedRepo: string | null;
+}): string | null {
+  if (input.prefill.repo || input.selectedRepo || !input.storedRepo) {
+    return null;
+  }
+  return input.storedRepo;
+}
+
+/**
  * Describe what could not be carried over, if anything.
  *
  * `settled` means "the list finished loading, without error, and is
@@ -207,13 +438,13 @@ export function describePrefillFallback(input: {
   const modelDropped = modelRequested && !models.matched;
 
   if (repoDropped && modelDropped) {
-    return "The original session's repository and model are no longer available. Pick them below.";
+    return i18n.t('agentChat.newSession.prefillRepoAndModelUnavailable');
   }
   if (repoDropped) {
-    return `${prefill.repo} is no longer available. Pick a repository below.`;
+    return i18n.t('agentChat.newSession.prefillRepoUnavailable', { repo: prefill.repo });
   }
   if (modelDropped) {
-    return `${prefill.model} is no longer available. Using your default model.`;
+    return i18n.t('agentChat.newSession.prefillModelUnavailable', { model: prefill.model });
   }
   return null;
 }

@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
@@ -10,37 +10,48 @@ import {
   security_finding_notifications,
 } from '@kilocode/db/schema';
 import type { SecurityFindingNotificationKind } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
-import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
-import { send as sendEmail, type TemplateName } from '@/lib/email';
-import { dispatchSecurityFindingPush } from '@/lib/notifications-worker-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { send as sendEmail, type TemplateName } from '@kilocode/web-shared/lib/email';
+import {
+  dispatchSecurityFindingPush,
+  dispatchSecurityLifecyclePush,
+} from '@kilocode/web-shared/lib/notifications-worker-client';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
+import { securityLifecycleEventSchema } from '@kilocode/notifications/schemas';
 import {
   SecurityNotificationPolicySchema,
   getEligibleSlaNotificationKind,
   meetsSecurityNotificationSeverityMinimum,
 } from '@kilocode/worker-utils/security-notification-policy';
 
-const SECRET_COMPARE_HMAC_KEY = Buffer.from('security-agent-notification-secret-compare');
-
-const BodySchema = z
+// The sweep posts the strict `{ notificationId }` shape with no discriminator,
+// so a discriminated union on `kind` would break it. A plain union keeps the
+// old shape parsing while adding the lifecycle shape.
+const NotificationBodySchema = z
   .object({
     notificationId: z.string().uuid(),
   })
   .strict();
+
+const SecurityLifecycleBodySchema = z
+  .object({
+    event: securityLifecycleEventSchema,
+    findingId: z.string().uuid(),
+    scope: z.string().min(1),
+    remediationId: z.string().uuid().optional(),
+    prUrl: z.string().url().optional(),
+    recipientUserIds: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+
+const BodySchema = z.union([NotificationBodySchema, SecurityLifecycleBodySchema]);
 
 const notificationKindToTemplate = {
   new_finding: 'securityFindingNew',
   sla_warning: 'securityFindingSlaWarning',
   sla_breach: 'securityFindingSlaBreach',
 } as const satisfies Record<SecurityFindingNotificationKind, TemplateName>;
-
-function secretMatches(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-  const left = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(provided).digest();
-  const right = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(expected).digest();
-  return timingSafeEqual(left, right);
-}
 
 function formatDeadline(iso: string | null): string {
   if (!iso) return '';
@@ -175,15 +186,37 @@ function isNotificationStillEligible(
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(req);
+  if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsedBody = BodySchema.safeParse(rawBody);
   if (!parsedBody.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+
+  // Lifecycle events have no persisted `security_finding_notifications` row,
+  // so they bypass the notification-row lookup and the email template pipeline
+  // entirely and dispatch push only.
+  if (!('notificationId' in parsedBody.data)) {
+    const body = parsedBody.data;
+    // Push must not extend route latency: the security-auto-analysis producer
+    // aborts at 10s and would drop the push if the route held the response.
+    after(async () => {
+      try {
+        await dispatchSecurityLifecyclePush({
+          event: body.event,
+          findingId: body.findingId,
+          scope: body.scope,
+          remediationId: body.remediationId,
+          prUrl: body.prUrl,
+          recipientUserIds: body.recipientUserIds,
+        });
+      } catch {
+        // Push is best-effort: the lifecycle persist already committed.
+      }
+    });
+    return NextResponse.json({ outcome: 'sent' }, { status: 200 });
   }
 
   const [row] = await db

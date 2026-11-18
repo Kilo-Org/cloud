@@ -1,8 +1,9 @@
-import { withSentryConfig } from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import createMDX from '@next/mdx';
 import { statSync } from 'fs';
 import { resolve } from 'path';
 import NextBundleAnalyzer from '@next/bundle-analyzer';
+import { buildAiGatewayRewrites } from './ai-gateway-rewrites.mjs';
 
 const withBundleAnalyzer = NextBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
@@ -24,11 +25,16 @@ validateGitLfs();
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
 
+// Next matches these entries against the request Origin's HOSTNAME only, so an
+// entry carrying a port (what `URL.host` yields for `http://127.0.0.1:7900`)
+// never matches and every `/_next/*` dev request from that origin is answered
+// 403 "Unauthorized" — the app URL a developer or device browser is told to use
+// then never hydrates. `hostname` is the form Next compares.
 const localNetworkDevOrigins = [
   '10.*.*.*',
   '192.168.*.*',
   ...Array.from({ length: 16 }, (_, index) => `172.${16 + index}.*.*`),
-  ...(process.env.APP_URL_OVERRIDE ? [new URL(process.env.APP_URL_OVERRIDE).host] : []),
+  ...(process.env.APP_URL_OVERRIDE ? [new URL(process.env.APP_URL_OVERRIDE).hostname] : []),
 ];
 
 /** @type {import('next').NextConfig} */
@@ -47,44 +53,41 @@ const nextConfig = {
     root: monorepoRoot,
   },
 
-  devIndicators: { position: 'bottom-right' },
+  // packages/web-shared/src/lib/email.ts reads these at runtime.
+  outputFileTracingIncludes: {
+    '/**': [
+      '../../packages/web-shared/src/emails/*.html',
+      '../../packages/web-shared/src/marketing-emails/*.html',
+    ],
+  },
+
+  // The dev-tools indicator is a fixed overlay pinned to a viewport corner. On
+  // phone-sized viewports (device runs) it covers the bottom-right of the page,
+  // e.g. the final lines of the Terms paragraph. Hide it; compile and runtime
+  // errors are still surfaced without the indicator.
+  devIndicators: false,
+
+  // Matches the gateway routes' 800s maxDuration. Next's default of 30s cuts off
+  // AI gateway requests proxied to a local apps/ai-gateway. Vercel ignores this
+  // and applies its own proxied-request timeout to external rewrites.
+  experimental: {
+    proxyTimeout: 800_000,
+    // The Cloud Agent sandbox runs dev work under a memory cgroup whose cap is
+    // far below the sandbox's MemTotal (e.g. 9 GiB cap, 12.5 GiB MemTotal).
+    // Turbopack's `auto` eviction decides from OS memory-pressure feedback, so
+    // it sees free memory the cgroup does not have and never evicts; the web
+    // dev server then grows until it fills the cap and everything in the cgroup
+    // stalls. The sandbox setup exports `full` to bound that; leaving it unset
+    // elsewhere keeps Next's `auto` default.
+    turbopackMemoryEviction: process.env.KILO_TURBOPACK_MEMORY_EVICTION || undefined,
+  },
 
   async rewrites() {
-    // Global API rewrites - proxy to global-api.kilo.ai when not on global backend
-    // Uses beforeFiles to ensure the rewrite happens BEFORE filesystem routes are checked
+    // beforeFiles rewrites run BEFORE filesystem routes are checked, so they
+    // take precedence over filesystem routes.
     // See: https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites
-    const globalApiRewrites =
-      process.env.VERCEL_ENV === 'production' && process.env.GLOBAL_KILO_BACKEND !== 'true'
-        ? [
-            {
-              source: '/api/fim/completions',
-              destination: 'https://global-api.kilo.ai/api/fim/completions',
-            },
-            {
-              source: '/api/edit/completions',
-              destination: 'https://global-api.kilo.ai/api/edit/completions',
-            },
-            {
-              source: '/api/gateway/:path*',
-              destination: 'https://global-api.kilo.ai/api/gateway/:path*',
-            },
-            {
-              source: '/api/openrouter/:path*',
-              destination: 'https://global-api.kilo.ai/api/openrouter/:path*',
-            },
-            {
-              source: '/api/exa/:path*',
-              destination: 'https://global-api.kilo.ai/api/exa/:path*',
-            },
-            {
-              source: '/api/marketplace/:path*',
-              destination: 'https://global-api.kilo.ai/api/marketplace/:path*',
-            },
-          ]
-        : [];
-
     return {
-      beforeFiles: globalApiRewrites,
+      beforeFiles: buildAiGatewayRewrites(process.env),
       afterFiles: [
         // /config.json is handled by src/app/config.json/route.ts which merges
         // Kilo-specific schema additions on top of the upstream opencode schema.
@@ -117,6 +120,16 @@ const nextConfig = {
         source: '/cli/install',
         destination: 'https://raw.githubusercontent.com/Kilo-Org/kilo/refs/heads/dev/install',
         permanent: false,
+      },
+      {
+        source: '/install',
+        destination: 'https://kilo.ai/install',
+        permanent: true,
+      },
+      {
+        source: '/learn',
+        destination: '/',
+        permanent: true,
       },
       {
         source: '/users/sign_up',

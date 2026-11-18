@@ -1,0 +1,2095 @@
+const mockHeaders = jest.fn<Promise<Headers>, []>();
+
+jest.mock('next/headers', () => ({
+  headers: () => mockHeaders(),
+  cookies: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
+  return { ...actual, evaluateStepUp: jest.fn(actual.evaluateStepUp) };
+});
+
+// The defensive unexpected-throw case needs this seam.
+jest.mock('@kilocode/web-shared/lib/admin/step-up-guard', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-guard');
+  return { ...actual, runStepUpGuard: jest.fn(actual.runStepUpGuard) };
+});
+
+const mockGetServerSession = jest.fn();
+const mockRedirect = jest.fn((url: string) => {
+  throw new Error(`NEXT_REDIRECT:${url}`);
+});
+
+jest.mock('next-auth', () => ({
+  __esModule: true,
+  ...jest.requireActual('next-auth'),
+  getServerSession: (...args: unknown[]) => mockGetServerSession(...args),
+}));
+
+jest.mock('next/navigation', () => ({
+  ...jest.requireActual('next/navigation'),
+  redirect: (url: string) => mockRedirect(url),
+}));
+
+import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
+import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
+import {
+  getUserUUID,
+  uuidSchema,
+  getUserFromAuth,
+  getUserFromSession,
+  sessionAuthOptions,
+  getUserFromBearerForCredentialExchange,
+  getUserFromSessionForCredentialIssuance,
+  getUserFromSessionForCredentialIssuanceOrRedirect,
+} from './server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  setAdminAccessSinkForTest,
+  type AdminAccessEvent,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  blacklisted_domains,
+  device_sessions,
+  kilocode_users,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
+import { clearEmailBlacklistCache } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import type { User } from '@kilocode/db/schema';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
+import { eq } from 'drizzle-orm';
+import { v5 as uuidv5 } from 'uuid';
+import jwt from 'jsonwebtoken';
+import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION, signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import {
+  DEVICE_SESSION_CACHE_TTL_MS,
+  resetDeviceSessionCacheForTest,
+} from '@kilocode/web-shared/lib/auth/device-session-cache';
+
+// Same namespace UUID used in user.server.ts
+const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+beforeEach(() => {
+  mockHeaders.mockReset();
+  mockGetServerSession.mockReset();
+  mockRedirect.mockClear();
+  clearEmailBlacklistCache();
+  resetDeviceSessionCacheForTest();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+function signPolicyClaims(claims: Record<string, unknown>, secret = NEXTAUTH_SECRET): string {
+  return jwt.sign(claims, secret, { algorithm: 'HS256' });
+}
+
+async function createParentAndChildOrganizations() {
+  const parentOwner = await insertTestUser();
+  const childOwner = await insertTestUser();
+  const parent = await createTestOrganization(
+    `Parent Organization ${crypto.randomUUID()}`,
+    parentOwner.id,
+    0
+  );
+  const child = await createTestOrganization(
+    `Child Organization ${crypto.randomUUID()}`,
+    childOwner.id,
+    0
+  );
+  await db
+    .update(organizations)
+    .set({ parent_organization_id: parent.id })
+    .where(eq(organizations.id, child.id));
+  return { parent, child };
+}
+
+async function deleteOrganizationsWithMemberships(organizationIds: readonly string[]) {
+  for (const organizationId of organizationIds) {
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organizationId));
+    await db.delete(organizations).where(eq(organizations.id, organizationId));
+  }
+}
+
+describe('isEmailBlacklistedByDomain', () => {
+  test('should return false when blacklisted_domains is undefined', () => {
+    const result = isEmailBlacklistedByDomain('test@example.com', undefined);
+    expect(result).toBe(false);
+  });
+
+  test('should return false when blacklisted_domains is empty array', () => {
+    const result = isEmailBlacklistedByDomain('test@example.com', []);
+    expect(result).toBe(false);
+  });
+
+  test('should return false when email domain is not in blacklist', () => {
+    const blacklist = ['spam.com', 'malicious.org'];
+    const result = isEmailBlacklistedByDomain('user@legitimate.com', blacklist);
+    expect(result).toBe(false);
+  });
+
+  test('should return true when email domain matches blacklisted domain with @', () => {
+    const blacklist = ['spam.com', 'malicious.org'];
+    const result = isEmailBlacklistedByDomain('user@spam.com', blacklist);
+    expect(result).toBe(true);
+  });
+
+  test('should return true for subdomain with @ pattern', () => {
+    const blacklist = ['example.com'];
+    const result = isEmailBlacklistedByDomain('user@sub.example.com', blacklist);
+    expect(result).toBe(true);
+  });
+
+  test('should handle multiple domains in blacklist', () => {
+    const blacklist = ['spam.com', 'malicious.org', 'bad.net'];
+
+    expect(isEmailBlacklistedByDomain('user@spam.com', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@malicious.org', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@bad.net', blacklist)).toBe(true);
+
+    expect(isEmailBlacklistedByDomain('user@good.com', blacklist)).toBe(false);
+  });
+
+  test('should be case insensitive', () => {
+    const blacklist = ['spam.com'];
+    const result = isEmailBlacklistedByDomain('user@SPAM.COM', blacklist);
+    expect(result).toBe(true); // Case insensitive, so should match
+  });
+
+  test('should handle edge case with domain as part of username', () => {
+    const blacklist = ['spam.com'];
+    const result = isEmailBlacklistedByDomain('spam.com@legitimate.org', blacklist);
+    expect(result).toBe(false);
+  });
+
+  test('should match exact domain endings correctly', () => {
+    const blacklist = ['evil.com'];
+
+    // Should match
+    expect(isEmailBlacklistedByDomain('user@evil.com', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('something.evil.com', blacklist)).toBe(true);
+
+    // Should NOT match
+    expect(isEmailBlacklistedByDomain('user@notevil.com', blacklist)).toBe(false);
+    expect(isEmailBlacklistedByDomain('user@evil.com.fake', blacklist)).toBe(false);
+  });
+
+  test('should handle mixed case in both email and blacklist', () => {
+    const blacklist = ['EXAMPLE.COM', 'Test-Domain.ORG'];
+    expect(isEmailBlacklistedByDomain('user@example.com', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('USER@EXAMPLE.COM', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@test-domain.org', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('USER@TEST-DOMAIN.ORG', blacklist)).toBe(true);
+  });
+
+  test('should handle case insensitive subdomain matching', () => {
+    const blacklist = ['EXAMPLE.COM'];
+    expect(isEmailBlacklistedByDomain('user.sub.example.com', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user.SUB.EXAMPLE.COM', blacklist)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user.Sub.Example.Com', blacklist)).toBe(true);
+  });
+});
+
+describe('getUserUUID', () => {
+  test('should return the same UUID for a user with a valid UUID id', () => {
+    const validUUID = '550e8400-e29b-41d4-a716-446655440000';
+    const user = { id: validUUID } as User;
+
+    const result = getUserUUID(user);
+
+    expect(result).toBe(validUUID);
+    expect(typeof result).toBe('string');
+  });
+
+  test('should generate a UUID for a legacy user id (oauth/google format)', () => {
+    const legacyId = 'oauth/google:114000741928328149731';
+    const user = { id: legacyId } as User;
+
+    const result = getUserUUID(user);
+
+    // Should return a valid UUID
+    expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(typeof result).toBe('string');
+  });
+
+  test('should always return the SAME UUID for the same legacy user id', () => {
+    const legacyId = 'oauth/google:114000741928328149731';
+    const user = { id: legacyId } as User;
+
+    const result1 = getUserUUID(user);
+    const result2 = getUserUUID(user);
+    const result3 = getUserUUID(user);
+
+    // All calls should return the exact same UUID
+    expect(result1).toBe(result2);
+    expect(result2).toBe(result3);
+
+    // Verify it matches the expected uuidv5 output
+    const expectedUUID = uuidv5(legacyId, USER_UUID_NAMESPACE);
+    expect(result1).toBe(expectedUUID);
+  });
+
+  test('should generate different UUIDs for different legacy user ids', () => {
+    const legacyId1 = 'oauth/google:114000741928328149731';
+    const legacyId2 = 'oauth/google:987654321098765432109';
+
+    const user1 = { id: legacyId1 } as User;
+    const user2 = { id: legacyId2 } as User;
+
+    const result1 = getUserUUID(user1);
+    const result2 = getUserUUID(user2);
+
+    expect(result1).not.toBe(result2);
+    expect(result1).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(result2).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
+
+  test('should handle various legacy id formats consistently', () => {
+    const legacyFormats = [
+      'oauth/google:114000741928328149731',
+      'oauth/github:12345678',
+      'oauth/gitlab:abcdef123',
+      'some-other-legacy-format',
+    ];
+
+    legacyFormats.forEach(legacyId => {
+      const user = { id: legacyId } as User;
+      const result = getUserUUID(user);
+
+      // Should always return a valid UUID
+      expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+
+      // Should be consistent across multiple calls
+      expect(getUserUUID(user)).toBe(result);
+
+      // Should match the expected uuidv5 output
+      expect(result).toBe(uuidv5(legacyId, USER_UUID_NAMESPACE));
+    });
+  });
+
+  test('should handle edge case with UUID-like string that is not valid', () => {
+    const invalidUUID = '550e8400-e29b-41d4-a716-44665544000'; // Missing one character
+    const user = { id: invalidUUID } as User;
+
+    const result = getUserUUID(user);
+
+    // Should generate a new UUID since the input is not a valid UUID
+    expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(result).toBe(uuidv5(invalidUUID, USER_UUID_NAMESPACE));
+  });
+
+  test('CRITICAL: should always return a UUID string, never undefined or null', () => {
+    const testCases = [
+      { id: '550e8400-e29b-41d4-a716-446655440000' }, // Valid UUID
+      { id: 'oauth/google:114000741928328149731' }, // Legacy format
+      { id: 'some-random-string' }, // Random string
+      { id: '' }, // Empty string
+    ];
+
+    testCases.forEach(user => {
+      const result = getUserUUID(user as User);
+
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+      expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+  });
+
+  test('should be deterministic - same input always produces same output', () => {
+    const testCases = [
+      'oauth/google:114000741928328149731',
+      'oauth/github:12345',
+      'random-legacy-id',
+    ];
+
+    testCases.forEach(legacyId => {
+      const user = { id: legacyId } as User;
+
+      // Call the function multiple times
+      const results = Array.from({ length: 10 }, () => getUserUUID(user));
+
+      // All results should be identical
+      const firstResult = results[0];
+      results.forEach(result => {
+        expect(result).toBe(firstResult);
+      });
+    });
+  });
+});
+
+/**
+ * This test verifies the UUID validation for organization IDs
+ * to prevent the production error: invalid input syntax for type uuid
+ * https://kilo-code.sentry.io/issues/KILOCODE-WEB-5MK
+ *
+ * The extension was sending organization names instead of UUIDs in the
+ * X-KiloCode-OrganizationId header, causing PostgreSQL to throw an error.
+ */
+describe('uuidSchema (organization ID validation)', () => {
+  test('should accept valid UUID v4', () => {
+    const validUUID = '550e8400-e29b-41d4-a716-446655440000';
+    const result = uuidSchema.safeParse(validUUID);
+    expect(result.success).toBe(true);
+  });
+
+  test('should accept valid UUID with lowercase letters', () => {
+    const validUUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const result = uuidSchema.safeParse(validUUID);
+    expect(result.success).toBe(true);
+  });
+
+  test('should accept valid UUID with uppercase letters', () => {
+    const validUUID = 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890';
+    const result = uuidSchema.safeParse(validUUID);
+    expect(result.success).toBe(true);
+  });
+
+  test('REGRESSION: should reject organization name instead of UUID', () => {
+    // This was the actual bug - extension sent an organization name instead of a UUID
+    const organizationName = 'MyOrganization';
+    const result = uuidSchema.safeParse(organizationName);
+    expect(result.success).toBe(false);
+  });
+
+  test('should reject empty string', () => {
+    const result = uuidSchema.safeParse('');
+    expect(result.success).toBe(false);
+  });
+
+  test('should reject random strings', () => {
+    const testCases = [
+      'not-a-uuid',
+      'my-organization',
+      'test123',
+      'some-org-name',
+      'acme-corp',
+      'org_12345',
+    ];
+
+    testCases.forEach(invalidValue => {
+      const result = uuidSchema.safeParse(invalidValue);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  test('should reject UUID-like strings with wrong format', () => {
+    const testCases = [
+      '550e8400-e29b-41d4-a716-44665544000', // Missing one character
+      '550e8400e29b41d4a716446655440000', // Missing dashes
+      '550e8400-e29b-41d4-a716-4466554400000', // Extra character
+      'g50e8400-e29b-41d4-a716-446655440000', // Invalid character 'g'
+    ];
+
+    testCases.forEach(invalidValue => {
+      const result = uuidSchema.safeParse(invalidValue);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  test('should reject null and undefined', () => {
+    expect(uuidSchema.safeParse(null).success).toBe(false);
+    expect(uuidSchema.safeParse(undefined).success).toBe(false);
+  });
+
+  test('should reject numbers', () => {
+    expect(uuidSchema.safeParse(12345).success).toBe(false);
+    expect(uuidSchema.safeParse(0).success).toBe(false);
+  });
+});
+
+describe('getUserFromAuth', () => {
+  test.each(['Bearer', 'bEaReR'])(
+    'returns 401 for a %s token with malformed JSON payload',
+    async scheme => {
+      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString(
+        'base64url'
+      );
+      const payload = Buffer.from('{').toString('base64url');
+      const token = `${header}.${payload}.signature`;
+      expect(() => jwt.decode(token)).toThrow(SyntaxError);
+      mockHeaders.mockResolvedValue(new Headers({ authorization: `${scheme} ${token}` }));
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(401);
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(['bearer', 'bEaReR'])(
+    'authenticates a %s scheme with a valid API token',
+    async scheme => {
+      const user = await insertTestUser({
+        google_user_email: `bearer-scheme-${crypto.randomUUID()}@example.com`,
+        api_token_pepper: 'bearer-scheme-pepper',
+      });
+      mockHeaders.mockResolvedValue(
+        new Headers({ authorization: `${scheme} ${generateApiToken(user)}` })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.user?.id).toBe(user.id);
+    }
+  );
+
+  test('refuses a valid API token with two spaces after the scheme', async () => {
+    const user = await insertTestUser({
+      google_user_email: `bearer-extra-space-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'bearer-extra-space-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ authorization: `Bearer  ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('returns 401 for a token with malformed JSON header', async () => {
+    const header = Buffer.from('{').toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ kiloUserId: 'malformed-token-user' })).toString(
+      'base64url'
+    );
+    const token = `${header}.${payload}.signature`;
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('flags a rejected credential so the caller does not answer as anonymous', async () => {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from('{').toString('base64url');
+    mockHeaders.mockResolvedValue(
+      new Headers({ authorization: `Bearer ${header}.${payload}.signature` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('does not flag a request that presented no credential', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue(null);
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(false);
+    expect(result.authorizationRefused).toBe(false);
+  });
+
+  test('returns 401 when the session read throws on malformed cookies', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(false);
+  });
+
+  test('flags an operation-scoped token presented to another endpoint', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_API_AUDIENCE,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    // The token verified, but not for this endpoint. It is still a credential
+    // that was presented and refused, so it must not become anonymous access.
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('enforces the requested audience without falling through to a valid session', async () => {
+    const user = await insertTestUser({
+      api_token_pepper: 'audience-transition-pepper',
+      web_session_pepper: 'current-web-session-pepper',
+    });
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_API_AUDIENCE,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        authorization: `Bearer ${token}`,
+        cookie: 'next-auth.session-token=session',
+      })
+    );
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+    });
+
+    const apiResult = await getUserFromAuth({ adminOnly: false });
+    const gatewayResult = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    expect(apiResult.user?.id).toBe(user.id);
+    expect(gatewayResult.user).toBeNull();
+    expect(gatewayResult.authFailedResponse?.status).toBe(401);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('accepts a gateway audience only for a gateway operation', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'gateway-audience-pepper' });
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_GATEWAY_AUDIENCE,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const gatewayResult = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+    const apiResult = await getUserFromAuth({ adminOnly: false });
+
+    expect(gatewayResult.user?.id).toBe(user.id);
+    expect(apiResult.user).toBeNull();
+    expect(apiResult.authFailedResponse?.status).toBe(401);
+  });
+
+  test('uses the signed organization instead of a conflicting request header', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'signed-organization-pepper' });
+    const signedOrganization = await createTestOrganization(
+      `Signed Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const headerOrganization = await createTestOrganization(
+      `Header Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_GATEWAY_AUDIENCE,
+      organizationId: signedOrganization.id,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: headerOrganization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.organizationId).toBe(signedOrganization.id);
+  });
+
+  test('uses the signed organization when no request header is supplied', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'signed-organization-no-header-pepper' });
+    const organization = await createTestOrganization(
+      `Signed Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_GATEWAY_AUDIENCE,
+      organizationId: organization.id,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.organizationId).toBe(organization.id);
+  });
+
+  test('uses the request header for a token without a signed organization', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'unbound-organization-pepper' });
+    const organization = await createTestOrganization(
+      `Header Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.organizationId).toBe(organization.id);
+  });
+
+  test('returns the authorization response for a refused email domain', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `blacklisted-domain@mail.${blockedDomain}`,
+      api_token_pepper: 'blacklisted-domain-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (R0)',
+      });
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('authorizes a user whose email domain only shares a raw suffix with a refused domain', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `allowed@not${blockedDomain}`,
+      api_token_pepper: 'allowed-domain-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.user?.id).toBe(user.id);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('rejects a token whose organization context was soft-deleted', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'deleted-organization-pepper' });
+    const organization = await createTestOrganization(
+      `Deleted Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    await markOrganizationAsDeleted(organization.id);
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+    expect(result.authorizationRefused).toBe(true);
+  });
+
+  test('accepts a direct member of the organization', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'direct-member-pepper' });
+    const organization = await createTestOrganization(
+      `Direct Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user)}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.organizationId).toBe(organization.id);
+    } finally {
+      await deleteOrganizationsWithMemberships([organization.id]);
+    }
+  });
+
+  test.each(['owner', 'admin'] as const)(
+    'accepts a %s of the parent organization for the child organization context',
+    async role => {
+      const user = await insertTestUser({ api_token_pepper: `parent-${role}-pepper` });
+      const { parent, child } = await createParentAndChildOrganizations();
+      try {
+        await db
+          .insert(organization_memberships)
+          .values({ organization_id: parent.id, kilo_user_id: user.id, role });
+        mockHeaders.mockResolvedValue(
+          new Headers({
+            Authorization: `Bearer ${generateApiToken(user)}`,
+            [ORGANIZATION_ID_HEADER]: child.id,
+          })
+        );
+
+        const result = await getUserFromAuth({ adminOnly: false });
+
+        expect(result.authFailedResponse).toBeNull();
+        expect(result.organizationId).toBe(child.id);
+      } finally {
+        await deleteOrganizationsWithMemberships([child.id, parent.id]);
+      }
+    }
+  );
+
+  test('refuses a member of the parent organization for the child organization context', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'parent-member-pepper' });
+    const { parent, child } = await createParentAndChildOrganizations();
+    try {
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'member' });
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user)}`,
+          [ORGANIZATION_ID_HEADER]: child.id,
+        })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (not a member of the organization)',
+      });
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await deleteOrganizationsWithMemberships([child.id, parent.id]);
+    }
+  });
+
+  test('refuses the child organization context when the parent organization is soft-deleted', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'deleted-parent-pepper' });
+    const { parent, child } = await createParentAndChildOrganizations();
+    try {
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'owner' });
+      await markOrganizationAsDeleted(parent.id);
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user)}`,
+          [ORGANIZATION_ID_HEADER]: child.id,
+        })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await deleteOrganizationsWithMemberships([child.id, parent.id]);
+    }
+  });
+
+  test('refuses an organization context with no membership relation', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'unrelated-organization-pepper' });
+    const owner = await insertTestUser();
+    const organization = await createTestOrganization(
+      `Unrelated Organization ${crypto.randomUUID()}`,
+      owner.id,
+      0
+    );
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user)}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await deleteOrganizationsWithMemberships([organization.id]);
+    }
+  });
+
+  test('allows API-token authentication for users from SSO-protected domains', async () => {
+    const ssoDomain = `${crypto.randomUUID()}.example.com`;
+    const user = await insertTestUser({
+      google_user_email: `api-token-user@${ssoDomain}`,
+      api_token_pepper: 'api-token-pepper',
+    });
+    const organization = await createTestOrganization('API Token SSO Domain Org', user.id, 0);
+    await db
+      .update(organizations)
+      .set({ sso_domain: ssoDomain })
+      .where(eq(organizations.id, organization.id));
+
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+  });
+
+  test('Authorization branch threads deviceSessionId from the bearer token', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-device-session-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'device-session-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('rejects a bearer token whose device session was revoked', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-revoked-session-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'revoked-session-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('serves the cached session answer, then rechecks it after the revocation window', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-session-window-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'session-window-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    let clock = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => clock);
+
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    // Revoked without the app's invalidation, as another instance would.
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'logout' })
+      .where(eq(device_sessions.id, session!.id));
+
+    // Inside the window the cached answer is served without a database read.
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    clock += DEVICE_SESSION_CACHE_TTL_MS;
+    const afterWindow = await getUserFromAuth({ adminOnly: false });
+
+    expect(afterWindow.authFailedResponse?.status).toBe(401);
+    expect(afterWindow.user).toBeNull();
+    expect(afterWindow.credentialsRejected).toBe(true);
+  });
+
+  test('web-session branch leaves deviceSessionId undefined', async () => {
+    const user = await insertTestUser({
+      google_user_email: `web-session-claim-${crypto.randomUUID()}@example.com`,
+      web_session_pepper: 'web-session-pepper',
+    });
+    // No Authorization header: auth must come from the web session.
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'web-session-pepper',
+      isNewUser: false,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBeUndefined();
+  });
+
+  test('failure paths leave deviceSessionId undefined even when the token carried the claim', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-failure-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'pre-rotation-pepper',
+    });
+    const deviceSessionId = crypto.randomUUID();
+    const token = generateApiToken(user, { deviceSessionId });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    // Rotate the pepper so the bearer token passes JWT verification but fails
+    // the pepper comparison — a post-validation failure path.
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: 'rotated-pepper' })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).not.toBeNull();
+    expect(result.user).toBeNull();
+    expect(result.deviceSessionId).toBeUndefined();
+  });
+});
+
+describe('getUserFromSession', () => {
+  test('returns the session user id for a valid session', async () => {
+    mockGetServerSession.mockResolvedValue({ kiloUserId: 'session-user-id' });
+
+    await expect(getUserFromSession()).resolves.toEqual({ id: 'session-user-id' });
+    expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
+  });
+
+  test('returns null when the session read throws on malformed cookies', async () => {
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    await expect(getUserFromSession()).resolves.toBeNull();
+  });
+
+  test.each([
+    ['a non-cookie TypeError', new TypeError("Cannot read properties of undefined (reading 'id')")],
+    ['a generic error', new Error('session callback failed')],
+  ])('rethrows %s from the session read', async (_label, error) => {
+    mockGetServerSession.mockRejectedValue(error);
+
+    await expect(getUserFromSession()).rejects.toBe(error);
+  });
+});
+
+describe('credential issuance authentication guards', () => {
+  test.each([
+    ['Bearer token', { Authorization: 'Bearer token' }],
+    ['empty authorization', { Authorization: '' }],
+    [
+      'cookie and bearer',
+      { Authorization: 'Bearer token', Cookie: 'next-auth.session-token=session' },
+    ],
+  ])('session-only guard rejects %s', async (_name, headers) => {
+    mockHeaders.mockResolvedValue(new Headers(headers));
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('uses the genuine session and primary database user', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      isNewUser: false,
+    });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user?.id).toBe(user.id);
+    expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
+  });
+
+  test('threads the server-only webSessionId and pepper from the session claim', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      webSessionId: 'per-session-id',
+    });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBe('per-session-id');
+    expect(result.webSessionPepper).toBe('current-web-session-pepper');
+  });
+
+  test('a bearer credential carries no webSessionId', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBeUndefined();
+  });
+
+  test('returns 401 when the session read throws on malformed cookies', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('rejects a revoked web session', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'revoked-web-session-pepper',
+    });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('does not authorize blocked users for credential issuance', async () => {
+    const user = await insertTestUser({ blocked_reason: 'blocked for test' });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+    expect(result.authorizationRefused).toBe(true);
+  });
+
+  test('does not authorize credential issuance when the block timestamp is set', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+  });
+
+  test('leaves generic bearer authentication available', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+  });
+
+  test('redirects an absent session to the callback-aware sign-in URL', async () => {
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
+    mockGetServerSession.mockResolvedValue(null);
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fprofile'
+    );
+    expect(mockRedirect).toHaveBeenCalledWith('/users/sign_in?callbackPath=%2Fprofile');
+  });
+
+  test('redirects blocked sessions to the blocked account page', async () => {
+    const user = await insertTestUser({ blocked_reason: 'blocked for test' });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/account-blocked'
+    );
+    expect(mockRedirect).toHaveBeenCalledWith('/account-blocked');
+  });
+
+  test('redirects a session with a block timestamp to the blocked account page', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/account-blocked'
+    );
+    expect(mockRedirect).toHaveBeenCalledWith('/account-blocked');
+  });
+
+  test.each([
+    ['bearer', { authorization: 'Bearer token' }],
+    ['mixed cookie and bearer', { authorization: 'Bearer token', cookie: 'session=value' }],
+  ])('redirects %s authentication to the callback-aware sign-in URL', async (_name, headers) => {
+    mockHeaders.mockResolvedValue(new Headers({ ...headers, 'x-pathname': '/profile' }));
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fprofile'
+    );
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('keeps the request query in the callback-aware sign-in URL', async () => {
+    // A resume link (`/cloud/sessions/<id>?at=<anchor>`) must not lose its
+    // anchor on the way to sign-in: the cloud-agent layout redirects before the
+    // session page can supply its own callbackPath, so the query has to come
+    // from the request the proxy stamped.
+    mockHeaders.mockResolvedValue(
+      new Headers({ 'x-pathname': '/cloud/sessions/ses_1', 'x-search': '?at=msg_2' })
+    );
+    mockGetServerSession.mockResolvedValue(null);
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fcloud%2Fsessions%2Fses_1%3Fat%3Dmsg_2'
+    );
+  });
+
+  test('appends no query when the request has none', async () => {
+    mockHeaders.mockResolvedValue(
+      new Headers({ 'x-pathname': '/cloud/sessions/ses_1', 'x-search': '' })
+    );
+    mockGetServerSession.mockResolvedValue(null);
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fcloud%2Fsessions%2Fses_1'
+    );
+  });
+});
+
+describe('credential exchange bearer authentication guard', () => {
+  async function createModernToken(user: User, pepper = user.api_token_pepper) {
+    const now = Math.floor(Date.now() / 1000);
+    return signPolicyClaims(
+      buildModernKiloTokenPayload({
+        userId: user.id,
+        pepper,
+        env: process.env.NODE_ENV,
+        audience: KILO_API_AUDIENCE,
+        issuedAt: now,
+        expiresAt: now + 300,
+        tokenPurpose: 'human-api',
+        credentialExchange: true,
+      })
+    );
+  }
+
+  test('authorizes an eligible modern bearer token', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'modern-exchange-pepper' });
+    const token = await createModernToken(user);
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'deny' }
+    );
+
+    expect(result.user?.id).toBe(user.id);
+  });
+
+  test.each([157_680_000, 157_788_000])(
+    'authorizes eligible legacy bearer tokens with a %i second lifetime',
+    async expiresInSeconds => {
+      const user = await insertTestUser({ api_token_pepper: `legacy-pepper-${expiresInSeconds}` });
+      const { token } = await signKiloToken({
+        userId: user.id,
+        pepper: user.api_token_pepper,
+        secret: NEXTAUTH_SECRET,
+        expiresInSeconds,
+        env: process.env.NODE_ENV,
+      });
+
+      const result = await getUserFromBearerForCredentialExchange(
+        new Headers({ authorization: `Bearer ${token}` }),
+        { legacy: 'five-year-api' }
+      );
+
+      expect(result.user?.id).toBe(user.id);
+    }
+  );
+
+  test.each([157_680_000, 157_788_000])(
+    'authorizes a near-expiry legacy bearer token with a %i second lifetime',
+    async lifetime => {
+      const user = await insertTestUser({ api_token_pepper: `near-expiry-pepper-${lifetime}` });
+      const now = Math.floor(Date.now() / 1000);
+      const token = signPolicyClaims({
+        version: 3,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        iat: now - lifetime + 300,
+        exp: now + 300,
+      });
+
+      const result = await getUserFromBearerForCredentialExchange(
+        new Headers({ authorization: `Bearer ${token}` }),
+        { legacy: 'five-year-api' }
+      );
+
+      expect(result.user?.id).toBe(user.id);
+    }
+  );
+
+  test.each([3600, 15 * 60, 24 * 60 * 60, 30 * 24 * 60 * 60])(
+    'rejects a %i second legacy bearer token',
+    async expiresInSeconds => {
+      const user = await insertTestUser({
+        api_token_pepper: `short-legacy-pepper-${expiresInSeconds}`,
+      });
+      const { token } = await signKiloToken({
+        userId: user.id,
+        pepper: user.api_token_pepper,
+        secret: NEXTAUTH_SECRET,
+        expiresInSeconds,
+        env: process.env.NODE_ENV,
+      });
+
+      const result = await getUserFromBearerForCredentialExchange(
+        new Headers({ authorization: `Bearer ${token}` }),
+        { legacy: 'five-year-api' }
+      );
+
+      expect(result.authFailedResponse?.status).toBe(401);
+    }
+  );
+
+  test('rejects a legacy bearer token when legacy exchange is disabled', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'legacy-denied-pepper' });
+    const { token } = await signKiloToken({
+      userId: user.id,
+      pepper: user.api_token_pepper,
+      secret: NEXTAUTH_SECRET,
+      expiresInSeconds: 157_680_000,
+      env: process.env.NODE_ENV,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'deny' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('rejects absent and mismatched pepper claims, including a null database pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const noPepper = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      env: process.env.NODE_ENV,
+      aud: KILO_API_AUDIENCE,
+      tokenPurpose: 'human-api',
+      credentialExchange: true,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 300,
+    });
+    const mismatched = await createModernToken(user, 'different-pepper');
+
+    for (const token of [noPepper, mismatched]) {
+      const result = await getUserFromBearerForCredentialExchange(
+        new Headers({ authorization: `Bearer ${token}` }),
+        { legacy: 'deny' }
+      );
+      expect(result.authFailedResponse?.status).toBe(401);
+    }
+  });
+
+  test('accepts an explicit null pepper only when the database pepper is null', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = await createModernToken(user, null);
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'deny' }
+    );
+
+    expect(result.user?.id).toBe(user.id);
+  });
+
+  test('rejects an explicit null pepper for a user with a string pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'string-pepper' });
+    const token = await createModernToken(user, null);
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'deny' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('rejects a token after its database pepper is rotated', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'before-rotation-pepper' });
+    const token = await createModernToken(user);
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: 'after-rotation-pepper' })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'deny' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test.each([
+    [
+      'missing environment',
+      (user: User, now: number) => ({
+        version: 3,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        aud: KILO_API_AUDIENCE,
+        tokenPurpose: 'human-api',
+        credentialExchange: true,
+        iat: now,
+        exp: now + 300,
+      }),
+    ],
+    [
+      'device purpose',
+      (user: User, now: number) => ({
+        version: 3,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        aud: KILO_API_AUDIENCE,
+        tokenPurpose: 'device-access',
+        credentialExchange: false,
+        iat: now,
+        exp: now + 300,
+      }),
+    ],
+    [
+      'unknown signed claim',
+      (user: User, now: number) => ({
+        version: 3,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        aud: KILO_API_AUDIENCE,
+        tokenPurpose: 'human-api',
+        credentialExchange: true,
+        futureRestriction: false,
+        iat: now,
+        exp: now + 300,
+      }),
+    ],
+  ])('rejects an eligible-looking token with %s', async (_name, claimsFor) => {
+    const user = await insertTestUser({ api_token_pepper: 'ineligible-claim-pepper' });
+    const token = signPolicyClaims(claimsFor(user, Math.floor(Date.now() / 1000)));
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test.each([
+    ['bot', { botId: '' }],
+    ['organization', { organizationId: '' }],
+    ['token source', { tokenSource: '' }],
+    ['admin', { isAdmin: false }],
+    ['internal use', { internalApiUse: false }],
+  ])('rejects a legacy bearer token with a %s marker', async (_name, marker) => {
+    const user = await insertTestUser({ api_token_pepper: 'system-marker-pepper' });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      ...marker,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('exchanges a five-year bearer token bound to its device session', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'session-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('refuses to exchange a five-year bearer token whose device session is revoked', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'revoked-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+  });
+
+  test.each([
+    'invalid signature',
+    'expired',
+    'future-issued',
+    'missing expiry',
+    'missing issuance',
+  ])('rejects an otherwise eligible token with %s without a session fallback', async invalidity => {
+    const user = await insertTestUser({ api_token_pepper: 'verification-test-pepper' });
+    const now = Math.floor(Date.now() / 1000);
+    const claims: Record<string, unknown> = buildModernKiloTokenPayload({
+      userId: user.id,
+      pepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      audience: KILO_API_AUDIENCE,
+      issuedAt: now,
+      expiresAt: now + 300,
+      tokenPurpose: 'human-api',
+      credentialExchange: true,
+    });
+    if (invalidity === 'expired') {
+      claims.iat = now - 600;
+      claims.exp = now - 300;
+    } else if (invalidity === 'future-issued') {
+      claims.iat = now + 300;
+      claims.exp = now + 600;
+    } else if (invalidity === 'missing expiry') {
+      delete claims.exp;
+    }
+    const token = jwt.sign(
+      claims,
+      invalidity === 'invalid signature' ? 'wrong-test-signing-secret' : NEXTAUTH_SECRET,
+      { algorithm: 'HS256', noTimestamp: invalidity === 'missing issuance' }
+    );
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'deny' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('rejects a valid token for a missing user', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: 'missing-credential-exchange-user',
+      apiTokenPepper: 'pepper',
+      env: process.env.NODE_ENV,
+      aud: KILO_API_AUDIENCE,
+      tokenPurpose: 'human-api',
+      credentialExchange: true,
+      iat: now,
+      exp: now + 300,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'deny' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('rejects wrong audiences, environment, blocked users, and ineligible modern claims', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'rejected-exchange-pepper' });
+    const now = Math.floor(Date.now() / 1000);
+    const invalidClaims = [
+      {
+        version: 3,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        aud: 'other-audience',
+        tokenPurpose: 'human-api',
+        credentialExchange: true,
+        iat: now,
+        exp: now + 300,
+      },
+      buildModernKiloTokenPayload({
+        userId: user.id,
+        pepper: user.api_token_pepper,
+        env: 'other-environment',
+        audience: KILO_API_AUDIENCE,
+        issuedAt: now,
+        expiresAt: now + 300,
+        tokenPurpose: 'human-api',
+        credentialExchange: true,
+      }),
+      buildModernKiloTokenPayload({
+        userId: user.id,
+        pepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        audience: KILO_API_AUDIENCE,
+        issuedAt: now,
+        expiresAt: now + 300,
+        tokenPurpose: 'human-api',
+        credentialExchange: false,
+      }),
+    ];
+
+    for (const claims of invalidClaims) {
+      const result = await getUserFromBearerForCredentialExchange(
+        new Headers({ authorization: `Bearer ${signPolicyClaims(claims)}` }),
+        { legacy: 'deny' }
+      );
+      expect(result.authFailedResponse?.status).toBe(401);
+    }
+
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'blocked for test' })
+      .where(eq(kilocode_users.id, user.id));
+    const blocked = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${await createModernToken(user)}` }),
+      { legacy: 'deny' }
+    );
+    expect(blocked.authFailedResponse?.status).toBe(403);
+  });
+});
+
+describe('binary step-up enforcement (REST)', () => {
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+  let evaluateStepUp: jest.Mock;
+
+  beforeAll(() => {
+    ({ evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    });
+  });
+
+  afterEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+    evaluateStepUp.mockClear();
+    mockHeaders.mockReset();
+    mockGetServerSession.mockReset();
+  });
+
+  async function sessionAdmin() {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-admin-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      web_session_pepper: 'step-up-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin/api/private-users' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: admin.id,
+      webSessionPepper: 'step-up-session-pepper',
+      webSessionId: 'step-up-web-session',
+    });
+    return admin;
+  }
+
+  async function errorCode(result: { authFailedResponse: unknown }): Promise<unknown> {
+    return (await (result.authFailedResponse as Response).json()) as unknown;
+  }
+
+  it('does not evaluate or deny when the switch is off', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await sessionAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(result.user?.id).toBe(admin.id);
+    expect(result.authFailedResponse).toBeNull();
+  });
+
+  it('allows a session with a fresh proof when on', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({
+      state: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(result.authFailedResponse).toBeNull();
+  });
+
+  it.each([
+    [{ status: 'not_enrolled' }, 'NOT_ENROLLED'],
+    [{ status: 'required' }, 'MFA_REQUIRED'],
+    [{ status: 'expired', verifiedAt: new Date().toISOString() }, 'MFA_EXPIRED'],
+    [{ status: 'session_unbound' }, 'SESSION_UNBOUND'],
+  ] as const)('denies %j with %s when on', async (state, code) => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({ state, proof: null, passkeyCount: 0 });
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: code });
+  });
+
+  it('denies a bearer credential with BEARER_NOT_ALLOWED when on', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await insertTestUser({
+      google_user_email: `step-up-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: 'step-up-bearer-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(admin)}`,
+        'x-pathname': '/admin/api/private-users',
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: 'BEARER_NOT_ALLOWED' });
+  });
+
+  it('fails closed with STEP_UP_UNAVAILABLE when evaluation errors', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockRejectedValueOnce(new Error('relation does not exist'));
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: 'STEP_UP_UNAVAILABLE' });
+  });
+
+  it('skips enforcement only for the layout escape hatch', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await sessionAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, skipStepUpGuard: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(result.user?.id).toBe(admin.id);
+  });
+});
+
+describe('step-up refusal telemetry (REST)', () => {
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+  let evaluateStepUp: jest.Mock;
+  let runStepUpGuard: jest.Mock;
+  let events: AdminAccessEvent[];
+
+  beforeAll(() => {
+    ({ evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    });
+    ({ runStepUpGuard } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-guard') as {
+      runStepUpGuard: jest.Mock;
+    });
+  });
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAdminAccessSinkForTest(null);
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+    evaluateStepUp.mockClear();
+  });
+
+  async function bearerAdmin(pathname = '/admin/api/safety-identifiers') {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-audit-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: `step-up-audit-bearer-${crypto.randomUUID()}`,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(admin)}`,
+        'x-pathname': pathname,
+        'x-forwarded-for': '203.0.113.9, 10.0.0.1',
+      })
+    );
+    return admin;
+  }
+
+  async function sessionAdmin() {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-audit-session-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      web_session_pepper: 'step-up-audit-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin/api/safety-identifiers' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: admin.id,
+      webSessionPepper: 'step-up-audit-session-pepper',
+      webSessionId: 'step-up-audit-web-session',
+    });
+    return admin;
+  }
+
+  test('records one denied privileged_access event for a refused API token', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await bearerAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      event: 'admin_access',
+      surface: 'rest',
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      authVia: 'token',
+      outcome: 'denied',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+      target: null,
+      wouldBlock: true,
+      kiloUserId: admin.id,
+      adminTier: 'platform_admin',
+      route: '/admin/api/safety-identifiers',
+      method: 'GET',
+      ip: '203.0.113.9',
+      tokenSource: null,
+    });
+  });
+
+  test('records exactly one succeeded event when the API token passes', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await bearerAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+    });
+    expect(
+      events.filter(event => event.kind === 'privileged_access' && event.outcome === 'denied')
+    ).toHaveLength(0);
+  });
+
+  test('carries the arriving surface through both events of one request', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    await bearerAdmin('/admin');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      stepUpSurface: 'server-component',
+    });
+
+    expect(result.user).not.toBeNull();
+    expect(events.map(event => event.surface)).toEqual(['server-component', 'server-component']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+      actionId: 'serverComponent.admin',
+      route: '/admin',
+      method: 'GET',
+    });
+  });
+
+  test('records a failed event for an unexpected guard throw', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await bearerAdmin();
+    runStepUpGuard.mockRejectedValueOnce(new Error('unexpected guard failure'));
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await (result.authFailedResponse as Response).json()).toEqual({
+      success: false,
+      error: 'STEP_UP_UNAVAILABLE',
+    });
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'failed',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+    });
+  });
+
+  test('leaves a session step-up refusal on the admin guard event', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({
+      state: { status: 'not_enrolled' },
+      proof: null,
+      passkeyCount: 0,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
+  });
+});
+
+describe('getUserFromAuth admin_access telemetry (REST)', () => {
+  let events: AdminAccessEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAdminAccessSinkForTest(null);
+  });
+
+  test('emits one rest/token event for an authorized admin via API token', async () => {
+    const admin = await insertTestUser({
+      google_user_email: `rest-admin-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      is_super_admin: true,
+      api_token_pepper: 'rest-admin-pepper',
+    });
+    const token = generateApiToken(admin);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        'x-pathname': '/admin/api/safety-identifiers',
+        'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      event: 'admin_access',
+      surface: 'rest',
+      kind: 'admin_guard',
+      authVia: 'token',
+      adminTier: 'super_admin',
+      credential: 'human_bearer',
+      wouldBlock: true,
+      kiloUserId: admin.id,
+      email: admin.google_user_email,
+      route: '/admin/api/safety-identifiers',
+      method: null,
+      ip: '203.0.113.7',
+      tokenSource: null,
+    });
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'sensitive_write',
+      route: '/admin/api/safety-identifiers',
+      kiloUserId: admin.id,
+    });
+  });
+
+  test.each([
+    ['delegated workload', { tokenSource: 'cloud-agent' }, 'delegated_workload'],
+    ['service assertion', { internalApiUse: true }, 'service_assertion'],
+  ] as const)(
+    'preserves %s provenance on a denied admin request',
+    async (_label, extra, expectedCredential) => {
+      const user = await insertTestUser({
+        google_user_email: `denied-${crypto.randomUUID()}@kilocode.ai`,
+        api_token_pepper: `denied-${crypto.randomUUID()}`,
+      });
+      mockHeaders.mockResolvedValue(
+        new Headers({ Authorization: `Bearer ${generateApiToken(user, extra)}` })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: true });
+
+      expect(result.authFailedResponse).not.toBeNull();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'privileged_access',
+        credential: expectedCredential,
+        outcome: 'denied',
+      });
+    }
+  );
+
+  test('does not emit when a non-admin token hits an admin-only check', async () => {
+    const nonAdmin = await insertTestUser({
+      is_admin: false,
+      api_token_pepper: 'rest-nonadmin-pepper',
+    });
+    const token = generateApiToken(nonAdmin);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.authFailedResponse).not.toBeNull();
+    expect(result.authorizationRefused).toBe(true);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      kiloUserId: null,
+    });
+  });
+
+  test('does not emit for adminOnly:false calls even for an admin', async () => {
+    const admin = await insertTestUser({
+      is_admin: true,
+      api_token_pepper: 'rest-admin-noemit-pepper',
+    });
+    const token = generateApiToken(admin);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events).toHaveLength(0);
+  });
+});

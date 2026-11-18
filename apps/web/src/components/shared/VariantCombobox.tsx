@@ -23,6 +23,7 @@ type VariantComboboxProps = {
   className?: string;
   /** Optional aria-label for the trigger button, overriding the default accessible name */
   triggerAriaLabel?: string;
+  onClear?: () => void;
 };
 
 export function VariantCombobox({
@@ -32,12 +33,13 @@ export function VariantCombobox({
   disabled = false,
   className,
   triggerAriaLabel,
+  onClear,
 }: VariantComboboxProps) {
   const [open, setOpen] = useState(false);
 
-  if (variants.length === 0) return null;
+  if (variants.length === 0 && !(onClear && value)) return null;
 
-  const selectedLabel = value ? thinkingEffortLabel(value) : 'Variant';
+  const selectedLabel = value ? thinkingEffortLabel(value) : onClear ? 'Default' : 'Variant';
 
   return (
     <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
@@ -61,6 +63,24 @@ export function VariantCombobox({
         <Command>
           <CommandList className="max-h-64 overflow-auto">
             <CommandGroup>
+              {onClear && (
+                <CommandItem
+                  value="__default__"
+                  onSelect={() => {
+                    onClear();
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <span className="truncate">Default</span>
+                  <Check
+                    className={cn(
+                      'ml-auto h-4 w-4 shrink-0',
+                      value === undefined ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                </CommandItem>
+              )}
               {variants.map(v => (
                 <CommandItem
                   key={v}

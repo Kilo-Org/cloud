@@ -1,4 +1,28 @@
-const { withAndroidManifest } = require('expo/config-plugins');
+const fs = require('fs');
+const path = require('path');
+
+const {
+  withAndroidManifest,
+  withDangerousMod,
+  withGradleProperties,
+} = require('expo/config-plugins');
+
+const BACKUP_RULES_RES = '@xml/kilo_backup_rules';
+const DATA_EXTRACTION_RULES_RES = '@xml/kilo_data_extraction_rules';
+
+/**
+ * Unused raw resource the release artifact inspector expects resource shrinking
+ * to strip.
+ *
+ * R8 shrinks resources in safe mode: it keeps every resource whose name starts
+ * with a string literal found in the code, so that a dynamic
+ * `Resources.getIdentifier()` lookup still resolves. The `zz_` prefix stays out
+ * of that heuristic because no literal in the app starts with `zz`. Do not
+ * rename this to a name that starts with a literal already in the code: the
+ * earlier `kilo_shrink_sentinel_unused` survived shrinking once the app gained a
+ * `kilo` literal, and the inspector gate then failed every release.
+ */
+const SHRINK_SENTINEL_NAME = 'zz_unused_shrink_sentinel';
 
 /**
  * Features Google Play treats as required because a permission implies them.
@@ -20,8 +44,21 @@ const OPTIONAL_FEATURES = [
  * Resolves manifest merger conflict between expo-secure-store and AppsFlyer SDK,
  * which both declare dataExtractionRules and fullBackupContent on <application>,
  * and stops Google Play from filtering devices on implied hardware features.
+ *
+ * The two SDKs want mutually incompatible backup rule files, so this plugin
+ * writes one union rule set (SecureStore + AppsFlyer exclusions) into the
+ * generated Android res directory and points both manifest attributes at it.
  */
-const withAndroidManifestFix = config => {
+function withAndroidManifestFix(config) {
+  config = withAndroidResources(config);
+  config = withGradleProperties(config, cfg => {
+    // AppsFlyer's SDK and purchase connector share a namespace. AGP 9 enables
+    // uniqueness validation by default; retain AGP 8's policy for this vendor pair.
+    const key = 'android.uniquePackageNames';
+    cfg.modResults = cfg.modResults.filter(entry => entry.type !== 'property' || entry.key !== key);
+    cfg.modResults.push({ type: 'property', key, value: 'false' });
+    return cfg;
+  });
   return withAndroidManifest(config, config => {
     const manifest = config.modResults.manifest;
     const application = manifest.application?.[0];
@@ -33,6 +70,10 @@ const withAndroidManifestFix = config => {
     // Add tools:replace to resolve the conflicting attributes
     application.$['tools:replace'] = 'android:dataExtractionRules,android:fullBackupContent';
 
+    // Point both attributes at the union rules written by withAndroidResources.
+    application.$['android:fullBackupContent'] = BACKUP_RULES_RES;
+    application.$['android:dataExtractionRules'] = DATA_EXTRACTION_RULES_RES;
+
     const features = (manifest['uses-feature'] ??= []);
     const declared = new Set(features.map(feature => feature.$?.['android:name']));
     for (const name of OPTIONAL_FEATURES) {
@@ -42,6 +83,69 @@ const withAndroidManifestFix = config => {
 
     return config;
   });
-};
+}
+
+/**
+ * Copies the union backup XML files, native alert title override, and an unused
+ * raw resource into the generated Android res directory.
+ *
+ * The raw resource is never referenced by the app. Release builds enable
+ * resource shrinking, which strips it from the AAB; the inspector asserts its
+ * absence to prove the shrink regression cannot silently land.
+ */
+function withAndroidResources(config) {
+  return withDangerousMod(config, [
+    'android',
+    async config => {
+      const resDir = path.join(config.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res');
+      const xmlDir = path.join(resDir, 'xml');
+      const rawDir = path.join(resDir, 'raw');
+      fs.mkdirSync(xmlDir, { recursive: true });
+      fs.mkdirSync(rawDir, { recursive: true });
+
+      fs.copyFileSync(
+        path.join(__dirname, 'backup', 'kilo_backup_rules.xml'),
+        path.join(xmlDir, 'kilo_backup_rules.xml')
+      );
+      fs.copyFileSync(
+        path.join(__dirname, 'backup', 'kilo_data_extraction_rules.xml'),
+        path.join(xmlDir, 'kilo_data_extraction_rules.xml')
+      );
+      fs.writeFileSync(path.join(rawDir, SHRINK_SENTINEL_NAME), 'resource shrink sentinel');
+      writeAlertTitleLayout(resDir);
+      return config;
+    },
+  ]);
+}
+
+/**
+ * Aligns the native alert title with the alert message.
+ *
+ * This fork follows the capability, not a scope. Android is the platform that
+ * lacks a title layout following the paragraph's own direction: React Native's
+ * bundled `alert_title_layout.xml` pins the title to `viewStart`, the device's
+ * direction, while the message follows the paragraph's own direction, so on an
+ * English device with the app in Arabic the title sits on the opposite edge
+ * from the message. iOS bundles no such layout — `RCTAlertManager` hands the
+ * title and the message to one `UIAlertController` — so no iOS prebuild calls
+ * this plugin.
+ *
+ * The overlay copies the installed layout, so the native `DialogTitle` class,
+ * the `alert_title` id, the window title style, padding, and sizing stay RN's.
+ */
+function writeAlertTitleLayout(resDir) {
+  // `textStart` follows the paragraph's own direction, like the alert message;
+  // `viewStart` follows the device direction and forks the two edges.
+  const source = path.join(
+    path.dirname(require.resolve('react-native/package.json')),
+    'ReactAndroid/src/main/res/views/alert/layout/alert_title_layout.xml'
+  );
+  const layout = fs
+    .readFileSync(source, 'utf8')
+    .replace('android:textAlignment="viewStart"', 'android:textAlignment="textStart"');
+  const layoutDir = path.join(resDir, 'layout');
+  fs.mkdirSync(layoutDir, { recursive: true });
+  fs.writeFileSync(path.join(layoutDir, 'alert_title_layout.xml'), layout);
+}
 
 module.exports = withAndroidManifestFix;

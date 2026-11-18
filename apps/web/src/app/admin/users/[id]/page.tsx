@@ -1,9 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminDashboard } from '@/app/admin/components/UserAdmin/UserAdminDashboard';
 import type { UserDetailProps } from '@/types/admin';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user/server';
-import { getPaymentStatusByUserIds, describePaymentMethods } from '@/lib/admin-utils-serverside';
-import { db } from '@/lib/drizzle';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
+import {
+  getPaymentStatusByUserIds,
+  describePaymentMethods,
+} from '@kilocode/web-shared/lib/admin-utils-serverside';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PaymentMethod } from '@kilocode/db/schema';
 import {
   kilocode_users,
@@ -11,14 +15,15 @@ import {
   organization_memberships,
   organizations,
   auto_top_up_configs,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
-import { findUserById } from '@/lib/user';
-import { getBalanceForUser } from '@/lib/user/balance';
-import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
-import { redirect } from 'next/navigation';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { getCrossAccountEmailConflicts, inferRowlessAuthProviders } from '@/lib/user';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { hasReceivedAnyFreeWelcomeCredits } from '@kilocode/web-shared/lib/welcomeCredits';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 
 async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const user = await findUserById(userId);
@@ -51,7 +56,6 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
       : null,
   }));
 
-  // Fetch organization memberships with organization details
   const organizationMemberships = await db
     .select({
       membership: organization_memberships,
@@ -65,17 +69,35 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const paymentMethodsByUserId = await getPaymentStatusByUserIds([user.id]);
   const creditInfo = await getBalanceForUser(user);
   const hasReceivedCardValidationCredits = await hasReceivedAnyFreeWelcomeCredits(user.id);
+  const authProviders = await db
+    .selectDistinct({
+      provider: user_auth_provider.provider,
+      email: user_auth_provider.email,
+    })
+    .from(user_auth_provider)
+    .where(eq(user_auth_provider.kilo_user_id, userId))
+    .orderBy(user_auth_provider.provider);
 
-  // Fetch auto-top-up config
   const autoTopUpConfig =
     (await db.query.auto_top_up_configs.findFirst({
       where: eq(auto_top_up_configs.owned_by_user_id, userId),
     })) ?? null;
 
-  // Check if user's email domain has SSO configured
   const emailDomain = getLowerDomainFromEmail(user.google_user_email);
   const ssoAuthority = emailDomain ? await resolveSsoAuthorityForDomain(emailDomain) : null;
   const isSSOProtectedDomain = ssoAuthority?.status !== 'not_required' && ssoAuthority !== null;
+  const loginMethods: Omit<UserDetailProps['login_methods'][number], 'email_relation'>[] =
+    authProviders.length > 0
+      ? authProviders.map(method => ({ ...method, source: 'linked' }))
+      : inferRowlessAuthProviders(user).map(provider => ({
+          provider,
+          email: user.google_user_email,
+          source: 'inferred',
+        }));
+  const conflictByEmail = await getCrossAccountEmailConflicts(
+    loginMethods.map(method => method.email),
+    user.id
+  );
 
   return {
     ...user,
@@ -92,14 +114,22 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     organization_memberships: organizationMemberships,
     autoTopUpConfig,
     is_sso_protected_domain: isSSOProtectedDomain,
+    login_methods: loginMethods.map(method => ({
+      ...method,
+      email_relation: conflictByEmail.get(method.email)
+        ? 'conflict'
+        : normalizeEmail(method.email) === normalizeEmail(user.google_user_email)
+          ? 'primary'
+          : 'different',
+    })),
   };
 }
 
 export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // Check authentication first
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) {
-    redirect('/admin/unauthorized');
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
   }
 
   const { id } = await params;

@@ -1,25 +1,46 @@
-import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
 import {
+  createBearerCallerForUser,
+  createCallerForUser,
+  createNativeCallerForUser,
+  createSessionCallerForUser,
+} from '@/routers/test-utils';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  agent_configs,
+  cli_sessions_v2,
   credit_transactions,
   device_sessions,
+  kiloclaw_instances,
   kilocode_users,
   magic_link_tokens,
+  microdollar_usage,
+  organization_memberships,
+  organizations,
+  passkey_credentials,
+  session_step_up_proofs,
+  user_activity_tokens,
   user_notification_preferences,
+  user_push_tokens,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
-import { sendSignInCodeEmail } from '@/lib/email';
+import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
+import { createAccountLinkingSession } from '@/lib/account-linking-session';
+import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
+import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
+import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
-jest.mock('@/lib/email', () => {
-  const actual = jest.requireActual('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/email', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/email');
   return {
     ...actual,
     sendSignInCodeEmail: jest.fn(),
@@ -32,6 +53,13 @@ jest.mock('@/lib/user/gdpr-removal', () => ({
   performGdprRemoval: jest.fn(),
 }));
 
+// Starting a link writes the linking cookie through `next/headers`, which has no
+// request scope here; the offer list is what this suite checks against.
+jest.mock('@/lib/account-linking-session', () => ({
+  ...jest.requireActual('@/lib/account-linking-session'),
+  createAccountLinkingSession: jest.fn(),
+}));
+
 jest.mock('@/lib/user', () => {
   const actual = jest.requireActual('@/lib/user');
   return {
@@ -40,15 +68,99 @@ jest.mock('@/lib/user', () => {
   };
 });
 
+// Registering a replacement iOS activity token retires the previous live row;
+// the router asks the notifications worker for a scope refresh so the retired
+// card is ended at registration. Never let that best-effort call reach the
+// network here.
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
+  refreshGlanceableScope: jest.fn(),
+}));
+
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
 const mockSendDeletionConfirmation = jest.mocked(sendAccountDeletionConfirmationEmail);
 const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSupportNotification);
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
+const mockRefreshGlanceableScope = jest.mocked(refreshGlanceableScope);
+
+const AVAILABLE_CAPABILITY = { available: true, unavailableReasonCode: null };
+const UNAVAILABLE_BALANCE_ALERTS = {
+  available: false,
+  unavailableReasonCode: 'organizationRequired',
+};
+const UNAVAILABLE_SECURITY_FINDINGS = {
+  available: false,
+  unavailableReasonCode: 'securityAgentRequired',
+};
+const UNAVAILABLE_KILOCLAW_ACTIVITY = {
+  available: false,
+  unavailableReasonCode: 'kiloclawInstanceRequired',
+};
+
+/** Capabilities for a user with no org, no Security config, and no KiloClaw instance. */
+const NO_GATES_CAPABILITIES = {
+  chatMessages: AVAILABLE_CAPABILITY,
+  agentAttention: AVAILABLE_CAPABILITY,
+  agentUpdates: AVAILABLE_CAPABILITY,
+  sessionStatus: AVAILABLE_CAPABILITY,
+  kiloclawActivity: UNAVAILABLE_KILOCLAW_ACTIVITY,
+  balanceAlerts: UNAVAILABLE_BALANCE_ALERTS,
+  spendAlerts: AVAILABLE_CAPABILITY,
+  securityFindings: UNAVAILABLE_SECURITY_FINDINGS,
+};
 
 let testUser: User;
 let surveyTestUser: User;
 let skipTestUser: User;
+
+describe('user router - getMe', () => {
+  it('getMe returns isAdmin: true for an admin user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: admin.id,
+      email: admin.google_user_email,
+      isAdmin: true,
+    });
+  });
+
+  it('getMe returns isAdmin: false for a non-admin user', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: user.id,
+      email: user.google_user_email,
+      isAdmin: false,
+    });
+  });
+});
+
+describe('user router - linkAuthProvider', () => {
+  it('starts a link for every provider the connected-accounts card offers', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
+
+    for (const { id } of AccountLinkingProviders) {
+      mockCreateLinkingSession.mockClear();
+      await expect(caller.user.linkAuthProvider({ provider: id })).resolves.toEqual({
+        success: true,
+      });
+      expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
+    }
+
+    // A method the card does not offer must not open a linking session.
+    mockCreateLinkingSession.mockClear();
+    await expect(caller.user.linkAuthProvider({ provider: 'workos' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+});
 
 describe('user router - updateProfile', () => {
   beforeAll(async () => {
@@ -464,14 +576,29 @@ describe('user router - credit purchase history', () => {
   const manualPurchaseId = crypto.randomUUID();
   const automaticPurchaseId = crypto.randomUUID();
 
+  const organizationPurchaseId = crypto.randomUUID();
+  let purchaseOrganizationId: string;
   beforeAll(async () => {
     purchaser = await insertTestUser({
       total_microdollars_acquired: 35_000_000,
       microdollars_used: 35_000_000,
     });
     otherUser = await insertTestUser();
+    const organization = await createTestOrganization('purchase-history-org', purchaser.id, 0);
+    purchaseOrganizationId = organization.id;
 
     await db.insert(credit_transactions).values([
+      {
+        id: organizationPurchaseId,
+        kilo_user_id: purchaser.id,
+        organization_id: purchaseOrganizationId,
+        amount_microdollars: 50_000_000,
+        is_free: false,
+        description: 'Organization top-up via stripe',
+        stripe_payment_id: `ch_${crypto.randomUUID()}`,
+        created_at: '2026-06-24T10:00:00.000Z',
+        expiry_date: '2027-06-24T10:00:00.000Z',
+      },
       {
         id: manualPurchaseId,
         kilo_user_id: purchaser.id,
@@ -480,6 +607,7 @@ describe('user router - credit purchase history', () => {
         description: 'Top-up via stripe',
         stripe_payment_id: `ch_${crypto.randomUUID()}`,
         created_at: '2026-06-20T10:00:00.000Z',
+        expiry_date: '2027-06-20T10:00:00.000Z',
       },
       {
         id: automaticPurchaseId,
@@ -514,6 +642,10 @@ describe('user router - credit purchase history', () => {
     await db
       .delete(credit_transactions)
       .where(inArray(credit_transactions.kilo_user_id, [purchaser.id, otherUser.id]));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, purchaseOrganizationId));
+    await db.delete(organizations).where(eq(organizations.id, purchaseOrganizationId));
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, [purchaser.id, otherUser.id]));
   });
 
@@ -525,13 +657,15 @@ describe('user router - credit purchase history', () => {
     expect(result.entries).toEqual([
       expect.objectContaining({
         id: automaticPurchaseId,
-        description: 'Automatic top-up',
+        kind: 'auto_top_up',
         amount_mUsd: 15_000_000,
+        expiryDate: null,
       }),
       expect.objectContaining({
         id: manualPurchaseId,
-        description: 'Credit purchase',
+        kind: 'purchase',
         amount_mUsd: 20_000_000,
+        expiryDate: '2027-06-20T10:00:00.000Z',
       }),
     ]);
     expect(result.nextCursor).toBeNull();
@@ -548,10 +682,45 @@ describe('user router - credit purchase history', () => {
       transactionId: manualPurchaseId,
       amount_mUsd: 20_000_000,
       purchasedAt: '2026-06-20T10:00:00.000Z',
+      expiryDate: '2027-06-20T10:00:00.000Z',
     });
     await expect(
       otherCaller.user.getCreditPurchaseConfirmation({ transactionId: manualPurchaseId })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('returns organization purchase deadlines only to authorized billing users', async () => {
+    const purchaserCaller = await createCallerForUser(purchaser.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+    const result = await purchaserCaller.user.getCreditPurchaseHistory({
+      cursor: 0,
+      organizationId: purchaseOrganizationId,
+    });
+    expect(result.entries).toEqual([
+      expect.objectContaining({
+        id: organizationPurchaseId,
+        amount_mUsd: 50_000_000,
+        expiryDate: '2027-06-24T10:00:00.000Z',
+      }),
+    ]);
+    await expect(
+      purchaserCaller.user.getCreditPurchaseConfirmation({
+        transactionId: organizationPurchaseId,
+        organizationId: purchaseOrganizationId,
+      })
+    ).resolves.toMatchObject({ expiryDate: '2027-06-24T10:00:00.000Z' });
+    await expect(
+      otherCaller.user.getCreditPurchaseHistory({
+        cursor: 0,
+        organizationId: purchaseOrganizationId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(
+      otherCaller.user.getCreditPurchaseReceipt({
+        transactionId: organizationPurchaseId,
+        organizationId: purchaseOrganizationId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   it('authorizes receipt lookup by purchase ownership', async () => {
@@ -609,11 +778,17 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
+      capabilities: NO_GATES_CAPABILITIES,
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
+    // Spend alerts are default-ON with no row, exactly like the spend view's
+    // push channel reads the same column.
+    expect(result.spendAlerts).toBe(true);
   });
 
   it('returns the stored preferences when a row exists', async () => {
@@ -625,6 +800,7 @@ describe('user router - notification preferences', () => {
       session_status_enabled: true,
       kiloclaw_activity_enabled: false,
       balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
       security_findings_enabled: true,
     });
 
@@ -638,8 +814,11 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: false,
       balanceAlerts: false,
+      spendAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
+      capabilities: NO_GATES_CAPABILITIES,
     });
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
   });
@@ -655,7 +834,9 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -670,6 +851,7 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
 
     // Calling again with true must update, not insert
@@ -697,8 +879,11 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
+      capabilities: NO_GATES_CAPABILITIES,
     });
 
     const firstPrefs = await firstCaller.user.getNotificationPreferences();
@@ -709,8 +894,11 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
+      capabilities: NO_GATES_CAPABILITIES,
     });
 
     // Setting second user's preference must not affect first user's row.
@@ -745,7 +933,9 @@ describe('user router - notification preferences', () => {
       sessionStatus: false,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -762,7 +952,76 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.agent_push_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
+  });
+
+  it('writes only notificationPreviews and leaves the category columns untouched', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({
+      notificationPreviews: 'full',
+    });
+
+    expect(result.notificationPreviews).toBe('full');
+    // All category columns stay at their DB default (true) because only the
+    // notificationPreviews key was supplied.
+    expect(result.chatMessages).toBe(true);
+    expect(result.agentAttention).toBe(true);
+    expect(result.agentUpdates).toBe(true);
+    expect(result.sessionStatus).toBe(true);
+    expect(result.kiloclawActivity).toBe(true);
+    expect(result.balanceAlerts).toBe(true);
+    expect(result.spendAlerts).toBe(true);
+    expect(result.securityFindings).toBe(true);
+    expect(result.agentPushEnabled).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.notification_previews).toBe('full');
+    expect(row?.chat_messages_enabled).toBe(true);
+    expect(row?.agent_attention_enabled).toBe(true);
+    expect(row?.session_status_enabled).toBe(true);
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+  });
+
+  it('persists spendAlerts and echoes it, without touching the other columns', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({ spendAlerts: false });
+    expect(result).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      balanceAlerts: true,
+      spendAlerts: false,
+      securityFindings: true,
+      notificationPreviews: 'generic',
+      agentPushEnabled: true,
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.spend_alerts_enabled).toBe(false);
+    // Unrelated category columns remain at their defaults: the partial upsert
+    // writes only the provided column, which is what keeps this screen and the
+    // spend view's push channel writing the same value.
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+
+    const got = await caller.user.getNotificationPreferences();
+    expect(got.spendAlerts).toBe(false);
   });
 
   it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
@@ -776,7 +1035,9 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -797,12 +1058,15 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: true,
       securityFindings: false,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
     const got = await caller.user.getNotificationPreferences();
     expect(got.balanceAlerts).toBe(false);
+    expect(got.spendAlerts).toBe(true);
     expect(got.securityFindings).toBe(false);
 
     const [row] = await db
@@ -838,7 +1102,999 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
+  });
+
+  it('one category toggle cannot delete unrelated subscriptions (seven other categories + agent_push_enabled preserved)', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    // Seed every category OFF and the master gate OFF. A full-row overwrite
+    // would flip an unrelated subscription back ON, so this pins the
+    // provided-only partial upsert contract.
+    await db.insert(user_notification_preferences).values({
+      user_id: firstUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
+      security_findings_enabled: false,
+    });
+
+    // Flip exactly one category ON.
+    const result = await caller.user.setNotificationPreferences({ balanceAlerts: true });
+    expect(result.balanceAlerts).toBe(true);
+    expect(result.spendAlerts).toBe(false);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+
+    // The single flipped column changed; every other column is untouched.
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(false);
+    expect(row?.agent_push_enabled).toBe(false);
+    expect(row?.chat_messages_enabled).toBe(false);
+    expect(row?.agent_attention_enabled).toBe(false);
+    expect(row?.session_status_enabled).toBe(false);
+    expect(row?.kiloclaw_activity_enabled).toBe(false);
+    expect(row?.spend_alerts_enabled).toBe(false);
+    expect(row?.security_findings_enabled).toBe(false);
+  });
+});
+
+describe('user router - notification capabilities', () => {
+  let capUser: User;
+
+  beforeAll(async () => {
+    capUser = await insertTestUser({
+      google_user_email: 'notif-caps@example.com',
+      google_user_name: 'Notif Caps',
+    });
+  });
+
+  afterEach(async () => {
+    // Remove every gate fixture so each test starts from the no-gates baseline.
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, capUser.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, capUser.id));
+    await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, capUser.id));
+    await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, capUser.id));
+    await db
+      .delete(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, capUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, capUser.id));
+  });
+
+  it('reports balanceAlerts unavailable with a reason when the user has no organization', async () => {
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.balanceAlerts).toEqual(UNAVAILABLE_BALANCE_ALERTS);
+    expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+    // The five always-on categories stay available for a signed-in user. Spend
+    // alerts are always available: every account has a personal scope.
+    expect(result.capabilities.chatMessages).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.agentAttention).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.agentUpdates).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.sessionStatus).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.spendAlerts).toEqual(AVAILABLE_CAPABILITY);
+  });
+
+  it('reports securityFindings unavailable when Security is disabled everywhere', async () => {
+    // The user has an org (so balanceAlerts is available) but no Security config.
+    await createTestOrganization('cap-org', capUser.id, 0);
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.balanceAlerts).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+  });
+
+  it('reports securityFindings available when the personal scope has Security enabled', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: capUser.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: capUser.id,
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.securityFindings).toEqual(AVAILABLE_CAPABILITY);
+  });
+
+  it('reports securityFindings unavailable when the personal scope has Security disabled', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: capUser.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: false,
+      created_by: capUser.id,
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+  });
+
+  it('reports kiloclawActivity unavailable when the only instance is destroyed', async () => {
+    await db.insert(kiloclaw_instances).values({
+      user_id: capUser.id,
+      sandbox_id: 'cap-sandbox-destroyed',
+      destroyed_at: '2026-01-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
+  });
+
+  it('reports every capability available when all gates are satisfied', async () => {
+    const org = await createTestOrganization('cap-org', capUser.id, 0);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: org.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: capUser.id,
+    });
+    await db.insert(kiloclaw_instances).values({
+      user_id: capUser.id,
+      sandbox_id: 'cap-sandbox',
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities).toEqual({
+      chatMessages: AVAILABLE_CAPABILITY,
+      agentAttention: AVAILABLE_CAPABILITY,
+      agentUpdates: AVAILABLE_CAPABILITY,
+      sessionStatus: AVAILABLE_CAPABILITY,
+      kiloclawActivity: AVAILABLE_CAPABILITY,
+      balanceAlerts: AVAILABLE_CAPABILITY,
+      spendAlerts: AVAILABLE_CAPABILITY,
+      securityFindings: AVAILABLE_CAPABILITY,
+    });
+  });
+});
+
+describe('user router - register push token', () => {
+  let tokenUser: User;
+  let otherTokenUser: User;
+
+  beforeAll(async () => {
+    tokenUser = await insertTestUser({
+      google_user_email: 'push-token-register@example.com',
+      google_user_name: 'Push Token Register',
+    });
+    otherTokenUser = await insertTestUser({
+      google_user_email: 'push-token-register-other@example.com',
+      google_user_name: 'Push Token Register Other',
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(user_push_tokens)
+      .where(inArray(user_push_tokens.user_id, [tokenUser.id, otherTokenUser.id]));
+    await db
+      .delete(user_notification_preferences)
+      .where(inArray(user_notification_preferences.user_id, [tokenUser.id, otherTokenUser.id]));
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [tokenUser.id, otherTokenUser.id]));
+  });
+
+  it('stores the app version when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-with-version]',
+      platform: 'android',
+      appVersion: '1.0.4',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBe('1.0.4');
+    expect(row?.platform).toBe('android');
+  });
+
+  it('stores a null app version when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-without-version]',
+      platform: 'android',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBeNull();
+  });
+
+  it('updates the app version on re-registration of the same token', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-re-register]';
+
+    await caller.user.registerPushToken({ token, platform: 'android' });
+    await caller.user.registerPushToken({ token, platform: 'android', appVersion: '1.0.4' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.app_version).toBe('1.0.4');
+  });
+
+  it('stores a null locale when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-locale-omitted]',
+      platform: 'ios',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.locale).toBeNull();
+  });
+
+  it('stores the locale when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-locale-es]',
+      platform: 'ios',
+      locale: 'es',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.locale).toBe('es');
+  });
+
+  it('clears the locale to null on re-registration without locale', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-locale-reregister]';
+
+    await caller.user.registerPushToken({ token, platform: 'ios', locale: 'es' });
+    await caller.user.registerPushToken({ token, platform: 'ios' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.locale).toBeNull();
+  });
+
+  it('updates platform, app version, and locale on re-registration by the same account', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-same-account-update]';
+
+    await caller.user.registerPushToken({
+      token,
+      platform: 'android',
+      appVersion: '1.0.4',
+      locale: 'es',
+    });
+    await expect(
+      caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.6', locale: 'fr' })
+    ).resolves.toEqual({ success: true });
+
+    const [row] = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(row).toMatchObject({
+      user_id: tokenUser.id,
+      platform: 'ios',
+      app_version: '1.0.6',
+      locale: 'fr',
+    });
+  });
+
+  it('keeps one row when the same account registers a token twice', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-idempotent]';
+
+    await caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.5' });
+    await expect(
+      caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.5' })
+    ).resolves.toEqual({ success: true });
+
+    const rows = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBe(tokenUser.id);
+  });
+
+  it('accepts simultaneous registrations of a new token by the same account', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const input = {
+      token: 'ExponentPushToken[token-simultaneous]',
+      platform: 'ios' as const,
+      appVersion: '1.0.5',
+      locale: 'es',
+    };
+
+    await expect(
+      Promise.all([caller.user.registerPushToken(input), caller.user.registerPushToken(input)])
+    ).resolves.toEqual([{ success: true }, { success: true }]);
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.token, input.token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: tokenUser.id,
+      platform: input.platform,
+      app_version: input.appVersion,
+      locale: input.locale,
+    });
+  });
+
+  it('rejects a token registered by another account and leaves the row with its owner', async () => {
+    const owner = await createCallerForUser(tokenUser.id);
+    const otherCaller = await createCallerForUser(otherTokenUser.id);
+    const token = 'ExponentPushToken[token-owned-elsewhere]';
+
+    await owner.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.4' });
+
+    await expect(
+      otherCaller.user.registerPushToken({
+        token,
+        platform: 'android',
+        appVersion: '1.0.6',
+        locale: 'fr',
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const rows = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: tokenUser.id,
+      platform: 'ios',
+      app_version: '1.0.4',
+      locale: null,
+    });
+  });
+
+  it('registerPushToken and unregisterPushToken never read or write user_notification_preferences', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    // Seed a distinctive preferences row so any accidental write is visible.
+    await db.insert(user_notification_preferences).values({
+      user_id: tokenUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
+      security_findings_enabled: false,
+      notification_previews: 'full',
+    });
+
+    const token = 'ExponentPushToken[token-prefs-untouched]';
+    await caller.user.registerPushToken({ token, platform: 'android' });
+
+    // Token registration must not mutate any preference column.
+    const [afterRegister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterRegister?.agent_push_enabled).toBe(false);
+    expect(afterRegister?.chat_messages_enabled).toBe(false);
+    expect(afterRegister?.agent_attention_enabled).toBe(false);
+    expect(afterRegister?.session_status_enabled).toBe(false);
+    expect(afterRegister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterRegister?.balance_alerts_enabled).toBe(false);
+    expect(afterRegister?.spend_alerts_enabled).toBe(false);
+    expect(afterRegister?.security_findings_enabled).toBe(false);
+    expect(afterRegister?.notification_previews).toBe('full');
+
+    // The token row now exists, proving register ran.
+    const tokensAfterRegister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterRegister).toHaveLength(1);
+
+    await caller.user.unregisterPushToken({ token });
+
+    // Token removal must not mutate any preference column either.
+    const [afterUnregister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterUnregister?.agent_push_enabled).toBe(false);
+    expect(afterUnregister?.chat_messages_enabled).toBe(false);
+    expect(afterUnregister?.agent_attention_enabled).toBe(false);
+    expect(afterUnregister?.session_status_enabled).toBe(false);
+    expect(afterUnregister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterUnregister?.balance_alerts_enabled).toBe(false);
+    expect(afterUnregister?.spend_alerts_enabled).toBe(false);
+    expect(afterUnregister?.security_findings_enabled).toBe(false);
+    expect(afterUnregister?.notification_previews).toBe('full');
+
+    // The token row is gone, proving unregister ran.
+    const tokensAfterUnregister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterUnregister).toHaveLength(0);
+  });
+});
+
+describe('user router - register activity token', () => {
+  let tokenUser: User;
+  let otherUser: User;
+
+  beforeAll(async () => {
+    tokenUser = await insertTestUser({
+      google_user_email: 'activity-token-register@example.com',
+      google_user_name: 'Activity Token Register',
+    });
+    otherUser = await insertTestUser({
+      google_user_email: 'activity-token-other@example.com',
+      google_user_name: 'Activity Token Other',
+    });
+  });
+
+  beforeEach(() => {
+    // The real worker client always resolves; a bare `jest.fn()` returns
+    // undefined, which the router's `.catch` would trip over.
+    mockRefreshGlanceableScope.mockReset();
+    mockRefreshGlanceableScope.mockResolvedValue(undefined);
+  });
+
+  afterEach(async () => {
+    mockRefreshGlanceableScope.mockClear();
+    await db
+      .delete(user_activity_tokens)
+      .where(inArray(user_activity_tokens.user_id, [tokenUser.id, otherUser.id]));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [tokenUser.id, otherUser.id]));
+  });
+
+  it('upserts the single row when the same token re-registers with a different kind, platform, and organizationId', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'activity-token-upsert';
+
+    await expect(
+      caller.user.registerActivityToken({
+        token,
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      })
+    ).resolves.toEqual({ success: true });
+
+    await expect(
+      caller.user.registerActivityToken({
+        token,
+        kind: 'ios_push_to_start',
+        platform: 'ios',
+        organizationId: 'org-1',
+      })
+    ).resolves.toEqual({ success: true });
+
+    const rows = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBe(tokenUser.id);
+    expect(rows[0]?.kind).toBe('ios_push_to_start');
+    expect(rows[0]?.platform).toBe('ios');
+    expect(rows[0]?.organization_id).toBe('org-1');
+  });
+
+  it('replaces the previous live ios_activity row for the same scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const tokenA = 'activity-token-replace-a';
+    const tokenB = 'activity-token-replace-b';
+
+    await caller.user.registerActivityToken({
+      token: tokenA,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    await caller.user.registerActivityToken({
+      token: tokenB,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // Exactly one live card target: B replaced A in the same transaction.
+    const liveAfterB = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(liveAfterB.map(row => row.token)).toEqual([tokenB]);
+
+    const [rowA] = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, tokenA));
+    expect(rowA?.superseded_at).not.toBeNull();
+
+    // Re-adopting A un-supersedes it and retires B: the app's own card is live
+    // again, and the scope still has exactly one live row.
+    await caller.user.registerActivityToken({
+      token: tokenA,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    const liveAfterA = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(liveAfterA.map(row => row.token)).toEqual([tokenA]);
+
+    const [rowAAgain] = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, tokenA));
+    expect(rowAAgain?.superseded_at).toBeNull();
+
+    const [rowB] = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, tokenB));
+    expect(rowB?.superseded_at).not.toBeNull();
+  });
+
+  it('converges when concurrent registrations race for one scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    // A live card already exists, so both concurrent registrations take the
+    // replace path: retire the live row, then insert. Both retire the same row
+    // and the second blocks on its row lock; once the first transaction
+    // commits, the second's insert collides with the first's live row on
+    // `UQ_user_activity_tokens_live_ios_activity` and the whole transaction
+    // rolls back. Registration must converge instead of rejecting.
+    await caller.user.registerActivityToken({
+      token: 'activity-token-race-seed',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    const racers = ['a', 'b', 'c', 'd', 'e'].map(suffix =>
+      caller.user.registerActivityToken({
+        token: `activity-token-race-${suffix}`,
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      })
+    );
+    const results = await Promise.allSettled(racers);
+
+    expect(results.map(result => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+    ]);
+
+    // Exactly one live card target survived the race.
+    const live = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(live).toHaveLength(1);
+    expect(live[0]?.token.startsWith('activity-token-race-')).toBe(true);
+  });
+
+  it('asks the notifications worker to end the replaced card at registration', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-a',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    // The first card has no predecessor to retire, so registration must not
+    // spend a device wake.
+    expect(mockRefreshGlanceableScope).not.toHaveBeenCalled();
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-b',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // The replacement retired A's row; the refresh is what sends the retired
+    // token its `end` instead of waiting for the next session transition.
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledTimes(1);
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+      userId: tokenUser.id,
+      organizationId: null,
+    });
+  });
+
+  it('asks for the scope refresh for each replaced card in its own scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-scope-org-1',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-refresh-1',
+    });
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-scope-org-2',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-refresh-1',
+    });
+
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledTimes(1);
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+      userId: tokenUser.id,
+      organizationId: 'org-refresh-1',
+    });
+  });
+
+  it('does not refresh when the same token re-registers its own card', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'activity-token-refresh-same';
+
+    await caller.user.registerActivityToken({
+      token,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    mockRefreshGlanceableScope.mockClear();
+
+    await caller.user.registerActivityToken({
+      token,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // Re-adopting the same card retires nothing, so there is no card to end.
+    expect(mockRefreshGlanceableScope).not.toHaveBeenCalled();
+  });
+
+  it('still registers the replacement when the notifications worker call fails', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    mockRefreshGlanceableScope.mockRejectedValueOnce(new Error('notifications worker down'));
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-fail-a',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    await expect(
+      caller.user.registerActivityToken({
+        token: 'activity-token-refresh-fail-b',
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      })
+    ).resolves.toEqual({ success: true });
+
+    // The DB invariant stands on its own: exactly one live card target.
+    const live = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(live.map(row => row.token)).toEqual(['activity-token-refresh-fail-b']);
+  });
+
+  it('keeps other scopes live when a scoped ios_activity token replaces its scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-scope-org-a',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-scope-1',
+    });
+    await caller.user.registerActivityToken({
+      token: 'activity-token-scope-org-b',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-scope-1',
+    });
+    // The personal scope is a different scope, so its live row survives.
+    await caller.user.registerActivityToken({
+      token: 'activity-token-scope-personal',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    const live = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(live.map(row => row.token).sort()).toEqual(
+      ['activity-token-scope-org-b', 'activity-token-scope-personal'].sort()
+    );
+  });
+
+  it('unregisterActivityToken deletes only the authenticated user matching token', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+    const ownToken = 'activity-token-own';
+    const otherToken = 'activity-token-other';
+
+    await caller.user.registerActivityToken({
+      token: ownToken,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    await otherCaller.user.registerActivityToken({
+      token: otherToken,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // The authenticated user cannot delete another user's token.
+    await caller.user.unregisterActivityToken({ token: otherToken });
+
+    const otherRows = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.user_id, otherUser.id));
+    expect(otherRows).toHaveLength(1);
+    expect(otherRows[0]?.token).toBe(otherToken);
+
+    // The user's own token is untouched by the cross-user delete attempt.
+    const ownRows = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.user_id, tokenUser.id));
+    expect(ownRows).toHaveLength(1);
+
+    // Deleting the own token removes only that row.
+    await caller.user.unregisterActivityToken({ token: ownToken });
+    const afterOwn = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.user_id, tokenUser.id));
+    expect(afterOwn).toHaveLength(0);
+  });
+
+  describe('session cards', () => {
+    const ownSessionId = `ses_card_own_${crypto.randomUUID()}`;
+    const secondSessionId = `ses_card_second_${crypto.randomUUID()}`;
+    const otherSessionId = `ses_card_other_${crypto.randomUUID()}`;
+    const orgSessionId = `ses_card_org_${crypto.randomUUID()}`;
+
+    beforeAll(async () => {
+      const org = await createTestOrganization('session-card-org', tokenUser.id, 0);
+      await db.insert(cli_sessions_v2).values([
+        { session_id: ownSessionId, kilo_user_id: tokenUser.id },
+        { session_id: secondSessionId, kilo_user_id: tokenUser.id },
+        { session_id: otherSessionId, kilo_user_id: otherUser.id },
+        { session_id: orgSessionId, kilo_user_id: tokenUser.id, organization_id: org.id },
+      ]);
+    });
+
+    afterAll(async () => {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          inArray(cli_sessions_v2.session_id, [
+            ownSessionId,
+            secondSessionId,
+            otherSessionId,
+            orgSessionId,
+          ])
+        );
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.kilo_user_id, tokenUser.id));
+      await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, tokenUser.id));
+    });
+
+    it('requires sessionId for a session card and rejects it for every other kind', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-missing-id',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+        })
+      ).rejects.toThrow();
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-extra-id',
+          kind: 'ios_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: ownSessionId,
+        })
+      ).rejects.toThrow();
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+    });
+
+    it('rejects a session the caller does not own in the given scope', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-foreign',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: otherSessionId,
+        })
+      ).rejects.toThrow('Session not found');
+      // An organization session is not in the personal scope.
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-wrong-scope',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: orgSessionId,
+        })
+      ).rejects.toThrow('Session not found');
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+      expect(mockRefreshGlanceableScope).not.toHaveBeenCalled();
+    });
+
+    it('keeps many live session cards beside the aggregate card and refreshes the scope', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await caller.user.registerActivityToken({
+        token: 'session-card-aggregate',
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      });
+      mockRefreshGlanceableScope.mockClear();
+
+      await caller.user.registerActivityToken({
+        token: 'session-card-a',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: ownSessionId,
+      });
+      await caller.user.registerActivityToken({
+        token: 'session-card-b',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: secondSessionId,
+      });
+
+      const rows = await db
+        .select({
+          token: user_activity_tokens.token,
+          kind: user_activity_tokens.kind,
+          sessionId: user_activity_tokens.session_id,
+        })
+        .from(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, tokenUser.id),
+            isNull(user_activity_tokens.superseded_at)
+          )
+        );
+      expect(rows.sort((a, b) => a.token.localeCompare(b.token))).toEqual([
+        { token: 'session-card-a', kind: 'ios_session_activity', sessionId: ownSessionId },
+        { token: 'session-card-aggregate', kind: 'ios_activity', sessionId: null },
+        { token: 'session-card-b', kind: 'ios_session_activity', sessionId: secondSessionId },
+      ]);
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledTimes(2);
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+        userId: tokenUser.id,
+        organizationId: null,
+      });
+    });
+
+    it('refreshes the scope when a session card is unregistered', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await caller.user.registerActivityToken({
+        token: 'session-card-unfollow',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: ownSessionId,
+      });
+      mockRefreshGlanceableScope.mockClear();
+
+      await caller.user.unregisterActivityToken({ token: 'session-card-unfollow' });
+
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+        userId: tokenUser.id,
+        organizationId: null,
+      });
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+    });
   });
 });
 
@@ -866,29 +2122,29 @@ describe('user router - device sessions', () => {
         .values([
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo iOS (current)',
+            user_agent: 'Kilo-Code/1.2.3 (ios)',
             last_seen_at: '2026-04-30 10:00:00+00',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo Android (production shape)',
+            user_agent: 'Kilo-Code/1.2.3 (android)',
             created_at: '2026-04-29 01:16:12.945+00',
             last_seen_at: '2026-04-29 01:16:12.945+00',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo Desktop (already revoked)',
+            user_agent: 'Kilo-Code/1.4.0',
             revoked_at: '2026-04-27 10:00:00+00',
             revoked_reason: 'user_revoked',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo macOS (revoke by id)',
+            user_agent: 'okhttp/4.9.2',
             last_seen_at: '2026-04-26 10:00:00+00',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo Tablet (revoke current)',
+            user_agent: 'Kilo-Code/1.4.0',
             last_seen_at: '2026-04-28 10:00:00+00',
           },
           {
@@ -921,7 +2177,10 @@ describe('user router - device sessions', () => {
     expect(result).toHaveLength(4);
     expect(result[0]).toEqual({
       id: currentSessionId,
-      user_agent: 'Kilo iOS (current)',
+      // `Kilo-Code/<version> (ios)` is the header the mobile app sends.
+      kind: 'app',
+      platform: 'ios',
+      clientName: null,
       created_at: expect.any(String),
       last_seen_at: '2026-04-30T10:00:00.000Z',
       isCurrent: true,
@@ -930,21 +2189,30 @@ describe('user router - device sessions', () => {
     // normalized to strict UTC ISO before it crosses the JSON boundary.
     expect(result[1]).toEqual({
       id: productionShapeSessionId,
-      user_agent: 'Kilo Android (production shape)',
+      kind: 'app',
+      platform: 'android',
+      clientName: null,
       created_at: '2026-04-29T01:16:12.945Z',
       last_seen_at: '2026-04-29T01:16:12.945Z',
       isCurrent: false,
     });
     expect(result[2]).toEqual({
       id: revokeCurrentSessionId,
-      user_agent: 'Kilo Tablet (revoke current)',
+      // A `Kilo-Code` product token with no app platform word is the CLI.
+      kind: 'cli',
+      platform: null,
+      clientName: null,
       created_at: expect.any(String),
       last_seen_at: '2026-04-28T10:00:00.000Z',
       isCurrent: false,
     });
     expect(result[3]).toEqual({
       id: revokeByIdSessionId,
-      user_agent: 'Kilo macOS (revoke by id)',
+      // OkHttp's default header, recorded by app builds that predate the
+      // client metadata header.
+      kind: 'app',
+      platform: 'android',
+      clientName: null,
       created_at: expect.any(String),
       last_seen_at: '2026-04-26T10:00:00.000Z',
       isCurrent: false,
@@ -995,6 +2263,34 @@ describe('user router - device sessions', () => {
     await expect(
       caller.user.revokeDeviceSessionById({ sessionId: 'not-a-uuid' })
     ).rejects.toThrow();
+  });
+
+  it('lists and revokes a session whose id is not a versioned UUID', async () => {
+    // A `uuid` column accepts any 8-4-4-4-12 hex value; this one carries a
+    // version-0 nibble, so the version-strict RFC validator would refuse it.
+    const versionlessSessionId = '1f0d3a52-6a0b-0c4e-0a51-0d1e2b3c4a05';
+    await db.insert(device_sessions).values({
+      id: versionlessSessionId,
+      kilo_user_id: owner.id,
+      user_agent: 'Kilo-Code/1.2.3 (ios)',
+      last_seen_at: '2026-04-25 10:00:00+00',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+
+    const listed = await caller.user.listDeviceSessions();
+    expect(listed.some(row => row.id === versionlessSessionId)).toBe(true);
+
+    await expect(
+      caller.user.revokeDeviceSessionById({ sessionId: versionlessSessionId })
+    ).resolves.toBeDefined();
+
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, versionlessSessionId));
+    expect(row?.revoked_at).not.toBeNull();
+    expect(row?.revoked_reason).toBe('user_revoked');
   });
 
   it('revokes the current device session with the logout reason', async () => {
@@ -1087,6 +2383,59 @@ describe('user router - account deletion', () => {
       deletionUser.google_user_email,
       expect.any(String)
     );
+  });
+
+  it('rejects self-service deletion for organization-managed users before any side effect', async () => {
+    await db
+      .update(kilocode_users)
+      .set({ personal_account_disabled: true })
+      .where(eq(kilocode_users.id, deletionUser.id));
+    const caller = await createCallerForUser(deletionUser.id);
+
+    await expect(caller.user.requestAccountDeletionChallenge()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId: crypto.randomUUID(), code: '123456' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.user.requestAccountDeletion()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+    expect(mockSendDeletionConfirmation).not.toHaveBeenCalled();
+    expect(mockSendDeletionSupportNotification).not.toHaveBeenCalled();
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+
+    const codeRows = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.email, deletionUser.google_user_email));
+    expect(codeRows).toHaveLength(0);
+
+    const [user] = await db
+      .select({ requestedAt: kilocode_users.account_deletion_requested_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, deletionUser.id));
+    expect(user?.requestedAt).toBeNull();
+  });
+
+  it('uses the primary eligibility flag when the authenticated user is stale', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    await db
+      .update(kilocode_users)
+      .set({ personal_account_disabled: true })
+      .where(eq(kilocode_users.id, deletionUser.id));
+
+    await expect(caller.user.requestAccountDeletionChallenge()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId: crypto.randomUUID(), code: '123456' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
   });
 
   it('challenge returns devCode when the email sends in non-production', async () => {
@@ -1293,5 +2642,564 @@ describe('user router - account deletion', () => {
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
 
     expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+});
+
+describe('user router - hasGatewayUsage', () => {
+  let freshUser: User;
+  let usedUser: User;
+  let orgUser: User;
+  let otherUser: User;
+
+  beforeAll(async () => {
+    freshUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-fresh@example.com',
+      google_user_name: 'Gateway Usage Fresh',
+    });
+    usedUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-used@example.com',
+      google_user_name: 'Gateway Usage Used',
+    });
+    orgUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-org@example.com',
+      google_user_name: 'Gateway Usage Org',
+    });
+    otherUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-other@example.com',
+      google_user_name: 'Gateway Usage Other',
+    });
+
+    // A personal, non-zero-cost gateway row.
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: usedUser.id,
+      cost: 1000,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 1,
+      cache_hit_tokens: 1,
+    });
+
+    // An org-scoped, zero-cost free-model row still counts as "used Kilo".
+    const org = await createTestOrganization('has-gateway-usage-org', orgUser.id, 0);
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: orgUser.id,
+      organization_id: org.id,
+      cost: 0,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 1,
+      cache_hit_tokens: 1,
+    });
+
+    // Another user's row must never make this caller report usage.
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: otherUser.id,
+      cost: 1000,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 1,
+      cache_hit_tokens: 1,
+    });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(microdollar_usage)
+      .where(
+        inArray(microdollar_usage.kilo_user_id, [
+          freshUser.id,
+          usedUser.id,
+          orgUser.id,
+          otherUser.id,
+        ])
+      );
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, orgUser.id));
+    await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, orgUser.id));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [freshUser.id, usedUser.id, orgUser.id, otherUser.id]));
+  });
+
+  it('reports no usage for a fresh user', async () => {
+    const caller = await createCallerForUser(freshUser.id);
+
+    await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: false });
+  });
+
+  it('reports usage after a personal gateway row', async () => {
+    const caller = await createCallerForUser(usedUser.id);
+
+    await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: true });
+  });
+
+  it('reports usage for an org-scoped row', async () => {
+    const caller = await createCallerForUser(orgUser.id);
+
+    await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: true });
+  });
+
+  it("ignores another user's gateway rows", async () => {
+    const isolatedUser = await insertTestUser({
+      google_user_email: `has-gateway-usage-isolated-${crypto.randomUUID()}@example.com`,
+    });
+
+    try {
+      const caller = await createCallerForUser(isolatedUser.id);
+
+      await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: false });
+    } finally {
+      await db.delete(microdollar_usage).where(eq(microdollar_usage.kilo_user_id, isolatedUser.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, isolatedUser.id));
+    }
+  });
+});
+
+describe('user router - passkeys', () => {
+  let owner: User;
+  let other: User;
+
+  beforeAll(async () => {
+    owner = await insertTestUser({ google_user_email: 'passkey-owner@example.com' });
+    other = await insertTestUser({ google_user_email: 'passkey-other@example.com' });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(passkey_credentials)
+      .where(inArray(passkey_credentials.kilo_user_id, [owner.id, other.id]));
+  });
+
+  async function insertPasskey(kiloUserId: string, name: string | null = null) {
+    const [row] = await db
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: kiloUserId,
+        credential_id: `credential-${crypto.randomUUID()}`,
+        public_key: 'cose-public-key-bytes',
+        name,
+      })
+      .returning();
+    return row;
+  }
+
+  it('lists the caller passkeys without the public key or the credential id', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createSessionCallerForUser(owner.id);
+
+    const result = await caller.user.getPasskeys();
+
+    expect(result.success).toBe(true);
+    expect(result.passkeys).toHaveLength(1);
+    expect(result.passkeys[0]).toMatchObject({
+      id: row.id,
+      name: 'Work laptop',
+      backed_up: false,
+    });
+    // The response is the list the UI renders and nothing else: no credential
+    // material can leak through it.
+    expect(Object.keys(result.passkeys[0]).sort()).toEqual([
+      'backed_up',
+      'created_at',
+      'device_type',
+      'id',
+      'last_used_at',
+      'name',
+    ]);
+  });
+
+  it('lists only the caller passkeys', async () => {
+    await insertPasskey(owner.id, 'Owner passkey');
+    await insertPasskey(other.id, 'Other passkey');
+    const caller = await createSessionCallerForUser(owner.id);
+
+    const result = await caller.user.getPasskeys();
+
+    expect(result.passkeys.map(passkey => passkey.name)).toEqual(['Owner passkey']);
+  });
+
+  it('renames an owned passkey', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createSessionCallerForUser(owner.id);
+
+    const result = await caller.user.renamePasskey({ id: row.id, name: 'Home desktop' });
+
+    expect(result).toEqual({ success: true });
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Home desktop');
+  });
+
+  it('refuses to rename another user passkey', async () => {
+    const row = await insertPasskey(other.id, 'Other passkey');
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await expect(caller.user.renamePasskey({ id: row.id, name: 'Hijacked' })).rejects.toMatchObject(
+      { code: 'NOT_FOUND' }
+    );
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Other passkey');
+  });
+
+  it('deletes an owned passkey', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createSessionCallerForUser(owner.id);
+
+    const result = await caller.user.deletePasskey({ id: row!.id });
+
+    expect(result).toEqual({ success: true });
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(0);
+  });
+
+  it('refuses to delete another user passkey and leaves it in place', async () => {
+    const row = await insertPasskey(other.id, 'Other passkey');
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('refuses an unknown passkey id', async () => {
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await expect(
+      caller.user.deletePasskey({ id: '11111111-1111-4111-8111-111111111111' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('refuses an empty passkey name', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await expect(caller.user.renamePasskey({ id: row.id, name: '   ' })).rejects.toThrow();
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Work laptop');
+  });
+
+  it.each([
+    [
+      'rename',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.renamePasskey({ id, name: 'Bearer rename' }),
+    ],
+    [
+      'delete',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.deletePasskey({ id }),
+    ],
+  ])('refuses %s through an API key bearer', async (_label, invoke) => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const bearerCaller = await createBearerCallerForUser(owner.id);
+
+    await expect(invoke(bearerCaller, row.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  async function insertNativeSession(
+    kiloUserId: string,
+    options: { browserSignIn?: boolean } = {}
+  ): Promise<string> {
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: kiloUserId,
+        // The app's SSO and OAuth sign-ins run in the browser and record the
+        // device-auth request that minted the session.
+        ...(options.browserSignIn ? { device_auth_request_id: crypto.randomUUID() } : {}),
+      })
+      .returning({ id: device_sessions.id });
+    return session!.id;
+  }
+
+  async function mintGrant(
+    deviceSessionId: string,
+    operation: 'enroll' | 'rename' | 'remove',
+    kiloUserId = owner.id
+  ): Promise<string> {
+    const minted = await mintPasskeyManagementAuthorization({
+      userId: kiloUserId,
+      deviceSessionId,
+      operation,
+    });
+    return minted.token;
+  }
+
+  it.each([
+    [
+      'rename',
+      (caller: Awaited<ReturnType<typeof createNativeCallerForUser>>, id: string) =>
+        caller.user.renamePasskey({ id, name: 'Native rename' }),
+    ],
+    [
+      'delete',
+      (caller: Awaited<ReturnType<typeof createNativeCallerForUser>>, id: string) =>
+        caller.user.deletePasskey({ id }),
+    ],
+  ])('requires a management grant to %s from a native session', async (_label, invoke) => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+
+    await expect(invoke(caller, row.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_REQUIRED',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('renames with a rename grant and spends it', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    await expect(
+      caller.user.renamePasskey({
+        id: row.id,
+        name: 'Home desktop',
+        managementAuthorization: grant,
+      })
+    ).resolves.toEqual({ success: true });
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Home desktop');
+
+    // The grant is single-use: the same token cannot remove the credential.
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+    const stillStored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stillStored).toHaveLength(1);
+  });
+
+  it('spends a rename grant exactly once when two renames race', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    const outcomes = await Promise.allSettled([
+      caller.user.renamePasskey({ id: row.id, name: 'First', managementAuthorization: grant }),
+      caller.user.renamePasskey({ id: row.id, name: 'Second', managementAuthorization: grant }),
+    ]);
+
+    const fulfilled = outcomes.filter(outcome => outcome.status === 'fulfilled');
+    expect(fulfilled).toHaveLength(1);
+    expect(outcomes.find(outcome => outcome.status === 'rejected')).toMatchObject({
+      reason: { code: 'FORBIDDEN', message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID' },
+    });
+
+    // The stored name is the winning caller's, so the losing mutation wrote
+    // nothing at all.
+    const winningName = outcomes[0]?.status === 'fulfilled' ? 'First' : 'Second';
+    const [stored] = await db
+      .select({ name: passkey_credentials.name })
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe(winningName);
+  });
+
+  it('renames through the session the app signed in with the browser', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id, { browserSignIn: true });
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    await expect(
+      caller.user.renamePasskey({
+        id: row.id,
+        name: 'SSO account',
+        managementAuthorization: grant,
+      })
+    ).resolves.toEqual({ success: true });
+
+    const [stored] = await db
+      .select({ name: passkey_credentials.name })
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('SSO account');
+  });
+
+  it('does not let a rename grant authorize a removal', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('removes the only passkey with a removal grant', async () => {
+    const row = await insertPasskey(owner.id, 'Only passkey');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'remove');
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).resolves.toEqual({ success: true });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(0);
+  });
+
+  it('refuses a grant replayed from another session of the same account', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const mintingSession = await insertNativeSession(owner.id);
+    const otherSession = await insertNativeSession(owner.id);
+    const grant = await mintGrant(mintingSession, 'remove');
+    const caller = await createNativeCallerForUser(owner.id, otherSession);
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+  });
+
+  it('refuses a grant minted for another account', async () => {
+    const row = await insertPasskey(other.id, 'Work laptop');
+    const ownerSession = await insertNativeSession(owner.id);
+    const otherSession = await insertNativeSession(other.id);
+    const grant = await mintGrant(ownerSession, 'remove', owner.id);
+    const caller = await createNativeCallerForUser(other.id, otherSession);
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('refuses a grant once its session is revoked', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const grant = await mintGrant(deviceSessionId, 'remove');
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString() })
+      .where(eq(device_sessions.id, deviceSessionId));
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('refuses a stolen admin bearer deleting the step-up passkey without a grant', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const row = await insertPasskey(admin.id, 'Admin MFA key');
+    const deviceSessionId = await insertNativeSession(admin.id);
+    const caller = await createNativeCallerForUser(admin.id, deviceSessionId);
+
+    await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_REQUIRED',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+
+    await db.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, admin.id));
+  });
+
+  it('deleting a passkey removes its step-up proofs', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    await db.insert(session_step_up_proofs).values({
+      kilo_user_id: owner.id,
+      session_id_hash: hashWebSessionId('passkey-delete-session'),
+      method: 'webauthn_uv',
+      passkey_credential_id: row!.id,
+      purpose: 'session',
+      verified_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    });
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await caller.user.deletePasskey({ id: row!.id });
+
+    const proofs = await db
+      .select()
+      .from(session_step_up_proofs)
+      .where(eq(session_step_up_proofs.passkey_credential_id, row!.id));
+    expect(proofs).toHaveLength(0);
   });
 });

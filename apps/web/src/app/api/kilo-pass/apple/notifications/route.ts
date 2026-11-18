@@ -2,6 +2,7 @@ import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 
 import { processAppStoreKiloPassNotification } from '@/lib/kilo-pass/apple-store-notifications';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 
 const AppStoreNotificationBodySchema = z.object({
   signedPayload: z.string().min(1),
@@ -9,7 +10,10 @@ const AppStoreNotificationBodySchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = AppStoreNotificationBodySchema.safeParse(await request.json());
+    // A body that is not JSON is a bad request, not a server fault. A 5xx would
+    // make Apple retry a request that can never succeed.
+    const rawBody = await request.json().catch(() => undefined);
+    const body = AppStoreNotificationBodySchema.safeParse(rawBody);
     if (!body.success) {
       return Response.json({ error: 'Missing signedPayload' }, { status: 400 });
     }
@@ -22,7 +26,11 @@ export async function POST(request: Request) {
     }
     return Response.json(result);
   } catch (error) {
-    captureException(error, { tags: { source: 'app_store_kilo_pass_notification' } });
+    // The failure may be a database error that quotes the bound parameters of a
+    // store-credential lookup, so it is sanitized before it is reported.
+    captureException(sanitizeErrorForTelemetry(error), {
+      tags: { source: 'app_store_kilo_pass_notification' },
+    });
     return Response.json({ error: 'Failed to process notification' }, { status: 500 });
   }
 }

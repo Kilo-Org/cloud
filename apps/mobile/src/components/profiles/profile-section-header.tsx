@@ -1,0 +1,58 @@
+import { type Href } from 'expo-router';
+
+import { ScreenHeader } from '@/components/screen-header';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
+
+/**
+ * The header every profile-editor section screen shares.
+ *
+ * A section screen edits one collection of one profile, and an organization has
+ * several profiles side by side: the section label alone ("Profile agents")
+ * leaves the reader unable to tell which of them the screen is changing. The
+ * profile name goes under the title as the header's subtitle, in the same
+ * normal-case treatment the Overview header gives it.
+ *
+ * The name comes from the Overview read, which is the query the screen above
+ * this one already runs: a section pushed from there renders it from cache, and
+ * a cold deep link pays one small summary read. The subtitle line is reserved
+ * whether or not the name is known yet, so the arrival of a long name cannot
+ * move the body, and while that read is in flight the line holds a placeholder
+ * bar instead of reading as an empty slot.
+ *
+ * Every section route passes the Profiles list of its own stack: a section
+ * screen exists in two stacks (the Profile tab's and the app-level Manage
+ * Profiles one), and a default shared here could only ever name one of them.
+ */
+export function ProfileSectionHeader({
+  profileId,
+  organizationId,
+  title,
+  backFallback,
+  onBack,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The section's own label: the screen's title and its accessible header name. */
+  title: string;
+  /**
+   * Where the header's Back lands when the screen opens with no history to pop.
+   * The section screen's stack passes its own Profiles list.
+   */
+  backFallback: Href;
+  onBack?: () => void;
+}>) {
+  const overview = useAgentProfileOverview(profileId, organizationId);
+  return (
+    <ScreenHeader
+      title={title}
+      subtitle={overview.data?.name}
+      subtitlePlaceholder={
+        overview.isPending ? <Skeleton className="h-3.5 w-24 rounded-full" /> : undefined
+      }
+      reserveSubtitle
+      backFallback={backFallback}
+      onBack={onBack}
+    />
+  );
+}

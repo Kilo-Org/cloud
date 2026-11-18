@@ -1,0 +1,402 @@
+import {
+  buildOpaqueScopeKey,
+  type GlanceableAgentsSnapshot,
+  glanceableAgentsSnapshotSchema,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+
+import {
+  type GatedSecureStore,
+  readGatedValueForUpdate,
+  widgetSecureStore,
+  writeGatedValue,
+} from '@/lib/auth/secure-store-gated';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+import {
+  _resetHomeWidgetDataForTests,
+  _setHomeWidgetStoreForTests,
+  restoreHomeWidgetData,
+} from './home-widget-data';
+import { readSignedInScope, type SignedInScope } from './scope';
+
+import { type GlanceableSink } from './sink-registry';
+import { GLANCEABLE_LEGACY_SCOPE_KEY, GLANCEABLE_SNAPSHOT_KEY } from './widget-store';
+
+/**
+ * Durable mirror of the last glanceable snapshot, which carries its own scope
+ * key, for JS restart fencing only. One serialized record per publish, so a
+ * restart reads the last publish whole: snapshot and scope key always come from
+ * the same one. The snapshot holds generic status, counts, timestamps and an
+ * opaque scope key — never titles, ids, or other raw content.
+ *
+ * iOS widgets read the snapshot through expo-widgets `updateSnapshot` /
+ * `updateTimeline`; Android widgets read through `react-native-android-widget`
+ * storage. This store exists so the background push handler can compare an
+ * incoming scope key without React context, which is why its item lives in the
+ * widget store (`./widget-store`) rather than under the default keychain class.
+ */
+
+// Test-only override so pure suites do not load expo-secure-store
+// (→ expo-modules-core → RN). Mirrors the deep-link-launch pattern.
+let secureStoreForTests: GatedSecureStore | null = null;
+
+function getSecureStore(): GatedSecureStore {
+  return secureStoreForTests ?? widgetSecureStore();
+}
+
+let lastSnapshot: GlanceableAgentsSnapshot | null = null;
+// The scope key this process may act for: the frame it published itself, or a
+// restore whose persisted record the signed-in account matched. Never a key
+// that only a record or the previous release's entry asserted, because the
+// waiting-ask fence and the activity prompt trust this value to answer for an
+// account.
+let localScopeKey: string | null = null;
+
+// Monotonic epoch bumped on every in-memory write. Restore captures it before
+// its async read and only fills when it is unchanged, so a live publish during
+// the read can never be clobbered by a stale persisted record.
+let persistEpoch = 0;
+
+// The mirror writes, chained one after the other the way `waiting-ask.ts` and
+// `home-widget-data.ts` chain theirs. A later publish is issued only once the
+// previous one has settled, so two rapid publishes can never land out of order:
+// a terminal blank always overwrites the happy frame published before it,
+// instead of racing it.
+let mirrorWrite: Promise<void> | null = null;
+
+// True when the last restore could not read the persisted mirror. A null
+// in-memory snapshot then means "unknown", not "nothing persisted": the record
+// may exist and name a card owner, so a caller that retires cards on a null
+// snapshot has to check this first.
+let restoreUnavailable = false;
+
+// How many restores have a read in flight right now. While this is non-zero a
+// null snapshot is "not read yet", not "nothing persisted": the mirror may still
+// name a card owner, so a caller that retires cards on a null snapshot must wait
+// until every in-flight read has consulted the record. A count, not a one-way
+// latch: a later restore re-opens the window, and overlapping reads keep it open
+// until the last one lands.
+let restoresInFlight = 0;
+
+// Callers parked on the read window (see `whenGlanceableRestoresSettle`). A
+// caller that deferred work on an unsettled read waits here, so the last read
+// to land resumes it instead of dropping the work.
+let settleWaiters: (() => void)[] = [];
+
+// What the restore learned about the record it put in memory. `none` means it
+// restored no record, so only frames written in this process are in memory;
+// `unknown` means the identity read did not complete, which is not a mismatch.
+// Decided from the same reads that fill the state, so a caller asks
+// synchronously instead of re-reading the keychain on every surface write.
+type RestoredScope = 'none' | 'match' | 'mismatch' | 'unknown';
+let restoredScope: RestoredScope = 'none';
+
+// True once this process wrote the in-memory snapshot itself. A frame it wrote
+// is already fenced by the context that produced it; only a restored record
+// needs `restoredScope` resolved before a surface may draw it.
+let snapshotWrittenInProcess = false;
+
+export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
+  return lastSnapshot;
+}
+
+/**
+ * The snapshot a surface may draw: the frame this process wrote, or a restored
+ * record only when it belongs to the signed-in scope. Sinks and republish paths
+ * read this instead of {@link getLastGlanceableSnapshot}, whose value also feeds
+ * the revision floor and the ownership questions a null must not answer.
+ */
+export function getGlanceableSnapshotForSignedInScope(): GlanceableAgentsSnapshot | null {
+  if (lastSnapshot === null) {
+    return null;
+  }
+  if (snapshotWrittenInProcess) {
+    return lastSnapshot;
+  }
+  // A record the signed-in scope matched, or one whose scope could not be
+  // checked at all, is drawable; only a confirmed different scope is not.
+  return restoredScope === 'match' || restoredScope === 'unknown' ? lastSnapshot : null;
+}
+
+/**
+ * True when the last `restorePersistedGlanceable` could not read the durable
+ * mirror. Distinct from an absent record: the keychain may still hold a
+ * snapshot that names an owner, so a null in-memory state is not proof that
+ * nothing owns the surface.
+ */
+export function isGlanceableRestoreUnavailable(): boolean {
+  return restoreUnavailable;
+}
+
+/**
+ * True when no `restorePersistedGlanceable` read is in flight. While one is, a
+ * null in-memory snapshot is not proof that nothing owns the surface: the
+ * mirror read may still fill it, and its record may name a card owner. Every
+ * read re-opens the window, not just the first. Distinct from
+ * `isGlanceableRestoreUnavailable`, which reports a read that failed rather
+ * than one that has not finished.
+ */
+export function isGlanceableRestoreSettled(): boolean {
+  return restoresInFlight === 0;
+}
+
+/**
+ * Resolve once no `restorePersistedGlanceable` read is in flight. A caller that
+ * had to defer work on an unsettled read — a sweep that must not retire cards
+ * on a null snapshot that only means "not read yet" — waits here and resumes
+ * when the last read lands, instead of dropping the work until some later
+ * foreground or publisher update happens to come by.
+ *
+ * Resolves at once when nothing is in flight, so the caller can await it on
+ * every path. A read that fails still settles, so a waiter always resumes and
+ * re-reads the state, including `isGlanceableRestoreUnavailable`.
+ */
+export async function whenGlanceableRestoresSettle(): Promise<void> {
+  if (restoresInFlight === 0) {
+    return;
+  }
+  await new Promise<void>(resolve => {
+    settleWaiters.push(resolve);
+  });
+}
+
+/**
+ * The scope key this process may act for, or `null` when it cannot name one:
+ * the frame it published itself, or a restore whose record the signed-in
+ * account matched. A restore of another scope's record, an unconfirmed legacy
+ * entry, and an identity read that did not resolve all leave it `null`, so a
+ * caller that must not answer for an unconfirmed account treats `null` as a
+ * refusal instead of comparing against a key no identity check supports.
+ */
+export function getLocalScopeKey(): string | null {
+  return localScopeKey;
+}
+
+/**
+ * Adopt the scope of a frame this process is about to publish, before the sinks
+ * draw it. A publisher records its waiting ask from the same context it draws
+ * for, and the platform sinks draw before the persist sink writes the frame, so
+ * the ask store hands that context over here instead of leaving the fences on
+ * the previous scope until the write lands. Only a live context reaches this:
+ * a restored record does not (see `restorePersistedGlanceable`).
+ */
+export function adoptGlanceableScopeKey(scopeKey: string): void {
+  localScopeKey = scopeKey;
+}
+
+/**
+ * One mirror write, issued only after the previous one settled. The snapshot
+ * carries its own scope key, so one write is the whole record: a restart can
+ * never pair one publish's snapshot with another publish's scope key. The
+ * in-memory snapshot is authoritative, so a failed write is reported at warning
+ * level with the stable write fingerprint and never rejects: a `void`-ed native
+ * rejection here would surface as an unhandled error with no caller able to
+ * recover it. The widget store's `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` class
+ * keeps the mirror readable while the phone is locked, so a background publish
+ * lands there; only a device that has not been unlocked since boot refuses it,
+ * and the next publish mirrors the frame again.
+ */
+async function mirrorSnapshotAfter(previous: Promise<void> | null, raw: string): Promise<void> {
+  if (previous !== null) {
+    await previous;
+  }
+  await writeGatedValue(getSecureStore, GLANCEABLE_SNAPSHOT_KEY, raw);
+}
+
+/** In-memory write plus a fire-and-forget SecureStore mirror. */
+function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
+  persistEpoch += 1;
+  snapshotWrittenInProcess = true;
+  lastSnapshot = snapshot;
+  // A publish carries the context that produced it, so it is the one scope this
+  // process can act for without a keychain round trip — including a terminal
+  // blank, whose key refuses every real scope's ask.
+  localScopeKey = snapshot.scopeKey;
+  mirrorWrite = mirrorSnapshotAfter(mirrorWrite, JSON.stringify(snapshot));
+}
+
+/** How a record's scope key relates to the signed-in scope the restore read. */
+function scopeRelation(recordScopeKey: string, signedInScope: SignedInScope): RestoredScope {
+  if (signedInScope.status === 'unavailable') {
+    return 'unknown';
+  }
+  return signedInScope.status === 'known' && scopeKeyOf(signedInScope) === recordScopeKey
+    ? 'match'
+    : 'mismatch';
+}
+
+/** The opaque key of a known signed-in scope; the one form the fence compares. */
+function scopeKeyOf(scope: Extract<SignedInScope, { status: 'known' }>): string {
+  return buildOpaqueScopeKey({ userId: scope.userId, organizationId: scope.organizationId });
+}
+
+/** Parse a stored record with the shared schema; a malformed record is absent. */
+function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const result = glanceableAgentsSnapshotSchema.safeParse(parsed);
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The scope key of the signed-in account, or `null` when it is not known: no
+ * signed-in account or a read that did not complete. Callers that must not act
+ * on an unconfirmed scope treat `null` as a refusal.
+ */
+export async function getAuthenticatedGlanceableScopeKey(): Promise<string | null> {
+  const signedInScope = await readSignedInScope(getSecureStore());
+  return signedInScope.status === 'known' ? scopeKeyOf(signedInScope) : null;
+}
+
+/**
+ * Restore the in-memory state from SecureStore after a JS restart. Best
+ * effort: a failed read keeps the null in-memory state. A live write during
+ * the read owns the state, so the stale persisted record is skipped. An
+ * already-set in-memory state (a remount) is never overwritten: only a real
+ * JS restart starts null and must restore from the persisted record.
+ */
+export async function restorePersistedGlanceable(): Promise<void> {
+  const startEpoch = persistEpoch;
+  restoreUnavailable = false;
+  // Re-open the read window on every restore, not just the first: a later read
+  // can fill the snapshot just as the first one could, so a null snapshot is
+  // "not read yet" until this read lands too.
+  restoresInFlight += 1;
+  try {
+    const snapshot = await readGatedValueForUpdate(getSecureStore, GLANCEABLE_SNAPSHOT_KEY);
+    // A mirror the keychain would not hand over — a locked device, or a read
+    // that failed — may still name an owner, so the uncertainty is recorded
+    // instead of the null snapshot reading as an empty mirror.
+    if (snapshot.status === 'unreadable') {
+      restoreUnavailable = true;
+      return;
+    }
+    // A live write landed during the read: it owns the state; skip the fill.
+    if (persistEpoch !== startEpoch) {
+      return;
+    }
+    const stored = snapshot.value === null ? null : parseStoredSnapshot(snapshot.value);
+    const authenticatedScope = await readSignedInScope(getSecureStore());
+    // A live write that landed during the identity read owns the state, the
+    // same as one that landed during the record read: skip the fill rather than
+    // clobber it with what was read before it.
+    if (persistEpoch !== startEpoch) {
+      return;
+    }
+    const authenticatedScopeKey =
+      authenticatedScope.status === 'known' ? scopeKeyOf(authenticatedScope) : null;
+    if (stored === null) {
+      // No usable record: a scope key the previous release wrote on its own
+      // still names the scope it published for. It is adopted only when the
+      // identity read names that same scope, so a key left behind by another
+      // account never becomes this process's scope.
+      const legacy = await readGatedValueForUpdate(getSecureStore, GLANCEABLE_LEGACY_SCOPE_KEY);
+      // An unreadable legacy entry leaves the scope unconfirmed, the same as an
+      // unreadable mirror above: it may name this account's scope.
+      if (legacy.status === 'unreadable') {
+        restoreUnavailable = true;
+        return;
+      }
+      // A live publish that landed during this read owns the scope, the same as
+      // one that landed during either read above.
+      if (persistEpoch !== startEpoch) {
+        return;
+      }
+      if (legacy.value !== null && legacy.value === authenticatedScopeKey) {
+        localScopeKey = legacy.value;
+      }
+      restoredScope = 'none';
+    } else {
+      lastSnapshot ??= stored;
+      // The record's own scope key says which context wrote it, not which one
+      // holds the device now, so it becomes this process's scope only on a
+      // match. A record of another scope leaves the scope a live publish set,
+      // and leaves a cold process with none: every reader of the scope key —
+      // the drawn frame and the waiting-ask fence — then refuses it.
+      restoredScope = scopeRelation(stored.scopeKey, authenticatedScope);
+      if (restoredScope === 'match') {
+        localScopeKey = stored.scopeKey;
+      }
+    }
+    await restoreHomeWidgetData(authenticatedScopeKey);
+  } catch (error) {
+    // The reads above no longer reject on a keychain failure — the gate reads
+    // it as unreadable. This stays for the unexpected, so a throw still records
+    // the uncertainty for callers that act on a null snapshot instead of
+    // escaping a restore that callers run fire-and-forget.
+    restoreUnavailable = true;
+    reportSecureStoreFailure('read', error);
+  } finally {
+    // Settled on every path, including the live-write early return and a failed
+    // read, so a null snapshot stops meaning "the read has not finished" once
+    // every in-flight read has consulted the record.
+    restoresInFlight -= 1;
+    if (restoresInFlight === 0) {
+      const waiting = settleWaiters;
+      settleWaiters = [];
+      for (const resume of waiting) {
+        resume();
+      }
+    }
+  }
+}
+
+/** The persist sink owns no native surface, so endImmediate is a no-op. */
+export const persistGlanceableSink: GlanceableSink = {
+  publish(snapshot) {
+    persistSnapshot(snapshot);
+  },
+  endImmediate() {
+    // The widget snapshot stays for later reads; nothing to end.
+  },
+  startOrUpdate(snapshot) {
+    persistSnapshot(snapshot);
+  },
+};
+
+// ── Test-only helpers ──────────────────────────────────────────────────────
+
+export function _setSecureStoreForTests(store: GatedSecureStore | null): void {
+  secureStoreForTests = store;
+  _setHomeWidgetStoreForTests(store);
+}
+
+export function _setLastGlanceableSnapshotForTests(
+  snapshot: GlanceableAgentsSnapshot | null
+): void {
+  persistEpoch += 1;
+  lastSnapshot = snapshot;
+  // Callers seed a completed restore, so the record is the state this process
+  // acts on rather than a record still to be verified.
+  snapshotWrittenInProcess = snapshot !== null;
+  restoredScope = 'none';
+  localScopeKey = snapshot?.scopeKey ?? null;
+  // Seeding the mirror models a completed restore: callers act on this state as
+  // the read's result, the same way `restorePersistedGlanceable` would.
+  restoresInFlight = 0;
+}
+
+export function _setGlanceableRestoreUnavailableForTests(unavailable: boolean): void {
+  restoreUnavailable = unavailable;
+}
+
+/** Settle the mirror chain so a case can assert what landed on disk. */
+export async function _flushGlanceableMirrorForTests(): Promise<void> {
+  await mirrorWrite;
+}
+
+export function _resetGlanceablePersistForTests(): void {
+  persistEpoch = 0;
+  mirrorWrite = null;
+  lastSnapshot = null;
+  restoredScope = 'none';
+  snapshotWrittenInProcess = false;
+  localScopeKey = null;
+  restoreUnavailable = false;
+  restoresInFlight = 0;
+  settleWaiters = [];
+  secureStoreForTests = null;
+  _resetHomeWidgetDataForTests();
+}

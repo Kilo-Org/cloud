@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { LANDING_URL } from '@/lib/constants';
+import { LANDING_URL } from '@kilocode/web-shared/lib/constants';
 import { formatBytes } from '@/lib/kiloclaw/instance-display';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {

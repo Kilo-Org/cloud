@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Je agentsessie heeft een update",
+      "lowBalance": "Je saldo heeft aandacht nodig",
+      "spendAlert": "Je bestedingen hebben aandacht nodig",
+      "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig",
+      "securityUpdate": "Een beveiligingscontrole heeft een update",
+      "activeAgentsGlanceable": "Actieve agents hebben een update"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Waarschuwing laag saldo",
+      "body": "Het saldo van {{organizationName}} is gedaald onder ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Bestedingswaarschuwing",
+      "body": "De bestedingen van {{scopeName}} overschreden ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nieuwe beveiligingsbevinding ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-waarschuwing"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-overschrijding"
+    }
+  },
+  "sessionReady": {
+    "body": "Je Kilo-sessie is klaar om vanaf je telefoon te bedienen"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

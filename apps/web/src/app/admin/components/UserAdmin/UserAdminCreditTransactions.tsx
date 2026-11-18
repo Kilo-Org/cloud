@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
@@ -11,7 +13,7 @@ export function UserAdminCreditTransactions({ id }: UserDetailProps) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-user-credit-transactions', id],
     queryFn: async (): Promise<{ credit_transactions: AdminCreditTransaction[] }> => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/users/credit-transactions?kilo_user_id=${encodeURIComponent(id)}`
       );
       if (!response.ok) {
@@ -75,7 +77,18 @@ export function UserAdminCreditTransactions({ id }: UserDetailProps) {
                           </BooleanBadge>
                           {transaction.is_free && (
                             <Badge variant="secondary" className="text-xs">
-                              Free
+                              Free flag
+                            </Badge>
+                          )}
+                          {transaction.paid_credit_policy && (
+                            <Badge variant="outline" className="text-xs">
+                              {transaction.paid_credit_policy === 'one_year'
+                                ? 'Paid · one-year expiry'
+                                : transaction.paid_credit_policy === 'apple_exempt'
+                                  ? 'Apple paid · no expiry'
+                                  : transaction.paid_credit_policy === 'legacy'
+                                    ? 'Paid · legacy terms'
+                                    : transaction.paid_credit_policy}
                             </Badge>
                           )}
                           {transaction.credit_category && (

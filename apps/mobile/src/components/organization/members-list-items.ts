@@ -4,14 +4,22 @@
 // the empty state can never go missing:
 //
 //   - both lists empty        -> `[]` (the list renders `ListEmptyComponent`)
-//   - active members present  -> `section: 'Members'` + one `member` row each
+//   - active members present  -> one `member` row each, starting with no section
+//                                label when nothing follows them
 //   - no active, invites      -> `members-empty` + the invites section
+//   - active, invites         -> `section: 'Members'` + one `member` row each,
+//                                then `section: 'Pending invitations'` + one
+//                                `invite` row each
 //   - invites present         -> `section: 'Pending invitations'` + one
 //                                `invite` row each
+//
+// The screen header already reads `Members`, so the active-members label only
+// appears when a Pending invitations label below it makes the groups ambiguous.
 //
 // `last` marks the final row of each group so the existing hairline rule is
 // preserved.
 
+import { i18n } from '@/i18n';
 import { type ActiveOrgMember, type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
 
 export type MembersListItem =
@@ -28,7 +36,9 @@ export function buildMembersListItems(args: {
   const items: MembersListItem[] = [];
 
   if (activeMembers.length > 0) {
-    items.push({ kind: 'section', title: 'Members' });
+    if (invitedMembers.length > 0) {
+      items.push({ kind: 'section', title: i18n.t('organization.members.title') });
+    }
     for (const [index, member] of activeMembers.entries()) {
       items.push({
         kind: 'member',
@@ -41,7 +51,7 @@ export function buildMembersListItems(args: {
   }
 
   if (invitedMembers.length > 0) {
-    items.push({ kind: 'section', title: 'Pending invitations' });
+    items.push({ kind: 'section', title: i18n.t('organization.members.pendingInvitations') });
     for (const [index, invite] of invitedMembers.entries()) {
       items.push({
         kind: 'invite',

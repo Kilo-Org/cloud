@@ -1,5 +1,6 @@
 import { PublicErrorCodeSchema, type ClientError } from '@kilocode/worker-utils/client-error';
 import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
+import { customerBillingFailureSchema } from '@kilocode/session-ingest-contracts';
 
 const NON_RETRYABLE_CODES = new Set([
   'PARSE_ERROR',
@@ -61,6 +62,12 @@ function parseExplicitLegacyCause(cause: unknown): ExplicitLegacyCause | undefin
   return { error: parsedError.data, retryable: cause.retryable };
 }
 
+function parseBillingFailure(cause: unknown) {
+  if (!cause || typeof cause !== 'object' || !('billingFailure' in cause)) return undefined;
+  const parsed = customerBillingFailureSchema.safeParse(cause.billingFailure);
+  return parsed.success ? parsed.data : undefined;
+}
+
 export function createClientError(code: string, message: string, retryable?: boolean): ClientError {
   return {
     code,
@@ -75,6 +82,7 @@ export function projectTrpcErrorData(
   cause?: unknown
 ): TrpcErrorData & { clientError: ClientError } {
   const explicitCause = parseExplicitLegacyCause(cause);
+  const billingFailure = parseBillingFailure(cause);
   if (explicitCause) {
     const clientError = createClientError(explicitCause.error, message, explicitCause.retryable);
     return {
@@ -82,24 +90,38 @@ export function projectTrpcErrorData(
       error: explicitCause.error,
       retryable: clientError.retryable,
       clientError,
+      ...(billingFailure ? { billingFailure } : {}),
     };
   }
   return {
     ...data,
     clientError: createClientError(data.code, message),
+    ...(billingFailure ? { billingFailure } : {}),
   };
 }
 
-export function buildTrpcErrorResponse(status: number, message: string, path?: string): Response {
+type BuildTrpcErrorResponseOptions = { retryable?: boolean };
+
+export function buildTrpcErrorResponse(
+  status: number,
+  message: string,
+  path?: string,
+  options: BuildTrpcErrorResponseOptions = {}
+): Response {
   const code =
     STATUS_TO_TRPC_CODE[status as keyof typeof STATUS_TO_TRPC_CODE] ?? 'INTERNAL_SERVER_ERROR';
+  const data = projectTrpcErrorData({ code, httpStatus: status, path }, message);
+  const clientError =
+    options.retryable === undefined
+      ? data.clientError
+      : { ...data.clientError, retryable: options.retryable };
 
   return new Response(
     JSON.stringify({
       error: {
         message,
         code: TRPC_ERROR_CODES_BY_KEY[code],
-        data: projectTrpcErrorData({ code, httpStatus: status, path }, message),
+        data: { ...data, clientError },
       },
     }),
     {

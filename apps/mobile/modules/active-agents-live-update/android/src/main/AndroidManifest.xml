@@ -1,0 +1,38 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android-only by capability: the receivers and the timeout/boot
+       permission behind the Live Update notification. iOS has no promoted
+       ongoing notification; its counterpart is the ActivityKit Live Activity
+       rendered through expo-widgets (src/glanceable-ios/). -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <application>
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsDeadlineReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
+    <!-- The notification's dismissal and quiet-alarm broadcasts. Explicit
+         intents only, so the receiver is not exported and needs no filter. -->
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsActionReceiver"
+      android:exported="false" />
+    <!-- The Approve action's target: an invisible gate that starts the
+         headless approval once the device is unlocked. Its own task, no
+         history, and no content of its own. -->
+    <activity
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApprovalActivity"
+      android:excludeFromRecents="true"
+      android:exported="false"
+      android:taskAffinity=""
+      android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    <!-- The headless-task-service chain the same Approve action can take. -->
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveReceiver"
+      android:exported="false" />
+    <service
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveTaskService"
+      android:exported="false" />
+  </application>
+</manifest>

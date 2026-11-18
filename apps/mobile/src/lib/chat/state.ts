@@ -1,0 +1,300 @@
+import { type Part } from '@kilocode/cloud-agent-sdk';
+import { type Effort, type Turn } from '@kilocode/harness-sdk';
+
+import { type LocalImage } from '@/lib/agent-attachments/local-image';
+
+import { type ChatFlag } from './chat-flag';
+import { type ChatRecord, NO_RECORD } from './store';
+
+/**
+ * What a chat looks like to whoever is drawing it.
+ *
+ * A screen never holds this: it reads it. The conversation runs in the
+ * registry whether or not a screen is mounted, and every change to one is
+ * published to whoever is watching.
+ */
+
+/** Something a person asked: the words and the images that go with them. */
+export type Question = {
+  readonly text: string;
+  readonly images: readonly LocalImage[];
+  /**
+   * The kept question this asks again, when it is a retry of one: its record is
+   * the one the ask drops once the slot holds the question, so two attempts that
+   * say the same words never take each other's place.
+   */
+  readonly from?: string | null;
+};
+
+/** Where a question goes: the model, and the effort it is asked with. Null is the model's default. */
+export type ChatTarget = { readonly model: string; readonly effort: Effort | null };
+
+/**
+ * A question that was asked and never answered, and one asked later took its
+ * place in the one slot a chat keeps.
+ *
+ * It stays in the transcript where it was said rather than going with the slot:
+ * the words may be all that is left of what the person pasted, so they keep
+ * their bubble, their Retry and their Copy to composer.
+ */
+export type Displaced = Question &
+  ChatTarget & {
+    /** Names its bubble, so its Retry finds it after another failure moved the list. */
+    readonly id: string;
+    /**
+     * How many stored turns came before it. The store appends a turn per
+     * answered question, so this places the bubble among the turns that were
+     * said after it and keeps the conversation in the order it happened.
+     */
+    readonly afterTurns: number;
+    /** Why it has no answer: the answer failed, or the person stopped it. */
+    readonly outcome: 'failed' | 'stopped';
+    /**
+     * The fixed copy key the slot's failure had when this question left it, so
+     * the bubble states the same cause where it was said: a send the account's
+     * balance refused keeps its statement and Add credits, and no Retry that
+     * would meet the same balance. A question kept before this was recorded, or
+     * one the person stopped, says nothing about a cause.
+     */
+    readonly failureKey?: string | null;
+  };
+
+/** What a chat screen draws. */
+export type ChatState = {
+  readonly sessionId: string;
+  readonly model: string;
+  /** The effort the session asks with. Null asks with the model's own default. */
+  readonly effort: Effort | null;
+  /** Every turn the store holds, oldest first. */
+  readonly turns: readonly Turn[];
+  /** The answer arriving right now, empty when none is. */
+  readonly answering: readonly Part[];
+  readonly status: 'opening' | 'idle' | 'working';
+  /**
+   * A question with no answer: still being asked, or asked and nothing came
+   * back. `status` tells the two apart, and an idle chat holding one is what
+   * puts a Retry under the last thing the person said.
+   */
+  readonly asked: string | null;
+  /** The images that question carries. Empty when it carries none. */
+  readonly askedImages: readonly LocalImage[];
+  /**
+   * The kept question the slot is asking again, when it is a retry of one.
+   *
+   * That question is already in the transcript, so the slot does not draw a
+   * second bubble for it: the bubble where it was said is the current attempt,
+   * and everything said after it stays after it.
+   */
+  readonly askedFrom: string | null;
+  /**
+   * The questions asked before that one and never answered, oldest first. A
+   * later send takes the one slot, and what it took the place of is kept here.
+   */
+  readonly displaced: readonly Displaced[];
+  /** The target that question was asked of, even if moving onto it failed. */
+  readonly askedModel: string | null;
+  /** The effort that question was asked with. */
+  readonly askedEffort: Effort | null;
+  /**
+   * Questions typed while an answer was arriving, in the order they will be
+   * asked. The composer stays open while the model works, so a person can ask
+   * twice; a session answers one question at a time, so the second waits here
+   * rather than racing the first.
+   */
+  readonly waiting: readonly Question[];
+  /** Why the last question ended with no answer, for the log rather than the screen. */
+  readonly failed: string | null;
+  /** A fixed localization key safe to display, never a provider's raw error. */
+  readonly failureKey: string | null;
+  /**
+   * What the chat used, how full the last call was, and when it started and
+   * last moved. Changed when a call ends, not on every word of an answer.
+   */
+  readonly record: ChatRecord;
+  /**
+   * The web-search switch, with the choice on disk and how far this session is
+   * from it. The two flags live here rather than in a store of their own, so a
+   * tap, its write and the move it causes are one operation of the chat, and a
+   * chat that moves carries them with it.
+   */
+  readonly webSearch: ChatFlag;
+  /** The Kilo MCP switch, the same way. */
+  readonly kiloTools: ChatFlag;
+};
+
+/**
+ * What every chat looks like, open or not.
+ *
+ * It is kept apart from the sessions the registry holds, so a screen can
+ * subscribe to a chat before it has opened and read the same object every time
+ * it asks: a snapshot built fresh on each read would tell React the screen had
+ * changed, forever.
+ */
+const states = new Map<string, ChatState>();
+
+const watchers = new Map<string, Set<() => void>>();
+
+/**
+ * Where a chat that moved points, so a screen watching the one it left follows
+ * to the one it became.
+ *
+ * Kept apart from the states, and carrying no copy of the conversation: a
+ * screen reading the id it left has to see the moved chat's turns, not an
+ * empty transcript, without a second copy of them being held per model switch.
+ */
+const movedTo = new Map<string, string>();
+
+/**
+ * Follows a chain of moves to the chat a screen should read now.
+ *
+ * Exported for the registry's own queue, which orders operations by the chat
+ * that carried on rather than by the id the caller still holds.
+ */
+export function resolveSessionId(sessionId: string): string {
+  const seen = new Set<string>();
+  let current = sessionId;
+  while (!seen.has(current)) {
+    seen.add(current);
+    const next = movedTo.get(current);
+    if (next === undefined) {
+      return current;
+    }
+    current = next;
+  }
+  // A cycle cannot happen — a chat only ever moves onto a new session — but a
+  // malformed one must not spin, so the id it came back to is the answer.
+  return current;
+}
+
+/**
+ * Whoever draws the list of chats, rather than one of them.
+ *
+ * A chat writes its turns when the answer ends, and the title of a row is the
+ * first thing said in it — so a list drawn before that is a list with a row it
+ * cannot name yet. The screen showing the list is not the screen the answer
+ * arrived on, and may not even be mounted, so the registry says when a chat
+ * changed and the list reads the database again.
+ */
+const listWatchers = new Set<() => void>();
+
+export function watchChats(watcher: () => void): () => void {
+  listWatchers.add(watcher);
+  return () => {
+    listWatchers.delete(watcher);
+  };
+}
+
+/**
+ * The copy a chat shows when it is not one this place may read: the app's own
+ * key for something that is no longer here.
+ *
+ * The screen withholds the Retry for it, because entering the chat again cannot
+ * change the answer.
+ */
+export const CHAT_UNAVAILABLE_KEY = 'queryError.notFoundDescription';
+
+/** A chat with nothing in it, which is what every chat starts as. */
+export const NOTHING = {
+  turns: [] as readonly Turn[],
+  answering: [] as readonly Part[],
+  asked: null,
+  askedImages: [] as readonly LocalImage[],
+  askedFrom: null,
+  displaced: [] as readonly Displaced[],
+  askedModel: null,
+  askedEffort: null,
+  waiting: [] as readonly Question[],
+  failed: null,
+  failureKey: null,
+  record: NO_RECORD,
+  webSearch: { kind: 'reading' },
+  kiloTools: { kind: 'reading' },
+} satisfies Omit<ChatState, 'sessionId' | 'model' | 'effort' | 'status'>;
+
+function publish(sessionId: string): void {
+  for (const watcher of watchers.get(sessionId) ?? []) {
+    watcher();
+  }
+}
+
+/** Changes what a chat looks like, and tells whoever is watching. */
+export function change(sessionId: string, into: Partial<ChatState>): void {
+  const target = resolveSessionId(sessionId);
+  states.set(target, { ...snapshotOf(target), ...into });
+  publish(target);
+  if (target !== sessionId) {
+    // A screen still watching the id the chat moved off reads the state above,
+    // so it is told even though the state now lives under the new id.
+    publish(sessionId);
+  }
+  // Only when a chat starts or stops working: every word of an answer is a
+  // change too, and a list that read the database once per word would read it
+  // hundreds of times for one answer.
+  if (into.status !== undefined) {
+    for (const watcher of listWatchers) {
+      watcher();
+    }
+  }
+}
+
+/**
+ * Points a chat that moved at the one it became, and drops the state it left.
+ *
+ * The state is not kept as a second copy under the old id: a screen reading it
+ * resolves to the chat that carried on, so the transcript is never cleared, and
+ * one conversation never becomes one copy per model switch.
+ */
+export function moveState(from: string, to: string): void {
+  movedTo.set(from, to);
+  states.delete(from);
+  publish(from);
+}
+
+/** The state a screen draws, whether or not the chat has opened yet. */
+export function snapshotOf(sessionId: string): ChatState {
+  const target = resolveSessionId(sessionId);
+  const held = states.get(target);
+  if (held !== undefined) {
+    return held;
+  }
+  const fresh: ChatState = {
+    sessionId: target,
+    model: '',
+    effort: null,
+    status: 'opening',
+    ...NOTHING,
+  };
+  states.set(target, fresh);
+  return fresh;
+}
+
+export function watch(sessionId: string, watcher: () => void): () => void {
+  const held = watchers.get(sessionId) ?? new Set<() => void>();
+  held.add(watcher);
+  watchers.set(sessionId, held);
+  return () => {
+    held.delete(watcher);
+    /* A chat that nothing watches any more holds nothing here. Without this the
+       map keeps one empty set for every session a screen ever visited. */
+    if (held.size === 0) {
+      watchers.delete(sessionId);
+    }
+  };
+}
+
+/** Forgets a chat, which is what closing or deleting one does. */
+export function forgetState(sessionId: string): void {
+  /* A chat nothing points at any more needs no pointer to it: left behind, it
+     would resolve a stale id onto a chat that no longer exists. The pointers
+     are read before any is removed, so a chain resolves as it was. */
+  const stale: string[] = [];
+  for (const from of movedTo.keys()) {
+    if (resolveSessionId(from) === sessionId) {
+      stale.push(from);
+    }
+  }
+  for (const from of stale) {
+    movedTo.delete(from);
+  }
+  states.delete(sessionId);
+}

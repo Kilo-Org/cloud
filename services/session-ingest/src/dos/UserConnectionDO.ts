@@ -1,14 +1,26 @@
 import { DurableObject } from 'cloudflare:workers';
+import { getWorkerDb } from '@kilocode/db/client';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils';
+import { z } from 'zod';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
-import { resolveAccessibleKiloSession } from '../services/session-access';
+import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
+import { isNeedsInputStatus } from './session-ingest-attention';
+import {
+  resolveAccessibleKiloSession,
+  type AccessibleKiloSession,
+} from '../services/session-access';
+import { refreshGlanceableSessions } from '../remote-session-notifications';
+import { prUrlMatchesGitUrl } from '../ingest/metadata';
 import {
   CLIOutboundMessageSchema,
+  heartbeatSessionCount,
   type CLIInboundMessage,
   type Instance,
   type SessionEventPayload,
   SessionEventPayloadSchema,
+  SessionStatusSchema,
   type WebInboundMessage,
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
@@ -16,6 +28,10 @@ import {
 type HeartbeatSession = {
   id: string;
   status: string;
+  // Wake time for a `scheduled` session (ISO-8601). Optional: absent for every
+  // other status and on legacy CLIs that predate scheduling. `aggregateSessions`
+  // spreads the session through, so it reaches `sessions.list` untouched.
+  scheduledAt?: string;
   title: string;
   gitUrl?: string;
   gitBranch?: string;
@@ -32,16 +48,39 @@ type HeartbeatSession = {
     platform: string;
     prUrl: string;
     prNumber: number;
+    // Branch the session pushed and the commit it pushed to that branch.
+    // Optional for older CLIs.
+    headRef?: string;
+    headSha?: string;
   };
 };
 
-type ConnectionCapabilities = { attachments?: boolean };
+const cleanupAttachmentSchema = z.discriminatedUnion('role', [
+  z
+    .object({
+      role: z.literal('cli'),
+      sessions: z.array(z.object({ id: z.string() }).passthrough()),
+    })
+    .passthrough(),
+  z.object({ role: z.literal('web'), subscribedSessions: z.array(z.string()) }).passthrough(),
+]);
+const pendingSessionSchema = z.object({ sessionId: z.string().optional() });
+
+type ConnectionCapabilities = {
+  attachments?: boolean;
+  // Old form is absent sessionClone; treat missing as incapable until
+  // every shipped CLI advertises it.
+  sessionClone?: boolean;
+  // Absent means the CLI cannot clone up to a message (fork from here).
+  sessionCloneAtMessage?: boolean;
+};
 
 type WSAttachment =
   | {
       role: 'cli';
       connectionId: string;
       sessions: HeartbeatSession[];
+      heartbeatAt?: number;
       // Undefined means no protocolVersion has been reported yet — either the
       // CLI hasn't sent its first heartbeat, or it's a legacy build that
       // predates this field entirely. Both cases fall back to legacy behavior.
@@ -60,6 +99,11 @@ type WSAttachment =
       // in-memory map or hibernation reconstruction — keeps the response
       // fresh and avoids stale instance rows on restart.
       instance?: Instance;
+      // Rows the frame budget shed from the list above. Present only while the
+      // live list is larger than one attachment can hold, and the reason a
+      // command for one of those rows can arrive with no known owner until the
+      // next heartbeat restores the full list.
+      sessionsTrimmed?: number;
     }
   | {
       role: 'web';
@@ -72,13 +116,14 @@ type WSAttachment =
       kiloUserId?: string;
     };
 
+type CliAttachment = Extract<WSAttachment, { role: 'cli' }>;
+
 // Type re-export so test files and other internal callers can reference the
 // connection-row shape from a single place.
-export type ConnectedInstanceRow = {
+// Instance metadata stays optional for old producers and hibernated attachments.
+// Remove that compatibility only after every supported old form has retired.
+export type ConnectedInstanceRow = Instance & {
   connectionId: string;
-  name: string;
-  projectName: string;
-  version?: string;
   // Latest capabilities from the CLI socket attachment. Omitted when the
   // attachment has no capabilities (legacy CLI / pre-field build) so the
   // response stays byte-identical for those clients.
@@ -94,6 +139,74 @@ export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 // payload for most retry scenarios.
 export const MAX_DURABLE_RESULT_BYTES = 120 * 1024;
 
+/**
+ * workerd rejects a socket attachment above this size, and the failed write
+ * stores nothing. A heartbeat that trips it never reaches `heartbeat_ack`, so
+ * the CLI's 30 s inactivity watchdog reconnects and the session loses its
+ * owning socket until the next heartbeat.
+ */
+const ATTACHMENT_FRAME_LIMIT_BYTES = 16_384;
+
+/**
+ * Persisted CLI attachment budget. Measured against workerd: a row list whose
+ * JSON text is 17,097 bytes still clones into 16,384, so the JSON measurement
+ * overestimates structured clone for these repeated-key rows. Seven eighths of
+ * the frame keeps a margin for a longer string value and still persists most
+ * rows; the write ladder covers any remaining overshoot.
+ */
+const CLI_ATTACHMENT_BUDGET_BYTES = (ATTACHMENT_FRAME_LIMIT_BYTES * 7) / 8;
+
+const ATTACHMENT_CAPACITY_ERROR = /^A WebSocket 'attachment' cannot be larger than \d+ bytes\./;
+
+function isAttachmentCapacityError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'Error' &&
+    ATTACHMENT_CAPACITY_ERROR.test(error.message)
+  );
+}
+
+function attachmentBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+/**
+ * Keep the session rows that fit the budget, in the CLI's order. Attention
+ * rows fit first: a pending approval or question must survive a hibernation
+ * wake, including the root row that surfaces a subagent raise. The in-memory
+ * list stays complete, so every reader and broadcast is unaffected; a wake
+ * before the next heartbeat (≤10 s on every CLI) sees the shorter snapshot
+ * instead of no snapshot at all.
+ */
+function fitCliAttachment(
+  attachment: CliAttachment,
+  budgetBytes: number
+): { readonly attachment: CliAttachment; readonly droppedSessions: number } {
+  if (attachmentBytes(attachment) <= budgetBytes) {
+    return { attachment, droppedSessions: 0 };
+  }
+  const attentionIds = new Set(hoistedChildAttention(attachment.sessions).keys());
+  for (const session of attachment.sessions) {
+    if (isNeedsInputStatus(session.status)) attentionIds.add(session.id);
+  }
+  const keep = new Set<number>();
+  let bytes = attachmentBytes({ ...attachment, sessions: [] });
+  for (const attentionFirst of [true, false]) {
+    attachment.sessions.forEach((session, index) => {
+      if (attentionIds.has(session.id) !== attentionFirst) return;
+      const cost = attachmentBytes(session) + (keep.size === 0 ? 0 : 1);
+      if (bytes + cost > budgetBytes) return;
+      bytes += cost;
+      keep.add(index);
+    });
+  }
+  const sessions = attachment.sessions.filter((_session, index) => keep.has(index));
+  return {
+    attachment: { ...attachment, sessions },
+    droppedSessions: attachment.sessions.length - sessions.length,
+  };
+}
+
 // Maximum allowed mutationId length used as a durable storage key prefix.
 const MAX_MUTATION_ID_LENGTH = 128;
 
@@ -102,6 +215,7 @@ const MAX_MUTATION_ID_LENGTH = 128;
 export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
   'send_message',
   'interrupt',
+  'drop_queued_message',
   'question_reply',
   'question_reject',
   'permission_respond',
@@ -109,6 +223,12 @@ export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
   'suggestion_dismiss',
   'list_models',
   'list_commands',
+  // Old CLIs lack this command; remove the CLI_UPGRADE_REQUIRED mapping when
+  // every supported CLI has list_directories.
+  'list_directories',
+  // Old CLIs lack this command; remove the CLI_UPGRADE_REQUIRED mapping when
+  // every supported CLI has list_agents.
+  'list_agents',
   'send_command',
   'create_session',
   'exit_cli',
@@ -120,11 +240,16 @@ const CATALOG_DEDUPE_COMMANDS: ReadonlySet<string> = new Set(['list_models', 'li
 // Operations that older CLIs reject with a precise "unknown command: <op>"
 // string. Only these commands get mapped to a structured CLI_UPGRADE_REQUIRED
 // response; any other CLI error is preserved verbatim.
+// Old remotes return upgrade-required for `drop_queued_message`; remove the
+// upgrade mapping when every remote supports drop.
 const CLI_UPGRADE_REQUIRED_COMMANDS: ReadonlySet<string> = new Set([
   'list_commands',
   'send_command',
   'create_session',
   'exit_cli',
+  'drop_queued_message',
+  'list_directories',
+  'list_agents',
 ]);
 
 const SESSION_OWNER_CHANGED_ERROR = {
@@ -137,6 +262,12 @@ const SESSION_ACCESS_DENIED_ERROR = {
   source: 'relay',
   code: 'SESSION_ACCESS_DENIED',
   message: 'You no longer have access to this session',
+};
+
+const ORGANIZATION_ACCESS_DENIED_ERROR = {
+  source: 'relay',
+  code: 'ORGANIZATION_ACCESS_DENIED',
+  message: 'You do not have access to this organization',
 };
 
 const CATALOG_TOO_LARGE_ERROR = {
@@ -205,6 +336,32 @@ const MUTATION_ID_TOO_LONG_ERROR = {
   message: 'Mutation ID is too long',
 };
 
+/** UUID v1–v5 shape used to gate the `create_session` organization claim. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * The organization a `create_session` command claims the new session belongs
+ * to. `none` is a personal create; `invalid` is a claim that cannot be read, so
+ * the command is refused instead of forwarded with an unreadable claim.
+ */
+type CreateSessionOrgClaim =
+  | { kind: 'none' }
+  | { kind: 'invalid' }
+  | { kind: 'organization'; organizationId: string };
+
+function readCreateSessionOrgClaim(msg: {
+  command: string;
+  data?: unknown;
+}): CreateSessionOrgClaim {
+  if (msg.command !== 'create_session') return { kind: 'none' };
+  const data = msg.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return { kind: 'none' };
+  if (!Object.hasOwn(data, 'orgId')) return { kind: 'none' };
+  const orgId: unknown = Reflect.get(data, 'orgId');
+  if (typeof orgId !== 'string') return { kind: 'invalid' };
+  return { kind: 'organization', organizationId: orgId };
+}
+
 type ReadyPushEntry = {
   kiloUserId: string;
   title: string;
@@ -215,6 +372,20 @@ type ReadyPushEntry = {
 type RenameEntry = {
   title: string;
   at: number;
+};
+
+/**
+ * A stored attention clear waiting for its absence window to elapse. Written
+ * when an owning CLI socket goes away and dropped again as soon as a live CLI
+ * owns the session, so a dropped link never clears a raise the CLI is still
+ * waiting on.
+ */
+type PendingAttentionResetEntry = {
+  kiloUserId: string;
+  /** When the absence window elapses and the stored attention may be cleared. */
+  dueAt: number;
+  /** The connection whose departure started the window (for logging). */
+  connectionId: string;
 };
 
 type PendingCommandEntry = {
@@ -236,6 +407,7 @@ type PendingCommandEntry = {
 const READY_PUSH_KEY_PREFIX = 'readyPush:';
 const RENAME_KEY_PREFIX = 'rename:';
 const PENDING_COMMAND_KEY_PREFIX = 'pendingCommand/';
+const ATTENTION_RESET_KEY_PREFIX = 'attentionReset:';
 const SESSION_READY_PUSH_DELAY_MS = 5_000;
 /** Backoff between ready-push claim retries so the 3-attempt bound spans real time. */
 const READY_PUSH_RETRY_BACKOFF_MS = 5_000;
@@ -243,16 +415,50 @@ const READY_PUSH_MAX_ATTEMPTS = 3;
 /** Drop offline rename catch-up entries that never matched a heartbeat title. */
 const RENAME_ENTRY_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 
+/**
+ * How long a session's stored attention survives its owning CLI socket going
+ * away. Exported for the tests that pin it.
+ *
+ * A torn-down socket is not proof the CLI is gone: a session-ingest restart, a
+ * drain, or a network blip severs the CLI's sockets while the CLI process
+ * stays alive and still waits on its raise. During such an outage the CLI
+ * cannot reconnect, so nothing can cancel the held clear — and the alarm may
+ * fire in a runtime that has no sockets at all (a workerd orphaned by a hard
+ * kill of the dev listener, or the restarted deployment before any client
+ * re-attached), where "no live CLI" is true by construction. The window is
+ * therefore measured from the disconnect and must be longer than any
+ * realistic outage plus the CLI's own reconnect backoff, or the clear beats
+ * the reconnect and consumes a raise the user is still trying to answer
+ * (observed on device: kill -> relay re-attach ~3 min, with the shade's
+ * Approve taps still in flight after that). The clear is held while a live
+ * CLI re-owns the session, and applied only after an unbroken absence this
+ * long — a raise nobody can answer any more must not sit in needs-input
+ * forever.
+ */
+export const CLI_ABSENCE_ATTENTION_RESET_MS = 600_000;
+
 export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
   private static readonly PENDING_COMMAND_TTL_MS = 35_000;
   private static readonly MAX_PENDING_COMMANDS = 128;
+  private static readonly CLI_ABSENCE_ATTENTION_RESET_MS = CLI_ABSENCE_ATTENTION_RESET_MS;
+  /** Backoff before retrying a clear whose SessionIngestDO delegate failed. */
+  private static readonly ATTENTION_RESET_RETRY_BACKOFF_MS = 5_000;
+  /**
+   * Longest a command waits for the next heartbeat to restore the owner of a
+   * session the attachment budget shed. Every CLI heartbeats every 10 s.
+   */
+  private static readonly TRIMMED_OWNER_WAIT_MS = 12_000;
 
   // Which CLI connection owns each session
   private sessionOwners = new Map<string, string>();
+  // Last reported attachment shape per CLI connection, so a steady trim logs once
+  private trimReport = new Map<string, string>();
+  // Commands waiting for a heartbeat to restore the owner of a shed session
+  private ownerWaiters = new Map<string, Set<(owned: boolean) => void>>();
   // Which web sockets want events for a session
   private webSubscriptions = new Map<string, Set<WebSocket>>();
-  // Sessions per CLI connection (from heartbeat)
+  // Live session snapshots from heartbeats and authoritative status notifications.
   private connectionSessions = new Map<string, HeartbeatSession[]>();
   // Protocol version per CLI connection (from heartbeat); absent = legacy CLI
   private connectionProtocolVersion = new Map<string, string | undefined>();
@@ -280,6 +486,12 @@ export class UserConnectionDO extends DurableObject<Env> {
   private readyPushFireAt = new Map<string, number>();
   // One-shot post-eviction rebuild gate; reset whenever ensureState actually reconstructs
   private readyPushRebuilt = false;
+  // In-memory mirror of attentionReset KV dueAt values — scheduling only; KV is
+  // the source of truth and `alarm()` re-lists it every wake.
+  private pendingAttentionResetAt = new Map<string, number>();
+  // One-shot post-eviction rebuild gate; reset whenever ensureState actually
+  // reconstructs. A durable hold whose mirror was lost still needs an alarm.
+  private attentionResetsRebuilt = false;
 
   // Synchronous reservation set for mutationId dedupe (prevents concurrent same-ID dispatch
   // across asynchronous storage reads in the mutationId path).
@@ -299,11 +511,21 @@ export class UserConnectionDO extends DurableObject<Env> {
     let webCount = 0;
     let sessionCount = 0;
 
-    for (const ws of this.ctx.getWebSockets()) {
+    const sockets = this.ctx.getWebSockets();
+    const openCliConnectionIds = new Set<string>();
+    for (const ws of sockets) {
+      if (ws.readyState !== WebSocket.OPEN) continue;
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      if (attachment?.role === 'cli') openCliConnectionIds.add(attachment.connectionId);
+    }
+    for (const ws of sockets) {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
       if (!attachment) continue;
 
       if (attachment.role === 'cli') {
+        if (ws.readyState !== WebSocket.OPEN && openCliConnectionIds.has(attachment.connectionId)) {
+          continue;
+        }
         cliCount++;
         const { connectionId, sessions, protocolVersion, capabilities } = attachment;
         this.connectionSessions.set(connectionId, sessions);
@@ -313,7 +535,14 @@ export class UserConnectionDO extends DurableObject<Env> {
         for (const session of sessions) {
           this.sessionOwners.set(session.id, connectionId);
         }
-        this.lastHeartbeatAt.set(connectionId, Date.now());
+        const heartbeatAt = attachment.heartbeatAt ?? Date.now();
+        this.lastHeartbeatAt.set(connectionId, heartbeatAt);
+        if (attachment.heartbeatAt === undefined) {
+          // A hibernated attachment may predate the frame budget: stamping it
+          // must not throw inside state reconstruction. The list is only what
+          // the DO already knew, so it cannot clear a trim marker.
+          this.persistCliAttachment(ws, { ...attachment, heartbeatAt }, false);
+        }
       } else {
         if (attachment.replaced) continue;
         webCount++;
@@ -338,6 +567,9 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.stateReconstructed = true;
     // Fresh reconstruction must re-list readyPush KV once for scheduling.
     this.readyPushRebuilt = false;
+    // Same for the held attention resets: the mirror is empty after eviction
+    // even though the durable holds are not.
+    this.attentionResetsRebuilt = false;
   }
 
   fetch(request: Request): Response {
@@ -360,15 +592,16 @@ export class UserConnectionDO extends DurableObject<Env> {
       const reconnect = this.closeStaleSocket(connectionId);
 
       const kiloUserId = url.searchParams.get('kiloUserId') ?? undefined;
+      const now = Date.now();
       const attachment: WSAttachment = {
         role: 'cli',
         connectionId,
         sessions: [],
+        heartbeatAt: now,
         kiloUserId,
       };
       this.ctx.acceptWebSocket(server, ['cli']);
       server.serializeAttachment(attachment);
-      const now = Date.now();
       this.lastHeartbeatAt.set(connectionId, now);
       this.scheduleNextAlarm(now);
 
@@ -480,6 +713,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     const now = Date.now();
     this.expirePendingCommands(now);
     await this.fireReadyPushes(now);
+    await this.firePendingAttentionResets(now);
     const staleConnectionIds: string[] = [];
 
     for (const [connectionId, lastSeen] of this.lastHeartbeatAt) {
@@ -489,7 +723,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     for (const connectionId of staleConnectionIds) {
-      // Find and close the stale CLI WebSocket
       for (const ws of this.ctx.getWebSockets('cli')) {
         const att = ws.deserializeAttachment() as WSAttachment | null;
         if (att?.role === 'cli' && att.connectionId === connectionId) {
@@ -500,17 +733,11 @@ export class UserConnectionDO extends DurableObject<Env> {
           break;
         }
       }
-      // handleCliDisconnect will clean up connectionSessions/sessionOwners/lastHeartbeatAt
-      // via the webSocketClose callback
     }
 
     this.scheduleNextAlarm(now);
     this.scheduleDurablePendingAlarm();
   }
-
-  // ---------------------------------------------------------------------------
-  // CLI message handling
-  // ---------------------------------------------------------------------------
 
   private handleCliMessage(
     ws: WebSocket,
@@ -521,10 +748,14 @@ export class UserConnectionDO extends DurableObject<Env> {
   ): void {
     const result = CLIOutboundMessageSchema.safeParse(parsed);
     if (!result.success) {
+      // Report the frame's size beside the byte count so a frame outside the
+      // contract is diagnosable from its shape, never from its contents.
+      const sessionCount = heartbeatSessionCount(parsed);
       console.warn('CLI message parse failed', {
         role: 'cli',
         connectionId: attachment.connectionId,
         byteCount: binaryByteCount ?? new TextEncoder().encode(raw).byteLength,
+        ...(sessionCount === undefined ? {} : { sessionCount }),
         issues: result.error.issues.map(issue => ({
           path: issue.path,
           code: issue.code,
@@ -574,14 +805,31 @@ export class UserConnectionDO extends DurableObject<Env> {
     capabilities: ConnectionCapabilities | undefined,
     instance: Instance | undefined
   ): void {
+    sessions = sessions.filter(session => !this.isSessionDeleted(session.id));
+    // Per-session evidence gate: a heartbeat prLink whose URL names a repo other
+    // than the session's own repo is a wrong link, and a wrong link is worse
+    // than no link. Drop it before it reaches the attachment or `sessions.list`.
+    sessions = sessions.map(session => {
+      if (!session.prLink || prUrlMatchesGitUrl(session.prLink.prUrl, session.gitUrl)) {
+        return session;
+      }
+      console.warn('Dropping heartbeat PR link whose repository does not match the session', {
+        sessionId: session.id,
+        connectionId: attachment.connectionId,
+      });
+      const { prLink: _dropped, ...rest } = session;
+      return rest;
+    });
     const { connectionId } = attachment;
+    const previousStatuses = new Map(
+      this.aggregateSessions().map(session => [session.id, session.status])
+    );
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
     this.connectionProtocolVersion.set(connectionId, protocolVersion);
     this.connectionCapabilities.set(connectionId, capabilities);
     this.scheduleNextAlarm(now);
 
-    // Remove sessions this connection previously owned but no longer reports
     const previousSessions = this.connectionSessions.get(connectionId) ?? [];
     const currentIds = new Set(sessions.map(s => s.id));
     for (const prev of previousSessions) {
@@ -598,7 +846,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Update ownership
     this.connectionSessions.set(connectionId, sessions);
     for (const session of sessions) {
       const previousOwner = this.sessionOwners.get(session.id);
@@ -621,7 +868,11 @@ export class UserConnectionDO extends DurableObject<Env> {
         this.scheduleSessionReadyPush(attachment.kiloUserId, session.id, session.title);
       }
       this.sessionOwners.set(session.id, connectionId);
+      // A live CLI owns (or re-owns) the session: whatever raise it was waiting
+      // on is answerable again, so the absence window is over.
+      this.cancelPendingAttentionReset(session.id);
     }
+    this.settleOwnerWaiters();
 
     // Offline rename catch-up: re-emit stored renames whose heartbeat title still
     // differs; delete entries once the CLI title matches (self-cleaning).
@@ -635,7 +886,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       })
     );
 
-    // Replay existing subscriptions for sessions newly owned by this CLI
     const previousIds = new Set(previousSessions.map(s => s.id));
     for (const session of sessions) {
       if (!previousIds.has(session.id) && this.webSubscriptions.has(session.id)) {
@@ -643,17 +893,50 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Persist to attachment for hibernation recovery
-    const updatedAttachment: WSAttachment = {
+    const updatedAttachment: CliAttachment = {
       role: 'cli',
       connectionId,
       sessions,
+      heartbeatAt: now,
       protocolVersion,
       capabilities,
       kiloUserId: attachment.kiloUserId,
       ...(instance ? { instance } : {}),
     };
-    ws.serializeAttachment(updatedAttachment);
+    this.persistCliAttachment(ws, updatedAttachment, true);
+
+    if (attachment.kiloUserId) {
+      const changedSessionIds = new Set<string>();
+      // `needsApproval` gates the Approve control on the locked surfaces, so a
+      // move into or out of `permission` is delivered on the shorter approval
+      // interval. Only the sessions that moved are named: this batch aggregates
+      // every connection, so it can span the personal scope and several orgs,
+      // and the shorter interval belongs only to the scope with the move.
+      const approvalChangedSessionIds = new Set<string>();
+      for (const session of this.aggregateSessions()) {
+        const previous = previousStatuses.get(session.id);
+        if (previous !== session.status) {
+          changedSessionIds.add(session.id);
+          if (previous === 'permission' || session.status === 'permission') {
+            approvalChangedSessionIds.add(session.id);
+          }
+        }
+        previousStatuses.delete(session.id);
+      }
+      for (const [sessionId, previous] of previousStatuses) {
+        changedSessionIds.add(sessionId);
+        if (previous === 'permission') approvalChangedSessionIds.add(sessionId);
+      }
+      if (changedSessionIds.size > 0) {
+        this.ctx.waitUntil(
+          refreshGlanceableSessions(this.env, {
+            userId: attachment.kiloUserId,
+            cliSessionIds: [...changedSessionIds],
+            approvalChangedSessionIds: [...approvalChangedSessionIds],
+          })
+        );
+      }
+    }
 
     // Broadcast the heartbeat to every one of the user's web sockets. Subscribers
     // and non-subscribers both receive it: a removed session id is detectable
@@ -672,6 +955,27 @@ export class UserConnectionDO extends DurableObject<Env> {
       },
     });
 
+    // Clients keep a needs-input status sticky until an explicit status event
+    // names the session, so a hoisted child raise must arrive and clear as
+    // `session.status.updated` on the root.
+    const changedAt = new Date(now).toISOString();
+    for (const change of hoistedAttentionChanges(previousSessions, sessions)) {
+      const status = SessionStatusSchema.safeParse(change.status);
+      const previousStatus = SessionStatusSchema.safeParse(change.previousStatus);
+      this.broadcastToWeb({
+        type: 'system',
+        event: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: change.sessionId,
+          previousStatus: previousStatus.success ? previousStatus.data : null,
+          status: status.success ? status.data : null,
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+    }
+
     this.sendToCli(ws, { type: 'heartbeat_ack' });
   }
 
@@ -682,12 +986,13 @@ export class UserConnectionDO extends DurableObject<Env> {
    * first-sights do not slide fireAt or reset attempts.
    */
   private scheduleSessionReadyPush(kiloUserId: string, sessionId: string, title: string): void {
-    if (this.readyPushFireAt.has(sessionId)) return;
+    if (this.readyPushFireAt.has(sessionId) || this.isSessionDeleted(sessionId)) return;
 
     const key = `${READY_PUSH_KEY_PREFIX}${sessionId}`;
     this.ctx.waitUntil(
       (async () => {
         const existing = await this.ctx.storage.get<ReadyPushEntry>(key);
+        if (this.isSessionDeleted(sessionId)) return;
         if (existing) {
           this.readyPushFireAt.set(sessionId, existing.fireAt);
           this.scheduleNextAlarm(Date.now());
@@ -756,6 +1061,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         await this.ctx.storage.delete(key);
         this.readyPushFireAt.delete(sessionId);
       } catch (error: unknown) {
+        if (this.isSessionDeleted(sessionId)) continue;
         const attempts = (entry.attempts ?? 0) + 1;
         if (attempts >= READY_PUSH_MAX_ATTEMPTS) {
           await this.ctx.storage.delete(key);
@@ -844,6 +1150,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     event: string,
     data: unknown
   ): void {
+    if (
+      this.isSessionDeleted(sessionId) ||
+      (parentSessionId && this.isSessionDeleted(parentSessionId))
+    )
+      return;
     const childSubs = this.webSubscriptions.get(sessionId);
     const parentSubs = parentSessionId ? this.webSubscriptions.get(parentSessionId) : undefined;
     if (!childSubs && !parentSubs) return;
@@ -879,7 +1190,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     let rehydratedDurable: PendingCommandEntry | undefined;
     let ownsReservation = false;
 
-    // Step 24: on in-memory miss, try to load the durable entry (D8 case 1).
     if (!entry) {
       // Synchronously reserve the correlationId before the async durable
       // read so a concurrent duplicate CLI reply cannot also process the
@@ -912,7 +1222,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           return;
         }
 
-        // Validate the responding CLI by attachment connectionId.
         const respondingAttachment = respondingWs.deserializeAttachment() as WSAttachment | null;
         if (
           respondingAttachment?.role !== 'cli' ||
@@ -923,7 +1232,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           return;
         }
 
-        // Resolve the originating web socket by persisted webConnectionId.
         const webWs = this.findWebByConnectionId(durable.webConnectionId);
         if (!webWs) {
           // D8 case 2: web socket is gone. Shape the terminal outcome
@@ -951,7 +1259,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           return;
         }
 
-        // Build an in-memory entry so the rest of handleCliResponse works.
         entry = {
           ws: webWs,
           sessionId: durable.sessionId,
@@ -967,13 +1274,11 @@ export class UserConnectionDO extends DurableObject<Env> {
         // after terminal storage.put succeeds (catalog guard and normal
         // path) or on any throw.
       } catch (error: unknown) {
-        // Clean reservation on unexpected error during rehydration.
         this.completedCorrelationIds.delete(id);
         ownsReservation = false;
         throw error;
       }
     } else if (entry.targetCliWs !== respondingWs) {
-      // Strict socket-identity check for an entry still in memory.
       return;
     }
 
@@ -982,7 +1287,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     // this try block. The finally clears any reservation that survives
     // a throw.
     try {
-      // Validate catalog result size for rehydrated entries too.
+      if (entry.sessionId && this.isSessionDeleted(entry.sessionId)) return;
       if (CATALOG_DEDUPE_COMMANDS.has(entry.command) && result !== undefined) {
         const serializedResult = JSON.stringify(result);
         const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
@@ -1048,7 +1353,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           this.completedCorrelationIds.delete(id);
           ownsReservation = false;
 
-          // Send the live response now that the durable entry is stored.
           if (!rehydrated) {
             this.sendToWeb(entry.ws, {
               type: 'response',
@@ -1165,7 +1469,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       ownsReservation = false;
 
       if (!rehydrated) {
-        // Send the live response now that the durable entry is safely stored.
         this.sendToWeb(entry.ws, {
           type: 'response',
           id: entry.originalId,
@@ -1179,8 +1482,6 @@ export class UserConnectionDO extends DurableObject<Env> {
                 : {}),
         });
       } else {
-        // Rehydrated entry: re-resolve the web socket by the persisted id
-        // and send the response now.
         const targetWebWs = this.findWebByConnectionId(webConnectionId ?? 'unknown');
         if (targetWebWs) {
           this.sendToWeb(targetWebWs, {
@@ -1203,10 +1504,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Web message handling
-  // ---------------------------------------------------------------------------
 
   private async handleWebMessage(
     ws: WebSocket,
@@ -1244,6 +1541,17 @@ export class UserConnectionDO extends DurableObject<Env> {
     attachment: WSAttachment & { role: 'web' },
     sessionId: string
   ): Promise<void> {
+    // A socket that already holds this subscription keeps it: the stored entry
+    // is the answer, and the access recheck, session-list send and CLI forward
+    // below run once per subscription. An unsubscribe clears both entries, so
+    // the next subscribe resolves access.
+    if (
+      this.webSubscriptions.get(sessionId)?.has(ws) &&
+      attachment.subscribedSessions.includes(sessionId)
+    ) {
+      return;
+    }
+
     // Recheck current membership before subscribing: a removed member must not
     // receive events from an org session they no longer have access to.
     const kiloUserId = attachment.kiloUserId;
@@ -1254,7 +1562,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       kiloUserId,
       kiloSessionId: sessionId,
     });
-    if (!accessible) {
+    if (!accessible || this.isSessionDeleted(sessionId)) {
       return;
     }
 
@@ -1265,7 +1573,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
     subs.add(ws);
 
-    // Persist subscription in attachment for hibernation recovery
     if (!attachment.subscribedSessions.includes(sessionId)) {
       attachment.subscribedSessions.push(sessionId);
       ws.serializeAttachment(attachment);
@@ -1300,7 +1607,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (subs) {
       subs.delete(ws);
 
-      // If no more subscribers, tell CLI to stop forwarding
       if (subs.size === 0) {
         this.webSubscriptions.delete(sessionId);
         const cliWs = this.findCliForSession(sessionId);
@@ -1310,7 +1616,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Update attachment
     const idx = attachment.subscribedSessions.indexOf(sessionId);
     if (idx !== -1) {
       attachment.subscribedSessions.splice(idx, 1);
@@ -1362,9 +1667,29 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
+    // A create may name an organization, and that claim reaches the CLI. Accept
+    // it only when the acting user can act for that organization: for a
+    // session-scoped create that is the resolved session's own organization,
+    // and for a connection-scoped create it is any organization the read paths
+    // grant, which includes a child organization reached through a parent role.
+    //
+    // This decides whether the create runs, not what the session records. The
+    // recorded organization is set by the ingest metadata write, which keeps its
+    // own rule, so accepting a scope here never widens the attribution.
+    const orgClaim = readCreateSessionOrgClaim(msg);
+    if (orgClaim.kind === 'invalid') {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: INVALID_COMMAND_ERROR,
+      });
+      return;
+    }
+
     // Command-time access recheck: a removed member must not forward a command
     // to a session they no longer have access to. Catalog commands without a
     // sessionId skip this check.
+    let accessibleSession: AccessibleKiloSession | null = null;
     if (msg.sessionId) {
       const kiloUserId = attachment.kiloUserId;
       if (!kiloUserId) {
@@ -1375,11 +1700,11 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
         return;
       }
-      const accessible = await resolveAccessibleKiloSession(this.env, {
+      accessibleSession = await resolveAccessibleKiloSession(this.env, {
         kiloUserId,
         kiloSessionId: msg.sessionId,
       });
-      if (!accessible) {
+      if (!accessibleSession) {
         this.sendToWeb(ws, {
           type: 'response',
           id: msg.id,
@@ -1389,12 +1714,44 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Find target CLI
+    if (orgClaim.kind === 'organization') {
+      const kiloUserId = attachment.kiloUserId;
+      const organizationId = orgClaim.organizationId;
+      const allowed =
+        kiloUserId !== undefined &&
+        UUID_RE.test(organizationId) &&
+        (accessibleSession !== null
+          ? accessibleSession.organizationId === organizationId
+          : await hasEffectiveOrganizationAccess(
+              getWorkerDb(this.env.HYPERDRIVE.connectionString),
+              {
+                kiloUserId,
+                organizationId,
+              }
+            ));
+      if (!allowed) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: ORGANIZATION_ACCESS_DENIED_ERROR,
+        });
+        return;
+      }
+    }
+
     let targetCli: WebSocket | undefined;
 
     if (msg.sessionId && msg.connectionId) {
-      targetCli = this.findCliByConnectionId(msg.connectionId);
-      if (this.sessionOwners.get(msg.sessionId) !== msg.connectionId || !targetCli) {
+      const sessionId = msg.sessionId;
+      const connectionId = msg.connectionId;
+      // Viewers send both fields, so a shed row arrives here with no owner at
+      // all. Wait for the heartbeat that restores it before reporting a change;
+      // a different owner is still rejected at once.
+      if (!this.sessionOwners.has(sessionId)) {
+        await this.waitForTrimmedOwner(sessionId, connectionId);
+      }
+      targetCli = this.findCliByConnectionId(connectionId);
+      if (this.sessionOwners.get(sessionId) !== connectionId || !targetCli) {
         this.sendToWeb(ws, {
           type: 'response',
           id: msg.id,
@@ -1406,8 +1763,13 @@ export class UserConnectionDO extends DurableObject<Env> {
       targetCli = this.findCliByConnectionId(msg.connectionId);
     } else if (msg.sessionId) {
       targetCli = this.findCliForSession(msg.sessionId);
+      if (!targetCli) {
+        const sessionId = msg.sessionId;
+        if (await this.waitForTrimmedOwner(sessionId)) {
+          targetCli = this.findCliForSession(sessionId);
+        }
+      }
     } else {
-      // Fall back to first available CLI
       const cliSockets = this.ctx.getWebSockets('cli');
       targetCli = cliSockets[0];
     }
@@ -1427,14 +1789,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       msg.sessionId && msg.connectionId ? msg.connectionId : undefined;
     const targetConnectionId = targetAttachment.connectionId;
 
-    // Resolve the originating web socket's connectionId from its attachment.
     const webAttachment = ws.deserializeAttachment() as WSAttachment | null;
     const webConnectionId =
       webAttachment?.role === 'web' && webAttachment.connectionId
         ? webAttachment.connectionId
         : 'unknown';
 
-    // In-memory dedupe for catalog commands from the same web socket
     if (
       !msg.mutationId &&
       CATALOG_DEDUPE_COMMANDS.has(msg.command) &&
@@ -1496,7 +1856,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           try {
             const durable = await this.getDurablePendingCommand(mutationId);
             if (!durable) {
-              // No existing entry: check cap (counts both in-memory and durable entries).
               const durableCount = await this.countDurablePendingCommands();
               const total = this.pendingCommands.size + durableCount;
               if (total >= UserConnectionDO.MAX_PENDING_COMMANDS) {
@@ -1530,7 +1889,6 @@ export class UserConnectionDO extends DurableObject<Env> {
               return;
             }
 
-            // Entry is 'pending': dedupe.
             if (CATALOG_DEDUPE_COMMANDS.has(msg.command)) {
               this.sendToWeb(ws, {
                 type: 'response',
@@ -1556,7 +1914,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
-    // In-memory cap check for the common path.
     if (this.pendingCommands.size >= UserConnectionDO.MAX_PENDING_COMMANDS) {
       this.sendToWeb(ws, {
         type: 'response',
@@ -1596,6 +1953,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     webConnectionId: string,
     now: number
   ): Promise<void> {
+    if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) return;
     const correlationId = msg.mutationId ?? crypto.randomUUID();
     this.pendingCommands.set(correlationId, {
       ws,
@@ -1617,6 +1975,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       webConnectionId,
       state: 'pending' as const,
     } satisfies PendingCommandEntry);
+    if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) {
+      this.ctx.storage.kv.delete(`${PENDING_COMMAND_KEY_PREFIX}${correlationId}`);
+      return;
+    }
     this.scheduleNextAlarm(now);
     this.scheduleDurablePendingAlarm();
 
@@ -1646,6 +2008,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     webConnectionId: string,
     now: number
   ): void {
+    if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) return;
     const correlationId = crypto.randomUUID();
     const pendingCommandKey = `${PENDING_COMMAND_KEY_PREFIX}${correlationId}`;
     this.pendingCommands.set(correlationId, {
@@ -1672,6 +2035,10 @@ export class UserConnectionDO extends DurableObject<Env> {
           state: 'pending' as const,
         } satisfies PendingCommandEntry)
         .then(async () => {
+          if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) {
+            this.ctx.storage.kv.delete(pendingCommandKey);
+            return;
+          }
           const terminalEntry = this.terminalDuringInitialWrite.get(correlationId);
           if (terminalEntry) {
             await this.ctx.storage.put(pendingCommandKey, terminalEntry);
@@ -1716,10 +2083,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Disconnect handling
-  // ---------------------------------------------------------------------------
-
   private async handleCliDisconnect(
     disconnectedWs: WebSocket,
     attachment: WSAttachment & { role: 'cli' }
@@ -1749,7 +2112,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
-    // Collect owned sessions before removing ownership
     const sessions = this.connectionSessions.get(connectionId) ?? [];
     const ownedSessions = new Set<string>();
     for (const session of sessions) {
@@ -1762,6 +2124,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.connectionProtocolVersion.delete(connectionId);
     this.connectionCapabilities.delete(connectionId);
     this.lastHeartbeatAt.delete(connectionId);
+    this.trimReport.delete(connectionId);
 
     console.log('CLI socket disconnected', {
       connectionId,
@@ -1771,11 +2134,49 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     // Leave webSubscriptions intact — a reconnecting CLI can resume
 
-    // Reset stored attention before broadcasting disconnect so the mobile
-    // departure refetch observes `retry` rather than a stuck `question`.
+    // Hold each owned session's stored attention for the CLI's absence window
+    // instead of clearing it now: a socket close can be our own link dropping
+    // (a session-ingest restart, a drain, a network blip) rather than the CLI
+    // going away, and an immediate clear would throw away a raise the user can
+    // still answer once the CLI is back. `alarm()` applies the clear if no live
+    // CLI re-owns the session within the window.
     // kiloUserId comes from the CLI attachment (authenticated /user/cli route);
     // without it we cannot safely target rows and must no-op.
-    await this.resetOwnedSessionAttentionOnDisconnect(attachment.kiloUserId, ownedSessions);
+    await this.deferOwnedSessionAttentionReset(attachment.kiloUserId, ownedSessions, connectionId);
+
+    const rootSessionIds = sessions
+      .filter(session => !session.parentSessionId && ownedSessions.has(session.id))
+      .map(session => session.id);
+    if (attachment.kiloUserId && rootSessionIds.length > 0) {
+      // A subagent raise carries `permission` on the child row and is only
+      // hoisted onto its root for display, so the scope the Approve control
+      // moves in is the root's. Name the owning root: an id outside
+      // `cliSessionIds` is unknown to the server's batch query, which resolves
+      // it to the personal scope and leaves the org scope whose permission
+      // cleared stuck behind the delivery window.
+      const permissionRootIds = new Set(
+        sessions
+          .filter(session => ownedSessions.has(session.id) && session.status === 'permission')
+          .map(session => session.parentSessionId ?? session.id)
+      );
+      this.ctx.waitUntil(
+        refreshGlanceableSessions(this.env, {
+          userId: attachment.kiloUserId,
+          cliSessionIds: rootSessionIds,
+          // A disconnecting CLI leaves the live aggregate, so the snapshot the
+          // locked surfaces build no longer carries its permission: the Approve
+          // control clears on the shorter approval interval. The attention reset
+          // above does not write the stored status — it holds the clear for the
+          // CLI absence window — so this hint covers the aggregate drop, and
+          // `resetAttentionStatusOnCliDisconnect` names the session on the same
+          // path for a session that stays snapshot-visible (a cloud agent merged
+          // from Postgres, not the live list). Only the scopes whose roots moved
+          // are named: this batch aggregates every connection, so a
+          // request-level flag would name scopes with no approval move.
+          approvalChangedSessionIds: rootSessionIds.filter(id => permissionRootIds.has(id)),
+        })
+      );
+    }
 
     this.broadcastToWeb({
       type: 'system',
@@ -1785,12 +2186,18 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   /**
-   * Commit attention clears for owned sessions before `cli.disconnected`.
+   * Hold the stored attention of the sessions this connection owned for the
+   * CLI's absence window. The clear itself happens in `alarm()` once the window
+   * elapses with no live CLI owning the session, and is dropped again by
+   * `cancelPendingAttentionReset` when a CLI re-owns it, so a link that drops
+   * under a live CLI never discards the raise it is waiting on.
+   *
    * Identity: attachment `kiloUserId` only — never guess from DO name.
    */
-  private async resetOwnedSessionAttentionOnDisconnect(
+  private async deferOwnedSessionAttentionReset(
     kiloUserId: string | undefined,
-    ownedSessions: ReadonlySet<string>
+    ownedSessions: ReadonlySet<string>,
+    connectionId: string
   ): Promise<void> {
     if (ownedSessions.size === 0) return;
 
@@ -1802,17 +2209,98 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
+    const dueAt = Date.now() + UserConnectionDO.CLI_ABSENCE_ATTENTION_RESET_MS;
     const results = await Promise.allSettled(
       [...ownedSessions].map(async sessionId => {
-        const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
-        await stub.resetAttentionStatusOnCliDisconnect(kiloUserId, sessionId);
+        await this.ctx.storage.put(`${ATTENTION_RESET_KEY_PREFIX}${sessionId}`, {
+          kiloUserId,
+          dueAt,
+          connectionId,
+        } satisfies PendingAttentionResetEntry);
+        this.pendingAttentionResetAt.set(sessionId, dueAt);
       })
     );
 
     for (const result of results) {
       if (result.status === 'rejected') {
-        console.error('Failed to reset attention status on CLI disconnect', {
+        console.error('Failed to hold attention status for the CLI absence window', {
           error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
+
+    this.scheduleNextAlarm(Date.now());
+  }
+
+  /** Drop a held clear once a live CLI owns the session again. */
+  private cancelPendingAttentionReset(sessionId: string): void {
+    // Delete the durable entry unconditionally. After an eviction the in-memory
+    // mirror is empty until `scheduleNextAlarm`'s asynchronous KV re-list lands;
+    // an early return when the mirror has no entry would leave the KV hold in
+    // place, and that re-list could repopulate and re-arm it. KV is the source
+    // of truth (`firePendingAttentionResets` re-lists it), so removing it here
+    // is what actually cancels the clear. A missing entry is a no-op.
+    this.pendingAttentionResetAt.delete(sessionId);
+    this.ctx.waitUntil(
+      this.ctx.storage
+        .delete(`${ATTENTION_RESET_KEY_PREFIX}${sessionId}`)
+        .catch((error: unknown) => {
+          console.error('Failed to cancel the held attention reset', {
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+    );
+  }
+
+  /**
+   * Apply the held attention clears whose window has elapsed. An entry is
+   * dropped without a write when a live CLI owns the session (the CLI came
+   * back), and re-armed briefly when the delegate write fails so a transient
+   * error cannot strand a raise in needs-input.
+   */
+  private async firePendingAttentionResets(now: number): Promise<void> {
+    let pending: Map<string, PendingAttentionResetEntry>;
+    try {
+      pending = await this.ctx.storage.list<PendingAttentionResetEntry>({
+        prefix: ATTENTION_RESET_KEY_PREFIX,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to list held attention resets', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    for (const [key, entry] of pending) {
+      if (!entry || typeof entry.dueAt !== 'number') continue;
+      const sessionId = key.slice(ATTENTION_RESET_KEY_PREFIX.length);
+      if (!sessionId) continue;
+
+      if (this.hasActiveCliSession(sessionId)) {
+        // The CLI is back with this session: keep the raise it still waits on.
+        this.pendingAttentionResetAt.delete(sessionId);
+        await this.ctx.storage.delete(key);
+        continue;
+      }
+
+      if (entry.dueAt > now) {
+        this.pendingAttentionResetAt.set(sessionId, entry.dueAt);
+        continue;
+      }
+
+      try {
+        const stub = getSessionIngestDO(this.env, { kiloUserId: entry.kiloUserId, sessionId });
+        await stub.resetAttentionStatusOnCliDisconnect(entry.kiloUserId, sessionId);
+        await this.ctx.storage.delete(key);
+        this.pendingAttentionResetAt.delete(sessionId);
+      } catch (error: unknown) {
+        const dueAt = now + UserConnectionDO.ATTENTION_RESET_RETRY_BACKOFF_MS;
+        await this.ctx.storage.put(key, { ...entry, dueAt });
+        this.pendingAttentionResetAt.set(sessionId, dueAt);
+        console.error('Failed to reset attention status after the CLI absence window', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -1859,10 +2347,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // RPC
-  // ---------------------------------------------------------------------------
-
   getActiveSessions(): Array<
     HeartbeatSession & {
       connectionId: string;
@@ -1882,20 +2366,28 @@ export class UserConnectionDO extends DurableObject<Env> {
    *
    * No in-memory map is consulted: hibernation/restart can never produce a
    * stale row because we only read from sockets that are alive right now.
-   * The 2KB `serializeAttachment` budget comfortably accommodates a bounded
-   * instance object (well under 200 bytes).
+   * Old attachments can omit metadata; the heartbeat write handles native
+   * capacity without discarding their legacy instance identity.
    */
   getConnectedInstances(): { instances: ConnectedInstanceRow[] } {
     this.ensureState();
     const instances: ConnectedInstanceRow[] = [];
+    const now = Date.now();
     for (const ws of this.ctx.getWebSockets('cli')) {
       const att = ws.deserializeAttachment() as WSAttachment | null;
-      if (att?.role !== 'cli' || !att.instance) continue;
+      if (att?.role !== 'cli' || !att.instance || ws.readyState !== WebSocket.OPEN) continue;
+      const heartbeatAt = this.lastHeartbeatAt.get(att.connectionId);
+      if (heartbeatAt !== undefined && now - heartbeatAt >= UserConnectionDO.HEARTBEAT_TIMEOUT_MS) {
+        continue;
+      }
       instances.push({
         connectionId: att.connectionId,
         name: att.instance.name,
         projectName: att.instance.projectName,
         ...(att.instance.version ? { version: att.instance.version } : {}),
+        ...(att.instance.kind !== undefined ? { kind: att.instance.kind } : {}),
+        ...(att.instance.startedAt !== undefined ? { startedAt: att.instance.startedAt } : {}),
+        ...(att.instance.gitBranch !== undefined ? { gitBranch: att.instance.gitBranch } : {}),
         ...(att.capabilities ? { capabilities: att.capabilities } : {}),
       });
     }
@@ -1915,6 +2407,86 @@ export class UserConnectionDO extends DurableObject<Env> {
     return sockets.length;
   }
 
+  private isSessionDeleted(sessionId: string): boolean {
+    return this.ctx.storage.kv.get(`deletedSession/${sessionId}`) === true;
+  }
+
+  async clearSession(sessionId: string): Promise<void> {
+    this.ensureState();
+    this.ctx.storage.kv.put(`deletedSession/${sessionId}`, true);
+    this.sessionOwners.delete(sessionId);
+    this.webSubscriptions.delete(sessionId);
+    this.readyPushFireAt.delete(sessionId);
+    this.ctx.storage.kv.delete(`${READY_PUSH_KEY_PREFIX}${sessionId}`);
+    this.ctx.storage.kv.delete(`${RENAME_KEY_PREFIX}${sessionId}`);
+    for (const [id, entry] of this.pendingCommands) {
+      if (entry.sessionId !== sessionId) continue;
+      this.pendingCommands.delete(id);
+      this.terminalDuringInitialWrite.delete(id);
+      this.completedCorrelationIds.delete(id);
+      this.sendToWeb(entry.ws, {
+        type: 'response',
+        id: entry.originalId,
+        error: { code: 'SESSION_DELETED', message: 'Session deleted' },
+      });
+    }
+    for (const [id, entry] of this.terminalDuringInitialWrite) {
+      if (entry.sessionId === sessionId) this.terminalDuringInitialWrite.delete(id);
+    }
+    for (const [key, value] of this.ctx.storage.kv.list({ prefix: PENDING_COMMAND_KEY_PREFIX })) {
+      const parsed = pendingSessionSchema.safeParse(value);
+      if (parsed.success && parsed.data.sessionId === sessionId) this.ctx.storage.kv.delete(key);
+    }
+    for (const [id, sessions] of this.connectionSessions) {
+      this.connectionSessions.set(
+        id,
+        sessions.filter(session => session.id !== sessionId)
+      );
+    }
+    for (const socket of this.ctx.getWebSockets()) {
+      const parsed = cleanupAttachmentSchema.safeParse(socket.deserializeAttachment());
+      if (!parsed.success) continue;
+      const attachment = parsed.data;
+      if (attachment.role === 'cli') {
+        socket.serializeAttachment({
+          ...attachment,
+          sessions: attachment.sessions.filter(session => session.id !== sessionId),
+        });
+        this.sendToCli(socket, { type: 'unsubscribe', sessionId });
+      } else {
+        socket.serializeAttachment({
+          ...attachment,
+          subscribedSessions: attachment.subscribedSessions.filter(id => id !== sessionId),
+        });
+      }
+    }
+    // The held clears are durable state, so the guard must read KV: after
+    // eviction the in-memory mirror is empty while the `attentionReset:*`
+    // entries still wait for the alarm that fires them. Deleting the alarm off
+    // the empty mirror would strand them forever.
+    const heldAttentionResets = [
+      ...this.ctx.storage.kv.list({ prefix: ATTENTION_RESET_KEY_PREFIX }),
+    ];
+    const pending = [...this.ctx.storage.kv.list({ prefix: PENDING_COMMAND_KEY_PREFIX })];
+    if (
+      this.lastHeartbeatAt.size === 0 &&
+      this.readyPushFireAt.size === 0 &&
+      heldAttentionResets.length === 0 &&
+      pending.length === 0
+    ) {
+      await this.ctx.storage.deleteAlarm();
+    } else {
+      this.scheduleNextAlarm(Date.now());
+      this.scheduleDurablePendingAlarm();
+    }
+  }
+
+  /**
+   * Persist authoritative status into the owning socket's live snapshot before
+   * fanout, so a subsequent list read or hibernation sees the same transition.
+   * Heartbeats have no status version: later heartbeats remain admissible, and
+   * notifications retain their existing arrival-order semantics.
+   */
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
     this.ensureState();
     const parsed = SessionEventPayloadSchema.parse(event);
@@ -1923,12 +2495,76 @@ export class UserConnectionDO extends DurableObject<Env> {
       event: parsed.type,
       data: parsed.data,
     };
+    const rootStatusEvents: WebInboundMessage[] = [];
+    if (parsed.type === 'session.status.updated') {
+      const data = parsed.data;
+      const sessionId = 'session' in data ? data.session.sessionId : data.sessionId;
+      const owner = this.sessionOwners.get(sessionId);
+      const socket = this.ctx.getWebSockets('cli').find(ws => {
+        if (ws.readyState !== WebSocket.OPEN) return false;
+        const attachment = ws.deserializeAttachment() as WSAttachment | null;
+        return attachment?.role === 'cli' && attachment.connectionId === owner;
+      });
+      const attachment = socket?.deserializeAttachment() as WSAttachment | null | undefined;
+      if (socket && attachment?.role === 'cli') {
+        const previousRootStatuses = new Map(
+          this.aggregateSessions().map(session => [session.id, session.status])
+        );
+        const previous = this.connectionSessions.get(attachment.connectionId) ?? [];
+        const status = data.status ?? ('session' in data ? data.session.status : null) ?? '';
+        const sessions = previous.map(session => {
+          if (session.id !== sessionId) return session;
+          const { scheduledAt: _previousScheduledAt, ...rest } = session;
+          const scheduledAt =
+            data.scheduledAt ?? ('session' in data ? data.session.scheduledAt : null);
+          return {
+            ...rest,
+            status,
+            ...(status === 'scheduled' && scheduledAt ? { scheduledAt } : {}),
+          };
+        });
+        this.persistCliAttachment(socket, { ...attachment, sessions }, false);
+        this.connectionSessions.set(attachment.connectionId, sessions);
+
+        const currentRoots = this.aggregateSessions();
+        const effectiveRootStatus = currentRoots.find(session => session.id === sessionId)?.status;
+        if (effectiveRootStatus !== undefined && effectiveRootStatus !== status) {
+          msg.data = {
+            ...data,
+            status: effectiveRootStatus,
+            statusUpdatedAt: null,
+            ...('session' in data
+              ? { session: { ...data.session, status: effectiveRootStatus, statusUpdatedAt: null } }
+              : {}),
+          };
+        }
+        for (const root of currentRoots) {
+          const previousStatus = previousRootStatuses.get(root.id);
+          if (root.id === sessionId || previousStatus === root.status) continue;
+          rootStatusEvents.push({
+            type: 'system',
+            event: 'session.status.updated',
+            data: {
+              source: 'v2',
+              sessionId: root.id,
+              previousStatus: previousStatus ?? null,
+              status: root.status,
+              ...(root.status === 'scheduled' && root.scheduledAt
+                ? { scheduledAt: root.scheduledAt }
+                : {}),
+              statusUpdatedAt: null,
+              changedAt: data.changedAt,
+            },
+          });
+        }
+      }
+    }
 
     let delivered = 0;
-    const json = JSON.stringify(msg);
+    const messages = [msg, ...rootStatusEvents].map(message => JSON.stringify(message));
     for (const ws of this.activeWebSockets()) {
       try {
-        ws.send(json);
+        for (const json of messages) ws.send(json);
         delivered++;
       } catch (err) {
         console.warn('notifySessionEvent: skipping failed web socket:', err);
@@ -1943,6 +2579,7 @@ export class UserConnectionDO extends DurableObject<Env> {
    */
   async notifySessionRenamed(sessionId: string, title: string): Promise<{ delivered: boolean }> {
     this.ensureState();
+    if (this.isSessionDeleted(sessionId)) return { delivered: false };
     await this.ctx.storage.put(`${RENAME_KEY_PREFIX}${sessionId}`, {
       title,
       at: Date.now(),
@@ -1970,9 +2607,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     return this.findCliForSession(sessionId) !== undefined;
   }
 
-  // ---------------------------------------------------------------------------
   // Helpers
-  // ---------------------------------------------------------------------------
 
   private sendToCli(ws: WebSocket, msg: CLIInboundMessage): void {
     try {
@@ -1987,6 +2622,131 @@ export class UserConnectionDO extends DurableObject<Env> {
       ws.send(JSON.stringify(msg));
     } catch (err) {
       console.warn('sendToWeb failed:', err);
+    }
+  }
+
+  /**
+   * Resolve every command waiting for a heartbeat to restore a shed owner.
+   * Called once per heartbeat, after the ownership map is updated.
+   */
+  private settleOwnerWaiters(): void {
+    for (const [sessionId, waiters] of this.ownerWaiters) {
+      if (!this.sessionOwners.has(sessionId)) continue;
+      this.ownerWaiters.delete(sessionId);
+      for (const settle of waiters) settle(true);
+    }
+  }
+
+  /**
+   * A trimmed attachment holds fewer rows than the live heartbeat, so a command
+   * for a shed row finds no owner until the next heartbeat restores it. Wait for
+   * that heartbeat instead of failing the command. Only a connection that
+   * reports a trim can be missing a live session, so every other unowned id
+   * still fails immediately. Pass `connectionId` to require that specific
+   * connection, which is the shape a viewer sends.
+   */
+  private waitForTrimmedOwner(sessionId: string, connectionId?: string): Promise<boolean> {
+    if (this.sessionOwners.has(sessionId)) return Promise.resolve(true);
+    const trimmed = this.ctx.getWebSockets('cli').some(ws => {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      return (
+        attachment?.role === 'cli' &&
+        attachment.sessionsTrimmed !== undefined &&
+        (connectionId === undefined || attachment.connectionId === connectionId)
+      );
+    });
+    if (!trimmed) return Promise.resolve(false);
+
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const settle = (owned: boolean) => {
+      clearTimeout(timer);
+      const waiters = this.ownerWaiters.get(sessionId);
+      waiters?.delete(settle);
+      if (waiters?.size === 0) this.ownerWaiters.delete(sessionId);
+      resolve(owned);
+    };
+    const timer = setTimeout(() => settle(false), UserConnectionDO.TRIMMED_OWNER_WAIT_MS);
+    let waiters = this.ownerWaiters.get(sessionId);
+    if (!waiters) {
+      waiters = new Set();
+      this.ownerWaiters.set(sessionId, waiters);
+    }
+    waiters.add(settle);
+    return promise;
+  }
+
+  /**
+   * Persist the CLI attachment without ever letting a write failure escape: a
+   * throw skips the acknowledgement and every broadcast that follows it, and
+   * the CLI then reconnects on its inactivity watchdog. Shed payload instead,
+   * keeping the acknowledgement and the live in-memory state.
+   *
+   * `complete` says whether this list is the CLI's whole live list. Only then
+   * can a write that sheds nothing clear `sessionsTrimmed`; a write built from
+   * what the DO already knows (a status event, or a hibernation stamp) says
+   * nothing about rows it never held, so it keeps the marker.
+   */
+  private persistCliAttachment(ws: WebSocket, attachment: CliAttachment, complete: boolean): void {
+    const fitted = fitCliAttachment(attachment, CLI_ATTACHMENT_BUDGET_BYTES);
+    // The trim is steady state for a busy connection, so report it on a change
+    // of shape rather than once per heartbeat.
+    const signature = `${fitted.attachment.sessions.length}/${fitted.droppedSessions}`;
+    if (this.trimReport.get(attachment.connectionId) !== signature) {
+      this.trimReport.set(attachment.connectionId, signature);
+      if (fitted.droppedSessions > 0) {
+        console.warn('Trimmed the CLI socket attachment to the frame budget', {
+          connectionId: attachment.connectionId,
+          sessions: attachment.sessions.length,
+          persistedSessions: fitted.attachment.sessions.length,
+          droppedSessions: fitted.droppedSessions,
+        });
+      }
+    }
+    // A status event or hibernation stamp spreads the socket's previous
+    // attachment and holds only the rows the DO knows, so an inherited marker
+    // must survive it: the CLI may still own rows this write never saw.
+    const { sessionsTrimmed: inheritedTrim, ...rest } = fitted.attachment;
+    const marker = fitted.droppedSessions > 0 ? fitted.droppedSessions : inheritedTrim;
+    const keepMarker = (marker ?? 0) > 0 && (fitted.droppedSessions > 0 || !complete);
+    const value: CliAttachment = keepMarker ? { ...rest, sessionsTrimmed: marker } : rest;
+    try {
+      ws.serializeAttachment(value);
+      return;
+    } catch (error) {
+      if (!isAttachmentCapacityError(error)) {
+        console.error('Failed to persist the CLI socket attachment', {
+          connectionId: attachment.connectionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+    }
+
+    // The JSON measurement overestimates clone for the row shapes measured above,
+    // but a shape with long or multi-byte values can undercount it. Metadata
+    // alone is small next to the frame limit, so this nearly always fits.
+    const { sessions: _sessions, ...metadata } = value;
+    try {
+      ws.serializeAttachment({
+        ...metadata,
+        sessions: [],
+        sessionsTrimmed: attachment.sessions.length,
+      });
+      console.error(
+        'CLI socket attachment exceeded the frame after trimming; dropped every session',
+        {
+          connectionId: attachment.connectionId,
+          sessions: attachment.sessions.length,
+        }
+      );
+    } catch (error) {
+      // The previous attachment is still stored (a failed write is atomic),
+      // and the next heartbeat retries the whole list.
+      console.error('CLI socket attachment is unsaveable even without sessions', {
+        connectionId: attachment.connectionId,
+        limitBytes: ATTACHMENT_FRAME_LIMIT_BYTES,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -2108,6 +2868,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // If storage.put fails, no live send occurs. A waitUntil retry keeps
       // the terminal outcome fenced while the loop continues.
       const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
+      if (entry.sessionId && this.isSessionDeleted(entry.sessionId)) continue;
       const durableEntry: PendingCommandEntry = {
         sessionId: entry.sessionId,
         originalId: entry.originalId,
@@ -2211,6 +2972,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // If storage.put fails, no live send occurs. A waitUntil retry keeps
       // the terminal outcome fenced while the loop continues.
       const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
+      if (entry.sessionId && this.isSessionDeleted(entry.sessionId)) continue;
       const durableEntry: PendingCommandEntry = {
         sessionId: entry.sessionId,
         originalId: entry.originalId,
@@ -2288,9 +3050,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Command error shaping
-  // ---------------------------------------------------------------------------
 
   /**
    * Compute the shaped terminal outcome for a command reply.
@@ -2371,16 +3131,15 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Durable pending command storage (D8)
-  // ---------------------------------------------------------------------------
 
   private async getDurablePendingCommand(
     correlationId: string
   ): Promise<PendingCommandEntry | undefined> {
-    return this.ctx.storage.get<PendingCommandEntry>(
+    const entry = await this.ctx.storage.get<PendingCommandEntry>(
       `${PENDING_COMMAND_KEY_PREFIX}${correlationId}`
     );
+    return entry?.sessionId && this.isSessionDeleted(entry.sessionId) ? undefined : entry;
   }
 
   private async countDurablePendingCommands(): Promise<number> {
@@ -2410,7 +3169,12 @@ export class UserConnectionDO extends DurableObject<Env> {
     });
     await Promise.all(
       [...entries].flatMap(([key, entry]) => {
-        if (entry.state !== 'pending' || !matches(entry)) return [];
+        if (
+          entry.state !== 'pending' ||
+          !matches(entry) ||
+          (entry.sessionId && this.isSessionDeleted(entry.sessionId))
+        )
+          return [];
         const correlationId = key.slice(PENDING_COMMAND_KEY_PREFIX.length);
         // Skip entries already delivered live by the in-memory sweep.
         // Prevents a duplicate delivery when the in-memory storage.put and
@@ -2514,6 +3278,10 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
         for (const [key, durable] of entries) {
           if (!durable || typeof durable.expiresAt !== 'number') continue;
+          if (durable.sessionId && this.isSessionDeleted(durable.sessionId)) {
+            this.ctx.storage.kv.delete(key);
+            continue;
+          }
           if (durable.expiresAt > now) continue;
 
           if (durable.state === 'pending') {
@@ -2605,6 +3373,33 @@ export class UserConnectionDO extends DurableObject<Env> {
       );
     }
 
+    // Same one-shot for the held attention resets: the mirror is empty after
+    // eviction, so the durable entries need re-listing before this wake can arm
+    // the alarm that fires them.
+    if (this.pendingAttentionResetAt.size === 0 && !this.attentionResetsRebuilt) {
+      this.ctx.waitUntil(
+        (async () => {
+          try {
+            const pending = await this.ctx.storage.list<PendingAttentionResetEntry>({
+              prefix: ATTENTION_RESET_KEY_PREFIX,
+            });
+            for (const [key, entry] of pending) {
+              if (!entry || typeof entry.dueAt !== 'number') continue;
+              const sessionId = key.slice(ATTENTION_RESET_KEY_PREFIX.length);
+              if (sessionId) this.pendingAttentionResetAt.set(sessionId, entry.dueAt);
+            }
+            this.attentionResetsRebuilt = true;
+            this.scheduleNextAlarm(Date.now());
+          } catch (error: unknown) {
+            // Leave attentionResetsRebuilt false so the next schedule retries.
+            console.error('Failed to rebuild held attention reset mirror', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })()
+      );
+    }
+
     let nextAlarmAt: number | undefined;
 
     for (const lastSeen of this.lastHeartbeatAt.values()) {
@@ -2617,6 +3412,13 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const entry of this.pendingCommands.values()) {
       if (entry.expiresAt > now && (nextAlarmAt === undefined || entry.expiresAt < nextAlarmAt)) {
         nextAlarmAt = entry.expiresAt;
+      }
+    }
+
+    for (const dueAt of this.pendingAttentionResetAt.values()) {
+      const armedAt = dueAt <= now ? now : dueAt;
+      if (nextAlarmAt === undefined || armedAt < nextAlarmAt) {
+        nextAlarmAt = armedAt;
       }
     }
 
@@ -2661,6 +3463,18 @@ export class UserConnectionDO extends DurableObject<Env> {
         capabilities?: ConnectionCapabilities;
       }
     > = [];
+    // A subagent raise arrives on the child row, but only root rows are
+    // emitted. Hoist the child's needs-input status onto its root so the
+    // session list shows NEEDS INPUT. Derived per call, so it clears when
+    // the child resolves.
+    // ponytail: one level deep; iterate to a fixed point if the CLI ever nests deeper.
+    const hoistedStatus = new Map<string, string>();
+    for (const [connectionId, sessions] of this.connectionSessions) {
+      if (!liveConnectionIds.has(connectionId)) continue;
+      for (const [root, status] of hoistedChildAttention(sessions)) {
+        hoistedStatus.set(root, status);
+      }
+    }
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
       const protocolVersion = this.connectionProtocolVersion.get(connectionId);
@@ -2673,6 +3487,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         if (this.sessionOwners.get(session.id) !== connectionId) continue;
         result.push({
           ...session,
+          status: hoistedStatus.get(session.id) ?? session.status,
           connectionId,
           ...(protocolVersion ? { protocolVersion } : {}),
           ...(capabilities ? { capabilities } : {}),

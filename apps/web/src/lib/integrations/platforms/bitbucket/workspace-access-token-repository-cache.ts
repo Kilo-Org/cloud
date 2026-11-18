@@ -13,7 +13,7 @@ import {
 import { platform_access_token_credentials, platform_integrations } from '@kilocode/db/schema';
 import { and, eq, exists, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import { BitbucketWorkspaceAccessTokenMetadataSchema } from './metadata';
 import {

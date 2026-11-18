@@ -1,3 +1,6 @@
+import { i18n } from '@/i18n';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
+
 export type ModelPricing = { prompt?: string; completion?: string };
 
 function formatSide(pricePerTokenStr: string | undefined): string | null {
@@ -11,10 +14,15 @@ function formatSide(pricePerTokenStr: string | undefined): string | null {
   }
 
   if (pricePer1M < 0.01) {
-    return '<$0.01';
+    return i18n.t('agentChat.modelCost.lessThan', {
+      amount: formatPrefixedMoney(0.01, i18n.language),
+    });
   }
 
-  return `$${pricePer1M.toFixed(2).replace(/\.?0+$/, '')}`;
+  // Two fixed decimals so every row in the picker lines up, matching the web
+  // model list (`formatPrice` pins `$X.XX`). Trimming produced "$0.6" beside
+  // "$0.54" in the same list.
+  return formatPrefixedMoney(pricePer1M, i18n.language);
 }
 
 /** Visible per-1M-token cost for picker rows. null = hide the cost line. */
@@ -29,7 +37,17 @@ export function formatModelCostPer1M(pricing: ModelPricing | undefined): string 
     return null;
   }
 
-  return `In ${input} · Out ${output} per 1M tokens`;
+  const million = formatNumber(1_000_000, i18n.language, { notation: 'compact' });
+  return i18n.t('agentChat.modelCost.perMillion', {
+    input,
+    inputLabel: i18n.t('agentChat.messageDetails.input'),
+    million,
+    output,
+    outputLabel: i18n.t('agentChat.messageDetails.output'),
+    // This frame prices one million tokens, so the unit label's plural family
+    // must pick the form that count selects.
+    tokens: i18n.t('agentChat.contextUsage.tokens', { count: 1_000_000 }),
+  });
 }
 
 /** Row-level cost decision: free/BYOK badges suppress cost; otherwise format. */

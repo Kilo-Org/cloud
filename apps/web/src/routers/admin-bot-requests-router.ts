@@ -1,5 +1,5 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { bot_requests, kilocode_users, organizations } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { sql, desc, eq, gte, count } from 'drizzle-orm';

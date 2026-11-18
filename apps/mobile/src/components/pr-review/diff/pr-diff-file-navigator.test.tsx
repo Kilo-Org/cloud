@@ -8,25 +8,38 @@
 //      fetch-to-completion loads the remaining pages.
 
 /* eslint-disable max-lines -- cohesive component-test suite for the navigator fetch rules */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement, Fragment, type ReactElement } from 'react';
-import { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
+import { type PageRunFailure } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { type SurfaceFeedback } from '@/lib/surface-feedback';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const fetchNextPageMock = vi.hoisted(() => vi.fn());
 const fetchAllRunMock = vi.hoisted(() => vi.fn());
+const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
+const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 // Records every `NavigatorFileRow` render. Because the navigator wraps the row
 // in `memo`, a memo hit (stable callbacks) does NOT push a new entry.
 const rowRenders = vi.hoisted(
   () => [] as { path: string; onSelect: () => void; onToggleViewed: () => void }[]
 );
+
+// Records every (ref, headSha) the navigator hands to the viewed-files hook,
+// so the provider-scoped keying (s6, identity rule 17) is proven at the call
+// site rather than only in the store's unit tests.
+const viewedFilesCalls = vi.hoisted(() => [] as unknown[][]);
+// Records every scroll request the navigator emits, so the bridge identity
+// wiring (rule 17) is proven at the call site too.
+const scrollRequests = vi.hoisted(() => [] as unknown[]);
 
 // Captures the latest FlashList props so tests can read `onEndReached`.
 const flashListProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
@@ -42,7 +55,9 @@ vi.mock('@shopify/flash-list', () => ({
     return createElement(
       Fragment,
       null,
-      data.map((item, index) => renderItem({ item, index }))
+      data.map((item, index) =>
+        createElement(Fragment, { key: index }, renderItem({ item, index }))
+      )
     );
   },
 }));
@@ -52,6 +67,7 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -59,14 +75,28 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
 vi.mock('@/lib/pr-review/file-navigator-bridge', () => ({
-  requestScrollToFile: vi.fn(),
+  requestScrollToFile: (...args: unknown[]) => {
+    scrollRequests.push(args[0]);
+  },
+}));
+vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
+  PrReviewUnavailableActions: 'PrReviewUnavailableActions',
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
+  Platform: platformState,
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insetsState,
 }));
 
 vi.mock('@/components/pr-review/diff/pr-diff-navigator-file-row', () => ({
@@ -97,7 +127,7 @@ type ListQueryResult = {
     refetch: () => unknown;
   };
   files: PrReviewFile[];
-  firstPageErrorState: null;
+  firstPageErrorState: { kind: 'permission' | 'not-found' | 'retryable' | 'reconnect' } | null;
   laterPageError: boolean;
 };
 
@@ -109,10 +139,10 @@ type ViewedResult = {
 
 type FetchAllResult = {
   run: () => unknown;
-  isRunning: boolean;
   loadedFiles: number;
   totalFiles: null;
-  error: unknown;
+  feedback: SurfaceFeedback<PageRunFailure>;
+  failure: PageRunFailure | null;
 };
 
 let listQueryResult: ListQueryResult = {
@@ -135,15 +165,18 @@ let viewedResult: ViewedResult = {
 };
 let fetchAllResult: FetchAllResult = {
   run: fetchAllRunMock,
-  isRunning: false,
+  feedback: { status: 'idle' },
   loadedFiles: 0,
   totalFiles: null,
-  error: null,
+  failure: null,
 };
 
 vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
   usePrReviewFileListQuery: () => listQueryResult,
-  usePrReviewViewedFiles: () => viewedResult,
+  usePrReviewViewedFiles: (...args: unknown[]) => {
+    viewedFilesCalls.push(args);
+    return viewedResult;
+  },
   useFetchToCompletion: () => fetchAllResult,
 }));
 
@@ -174,8 +207,17 @@ async function mountNavigator() {
   return result;
 }
 
+// The navigator's field is `@/components/ui/input`: the accessibility label
+// sits on the composite and on the host TextInput it renders. Match the host so
+// the lookup stays single (`findByProps` throws on two matches).
+function isSearchInput(node: { type: unknown; props: { accessibilityLabel?: string } }) {
+  return (
+    String(node.type) === 'TextInput' && node.props.accessibilityLabel === 'Filter files by path'
+  );
+}
+
 function findSearchInput(renderer: Awaited<ReturnType<typeof mountNavigator>>['renderer']) {
-  return renderer.root.findByProps({ accessibilityLabel: 'Filter files by path' });
+  return renderer.root.find(node => isSearchInput(node));
 }
 
 function typeSearch(
@@ -186,6 +228,15 @@ function typeSearch(
   act(() => {
     (input.props.onChangeText as (value: string) => void)(text);
   });
+}
+
+// Every string a mocked `Text` node rendered, one per line: the terminal
+// states are asserted on their copy, not on a key name.
+function renderedText(renderer: RenderWithProvidersResult['renderer']) {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Text')
+    .map(node => (typeof node.props.children === 'string' ? node.props.children : ''))
+    .join('\n');
 }
 
 function findRetryButton(renderer: Awaited<ReturnType<typeof mountNavigator>>['renderer']) {
@@ -216,10 +267,10 @@ describe('PrDiffFileNavigator later-page retry (finding 1)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -273,11 +324,57 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
+  });
+
+  it('keeps the search input mounted while the list becomes empty and returns', async () => {
+    const { renderer } = await mountNavigator();
+    const input = findSearchInput(renderer);
+    typeSearch(renderer, 'missing');
+    expect(findSearchInput(renderer)).toBe(input);
+    const centered = renderer.root.find(node => String(node.type) === 'CenteredState');
+    expect(centered.findByProps({ children: 'No files match "missing"' })).toBeDefined();
+    const header = renderer.root.findByProps({ collapsable: false });
+    expect(header.find(node => isSearchInput(node))).toBe(input);
+    expect(header.parent).toBe(centered.parent);
+    typeSearch(renderer, 'src');
+    expect(findSearchInput(renderer)).toBe(input);
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+  });
+
+  it.each(['permission', 'not-found', 'retryable', 'reconnect'] as const)(
+    'centers the %s body outside the list',
+    async kind => {
+      listQueryResult.files = [];
+      listQueryResult.firstPageErrorState = { kind };
+      const { renderer } = await mountNavigator();
+      expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
+      expect(flashListProps.current).toBeNull();
+      expect(findSearchInput(renderer)).toBeDefined();
+      const retries = renderer.root.findAllByProps({ accessibilityLabel: 'Retry loading files' });
+      if (kind === 'retryable' || kind === 'reconnect') {
+        expect(retries).toHaveLength(1);
+        const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading files' });
+        act(() => {
+          (retry.props.onPress as () => void)();
+        });
+        expect(listQueryResult.query.refetch).toHaveBeenCalledOnce();
+      } else {
+        expect(retries).toHaveLength(0);
+      }
+    }
+  );
+
+  it('renders the empty state without mounting a list', async () => {
+    listQueryResult.files = [];
+    const { renderer } = await mountNavigator();
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.placement).toBeUndefined();
+    expect(flashListProps.current).toBeNull();
   });
 
   it('does not re-render the memoized row on a search keystroke', async () => {
@@ -315,10 +412,10 @@ describe('PrDiffFileNavigator onEndReached gating (finding 3)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -365,10 +462,10 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -386,10 +483,10 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
   it('shows the load-all retry when fetch-to-completion has an error', async () => {
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'failed', failure: { kind: 'load-all-failed', at: 1 } },
       loadedFiles: 1,
       totalFiles: null,
-      error: new Error('page failed'),
+      failure: { kind: 'load-all-failed', at: 1 },
     };
     const { renderer } = await mountNavigator();
 
@@ -421,10 +518,10 @@ describe('PrDiffFileNavigator stale row callbacks (finding 5)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -451,5 +548,311 @@ describe('PrDiffFileNavigator stale row callbacks (finding 5)', () => {
 
     expect(toggleB).toHaveBeenCalledTimes(1);
     expect(toggleA).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrDiffFileNavigator list bottom inset (plan §6)', () => {
+  beforeEach(() => {
+    fetchNextPageMock.mockReset();
+    fetchAllRunMock.mockReset();
+    rowRenders.length = 0;
+    flashListProps.current = null;
+    platformState.OS = 'ios';
+    insetsState.bottom = 0;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      feedback: { status: 'idle' },
+      loadedFiles: 0,
+      totalFiles: null,
+      failure: null,
+    };
+  });
+
+  function listContentStyle(): Record<string, unknown> | null {
+    return (
+      (flashListProps.current?.contentContainerStyle as Record<string, unknown> | null) ?? null
+    );
+  }
+
+  it('keeps the 32-point base padding on iOS regardless of the inset', async () => {
+    platformState.OS = 'ios';
+    insetsState.bottom = 34;
+    await mountNavigator();
+
+    expect(listContentStyle()).toEqual({ paddingBottom: 32, paddingTop: 8 });
+  });
+
+  it('keeps the 32-point base padding on Android at a zero inset', async () => {
+    platformState.OS = 'android';
+    insetsState.bottom = 0;
+    await mountNavigator();
+
+    expect(listContentStyle()).toEqual({ paddingBottom: 32, paddingTop: 8 });
+  });
+
+  it('adds the Android system inset to the list bottom padding', async () => {
+    platformState.OS = 'android';
+    insetsState.bottom = 34;
+    await mountNavigator();
+
+    expect(listContentStyle()).toEqual({ paddingBottom: 66, paddingTop: 8 });
+  });
+});
+
+// s6 (identity rule 17): the sheet toggling a file here and the diff list
+// behind it share the viewed store, so both must key it by the LIVE provider
+// ref. A bare triple would silently collide across providers and GitLab
+// instances; the store only folds the collision-free key when it receives
+// the ref.
+describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+
+  beforeEach(() => {
+    viewedFilesCalls.length = 0;
+    scrollRequests.length = 0;
+    rowRenders.length = 0;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      feedback: { status: 'idle' },
+      loadedFiles: 0,
+      totalFiles: null,
+      failure: null,
+    };
+  });
+
+  it('keys the viewed set by the provider ref under the provider scope', async () => {
+    await renderWithProviders(
+      <ProviderPrScopeProvider value={{ ref: GITLAB_REF, organizationId: null }}>
+        <PrDiffFileNavigator {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+
+    expect(viewedFilesCalls[0]).toEqual([GITLAB_REF, 'sha']);
+  });
+
+  it('falls back to the GitHub ref triple on the GitHub route', async () => {
+    await renderWithProviders(<PrDiffFileNavigator {...BASE_PROPS} />);
+
+    expect(viewedFilesCalls[0]).toEqual([
+      { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 7 },
+      'sha',
+    ]);
+  });
+
+  // The scroll request carries the same live ref the viewed set uses, so the
+  // bridge resolves its provider-scoped key (rule 17) from the identity the
+  // call site hands it.
+  it('carries the provider ref on the scroll request under the provider scope', async () => {
+    await renderWithProviders(
+      <ProviderPrScopeProvider value={{ ref: GITLAB_REF, organizationId: null }}>
+        <PrDiffFileNavigator {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+
+    const row = rowRenders.find(entry => entry.path === 'src/a.ts');
+    if (!row) {
+      throw new Error('navigator row for src/a.ts did not render');
+    }
+    act(() => {
+      row.onSelect();
+    });
+
+    expect(scrollRequests).toEqual([
+      {
+        owner: 'octocat',
+        repo: 'hello-world',
+        number: 7,
+        ref: GITLAB_REF,
+        path: 'src/a.ts',
+      },
+    ]);
+  });
+});
+
+// The terminal states speak the scope's provider: the navigator reuses the
+// same `usePrDiffStateCopy` selector the Files tab reads, so a GitLab merge
+// request keeps its own noun and only GitHub can blame a missing Kilo GitHub
+// App (Bitbucket Cloud has no such App).
+describe('PrDiffFileNavigator provider wording', () => {
+  const GITHUB_APP_CLAUSE = "the Kilo GitHub App isn't installed on it";
+  const NEUTRAL_DESCRIPTION =
+    'The connection may have failed, or the item may be deleted or inaccessible.';
+
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+  const BITBUCKET_REF: ProviderPrRef = {
+    platform: 'bitbucket',
+    workspace: 'acme',
+    repoSlug: 'widgets',
+    prId: 42,
+  };
+  const GITHUB_REF: ProviderPrRef = {
+    platform: 'github',
+    owner: 'octocat',
+    repo: 'hello-world',
+    number: 7,
+  };
+
+  beforeEach(() => {
+    fetchNextPageMock.mockReset();
+    fetchAllRunMock.mockReset();
+    rowRenders.length = 0;
+    flashListProps.current = null;
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      feedback: { status: 'idle' },
+      loadedFiles: 0,
+      totalFiles: null,
+      failure: null,
+    };
+  });
+
+  function setFirstPageState(kind: 'not-found' | 'permission') {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [],
+      firstPageErrorState: { kind },
+      laterPageError: false,
+    };
+  }
+
+  async function mountInScope(ref: ProviderPrRef) {
+    const { renderer } = await renderWithProviders(
+      <ProviderPrScopeProvider value={{ ref, organizationId: null }}>
+        <PrDiffFileNavigator {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+    return renderer;
+  }
+
+  it('says "merge request" and drops the GitHub App clause for GitLab', async () => {
+    setFirstPageState('not-found');
+
+    const text = renderedText(await mountInScope(GITLAB_REF));
+
+    expect(text).toContain('Merge request unavailable');
+    expect(text).toContain(NEUTRAL_DESCRIPTION);
+    expect(text).not.toContain(GITHUB_APP_CLAUSE);
+  });
+
+  it('keeps the pull-request noun but drops the GitHub App clause for Bitbucket', async () => {
+    setFirstPageState('not-found');
+
+    const text = renderedText(await mountInScope(BITBUCKET_REF));
+
+    expect(text).toContain('Pull request unavailable');
+    expect(text).toContain(NEUTRAL_DESCRIPTION);
+    expect(text).not.toContain(GITHUB_APP_CLAUSE);
+  });
+
+  it('keeps the GitHub App clause for GitHub', async () => {
+    setFirstPageState('not-found');
+
+    const text = renderedText(await mountInScope(GITHUB_REF));
+
+    expect(text).toContain('Pull request unavailable');
+    expect(text).toContain(GITHUB_APP_CLAUSE);
+  });
+
+  it('names a merge request in the GitLab permission copy', async () => {
+    setFirstPageState('permission');
+
+    const text = renderedText(await mountInScope(GITLAB_REF));
+
+    expect(text).toContain("You don't have permission to view this merge request.");
+    expect(text).not.toContain('this pull request');
+  });
+
+  it('keeps the pull-request permission copy for GitHub', async () => {
+    setFirstPageState('permission');
+
+    const text = renderedText(await mountInScope(GITHUB_REF));
+
+    expect(text).toContain("You don't have permission to view this pull request.");
+  });
+});
+
+// The listed-file progress line inflects for the language it renders in, so the
+// caller must hand i18next the count beside the figure the copy interpolates.
+describe('PrDiffFileNavigator listed-file progress', () => {
+  beforeEach(async () => {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => true, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      feedback: { status: 'idle' },
+      loadedFiles: 0,
+      totalFiles: null,
+      failure: null,
+    };
+    await i18n.changeLanguage('fr');
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('agrees the French participle with the one listed file', async () => {
+    const { renderer } = await renderWithProviders(
+      createElement(PrDiffFileNavigator, { ...BASE_PROPS, changedFiles: 2 })
+    );
+
+    // Truncated: the copy names the listed files instead of the whole set.
+    expect(renderedText(renderer)).toContain('1 sur 1 consulté parmi les fichiers affichés');
   });
 });

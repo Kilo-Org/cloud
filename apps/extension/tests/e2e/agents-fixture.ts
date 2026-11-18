@@ -1,9 +1,6 @@
 /* eslint-disable import/no-nodejs-modules, max-lines */
 import type { BrowserContext, Page } from '@playwright/test';
-
-// ---------------------------------------------------------------------------
-// Default fixture data
-// ---------------------------------------------------------------------------
+import type { inferRouterOutputs, RootRouter } from '@kilocode/trpc';
 
 const DEFAULT_ORG_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -38,10 +35,6 @@ export const DEFAULT_HISTORY_SESSION_2: HistorySessionSeed = {
   updatedAt: new Date(Date.now() - 86_400_000).toISOString(),
 };
 
-// ---------------------------------------------------------------------------
-// Seed types
-// ---------------------------------------------------------------------------
-
 export interface CloudAgentSessionSeed {
   cloudAgentSessionId: string;
   gitBranch: string;
@@ -67,16 +60,19 @@ export interface HistorySessionSeed {
   updatedAt: string;
 }
 
-export interface ConnectedInstanceSeed {
-  connectionId: string;
-  name: string;
-  projectName: string;
-}
+type ConnectedInstance =
+  inferRouterOutputs<RootRouter>['activeSessions']['listInstances']['instances'][number];
 
-export const DEFAULT_INSTANCE: ConnectedInstanceSeed = {
+export type ConnectedInstanceSeed = Omit<ConnectedInstance, 'kind' | 'startedAt' | 'gitBranch'> &
+  Partial<Pick<ConnectedInstance, 'kind' | 'startedAt' | 'gitBranch'>>;
+
+export const DEFAULT_INSTANCE: ConnectedInstance = {
   connectionId: 'cli-connection-42',
+  gitBranch: null,
+  kind: 'cli',
   name: 'dev-laptop',
   projectName: 'checkout-service',
+  startedAt: null,
 };
 
 export const SPAWNED_SESSION_ID = 'ses_spawnedcli0000000000000001';
@@ -124,10 +120,6 @@ export interface AgentsFixtureResult {
   ingestClientMessages: unknown[];
 }
 
-// ---------------------------------------------------------------------------
-// Type guards
-// ---------------------------------------------------------------------------
-
 const isCloudAgentSessionSeed = (
   session: CloudAgentSessionSeed | RemoteSessionSeed
 ): session is CloudAgentSessionSeed => 'cloudAgentSessionId' in session;
@@ -136,10 +128,6 @@ const isRecordObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const hasStringOptional = (record: Record<string, unknown>, key: string): string | undefined =>
   typeof record[key] === 'string' ? record[key] : undefined;
-
-// ---------------------------------------------------------------------------
-// URL helpers
-// ---------------------------------------------------------------------------
 
 const proceduresFromUrl = (url: string): string | null => {
   try {
@@ -186,10 +174,6 @@ const unwrapTrpcBatchInputs = (raw: unknown, count: number): unknown[] => {
   return [raw];
 };
 
-// ---------------------------------------------------------------------------
-// Mock builders
-// ---------------------------------------------------------------------------
-
 const activeSessionFromCloudAgent = (session: CloudAgentSessionSeed) => ({
   connectionId: 'cloud-agent',
   gitBranch: session.gitBranch,
@@ -213,10 +197,6 @@ interface TrpcResultItem {
   result?: { data: unknown };
 }
 
-// ---------------------------------------------------------------------------
-// JSON parse helper for WebSocket messages
-// ---------------------------------------------------------------------------
-
 const parseJsonMessage = (message: unknown): unknown => {
   const text = typeof message === 'string' ? message : String(message);
   try {
@@ -225,10 +205,6 @@ const parseJsonMessage = (message: unknown): unknown => {
     return message;
   }
 };
-
-// ---------------------------------------------------------------------------
-// Main mock setup
-// ---------------------------------------------------------------------------
 
 export const mockAgentsApi = async (
   context: BrowserContext,
@@ -250,12 +226,10 @@ export const mockAgentsApi = async (
   /** Set when a `create_session` command spawns a session on a CLI instance. */
   let spawnedKiloSessionId: string | null = null;
 
-  // ---- /api/user ----
   await context.route('https://app.kilo.ai/api/user', route =>
     route.fulfill({ json: { google_user_email: 'user@kilo.ai' }, status: 200 })
   );
 
-  // ---- /api/organizations ----
   await context.route('https://app.kilo.ai/api/organizations', route =>
     route.fulfill({
       json: { organizations: [{ id: DEFAULT_ORG_ID, name: 'Test Org' }] },
@@ -263,7 +237,6 @@ export const mockAgentsApi = async (
     })
   );
 
-  // ---- /api/gateway/models ----
   await context.route('https://app.kilo.ai/api/gateway/models', route =>
     route.fulfill({
       json: {
@@ -279,7 +252,6 @@ export const mockAgentsApi = async (
     })
   );
 
-  // ---- /api/cloud-agent-next/sessions/stream-ticket ----
   await context.route('https://app.kilo.ai/api/cloud-agent-next/sessions/stream-ticket', route =>
     route.fulfill({
       json: { expiresAt: Math.floor(Date.now() / 1000) + 3600, ticket: 'mock-stream-ticket' },
@@ -287,7 +259,6 @@ export const mockAgentsApi = async (
     })
   );
 
-  // ---- tRPC batch dispatcher ----
   const dispatchBatchProcedures = (procList: string[], inputs: unknown[]): TrpcResultItem[] =>
     procList.map((proc, index) => {
       const input = inputs[index];
@@ -321,7 +292,14 @@ export const mockAgentsApi = async (
       }
 
       if (proc === 'activeSessions.listInstances') {
-        return { result: { data: { instances: options.instances ?? [] } } };
+        // eslint-disable-next-line oxc/no-map-spread -- Keep caller-owned seeds immutable and preserve every router field.
+        const instances = (options.instances ?? []).map((instance): ConnectedInstance => ({
+          ...instance,
+          gitBranch: instance.gitBranch ?? null,
+          kind: instance.kind ?? 'cli',
+          startedAt: instance.startedAt ?? null,
+        }));
+        return { result: { data: { instances } } };
       }
 
       if (proc === 'cliSessionsV2.list') {
@@ -548,7 +526,6 @@ export const mockAgentsApi = async (
       return { result: { data: {} } };
     });
 
-  // ---- tRPC route ----
   await context.route(
     url => {
       try {
@@ -664,7 +641,6 @@ export const mockAgentsApi = async (
     }
   );
 
-  // ---- WebSocket: cloud-agent-next ----
   await context.routeWebSocket('wss://cloud-agent-next.kilosessions.ai/*', ws => {
     ws.onMessage(message => {
       const parsed = parseJsonMessage(message);
@@ -677,7 +653,6 @@ export const mockAgentsApi = async (
     }
   });
 
-  // ---- WebSocket: session ingest ----
   // Glob with a wildcard — the client appends ?token=…&connectionId=… and a
   // Bare-string pattern silently never matches (auth then fails).
   await context.routeWebSocket('wss://ingest.kilosessions.ai/api/user/web**', ws => {
@@ -724,10 +699,6 @@ export const mockAgentsApi = async (
   return { calledProcedures, cloudAgentClientMessages, ingestClientMessages };
 };
 
-// ---------------------------------------------------------------------------
-// Cloud Agent WebSocket event builders
-// ---------------------------------------------------------------------------
-
 let _eventCounter = 0;
 
 /**
@@ -748,7 +719,7 @@ const buildDefaultCloudAgentStream = (): Record<string, unknown>[] => {
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-1',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });
@@ -924,7 +895,7 @@ export const buildRunningCloudAgentStream = (
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-1',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });
@@ -934,6 +905,7 @@ export const buildRunningCloudAgentStream = (
 
   return [
     kilocode('session.created', { info: { id: sessionId } }),
+    // Historical status is ignored during replay; the connected snapshot is authoritative.
     kilocode('session.status', { sessionID: sessionId, status: { type: 'busy' } }),
     kilocode('message.updated', {
       info: {
@@ -954,6 +926,7 @@ export const buildRunningCloudAgentStream = (
         type: 'text',
       },
     }),
+    { ...ev('connected', { sessionStatus: { type: 'busy' } }), eventId: 0, executionId: null },
   ];
 };
 
@@ -965,7 +938,7 @@ export const buildQuestionCloudAgentStream = (
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-q',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });
@@ -995,6 +968,7 @@ export const buildQuestionCloudAgentStream = (
         type: 'text',
       },
     }),
+    { ...ev('connected', {}), eventId: 0, executionId: null },
     ev('question.asked', {
       callID: 'call-q-1',
       id: 'q-1',
@@ -1021,7 +995,7 @@ export const buildPermissionCloudAgentStream = (
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-p',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });
@@ -1051,6 +1025,7 @@ export const buildPermissionCloudAgentStream = (
         type: 'text',
       },
     }),
+    { ...ev('connected', {}), eventId: 0, executionId: null },
     ev('permission.asked', {
       always: [],
       callID: 'call-p-1',
@@ -1062,10 +1037,6 @@ export const buildPermissionCloudAgentStream = (
     ev('session.status', { sessionID: sessionId, status: { type: 'permission' } }),
   ];
 };
-
-// ---------------------------------------------------------------------------
-// Live-test helpers
-// ---------------------------------------------------------------------------
 
 export const navigateToAgentsMode = async (sidePanel: Page): Promise<void> => {
   const agentsTab = sidePanel.getByRole('tab', { name: 'Agents' });

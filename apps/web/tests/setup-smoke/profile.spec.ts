@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { randomUUID } from 'node:crypto';
 
 test.describe('local setup smoke', () => {
@@ -13,21 +13,6 @@ test.describe('local setup smoke', () => {
     const signInUrl = `/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}&callbackPath=${encodeURIComponent('/profile')}`;
     const postgresUrl = process.env.POSTGRES_URL;
     if (!postgresUrl) throw new Error('POSTGRES_URL must be set for setup smoke tests');
-
-    await page.route('**/api/auto-routing/mode', async route => {
-      const request = route.request();
-      await route.fulfill({
-        status: request.method() === 'GET' ? 200 : 405,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ownerType: 'user',
-          ownerId: `setup-smoke-${uniqueId}`,
-          mode: 'cost_per_accuracy',
-          configuredMode: null,
-          defaultMode: 'cost_per_accuracy',
-        }),
-      });
-    });
 
     const { db, pool } = createDrizzleClient({
       connectionString: postgresUrl,
@@ -62,6 +47,6 @@ test.describe('local setup smoke', () => {
     await expect(profileCard.getByRole('button', { name: 'Edit profile' })).toBeVisible();
     await expect(profileCard.getByText(testEmail, { exact: true })).toBeVisible();
 
-    await expect(page.getByText('Auto routing', { exact: true })).toBeVisible();
+    await expect(page.getByText('Platform routing mode', { exact: true })).toBeVisible();
   });
 });

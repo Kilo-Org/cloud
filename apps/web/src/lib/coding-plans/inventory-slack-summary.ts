@@ -1,12 +1,13 @@
 import 'server-only';
 
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getCodingPlanAvailabilityIntentCounts, getKeyInventoryCounts } from '@/lib/coding-plans';
 import { getCodingPlanCatalog } from '@/lib/coding-plans/pricing';
 import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
+import { escapeSlackLabel, escapeSlackText } from '@/lib/slack/slack-escape';
 
 export type CodingPlanInventoryCount = {
   providerId: string;
@@ -50,14 +51,6 @@ const KNOWN_STATUSES = new Set([
 
 function statusCount(summary: InventoryPlanSummary, status: string): number {
   return summary.statusCounts[status] ?? 0;
-}
-
-function escapeSlackText(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeSlackLabel(value: string): string {
-  return escapeSlackText(value).replaceAll('`', "'").replaceAll('\n', ' ');
 }
 
 function formatCount(count: number): string {

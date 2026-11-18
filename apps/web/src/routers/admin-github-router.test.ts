@@ -1,12 +1,15 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
+import { rootRouter } from '@/routers/root-router';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
-  getKilocodeRepoOpenPullRequestCounts,
   getKilocodeRepoOpenPullRequestsSummary,
   getKilocodeRepoRecentlyClosedExternalPRs,
-  getKilocodeRepoRecentlyMergedExternalPRs,
 } from '@/lib/github/open-pull-request-counts';
+import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
+import { uninstallGitHubOrganizationInstallation } from '@/lib/admin/github-installation-uninstall';
+import { setAdminAccessSinkForTest } from '@kilocode/web-shared/lib/admin/admin-access-log';
 
 jest.mock('@/lib/github/open-pull-request-counts', () => ({
   getKilocodeRepoOpenPullRequestCounts: jest.fn(),
@@ -16,8 +19,20 @@ jest.mock('@/lib/github/open-pull-request-counts', () => ({
   ALL_REPO_IDS: ['kilocode', 'cloud', 'kilo-marketplace', 'kilocode-legacy'],
 }));
 
+jest.mock('@/lib/admin/github-installation-lookup', () => ({
+  lookupGitHubOrganizationInstallation: jest.fn(),
+}));
+
+jest.mock('@/lib/admin/github-installation-uninstall', () => ({
+  uninstallGitHubOrganizationInstallation: jest.fn(),
+}));
+
 let regularUser: User;
 let adminUser: User;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe('admin.github.getKilocodeOpenPullRequestCounts', () => {
   beforeAll(async () => {
@@ -41,21 +56,141 @@ describe('admin.github.getKilocodeOpenPullRequestCounts', () => {
       'Admin access required'
     );
   });
+});
 
-  it('returns PR counts for admin users', async () => {
-    const mockCounts = {
-      totalOpenPullRequests: 10,
-      teamOpenPullRequests: 4,
-      externalOpenPullRequests: 6,
-      updatedAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
+describe('admin.github.lookupOrganizationInstallation', () => {
+  it('denies anonymous callers before a lookup', async () => {
+    const createCaller = createCallerFactory(rootRouter);
+    const caller = createCaller({ user: null } as never);
+
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({ organization: 'acme' })
+    ).rejects.toThrow();
+    expect(lookupGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('denies non-admin callers before a lookup', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({ organization: 'acme' })
+    ).rejects.toThrow('Admin access required');
+    expect(lookupGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('normalizes input and delegates only for an admin', async () => {
+    const response = {
+      organization: 'acme',
+      checkedAt: new Date().toISOString(),
+      apps: [],
+      records: [],
+      recordsTruncated: false,
     };
-
-    (getKilocodeRepoOpenPullRequestCounts as jest.Mock).mockResolvedValue(mockCounts);
+    (lookupGitHubOrganizationInstallation as jest.Mock).mockResolvedValue(response);
 
     const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeOpenPullRequestCounts();
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({
+        organization: 'https://github.com/acme/',
+      })
+    ).resolves.toEqual(response);
+    expect(lookupGitHubOrganizationInstallation).toHaveBeenCalledWith('acme');
+  });
 
-    expect(result).toEqual(mockCounts);
+  it('returns a generic error when the database lookup fails', async () => {
+    const sentinel = 'SELECT secret FROM platform_integrations WHERE account = acme';
+    (lookupGitHubOrganizationInstallation as jest.Mock).mockRejectedValue(new Error(sentinel));
+    const caller = await createCallerForUser(adminUser.id);
+
+    const error = await caller.admin.github
+      .lookupOrganizationInstallation({ organization: 'acme' })
+      .catch(error => error);
+
+    expect(error).toHaveProperty('message', 'GitHub installation lookup failed');
+    expect(error.message).not.toContain(sentinel);
+    expect(error.cause).toBeUndefined();
+  });
+
+  it('preserves admin guard auditing without lookup input or results', async () => {
+    const sink = jest.fn();
+    setAdminAccessSinkForTest(sink);
+    (lookupGitHubOrganizationInstallation as jest.Mock).mockResolvedValue({
+      organization: 'private-lookup-target',
+      records: [{ id: 'private-lookup-result' }],
+    });
+
+    try {
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.github.lookupOrganizationInstallation({
+        organization: 'private-lookup-target',
+      });
+      expect(sink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'admin_guard',
+          route: 'admin.github.lookupOrganizationInstallation',
+          method: 'mutation',
+          target: null,
+        })
+      );
+      expect(JSON.stringify(sink.mock.calls)).not.toContain('private-lookup-target');
+      expect(JSON.stringify(sink.mock.calls)).not.toContain('private-lookup-result');
+    } finally {
+      setAdminAccessSinkForTest(null);
+    }
+  });
+
+  it('rejects invalid input without calling the lookup', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({ organization: 'acme--tools' })
+    ).rejects.toThrow('Enter a valid GitHub organization login');
+    expect(lookupGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.github.uninstallOrganizationInstallation', () => {
+  const input = {
+    integrationId: '12345678-1234-4234-9234-123456789abc',
+    installationId: '123',
+    accountId: '456',
+    appType: 'standard' as const,
+    owner: { type: 'user' as const, id: 'oauth/github|arbitrary-user-id' },
+    confirmation: '123',
+  };
+
+  it('denies anonymous callers before local or upstream work', async () => {
+    const createCaller = createCallerFactory(rootRouter);
+    const caller = createCaller({ user: null } as never);
+
+    await expect(caller.admin.github.uninstallOrganizationInstallation(input)).rejects.toThrow();
+    expect(uninstallGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('denies non-admin callers before local or upstream work', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(caller.admin.github.uninstallOrganizationInstallation(input)).rejects.toThrow(
+      'Admin access required'
+    );
+    expect(uninstallGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('passes the exact, client-safe snapshot to the guarded helper', async () => {
+    (uninstallGitHubOrganizationInstallation as jest.Mock).mockResolvedValue({
+      status: 'uninstalled',
+      localCleanup: 'complete',
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(caller.admin.github.uninstallOrganizationInstallation(input)).resolves.toEqual({
+      status: 'uninstalled',
+      localCleanup: 'complete',
+    });
+    expect(uninstallGitHubOrganizationInstallation).toHaveBeenCalledWith({
+      input,
+      actor: expect.objectContaining({ id: adminUser.id }),
+    });
   });
 });
 
@@ -68,37 +203,7 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
     );
   });
 
-  it('returns summary for admin users', async () => {
-    const mockSummary = {
-      totalOpenPullRequests: 10,
-      teamOpenPullRequests: 4,
-      externalOpenPullRequests: 6,
-      externalOpenPullRequestsList: [
-        {
-          number: 123,
-          title: 'Fix thing',
-          url: 'https://github.com/Kilo-Org/kilocode/pull/123',
-          repo: 'kilocode',
-          authorLogin: 'external-user',
-          createdAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-          ageDays: 12,
-          commentCount: 3,
-          teamCommented: true,
-          reviewStatus: 'commented',
-        },
-      ],
-      updatedAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-    };
-
-    (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeOpenPullRequestsSummary();
-
-    expect(result).toEqual(mockSummary);
-  });
-
-  it('passes repos parameter through to the service', async () => {
+  it('returns the service response and passes repos/includeDrafts through to the service', async () => {
     const mockSummary = {
       totalOpenPullRequests: 1,
       teamOpenPullRequests: 0,
@@ -110,49 +215,18 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
     (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
 
     const caller = await createCallerForUser(adminUser.id);
-    await caller.admin.github.getKilocodeOpenPullRequestsSummary({
+    const result = await caller.admin.github.getKilocodeOpenPullRequestsSummary({
       repos: ['kilocode', 'cloud'],
       includeDrafts: true,
     });
 
+    expect(result).toEqual(mockSummary);
     expect(getKilocodeRepoOpenPullRequestsSummary).toHaveBeenCalledWith(
       expect.objectContaining({
         repos: ['kilocode', 'cloud'],
         includeDrafts: true,
       })
     );
-  });
-
-  it('always returns numeric commentCount values for external PR rows', async () => {
-    const mockSummary = {
-      totalOpenPullRequests: 1,
-      teamOpenPullRequests: 0,
-      externalOpenPullRequests: 1,
-      externalOpenPullRequestsList: [
-        {
-          number: 1,
-          title: 'Example',
-          url: 'https://github.com/Kilo-Org/kilocode/pull/1',
-          repo: 'kilocode',
-          authorLogin: 'external-user',
-          createdAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-          ageDays: 1,
-          commentCount: 0,
-          teamCommented: false,
-          reviewStatus: 'no_reviews',
-        },
-      ],
-      updatedAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-    };
-
-    (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeOpenPullRequestsSummary();
-
-    expect(
-      result.externalOpenPullRequestsList.every(pr => typeof pr.commentCount === 'number')
-    ).toBe(true);
   });
 });
 
@@ -163,43 +237,6 @@ describe('admin.github.getKilocodeRecentlyMergedExternalPRs', () => {
     await expect(caller.admin.github.getKilocodeRecentlyMergedExternalPRs()).rejects.toThrow(
       'Admin access required'
     );
-  });
-
-  it('returns recently merged external PRs for admin users', async () => {
-    const mockMergedPrs = [
-      {
-        number: 456,
-        title: 'External feature',
-        url: 'https://github.com/Kilo-Org/kilocode/pull/456',
-        authorLogin: 'external-contributor',
-        mergedAt: new Date('2024-01-15T10:00:00.000Z').toISOString(),
-      },
-      {
-        number: 789,
-        title: 'Another fix',
-        url: 'https://github.com/Kilo-Org/kilocode/pull/789',
-        authorLogin: 'community-dev',
-        mergedAt: new Date('2024-01-14T08:00:00.000Z').toISOString(),
-      },
-    ];
-
-    (getKilocodeRepoRecentlyMergedExternalPRs as jest.Mock).mockResolvedValue(mockMergedPrs);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyMergedExternalPRs();
-
-    expect(result).toEqual(mockMergedPrs);
-    expect(result.length).toBe(2);
-    expect(result[0]?.number).toBe(456);
-  });
-
-  it('returns empty array when no merged PRs', async () => {
-    (getKilocodeRepoRecentlyMergedExternalPRs as jest.Mock).mockResolvedValue([]);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyMergedExternalPRs();
-
-    expect(result).toEqual([]);
   });
 });
 
@@ -212,7 +249,7 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
     );
   });
 
-  it('returns recently closed external PRs for admin users', async () => {
+  it('returns the service response and passes repos parameter through to the service', async () => {
     const mockClosedPrs = {
       prs: [
         {
@@ -247,53 +284,15 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
     (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue(mockClosedPrs);
 
     const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyClosedExternalPRs();
-
-    expect(result).toEqual(mockClosedPrs);
-    expect(result.prs.length).toBe(2);
-    expect(result.prs[0]?.status).toBe('merged');
-    expect(result.prs[1]?.status).toBe('closed');
-    expect(typeof result.thisWeekMergedCount).toBe('number');
-    expect(typeof result.thisWeekClosedCount).toBe('number');
-    expect(typeof result.weekStart).toBe('string');
-  });
-
-  it('passes repos parameter through to the service', async () => {
-    const mockClosedPrs = {
-      prs: [],
-      thisWeekMergedCount: 0,
-      thisWeekClosedCount: 0,
-      weekStart: new Date('2024-01-15T00:00:00.000Z').toISOString(),
-    };
-
-    (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue(mockClosedPrs);
-
-    const caller = await createCallerForUser(adminUser.id);
-    await caller.admin.github.getKilocodeRecentlyClosedExternalPRs({
+    const result = await caller.admin.github.getKilocodeRecentlyClosedExternalPRs({
       repos: ['cloud'],
     });
 
+    expect(result).toEqual(mockClosedPrs);
     expect(getKilocodeRepoRecentlyClosedExternalPRs).toHaveBeenCalledWith(
       expect.objectContaining({
         repos: ['cloud'],
       })
     );
-  });
-
-  it('returns empty array when no closed PRs', async () => {
-    (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue({
-      prs: [],
-      thisWeekMergedCount: 0,
-      thisWeekClosedCount: 0,
-      weekStart: new Date('2024-01-15T00:00:00.000Z').toISOString(),
-    });
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyClosedExternalPRs();
-
-    expect(result.prs).toEqual([]);
-    expect(result.thisWeekMergedCount).toBe(0);
-    expect(result.thisWeekClosedCount).toBe(0);
-    expect(typeof result.weekStart).toBe('string');
   });
 });

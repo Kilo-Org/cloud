@@ -1,18 +1,55 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships, type User } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, like } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import crypto from 'crypto';
+import { isUniqueViolation } from '@/lib/db-errors';
 import type { BotType } from './types';
-import { generateBotUserId, generateBotUserEmail, getBotDisplayName } from './types';
+import {
+  generateBotUserId,
+  generateBotUserEmail,
+  getBotDisplayName,
+  INTERNAL_BOT_SLUG_PATTERN,
+  INTERNAL_BOT_USER_ID_PREFIX,
+  internalBotUserEmail,
+  internalBotUserId,
+} from './types';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
-} from '@/lib/ai-gateway/providerHash';
+} from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+
+/**
+ * Read a bot user by id. The `is_bot` filter is part of the identity: a row
+ * that holds the generated id without being a bot is not the bot user.
+ */
+async function selectBotUserById(id: string): Promise<User | undefined> {
+  const [bot] = await db
+    .select()
+    .from(kilocode_users)
+    .where(and(eq(kilocode_users.id, id), eq(kilocode_users.is_bot, true)))
+    .limit(1);
+  return bot;
+}
+
+/**
+ * Read any user by id, without the `is_bot` filter. Only `ensureInternalBotUser`
+ * uses it: that path must see a non-bot row holding the internal bot id so it
+ * can raise `InternalBotUnusableError` instead of adopting it.
+ */
+async function selectUserById(id: string): Promise<User | undefined> {
+  const [user] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, id)).limit(1);
+  return user;
+}
+
+/** A bot is unusable while either blocked column is set. */
+function isBlockedBotUser(user: Pick<User, 'blocked_at' | 'blocked_reason'>): boolean {
+  return user.blocked_at !== null || user.blocked_reason !== null;
+}
 
 /**
  * Get the user ID of a bot for an organization
@@ -23,14 +60,7 @@ export async function getBotUserId(
   botType: BotType
 ): Promise<string | null> {
   const botId = generateBotUserId(organizationId, botType);
-
-  const [bot] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
-    .limit(1);
-
-  return bot?.id ?? null;
+  return (await selectBotUserById(botId))?.id ?? null;
 }
 
 export async function getUnblockedBotUserForOrg(
@@ -52,6 +82,8 @@ export async function getUnblockedBotUserForOrg(
       and(
         eq(kilocode_users.id, botId),
         eq(kilocode_users.is_bot, true),
+        // Mirrors isBlockedBotUser: the row is usable only while both blocked
+        // columns are null.
         isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
@@ -61,28 +93,21 @@ export async function getUnblockedBotUserForOrg(
   return bot?.user ?? null;
 }
 
+type BotUserIdentity = { id: string; email: string; displayName: string };
+
 /**
- * Create a bot user for an organization
- * Returns the created user
+ * Insert a bot user row. Shared by per-org product bots and internal bots so
+ * every bot gets the same pepper, safety identifiers and billing defaults.
  */
-async function createBotUser(organizationId: string, botType: BotType): Promise<User> {
-  const botId = generateBotUserId(organizationId, botType);
-  const botEmail = generateBotUserEmail(organizationId, botType);
-  const botName = getBotDisplayName(botType);
+async function insertBotUser({ id, email, displayName }: BotUserIdentity): Promise<User> {
+  logExceptInTest('[insertBotUser] Creating bot user', { botId: id });
 
-  logExceptInTest('[createBotUser] Creating bot user', {
-    botId,
-    organizationId,
-    botType,
-  });
-
-  // Create bot user with minimal required fields
   const [botUser] = await db
     .insert(kilocode_users)
     .values({
-      id: botId,
-      google_user_email: botEmail,
-      google_user_name: botName,
+      id,
+      google_user_email: email,
+      google_user_name: displayName,
       google_user_image_url:
         'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIyNCIgZmlsbD0iIzY2NjY2NiIvPjwvc3ZnPg==', // Gray circle placeholder
       stripe_customer_id: `bot_stripe_${crypto.randomBytes(8).toString('hex')}`,
@@ -90,18 +115,44 @@ async function createBotUser(organizationId: string, botType: BotType): Promise<
       api_token_pepper: crypto.randomBytes(32).toString('hex'), // For JWT signing
       is_admin: false,
       auto_top_up_enabled: false,
-      openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(botId),
-      openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(botId),
-      vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(botId),
+      openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(id),
+      openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(id),
+      vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(id),
     })
     .returning();
 
   if (!botUser) {
-    throw new Error(`Failed to create bot user ${botId}`);
+    throw new Error(`Failed to create bot user ${id}`);
   }
 
-  logExceptInTest('[createBotUser] Bot user created successfully', { botId });
+  logExceptInTest('[insertBotUser] Bot user created successfully', { botId: id });
   return botUser;
+}
+
+/**
+ * Read the bot user for `identity`, creating the row when it is absent. A
+ * concurrent create is recovered by re-reading the row the winner inserted.
+ * `select` is the caller's by-id read, so a caller that must not filter on
+ * `is_bot` keeps its unfiltered read.
+ */
+async function findOrCreateBotUser(
+  identity: BotUserIdentity,
+  select: (id: string) => Promise<User | undefined>
+): Promise<{ user: User; created: boolean }> {
+  const existing = await select(identity.id);
+  if (existing) {
+    return { user: existing, created: false };
+  }
+
+  try {
+    return { user: await insertBotUser(identity), created: true };
+  } catch (error) {
+    // A concurrent create won the insert; reuse its row.
+    if (!isUniqueViolation(error)) throw error;
+    const recovered = await select(identity.id);
+    if (!recovered) throw error;
+    return { user: recovered, created: false };
+  }
 }
 
 /**
@@ -109,7 +160,6 @@ async function createBotUser(organizationId: string, botType: BotType): Promise<
  * Adds membership if it doesn't exist
  */
 async function ensureBotIsOrgMember(botUserId: string, organizationId: string): Promise<void> {
-  // Check if membership already exists
   const [existing] = await db
     .select()
     .from(organization_memberships)
@@ -129,12 +179,17 @@ async function ensureBotIsOrgMember(botUserId: string, organizationId: string): 
     return;
   }
 
-  // Add bot as organization member
-  await db.insert(organization_memberships).values({
-    organization_id: organizationId,
-    kilo_user_id: botUserId,
-    role: 'member',
-  });
+  // Add bot as organization member; a concurrent insert of the same pair is a no-op.
+  await db
+    .insert(organization_memberships)
+    .values({
+      organization_id: organizationId,
+      kilo_user_id: botUserId,
+      role: 'member',
+    })
+    .onConflictDoNothing({
+      target: [organization_memberships.organization_id, organization_memberships.kilo_user_id],
+    });
 
   logExceptInTest('[ensureBotIsOrgMember] Added bot to organization', {
     botUserId,
@@ -149,31 +204,21 @@ async function ensureBotIsOrgMember(botUserId: string, organizationId: string): 
 export async function ensureBotUserForOrg(organizationId: string, botType: BotType): Promise<User> {
   try {
     const botId = generateBotUserId(organizationId, botType);
+    const { user: botUser } = await findOrCreateBotUser(
+      {
+        id: botId,
+        email: generateBotUserEmail(organizationId, botType),
+        displayName: getBotDisplayName(botType),
+      },
+      selectBotUserById
+    );
 
-    // Try to get existing bot user
-    const [existingBot] = await db
-      .select()
-      .from(kilocode_users)
-      .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
-      .limit(1);
-
-    let botUser: User;
-
-    if (existingBot) {
-      if (existingBot.blocked_at !== null || existingBot.blocked_reason !== null) {
-        throw new Error(`Cannot use blocked bot user ${botId}`);
-      }
-      logExceptInTest('[ensureBotUserForOrg] Using existing bot user', {
-        botId,
-        organizationId,
-      });
-      botUser = existingBot;
-    } else {
-      // Create new bot user
-      botUser = await createBotUser(organizationId, botType);
+    if (isBlockedBotUser(botUser)) {
+      throw new Error(`Cannot use blocked bot user ${botId}`);
     }
 
-    // Ensure bot is org member
+    logExceptInTest('[ensureBotUserForOrg] Bot user is ready', { botId, organizationId });
+
     await ensureBotIsOrgMember(botUser.id, organizationId);
 
     return botUser;
@@ -189,4 +234,67 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
     });
     throw error;
   }
+}
+
+/** The `bot-internal-<slug>` id is taken by a row that cannot be used as an internal bot. */
+export class InternalBotUnusableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InternalBotUnusableError';
+  }
+}
+
+/**
+ * Get or create an internal bot user (`bot-internal-<slug>`) and make it a
+ * `member` of the organization. Safe to call repeatedly and concurrently: an
+ * existing user or membership is reused. A blocked or non-bot row with the id
+ * is refused rather than re-adopted. Returns whether the user row was created.
+ */
+export async function ensureInternalBotUser(input: {
+  slug: string;
+  displayName: string;
+  organizationId: string;
+}): Promise<{ user: User; created: boolean }> {
+  if (!INTERNAL_BOT_SLUG_PATTERN.test(input.slug)) {
+    throw new Error('Invalid internal bot slug');
+  }
+  const id = internalBotUserId(input.slug);
+  const { user, created } = await findOrCreateBotUser(
+    { id, email: internalBotUserEmail(input.slug), displayName: input.displayName },
+    selectUserById
+  );
+
+  if (!user.is_bot) {
+    throw new InternalBotUnusableError(`User ${id} exists but is not a bot`);
+  }
+  if (isBlockedBotUser(user)) {
+    throw new InternalBotUnusableError(`Bot user ${id} is blocked`);
+  }
+  if (!user.api_token_pepper?.trim()) {
+    throw new InternalBotUnusableError(`Bot user ${id} has no API token pepper`);
+  }
+
+  await ensureBotIsOrgMember(user.id, input.organizationId);
+  return { user, created };
+}
+
+export async function listInternalBotUsers() {
+  return db
+    .select({
+      id: kilocode_users.id,
+      name: kilocode_users.google_user_name,
+      email: kilocode_users.google_user_email,
+      createdAt: kilocode_users.created_at,
+      blockedAt: kilocode_users.blocked_at,
+      blockedReason: kilocode_users.blocked_reason,
+      organizationId: organization_memberships.organization_id,
+      role: organization_memberships.role,
+    })
+    .from(kilocode_users)
+    .leftJoin(
+      organization_memberships,
+      eq(organization_memberships.kilo_user_id, kilocode_users.id)
+    )
+    .where(like(kilocode_users.id, `${INTERNAL_BOT_USER_ID_PREFIX}%`))
+    .orderBy(kilocode_users.id);
 }

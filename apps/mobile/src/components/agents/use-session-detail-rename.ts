@@ -1,12 +1,15 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 
 import {
   getSessionDetailRenameState,
   initialRenameState,
   renameStateReducer,
+  titleFromSessionUpdatedEvent,
+  useUserSessionTitlesRevision,
 } from './session-detail-rename-state';
 
 type SessionDetailRenameApi = {
@@ -48,8 +51,15 @@ export function useSessionDetailRename({
   fallbackTitle,
 }: Readonly<SessionDetailRenameInput>): SessionDetailRenameApi {
   const { renameSessionAsync } = useSessionMutations();
+  const connection = useUserWebConnection();
+  // `getSessionDetailRenameState` reads the durable record of the user's own
+  // titles, so repaint the header when that record hydrates after a cold start
+  // or a rename records a new title.
+  useUserSessionTitlesRevision();
   const [renameState, dispatch] = useReducer(renameStateReducer, initialRenameState());
+  const [liveTitle, setLiveTitle] = useState<string | undefined>(undefined);
   const lastSeenServerTitleRef = useRef<string | undefined>(serverTitle);
+  const effectiveServerTitle = liveTitle ?? serverTitle;
 
   // Drop the optimistic override when the route's session changes so a
   // previous screen's pending rename can't leak onto the next one. The
@@ -57,23 +67,36 @@ export function useSessionDetailRename({
   // remounts this hook with a fresh ref and fresh state — this effect
   // exists as a defensive reset for callers that reuse the instance.
   useEffect(() => {
+    setLiveTitle(undefined);
     dispatch({ type: 'sessionChanged' });
   }, [sessionId]);
 
+  useEffect(
+    () =>
+      connection.onSessionEvent('session.updated', payload => {
+        const next = titleFromSessionUpdatedEvent(sessionId, payload);
+        if (next !== undefined) {
+          setLiveTitle(next);
+        }
+      }),
+    [connection, sessionId]
+  );
+
   // Sync the optimistic override only when the authoritative server title
-  // actually changes (e.g. the parent refetches and pushes a new prop). A
-  // stable but unrelated prop (failure case: server title stays the same)
-  // is intentionally ignored — failure is handled explicitly in `submit`.
+  // actually changes (e.g. the parent refetches and pushes a new prop, or
+  // ingest emits session.updated). A stable but unrelated prop (failure
+  // case: server title stays the same) is intentionally ignored — failure
+  // is handled explicitly in `submit`.
   useEffect(() => {
-    if (serverTitle === undefined) {
+    if (effectiveServerTitle === undefined) {
       return;
     }
-    if (lastSeenServerTitleRef.current === serverTitle) {
+    if (lastSeenServerTitleRef.current === effectiveServerTitle) {
       return;
     }
-    lastSeenServerTitleRef.current = serverTitle;
+    lastSeenServerTitleRef.current = effectiveServerTitle;
     dispatch({ type: 'serverTitleChanged' });
-  }, [serverTitle]);
+  }, [effectiveServerTitle]);
 
   const openModal = useCallback(() => {
     dispatch({ type: 'openModal' });
@@ -92,9 +115,10 @@ export function useSessionDetailRename({
       // what the user actually saw, not a stale server title that may lag
       // behind after a prior successful rename.
       const previousTitle = getSessionDetailRenameState({
+        sessionId,
         fallbackTitle,
         isLoaded,
-        serverTitle,
+        serverTitle: effectiveServerTitle,
         renameState,
       }).title;
       dispatch({ type: 'submit', nextTitle: next });
@@ -113,13 +137,14 @@ export function useSessionDetailRename({
         throw error;
       }
     },
-    [fallbackTitle, isLoaded, renameSessionAsync, renameState, serverTitle, sessionId]
+    [effectiveServerTitle, fallbackTitle, isLoaded, renameSessionAsync, renameState, sessionId]
   );
 
   const state = getSessionDetailRenameState({
+    sessionId,
     fallbackTitle,
     isLoaded,
-    serverTitle,
+    serverTitle: effectiveServerTitle,
     renameState,
   });
 

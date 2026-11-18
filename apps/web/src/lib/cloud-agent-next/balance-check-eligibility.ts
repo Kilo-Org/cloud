@@ -1,17 +1,51 @@
 import 'server-only';
-import { type db } from '@/lib/drizzle';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { type db } from '@kilocode/web-shared/lib/drizzle';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
+  getEnabledByokProviders,
   getModelUserByokProviders,
   getOrganizationByokProviderIds,
   getUserByokProviderIds,
-} from '@/lib/ai-gateway/byok';
+  type ByokOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import {
+  getOpenAiChatGptStoredConnection,
+  openAiChatGptSharedServicesOwner,
+  type OpenAiChatGptOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { resolveClaudeBillingModel } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
+import { resolveClaudeBillingConnector } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/connector';
+import {
+  getGrantedClaudeBillingConnection,
+  type ClaudeBillingOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
+import {
+  resolveOrganizationMemberModelDecision,
+  type EffectiveOrganizationModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {
   isFree: boolean;
   hasUserByokAvailable: boolean;
+  /**
+   * Set when the model cannot bill until an organization owner reconnects the
+   * organization's Claude connection, because the account that linked it is
+   * gone. Routing refuses every request for the model in that state, so no
+   * balance and no other credential runs it; a caller that refuses on the
+   * balance reports this requirement instead.
+   */
+  reconnectRequired?: 'claude_billing';
 };
 
 /**
@@ -20,47 +54,199 @@ export type BalanceCheckModelEligibility = {
  *
  * Skips the check when either:
  * - the model is Kilo-funded (free for the user), or
- * - the model is not Kilo-exclusive AND the user has a BYOK provider
- *   configured that can serve it, so the session is billed against the
- *   user's own key rather than their balance.
- *
- * Kilo-exclusive models (e.g. `deepseek/deepseek-v4-pro:discounted`) are
- * always excluded from the BYOK bypass: they are Kilo-funded and platform
- * billed, so even when `getModelUserByokProviders` reports a provider that
- * can route the model, they must still go through the worker-side balance
- * check and cannot be legitimately served via a user's own BYOK key.
- *
- * The resulting predicate is a strict subset of the
- * `isFree || hasUserByokAvailable` predicate used by the NewSessionPanel
- * model picker to filter `hasLimitedAccess` users: this router additionally
- * forces Kilo-exclusive models through the balance check, so the picker
- * may offer a model as free while the router still requires a balance.
+ * - the user has a BYOK credential that serves it: a Vercel-routed inference
+ *   provider key, a gateway key, a direct BYOK key (bespoke or catalog mode),
+ *   a "Sign in with ChatGPT" connection, or a Claude billing link, so the
+ *   session is billed against the user's own key, plan, or Claude organization
+ *   rather than their balance.
  */
 export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   fromDb: typeof db;
   user: Pick<User, 'id'>;
   modelId: string;
   organizationId?: string;
+  includeSharedServicesConnection?: boolean;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = await isFreeModel(params.modelId);
-  if (isFree) {
+  // Naming a custom LLM the user cannot call skips this check too, but the
+  // gateway refuses every request for it, so the session cannot run inference.
+  if (isFreeModel(params.modelId)) {
     return { isFree: true, hasUserByokAvailable: false };
-  }
-
-  if (isKiloExclusiveModel(params.modelId)) {
-    return { isFree: false, hasUserByokAvailable: false };
-  }
-
-  const modelProviders = await getModelUserByokProviders(params.modelId);
-  if (modelProviders.length === 0) {
-    return { isFree: false, hasUserByokAvailable: false };
   }
 
   const enabledProviderIds = params.organizationId
     ? await getOrganizationByokProviderIds(params.fromDb, params.organizationId)
     : await getUserByokProviderIds(params.fromDb, params.user.id);
+  if (enabledProviderIds.length === 0) {
+    const hasChatGptAvailable = await hasOpenAiChatGptByokForModel(params);
+    const claudeBilling = await resolveClaudeBillingForModel(params);
+    return withClaudeBilling(
+      {
+        isFree: false,
+        hasUserByokAvailable: hasChatGptAvailable || claudeBilling === 'byok',
+      },
+      claudeBilling
+    );
+  }
 
   const enabled = new Set(enabledProviderIds);
-  const hasUserByokAvailable = modelProviders.some(provider => enabled.has(provider));
-  return { isFree: false, hasUserByokAvailable };
+  const modelProviders = await getModelUserByokProviders(params.modelId, enabled);
+  // Callers authorize organization access first, which also admits Kilo admins
+  // and parent-organization owners who hold no membership row.
+  const memberDecision = params.organizationId
+    ? await resolveOrganizationMemberModelDecision({
+        organizationId: params.organizationId,
+        kiloUserId: params.user.id,
+        allowNonMember: true,
+        modelId: params.modelId,
+      })
+    : undefined;
+  const decision = memberDecision?.decision;
+  // Like routing, a denial leaves no allowed provider for the model.
+  const allowedProviders = decision
+    ? decision.allowed
+      ? decision.eligibleProviderRoutes
+      : new Set<string>()
+    : undefined;
+  const hasUserByokAvailable = await hasEnabledUserByokForModel({
+    modelId: params.modelId,
+    modelProviders,
+    enabledProviderIds: enabled,
+    allowedProviders,
+  });
+  const hasByokAvailable =
+    hasUserByokAvailable ||
+    (await hasDirectByokForModel({
+      fromDb: params.fromDb,
+      owner: params.organizationId
+        ? { type: 'organization', id: params.organizationId }
+        : { type: 'user', id: params.user.id },
+      enabledProviderIds: enabled,
+      modelId: params.modelId,
+      policy: memberDecision?.policy,
+    }));
+  const hasChatGptAvailable = await hasOpenAiChatGptByokForModel(params);
+  const claudeBilling = await resolveClaudeBillingForModel(params);
+  return withClaudeBilling(
+    {
+      isFree: false,
+      hasUserByokAvailable: hasByokAvailable || hasChatGptAvailable || claudeBilling === 'byok',
+    },
+    claudeBilling
+  );
+}
+
+/**
+ * Add the reconnect requirement of an organization's Claude connection. A gone
+ * connector does not change `hasUserByokAvailable`: another credential may still
+ * exist, and routing decides the billing path.
+ */
+function withClaudeBilling(
+  eligibility: { isFree: boolean; hasUserByokAvailable: boolean },
+  claudeBilling: ClaudeBillingModelEligibility
+): BalanceCheckModelEligibility {
+  return claudeBilling === 'reconnect'
+    ? { ...eligibility, reconnectRequired: 'claude_billing' }
+    : eligibility;
+}
+
+/**
+ * Whether a direct BYOK key serves `modelId`, as `getProvider` routes it: a
+ * bespoke `<provider>/<model>` id to that provider's enabled key unless the key
+ * is in catalog mode, or a catalog id to a catalog-mode key. Organization
+ * catalog ids also pass the provider allow-list.
+ */
+async function hasDirectByokForModel(params: {
+  fromDb: typeof db;
+  owner: ByokOwner;
+  enabledProviderIds: ReadonlySet<string>;
+  modelId: string;
+  policy?: EffectiveOrganizationModelPolicy;
+}): Promise<boolean> {
+  const modelId = params.modelId.toLowerCase();
+  // Routing serves a custom LLM before any direct BYOK route, so no key serves
+  // an id a custom LLM owns.
+  if (await isCustomLlm(modelId)) return false;
+  const { provider, model } = await getDirectByokModel(modelId);
+  if (provider && model) {
+    const enabledProviders = await getEnabledByokProviders(params.fromDb, params.owner);
+    const key = enabledProviders.find(enabled => enabled.providerId === provider.id);
+    return key !== undefined && !(key.serveCatalogModels && supportsCatalogMode(provider.id));
+  }
+
+  if (![...params.enabledProviderIds].some(providerId => supportsCatalogMode(providerId))) {
+    return false;
+  }
+  const catalogModelIds =
+    params.owner.type === 'organization' && params.policy
+      ? await getAllowedDirectByokCatalogModelIds(params.owner.id, params.policy)
+      : await getDirectByokCatalogModelIds(params.owner);
+  return catalogModelIds.has(modelId);
+}
+
+/**
+ * Whether a "Sign in with ChatGPT" connection serves the model, so the ChatGPT
+ * plan pays instead of the Kilo balance. Service runs also consider the
+ * organization's shared-services connection, which routing tries first.
+ */
+async function hasOpenAiChatGptByokForModel(params: {
+  user: Pick<User, 'id'>;
+  modelId: string;
+  organizationId?: string;
+  includeSharedServicesConnection?: boolean;
+}): Promise<boolean> {
+  if (!(await getOpenAiChatGptCandidateModel('responses', params.modelId))) return false;
+
+  const owners: OpenAiChatGptOwner[] = [];
+  if (params.includeSharedServicesConnection && params.organizationId) {
+    owners.push(openAiChatGptSharedServicesOwner(params.organizationId));
+  }
+  owners.push({ kiloUserId: params.user.id, organizationId: params.organizationId ?? null });
+
+  for (const owner of owners) {
+    const stored = await getOpenAiChatGptStoredConnection(owner);
+    if (stored?.isEnabled && stored.connection.status === 'connected') return true;
+  }
+  return false;
+}
+
+type ClaudeBillingModelEligibility =
+  /** A connected Claude billing link serves the model. */
+  | 'byok'
+  /**
+   * An organization link serves the model and the account that linked it is
+   * gone, so routing refuses the model with a reconnect requirement.
+   */
+  | 'reconnect'
+  /** No Claude billing link serves the model. */
+  | 'none';
+
+/**
+ * How a Claude billing link serves the model, so the customer's Claude
+ * organization pays instead of the Kilo balance. The owner matches
+ * `checkClaudeBilling`: an organization request uses the organization link,
+ * whether a member or a bot makes it, and a personal request uses only the
+ * person's own link. An organization link whose recorded connector is gone
+ * cannot bill either, because routing answers it with a reconnect requirement
+ * instead of another payer.
+ */
+async function resolveClaudeBillingForModel(params: {
+  fromDb: typeof db;
+  user: Pick<User, 'id'>;
+  modelId: string;
+  organizationId?: string;
+}): Promise<ClaudeBillingModelEligibility> {
+  if (!(await resolveClaudeBillingModel(params.modelId))) return 'none';
+
+  const owner: ClaudeBillingOwner = params.organizationId
+    ? { kind: 'organization', organizationId: params.organizationId }
+    : { kind: 'personal', kiloUserId: params.user.id };
+
+  const row = await getGrantedClaudeBillingConnection(owner, params.fromDb);
+  if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'none';
+  if (row?.status !== ClaudeBillingConnectionStatus.Connected) return 'none';
+  if (owner.kind === 'organization') {
+    const connector = await resolveClaudeBillingConnector(row.created_by, params.fromDb);
+    if (connector.kind === 'gone') return 'reconnect';
+  }
+  return 'byok';
 }

@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type Text as RNText, ScrollView, View } from 'react-native';
+import { ScrollView, type TextInstance, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
+import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
+
+import { displaySafeText } from '@kilocode/app-shared/display-text';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -9,10 +15,19 @@ import {
   type BlockingCardSubmissionError,
   formatBlockingCardTitle,
   getBlockingCardPresentationForKind,
+  type PermissionResponse,
 } from '@/components/agents/blocking-card-state';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { permissionToolLabel } from '@/components/agents/permission-tool-label';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+
+// `metadata` is an untyped transport payload. Decode the one field that is
+// display copy instead of narrowing its raw `unknown` shape with a runtime
+// check.
+const commandSchema = z.string();
 
 type PermissionCardProps = {
   permission: string;
@@ -50,6 +65,8 @@ export function PermissionCard({
   pendingCount = 1,
 }: Readonly<PermissionCardProps>) {
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
+  const { t } = useTranslation();
   const [activeResponse, setActiveResponse] = useState<'once' | 'always' | 'reject' | null>(null);
 
   // Accessibility presentation is derived from the shared FSM so the
@@ -63,37 +80,60 @@ export function PermissionCard({
   // accessibility element. The focus target is a non-interactive leaf title
   // inside the header; this keeps every Deny/Allow option reachable by
   // VoiceOver while still landing focus on the card when it appears.
-  const titleRef = useRef<RNText | null>(null);
+  const titleRef = useRef<TextInstance | null>(null);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;
   useEffect(
     () =>
       applyBlockingCardAppearance(presentationRef.current, titleRef, {
         announce: announceForA11y,
-        focus: moveA11yFocus,
+        focus: requestA11yFocus,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only announce/focus on a new request
     [requestId]
   );
 
   function handleRespond(response: 'once' | 'always' | 'reject') {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     setActiveResponse(response);
     onRespond(response);
   }
 
-  // Format permission name for display
-  const permissionDisplay = permission
-    .split('_')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+  // Localized tool name from the catalog — never re-cased in code.
+  const permissionDisplay = permissionToolLabel(permission);
 
-  const title = formatBlockingCardTitle('Permission required', pendingCount);
+  const title = formatBlockingCardTitle(t('agentChat.permissionCard.title'), pendingCount);
   const isInert = presentation.state === 'non-retryable';
 
   // Skill-shell batches accept only once/reject (CLI/TUI show no persist option);
   // never offer Always Allow for them.
   const isSkillShell = metadata?.skillShell === true;
+
+  // The retry CTA re-sends the decision that failed, so its label names that
+  // decision from the catalog. Without a recorded decision there is no retry
+  // CTA and no label.
+  const retryPermissionResponse = presentation.retryPermissionResponse;
+  const retryLabel = retryPermissionResponse ? retryLabelFor(retryPermissionResponse) : null;
+
+  function retryLabelFor(response: PermissionResponse): string {
+    if (response === 'reject') {
+      return t('agentChat.permissionCard.retryDeny');
+    }
+    if (response === 'always') {
+      return t('agentChat.permissionCard.retryAlwaysAllow');
+    }
+    return t('agentChat.permissionCard.retryAllowOnce');
+  }
+
+  // Only the command is display copy. Other metadata entries are control flags
+  // or machine payloads and must not reach the card as raw key/value rows.
+  const parsedCommand = commandSchema.safeParse(metadata?.command);
+  const command = parsedCommand.success ? parsedCommand.data : null;
+  // Patterns are the rule-matching form of the request, not display copy. When
+  // the verbatim command is present they repeat it in a different spelling, so
+  // the card shows the command alone and keeps the patterns for requests that
+  // have no command, such as path scopes.
+  const showPatterns = patterns.length > 0 && !command;
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -107,7 +147,7 @@ export function PermissionCard({
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-destructive/10 px-4 py-2">
+        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
           <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
         </View>
       ) : null}
@@ -115,27 +155,30 @@ export function PermissionCard({
       <ScrollView className="max-h-96 shrink">
         <View className="gap-3 p-4">
           <Text className="text-sm text-foreground">
-            Allow <Text className="font-medium">{permissionDisplay}</Text>?
+            {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
 
-          {patterns.length > 0 ? (
+          {showPatterns ? (
             <View className="gap-1 rounded-lg bg-muted p-2">
-              <Text className="text-xs font-medium text-muted-foreground">Applies to:</Text>
+              <Text className="text-xs font-medium text-muted-foreground">
+                {t('agentChat.permissionCard.appliesTo')}
+              </Text>
               {patterns.map((pattern, index) => (
                 <Text key={index} className="text-xs text-muted-foreground">
-                  • {pattern}
+                  • {isolateLtrBidiText(displaySafeText(pattern))}
                 </Text>
               ))}
             </View>
           ) : null}
 
-          {metadata && Object.keys(metadata).length > 0 ? (
-            <View className="gap-1">
-              {Object.entries(metadata).map(([key, value]) => (
-                <Text key={key} className="text-xs text-muted-foreground">
-                  {key}: {String(value)}
-                </Text>
-              ))}
+          {command ? (
+            <View className="gap-1 rounded-lg bg-muted p-2">
+              <Text className="text-xs font-medium text-muted-foreground">
+                {t('profiles.commandLabel')}
+              </Text>
+              <Text className="text-xs text-muted-foreground">
+                {isolateLtrBidiText(displaySafeText(command))}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -154,13 +197,13 @@ export function PermissionCard({
                 }}
                 disabled={isSubmitting || isInert}
                 accessibilityRole="button"
-                accessibilityLabel="Deny permission"
+                accessibilityLabel={t('agentChat.permissionCard.denyPermission')}
               >
                 {activeResponse === 'reject' && isSubmitting ? (
                   <ActivityIndicator size="small" color={colors.foreground} />
                 ) : (
                   <Text className={cn('text-xs', activeResponse === 'reject' && 'font-medium')}>
-                    Deny
+                    {t('agentChat.permissionCard.deny')}
                   </Text>
                 )}
               </Button>
@@ -173,13 +216,13 @@ export function PermissionCard({
                 }}
                 disabled={isSubmitting || isInert}
                 accessibilityRole="button"
-                accessibilityLabel="Allow once"
+                accessibilityLabel={t('agentChat.permissionCard.allowOnceAccessibility')}
               >
                 {activeResponse === 'once' && isSubmitting ? (
                   <ActivityIndicator size="small" color={colors.secondaryForeground} />
                 ) : (
                   <Text className={cn('text-xs', activeResponse === 'once' && 'font-medium')}>
-                    Allow Once
+                    {t('agentChat.permissionCard.allowOnce')}
                   </Text>
                 )}
               </Button>
@@ -192,40 +235,33 @@ export function PermissionCard({
                   }}
                   disabled={isSubmitting || isInert}
                   accessibilityRole="button"
-                  accessibilityLabel="Always allow"
+                  accessibilityLabel={t('agentChat.permissionCard.alwaysAllowAccessibility')}
                 >
                   {activeResponse === 'always' && isSubmitting ? (
-                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    <ActivityIndicator size="small" color={mutedDisabledInk} />
                   ) : (
-                    <Text
-                      className={cn(
-                        'text-xs text-primary-foreground',
-                        activeResponse === 'always' && 'font-medium'
-                      )}
-                    >
-                      Always Allow
+                    <Text className={cn('text-xs', activeResponse === 'always' && 'font-medium')}>
+                      {t('agentChat.permissionCard.alwaysAllow')}
                     </Text>
                   )}
                 </Button>
               ) : null}
             </>
           ) : null}
-          {presentation.hasRetryCta ? (
+          {presentation.hasRetryCta && retryPermissionResponse && retryLabel ? (
             <Button
               size="sm"
-              className="flex-1"
+              className={cn(STATE_ACTION_CLASS, 'flex-1')}
               onPress={() => {
-                handleRespond(activeResponse ?? 'once');
+                handleRespond(retryPermissionResponse);
               }}
               disabled={isSubmitting || isInert}
               accessibilityRole="button"
-              accessibilityLabel="Retry"
+              accessibilityLabel={retryLabel}
             >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
-              <Text className={cn('text-xs text-primary-foreground', isSubmitting && 'ml-2')}>
-                {isSubmitting ? 'Retrying…' : 'Retry'}
+              {isSubmitting ? <ActivityIndicator size="small" color={mutedDisabledInk} /> : null}
+              <Text className={cn('text-xs', isSubmitting && 'ml-2')}>
+                {isSubmitting ? t('agentChat.permissionCard.retrying') : retryLabel}
               </Text>
             </Button>
           ) : null}

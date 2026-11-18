@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import type { db } from '@/lib/drizzle';
-import { getEnvVariable } from '@/lib/dotenvx';
+import type { db } from '@kilocode/web-shared/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 type DbInstance = typeof db;
 

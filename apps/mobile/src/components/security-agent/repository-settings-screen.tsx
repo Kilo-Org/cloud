@@ -2,27 +2,32 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { FolderGit2 } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
-import { toast } from 'sonner-native';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyListBody } from '@/lib/query/list-body-state';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import { OrphanedFindingsCard } from '@/components/security-agent/orphaned-findings-card';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
-import { trpcClient } from '@/lib/trpc';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -37,10 +42,24 @@ import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/l
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
+/** The repository rows the picker lists; derived from the hook so the row shape cannot drift. */
+type RepositoryRow = NonNullable<ReturnType<typeof useSecurityAgentRepositories>['data']>[number];
+
+// FlashList takes `contentContainerStyle`, not className, so the ScrollView's
+// `px-6 pt-4` content classes map to their pixel values. The tab-bar inset
+// rides on the content (the ScrollView used a frame `marginBottom`) so the
+// last row can still scroll clear of the bar.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+
+// The gutter each row keeps inside the safe-area side insets: in landscape they
+// are what clear the sensor housing, and portrait insets are zero.
+const LIST_CONTENT_GUTTER = 24;
+
 function RepositorySettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Repositories" />
+      <ScreenHeader className="px-6" title={t('common.repositories')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -52,54 +71,111 @@ function RepositorySettingsSkeleton() {
 }
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
+  const connectivity = useCommittedConnectivityStatus();
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<FlattenedSecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setMode(config.data.repositorySelectionMode);
     setSelectedIds(config.data.selectedRepositoryIds);
-  }, [config.data]);
+  }, [baseline, config.data]);
 
   // The repositories screen stays reachable while the agent is disabled so a
   // user with integration repos but no effective selection can pick repos and
   // then enable (the overview's "Select repositories" CTA lands here). Opt out
   // of the disabled-state redirect; every other sub-screen keeps it.
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, true);
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { skipRedirect: true });
 
   const valid = mode === 'all' || selectedIds.length > 0;
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
+  });
+
+  // Selection is a Set for O(1) row lookups: the row renderer would otherwise
+  // scan `selectedIds` once per repository per render (O(repos × selected)).
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const toggleRepo = useCallback((id: number) => {
+    setSelectedIds(current =>
+      current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]
+    );
+  }, []);
+
+  const paddingBottom = useTabBarBottomPadding();
+  const insets = useSafeAreaInsets();
+  // One content-container style for the whole list, so every row — recycled or
+  // not — starts at the same offset and a rotation re-derives it once.
+  const listContentContainerStyle = useMemo(
+    () => ({
+      paddingTop: 16,
+      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
+      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+      paddingBottom,
+    }),
+    [insets.left, insets.right, paddingBottom]
+  );
+
+  // Hoisted so the FlashList keeps one renderer identity across toggles and
+  // re-renders only the rows whose `selected` actually changed.
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<RepositoryRow>) => (
+      <RepoToggleRow
+        repo={item}
+        selected={selectedIdSet.has(item.id)}
+        disabled={!canManage}
+        className="border-b-[0.5px] border-hair-soft"
+        onPress={() => {
+          toggleRepo(item.id);
+        }}
+      />
+    ),
+    [selectedIdSet, canManage, toggleRepo]
+  );
 
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="Repositories"
-        variant="offline"
-        message="Could not load repository settings"
+        title={t('common.repositories')}
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
+        message={t('securityAgent.repositories.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -108,20 +184,161 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     return <RepositorySettingsSkeleton />;
   }
 
-  const setModeOption = (option: RepositorySelectionMode) => {
-    setMode(option);
+  const showRepositoryStates = mode === 'selected';
+  const hasRepositories = (repositories.data?.length ?? 0) > 0;
+  // A loading, failed, or not-yet-fetched repository query must not read as
+  // zero repositories. Only a delivered read may claim the list is empty: a
+  // read paused by lost connectivity delivered nothing and names the
+  // connection with Retry instead.
+  const repositoriesBody = classifyListBody({
+    rowCount: repositories.data?.length ?? 0,
+    hasDeliveredData: repositories.data !== undefined,
+    isError: repositories.isError,
+    isFetching: repositories.isFetching,
+    fetchStatus: repositories.fetchStatus,
+    connectivityKnown: connectivity !== 'unknown',
+  });
+  const repositoriesFailed =
+    repositoriesBody.status === 'error' ||
+    (repositoriesBody.status === 'rows' && repositories.isError);
+
+  // An empty grant is the one repository state that is not about the mode: with
+  // nothing accessible there is nothing to select and nothing to sync whichever
+  // mode is stored, and widening the app's access is the only way out. Naming it
+  // only in `selected` mode left the disabled agent's "Select repositories" row
+  // landing on a screen whose only controls were the two mode choices. Only the
+  // classifier's delivered-empty answer reaches the section in `all` mode, so a
+  // cached `[]` under a failed read cannot render a label with no control.
+  const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
+
+  // The GitHub settings page is where installation access is widened on the
+  // web, and `openAppShellHandoff` resolves when that page closes — on both
+  // platforms it awaits the browser's own dismissal (a launch or mint it could
+  // not complete is toasted by that helper and still resolves). Reading the
+  // repository list again on that return edge is what makes a grant show up
+  // here: without it the cached empty answer stays fresh for the whole stale
+  // window, and the disabled agent's enable rule counts exactly these
+  // repositories.
+  const manageAccess = async () => {
+    const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+    await openAppShellHandoff(
+      { page: 'github-app', ...(orgId ? { organizationId: orgId } : {}) },
+      { label: t('securityAgent.repositories.githubAppSettings') }
+    );
+    await repositories.refetch();
   };
 
-  const toggleRepo = (id: number) => {
-    setSelectedIds(current =>
-      current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]
-    );
-  };
+  // Everything above the rows (permission note, mode choice, and — in selected
+  // mode — the loading / error / empty branches) rides on the list header so
+  // the rendered order and paddings are unchanged from the ScrollView version.
+  const listHeader: ReactNode = (
+    <>
+      {!canManage && (
+        <Text className="pb-4 text-center text-xs text-muted-foreground">
+          {t('securityAgent.sla.permissionNote')}
+        </Text>
+      )}
+      <OrphanedFindingsCard scope={scope} canManage={canManage} />
+      <RadioGroup label={t('common.repositories')}>
+        {(['all', 'selected'] as const).map(option => (
+          <ChoiceRow
+            key={option}
+            label={
+              option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
+            }
+            selected={mode === option}
+            disabled={!canManage}
+            className="border-b-[0.5px] border-hair-soft"
+            onPress={() => {
+              setMode(option);
+            }}
+          />
+        ))}
+      </RadioGroup>
+
+      {showRepositorySection && (
+        <View className="mt-6">
+          {/* The empty state's own title already says "No repositories", so a
+              section label above it only repeats the screen title. */}
+          {repositoriesBody.status === 'empty' ? null : (
+            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
+              {t('common.repositories')}
+            </Text>
+          )}
+          {repositoriesBody.status === 'loading' && (
+            <View className="gap-3 pt-2">
+              <Skeleton className="h-12 w-full rounded-lg" />
+              <Skeleton className="h-12 w-full rounded-lg" />
+            </View>
+          )}
+          {repositoriesFailed && (
+            <QueryError
+              variant={
+                repositoriesBody.status === 'error' && repositoriesBody.cause === 'offline'
+                  ? 'offline'
+                  : 'server'
+              }
+              placement="top"
+              title={t('common.couldNotLoadRepositories')}
+              onRetry={() => void repositories.refetch()}
+              isRetrying={repositories.isFetching}
+            />
+          )}
+          {repositoriesBody.status === 'empty' ? (
+            <EmptyState
+              placement="top"
+              icon={FolderGit2}
+              title={t('securityAgent.repositories.noRepositories')}
+              description={t('securityAgent.repositories.noRepositoriesDescription')}
+              iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
+              action={
+                <Button
+                  className={STATE_ACTION_CLASS}
+                  // Widening the grant is the only way out of this state, and
+                  // the header's Save is quiet while the screen has nothing to
+                  // save. The action therefore carries the filled primary
+                  // style instead of an outlined one that recedes into the
+                  // page beside it.
+                  variant="default"
+                  onPress={() => {
+                    void manageAccess();
+                  }}
+                >
+                  <Text>{t('securityAgent.repositories.manageAccess')}</Text>
+                </Button>
+              }
+            />
+          ) : null}
+        </View>
+      )}
+    </>
+  );
+
+  const listFooter: ReactNode =
+    showRepositoryStates &&
+    !repositories.isLoading &&
+    !repositories.isError &&
+    hasRepositories &&
+    selectedIds.length === 0 ? (
+      <Text className="pt-2 text-xs text-destructive">
+        {t('securityAgent.repositories.selectAtLeastOne')}
+      </Text>
+    ) : null;
+
+  // The ScrollView cannot hold a virtualized list, so the picker's rows live in
+  // this FlashList and stop mounting every repository in one commit. Its data
+  // is empty outside selected mode (or while loading / errored), leaving only
+  // the header's states visible.
+  const listData =
+    showRepositoryStates && !repositories.isLoading && !repositories.isError
+      ? (repositories.data ?? [])
+      : [];
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Repositories"
+        className="px-6"
+        title={t('common.repositories')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -135,106 +352,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
-        {!canManage && (
-          <Text className="pb-4 text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
-        )}
-        <RadioGroup label="Repositories">
-          {(['all', 'selected'] as const).map(option => (
-            <ChoiceRow
-              key={option}
-              label={option === 'all' ? 'All repositories' : 'Selected repositories'}
-              selected={mode === option}
-              disabled={!canManage}
-              className="border-b-[0.5px] border-hair-soft"
-              onPress={() => {
-                setModeOption(option);
-              }}
-            />
-          ))}
-        </RadioGroup>
-
-        {mode === 'selected' && (
-          <View className="mt-6">
-            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-              Repositories
-            </Text>
-            {repositories.isLoading && (
-              <View className="gap-3 pt-2">
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-lg" />
-              </View>
-            )}
-            {repositories.isError && (
-              <QueryError
-                variant="server"
-                placement="top"
-                title="Could not load repositories"
-                onRetry={() => void repositories.refetch()}
-                isRetrying={repositories.isFetching}
-              />
-            )}
-            {!repositories.isLoading && !repositories.isError && repositories.data?.length === 0 ? (
-              <EmptyState
-                placement="top"
-                icon={FolderGit2}
-                title="No repositories"
-                description="Grant the Kilo GitHub App access to repositories"
-                action={
-                  <Button
-                    variant="outline"
-                    onPress={() => {
-                      void (async () => {
-                        const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
-                        try {
-                          const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-                            organizationId: orgId ?? undefined,
-                            returnTo: '/cloud/sessions',
-                          });
-                          await openExternalUrl(
-                            getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token),
-                            {
-                              label: 'GitHub App settings',
-                            }
-                          );
-                        } catch {
-                          toast.error('Could not open GitHub App settings');
-                        }
-                      })();
-                    }}
-                  >
-                    <Text>Manage GitHub App access</Text>
-                  </Button>
-                }
-              />
-            ) : null}
-            {!repositories.isLoading &&
-              !repositories.isError &&
-              (repositories.data ?? []).map(repo => (
-                <RepoToggleRow
-                  key={repo.id}
-                  repo={repo}
-                  selected={selectedIds.includes(repo.id)}
-                  disabled={!canManage}
-                  className="border-b-[0.5px] border-hair-soft"
-                  onPress={() => {
-                    toggleRepo(repo.id);
-                  }}
-                />
-              ))}
-            {!repositories.isLoading &&
-              !repositories.isError &&
-              (repositories.data?.length ?? 0) > 0 &&
-              selectedIds.length === 0 && (
-                <Text className="pt-2 text-xs text-destructive">
-                  Select at least one repository.
-                </Text>
-              )}
-          </View>
-        )}
-      </TabScreenScrollView>
+      {feedback.node}
+      <FlashList
+        style={listStyle}
+        data={listData}
+        renderItem={renderItem}
+        keyExtractor={repo => String(repo.id)}
+        getItemType={() => 'repo'}
+        contentContainerStyle={listContentContainerStyle}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+      />
+      {dialog}
     </View>
   );
 }

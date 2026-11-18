@@ -1,8 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
 import { persistQueryClientSubscribe } from '@tanstack/react-query-persist-client';
 import { useEffect, useRef } from 'react';
 
-import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { setAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { clearScope } from '@/lib/persist/encrypted-kv';
@@ -13,6 +12,8 @@ import {
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from '@/lib/persist/read-cache';
+import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
+import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 import { queryClient } from '@/lib/query-client';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
@@ -41,14 +42,31 @@ export function CachePersistenceMount() {
       return undefined;
     }
 
-    // Account change: drop the previous account's read-cache scope. The
-    // sign-out path already clears the scope, so this only fires on a direct
-    // switch where the sign-out cleanup never ran. Best effort: the helper
-    // swallows a storage failure, and a redundant clear only costs a future
-    // warm start.
+    // Account change: drop the previous account's read-cache scope and offline
+    // translation cache. The sign-out path clears both, so this only fires on a
+    // direct switch where the sign-out cleanup never ran. The translation cache
+    // holds the previous account's tool text, so it must go too — the runtime's
+    // in-memory retry memory and cache hold the same text because a
+    // `retryUnresolvedTranslations` call re-sends it under the new account's
+    // token, so the runtime reset runs with the disk scope clear and settles
+    // the writes it already dispatched before the scope is dropped. Best
+    // effort: both helpers swallow a storage failure, and a redundant clear
+    // only costs a future warm start.
     const previousUserId = previousUserIdRef.current;
     if (previousUserId !== null && previousUserId !== userId) {
       void clearCacheScopeForSignOut(previousUserId);
+      void (async () => {
+        try {
+          await clearToolSummaryTranslationMemoryForSignOut();
+        } catch {
+          // A failed runtime reset must not skip the independent privacy clear.
+        }
+        try {
+          await clearToolSummaryTranslationsForSignOut();
+        } catch {
+          // Best effort: cleanup must not escape as an unhandled rejection.
+        }
+      })();
     }
     previousUserIdRef.current = userId;
 
@@ -79,16 +97,14 @@ export function CachePersistenceMount() {
       })();
     }
 
-    // Record the identity hint for the next cold start. `writeAccountMetadata`
-    // fences the write on the auth epoch; sign-out deletes it. The write is
-    // best effort and its rejection is swallowed so a SecureStore failure can
-    // never escape as an unhandled rejection (a failed hint only costs a
-    // future warm start).
+    // Record the identity hint for the next cold start. `setAccountMetadata`
+    // fences the write on the auth epoch and gives this key the class a locked
+    // push needs; sign-out deletes it. The write is best effort and its
+    // rejection is swallowed so a SecureStore failure can never escape as an
+    // unhandled rejection (a failed hint only costs a future warm start).
     void (async () => {
       try {
-        await writeAccountMetadata(ACTIVE_USER_ID_KEY, async () => {
-          await SecureStore.setItemAsync(ACTIVE_USER_ID_KEY, userId);
-        });
+        await setAccountMetadata(ACTIVE_USER_ID_KEY, userId);
       } catch {
         // Best effort: a failed identity hint only costs a future warm start.
       }

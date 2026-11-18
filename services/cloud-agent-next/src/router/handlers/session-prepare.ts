@@ -14,19 +14,19 @@
  * execution-scoped callback target override on `send`.
  */
 import { TRPCError } from '@trpc/server';
-import type { WorkerDb } from '@kilocode/db/client';
-import type * as z from 'zod';
 import {
-  mergeProfileConfiguration,
-  profileMcpServersToClientRecord,
-  ProfileNotFoundError,
-  type ClientMcpServerValue,
-  type InlineAgentInput,
-  type MergeProfileConfigurationResult,
-  type ProfileOwner,
-} from '@kilocode/cloud-agent-profile';
-import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+  isWorkspaceCallbackTargetUrl,
+  parseWorkspaceSessionCallbackTarget,
+  WORKSPACE_SESSION_CALLBACK_PREFIX,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import type * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { isWorkspaceAnchorMetadata } from '../../cloud-agent-authority.js';
+import { requireCurrentSessionAccess } from '../../session-access.js';
+import { withDORetry } from '../../utils/do-retry.js';
+import type { TRPCContext } from '../../types.js';
+import type { SessionMetadata } from '../../persistence/session-metadata.js';
 
 import { internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -34,164 +34,97 @@ import {
   PrepareSessionOutput,
   UpdateSessionInput,
   UpdateSessionOutput,
-  isBuiltinMode,
 } from '../schemas.js';
 import {
   registerNewSession,
   startNewSession,
   createSessionWithLedger,
 } from '../../session/session-registration.js';
-import { getPgDb } from '../../db/pg.js';
-import type { Env } from '../../types.js';
-import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
-import { assertKiloModelAvailable } from '../../model-validation.js';
-import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
-import { assertOrganizationMembership } from './organization-membership.js';
+import { preflightSessionCreation } from './session-creation-preflight.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
   updateSession: typeof updateSessionHandler;
 };
 
-const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
-  'cloud-agent-web',
-  'slack',
-  'github',
-  'linear',
-  'discord',
-  'app-builder',
-  'webhook',
-  'scheduled',
-]);
-
-export type ProfileResolutionPolicy = {
-  defaultProfileResolution: 'explicit-profile-only' | 'include-web-defaults';
-};
-
-export function profileResolutionPolicyForSessionCreateOrigin(
-  createdOnPlatform: string | undefined
-): ProfileResolutionPolicy {
-  return {
-    defaultProfileResolution:
-      createdOnPlatform !== undefined && IMPLICIT_PROFILE_RESOLUTION_ORIGINS.has(createdOnPlatform)
-        ? 'include-web-defaults'
-        : 'explicit-profile-only',
-  };
-}
-
+type CallbackTarget = z.infer<typeof PrepareSessionInput>['callbackTarget'];
 type PrepareInput = z.infer<typeof PrepareSessionInput>;
 
-function repoFullNameForBindingLookup(input: SessionCreateRequest): string | undefined {
-  if (input.repository.type === 'github') return input.repository.repo;
-  if (input.repository.type === 'gitlab') {
-    // The repository discriminator establishes this host as GitLab, including self-hosted instances.
-    return repoFullNameFromGitUrl(input.repository.url, input.repository.url);
-  }
-  return undefined;
+async function loadCallbackSession(
+  ctx: TRPCContext,
+  userId: string,
+  sessionId: string
+): Promise<SessionMetadata | null> {
+  return withDORetry(
+    () => getSandboxSessionStub(ctx.env, userId, sessionId),
+    stub => stub.getMetadata(),
+    'getMetadata'
+  );
 }
 
-async function resolveProfileForSessionCreateRequest(
-  ctx: { env: Pick<Env, 'HYPERDRIVE'>; userId: string },
-  input: SessionCreateRequest,
-  policy: ProfileResolutionPolicy,
-  db?: WorkerDb
-): Promise<MergeProfileConfigurationResult | null> {
-  const shouldResolve =
-    input.profile?.id !== undefined || policy.defaultProfileResolution === 'include-web-defaults';
-  if (!shouldResolve) return null;
-
-  const owner: ProfileOwner = input.options?.kilocodeOrganizationId
-    ? { type: 'organization', id: input.options.kilocodeOrganizationId }
-    : { type: 'user', id: ctx.userId };
-  const userId = input.options?.kilocodeOrganizationId ? ctx.userId : undefined;
-  const overrides = input.profile?.overrides;
-
-  try {
-    return await mergeProfileConfiguration(db ?? getPgDb(ctx.env), {
-      profileId: input.profile?.id,
-      owner,
-      userId,
-      repoFullName: repoFullNameForBindingLookup(input),
-      platform:
-        input.repository.type === 'gitlab'
-          ? 'gitlab'
-          : input.repository.type === 'github'
-            ? 'github'
-            : undefined,
-      envVars: overrides?.envVars,
-      setupCommands: overrides?.setupCommands,
-      encryptedSecrets: overrides?.encryptedSecrets,
-      mcpServers: overrides?.mcpServers as Record<string, ClientMcpServerValue> | undefined,
-      runtimeSkills: overrides?.runtimeSkills,
-      runtimeAgents: overrides?.runtimeAgents as InlineAgentInput[] | undefined,
-    });
-  } catch (err) {
-    if (err instanceof ProfileNotFoundError) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: err.message });
+/**
+ * Keeps a callback inside the workspace that launched the child. The
+ * `cloud-agent-context` line in the invoking chat names the session that
+ * should receive the result.
+ */
+async function validateCallbackTarget(
+  ctx: TRPCContext,
+  target: CallbackTarget
+): Promise<CallbackTarget> {
+  if (!target) return target;
+  const isWorkspaceUrl = target.url.startsWith(WORKSPACE_SESSION_CALLBACK_PREFIX);
+  if (!isWorkspaceCallbackTargetUrl(target.url)) {
+    if (isWorkspaceUrl || target.url.startsWith('session:')) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Unsupported callback target' });
     }
-    throw err;
+    return target;
   }
-}
-
-function applyProfileResolution(
-  input: SessionCreateRequest,
-  resolved: MergeProfileConfigurationResult | null
-): SessionCreateRequest {
-  if (!resolved) {
-    return {
-      ...input,
-      profile: {
-        ...input.profile,
-        resolved: {
-          ...input.profile?.resolved,
-          envVars: input.profile?.overrides?.envVars,
-          encryptedSecrets: input.profile?.overrides?.encryptedSecrets,
-          setupCommands: input.profile?.overrides?.setupCommands,
-          mcpServers: input.profile?.overrides?.mcpServers,
-          runtimeSkills: input.profile?.overrides?.runtimeSkills,
-          runtimeAgents: input.profile?.overrides?.runtimeAgents,
-        },
-      },
-    };
+  const authority = ctx.cloudAgentAuthority;
+  if (!authority) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'A workspace callback requires a session launched by a Cloud Agent parent',
+    });
   }
-
-  return {
-    ...input,
-    profile: {
-      ...input.profile,
-      resolved: {
-        envVars: resolved.envVars,
-        setupCommands: resolved.setupCommands,
-        encryptedSecrets: resolved.encryptedSecrets,
-        mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
-        runtimeSkills: resolved.skills,
-        runtimeAgents: resolved.agents,
-        kiloCommands: resolved.kiloCommands ?? input.profile?.resolved?.kiloCommands,
-      },
-    },
-  };
-}
-
-export async function resolveEffectiveSessionConfiguration(
-  ctx: { env: Pick<Env, 'HYPERDRIVE'>; userId: string },
-  input: SessionCreateRequest,
-  policy: ProfileResolutionPolicy,
-  db?: WorkerDb
-): Promise<SessionCreateRequest> {
-  const resolved = await resolveProfileForSessionCreateRequest(ctx, input, policy, db);
-  return applyProfileResolution(input, resolved);
-}
-
-export function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {
-  if (isBuiltinMode(mode)) return;
-  const slugs = new Set((profile.runtimeAgents ?? []).map(a => a.slug));
-  if (slugs.has(mode)) return;
-
-  throw new TRPCError({
-    code: 'BAD_REQUEST',
-    message: `Mode "${mode}" is not a built-in slug and does not match any runtimeAgents on this session`,
+  const targetSessionId = parseWorkspaceSessionCallbackTarget(target.url);
+  if (targetSessionId === null) return { url: target.url };
+  const [targetSession, parentSession] = await Promise.all([
+    loadCallbackSession(ctx, authority.ownerId, targetSessionId),
+    targetSessionId === authority.parentSessionId
+      ? Promise.resolve(undefined)
+      : loadCallbackSession(ctx, authority.ownerId, authority.parentSessionId),
+  ]);
+  const parent = targetSessionId === authority.parentSessionId ? targetSession : parentSession;
+  if (
+    !targetSession ||
+    !parent ||
+    targetSession.identity.sessionId !== targetSessionId ||
+    targetSession.identity.userId !== authority.ownerId ||
+    (targetSession.identity.orgId ?? null) !== authority.organizationId ||
+    targetSession.parentCloudAgentSessionId !== undefined ||
+    targetSession.allowSubagentSessions !== true ||
+    !parent.identity.sessionId.startsWith('workspace_') ||
+    !isWorkspaceAnchorMetadata(parent) ||
+    parent.allowSubagentSessions !== true
+  ) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Callback session is not available' });
+  }
+  const worktreeId = parent.workspace?.worktreeId;
+  if (!worktreeId || targetSession.workspace?.worktreeId !== worktreeId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Callback session is outside the child workspace',
+    });
+  }
+  await requireCurrentSessionAccess({
+    env: ctx.env,
+    kiloUserId: authority.ownerId,
+    cloudAgentSessionId: targetSessionId,
+    expectedOrganizationId: targetSession.identity.orgId ?? null,
+    expectedKiloSessionId: targetSession.auth.kiloSessionId,
   });
+  return { url: target.url };
 }
 
 export function prepareInputToSessionCreateRequest(input: PrepareInput): SessionCreateRequest {
@@ -207,6 +140,14 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     repository = {
       type: 'github',
       repo: input.githubRepo,
+      githubAccessPurpose: input.githubAccessPurpose ?? 'workflow',
+      ...(input.githubIntegrationId ? { githubIntegrationId: input.githubIntegrationId } : {}),
+      ...(input.allowUserAuthorization === undefined
+        ? {}
+        : { allowUserAuthorization: input.allowUserAuthorization }),
+      ...(input.githubPullRequestNumber !== undefined
+        ? { pullRequestNumber: input.githubPullRequestNumber }
+        : {}),
       branch: input.upstreamBranch,
     };
   } else {
@@ -245,21 +186,29 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     }
   }
 
+  repository = {
+    ...repository,
+    ...(input.baseBranch === undefined ? {} : { baseBranch: input.baseBranch }),
+    ...(input.baseSha === undefined ? {} : { baseSha: input.baseSha }),
+  };
+
   const initialTurn: SessionCreateRequest['initialTurn'] =
-    input.initialPayload?.type === 'command'
-      ? {
-          type: 'command',
-          id: input.initialMessageId,
-          command: input.initialPayload.command,
-          arguments: input.initialPayload.arguments,
-          attachments: input.attachments ?? input.images,
-        }
-      : {
-          type: 'prompt',
-          prompt: input.prompt,
-          attachments: input.attachments ?? input.images,
-          id: input.initialMessageId,
-        };
+    input.cloneFromKiloSessionId !== undefined
+      ? undefined
+      : input.initialPayload?.type === 'command'
+        ? {
+            type: 'command',
+            id: input.initialMessageId,
+            command: input.initialPayload.command,
+            arguments: input.initialPayload.arguments,
+            attachments: input.attachments,
+          }
+        : {
+            type: 'prompt',
+            prompt: input.prompt,
+            attachments: input.attachments,
+            id: input.initialMessageId,
+          };
 
   return {
     initialTurn,
@@ -269,7 +218,25 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       variant: input.variant,
     },
     repository,
-    runtime: input.devcontainer ? { devcontainer: true } : undefined,
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
+    runtime:
+      input.sandboxAllocation !== undefined ||
+      input.egressMode !== undefined ||
+      input.egressAllowlist !== undefined ||
+      input.egressAudit !== undefined
+        ? {
+            sandboxAllocation: input.sandboxAllocation,
+            egressMode: input.egressMode,
+            egressAllowlist: input.egressAllowlist,
+            egressAudit: input.egressAudit,
+          }
+        : undefined,
+    clone: input.cloneFromKiloSessionId
+      ? {
+          cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+          ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
+        }
+      : undefined,
     profile: {
       id: input.profileId,
       overrides: {
@@ -288,12 +255,16 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       condenseOnComplete: input.condenseOnComplete,
       gateThreshold: input.gateThreshold,
     },
+    ...(input.requestedEnvironment ? { requestedEnvironment: input.requestedEnvironment } : {}),
+    ...(input.requireEnvironmentChoice ? { requireEnvironmentChoice: true as const } : {}),
     options: {
       callbackTarget: input.callbackTarget,
       kilocodeOrganizationId: input.kilocodeOrganizationId,
       createdOnPlatform: input.createdOnPlatform,
+      clientProvenance: input.clientProvenance,
       shallow: input.shallow,
       operationKey: input.operationKey,
+      kiloSessionId: 'kiloSessionId' in input ? input.kiloSessionId : undefined,
     },
   };
 }
@@ -318,54 +289,31 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .output(PrepareSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
-      const request = prepareInputToSessionCreateRequest(input);
-      if (input.kilocodeOrganizationId) {
-        await assertOrganizationMembership(
-          getPgDb(ctx.env),
-          ctx.userId,
-          input.kilocodeOrganizationId
-        );
+      const callbackTarget = await validateCallbackTarget(ctx, input.callbackTarget);
+      const request = prepareInputToSessionCreateRequest({ ...input, callbackTarget });
+      if (ctx.cloudAgentAuthority) {
+        request.parentCloudAgentSessionId = ctx.cloudAgentAuthority.parentSessionId;
+        if (request.options?.operationKey === undefined) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'operation_key_required' });
+        }
       }
-      await assertBitbucketRepositoryAccessBeforeSessionCreation({
-        env: ctx.env,
-        userId: ctx.userId,
-        orgId: input.kilocodeOrganizationId,
-        repository: request.repository,
-      });
-      const policy = profileResolutionPolicyForSessionCreateOrigin(input.createdOnPlatform);
-      const requestWithProfile = await resolveEffectiveSessionConfiguration(ctx, request, policy);
-      assertModeAvailableForProfile(
-        requestWithProfile.agent.mode,
-        requestWithProfile.profile?.resolved ?? {}
+      const requestWithProfile = await preflightSessionCreation(
+        request,
+        ctx,
+        'prepareSession',
+        resolvedRequest => {
+          if (
+            resolvedRequest.initialTurn !== undefined &&
+            resolvedRequest.initialTurn.type === 'command' &&
+            resolvedRequest.initialTurn.attachments !== undefined
+          ) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Attachments cannot be attached to slash commands',
+            });
+          }
+        }
       );
-
-      if (
-        requestWithProfile.initialTurn.type === 'command' &&
-        requestWithProfile.initialTurn.attachments !== undefined
-      ) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Attachments cannot be attached to slash commands',
-        });
-      }
-
-      if (input.devcontainer && !input.autoInitiate) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'devcontainer sessions must use autoInitiate',
-        });
-      }
-
-      if (requestWithProfile.initialTurn.type === 'prompt') {
-        await assertKiloModelAvailable({
-          env: ctx.env,
-          submittedModel: requestWithProfile.agent.model,
-          originalToken: ctx.authToken,
-          originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
-          createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
-          procedure: 'prepareSession',
-        });
-      }
 
       const operationKey = requestWithProfile.options?.operationKey;
       const registrationContext = {
@@ -373,8 +321,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         authToken: ctx.authToken,
         botId: ctx.botId,
+        cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
-      const billingOrigin = { billingOrigin: input.createdOnPlatform };
+      const billingOrigin = { billingOrigin: requestWithProfile.options?.createdOnPlatform };
       // Admit into the operation ledger only when the client supplied an
       // `operationKey` AND the effective `autoInitiate` is true. Otherwise the
       // key is ignored and the legacy split-flow behavior is preserved.
@@ -392,6 +341,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const response = {
         cloudAgentSessionId: result.cloudAgentSessionId,
         kiloSessionId: result.kiloSessionId,
+        ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
       };
       if ('replayed' in result && result.replayed === true) {
         return { ...response, replayed: true };
@@ -413,16 +363,24 @@ const updateSessionHandler = internalApiProtectedProcedure
   .output(UpdateSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'updateSession' }, async () => {
+      const callbackUrl = input.callbackTarget?.url;
+      if (callbackUrl?.startsWith('session:')) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Unsupported callback target' });
+      }
+      if (callbackUrl?.startsWith('workspace:')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'A workspace callback can only be set when a Cloud Agent parent launches a session',
+        });
+      }
       logger.setTags({
         cloudAgentSessionId: input.cloudAgentSessionId,
         userId: ctx.userId,
       });
       logger.info('Updating session');
 
-      const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
-        `${ctx.userId}:${input.cloudAgentSessionId}`
-      );
-      const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
+      const stub = getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId);
 
       const result = await stub.tryUpdate({ callbackTarget: input.callbackTarget });
 

@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this -- the File mock mirrors the instance-only native File surface. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { trpcClient } from '@/lib/trpc';
@@ -17,16 +18,20 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
-vi.mock('expo-file-system/legacy', () => ({
-  createUploadTask: vi.fn(() => ({
-    uploadAsync: vi.fn().mockResolvedValue({ status: 200 }),
-  })),
-  FileSystemUploadType: { BINARY_CONTENT: 'binary-content' },
-  getInfoAsync: vi.fn().mockResolvedValue({
-    exists: true,
-    isDirectory: false,
-    size: 100,
-  }),
+/** The progress shape the native task really emits: iOS sends `bigint` counts. */
+type NativeUploadProgress = { bytesSent: number | bigint; totalBytes: number | bigint };
+type UploadTaskOptions = { onProgress?: (progress: NativeUploadProgress) => void };
+
+const createUploadTaskMock = vi.fn((_url: string, _options: UploadTaskOptions) => ({
+  uploadAsync: vi.fn().mockResolvedValue({ status: 200, body: '', headers: {} }),
+  cancel: vi.fn(),
+}));
+vi.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 'binary-content', MULTIPART: 'multipart' },
+  File: class {
+    createUploadTask = (url: string, options: UploadTaskOptions): unknown =>
+      createUploadTaskMock(url, options);
+  },
 }));
 
 describe('uploadOne', () => {
@@ -96,8 +101,6 @@ describe('uploadOne', () => {
   });
 
   it('does not create an upload task when cancelled after the presign', async () => {
-    const { createUploadTask } = await import('expo-file-system/legacy');
-
     await expect(
       uploadOne({
         attachmentId: 'att-3',
@@ -111,6 +114,28 @@ describe('uploadOne', () => {
       })
     ).rejects.toThrow('Upload cancelled');
 
-    expect(createUploadTask).not.toHaveBeenCalled();
+    expect(createUploadTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a numeric fraction when iOS sends the byte counts as bigint', async () => {
+    const reported: (number | null)[] = [];
+    await uploadOne({
+      attachmentId: 'att-4',
+      path: 'path-4',
+      extension: 'jpg',
+      contentType: 'image/jpeg',
+      contentLength: 1024,
+      localUri: 'file:///cache/photo.jpg',
+      onProgress: progress => {
+        reported.push(progress);
+      },
+    });
+
+    const emit = createUploadTaskMock.mock.calls[0]?.[1].onProgress;
+    emit?.({ bytesSent: 256n, totalBytes: 1024n });
+    emit?.({ bytesSent: 1024n, totalBytes: 1024n });
+    emit?.({ bytesSent: 10n, totalBytes: 0n });
+
+    expect(reported).toEqual([0.25, 1, null]);
   });
 });

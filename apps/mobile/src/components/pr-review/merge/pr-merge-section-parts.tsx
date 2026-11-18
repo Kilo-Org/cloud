@@ -3,24 +3,53 @@
 // repo's 300-line limit.
 
 import { type LucideIcon, RefreshCw } from '@/components/ui/icons';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { mergeBlockedReasonIcon } from '@/components/pr-review/merge/pr-merge-icons';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import {
   type MergeBlockedReason,
-  type PrOverviewDto,
+  prMergeMethodName,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
-export function TerminalChip({ state }: Readonly<{ state: PrOverviewDto['state'] }>) {
-  const label = state === 'merged' ? 'Already merged' : 'This pull request is closed';
+// Mid-sentence lowercase noun (common.*) vs the capitalized standalone
+// label (prReview.terms.*) — see providerPrTermKey.
+// i18n-dup-ok: one copy, two senses: mid-sentence lowercase noun vs
+// capitalized standalone label; languages case-decline them apart.
+type TerminalNounKey = 'common.mergeRequest' | 'common.pullRequest';
+
+function closedLabelKey(
+  nounKey: TerminalNounKey
+): 'prReview.merge.terminal.closedMergeRequest' | 'prReview.merge.terminal.closed' {
+  return nounKey === 'common.mergeRequest'
+    ? 'prReview.merge.terminal.closedMergeRequest'
+    : 'prReview.merge.terminal.closed';
+}
+
+/**
+ * The sentence a closed review still needs. A merged review renders nothing at
+ * this slot: its state chip and the merged-by line already say it merged, so a
+ * box repeating them only doubled the text.
+ */
+export function ClosedChip({
+  nounKey = 'common.pullRequest',
+}: Readonly<{
+  /**
+   * The provider's own noun for the closed sentence (s6): a GitLab merge
+   * request says "merge request", GitHub and Bitbucket say "pull request".
+   */
+  nounKey?: TerminalNounKey;
+}>) {
+  const { t } = useTranslation();
+  const label = t(closedLabelKey(nounKey));
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Merge
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.merge.mergeTitle')} />
       <View className="rounded-lg bg-secondary p-4">
         <Text className="text-sm text-muted-foreground">{label}</Text>
       </View>
@@ -29,10 +58,11 @@ export function TerminalChip({ state }: Readonly<{ state: PrOverviewDto['state']
 }
 
 export function MergeabilityCheckingRow() {
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center gap-2 rounded-lg bg-secondary p-4">
       <ActivityIndicator size="small" />
-      <Text className="text-sm text-muted-foreground">Checking mergeability…</Text>
+      <Text className="text-sm text-muted-foreground">{t('prReview.merge.checking')}</Text>
     </View>
   );
 }
@@ -42,9 +72,10 @@ export function MergeabilityTimedOutRow({
   isRefreshing,
 }: Readonly<{ onRefresh: () => void; isRefreshing: boolean }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="gap-2 rounded-lg bg-secondary p-4">
-      <Text className="text-sm text-muted-foreground">Couldn&apos;t determine mergeability.</Text>
+      <Text className="text-sm text-muted-foreground">{t('prReview.merge.couldNotDetermine')}</Text>
       <Button
         variant="outline"
         size="sm"
@@ -52,11 +83,11 @@ export function MergeabilityTimedOutRow({
           onRefresh();
         }}
         loading={isRefreshing}
-        accessibilityLabel="Refresh mergeability"
+        accessibilityLabel={t('prReview.merge.refreshMergeability')}
       >
         <View className="flex-row items-center gap-2">
           <RefreshCw size={14} color={colors.foreground} />
-          <Text>Refresh</Text>
+          <Text>{t('common.refresh')}</Text>
         </View>
       </Button>
     </View>
@@ -80,9 +111,11 @@ function BlockedReasonRow({ reason }: Readonly<{ reason: MergeBlockedReason }>) 
       <Icon size={16} color={tone} />
       <View className="flex-1 gap-0.5">
         <Text className="text-sm font-medium text-foreground">{reason.title}</Text>
-        <Text variant="muted" className="text-xs">
-          {reason.detail}
-        </Text>
+        {reason.detail === undefined ? null : (
+          <Text variant="muted" className="text-xs">
+            {reason.detail}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -100,11 +133,10 @@ export function BlockedPanel({
   onUpdateBranch: () => void;
 }>) {
   const hasBehindReason = reasons.some(r => r.id === 'behind');
+  const { t } = useTranslation();
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Why this can&apos;t be merged yet
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.merge.blockedTitle')} />
       <View className="overflow-hidden rounded-lg bg-secondary">
         {reasons.map(reason => (
           <BlockedReasonRow key={reason.id} reason={reason} />
@@ -115,9 +147,9 @@ export function BlockedPanel({
           variant="outline"
           onPress={onUpdateBranch}
           loading={isUpdatePending}
-          accessibilityLabel="Update branch from base"
+          accessibilityLabel={t('prReview.merge.updateBranchFromBase')}
         >
-          <Text>Update branch</Text>
+          <Text>{t('prReview.merge.updateBranch')}</Text>
         </Button>
       ) : null}
     </View>
@@ -129,22 +161,30 @@ export function AutoMergeEnabledBanner({
   onDisable,
   isDisabling,
 }: Readonly<{ method: string; onDisable: () => void; isDisabling: boolean }>) {
+  const { t } = useTranslation();
   return (
-    <View className="gap-3 rounded-lg bg-accent-soft p-4">
+    // The notice is secondary: the accent tints the surface and the hairline,
+    // while the copy stays on the secondary ink. The accent foreground is
+    // already the filled merge button's fill, and the muted foreground measures
+    // under 4.5:1 on this tint, so `--ink2` is the ink that still reads as a
+    // quiet second line here. Taking the accent as ink turned the sentence into
+    // a second saturated accent next to the merge action, worst in dark mode.
+    <View className="gap-3 rounded-lg border border-accent-soft-tint-foreground bg-accent-soft-tint p-4 dark:border-accent-soft-tint">
       <View className="gap-1">
-        <Text className="text-sm font-medium text-accent-soft-foreground">Auto-merge is on</Text>
-        <Text className="text-xs text-accent-soft-foreground">
-          GitHub will merge this pull request automatically when all required checks pass (method:{' '}
-          {method.toLowerCase()}).
+        <Text className="text-sm font-medium text-foreground">
+          {t('prReview.merge.autoMergeOn')}
+        </Text>
+        <Text className="text-xs text-ink2">
+          {t('prReview.merge.autoMergeDescription', { method: prMergeMethodName(method) })}
         </Text>
       </View>
       <Button
         variant="outline"
         onPress={onDisable}
         loading={isDisabling}
-        accessibilityLabel="Disable auto-merge"
+        accessibilityLabel={t('prReview.merge.disableAutoMerge')}
       >
-        <Text>Disable auto-merge</Text>
+        <Text>{t('prReview.merge.disableAutoMerge')}</Text>
       </Button>
     </View>
   );

@@ -15,7 +15,12 @@ import type {
   DependabotAlertsAvailability,
   DependabotAlertState,
 } from '../core/types';
-import { errorExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
+import type { DismissReason } from '../core/schemas';
+import {
+  errorExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 
 const log = sentryLogger('security-agent:dependabot-api', 'info');
 const warn = sentryLogger('security-agent:dependabot-api', 'warning');
@@ -119,11 +124,7 @@ export type FetchAlertsResult =
   | { status: 'access_blocked' }
   | { status: 'auth_invalid' };
 
-type FetchAlertsSkipStatus =
-  | 'repo_not_found'
-  | 'alerts_disabled'
-  | 'access_blocked'
-  | 'auth_invalid';
+type FetchAlertsSkipStatus = Exclude<FetchAlertsResult, { status: 'success' }>['status'];
 
 export type RepositoryDependabotAlertsAvailability = {
   id: number;
@@ -144,6 +145,9 @@ const ACCESS_BLOCKED_HINTS = ['repository access blocked'] as const;
 
 const DEPENDABOT_AVAILABILITY_CACHE_TTL_MS = 30 * 60_000;
 const DEPENDABOT_AVAILABILITY_CACHE_MAX_ENTRIES = 10_000;
+// Mobile control-plane procedures time out after 10 s. Probing stops starting new
+// GitHub requests after this budget so large installations still get a response.
+const DEPENDABOT_AVAILABILITY_CHECK_BUDGET_MS = 5_000;
 const dependabotAvailabilityCache = new Map<
   string,
   { status: DependabotAlertsAvailability; expiresAtMs: number }
@@ -195,11 +199,14 @@ export function classifyFetchAlertsError(
  * A successful request is enough to prove alerts are enabled, even when no alerts exist.
  * Ambiguous permission, authentication, and transient failures remain unknown so the UI
  * never labels a repository as disabled without a definitive GitHub response.
+ * Repositories not checked within the probing budget also remain unknown. Probes already
+ * in flight still populate the cache, so later calls cover more repositories.
  */
 export async function checkDependabotAlertsAvailability(
   installationId: string,
   appType: GitHubAppType,
-  repositories: ReadonlyArray<{ id: number; fullName: string }>
+  repositories: ReadonlyArray<{ id: number; fullName: string }>,
+  expectedIntegrationId?: string
 ): Promise<RepositoryDependabotAlertsAvailability[]> {
   if (repositories.length === 0) return [];
 
@@ -224,7 +231,8 @@ export async function checkDependabotAlertsAvailability(
 
   let token: string;
   try {
-    token = (await generateGitHubInstallationToken(installationId, appType)).token;
+    token = (await generateGitHubInstallationToken(installationId, appType, expectedIntegrationId))
+      .token;
   } catch {
     warnExceptInTest('Unable to authenticate while checking Dependabot alerts availability');
     return repositories.map(repository => ({
@@ -235,24 +243,31 @@ export async function checkDependabotAlertsAvailability(
 
   const octokit = new Octokit({ auth: token });
   const limit = pLimit(5);
-  const checkedResults = await Promise.all(
+  const checkedResultsById = new Map<number, DependabotAlertsAvailability>();
+  const probes = Promise.all(
     repositoriesToCheck.map(repository =>
-      limit(async (): Promise<RepositoryDependabotAlertsAvailability> => {
+      limit(async () => {
+        let status: DependabotAlertsAvailability;
         try {
-          const status = await checkRepositoryDependabotAlertsAvailability({
+          status = await checkRepositoryDependabotAlertsAvailability({
             installationId,
             appType,
             repositoryFullName: repository.fullName,
             octokit,
           });
-          return { id: repository.id, status };
         } catch {
-          return { id: repository.id, status: 'unknown' };
+          status = 'unknown';
         }
+        checkedResultsById.set(repository.id, status);
       })
     )
   );
-  const checkedResultsById = new Map(checkedResults.map(result => [result.id, result.status]));
+  const budgetExpired = Promise.withResolvers<void>();
+  const budgetTimer = setTimeout(budgetExpired.resolve, DEPENDABOT_AVAILABILITY_CHECK_BUDGET_MS);
+  await Promise.race([probes, budgetExpired.promise]);
+  clearTimeout(budgetTimer);
+  limit.clearQueue();
+
   const results = repositories.map(repository => ({
     id: repository.id,
     status: cachedResults.get(repository.id) ?? checkedResultsById.get(repository.id) ?? 'unknown',
@@ -384,7 +399,6 @@ export async function fetchAllDependabotAlerts(
         // No state filter - get all alerts including fixed/dismissed
       },
       response => {
-        // Track rate limit on each page response
         const remaining = response.headers['x-ratelimit-remaining'];
         const limit = response.headers['x-ratelimit-limit'];
         if (remaining !== undefined && Number(remaining) < 100) {
@@ -465,7 +479,6 @@ export async function fetchOpenDependabotAlerts(
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
-    // Use Octokit's paginate helper which handles cursor-based pagination automatically
     const data = await octokit.paginate(octokit.rest.dependabot.listAlertsForRepo, {
       owner,
       repo,
@@ -527,23 +540,12 @@ export async function fetchDependabotAlert(
       return null;
     }
 
-    // Return null if alert not found
     if (status === 404) {
       return null;
     }
     throw error;
   }
 }
-
-/**
- * Dismiss reason types for Dependabot alerts
- */
-export type DependabotDismissReason =
-  | 'fix_started'
-  | 'no_bandwidth'
-  | 'tolerable_risk'
-  | 'inaccurate'
-  | 'not_used';
 
 /**
  * Dismiss a Dependabot alert
@@ -554,7 +556,7 @@ export async function dismissDependabotAlert(
   owner: string,
   repo: string,
   alertNumber: number,
-  dismissedReason: DependabotDismissReason,
+  dismissedReason: DismissReason,
   dismissedComment?: string
 ): Promise<void> {
   const tokenData = await generateGitHubInstallationToken(installationId);
@@ -590,7 +592,6 @@ export async function isDependabotEnabled(
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
-    // Try to fetch alerts - if it succeeds, Dependabot is enabled
     await octokit.rest.dependabot.listAlertsForRepo({
       owner,
       repo,

@@ -1,0 +1,282 @@
+import { z } from 'zod';
+import { autoCommitRecordSchema } from '@kilocode/worker-utils/cloud-agent-commits';
+import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
+import type { EventId } from '../types/ids.js';
+import type { StoredEvent } from '../websocket/types.js';
+import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
+import {
+  projectSafeAssistantError,
+  projectSafeSdkAssistantError,
+  projectSafeSessionError,
+} from '../shared/assistant-failure.js';
+
+const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
+  'message.removed',
+  'message.part.removed',
+  'session.created',
+  'session.updated',
+  'session.status',
+  'session.error',
+  'session.idle',
+  'session.turn.close',
+  'question.asked',
+  'question.replied',
+  'question.rejected',
+  'permission.asked',
+  'permission.replied',
+]);
+
+export const pendingInteractionsSchema = z.object({
+  revision: z.number().int().nonnegative(),
+  questions: z.array(z.unknown()),
+  permissions: z.array(z.unknown()),
+});
+
+export type PendingInteractions = z.infer<typeof pendingInteractionsSchema>;
+
+const interactionIdentitySchema = z.object({ id: z.string().min(1) }).passthrough();
+const interactionReplySchema = z.object({ requestID: z.string().min(1) });
+
+export function applyPendingInteractionEvent(
+  snapshot: PendingInteractions | undefined,
+  payload: SandboxControlSessionEventInput
+): PendingInteractions | undefined {
+  let collection: 'questions' | 'permissions';
+  switch (payload.type) {
+    case 'question.asked':
+    case 'question.replied':
+    case 'question.rejected':
+      collection = 'questions';
+      break;
+    case 'permission.asked':
+    case 'permission.replied':
+      collection = 'permissions';
+      break;
+    default:
+      return undefined;
+  }
+  const asked = payload.type.endsWith('.asked');
+  if (!snapshot && !asked) return undefined;
+  const request = asked ? interactionIdentitySchema.safeParse(payload.properties) : undefined;
+  const reply = asked ? undefined : interactionReplySchema.safeParse(payload.properties);
+  const id = request?.success ? request.data.id : reply?.success ? reply.data.requestID : undefined;
+  if (!id) return undefined;
+  const current = snapshot ?? { revision: 0, questions: [], permissions: [] };
+  const remaining = current[collection].filter(item => {
+    const parsed = interactionIdentitySchema.safeParse(item);
+    return !parsed.success || parsed.data.id !== id;
+  });
+  return {
+    ...current,
+    revision: current.revision + 1,
+    [collection]: asked ? [...remaining, payload.properties] : remaining,
+  };
+}
+
+export type SandboxControlEventQueries = {
+  insertUnique(params: {
+    executionId: string;
+    sessionId: string;
+    streamEventType: string;
+    payload: string;
+    timestamp: number;
+    entityId: string;
+  }): EventId | null;
+  upsert(params: {
+    executionId: string;
+    sessionId: string;
+    streamEventType: string;
+    payload: string;
+    timestamp: number;
+    entityId: string;
+  }): EventId;
+  insert(params: {
+    executionId: string;
+    sessionId: string;
+    streamEventType: string;
+    payload: string;
+    timestamp: number;
+  }): EventId;
+};
+
+export type SandboxControlSessionEventInput = {
+  type: string;
+  properties: Record<string, unknown>;
+  timestamp?: string;
+};
+
+export function publicEventProperties({
+  type,
+  properties,
+}: SandboxControlSessionEventInput): Record<string, unknown> {
+  if (type === 'conversation.message.updated' || type === 'conversation.event') {
+    const projectError = (error: unknown) => {
+      const parsed = z
+        .object({ type: z.string(), message: z.string(), status: z.number().optional() })
+        .safeParse(error);
+      if (!parsed.success) return undefined;
+      return {
+        type: parsed.data.type,
+        message: projectSafeAssistantError({
+          name: 'APIError',
+          data: { message: parsed.data.message, statusCode: parsed.data.status },
+        }),
+        ...(parsed.data.status === undefined ? {} : { status: parsed.data.status }),
+      };
+    };
+    if (type === 'conversation.message.updated') {
+      const message = z.record(z.string(), z.unknown()).safeParse(properties.message);
+      if (!message.success) return properties;
+      const retry = z.record(z.string(), z.unknown()).safeParse(message.data.retry);
+      return {
+        ...properties,
+        message: {
+          ...message.data,
+          ...(message.data.error === undefined ? {} : { error: projectError(message.data.error) }),
+          ...(retry.success
+            ? { retry: { ...retry.data, error: projectError(retry.data.error) } }
+            : {}),
+        },
+      };
+    }
+    const event = z
+      .object({ data: z.record(z.string(), z.unknown()) })
+      .passthrough()
+      .safeParse(properties.event);
+    if (!event.success || event.data.data.error === undefined) return properties;
+    return {
+      ...properties,
+      event: {
+        ...event.data,
+        data: { ...event.data.data, error: projectError(event.data.data.error) },
+      },
+    };
+  }
+  if (type === 'session.error') {
+    return {
+      ...properties,
+      error: projectSafeSessionError(properties.error, properties.reason),
+    };
+  }
+  if (type === 'session.turn.close' && properties.error !== undefined) {
+    return { ...properties, error: projectSafeAssistantError(properties.error) };
+  }
+  const key =
+    type === 'message.updated' ? 'info' : type === 'message.part.updated' ? 'part' : undefined;
+  if (key === undefined) return properties;
+  const carrier = properties[key];
+  if (typeof carrier !== 'object' || carrier === null || Array.isArray(carrier)) return properties;
+  if (key === 'info' && (!('role' in carrier) || carrier.role !== 'assistant')) return properties;
+  if (!('error' in carrier) || carrier.error === undefined || carrier.error === null)
+    return properties;
+  return {
+    ...properties,
+    [key]: {
+      ...carrier,
+      error:
+        key === 'part' && 'type' in carrier && carrier.type === 'retry'
+          ? projectSafeSdkAssistantError(carrier.error)
+          : projectSafeAssistantError(carrier.error),
+    },
+  };
+}
+
+/**
+ * One completion for each repository of a multi-repository turn shares the
+ * assistant message, so each is stored under its own key. Without a repository
+ * there is one completion for the message, as before.
+ */
+export function autocommitEntityId(messageId: string, repository: unknown): string {
+  return typeof repository === 'string'
+    ? `autocommit/${messageId}/${repository}`
+    : `autocommit/${messageId}`;
+}
+
+export function persistSandboxControlSessionEvent(params: {
+  sessionId: string;
+  payload: SandboxControlSessionEventInput;
+  eventQueries: SandboxControlEventQueries;
+  broadcast: (event: StoredEvent) => void;
+}): { applied: true } {
+  const commit =
+    params.payload.type === 'autocommit_completed' && params.payload.properties.skipped !== true
+      ? autoCommitRecordSchema.safeParse(params.payload.properties)
+      : undefined;
+  if (commit?.success) {
+    const timestamp = Date.parse(commit.data.committedAt);
+    const payload = JSON.stringify({
+      type: params.payload.type,
+      event: params.payload.type,
+      properties: { ...params.payload.properties, ...commit.data },
+    });
+    const eventId = params.eventQueries.insertUnique({
+      executionId: '',
+      sessionId: params.sessionId,
+      streamEventType: 'kilocode',
+      payload,
+      timestamp,
+      entityId: `commit/${commit.data.commitHash}`,
+    });
+    if (eventId === null) return { applied: true };
+    params.broadcast({
+      id: eventId,
+      execution_id: '',
+      session_id: params.sessionId,
+      stream_event_type: 'kilocode',
+      payload,
+      timestamp,
+    });
+    return { applied: true };
+  }
+  const properties = publicEventProperties(params.payload);
+  const timestamp = params.payload.timestamp ? Date.parse(params.payload.timestamp) : Date.now();
+  const livePayload = JSON.stringify({
+    type: params.payload.type,
+    event: params.payload.type,
+    properties,
+  });
+  const entityId =
+    params.payload.type === 'autocommit_completed' &&
+    typeof params.payload.properties.messageId === 'string'
+      ? autocommitEntityId(
+          params.payload.properties.messageId,
+          params.payload.properties.repository
+        )
+      : extractEntityId(params.payload.type, { properties: params.payload.properties });
+  let eventId: EventId = 0;
+  if (entityId) {
+    const persistedPayload = JSON.stringify(
+      slimPersistedKilocodeEvent({
+        type: params.payload.type,
+        event: params.payload.type,
+        properties,
+      })
+    );
+    eventId = params.eventQueries.upsert({
+      executionId: '',
+      sessionId: params.sessionId,
+      streamEventType: 'kilocode',
+      payload: persistedPayload,
+      timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
+      entityId,
+    });
+  } else if (PERSISTED_KILO_EVENT_NAMES.has(params.payload.type)) {
+    eventId = params.eventQueries.insert({
+      executionId: '',
+      sessionId: params.sessionId,
+      streamEventType: 'kilocode',
+      payload: livePayload,
+      timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
+    });
+  }
+
+  params.broadcast({
+    id: eventId,
+    execution_id: '',
+    session_id: params.sessionId,
+    stream_event_type: 'kilocode',
+    payload: livePayload,
+    timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
+  });
+  return { applied: true };
+}

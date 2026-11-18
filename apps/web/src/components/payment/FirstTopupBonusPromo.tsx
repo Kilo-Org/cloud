@@ -1,6 +1,9 @@
 'use client';
 
-import { FIRST_TOPUP_BONUS_AMOUNT, PROMO_CREDIT_EXPIRY_HRS } from '@/lib/constants';
+import {
+  FIRST_TOPUP_BONUS_AMOUNT,
+  PROMO_CREDIT_EXPIRY_HRS,
+} from '@kilocode/web-shared/lib/constants';
 
 export function FirstTopupBonusPromo() {
   return (

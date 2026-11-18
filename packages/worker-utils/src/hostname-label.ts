@@ -24,6 +24,7 @@
  */
 
 import { isInstanceKeyedSandboxId } from './instance-id';
+import { bytesToBase64url, base64urlToBytes } from './base64url';
 
 /** RFC 1035 max label length. */
 export const MAX_HOSTNAME_LABEL_LENGTH = 63;
@@ -66,19 +67,9 @@ const INSTANCE_KEYED_BODY_RE = /^[0-9a-f]{32}$/;
 const INSTANCE_LABEL_RE = /^i-([0-9a-f]{32})$/;
 const USER_LABEL_RE = /^u-([0-9a-v]+)$/;
 
-function bytesToBase64url(bytes: Uint8Array): string {
-  const binString = Array.from(bytes, b => String.fromCodePoint(b)).join('');
-  return btoa(binString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64urlToBytes(encoded: string): Uint8Array | null {
+function base64urlToBytesOrNull(encoded: string): Uint8Array | null {
   try {
-    let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4 !== 0) {
-      b64 += '=';
-    }
-    const binString = atob(b64);
-    const bytes = Uint8Array.from(binString, c => c.codePointAt(0) ?? 0);
+    const bytes = base64urlToBytes(encoded);
     return bytesToBase64url(bytes) === encoded ? bytes : null;
   } catch {
     return null;
@@ -147,7 +138,7 @@ export function hostnameLabelFromSandboxId(sandboxId: string): string | null {
     return label;
   }
 
-  const legacyUserIdBytes = base64urlToBytes(sandboxId);
+  const legacyUserIdBytes = base64urlToBytesOrNull(sandboxId);
   if (!legacyUserIdBytes || legacyUserIdBytes.length === 0) return null;
 
   const label = `u-${bytesToBase32Hex(legacyUserIdBytes)}`;

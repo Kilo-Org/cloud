@@ -75,7 +75,7 @@ test('GET / returns a plaintext cheat sheet', async () => {
   });
 });
 
-test('PostHog lookup returns id (not uuid) for ok@local.test', async () => {
+test('PostHog lookup returns uuid for ok@local.test', async () => {
   await withMock(async origin => {
     const { status, body } = await requestJson(
       origin,
@@ -86,9 +86,57 @@ test('PostHog lookup returns id (not uuid) for ok@local.test', async () => {
     const person = results[0];
     assert.equal(results.length, 1);
     assert.ok(person);
-    assert.equal(typeof person.id, 'string');
-    assert.equal(person.uuid, undefined);
+    assert.equal(typeof person.uuid, 'string');
     assert.equal((person.properties as { email?: string }).email, 'ok@local.test');
+  });
+});
+
+test('PostHog environments lookup and bulk_delete use trailing slashes and uuid ids', async () => {
+  await withMock(async origin => {
+    const distinct = await requestJson(
+      origin,
+      '/api/environments/proj/persons/?distinct_id=ok%40local.test'
+    );
+    const byEmail = await requestJson(
+      origin,
+      '/api/environments/proj/persons/?email=ok%40local.test'
+    );
+    assert.equal(distinct.status, 200);
+    assert.equal(byEmail.status, 200);
+    const person = (byEmail.body as { results: Array<{ uuid: string }> }).results[0];
+    assert.ok(person?.uuid);
+
+    const deleted = await requestJson(origin, '/api/environments/proj/persons/bulk_delete/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ids: [person.uuid],
+        delete_events: true,
+        delete_recordings: true,
+        keep_person: false,
+      }),
+    });
+    assert.equal(deleted.status, 202);
+    assert.deepEqual(deleted.body, {
+      id: 'deletion-mock',
+      persons_found: 1,
+      persons_deleted: 0,
+      persons_queued_for_deletion: 1,
+      events_queued_for_deletion: true,
+      recordings_queued_for_deletion: true,
+      deletion_errors: [],
+    });
+
+    const gone = await requestJson(origin, `/api/environments/proj/persons/${person.uuid}/`);
+    assert.equal(gone.status, 404);
+    const status = await requestJson(
+      origin,
+      `/api/environments/proj/persons/deletion_status/?person_uuid=${person.uuid}&status=all`
+    );
+    const results = (status.body as { results: Array<{ status: string; person_uuid: string }> })
+      .results;
+    assert.equal(results[0]?.status, 'completed');
+    assert.equal(results[0]?.person_uuid, person.uuid);
   });
 });
 
@@ -104,7 +152,7 @@ test('PostHog fail-posthog lookup is 500 and 429-posthog bulk delete is 429', as
       origin,
       '/api/projects/proj/persons?email=429-posthog%40local.test'
     );
-    const person = (lookedUp.body as { results: Array<{ id: string; distinct_ids: string[] }> })
+    const person = (lookedUp.body as { results: Array<{ uuid: string; distinct_ids: string[] }> })
       .results[0];
     assert.ok(person);
     const deleted = await requestJson(origin, '/api/projects/proj/persons/bulk_delete', {
@@ -164,9 +212,9 @@ test('missing@local.test is empty or 404 across providers', async () => {
     });
     assert.equal(cio.status, 404);
 
-    const substack = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (substack.body as { subscribers: Array<{ email: string }> }).subscribers;
-    assert.ok(!subscribers.some(row => row.email === 'missing@local.test'));
+    const substack = await searchSubscribers(origin, 'missing@local.test');
+    assert.deepEqual((substack.body as { subscribers: unknown[] }).subscribers, []);
+    assert.equal((substack.body as { count: number }).count, 0);
   });
 });
 
@@ -193,18 +241,45 @@ test('Pylon #1430 contact delete is 429 and #1431 reply is 429', async () => {
   });
 });
 
-test('Substack first page includes exact matches plus decoys without prior priming', async () => {
+test('Substack filtered search uses the live contract and paginates decoys', async () => {
   await withMock(async origin => {
-    const listed = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (listed.body as { subscribers: Array<{ id: string; email: string }> })
-      .subscribers;
-    assert.ok(subscribers.some(row => row.email === 'ok@local.test' && row.id));
-    assert.ok(subscribers.some(row => row.email === 'expired-substack@local.test'));
-    assert.ok(!subscribers.some(row => row.email === 'missing@local.test'));
-    assert.ok(!subscribers.some(row => row.email === 'no-substack@local.test'));
-    const decoys = subscribers.filter(row => row.id.startsWith('partial-'));
-    assert.ok(decoys.length >= 2);
-    const refused = await requestJson(origin, `/api/v1/subscriber/${decoys[0]?.id}`, {
+    await requestJson(origin, '/api/projects/proj/persons?email=ok-contract%40example.com');
+    await requestJson(origin, '/api/projects/proj/persons?email=ok-decoy%40example.com');
+    const listed = await searchSubscribers(origin, 'ok', 0, 1);
+    const body = listed.body as {
+      count: number;
+      subscribers: Array<{
+        user_email_address: string;
+        user_id: number;
+        subscription_id: number;
+        is_subscribed: boolean;
+      }>;
+      order: unknown;
+      tagAssignments: unknown;
+    };
+    assert.equal(listed.status, 200);
+    assert.ok(body.count > 1);
+    assert.equal(body.subscribers.length, 1);
+    assert.equal(typeof body.subscribers[0]?.user_id, 'number');
+    assert.equal(typeof body.subscribers[0]?.subscription_id, 'number');
+    assert.equal(body.subscribers[0]?.is_subscribed, false);
+    assert.deepEqual(body.order, { by: 'subscription_created_at', direction: 'desc' });
+    assert.deepEqual(body.tagAssignments, {});
+    const next = await searchSubscribers(origin, 'ok', 1, 1);
+    assert.equal((next.body as { count: number }).count, body.count);
+    assert.notDeepEqual((next.body as { subscribers: unknown[] }).subscribers, body.subscribers);
+    const exact = await searchSubscribers(origin, 'ok-contract@example.com');
+    assert.equal((exact.body as { count: number }).count, 1);
+    const absent = await searchSubscribers(origin, 'missing@example.com');
+    assert.equal((absent.body as { count: number }).count, 0);
+    assert.ok(!Object.hasOwn(absent.body as object, 'tagAssignments'));
+    const invalid = await requestJson(origin, '/api/v1/subscriber-stats', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ search: 'ok@example.com' }),
+    });
+    assert.equal(invalid.status, 400);
+    const refused = await requestJson(origin, '/api/v1/subscriber/partial-prefix-decoy', {
       method: 'DELETE',
     });
     assert.equal(refused.status, 409);
@@ -215,20 +290,63 @@ test('Substack first page includes exact matches plus decoys without prior primi
   });
 });
 
+test('Substack delete-by-email uses disable_email=true and already-gone bodies', async () => {
+  await withMock(async origin => {
+    const deleted = await requestJson(
+      origin,
+      '/api/v1/subscriber/ok%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(deleted.status, 200);
+
+    const missing = await requestJson(
+      origin,
+      '/api/v1/subscriber/missing%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(missing.status, 404);
+    assert.equal((missing.body as { error?: string }).error, 'User not found');
+
+    const goneUser = await requestJson(
+      origin,
+      '/api/v1/subscriber/gone-user%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(goneUser.status, 400);
+    assert.equal((goneUser.body as { error?: string }).error, 'User not found');
+
+    const goneSub = await requestJson(
+      origin,
+      '/api/v1/subscriber/gone-sub%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(goneSub.status, 400);
+    assert.equal((goneSub.body as { error?: string }).error, 'Subscription not found');
+  });
+});
+
 test('Substack deletes the exact match and 401s expired-substack', async () => {
   await withMock(async origin => {
-    const listed = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (listed.body as { subscribers: Array<{ id: string; email: string }> })
-      .subscribers;
-    const ok = subscribers.find(row => row.email === 'ok@local.test');
-    const expired = subscribers.find(row => row.email === 'expired-substack@local.test');
-    assert.ok(ok);
-    assert.ok(expired);
-    const deleted = await requestJson(origin, `/api/v1/subscriber/${ok.id}`, { method: 'DELETE' });
+    await requestJson(origin, '/api/projects/proj/persons?email=ok-contract%40example.com');
+    await requestJson(
+      origin,
+      '/api/projects/proj/persons?email=expired-substack-contract%40example.com'
+    );
+    const listed = await searchSubscribers(origin, 'ok-contract@example.com');
+    assert.equal((listed.body as { count: number }).count, 1);
+    const deleted = await requestJson(
+      origin,
+      '/api/v1/subscriber/ok-contract%40example.com?disable_email=true',
+      { method: 'DELETE' }
+    );
     assert.equal(deleted.status, 200);
-    const unauthorized = await requestJson(origin, `/api/v1/subscriber/${expired.id}`, {
-      method: 'DELETE',
-    });
+    const unauthorized = await requestJson(
+      origin,
+      '/api/v1/subscriber/expired-substack-contract%40example.com?disable_email=true',
+      {
+        method: 'DELETE',
+      }
+    );
     assert.equal(unauthorized.status, 401);
     const profile = await requestJson(origin, '/api/v1/user/profile/self');
     assert.equal(profile.status, 200);
@@ -247,16 +365,6 @@ test('Customer.io DELETE follows 429-cio / fail-cio / ok scenarios', async () =>
     assert.equal(failed.status, 500);
     const ok = await requestJson(origin, '/api/v1/customers/ok%40local.test', { method: 'DELETE' });
     assert.equal(ok.status, 200);
-  });
-});
-
-test('does not implement CSA Kilo support user routes', async () => {
-  await withMock(async origin => {
-    const { status } = await requestJson(
-      origin,
-      '/api/internal/support/users?email=ok%40local.test'
-    );
-    assert.equal(status, 404);
   });
 });
 
@@ -285,9 +393,8 @@ test('fail-pylon contact search is 500 and no-substack is absent from Substack',
       '/api/projects/proj/persons?email=no-substack%40local.test'
     );
     assert.equal((posthog.body as { results: unknown[] }).results.length, 1);
-    const listed = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (listed.body as { subscribers: Array<{ email: string }> }).subscribers;
-    assert.ok(!subscribers.some(row => row.email === 'no-substack@local.test'));
+    const listed = await searchSubscribers(origin, 'no-substack@local.test');
+    assert.equal((listed.body as { count: number }).count, 0);
   });
 });
 
@@ -321,3 +428,16 @@ test('binds 127.0.0.1 only', async () => {
     assert.equal(handle.host, '127.0.0.1');
   });
 });
+
+function searchSubscribers(origin: string, search: string, offset = 0, limit = 50) {
+  return requestJson(origin, '/api/v1/subscriber-stats', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      filters: { search, order_by_desc_nulls_last: 'subscription_created_at' },
+      limit,
+      offset,
+      includeTags: true,
+    }),
+  });
+}

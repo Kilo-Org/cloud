@@ -4,21 +4,28 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import { z } from 'zod';
-import type { Part, SessionStatus, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
+import type { BackgroundActivityState } from './background-activity';
+import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
   CloudStatus,
   SuggestionAction,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   PreparationStepSnapshot,
 } from './types';
 import {
-  cloudAgentEventSchema,
+  cloudWorktreeChangesReadyDataSchema,
+  cloudWorkspaceArtifactsChangedDataSchema,
+  isValidCloudAgentEvent,
+  projectSessionGoal,
   kilocodePayloadSchema,
   messageUpdatedDataSchema,
+  normalizeAssistantMessageError,
   messagePartUpdatedDataSchema,
   messagePartDeltaDataSchema,
   messagePartRemovedDataSchema,
+  messageRemovedDataSchema,
   sessionStatusDataSchema,
   sessionCreatedDataSchema,
   sessionUpdatedDataSchema,
@@ -30,6 +37,7 @@ import {
   questionRepliedDataSchema,
   questionRejectedDataSchema,
   permissionAskedDataSchema,
+  permissionAskedIdentitySchema,
   permissionRepliedDataSchema,
   suggestionShownDataSchema,
   suggestionAcceptedDataSchema,
@@ -47,12 +55,25 @@ import {
   cloudMessageCompletedDataSchema,
   cloudMessageFailedDataSchema,
   type CloudAgentEvent,
+  type SessionStatus,
+  type CustomerBillingFailure,
 } from './schemas';
 
 /** Chat events — data mutations for messages and parts. */
-export type ChatEvent =
+export type ChatEventVersion = {
+  sourceId: string;
+  eventId?: number;
+  cursor: number;
+};
+
+export type ChatEvent = (
   | { type: 'message.updated'; info: Message }
-  | { type: 'message.part.updated'; part: Part }
+  | {
+      type: 'message.part.updated';
+      part: Part;
+      time?: number | undefined;
+      textOmitted?: boolean;
+    }
   | {
       type: 'message.part.delta';
       sessionId: string;
@@ -66,10 +87,18 @@ export type ChatEvent =
       sessionId: string;
       messageId: string;
       partId: string;
-    };
+    }
+  | {
+      type: 'message.removed';
+      sessionId: string;
+      messageId: string;
+    }
+) & { version?: ChatEventVersion };
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
 export type ServiceEvent =
+  | { type: 'background.activity'; state: BackgroundActivityState }
+  | { type: 'background.invalidated' }
   | { type: 'session.status'; sessionId: string; status: SessionStatus }
   | { type: 'session.created'; info: SessionInfo }
   | { type: 'session.updated'; info: SessionInfo }
@@ -90,6 +119,16 @@ export type ServiceEvent =
       patterns: string[];
       metadata: Record<string, unknown>;
       always: string[];
+    }
+  | {
+      /**
+       * A permission request is waiting that this app cannot read: its scope
+       * did not parse, so no consent card can be offered for it. The request is
+       * still pending for the CLI, so the user is told it exists rather than
+       * seeing it vanish.
+       */
+      type: 'permission.unreadable';
+      requestId: string;
     }
   | { type: 'permission.replied'; requestId: string }
   | {
@@ -125,12 +164,14 @@ export type ServiceEvent =
       timestamp?: number | undefined;
       action?: string | undefined;
       stepId?: string | undefined;
+      parentStepId?: string | undefined;
       kind?: 'phase' | 'setup_command' | undefined;
       label?: string | undefined;
       command?: string | undefined;
       commandIndex?: number | undefined;
       commandCount?: number | undefined;
       detail?: string | undefined;
+      snapshotCapturedAt?: number | undefined;
       output?: string | undefined;
       safeError?: string | undefined;
       exitCode?: number | undefined;
@@ -150,30 +191,54 @@ export type ServiceEvent =
   | { type: 'autocommit_started'; messageId: string; message?: string | undefined }
   | {
       type: 'autocommit_completed';
+      repository?: string | undefined;
       messageId: string;
       success: boolean;
       message?: string | undefined;
       skipped?: boolean | undefined;
       commitHash?: string | undefined;
       commitMessage?: string | undefined;
+      userMessageId?: string | undefined;
+      committedAt?: string | undefined;
+      pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown' | undefined;
+      commitMessageTruncated?: boolean | undefined;
+      timestamp?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
+  | { type: 'bootstrap.complete' }
   | {
       type: 'connected';
+      bootstrapPending?: boolean | undefined;
+      ancillaryOmittedItemCount?: number | undefined;
+      cloudSessionId?: string;
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
+      activeMessageId?: string | null | undefined;
     }
-  | { type: 'commands.available'; commands: SlashCommandInfo[] }
+  | {
+      type: 'commands.available';
+      commands: SlashCommandInfo[];
+      catalogStatus?: SlashCommandCatalogStatus | undefined;
+    }
+  | { type: 'worktree.changes.ready'; cloudSessionId: string; revision: number }
+  | { type: 'workspace.artifacts.changed'; cloudSessionId: string; revision: number }
   | {
       type: 'cloud.message.queued';
       messageId: string;
       executionId?: string | undefined;
       content?: string | undefined;
+      createdAt?: number | undefined;
+    }
+  | {
+      type: 'cloud.message.canceled';
+      messageId: string;
+      executionId?: string | undefined;
     }
   | {
       type: 'cloud.message.sent';
       messageId: string;
       executionId?: string | undefined;
+      turnType?: 'command' | undefined;
     }
   | {
       type: 'cloud.message.completed';
@@ -184,6 +249,9 @@ export type ServiceEvent =
       type: 'cloud.message.failed';
       messageId: string;
       executionId?: string | undefined;
+      delivery?: 'queued' | 'sent' | undefined;
+      accepted?: boolean | undefined;
+      billingFailure?: CustomerBillingFailure;
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
@@ -201,14 +269,11 @@ const CHAT_EVENT_TYPES = new Set([
   'message.part.updated',
   'message.part.delta',
   'message.part.removed',
+  'message.removed',
 ]);
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
   return CHAT_EVENT_TYPES.has(event.type);
-}
-
-export function isServiceEvent(event: NormalizedEvent): event is ServiceEvent {
-  return !CHAT_EVENT_TYPES.has(event.type);
 }
 
 /** Best-effort error message extraction from a loosely-typed error field. */
@@ -234,12 +299,29 @@ const sessionModelSchema = z.object({
   variant: z.string().optional(),
 });
 
+export { projectSessionGoal } from './schemas';
+
+const connectedServiceDataSchema = connectedDataSchema.extend({
+  activeMessageId: z.string().nullable().optional().catch(undefined),
+});
+
+// `cloud.message.canceled` mirrors the queued payload minus the content field.
+const cloudMessageCanceledDataSchema = z
+  .object({
+    messageId: z.string(),
+    executionId: z.string().optional(),
+  })
+  .passthrough();
+
 function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): SessionInfo {
   const model = sessionModelSchema.safeParse(rawInfo['model']);
+  const goal = projectSessionGoal(rawInfo['metadata']);
   return {
     id: rawInfo.id,
     parentID: rawInfo['parentID'] != null ? String(rawInfo['parentID']) : undefined,
+    ...(typeof rawInfo['title'] === 'string' ? { title: rawInfo['title'] } : {}),
     ...(model.success ? { model: model.data } : {}),
+    ...(goal === undefined ? {} : { goal }),
   };
 }
 
@@ -248,13 +330,20 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'message.updated': {
       const r = messageUpdatedDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'message.updated', info: r.data.info as Message };
+      const info = messageUpdatedDataSchema.shape.info.parse(
+        normalizeAssistantMessageError(r.data.info)
+      );
+      return { type: 'message.updated', info: info as Message };
     }
 
     case 'message.part.updated': {
       const r = messagePartUpdatedDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'message.part.updated', part: r.data.part as Part };
+      return {
+        type: 'message.part.updated',
+        part: r.data.part as Part,
+        ...(r.data.time === undefined ? {} : { time: r.data.time }),
+      };
     }
 
     case 'message.part.delta': {
@@ -278,6 +367,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         sessionId: r.data.sessionID,
         messageId: r.data.messageID,
         partId: r.data.partID,
+      };
+    }
+
+    case 'message.removed': {
+      const r = messageRemovedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'message.removed',
+        sessionId: r.data.sessionID,
+        messageId: r.data.messageID,
       };
     }
 
@@ -346,7 +445,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return {
         type: 'question.asked',
         requestId: r.data.id,
-        questions: r.data.questions as QuestionInfo[] | undefined,
+        questions: r.data.questions,
       };
     }
 
@@ -364,15 +463,23 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'permission.asked': {
       const r = permissionAskedDataSchema.safeParse(data);
-      if (!r.success) return null;
-      return {
-        type: 'permission.asked',
-        requestId: r.data.id,
-        permission: r.data.permission,
-        patterns: r.data.patterns,
-        metadata: r.data.metadata,
-        always: r.data.always,
-      };
+      if (r.success) {
+        return {
+          type: 'permission.asked',
+          requestId: r.data.id,
+          permission: r.data.permission,
+          patterns: r.data.patterns,
+          metadata: r.data.metadata,
+          always: r.data.always,
+        };
+      }
+      // A request whose scope does not parse cannot be offered as a decision:
+      // forwarding an empty scope would describe settings the app never read.
+      // It is not dropped either, because the CLI keeps waiting for an answer
+      // the app would otherwise never mention.
+      const identity = permissionAskedIdentitySchema.safeParse(data);
+      if (!identity.success) return null;
+      return { type: 'permission.unreadable', requestId: identity.data.id };
     }
 
     case 'permission.replied': {
@@ -453,12 +560,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
               timestamp: r.data.timestamp,
               action: r.data.action,
               ...(r.data.stepId === undefined ? {} : { stepId: r.data.stepId }),
+              ...(r.data.parentStepId === undefined ? {} : { parentStepId: r.data.parentStepId }),
               ...(r.data.kind === undefined ? {} : { kind: r.data.kind }),
               ...(r.data.label === undefined ? {} : { label: r.data.label }),
               ...(r.data.command === undefined ? {} : { command: r.data.command }),
               ...(r.data.commandIndex === undefined ? {} : { commandIndex: r.data.commandIndex }),
               ...(r.data.commandCount === undefined ? {} : { commandCount: r.data.commandCount }),
               ...(r.data.detail === undefined ? {} : { detail: r.data.detail }),
+              ...(r.data.snapshotCapturedAt === undefined
+                ? {}
+                : { snapshotCapturedAt: r.data.snapshotCapturedAt }),
               ...(r.data.output === undefined ? {} : { output: r.data.output }),
               ...(r.data.safeError === undefined ? {} : { safeError: r.data.safeError }),
               ...(r.data.exitCode === undefined ? {} : { exitCode: r.data.exitCode }),
@@ -480,12 +591,17 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       if (!r.success) return null;
       return {
         type: 'autocommit_completed',
+        repository: r.data.repository,
         messageId: r.data.messageId,
         success: r.data.success,
         message: r.data.message,
         skipped: r.data.skipped,
         commitHash: r.data.commitHash,
         commitMessage: r.data.commitMessage,
+        userMessageId: r.data.userMessageId,
+        committedAt: r.data.committedAt,
+        pushStatus: r.data.pushStatus,
+        commitMessageTruncated: r.data.commitMessageTruncated,
       };
     }
 
@@ -496,19 +612,31 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     }
 
     case 'connected': {
-      const r = connectedDataSchema.safeParse(data);
+      const r = connectedServiceDataSchema.safeParse(data);
       if (!r.success) return null;
       return {
         type: 'connected',
+        ...(r.data.bootstrapPending !== undefined && { bootstrapPending: r.data.bootstrapPending }),
+        ...(r.data.ancillaryOmittedItemCount !== undefined && {
+          ancillaryOmittedItemCount: r.data.ancillaryOmittedItemCount,
+        }),
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
+        ...(r.data.activeMessageId !== undefined && { activeMessageId: r.data.activeMessageId }),
       };
     }
+
+    case 'bootstrap.complete':
+      return z.object({}).safeParse(data).success ? { type: 'bootstrap.complete' } : null;
 
     case 'commands.available': {
       const r = commandsAvailableDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'commands.available', commands: r.data.commands };
+      return {
+        type: 'commands.available',
+        commands: r.data.commands,
+        ...(r.data.catalogStatus ? { catalogStatus: r.data.catalogStatus } : {}),
+      };
     }
 
     case 'cloud.message.queued': {
@@ -522,6 +650,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       };
     }
 
+    case 'cloud.message.canceled': {
+      const r = cloudMessageCanceledDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'cloud.message.canceled',
+        messageId: r.data.messageId,
+        executionId: r.data.executionId,
+      };
+    }
+
     case 'cloud.message.sent': {
       const r = cloudMessageSentDataSchema.safeParse(data);
       if (!r.success) return null;
@@ -529,6 +667,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         type: 'cloud.message.sent',
         messageId: r.data.messageId,
         executionId: r.data.executionId,
+        ...(r.data.turnType === 'command' ? { turnType: r.data.turnType } : {}),
       };
     }
 
@@ -553,14 +692,24 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       const reason: 'interrupted' | 'exhausted' | 'execution' =
         rawReason === 'interrupted' ? 'interrupted' : attempts != null ? 'exhausted' : 'execution';
       const error =
-        r.data.error !== undefined ? extractErrorMessage(r.data.error) : 'Message delivery failed';
+        r.data.error !== undefined
+          ? extractErrorMessage(r.data.error)
+          : rawReason === 'attach_exhausted'
+            ? rawReason
+            : 'Message delivery failed';
       return {
         type: 'cloud.message.failed',
         messageId,
         executionId,
+        ...(r.data.delivery !== undefined && { delivery: r.data.delivery }),
+        ...(typeof r.data['accepted'] === 'boolean' && { accepted: r.data['accepted'] }),
         error,
         reason,
         attempts,
+        ...((rawReason === 'billing_blocked' || rawReason === 'billing_unavailable') &&
+        r.data.billingFailure !== undefined
+          ? { billingFailure: r.data.billingFailure }
+          : {}),
       };
     }
 
@@ -574,7 +723,27 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
  * Returns null for invalid or unrecognized events.
  */
 export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
-  if (!cloudAgentEventSchema.safeParse(raw).success) return null;
+  if (!isValidCloudAgentEvent(raw)) return null;
+
+  if (raw.streamEventType === 'cloud.worktree.changes.ready') {
+    const r = cloudWorktreeChangesReadyDataSchema.safeParse(raw.data);
+    if (!r.success) return null;
+    return {
+      type: 'worktree.changes.ready',
+      cloudSessionId: raw.sessionId,
+      revision: r.data.revision,
+    };
+  }
+
+  if (raw.streamEventType === 'cloud.workspace.artifacts.changed') {
+    const r = cloudWorkspaceArtifactsChangedDataSchema.safeParse(raw.data);
+    if (!r.success) return null;
+    return {
+      type: 'workspace.artifacts.changed',
+      cloudSessionId: raw.sessionId,
+      revision: r.data.revision,
+    };
+  }
 
   let eventType = raw.streamEventType;
   let data: unknown = raw.data;
@@ -585,7 +754,20 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
     data = kilo.data.properties;
   }
 
-  return normalizeInnerEvent(eventType, data);
+  const event = normalizeInnerEvent(eventType, data);
+  if (raw.streamEventType === 'connected' && event?.type === 'connected') {
+    return { ...event, cloudSessionId: raw.sessionId };
+  }
+  if (event?.type === 'cloud.message.queued') {
+    const createdAt = Date.parse(raw.timestamp);
+    return Number.isFinite(createdAt) ? { ...event, createdAt } : event;
+  }
+  // Only a completion that carries a storable commit hash gets the envelope
+  // timestamp the commit record is anchored to. The schema already dropped a
+  // hash that could not be stored, so its presence is the whole test.
+  return event?.type === 'autocommit_completed' && event.commitHash !== undefined
+    ? { ...event, timestamp: raw.timestamp }
+    : event;
 }
 
 /**

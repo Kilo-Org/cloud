@@ -1,0 +1,254 @@
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import { getWorkerDb } from '@kilocode/db/client';
+import {
+  GitHubInstallationAccessDeniedError,
+  InstallationLookupService,
+} from '../../../../../../services/git-token-service/src/installation-lookup-service';
+
+const installationId = '880099';
+const connectionString = () => {
+  const url = new URL(process.env.POSTGRES_URL!);
+  url.pathname = `${url.pathname}-${process.env.JEST_WORKER_ID}`;
+  return url.toString();
+};
+
+describe('InstallationLookupService database authorization', () => {
+  const workerDb = getWorkerDb(connectionString());
+  afterEach(cleanupDbForTest);
+  afterAll(async () => {
+    await workerDb.$client.end();
+  });
+
+  const service = () =>
+    new InstallationLookupService(
+      {
+        HYPERDRIVE: {
+          connectionString: connectionString(),
+        },
+      },
+      workerDb
+    );
+
+  it('accepts true legacy direct lookups but rejects an unbound shadow when canonical exists', async () => {
+    const user = await insertTestUser();
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: null,
+        platform_account_login: 'acme',
+        integration_status: 'active',
+      })
+      .returning();
+    await expect(
+      service().assertActiveAssociationForInstallation(installationId, 'standard')
+    ).resolves.toBeUndefined();
+    await expect(
+      service().findActiveAssociationById(legacy.id, { userId: user.id })
+    ).resolves.toMatchObject({
+      success: true,
+      installationId,
+      githubAppType: 'standard',
+    });
+
+    await db.insert(github_app_installations).values({
+      github_app_type: 'standard',
+      installation_id: installationId,
+      lifecycle_state: 'active',
+      sharing_mode: 'web_cloud_agent',
+    });
+    await expect(
+      service().assertActiveAssociationForInstallation(installationId, 'standard')
+    ).rejects.toBeInstanceOf(GitHubInstallationAccessDeniedError);
+    await expect(
+      service().findActiveAssociationById(legacy.id, { userId: user.id })
+    ).resolves.toEqual({
+      success: false,
+    });
+  });
+
+  it('allows shared managed lookup only for the exact active association', async () => {
+    const user = await insertTestUser();
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({
+        github_app_type: 'standard',
+        installation_id: installationId,
+        account_login: 'acme',
+        lifecycle_state: 'active',
+        sharing_mode: 'web_cloud_agent',
+        repository_access: 'selected',
+        repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+        permissions: { contents: 'write', pull_requests: 'write' },
+      })
+      .returning();
+    const [association] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        platform_account_login: 'acme',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        github_connection_role: 'agent_only',
+        integration_status: 'active',
+      })
+      .returning();
+    await expect(
+      service().findManagedInstallationForRepo({
+        githubRepo: 'acme/repo',
+        userId: user.id,
+        expectedIntegrationId: association.id,
+        accessPurpose: 'agent',
+      })
+    ).resolves.toMatchObject({ success: true, installationId });
+    await expect(
+      service().findManagedInstallationForRepo({ githubRepo: 'acme/repo', userId: user.id })
+    ).resolves.toEqual({ success: false, reason: 'no_installation_found' });
+
+    await db
+      .update(platform_integrations)
+      .set({ github_disconnected_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, association.id));
+    await expect(
+      service().findManagedInstallationForRepo({
+        githubRepo: 'acme/repo',
+        userId: user.id,
+        expectedIntegrationId: association.id,
+        accessPurpose: 'agent',
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+  });
+
+  it('resolves a stored integration only for its owner', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const outsider = await insertTestUser();
+    const organization = await createTestOrganization('Integration owner org', member.id, 0);
+    const [personal] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        integration_status: 'active',
+      })
+      .returning();
+    const [orgOwned] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: '880100',
+        github_app_type: 'standard',
+        integration_status: 'active',
+      })
+      .returning();
+
+    await expect(
+      service().findActiveAssociationById(personal.id, { userId: owner.id })
+    ).resolves.toMatchObject({ success: true, installationId });
+    await expect(
+      service().findActiveAssociationById(personal.id, { userId: outsider.id })
+    ).resolves.toEqual({ success: false });
+    await expect(
+      service().findActiveAssociationById(personal.id, {
+        userId: owner.id,
+        orgId: organization.id,
+      })
+    ).resolves.toEqual({ success: false });
+
+    await expect(
+      service().findActiveAssociationById(orgOwned.id, {
+        userId: member.id,
+        orgId: organization.id,
+      })
+    ).resolves.toMatchObject({ success: true, installationId: '880100' });
+    await expect(
+      service().findActiveAssociationById(orgOwned.id, {
+        userId: outsider.id,
+        orgId: organization.id,
+      })
+    ).resolves.toEqual({ success: false });
+    await expect(
+      service().findActiveAssociationById(orgOwned.id, { userId: member.id })
+    ).resolves.toEqual({ success: false });
+  });
+
+  it('authorizes a healthy organization association that carries no stored role', async () => {
+    const member = await insertTestUser();
+    const organization = await createTestOrganization('Roleless token org', member.id, 0);
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({
+        github_app_type: 'standard',
+        installation_id: '880101',
+        account_login: 'acme',
+        lifecycle_state: 'active',
+        repository_access: 'selected',
+        repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+        permissions: { contents: 'read' },
+      })
+      .returning();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '880101',
+        platform_account_login: 'acme',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        integration_status: 'active',
+        permissions: { contents: 'read' },
+        repository_access: 'selected',
+        repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+      })
+      .returning();
+
+    await expect(
+      service().assertActiveAssociationForInstallation('880101', 'standard', integration.id)
+    ).resolves.toBeUndefined();
+    await expect(
+      service().findInstallationId({
+        githubRepo: 'acme/repo',
+        userId: member.id,
+        orgId: organization.id,
+      })
+    ).resolves.toMatchObject({ success: true, installationId: '880101' });
+  });
+
+  it('keeps a personal association without a stored role unauthorized', async () => {
+    const user = await insertTestUser();
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: user.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '880102',
+      platform_account_login: 'personal',
+      github_app_type: 'standard',
+      integration_status: 'active',
+      repository_access: 'all',
+    });
+
+    await expect(
+      service().assertActiveAssociationForInstallation('880102', 'standard')
+    ).rejects.toBeInstanceOf(GitHubInstallationAccessDeniedError);
+  });
+});

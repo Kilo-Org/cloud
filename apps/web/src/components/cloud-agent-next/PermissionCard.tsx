@@ -3,12 +3,11 @@
 import { useState, useCallback, createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import { Shield, Loader2 } from 'lucide-react';
+import { displaySafeText } from '@kilocode/app-shared/display-text';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 
-// ---------------------------------------------------------------------------
 // PermissionContext — mirrors QuestionContext pattern
-// ---------------------------------------------------------------------------
 
 type PermissionContextValue = {
   cloudAgentSessionId: string | null;
@@ -45,10 +44,6 @@ export function PermissionContextProvider({
   );
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
-
-// ---------------------------------------------------------------------------
-// PermissionCard
-// ---------------------------------------------------------------------------
 
 type PermissionCardProps = {
   requestId: string;
@@ -111,7 +106,6 @@ export function PermissionCard({
 
   const isAlreadyAllowed = always.includes(permission);
 
-  // Extract command from metadata if present
   const command = typeof metadata.command === 'string' ? metadata.command : null;
 
   return (
@@ -119,7 +113,7 @@ export function PermissionCard({
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2">
         <Shield className="h-4 w-4 shrink-0 text-amber-500" />
-        <span className="text-sm font-medium capitalize">{permission}</span>
+        <span className="text-sm font-medium capitalize">{displaySafeText(permission)}</span>
         <span className="text-muted-foreground text-xs">permission request</span>
       </div>
 
@@ -131,7 +125,7 @@ export function PermissionCard({
             <div className="flex flex-wrap gap-1">
               {patterns.map((pattern, idx) => (
                 <code key={idx} className="bg-muted rounded px-1.5 py-0.5 text-xs">
-                  {pattern}
+                  {displaySafeText(pattern)}
                 </code>
               ))}
             </div>
@@ -143,7 +137,7 @@ export function PermissionCard({
           <div>
             <div className="text-muted-foreground mb-1 text-xs font-medium">Command</div>
             <pre className="bg-muted overflow-x-auto rounded px-2 py-1 text-xs">
-              <code>{command}</code>
+              <code>{displaySafeText(command)}</code>
             </pre>
           </div>
         )}

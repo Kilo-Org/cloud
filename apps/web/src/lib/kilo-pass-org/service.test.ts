@@ -1,24 +1,33 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import type Stripe from 'stripe';
 import {
   credit_transactions,
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plans,
+  kilo_pass_org_audit_records,
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_processing_runs,
   kilo_pass_org_supplements,
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
-import { KiloPassOrgAgreementState } from '@kilocode/db/schema-types';
+import {
+  KiloPassOrgAgreementState,
+  KiloPassOrgProcessingCondition,
+} from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { createOrganization } from '@/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { handleOrganizationKiloPassSubscriptionEvent } from './stripe-adapter';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { monthlyWindowFromOriginalAnchor } from './calculations';
 import {
   activatePaidAgreement,
   createParentSupplement,
   createPendingAgreement,
+  endAgreementAfterPassItemRemoved,
   nextIssuanceBoundary,
   organizationKiloPassService,
   runOrganizationPassIssuanceCron,
@@ -52,6 +61,123 @@ describe('Kilo Pass organization agreement service', () => {
       .set({ parent_organization_id: null })
       .where(inArray(organizations.id, ids));
     await db.delete(organizations).where(inArray(organizations.id, ids));
+  });
+
+  it.each(['legacy', 'one_year'] as const)(
+    'classifies direct free-flagged base grants as paid %s principal',
+    async terms => {
+      const owner = await insertTestUser();
+      const parent = await createOrganization(`kpo-policy-${crypto.randomUUID()}`, owner.id);
+      organizationIds.push(parent.id);
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 0,
+          microdollars_used: 5_000_000,
+        })
+        .where(eq(organizations.id, parent.id));
+      const pending = await createPendingAgreement({
+        parentOrganizationId: parent.id,
+        actorUserId: owner.id,
+        tier: 'tier_19',
+        cadence: 'yearly',
+        paidSeatCount: 1,
+        issuanceAnchorAt: window.start,
+        providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+        providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+        initialAllocations: [],
+      });
+      await activatePaidAgreement({
+        agreementId: pending.agreementId,
+        recipientUserId: owner.id,
+        paidFrom: window.start,
+        paidUntil: new Date('2027-07-01T00:00:00.000Z'),
+        paidSeatCount: 1,
+        firstWindow: window,
+        isBridge: false,
+        paidCreditTerms: terms,
+      });
+      const [base] = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, parent.id),
+            eq(credit_transactions.description, 'Kilo Pass organization base issuance')
+          )
+        );
+      expect(base).toMatchObject({
+        is_free: true,
+        credit_source: 'pass',
+        paid_credit_policy: terms,
+        expiration_baseline_microdollars_used: terms === 'one_year' ? 0 : null,
+      });
+      expect(base?.expiry_date && new Date(base.expiry_date).toISOString()).toBe(
+        terms === 'one_year' ? '2027-07-01T00:00:00.000Z' : null
+      );
+      await runOrganizationPassIssuanceCron(db, new Date('2026-08-01T00:00:00.000Z'));
+      const credits = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, parent.id),
+            eq(credit_transactions.description, 'Kilo Pass organization base issuance')
+          )
+        );
+      expect(credits.every(credit => credit.paid_credit_policy === terms)).toBe(true);
+    }
+  );
+
+  it('keeps captured paid terms through a snapshotless manual activation and recovery', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-manual-policy-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const pending = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'yearly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+    await db
+      .update(kilo_pass_org_agreements)
+      .set({
+        processing_condition: KiloPassOrgProcessingCondition.Manual,
+      })
+      .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+    await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: window.start,
+      paidUntil: new Date('2027-07-01T00:00:00.000Z'),
+      paidSeatCount: 1,
+      firstWindow: window,
+      isBridge: false,
+      paidCreditTerms: 'one_year',
+    });
+    await db
+      .update(kilo_pass_org_agreements)
+      .set({
+        processing_condition: KiloPassOrgProcessingCondition.Ready,
+      })
+      .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+    await runOrganizationPassIssuanceCron(db, window.start);
+    const [base] = await db
+      .select()
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.organization_id, parent.id),
+          eq(credit_transactions.description, 'Kilo Pass organization base issuance')
+        )
+      );
+    expect(base?.paid_credit_policy).toBe('one_year');
+    expect(new Date(base?.expiry_date ?? '').toISOString()).toBe('2027-07-01T00:00:00.000Z');
   });
 
   it('seeds concrete immutable standard terms and activates exactly once with parent remainder', async () => {
@@ -681,6 +807,209 @@ describe('Kilo Pass organization agreement service', () => {
 
     expect(second).toEqual({ agreementId: expect.any(String), created: true });
     expect(second.agreementId).not.toBe(first.agreementId);
+  });
+
+  it('recovers the release audit for the original agreement after a partial webhook failure', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-recovery-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const providerSubscriptionId = `sub_${crypto.randomUUID()}`;
+    const scheduleId = `sub_sched_${crypto.randomUUID()}`;
+    const original = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId,
+      providerSeatAddOnItemId: 'si_pass_original',
+      initialAllocations: [],
+    });
+    await db
+      .update(kilo_pass_org_agreements)
+      .set({ state: KiloPassOrgAgreementState.CancelAtPeriodEnd })
+      .where(eq(kilo_pass_org_agreements.id, original.agreementId));
+    const seatItem = {
+      id: 'si_seat',
+      quantity: 1,
+      price: { id: 'price_seat', product: [...SEAT_PRODUCT_IDS][0] ?? 'prod_seat' },
+    };
+    const seatOnlyEvent = (schedule: string | null) =>
+      ({
+        id: providerSubscriptionId,
+        status: 'active',
+        schedule,
+        metadata: {
+          type: 'kilo-pass-org',
+          organizationId: parent.id,
+          kiloUserId: owner.id,
+          tier: 'tier_19',
+          cadence: 'monthly',
+        },
+        items: { data: [seatItem] },
+      }) as unknown as Stripe.Subscription;
+    const ownedSchedule = (status: Stripe.SubscriptionSchedule.Status) =>
+      ({
+        id: scheduleId,
+        status,
+        metadata: { origin: 'kilo-pass-org-cancellation', agreementId: original.agreementId },
+        current_phase: { start_date: 1, end_date: 2 },
+        phases: [{ start_date: 1, end_date: 2, items: [{ price: 'price_seat', quantity: 1 }] }],
+      }) as unknown as Stripe.SubscriptionSchedule;
+    let scheduleStatus: Stripe.SubscriptionSchedule.Status = 'active';
+    let freshSubscription = seatOnlyEvent(null);
+    const auditRows = () =>
+      db
+        .select()
+        .from(kilo_pass_org_audit_records)
+        .where(
+          eq(
+            kilo_pass_org_audit_records.idempotency_key,
+            `provider-schedule-released:${scheduleId}`
+          )
+        );
+    const agreementState = async (agreementId: string) =>
+      (
+        await db
+          .select({ state: kilo_pass_org_agreements.state })
+          .from(kilo_pass_org_agreements)
+          .where(eq(kilo_pass_org_agreements.id, agreementId))
+      )[0]?.state;
+    jest
+      .spyOn(stripeClient.subscriptionSchedules, 'retrieve')
+      .mockImplementation(async () => ownedSchedule(scheduleStatus) as never);
+    const release = jest
+      .spyOn(stripeClient.subscriptionSchedules, 'release')
+      .mockImplementation(async () => {
+        scheduleStatus = 'released';
+        return ownedSchedule('released') as never;
+      });
+    jest
+      .spyOn(stripeClient.subscriptions, 'retrieve')
+      .mockImplementation(async () => freshSubscription as never);
+
+    try {
+      jest.spyOn(db, 'transaction').mockRejectedValueOnce(new Error('database unavailable'));
+      await expect(
+        handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(scheduleId))
+      ).rejects.toThrow('database unavailable');
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(await agreementState(original.agreementId)).toBe(
+        KiloPassOrgAgreementState.CancelAtPeriodEnd
+      );
+
+      await handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(null));
+      expect(await agreementState(original.agreementId)).toBe(KiloPassOrgAgreementState.Ended);
+      expect(await auditRows()).toEqual([]);
+
+      await expect(
+        handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(scheduleId))
+      ).resolves.toBe(true);
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(await auditRows()).toEqual([
+        expect.objectContaining({
+          agreement_id: original.agreementId,
+          after_json: expect.objectContaining({ scheduleId, alreadyTerminal: true }),
+        }),
+      ]);
+
+      const repurchase = await createPendingAgreement({
+        parentOrganizationId: parent.id,
+        actorUserId: owner.id,
+        tier: 'tier_19',
+        cadence: 'monthly',
+        paidSeatCount: 1,
+        issuanceAnchorAt: window.start,
+        providerSubscriptionId,
+        providerSeatAddOnItemId: 'si_pass_repurchase',
+        initialAllocations: [],
+      });
+      await db
+        .update(kilo_pass_org_agreements)
+        .set({ state: KiloPassOrgAgreementState.Active })
+        .where(eq(kilo_pass_org_agreements.id, repurchase.agreementId));
+      freshSubscription = {
+        ...seatOnlyEvent(null),
+        items: {
+          data: [
+            seatItem,
+            {
+              id: 'si_pass_repurchase',
+              quantity: 1,
+              price: { id: 'price_repurchased_pass', product: 'prod_kilo_pass' },
+            },
+          ],
+        },
+      } as unknown as Stripe.Subscription;
+
+      await handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(null));
+      await handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(scheduleId));
+      expect(await agreementState(repurchase.agreementId)).toBe(KiloPassOrgAgreementState.Active);
+      expect(await auditRows()).toHaveLength(1);
+    } finally {
+      jest.restoreAllMocks();
+      await db
+        .delete(kilo_pass_org_audit_records)
+        .where(
+          eq(
+            kilo_pass_org_audit_records.idempotency_key,
+            `provider-schedule-released:${scheduleId}`
+          )
+        );
+    }
+  });
+
+  it('ends an agreement after pass removal and audits its schedule release once', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-removed-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const pending = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+    const scheduleId = `sub_sched_${crypto.randomUUID()}`;
+
+    await endAgreementAfterPassItemRemoved({
+      agreementId: pending.agreementId,
+      scheduleRelease: { scheduleId, status: 'released', alreadyTerminal: false },
+    });
+    await endAgreementAfterPassItemRemoved({
+      agreementId: pending.agreementId,
+      scheduleRelease: { scheduleId, status: 'released', alreadyTerminal: true },
+    });
+
+    const [agreement] = await db
+      .select({ state: kilo_pass_org_agreements.state })
+      .from(kilo_pass_org_agreements)
+      .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+    expect(agreement?.state).toBe(KiloPassOrgAgreementState.Ended);
+    const audits = await db
+      .select()
+      .from(kilo_pass_org_audit_records)
+      .where(
+        and(
+          eq(kilo_pass_org_audit_records.agreement_id, pending.agreementId),
+          eq(kilo_pass_org_audit_records.action, 'provider_schedule_released')
+        )
+      );
+    expect(audits).toEqual([
+      expect.objectContaining({
+        reason: 'pass_item_removed',
+        idempotency_key: `provider-schedule-released:${scheduleId}`,
+        after_json: expect.objectContaining({ scheduleId, alreadyTerminal: false }),
+      }),
+    ]);
+    await db
+      .delete(kilo_pass_org_audit_records)
+      .where(eq(kilo_pass_org_audit_records.agreement_id, pending.agreementId));
   });
 
   it('rejects non-child allocation and stale plan writes', async () => {
@@ -1348,5 +1677,152 @@ describe('Kilo Pass organization agreement service', () => {
       ['2026-07-15T00:00:00.000Z', '2026-08-01T00:00:00.000Z'],
       ['2026-08-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'],
     ]);
+  });
+
+  it('recovers a partially paid window at its prorated amounts', async () => {
+    const owner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createOrganization(`kpo-bridge-retry-${crypto.randomUUID()}`, owner.id);
+    const child = await createOrganization(
+      `kpo-bridge-retry-child-${crypto.randomUUID()}`,
+      childOwner.id
+    );
+    organizationIds.push(parent.id, child.id);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    const anchor = window.start;
+    const pending = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 2,
+      issuanceAnchorAt: anchor,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [{ organizationId: child.id, passCapacity: 2 }],
+    });
+    const bridgeWindow = { start: new Date('2026-07-15T00:00:00.000Z'), end: window.end };
+    const blocked = await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: bridgeWindow.start,
+      paidUntil: new Date('2026-09-01T00:00:00.000Z'),
+      paidSeatCount: 1,
+      firstWindow: window,
+      paidBridgeInterval: bridgeWindow,
+      isBridge: true,
+    });
+    expect(blocked).toEqual({ issued: false, blocked: true });
+    const [blockedRun] = await db
+      .select()
+      .from(kilo_pass_org_processing_runs)
+      .where(
+        and(
+          eq(kilo_pass_org_processing_runs.agreement_id, pending.agreementId),
+          eq(kilo_pass_org_processing_runs.window_start, bridgeWindow.start.toISOString())
+        )
+      );
+    if (!blockedRun) throw new Error('blocked processing run was not created');
+    expect(blockedRun).toMatchObject({ state: 'blocked' });
+    expect(new Date(blockedRun.window_start).toISOString()).toBe(bridgeWindow.start.toISOString());
+    expect(new Date(blockedRun.window_end).toISOString()).toBe(bridgeWindow.end.toISOString());
+    await expect(
+      db
+        .select({ id: kilo_pass_org_issuance_snapshots.id })
+        .from(kilo_pass_org_issuance_snapshots)
+        .where(
+          and(
+            eq(kilo_pass_org_issuance_snapshots.agreement_id, pending.agreementId),
+            eq(kilo_pass_org_issuance_snapshots.window_start, bridgeWindow.start.toISOString())
+          )
+        )
+    ).resolves.toHaveLength(0);
+
+    await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: window.end,
+      paidUntil: new Date('2026-10-01T00:00:00.000Z'),
+      paidSeatCount: 3,
+      firstWindow: monthlyWindowFromOriginalAnchor(anchor, 1),
+      isBridge: false,
+    });
+    await organizationKiloPassService.retryRun({
+      organizationId: parent.id,
+      runId: blockedRun.id,
+      actorUserId: owner.id,
+    });
+
+    const recoveredSnapshots = await db
+      .select({
+        container: kilo_pass_org_issuance_snapshots.allocation_container_organization_id,
+        kind: kilo_pass_org_issuance_snapshots.kind,
+        start: kilo_pass_org_issuance_snapshots.window_start,
+        end: kilo_pass_org_issuance_snapshots.window_end,
+        base: kilo_pass_org_issuance_snapshots.base_credit_microdollars,
+        bonus: kilo_pass_org_issuance_snapshots.bonus_credit_microdollars,
+        unlock: kilo_pass_org_issuance_snapshots.unlock_spend_microdollars,
+      })
+      .from(kilo_pass_org_issuance_snapshots)
+      .where(
+        and(
+          eq(kilo_pass_org_issuance_snapshots.agreement_id, pending.agreementId),
+          eq(kilo_pass_org_issuance_snapshots.window_start, bridgeWindow.start.toISOString())
+        )
+      );
+    const byContainer = Object.fromEntries(
+      recoveredSnapshots.map(snapshot => [
+        snapshot.container === child.id ? 'child' : 'parent',
+        {
+          kind: snapshot.kind,
+          start: new Date(snapshot.start).toISOString(),
+          end: new Date(snapshot.end).toISOString(),
+          base: snapshot.base,
+          bonus: snapshot.bonus,
+          unlock: snapshot.unlock,
+        },
+      ])
+    );
+    expect(byContainer).toEqual({
+      child: {
+        kind: 'bridge',
+        start: '2026-07-15T00:00:00.000Z',
+        end: '2026-08-01T00:00:00.000Z',
+        base: 20_838_710,
+        bonus: 4_387_097,
+        unlock: 20_838_710,
+      },
+      parent: {
+        kind: 'bridge',
+        start: '2026-07-15T00:00:00.000Z',
+        end: '2026-08-01T00:00:00.000Z',
+        base: 10_419_355,
+        bonus: 2_193_548,
+        unlock: 10_419_355,
+      },
+    });
+
+    const grants = await db
+      .select({
+        organizationId: credit_transactions.organization_id,
+        category: credit_transactions.credit_category,
+        amount: credit_transactions.amount_microdollars,
+      })
+      .from(credit_transactions)
+      .where(inArray(credit_transactions.organization_id, [child.id, parent.id]));
+    const recoveredGrants = new Map(
+      grants
+        .filter(grant => grant.category?.includes(bridgeWindow.start.toISOString()))
+        .map(grant => [grant.organizationId, grant.amount])
+    );
+    expect(recoveredGrants).toEqual(
+      new Map([
+        [child.id, 20_838_710],
+        [parent.id, 10_419_355],
+      ])
+    );
   });
 });

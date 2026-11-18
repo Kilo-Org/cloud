@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
@@ -15,6 +16,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  BYOK_ONLY_DESCRIPTION,
+  ByokOnlyPriceCell,
+  ByokOnlyTag,
   PolicyPill,
   ProviderPolicyTag,
 } from '@/components/organizations/providers-and-models/PolicyPills';
@@ -34,6 +38,7 @@ export function ProviderDetailsDialog({
   formatPriceCompact,
   onToggleProviderEnabled,
   onToggleModelAllowed,
+  onSetModelsAllowed,
   onClose,
 }: {
   open: boolean;
@@ -45,11 +50,16 @@ export function ProviderDetailsDialog({
   formatPriceCompact: (raw: string) => string;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
+  onSetModelsAllowed: (modelIds: ReadonlyArray<string>, nextAllowed: boolean) => void;
   onClose: () => void;
 }) {
   const isProviderEnabled = infoProvider
     ? enabledProviderSlugs.has(infoProvider.providerSlug)
     : false;
+  const providerModelIds = infoProviderModels.map(model => model.modelId);
+  const hasModels = providerModelIds.length > 0;
+  const allModelsAllowed = providerModelIds.every(modelId => allowedModelIds.has(modelId));
+  const noModelsAllowed = providerModelIds.every(modelId => !allowedModelIds.has(modelId));
 
   return (
     <Dialog open={open} onOpenChange={nextOpen => (nextOpen ? null : onClose())}>
@@ -60,6 +70,7 @@ export function ProviderDetailsDialog({
               <img
                 src={infoProvider.providerIconUrl}
                 alt=""
+                referrerPolicy="no-referrer"
                 className="h-6 w-6 shrink-0 object-contain"
               />
             ) : null}
@@ -89,9 +100,14 @@ export function ProviderDetailsDialog({
           {infoProvider ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
+                <ByokOnlyTag value={infoProvider.byokOnly} />
                 <ProviderPolicyTag value={infoProvider.trains} variant="trains" />
                 <ProviderPolicyTag value={infoProvider.retainsPrompts} variant="retainsPrompts" />
               </div>
+
+              {infoProvider.byokOnly ? (
+                <div className="text-muted-foreground text-xs">{BYOK_ONLY_DESCRIPTION}</div>
+              ) : null}
 
               {infoProvider.headquarters ? (
                 <div className="text-muted-foreground text-xs">
@@ -113,10 +129,36 @@ export function ProviderDetailsDialog({
             </div>
           ) : null}
 
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground text-xs">
+              Changes apply to these models across all providers and take effect after you save.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canEdit || !hasModels || allModelsAllowed}
+                onClick={() => onSetModelsAllowed(providerModelIds, true)}
+              >
+                Select all
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canEdit || !hasModels || noModelsAllowed}
+                onClick={() => onSetModelsAllowed(providerModelIds, false)}
+              >
+                Deselect all
+              </Button>
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Model allowed</TableHead>
+                <TableHead>Model enabled</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>
@@ -142,8 +184,16 @@ export function ProviderDetailsDialog({
                       <div className="font-medium">{model.modelName}</div>
                       <div className="text-muted-foreground mt-0.5 text-xs">{model.modelId}</div>
                     </TableCell>
-                    <TableCell>{formatPriceCompact(model.promptPrice)}</TableCell>
-                    <TableCell>{formatPriceCompact(model.completionPrice)}</TableCell>
+                    {infoProvider?.byokOnly ? (
+                      <TableCell colSpan={2}>
+                        <ByokOnlyPriceCell />
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell>{formatPriceCompact(model.promptPrice)}</TableCell>
+                        <TableCell>{formatPriceCompact(model.completionPrice)}</TableCell>
+                      </>
+                    )}
                     <TableCell>
                       <PolicyPill value={model.trains} variant="trains" />
                     </TableCell>

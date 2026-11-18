@@ -1,4 +1,6 @@
-import { type QueryClient } from '@tanstack/react-query';
+import { hashKey, type QueryClient } from '@tanstack/react-query';
+
+import { nextMutationGeneration } from '@/lib/hooks/mutation-generations';
 
 /**
  * Pure logic for the per-user notification-preference settings (S3 — the
@@ -14,12 +16,11 @@ export const DEFAULT_NOTIFICATION_PREFERENCE = true as const;
 
 /** tRPC keys for the per-category toggles on the dedicated Notifications screen. */
 export const NOTIFICATION_CATEGORY_KEYS = [
-  'chatMessages',
   'agentAttention',
   'agentUpdates',
   'sessionStatus',
-  'kiloclawActivity',
   'balanceAlerts',
+  'spendAlerts',
   'securityFindings',
 ] as const;
 
@@ -27,14 +28,14 @@ export type NotificationCategoryKey = (typeof NOTIFICATION_CATEGORY_KEYS)[number
 
 /** Full shape of a single row in the tRPC cache for `getNotificationPreferences`. */
 export type NotificationPreferences = Readonly<{
-  chatMessages: boolean;
   agentAttention: boolean;
   agentUpdates: boolean;
   sessionStatus: boolean;
-  kiloclawActivity: boolean;
   balanceAlerts: boolean;
+  spendAlerts: boolean;
   securityFindings: boolean;
   agentPushEnabled: boolean;
+  notificationPreviews?: 'generic' | 'full';
 }>;
 
 /** What the cache may hold — either the typed full row or the legacy `agentPushEnabled` snapshot. */
@@ -102,12 +103,11 @@ function defaultPreferences(
   overrides: Partial<NotificationPreferences> = {}
 ): NotificationPreferences {
   return {
-    chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
     agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
     agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-    kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
     balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
     agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
     ...overrides,
@@ -141,6 +141,46 @@ export function readAgentPushPreference(
   return readFromSnapshot(snapshot)[category];
 }
 
+/**
+ * Read a single category's value, or `undefined` while the server-resolved row
+ * has not loaded. {@link readAgentPushPreference}'s default-ON fallback is right
+ * for a rendered control (a user with no stored row really has the category on),
+ * but a caller that *acts* on the value must not read an unloaded cache as ON:
+ * the app-owned needs-input carrier would then alert a category the user turned
+ * off after a restart. `undefined` means "not loaded yet — withhold".
+ */
+export function readAgentPushPreferenceIfLoaded(
+  queryClient: Pick<QueryClient, 'getQueryData'>,
+  queryKey: readonly unknown[],
+  category: NotificationCategoryKey = 'agentUpdates'
+): boolean | undefined {
+  const snapshot = queryClient.getQueryData(queryKey) as NotificationPreferencesSnapshot;
+  if (snapshot === undefined) {
+    return undefined;
+  }
+  return readFromSnapshot(snapshot)[category];
+}
+
+/**
+ * The user's message-preview choice, or `undefined` while the server-resolved
+ * row has not loaded. A caller that acts on it treats `undefined` as the
+ * server's own default (`generic`): a legacy snapshot that predates the column
+ * carries no choice either, so it reads the same way instead of claiming the
+ * content-revealing value.
+ */
+export function readNotificationPreviewsIfLoaded(
+  queryClient: Pick<QueryClient, 'getQueryData'>,
+  queryKey: readonly unknown[]
+): NotificationPreferences['notificationPreviews'] {
+  const snapshot = queryClient.getQueryData(queryKey) as NotificationPreferencesSnapshot;
+  if (snapshot === undefined) {
+    return undefined;
+  }
+  // Neither a legacy snapshot nor a row from a server that predates the column
+  // carries a choice, so both read as unloaded rather than as `full`.
+  return readFromSnapshot(snapshot).notificationPreviews;
+}
+
 type OptimisticArgs = Readonly<{
   queryClient: Pick<QueryClient, 'cancelQueries' | 'getQueryData' | 'setQueryData'>;
   queryKey: readonly unknown[];
@@ -150,6 +190,9 @@ type OptimisticArgs = Readonly<{
 
 type OptimisticContext = Readonly<{
   previous: NotificationPreferencesSnapshot;
+  // Generation stamped atomically with the optimistic write, so a later
+  // rollback only fires when this write is still the latest one.
+  generation: number;
   // When the legacy single-key snapshot was the cache value, also remember
   // whether we materialized it into the full per-category shape so the
   // rollback can restore the original shape.
@@ -164,6 +207,10 @@ type OptimisticContext = Readonly<{
  */
 export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<OptimisticContext> {
   await args.queryClient.cancelQueries({ queryKey: args.queryKey });
+  // Stamp after the last await, in the same synchronous block as the cache
+  // write below. Stamping before the await lets a second mutation take the
+  // newer generation while this one still owns the newer cache write.
+  const generation = nextMutationGeneration(hashKey(args.queryKey));
   const rawPrevious = args.queryClient.getQueryData(
     args.queryKey
   ) as NotificationPreferencesSnapshot;
@@ -174,7 +221,7 @@ export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<Op
       ...defaultPreferences(),
       [args.category]: args.next,
     });
-    return { previous: undefined, previousWasLegacy: false };
+    return { previous: undefined, previousWasLegacy: false, generation };
   }
   if (isLegacySnapshot(rawPrevious)) {
     // Promote the legacy snapshot into the new per-category shape (sharing the
@@ -184,14 +231,14 @@ export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<Op
       ...promoted,
       [args.category]: args.next,
     });
-    return { previous: rawPrevious, previousWasLegacy: true };
+    return { previous: rawPrevious, previousWasLegacy: true, generation };
   }
   const previous = rawPrevious as NotificationPreferences;
   args.queryClient.setQueryData(args.queryKey, {
     ...previous,
     [args.category]: args.next,
   });
-  return { previous: rawPrevious, previousWasLegacy: false };
+  return { previous: rawPrevious, previousWasLegacy: false, generation };
 }
 
 type RollbackArgs = Readonly<{

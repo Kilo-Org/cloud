@@ -1,51 +1,163 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { AgentSandboxUnavailableError } from '../../agent-sandbox/protocol.js';
-import { createAgentSandbox } from '../../agent-sandbox/factory.js';
+import type { WorkerDb } from '@kilocode/db/client';
 import { logger, withLogTags } from '../../logger.js';
 import { generateSandboxId } from '../../sandbox-id.js';
-import type { SessionId, InterruptResult, TRPCContext } from '../../types.js';
-import type { SandboxId } from '../../types.js';
-import {
-  InvalidSessionMetadataError,
-  SessionService,
-  fetchSessionMetadata,
-} from '../../session-service.js';
+import type { SessionId, InterruptResult, TRPCContext, SandboxId } from '../../types.js';
+import { fetchSessionMetadata } from '../../session/metadata.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { interruptControlSession } from '../control-plane-session.js';
+import {
+  protectedProcedure,
+  publicProcedure,
+  internalApiProtectedProcedure,
+  cloudAgentManagedProcedure,
+} from '../auth.js';
 import {
   sessionIdSchema,
+  MessageIdSchema,
   GetSessionInput,
   GetSessionOutput,
+  GetSandboxStatusInput,
+  GetSandboxStatusOutput,
   GetSessionHealthInput,
   GetSessionHealthOutput,
   GetMessageResultInput,
   GetMessageResultOutput,
-  GetLatestAssistantMessageInput,
-  GetLatestAssistantMessageOutput,
 } from '../schemas.js';
 import { readProfileBundle } from '../../session-profile.js';
-import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
+import type {
+  ControlPlaneSessionMetadataSummary,
+  ControlPlaneSessionSnapshot,
+  SandboxSessionV2,
+} from '../../control-plane/session/session-do.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
+import { getPgDb } from '../../db/pg.js';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
+import {
+  WORKSPACE_DELETING,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+} from '@kilocode/session-ingest-contracts';
+import { and, eq } from 'drizzle-orm';
+import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
+import type { PreparationAttempt } from '../../shared/protocol.js';
+import { getSessionAuxiliaryMetadata } from '../../session/session-auxiliary-metadata.js';
+import { getBackgroundActivity } from './session-background.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
+  githubIntegrationId?: string;
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
 } {
   const repository = metadata.repository;
   if (!repository) return {};
   switch (repository.type) {
     case 'github':
-      return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+      return {
+        githubRepo: repository.repo,
+        platform: repository.platform ?? 'github',
+        ...(repository.githubIntegrationId === undefined
+          ? {}
+          : { githubIntegrationId: repository.githubIntegrationId }),
+      };
     case 'gitlab':
       return { gitUrl: repository.url, platform: 'gitlab' };
     case 'bitbucket':
-      return { gitUrl: repository.url, platform: 'bitbucket' };
+      return {
+        gitUrl: repository.url,
+        platform: 'bitbucket',
+        bitbucketWorkspaceUuid: repository.workspaceUuid,
+        bitbucketRepositoryUuid: repository.repositoryUuid,
+      };
     case 'git':
       return { gitUrl: repository.url, platform: repository.platform };
+  }
+}
+
+/** Projects the control-plane sandbox lifecycle onto the public health enum. */
+function sandboxStatusFromLifecycle(
+  status: SandboxLifecycleStatus
+): 'healthy' | 'destroyed' | 'unreachable' | 'unknown' {
+  switch (status) {
+    case 'active':
+      return 'healthy';
+    case 'unreachable':
+      return 'unreachable';
+    case 'error':
+      return 'destroyed';
+    default:
+      return 'unknown';
+  }
+}
+
+type WorktreeOwnership = {
+  parentSessionId: string | null;
+  cloudAgentSessionScopeId: string | null;
+};
+
+async function findWorktreeOwnership(
+  db: WorkerDb,
+  userId: string,
+  kiloSessionId: string,
+  cloudAgentSessionId: string
+): Promise<WorktreeOwnership | null> {
+  const [row] = await db
+    .select({
+      parentSessionId: cli_sessions_v2.parent_session_id,
+      cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+    })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, userId),
+        eq(cli_sessions_v2.session_id, kiloSessionId),
+        eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId)
+      )
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+function deletionErrorCode(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Rejects a destructive session delete that would remove the final hosted root
+ * of an active workspace before any runtime teardown. The authoritative delete
+ * still re-checks the invariant inside the row-deletion transaction.
+ */
+async function assertHostedRootSessionDeletable(
+  env: TRPCContext['env'],
+  userId: string,
+  cloudAgentSessionId: SessionId,
+  kiloSessionId: string | undefined
+): Promise<void> {
+  if (!kiloSessionId) return;
+  try {
+    await env.SESSION_INGEST.assertHostedWorkspaceSessionDeletable({
+      kiloUserId: userId,
+      sessionId: kiloSessionId,
+      cloudAgentSessionId,
+    });
+  } catch (error) {
+    const code = deletionErrorCode(error);
+    if (code.includes(WORKSPACE_REQUIRES_ROOT_SESSION)) {
+      throw new TRPCError({ code: 'CONFLICT', message: WORKSPACE_REQUIRES_ROOT_SESSION });
+    }
+    if (code.includes(WORKSPACE_DELETING)) {
+      throw new TRPCError({ code: 'CONFLICT', message: WORKSPACE_DELETING });
+    }
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_deletion_unavailable',
+    });
   }
 }
 
@@ -59,6 +171,8 @@ async function deleteSessionResources(
   logger.info('Starting session deletion');
 
   try {
+    const getStub = () => getSandboxSessionStub(env, userId, sessionId);
+
     const metadata = await fetchSessionMetadata(env, userId, sessionId);
     if (!metadata) {
       logger.info('Session not found or already deleted');
@@ -67,13 +181,12 @@ async function deleteSessionResources(
 
     await authorizeExistingSession?.();
 
+    if (authorizeExistingSession && metadata.workspace?.worktreeId) {
+      await assertHostedRootSessionDeletable(env, userId, sessionId, metadata.auth.kiloSessionId);
+    }
+
     try {
-      const doKey = `${userId}:${sessionId}`;
-      await withDORetry(
-        () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
-        stub => stub.deleteSession(),
-        'deleteSession'
-      );
+      await withDORetry(getStub, stub => stub.deleteSession(), 'deleteSession');
       logger.info('Session metadata destroyed');
     } catch (error) {
       logger
@@ -100,10 +213,11 @@ async function deleteSessionResources(
 
 /**
  * Creates session management handlers.
- * These handlers manage session lifecycle (delete, interrupt, logs) and health checks.
+ * These handlers manage session lifecycle and health checks.
  */
 export function createSessionManagementHandlers() {
   return {
+    getBackgroundActivity,
     /**
      * Delete a session and clean up all associated resources.
      *
@@ -137,8 +251,9 @@ export function createSessionManagementHandlers() {
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const sessionId = input.sessionId as SessionId;
         return withLogTags({ source: 'cleanupSession' }, () =>
-          deleteSessionResources(input.sessionId as SessionId, ctx.userId, ctx.env)
+          deleteSessionResources(sessionId, ctx.userId, ctx.env)
         );
       }),
 
@@ -147,7 +262,7 @@ export function createSessionManagementHandlers() {
      * The DO may signal a connected wrapper immediately and durably supervises
      * physical cleanup without letting this route issue provider teardown.
      */
-    interruptSession: protectedProcedure
+    interruptSession: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema.describe('Session ID to interrupt'),
@@ -167,47 +282,43 @@ export function createSessionManagementHandlers() {
           });
 
           try {
-            const metadata = await fetchSessionMetadata(env, userId, sessionId);
+            const notFoundResult: InterruptResult = {
+              success: false,
+              message: 'Session not found',
+              processesFound: false,
+            };
+            const readMetadata = () => fetchSessionMetadata(env, userId, sessionId);
 
-            if (!metadata) {
+            if (!(await readMetadata())) {
               logger.info('Session not found');
-              return {
-                success: false,
-                message: 'Session not found',
-                processesFound: false,
-              };
+              return notFoundResult;
             }
+            const interruptResult = await interruptControlSession({
+              env,
+              ownerId: userId,
+              sessionId,
+            });
 
-            // Mark session as interrupted in DO before killing processes (with retry)
-            // This signals the streaming generator to stop
-            const doKey = `${userId}:${sessionId}`;
-            const getStub = () =>
-              env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+            const success = interruptResult !== undefined && interruptResult.state !== 'rejected';
+            const message =
+              interruptResult === undefined
+                ? 'No session work to interrupt'
+                : interruptResult.message;
 
-            await withDORetry(getStub, stub => stub.markAsInterrupted(), 'markAsInterrupted');
-
-            const interruptResult = await withDORetry(
-              getStub,
-              stub => stub.interruptExecution(),
-              'interruptExecution'
-            );
-
-            if (!interruptResult.success) {
+            if (!success) {
               logger
                 .withFields({
-                  message:
-                    interruptResult.message ??
-                    'No accepted current messages or pending queued messages',
+                  reason: message ?? 'No accepted current messages or pending queued messages',
                 })
                 .info('No accepted current messages or pending queued messages to interrupt');
             }
 
             logger.info('Session interruption completed');
             return {
-              success: interruptResult.success,
-              message: interruptResult.success
+              success,
+              message: success
                 ? 'Session interruption accepted'
-                : (interruptResult.message ?? 'No session work to interrupt'),
+                : (message ?? 'No session work to interrupt'),
               processesFound: false,
             };
           } catch (error) {
@@ -223,17 +334,59 @@ export function createSessionManagementHandlers() {
       }),
 
     /**
+     * Drop one pending (not yet accepted) queued message by id. Never interrupts
+     * the accepted/current run; a missing id or the accepted current message
+     * returns `{ dropped: false }`.
+     */
+    cancelQueuedMessage: protectedProcedure
+      .input(
+        z.object({
+          sessionId: sessionIdSchema.describe('Session ID owning the queued message'),
+          messageId: MessageIdSchema.describe('Message ID to drop from the queue'),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        return withLogTags({ source: 'cancelQueuedMessage' }, async () => {
+          const sessionId = input.sessionId as SessionId;
+          const { userId, env } = ctx;
+
+          logger.setTags({ userId, sessionId });
+          logger.info('Canceling queued message');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
+
+          try {
+            const getStub = () => getSandboxSessionStub(env, userId, sessionId);
+            return await withDORetry(
+              getStub,
+              stub => stub.cancelQueuedMessage(input.messageId),
+              'cancelQueuedMessage'
+            );
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            logger.withFields({ error: errorMsg }).error('Failed to cancel queued message');
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to cancel queued message: ${errorMsg}`,
+            });
+          }
+        });
+      }),
+
+    /**
      * Get session metadata.
      *
      * Returns sanitized session metadata (no secrets) including lifecycle timestamps.
      * Useful for frontend idempotency - checking if a session was already initiated
      * before a page refresh.
-     *
      * Security:
      * - Excludes: githubToken, gitToken, envVars values, setupCommands, mcpServers configs
      * - Includes: counts of envVars, setupCommands, mcpServers for debugging
      */
-    getSession: protectedProcedure
+    getSession: cloudAgentManagedProcedure
       .input(GetSessionInput)
       .output(GetSessionOutput)
       .query(async ({ input, ctx }) => {
@@ -242,77 +395,93 @@ export function createSessionManagementHandlers() {
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
-          logger.info('Fetching session metadata');
-          await requireCurrentSessionAccess({
+          const sessionAccess = await requireCurrentSessionAccess({
             env,
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
+            ...(ctx.cloudAgentAuthority
+              ? { expectedOrganizationId: ctx.cloudAgentAuthority.organizationId }
+              : {}),
           });
 
-          // Get DO stub keyed by userId:sessionId for user isolation
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+          // Get DO stub keyed by userId:sessionId for user isolation. The getter
+          // returns a fresh stub per retry attempt.
+          const getStub = () => getSandboxSessionStub(env, userId, sessionId);
 
-          // Fetch metadata with retry
-          const metadata = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            CloudAgentSessionState | null
-          >(getStub, s => s.getMetadata(), 'getMetadata');
-
-          // Handle not found
-          if (!metadata) {
-            logger.info('Session not found');
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'Session not found',
-            });
-          }
-
-          const currentWork = await withDORetry(
-            getStub,
-            s => s.getCurrentMessageWork(),
-            'getCurrentMessageWork'
+          const summaryRead = withDORetry<
+            DurableObjectStub<SandboxSessionV2>,
+            ControlPlaneSessionMetadataSummary
+          >(getStub, s => s.getSessionMetadataSummary(), 'getSessionMetadataSummary').then(
+            result => {
+              if (!result.metadata)
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+              return { ...result, metadata: result.metadata };
+            }
           );
-
-          // Fetch the latest persisted event ID for the durability watermark.
-          // Failures are swallowed so an optional watermark read never blocks
-          // the session response.
-          let latestEventId: number | null = null;
-          try {
-            latestEventId = await withDORetry(
-              getStub,
-              s => s.getLatestEventId(),
-              'getLatestEventId'
-            );
-          } catch (error) {
-            logger
-              .withFields({
-                sessionId,
-                error: error instanceof Error ? error.message : String(error),
-              })
-              .warn('Failed to fetch latest event ID for getSession');
-          }
-
-          // Compute sandboxId for log correlation
-          const sessionMetadata = metadata;
+          const [
+            { metadata: sessionMetadata, snapshot, currentMessage },
+            auxiliaryMetadata,
+            worktreeOwnership,
+          ] = await Promise.all([
+            summaryRead,
+            (async () => {
+              try {
+                return await getSessionAuxiliaryMetadata(getPgDb(env), {
+                  userId,
+                  cloudAgentSessionId: sessionId,
+                  kiloSessionId: sessionAccess.kiloSessionId,
+                  organizationId: sessionAccess.organizationId,
+                });
+              } catch (error) {
+                logger
+                  .withFields({
+                    sessionId,
+                    errorName: error instanceof Error ? error.name : 'unknown',
+                  })
+                  .warn('Failed to fetch optional auxiliary metadata for getSession');
+                return null;
+              }
+            })(),
+            summaryRead.then(({ metadata }) =>
+              metadata.workspace?.worktreeId
+                ? findWorktreeOwnership(
+                    getPgDb(env),
+                    userId,
+                    sessionAccess.kiloSessionId,
+                    sessionId
+                  )
+                : null
+            ),
+          ]);
+          const found = snapshot.type === 'found' ? snapshot : null;
+          const currentWork =
+            found && currentMessage
+              ? {
+                  messageId: currentMessage.messageId,
+                  status:
+                    currentMessage.state === 'accepted'
+                      ? ('running' as const)
+                      : ('pending' as const),
+                  health: 'healthy' as const,
+                }
+              : null;
+          const latestEventId = found?.latestEventId ?? null;
+          const routeReady = found ? found.route?.state === 'ready' : undefined;
+          const title = found?.title;
+          const totalCostMicrodollars = found?.totalCostMicrodollars;
+          const updateCursor = found?.updateCursor;
           const metadataProfile = readProfileBundle(sessionMetadata);
 
           const sandboxId =
             sessionMetadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              sessionMetadata.identity.orgId,
-              userId,
-              sessionMetadata.identity.sessionId,
-              sessionMetadata.identity.botId,
-              {
-                createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(sessionMetadata.identity.sessionId, {
+              createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
-          logger.info('Session metadata retrieved successfully');
+
+          // Worktree ownership lives on the external ownership row, not in DO metadata.
+          const worktreeId = sessionMetadata.workspace?.worktreeId;
 
           // Sanitize and return safe fields only (no tokens/secrets)
           const repositoryFields = publicRepositoryFields(sessionMetadata);
@@ -321,11 +490,27 @@ export function createSessionManagementHandlers() {
             kiloSessionId: sessionMetadata.auth.kiloSessionId,
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,
+            environmentId: sessionMetadata.environment?.environmentId,
             sandboxId,
+            ...auxiliaryMetadata,
+            createdOnPlatform:
+              sessionMetadata.identity.createdOnPlatform ?? auxiliaryMetadata?.createdOnPlatform,
+            title,
+            totalCostMicrodollars,
+            updateCursor,
 
-            githubRepo: repositoryFields.githubRepo,
-            gitUrl: repositoryFields.gitUrl,
-            platform: repositoryFields.platform,
+            ...(worktreeId
+              ? {
+                  worktreeId,
+                  parentSessionId: worktreeOwnership?.parentSessionId ?? null,
+                  cloudAgentSessionScopeId: worktreeOwnership?.cloudAgentSessionScopeId ?? null,
+                }
+              : {}),
+            ...(sessionMetadata.parentCloudAgentSessionId
+              ? { parentCloudAgentSessionId: sessionMetadata.parentCloudAgentSessionId }
+              : {}),
+
+            ...repositoryFields,
             // githubToken: OMITTED
             // gitToken: OMITTED
 
@@ -336,9 +521,13 @@ export function createSessionManagementHandlers() {
             variant: sessionMetadata.agent?.variant,
             autoCommit: sessionMetadata.finalization?.autoCommit,
             upstreamBranch: sessionMetadata.repository?.upstreamBranch,
+            branchName: sessionMetadata.workspace?.branchName,
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,
+              mode: agent.config.mode,
+              hidden: agent.config.hidden,
+              disable: agent.config.disable,
               model: agent.config.model ?? undefined,
               variant: agent.config.variant,
             })),
@@ -361,6 +550,11 @@ export function createSessionManagementHandlers() {
             preparedAt: sessionMetadata.lifecycle.preparedAt,
             initiatedAt: sessionMetadata.lifecycle.initiatedAt,
 
+            // Whether this session's route is ready to accept a terminal.
+            // A session without a found snapshot falls back to having been
+            // prepared at least once.
+            routeReady: routeReady ?? Boolean(sessionMetadata.lifecycle.preparedAt),
+
             // callbackTarget is intentionally NOT returned: it may carry
             // service-to-service auth headers and is reachable by the
             // session's owning user via the web tRPC surface.
@@ -374,6 +568,44 @@ export function createSessionManagementHandlers() {
         });
       }),
 
+    getSandboxStatus: protectedProcedure
+      .input(GetSandboxStatusInput)
+      .output(GetSandboxStatusOutput)
+      .query(async ({ input, ctx }) => {
+        const sessionId = input.cloudAgentSessionId as SessionId;
+        await requireCurrentSessionAccess({
+          env: ctx.env,
+          kiloUserId: ctx.userId,
+          cloudAgentSessionId: sessionId,
+        });
+
+        try {
+          return await withDORetry(
+            () => () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+            async getStub => {
+              try {
+                return GetSandboxStatusOutput.parse(await getStub().getSandboxStatus());
+              } catch (error) {
+                throw Object.assign(new Error('Sandbox status unavailable'), {
+                  retryable:
+                    error instanceof Error && 'retryable' in error && error.retryable === true,
+                });
+              }
+            },
+            'getSandboxStatus'
+          );
+        } catch {
+          return {
+            status: 'unknown',
+            provider: 'Unknown',
+            observedAt: Date.now(),
+            detailCode: 'status_unavailable',
+            inactivityTimeoutMs: null,
+            estimatedSleepAt: null,
+          };
+        }
+      }),
+
     getSessionHealth: protectedProcedure
       .input(GetSessionHealthInput)
       .output(GetSessionHealthOutput)
@@ -383,19 +615,16 @@ export function createSessionManagementHandlers() {
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
-          logger.info('Fetching session health');
           await requireCurrentSessionAccess({
             env,
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
           });
 
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+          const getStub = () => getSandboxSessionStub(env, userId, sessionId);
 
           const metadata = await withDORetry<
-            ReturnType<typeof getStub>,
+            DurableObjectStub<SandboxSessionV2>,
             CloudAgentSessionState | null
           >(getStub, s => s.getMetadata(), 'getMetadata');
 
@@ -409,58 +638,54 @@ export function createSessionManagementHandlers() {
 
           const sandboxId: SandboxId =
             metadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              metadata.identity.orgId,
-              userId,
-              metadata.identity.sessionId,
-              metadata.identity.botId,
-              {
-                createdOnPlatform: metadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(metadata.identity.sessionId, {
+              createdOnPlatform: metadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
 
-          // Stranded legacy execution rows from pre-message deployments do not
-          // represent resumable current work and must not gate continuation.
-          const activeMessageWork = await withDORetry(
-            getStub,
-            s => s.getCurrentMessageWork(),
-            'getCurrentMessageWork'
-          );
+          const activeMessageWork = await (async (): Promise<{
+            messageId: string;
+            status: 'pending' | 'running';
+            health: 'healthy' | 'stale';
+          } | null> => {
+            const snapshot = await withDORetry<
+              DurableObjectStub<SandboxSessionV2>,
+              ControlPlaneSessionSnapshot
+            >(
+              () => getSandboxSessionStub(env, userId, sessionId),
+              s => s.getSession(),
+              'getSession'
+            );
+            if (snapshot.type !== 'found') return null;
+            const accepted = snapshot.messages.find(message => message.state === 'accepted');
+            const queued = snapshot.messages.find(message => message.state === 'queued');
+            return accepted
+              ? { messageId: accepted.messageId, status: 'running', health: 'healthy' }
+              : queued
+                ? { messageId: queued.messageId, status: 'pending', health: 'healthy' }
+                : null;
+          })();
           const activeExecutionId = activeMessageWork?.messageId;
           const activeExecutionStatus = activeMessageWork?.status;
           const executionHealth = activeMessageWork?.health ?? 'none';
 
-          const cleanupScheduled = await withDORetry(
-            getStub,
-            s => s.isSandboxCleanupScheduled(),
-            'isSandboxCleanupScheduled'
-          );
-          let sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' | 'unknown' = cleanupScheduled
-            ? 'destroyed'
-            : 'unknown';
-          if (!cleanupScheduled) {
-            try {
-              await createAgentSandbox(env, metadata).probeHealth();
-              sandboxStatus = 'healthy';
-            } catch (error) {
-              if (!(error instanceof AgentSandboxUnavailableError)) {
-                sandboxStatus = 'unreachable';
+          const sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' | 'unknown' =
+            await (async (): Promise<'healthy' | 'destroyed' | 'unreachable' | 'unknown'> => {
+              try {
+                const snapshot = await withDORetry(
+                  () => getSandboxSessionStub(env, userId, sessionId),
+                  stub => stub.getSandboxStatus(),
+                  'getSandboxStatus'
+                );
+                return sandboxStatusFromLifecycle(snapshot.status);
+              } catch (error) {
                 logger
                   .withFields({ error: error instanceof Error ? error.message : String(error) })
-                  .warn('Sandbox health probe failed');
+                  .warn('Sandbox status read failed');
+                return 'unknown';
               }
-            }
-          }
-
-          logger.info('Session health retrieved successfully', {
-            sandboxStatus,
-            executionHealth,
-            activeExecutionId: activeExecutionId ?? undefined,
-            activeExecutionStatus,
-          });
+            })();
 
           return {
             cloudAgentSessionId: sessionId,
@@ -473,7 +698,7 @@ export function createSessionManagementHandlers() {
         });
       }),
 
-    getMessageResult: protectedProcedure
+    getMessageResult: cloudAgentManagedProcedure
       .input(GetMessageResultInput)
       .output(GetMessageResultOutput)
       .query(async ({ input, ctx }) => {
@@ -485,14 +710,9 @@ export function createSessionManagementHandlers() {
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
           });
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+          const getStub = () => getSandboxSessionStub(env, userId, sessionId);
 
-          const response = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            MessageResultRPCResponse
-          >(
+          const response: MessageResultRPCResponse = await withDORetry(
             getStub,
             async stub => await stub.getMessageResult(input.messageId),
             'getMessageResult'
@@ -514,132 +734,24 @@ export function createSessionManagementHandlers() {
         });
       }),
 
-    getLatestAssistantMessage: protectedProcedure
-      .input(GetLatestAssistantMessageInput)
-      .output(GetLatestAssistantMessageOutput)
+    /** The preparation attempts a stream replay builds, so the first page can show them. */
+    getPreparationAttempts: protectedProcedure
+      .input(GetSessionInput)
       .query(async ({ input, ctx }) => {
-        return withLogTags({ source: 'getLatestAssistantMessage' }, async () => {
+        return withLogTags({ source: 'getPreparationAttempts' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           const { userId, env } = ctx;
-
-          logger.setTags({ userId, sessionId });
-          logger.info('Fetching latest assistant message');
           await requireCurrentSessionAccess({
             env,
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
           });
-
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
-
-          const metadata = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            CloudAgentSessionState | null
-          >(getStub, s => s.getMetadata(), 'getMetadata');
-          if (!metadata) {
-            logger.info('Session not found');
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'Session not found',
-            });
-          }
-
-          const message = await withDORetry(
-            getStub,
-            s => s.getLatestAssistantMessage(),
-            'getLatestAssistantMessage'
+          const attempts: PreparationAttempt[] = await withDORetry(
+            () => getSandboxSessionStub(env, userId, sessionId),
+            stub => stub.getPreparationAttempts(),
+            'getPreparationAttempts'
           );
-
-          return {
-            cloudAgentSessionId: sessionId,
-            message,
-          };
-        });
-      }),
-
-    /**
-     * Get all log files and running processes for a session's sandbox.
-     *
-     * Discovers wrapper logs from /tmp and CLI logs from the session home directory.
-     * Useful for debugging wrapper startup and CLI issues.
-     */
-    getWrapperLogs: internalApiProtectedProcedure
-      .input(
-        z.object({
-          sessionId: sessionIdSchema.describe('Session ID'),
-        })
-      )
-      .query(async ({ input, ctx }) => {
-        return withLogTags({ source: 'getWrapperLogs' }, async () => {
-          const sessionId = input.sessionId as SessionId;
-          const { userId, env } = ctx;
-
-          logger.setTags({ userId, sessionId });
-          logger.info('Fetching all session logs');
-
-          // Fetch session metadata to get sandboxId and validate ownership
-          const sessionService = new SessionService();
-          let sandboxId: SandboxId;
-          try {
-            sandboxId = await sessionService.getSandboxIdForSession(env, userId, sessionId);
-          } catch (error) {
-            if (error instanceof InvalidSessionMetadataError) {
-              throw new TRPCError({
-                code: 'PRECONDITION_FAILED',
-                message: `Session metadata is invalid or unavailable. Please re-initiate session ${sessionId}.`,
-              });
-            }
-
-            if (error instanceof TRPCError) {
-              throw error;
-            }
-
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: `Failed to load session metadata for ${sessionId}.`,
-            });
-          }
-
-          logger.setTags({
-            sandboxId,
-            orgId: sessionService.metadata?.identity.orgId ?? '(personal)',
-          });
-
-          const metadata = sessionService.metadata;
-          if (!metadata) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Session metadata is invalid or unavailable.',
-            });
-          }
-
-          let logs: Awaited<ReturnType<ReturnType<typeof createAgentSandbox>['readWrapperLogs']>>;
-          try {
-            logs = await createAgentSandbox(env, metadata).readWrapperLogs();
-          } catch (error) {
-            if (error instanceof AgentSandboxUnavailableError) {
-              throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-            }
-            throw error;
-          }
-          if (!logs) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Wrapper logs are unavailable because the session wrapper is not running',
-            });
-          }
-
-          logger.info('Successfully retrieved session logs', {
-            fileCount: Object.keys(logs.files).length,
-          });
-
-          return {
-            sessionId,
-            files: logs.files,
-            processes: logs.processes,
-          };
+          return attempts;
         });
       }),
 

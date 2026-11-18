@@ -1,12 +1,33 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { user_push_tokens } from '@kilocode/db/schema';
-import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
+import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
+import {
+  androidChannelIdForPushData,
+  androidChannelIdForPushDataToAppVersion,
+  genericPushContentForPushData,
+  iosInterruptionLevelForPushData,
+  iosMutableContentForPushData,
+  pushBodyCatalogKey,
+  pushTitleCatalogKey,
+  resolvePushLocale,
+  translatePush,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+} from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
 import { isPushSinkEnabled } from '../lib/push-sink';
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
+import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
+import {
+  foldPendingGlanceableRefreshDeadline,
+  flushDueGlanceableRefreshesSafely,
+  refreshGlanceableSnapshot,
+} from '../lib/glanceable-refresh';
+import { expoPushExtrasForPushData } from '../lib/push-message-extras';
+import { agentBriefingDispatchGate, pushIdempotencyTtlMs } from '../lib/agent-briefing-push';
+import { recordNotificationHistory } from '../lib/notification-history';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -52,6 +73,21 @@ export class NotificationChannelDO extends DurableObject<Env> {
   // sequential post-failure retry (claim already released) still reuses the
   // `pending` slot as before.
   private readonly inFlight = new Set<string>();
+
+  async refreshGlanceableSnapshot(params: {
+    userId: string;
+    organizationId: string | null;
+    approvalChanged?: boolean;
+  }): Promise<void> {
+    const { userId, organizationId, approvalChanged } = params;
+    await refreshGlanceableSnapshot(
+      { userId, organizationId },
+      this.ctx.storage,
+      glanceableDeliveryDeps(this.env),
+      Date.now,
+      { approvalChanged }
+    );
+  }
 
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
     if (this.inFlight.has(input.idempotencyKey)) {
@@ -143,30 +179,57 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     // 4. Badge math. On a retry the badge was already incremented during
     //    the prior attempt; re-applying the delta would double-count.
-    //    The total is recomputed in either case (other writers may have
-    //    advanced it).
-    let badgeTotal: number | undefined;
-    if (input.badge) {
-      if (!isRetry) {
-        // Mark `pending` BEFORE the increment so any later failure path
-        // is gated on the marker and a retry skips the increment.
-        const ts = Date.now();
-        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
-        // Also schedule cleanup at this point — if Expo keeps failing and
-        // no future push ever lands, `pending` would otherwise leak.
-        await this.ensureCleanupAlarm(ts);
-        badgeTotal = await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
-      } else {
-        badgeTotal = await this.getTotal();
-      }
+    if (input.badge && !isRetry) {
+      // Mark `pending` BEFORE the increment so any later failure path
+      // is gated on the marker and a retry skips the increment.
+      const ts = Date.now();
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
+      // Also schedule cleanup at this point — if Expo keeps failing and
+      // no future push ever lands, `pending` would otherwise leak.
+      await this.ensureCleanupAlarm(ts);
+      await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
     }
 
     // 5. Tokens. Missing Expo tokens only means no OS push can be sent; the
     //    in-app badge state above is still authoritative for client hydration.
     const tokens = await db
-      .select({ token: user_push_tokens.token })
+      .select({
+        token: user_push_tokens.token,
+        app_version: user_push_tokens.app_version,
+        locale: user_push_tokens.locale,
+      })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, input.userId));
+
+    // Preview mode + notification kind routing. Resolved before the sink
+    // branch so the sink log can record them (both are non-content). Fail
+    // closed: a read that throws, or an absent row, is treated as 'generic'.
+    //
+    // iOS has no per-kind channel: the interruption level is the iOS
+    // equivalent of the Android channel and is what lets needs-input break
+    // through a Focus / Do Not Disturb. The per-Focus filter that lets the
+    // user choose which Focuses allow agent progress is applied on the client:
+    // the foreground handler reads the stored choice, and `mutableContent`
+    // below routes a progress push through the extension that reads the same
+    // choice when the app is not in the foreground.
+    const channelId = androidChannelIdForPushData(input.push.data);
+    // Attention extras keep the action category; the shared kind model below
+    // owns interruption levels and Focus filtering for every push. Progress
+    // extras additionally carry the iOS thread, which is scoped to this
+    // account because the DO instance is the account's.
+    const pushExtras = await expoPushExtrasForPushData(input.push.data, input.userId);
+    const interruptionLevel = iosInterruptionLevelForPushData(input.push.data);
+    const mutableContent = iosMutableContentForPushData(input.push.data);
+    let previews: 'generic' | 'full' = 'generic';
+    try {
+      const [prefRow] = await db
+        .select({ notification_previews: user_notification_preferences.notification_previews })
+        .from(user_notification_preferences)
+        .where(eq(user_notification_preferences.user_id, input.userId));
+      previews = prefRow?.notification_previews ?? 'generic';
+    } catch {
+      previews = 'generic';
+    }
 
     if (tokens.length === 0) {
       const ts = Date.now();
@@ -181,6 +244,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
     //    `delivered` state. No receipt work is created; `delivered` here
     //    means the sink captured the payload, never device delivery.
     if (isPushSinkEnabled(this.env)) {
+      const briefingSuppression = await agentBriefingDispatchGate(db, input);
+      if (briefingSuppression) return briefingSuppression;
       const ts = Date.now();
       // Content-free observability only. Title, body, and the `data` object are
       // agent/user-controlled and can carry credentials or private customer
@@ -200,32 +265,124 @@ export class NotificationChannelDO extends DurableObject<Env> {
               : undefined,
           sound: input.push.sound ?? null,
           priority: input.push.priority ?? 'default',
+          channelId,
+          interruptionLevel,
+          mutableContent,
+          previews,
         },
         to: '<redacted>',
       });
       await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
       await this.ensureCleanupAlarm(ts);
+      // The sink stands in for an accepted send, so it records history the
+      // same way. Never throws: a failed write cannot change the outcome.
+      await recordNotificationHistory(db, input);
       return { kind: 'delivered', tokenCount: tokens.length };
     }
 
-    // 7. Send via Expo
-    const messages: ExpoPushMessage[] = tokens.map(
-      ({ token }) =>
-        ({
-          to: token,
-          title: input.push.title,
-          body: input.push.body,
-          data: input.push.data,
-          ...(badgeTotal !== undefined && { badge: badgeTotal }),
-          sound: input.push.sound ?? undefined,
-          priority: input.push.priority ?? 'default',
-        }) satisfies ExpoPushMessage
-    );
+    // 7. Send via Expo. Each token resolves its own locale and gets its own
+    //    title/body pair; a user with two tokens can receive two locales in
+    //    one dispatch.
+    const messages: ExpoPushMessage[] = tokens.map(({ token, app_version, locale }) => {
+      // Null and unsupported tags fall back to English.
+      const resolvedLocale = resolvePushLocale(locale);
+
+      let title: string;
+      let body: string;
+      if (previews === 'generic' || input.push.data.type === 'agent_briefing') {
+        ({ title, body } = genericPushContentForPushData(input.push.data, resolvedLocale));
+      } else if (input.push.i18nKey !== undefined) {
+        // Per-token translation of the system copy. User-authored fields
+        // (session title, conversation title, finding title, instance name)
+        // arrive as i18nParams and pass through the catalog templates. Both
+        // keys come from the mapping because sibling kinds can share one
+        // entry: the security-finding kinds read one body, both session kinds
+        // read one title, and each kind keeps its own entry otherwise.
+        title = translatePush(
+          resolvedLocale,
+          pushTitleCatalogKey(input.push.i18nKey),
+          input.push.i18nParams,
+          input.push.title
+        );
+        body = translatePush(
+          resolvedLocale,
+          pushBodyCatalogKey(input.push.i18nKey),
+          input.push.i18nParams,
+          input.push.body
+        );
+      } else {
+        // Old form is raw English title/body; remove when every producer sends i18nKey.
+        title = input.push.title;
+        body = input.push.body;
+      }
+
+      // A resolved locale can still yield empty copy: an i18nKey with no
+      // catalog entry falls back to `input.push.title`/`input.push.body`, which
+      // a producer may leave blank. With no title and no body, Expo/FCM surfaces
+      // a bare app-name "Kilo" row on the lock screen and in the shade. Anchor
+      // every token to content-free generic copy so no token can ever post a
+      // contentless notification. Content-free observability only: record the
+      // fixed `type` discriminator and lengths, never the empty or substituted
+      // strings themselves.
+      if (title.trim() === '' && body.trim() === '') {
+        const substituted = genericPushContentForPushData(input.push.data, resolvedLocale);
+        console.warn('push_content_substituted', {
+          idempotencyKey: input.idempotencyKey,
+          dataType: input.push.data.type,
+          titleLength: title.length,
+          bodyLength: body.length,
+          substitutedTitleLength: substituted.title.length,
+          substitutedBodyLength: substituted.body.length,
+        });
+        title = substituted.title;
+        body = substituted.body;
+      }
+
+      // Android 8+ drops a notification addressed to a channel that does not
+      // exist. Only clients that create channels (a non-null app version at
+      // registration) get a channelId; older clients fall back to the default
+      // channel. The split agent channels are newer than the rest, so a token
+      // registered before they shipped only has the legacy `agent` channel and
+      // keeps routing there. iOS ignores channelId either way.
+      const clientChannelId = androidChannelIdForPushDataToAppVersion(input.push.data, app_version);
+      return {
+        to: token,
+        title,
+        body,
+        data: input.push.data,
+        ...(input.push.data.type === 'agent_briefing' && input.agentBriefing
+          ? { expiration: Math.floor(Date.parse(input.agentBriefing.expiresAt) / 1000) }
+          : {}),
+        ...pushExtras,
+        ...(clientChannelId !== undefined && { channelId: clientChannelId }),
+        // iOS has no per-kind channel; the interruption level is its
+        // equivalent and it is what lets a needs-input push break through a
+        // Focus / Do Not Disturb. Applied to every message — unlike
+        // channelId there is no older-client failure mode for the field.
+        interruptionLevel,
+        // A progress push carries `mutable-content` so the iOS notification
+        // service extension can drop it when the active Focus excluded agent
+        // progress. Older clients without the extension still show it: the
+        // extension only filters, it never adds a banner.
+        ...(mutableContent && { mutableContent: true }),
+        sound: input.push.sound ?? undefined,
+        priority: input.push.priority ?? 'default',
+      } satisfies ExpoPushMessage;
+    });
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
+    let briefingSuppression = await agentBriefingDispatchGate(db, input);
+    if (briefingSuppression) return briefingSuppression;
     let result: SendResult;
     try {
-      result = await sendPushNotifications(messages, accessToken);
+      if (input.push.data.type === 'agent_briefing') {
+        result = await sendPushNotifications(messages, accessToken, async () => {
+          briefingSuppression = await agentBriefingDispatchGate(db, input);
+          return briefingSuppression === null;
+        });
+      } else {
+        result = await sendPushNotifications(messages, accessToken);
+      }
     } catch (err) {
       // Leave any `pending` marker in place — retries will re-attempt the
       // send while skipping the badge increment.
@@ -251,6 +408,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
         staleTokens: result.staleTokens,
         finalStage: result.ticketErrors.length > 0 ? 'failed' : 'delivered',
       } satisfies AcceptedDeliveryIdemRecord;
+
+      // Record history before the acceptance marker. After the marker a replay
+      // answers `duplicate` and would never write the row again, so a crash
+      // between the two would lose that push from history for good. The insert
+      // is idempotent on the dispatch key, so writing it first cannot double it.
+      await recordNotificationHistory(db, input);
 
       // Persist acceptance before side effects that can fail independently. A
       // replay then repairs bookkeeping rather than sending another OS push.
@@ -295,6 +458,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
       await this.ensureCleanupAlarm(ts);
       return { kind: 'no_tokens' };
     }
+
+    if (briefingSuppression) return briefingSuppression;
 
     console.warn('Expo returned no classified ticket outcomes for attempted push dispatch', {
       tokenCount: tokens.length,
@@ -373,6 +538,16 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     const now = Date.now();
+    // Deliver any glanceable refresh the rate-limit window deferred. Its
+    // remaining deadline folds into this sweep's alarm so the trailing
+    // delivery is not stranded when no idem/rl record outlives it. The flush runs
+    // safely: a failure inside it must not skip the idem/rate-limit GC below,
+    // which is storage reclamation. The fold re-reads the pending deadlines, so
+    // a failed flush still reschedules the trailing delivery.
+    const dueGlanceableRefreshAt = await flushDueGlanceableRefreshesSafely(
+      this.ctx.storage,
+      glanceableDeliveryDeps(this.env)
+    );
     const idemEntries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
     const expiredIdem: string[] = [];
     let nextAlarmAt: number | undefined;
@@ -381,6 +556,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
         nextAlarmAt = deadline;
       }
     };
+    if (dueGlanceableRefreshAt !== null) requestAlarmAtOrBefore(dueGlanceableRefreshAt);
 
     for (const [key, rec] of idemEntries) {
       if (rec.stage === 'accepted') {
@@ -389,15 +565,15 @@ export class NotificationChannelDO extends DurableObject<Env> {
           console.warn('Accepted push bookkeeping repair failed', { error: bookkeepingError });
           requestAlarmAtOrBefore(now + ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS);
         } else {
-          requestAlarmAtOrBefore(Date.now() + IDEM_TTL_MS);
+          requestAlarmAtOrBefore(Date.now() + pushIdempotencyTtlMs(key));
         }
         continue;
       }
 
-      if (now - rec.ts > IDEM_TTL_MS) {
+      if (now - rec.ts >= pushIdempotencyTtlMs(key)) {
         expiredIdem.push(key);
       } else {
-        requestAlarmAtOrBefore(rec.ts + IDEM_TTL_MS);
+        requestAlarmAtOrBefore(rec.ts + pushIdempotencyTtlMs(key));
       }
     }
 
@@ -417,8 +593,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     const toDelete = [...expiredIdem, ...expiredRl];
     if (toDelete.length > 0) await this.ctx.storage.delete(toDelete);
-    if (nextAlarmAt !== undefined) {
-      await this.ctx.storage.setAlarm(nextAlarmAt);
+    // A deferral can land during the awaits above. Fold the pending deadline in
+    // again rather than trusting the flush's earlier capture, so the final
+    // setAlarm cannot overwrite it and delay the trailing delivery.
+    const alarmAt = await foldPendingGlanceableRefreshDeadline(this.ctx.storage, nextAlarmAt);
+    if (alarmAt !== undefined) {
+      await this.ctx.storage.setAlarm(alarmAt);
     }
   }
 
@@ -478,7 +658,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   // Read-modify-write of a bucket counter. The DO is single-threaded, so
   // this is race-free without explicit locking.
-  private async incrementBucket(bucket: string, delta: number): Promise<number> {
+  private async incrementBucket(bucket: string, delta: number): Promise<void> {
     const key = `${BUCKET_PREFIX}${bucket}`;
     const total = await this.getTotal();
     const current = (await this.ctx.storage.get<number>(key)) ?? 0;
@@ -491,7 +671,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     const nextTotal = Math.max(0, total + delta);
     await this.ctx.storage.put<number>(TOTAL_KEY, nextTotal);
-    return nextTotal;
   }
 
   // Aggregate badge count. Existing DOs without the aggregate fall back to one

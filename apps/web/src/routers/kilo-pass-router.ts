@@ -1,6 +1,8 @@
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { captureException } from '@sentry/nextjs';
-import { db, readDb } from '@/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   CreditEnrollmentError,
   enrollWithCredits,
@@ -12,11 +14,31 @@ import {
   resolveKiloClawEnrollmentPriceVersion,
   type KiloClawPriceVersion,
 } from '@kilocode/db';
-import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
-import { client as stripe } from '@/lib/stripe-client';
-import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import {
+  getKiloPassStateForUser,
+  type KiloPassSubscriptionState,
+} from '@kilocode/web-shared/lib/kilo-pass/state';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
+import { getStripePriceIdForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { APP_URL } from '@/lib/constants';
+import {
+  createTopUpCheckoutSession,
+  mergeServiceFeeCommercialMetadata,
+  prepareTopUpCheckoutFee,
+  resolveFixedUsdPriceUnitAmount,
+  type CheckoutSessionCreateFn,
+  type CheckoutSessionLike,
+  type ServiceFeeCheckoutDependencies,
+  type TopUpPriceReader,
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import {
+  enqueueChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -42,7 +64,7 @@ import {
   KiloPassTier,
   KiloPassPaymentProvider,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   ImpactReferralBeneficiaryRole,
   ImpactReferralDecisionOutcome,
@@ -50,59 +72,51 @@ import {
   ImpactReferralRewardKind,
   ImpactReferralRewardStatus,
 } from '@kilocode/db/schema-types';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { and, asc, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { computeKiloPassBonusCreditsUsd } from '@/lib/kilo-pass/bonus-decision';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { computeKiloPassBonusCreditsUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { getStripeReportedEndedAtIso } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
+import { createOrReuseKiloPassCheckoutSession } from '@/lib/kilo-pass/checkout-session';
 import {
   isTerminalKiloPassScheduleStatus,
   maybeMapStripeScheduleStatusToDb,
   reconcileKiloPassScheduledChangeTerminalStatus,
   releaseScheduledChangeForSubscription,
 } from '@/lib/kilo-pass/scheduled-change-release';
-import { KILO_PASS_BONUS_LIKE_ITEM_KINDS, appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_TIER_CONFIG,
-} from '@/lib/kilo-pass/constants';
-import { fromMicrodollars } from '@/lib/utils';
+  KILO_PASS_BONUS_LIKE_ITEM_KINDS,
+  appendKiloPassAuditLog,
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
 } from '@/lib/subscriptions/subscription-center';
 import type Stripe from 'stripe';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
-import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
-import {
-  getAllMobileStoreKiloPassProducts,
-  getMobileStoreKiloPassProductByAppleProductId,
-} from '@/lib/kilo-pass/mobile-store-products';
-import {
-  buildPurchasePresentation,
-  getPurchasePresentationForUser,
-} from '@/lib/kilo-pass/purchase-presentation';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
+import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
+import { getPurchasePresentationForUser } from '@/lib/kilo-pass/purchase-presentation';
 import {
   PURCHASE_PLATFORMS,
   PURCHASE_PRESENTATION_KINDS,
   PURCHASE_PRODUCTS,
   PURCHASE_STATUS_CLASSES,
   PURCHASE_STOREFRONTS,
-  isNativeIapMutationAllowed,
 } from '@kilocode/app-shared/commerce';
-import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
-import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
-import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import {
   getInitialWelcomePromoContextForSubscription,
   getKiloPassWelcomePromoPolicy,
   type KiloPassWelcomePromoPolicy,
-} from '@/lib/kilo-pass/welcome-promo-context';
-import { sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const logHostingActivationInfo = sentryLogger('kilo-pass-hosting-activation', 'info');
 const logHostingActivationWarning = sentryLogger('kilo-pass-hosting-activation', 'warning');
@@ -117,6 +131,7 @@ const KiloPassCreditHistoryEntrySchema = z.object({
   id: z.string(),
   date: z.string(),
   amountUsd: z.number(),
+  expiryDate: z.string().nullable(),
   kind: z.enum([
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
@@ -144,16 +159,9 @@ const KiloPassTierSchema = z.enum(KiloPassTier);
 const KiloPassCadenceSchema = z.enum(KiloPassCadence);
 const KiloPassPaymentProviderSchema = z.enum(KiloPassPaymentProvider);
 
-const KiloPassSubscriptionStatusSchema = z.union([
-  z.literal('active'),
-  z.literal('canceled'),
-  z.literal('incomplete'),
-  z.literal('incomplete_expired'),
-  z.literal('past_due'),
-  z.literal('paused'),
-  z.literal('trialing'),
-  z.literal('unpaid'),
-]);
+// The provider reports subscription statuses as an open set, so the response
+// carries the stored value unchanged.
+const KiloPassSubscriptionStatusSchema = z.string();
 
 type KiloPassBonusKind =
   | KiloPassIssuanceItemKind.Bonus
@@ -172,6 +180,8 @@ const KiloPassSubscriptionStateBaseSchema = z.object({
   currentStreakMonths: z.number(),
   nextYearlyIssueAt: z.string().nullable(),
   startedAt: z.string().nullable(),
+  /** The date the pass stopped, for a pass that already ended. */
+  endedAt: z.string().nullable(),
   resumesAt: z.string().nullable(),
 });
 
@@ -246,13 +256,6 @@ const KiloPassReferralRewardSummaryOutputSchema = z.object({
   ),
 });
 
-const CompleteStorePurchaseOutputSchema = z.object({
-  subscriptionId: z.string(),
-  tier: KiloPassTierSchema,
-  cadence: KiloPassCadenceSchema,
-  alreadyProcessed: z.boolean(),
-});
-
 type KiloPassSubscriptionStateResponse = z.infer<typeof KiloPassSubscriptionStateSchema>;
 
 type KiloPassCreditHistoryRow = {
@@ -261,6 +264,7 @@ type KiloPassCreditHistoryRow = {
   amountUsd: number;
   createdAt: string;
   description: string | null;
+  expiryDate: string | null;
 };
 
 type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
@@ -272,82 +276,6 @@ const KILO_PASS_PENDING_REFERRAL_REWARD_STATUSES = new Set<string>([
   ImpactReferralRewardStatus.Pending,
   ImpactReferralRewardStatus.Earned,
 ]);
-
-const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
-  'App Store purchase account token does not match the signed-in user.';
-const APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
-  "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.";
-
-function assertAppStoreAccountTokenMatchesUser(params: {
-  appAccountToken: string | null;
-  userAppStoreAccountToken: string;
-}): void {
-  if (params.appAccountToken === null) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE,
-    });
-  }
-  if (params.appAccountToken !== params.userAppStoreAccountToken) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE,
-    });
-  }
-}
-
-function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
-  if (error instanceof TRPCError) {
-    if (error.code === 'CONFLICT') {
-      return new TRPCError({
-        code: 'CONFLICT',
-        message: 'Purchase is still being processed — try again in a moment.',
-      });
-    }
-    return error;
-  }
-
-  captureException(error, {
-    tags: {
-      area: 'kilo-pass',
-      operation: 'complete-app-store-purchase',
-    },
-    extra: {
-      kiloUserId: userId,
-    },
-  });
-
-  const message = error instanceof Error ? error.message : '';
-  const isVerifierFailure =
-    message.startsWith('Apple ') || message.includes('transaction') || message.includes('product');
-  const isDomainFailure =
-    message.includes('already belongs') ||
-    message.includes('already have an active Kilo Pass subscription') ||
-    message.includes('previous period expiration');
-
-  if (isVerifierFailure) {
-    return new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'We could not verify this App Store purchase. Please try again.',
-    });
-  }
-
-  if (isDomainFailure) {
-    return new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'This App Store purchase cannot be used for your account.',
-    });
-  }
-
-  return new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: 'We could not finish this App Store purchase. Please try again.',
-  });
-}
-
-function isTwoMonthPromoOfferActive(): boolean {
-  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
-}
 
 function roundToCents(usd: number): number {
   return Math.round(usd * 100) / 100;
@@ -590,6 +518,7 @@ async function getKiloPassIssuanceCreditHistoryRows(
       amountUsd: kilo_pass_issuance_items.amount_usd,
       createdAt: credit_transactions.created_at,
       description: credit_transactions.description,
+      expiryDate: credit_transactions.expiry_date,
     })
     .from(kilo_pass_issuance_items)
     .innerJoin(
@@ -621,6 +550,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -657,6 +587,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -683,6 +614,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
     amountUsd: roundToCents(fromMicrodollars(row.amountMicrodollars)),
     createdAt: row.createdAt,
     description: row.description,
+    expiryDate: row.expiryDate,
   }));
 }
 
@@ -860,6 +792,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
 
   return {
     ...params.subscription,
+    endedAt: params.subscription.endedAt ?? null,
     nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
       subscription: params.subscription,
       isFirstTimeSubscriberEver,
@@ -891,6 +824,12 @@ async function buildEndedKiloPassSubscriptionState(params: {
   kiloUserId: string;
   subscription: KiloPassSubscriptionState;
   status: Stripe.Subscription.Status;
+  /**
+   * The provider's end date, when the status came from a provider read. The
+   * stored date wins when the row carries one; this value fills the gap for a
+   * row whose date was never stored.
+   */
+  providerEndedAt?: string | null;
 }): Promise<KiloPassSubscriptionStateResponse> {
   const baseAmountUsd = getMonthlyPriceUsd(params.subscription.tier);
   const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEver({
@@ -901,6 +840,7 @@ async function buildEndedKiloPassSubscriptionState(params: {
   return {
     ...params.subscription,
     status: params.status,
+    endedAt: params.subscription.endedAt ?? params.providerEndedAt ?? null,
     nextBonusCreditsUsd: null,
     nextBillingAt: null,
     isFirstTimeSubscriberEver,
@@ -1032,14 +972,6 @@ const GetPurchasePresentationInputSchema = z.object({
   program: z.string().max(64).nullable().optional(),
 });
 
-const PreflightPurchaseInputSchema = z.object({
-  platform: PurchasePlatformSchema,
-  storefront: PurchaseStorefrontSchema,
-  product: PurchaseProductSchema,
-  program: z.string().max(64).nullable().optional(),
-  appleProductId: z.string().min(1),
-});
-
 const PurchasePresentationCtaOutputSchema = z.object({
   label: z.string().nullable(),
   action: z.enum(['none', 'open_web', 'open_native']),
@@ -1049,29 +981,11 @@ const GetPurchasePresentationOutputSchema = z.object({
   kind: z.enum(PURCHASE_PRESENTATION_KINDS),
   statusClass: z.enum(PURCHASE_STATUS_CLASSES),
   reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
-      'unsupported_combination',
-    ])
+    .enum(['credits_not_sold_on_ios', 'kilo_pass_not_sold_in_app', 'unsupported_combination'])
     .nullable(),
   cta: PurchasePresentationCtaOutputSchema,
   webUrl: z.string().nullable(),
   program: z.string().nullable(),
-});
-
-const PreflightPurchaseOutputSchema = z.object({
-  allowed: z.boolean(),
-  statusClass: z.enum(PURCHASE_STATUS_CLASSES),
-  reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
-      'unsupported_combination',
-      'unknown_product',
-      'already_subscribed',
-    ])
-    .nullable(),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -1194,12 +1108,124 @@ async function getSettledKiloPassCheckoutSubscription(params: {
   };
 }
 
-export const kiloPassRouter = createTRPCRouter({
-  getMobileStoreProducts: baseProcedure.query(({ ctx }) => ({
-    appAccountToken: ctx.user.app_store_account_token,
-    products: getAllMobileStoreKiloPassProducts(),
-  })),
+const PERSONAL_KILO_PASS_CHECKOUT_FLOW = 'personal_kilo_pass' as const;
 
+export type PersonalKiloPassCheckoutDependencies = ServiceFeeCheckoutDependencies & {
+  createSession?: CheckoutSessionCreateFn;
+  retrievePriceUnitAmount?: typeof resolveFixedUsdPriceUnitAmount;
+};
+
+function createDefaultPersonalKiloPassCheckoutDependencies(): PersonalKiloPassCheckoutDependencies {
+  const stores = createServiceFeeStores();
+  return {
+    store: stores.assessments,
+    stripe: stripe,
+    listCheckoutLineItems: (sessionId, listParams) =>
+      stripe.checkout.sessions.listLineItems(sessionId, listParams),
+    expireCheckoutSession: sessionId => stripe.checkout.sessions.expire(sessionId),
+    createSession: sessionParams =>
+      stripe.checkout.sessions.create(sessionParams, { timeout: 10_000 }),
+  };
+}
+
+function requireTopUpPriceReader(
+  stripeReader: PersonalKiloPassCheckoutDependencies['stripe']
+): TopUpPriceReader {
+  if (!stripeReader || !('prices' in stripeReader) || !stripeReader.prices) {
+    throw new Error('Stripe price reader is required to create a Kilo Pass checkout session');
+  }
+  return stripeReader as TopUpPriceReader;
+}
+
+export async function createPersonalKiloPassCheckoutSession(params: {
+  kiloUserId: string;
+  stripeCustomerId: string;
+  tier: KiloPassTier;
+  cadence: KiloPassCadence;
+  affiliateTrackingId: string;
+  priceId: string;
+  deps?: PersonalKiloPassCheckoutDependencies;
+  paidCreditTerms?: PaidCreditTerms;
+}): Promise<CheckoutSessionLike & { amountCents: number }> {
+  const paidCreditTerms = params.paidCreditTerms ?? getPaidCreditTerms('pass', params.deps?.now);
+  const deps = {
+    ...createDefaultPersonalKiloPassCheckoutDependencies(),
+    ...params.deps,
+  };
+  const retrievePrice = deps.retrievePriceUnitAmount ?? resolveFixedUsdPriceUnitAmount;
+  const principalMinor = await retrievePrice({
+    stripe: requireTopUpPriceReader(deps.stripe),
+    priceId: params.priceId,
+  });
+
+  const prepared = await prepareTopUpCheckoutFee({
+    flow: PERSONAL_KILO_PASS_CHECKOUT_FLOW,
+    principalMinor,
+    kiloUserId: params.kiloUserId,
+    stripeCustomerId: params.stripeCustomerId,
+    taxPrincipal: { kind: 'price', priceId: params.priceId },
+    deps,
+  });
+
+  const productMetadata = {
+    type: 'kilo-pass',
+    kiloUserId: params.kiloUserId,
+    tier: params.tier,
+    cadence: params.cadence,
+    affiliateTrackingId: params.affiliateTrackingId,
+    paid_credit_policy: paidCreditTerms,
+  };
+  const sessionMetadata = mergeServiceFeeCommercialMetadata(
+    productMetadata,
+    prepared.commercialMetadata
+  );
+  const createSession =
+    deps.createSession ?? (sessionParams => stripe.checkout.sessions.create(sessionParams));
+
+  const session = await createTopUpCheckoutSession({
+    prepared,
+    buildSessionParams: feeLine => ({
+      mode: 'subscription',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Each monthly base-credit allotment expires one year after issuance. Bonus-credit deadlines are unchanged.',
+          },
+        },
+      }),
+      customer: params.stripeCustomerId,
+      allow_promotion_codes: true,
+      billing_address_collection: 'required',
+      line_items: feeLine
+        ? [{ price: params.priceId, quantity: 1 }, feeLine]
+        : [{ price: params.priceId, quantity: 1 }],
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
+      },
+      tax_id_collection: {
+        enabled: true,
+        required: 'never',
+      },
+      success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
+      subscription_data: {
+        metadata: productMetadata,
+      },
+      metadata: sessionMetadata,
+      expand: ['line_items.data.price.product'],
+    }),
+    createSession,
+    deps,
+  });
+  // Report the resolved principal explicitly; the caller enqueues it inside its transaction.
+  return { ...session, amountCents: principalMinor };
+}
+
+export type CreatePersonalKiloPassCheckoutSession = typeof createPersonalKiloPassCheckoutSession;
+
+export const kiloPassRouter = createTRPCRouter({
   getPurchasePresentation: baseProcedure
     .input(GetPurchasePresentationInputSchema)
     .output(GetPurchasePresentationOutputSchema)
@@ -1210,98 +1236,6 @@ export const kiloPassRouter = createTRPCRouter({
         product: input.product,
         program: input.program,
       });
-    }),
-
-  preflightPurchase: baseProcedure
-    .input(PreflightPurchaseInputSchema)
-    .output(PreflightPurchaseOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
-      const presentation = buildPurchasePresentation({
-        subscription,
-        input: {
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-          program: input.program,
-        },
-      });
-
-      if (presentation.kind !== 'native_iap') {
-        return {
-          allowed: false,
-          statusClass: presentation.statusClass,
-          reason: presentation.reason,
-        };
-      }
-
-      if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
-        return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
-      }
-
-      const hasLiveOtherProviderSub =
-        subscription != null &&
-        !isStripeSubscriptionEnded(subscription.status) &&
-        subscription.paymentProvider !== KiloPassPaymentProvider.AppStore;
-
-      if (hasLiveOtherProviderSub) {
-        return { allowed: false, statusClass: 'terminal', reason: 'already_subscribed' };
-      }
-
-      return { allowed: true, statusClass: 'healthy', reason: null };
-    }),
-
-  completeAppStorePurchase: baseProcedure
-    .input(
-      z.object({
-        signedTransactionJws: z.string().min(1),
-        platform: PurchasePlatformSchema,
-        storefront: PurchaseStorefrontSchema,
-        product: PurchaseProductSchema,
-        program: z.string().max(64).nullable().optional(),
-      })
-    )
-    .output(CompleteStorePurchaseOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      if (
-        !isNativeIapMutationAllowed({
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-        })
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'commerce_not_available',
-        });
-      }
-      try {
-        const purchase = await verifyAppleKiloPassTransactionJws(input.signedTransactionJws);
-        assertAppStoreAccountTokenMatchesUser({
-          appAccountToken: purchase.appAccountToken,
-          userAppStoreAccountToken: ctx.user.app_store_account_token,
-        });
-        const result = await completeStoreKiloPassPurchase({
-          user: ctx.user,
-          purchase,
-        });
-        if (!result.alreadyProcessed) {
-          trackKiloPassPurchaseCompleted({
-            channel: 'app_store',
-            distinctId: ctx.user.google_user_email,
-            userId: ctx.user.id,
-            tier: result.tier,
-            cadence: result.cadence,
-            purchaseKind: result.purchaseKind,
-            providerTransactionId: purchase.providerTransactionId,
-            productId: purchase.productId,
-            environment: purchase.environment,
-          });
-        }
-        return result;
-      } catch (error) {
-        throw mapAppStoreCompletionError(error, ctx.user.id);
-      }
     }),
 
   getAverageMonthlyUsageLast3Months: baseProcedure
@@ -1442,22 +1376,26 @@ export const kiloPassRouter = createTRPCRouter({
     if (!subscriptionBase) {
       return {
         subscription: null,
-        isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive(),
+        isEligibleForFirstMonthPromo: true,
+      };
+    }
+
+    // A pass that already ended is final: the stored status and end date are
+    // the whole answer, and no provider read can revive it. Reading the
+    // provider here turned a lapsed pass into a load error whenever that read
+    // failed, so every terminal state answers before the provider is touched.
+    if (isStripeSubscriptionEnded(subscriptionBase.status)) {
+      return {
+        subscription: await buildEndedKiloPassSubscriptionState({
+          kiloUserId: ctx.user.id,
+          subscription: subscriptionBase,
+          status: subscriptionBase.status,
+        }),
+        isEligibleForFirstMonthPromo: false,
       };
     }
 
     if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {
-      if (isStripeSubscriptionEnded(subscriptionBase.status)) {
-        return {
-          subscription: await buildEndedKiloPassSubscriptionState({
-            kiloUserId: ctx.user.id,
-            subscription: subscriptionBase,
-            status: subscriptionBase.status,
-          }),
-          isEligibleForFirstMonthPromo: false,
-        };
-      }
-
       const latestStorePurchase = await db.query.kilo_pass_store_purchases.findFirst({
         where: and(
           eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscriptionBase.subscriptionId),
@@ -1508,6 +1446,7 @@ export const kiloPassRouter = createTRPCRouter({
           kiloUserId: ctx.user.id,
           subscription: subscriptionBase,
           status: stripeSubscription.status,
+          providerEndedAt: getStripeReportedEndedAtIso(stripeSubscription),
         }),
         isEligibleForFirstMonthPromo: false,
       };
@@ -1608,7 +1547,9 @@ export const kiloPassRouter = createTRPCRouter({
       });
 
       return {
-        subscription: settledSubscription ? subscription : null,
+        subscription: settledSubscription
+          ? { ...subscription, endedAt: subscription.endedAt ?? null }
+          : null,
         creditsAwarded: settledSubscription?.creditsAwarded ?? false,
         hostingIntent,
         welcomePromoIneligibleDueToReusedFingerprint:
@@ -2045,6 +1986,11 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
+      await abandonCollectibleInvoicesForStripeSubscription({
+        stripe,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+      });
+
       await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
         cancel_at_period_end: true,
       });
@@ -2296,6 +2242,16 @@ export const kiloPassRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `Kilo Pass subscription is not active (status=${subscription.status}).`,
+        });
+      }
+
+      // A subscription set to cancel at period end ends instead of switching plans, so the
+      // user has to resume it before changing plans.
+      if (subscription.cancelAtPeriodEnd) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Your Kilo Pass is set to cancel. Resume your subscription before changing plans.',
         });
       }
 
@@ -2590,6 +2546,7 @@ export const kiloPassRouter = createTRPCRouter({
         amountUsd: row.amountUsd,
         kind: row.kind,
         description: row.description ?? `${row.kind} credits`,
+        expiryDate: row.expiryDate,
       }));
 
       return {
@@ -2612,14 +2569,6 @@ export const kiloPassRouter = createTRPCRouter({
 
       const { tier, cadence } = input;
 
-      const existing = await getKiloPassStateForUser(db, ctx.user.id);
-      if (existing && !isStripeSubscriptionEnded(existing.status)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'You already have an active Kilo Pass subscription.',
-        });
-      }
-
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
         throw new TRPCError({
@@ -2630,37 +2579,52 @@ export const kiloPassRouter = createTRPCRouter({
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const paidCreditTerms = getPaidCreditTerms('pass');
       const sessionMetadata = {
         type: 'kilo-pass',
         kiloUserId: ctx.user.id,
         tier,
         cadence,
         affiliateTrackingId: attribution?.tracking_id ?? '',
+        paid_credit_policy: paidCreditTerms,
       };
 
-      const session = await stripe.checkout.sessions.create({
-        mode: 'subscription',
-        customer: stripeCustomerId,
-        allow_promotion_codes: true,
-        billing_address_collection: 'required',
-        line_items: [{ price: priceId, quantity: 1 }],
-        customer_update: {
-          name: 'auto',
-          address: 'auto',
-        },
-        tax_id_collection: {
-          enabled: true,
-          required: 'never',
-        },
-        success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
-        subscription_data: {
-          metadata: sessionMetadata,
-        },
-        metadata: sessionMetadata,
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'kilo_pass',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
       });
 
-      return { url: typeof session.url === 'string' ? session.url : null };
+      return createOrReuseKiloPassCheckoutSession({
+        userId: ctx.user.id,
+        stripeCustomerId,
+        metadata: sessionMetadata,
+        createSession: () =>
+          createPersonalKiloPassCheckoutSession({
+            kiloUserId: ctx.user.id,
+            stripeCustomerId,
+            tier,
+            cadence,
+            affiliateTrackingId: attribution?.tracking_id ?? '',
+            priceId,
+            paidCreditTerms,
+          }),
+        // Enqueue inside the checkout transaction for the charged session, created or reused. The
+        // stable id derived from the session id makes a retry or reuse idempotent.
+        onSession: (tx, session) =>
+          enqueueChargeAttempted(tx, {
+            eventId: `kilo-pass-checkout:${session.id}`,
+            flow: 'kilo_pass',
+            userId: ctx.user.id,
+            amountCents: session.amountCents ?? session.amount_total ?? 0,
+            accountCreatedAt: ctx.user.created_at,
+            accountUsedMicrodollars: ctx.user.microdollars_used,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
+          }),
+      });
     }),
 
   getChurnkeyAuthHash: baseProcedure

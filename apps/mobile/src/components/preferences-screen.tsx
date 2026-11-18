@@ -1,137 +1,132 @@
 import { type Href, useRouter } from 'expo-router';
-import { Bell, Brain, type LucideIcon, Smartphone } from '@/components/ui/icons';
-import { Switch, View } from 'react-native';
+import {
+  Bell,
+  Globe,
+  History,
+  Mic,
+  SlidersHorizontal,
+  Wallet,
+  WandSparkles,
+} from '@/components/ui/icons';
+import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
-import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
-import { cn } from '@/lib/utils';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   setThemePreference,
   type ThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
-type PreferenceRowProps = Readonly<{
-  icon: LucideIcon;
-  title: string;
-  subtitle: string;
-  value: boolean;
-  disabled: boolean;
-  onValueChange: (next: boolean) => void;
-}>;
-
-/** Switch row shaped like the Notifications category row. */
-function PreferenceRow({
-  icon: Icon,
-  title,
-  subtitle,
-  value,
-  disabled,
-  onValueChange,
-}: PreferenceRowProps) {
-  const colors = useThemeColors();
-  return (
-    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <Icon size={18} color={colors.secondaryForeground} />
-      <View className="flex-1">
-        {/* Disabled cue is the muted title, not row opacity — see the same
-            pattern in notifications-screen's CategoryRow. */}
-        <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
-          {title}
-        </Text>
-        <Text variant="muted" className="mt-0.5 text-xs">
-          {subtitle}
-        </Text>
-      </View>
-      <Switch
-        value={value}
-        disabled={disabled}
-        accessibilityLabel={title}
-        accessibilityState={{ disabled }}
-        onValueChange={onValueChange}
-      />
-    </View>
-  );
-}
-
+/**
+ * Preferences hub: each group s1 split into a subpage is one navigation row
+ * here. The rows are moved, not redesigned — the subpages hold every switch
+ * and picker verbatim; this screen only routes to them.
+ */
 export function PreferencesScreen() {
   const router = useRouter();
   const { preference: themePreference } = useThemePreference();
-  const {
-    defaultExpanded,
-    hasLoaded: reasoningLoaded,
-    setDefaultExpanded,
-  } = useReasoningPreference();
-  const {
-    keepScreenOn,
-    hasLoaded: keepScreenOnLoaded,
-    setKeepScreenOn,
-  } = useKeepScreenOnPreference();
+  const { t } = useTranslation();
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Preferences" />
+      <ScreenHeader title={t('common.preferences')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-3 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-4 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <PreferenceRow
-          icon={Brain}
-          title="Auto expand thinking"
-          subtitle="Show the agent's thinking expanded when it finishes."
-          value={defaultExpanded}
-          disabled={!reasoningLoaded}
-          onValueChange={setDefaultExpanded}
+        <ConfigureRow
+          icon={SlidersHorizontal}
+          title={t('preferences.general')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/general' as Href);
+          }}
         />
-        <PreferenceRow
-          icon={Smartphone}
-          title="Keep screen on while on session page"
-          subtitle="Hold the screen awake while the session is working."
-          value={keepScreenOn}
-          disabled={!keepScreenOnLoaded}
-          onValueChange={setKeepScreenOn}
+        <ConfigureRow
+          icon={Mic}
+          title={t('preferences.voiceInput')}
+          subtitle={t('preferences.gatewayTranscriptionSubtitle')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/voice-input' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={WandSparkles}
+          title={t('preferences.toolSummaryTranslation')}
+          subtitle={t('preferences.toolSummaryTranslationSubtitle')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
+          }}
         />
 
         {/* Appearance */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Appearance
+            {t('preferences.appearance')}
           </Text>
           <SegmentedControl<ThemePreference>
-            accessibilityLabel="Appearance"
+            accessibilityLabel={t('preferences.appearance')}
             options={[
-              { value: 'system', label: 'System' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
+              { value: 'system', label: t('preferences.appearanceSystem') },
+              { value: 'light', label: t('preferences.appearanceLight') },
+              { value: 'dark', label: t('preferences.appearanceDark') },
             ]}
             value={themePreference}
             onChange={setThemePreference}
           />
         </View>
 
-        {/* Notifications */}
-        <View className="mt-3 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Notifications
-          </Text>
-          <ConfigureRow
-            icon={Bell}
-            title="Notifications"
-            subtitle="Push preferences"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
-            }}
-          />
-        </View>
+        <ConfigureRow
+          icon={Globe}
+          title={t('preferences.account')}
+          subtitle={t('preferences.accountSubtitle')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/account' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Bell}
+          title={t('common.notifications')}
+          subtitle={t('preferences.notificationsSubtitle')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/notifications' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={History}
+          title={t('notifications.history.title')}
+          subtitle={t('notifications.history.subtitle')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Wallet}
+          title={t('notifications.channel.spend')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
+          }}
+        />
       </TabScreenScrollView>
     </View>
   );

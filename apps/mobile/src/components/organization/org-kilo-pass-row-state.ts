@@ -1,11 +1,13 @@
-import { formatDate, parseTimestamp } from '@/lib/utils';
+import { i18n } from '@/i18n';
+import { formatDate, formatNumber, formatPrefixedUsd } from '@/lib/format';
+import { parseTimestamp } from '@/lib/utils';
 
 /**
  * Minimal structural shape of the `trpc.organizations.kiloPass.summary`
- * output needed here (mirrors `subscription-card-state.ts`, which also takes
- * a narrow local input type so the pure mapper stays free of tRPC/RN imports
- * and testable in a node environment). The screen passes the real tRPC
- * result; structural typing keeps the two in lockstep.
+ * output needed here (the pattern `lib/kilo-pass/state.ts` follows for the
+ * personal pass): a narrow local input type keeps the pure mapper free of
+ * tRPC/RN imports and testable in a node environment. The screen passes the
+ * real tRPC result; structural typing keeps the two in lockstep.
  */
 export type OrgKiloPassSummary = {
   state:
@@ -41,13 +43,13 @@ export type OrgKiloPassRowState = {
   /** Warn-tint the icon tile for states needing org-admin attention or action. */
   attention: boolean;
   /**
-   * What pressing the row does. `manage` opens the web detail page, `setup`
-   * opens the web setup flow, `retry` refetches the summary, `none` renders
-   * an inert row. Loading and query-error states must not offer a web action:
-   * loading has nothing to open yet, and an unresolved summary could send the
-   * user somewhere misleading.
+   * What pressing the row does. `retry` refetches the payload that could not
+   * load (the summary, or the membership payload that decides whether this
+   * organization has one), `none` renders an inert row. The row opens nothing
+   * else: Kilo Pass is no longer sold in either store, so it has no setup or
+   * management page to send the reader to.
    */
-  action: 'none' | 'retry' | 'setup' | 'manage';
+  action: 'none' | 'retry';
   /** Trailing action label (only for `retry`). */
   actionLabel: string | null;
   /** Accessibility hint for the press action; null for inert rows. */
@@ -56,18 +58,21 @@ export type OrgKiloPassRowState = {
   loading: boolean;
 };
 
-const TIER_LABELS = {
-  tier_19: '$19',
-  tier_49: '$49',
-  tier_199: '$199',
-} satisfies Record<'tier_19' | 'tier_49' | 'tier_199', string>;
+const TIER_PRICES = { tier_19: 19, tier_49: 49, tier_199: 199 } as const;
 
 function paidSeatsLabel(count: number): string {
-  return `${count} paid ${count === 1 ? 'seat' : 'seats'}`;
+  return i18n.t('organization.kiloPass.paidSeat', {
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  });
 }
 
 function activeSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
-  return `${TIER_LABELS[agreement.tier]} · ${paidSeatsLabel(agreement.paidSeatCount)}`;
+  const tierPrice = formatPrefixedUsd(TIER_PRICES[agreement.tier], i18n.language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  return `${tierPrice} · ${paidSeatsLabel(agreement.paidSeatCount)}`;
 }
 
 /** `paidThrough` arrives as a PostgreSQL timestamp; Hermes needs `parseTimestamp`. */
@@ -76,23 +81,23 @@ function formatPeriodEnd(iso: string | null): string | null {
     return null;
   }
   const date = parseTimestamp(iso);
-  return Number.isNaN(date.getTime()) ? null : formatDate(date);
+  return Number.isNaN(date.getTime()) ? null : formatDate(date, i18n.language);
 }
 
 function cancelingSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
   const ends = formatPeriodEnd(agreement.paidThrough);
   return ends
-    ? `Ends ${ends} · ${activeSubtitle(agreement)}`
-    : `Canceling · ${activeSubtitle(agreement)}`;
+    ? `${i18n.t('common.ends', { date: ends })} · ${activeSubtitle(agreement)}`
+    : `${i18n.t('organization.kiloPass.canceling')} · ${activeSubtitle(agreement)}`;
 }
 
-function manage(subtitle: string, attention = false): OrgKiloPassRowState {
+function settled(subtitle: string, attention = false): OrgKiloPassRowState {
   return {
     subtitle,
     attention,
-    action: 'manage',
+    action: 'none',
     actionLabel: null,
-    accessibilityHint: 'Opens Kilo Pass management on web.',
+    accessibilityHint: null,
     loading: false,
   };
 }
@@ -102,19 +107,19 @@ function conditionRow(
   condition: OrgKiloPassSummary['processingCondition']
 ): OrgKiloPassRowState | null {
   if (condition === 'suspended_for_review') {
-    return manage('Payment needs attention', true);
+    return settled(i18n.t('organization.kiloPass.paymentNeedsAttention'), true);
   }
   if (condition === 'manual') {
-    return manage('Processing needs review', true);
+    return settled(i18n.t('organization.kiloPass.processingNeedsReview'), true);
   }
   if (condition === 'blocked') {
-    return manage('Processing blocked', true);
+    return settled(i18n.t('organization.kiloPass.processingBlocked'), true);
   }
   if (condition === 'overallocated') {
-    return manage('Pass assignments exceed paid seats', true);
+    return settled(i18n.t('organization.kiloPass.overallocated'), true);
   }
   if (condition === 'failed') {
-    return manage('Credit processing delayed · retrying automatically', true);
+    return settled(i18n.t('organization.kiloPass.creditProcessingDelayed'), true);
   }
   return null;
 }
@@ -127,16 +132,16 @@ export function getOrgKiloPassRowState(params: {
   if (data == null) {
     if (params.isError) {
       return {
-        subtitle: 'Could not load status',
+        subtitle: i18n.t('organization.kiloPass.couldNotLoadStatus'),
         attention: true,
         action: 'retry',
-        actionLabel: 'Retry',
-        accessibilityHint: 'Retries loading Kilo Pass status.',
+        actionLabel: i18n.t('common.retry'),
+        accessibilityHint: i18n.t('organization.kiloPass.retryHint'),
         loading: false,
       };
     }
     return {
-      subtitle: 'Loading…',
+      subtitle: i18n.t('common.loading'),
       attention: false,
       action: 'none',
       actionLabel: null,
@@ -150,16 +155,9 @@ export function getOrgKiloPassRowState(params: {
   const { agreement } = data;
   if (agreement == null) {
     // `getSummary` returns a null agreement only when no agreement row exists
-    // at all (`state: 'unavailable'`). The web detail page's `detail` query
-    // throws for those orgs, so the setup flow is the only safe destination.
-    return {
-      subtitle: 'Not subscribed',
-      attention: false,
-      action: 'setup',
-      actionLabel: null,
-      accessibilityHint: 'Opens Kilo Pass setup on web.',
-      loading: false,
-    };
+    // at all (`state: 'unavailable'`). Kilo Pass is no longer sold in either
+    // store, so the row states that and offers nothing to open.
+    return settled(i18n.t('organization.kiloPass.notSubscribed'));
   }
 
   const condition = conditionRow(data.processingCondition);
@@ -168,29 +166,30 @@ export function getOrgKiloPassRowState(params: {
   }
 
   if (data.commercialState === 'active') {
-    return manage(activeSubtitle(agreement));
+    return settled(activeSubtitle(agreement));
   }
   if (data.commercialState === 'cancel_at_period_end') {
-    return manage(cancelingSubtitle(agreement));
+    return settled(cancelingSubtitle(agreement));
   }
   if (data.commercialState === 'pending_payment' || data.state === 'pending_payment') {
-    return manage('Payment pending');
+    return settled(i18n.t('organization.kiloPass.paymentPending'));
   }
   if (data.state === 'requires_action') {
-    return manage('Payment needs attention', true);
+    return settled(i18n.t('organization.kiloPass.paymentNeedsAttention'), true);
   }
   if (data.state === 'activating') {
-    return manage('Activating');
+    return settled(i18n.t('organization.kiloPass.activating'));
   }
   if (data.commercialState === 'ended' || data.state === 'ended') {
-    return manage('Ended');
+    return settled(i18n.t('organization.kiloPass.ended'));
   }
   if (data.state === 'blocked') {
-    return manage('Processing blocked', true);
+    return settled(i18n.t('organization.kiloPass.processingBlocked'), true);
   }
   if (data.state === 'failed') {
-    return manage('Credit processing delayed · retrying automatically', true);
+    return settled(i18n.t('organization.kiloPass.creditProcessingDelayed'), true);
   }
-  // Remainder with an agreement row: safe to open detail.
-  return manage('Not subscribed');
+  // Remainder with an agreement row: no commercial state is reported, so the
+  // row states that and stays inert.
+  return settled(i18n.t('organization.kiloPass.notSubscribed'));
 }

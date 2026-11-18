@@ -29,12 +29,10 @@
  *   kernel kills the biggest resident instead: either the leaking server
  *   (intended) or a fat newborn tool (better — server survives).
  *
- * Modes (TOOL_CGROUP_MODE) govern the tool tier: `off` (default — unset/empty/
- * invalid all resolve here, so a wrapper outside the Worker's org allowlist
- * never migrates a single process); `observe` — migrate + report usage but no
- * limit, for rollout validation; `enforce` — memory.max = MemTotal − reserve.
- * The server tier is independently controlled by `TOOL_CGROUP_SERVER_LIMIT_MB`
- * (unset/0 = observe-only, uncapped) whenever the feature is not `off`.
+ * The tool tier always starts in `enforce` mode — memory.max = MemTotal −
+ * reserve. If the cap cannot be applied, it falls back to observe mode. The
+ * server tier is independently controlled by `TOOL_CGROUP_SERVER_LIMIT_MB`
+ * (unset/0 = observe-only, uncapped).
  *
  * CPU: each slice can carry a `cpu.weight` (`TOOL_CGROUP_CPU_WEIGHT` /
  * `TOOL_CGROUP_SERVER_CPU_WEIGHT`). Weight is proportional priority under
@@ -50,7 +48,6 @@ import { appendFile, readFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import {
   TOOL_CGROUP_CPU_WEIGHT_ENV,
-  TOOL_CGROUP_MODE_ENV,
   TOOL_CGROUP_OOM_GROUP_ENV,
   TOOL_CGROUP_RESERVE_MB_ENV,
   TOOL_CGROUP_SERVER_CPU_WEIGHT_ENV,
@@ -116,10 +113,6 @@ const MIN_CAP_BYTES = 1024 * 1024 * 1024;
 /** §2.2 budget check: server cap + this headroom must fit under the tool reserve. */
 const SERVER_BUDGET_HEADROOM_BYTES = 512 * 1024 * 1024;
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
 function parseEnvInt(
   env: Record<string, string | undefined>,
   name: string,
@@ -134,13 +127,6 @@ function parseEnvInt(
     return defaultValue;
   }
   return parsed;
-}
-
-function parseMode(value: string | undefined, log: Logger): ToolCgroupMode {
-  if (value === undefined || value === '') return 'off';
-  if (value === 'off' || value === 'observe' || value === 'enforce') return value;
-  log(`WARNING: Invalid TOOL_CGROUP_MODE: ${value}, using off`);
-  return 'off';
 }
 
 function parseServerLimitBytes(
@@ -171,7 +157,7 @@ export function parseToolCgroupConfig(
   log: Logger = logToFile
 ): ToolCgroupConfig {
   return {
-    mode: parseMode(env[TOOL_CGROUP_MODE_ENV], log),
+    mode: 'enforce',
     reserveBytes:
       parseEnvInt(env, TOOL_CGROUP_RESERVE_MB_ENV, DEFAULT_RESERVE_MB, log) * 1024 * 1024,
     serverLimitBytes: parseServerLimitBytes(env, log),
@@ -201,10 +187,6 @@ export function readMemTotalBytes(procRoot: string): number | undefined {
     return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Process table
-// ---------------------------------------------------------------------------
 
 export type ProcessEntry = { pid: number; ppid: number; argv: string[] };
 
@@ -240,7 +222,7 @@ export async function readProcessTable(procRoot: string): Promise<Map<number, Pr
 }
 
 /** Basenames of the real kilo server entrypoint (script or re-exec shim). */
-const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
+const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo', 'kilo2', '.kilo2']);
 
 /**
  * The kilo-server chain must never be group-killed under the tool cap: an OOM
@@ -311,10 +293,6 @@ export function classifyProcesses(
   }
   return { toolPids, serverPids };
 }
-
-// ---------------------------------------------------------------------------
-// Cgroup slice — a single cgroup v2 directory (kilo-tools or kilo-server)
-// ---------------------------------------------------------------------------
 
 /**
  * One cgroup v2 memory slice: creation, limit, membership, OOM-event
@@ -517,10 +495,6 @@ function resetStaleControl(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Manager — owns both slices, runs the sweeper
-// ---------------------------------------------------------------------------
-
 export class ToolCgroupManager {
   private readonly config: ToolCgroupConfig;
   private readonly log: Logger;
@@ -683,9 +657,8 @@ export class ToolCgroupManager {
 }
 
 /**
- * Parse config from env, configure both slices, and start the sweeper.
- * Returns null when disabled or unavailable (e.g. read-only cgroup fs) —
- * the wrapper then runs exactly as before this feature existed.
+ * Parse tuning config from env, configure both slices, and start the sweeper.
+ * Returns null when unavailable (e.g. read-only cgroup fs).
  *
  * When mode is `off`, best-effort neutralizes any stale cap left by a
  * previous wrapper generation in a reused container (W2) before returning.

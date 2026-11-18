@@ -16,7 +16,7 @@ The Kilo Community is [on Discord](https://kilo.ai/discord).
 
 ## Prerequisites
 
-- **Node.js 24** (`.nvmrc` pins `24.14.1`) — required for all packages.
+- **Node.js 24** (`.nvmrc` pins `24.22.1`) — required for all packages.
 - **pnpm 11.1.2** — use Corepack so the active version matches `package.json` `packageManager`:
   ```bash
   corepack enable
@@ -127,11 +127,16 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 - `pnpm dev:seed app:create-user <name> <email>` — creates a `kilocode_users` row with a real Stripe test customer, pre-bypassing onboarding gates so you can use the app immediately.
 - `pnpm dev:seed app:add-credits <user-id> <usd>` — grants credits to an existing user, updating the `total_microdollars_acquired` balance and creating a `credit_transactions` row. Supports `--paid`/`--free`, `--category`, `--expires-in-days`, etc. Useful for testing billing and credit flows without manual DB edits.
 
+### Sales demos
+
+The scheduled `/api/cron/sales-demo-reset` route refreshes demo credits and usage.
+Scheduled and manual resets preserve organization membership, sub-organization membership, roles, and group assignments.
+Resets do not restore assignments that an earlier reset removed.
+
 ### KiloClaw
 
 - `pnpm dev:seed kiloclaw:fake-instance <user-id> [options]` — creates a fake personal KiloClaw instance + subscription in the database only (no real container or Worker). Before creating, it retires any prior fake personal instances for that user. Supports `--plan=trial|standard|commit` and `--days=<n>`. For paid plans, it also grants enough credits to cover the plan cost and then deducts the subscription cost.
 - `pnpm dev:seed kiloclaw:fake-org-instance <user-id> <org-id> [options]` — same as above, but creates an instance belonging to an organization rather than a personal account.
-- `pnpm dev:seed kiloclaw:referrals-<scenario>` — seeds KiloClaw referral fixtures. Topics include `referrals-happy-path`, `referrals-pending-referrer`, `referrals-cap-boundary`, and `referrals-support-override`.
 - `pnpm dev:seed kiloclaw-billing:inactive-trials` — seeds inactive-trial billing fixtures. One user is provisioned through the real KiloClaw worker endpoint (`/api/platform/provision`), while others are DB-only rows representing users in recently-started, support-marked, or eligible inactive-trial states.
 
 ## Common Development Commands

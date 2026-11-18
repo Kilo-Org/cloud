@@ -1,6 +1,4 @@
-/**
- * Pure UI helpers for GitHub PR badges and associated PR data.
- */
+import type { PrObservationSummary } from '@/lib/integrations/platforms/github/pr-observations';
 
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
 
@@ -10,6 +8,7 @@ export type AssociatedPr = {
   state: string;
   title: string | null;
   headSha: string | null;
+  observations: PrObservationSummary | null;
   lastSyncedAt: string;
   reviewDecision: ReviewDecision | null;
   // Server is currently fetching the review decision for this PR. The list
@@ -19,6 +18,12 @@ export type AssociatedPr = {
   // Host platform of the linked PR (e.g. 'github'). Always present when an
   // associatedPr is returned.
   platform: string;
+  /** Target branch of the pull request, from the PR cache. */
+  baseRef?: string | null;
+  /** GitHub stack metadata; null when the PR is not in a stack. */
+  stackNumber?: number | null;
+  stackPosition?: number | null;
+  stackSize?: number | null;
 };
 
 export type PrBadgeState = 'open' | 'closed' | 'merged' | 'draft';

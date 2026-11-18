@@ -1,5 +1,5 @@
-import { WORKOS_API_KEY } from '@/lib/config.server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { WorkOS } from '@workos-inc/node';
 const workos = new WorkOS(WORKOS_API_KEY);
 

@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Favorite-id helpers cover every representation. */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
@@ -10,6 +11,10 @@ import {
   favoriteToggleAction,
   isFavoriteOption,
 } from './model-picker-rows';
+
+afterEach(async () => {
+  await i18n.changeLanguage('en');
+});
 
 const noFavorites = new Set<string>();
 
@@ -76,15 +81,22 @@ describe('buildModelPickerRows', () => {
     expect(
       buildModelPickerRows({ models: gatewayModels, search: '', favoriteIds: noFavorites })
     ).toEqual([
-      { key: 'recommended', title: 'RECOMMENDED', type: 'header' },
+      { key: 'recommended', title: 'Recommended', type: 'header' },
       {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
         isFavorite: false,
+        showsProvider: true,
         type: 'model',
       },
-      { key: 'all', title: 'ALL MODELS', type: 'header' },
-      { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: false, type: 'model' },
+      { key: 'all', title: 'All models', type: 'header' },
+      {
+        key: 'model:openai/gpt-5',
+        model: gatewayModels[1],
+        isFavorite: false,
+        showsProvider: true,
+        type: 'model',
+      },
     ]);
   });
 
@@ -92,32 +104,156 @@ describe('buildModelPickerRows', () => {
     expect(
       buildModelPickerRows({ models: gatewayModels, search: 'Sonnet 4', favoriteIds: noFavorites })
     ).toEqual([
-      { key: 'recommended', title: 'RECOMMENDED', type: 'header' },
+      { key: 'recommended', title: 'Recommended', type: 'header' },
       {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
         isFavorite: false,
+        showsProvider: true,
         type: 'model',
       },
     ]);
     expect(
       buildModelPickerRows({ models: gatewayModels, search: 'openai/', favoriteIds: noFavorites })
     ).toEqual([
-      { key: 'all', title: 'ALL MODELS', type: 'header' },
-      { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: false, type: 'model' },
+      { key: 'all', title: 'All models', type: 'header' },
+      {
+        key: 'model:openai/gpt-5',
+        model: gatewayModels[1],
+        isFavorite: false,
+        showsProvider: true,
+        type: 'model',
+      },
     ]);
+  });
+
+  it('matches an auto model by the translated name its row renders', async () => {
+    // The row renders `models.auto.efficient` ("Auto Efficiente" in
+    // Italian) instead of the gateway's English "Auto Efficient", so the
+    // search must match the translated name the user can see.
+    await i18n.changeLanguage('it');
+    const autoEfficient: SessionModelOption = {
+      id: 'kilo-auto/efficient',
+      name: 'Auto Efficient',
+      displayId: 'kilo-auto/efficient',
+      variants: [],
+      isPreferred: true,
+      showGatewayMetadata: true,
+    };
+
+    const rows = buildModelPickerRows({
+      models: [autoEfficient],
+      search: 'Efficiente',
+      favoriteIds: noFavorites,
+    });
+
+    expect(rows).toEqual([
+      { key: 'recommended', title: i18n.t('common.recommended'), type: 'header' },
+      {
+        key: 'model:kilo-auto/efficient',
+        model: autoEfficient,
+        isFavorite: false,
+        showsProvider: true,
+        type: 'model',
+      },
+    ]);
+  });
+
+  it.each([
+    ['frontier', 'frontier'],
+    ['balanced', 'balanced'],
+    ['efficient', 'efficient'],
+    ['small', 'small'],
+    ['free', 'free'],
+    ['org', 'organization'],
+  ])('finds the %s Auto tier by its visible Arabic label', async (tier, key) => {
+    await i18n.changeLanguage('ar');
+    const search = i18n.t(`models.auto.${key}`);
+    for (const prefix of ['', 'kilocode/']) {
+      const model: SessionModelOption = {
+        ...remoteKiloClaude,
+        name: `Auto ${tier}`,
+        displayId: `${prefix}kilo-auto/${tier}`,
+        modelRef: { providerID: 'kilo', modelID: `${prefix}kilo-auto/${tier}` },
+      };
+      expect(search).not.toBe(model.name);
+      expect(
+        buildModelPickerRows({
+          models: [model, gatewayGpt5],
+          search,
+          favoriteIds: noFavorites,
+        }).filter(row => row.type === 'model')
+      ).toEqual([
+        {
+          key: `model:${model.id}`,
+          model,
+          isFavorite: false,
+          showsProvider: false,
+          type: 'model',
+        },
+      ]);
+    }
+  });
+
+  it('keeps the catalog name, id, provider and favorite identity searchable in Arabic', async () => {
+    await i18n.changeLanguage('ar');
+    const model: SessionModelOption = {
+      ...remoteKiloClaude,
+      name: 'Auto Efficient',
+      displayId: 'kilo-auto/efficient',
+      modelRef: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+      provider: { id: 'kilo', name: 'Kilo Gateway' },
+    };
+    const favoriteIds = new Set(['kilo-auto/efficient']);
+    for (const search of [
+      i18n.t('models.auto.efficient'),
+      '  AUTO EFFICIENT  ',
+      'kilo-auto/efficient',
+      'Kilo Gateway',
+      'kilo',
+    ]) {
+      expect(buildModelPickerRows({ models: [model], search, favoriteIds })).toEqual([
+        { key: 'favorites', title: i18n.t('agentChat.modelPicker.favorites'), type: 'header' },
+        {
+          key: `model:${model.id}`,
+          model,
+          isFavorite: true,
+          showsProvider: true,
+          type: 'model',
+        },
+      ]);
+    }
+  });
+
+  it('keeps no matches empty and restores the catalog when the query is cleared', () => {
+    expect(
+      buildModelPickerRows({ models: gatewayModels, search: 'no-match', favoriteIds: noFavorites })
+    ).toEqual([]);
+    expect(
+      buildModelPickerRows({ models: gatewayModels, search: '   ', favoriteIds: noFavorites })
+        .filter(row => row.type === 'model')
+        .map(row => row.model)
+    ).toEqual(gatewayModels);
+    expect(buildModelPickerRows({ models: [], search: '', favoriteIds: noFavorites })).toEqual([]);
   });
 
   it('pulls a favorited model into its own FAVORITES group ahead of everything else', () => {
     const favoriteIds = new Set(['openai/gpt-5']);
     expect(buildModelPickerRows({ models: gatewayModels, search: '', favoriteIds })).toEqual([
-      { key: 'favorites', title: 'FAVORITES', type: 'header' },
-      { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: true, type: 'model' },
-      { key: 'recommended', title: 'RECOMMENDED', type: 'header' },
+      { key: 'favorites', title: 'Favorites', type: 'header' },
+      {
+        key: 'model:openai/gpt-5',
+        model: gatewayModels[1],
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      },
+      { key: 'recommended', title: 'Recommended', type: 'header' },
       {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
         isFavorite: false,
+        showsProvider: true,
         type: 'model',
       },
     ]);
@@ -128,9 +264,21 @@ describe('buildModelPickerRows', () => {
       buildModelPickerRows({ models: remoteModels, search: '', favoriteIds: noFavorites })
     ).toEqual([
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
-      { key: 'model:remote-model-0', model: remoteModels[0], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-0',
+        model: remoteModels[0],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
       { key: 'provider:custom-openai', title: 'CUSTOM OPENAI', type: 'header' },
-      { key: 'model:remote-model-1', model: remoteModels[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-1',
+        model: remoteModels[1],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
     expect(
       buildModelPickerRows({
@@ -140,7 +288,13 @@ describe('buildModelPickerRows', () => {
       })
     ).toEqual([
       { key: 'provider:custom-openai', title: 'CUSTOM OPENAI', type: 'header' },
-      { key: 'model:remote-model-1', model: remoteModels[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-1',
+        model: remoteModels[1],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
     expect(
       buildModelPickerRows({
@@ -161,10 +315,22 @@ describe('buildModelPickerRows', () => {
   it('keeps a favorited remote model out of its provider group', () => {
     const favoriteIds = new Set(['remote:custom-openai:shared/model.id']);
     expect(buildModelPickerRows({ models: remoteModels, search: '', favoriteIds })).toEqual([
-      { key: 'favorites', title: 'FAVORITES', type: 'header' },
-      { key: 'model:remote-model-1', model: remoteModels[1], isFavorite: true, type: 'model' },
+      { key: 'favorites', title: 'Favorites', type: 'header' },
+      {
+        key: 'model:remote-model-1',
+        model: remoteModels[1],
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      },
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
-      { key: 'model:remote-model-0', model: remoteModels[0], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-0',
+        model: remoteModels[0],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
   });
 
@@ -177,11 +343,43 @@ describe('buildModelPickerRows', () => {
       { ...remoteWorkspaceClaude, id: 'remote-model-1' },
     ];
     expect(buildModelPickerRows({ models: reordered, search: '', favoriteIds })).toEqual([
-      { key: 'favorites', title: 'FAVORITES', type: 'header' },
-      { key: 'model:remote-model-0', model: reordered[0], isFavorite: true, type: 'model' },
+      { key: 'favorites', title: 'Favorites', type: 'header' },
+      {
+        key: 'model:remote-model-0',
+        model: reordered[0],
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      },
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
-      { key: 'model:remote-model-1', model: reordered[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-1',
+        model: reordered[1],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
+  });
+
+  it('uppercases a provider group title with the active locale (Turkish i → İ)', async () => {
+    await i18n.changeLanguage('tr');
+    const model: SessionModelOption = {
+      ...remoteWorkspaceClaude,
+      provider: { id: 'kilo-instance', name: 'Kilo instance' },
+    };
+    expect(buildModelPickerRows({ models: [model], search: '', favoriteIds: noFavorites })).toEqual(
+      [
+        { key: 'provider:kilo-instance', title: 'KİLO İNSTANCE', type: 'header' },
+        {
+          key: 'model:remote-model-0',
+          model,
+          isFavorite: false,
+          showsProvider: false,
+          type: 'model',
+        },
+      ]
+    );
   });
 });
 

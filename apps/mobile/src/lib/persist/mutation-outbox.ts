@@ -68,22 +68,15 @@ function fullKey(userId: string, fingerprint: string): string {
   return `${outboxScope(userId)}\u0000${fingerprint}`;
 }
 
-const OUTBOX_READ_DISCARDED = 'outbox read discarded';
-const OUTBOX_WRITE_FAILED = 'outbox write failed';
-
-function reportOutboxFailure(report: {
-  message: string;
-  reason: string;
-  userId: string;
-  fingerprint: string;
-}): void {
-  Sentry.captureException(new Error(report.message), {
+function reportOutboxFailure(
+  error: unknown,
+  operation: 'read' | 'write' | 'remove' | 'list',
+  fingerprint?: string
+): void {
+  Sentry.captureException(error, {
     level: 'warning',
-    extra: {
-      scope: outboxScope(report.userId),
-      fingerprint: report.fingerprint,
-      reason: report.reason,
-    },
+    tags: { 'error.subsystem': 'mutation-outbox', 'error.operation': operation },
+    ...(fingerprint ? { fingerprint: [fingerprint] } : {}),
   });
 }
 
@@ -99,12 +92,11 @@ export async function writeOutboxRow(userId: string, row: OutboxRow): Promise<vo
   try {
     const serialized = JSON.stringify(row) as string | undefined;
     if (serialized === undefined) {
-      reportOutboxFailure({
-        message: 'outbox row cannot be serialized to JSON',
-        reason: OUTBOX_WRITE_FAILED,
-        userId,
-        fingerprint: row.fingerprint,
-      });
+      reportOutboxFailure(
+        new Error('outbox row cannot be serialized to JSON'),
+        'write',
+        'outbox-write-unsupported-row'
+      );
       return;
     }
     const epoch = currentAuthEpoch();
@@ -115,12 +107,7 @@ export async function writeOutboxRow(userId: string, row: OutboxRow): Promise<vo
       await encryptedKv.setItem(outboxScope(userId), row.fingerprint, serialized);
     });
   } catch (error) {
-    reportOutboxFailure({
-      message: error instanceof Error ? error.message : OUTBOX_WRITE_FAILED,
-      reason: OUTBOX_WRITE_FAILED,
-      userId,
-      fingerprint: row.fingerprint,
-    });
+    reportOutboxFailure(error, 'write');
   }
 }
 
@@ -143,22 +130,16 @@ export async function loadOutboxRow(
     }
     const parsed: unknown = JSON.parse(raw);
     if (!isOutboxRow(parsed)) {
-      reportOutboxFailure({
-        message: 'stored outbox row does not match its expected shape',
-        reason: OUTBOX_READ_DISCARDED,
-        userId,
-        fingerprint,
-      });
+      reportOutboxFailure(
+        new Error('stored outbox row does not match its expected shape'),
+        'read',
+        'outbox-read-shape-mismatch'
+      );
       return null;
     }
     return parsed;
   } catch (error) {
-    reportOutboxFailure({
-      message: error instanceof Error ? error.message : 'stored outbox row is not valid JSON',
-      reason: OUTBOX_READ_DISCARDED,
-      userId,
-      fingerprint,
-    });
+    reportOutboxFailure(error, 'read');
     return null;
   }
 }
@@ -178,12 +159,7 @@ export async function removeOutboxRow(userId: string, fingerprint: string): Prom
       await encryptedKv.removeItem(outboxScope(userId), fingerprint);
     });
   } catch (error) {
-    reportOutboxFailure({
-      message: error instanceof Error ? error.message : OUTBOX_WRITE_FAILED,
-      reason: OUTBOX_WRITE_FAILED,
-      userId,
-      fingerprint,
-    });
+    reportOutboxFailure(error, 'remove');
   }
 }
 
@@ -220,12 +196,7 @@ export async function listOutboxRows(userId: string): Promise<OutboxRow[] | null
       .map(raw => parseOutboxRow(raw))
       .filter((row): row is OutboxRow => row !== null);
   } catch (error) {
-    reportOutboxFailure({
-      message: error instanceof Error ? error.message : OUTBOX_WRITE_FAILED,
-      reason: OUTBOX_WRITE_FAILED,
-      userId,
-      fingerprint: '<list>',
-    });
+    reportOutboxFailure(error, 'list');
     return null;
   }
 }

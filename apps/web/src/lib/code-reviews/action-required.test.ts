@@ -1,11 +1,11 @@
 const mockSendCodeReviewDisabledEmail = jest.fn();
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendCodeReviewDisabledEmail: (...args: unknown[]) => mockSendCodeReviewDisabledEmail(...args),
 }));
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   agent_configs,
   cloud_agent_code_reviews,
@@ -51,7 +51,13 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
     expect(
       classifyCodeReviewActionRequiredFailure(
-        'Forbidden: [BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.'
+        'Forbidden: [BYOK] Your API key does not have permission to access this model. Please check your API key permissions.'
+      )
+    ).toBe('byok_invalid_key');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Forbidden: [BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.'
       )
     ).toBe('byok_invalid_key');
 
@@ -123,6 +129,11 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
   it('does not classify unrelated auth, rate-limit, or BYOK quota failures', () => {
     expect(classifyCodeReviewActionRequiredFailure('GitHub returned 401 Unauthorized')).toBeNull();
     expect(classifyCodeReviewActionRequiredFailure('GitHub returned 403 Forbidden')).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'GitLab rejected the connected credential while preparing this review of owner/repo. Reconnect the GitLab integration, then retry.'
+      )
+    ).toBeNull();
     expect(classifyCodeReviewActionRequiredFailure('Rate limit exceeded: 429')).toBeNull();
     expect(
       classifyCodeReviewActionRequiredFailure('[BYOK] Your account quota is exhausted.')
@@ -167,7 +178,7 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
   it('routes repeated repository clone timeout recovery to support email', () => {
     expect(getCodeReviewActionRequiredRecoveryHref('repeated_repository_clone_timeout')).toBe(
-      'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
+      'mailto:hi@kilo.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
     );
   });
 

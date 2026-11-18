@@ -1,32 +1,22 @@
 # dependencies
 node_modules/
 /.pnpm-store/
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
 # build output
 .next/
 /out/
 /build
 packages/trpc/dist/
+packages/harness-sdk/dist/
 **/wrapper/dist/
+/services/cloud-agent-next/dist/
 *.tsbuildinfo
 next-env.d.ts
 
 # env & secrets
-.env*.local*
-!.env*.example*
 .dev.vars
 .dev.vars.*
 !.dev.vars.example*
-.env.keys
-.env.grafana
-.env.sentry-build-plugin
 .tokens.json
 .test-token
 *.pem
@@ -38,7 +28,6 @@ next-env.d.ts
 /dev/*/.dev-logs/
 /dev/fixtures/
 /dev/*/fixtures/
-dev-debug-request-logs/*
 **/dev-debug-request-logs/
 /dev/logs/
 /dev/*/logs/
@@ -48,12 +37,11 @@ dev-debug-request-logs/*
 .tmp/
 test-results/
 playwright-report/
-playwright/.auth/
+/.e2e-evidence/
+**/playwright/.auth/
 
 # debug logs
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 .pnpm-debug.log*
 
 # editor & OS
@@ -65,14 +53,11 @@ yarn-error.log*
 # local plans & prototypes
 /plans/
 /.plans/*
-!/.plans/experimental-models-1.md
-!/.plans/experimental-models-2.md
 !/.plans/kilo-pass-welcome-promo-card-fingerprint-guard.md
 /.plan/
 .kilo/plans
 .superpowers/
 docs/superpowers/
-.kilo/node_modules
 .kilo/package.json
 .kilo/package-lock.json
 .kilo/bun.lock
@@ -119,14 +104,14 @@ supabase/.temp
 *.cyclonedx.json
 *.cyclonedx.json.gz
 *.spdx.json
+# where the release workflow writes the SBOMs and the downloaded IPA/AAB
+/apps/mobile/artifacts/
 
 # misc
 TMP_CI_commit_msg.txt
 *.csv
 run-milvus-test.sh
 
-.beads/
-.env*.local
 .tests/
 
 # Ignore stray .env-prefixed files but preserve committed example/test/envrc files.
@@ -136,3 +121,10 @@ run-milvus-test.sh
 !.env.test
 !.envrc
 .playwright-mcp
+
+# Harness markers: the kwf workflow drops these in a worktree, and one
+# reached a product commit (46640f5e8e96) before it was removed by hand.
+.kwf*
+
+# Staging-only usage queue callback, created by the gateway build.
+/apps/ai-gateway/src/app/api/v1/internal/queues/usage/route.ts

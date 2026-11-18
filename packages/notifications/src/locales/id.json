@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sesi agen Anda memiliki pembaruan",
+      "lowBalance": "Saldo Anda perlu diperhatikan",
+      "spendAlert": "Pengeluaran Anda perlu diperhatikan",
+      "securityFinding": "Temuan keamanan perlu diperhatikan",
+      "securityUpdate": "Pemeriksaan keamanan memiliki pembaruan",
+      "activeAgentsGlanceable": "Agen aktif memiliki pembaruan"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Peringatan saldo rendah",
+      "body": "Saldo {{organizationName}} turun di bawah ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Peringatan pengeluaran",
+      "body": "Pengeluaran {{scopeName}} melewati ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} di {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Temuan keamanan baru ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Peringatan SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Pelanggaran SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Sesi Kilo Anda siap dikendalikan dari ponsel"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

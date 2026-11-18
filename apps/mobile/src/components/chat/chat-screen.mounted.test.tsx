@@ -1,0 +1,1212 @@
+/* eslint-disable max-lines -- every chat screen behavior shares this one mocked harness */
+/* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
+import { createElement, type ReactElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
+import { ChatScreen } from '@/components/chat/chat-screen';
+import { act, type ReactTestRenderer } from '@/test/renderer';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { type StoredChatBackend } from '@/lib/chat/backend-store';
+import { backendTargetId, CREDITS_FAILURE_KEY, localTargetId } from '@/lib/chat/backend-target';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
+
+/**
+ * What the chat screen draws while it is opening.
+ *
+ * Reopening a stored chat is not instant: the Kilo server is read before the
+ * history, so the transcript is empty for a moment even though the chat has
+ * one. That moment has to read as a loading transcript, and the empty state
+ * belongs to a chat that has finished opening and really has nothing in it.
+ */
+
+const state = vi.hoisted(() => ({
+  status: 'opening' as 'opening' | 'idle' | 'working',
+  messages: [] as { info: { id: string; role?: string } }[],
+  asked: null as string | null,
+  askedFrom: null as string | null,
+  displaced: [] as {
+    id: string;
+    text: string;
+    images: { media: string; data: string }[];
+    model: string;
+    effort: 'low' | 'medium' | 'high' | null;
+    afterTurns: number;
+    outcome: 'failed' | 'stopped';
+    failureKey?: string | null;
+  }[],
+  failed: null as string | null,
+  failureKey: null as string | null,
+  retry: vi.fn(),
+  send: vi.fn(),
+  model: 'm1',
+  effort: null as 'low' | 'medium' | 'high' | null,
+  images: false,
+  record: {
+    createdAt: 1,
+    updatedAt: 2,
+    usage: {},
+    prompted: 0,
+    effort: null,
+  },
+}));
+
+type AlertAction = { onPress?: () => void };
+const router = vi.hoisted(() => ({
+  push: vi.fn<(href: string) => void>(),
+  dismissTo: vi.fn<(href: string) => void>(),
+}));
+vi.mock('expo-router', () => ({ useRouter: () => router }));
+const backendUi = vi.hoisted(() => ({
+  profiles: [] as StoredChatBackend[],
+  loaded: true,
+  alert: vi.fn<(title: string, message: string, actions?: AlertAction[]) => void>(),
+}));
+
+const mcpModel = vi.hoisted(() => ({
+  view: {
+    enabled: false,
+    toggleable: true,
+    statusKey: 'modelChat.mcp.off',
+    descriptionKey: null,
+    toolCount: 0,
+    retry: false,
+    busy: false,
+    tone: 'muted',
+  },
+  setEnabled: () => undefined,
+  retry: () => undefined,
+  retrying: false,
+  settingsTools: {
+    titleKey: 'modelChat.mcp.settingsToolsTitle',
+    subtitleKey: 'modelChat.mcp.settingsToolsSubtitle',
+    statusKey: 'modelChat.mcp.settingsToolsOff',
+    tone: 'muted',
+  },
+  settingsToolsEnabled: false,
+  setSettingsToolsEnabled: () => undefined,
+  servers: [],
+  storedServers: [],
+  setServerEnabled: () => undefined,
+  addServer: async () => {
+    await Promise.resolve();
+    return false;
+  },
+  updateServer: async () => {
+    await Promise.resolve();
+    return false;
+  },
+  deleteServer: async () => {
+    await Promise.resolve();
+    return false;
+  },
+  saving: false,
+}));
+
+/** The chat's place: which account and balance its sends draw on. */
+type TestPlace = {
+  chatScope: string;
+  org: { kind: 'personal' } | { kind: 'organization'; id: string };
+};
+
+/** A chat the person pays for, and the organization's own that a test switches to. */
+const PERSONAL_PLACE: TestPlace = { chatScope: 'u1:personal', org: { kind: 'personal' } };
+const chatPlace = vi.hoisted(() => ({ value: null as TestPlace | null }));
+
+/** The platform the screen reads. */
+const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
+/** Whether the storefront rule lets an organization's top-up link out. */
+const storefrontRule = vi.hoisted(() => ({ linkAllowed: false }));
+/** The external link helper, so a press that opens a page is asserted, not launched. */
+const externalLink = vi.hoisted(() => ({
+  open: vi.fn<(url: string, options?: { label?: string }) => Promise<void>>(),
+}));
+
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => storefrontRule.linkAllowed,
+}));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: externalLink.open }));
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
+
+vi.mock('@/lib/chat/use-chat', () => ({
+  useChatPlace: () => chatPlace.value,
+  useChat: () => ({
+    state: {
+      sessionId: 's1',
+      model: state.model,
+      effort: state.effort,
+      turns: [],
+      answering: [],
+      status: state.status,
+      asked: state.asked,
+      askedFrom: state.askedFrom,
+      displaced: state.displaced,
+      waiting: [],
+      failed: state.failed,
+      failureKey: state.failureKey,
+      record: state.record,
+    },
+    send: state.send,
+    stop: vi.fn(),
+    retry: state.retry,
+  }),
+  useChatList: () => ({ chats: [], rename: vi.fn() }),
+}));
+vi.mock('@/lib/chat/turns', () => ({
+  asMessages: () => state.messages,
+  askedMessageId: (sessionId: string) => `${sessionId}:asked`,
+  displacedMessageId: (sessionId: string, id: string) => `${sessionId}:displaced:${id}`,
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: null }),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'u1' }),
+}));
+vi.mock('@/lib/hooks/use-available-models', () => ({
+  useAvailableModels: () => ({ models: [], isLoading: false, isError: false }),
+}));
+vi.mock('@/lib/hooks/use-session-model-options', () => ({
+  useSessionModelOptions: () => ({ options: [] }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: 'black', mutedForeground: 'grey' }),
+}));
+vi.mock('@/lib/chat/backend-store', () => ({
+  useChatBackends: () => backendUi.profiles,
+  getChatBackendsHasLoaded: () => backendUi.loaded,
+}));
+vi.mock('@/lib/chat/backend-capabilities', () => ({
+  useTargetSupportsImages: () => state.images,
+}));
+vi.mock('@/lib/chat/layers', () => ({ rememberModelFacts: () => undefined }));
+vi.mock('@/lib/chat/local-models', () => ({ useLocalModels: () => [] }));
+vi.mock('@/lib/chat/gguf-models', () => ({
+  useGgufModels: () => ({ models: [], download: null, failure: null }),
+  ggufModelOptions: () => [],
+}));
+vi.mock('@/components/chat/backend-settings-sheet', () => ({
+  BackendSettingsControl: 'BackendSettingsControl',
+}));
+vi.mock('@/components/agents/chat-composer', () => ({ ChatComposer: 'ChatComposer' }));
+vi.mock('@/components/agents/message-bubble', () => ({ MessageBubble: 'MessageBubble' }));
+vi.mock('@/components/agents/message-details-sheet', () => ({
+  MessageDetailsSheet: 'MessageDetailsSheet',
+}));
+vi.mock('@/components/agents/part-detail-sheet-host', () => ({
+  PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/session-message-list', () => ({
+  SessionMessageList: 'SessionMessageList',
+}));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  Lock: 'Lock',
+  MessageCircle: 'MessageCircle',
+  SearchX: 'SearchX',
+  Server: 'Server',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
+  Wrench: 'Wrench',
+}));
+vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
+vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
+vi.mock('@/components/chat/mcp-settings-sheet', () => ({
+  McpSettingsSheet: 'McpSettingsSheet',
+  useMcpSettings: () => mcpModel,
+}));
+vi.mock('@/components/chat/chat-details-sheet', () => ({ ChatDetailsSheet: 'ChatDetailsSheet' }));
+vi.mock('@/components/agents/session-context-metrics', () => ({
+  SessionContextMetrics: 'SessionContextMetrics',
+}));
+vi.mock('@/components/agents/working-indicator', () => ({
+  WorkingIndicator: 'WorkingIndicator',
+}));
+const announce = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: announce }));
+vi.mock('@/components/chat/web-search-row', () => ({
+  useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
+}));
+const keyboard = vi.hoisted(() => ({ progress: 0 }));
+vi.mock('react-native-keyboard-controller', () => ({
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: keyboard.progress } }),
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  Extrapolation: { CLAMP: 'clamp' },
+  // Two-point interpolation, which is all the composer's safe-area inset asks
+  // for: closed (0) takes the first output, open (1) the second.
+  interpolate: (
+    value: number,
+    _input: readonly [number, number],
+    output: readonly [number, number]
+  ) => (value <= 0 ? output[0] : output[1]),
+  useAnimatedStyle: (style: () => unknown) => style(),
+}));
+vi.mock('react-native', () => ({
+  Alert: { alert: backendUi.alert },
+  ActivityIndicator: 'ActivityIndicator',
+  Platform: platform,
+  Pressable: 'Pressable',
+  View: 'View',
+  useWindowDimensions: () => ({ width: 1080, height: 2400, scale: 2, fontScale: 1 }),
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
+}));
+
+let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
+
+beforeEach(() => {
+  state.status = 'opening';
+  state.messages = [];
+  state.asked = null;
+  state.askedFrom = null;
+  state.displaced = [];
+  state.failed = null;
+  state.failureKey = null;
+  state.retry.mockClear();
+  router.push.mockClear();
+  router.dismissTo.mockClear();
+  backendUi.profiles = [];
+  backendUi.alert.mockClear();
+  backendUi.loaded = true;
+  state.model = 'm1';
+  state.effort = null;
+  state.images = false;
+  keyboard.progress = 0;
+  state.send.mockClear();
+  chatPlace.value = PERSONAL_PLACE;
+  platform.OS = 'ios';
+  storefrontRule.linkAllowed = false;
+  externalLink.open.mockReset();
+});
+afterEach(() => {
+  view?.unmount();
+  view = undefined;
+});
+
+async function mount(): Promise<ReactTestRenderer> {
+  view = await renderWithProviders(createElement(ChatScreen, { opened: 's1' }));
+  return view.renderer;
+}
+
+const count = (tree: ReactTestRenderer, type: string): number =>
+  tree.root.findAll(node => (node.type as string) === type).length;
+
+function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
+  return typeof value === 'function';
+}
+
+/** The props each state surface on screen was drawn with. */
+type StateProps = { title?: unknown; description?: unknown; action?: unknown };
+
+const emptyStatesOf = (tree: ReactTestRenderer): StateProps[] =>
+  tree.root.findAll(node => (node.type as string) === 'EmptyState').map(node => node.props);
+
+/** The copy the state's description node was given. */
+const descriptionMessageOf = (surface: StateProps): unknown =>
+  (surface.description as ReactElement<{ message: unknown }>).props.message;
+
+/** Mounts the state's action row, which the harness's stubbed `EmptyState` does not draw. */
+function mountAction(tree: ReactTestRenderer): Promise<RenderWithProvidersResult> {
+  const [surface] = emptyStatesOf(tree);
+  if (surface === undefined || surface.action === undefined) {
+    throw new TypeError('The state has no action');
+  }
+  return renderWithProviders(surface.action as ReactElement);
+}
+
+/** The copy the screen's status nodes carry, in tree order. */
+const messagesOf = (tree: ReactTestRenderer): unknown[] =>
+  tree.root
+    .findAll(node => (node.type as string) === 'AccessibleStatus')
+    .map(node => node.props.message);
+
+const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
+  tree.root
+    .findAll(node => (node.type as string) === 'Button')
+    .map(button => button.find(node => (node.type as string) === 'Text').props.children);
+
+/** The button carrying the given label, for the props a press alone cannot show. */
+function buttonOf(tree: ReactTestRenderer, label: unknown) {
+  const button = tree.root
+    .findAll(node => (node.type as string) === 'Button')
+    .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
+  if (button === undefined) {
+    throw new TypeError(`No button ${String(label)}`);
+  }
+  return button;
+}
+
+function press(tree: ReactTestRenderer, label: unknown): void {
+  const button = buttonOf(tree, label);
+  const { onPress } = button.props;
+  if (!isHandler(onPress)) {
+    throw new TypeError(`The ${String(label)} button has no press handler`);
+  }
+  act(() => {
+    onPress();
+  });
+}
+
+describe('the chat transcript while it opens', () => {
+  it('shows a loading transcript instead of the empty state', async () => {
+    const tree = await mount();
+
+    expect(count(tree, 'EmptyState')).toBe(0);
+    expect(count(tree, 'SessionMessageList')).toBe(0);
+    expect(count(tree, 'SessionSkeletonMessages')).toBe(1);
+  });
+
+  it('shows the empty state once the open has finished with no messages', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+
+    /* A chat that finished opening with nothing in it and nothing wrong is the
+       one case that keeps the invitation to start one, with no failure beside
+       it. */
+    expect(emptyStatesOf(tree).map(surface => surface.title)).toEqual([
+      i18n.t('modelChat.empty.title'),
+    ]);
+    expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
+    expect(messagesOf(tree)).toEqual([]);
+    /* Nothing failed, so the chat takes a first message. */
+    expect(count(tree, 'ChatComposer')).toBe(1);
+    /* The state centers in the transcript area its own scroller shows, so the
+       pending paint and the measured placement agree from the first frame and
+       the state does not move when a measurement lands. The state centers
+       through its own scroller, so no second one wraps it. */
+    const [empty] = emptyStatesOf(tree);
+    expect(empty?.description).toBeDefined();
+    expect(count(tree, 'CenteredState')).toBe(0);
+  });
+
+  it.each([
+    { progress: 0, height: 24 },
+    { progress: 1, height: 0 },
+  ])(
+    'keeps the composer inset in step with the keyboard at progress $progress',
+    async ({ progress, height }) => {
+      keyboard.progress = progress;
+      const tree = await mount();
+      const inset = tree.root.find(node => node.props.testID === 'chat-composer-inset');
+
+      // The inset below the composer tracks the keyboard's own progress, rather
+      // than flipping after the keyboard has landed, and draws on the composer's
+      // bar surface instead of the screen background.
+      expect(inset.props.style).toEqual({ height });
+      expect(inset.parent?.type).toBe('BlurBar');
+    }
+  );
+
+  it.each([
+    { status: 'idle' as const, rows: 0, announced: [] },
+    { status: 'working' as const, rows: 1, announced: [['Generating…']] },
+  ])(
+    'draws the working row above the composer only while working ($status)',
+    async ({ status, rows, announced }) => {
+      announce.mockClear();
+      state.status = status;
+      state.messages = [{ info: { id: 'm1', role: 'assistant' } }];
+      const tree = await mount();
+      const working = tree.root.findAll(node => (node.type as string) === 'WorkingIndicator');
+
+      // An idle chat reserves no status space: the transcript ends at the composer.
+      expect(working).toHaveLength(rows);
+      if (rows === 1) {
+        expect(working[0]?.props).toMatchObject({ isStreaming: true, messages: state.messages });
+      }
+      // The row is not a live region, so the reply start is announced once.
+      expect(announce.mock.calls).toEqual(announced);
+    }
+  );
+
+  it('hands the sheet the whole chat-tools model', async () => {
+    const tree = await mount();
+    const sheet = tree.root.findAll(node => (node.type as string) === 'McpSettingsSheet')[0];
+
+    expect(sheet?.props.settings).toBe(mcpModel);
+    expect(sheet?.props.visible).toBe(false);
+  });
+  it('gives the composer no mode control, because a chat is not an agent session', async () => {
+    const tree = await mount();
+    const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+
+    expect(composer.props.modeControl).toBeUndefined();
+  });
+  it('shows the stored transcript once the open has finished with messages', async () => {
+    state.status = 'idle';
+    state.messages = [{ info: { id: 'm-1' } }];
+    const tree = await mount();
+
+    expect(count(tree, 'SessionMessageList')).toBe(1);
+    expect(count(tree, 'EmptyState')).toBe(0);
+    expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
+  });
+});
+
+type Metric = ReactElement<{ onPress: () => void; info: unknown }>;
+
+function metricOf(tree: ReactTestRenderer): Metric {
+  const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+  const right = header.props.headerRight as ReactElement<{ children: readonly Metric[] }>;
+  const [metric] = right.props.children;
+  if (metric === undefined) {
+    throw new Error('the header has no metric');
+  }
+  return metric;
+}
+
+describe('the chat header', () => {
+  it('spaces its three controls so they never sit flush', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+    const cluster = header.props.headerRight as ReactElement<{
+      className: string;
+      children: readonly ReactElement[];
+    }>;
+    // Three controls share this row: the context pill, the backend button and
+    // the tools button. Without a gap they touch, which reads as one broken
+    // control rather than three. Every other multi-control header cluster in
+    // the app carries the same spacing.
+    expect(cluster.props.className).toContain('gap-2');
+    expect(cluster.props.children).toHaveLength(3);
+  });
+});
+
+function details(tree: ReactTestRenderer) {
+  return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
+    readonly visible: boolean;
+    readonly onClose: () => void;
+  };
+}
+
+describe('the chat details', () => {
+  it('opens from the header metric onto the chat the screen shows', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+
+    expect(details(tree)).toMatchObject({ visible: false, model: 'm1', record: state.record });
+    act(() => {
+      metricOf(tree).props.onPress();
+    });
+    expect(details(tree).visible).toBe(true);
+    act(() => {
+      details(tree).onClose();
+    });
+    expect(details(tree).visible).toBe(false);
+  });
+
+  it('shows no window reading before the first answer', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+
+    expect(metricOf(tree).props.info).toBeUndefined();
+  });
+});
+
+describe('backend context-transfer approval', () => {
+  it.each([
+    localTargetId('apple'),
+    localTargetId('android'),
+    localTargetId('gguf', 'qwen-test.gguf'),
+  ])('describes local processing and waits for approval before selecting %s', async target => {
+    state.status = 'idle';
+    const tree = await mount();
+    const composer = () =>
+      tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+        model: string;
+        onModelSelect: (model: string, variant: string) => void;
+      };
+
+    act(() => {
+      composer().onModelSelect(target, '');
+    });
+    expect(composer().model).toBe('m1');
+    const [title, message, actions] = backendUi.alert.mock.calls.at(-1) ?? [];
+    expect(title).toBe(i18n.t('modelChat.localModels.switchTitle'));
+    expect(message).toBe(i18n.t('modelChat.localModels.switchMessage', { name: target }));
+    expect(actions?.find(action => action.onPress)).toMatchObject({
+      text: i18n.t('modelChat.localModels.switchConfirm'),
+    });
+    act(() => {
+      actions?.find(action => action.onPress)?.onPress?.();
+    });
+    expect(composer().model).toBe(target);
+    act(() => {
+      composer().onModelSelect('m1', '');
+    });
+    expect(backendUi.alert.mock.calls.at(-1)?.slice(0, 2)).toEqual([
+      i18n.t('modelChat.backends.switchTitle'),
+      i18n.t('modelChat.backends.switchMessage', { name: 'm1' }),
+    ]);
+    expect(composer().model).toBe(target);
+  });
+
+  it('requires approval when returning from a picked custom backend before its queued move finishes', async () => {
+    state.status = 'working';
+    const backend: StoredChatBackend = {
+      id: 'backend-one',
+      revision: 1,
+      name: 'One',
+      baseUrl: 'https://one.example/v1',
+      apiKind: 'responses',
+      apiKey: '',
+      headers: {},
+      models: [{ id: 'shared', name: 'Shared', tools: false, images: false, reasoning: false }],
+      allowLocalHttp: false,
+    };
+    backendUi.profiles = [backend];
+    const target = backendTargetId(backend, 'shared');
+    const tree = await mount();
+    const composer = () =>
+      tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+        model: string;
+        onModelSelect: (model: string, variant: string) => void;
+      };
+    act(() => {
+      composer().onModelSelect(target, '');
+    });
+    expect(composer().model).toBe('m1');
+    act(() => {
+      backendUi.alert.mock.calls
+        .at(-1)?.[2]
+        ?.find(action => action.onPress)
+        ?.onPress?.();
+    });
+    expect(composer().model).toBe(target);
+    act(() => {
+      composer().onModelSelect('m1', '');
+    });
+    expect(backendUi.alert).toHaveBeenCalledTimes(2);
+    expect(composer().model).toBe(target);
+  });
+});
+
+describe('sending before stored backends load', () => {
+  it('does not report a stored custom target as deleted', async () => {
+    state.status = 'idle';
+    backendUi.loaded = false;
+    state.model = 'backend:server:1:model';
+    const tree = await mount();
+    const { onSend } = tree.root.find(node => (node.type as string) === 'ChatComposer').props;
+    if (!isHandler(onSend)) {
+      throw new TypeError('Composer has no send handler');
+    }
+    act(() => {
+      onSend('Question');
+    });
+    expect(backendUi.alert).not.toHaveBeenCalled();
+    expect(state.send).toHaveBeenCalledWith(
+      'Question',
+      { model: 'backend:server:1:model', effort: null },
+      []
+    );
+  });
+});
+
+describe('images in a chat', () => {
+  it.each([false, true])(
+    'offers the attach control only for a model that reads images (%s)',
+    async images => {
+      state.status = 'idle';
+      state.images = images;
+      const tree = await mount();
+      const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+
+      expect(composer.props).toMatchObject({
+        attachmentsEnabled: images,
+        attachmentDelivery: 'local',
+      });
+    }
+  );
+
+  it('sends the images the composer read with the question', async () => {
+    state.status = 'idle';
+    state.images = true;
+    const tree = await mount();
+    const { onSend } = tree.root.find(node => (node.type as string) === 'ChatComposer').props;
+    if (!isHandler(onSend)) {
+      throw new TypeError('Composer has no send handler');
+    }
+    const image = { media: 'image/jpeg', data: 'AAAA' };
+    act(() => {
+      onSend('What is this?', { images: [image] });
+    });
+    expect(state.send).toHaveBeenCalledWith('What is this?', { model: 'm1', effort: null }, [
+      image,
+    ]);
+  });
+});
+
+const composerOf = (tree: ReactTestRenderer) =>
+  tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+    variant: string;
+    onModelSelect: (model: string, variant: string) => void;
+    onSend: (text: string) => void;
+  };
+
+describe('the thinking effort of a chat', () => {
+  const backend: StoredChatBackend = {
+    id: 'reasoner',
+    revision: 1,
+    name: 'Reasoner',
+    baseUrl: 'https://reasoner.example/v1',
+    apiKind: 'chat_completions',
+    apiKey: '',
+    headers: {},
+    models: [{ id: 'r1', name: 'R1', tools: false, images: false, reasoning: true }],
+    allowLocalHttp: false,
+  };
+  const target = backendTargetId(backend, 'r1');
+  it('sends the effort the person picked', async () => {
+    state.status = 'idle';
+    state.model = target;
+    backendUi.profiles = [backend];
+    const tree = await mount();
+
+    act(() => {
+      composerOf(tree).onModelSelect(target, 'high');
+    });
+    act(() => {
+      composerOf(tree).onSend('Think hard');
+    });
+
+    expect(state.send).toHaveBeenCalledWith('Think hard', { model: target, effort: 'high' }, []);
+  });
+
+  it('shows the effort a reopened chat was opened with', async () => {
+    state.status = 'idle';
+    state.model = target;
+    state.effort = 'medium';
+    backendUi.profiles = [backend];
+    const tree = await mount();
+
+    expect(composerOf(tree).variant).toBe('medium');
+  });
+
+  it('sends no effort to a model that takes none', async () => {
+    state.status = 'idle';
+    state.model = target;
+    state.effort = 'high';
+    backendUi.profiles = [
+      {
+        ...backend,
+        models: [{ id: 'r1', name: 'R1', tools: false, images: false, reasoning: false }],
+      },
+    ];
+    const tree = await mount();
+
+    act(() => {
+      composerOf(tree).onSend('Plain');
+    });
+
+    expect(state.send).toHaveBeenCalledWith('Plain', { model: target, effort: null }, []);
+  });
+});
+
+describe('a retained chat failure', () => {
+  it('states the refused send on the question and opens where the credit is bought', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    /* The question is still on screen, so the failure belongs to its own bubble
+       rather than replacing the transcript. */
+    expect(count(tree, 'EmptyState')).toBe(0);
+    const refused = bubbleFor(tree, 's1:asked');
+    /* The bubble states the balance, not a generic agent failure, so the row
+       above the composer has no second sentence to say. */
+    expect(refused.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
+    expect(messagesOf(tree)).toEqual([]);
+    expect(buttonLabels(tree)).toEqual([]);
+    /* Asking again meets the same balance, so the question offers no Retry. The
+       action that settles it is the only recovery, and Copy to composer keeps
+       the words for the send that follows it. */
+    expect(refused.onRetryMessage).toBeUndefined();
+    expect(refused.onCopyToComposer).toBeInstanceOf(Function);
+    act(() => {
+      pressInAppCredits(refused);
+    });
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  it('states the balance in the row when no question is on screen to carry it', async () => {
+    /* A tool-switch refusal after the answer landed: the chat has a transcript
+       and no unanswered question, so the row is the only place the cause can
+       be stated — and the only place that can offer the action. */
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    expect(buttonLabels(tree)).toEqual([i18n.t('addCredits.cta')]);
+    /* That action is the row's only recovery, so it carries the same 48 dp
+       frame the Retry button in this row uses. */
+    expect(String(buttonOf(tree, i18n.t('addCredits.cta')).props.className)).toContain(
+      STATE_ACTION_CLASS
+    );
+    press(tree, i18n.t('addCredits.cta'));
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    /* Nothing on screen could be asked again, and a re-send meets the same
+       refusal, so no Retry joins it. */
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  /* The balance that refused the send decides where the credit is bought. An
+     organization's chat spends that organization's balance, so its own billing
+     page settles it, where the storefront rule allows the link. */
+  it('opens the organization billing page where the storefront rule allows the link', async () => {
+    chatPlace.value = { chatScope: 'u1:org-1', org: { kind: 'organization', id: 'org-1' } };
+    platform.OS = 'ios';
+    storefrontRule.linkAllowed = true;
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    press(tree, i18n.t('addCredits.cta'));
+    expect(router.push).not.toHaveBeenCalled();
+    expect(externalLink.open).toHaveBeenCalledWith(
+      'https://example.com/organizations/org-1/payment-details',
+      { label: i18n.t('addCredits.billingPage') }
+    );
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  /* Outside the one storefront that may link, the organization's page prints as
+     plain text: the refusal still states its cause and the label, and nothing
+     opens. */
+  it('prints the organization top-up as plain text where the rule refuses the link', async () => {
+    chatPlace.value = { chatScope: 'u1:org-1', org: { kind: 'organization', id: 'org-1' } };
+    platform.OS = 'android';
+    storefrontRule.linkAllowed = false;
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    expect(buttonLabels(tree)).toEqual([]);
+    expect(
+      tree.root.findAll(
+        node => (node.type as string) === 'Text' && node.props.children === i18n.t('addCredits.cta')
+      )
+    ).toHaveLength(1);
+    expect(externalLink.open).not.toHaveBeenCalled();
+  });
+
+  /* The chat's payer is read from its place. Until that resolves, the screen
+     offers no destination rather than guessing the person's own balance. */
+  it('offers no Add credits until the chat’s payer is known', async () => {
+    chatPlace.value = null;
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    expect(buttonLabels(tree)).toEqual([]);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('a chat that settled without a transcript', () => {
+  it('draws the not-found copy once, with a way back and no empty state', async () => {
+    state.status = 'idle';
+    state.failureKey = 'queryError.notFoundDescription';
+    const tree = await mount();
+
+    /* One state, not two: the area says what is true — in the empty state's
+       place — and the composer is not drawn at all below it. */
+    expect(count(tree, 'EmptyState')).toBe(1);
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(failure?.title).toBe(i18n.t('common.notFound'));
+    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.notFoundDescription'));
+    expect(messagesOf(tree)).toEqual([]);
+    /* Entering it again settles the same state, so no Retry is offered. */
+    const action = await mountAction(tree);
+    expect(buttonLabels(action.renderer)).toEqual([i18n.t('common.back')]);
+    press(action.renderer, i18n.t('common.back'));
+    action.unmount();
+    expect(router.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)');
+  });
+
+  it('offers Retry and Back for a failure that could settle differently', async () => {
+    state.status = 'idle';
+    state.failureKey = 'common.somethingWentWrong';
+    const tree = await mount();
+
+    /* No transcript means nothing to send into, whichever failure it was. */
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(failure?.title).toBe(i18n.t('common.somethingWentWrong'));
+    /* The title already says it, so the state does not repeat the sentence;
+       the neutral description carries the retry invitation instead. */
+    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.neutralDescription'));
+    /* A balance caused nothing here, so no Add credits joins the two ways out. */
+    const action = await mountAction(tree);
+    expect(buttonLabels(action.renderer)).toEqual([i18n.t('common.retry'), i18n.t('common.back')]);
+    press(action.renderer, i18n.t('common.retry'));
+    action.unmount();
+    expect(state.retry).toHaveBeenCalledOnce();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('shows only fixed copy for a failure a provider body caused', async () => {
+    state.status = 'idle';
+    state.failed = 'Bearer provider-secret from a raw provider body';
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    const tree = await mount();
+
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(descriptionMessageOf(failure ?? {})).toBe(
+      'This chat backend was deleted. Choose another backend to continue.'
+    );
+    expect(
+      tree.root.findAll(node =>
+        Object.values(node.props).some(
+          value => typeof value === 'string' && value.includes('provider-secret')
+        )
+      )
+    ).toHaveLength(0);
+    const action = await mountAction(tree);
+    press(action.renderer, i18n.t('common.retry'));
+    action.unmount();
+    expect(state.retry).toHaveBeenCalledOnce();
+  });
+});
+
+type BubbleProps = {
+  onLongPressDetails?: (message: unknown) => void;
+  deliveryState?: { status: string; error?: string; reason?: string };
+  onRetryMessage?: (message: unknown) => void;
+  addCredits?: AddCreditsDestination;
+  onCopyToComposer?: (text: string) => void;
+};
+
+type RenderItem = (info: { item: unknown; index: number }) => { props: BubbleProps };
+
+/** The props the transcript hands the bubble of one message. */
+function bubbleFor(tree: ReactTestRenderer, id: string): BubbleProps {
+  const list = tree.root.find(node => (node.type as string) === 'SessionMessageList');
+  const renderItem = list.props.renderItem as RenderItem;
+  const item = state.messages.find(message => message.info.id === id);
+  if (item === undefined) {
+    throw new TypeError(`No message ${id}`);
+  }
+  return renderItem({ item, index: 0 }).props;
+}
+
+const sheetOf = (tree: ReactTestRenderer) =>
+  tree.root.find(node => (node.type as string) === 'MessageDetailsSheet').props as {
+    visible: boolean;
+    message: unknown;
+    deliveryState?: unknown;
+    onClose: () => void;
+  };
+
+/** Presses the in-app Add credits action a bubble was handed. */
+function pressInAppCredits(bubble: BubbleProps): void {
+  const credits = bubble.addCredits;
+  if (credits?.kind !== 'inApp') {
+    throw new TypeError('The bubble has no in-app Add credits action');
+  }
+  credits.onPress();
+}
+
+describe('message actions', () => {
+  it('opens the details of a question and of an answer on long-press', async () => {
+    state.status = 'idle';
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+    expect(sheetOf(tree).visible).toBe(false);
+
+    for (const message of state.messages) {
+      act(() => {
+        bubbleFor(tree, message.info.id).onLongPressDetails?.(message);
+      });
+      expect(sheetOf(tree)).toMatchObject({ visible: true, message });
+      act(() => {
+        sheetOf(tree).onClose();
+      });
+      expect(sheetOf(tree).visible).toBe(false);
+    }
+  });
+
+  it('puts Retry and Copy to composer on the failed question, and states why under the transcript', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+      // Typed while the answer failed: it waits under the question.
+      { info: { id: 's1:waiting:0', role: 'user' } },
+    ];
+    const tree = await mount();
+    const failed = bubbleFor(tree, 's1:asked');
+
+    expect(failed.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubbleFor(tree, 's1:waiting:0').onRetryMessage).toBeUndefined();
+    expect(bubbleFor(tree, 't1').deliveryState).toBeUndefined();
+    expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
+      'This chat backend was deleted. Choose another backend to continue.'
+    );
+    // The message carries the one Retry.
+    expect(count(tree, 'Button')).toBe(0);
+
+    act(() => {
+      failed.onRetryMessage?.(state.messages[1]);
+    });
+    expect(state.retry).toHaveBeenCalledOnce();
+
+    const setText = vi.fn();
+    const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+    const controlRef = composer.props.controlRef as { current: unknown };
+    controlRef.current = { setText, hasContent: () => false, restoreAttachments: () => undefined };
+    act(() => {
+      failed.onCopyToComposer?.('what is a monad');
+    });
+    expect(setText).toHaveBeenCalledWith('what is a monad');
+
+    act(() => {
+      failed.onLongPressDetails?.(state.messages[1]);
+    });
+    expect(sheetOf(tree).deliveryState).toEqual(failed.deliveryState);
+  });
+
+  it('keeps a failed question below the one that took its place, with its recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'second question';
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: 'modelChat.backends.deletedBackend',
+      },
+    ];
+    // In the order the registry draws them: the failure, then the question that
+    // took its place.
+    state.messages = [
+      { info: { id: 's1:displaced:k1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+    ];
+    const tree = await mount();
+    const kept = bubbleFor(tree, 's1:displaced:k1');
+
+    // It keeps the footer and the recovery it had in the slot.
+    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
+
+    act(() => {
+      kept.onRetryMessage?.(state.messages[0]);
+    });
+    // Its own Retry asks that question, not the one in the slot.
+    expect(state.retry).toHaveBeenCalledWith(state.displaced[0]);
+
+    act(() => {
+      kept.onLongPressDetails?.(state.messages[0]);
+    });
+    expect(sheetOf(tree).deliveryState).toEqual(kept.deliveryState);
+  });
+
+  it('keeps the balance cause on a question a later send pushed out of the slot', async () => {
+    state.status = 'idle';
+    state.asked = 'second question';
+    /* The slot holds a different failure, as a tool-set move that failed after
+       an answer would leave it: the kept bubble must read its own record. */
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
+      },
+    ];
+    state.messages = [
+      { info: { id: 's1:displaced:k1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+    ];
+    const tree = await mount();
+    const kept = bubbleFor(tree, 's1:displaced:k1');
+
+    // The cause it failed with travels with it, so the bubble where it was said
+    // states the balance rather than a generic agent failure.
+    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
+    // Asking it again meets the same balance: the action that settles it stays,
+    // and the Retry does not.
+    expect(kept.onRetryMessage).toBeUndefined();
+    act(() => {
+      pressInAppCredits(kept);
+    });
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+    // The slot's own question keeps the cause its own failure has.
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'execution',
+    });
+  });
+
+  it('reads a kept question the person stopped as interrupted', async () => {
+    state.status = 'idle';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'stopped question',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'stopped',
+        failureKey: null,
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:displaced:k1').deliveryState).toMatchObject({
+      reason: 'interrupted',
+    });
+  });
+
+  it('draws a question it was asked again at its own bubble, with the slot recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    // One bubble for one question: the attempt is drawn where it was said, and
+    // carries the recovery the slot hands it — the balance's action, no Retry.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
+    expect(bubble.onRetryMessage).toBeUndefined();
+    act(() => {
+      pressInAppCredits(bubble);
+    });
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  it('falls back to its own bubble when the record the slot names is gone', async () => {
+    state.status = 'idle';
+    state.asked = 'a question whose kept record is no longer here';
+    state.askedFrom = 'gone';
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    state.displaced = [];
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:asked');
+
+    // The transcript drew the slot's own bubble, so the recovery is on it.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubble.onRetryMessage).toBeDefined();
+  });
+
+  it('shows no recovery under a question asked again while it is being asked', async () => {
+    state.status = 'working';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    expect(bubble.deliveryState).toBeUndefined();
+    expect(bubble.onRetryMessage).toBeUndefined();
+  });
+
+  it('reads a question with no failure as stopped, with no row under the transcript', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toMatchObject({ reason: 'interrupted' });
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
+  });
+
+  it('offers no Retry while the question is still being answered', async () => {
+    state.status = 'working';
+    state.asked = 'what is a monad';
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:asked').onRetryMessage).toBeUndefined();
+  });
+});

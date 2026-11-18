@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   getPlatformOAuthCallbackPath,
   type StandardOAuthPlatform,

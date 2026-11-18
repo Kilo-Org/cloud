@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { PullRequestPayload } from '../webhook-schemas';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   createCodeReview,
   cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
+  findReviewCoveringHeads,
   updateReviewHeadShaAndCheckRun,
+  type CoveringReview,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
@@ -29,18 +31,17 @@ import type { GitHubAppType } from '@/lib/integrations/platforms/github/adapter'
 import {
   addReactionToPR,
   createCheckRun,
-  isMergeCommit,
+  findLatestCheckRunId,
+  getCheckRunConclusion,
+  resolveMergeHeadContent,
   updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
+import { isNonTerminalCodeReviewStatus } from '@/lib/code-reviews/dispatch/dispatch-constants';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
-
-/**
- * GitHub Pull Request Event Handler
- * Handles: opened, synchronize, reopened
 
 /**
  * Handles pull request events that trigger code review
@@ -71,7 +72,6 @@ export async function handlePullRequestCodeReview(
       checkoutRef: checkoutRef.checkoutRef,
     });
 
-    // Skip draft PRs - only trigger code review for ready PRs
     if (pull_request.draft === true) {
       logExceptInTest('Skipping draft PR:', {
         pr_number: pull_request.number,
@@ -80,7 +80,6 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped draft PR' }, { status: 200 });
     }
 
-    // Debug: Log integration fields
     logExceptInTest('Integration fields:', {
       id: integration.id,
       owned_by_organization_id: integration.owned_by_organization_id,
@@ -88,8 +87,6 @@ export async function handlePullRequestCodeReview(
       kilo_requester_user_id: integration.kilo_requester_user_id,
     });
 
-    // 1. Determine owner from integration
-    // For orgs: use bot user, fallback to integration creator
     const orgBotUserId = integration.owned_by_organization_id
       ? await getBotUserId(integration.owned_by_organization_id, 'code-review')
       : null;
@@ -98,7 +95,6 @@ export async function handlePullRequestCodeReview(
       ? {
           type: 'org',
           id: integration.owned_by_organization_id,
-          // Use bot user if available, fallback to integration creator
           userId: (orgBotUserId ?? integration.kilo_requester_user_id) as string,
         }
       : {
@@ -107,7 +103,6 @@ export async function handlePullRequestCodeReview(
           userId: integration.owned_by_user_id as string,
         };
 
-    // Validate we have a valid user ID
     if (!owner.userId) {
       logExceptInTest('No valid user ID found for integration:', {
         integrationId: integration.id,
@@ -121,7 +116,6 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // 2. Check if code review agent is enabled for this owner
     const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'github');
 
     if (!agentConfig || !agentConfig.is_enabled || getCodeReviewActionRequiredState(agentConfig)) {
@@ -138,11 +132,10 @@ export async function handlePullRequestCodeReview(
       `Code review agent enabled for ${owner.type} ${owner.id}, processing ${repository.full_name}#${pull_request.number}`
     );
 
-    // 3. Check if repository is in allowed list (when using selected repositories mode)
     const config = agentConfig.config as CodeReviewAgentConfig;
 
-    // Bot PRs are skipped by default (enforced at step 5b). Compute the decision up front so the
-    // merge-commit path (step 4) also defers to it: otherwise a bot PR whose head is a merge commit
+    // Bot PRs are skipped by default (enforced below). Compute the decision up front so the
+    // merge-commit path also defers to it: otherwise a bot PR whose head is a merge commit
     // would be re-pointed to a new SHA with a fresh check run, keeping alive a review the guardrail
     // is meant to skip. When true, the PR falls through to cancellation + skip instead.
     const skipBotPullRequests = config.skip_bot_pull_requests ?? true;
@@ -180,50 +173,80 @@ export async function handlePullRequestCodeReview(
     const headFullName = checkoutRef.headRepoFullName ?? repository.full_name;
     const [headOwner, headRepoName] = headFullName.split('/');
 
-    // 4. Skip merge commits on synchronize (e.g. merging base branch into feature branch).
+    // Skip merge commits on synchronize (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
-    if (
+    // The skip holds only while a review covers the content the head carries. A head that stacks
+    // merges on branch commits no review has covered yet, or that takes code from outside the base
+    // branch, must be reviewed here, or the pull request never gets a review at its head and a
+    // repository that requires the Kilo check stays blocked.
+    const mergeHeadContent =
+      payload.action === GITHUB_ACTION.SYNCHRONIZE &&
       !isBotPullRequestSkip &&
       headOwner &&
-      headRepoName &&
-      (await shouldSkipSynchronizeForMergeCommit({
-        action: payload.action,
-        installationId: integration.platform_installation_id as string,
-        headOwner,
-        headRepoName,
-        headSha: pull_request.head.sha,
-        appType,
-      }))
-    ) {
+      headRepoName
+        ? await resolveMergeHeadContent({
+            appType,
+            baseSha: pull_request.base.sha,
+            headSha: pull_request.head.sha,
+            installationId: integration.platform_installation_id as string,
+            owner: headOwner,
+            repo: headRepoName,
+          })
+        : { kind: 'not_merge' as const };
+
+    const coveringReview =
+      mergeHeadContent.kind === 'review_content'
+        ? await coveringReviewFor(reviewScope, mergeHeadContent.shas)
+        : null;
+
+    if (coveringReview !== null) {
       logExceptInTest('Skipping merge commit:', {
         pr_number: pull_request.number,
         repo: repository.full_name,
         head_sha: pull_request.head.sha,
       });
 
-      // The preserved review's check run still sits on the prior SHA, so
-      // branch protection that requires the Kilo check would stay blocked
-      // on the merge-commit head. Drop a fresh check run on the new HEAD
-      // and repoint the review at it so its eventual completion callback
-      // updates the gate on the commit GitHub actually evaluates. Note
-      // the check run goes on the *base* repo (where branch protection
-      // lives and where the app is installed), not the head/fork repo.
+      // Branch protection evaluates the merge-commit head, where no check run exists yet. Note
+      // the check run goes on the *base* repo (where branch protection lives and where the app is
+      // installed), not the head/fork repo.
       const [baseOwner, baseRepoName] = repository.full_name.split('/');
-      await migrateInFlightReviewsToMergeCommitHead({
-        newHeadSha: pull_request.head.sha,
-        integrationId: integration.id,
-        installationId: integration.platform_installation_id as string,
-        baseOwner,
-        baseRepoName,
-        appType,
-        reviewScope,
-      });
+      if (isNonTerminalCodeReviewStatus(coveringReview.status)) {
+        // The preserved review's check run still sits on the prior SHA. Drop a fresh check run on
+        // the new HEAD and repoint the review at it so its eventual completion callback updates the
+        // gate on the commit GitHub actually evaluates.
+        await migrateInFlightReviewsToMergeCommitHead({
+          newHeadSha: pull_request.head.sha,
+          integrationId: integration.id,
+          installationId: integration.platform_installation_id as string,
+          baseOwner,
+          baseRepoName,
+          appType,
+          reviewScope,
+        });
+      } else {
+        await gateMergeHeadFromCoveringReview({
+          appType,
+          baseOwner,
+          baseRepoName,
+          coveringReview,
+          headSha: pull_request.head.sha,
+          installationId: integration.platform_installation_id as string,
+        });
+      }
 
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
-    // 5. Cancel any existing reviews for this PR (different SHA)
+    if (mergeHeadContent.kind !== 'not_merge') {
+      logExceptInTest('Reviewing merge commit whose content no review covers:', {
+        pr_number: pull_request.number,
+        repo: repository.full_name,
+        head_sha: pull_request.head.sha,
+      });
+    }
+
+    // Cancel any existing reviews for this PR (different SHA).
     // This prevents spam when user pushes multiple commits quickly
     const cancelledReviews = await cancelSupersededReviewsForPR(reviewScope, pull_request.head.sha);
 
@@ -297,12 +320,12 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // 5b. Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
+    // Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
     // (dependabot/renovate/etc.) — high-volume, low-value dependency bumps otherwise consume review
-    // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests` (see the
-    // decision computed before step 4). Applies to standard and council reviews; manual reviews
-    // never reach this handler. Runs AFTER supersession (step 5) so a bot push still cancels any
-    // stale in-flight review and resolves its check run, instead of leaving it stuck.
+    // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests`. Applies to
+    // standard and council reviews; manual reviews never reach this handler. Runs AFTER
+    // supersession so a bot push still cancels any stale in-flight review and resolves its
+    // check run, instead of leaving it stuck.
     if (isBotPullRequestSkip) {
       logExceptInTest('Skipping bot-authored PR:', {
         pr_number: pull_request.number,
@@ -312,7 +335,6 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped bot-authored PR' }, { status: 200 });
     }
 
-    // 6. Check for duplicate review (same repo, PR, SHA)
     const existingReview = await findExistingReview(reviewScope, pull_request.head.sha);
 
     if (existingReview) {
@@ -329,7 +351,7 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // 6b. Decide standard vs council for this automated review. Council is a per-repo opt-in and
+    // Decide standard vs council for this automated review. Council is a per-repo opt-in and
     // requires an active council config + entitlement. The entitlement lookup is a DB call, so it
     // is gated behind the two cheap local checks (most webhooks are standard and skip it). Falls
     // back to 'standard' if any condition is missing, so a bad/absent council config never blocks.
@@ -371,7 +393,7 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // 7. Create review record (session_id will be updated async)
+    // The review record's session_id is updated async.
     const reviewId = await createCodeReview({
       owner,
       reviewType,
@@ -395,7 +417,6 @@ export async function handlePullRequestCodeReview(
 
     const [repoOwner, repoName] = repository.full_name.split('/');
 
-    // 8. Create GitHub Check Run (PR gate) — skip for lite (read-only) app
     if (appType !== 'lite') {
       let checkRunId: number | undefined;
       try {
@@ -444,7 +465,6 @@ export async function handlePullRequestCodeReview(
       }
     }
 
-    // 9. Post 👀 reaction to show Kilo is reviewing
     try {
       await addReactionToPR(
         integration.platform_installation_id as string,
@@ -459,7 +479,6 @@ export async function handlePullRequestCodeReview(
       logExceptInTest('Failed to add eyes reaction:', reactionError);
     }
 
-    // 10. Try to dispatch pending reviews (including this new one)
     // Review is created with status='pending' and dispatch will pick it up if slots available
     try {
       const dispatchResult = await tryDispatchPendingReviews(owner);
@@ -484,7 +503,6 @@ export async function handlePullRequestCodeReview(
       // Don't throw - review record created as pending, will be picked up later
     }
 
-    // 11. Return 202 Accepted (always succeeds, review queued as pending)
     return NextResponse.json(
       {
         message: 'Code review queued',
@@ -513,31 +531,94 @@ export async function handlePullRequestCodeReview(
 }
 
 /**
- * Decides whether a pull_request webhook should bail out because its head
- * commit is a merge commit (e.g. produced by GitHub's "Update branch" button
- * or a manual `git merge main`). Only applies to synchronize events.
- *
- * Extracted so tests can inject a fake `isMergeCommitFn` without mocking the
- * GitHub adapter module.
+ * The review that covers the content a merge commit carries, or null when none
+ * does. A read failure answers null, so an unreadable history reviews the head
+ * instead of skipping it.
  */
-export async function shouldSkipSynchronizeForMergeCommit(args: {
-  action: string;
-  installationId: string;
-  headOwner: string;
-  headRepoName: string;
-  headSha: string;
+async function coveringReviewFor(
+  scope: ReviewScope,
+  headShas: readonly string[]
+): Promise<CoveringReview | null> {
+  try {
+    return await findReviewCoveringHeads(scope, headShas);
+  } catch (error) {
+    logExceptInTest('Failed to read reviews of the merge head content:', error);
+    return null;
+  }
+}
+
+/**
+ * A finished review of the same content leaves no check run on this head, so
+ * branch protection that requires the Kilo check stays blocked here. Create the
+ * head's check run with the verdict the review finished with, so the gate on the
+ * merge head matches the gate on the content it carries. A verdict that cannot
+ * be read is logged and leaves the head without a run instead of inventing one.
+ */
+async function gateMergeHeadFromCoveringReview(args: {
   appType: GitHubAppType;
-  isMergeCommitFn?: (
-    installationId: string,
-    owner: string,
-    repo: string,
-    sha: string,
-    appType: GitHubAppType
-  ) => Promise<boolean>;
-}): Promise<boolean> {
-  if (args.action !== GITHUB_ACTION.SYNCHRONIZE) return false;
-  const check = args.isMergeCommitFn ?? isMergeCommit;
-  return check(args.installationId, args.headOwner, args.headRepoName, args.headSha, args.appType);
+  baseOwner: string;
+  baseRepoName: string;
+  coveringReview: Readonly<{ checkRunId: number | null; headSha: string; id: string }>;
+  headSha: string;
+  installationId: string;
+}): Promise<void> {
+  if (args.appType === 'lite' || args.coveringReview.checkRunId === null) {
+    return;
+  }
+  const conclusion = await getCheckRunConclusion(
+    args.installationId,
+    args.baseOwner,
+    args.baseRepoName,
+    args.coveringReview.checkRunId,
+    args.appType
+  );
+  if (conclusion === undefined) {
+    logExceptInTest('No verdict to carry to the merge-commit head:', {
+      head_sha: args.headSha,
+      review_id: args.coveringReview.id,
+      reviewed_sha: args.coveringReview.headSha,
+    });
+    return;
+  }
+  try {
+    // The Kilo check on this head may already carry the covering verdict: the
+    // webhook delivered this synchronization once, a recovery sweep ran here
+    // before, or a previous pass created the run. Gate the head once; a second
+    // run with the same conclusion adds noise, not coverage. A lookup failure
+    // reads as "no run" and the create below answers 422 on the decided run.
+    const existingRunId = await findLatestCheckRunId(
+      args.installationId,
+      args.baseOwner,
+      args.baseRepoName,
+      args.headSha,
+      args.appType
+    );
+    if (existingRunId !== undefined) {
+      logExceptInTest('Merge-commit head already carries the Kilo check:', {
+        head_sha: args.headSha,
+        check_run_id: existingRunId,
+      });
+      return;
+    }
+
+    await createCheckRun(
+      args.installationId,
+      args.baseOwner,
+      args.baseRepoName,
+      args.headSha,
+      {
+        conclusion,
+        detailsUrl: `${APP_URL}/code-reviews/${args.coveringReview.id}`,
+        output: {
+          title: 'Kilo Code Review',
+          summary: `Reviewed at ${args.coveringReview.headSha.substring(0, 7)}; this head merges no new branch content.`,
+        },
+      },
+      args.appType
+    );
+  } catch (error) {
+    logExceptInTest('Failed to create the merge-commit check run:', error);
+  }
 }
 
 /**
@@ -619,9 +700,6 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   }
 }
 
-/**
- * Main router for pull request events
- */
 export async function handlePullRequest(
   payload: PullRequestPayload,
   integration: PlatformIntegration

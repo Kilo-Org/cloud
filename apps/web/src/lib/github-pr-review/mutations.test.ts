@@ -16,6 +16,7 @@ import {
   ReviewSideSchema,
   buildAddReactionVariables,
   buildCreateReviewCommentParams,
+  buildDeleteCommentParams,
   buildDeleteRefParams,
   buildDisableAutoMergeVariables,
   buildEnableAutoMergeVariables,
@@ -26,6 +27,7 @@ import {
   buildSubmitReviewParams,
   buildUnresolveThreadVariables,
   buildUpdateBranchParams,
+  buildUpdateCommentParams,
 } from './mutations';
 
 describe('GitHub PR review mutation enums', () => {
@@ -220,6 +222,40 @@ describe('buildReplyToCommentParams', () => {
       pull_number: 7,
       comment_id: 99,
       body: 'thanks',
+    });
+  });
+});
+
+describe('buildUpdateCommentParams', () => {
+  it('maps to the REST field names the review and issue endpoints share', () => {
+    expect(
+      buildUpdateCommentParams({
+        owner: 'octocat',
+        repo: 'hello',
+        commentId: 99,
+        body: 'edited',
+      })
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 99,
+      body: 'edited',
+    });
+  });
+});
+
+describe('buildDeleteCommentParams', () => {
+  it('maps to the REST field names the review and issue endpoints share', () => {
+    expect(
+      buildDeleteCommentParams({
+        owner: 'octocat',
+        repo: 'hello',
+        commentId: 99,
+      })
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 99,
     });
   });
 });

@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -8,17 +8,16 @@ import {
   type BillingCorrelationContext,
 } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { send as sendEmail } from '@/lib/email';
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { send as sendEmail } from '@kilocode/web-shared/lib/email';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
-import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
-import { client as stripe } from '@/lib/stripe-client';
+import { isIntroPriceId } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import { enqueueAffiliateEventForUser } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
-import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import {
   enforceKiloClawCommitRetirementGuard,
   reportKiloClawCommitRetirementAnomaly,
@@ -88,18 +87,6 @@ function logBillingSideEffect(
     return;
   }
   console.log(record);
-}
-
-function secretMatches(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-
-  const providedBuffer = Buffer.from(provided);
-  const expectedBuffer = Buffer.from(expected);
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 function hasOrganizationDestinationPath(
@@ -352,20 +339,6 @@ const BodySchema = z.discriminatedUnion('action', [
     }),
   }),
   z.object({
-    action: z.literal('process_paid_conversion'),
-    input: z.object({
-      userId: z.string().min(1),
-      dedupeKey: z.string().min(1),
-      eventDateIso: z.string().datetime(),
-      orderId: z.string().min(1),
-      amount: z.number().nonnegative(),
-      currencyCode: z.string().min(1),
-      itemCategory: z.string().min(1),
-      itemName: z.string().min(1),
-      itemSku: z.string().min(1).optional(),
-    }),
-  }),
-  z.object({
     action: z.literal('project_pending_kilo_pass_bonus'),
     input: z.object({
       userId: z.string().min(1),
@@ -409,8 +382,6 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
     case 'commit_retirement_guard':
     case 'report_commit_retirement_anomaly':
       return {};
-    case 'process_paid_conversion':
-      return { userId: body.input.userId };
     case 'project_pending_kilo_pass_bonus':
       return { userId: body.input.userId };
     case 'issue_kilo_pass_bonus_from_usage_threshold':
@@ -421,7 +392,7 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
 export async function POST(request: NextRequest) {
   const correlation = readBillingCorrelationHeaders(request.headers) ?? undefined;
   const secret = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
+  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
     logBillingSideEffect('error', 'Rejected billing side effect request', {
       ...correlation,
       event: 'request_rejected',
@@ -533,61 +504,6 @@ export async function POST(request: NextRequest) {
         });
         payload = { enqueued: true };
         break;
-
-      case 'process_paid_conversion': {
-        logImpactReferralDebug('KiloClaw billing side effect processing paid conversion', {
-          userId: parsed.data.input.userId,
-          dedupeKey: parsed.data.input.dedupeKey,
-          orderId: parsed.data.input.orderId,
-          amount: parsed.data.input.amount,
-          currencyCode: parsed.data.input.currencyCode,
-          itemCategory: parsed.data.input.itemCategory,
-        });
-        const disposition = await processPersonalKiloClawPaidConversion({
-          userId: parsed.data.input.userId,
-          sourcePaymentId: parsed.data.input.orderId,
-          orderId: parsed.data.input.orderId,
-          amount: parsed.data.input.amount,
-          currencyCode: parsed.data.input.currencyCode,
-          itemCategory: parsed.data.input.itemCategory,
-          itemName: parsed.data.input.itemName,
-          itemSku: parsed.data.input.itemSku,
-          convertedAt: new Date(parsed.data.input.eventDateIso),
-        });
-
-        logImpactReferralDebug('KiloClaw billing side effect paid conversion disposition', {
-          userId: parsed.data.input.userId,
-          orderId: parsed.data.input.orderId,
-          shouldEnqueueAffiliateSale: disposition.shouldEnqueueAffiliateSale,
-          winningTouchType: disposition.winningTouchType,
-          conversionId: disposition.conversionId,
-          disqualificationReason: disposition.disqualificationReason,
-        });
-
-        if (disposition.shouldEnqueueAffiliateSale) {
-          await enqueueAffiliateEventForUser({
-            userId: parsed.data.input.userId,
-            provider: 'impact',
-            eventType: 'sale',
-            dedupeKey: parsed.data.input.dedupeKey,
-            eventDate: new Date(parsed.data.input.eventDateIso),
-            orderId: parsed.data.input.orderId,
-            amount: parsed.data.input.amount,
-            currencyCode: parsed.data.input.currencyCode,
-            itemCategory: parsed.data.input.itemCategory,
-            itemName: parsed.data.input.itemName,
-            itemSku: parsed.data.input.itemSku,
-          });
-        }
-
-        payload = {
-          affiliateSaleEnqueued: disposition.shouldEnqueueAffiliateSale,
-          winningTouchType: disposition.winningTouchType,
-          conversionId: disposition.conversionId,
-          disqualificationReason: disposition.disqualificationReason,
-        };
-        break;
-      }
 
       case 'project_pending_kilo_pass_bonus':
         payload = {

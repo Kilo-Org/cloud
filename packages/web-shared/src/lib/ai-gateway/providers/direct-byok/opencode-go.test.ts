@@ -1,0 +1,253 @@
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import type OpenAI from 'openai';
+import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
+import type { TransformRequestContext } from '../types';
+import { getAiSdkProvider } from '../model-settings';
+import openCodeGo from './opencode-go';
+
+describe('OpenCode Go session headers', () => {
+  const requests: GatewayRequest[] = [
+    { kind: 'chat_completions', body: { model: 'qwen3.7-plus', messages: [] } },
+    { kind: 'messages', body: { model: 'qwen3.7-plus', messages: [], max_tokens: 100 } },
+    { kind: 'responses', body: { model: 'qwen3.7-plus', input: 'Hello' } },
+  ];
+
+  function createContext(
+    overrides: Partial<TransformRequestContext> = {}
+  ): TransformRequestContext {
+    return {
+      provider: {
+        type: 'direct-byok',
+        apiUrl: 'https://opencode.ai/zen/go/v1',
+        apiUrlOverrides: {},
+        disableUrlSuffix: false,
+        apiKey: 'test-api-key',
+        apiKeyHeader: null,
+        supportedChatApis: ['chat_completions', 'messages', 'responses'],
+        responseTransforms: null,
+        async transformRequest() {},
+      },
+      model: 'opencode-go/qwen3.7-plus',
+      request: requests[0],
+      originalHeaders: EmptyFraudDetectionHeaders,
+      extraHeaders: {},
+      userByok: null,
+      kilo_user_id: 'oauth/test-user',
+      organization_id: null,
+      session_id: 'conversation-1',
+      ...overrides,
+    };
+  }
+
+  test.each(requests)('adds a stable conversation header for $kind', request => {
+    const first = createContext({ request });
+    const next = createContext({ request });
+    const otherApi = createContext();
+
+    openCodeGo.transformRequest(first);
+    openCodeGo.transformRequest(next);
+    openCodeGo.transformRequest(otherApi);
+
+    const session = first.extraHeaders['x-opencode-session'];
+    expect(session).toEqual(expect.any(String));
+    expect(session).not.toBe('');
+    expect(session).not.toContain(first.kilo_user_id);
+    expect(next.extraHeaders['x-opencode-session']).toBe(session);
+    expect(otherApi.extraHeaders['x-opencode-session']).toBe(session);
+    expect(first.extraHeaders['x-api-key']).toBe(
+      request.kind === 'messages' ? 'test-api-key' : undefined
+    );
+  });
+
+  test.each([{ session_id: 'conversation-2' }, { kilo_user_id: 'oauth/another-user' }])(
+    'isolates sessions when the conversation or user changes: %j',
+    overrides => {
+      const first = createContext();
+      const other = createContext(overrides);
+
+      openCodeGo.transformRequest(first);
+      openCodeGo.transformRequest(other);
+
+      expect(other.extraHeaders['x-opencode-session']).not.toBe(
+        first.extraHeaders['x-opencode-session']
+      );
+    }
+  );
+
+  test.each(requests.filter(request => request.kind !== 'messages'))(
+    'matches the existing prompt cache key for $kind',
+    request => {
+      const trackedRequest = structuredClone(request);
+      const context = createContext({ request: trackedRequest });
+      applyTrackingIds(trackedRequest, context.provider, context.kilo_user_id, context.session_id);
+      const promptCacheKey = trackedRequest.body.prompt_cache_key;
+
+      openCodeGo.transformRequest(context);
+
+      expect(promptCacheKey).toEqual(expect.any(String));
+      expect(context.extraHeaders['x-opencode-session']).toBe(promptCacheKey);
+    }
+  );
+
+  test('removes user tracking fields from Chat Completions requests', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'qwen3.7-plus', messages: [] },
+    };
+    const context = createContext({ request });
+    applyTrackingIds(request, context.provider, context.kilo_user_id, context.session_id);
+
+    openCodeGo.transformRequest(context);
+
+    expect(request.body).not.toHaveProperty('prompt_cache_key');
+    expect(request.body).not.toHaveProperty('safety_identifier');
+    expect(request.body).not.toHaveProperty('user');
+    expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
+  });
+
+  test('removes message names from Chat Completions requests', () => {
+    const toolMessageFromClient = {
+      role: 'tool',
+      name: 'read',
+      tool_call_id: 'call-1',
+      content: 'ok',
+    };
+    const body: OpenRouterChatCompletionRequest = {
+      model: 'glm-5.3-flash',
+      messages: [
+        { role: 'user', name: 'alice', content: 'Read a' },
+        {
+          role: 'assistant',
+          name: 'agent',
+          content: '',
+          tool_calls: [
+            { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+          ],
+        },
+        toolMessageFromClient as OpenAI.Chat.ChatCompletionToolMessageParam,
+      ],
+    };
+
+    openCodeGo.transformRequest(createContext({ request: { kind: 'chat_completions', body } }));
+
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'Read a' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content: 'ok' },
+    ]);
+  });
+
+  test('forwards Muse Responses requests without rewriting the body', () => {
+    const body = {
+      model: 'muse-spark-1.3-contributor',
+      input: 'Hello',
+      reasoning: { effort: 'high' as const },
+    };
+    const request: GatewayRequest = { kind: 'responses', body: structuredClone(body) };
+    const context = createContext({ model: 'opencode-go/muse-spark-1.3-contributor', request });
+
+    openCodeGo.transformRequest(context);
+
+    expect(request.body).toEqual(body);
+    expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
+    expect(context.extraHeaders).not.toHaveProperty('x-api-key');
+  });
+
+  test('keeps the header stable when the model, API key, or request body changes', () => {
+    const first = createContext();
+    const next = createContext({
+      model: 'opencode-go/minimax-m3',
+      request: { kind: 'responses', body: { model: 'minimax-m3', input: 'Next turn' } },
+      provider: { ...first.provider, apiKey: 'rotated-key' },
+    });
+
+    openCodeGo.transformRequest(first);
+    openCodeGo.transformRequest(next);
+
+    expect(next.extraHeaders['x-opencode-session']).toBe(first.extraHeaders['x-opencode-session']);
+  });
+
+  test('assigns isolated fallback headers when no conversation identifier is available', () => {
+    const first = createContext({ session_id: null });
+    const second = createContext({ session_id: null });
+
+    openCodeGo.transformRequest(first);
+    openCodeGo.transformRequest(second);
+
+    expect(first.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
+    expect(first.extraHeaders['x-opencode-session']).not.toBe('');
+    expect(second.extraHeaders['x-opencode-session']).not.toBe(
+      first.extraHeaders['x-opencode-session']
+    );
+  });
+});
+
+describe('OpenCode Go Chat Completions client headers', () => {
+  const upstream = {
+    apiUrl: 'https://opencode.ai/zen/go/v1',
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey: 'test-api-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: null,
+  } as const;
+
+  test('sends its own session header and the credential as a bearer token', () => {
+    const headers = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+
+    expect(headers['x-opencode-session']).toEqual(expect.any(String));
+    expect(headers.authorization).toBeUndefined();
+    expect(headers['x-api-key']).toBeUndefined();
+  });
+
+  test('adds the credential header when the upstream does not take a bearer token', () => {
+    const headers = openCodeGo.chatCompletionsHeaders({
+      ...upstream,
+      apiUrlOverrides: {},
+      apiKeyHeader: 'x-api-key',
+    });
+
+    expect(headers['x-api-key']).toBe('test-api-key');
+    expect(headers['x-opencode-session']).toEqual(expect.any(String));
+  });
+
+  test('gives each client its own session', () => {
+    const first = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+    const second = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+
+    expect(first['x-opencode-session']).not.toBe(second['x-opencode-session']);
+  });
+});
+
+describe('OpenCode Go AI SDK provider', () => {
+  test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(
+    'uses the Anthropic Messages API for OpenCode Go model %s',
+    model => {
+      expect(openCodeGo.getAiSdkProvider?.(model)).toEqual({ aiSdkProvider: 'anthropic' });
+    }
+  );
+
+  test.each(['opencode-go/muse-spark-1.2-contributor', 'opencode-go/muse-spark-1.3-contributor'])(
+    'leaves OpenCode Go model %s to the model-name classification',
+    model => {
+      expect(openCodeGo.getAiSdkProvider?.(model)).toBeNull();
+      expect(getAiSdkProvider(model)).toBe('openai');
+    }
+  );
+
+  test('uses the Responses API for Muse models through the gateway', () => {
+    expect(getAiSdkProvider('meta/muse-spark-1.2')).toBe('openai');
+  });
+
+  test('uses Chat Completions for MiniMax models that a provider does not reassign', () => {
+    expect(getAiSdkProvider('minimax/minimax-m2.5')).toBeUndefined();
+  });
+});

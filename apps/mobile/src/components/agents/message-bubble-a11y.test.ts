@@ -1,60 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
+import '@/i18n';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 
-describe('buildAgentMessageBubbleAccessibilityProps', () => {
-  it('marks the wrapping Pressable as non-accessible so the message subtree stays navigable', () => {
-    const props = buildAgentMessageBubbleAccessibilityProps({
-      isUser: true,
-      canCopy: true,
-    });
-
-    expect(props.accessible).toBe(false);
-  });
-
-  it('labels user-authored messages consistently with the previous role/label', () => {
-    const props = buildAgentMessageBubbleAccessibilityProps({
-      isUser: true,
-      canCopy: true,
-    });
-
-    expect(props.accessibilityLabel).toBe('User message');
-  });
-
-  it('labels assistant-authored messages consistently with the previous role/label', () => {
-    const props = buildAgentMessageBubbleAccessibilityProps({
-      isUser: false,
-      canCopy: true,
-    });
-
-    expect(props.accessibilityLabel).toBe('Assistant message');
-  });
-
-  it('keeps the long-press hint and the text role on the inner actions host', () => {
-    const props = buildAgentMessageBubbleAccessibilityProps({
-      isUser: false,
-      canCopy: true,
-    });
-
-    expect(props.accessibilityRole).toBe('text');
-    expect(props.accessibilityHint).toBe('Long press for message details');
-  });
-
-  it('exposes the copy custom action with the same name and label as before', () => {
-    const props = buildAgentMessageBubbleAccessibilityProps({
-      isUser: true,
-      canCopy: true,
-    });
-
-    expect(props.accessibilityActions).toEqual([{ name: 'copy', label: 'Copy message' }]);
-  });
-
-  it('omits the copy action when the caller disables it so the inner host can be left out', () => {
-    const props = buildAgentMessageBubbleAccessibilityProps({
-      isUser: false,
-      canCopy: false,
-    });
-
-    expect(props.accessibilityActions).toEqual([]);
-  });
+describe.each([
+  { isUser: true, label: 'User message' },
+  { isUser: false, label: 'Assistant message' },
+])('message accessibility props for $label', ({ isUser, label }) => {
+  it.each([
+    { canCopy: true, canOpenDetails: true, actions: ['details', 'copy'] },
+    { canCopy: false, canOpenDetails: true, actions: ['details'] },
+    { canCopy: true, canOpenDetails: false, actions: ['copy'] },
+    { canCopy: false, canOpenDetails: false, actions: [] },
+  ])(
+    'exposes actions and hints with canCopy=$canCopy canOpenDetails=$canOpenDetails',
+    ({ canCopy, canOpenDetails, actions }) => {
+      expect(
+        buildAgentMessageBubbleAccessibilityProps({ isUser, canCopy, canOpenDetails })
+      ).toEqual({
+        accessible: false,
+        accessibilityRole: 'text',
+        accessibilityLabel: label,
+        accessibilityHint: canOpenDetails ? 'Long press for message details' : '',
+        accessibilityActions: actions.map(name => ({
+          name,
+          label: name === 'details' ? 'Message details' : 'Copy message',
+        })),
+      });
+    }
+  );
 });

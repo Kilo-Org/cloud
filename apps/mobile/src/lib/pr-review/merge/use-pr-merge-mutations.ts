@@ -1,4 +1,5 @@
-// S8 merge-side mutation hooks. Pattern mirrors the repo's existing
+// S8 merge-side mutation hooks, s6: provider-aware through the
+// `providerReview` seam. Pattern mirrors the repo's existing
 // mutation hooks (useSessionMutations, useSecurityAgentMutations):
 //  - `onError` toasts the message
 //  - `onSettled` invalidates the overview + the per-PR listChecks /
@@ -6,56 +7,123 @@
 //  - keeps the mutation hook thin and lets the sheet / section handle
 //    inline errors (toasts paint behind formSheets)
 //
-// listChecks is keyed by `(owner, repo, ref)`. The head ref will change
-// after a successful merge / update-branch, so we invalidate the
+// listChecks is keyed by `(owner, repo, ref)` on GitHub. The head ref will
+// change after a successful merge / update-branch, so we invalidate the
 // procedure PATH (not a single key) — every cached check list for this
 // PR is dropped and any mounted consumer re-fetches against the new
 // head. `listFiles` is per-page; we invalidate the full procedure too.
+// The provider arms mirror this on `providerReview` (path filters).
+//
+// Provider arms (s6): `mergePullRequest` requires the `expectedHeadSha`
+// fence on every provider — the server refuses a moved head with the
+// explicit stale-head reason (CONFLICT) before any merge call, and the
+// sheet keeps that reason inline without navigating away. The provider
+// result `{done, replayed}` is normalized onto the GitHub result shape so
+// the existing `assertMergeResult` gate keeps its "never celebrate a
+// merge that did not happen" contract. Auto-merge is GitLab-only:
+// Bitbucket Cloud has no auto-merge API, and the server answers
+// `enableAutoMerge` with `{supported: false, reason}` so the UI shows the
+// provider reason instead of failing.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+import { i18n } from '@/i18n';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import {
+  type GitHubPrRef,
+  type ProviderPrPlatform,
+  type ProviderPrScope,
+  providerPrTriple,
+} from '@/lib/pr-review/provider-pr-ref';
+import {
+  providerFingerprintInput,
+  providerWriteIdentity,
+} from '@/lib/pr-review/provider-write-identity';
+import { type ReviewWriteRef, useReviewWriteScope } from '@/lib/pr-review/use-pr-review-mutations';
 import {
   assertMergeResult,
   gateMergeResult,
   type MergePullRequestResult,
 } from '@/lib/pr-review/merge/merge-result-gate';
-import { useHoistedOperationKey } from '@/lib/operation-key';
+import { MergeNotCompletedError } from '@/lib/pr-review/merge/merge-result-error';
+import {
+  mergeOperationKey,
+  retireMergeOperationKey,
+} from '@/lib/pr-review/merge/pr-merge-operation-key';
 import {
   isPrMutationRetryable,
   mapPrOperationError,
+  prOperationNotAdmittedError,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 
-type PrRef = { owner: string; repo: string; number: number };
+type RouterInputs = inferRouterInputs<MobileRouter>;
+type MergePullRequestInput = RouterInputs['githubPrReview']['mergePullRequest'];
+type GithubAutoMergeInput = RouterInputs['githubPrReview']['enableAutoMerge'];
+type GithubDisableAutoMergeInput = RouterInputs['githubPrReview']['disableAutoMerge'];
 
-type MergePullRequestInput = {
-  owner: string;
-  repo: string;
-  number: number;
-  method: 'merge' | 'squash' | 'rebase';
+/**
+ * The merge-sheet vars for a provider PR/MR. `method` is a UI concept:
+ * GitLab folds it into `squash`, Bitbucket Cloud has only the merge
+ * commit, and the fingerprint mirrors the server's `method` field.
+ */
+type ProviderMergeVars = {
+  expectedHeadSha: string;
+  squash?: boolean;
+  deleteBranch?: boolean;
   commitTitle?: string;
   commitMessage?: string;
-  deleteBranch: boolean;
-  expectedHeadSha: string;
+};
+export type MergeVars = MergePullRequestInput | ProviderMergeVars;
+
+/** The auto-merge vars for a provider MR (GitLab; Bitbucket answers unsupported). */
+type ProviderAutoMergeVars = { expectedHeadSha: string };
+export type EnableAutoMergeVars = GithubAutoMergeInput | ProviderAutoMergeVars;
+export type DisableAutoMergeVars = GithubDisableAutoMergeInput | ProviderAutoMergeVars;
+
+/**
+ * The resolved auto-merge answer across arms: GitHub reports
+ * `{enabled, prNodeId}`, the provider seam reports `{supported, reason}`
+ * plus the ledger flags. Every field is optional so both arms land in the
+ * same `TData`; only `supported: false` (Bitbucket has no auto-merge API)
+ * is read back, to keep the success announcement off an unsupported answer.
+ */
+export type AutoMergeOutcome = {
+  enabled?: boolean;
+  prNodeId?: string;
+  supported?: boolean;
+  reason?: string;
+  done?: boolean;
+  replayed?: boolean;
 };
 
-function usePrRefKeys(ref: PrRef) {
+function useMergeKeys(scope: ProviderPrScope) {
   const trpc = useTRPC();
+  if (scope.ref.platform === 'github') {
+    const triple = providerPrTriple(scope.ref);
+    return {
+      getPullRequest: trpc.githubPrReview.getPullRequest.queryKey(triple),
+      listChecksPath: trpc.githubPrReview.listChecks.pathFilter(),
+      listFilesPath: trpc.githubPrReview.listFiles.pathFilter(),
+    };
+  }
   return {
-    getPullRequest: trpc.githubPrReview.getPullRequest.queryKey(ref),
-    listChecksPath: trpc.githubPrReview.listChecks.pathFilter(),
-    listFilesPath: trpc.githubPrReview.listFiles.pathFilter(),
+    getPullRequest: trpc.providerReview.getPullRequest.queryKey(providerWriteIdentity(scope)),
+    listChecksPath: trpc.providerReview.listChecks.pathFilter(),
+    listFilesPath: trpc.providerReview.listFiles.pathFilter(),
   };
 }
 
 async function invalidatePrCaches(
   queryClient: ReturnType<typeof useQueryClient>,
-  keys: ReturnType<typeof usePrRefKeys>
+  keys: ReturnType<typeof useMergeKeys>
 ): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: keys.getPullRequest }),
@@ -64,10 +132,108 @@ async function invalidatePrCaches(
   ]);
 }
 
-export function useMergePullRequestMutation(ref: PrRef) {
+/**
+ * The one fingerprint a merge's key is minted for. Built in one place so the
+ * key that admitted the request is the key the outcome retires: the arms only
+ * carry the operationKey, never a getter, and no "whatever was last" state is
+ * needed to rotate it.
+ */
+function mergeIntentFingerprint(scope: ProviderPrScope, vars: MergeVars): string {
+  if ('owner' in vars) {
+    return prIntentFingerprint('merge', vars);
+  }
+  const identity = providerWriteIdentity(scope);
+  return prIntentFingerprint(
+    'merge',
+    identity.platform === 'gitlab'
+      ? providerFingerprintInput(identity, {
+          method: vars.squash ? 'squash' : 'merge',
+          commitTitle: vars.commitTitle,
+          commitMessage: vars.commitMessage,
+          deleteBranch: vars.deleteBranch,
+          expectedHeadSha: vars.expectedHeadSha,
+        })
+      : providerFingerprintInput(identity, {
+          method: 'merge',
+          commitMessage: vars.commitMessage,
+          deleteBranch: vars.deleteBranch,
+          expectedHeadSha: vars.expectedHeadSha,
+        })
+  );
+}
+
+/** The GitHub merge arm — the pre-s6 call, unchanged. */
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function githubMergeResult(
+  vars: MergePullRequestInput,
+  operationKey: string
+): Promise<MergePullRequestResult> {
+  return trpcClient.githubPrReview.mergePullRequest.mutate({ ...vars, operationKey });
+}
+
+/**
+ * The merge-failure sentence with its provider noun filled in. Most catalogs
+ * open that sentence with `{{term}}`, and the noun key is the mid-sentence
+ * lowercase form, so the noun is capitalized only when it leads the rendered
+ * sentence; a catalog that names the noun later keeps the lowercase form.
+ */
+function mergeNotCompletedMessage(platform: ProviderPrPlatform): string {
+  const term = i18n.t(providerPrNounKey(platform));
+  const message = i18n.t('prReview.operation.mergeResultNotCompleted', { term });
+  if (term.length === 0 || !message.startsWith(term)) {
+    return message;
+  }
+  const initial = term.slice(0, 1).toLocaleUpperCase(i18n.language);
+  return initial + term.slice(1) + message.slice(term.length);
+}
+
+/**
+ * The provider merge arm. One call per platform arm: a conditional spread
+ * inside a single literal would cross-multiply the identity union and hand
+ * the server gitlab-only fields on a bitbucket call. The layer reports no
+ * separate branch-delete outcome: the source-branch removal rides the merge
+ * call itself, so a committed merge is always the clean shape for the gate.
+ * A `done: false` answer is the same never-celebrate contract as GitHub's
+ * `merged: false`, but with provider wording: the default
+ * `MergeNotCompletedError` message names GitHub.
+ */
+async function providerMergeResult(
+  scope: ProviderPrScope,
+  vars: ProviderMergeVars,
+  operationKey: string
+): Promise<MergePullRequestResult> {
+  const identity = providerWriteIdentity(scope);
+  const merged =
+    identity.platform === 'gitlab'
+      ? await trpcClient.providerReview.mergePullRequest.mutate({
+          ...identity,
+          expectedHeadSha: vars.expectedHeadSha,
+          ...(vars.squash !== undefined ? { squash: vars.squash } : {}),
+          ...(vars.deleteBranch !== undefined ? { deleteBranch: vars.deleteBranch } : {}),
+          ...(vars.commitTitle !== undefined ? { commitTitle: vars.commitTitle } : {}),
+          ...(vars.commitMessage !== undefined ? { commitMessage: vars.commitMessage } : {}),
+          operationKey,
+        })
+      : await trpcClient.providerReview.mergePullRequest.mutate({
+          ...identity,
+          expectedHeadSha: vars.expectedHeadSha,
+          ...(vars.deleteBranch !== undefined ? { deleteBranch: vars.deleteBranch } : {}),
+          ...(vars.commitMessage !== undefined ? { commitMessage: vars.commitMessage } : {}),
+          operationKey,
+        });
+  if (!merged.done) {
+    throw new MergeNotCompletedError({
+      sha: vars.expectedHeadSha,
+      message: mergeNotCompletedMessage(scope.ref.platform),
+    });
+  }
+  return { merged: true, sha: vars.expectedHeadSha, branchDeleted: false };
+}
+
+export function useMergePullRequestMutation(ref: ReviewWriteRef) {
   const queryClient = useQueryClient();
-  const keys = usePrRefKeys(ref);
-  const { getKey, rotateKey } = useHoistedOperationKey();
+  const scope = useReviewWriteScope(ref);
+  const keys = useMergeKeys(scope);
 
   // P0-B-08: gate success on the authoritative `merged: true` result
   // BEFORE React Query resolves the mutation. The server only treats
@@ -80,22 +246,34 @@ export function useMergePullRequestMutation(ref: PrRef) {
   // retry. The typed return is preserved so `performSubmit` can read
   // the sha / branchDeleted / branchDeleteError off the resolved value.
   //
-  // P1-A-08c: the hoisted operation key rides the input so a same-key retry
-  // reconciles against authoritative PR state before ever re-merging.
-  return useMutation<MergePullRequestResult, Error, MergePullRequestInput>({
+  // P1-A-08c: the retained operation key rides the input so a same-key retry
+  // reconciles against authoritative PR state before ever re-merging — including
+  // a retry from a merge screen that was dismissed and reopened, which is why
+  // the key lives in the merge domain's store rather than in this hook.
+  return useMutation<MergePullRequestResult, Error, MergeVars>({
     mutationFn: async input => {
+      const fingerprint = mergeIntentFingerprint(scope, input);
+      const operationKey = mergeOperationKey(fingerprint);
+      if (operationKey === null) {
+        // The store keeps only unresolved intents and never evicts one to make
+        // room, so it refuses a new intent once it is full. Sending anyway would
+        // give the write no ledger identity to dedupe a retry against, and a
+        // retry cannot succeed while every slot holds an unresolved write, so
+        // the refusal is not presented as one.
+        throw prOperationNotAdmittedError(i18n.t('prReview.merge.couldNotMerge'));
+      }
       try {
-        const result = await trpcClient.githubPrReview.mergePullRequest.mutate({
-          ...input,
-          operationKey: getKey(prIntentFingerprint('merge', input)),
-        });
+        const result =
+          scope.ref.platform === 'github'
+            ? await githubMergeResult(input as MergePullRequestInput, operationKey)
+            : await providerMergeResult(scope, input as ProviderMergeVars, operationKey);
         // Throws on `merged: false`; returns the gate on clean / partial.
         assertMergeResult(result);
-        rotateKey();
+        retireMergeOperationKey(fingerprint, operationKey);
         return result;
       } catch (error) {
         if (!isPrMutationRetryable(error)) {
-          rotateKey();
+          retireMergeOperationKey(fingerprint, operationKey);
         }
         throw mapPrOperationError(error, 'merge');
       }
@@ -108,7 +286,9 @@ export function useMergePullRequestMutation(ref: PrRef) {
       // (which renders that text) has no live region of its own.
       const gate = gateMergeResult(result);
       const message =
-        gate.kind === 'partial' ? `Merged. Couldn't delete the branch: ${gate.reason}` : 'Merged';
+        gate.kind === 'partial'
+          ? i18n.t('prReview.merge.partialSuccessBanner.accessibility', { reason: gate.reason })
+          : i18n.t('prReview.overview.stateMerged');
       announceForA11y(message);
     },
     onError: (error: { message: string }) => {
@@ -120,10 +300,15 @@ export function useMergePullRequestMutation(ref: PrRef) {
   });
 }
 
-export function useUpdateBranchMutation(ref: PrRef) {
+/**
+ * Update the branch from its base. The procedure and its caches are GitHub's,
+ * so the hook takes a GitHub pull request ref: a GitLab or Bitbucket ref, or a
+ * provider-neutral triple, does not type-check into this arm.
+ */
+export function useUpdateBranchMutation(ref: GitHubPrRef) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const keys = usePrRefKeys(ref);
+  const keys = useMergeKeys({ ref, organizationId: null });
 
   return useMutation(
     trpc.githubPrReview.updateBranch.mutationOptions({
@@ -137,41 +322,104 @@ export function useUpdateBranchMutation(ref: PrRef) {
   );
 }
 
-export function useEnableAutoMergeMutation(ref: PrRef) {
-  const trpc = useTRPC();
+/**
+ * Arm auto-merge. GitHub keeps its exact pre-s6 path; GitLab arms
+ * merge-when-pipeline-succeeds fenced on the head; Bitbucket Cloud has no
+ * auto-merge API, so the server answers `{supported: false, reason}` —
+ * the sheet shows the reason instead of celebrating.
+ */
+export function useEnableAutoMergeMutation(ref: ReviewWriteRef) {
   const queryClient = useQueryClient();
-  const keys = usePrRefKeys(ref);
+  const scope = useReviewWriteScope(ref);
+  const keys = useMergeKeys(scope);
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
-  return useMutation(
-    trpc.githubPrReview.enableAutoMerge.mutationOptions({
-      onSuccess: () => {
-        // Bare success announcement beside the merge sheet's existing
-        // auto-merge success effect (haptic + refetch + dismiss).
-        announceForA11y('Auto-merge enabled');
-      },
-      onError: (error: { message: string }) => {
-        announcingToast.error(error.message);
-      },
-      onSettled: async () => {
-        await invalidatePrCaches(queryClient, keys);
-      },
-    })
-  );
+  return useMutation<AutoMergeOutcome, Error, EnableAutoMergeVars>({
+    mutationFn: async (vars: EnableAutoMergeVars) => {
+      if (scope.ref.platform === 'github') {
+        return trpcClient.githubPrReview.enableAutoMerge.mutate(vars as GithubAutoMergeInput);
+      }
+      try {
+        const result = await trpcClient.providerReview.enableAutoMerge.mutate({
+          ...providerWriteIdentity(scope),
+          expectedHeadSha: (vars as ProviderAutoMergeVars).expectedHeadSha,
+          operationKey: getKey(
+            prIntentFingerprint(
+              'enable_auto_merge',
+              providerFingerprintInput(scope.ref, {
+                expectedHeadSha: (vars as ProviderAutoMergeVars).expectedHeadSha,
+              })
+            )
+          ),
+        });
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isPrMutationRetryable(error)) {
+          rotateKey();
+        }
+        throw mapPrOperationError(error, 'merge');
+      }
+    },
+    onSuccess: (result: AutoMergeOutcome) => {
+      // Bare success announcement beside the merge sheet's existing
+      // auto-merge success effect (haptic + refetch + dismiss). A
+      // `supported: false` answer (Bitbucket) is not a success — the
+      // sheet renders the provider reason instead.
+      if (result.supported !== false) {
+        announceForA11y(i18n.t('prReview.announce.autoMergeEnabled'));
+      }
+    },
+    onError: (error: { message: string }) => {
+      announcingToast.error(error.message);
+    },
+    onSettled: async () => {
+      await invalidatePrCaches(queryClient, keys);
+    },
+  });
 }
 
-export function useDisableAutoMergeMutation(ref: PrRef) {
-  const trpc = useTRPC();
+/** Cancel auto-merge. Same arms as `useEnableAutoMergeMutation`. */
+export function useDisableAutoMergeMutation(ref: ReviewWriteRef) {
   const queryClient = useQueryClient();
-  const keys = usePrRefKeys(ref);
+  const scope = useReviewWriteScope(ref);
+  const keys = useMergeKeys(scope);
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
-  return useMutation(
-    trpc.githubPrReview.disableAutoMerge.mutationOptions({
-      onError: (error: { message: string }) => {
-        announcingToast.error(error.message);
-      },
-      onSettled: async () => {
-        await invalidatePrCaches(queryClient, keys);
-      },
-    })
-  );
+  return useMutation({
+    mutationFn: async (vars: DisableAutoMergeVars) => {
+      if (scope.ref.platform === 'github') {
+        return trpcClient.githubPrReview.disableAutoMerge.mutate(
+          vars as GithubDisableAutoMergeInput
+        );
+      }
+      try {
+        const result = await trpcClient.providerReview.disableAutoMerge.mutate({
+          ...providerWriteIdentity(scope),
+          expectedHeadSha: (vars as ProviderAutoMergeVars).expectedHeadSha,
+          operationKey: getKey(
+            prIntentFingerprint(
+              'disable_auto_merge',
+              providerFingerprintInput(scope.ref, {
+                expectedHeadSha: (vars as ProviderAutoMergeVars).expectedHeadSha,
+              })
+            )
+          ),
+        });
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isPrMutationRetryable(error)) {
+          rotateKey();
+        }
+        throw mapPrOperationError(error, 'merge');
+      }
+    },
+    onError: (error: { message: string }) => {
+      announcingToast.error(error.message);
+    },
+    onSettled: async () => {
+      await invalidatePrCaches(queryClient, keys);
+    },
+  });
 }

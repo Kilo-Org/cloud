@@ -1,0 +1,77 @@
+import {
+  CHATGPT_ACCESS_FLAG,
+  CODE_REVIEW_COUNCIL_FLAG,
+  CODE_REVIEW_MD_CONVERSION_FLAG,
+  type FeatureFlagKey,
+  ORGANIZATION_AUTO_MODEL_FLAG,
+} from '@kilocode/app-shared/feature-flags';
+import * as Application from 'expo-application';
+
+/**
+ * Version-aware feature flags.
+ *
+ * Every flag a mobile build reads must be registered here with the oldest app
+ * version that understands it. The app applies a flag's remote value only when
+ * its own version is at or above that minimum, and falls back to the flag's
+ * default otherwise — a flag that a build does not understand must never
+ * change that build's behaviour, whatever PostHog returns.
+ *
+ * Workflow: when a flag (or a renamed one) is introduced in version X, register
+ * it with `minAppVersion: X`. Older builds that already carry this registry
+ * then skip the key they do not understand instead of acting on it.
+ *
+ * Keys come from `@kilocode/app-shared/feature-flags`, the same constants the
+ * web app passes to `useFeatureFlagEnabled`. One project serves both clients,
+ * so a shared spelling is what makes the same person's rollout decision match
+ * across platforms; never paste a key string here.
+ */
+
+export type FeatureFlagDefinition = Readonly<{
+  key: FeatureFlagKey;
+  /** Oldest app version that understands this flag. Lower builds fall back to `defaultValue`. */
+  minAppVersion: string;
+  /** Value used when the build is too old or the remote value is not loaded. Must match every `useFeatureFlag` call site for the key. */
+  defaultValue: boolean;
+}>;
+
+/**
+ * Every flag defaults to `false`, matching the web: `useFeatureFlagEnabled` is
+ * undefined until flags load, so a gated surface stays hidden until PostHog
+ * says otherwise. A mobile surface that only appears once the flag is on must
+ * therefore never be shown from a default.
+ */
+export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
+  {
+    key: CODE_REVIEW_MD_CONVERSION_FLAG,
+    minAppVersion: '1.0.16',
+    defaultValue: false,
+  },
+  {
+    key: CODE_REVIEW_COUNCIL_FLAG,
+    minAppVersion: '1.0.16',
+    defaultValue: false,
+  },
+  {
+    key: ORGANIZATION_AUTO_MODEL_FLAG,
+    minAppVersion: '1.0.16',
+    defaultValue: false,
+  },
+  {
+    key: CHATGPT_ACCESS_FLAG,
+    minAppVersion: '1.0.16',
+    defaultValue: false,
+  },
+];
+
+const DEFINITIONS_BY_KEY: ReadonlyMap<string, FeatureFlagDefinition> = new Map(
+  FEATURE_FLAG_DEFINITIONS.map(definition => [definition.key, definition])
+);
+
+export function getFeatureFlagDefinition(key: string): FeatureFlagDefinition | undefined {
+  return DEFINITIONS_BY_KEY.get(key);
+}
+
+/** This build's version, or null when the platform does not report one. */
+export function currentAppVersion(): string | null {
+  return Application.nativeApplicationVersion ?? null;
+}

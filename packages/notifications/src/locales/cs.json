@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Vaše relace agenta má aktualizaci",
+      "lowBalance": "Váš zůstatek vyžaduje pozornost",
+      "spendAlert": "Vaše útrata vyžaduje pozornost",
+      "securityFinding": "Nález zabezpečení vyžaduje pozornost",
+      "securityUpdate": "Kontrola zabezpečení má aktualizaci",
+      "activeAgentsGlanceable": "Aktivní agenti mají aktualizaci"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Upozornění na nízký zůstatek",
+      "body": "Zůstatek organizace {{organizationName}} klesl pod ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Upozornění na útratu",
+      "body": "Útrata {{scopeName}} překročila ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nový nález zabezpečení ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Varování o SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Porušení SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Vaše relace Kilo je připravena k ovládání z telefonu"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

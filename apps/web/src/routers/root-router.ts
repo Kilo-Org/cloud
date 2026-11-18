@@ -1,15 +1,19 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { organizationsRouter } from '@/routers/organizations/organization-router';
 import { testRouter } from '@/routers/test-router';
 import { debugRouter } from '@/routers/debug-router';
 import { userRouter } from '@/routers/user-router';
 import { adminRouter } from '@/routers/admin-router';
+import { stepUpRouter } from '@/routers/step-up-router';
 import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router';
-import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
+import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
+import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
+import { cloudAgentNextFailuresRouter } from '@/routers/cloud-agent-next-failures-router';
+import { appShellRouter } from '@/routers/app-shell-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
@@ -21,19 +25,19 @@ import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
-import { appBuilderRouter } from '@/routers/app-builder-router';
+import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
+import { claudeBillingRouter } from '@/routers/claude-billing-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
-import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
-import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
-import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
-import { personalAutoFixRouter } from '@/routers/personal-auto-fix-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
+import { creditsRouter } from '@/routers/credits-router';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
+import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
+import { cloudEnvironmentsRouter } from '@/routers/cloud-environments-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
-import { appBuilderFeedbackRouter } from '@/routers/app-builder-feedback-router';
+import { feedbackRouter } from '@/routers/feedback-router';
 import { cloudAgentNextFeedbackRouter } from '@/routers/cloud-agent-next-feedback-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
@@ -42,22 +46,29 @@ import { codingPlansRouter } from '@/routers/coding-plans-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
-import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
-import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
+import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
+import { spendAlertRouter } from '@/routers/spend-alert-router';
+import { agentBriefingRouter } from '@/routers/agent-briefing-router';
+import { personalVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
+import { computeBillingRouter } from '@/routers/compute-billing-router';
 export const rootRouter = createTRPCRouter({
+  vercelCompute: personalVercelComputeRouter,
   test: testRouter,
   organizations: organizationsRouter,
   debug: debugRouter,
   user: userRouter,
   admin: adminRouter,
+  stepUp: stepUpRouter,
   codeIndexing: codeIndexingRouter,
-  deployments: deploymentsRouter,
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
+  workspaceFolders: workspaceFoldersRouter,
+  todos: todosRouter,
+  appShell: appShellRouter,
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,
   platformIntegrations: platformIntegrationsRouter,
@@ -66,23 +77,24 @@ export const rootRouter = createTRPCRouter({
   dolthub: dolthubRouter,
   discord: discordRouter,
   cloudAgentNext: cloudAgentNextRouter,
+  cloudAgentNextFailures: cloudAgentNextFailuresRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
-  appBuilder: appBuilderRouter,
+  openAiChatGpt: openAiChatGptRouter,
+  claudeBilling: claudeBillingRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
-  autoTriage: autoTriageRouter,
-  personalAutoTriage: personalAutoTriageRouter,
-  autoFix: autoFixRouter,
-  personalAutoFix: personalAutoFixRouter,
   appReportedMessages: appReportedMessagesRouter,
   kiloPass: kiloPassRouter,
+  credits: creditsRouter,
   agentProfiles: agentProfilesRouter,
+  cloudAgentSettings: cloudAgentSettingsRouter,
+  cloudEnvironments: cloudEnvironmentsRouter,
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
-  appBuilderFeedback: appBuilderFeedbackRouter,
+  feedback: feedbackRouter,
   cloudAgentNextFeedback: cloudAgentNextFeedbackRouter,
   kiloChat: kiloChatRouter,
   kiloclaw: kiloclawRouter,
@@ -91,12 +103,14 @@ export const rootRouter = createTRPCRouter({
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,
-  mcpGateway: mcpGatewayRouter,
-  mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
+  providerReview: providerReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
+  spendAlerts: spendAlertRouter,
+  agentBriefing: agentBriefingRouter,
+  computeBilling: computeBillingRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

@@ -117,6 +117,32 @@ export function contentBlocksToText(content: Array<{ type: string; text?: string
 type PreviewBlock = { type: string; text?: string; filename?: string; mimeType?: string };
 
 /**
+ * Structured label for one attachment in a preview: its filename when present,
+ * or a stable fallback code for a nameless attachment. Mobile maps the
+ * `image`/`attachment` codes to catalog keys; web keeps the English strings
+ * `contentBlocksPreviewText` returns.
+ */
+export type AttachmentPreviewLabel =
+  | { kind: 'filename'; filename: string }
+  | { kind: 'image' }
+  | { kind: 'attachment' };
+
+export function contentBlocksAttachmentPreviewLabels(
+  content: Array<PreviewBlock>
+): AttachmentPreviewLabel[] {
+  return content
+    .filter(
+      (b): b is { type: 'attachment'; filename?: string; mimeType?: string } =>
+        b.type === 'attachment'
+    )
+    .map(a =>
+      a.filename
+        ? { kind: 'filename', filename: a.filename }
+        : { kind: a.mimeType?.startsWith('image/') ? 'image' : 'attachment' }
+    );
+}
+
+/**
  * Short, human-readable single-line preview of a message's content blocks.
  * Falls back to attachment filenames (or a mime-typed descriptor) when no
  * text is present, so attachment-only messages don't render as empty strings
@@ -125,13 +151,19 @@ type PreviewBlock = { type: string; text?: string; filename?: string; mimeType?:
 export function contentBlocksPreviewText(content: Array<PreviewBlock>): string {
   const text = contentBlocksToText(content).trim();
   if (text) return text;
-  const attachments = content.filter(
-    (b): b is { type: 'attachment'; filename?: string; mimeType?: string } =>
-      b.type === 'attachment'
-  );
-  if (attachments.length === 0) return '';
-  return attachments
-    .map(a => a.filename || (a.mimeType?.startsWith('image/') ? 'Image' : 'Attachment'))
+  const labels = contentBlocksAttachmentPreviewLabels(content);
+  if (labels.length === 0) return '';
+  return labels
+    .map(label => {
+      switch (label.kind) {
+        case 'filename':
+          return label.filename;
+        case 'image':
+          return 'Image';
+        case 'attachment':
+          return 'Attachment';
+      }
+    })
     .join(', ');
 }
 

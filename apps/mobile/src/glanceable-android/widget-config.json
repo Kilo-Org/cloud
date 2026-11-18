@@ -1,0 +1,15 @@
+{
+  "widgets": [
+    {
+      "name": "ActiveAgentsWidget",
+      "minWidth": "110dp",
+      "minHeight": "40dp",
+      "targetCellWidth": 4,
+      "targetCellHeight": 4,
+      "maxResizeWidth": "440dp",
+      "maxResizeHeight": "400dp",
+      "resizeMode": "horizontal|vertical",
+      "updatePeriodMillis": 1800000
+    }
+  ]
+}

@@ -5,22 +5,23 @@ import {
   organization_seats_purchases,
   organization_memberships,
   organization_membership_removals,
+  organization_invitations,
+  external_side_effect_outbox,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { eq, and } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { eq, and, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   createOrganization,
-  removeUserFromOrganization,
   inviteUserToOrganization,
   acceptOrganizationInvite,
   addUserToOrganization,
-} from '@/lib/organizations/organizations';
-import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@kilocode/web-shared/lib/config.server';
 
-// Validate required environment variables at module load time
 if (STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID?.trim() === '') {
   throw new Error(
     'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID must be set in test environment (.env.test)'
@@ -31,7 +32,7 @@ if (STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID?.trim() === '') {
 // organization-seats.ts can verify the existing subscription without hitting
 // the real Stripe API. Return ended_at: null so the guard treats the existing
 // subscription as still active and rejects the duplicate.
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: {
       retrieve: jest.fn().mockResolvedValue({ ended_at: null }),
@@ -39,7 +40,6 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-// Helper function to create a mock Stripe subscription
 function createMockSubscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subscription {
   const baseSubscription = {
     id: `sub_test_${Math.random().toString(36).substring(7)}`,
@@ -218,10 +218,8 @@ describe('handleSubscriptionEvent', () => {
       },
     });
 
-    // Test with isSubscriptionCreateEvent = false (should still add as owner)
     await handleSubscriptionEvent(subscription, 'test-always-owner');
 
-    // Check that user was added as owner
     const membership = await db
       .select()
       .from(organization_memberships)
@@ -458,7 +456,6 @@ describe('handleSubscriptionEvent', () => {
   test('should handle concurrent calls with same idempotency key', async () => {
     const idempotencyKey = 'test-concurrent-calls';
 
-    // Simulate concurrent calls
     const promises = [
       handleSubscriptionEvent(mockSubscription, idempotencyKey),
       handleSubscriptionEvent(mockSubscription, idempotencyKey),
@@ -472,7 +469,6 @@ describe('handleSubscriptionEvent', () => {
       .from(organization_seats_purchases)
       .where(eq(organization_seats_purchases.idempotency_key, idempotencyKey));
 
-    // Should only have one record despite multiple concurrent calls
     expect(purchases).toHaveLength(1);
   });
 
@@ -566,7 +562,6 @@ describe('handleSubscriptionEvent', () => {
       .where(eq(organization_seats_purchases.idempotency_key, idempotencyKey));
 
     expect(purchases).toHaveLength(1);
-    // Even with high original values, should be zeroed out due to ended_at
     expect(purchases[0].seat_count).toBe(0);
     expect(purchases[0].amount_usd).toBe(0);
     expect(purchases[0].subscription_status).toBe('ended');
@@ -607,7 +602,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(subscription, 'test-first-subscription');
 
-    // Check that organization seat_count was updated
     const updatedOrg = await db
       .select()
       .from(organizations)
@@ -620,7 +614,6 @@ describe('Organization seat count tracking', () => {
   test('should immediately grant seats when upgrading (higher seat count)', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // First subscription with 5 seats
     const firstSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -645,7 +638,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(firstSubscription, 'test-first-5-seats');
 
-    // Verify organization has 5 seats
     let updatedOrg = await db
       .select()
       .from(organizations)
@@ -653,7 +645,6 @@ describe('Organization seat count tracking', () => {
       .then(rows => rows[0]);
     expect(updatedOrg.seat_count).toBe(5);
 
-    // Upgrade to 15 seats with a more recent starts_at (immediate upgrade)
     const upgradeSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -678,7 +669,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(upgradeSubscription, 'test-upgrade-15-seats');
 
-    // Should immediately grant 15 seats since it has more recent starts_at
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -690,7 +680,6 @@ describe('Organization seat count tracking', () => {
   test('should not downgrade seats until next billing cycle (more recent starts_at)', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // First subscription with 20 seats
     const firstSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -716,7 +705,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(firstSubscription, 'test-first-20-seats');
 
-    // Verify organization has 20 seats
     let updatedOrg = await db
       .select()
       .from(organizations)
@@ -724,7 +712,6 @@ describe('Organization seat count tracking', () => {
       .then(rows => rows[0]);
     expect(updatedOrg.seat_count).toBe(20);
 
-    // Downgrade to 8 seats in the same billing period (same starts_at)
     const downgradeSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -750,7 +737,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(downgradeSubscription, 'test-downgrade-8-seats');
 
-    // Should still have 20 seats (no downgrade in same billing period)
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -758,7 +744,6 @@ describe('Organization seat count tracking', () => {
       .then(rows => rows[0]);
     expect(updatedOrg.seat_count).toBe(20);
 
-    // Now simulate next billing cycle with lower seat count
     const nextBillingCycleSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -783,7 +768,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(nextBillingCycleSubscription, 'test-next-billing-8-seats');
 
-    // Now should downgrade to 8 seats
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -795,7 +779,6 @@ describe('Organization seat count tracking', () => {
   test('should handle multiple subscription events and use most recent starts_at', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // Create multiple subscription events with different starts_at dates
     const subscriptions = [
       {
         seats: 10,
@@ -819,7 +802,6 @@ describe('Organization seat count tracking', () => {
       },
     ];
 
-    // Process all subscriptions
     for (const sub of subscriptions) {
       const subscription = createMockSubscription({
         metadata: {
@@ -846,7 +828,6 @@ describe('Organization seat count tracking', () => {
       await handleSubscriptionEvent(subscription, sub.idempotency);
     }
 
-    // Should use the seat count from the most recent starts_at (25 seats)
     const updatedOrg = await db
       .select()
       .from(organizations)
@@ -858,7 +839,6 @@ describe('Organization seat count tracking', () => {
   test('should handle zero seats correctly', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // First give some seats
     const firstSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -883,7 +863,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(firstSubscription, 'test-zero-first');
 
-    // Then simulate subscription cancellation (zero seats) in next billing cycle
     const canceledSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -909,7 +888,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(canceledSubscription, 'test-zero-canceled');
 
-    // Should now have 0 seats
     const updatedOrg = await db
       .select()
       .from(organizations)
@@ -921,7 +899,6 @@ describe('Organization seat count tracking', () => {
   test('should handle same starts_at with different seat counts (use latest processed)', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // Two subscriptions with same starts_at but different seat counts
     const firstSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1009,7 +986,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(subscription, 'test-transaction-consistency');
 
-    // Verify both the purchase record and organization seat count are consistent
     const [purchase, organization] = await Promise.all([
       db
         .select()
@@ -1030,7 +1006,6 @@ describe('Organization seat count tracking', () => {
   test('should handle complex scenario: upgrade, downgrade, then upgrade again', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // Start with 5 seats
     const initialSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1055,7 +1030,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(initialSubscription, 'test-complex-1');
 
-    // Upgrade to 20 seats (more recent starts_at)
     const upgradeSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1080,7 +1054,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(upgradeSubscription, 'test-complex-2');
 
-    // Should have 20 seats
     let updatedOrg = await db
       .select()
       .from(organizations)
@@ -1088,7 +1061,6 @@ describe('Organization seat count tracking', () => {
       .then(rows => rows[0]);
     expect(updatedOrg.seat_count).toBe(20);
 
-    // Downgrade to 3 seats (even more recent starts_at)
     const downgradeSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1113,7 +1085,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(downgradeSubscription, 'test-complex-3');
 
-    // Should now have 3 seats
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -1121,7 +1092,6 @@ describe('Organization seat count tracking', () => {
       .then(rows => rows[0]);
     expect(updatedOrg.seat_count).toBe(3);
 
-    // Upgrade again to 25 seats (most recent starts_at)
     const finalUpgradeSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1146,7 +1116,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(finalUpgradeSubscription, 'test-complex-4');
 
-    // Should have 25 seats
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -1158,8 +1127,6 @@ describe('Organization seat count tracking', () => {
   test('should handle out-of-order subscription events correctly', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // Process events out of chronological order
-    // Event 3: Most recent (should be final result)
     const futureSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1183,7 +1150,6 @@ describe('Organization seat count tracking', () => {
       },
     });
 
-    // Event 1: Oldest
     const oldSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1207,7 +1173,6 @@ describe('Organization seat count tracking', () => {
       },
     });
 
-    // Event 2: Middle
     const middleSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1231,12 +1196,10 @@ describe('Organization seat count tracking', () => {
       },
     });
 
-    // Process in non-chronological order: future, old, middle
     await handleSubscriptionEvent(futureSubscription, 'test-order-1');
     await handleSubscriptionEvent(oldSubscription, 'test-order-2');
     await handleSubscriptionEvent(middleSubscription, 'test-order-3');
 
-    // Should always use the most recent starts_at (30 seats)
     const updatedOrg = await db
       .select()
       .from(organizations)
@@ -1248,7 +1211,6 @@ describe('Organization seat count tracking', () => {
   test('should handle subscription with very old starts_at after newer ones', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // First, create a recent subscription
     const recentSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1274,7 +1236,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(recentSubscription, 'test-old-starts-1');
 
-    // Verify we have 15 seats
     let updatedOrg = await db
       .select()
       .from(organizations)
@@ -1282,7 +1243,6 @@ describe('Organization seat count tracking', () => {
       .then(rows => rows[0]);
     expect(updatedOrg.seat_count).toBe(15);
 
-    // Now process a subscription with much older starts_at
     const oldSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1308,7 +1268,6 @@ describe('Organization seat count tracking', () => {
 
     await handleSubscriptionEvent(oldSubscription, 'test-old-starts-2');
 
-    // Should still have 15 seats (from more recent starts_at)
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -1385,7 +1344,6 @@ describe('Non-seat product filtering', () => {
     // Amount should only include seat product: 5 * $10 = $50, not $50 + $49
     expect(purchases[0].amount_usd).toBe(50);
 
-    // Verify organization seat_count is correct
     const org = await db
       .select()
       .from(organizations)
@@ -1668,7 +1626,6 @@ describe('Organization plan type updates from subscription', () => {
   });
 
   test('should update organization plan from enterprise to teams when teams subscription is purchased', async () => {
-    // Set organization to enterprise plan initially (simulating enterprise trial)
     await db
       .update(organizations)
       .set({ plan: 'enterprise' })
@@ -1705,10 +1662,8 @@ describe('Organization plan type updates from subscription', () => {
       },
     });
 
-    // Handle the subscription event (simulating checkout completion)
     await handleSubscriptionEvent(teamsSubscription, 'test-teams-subscription', true);
 
-    // Verify organization plan was updated to teams
     const updatedOrg = await db
       .select()
       .from(organizations)
@@ -1732,7 +1687,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
   test('should preserve provider allow and model deny lists when transitioning enterprise → teams → enterprise', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // Set org to enterprise plan with provider allow and model deny lists
     await db
       .update(organizations)
       .set({
@@ -1747,7 +1701,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
     const base = createMockSubscription();
     const baseItem = base.items.data[0];
 
-    // Process a subscription event that transitions to 'teams'
     const teamsSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1779,7 +1732,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
 
     await handleSubscriptionEvent(teamsSubscription, 'test-l3-to-teams');
 
-    // Verify plan is teams AND access lists are preserved
     let updatedOrg = await db
       .select()
       .from(organizations)
@@ -1790,7 +1742,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
     expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
     expect(updatedOrg.settings.provider_allow_list).toEqual(['openai']);
 
-    // Process a subscription event that transitions back to 'enterprise'
     const enterpriseSubscription = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1814,7 +1765,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
 
     await handleSubscriptionEvent(enterpriseSubscription, 'test-l3-back-to-enterprise');
 
-    // Verify plan is enterprise AND access lists are still preserved
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -1848,7 +1798,6 @@ describe('C1: Webhook event replay deduplication', () => {
 
     const idempotencyKey = 'evt_test_replay';
 
-    // Call twice with the same idempotency key (simulating webhook replay)
     await handleSubscriptionEvent(mockSubscription, idempotencyKey);
     await handleSubscriptionEvent(mockSubscription, idempotencyKey);
 
@@ -1877,13 +1826,10 @@ describe('H2: Membership removal tombstone', () => {
     const base = createMockSubscription();
     const baseItem = base.items.data[0];
 
-    // Add the user as a member first
     await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
 
-    // Step 1: Remove the user from the org → creates a removal tombstone
     await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
 
-    // Verify the removal record exists
     const removals = await db
       .select()
       .from(organization_membership_removals)
@@ -1895,8 +1841,6 @@ describe('H2: Membership removal tombstone', () => {
       );
     expect(removals).toHaveLength(1);
 
-    // Step 2: Process a subscription event with the removed user as metadata user
-    // The removed user should NOT be re-added
     const subscriptionForRemovedUser = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1919,7 +1863,6 @@ describe('H2: Membership removal tombstone', () => {
 
     await handleSubscriptionEvent(subscriptionForRemovedUser, 'test-h2-after-removal');
 
-    // Verify removed user is NOT a member
     const membershipsAfterEvent = await db
       .select()
       .from(organization_memberships)
@@ -1931,7 +1874,6 @@ describe('H2: Membership removal tombstone', () => {
       );
     expect(membershipsAfterEvent).toHaveLength(0);
 
-    // Step 3: User accepts a new invite → removal tombstone is cleared
     const invitation = await inviteUserToOrganization(
       testOrganization.id,
       testUser.id,
@@ -1940,7 +1882,6 @@ describe('H2: Membership removal tombstone', () => {
     );
     await acceptOrganizationInvite(removedUser.id, invitation.token);
 
-    // Verify tombstone was cleared
     const removalsAfterAccept = await db
       .select()
       .from(organization_membership_removals)
@@ -1952,7 +1893,6 @@ describe('H2: Membership removal tombstone', () => {
       );
     expect(removalsAfterAccept).toHaveLength(0);
 
-    // Step 4: Process subscription event again → user IS added back (tombstone cleared)
     const subscriptionAfterRejoin = createMockSubscription({
       metadata: {
         type: 'organization_seats',
@@ -1988,6 +1928,187 @@ describe('H2: Membership removal tombstone', () => {
       );
     expect(membershipsAfterRejoin.length).toBeGreaterThanOrEqual(1);
   });
+
+  test('should reject an invitation older than the removal record', async () => {
+    // Fixtures: the stored record, then an invitation with an earlier
+    // creation timestamp.
+    await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
+    await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
+    await db
+      .update(organization_membership_removals)
+      .set({ removed_at: sql`NOW()` })
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    const [removalRow] = await db
+      .select({ removedAt: organization_membership_removals.removed_at })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+
+    const invitation = await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      removedUser.google_user_email,
+      'member'
+    );
+    await db
+      .update(organization_invitations)
+      .set({ created_at: new Date(new Date(removalRow.removedAt).getTime() - 1000).toISOString() })
+      .where(eq(organization_invitations.id, invitation.id));
+
+    await db.insert(external_side_effect_outbox).values({
+      operation: 'send_org_invite_email',
+      invitation_id: invitation.id,
+      payload: {
+        invitationId: invitation.id,
+        to: removedUser.google_user_email,
+        organizationName: testOrganization.name,
+        inviterName: 'Test User',
+        acceptInviteUrl: `https://app.kilo.ai/invite/${invitation.token}`,
+      },
+    });
+
+    const result = await acceptOrganizationInvite(removedUser.id, invitation.token);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('Invitation is no longer valid');
+    }
+
+    const memberships = await db
+      .select()
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(memberships).toHaveLength(0);
+
+    const removals = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removals).toHaveLength(1);
+
+    // The refused invitation is expired so it cannot linger as live.
+    const [refusedInvitation] = await db
+      .select({ expiresAt: organization_invitations.expires_at })
+      .from(organization_invitations)
+      .where(eq(organization_invitations.id, invitation.id));
+    expect(new Date(refusedInvitation.expiresAt).getTime()).toBeLessThanOrEqual(Date.now());
+
+    // Its invite email row is terminal, so the sender never mails it later.
+    const [outboxRow] = await db
+      .select()
+      .from(external_side_effect_outbox)
+      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    expect(outboxRow.status).toBe('failed');
+    expect(outboxRow.last_error).toBe('revoked');
+    expect(outboxRow.claimed_at).toBeNull();
+    expect(outboxRow.next_attempt_at).toBeNull();
+  });
+
+  test('should reject an invitation created at the same instant as the removal record', async () => {
+    await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
+    await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
+
+    const invitation = await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      removedUser.google_user_email,
+      'member'
+    );
+    await db
+      .update(organization_membership_removals)
+      .set({ removed_at: sql`date_trunc('milliseconds', NOW())` })
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    const [removalRow] = await db
+      .select({ removedAt: organization_membership_removals.removed_at })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    await db
+      .update(organization_invitations)
+      .set({ created_at: new Date(removalRow.removedAt).toISOString() })
+      .where(eq(organization_invitations.id, invitation.id));
+
+    const result = await acceptOrganizationInvite(removedUser.id, invitation.token);
+    expect(result.success).toBe(false);
+
+    const memberships = await db
+      .select()
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(memberships).toHaveLength(0);
+
+    const removals = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removals).toHaveLength(1);
+  });
+
+  test('should accept a newer invitation and clear the stored membership record', async () => {
+    await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
+    await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
+
+    const reinvitation = await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      removedUser.google_user_email,
+      'member'
+    );
+
+    const result = await acceptOrganizationInvite(removedUser.id, reinvitation.token);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.organizationId).toBe(testOrganization.id);
+    }
+
+    const removals = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removals).toHaveLength(0);
+  });
 });
 
 describe('H1: Duplicate subscription guard', () => {
@@ -2004,7 +2125,6 @@ describe('H1: Duplicate subscription guard', () => {
     const base = createMockSubscription();
     const baseItem = base.items.data[0];
 
-    // First subscription creation succeeds
     const firstSubscription = createMockSubscription({
       id: 'sub_first_active',
       metadata: {
@@ -2028,7 +2148,6 @@ describe('H1: Duplicate subscription guard', () => {
 
     await handleSubscriptionEvent(firstSubscription, 'test-h1-first-sub', true);
 
-    // Second subscription creation (different subscription ID) should throw
     const secondSubscription = createMockSubscription({
       id: 'sub_second_attempt',
       metadata: {

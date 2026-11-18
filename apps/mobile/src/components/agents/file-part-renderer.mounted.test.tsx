@@ -1,17 +1,31 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 /* eslint-disable max-lines -- cohesive mounted suite: all FilePart tap/preview/share states share one harness */
-import { type FilePart } from '@kilocode/cloud-agent-sdk';
+import { type FilePart, type NativeSessionState } from '@kilocode/cloud-agent-sdk';
+import { readNativeConversation } from '@kilocode/cloud-agent-sdk/native-conversation-source';
+import { kilo2AssetKey } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ShareRemoteFileError } from '@/lib/share-remote-file';
+
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FilePartRenderer } from './file-part-renderer';
-import { __resetFilePartCacheForTests, cacheFilePart } from './file-part-cache';
+import {
+  __resetFilePartCacheForTests,
+  cacheFilePart,
+  overwriteFilePartCacheEntry,
+} from './file-part-cache';
+import { __resetFilePartUrlResolverForTests } from './file-part-url-resolver';
 
 type FileInstance = {
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  write: (content: string, options?: { encoding?: string }) => Promise<void>;
+  writeSync: (content: string, options?: { encoding?: string }) => void;
   text: ReturnType<typeof vi.fn>;
+  canPreview: ReturnType<typeof vi.fn>;
+  preview: ReturnType<typeof vi.fn>;
+  copy: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
   filename?: string;
 };
 
@@ -20,6 +34,12 @@ const fileInstances: FileInstance[] = [];
 const expoFileSystemMock = vi.hoisted(() => {
   const directoryCreate = vi.fn();
   const fileText = vi.fn();
+  // The native preview flow: a test switches the verdict per case.
+  const previewBehavior = {
+    canPreview: true,
+    previewError: null as Error | null,
+    exists: true,
+  };
   const Directory = vi.fn(function DirectoryMock(_base: unknown, name: string) {
     return {
       name,
@@ -32,8 +52,24 @@ const expoFileSystemMock = vi.hoisted(() => {
         typeof directoryOrUri === 'string'
           ? directoryOrUri
           : `file:///cache/session-file-parts/${filename}`,
-      write: vi.fn(),
+      get exists() {
+        return previewBehavior.exists;
+      },
+      get extension() {
+        const dot = instance.uri.lastIndexOf('.');
+        return dot === -1 ? '' : instance.uri.slice(dot);
+      },
+      write: vi.fn().mockResolvedValue(undefined),
+      writeSync: vi.fn(),
       text: fileText,
+      canPreview: vi.fn(() => Promise.resolve(previewBehavior.canPreview)),
+      preview: vi.fn(() =>
+        previewBehavior.previewError !== null
+          ? Promise.reject(previewBehavior.previewError)
+          : Promise.resolve()
+      ),
+      copy: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(),
       filename,
     };
     fileInstances.push(instance);
@@ -45,6 +81,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     Paths: { cache: 'file:///cache' },
     directoryCreate,
     fileText,
+    previewBehavior,
   };
 });
 
@@ -71,7 +108,11 @@ vi.mock('@/lib/share-remote-file', () => ({
   shareRemoteFile: shareRemoteFileMock.shareRemoteFile,
 }));
 
-const showActionSheetWithOptions = vi.hoisted(() => vi.fn());
+type ActionSheetConfig = { options: string[]; cancelButtonIndex: number };
+
+const showActionSheetWithOptions = vi.hoisted(() =>
+  vi.fn<(config: ActionSheetConfig, callback?: (index?: number) => void) => void>()
+);
 
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions }),
@@ -84,16 +125,54 @@ const toastMock = vi.hoisted(() => ({
 
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 
+const getAttachmentDownloadUrlMutate = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    cloudAgentNext: {
+      getAttachmentDownloadUrl: { mutate: getAttachmentDownloadUrlMutate },
+    },
+  },
+}));
+
+const reactNativeMock = vi.hoisted(() => ({
+  Platform: { OS: 'ios' as string },
+  useWindowDimensions: vi.fn(() => ({ width: 390, height: 844 })),
+}));
+const safeAreaMock = vi.hoisted(() => ({
+  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
+}));
+
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
-  Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  Platform: reactNativeMock.Platform,
+  useWindowDimensions: reactNativeMock.useWindowDimensions,
 }));
-vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', File: 'File' }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: vi.fn(),
+}));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  File: 'File',
+  Share: 'Share',
+}));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
+vi.mock('expo-video', () => ({
+  VideoView: 'VideoView',
+  useVideoPlayer: () => ({ loop: false }),
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -122,7 +201,20 @@ beforeEach(() => {
   vi.clearAllMocks();
   fileInstances.length = 0;
   __resetFilePartCacheForTests();
+  __resetFilePartUrlResolverForTests();
+  reactNativeMock.Platform.OS = 'ios';
+  reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
+  safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 0, bottom: 0 });
+  getAttachmentDownloadUrlMutate.mockReset();
+  getAttachmentDownloadUrlMutate.mockResolvedValue({
+    signedUrl: 'https://r2.example/signed',
+    key: 'k',
+    expiresAt: '2099-01-01T00:00:00Z',
+  });
   expoFileSystemMock.fileText.mockReset();
+  expoFileSystemMock.previewBehavior.canPreview = true;
+  expoFileSystemMock.previewBehavior.previewError = null;
+  expoFileSystemMock.previewBehavior.exists = true;
   shareRemoteFileMock.getSafeCacheFilename.mockImplementation(
     ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`
   );
@@ -137,11 +229,14 @@ beforeEach(() => {
   );
 });
 
-async function mount(part: FilePart): Promise<TestRenderer.ReactTestRenderer> {
+async function mount(
+  part: FilePart,
+  onLongPress?: () => void
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(createElement(FilePartRenderer, { part }));
+    ref.current = TestRenderer.create(createElement(FilePartRenderer, { part, onLongPress }));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -179,6 +274,13 @@ function findByType(
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
+function findByTestID(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.props.testID === testID);
+}
+
 function pressableByLabel(
   root: TestRenderer.ReactTestInstance,
   label: string
@@ -189,6 +291,12 @@ function pressableByLabel(
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel === label
   );
+}
+
+function accessibleStatusNodes(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.type === AccessibleStatus);
 }
 
 function texts(root: TestRenderer.ReactTestInstance): string[] {
@@ -226,7 +334,198 @@ async function selectActionSheet(index: number): Promise<void> {
   });
 }
 
+function actionSheetConfig(): ActionSheetConfig {
+  const call = showActionSheetWithOptions.mock.calls.at(-1);
+  if (!call) {
+    throw new Error('action sheet was not shown');
+  }
+  return call[0];
+}
+
+function actionSheetOptions(): string[] {
+  return actionSheetConfig().options;
+}
+
+async function selectActionSheetOption(label: string): Promise<void> {
+  const options = actionSheetOptions();
+  const index = options.indexOf(label);
+  if (index === -1) {
+    throw new Error(`option "${label}" missing from ${options.join(' | ')}`);
+  }
+  await selectActionSheet(index);
+}
+
 describe('FilePartRenderer mounted', () => {
+  it('shows a loading image instead of the inline payload while the cache write is pending', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      directoryOrUri: unknown,
+      filename?: string
+    ) {
+      const instance = {
+        uri:
+          typeof directoryOrUri === 'string'
+            ? directoryOrUri
+            : `file:///cache/session-file-parts/${filename}`,
+        exists: true,
+        write: vi.fn(() => write.promise),
+        writeSync: vi.fn(),
+        text: expoFileSystemMock.fileText,
+        canPreview: vi.fn(() => Promise.resolve(true)),
+        preview: vi.fn(() => Promise.resolve()),
+        copy: vi.fn(() => Promise.resolve()),
+        extension: '.png',
+        delete: vi.fn(),
+        filename,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+    const dataUrl = 'data:image/png;base64,QUJD';
+    cacheFilePart('part-1', { url: dataUrl, mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: dataUrl })
+    );
+
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(node => node.props.accessibilityLabel === 'Loading image')
+    ).toHaveLength(1);
+
+    write.resolve(undefined);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const image = first(findByType(renderer.root, 'Image'));
+    expect(image.props.source).toEqual({ uri: 'file:///cache/session-file-parts/part-1-shot.png' });
+
+    await unmount(renderer);
+  });
+
+  it.each([
+    { mime: 'image/png', filename: 'shot.png', label: 'Open shot.png full screen' },
+    { mime: 'text/markdown', filename: 'readme.md', label: 'Preview readme.md' },
+    { mime: 'application/pdf', filename: 'report.pdf', label: 'Open report.pdf' },
+  ])(
+    'forwards $mime long-press without replacing its normal tap',
+    async ({ mime, filename, label }) => {
+      expoFileSystemMock.fileText.mockResolvedValue('Attachment body');
+      const url = `https://example.test/${filename}`;
+      cacheFilePart('part-1', { url, mime, filename });
+      const part = makeFilePart({ id: 'part-1', mime, filename, url: '' });
+      const selected: string[] = [];
+      const renderer = await mount(part, () => {
+        selected.push(part.messageID);
+      });
+      const button = first(pressableByLabel(renderer.root, label));
+      act(() => {
+        (button.props.onLongPress as () => void)();
+      });
+      expect(selected).toEqual(['message-1']);
+      expect(findByType(renderer.root, 'ImageViewer')).toHaveLength(0);
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+      expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+      await press(button);
+      if (mime === 'image/png') {
+        expect(first(findByType(renderer.root, 'ImageViewer')).props.uri).toBe(url);
+      } else if (mime === 'text/markdown') {
+        expect(first(findByType(renderer.root, 'ChatMarkdownText')).props.value).toBe(
+          'Attachment body'
+        );
+      } else {
+        await selectActionSheetOption('Open as text');
+        expect(texts(renderer.root)).toContain('Attachment body');
+      }
+      expect(selected).toEqual(['message-1']);
+      await unmount(renderer);
+    }
+  );
+
+  it('plays a video part inline with native controls and shares it from the caption row', async () => {
+    const url = 'https://example.test/clip.mp4';
+    cacheFilePart('part-1', { url, mime: 'video/mp4', filename: 'clip.mp4' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'video/mp4', filename: 'clip.mp4', url: '' })
+    );
+
+    const video = findByType(renderer.root, 'VideoView');
+    expect(video).toHaveLength(1);
+    expect(video[0]?.props.nativeControls).toBe(true);
+    expect(video[0]?.props.contentFit).toBe('contain');
+    // No full-screen viewer: the native player owns the enlarged surface.
+    expect(findByType(renderer.root, 'ImageViewer')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('clip.mp4');
+
+    await press(first(pressableByLabel(renderer.root, 'Share clip.mp4')));
+    await flushAsync();
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ url, filename: 'clip.mp4' })
+    );
+
+    await unmount(renderer);
+  });
+
+  it('forwards image-error long-press without retrying until the normal tap', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const selected: string[] = [];
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' }),
+      () => {
+        selected.push('message-1');
+      }
+    );
+    act(() => {
+      (first(findByType(renderer.root, 'Image')).props.onError as () => void)();
+    });
+    const retry = first(pressableByLabel(renderer.root, 'Image unavailable, retry loading'));
+    act(() => {
+      (retry.props.onLongPress as () => void)();
+    });
+    expect(selected).toEqual(['message-1']);
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('Image unavailable');
+    await press(retry);
+    expect(first(findByType(renderer.root, 'Image')).props.source).toEqual({
+      uri: 'https://x/a.png',
+    });
+    expect(selected).toEqual(['message-1']);
+    await unmount(renderer);
+  });
+
+  it('forwards image-presign failure long-press and preserves normal retry recovery', async () => {
+    const uuid = '88888888-8888-4888-8888-888888888888';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    getAttachmentDownloadUrlMutate.mockRejectedValueOnce(new Error('presign failed'));
+    const selected: string[] = [];
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' }),
+      () => {
+        selected.push('message-1');
+      }
+    );
+    await flushAsync();
+    const retry = first(pressableByLabel(renderer.root, 'Image unavailable, retry loading'));
+    act(() => {
+      (retry.props.onLongPress as () => void)();
+    });
+    expect(selected).toEqual(['message-1']);
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('Image unavailable');
+    await press(retry);
+    await flushAsync();
+    expect(first(findByType(renderer.root, 'Image')).props.source).toEqual({
+      uri: 'https://r2.example/signed',
+    });
+    expect(selected).toEqual(['message-1']);
+    await unmount(renderer);
+  });
+
   it('opens the full-screen viewer when an image FilePart is tapped', async () => {
     cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
     const renderer = await mount(
@@ -237,11 +536,11 @@ describe('FilePartRenderer mounted', () => {
     const buttons = pressableByLabel(root, 'Open shot.png full screen');
     expect(buttons).toHaveLength(1);
     expect(buttons[0]?.props.accessibilityRole).toBe('button');
-    expect(findByType(root, 'ImageViewerModal')).toHaveLength(0);
+    expect(findByType(root, 'ImageViewer')).toHaveLength(0);
 
     await press(first(buttons));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props).toMatchObject({ visible: true, uri: 'https://x/a.png' });
 
@@ -267,6 +566,182 @@ describe('FilePartRenderer mounted', () => {
     expect(pressableByLabel(root, 'Open shot.png full screen')).toHaveLength(0);
     expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
     expect(texts(root)).toContain('Image unavailable');
+
+    await unmount(renderer);
+  });
+
+  it('keeps the retry chip through a failed renew', async () => {
+    const uuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    overwriteFilePartCacheEntry('part-1', {
+      url: 'https://r2.example/signed',
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+      urlExpiresAt: Date.now() - 1000,
+    });
+
+    // A pending presign keeps the renew in flight after the read-path kick.
+    const renewHolder: { reject?: (error: Error) => void } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        renewHolder.reject = reject;
+      })
+    );
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    // The image errors while the renew is in flight: the retry chip shows at
+    // once and must not be hidden by the renew.
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+    expect(texts(root)).toContain('Image unavailable');
+
+    await act(async () => {
+      renewHolder.reject?.(new Error('renew failed'));
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    // The renew failed and the URL is unchanged, so the retry chip stays.
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+    expect(texts(root)).toContain('Image unavailable');
+
+    await unmount(renderer);
+  });
+
+  it('clears the retry chip after a successful renew that follows an image error', async () => {
+    const uuid = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    overwriteFilePartCacheEntry('part-1', {
+      url: 'https://r2.example/stale',
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+      urlExpiresAt: Date.now() - 1000,
+    });
+
+    // A pending presign keeps the renew in flight, then lands a fresh URL.
+    const renewHolder: {
+      resolve?: (value: { signedUrl: string; key: string; expiresAt: string }) => void;
+    } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise(resolve => {
+        renewHolder.resolve = resolve;
+      })
+    );
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    // The image errors while the renew is in flight; the chip shows at once.
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+
+    // The renew succeeds with a fresh signed URL: the error clears in the same
+    // render, so the chip disappears and the image shows the new URL.
+    await act(async () => {
+      renewHolder.resolve?.({
+        signedUrl: 'https://r2.example/fresh',
+        key: 'k',
+        expiresAt: '2099-01-01T00:00:00Z',
+      });
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    const reRendered = findByType(root, 'Image')[0];
+    expect(reRendered?.props.source).toEqual({ uri: 'https://r2.example/fresh' });
+
+    await unmount(renderer);
+  });
+
+  it('keeps the open viewer mounted after a failed renew leaves imageFailed set', async () => {
+    const uuid = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    overwriteFilePartCacheEntry('part-1', {
+      url: 'https://r2.example/signed',
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+      urlExpiresAt: Date.now() - 1000,
+    });
+
+    // A pending presign keeps the renew in flight after the read-path kick.
+    const renewHolder: { reject?: (error: Error) => void } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        renewHolder.reject = reject;
+      })
+    );
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    // Open the viewer before the renew settles.
+    await press(first(pressableByLabel(root, `Open ${uuid}.png full screen`)));
+    expect(findByType(root, 'ImageViewer')).toHaveLength(1);
+
+    // The image errors while the renew is in flight.
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    // The renew fails: renewing clears but the open viewer must stay mounted
+    // instead of swapping the tree to the retry chip.
+    await act(async () => {
+      renewHolder.reject?.(new Error('renew failed'));
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    expect(findByType(root, 'ImageViewer')).toHaveLength(1);
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    expect(pressableByLabel(root, `Open ${uuid}.png full screen`)).toHaveLength(1);
 
     await unmount(renderer);
   });
@@ -297,7 +772,7 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('shows the ActionSheet when a non-image, non-markdown FilePart is tapped', async () => {
+  it('offers the native preview beside the text and share choices for a document', async () => {
     cacheFilePart('part-1', {
       url: 'data:application/pdf;base64,QUJD',
       mime: 'application/pdf',
@@ -315,12 +790,32 @@ describe('FilePartRenderer mounted', () => {
     await press(first(buttons));
 
     expect(showActionSheetWithOptions).toHaveBeenCalledTimes(1);
-    const options = showActionSheetWithOptions.mock.calls[0]?.[0] as {
-      options: string[];
-      cancelButtonIndex: number;
-    };
-    expect(options.options).toEqual(['Open as text', 'Open in external app', 'Cancel']);
-    expect(options.cancelButtonIndex).toBe(2);
+    expect(actionSheetOptions()).toEqual([
+      'Preview report.pdf',
+      'Open as text',
+      'Open in external app',
+      'Cancel',
+    ]);
+    expect(actionSheetConfig().cancelButtonIndex).toBe(3);
+
+    await unmount(renderer);
+  });
+
+  it('keeps only the text and share choices for a file that has no document preview', async () => {
+    cacheFilePart('part-1', {
+      url: 'data:application/zip;base64,QUJD',
+      mime: 'application/zip',
+      filename: 'bundle.zip',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'application/zip', filename: 'bundle.zip', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open bundle.zip')));
+
+    expect(actionSheetOptions()).toEqual(['Open as text', 'Open in external app', 'Cancel']);
+    expect(actionSheetConfig().cancelButtonIndex).toBe(2);
 
     await unmount(renderer);
   });
@@ -338,7 +833,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(0);
+    await selectActionSheetOption('Open as text');
     await flushAsync();
 
     expect(texts(root)).toContain('plain text body');
@@ -359,7 +854,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
@@ -406,7 +901,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
@@ -468,7 +963,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledTimes(1);
@@ -501,10 +996,38 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('shows "This file is empty." for empty decoded text', async () => {
+  it.each([
+    ['ios', 'text/markdown', 'readme.md'],
+    ['android', 'text/markdown', 'readme.md'],
+    ['ios', 'text/plain', 'file.txt'],
+    ['android', 'text/plain', 'file.txt'],
+  ])(
+    'centers the empty %s %s preview outside its content scroller',
+    async (platform, mime, filename) => {
+      reactNativeMock.Platform.OS = platform;
+      expoFileSystemMock.fileText.mockResolvedValue('');
+      cacheFilePart('part-1', { url: `data:${mime};base64,QUJD`, mime, filename });
+      const renderer = await mount(makeFilePart({ id: 'part-1', mime, filename, url: '' }));
+      const root = renderer.root;
+      const markdown = mime === 'text/markdown';
+      await press(first(pressableByLabel(root, `${markdown ? 'Preview' : 'Open'} ${filename}`)));
+      if (!markdown) {
+        await selectActionSheetOption('Open as text');
+      }
+      await flushAsync();
+
+      expect(texts(root)).toContain('This file is empty.');
+      expect(findByType(root, 'CenteredState')).toHaveLength(1);
+      expect(findByType(root, 'ScrollView')).toHaveLength(0);
+      expect(findByType(root, 'SheetHeader')).toHaveLength(1);
+      await unmount(renderer);
+    }
+  );
+
+  it('shares the source file from the header Share on an empty markdown preview', async () => {
     expoFileSystemMock.fileText.mockResolvedValue('');
     cacheFilePart('part-1', {
-      url: 'data:text/markdown;base64,QUJD',
+      url: 'data:text/markdown;base64,',
       mime: 'text/markdown',
       filename: 'readme.md',
     });
@@ -517,6 +1040,24 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     expect(texts(root)).toContain('This file is empty.');
+
+    const headers = findByType(root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(headers[0]?.props.onShare).toBeTypeOf('function');
+    // Filenames truncate in the middle so the extension stays visible.
+    expect(headers[0]?.props.titleEllipsis).toBe('middle');
+
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-readme.md',
+      { mimeType: 'text/markdown' }
+    );
 
     await unmount(renderer);
   });
@@ -538,6 +1079,14 @@ describe('FilePartRenderer mounted', () => {
 
     expect(texts(root)).toContain('Could not load this file.');
     expect(pressableByLabel(root, 'Retry loading file')).toHaveLength(1);
+    expect(findByType(root, 'CenteredState')).toHaveLength(1);
+    expect(findByType(root, 'ScrollView')).toHaveLength(0);
+    expoFileSystemMock.fileText.mockResolvedValue('Recovered');
+    await press(first(pressableByLabel(root, 'Retry loading file')));
+    await flushAsync();
+    expect(findByType(root, 'CenteredState')).toHaveLength(0);
+    expect(findByType(root, 'ScrollView')).toHaveLength(1);
+    expect(first(findByType(root, 'ChatMarkdownText')).props.value).toBe('Recovered');
 
     await unmount(renderer);
   });
@@ -567,7 +1116,7 @@ describe('FilePartRenderer mounted', () => {
 
     expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -587,11 +1136,1014 @@ describe('FilePartRenderer mounted', () => {
     shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce('sharing-unavailable');
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(toastMock.error).toHaveBeenCalledWith('File sharing is not available on this device.');
 
     await unmount(renderer);
   });
+
+  it('opens a document through the platform preview with the part MIME', async () => {
+    const copyDelete = vi.fn();
+    shareRemoteFileMock.downloadRemoteFile.mockResolvedValue({
+      uri: 'file:///cache/session-file-parts/part-1-report.pdf',
+      delete: copyDelete,
+    });
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'application/pdf',
+        filename: 'report.pdf',
+        url: 'https://x/report.pdf',
+      })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    await selectActionSheetOption('Preview report.pdf');
+    await flushAsync();
+
+    const previewCopy = fileInstances.find(
+      instance => instance.uri === 'file:///cache/session-file-parts/part-1-report.pdf'
+    );
+    expect(previewCopy?.canPreview).toHaveBeenCalledWith({ mimeType: 'application/pdf' });
+    expect(previewCopy?.preview).toHaveBeenCalledWith({
+      mimeType: 'application/pdf',
+      title: 'report.pdf',
+    });
+    expect(copyDelete).not.toHaveBeenCalled();
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('toasts "Preview unavailable" and drops the preview choice when no viewer handles the document', async () => {
+    expoFileSystemMock.previewBehavior.canPreview = false;
+    const copyDelete = vi.fn();
+    shareRemoteFileMock.downloadRemoteFile.mockResolvedValue({
+      uri: 'file:///cache/session-file-parts/part-1-report.pdf',
+      delete: copyDelete,
+    });
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'application/pdf',
+        filename: 'report.pdf',
+        url: 'https://x/report.pdf',
+      })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    await selectActionSheetOption('Preview report.pdf');
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
+    expect(copyDelete).toHaveBeenCalledTimes(1);
+    const rejected = fileInstances.find(
+      instance => instance.uri === 'file:///cache/session-file-parts/part-1-report.pdf'
+    );
+    expect(rejected?.preview).not.toHaveBeenCalled();
+
+    showActionSheetWithOptions.mockClear();
+    toastMock.error.mockClear();
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    expect(actionSheetOptions()).toEqual(['Open as text', 'Open in external app', 'Cancel']);
+
+    await unmount(renderer);
+  });
+
+  it('toasts a retryable message when the document cannot be downloaded', async () => {
+    shareRemoteFileMock.downloadRemoteFile.mockRejectedValue(new Error('offline'));
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'application/pdf',
+        filename: 'report.pdf',
+        url: 'https://x/report.pdf',
+      })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    await selectActionSheetOption('Preview report.pdf');
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
+    expect(findByType(root, 'ActivityIndicator')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('passes a share action to the image viewer and shares an http(s) URL via shareRemoteFile', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    const viewers = findByType(root, 'ImageViewer');
+    expect(viewers).toHaveLength(1);
+    expect(viewers[0]?.props.onShare).toBeTypeOf('function');
+    expect(viewers[0]?.props.sharing).toBe(false);
+
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledWith({
+      url: 'https://x/a.png',
+      cacheDirectoryName: 'session-file-parts',
+      cacheKey: 'part-1',
+      filename: 'shot.png',
+    });
+
+    await unmount(renderer);
+  });
+
+  it('shares a captured data: image through the viewer via shareLocalFile', async () => {
+    cacheFilePart('part-1', {
+      url: 'data:image/png;base64,QUJD',
+      mime: 'image/png',
+      filename: 'shot.png',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    const viewers = findByType(root, 'ImageViewer');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-shot.png',
+      { mimeType: 'image/png' }
+    );
+
+    await unmount(renderer);
+  });
+
+  it('shares a captured data: markdown through the preview sheet via shareLocalFile', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    const headers = findByType(root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(headers[0]?.props.onShare).toBeTypeOf('function');
+
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-readme.md',
+      { mimeType: 'text/markdown' }
+    );
+
+    await unmount(renderer);
+  });
+
+  it('shares an http(s) markdown through the preview sheet via shareRemoteFile', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'https://x/readme.md',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledWith({
+      url: 'https://x/readme.md',
+      cacheDirectoryName: 'session-file-parts',
+      cacheKey: 'part-1',
+      filename: 'readme.md',
+    });
+
+    await unmount(renderer);
+  });
+
+  it('renders share failures inline in the image viewer instead of toasting', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const viewers = findByType(root, 'ImageViewer');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    const updated = findByType(root, 'ImageViewer');
+    expect(updated[0]?.props.shareError).not.toBeNull();
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('toasts a share failure that lands after the viewer closed', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    const shareHolder: { reject?: (error: Error) => void } = {};
+    shareRemoteFileMock.shareRemoteFile.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        shareHolder.reject = reject;
+      })
+    );
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const viewers = findByType(root, 'ImageViewer');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+
+    // Close the viewer while the share is in flight.
+    const openViewers = findByType(root, 'ImageViewer');
+    await act(async () => {
+      await Promise.resolve();
+      (first(openViewers).props.onClose as () => void)();
+    });
+
+    await act(async () => {
+      shareHolder.reject?.(new Error('boom'));
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Share failed');
+
+    await unmount(renderer);
+  });
+
+  it('renders share failures inline in the Markdown preview instead of toasting', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(texts(root)).toContain('Share failed');
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    const statuses = accessibleStatusNodes(root);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('Share failed');
+    expect(statuses[0]?.props.className).toBe('px-6 pt-2 text-sm');
+    const statusText = findByType(first(statuses), 'Text');
+    expect(statusText[0]?.props.className).toContain('text-destructive');
+
+    await unmount(renderer);
+  });
+
+  it('renders the share error outside the scroll view, directly under the header', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(texts(root)).toContain('Share failed');
+    const scrollViews = findByType(root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(texts(first(scrollViews))).not.toContain('Share failed');
+
+    await unmount(renderer);
+  });
+
+  it('renders the retryable share error inline in the image viewer', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(
+      new ShareRemoteFileError('download-failed')
+    );
+
+    const viewers = findByType(root, 'ImageViewer');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    const updated = findByType(root, 'ImageViewer');
+    expect(updated[0]?.props.shareError).toBe('Failed to share file. Please try again.');
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('renders the non-retryable share error inline in the Markdown preview', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce('sharing-unavailable');
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(texts(root)).toContain('File sharing is not available on this device.');
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    const statuses = accessibleStatusNodes(root);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('File sharing is not available on this device.');
+
+    await unmount(renderer);
+  });
+
+  it('presigns a markdown attachment and previews its text', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '11111111-1111-4111-8111-111111111111';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledWith({
+      messageUuid: uuid,
+      filename: `${uuid}.md`,
+    });
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+    expect(toastMock.error).not.toHaveBeenCalledWith('Preview unavailable');
+
+    await unmount(renderer);
+  });
+
+  it('opens the markdown modal after a tap during the presign resolves', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '33333333-3333-4333-8333-333333333333';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const presignHolder: {
+      resolve?: (value: { signedUrl: string; key: string; expiresAt: string }) => void;
+    } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise(resolve => {
+        presignHolder.resolve = resolve;
+      })
+    );
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    // The presign is still in flight, so the chip is busy. A tap during that
+    // window must open the modal once the URL lands, without a second tap.
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      presignHolder.resolve?.({
+        signedUrl: 'https://r2.example/signed',
+        key: 'k',
+        expiresAt: '2099-01-01T00:00:00Z',
+      });
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(renderer);
+  });
+
+  it('shows a retry toast when the presign fails, then opens after a successful retry', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '22222222-2222-4222-8222-222222222222';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    getAttachmentDownloadUrlMutate.mockRejectedValueOnce(new Error('presign failed'));
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+
+    expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(renderer);
+  });
+
+  it('presigns an image attachment and renders the inline image', async () => {
+    const uuid = '33333333-3333-4333-8333-333333333333';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    expect(image.props.source).toEqual({ uri: 'https://r2.example/signed' });
+    expect(image.props.transition).toBe(0);
+
+    await press(first(pressableByLabel(root, `Open ${uuid}.png full screen`)));
+
+    const viewers = findByType(root, 'ImageViewer');
+    expect(viewers).toHaveLength(1);
+    expect(viewers[0]?.props).toMatchObject({ visible: true, uri: 'https://r2.example/signed' });
+
+    await unmount(renderer);
+  });
+
+  it('reuses the cached presigned URL after an unmount and remount', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '77777777-7777-4777-8777-777777777777';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+
+    const remounted = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+
+    await press(first(pressableByLabel(remounted.root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    const markdown = findByType(remounted.root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(remounted);
+  });
+
+  it('retries the presign after an image presign failure', async () => {
+    const uuid = '88888888-8888-4888-8888-888888888888';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    getAttachmentDownloadUrlMutate.mockRejectedValueOnce(new Error('presign failed'));
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+    expect(texts(root)).toContain('Image unavailable');
+
+    await press(first(pressableByLabel(root, 'Image unavailable, retry loading')));
+    await flushAsync();
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    expect(image.props.source).toEqual({ uri: 'https://r2.example/signed' });
+
+    await unmount(renderer);
+  });
+
+  it('toasts "Preview unavailable" for a part with no URL and no cache entry', async () => {
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'application/pdf', filename: 'report.pdf', url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+
+    expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
+    expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('re-presigns on modal Retry after a download failure', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '44444444-4444-4444-8444-444444444444';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    shareRemoteFileMock.downloadRemoteFile.mockRejectedValueOnce(new Error('R2 404'));
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    expect(texts(root)).toContain('Could not load this file.');
+    const retryButtons = pressableByLabel(root, 'Retry loading file');
+    expect(retryButtons).toHaveLength(1);
+
+    const callsBefore = getAttachmentDownloadUrlMutate.mock.calls.length;
+    await press(first(retryButtons));
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate.mock.calls.length).toBe(callsBefore + 1);
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(renderer);
+  });
+
+  it('shows "This file is empty." for an empty markdown attachment', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('');
+    const uuid = '55555555-5555-4555-8555-555555555555';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    expect(texts(root)).toContain('This file is empty.');
+
+    await unmount(renderer);
+  });
+
+  it('re-presigns on image retry when the cache entry carries an attachment ref', async () => {
+    const uuid = '99999999-9999-4999-8999-999999999999';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    overwriteFilePartCacheEntry('part-1', {
+      url: 'https://r2.example/signed',
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+
+    const callsBefore = getAttachmentDownloadUrlMutate.mock.calls.length;
+    await press(first(pressableByLabel(root, 'Image unavailable, retry loading')));
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate.mock.calls.length).toBe(callsBefore + 1);
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    const reRendered = findByType(root, 'Image')[0];
+    expect(reRendered?.props.source).toEqual({ uri: 'https://r2.example/signed' });
+
+    await unmount(renderer);
+  });
+
+  it('re-renders the same URL on image retry when there is no attachment ref', async () => {
+    cacheFilePart('part-1', {
+      url: 'data:image/png;base64,QUJD',
+      mime: 'image/png',
+      filename: 'shot.png',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    expect(image.props.source).toEqual({ uri: 'file:///cache/session-file-parts/part-1-shot.png' });
+
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+
+    await press(first(pressableByLabel(root, 'Image unavailable, retry loading')));
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    const reRendered = findByType(root, 'Image')[0];
+    expect(reRendered?.props.source).toEqual({
+      uri: 'file:///cache/session-file-parts/part-1-shot.png',
+    });
+
+    await unmount(renderer);
+  });
+
+  it('toasts when a markdown tap during the presign is followed by a presign failure', async () => {
+    const uuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const presignHolder: { reject?: (error: Error) => void } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        presignHolder.reject = reject;
+      })
+    );
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      presignHolder.reject?.(new Error('presign failed'));
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+});
+
+describe('FilePartRenderer preview sheet surface', () => {
+  async function openMarkdownPreview(): Promise<TestRenderer.ReactTestRenderer> {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    await press(first(pressableByLabel(renderer.root, 'Preview readme.md')));
+    await flushAsync();
+    return renderer;
+  }
+
+  it('renders the native full-window sheet on iOS', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const sheets = findByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.handleComponent).toBeNull();
+    expect(sheets[0]?.props.index).toBe(0);
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
+
+    await unmount(renderer);
+  });
+
+  it('sizes the preview ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const scrollViews = findByType(renderer.root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(scrollViews[0]?.props.className).toBe('flex-1');
+
+    await unmount(renderer);
+  });
+
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
+
+    const renderer = await openMarkdownPreview();
+
+    const sheets = findByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.index).toBe(0);
+
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // flex-1 fills the window; the padding clears the system status bar.
+    expect(surface[0]?.props.className).toContain('flex-1');
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
+
+    // The insets.bottom spacer clears the Android navigation bar.
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.style as { height?: number } | undefined)?.height === 34 &&
+        node.props.className === 'bg-background'
+    );
+    expect(spacers).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('closes the preview when the sheet is dismissed', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await openMarkdownPreview();
+
+    const sheet = findByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (sheet.props.onClose as () => void)();
+    });
+
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('closes the preview when Done is pressed', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const header = findByType(renderer.root, 'SheetHeader')[0];
+    if (!header) {
+      throw new Error('SheetHeader not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (header.props.onDone as () => void)();
+    });
+
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+});
+
+it('mounts projected native image/PDF results in the real file renderer and opens existing viewers', async () => {
+  const imageURI = `media:${'a'.repeat(64)}`;
+  const pdfURI = `media:${'b'.repeat(64)}`;
+  const imageURL =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jDXsAAAAASUVORK5CYII=';
+  const pdfURL = 'data:application/pdf;base64,JVBERi0xLjcK';
+  const state: NativeSessionState = {
+    connection: 'connected',
+    runnerConnected: true,
+    session: {
+      id: 'ses_native',
+      origin: { directory: '/owned' },
+      time: { created: 1, updated: 2 },
+    },
+    snapshot: { position: 2, revision: 2 },
+    pending: { permissions: [], questions: [], unreadablePermissions: [] },
+    events: [],
+    commands: {},
+    assetURLs: {
+      [kilo2AssetKey('msg_native_files_000000_file_0', imageURI, 'image/png')]: imageURL,
+      [kilo2AssetKey('msg_native_files_000000_file_1', pdfURI, 'application/pdf')]: pdfURL,
+    },
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_native_files',
+          type: 'assistant',
+          time: { created: 1, completed: 2 },
+          content: [
+            {
+              type: 'tool',
+              id: 'read-files',
+              name: 'read',
+              time: { created: 1, completed: 2 },
+              state: {
+                status: 'completed',
+                input: { path: '/owned' },
+                content: [
+                  { type: 'file', uri: imageURI, mime: 'image/png', name: 'snapshot.png' },
+                  { type: 'file', uri: pdfURI, mime: 'application/pdf', name: 'report.pdf' },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const files = readNativeConversation(state)
+    .messages.flatMap(message => message.parts)
+    .filter(part => part.type === 'file');
+  expect(files).toHaveLength(2);
+  const image = files.find(part => part.mime === 'image/png');
+  const pdf = files.find(part => part.mime === 'application/pdf');
+  if (!image || !pdf) {
+    throw new Error('Native file results were not projected');
+  }
+  const imageRenderer = await mount(image);
+  expect(first(findByType(imageRenderer.root, 'Image')).props.source).toEqual({ uri: imageURL });
+  await press(first(pressableByLabel(imageRenderer.root, 'Open snapshot.png full screen')));
+  expect(first(findByType(imageRenderer.root, 'ImageViewer')).props).toMatchObject({
+    visible: true,
+    uri: imageURL,
+  });
+  await unmount(imageRenderer);
+  const pdfRenderer = await mount(pdf);
+  await press(first(pressableByLabel(pdfRenderer.root, 'Open report.pdf')));
+  await selectActionSheetOption('Preview report.pdf');
+  await flushAsync();
+  const written = fileInstances.find(instance => instance.filename?.endsWith('-report.pdf'));
+  expect(written?.write).toHaveBeenCalledWith('JVBERi0xLjcK', { encoding: 'base64' });
+  const previewed = fileInstances.find(instance => instance.canPreview.mock.calls.length > 0);
+  expect(previewed?.canPreview).toHaveBeenCalledWith({ mimeType: 'application/pdf' });
+  expect(previewed?.preview).toHaveBeenCalledWith({
+    mimeType: 'application/pdf',
+    title: 'report.pdf',
+  });
+  expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+  expect(shareRemoteFileMock.downloadRemoteFile).not.toHaveBeenCalled();
+  expect(toastMock.error).not.toHaveBeenCalled();
+  await unmount(pdfRenderer);
 });

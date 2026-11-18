@@ -4,7 +4,11 @@ import {
   WORKFLOW_NAVIGATION_TIMEOUT_MS,
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
-import { EVAL_TAB_MESSAGE } from '@/src/shared/tab-debugger';
+import {
+  CLAIM_TAB_MESSAGE,
+  EVAL_TAB_MESSAGE,
+  RELEASE_BROWSER_CALLER_MESSAGE,
+} from '@/src/shared/tab-debugger';
 
 type TabListener = (tabId: number, changeInfo: object, tabInfo: object) => void;
 
@@ -49,10 +53,122 @@ vi.mock('#imports', () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
+import { claimTab, evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
+
+const runCaller = { kind: 'workflow', runId: 'run-1' } as const;
+
+describe('workflow tab claim', () => {
+  it('claims the tab for the run caller and hands over the panel lease', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ granted: true, ok: true, type: CLAIM_TAB_MESSAGE });
+
+    const panelCaller = {
+      conversationId: 'conversation-1',
+      kind: 'panel',
+      panelId: 'panel-1',
+    } as const;
+
+    await expect(claimTab(7, runCaller, { from: panelCaller })).resolves.toBe(true);
+    expect(mocks.sendMessage).toHaveBeenCalledWith({
+      caller: runCaller,
+      from: panelCaller,
+      tabId: 7,
+      type: CLAIM_TAB_MESSAGE,
+    });
+  });
+
+  it('reports a refused claim as false', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ granted: false, ok: true, type: CLAIM_TAB_MESSAGE });
+
+    await expect(claimTab(7, runCaller)).resolves.toBe(false);
+    expect(mocks.sendMessage).toHaveBeenCalledWith({
+      caller: runCaller,
+      tabId: 7,
+      type: CLAIM_TAB_MESSAGE,
+    });
+  });
+
+  it('drops a queued claim as soon as the turn is stopped', async () => {
+    const { promise: neverSettles } = Promise.withResolvers<void>();
+
+    mocks.sendMessage.mockReset();
+    // The claim itself keeps waiting — the tab is held elsewhere — while the release resolves.
+    mocks.sendMessage.mockReturnValueOnce(neverSettles);
+    mocks.sendMessage.mockResolvedValue({
+      ok: true,
+      released: 1,
+      type: RELEASE_BROWSER_CALLER_MESSAGE,
+    });
+    const abort = new AbortController();
+
+    const claim = claimTab(7, runCaller, { signal: abort.signal });
+
+    abort.abort();
+
+    await expect(claim).resolves.toBe(false);
+    // The cancellation travels as a release of the run caller, which drops the queued wait.
+    expect(mocks.sendMessage).toHaveBeenLastCalledWith({
+      caller: runCaller,
+      type: RELEASE_BROWSER_CALLER_MESSAGE,
+    });
+  });
+
+  it('releases a grant that lands after the turn is stopped', async () => {
+    const { promise: heldClaim, resolve: resolveClaim } = Promise.withResolvers<unknown>();
+
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockReturnValueOnce(heldClaim);
+    mocks.sendMessage.mockResolvedValue({
+      ok: true,
+      released: 1,
+      type: RELEASE_BROWSER_CALLER_MESSAGE,
+    });
+    const abort = new AbortController();
+    const isReleaseMessage = (message: unknown): boolean =>
+      typeof message === 'object' &&
+      message !== null &&
+      'type' in message &&
+      message.type === RELEASE_BROWSER_CALLER_MESSAGE;
+    const releaseMessages = (): number =>
+      mocks.sendMessage.mock.calls.filter(([message]) => isReleaseMessage(message)).length;
+
+    const claim = claimTab(7, runCaller, { signal: abort.signal });
+
+    abort.abort();
+
+    await expect(claim).resolves.toBe(false);
+    expect(releaseMessages()).toBe(1);
+
+    // The background granted the claim anyway, after the abort.
+    // The run is gone, so the late grant is dropped and released here.
+    resolveClaim({ granted: true, ok: true, type: CLAIM_TAB_MESSAGE });
+
+    await vi.waitFor(() => {
+      expect(releaseMessages()).toBe(2);
+    });
+  });
+
+  it('does not claim at all once the turn is stopped', async () => {
+    mocks.sendMessage.mockReset();
+    const abort = new AbortController();
+
+    abort.abort();
+
+    await expect(claimTab(7, runCaller, { signal: abort.signal })).resolves.toBe(false);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed transport as a refused claim', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockRejectedValueOnce(new Error('disconnected'));
+
+    await expect(claimTab(7, runCaller)).resolves.toBe(false);
+  });
+});
 
 describe('workflow eval', () => {
-  it('sends eval message with WORKFLOW_PAGE_EVAL_TIMEOUT_MS', async () => {
+  it('sends eval message with WORKFLOW_PAGE_EVAL_TIMEOUT_MS and the run caller', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({
       ok: true,
@@ -60,8 +176,14 @@ describe('workflow eval', () => {
       type: EVAL_TAB_MESSAGE,
     });
 
-    await expect(evalInTab(7, 'return 42;')).resolves.toStrictEqual({ ok: true, value: 42 });
+    const caller = { kind: 'workflow', runId: 'run-1' } as const;
+
+    await expect(evalInTab(7, 'return 42;', caller)).resolves.toStrictEqual({
+      ok: true,
+      value: 42,
+    });
     expect(mocks.sendMessage).toHaveBeenCalledWith({
+      caller,
       code: 'return 42;',
       tabId: 7,
       timeoutMs: WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
@@ -73,7 +195,7 @@ describe('workflow eval', () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockRejectedValueOnce(new Error('disconnected'));
 
-    await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 1;', runCaller)).resolves.toStrictEqual({
       error: 'disconnected',
       ok: false,
     });
@@ -83,7 +205,7 @@ describe('workflow eval', () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({ unexpected: true });
 
-    await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 1;', runCaller)).resolves.toStrictEqual({
       error: 'Extension background returned an invalid response.',
       ok: false,
     });
@@ -96,7 +218,7 @@ describe('workflow eval', () => {
       ok: false,
     });
 
-    await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 1;', runCaller)).resolves.toStrictEqual({
       error: 'tab closed',
       ok: false,
     });
@@ -110,7 +232,7 @@ describe('workflow eval', () => {
       type: 'kilo.tabs.snapshot',
     });
 
-    await expect(evalInTab(7, 'return 42;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 42;', runCaller)).resolves.toStrictEqual({
       error: 'Extension background returned the wrong response.',
       ok: false,
     });
@@ -195,7 +317,6 @@ describe('workflow navigateTab', () => {
 
     const navPromise = navigateTab(7, 'https://example.com/dest?x=1');
 
-    // Wait for the listener to be registered.
     await vi.waitFor(() => {
       expect(mocks.addListener).toHaveBeenCalledTimes(1);
     });
@@ -519,7 +640,6 @@ describe('workflow navigateTab', () => {
 
     const navPromise = navigateTab(7, 'https://example.com/dest');
 
-    // Wait for the listener to be registered and tabs.update to be called.
     await vi.waitFor(() => {
       expect(mocks.addListener).toHaveBeenCalledTimes(1);
       expect(mocks.tabsUpdate).toHaveBeenCalledTimes(1);

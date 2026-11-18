@@ -1,219 +1,140 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
-/* eslint-disable max-lines -- the test file covers all four feature states plus owner-mount assertions */
+/* eslint-disable max-lines -- the ended-page cases share the screen's one mock harness with the active-state cases. */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import '@/i18n';
 
-import {
-  KILO_PASS_OTHER_ACCOUNT_COPY,
-  KiloPassSubscriptionScreen,
-} from './kilo-pass-subscription-screen';
+import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
+import { type KiloPassSubscription } from '@/lib/kilo-pass/state';
 
-// ── Mutable state ────────────────────────────────────────────────────
-
-const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' as string }));
-
+const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
+const mockClearance = vi.hoisted(() => ({ windowTop: 0 }));
 const mocks = vi.hoisted(() => ({
-  presentation: {
-    isPending: false,
+  state: {
+    data: undefined as unknown,
     isError: false,
-    data: null as { kind: string; webUrl: string | null } | null,
+    isPending: false,
     refetch: vi.fn(),
   },
-  preflightMutateAsync: vi.fn(),
-  preflightIsPending: false,
-  ownerMount: vi.fn(),
-  nativeIap: {
-    clearError: vi.fn(),
-    errorMessage: null as string | null,
+  scheduled: {
+    data: undefined as unknown,
+    isError: false,
     isPending: false,
-    products: [] as unknown[],
-    productsError: null as string | null,
-    productsIsLoading: false,
-    productsIsRefetching: false,
-    productsRefetch: vi.fn(),
-    purchase: vi.fn(),
-    ownedByAnotherAccount: false,
+    refetch: vi.fn(),
   },
-  routerPush: vi.fn(),
+  /** Every options object the screen hands the scheduled-change read. */
+  scheduledOptions: [] as Record<string, unknown>[],
+  ledgers: {
+    credit: {
+      query: {
+        isPending: false,
+        isError: false,
+        isFetchingNextPage: false,
+        isFetchNextPageError: false,
+        refetch: vi.fn(),
+        fetchNextPage: vi.fn(),
+      },
+      entries: [] as unknown[],
+      hasMore: false,
+    },
+    billing: {
+      query: {
+        isPending: false,
+        isError: false,
+        isFetchingNextPage: false,
+        isFetchNextPageError: false,
+        refetch: vi.fn(),
+        fetchNextPage: vi.fn(),
+      },
+      entries: [] as unknown[],
+      hasMore: false,
+    },
+  },
 }));
 
-// ── Mocks ───────────────────────────────────────────────────────────
-
-vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
-  Platform: mockedPlatform,
-  Pressable: 'Pressable',
-  View: 'View',
-}));
-
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
-
-vi.mock('expo-haptics', () => ({
-  selectionAsync: vi.fn(),
-}));
-
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: mocks.routerPush }),
-}));
-
+vi.mock('expo-router', () => ({ useRouter: () => mockRouter }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
 vi.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({
-    mutateAsync: mocks.preflightMutateAsync,
-    isPending: mocks.preflightIsPending,
-  }),
-  useQuery: () => mocks.presentation,
+  useQuery: (options?: { key?: string }) => {
+    if (options?.key === 'scheduled') {
+      mocks.scheduledOptions.push(options);
+      return mocks.scheduled;
+    }
+    return mocks.state;
+  },
 }));
-
-vi.mock('@/components/detail-screen', () => ({
-  DetailScreenScrollView: 'DetailScreenScrollView',
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
+vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The body's blocks have their own suites. The screen owns which state it
+// shows and when it prints the page, so they render as hosts here.
+vi.mock('@/components/kilo-pass/kilo-pass-management', () => ({
+  KiloPassManagementSections: 'KiloPassManagementSections',
 }));
-
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: 'ScreenHeader',
+vi.mock('@/components/kilo-pass/kilo-pass-history-sections', () => ({
+  KiloPassCreditHistorySection: 'KiloPassCreditHistorySection',
+  KiloPassBillingHistorySection: 'KiloPassBillingHistorySection',
 }));
-
-vi.mock('@/components/ui/button', () => ({
-  Button: 'Button',
+vi.mock('@/lib/hooks/use-kilo-pass-history', () => ({
+  useKiloPassCreditHistory: () => mocks.ledgers.credit,
+  useKiloPassBillingHistory: () => mocks.ledgers.billing,
 }));
-
-vi.mock('@/components/ui/skeleton', () => ({
-  Skeleton: 'Skeleton',
+vi.mock('@/lib/form-sheet', () => ({
+  useSheetHeaderTopClearance: () => mockClearance.windowTop,
 }));
-
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
-}));
-
-vi.mock('@/lib/config', () => ({
-  WEB_BASE_URL: 'https://example.com',
-}));
-
-vi.mock('@/lib/external-link', () => ({
-  openExternalUrl: vi.fn(),
-}));
-
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    foreground: '#000000',
-    mutedForeground: '#6F6A61',
-    primaryForeground: '#FFFFFF',
-  }),
-}));
-
-vi.mock('@/lib/kilo-pass/legal-links', () => ({
-  getKiloPassLegalLinks: () => [
-    { url: 'https://example.com/privacy', label: 'Privacy Policy' },
-    { url: 'https://example.com/terms', label: 'Terms of Use' },
-  ],
-  KILO_PASS_LEGAL_DISCLOSURE: '',
-}));
-
-vi.mock('@/lib/kilo-pass/navigation', () => ({
-  ensureProfileAfterKiloPassPurchase: vi.fn(),
-}));
-
-vi.mock('@/lib/kilo-pass/subscription-page-copy', () => ({
-  formatKiloPassTierDescription: () => 'description',
-  KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION: '',
-}));
-
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
-  useInlinePurchaseErrorOwnership: () => undefined,
-}));
-
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     kiloPass: {
-      getPurchasePresentation: { queryOptions: () => ({}) },
-      preflightPurchase: { mutationOptions: () => ({}) },
+      getState: { queryOptions: () => ({ key: 'state' }) },
+      getScheduledChange: { queryOptions: () => ({ key: 'scheduled' }) },
     },
   }),
 }));
 
-vi.mock('@/lib/utils', () => ({
-  cn: (...args: unknown[]) => args.filter(arg => typeof arg === 'string').join(' '),
-}));
-
-vi.mock('@kilocode/app-shared/commerce', () => ({
-  KILO_PASS_MANAGE_CTA_LABEL: 'Manage',
-  KILO_PASS_TITLE: 'Kilo Pass',
-  KILO_PASS_UNAVAILABLE_DESCRIPTION:
-    'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.',
-  KILO_PASS_WEB_MANAGEMENT_DESCRIPTION: 'This Kilo Pass is managed on the web.',
-}));
-
-// The owner is the single `useIAP` call site (plan assumption 8). The mock
-// records mounts so the screen test can assert the owner is not mounted for
-// non-native / Android presentations, which means `useIAP` is never invoked.
-vi.mock('./kilo-pass-native-iap-owner', () => ({
-  KiloPassNativeIapOwner: ({ children }: { children: unknown }) => {
-    mocks.ownerMount();
-    return children;
-  },
-  useKiloPassNativeIap: () => mocks.nativeIap,
-}));
-
-vi.mock('./restore-purchases-button', () => ({
-  RestorePurchasesButton: 'RestorePurchasesButton',
-}));
-
-// ── Fixtures and helpers ─────────────────────────────────────────────
-
-const product = {
-  appleProductId: 'com.kilo.pass.tier49.monthly',
-  webMonthlyPriceUsd: 49,
-  displayPrice: '$49.99',
-};
-
-async function flush(): Promise<void> {
-  await new Promise<void>(resolve => {
-    setImmediate(resolve);
-  });
+function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSubscription {
+  return {
+    tier: 'tier_49',
+    cadence: 'monthly',
+    status: 'active',
+    cancelAtPeriodEnd: false,
+    resumesAt: null,
+    endedAt: null,
+    nextBillingAt: '2026-12-05T12:00:00.000Z',
+    refillAt: '2026-12-05T12:00:00.000Z',
+    currentPeriodBaseCreditsUsd: 49,
+    currentPeriodUsageUsd: 12.5,
+    currentPeriodBonus: {
+      status: 'available',
+      kind: null,
+      actualAmountUsd: null,
+      projectedAmountUsd: 9.8,
+    },
+    ...overrides,
+  };
 }
 
-function first<T>(items: readonly T[]): T {
-  const item = items[0];
-  if (item === undefined) {
-    throw new Error('Expected at least one item');
-  }
-  return item;
-}
-
-function ignoreDeferredResolution(_value: unknown): void {
-  return undefined;
-}
-
-function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolvePromise: (value: T) => void = ignoreDeferredResolution;
-  const promise = new Promise<T>(resolve => {
-    resolvePromise = resolve;
-  });
-  return { promise, resolve: resolvePromise };
+/** A pass kilo.ai bills, so the screen reads its schedule and invoices. */
+function stripeSubscription(overrides: Partial<KiloPassSubscription> = {}) {
+  return { ...subscription(overrides), paymentProvider: 'stripe' };
 }
 
 async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
-  let renderer: TestRenderer.ReactTestRenderer | null = null;
+  const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
-    renderer = TestRenderer.create(createElement(KiloPassSubscriptionScreen));
-    await flush();
+    holder.current = TestRenderer.create(createElement(KiloPassSubscriptionScreen));
+    await Promise.resolve();
   });
-  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+  const renderer = holder.current;
   if (!renderer) {
     throw new Error('Failed to create test renderer');
   }
   return renderer;
-}
-
-function productTiles(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
-  return renderer.root.findAll(
-    node =>
-      String(node.type) === 'Pressable' &&
-      typeof (node.props as Record<string, unknown>).accessibilityLabel === 'string' &&
-      ((node.props as Record<string, unknown>).accessibilityLabel as string).includes('in credits')
-  );
 }
 
 function allText(renderer: TestRenderer.ReactTestRenderer): string {
@@ -233,272 +154,242 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
   return texts.join(' ');
 }
 
-async function press(node: TestRenderer.ReactTestInstance): Promise<void> {
-  await act(async () => {
-    (node.props as { onPress?: () => void }).onPress?.();
-    await flush();
-  });
+function nodesOfType(
+  renderer: TestRenderer.ReactTestRenderer,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => String(node.type) === type);
 }
-
-function setNativeIapPresentation(): void {
-  mockedPlatform.OS = 'ios';
-  mocks.presentation.data = { kind: 'native_iap', webUrl: null };
-  mocks.nativeIap.productsIsLoading = false;
-}
-
-// ── Tests ────────────────────────────────────────────────────────────
 
 describe('KiloPassSubscriptionScreen', () => {
   beforeEach(() => {
-    mockedPlatform.OS = 'ios';
-    mocks.presentation.isPending = false;
-    mocks.presentation.isError = false;
-    mocks.presentation.data = null;
-    mocks.preflightMutateAsync.mockReset();
-    mocks.preflightIsPending = false;
-    mocks.ownerMount.mockReset();
-    mocks.nativeIap.clearError.mockReset();
-    mocks.nativeIap.errorMessage = null;
-    mocks.nativeIap.isPending = false;
-    mocks.nativeIap.products = [];
-    mocks.nativeIap.productsError = null;
-    mocks.nativeIap.productsIsLoading = false;
-    mocks.nativeIap.productsIsRefetching = false;
-    mocks.nativeIap.productsRefetch.mockReset();
-    mocks.nativeIap.purchase.mockReset();
-    mocks.nativeIap.ownedByAnotherAccount = false;
-    mocks.routerPush.mockReset();
+    mockClearance.windowTop = 0;
+    mocks.state.isPending = false;
+    mocks.state.isError = false;
+    mocks.state.data = { subscription: null, isEligibleForFirstMonthPromo: true };
+    mocks.state.refetch.mockClear();
+    mocks.scheduled.isPending = false;
+    mocks.scheduled.data = { scheduledChange: null };
+    mocks.scheduledOptions.length = 0;
+    mocks.ledgers.credit.query.isPending = false;
+    mocks.ledgers.billing.query.isPending = false;
+    mockRouter.replace.mockClear();
+    mockRouter.push.mockClear();
   });
 
-  it('happy: native_iap with products and an allowed preflight enables tiles and starts purchase', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [product];
-    mocks.preflightMutateAsync.mockResolvedValue({
-      allowed: true,
-      statusClass: 'healthy',
-      reason: null,
-    });
-
+  it('shows the loading skeleton while the pass query is pending', async () => {
+    mocks.state.isPending = true;
     const renderer = await renderScreen();
-    const tiles = productTiles(renderer);
-    expect(tiles).toHaveLength(1);
-    expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(false);
-
-    await press(first(tiles));
-
-    expect(mocks.preflightMutateAsync).toHaveBeenCalledWith({
-      platform: 'ios',
-      storefront: 'app_store',
-      product: 'kilo_pass',
-      appleProductId: product.appleProductId,
-    });
-    expect(mocks.nativeIap.purchase).toHaveBeenCalledTimes(1);
-
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
     renderer.unmount();
   });
 
-  it('blocked: an App Store pass owned by another Kilo account disables the tiles', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [product];
-    mocks.nativeIap.ownedByAnotherAccount = true;
-
+  it('tells an account without a pass that the app does not offer one', async () => {
     const renderer = await renderScreen();
-    const tiles = productTiles(renderer);
-    expect(allText(renderer)).toContain(KILO_PASS_OTHER_ACCOUNT_COPY);
-    expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
-    expect(
-      (first(tiles).props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
-        ?.disabled
-    ).toBe(true);
-
+    const emptyState = nodesOfType(renderer, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    expect(emptyState[0]?.props.title).toBe("Kilo Pass isn't available in the app.");
+    // A finished message with no action: the app sells nothing here.
+    expect(emptyState[0]?.props.action).toBeUndefined();
     renderer.unmount();
   });
 
-  it('retryable: a transient preflight failure shows Try again and does not start IAP', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [product];
-    mocks.preflightMutateAsync.mockRejectedValue(new Error('Network request failed'));
-
-    const renderer = await renderScreen();
-    const tiles = productTiles(renderer);
-    await press(first(tiles));
-
-    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
-    expect(allText(renderer)).toContain(
-      "Couldn't verify your purchase. Check your connection and try again."
-    );
-    expect(allText(renderer)).toContain('Try again');
-
-    const retryButton = renderer.root.find(
-      node =>
-        String(node.type) === 'Button' &&
-        (node.props as Record<string, unknown>).accessibilityLabel ===
-          'Try verifying purchase again'
-    );
-    await press(retryButton);
-
-    expect(mocks.preflightMutateAsync).toHaveBeenCalledTimes(2);
-    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
-
-    renderer.unmount();
-  });
-
-  it('non-retryable: an allowed:false preflight disables the tiles and shows a terminal message', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [product];
-    mocks.preflightMutateAsync.mockResolvedValue({
-      allowed: false,
-      statusClass: 'terminal',
-      reason: 'already_subscribed',
-    });
-
-    const renderer = await renderScreen();
-    const tiles = productTiles(renderer);
-    await press(first(tiles));
-
-    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
-    expect(allText(renderer)).toContain('You already have a Kilo Pass subscription.');
-    expect(
-      renderer.root.findAll(
-        node =>
-          String(node.type) === 'Button' &&
-          (node.props as Record<string, unknown>).accessibilityLabel ===
-            'Try verifying purchase again'
-      )
-    ).toHaveLength(0);
-
-    const tilesAfter = productTiles(renderer);
-    expect((first(tilesAfter).props as { disabled?: boolean }).disabled).toBe(true);
-    expect(
-      (first(tilesAfter).props as { accessibilityState?: { disabled?: boolean } })
-        .accessibilityState?.disabled
-    ).toBe(true);
-
-    renderer.unmount();
-  });
-
-  it('non-retryable presentation: unavailable shows the unavailable screen with no purchase CTA', async () => {
-    mockedPlatform.OS = 'ios';
-    mocks.presentation.data = { kind: 'unavailable', webUrl: null };
-
-    const renderer = await renderScreen();
-
-    expect(allText(renderer)).toContain(
-      'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.'
-    );
-    expect(productTiles(renderer)).toHaveLength(0);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'RestorePurchasesButton')
-    ).toHaveLength(0);
-    expect(mocks.ownerMount).not.toHaveBeenCalled();
-
-    renderer.unmount();
-  });
-
-  it('non-retryable presentation: web_management shows Manage and no purchase CTA', async () => {
-    mockedPlatform.OS = 'android';
-    mocks.presentation.data = {
-      kind: 'web_management',
-      webUrl: 'https://example.com/subscriptions/kilo-pass',
+  it('prints the plan and both ledgers of a lapsed pass', async () => {
+    mocks.state.data = {
+      subscription: stripeSubscription({
+        status: 'canceled',
+        endedAt: '2026-11-08T04:05:06.000Z',
+      }),
+      isEligibleForFirstMonthPromo: false,
     };
-
     const renderer = await renderScreen();
 
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on the web.');
-    expect(allText(renderer)).toContain('Manage');
-    expect(productTiles(renderer)).toHaveLength(0);
-    expect(mocks.ownerMount).not.toHaveBeenCalled();
+    const text = allText(renderer);
+    expect(text).toContain('Pro · Monthly');
+    expect(text).toContain('Ended Nov 8, 2026');
 
+    const creditSections = nodesOfType(renderer, 'KiloPassCreditHistorySection');
+    const billingSections = nodesOfType(renderer, 'KiloPassBillingHistorySection');
+    expect(creditSections).toHaveLength(1);
+    expect(billingSections).toHaveLength(1);
+    // A block that read its own ledger would fetch a second time and settle
+    // after the page printed.
+    expect(creditSections[0]?.props.history).toBe(mocks.ledgers.credit);
+    expect(billingSections[0]?.props.history).toBe(mocks.ledgers.billing);
     renderer.unmount();
   });
 
-  it('empty: native_iap with zero products shows App Store products unavailable', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [];
-
+  it('leaves out the invoices of a lapsed pass a store sold', async () => {
+    mocks.state.data = {
+      subscription: {
+        ...subscription({ status: 'canceled', endedAt: '2026-11-08T04:05:06.000Z' }),
+        paymentProvider: 'google_play',
+      },
+      isEligibleForFirstMonthPromo: false,
+    };
     const renderer = await renderScreen();
 
-    expect(allText(renderer)).toContain('App Store products unavailable');
-    expect(allText(renderer)).toContain('Try again');
-    expect(productTiles(renderer)).toHaveLength(0);
+    expect(nodesOfType(renderer, 'KiloPassCreditHistorySection')).toHaveLength(1);
+    // A store-sold pass has no Stripe invoices, and the read rejects one, so
+    // the screen disables it and renders no section.
+    expect(nodesOfType(renderer, 'KiloPassBillingHistorySection')).toHaveLength(0);
+    renderer.unmount();
+  });
 
-    const retryButton = renderer.root.find(
-      node =>
-        String(node.type) === 'Pressable' &&
-        (node.props as Record<string, unknown>).accessibilityLabel ===
-          'Try loading Kilo Pass products again'
+  it('holds a lapsed page until its ledgers have their first page', async () => {
+    mocks.state.data = {
+      subscription: stripeSubscription({
+        status: 'canceled',
+        endedAt: '2026-11-08T04:05:06.000Z',
+      }),
+      isEligibleForFirstMonthPromo: false,
+    };
+    mocks.ledgers.credit.query.isPending = true;
+    const renderer = await renderScreen();
+
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'KiloPassCreditHistorySection')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('offers no action or detail rows on a lapsed page', async () => {
+    mocks.state.data = {
+      subscription: stripeSubscription({
+        status: 'canceled',
+        endedAt: '2026-11-08T04:05:06.000Z',
+      }),
+      isEligibleForFirstMonthPromo: false,
+    };
+    const renderer = await renderScreen();
+
+    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
+    expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
+    // Manage, cancel and buy live in the management block, and a lapsed page
+    // does not render it at all.
+    expect(nodesOfType(renderer, 'KiloPassManagementSections')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('prints the pass details the web console shows, with no manage action', async () => {
+    mocks.state.data = { subscription: subscription(), isEligibleForFirstMonthPromo: false };
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain('Pro · Monthly');
+    expect(allText(renderer)).toContain('Active');
+
+    const rows = nodesOfType(renderer, 'KvRow');
+    expect(rows.map(row => [row.props.label, row.props.value])).toEqual([
+      ['Renews', 'Dec 5, 2026'],
+      ["This month's usage", '$12.50 / $58.80'],
+      ['Available free bonus', '$9.80'],
+    ]);
+    expect(rows.at(-1)?.props.last).toBe(true);
+
+    // No button exists on the details surface: managing, cancelling, and
+    // buying a pass are web-only.
+    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('prints a scheduled cancellation as active until the paid-through date', async () => {
+    mocks.state.data = {
+      subscription: subscription({ cancelAtPeriodEnd: true }),
+      isEligibleForFirstMonthPromo: false,
+    };
+    const renderer = await renderScreen();
+    expect(allText(renderer)).toContain('Cancels on Dec 5, 2026');
+    const rows = nodesOfType(renderer, 'KvRow');
+    expect(rows[0]?.props.label).toBe('Active until');
+    renderer.unmount();
+  });
+
+  it('holds the page until a ledger has its first page', async () => {
+    mocks.state.data = { subscription: subscription(), isEligibleForFirstMonthPromo: false };
+    mocks.ledgers.credit.query.isPending = true;
+    const renderer = await renderScreen();
+    // Printing the details first would let the ledger grow under the reader
+    // and push everything below it.
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('holds the page while the scheduled change is unresolved', async () => {
+    mocks.state.data = { subscription: stripeSubscription(), isEligibleForFirstMonthPromo: false };
+    mocks.scheduled.isPending = true;
+    const renderer = await renderScreen();
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('settles the scheduled change even while the device reports offline', async () => {
+    mocks.state.data = { subscription: stripeSubscription(), isEligibleForFirstMonthPromo: false };
+    const renderer = await renderScreen();
+    // The page waits on this read, so it must not pause in `pending` on the
+    // default online mode: that neither errors nor answers, and the screen
+    // would hold its loading state with no retry.
+    expect(mocks.scheduledOptions.at(-1)).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
+    renderer.unmount();
+  });
+
+  it('hands each resolved block the value the page already read', async () => {
+    mocks.state.data = { subscription: stripeSubscription(), isEligibleForFirstMonthPromo: false };
+    const renderer = await renderScreen();
+    const sections = renderer.root.findAll(node =>
+      ['KiloPassCreditHistorySection', 'KiloPassBillingHistorySection'].includes(String(node.type))
     );
-    await press(retryButton);
-
-    expect(mocks.nativeIap.productsRefetch).toHaveBeenCalledTimes(1);
-
+    // A block that read its own ledger would fetch a second time and settle
+    // after the page printed.
+    expect(sections).toHaveLength(2);
+    for (const section of sections) {
+      const history =
+        String(section.type) === 'KiloPassCreditHistorySection'
+          ? mocks.ledgers.credit
+          : mocks.ledgers.billing;
+      expect(section.props.history).toBe(history);
+    }
     renderer.unmount();
   });
 
-  it('does not mount the IAP owner (single useIAP call site) on Android', async () => {
-    mockedPlatform.OS = 'android';
-    mocks.presentation.data = { kind: 'unavailable', webUrl: null };
-
+  it('keeps a failed pass query retryable', async () => {
+    mocks.state.isError = true;
     const renderer = await renderScreen();
-
-    expect(mocks.ownerMount).not.toHaveBeenCalled();
-
-    renderer.unmount();
-  });
-
-  it('mounts the IAP owner only for native_iap on iOS', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [];
-
-    const renderer = await renderScreen();
-
-    expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
-
-    renderer.unmount();
-  });
-
-  it('disables the product tiles while preflight is pending', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [product];
-    mocks.preflightIsPending = true;
-
-    const renderer = await renderScreen();
-    const tiles = productTiles(renderer);
-
-    expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
-    expect(
-      (first(tiles).props as { accessibilityState?: { busy?: boolean; disabled?: boolean } })
-        .accessibilityState?.busy
-    ).toBe(true);
-    expect(
-      (first(tiles).props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
-        ?.disabled
-    ).toBe(true);
-
-    renderer.unmount();
-  });
-
-  it('does not start the purchase when the screen unmounts during preflight', async () => {
-    setNativeIapPresentation();
-    mocks.nativeIap.products = [product];
-    const deferred = createDeferred<unknown>();
-    mocks.preflightMutateAsync.mockReturnValue(deferred.promise);
-
-    const renderer = await renderScreen();
-    const tiles = productTiles(renderer);
+    expect(allText(renderer)).toContain("Couldn't load Kilo Pass.");
+    expect(allText(renderer)).toContain('Kilo Pass could not be loaded. Try again.');
+    const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading Kilo Pass' });
     act(() => {
-      (first(tiles).props as { onPress?: () => void }).onPress?.();
+      (retry.props.onPress as () => void)();
     });
+    expect(mocks.state.refetch).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
 
-    act(() => {
-      renderer.unmount();
-    });
+  it('clears the window top inset itself when the modal surface reaches the window top', async () => {
+    mockClearance.windowTop = 51.8;
+    const renderer = await renderScreen();
+    const header = nodesOfType(renderer, 'ScreenHeader')[0];
+    expect(header?.props.safeAreaTop).toBe(false);
+    expect(String(header?.props.className)).toContain('pt-2');
+    // `safeAreaTop: false` only stops the header drawing the inset; the surface
+    // that owns the window top pads it, or the header sits under the status bar.
+    const padded = nodesOfType(renderer, 'View').filter(
+      node => (node.props.style as { paddingTop?: number } | undefined)?.paddingTop === 51.8
+    );
+    expect(padded).toHaveLength(1);
+    renderer.unmount();
+    mockClearance.windowTop = 0;
+  });
 
-    await act(async () => {
-      deferred.resolve({ allowed: true, statusClass: 'healthy', reason: null });
-      await flush();
-    });
-
-    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
+  it('keeps the header inset when the sheet presents below the window top', async () => {
+    const renderer = await renderScreen();
+    const header = nodesOfType(renderer, 'ScreenHeader')[0];
+    expect(header?.props.safeAreaTop).toBe(true);
+    expect(header?.props.className).toBeUndefined();
+    renderer.unmount();
   });
 });

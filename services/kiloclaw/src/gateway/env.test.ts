@@ -48,8 +48,6 @@ beforeAll(() => {
 });
 
 describe('buildEnvVars', () => {
-  // ─── Platform defaults (Layer 1) ─────────────────────────────────────
-
   it('puts OPENCLAW_GATEWAY_TOKEN in sensitive and AUTO_APPROVE_DEVICES in env', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
@@ -98,8 +96,6 @@ describe('buildEnvVars', () => {
     expect(result.sensitive.SLACK_BOT_TOKEN).toBeUndefined();
     expect(result.sensitive.SLACK_APP_TOKEN).toBeUndefined();
   });
-
-  // ─── User config merging (Layers 2-4) ────────────────────────────────
 
   it('merges user plaintext env vars on top of platform defaults', async () => {
     const env = createMockEnv();
@@ -234,8 +230,6 @@ describe('buildEnvVars', () => {
     expect(result.sensitive.SLACK_APP_TOKEN).toBe('slack-app-012');
   });
 
-  // ─── Worker-level DM policy passthrough ─────────────────────────────
-
   it('passes TELEGRAM_DM_POLICY and DISCORD_DM_POLICY in env bucket', async () => {
     const env = createMockEnv({
       TELEGRAM_DM_POLICY: 'open',
@@ -337,8 +331,6 @@ describe('buildEnvVars', () => {
     expect(result.env.REQUIRE_PROXY_TOKEN).toBe('false');
   });
 
-  // ─── Reserved system vars (Layer 5) ──────────────────────────────────
-
   it('reserved system vars cannot be overridden by user config', async () => {
     const env = createMockEnv({
       AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
@@ -387,8 +379,6 @@ describe('buildEnvVars', () => {
     expect(result.env.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
-  // ─── Reserved prefix validation ──────────────────────────────────────
-
   it('drops user envVars with reserved KILOCLAW_ prefix instead of throwing', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
@@ -420,8 +410,6 @@ describe('buildEnvVars', () => {
     expect(result.env['MY-VAR']).toBeUndefined();
     expect(result.env.GOOD_VAR).toBe('good');
   });
-
-  // ─── Google credentials (Layer 4b) ───────────────────────────────────
 
   it('decrypts Google gog config tarball into sensitive bucket', async () => {
     const env = createMockEnv({
@@ -492,7 +480,6 @@ describe('buildEnvVars', () => {
     expect(result.sensitive.KILOCLAW_GOG_CONFIG_TARBALL).toBeUndefined();
   });
 
-  // ─── Catalog-derived SENSITIVE_KEYS equivalence ───────────────────────
   // Verifies that switching from hardcoded SENSITIVE_KEYS to catalog-derived
   // ALL_SECRET_ENV_VARS produces identical classification behavior.
   // The catalog contains the exact same 4 env var names that were hardcoded.
@@ -524,8 +511,6 @@ describe('buildEnvVars', () => {
     expect(result.env.SLACK_BOT_TOKEN).toBeUndefined();
     expect(result.env.SLACK_APP_TOKEN).toBeUndefined();
   });
-
-  // ─── Instance feature flags (Layer 6) ───────────────────────────────
 
   it('maps instanceFeatures to KILOCLAW_* env vars', async () => {
     const env = createMockEnv();
@@ -577,8 +562,6 @@ describe('buildEnvVars', () => {
     }
   });
 
-  // ─── Exec preset env vars ─────────────────────────────────────────────
-
   it('passes KILOCLAW_EXEC_SECURITY and KILOCLAW_EXEC_ASK in env when set', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
@@ -608,8 +591,6 @@ describe('buildEnvVars', () => {
     expect(result.env.KILOCLAW_EXEC_SECURITY).toBeUndefined();
     expect(result.env.KILOCLAW_EXEC_ASK).toBeUndefined();
   });
-
-  // ─── Custom secrets (non-catalog) ──────────────────────────────────
 
   it('routes custom encrypted secrets to the sensitive bucket', async () => {
     const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
@@ -656,8 +637,6 @@ describe('buildEnvVars', () => {
     expect(result.env.KILOCLAW_SECRET_CONFIG_PATHS).toBeUndefined();
   });
 
-  // ─── kilo-chat env passthrough ──────────────────────────────────────
-
   it('forwards KILOCHAT_BASE_URL into plaintext env', async () => {
     const env = createMockEnv({
       KILOCHAT_BASE_URL: 'https://chat.kiloapps.io',
@@ -671,8 +650,6 @@ describe('buildEnvVars', () => {
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
     expect(result.env.KILOCHAT_BASE_URL).toBeUndefined();
   });
-
-  // ─── Vector memory + dreaming ───────────────────────────────────────
 
   it('emits KILOCLAW_VECTOR_MEMORY_ENABLED only when vectorMemoryEnabled is truthy', async () => {
     const env = createMockEnv();

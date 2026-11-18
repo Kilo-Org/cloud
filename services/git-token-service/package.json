@@ -19,13 +19,14 @@
     "@octokit/auth-app": "catalog:",
     "@octokit/rest": "22.0.1",
     "drizzle-orm": "catalog:",
+    "graphql": "16.14.2",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "catalog:vitest5",
     "wrangler": "catalog:"
   }
 }

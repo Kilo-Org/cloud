@@ -1,5 +1,15 @@
 import type { GateThreshold, ReviewStyle } from './enums';
 
+/**
+ * Bound on the optional one-off instructions of a manual review. The web route
+ * validates the start request against it
+ * (`ManualCodeReviewJobInputSchema.instructions`), and both clients cap their
+ * own field at the same number, so a draft the form accepts is a draft the
+ * route accepts. One constant instead of three copies: an over-limit note used
+ * to reach the route and come back as its generic "can't be reviewed" answer.
+ */
+export const MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH = 4_000;
+
 // Wire shape of a per-repository model override. Mirrors the tRPC input/output
 // contract (camelCase); the persisted snake_case shape lives in
 // RepositoryModelOverrideSchema in @kilocode/db/schema-types.
@@ -23,9 +33,9 @@ export type ManuallyAddedRepositoryInput = {
   private: boolean;
 };
 
-// Wire shape of the Code Reviewer council config (camelCase keys mirror the
-// tRPC patch input; the persisted snake_case shape is
-// CodeReviewCouncilConfigSchema in @kilocode/db/schema-types). Kept loose on
+// Wire shape of the Code Reviewer council config. Its keys are snake_case,
+// matching the route input and the persisted shape
+// (CodeReviewCouncilConfigSchema in @kilocode/db/schema-types). Kept loose on
 // purpose — callers zod-validate against the canonical schema at the route
 // boundary, and this helper only needs to know it's an opaque object that
 // should be preserved verbatim when the patch doesn't carry it.
@@ -42,6 +52,8 @@ export type CodeReviewCouncilConfigInput = {
     model_slug?: string;
     thinking_effort?: string | null;
   }>;
+  /** Label gate for automated reviews; absent/empty means every eligible PR runs council. */
+  required_labels?: string[];
 };
 
 // Mobile/personal-org save patch. All keys are optional; omission preserves the
@@ -60,6 +72,9 @@ export type CodeReviewConfigPatch = Partial<{
   selectedRepositoryIds: (number | string)[];
   repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
+  reviewGuidelineSourceRepositories: string[];
+  /** GitHub only: skip automated reviews of PRs opened by bot accounts. */
+  skipBotPullRequests: boolean;
 }>;
 
 // Field-merge PATCH surface. Extends the save patch with the org-only fields
@@ -76,23 +91,17 @@ export type CodeReviewFieldMergePatch = CodeReviewConfigPatch &
 // `stored` argument to `applyCodeReviewConfigPatch`. Every field is optional
 // because callers may have a subset (e.g. personal configs never carry
 // `council`); the helper preserves whatever is supplied.
-export type CodeReviewStoredConfig = {
-  reviewStyle?: ReviewStyle;
-  focusAreas?: string[];
+export type CodeReviewStoredConfig = Omit<CodeReviewFieldMergePatch, 'customInstructions'> & {
   customInstructions?: string | null;
-  modelSlug?: string;
-  thinkingEffort?: string | null;
-  gateThreshold?: GateThreshold;
-  repositorySelectionMode?: 'all' | 'selected';
-  selectedRepositoryIds?: (number | string)[];
-  repositoryModelOverrides?: RepositoryModelOverrideInput[];
-  disableReviewMd?: boolean;
-  // Org-only fields. Personal configs never have these in storage, so the
-  // stored snapshot can omit them and the helper still works.
-  manuallyAddedRepositories?: ManuallyAddedRepositoryInput[];
-  council?: CodeReviewCouncilConfigInput | null;
-  councilEnabledRepositoryIds?: (number | string)[];
 };
+
+function assignStoredField<K extends keyof CodeReviewStoredConfig>(
+  target: CodeReviewStoredConfig,
+  key: K,
+  value: CodeReviewStoredConfig[K]
+): void {
+  target[key] = value;
+}
 
 // Field-merge helper for the PATCH endpoints (`personalReviewAgent.patchReviewConfig`
 // and `organizations.reviewAgent.patchReviewConfig`). Returns a new object
@@ -112,12 +121,11 @@ export function applyCodeReviewConfigPatch(
   patch: CodeReviewFieldMergePatch
 ): CodeReviewStoredConfig {
   const merged: CodeReviewStoredConfig = { ...stored };
-  for (const key of Object.keys(patch) as Array<keyof CodeReviewFieldMergePatch>) {
+  for (const key of Object.keys(patch) as Array<keyof CodeReviewStoredConfig>) {
     if (Object.prototype.hasOwnProperty.call(patch, key)) {
-      const value = patch[key];
+      const value: CodeReviewStoredConfig[typeof key] = patch[key];
       if (value !== undefined) {
-        // Safe: every key in the patch is also a key on CodeReviewStoredConfig.
-        (merged as Record<string, unknown>)[key] = value;
+        assignStoredField(merged, key, value);
       }
     }
   }

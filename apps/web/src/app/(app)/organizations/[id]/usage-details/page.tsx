@@ -17,6 +17,7 @@ export default async function OrganizationUsageStatsPage({
           organizationName={organization.name}
           callerRole={role}
           organizationPlan={organization.plan}
+          isSalesDemo={organization.settings.is_sales_demo === true}
           title={`Usage — ${organization.name}`}
         />
       )}

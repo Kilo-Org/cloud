@@ -7,7 +7,9 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { collectCopyableText } from './collect-copyable-text';
+import { i18n } from '@/i18n';
+
+import { collectCopyableText, hasCopyableText, messageTextParts } from './collect-copyable-text';
 
 function makeTextPart(overrides: Partial<TextPart> = {}): TextPart {
   return {
@@ -132,7 +134,7 @@ describe('collectCopyableText', () => {
       time: { start: 0, end: 1 },
     });
     expect(collectCopyableText(message([part]))).toBe(
-      'read\n{\n  "filePath": "/missing.txt"\n}\nError: No such file or directory'
+      `read\n{\n  "filePath": "/missing.txt"\n}\n${i18n.t('agentChat.collectCopyableText.errorPrefix', { error: 'No such file or directory' })}`
     );
   });
 
@@ -143,5 +145,110 @@ describe('collectCopyableText', () => {
         message([makeTextPart({ text: 'Hello' }), part, makeTextPart({ text: 'Goodbye' })])
       )
     ).toBe('Hello\n\nGoodbye');
+  });
+});
+
+describe('messageTextParts — the Copy message payload', () => {
+  it('keeps the message text alone, with no thinking or tool text around it', () => {
+    const parts: Part[] = [
+      makeReasoningPart({ text: 'I should think step by step.' }),
+      makeTextPart({ text: 'Hello' }),
+      makeToolPart('bash', {
+        status: 'completed',
+        input: { command: 'ls -la' },
+        output: 'total 0',
+        title: 'bash',
+        metadata: {},
+        time: { start: 0, end: 1 },
+      }),
+      makeTextPart({ text: 'world', id: 'part-2' }),
+    ];
+    expect(collectCopyableText({ parts: messageTextParts(parts) })).toBe('Hello\n\nworld');
+  });
+
+  it('drops injected server context and keeps the human prompt', () => {
+    const parts: Part[] = [
+      makeTextPart({
+        id: 'context',
+        text: '<cloud-agent-context session-id="workspace_123" />',
+        synthetic: true,
+      }),
+      makeTextPart({ id: 'prompt', text: 'Fix the bug' }),
+    ];
+    expect(collectCopyableText({ parts: messageTextParts(parts) })).toBe('Fix the bug');
+  });
+
+  it('still drops the synthetic snapshot-progress text', () => {
+    const parts: Part[] = [
+      makeTextPart({ text: '⠋ Initializing snapshot…', synthetic: true }),
+      makeTextPart({ text: 'Real answer' }),
+    ];
+    expect(collectCopyableText({ parts: messageTextParts(parts) })).toBe('Real answer');
+  });
+
+  it('offers no Copy message for a row whose parts are thinking and tools only', () => {
+    const parts: Part[] = [
+      makeReasoningPart({ text: 'thinking...' }),
+      makeToolPart('read', { status: 'pending', input: {}, raw: '' }),
+    ];
+    expect(hasCopyableText({ parts: messageTextParts(parts) })).toBe(false);
+  });
+});
+
+describe('hasCopyableText', () => {
+  it('agrees with collectCopyableText for every copyable and non-copyable shape', () => {
+    const cases: Part[][] = [
+      [],
+      [makeFilePart()],
+      [makeTextPart({ text: 'Hello' })],
+      [makeTextPart({ text: '' })],
+      [makeTextPart({ text: '⠋ Initializing snapshot…', synthetic: true })],
+      [makeTextPart({ text: 'Note: Initializing snapshot can take a while' })],
+      [makeTextPart({ text: 'User typed this', synthetic: true })],
+      [
+        makeTextPart({ text: 'First' }),
+        makeReasoningPart({ text: 'I should think step by step.' }),
+        makeTextPart({ text: 'Second' }),
+      ],
+      [makeReasoningPart({ text: '' })],
+      [
+        makeToolPart('bash', {
+          status: 'completed',
+          input: { command: 'ls -la' },
+          output: 'total 0',
+          title: 'bash',
+          metadata: {},
+          time: { start: 0, end: 1 },
+        }),
+      ],
+      [
+        makeToolPart('read', {
+          status: 'error',
+          input: { filePath: '/missing.txt' },
+          error: 'No such file or directory',
+          time: { start: 0, end: 1 },
+        }),
+      ],
+      [makeToolPart('pending_tool', { status: 'pending', input: {}, raw: '' })],
+      [
+        makeToolPart('completed_empty', {
+          status: 'completed',
+          input: {},
+          output: '',
+          title: 'completed_empty',
+          metadata: {},
+          time: { start: 0, end: 1 },
+        }),
+      ],
+    ];
+
+    for (const parts of cases) {
+      expect(hasCopyableText(message(parts))).toBe(collectCopyableText(message(parts)).length > 0);
+    }
+  });
+
+  it('is true for a long streamed reasoning part without joining it', () => {
+    const long = 'x'.repeat(250_000);
+    expect(hasCopyableText(message([makeReasoningPart({ text: long })]))).toBe(true);
   });
 });

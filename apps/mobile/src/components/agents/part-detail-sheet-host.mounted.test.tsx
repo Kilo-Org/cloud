@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-lines -- cohesive mounted suite for the part-detail sheet host lifecycle */
 import {
   type Part,
   type ReasoningPart,
@@ -6,8 +6,8 @@ import {
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 import { createElement, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useOpenPartDetail } from './open-part-detail-context';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
@@ -15,17 +15,79 @@ import { PartDetailSheetHost } from './part-detail-sheet-host';
 // while the sheet module loads, so its binding must already be initialized.
 import { MonoScrollBlock } from './mono-scroll-block';
 
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#000' }),
+}));
+const keyboardState = vi.hoisted(() => ({ visible: false, listeners: new Set<() => void>() }));
+const keyboardDismiss = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
+  Keyboard: { dismiss: keyboardDismiss },
 }));
+vi.mock('react-native-keyboard-controller', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    keyboardState.listeners.add(listener);
+    return () => {
+      keyboardState.listeners.delete(listener);
+    };
+  };
+  type KeyboardStateSnapshot = {
+    height: number;
+    isVisible: boolean;
+    progress: number;
+    duration: number;
+  };
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useWindowDimensions: () => ({ width: 400, height: 800 }),
+    useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {
+      const isVisible = useSyncExternalStore(subscribe, () => keyboardState.visible);
+      const snapshot: KeyboardStateSnapshot = {
+        height: isVisible ? 300 : 0,
+        isVisible,
+        progress: isVisible ? 1 : 0,
+        duration: 0,
+      };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+const cachedUri = vi.hoisted(() => ({ value: undefined as string | undefined }));
+vi.mock('./tool-card-image-cache', () => ({
+  isToolCardImagePending: () => false,
+  useToolCardImageUri: () => cachedUri.value,
+}));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
+}));
+// `tool-card-display` imports the Lucide icon components; the node project cannot
+// parse their Flow-sourced react-native runtime, so stub the icon module.
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
@@ -54,7 +116,7 @@ vi.mock('./tool-part-detail-body', () => ({
     createElement(
       'ToolPartDetailBody',
       props,
-      createElement(MonoScrollBlock, { content: LONG_LINE })
+      props.part.tool === 'bash' ? createElement(MonoScrollBlock, { content: LONG_LINE }) : null
     ),
 }));
 
@@ -132,7 +194,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -141,9 +203,13 @@ function radio(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
+  // This suite mounts iOS, where `radioItemA11y` renders each choice as a
+  // button whose state rides the selected trait.
   return findByType(root, 'Pressable').find(
     node =>
-      propOf(node, 'accessibilityRole') === 'radio' && propOf(node, 'accessibilityLabel') === label
+      propOf(node, 'accessibilityRole') === 'button' &&
+      propOf(node, 'accessibilityState') !== undefined &&
+      propOf(node, 'accessibilityLabel') === label
   );
 }
 
@@ -154,6 +220,21 @@ function pressRadio(root: TestRenderer.ReactTestInstance, label: string): void {
 
 function sheetTitle(renderer: TestRenderer.ReactTestRenderer): unknown {
   return propOf(findByType(renderer.root, 'SheetHeader')[0], 'title');
+}
+
+function reportSheetDismissed(renderer: TestRenderer.ReactTestRenderer): void {
+  (propOf(findByType(renderer.root, 'BottomSheet')[0], 'onDismiss') as () => void)();
+}
+
+function reportSheetSelfDismissal(renderer: TestRenderer.ReactTestRenderer): void {
+  (propOf(findByType(renderer.root, 'BottomSheet')[0], 'onClose') as () => void)();
+}
+
+function setKeyboardVisible(visible: boolean): void {
+  keyboardState.visible = visible;
+  for (const listener of keyboardState.listeners) {
+    listener();
+  }
 }
 
 async function mountHost(messages: StoredMessage[]): Promise<TestRenderer.ReactTestRenderer> {
@@ -171,6 +252,12 @@ async function mountHost(messages: StoredMessage[]): Promise<TestRenderer.ReactT
   return renderer;
 }
 
+beforeEach(() => {
+  keyboardState.visible = false;
+  keyboardState.listeners.clear();
+  keyboardDismiss.mockClear();
+});
+
 describe('PartDetailSheetHost mounted', () => {
   it('opens a tool part and updates content live without close/reopen', async () => {
     const renderer = await mountHost([makeMessage('m1', [makeBashPart('bash-1', 'echo one')])]);
@@ -182,8 +269,8 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
 
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'visible')).toBe(true);
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'presentationStyle')).toBe('pageSheet');
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'snapPoints')).toEqual(['100%']);
     expect(sheetTitle(renderer)).toBe('bash: echo one');
     const openedPart = propOf(findByType(renderer.root, 'ToolPartDetailBody')[0], 'part');
     expect((openedPart as ToolPart).id).toBe('bash-1');
@@ -196,7 +283,7 @@ describe('PartDetailSheetHost mounted', () => {
     });
 
     // Still open, no close/reopen: the sheet reflects the refreshed part.
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'visible')).toBe(true);
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
     expect(sheetTitle(renderer)).toBe('bash: echo two');
     const refreshedPart = propOf(findByType(renderer.root, 'ToolPartDetailBody')[0], 'part');
     expect((refreshedPart as ToolPart).state.status).toBe('completed');
@@ -218,6 +305,49 @@ describe('PartDetailSheetHost mounted', () => {
         propOf(node, 'children') === 'Details unavailable'
     );
     expect(unavailable).toHaveLength(1);
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+  });
+
+  it('switches from a centered state to inline content when an attachment becomes available', async () => {
+    const part: ToolPart = {
+      ...makeBashPart('read-1', '', true),
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: { filePath: 'image.png' },
+        output: 'Image read successfully',
+        title: 'read',
+        metadata: {},
+        time: { start: 1, end: 2 },
+        attachments: [
+          {
+            id: 'file-1',
+            sessionID: 's1',
+            messageID: 'm1',
+            type: 'file',
+            mime: 'image/png',
+            url: '',
+          },
+        ],
+      },
+    };
+    const renderer = await mountHost([makeMessage('m1', [part])]);
+    act(() => {
+      capturedOpener?.('read-1');
+    });
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    act(() => {
+      cachedUri.value = 'file:///cached.png';
+      renderer.update(hostElement([makeMessage('m1', [part])]));
+    });
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(0);
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(1);
+    cachedUri.value = undefined;
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('renders full selectable reasoning text with the completed label', async () => {
@@ -240,7 +370,7 @@ describe('PartDetailSheetHost mounted', () => {
     expect(reasoningTexts).toHaveLength(1);
   });
 
-  it('resets the text mode to wrap when the sheet closes through the host', async () => {
+  it('keeps the title, body and text mode until the native dismissal reports, then reopens fresh', async () => {
     const renderer = await mountHost([
       makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
     ]);
@@ -250,16 +380,15 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
 
-    // Opens wrapped by default. A React Native radio reports its current
-    // choice through `checked`, not `selected` — see `radioItemA11y` in
-    // @/components/ui/radio-group.
+    // Opens wrapped by default. On iOS `radioItemA11y` reports the current
+    // choice through the selected trait.
     expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      checked: false,
+      selected: false,
       disabled: false,
       busy: false,
     });
@@ -269,28 +398,368 @@ describe('PartDetailSheetHost mounted', () => {
       pressRadio(renderer.root, 'Scroll');
     });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });
 
     // Close through the real host boundary: the SheetHeader Done button's
-    // onDone is the host's `close`, which flips visible -> false.
+    // onDone is the host's `close`, which flips visible -> false and starts
+    // the native leave animation.
     await act(async () => {
       await Promise.resolve();
       (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
     });
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'visible')).toBe(false);
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
 
-    // Reopen the same part: the sheet resets to Wrap.
+    // The leaving sheet still shows this presentation: the original title
+    // and body, the live part behind them, and the Scroll mode. A stream
+    // tick during the leave still resolves against the same part.
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+    const leavingPart = propOf(findByType(renderer.root, 'ToolPartDetailBody')[0], 'part');
+    expect((leavingPart as ToolPart).id).toBe('bash-1');
+    expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
+      selected: true,
+      disabled: false,
+      busy: false,
+    });
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(hostElement([makeMessage('m1', [makeBashPart('bash-1', 'echo two', true)])]));
+    });
+    expect(sheetTitle(renderer)).toBe('bash: echo two');
+
+    // The native dismissal report ends the presentation: the sheet unmounts.
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetDismissed(renderer);
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    // Reopen the same part: a fresh presentation resets to Wrap.
     await act(async () => {
       await Promise.resolve();
       capturedOpener?.('bash-1');
     });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(sheetTitle(renderer)).toBe('bash: echo two');
     expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });
+  });
+
+  it('keeps the part through a native self-dismissal and clears it on the dismissal report', async () => {
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+
+    // The drag/backdrop path: the native sheet reports its own close before
+    // it reports the finished dismissal.
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetSelfDismissal(renderer);
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetDismissed(renderer);
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+  });
+
+  it.each(['bash-1', 'bash-2'])(
+    'keeps the leaving presentation and reopens %s with fresh text mode',
+    async partId => {
+      const renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        pressRadio(renderer.root, 'Scroll');
+      });
+      await act(() => {
+        (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      await act(() => {
+        capturedOpener?.(partId);
+      });
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
+      expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toMatchObject({
+        selected: true,
+      });
+      await act(() => {
+        reportSheetSelfDismissal(renderer);
+        reportSheetDismissed(renderer);
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe(partId === 'bash-1' ? 'bash: echo one' : 'bash: echo two');
+      expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toMatchObject({
+        selected: true,
+      });
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
+  it('dismisses the keyboard first and presents only once it reports hidden', async () => {
+    keyboardState.visible = true;
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      setKeyboardVisible(false);
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+
+    await act(async () => {
+      await Promise.resolve();
+      (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetDismissed(renderer);
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('presents at once when the keyboard is already hidden', async () => {
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+  });
+
+  it('opens only the latest part when the keyboard handoff is superseded', async () => {
+    keyboardState.visible = true;
+    const renderer = await mountHost([
+      makeMessage('m1', [
+        makeBashPart('bash-1', 'echo one', true),
+        makeReasoningPart('r1', 'working through it', true),
+      ]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+      capturedOpener?.('r1');
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      setKeyboardVisible(false);
+    });
+    expect(sheetTitle(renderer)).toBe('Thought');
+    expect(findByType(renderer.root, 'ToolPartDetailBody')).toHaveLength(0);
+  });
+
+  it('opens after a missing keyboard-hide completion', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      keyboardState.visible = true;
+      renderer = await mountHost([makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)])]);
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it('opens a part after a dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        (propOf(findByType(mounted.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(-1);
+
+      // The native sheet never reports the finished dismissal. Without the sheet's
+      // deadline the host stays dismissing and every later open only queues.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes when the native close and dismissal report in one act', async () => {
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+    try {
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+
+      // The adapter reports the close and the finished dismissal as one pair, so
+      // the host reduces the close after the report has already been queued.
+      await act(() => {
+        reportSheetSelfDismissal(renderer);
+        reportSheetDismissed(renderer);
+      });
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+      // The host settled: a later tap presents again instead of queueing forever.
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+    } finally {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  });
+
+  it('reopens for a part chosen after a self-dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      const node = findByType(mounted.root, 'BottomSheet')[0];
+      await act(() => {
+        (propOf(node, 'onRequestDismiss') as () => boolean)();
+      });
+
+      // No report follows: the sheet's own deadline ends the dismissal, forwarding
+      // the dismissal before the close.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(findByType(mounted.root, 'BottomSheet')).toHaveLength(0);
+
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(mounted)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it('presents the part queued behind a dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        (propOf(findByType(mounted.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      // The next part is chosen while the dismissal is still outstanding.
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(sheetTitle(mounted)).toBe('bash: echo one');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      // The deadline reports the close before the dismissal: the queued part is not
+      // dismissed again by the close, so it is on screen afterwards.
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(mounted)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
   });
 });

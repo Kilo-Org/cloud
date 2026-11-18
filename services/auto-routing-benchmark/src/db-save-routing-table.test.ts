@@ -66,13 +66,16 @@ describe('saveRoutingTable', () => {
     expect(mocks.batch).toHaveBeenCalledTimes(1);
     const batch = mocks.batch.mock.calls[0]?.[0] as Array<{ kind: string; values?: unknown }>;
     expect(batch).toBeDefined();
-    const candidateInsertSizes = batch
-      .filter(stmt => stmt.kind === 'insert')
-      .map(stmt => {
-        expect(Array.isArray(stmt.values)).toBe(true);
-        return (stmt.values as unknown[]).length;
-      });
+    const candidateInserts = batch.filter(stmt => stmt.kind === 'insert');
+    const candidateInsertSizes = candidateInserts.map(stmt => {
+      expect(Array.isArray(stmt.values)).toBe(true);
+      const rows = stmt.values as Record<string, unknown>[];
+      const boundVariables = rows.reduce((total, row) => total + Object.keys(row).length, 0);
+      expect(boundVariables).toBeLessThanOrEqual(100);
+      return rows.length;
+    });
 
-    expect(candidateInsertSizes).toEqual([10, 10, 5]);
+    expect(candidateInsertSizes.reduce((total, size) => total + size, 0)).toBe(25);
+    expect(candidateInserts.length).toBeGreaterThan(1);
   });
 });

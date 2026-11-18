@@ -1,22 +1,27 @@
-import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-
 import { API_BASE_URL } from '@/lib/config';
+import { type AuthBrowserKind, dismissAuthBrowser } from '@/lib/auth/auth-browser';
 import { classifyPollResponse } from '@/lib/auth/poll-response';
-import {
-  buildDeviceAuthPollRequest,
-  parseDeviceAuthTokenResponse,
-} from '@/lib/auth/native-auth-contract';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
   approvedDeviceAuthState,
+  deviceAuthErrorKey,
   type DeviceAuthState,
   errorDeviceAuthState,
   terminalDeviceAuthState,
 } from '@/lib/auth/device-auth-state';
+import {
+  buildDeviceAuthPollRequest,
+  parseDeviceAuthTokenResponse,
+} from '@/lib/auth/native-auth-contract';
 
 const POLL_BASE_INTERVAL_MS = 3000;
 const POLL_MAX_INTERVAL_MS = 15_000;
 const POLL_OVERALL_TIMEOUT_MS = 5 * 60 * 1000;
+
+export type DeviceAuthPollHandle = {
+  cleanup: () => void;
+  pollNow: () => void;
+};
 
 export function startDeviceAuthPoll(params: {
   code: string;
@@ -24,12 +29,30 @@ export function startDeviceAuthPoll(params: {
   signal: AbortSignal;
   setState: (updater: (prev: DeviceAuthState) => DeviceAuthState) => void;
   cleanup: () => void;
-}) {
-  const { code, deviceCode, signal, setState, cleanup } = params;
+  /**
+   * The API that opened the verification page. Approval ends the flow without
+   * waiting for the page, so the poll closes it with the matching dismissal.
+   */
+  browserKind: AuthBrowserKind;
+  startedAt?: number;
+}): DeviceAuthPollHandle {
+  const { code, deviceCode, signal, setState, cleanup, browserKind } = params;
 
-  const startedAt = Date.now();
+  // A resumed transaction reuses the original start clock so its overall
+  // budget does not restart from `Date.now()` and outlive the server code.
+  const startedAt = params.startedAt ?? Date.now();
   let retryDelay = POLL_BASE_INTERVAL_MS;
   let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
+  let inFlight = false;
+  let lastTickStartedAt = 0;
+  // The server's own throttle deadline, in `Date.now()` milliseconds. A
+  // foreground poll (`pollNow`) must not send a request before it: resuming
+  // the app is not the server's permission to poll again. Only a retry that
+  // named a `Retry-After` records a deadline; our own backoff stays
+  // bypassable so a resume still polls promptly while the server is merely
+  // pending. Always at or before the retry timer it was scheduled with, so
+  // it is never stale while a timer is pending.
+  let throttledUntil = 0;
 
   const scheduleNext = (delay: number) => {
     timeoutId = setTimeout(() => {
@@ -38,10 +61,24 @@ export function startDeviceAuthPoll(params: {
   };
 
   const tick = async () => {
-    if (Date.now() - startedAt > POLL_OVERALL_TIMEOUT_MS) {
+    inFlight = true;
+    lastTickStartedAt = Date.now();
+    try {
+      await runTick();
+    } finally {
+      inFlight = false;
+    }
+  };
+
+  const runTick = async () => {
+    if (Date.now() - startedAt >= POLL_OVERALL_TIMEOUT_MS) {
       cleanup();
       setState(previous =>
-        errorDeviceAuthState(code, 'Sign-in timed out. Please try again.', previous.verificationUrl)
+        errorDeviceAuthState(
+          code,
+          deviceAuthErrorKey('authErrors.signInTimedOut'),
+          previous.verificationUrl
+        )
       );
       return;
     }
@@ -49,7 +86,7 @@ export function startDeviceAuthPoll(params: {
     try {
       const response = await fetch(`${API_BASE_URL}/api/device-auth/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
         body: JSON.stringify(buildDeviceAuthPollRequest(deviceCode)),
         signal,
       });
@@ -64,9 +101,7 @@ export function startDeviceAuthPoll(params: {
 
       if (parsed?.status === 'approved') {
         cleanup();
-        if (Platform.OS !== 'android') {
-          WebBrowser.dismissAuthSession();
-        }
+        dismissAuthBrowser(browserKind);
         setState(previous =>
           approvedDeviceAuthState({
             code,
@@ -74,6 +109,7 @@ export function startDeviceAuthPoll(params: {
             refreshToken: parsed.refreshToken,
             expiresIn: parsed.expiresIn,
             previousVerificationUrl: previous.verificationUrl,
+            pendingLink: parsed.pendingLink,
           })
         );
         return;
@@ -81,20 +117,24 @@ export function startDeviceAuthPoll(params: {
 
       if (parsed && (parsed.status === 'denied' || parsed.status === 'expired')) {
         cleanup();
-        const message = parsed.status === 'denied' ? 'Access denied by user' : 'Code expired';
+        // The banner re-translates denied/expired at render by status; the
+        // stored key is the fallback a terminal state still carries.
+        const error = deviceAuthErrorKey(
+          parsed.status === 'denied' ? 'authErrors.accessDeniedByUser' : 'authErrors.codeExpired'
+        );
         const terminalStatus: 'denied' | 'expired' = parsed.status;
         setState(previous =>
           terminalDeviceAuthState({
             status: terminalStatus,
             code,
-            error: message,
+            error,
             previousVerificationUrl: previous.verificationUrl,
           })
         );
         return;
       }
 
-      const outcome = classifyPollResponse(response.status);
+      const outcome = classifyPollResponse(response.status, response.headers.get('retry-after'));
 
       // eslint-disable-next-line typescript-eslint/switch-exhaustiveness-check
       switch (outcome.status) {
@@ -105,7 +145,7 @@ export function startDeviceAuthPoll(params: {
           setState(previous =>
             errorDeviceAuthState(
               code,
-              'Sign-in failed. Please try again.',
+              deviceAuthErrorKey('authErrors.invalidToken'),
               previous.verificationUrl
             )
           );
@@ -118,7 +158,20 @@ export function startDeviceAuthPoll(params: {
         }
         case 'retry': {
           retryDelay = Math.min(retryDelay * 2, POLL_MAX_INTERVAL_MS);
-          scheduleNext(retryDelay);
+          // A throttled poll waits as long as the server asked, never less
+          // than our own backoff, and never past the overall poll budget: the
+          // wait is capped by the time left, so a Retry-After longer than the
+          // remaining budget cannot schedule a tick after the budget. The
+          // boundary check above is inclusive so a wait capped to exactly the
+          // remaining time times out on that tick instead of polling again.
+          const wait = Math.max(retryDelay, outcome.retryAfterMs ?? 0);
+          const remaining = POLL_OVERALL_TIMEOUT_MS - (Date.now() - startedAt);
+          const delay = Math.min(wait, Math.max(0, remaining));
+          // Record the server's deadline for a foreground poll. Capped by the
+          // scheduled delay, so a Retry-After longer than the remaining budget
+          // never pushes the deadline past the tick that times the poll out.
+          throttledUntil = Date.now() + Math.min(outcome.retryAfterMs ?? 0, delay);
+          scheduleNext(delay);
           return;
         }
         case 'error': {
@@ -136,17 +189,43 @@ export function startDeviceAuthPoll(params: {
       }
       cleanup();
       setState(previous =>
-        errorDeviceAuthState(code, 'Network error. Please try again.', previous.verificationUrl)
+        errorDeviceAuthState(
+          code,
+          deviceAuthErrorKey('authErrors.networkError'),
+          previous.verificationUrl
+        )
       );
     }
   };
 
   scheduleNext(retryDelay);
 
-  return () => {
+  const pollNow = () => {
+    // At most one extra poll per foreground transition: skip when a tick is
+    // already in flight or the last tick started under 1 second ago.
+    if (inFlight || Date.now() - lastTickStartedAt < 1000) {
+      return;
+    }
+    // A foreground transition is not the server's permission to poll again.
+    // While a Retry-After throttle is in force, leave the retry timer it was
+    // scheduled with in place instead of ticking: the server asked us to wait.
+    if (Date.now() < throttledUntil) {
+      return;
+    }
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = undefined;
     }
+    void tick();
+  };
+
+  return {
+    cleanup: () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+    },
+    pollNow,
   };
 }

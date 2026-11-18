@@ -1,5 +1,5 @@
 import { SignInButton } from '@/components/auth/SigninButton';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { getProviderById, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import styles from './AuthProviderButtons.module.css';
 
@@ -24,7 +24,8 @@ export function AuthProviderButtons({
     <>
       {providers.map(providerId => {
         const provider = getProviderById(providerId);
-        const label = customLabels?.[providerId] || `Continue with ${provider.name}`;
+        const label =
+          customLabels?.[providerId] || provider.signInLabel || `Continue with ${provider.name}`;
         return (
           <SignInButton
             key={providerId}

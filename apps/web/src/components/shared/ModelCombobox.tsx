@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -13,14 +13,18 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { BookOpenCheck, Brain, ChevronsUpDown, Check, Image } from 'lucide-react';
+import { BookOpenCheck, Brain, ChevronsUpDown, Check, Image, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   buildModelOptionGroups,
   getModelOptionKeywords,
+  NO_FAVORITES,
   type ModelOption,
   type ModelOptionGroup,
 } from './model-combobox-options';
+import { favoriteToggleAction, isFavoriteOption } from './model-favorites';
+import { useModelFavorites } from '@/lib/hooks/use-model-preferences';
+import { usePreferredModels } from './usePreferredModels';
 
 export type { ModelOption };
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -42,6 +46,8 @@ export type ModelComboboxProps = {
   value?: string;
   onValueChange: (value: string) => void;
   isLoading?: boolean;
+  /** Start loading a deferred catalog on pointer, keyboard, or open intent. */
+  onLoadModels?: () => void;
   error?: string;
   placeholder?: string;
   searchPlaceholder?: string;
@@ -66,6 +72,13 @@ export type ModelComboboxProps = {
   modal?: boolean;
   /** Optional aria-label for the trigger button, overriding the default accessible name */
   triggerAriaLabel?: string;
+  /** Optional id for the trigger button/label pair. Set this when rendering more than one full-variant combobox on a page to avoid duplicate DOM ids. */
+  id?: string;
+  /**
+   * Show favorite stars and a Favorites group, persisted to the user's cloud
+   * model preferences. Favorites are per-user and shared with the mobile app.
+   */
+  favorites?: boolean;
 };
 
 export function ModelCombobox({
@@ -75,6 +88,7 @@ export function ModelCombobox({
   value,
   onValueChange,
   isLoading,
+  onLoadModels,
   error,
   placeholder = 'Select a model',
   searchPlaceholder = 'Search models...',
@@ -88,8 +102,16 @@ export function ModelCombobox({
   pinnedModel,
   modal = false,
   triggerAriaLabel,
+  id = 'model-combobox',
+  favorites,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
+  const pendingStarFocusRef = useRef<string | null>(null);
+  const handleOpenChange = (value: boolean) => {
+    if (value) onLoadModels?.();
+    else pendingStarFocusRef.current = null;
+    setOpen(value);
+  };
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +119,54 @@ export function ModelCombobox({
     listRef.current?.scrollTo({ top: 0 });
   }, []);
 
-  const modelGroups = useMemo(() => buildModelOptionGroups(models), [models]);
+  const preferredModels = usePreferredModels();
+  const {
+    favorites: favoriteModels,
+    favoritesError,
+    refetchFavorites,
+    addFavorite,
+    removeFavorite,
+  } = useModelFavorites({ enabled: favorites === true });
+  // The disabled query still observes cached favorites; only an opted-in
+  // picker may group or star them.
+  const favoriteIds = useMemo(
+    () => (favorites ? new Set(favoriteModels) : NO_FAVORITES),
+    [favorites, favoriteModels]
+  );
+  const modelGroups = useMemo(
+    () => buildModelOptionGroups(models, preferredModels, favoriteIds),
+    [models, preferredModels, favoriteIds]
+  );
+
+  // Toggling remounts the row into another group and drops focus to the body;
+  // restore it to the same model's star, or the search input when the star is
+  // gone (an unavailable model that was just un-favorited).
+  useEffect(() => {
+    const modelId = pendingStarFocusRef.current;
+    if (!modelId) return;
+    pendingStarFocusRef.current = null;
+    const list = listRef.current;
+    if (!list) return;
+    const star = list.querySelector<HTMLButtonElement>(
+      `button[data-model-id="${CSS.escape(modelId)}"]`
+    );
+    if (star) star.focus();
+    else list.parentElement?.querySelector<HTMLInputElement>('[cmdk-input]')?.focus();
+  }, [favoriteIds]);
+
+  const handleToggleFavorite = useCallback(
+    (model: ModelOption) => {
+      pendingStarFocusRef.current = model.id;
+      const action = favoriteToggleAction(model, favoriteModels);
+      if (action.type === 'remove') {
+        for (const id of action.models) removeFavorite({ model: id });
+      } else {
+        addFavorite({ model: action.model });
+      }
+    },
+    [favoriteModels, addFavorite, removeFavorite]
+  );
+  const onToggleFavorite = favorites ? handleToggleFavorite : undefined;
 
   const selectedModel = [pinnedModel, ...models].find(model => model?.id === value);
   const isCompact = variant === 'compact';
@@ -190,7 +259,7 @@ export function ModelCombobox({
     return (
       <Popover
         open={disabled ? false : open}
-        onOpenChange={disabled ? undefined : setOpen}
+        onOpenChange={disabled ? undefined : handleOpenChange}
         modal={modal}
       >
         <PopoverTrigger asChild>
@@ -204,6 +273,8 @@ export function ModelCombobox({
             disabled={disabled}
             className={cn('h-9 justify-between gap-1.5', className)}
             ref={triggerRef}
+            onPointerEnter={onLoadModels}
+            onFocus={onLoadModels}
           >
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="min-w-0 truncate">
@@ -217,6 +288,9 @@ export function ModelCombobox({
         <PopoverContent className="w-[min(24rem,calc(100vw-2rem))] p-0" align="start">
           <Command>
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
+            {favorites && favoritesError && (
+              <FavoritesReadError message={favoritesError} onRetry={refetchFavorites} />
+            )}
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
               {pinnedModel && (
@@ -236,6 +310,8 @@ export function ModelCombobox({
                   onValueChange(modelId);
                   setOpen(false);
                 }}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={onToggleFavorite}
               />
             </CommandList>
           </Command>
@@ -247,18 +323,20 @@ export function ModelCombobox({
   return (
     <div className="space-y-2">
       {showLabel && (
-        <Label htmlFor="model-combobox">
+        <Label htmlFor={id}>
           {label} {required && <span className="text-red-400">*</span>}
         </Label>
       )}
       <Popover
         open={disabled ? false : open}
-        onOpenChange={disabled ? undefined : setOpen}
+        onOpenChange={disabled ? undefined : handleOpenChange}
         modal={modal}
       >
         <PopoverTrigger asChild>
           <Button
-            id="model-combobox"
+            id={id}
+            onPointerEnter={onLoadModels}
+            onFocus={onLoadModels}
             type="button"
             variant="outline"
             role="combobox"
@@ -284,6 +362,9 @@ export function ModelCombobox({
         >
           <Command>
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
+            {favorites && favoritesError && (
+              <FavoritesReadError message={favoritesError} onRetry={refetchFavorites} />
+            )}
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
               {pinnedModel && (
@@ -303,12 +384,29 @@ export function ModelCombobox({
                   onValueChange(modelId);
                   setOpen(false);
                 }}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={onToggleFavorite}
               />
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
       {!isCompact && helperText && <p className="text-muted-foreground text-xs">{helperText}</p>}
+    </div>
+  );
+}
+
+function FavoritesReadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="text-destructive flex items-center justify-between gap-2 border-b px-3 py-2 text-xs">
+      <span className="min-w-0">{message}</span>
+      <button
+        type="button"
+        onClick={() => onRetry()}
+        className="hover:text-foreground shrink-0 underline underline-offset-2"
+      >
+        Try Again
+      </button>
     </div>
   );
 }
@@ -352,10 +450,14 @@ function ModelOptionGroups({
   groups,
   value,
   onSelect,
+  favoriteIds,
+  onToggleFavorite,
 }: {
   groups: ModelOptionGroup[];
   value?: string;
   onSelect: (value: string) => void;
+  favoriteIds: ReadonlySet<string>;
+  onToggleFavorite?: (model: ModelOption) => void;
 }) {
   return groups.map(group => (
     <CommandGroup key={group.id} heading={group.heading}>
@@ -396,11 +498,60 @@ function ModelOptionGroups({
                 model.id === value ? 'opacity-100' : 'opacity-0'
               )}
             />
+            {onToggleFavorite && (!model.unavailable || isFavoriteOption(model, favoriteIds)) && (
+              <FavoriteStar
+                model={model}
+                isFavorite={isFavoriteOption(model, favoriteIds)}
+                onToggle={onToggleFavorite}
+              />
+            )}
           </CommandItem>
         );
       })}
     </CommandGroup>
   ));
+}
+
+function FavoriteStar({
+  model,
+  isFavorite,
+  onToggle,
+}: {
+  model: ModelOption;
+  isFavorite: boolean;
+  onToggle: (model: ModelOption) => void;
+}) {
+  const label = isFavorite
+    ? `Remove ${model.name} from favorites`
+    : `Add ${model.name} to favorites`;
+  return (
+    <button
+      type="button"
+      data-model-id={model.id}
+      aria-label={label}
+      aria-pressed={isFavorite}
+      title={label}
+      onClick={event => {
+        event.stopPropagation();
+        event.preventDefault();
+        onToggle(model);
+      }}
+      onPointerDown={event => event.stopPropagation()}
+      onKeyDown={event => {
+        // cmdk's root handler turns a bubbled Enter into a row selection;
+        // the button's own default action must fire the toggle instead.
+        if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+      }}
+      className={cn(
+        // pointer-events-auto keeps the star tappable on unavailable rows,
+        // which cmdk renders with pointer-events-none.
+        'focus-visible:ring-ring pointer-events-auto relative inline-flex shrink-0 items-center rounded-sm p-0.5 outline-none before:absolute before:-inset-2 focus-visible:ring-2 [@media(any-pointer:coarse)]:before:-inset-3',
+        isFavorite ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+      )}
+    >
+      <Star className={cn('h-4 w-4', isFavorite && 'fill-current')} />
+    </button>
+  );
 }
 
 /**

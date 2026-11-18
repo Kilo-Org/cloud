@@ -1,7 +1,7 @@
 import type { KiloNotification } from '@/lib/notifications';
 import { generateUserNotifications } from '@/lib/notifications';
-import { getUserFromAuth } from '@/lib/user/server';
-import { isLegacyKiloExtensionNotificationsUserAgent } from '@/lib/userAgent';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { isLegacyKiloExtensionNotificationsUserAgent } from '@kilocode/web-shared/lib/userAgent';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export async function GET(

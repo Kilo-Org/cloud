@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import type {
-  DispatchPushInput,
-  DispatchPushOutcome,
-  InternalDispatchLowBalanceRequest,
-  InternalDispatchSecurityFindingRequest,
+import {
+  pushDataSchema,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+  type InternalDispatchLowBalanceRequest,
+  type InternalDispatchSecurityFindingRequest,
+  type InternalDispatchSecurityLifecycleRequest,
+  type InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications';
 
 import type { UserNotificationPreferences } from './cloud-agent-session-push';
@@ -12,11 +15,10 @@ import { dispatchInternalPushCore, type InternalDispatchDeps } from './internal-
 
 const ALL_ON: UserNotificationPreferences = {
   agentPushEnabled: true,
-  chatMessagesEnabled: true,
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
+  spendAlertsEnabled: true,
   securityFindingsEnabled: true,
 };
 
@@ -50,6 +52,57 @@ function securityFinding(
   };
 }
 
+function securityLifecycle(
+  overrides: Partial<InternalDispatchSecurityLifecycleRequest> = {}
+): InternalDispatchSecurityLifecycleRequest {
+  return {
+    kind: 'security_lifecycle',
+    event: 'remediation_pr_opened',
+    findingId: 'finding-1',
+    scope: 'org-1',
+    remediationId: 'remediation-1',
+    prUrl: 'https://github.com/acme/api/pull/42',
+    recipientUserIds: ['user-a', 'user-b'],
+    ...overrides,
+  };
+}
+
+function spendAlert(
+  overrides: Partial<InternalDispatchSpendAlertRequest> = {}
+): InternalDispatchSpendAlertRequest {
+  return {
+    kind: 'spend_alert',
+    recipientUserIds: ['user-a', 'user-b'],
+    scope: 'organization',
+    organizationId: 'org-1',
+    alertKind: 'threshold',
+    scopeName: 'Acme Corp',
+    amountUsd: 42.5,
+    thresholdUsd: 40,
+    dedupeKey: 'org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed',
+    ...overrides,
+  };
+}
+
+function expectedSpendAlertInput(userId: string): DispatchPushInput {
+  return {
+    userId,
+    presenceContext: null,
+    idempotencyKey:
+      'spend-alert:organization:org-1:threshold:40:org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed',
+    badge: null,
+    push: {
+      title: 'Spend alert',
+      body: 'Acme Corp spend crossed $42.5',
+      i18nKey: 'internal.spendAlert',
+      i18nParams: { scopeName: 'Acme Corp', amountUsd: '42.5' },
+      data: { type: 'spend_alert', scope: 'organization', organizationId: 'org-1' },
+      sound: 'default',
+      priority: 'high',
+    },
+  };
+}
+
 function expectedLowBalanceInput(userId: string): DispatchPushInput {
   return {
     userId,
@@ -59,6 +112,8 @@ function expectedLowBalanceInput(userId: string): DispatchPushInput {
     push: {
       title: 'Low balance alert',
       body: 'Acme Corp balance fell below $10',
+      i18nKey: 'internal.lowBalance',
+      i18nParams: { organizationName: 'Acme Corp', minimumBalanceUsd: '10' },
       data: { type: 'low_balance', organizationId: 'org-1' },
       sound: 'default',
       priority: 'high',
@@ -113,6 +168,54 @@ function fakeDeps(
 }
 
 describe('dispatchInternalPushCore', () => {
+  it('routes briefing dispatch through the user DO with only the local date in its identity', async () => {
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
+    const result = await dispatchInternalPushCore(
+      {
+        kind: 'agent_briefing',
+        userId: 'oauth/github/123',
+        localDate: '2026-10-15',
+        expiresAt: '2026-10-15T12:00:00.000Z',
+      },
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'oauth/github/123', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toEqual([
+      {
+        userId: 'oauth/github/123',
+        presenceContext: null,
+        idempotencyKey: 'agent-briefing:2026-10-15',
+        agentBriefing: { localDate: '2026-10-15', expiresAt: '2026-10-15T12:00:00.000Z' },
+        badge: null,
+        push: {
+          title: 'Kilo',
+          body: 'Active agents have an update',
+          data: { type: 'agent_briefing', url: '/agent-briefing' },
+          sound: 'default',
+          priority: 'default',
+        },
+      },
+    ]);
+  });
+
+  it.each(['suppressed_preference', 'suppressed_expired', 'suppressed_access'] as const)(
+    'preserves the live briefing gate outcome %s',
+    async kind => {
+      const { deps } = fakeDeps({ dispatchPush: async () => ({ kind }) });
+      const result = await dispatchInternalPushCore(
+        {
+          kind: 'agent_briefing',
+          userId: 'user-a',
+          localDate: '2026-10-15',
+          expiresAt: '2026-10-15T12:00:00.000Z',
+        },
+        deps
+      );
+      expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: kind }]);
+    }
+  );
+
   it('low_balance happy path: dispatches both recipients with exact DispatchPushInput', async () => {
     const { deps, calls } = fakeDeps();
     const result = await dispatchInternalPushCore(lowBalance(), deps);
@@ -150,6 +253,43 @@ describe('dispatchInternalPushCore', () => {
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
+  it('low_balance reads only balanceAlertsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        securityFindingsEnabled: false,
+        balanceAlertsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(
+      lowBalance({ recipientUserIds: ['user-a'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('security_finding reads only securityFindingsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        balanceAlertsEnabled: false,
+        securityFindingsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(securityFinding(), deps);
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
   it('null prefs row is default-on and dispatches', async () => {
     const { deps, calls } = fakeDeps({ preferences: null });
     const result = await dispatchInternalPushCore(
@@ -169,7 +309,19 @@ describe('dispatchInternalPushCore', () => {
       deps
     );
 
-    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed', reason: 'preference_read_failed' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('readPreferences throw (security_finding) → failed with zero dispatchPush calls', async () => {
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
+    const result = await dispatchInternalPushCore(securityFinding(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed', reason: 'preference_read_failed' },
+    ]);
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
@@ -193,20 +345,23 @@ describe('dispatchInternalPushCore', () => {
       notificationKind: 'new_finding' as const,
       severity: 'critical',
       expectedTitle: 'New security finding (critical)',
+      expectedI18nKey: 'internal.securityFindingNew',
     },
     {
       notificationKind: 'sla_warning' as const,
       severity: 'high',
       expectedTitle: 'SLA warning',
+      expectedI18nKey: 'internal.securityFindingSlaWarning',
     },
     {
       notificationKind: 'sla_breach' as const,
       severity: 'medium',
       expectedTitle: 'SLA breach',
+      expectedI18nKey: 'internal.securityFindingSlaBreach',
     },
   ])(
     'security_finding $notificationKind copy is exact',
-    async ({ notificationKind, severity, expectedTitle }) => {
+    async ({ notificationKind, severity, expectedTitle, expectedI18nKey }) => {
       const { deps, calls } = fakeDeps();
       const input = securityFinding({ notificationKind, severity, title: 'XSS in admin' });
       const result = await dispatchInternalPushCore(input, deps);
@@ -221,6 +376,12 @@ describe('dispatchInternalPushCore', () => {
         push: {
           title: expectedTitle,
           body: 'XSS in admin in acme/api',
+          i18nKey: expectedI18nKey,
+          i18nParams: {
+            severity,
+            findingTitle: 'XSS in admin',
+            repoFullName: 'acme/api',
+          },
           data: {
             type: 'security_finding',
             findingId: 'finding-1',
@@ -285,9 +446,43 @@ describe('dispatchInternalPushCore', () => {
     });
     const result = await dispatchInternalPushCore(securityFinding(), deps);
 
-    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed', reason: 'dispatch_rejected' },
+    ]);
     expect(calls.dispatchPushInputs).toHaveLength(1);
   });
+
+  it.each([
+    { error: 'Expo rejected 1 push ticket', expectedReason: 'expo_ticket_rejected' },
+    {
+      error: 'Accepted push bookkeeping failed: connection reset',
+      expectedReason: 'delivery_bookkeeping_failed',
+    },
+    {
+      error: 'Expo returned no classified push ticket outcomes',
+      expectedReason: 'unclassified_ticket_outcome',
+    },
+    { error: 'fetch failed', expectedReason: 'send_failed' },
+  ])(
+    'DO failure "$error" is reported with stable reason $expectedReason',
+    async ({ error, expectedReason }) => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { deps } = fakeDeps({
+        dispatchPush: async () => ({ kind: 'failed' as const, error }),
+      });
+      const result = await dispatchInternalPushCore(securityFinding(), deps);
+
+      expect(result.perRecipient).toEqual([
+        { userId: 'user-a', outcome: 'failed', reason: expectedReason },
+      ]);
+      // The raw DO error stays in worker logs only; the client sees the token.
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Internal dispatch push delivery failed',
+        expect.objectContaining({ kind: 'security_finding', reason: expectedReason, error })
+      );
+      warnSpy.mockRestore();
+    }
+  );
 
   it('passes through DO outcomes duplicate and no_tokens', async () => {
     const outcomes: Record<string, DispatchPushOutcome> = {
@@ -317,6 +512,282 @@ describe('dispatchInternalPushCore', () => {
       { userId: 'user-b', outcome: 'delivered' },
     ]);
     expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs.map(i => i.userId)).toEqual(['user-a', 'user-b']);
+  });
+
+  it('security_lifecycle dispatches all recipients with a payload that validates', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(securityLifecycle(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    for (const input of calls.dispatchPushInputs) {
+      expect(input.push.data).toEqual({
+        type: 'security_lifecycle',
+        event: 'remediation_pr_opened',
+        findingId: 'finding-1',
+        scope: 'org-1',
+        remediationId: 'remediation-1',
+        prUrl: 'https://github.com/acme/api/pull/42',
+      });
+      expect(pushDataSchema.safeParse(input.push.data).success).toBe(true);
+    }
+    expect(calls.dispatchPushInputs[0]).toEqual({
+      userId: 'user-a',
+      presenceContext: null,
+      idempotencyKey: 'security-lifecycle:finding-1:remediation_pr_opened:remediation-1',
+      badge: null,
+      push: {
+        title: 'Kilo',
+        body: 'A security check has an update',
+        i18nKey: 'internal.securityLifecycle',
+        data: {
+          type: 'security_lifecycle',
+          event: 'remediation_pr_opened',
+          findingId: 'finding-1',
+          scope: 'org-1',
+          remediationId: 'remediation-1',
+          prUrl: 'https://github.com/acme/api/pull/42',
+        },
+        sound: 'default',
+        priority: 'high',
+      },
+    } satisfies DispatchPushInput);
+  });
+
+  it('security_lifecycle omits optional fields when absent and still validates', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      securityLifecycle({
+        event: 'analysis_completed',
+        remediationId: undefined,
+        prUrl: undefined,
+        recipientUserIds: ['user-a'],
+      }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+    expect(calls.dispatchPushInputs[0].push.data).toEqual({
+      type: 'security_lifecycle',
+      event: 'analysis_completed',
+      findingId: 'finding-1',
+      scope: 'org-1',
+    });
+    expect(pushDataSchema.safeParse(calls.dispatchPushInputs[0].push.data).success).toBe(true);
+    expect(calls.dispatchPushInputs[0].idempotencyKey).toBe(
+      'security-lifecycle:finding-1:analysis_completed:none'
+    );
+  });
+
+  it('suppresses security_lifecycle when securityFindingsEnabled is false (no DO call)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: { ...ALL_ON, securityFindingsEnabled: false },
+    });
+    const result = await dispatchInternalPushCore(securityLifecycle(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'suppressed_preference' },
+      { userId: 'user-b', outcome: 'suppressed_preference' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('security_lifecycle reads only securityFindingsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        balanceAlertsEnabled: false,
+        securityFindingsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(
+      securityLifecycle({ recipientUserIds: ['user-a'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('dedups duplicate recipient ids in security_lifecycle to one call', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      securityLifecycle({ recipientUserIds: ['user-a', 'user-a', 'user-b'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+  });
+
+  it('spend_alert dispatches every recipient with an exact, schema-valid payload', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(spendAlert(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
+    expect(calls.dispatchPushInputs).toEqual([
+      expectedSpendAlertInput('user-a'),
+      expectedSpendAlertInput('user-b'),
+    ]);
+    for (const input of calls.dispatchPushInputs) {
+      expect(pushDataSchema.safeParse(input.push.data).success).toBe(true);
+    }
+  });
+
+  it('spend_alert personal scope omits organizationId and keys on the personal scope', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      spendAlert({
+        scope: 'personal',
+        organizationId: undefined,
+        scopeName: 'you',
+        alertKind: 'anomaly',
+        recipientUserIds: ['user-a'],
+      }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe(
+      'spend-alert:personal:personal:anomaly:40:org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed'
+    );
+    expect(calls.dispatchPushInputs[0]!.push.data).toEqual({
+      type: 'spend_alert',
+      scope: 'personal',
+    });
+    expect(pushDataSchema.safeParse(calls.dispatchPushInputs[0]!.push.data).success).toBe(true);
+  });
+
+  it('spend_alert stays one alert per crossing: the same threshold shares one idempotency key', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(spendAlert({ recipientUserIds: ['user-a'] }), deps);
+    // A re-evaluated sweep with a grown total must dedupe to the same key.
+    await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'], amountUsd: 61.25 }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe(
+      calls.dispatchPushInputs[1]!.idempotencyKey
+    );
+  });
+
+  it('crossing a different threshold is a distinct alert', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 40 }),
+      deps
+    );
+    await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 80 }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).not.toBe(
+      calls.dispatchPushInputs[1]!.idempotencyKey
+    );
+  });
+
+  it('a new firing episode at the same threshold is a distinct alert', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(
+      spendAlert({
+        recipientUserIds: ['user-a'],
+        dedupeKey: 'org:org-1:threshold:push:hour-1:armed',
+      }),
+      deps
+    );
+    // The condition cleared and crossed again inside the DO's one-hour
+    // idempotency window: the outbox row (and its episode key) is new, so the
+    // push must send instead of being dropped as a duplicate of the first.
+    await dispatchInternalPushCore(
+      spendAlert({
+        recipientUserIds: ['user-a'],
+        dedupeKey: 'org:org-1:threshold:push:hour-1:2026-01-01T00:00:00.000Z',
+      }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).not.toBe(
+      calls.dispatchPushInputs[1]!.idempotencyKey
+    );
+  });
+
+  it('suppresses spend_alert when spendAlertsEnabled is false (no DO call)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: { ...ALL_ON, spendAlertsEnabled: false },
+    });
+    const result = await dispatchInternalPushCore(spendAlert(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'suppressed_preference' },
+      { userId: 'user-b', outcome: 'suppressed_preference' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('spend_alert reads only spendAlertsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        balanceAlertsEnabled: false,
+        securityFindingsEnabled: false,
+        spendAlertsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('a preference-read throw fails closed for the whole recipient set', async () => {
+    // The preference read throws for every recipient in this batch: the whole
+    // recipient set fails closed and zero dispatchPush calls happen.
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
+    const result = await dispatchInternalPushCore(spendAlert(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed', reason: 'preference_read_failed' },
+      { userId: 'user-b', outcome: 'failed', reason: 'preference_read_failed' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('dedups duplicate recipient ids in spend_alert to one call', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a', 'user-a', 'user-b'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
     expect(calls.dispatchPushInputs.map(i => i.userId)).toEqual(['user-a', 'user-b']);
   });
 });

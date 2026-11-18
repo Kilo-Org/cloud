@@ -19,10 +19,9 @@
 // so this module is testable in plain Node and reusable by any future
 // non-mobile surface (web, CLI, etc.).
 
-export type DiffLineType = 'context' | 'add' | 'del';
+import { i18n } from '@/i18n';
 
-/** Human-readable, screen-reader-friendly status word for a diff line. */
-type DiffLineStatusWord = 'Added' | 'Deleted' | 'Context';
+export type DiffLineType = 'context' | 'add' | 'del';
 
 /**
  * Single-character gutter glyph for a diff line. The CHARACTER is the
@@ -41,14 +40,14 @@ type DiffLineMarker = '+' | '-' | '·';
  * The status word for a diff line. Used in accessibility labels and any
  * future surface that needs to describe the line type in prose.
  */
-export function diffLineStatusWord(type: DiffLineType): DiffLineStatusWord {
+export function diffLineStatusWord(type: DiffLineType): string {
   if (type === 'add') {
-    return 'Added';
+    return i18n.t('common.added');
   }
   if (type === 'del') {
-    return 'Deleted';
+    return i18n.t('common.deleted');
   }
-  return 'Context';
+  return i18n.t('prReview.diff.statusContext');
 }
 
 /**
@@ -83,6 +82,20 @@ export type ParsedDiffLine = {
 };
 
 /**
+ * The line number a diff row shows in its gutter and speaks in its
+ * accessibility label — one rule for both, so a row never draws one number
+ * and announces another.
+ *
+ * New-file numbering: an added line has only a new number, and a context
+ * line uses its new number, which is also the side a comment on it anchors
+ * to (`sideForDiffLineType` → RIGHT). A deleted line has no new number, so
+ * it keeps its old one.
+ */
+export function diffLineNumber(line: ParsedDiffLine): number | undefined {
+  return line.type === 'del' ? line.oldLine : (line.newLine ?? line.oldLine);
+}
+
+/**
  * Build a screen-reader label for a diff line. Always includes BOTH the
  * status word ("Added" / "Deleted" / "Context") AND the line text — the
  * status word is the non-color signal, the line text is what the line
@@ -96,11 +109,13 @@ export type ParsedDiffLine = {
  */
 export function buildDiffLineAccessibilityLabel(line: ParsedDiffLine): string {
   const status = diffLineStatusWord(line.type);
-  const lineNumber = line.newLine ?? line.oldLine;
-  const linePart = lineNumber !== undefined ? ` line ${lineNumber}` : '';
+  const lineNumber = diffLineNumber(line);
   const trimmed = line.text.trim();
-  const text = trimmed === '' ? '(empty)' : line.text;
-  return `${status}${linePart}: ${text}`;
+  const text = trimmed === '' ? i18n.t('prReview.diff.emptyLine') : line.text;
+  if (lineNumber === undefined) {
+    return i18n.t('prReview.diff.lineLabelNoNumber', { status, text });
+  }
+  return i18n.t('prReview.diff.lineLabel', { status, line: lineNumber, text });
 }
 
 export type ParsedHunk = {

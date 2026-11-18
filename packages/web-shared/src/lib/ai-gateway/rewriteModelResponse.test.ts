@@ -1,0 +1,3642 @@
+import { describe, test, expect, beforeEach } from '@jest/globals';
+import { after } from 'next/server';
+import {
+  rewriteModelResponse,
+  logUnrewrittenResponse,
+  redactApiRequestLogRequest,
+  type RequestLoggingParams,
+} from './rewriteModelResponse';
+import { rewriteModelResponse_ChatCompletions } from './rewriteModelResponse.chatCompletions';
+import { rewriteModelResponse_Messages } from './rewriteModelResponse.messages';
+import { rewriteModelResponse_Responses } from './rewriteModelResponse.responses';
+import {
+  getDynamicRequestLoggingMode,
+  type RequestLoggingMode,
+} from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { api_request_log_2 } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
+import { eq } from 'drizzle-orm';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  apiRequestLogBlobKey,
+  apiRequestLogBlobSchema,
+  type EnkryptRequestLog,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
+import type { RewriteResponseParams } from './rewriteModelResponse.shared';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+
+jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
+  jest
+    .requireActual<{
+      createFakeR2ClientModule: () => FakeR2ClientModule;
+    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
+    .createFakeR2ClientModule()
+);
+
+jest.mock('next/server', () => ({
+  ...(jest.requireActual('next/server') as Record<string, unknown>),
+  after: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins', () => ({
+  getDynamicRequestLoggingMode: jest.fn(async (): Promise<RequestLoggingMode | null> => null),
+}));
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  logExceptInTest: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(async () => ({ models: [] })),
+}));
+
+const mockedOptIn = jest.mocked(getDynamicRequestLoggingMode);
+const mockedLog = jest.mocked(logExceptInTest);
+const mockedAfter = jest.mocked(after);
+const freeUsageContext = {
+  requested_model: 'upstream-model',
+  provider: 'openrouter',
+  is_free: true,
+  custom_llm_pricing: null,
+  user_byok: false,
+  custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+  api_kind: 'chat_completions',
+} satisfies RewriteResponseParams['usageContext'];
+
+beforeEach(() => {
+  mockedOptIn.mockClear();
+  mockedLog.mockClear();
+  mockedAfter.mockClear();
+});
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+function sseResponse(body: string, status = 200): Response {
+  return new Response(body, {
+    status,
+    headers: { 'content-type': 'text/event-stream' },
+  });
+}
+
+function hangingSseResponse(body: string): { response: Response; cancel: jest.Mock } {
+  const encoder = new TextEncoder();
+  const cancel = jest.fn();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(body));
+    },
+    cancel,
+  });
+
+  return {
+    response: new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
+    cancel,
+  };
+}
+
+function failingResponse(
+  contentType: string,
+  failure: string | Error,
+  initialBody?: string
+): Response {
+  const encoder = new TextEncoder();
+  let pullCount = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (pullCount++ === 0 && initialBody !== undefined) {
+        controller.enqueue(encoder.encode(initialBody));
+        return;
+      }
+
+      const error = typeof failure === 'string' ? new Error(failure) : failure;
+      if (typeof failure === 'string') error.name = failure;
+      controller.error(error);
+    },
+  });
+
+  return new Response(body, { headers: { 'content-type': contentType } });
+}
+
+async function readOutputStream(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+  const decoder = new TextDecoder();
+  let out = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    out += typeof value === 'string' ? value : decoder.decode(value, { stream: true });
+  }
+  out += decoder.decode();
+  return out;
+}
+
+function dataPayloads(sse: string): string[] {
+  return sse
+    .split('\n\n')
+    .map(block =>
+      block
+        .split('\n')
+        .find(line => line.startsWith('data: '))
+        ?.slice('data: '.length)
+    )
+    .filter((payload): payload is string => payload !== undefined);
+}
+
+function dataObjects(sse: string): unknown[] {
+  return dataPayloads(sse)
+    .filter(payload => payload !== '[DONE]')
+    .map(payload => JSON.parse(payload));
+}
+
+const rewriteChatCompletionsWithoutTransforms: typeof rewriteModelResponse_Messages = params =>
+  rewriteModelResponse_ChatCompletions({ ...params, responseTransforms: null });
+
+const rewriters = [
+  ['Chat Completions', rewriteChatCompletionsWithoutTransforms],
+  ['Messages', rewriteModelResponse_Messages],
+  ['Responses', rewriteModelResponse_Responses],
+] as const;
+
+describe.each(rewriters)('%s SSE proxy headers', (_name, rewrite) => {
+  test('keeps event streams uncompressed through external rewrites', async () => {
+    const result = await rewrite({
+      response: sseResponse(''),
+      usageContext: freeUsageContext,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+    expect(result.headers.get('content-encoding')).toBe('identity');
+    expect(await readOutputStream(result)).toBe('');
+  });
+});
+
+describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect', 'disconnected'],
+    ['TimeoutError', 'timeout', 'timed out'],
+  ])('returns structured JSON for %s', async (errorName, errorType, messageFragment) => {
+    const result = await rewrite({
+      response: failingResponse('application/json', errorName),
+      usageContext: freeUsageContext,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({
+      error: expect.stringContaining(messageFragment),
+      error_type: errorType,
+      message: expect.stringContaining(messageFragment),
+    });
+  });
+
+  test.each([
+    ['a closed socket', 'UND_ERR_SOCKET', 'upstream_disconnect', 'interrupted'],
+    ['a reset connection', 'ECONNRESET', 'upstream_disconnect', 'interrupted'],
+    ['an idle body timeout', 'UND_ERR_BODY_TIMEOUT', 'timeout', 'timed out'],
+  ])(
+    'reports an undici body termination after %s',
+    async (_description, causeCode, errorType, messageFragment) => {
+      const terminated = () =>
+        new TypeError('terminated', { cause: Object.assign(new Error(), { code: causeCode }) });
+
+      const jsonResult = await rewrite({
+        response: failingResponse('application/json', terminated()),
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      expect(jsonResult.status).toBe(503);
+      expect(await jsonResult.json()).toEqual({
+        error: expect.stringContaining(messageFragment),
+        error_type: errorType,
+        message: expect.stringContaining(messageFragment),
+      });
+
+      const sseResult = await rewrite({
+        response: failingResponse(
+          'text/event-stream',
+          terminated(),
+          'data: {"id":"gen-1","type":"ping","choices":[]}\n\n'
+        ),
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      const events = dataObjects(await readOutputStream(sseResult)) as {
+        error?: { message: string };
+      }[];
+      expect(events).toHaveLength(2);
+      expect(events[1].error?.message).toContain(messageFragment);
+    }
+  );
+
+  test('still fails the response for an unrecognized JSON read error', async () => {
+    await expect(
+      rewrite({
+        response: failingResponse('application/json', new TypeError('unexpected')),
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      })
+    ).rejects.toThrow('unexpected');
+  });
+
+  test.each(['high', 'medium', 'low', 'none', null])(
+    'omits effort advice for effort %s',
+    async reasoningEffort => {
+      const result = await rewrite({
+        response: failingResponse('application/json', 'TimeoutError'),
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort,
+      });
+
+      expect(await result.json()).toEqual({
+        error: 'The upstream provider timed out while sending the response.',
+        error_type: 'timeout',
+        message: 'The upstream provider timed out while sending the response.',
+      });
+    }
+  );
+
+  test('includes the vercel request id only in the JSON read error message', async () => {
+    const result = await rewrite({
+      response: failingResponse('application/json', 'ResponseAborted'),
+      usageContext: freeUsageContext,
+      capture: null,
+      vercelRequestId: 'iad1::iad1::request-id',
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({
+      error:
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)',
+      error_type: 'upstream_disconnect',
+      message:
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)',
+    });
+  });
+
+  test('includes the vercel request id only in the stream error message', async () => {
+    const result = await rewrite({
+      response: failingResponse('text/event-stream', 'ResponseAborted'),
+      usageContext: freeUsageContext,
+      capture: null,
+      vercelRequestId: 'iad1::iad1::request-id',
+      reasoningEffort: null,
+    });
+    const events = dataObjects(await readOutputStream(result)) as {
+      error: { message: string };
+    }[];
+
+    expect(events).toHaveLength(1);
+    expect(events[0].error.message).toBe(
+      'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)'
+    );
+    expect(events[0].error).not.toHaveProperty('vercel_request_id');
+  });
+
+  test('omits the request id suffix when no vercel request id is available', async () => {
+    const result = await rewrite({
+      response: failingResponse('text/event-stream', 'ResponseAborted'),
+      usageContext: freeUsageContext,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const events = dataObjects(await readOutputStream(result)) as {
+      error: { message: string };
+    }[];
+
+    expect(events[0].error.message).toBe(
+      'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.'
+    );
+  });
+
+  test.each(['application/json', 'text/event-stream'])(
+    'reports the gateway duration limit for a %s body that outlives the upstream budget',
+    async contentType => {
+      const result = await rewrite({
+        response: failingResponse(contentType, new UpstreamTimeoutError(600_000, 5_000)),
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: 'iad1::iad1::request-id',
+        reasoningEffort: null,
+      });
+      const message =
+        "The response reached the gateway's 600-second duration limit and was stopped before it finished. (request id: iad1::iad1::request-id)";
+
+      if (contentType === 'application/json') {
+        expect(result.status).toBe(503);
+        expect(await result.json()).toEqual({ error: message, error_type: 'timeout', message });
+      } else {
+        const events = dataObjects(await readOutputStream(result)) as {
+          error: { message: string };
+        }[];
+        expect(events).toHaveLength(1);
+        expect(events[0].error.message).toBe(message);
+      }
+    }
+  );
+});
+
+const timeoutEffortRequests = [
+  {
+    name: 'Chat Completions nested effort',
+    request: {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [], reasoning: { effort: 'xhigh' } },
+    },
+    effort: 'xhigh',
+  },
+  {
+    name: 'Chat Completions top-level effort',
+    request: {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [], reasoning_effort: 'max' },
+    },
+    effort: 'max',
+  },
+  {
+    name: 'Responses',
+    request: {
+      kind: 'responses',
+      body: { model: 'test-model', input: 'Hello', reasoning: { effort: 'xhigh' } },
+    },
+    effort: 'xhigh',
+  },
+  {
+    name: 'Messages',
+    request: {
+      kind: 'messages',
+      body: {
+        model: 'test-model',
+        messages: [],
+        max_tokens: 1024,
+        output_config: { effort: 'max' },
+      },
+    },
+    effort: 'max',
+  },
+] satisfies { name: string; request: GatewayRequest; effort: string }[];
+
+describe.each(timeoutEffortRequests)('$name timeout effort guidance', ({ request, effort }) => {
+  test.each([
+    ['application/json', 'TimeoutError', 'timeout'],
+    ['application/json', 'ResponseAborted', 'upstream_disconnect'],
+    ['text/event-stream', 'TimeoutError', 'timeout'],
+    ['text/event-stream', 'ResponseAborted', 'upstream_disconnect'],
+  ])('suggests lowering effort for %s %s', async (contentType, errorName, errorType) => {
+    const result = await rewriteModelResponse({
+      response: failingResponse(contentType, errorName),
+      model: request.body.model ?? 'test-model',
+      providerId: 'openrouter',
+      kind: request.kind,
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: {
+        usage_id: crypto.randomUUID(),
+        user: null,
+        organization_id: null,
+        session_id: null,
+        vercel_request_id: 'fra1::request-id',
+        request,
+      },
+      responseTransforms: null,
+    });
+    const expectedMessage =
+      (errorName === 'TimeoutError'
+        ? 'The upstream provider timed out while sending the response.'
+        : 'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.') +
+      ` Try lowering the reasoning effort from "${effort}" to "high" or lower to reduce the chance of timeouts. (request id: fra1::request-id)`;
+
+    if (contentType === 'application/json') {
+      expect(result.status).toBe(503);
+      expect(await result.json()).toEqual({
+        error: expectedMessage,
+        error_type: errorType,
+        message: expectedMessage,
+      });
+    } else {
+      expect(result.status).toBe(200);
+      expect(dataObjects(await readOutputStream(result))).toEqual([
+        expect.objectContaining({
+          error: expect.objectContaining({ message: expectedMessage }),
+        }),
+      ]);
+    }
+  });
+});
+
+describe('rewriteModelResponse_ChatCompletions', () => {
+  describe('JSON responses', () => {
+    test('zeroes billed cost for free requests and preserves upstream cost details', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          cost: 0.5,
+          cost_details: { upstream_inference_cost: 0.4 },
+          is_byok: true,
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.model).toBe('upstream-model');
+      expect(json.usage.cost).toBe(0);
+      expect(json.usage.cost_details).toEqual({ upstream_inference_cost: 0.4 });
+      expect(json.usage.is_byok).toBe(false);
+      expect(json.usage.prompt_tokens).toBe(10);
+      expect(json.usage.prompt_tokens_details.cached_tokens).toBe(3);
+      expect(result.headers.get('content-encoding')).toBe('identity');
+    });
+
+    test('defaults cached_tokens to 0 when absent', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: {},
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
+    });
+
+    test('defaults reasoning_tokens to 0 when completion_tokens_details omits it', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          cost: 0.5,
+          is_byok: true,
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+          completion_tokens_details: { text_tokens: 3 },
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.usage).toEqual({
+        cost: 0,
+        is_byok: false,
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_tokens_details: { cached_tokens: 3 },
+        completion_tokens_details: { text_tokens: 3, reasoning_tokens: 0 },
+      });
+    });
+
+    test.each([0, 7])(
+      'preserves a supplied reasoning_tokens value of %s',
+      async reasoningTokens => {
+        const upstream = jsonResponse({
+          model: 'upstream-model',
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 5,
+            total_tokens: 15,
+            prompt_tokens_details: { cached_tokens: 3 },
+            completion_tokens_details: { reasoning_tokens: reasoningTokens },
+          },
+        });
+
+        const result = await rewriteModelResponse_ChatCompletions({
+          response: upstream,
+          usageContext: freeUsageContext,
+          capture: null,
+          vercelRequestId: null,
+          reasoningEffort: null,
+          responseTransforms: null,
+        });
+        const json = await result.json();
+
+        expect(json.usage).toEqual({
+          cost: 0,
+          is_byok: false,
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+          completion_tokens_details: { reasoning_tokens: reasoningTokens },
+        });
+      }
+    );
+
+    test('does not add completion_tokens_details when absent', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.usage).toEqual({
+        cost: 0,
+        is_byok: false,
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_tokens_details: { cached_tokens: 3 },
+      });
+    });
+
+    test('passes through invalid JSON bodies unchanged and preserves status', async () => {
+      const upstream = new Response('not-json{', {
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { 'content-type': 'application/json' },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+
+      expect(result.status).toBe(502);
+      expect(await result.text()).toBe('not-json{');
+    });
+
+    test('splits tagged Gemini thoughts from the answer in a message flagged as a thought', async () => {
+      const upstream = jsonResponse({
+        model: 'google/gemini-3.1-pro-preview',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '<think>\n**Multiplying**\n\n23 * 47 is 1081.\n\n \n</think>\n\n1081',
+              extra_content: { google: { thought: true, thought_signature: 'opaque-signature' } },
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: '1081',
+        reasoning_details: [
+          {
+            type: 'reasoning.text',
+            text: '**Multiplying**\n\n23 * 47 is 1081.',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+          {
+            type: 'reasoning.encrypted',
+            data: 'opaque-signature',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
+      });
+    });
+
+    test('splits tagged Gemini thoughts that precede tool calls', async () => {
+      const upstream = jsonResponse({
+        model: 'google/gemini-3.5-flash',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '<think>\nI should read the file.\n\n\n</think>\n\n',
+              extra_content: { google: { thought: true } },
+              tool_calls: [
+                {
+                  id: 'call-1',
+                  type: 'function',
+                  function: { name: 'read', arguments: '{}' },
+                  extra_content: { google: { thought_signature: 'tool-signature' } },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.content).toBe('');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        {
+          type: 'reasoning.text',
+          text: 'I should read the file.',
+          index: 0,
+          format: 'google-gemini-v1',
+        },
+        {
+          type: 'reasoning.encrypted',
+          data: 'tool-signature',
+          id: 'call-1',
+          index: 0,
+          format: 'google-gemini-v1',
+        },
+      ]);
+    });
+
+    test('treats untagged content flagged as a Gemini thought as reasoning only', async () => {
+      const upstream = jsonResponse({
+        model: 'google/gemini-3.5-flash',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'only a thought',
+              extra_content: { google: { thought: true } },
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'only a thought', index: 0, format: 'google-gemini-v1' },
+        ],
+      });
+    });
+
+    test('maps message reasoning_content to reasoning_details', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning_content: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'answer',
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'full thought', index: 0, format: 'unknown' },
+        ],
+      });
+    });
+
+    test('maps a message reasoning string to reasoning_details', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.Reasoning,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'answer',
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'full thought', index: 0, format: 'unknown' },
+        ],
+      });
+    });
+
+    test('leaves an OpenRouter reasoning string next to reasoning_details alone', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'answer',
+              reasoning: 'full thought',
+              reasoning_details: [{ type: 'reasoning.text', text: 'full thought', index: 0 }],
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.Reasoning,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        { type: 'reasoning.text', text: 'full thought', index: 0 },
+      ]);
+    });
+
+    test('leaves reasoning_content alone when reasoning_details are already present', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'answer',
+              reasoning_content: 'full thought',
+              reasoning_details: [{ type: 'reasoning.text', text: 'full thought', index: 0 }],
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning_content).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        { type: 'reasoning.text', text: 'full thought', index: 0 },
+      ]);
+    });
+
+    test('leaves reasoning_content alone when the transform is disabled', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning_content: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning_content).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toBeUndefined();
+    });
+
+    test('adds the missing function type to message tool calls', async () => {
+      const upstream = jsonResponse({
+        model: 'mistral-medium-3',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              tool_calls: [
+                { id: 'BlUZaHnVa', function: { name: 'read', arguments: '{}' }, index: 0 },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.tool_calls).toEqual([
+        {
+          id: 'BlUZaHnVa',
+          type: 'function',
+          function: { name: 'read', arguments: '{}' },
+          index: 0,
+        },
+      ]);
+    });
+
+    test('drops null message tool_calls', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'It is cloudy in Paris.', tool_calls: null },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'It is cloudy in Paris.',
+      });
+    });
+
+    test('preserves message tool_calls arrays', async () => {
+      const toolCalls = [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+        },
+      ];
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: null, tool_calls: toolCalls },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.tool_calls).toEqual(toolCalls);
+    });
+  });
+
+  describe('streaming responses', () => {
+    test('tracks event progress every 30 seconds and clears the interval', async () => {
+      const intervalHandle = setTimeout(() => {}, 0);
+      clearTimeout(intervalHandle);
+      const setIntervalSpy = jest.spyOn(globalThis, 'setInterval').mockReturnValue(intervalHandle);
+      const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval');
+      const encoder = new TextEncoder();
+      const upstreamController: { current?: ReadableStreamDefaultController<Uint8Array> } = {};
+      const upstream = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            upstreamController.current = controller;
+            controller.enqueue(
+              encoder.encode('data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n')
+            );
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+
+      try {
+        const result = await rewriteModelResponse_ChatCompletions({
+          response: upstream,
+          usageContext: freeUsageContext,
+          capture: null,
+          vercelRequestId: null,
+          reasoningEffort: null,
+          responseTransforms: null,
+        });
+        const reader = result.body?.getReader();
+        expect(reader).toBeDefined();
+        expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+        const first = await reader?.read();
+        expect(first?.done).toBe(false);
+        expect(first?.value).toContain('"id":"gen-chat"');
+        expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+
+        upstreamController.current?.close();
+        await reader?.read();
+        expect(clearIntervalSpy).toHaveBeenCalledWith(intervalHandle);
+      } finally {
+        setIntervalSpy.mockRestore();
+        clearIntervalSpy.mockRestore();
+      }
+    });
+
+    test.each([true, false])('drops incomplete chunk usage (isFree=%s)', async isFree => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-1","choices":[{"index":0,"delta":{"content":"hi"}}],"usage":{"extra_properties":{"google":{"traffic_type":"ON_DEMAND"}}}}\n\n' +
+          'data: {"id":"gen-1","choices":[],"usage":{"prompt_tokens":0,"completion_tokens":1,"total_tokens":1,"cost":0.01}}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: { ...freeUsageContext, is_free: isFree },
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const output = await readOutputStream(result);
+      expect(dataObjects(output)).toEqual([
+        { id: 'gen-1', choices: [{ index: 0, delta: { content: 'hi' } }] },
+        {
+          id: 'gen-1',
+          choices: [],
+          usage: {
+            prompt_tokens: 0,
+            completion_tokens: 1,
+            total_tokens: 1,
+            cost: isFree ? 0 : 0.01,
+            is_byok: false,
+          },
+        },
+      ]);
+      expect(dataPayloads(output).at(-1)).toBe('[DONE]');
+    });
+
+    test.each([
+      ['ResponseAborted', 'upstream_disconnect'],
+      ['TimeoutError', 'timeout'],
+    ])('emits a structured SSE error for %s', async (errorName, errorType) => {
+      const upstream = failingResponse(
+        'text/event-stream',
+        errorName,
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+      const events = dataObjects(sse) as Array<{ error?: { code: number; type: string } }>;
+
+      expect(events[0]).toMatchObject({ model: 'upstream-model' });
+      expect(events[1]).toMatchObject({ id: 'gen-chat' });
+      expect(events[1]?.error).toMatchObject({ code: 503, type: errorType });
+      expect(dataPayloads(sse)).not.toContain('[DONE]');
+    });
+
+    test('drops null delta role and emits [DONE]', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"delta":{"role":null,"content":"hi"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+      const [chunk] = dataObjects(sse) as Array<{
+        model: string;
+        choices: Array<{ delta: { role?: unknown; content: string } }>;
+      }>;
+
+      expect(chunk.model).toBe('upstream-model');
+      expect('role' in chunk.choices[0].delta).toBe(false);
+      expect(chunk.choices[0].delta.content).toBe('hi');
+      expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('drops null delta tool_calls', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"hi","tool_calls":null}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({ content: 'hi' });
+    });
+
+    test('drops null delta tool call type', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"read","arguments":""}}]}}]}\n\n' +
+          'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":null,"type":null,"function":{"name":null,"arguments":"{}"}}]}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [first, continuation] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: { tool_calls: Array<Record<string, unknown>> } }>;
+      }>;
+
+      expect(first.choices[0].delta.tool_calls[0]).toEqual({
+        index: 0,
+        id: 'call-1',
+        type: 'function',
+        function: { name: 'read', arguments: '' },
+      });
+      expect(continuation.choices[0].delta.tool_calls[0]).toEqual({
+        index: 0,
+        id: null,
+        function: { name: null, arguments: '{}' },
+      });
+    });
+
+    test('maps Gemini thought content and signatures to reasoning_details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"google":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"google":{"thought":false}}}},{"index":2,"delta":{"tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{}"},"extra_content":{"trace_id":"trace-1","google":{"thought_signature":"opaque-signature"}}}]}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_details: [
+          {
+            type: 'reasoning.text',
+            text: 'first thought',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
+      });
+      expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
+      expect(chunk.choices[2].delta).toEqual({
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: { name: 'lookup', arguments: '{}' },
+            extra_content: { trace_id: 'trace-1' },
+          },
+        ],
+        reasoning_details: [
+          {
+            type: 'reasoning.encrypted',
+            data: 'opaque-signature',
+            id: 'call-1',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
+      });
+    });
+
+    test('maps a message-level Gemini signature to encrypted reasoning details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"answer","extra_content":{"google":{"thought_signature":"root-signature"}}}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        content: 'answer',
+        reasoning_details: [
+          {
+            type: 'reasoning.encrypted',
+            data: 'root-signature',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
+      });
+    });
+
+    test('adds the missing function type to starting tool call deltas only', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"mistral-medium-3","choices":[{"index":0,"delta":{"tool_calls":[{"id":"1KVxQL4of","function":{"name":"read","arguments":"{\\"a\\""},"index":0}]}},{"index":0,"delta":{"tool_calls":[{"function":{"arguments":":1}"},"index":0}]}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: { tool_calls: Array<Record<string, unknown>> } }>;
+      }>;
+
+      expect(chunk.choices[0].delta.tool_calls[0]).toEqual({
+        id: '1KVxQL4of',
+        type: 'function',
+        function: { name: 'read', arguments: '{"a"' },
+        index: 0,
+      });
+      expect(chunk.choices[1].delta.tool_calls[0]).toEqual({
+        function: { arguments: ':1}' },
+        index: 0,
+      });
+    });
+
+    test('maps delta reasoning_content to reasoning_details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"reasoning_content":"first "}},{"index":0,"delta":{"reasoning_content":"thought"}},{"index":0,"delta":{"content":"answer"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'first ', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[1].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'thought', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[2].delta).toEqual({ content: 'answer' });
+    });
+
+    test('maps a delta reasoning string to reasoning_details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"reasoning":"first "}},{"index":0,"delta":{"reasoning_content":"untouched"}},{"index":0,"delta":{"content":"answer"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.Reasoning,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'first ', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[1].delta).toEqual({ reasoning_content: 'untouched' });
+      expect(chunk.choices[2].delta).toEqual({ content: 'answer' });
+    });
+
+    test('does not treat a null error field as terminal', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-chat","error":null,"choices":[]}\n\n' +
+          'data: {"id":"gen-chat","choices":[{"delta":{"content":"still streaming"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+
+      expect(sse).toContain('still streaming');
+      expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('cancels upstream and closes immediately after [DONE]', async () => {
+      const capture = makeCapture();
+      const body =
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n' +
+        'data: [DONE]\n\n' +
+        'data: {"id":"ignored","model":"upstream-model","choices":[]}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture,
+        vercelRequestId: 'iad1::terminal-request',
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+
+      expect(dataObjects(sse)).toEqual([{ id: 'gen-chat', model: 'upstream-model', choices: [] }]);
+      expect(dataPayloads(sse)).toContain('[DONE]');
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind: 'chat_completions',
+          eventType: '[DONE]',
+          generationId: 'gen-chat',
+          vercelRequestId: 'iad1::terminal-request',
+        }
+      );
+    });
+
+    test('adds an empty choices array and zeroes cost on free usage-only chunks', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","usage":{"cost":1,"is_byok":true,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{}}}\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+      const [chunk] = dataObjects(sse) as Array<{
+        model: string;
+        choices: unknown[];
+        usage: {
+          cost?: number;
+          is_byok?: boolean;
+          prompt_tokens_details: { cached_tokens: number };
+        };
+      }>;
+
+      expect(chunk.model).toBe('upstream-model');
+      expect(chunk.choices).toEqual([]);
+      expect(chunk.usage.cost).toBe(0);
+      expect(chunk.usage.is_byok).toBe(false);
+      expect(chunk.usage.prompt_tokens_details.cached_tokens).toBe(0);
+    });
+
+    test('defaults reasoning_tokens in a usage-only chunk and still terminates with [DONE]', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[],"usage":{"cost":1,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{"cached_tokens":1},"completion_tokens_details":{"text_tokens":3}}}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+      const [chunk] = dataObjects(sse) as Array<{
+        usage: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+          prompt_tokens_details: { cached_tokens: number };
+          completion_tokens_details: { text_tokens?: number; reasoning_tokens: number };
+        };
+      }>;
+
+      expect(chunk.usage).toEqual({
+        cost: 0,
+        is_byok: false,
+        prompt_tokens: 4,
+        completion_tokens: 2,
+        total_tokens: 6,
+        prompt_tokens_details: { cached_tokens: 1 },
+        completion_tokens_details: { text_tokens: 3, reasoning_tokens: 0 },
+      });
+      expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('keeps the pre-rewrite clone for accounting byte-for-byte', async () => {
+      const body =
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[],"usage":{"cost":1,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{"cached_tokens":1},"completion_tokens_details":{"text_tokens":3}}}\n\n';
+      const upstream = sseResponse(body);
+      const accountingClone = upstream.clone();
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      await readOutputStream(result);
+
+      expect(await accountingClone.text()).toBe(body);
+    });
+
+    test('forwards SSE comments as a processing keep-alive', async () => {
+      const upstream = sseResponse(
+        ': openrouter heartbeat\n\n' + 'data: {"model":"upstream-model","choices":[]}\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+
+      expect(sse).toContain(': KILO PROCESSING');
+    });
+
+    test('returns an empty body when upstream has no body', async () => {
+      const upstream = new Response(null, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+
+      expect(await readOutputStream(result)).toBe('');
+    });
+  });
+});
+
+describe('rewriteModelResponse_Messages', () => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect'],
+    ['TimeoutError', 'timeout'],
+  ])('emits an Anthropic SSE error for %s', async (errorName, errorType) => {
+    const result = await rewriteModelResponse_Messages({
+      response: failingResponse(
+        'text/event-stream',
+        errorName,
+        'data: {"type":"message_start","message":{"id":"gen-message","usage":{"input_tokens":1,"output_tokens":0}}}\n\n'
+      ),
+      usageContext: { ...freeUsageContext, api_kind: 'messages' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+
+    expect(sse).toContain('event: error\n');
+    expect(dataObjects(sse)).toEqual([
+      {
+        type: 'message_start',
+        message: {
+          id: 'gen-message',
+          usage: { input_tokens: 1, output_tokens: 0, cost: 0, is_byok: false },
+        },
+      },
+      {
+        id: 'gen-message',
+        type: 'error',
+        error: {
+          type: 'api_error',
+          message: expect.any(String),
+          error_type: errorType,
+        },
+      },
+    ]);
+  });
+
+  test('zeroes free JSON response cost and preserves upstream cost details', async () => {
+    const upstream = jsonResponse({
+      type: 'message',
+      model: 'upstream-model',
+      usage: {
+        input_tokens: 20,
+        output_tokens: 7,
+        cost: 0.3,
+        cost_details: { upstream_inference_cost: 0.2 },
+        is_byok: false,
+      },
+    });
+
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'messages' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const json = await result.json();
+
+    expect(json.model).toBe('upstream-model');
+    expect(json.usage.input_tokens).toBe(20);
+    expect(json.usage.cost).toBe(0);
+    expect(json.usage.cost_details).toEqual({ upstream_inference_cost: 0.2 });
+    expect(json.usage.is_byok).toBe(false);
+  });
+
+  test('passes through invalid JSON bodies unchanged', async () => {
+    const upstream = new Response('}{', {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'messages' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(500);
+    expect(await result.text()).toBe('}{');
+  });
+
+  test('rewrites message_start and message_delta usage and ignores [DONE]', async () => {
+    const upstream = sseResponse(
+      'data: {"type":"message_start","message":{"model":"upstream-model","usage":{"input_tokens":11,"output_tokens":0,"cost":0.1,"is_byok":true}}}\n\n' +
+        'data: {"type":"message_delta","usage":{"output_tokens":9,"cost":0.2,"is_byok":true},"delta":{}}\n\n' +
+        'data: [DONE]\n\n'
+    );
+
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'messages' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+    const events = dataObjects(sse) as Array<{
+      type: string;
+      message?: {
+        model: string;
+        usage: { cost?: number; is_byok?: boolean; input_tokens: number };
+      };
+      usage?: { cost?: number; is_byok?: boolean; output_tokens: number };
+    }>;
+
+    expect(events[0].message?.model).toBe('upstream-model');
+    expect(events[0].message?.usage.cost).toBe(0);
+    expect(events[0].message?.usage.is_byok).toBe(false);
+    expect(events[0].message?.usage.input_tokens).toBe(11);
+
+    expect(events[1].usage?.cost).toBe(0);
+    expect(events[1].usage?.is_byok).toBe(false);
+    expect(events[1].usage?.output_tokens).toBe(9);
+
+    expect(dataPayloads(sse)).toContain('[DONE]');
+  });
+
+  test('does not synthesize a [DONE] sentinel when upstream omits it', async () => {
+    const upstream = sseResponse(
+      'data: {"type":"message_delta","usage":{"output_tokens":9},"delta":{}}\n\n'
+    );
+
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'messages' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+
+    expect(dataPayloads(sse)).not.toContain('[DONE]');
+  });
+
+  test('cancels upstream and closes immediately after message_stop', async () => {
+    const capture = makeCapture();
+    const body =
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
+    const { response: upstream, cancel } = hangingSseResponse(body);
+
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'messages' },
+      capture,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+
+    expect(dataObjects(sse)).toEqual([{ type: 'message_stop' }]);
+    expect(dataPayloads(sse)).not.toContain('[DONE]');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(body);
+    expect(capture.setReadError).not.toHaveBeenCalled();
+    expect(mockedLog).toHaveBeenCalledWith(
+      '[rewriteModelResponse] received terminal stream event',
+      {
+        kind: 'messages',
+        eventType: 'message_stop',
+        generationId: '<none>',
+        vercelRequestId: '<none>',
+      }
+    );
+  });
+
+  test('cancels upstream and closes immediately after a compatible [DONE] sentinel', async () => {
+    const capture = makeCapture();
+    const body =
+      'data: [DONE]\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
+    const { response: upstream, cancel } = hangingSseResponse(body);
+
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'messages' },
+      capture,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+
+    expect(dataObjects(sse)).toEqual([]);
+    expect(dataPayloads(sse)).toEqual(['[DONE]']);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(body);
+    expect(capture.setReadError).not.toHaveBeenCalled();
+  });
+});
+
+describe('rewriteModelResponse_Responses', () => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect'],
+    ['TimeoutError', 'timeout'],
+  ])('emits an OpenAI Responses SSE error for %s', async (errorName, errorType) => {
+    const result = await rewriteModelResponse_Responses({
+      response: failingResponse(
+        'text/event-stream',
+        errorName,
+        'data: {"type":"response.created","sequence_number":4,"response":{"id":"gen-response"}}\n\n'
+      ),
+      usageContext: { ...freeUsageContext, api_kind: 'responses' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+
+    expect(sse).toContain('event: error\n');
+    expect(dataObjects(sse)).toEqual([
+      {
+        type: 'response.created',
+        sequence_number: 4,
+        response: { id: 'gen-response' },
+      },
+      {
+        id: 'gen-response',
+        type: 'error',
+        sequence_number: 5,
+        error: {
+          type: errorType,
+          code: errorType === 'timeout' ? '504' : '503',
+          message: expect.any(String),
+        },
+      },
+    ]);
+  });
+
+  test('zeroes free JSON response cost', async () => {
+    const upstream = jsonResponse({
+      id: 'resp_1',
+      model: 'upstream-model',
+      usage: {
+        cost: 0.9,
+        is_byok: true,
+        prompt_tokens: 30,
+        completion_tokens: 12,
+        total_tokens: 42,
+        prompt_tokens_details: {},
+      },
+    });
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'responses' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const json = await result.json();
+
+    expect(json.model).toBe('upstream-model');
+    expect(json.usage.cost).toBe(0);
+    expect(json.usage.is_byok).toBe(false);
+    expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
+  });
+
+  test('restores the id of output items that only carry item_id in JSON responses', async () => {
+    const upstream = jsonResponse({
+      id: 'resp_1',
+      output: [
+        {
+          type: 'function_call',
+          item_id: 'fc_1',
+          call_id: 'call_1',
+          name: 'read',
+          arguments: '{}',
+        },
+        { type: 'message', id: 'msg_1', item_id: 'other_id', content: [] },
+      ],
+    });
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'responses' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(await result.json()).toMatchObject({
+      output: [
+        { id: 'fc_1', item_id: 'fc_1' },
+        { id: 'msg_1', item_id: 'other_id' },
+      ],
+    });
+  });
+
+  test('restores the id of output items that only carry item_id in streams', async () => {
+    const upstream = sseResponse(
+      'data: {"type":"response.function_call_arguments.delta","sequence_number":1,"item_id":"fc_1","delta":"{}"}\n\n' +
+        'data: {"type":"response.output_item.done","sequence_number":2,"item":{"type":"function_call","item_id":"fc_1","call_id":"call_1","name":"read","arguments":"{}"}}\n\n' +
+        'data: {"type":"response.output_item.done","sequence_number":3,"item":{"type":"message","id":"msg_1","item_id":"other_id"}}\n\n' +
+        'data: {"type":"response.completed","sequence_number":4,"response":{"output":[{"type":"function_call","item_id":"fc_1","call_id":"call_1"},{"type":"message","id":"msg_1","item_id":"other_id"}]}}\n\n'
+    );
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'responses' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    expect(dataObjects(await readOutputStream(result))).toEqual([
+      {
+        type: 'response.function_call_arguments.delta',
+        sequence_number: 1,
+        item_id: 'fc_1',
+        delta: '{}',
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 2,
+        item: {
+          type: 'function_call',
+          id: 'fc_1',
+          item_id: 'fc_1',
+          call_id: 'call_1',
+          name: 'read',
+          arguments: '{}',
+        },
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 3,
+        item: { type: 'message', id: 'msg_1', item_id: 'other_id' },
+      },
+      {
+        type: 'response.completed',
+        sequence_number: 4,
+        response: {
+          output: [
+            { type: 'function_call', id: 'fc_1', item_id: 'fc_1', call_id: 'call_1' },
+            { type: 'message', id: 'msg_1', item_id: 'other_id' },
+          ],
+        },
+      },
+    ]);
+  });
+
+  test('zeroes nested free response cost and closes after the completed event', async () => {
+    const upstream = sseResponse(
+      'event: response.completed\n' +
+        'data: {"type":"response.completed","response":{"model":"upstream-model","usage":{"cost":0.5,"is_byok":true,"prompt_tokens":3,"completion_tokens":1,"total_tokens":4,"prompt_tokens_details":{"cached_tokens":1}}}}\n\n' +
+        'data: [DONE]\n\n'
+    );
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'responses' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+    const [event] = dataObjects(sse) as Array<{
+      type: string;
+      response: {
+        model: string;
+        usage: {
+          cost?: number;
+          is_byok?: boolean;
+          prompt_tokens_details: { cached_tokens: number };
+        };
+      };
+    }>;
+
+    expect(event.response.model).toBe('upstream-model');
+    expect(event.response.usage.cost).toBe(0);
+    expect(event.response.usage.is_byok).toBe(false);
+    expect(event.response.usage.prompt_tokens_details.cached_tokens).toBe(1);
+    expect(sse).toContain('event: response.completed');
+    expect(dataPayloads(sse)).not.toContain('[DONE]');
+  });
+
+  test.each(['response.completed', 'response.incomplete', 'response.failed'])(
+    'forwards %s, cancels upstream, and closes without waiting for EOF',
+    async type => {
+      const capture = makeCapture();
+      const body =
+        `event: ${type}\ndata: ${JSON.stringify({ type })}\n\n` +
+        'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"ignored"}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewriteModelResponse_Responses({
+        response: upstream,
+        usageContext: { ...freeUsageContext, api_kind: 'responses' },
+        capture,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      const sse = await readOutputStream(result);
+
+      expect(dataObjects(sse)).toEqual([{ type }]);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind: 'responses',
+          eventType: type,
+          generationId: '<none>',
+          vercelRequestId: '<none>',
+        }
+      );
+    }
+  );
+});
+
+const usageShapes = [
+  {
+    kind: 'chat_completions',
+    rewrite: rewriteChatCompletionsWithoutTransforms,
+    tokens: {
+      prompt_tokens: 1_000_000,
+      completion_tokens: 500_000,
+      total_tokens: 1_500_000,
+      prompt_tokens_details: { cached_tokens: 200_000, cache_write_tokens: 100_000 },
+    },
+  },
+  {
+    kind: 'messages',
+    rewrite: rewriteModelResponse_Messages,
+    tokens: {
+      input_tokens: 700_000,
+      output_tokens: 500_000,
+      cache_read_input_tokens: 200_000,
+      cache_creation_input_tokens: 100_000,
+    },
+  },
+  {
+    kind: 'responses',
+    rewrite: rewriteModelResponse_Responses,
+    tokens: {
+      input_tokens: 1_000_000,
+      output_tokens: 500_000,
+      total_tokens: 1_500_000,
+      input_tokens_details: { cached_tokens: 200_000, cache_write_tokens: 100_000 },
+    },
+  },
+] as const;
+
+type UsagePayload = { model: string; usage: Record<string, unknown> };
+
+async function rewriteUsageFixture(
+  shape: (typeof usageShapes)[number],
+  stream: boolean,
+  usageContext: RewriteResponseParams['usageContext'],
+  usage: Record<string, unknown>,
+  metadata: Record<string, unknown> = {}
+) {
+  const payload = {
+    model: 'upstream-model',
+    usage,
+    ...metadata,
+    ...(shape.kind === 'chat_completions'
+      ? {
+          choices: [
+            {
+              index: 0,
+              ...(stream
+                ? { delta: { content: 'answer', ...metadata } }
+                : { message: { role: 'assistant', content: 'answer', ...metadata } }),
+            },
+          ],
+        }
+      : {}),
+  };
+  const body =
+    !stream || shape.kind === 'chat_completions'
+      ? payload
+      : shape.kind === 'messages'
+        ? { type: 'message_start', message: payload, ...metadata }
+        : { type: 'response.completed', response: payload, ...metadata };
+  const upstream = stream ? sseResponse(`data: ${JSON.stringify(body)}\n\n`) : jsonResponse(body);
+  const accountingClone = upstream.clone();
+  const result = await shape.rewrite({
+    response: upstream,
+    usageContext,
+    capture: null,
+    vercelRequestId: null,
+    reasoningEffort: null,
+  });
+  const objects = stream ? dataObjects(await readOutputStream(result)) : [await result.json()];
+  const envelope = objects[0] as UsagePayload & { message?: UsagePayload; response?: UsagePayload };
+  expect(await accountingClone.text()).toBe(
+    stream ? `data: ${JSON.stringify(body)}\n\n` : JSON.stringify(body)
+  );
+  return { payload: envelope.message ?? envelope.response ?? envelope, objects };
+}
+
+describe('JSON bodies that are not objects', () => {
+  const rewriters = [
+    [
+      'chat completions',
+      'chat_completions',
+      (params: RewriteResponseParams) =>
+        rewriteModelResponse_ChatCompletions({ ...params, responseTransforms: null }),
+    ],
+    ['messages', 'messages', rewriteModelResponse_Messages],
+    ['responses', 'responses', rewriteModelResponse_Responses],
+  ] as const;
+
+  test.each(
+    rewriters.flatMap(([name, kind, rewrite]) =>
+      ['null', '[]', '"text"', '42', 'true'].map(text => [name, text, kind, rewrite] as const)
+    )
+  )('%s passes the JSON body %s through unchanged', async (_name, text, kind, rewrite) => {
+    const setBody = jest.fn();
+    const result = await rewrite({
+      response: new Response(text, {
+        status: 200,
+        statusText: 'Fine',
+        headers: { 'content-type': 'application/json' },
+      }),
+      usageContext: { ...freeUsageContext, api_kind: kind },
+      capture: { setGenerationId: jest.fn(), setBody, setReadError: jest.fn() },
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.statusText).toBe('Fine');
+    expect(result.headers.get('content-type')).toBe('application/json');
+    expect(await result.text()).toBe(text);
+    expect(setBody).toHaveBeenCalledWith(text);
+  });
+});
+
+describe('Vercel provider metadata rewriting', () => {
+  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+    '@kilocode/web-shared/lib/r2/create-client'
+  );
+  const metadata = {
+    gateway: {
+      cost: '0.25',
+      routing: {
+        finalProvider: 'amazon-bedrock',
+        modelAttempts: [
+          {
+            success: true,
+            providerAttempts: [
+              { provider: 'openai', success: false, error: { code: 'rate_limit' } },
+              { provider: 'amazon-bedrock', success: true, credentialType: 'byok' },
+            ],
+          },
+        ],
+      },
+    },
+  };
+
+  beforeEach(() => {
+    jest.spyOn(fakeR2, 'send');
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-ai-provider-metadata',
+      R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+      R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+    });
+    fakeR2.objects.clear();
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  function expectNoArchiveIO() {
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(fakeR2.send).not.toHaveBeenCalled();
+    expect(fakeR2.objects.size).toBe(0);
+  }
+
+  describe.each(usageShapes)('$kind', shape => {
+    describe.each([false, true])('stream=%s', stream => {
+      test.each(['provider_metadata', 'providerMetadata'])(
+        'strips %s without scheduling archive IO',
+        async metadataKey => {
+          const payload = {
+            id: 'gen_metadata_test',
+            model: 'upstream-model',
+            usage: { ...shape.tokens },
+            [metadataKey]: metadata,
+            ...(shape.kind === 'chat_completions'
+              ? {
+                  choices: [
+                    {
+                      index: 0,
+                      ...(stream
+                        ? { delta: { content: 'answer' } }
+                        : { message: { role: 'assistant', content: 'answer' } }),
+                    },
+                  ],
+                }
+              : {}),
+          };
+          const body =
+            !stream || shape.kind === 'chat_completions'
+              ? payload
+              : shape.kind === 'messages'
+                ? { type: 'message_start', message: payload }
+                : { type: 'response.completed', response: payload };
+          const result = await rewriteModelResponse({
+            response: stream
+              ? sseResponse(`data: ${JSON.stringify(body)}\n\n`)
+              : jsonResponse(body),
+            model: 'requested-model',
+            providerId: 'vercel',
+            kind: shape.kind,
+            isFree: false,
+            userByok: false,
+            customLlmPricing: null,
+            logging: makeLogging(),
+            responseTransforms: null,
+          });
+          const output = stream
+            ? await readOutputStream(result)
+            : JSON.stringify(await result.json());
+
+          expect(output).not.toContain('provider_metadata');
+          expect(output).not.toContain('providerMetadata');
+          expectNoArchiveIO();
+        }
+      );
+    });
+  });
+
+  test.each([false, true])(
+    'strips nested Chat Completions metadata without usage or archive IO, stream=%s',
+    async stream => {
+      const choice = { content: 'answer', provider_metadata: metadata };
+      const body = {
+        id: 'gen_metadata_test',
+        choices: [{ index: 0, ...(stream ? { delta: choice } : { message: choice }) }],
+      };
+      const result = await rewriteModelResponse({
+        response: stream ? sseResponse(`data: ${JSON.stringify(body)}\n\n`) : jsonResponse(body),
+        model: 'requested-model',
+        providerId: 'vercel',
+        kind: 'chat_completions',
+        isFree: false,
+        userByok: false,
+        customLlmPricing: null,
+        logging: makeLogging(),
+        responseTransforms: null,
+      });
+      const output = stream ? await readOutputStream(result) : JSON.stringify(await result.json());
+
+      expect(output).not.toContain('provider_metadata');
+      expectNoArchiveIO();
+    }
+  );
+
+  test('does not perform archive IO for observed metadata before an upstream disconnect', async () => {
+    const result = await rewriteModelResponse({
+      response: failingResponse(
+        'text/event-stream',
+        'ResponseAborted',
+        `data: ${JSON.stringify({ id: 'gen_metadata_test', choices: [], provider_metadata: metadata })}\n\n`
+      ),
+      model: 'requested-model',
+      providerId: 'vercel',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await readOutputStream(result)).toContain('upstream_disconnect');
+    expectNoArchiveIO();
+  });
+});
+
+describe.each(usageShapes)('$kind billed usage normalization', shape => {
+  describe.each([false, true])('stream=%s', stream => {
+    describe.each(['openrouter', 'vercel'] as const)('%s', provider => {
+      describe.each([false, true])('upstream BYOK=%s', upstreamByok => {
+        test.each([
+          { name: 'paid', model: 'openai/gpt-5', isFree: false, userByok: false, cost: 1.2 },
+          { name: 'free', model: 'openai/gpt-5', isFree: true, userByok: false, cost: 0 },
+          { name: 'user BYOK', model: 'openai/gpt-5', isFree: false, userByok: true, cost: 0 },
+          {
+            name: 'custom pricing',
+            model: 'google/gemini-3.8-flash',
+            isFree: false,
+            userByok: false,
+            cost: 2.419167,
+          },
+          {
+            name: 'custom pricing with user BYOK',
+            model: 'google/gemini-3.8-flash',
+            isFree: false,
+            userByok: true,
+            cost: 0,
+          },
+        ])('$name', async ({ model, isFree, userByok, cost }) => {
+          const usesMetadataCost = provider === 'vercel' && shape.kind !== 'chat_completions';
+          // On BYOK, OpenRouter charges its 5% fee and Vercel charges nothing.
+          const gatewayCost = upstreamByok ? (provider === 'openrouter' ? 0.06 : 0) : 1.2;
+          const usage = {
+            ...shape.tokens,
+            market_cost: 99,
+            gateway_cost: 88,
+            ...(usesMetadataCost
+              ? {}
+              : {
+                  cost: gatewayCost,
+                  cost_details: { upstream_inference_cost: 1.2 },
+                  is_byok: upstreamByok,
+                }),
+          };
+          const providerMetadata = {
+            gateway: {
+              cost: String(gatewayCost),
+              marketCost: '1.2',
+              routing: {
+                modelAttempts: [
+                  {
+                    success: true,
+                    providerAttempts: [
+                      { success: true, credentialType: upstreamByok ? 'byok' : 'system' },
+                    ],
+                  },
+                ],
+              },
+            },
+          };
+          const { payload, objects } = await rewriteUsageFixture(
+            shape,
+            stream,
+            {
+              requested_model: model,
+              provider,
+              is_free: isFree,
+              custom_llm_pricing: null,
+              user_byok: userByok,
+              custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+              api_kind: shape.kind,
+            },
+            usage,
+            provider === 'vercel' ? { provider_metadata: providerMetadata, providerMetadata } : {}
+          );
+
+          expect(payload.model).toBe(model);
+          expect(payload.usage.cost).toBeCloseTo(cost, 8);
+          expect(payload.usage.is_byok).toBe(userByok);
+          expect(payload.usage.cost_details).toEqual({ upstream_inference_cost: 1.2 });
+          expect(payload.usage).toMatchObject(shape.tokens);
+          expect(payload.usage).not.toHaveProperty('market_cost');
+          expect(payload.usage).not.toHaveProperty('gateway_cost');
+          expect(JSON.stringify(objects)).not.toContain('"provider_metadata"');
+          expect(JSON.stringify(objects)).not.toContain('"providerMetadata"');
+        });
+      });
+    });
+
+    // Real BYOK usage with web search: OpenRouter charges an Exa search plus
+    // its 5% fee, Vercel charges five Perplexity searches without a fee.
+    test.each([
+      { provider: 'openrouter', gatewayCost: 0.0072658, upstream: 0.005316, billed: 0.012316 },
+      { provider: 'vercel', gatewayCost: 0.025, upstream: 0.041388, billed: 0.066388 },
+    ] as const)(
+      'reports $provider BYOK non-inference costs in the billed cost',
+      async ({ provider, gatewayCost, upstream, billed }) => {
+        const usesMetadataCost = provider === 'vercel' && shape.kind !== 'chat_completions';
+        const usage = {
+          ...shape.tokens,
+          ...(usesMetadataCost
+            ? {}
+            : {
+                cost: gatewayCost,
+                cost_details: { upstream_inference_cost: upstream },
+                is_byok: true,
+              }),
+        };
+        const providerMetadata = {
+          gateway: {
+            cost: String(gatewayCost),
+            marketCost: String(upstream),
+            routing: {
+              modelAttempts: [
+                { success: true, providerAttempts: [{ success: true, credentialType: 'byok' }] },
+              ],
+            },
+          },
+        };
+        const { payload } = await rewriteUsageFixture(
+          shape,
+          stream,
+          {
+            requested_model: 'openai/gpt-5',
+            provider,
+            is_free: false,
+            custom_llm_pricing: null,
+            user_byok: false,
+            api_kind: shape.kind,
+            custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+          },
+          usage,
+          provider === 'vercel' ? { provider_metadata: providerMetadata, providerMetadata } : {}
+        );
+
+        expect(payload.usage.cost).toBeCloseTo(billed, 8);
+        expect(payload.usage.cost_details).toEqual({ upstream_inference_cost: upstream });
+      }
+    );
+
+    test.each([
+      { provider: 'openai-chatgpt', model: 'openai/gpt-5' },
+      { provider: 'claude-billing', model: 'anthropic/claude-sonnet-4.5' },
+    ] as const)(
+      'reports $provider connected billing as BYOK with zero billed cost',
+      async ({ provider, model }) => {
+        const { payload } = await rewriteUsageFixture(
+          shape,
+          stream,
+          {
+            requested_model: model,
+            provider,
+            is_free: false,
+            custom_llm_pricing: null,
+            user_byok: false,
+            custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+            api_kind: shape.kind,
+          },
+          {
+            ...shape.tokens,
+            cost: 1.2,
+            cost_details: { upstream_inference_cost: 1.1 },
+            is_byok: false,
+          }
+        );
+
+        expect(payload.usage).toMatchObject({
+          ...shape.tokens,
+          cost: 0,
+          is_byok: true,
+          cost_details: { upstream_inference_cost: 1.1 },
+        });
+      }
+    );
+
+    test.each(['provider_metadata', 'providerMetadata'])(
+      'reads Vercel %s while preserving existing inference cost details',
+      async metadataKey => {
+        const { payload, objects } = await rewriteUsageFixture(
+          shape,
+          stream,
+          {
+            requested_model: 'openai/gpt-5',
+            provider: 'vercel',
+            is_free: false,
+            custom_llm_pricing: null,
+            user_byok: false,
+            custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+            api_kind: shape.kind,
+          },
+          {
+            ...shape.tokens,
+            cost_details: { upstream_inference_cost: 0.9 },
+            ...(shape.kind === 'chat_completions' ? { cost: 1.2, is_byok: false } : {}),
+          },
+          { [metadataKey]: { gateway: { cost: '0.06', marketCost: '1.2' } } }
+        );
+
+        expect(payload.usage).toMatchObject({
+          cost: 1.2,
+          is_byok: false,
+          cost_details: { upstream_inference_cost: 0.9 },
+        });
+        expect(JSON.stringify(objects)).not.toContain(`"${metadataKey}"`);
+      }
+    );
+
+    test.each([
+      { inferenceCost: null, userByok: false },
+      { inferenceCost: undefined, userByok: false },
+      { inferenceCost: null, userByok: true },
+      { inferenceCost: undefined, userByok: true },
+    ])(
+      'backfills Vercel inference cost $inferenceCost for user BYOK=$userByok',
+      async ({ inferenceCost, userByok }) => {
+        const { payload } = await rewriteUsageFixture(
+          shape,
+          stream,
+          {
+            requested_model: 'openai/gpt-5',
+            provider: 'vercel',
+            is_free: false,
+            custom_llm_pricing: null,
+            user_byok: userByok,
+            custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+            api_kind: shape.kind,
+          },
+          {
+            ...shape.tokens,
+            cost_details: {
+              upstream_inference_cost: inferenceCost,
+              upstream_inference_prompt_cost: 0.2,
+            },
+            ...(shape.kind === 'chat_completions' ? { cost: 1.2, is_byok: false } : {}),
+          },
+          { provider_metadata: { gateway: { marketCost: '1.2' } } }
+        );
+
+        expect(payload.usage).toMatchObject({
+          cost: userByok ? 0 : 1.2,
+          is_byok: userByok,
+          cost_details: {
+            upstream_inference_cost: 1.2,
+            upstream_inference_prompt_cost: 0.2,
+          },
+        });
+      }
+    );
+
+    test.each([
+      ['requested/alias', 'requested/alias'],
+      ['typesafe/jev-1.13', 'typesafe/jev-1.13'],
+      ['nvidia/nemotron-3-super-120b-a12b', 'nvidia/nemotron-3-super-120b-a12b'],
+      ['~auto', 'upstream-model'],
+      ['openrouter/auto', 'upstream-model'],
+      ['typesafe/jev-router', 'upstream-model'],
+      ['nvidia/switchyard', 'upstream-model'],
+    ])('handles requested model %s', async (requestedModel, expectedModel) => {
+      const { payload } = await rewriteUsageFixture(
+        shape,
+        stream,
+        { ...freeUsageContext, requested_model: requestedModel, api_kind: shape.kind },
+        { ...shape.tokens }
+      );
+
+      expect(payload.model).toBe(expectedModel);
+    });
+  });
+});
+
+test.each(['openrouter', 'vercel'] as const)(
+  'prices %s Messages deltas using start input and cache tokens without adding token fields',
+  async provider => {
+    const startUsage = {
+      input_tokens: 700_000,
+      output_tokens: 0,
+      cache_read_input_tokens: 200_000,
+      cache_creation_input_tokens: 100_000,
+    };
+    const deltaUsage = { output_tokens: 500_000 };
+    const result = await rewriteModelResponse_Messages({
+      response: sseResponse(
+        `event: message_start\ndata: ${JSON.stringify({
+          type: 'message_start',
+          message: { model: 'upstream-model', usage: startUsage },
+        })}\n\n` +
+          `event: message_delta\ndata: ${JSON.stringify({
+            type: 'message_delta',
+            delta: { stop_reason: 'end_turn' },
+            usage: deltaUsage,
+          })}\n\n` +
+          'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+      ),
+      usageContext: {
+        requested_model: 'google/gemini-3.8-flash',
+        provider,
+        is_free: false,
+        custom_llm_pricing: null,
+        user_byok: false,
+        custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+        api_kind: 'messages',
+      },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const [start, delta] = dataObjects(await readOutputStream(result)) as [
+      { message: UsagePayload },
+      { usage: Record<string, unknown> },
+    ];
+
+    expect(start.message.usage).toEqual({ ...startUsage, cost: 0.544167, is_byok: false });
+    expect(delta.usage).toEqual({ ...deltaUsage, cost: 2.419167, is_byok: false });
+  }
+);
+
+test.each(['provider_metadata', 'providerMetadata'])(
+  'retains Messages start-frame %s for final usage',
+  async metadataKey => {
+    const events = [
+      {
+        type: 'message_start',
+        message: {
+          id: 'message-start-metadata',
+          model: 'upstream-model',
+          usage: { input_tokens: 3, output_tokens: 0 },
+          [metadataKey]: { gateway: { marketCost: '0.12' } },
+        },
+      },
+      { type: 'message_delta', usage: { output_tokens: 2 }, delta: {} },
+      { type: 'message_stop' },
+    ];
+    const result = await rewriteModelResponse_Messages({
+      response: sseResponse(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')),
+      usageContext: {
+        requested_model: 'requested-model',
+        provider: 'vercel',
+        is_free: false,
+        custom_llm_pricing: null,
+        user_byok: false,
+        custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+        api_kind: 'messages',
+      },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const objects = dataObjects(await readOutputStream(result)) as {
+      usage?: Record<string, unknown>;
+    }[];
+
+    expect(objects[1].usage).toEqual({
+      output_tokens: 2,
+      cost: 0.12,
+      is_byok: false,
+      cost_details: { upstream_inference_cost: 0.12 },
+    });
+    expect(JSON.stringify(objects)).not.toContain(`"${metadataKey}"`);
+    expect(JSON.stringify(objects)).not.toContain('upstream-model');
+  }
+);
+
+describe.each(usageShapes.filter(shape => shape.kind !== 'chat_completions'))(
+  '$kind retained stream metadata',
+  shape => {
+    test.each(['provider_metadata', 'providerMetadata'])(
+      'uses the latest %s for a later usage-only event',
+      async metadataKey => {
+        const initialMetadata = { [metadataKey]: { gateway: { marketCost: '0.06' } } };
+        const latestMetadata = { [metadataKey]: { gateway: { marketCost: '0.12' } } };
+        const events =
+          shape.kind === 'messages'
+            ? [
+                {
+                  type: 'message_start',
+                  message: {
+                    id: 'message-1',
+                    model: 'upstream-first-model',
+                    usage: { input_tokens: 3, output_tokens: 0 },
+                    ...initialMetadata,
+                  },
+                },
+                {
+                  type: 'message_delta',
+                  usage: { output_tokens: 1 },
+                  delta: {},
+                  ...latestMetadata,
+                },
+                { type: 'message_delta', usage: { output_tokens: 2 }, delta: {} },
+              ]
+            : [
+                {
+                  type: 'response.created',
+                  response: { id: 'response-1', model: 'upstream-first-model', ...initialMetadata },
+                },
+                {
+                  type: 'response.in_progress',
+                  response: { id: 'response-1', model: 'upstream-next-model', ...latestMetadata },
+                },
+                {
+                  type: 'response.completed',
+                  response: {
+                    id: 'response-1',
+                    model: 'upstream-final-model',
+                    usage: { input_tokens: 3, output_tokens: 2 },
+                  },
+                },
+              ];
+        const result = await shape.rewrite({
+          response: sseResponse(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')),
+          usageContext: {
+            requested_model: 'requested-model',
+            provider: 'vercel',
+            is_free: false,
+            custom_llm_pricing: null,
+            user_byok: false,
+            custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+            api_kind: shape.kind,
+          },
+          capture: null,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const objects = dataObjects(await readOutputStream(result)) as {
+          message?: UsagePayload;
+          response?: UsagePayload;
+          usage?: Record<string, unknown>;
+        }[];
+        const final = objects[2];
+
+        expect(objects).toHaveLength(3);
+        expect(final.response?.usage ?? final.usage).toMatchObject({
+          output_tokens: 2,
+          cost: 0.12,
+          cost_details: { upstream_inference_cost: 0.12 },
+          is_byok: false,
+        });
+        for (const object of objects) {
+          const message = object.message ?? object.response;
+          if (message) expect(message.model).toBe('requested-model');
+        }
+        expect(JSON.stringify(objects)).not.toContain('"provider_metadata"');
+        expect(JSON.stringify(objects)).not.toContain('"providerMetadata"');
+      }
+    );
+  }
+);
+
+describe.each([
+  [
+    'Chat Completions',
+    'chat_completions',
+    rewriteChatCompletionsWithoutTransforms,
+    'data: {"id":"gen-chat","choices":[]}\n\n',
+    'data: {"error":{"code":429,"message":"rate limited"}}\n\n',
+    'gen-chat',
+  ],
+  [
+    'Messages',
+    'messages',
+    rewriteModelResponse_Messages,
+    'event: message_start\ndata: {"type":"message_start","message":{"id":"gen-message","usage":{"input_tokens":1,"output_tokens":0}}}\n\n',
+    'event: error\ndata: {"type":"error","error":{"type":"api_error","message":"rate limited"}}\n\n',
+    'gen-message',
+  ],
+  [
+    'Responses',
+    'responses',
+    rewriteModelResponse_Responses,
+    'event: response.created\ndata: {"type":"response.created","response":{"id":"gen-response"}}\n\n',
+    'event: error\ndata: {"type":"error","error":{"type":"server_error","message":"rate limited"}}\n\n',
+    'gen-response',
+  ],
+] as const)(
+  '%s terminal stream errors',
+  (_name, kind, rewrite, initialEvent, errorEvent, generationId) => {
+    test('logs the error event and closes without waiting for EOF', async () => {
+      const capture = makeCapture();
+      const body = initialEvent + errorEvent + 'data: {"ignored":true}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewrite({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture,
+        vercelRequestId: 'iad1::error-request',
+        reasoningEffort: null,
+      });
+      const sse = await readOutputStream(result);
+
+      expect(sse).toContain('rate limited');
+      expect(sse).not.toContain('ignored');
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind,
+          eventType: 'error',
+          generationId,
+          vercelRequestId: 'iad1::error-request',
+        }
+      );
+    });
+  }
+);
+
+const LOG_USER_ID = 'rewrite-model-response-log-user';
+
+function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingParams {
+  return {
+    usage_id: crypto.randomUUID(),
+    user: { id: LOG_USER_ID } as RequestLoggingParams['user'],
+    organization_id: null,
+    session_id: null,
+    vercel_request_id: null,
+    request: { body: {} } as unknown as RequestLoggingParams['request'],
+    ...overrides,
+  };
+}
+
+describe('redactApiRequestLogRequest', () => {
+  test('replaces gateway BYOK credentials without mutating the upstream request', () => {
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'zai/glm-5.2',
+        messages: [{ role: 'user', content: 'hello' }],
+        providerOptions: {
+          gateway: {
+            order: ['friendli', 'novita'],
+            byok: {
+              friendli: [{ apiKey: 'friendli-managed-key', baseURL: 'https://api.friendli.ai' }],
+              bedrock: [
+                {
+                  accessKeyId: 'AKIAEXAMPLE',
+                  secretAccessKey: 'bedrock-secret',
+                  region: 'us-east-1',
+                },
+                { apiKey: 'bedrock-api-key', region: 'us-west-2' },
+              ],
+            },
+          },
+          anthropic: { effort: 'high' },
+        },
+      },
+    } satisfies RequestLoggingParams['request'];
+
+    expect(redactApiRequestLogRequest(request)).toEqual({
+      model: 'zai/glm-5.2',
+      messages: [{ role: 'user', content: 'hello' }],
+      providerOptions: {
+        gateway: {
+          order: ['friendli', 'novita'],
+          byok: {
+            friendli: [{ apiKey: '[redacted]' }],
+            bedrock: [{ apiKey: '[redacted]' }, { apiKey: '[redacted]' }],
+          },
+        },
+        anthropic: { effort: 'high' },
+      },
+    });
+    expect(request.body.providerOptions.gateway.byok.friendli[0].apiKey).toBe(
+      'friendli-managed-key'
+    );
+    expect(request.body.providerOptions.gateway.byok.bedrock[0]).toMatchObject({
+      accessKeyId: 'AKIAEXAMPLE',
+      secretAccessKey: 'bedrock-secret',
+    });
+    expect(request.body.providerOptions.gateway.byok.bedrock[1]).toEqual({
+      apiKey: 'bedrock-api-key',
+      region: 'us-west-2',
+    });
+  });
+});
+
+describe('rewriteModelResponse', () => {
+  describe.each(usageShapes)('$kind authoritative request context', shape => {
+    test.each([
+      { isFree: false, userByok: false, cost: 1.2 },
+      { isFree: true, userByok: false, cost: 0 },
+      { isFree: false, userByok: true, cost: 0 },
+    ])('uses main model and flags $isFree/$userByok', async ({ isFree, userByok, cost }) => {
+      const result = await rewriteModelResponse({
+        response: jsonResponse({
+          model: 'upstream-model',
+          usage: { ...shape.tokens, cost: 1.2, is_byok: false },
+        }),
+        model: 'requested-model',
+        providerId: 'openrouter',
+        kind: shape.kind,
+        isFree,
+        userByok,
+        customLlmPricing: null,
+        logging: makeLogging({
+          request: {
+            kind: shape.kind,
+            body: { model: 'logging-only-model' },
+          } as GatewayRequest,
+        }),
+        responseTransforms: null,
+      });
+
+      expect(await result.json()).toMatchObject({
+        model: 'requested-model',
+        usage: { ...shape.tokens, cost, is_byok: userByok },
+      });
+    });
+  });
+
+  test('rewrites paid-model Kilo organization traffic without stripping cost', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: 'openai/gpt-5',
+        usage: {
+          cost: 0.5,
+          cost_details: { upstream_inference_cost: 0.4 },
+          is_byok: false,
+        },
+      }),
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging({ organization_id: KILO_ORGANIZATION_ID }),
+      responseTransforms: null,
+    });
+
+    expect(result).not.toBeNull();
+    expect(await result?.json()).toMatchObject({
+      usage: {
+        cost: 0.5,
+        cost_details: { upstream_inference_cost: 0.4 },
+        is_byok: false,
+      },
+    });
+  });
+
+  test('rewrites paid-model traffic for other organizations without stripping cost', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: 'openai/gpt-5',
+        usage: {
+          cost: 0.5,
+          cost_details: { upstream_inference_cost: 0.4 },
+          is_byok: false,
+        },
+      }),
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toMatchObject({
+      usage: {
+        cost: 0.5,
+        cost_details: { upstream_inference_cost: 0.4 },
+        is_byok: false,
+      },
+    });
+  });
+
+  test('returns zero cost for free models outside the Kilo organization', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: 'google/gemma-4-26b-a4b-it:free',
+        usage: { cost: 0, is_byok: false },
+      }),
+      model: 'google/gemma-4-26b-a4b-it:free',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(result).not.toBeNull();
+    expect(await result?.json()).toEqual({
+      model: 'google/gemma-4-26b-a4b-it:free',
+      usage: { cost: 0, is_byok: false },
+    });
+  });
+
+  test('zeroes upstream cost and normalizes the model for free custom LLMs', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ model: 'upstream', usage: { cost: 0.5, is_byok: false } }),
+      model: 'kilo-internal/custom-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({
+      model: 'kilo-internal/custom-model',
+      usage: { cost: 0, is_byok: false },
+    });
+  });
+
+  test('returns zero custom-priced cost when no tokens were consumed', async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValueOnce(TEST_CUSTOM_PRICING_CONFIG);
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: 'google/gemini-3.8-flash',
+        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+      }),
+      model: 'google/gemini-3.8-flash',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({
+      model: 'google/gemini-3.8-flash',
+      usage: { cost: 0, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+    });
+  });
+
+  test('processes paid-model responses when request logging is enabled', async () => {
+    mockedOptIn.mockResolvedValueOnce('all');
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ model: 'openai/gpt-5' }),
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      responseTransforms: null,
+    });
+
+    expect(result).not.toBeNull();
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not schedule a log insert without opt-in', async () => {
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'openai/gpt-5' }),
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedOptIn).toHaveBeenCalled();
+  });
+
+  test.each(['user@anaconda.com', 'user@kilocode.ai'])(
+    'requires an explicit opt-in for %s',
+    async email => {
+      await rewriteModelResponse({
+        response: jsonResponse({ model: 'openai/gpt-5' }),
+        model: 'openai/gpt-5',
+        providerId: 'openrouter',
+        kind: 'chat_completions',
+        isFree: false,
+        userByok: false,
+        customLlmPricing: null,
+        logging: makeLogging({
+          user: { id: 'test-user', google_user_email: email } as RequestLoggingParams['user'],
+        }),
+        responseTransforms: null,
+      });
+
+      expect(mockedAfter).not.toHaveBeenCalled();
+      expect(mockedOptIn).toHaveBeenCalledWith({ accountId: 'test-user', organizationId: null });
+    }
+  );
+
+  test('does not log custom models without opt-in', async () => {
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'kilo-internal/my-model' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: LOG_USER_ID, organizationId: null });
+  });
+
+  test('logs custom models with opt-in', async () => {
+    mockedOptIn.mockResolvedValueOnce('all');
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'kilo-internal/my-model' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not log unrewritten custom model responses without opt-in', async () => {
+    await logUnrewrittenResponse({
+      response: jsonResponse({ error: 'upstream error' }, 400),
+      model: 'kilo-internal/my-model',
+      logging: makeLogging(),
+      error: null,
+    });
+
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: LOG_USER_ID, organizationId: null });
+  });
+});
+
+describe('api_request_log_2 storage', () => {
+  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+    '@kilocode/web-shared/lib/r2/create-client'
+  );
+  const storageUserId = 'api-request-log-r2-storage-test';
+  const organizationId = '5a0e7d36-3c0b-4cf2-9a3e-2c7a1d9b6f41';
+  const bucket = 'test-api-request-log';
+  const storageUser = { id: storageUserId } as RequestLoggingParams['user'];
+
+  async function runScheduledLogInsert() {
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+    const task = mockedAfter.mock.calls[0][0];
+    await (typeof task === 'function' ? task() : task);
+  }
+
+  async function selectLoggedRows() {
+    return db
+      .select()
+      .from(api_request_log_2)
+      .where(eq(api_request_log_2.kilo_user_id, storageUserId));
+  }
+
+  async function selectLoggedRow() {
+    const rows = await selectLoggedRows();
+    expect(rows).toHaveLength(1);
+    return rows[0];
+  }
+
+  function storedBlob(row: { id: string; created_at: string }) {
+    return apiRequestLogBlobSchema.parse(
+      JSON.parse(fakeR2.objects.get(`${bucket}/${apiRequestLogBlobKey(row)}`) ?? '')
+    );
+  }
+
+  function storageLogging(overrides?: Partial<RequestLoggingParams>) {
+    return makeLogging({ user: storageUser, ...overrides });
+  }
+
+  async function logUpstreamResponse(
+    response: Response,
+    mode: RequestLoggingMode,
+    error: Record<string, string> | null,
+    logging = storageLogging({
+      organization_id: organizationId,
+      session_id: 'ses_storage',
+      request: {
+        kind: 'chat_completions',
+        body: {
+          model: 'kilo-internal/my-model',
+          messages: [{ role: 'user', content: 'hello' }],
+          providerOptions: { gateway: { byok: { friendli: [{ apiKey: 'secret-key' }] } } },
+        },
+      },
+    })
+  ) {
+    mockedOptIn.mockResolvedValueOnce(mode);
+    await logUnrewrittenResponse({
+      response,
+      model: 'kilo-internal/my-model',
+      error,
+      logging,
+    });
+    await runScheduledLogInsert();
+    return logging;
+  }
+
+  beforeEach(() => {
+    fakeR2.objects.clear();
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, storageUserId));
+  });
+
+  test('stores the row under the usage ID and the redacted request and raw response at the derived key', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
+    const logging = await logUpstreamResponse(
+      jsonResponse({ error: 'upstream error' }, 400),
+      'all',
+      null
+    );
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(fakeR2.objects.size).toBe(1);
+    expect(fakeR2.credentials).toEqual({
+      accessKeyId: 'mock-test-api-request-log-access-key',
+      secretAccessKey: 'mock-test-api-request-log-secret-key',
+    });
+    const row = await selectLoggedRow();
+    expect(row).toEqual({
+      id: logging.usage_id,
+      created_at: expect.any(String),
+      generation_id: null,
+      kilo_user_id: storageUserId,
+      organization_id: organizationId,
+      session_id: 'ses_storage',
+      requested_model: 'kilo-internal/my-model',
+    });
+    const date = new Date(row.created_at).toISOString().slice(0, 10).replaceAll('-', '/');
+    expect([...fakeR2.objects.keys()]).toEqual([`${bucket}/${date}/${logging.usage_id}.json`]);
+    expect(storedBlob(row)).toEqual({
+      version: 2,
+      request: {
+        model: 'kilo-internal/my-model',
+        messages: [{ role: 'user', content: 'hello' }],
+        providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
+      },
+      response: JSON.stringify({ error: 'upstream error' }),
+      error: null,
+    });
+  });
+
+  test.each([
+    {
+      kind: 'chat_completions',
+      json: { id: 'gen-chat', model: 'upstream-model', choices: [] },
+      sse: 'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\ndata: {"id":"gen-chat-2","choices":[]}\n\ndata: [DONE]\n\n',
+      expected: 'gen-chat',
+    },
+    {
+      kind: 'messages',
+      json: { id: 'msg-1', type: 'message', model: 'upstream-model', content: [] },
+      sse: 'data: {"type":"message_start","message":{"id":"msg-1","model":"upstream-model"}}\n\ndata: {"type":"message_stop"}\n\n',
+      expected: 'msg-1',
+    },
+    {
+      kind: 'responses',
+      json: { id: 'resp-1', object: 'response', model: 'upstream-model', output: [] },
+      sse: 'data: {"type":"response.created","response":{"id":"resp-1","model":"upstream-model"}}\n\ndata: {"type":"response.completed","response":{"id":"resp-1","model":"upstream-model"}}\n\n',
+      expected: 'resp-1',
+    },
+  ] as const)('stores the $kind generation ID', async ({ kind, json, sse, expected }) => {
+    for (const response of [jsonResponse(json), sseResponse(sse)]) {
+      mockedAfter.mockClear();
+      mockedOptIn.mockResolvedValueOnce('all');
+      const logging = storageLogging({
+        request: { kind, body: { model: 'kilo-internal/my-model' } } as GatewayRequest,
+      });
+      const result = await rewriteModelResponse({
+        response,
+        model: 'kilo-internal/my-model',
+        providerId: 'custom',
+        kind,
+        isFree: true,
+        userByok: false,
+        customLlmPricing: null,
+        logging,
+        responseTransforms: null,
+      });
+      await readOutputStream(result);
+      await runScheduledLogInsert();
+
+      const [row] = await db
+        .select({ generation_id: api_request_log_2.generation_id })
+        .from(api_request_log_2)
+        .where(eq(api_request_log_2.id, logging.usage_id));
+      expect(row).toEqual({ generation_id: expected });
+    }
+  });
+
+  test('does not log anonymous requests, even when an opt-in matches', async () => {
+    const enkrypt = jest.fn(async (_captureResponse?: boolean): Promise<EnkryptRequestLog[]> => []);
+    mockedOptIn.mockResolvedValueOnce('all');
+
+    await logUnrewrittenResponse({
+      response: jsonResponse({ error: 'upstream error' }, 400),
+      model: 'kilo-internal/my-model',
+      error: null,
+      logging: makeLogging({ user: null, enkrypt }),
+    });
+    await runScheduledLogInsert();
+
+    expect(enkrypt).toHaveBeenCalledWith(false);
+    expect(fakeR2.objects.size).toBe(0);
+  });
+
+  test('awaits Enkrypt calls only in after() and stores them with the request and response in one PUT', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
+    const pending = Promise.withResolvers<EnkryptRequestLog[]>();
+    const getterStarted = Promise.withResolvers<void>();
+    const enkrypt = jest.fn(() => {
+      getterStarted.resolve();
+      return pending.promise;
+    });
+    const calls: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'conversation',
+        request: {
+          text: 'hello',
+          detectors: { injection_attack: { enabled: true, need_explanation: false } },
+          user_metadata: { organization_id: 'org-1' },
+        },
+        response: '{ "summary": { "injection_attack": 0 }, "vendor_detail": "raw input" }',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'output',
+        scan: 'log_only',
+        part: 'response',
+        request: {
+          text: 'hello back',
+          detectors: { pii: { enabled: true, entities: ['secrets'] } },
+          user_metadata: { organization_id: 'org-1' },
+        },
+        response: '{ "summary": { "pii": 0 }, "vendor_detail": "raw output" }',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'kilo-internal/my-model',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    } satisfies GatewayRequest;
+    const upstream = { model: 'upstream-model', choices: [] };
+    mockedOptIn.mockResolvedValueOnce('all');
+
+    const response = await rewriteModelResponse({
+      response: jsonResponse(upstream),
+      model: request.body.model,
+      providerId: 'custom',
+      kind: request.kind,
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging: storageLogging({ request, enkrypt }),
+      responseTransforms: null,
+    });
+    await response.text();
+
+    expect(enkrypt).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    const persisted = runScheduledLogInsert();
+    await getterStarted.promise;
+    try {
+      expect(send).not.toHaveBeenCalled();
+      expect(await selectLoggedRows()).toEqual([]);
+    } finally {
+      pending.resolve(calls);
+      await persisted;
+    }
+
+    const row = await selectLoggedRow();
+    expect(enkrypt).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(fakeR2.objects.size).toBe(1);
+    expect(storedBlob(row)).toEqual({
+      version: 2,
+      request: request.body,
+      response: JSON.stringify(upstream),
+      error: null,
+      enkrypt: calls,
+    });
+  });
+
+  test.each([null, 'errors_only'] as const)(
+    'disables Enkrypt response capture in after() for a successful response with logging mode %s',
+    async mode => {
+      const send = jest.spyOn(fakeR2, 'send');
+      const enkrypt = jest.fn(
+        async (_captureResponse?: boolean): Promise<EnkryptRequestLog[]> => []
+      );
+      mockedOptIn.mockResolvedValueOnce(mode);
+      const response = await rewriteModelResponse({
+        response: jsonResponse({ model: 'upstream-model', choices: [] }),
+        model: 'kilo-internal/my-model',
+        providerId: 'custom',
+        kind: 'chat_completions',
+        isFree: true,
+        userByok: false,
+        customLlmPricing: null,
+        logging: storageLogging({ enkrypt }),
+        responseTransforms: null,
+      });
+      await response.text();
+
+      expect(enkrypt).not.toHaveBeenCalled();
+      await runScheduledLogInsert();
+
+      expect(enkrypt).toHaveBeenCalledTimes(1);
+      expect(enkrypt).toHaveBeenCalledWith(false);
+      expect(send).not.toHaveBeenCalled();
+      expect(await selectLoggedRows()).toEqual([]);
+      expect(fakeR2.objects.size).toBe(0);
+    }
+  );
+
+  test('strips NUL bytes from the client-supplied session ID and the upstream generation ID', async () => {
+    mockedOptIn.mockResolvedValueOnce('all');
+    const logging = storageLogging({
+      session_id: 'ses\u0000_storage',
+      request: {
+        kind: 'chat_completions',
+        body: { model: 'kilo-internal/my-model' },
+      } as GatewayRequest,
+    });
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ id: 'gen\u0000-1', model: 'upstream-model', choices: [] }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging,
+      responseTransforms: null,
+    });
+    await result.text();
+    await runScheduledLogInsert();
+
+    expect(await selectLoggedRow()).toMatchObject({
+      id: logging.usage_id,
+      session_id: 'ses_storage',
+      generation_id: 'gen-1',
+    });
+  });
+
+  test('leaves the uploaded blob to R2 lifecycle cleanup when the row insert fails', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
+    jest.spyOn(db, 'insert').mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(fakeR2.objects.size).toBe(1);
+    expect(await selectLoggedRows()).toEqual([]);
+    expect(mockedLog).toHaveBeenCalledWith(
+      expect.stringContaining('failed to insert api_request_log_2')
+    );
+  });
+
+  test('skips the row when the R2 upload fails', async () => {
+    jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));
+
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
+
+    expect(await selectLoggedRows()).toEqual([]);
+    expect(mockedLog).toHaveBeenCalledWith(
+      expect.stringContaining('failed to upload api_request_log_2 blob to R2')
+    );
+  });
+
+  test('logs upstream error statuses for errors-only opt-ins', async () => {
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only', null);
+
+    const row = await selectLoggedRow();
+    expect(storedBlob(row)).toMatchObject({
+      response: JSON.stringify({ error: 'upstream error' }),
+      error: null,
+    });
+  });
+
+  test('skips successful responses for errors-only opt-ins', async () => {
+    await logUpstreamResponse(
+      jsonResponse({ model: 'kilo-internal/my-model' }),
+      'errors_only',
+      null
+    );
+
+    expect(await selectLoggedRows()).toHaveLength(0);
+    expect(fakeR2.objects.size).toBe(0);
+  });
+
+  test('logs successful statuses with a response read error for errors-only opt-ins', async () => {
+    await logUpstreamResponse(
+      failingResponse('application/json', 'upstream disconnected'),
+      'errors_only',
+      null
+    );
+
+    const row = await selectLoggedRow();
+    expect(storedBlob(row)).toMatchObject({
+      request: expect.any(Object),
+      response: null,
+      error: { response_body_read_error: expect.stringContaining('upstream disconnected') },
+    });
+    expect(fakeR2.objects.size).toBe(1);
+  });
+
+  test('logs successful responses for opt-ins that log all requests', async () => {
+    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all', null);
+
+    expect(storedBlob(await selectLoggedRow())).toMatchObject({ error: null });
+  });
+
+  test.each<RequestLoggingMode>(['all', 'errors_only'])(
+    'stores the caller error marker for %s opt-ins',
+    async mode => {
+      await logUpstreamResponse(jsonResponse({ error: 'blocked' }, 400), mode, {
+        guardrail_rejection: 'block',
+      });
+
+      expect(storedBlob(await selectLoggedRow())).toMatchObject({
+        error: { guardrail_rejection: 'block' },
+      });
+    }
+  );
+});
+
+function makeCapture() {
+  return { setGenerationId: jest.fn(), setBody: jest.fn(), setReadError: jest.fn() };
+}
+
+describe('request log capture', () => {
+  test.each(rewriters)('%s: captures the raw JSON body', async (_name, rewrite) => {
+    const capture = makeCapture();
+    const body = { model: 'upstream-model' };
+
+    const result = await rewrite({
+      response: jsonResponse(body),
+      usageContext: freeUsageContext,
+      capture,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(200);
+    expect(capture.setBody).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(JSON.stringify(body));
+    expect(capture.setReadError).not.toHaveBeenCalled();
+  });
+
+  test.each(rewriters)('%s: captures the raw event stream', async (_name, rewrite) => {
+    const capture = makeCapture();
+    const sseBody =
+      'data: {"id":"gen-1","model":"upstream-model","choices":[]}\n\n' + 'data: [DONE]\n\n';
+
+    const result = await rewrite({
+      response: sseResponse(sseBody),
+      usageContext: freeUsageContext,
+      capture,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    await readOutputStream(result);
+
+    expect(capture.setBody).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(sseBody);
+    expect(capture.setReadError).not.toHaveBeenCalled();
+  });
+
+  test.each(rewriters)(
+    '%s: captures an empty body when upstream has no body',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+
+      const result = await rewrite({
+        response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }),
+        usageContext: freeUsageContext,
+        capture,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      await readOutputStream(result);
+
+      expect(capture.setBody).toHaveBeenCalledWith('');
+      expect(capture.setReadError).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: records a read error with the chunks received before the stream failed',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+      const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
+
+      const result = await rewrite({
+        response: failingResponse('text/event-stream', 'ResponseAborted', receivedChunks),
+        usageContext: freeUsageContext,
+        capture,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      await readOutputStream(result);
+
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: records a read error without a partial body when the stream fails immediately',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+
+      const result = await rewrite({
+        response: failingResponse('text/event-stream', 'ResponseAborted'),
+        usageContext: freeUsageContext,
+        capture,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      await readOutputStream(result);
+
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: records a read error when a JSON body cannot be read',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+
+      const result = await rewrite({
+        response: failingResponse('application/json', 'TimeoutError'),
+        usageContext: freeUsageContext,
+        capture,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+
+      expect(result.status).toBe(503);
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
+
+  test('records a read error when the response stream is cancelled', async () => {
+    const capture = makeCapture();
+    const upstream = new Response(new ReadableStream<Uint8Array>({ start() {} }), {
+      headers: { 'content-type': 'text/event-stream' },
+    });
+
+    const result = await rewriteModelResponse_ChatCompletions({
+      response: upstream,
+      usageContext: freeUsageContext,
+      capture,
+      vercelRequestId: null,
+      reasoningEffort: null,
+      responseTransforms: null,
+    });
+    const reader = result.body?.getReader();
+    await reader?.cancel();
+
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
+    expect(capture.setBody).not.toHaveBeenCalled();
+  });
+
+  test.each(rewriters)(
+    '%s: records the chunks received before the response stream is cancelled',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+      const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
+      const { response: upstream } = hangingSseResponse(receivedChunks);
+
+      const result = await rewrite({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      const reader = result.body?.getReader();
+      await reader?.read();
+      await reader?.cancel();
+
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
+});

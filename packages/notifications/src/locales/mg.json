@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Misy fanavaozana ny session agent anao",
+      "lowBalance": "Mila jerena ny balan-nao",
+      "spendAlert": "Mila jerena ny fandaniana",
+      "securityFinding": "Misy hitan'ny fiarovana mila jerena",
+      "securityUpdate": "Misy fanavaozana ny fisavana fiarovana",
+      "activeAgentsGlanceable": "Misy fanavaozana ny agent mavitrika"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Fampandrenesana balan ambany",
+      "body": "Ny balan’ny {{organizationName}} dia latsaka ambany ny ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Fampandrenesana fandaniana",
+      "body": "Nihoatra ny ${{amountUsd}} ny fandaniana tao amin'ny {{scopeName}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Hitan'ny fiarovana vaovao ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Fampitandremana SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Fanitsakitsahana SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Vonona fehezina avy amin'ny findainao ny session Kilo anao"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

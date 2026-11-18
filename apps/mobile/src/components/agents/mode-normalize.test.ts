@@ -9,6 +9,7 @@ import {
   type ModeOption,
   normalizeAgentMode,
   resolvePinnedAgentModel,
+  resolveSessionRoleView,
   visibleProfileAgents,
 } from '@/components/agents/mode-normalize';
 
@@ -60,8 +61,17 @@ describe('visibleProfileAgents', () => {
     config: {},
   };
 
-  it('keeps a visible primary agent', () => {
-    expect(visibleProfileAgents([base])).toHaveLength(1);
+  it('keeps visible agents in input order and drops the rest', () => {
+    const custom = { ...base, slug: 'reviewer', name: 'Reviewer', config: { description: 'd' } };
+    const agents = [
+      { ...base, config: { disable: true } },
+      custom,
+      { ...base, slug: 'h', name: 'H', config: { hidden: true } },
+      { ...base, slug: 'sub', name: 'Sub', config: { mode: 'subagent' } },
+      base,
+    ];
+
+    expect(visibleProfileAgents(agents)).toEqual([custom, base]);
   });
 
   it('drops a disabled agent', () => {
@@ -171,6 +181,131 @@ describe('resolvePinnedAgentModel', () => {
     expect(
       resolvePinnedAgentModel({ slug: 'missing', profileAgents: [], runtimeAgents: [] })
     ).toEqual({});
+  });
+});
+
+describe('resolveSessionRoleView', () => {
+  const profileAgents = [
+    {
+      slug: 'reviewer',
+      name: 'Profile Reviewer',
+      config: { description: 'Review the change', model: 'profile-model', variant: 'fast' },
+    },
+  ];
+
+  it('merges a remote session profile agents with its runtime agents', () => {
+    const runtimeAgents = [{ slug: 'deployer', name: 'Deployer' }];
+    const view = resolveSessionRoleView({
+      sessionType: 'remote',
+      runtimeAgents,
+      profileAgents,
+      selectedMode: 'code',
+    });
+
+    expect(view.customOptions).toEqual([
+      { value: 'reviewer', label: 'Profile Reviewer', description: 'Review the change' },
+      { value: 'deployer', label: 'Deployer', description: '' },
+    ]);
+  });
+
+  it('shows a remote profile role even when the runtime agents are absent', () => {
+    const view = resolveSessionRoleView({
+      sessionType: 'remote',
+      runtimeAgents: undefined,
+      profileAgents,
+      selectedMode: 'code',
+    });
+
+    expect(view.customOptions).toEqual([
+      { value: 'reviewer', label: 'Profile Reviewer', description: 'Review the change' },
+    ]);
+  });
+
+  it('keeps a profile label when a runtime agent shares its slug', () => {
+    const view = resolveSessionRoleView({
+      sessionType: 'remote',
+      runtimeAgents: [{ slug: 'reviewer', name: 'Runtime Reviewer' }],
+      profileAgents,
+      selectedMode: 'code',
+    });
+
+    expect(view.customOptions).toEqual([
+      { value: 'reviewer', label: 'Profile Reviewer', description: 'Review the change' },
+    ]);
+  });
+
+  it.each(['cloud-agent', 'read-only'] as const)(
+    'uses only runtime agents for a %s session',
+    sessionType => {
+      const view = resolveSessionRoleView({
+        sessionType,
+        runtimeAgents: [{ slug: 'deployer', name: 'Deployer' }],
+        profileAgents,
+        selectedMode: 'code',
+      });
+
+      expect(view.customOptions).toEqual([
+        { value: 'deployer', label: 'Deployer', description: '' },
+      ]);
+    }
+  );
+
+  it('pins a cloud-agent model from runtimeAgents even when the profile agent pins another', () => {
+    const view = resolveSessionRoleView({
+      sessionType: 'cloud-agent',
+      runtimeAgents: [
+        { slug: 'reviewer', name: 'Runtime Reviewer', model: 'runtime-model', variant: 'slow' },
+      ],
+      profileAgents,
+      selectedMode: 'reviewer',
+    });
+
+    expect(view.pinned).toEqual({
+      model: 'runtime-model',
+      variant: 'slow',
+      agentName: 'Runtime Reviewer',
+    });
+  });
+
+  it('does not pin from a remote profile agent when the runtime agent pins none', () => {
+    const view = resolveSessionRoleView({
+      sessionType: 'remote',
+      runtimeAgents: [{ slug: 'reviewer', name: 'Runtime Reviewer' }],
+      profileAgents,
+      selectedMode: 'reviewer',
+    });
+
+    expect(view.pinned).toEqual({ agentName: 'Runtime Reviewer' });
+  });
+
+  it('pins a remote model from runtimeAgents even when the profile agent pins another', () => {
+    const view = resolveSessionRoleView({
+      sessionType: 'remote',
+      runtimeAgents: [
+        { slug: 'reviewer', name: 'Runtime Reviewer', model: 'runtime-model', variant: 'slow' },
+      ],
+      profileAgents,
+      selectedMode: 'reviewer',
+    });
+
+    expect(view.pinned).toEqual({
+      model: 'runtime-model',
+      variant: 'slow',
+      agentName: 'Runtime Reviewer',
+    });
+  });
+
+  it('appends a selected remote profile slug that is not otherwise listed', () => {
+    const view = resolveSessionRoleView({
+      sessionType: 'remote',
+      runtimeAgents: undefined,
+      profileAgents: [],
+      selectedMode: 'inherited',
+    });
+
+    expect(view.customOptions).toEqual([
+      { value: 'inherited', label: 'inherited', description: '' },
+    ]);
   });
 });
 

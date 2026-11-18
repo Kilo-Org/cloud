@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useRouter } from 'next/navigation';
@@ -15,7 +15,7 @@ import { TriggerForm, type TriggerFormData } from '@/components/webhook-triggers
 import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { ArrowLeft, Webhook, AlertCircle } from 'lucide-react';
 
 type CreateWebhookTriggerContentProps = {
@@ -26,6 +26,8 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [githubRepo, setGithubRepo] = useState('');
+  const [isExistingChat, setIsExistingChat] = useState(false);
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
@@ -34,7 +36,17 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     ? `/organizations/${organizationId}/integrations`
     : '/integrations';
 
-  // Fetch eligibility to check if user can create webhook triggers (requires credits)
+  const {
+    data: capabilities,
+    isPending: isLoadingCapabilities,
+    isError: hasCapabilitiesError,
+    refetch: refetchCapabilities,
+  } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions({
+      organizationId,
+      githubRepo: githubRepo || undefined,
+    })
+  );
 
   // Fetch GitHub repositories
   const {
@@ -57,7 +69,11 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     !isLoadingRepos && githubRepoData?.integrationInstalled === false;
 
   // Fetch models
-  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    true,
+    'shared_services'
+  );
 
   // Transform repositories to RepositoryOption format
   const repositories = useMemo<RepositoryOption[]>(() => {
@@ -79,6 +95,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
       })),
     [modelsData?.data]
   );
@@ -110,14 +127,25 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     async (formData: TriggerFormData) => {
       await createTrigger({
         triggerId: formData.triggerId,
+        ...(formData.targetType === 'cloud_agent_chat'
+          ? {
+              targetType: formData.targetType,
+              cloudAgentSessionId: formData.cloudAgentSessionId,
+            }
+          : {}),
+        runAsCreator: formData.runAsCreator,
         activationMode: formData.activationMode,
         cronExpression: formData.cronExpression,
         cronTimezone: formData.cronTimezone,
         githubRepo: formData.githubRepo,
         mode: formData.mode,
         model: formData.model,
+        variant: formData.variant ?? undefined,
+        sandboxAllocation: formData.sandboxAllocation ?? undefined,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
+        environmentId: formData.environmentId,
+        bodySchema: formData.bodySchema,
         autoCommit: formData.autoCommit,
         condenseOnComplete: formData.condenseOnComplete,
         webhookAuth: formData.webhookAuth.enabled
@@ -163,7 +191,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
       {headerContent}
 
       {/* GitHub integration missing - non-blocking banner */}
-      {isGitHubIntegrationMissing && (
+      {isGitHubIntegrationMissing && !isExistingChat && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -201,6 +229,13 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         repositoriesError={repoError?.message}
         models={modelOptions}
         isLoadingModels={isLoadingModels}
+        canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+        sandboxSelection={capabilities?.sandboxSelection}
+        onRepositoryChange={setGithubRepo}
+        onTargetTypeChange={target => setIsExistingChat(target === 'cloud_agent_chat')}
+        isLoadingCapabilities={isLoadingCapabilities}
+        hasCapabilitiesError={hasCapabilitiesError}
+        onRetryCapabilities={() => void refetchCapabilities()}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isLoading={isCreatePending}

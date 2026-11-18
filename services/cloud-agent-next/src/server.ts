@@ -1,21 +1,23 @@
+import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
+import { billingSubjectSchema } from '@kilocode/container-usage';
+import { captureCloudAgentException, instrumentCloudAgentWorker } from './sentry.js';
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
 import { appRouter } from './router.js';
-import type { Env } from './types.js';
+import type { Env, TRPCContext } from './types.js';
 import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
 import {
   resolveSecret,
   validateStreamTicket,
-  validateWrapperDispatchTicket,
   STREAM_TICKET_AUDIENCE,
   TERMINAL_TICKET_AUDIENCE,
-  type WrapperAuthClaims,
 } from './auth.js';
 import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
-import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
+import { createNotFoundHandler } from '@kilocode/worker-utils';
+import { createWorkerErrorHandler } from './error-handler.js';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
 import {
@@ -23,11 +25,11 @@ import {
   consumeCloudAgentReportBatch,
   removeExpiredCloudAgentReportData,
 } from './telemetry/report-consumer.js';
+import { runCloudAgentOutcomeCollection } from './telemetry/outcome-aggregate.js';
+import { runCloudAgentOpenStockCollection } from './telemetry/open-stock.js';
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
-import { resolveTerminalWrapperClient } from './terminal/access.js';
 import { requestMethodAllowsBody } from './shared/http-proxy.js';
-import { hasDuplicateQueryParameters } from './shared/http-query.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from './session-access.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { and, eq, isNotNull } from 'drizzle-orm';
@@ -35,19 +37,111 @@ import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { getPgDb } from './db/pg.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
-  KILO_FACADE_GLOBAL_FEED_PATH,
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
+import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
+import { isControlSession } from './session-identity.js';
+import { PREVIEW_OPEN_PATH, handlePreviewOpen, handlePreviewRequest } from './preview/route.js';
+import { matchPreviewHost } from './preview/host.js';
+import { withoutPreviewMarkers } from './shared/preview-headers.js';
+import { withDORetry } from './utils/do-retry.js';
+import { parseBearerCredential } from './sandbox-control/credential.js';
+import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
+import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
+import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
+import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
+import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import { registerWorkspaceArtifactRoutes } from './sandbox-control/workspace-artifact-routes.js';
+import { registerEnvironmentBuildRoutes } from './environment-build/routes.js';
+import {
+  runtimeCredentialProxyFacadeBaseUrl,
+  runtimeCredentialProxyUpstream,
+  type RuntimeProxyHandleClaims,
+  verifyRuntimeCredentialProxyHandle,
+} from './runtime-credential-proxy.js';
+import {
+  logRuntimeProxyRequestFailed,
+  readUpstreamFailureEvidence,
+  runtimeProxyRequestShape,
+} from './runtime-credential-proxy-diagnostics.js';
+import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
+import {
+  inferRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyScopeIngestRoute,
+  resolveRuntimeCredentialProxyScopedIngestRoute,
+  runtimeProxyAttestationAudience,
+  type RuntimeCredentialProxyRoute,
+} from './kilo/runtime-credential-proxy-routes.js';
+import { readBoundedBody } from './utils/read-bounded-body.js';
+import {
+  encodeCloudAgentSessionScopeV2ViewHeaders,
+  forwardCloudAgentSessionScopeRequest,
+  forwardCloudAgentSessionScopeV2Request,
+} from './cloud-agent-session-scope-proxy.js';
+import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
+import {
+  issueRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { TRPCError } from '@trpc/server';
+import {
+  readWidgetApprovalKey,
+  widgetApprovalKeyRequestSchema,
+  type WidgetApproval,
+} from './widget-approval-key.js';
+import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js';
+import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
+import { z } from 'zod';
+import { isOrgInList } from './sandbox-id.js';
+import { containersBillingIdentity } from './container-usage-context.js';
+import { CLOUDFLARE_CONTAINERS_INSTANCES } from '@kilocode/worker-utils/sandbox-allocation';
+import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
 const app = new Hono<HonoContext>();
 
-function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
-  const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  const isRealOrigin = origin !== undefined && origin !== 'null';
-  return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
+const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
+const SnapshotBuildStartInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+const SnapshotBuildCleanupInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+    snapshotId: z.string().min(1).max(256).optional(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+
+function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : `user:${input.userId}`;
+}
+
+function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : input.userId;
+}
+
+function createTerminalForwardRequest(
+  request: Request,
+  pathname: '/terminal/browser' | '/terminal/wrapper',
+  ptyId: string,
+  authorization?: string
+): Request {
+  const url = new URL(request.url);
+  url.pathname = pathname;
+  url.search = '';
+  url.searchParams.set('ptyId', ptyId);
+
+  const headers = new Headers();
+  for (const name of ['Upgrade', 'Connection', 'Sec-WebSocket-Key', 'Sec-WebSocket-Version']) {
+    const value = request.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  if (authorization !== undefined) headers.set('Authorization', authorization);
+
+  return new Request(url, { method: 'GET', headers });
 }
 
 // TODO: the name is not very clear. I thought it is a termination of a websocket, not that websocket is for PTY
@@ -69,8 +163,12 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     logger.withFields({ cloudAgentSessionId }).warn('/terminal: Missing ptyId parameter');
     return new Response('Missing ptyId parameter', { status: 400 });
   }
+  if (!PtyIdSchema.safeParse(ptyId).success) {
+    logger.withFields({ cloudAgentSessionId }).warn('/terminal: Invalid ptyId parameter');
+    return new Response('Invalid ptyId parameter', { status: 400 });
+  }
 
-  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin') ?? undefined)) {
+  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin'))) {
     logger.withFields({ cloudAgentSessionId, ptyId }).warn('/terminal: Origin not allowed');
     return new Response('Origin not allowed', { status: 403 });
   }
@@ -115,6 +213,11 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('PTY mismatch', { status: 403 });
   }
 
+  if (!isControlSession(cloudAgentSessionId)) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Legacy session rejected');
+    return new Response('Not found', { status: 404 });
+  }
+
   try {
     await requireCurrentSessionAccess({
       env,
@@ -132,11 +235,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Missing ticket nonce');
     return new Response('Missing ticket nonce', { status: 401 });
   }
-  const consumed = await consumeStreamTicketNonce(
-    env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Ticket nonce already used');
     return new Response('Ticket nonce already used', { status: 401 });
@@ -144,29 +243,49 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
 
-  const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
-  const stub = env.CLOUD_AGENT_SESSION.get(doId);
-  const metadata = await stub.getMetadata();
-  const terminal = await resolveTerminalWrapperClient({
-    env,
-    metadata,
-    sessionId: cloudAgentSessionId,
-  });
-  if (!terminal.success || !terminal.data) {
-    return new Response(terminal.error ?? 'Terminal unavailable', { status: 503 });
-  }
-
-  return terminal.data.client.connectTerminal(ptyId, request);
+  return getSandboxSessionStub(env, userId, cloudAgentSessionId).fetch(
+    createTerminalForwardRequest(request, '/terminal/browser', ptyId)
+  );
 }
 
 app.use('*', async (c: Context<HonoContext>, next: Next) => {
   await withLogTags({ source: 'worker-entry' }, async () => {
     const url = new URL(c.req.url);
     logger.setTags({ method: c.req.method, path: url.pathname });
-    logger.info('Handling request');
     await next();
   });
 });
+
+// Kilo 7.4.20 and current releases both append their own `/api/...` route to
+// configured targets. Only a verified opaque handle may turn that otherwise
+// ordinary Worker path into a facade request.
+app.use('*', async (c: Context<HonoContext>, next: Next) => {
+  const facadeBase = c.env.WORKER_URL
+    ? runtimeCredentialProxyFacadeBaseUrl(c.env.WORKER_URL)
+    : null;
+  if (!facadeBase) return next();
+  const facadePath = new URL(facadeBase).pathname.replace(/\/+$/, '');
+  const requestPath = new URL(c.req.url).pathname;
+  const path = facadePath
+    ? requestPath.startsWith(`${facadePath}/`)
+      ? requestPath.slice(facadePath.length)
+      : null
+    : requestPath;
+  if (!path) return next();
+  // This route remains available for already-issued configurations. A prefixed
+  // deployment never supported it because Hono registers the legacy route at
+  // the Worker root; root deployments retain the transition behavior.
+  if (path.startsWith('/api/runtime-credential-proxy/')) return next();
+  const handle = runtimeProxyAuthorization(c.req.raw);
+  if (!handle) return next();
+  const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
+  if (!claims) return next();
+  const route = inferRuntimeCredentialProxyRoute(path);
+  if (!route) return c.text('Not found', 404);
+  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
+});
+
+registerVercelScmBrokerRoute(app);
 
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({
@@ -175,66 +294,434 @@ app.get('/health', (c: Context<HonoContext>) => {
   });
 });
 
+// Handle authentication is bearer-only; the URL contains neither a credential
+// nor an upstream authority. Register before the broad facade routes.
+app.all('/api/runtime-credential-proxy/:route/*', routeRuntimeCredentialProxy);
+
+function requireInternalApi(c: Context<HonoContext>): Response | null {
+  if (!c.env.INTERNAL_API_SECRET) {
+    return c.text('Internal API secret not configured', 500);
+  }
+  const internalApiKey = c.req.header('x-internal-api-key');
+  if (!internalApiKey || !timingSafeEqual(internalApiKey, c.env.INTERNAL_API_SECRET)) {
+    return c.text('Invalid or missing internal API key', 401);
+  }
+  return null;
+}
+
+registerControlLogRoutes(app);
+registerWorkspaceArtifactRoutes(app);
+registerRuntimeArtifactRoutes(app);
+registerStartupFailureRoute(app);
+registerEnvironmentBuildRoutes(app);
+
+app.get('/internal/code-review/billing/:type/:id', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+  const subject = billingSubjectSchema.safeParse({
+    type: c.req.param('type'),
+    id: c.req.param('id'),
+  });
+  if (!subject.success) return c.text('Invalid billing owner', 400);
+  const mode = await c.env.CONTAINER_USAGE_METER.getBillingMode({
+    service: 'cloud-agent-next-sandbox-containers-code-review',
+    subject: subject.data,
+  });
+  return c.json({ enabled: mode === 'paid' }, 200, { 'Cache-Control': 'no-store' });
+});
+
+app.get('/internal/containers/billing/:type/:id/:instance', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+  const subject = billingSubjectSchema.safeParse({
+    type: c.req.param('type'),
+    id: c.req.param('id'),
+  });
+  if (!subject.success) return c.text('Invalid billing owner', 400);
+  const instance = z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).safeParse(c.req.param('instance'));
+  if (!instance.success) return c.text('Invalid instance size', 400);
+  const billingMode = await c.env.CONTAINER_USAGE_METER.getBillingMode({
+    service: containersBillingIdentity(instance.data).service,
+    subject: subject.data,
+  });
+  return c.json({ billingMode }, 200, { 'Cache-Control': 'no-store' });
+});
+
+app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const organizationId = z.uuid().safeParse(c.req.param('organizationId'));
+  if (!organizationId.success) return c.text('Invalid organization ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, organizationId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/internal/byoc/vercel-enrollment/user/:userId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const userId = z.string().min(1).safeParse(c.req.param('userId'));
+  if (!userId.success) return c.text('Invalid user ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, userId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  try {
+    return c.json(await getVercelRuntimeIdentity(), 200, { 'Cache-Control': 'no-store' });
+  } catch {
+    return c.text('Vercel runtime identity could not be resolved', 502);
+  }
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/start', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = SnapshotBuildStartInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+  if (!isOrgInList(c.env.BYOC_VERCEL_IDS, snapshotBuildOwnerId(input.data))) {
+    return c.text('Owner is not enrolled in Vercel compute', 403);
+  }
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
+      stub => stub.start(input.data),
+      'startVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build could not be started', 502);
+  }
+  return c.json({ accepted: true }, 202);
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = SnapshotBuildCleanupInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
+      stub => stub.cleanup(input.data),
+      'cleanupVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build resources could not be cleaned up', 502);
+  }
+
+  return c.body(null, 204);
+});
+
+app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
+  return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
+});
+
+app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {
+  if (c.req.header('Upgrade')?.toLowerCase() !== 'websocket') {
+    return c.text('Expected WebSocket upgrade', 426);
+  }
+
+  const ownerId = c.req.param('ownerId');
+  const sessionId = c.req.param('sessionId');
+  const ptyId = c.req.param('ptyId');
+  if (!ownerId) {
+    return c.text('Invalid ownerId', 400);
+  }
+  if (!sessionId || !sessionIdSchema.safeParse(sessionId).success) {
+    return c.text('Invalid sessionId', 400);
+  }
+  if (!ptyId || !PtyIdSchema.safeParse(ptyId).success) {
+    return c.text('Invalid ptyId', 400);
+  }
+
+  const authorization = c.req.header('Authorization');
+  if (!authorization || parseBearerCredential(authorization) === null) {
+    return c.text('Invalid or missing Authorization header', 401);
+  }
+
+  const stub = getSandboxSessionStub(c.env, ownerId, sessionId);
+  return stub.fetch(
+    createTerminalForwardRequest(c.req.raw, '/terminal/wrapper', ptyId, authorization)
+  );
+});
+
 function createSanitizedForwardRequest(
   request: Request,
   url: string | URL,
-  headers: Headers
+  headers: Headers,
+  body?: BodyInit
 ): Request {
   const init: RequestInit & { duplex?: 'half' } = {
     method: request.method,
     headers,
   };
-  if (request.body && requestMethodAllowsBody(request.method)) {
-    init.body = request.body;
+  if ((body !== undefined || request.body) && requestMethodAllowsBody(request.method)) {
+    init.body = body ?? request.body;
     init.duplex = 'half';
   }
   return new Request(url, init);
 }
 
-function parseOptionalWrapperGeneration(raw: string | null): number | undefined {
-  if (raw === null) return undefined;
-  const parsed = Number(raw);
-  return Number.isInteger(parsed) ? parsed : undefined;
+function runtimeProxyAuthorization(request: Request): string | null {
+  const authorization = request.headers.get('Authorization');
+  const match = authorization ? /^Bearer ([A-Za-z0-9._-]+)$/.exec(authorization) : null;
+  return match?.[1] ?? null;
 }
 
-/**
- * Defense-in-depth on top of the DO's own fencing checks: reject a wrapper
- * dispatch ticket whose claims disagree with the fence tuple carried on the
- * request itself. Only compares fields the caller supplies — a route that
- * doesn't parse a given fence field yet is not forced to require it.
- *
- * A legacy raw Kilo JWT (see auth.ts) carries no fence claims to compare, so
- * it is exempt — wrapper processes bound before ticket support shipped rely
- * on requireCurrentSessionAccess/the DO's own checks until their next dispatch.
- */
-function ticketClaimsMismatchRequestFence(
-  claims: WrapperAuthClaims,
-  expected: {
-    cloudAgentSessionId: string;
-    kiloSessionId?: string | null;
-    wrapperRunId?: string | null;
-    wrapperGeneration?: number;
-    wrapperConnectionId?: string | null;
+function runtimeProxyHeaders(request: Request, token: string, organizationId?: string): Headers {
+  const headers = new Headers(request.headers);
+  for (const name of [
+    'Authorization',
+    'X-API-Key',
+    'API-Key',
+    'X-Auth-Token',
+    'Cookie',
+    'Host',
+    'Connection',
+    'Proxy-Connection',
+    'Keep-Alive',
+    'Proxy-Authenticate',
+    'Proxy-Authorization',
+    'TE',
+    'Trailer',
+    'Transfer-Encoding',
+    'Upgrade',
+    'X-Kilocode-OrganizationId',
+  ]) {
+    headers.delete(name);
   }
-): boolean {
-  if (claims.type !== 'wrapper_dispatch_ticket') return false;
-  if (claims.cloudAgentSessionId !== expected.cloudAgentSessionId) return true;
-  if (expected.kiloSessionId != null && claims.kiloSessionId !== expected.kiloSessionId)
-    return true;
-  if (expected.wrapperRunId != null && claims.wrapperRunId !== expected.wrapperRunId) return true;
-  if (
-    expected.wrapperGeneration !== undefined &&
-    claims.wrapperGeneration !== expected.wrapperGeneration
-  ) {
-    return true;
+  const attributionHeaders = new Set([
+    'x-kilocode-feature',
+    'x-kilocode-editorname',
+    'x-kilocode-mode',
+    'x-kilocode-machineid',
+    'x-kilocode-taskid',
+    'x-kilocode-projectid',
+    'x-kilocode-version',
+    'x-kilo-session',
+    'x-kilo-request',
+  ]);
+  for (const name of [...headers.keys()]) {
+    if (
+      name.startsWith('proxy-') ||
+      name.startsWith('x-forwarded-') ||
+      name.startsWith('x-internal-') ||
+      ((name.startsWith('x-kilo-') || name.startsWith('x-kilocode-')) &&
+        !attributionHeaders.has(name)) ||
+      name === 'forwarded' ||
+      name === 'x-real-ip' ||
+      name === 'x-kilocode-organizationid'
+    ) {
+      headers.delete(name);
+    }
   }
-  if (
-    expected.wrapperConnectionId != null &&
-    claims.wrapperConnectionId !== expected.wrapperConnectionId
-  ) {
-    return true;
+  headers.set('Authorization', `Bearer ${token}`);
+  if (organizationId) headers.set('X-Kilocode-OrganizationId', organizationId);
+  return headers;
+}
+
+function sanitizeRuntimeProxyResponse(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const name of [
+    'Set-Cookie',
+    'Connection',
+    'Proxy-Connection',
+    'Keep-Alive',
+    'Proxy-Authenticate',
+    'Proxy-Authorization',
+    'TE',
+    'Trailer',
+    'Transfer-Encoding',
+    'Upgrade',
+  ]) {
+    headers.delete(name);
   }
-  return false;
+  headers.delete(RUNTIME_PROXY_ATTESTATION_HEADER);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {
+  const handle = runtimeProxyAuthorization(c.req.raw);
+  if (!handle) return c.text('Unauthorized', 401);
+  const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
+  if (!claims) return c.text('Unauthorized', 401);
+  const route = c.req.param('route');
+  const prefix = `/api/runtime-credential-proxy/${route}/`;
+  const requestPath = new URL(c.req.url).pathname;
+  if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
+  const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
+  if (route !== 'backend' && route !== 'provider' && route !== 'ingest' && route !== 'exa')
+    return c.text('Not found', 404);
+  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
+}
+
+async function forwardRuntimeCredentialProxy(
+  c: Context<HonoContext>,
+  handle: string,
+  claims: RuntimeProxyHandleClaims,
+  route: RuntimeCredentialProxyRoute,
+  path: string
+): Promise<Response> {
+  if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
+  const correlation = { sessionId: claims.sessionId, kiloSessionId: claims.kiloSessionId };
+  const requestShape = (organizationId: string | undefined) =>
+    runtimeProxyRequestShape({
+      route,
+      method: c.req.method,
+      path,
+      organizationId,
+      kiloSessionId: claims.kiloSessionId,
+    });
+  // One diagnostic per refused request: the path, method or body has no allowlist entry.
+  const rejectRoute = (organizationId: string | undefined): Response => {
+    logRuntimeProxyRequestFailed({
+      upstreamAttempted: false,
+      rejectionStage: 'route',
+      request: requestShape(organizationId),
+      ...correlation,
+    });
+    return c.text('Not found', 404);
+  };
+  let bodyText: string | undefined;
+  if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
+    bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
+    if (bodyText === undefined) return rejectRoute(undefined);
+  }
+  let credential: {
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    scopeView?: ScopeGrantView;
+  } | null;
+  try {
+    credential = await withDORetry(
+      () => getSandboxSessionStub(c.env, claims.userId, claims.sessionId),
+      session => session.resolveRuntimeCredentialProxyGrant(handle),
+      'resolveRuntimeCredentialProxyGrant'
+    );
+  } catch {
+    return c.text('Credential unavailable', 503);
+  }
+  if (!credential) return c.text('Unauthorized', 401);
+  const derivedTargets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
+  const targets = derivedTargets.success
+    ? derivedTargets.targets
+    : deriveLoopbackFacadeTargets(c.env);
+  if (!targets) return c.text('Not found', 404);
+
+  const search = new URL(c.req.url).search;
+  const scopeView = route === 'ingest' ? credential.scopeView : undefined;
+  let scopedV1 = false;
+  let scopedV2Headers: Record<string, string> | null = null;
+  let upstream: URL | null;
+  if (scopeView !== undefined) {
+    const adopted = resolveRuntimeCredentialProxyScopeIngestRoute({
+      targets: targets,
+      route,
+      method: c.req.method,
+      pathname: path,
+      search,
+      memberRootKiloSessionIds: scopeView.memberRootKiloSessionIds,
+      organizationId: credential.organizationId,
+      contentType: c.req.header('content-type'),
+      bodyText,
+    });
+    if (adopted === null) return rejectRoute(credential.organizationId);
+    upstream = adopted.upstream;
+    if (adopted.kind === 'scoped') {
+      const v2Headers = encodeCloudAgentSessionScopeV2ViewHeaders(scopeView);
+      if (v2Headers === null) return c.text('Credential unavailable', 503);
+      scopedV2Headers = v2Headers;
+    }
+  } else {
+    const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
+      targets: targets,
+      route,
+      method: c.req.method,
+      pathname: path,
+      search,
+      kiloSessionId: claims.kiloSessionId,
+      organizationId: credential.organizationId,
+      contentType: c.req.header('content-type'),
+      bodyText,
+    });
+    scopedV1 = scopedUpstream !== null;
+    upstream =
+      scopedUpstream ??
+      runtimeCredentialProxyUpstream(
+        targets,
+        route,
+        c.req.method,
+        path,
+        search,
+        claims.kiloSessionId,
+        credential.organizationId,
+        c.req.header('content-type'),
+        bodyText
+      );
+  }
+  if (!upstream) return rejectRoute(credential.organizationId);
+  try {
+    // The route allowlist is resolved above before a proof is issued.
+    const audience = runtimeProxyAttestationAudience(route, path);
+    const proof = await issueRuntimeProxyAttestation({
+      secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
+        if (!value) throw new Error('Authentication unavailable');
+        return value;
+      }),
+      audience,
+      bearer: credential.token,
+      ...credential.runtimeAuthorization,
+    });
+    const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
+    headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
+    const request = createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText);
+    const response =
+      scopedV2Headers !== null
+        ? await forwardCloudAgentSessionScopeV2Request(request, c.env, {
+            authorization: `Bearer ${credential.token}`,
+            scopeHeaders: scopedV2Headers,
+            runtimeProxyAttestation: proof,
+          })
+        : scopedV1
+          ? await forwardCloudAgentSessionScopeRequest(request, c.env, {
+              authorization: `Bearer ${credential.token}`,
+              sessionIngestScope: {
+                cloudAgentSessionId: claims.sessionId,
+                rootKiloSessionId: claims.kiloSessionId,
+              },
+              runtimeProxyAttestation: proof,
+            })
+          : await fetch(request, { redirect: 'manual' });
+    if (!response.ok) {
+      logRuntimeProxyRequestFailed({
+        upstreamAttempted: true,
+        upstreamStatus: response.status,
+        evidence: await readUpstreamFailureEvidence(response),
+        request: requestShape(credential.organizationId),
+        ...correlation,
+      });
+    }
+    return sanitizeRuntimeProxyResponse(response);
+  } catch {
+    return c.text('Upstream unavailable', 502);
+  }
 }
 
 function stripPublicCredentialHeaders(headers: Headers): Headers {
@@ -269,6 +756,8 @@ async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Re
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
+  if (authResult.cloudAgentAuthority)
+    return c.text('Cloud Agent authority only permits preparation', 403);
   return routeToUserKiloFacade(c, authResult.userId, authResult.token);
 }
 
@@ -287,6 +776,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
   if (!cloudAgentSessionId) {
     logger.warn('/stream: Missing cloudAgentSessionId parameter');
     return c.text('Missing cloudAgentSessionId parameter', 400);
+  }
+
+  if (!isAllowedStreamWebSocketOrigin(c.env, c.req.header('Origin'))) {
+    logger.withFields({ cloudAgentSessionId }).warn('/stream: Origin not allowed');
+    return c.text('Origin not allowed', 403);
   }
 
   const ticket = url.searchParams.get('ticket');
@@ -324,6 +818,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Session mismatch', 403);
   }
 
+  if (!isControlSession(cloudAgentSessionId)) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Legacy session rejected');
+    return c.text('Not found', 404);
+  }
+
   try {
     await requireCurrentSessionAccess({
       env: c.env,
@@ -341,11 +840,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Missing ticket nonce');
     return c.text('Missing ticket nonce', 401);
   }
-  const consumed = await consumeStreamTicketNonce(
-    c.env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(c.env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Ticket nonce already used');
     return c.text('Ticket nonce already used', 401);
@@ -353,290 +848,19 @@ app.get('/stream', async (c: Context<HonoContext>) => {
 
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');
 
-  const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
-  const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
-  return stub.fetch(c.req.raw);
+  return getSandboxSessionStub(c.env, userId, cloudAgentSessionId).fetch(c.req.raw);
 });
 
 app.get('/terminal', async (c: Context<HonoContext>) => {
   return handleTerminalWebSocket(c.req.raw, c.env);
 });
 
-app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const rawUserId = c.req.param('userId');
-  const cloudAgentSessionId = c.req.param('sessionId');
-  if (!rawUserId || !cloudAgentSessionId) {
-    return c.text('Missing route params', 400);
-  }
-
-  let userId: string;
-  try {
-    userId = decodeURIComponent(rawUserId);
-  } catch {
-    return c.text('Invalid userId encoding', 400);
-  }
-
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateWrapperDispatchTicket(
-    c.req.header('Authorization') ?? null,
-    nextAuthSecret
-  );
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  if (authResult.claims.userId !== userId) {
-    return c.text('Token does not match session user', 403);
-  }
-
-  const url = new URL(c.req.url);
-  if (hasDuplicateQueryParameters(url.searchParams)) {
-    return c.text('Invalid global feed producer identity', 400);
-  }
-  const kiloSessionId = url.searchParams.get('kiloSessionId');
-  const wrapperRunId = url.searchParams.get('wrapperRunId');
-  const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
-  const wrapperConnectionId = url.searchParams.get('wrapperConnectionId');
-  const wrapperGeneration = wrapperGenerationParam ? Number(wrapperGenerationParam) : NaN;
-
-  if (
-    !kiloSessionId ||
-    !wrapperRunId ||
-    !Number.isInteger(wrapperGeneration) ||
-    wrapperGeneration < 0 ||
-    !wrapperConnectionId
-  ) {
-    return c.text('Invalid global feed producer identity', 400);
-  }
-
-  if (
-    ticketClaimsMismatchRequestFence(authResult.claims, {
-      cloudAgentSessionId,
-      kiloSessionId,
-      wrapperRunId,
-      wrapperGeneration,
-      wrapperConnectionId,
-    })
-  ) {
-    return c.text('Ticket does not match dispatch fence', 403);
-  }
-
-  try {
-    await requireCurrentSessionAccess({
-      env: c.env,
-      kiloUserId: userId,
-      cloudAgentSessionId,
-      expectedKiloSessionId: kiloSessionId,
-    });
-  } catch (error) {
-    return projectSessionAccessHttpError(error);
-  }
-
-  const sessionDoId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
-  const sessionStub = c.env.CLOUD_AGENT_SESSION.get(sessionDoId);
-  const validation = await sessionStub.validateKiloGlobalFeedProducer({
-    kiloSessionId,
-    wrapperRunId,
-    wrapperGeneration,
-    wrapperConnectionId,
-  });
-  if (!validation.success) {
-    return new Response(validation.message, { status: validation.status });
-  }
-
-  const facadeId = c.env.USER_KILO_FACADE.idFromName(userId);
-  const facadeStub = c.env.USER_KILO_FACADE.get(facadeId);
-  const facadeUrl = new URL(c.req.url);
-  facadeUrl.pathname = KILO_FACADE_GLOBAL_FEED_PATH;
-  facadeUrl.search = '';
-  facadeUrl.searchParams.set('userId', userId);
-  facadeUrl.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
-  facadeUrl.searchParams.set('kiloSessionId', kiloSessionId);
-  facadeUrl.searchParams.set('wrapperRunId', wrapperRunId);
-  facadeUrl.searchParams.set('wrapperGeneration', String(wrapperGeneration));
-  facadeUrl.searchParams.set('wrapperConnectionId', wrapperConnectionId);
-
-  const headers = stripPublicCredentialHeaders(c.req.raw.headers);
-  const request = createSanitizedForwardRequest(c.req.raw, facadeUrl, headers);
-  return facadeStub.fetch(request);
-});
-
-app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const rawUserId = c.req.param('userId');
-  const sessionId = c.req.param('sessionId');
-  if (!rawUserId || !sessionId) {
-    return c.text('Missing route params', 400);
-  }
-
-  let userId: string;
-  try {
-    userId = decodeURIComponent(rawUserId);
-  } catch {
-    return c.text('Invalid userId encoding', 400);
-  }
-
-  const authHeader = c.req.header('Authorization');
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  if (authResult.claims.userId !== userId) {
-    return c.text('Token does not match session user', 403);
-  }
-
-  const url = new URL(c.req.url);
-  const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
-  const wrapperGeneration = parseOptionalWrapperGeneration(wrapperGenerationParam);
-  if (wrapperGenerationParam !== null && wrapperGeneration === undefined) {
-    return c.text('Invalid wrapperGeneration parameter', 400);
-  }
-  if (
-    ticketClaimsMismatchRequestFence(authResult.claims, {
-      cloudAgentSessionId: sessionId,
-      kiloSessionId: url.searchParams.get('kiloSessionId'),
-      wrapperRunId: url.searchParams.get('wrapperRunId'),
-      wrapperGeneration,
-      wrapperConnectionId: url.searchParams.get('wrapperConnectionId'),
-    })
-  ) {
-    return c.text('Ticket does not match dispatch fence', 403);
-  }
-
-  try {
-    await requireCurrentSessionAccess({
-      env: c.env,
-      kiloUserId: userId,
-      cloudAgentSessionId: sessionId,
-    });
-  } catch (error) {
-    return projectSessionAccessHttpError(error);
-  }
-
-  const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-  const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
-  const doUrl = new URL(c.req.url);
-  doUrl.pathname = '/ingest';
-  const doRequest = new Request(doUrl.toString(), c.req.raw);
-  return stub.fetch(doRequest);
-});
-
-const ALLOWED_LOG_FILENAMES = new Set(['logs.tar.gz']);
-const MAX_LOG_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
-
-app.put(
-  '/sessions/:userId/:sessionId/logs/:executionId/:filename',
-  async (c: Context<HonoContext>) => {
-    const rawUserId = c.req.param('userId');
-    const filename = c.req.param('filename');
-    const sessionId = c.req.param('sessionId');
-    const executionId = c.req.param('executionId');
-    if (!rawUserId || !filename || !sessionId || !executionId) {
-      return c.text('Missing route params', 400);
-    }
-
-    let userId: string;
-    try {
-      userId = decodeURIComponent(rawUserId);
-    } catch {
-      return c.text('Invalid userId encoding', 400);
-    }
-
-    if (!ALLOWED_LOG_FILENAMES.has(filename)) {
-      return c.text('Invalid filename', 400);
-    }
-
-    const authHeader = c.req.header('Authorization');
-    const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-    const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
-    if (!authResult.success) {
-      return c.text(authResult.error, 401);
-    }
-    if (authResult.claims.userId !== userId) {
-      return c.text('Token does not match session user', 403);
-    }
-
-    const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
-    if (!kiloSessionId && authResult.claims.type === 'wrapper_dispatch_ticket') {
-      return c.text('Missing kiloSessionId parameter', 400);
-    }
-
-    if (
-      ticketClaimsMismatchRequestFence(authResult.claims, {
-        cloudAgentSessionId: sessionId,
-        kiloSessionId,
-      })
-    ) {
-      return c.text('Ticket does not match dispatch fence', 403);
-    }
-
-    try {
-      const sessionAccess = await requireCurrentSessionAccess({
-        env: c.env,
-        kiloUserId: userId,
-        cloudAgentSessionId: sessionId,
-        expectedKiloSessionId: kiloSessionId ?? undefined,
-      });
-      const authoritativeKiloSessionId = kiloSessionId ?? sessionAccess.kiloSessionId;
-      if (!authoritativeKiloSessionId) {
-        return c.text('Missing kiloSessionId parameter', 400);
-      }
-    } catch (error) {
-      return projectSessionAccessHttpError(error);
-    }
-
-    const contentLength = parseInt(c.req.header('Content-Length') ?? '', 10);
-    if (contentLength > MAX_LOG_UPLOAD_BYTES) {
-      return c.text('Request body too large', 413);
-    }
-
-    // Buffer the body — R2 requires a known-length value (ArrayBuffer, string, etc.)
-    const body = await c.req.arrayBuffer();
-    if (body.byteLength === 0) {
-      return c.text('Missing request body', 400);
-    }
-    if (body.byteLength > MAX_LOG_UPLOAD_BYTES) {
-      return c.text('Request body too large', 413);
-    }
-
-    const safeUserId = encodeURIComponent(userId);
-    const safeSessionId = encodeURIComponent(sessionId);
-    const safeExecutionId = encodeURIComponent(executionId);
-
-    try {
-      await c.env.R2_BUCKET.put(
-        `logs/${safeUserId}/${safeSessionId}/${safeExecutionId}/${filename}`,
-        body,
-        { httpMetadata: { contentType: 'application/gzip' } }
-      );
-    } catch (err) {
-      logger
-        .withFields({ error: err instanceof Error ? err.message : String(err) })
-        .error('R2 put failed for log upload');
-      return c.text('R2 write failed', 500);
-    }
-
-    return c.body(null, 204);
-  }
-);
+/** Concurrent revocation closes per wave. */
+const ORG_STREAM_CLOSE_CONCURRENCY = 8;
 
 app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
-  const internalApiKey = c.req.header('x-internal-api-key');
-  if (!c.env.INTERNAL_API_SECRET) {
-    return c.text('Internal API secret not configured', 500);
-  }
-  if (!internalApiKey || !timingSafeEqual(internalApiKey, c.env.INTERNAL_API_SECRET)) {
-    return c.text('Invalid or missing internal API key', 401);
-  }
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
 
   const body = (await c.req.json().catch(() => null)) as {
     userId?: unknown;
@@ -665,14 +889,64 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
       )
     );
 
-  for (const row of rows) {
-    if (!row.cloudAgentSessionId) continue;
-    const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${row.cloudAgentSessionId}`);
-    const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
-    await stub.closeOrgStreams(organizationId);
+  // The caller bounds this request, and a close that has a route to retire can
+  // refresh the provider policy or stop its sandbox. Matching closes therefore
+  // run in waves of eight, so the sessions of one wave share the caller's
+  // budget and the request keeps a bounded number of concurrent DO calls.
+  const sessionIds = rows.flatMap(row => {
+    const sessionId = row.cloudAgentSessionId;
+    return sessionId && isControlSession(sessionId) ? [sessionId] : [];
+  });
+  for (let index = 0; index < sessionIds.length; index += ORG_STREAM_CLOSE_CONCURRENCY) {
+    await Promise.all(
+      sessionIds.slice(index, index + ORG_STREAM_CLOSE_CONCURRENCY).map(async sessionId => {
+        try {
+          await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+        } catch (error) {
+          // One session's failed close (an unreachable Durable Object, or a
+          // release that could not finish) must not stop the others. Every
+          // later grant is issued only on a current membership, so authority
+          // ends at the next issuance: until then the session keeps the grant
+          // it already holds.
+          logger
+            .withFields({
+              cloudAgentSessionId: sessionId,
+              userId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .error('/internal/streams/close: session close failed');
+        }
+      })
+    );
   }
 
   return c.body(null, 204);
+});
+
+// Home widget identity read for the trusted web backend only: the internal key
+// gates the route, the body names the exact owned session, and the response
+// carries a one-way binding plus the pending request's command as one trimmed
+// line, never the raw permission or any mutation authority.
+app.post('/internal/widgets/approval-key', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const parsed = widgetApprovalKeyRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.text('Invalid request', 400);
+  }
+
+  let approval: WidgetApproval;
+  try {
+    approval = await readWidgetApprovalKey(c.env, parsed.data);
+  } catch (error) {
+    // Ownership refusals (403) and an unavailable access read (503) come from
+    // `requireCurrentSessionAccess`; anything else is a DO failure (500).
+    if (error instanceof TRPCError) return projectSessionAccessHttpError(error);
+    throw error;
+  }
+  c.header('Cache-Control', 'no-store');
+  return c.json({ approvalKey: approval.approvalKey, command: approval.command });
 });
 
 app.use('/trpc/*', authMiddleware);
@@ -687,11 +961,29 @@ app.use(
       env: c.env,
       userId: c.get('userId'),
       authToken: c.get('authToken'),
+      cloudAgentAuthority: c.get('cloudAgentAuthority'),
       botId: c.get('botId'),
       validatedSessionAccess: c.get('validatedSessionAccess'),
       request: c.req.raw,
     }),
-    onError: ({ error, path }: { error: Error; path?: string }) => {
+    onError: ({
+      error,
+      path,
+      ctx,
+    }: {
+      error: Error;
+      path?: string;
+      ctx?: Pick<TRPCContext, 'userId' | 'validatedSessionAccess'>;
+    }) => {
+      const access = ctx?.validatedSessionAccess;
+      captureCloudAgentException(error, {
+        operation: path ?? 'trpc',
+        userId: ctx?.userId,
+        ...(access && {
+          sessionId: access.cloudAgentSessionId,
+          orgId: access.organizationId ?? '(personal)',
+        }),
+      });
       logger.setTags({ path });
       logger
         .withFields({
@@ -704,11 +996,31 @@ app.use(
 );
 
 app.notFound(createNotFoundHandler());
-app.onError(createErrorHandler(logger, { includeMessage: false }));
+const errorHandler = createWorkerErrorHandler(logger);
+app.onError((error, c) => {
+  captureCloudAgentException(error, { operation: 'http', userId: c.get('userId') });
+  return errorHandler(error, c);
+});
 
-export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+export const REPORT_RETENTION_CRON = '17 2 * * *';
+export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
+// Cloudflare has been observed to keep firing a previously configured `*/3` trigger after a
+// deploy changed it to `*/5`. Accept both so a stale trigger cannot silently disable collection;
+// the collector floors `scheduledTime` to 5-minute buckets, so extra ticks only repeat a bucket.
+export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
+
+const worker = {
+  fetch(incoming: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+    // The preview marker selects the physical sandbox DO's port path, so a client
+    // copy never passes ingress, whichever route later forwards the request.
+    const request = withoutPreviewMarkers(incoming);
     const url = new URL(request.url);
+    if (matchPreviewHost(url.hostname, env.PREVIEW_HOST_SUFFIX) !== null) {
+      return handlePreviewRequest(request, env);
+    }
+    if (url.pathname === PREVIEW_OPEN_PATH) {
+      return handlePreviewOpen(request, env);
+    }
     if (
       url.pathname === '/terminal' &&
       request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
@@ -718,9 +1030,9 @@ export default {
 
     return app.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
-      const consumer = createCallbackQueueConsumer();
+      const consumer = createCallbackQueueConsumer(env);
       return consumer(batch as MessageBatch<CallbackJob>);
     }
     if (CLOUD_AGENT_REPORT_QUEUE_NAMES.has(batch.queue)) {
@@ -729,11 +1041,29 @@ export default {
 
     logger.warn(`Received message from unexpected queue: ${batch.queue}`);
   },
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    await removeExpiredCloudAgentReportData(env);
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    if (controller.cron === REPORT_RETENTION_CRON) {
+      await removeExpiredCloudAgentReportData(env);
+      return;
+    }
+    if (OUTCOME_AGGREGATE_CRONS.has(controller.cron)) {
+      try {
+        await runCloudAgentOutcomeCollection(env, new Date(), controller.scheduledTime);
+      } finally {
+        await runCloudAgentOpenStockCollection(env);
+      }
+      return;
+    }
+    logger.warn('Cloud Agent scheduled handler received an unrecognized cron', {
+      cron: controller.cron,
+    });
   },
-};
+} satisfies ExportedHandler<Env>;
 
-export { Sandbox } from '@cloudflare/sandbox';
-export { CloudAgentSession } from './persistence/CloudAgentSession.js';
+export default instrumentCloudAgentWorker(worker);
+
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Igba-ijiroro aṣoju rẹ ni imudojuiwọn",
+      "lowBalance": "Iwọntunwọnsi rẹ nilo akiyesi",
+      "spendAlert": "Inawo rẹ nilo akiyesi",
+      "securityFinding": "Wiwa aabo nilo akiyesi",
+      "securityUpdate": "Ayẹwo aabo ni imudojuiwọn",
+      "activeAgentsGlanceable": "Awọn aṣoju to n ṣiṣẹ ni imudojuiwọn"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Ifitonileti iwọntunwọnsi kekere",
+      "body": "Iwọntunwọnsi {{organizationName}} ṣubu ni isalẹ ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Ifitonileti inawo",
+      "body": "Inawo {{scopeName}} kọja ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} ninu {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Wiwa aabo tuntun ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Ikilọ SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Irufin SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Igba-ijiroro Kilo rẹ ti ṣetan lati ṣakoso lati foonu rẹ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

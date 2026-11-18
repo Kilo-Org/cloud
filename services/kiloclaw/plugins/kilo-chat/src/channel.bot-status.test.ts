@@ -1,13 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleBotStatusRequest } from './webhook/dispatch.js';
-import { PLUGIN_CAPABILITIES } from './channel';
 import type { KiloChatClient } from './client.js';
-
-describe('PLUGIN_CAPABILITIES', () => {
-  it('declares the attachments capability', () => {
-    expect(PLUGIN_CAPABILITIES).toEqual(['attachments']);
-  });
-});
 
 describe('handleBotStatusRequest capability declaration', () => {
   it('includes capabilities: ["attachments"] in the sendBotStatus payload', async () => {

@@ -1,13 +1,15 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
-jest.mock('@/lib/ai-gateway/usage-daily-rollup-repairs', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/usage-daily-rollup-repairs', () => ({
   processPendingDailyUsageRollupRepairs: jest.fn(),
 }));
 const mockSentryLog = jest.fn();
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => mockSentryLog) }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => mockSentryLog),
+}));
 
-import { processPendingDailyUsageRollupRepairs } from '@/lib/ai-gateway/usage-daily-rollup-repairs';
+import { processPendingDailyUsageRollupRepairs } from '@kilocode/web-shared/lib/ai-gateway/usage-daily-rollup-repairs';
 import { GET, maxDuration } from './route';
 
 const mockProcessPendingDailyUsageRollupRepairs = jest.mocked(

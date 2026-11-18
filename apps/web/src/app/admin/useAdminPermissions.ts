@@ -7,6 +7,7 @@ type AdminPermissionData = {
   isSuperadmin: boolean;
   canViewSessions: boolean;
   canManageCredits: boolean;
+  canExportApiRequestLogs: boolean;
 };
 
 export function deriveAdminPermissions(
@@ -19,6 +20,7 @@ export function deriveAdminPermissions(
       isSuperadmin: false,
       canViewSessions: false,
       canManageCredits: false,
+      canExportApiRequestLogs: false,
     };
   }
 
@@ -27,6 +29,7 @@ export function deriveAdminPermissions(
     isSuperadmin: query.data.isSuperadmin,
     canViewSessions: query.data.canViewSessions,
     canManageCredits: query.data.canManageCredits,
+    canExportApiRequestLogs: query.data.canExportApiRequestLogs,
   };
 }
 

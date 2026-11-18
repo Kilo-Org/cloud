@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one pure helper module: payload parsing, the enrichment-preserving merges, and the status/ordering helpers share the cached-row contracts their callers and tests read together */
 /**
  * Pure helpers for the app-level active-sessions live-sync owner.
  *
@@ -7,11 +8,12 @@
  * (including `connectionId`) come from the latest WS payload, so session
  * ownership can transfer between CLI connections. Once a row has been
  * through a tRPC fetch the cached DB title is sticky too — heartbeats
- * never carry a cloud rename. `capabilities` is the hybrid exception: the
- * WS value wins when present (upgrade or downgrade), and the cached value
- * is preserved only when the WS row omits the field. The functions here
- * never touch React, the network, or a QueryClient — they are pure and
- * exhaustively unit-tested alongside this file.
+ * never carry a cloud rename. `session.updated` (ingest title write) does
+ * apply. `capabilities` is the hybrid exception: the WS value wins when
+ * present (upgrade or downgrade), and the cached value is preserved only
+ * when the WS row omits the field. The functions here never touch React,
+ * the network, or a QueryClient — they are pure and exhaustively
+ * unit-tested alongside this file.
  *
  * Status resolution for live rows: CLI heartbeats/snapshots often report
  * only idle/busy while `cli_sessions_v2` holds question/permission. A
@@ -19,11 +21,13 @@
  * only an explicit `session.status.updated` (or disconnect) clears it.
  */
 
+import { parseTimestamp } from '@kilocode/app-shared/utils';
 import {
   type CliConnectionData,
   cliConnectionDataSchema,
   type HeartbeatData,
   heartbeatDataSchema,
+  sessionRowEventPayloadSchema,
   type SessionsListData,
   sessionsListDataSchema,
   type SessionStatusUpdatedPayload,
@@ -60,6 +64,12 @@ type IncomingWsSession = {
   parentSessionId?: string;
   connectionId?: string;
   capabilities?: { attachments?: boolean };
+  /**
+   * ISO-8601 wake time. Only a `scheduled` row carries one, and even then the
+   * CLI may omit it. Declared so a heartbeat / sessions.list cannot drop the
+   * field the glanceable snapshot reads for the soonest wake.
+   */
+  scheduledAt?: string;
 };
 
 /** Cached active session (tRPC output); enrichment fields preserved across WS. */
@@ -133,27 +143,47 @@ export function parseCliConnectionPayload(value: unknown): CliConnectionData | n
   return parsed.data;
 }
 
+type SessionStatusUpdate = {
+  sessionId: string;
+  status: string;
+  scheduledAt?: string | null;
+  /** ISO 8601 status-change time; absent when the payload's value is null or unparseable. */
+  statusUpdatedAt?: string;
+};
+
+/** Hermes cannot parse a PostgreSQL timestamp, so a status time enters the cache normalized. */
+function toIsoStatusTime(value: string | null): string | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  const at = parseTimestamp(value).getTime();
+  return Number.isFinite(at) ? new Date(at).toISOString() : undefined;
+}
+
 /**
  * Dual-shaped `session.status.updated` (full session row vs lightweight
  * sessionId). Null payload status becomes `''` for the cache string field.
  */
-export function parseSessionStatusUpdatedPayload(
-  value: unknown
-): { sessionId: string; status: string } | null {
+export function parseSessionStatusUpdatedPayload(value: unknown): SessionStatusUpdate | null {
   const parsed = sessionStatusUpdatedPayloadSchema.safeParse(value);
   if (!parsed.success) {
     return null;
   }
   const data: SessionStatusUpdatedPayload = parsed.data;
+  const statusUpdatedAt = toIsoStatusTime(data.statusUpdatedAt);
   if ('session' in data) {
     return {
       sessionId: data.session.sessionId,
       status: data.status ?? data.session.status ?? '',
+      scheduledAt: data.scheduledAt ?? data.session.scheduledAt,
+      statusUpdatedAt,
     };
   }
   return {
     sessionId: data.sessionId,
     status: data.status ?? '',
+    scheduledAt: data.scheduledAt,
+    statusUpdatedAt,
   };
 }
 
@@ -178,6 +208,11 @@ type PreservedFields = {
    * guard).
    */
   totalCostMicrodollars: number | undefined;
+  /**
+   * Sticky: WS payloads never carry the associated PR. Preserved so the
+   * tray `#N` mark and PR search survive a heartbeat and a snapshot.
+   */
+  associatedPr: ActiveSession['associatedPr'];
 };
 
 function readEnrichment(current: CachedActiveSession | undefined): PreservedFields {
@@ -193,6 +228,7 @@ function readEnrichment(current: CachedActiveSession | undefined): PreservedFiel
     lastActivityAt: current?.lastActivityAt,
     organizationId: current?.organizationId,
     totalCostMicrodollars: current?.totalCostMicrodollars,
+    associatedPr: current?.associatedPr,
   };
 }
 
@@ -204,11 +240,12 @@ function withEnrichmentAndConnectionId(
   connectionId: string
 ): CachedActiveSession {
   const enrichment = readEnrichment(current);
+  const status = effectiveStatus(row.status, current?.status);
   return {
     id: row.id,
     // Sticky attention: a non-attention WS status must not clear a held
     // question/permission. "stored" for WS paths is the cached row status.
-    status: effectiveStatus(row.status, current?.status),
+    status,
     // The tray title is DB-authoritative (the router enriches it from
     // cli_sessions_v2), so once a row has been through a tRPC fetch a heartbeat's
     // CLI title must not overwrite it — nothing propagates a cloud rename back to
@@ -223,6 +260,11 @@ function withEnrichmentAndConnectionId(
     // only when the WS row omits the field (legacy payloads).
     capabilities: row.capabilities ?? current?.capabilities,
     ...enrichment,
+    // Socket statuses are undated; a changed status cannot inherit the cached time.
+    statusUpdatedAt: status === current?.status ? current.statusUpdatedAt : undefined,
+    // Wire wins, including omission: a CLI that reports `scheduled` with no
+    // wake time must show scheduled with no time, not a cached timestamp.
+    ...(row.scheduledAt === undefined ? {} : { scheduledAt: row.scheduledAt }),
   };
 }
 
@@ -303,16 +345,40 @@ export function mergeHeartbeatForActiveSessions(
 
 /**
  * Apply an explicit status transition (including leaving attention).
- * Unknown session ids are ignored — live cache only holds active rows.
+ * Unknown session ids are ignored — live cache only holds active rows. The
+ * transition's own time replaces the row's `statusUpdatedAt`. An undated
+ * transition preserves the cached time only when the status is unchanged.
  */
 export function applySessionStatusUpdated(
   current: readonly CachedActiveSession[],
-  sessionId: string,
-  status: string
+  update: SessionStatusUpdate
 ): CachedActiveSession[] {
-  return current.map(row =>
-    row.id === sessionId && row.status !== status ? { ...row, status } : row
-  );
+  const scheduledAt = update.status === 'scheduled' ? (update.scheduledAt ?? undefined) : undefined;
+  const statusUpdatedAt = update.statusUpdatedAt;
+  return current.map(row => {
+    if (row.id !== update.sessionId) {
+      return row;
+    }
+    if (
+      row.status === update.status &&
+      row.scheduledAt === scheduledAt &&
+      (statusUpdatedAt === undefined || row.statusUpdatedAt === statusUpdatedAt)
+    ) {
+      return row;
+    }
+    const next: CachedActiveSession = { ...row, status: update.status };
+    if (scheduledAt === undefined) {
+      delete next.scheduledAt;
+    } else {
+      next.scheduledAt = scheduledAt;
+    }
+    if (statusUpdatedAt !== undefined) {
+      next.statusUpdatedAt = statusUpdatedAt;
+    } else if (row.status !== update.status) {
+      delete next.statusUpdatedAt;
+    }
+    return next;
+  });
 }
 
 /**
@@ -397,7 +463,9 @@ type LiveSystemEventAction =
 
 /**
  * Pure routing for ActiveSessionsLiveSync system events. session.status.updated
- * is included here so the owner can handle it via onSystemEvent only.
+ * and session.updated are included here so the owner can handle them via
+ * onSystemEvent only. Blank `session.updated` titles are ignored so a
+ * heartbeat-sticky row is never blanked.
  */
 export function planLiveSystemEventActions(event: {
   event: string;
@@ -436,7 +504,20 @@ export function planLiveSystemEventActions(event: {
     return [
       {
         type: 'write',
-        updater: current => applySessionStatusUpdated(current, payload.sessionId, payload.status),
+        updater: current => applySessionStatusUpdated(current, payload),
+      },
+    ];
+  }
+  if (event.event === 'session.updated') {
+    const parsed = sessionRowEventPayloadSchema.safeParse(event.data);
+    const title = parsed.success ? parsed.data.session.title : null;
+    if (!parsed.success || title == null || title.trim().length === 0) {
+      return [];
+    }
+    return [
+      {
+        type: 'write',
+        updater: current => applyActiveSessionTitle(current, parsed.data.session.sessionId, title),
       },
     ];
   }

@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';
@@ -24,6 +24,535 @@ const schemaTestDb = createDrizzleClient({
 
 afterAll(async () => {
   await schemaTestDb.pool.end();
+});
+
+describe('cloud agent stacked workspace schema', () => {
+  let userId: string;
+  let otherUserId: string;
+  let organizationId: string;
+  let otherOrganizationId: string;
+
+  beforeEach(async () => {
+    userId = `oauth/schema-sidebar-${crypto.randomUUID()}`;
+    otherUserId = `oauth/schema-sidebar-${crypto.randomUUID()}`;
+    organizationId = crypto.randomUUID();
+    otherOrganizationId = crypto.randomUUID();
+    await schemaTestDb.db.insert(schema.kilocode_users).values(
+      [userId, otherUserId].map(id => ({
+        id,
+        google_user_email: `${id}@example.com`,
+        google_user_name: 'Sidebar schema test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      }))
+    );
+    await schemaTestDb.db.insert(schema.organizations).values([
+      { id: organizationId, name: 'Sidebar schema organization' },
+      { id: otherOrganizationId, name: 'Other sidebar schema organization' },
+    ]);
+  });
+
+  afterEach(async () => {
+    await schemaTestDb.db
+      .delete(schema.cloud_agent_worktrees)
+      .where(inArray(schema.cloud_agent_worktrees.kilo_user_id, [userId, otherUserId]));
+    await schemaTestDb.db
+      .delete(schema.kilocode_users)
+      .where(inArray(schema.kilocode_users.id, [userId, otherUserId]));
+    await schemaTestDb.db
+      .delete(schema.organizations)
+      .where(inArray(schema.organizations.id, [organizationId, otherOrganizationId]));
+  });
+
+  it('nulls a deleted worktree parent without losing the child base or sidebar position', async () => {
+    const parentId = `workspace_${crypto.randomUUID()}`;
+    const childId = `workspace_${crypto.randomUUID()}`;
+    const baseSha = 'a'.repeat(40);
+    await schemaTestDb.db.insert(schema.cloud_agent_worktrees).values({
+      worktree_id: parentId,
+      kilo_user_id: userId,
+    });
+    const [child] = await schemaTestDb.db
+      .insert(schema.cloud_agent_worktrees)
+      .values({
+        worktree_id: childId,
+        kilo_user_id: userId,
+        parent_worktree_id: parentId,
+        base_branch: 'feature/parent',
+        base_sha: baseSha,
+        sidebar_position: 'a0',
+      })
+      .returning();
+    expect(child).toMatchObject({ parent_worktree_id: parentId });
+    await expect(
+      schemaTestDb.db.insert(schema.cloud_agent_worktrees).values({
+        worktree_id: `workspace_${crypto.randomUUID()}`,
+        kilo_user_id: userId,
+        parent_worktree_id: `workspace_${crypto.randomUUID()}`,
+      })
+    ).rejects.toMatchObject({ cause: { code: '23503' } });
+
+    await schemaTestDb.db
+      .delete(schema.cloud_agent_worktrees)
+      .where(eq(schema.cloud_agent_worktrees.worktree_id, parentId));
+    const children = await schemaTestDb.db
+      .select()
+      .from(schema.cloud_agent_worktrees)
+      .where(eq(schema.cloud_agent_worktrees.worktree_id, childId));
+    expect(children).toEqual([
+      expect.objectContaining({
+        parent_worktree_id: null,
+        base_branch: 'feature/parent',
+        base_sha: baseSha,
+        sidebar_position: 'a0',
+      }),
+    ]);
+  });
+
+  it('defaults user settings to manual order and no overrides, with one row per user', async () => {
+    const settings = await schemaTestDb.db
+      .insert(schema.cloud_agent_user_settings)
+      .values([{ kilo_user_id: userId }, { kilo_user_id: otherUserId, workspace_order: 'created' }])
+      .returning();
+    expect(settings).toEqual([
+      expect.objectContaining({ workspace_order: 'manual', builtin_agents: {} }),
+      expect.objectContaining({ workspace_order: 'created', builtin_agents: {} }),
+    ]);
+    await expect(
+      schemaTestDb.db.insert(schema.cloud_agent_user_settings).values({ kilo_user_id: userId })
+    ).rejects.toMatchObject({ cause: { code: '23505' } });
+    await expect(
+      schemaTestDb.db.execute(sql`
+        UPDATE cloud_agent_user_settings SET workspace_order = 'invalid'
+        WHERE kilo_user_id = ${userId}
+      `)
+    ).rejects.toMatchObject({
+      cause: { constraint: 'cloud_agent_user_settings_workspace_order_check' },
+    });
+  });
+
+  it('defaults manual folders and scopes smart preset uniqueness by owner and organization', async () => {
+    const manualFolders = await schemaTestDb.db
+      .insert(schema.cloud_agent_workspace_folders)
+      .values([
+        { kilo_user_id: userId, name: 'Manual one', position: 0 },
+        { kilo_user_id: userId, name: 'Manual two', position: 1 },
+      ])
+      .returning();
+    for (const folder of manualFolders) {
+      expect(folder).toMatchObject({ kind: 'manual', smart_preset: null, sort_mode: 'manual' });
+    }
+    const smartFolder = {
+      kilo_user_id: userId,
+      name: 'Needs you',
+      position: 2,
+      kind: 'smart',
+      smart_preset: 'needs_you',
+    } as const;
+    const smartFolders = await schemaTestDb.db
+      .insert(schema.cloud_agent_workspace_folders)
+      .values([
+        smartFolder,
+        { ...smartFolder, organization_id: organizationId },
+        { ...smartFolder, organization_id: otherOrganizationId },
+        { ...smartFolder, kilo_user_id: otherUserId, organization_id: organizationId },
+        { ...smartFolder, kilo_user_id: otherUserId },
+        { ...smartFolder, smart_preset: 'in_review', sort_mode: 'created' },
+        { ...smartFolder, smart_preset: 'done', sort_mode: 'activity' },
+      ])
+      .returning();
+    expect(smartFolders).toHaveLength(7);
+    for (const scope of [null, organizationId]) {
+      await expect(
+        schemaTestDb.db
+          .insert(schema.cloud_agent_workspace_folders)
+          .values({ ...smartFolder, organization_id: scope })
+      ).rejects.toMatchObject({ cause: { code: '23505' } });
+    }
+  });
+
+  it.each([
+    ['invalid', null, 'manual', 'kind'],
+    ['manual', 'needs_you', 'manual', 'smart_preset'],
+    ['smart', null, 'manual', 'smart_preset'],
+    ['smart', 'invalid', 'manual', 'smart_preset'],
+    ['manual', null, 'invalid', 'sort_mode'],
+  ])('rejects folder kind=%s preset=%s sort=%s', async (kind, preset, sort, constraint) => {
+    await expect(
+      schemaTestDb.db.execute(sql`
+        INSERT INTO cloud_agent_workspace_folders
+          (kilo_user_id, name, position, kind, smart_preset, sort_mode)
+        VALUES (${userId}, 'Invalid folder', 0, ${kind}, ${preset}, ${sort})
+      `)
+    ).rejects.toMatchObject({
+      cause: { constraint: `cloud_agent_workspace_folders_${constraint}_check` },
+    });
+  });
+});
+
+it('migration 0345 preserves retry safety around its concurrent indexes', () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0345_cloud_agent_stacked_workspaces.sql'),
+    'utf8'
+  );
+  const statements = migration.split('--> statement-breakpoint').map(statement => statement.trim());
+  const commitPosition = statements.indexOf('COMMIT;');
+  expect(statements.slice(commitPosition, commitPosition + 11)).toEqual([
+    'COMMIT;',
+    'SET statement_timeout = 0;',
+    'DROP INDEX CONCURRENTLY IF EXISTS "IDX_cli_sessions_v2_user_activity";',
+    'DROP INDEX CONCURRENTLY IF EXISTS "UQ_cloud_agent_workspace_folders_smart_preset";',
+    'DROP INDEX CONCURRENTLY IF EXISTS "IDX_cloud_agent_worktrees_parent_worktree_id";',
+    'CREATE INDEX CONCURRENTLY "IDX_cli_sessions_v2_user_activity" ON "cli_sessions_v2" USING btree ("kilo_user_id",coalesce("last_activity_at", "created_at"));',
+    expect.stringMatching(
+      /^CREATE UNIQUE INDEX CONCURRENTLY "UQ_cloud_agent_workspace_folders_smart_preset" /
+    ),
+    'CREATE INDEX CONCURRENTLY "IDX_cloud_agent_worktrees_parent_worktree_id" ON "cloud_agent_worktrees" USING btree ("parent_worktree_id") WHERE "cloud_agent_worktrees"."parent_worktree_id" is not null;',
+    'RESET statement_timeout;',
+    'BEGIN;',
+    expect.stringContaining('cloud_agent_workspace_folders_kind_check'),
+  ]);
+  expect(statements[0]).toContain(
+    "IF to_regclass('public.cloud_agent_user_settings') IS NULL THEN"
+  );
+  expect(statements[0]).toContain('CREATE TABLE "cloud_agent_user_settings"');
+  expect(statements[0]).toContain('ADD COLUMN "base_sha" text;');
+  expect(statements[0]).toMatch(/END IF;\s*END \$\$;$/);
+});
+
+it('migration 0345 backfills old owners and folders to activity and copies built-in agent overrides', async () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0345_cloud_agent_stacked_workspaces.sql'),
+    'utf8'
+  );
+  const backfills = migration
+    .split('-->  statement-breakpoint')
+    .slice(1)
+    .map(statement => statement.trim());
+  expect(backfills).toHaveLength(3);
+  expect(backfills[0]).toContain('INSERT INTO "cloud_agent_user_settings"');
+  expect(backfills[1]).toContain('FROM "cloud_agent_builtin_agent_settings"');
+  expect(backfills[2]).toContain('UPDATE "cloud_agent_workspace_folders"');
+
+  await schemaTestDb.db.transaction(async tx => {
+    for (const table of [
+      'cloud_agent_user_settings',
+      'cloud_agent_builtin_agent_settings',
+      'cloud_agent_worktrees',
+      'cloud_agent_workspace_folders',
+    ]) {
+      await tx.execute(
+        sql.raw(`CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING ALL) ON COMMIT DROP`)
+      );
+    }
+    const organizationId = crypto.randomUUID();
+    await tx.insert(schema.cloud_agent_worktrees).values([
+      { worktree_id: 'old-personal-one', kilo_user_id: 'oauth/old-owner' },
+      { worktree_id: 'old-personal-two', kilo_user_id: 'oauth/old-owner' },
+      { worktree_id: 'old-org', kilo_user_id: 'oauth/old-owner', organization_id: organizationId },
+      { worktree_id: 'old-other-owner', kilo_user_id: 'oauth/other-owner' },
+      { worktree_id: 'old-explicit-preference', kilo_user_id: 'oauth/explicit-owner' },
+    ]);
+    await tx.insert(schema.cloud_agent_user_settings).values({
+      kilo_user_id: 'oauth/explicit-owner',
+      workspace_order: 'created',
+    });
+    const oldOwnerAgents = { explore: { model: 'kilo/anthropic/claude-haiku-4.5' } };
+    const agentsOnlyAgents = { plan: { disable: true } };
+    await tx.insert(schema.cloud_agent_builtin_agent_settings).values([
+      { user_id: 'oauth/old-owner', agents: oldOwnerAgents },
+      { user_id: 'oauth/agents-only-owner', agents: agentsOnlyAgents },
+    ]);
+    const oldFolders = await tx
+      .insert(schema.cloud_agent_workspace_folders)
+      .values([
+        { kilo_user_id: 'oauth/old-owner', name: 'Old personal', position: 0 },
+        {
+          kilo_user_id: 'oauth/old-owner',
+          organization_id: organizationId,
+          name: 'Old organization',
+          position: 0,
+        },
+        { kilo_user_id: 'oauth/folder-only-owner', name: 'No worktree', position: 0 },
+      ])
+      .returning();
+    for (const statement of backfills) await tx.execute(sql.raw(statement));
+    const settings = await tx.select().from(schema.cloud_agent_user_settings);
+    expect(settings).toHaveLength(4);
+    expect(settings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kilo_user_id: 'oauth/old-owner',
+          workspace_order: 'activity',
+          builtin_agents: oldOwnerAgents,
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'oauth/other-owner',
+          workspace_order: 'activity',
+          builtin_agents: {},
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'oauth/explicit-owner',
+          workspace_order: 'created',
+          builtin_agents: {},
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'oauth/agents-only-owner',
+          workspace_order: 'manual',
+          builtin_agents: agentsOnlyAgents,
+        }),
+      ])
+    );
+    const updatedFolders = await tx.select().from(schema.cloud_agent_workspace_folders);
+    expect(updatedFolders).toHaveLength(oldFolders.length);
+    for (const folder of oldFolders) {
+      expect(updatedFolders).toContainEqual({ ...folder, sort_mode: 'activity' });
+    }
+    const [newSettings] = await tx
+      .insert(schema.cloud_agent_user_settings)
+      .values({ kilo_user_id: 'oauth/new-owner' })
+      .returning();
+    expect(newSettings).toMatchObject({ workspace_order: 'manual', builtin_agents: {} });
+    const [newFolder] = await tx
+      .insert(schema.cloud_agent_workspace_folders)
+      .values({ kilo_user_id: 'oauth/new-owner', name: 'New folder', position: 0 })
+      .returning();
+    expect(newFolder).toMatchObject({ kind: 'manual', smart_preset: null, sort_mode: 'manual' });
+  });
+});
+
+it('webhook profile migration preserves saved rows and only relaxes the explicit profile requirement', async () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0297_white_lenny_balinger.sql'),
+    'utf8'
+  );
+  await schemaTestDb.db.transaction(async tx => {
+    // A temporary clone isolates the migration from the real shared table.
+    await tx.execute(
+      sql.raw(
+        'CREATE TEMP TABLE cloud_agent_webhook_triggers (LIKE public.cloud_agent_webhook_triggers INCLUDING ALL) ON COMMIT DROP'
+      )
+    );
+    await tx.execute(
+      sql.raw(
+        'ALTER TABLE cloud_agent_webhook_triggers DROP CONSTRAINT "CHK_cloud_agent_webhook_triggers_cloud_agent_fields"'
+      )
+    );
+    await tx.execute(
+      sql.raw(
+        `ALTER TABLE cloud_agent_webhook_triggers ADD CONSTRAINT "CHK_cloud_agent_webhook_triggers_cloud_agent_fields" CHECK (target_type != 'cloud_agent' OR (github_repo IS NOT NULL AND profile_id IS NOT NULL))`
+      )
+    );
+    await tx.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id, github_repo, profile_id)
+      VALUES ('saved-trigger', 'oauth/migration-user', 'owner/repo', '00000000-0000-4000-8000-000000000001')`);
+    const before = await tx.execute(sql`SELECT * FROM cloud_agent_webhook_triggers`);
+    for (const statement of migration.split('--> statement-breakpoint')) {
+      if (statement.trim()) await tx.execute(sql.raw(statement));
+    }
+    const after = await tx.execute(sql`SELECT * FROM cloud_agent_webhook_triggers`);
+    expect(after.rows).toEqual(before.rows);
+    await tx.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id, github_repo)
+      VALUES ('no-profile', 'oauth/migration-user', 'owner/repo')`);
+    const optional = await tx.execute(
+      sql`SELECT profile_id FROM cloud_agent_webhook_triggers WHERE trigger_id = 'no-profile'`
+    );
+    expect(optional.rows).toEqual([{ profile_id: null }]);
+    await expect(
+      tx.transaction(async nested => {
+        await nested.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id)
+        VALUES ('no-repo', 'oauth/migration-user')`);
+      })
+    ).rejects.toThrow();
+    await expect(
+      tx.transaction(async nested => {
+        await nested.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, github_repo)
+        VALUES ('no-owner', 'owner/repo')`);
+      })
+    ).rejects.toThrow();
+    await expect(
+      tx.transaction(async nested => {
+        await nested.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id, target_type)
+        VALUES ('no-instance', 'oauth/migration-user', 'kiloclaw_chat')`);
+      })
+    ).rejects.toThrow();
+  });
+});
+
+it('migration 0239 executes the deterministic GitHub installation backfill idempotently', async () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0239_old_hemingway.sql'),
+    'utf8'
+  );
+  const dml = migration
+    .split('-->  statement-breakpoint')
+    .map(statement => statement.trim())
+    .filter(statement => statement.startsWith('WITH eligible AS'));
+  expect(dml).toHaveLength(2);
+  expect(dml[0]).toContain('INSERT INTO github_app_installations');
+  expect(dml[1]).toContain('UPDATE platform_integrations');
+  const rollback = new Error('rollback migration 0238 execution test');
+  await expect(
+    schemaTestDb.db.transaction(async tx => {
+      const userId = `github-migration-${crypto.randomUUID()}`;
+      await tx.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'GitHub migration test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const otherUserId = `github-migration-${crypto.randomUUID()}`;
+      await tx.insert(schema.kilocode_users).values({
+        id: otherUserId,
+        google_user_email: `${otherUserId}@example.com`,
+        google_user_name: 'GitHub migration peer',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const prefix = Date.now().toString();
+      const ids = {
+        standard: `${prefix}01`,
+        lite: `${prefix}02`,
+        preexisting: `${prefix}03`,
+        malformed: `bad-${prefix}`,
+        inactive: `${prefix}04`,
+        suspended: `${prefix}05`,
+        authInvalid: `${prefix}06`,
+        disconnected: `${prefix}07`,
+        nonApp: `${prefix}08`,
+        ambiguous: `${prefix}09`,
+        deduplicated: `${prefix}10`,
+      };
+      const [preexisting] = await tx
+        .insert(schema.github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: ids.preexisting,
+          lifecycle_state: 'active',
+        })
+        .returning();
+      const base = {
+        owned_by_user_id: userId,
+        platform: 'github',
+        integration_type: 'app',
+        integration_status: 'active',
+      } as const;
+      const fixtures = await tx
+        .insert(schema.platform_integrations)
+        .values([
+          { ...base, platform_installation_id: ids.standard, github_app_type: null },
+          { ...base, platform_installation_id: ids.lite, github_app_type: 'lite' },
+          { ...base, platform_installation_id: ids.preexisting, github_app_type: 'standard' },
+          { ...base, platform_installation_id: ids.malformed, github_app_type: 'standard' },
+          {
+            ...base,
+            platform_installation_id: ids.inactive,
+            github_app_type: 'standard',
+            integration_status: 'suspended',
+          },
+          {
+            ...base,
+            platform_installation_id: ids.suspended,
+            github_app_type: 'standard',
+            suspended_at: new Date().toISOString(),
+            suspended_by: 'github_suspended',
+          },
+          {
+            ...base,
+            platform_installation_id: ids.authInvalid,
+            github_app_type: 'standard',
+            auth_invalid_at: new Date().toISOString(),
+            auth_invalid_reason: 'test',
+          },
+          {
+            ...base,
+            platform_installation_id: ids.disconnected,
+            github_app_type: 'standard',
+            github_disconnected_at: new Date().toISOString(),
+          },
+          {
+            ...base,
+            platform_installation_id: ids.nonApp,
+            github_app_type: 'standard',
+            integration_type: 'token',
+          },
+          { ...base, platform_installation_id: ids.ambiguous, github_app_type: null },
+          {
+            ...base,
+            owned_by_user_id: otherUserId,
+            platform_installation_id: ids.ambiguous,
+            github_app_type: 'standard',
+          },
+          {
+            ...base,
+            platform_installation_id: null,
+            github_app_type: 'standard',
+            integration_status: 'suspended',
+            suspended_at: new Date().toISOString(),
+            suspended_by: 'migration-0205-github-dedup',
+            metadata: { github_dedup: { original_installation_id: ids.deduplicated } },
+          },
+        ])
+        .returning();
+      for (const statement of dml) await tx.execute(sql.raw(statement));
+      const firstCanonicalCount = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.github_app_installations);
+      const linked = await tx
+        .select()
+        .from(schema.platform_integrations)
+        .where(eq(schema.platform_integrations.owned_by_user_id, userId));
+      const linkedIds = linked
+        .filter(row => row.github_installation_id)
+        .map(row => row.platform_installation_id);
+      expect(linkedIds.sort()).toEqual([ids.lite, ids.preexisting, ids.standard].sort());
+      expect(
+        linked.find(row => row.platform_installation_id === ids.preexisting)?.github_installation_id
+      ).toBe(preexisting.id);
+      const canonicalRows = await tx
+        .select({
+          id: schema.github_app_installations.id,
+          appType: schema.github_app_installations.github_app_type,
+          installationId: schema.github_app_installations.installation_id,
+        })
+        .from(schema.github_app_installations)
+        .where(inArray(schema.github_app_installations.installation_id, Object.values(ids)));
+      expect(
+        canonicalRows
+          .map(row => ({ appType: row.appType, installationId: row.installationId }))
+          .sort((left, right) => left.installationId.localeCompare(right.installationId))
+      ).toEqual(
+        [
+          { appType: 'standard', installationId: ids.standard },
+          { appType: 'lite', installationId: ids.lite },
+          { appType: 'standard', installationId: ids.preexisting },
+        ].sort((left, right) => left.installationId.localeCompare(right.installationId))
+      );
+      for (const excluded of [
+        ids.malformed,
+        ids.inactive,
+        ids.suspended,
+        ids.authInvalid,
+        ids.disconnected,
+        ids.deduplicated,
+        ids.nonApp,
+        ids.ambiguous,
+      ]) {
+        expect(canonicalRows.some(row => row.installationId === excluded)).toBe(false);
+      }
+      for (const statement of dml) await tx.execute(sql.raw(statement));
+      const secondCanonicalCount = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.github_app_installations);
+      expect(secondCanonicalCount).toEqual(firstCanonicalCount);
+      const rebound = await tx
+        .select()
+        .from(schema.platform_integrations)
+        .where(eq(schema.platform_integrations.id, fixtures[2]?.id ?? ''));
+      expect(rebound[0]?.github_installation_id).toBe(preexisting.id);
+      throw rollback;
+    })
+  ).rejects.toBe(rollback);
 });
 
 async function withKiloPassTestUser(
@@ -143,64 +672,8 @@ describe('user data export cleanup reasons', () => {
   });
 });
 
-type EphemeralDeploymentInsert = typeof schema.deployments_ephemeral.$inferInsert;
 type CodingPlanInventoryInsert = typeof schema.coding_plan_key_inventory.$inferInsert;
 type CodingPlanSubscriptionInsert = typeof schema.coding_plan_subscriptions.$inferInsert;
-
-async function withEphemeralTestUser(
-  testFn: (params: { userId: string }) => Promise<void>
-): Promise<void> {
-  const userId = `schema-ephemeral-${crypto.randomUUID()}`;
-
-  await schemaTestDb.db.insert(schema.kilocode_users).values({
-    id: userId,
-    google_user_email: `${userId}@example.com`,
-    google_user_name: 'Schema Test User',
-    google_user_image_url: 'https://example.com/avatar.png',
-    stripe_customer_id: `cus_${crypto.randomUUID()}`,
-  });
-
-  try {
-    await testFn({ userId });
-  } finally {
-    await schemaTestDb.db
-      .delete(schema.deployments_ephemeral)
-      .where(eq(schema.deployments_ephemeral.owned_by_user_id, userId));
-    await schemaTestDb.db.delete(schema.kilocode_users).where(eq(schema.kilocode_users.id, userId));
-  }
-}
-
-async function insertEphemeralDeployment(
-  overrides: Partial<EphemeralDeploymentInsert> = {}
-): Promise<typeof schema.deployments_ephemeral.$inferSelect> {
-  const [deployment] = await schemaTestDb.db
-    .insert(schema.deployments_ephemeral)
-    .values({
-      source_type: 'html',
-      internal_worker_name: `qdpl-${crypto.randomUUID()}`,
-      status: 'pending',
-      next_cleanup_at: '2026-06-03T00:00:00.000Z',
-      ...overrides,
-    })
-    .returning();
-
-  if (!deployment) {
-    throw new Error('Failed to insert ephemeral deployment');
-  }
-
-  return deployment;
-}
-
-async function expectEphemeralConstraintViolation(
-  insertPromise: Promise<unknown>,
-  constraint: string
-): Promise<void> {
-  await expect(insertPromise).rejects.toMatchObject({
-    cause: {
-      constraint,
-    },
-  });
-}
 
 async function withCodingPlanSchemaUser(
   testFn: (params: { userId: string }) => Promise<void>
@@ -412,6 +885,132 @@ async function expectPlatformCredentialConstraintViolation(
 }
 
 describe('database schema', () => {
+  it('enforces blacklisted domain primary key values', async () => {
+    const rollback = new Error('rollback blacklisted domain fixtures');
+    await expect(
+      schemaTestDb.db.transaction(async tx => {
+        const domain = 'Api.Deep.Example.COM';
+        const [inserted] = await tx
+          .insert(schema.blacklisted_domains)
+          .values({ domain })
+          .returning();
+        expect(inserted).toEqual({ domain });
+
+        await expect(
+          tx.transaction(nested => nested.insert(schema.blacklisted_domains).values({ domain }))
+        ).rejects.toMatchObject({
+          cause: { constraint: 'blacklisted_domains_pkey' },
+        });
+
+        await expect(
+          tx.transaction(nested =>
+            nested.execute(sql`INSERT INTO ${schema.blacklisted_domains} (domain) VALUES (NULL)`)
+          )
+        ).rejects.toMatchObject({ cause: { code: '23502', column: 'domain' } });
+
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+  });
+
+  it('indexes Enkrypt usage lookups by inference usage across monthly partitions', async () => {
+    await schemaTestDb.db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
+      const plan = await tx.execute(sql`
+        EXPLAIN SELECT * FROM ${schema.enkrypt_usage}
+        WHERE ${schema.enkrypt_usage.microdollar_usage_id} = ${crypto.randomUUID()}::uuid
+      `);
+      expect(JSON.stringify(plan.rows)).toContain('Index Cond: (microdollar_usage_id =');
+    });
+  });
+
+  it('indexes Enkrypt usage lookups by user across monthly partitions', async () => {
+    await schemaTestDb.db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
+      const plan = await tx.execute(sql`
+        EXPLAIN SELECT * FROM ${schema.enkrypt_usage}
+        WHERE ${schema.enkrypt_usage.kilo_user_id} = 'oauth/enkrypt-index-test'
+      `);
+      expect(JSON.stringify(plan.rows)).toContain('Index Cond: (kilo_user_id =');
+    });
+  });
+
+  it('routes Enkrypt usage into monthly partitions with a timestamp-qualified primary key', async () => {
+    const partitioning = await schemaTestDb.db.execute(sql`
+      SELECT pg_get_partkeydef(partrelid) AS key
+      FROM pg_partitioned_table
+      WHERE partrelid = 'public.enkrypt_usage'::regclass
+    `);
+    expect(partitioning.rows).toEqual([{ key: 'RANGE (created_at)' }]);
+
+    const rollback = new Error('rollback Enkrypt partition fixtures');
+    await expect(
+      schemaTestDb.db.transaction(async tx => {
+        const [apiKind] = await tx
+          .insert(schema.api_kind)
+          .values({ api_kind: 'chat_completions' })
+          .onConflictDoUpdate({
+            target: schema.api_kind.api_kind,
+            set: { api_kind: 'chat_completions' },
+          })
+          .returning();
+        const [decision] = await tx
+          .insert(schema.enkrypt_usage_decision)
+          .values({ decision: 'allowed' })
+          .onConflictDoUpdate({
+            target: schema.enkrypt_usage_decision.decision,
+            set: { decision: 'allowed' },
+          })
+          .returning();
+        if (!apiKind || !decision) throw new Error('Missing Enkrypt lookup fixtures');
+
+        const now = new Date();
+        const timestamps = [0, 1].map(offset =>
+          new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString()
+        );
+        const usage = {
+          id: crypto.randomUUID(),
+          organization_id: crypto.randomUUID(),
+          kilo_user_id: 'oauth/enkrypt-partition-test',
+          microdollar_usage_id: crypto.randomUUID(),
+          api_kind_id: apiKind.api_kind_id,
+          decision_id: decision.decision_id,
+          charged_microdollars: 100,
+        };
+        await tx
+          .insert(schema.enkrypt_usage)
+          .values(timestamps.map(created_at => ({ ...usage, created_at })));
+        const partitions = await tx.execute(sql`
+          SELECT tableoid::regclass::text AS name
+          FROM ${schema.enkrypt_usage}
+          WHERE ${schema.enkrypt_usage.id} = ${usage.id}
+          ORDER BY ${schema.enkrypt_usage.created_at}
+        `);
+        expect(partitions.rows).toEqual(
+          timestamps.map(timestamp => ({
+            name: `enkrypt_usage_${timestamp.slice(0, 7).replace('-', '_')}`,
+          }))
+        );
+        await expect(
+          tx.transaction(nested =>
+            nested.insert(schema.enkrypt_usage).values({ ...usage, created_at: timestamps[0] })
+          )
+        ).rejects.toThrow();
+        await expect(
+          tx.transaction(nested =>
+            nested.insert(schema.enkrypt_usage).values({
+              ...usage,
+              id: crypto.randomUUID(),
+              decision_id: -1,
+              created_at: timestamps[0],
+            })
+          )
+        ).rejects.toThrow();
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+  });
+
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
     const migrationsDir = path.join(__dirname, 'migrations');
 
@@ -456,6 +1055,560 @@ describe('database schema', () => {
     }
   });
 
+  it('requires cloud agent run diagnostic text and expiry to be set and cleared together', async () => {
+    const sessionId = `schema-cloud-agent-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    await schemaTestDb.db.insert(schema.cloud_agent_sessions).values({
+      cloud_agent_session_id: sessionId,
+      kilo_session_id: `${sessionId}-kilo`,
+      initial_message_id: `${sessionId}-initial`,
+      created_at: now,
+    });
+
+    try {
+      const runs = await schemaTestDb.db
+        .insert(schema.cloud_agent_session_runs)
+        .values([
+          {
+            cloud_agent_session_id: sessionId,
+            message_id: 'no-diagnostic',
+            status: 'failed',
+          },
+          {
+            cloud_agent_session_id: sessionId,
+            message_id: 'retained-diagnostic',
+            status: 'failed',
+            error_message_redacted: 'The model context limit was exceeded',
+            error_expires_at: now,
+          },
+        ])
+        .returning();
+
+      expect(runs).toHaveLength(2);
+      const clearedRuns = await schemaTestDb.db
+        .update(schema.cloud_agent_session_runs)
+        .set({ error_message_redacted: null, error_expires_at: null })
+        .where(eq(schema.cloud_agent_session_runs.cloud_agent_session_id, sessionId))
+        .returning();
+      expect(clearedRuns).toHaveLength(2);
+      for (const run of clearedRuns) {
+        expect(run).toMatchObject({ error_message_redacted: null, error_expires_at: null });
+      }
+      await expect(
+        schemaTestDb.db.insert(schema.cloud_agent_session_runs).values({
+          cloud_agent_session_id: sessionId,
+          message_id: 'missing-text',
+          status: 'failed',
+          error_expires_at: now,
+        })
+      ).rejects.toMatchObject({
+        cause: { constraint: 'cloud_agent_session_runs_error_expiry_check' },
+      });
+      await expect(
+        schemaTestDb.db.insert(schema.cloud_agent_session_runs).values({
+          cloud_agent_session_id: sessionId,
+          message_id: 'missing-expiry',
+          status: 'failed',
+          error_message_redacted: 'The model context limit was exceeded',
+        })
+      ).rejects.toMatchObject({
+        cause: { constraint: 'cloud_agent_session_runs_error_expiry_check' },
+      });
+    } finally {
+      await schemaTestDb.db
+        .delete(schema.cloud_agent_sessions)
+        .where(eq(schema.cloud_agent_sessions.cloud_agent_session_id, sessionId));
+    }
+  });
+
+  describe('cloud agent repository environments', () => {
+    it('enforces ownership XOR and V1 platform identity consistency', async () => {
+      const userId = `schema-env-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const [organization] = await schemaTestDb.db
+        .insert(schema.organizations)
+        .values({ name: `Schema env org ${crypto.randomUUID()}` })
+        .returning({ id: schema.organizations.id });
+
+      const workspaceUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const repositoryUuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+      try {
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            owned_by_organization_id: organization.id,
+            name: 'both-owners',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_owner_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            name: 'no-owner',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_owner_check' },
+        });
+
+        // Raw SQL because 'gitea' is not a valid value of the typed platform
+        // union; the database check is the guard for non-TypeScript writers.
+        await expect(
+          schemaTestDb.db.execute(sql`
+            INSERT INTO cloud_agent_environments
+              (owned_by_user_id, name, platform, repo_full_name, gitlab_clone_url, bitbucket_workspace_uuid)
+            VALUES
+              (${userId}, 'bad-platform', 'gitea', 'acme/widgets', 'https://gitlab.com/group/project.git', ${workspaceUuid}::uuid)
+          `)
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'github-with-url',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+            gitlab_clone_url: 'https://gitlab.com/group/project.git',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'gitlab-without-url',
+            platform: 'gitlab',
+            repo_full_name: 'group/project',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'bitbucket-half',
+            platform: 'bitbucket',
+            repo_full_name: 'team/repo',
+            bitbucket_workspace_uuid: workspaceUuid,
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
+        });
+
+        // V1 rows with exactly one column that breaks the rule. Each term of the
+        // V1 alternative needs its own case, because removing a single term must
+        // fail a test. `repo_full_name` is nullable only for V2 rows.
+        const gitlabUrl = 'https://gitlab.com/group/project.git';
+        const brokenV1Rows = [
+          ['github-no-repo-name', { platform: 'github' }],
+          [
+            'github-workspace-uuid',
+            {
+              platform: 'github',
+              repo_full_name: 'acme/widgets',
+              bitbucket_workspace_uuid: workspaceUuid,
+            },
+          ],
+          [
+            'github-repository-uuid',
+            {
+              platform: 'github',
+              repo_full_name: 'acme/widgets',
+              bitbucket_repository_uuid: repositoryUuid,
+            },
+          ],
+          [
+            'gitlab-workspace-uuid',
+            {
+              platform: 'gitlab',
+              repo_full_name: 'group/project',
+              gitlab_clone_url: gitlabUrl,
+              bitbucket_workspace_uuid: workspaceUuid,
+            },
+          ],
+          [
+            'gitlab-repository-uuid',
+            {
+              platform: 'gitlab',
+              repo_full_name: 'group/project',
+              gitlab_clone_url: gitlabUrl,
+              bitbucket_repository_uuid: repositoryUuid,
+            },
+          ],
+          [
+            'bitbucket-no-workspace-uuid',
+            {
+              platform: 'bitbucket',
+              repo_full_name: 'team/repo',
+              bitbucket_repository_uuid: repositoryUuid,
+            },
+          ],
+          [
+            'bitbucket-with-gitlab-url',
+            {
+              platform: 'bitbucket',
+              repo_full_name: 'team/repo',
+              bitbucket_workspace_uuid: workspaceUuid,
+              bitbucket_repository_uuid: repositoryUuid,
+              gitlab_clone_url: gitlabUrl,
+            },
+          ],
+        ] as const satisfies readonly (readonly [
+          string,
+          Partial<typeof schema.cloud_agent_environments.$inferInsert>,
+        ])[];
+        for (const [name, columns] of brokenV1Rows) {
+          await expect(
+            schemaTestDb.db
+              .insert(schema.cloud_agent_environments)
+              .values({ owned_by_user_id: userId, name, ...columns })
+          ).rejects.toMatchObject({
+            cause: { constraint: 'cloud_agent_environments_identity_check' },
+          });
+        }
+
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'github-ok',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_organization_id: organization.id,
+          name: 'bitbucket-ok',
+          platform: 'bitbucket',
+          repo_full_name: 'team/repo',
+          bitbucket_workspace_uuid: workspaceUuid,
+          bitbucket_repository_uuid: repositoryUuid,
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_organization_id, organization.id));
+        await schemaTestDb.db
+          .delete(schema.organizations)
+          .where(eq(schema.organizations.id, organization.id));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+
+    it('accepts exactly one of the V1 and V2 identity alternatives', async () => {
+      const userId = `schema-env-v2-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env V2 test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const members = [
+        { platform: 'github', repoFullName: 'acme/widgets' },
+        { platform: 'github', repoFullName: 'acme/gadgets' },
+      ];
+      const workspaceUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const repositoryUuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const identityCheck = { cause: { constraint: 'cloud_agent_environments_identity_check' } };
+
+      try {
+        // V1: no repositories and the whole identity.
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'v1',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        });
+
+        // V2: repositories and no identity column.
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'v2',
+          repositories: members,
+        });
+
+        // A V2 environment may contain a repository that also has a V1 environment,
+        // and a second V2 environment may repeat the same members.
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'v2-again',
+          repositories: members,
+        });
+
+        // Neither alternative: an all-null row.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'neither',
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V1 with a null platform: `platform = 'github'` would be UNKNOWN, so the
+        // check must test `platform IS NOT NULL` explicitly.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v1-null-platform',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // Both alternatives at once.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'both',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+            repositories: members,
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V2 with an empty list.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v2-empty',
+            repositories: [],
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V2 whose value is not an array.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v2-object',
+            repositories: { platform: 'github', repoFullName: 'acme/widgets' },
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V2 with any one identity column set. Each column needs its own case:
+        // dropping one `IS NULL` term from the V2 alternative must fail one case.
+        const strayIdentityColumns = [
+          { platform: 'github' },
+          { repo_full_name: 'acme/widgets' },
+          { gitlab_clone_url: 'https://gitlab.com/group/project.git' },
+          { bitbucket_workspace_uuid: workspaceUuid },
+          { bitbucket_repository_uuid: repositoryUuid },
+        ] satisfies Partial<typeof schema.cloud_agent_environments.$inferInsert>[];
+        for (const stray of strayIdentityColumns) {
+          await expect(
+            schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+              owned_by_user_id: userId,
+              name: `v2-stray-${Object.keys(stray)[0]}`,
+              repositories: members,
+              ...stray,
+            })
+          ).rejects.toMatchObject(identityCheck);
+        }
+
+        // The V1 unique indexes cover V1 rows only: a second V1 row for the same
+        // repository is still rejected.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v1-again',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'UQ_cloud_agent_environments_github_user' },
+        });
+
+        const migration = fs.readFileSync(
+          path.join(__dirname, 'migrations/0330_windy_iron_monger.sql'),
+          'utf8'
+        );
+        const client = await schemaTestDb.pool.connect();
+        try {
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            await client.query('BEGIN');
+            for (const statement of migration.split('--> statement-breakpoint')) {
+              await client.query(statement);
+            }
+            await client.query('COMMIT');
+          }
+          const index = await client.query(`
+            SELECT indisvalid, indisready FROM pg_index
+            WHERE indexrelid = '"IDX_cloud_agent_environments_repositories"'::regclass
+          `);
+          expect(index.rows).toEqual([{ indisvalid: true, indisready: true }]);
+        } finally {
+          await client.query('ROLLBACK');
+          client.release();
+        }
+
+        const matches = await schemaTestDb.db
+          .select({ name: schema.cloud_agent_environments.name })
+          .from(schema.cloud_agent_environments)
+          .where(
+            sql`${schema.cloud_agent_environments.owned_by_user_id} = ${userId} AND ${schema.cloud_agent_environments.repositories} @> ${JSON.stringify([members[1]])}::jsonb`
+          );
+        expect(matches.map(row => row.name).sort()).toEqual(['v2', 'v2-again']);
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+
+    it('enforces a consistent nullable network policy', async () => {
+      const userId = `schema-env-egress-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env egress test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const base = {
+        owned_by_user_id: userId,
+        platform: 'github' as const,
+      };
+
+      try {
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'absent',
+          repo_full_name: 'acme/absent',
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'full',
+          repo_full_name: 'acme/full',
+          egress_mode: 'unrestricted',
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'none',
+          repo_full_name: 'acme/none',
+          egress_mode: 'allowlist',
+          egress_allowlist: [],
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'limited',
+          repo_full_name: 'acme/limited',
+          egress_mode: 'allowlist',
+          egress_allowlist: ['api.example.com'],
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            ...base,
+            name: 'allowlist-without-list',
+            repo_full_name: 'acme/allowlist-without-list',
+            egress_mode: 'allowlist',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            ...base,
+            name: 'unrestricted-with-list',
+            repo_full_name: 'acme/unrestricted-with-list',
+            egress_mode: 'unrestricted',
+            egress_allowlist: ['api.example.com'],
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            ...base,
+            name: 'mode-absent-with-list',
+            repo_full_name: 'acme/mode-absent-with-list',
+            egress_allowlist: ['api.example.com'],
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
+
+        // Raw SQL because 'gitea' is not a valid value of the typed mode union;
+        // the database check is the guard for non-TypeScript writers.
+        await expect(
+          schemaTestDb.db.execute(sql`
+            INSERT INTO cloud_agent_environments
+              (owned_by_user_id, name, platform, repo_full_name, egress_mode, egress_allowlist)
+            VALUES
+              (${userId}, 'unknown-mode', 'github', 'acme/unknown-mode', 'unknown', ARRAY['api.example.com'])
+          `)
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+
+    it('enforces one name per repository identity and owner', async () => {
+      const userId = `schema-env-unique-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env unique test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+
+      try {
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'duplicate',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'duplicate',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'UQ_cloud_agent_environments_github_user' },
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+  });
+
   /**
    * This test ensures that if someone adds/removes values from enums used in schema check constraints,
    * they are reminded to generate a migration. The check constraints in the database must match the
@@ -469,6 +1622,17 @@ describe('database schema', () => {
     // Snapshot of expected enum values - update this when intentionally changing enums
     // After updating, run 'pnpm drizzle generate' to create the migration
     const expectedEnumValues = {
+      TodoItemSessionOrigin: ['started', 'linked'],
+      WorkspaceFolderColor: [
+        'default',
+        'red',
+        'orange',
+        'yellow',
+        'green',
+        'teal',
+        'blue',
+        'purple',
+      ],
       KiloPassTier: ['tier_19', 'tier_49', 'tier_199'],
       KiloPassCadence: ['monthly', 'yearly'],
       KiloPassPaymentProvider: ['stripe', 'app_store', 'google_play'],
@@ -651,6 +1815,25 @@ describe('database schema', () => {
         'kiloclaw_suspension',
       ],
       StripeDisputeActionStatus: ['queued', 'processing', 'completed', 'failed', 'skipped'],
+      StripeServiceFeeFlow: [
+        'personal_top_up',
+        'organization_top_up',
+        'personal_auto_top_up_setup',
+        'organization_auto_top_up_setup',
+        'personal_auto_top_up',
+        'organization_auto_top_up',
+        'personal_kilo_pass',
+        'organization_kilo_pass',
+      ],
+      StripeServiceFeeOutcome: [
+        'pending',
+        'charged',
+        'exempt',
+        'pre_activation',
+        'zero_rounded',
+        'unsupported_currency',
+        'missed',
+      ],
       AffiliateProvider: ['impact'],
       AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal'],
       AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
@@ -675,13 +1858,17 @@ describe('database schema', () => {
         'substack',
         'anonymize',
         'pylon_reply',
+        'pylon_finalize',
+        'completion_email',
         'pylon_contact',
+        'csa_support_db',
       ],
       UserDeletionCloudSubjectResolution: [
         'current_user',
         'authoritative_absence',
         'prior_queue_cleanup',
         'legacy_identity_unresolved',
+        'unresolved',
       ],
       UserDeletionAuditEventType: [
         'request_created',
@@ -705,6 +1892,7 @@ describe('database schema', () => {
         'posthog',
         'substack',
         'pylon',
+        'csa',
       ],
       ImpactReferralProduct: ['kiloclaw', 'kilo_pass'],
       ImpactAdvocateProgramKey: ['kiloclaw', 'kilo_pass'],
@@ -729,6 +1917,7 @@ describe('database schema', () => {
       ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
       ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
       BYOKManagementSource: ['user', 'coding_plan'],
+      ClaudeBillingConnectionStatus: ['pending', 'connected', 'billing_unavailable', 'removed'],
       CodingPlanCredentialStatus: [
         'available',
         'assigned',
@@ -739,6 +1928,13 @@ describe('database schema', () => {
       CodingPlanSubscriptionStatus: ['active', 'past_due', 'canceled'],
       CodingPlanTermKind: ['activation', 'extension', 'renewal'],
       CodeReviewAnalyticsCaptureStatus: ['captured', 'missing', 'invalid', 'omitted'],
+      CodeReviewPublicationStatus: [
+        'missing',
+        'not_applicable',
+        'published',
+        'unchanged',
+        'unknown',
+      ],
       CodeReviewAnalyticsChangeType: [
         'bug_fix',
         'feature',
@@ -780,22 +1976,6 @@ describe('database schema', () => {
         'security_configuration',
         'other',
       ],
-      MCPGatewayOwnerScope: ['personal', 'organization'],
-      MCPGatewayAuthMode: ['none', 'static_headers', 'oauth_dynamic', 'oauth_static'],
-      MCPGatewaySharingMode: ['single_user', 'multi_user'],
-      MCPGatewayProviderScopeSource: ['none', 'discovered', 'override'],
-      MCPGatewayRouteStatus: ['active', 'rotated', 'revoked'],
-      MCPGatewayInstanceStatus: ['active', 'needs_reauth', 'revoked', 'removed'],
-      MCPGatewayProviderGrantStatus: ['active', 'revoked'],
-      MCPGatewaySecretKind: [
-        'static_provider_credentials',
-        'dynamic_registration',
-        'static_headers',
-      ],
-      MCPGatewayOAuthClientAuthMethod: ['none', 'client_secret_post', 'client_secret_basic'],
-      MCPGatewayAuthorizationRequestStatus: ['pending', 'completed', 'error'],
-      MCPGatewayPendingProviderAuthorizationStatus: ['pending', 'completed', 'error'],
-      MCPGatewayAuditOutcome: ['success', 'failure', 'blocked'],
       SecurityFindingNotificationKind: ['new_finding', 'sla_warning', 'sla_breach'],
       SecurityFindingNotificationStatus: [
         'staged',
@@ -805,6 +1985,8 @@ describe('database schema', () => {
         'failed',
         'cancelled',
       ],
+      CustomRouterBaseRouter: ['efficient', 'frontier'],
+      CustomRouterMode: ['cost_per_accuracy', 'best_accuracy', 'cheapest'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};
@@ -1142,107 +2324,6 @@ describe('database schema', () => {
     });
   });
 
-  describe('ephemeral deployments', () => {
-    it('allows pending rows with null slug and expiry', async () => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        const deployment = await insertEphemeralDeployment({ owned_by_user_id: userId });
-
-        expect(deployment.deployment_slug).toBeNull();
-        expect(deployment.expires_at).toBeNull();
-      });
-    });
-
-    it.each([
-      { deployment_slug: null, expires_at: '2026-06-04T00:00:00.000Z' },
-      { deployment_slug: `schema-${crypto.randomUUID()}`, expires_at: null },
-    ])('rejects active rows without both slug and expiry', async values => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        await expectEphemeralConstraintViolation(
-          insertEphemeralDeployment({ owned_by_user_id: userId, status: 'active', ...values }),
-          'deployments_ephemeral_active_fields_check'
-        );
-      });
-    });
-
-    it('allows active rows with both slug and expiry', async () => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        await insertEphemeralDeployment({
-          owned_by_user_id: userId,
-          status: 'active',
-          deployment_slug: `schema-${crypto.randomUUID()}`,
-          expires_at: '2026-06-04T00:00:00.000Z',
-        });
-      });
-    });
-
-    it.each([
-      { cleanup_claim_token: crypto.randomUUID(), cleanup_claimed_until: null },
-      { cleanup_claim_token: null, cleanup_claimed_until: '2026-06-03T00:01:00.000Z' },
-    ])('rejects rows with only one claim field', async values => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        await expectEphemeralConstraintViolation(
-          insertEphemeralDeployment({ owned_by_user_id: userId, ...values }),
-          'deployments_ephemeral_claim_fields_check'
-        );
-      });
-    });
-
-    it('allows rows with both claim fields present', async () => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        await insertEphemeralDeployment({
-          owned_by_user_id: userId,
-          cleanup_claim_token: crypto.randomUUID(),
-          cleanup_claimed_until: '2026-06-03T00:01:00.000Z',
-        });
-      });
-    });
-
-    it('rejects unsupported source types', async () => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        await expectEphemeralConstraintViolation(
-          insertEphemeralDeployment({ owned_by_user_id: userId, source_type: 'git' as 'html' }),
-          'deployments_ephemeral_source_type_check'
-        );
-      });
-    });
-
-    it('rejects unsupported statuses', async () => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        await expectEphemeralConstraintViolation(
-          insertEphemeralDeployment({ owned_by_user_id: userId, status: 'completed' as 'pending' }),
-          'deployments_ephemeral_status_check'
-        );
-      });
-    });
-
-    it('rejects duplicate internal worker names', async () => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        const internal_worker_name = `qdpl-${crypto.randomUUID()}`;
-        await insertEphemeralDeployment({ owned_by_user_id: userId, internal_worker_name });
-
-        await expectEphemeralConstraintViolation(
-          insertEphemeralDeployment({ owned_by_user_id: userId, internal_worker_name }),
-          'UQ_deployments_ephemeral_internal_worker_name'
-        );
-      });
-    });
-
-    it('rejects duplicate non-null slugs while allowing multiple null slugs', async () => {
-      await withEphemeralTestUser(async ({ userId }) => {
-        await insertEphemeralDeployment({ owned_by_user_id: userId });
-        await insertEphemeralDeployment({ owned_by_user_id: userId });
-
-        const deployment_slug = `schema-${crypto.randomUUID()}`;
-        await insertEphemeralDeployment({ owned_by_user_id: userId, deployment_slug });
-
-        await expectEphemeralConstraintViolation(
-          insertEphemeralDeployment({ owned_by_user_id: userId, deployment_slug }),
-          'UQ_deployments_ephemeral_deployment_slug'
-        );
-      });
-    });
-  });
-
   describe('Kilo Pass subscription provider IDs', () => {
     it('rejects Stripe subscriptions with null provider IDs', async () => {
       await withKiloPassTestUser(async ({ userId }) => {
@@ -1430,9 +2511,9 @@ describe('database schema', () => {
     });
   });
 
-  describe('GitHub platform integration global unique index', () => {
-    const uniqueIndexName = 'UQ_platform_integrations_github_platform_inst';
-    const installationId = `schema-github-idx-${crypto.randomUUID()}`;
+  describe('GitHub platform integration sharing constraints', () => {
+    const uniqueIndexName = 'UQ_platform_integrations_github_user_canonical';
+    const installationId = `8${Date.now()}`;
     let userIdA: string;
     let userIdB: string;
 
@@ -1468,9 +2549,17 @@ describe('database schema', () => {
       await schemaTestDb.db
         .delete(schema.kilocode_users)
         .where(eq(schema.kilocode_users.id, userIdB));
+      await schemaTestDb.db
+        .delete(schema.github_app_installations)
+        .where(eq(schema.github_app_installations.installation_id, installationId));
     });
 
-    it('rejects duplicate (platform, github_app_type, platform_installation_id) for GitHub', async () => {
+    it('allows different owners to associate with one canonical GitHub installation', async () => {
+      const [canonical] = await schemaTestDb.db
+        .insert(schema.github_app_installations)
+        .values({ github_app_type: 'standard', installation_id: installationId })
+        .returning({ id: schema.github_app_installations.id });
+      if (!canonical) throw new Error('Expected canonical GitHub installation');
       const base = {
         platform: 'github',
         integration_type: 'app',
@@ -1480,6 +2569,7 @@ describe('database schema', () => {
         integration_status: 'active',
         repository_access: 'all',
         github_app_type: 'standard',
+        github_installation_id: canonical.id,
         installed_at: '2026-07-01T00:00:00.000Z',
       } satisfies typeof schema.platform_integrations.$inferInsert;
 
@@ -1489,13 +2579,41 @@ describe('database schema', () => {
         owned_by_user_id: userIdA,
       });
 
-      // Second insert with same installation_id but different owner must fail.
-      const duplicate = schemaTestDb.db.insert(schema.platform_integrations).values({
-        ...base,
-        owned_by_user_id: userIdB,
-      });
+      await expect(
+        schemaTestDb.db.insert(schema.platform_integrations).values({
+          ...base,
+          owned_by_user_id: userIdB,
+        })
+      ).resolves.not.toThrow();
+    });
 
-      await expect(duplicate).rejects.toMatchObject({
+    it('rejects a second association from the same owner to one canonical installation', async () => {
+      const [canonical] = await schemaTestDb.db
+        .insert(schema.github_app_installations)
+        .values({ github_app_type: 'standard', installation_id: installationId })
+        .returning({ id: schema.github_app_installations.id });
+      if (!canonical) throw new Error('Expected canonical GitHub installation');
+      const base = {
+        platform: 'github',
+        integration_type: 'app',
+        platform_account_id: '12345',
+        platform_account_login: 'test-owner',
+        integration_status: 'active',
+        repository_access: 'all',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        owned_by_user_id: userIdA,
+      } satisfies typeof schema.platform_integrations.$inferInsert;
+      await schemaTestDb.db.insert(schema.platform_integrations).values({
+        ...base,
+        platform_installation_id: installationId,
+      });
+      await expect(
+        schemaTestDb.db.insert(schema.platform_integrations).values({
+          ...base,
+          platform_installation_id: `${installationId}0`,
+        })
+      ).rejects.toMatchObject({
         cause: {
           constraint: uniqueIndexName,
         },
@@ -1532,8 +2650,11 @@ describe('database schema', () => {
       await expect(lite).resolves.not.toThrow();
     });
 
-    it('runs migration 0204 against duplicates before creating its unique index', async () => {
-      const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
+    it('runs the GitHub installation backfill before creating its unique index', async () => {
+      // The backfill and the unique index that this test exercises live in
+      // `0205_device_auth_hardening.sql` in the current journal; the earlier
+      // `0204_brainy_baron_strucker.sql` name no longer exists on disk.
+      const migrationPath = path.join(__dirname, 'migrations/0205_device_auth_hardening.sql');
       const fullMigration = fs.readFileSync(migrationPath, 'utf8');
       const statements = fullMigration.split('--> statement-breakpoint');
       // The dedup DO block is its own statement. The COMMIT/CONCURRENTLY/BEGIN
@@ -1552,8 +2673,6 @@ describe('database schema', () => {
 
       try {
         await schemaTestDb.db.transaction(async tx => {
-          await tx.execute(sql.raw('DROP INDEX "UQ_platform_integrations_github_platform_inst"'));
-
           const base = {
             platform: 'github',
             integration_type: 'app',
@@ -1604,13 +2723,15 @@ describe('database schema', () => {
           expect(loser).toMatchObject({ status: 'suspended', installationId: null });
           expect(loser?.metadata).toMatchObject({
             github_dedup: {
-              reason: 'Duplicate installation resolved by migration 0204',
+              reason: 'Duplicate installation resolved by migration 0205',
               original_installation_id: installationId,
             },
           });
           await expect(
             tx.insert(schema.platform_integrations).values({ ...base, owned_by_user_id: userIdA })
-          ).rejects.toMatchObject({ cause: { constraint: uniqueIndexName } });
+          ).rejects.toMatchObject({
+            cause: { constraint: 'UQ_platform_integrations_github_platform_inst' },
+          });
 
           throw rollback;
         });
@@ -1775,7 +2896,7 @@ describe('user deletion queue invariants', () => {
     });
   });
 
-  it('rejects unknown request status, completed without timestamp, and active without email', async () => {
+  it('rejects unknown request status, completed without timestamp, and in-progress without email', async () => {
     await withDeletionTestUser(async ({ userId, email }) => {
       await expect(
         schemaTestDb.db.execute(sql`
@@ -1809,12 +2930,27 @@ describe('user deletion queue invariants', () => {
             user_id, status, target_email, target_email_hmac,
             cloud_subject_resolution
           ) VALUES (
-            ${userId}, 'pending', NULL, ${`hmac-${crypto.randomUUID()}`}, 'current_user'
+            ${userId}, 'in_progress', NULL, ${`hmac-${crypto.randomUUID()}`}, 'current_user'
           )
         `)
       ).rejects.toMatchObject({
         cause: { constraint: 'user_deletion_requests_active_email_check' },
       });
+    });
+  });
+
+  it('allows a ticket-only pending request without email or HMAC', async () => {
+    await withDeletionTestUser(async ({ userId }) => {
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_requests).values({
+          user_id: userId,
+          status: UserDeletionRequestStatus.Pending,
+          target_email: null,
+          target_email_hmac: null,
+          pylon_ticket_ref: `#iss-${crypto.randomUUID()}`,
+          cloud_subject_resolution: UserDeletionCloudSubjectResolution.Unresolved,
+        })
+      ).resolves.toBeDefined();
     });
   });
 

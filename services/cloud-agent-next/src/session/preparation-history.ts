@@ -6,7 +6,6 @@ import type {
 } from '../shared/protocol.js';
 import type { EventQueries } from './queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { EventId } from '../types/ids.js';
 import { logger } from '../logger.js';
 
 const OUTPUT_TAIL_MAX_BYTES = 65_536;
@@ -50,6 +49,11 @@ function isPreparationEvent(data: unknown): data is PreparingEventDataV2 {
     typeof data.timestamp === 'number' &&
     typeof data.step === 'string' &&
     typeof data.message === 'string' &&
+    (data.snapshotCapturedAt === undefined ||
+      (typeof data.snapshotCapturedAt === 'number' &&
+        Number.isInteger(data.snapshotCapturedAt) &&
+        data.snapshotCapturedAt >= 0 &&
+        data.snapshotCapturedAt <= 8_640_000_000_000_000)) &&
     typeof data.action === 'string'
   );
 }
@@ -190,7 +194,7 @@ export function materializePreparationEvent(
       : undefined;
 
   if (data.action === 'attempt_started') {
-    if (attempt && attempt.revision >= data.revision) return false;
+    if (attempt && (isTerminal(attempt.status) || attempt.revision >= data.revision)) return false;
     const handoff = attempt?.status === 'running';
     attempt = {
       id: attemptId,
@@ -213,9 +217,10 @@ export function materializePreparationEvent(
     return true;
   }
 
-  if (!attempt || data.revision <= attempt.revision || isTerminal(attempt.status)) return false;
+  if (!attempt || data.revision <= attempt.revision) return false;
 
   if (data.action === 'attempt_completed' || data.action === 'attempt_failed') {
+    if (isTerminal(attempt.status)) return false;
     attempt = {
       ...attempt,
       status: data.action === 'attempt_completed' ? 'completed' : 'failed',
@@ -257,15 +262,24 @@ export function materializePreparationEvent(
       label: data.label,
       status: 'running',
       startedAt: data.timestamp,
+      startedRevision: data.revision,
       revision: data.revision,
       ...(data.command === undefined ? {} : { command: data.command }),
       ...(data.commandIndex === undefined ? {} : { commandIndex: data.commandIndex }),
       ...(data.commandCount === undefined ? {} : { commandCount: data.commandCount }),
+      ...(data.parentStepId === undefined ? {} : { parentStepId: data.parentStepId }),
     };
   } else {
     if (!step || data.revision <= step.revision || isTerminal(step.status)) return false;
     if (data.action === 'step_progress') {
-      step = { ...step, latestDetail: data.detail, revision: data.revision };
+      step = {
+        ...step,
+        latestDetail: data.detail,
+        ...(data.snapshotCapturedAt === undefined
+          ? {}
+          : { snapshotCapturedAt: data.snapshotCapturedAt }),
+        revision: data.revision,
+      };
     } else if (data.action === 'step_output') {
       const tail = utf8Tail(`${step.outputTail ?? ''}${data.output}`, OUTPUT_TAIL_MAX_BYTES);
       step = {
@@ -320,6 +334,46 @@ export function readPreparationAttempt(
   return snapshot?.action === 'attempt_snapshot' ? snapshot.attempt : null;
 }
 
+/** Read the materialized step snapshots of one attempt. */
+export function readPreparationSteps(
+  eventQueries: EventQueries,
+  attemptId: string
+): PreparationStepSnapshot[] {
+  const steps: PreparationStepSnapshot[] = [];
+  for (const row of eventQueries.findByEntityPrefix(`${attemptEntityId(attemptId)}/step/`)) {
+    const snapshot = parseSnapshot(row.payload);
+    if (snapshot?.action === 'step_snapshot') steps.push(snapshot.stepSnapshot);
+  }
+  return steps.sort((a, b) => {
+    if ((a.startedRevision === undefined) !== (b.startedRevision === undefined)) {
+      return a.startedRevision === undefined ? -1 : 1;
+    }
+    return (
+      (a.startedRevision ?? 0) - (b.startedRevision ?? 0) ||
+      a.startedAt - b.startedAt ||
+      a.id.localeCompare(b.id)
+    );
+  });
+}
+
+/**
+ * Every materialized attempt with its steps, in the order a client that
+ * replays the snapshots builds them, so a page can show them before the stream.
+ * Step output is left out: only an opened step shows it, and the stream sends it.
+ */
+export function listPreparationAttempts(eventQueries: EventQueries): PreparationAttempt[] {
+  const attempts: PreparationAttempt[] = [];
+  for (const row of eventQueries.findByEntityPrefix('preparation/attempt/')) {
+    const snapshot = parseSnapshot(row.payload);
+    if (snapshot?.action !== 'attempt_snapshot') continue;
+    const steps = readPreparationSteps(eventQueries, snapshot.attempt.id).map(
+      ({ outputTail: _outputTail, outputTruncated: _outputTruncated, ...step }) => step
+    );
+    attempts.push({ ...snapshot.attempt, steps });
+  }
+  return attempts.sort((a, b) => a.startedAt - b.startedAt);
+}
+
 export type PreparationOutcome = { status: 'completed' } | { status: 'failed'; safeError: string };
 
 /**
@@ -343,7 +397,7 @@ export function finalizePreparationAttempt(
   const events: StoredEvent[] = [];
   const emit = (data: PreparingEventDataV2): void => {
     const stored: StoredEvent = {
-      id: 0 as EventId,
+      id: 0,
       execution_id: row.execution_id,
       session_id: row.session_id,
       stream_event_type: 'preparing',
@@ -407,6 +461,34 @@ export function finalizePreparationAttempt(
   return events;
 }
 
+export function finalizeOtherRunningAttemptsForMessage(
+  eventQueries: EventQueries,
+  triggerMessageId: string,
+  keepAttemptId: string,
+  timestamp: number
+): StoredEvent[] {
+  const events: StoredEvent[] = [];
+  for (const row of getPreparationSnapshots(eventQueries)) {
+    const snapshot = parseSnapshot(row.payload);
+    if (snapshot?.action !== 'attempt_snapshot') continue;
+    const attempt = snapshot.attempt;
+    if (
+      attempt.status !== 'running' ||
+      attempt.triggerMessageId !== triggerMessageId ||
+      attempt.id === keepAttemptId
+    ) {
+      continue;
+    }
+    events.push(
+      ...finalizePreparationAttempt(eventQueries, attempt.id, {
+        status: 'completed',
+        timestamp,
+      })
+    );
+  }
+  return events;
+}
+
 /**
  * Repair attempts stranded in 'running'. Preparation is hard-capped well
  * below this timeout, so a running attempt whose snapshots stopped updating
@@ -436,28 +518,17 @@ export function reconcileStalePreparationAttempts(
 
 /**
  * Map a 'preparing' stream event to the `cloud.status` broadcast that should
- * accompany it, or null when none should be sent. Stale v2 events (ones the
- * materializer rejected) must not regress a ready session back to
- * 'preparing' — that strands the chat input in its disabled state.
+ * accompany legacy preparation, or null when none should be sent. V2 status
+ * comes from the materialized attempt in the SDK.
  */
 export function cloudStatusForPreparingEvent(
   data: unknown,
-  applied: boolean
+  _applied: boolean
 ): CloudStatusData['cloudStatus'] | null {
   if (!isRecord(data)) return null;
+  if (data.version === 2) return null;
   const step = typeof data.step === 'string' ? { step: data.step } : {};
   const message = typeof data.message === 'string' ? { message: data.message } : {};
-  if (data.version === 2) {
-    if (!applied) return null;
-    if (data.action === 'attempt_completed') return { type: 'ready' };
-    if (data.action === 'attempt_failed') {
-      return {
-        type: 'error',
-        ...(typeof data.safeError === 'string' ? { message: data.safeError } : message),
-      };
-    }
-    return { type: 'preparing', ...step, ...message };
-  }
   if (data.step === 'ready') return { type: 'ready' };
   if (data.step === 'failed') return { type: 'error', ...message };
   return { type: 'preparing', ...step, ...message };

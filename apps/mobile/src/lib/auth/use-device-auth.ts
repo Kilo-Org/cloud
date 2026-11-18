@@ -1,45 +1,52 @@
-import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
-import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
-import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
-import { parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
+import { appShellSignInUrl } from '@/lib/app-shell-handoff';
+import { API_BASE_URL } from '@/lib/config';
+import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
+import { parseAuthError, parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
+  deviceAuthErrorKey,
   type DeviceAuthState,
   errorDeviceAuthState,
   idleDeviceAuthState,
   pendingDeviceAuthState,
 } from '@/lib/auth/device-auth-state';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
+import {
+  clearPendingExternalAuth,
+  readPendingExternalAuth,
+  writePendingExternalAuth,
+} from '@/lib/auth/pending-external-auth';
 
 type DeviceAuthResult = DeviceAuthState & {
-  start: (mode?: 'signin' | 'signup') => Promise<void>;
+  /** `pendingLinkToken` ties the browser sign-in to the pending link it resolves. */
+  start: (mode?: 'signin' | 'sso', ssoEmail?: string, pendingLinkToken?: string) => Promise<void>;
   cancel: () => void;
   openBrowser: () => Promise<void>;
+  clearError: () => void;
 };
 
 const START_TIMEOUT_MS = 15_000;
-
-// Android has no native auth session; expo-web-browser's polyfill keeps
-// module-level state that can get stuck and reject every future call
-// (KILO-APP-22). We poll the server for approval instead of relying on a
-// redirect, so a plain browser open is all Android needs.
-async function openAuthBrowser(url: string) {
-  await (Platform.OS === 'android'
-    ? WebBrowser.openBrowserAsync(url)
-    : WebBrowser.openAuthSessionAsync(url));
-}
 
 export function useDeviceAuth(): DeviceAuthResult {
   const [state, setState] = useState<DeviceAuthState>(idleDeviceAuthState());
 
   const timeoutReference = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const abortReference = useRef<AbortController | undefined>(undefined);
-  const pollCleanupRef = useRef<(() => void) | undefined>(undefined);
+  const pollCleanupRef = useRef<{ cleanup: () => void; pollNow: () => void } | undefined>(
+    undefined
+  );
   // The device secret is stored ONLY in a ref — never in React state, never in
   // a URL, never in the clipboard. It is consumed in the POST body only.
   const deviceCodeReference = useRef<string | undefined>(undefined);
+  // Monotonic epoch bumped at the top of every start(). The mount restore read
+  // captures it before its async SecureStore read and bails when it changed, so
+  // a live start() that begins while the read is in flight always wins and the
+  // restore never clobbers it or starts a second poll.
+  const flowEpochRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (timeoutReference.current) {
@@ -51,17 +58,78 @@ export function useDeviceAuth(): DeviceAuthResult {
       abortReference.current = undefined;
     }
     if (pollCleanupRef.current) {
-      pollCleanupRef.current();
+      pollCleanupRef.current.cleanup();
       pollCleanupRef.current = undefined;
     }
     deviceCodeReference.current = undefined;
+    void clearPendingExternalAuth();
   }, []);
 
   // Cleanup on unmount
   useEffect(() => cleanup, [cleanup]);
 
+  // Android opens a plain browser and returns via AppState 'active', so poll
+  // once immediately on foreground while pending — bounded by pollNow (one per
+  // foreground, never within 1 s of the previous poll).
+  useEffect(() => {
+    const handleChange = (nextState: AppStateStatus) => {
+      if (nextState !== 'active') {
+        return;
+      }
+      if (state.status !== 'pending') {
+        return;
+      }
+      pollCleanupRef.current?.pollNow();
+    };
+    const subscription = AppState.addEventListener('change', handleChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [state.status]);
+
+  // Restore a pending transaction that survived process death. The record is
+  // read once on mount; an absent or expired record leaves the screen idle.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restorePending() {
+      const epochAtRead = flowEpochRef.current;
+      const result = await readPendingExternalAuth();
+      if (cancelled || flowEpochRef.current !== epochAtRead) {
+        return;
+      }
+      if (result.kind === 'stale') {
+        await clearPendingExternalAuth();
+        return;
+      }
+      if (result.kind === 'none') {
+        return;
+      }
+      const record = result.record;
+      deviceCodeReference.current = record.deviceCode;
+      setState(pendingDeviceAuthState(record.userCode, record.verificationUrl, true));
+      const abort = new AbortController();
+      abortReference.current = abort;
+      pollCleanupRef.current = startDeviceAuthPoll({
+        code: record.userCode,
+        deviceCode: record.deviceCode,
+        signal: abort.signal,
+        setState,
+        cleanup,
+        browserKind: resolveAuthBrowserKind(record.verificationUrl),
+        startedAt: record.startedAt,
+      });
+    }
+
+    void restorePending();
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanup]);
+
   const start = useCallback(
-    async (mode?: 'signin' | 'signup') => {
+    async (mode?: 'signin' | 'sso', ssoEmail?: string, pendingLinkToken?: string) => {
+      flowEpochRef.current += 1;
       cleanup();
       setState(pendingDeviceAuthState(undefined, undefined));
 
@@ -73,14 +141,19 @@ export function useDeviceAuth(): DeviceAuthResult {
       const startTimeout = setTimeout(() => {
         startAbort.abort();
         setState(
-          errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+          errorDeviceAuthState(
+            undefined,
+            deviceAuthErrorKey('authErrors.startSignInFailed'),
+            undefined
+          )
         );
       }, START_TIMEOUT_MS);
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/device-auth/codes?app=1`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
+          ...(pendingLinkToken ? { body: JSON.stringify({ pendingLinkToken }) } : {}),
           signal: startAbort.signal,
         });
         // The timeout guards ONLY the POST. This function stays suspended on
@@ -96,16 +169,25 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         if (!response.ok) {
-          if (response.status === 429) {
-            const body = (await response.json().catch(() => undefined)) as
-              | { error?: string }
-              | undefined;
-            const message = getDeviceAuth429Message(body);
-            setState(errorDeviceAuthState(undefined, message, undefined));
+          // One body read serves both refusals below: the pending-link match and
+          // the stable code that picks the banner copy.
+          const body = await response.json().catch(() => undefined);
+          // A link that lapsed or was used elsewhere cannot start a browser sign-in. The
+          // pending-link screen shows its own expired state, so this is no error banner.
+          if (
+            response.status === 400 &&
+            pendingLinkToken &&
+            parseAuthError(body)?.code === 'PENDING_LINK_EXPIRED'
+          ) {
+            setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
             return;
           }
           setState(
-            errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+            errorDeviceAuthState(
+              undefined,
+              getDeviceAuthStartRefusalError(body, response.status),
+              undefined
+            )
           );
           return;
         }
@@ -113,7 +195,11 @@ export function useDeviceAuth(): DeviceAuthResult {
         const data = parseDeviceAuthCodeResponse(await response.json());
         if (!data) {
           setState(
-            errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+            errorDeviceAuthState(
+              undefined,
+              deviceAuthErrorKey('authErrors.startSignInFailed'),
+              undefined
+            )
           );
           return;
         }
@@ -122,18 +208,29 @@ export function useDeviceAuth(): DeviceAuthResult {
 
         deviceCodeReference.current = deviceCode;
 
-        // Sign-in uses the server-provided verificationUrl which points directly
-        // at /device-auth?code=... Sign-up instead routes through the sign-in
-        // page with signup=true so the web UI renders the create-account flow;
-        // callbackPath then forwards the user to /device-auth?code=... after
-        // account creation to complete the device-auth approval.
-        const browserUrl =
-          mode === 'signup'
-            ? `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
-                callbackPath: `/device-auth?code=${userCode}&app=1`,
-                signup: 'true',
-              }).toString()}`
-            : data.verificationUrl;
+        // Sign-in uses the server-provided verificationUrl, which points at the
+        // chrome-free `/device-auth` approval page (outside the full web's
+        // navigation, and it closes itself). SSO recovery routes through the app
+        // shell's sign-in page — the marketing sign-in page links to the pricing
+        // site — and hands it the approval page as its callback; the
+        // organization id is NOT put in the URL, it stays in client state and as
+        // a Sentry tag.
+        const verificationUrl = new URL(data.verificationUrl);
+        const callbackPath = `${verificationUrl.pathname}${verificationUrl.search}`;
+        let browserUrl = data.verificationUrl;
+        if (mode === 'sso') {
+          browserUrl = appShellSignInUrl({ email: ssoEmail, callbackPath });
+        }
+
+        // Persist the pending transaction so a process death mid-sign-in can
+        // resume it. The device code is a secret, so it lives in SecureStore
+        // only (never React state, a URL, or the clipboard).
+        void writePendingExternalAuth({
+          deviceCode,
+          userCode,
+          verificationUrl: browserUrl,
+          startedAt: Date.now(),
+        });
 
         setState(pendingDeviceAuthState(userCode, browserUrl));
 
@@ -145,6 +242,10 @@ export function useDeviceAuth(): DeviceAuthResult {
           signal: abort.signal,
           setState,
           cleanup,
+          // Approval dismisses the page the flow opened, so the poll has to know
+          // which API opened it: the plain browser on a non-product host (or on
+          // Android) needs its own dismissal.
+          browserKind: resolveAuthBrowserKind(browserUrl),
         });
 
         await openAuthBrowser(browserUrl);
@@ -156,8 +257,13 @@ export function useDeviceAuth(): DeviceAuthResult {
           return;
         }
         setState(
-          errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+          errorDeviceAuthState(
+            undefined,
+            deviceAuthErrorKey('authErrors.startSignInFailed'),
+            undefined
+          )
         );
+        void clearPendingExternalAuth();
       } finally {
         clearTimeout(startTimeout);
       }
@@ -170,6 +276,21 @@ export function useDeviceAuth(): DeviceAuthResult {
     setState(idleDeviceAuthState());
   }, [cleanup]);
 
+  // Dismisses a terminal error (denied/expired/timed out) when a new sign-in
+  // attempt starts, so a stale timeout message does not sit above the form while
+  // the next attempt runs. A live flow (pending/approved/idle) is left alone.
+  // An `error` is not always terminal: a failed Open-browser tap sets one while
+  // the poll stays registered, so tearing the flow down here — rather than only
+  // dropping its code — keeps that still-running poll from flipping the screen
+  // to approved (signing the user in mid-attempt) after the error is dismissed.
+  const clearError = useCallback(() => {
+    if (state.status !== 'error' && state.status !== 'denied' && state.status !== 'expired') {
+      return;
+    }
+    cleanup();
+    setState(idleDeviceAuthState());
+  }, [cleanup, state.status]);
+
   const openBrowser = useCallback(async () => {
     if (state.verificationUrl) {
       try {
@@ -178,7 +299,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         setState(previous =>
           errorDeviceAuthState(
             previous.code,
-            'Could not open browser. Please try again.',
+            deviceAuthErrorKey('authErrors.couldNotOpenBrowser'),
             previous.verificationUrl
           )
         );
@@ -186,5 +307,5 @@ export function useDeviceAuth(): DeviceAuthResult {
     }
   }, [state.verificationUrl]);
 
-  return { ...state, start, cancel, openBrowser };
+  return { ...state, start, cancel, openBrowser, clearError };
 }

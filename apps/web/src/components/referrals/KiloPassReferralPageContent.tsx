@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 
 const SHARE_WIDGET_ANCHOR_ID = 'kilo-pass-referral-share';

@@ -6,8 +6,10 @@
  */
 
 import { z } from 'zod';
-import { eq, and, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import {
+  organizationWorkflowGitHubConnectionSql,
+  organizationWorkflowGitHubPreferenceSql,
   recordSecurityAgentRepositorySyncAttempt,
   recordSecurityAgentRepositorySyncFailure,
   recordSecurityAgentRepositorySyncSuccess,
@@ -16,6 +18,7 @@ import {
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   agent_configs,
+  github_app_installations,
   platform_integrations,
   security_findings,
   security_finding_notifications,
@@ -26,6 +29,7 @@ import {
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
+  type IntegrationPermissions,
   type PlatformRepository,
 } from '@kilocode/db/schema-types';
 import {
@@ -164,7 +168,37 @@ type SecurityReviewOwner =
   | { organizationId: string; userId?: never }
   | { userId: string; organizationId?: never };
 
-type SyncResult = {
+export const SECURITY_SYNC_OWNER_BUDGET_MS = 8 * 60 * 1000;
+/** Outlives the 15-minute queue consumer wall time, so a live chunk is never taken over. */
+export const SECURITY_SYNC_LEASE_TTL_MS = 20 * 60 * 1000;
+export const SECURITY_SYNC_NO_PROGRESS_CHUNK_LIMIT = 2;
+
+const SyncRunProgressSchema = z.object({
+  runId: z.string().min(1),
+  completedRepos: z.array(z.string().min(1)),
+  staleRepos: z.array(z.string()),
+  authInvalidRepos: z.array(z.string()),
+  synced: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  authInvalid: z.number().int().nonnegative(),
+  reauthRequired: z.boolean(),
+  noProgressChunks: z.number().int().nonnegative().default(0),
+  chunkIndex: z.number().int().nonnegative().optional(),
+});
+
+type SyncRunProgress = z.infer<typeof SyncRunProgressSchema>;
+
+/** A writer's checkpoint: the schema fields plus the chunk fence this write installs. */
+type SyncRunProgressWrite = SyncRunProgress & { chunkIndex: number };
+
+const SyncLeaseSchema = z.object({
+  runId: z.string().optional(),
+  chunkIndex: z.number().int().optional(),
+  expiresAt: z.string().optional(),
+});
+
+export type SyncResult = {
   synced: number;
   errors: number;
   /** Repos where Dependabot alerts are permanently disabled (safe to skip) */
@@ -177,14 +211,38 @@ type SyncResult = {
   staleRepos: string[];
   /** Stable command-ledger result when an acknowledged sync resolves without normal success. */
   commandResultCode?: string;
+  exhaustedBudget: boolean;
+  remainingRepoCount: number;
+  /** A strictly older chunk of the holding run; ack without syncing or failing the command. */
+  staleChunk?: boolean;
+  /** A different run holds the owner lease; fail the manual command with SYNC_ALREADY_RUNNING. */
+  claimDenied?: boolean;
+  /** A lease-guarded write, clear, or freshness update matched zero rows. */
+  checkpointRejected?: boolean;
+  /** Two consecutive budget chunks completed no repo; the run stopped. */
+  noProgress?: boolean;
+  /** Run id currently holding the lease, when known. */
+  holderRunId?: string | null;
 };
 
 type FetchAlertsResult =
   | { status: 'success'; alerts: DependabotAlertRaw[] }
   | { status: 'repo_not_found' }
-  | { status: 'alerts_disabled' }
+  | { status: 'alerts_disabled'; httpStatus: number; bodyExcerpt: string }
   | { status: 'access_blocked' }
   | { status: 'auth_invalid' };
+
+const ALERTS_DISABLED_BODY_EXCERPT_LIMIT = 200;
+
+/** Collapse whitespace, redact token-shaped values, then bound the excerpt. */
+function redactAlertsDisabledBody(body: string): string {
+  return body
+    .replace(/\s+/g, ' ')
+    .replace(/bearer\s+\S+/gi, 'bearer [redacted]')
+    .replace(/gh[pousr]_[A-Za-z0-9]+/g, '[redacted]')
+    .replace(/github_pat_[A-Za-z0-9_]+/g, '[redacted]')
+    .slice(0, ALERTS_DISABLED_BODY_EXCERPT_LIMIT);
+}
 
 function createEmptySyncResult(): SyncResult {
   return {
@@ -195,7 +253,434 @@ function createEmptySyncResult(): SyncResult {
     authInvalidRepos: [],
     reauthRequired: false,
     staleRepos: [],
+    exhaustedBudget: false,
+    remainingRepoCount: 0,
   };
+}
+
+function readSyncRunProgress(
+  runtimeState: Record<string, unknown>,
+  runId: string
+): SyncRunProgress | null {
+  const parsed = SyncRunProgressSchema.safeParse(runtimeState.sync_run);
+  if (!parsed.success || parsed.data.runId !== runId) return null;
+  return parsed.data;
+}
+
+function applySyncRunProgress(result: SyncResult, progress: SyncRunProgress): void {
+  result.synced = progress.synced;
+  result.errors = progress.errors;
+  result.skipped = progress.skipped;
+  result.authInvalid = progress.authInvalid;
+  result.authInvalidRepos = [...progress.authInvalidRepos];
+  result.reauthRequired = progress.reauthRequired;
+  result.staleRepos = [...progress.staleRepos];
+}
+
+function toSyncRunProgress(
+  runId: string,
+  result: SyncResult,
+  completedRepos: string[],
+  chunkIndex: number,
+  noProgressChunks: number
+): SyncRunProgressWrite {
+  return {
+    runId,
+    completedRepos,
+    staleRepos: result.staleRepos,
+    authInvalidRepos: result.authInvalidRepos,
+    synced: result.synced,
+    errors: result.errors,
+    skipped: result.skipped,
+    authInvalid: result.authInvalid,
+    reauthRequired: result.reauthRequired,
+    noProgressChunks,
+    chunkIndex,
+  };
+}
+
+function readLastCompletedRunId(runtimeState: Record<string, unknown>): string | null {
+  const value = runtimeState.last_completed_run_id;
+  return typeof value === 'string' ? value : null;
+}
+
+function readSyncRunRunId(runtimeState: Record<string, unknown>): string | null {
+  const value = runtimeState.sync_run;
+  if (
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { runId?: unknown }).runId === 'string'
+  ) {
+    return (value as { runId: string }).runId;
+  }
+  return null;
+}
+
+type SyncLeaseReadOutcome =
+  | { kind: 'completed' }
+  | { kind: 'stale_chunk'; holderRunId: string | null; holderChunkIndex: number | null }
+  | { kind: 'superseded'; holderRunId: string | null; holderChunkIndex: number | null };
+
+/**
+ * Classifies a runtime_state read that did not acquire the lease. `completed`
+ * means this run already finished. `stale_chunk` means a newer chunk of this
+ * same run holds the lease, or no different run id is visible at all (the lease
+ * vanished in a millisecond race). `superseded` means a different run id is
+ * actually visible on the lease or the cursor.
+ */
+function classifySyncLeaseRead(
+  runtimeState: Record<string, unknown>,
+  runId: string,
+  chunkIndex: number
+): SyncLeaseReadOutcome {
+  if (readLastCompletedRunId(runtimeState) === runId) return { kind: 'completed' };
+  const parsedLease = SyncLeaseSchema.safeParse(runtimeState.sync_lease);
+  const lease = parsedLease.success ? parsedLease.data : null;
+  const holderRunId = lease?.runId ?? null;
+  const holderChunkIndex = lease?.chunkIndex ?? null;
+  if (holderRunId === runId && (holderChunkIndex ?? -1) > chunkIndex) {
+    return { kind: 'stale_chunk', holderRunId, holderChunkIndex };
+  }
+  const cursorRunId = readSyncRunRunId(runtimeState);
+  const foreignHolder = holderRunId !== null && holderRunId !== runId;
+  const foreignCursor = cursorRunId !== null && cursorRunId !== runId;
+  if (foreignHolder || foreignCursor) {
+    return { kind: 'superseded', holderRunId, holderChunkIndex };
+  }
+  return { kind: 'stale_chunk', holderRunId, holderChunkIndex };
+}
+
+async function selectOwnerRuntimeState(
+  db: WorkerDb,
+  owner: SecurityReviewOwner
+): Promise<Record<string, unknown> | null> {
+  const rows = await db
+    .select({ runtime_state: agent_configs.runtime_state })
+    .from(agent_configs)
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner)
+      )
+    )
+    .limit(1);
+  const value = rows[0]?.runtime_state;
+  return value ?? null;
+}
+
+/**
+ * Claims the single owner-sync lease for `runId` at `chunkIndex`. Returns the
+ * post-image runtime_state, or null when another run holds the lease or a
+ * stricter same-run chunk is live. A different run that claims the owner
+ * adopts the previous run's completed repos and counters, so a takeover
+ * continues the remaining work instead of restarting at the first repo.
+ */
+export async function claimOwnerSyncLease(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runId: string,
+  chunkIndex: number
+): Promise<{ runtimeState: Record<string, unknown> } | null> {
+  const ttlSeconds = Math.floor(SECURITY_SYNC_LEASE_TTL_MS / 1000);
+  const lease = sql`jsonb_build_object(
+    'runId', ${runId}::text,
+    'chunkIndex', to_jsonb(${chunkIndex}::int),
+    'expiresAt', to_jsonb(now() + make_interval(secs => ${ttlSeconds}))
+  )`;
+  const skeleton = JSON.stringify({
+    runId,
+    completedRepos: [],
+    staleRepos: [],
+    authInvalidRepos: [],
+    synced: 0,
+    errors: 0,
+    skipped: 0,
+    authInvalid: 0,
+    reauthRequired: false,
+    noProgressChunks: 0,
+  });
+  const [row] = await db
+    .update(agent_configs)
+    .set({
+      runtime_state: sql`CASE
+        WHEN ${agent_configs.runtime_state}->'sync_run'->>'runId' = ${runId}
+        THEN jsonb_set(COALESCE(${agent_configs.runtime_state}, '{}'::jsonb), '{sync_lease}', ${lease}, true)
+        ELSE jsonb_set(
+          jsonb_set(COALESCE(${agent_configs.runtime_state}, '{}'::jsonb), '{sync_lease}', ${lease}, true),
+          '{sync_run}',
+          ${skeleton}::jsonb || COALESCE(
+            (${agent_configs.runtime_state}->'sync_run') - 'runId' - 'chunkIndex' - 'noProgressChunks',
+            '{}'::jsonb
+          ),
+          true
+        )
+      END`,
+    })
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner),
+        sql`(
+          NOT jsonb_exists(COALESCE(${agent_configs.runtime_state}, '{}'::jsonb), 'sync_lease')
+          OR (
+            ${agent_configs.runtime_state}->'sync_lease'->>'runId' = ${runId}
+            AND COALESCE((${agent_configs.runtime_state}->'sync_lease'->>'chunkIndex')::int, -1) <= ${chunkIndex}
+          )
+          OR (
+            ${agent_configs.runtime_state}->'sync_lease'->>'runId' IS DISTINCT FROM ${runId}
+            AND (${agent_configs.runtime_state}->'sync_lease'->>'expiresAt')::timestamptz < now()
+          )
+        )`
+      )
+    )
+    .returning({ runtimeState: agent_configs.runtime_state });
+
+  if (!row?.runtimeState) return null;
+  return { runtimeState: row.runtimeState };
+}
+
+export async function releaseOwnerSyncLease(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runId: string,
+  chunkIndex: number
+): Promise<{ released: boolean }> {
+  const rows = await db
+    .update(agent_configs)
+    .set({
+      runtime_state: sql`COALESCE(${agent_configs.runtime_state}, '{}'::jsonb) - 'sync_lease'`,
+    })
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner),
+        sql`${agent_configs.runtime_state}->'sync_lease'->>'runId' = ${runId}`,
+        sql`COALESCE((${agent_configs.runtime_state}->'sync_lease'->>'chunkIndex')::int, -1) <= ${chunkIndex}`
+      )
+    )
+    .returning({ id: agent_configs.id });
+  return { released: rows.length > 0 };
+}
+
+export async function writeSyncRunProgress(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  progress: SyncRunProgressWrite
+): Promise<{ written: boolean }> {
+  const progressJson = JSON.stringify(progress);
+  const completedReposJson = JSON.stringify(progress.completedRepos);
+  const rows = await db
+    .update(agent_configs)
+    .set({
+      runtime_state: sql`jsonb_set(
+        COALESCE(${agent_configs.runtime_state}, '{}'::jsonb),
+        '{sync_run}',
+        ${progressJson}::jsonb || jsonb_build_object(
+          'completedRepos',
+          (
+            SELECT COALESCE(jsonb_agg(DISTINCT elem), '[]'::jsonb)
+            FROM jsonb_array_elements_text(
+              COALESCE(${agent_configs.runtime_state}->'sync_run'->'completedRepos', '[]'::jsonb)
+              || ${completedReposJson}::jsonb
+            ) AS elem
+          )
+        ),
+        true
+      )`,
+    })
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner),
+        sql`${agent_configs.runtime_state}->'sync_lease'->>'runId' = ${progress.runId}`,
+        sql`${agent_configs.runtime_state}->'sync_run'->>'runId' = ${progress.runId}`,
+        sql`COALESCE((${agent_configs.runtime_state}->'sync_lease'->>'chunkIndex')::int, -1) <= ${progress.chunkIndex}`,
+        sql`(${agent_configs.runtime_state}->'sync_run'->'chunkIndex' IS NULL OR (${agent_configs.runtime_state}->'sync_run'->>'chunkIndex')::int <= ${progress.chunkIndex})`
+      )
+    )
+    .returning({ id: agent_configs.id });
+  return { written: rows.length > 0 };
+}
+
+export async function clearSyncRunProgress(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runId: string,
+  chunkIndex: number
+): Promise<{ cleared: boolean }> {
+  const rows = await db
+    .update(agent_configs)
+    .set({
+      runtime_state: sql`COALESCE(${agent_configs.runtime_state}, '{}'::jsonb) - 'sync_run'`,
+    })
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner),
+        sql`${agent_configs.runtime_state}->'sync_run'->>'runId' = ${runId}`,
+        sql`${agent_configs.runtime_state}->'sync_lease'->>'runId' = ${runId}`,
+        sql`COALESCE((${agent_configs.runtime_state}->'sync_lease'->>'chunkIndex')::int, -1) <= ${chunkIndex}`,
+        sql`(${agent_configs.runtime_state}->'sync_run'->'chunkIndex' IS NULL OR (${agent_configs.runtime_state}->'sync_run'->>'chunkIndex')::int <= ${chunkIndex})`
+      )
+    )
+    .returning({ id: agent_configs.id });
+  return { cleared: rows.length > 0 };
+}
+
+export async function advanceOwnerSyncFreshness(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runId: string,
+  chunkIndex: number
+): Promise<{ advanced: boolean }> {
+  const rows = await db
+    .update(agent_configs)
+    .set({
+      runtime_state: sql`jsonb_set(
+        COALESCE(${agent_configs.runtime_state}, '{}'::jsonb) - 'sync_run',
+        '{last_synced_at}',
+        to_jsonb(now()),
+        true
+      ) || jsonb_build_object('last_completed_run_id', ${runId}::text)`,
+    })
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner),
+        sql`${agent_configs.runtime_state}->'sync_run'->>'runId' = ${runId}`,
+        sql`${agent_configs.runtime_state}->'sync_lease'->>'runId' = ${runId}`,
+        sql`COALESCE((${agent_configs.runtime_state}->'sync_lease'->>'chunkIndex')::int, -1) <= ${chunkIndex}`,
+        sql`(${agent_configs.runtime_state}->'sync_run'->'chunkIndex' IS NULL OR (${agent_configs.runtime_state}->'sync_run'->>'chunkIndex')::int <= ${chunkIndex})`
+      )
+    )
+    .returning({ id: agent_configs.id });
+  return { advanced: rows.length > 0 };
+}
+
+/** One read + classification for a lease-guarded mutation that matched zero rows. */
+async function classifyOwnerMutationMiss(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runId: string,
+  chunkIndex: number
+): Promise<SyncLeaseReadOutcome | null> {
+  const runtimeState = await selectOwnerRuntimeState(db, owner);
+  return runtimeState ? classifySyncLeaseRead(runtimeState, runId, chunkIndex) : null;
+}
+
+/** Lease release reasons emitted by owner-scoped terminal returns. */
+type OwnerLeaseReleaseReason = 'completed' | 'incomplete' | 'no_progress' | 'abandoned';
+
+/**
+ * Releases the owner lease and logs the outcome. A zero-row release is logged
+ * and returned; a database error propagates so the bounded queue retry runs and
+ * the lease does not stay held until the TTL expires.
+ */
+async function releaseOwnerSyncLeaseLogged(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runId: string,
+  chunkIndex: number,
+  reason: OwnerLeaseReleaseReason
+): Promise<void> {
+  const released = await releaseOwnerSyncLease(db, owner, runId, chunkIndex);
+  if (released.released) {
+    console.info('Security sync lease released', { runId, chunkIndex, reason });
+  } else {
+    console.info('Security sync lease release rejected', { runId, holderRunId: null, reason });
+  }
+}
+
+/**
+ * The single decision for a lease-guarded mutation (write, clear, or freshness
+ * update) that matched zero rows: what to return and whether the owner lease
+ * must be released. A newer chunk of this same run never releases. A superseded
+ * or vanished lease releases only where the caller owns the foreign-release
+ * decision. A completed run always releases and returns the empty result.
+ */
+function reactToOwnerMutationMiss(
+  miss: SyncLeaseReadOutcome | null,
+  base: SyncResult,
+  options: { releaseOnSuperseded: boolean }
+): { result: SyncResult; release: boolean } {
+  if (miss?.kind === 'stale_chunk') {
+    return {
+      result: { ...base, staleChunk: true, exhaustedBudget: false, holderRunId: miss.holderRunId },
+      release: false,
+    };
+  }
+  if (miss?.kind === 'completed') {
+    return { result: createEmptySyncResult(), release: true };
+  }
+  return {
+    result: { ...base, checkpointRejected: true, exhaustedBudget: false },
+    release: options.releaseOnSuperseded,
+  };
+}
+
+/**
+ * Fenced clear then release for an owner-scoped terminal return. The clear is
+ * best-effort so a failed clear does not mask the real sync result. A zero-row
+ * clear is classified against the live runtime state: a newer chunk of this run
+ * owns the command (`staleChunk`, no release), a different run supersedes it
+ * (`checkpointRejected`, release), or this run already completed (release and
+ * return the completed result). Returns an overriding result on those
+ * classifications, or null to return the caller's own result. Release errors
+ * propagate.
+ */
+async function teardownOwnerLease(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runId: string,
+  chunkIndex: number,
+  reason: 'incomplete' | 'abandoned'
+): Promise<SyncResult | null> {
+  let cleared: boolean;
+  try {
+    cleared = (await clearSyncRunProgress(db, owner, runId, chunkIndex)).cleared;
+  } catch (error) {
+    console.error('Failed to clear Security sync run progress', {
+      runId,
+      chunkIndex,
+      reason,
+      error_type: error instanceof Error ? error.name : 'UnknownError',
+    });
+    await releaseOwnerSyncLeaseLogged(db, owner, runId, chunkIndex, reason);
+    return null;
+  }
+
+  if (cleared) {
+    await releaseOwnerSyncLeaseLogged(db, owner, runId, chunkIndex, reason);
+    return null;
+  }
+
+  const miss = await classifyOwnerMutationMiss(db, owner, runId, chunkIndex);
+  if (miss?.kind === 'stale_chunk') {
+    console.info('Security sync checkpoint clear rejected', {
+      runId,
+      chunkIndex,
+      reason: 'stale_chunk',
+    });
+  } else if (miss?.kind !== 'completed') {
+    console.info('Security sync checkpoint clear rejected', {
+      runId,
+      chunkIndex,
+      reason: 'superseded',
+    });
+  }
+  const reaction = reactToOwnerMutationMiss(miss, createEmptySyncResult(), {
+    releaseOnSuperseded: true,
+  });
+  if (reaction.release) {
+    await releaseOwnerSyncLeaseLogged(db, owner, runId, chunkIndex, reason);
+  }
+  return reaction.result;
 }
 
 function createAuthInvalidSyncResult(repositories: string[]): SyncResult {
@@ -231,6 +716,56 @@ function integrationOwnerFilter(owner: SecurityReviewOwner) {
     return eq(platform_integrations.owned_by_organization_id, owner.organizationId);
   }
   return eq(platform_integrations.owned_by_user_id, owner.userId);
+}
+
+/**
+ * The connection role an eligible sync may act on. An organization resolves the
+ * shared workflow connection definition, so the same installation its Security
+ * Agent entry gate reports is the one this sync reads. A personal association
+ * keeps its stored role.
+ */
+function connectionRoleFilter(owner: SecurityReviewOwner) {
+  return isOrgOwner(owner)
+    ? organizationWorkflowGitHubConnectionSql()
+    : eq(platform_integrations.github_connection_role, 'workflow');
+}
+
+function eligibleSecuritySyncIntegration(owner: SecurityReviewOwner) {
+  const canonicalInstallationMatchesIntegration = sql`
+    ${github_app_installations.lifecycle_state} = 'active'
+    AND ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+    AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+    AND ${github_app_installations.suspended_at} IS NULL
+    AND ${github_app_installations.deleted_at} IS NULL
+  `;
+  const legacyInstallationHasNoCanonicalRecord = sql`
+    ${platform_integrations.github_installation_id} IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM ${github_app_installations}
+      WHERE ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+        AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+    )
+  `;
+
+  return and(
+    integrationOwnerFilter(owner),
+    eq(platform_integrations.platform, 'github'),
+    connectionRoleFilter(owner),
+    eq(platform_integrations.integration_type, 'app'),
+    eq(platform_integrations.integration_status, 'active'),
+    isNull(platform_integrations.suspended_at),
+    isNull(platform_integrations.github_disconnected_at),
+    isNotNull(platform_integrations.platform_installation_id),
+    or(legacyInstallationHasNoCanonicalRecord, canonicalInstallationMatchesIntegration),
+    sql`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})->>'vulnerability_alerts' IN ('read', 'write')`,
+    sql`EXISTS (
+      SELECT 1
+      FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
+      WHERE jsonb_typeof(repository->'id') = 'number'
+        AND jsonb_typeof(repository->'full_name') = 'string'
+        AND repository->>'full_name' <> ''
+    )`
+  );
 }
 
 function analysisOwnerStateFilter(owner: SecurityReviewOwner) {
@@ -269,6 +804,7 @@ type EnabledOwnerConfig = {
   notificationPolicy: SecurityNotificationPolicy | null;
   autoAnalysisEnabledAt: string | null;
   authInvalidAt: string | null;
+  githubAppType: 'standard' | 'lite';
   /** Number of selected_repository_ids that are no longer accessible via the installation.
    *  Non-zero means the app lost access to a configured repo — freshness must not advance. */
   missingSelectedRepoCount: number;
@@ -277,7 +813,7 @@ type EnabledOwnerConfig = {
 export async function getOwnerConfig(
   db: WorkerDb,
   owner: SecurityReviewOwner
-): Promise<EnabledOwnerConfig | null> {
+): Promise<EnabledOwnerConfig | { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' } | null> {
   // Get agent config
   const configs = await db
     .select({
@@ -299,35 +835,39 @@ export async function getOwnerConfig(
   if (configs.length === 0) return null;
   const agentConfig = configs[0];
 
-  // Get platform integration
   const integrations = await db
     .select({
       id: platform_integrations.id,
       platform_installation_id: platform_integrations.platform_installation_id,
-      permissions: platform_integrations.permissions,
-      repositories: platform_integrations.repositories,
+      permissions: sql<IntegrationPermissions | null>`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})`,
+      repositories: sql<
+        PlatformRepository[] | null
+      >`COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories})`,
       authInvalidAt: platform_integrations.auth_invalid_at,
+      githubAppType: platform_integrations.github_app_type,
     })
     .from(platform_integrations)
-    .where(
-      and(
-        integrationOwnerFilter(owner),
-        eq(platform_integrations.platform, 'github'),
-        isNotNull(platform_integrations.platform_installation_id)
-      )
+    .leftJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
+    )
+    .where(eligibleSecuritySyncIntegration(owner))
+    .orderBy(
+      desc(organizationWorkflowGitHubPreferenceSql()),
+      asc(platform_integrations.created_at),
+      asc(platform_integrations.id)
     )
     .limit(1);
 
-  if (integrations.length === 0) return null;
+  if (integrations.length === 0) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
   const integration = integrations[0];
 
-  if (!integration.platform_installation_id) return null;
+  if (!integration.platform_installation_id) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
 
-  // Check vulnerability_alerts permission
   const perms = integration.permissions;
   if (!perms || (perms.vulnerability_alerts !== 'read' && perms.vulnerability_alerts !== 'write')) {
     console.warn(`Integration ${integration.id} missing vulnerability_alerts permission, skipping`);
-    return null;
+    return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
   }
 
   // Filter repositories
@@ -337,7 +877,7 @@ export async function getOwnerConfig(
       typeof repository.full_name === 'string' &&
       repository.full_name.length > 0
   );
-  if (allRepos.length === 0) return null;
+  if (allRepos.length === 0) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
 
   const repoNameToId = new Map(allRepos.map(r => [r.full_name, r.id]));
 
@@ -400,6 +940,7 @@ export async function getOwnerConfig(
     notificationPolicy,
     autoAnalysisEnabledAt: ownerStates[0]?.autoAnalysisEnabledAt ?? null,
     authInvalidAt: integration.authInvalidAt,
+    githubAppType: integration.githubAppType ?? 'standard',
     missingSelectedRepoCount,
   };
 }
@@ -513,7 +1054,11 @@ export async function fetchAllDependabotAlerts(
           body.includes('archived repositories') ||
           body.includes('archived repository'))
       ) {
-        return { status: 'alerts_disabled' };
+        return {
+          status: 'alerts_disabled',
+          httpStatus: response.status,
+          bodyExcerpt: redactAlertsDisabledBody(body),
+        };
       }
 
       throw new Error(`GitHub API error ${response.status} for ${repoOwner}/${repoName}`);
@@ -668,22 +1213,13 @@ async function upsertSecurityFinding(
   const ownerOrganizationId = isOrgOwner(owner) ? owner.organizationId : null;
   const ownerUserId = isOrgOwner(owner) ? null : owner.userId;
 
-  // Only rewrite an existing finding when the source data actually changed. Re-syncing an
-  // unchanged finding otherwise rewrote the row on every run (bumping last_synced_at/
-  // updated_at), which — multiplied by ~13 indexes and the TOASTed raw_data column —
-  // produced large amounts of WAL for findings that had not changed.
-  //
-  // Every stored column is derived from the Dependabot alert (see parseDependabotAlert),
-  // and GitHub only advances the alert's updated_at on real changes, so comparing the
-  // stored raw_data (jsonb, order-independent) detects any source-driven change in one
-  // check. sla_due_at is the only value we compute ourselves, so it is compared separately
-  // to catch SLA-policy changes. When neither differs the DO UPDATE matches no row and the
-  // fallback SELECT below returns the existing finding with wasInserted=false and no
-  // status/severity delta, so notifications and audit events behave exactly as they did for
-  // an unchanged re-sync.
+  // Avoid WAL/TOAST churn on unchanged alerts. Metadata-only updates must not undo
+  // a dismissal applied after the source fetch.
+  const sourceDataChangedPredicate = sql`${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}`;
   const materialChangePredicate = sql`(
-        ${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}
+        ${sourceDataChangedPredicate}
         OR ${security_findings.sla_due_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)}
+        OR ${security_findings.platform_integration_id} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)}
       )`;
 
   const result = await db.execute<Record<string, unknown>>(sql`
@@ -697,6 +1233,19 @@ async function upsertSecurityFinding(
         AND ${security_findings.source_id} = ${finding.source_id}
         AND ${findingOwnerPredicate(owner)}
       FOR UPDATE
+    ),
+    eligible_input AS (
+      SELECT 1
+      FROM ${platform_integrations}
+      LEFT JOIN ${github_app_installations}
+        ON ${platform_integrations.github_installation_id} = ${github_app_installations.id}
+      WHERE ${platform_integrations.id} = ${platformIntegrationId}
+        AND ${eligibleSecuritySyncIntegration(owner)}
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
+          WHERE lower(repository->>'full_name') = lower(${repoFullName})
+        )
     ),
     upserted AS (
       INSERT INTO ${security_findings} (
@@ -756,10 +1305,11 @@ async function upsertSecurityFinding(
         ${sql.param(finding.cwe_ids)}::text[],
         ${finding.cvss_score?.toString() ?? null},
         ${finding.dependency_scope}
-      FROM (SELECT 1) AS input
+      FROM eligible_input
       LEFT JOIN existing_match ON true
       ON CONFLICT ${findingOwnerConflictTarget(owner)} DO UPDATE
       SET
+        ${sql.identifier(security_findings.platform_integration_id.name)} = EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)},
         ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
         ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
         ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
@@ -771,18 +1321,24 @@ async function upsertSecurityFinding(
         ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
         ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
         ${sql.identifier(security_findings.status.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.status}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.status}
           ELSE EXCLUDED.${sql.identifier(security_findings.status.name)}
         END,
         ${sql.identifier(security_findings.ignored_reason.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.ignored_reason}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_reason}
           ELSE EXCLUDED.${sql.identifier(security_findings.ignored_reason.name)}
         END,
         ${sql.identifier(security_findings.ignored_by.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.ignored_by}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_by}
           ELSE EXCLUDED.${sql.identifier(security_findings.ignored_by.name)}
         END,
-        ${sql.identifier(security_findings.fixed_at.name)} = EXCLUDED.${sql.identifier(security_findings.fixed_at.name)},
+        ${sql.identifier(security_findings.fixed_at.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.fixed_at}
+          ELSE EXCLUDED.${sql.identifier(security_findings.fixed_at.name)}
+        END,
         ${sql.identifier(security_findings.sla_due_at.name)} = EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)},
         ${sql.identifier(security_findings.dependabot_html_url.name)} = EXCLUDED.${sql.identifier(security_findings.dependabot_html_url.name)},
         ${sql.identifier(security_findings.raw_data.name)} = EXCLUDED.${sql.identifier(security_findings.raw_data.name)},
@@ -1610,15 +2166,145 @@ export async function syncOwner(params: {
   actor?: { id: string; email?: string | null; name?: string | null };
   repoFullName?: string;
   notificationMaterializationEnabled?: boolean;
+  budgetMs?: number;
+  chunkIndex?: number;
 }): Promise<SyncResult> {
   const { db: database, gitTokenService, owner, runId, actor, repoFullName } = params;
   const trigger = params.trigger ?? 'scheduled';
+  const chunkIndex = params.chunkIndex ?? 0;
   const startTime = Date.now();
+  const ownerId =
+    'organizationId' in owner ? (owner.organizationId ?? 'unknown') : (owner.userId ?? 'unknown');
+  const ownerType = isOrgOwner(owner) ? 'org' : 'user';
+  const ownerScoped = repoFullName === undefined;
+
+  let claimRuntimeState: Record<string, unknown> | null = null;
+  let previousProgress: SyncRunProgress | null = null;
+  let leaseHeld = false;
+
+  if (ownerScoped) {
+    let claimed = await claimOwnerSyncLease(database, owner, runId, chunkIndex);
+    if (!claimed) {
+      const denyState = await selectOwnerRuntimeState(database, owner);
+      if (denyState) {
+        const outcome = classifySyncLeaseRead(denyState, runId, chunkIndex);
+        if (outcome.kind === 'completed') {
+          console.info('Security sync run already completed; delivery acknowledged', {
+            runId,
+            ownerId,
+            ownerType,
+            chunkIndex,
+          });
+          return createEmptySyncResult();
+        }
+        if (outcome.kind === 'stale_chunk' && outcome.holderRunId === null) {
+          // Only the vanish race reaches here: the holder released between the failed
+          // claim and this read, so no lease is visible and nothing else will
+          // terminalize or retry the command. A genuine same-run-stale classification
+          // always reports a non-null holder. Re-claim once and continue; if the retry
+          // misses too, throw so the bounded queue retry re-claims.
+          console.info('Security sync run claim denied', {
+            runId,
+            ownerId,
+            ownerType,
+            chunkIndex,
+            holderRunId: outcome.holderRunId,
+            holderChunkIndex: outcome.holderChunkIndex,
+            reason: 'stale_chunk',
+          });
+          claimed = await claimOwnerSyncLease(database, owner, runId, chunkIndex);
+          if (!claimed) {
+            throw new Error(
+              `Security sync run ${runId} lost its lease holder and could not re-claim`
+            );
+          }
+        } else if (outcome.kind === 'stale_chunk') {
+          console.info('Security sync run claim denied', {
+            runId,
+            ownerId,
+            ownerType,
+            chunkIndex,
+            holderRunId: outcome.holderRunId,
+            holderChunkIndex: outcome.holderChunkIndex,
+            reason: 'stale_chunk',
+          });
+          return {
+            ...createEmptySyncResult(),
+            staleChunk: true,
+            exhaustedBudget: false,
+            holderRunId: outcome.holderRunId,
+          };
+        } else {
+          console.info('Security sync run claim denied', {
+            runId,
+            ownerId,
+            ownerType,
+            chunkIndex,
+            holderRunId: outcome.holderRunId,
+            holderChunkIndex: outcome.holderChunkIndex,
+            reason: 'held_by_other',
+          });
+          return {
+            ...createEmptySyncResult(),
+            claimDenied: true,
+            exhaustedBudget: false,
+            holderRunId: outcome.holderRunId,
+            commandResultCode: 'SYNC_ALREADY_RUNNING',
+          };
+        }
+      }
+      // No config row exists; fall through so getOwnerConfig returns CONFIG_DISABLED.
+    }
+
+    if (claimed) {
+      leaseHeld = true;
+      claimRuntimeState = claimed.runtimeState;
+      if (readLastCompletedRunId(claimRuntimeState) === runId) {
+        await clearSyncRunProgress(database, owner, runId, chunkIndex);
+        await releaseOwnerSyncLeaseLogged(database, owner, runId, chunkIndex, 'completed');
+        console.info('Security sync run completed redelivery', { runId, ownerId, chunkIndex });
+        return createEmptySyncResult();
+      }
+      const parsedProgress = readSyncRunProgress(claimRuntimeState, runId);
+      const resumed =
+        parsedProgress !== null &&
+        (parsedProgress.completedRepos.length > 0 ||
+          parsedProgress.chunkIndex !== undefined ||
+          parsedProgress.noProgressChunks > 0);
+      previousProgress = resumed ? parsedProgress : null;
+      console.info('Security sync run claim acquired', {
+        runId,
+        ownerId,
+        ownerType,
+        chunkIndex,
+        resumed,
+      });
+      if (previousProgress) {
+        console.info('Resuming security sync owner run', {
+          runId,
+          storedRunId: previousProgress.runId,
+          chunkIndex,
+          ownerId,
+        });
+      } else {
+        console.info('Security sync resume miss', {
+          runId,
+          chunkIndex,
+          reason: parsedProgress === null ? 'schema_invalid' : 'no_checkpoint',
+        });
+      }
+    }
+  }
 
   const config = await getOwnerConfig(database, owner);
-  if (!config) {
-    console.info(`No enabled config for owner, skipping`, { runId, owner });
-    return { ...createEmptySyncResult(), commandResultCode: 'CONFIG_DISABLED' };
+  if (!config || 'unavailable' in config) {
+    const resultCode = config?.unavailable ?? 'CONFIG_DISABLED';
+    console.info('Skipping security sync before fetching', { runId, owner, resultCode });
+    if (leaseHeld) {
+      const teardown = await teardownOwnerLease(database, owner, runId, chunkIndex, 'abandoned');
+      if (teardown) return teardown;
+    }
+    return { ...createEmptySyncResult(), commandResultCode: resultCode };
   }
 
   const repositories = selectRepositoriesForSync(config, repoFullName);
@@ -1643,12 +2329,25 @@ export async function syncOwner(params: {
       repositoryCount: repositories.length,
       authInvalidAt: config.authInvalidAt,
     });
+    if (leaseHeld) {
+      const teardown = await teardownOwnerLease(database, owner, runId, chunkIndex, 'abandoned');
+      if (teardown) return teardown;
+    }
     return createAuthInvalidSyncResult(repositories);
   }
 
+  const completedRepos = new Set(previousProgress?.completedRepos ?? []);
+  const remainingRepositories = repositories.filter(name => !completedRepos.has(name));
   const totalResult = createEmptySyncResult();
+  if (previousProgress) {
+    applySyncRunProgress(totalResult, previousProgress);
+  }
   let firstError: Error | null = null;
   let successfulRepos = 0;
+  let processedThisPass = 0;
+  let incompleteFailures = 0;
+  let exhaustedBudget = false;
+  let nextRepo: string | null = null;
   const notificationPolicy = params.notificationMaterializationEnabled
     ? config.notificationPolicy
     : null;
@@ -1656,16 +2355,40 @@ export async function syncOwner(params: {
     ? await resolveNotificationRecipientUserIds(database, owner)
     : [];
 
-  for (const repoFullName of repositories) {
+  for (const selectedRepoFullName of remainingRepositories) {
+    if (
+      processedThisPass > 0 &&
+      params.budgetMs !== undefined &&
+      Date.now() - startTime >= params.budgetMs
+    ) {
+      exhaustedBudget = true;
+      nextRepo = selectedRepoFullName;
+      break;
+    }
+
+    const remainingBudgetMs =
+      params.budgetMs === undefined
+        ? null
+        : Math.max(0, params.budgetMs - (Date.now() - startTime));
+    const repoStartedAt = Date.now();
+    let outcome: 'synced' | 'skipped' | 'auth_invalid' | 'stale' | 'error' = 'synced';
+    console.info('Security sync repo started', {
+      runId,
+      repoFullName: selectedRepoFullName,
+      remainingBudgetMs,
+      chunkIndex,
+    });
+
     try {
       const repoResult = await syncRepo({
         db: database,
         gitTokenService,
         installationId: config.installationId,
+        githubAppType: config.githubAppType,
         owner,
         runId,
         platformIntegrationId: config.platformIntegrationId,
-        repoFullName,
+        repoFullName: selectedRepoFullName,
         slaConfig: config.slaConfig,
         notificationPolicy,
         notificationRecipientUserIds,
@@ -1679,27 +2402,161 @@ export async function syncOwner(params: {
       totalResult.reauthRequired = totalResult.reauthRequired || repoResult.reauthRequired;
       totalResult.staleRepos.push(...repoResult.staleRepos);
       successfulRepos++;
+      completedRepos.add(selectedRepoFullName);
+      processedThisPass++;
+
+      if (repoResult.authInvalid > 0 || repoResult.authInvalidRepos.length > 0) {
+        outcome = 'auth_invalid';
+      } else if (repoResult.staleRepos.length > 0) {
+        outcome = 'stale';
+      } else if (repoResult.skipped > 0) {
+        outcome = 'skipped';
+      }
 
       if (repoResult.reauthRequired) {
         break;
       }
     } catch (error) {
-      totalResult.errors++;
+      outcome = 'error';
+      incompleteFailures++;
       await recordSecurityAgentRepositorySyncFailure(database, {
         owner: toSecurityAgentCommandOwner(owner),
-        repoFullName,
+        repoFullName: selectedRepoFullName,
         failureCode: 'SYNC_FAILED',
       });
-      console.error(`Failed to sync ${repoFullName}`, {
+      console.error(`Failed to sync ${selectedRepoFullName}`, {
         error: error instanceof Error ? error.message : String(error),
       });
       if (!firstError && error instanceof Error) {
         firstError = error;
       }
+      processedThisPass++;
+    } finally {
+      console.info('Security sync repo finished', {
+        runId,
+        repoFullName: selectedRepoFullName,
+        durationMs: Date.now() - repoStartedAt,
+        outcome,
+        remainingBudgetMs,
+        chunkIndex,
+      });
     }
   }
 
-  if (successfulRepos === 0 && firstError) {
+  const remainingRepoCount = repositories.filter(name => !completedRepos.has(name)).length;
+  if (exhaustedBudget && remainingRepoCount > 0 && !totalResult.reauthRequired) {
+    const admission = previousProgress?.noProgressChunks ?? 0;
+    const noProgressChunks = successfulRepos > 0 ? 0 : admission + 1;
+    const stoppedForNoProgress = noProgressChunks >= SECURITY_SYNC_NO_PROGRESS_CHUNK_LIMIT;
+
+    if (!stoppedForNoProgress) {
+      console.info('Security sync owner budget exhausted; continuation required', {
+        runId,
+        completedRepoCount: completedRepos.size,
+        remainingRepoCount,
+        durationMs: Date.now() - startTime,
+        budgetMs: params.budgetMs ?? null,
+        remainingBudgetMs:
+          params.budgetMs === undefined
+            ? null
+            : Math.max(0, params.budgetMs - (Date.now() - startTime)),
+        lastCompletedRepo: [...completedRepos].at(-1) ?? null,
+        nextRepo,
+        chunkIndex,
+        noProgressChunks,
+        stoppedForNoProgress,
+      });
+    }
+
+    if (stoppedForNoProgress) {
+      const cleared = await clearSyncRunProgress(database, owner, runId, chunkIndex);
+      if (cleared.cleared) {
+        await releaseOwnerSyncLeaseLogged(database, owner, runId, chunkIndex, 'no_progress');
+        console.info('Security sync no progress; run stopped', {
+          runId,
+          chunkIndex,
+          noProgressChunks,
+          completedRepoCount: completedRepos.size,
+          stoppedForNoProgress,
+        });
+        return {
+          ...totalResult,
+          noProgress: true,
+          exhaustedBudget: false,
+          commandResultCode: 'SYNC_NO_PROGRESS',
+          remainingRepoCount,
+        };
+      }
+      const miss = await classifyOwnerMutationMiss(database, owner, runId, chunkIndex);
+      if (miss?.kind === 'stale_chunk') {
+        console.info('Security sync checkpoint clear rejected', {
+          runId,
+          chunkIndex,
+          reason: 'stale_chunk',
+        });
+      } else if (miss?.kind !== 'completed') {
+        console.info('Security sync checkpoint clear rejected', {
+          runId,
+          chunkIndex,
+          reason: 'superseded',
+        });
+      }
+      const reaction = reactToOwnerMutationMiss(
+        miss,
+        { ...totalResult, remainingRepoCount },
+        { releaseOnSuperseded: false }
+      );
+      if (reaction.release) {
+        await releaseOwnerSyncLeaseLogged(database, owner, runId, chunkIndex, 'completed');
+      }
+      return reaction.result;
+    }
+
+    const written = await writeSyncRunProgress(
+      database,
+      owner,
+      toSyncRunProgress(runId, totalResult, [...completedRepos], chunkIndex, noProgressChunks)
+    );
+    if (!written.written) {
+      const miss = await classifyOwnerMutationMiss(database, owner, runId, chunkIndex);
+      if (miss?.kind === 'stale_chunk') {
+        console.info('Security sync checkpoint write rejected', {
+          runId,
+          chunkIndex,
+          completedRepoCount: completedRepos.size,
+          reason: 'stale_chunk',
+        });
+      } else if (miss?.kind !== 'completed') {
+        console.info('Security sync checkpoint write rejected', {
+          runId,
+          chunkIndex,
+          completedRepoCount: completedRepos.size,
+          reason: 'superseded',
+        });
+      }
+      const reaction = reactToOwnerMutationMiss(
+        miss,
+        { ...totalResult, remainingRepoCount },
+        { releaseOnSuperseded: false }
+      );
+      if (reaction.release) {
+        await releaseOwnerSyncLeaseLogged(database, owner, runId, chunkIndex, 'completed');
+      }
+      return reaction.result;
+    }
+    console.info('Security sync checkpoint write accepted', {
+      runId,
+      chunkIndex,
+      completedRepoCount: completedRepos.size,
+      remainingRepoCount,
+      noProgressChunks,
+    });
+    return { ...totalResult, exhaustedBudget: true, remainingRepoCount };
+  }
+
+  totalResult.errors += incompleteFailures;
+
+  if (successfulRepos === 0 && firstError && !previousProgress) {
     throw firstError;
   }
 
@@ -1729,8 +2586,6 @@ export async function syncOwner(params: {
   }
 
   // Write audit log
-  const ownerId =
-    'organizationId' in owner ? (owner.organizationId ?? 'unknown') : (owner.userId ?? 'unknown');
   try {
     await writeAuditLog(database, {
       owner,
@@ -1763,35 +2618,52 @@ export async function syncOwner(params: {
   // repo-level setting, and blocking here would leave the timestamp stuck.
   // Missing selected repos (installation lost access) also block — the repo
   // was configured but silently dropped from the accessible list.
-  if (
-    !repoFullName &&
+  const shouldAdvanceFreshness =
+    ownerScoped &&
     totalResult.errors === 0 &&
     totalResult.authInvalid === 0 &&
     totalResult.staleRepos.length === 0 &&
-    config.missingSelectedRepoCount === 0
-  ) {
-    try {
-      await database
-        .update(agent_configs)
-        .set({
-          runtime_state: sql`jsonb_set(
-            COALESCE(${agent_configs.runtime_state}, '{}'::jsonb),
-            '{last_synced_at}',
-            to_jsonb(now())
-          )`,
-        })
-        .where(
-          and(
-            eq(agent_configs.agent_type, 'security_scan'),
-            eq(agent_configs.platform, 'github'),
-            ownerFilter(owner)
-          )
+    config.missingSelectedRepoCount === 0;
+  if (shouldAdvanceFreshness) {
+    const advanced = await advanceOwnerSyncFreshness(database, owner, runId, chunkIndex);
+    if (advanced.advanced) {
+      await releaseOwnerSyncLeaseLogged(database, owner, runId, chunkIndex, 'completed');
+    } else {
+      const miss = await classifyOwnerMutationMiss(database, owner, runId, chunkIndex);
+      if (miss?.kind === 'stale_chunk') {
+        console.info('Security sync freshness update rejected', {
+          runId,
+          chunkIndex,
+          completedRepoCount: completedRepos.size,
+          reason: 'stale_chunk',
+        });
+      } else if (miss?.kind !== 'completed') {
+        console.info('Security sync freshness update rejected', {
+          runId,
+          chunkIndex,
+          completedRepoCount: completedRepos.size,
+          reason: 'superseded',
+        });
+      }
+      const reaction = reactToOwnerMutationMiss(
+        miss,
+        { ...totalResult, remainingRepoCount: 0 },
+        { releaseOnSuperseded: true }
+      );
+      if (reaction.release) {
+        await releaseOwnerSyncLeaseLogged(
+          database,
+          owner,
+          runId,
+          chunkIndex,
+          miss?.kind === 'completed' ? 'completed' : 'abandoned'
         );
-    } catch (error) {
-      console.error('Failed to update last_synced_at in runtime_state', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      }
+      return reaction.result;
     }
+  } else if (leaseHeld) {
+    const teardown = await teardownOwnerLease(database, owner, runId, chunkIndex, 'incomplete');
+    if (teardown) return teardown;
   }
 
   const syncSummary = {
@@ -1819,13 +2691,14 @@ export async function syncOwner(params: {
     console.info('Sync cycle summary', syncSummary);
   }
 
-  return totalResult;
+  return { ...totalResult, remainingRepoCount: 0 };
 }
 
 async function syncRepo(params: {
   db: WorkerDb;
   gitTokenService: GitTokenService;
   installationId: string;
+  githubAppType: 'standard' | 'lite';
   owner: SecurityReviewOwner;
   runId: string;
   platformIntegrationId: string;
@@ -1839,6 +2712,7 @@ async function syncRepo(params: {
     db: database,
     gitTokenService,
     installationId,
+    githubAppType,
     owner,
     runId,
     platformIntegrationId,
@@ -1849,7 +2723,12 @@ async function syncRepo(params: {
   } = params;
   const commandOwner = toSecurityAgentCommandOwner(owner);
   await recordSecurityAgentRepositorySyncAttempt(database, { owner: commandOwner, repoFullName });
-  const token = await gitTokenService.getToken(installationId);
+  const token = await gitTokenService.getToken(
+    installationId,
+    githubAppType,
+    platformIntegrationId,
+    true
+  );
   const result = createEmptySyncResult();
 
   const [repoOwner, repoName] = repoFullName.split('/');
@@ -1886,7 +2765,12 @@ async function syncRepo(params: {
   }
 
   if (fetchResult.status === 'alerts_disabled') {
-    console.info(`Dependabot alerts disabled for ${repoFullName}, skipping`);
+    console.info(`Dependabot alerts disabled for ${repoFullName}, skipping`, {
+      runId,
+      repoFullName,
+      httpStatus: fetchResult.httpStatus,
+      bodyExcerpt: fetchResult.bodyExcerpt,
+    });
     result.skipped = 1;
     await recordSecurityAgentRepositorySyncFailure(database, {
       owner: commandOwner,

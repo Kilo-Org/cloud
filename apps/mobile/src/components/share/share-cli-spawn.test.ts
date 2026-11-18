@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
 import {
-  REMOTE_SPAWN_NON_RETRYABLE_TOAST,
-  REMOTE_SPAWN_RETRYABLE_TOAST,
+  remoteSpawnNonRetryableToast,
+  remoteSpawnRetryableToast,
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
 
@@ -21,6 +21,9 @@ function instance(
   return {
     name: 'laptop',
     projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
     ...overrides,
   };
 }
@@ -31,7 +34,10 @@ const ROWS: readonly ShareCliSpawnRow[] = [
     connectionId: 'conn-2',
     name: 'Studio',
     projectName: 'mobile',
-    capabilities: { attachments: true },
+    kind: 'remote',
+    startedAt: '2026-08-28T19:30:00.123Z',
+    gitBranch: 'feature/share',
+    capabilities: { attachments: true, sessionClone: true },
   }),
 ];
 
@@ -172,7 +178,7 @@ describe('spawn outcome → action mapping (resolveRemoteSubmitOutcome)', () => 
     });
     expect(action).toMatchObject({
       kind: 'retryable',
-      toast: REMOTE_SPAWN_RETRYABLE_TOAST,
+      toast: remoteSpawnRetryableToast(),
       shouldRefetchInstances: true,
     });
   });
@@ -184,7 +190,7 @@ describe('spawn outcome → action mapping (resolveRemoteSubmitOutcome)', () => 
         refetchedInstances: [],
         selectedConnectionId: CONNECTION_ID,
       })
-    ).toEqual({ kind: 'nonRetryable', toast: REMOTE_SPAWN_NON_RETRYABLE_TOAST });
+    ).toEqual({ kind: 'nonRetryable', toast: remoteSpawnNonRetryableToast() });
   });
 });
 

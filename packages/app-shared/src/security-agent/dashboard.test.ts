@@ -9,11 +9,13 @@ function makeStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
       bySeverity: {
         critical: { overdue: 1 },
         high: { overdue: 1 },
+        medium: { overdue: 1 },
+        low: { overdue: 0 },
       },
       dueSoon: { total: 4, exploitable: 2 },
       untrackedCount: 5,
     },
-    severity: { critical: 2, high: 3 },
+    severity: { critical: 2, high: 3, medium: 1, low: 0 },
     analysis: {
       total: 10,
       exploitable: 2,
@@ -36,7 +38,7 @@ describe('buildSecurityDashboardMetrics', () => {
         id: 'openFindings',
         label: 'Open findings',
         value: '10',
-        detail: '2 critical, 3 high',
+        detail: '2 critical, 3 high, 1 medium & low',
         tone: 'danger',
       },
       {
@@ -80,7 +82,7 @@ describe('buildSecurityDashboardMetrics', () => {
         id: 'deadlinePassed',
         label: 'Deadline passed',
         value: '3',
-        detail: '1 critical, 1 high',
+        detail: '1 critical, 1 high, 1 medium & low',
         tone: 'danger',
       },
       {
@@ -100,6 +102,29 @@ describe('buildSecurityDashboardMetrics', () => {
     ]);
   });
 
+  it('omits the medium & low bucket while no medium or low finding is counted', () => {
+    const data = makeStats({
+      severity: { critical: 2, high: 3, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 10, withinSla: 7, overdue: 2 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 1 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 4, exploitable: 2 },
+        untrackedCount: 5,
+      },
+    });
+
+    const [openFindings] = buildSecurityDashboardMetrics(data, false);
+    const deadlinePassed = buildSecurityDashboardMetrics(data, true)[1];
+
+    expect(openFindings?.detail).toBe('2 critical, 3 high');
+    expect(deadlinePassed?.detail).toBe('1 critical, 1 high');
+  });
+
   it('reports "Not measured" instead of dividing by zero when there are no SLA-tracked findings', () => {
     const data = makeStats({
       sla: {
@@ -107,6 +132,8 @@ describe('buildSecurityDashboardMetrics', () => {
         bySeverity: {
           critical: { overdue: 0 },
           high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
         },
         dueSoon: { total: 0, exploitable: 0 },
         untrackedCount: 0,

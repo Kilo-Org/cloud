@@ -1,11 +1,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserFromAuth } from '@/lib/user/server';
-import { APP_URL } from '@/lib/constants';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
+import { requireOrganizationKiloClawComputeEntitlement } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import {
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   let organizationId: string | undefined;
 
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL('/claw/settings?error=invalid_organization', APP_URL));
       }
       organizationId = parsedOrgId.data;
-      await ensureOrganizationAccess({ user }, organizationId);
+      await ensureOrganizationAccess({ user, tokenSource }, organizationId);
       await requireOrganizationKiloClawComputeEntitlement(organizationId);
     } else {
       await requireKiloClawAccess(user.id);

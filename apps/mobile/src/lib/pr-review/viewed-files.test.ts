@@ -26,6 +26,8 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
+  ACTIVE_USER_ID_KEY: 'active-user-id',
+  ORGANIZATION_STORAGE_KEY: 'organization',
   PR_REVIEW_VIEWED_KEY: 'pr-review-viewed',
 }));
 
@@ -87,7 +89,7 @@ describe('viewed-files', () => {
   it('caps the map at 20 PRs, evicting the least-recently-touched', async () => {
     const seed: Record<string, { headSha: string; viewedPaths: string[] }> = {};
     for (let index = 0; index < 20; index += 1) {
-      seed[`octocat/repo-${index}#1`] = { headSha: SHA1, viewedPaths: [] };
+      seed[`octocat/repo-${index}#1`] = { headSha: SHA1, viewedPaths: [`kept-${index}.ts`] };
     }
     setStored(seed);
     await toggleViewedFile({
@@ -102,14 +104,21 @@ describe('viewed-files', () => {
     await expect(
       getViewedFiles({ owner: 'octocat', repo: 'brand-new-repo', number: 1 }, SHA1)
     ).resolves.toEqual(['a.ts']);
-    // The oldest (repo-0) was evicted; reading it yields an empty list.
+    // The oldest (repo-0) was evicted; its set is gone, not just emptied.
     await expect(
       getViewedFiles({ owner: 'octocat', repo: 'repo-0', number: 1 }, SHA1)
     ).resolves.toEqual([]);
-    // The most-recently-touched original (repo-19) is still present.
+    // The most-recently-touched original survives WITH its own set — an
+    // empty-seed eviction would make this assertion pass vacuously.
     await expect(
       getViewedFiles({ owner: 'octocat', repo: 'repo-19', number: 1 }, SHA1)
-    ).resolves.toEqual([]);
+    ).resolves.toEqual(['kept-19.ts']);
+    // The stored map itself holds exactly the cap: 20 entries after the
+    // 21st toggle, not 19 survivors plus the newcomer.
+    const stored = JSON.parse(store.get('pr-review-viewed') ?? '{}') as Record<string, unknown>;
+    expect(Object.keys(stored)).toHaveLength(20);
+    expect(stored['octocat/repo-0#1']).toBeUndefined();
+    expect(stored['octocat/repo-19#1']).toEqual({ headSha: SHA1, viewedPaths: ['kept-19.ts'] });
   });
 
   it('treats corrupt stored data as an empty map', async () => {
@@ -148,6 +157,33 @@ describe('viewed-files', () => {
     expect(store.has('pr-review-viewed')).toBe(false);
   });
 
+  it('leaves the stored viewed set intact when the read for a toggle fails', async () => {
+    setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
+    // The toggle stays total and aborts: persisting a map derived from the
+    // unreadable record would have wiped the stored set.
+    await expect(
+      toggleViewedFile({ ...REF, headSha: SHA1, path: 'b.ts' })
+    ).resolves.toBeUndefined();
+
+    expect(JSON.parse(store.get('pr-review-viewed') ?? '{}')).toEqual({
+      'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] },
+    });
+  });
+
+  it('retries a failed read on the next toggle instead of caching an empty map', async () => {
+    setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
+    await toggleViewedFile({ ...REF, headSha: SHA1, path: 'b.ts' });
+
+    // The failed read left the cache empty, so the next toggle re-reads and
+    // builds on the stored set rather than on an empty one.
+    await toggleViewedFile({ ...REF, headSha: SHA1, path: 'b.ts' });
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['a.ts', 'b.ts']);
+  });
+
   it('caches the map so a second read after a toggle does not re-read the store', async () => {
     setStored({});
     await toggleViewedFile({ ...REF, headSha: SHA1, path: 'src/index.ts' });
@@ -169,6 +205,71 @@ describe('viewed-files', () => {
     const callsBefore = getItemMock.mock.calls.length;
     await expect(getViewedFiles(REF, SHA1)).resolves.toEqual([]);
     expect(getItemMock.mock.calls.length).toBe(callsBefore);
+  });
+
+  // s6 (identity rule 17): a provider ref folds the s1 collision-free key
+  // into the storage key, while the legacy GitHub bytes never change.
+  describe('provider refs', () => {
+    const GITLAB_A = {
+      platform: 'gitlab' as const,
+      projectPath: 'group/app',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.example.com',
+    };
+    const GITLAB_B = {
+      platform: 'gitlab' as const,
+      projectPath: 'group/app',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.com',
+    };
+
+    it('keeps a github ProviderPrRef byte-identical to the legacy triple (migration)', async () => {
+      setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+      await expect(
+        getViewedFiles(
+          { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 42 },
+          SHA1
+        )
+      ).resolves.toEqual(['a.ts']);
+
+      await toggleViewedFile({
+        platform: 'github',
+        owner: 'octocat',
+        repo: 'hello-world',
+        number: 42,
+        headSha: SHA1,
+        path: 'b.ts',
+      });
+      // The write landed on the SAME legacy key, not a suffixed one.
+      const written: Record<string, unknown> = JSON.parse(store.get('pr-review-viewed') ?? '{}');
+      expect(Object.keys(written)).toEqual(['octocat/hello-world#42']);
+    });
+
+    it('separates one GitLab project on two instances', async () => {
+      await toggleViewedFile({ ...GITLAB_A, headSha: SHA1, path: 'a.ts' });
+      await expect(getViewedFiles(GITLAB_A, SHA1)).resolves.toEqual(['a.ts']);
+      await expect(getViewedFiles(GITLAB_B, SHA1)).resolves.toEqual([]);
+    });
+
+    it('separates a GitLab MR from a same-triple GitHub PR', async () => {
+      await toggleViewedFile({ ...GITLAB_A, headSha: SHA1, path: 'a.ts' });
+      await expect(
+        getViewedFiles({ owner: 'group', repo: 'app', number: 7 }, SHA1)
+      ).resolves.toEqual([]);
+    });
+
+    it('separates same-numbered Bitbucket PRs across workspaces', async () => {
+      const one = { platform: 'bitbucket' as const, workspace: 'acme', repoSlug: 'app', prId: 7 };
+      const other = {
+        platform: 'bitbucket' as const,
+        workspace: 'other',
+        repoSlug: 'app',
+        prId: 7,
+      };
+      await toggleViewedFile({ ...one, headSha: SHA1, path: 'a.ts' });
+      await expect(getViewedFiles(one, SHA1)).resolves.toEqual(['a.ts']);
+      await expect(getViewedFiles(other, SHA1)).resolves.toEqual([]);
+    });
   });
 
   it('a concurrent read during clear never returns the prior paths', async () => {

@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { bulkBlockUsers, type BulkBlockResponse } from '@/lib/abuse/bulkBlock';
 
 const schema = z.object({
@@ -15,7 +15,8 @@ export async function POST(
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const parsed = schema.safeParse(await request.json());
+  const body: unknown = await request.json().catch(() => undefined);
+  const parsed = schema.safeParse(body);
   if (!parsed.success)
     return NextResponse.json(
       {

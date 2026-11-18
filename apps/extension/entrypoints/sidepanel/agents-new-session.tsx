@@ -27,23 +27,27 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import type { CreateRemoteSessionInput } from '@kilocode/cloud-agent-sdk';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
+import { CONVERSATION_CREATED_EVENT, captureEvent } from '@/src/shared/analytics';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
+import { getDefaultGatewayModelId } from '@/src/shared/default-gateway-model';
 import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
 import { isGatewayModelId } from '@/src/shared/model-picker-rows';
-import { getModelPreferencesQueryKey } from '@/src/shared/side-panel-query-options';
+import {
+  activeSessionsQueryKey,
+  cliInstancesQueryKey,
+  getModelPreferencesQueryKey,
+  sessionHistoryQueryKey,
+  sessionRepositoriesQueryKey,
+} from '@/src/shared/side-panel-query-options';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { useExtensionAgents } from './agents-provider';
-import { activeSessionsQueryKey, sessionHistoryQueryKey } from './agents-session-list';
 import { ModelPicker } from './model-picker';
 import { useGatewayModels } from './use-gateway-models';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const PROMPT_MIN_LENGTH = 3;
-const PROMPT_MAX_LENGTH = 4000;
+const PROMPT_MAX_LENGTH = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 const MODE = 'code' as const;
 
 /**
@@ -62,10 +66,6 @@ const CLI_DEFAULT_MODEL_OPTION: KiloGatewayModelOption = {
 export { PROMPT_MAX_LENGTH, PROMPT_MIN_LENGTH, MODE };
 // Exported for focused test coverage.
 
-// ---------------------------------------------------------------------------
-// Stored Auth hook
-// ---------------------------------------------------------------------------
-
 const storedAuthQueryKey = ['side-panel', 'stored-auth'] as const;
 
 const useStoredAuth = () => {
@@ -78,10 +78,6 @@ const useStoredAuth = () => {
 
   return { auth: query.data ?? undefined, isLoading: query.isLoading };
 };
-
-// ---------------------------------------------------------------------------
-// Pure helpers
-// ---------------------------------------------------------------------------
 
 interface RepoOption {
   readonly id: number;
@@ -172,31 +168,38 @@ export const buildCreateRemoteSessionInput = ({
  * reason is a dead end — most often no GitHub integration, so a cloud session
  * can never get a repository.
  */
+export type SubmitBlocker =
+  | 'connect-github'
+  | 'no-repos'
+  | 'repos-unavailable'
+  | 'pick-repo'
+  | 'no-models';
+
 export const submitBlockedReason = ({
   hasModels,
   integrationInstalled,
   isCloudTarget,
-  isLoading,
-  isPromptValid,
+  isModelsLoading,
   repoCount,
+  repoStatus,
   selectedRepo,
 }: {
   hasModels: boolean;
   integrationInstalled: boolean;
   isCloudTarget: boolean;
-  /** Repositories or models still in flight; an empty list means nothing yet. */
-  isLoading: boolean;
-  isPromptValid: boolean;
+  isModelsLoading: boolean;
   repoCount: number;
+  repoStatus: 'loading' | 'error' | 'ready';
   selectedRepo: string;
-}): 'connect-github' | 'no-repos' | 'pick-repo' | 'no-models' | null => {
-  if (!isPromptValid || !isCloudTarget) {
-    // The textarea already reports a short prompt; a CLI target needs nothing else.
+}): SubmitBlocker | null => {
+  if (!isCloudTarget) {
     return null;
   }
-  if (isLoading) {
-    // Naming a blocker mid-load would name the wrong one.
+  if (repoStatus === 'loading' || isModelsLoading) {
     return null;
+  }
+  if (repoStatus === 'error') {
+    return 'repos-unavailable';
   }
   if (!integrationInstalled) {
     return 'connect-github';
@@ -225,10 +228,6 @@ const isModelPreferencesGetResult = (
 export { isModelPreferencesGetResult };
 // Exported for focused test coverage.
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 // eslint-disable-next-line max-lines -- Cohesive single-purpose new-session form; splitting would scatter form state
 export const AgentsNewSession = ({
   onCreated,
@@ -237,13 +236,11 @@ export const AgentsNewSession = ({
   onCreated: (kiloSessionId: string, initialPrompt?: string) => void;
   onCancel: () => void;
 }): JSX.Element => {
-  const { organizationId, trpcClient, userWebConnection } = useExtensionAgents();
+  const { manager, organizationId, token, trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
 
-  // ---- Auth (for gateway models) ----
   const { auth, isLoading: isAuthLoading } = useStoredAuth();
 
-  // ---- Models ----
   const {
     isLoading: isModelsLoading,
     modelLoadError,
@@ -254,7 +251,6 @@ export const AgentsNewSession = ({
     organizationId: organizationId ?? undefined,
   });
 
-  // ---- Model preferences (lastSelected) ----
   // Same key and fetcher as the embedded ModelPicker's `useModelPreferences`,
   // So favorites and lastSelected arrive on one request.
   const { data: modelPrefsData } = useQuery({
@@ -286,7 +282,6 @@ export const AgentsNewSession = ({
       trpcClient.modelPreferences.setLastSelected.mutate(input as never),
   });
 
-  // ---- Repos ----
   const {
     data: repoData,
     isLoading: isRepoLoading,
@@ -306,7 +301,7 @@ export const AgentsNewSession = ({
             forceRefresh: false,
             organizationId,
           } as never),
-    queryKey: ['agents-new-session', 'repos', organizationId],
+    queryKey: sessionRepositoriesQueryKey({ organizationId, token }),
     retry: 2,
   });
 
@@ -320,17 +315,15 @@ export const AgentsNewSession = ({
     return raw?.integrationInstalled ?? true;
   }, [repoData]);
 
-  // ---- Connected CLI instances (spawn targets) ----
   // A failed query degrades to cloud-only; the form never blocks on this.
   const { data: instancesData } = useQuery({
     enabled: auth !== undefined && auth.token !== '',
     queryFn: () => trpcClient.activeSessions.listInstances.query(),
-    queryKey: ['agents-new-session', 'instances'],
+    queryKey: cliInstancesQueryKey({ token }),
     retry: 1,
   });
   const instances = useMemo(() => instancesData?.instances ?? [], [instancesData]);
 
-  // ---- Form state ----
   const [prompt, setPrompt] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
@@ -348,6 +341,7 @@ export const AgentsNewSession = ({
   const [repoSearch, setRepoSearch] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const repoDropdownRef = useRef<HTMLDivElement>(null);
+  const repoButtonRef = useRef<HTMLButtonElement>(null);
 
   const isCloudTarget = runTarget === 'cloud';
   const selectedInstance = useMemo(
@@ -362,7 +356,6 @@ export const AgentsNewSession = ({
     }
   }, [isCloudTarget, selectedInstance]);
 
-  // ---- Close the repo dropdown on outside click ----
   useEffect(() => {
     const handler = (evt: MouseEvent): void => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- browser DOM event target
@@ -377,7 +370,27 @@ export const AgentsNewSession = ({
     };
   }, []);
 
-  // ---- Auto-select model from lastSelected, then first available ----
+  useEffect(() => {
+    if (!repoDropdownOpen) {
+      return;
+    }
+    const handler = (evt: KeyboardEvent): void => {
+      if (evt.key !== 'Escape') {
+        return;
+      }
+      // The open popover owns Escape; closing the whole form would lose the draft.
+      evt.preventDefault();
+      evt.stopPropagation();
+      setRepoDropdownOpen(false);
+      setRepoSearch('');
+      repoButtonRef.current?.focus();
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => {
+      document.removeEventListener('keydown', handler, true);
+    };
+  }, [repoDropdownOpen]);
+
   useEffect(() => {
     if (isModelUserSelected || modelOptions.length === 0) {
       return;
@@ -396,12 +409,11 @@ export const AgentsNewSession = ({
       }
     }
 
-    // Fallback: first model in loaded list (index 0)
-    setSelectedModel(modelOptions[0]?.id ?? '');
+    // Fallback: the shared Auto/recommended default, never the catalogue's first row.
+    setSelectedModel(getDefaultGatewayModelId(modelOptions) ?? '');
     setSelectedVariant('');
   }, [modelOptions, lastSelected, isModelUserSelected]);
 
-  // ---- Auto-select repo: if only one, use it ----
   useEffect(() => {
     if (selectedRepo || repos.length !== 1) {
       return;
@@ -409,7 +421,6 @@ export const AgentsNewSession = ({
     setSelectedRepo(repos[0]?.fullName ?? '');
   }, [repos, selectedRepo]);
 
-  // ---- Picker values per run target ----
   const pickerModelOptions = useMemo(
     () => (isCloudTarget ? modelOptions : [CLI_DEFAULT_MODEL_OPTION, ...modelOptions]),
     [isCloudTarget, modelOptions]
@@ -417,14 +428,12 @@ export const AgentsNewSession = ({
   const pickerModel = isCloudTarget ? selectedModel : cliModel;
   const pickerVariant = isCloudTarget ? selectedVariant : cliVariant;
 
-  // ---- Variants for current model ----
   const selectedModelOption = useMemo(
     () => modelOptions.find(opt => opt.id === pickerModel),
     [modelOptions, pickerModel]
   );
   const availableVariants = selectedModelOption?.variants ?? [];
 
-  // ---- Derived state ----
   const trimmed = trimValue(prompt);
   const isPromptValid = trimmed.length >= PROMPT_MIN_LENGTH && trimmed.length <= PROMPT_MAX_LENGTH;
   /* A CLI instance inherits the repo from the CLI and defaults to its own
@@ -459,15 +468,14 @@ export const AgentsNewSession = ({
     hasModels: modelOptions.length > 0,
     integrationInstalled,
     isCloudTarget,
-    isLoading: isRepoLoading || isModelsLoading,
-    isPromptValid,
+    isModelsLoading,
     repoCount: repos.length,
+    repoStatus,
     selectedRepo,
   });
 
   const isCreditsError = submitError?.toLowerCase().includes('insufficient credits') ?? false;
 
-  // ---- Handlers ----
   const handleModelSelect = useCallback(
     (modelId: string) => {
       if (isCloudTarget) {
@@ -508,7 +516,6 @@ export const AgentsNewSession = ({
     setSubmitError(null);
     setIsSubmitting(true);
 
-    // ---- CLI instance target: spawn over the user-web socket ----
     if (!isCloudTarget) {
       try {
         const raw = await createRemoteSessionOnConnection(
@@ -527,9 +534,11 @@ export const AgentsNewSession = ({
           return;
         }
         void queryClient.invalidateQueries({
-          queryKey: activeSessionsQueryKey(organizationId),
+          queryKey: activeSessionsQueryKey({ organizationId, token }),
         });
+        captureEvent(CONVERSATION_CREATED_EVENT, { mode: 'agents' });
         setIsSubmitting(false);
+        manager.noteSpawnedSession(parsed.kiloSessionId);
         onCreated(parsed.kiloSessionId, trimmed);
       } catch (error) {
         setSubmitError(error instanceof Error ? error.message : 'Failed to start the session.');
@@ -571,12 +580,13 @@ export const AgentsNewSession = ({
 
       // Invalidate pinned session list keys
       void queryClient.invalidateQueries({
-        queryKey: activeSessionsQueryKey(organizationId),
+        queryKey: activeSessionsQueryKey({ organizationId, token }),
       });
       void queryClient.invalidateQueries({
-        queryKey: sessionHistoryQueryKey(organizationId),
+        queryKey: sessionHistoryQueryKey({ organizationId, token }),
       });
 
+      captureEvent(CONVERSATION_CREATED_EVENT, { mode: 'agents' });
       setIsSubmitting(false);
       onCreated(kiloSessionId);
     } catch (error) {
@@ -597,12 +607,13 @@ export const AgentsNewSession = ({
     selectedVariant,
     selectedRepo,
     organizationId,
+    token,
     trpcClient,
     queryClient,
     onCreated,
+    manager,
   ]);
 
-  // ---- Credits CTA URL ----
   const creditsUrl = useMemo(() => {
     const base = getKiloApiBaseUrl().replace(/\/+$/, '');
     return organizationId === null
@@ -610,10 +621,8 @@ export const AgentsNewSession = ({
       : `${base}/organizations/${encodeURIComponent(organizationId)}`;
   }, [organizationId]);
 
-  // ---- isSubmitting error display ----
   const displayError: string | null = submitError;
 
-  // ---- Textarea auto-resize ----
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) {
@@ -648,7 +657,29 @@ export const AgentsNewSession = ({
     [isFormValid, handleSubmit]
   );
 
-  // ---- Render: loading auth ----
+  /* Escape leaves the form exactly like the Back arrow. A dialog or a native
+     select closes itself first, and the repository popover stops the event in
+     the capture phase. */
+  useEffect(() => {
+    const handler = (evt: KeyboardEvent): void => {
+      if (evt.key !== 'Escape' || evt.defaultPrevented) {
+        return;
+      }
+      const { target } = evt;
+      if (target instanceof Element && target.closest('[role="dialog"]') !== null) {
+        return;
+      }
+      if (target instanceof HTMLSelectElement) {
+        return;
+      }
+      onCancel();
+    };
+    document.addEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+    };
+  }, [onCancel]);
+
   if (isAuthLoading) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-6">
@@ -657,7 +688,6 @@ export const AgentsNewSession = ({
     );
   }
 
-  // ---- Render ----
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       {/* Header */}
@@ -726,6 +756,22 @@ export const AgentsNewSession = ({
           {prompt.length > 0 && prompt.length < PROMPT_MIN_LENGTH ? (
             <p className="mt-1 type-label text-foreground-muted">
               Enter at least {PROMPT_MIN_LENGTH} characters
+            </p>
+          ) : null}
+          {prompt.length >= PROMPT_MAX_LENGTH * 0.9 ? (
+            <p
+              aria-live="polite"
+              className={`mt-1 type-label ${
+                prompt.length >= PROMPT_MAX_LENGTH
+                  ? 'text-status-yellow-300'
+                  : 'text-foreground-muted'
+              }`}
+            >
+              {prompt.length.toLocaleString('en-US')} / {PROMPT_MAX_LENGTH.toLocaleString('en-US')}{' '}
+              characters
+              {prompt.length >= PROMPT_MAX_LENGTH
+                ? ' · limit reached, extra text is dropped'
+                : null}
             </p>
           ) : null}
         </div>
@@ -820,6 +866,7 @@ export const AgentsNewSession = ({
           {isCloudTarget ? (
             <div ref={repoDropdownRef} className="relative">
               <button
+                ref={repoButtonRef}
                 aria-label="Select repository"
                 className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isSubmitting || repoStatus === 'loading'}
@@ -1013,6 +1060,9 @@ export const AgentsNewSession = ({
               </>
             ) : null}
             {blockedReason === 'no-repos' ? 'No repositories available on this account.' : null}
+            {blockedReason === 'repos-unavailable'
+              ? 'Repositories did not load. Open the repository picker and retry.'
+              : null}
             {blockedReason === 'no-models' ? 'No models available. Retry above.' : null}
             {blockedReason === 'pick-repo' ? 'Choose a repository to start.' : null}
           </p>

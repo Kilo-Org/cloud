@@ -30,7 +30,6 @@ export function TrialEndDateDialog({
   const [selectedDate, setSelectedDate] = useState<string>('');
   const updateFreeTrialEndAt = useUpdateOrganizationFreeTrialEndAt();
 
-  // Reset to current date when dialog opens
   useEffect(() => {
     if (open) {
       if (currentTrialEndAt) {
@@ -46,7 +45,6 @@ export function TrialEndDateDialog({
     try {
       let freeTrialEndAt: string | null = null;
       if (selectedDate) {
-        // Set time to end of day (23:59:59) for the selected date
         const dateTime = new Date(`${selectedDate}T23:59:59`);
         freeTrialEndAt = dateTime.toISOString();
       }

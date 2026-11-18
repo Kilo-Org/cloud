@@ -28,11 +28,28 @@ import {
   getPlatformOAuthConnectPath,
 } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
+import { APP_SHELL_PREFIX } from '@/lib/app-shell/shell-paths';
+
+const gitlabConnectionErrorMessages: Record<string, string> = {
+  missing_code: 'Authorization code missing from GitLab',
+  connection_failed: 'Failed to connect to GitLab',
+  oauth_init_failed: 'Failed to initiate GitLab OAuth',
+  permission_required: 'You need a billing role to replace this GitLab integration',
+  organization_access_required: 'You do not have access to this organization',
+};
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  /** Overrides the OAuth start route, which the app shell serves itself. */
+  connectPath?: string;
+  /**
+   * True inside the app shell, which may not link to the marketing site: the
+   * self-hosted note keeps its meaning without the docs and sales links.
+   */
+  shell?: boolean;
 };
 
 type InstanceValidationState = {
@@ -66,6 +83,8 @@ export function GitLabIntegrationDetails({
   organizationId,
   success,
   error,
+  connectPath,
+  shell = false,
 }: GitLabIntegrationDetailsProps) {
   // Shared state between OAuth and PAT
   const [instanceUrl, setInstanceUrl] = useState('https://gitlab.com');
@@ -157,14 +176,18 @@ export function GitLabIntegrationDetails({
   // Connect with PAT mutation
   const { mutate: connectWithPATMutate, isPending: isConnectingWithPAT } = useMutation(
     trpc.gitlab.connectWithPAT.mutationOptions({
-      onSuccess: () => {
-        toast.success('GitLab connected successfully!');
+      onSuccess: result => {
+        const warning = result.warnings?.join(' ');
+        toast.success('GitLab connected successfully!', warning ? { description: warning } : {});
         // Reset PAT form
         setPatToken('');
         setPATValidation({ status: 'idle' });
         setConnectionMethod('oauth');
-        // Reload the page to refresh the installation data
-        window.location.reload();
+        // Refresh the installation in place. A reload here would replace the
+        // document and discard the toast before it can be read.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gitlab.getInstallation.queryKey(input),
+        });
       },
       onError: err => {
         toast.error('Failed to connect', { description: err.message });
@@ -272,12 +295,13 @@ export function GitLabIntegrationDetails({
       toast.success('GitLab connected successfully!');
     }
     if (error) {
-      const errorMessages: Record<string, string> = {
-        missing_code: 'Authorization code missing from GitLab',
-        connection_failed: 'Failed to connect to GitLab',
-        oauth_init_failed: 'Failed to initiate GitLab OAuth',
-      };
-      toast.error(errorMessages[error] || `Connection failed: ${error}`);
+      toast.error(
+        resolveConnectionErrorMessage(
+          gitlabConnectionErrorMessages,
+          error,
+          `Connection failed: ${error}`
+        )
+      );
     }
   }, [success, error]);
 
@@ -297,7 +321,7 @@ export function GitLabIntegrationDetails({
       params.set('instanceUrl', instanceUrl);
     }
 
-    const basePath = getPlatformOAuthConnectPath(PLATFORM.GITLAB);
+    const basePath = connectPath ?? getPlatformOAuthConnectPath(PLATFORM.GITLAB);
 
     if (isSelfHostedInput && clientId && clientSecret) {
       try {
@@ -317,6 +341,10 @@ export function GitLabIntegrationDetails({
         } | null;
 
         if (response.status === 401) {
+          if (shell) {
+            window.location.assign(`${APP_SHELL_PREFIX}/expired`);
+            return;
+          }
           const callbackPath = organizationId
             ? `/organizations/${organizationId}/integrations/gitlab`
             : '/integrations/gitlab';
@@ -340,7 +368,8 @@ export function GitLabIntegrationDetails({
     }
 
     const queryString = params.toString();
-    window.location.href = queryString ? `${basePath}?${queryString}` : basePath;
+    const separator = basePath.includes('?') ? '&' : '?';
+    window.location.href = queryString ? `${basePath}${separator}${queryString}` : basePath;
   };
 
   const handleDisconnect = async () => {
@@ -602,20 +631,26 @@ export function GitLabIntegrationDetails({
                   {showSelfHosted && (
                     <>
                       <p className="text-muted-foreground mb-2 text-sm">
-                        Using a self-hosted GitLab instance is a{' '}
-                        <a
-                          href="https://kilo.ai/docs/automate/integrations"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary underline"
-                        >
-                          feature of Kilo Code Enterprise
-                        </a>
-                        . Contact{' '}
-                        <a href="mailto:sales@kilocode.ai" className="text-primary underline">
-                          Sales
-                        </a>{' '}
-                        to learn more.
+                        {shell ? (
+                          'Using a self-hosted GitLab instance is a feature of Kilo Code Enterprise.'
+                        ) : (
+                          <>
+                            Using a self-hosted GitLab instance is a{' '}
+                            <a
+                              href="https://kilo.ai/docs/automate/integrations"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline"
+                            >
+                              feature of Kilo Code Enterprise
+                            </a>
+                            . Contact{' '}
+                            <a href="mailto:sales@kilocode.ai" className="text-primary underline">
+                              Sales
+                            </a>{' '}
+                            to learn more.
+                          </>
+                        )}
                       </p>
                       <div className="space-y-4 rounded-lg border p-4">
                         <div className="space-y-2">

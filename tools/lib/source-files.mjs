@@ -1,0 +1,107 @@
+/**
+ * The source-tree walk the mobile audits share.
+ *
+ * Every audit scans the same kind of tree — `.ts`/`.tsx` files below one or two
+ * source roots, with `node_modules` pruned — and every audit leaves out files of
+ * its own kind. The walk lives here; the exclusion stays at each call site as a
+ * required predicate, so no audit inherits a policy it did not state.
+ *
+ * The audits that read the tree also read each file the same way, whether they
+ * take the walk below or one file whose text they already hold: its text, its
+ * syntax tree, and the lines that say the parser refused it. That step lives
+ * here too, so two audits cannot drift apart on which files they read, how they
+ * spell a path in a diagnostic, or how they report a file with a syntax error.
+ */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative as relativePath, sep } from 'node:path';
+
+import { lineIndex, parseProblems, parseSourceFile } from './ast.mjs';
+
+/**
+ * Whether a file name is test scaffolding rather than app code: a suite
+ * (`x.test.ts`), a mounted harness (`x.mounted.test.tsx`) and the helper a
+ * harness shares with its suite (`x.mounted.test-helpers.ts`). Every audit that
+ * reads copy, classes or formatters passes this predicate. It matches the two
+ * name segments, so a helper named only `x.test-helpers.ts` still counts as app
+ * code — say so here rather than widening the rule silently.
+ */
+export function isTestArtifact(name) {
+  return name.includes('.test.') || name.includes('.mounted.');
+}
+
+/**
+ * Every `.ts`/`.tsx` file below `dir`, depth-first, with `node_modules` pruned.
+ * `skip` receives each candidate's file name and decides whether the audit
+ * leaves it out.
+ */
+export function sourceFiles(dir, skip) {
+  const files = [];
+  collect(dir, skip, files);
+  return files;
+}
+
+function collect(dir, skip, files) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== 'node_modules') {
+        collect(path, skip, files);
+      }
+    } else if (/\.tsx?$/.test(entry.name) && !skip(entry.name)) {
+      files.push(path);
+    }
+  }
+}
+
+/**
+ * One source file, parsed and named the way the walk below does it: its
+ * absolute path `file`, the normalised path `path` a diagnostic names it by,
+ * its `text`, its syntax tree `program`, one `problems` line per parse error,
+ * and `lineOf`, the offset-to-line lookup the parse problems were built with,
+ * so a caller reuses it instead of scanning the text again.
+ *
+ * `text` is the caller's, so a caller that already holds the text — an audit
+ * whose rules take the source it was given — parses it through the same step
+ * the walk uses. Paths are named from `root`; a file outside it — a fixture
+ * tree in a temporary directory — is named from `dir`.
+ */
+export function parseSourceEntry(dir, root, file, text) {
+  const { program, errors } = parseSourceFile(file, text);
+  const fromRoot = relativePath(root, file);
+  const path = (fromRoot.startsWith('..') ? relativePath(dir, file) : fromRoot)
+    .split(sep)
+    .join('/');
+  const lineOf = lineIndex(text);
+  return {
+    file,
+    path,
+    text,
+    program,
+    lineOf,
+    problems: parseProblems(path, errors, lineOf),
+  };
+}
+
+/**
+ * Every source file below `dir`, read and parsed once, one file at a time, each
+ * as one `parseSourceEntry`: its absolute path `file`, the normalised path
+ * `path` a diagnostic names it by, its `text`, its syntax tree `program`, the
+ * `lineOf` lookup, and one `problems` line per parse error.
+ *
+ * The walk is a generator, so a caller's `for … of` holds one file's text and
+ * one syntax tree at a time and peak memory does not grow with the tree.
+ *
+ * A file the parser refused has an empty tree, so the keys or calls it holds
+ * would leave an audit without a word. `problems` says what the parser stopped
+ * at instead, and a caller must report every line of it: an unaudited file is
+ * not a clean one.
+ *
+ * Paths are named from `root`. A file outside it — a fixture tree in a
+ * temporary directory — is named from `dir`, so it still reads from its own
+ * root.
+ */
+export function* parseSourceTree(dir, root, skip) {
+  for (const file of sourceFiles(dir, skip)) {
+    yield parseSourceEntry(dir, root, file, readFileSync(file, 'utf8'));
+  }
+}

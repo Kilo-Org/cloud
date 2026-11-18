@@ -6,17 +6,23 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/notifications/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/notifications/src",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
+    "i18next": "^27.1.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:vitest5"
   }
 }

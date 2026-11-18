@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
 import { EDITOR_OPTIONS } from '@/lib/editorOptions';
 import { ExternalLink, X } from 'lucide-react';
-import { LANDING_URL } from '@/lib/constants';
+import { LANDING_URL } from '@kilocode/web-shared/lib/constants';
 
 type OrganizationWelcomeHeaderProps = {
   organizationName: string;

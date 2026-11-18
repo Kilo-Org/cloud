@@ -31,6 +31,49 @@ describe('security agent config', () => {
     expect(parseSecurityAgentConfig({}).sla_notifications_enabled).toBe(false);
   });
 
+  it('pins the high-confidence automation defaults', () => {
+    const config = parseSecurityAgentConfig({});
+    expect(config.auto_dismiss_confidence_threshold).toBe('high');
+    expect(config.auto_analysis_min_severity).toBe('high');
+    expect(config.auto_remediation_min_severity).toBe('high');
+  });
+
+  it('defaults auto-remediation approval to not required for legacy config', () => {
+    expect(parseSecurityAgentConfig({}).auto_remediation_require_approval).toBe(false);
+  });
+
+  it('keeps the remediation default when only the analysis model changes', () => {
+    expect(
+      parseSecurityAgentConfig({
+        model_slug: 'analysis-model',
+        analysis_model_slug: 'analysis-model',
+      }).remediation_model_slug
+    ).toBe(DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL);
+
+    const merged = mergeSecurityAgentConfigPatch(
+      { analysis_model_slug: 'analysis-model' },
+      { analysis_model_slug: 'next-analysis-model' }
+    );
+    expect(merged.analysis_model_slug).toBe('next-analysis-model');
+    expect(merged.remediation_model_slug).toBe(DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL);
+  });
+
+  it('keeps an explicitly stored remediation model over the analysis model', () => {
+    expect(
+      parseSecurityAgentConfig({
+        analysis_model_slug: 'analysis-model',
+        model_slug: 'analysis-model',
+        remediation_model_slug: 'remediation-model',
+      }).remediation_model_slug
+    ).toBe('remediation-model');
+
+    const merged = mergeSecurityAgentConfigPatch(
+      { remediation_model_slug: 'stored-remediation-model' },
+      { analysis_model_slug: 'next-analysis-model' }
+    );
+    expect(merged.remediation_model_slug).toBe('stored-remediation-model');
+  });
+
   it('tolerates malformed notification fields during general config reads', () => {
     expect(() =>
       parseSecurityAgentConfig({

@@ -1,5 +1,5 @@
 import 'server-only';
-import { DISCORD_BOT_TOKEN } from '@/lib/config.server';
+import { DISCORD_BOT_TOKEN } from '@kilocode/web-shared/lib/config.server';
 import { buildDiscordApiUrl, isDiscordSnowflake, parseDiscordSnowflake } from './discord-id';
 
 /**

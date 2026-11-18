@@ -12,14 +12,36 @@ vi.mock('expo-crypto', () => {
   };
 });
 
-vi.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: 'file:///cache/',
-  copyAsync: vi.fn(async () => {
-    await Promise.resolve();
-  }),
-  deleteAsync: vi.fn(async () => {
-    await Promise.resolve();
-  }),
+const expoFileSystemMock = vi.hoisted(() => {
+  const files = new Map<string, string>();
+  const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {
+    const uri =
+      rest.length > 0 ? `${(_base as { uri: string }).uri}/${String(rest[0])}` : String(_base);
+    return {
+      uri,
+      get exists() {
+        return files.has(uri);
+      },
+      write(content: string) {
+        files.set(uri, content);
+      },
+      textSync() {
+        return files.get(uri) ?? '';
+      },
+      delete() {
+        files.delete(uri);
+      },
+    };
+  });
+  return {
+    File,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
+
+vi.mock('expo-file-system', () => ({
+  File: expoFileSystemMock.File,
+  Paths: expoFileSystemMock.Paths,
 }));
 
 describe('normalizeShareIntent partial copy failures', () => {
@@ -111,30 +133,57 @@ describe('normalizeShareIntent partial copy failures', () => {
     });
   });
 
-  it('all copy failures without text throw', async () => {
-    await expect(
-      normalizeShareIntent(
-        {
-          text: null,
-          webUrl: null,
-          meta: null,
-          files: [
-            {
-              fileName: 'a.jpg',
-              mimeType: 'image/jpeg',
-              path: 'file:///share/a.jpg',
-              size: 1,
-              width: null,
-              height: null,
-              duration: null,
-            },
-          ],
-        },
-        async () => {
-          await Promise.resolve();
-          throw new Error('copy failed');
-        }
-      )
-    ).rejects.toThrow('Failed to copy shared files');
+  it('all copy failures without text resolve to a failed-files payload', async () => {
+    const payload = await normalizeShareIntent(
+      {
+        text: null,
+        webUrl: null,
+        meta: null,
+        files: [
+          {
+            fileName: 'a.jpg',
+            mimeType: 'image/jpeg',
+            path: 'file:///share/a.jpg',
+            size: 1,
+            width: null,
+            height: null,
+            duration: null,
+          },
+        ],
+      },
+      async () => {
+        await Promise.resolve();
+        throw new Error('copy failed');
+      }
+    );
+
+    expect(payload).toEqual({ text: '', files: [], failedFiles: ['a.jpg'] });
+  });
+
+  it('an unnamed failed copy keeps the placeholder name the gate shows', async () => {
+    const payload = await normalizeShareIntent(
+      {
+        text: '',
+        webUrl: null,
+        meta: null,
+        files: [
+          {
+            fileName: '',
+            mimeType: 'image/jpeg',
+            path: 'file:///share/unnamed',
+            size: null,
+            width: null,
+            height: null,
+            duration: null,
+          },
+        ],
+      },
+      async () => {
+        await Promise.resolve();
+        throw new Error('copy failed');
+      }
+    );
+
+    expect(payload).toEqual({ text: '', files: [], failedFiles: ['shared-file'] });
   });
 });

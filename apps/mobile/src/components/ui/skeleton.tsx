@@ -6,19 +6,19 @@ import Animated, {
   Easing,
   makeMutable,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
 import { cn } from '@/lib/utils';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 
 type SkeletonProps = {
   className?: string;
 };
 
-/** Soft horizontal highlight over `bg-muted` — concrete rgba, not className. */
+/** Soft horizontal highlight over `bg-skeleton-fill` — concrete rgba, not className. */
 const LIGHT_SHIMMER = [
   'rgba(255, 255, 255, 0)',
   'rgba(255, 255, 255, 0.45)',
@@ -72,7 +72,7 @@ function releaseShimmerClock(): void {
 }
 
 export function Skeleton({ className }: Readonly<SkeletonProps>) {
-  const reducedMotion = useReducedMotion();
+  const { reducedMotion } = useMotionPolicy();
   const colorScheme = useColorScheme();
   const layoutWidth = useSharedValue(0);
   const pulse = useSharedValue(0.4);
@@ -112,16 +112,16 @@ export function Skeleton({ className }: Readonly<SkeletonProps>) {
     layoutWidth.value = event.nativeEvent.layout.width;
   };
 
-  // Reduced motion: static muted block at opacity 0.7 — no gradient, no clock.
+  // Reduced motion: static placeholder block at opacity 0.7 — no gradient, no clock.
   if (reducedMotion) {
-    return <View className={cn('rounded-md bg-muted opacity-70', className)} />;
+    return <View className={cn('rounded-md bg-skeleton-fill opacity-70', className)} />;
   }
 
   const shimmerColors = colorScheme === 'dark' ? DARK_SHIMMER : LIGHT_SHIMMER;
 
   return (
     <Animated.View
-      className={cn('overflow-hidden rounded-md bg-muted', className)}
+      className={cn('overflow-hidden rounded-md bg-skeleton-fill', className)}
       onLayout={onLayout}
       style={pulseStyle}
     >

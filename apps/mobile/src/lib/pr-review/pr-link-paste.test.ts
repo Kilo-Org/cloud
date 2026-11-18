@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  decidePrLinkOpen,
   decidePrLinkPaste,
-  PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY,
-  PR_LINK_TOAST_INVALID_COPY,
+  prLinkToastClipboardEmptyCopy,
+  prLinkToastPasteDeniedCopy,
+  readPrLinkPasteClipboard,
   selectPrLinkClearButtonVisible,
+  selectPrLinkPasteEmptyReason,
 } from './pr-link-paste';
 
 describe('decidePrLinkPaste', () => {
@@ -31,7 +34,38 @@ describe('decidePrLinkPaste', () => {
     });
   });
 
-  it('returns non-url-text with trimmed text for non-PR content', () => {
+  it('returns valid-pr-url for a gitlab.com merge request', () => {
+    const url = 'https://gitlab.com/group/sub/repo/-/merge_requests/123';
+    expect(decidePrLinkPaste(url)).toEqual({ kind: 'valid-pr-url', text: url });
+  });
+
+  it('returns valid-pr-url for a self-managed GitLab host, legacy form included', () => {
+    expect(
+      decidePrLinkPaste('https://gitlab.example.com/acme/api/-/merge_requests/9/diffs')
+    ).toEqual({
+      kind: 'valid-pr-url',
+      text: 'https://gitlab.example.com/acme/api/-/merge_requests/9/diffs',
+    });
+    expect(decidePrLinkPaste('https://gitlab.example.com/acme/api/merge_requests/9')).toEqual({
+      kind: 'valid-pr-url',
+      text: 'https://gitlab.example.com/acme/api/merge_requests/9',
+    });
+  });
+
+  it('returns valid-pr-url for a Bitbucket pull request, overview variant included', () => {
+    expect(decidePrLinkPaste('https://bitbucket.org/acme/api/pull-requests/42')).toEqual({
+      kind: 'valid-pr-url',
+      text: 'https://bitbucket.org/acme/api/pull-requests/42',
+    });
+    expect(
+      decidePrLinkPaste('https://bitbucket.org/acme/api/pull-requests/42/overview?tab=commits')
+    ).toEqual({
+      kind: 'valid-pr-url',
+      text: 'https://bitbucket.org/acme/api/pull-requests/42/overview?tab=commits',
+    });
+  });
+
+  it('returns non-url-text with trimmed text for non-review content', () => {
     expect(decidePrLinkPaste('  not a url  ')).toEqual({
       kind: 'non-url-text',
       text: 'not a url',
@@ -44,6 +78,120 @@ describe('decidePrLinkPaste', () => {
       kind: 'non-url-text',
       text: 'https://gitlab.com/o/r/pull/1',
     });
+    expect(decidePrLinkPaste('https://bitbucket.org/acme/api/pull-requests/abc')).toEqual({
+      kind: 'non-url-text',
+      text: 'https://bitbucket.org/acme/api/pull-requests/abc',
+    });
+  });
+});
+
+describe('decidePrLinkOpen', () => {
+  it('returns the GitHub ref for a github.com PR link', () => {
+    expect(decidePrLinkOpen('https://github.com/octocat/hello-world/pull/42')).toEqual({
+      kind: 'open',
+      ref: { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 42 },
+    });
+  });
+
+  it('returns the GitLab ref with the pasted origin as instanceHint', () => {
+    expect(
+      decidePrLinkOpen('  https://gitlab.example.com/group/sub/repo/-/merge_requests/7#note_1 ')
+    ).toEqual({
+      kind: 'open',
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/sub/repo',
+        mrIid: 7,
+        instanceHint: 'https://gitlab.example.com',
+      },
+    });
+  });
+
+  it('returns the Bitbucket ref for a pull request link', () => {
+    expect(decidePrLinkOpen('https://bitbucket.org/acme/api/pull-requests/42')).toEqual({
+      kind: 'open',
+      ref: { platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 },
+    });
+  });
+
+  it('returns invalid for anything no provider serves', () => {
+    expect(decidePrLinkOpen('hello')).toEqual({ kind: 'invalid' });
+    expect(decidePrLinkOpen('https://github.example.com/o/r/pull/1')).toEqual({ kind: 'invalid' });
+    expect(decidePrLinkOpen('')).toEqual({ kind: 'invalid' });
+  });
+});
+
+describe('selectPrLinkPasteEmptyReason', () => {
+  it('reports denied when the read is empty but the clipboard still has text', () => {
+    expect(selectPrLinkPasteEmptyReason('', true)).toBe('denied');
+    expect(selectPrLinkPasteEmptyReason(null, true)).toBe('denied');
+    expect(selectPrLinkPasteEmptyReason(undefined, true)).toBe('denied');
+  });
+
+  it('reports empty when the clipboard has no text either', () => {
+    expect(selectPrLinkPasteEmptyReason('', false)).toBe('empty');
+    expect(selectPrLinkPasteEmptyReason(null, false)).toBe('empty');
+  });
+
+  it('reports empty for a whitespace-only read even when the clipboard has text', () => {
+    expect(selectPrLinkPasteEmptyReason('  \n ', true)).toBe('empty');
+  });
+});
+
+describe('readPrLinkPasteClipboard', () => {
+  const reader = (text: string | null, hasString: boolean) => ({
+    getStringAsync: async () => {
+      await Promise.resolve();
+      return text;
+    },
+    hasStringAsync: async () => {
+      await Promise.resolve();
+      return hasString;
+    },
+  });
+
+  it('hands a resolvable read to the paste decision', async () => {
+    const url = 'https://github.com/octocat/hello-world/pull/42';
+    await expect(readPrLinkPasteClipboard(reader(url, true))).resolves.toEqual({
+      kind: 'valid-pr-url',
+      text: url,
+    });
+    await expect(readPrLinkPasteClipboard(reader('  not a link  ', true))).resolves.toEqual({
+      kind: 'non-url-text',
+      text: 'not a link',
+    });
+  });
+
+  it('names an empty clipboard as empty', async () => {
+    await expect(readPrLinkPasteClipboard(reader('', false))).resolves.toEqual({
+      kind: 'empty',
+      reason: 'empty',
+    });
+  });
+
+  it('reports a declined paste prompt as a denial', async () => {
+    await expect(readPrLinkPasteClipboard(reader('', true))).resolves.toEqual({
+      kind: 'empty',
+      reason: 'denied',
+    });
+  });
+
+  it('turns a rejected text read into the denied result instead of rejecting', async () => {
+    await expect(
+      readPrLinkPasteClipboard({
+        getStringAsync: () => Promise.reject(new Error('clipboard unavailable')),
+        hasStringAsync: () => Promise.resolve(false),
+      })
+    ).resolves.toEqual({ kind: 'empty', reason: 'denied' });
+  });
+
+  it('turns a rejected text probe into the denied result instead of rejecting', async () => {
+    await expect(
+      readPrLinkPasteClipboard({
+        getStringAsync: () => Promise.resolve(''),
+        hasStringAsync: () => Promise.reject(new Error('clipboard unavailable')),
+      })
+    ).resolves.toEqual({ kind: 'empty', reason: 'denied' });
   });
 });
 
@@ -56,10 +204,11 @@ describe('selectPrLinkClearButtonVisible', () => {
     expect(selectPrLinkClearButtonVisible({ hasInput: false })).toBe(false);
   });
 });
-
 describe('PR link toast copy', () => {
   it('exports the pinned toast copy strings', () => {
-    expect(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY).toBe('Clipboard is empty');
-    expect(PR_LINK_TOAST_INVALID_COPY).toBe('Not a GitHub pull request link');
+    expect(prLinkToastClipboardEmptyCopy()).toBe('Clipboard is empty');
+    expect(prLinkToastPasteDeniedCopy()).toBe(
+      'Paste access was denied. Allow paste and try again.'
+    );
   });
 });

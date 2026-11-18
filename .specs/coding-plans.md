@@ -46,7 +46,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 1.4. A Plan ID **MUST NOT** be treated as the upstream provider identity. Multiple future plans from one upstream provider **MAY** coexist without extending or replacing one another unless their product rules explicitly state otherwise.
 
-1.5. The MiniMax token catalog **MUST** contain Token Plan Plus, Token Plan Max, and Token Plan Ultra. All MiniMax token offerings **MUST** share the ordinary MiniMax BYOK provider ID, `minimax`.
+1.5. MiniMax Token Plan Plus, Token Plan Max, and Token Plan Ultra are no longer supported and are being removed from the Plan Catalog. The system **MUST NOT** create a new MiniMax subscription or accept a new MiniMax Availability Notification Intent; customer-facing catalog and purchase surfaces **MUST NOT** offer these plans for a new purchase. A live MiniMax subscription created before closure **MAY** continue under its existing terms while removal is in progress. Plan pricing, naming, and provider ID data for these plans **MAY** remain resolvable for existing subscribers and administrative inventory and remediation surfaces until removal is complete. Any MiniMax token offering that remains resolvable **MUST** continue to share the ordinary MiniMax BYOK provider ID, `minimax`.
 
 1.6. The catalog **MUST** contain BytePlus Enterprise Coding Plan Lite with Plan ID `byteplus-coding-plan-team-lite`, provider ID `byteplus-coding`, a price of $20 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per subscription period. The plan's supported model IDs are `dola-seed-2.0-pro`, `dola-seed-2.0-lite`, `dola-seed-2.0-code`, `bytedance-seed-code`, `kimi-k2.5`, `glm-5.1`, `glm-5.2`, `deepseek-v4-flash`, `deepseek-v4-pro`, and `gpt-oss-120b`. Upstream Auto, Kimi-K2-Thinking, and GLM-4.7 **MUST NOT** be exposed.
 
@@ -84,13 +84,13 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 3.5. An Installed BYOK Configuration **MUST** remain read-only while it contains Kilo's issued credential. User-facing BYOK surfaces **MUST** identify its Coding Plan origin and **MUST NOT** offer update, enable/disable, or delete controls. The corresponding API operations **MUST** reject attempts to mutate it. Non-mutating credential testing **MAY** remain available. The surface **MUST** direct users who want the configuration removed to cancel the plan in the Subscription Center, which removes it at Effective Cancellation.
 
-3.6. Cloud **MAY** query current Upstream Provider quota for an authenticated owner of an active or `past_due` Coding Plan by either using the retained assigned Managed Plan Credential directly or using a scoped Provider Management Credential with the assigned inventory row's Upstream Usage ID. Decryption and provider access **MUST** remain server-side. Managed Plan Credentials, Provider Management Credentials, inventory identity, Upstream Plan IDs, Upstream Usage IDs, fingerprints, ciphertext, usernames, and authorization metadata **MUST NOT** leave Cloud. Cloud **MUST** normalize provider quota into subscription-owned quota windows before returning it to Kilo clients; provider-native fields, status codes, and display labels **MUST NOT** cross that boundary.
+3.6. Cloud **MAY** query current Upstream Provider quota for an authenticated owner of an active or `past_due` Coding Plan by either using the retained assigned Managed Plan Credential directly or using a scoped Provider Management Credential with the assigned inventory row's Upstream Usage ID. Decryption and provider access **MUST** remain server-side. Managed Plan Credentials, Provider Management Credentials, inventory identity, Upstream Plan IDs, Upstream Usage IDs, fingerprints, ciphertext, usernames, and authorization metadata **MUST NOT** leave Cloud, except for the stored upstream identifier that authorized administrative remediation surfaces **MAY** display under 4.2 and 4.8. Cloud **MUST** normalize provider quota into subscription-owned quota windows before returning it to Kilo clients; provider-native fields, status codes, and display labels **MUST NOT** cross that boundary.
 
 ## 4. Credential provisioning and inventory
 
 4.1. Kilo **MUST** acquire or provision Managed Plan Credentials before accepting a purchase that depends on them. For an offering initially provisioned by operator upload, only authorized administrative tooling **MAY** insert credentials into inventory.
 
-4.2. Available and assigned credentials **MUST** be encrypted at rest. Raw credentials **MUST NOT** appear in logs, analytics, error messages, customer responses, ordinary BYOK responses, or administrative inventory and remediation responses. Authorized administrative remediation surfaces **MAY** display the stored Upstream Plan ID needed to revoke issued provider access.
+4.2. Available and assigned credentials **MUST** be encrypted at rest. Raw credentials **MUST NOT** appear in logs, analytics, error messages, customer responses, ordinary BYOK responses, or administrative inventory and remediation responses. Authorized administrative remediation surfaces **MAY** display the stored upstream identifier needed to revoke or map issued provider access: the Upstream Plan ID for MiniMax and the assigned username for BytePlus.
 
 4.3. Inventory **MUST** distinguish at least these credential lifecycle states: available, assigned, revocation pending, revoked, and revocation failed.
 
@@ -102,7 +102,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 4.7. Kilo **MUST** retain the Upstream Plan ID and non-secret assignment and revocation disposition evidence on inventory records for the required operational and compliance retention period. When an issued credential enters manual revocation remediation, Kilo **MUST** remove retained encrypted credential material because support deprovisions it using the Upstream Plan ID. After the applicable retention period, terminal credential records **MAY** be deleted without deleting billing history.
 
-4.8. Administrative upload tooling **MUST** accept each issued MiniMax or BytePlus credential with its provider-specific upstream identifier, using the `<api key>::<upstream identifier>` input format or an equivalent structured input, and **MUST** persist the identifier on the inventory record without treating it as the Kilo Plan ID. For MiniMax, the second value is the Upstream Plan ID. For BytePlus, it is the assigned provider username used to resolve and verify the seat; it is not a subscriber name or email address and **MUST NOT** be returned in admin queue responses.
+4.8. Administrative upload tooling **MUST** accept each issued MiniMax or BytePlus credential with its provider-specific upstream identifier, using the `<api key>::<upstream identifier>` input format or an equivalent structured input, and **MUST** persist the identifier on the inventory record without treating it as the Kilo Plan ID. For MiniMax, the second value is the Upstream Plan ID. For BytePlus, it is the assigned provider username used to resolve and verify the seat; it is not a subscriber name or email address. The stored identifier **MUST** be surfaced in authorized administrative remediation and queue responses so staff can map the inventory item to the provider-side seat.
 
 4.9. Administrative upload tooling **MUST** prevent accidental duplicate credential assignment without exposing raw credential values in list responses, for example through a secure, non-reversible fingerprint comparison.
 
@@ -138,7 +138,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 6.3. Purchase **MUST** reject an occupied personal BYOK slot for the selected provider before a charge or issued credential assignment commits, including when the existing key is disabled. Once subscribed, the Installed BYOK Configuration **MUST** remain read-only until Kilo removes it at Effective Cancellation.
 
-6.4. While a live BytePlus subscription has its enabled managed key, Kilo Auto **MUST** prefer `byteplus-coding/bytedance-seed-code`. When both BytePlus and a recognized MiniMax Coding Plan are active, BytePlus takes precedence, followed by the MiniMax preference, followed by ordinary Kilo Auto routing. If the preferred model is denied or incompatible with request constraints, routing **MUST** continue through ordinary Kilo Auto rather than selecting another model from that provider.
+6.4. Kilo Auto (`kilo-auto/efficient`) **MUST** route Coding Plan users through ordinary Kilo Auto routing without preferring an active Coding Plan's provider or model. Coding Plan models **MUST** remain directly selectable through their ordinary personal BYOK provider identity.
 
 6.5. Current routing state **MUST** be reported separately from subscription and provider-quota state. A quota request MAY either use the assigned Managed Plan Credential directly, as MiniMax does, or use a scoped Provider Management Credential together with the assigned inventory row's Upstream Usage ID, as BytePlus requires. The assigned row, owner, plan, provider, and live subscription status **MUST** be verified server-side for every request. Quota authorization **MUST NOT** use the Installed BYOK Configuration, a subscriber-supplied provider or plan value, or a BytePlus inference API key when the control-plane path is required.
 
@@ -162,11 +162,17 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 8.1. Logs and monitoring **MUST NOT** contain raw Managed Plan Credentials, credential-bearing authorization headers, provider-management secrets, or unfiltered provider/SDK key-test error content.
 
-8.2. General administrative credential inventory responses **MUST** return non-secret status and remediation metadata only. For a `revocation_pending` or `revocation_failed` item, the manual-revocation admin console **MAY** display its MiniMax Upstream Plan ID to authorized staff, but **MUST NOT** display the BytePlus username stored for seat reconciliation. Raw credential values **MUST NOT** be returned by queue, list, or remediation APIs or appear on customer surfaces.
+8.2. General administrative credential inventory responses **MUST** return non-secret status and remediation metadata only. For a `revocation_pending` or `revocation_failed` item, the manual-revocation admin console **MAY** display its MiniMax Upstream Plan ID or its assigned BytePlus username to authorized staff so they can deprovision the issued provider access or map the inventory item to the provider-side seat. Raw credential values **MUST NOT** be returned by queue, list, or remediation APIs or appear on customer surfaces.
 
 8.3. The initial pilot does not require a Coding Plans audit-log history for admin inventory upload or manual revocation actions. Inventory lifecycle state, Upstream Plan ID, request/completion timestamps, attempt count, and sanitized failure information **MUST** record current disposition without retaining raw credentials after remediation starts.
 
 8.4. Current quota responses and logs **MUST NOT** contain Managed Plan Credentials, Provider Management Credentials, authorization headers, raw provider bodies or messages, inventory metadata, Upstream Plan IDs, Upstream Usage IDs, usernames, fingerprints, ciphertext, or provider-native quota fields. Provider responses **MUST** be bounded, validated, and normalized to an explicit non-secret subscription quota-window contract before leaving the Cloud boundary. The initial quota-window contract **MUST NOT** represent monetary balances or purchased-credit balances as subscription quota.
+
+### 2026-09-25 -- MiniMax Token Plan closed to new signups
+
+- Closed MiniMax Token Plan Plus, Max, and Ultra to new signups and new Availability Notification Intents, superseding 1.5's prior unconditional catalog requirement.
+- Confirmed a live MiniMax subscription created before closure continues under its existing terms while Kilo completes removal of MiniMax from the Plan Catalog.
+- Administrative inventory, upload, and remediation surfaces retain MiniMax visibility per 4.2 and 8.2 for as long as any MiniMax inventory or subscription remains.
 
 ### 2026-08-11 -- BytePlus Enterprise Coding Plan catalog copy
 
@@ -178,3 +184,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - Added Provider Management Credential and Upstream Usage ID definitions for provider control-plane quota lookups.
 - Allowed scoped control-plane authorization for BytePlus while preserving owner, live-subscription, assignment, and server-only data-boundary requirements.
 - Clarified that the BytePlus upload identifier is the assigned provider username used to resolve a seat.
+
+### 2026-10-14 -- Ordinary Kilo Auto routing for Coding Plan users
+
+- Updated §6.4 so Kilo Auto no longer prefers the Coding Plan default model.
+- Coding Plan users are routed through ordinary Kilo Auto routing.

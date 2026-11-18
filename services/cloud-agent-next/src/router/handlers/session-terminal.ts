@@ -1,12 +1,12 @@
 import { TRPCError } from '@trpc/server';
 import { logger, withLogTags } from '../../logger.js';
 import type { OperationResult } from '../../persistence/types.js';
-import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
-import type { WrapperPty } from '../../kilo/wrapper-client.js';
 import type { SessionId } from '../../types/ids.js';
 import { withDORetry } from '../../utils/do-retry.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { protectedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
+import { SANDBOX_STATUS_DETAIL_MESSAGES } from '../../shared/sandbox-status.js';
 import {
   CloseTerminalInput,
   CloseTerminalOutput,
@@ -21,23 +21,15 @@ function throwTerminalError(result: OperationResult<unknown>): never {
   const code =
     message === 'Session not found'
       ? 'NOT_FOUND'
-      : message.includes('interactive Cloud Agent')
+      : message.startsWith('Terminal access denied:') || message.includes('interactive Cloud Agent')
         ? 'FORBIDDEN'
         : message.includes('workspace is prepared') ||
-            message.includes('session wrapper is not running')
+            message.includes('session wrapper is not running') ||
+            message === SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped
           ? 'PRECONDITION_FAILED'
           : 'SERVICE_UNAVAILABLE';
 
   throw new TRPCError({ code, message });
-}
-
-function getSessionStub(
-  env: { CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession> },
-  userId: string,
-  sessionId: SessionId
-): DurableObjectStub<CloudAgentSession> {
-  const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-  return env.CLOUD_AGENT_SESSION.get(doId);
 }
 
 export function createSessionTerminalHandlers() {
@@ -56,17 +48,17 @@ export function createSessionTerminalHandlers() {
             cloudAgentSessionId: sessionId,
           });
 
-          const result = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            OperationResult<{ pty: WrapperPty }>
-          >(
-            () => getSessionStub(ctx.env, ctx.userId, sessionId),
+          // Generate once so a retry reuses the same creation identity.
+          const operationId = crypto.randomUUID();
+          const result = await withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
             stub =>
-              stub.createTerminal({
+              stub.terminalCreate({
+                operationId,
                 cols: input.cols,
                 rows: input.rows,
               }),
-            'createTerminal'
+            'terminalCreate'
           );
 
           if (!result.success || !result.data) {
@@ -90,18 +82,15 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
-          const result = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            OperationResult<{ pty: WrapperPty }>
-          >(
-            () => getSessionStub(ctx.env, ctx.userId, sessionId),
+          const result = await withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
             stub =>
-              stub.resizeTerminal({
+              stub.terminalResize({
                 ptyId: input.ptyId,
                 cols: input.cols,
                 rows: input.rows,
               }),
-            'resizeTerminal'
+            'terminalResize'
           );
 
           if (!result.success || !result.data) {
@@ -126,13 +115,10 @@ export function createSessionTerminalHandlers() {
             cloudAgentSessionId: sessionId,
           });
 
-          const result = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            OperationResult<{ success: boolean }>
-          >(
-            () => getSessionStub(ctx.env, ctx.userId, sessionId),
-            stub => stub.closeTerminal({ ptyId: input.ptyId }),
-            'closeTerminal'
+          const result = await withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+            stub => stub.terminalClose({ ptyId: input.ptyId }),
+            'terminalClose'
           );
 
           if (!result.success || !result.data) {

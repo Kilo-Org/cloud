@@ -1,16 +1,17 @@
-/**
- * Pure core for internal dispatch of low-balance and security-finding pushes.
- * IO is injected via deps so unit tests can substitute in-memory fakes.
- */
-
-import type {
-  DispatchPushInput,
-  DispatchPushOutcome,
-  InternalDispatchRequest,
-  PerRecipientResult,
+import {
+  genericPushContentForPushData,
+  SECURITY_FINDING_PUSH_TITLE_KEYS,
+  SECURITY_LIFECYCLE_I18N_KEY,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+  type InternalDispatchRequest,
+  type PerRecipientResult,
 } from '@kilocode/notifications';
 
-import type { UserNotificationPreferences } from './cloud-agent-session-push';
+import {
+  DEFAULT_USER_NOTIFICATION_PREFERENCES,
+  type UserNotificationPreferences,
+} from './cloud-agent-session-push';
 
 type RecipientDOStub = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
@@ -24,16 +25,6 @@ export type InternalDispatchDeps = {
    * read with no row → default-on for every category.
    */
   readPreferences: (userId: string) => Promise<UserNotificationPreferences | null>;
-};
-
-const DEFAULT_PREFERENCES: UserNotificationPreferences = {
-  agentPushEnabled: true,
-  chatMessagesEnabled: true,
-  agentAttentionEnabled: true,
-  sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
-  balanceAlertsEnabled: true,
-  securityFindingsEnabled: true,
 };
 
 function securityFindingTitle(
@@ -51,56 +42,154 @@ function securityFindingTitle(
 }
 
 function buildDispatchInput(userId: string, input: InternalDispatchRequest): DispatchPushInput {
-  if (input.kind === 'low_balance') {
-    return {
-      userId,
-      presenceContext: null,
-      idempotencyKey: `low-balance:${input.organizationId}`,
-      badge: null,
-      push: {
-        title: 'Low balance alert',
-        body: `${input.organizationName} balance fell below $${input.minimumBalanceUsd}`,
-        data: {
-          type: 'low_balance',
-          organizationId: input.organizationId,
+  switch (input.kind) {
+    case 'agent_briefing':
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `agent-briefing:${input.localDate}`,
+        agentBriefing: { localDate: input.localDate, expiresAt: input.expiresAt },
+        badge: null,
+        push: {
+          // The catalog-backed generic copy for this data type. The channel DO
+          // replaces both fields for `agent_briefing`, so this only has to agree
+          // with `push-copy.ts`, which it does by reading the same source.
+          ...genericPushContentForPushData(
+            { type: 'agent_briefing', url: '/agent-briefing' },
+            'en'
+          ),
+          data: { type: 'agent_briefing', url: '/agent-briefing' },
+          sound: 'default',
+          priority: 'default',
         },
-        sound: 'default',
-        priority: 'high',
-      },
-    } satisfies DispatchPushInput;
+      } satisfies DispatchPushInput;
+    case 'low_balance':
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `low-balance:${input.organizationId}`,
+        badge: null,
+        push: {
+          title: 'Low balance alert',
+          body: `${input.organizationName} balance fell below $${input.minimumBalanceUsd}`,
+          i18nKey: 'internal.lowBalance',
+          i18nParams: {
+            organizationName: input.organizationName,
+            minimumBalanceUsd: String(input.minimumBalanceUsd),
+          },
+          data: {
+            type: 'low_balance',
+            organizationId: input.organizationId,
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
+    case 'spend_alert':
+      // One alert per firing episode, even with several recipients: the owner's
+      // contacts must not get a second push for the same crossing, but a
+      // condition that clears and crosses again inside the DO's idempotency
+      // window must still send. The outbox row's `dedupeKey` carries the
+      // episode, so the key differs between two crossings; the amount is not
+      // part of the identity so a re-evaluated sweep with a slightly different
+      // total still dedupes.
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `spend-alert:${input.scope}:${input.organizationId ?? 'personal'}:${input.alertKind}:${input.thresholdUsd}:${input.dedupeKey}`,
+        badge: null,
+        push: {
+          title: 'Spend alert',
+          body: `${input.scopeName} spend crossed $${input.amountUsd}`,
+          i18nKey: 'internal.spendAlert',
+          i18nParams: {
+            scopeName: input.scopeName,
+            amountUsd: String(input.amountUsd),
+          },
+          data: {
+            type: 'spend_alert',
+            scope: input.scope,
+            ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
+    case 'security_finding': {
+      const title = securityFindingTitle(input.notificationKind, input.severity);
+      return {
+        userId,
+        presenceContext: null,
+        // Sibling finding rows for one advisory (per manifest, per scope) must
+        // collapse to one push per recipient; the DO instance is already per
+        // recipient. `notificationKind` stays in the key so `new_finding` and SLA
+        // pushes stay distinct.
+        idempotencyKey: input.ghsaId
+          ? `security-finding:${input.repoFullName}:${input.ghsaId}:${input.notificationKind}`
+          : `security-finding:${input.notificationId}`,
+        badge: null,
+        push: {
+          title,
+          body: `${input.title} in ${input.repoFullName}`,
+          i18nKey: SECURITY_FINDING_PUSH_TITLE_KEYS[input.notificationKind],
+          i18nParams: {
+            severity: input.severity,
+            findingTitle: input.title,
+            repoFullName: input.repoFullName,
+          },
+          data: {
+            type: 'security_finding',
+            findingId: input.findingId,
+            scope: input.scope,
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
+    }
+    case 'security_lifecycle':
+      // Lifecycle events carry no finding title/severity, so the full-preview
+      // copy matches the generic preview copy in `push-copy.ts`: a status
+      // update, never the "finding needs attention" body.
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `security-lifecycle:${input.findingId}:${input.event}:${input.remediationId ?? 'none'}`,
+        badge: null,
+        push: {
+          title: 'Kilo',
+          body: 'A security check has an update',
+          // The catalog mapping reads this key, so the payload and the shared
+          // copy entries cannot drift apart.
+          i18nKey: SECURITY_LIFECYCLE_I18N_KEY,
+          data: {
+            type: 'security_lifecycle',
+            event: input.event,
+            findingId: input.findingId,
+            scope: input.scope,
+            ...(input.remediationId !== undefined ? { remediationId: input.remediationId } : {}),
+            ...(input.prUrl !== undefined ? { prUrl: input.prUrl } : {}),
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
   }
-
-  const title = securityFindingTitle(input.notificationKind, input.severity);
-  return {
-    userId,
-    presenceContext: null,
-    // Sibling finding rows for one advisory (per manifest, per scope) must
-    // collapse to one push per recipient; the DO instance is already per
-    // recipient. `notificationKind` stays in the key so `new_finding` and SLA
-    // pushes stay distinct.
-    idempotencyKey: input.ghsaId
-      ? `security-finding:${input.repoFullName}:${input.ghsaId}:${input.notificationKind}`
-      : `security-finding:${input.notificationId}`,
-    badge: null,
-    push: {
-      title,
-      body: `${input.title} in ${input.repoFullName}`,
-      data: {
-        type: 'security_finding',
-        findingId: input.findingId,
-        scope: input.scope,
-      },
-      sound: 'default',
-      priority: 'high',
-    },
-  } satisfies DispatchPushInput;
 }
 
 function categoryEnabled(
   prefs: UserNotificationPreferences,
-  kind: InternalDispatchRequest['kind']
+  kind: Exclude<InternalDispatchRequest['kind'], 'agent_briefing'>
 ): boolean {
-  return kind === 'low_balance' ? prefs.balanceAlertsEnabled : prefs.securityFindingsEnabled;
+  switch (kind) {
+    case 'low_balance':
+      return prefs.balanceAlertsEnabled;
+    case 'spend_alert':
+      return prefs.spendAlertsEnabled;
+    case 'security_finding':
+    case 'security_lifecycle':
+      return prefs.securityFindingsEnabled;
+  }
 }
 
 /** Narrow DO outcomes that cannot occur with null presence / no rate limit. */
@@ -112,9 +201,25 @@ function mapOutcome(kind: DispatchPushOutcome['kind']): PerRecipientResult['outc
 }
 
 /**
- * Dispatch a low-balance or security-finding push to one or more recipients.
- * Per-recipient preference gate runs before any DO call; preference-read
- * throws fail closed without calling dispatchPush.
+ * Reduce a DO failure message to a stable, content-free classification. The
+ * raw message can carry upstream detail (an Expo response excerpt, a database
+ * error string) that must not cross into client logs or Sentry; the token is
+ * what the dispatch client aggregates and alerts on.
+ */
+function classifyDispatchError(error: string): string {
+  if (error.startsWith('Expo rejected')) return 'expo_ticket_rejected';
+  if (error === 'Briefing eligibility read failed') return 'eligibility_read_failed';
+  if (error.startsWith('Accepted push bookkeeping failed')) return 'delivery_bookkeeping_failed';
+  if (error === 'Expo returned no classified push ticket outcomes') {
+    return 'unclassified_ticket_outcome';
+  }
+  return 'send_failed';
+}
+
+/**
+ * Dispatch a low-balance, spend-alert, or security push to one or more
+ * recipients. Per-recipient preference gate runs before any DO call;
+ * preference-read throws fail closed without calling dispatchPush.
  */
 export async function dispatchInternalPushCore(
   input: InternalDispatchRequest,
@@ -123,7 +228,32 @@ export async function dispatchInternalPushCore(
   const recipients: string[] = [];
   const seen = new Set<string>();
 
-  if (input.kind === 'low_balance') {
+  if (input.kind === 'agent_briefing') {
+    try {
+      const outcome = await deps
+        .getRecipientDOStub(input.userId)
+        .dispatchPush(buildDispatchInput(input.userId, input));
+      return {
+        perRecipient: [
+          {
+            userId: input.userId,
+            outcome: mapOutcome(outcome.kind),
+            ...(outcome.kind === 'failed' ? { reason: classifyDispatchError(outcome.error) } : {}),
+          },
+        ],
+      };
+    } catch {
+      return {
+        perRecipient: [{ userId: input.userId, outcome: 'failed', reason: 'dispatch_rejected' }],
+      };
+    }
+  }
+
+  if (
+    input.kind === 'low_balance' ||
+    input.kind === 'spend_alert' ||
+    input.kind === 'security_lifecycle'
+  ) {
     for (const id of input.recipientUserIds) {
       if (seen.has(id)) continue;
       seen.add(id);
@@ -134,32 +264,40 @@ export async function dispatchInternalPushCore(
   }
 
   const results = await Promise.allSettled(
-    recipients.map(async userId => {
+    recipients.map(async (userId): Promise<Omit<PerRecipientResult, 'userId'>> => {
       let prefs: UserNotificationPreferences;
       try {
         const row = await deps.readPreferences(userId);
-        prefs = row ?? DEFAULT_PREFERENCES;
+        prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
       } catch {
-        return 'failed' as const;
+        return { outcome: 'failed', reason: 'preference_read_failed' };
       }
 
       if (!categoryEnabled(prefs, input.kind)) {
-        return 'suppressed_preference' as const;
+        return { outcome: 'suppressed_preference' };
       }
 
       const stub = deps.getRecipientDOStub(userId);
       const dispatchInput = buildDispatchInput(userId, input);
       const outcome = await stub.dispatchPush(dispatchInput);
-      return mapOutcome(outcome.kind);
+      if (outcome.kind === 'failed') {
+        const reason = classifyDispatchError(outcome.error);
+        console.warn('Internal dispatch push delivery failed', {
+          kind: input.kind,
+          reason,
+          error: outcome.error,
+        });
+        return { outcome: 'failed', reason };
+      }
+      return { outcome: mapOutcome(outcome.kind) };
     })
   );
 
   const perRecipient: PerRecipientResult[] = recipients.map((userId, index) => {
     const result = results[index];
-    return {
-      userId,
-      outcome: result?.status === 'fulfilled' ? result.value : 'failed',
-    };
+    return result?.status === 'fulfilled'
+      ? { userId, ...result.value }
+      : { userId, outcome: 'failed', reason: 'dispatch_rejected' };
   });
 
   return { perRecipient };

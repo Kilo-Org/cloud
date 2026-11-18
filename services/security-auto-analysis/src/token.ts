@@ -1,115 +1,121 @@
-type JwtPayload = Record<string, unknown>;
-type JwtOptions = {
-  expiresIn: string;
-};
+import { signKiloToken } from '@kilocode/worker-utils';
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  CLOUD_AGENT_NEXT_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import type { RuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
 type TokenUser = {
   id: string;
   api_token_pepper: string | null;
 };
 
-const JWT_TOKEN_VERSION = 3;
+const ONE_HOUR_SECONDS = 60 * 60;
+
+function isSharedResourceTokensEnabled(value: string | boolean | undefined): boolean {
+  return value === true || value === 'true';
+}
 
 export async function generateInternalServiceToken(
   userId: string,
-  secret: string
+  secret: string,
+  sharedResourceTokensEnabled: string | boolean | undefined
 ): Promise<string> {
-  return signJwt(
-    {
-      kiloUserId: userId,
-      version: JWT_TOKEN_VERSION,
-    },
+  if (isSharedResourceTokensEnabled(sharedResourceTokensEnabled)) {
+    const { token } = await signModernKiloToken({
+      userId,
+      secret,
+      expiresInSeconds: ONE_HOUR_SECONDS,
+      audience: SESSION_INGEST_AUDIENCE,
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+    });
+    return token;
+  }
+
+  // No `pepper` field: verifiers treat an absent apiTokenPepper claim as
+  // "skip pepper comparison" for internal-service tokens (see
+  // verifyKiloBearerAgainstCurrentPepper in @kilocode/worker-utils).
+  const { token } = await signKiloToken({
+    userId,
     secret,
-    { expiresIn: '1h' }
-  );
+    expiresInSeconds: ONE_HOUR_SECONDS,
+  });
+  return token;
 }
 
-export async function generateApiToken(
+export async function generateControlToken(
   user: TokenUser,
   secret: string,
-  environment: string
+  environment: RuntimeEnvironment,
+  sharedResourceTokensEnabled: string | boolean | undefined,
+  organizationId?: string
 ): Promise<string> {
-  return signJwt(
-    {
+  if (isSharedResourceTokensEnabled(sharedResourceTokensEnabled)) {
+    const { token } = await signModernKiloToken({
+      userId: user.id,
+      pepper: user.api_token_pepper,
+      secret,
+      expiresInSeconds: ONE_HOUR_SECONDS,
       env: environment,
-      kiloUserId: user.id,
-      apiTokenPepper: user.api_token_pepper,
-      version: JWT_TOKEN_VERSION,
+      audience: CLOUD_AGENT_NEXT_AUDIENCE,
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+      extra: {
+        internalApiUse: true,
+        createdOnPlatform: 'security-agent',
+        organizationId,
+        runtimeAdmission: {
+          source: 'automation',
+          authorizationUserId: user.id,
+          authorizationPepper: user.api_token_pepper,
+        },
+      },
+    });
+    return token;
+  }
+
+  const { token } = await signKiloToken({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    secret,
+    expiresInSeconds: ONE_HOUR_SECONDS,
+    env: environment,
+    extra: {
       internalApiUse: true,
       createdOnPlatform: 'security-agent',
     },
+  });
+  return token;
+}
+
+export async function generateTriageToken(
+  user: TokenUser,
+  secret: string,
+  environment: RuntimeEnvironment,
+  sharedResourceTokensEnabled: string | boolean | undefined,
+  organizationId?: string
+): Promise<string> {
+  if (!isSharedResourceTokensEnabled(sharedResourceTokensEnabled)) {
+    return generateControlToken(user, secret, environment, false);
+  }
+
+  const { token } = await signModernKiloToken({
+    userId: user.id,
+    pepper: user.api_token_pepper,
     secret,
-    { expiresIn: '1h' }
-  );
-}
-
-async function signJwt(payload: JwtPayload, secret: string, options: JwtOptions): Promise<string> {
-  const header = {
-    alg: 'HS256',
-    typ: 'JWT',
-  };
-
-  const now = Math.floor(Date.now() / 1000);
-  const exp = now + parseExpiresIn(options.expiresIn);
-
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(
-    JSON.stringify({
-      ...payload,
-      iat: now,
-      exp,
-    })
-  );
-
-  const signature = await hmacSha256(`${encodedHeader}.${encodedPayload}`, secret);
-  const encodedSignature = base64UrlEncodeBytes(new Uint8Array(signature));
-
-  return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
-}
-
-function parseExpiresIn(expiresIn: string): number {
-  const match = expiresIn.match(/^(\d+)([smhd])$/);
-  if (!match) {
-    throw new Error(`Invalid expiresIn format: ${expiresIn}`);
-  }
-
-  const value = Number.parseInt(match[1], 10);
-  const unit = match[2];
-
-  if (unit === 's') {
-    return value;
-  }
-  if (unit === 'm') {
-    return value * 60;
-  }
-  if (unit === 'h') {
-    return value * 60 * 60;
-  }
-
-  return value * 60 * 60 * 24;
-}
-
-function base64UrlEncodeBytes(bytes: Uint8Array): string {
-  const base64 = btoa(bytes.reduce((s, b) => s + String.fromCharCode(b), ''));
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64UrlEncode(value: string): string {
-  return base64UrlEncodeBytes(new TextEncoder().encode(value));
-}
-
-async function hmacSha256(message: string, secret: string): Promise<ArrayBuffer> {
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secret);
-  const messageData = encoder.encode(message);
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  return crypto.subtle.sign('HMAC', key, messageData);
+    expiresInSeconds: ONE_HOUR_SECONDS,
+    env: environment,
+    audience: KILO_GATEWAY_AUDIENCE,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
+    extra: {
+      internalApiUse: true,
+      createdOnPlatform: 'security-agent',
+      organizationId,
+    },
+  });
+  return token;
 }

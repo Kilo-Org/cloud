@@ -1,4 +1,3 @@
-/** Dropdown to select an environment profile with default indicator. */
 'use client';
 
 import { useState } from 'react';
@@ -42,6 +41,8 @@ type ProfileSelectorProps = {
    * Use this for features that don't support personal profiles in org context (e.g., webhook triggers).
    */
   orgProfilesOnly?: boolean;
+  emptyLabel?: string;
+  savedSelectionLabel?: string;
 };
 
 export function ProfileSelector({
@@ -52,10 +53,11 @@ export function ProfileSelector({
   onRepoDefaultsClick,
   disabled = false,
   orgProfilesOnly = false,
+  emptyLabel = 'No profile',
+  savedSelectionLabel,
 }: ProfileSelectorProps) {
   const [showManageDialog, setShowManageDialog] = useState(false);
 
-  // Use combined profiles when in org context, otherwise use regular profiles
   const combinedQuery = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -68,9 +70,7 @@ export function ProfileSelector({
   const isLoading = organizationId ? combinedQuery.isLoading : regularQuery.isLoading;
   const error = organizationId ? combinedQuery.error : regularQuery.error;
 
-  // Get profiles based on context
   const orgProfiles = organizationId ? (combinedQuery.data?.orgProfiles ?? []) : [];
-  // Hide personal profiles in org context when orgProfilesOnly is true
   const personalProfiles = organizationId
     ? orgProfilesOnly
       ? []
@@ -110,7 +110,6 @@ export function ProfileSelector({
     );
   }
 
-  // Render profile item with owner icon
   const renderProfileItem = (profile: ProfileSummaryWithOwner, isEffectiveDefault: boolean) => (
     <SelectItem key={profile.id} value={profile.id}>
       <div className="flex items-center gap-2">
@@ -163,7 +162,9 @@ export function ProfileSelector({
                 ) : (
                   <>
                     <FolderCog className="h-4 w-4 shrink-0" />
-                    <span>No profile</span>
+                    <span>
+                      {selectedProfileId && savedSelectionLabel ? savedSelectionLabel : emptyLabel}
+                    </span>
                   </>
                 )}
               </div>
@@ -172,7 +173,7 @@ export function ProfileSelector({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__">
-            <span className="text-muted-foreground">No profile</span>
+            <span className="text-muted-foreground">{emptyLabel}</span>
           </SelectItem>
 
           {/* Org profiles section (only in org context) */}

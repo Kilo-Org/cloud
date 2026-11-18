@@ -10,8 +10,9 @@
 // that keeps it testable in plain Node.
 
 import { readTrpcErrorField } from '@/lib/trpc-error';
+import { i18n } from '@/i18n';
 
-type PrReviewQueryState =
+export type PrReviewQueryState =
   | {
       /**
        * The fetch failed with a transient error (network, 5xx, etc.). The
@@ -44,6 +45,17 @@ type PrReviewQueryState =
        * keep failing in the same way.
        */
       kind: 'reconnect';
+    }
+  | {
+      /**
+       * The read failed with BAD_GATEWAY: the review read path returned a
+       * retryable gateway failure — the authorization layer in front of
+       * GitHub is temporarily unavailable, GitHub itself answered 5xx, or
+       * the provider read layer reported a retryable transport failure.
+       * The caller should render its own unavailable state with a retry
+       * CTA instead of the generic server-error copy.
+       */
+      kind: 'service-unavailable';
     };
 
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
@@ -59,6 +71,9 @@ export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   }
   if (code === 'UNAUTHORIZED') {
     return { kind: 'reconnect' };
+  }
+  if (code === 'BAD_GATEWAY') {
+    return { kind: 'service-unavailable' };
   }
   return { kind: 'retryable' };
 }
@@ -122,7 +137,7 @@ export function classifyPrReviewMutationError(error: unknown): PrReviewMutationE
   if (code === 'FORBIDDEN') {
     return {
       kind: 'forbidden',
-      message: error instanceof Error ? error.message : 'Forbidden',
+      message: error instanceof Error ? error.message : i18n.t('prReview.operation.forbidden'),
     };
   }
   if (code === 'PRECONDITION_FAILED' && readTrpcErrorField(error, 'message') === 'terms_required') {

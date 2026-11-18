@@ -1,6 +1,17 @@
+/* eslint-disable max-lines -- The new-session prompt owns its uncontrolled input, starter chips, counter, newline control, voice dictation, and attachment strip end-to-end in one cohesive surface. */
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Animated, {
+  createAnimatedComponent,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
+import { useKeyboardMotionProgress } from '@/components/keyboard-motion-provider';
 import {
-  type LayoutChangeEvent,
+  AccessibilityInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   TextInput as RNTextInput,
@@ -9,57 +20,143 @@ import {
   type TextStyle,
   View,
 } from 'react-native';
-import { Paperclip } from '@/components/ui/icons';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
+import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
 } from '@/components/agents/composer-paste-text';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
-import { useTextHeight } from '@/components/agents/use-text-height';
-import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import {
+  NEW_SESSION_PROMPT_DEFAULT_LINES,
+  NEW_SESSION_PROMPT_LINE_HEIGHT,
+  resolveNewSessionPromptHeight,
+  shouldEnableComposerInputScroll,
+} from '@/components/agents/chat-composer-input-height';
+import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
+import {
+  resolveNewSessionPromptControlState,
+  resolvePromptCounterRemaining,
+} from '@/components/agents/new-session-prompt-state';
+import {
+  resolveComposerEdgeFadeHeight,
+  resolveNewSessionPromptMinHeight,
+} from '@/components/agents/new-session-prompt-fit';
+import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
+import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
+import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
+import { resolveAlphaColor } from '@/lib/theme-color';
 import { cn } from '@/lib/utils';
-import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
+import {
+  applyVoiceDraftAtSelection,
+  type VoiceInputSelection,
+} from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
-import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { AGENT_ATTACHMENT_MAX_BYTES } from '@/lib/agent-attachments/constants';
 import {
-  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  hasAnyFailedAttachment,
+  isAnyAttachmentUploading,
+} from '@/lib/agent-attachments/agent-attachment-types';
+import {
+  clipboardPasteFailureMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
-const PROMPT_INPUT_DEFAULT_LINES = 3;
-const PROMPT_INPUT_MAX_LINES = 6;
-const PROMPT_INPUT_LINE_HEIGHT = 24;
-// Must mirror the TextInput's actual padding: py-2 (16 total) and px-2 on
-// iOS (16 total) / the 24pt-per-side Android inset (48 total).
-const PROMPT_INPUT_VERTICAL_PADDING = 16;
-const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
+// Mirrors the input's `text-base`.
+const PROMPT_INPUT_FONT_SIZE = 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
-const PROMPT_INPUT_MAX_CHARS = 4000;
-const PROMPT_INPUT_MIN_HEIGHT =
-  PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
-const PROMPT_INPUT_MAX_HEIGHT =
-  PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_MAX_LINES + PROMPT_INPUT_VERTICAL_PADDING;
-
-const promptInputStyle = {
-  includeFontPadding: false,
-  lineHeight: PROMPT_INPUT_LINE_HEIGHT,
-  textAlignVertical: 'top',
-} satisfies TextStyle;
+/**
+ * The input's `py-2` in dp: NativeWind's native rem is 14, so the utility is
+ * 7, which the design-gate dump reports as `paddingBlock: 7`.
+ */
+const PROMPT_INPUT_VERTICAL_INSET = 7;
+/**
+ * Where a scrolled field cuts its topmost line, from the field's top. Android's
+ * EditText clips scrolled text at its padding, so the cut is at the text box.
+ * The iOS text view draws scrolled text through its padding and clips at its
+ * own bounds, so the cut is at the field's top edge.
+ */
+const PROMPT_TOP_CLIP_EDGE = Platform.OS === 'ios' ? 0 : PROMPT_INPUT_VERTICAL_INSET;
+/** A sub-pixel scroll is not a hidden line above the field. */
+const PROMPT_SCROLLED_THRESHOLD = 0.5;
+const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
+/** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
+const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
+// LinearGradient is not NativeWind-mapped; the physical style objects follow
+// the skeleton.tsx overlay pattern. The band starts at the clip edge, where a
+// scrolled field cuts its topmost line, and its height comes from the scroll
+// offset on the UI thread.
+const PROMPT_TOP_FADE_STYLE = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: PROMPT_TOP_CLIP_EDGE,
+} as const;
+const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
+// The bottom band is iOS-only: the hard bottom cut was seen and the band proven
+// on iOS, while an Android emulator run never reached a state where a line is
+// cut at the text box's bottom edge. The iOS text view draws scrolled text through
+// its padding and clips at its own bounds, so the band sits at the field's
+// bottom edge. Its height comes from the scroll offset and the field's current
+// height, on the UI thread.
+const PROMPT_BOTTOM_FADE_STYLE = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
+} as const;
+const PROMPT_BOTTOM_FADE_FILL = { flex: 1 } as const;
+/**
+ * How far past the hidden part a fade band reaches, in lines. iOS gets a quarter
+ * line, so a clipped descender or ascender fades instead of ending flat at the
+ * edge. Android gets none: its band stays at the hidden part, the rule it
+ * shipped with, because no device run proved a change there.
+ */
+const PROMPT_EDGE_FADE_RAMP_LINES = Platform.OS === 'ios' ? 0.25 : 0;
+const AnimatedPromptInput = createAnimatedComponent(RNTextInput);
 
 /**
- * New-session prompt surface: attachment strip, full-width multiline text
- * input, bottom action row (paperclip leading, voice toggle trailing), and
- * the model/mode toolbar. Owns the prompt ref (for voice input to read), the
+ * The field's rendered height at a keyboard motion progress, in points. The
+ * field grows from its keyboard-closed floor to its keyboard-open floor as the
+ * keyboard lands, so the bottom fade's cut edge moves with it.
+ */
+function resolvePromptRenderedHeight(
+  closedPromptHeight: number,
+  promptHeight: number,
+  progress: number
+): number {
+  'worklet';
+  return (
+    closedPromptHeight + (promptHeight - closedPromptHeight) * Math.max(0, Math.min(1, progress))
+  );
+}
+
+type NewSessionPromptComponentProps = NewSessionPromptProps & {
+  /**
+   * Return (when the Return-sends preference is on) triggers the host's Start
+   * flow. Omitted by hosts that have not wired the preference, so Return is a
+   * no-op there rather than starting on its own.
+   */
+  onStartSession?: () => void;
+};
+
+/**
+ * New-session prompt surface: model/mode toolbar, attachment strip,
+ * full-width multiline text input, and bottom action row (paperclip leading,
+ * voice toggle trailing). Owns the prompt ref (for voice input to read), the
  * height-measuring TextInput machinery, and the `useVoiceInput` hook. The
  * route listens to `onChangeText` so the create handler can read the live
  * prompt value after `settleVoiceInputBeforeSubmit` resolves; the attachment,
@@ -85,44 +182,195 @@ export function NewSessionPrompt({
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
+  onMoveAttachment,
+  onReorderAttachments,
   onRefetchModels,
   onPrefillAttachments,
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
-}: Readonly<NewSessionPromptProps>) {
+  frameHeight,
+  keyboardClosedFrameHeight,
+  cardTop = 0,
+  lineCount = NEW_SESSION_PROMPT_DEFAULT_LINES,
+  keyboardClosedLineCount = lineCount,
+  onStartSession,
+  isCloneEntry = false,
+  autoFocusOnMount = true,
+}: Readonly<NewSessionPromptComponentProps>) {
+  // The input never takes focus for a share payload, whatever the host decides:
+  // the payload prefills the composer, and raising the keyboard on arrival hides
+  // the attachment strip and Start. The veto stays here so a host that keeps the
+  // prop's default cannot lose it.
+  const takesFocusOnMount = autoFocusOnMount && (shareId === undefined || shareId === '');
   const colors = useThemeColors();
+  const { t } = useTranslation();
+  const fontScale = useLiveFontScale();
+  const { returnSendsMessage } = useReturnSendsMessagePreference();
+  // The counter's remaining count, or null while it is hidden. Only the value
+  // the card renders is held: the raw character count is not, so a keystroke
+  // that leaves the counter hidden publishes nothing and re-renders nothing.
+  const [counterRemaining, setCounterRemaining] = useState<number | null>(() =>
+    resolvePromptCounterRemaining(initialPrompt?.length ?? 0)
+  );
+  const publishedCounterRef = useRef<number | null>(
+    resolvePromptCounterRemaining(initialPrompt?.length ?? 0)
+  );
   const promptRef = useRef(initialPrompt ?? '');
-  const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
   // Last caret the input reported. Paste inserts here so the button behaves
   // like the platform paste.
   const promptSelectionRef = useRef<ComposerSelection | null>(null);
-  const [promptInputWidth, setPromptInputWidth] = useState(0);
-  const promptMeasure = useTextHeight({
-    minHeight: PROMPT_INPUT_MIN_HEIGHT,
-    maxHeight: PROMPT_INPUT_MAX_HEIGHT,
-    verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
-    textContentWidth: promptInputWidth - PROMPT_INPUT_HORIZONTAL_PADDING,
-    fontSize: 16,
-    lineHeight: PROMPT_INPUT_LINE_HEIGHT,
+  // Selection-aware dictation state: the caret captured at session start, the
+  // draft the last speech result produced, and the abort trigger. A user edit
+  // (including an IME edit, which fires onChangeText) diverges the live draft
+  // from the expected draft, so the next speech result aborts instead of
+  // inserting into the edit.
+  const voiceBaseDraftRef = useRef('');
+  const voiceBaseSelectionRef = useRef<VoiceInputSelection | null>(null);
+  const voiceExpectedDraftRef = useRef('');
+  // RN 0.86 exposes no IME composition event, so this stays false; the draft
+  // divergence above is what aborts dictation when an IME session edits text.
+  const isComposingRef = useRef(false);
+  const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
+  const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
+  // The band's extra reach past the hidden part, in points at this font scale.
+  const promptEdgeFadeRamp = PROMPT_EDGE_FADE_RAMP_LINES * promptLineHeight;
+  // The card rows that render only in some states, read by name in the render
+  // below (the measured card chrome covers their height without a static
+  // budget, so they need no separate reservation here).
+  const showsAttachmentStatus = attachments.some(
+    attachment => attachment.metadataStripFailed === true
+  );
+  const showsCounter = counterRemaining !== null;
+  const [topChromeHeight, setTopChromeHeight] = useState(0);
+  const [bottomChromeHeight, setBottomChromeHeight] = useState(0);
+  const cardChromeHeight =
+    topChromeHeight > 0 && bottomChromeHeight > 0 ? topChromeHeight + bottomChromeHeight + 2 : 0;
+  const fit = {
+    cardTop,
+    cardChromeHeight,
+    preferredMinHeight: resolveNewSessionPromptHeight(promptLineHeight, lineCount),
+    lineHeight: promptLineHeight,
+    preferredLines: lineCount,
+  };
+  const promptHeight = resolveNewSessionPromptMinHeight({ ...fit, frameHeight: frameHeight ?? 0 });
+  const closedPromptHeight = resolveNewSessionPromptMinHeight({
+    ...fit,
+    preferredMinHeight: resolveNewSessionPromptHeight(promptLineHeight, keyboardClosedLineCount),
+    preferredLines: keyboardClosedLineCount,
+    frameHeight: keyboardClosedFrameHeight ?? frameHeight ?? 0,
+  });
+  const keyboardProgress = useKeyboardMotionProgress();
+  const promptHeightStyle = useAnimatedStyle(() => ({
+    height: resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value),
+  }));
+
+  // The draft's own laid-out height, reported by the input on every content
+  // change on Android. The field keeps its size, so this only decides whether a
+  // vertical drag over the field scrolls the draft or the form behind it: a
+  // drag over a field whose text fits belongs to the form, exactly as it did
+  // when the field grew to its text and only scrolled once the cap stopped it.
+  //
+  // iOS cannot use the report: Fabric emits `onContentSizeChange` only when the
+  // field's own frame changes (`RCTTextInputComponentView` `updateLayoutMetrics`),
+  // and this field's frame does not change while the user types. The gate stayed
+  // closed, and a text view that cannot scroll never follows its caret, so the
+  // lines past the third and the caret were hidden. The iOS field always scrolls:
+  // a text view whose content fits does not take a vertical drag, so the form
+  // still gets it.
+  const [contentHeight, setContentHeight] = useState(0);
+  const promptScrolls =
+    Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptHeight);
+  // The fade band over the clipped top line, driven from the field's scroll
+  // offset. It lives in a shared value, not React state: a drag reports a frame
+  // per few pixels, and this card's toolbar, attachment strip and controls are
+  // not memoized, so committing each offset would re-render all of them at
+  // frame rate just to resize an overlay. Only the crossing that mounts the
+  // gradient is state.
+  const promptScrollOffset = useSharedValue(0);
+  const [promptFaded, setPromptFaded] = useState(false);
+  // The first line box starts `PROMPT_INPUT_VERTICAL_INSET` below the content's
+  // top, so the offset into the cut line is measured from the clip edge: on iOS
+  // the field scrolls through the padding before it cuts any text.
+  const promptTopFadeStyle = useAnimatedStyle(() => ({
+    height: resolveComposerEdgeFadeHeight({
+      clipEdgeOffset: Math.max(
+        0,
+        promptScrollOffset.value - (PROMPT_INPUT_VERTICAL_INSET - PROMPT_TOP_CLIP_EDGE)
+      ),
+      edge: 'top',
+      lineHeight: promptLineHeight,
+      ramp: promptEdgeFadeRamp,
+    }),
+  }));
+  // The same band at the bottom edge, for the line a scrolled field cuts there.
+  // It covers only the part of that line still inside the field, so it cannot
+  // dim the line above it. No content height is needed: a draft that ends above
+  // that slot leaves the band over blank card, where it is invisible, which also
+  // matters because iOS cannot report the content height. The band stays
+  // mounted, and its height is 0 where the edge lands on a line boundary. Only
+  // iOS renders it.
+  const promptBottomFadeStyle = useAnimatedStyle(() => {
+    // The bottom clip edge in content coordinates: the scroll offset plus the
+    // field's rendered height, where the iOS text view clips at its own bounds.
+    // The first line box starts one inset into the content, so the edge is
+    // measured from that line box.
+    const clipEdge =
+      promptScrollOffset.value +
+      resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value);
+    return {
+      height: resolveComposerEdgeFadeHeight({
+        clipEdgeOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
+        edge: 'bottom',
+        lineHeight: promptLineHeight,
+        ramp: promptEdgeFadeRamp,
+      }),
+    };
   });
 
-  const promptMeasureSetTextRef = useRef(promptMeasure.setText);
-  useEffect(() => {
-    promptMeasureSetTextRef.current(initialPromptRef.current);
+  function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const next = Math.max(0, event.nativeEvent.contentOffset.y);
+    promptScrollOffset.value = next;
+    const faded = next > PROMPT_SCROLLED_THRESHOLD;
+    setPromptFaded(current => (current === faded ? current : faded));
+  }
+
+  const promptInputStyle = {
+    color: colors.foreground,
+    includeFontPadding: false,
+    fontSize: PROMPT_INPUT_FONT_SIZE * fontScale,
+    lineHeight: promptLineHeight,
+    textAlignVertical: 'top',
+  } satisfies TextStyle;
+  // The one-line floor is shorter than the touch target. The slop makes the
+  // field's whole height reachable without taking room from the sections under
+  // the card, which the short window has none of.
+  const promptHitSlopDp = Math.max(0, (TOUCH_TARGET_DP - promptHeight) / 2);
+
+  // Publish the counter only when the value the card renders changes: the
+  // count stays hidden until the draft nears the limit, and republishing the
+  // raw length re-rendered this card — its toolbar, attachment strip, controls
+  // and voice surface — on every keystroke of a draft that never shows it.
+  const publishCounter = useCallback((length: number) => {
+    const next = resolvePromptCounterRemaining(length);
+    if (next === publishedCounterRef.current) {
+      return;
+    }
+    publishedCounterRef.current = next;
+    setCounterRemaining(next);
   }, []);
 
   const handlePromptChange = useCallback(
     (text: string) => {
       promptRef.current = text;
-      promptMeasure.setText(text);
+      publishCounter(text.length);
       onChangeText(text);
     },
-    [onChangeText, promptMeasure]
+    [onChangeText, publishCounter]
   );
 
-  useSharePrefill({
+  const sharePrefill = useSharePrefill({
     shareId,
     inputRef: promptInputRef,
     maxLength: PROMPT_INPUT_MAX_CHARS,
@@ -131,17 +379,39 @@ export function NewSessionPrompt({
   });
 
   const voiceInput = useVoiceInput({
-    disabled: isCreating,
-    getDraft: () => promptRef.current,
+    disabled: isCloneEntry || isCreating,
+    getDraft: () => {
+      // The controller calls getDraft exactly once, at session start, to
+      // snapshot the base draft. Capture the caret at the same instant so the
+      // selection-aware insert path knows where to splice the transcript.
+      voiceBaseDraftRef.current = promptRef.current;
+      voiceBaseSelectionRef.current = promptSelectionRef.current;
+      voiceExpectedDraftRef.current = promptRef.current;
+      return promptRef.current;
+    },
     onDraftChange: draft => {
-      applyVoiceDraftToInput({
+      const result = applyVoiceDraftAtSelection({
+        baseDraft: voiceBaseDraftRef.current,
+        baseSelection: voiceBaseSelectionRef.current,
+        currentDraft: promptRef.current,
+        expectedDraft: voiceExpectedDraftRef.current,
+        mergedDraft: draft,
+        isComposing: isComposingRef.current,
         input: promptInputRef.current,
-        draft,
         maxLength: PROMPT_INPUT_MAX_CHARS,
         onChangeText: handlePromptChange,
       });
+      if (result.kind === 'aborted') {
+        // The user edited the live speech range or an IME session is composing:
+        // keep their text, stop recognition, and announce the stop once.
+        AccessibilityInfo.announceForAccessibility(t('voiceInput.listeningStopped'));
+        void abortVoiceInputRef.current?.();
+        return;
+      }
+      voiceExpectedDraftRef.current = result.draft;
     },
   });
+  abortVoiceInputRef.current = voiceInput.abort;
 
   useEffect(() => {
     voiceInputSettlerRef.current = voiceInput.settleBeforeSubmit;
@@ -158,18 +428,17 @@ export function NewSessionPrompt({
     voiceInputActive: voiceInput.isActive,
   });
 
-  const paperclipDisabled = control.paperclipDisabled;
-
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await onPrefillAttachments([file]);
     },
     addText: text => {
-      // The hook calls the latest render's callback, so this sees a create or
-      // a voice session that started during the clipboard read. Neither may
-      // take a draft mutation. `NewSessionPrompt` holds no submit lock, so the
-      // button's own disabled rule is the authority.
-      if (!control.inputEditable) {
+      // The hook calls the latest render's callback, so this sees a create
+      // that started during the clipboard read. A create already holds its own
+      // snapshot, so a late paste must not land in the draft behind it.
+      // `NewSessionPrompt` holds no submit lock, so the button's own disabled
+      // rule is the authority.
+      if (control.draftMutationLocked) {
         return;
       }
       promptSelectionRef.current = pasteTextIntoComposer(text, {
@@ -181,129 +450,260 @@ export function NewSessionPrompt({
       });
     },
     onFailure: reason => {
-      toast.error(
-        reason === 'empty' ? CLIPBOARD_PASTE_EMPTY_MESSAGE : describeClassificationFailure(reason)
-      );
+      toast.error(clipboardPasteFailureMessage(reason) ?? describeClassificationFailure(reason));
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
-
-  function handlePromptInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
-    setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
-  }
 
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
   }
 
-  function handlePaperclipPress() {
-    onAddAttachment();
+  function handleInsertNewline() {
+    if (control.draftMutationLocked) {
+      return;
+    }
+    promptSelectionRef.current = pasteTextIntoComposer('\n', {
+      input: promptInputRef.current,
+      draft: promptRef.current,
+      selection: promptSelectionRef.current,
+      maxLength: PROMPT_INPUT_MAX_CHARS,
+      onChangeText: handlePromptChange,
+    });
   }
 
-  function handleVoiceToggle() {
-    void voiceInput.toggle();
+  // Return (with the Return-sends preference on) starts the session with the
+  // same gates as the Start button: a non-empty prompt, an idle form, and no
+  // failed or in-flight attachments. A blocked start shows the same error the
+  // composer shows for a failed attachment. Voice settlement and the host's
+  // model/repository/profile gates run inside `onStartSession` itself.
+  function handleReturnSubmit() {
+    if (control.createDisabled || !hasVisibleComposerText(promptRef.current)) {
+      return;
+    }
+    if (hasAnyFailedAttachment(attachments)) {
+      toast.error(t('agentChat.composer.removeFailedAttachments'));
+      return;
+    }
+    if (isAnyAttachmentUploading(attachments)) {
+      toast.error(t('agentChat.composer.waitForUploads'));
+      return;
+    }
+    onStartSession?.();
+  }
+
+  // Clone entry has no composer: render the models error or the toolbar as a
+  // standalone block, never an empty rounded composer card. The input, the
+  // attachment strip, the paperclip, the paste button, and voice are unmounted.
+  if (isCloneEntry) {
+    return (
+      <NewSessionPromptClone
+        isModelsError={isModelsError}
+        modelOptions={modelOptions}
+        mode={mode}
+        model={model}
+        variant={variant}
+        onModeChange={onModeChange}
+        onModelSelect={onModelSelect}
+        customOptions={customOptions}
+        modelLocked={modelLocked}
+        modelLockLabel={modelLockLabel}
+        isLoadingModels={isLoadingModels}
+        isCreating={isCreating}
+        onRefetchModels={onRefetchModels}
+      />
+    );
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-black/5">
-      <AttachmentPreviewStrip
-        attachments={attachments}
-        onRemove={onRemoveAttachment}
-        onRetry={onRetryAttachment}
-      />
-      <View className="px-2 pt-2">
-        {promptMeasure.measureElement}
-        <RNTextInput
-          ref={promptInputRef}
-          placeholder="What would you like to work on?"
-          placeholderTextColor={colors.mutedForeground}
-          multiline
-          defaultValue={initialPrompt}
-          className={cn(
-            'w-full px-2 py-2 text-base leading-6 text-foreground',
-            isCreating && 'opacity-50'
-          )}
-          style={[
-            promptInputStyle,
-            { height: promptMeasure.height },
-            Platform.OS === 'android'
-              ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
-              : undefined,
-          ]}
-          onChangeText={handlePromptChange}
-          onSelectionChange={handlePromptSelectionChange}
-          onLayout={handlePromptInputLayout}
-          scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
-          editable={control.inputEditable}
-          maxLength={PROMPT_INPUT_MAX_CHARS}
-          accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
-          // A shared payload prefills this input, so raising the keyboard on
-          // arrival hides the attachment strip and the Start button.
-          autoFocus={shareId === undefined || shareId === ''}
+    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+      <View
+        className="pb-2"
+        onLayout={event => {
+          setTopChromeHeight(event.nativeEvent.layout.height);
+        }}
+      >
+        {isModelsError && modelOptions.length === 0 ? (
+          <QueryError
+            placement="top"
+            variant="server"
+            title={t('agentChat.newSession.couldNotLoadModels')}
+            message={t('organization.boundary.loadErrorMessage')}
+            onRetry={() => {
+              onRefetchModels();
+            }}
+            className="border-b border-border py-4"
+          />
+        ) : (
+          <ChatToolbar
+            modeControl={{ mode, onModeChange, customOptions }}
+            model={model}
+            variant={variant}
+            modelOptions={modelOptions}
+            onModelSelect={onModelSelect}
+            disabled={isCreating}
+            isLoadingModels={isLoadingModels}
+            modelLocked={modelLocked}
+            modelLockLabel={modelLockLabel}
+            className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+          />
+        )}
+        {sharePrefill.failed ? (
+          <SharePrefillFailure
+            onRetry={() => {
+              sharePrefill.retry();
+            }}
+            onDismiss={() => {
+              sharePrefill.dismiss();
+            }}
+          />
+        ) : null}
+        <AttachmentPreviewStrip
+          attachments={attachments}
+          onRemove={onRemoveAttachment}
+          onRetry={onRetryAttachment}
+          onMove={onMoveAttachment}
+          onReorder={onReorderAttachments}
         />
-        <View className="flex-row items-center justify-between pb-2">
-          <View className="flex-row items-center gap-1">
-            <Pressable
-              onPress={handlePaperclipPress}
-              disabled={paperclipDisabled}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              className={cn(
-                'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-                paperclipDisabled && 'opacity-50'
-              )}
-              accessibilityRole="button"
-              accessibilityLabel="Add attachment"
-              accessibilityState={{ disabled: paperclipDisabled }}
+        {showsAttachmentStatus ? (
+          <AccessibleStatus
+            tone="error"
+            message={t('agentChat.composer.photoMetadataNotRemoved')}
+            className="mb-2 px-4 text-xs"
+          />
+        ) : null}
+      </View>
+      <View className="px-2">
+        <View>
+          <AnimatedPromptInput
+            ref={promptInputRef}
+            // The placeholder is the field's accessible name. Android reports a
+            // TextInput's hint only while the field is empty, so without this
+            // the name became whatever was typed: the draft once it held text,
+            // and spaces when it held only spaces. The typed draft stays the
+            // field's value.
+            accessibilityLabel={t('agentChat.newSession.promptPlaceholder')}
+            placeholder={t('agentChat.newSession.promptPlaceholder')}
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            defaultValue={initialPrompt}
+            // No dimming while a create is in flight: the field stays editable
+            // (an in-flight create must not steal the IME from the pinned
+            // footer), so it must not read as disabled. The busy affordance is
+            // the Start button's own spinner. An edit made mid-flight is not
+            // discarded: the creator cancels the attempt before it dispatches
+            // and keeps this draft (see `createSessionFromDraft`).
+            className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
+            style={[
+              promptInputStyle,
+              promptHeightStyle,
+              Platform.OS === 'android'
+                ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
+                : undefined,
+            ]}
+            onChangeText={handlePromptChange}
+            onSelectionChange={handlePromptSelectionChange}
+            hitSlop={
+              promptHitSlopDp > 0
+                ? { top: promptHitSlopDp, right: 0, bottom: promptHitSlopDp, left: 0 }
+                : undefined
+            }
+            onContentSizeChange={event => {
+              const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
+              setContentHeight(current => (current === next ? current : next));
+              if (!shouldEnableComposerInputScroll(next, promptHeight)) {
+                // The draft fits again: the field is back at its top, where the
+                // first line is whole.
+                promptScrollOffset.value = 0;
+                setPromptFaded(false);
+              }
+            }}
+            onScroll={handlePromptScroll}
+            scrollEnabled={promptScrolls}
+            maxLength={PROMPT_INPUT_MAX_CHARS}
+            returnKeyType={returnSendsMessage ? 'send' : 'default'}
+            submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
+            onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
+            maxFontSizeMultiplier={1}
+            // Focus on arrival only when the form has nothing left to configure
+            // (the host resolves this) and no share payload prefills it: the
+            // keyboard it raises would otherwise shrink the frame past the
+            // repository, Environment and Advanced sections the session still
+            // needs before it can start.
+            autoFocus={takesFocusOnMount}
+            // Android's IME swaps the app for its full-screen extract editor in a
+            // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
+            disableFullscreenUI
+          />
+          {promptFaded ? (
+            <Animated.View
+              className="absolute left-0 right-0"
+              pointerEvents="none"
+              style={[PROMPT_TOP_FADE_STYLE, promptTopFadeStyle]}
             >
-              <Paperclip size={18} color={colors.mutedForeground} />
-            </Pressable>
-            {/* Follows the input, not the paperclip: a full attachment list
-                still allows a text paste. */}
-            <ComposerPasteButton onPress={pasteClipboard} disabled={!control.inputEditable} />
-          </View>
-          {voiceInput.available ? (
-            <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
-              <VoiceInputStatus status={voiceInput.status} />
-            </View>
+              <LinearGradient
+                // The card's own color, so the slice fades into the surface
+                // behind it instead of drawing a bar of its own.
+                colors={[resolveAlphaColor(colors.card, 1), resolveAlphaColor(colors.card, 0)]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={PROMPT_TOP_FADE_FILL}
+              />
+            </Animated.View>
           ) : null}
-          {voiceInput.available ? (
-            <VoiceInputButton
-              disabled={control.voiceDisabled}
-              size="md"
-              status={voiceInput.status}
-              onPress={handleVoiceToggle}
-            />
+          {Platform.OS === 'ios' ? (
+            <Animated.View
+              className="absolute left-0 right-0"
+              pointerEvents="none"
+              style={[PROMPT_BOTTOM_FADE_STYLE, promptBottomFadeStyle]}
+            >
+              <LinearGradient
+                // Transparent above and the card's own color at the cut edge,
+                // so the line fades into the surface under it instead of ending
+                // hard.
+                colors={[resolveAlphaColor(colors.card, 0), resolveAlphaColor(colors.card, 1)]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={PROMPT_BOTTOM_FADE_FILL}
+              />
+            </Animated.View>
           ) : null}
         </View>
-      </View>
-      {isModelsError && modelOptions.length === 0 ? (
-        <QueryError
-          placement="top"
-          variant="server"
-          title="Couldn't load models"
-          message="Check your connection and try again."
-          onRetry={() => {
-            onRefetchModels();
+        <View
+          onLayout={event => {
+            setBottomChromeHeight(event.nativeEvent.layout.height);
           }}
-          className="border-t border-border py-4"
-        />
-      ) : (
-        <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onModelSelect={onModelSelect}
-          disabled={isCreating}
-          isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
-          modelLocked={modelLocked}
-          modelLockLabel={modelLockLabel}
-          className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-        />
-      )}
+        >
+          {showsCounter ? (
+            <RemainingCharactersCounter remaining={counterRemaining} className="px-1 pb-1" />
+          ) : null}
+          <NewSessionPromptControls
+            control={control}
+            voiceInput={voiceInput}
+            onAddAttachment={onAddAttachment}
+            pasteClipboard={pasteClipboard}
+          >
+            {returnSendsMessage ? (
+              <View className="ml-1">
+                <Pressable
+                  onPress={handleInsertNewline}
+                  disabled={control.draftMutationLocked}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('agentChat.composer.insertNewline')}
+                  accessibilityState={{ disabled: control.draftMutationLocked }}
+                  style={{ minHeight: PROMPT_HIT_TARGET, minWidth: PROMPT_HIT_TARGET }}
+                  className={cn(
+                    'items-center justify-center rounded-full active:opacity-70',
+                    control.draftMutationLocked && 'opacity-50'
+                  )}
+                >
+                  <CornerDownLeft size={18} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
+            ) : null}
+          </NewSessionPromptControls>
+        </View>
+      </View>
     </View>
   );
 }

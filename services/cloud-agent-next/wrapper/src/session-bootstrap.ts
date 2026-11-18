@@ -1,3 +1,5 @@
+import { runSetupScript } from './setup-script.js';
+import { writeRuntimeSkills } from './runtime-skills.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -10,7 +12,9 @@ import {
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
-import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
+import { parseControlPlaneCredential } from '../../src/shared/control-plane-credential.js';
+import { writeCloudAgentRulesFile } from './cloud-agent-rules-file.js';
+import { writeRuntimeInstructions } from './runtime-instructions.js';
 import {
   createSafeProcessDiagnostic,
   git,
@@ -21,12 +25,19 @@ import {
   type ProcessOptions,
   type ProcessOutputStream,
 } from './utils.js';
-import { redactSecrets } from './redact-output.js';
+import { createOutputRedactor, createSecretRedactor, redactSecrets } from './redact-output.js';
 import { restoreSession } from './restore-session.js';
 import { stripAnsi } from './event-parser.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
+import { reportRestoreIncomplete } from './restore-incomplete.js';
+import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
+import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
+import { credentialFreeGitUrl, requireGitCredentialRecord } from './control/git-credentials.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
+// Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
+// the clone) fails as its own timeout with its own attribution and redelivery
+// budget, not as the generic preparation-deadline failure.
 const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
 // Setup commands may legitimately stay silent for minutes (piped tools often
 // buffer), unlike git commands which run with --progress, so they get a more
@@ -41,34 +52,12 @@ const SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES = 1_024;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_BYTES + 1;
-
-function cleanTerminalOutput(text: string): string {
-  return stripAnsi(text)
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map(line => line.split('\r').at(-1) ?? '')
-    .map(line =>
-      Array.from(line)
-        .filter(character => {
-          const codePoint = character.codePointAt(0) ?? 0;
-          return (
-            codePoint === 9 ||
-            (codePoint >= 32 && codePoint !== 127 && (codePoint < 128 || codePoint > 159))
-          );
-        })
-        .join('')
-    )
-    .join('\n');
-}
-
-function boundedUtf8Tail(text: string, maxBytes: number): string {
-  const bytes = Buffer.from(text);
-  if (bytes.length <= maxBytes) return text;
-  return bytes
-    .subarray(bytes.length - maxBytes)
-    .toString('utf8')
-    .replace(/^\uFFFD/, '');
-}
+const ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 120_000;
+const ATTACHMENT_DOWNLOAD_DEADLINE_MS = 130_000;
+const MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS = 3;
+// Backoff before attempt N (attempt 1 is the initial try): attempt 2 waits
+// 250ms and attempt 3 waits 750ms.
+const ATTACHMENT_RETRY_BACKOFF_MS = [250, 750];
 
 /**
  * True for MIME classes that the prompt must surface as a `file://` part. Any
@@ -82,37 +71,25 @@ function isPromptFileMime(mime: string): boolean {
 
 function createSetupOutputReporter(
   progress: BootstrapProgress | undefined,
-  stepId: string
+  stepId: string,
+  redact: (text: string) => string
 ): {
   onOutput: (stream: ProcessOutputStream, output: string) => void;
   flush: () => void;
 } {
-  const buffers: Record<ProcessOutputStream, string> = { stdout: '', stderr: '' };
-
-  const report = (text: string): void => {
-    const cleaned = cleanTerminalOutput(text).trim();
-    if (cleaned)
-      progress?.({
-        type: 'output',
-        step: 'setup_commands',
-        stepId,
-        output: `${redactSecrets(cleaned)}\n`,
-      });
-  };
-
-  return {
-    onOutput(stream, output) {
-      const lines = (buffers[stream] + output).split('\n');
-      buffers[stream] = lines.pop() ?? '';
-      report(lines.map(line => (line.endsWith('\r') ? line.slice(0, -1) : line)).join('\n'));
-    },
-    flush() {
-      report(buffers.stdout);
-      report(buffers.stderr);
-      buffers.stdout = '';
-      buffers.stderr = '';
-    },
-  };
+  return createOutputRedactor(
+    text => redact(cleanTerminalOutput(text)),
+    text => {
+      const cleaned = text.trim();
+      if (cleaned)
+        progress?.({
+          type: 'output',
+          step: 'setup_commands',
+          stepId,
+          output: `${cleaned}\n`,
+        });
+    }
+  );
 }
 
 export type BootstrapProgressStep =
@@ -121,6 +98,7 @@ export type BootstrapProgressStep =
   | 'cloning'
   | 'branch'
   | 'kilo_session'
+  | 'restore_incomplete'
   | 'setup_commands'
   | 'attachments'
   | 'kilo_server';
@@ -165,58 +143,9 @@ export type WrapperBootstrapDeps = {
   git?: GitRunner;
   runProcess?: ProcessRunner;
   restoreSession?: typeof restoreSession;
+  beforeFailureCleanup?: () => Promise<void>;
   workspacePreparationTimeoutMs?: number;
 };
-
-const GIT_FAILURE_PATTERNS = [
-  { subtype: 'sandbox_storage_full', pattern: /no space left on device|disk quota exceeded/i },
-  {
-    subtype: 'git_authentication_failed',
-    pattern: /authentication failed|could not read username|http 401|http 403/i,
-  },
-  {
-    subtype: 'git_rate_limited',
-    // Anchor 429 to an HTTP-error context: clones run with --progress, so a bare
-    // 429 also matches object counts (e.g. "remote: Total 429 (delta 12)").
-    pattern: /(?:error|http|status(?:\s+code)?)\s*:?\s*429\b|too many requests|rate limit(?:ed)?/i,
-  },
-  {
-    subtype: 'git_network_failed',
-    pattern:
-      /remote end hung up|connection (?:reset|timed out)|could not resolve host|failed to connect/i,
-  },
-  {
-    subtype: 'git_pack_corrupt',
-    pattern: /bad object|pack.*corrupt|invalid index-pack output|early eof/i,
-  },
-] as const;
-
-function classifyGitFailure(result: ExecResult, operation: 'clone' | 'checkout') {
-  if (isTimeoutTermination(result)) {
-    return operation === 'clone' ? 'git_clone_timeout' : 'git_checkout_timeout';
-  }
-  const output = `${result.stderr}\n${result.stdout}`;
-  if (
-    operation === 'checkout' &&
-    /would be overwritten|index\.lock.*exists|unable to create.*index\.lock/i.test(output)
-  ) {
-    return 'git_checkout_conflict';
-  }
-  return (
-    GIT_FAILURE_PATTERNS.find(entry => entry.pattern.test(output))?.subtype ??
-    'workspace_setup_unknown'
-  );
-}
-
-function gitOperationError(
-  result: ExecResult,
-  operation: 'clone' | 'checkout'
-): WrapperBootstrapError {
-  const label = operation === 'clone' ? 'Repository clone' : 'Repository checkout';
-  const subtype = classifyGitFailure(result, operation);
-  const message = isTimeoutTermination(result) ? `${label} timed out` : `${label} failed`;
-  return workspaceBootstrapError(subtype, message, createSafeProcessDiagnostic(result));
-}
 
 const GIT_PROGRESS_PATTERN =
   /\b(Receiving objects|Resolving deltas|Updating files|Checking out files|Compressing objects):\s+(\d+)%/g;
@@ -258,10 +187,12 @@ function parseCloneSizeProxies(output: string): {
   return proxies;
 }
 
-function gitProgressReporter(
-  progress: BootstrapProgress | undefined,
-  step: 'cloning' | 'branch',
-  prefix: string
+/**
+ * Parses `git --progress` output into throttled "Receiving objects: 45%" lines.
+ * Shared by the legacy bootstrap and the control-plane preparation.
+ */
+export function createGitProgressReporter(
+  report: (progressText: string) => void
 ): (stream: ProcessOutputStream, output: string) => void {
   let bufferedOutput = '';
   let lastReportedProgress = '';
@@ -281,8 +212,16 @@ function gitProgressReporter(
 
     lastReportedProgress = progressText;
     lastReportedAt = now;
-    progress?.(step, `${prefix} ${progressText}`);
+    report(progressText);
   };
+}
+
+function gitProgressReporter(
+  progress: BootstrapProgress | undefined,
+  step: 'cloning' | 'branch',
+  prefix: string
+): (stream: ProcessOutputStream, output: string) => void {
+  return createGitProgressReporter(progressText => progress?.(step, `${prefix} ${progressText}`));
 }
 
 function longGitOptions(
@@ -299,32 +238,18 @@ function longGitOptions(
   };
 }
 
-export class RestoredWorkspaceReconciliationError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'RestoredWorkspaceReconciliationError';
-  }
+function canonicalGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
+  const raw = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
+  return credentialFreeGitUrl(raw);
 }
 
-export function workspaceBootstrapErrorCode(
-  error: unknown
-): 'WORKSPACE_RECONCILIATION_FAILED' | 'WORKSPACE_SETUP_FAILED' {
-  return error instanceof RestoredWorkspaceReconciliationError
-    ? 'WORKSPACE_RECONCILIATION_FAILED'
-    : 'WORKSPACE_SETUP_FAILED';
-}
-
-function authenticatedUrl(
-  gitUrl: string,
-  token: string | undefined,
-  platform: 'github' | 'gitlab' | 'bitbucket' | undefined
-): string {
-  if (!token) return gitUrl;
-  const url = new URL(gitUrl);
-  url.username =
-    platform === 'gitlab' ? 'oauth2' : platform === 'bitbucket' ? 'x-token-auth' : 'x-access-token';
-  url.password = token;
-  return url.toString();
+function isHelperBackedRemote(
+  repo: NonNullable<WrapperSessionReadyRequest['repo']>,
+  env: WrapperSessionReadyRequest['materialized']['env']
+): boolean {
+  if (repo.kind === 'github') return true;
+  if (repo.platform === 'gitlab' || repo.platform === 'bitbucket') return true;
+  return Boolean(repo.token) || (repo.platform === 'github' && Boolean(env.GH_TOKEN));
 }
 
 async function exists(filePath: string): Promise<boolean> {
@@ -342,6 +267,18 @@ function gitBootstrapMarkerPath(workspacePath: string): string {
 
 function sessionAuthFilePath(sessionHome: string): string {
   return path.join(sessionHome, '.local/share/kilo/auth.json');
+}
+
+async function materializeRepositoryCredentials(
+  request: WrapperSessionReadyRequest
+): Promise<void> {
+  const repo = request.repo;
+  await requireGitCredentialRecord({
+    home: request.workspace.sessionHome,
+    url: repo ? canonicalGitUrl(repo) : '',
+    token: repo?.token,
+    platform: repo?.kind === 'github' ? 'github' : repo?.platform,
+  });
 }
 
 // The marker is removed before re-bootstrapping and written only after restore
@@ -369,50 +306,40 @@ async function removePath(filePath: string, signal?: AbortSignal): Promise<void>
   }
 }
 
-async function cleanupWorkspace(request: WrapperSessionReadyRequest): Promise<void> {
+async function cleanupWorkspace(
+  request: WrapperSessionReadyRequest,
+  beforeFailureCleanup: WrapperBootstrapDeps['beforeFailureCleanup']
+): Promise<void> {
+  try {
+    await beforeFailureCleanup?.();
+  } catch {
+    logToFile('Failed to finalize logs before workspace cleanup');
+  }
   await Promise.allSettled([
     removePath(request.workspace.workspacePath),
     removePath(request.workspace.sessionHome),
   ]);
 }
 
-function isCodeReviewSession(request: WrapperSessionReadyRequest): boolean {
-  return request.materialized.env.KILO_PLATFORM === 'code-review';
-}
-
-function isBitbucketReviewSession(
-  request: WrapperSessionReadyRequest
-): request is WrapperSessionReadyRequest & {
-  repo: Extract<NonNullable<WrapperSessionReadyRequest['repo']>, { kind: 'git' }>;
-} {
-  const repo = request.repo;
-  return isCodeReviewSession(request) && repo?.kind === 'git' && repo.platform === 'bitbucket';
-}
-
 // Wire-format prefix of a Bitbucket outbound session capability (see the
-// git-token-service BitbucketSessionCapabilityCodec). A capability in the origin
-// stays authenticated through the outbound interceptor, unlike a raw token which
-// is stripped after bootstrap.
+// git-token-service BitbucketSessionCapabilityCodec). Presence of a capability
+// qualifies the session for blobless clone; the credential helper authenticates
+// later lazy fetches.
 const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
 
-function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
+export function isBloblessReviewCloneEligible(
+  origin: string | undefined,
+  platform: string | undefined,
+  token: string | undefined
+): boolean {
+  if (origin !== 'code-review') return false;
+  if (platform === 'github' || platform === 'gitlab') return true;
   return (
-    isBitbucketReviewSession(request) &&
-    typeof request.repo.token === 'string' &&
-    request.repo.token.startsWith(BITBUCKET_CAPABILITY_PREFIX)
+    platform === 'bitbucket' &&
+    token !== undefined &&
+    (token.startsWith(BITBUCKET_CAPABILITY_PREFIX) ||
+      parseControlPlaneCredential(token)?.purpose === 'bitbucket')
   );
-}
-
-function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
-  if (!isCodeReviewSession(request)) return false;
-  const repo = request.repo;
-  // GitHub/GitLab keep working credentials via outbound injection. Bitbucket
-  // keeps them only when the session uses an outbound capability (a raw-token
-  // origin is credential-stripped after bootstrap). Other/unknown git remotes
-  // have no such guarantee, so they keep a full clone.
-  if (repo?.kind === 'github') return true;
-  if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
-  return hasBitbucketReviewCapability(request);
 }
 
 async function cloneRepository(
@@ -426,9 +353,8 @@ async function cloneRepository(
     throw new Error('Session metadata is missing a repository source');
   }
 
-  const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
+  const repoUrl = canonicalGitUrl(repo);
   const platform = repo.kind === 'git' ? repo.platform : 'github';
-  const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
   // Code review reads changed files from the working tree and gets the PR diff
   // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
   // commit graph but not every historical file blob, so a blobless partial clone
@@ -436,8 +362,12 @@ async function cloneRepository(
   // which on large repositories otherwise exceeds the clone timeout. Full history
   // is retained, so incremental diffs and merge-base still work. See
   // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
-  // capability-backed Bitbucket, whose origin stays authenticated for lazy fetch).
-  const useBlobless = isBloblessReviewCloneEligible(request);
+  // capability-backed Bitbucket). The credential helper authenticates lazy fetch.
+  const useBlobless = isBloblessReviewCloneEligible(
+    request.materialized.env.KILO_PLATFORM,
+    platform,
+    repo.token
+  );
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
     await removePath(request.workspace.workspacePath, signal);
@@ -509,22 +439,39 @@ async function cloneRepository(
     `bootstrap clone complete kiloSessionId=${request.kiloSessionId} mode=${cloneTelemetry.mode} attempts=${attempts} durationMs=${cloneTelemetry.durationMs} totalObjects=${cloneTelemetry.totalObjects ?? '(unknown)'} receivedBytes=${cloneTelemetry.receivedBytes ?? '(unknown)'}`
   );
 
-  const authorName =
-    repo.kind === 'github' ? (repo.gitAuthor?.name ?? 'Kilo Code Cloud') : 'Kilo Code Cloud';
-  const authorEmail =
-    repo.kind === 'github' ? (repo.gitAuthor?.email ?? 'agent@kilocode.ai') : 'agent@kilocode.ai';
-  const authorNameResult = await runGit(['config', 'user.name', authorName], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
-  const authorEmailResult = await runGit(['config', 'user.email', authorEmail], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
+  await configureWorkspaceGitAuthor(
+    request.workspace.workspacePath,
+    runGit,
+    repo.kind === 'github' ? repo.gitAuthor : undefined
+  );
+  return cloneTelemetry;
+}
+
+export async function configureWorkspaceGitAuthor(
+  workspacePath: string,
+  runGit: GitRunner = git,
+  author?: { name: string; email: string },
+  signal?: AbortSignal
+): Promise<void> {
+  const authorNameResult = await runGit(
+    ['config', 'user.name', author?.name ?? 'Kilo Code Cloud'],
+    {
+      cwd: workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    }
+  );
+  const authorEmailResult = await runGit(
+    ['config', 'user.email', author?.email ?? 'agent@kilocode.ai'],
+    {
+      cwd: workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    }
+  );
   if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
     throw new Error('Failed to configure git author identity');
   }
-  return cloneTelemetry;
 }
 
 async function branchExists(
@@ -545,44 +492,37 @@ async function branchExists(
   return false;
 }
 
-const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
-const GITLAB_MR_REF_PATTERN = /^refs\/merge-requests\/\d+\/head$/;
-
-function isSyntheticReviewRef(branchName: string): boolean {
-  return GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName);
-}
-
-async function fetchSyntheticReviewRef(
-  runGit: GitRunner,
-  workspacePath: string,
-  branchName: string,
-  progress: BootstrapProgress | undefined
-): Promise<void> {
-  const fetchResult = await runGit(
-    ['fetch', '--progress', 'origin', branchName],
-    longGitOptions(progress, 'branch', 'Fetching review branch...', workspacePath)
+function gitOutputRedactor(request: WrapperSessionReadyRequest): (text: string) => string {
+  return createSecretRedactor(
+    process.env,
+    [
+      request.materialized.env,
+      {
+        ...(request.repo?.kind === 'git' && request.repo.token
+          ? { GIT_TOKEN: request.repo.token }
+          : {}),
+      },
+    ],
+    request.materialized.secretEnvKeys ?? []
   );
-  if (fetchResult.exitCode !== 0) {
-    throw gitOperationError(fetchResult, 'checkout');
-  }
-
-  const checkoutResult = await runGit(
-    ['checkout', '--progress', '-B', branchName, 'FETCH_HEAD'],
-    longGitOptions(progress, 'branch', 'Checking out review branch...', workspacePath)
-  );
-  if (checkoutResult.exitCode !== 0) {
-    throw gitOperationError(checkoutResult, 'checkout');
-  }
 }
 
 async function prepareBranch(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
-  progress: BootstrapProgress | undefined
+  progress: BootstrapProgress | undefined,
+  signal?: AbortSignal
 ): Promise<void> {
   const { workspacePath, branchName, strictBranch } = request.workspace;
   if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
+    await checkoutSyntheticReviewRef({
+      runGit,
+      workspacePath,
+      branchName,
+      ...(signal ? { signal } : {}),
+      onProgress: message => progress?.('branch', message),
+      redact: gitOutputRedactor(request),
+    });
     return;
   }
 
@@ -634,46 +574,12 @@ async function prepareBranch(
   }
 }
 
-async function sanitizeBitbucketCodeReviewRemote(
+async function sanitizeOriginRemote(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
-): Promise<boolean> {
-  if (!isBitbucketReviewSession(request)) {
-    return false;
-  }
-  // A capability origin stays authenticated through the outbound interceptor and
-  // is safe to expose (scoped to one repo, useless outside this container), so it
-  // must stay in place for a blobless clone's later lazy blob fetches. Only a raw
-  // workspace token needs stripping. Either way this is a handled code-review
-  // remote (return true), so callers do not refresh a token over it.
-  if (hasBitbucketReviewCapability(request)) {
-    return true;
-  }
-  const canonicalUrl = new URL(request.repo.url);
-  canonicalUrl.username = '';
-  canonicalUrl.password = '';
-  const result = await runGit(['remote', 'set-url', 'origin', canonicalUrl.toString()], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
-  if (result.exitCode !== 0) {
-    throw new Error('Failed to update git remote URL');
-  }
-  return true;
-}
-
-function repositoryUrls(request: WrapperSessionReadyRequest): {
-  canonical: string;
-  authenticated: string;
-} | null {
-  const repo = request.repo;
-  if (!repo) return null;
-  const canonical = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
-  const platform = repo.kind === 'git' ? repo.platform : 'github';
-  return {
-    canonical,
-    authenticated: authenticatedUrl(canonical, repo.token, platform),
-  };
+): Promise<void> {
+  if (!request.repo || !isHelperBackedRemote(request.repo, request.materialized.env)) return;
+  await setOriginUrl(request, runGit, canonicalGitUrl(request.repo));
 }
 
 async function setOriginUrl(
@@ -690,33 +596,23 @@ async function setOriginUrl(
   }
 }
 
-async function refreshGitRemoteToken(
+async function refreshGitAuthor(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<void> {
   const repo = request.repo;
-  const urls = repositoryUrls(request);
-  if (!repo?.refreshRemote || !repo.token || !urls) return;
+  if (repo?.kind !== 'github' || !repo.gitAuthor) return;
 
-  const result = await runGit(['remote', 'set-url', 'origin', urls.authenticated], {
+  const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
     cwd: request.workspace.workspacePath,
     timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
-  if (result.exitCode !== 0) {
-    throw new Error('Failed to update git remote URL');
-  }
-  if (repo.kind === 'github' && repo.gitAuthor) {
-    const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
-      cwd: request.workspace.workspacePath,
-      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-    });
-    const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
-      cwd: request.workspace.workspacePath,
-      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-    });
-    if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
-      throw new Error('Failed to configure git author identity');
-    }
+  const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
+    cwd: request.workspace.workspacePath,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+  });
+  if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
+    throw new Error('Failed to configure git author identity');
   }
 }
 
@@ -735,41 +631,9 @@ async function writeSessionAuthFile(request: WrapperSessionReadyRequest): Promis
 }
 
 async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promise<void> {
-  const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
-  await fs.mkdir(rulesDir, { recursive: true });
-  await fs.writeFile(
-    path.join(rulesDir, 'cloud-agent.md'),
-    buildCloudAgentRules(request.agentSessionId)
-  );
-}
-
-function isSafeSkillFilePath(relativePath: string): boolean {
-  if (relativePath.length === 0 || relativePath.length > 200) return false;
-  if (relativePath.startsWith('/')) return false;
-  if (relativePath.includes('..')) return false;
-  if (relativePath.includes('\\') || relativePath.includes('\0')) return false;
-  if (relativePath.toLowerCase() === 'skill.md') return false;
-  return /^[a-zA-Z0-9._\-/]+$/.test(relativePath);
-}
-
-async function writeRuntimeSkills(request: WrapperSessionReadyRequest): Promise<void> {
-  const skills = request.materialized.runtimeSkills;
-  if (!skills?.length) return;
-
-  const baseDir = path.join(request.workspace.sessionHome, '.kilocode/skills');
-  await fs.mkdir(baseDir, { recursive: true });
-
-  for (const skill of skills) {
-    const skillDir = path.join(baseDir, skill.name);
-    await fs.mkdir(skillDir, { recursive: true });
-    await fs.writeFile(path.join(skillDir, 'SKILL.md'), skill.rawMarkdown);
-    for (const [relativePath, content] of Object.entries(skill.files ?? {})) {
-      if (!isSafeSkillFilePath(relativePath)) continue;
-      const targetPath = path.join(skillDir, relativePath);
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      await fs.writeFile(targetPath, content);
-    }
-  }
+  await writeCloudAgentRulesFile(request.workspace.sessionHome, {
+    bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+  });
 }
 
 async function bootstrapEmptyKiloSession(
@@ -818,8 +682,7 @@ async function bootstrapEmptyKiloSession(
 
 async function restoreOrBootstrapKiloSession(
   request: WrapperSessionReadyRequest,
-  restore: typeof restoreSession,
-  restorePath: Exclude<WrapperRestoreTelemetry['path'], 'warm'>
+  restore: typeof restoreSession
 ): Promise<WrapperRestoreTelemetry | undefined> {
   if (request.workspace.preferSnapshot) {
     logToFile(
@@ -830,7 +693,7 @@ async function restoreOrBootstrapKiloSession(
       logToFile(
         `bootstrap snapshot restore ready kiloSessionId=${request.kiloSessionId} downloaded=${result.downloaded} diffsApplied=${result.diffs.applied} diffsSkipped=${result.diffs.skipped} diffsTotal=${result.diffs.total}`
       );
-      return { path: restorePath, diffs: result.diffs };
+      return { path: 'cold', diffs: result.diffs };
     }
     logToFile(
       `bootstrap snapshot restore failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} subtype=${result.subtype ?? '(none)'}`
@@ -844,6 +707,18 @@ async function restoreOrBootstrapKiloSession(
         result.detail
       );
     }
+    if (request.workspace.requireSnapshot) {
+      throw workspaceBootstrapError(
+        'kilo_import_failed',
+        'Session snapshot required but not found',
+        result.detail
+      );
+    }
+    // Non-clone sessions keep the empty-import fallback on a 404. This mirrors
+    // the old empty-first-preparation behavior, where a first preparation
+    // without a clone bootstrapped an empty session instead of attempting
+    // snapshot restore. Remove this fallback only after old prepared sessions
+    // age out.
     logToFile(
       `bootstrap snapshot missing; falling back to empty import kiloSessionId=${request.kiloSessionId}`
     );
@@ -851,52 +726,7 @@ async function restoreOrBootstrapKiloSession(
     logToFile(`bootstrap fresh session using empty import kiloSessionId=${request.kiloSessionId}`);
   }
   await bootstrapEmptyKiloSession(request, restore);
-  return { path: restorePath };
-}
-
-async function reconcileRestoredWorkspace(
-  request: WrapperSessionReadyRequest,
-  runGit: GitRunner,
-  progress: BootstrapProgress | undefined
-): Promise<void> {
-  const { workspacePath, branchName, upstreamBranch, strictBranch } = request.workspace;
-  if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
-    return;
-  }
-
-  let sourceBranch: string;
-  if (upstreamBranch) {
-    sourceBranch = upstreamBranch;
-  } else if (strictBranch) {
-    sourceBranch = branchName;
-  } else {
-    const defaultBranchResult = await runGit(
-      ['ls-remote', '--symref', 'origin', 'HEAD'],
-      longGitOptions(progress, 'branch', 'Resolving default branch...', workspacePath)
-    );
-    const defaultBranchMatch = defaultBranchResult.stdout.match(/^ref: refs\/heads\/(.+)\s+HEAD$/m);
-    if (defaultBranchResult.exitCode !== 0 || !defaultBranchMatch?.[1]) {
-      throw new Error('Failed to resolve authoritative remote default branch');
-    }
-    sourceBranch = defaultBranchMatch[1];
-  }
-
-  const fetchResult = await runGit(
-    ['fetch', 'origin', sourceBranch],
-    longGitOptions(progress, 'branch', 'Fetching authoritative state...', workspacePath)
-  );
-  if (fetchResult.exitCode !== 0) {
-    throw new Error('Failed to fetch authoritative remote state');
-  }
-
-  const checkoutResult = await runGit(
-    ['checkout', '-B', branchName, 'FETCH_HEAD'],
-    longGitOptions(progress, 'branch', 'Checking out session branch...', workspacePath)
-  );
-  if (checkoutResult.exitCode !== 0) {
-    throw new Error(`Failed to create session branch ${branchName} from origin/${sourceBranch}`);
-  }
+  return { path: 'cold' };
 }
 
 async function runSetupCommands(
@@ -905,14 +735,19 @@ async function runSetupCommands(
   progress: BootstrapProgress | undefined
 ): Promise<void> {
   const setupCommands = request.materialized.setupCommands ?? [];
+  const redact = createSecretRedactor(
+    { ...process.env, ...request.materialized.env },
+    [],
+    request.materialized.secretEnvKeys ?? []
+  );
   logToFile(
     `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} workspacePath=${request.workspace.workspacePath}`
   );
   for (const [index, command] of setupCommands.entries()) {
     const startedAt = Date.now();
     const stepId = `setup_command:${index}`;
-    const safeCommand = redactSecrets(command);
-    const outputReporter = createSetupOutputReporter(progress, stepId);
+    const safeCommand = redact(command);
+    const outputReporter = createSetupOutputReporter(progress, stepId, redact);
     progress?.({
       type: 'started',
       step: 'setup_commands',
@@ -923,12 +758,16 @@ async function runSetupCommands(
       commandIndex: index,
       commandCount: setupCommands.length,
     });
-    const result = await run('sh', ['-lc', command], {
-      cwd: request.workspace.workspacePath,
-      inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
-      hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
-      onOutput: outputReporter.onOutput,
-    });
+    const result = await runSetupScript(
+      command,
+      {
+        cwd: request.workspace.workspacePath,
+        inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
+        hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
+        onOutput: outputReporter.onOutput,
+      },
+      run
+    );
     outputReporter.flush();
     logToFile(
       `bootstrap setup command finished kiloSessionId=${request.kiloSessionId} index=${index + 1} count=${setupCommands.length} elapsedMs=${Date.now() - startedAt} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? '(none)'}`
@@ -946,7 +785,7 @@ async function runSetupCommands(
       throw workspaceBootstrapError(
         timedOut ? 'setup_command_timeout' : 'setup_command_failed',
         safeError,
-        createSetupCommandDiagnostic(command, result),
+        createSetupCommandDiagnostic(command, result, redact),
         timedOut
       );
     }
@@ -957,14 +796,18 @@ async function runSetupCommands(
   );
 }
 
-function createSetupCommandDiagnostic(command: string, result: ExecResult): string {
+function createSetupCommandDiagnostic(
+  command: string,
+  result: ExecResult,
+  redact: (text: string) => string
+): string {
   const base = createSafeProcessDiagnostic(result);
   const safeCommand = boundedUtf8Tail(
-    redactSecrets(cleanTerminalOutput(command)).trim(),
+    redact(cleanTerminalOutput(command)).trim(),
     SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES
   );
   const combinedOutput = [result.stdout, result.stderr].filter(Boolean).join('\n');
-  const safeOutput = redactSecrets(cleanTerminalOutput(combinedOutput)).trim();
+  const safeOutput = redact(cleanTerminalOutput(combinedOutput)).trim();
   const outputTail = boundedUtf8Tail(safeOutput, SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES);
   const parts: string[] = [`command: ${safeCommand}`, base];
   if (outputTail) {
@@ -984,6 +827,17 @@ async function safeUnlink(filePath: string): Promise<void> {
 }
 
 /**
+ * Permanent per-attachment failure: the body exceeded the size cap. Unlike
+ * transient network/stream errors it must never be retried.
+ */
+class AttachmentTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AttachmentTooLargeError';
+  }
+}
+
+/**
  * Bounded streaming read. We never trust the server's `content-length` header
  * alone: the response body is pulled at most `MAX_ATTACHMENT_DOWNLOAD_BYTES`
  * bytes. If the producer keeps producing after the cap, the read is aborted,
@@ -991,20 +845,32 @@ async function safeUnlink(filePath: string): Promise<void> {
  */
 async function downloadBounded(
   filePath: string,
-  response: Response
+  response: Response,
+  signal: AbortSignal
 ): Promise<{ bytesWritten: number }> {
+  signal.throwIfAborted();
   const body = response.body;
   if (!body) {
     throw new Error('Attachment download failed: empty body');
   }
 
-  const handle = await fs.open(filePath, 'w');
+  const handle = await fs.open(
+    filePath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+    0o600
+  );
+  const reader = body.getReader();
+  const onAbort = (): void => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
   let bytesWritten = 0;
   let overflowed = false;
   try {
-    const reader = body.getReader();
+    signal.throwIfAborted();
     while (true) {
       const { value, done } = await reader.read();
+      signal.throwIfAborted();
       if (done) break;
       if (!value) continue;
       const remaining = MAX_ATTACHMENT_DOWNLOAD_BYTES - bytesWritten;
@@ -1013,26 +879,25 @@ async function downloadBounded(
         await handle.write(value.subarray(0, writable));
         bytesWritten += writable;
         overflowed = true;
-        try {
-          await reader.cancel();
-        } catch {
-          // Ignore: we're tearing the connection down anyway.
-        }
+        void reader.cancel().catch(() => {});
         break;
       }
       await handle.write(value);
+      signal.throwIfAborted();
       bytesWritten += value.byteLength;
     }
   } catch (error) {
     await safeUnlink(filePath);
     throw error;
   } finally {
+    signal.removeEventListener('abort', onAbort);
+    reader.releaseLock();
     await handle.close();
   }
 
   if (overflowed) {
     await safeUnlink(filePath);
-    throw new Error(
+    throw new AttachmentTooLargeError(
       `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
     );
   }
@@ -1042,59 +907,110 @@ async function downloadBounded(
 
 export type DownloadResult =
   | { kind: 'ok'; part: WrapperPromptPart; bytesWritten: number }
-  | { kind: 'failed'; part: WrapperPromptPart };
+  | { kind: 'failed'; message: string; retryable: boolean };
+
+type AttachmentReadStrategy = 'stream' | 'buffer';
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Buffered read used when retrying a failed attachment download. The retry
+ * always re-fetches over a fresh connection: the failure being worked around
+ * is Bun's Web Streams reader intermittently throwing
+ * (`TypeError: undefined is not a function`) mid-read, so reusing the failed
+ * response's stream is not an option. The whole replacement body is pulled
+ * with `response.arrayBuffer()` instead of a `getReader()` loop.
+ *
+ * Memory stays bounded by checking the `content-length` gate before buffering:
+ * only responses advertising within the cap take this path, and the materialized
+ * bytes are re-checked afterwards for a lying header. `content-length` is a
+ * server-supplied hint for our own R2 presigned URLs, not the size enforcement
+ * itself (the post-read check is). Responses with a missing, invalid, or
+ * over-cap header fall back to the bounded streaming read, which enforces the
+ * cap incrementally without trusting the header.
+ */
+async function downloadBuffered(
+  filePath: string,
+  response: Response,
+  signal: AbortSignal
+): Promise<{ bytesWritten: number }> {
+  signal.throwIfAborted();
+  const contentLengthHeader = response.headers.get('content-length');
+  const contentLength = contentLengthHeader === null ? undefined : Number(contentLengthHeader);
+  if (
+    contentLength === undefined ||
+    Number.isNaN(contentLength) ||
+    contentLength > MAX_ATTACHMENT_BYTES
+  ) {
+    return downloadBounded(filePath, response, signal);
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  signal.throwIfAborted();
+  if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+    throw new AttachmentTooLargeError(
+      `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
+    );
+  }
+
+  const handle = await fs.open(
+    filePath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+    0o600
+  );
+  try {
+    await handle.write(bytes);
+  } finally {
+    await handle.close();
+  }
+  return { bytesWritten: bytes.byteLength };
+}
 
 /**
  * Download a single attachment. Per-file failure (non-2xx response,
- * read/timeout error, overflow) is converted to an explanatory text part so
- * the rest of the prompt can still proceed; the whole-message abort path is
+ * read/timeout error, overflow) is converted to a structured failure so the
+ * caller can retry transient errors or surface an explanatory text part and
+ * let the rest of the prompt proceed; the whole-message abort path is
  * reserved for non-attachment failures.
  */
 async function downloadAndMaterializeAttachment(
   attachment: WrapperBootstrapAttachment,
   fetchImpl: typeof fetch,
-  abortController: AbortController
+  signal: AbortSignal,
+  strategy: AttachmentReadStrategy = 'stream'
 ): Promise<DownloadResult> {
+  signal.throwIfAborted();
   await fs.mkdir(path.dirname(attachment.localPath), { recursive: true });
+  signal.throwIfAborted();
 
   let response: Response;
   try {
-    response = await fetchImpl(attachment.signedUrl, {
-      signal: abortController.signal,
-    });
+    response = await fetchImpl(attachment.signedUrl, { signal });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
-      },
-    };
+    const message = redactSecrets(error instanceof Error ? error.message : String(error));
+    return { kind: 'failed', message, retryable: true };
   }
 
   if (!response.ok) {
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (HTTP ${response.status})`,
-      },
-    };
+    void response.body?.cancel().catch(() => {});
+    const retryable = response.status === 429 || response.status >= 500;
+    return { kind: 'failed', message: `HTTP ${response.status}`, retryable };
   }
 
   let result: { bytesWritten: number };
   try {
-    result = await downloadBounded(attachment.localPath, response);
+    result =
+      strategy === 'buffer'
+        ? await downloadBuffered(attachment.localPath, response, signal)
+        : await downloadBounded(attachment.localPath, response, signal);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
-      },
-    };
+    void response.body?.cancel().catch(() => {});
+    if (error instanceof AttachmentTooLargeError) {
+      return { kind: 'failed', message: error.message, retryable: false };
+    }
+    throw error;
   }
 
   if (isPromptFileMime(attachment.mime)) {
@@ -1123,52 +1039,125 @@ async function downloadAndMaterializeAttachment(
   };
 }
 
+/**
+ * Download and materialize a single attachment, retrying transient failures.
+ * The first attempt uses the bounded streaming read; later attempts re-fetch
+ * and use the buffered read, which bypasses the flaky Web Streams reader.
+ * One overall deadline bounds the whole attachment (retries included): each
+ * attempt's timeout is clamped to the remaining budget, so an in-flight
+ * attempt started just under the deadline cannot run a full extra timeout.
+ * Filesystem failures during directory/file creation throw into the same
+ * bounded retry loop as transient network failures. Returns the prompt part:
+ * a `file://` part on success, or an explanatory text part when retries are
+ * exhausted or the failure is permanent.
+ */
+async function materializeAttachment(
+  attachment: WrapperBootstrapAttachment,
+  fetchImpl: typeof fetch,
+  externalSignal?: AbortSignal
+): Promise<WrapperPromptPart> {
+  const deadline = Date.now() + ATTACHMENT_DOWNLOAD_DEADLINE_MS;
+  let attemptsMade = 0;
+  for (let attempt = 1; attempt <= MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS; attempt++) {
+    if (Date.now() >= deadline) break;
+    attemptsMade = attempt;
+    const timeoutMs = Math.min(ATTACHMENT_DOWNLOAD_TIMEOUT_MS, Math.max(1, deadline - Date.now()));
+    const abortController = new AbortController();
+    const timeout = setTimeout(
+      () => abortController.abort(new Error('attachment download timeout')),
+      timeoutMs
+    );
+    const signal = externalSignal
+      ? AbortSignal.any([abortController.signal, externalSignal])
+      : abortController.signal;
+    try {
+      const result = await downloadAndMaterializeAttachment(
+        attachment,
+        fetchImpl,
+        signal,
+        attempt === 1 ? 'stream' : 'buffer'
+      );
+      if (result.kind === 'ok') return result.part;
+      if (!result.retryable) {
+        return {
+          type: 'text',
+          text: `attachment ${attachment.filename} could not be retrieved (${result.message})`,
+        };
+      }
+      logToFile(
+        `attachment download attempt ${attempt}/${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} failed filename=${attachment.filename} reason=${result.message}`
+      );
+    } catch (error) {
+      externalSignal?.throwIfAborted();
+      if (error instanceof AttachmentTooLargeError) {
+        return {
+          type: 'text',
+          text: `attachment ${attachment.filename} could not be retrieved (${error.message})`,
+        };
+      }
+      const message = redactSecrets(error instanceof Error ? error.message : String(error));
+      logToFile(
+        `attachment download attempt ${attempt}/${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} failed filename=${attachment.filename} reason=${message}`
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+    externalSignal?.throwIfAborted();
+    if (attempt < MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS) {
+      if (Date.now() >= deadline) break;
+      await sleep(ATTACHMENT_RETRY_BACKOFF_MS[attempt - 1] ?? 0);
+    }
+  }
+  return {
+    type: 'text',
+    text: `attachment ${attachment.filename} could not be retrieved (download failed after ${attemptsMade} ${attemptsMade === 1 ? 'attempt' : 'attempts'})`,
+  };
+}
+
 export type MaterializeDeps = {
   fetch?: typeof fetch;
+  signal?: AbortSignal;
 };
+
+export async function materializeMessageAttachments(
+  message: WrapperPromptRequest['message'],
+  deps: MaterializeDeps = {}
+): Promise<WrapperPromptRequest['message']> {
+  deps.signal?.throwIfAborted();
+  if (!message.attachments?.length) return message;
+  const fetchImpl = deps.fetch ?? fetch;
+
+  const parts: WrapperPromptPart[] = [];
+  for (const attachment of message.attachments) {
+    deps.signal?.throwIfAborted();
+    parts.push(await materializeAttachment(attachment, fetchImpl, deps.signal));
+  }
+
+  return {
+    ...message,
+    parts: [
+      ...(message.parts ??
+        (message.prompt ? [{ type: 'text' as const, text: message.prompt }] : [])),
+      ...parts,
+    ],
+    prompt: undefined,
+    attachments: undefined,
+  };
+}
 
 export async function materializePromptAttachments(
   prompt: WrapperPromptRequest,
   deps: MaterializeDeps = {}
 ): Promise<WrapperPromptRequest> {
-  if (!prompt.message.attachments?.length) return prompt;
-  const fetchImpl = deps.fetch ?? fetch;
-
-  const parts: WrapperPromptPart[] = [];
-  for (const attachment of prompt.message.attachments) {
-    const abortController = new AbortController();
-    const timeout = setTimeout(
-      () => abortController.abort(new Error('attachment download timeout')),
-      120_000
-    );
-    let result: DownloadResult;
-    try {
-      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, abortController);
-    } finally {
-      clearTimeout(timeout);
-    }
-    parts.push(result.part);
-  }
-
-  return {
-    ...prompt,
-    message: {
-      ...prompt.message,
-      parts: [
-        ...(prompt.message.parts ?? [{ type: 'text', text: prompt.message.prompt ?? '' }]),
-        ...parts,
-      ],
-      prompt: undefined,
-      attachments: undefined,
-    },
-  };
+  return { ...prompt, message: await materializeMessageAttachments(prompt.message, deps) };
 }
 
 async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   request: WrapperSessionReadyRequest,
   progress: BootstrapProgress | undefined,
   deps: WrapperBootstrapDeps,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timeoutError: WrapperBootstrapError
 ): Promise<WrapperBootstrapResult> {
   const runGit = deps.git ?? git;
   const run = deps.runProcess ?? runProcess;
@@ -1180,12 +1169,10 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   let workspaceNeedsBootstrap = true;
   let cloneTelemetry: WrapperCloneTelemetry | undefined;
   let restoreTelemetry: WrapperRestoreTelemetry | undefined;
-  const restoredFromBackup = request.workspace.restoredFromBackup === true;
 
   try {
     workspaceWasWarm = await isCompleteGitWorkspace(request.workspace.workspacePath);
-    workspaceNeedsBootstrap =
-      restoredFromBackup || !workspaceWasWarm || !request.workspace.preferSnapshot;
+    workspaceNeedsBootstrap = !workspaceWasWarm || !request.workspace.preferSnapshot;
     logToFile(
       `bootstrap workspace plan kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} home=${process.env.HOME ?? '(unset)'} homeMatchesSessionHome=${process.env.HOME === request.workspace.sessionHome} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0}`
     );
@@ -1194,6 +1181,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     await ensureWorkspaceDirectories(request);
+    await materializeRepositoryCredentials(request);
     signal.throwIfAborted();
 
     if (workspaceNeedsBootstrap) {
@@ -1201,14 +1189,17 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     await writeCloudAgentRules(request);
+    await writeRuntimeInstructions(
+      request.workspace.sessionHome,
+      request.materialized.runtimeInstructions
+    );
 
     if (workspaceWasWarm) {
       logToFile(
         `bootstrap warm workspace refreshing remote kiloSessionId=${request.kiloSessionId}`
       );
-      if (workspaceNeedsBootstrap || !(await sanitizeBitbucketCodeReviewRemote(request, runGit))) {
-        await refreshGitRemoteToken(request, runGit);
-      }
+      await sanitizeOriginRemote(request, runGit);
+      await refreshGitAuthor(request, runGit);
       logToFile(`bootstrap warm workspace remote ready kiloSessionId=${request.kiloSessionId}`);
     } else {
       progress?.('cloning', 'Cloning repository...');
@@ -1216,6 +1207,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         `bootstrap cold workspace cloning repository kiloSessionId=${request.kiloSessionId}`
       );
       cloneTelemetry = await cloneRepository(request, runGit, progress, signal);
+      await sanitizeOriginRemote(request, runGit);
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
@@ -1226,41 +1218,49 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap branch preparation starting kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false}`
       );
-      if (restoredFromBackup) {
-        try {
-          const urls = repositoryUrls(request);
-          if (urls) await setOriginUrl(request, runGit, urls.authenticated);
-          await reconcileRestoredWorkspace(request, runGit, progress);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          throw new RestoredWorkspaceReconciliationError(message, { cause: error });
-        }
-      } else {
-        await prepareBranch(request, runGit, progress);
-      }
+      await prepareBranch(request, runGit, progress, signal);
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
-      await sanitizeBitbucketCodeReviewRemote(request, runGit);
 
-      await writeRuntimeSkills(request);
+      await writeRuntimeSkills(request.workspace.sessionHome, request.materialized.runtimeSkills, {
+        signal,
+        onProgress: detail => progress?.('setup_commands', detail),
+      });
 
       progress?.(
         'kilo_session',
         request.workspace.preferSnapshot ? 'Restoring session...' : 'Importing session...'
       );
-      restoreTelemetry = await restoreOrBootstrapKiloSession(
-        request,
-        restore,
-        restoredFromBackup ? 'backup' : 'cold'
-      );
-      if (restoreTelemetry?.diffs) {
-        const restoreLabel = restoreTelemetry.path === 'backup' ? 'Resume restore' : 'Cold restore';
+      restoreTelemetry = await restoreOrBootstrapKiloSession(request, restore);
+      const incomplete = restoreTelemetry
+        ? await reportRestoreIncomplete({
+            diffs: restoreTelemetry.diffs ?? { applied: 0, skipped: 0, total: 0 },
+            identity: `kiloSessionId=${request.kiloSessionId} wrapperRunId=${request.session.wrapperRunId} wrapperGeneration=${request.session.wrapperGeneration}`,
+            log: logToFile,
+            step: {
+              started: label =>
+                progress?.({
+                  type: 'started',
+                  step: 'restore_incomplete',
+                  stepId: 'phase:restore_incomplete',
+                  kind: 'phase',
+                  label,
+                }),
+              failed: safeError =>
+                progress?.({
+                  type: 'failed',
+                  step: 'restore_incomplete',
+                  stepId: 'phase:restore_incomplete',
+                  safeError,
+                }),
+            },
+          })
+        : undefined;
+      if (!incomplete && restoreTelemetry?.diffs) {
         progress?.(
           'kilo_session',
-          restoreTelemetry.diffs.skipped > 0
-            ? `${restoreLabel} incomplete, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
-            : `${restoreLabel}, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
+          `Cold restore, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
         );
       }
 
@@ -1284,26 +1284,20 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     progress?.('kilo_server', 'Starting Kilo...');
     return {
       workspaceWasWarm,
-      restoredFromBackup,
       ...(cloneTelemetry ? { clone: cloneTelemetry } : {}),
       ...(restoreTelemetry ? { restore: restoreTelemetry } : {}),
     };
   } catch (error) {
-    if (error instanceof RestoredWorkspaceReconciliationError) {
-      if (workspaceNeedsBootstrap) {
-        await cleanupWorkspace(request);
-      }
-      throw error;
-    }
+    const failure = signal.reason === timeoutError ? timeoutError : error;
     const bootstrapError =
-      error instanceof WrapperBootstrapError
-        ? error
+      failure instanceof WrapperBootstrapError
+        ? failure
         : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
     logToFile(
-      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'}`
+      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
     );
     if (workspaceNeedsBootstrap) {
-      await cleanupWorkspace(request);
+      await cleanupWorkspace(request, deps.beforeFailureCleanup);
       logToFile(`bootstrap workspace cleanup finished kiloSessionId=${request.kiloSessionId}`);
     }
     throw bootstrapError;
@@ -1358,11 +1352,9 @@ export async function prepareWrapperBootstrapWorkspace(
               : workspaceSignal,
           }),
       },
-      workspaceSignal
+      workspaceSignal,
+      timeoutError
     );
-  } catch (error) {
-    if (workspaceSignal.reason === timeoutError) throw timeoutError;
-    throw error;
   } finally {
     clearTimeout(timeout);
   }

@@ -1,56 +1,130 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
+  type Owner,
+} from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
-  deleteIntegration,
   findPendingInstallationByKiloUserId,
+  getGitHubIntegrationById,
+  personalGitHubIntegrationOrder,
+  updateIntegrationMetadataForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
+import { uninstallExclusiveGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import { ownerCondition } from '@/lib/integrations/db/predicates';
 import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
   fetchGitHubRepositories,
+  GitHubRateLimitError,
+  isGitHubRateLimitError,
+  toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
-import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * List all integrations for an owner
  * Only returns GitHub integrations to prevent errors with non-GitHub platforms
  */
 export async function listIntegrations(owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const integrations = await db
     .select()
     .from(platform_integrations)
-    .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')));
+    .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
+    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
 
   return integrations;
+}
+
+/**
+ * Which of these connections `uninstallApp` can remove upstream, judged by the
+ * same rule `uninstallExclusiveGitHubInstallation` applies: a `workflow`-role
+ * association whose installation has no other locally connected association.
+ * The hub reads this instead of guessing from the list alone, so it never
+ * offers a native Disconnect the server would refuse.
+ */
+export async function listNativelyUninstallableIds(
+  integrations: readonly PlatformIntegration[]
+): Promise<Set<string>> {
+  const candidates = integrations.filter(
+    integration =>
+      integration.github_connection_role === 'workflow' &&
+      integration.platform_installation_id != null
+  );
+  const installationIds = [
+    ...new Set(candidates.map(integration => integration.platform_installation_id as string)),
+  ];
+  if (installationIds.length === 0) {
+    return new Set();
+  }
+
+  // Every owner's association can share one installation, so the sibling count
+  // is read across the table, exactly as the uninstall transaction does.
+  const connected = await db
+    .select({
+      installationId: platform_integrations.platform_installation_id,
+      appType: platform_integrations.github_app_type,
+    })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        inArray(platform_integrations.platform_installation_id, installationIds),
+        isNull(platform_integrations.github_disconnected_at)
+      )
+    );
+
+  const countKey = (installationId: string, appType: string | null) =>
+    `${installationId}:${appType ?? 'standard'}`;
+  const counts = new Map<string, number>();
+  for (const row of connected) {
+    if (!row.installationId) continue;
+    const key = countKey(row.installationId, row.appType);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return new Set(
+    candidates
+      .filter(
+        integration =>
+          counts.get(
+            countKey(integration.platform_installation_id as string, integration.github_app_type)
+          ) === 1
+      )
+      .map(integration => integration.id)
+  );
 }
 
 /**
  * Get GitHub App installation status for an owner
  */
 export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
-    .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
+    .orderBy(
+      ...(owner.type === 'org'
+        ? [
+            desc(platformIntegrationHealthSql()),
+            asc(platform_integrations.created_at),
+            asc(platform_integrations.id),
+          ]
+        : personalGitHubIntegrationOrder())
+    )
     .limit(1);
 
   return integration || null;
@@ -69,15 +143,17 @@ export async function checkUserPendingInstallation(userId: string) {
  * This includes:
  * - 404 Not Found: Installation was deleted
  * - 401 Unauthorized: App credentials revoked
- * - 403 Forbidden: App was suspended or access revoked
+ * - 403 Forbidden: App was suspended or access revoked, unless GitHub answered
+ *   with a rate limit instead. 403 carries both meanings, and a limited request
+ *   proves nothing about the installation, so it is not "gone".
  */
 export function isInstallationGoneError(error: unknown): boolean {
-  // Octokit errors have a status property
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status: number }).status;
-    return status === 404 || status === 401 || status === 403;
-  }
-  return false;
+  // Octokit errors carry the HTTP status.
+  if (!error || typeof error !== 'object' || !('status' in error)) return false;
+  const status = error.status;
+  if (typeof status !== 'number') return false;
+  if (status === 403) return !isGitHubRateLimitError(error);
+  return status === 404 || status === 401;
 }
 
 /**
@@ -85,27 +161,16 @@ export function isInstallationGoneError(error: unknown): boolean {
  */
 export async function uninstallApp(
   owner: Owner,
+  integrationId: string | undefined,
   _userId: string,
   _userEmail: string,
   _userName: string
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
-
-  // Get the integration
-  const [integration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        ownershipCondition,
-        eq(platform_integrations.platform, 'github'),
-        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
-      )
-    )
-    .limit(1);
+  const integration = integrationId
+    ? await getGitHubIntegrationById(owner, integrationId)
+    : owner.type === 'user'
+      ? await getInstallation(owner)
+      : null;
 
   if (!integration) {
     throw new TRPCError({
@@ -121,36 +186,44 @@ export async function uninstallApp(
     });
   }
 
-  // Delete the installation from GitHub
-  const appType = integration.github_app_type || 'standard';
   try {
-    await deleteGitHubInstallation(integration.platform_installation_id, appType);
+    await uninstallExclusiveGitHubInstallation({
+      owner,
+      integrationId: integration.id,
+      deleteUpstream: async (installationId, appType) => {
+        try {
+          await deleteGitHubInstallation(installationId, appType);
+        } catch (error) {
+          // A rate-limited delete proves nothing about the installation, so
+          // surface the typed limit and let the transaction roll back instead
+          // of removing the local association for an installation that is
+          // still installed upstream.
+          const rateLimitError = toGitHubRateLimitError(error);
+          if (rateLimitError) throw rateLimitError;
+          if (!isInstallationGoneError(error)) throw error;
+        }
+      },
+    });
   } catch (error) {
-    // If the installation is already gone on GitHub (404, 401, 403),
-    // proceed to delete from our database anyway
-    if (!isInstallationGoneError(error)) {
+    if (error instanceof Error && error.message.includes('disconnected locally')) {
       throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: `Failed to delete GitHub installation: ${error instanceof Error ? error.message : String(error)}`,
+        code: 'CONFLICT',
+        message: 'Disconnect this Kilo connection instead of uninstalling the shared GitHub App',
       });
     }
-    // Installation is already gone on GitHub, continue to delete from our database
-  }
-
-  // Delete from database
-  if (owner.type === 'org') {
-    await deleteIntegration(owner.id, 'github');
-    // TODO: Add audit log when integration audit actions are defined
-  } else {
-    // Delete for user
-    await db
-      .delete(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.owned_by_user_id, owner.id),
-          eq(platform_integrations.platform, 'github')
-        )
-      );
+    if (error instanceof GitHubRateLimitError) {
+      const minutes = Math.max(1, Math.round((error.resetAt.getTime() - Date.now()) / 60_000));
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: `GitHub rate limit reached. Try again in about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+        cause: error,
+      });
+    }
+    errorExceptInTest('Failed to delete GitHub installation', { error });
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to delete GitHub installation',
+    });
   }
 
   return { success: true };
@@ -158,17 +231,16 @@ export async function uninstallApp(
 
 /**
  * List repositories accessible by an integration
- * Returns cached repositories by default, fetches fresh from GitHub when forceRefresh is true
+ * Returns the cached snapshot by default, including an empty one that has
+ * already synced; reads the provider when the row has no snapshot yet or when
+ * forceRefresh is true
  */
 export async function listRepositories(
   owner: Owner,
   integrationId: string,
   forceRefresh: boolean = false
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -197,10 +269,23 @@ export async function listRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  // If forceRefresh, no cached repos, or never synced before, fetch from GitHub and update cache
-  if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
+  // Answer from the cached snapshot unless the caller forces a sync or the
+  // integration has never synced: a synced empty snapshot is the
+  // connected-empty state, not a reason to re-query GitHub on every read.
+  if (
+    shouldSyncProviderRepositories({
+      forceRefresh,
+      cachedRepositories,
+      repositoriesSyncedAt: integration.repositories_synced_at,
+    })
+  ) {
     const appType = integration.github_app_type || 'standard';
-    const repos = await fetchGitHubRepositories(integration.platform_installation_id, appType);
+    const repos = await fetchGitHubRepositories(
+      integration.platform_installation_id,
+      appType,
+      integration.id,
+      'management'
+    );
     await updateRepositoriesForIntegration(integrationId, repos);
     return {
       repositories: repos,
@@ -208,29 +293,29 @@ export async function listRepositories(
     };
   }
 
-  // Return cached repos
   return {
-    repositories: cachedRepositories,
+    repositories: cachedRepositories ?? [],
     syncedAt: integration.repositories_synced_at,
   };
 }
 
 /**
- * Cancel a pending installation
+ * Cancel one pending installation request.
+ *
+ * The id is required: a user can hold several pending requests, so the caller
+ * must name the row it displayed. An id that is not a pending request for this
+ * owner is refused rather than replaced by another matching row.
  */
-export async function cancelPendingInstallation(owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+export async function cancelPendingInstallation(owner: Owner, integrationId: string) {
+  const ownershipCondition = ownerCondition(owner);
 
-  // Find the pending installation
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         ownershipCondition,
+        eq(platform_integrations.id, integrationId),
         eq(platform_integrations.platform, 'github'),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
         isNull(platform_integrations.platform_installation_id)
@@ -260,12 +345,10 @@ export async function cancelPendingInstallation(owner: Owner) {
 export async function listBranches(
   owner: Owner,
   integrationId: string,
-  repositoryFullName: string
+  repositoryFullName: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -297,7 +380,9 @@ export async function listBranches(
   const branches = await fetchGitHubBranches(
     integration.platform_installation_id,
     repositoryFullName,
-    appType
+    appType,
+    integration.id,
+    purpose
   );
 
   return { branches };
@@ -306,12 +391,20 @@ export async function listBranches(
 /**
  * Update the model for a GitHub App integration.
  * For organization-owned integrations, validates the model against org access policy.
+ *
+ * `integrationId` targets one specific installation — required for organizations that
+ * can have multiple GitHub installations, since `getInstallation` would otherwise just
+ * guess one. When omitted, falls back to the owner's single best installation, which
+ * covers the personal (single-installation) case.
  */
 export async function updateModel(
   owner: Owner,
-  modelSlug: string
+  modelSlug: string,
+  integrationId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const integration = await getInstallation(owner);
+  const integration = integrationId
+    ? await getGitHubIntegrationById(owner, integrationId)
+    : await getInstallation(owner);
 
   if (!integration) {
     return { success: false, error: 'No GitHub App installation found' };
@@ -324,18 +417,12 @@ export async function updateModel(
     }
   }
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
-
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata: {
-        ...existingMetadata,
-        model_slug: modelSlug,
-      },
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integration.id));
+  await updateIntegrationMetadataForOwner(
+    owner,
+    PLATFORM.GITHUB,
+    { model_slug: modelSlug },
+    integration.id
+  );
 
   return { success: true };
 }

@@ -1,11 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteRetainedSecurityAgentCommands,
   reconcileStaleSecurityAgentCommands,
 } from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { discoverDueOwners, reconcileStaleAnalysisQueueRows } from './db/queries.js';
-import { discoverQueuedRemediationAttempts } from './remediation.js';
+import {
+  discoverQueuedRemediationAttempts,
+  recoverStaleRemediationLaunchAttempts,
+} from './remediation.js';
 import { dispatchDueOwners } from './dispatcher.js';
 
 const loggerMock = vi.hoisted(() => {
@@ -27,7 +30,10 @@ vi.mock('./db/queries.js', () => ({
   discoverDueOwners: vi.fn(),
   reconcileStaleAnalysisQueueRows: vi.fn(),
 }));
-vi.mock('./remediation.js', () => ({ discoverQueuedRemediationAttempts: vi.fn() }));
+vi.mock('./remediation.js', () => ({
+  discoverQueuedRemediationAttempts: vi.fn(),
+  recoverStaleRemediationLaunchAttempts: vi.fn(),
+}));
 vi.mock('./logger.js', () => ({
   logger: loggerMock,
   sanitizedExceptionName: (error: unknown) =>
@@ -61,9 +67,48 @@ beforeEach(() => {
   } as never);
   vi.mocked(deleteRetainedSecurityAgentCommands).mockResolvedValue(3);
   vi.mocked(discoverDueOwners).mockResolvedValue([{ type: 'user', id: 'sensitive-owner-id' }]);
+  vi.mocked(recoverStaleRemediationLaunchAttempts).mockResolvedValue({
+    requeuedCount: 2,
+    failedCount: 1,
+    cancelledCount: 1,
+  });
   vi.mocked(discoverQueuedRemediationAttempts).mockResolvedValue(['sensitive-attempt-id']);
   ownerQueueSend.mockResolvedValue(undefined);
   remediationQueueSend.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('dispatchDueOwners remediation launch recovery', () => {
+  it.each([undefined, '1000', '60000', '600000'])(
+    'keeps the five-minute reclaim window independent of command timeout %s',
+    async acceptedCommandTimeoutMs => {
+      vi.useFakeTimers();
+      const now = new Date('2026-10-26T22:00:00.000Z');
+      vi.setSystemTime(now);
+      const workerEnv = {
+        ...env(),
+        SECURITY_AGENT_COMMAND_ACCEPTED_TIMEOUT_MS: acceptedCommandTimeoutMs,
+      };
+
+      await dispatchDueOwners(workerEnv, 'dispatch-123');
+
+      expect(recoverStaleRemediationLaunchAttempts).toHaveBeenCalledWith(expect.anything(), {
+        env: workerEnv,
+        claimedBefore: new Date(now.getTime() - 5 * 60 * 1000),
+      });
+      expect(reconcileStaleSecurityAgentCommands).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          acceptedBefore: new Date(
+            now.getTime() - Number(acceptedCommandTimeoutMs ?? 5 * 60 * 1000)
+          ),
+        })
+      );
+    }
+  );
 });
 
 describe('dispatchDueOwners telemetry', () => {
@@ -83,6 +128,7 @@ describe('dispatchDueOwners telemetry', () => {
     expect(stageTags.map(tags => tags.dispatcher_stage)).toEqual([
       'stale_analysis_queue_reconciliation',
       'stale_command_reconciliation',
+      'stale_remediation_launch_reconciliation',
       'retained_command_deletion',
       'due_owner_discovery',
       'owner_queue_sends',
@@ -96,11 +142,98 @@ describe('dispatchDueOwners telemetry', () => {
       requeued_pending_count: 1,
       failed_running_count: 2,
     });
-    const serializedLogs = JSON.stringify(loggerMock.withTags.mock.calls);
-    expect(serializedLogs).not.toContain('sensitive-owner-id');
-    expect(serializedLogs).not.toContain('sensitive-command-id');
-    expect(serializedLogs).not.toContain('sensitive-attempt-id');
-    expect(serializedLogs).not.toContain('postgres://');
+    expect(stageTags[2]).toMatchObject({
+      requeued_stale_remediation_launch_count: 2,
+      failed_stale_remediation_launch_count: 1,
+      cancelled_stale_remediation_launch_count: 1,
+    });
+    const serializedStageLogs = JSON.stringify(
+      loggerMock.withTags.mock.calls.filter(
+        ([tags]) =>
+          (tags as { event_name?: string }).event_name ===
+          'security_auto_analysis.dispatcher_stage_succeeded'
+      )
+    );
+    expect(serializedStageLogs).not.toContain('sensitive-owner-id');
+    expect(serializedStageLogs).not.toContain('sensitive-command-id');
+    expect(serializedStageLogs).not.toContain('sensitive-attempt-id');
+    expect(serializedStageLogs).not.toContain('postgres://');
+  });
+
+  it('logs one command_stalled event per reconciled stale command', async () => {
+    vi.mocked(reconcileStaleSecurityAgentCommands).mockResolvedValueOnce({
+      staleAccepted: [
+        {
+          id: 'stale-accepted-id',
+          command_type: 'sync',
+          owned_by_organization_id: 'org-123',
+          accepted_at: new Date(Date.now() - 5_000).toISOString(),
+          result_code: 'COMMAND_STALLED',
+          repo_full_name: 'acme/widgets',
+        },
+      ],
+      staleRunning: [
+        {
+          id: 'stale-running-id',
+          command_type: 'sync',
+          owned_by_user_id: 'user-123',
+          accepted_at: new Date(Date.now() - 9_000).toISOString(),
+          started_at: new Date(Date.now() - 4_000).toISOString(),
+          last_error_redacted: 'must-not-be-logged',
+        },
+      ],
+    } as never);
+
+    await dispatchDueOwners(env(), 'dispatch-123');
+
+    const stallTags = loggerMock.withTags.mock.calls
+      .map(([tags]) => tags as Record<string, unknown>)
+      .filter(tags => tags.event_name === 'security_auto_analysis.command_stalled');
+    expect(stallTags).toHaveLength(2);
+    expect(stallTags[0]).toMatchObject({
+      command_id: 'stale-accepted-id',
+      command_type: 'sync',
+      owner_type: 'org',
+      owner_id: 'org-123',
+      previous_status: 'accepted',
+      result_code: 'COMMAND_STALLED',
+      repo_full_name: 'acme/widgets',
+    });
+    expect(Number(stallTags[0]?.age_ms)).toBeGreaterThanOrEqual(4_000);
+    expect(stallTags[1]).toMatchObject({
+      command_id: 'stale-running-id',
+      owner_type: 'user',
+      owner_id: 'user-123',
+      previous_status: 'running',
+      result_code: null,
+    });
+    expect(Number(stallTags[1]?.age_ms)).toBeGreaterThanOrEqual(3_000);
+    const serializedStallLogs = JSON.stringify(stallTags);
+    expect(serializedStallLogs).not.toContain('must-not-be-logged');
+    expect(serializedStallLogs).not.toContain('postgres://');
+    expect(stallTags[1]?.age_ms).not.toBeNull();
+  });
+
+  it('logs command_stalled with a null age_ms when timestamps are absent', async () => {
+    vi.mocked(reconcileStaleSecurityAgentCommands).mockResolvedValueOnce({
+      staleAccepted: [{ id: 'no-timestamp-id', command_type: 'sync' }],
+      staleRunning: [],
+    } as never);
+
+    await dispatchDueOwners(env(), 'dispatch-123');
+
+    const stallTags = loggerMock.withTags.mock.calls
+      .map(([tags]) => tags as Record<string, unknown>)
+      .filter(tags => tags.event_name === 'security_auto_analysis.command_stalled');
+    expect(stallTags).toHaveLength(1);
+    expect(stallTags[0]).toMatchObject({
+      command_id: 'no-timestamp-id',
+      age_ms: null,
+      started_at: null,
+      accepted_at: null,
+      result_code: null,
+      repo_full_name: null,
+    });
   });
 
   it.each([
@@ -112,6 +245,11 @@ describe('dispatchDueOwners telemetry', () => {
       stage: 'stale_command_reconciliation',
       fail: () =>
         vi.mocked(reconcileStaleSecurityAgentCommands).mockRejectedValueOnce(stageError()),
+    },
+    {
+      stage: 'stale_remediation_launch_reconciliation',
+      fail: () =>
+        vi.mocked(recoverStaleRemediationLaunchAttempts).mockRejectedValueOnce(stageError()),
     },
     {
       stage: 'retained_command_deletion',

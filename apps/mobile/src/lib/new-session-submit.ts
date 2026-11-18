@@ -8,11 +8,11 @@
  *      slice landed — `canCreate` is computed with the exact same
  *      expression, and `isCloudAgentTargetSelected` defaults to `true`
  *      because the route's `runOnInstance` state defaults to `null`.
- *   2. Whenever a remote target is selected, the predicate evaluates
- *      to `false` REGARDLESS of the rest of the input. The actual
- *      remote submit wiring is a later slice (C3b); until then the
- *      start button must stay inert so we cannot accidentally fire
- *      the cloud-agent path with the wrong target.
+ *   2. Whenever a remote target is selected, this predicate evaluates to
+ *      `false` REGARDLESS of the rest of the input: the remote-CLI spawn has
+ *      its own gate (`resolveRemoteStartMissingContent` for the composer, plus
+ *      the spawn flags the screen owns), because it needs neither a repository
+ *      nor a Cloud Agent profile.
  */
 export function resolveNewSessionSubmitEnabled({
   attachmentsHasFailed,
@@ -33,6 +33,8 @@ export function resolveNewSessionSubmitEnabled({
   model: string;
   selectedRepo: string;
 }): boolean {
+  // `attachmentsIsUploading` means "an upload is in flight". Attached-but-not-
+  // uploaded chips no longer block Start: they upload during the create call.
   const canCreate =
     hasPrompt &&
     Boolean(selectedRepo) &&
@@ -41,10 +43,9 @@ export function resolveNewSessionSubmitEnabled({
     !attachmentsHasFailed;
 
   // The remote-target case short-circuits the entire cloud-agent
-  // submission path, not just `canCreate`. The Start button's `disabled`
-  // prop is the OR of every blocking flag, so a single boolean here is
-  // sufficient to gate both the button and any future submit call site
-  // (e.g. a submit-on-enter handler C3b might add).
+  // submission path, not just `canCreate`: no Cloud Agent create is ever
+  // issued for a remote target. The screen gates the remote Start on the
+  // spawn's own preconditions (see `resolveRemoteStartMissingContent`).
   if (isRemoteTargetSelected) {
     return false;
   }
@@ -86,9 +87,16 @@ export function resolveNewSessionStartDisabled(input: {
   isSubmitting: boolean;
   model: string;
   selectedRepo: string;
+  /** True when the selected repo key still resolves to a picker row. */
+  selectedRepositoryResolved: boolean;
   isProfileLoading: boolean;
 }): boolean {
+  // A selected key that no longer resolves to a row (after a refresh or a
+  // provider change) must not submit: the create body would carry no
+  // repository field and the server would reject it.
+  const staleSelection = input.selectedRepo !== '' && !input.selectedRepositoryResolved;
   return (
+    staleSelection ||
     resolveNewSessionSubmitDisabled({
       attachmentsHasFailed: input.attachmentsHasFailed,
       attachmentsIsUploading: input.attachmentsIsUploading,
@@ -98,6 +106,320 @@ export function resolveNewSessionStartDisabled(input: {
       isSubmitting: input.isSubmitting,
       model: input.model,
       selectedRepo: input.selectedRepo,
-    }) || input.isProfileLoading
+    }) ||
+    input.isProfileLoading
+  );
+}
+
+/**
+ * Whether a remote-CLI start would hand the CLI nothing at all: no prompt text
+ * and no attachment. Mirrors `buildComposerSharePayload`, which returns `null`
+ * for exactly this composer state, so Start is blocked on the same condition
+ * that makes the spawn carry no content.
+ *
+ * An attachment alone is enough. The destination session receives the files in
+ * its composer (delivery does not auto-send without text, so the user sends
+ * them there) while the spawn itself completes as usual.
+ */
+export function resolveRemoteStartMissingContent(input: {
+  hasPrompt: boolean;
+  hasAttachments: boolean;
+}): boolean {
+  return !input.hasPrompt && !input.hasAttachments;
+}
+
+/**
+ * A synthetic, always-resolvable picker key used only to re-evaluate a Start
+ * gate as if a repository were selected. It is never rendered or submitted.
+ */
+const SYNTHETIC_REPOSITORY_KEY = 'synthetic:selection';
+
+/**
+ * Why the Start button is unavailable, when the missing repository is what
+ * blocks it. `select-repository` means a picker row exists to pick;
+ * `connect-provider` means the account has no repositories at all and a
+ * provider still has to be connected; `refresh-repositories` means the account
+ * has no repositories but no provider is left to connect (a provider is
+ * already connected and empty, or its list failed to load), so the way to get
+ * rows is to refresh/check access — telling the user to select or connect
+ * would name a control that does not exist.
+ */
+export type NewSessionStartBlockedReason =
+  | 'select-repository'
+  | 'connect-provider'
+  | 'refresh-repositories'
+  /** Cloud Agent needs prompt text; an attachment alone does not submit. */
+  | 'enter-prompt'
+  /** Remote CLI needs prompt text or a file; an empty composer spawns nothing. */
+  | 'enter-prompt-or-file'
+  /** A failed attachment blocks Start until the user removes it. */
+  | 'attachment-failed'
+  /** An upload in flight blocks Start until it settles. */
+  | 'attachment-uploading'
+  /** A still-loading profile blocks Start until the query settles. */
+  | 'profile-loading'
+  /** Cloud Agent needs a model; an empty or unavailable one disables Start. */
+  | 'model-missing'
+  /** A selected repository that no longer resolves to a picker row blocks Start. */
+  | 'stale-selection';
+
+/**
+ * The inputs for `resolveNewSessionStartBlockedReason`. `gate` is the entry's
+ * own Start-gate input; `selectedRepo` / `selectedRepositoryResolved` are
+ * omitted because the helper replaces them with a synthetic selection to tell
+ * whether the missing repository is the one blocking Start.
+ */
+type NewSessionStartBlockedReasonInput = {
+  /** The account has at least one repository row on some provider. */
+  hasRepositories: boolean;
+  /** A provider group the user can actually connect (`status === 'connect'`). */
+  hasConnectableProvider: boolean;
+  /** Any provider group is still loading, so its status is not settled. */
+  isLoadingRepositories: boolean;
+  /** True when a remote CLI is the run target rather than Cloud Agent. */
+  isRemoteTargetSelected: boolean;
+  /** The current picker key; `''` when no repository is selected. */
+  selectedRepo: string;
+  /**
+   * The composer holds at least one attachment. A remote CLI receives files as
+   * content, so a file alone unblocks its Start; Cloud Agent still needs text.
+   */
+  hasAttachments: boolean;
+  /**
+   * True when `selectedRepo` still resolves to a picker row. A selected key
+   * that no longer resolves keeps Start disabled for the stale selection, so
+   * the empty composer is not what blocks it and must not be named.
+   */
+  selectedRepositoryResolved: boolean;
+} & (
+  | {
+      entry: 'new-session';
+      gate: Omit<
+        Parameters<typeof resolveNewSessionStartDisabled>[0],
+        'selectedRepo' | 'selectedRepositoryResolved'
+      >;
+    }
+  | {
+      entry: 'continue';
+      gate: Omit<
+        Parameters<typeof resolveContinueStartDisabled>[0],
+        'selectedRepo' | 'selectedRepositoryResolved'
+      >;
+    }
+);
+
+/**
+ * The composer precondition that owns a Cloud Agent Start gate, named so a
+ * disabled Start the repository step does not cause is never silent. Each of
+ * these disables the gate on its own (`resolveNewSessionStartDisabled` ORs
+ * them in), so reading them from the gate names a real cause. A failed
+ * attachment outranks an upload in flight: the same chip usually carries both,
+ * and the failure is what the user has to fix. A waiting profile outranks a
+ * missing model: the profile settles on its own, and the model the screen will
+ * show may arrive with it. A clone entry has no composer and no profile, so it
+ * never reaches here.
+ */
+function resolveComposerBlockedReason(
+  input: NewSessionStartBlockedReasonInput
+): NewSessionStartBlockedReason | null {
+  if (input.entry !== 'new-session') {
+    return null;
+  }
+  if (input.gate.attachmentsHasFailed) {
+    return 'attachment-failed';
+  }
+  if (input.gate.attachmentsIsUploading) {
+    return 'attachment-uploading';
+  }
+  if (input.gate.isProfileLoading) {
+    return 'profile-loading';
+  }
+  if (input.gate.model === '') {
+    return 'model-missing';
+  }
+  return null;
+}
+
+/**
+ * One line naming why Start is unavailable, or `null` when nothing nameable is
+ * the blocker. Kept pure and beside the gates so both entries share the same
+ * decision and the tests can pin it without rendering.
+ *
+ * A repository reason is only ever emitted when re-evaluating the entry's own
+ * gate with a synthetic selected/resolved repository makes Start ENABLED — i.e.
+ * the missing repository is the blocker. If the gate is still disabled with
+ * that synthetic selection, some other precondition (uploading or failed
+ * attachment, loading profile, creating/submitting, empty or unavailable model)
+ * owns the blocker, and the repository is not it. Provider connect state and
+ * repository count stay separate, exactly like the extension's
+ * `submitBlockedReason` separates `integrationInstalled` from `repoCount`: a
+ * `connected-empty`, `error`, or `repos` group never reads as "connect a
+ * provider".
+ *
+ * The empty composer never hides that blocker, because the form opens empty:
+ * with nothing typed and no repository selected the footer names the
+ * repository step. Once a repository is selected, an empty composer is named
+ * instead, because a disabled Start with no explanation is a dead end: Cloud
+ * Agent needs prompt text, and a remote CLI needs a prompt or a file.
+ *
+ * `connect-provider` is the state where the repository section's connect card
+ * owns the step: that card names the connect prompt and carries its own
+ * button, so the footer does not render the reason and opens no connect flow.
+ *
+ * The other preconditions that block Start are named too, wherever they own
+ * the blocker: a failed or in-flight attachment, a still-loading profile, an
+ * empty model, and a repository key that no longer resolves each say what the
+ * user waits for, picks, or fixes. Creating and submitting stay `null`, because
+ * no copy can tell the user what to do about a request already in flight.
+ */
+export function resolveNewSessionStartBlockedReason(
+  input: NewSessionStartBlockedReasonInput
+): NewSessionStartBlockedReason | null {
+  // A remote-CLI target inherits its repository from the CLI and never sends
+  // one, so the missing repository is never its blocker. Its content is: an
+  // empty composer hands the spawn nothing (`buildComposerSharePayload` returns
+  // null for it). A clone entry has no composer at all.
+  if (input.isRemoteTargetSelected) {
+    if (input.entry !== 'new-session' || input.gate.hasPrompt || input.hasAttachments) {
+      return null;
+    }
+    return 'enter-prompt-or-file';
+  }
+  // A selected repository means the picker was completed. When the empty
+  // composer is all that still keeps Start disabled, name it: a prompt is the
+  // one precondition Cloud Agent does not accept an attachment for.
+  if (input.selectedRepo !== '') {
+    // A key that no longer resolves to a picker row is the blocker (the
+    // repository section asks for a new pick), so the prompt is not the reason:
+    // naming it would leave the real blocker unstated. The clone entry keeps
+    // its own footer and its own gate, so it names nothing here.
+    if (!input.selectedRepositoryResolved) {
+      return input.entry === 'new-session' ? 'stale-selection' : null;
+    }
+    if (
+      input.entry === 'new-session' &&
+      !input.gate.hasPrompt &&
+      !resolveNewSessionStartDisabled({
+        ...input.gate,
+        hasPrompt: true,
+        selectedRepo: input.selectedRepo,
+        selectedRepositoryResolved: true,
+      })
+    ) {
+      return 'enter-prompt';
+    }
+    return resolveComposerBlockedReason(input);
+  }
+  // A still-loading list only defers the decision while it could change it: when
+  // no rows exist yet, naming a blocker now could name the wrong one. Once rows
+  // already exist, `select-repository` is unambiguous and must not be hidden
+  // behind an unrelated group that is still loading.
+  if (!input.hasRepositories && input.isLoadingRepositories) {
+    return null;
+  }
+
+  const gateDisabledWithSyntheticRepo =
+    input.entry === 'new-session'
+      ? resolveNewSessionStartDisabled({
+          ...input.gate,
+          // An empty composer is itself a blocker, so it must not decide this
+          // question: the form opens with it empty, and a repository the user
+          // still has to pick or connect is the blocker they can act on. Only
+          // the other preconditions (attachment state, model, create/submit,
+          // profile) own the blocker here.
+          hasPrompt: true,
+          selectedRepo: SYNTHETIC_REPOSITORY_KEY,
+          selectedRepositoryResolved: true,
+        })
+      : resolveContinueStartDisabled({
+          ...input.gate,
+          selectedRepo: SYNTHETIC_REPOSITORY_KEY,
+          selectedRepositoryResolved: true,
+        });
+
+  // Still disabled with a repository supplied: some other condition blocks
+  // Start, so the missing repository is not the reason. Name the one the user
+  // can act on or wait out; only a create or submit already in flight stays
+  // silent, because no copy can tell the user what to do about it.
+  if (gateDisabledWithSyntheticRepo) {
+    return resolveComposerBlockedReason(input);
+  }
+
+  // The account cannot pick a repository yet and a provider can still be
+  // connected: name the connect step rather than an empty picker.
+  if (!input.hasRepositories && input.hasConnectableProvider) {
+    return 'connect-provider';
+  }
+  // No repositories and no provider left to connect (already connected but
+  // empty, or its list failed): the picker is empty and disabled, so neither
+  // "select" nor "connect" names a control the user can reach. Name the
+  // refresh/access step the repository section actually offers instead.
+  if (!input.hasRepositories) {
+    return 'refresh-repositories';
+  }
+  return 'select-repository';
+}
+
+/**
+ * The provider still available to connect: the first group in the `connect`
+ * state, in the repository section's fixed github/gitlab/bitbucket order, or
+ * `null` when no provider is left to connect. Kept pure so the connect state
+ * is pinnable without rendering; the screen reads it only to tell whether the
+ * `connect-provider` state applies, which the repository section's connect
+ * card then carries.
+ */
+export function resolveNewSessionConnectProvider<K extends string>(
+  groups: readonly { key: K; status: string }[]
+): K | null {
+  return groups.find(group => group.status === 'connect')?.key ?? null;
+}
+
+/**
+ * Whether the continue-form Start button is disabled. Distinct from the
+ * ordinary new-session gate: a clone carries no prompt and no profile
+ * requirement.
+ *
+ *   - Clone Cloud Agent: disabled while creating, submitting, without a model,
+ *     or without a repository. Empty prompt and profile loading do NOT block.
+ *   - Clone live CLI: disabled while spawning, submitting, without a model,
+ *     while the instance catalog is loading, when the instance lacks the
+ *     `sessionClone` capability, or while a delivered clone/import failure is
+ *     shown inline. Empty prompt, empty repository, and profile loading do NOT
+ *     block.
+ */
+export function resolveContinueStartDisabled(input: {
+  isCreating: boolean;
+  isSubmitting: boolean;
+  isSpawningRemote: boolean;
+  model: string;
+  selectedRepo: string;
+  selectedRepositoryResolved: boolean;
+  isRemoteTargetSelected: boolean;
+  instanceCatalogLoading: boolean;
+  instanceHasSessionClone: boolean;
+  cloneImportFailureKey: string | null;
+  isModelUnavailable: boolean;
+}): boolean {
+  if (input.isRemoteTargetSelected) {
+    return (
+      input.isSpawningRemote ||
+      input.isSubmitting ||
+      input.model === '' ||
+      input.isModelUnavailable ||
+      input.instanceCatalogLoading ||
+      !input.instanceHasSessionClone ||
+      input.cloneImportFailureKey !== null
+    );
+  }
+  // A selected picker key that no longer resolves to a row must not submit:
+  // the clone prepare body would carry no repository field and the server
+  // would reject it. Mirrors `resolveNewSessionStartDisabled`'s stale gate.
+  const staleSelection = input.selectedRepo !== '' && !input.selectedRepositoryResolved;
+  return (
+    input.isCreating ||
+    input.isSubmitting ||
+    input.model === '' ||
+    input.selectedRepo === '' ||
+    staleSelection
   );
 }

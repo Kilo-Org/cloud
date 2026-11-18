@@ -5,6 +5,10 @@ import {
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
+import { humanTextParts } from './part-types';
+
 type CopyableMessage = {
   parts: readonly Part[];
 };
@@ -33,7 +37,7 @@ function formatToolInput(input: Record<string, unknown>): string {
   try {
     return JSON.stringify(input, null, 2);
   } catch {
-    return '[unserializable input]';
+    return i18n.t('agentChat.collectCopyableText.unserializableInput');
   }
 }
 
@@ -47,7 +51,7 @@ function collectToolPartText(part: ToolPart): string {
     payload.push(part.state.output);
   }
   if (part.state.status === 'error' && part.state.error) {
-    payload.push(`Error: ${part.state.error}`);
+    payload.push(i18n.t('agentChat.collectCopyableText.errorPrefix', { error: part.state.error }));
   }
   // No payload yet (pending/running without output): nothing worth copying.
   if (payload.length === 0) {
@@ -56,6 +60,23 @@ function collectToolPartText(part: ToolPart): string {
   return [part.tool, ...payload].join('\n');
 }
 
+/**
+ * The message's own prose. The Copy message action reads only these parts:
+ * the thinking block the transcript shows above a reply and the tool calls it
+ * shows between its paragraphs are transcript chrome, not message text, so
+ * they never reach the clipboard ahead of or around the reply. Synthetic
+ * server context is chrome too and is dropped when a human text part exists.
+ */
+export function messageTextParts(parts: readonly Part[]): Part[] {
+  return humanTextParts(parts);
+}
+
+/**
+ * Collects every copyable part kind of a message: text prose, reasoning text,
+ * and tool invocations with their input/output. The Copy message paths read it
+ * over `messageTextParts`, so what they put on the clipboard is the message
+ * text alone.
+ */
 export function collectCopyableText(message: CopyableMessage): string {
   return message.parts
     .map(part => {
@@ -72,4 +93,32 @@ export function collectCopyableText(message: CopyableMessage): string {
     })
     .filter(text => text.length > 0)
     .join('\n\n');
+}
+
+/**
+ * Whether `collectCopyableText` would return any text, without building it.
+ *
+ * The message bubble only needs the boolean to decide whether the copy action
+ * is available. Calling `collectCopyableText(...).length > 0` joins every part
+ * — including a streaming reasoning/text part that can hold hundreds of
+ * kilobytes — on every streamed publish. This short-circuits on the first
+ * part with copyable content instead of allocating the joined string.
+ */
+export function hasCopyableText(message: CopyableMessage): boolean {
+  return message.parts.some(part => {
+    if (isTextPart(part)) {
+      return !isSnapshotProgressText(part) && part.text.length > 0;
+    }
+    if (isReasoningPart(part)) {
+      return part.text.length > 0;
+    }
+    if (isToolPart(part)) {
+      return (
+        Object.keys(part.state.input).length > 0 ||
+        (part.state.status === 'completed' && Boolean(part.state.output)) ||
+        (part.state.status === 'error' && Boolean(part.state.error))
+      );
+    }
+    return false;
+  });
 }

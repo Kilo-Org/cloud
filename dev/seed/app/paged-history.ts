@@ -1,0 +1,519 @@
+import { execFileSync } from 'node:child_process';
+
+import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
+import { signKiloToken } from '@kilocode/worker-utils';
+import { and, eq, or } from 'drizzle-orm';
+
+import type { SeedResult } from '../index';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
+import {
+  buildAssistantMessageItem,
+  buildSessionItem,
+  buildUserMessageItem,
+  parseSessionIngestServiceStatus,
+  type SessionIngestItem,
+} from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from '../lib/token-signing';
+
+export const usage = '<email>';
+
+export const SESSION_ID = 'ses_000000000005PagedHistory01';
+export const SESSION_TITLE = '60-message pagination fixture';
+export const SESSION_SLUG = 'paged-history-fixture';
+export const MESSAGE_COUNT = 60;
+
+/**
+ * The first message of the loaded page (the newest 50 are messages 11-60) and
+ * the first loaded assistant message. It opens the burst whose marker moves
+ * onto the prepended older page, so it carries an inline reasoning part: the e2
+ * scenario expands that row's thinking and proves the prepend neither remounts
+ * (and so collapses) it nor jumps the viewport.
+ */
+export const REASONING_MESSAGE_INDEX = 11;
+
+/**
+ * The newest fixture message (an assistant row) carries a large fenced `ts`
+ * block instead of the usual padded body, so the mobile session page renders a
+ * code fence the perf proof can scroll away from and remount. It is even, and
+ * so an assistant turn, matching the branch that builds this text part.
+ * CODE_CHUNK_LINES is 32, so this spans many first-paint chunks.
+ */
+export const FENCE_MESSAGE_INDEX = 60;
+export const FENCE_CODE_LINE_COUNT = 1024;
+
+const TOKEN_EXPIRES_SECONDS = 3600;
+const POLL_TIMEOUT_MS = 30_000;
+const POLL_INTERVAL_MS = 500;
+const BASE_CREATED_AT = 1_700_100_000_000;
+
+function printUsage(): void {
+  console.log(`Usage: pnpm dev:seed app:paged-history ${usage}`);
+  console.log('');
+  console.log('Seeds one read-only cloud-agent session with 60 tall transcript');
+  console.log('messages so the first page (50) overflows and older history stays');
+  console.log('behind a scroll-up. The first loaded assistant message (message 11)');
+  console.log('carries an inline reasoning part, so "Auto expand thinking" renders its');
+  console.log('expanded thinking on the burst-opening row that the prepend re-marks.');
+  console.log(
+    `The newest message (message ${FENCE_MESSAGE_INDEX}) carries a ${FENCE_CODE_LINE_COUNT}-line fenced ts block for the code-fence perf proof.`
+  );
+  console.log('Writes the cli_sessions_v2 row, then ingests through the local');
+  console.log('cloudflare-session-ingest worker.');
+  console.log('No cloud-agent session ID is set, so the UI is historical/read-only.');
+  console.log('');
+  console.log('Examples:');
+  console.log('  pnpm dev:seed app:paged-history evgeny@kilocode.ai');
+  console.log('  pnpm -s dev:seed app:paged-history evgeny@kilocode.ai --json');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Whether the materialized history holds the fixture's inline reasoning part. */
+function historyHasReasoningPart(history: Record<string, unknown>): boolean {
+  if (!Array.isArray(history.messages)) {
+    return false;
+  }
+  for (const message of history.messages) {
+    if (!isRecord(message) || !Array.isArray(message.parts)) {
+      continue;
+    }
+    for (const part of message.parts) {
+      if (
+        isRecord(part) &&
+        part.id === reasoningPartIdFor(REASONING_MESSAGE_INDEX) &&
+        part.type === 'reasoning'
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function parseArgs(args: string[]): string {
+  const positionals: string[] = [];
+  for (const arg of args) {
+    if (arg.startsWith('--')) {
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+    positionals.push(arg.trim());
+  }
+
+  const [email, ...rest] = positionals;
+  if (!email) {
+    printUsage();
+    throw new Error('email is required');
+  }
+  if (rest.length > 0) {
+    printUsage();
+    throw new Error(`Unexpected extra arguments: ${rest.join(' ')}`);
+  }
+  if (!isValidEmail(email)) {
+    throw new Error(`email is not a valid address: ${email}`);
+  }
+  return email;
+}
+
+function readSessionIngestStatusJson(): string {
+  try {
+    return execFileSync('pnpm', ['-s', 'dev:status', '--json'], { encoding: 'utf8' });
+  } catch (error) {
+    throw new Error(
+      `dev:status --json failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+function paddedIndex(index: number): string {
+  return String(index).padStart(10, '0');
+}
+
+function messageIdFor(index: number): string {
+  return `msgPaged${paddedIndex(index)}`;
+}
+
+function partIdFor(index: number): string {
+  return `prtPaged${paddedIndex(index)}`;
+}
+
+function reasoningPartIdFor(index: number): string {
+  return `prtPagedReason${paddedIndex(index)}`;
+}
+
+function messageBody(role: 'User' | 'Assistant', index: number): string {
+  return [
+    `${role} message ${index} of ${MESSAGE_COUNT}.`,
+    '',
+    'Padded so fifty messages overflow the chat viewport.',
+    'Short one-liners stay on-screen, and the near-top autoload then pulls the older page immediately.',
+    `Marker line A for message ${index}.`,
+    `Marker line B for message ${index}.`,
+    `Marker line C for message ${index}.`,
+    `Marker line D for message ${index}.`,
+    `Marker line E for message ${index}.`,
+    `Marker line F for message ${index}.`,
+    `Marker line G for message ${index}.`,
+    `End of ${role.toLowerCase()} message ${index}.`,
+  ].join('\n');
+}
+
+/**
+ * A deterministic fenced `ts` block. Its line count is well past the four
+ * chunks the first paint mounts (CODE_CHUNK_LINES = 32), so the mobile code
+ * block highlights lazily instead of lexing and highlighting the whole fence
+ * at mount.
+ */
+function fenceBody(lineCount: number): string {
+  const lines: string[] = [
+    `Fixture message ${FENCE_MESSAGE_INDEX} of ${MESSAGE_COUNT}: large fenced ts block.`,
+    '',
+    '```ts',
+  ];
+  for (let line = 1; line <= lineCount; line += 1) {
+    lines.push(`const pagedHistoryLine${String(line).padStart(4, '0')} = ${line};`);
+  }
+  lines.push('```');
+  lines.push('');
+  lines.push(`End of fixture message ${FENCE_MESSAGE_INDEX} fence.`);
+  return lines.join('\n');
+}
+
+function reasoningBody(index: number): string {
+  return [
+    `Reasoning for message ${index} of ${MESSAGE_COUNT}.`,
+    '',
+    'Expanded thinking stays mounted when the older page prepends.',
+    'Reasoning marker line A.',
+    'Reasoning marker line B.',
+    `End of reasoning for message ${index}.`,
+  ].join('\n');
+}
+
+function buildTextPartItem(params: {
+  partId: string;
+  sessionId: string;
+  messageId: string;
+  text: string;
+}): SessionIngestItem {
+  return {
+    type: 'part',
+    data: {
+      id: params.partId,
+      sessionID: params.sessionId,
+      messageID: params.messageId,
+      type: 'text',
+      text: params.text,
+    },
+  };
+}
+
+/**
+ * A reasoning part must carry `time: { start, end }`: the read contract declares
+ * it non-optional, so the read seam drops a reasoning part without it instead of
+ * rendering the row (packages/session-ingest-contracts/src/rpc-contract.ts).
+ */
+function buildReasoningPartItem(params: {
+  partId: string;
+  sessionId: string;
+  messageId: string;
+  text: string;
+  start: number;
+  end: number;
+}): SessionIngestItem {
+  return {
+    type: 'part',
+    data: {
+      id: params.partId,
+      sessionID: params.sessionId,
+      messageID: params.messageId,
+      type: 'reasoning',
+      text: params.text,
+      time: { start: params.start, end: params.end },
+    },
+  };
+}
+
+export function buildPagedHistoryIngestItems(): SessionIngestItem[] {
+  const items: SessionIngestItem[] = [
+    buildSessionItem({
+      sessionId: SESSION_ID,
+      slug: SESSION_SLUG,
+      title: SESSION_TITLE,
+    }),
+  ];
+
+  for (let index = 1; index <= MESSAGE_COUNT; index += 1) {
+    const createdAt = BASE_CREATED_AT + index * 1_000;
+    const messageId = messageIdFor(index);
+
+    // The burst opener is an assistant turn: the loaded page starts at message
+    // 11 and its marker moves to message 1 when the older page prepends. Its
+    // inline reasoning is what the e2 scenario expands before that prepend.
+    if (index === REASONING_MESSAGE_INDEX) {
+      items.push(
+        buildAssistantMessageItem({
+          messageId,
+          sessionId: SESSION_ID,
+          parentId: messageIdFor(index - 1),
+          createdAt,
+          completedAt: createdAt + 200,
+          cost: 0.001,
+          tokens: {
+            total: 40,
+            input: 20,
+            output: 16,
+            reasoning: 8,
+            cache: { read: 2, write: 2 },
+          },
+        }),
+        buildReasoningPartItem({
+          partId: reasoningPartIdFor(index),
+          sessionId: SESSION_ID,
+          messageId,
+          text: reasoningBody(index),
+          start: createdAt + 1,
+          end: createdAt + 100,
+        }),
+        buildTextPartItem({
+          partId: partIdFor(index),
+          sessionId: SESSION_ID,
+          messageId,
+          text: messageBody('Assistant', index),
+        })
+      );
+      continue;
+    }
+
+    const isUser = index % 2 === 1;
+
+    if (isUser) {
+      items.push(
+        buildUserMessageItem({
+          messageId,
+          sessionId: SESSION_ID,
+          createdAt,
+        }),
+        buildTextPartItem({
+          partId: partIdFor(index),
+          sessionId: SESSION_ID,
+          messageId,
+          text: messageBody('User', index),
+        })
+      );
+      continue;
+    }
+
+    items.push(
+      buildAssistantMessageItem({
+        messageId,
+        sessionId: SESSION_ID,
+        parentId: messageIdFor(index - 1),
+        createdAt,
+        completedAt: createdAt + 200,
+        cost: 0.001,
+        tokens: {
+          total: 40,
+          input: 20,
+          output: 16,
+          reasoning: 0,
+          cache: { read: 2, write: 2 },
+        },
+      }),
+      buildTextPartItem({
+        partId: partIdFor(index),
+        sessionId: SESSION_ID,
+        messageId,
+        text:
+          index === FENCE_MESSAGE_INDEX
+            ? fenceBody(FENCE_CODE_LINE_COUNT)
+            : messageBody('Assistant', index),
+      })
+    );
+  }
+
+  return items;
+}
+
+async function ingestSession(
+  baseUrl: string,
+  sessionId: string,
+  token: string,
+  items: SessionIngestItem[]
+): Promise<void> {
+  const response = await fetch(`${baseUrl}/api/session/${sessionId}/ingest?v=1`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ data: items }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Ingest of ${sessionId} failed (${response.status}): ${body}`);
+  }
+}
+
+async function pollForMessages(baseUrl: string, sessionId: string, token: string): Promise<number> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+
+  for (;;) {
+    const response = await fetch(`${baseUrl}/api/session/${sessionId}/messages?limit=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      throw new Error(`Messages read of ${sessionId} failed (${response.status})`);
+    }
+
+    const payload: unknown = await response.json();
+    if (!isRecord(payload) || payload.success !== true) {
+      throw new Error(`Messages read of ${sessionId} returned an unexpected shape`);
+    }
+
+    const history = payload.history;
+    if (history === null) {
+      if (Date.now() >= deadline) {
+        throw new Error(`Timed out waiting for history of ${sessionId}`);
+      }
+      await sleep(POLL_INTERVAL_MS);
+      continue;
+    }
+    if (!isRecord(history)) {
+      throw new Error(`Messages read of ${sessionId} returned an unexpected history shape`);
+    }
+    if (history.kind !== undefined) {
+      throw new Error(`session-ingest reported ${String(history.kind)} for ${sessionId}`);
+    }
+    if (!Array.isArray(history.messages)) {
+      throw new Error(`Messages read of ${sessionId} returned an unexpected history shape`);
+    }
+
+    // The read seam drops a reasoning part whose `time` is absent, so a
+    // materialized reasoning part is the fixture's own proof that the e2 row
+    // will render. Poll for it rather than counting messages alone.
+    if (history.messages.length === MESSAGE_COUNT && historyHasReasoningPart(history)) {
+      return history.messages.length;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for ${MESSAGE_COUNT} messages and the reasoning part in ${sessionId}; saw ${history.messages.length}`
+      );
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
+export async function run(...args: string[]): Promise<SeedResult | void> {
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage();
+    return;
+  }
+
+  const email = parseArgs(args);
+
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error(
+      'NEXTAUTH_SECRET is not set for this worktree. Ensure local env is prepared (pnpm dev:worktree:prepare).'
+    );
+  }
+
+  const normalizedEmail = normalizeSeedEmail(email);
+  assertLocalSeedDatabase('app:paged-history');
+  const db = getSeedDb();
+  const matches = await db
+    .select({
+      userId: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+      apiTokenPepper: kilocode_users.api_token_pepper,
+      isAdmin: kilocode_users.is_admin,
+    })
+    .from(kilocode_users)
+    .where(
+      or(
+        eq(kilocode_users.google_user_email, email),
+        eq(kilocode_users.normalized_email, normalizedEmail)
+      )
+    );
+
+  if (matches.length === 0) {
+    throw new Error(
+      `No user found for email ${email}. Sign in locally first, or seed a user (pnpm dev:seed app:create-user).`
+    );
+  }
+
+  const exactMatches = matches.filter(match => match.email === email);
+  const resolvedMatches = exactMatches.length > 0 ? exactMatches : matches;
+  if (resolvedMatches.length > 1) {
+    const matchList = resolvedMatches.map(match => `${match.email} (${match.userId})`).join(', ');
+    throw new Error(`Multiple users matched ${email}: ${matchList}`);
+  }
+
+  const [user] = resolvedMatches;
+
+  const { token } = await signKiloToken({
+    userId: user.userId,
+    pepper: user.apiTokenPepper,
+    secret,
+    ...seedTokenSigningParams(TOKEN_EXPIRES_SECONDS),
+    extra: user.isAdmin ? { isAdmin: true } : undefined,
+  });
+
+  const serviceStatus = parseSessionIngestServiceStatus(readSessionIngestStatusJson());
+  if (serviceStatus.status !== 'up') {
+    throw new Error(
+      `cloudflare-session-ingest is not up (status=${serviceStatus.status}). Start the local stack first.`
+    );
+  }
+  const sessionIngestUrl = `http://localhost:${serviceStatus.port}`;
+
+  await db
+    .delete(cli_sessions_v2)
+    .where(
+      and(eq(cli_sessions_v2.kilo_user_id, user.userId), eq(cli_sessions_v2.session_id, SESSION_ID))
+    );
+
+  await db.insert(cli_sessions_v2).values({
+    session_id: SESSION_ID,
+    kilo_user_id: user.userId,
+    title: SESSION_TITLE,
+    created_on_platform: 'cloud-agent-web',
+  } satisfies typeof cli_sessions_v2.$inferInsert);
+
+  await ingestSession(sessionIngestUrl, SESSION_ID, token, buildPagedHistoryIngestItems());
+  const messageCount = await pollForMessages(sessionIngestUrl, SESSION_ID, token);
+
+  console.log('');
+  console.log('Seeded a read-only 60-message cloud-agent transcript.');
+  console.log('Message 11 (the first loaded assistant message) carries inline reasoning.');
+  console.log('Turn on "Auto expand thinking" to see it expanded.');
+  console.log(
+    `Message ${FENCE_MESSAGE_INDEX} carries a ${FENCE_CODE_LINE_COUNT}-line fenced ts block for the code-fence perf proof.`
+  );
+  console.log('Hard-refresh /cloud/chat?sessionId=' + SESSION_ID + '.');
+  console.log('Newest 50 should be on screen; scroll up for the older 10.');
+
+  return {
+    userId: user.userId,
+    email: user.email,
+    sessionId: SESSION_ID,
+    messageCount,
+    reasoningMessageId: messageIdFor(REASONING_MESSAGE_INDEX),
+    reasoningPartId: reasoningPartIdFor(REASONING_MESSAGE_INDEX),
+    fenceMessageId: messageIdFor(FENCE_MESSAGE_INDEX),
+    fencePartId: partIdFor(FENCE_MESSAGE_INDEX),
+    fenceMessageIndex: FENCE_MESSAGE_INDEX,
+    fenceCodeLineCount: FENCE_CODE_LINE_COUNT,
+    sessionIngestPort: serviceStatus.port,
+    sessionIngestUrl,
+    chatPath: `/cloud/chat?sessionId=${SESSION_ID}`,
+  };
+}

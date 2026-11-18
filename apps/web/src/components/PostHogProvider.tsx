@@ -6,11 +6,10 @@ import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
-  isSessionSharePath,
-  sanitizeAnalyticsPathname,
+  isSharedSessionPath,
   sanitizeAnalyticsUrl,
-  sanitizeAnalyticsUrlValue,
-} from '@/lib/sanitize-analytics-url';
+} from '@kilocode/web-shared/lib/sanitize-analytics-url';
+import { sanitizePostHogEvent } from '@/lib/posthog-event-sanitizer';
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -31,23 +30,8 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
-      disable_session_recording: isSessionSharePath(window.location.pathname),
-      before_send: event => {
-        if (!event?.properties) return event;
-        return {
-          ...event,
-          properties: {
-            ...event.properties,
-            $current_url: sanitizeAnalyticsUrlValue(event.properties.$current_url),
-            $pathname:
-              typeof event.properties.$pathname === 'string'
-                ? sanitizeAnalyticsPathname(event.properties.$pathname)
-                : event.properties.$pathname,
-            $referrer: sanitizeAnalyticsUrlValue(event.properties.$referrer),
-            $referring_domain: sanitizeAnalyticsUrlValue(event.properties.$referring_domain),
-          },
-        };
-      },
+      disable_session_recording: isSharedSessionPath(window.location.pathname),
+      before_send: event => sanitizePostHogEvent(event),
       loaded: function (ph) {
         if (!isProduction) {
           // Opt out of capturing in non-production environments
@@ -92,7 +76,7 @@ function PostHogPageView() {
 
   useEffect(() => {
     if (!pathname || !posthog) return;
-    if (isSessionSharePath(pathname)) {
+    if (isSharedSessionPath(pathname)) {
       posthog.stopSessionRecording();
       return;
     }
@@ -115,6 +99,8 @@ function IdentifyUser() {
   const posthog = usePostHog();
   const { data: session, status } = useSession();
   const previousStatusRef = useRef<string | undefined>(undefined);
+  const email = session?.user?.email;
+  const name = session?.user?.name;
 
   useEffect(() => {
     // Check if posthog is loaded before using it
@@ -122,23 +108,9 @@ function IdentifyUser() {
 
     const previousStatus = previousStatusRef.current;
 
-    if (status === 'authenticated' && session?.user?.email) {
-      const currentAnonymousId = posthog.get_distinct_id();
-      posthog.identify(session.user.email, {
-        email: session.user.email,
-        name: session.user.name,
-      });
-      // Alias the new user ID (session.user.email) to the previous anonymous ID.
-      // This links pre-login events to the identified user.
-      // Important: Only call alias if currentAnonymousId is different from session.user.email
-      // to avoid aliasing an ID to itself.
-      if (currentAnonymousId && currentAnonymousId !== session.user.email) {
-        posthog.alias(session.user.email, currentAnonymousId);
-      }
-      // Re-fetch feature flags now that the user is identified.
-      // Without this, flags evaluated for the anonymous ID remain cached,
-      // so user-targeted flags would stay false until the next natural reload.
-      posthog.reloadFeatureFlags();
+    if (status === 'authenticated' && email) {
+      // identify links the anonymous ID and reloads flags when the identity changes.
+      posthog.identify(email, { email, name });
     } else if (status === 'unauthenticated' && previousStatus === 'authenticated') {
       // Reset PostHog identification only when transitioning from authenticated to unauthenticated (logout)
       posthog.reset();
@@ -146,7 +118,7 @@ function IdentifyUser() {
 
     // Update the previous status for the next render
     previousStatusRef.current = status;
-  }, [session, status, posthog]); // Rerun effect if session, status, or posthog instance changes
+  }, [email, name, status, posthog]);
 
   return null; // This component doesn't render anything
 }

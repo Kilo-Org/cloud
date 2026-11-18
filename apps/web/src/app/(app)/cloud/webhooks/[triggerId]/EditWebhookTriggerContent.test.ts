@@ -1,0 +1,330 @@
+import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { createRequire } from 'node:module';
+import React, { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import type { TriggerFormData, TriggerFormProps } from '@/components/webhook-triggers/TriggerForm';
+import type { EditWebhookTriggerContent as EditWebhookTriggerContentComponent } from './EditWebhookTriggerContent';
+
+let formProps: TriggerFormProps | undefined;
+let targetType = 'cloud_agent';
+const updateMutation = jest.fn<(input: unknown) => Promise<unknown>>();
+const invokeTrigger = jest.fn<(triggerId: string) => Promise<unknown>>();
+const invalidateQueries = jest.fn();
+const refetchTrigger = jest.fn();
+const savedEnvironmentId = '00000000-0000-4000-8000-000000000006';
+
+jest.mock('@/components/webhook-triggers/TriggerForm', () => ({
+  TriggerForm: (props: TriggerFormProps) => {
+    formProps = props;
+    return null;
+  },
+}));
+jest.mock('@/components/webhook-triggers', () => ({
+  useInvokeWebhookTrigger: () => ({ invokeTrigger, isInvoking: false, invokingTriggerId: null }),
+}));
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (options: { kind: string }) => {
+    if (options.kind === 'capabilities') return { data: { canSetSandboxAllocation: true } };
+    if (options.kind === 'trigger') {
+      return {
+        data: {
+          triggerId: 'daily-report',
+          activationMode: 'scheduled',
+          cronExpression: '0 9 * * *',
+          cronTimezone: 'UTC',
+          githubRepo: 'kilo/cloud',
+          mode: 'ask',
+          model: 'alpha',
+          promptTemplate: 'Saved prompt',
+          profileId: 'profile-1',
+          environmentId: savedEnvironmentId,
+          isActive: true,
+          targetType,
+          canEdit: true,
+          canEditReason: null,
+          canRun: true,
+        },
+        isLoading: false,
+        refetch: refetchTrigger,
+      };
+    }
+    return { data: { repositories: [] }, isLoading: false };
+  },
+  useMutation: (options: {
+    kind: string;
+    onSuccess?: () => void;
+    onError?: (error: Error) => void;
+  }) => ({
+    mutateAsync: async (input: unknown) => {
+      try {
+        const result = await updateMutation(input);
+        options.onSuccess?.();
+        return result;
+      } catch (error) {
+        options.onError?.(error as Error);
+        throw error;
+      }
+    },
+    isPending: false,
+  }),
+  useQueryClient: () => ({ invalidateQueries }),
+}));
+jest.mock('@/lib/trpc/utils', () => ({
+  useTRPC: () => ({
+    webhookTriggers: {
+      capabilities: { queryOptions: () => ({ kind: 'capabilities' }) },
+      get: { queryOptions: () => ({ kind: 'trigger' }) },
+      update: { mutationOptions: (options: object) => ({ kind: 'update', ...options }) },
+      delete: { mutationOptions: (options: object) => ({ kind: 'delete', ...options }) },
+      list: { queryKey: () => ['list'] },
+    },
+    cloudAgentNext: { listGitHubRepositories: { queryOptions: () => ({ kind: 'repos' }) } },
+    organizations: {
+      cloudAgentNext: { listGitHubRepositories: { queryOptions: () => ({ kind: 'repos' }) } },
+    },
+  }),
+}));
+jest.mock('@/lib/hooks/use-openrouter-models', () => ({
+  useModelSelectorList: () => ({ data: { data: [] } }),
+}));
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) => children,
+}));
+jest.mock('sonner', () => ({ toast: { error: jest.fn(), success: jest.fn() } }));
+jest.mock('lucide-react', () => new Proxy({}, { get: () => () => null }));
+jest.mock('@/components/ui/button', () => ({
+  Button: ({
+    children,
+    asChild,
+    onClick,
+  }: React.ComponentProps<'button'> & { asChild?: boolean }) =>
+    asChild ? children : createElement('button', { onClick }, children),
+}));
+jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+jest.mock('@/components/ui/card', () => ({
+  Card: ({ children }: { children: React.ReactNode }) => children,
+  CardContent: ({ children }: { children: React.ReactNode }) => children,
+  CardDescription: ({ children }: { children: React.ReactNode }) => children,
+  CardHeader: ({ children }: { children: React.ReactNode }) => children,
+  CardTitle: ({ children }: { children: React.ReactNode }) => children,
+}));
+jest.mock('@/components/ui/badge', () => ({
+  Badge: ({ children }: { children: React.ReactNode }) => children,
+}));
+jest.mock('@/lib/webhook-routes', () => ({
+  getWebhookRoutes: () => ({ list: '/', requests: () => '/' }),
+}));
+
+type LinkedomModule = {
+  parseHTML: (html: string) => { window: Record<string, unknown>; document: Document };
+};
+
+function installDom() {
+  const requireFromHere = createRequire(__filename);
+  const requireFromNext = createRequire(requireFromHere.resolve('next/package.json'));
+  const parsed = (requireFromNext('linkedom') as LinkedomModule).parseHTML(
+    '<!doctype html><html><body><div id="root"></div></body></html>'
+  );
+  const globals = globalThis as typeof globalThis & Record<string, unknown>;
+  const previous = new Map<string, unknown>();
+  for (const name of [
+    'React',
+    'window',
+    'document',
+    'HTMLElement',
+    'Element',
+    'Node',
+    'IS_REACT_ACT_ENVIRONMENT',
+  ]) {
+    previous.set(name, globals[name]);
+  }
+  Object.assign(globals, {
+    React,
+    window: parsed.window,
+    document: parsed.document,
+    HTMLElement: (parsed.window as { HTMLElement: typeof HTMLElement }).HTMLElement,
+    Element: (parsed.window as { Element: typeof Element }).Element,
+    Node: (parsed.window as { Node: typeof Node }).Node,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  const container = parsed.document.getElementById('root');
+  if (!container) throw new Error('root missing');
+  return {
+    container: container as HTMLElement,
+    cleanup: () => previous.forEach((value, name) => (globals[name] = value)),
+  };
+}
+
+let EditWebhookTriggerContent!: typeof EditWebhookTriggerContentComponent;
+
+beforeAll(
+  async () => ({ EditWebhookTriggerContent } = await import('./EditWebhookTriggerContent'))
+);
+
+describe('EditWebhookTriggerContent save and invoke', () => {
+  let root: Root | undefined;
+  let cleanup: (() => void) | undefined;
+  let container: HTMLElement;
+  const data: TriggerFormData = {
+    triggerId: 'daily-report',
+    activationMode: 'scheduled',
+    cronExpression: '0 9 * * *',
+    cronTimezone: 'UTC',
+    githubRepo: 'kilo/cloud',
+    mode: 'ask',
+    model: 'alpha',
+    promptTemplate: 'Current prompt',
+    profileId: 'profile-1',
+    webhookAuth: { enabled: false },
+    isActive: true,
+  };
+
+  afterEach(() => {
+    if (root) act(() => root?.unmount());
+    root = undefined;
+    cleanup?.();
+    cleanup = undefined;
+    formProps = undefined;
+    targetType = 'cloud_agent';
+    updateMutation.mockReset();
+    invokeTrigger.mockReset();
+  });
+
+  async function render() {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+    root = createRoot(dom.container);
+    await act(async () => {
+      root?.render(
+        createElement(EditWebhookTriggerContent, {
+          params: Promise.resolve({ triggerId: 'daily-report' }),
+          organizationId: 'org-1',
+        })
+      );
+      await Promise.resolve();
+    });
+    if (!formProps?.onSaveAndInvoke) throw new Error('save and invoke callback missing');
+    return formProps.onSaveAndInvoke;
+  }
+
+  it('pauses an existing-chat trigger without submitting the form configuration', async () => {
+    targetType = 'cloud_agent_chat';
+    updateMutation.mockResolvedValue(undefined);
+    await render();
+    const button = [...container.querySelectorAll('button')].find(
+      element => element.textContent === 'Pause trigger'
+    );
+    if (!button) throw new Error('Pause trigger button missing');
+    const confirm = jest.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const originalConfirm = Object.getOwnPropertyDescriptor(window, 'confirm');
+    Object.defineProperty(window, 'confirm', { configurable: true, value: confirm });
+    try {
+      await act(async () => button.click());
+      expect(updateMutation).not.toHaveBeenCalled();
+      expect(confirm).toHaveBeenCalledWith(
+        'Pause this trigger? Unsaved changes will be discarded.'
+      );
+      await act(async () => button.click());
+    } finally {
+      if (originalConfirm) Object.defineProperty(window, 'confirm', originalConfirm);
+      else Reflect.deleteProperty(window, 'confirm');
+    }
+    expect(updateMutation).toHaveBeenCalledWith({
+      triggerId: 'daily-report',
+      organizationId: 'org-1',
+      isActive: false,
+    });
+    expect(invokeTrigger).not.toHaveBeenCalled();
+  });
+
+  it('awaits the saved current configuration before invoking in the organization namespace', async () => {
+    let resolveUpdate: () => void = () => undefined;
+    updateMutation.mockReturnValue(
+      new Promise<void>(resolve => {
+        resolveUpdate = resolve;
+      })
+    );
+    const onSaveAndInvoke = await render();
+    let pending: Promise<void> = Promise.resolve();
+    act(() => {
+      pending = onSaveAndInvoke(data);
+    });
+    expect(invokeTrigger).not.toHaveBeenCalled();
+    expect(updateMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ promptTemplate: 'Current prompt', organizationId: 'org-1' })
+    );
+    await act(async () => {
+      resolveUpdate();
+      await pending;
+    });
+    expect(invokeTrigger).toHaveBeenCalledWith('daily-report');
+  });
+
+  it('does not invoke when saving fails and permits retry after either failure', async () => {
+    updateMutation.mockRejectedValueOnce(new Error('save failed')).mockResolvedValue(undefined);
+    invokeTrigger
+      .mockRejectedValueOnce(new Error('invoke failed'))
+      .mockResolvedValueOnce({ requestId: 'request-1' });
+    const onSaveAndInvoke = await render();
+    await act(async () => {
+      await onSaveAndInvoke(data);
+    });
+    expect(invokeTrigger).not.toHaveBeenCalled();
+    await act(async () => {
+      await onSaveAndInvoke(data);
+    });
+    expect(updateMutation).toHaveBeenCalledTimes(2);
+    expect(invokeTrigger).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await onSaveAndInvoke(data);
+    });
+    expect(updateMutation).toHaveBeenCalledTimes(3);
+    expect(invokeTrigger).toHaveBeenCalledTimes(2);
+  });
+
+  it('initializes the saved environment and forwards changes, clears, and omissions', async () => {
+    updateMutation.mockResolvedValue(undefined);
+    await render();
+
+    expect(formProps?.initialData?.environmentId).toBe(savedEnvironmentId);
+    const onSubmit = formProps?.onSubmit;
+    if (!onSubmit) throw new Error('submit callback missing');
+
+    await act(async () => {
+      await onSubmit({ ...data, environmentId: savedEnvironmentId });
+    });
+    expect(updateMutation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: savedEnvironmentId })
+    );
+
+    await act(async () => {
+      await onSubmit({ ...data, environmentId: null });
+    });
+    expect(updateMutation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: null })
+    );
+
+    await act(async () => {
+      await onSubmit({ ...data, environmentId: undefined });
+    });
+    const [omitted] = updateMutation.mock.calls.at(-1) ?? [];
+    expect((omitted as { environmentId?: string | null }).environmentId).toBeUndefined();
+  });
+
+  it('forwards a selected environment when saving and invoking', async () => {
+    updateMutation.mockResolvedValue(undefined);
+    const onSaveAndInvoke = await render();
+
+    await act(async () => {
+      await onSaveAndInvoke({ ...data, environmentId: savedEnvironmentId });
+    });
+
+    expect(updateMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ environmentId: savedEnvironmentId })
+    );
+    expect(invokeTrigger).toHaveBeenCalledWith('daily-report');
+  });
+});

@@ -9,6 +9,8 @@ nearer `AGENTS.md` and follow its scoped invariants.
 | Path | Description |
 |---|---|
 | `apps/web/` | Next.js web application deployed to Vercel |
+| `apps/ai-gateway/` | Next.js app for the AI gateway API routes, deployed to Vercel as `kilocode-ai-gateway` |
+| `apps/ai-gateway-secure-proxy/` | Minimal Next.js relay for custom LLM requests, deployed to Vercel as `kilocode-ai-gateway-secure-proxy` |
 | `apps/mobile/` | React Native mobile application |
 | `apps/extension/` | WXT browser extension |
 | `services/` | Cloudflare Worker and supporting services |
@@ -43,12 +45,15 @@ data-contract caveats, even when changed code is outside `packages/db`.
 | `pnpm format` | Format supported files |
 | `pnpm typecheck` | Run repository TypeScript checks |
 | `pnpm lint` | Run repository lint checks |
-| `pnpm test` | Run web, web-env, and local development-tool tests; not every package suite |
-| `pnpm validate` | Run root typecheck, lint, and test scripts |
+| `pnpm test` | Run the web suite and the repository script suites; not every package suite |
+| `pnpm validate` | Run typecheck, lint, test, and the dependency-cycle check |
 
-Package-level scripts are in the relevant `package.json`. Read root and relevant
-package manifests before running repository JavaScript or package scripts. Load
-`repository-verification` to select narrow checks and prepare test dependencies.
+The root `package.json` `scripts` block lists what each aggregate command runs;
+`typecheck` and `lint` hand off to `scripts/typecheck-all.sh` and
+`scripts/lint-all.sh`. Package-level scripts are in the relevant `package.json`.
+Read root and relevant package manifests before running repository JavaScript or
+package scripts. Load `repository-verification` to select narrow checks and
+prepare test dependencies.
 
 ## Guidance Map
 
@@ -58,6 +63,7 @@ package manifests before running repository JavaScript or package scripts. Load
 | TypeScript implementation or review | `code-quality` skill |
 | Verification or pre-commit checks | `repository-verification` skill |
 | Local services, ports, and fake login | `local-development` skill |
+| Cloud Agent sandbox setup, memory cap, and fake-LLM sessions | `cloud-agent-sandbox` skill and `.kilo/cloud-agent-setup.sh` |
 | Shared web environment changes | `apps/web/AGENTS.md` and `DEVELOPMENT.md` |
 | PostgreSQL schema or migration work | `packages/db/AGENTS.md` and `database-migrations` skill |
 | Service, Durable Object, or Worker code | `services/AGENTS.md`, nearest owning service's `AGENTS.md`, and relevant Durable Objects or Workers skills |
@@ -74,9 +80,10 @@ suggests:
 | Vercel project | Function regions |
 |---|---|
 | `kilocode-app` | Frankfurt only |
-| `kilocode-global-app` | Frankfurt and us-west (SFO) |
+| `kilocode-ai-gateway` | Frankfurt and us-west (SFO) |
+| `kilocode-ai-gateway-secure-proxy` | us-west (SFO) only |
 
-Treat this table as the source of truth for compute location, database
+Treat this table as the source of truth for compute location, database and Redis
 round-trip latency, and replica reasoning. If an observed region is not `fra1` or
 `sfo1`, it is a proxy/edge hop, not the function. Confirm against the Vercel
 project's region list rather than inferring from a request or log field.
@@ -100,8 +107,22 @@ a rewrite to another Vercel app, where PoP hops accumulate.
 
 `VERCEL_REGION` is documented as "the ID of the Region where the app is running",
 i.e. the function region. Given the table above it should only ever be `fra1` or
-`sfo1`, which is what makes `isUSRegion` in `apps/web/src/lib/drizzle.ts` behave
-correctly for the SFO half of `kilocode-global-app`.
+`sfo1`, which is what makes `isUSRegion` in `packages/web-shared/src/lib/drizzle.ts` behave
+correctly for the SFO half of `kilocode-ai-gateway`.
+
+## Failure UX
+
+When changing failure handling — especially in the Cloud Agent control plane — optimize the
+user's experience, not only correctness:
+
+- Do not fail a turn on a transient or single-observation condition. Retry within a bound.
+- When progress is impossible, fail fast with a correct, specific reason. Do not make the user
+  wait for a long timeout to learn something the system already knows.
+- Never leave a session hanging silently. Surface the known error and release the session.
+- Resume promptly when the condition clears, for example when the user answers a question.
+
+A change that stops spurious failures but lengthens the wait for a genuine failure is only half a
+fix. State both effects in the change's verification.
 
 ## Security Baseline
 

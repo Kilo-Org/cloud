@@ -1,8 +1,17 @@
-/* eslint-disable max-lines */
+/* eslint-disable import/max-dependencies, max-lines */
 import { storage } from '#imports';
 import { z } from 'zod';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
+import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
+import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
+import { createBrowserRuntime } from '@/src/shared/browser-runtime';
+import type { BrowserRuntime } from '@/src/shared/browser-runtime';
+import {
+  createStorageSessionLeasePersistence,
+  createTabLeaseRegistry,
+} from '@/src/shared/browser-tab-leases';
+import { startLocalAgentsHost } from '@/src/shared/local-agents/host';
 import {
   ADD_TO_MEMORY_MENU_ID,
   enableActionClickSidePanel,
@@ -17,15 +26,17 @@ import type {
   NativeSidebarActionApi,
 } from '@/src/shared/side-panel';
 import {
+  BROWSER_TOOL_MESSAGE,
+  CLAIM_TAB_MESSAGE,
+  DISPOSE_BROWSER_CALLER_MESSAGE,
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
+  RELEASE_BROWSER_CALLER_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   WEB_MCP_DISCOVER_MESSAGE,
   WEB_MCP_EXECUTE_MESSAGE,
   discoverWebMcpToolsInTab,
-  evalInTab,
-  evalInTabWithScripting,
   executeWebMcpToolInTab,
   getPageSnapshotInTabWithScripting,
   getViewportScreenshotWithTabsApi,
@@ -37,8 +48,10 @@ import type {
   BrowserScriptingApi,
   BrowserTabsApi,
   ChromeDebuggerApi,
+  EvalTabResult,
   TabDebuggerRequest,
   TabDebuggerResponse,
+  WebMcpDiscoveryResult,
 } from '@/src/shared/tab-debugger';
 
 interface ChromeRuntimeApi {
@@ -95,7 +108,112 @@ const isTrustedExtensionSender = (sender: unknown, runtimeId: string | undefined
   return id === runtimeId && (isExtensionScheme(origin) || isExtensionScheme(url));
 };
 
-const handleTabDebuggerRequest = async ({
+/*
+ * One browser runtime per tabs API — in the browser, the one `chrome.tabs`
+ * object. Every browser-tool and eval message goes through it: it owns the
+ * per-tab lease, the single debugger attachment per tab, one ref registry per
+ * caller, and the serial call chain. Where `debuggerApi` is absent (Firefox)
+ * the tab session builds the scripting backend.
+ */
+const browserRuntimes = new WeakMap<BrowserTabsApi, BrowserRuntime>();
+
+// One onRemoved listener per tabs API, wired lazily on the first message; the WeakSet keeps a second registration a no-op.
+const runtimeCleanupWiredTabsApis = new WeakSet<BrowserTabsApi>();
+
+const getBrowserRuntime = ({
+  debuggerApi,
+  scriptingApi,
+  tabsApi,
+}: {
+  readonly debuggerApi: ChromeDebuggerApi | undefined;
+  readonly scriptingApi: BrowserScriptingApi | undefined;
+  readonly tabsApi: BrowserTabsApi;
+}): BrowserRuntime => {
+  const existing = browserRuntimes.get(tabsApi);
+
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const runtime = createBrowserRuntime({
+    debuggerApi,
+    leases: createTabLeaseRegistry({
+      persistence: createStorageSessionLeasePersistence(storage),
+    }),
+    scriptingApi,
+    tabsApi,
+  });
+
+  browserRuntimes.set(tabsApi, runtime);
+
+  if (!runtimeCleanupWiredTabsApis.has(tabsApi)) {
+    runtimeCleanupWiredTabsApis.add(tabsApi);
+    tabsApi.onRemoved?.addListener(tabId => {
+      void runtime.disposeTab(tabId);
+    });
+    // A tab opened from a tab in a session's group joins that session (D9).
+    tabsApi.onCreated?.addListener(tab => {
+      if (tab.id !== undefined) {
+        void runtime.noteTabCreated(tab.id, tab.openerTabId);
+      }
+    });
+  }
+
+  return runtime;
+};
+
+const webMcpDiscoveryValueSchema = z.object({
+  documentId: z.string(),
+  tools: z.array(
+    z.object({
+      description: z.string(),
+      inputSchema: z.unknown(),
+      name: z.string(),
+      origin: z.string(),
+      title: z.string(),
+    })
+  ),
+});
+
+/**
+ * The WebMCP runtime hooks the page-family handlers need for
+ * `browser_webmcp_list`/`browser_webmcp_call`, wired to the same injected
+ * discovery/execution helpers the standalone WebMCP messages use. The
+ * execution hook is signature-checked by the page handler before anything
+ * runs in the page.
+ */
+const webMcpDispatchOptions = (
+  scriptingApi: BrowserScriptingApi | undefined
+): Pick<BrowserToolDispatchOptions, 'webMcpDiscover' | 'webMcpExecute'> => ({
+  webMcpDiscover:
+    scriptingApi === undefined
+      ? undefined
+      : async (tabId: number): Promise<WebMcpDiscoveryResult | undefined> => {
+          const discovery = await discoverWebMcpToolsInTab({ scriptingApi, tabId });
+
+          if (!discovery.ok) {
+            return undefined;
+          }
+
+          const parsed = webMcpDiscoveryValueSchema.safeParse(discovery.value);
+
+          return parsed.success ? parsed.data : undefined;
+        },
+  webMcpExecute:
+    scriptingApi === undefined
+      ? undefined
+      : (event: WebMcpToolCallEvent): Promise<EvalTabResult> =>
+          executeWebMcpToolInTab({
+            arguments: JSON.stringify(event.arguments),
+            definitionSignature: event.definitionSignature,
+            documentId: event.documentId,
+            scriptingApi,
+            tabId: event.tabId,
+            toolName: event.name,
+          }),
+});
+
+export const handleTabDebuggerRequest = async ({
   debuggerApi,
   request,
   scriptingApi,
@@ -194,12 +312,18 @@ const handleTabDebuggerRequest = async ({
       return { error: 'WebMCP execution API is unavailable.', ok: false };
     }
 
-    if (debuggerApi) {
+    if (request.type === EVAL_TAB_MESSAGE) {
+      if (tabsApi === undefined) {
+        return { error: 'Tab evaluation API is unavailable.', ok: false };
+      }
+
+      const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
+
       return {
         ok: true,
-        result: await evalInTab({
+        result: await runtime.evalInTab({
+          caller: request.caller,
           code: request.code,
-          debuggerApi,
           tabId: request.tabId,
           ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
         }),
@@ -207,20 +331,117 @@ const handleTabDebuggerRequest = async ({
       };
     }
 
-    if (scriptingApi) {
+    if (request.type === CLAIM_TAB_MESSAGE) {
+      if (tabsApi === undefined) {
+        return { error: 'Tab lease API is unavailable.', ok: false };
+      }
+
+      const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
+
       return {
-        ok: true,
-        result: await evalInTabWithScripting({
-          code: request.code,
-          scriptingApi,
+        granted: await runtime.claimTab({
+          caller: request.caller,
+          ...(request.from === undefined ? {} : { from: request.from }),
           tabId: request.tabId,
-          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
         }),
-        type: EVAL_TAB_MESSAGE,
+        ok: true,
+        type: CLAIM_TAB_MESSAGE,
       };
     }
 
-    return { error: 'Tab evaluation API is unavailable.', ok: false };
+    if (request.type === RELEASE_BROWSER_CALLER_MESSAGE) {
+      const runtime =
+        tabsApi === undefined
+          ? undefined
+          : getBrowserRuntime({
+              debuggerApi,
+              scriptingApi,
+              tabsApi,
+            });
+
+      return {
+        ok: true,
+        released: runtime?.releaseCaller(request.caller) ?? 0,
+        type: RELEASE_BROWSER_CALLER_MESSAGE,
+      };
+    }
+
+    if (request.type === DISPOSE_BROWSER_CALLER_MESSAGE) {
+      const runtime =
+        tabsApi === undefined
+          ? undefined
+          : getBrowserRuntime({
+              debuggerApi,
+              scriptingApi,
+              tabsApi,
+            });
+
+      return {
+        ok: true,
+        released: runtime?.disposeCaller(request.caller) ?? 0,
+        type: DISPOSE_BROWSER_CALLER_MESSAGE,
+      };
+    }
+
+    if (request.type === BROWSER_TOOL_MESSAGE) {
+      if (tabsApi === undefined) {
+        return { error: 'Browser tool API is unavailable.', ok: false };
+      }
+
+      const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
+      const outcome = await runtime.runTool({
+        ...(request.agent === undefined ? {} : { agent: request.agent }),
+        arguments: request.arguments,
+        caller: request.caller,
+        options: webMcpDispatchOptions(scriptingApi),
+        tabId: request.tabId,
+        ...(request.takeOver === undefined ? {} : { takeOver: request.takeOver }),
+        toolName: request.tool,
+      });
+
+      if (outcome.kind === 'needs_permission') {
+        return {
+          ok: true,
+          permission: {
+            items: outcome.items.map(item => ({ ...item })),
+            ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),
+          },
+          result: outcome.result,
+          type: BROWSER_TOOL_MESSAGE,
+        };
+      }
+
+      if (outcome.kind === 'origin_changed') {
+        return {
+          ok: true,
+          originChanged: { from: outcome.from, to: outcome.to },
+          result: outcome.result,
+          type: BROWSER_TOOL_MESSAGE,
+        };
+      }
+
+      if (outcome.kind === 'needs_take_over') {
+        return {
+          ok: true,
+          takeOver: {
+            holderKind: 'agent',
+            sessionTitle: outcome.holder.title ?? 'Kilo CLI session',
+            tabId: request.tabId,
+          },
+          type: BROWSER_TOOL_MESSAGE,
+        };
+      }
+
+      return {
+        ok: true,
+        result: outcome.result,
+        type: BROWSER_TOOL_MESSAGE,
+        ...(outcome.withheldFrames === undefined ? {} : { withheldFrames: outcome.withheldFrames }),
+      };
+    }
+
+    // Every schema-valid request type is handled above; this keeps the chain total for future message types.
+    return { error: 'Unsupported tab debugger request.', ok: false };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Debugger request failed.',
@@ -281,6 +502,9 @@ const handleAddToMemoryClick = (
 };
 
 export default defineBackground(() => {
+  // Local agents register every listener here so one service-worker wake serves either feature.
+  startLocalAgentsHost();
+
   const chromeApi = (
     globalThis as typeof globalThis & {
       chrome?: {

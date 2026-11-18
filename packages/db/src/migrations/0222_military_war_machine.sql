@@ -1,0 +1,12 @@
+ALTER TABLE "user_deletion_provider_credentials" DROP CONSTRAINT "user_deletion_provider_credentials_scope_check";--> statement-breakpoint
+ALTER TABLE "user_deletion_requests" DROP CONSTRAINT "user_deletion_requests_cloud_subject_resolution_check";--> statement-breakpoint
+ALTER TABLE "user_deletion_requests" DROP CONSTRAINT "user_deletion_requests_active_email_check";--> statement-breakpoint
+ALTER TABLE "user_deletion_steps" DROP CONSTRAINT "user_deletion_steps_step_key_check";--> statement-breakpoint
+DROP INDEX "UQ_user_deletion_requests_active_email_hmac";--> statement-breakpoint
+ALTER TABLE "user_deletion_requests" ALTER COLUMN "target_email_hmac" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "user_deletion_requests" ADD COLUMN "requested_by_email" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_user_deletion_requests_active_email_hmac" ON "user_deletion_requests" USING btree ("target_email_hmac") WHERE "user_deletion_requests"."target_email_hmac" IS NOT NULL AND "user_deletion_requests"."status" IN ('pending', 'in_progress', 'finalizing');--> statement-breakpoint
+ALTER TABLE "user_deletion_provider_credentials" ADD CONSTRAINT "user_deletion_provider_credentials_scope_check" CHECK ("user_deletion_provider_credentials"."provider_scope" IN ('kiloclaw', 'customerio', 'cloud_storage', 'session_ingest', 'posthog', 'substack', 'pylon', 'csa'));--> statement-breakpoint
+ALTER TABLE "user_deletion_requests" ADD CONSTRAINT "user_deletion_requests_cloud_subject_resolution_check" CHECK ("user_deletion_requests"."cloud_subject_resolution" IN ('current_user', 'authoritative_absence', 'prior_queue_cleanup', 'legacy_identity_unresolved', 'unresolved'));--> statement-breakpoint
+ALTER TABLE "user_deletion_requests" ADD CONSTRAINT "user_deletion_requests_active_email_check" CHECK (("user_deletion_requests"."status" NOT IN ('in_progress', 'finalizing') OR "user_deletion_requests"."target_email" IS NOT NULL) AND ("user_deletion_requests"."status" NOT IN ('completed', 'cancelled') OR "user_deletion_requests"."target_email" IS NULL));--> statement-breakpoint
+ALTER TABLE "user_deletion_steps" ADD CONSTRAINT "user_deletion_steps_step_key_check" CHECK ("user_deletion_steps"."step_key" IN ('kiloclaw_destroy', 'customerio', 'cli_v1_blobs', 'cli_v2_sessions', 'usage_prompt_prefixes', 'posthog', 'substack', 'anonymize', 'pylon_reply', 'pylon_finalize', 'pylon_contact', 'csa_support_db'));

@@ -1,0 +1,366 @@
+import {
+  buildOpaqueScopeKey,
+  type GlanceableSessionRow,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { z } from 'zod';
+
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+
+import {
+  adoptGlanceableScopeKey,
+  getAuthenticatedGlanceableScopeKey,
+  getLocalScopeKey,
+} from './persist';
+
+/**
+ * One durable record of the oldest waiting ask: the session the activity's
+ * Approve and Open buttons name.
+ *
+ * The glanceable snapshot is privacy-minimal by contract — status, counts,
+ * timestamps and an opaque scope key, never a session id — so the id the
+ * buttons need is kept beside it, locally, while the tray rows that carry `id`
+ * are still in scope. Exactly one ask is stored: the app publishes one scope at
+ * a time, so the tray's current scope is the only ask that can be actioned.
+ *
+ * Writes go to SecureStore under one key behind the same lazy `require` guard
+ * `persist.ts` uses, so the pure vitest project never loads the native module.
+ */
+
+export type WaitingAsk = {
+  kiloSessionId: string;
+  /** 'permission' | 'question' — the tray row's status. */
+  status: string;
+  /** True when the row came from the cloud-agent control plane. */
+  isCloudAgent: boolean;
+  /**
+   * The snapshot scope key the ask was recorded under. Read on hydration to
+   * fence the mirror to the scope this process currently publishes.
+   */
+  scopeKey: string;
+  organizationId: string | null;
+  userId: string;
+  recordedAt: number;
+  /**
+   * The selected row's status time, the ask's identity beside the session and
+   * status: a changed wait carries a new time, so a binding is never carried
+   * onto a different request. Absent on rows that never carried one, and on a
+   * record mirrored by a build that did not store it.
+   */
+  statusUpdatedAt?: string | null;
+  /**
+   * The pending permission id this ask's surface names, or null while the ask
+   * has no binding (a record made before the control-plane read lands, a read
+   * that failed, or a mirror written by a release without bindings). Approve is
+   * offered only with one, and an answer is sent only for it.
+   */
+  boundPermissionId: string | null;
+};
+
+/**
+ * One tray row as the publisher reads it. `id` is optional so the publisher
+ * keeps accepting the status-only rows its tests pass; a waiting row without an
+ * id is skipped, because a button that cannot name a session cannot action one.
+ */
+export type WaitingAskRow = GlanceableSessionRow & {
+  id?: string;
+  connectionId?: string | null;
+};
+
+export type WaitingAskContext = {
+  userId: string;
+  organizationId: string | null;
+};
+
+/** The statuses that name a waiting agent the user can approve. */
+const ASKING_STATUSES = new Set(['permission', 'question']);
+
+// SecureStore key owned by this module; nothing else owns it.
+const WAITING_ASK_KEY = 'glanceable-waiting-ask';
+
+const waitingAskSchema = z.object({
+  kiloSessionId: z.string().min(1),
+  status: z.string(),
+  isCloudAgent: z.boolean(),
+  scopeKey: z.string().min(1),
+  organizationId: z.string().nullable(),
+  userId: z.string(),
+  recordedAt: z.number(),
+  // A mirror a release without bindings wrote carries neither key: it parses,
+  // and it reads as an ask with no identity time and no binding, so Approve
+  // stays hidden until a live select binds it.
+  statusUpdatedAt: z.string().nullable().optional(),
+  boundPermissionId: z.string().nullable().default(null),
+});
+
+/**
+ * Epoch ms for a row's status time. An absent or unparseable value sorts after
+ * every dated row, so a row whose wait cannot be timed never displaces one that
+ * can, and still wins when it is the only row waiting.
+ */
+function readStatusTime(statusUpdatedAt: string | null | undefined): number {
+  if (statusUpdatedAt == null) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const at = Date.parse(statusUpdatedAt);
+  return Number.isNaN(at) ? Number.POSITIVE_INFINITY : at;
+}
+
+function isAskingRow(row: WaitingAskRow): row is WaitingAskRow & { id: string } {
+  return row.id !== undefined && ASKING_STATUSES.has(row.status);
+}
+
+/**
+ * The waiting ask the action buttons should name, or null when nothing waits.
+ *
+ * An approvable ask wins over any other: the oldest cloud-agent `permission`,
+ * the row the widget's own Approve answers (`pickFrontApprovableSession`). Only
+ * when none waits does the oldest ask of any kind win. Without the preference an
+ * older question hid Approve on the Live Activity and the ongoing card while
+ * the widget still offered it for the newer permission.
+ *
+ * Within a rank the oldest `statusUpdatedAt` wins; ties keep the first row in
+ * tray order, which is the order the publisher already relies on.
+ * `isCloudAgent` marks the row the cloud-agent control plane merged in (the
+ * sentinel connection id in `active-sessions-live.ts`); a row with no
+ * `connectionId` is not cloud-agent.
+ */
+export function selectWaitingAsk(
+  rows: readonly WaitingAskRow[],
+  ctx: WaitingAskContext,
+  now: number
+): WaitingAsk | null {
+  let chosen: (WaitingAskRow & { id: string }) | null = null;
+  let chosenApprovable = false;
+  let chosenAt = Number.POSITIVE_INFINITY;
+  for (const row of rows) {
+    if (isAskingRow(row)) {
+      const approvable =
+        row.status === 'permission' && row.connectionId === CLOUD_AGENT_CONNECTION_ID;
+      const at = readStatusTime(row.statusUpdatedAt);
+      const ranksHigher = approvable && !chosenApprovable;
+      const sameRankOlder = approvable === chosenApprovable && at < chosenAt;
+      if (chosen === null || ranksHigher || sameRankOlder) {
+        chosen = row;
+        chosenApprovable = approvable;
+        chosenAt = at;
+      }
+    }
+  }
+  if (chosen === null) {
+    return null;
+  }
+  return {
+    kiloSessionId: chosen.id,
+    status: chosen.status,
+    isCloudAgent: chosen.connectionId === CLOUD_AGENT_CONNECTION_ID,
+    // The snapshot's own scope key, so a sink can fence the ask against the
+    // surface it belongs to without re-deriving the hash.
+    scopeKey: buildOpaqueScopeKey({ userId: ctx.userId, organizationId: ctx.organizationId }),
+    organizationId: ctx.organizationId,
+    userId: ctx.userId,
+    recordedAt: now,
+    statusUpdatedAt: chosen.statusUpdatedAt,
+    // Selection is pure: the answer path's binding comes from the control-plane
+    // read the recording step runs, never from the trace.
+    boundPermissionId: null,
+  };
+}
+
+// ── Store ───────────────────────────────────────────────────────────────────
+
+type SecureStoreLike = {
+  setItemAsync: (key: string, value: string) => Promise<void>;
+  getItemAsync: (key: string) => Promise<string | null>;
+  deleteItemAsync: (key: string) => Promise<void>;
+};
+
+// Test-only override so pure suites do not load expo-secure-store
+// (→ expo-modules-core → RN). Mirrors the persist.ts pattern.
+let secureStoreForTests: SecureStoreLike | null = null;
+
+function getSecureStore(): SecureStoreLike {
+  if (secureStoreForTests) {
+    return secureStoreForTests;
+  }
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  return require('expo-secure-store') as SecureStoreLike;
+}
+
+let currentAsk: WaitingAsk | null = null;
+
+// Monotonic epoch bumped on every in-memory write. Hydration captures it before
+// its async read and only fills when it is unchanged, so a live record during
+// the read can never be clobbered by a stale persisted record.
+let waitingAskEpoch = 0;
+
+// True once this process has recorded (or cleared) an ask. That record's mirror
+// write may still be in the chain behind a slower write, so the mirror can hold
+// a value this process has already superseded — an ask whose delete is queued.
+// Hydration fills only for a process that has not written yet: otherwise a
+// record this run made (or cleared) is authoritative, mirror or not.
+let recordedInProcess = false;
+
+// The mirror writes, chained one after the other. A later record's write is
+// issued only once the previous one has settled, so two rapid records can never
+// land out of order on disk, and no rejection escapes: the in-memory value is
+// authoritative and the next record repopulates a failed mirror.
+let mirrorWrite: Promise<void> | null = null;
+
+async function mirrorAskAfter(
+  previous: Promise<void> | null,
+  ask: WaitingAsk | null
+): Promise<void> {
+  if (previous !== null) {
+    await previous;
+  }
+  try {
+    const store = getSecureStore();
+    await (ask === null
+      ? store.deleteItemAsync(WAITING_ASK_KEY)
+      : store.setItemAsync(WAITING_ASK_KEY, JSON.stringify(ask)));
+  } catch (error) {
+    // A missing mirror keeps the in-memory value authoritative. Reported at
+    // warning level so a locked-keychain failure is visible.
+    reportSecureStoreFailure(ask === null ? 'delete' : 'write', error);
+  }
+}
+
+function mirrorAsk(ask: WaitingAsk | null): void {
+  mirrorWrite = mirrorAskAfter(mirrorWrite, ask);
+}
+
+function parseStoredAsk(raw: string): WaitingAsk | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const result = waitingAskSchema.safeParse(parsed);
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Replace the one ask and mirror it to SecureStore. `null` clears both. The
+ * mirror is fire-and-forget: the in-memory value is authoritative for the sinks
+ * of this run, and a failed mirror is treated as absent after a restart. The
+ * writes are serialized so a burst of records cannot land out of order, and a
+ * failing native module must never break the publisher that calls this.
+ */
+export function recordWaitingAsk(ask: WaitingAsk | null): void {
+  waitingAskEpoch += 1;
+  currentAsk = ask;
+  recordedInProcess = true;
+  if (ask !== null) {
+    // A live record carries the context the publisher draws for, and the
+    // platform sinks draw before the persist sink writes the frame: adopt it
+    // here so the draw-time fence judges this ask by the scope it was recorded
+    // for, not by the one still in memory.
+    adoptGlanceableScopeKey(ask.scopeKey);
+  }
+  mirrorAsk(ask);
+}
+
+/**
+ * The hydrated in-memory ask; the sinks read this synchronously.
+ *
+ * Fenced against the scope this process can act for. An ask recorded before the
+ * process learned a different scope is never drawn: every surface reads the ask
+ * at draw time to decide whether Open and Approve are offered, so a switch must
+ * not keep the previous scope's actions up until the next select replaces the
+ * record. A process with no confirmed scope yet still draws the ask it recorded
+ * itself — that record carries the publisher's own context, and the mirror, the
+ * only other source, is not hydrated without a scope to authorize it against.
+ */
+export function getWaitingAsk(): WaitingAsk | null {
+  const ask = currentAsk;
+  if (ask === null) {
+    return null;
+  }
+  const localScopeKey = getLocalScopeKey();
+  return localScopeKey === null || ask.scopeKey === localScopeKey ? ask : null;
+}
+
+let hydrationPromise: Promise<void> | null = null;
+
+/**
+ * One read of the mirror, epoch-guarded exactly like
+ * `restorePersistedGlanceable`: a record that lands during the read owns the
+ * state, and an already-set in-memory ask is never overwritten. A process that
+ * has recorded anything itself is not hydrated either, because the mirror it
+ * would read can still hold the value that record replaced — a cleared ask
+ * whose delete is queued behind the write chain. Best effort — a failed or
+ * malformed read leaves the in-memory state alone.
+ *
+ * A record is accepted only for the scope this process can act for: the one a
+ * publish or a matching restore confirmed, or — when neither has resolved one —
+ * the scope the signed-in account derives. The mirror outlives a sign-out or an
+ * org switch, so this is the one boundary where another scope's record could
+ * enter the process. A record this process can place outside its scope is
+ * deleted here rather than left for whichever account reads the device next; an
+ * unconfirmed scope keeps it, because absence of proof is not proof it is
+ * foreign.
+ */
+async function hydrateStoredAsk(): Promise<void> {
+  const startEpoch = waitingAskEpoch;
+  try {
+    const raw = await getSecureStore().getItemAsync(WAITING_ASK_KEY);
+    if (waitingAskEpoch !== startEpoch) {
+      return;
+    }
+    if (raw === null || currentAsk !== null || recordedInProcess) {
+      return;
+    }
+    const parsed = parseStoredAsk(raw);
+    if (parsed === null) {
+      return;
+    }
+    const scopeKey = getLocalScopeKey() ?? (await getAuthenticatedGlanceableScopeKey());
+    if (waitingAskEpoch !== startEpoch) {
+      return;
+    }
+    if (scopeKey === null) {
+      return;
+    }
+    if (parsed.scopeKey === scopeKey) {
+      currentAsk = parsed;
+    } else {
+      mirrorAsk(null);
+    }
+  } catch (error) {
+    // A malformed mirror is treated as absent; the next record repopulates it.
+    reportSecureStoreFailure('read', error);
+  }
+}
+
+/**
+ * Hydrate from SecureStore once and return the current ask. The headless
+ * background paths (a push wake with no React context) call this; the sinks use
+ * the synchronous `getWaitingAsk`. The answer is the same fenced read, so an ask
+ * this process can place in another scope is never returned to an approval.
+ */
+export async function readWaitingAsk(): Promise<WaitingAsk | null> {
+  hydrationPromise ??= hydrateStoredAsk();
+  await hydrationPromise;
+  return getWaitingAsk();
+}
+
+// ── Test-only helpers ──────────────────────────────────────────────────────
+
+export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
+  secureStoreForTests = store;
+}
+
+/** Settle the mirror chain so a case can assert what landed on disk. */
+export async function _flushWaitingAskMirrorForTests(): Promise<void> {
+  await mirrorWrite;
+}
+
+export function _resetWaitingAskForTests(): void {
+  currentAsk = null;
+  waitingAskEpoch = 0;
+  recordedInProcess = false;
+  hydrationPromise = null;
+  mirrorWrite = null;
+  secureStoreForTests = null;
+}

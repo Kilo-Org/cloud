@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "உங்கள் முகவர் அமர்வில் ஒரு புதுப்பிப்பு உள்ளது",
+      "lowBalance": "உங்கள் இருப்புக்கு கவனம் தேவை",
+      "spendAlert": "உங்கள் செலவுக்கு கவனம் தேவை",
+      "securityFinding": "ஒரு பாதுகாப்பு கண்டுபிடிப்புக்கு கவனம் தேவை",
+      "securityUpdate": "பாதுகாப்பு சரிபார்ப்பில் ஒரு புதுப்பிப்பு உள்ளது",
+      "activeAgentsGlanceable": "செயலில் உள்ள முகவர்களில் ஒரு புதுப்பிப்பு உள்ளது"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "குறைந்த இருப்பு எச்சரிக்கை",
+      "body": "{{organizationName}} இருப்பு ${{minimumBalanceUsd}} க்கு கீழே விழுந்தது"
+    },
+    "spendAlert": {
+      "title": "செலவு எச்சரிக்கை",
+      "body": "{{scopeName}} செலவு ${{amountUsd}} ஐ தாண்டியது"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}} இல் {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "புதிய பாதுகாப்பு கண்டுபிடிப்பு ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA எச்சரிக்கை"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA மீறல்"
+    }
+  },
+  "sessionReady": {
+    "body": "உங்கள் Kilo அமர்வு உங்கள் தொலைபேசியிலிருந்து கட்டுப்படுத்த தயாராக உள்ளது"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

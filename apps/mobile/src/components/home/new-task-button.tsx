@@ -1,7 +1,8 @@
-import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Plus } from '@/components/ui/icons';
 import { View } from 'react-native';
 
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -11,7 +12,8 @@ type NewTaskButtonProps = {
 };
 
 export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) {
-  const router = useRouter();
+  const { openNewSession } = useNewSessionNavigator();
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   return (
@@ -21,14 +23,11 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
         size="lg"
         className="w-full"
         onPress={() => {
-          const path = organizationId
-            ? `/(app)/agent-chat/new?organizationId=${organizationId}`
-            : '/(app)/agent-chat/new';
-          router.push(path as Href);
+          openNewSession(organizationId);
         }}
       >
         <Plus size={18} color={colors.primaryForeground} />
-        <Text className="shrink text-center font-semibold">New coding task</Text>
+        <Text className="shrink text-center font-semibold">{t('home.newCodingTask')}</Text>
       </Button>
     </View>
   );

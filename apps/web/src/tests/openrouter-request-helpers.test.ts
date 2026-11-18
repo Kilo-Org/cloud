@@ -1,13 +1,90 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, jest, test } from '@jest/globals';
 import {
   addCacheBreakpoints,
+  getReasoningEffort,
+  getReasoningEffortTimeoutSuggestion,
   removeChatCompletionsToolNames,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
+
+describe('getReasoningEffort', () => {
+  test.each([
+    { options: { output_config: { effort: 'max' } }, expected: 'max' },
+    { options: { output_config: { effort: 'high' } }, expected: 'high' },
+    { options: { output_config: {} }, expected: null },
+    { options: {}, expected: null },
+  ] as const)('reads messages effort from $options as $expected', ({ options, expected }) => {
+    expect(
+      getReasoningEffort({
+        kind: 'messages',
+        body: { model: 'test-model', messages: [], max_tokens: 1024, ...options },
+      })
+    ).toBe(expected);
+  });
+
+  test.each([
+    { options: { reasoning: { effort: 'xhigh' } }, expected: 'xhigh' },
+    { options: { reasoning: { effort: 'high' } }, expected: 'high' },
+    { options: { reasoning: { effort: null } }, expected: null },
+    { options: { reasoning: {} }, expected: null },
+    { options: { reasoning: null }, expected: null },
+    { options: {}, expected: null },
+  ] as const)('reads responses effort from $options as $expected', ({ options, expected }) => {
+    expect(
+      getReasoningEffort({
+        kind: 'responses',
+        body: { model: 'test-model', input: 'test', ...options },
+      })
+    ).toBe(expected);
+  });
+
+  test.each([
+    { options: { reasoning: { effort: 'xhigh' } }, expected: 'xhigh' },
+    { options: { reasoning_effort: 'xhigh' }, expected: 'xhigh' },
+    {
+      options: { reasoning: { effort: 'high' }, reasoning_effort: 'xhigh' },
+      expected: 'high',
+    },
+    {
+      options: { reasoning: { effort: 'none' }, reasoning_effort: 'xhigh' },
+      expected: 'none',
+    },
+    { options: { reasoning: { effort: null }, reasoning_effort: 'xhigh' }, expected: 'xhigh' },
+    { options: { reasoning: {}, reasoning_effort: 'high' }, expected: 'high' },
+    { options: { reasoning: { effort: null }, reasoning_effort: null }, expected: null },
+    { options: { reasoning: {} }, expected: null },
+    { options: {}, expected: null },
+  ] as const)(
+    'reads chat completions effort from $options as $expected',
+    ({ options, expected }) => {
+      expect(
+        getReasoningEffort({
+          kind: 'chat_completions',
+          body: { model: 'test-model', messages: [], ...options },
+        })
+      ).toBe(expected);
+    }
+  );
+});
+
+describe('getReasoningEffortTimeoutSuggestion', () => {
+  test.each(['xhigh', 'max'])('suggests lowering %s effort', effort => {
+    expect(getReasoningEffortTimeoutSuggestion(effort)).toBe(
+      ` Try lowering the reasoning effort from "${effort}" to "high" or lower to reduce the chance of timeouts.`
+    );
+  });
+
+  test.each(['high', 'medium', 'low', 'minimal', 'none', 'XHIGH', 'MAX', 'max ', '', null])(
+    'does not suggest lowering %s effort',
+    effort => {
+      expect(getReasoningEffortTimeoutSuggestion(effort)).toBe('');
+    }
+  );
+});
 
 describe('removeChatCompletionsToolNames', () => {
   test('removes names from tool messages only', () => {
@@ -610,5 +687,163 @@ describe('addCacheBreakpoints', () => {
     addCacheBreakpoints(request);
 
     expect(request.body.messages.at(-1)?.content).toBe('Latest prompt');
+  });
+
+  test('leaves a chat completions body unchanged when a content block carries cache_control', () => {
+    let deepest: Record<string, unknown> = {
+      type: 'text',
+      text: 'Deep prompt',
+      cache_control: { type: 'ephemeral' },
+    };
+    for (let level = 1; level < 20_000; level += 1) {
+      deepest = { nested: deepest };
+    }
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              deepest as unknown as OpenAI.ChatCompletionContentPart,
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(0)?.content).toBe('You are helpful.');
+    const lastContent = request.body.messages.at(-1)?.content;
+    expect(Array.isArray(lastContent)).toBe(true);
+    expect((lastContent as unknown[]).at(0)).toEqual({
+      type: 'text',
+      text: 'Latest prompt',
+    });
+  });
+
+  test('leaves a responses body unchanged when its first message carries prompt_cache_breakpoint', () => {
+    const marker = {
+      type: 'message',
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'First prompt', prompt_cache_breakpoint: { mode: 'explicit' } },
+      ],
+    };
+    const input = [
+      marker,
+      ...Array.from({ length: 5_000 }, (_, index) => ({
+        type: 'message',
+        role: 'user',
+        content: `Prompt ${index}`,
+      })),
+    ];
+
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: input as unknown as OpenAI.Responses.ResponseInputItem[],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (!Array.isArray(request.body.input)) throw new Error('expected responses input array');
+    expect(request.body.input.at(0)).toEqual(marker);
+    expect(request.body.input.at(-1)).toEqual({
+      type: 'message',
+      role: 'user',
+      content: 'Prompt 4999',
+    });
+  });
+
+  test('leaves a chat completions body with many object nodes unchanged', () => {
+    const filler = Array.from({ length: 20_000 }, (_, index) => ({
+      first: `first-${index}`,
+      second: `second-${index}`,
+      third: `third-${index}`,
+      fourth: `fourth-${index}`,
+      fifth: `fifth-${index}`,
+      sixth: `sixth-${index}`,
+    }));
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              { filler } as unknown as OpenAI.ChatCompletionContentPart,
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    const content = request.body.messages.at(-1)?.content as unknown[];
+    expect(request.body.messages.at(0)?.content).toBe('You are helpful.');
+    expect(content).toHaveLength(2);
+    expect(content[0]).toEqual({ type: 'text', text: 'Latest prompt' });
+  });
+
+  test('emits one aggregated record naming the breakpoints it set', () => {
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: {
+          model: 'test-model',
+          messages: [
+            { role: 'system', content: 'You are helpful.' },
+            { role: 'user', content: 'First prompt' },
+            { role: 'tool', tool_call_id: 'call_1', content: 'Latest tool output' },
+          ],
+        },
+      };
+
+      addCacheBreakpoints(request);
+
+      expect(debug).toHaveBeenCalledTimes(1);
+      expect(debug.mock.calls[0]?.[0]).toBe(
+        '[addCacheBreakpoints] set 2 cache breakpoints for chat_completions: chat_completions.system, chat_completions.last.tool'
+      );
+    } finally {
+      debug.mockRestore();
+    }
+  });
+
+  test('emits nothing when every breakpoint is already present', () => {
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'anthropic/claude-sonnet-4-5',
+          max_tokens: 1024,
+          system: [
+            { type: 'text', text: 'You are helpful.', cache_control: { type: 'ephemeral' } },
+          ],
+          messages: [{ role: 'user', content: 'Latest prompt' }],
+        },
+      };
+
+      addCacheBreakpoints(request);
+
+      expect(debug).not.toHaveBeenCalled();
+    } finally {
+      debug.mockRestore();
+    }
   });
 });

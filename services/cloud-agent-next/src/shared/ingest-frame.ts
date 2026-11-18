@@ -19,6 +19,7 @@
  */
 
 import { trimPayload } from './trim-payload.js';
+import { projectSafeAssistantError } from './assistant-failure.js';
 import type { IngestEvent, StreamEventType, WrapperEventTruncatedData } from './protocol.js';
 
 /** Cloudflare's per-WebSocket-message receive limit. Documentation/logging only. */
@@ -126,6 +127,9 @@ function compactTerminalData(streamEventType: StreamEventType, data: unknown): u
     case 'autocommit_started': {
       const out: Record<string, unknown> = { message: safeString(data.message, 1000) ?? '' };
       if (typeof data.messageId === 'string') out.messageId = data.messageId;
+      // The repository is part of the event's identity, so two repositories stay apart.
+      const repository = safeString(data.repository, 500);
+      if (repository !== undefined) out.repository = repository;
       return out;
     }
     case 'autocommit_completed': {
@@ -136,6 +140,8 @@ function compactTerminalData(streamEventType: StreamEventType, data: unknown): u
       if (typeof data.messageId === 'string') out.messageId = data.messageId;
       if (typeof data.skipped === 'boolean') out.skipped = data.skipped;
       if (typeof data.commitHash === 'string') out.commitHash = data.commitHash;
+      const repository = safeString(data.repository, 500);
+      if (repository !== undefined) out.repository = repository;
       // Drop commitMessage (may be large) on compaction.
       return out;
     }
@@ -149,6 +155,20 @@ function compactTerminalData(streamEventType: StreamEventType, data: unknown): u
   }
 }
 
+function compactMessagePart(part: Record<string, unknown>): Record<string, unknown> {
+  const compactPart: Record<string, unknown> = {};
+  if (typeof part.type === 'string') compactPart.type = part.type;
+  if (typeof part.id === 'string') compactPart.id = part.id;
+  if (typeof part.sessionID === 'string') compactPart.sessionID = part.sessionID;
+  if (typeof part.messageID === 'string') compactPart.messageID = part.messageID;
+  if (typeof part.status === 'string') compactPart.status = part.status;
+  const state = part.state;
+  if (isRecord(state) && typeof state.status === 'string') {
+    compactPart.state = { status: state.status };
+  }
+  return compactPart;
+}
+
 function compactMessagePartUpdated(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { event: data.event, type: data.type };
   const properties = data.properties;
@@ -156,18 +176,7 @@ function compactMessagePartUpdated(data: Record<string, unknown>): Record<string
     const compactProps: Record<string, unknown> = {};
     if (typeof properties.sessionID === 'string') compactProps.sessionID = properties.sessionID;
     const part = properties.part;
-    if (isRecord(part)) {
-      const compactPart: Record<string, unknown> = {};
-      if (typeof part.type === 'string') compactPart.type = part.type;
-      if (typeof part.id === 'string') compactPart.id = part.id;
-      if (typeof part.messageID === 'string') compactPart.messageID = part.messageID;
-      if (typeof part.status === 'string') compactPart.status = part.status;
-      const state = part.state;
-      if (isRecord(state) && typeof state.status === 'string') {
-        compactPart.state = { status: state.status };
-      }
-      compactProps.part = compactPart;
-    }
+    if (isRecord(part)) compactProps.part = compactMessagePart(part);
     out.properties = compactProps;
   }
   return out;
@@ -185,7 +194,7 @@ function compactMessageUpdated(data: Record<string, unknown>): Record<string, un
       if (typeof info.sessionID === 'string') compactInfo.sessionID = info.sessionID;
       if (typeof info.role === 'string') compactInfo.role = info.role;
       if (isRecord(info.time)) compactInfo.time = info.time;
-      const safeError = safeString(info.error, 2000);
+      const safeError = projectSafeAssistantError(info.error);
       if (safeError !== undefined) compactInfo.error = safeError;
       out.properties = { info: compactInfo };
     }
@@ -193,14 +202,130 @@ function compactMessageUpdated(data: Record<string, unknown>): Record<string, un
   return out;
 }
 
+function omitExpensiveMessageInfo(info: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...info };
+  if (isRecord(out.summary)) {
+    const { diffs: _diffs, ...summaryRest } = out.summary;
+    if (Object.keys(summaryRest).length > 0) out.summary = summaryRest;
+    else delete out.summary;
+  }
+  if (out.error !== undefined && out.error !== null) {
+    const safeError = projectSafeAssistantError(out.error);
+    if (safeError !== undefined) out.error = safeError;
+    else delete out.error;
+  }
+  return out;
+}
+
+/**
+ * Cheap tool-state metadata that must survive persist so stream catch-up can
+ * still link a task part to its subagent. `sessionId` drives the inline
+ * progress rows and the drawer; `model` is the routed model shown on the
+ * drawer. Every other metadata field (diffs, patches, snapshots) can be large,
+ * so it is dropped.
+ */
+function slimPersistedPartMetadata(metadata: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(metadata)) return undefined;
+  const out: Record<string, unknown> = {};
+  if (typeof metadata.sessionId === 'string') out.sessionId = metadata.sessionId;
+  if (isRecord(metadata.model)) {
+    const { providerID, modelID } = metadata.model;
+    if (typeof providerID === 'string' && typeof modelID === 'string') {
+      out.model = { providerID, modelID };
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function omitExpensivePart(part: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...part };
+  delete out.snapshot;
+  delete out.patch;
+  delete out.metadata;
+
+  if (typeof out.url === 'string' && out.url.startsWith('data:')) {
+    out.url = '';
+  }
+
+  const source = out.source;
+  if (isRecord(source)) {
+    const nextSource: Record<string, unknown> = { ...source };
+    delete nextSource.content;
+    if (isRecord(nextSource.text)) {
+      nextSource.text = { ...nextSource.text, value: '' };
+    }
+    if (Object.keys(nextSource).length > 0) out.source = nextSource;
+    else delete out.source;
+  }
+
+  if (isRecord(out.state)) {
+    const { metadata, ...stateRest } = out.state;
+    const state: Record<string, unknown> = { ...stateRest };
+    const slimMetadata = slimPersistedPartMetadata(metadata);
+    if (slimMetadata !== undefined) state.metadata = slimMetadata;
+    if (Array.isArray(state.attachments)) {
+      state.attachments = state.attachments.map((attachment): unknown =>
+        isRecord(attachment) ? omitExpensivePart(attachment) : attachment
+      );
+    }
+    out.state = state;
+  }
+
+  return out;
+}
+
+function persistedKilocodeEnvelope(
+  data: Record<string, unknown>,
+  properties: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { properties };
+  if (data.event !== undefined) out.event = data.event;
+  if (data.type !== undefined) out.type = data.type;
+  return out;
+}
+
+/**
+ * Drops expensive blobs from entity-upserted message events before SQLite
+ * persist. Client stream replay uses this payload, so cheap fields (model,
+ * variant, time, text, tool status, task child-session linkage) stay. Live
+ * broadcasts still use the unspecialized public payload. Oversized ingest
+ * compaction is separate. Persist keeps only event, type, and sanitized
+ * properties so wrapper top-level info/part aliases are not stored.
+ */
+export function slimPersistedKilocodeEvent(data: unknown): unknown {
+  if (!isRecord(data)) return data;
+
+  const eventName = kiloEventNameOf(data);
+  if (eventName === 'message.updated') {
+    const properties = data.properties;
+    if (!isRecord(properties) || !isRecord(properties.info)) return data;
+    return persistedKilocodeEnvelope(data, {
+      ...properties,
+      info: omitExpensiveMessageInfo(properties.info),
+    });
+  }
+  if (eventName !== 'message.part.updated') return data;
+
+  const properties = data.properties;
+  if (!isRecord(properties) || !isRecord(properties.part)) return data;
+  return persistedKilocodeEnvelope(data, {
+    ...properties,
+    part: omitExpensivePart(properties.part),
+  });
+}
+
 function compactCommandsAvailable(data: Record<string, unknown>): Record<string, unknown> {
   const commands = data.commands;
   if (!Array.isArray(commands)) return { commands: [] };
-  return {
+  const compact: Record<string, unknown> = {
     commands: commands
       .filter((c): c is Record<string, unknown> => isRecord(c) && typeof c.name === 'string')
       .map(c => ({ name: c.name as string })),
   };
+  // The status is what tells the reader that rows are missing, so it survives
+  // the compaction that keeps the event inside the frame budget.
+  if (isRecord(data.catalogStatus)) compact.catalogStatus = data.catalogStatus;
+  return compact;
 }
 
 function buildTruncationSurrogate(

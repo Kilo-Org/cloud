@@ -199,6 +199,42 @@ describe('buildCreateRemoteSessionInput', () => {
       orgId: 'org-xyz',
     });
   });
+
+  it('omits an empty directory so the CLI falls back to its launch directory', () => {
+    expect(buildCreateRemoteSessionInput({ directory: '' })).toBeUndefined();
+    expect(buildCreateRemoteSessionInput({ mode: 'code', directory: '' })).toEqual({
+      agent: 'code',
+    });
+  });
+
+  it('includes a relative directory path', () => {
+    expect(buildCreateRemoteSessionInput({ directory: 'src/server' })).toEqual({
+      directory: 'src/server',
+    });
+  });
+
+  it('combines a relative directory with mode, selection, and organizationId', () => {
+    expect(
+      buildCreateRemoteSessionInput({
+        mode: 'plan',
+        directory: 'worktrees/kilo',
+        selection: {
+          model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+          variant: 'medium',
+        },
+        organizationId: 'org-xyz',
+      })
+    ).toEqual({
+      agent: 'plan',
+      directory: 'worktrees/kilo',
+      model: {
+        providerID: 'kilo',
+        modelID: 'kilo-auto/efficient',
+        variant: 'medium',
+      },
+      orgId: 'org-xyz',
+    });
+  });
 });
 
 describe('resolveSpawnOrganizationId', () => {

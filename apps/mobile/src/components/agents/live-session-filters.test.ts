@@ -1,0 +1,225 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  buildLiveFilterOptions,
+  filterLiveSessions,
+  liveSessionPlatformBucket,
+  type LiveSessionQuery,
+} from './live-session-filters';
+
+const CLOUD = {
+  id: 'cloud',
+  title: 'Fix the login redirect',
+  gitUrl: 'https://github.com/kilo/cloud.git',
+  createdOnPlatform: 'cloud-agent-web',
+};
+const CLI = {
+  id: 'cli',
+  title: 'Bump deps',
+  gitUrl: 'git@github.com:kilo/app.git',
+  gitBranch: 'feature/session-search',
+  createdOnPlatform: 'cli',
+};
+const VSCODE = {
+  id: 'vscode',
+  title: 'Rename the module',
+  gitUrl: 'https://github.com/kilo/cloud.git',
+  createdOnPlatform: 'vscode',
+  associatedPr: { number: 42, title: 'Harden live search' },
+};
+const BARE = { id: 'bare', title: '', gitUrl: null, createdOnPlatform: 'unknown' };
+const PLACEHOLDER = {
+  id: 'placeholder',
+  title: 'New session - 2026-09-21T15:44:47.176Z',
+  gitUrl: null,
+  createdOnPlatform: 'cli',
+};
+
+describe('liveSessionPlatformBucket', () => {
+  it('folds platform variants into the filter bucket', () => {
+    expect(liveSessionPlatformBucket('cloud-agent-web')).toBe('cloud-agent');
+    expect(liveSessionPlatformBucket('agent-manager')).toBe('extension');
+    expect(liveSessionPlatformBucket('cli')).toBe('cli');
+  });
+
+  it('gives desktop its own bucket instead of other', () => {
+    expect(liveSessionPlatformBucket('desktop')).toBe('desktop');
+  });
+
+  it('buckets an unlisted platform as other and an unknown origin as null', () => {
+    expect(liveSessionPlatformBucket('jetbrains')).toBe('other');
+    expect(liveSessionPlatformBucket('unknown')).toBeNull();
+    expect(liveSessionPlatformBucket(undefined)).toBeNull();
+  });
+});
+
+describe('buildLiveFilterOptions', () => {
+  it('offers each repository once, sorted, and skips rows without one', () => {
+    const { projectOptions } = buildLiveFilterOptions([CLOUD, VSCODE, CLI, BARE]);
+
+    expect(projectOptions).toEqual([
+      { gitUrl: 'git@github.com:kilo/app.git', displayName: 'kilo/app' },
+      { gitUrl: 'https://github.com/kilo/cloud.git', displayName: 'kilo/cloud' },
+    ]);
+  });
+
+  it('merges repositories that render to one label into a single option', () => {
+    const ssh = {
+      id: 'ssh',
+      title: 'ssh clone',
+      gitUrl: 'git@github.com:kilo/cloud.git',
+      createdOnPlatform: 'cli',
+    };
+    const https = {
+      id: 'https',
+      title: 'https clone',
+      gitUrl: 'https://github.com/kilo/cloud.git',
+      createdOnPlatform: 'cli',
+    };
+    const { projectOptions } = buildLiveFilterOptions([ssh, https]);
+
+    // First-seen git URL wins, so the option stays stable across renders.
+    expect(projectOptions).toEqual([
+      { gitUrl: 'git@github.com:kilo/cloud.git', displayName: 'kilo/cloud' },
+    ]);
+  });
+
+  it('offers only the platform buckets that are live, in canonical order', () => {
+    expect(buildLiveFilterOptions([CLI, VSCODE, CLOUD, BARE]).platformOptions).toEqual([
+      'cloud-agent',
+      'extension',
+      'cli',
+    ]);
+  });
+
+  it('offers nothing for an empty live list', () => {
+    expect(buildLiveFilterOptions([])).toEqual({ projectOptions: [], platformOptions: [] });
+  });
+});
+
+const query = (over: Partial<LiveSessionQuery> = {}): LiveSessionQuery => ({
+  platformFilter: [],
+  projectFilter: [],
+  searchQuery: '',
+  ...over,
+});
+
+describe('filterLiveSessions', () => {
+  const sessions = [CLOUD, CLI, VSCODE, BARE];
+
+  it('returns the list untouched when nothing narrows it', () => {
+    expect(filterLiveSessions(sessions, query())).toBe(sessions);
+  });
+
+  it('keeps only the selected repository', () => {
+    expect(
+      filterLiveSessions(
+        sessions,
+        query({ projectFilter: ['https://github.com/kilo/cloud.git'] })
+      ).map(s => s.id)
+    ).toEqual(['cloud', 'vscode']);
+  });
+
+  it('matches a platform bucket across its variants', () => {
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['cloud-agent'] })).map(s => s.id)
+    ).toEqual(['cloud']);
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['extension'] })).map(s => s.id)
+    ).toEqual(['vscode']);
+  });
+
+  it('matches a persisted variant selection as the bucket row the sheet checks', () => {
+    // A legacy record can hold `cloud-agent-web`; the badge and the sheet
+    // collapse it to the single `cloud-agent` row, so the list must too.
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['cloud-agent-web'] })).map(s => s.id)
+    ).toEqual(['cloud']);
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['agent-manager'] })).map(s => s.id)
+    ).toEqual(['vscode']);
+  });
+
+  it('matches every alias of a merged repository from one stored URL', () => {
+    const aliases = [
+      { id: 'ssh', gitUrl: 'git@github.com:kilo/cloud.git', createdOnPlatform: 'cli' },
+      { id: 'https', gitUrl: 'https://github.com/kilo/cloud.git', createdOnPlatform: 'cli' },
+    ];
+    expect(
+      filterLiveSessions(
+        aliases,
+        query({ projectFilter: ['https://github.com/kilo/cloud.git'] })
+      ).map(s => s.id)
+    ).toEqual(['ssh', 'https']);
+    expect(
+      filterLiveSessions(aliases, query({ projectFilter: ['git@github.com:kilo/cloud.git'] })).map(
+        s => s.id
+      )
+    ).toEqual(['ssh', 'https']);
+  });
+
+  it('combines every dimension with AND', () => {
+    expect(
+      filterLiveSessions(
+        sessions,
+        query({ platformFilter: ['cli'], projectFilter: ['https://github.com/kilo/cloud.git'] })
+      )
+    ).toHaveLength(0);
+    expect(
+      filterLiveSessions(
+        sessions,
+        query({ platformFilter: ['cli'], projectFilter: ['git@github.com:kilo/app.git'] })
+      ).map(s => s.id)
+    ).toEqual(['cli']);
+  });
+
+  it('searches mid-string in the title case-insensitively', () => {
+    expect(
+      filterLiveSessions(sessions, query({ searchQuery: '  LOGIN REDI ' })).map(s => s.id)
+    ).toEqual(['cloud']);
+  });
+
+  it('searches mid-string in other session metadata case-insensitively', () => {
+    expect(
+      filterLiveSessions(sessions, query({ searchQuery: 'SSION-SEA' })).map(s => s.id)
+    ).toEqual(['cli']);
+    expect(filterLiveSessions(sessions, query({ searchQuery: 'LIVE SEA' })).map(s => s.id)).toEqual(
+      ['vscode']
+    );
+  });
+
+  it('searches the repository name too', () => {
+    expect(filterLiveSessions(sessions, query({ searchQuery: 'kilo/app' })).map(s => s.id)).toEqual(
+      ['cli']
+    );
+  });
+
+  it('treats a whitespace-only query as no search', () => {
+    expect(filterLiveSessions(sessions, query({ searchQuery: '   ' }))).toBe(sessions);
+  });
+
+  it('never claims a row with an unknown origin or no repository', () => {
+    expect(filterLiveSessions(sessions, query({ platformFilter: ['other'] }))).toHaveLength(0);
+    expect(
+      filterLiveSessions([BARE], query({ projectFilter: ['https://github.com/kilo/cloud.git'] }))
+    ).toHaveLength(0);
+  });
+
+  it('does not index the raw creation-default title', () => {
+    // The row paints the generic "Untitled session" label for this title (or
+    // whatever the platform default is), so searching for the placeholder's
+    // ISO timestamp must never surface the row.
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: '2026-09-21' }))
+    ).toHaveLength(0);
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: 'new session' }))
+    ).toHaveLength(0);
+  });
+
+  it('still indexes the resolved title of a real session alongside a placeholder row', () => {
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: 'LOGIN REDI' })).map(s => s.id)
+    ).toEqual(['cloud']);
+  });
+});

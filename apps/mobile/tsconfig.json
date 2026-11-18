@@ -1,12 +1,27 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
+    // app.config.ts imports src/i18n/languages.ts with its extension: the Expo
+    // config loader resolves require('./x.ts') but not the extensionless form.
+    "allowImportingTsExtensions": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
       "@/*": ["./src/*"],
       "@/assets/*": ["./assets/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]
+  // src/lib/env-keys.js and src/lib/android-notification-channels.js carry
+  // @ts-check JSDoc contracts (env keys, silent Android channels) read by
+  // app.config.ts and scripts/assert-expo-config.mjs. Explicitly listed so the
+  // check does not depend on some .ts file happening to import them.
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "src/lib/env-keys.js",
+    "src/lib/android-notification-channels.js",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+  ]
 }

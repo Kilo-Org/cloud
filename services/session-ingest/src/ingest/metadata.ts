@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
@@ -7,11 +7,25 @@ import type { Env } from '../env';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { isNeedsInputStatus } from '../dos/session-ingest-attention';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
+import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { SessionStatusSchema } from '../types/user-connection-protocol';
 import { isDefaultSessionTitle } from './default-session-title';
+import { isWorktreeDeleting } from '../services/worktree-deletion';
+import { recordWorkspaceCheckout } from '../services/workspace-checkout';
 
 /** Stored status written when a CLI disconnects while the session is waiting on input. */
 export const CLI_DISCONNECT_ATTENTION_RESET_STATUS = 'retry' as const;
+
+/**
+ * How stale a `busy` row's `status_updated_at` must be before a CLI disconnect may
+ * clear it. A status write from a live CLI — or one that just re-attached — inside
+ * this window is never consumed: the write is fresher than the gate, so it keeps
+ * its `busy` and the CLI's next status write stands. The hold that reaches
+ * `resetAttentionStatusOnCliDisconnect` is already at least
+ * `CLI_ABSENCE_ATTENTION_RESET_MS` (600 s) old, so this 60 s gate is a second line
+ * of defence for the re-attach/cancel race, not the primary guard.
+ */
+export const CLI_DISCONNECT_STALE_BUSY_WINDOW_MS = 60_000;
 
 type SessionMetadataUpdates = Partial<
   Pick<
@@ -23,11 +37,54 @@ type SessionMetadataUpdates = Partial<
     | 'git_branch'
     | 'status'
     | 'status_updated_at'
+    | 'status_transition_id'
     | 'platform'
     | 'pr_url'
     | 'pr_number'
+    | 'pr_head_ref'
+    | 'pr_head_sha'
+    | 'pr_link_verified_at'
+    | 'briefing_excerpt'
+    | 'briefing_excerpt_scope_changed_at'
   >
 >;
+
+/**
+ * Reduce a pull/merge request URL to its repository URL by dropping the
+ * `/pull/<n>` (GitHub), `/-/merge_requests/<n>` (GitLab), or
+ * `/merge_requests/<n>` suffix. Returns null when the input is not an http(s)
+ * URL with a recognizable request path.
+ */
+export function repoUrlFromPrUrl(prUrl: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(prUrl.trim());
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+
+  const match = parsed.pathname.match(/^(.*?)\/(?:-\/)?(?:pull|merge_requests)\/\d+(?:\/.*)?$/i);
+  if (!match?.[1]) return null;
+
+  return `${parsed.protocol}//${parsed.host}${match[1]}`;
+}
+
+/**
+ * True only when a PR URL's host+owner+repo equals the session's repository,
+ * compared after normalization (case-insensitive host/owner/name; `.git` and
+ * SSH forms folded). A missing PR URL or git URL is never evidence, so both
+ * return false.
+ */
+export function prUrlMatchesGitUrl(
+  prUrl: string | null | undefined,
+  gitUrl: string | null | undefined
+): boolean {
+  if (!prUrl || !gitUrl) return false;
+  const repoUrl = repoUrlFromPrUrl(prUrl);
+  if (!repoUrl) return false;
+  return normalizeGitUrl(repoUrl) === normalizeGitUrl(gitUrl);
+}
 
 export function computeSessionMetadataUpdates(
   mergedChanges: Map<string, string | null>,
@@ -48,7 +105,19 @@ export function computeSessionMetadataUpdates(
   if (mergedChanges.has('gitBranch')) updates.git_branch = mergedChanges.get('gitBranch') ?? null;
   if (mergedChanges.has('status')) {
     updates.status = mergedChanges.get('status') ?? null;
-    updates.status_updated_at = now();
+    const occurredAt = mergedChanges.get('statusOccurredAt');
+    updates.status_updated_at =
+      occurredAt && Number.isFinite(Date.parse(occurredAt))
+        ? new Date(occurredAt).toISOString()
+        : now();
+    const transitionId = mergedChanges.get('statusTransitionId');
+    updates.status_transition_id =
+      occurredAt &&
+      Number.isFinite(Date.parse(occurredAt)) &&
+      transitionId &&
+      /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(transitionId)
+        ? transitionId
+        : null;
   }
   // PR-link triple. `platform` here is the PR host (not created_on_platform); the
   // change-map string for prNumber is converted back to an integer, or null on clear.
@@ -58,8 +127,47 @@ export function computeSessionMetadataUpdates(
     const raw = mergedChanges.get('prNumber');
     updates.pr_number = raw === null ? null : Number(raw);
   }
+  if (mergedChanges.has('prHeadRef')) {
+    updates.pr_head_ref = mergedChanges.get('prHeadRef') ?? null;
+  }
+  if (mergedChanges.has('prHeadSha')) {
+    updates.pr_head_sha = mergedChanges.get('prHeadSha') ?? null;
+  }
+  // Any link or head-field change invalidates a prior GitHub verification: the
+  // stored evidence no longer describes what the PR was checked against, so the
+  // link must be re-verified (and hidden in the meantime) before it is shown.
+  if (
+    mergedChanges.has('prPlatform') ||
+    mergedChanges.has('prUrl') ||
+    mergedChanges.has('prNumber') ||
+    mergedChanges.has('prHeadRef') ||
+    mergedChanges.has('prHeadSha')
+  ) {
+    updates.pr_link_verified_at = null;
+  }
 
   return updates;
+}
+
+type StatusTransitionOrder = { occurredAt: string | null; transitionId: string | null };
+
+/**
+ * Whether a timestamped producer transition is ordered strictly before the current one.
+ * A producer cursor orders by itself alone: server writes (CLI-disconnect reset) move
+ * status_updated_at but never the cursor, so they can never outrank a producer transition.
+ * Only a cursorless (legacy/untimestamped) projection falls back to source time.
+ */
+export function precedesStatusTransition(
+  incoming: StatusTransitionOrder,
+  current: StatusTransitionOrder
+): boolean {
+  if (incoming.occurredAt === null) return false;
+  if (current.transitionId !== null) {
+    return incoming.transitionId === null || incoming.transitionId < current.transitionId;
+  }
+  return (
+    current.occurredAt !== null && Date.parse(incoming.occurredAt) < Date.parse(current.occurredAt)
+  );
 }
 
 export async function applyMetadataChanges(
@@ -67,13 +175,20 @@ export async function applyMetadataChanges(
   kiloUserId: string,
   sessionId: string,
   mergedChanges: Map<string, string | null>,
-  ctx?: { waitUntil(promise: Promise<unknown>): void }
+  ctx?: { waitUntil(promise: Promise<unknown>): void },
+  expectedCloudAgentSessionId?: string
 ): Promise<void> {
   if (mergedChanges.size === 0) return;
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const status = mergedChanges.has('status') ? (mergedChanges.get('status') ?? null) : undefined;
   const updates = computeSessionMetadataUpdates(mergedChanges);
+  const rawStatusOccurredAt = mergedChanges.get('statusOccurredAt');
+  const statusOccurredAt =
+    rawStatusOccurredAt && Number.isFinite(Date.parse(rawStatusOccurredAt))
+      ? new Date(rawStatusOccurredAt).toISOString()
+      : null;
+  const statusTransitionId = updates.status_transition_id ?? null;
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
@@ -83,15 +198,30 @@ export async function applyMetadataChanges(
   /** True only when an agent-generated title write was actually applied (placeholder was still unset). */
   let titleWriteApplied = false;
 
+  /** True only when a git_url write was actually applied (non-Cloud-Agent write or Cloud Agent null-to-value heal). */
+  let gitUrlWriteApplied = false;
+
+  /** True only when a PR link/head-field write was actually applied (not rejected as a repo mismatch). */
+  let prLinkWriteApplied = false;
+
+  /** The checkout a Cloud Agent workspace chat reported, recorded on its workspace after commit. */
+  let workspaceCheckout: { worktreeId: string; gitUrl: string; gitBranch: string } | null = null;
+
   const notification = await db.transaction(async tx => {
     const selectCurrentRow = () =>
       tx
         .select({
           title: cli_sessions_v2.title,
           status: cli_sessions_v2.status,
+          statusUpdatedAt: cli_sessions_v2.status_updated_at,
+          statusTransitionId: cli_sessions_v2.status_transition_id,
           parentSessionId: cli_sessions_v2.parent_session_id,
           cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
           cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+          gitUrl: cli_sessions_v2.git_url,
+          prUrl: cli_sessions_v2.pr_url,
+          organizationId: cli_sessions_v2.organization_id,
         })
         .from(cli_sessions_v2)
         .where(
@@ -128,16 +258,42 @@ export async function applyMetadataChanges(
     }
 
     const [currentRow] = await selectCurrentRow().for('update');
-    if (!currentRow) return null;
+    if (
+      !currentRow ||
+      (expectedCloudAgentSessionId !== undefined &&
+        currentRow.cloudAgentSessionId !== expectedCloudAgentSessionId) ||
+      (currentRow.worktreeId && (await isWorktreeDeleting(tx, currentRow.worktreeId)))
+    )
+      return null;
     const cloudAgentSessionScopeId = currentRow.cloudAgentSessionScopeId;
     const hasCloudAgentSessionScope = cloudAgentSessionScopeId != null;
     const isCloudAgentManagedSession =
       hasCloudAgentSessionScope || currentRow.cloudAgentSessionId != null;
+    if (currentRow.cloudAgentSessionId != null) {
+      delete updates.created_on_platform;
+    }
 
+    const staleStatus =
+      precedesStatusTransition(
+        { occurredAt: statusOccurredAt, transitionId: statusTransitionId },
+        { occurredAt: currentRow.statusUpdatedAt, transitionId: currentRow.statusTransitionId }
+      ) ||
+      (statusOccurredAt !== null &&
+        currentRow.statusTransitionId !== null &&
+        statusTransitionId === currentRow.statusTransitionId);
+    if (staleStatus) {
+      delete updates.status;
+      delete updates.status_updated_at;
+      delete updates.status_transition_id;
+    }
     const statusChange =
-      status === undefined
+      status === undefined || staleStatus
         ? { changed: false, previousStatus: null }
         : (() => {
+            // `SessionStatusSchema` is a permissive `z.string()`: a stored status
+            // this worker does not know yet (`scheduled`, or any future value)
+            // must not throw here and must be reported faithfully as the
+            // previous status, never coerced to `idle`.
             const previousStatus = SessionStatusSchema.nullable().parse(currentRow.status);
             return { changed: status !== previousStatus, previousStatus };
           })();
@@ -195,6 +351,57 @@ export async function applyMetadataChanges(
       }
     }
 
+    if (mergedChanges.has('gitUrl')) {
+      if (isCloudAgentManagedSession) {
+        // Compatibility: old Cloud Agent rows can start without git_url; remove this heal only after no old worker or null root row remains.
+        const inputGitUrl = updates.git_url;
+        if (inputGitUrl != null && currentRow.gitUrl == null) {
+          gitUrlWriteApplied = true;
+        } else {
+          delete updates.git_url;
+        }
+      } else {
+        gitUrlWriteApplied = true;
+      }
+    }
+
+    // PR-link evidence gate (never fuzzy): a link whose URL names a repo other
+    // than the session's effective repo is a guess, not evidence. Drop the whole
+    // link and its head fields so nothing is stored; a mismatch must never be
+    // overwritten by a later branch-only cache row. The effective repo is the
+    // git_url this write will store, else the stored one; the effective PR URL
+    // is the one this write carries, else the stored one (so a head-only update
+    // is still checked against the existing link).
+    const hasPrLinkChange =
+      mergedChanges.has('prPlatform') ||
+      mergedChanges.has('prUrl') ||
+      mergedChanges.has('prNumber') ||
+      mergedChanges.has('prHeadRef') ||
+      mergedChanges.has('prHeadSha');
+    if (hasPrLinkChange) {
+      const effectiveGitUrl = updates.git_url !== undefined ? updates.git_url : currentRow.gitUrl;
+      const effectivePrUrl = updates.pr_url !== undefined ? updates.pr_url : currentRow.prUrl;
+      if (effectivePrUrl != null && !prUrlMatchesGitUrl(effectivePrUrl, effectiveGitUrl)) {
+        console.warn('Dropping session PR link whose repository does not match the session', {
+          kiloUserId,
+          sessionId,
+        });
+        delete updates.pr_url;
+        delete updates.pr_number;
+        delete updates.platform;
+        delete updates.pr_head_ref;
+        delete updates.pr_head_sha;
+        delete updates.pr_link_verified_at;
+      } else {
+        prLinkWriteApplied = true;
+      }
+    }
+
+    if (organizationIdWriteApplied && updates.organization_id !== currentRow.organizationId) {
+      updates.briefing_excerpt = null;
+      updates.briefing_excerpt_scope_changed_at = new Date().toISOString();
+    }
+
     if (Object.keys(updates).length > 0) {
       await tx
         .update(cli_sessions_v2)
@@ -205,6 +412,15 @@ export async function applyMetadataChanges(
             eq(cli_sessions_v2.kilo_user_id, kiloUserId)
           )
         );
+    }
+
+    const effectiveGitUrl = updates.git_url !== undefined ? updates.git_url : currentRow.gitUrl;
+    if (currentRow.worktreeId && effectiveGitUrl && updates.git_branch) {
+      workspaceCheckout = {
+        worktreeId: currentRow.worktreeId,
+        gitUrl: effectiveGitUrl,
+        gitBranch: updates.git_branch,
+      };
     }
 
     let parentSessionIdWriteApplied = false;
@@ -318,13 +534,11 @@ export async function applyMetadataChanges(
     // Refused org/parent/title claims must not emit phantom session.updated events.
     const changedNonStatus =
       titleWriteApplied ||
-      mergedChanges.has('platform') ||
+      updates.created_on_platform !== undefined ||
       organizationIdWriteApplied ||
-      mergedChanges.has('gitUrl') ||
+      gitUrlWriteApplied ||
       mergedChanges.has('gitBranch') ||
-      mergedChanges.has('prPlatform') ||
-      mergedChanges.has('prUrl') ||
-      mergedChanges.has('prNumber') ||
+      prLinkWriteApplied ||
       parentSessionIdWriteApplied;
 
     if (!changedNonStatus && !statusChange.changed) return null;
@@ -340,6 +554,7 @@ export async function applyMetadataChanges(
         git_url: cli_sessions_v2.git_url,
         git_branch: cli_sessions_v2.git_branch,
         parent_session_id: cli_sessions_v2.parent_session_id,
+        cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
         status: cli_sessions_v2.status,
         status_updated_at: cli_sessions_v2.status_updated_at,
       })
@@ -358,6 +573,12 @@ export async function applyMetadataChanges(
       session: mapSessionEventRow(persistedRow),
     };
   });
+
+  if (workspaceCheckout) {
+    // After commit: worktree deletion locks the worktree before its sessions,
+    // so writing it while holding the session row lock could deadlock.
+    await recordWorkspaceCheckout(db, kiloUserId, workspaceCheckout);
+  }
 
   if (organizationIdWriteApplied) {
     try {
@@ -409,6 +630,23 @@ export async function applyMetadataChanges(
       },
       ctx
     );
+    if (notification.session.parentSessionId === null) {
+      // The transaction has committed, so the snapshot route reads the new status.
+      const delivery = refreshGlanceableSessions(env, {
+        userId: kiloUserId,
+        cliSessionIds: [sessionId],
+        // A permission wait appearing or clearing gates the Approve control on
+        // the locked/background surfaces, so it must not wait for the shared
+        // delivery window. This caller is the one that saw the previous status.
+        approvalChangedSessionIds:
+          notification.previousStatus === 'permission' ||
+          notification.session.status === 'permission'
+            ? [sessionId]
+            : [],
+      });
+      if (ctx) ctx.waitUntil(delivery);
+      else await delivery;
+    }
   }
 }
 
@@ -431,12 +669,19 @@ export async function flushPartialMetadataChanges(
 }
 
 /**
- * Clear a stored attention status when the owning CLI disconnects.
+ * Clear a stored attention status, or a busy status older than
+ * `CLI_DISCONNECT_STALE_BUSY_WINDOW_MS`, when the owning CLI disconnects.
  *
- * Only rows currently in `question`/`permission` are updated (to `retry`). Uses a
- * conditional write so concurrent non-attention updates are not overwritten. Emits
- * `session.status.updated` via the metadata path only — never enters the ingest
- * completion pipeline, so no "Task completed" push can fire.
+ * Only rows currently in `question`/`permission`, or `busy` rows whose
+ * `status_updated_at` is at least `CLI_DISCONNECT_STALE_BUSY_WINDOW_MS` old, are
+ * updated (to `retry`). Uses a conditional write so concurrent non-attention
+ * updates are not overwritten. Emits `session.status.updated` via the metadata
+ * path only — never enters the ingest completion pipeline, so no "Task
+ * completed" push can fire. A cleared `permission` also asks for an
+ * approval-exempt glanceable refresh: the Approve control must disappear here,
+ * ten minutes after the CLI that held it left. The producer cursor
+ * (`status_transition_id`) is left untouched, so a delayed producer transition
+ * newer than that cursor still applies over this server reset.
  */
 export async function resetAttentionStatusOnCliDisconnect(
   env: Env,
@@ -446,10 +691,28 @@ export async function resetAttentionStatusOnCliDisconnect(
 ): Promise<void> {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const statusUpdatedAt = new Date().toISOString();
+  const cutoff = new Date(Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS).toISOString();
+  // A busy row is only eligible once its own status write is at least the window
+  // old, so a live CLI's recent write (or a just-re-attached CLI's) is never
+  // consumed. A busy row with `status_updated_at IS NULL` is left alone: nothing
+  // can prove it stale. That case is unreachable in production — every writer of
+  // `status` stamps `status_updated_at` together (`computeSessionMetadataUpdates`)
+  // and no insert sets `status` — so the null branch is only a safety net.
+  const eligible = (
+    status: string | null,
+    statusUpdatedAtValue: string | null | undefined
+  ): boolean =>
+    isNeedsInputStatus(status) ||
+    (status === 'busy' &&
+      statusUpdatedAtValue != null &&
+      new Date(statusUpdatedAtValue).getTime() <= new Date(cutoff).getTime());
 
   const notification = await db.transaction(async tx => {
     const [statusRow] = await tx
-      .select({ status: cli_sessions_v2.status })
+      .select({
+        status: cli_sessions_v2.status,
+        statusUpdatedAt: cli_sessions_v2.status_updated_at,
+      })
       .from(cli_sessions_v2)
       .where(
         and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
@@ -460,7 +723,7 @@ export async function resetAttentionStatusOnCliDisconnect(
     if (!statusRow) return null;
 
     const previousStatus = SessionStatusSchema.nullable().parse(statusRow.status);
-    if (!isNeedsInputStatus(previousStatus)) return null;
+    if (!eligible(previousStatus, statusRow.statusUpdatedAt)) return null;
 
     await tx
       .update(cli_sessions_v2)
@@ -472,8 +735,15 @@ export async function resetAttentionStatusOnCliDisconnect(
         and(
           eq(cli_sessions_v2.session_id, sessionId),
           eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-          // Re-check in WHERE so a concurrent non-attention write wins.
-          inArray(cli_sessions_v2.status, ['question', 'permission'])
+          // Re-check in WHERE so a concurrent non-eligible write wins.
+          or(
+            inArray(cli_sessions_v2.status, ['question', 'permission']),
+            and(
+              eq(cli_sessions_v2.status, 'busy'),
+              isNotNull(cli_sessions_v2.status_updated_at),
+              sql`${cli_sessions_v2.status_updated_at} <= ${cutoff}::timestamptz`
+            )
+          )
         )
       );
 
@@ -488,6 +758,7 @@ export async function resetAttentionStatusOnCliDisconnect(
         git_url: cli_sessions_v2.git_url,
         git_branch: cli_sessions_v2.git_branch,
         parent_session_id: cli_sessions_v2.parent_session_id,
+        cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
         status: cli_sessions_v2.status,
         status_updated_at: cli_sessions_v2.status_updated_at,
       })
@@ -524,4 +795,21 @@ export async function resetAttentionStatusOnCliDisconnect(
     },
     ctx
   );
+
+  if (notification.previousStatus === 'permission') {
+    // This is the deferred half of a CLI disconnect: the live session left the
+    // aggregate when the socket closed, but a session that stays
+    // snapshot-visible (a cloud agent, whose row is merged from Postgres rather
+    // than the live list) kept showing the permission the whole absence window.
+    // The Approve control gates on `permission`, so clearing it must not wait
+    // for the shared delivery window — the same exemption an in-band
+    // `permission -> busy` move gets in `applyMetadataChanges`.
+    const delivery = refreshGlanceableSessions(env, {
+      userId: kiloUserId,
+      cliSessionIds: [sessionId],
+      approvalChangedSessionIds: [sessionId],
+    });
+    if (ctx) ctx.waitUntil(delivery);
+    else await delivery;
+  }
 }

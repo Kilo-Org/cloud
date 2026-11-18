@@ -1,5 +1,7 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'child_process';
 import { appendFileSync } from 'fs';
+import { setTimeout as delay } from 'node:timers/promises';
+import { currentOwnedProcessScope, type OwnedProcessScope } from './control/owned-processes.js';
 
 export type ExecResult = {
   stdout: string;
@@ -9,18 +11,28 @@ export type ExecResult = {
   terminationReason?: TerminationReason;
   stdoutTruncated?: boolean;
   stderrTruncated?: boolean;
+  stdoutBytes?: Buffer;
+  stderrBytes?: Buffer;
 };
 
 export type ProcessOutputStream = 'stdout' | 'stderr';
 
+/** Starts the child in place of `spawn`; it must keep the given `detached` and `stdio`. */
+export type ProcessSpawn = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+
 export type ProcessOptions = {
+  spawn?: ProcessSpawn;
   cwd?: string;
+  stdinFd?: number;
+  env?: NodeJS.ProcessEnv;
+  inheritEnv?: boolean;
   timeoutMs?: number;
   inactivityTimeoutMs?: number;
   hardTimeoutMs?: number;
   signal?: AbortSignal;
   terminationGraceMs?: number;
   maxOutputBytes?: number;
+  rawOutput?: boolean;
   onOutput?: (stream: ProcessOutputStream, output: string) => void;
 };
 
@@ -42,6 +54,18 @@ const EXEC_HARD_TIMEOUT_MESSAGE = 'exec hard timeout reached';
 const EXEC_ABORTED_MESSAGE = 'exec aborted';
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1_024;
 const TRUNCATION_MARKER = 'output truncated';
+const OWNED_TREE_OBSERVATION_MS = 1_000;
+
+async function waitForOwnedTree(scope: OwnedProcessScope, deadlineAt: number): Promise<void> {
+  if (process.platform !== 'linux' || !scope.observesOccupancy() || Date.now() >= deadlineAt)
+    return;
+  while (Date.now() < deadlineAt) {
+    if (await scope.verify(false, deadlineAt)) return;
+    const remaining = deadlineAt - Date.now();
+    if (remaining <= 0) return;
+    await delay(Math.min(25, remaining));
+  }
+}
 
 export type TerminationReason = 'timeout' | 'inactivity_timeout' | 'hard_timeout' | 'abort';
 
@@ -56,10 +80,9 @@ export function isTimeoutTermination(result: ExecResult): boolean {
 function utf8Tail(value: string, maxBytes: number): string {
   const bytes = Buffer.from(value);
   if (bytes.length <= maxBytes) return value;
-  return bytes
-    .subarray(bytes.length - maxBytes)
-    .toString('utf8')
-    .replace(/^\uFFFD/, '');
+  let start = bytes.length - maxBytes;
+  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start += 1;
+  return bytes.subarray(start).toString('utf8');
 }
 
 function appendBoundedTail(
@@ -114,19 +137,47 @@ export function runProcess(
       exitCode: EXEC_TIMEOUT_EXIT_CODE,
       elapsedMs: 0,
       terminationReason: 'abort',
+      ...(opts.rawOutput ? { stdoutBytes: Buffer.alloc(0), stderrBytes: Buffer.alloc(0) } : {}),
     });
   }
 
   return new Promise((resolve, reject) => {
-    const proc = spawn(command, args, {
+    const options = {
       cwd: opts?.cwd,
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+      ...(opts?.inheritEnv === false
+        ? { env: opts.env ?? {} }
+        : opts?.env
+          ? { env: { ...process.env, ...opts.env } }
+          : {}),
+    };
+    const owned = opts?.spawn ? undefined : currentOwnedProcessScope();
+    const proc =
+      owned?.spawn(command, args, options) ??
+      (opts?.spawn ?? spawn)(command, args, {
+        ...options,
+        detached: true,
+        stdio: [opts?.stdinFd ?? 'ignore', 'pipe', 'pipe'],
+      });
+    const stdoutStream = proc.stdout;
+    const stderrStream = proc.stderr;
+    if (stdoutStream === null || stderrStream === null) {
+      proc.kill();
+      reject(new Error('Child process did not create output streams'));
+      return;
+    }
     let stdout = '';
     let stderr = '';
     let stdoutTruncated = false;
     let stderrTruncated = false;
+    const rawChunks: Record<ProcessOutputStream, Buffer[]> = { stdout: [], stderr: [] };
+    const rawLengths: Record<ProcessOutputStream, number> = { stdout: 0, stderr: 0 };
+    const rawOutput = () =>
+      opts?.rawOutput
+        ? {
+            stdoutBytes: Buffer.concat(rawChunks.stdout, rawLengths.stdout),
+            stderrBytes: Buffer.concat(rawChunks.stderr, rawLengths.stderr),
+          }
+        : {};
     const maxOutputBytes = opts?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     let settled = false;
     let terminationReason: TerminationReason | null = null;
@@ -153,8 +204,8 @@ export function runProcess(
     };
 
     const destroyPipes = (): void => {
-      proc.stdout.destroy();
-      proc.stderr.destroy();
+      stdoutStream.destroy();
+      stderrStream.destroy();
     };
 
     const resolveTermination = (destroyOpenPipes = false): void => {
@@ -175,6 +226,7 @@ export function runProcess(
         exitCode: EXEC_TIMEOUT_EXIT_CODE,
         elapsedMs: Date.now() - startedAt,
         terminationReason: reason,
+        ...rawOutput(),
         ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
         ...(stderrTruncated || boundedStderr.truncated ? { stderrTruncated: true } : {}),
       });
@@ -226,8 +278,7 @@ export function runProcess(
       inactivityTimer = setTimeout(() => terminate('inactivity_timeout'), opts.inactivityTimeoutMs);
     };
 
-    const captureOutput = (stream: ProcessOutputStream, output: Buffer): void => {
-      const text = output.toString();
+    const captureOutput = (stream: ProcessOutputStream, text: string): void => {
       if (stream === 'stdout') {
         const bounded = appendBoundedTail(stdout, text, maxOutputBytes);
         stdout = bounded.value;
@@ -253,8 +304,28 @@ export function runProcess(
       hardTimeoutTimer = setTimeout(() => terminate('hard_timeout'), opts.hardTimeoutMs);
     }
 
-    proc.stdout.on('data', (output: Buffer) => captureOutput('stdout', output));
-    proc.stderr.on('data', (output: Buffer) => captureOutput('stderr', output));
+    if (opts?.rawOutput) {
+      const captureBytes = (stream: ProcessOutputStream, bytes: Buffer): void => {
+        const available = Math.max(0, maxOutputBytes - rawLengths[stream]);
+        const retained = Math.min(available, bytes.length);
+        if (retained > 0) {
+          rawChunks[stream].push(Buffer.from(bytes.subarray(0, retained)));
+          rawLengths[stream] += retained;
+        }
+        if (retained < bytes.length) {
+          if (stream === 'stdout') stdoutTruncated = true;
+          else stderrTruncated = true;
+        }
+        resetInactivityTimer();
+      };
+      stdoutStream.on('data', (output: Buffer) => captureBytes('stdout', output));
+      stderrStream.on('data', (output: Buffer) => captureBytes('stderr', output));
+    } else {
+      stdoutStream.setEncoding('utf8');
+      stderrStream.setEncoding('utf8');
+      stdoutStream.on('data', (output: string) => captureOutput('stdout', output));
+      stderrStream.on('data', (output: string) => captureOutput('stderr', output));
+    }
 
     if (opts?.signal) {
       if (opts.signal.aborted) {
@@ -263,31 +334,46 @@ export function runProcess(
         opts.signal.addEventListener('abort', abortHandler, { once: true });
       }
     }
+    let finishing = false;
     proc.on('close', (code, signal) => {
-      if (settled) return;
+      if (settled || finishing) return;
       if (terminationReason !== null) {
         waitForTerminatedGroup();
         return;
       }
+      finishing = true;
+      clearTimers();
+      removeAbortHandler();
+      const exitCode = code ?? (signal === null ? 0 : 1);
+      const complete = (): void => {
+        if (settled) return;
+        settled = true;
+        resolve({
+          stdout,
+          stderr,
+          exitCode,
+          elapsedMs: Date.now() - startedAt,
+          ...rawOutput(),
+          ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
+          ...(stderrTruncated ? { stderrTruncated: true } : {}),
+        });
+      };
+      if (!owned || process.platform !== 'linux') {
+        complete();
+        return;
+      }
+      const remainingMs =
+        opts?.timeoutMs !== undefined
+          ? Math.max(0, opts.timeoutMs - (Date.now() - startedAt))
+          : OWNED_TREE_OBSERVATION_MS;
+      void waitForOwnedTree(owned, Date.now() + remainingMs).then(complete, complete);
+    });
+    proc.on('error', err => {
+      if (settled || finishing) return;
       settled = true;
       clearTimers();
       removeAbortHandler();
-      resolve({
-        stdout,
-        stderr,
-        exitCode: code ?? (signal === null ? 0 : 1),
-        elapsedMs: Date.now() - startedAt,
-        ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
-        ...(stderrTruncated ? { stderrTruncated: true } : {}),
-      });
-    });
-    proc.on('error', err => {
-      if (!settled) {
-        settled = true;
-        clearTimers();
-        removeAbortHandler();
-        reject(err);
-      }
+      reject(err);
     });
   });
 }
@@ -326,7 +412,8 @@ export async function withTimeoutAndAbort<T>(
 export async function getCurrentBranch(
   workspacePath: string,
   timeoutMs?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<string> {
   let result: ExecResult;
   try {
@@ -334,6 +421,7 @@ export async function getCurrentBranch(
       cwd: workspacePath,
       timeoutMs,
       signal,
+      ...(env ? { env, inheritEnv: false } : {}),
     });
   } catch {
     return '';
@@ -351,13 +439,15 @@ export async function getCurrentBranch(
 export async function hasGitUpstream(
   workspacePath: string,
   timeoutMs?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<boolean> {
   try {
     const result = await git(['rev-parse', '--abbrev-ref', '@{upstream}'], {
       cwd: workspacePath,
       timeoutMs,
       signal,
+      ...(env ? { env, inheritEnv: false } : {}),
     });
     return result.exitCode === 0 && result.stdout.trim() !== '';
   } catch {

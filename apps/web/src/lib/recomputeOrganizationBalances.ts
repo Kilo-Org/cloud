@@ -11,18 +11,19 @@
  * This avoids surprising balance changes for users while still ensuring the org row and
  * credit transaction baselines are self-consistent.
  */
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   credit_transactions,
   microdollar_usage,
   exa_usage_log,
+  enkrypt_usage,
   compute_usage_charge,
   type Organization,
 } from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
-import { type Result, failureResult, successResult } from '@/lib/maybe-result';
-import { computeExpiration } from '@/lib/creditExpiration';
+import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { computeExpiration } from '@kilocode/db/credit-expiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { mergeSortedByCreatedAt } from '@/lib/user/recompute-balances';
 
@@ -85,6 +86,20 @@ export async function recomputeOrganizationBalances(args: {
     )
     .orderBy(asc(exa_usage_log.created_at));
 
+  const enkryptUsage = await db
+    .select({
+      cost: enkrypt_usage.charged_microdollars,
+      created_at: enkrypt_usage.created_at,
+    })
+    .from(enkrypt_usage)
+    .where(
+      and(
+        eq(enkrypt_usage.organization_id, args.organizationId),
+        gt(enkrypt_usage.charged_microdollars, 0)
+      )
+    )
+    .orderBy(asc(enkrypt_usage.created_at));
+
   const computeUsage = await db
     .select({
       cost: compute_usage_charge.amount_microdollars,
@@ -99,7 +114,7 @@ export async function recomputeOrganizationBalances(args: {
     )
     .orderBy(asc(compute_usage_charge.created_at));
 
-  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage);
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, enkryptUsage, computeUsage);
 
   // Fetch all credit transactions for this org
   const creditTransactions = await db
@@ -114,13 +129,32 @@ export async function recomputeOrganizationBalances(args: {
       description: credit_transactions.description,
       is_free: credit_transactions.is_free,
       original_transaction_id: credit_transactions.original_transaction_id,
+      consumed_microdollars: credit_transactions.consumed_microdollars,
+      retired_microdollars: credit_transactions.retired_microdollars,
+      credit_source: credit_transactions.credit_source,
+      source_transaction_id: credit_transactions.source_transaction_id,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_category: credit_transactions.credit_category,
     })
     .from(credit_transactions)
     .where(eq(credit_transactions.organization_id, args.organizationId))
     .orderBy(asc(credit_transactions.created_at));
 
+  const hasNormalizedLots = creditTransactions.some(
+    transaction =>
+      transaction.paid_credit_policy !== 'settlement' &&
+      transaction.credit_category !== 'accounting_adjustment' &&
+      (transaction.consumed_microdollars > 0 || transaction.retired_microdollars > 0)
+  );
+  // Lots written by source-aware grants or linked to a source lot carry exposure baselines.
+  // Only untracked legacy lots are rebuilt from usage history.
+  const trackedLotIds = new Set(
+    creditTransactions
+      .filter(t => t.credit_source !== null || t.source_transaction_id !== null)
+      .map(t => t.id)
+  );
   // Compute total usage AND original baselines in a single pass.
-  // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
+  // usageRecords contains LLM, Exa, Enkrypt guardrail, and metered-compute charges, merge-sorted
   // by created_at, so baselines are computed at the correct points in time.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;
@@ -130,7 +164,12 @@ export async function recomputeOrganizationBalances(args: {
       cumulativeUsage += usageRecords[usageIdx].cost;
       usageIdx++;
     }
-    computedOriginalBaselines.set(txn.id, cumulativeUsage);
+    computedOriginalBaselines.set(
+      txn.id,
+      trackedLotIds.has(txn.id) || hasNormalizedLots
+        ? (txn.original_baseline_microdollars_used ?? cumulativeUsage)
+        : cumulativeUsage
+    );
   }
   while (usageIdx < usageRecords.length) {
     cumulativeUsage += usageRecords[usageIdx].cost;
@@ -142,7 +181,9 @@ export async function recomputeOrganizationBalances(args: {
     .filter(t => t.expiry_date != null)
     .map(t => ({
       ...t,
-      expiration_baseline_microdollars_used: computedOriginalBaselines.get(t.id) ?? 0,
+      expiration_baseline_microdollars_used: trackedLotIds.has(t.id)
+        ? (t.expiration_baseline_microdollars_used ?? 0) + cumulativeUsage - org.microdollars_used
+        : (computedOriginalBaselines.get(t.id) ?? 0),
     }));
 
   const lastExpirationTime = creditTransactions
@@ -150,17 +191,17 @@ export async function recomputeOrganizationBalances(args: {
     .map(t => new Date(t.created_at))
     .reduce((max, d) => (d > max ? d : max), new Date(0));
 
-  const expirationResult = computeExpiration(
-    expiringTransactions,
-    { id: org.id, microdollars_used: cumulativeUsage },
-    lastExpirationTime,
-    'system'
-  );
-
-  const computedExpirationBaselines = new Map([
-    ...computedOriginalBaselines,
-    ...expirationResult.newBaselines,
-  ]);
+  const computedExpirationBaselines = hasNormalizedLots
+    ? new Map<string, number>()
+    : new Map([
+        ...computedOriginalBaselines,
+        ...computeExpiration(
+          expiringTransactions,
+          { id: org.id, microdollars_used: cumulativeUsage },
+          lastExpirationTime,
+          'system'
+        ).newBaselines,
+      ]);
 
   const updatesForOriginalBaseline = creditTransactions
     .map(t => ({
@@ -171,19 +212,25 @@ export async function recomputeOrganizationBalances(args: {
     .filter(t => t.baseline !== t.db);
 
   const updatesForExpirationBaseline = creditTransactions
-    .filter(t => t.expiry_date != null)
+    .filter(t => t.amount_microdollars > 0)
     .map(t => ({
       id: t.id,
-      baseline: computedExpirationBaselines.get(t.id) ?? 0,
+      baseline:
+        hasNormalizedLots || trackedLotIds.has(t.id) || t.expiry_date === null
+          ? (t.expiration_baseline_microdollars_used ?? 0) + cumulativeUsage - org.microdollars_used
+          : (computedExpirationBaselines.get(t.id) ?? 0),
       db: t.expiration_baseline_microdollars_used,
     }))
-    .filter(t => t.baseline !== t.db);
+    .filter(t => t.baseline !== (t.db ?? 0));
 
   const new_microdollars_used = cumulativeUsage;
-  const credit_transactions_sum = creditTransactions.reduce(
-    (acc, txn) => acc + txn.amount_microdollars,
-    0
-  );
+  // Kilo Pass consumption debits mirror usage already counted in microdollars_used and never
+  // change total_microdollars_acquired, so they are not acquired credit.
+  const credit_transactions_sum = creditTransactions
+    .filter(
+      txn => !(txn.amount_microdollars < 0 && txn.credit_category?.startsWith('kpo:consumption:'))
+    )
+    .reduce((acc, txn) => acc + txn.amount_microdollars, 0);
   // Preserve the user-visible balance while correcting microdollars_used from the ledger.
   // If microdollars_used drifted, total_acquired shifts to compensate, and an
   // accounting_adjustment transaction reconciles the ledger to match.
@@ -237,6 +284,7 @@ async function applyOrganizationBalanceUpdates(
         amount_microdollars: updates.accounting_error_mUsd,
         is_free: true,
         credit_category: 'accounting_adjustment',
+        retired_microdollars: Math.max(0, updates.accounting_error_mUsd),
         description: 'Correction to match cached balance during recomputation',
         original_baseline_microdollars_used: updates.org_update.microdollars_used,
       });

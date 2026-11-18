@@ -1,168 +1,194 @@
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import type * as React from 'react';
+import { type AccessibilityActionEvent } from 'react-native';
+import type * as ReactI18next from 'react-i18next';
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
+import '@/i18n';
 import {
   assistantMessage,
   findElementByType,
   isActionsOverlayProps,
-  pressableProps,
-  renderBubble,
   userMessage,
 } from './message-bubble-test-utils';
 
+const clipboard = vi.hoisted(() => ({ text: '' }));
+vi.mock('react', async importOriginal => ({
+  ...(await importOriginal<typeof React>()),
+  useCallback: <T>(fn: T) => fn,
+  // The harness invokes the component directly, so React has no dispatcher;
+  // this file renders each message once and asserts nothing about memoization.
+  useMemo: <T>(fn: () => T) => fn(),
+}));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return { ...actual, useTranslation: () => ({ t: actual.getI18n().t.bind(actual.getI18n()) }) };
+});
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'android' },
 }));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
-  FadeOut: { duration: vi.fn() },
+vi.mock('expo-clipboard', () => ({
+  setStringAsync: (text: string) => {
+    clipboard.text = text;
+  },
 }));
-vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/ui/icons', () => ({
-  Clock: () => null,
-}));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Clock: 'Clock' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
+  useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
-vi.mock('@/components/ui/bubble', () => ({
-  Bubble: ({ children }: { children?: unknown }) => children,
+vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The Add credits element pulls `@/lib/external-link` → `expo-web-browser`, which
+// the pure project cannot load; this harness reads the bubble's own element tree.
+vi.mock('@/components/add-credits-row', () => ({ AddCreditsRow: 'AddCreditsRow' }));
+vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' }));
+vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
+vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
+vi.mock('./part-renderer', () => ({ PartRenderer: 'PartRenderer' }));
+// The condensed-row module pulls `fixed-part-row` → `activity-indicator` →
+// `a11y/motion` → `expo-battery`, which the pure project cannot load. The a11y
+// harness inspects the element tree, so stand the row in as a sentinel like the
+// sibling `message-bubble.test.ts` harness does.
+vi.mock('./tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+  ToolOneLineRow: 'ToolOneLineRow',
 }));
-vi.mock('@/components/ui/text', () => ({
-  Text: ({ children }: { children?: unknown }) => children,
-}));
-vi.mock('./chat-markdown-text', () => ({
-  ChatMarkdownText: () => null,
-}));
-vi.mock('./compaction-separator', () => ({
-  CompactionSeparator: () => null,
-}));
-vi.mock('./file-part-renderer', () => ({
-  FilePartRenderer: () => null,
-}));
-vi.mock('./part-renderer', () => ({
-  PartRenderer: () => null,
-}));
-vi.mock('./part-types', () => ({
-  isFilePart: () => false,
-  isTextPart: () => false,
-  firstHumanText: () => '',
-}));
-vi.mock('./use-message-copy', () => ({
-  useMessageCopy: () => ({ copyMessage: vi.fn() }),
-}));
-vi.mock('./message-bubble-a11y', async () => {
-  const actual = await vi.importActual<{
-    buildAgentMessageBubbleAccessibilityProps: typeof buildAgentMessageBubbleAccessibilityProps;
-  }>('./message-bubble-a11y');
-  return {
-    ...actual,
-    buildAgentMessageBubbleAccessibilityProps: vi.fn(
-      actual.buildAgentMessageBubbleAccessibilityProps
-    ),
-  };
+
+describe.each([
+  { role: 'user', makeMessage: userMessage, label: 'User message' },
+  { role: 'assistant', makeMessage: assistantMessage, label: 'Assistant message' },
+])('MessageBubble accessibility: $role', ({ makeMessage, label }) => {
+  it.each([
+    { kind: 'text', callback: true, actions: ['details', 'copy'], copied: 'hi' },
+    { kind: 'text', callback: false, actions: ['copy'], copied: 'hi' },
+    { kind: 'files', callback: true, actions: ['details'], copied: 'unchanged' },
+    { kind: 'files', callback: false, actions: [], copied: 'unchanged' },
+    { kind: 'text and files', callback: true, actions: ['details', 'copy'], copied: 'hi' },
+    { kind: 'text and files', callback: false, actions: ['copy'], copied: 'hi' },
+  ])(
+    'preserves descendants and executes actions with content=$kind callback=$callback',
+    async ({ kind, callback, actions, copied }) => {
+      const message = makeMessage('message-1');
+      message.parts = kind === 'files' ? [] : userMessage('message-1').parts;
+      if (kind !== 'text') {
+        message.parts.push({
+          id: 'file-1',
+          sessionID: 'ses_1',
+          messageID: message.info.id,
+          type: 'file',
+          mime: 'text/plain',
+          url: 'file:///attachment.txt',
+        });
+      }
+      const selected: StoredMessage[] = [];
+      const { MessageBubble } = await import('./message-bubble');
+      // eslint-disable-next-line new-cap
+      const tree = MessageBubble.type({
+        message,
+        onLongPressDetails: callback
+          ? value => {
+              selected.push(value);
+            }
+          : undefined,
+      });
+      const wrapper = findElementByType(tree, 'Pressable');
+      expect(wrapper?.props.accessible).toBe(false);
+      expect(wrapper?.props.accessibilityRole).toBeUndefined();
+      expect(wrapper?.props.accessibilityLabel).toBeUndefined();
+      expect(wrapper?.props.accessibilityHint).toBeUndefined();
+      expect(wrapper?.props.accessibilityActions).toBeUndefined();
+      expect(wrapper?.props.accessibilityElementsHidden).toBeUndefined();
+      const body = findElementByType(tree, label === 'User message' ? 'Bubble' : 'View', props =>
+        Boolean(props.children)
+      );
+      expect(body).not.toBeNull();
+      expect(body?.props.accessible).not.toBe(true);
+      clipboard.text = 'unchanged';
+      if (!wrapper) {
+        throw new Error('Message wrapper is missing');
+      }
+      (wrapper.props.onLongPress as () => void)();
+      expect(selected).toEqual(callback ? [message] : []);
+      expect(clipboard.text).toBe('unchanged');
+
+      const host = findElementByType(tree, 'View', isActionsOverlayProps);
+      if (actions.length === 0) {
+        expect(host).toBeNull();
+        return;
+      }
+      // Android composes an unnamed focus stop's name from its speaking
+      // non-focusable descendants in child order, so the host comes first.
+      const children = wrapper.props.children;
+      const [firstChild] = Array.isArray(children) ? children : [children];
+      expect(findElementByType(firstChild, 'View', isActionsOverlayProps)).not.toBeNull();
+      expect(host?.props.accessibilityRole).toBe('text');
+      expect(host?.props.accessibilityLabel).toBe(label);
+      expect(host?.props.children).toBeUndefined();
+      const exposed = host?.props.accessibilityActions as { name: string; label: string }[];
+      expect(exposed).toEqual(
+        actions.map(name => ({
+          name,
+          label: name === 'details' ? 'Message details' : 'Copy message',
+        }))
+      );
+      expect(host?.props.accessibilityHint).toBe(callback ? 'Long press for message details' : '');
+      const invoke = host?.props.onAccessibilityAction as (
+        event: Pick<AccessibilityActionEvent, 'nativeEvent'>
+      ) => void;
+      invoke({ nativeEvent: { actionName: 'details' } });
+      expect(selected).toEqual(callback ? [message, message] : []);
+      expect(clipboard.text).toBe('unchanged');
+      invoke({ nativeEvent: { actionName: 'copy' } });
+      await Promise.resolve();
+      expect(clipboard.text).toBe(copied);
+      expect(selected).toEqual(callback ? [message, message] : []);
+    }
+  );
 });
 
-describe('MessageBubble accessibility', () => {
-  it('renders the wrapping Pressable as non-accessible on a user message so the subtree stays navigable', async () => {
-    const tree = await renderBubble(userMessage('m-user-a11y'));
-    const wrapper = findElementByType(tree, 'Pressable');
-    expect(wrapper).not.toBeNull();
-    expect(wrapper?.props.accessible).toBe(false);
-    // The wrapper must not also be the focusable element; the role/label/hint
-    // would otherwise shadow interactive descendants (permission/question
-    // `Button`s, child-session "open" `Pressable`, file parts).
-    expect(wrapper?.props.accessibilityRole).toBeUndefined();
-    expect(wrapper?.props.accessibilityLabel).toBeUndefined();
-    expect(wrapper?.props.accessibilityHint).toBeUndefined();
-    expect(wrapper?.props.accessibilityActions).toBeUndefined();
-  });
-
-  it('hosts the user-message label, role, hint, and copy action on a dedicated inner overlay', async () => {
-    const tree = await renderBubble(userMessage('m-user-overlay'));
-    const host = findElementByType(tree, 'View', isActionsOverlayProps);
-    expect(host).not.toBeNull();
-    expect(host?.props.accessibilityRole).toBe('text');
-    expect(host?.props.accessibilityLabel).toBe('User message');
-    expect(host?.props.accessibilityHint).toBe('Long press for message details');
-    expect(host?.props.accessibilityActions).toEqual([{ name: 'copy', label: 'Copy message' }]);
-    expect(typeof host?.props.onAccessibilityAction).toBe('function');
-  });
-
-  it('renders the wrapping Pressable as non-accessible on an assistant message so the subtree stays navigable', async () => {
-    const tree = await renderBubble(assistantMessage('m-asst-a11y'));
-    const wrapper = findElementByType(tree, 'Pressable');
-    expect(wrapper).not.toBeNull();
-    expect(wrapper?.props.accessible).toBe(false);
-    expect(wrapper?.props.accessibilityRole).toBeUndefined();
-    expect(wrapper?.props.accessibilityLabel).toBeUndefined();
-    expect(wrapper?.props.accessibilityHint).toBeUndefined();
-    expect(wrapper?.props.accessibilityActions).toBeUndefined();
-  });
-
-  it('hosts the assistant-message label, role, hint, and copy action on a dedicated inner overlay', async () => {
-    const tree = await renderBubble(assistantMessage('m-asst-overlay'));
-    const host = findElementByType(tree, 'View', isActionsOverlayProps);
-    expect(host).not.toBeNull();
-    expect(host?.props.accessibilityRole).toBe('text');
-    expect(host?.props.accessibilityLabel).toBe('Assistant message');
-    expect(host?.props.accessibilityHint).toBe('Long press for message details');
-    expect(host?.props.accessibilityActions).toEqual([{ name: 'copy', label: 'Copy message' }]);
-    expect(typeof host?.props.onAccessibilityAction).toBe('function');
-  });
-
-  it('omits the inner accessibility actions host when no custom actions are exposed', async () => {
-    vi.mocked(buildAgentMessageBubbleAccessibilityProps).mockReturnValue({
-      accessible: false,
-      accessibilityLabel: 'Assistant message',
-      accessibilityHint: 'Long press for message details',
-      accessibilityRole: 'text',
-      accessibilityActions: [],
-    });
-
-    const userTree = await renderBubble(userMessage('m-user-no-actions'));
-    expect(findElementByType(userTree, 'View', isActionsOverlayProps)).toBeNull();
-
-    const asstTree = await renderBubble(assistantMessage('m-asst-no-actions'));
-    expect(findElementByType(asstTree, 'View', isActionsOverlayProps)).toBeNull();
-
-    vi.mocked(buildAgentMessageBubbleAccessibilityProps).mockRestore();
-  });
-
-  it('keeps the long-press accelerator wired on the wrapping Pressable for both user and assistant messages', async () => {
-    const userTree = await renderBubble(userMessage('m-user-lp'));
-    const userWrapper = findElementByType(userTree, 'Pressable');
-    expect(typeof userWrapper?.props.onLongPress).toBe('function');
-
-    const asstTree = await renderBubble(assistantMessage('m-asst-lp'));
-    const asstWrapper = findElementByType(asstTree, 'Pressable');
-    expect(typeof asstWrapper?.props.onLongPress).toBe('function');
-  });
-});
-
-describe('MessageBubble long-press details', () => {
-  it('invokes onLongPressDetails on long-press, not copyMessage', async () => {
-    const onLongPressDetails = vi.fn((..._args: unknown[]) => {
-      // void-returning callback matching MessageBubble's prop type
-    });
+describe('MessageBubble failed message treatment', () => {
+  it('marks every error heading and leaves a message the person stopped unmarked', async () => {
     const { MessageBubble } = await import('./message-bubble');
-    const message = userMessage('m-long');
-    // MessageBubble is wrapped in React.memo; invoke its inner component.
+    const retry = vi.fn<(message: StoredMessage) => void>();
     // eslint-disable-next-line new-cap
-    const tree = MessageBubble.type({ message, onLongPressDetails });
-    const props = pressableProps(tree);
-    expect(props).not.toBeNull();
-    const handler = props === null ? undefined : props.onLongPress;
-    expect(typeof handler).toBe('function');
-    const invoke = handler as (() => void) | undefined;
-    invoke?.();
-    expect(onLongPressDetails).toHaveBeenCalledWith(message);
+    const undelivered = MessageBubble.type({
+      message: userMessage('m-undelivered'),
+      deliveryState: { status: 'failed', error: 'Delivery exhausted', reason: 'exhausted' },
+      onRetryMessage: retry,
+    });
+    // eslint-disable-next-line new-cap
+    const execution = MessageBubble.type({
+      message: userMessage('m-execution'),
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: retry,
+    });
+    // eslint-disable-next-line new-cap
+    const stopped = MessageBubble.type({
+      message: userMessage('m-stopped'),
+      deliveryState: { status: 'failed', error: '', reason: 'interrupted' },
+      onRetryMessage: retry,
+    });
+    // eslint-disable-next-line new-cap
+    const unexplained = MessageBubble.type({
+      message: userMessage('m-unexplained'),
+      deliveryState: { status: 'failed', error: 'Delivery exhausted', reason: 'exhausted' },
+    });
+
+    // Every failure heading that reports an error carries the same marker; a
+    // message the person stopped reports a neutral status and carries none. The
+    // bubble keeps the same fill and ink as a delivered one in every state.
+    expect(findElementByType(undelivered, 'AlertCircle')).not.toBeNull();
+    expect(findElementByType(execution, 'AlertCircle')).not.toBeNull();
+    expect(findElementByType(stopped, 'AlertCircle')).toBeNull();
+    // Without a wired action the row states nothing, so no marker is drawn.
+    expect(findElementByType(unexplained, 'AlertCircle')).toBeNull();
   });
 });

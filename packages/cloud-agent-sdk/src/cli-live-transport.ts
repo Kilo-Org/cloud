@@ -3,9 +3,19 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
+import {
+  replaySnapshotPage,
+  sessionSnapshotFailureMessage,
+  snapshotPageFromSnapshot,
+} from './snapshot-page';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
-import { parseCreateSessionResponse } from './create-session';
-import { cloudAgentSdkRuntime } from './runtime';
+import {
+  buildCreateSessionWireData,
+  createSessionWireMutationIds,
+  hasExtendedCreateSessionFields,
+  isInvalidCreateSessionCommand,
+  parseCreateSessionResponse,
+} from './create-session';
 import { parseExitSessionResponse } from './exit-session';
 import {
   cliConnectionDataSchema,
@@ -13,7 +23,7 @@ import {
   remoteModelCatalogV1Schema,
   sessionsListDataSchema,
 } from './schemas';
-import type { SlashCommandInfo } from './schemas';
+import type { ActiveSessionData, SlashCommandInfo } from './schemas';
 import type { RemoteModelState } from './remote-model-catalog';
 import type {
   CreateRemoteSessionInput,
@@ -28,32 +38,10 @@ import type {
   SessionSnapshotPageOutcome,
 } from './types';
 import {
-  CommandDeliveredError,
   UserWebCommandError,
   type UserWebCliEvent,
   type UserWebConnection,
 } from './user-web-connection';
-
-/** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
-const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
-
-/**
- * Build `create_session` wire data: always `protocolVersion: 1`, plus any
- * defined inheritance fields (Decision 5 shape).
- */
-function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
-  protocolVersion: 1;
-  agent?: string;
-  model?: { providerID: string; modelID: string; variant?: string };
-  orgId?: string;
-} {
-  return {
-    protocolVersion: 1,
-    ...(input?.agent !== undefined ? { agent: input.agent } : {}),
-    ...(input?.model !== undefined ? { model: input.model } : {}),
-    ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
-  };
-}
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
@@ -63,7 +51,7 @@ type CliLiveTransportConfig = {
    * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
    * (initial bounded read AND reconnect immediate + delayed resync) uses it
    * so the transport never overwrites older messages already loaded via
-   * `loadOlderMessages`. The initial read additionally fires
+   * `loadOlderMessages`. The first page that applies additionally fires
    * `onInitialPageLoaded` so the manager can record the cursor.
    */
   fetchSnapshotPage?: (
@@ -71,8 +59,9 @@ type CliLiveTransportConfig = {
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /**
-   * Called after a successful initial bounded page read. Reconnect and
-   * delayed-resync replays do NOT call this so the user's already-advanced
+   * Called once per attach with the first successful page that applies — the
+   * connect() read, a reconnect catch-up that supersedes it, or the delayed
+   * resync. Later replays do NOT call this so the user's already-advanced
    * older-messages cursor is never reset to the latest 50.
    */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
@@ -85,8 +74,9 @@ type CliLiveTransportConfig = {
    * CLI in `sessions.heartbeat` / `sessions.list` change (upgrade, downgrade,
    * reconnect, or absent). The payload is the latest capabilities — `undefined`
    * means the CLI has not reported any (older CLIs, mid-reconnect, or a CLI
-   * whose session list dropped this session). The session manager uses this
-   * to recompute the `supportsAttachments` gate.
+   * whose session list dropped this session), which the session manager's
+   * gate treats as supported. The session manager uses this to recompute the
+   * `supportsAttachments` gate.
    */
   onCapabilitiesChange?:
     | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
@@ -99,6 +89,17 @@ type CliLiveTransportConfig = {
 const RECONNECT_RESYNC_DELAY_MS = 5000;
 const REMOTE_SESSION_EXIT_UNAVAILABLE =
   'Remote session exit is unavailable for the current session';
+
+// Bounded self-healing for remote model discovery. A CLI can answer
+// `list_models` with a valid-but-empty v1 catalog (e.g. while its provider
+// registry is still warming up) or fail transiently. Neither may be published
+// as a terminal result: re-issue `list_models` under a capped attempt budget
+// with exponential backoff so a slow, late, or briefly-failing CLI still
+// converges on the full catalog. The budget resets on an owner change, on a
+// non-empty catalog, and when the consumer calls `retryRemoteModels`.
+export const REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS = 4;
+export const REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS = 1000;
+const EMPTY_REMOTE_MODEL_CATALOG_ERROR = 'Remote model catalog is empty';
 
 /**
  * Deep-copy a list of validated remote slash commands.
@@ -156,6 +157,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       protocol: 'unknown',
       refresh: 'idle',
     };
+    // Attempts consumed from the current owner's model-discovery budget, and
+    // the pending backoff retry timer. Both are owner-scoped: an owner change
+    // or an explicit retry resets the budget, and losing the owner / tearing
+    // down the transport clears the timer.
+    let modelDiscoveryAttempts = 0;
+    let modelRetryTimer: ReturnType<typeof setTimeout> | null = null;
     let remoteCommandState: RemoteCommandState = {
       ownerConnectionId: null,
       refresh: 'idle',
@@ -171,12 +178,56 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       config.onRemoteModelStateChange?.(next);
     }
 
+    function clearModelRetryTimer(): void {
+      if (modelRetryTimer) {
+        clearTimeout(modelRetryTimer);
+        modelRetryTimer = null;
+      }
+    }
+
+    function resetModelDiscoveryBudget(): void {
+      modelDiscoveryAttempts = 0;
+      clearModelRetryTimer();
+    }
+
+    /**
+     * Schedule one backoff retry of `list_models` for the current owner when
+     * the attempt budget still allows it. A pending timer is never doubled up:
+     * a retry already in flight means the next failure's schedule is a no-op.
+     */
+    function scheduleModelRetry(expectedOwnerConnectionId: string): void {
+      if (ownerConnectionId !== expectedOwnerConnectionId) return;
+      if (modelDiscoveryAttempts >= REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS) return;
+      if (modelRetryTimer) return;
+
+      const delay =
+        REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS * 2 ** Math.max(0, modelDiscoveryAttempts - 1);
+      modelRetryTimer = setTimeout(() => {
+        modelRetryTimer = null;
+        if (ownerConnectionId !== expectedOwnerConnectionId) return;
+        discoverModels(expectedOwnerConnectionId);
+      }, delay);
+    }
+
     function publishRemoteCommandState(next: RemoteCommandState): void {
       remoteCommandState = {
         ...next,
         commands: deepCopyCommands(next.commands),
       };
       config.onRemoteCommandStateChange?.(next);
+    }
+
+    function isCurrentDiscoveryRequest(
+      currentRequestGeneration: number,
+      expectedOwnerConnectionId: string,
+      expectedGeneration: number,
+      expectedRequestGeneration: number
+    ): boolean {
+      return (
+        expectedGeneration === generation &&
+        expectedRequestGeneration === currentRequestGeneration &&
+        ownerConnectionId === expectedOwnerConnectionId
+      );
     }
 
     function canExitSession(): boolean {
@@ -206,6 +257,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
       const previousOwnerConnectionId = ownerConnectionId;
       ownerConnectionId = nextOwnerConnectionId;
+      // A new (or absent) owner gets a fresh self-healing budget.
+      resetModelDiscoveryBudget();
       catalogRequestGeneration += 1;
       catalogRequestInFlight = null;
       commandCatalogRequestGeneration += 1;
@@ -216,27 +269,20 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         refresh: nextOwnerConnectionId ? 'loading' : 'idle',
       });
       // Owner replacement clears the command cache; emit an empty catalog
-      // event and the matching idle state so consumers can re-render.
-      if (previousOwnerConnectionId) {
-        publishCommands([]);
-        publishRemoteCommandState({
-          ownerConnectionId: nextOwnerConnectionId,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
-      } else {
-        publishRemoteCommandState({
-          ownerConnectionId: nextOwnerConnectionId,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
-      }
+      // event and the matching idle state so consumers can re-render. A
+      // transition from no owner preserves whatever cache exists.
+      if (previousOwnerConnectionId) publishCommands([]);
+      publishRemoteCommandState({
+        ownerConnectionId: nextOwnerConnectionId,
+        refresh: 'idle',
+        commands: snapshotCommands(),
+        canExitSession: undefined,
+      });
       // A CLI handoff or a permanent drop invalidates whatever the prior
-      // owner reported — the new owner has to re-advertise before any
-      // capability re-enables. Empty currentCapabilities also drives the
-      // existing 'idle' reset on the consumer side.
+      // owner reported. The session manager's gate is optimistic, so it keeps
+      // the feature available until the new owner's next heartbeat /
+      // sessions.list reports an explicit negative. Empty currentCapabilities
+      // also drives the existing 'idle' reset on the consumer side.
       publishCapabilities(undefined);
       config.onCapabilityChange?.();
 
@@ -253,9 +299,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       expectedRequestGeneration: number
     ): void {
       if (
-        expectedGeneration !== generation ||
-        expectedRequestGeneration !== catalogRequestGeneration ||
-        ownerConnectionId !== expectedOwnerConnectionId
+        !isCurrentDiscoveryRequest(
+          catalogRequestGeneration,
+          expectedOwnerConnectionId,
+          expectedGeneration,
+          expectedRequestGeneration
+        )
       ) {
         return;
       }
@@ -281,11 +330,15 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         refresh: 'error',
         error: error instanceof Error ? error.message : 'Failed to discover remote models',
       });
+      // Transient failures must not be terminal: keep retrying under the
+      // bounded budget so a late/slow CLI still produces the full catalog.
+      scheduleModelRetry(expectedOwnerConnectionId);
     }
 
     function discoverModels(expectedOwnerConnectionId: string): void {
       if (catalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
 
+      modelDiscoveryAttempts += 1;
       catalogRequestGeneration += 1;
       const expectedRequestGeneration = catalogRequestGeneration;
       const expectedGeneration = generation;
@@ -310,9 +363,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .then(
           result => {
             if (
-              expectedGeneration !== generation ||
-              expectedRequestGeneration !== catalogRequestGeneration ||
-              ownerConnectionId !== expectedOwnerConnectionId
+              !isCurrentDiscoveryRequest(
+                catalogRequestGeneration,
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration
+              )
             ) {
               return;
             }
@@ -328,6 +384,29 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
               return;
             }
 
+            // Count models, not providers: the wire schema allows a connected
+            // provider with an empty `models` record, and that catalog projects
+            // to zero picker options. Such a shape is not a successful load
+            // either, so it must self-heal under the budget instead of
+            // publishing an empty `idle` catalog that would stick.
+            const hasModel = parsed.data.providers.some(provider => provider.models.length > 0);
+            if (!hasModel) {
+              // The CLI may still be warming up its provider registry.
+              // Surface it as an error and self-heal under the budget instead
+              // of publishing an empty `idle` catalog that would stick.
+              publishRemoteModelState({
+                ownerConnectionId: expectedOwnerConnectionId,
+                protocol: 'v1',
+                refresh: 'error',
+                error: EMPTY_REMOTE_MODEL_CATALOG_ERROR,
+              });
+              scheduleModelRetry(expectedOwnerConnectionId);
+              return;
+            }
+
+            // Non-empty catalog: the discovery budget has paid off. Reset it
+            // so a later owner-scoped refresh (reconnect, retry) starts fresh.
+            resetModelDiscoveryBudget();
             publishRemoteModelState({
               ownerConnectionId: expectedOwnerConnectionId,
               protocol: 'v1',
@@ -358,9 +437,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       clearCatalog: boolean
     ): void {
       if (
-        expectedGeneration !== generation ||
-        expectedRequestGeneration !== commandCatalogRequestGeneration ||
-        ownerConnectionId !== expectedOwnerConnectionId
+        !isCurrentDiscoveryRequest(
+          commandCatalogRequestGeneration,
+          expectedOwnerConnectionId,
+          expectedGeneration,
+          expectedRequestGeneration
+        )
       ) {
         return;
       }
@@ -450,9 +532,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .then(
           result => {
             if (
-              expectedGeneration !== generation ||
-              expectedRequestGeneration !== commandCatalogRequestGeneration ||
-              ownerConnectionId !== expectedOwnerConnectionId
+              !isCurrentDiscoveryRequest(
+                commandCatalogRequestGeneration,
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration
+              )
             ) {
               return;
             }
@@ -496,18 +581,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
     }
 
-    function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: 'session.created', info: page.info });
-
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          sink.onChatEvent({ type: 'message.part.updated', part });
-        }
-      }
-    }
-
     function handleEventMessage(
       sessionId: string,
       parentSessionId: string | undefined,
@@ -539,16 +612,51 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     // Heartbeats carry the CLI's current per-session status. Forwarding it
     // re-derives activity after a reconnect: a terminal `session.status: idle`
     // fired while the socket was dead is never replayed, which otherwise
-    // leaves the UI stuck on a busy indicator forever.
-    function forwardHeartbeatStatus(status: string): void {
-      if (status !== 'idle' && status !== 'busy') return;
-      if (status === lastForwardedHeartbeatStatus) return;
-      lastForwardedHeartbeatStatus = status;
+    // leaves the UI stuck on a busy indicator forever. A `scheduled` status
+    // carries the wake time, which is part of the dedupe key so a changed wake
+    // re-derives instead of being swallowed as a repeat.
+    function forwardHeartbeatStatus(status: string, scheduledAt?: string): void {
+      if (status !== 'idle' && status !== 'busy' && status !== 'scheduled') return;
+      const key = status === 'scheduled' ? `scheduled:${scheduledAt ?? ''}` : status;
+      if (key === lastForwardedHeartbeatStatus) return;
+      lastForwardedHeartbeatStatus = key;
       sink.onServiceEvent({
         type: 'session.status',
         sessionId: config.kiloSessionId,
-        status: { type: status },
+        status:
+          status === 'scheduled'
+            ? { type: 'scheduled', ...(scheduledAt ? { scheduledAt } : {}) }
+            : { type: status },
       });
+    }
+
+    /**
+     * Apply one `sessions.list` / `sessions.heartbeat` observation of this
+     * session. A payload that lists it names the owner connection to adopt,
+     * together with its status and capabilities; one that omits it stops the
+     * session. The events differ in where the owner id comes from — the matched
+     * `sessions.list` row versus the `sessions.heartbeat` envelope — and in what
+     * an omitted session means: `sessions.list` reports every session, so its
+     * silence clears the owner, while a heartbeat comes from any connected CLI,
+     * so only the owner's own heartbeat may clear it.
+     */
+    function applySessionObservation(
+      session: ActiveSessionData | undefined,
+      ownerId: string | undefined,
+      clearOwnerWhenAbsent: boolean
+    ): void {
+      if (session && ownerId !== undefined) {
+        setOwnerConnectionId(ownerId);
+        sessionStopped = false;
+        forwardHeartbeatStatus(session.status, session.scheduledAt);
+        publishCapabilities(session.capabilities);
+        return;
+      }
+
+      if (clearOwnerWhenAbsent || ownerId === ownerConnectionId) {
+        setOwnerConnectionId(null);
+        stopForDisconnectedSession();
+      }
     }
 
     function handleSystemMessage(event: string, data: unknown): void {
@@ -566,16 +674,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (!parsed.success) return;
 
         const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
-        if (session) {
-          setOwnerConnectionId(session.connectionId);
-          sessionStopped = false;
-          forwardHeartbeatStatus(session.status);
-          publishCapabilities(session.capabilities);
-          return;
-        }
-
-        setOwnerConnectionId(null);
-        stopForDisconnectedSession();
+        applySessionObservation(session, session?.connectionId, true);
         return;
       }
 
@@ -584,18 +683,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (!parsed.success) return;
 
         const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
-        if (session) {
-          setOwnerConnectionId(parsed.data.connectionId);
-          sessionStopped = false;
-          forwardHeartbeatStatus(session.status);
-          publishCapabilities(session.capabilities);
-          return;
-        }
-
-        if (ownerConnectionId === parsed.data.connectionId) {
-          setOwnerConnectionId(null);
-          stopForDisconnectedSession();
-        }
+        applySessionObservation(session, parsed.data.connectionId, false);
       }
     }
 
@@ -674,6 +762,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function releaseConnection(): void {
+      clearModelRetryTimer();
       cleanup?.();
       cleanup = null;
     }
@@ -683,6 +772,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         generation += 1;
         const expectedGeneration = generation;
         releaseConnection();
+        resetModelDiscoveryBudget();
         sessionStopped = false;
         ownerConnectionId = null;
         lastForwardedHeartbeatStatus = null;
@@ -708,6 +798,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         let bufferedCliEvents: UserWebCliEvent[] | null = [];
         let bufferedEventsFromSupersededSnapshot: UserWebCliEvent[] = [];
         let snapshotReplayGeneration = 0;
+        // One page per attach seeds the manager. Whichever page applies first
+        // wins — the connect() read, a reconnect catch-up, or a delayed resync
+        // — so a slower read cannot reset an already-recorded cursor.
+        let initialPageRecorded = false;
 
         const drainBufferedCliEvents = (): void => {
           const events = bufferedCliEvents;
@@ -721,21 +815,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         const replayCurrentSnapshot = (reportError: boolean): void => {
           snapshotReplayGeneration += 1;
           const expectedSnapshotReplayGeneration = snapshotReplayGeneration;
-          // The very first call (from `connect()`) is the initial bounded
-          // read and fires `onInitialPageLoaded`; reconnect and delayed
-          // resync calls deliberately do not, so the manager's already-
-          // advanced older-messages cursor is never reset on reconnect.
-          const isInitial = reportError;
           if (bufferedCliEvents !== null) {
             bufferedEventsFromSupersededSnapshot.push(...bufferedCliEvents);
           }
           bufferedCliEvents = [];
 
           if (!config.fetchSnapshot && !config.fetchSnapshotPage) {
-            bufferedCliEvents = [
-              ...bufferedEventsFromSupersededSnapshot,
-              ...(bufferedCliEvents ?? []),
-            ];
+            bufferedCliEvents = [...bufferedEventsFromSupersededSnapshot];
             bufferedEventsFromSupersededSnapshot = [];
             drainBufferedCliEvents();
             return;
@@ -748,11 +834,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             ) {
               return;
             }
-            if (isInitial) {
+            if (!initialPageRecorded) {
+              initialPageRecorded = true;
               config.onInitialPageLoaded?.(page);
             }
             bufferedEventsFromSupersededSnapshot = [];
-            replayPage(page);
+            replaySnapshotPage(sink, page);
             drainBufferedCliEvents();
           };
           const onError = (error: unknown): void => {
@@ -778,31 +865,20 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
               if (page && page.kind === 'success') {
                 onPage(page);
-              } else {
-                onError(
-                  new Error(
-                    page === null
-                      ? 'Session not found'
-                      : page.kind === 'retryable_failure'
-                        ? 'Session history temporarily unavailable'
-                        : page.kind === 'too_large'
-                          ? 'Session history too large to load'
-                          : 'Session history is unavailable'
-                  )
-                );
+                return;
               }
+              if (page === null) {
+                onError(new Error('Session not found'));
+                return;
+              }
+              onError(new Error(sessionSnapshotFailureMessage(page.kind)));
             }, onError);
             return;
           }
 
           if (config.fetchSnapshot) {
             void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
-              onPage({
-                info: snapshot.info,
-                messages: snapshot.messages,
-                nextCursor: null,
-                omittedItemCount: 0,
-              });
+              onPage(snapshotPageFromSnapshot(snapshot));
             }, onError);
           }
         };
@@ -825,9 +901,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           handleSystemMessage(msg.event, msg.data);
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
-          // Recompute the capability gate fail-closed immediately. The prior
-          // owner may have been attachment-capable, but after a reconnect we
-          // must wait for the next heartbeat / sessions.list to re-advertise.
+          // Publish the absent capabilities immediately. The session manager's
+          // gate is optimistic, so it keeps reporting supported until the next
+          // heartbeat / sessions.list either re-advertises the capability or
+          // explicitly denies it.
           publishCapabilities(undefined);
           replayCurrentSnapshot(false);
           // The snapshot store lags the live stream, and the CLI only forwards
@@ -861,6 +938,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
       canSend: () => ownerConnectionId !== null,
       retryRemoteModels: () => {
+        // An explicit retry grants a fresh bounded budget and cancels any
+        // pending backoff timer before re-issuing immediately.
+        resetModelDiscoveryBudget();
         if (ownerConnectionId) discoverModels(ownerConnectionId);
       },
       retryRemoteCommands: () => {
@@ -876,27 +956,24 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
         // Extended fields degrade via a single bare retry on the exact
         // old-CLI delivered error; other failures are hard rejects.
-        const mutationId = input?.mutationId ?? cloudAgentSdkRuntime.randomUUID();
         const wireData = buildCreateSessionWireData(input);
-        const hasExtendedFields =
-          wireData.agent !== undefined ||
-          wireData.model !== undefined ||
-          wireData.orgId !== undefined;
+        const wireMutationIds = createSessionWireMutationIds(input?.mutationId);
+        const hasExtendedFields = hasExtendedCreateSessionFields(wireData);
+        const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
         let result: unknown;
         try {
-          result = await sendCommand('create_session', wireData, mutationId);
+          result = await sendCommand('create_session', wireData, wireMutationIds.extended);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
-          if (
-            hasExtendedFields &&
-            error instanceof CommandDeliveredError &&
-            error.message === INVALID_CREATE_SESSION_COMMAND
-          ) {
+          // Old form is one bare protocolVersion 1 retry for extended fields;
+          // a clone id must never use that fallback because it would create a
+          // fresh session.
+          if (!hasCloneField && hasExtendedFields && isInvalidCreateSessionCommand(error)) {
             result = await sendCommand(
               'create_session',
               { protocolVersion: 1 },
-              cloudAgentSdkRuntime.randomUUID()
+              wireMutationIds.bare
             );
           } else {
             throw error;
@@ -978,6 +1055,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         return sendCommand('send_message', {
           sessionID: config.kiloSessionId,
           parts,
+          // Old form is `send_message` without `messageID`; include it once the
+          // client assigns an id so the CLI can correlate the queued turn.
+          // Remove the omission when every client sends it.
+          ...(input.messageId ? { messageID: input.messageId } : {}),
           ...(payload.mode ? { agent: payload.mode } : {}),
           ...(remoteModel.kind === 'none'
             ? {}
@@ -988,6 +1069,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
       },
       interrupt: () => sendCommand('interrupt', {}),
+      dropQueuedMessage: async messageId => {
+        // The kilocode handler ACKs success only when the queue actually
+        // dropped it (it throws "message not queued" otherwise), so a resolved
+        // `drop_queued_message` command means the queued message was dropped.
+        await sendCommand('drop_queued_message', { protocolVersion: 1, messageID: messageId });
+        return { dropped: true };
+      },
       answer: payload =>
         sendCommand('question_reply', {
           requestID: payload.requestId,

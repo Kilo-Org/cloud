@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
@@ -76,5 +75,68 @@ describe('usePrDiffContextLoader', () => {
 
     await waitFor(() => current(holder).expandedContext['src/index.ts']?.[0]?.status === 'partial');
     expect(queryFnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a provider answer with lines lands as partial with those lines', async () => {
+    queryFnMock.mockResolvedValue({ lines: ['line-a'], totalLines: 1 });
+    const holder = await mountProbe();
+
+    act(() => {
+      current(holder).handleLoadContext(ITEM, 20);
+    });
+
+    await waitFor(() => current(holder).expandedContext['src/index.ts']?.[0]?.status === 'partial');
+    expect(current(holder).expandedContext['src/index.ts']?.[0]).toEqual({
+      status: 'partial',
+      lines: ['line-a'],
+      totalLines: 1,
+    });
+  });
+
+  it('a provider answer with no lines marks the gap unavailable', async () => {
+    queryFnMock.mockResolvedValue({ lines: [], totalLines: 0 });
+    const holder = await mountProbe();
+
+    act(() => {
+      current(holder).handleLoadContext(ITEM, 20);
+    });
+
+    await waitFor(
+      () => current(holder).expandedContext['src/index.ts']?.[0]?.status === 'unavailable'
+    );
+    expect(current(holder).expandedContext['src/index.ts']?.[0]).toEqual({
+      status: 'unavailable',
+    });
+  });
+
+  it('a NOT_FOUND rejection marks the gap unavailable, not error', async () => {
+    queryFnMock.mockRejectedValue({ data: { code: 'NOT_FOUND', message: 'no such ref' } });
+    const holder = await mountProbe();
+
+    act(() => {
+      current(holder).handleLoadContext(ITEM, 20);
+    });
+
+    await waitFor(
+      () => current(holder).expandedContext['src/index.ts']?.[0]?.status === 'unavailable'
+    );
+    expect(current(holder).expandedContext['src/index.ts']?.[0]).toEqual({
+      status: 'unavailable',
+    });
+  });
+
+  it('any other rejection marks the gap error', async () => {
+    queryFnMock.mockRejectedValue(new Error('boom'));
+    const holder = await mountProbe();
+
+    act(() => {
+      current(holder).handleLoadContext(ITEM, 20);
+    });
+
+    await waitFor(() => current(holder).expandedContext['src/index.ts']?.[0]?.status === 'error');
+    expect(current(holder).expandedContext['src/index.ts']?.[0]).toEqual({
+      status: 'error',
+      lines: [],
+    });
   });
 });

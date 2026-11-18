@@ -1,0 +1,950 @@
+/* eslint-disable max-lines -- the engine suite covers every session path (happy, error mapping, abort, prep races) on one fake harness. */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the engine's fake deps resolve immediately, so they settle without await */
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
+import { type VoiceInputNativeEvent } from '../voice-input-controller';
+import {
+  type TranscribeRecordingInput,
+  type TranscribeRecordingResult,
+} from './gateway-transcription-client';
+import {
+  createGatewayVoiceInputEngine,
+  type GatewayRecorder,
+  type GatewayVoiceInputEngineDeps,
+} from './gateway-voice-input-engine';
+
+vi.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
+  File: class {
+    createUploadTask = vi.fn();
+  },
+}));
+
+vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
+
+const audioMock = vi.hoisted(() => ({
+  getRecordingPermissionsAsync: vi.fn(),
+  requestRecordingPermissionsAsync: vi.fn(),
+}));
+vi.mock('expo-audio', () => audioMock);
+
+type RecordedEvent = { event: keyof VoiceInputNativeEvent; payload: unknown };
+
+const START_OPTIONS = {
+  continuous: false,
+  interimResults: true,
+  lang: 'en-US',
+  maxAlternatives: 1,
+  requiresOnDeviceRecognition: false,
+} as const;
+
+/**
+ * Bounded drain, for negative assertions only ("no further events arrive").
+ * Positive expectations wait on their observable condition with vi.waitFor
+ * instead of a fixed number of event-loop turns.
+ */
+async function drain(): Promise<void> {
+  for (let i = 0; i < 4; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- each macrotask turn lets late continuations land
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+  }
+}
+
+type FakeRecorder = GatewayRecorder & {
+  prepareToRecordAsync: Mock<() => Promise<void>>;
+  record: Mock<() => void>;
+  stop: Mock<() => Promise<void>>;
+  release: Mock<() => void>;
+};
+
+function makeRecorder(uri: string | null = null): FakeRecorder {
+  const recorder = {
+    uri,
+    prepareToRecordAsync: vi.fn(async (): Promise<void> => undefined),
+    record: vi.fn((): void => {
+      // A real recorder exposes its file URI only once it is recording.
+      recorder.uri ??= 'file:///recordings/recording.m4a';
+    }),
+    stop: vi.fn(async (): Promise<void> => undefined),
+    release: vi.fn((): void => undefined),
+  };
+  return recorder;
+}
+
+type UploadMock = Mock<(input: TranscribeRecordingInput) => Promise<TranscribeRecordingResult>>;
+
+function buildEngine(overrides: Partial<GatewayVoiceInputEngineDeps> = {}): {
+  engine: ReturnType<typeof createGatewayVoiceInputEngine>;
+  events: RecordedEvent[];
+  recorder: FakeRecorder;
+  upload: UploadMock;
+  deleteRecording: Mock<(uri: string) => Promise<void>>;
+} {
+  const recorder = makeRecorder();
+  const events: RecordedEvent[] = [];
+  const upload = vi.fn(async (): Promise<TranscribeRecordingResult> => ({
+    ok: true,
+    text: 'hello world',
+  }));
+  const deleteRecording = vi.fn(async (): Promise<void> => undefined);
+  const deps: GatewayVoiceInputEngineDeps = {
+    setAudioMode: vi.fn(async (): Promise<void> => undefined),
+    createRecorder: vi.fn(() => recorder),
+    readModelId: vi.fn(async () => ({ id: 'whisper-large-v3', name: 'Whisper Large v3' })),
+    readAuthToken: vi.fn(async (): Promise<string | null> => 'token-1'),
+    readOrganizationId: vi.fn(async (): Promise<string | null> => 'org-1'),
+    deleteRecording,
+    upload,
+    ...overrides,
+  };
+  const engine = createGatewayVoiceInputEngine(deps);
+  for (const event of [
+    'start',
+    'transcribing',
+    'result',
+    'nomatch',
+    'error',
+    'end',
+  ] as (keyof VoiceInputNativeEvent)[]) {
+    engine.addListener(event, payload => {
+      events.push({ event, payload });
+    });
+  }
+  return { engine, events, recorder, upload, deleteRecording };
+}
+
+/**
+ * Run the engine's queued continuations without advancing the fake clock.
+ * Deterministic under fake timers (unlike a real-timeout drain): each pass
+ * runs exactly the continuations queued at the current clock time. Kept for
+ * the fake-timer rotation describe, where order-pinned assertions mix
+ * negative expectations ("transcribing has not fired yet") that vi.waitFor
+ * cannot express, and where waitFor's timer advancement could fire a pending
+ * rotation early.
+ */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 6; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- each pass lets one chained continuation land
+    await vi.advanceTimersByTimeAsync(0);
+  }
+}
+
+async function startAndStop(harness: ReturnType<typeof buildEngine>): Promise<void> {
+  harness.engine.start(START_OPTIONS);
+  await vi.waitFor(() => {
+    expect(harness.recorder.record).toHaveBeenCalledTimes(1);
+  });
+  harness.engine.stop();
+}
+
+beforeEach(() => {
+  audioMock.getRecordingPermissionsAsync.mockReset();
+  audioMock.requestRecordingPermissionsAsync.mockReset();
+});
+
+describe('createGatewayVoiceInputEngine', () => {
+  it('emits start, then transcribing synchronously on stop, then the final result and end', async () => {
+    const { engine, events, recorder, upload } = buildEngine();
+
+    engine.start(START_OPTIONS);
+    await vi.waitFor(() => {
+      expect(recorder.record).toHaveBeenCalledTimes(1);
+    });
+    expect(events.map(entry => entry.event)).toEqual(['start']);
+
+    engine.stop();
+    // The transcribing signal fires before any await so the UI flips to
+    // "Transcribing…" without a gap.
+    expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing']);
+
+    await vi.waitFor(() => {
+      expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'result', 'end']);
+    });
+    const result = events[2]?.payload as VoiceInputNativeEvent['result'];
+    expect(result.isFinal).toBe(true);
+    expect(result.results[0]?.transcript).toBe('hello world');
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(recorder.release).toHaveBeenCalledTimes(1);
+    expect(upload).toHaveBeenCalledTimes(1);
+    const input = upload.mock.calls[0]?.[0];
+    expect(input?.recordingUri).toBe('file:///recordings/recording.m4a');
+    expect(input?.model).toEqual({ id: 'whisper-large-v3', name: 'Whisper Large v3' });
+    expect(input?.language).toBe('en-US');
+    expect(input?.authToken).toBe('token-1');
+    expect(input?.organizationId).toBe('org-1');
+  });
+
+  it('maps an unavailable model to gateway-model-unavailable and terminalizes with end', async () => {
+    const harness = buildEngine({
+      upload: async (): Promise<TranscribeRecordingResult> => ({
+        ok: false,
+        status: 404,
+        isTimeout: false,
+        isNetworkError: false,
+      }),
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'error',
+        'end',
+      ]);
+    });
+    const errorPayload = harness.events[2]?.payload as VoiceInputNativeEvent['error'];
+    expect(errorPayload.error).toBe('gateway-model-unavailable');
+  });
+
+  it('maps unreachable, timeout, server and invalid-response to their gateway codes', async () => {
+    const cases: [TranscribeRecordingResult, string][] = [
+      [{ ok: false, isTimeout: false, isNetworkError: true }, 'gateway-unreachable'],
+      [{ ok: false, isTimeout: true, isNetworkError: false }, 'gateway-timeout'],
+      [{ ok: false, status: 503, isTimeout: false, isNetworkError: false }, 'gateway-server'],
+      [
+        { ok: false, status: 200, isTimeout: false, isNetworkError: false },
+        'gateway-invalid-response',
+      ],
+    ];
+    for (const [result, code] of cases) {
+      const harness = buildEngine({ upload: async () => result });
+      // eslint-disable-next-line no-await-in-loop -- each case needs its own fully settled engine session
+      await startAndStop(harness);
+      // eslint-disable-next-line no-await-in-loop -- the terminal error event must land before asserting
+      await vi.waitFor(() => {
+        expect(harness.events.map(entry => entry.event)).toEqual([
+          'start',
+          'transcribing',
+          'error',
+          'end',
+        ]);
+      });
+      const errorPayload = harness.events[2]?.payload as VoiceInputNativeEvent['error'];
+      expect(errorPayload.error).toBe(code);
+      expect(harness.events[3]?.event).toBe('end');
+    }
+  });
+
+  it('maps an empty transcription to the existing no-speech error', async () => {
+    const harness = buildEngine({
+      upload: async (): Promise<TranscribeRecordingResult> => ({ ok: true, text: '   ' }),
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'error',
+        'end',
+      ]);
+    });
+    const errorPayload = harness.events[2]?.payload as VoiceInputNativeEvent['error'];
+    expect(errorPayload.error).toBe('no-speech');
+  });
+
+  it('emits gateway-no-model without uploading when no model is chosen', async () => {
+    const harness = buildEngine({ readModelId: async () => null });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'error',
+        'end',
+      ]);
+    });
+    const errorPayload = harness.events[2]?.payload as VoiceInputNativeEvent['error'];
+    expect(errorPayload.error).toBe('gateway-no-model');
+    expect(harness.upload).not.toHaveBeenCalled();
+  });
+
+  it('emits gateway-auth without uploading when no auth token is available', async () => {
+    const harness = buildEngine({
+      readAuthToken: async () => null,
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'error',
+        'end',
+      ]);
+    });
+
+    const errorPayload = harness.events[2]?.payload as VoiceInputNativeEvent['error'];
+    expect(errorPayload.error).toBe('gateway-auth');
+    expect(harness.upload).not.toHaveBeenCalled();
+  });
+
+  it('terminalizes with a client error when the model read rejects', async () => {
+    const harness = buildEngine({
+      readModelId: async () => {
+        throw new Error('secure store unavailable');
+      },
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'error',
+        'end',
+      ]);
+    });
+    const errorPayload = harness.events[2]?.payload as VoiceInputNativeEvent['error'];
+    expect(errorPayload.error).toBe('client');
+    expect(harness.upload).not.toHaveBeenCalled();
+    expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('emits client error and end when recording prep fails', async () => {
+    const { engine, events } = buildEngine({
+      setAudioMode: async () => {
+        throw new Error('audio mode refused');
+      },
+    });
+
+    engine.start(START_OPTIONS);
+    await vi.waitFor(() => {
+      expect(events.map(entry => entry.event)).toEqual(['error', 'end']);
+    });
+    const errorPayload = events[0]?.payload as VoiceInputNativeEvent['error'];
+    expect(errorPayload.error).toBe('client');
+  });
+
+  it('abort during upload emits end with no result and aborts the upload signal', async () => {
+    const uploadInputs: TranscribeRecordingInput[] = [];
+    const uploadResolvers: ((value: TranscribeRecordingResult) => void)[] = [];
+    const harness = buildEngine({
+      upload: async input => {
+        uploadInputs.push(input);
+        return new Promise<TranscribeRecordingResult>(resolve => {
+          uploadResolvers.push(resolve);
+        });
+      },
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(uploadInputs).toHaveLength(1);
+    });
+    const capturedSignal = uploadInputs[0]?.signal;
+    expect(capturedSignal).toBeDefined();
+    expect(harness.events.map(entry => entry.event)).toEqual(['start', 'transcribing']);
+
+    harness.engine.abort();
+    expect(harness.events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'end']);
+    expect(capturedSignal?.aborted).toBe(true);
+
+    // The late upload answer must not resurrect the session.
+    uploadResolvers[0]?.({ ok: true, text: 'too late' });
+    await drain();
+    expect(harness.events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'end']);
+  });
+
+  it('abort during recording stops and releases the recorder without a result', async () => {
+    const { engine, events, recorder } = buildEngine();
+
+    engine.start(START_OPTIONS);
+    await vi.waitFor(() => {
+      expect(recorder.record).toHaveBeenCalledTimes(1);
+    });
+    engine.abort();
+
+    expect(events.map(entry => entry.event)).toEqual(['start', 'end']);
+    await vi.waitFor(() => {
+      expect(recorder.stop).toHaveBeenCalledTimes(1);
+      expect(recorder.release).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('stop during prep still terminalizes with start, transcribing, result and end', async () => {
+    const prepState: { resolve?: () => void } = {};
+    const recorder = makeRecorder();
+    recorder.prepareToRecordAsync.mockImplementation(
+      async () =>
+        new Promise<void>(resolve => {
+          prepState.resolve = resolve;
+        })
+    );
+    const { engine, events } = buildEngine({ createRecorder: () => recorder });
+
+    engine.start(START_OPTIONS);
+    await vi.waitFor(() => {
+      expect(recorder.prepareToRecordAsync).toHaveBeenCalledTimes(1);
+    });
+    engine.stop();
+    prepState.resolve?.();
+    await vi.waitFor(() => {
+      expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'result', 'end']);
+    });
+  });
+
+  it('stop and abort are no-ops when no session is active', async () => {
+    const { engine, events } = buildEngine();
+
+    engine.stop();
+    engine.abort();
+    await drain();
+
+    expect(events).toEqual([]);
+  });
+
+  it('a second start after terminalization runs a fresh session', async () => {
+    const harness = buildEngine();
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'result',
+        'end',
+      ]);
+    });
+    harness.engine.start(START_OPTIONS);
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'result',
+        'end',
+        'start',
+      ]);
+    });
+    harness.engine.stop();
+    await vi.waitFor(() => {
+      expect(harness.events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'result',
+        'end',
+        'start',
+        'transcribing',
+        'result',
+        'end',
+      ]);
+    });
+  });
+
+  it('is always available and never continuous or on-device', () => {
+    const { engine } = buildEngine();
+    expect(engine.isRecognitionAvailable()).toBe(true);
+    expect(engine.supportsContinuousRecognition()).toBe(false);
+    expect(engine.supportsOnDevice()).toBe(false);
+  });
+
+  it('delegates permissions to the expo-audio recording permission', async () => {
+    audioMock.getRecordingPermissionsAsync.mockResolvedValue({
+      status: 'granted',
+      granted: true,
+      canAskAgain: false,
+      expires: 'never',
+    });
+    audioMock.requestRecordingPermissionsAsync.mockResolvedValue({
+      status: 'denied',
+      granted: false,
+      canAskAgain: true,
+      expires: 'never',
+    });
+    const { engine } = buildEngine();
+
+    await expect(engine.getPermissions()).resolves.toEqual({
+      granted: true,
+      canAskAgain: false,
+    });
+    await expect(engine.requestPermissions()).resolves.toEqual({
+      granted: false,
+      canAskAgain: true,
+    });
+  });
+
+  it('remove() detaches a listener', async () => {
+    const { engine } = buildEngine();
+    const seen: string[] = [];
+    const subscription = engine.addListener('start', () => {
+      seen.push('start');
+    });
+    subscription.remove();
+
+    engine.start(START_OPTIONS);
+    await drain();
+
+    expect(seen).toEqual([]);
+  });
+});
+
+/** A subscriber that fails the way a UI listener would: a synchronous throw. */
+const throwFromListener = (): void => {
+  throw new Error('subscriber failed');
+};
+
+describe('listener isolation', () => {
+  afterEach(() => {
+    setTelemetrySink(null);
+  });
+
+  it('keeps dispatching to the other listeners and still ends the session when one throws', async () => {
+    const harness = buildEngine();
+    const seen: string[] = [];
+    harness.engine.addListener('result', throwFromListener);
+    harness.engine.addListener('result', payload => {
+      seen.push(`result:${payload.results[0]?.transcript ?? ''}`);
+    });
+    harness.engine.addListener('end', () => {
+      seen.push('end');
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(seen).toEqual(['result:hello world', 'end']);
+    });
+    // The throwing subscriber must not cost the session its cleanup either.
+    expect(harness.recorder.release).toHaveBeenCalledTimes(1);
+    expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('cleans up and emits end when a listener throws on the error event', async () => {
+    const harness = buildEngine({
+      upload: async (): Promise<TranscribeRecordingResult> => ({
+        ok: false,
+        status: 503,
+        isTimeout: false,
+        isNetworkError: false,
+      }),
+    });
+    const ended: string[] = [];
+    harness.engine.addListener('error', throwFromListener);
+    harness.engine.addListener('end', () => {
+      ended.push('end');
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(ended).toEqual(['end']);
+    });
+    expect(harness.recorder.release).toHaveBeenCalledTimes(1);
+    expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('reports a throwing listener through telemetry without the event payload', async () => {
+    const sink = vi.fn<(event: TelemetryEvent) => void>();
+    setTelemetrySink(sink);
+    const harness = buildEngine();
+    harness.engine.addListener('result', throwFromListener);
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(sink).toHaveBeenCalledWith({
+        level: 'error',
+        message: 'voice-input listener threw on result',
+        tags: { 'error.subsystem': 'voice-input', 'error.operation': 'dispatch' },
+      });
+    });
+  });
+
+  it('uploads the next segment and finalizes after an earlier segment threw in a listener', async () => {
+    vi.useFakeTimers();
+    try {
+      let sequence = 0;
+      const harness = buildEngine({
+        createRecorder: () => {
+          sequence += 1;
+          return makeRecorder(`file:///recordings/segment-${sequence}.m4a`);
+        },
+        segmentDurationMs: 30,
+      });
+      const transcripts: string[] = [];
+      let endCount = 0;
+      harness.engine.addListener('result', (payload): void => {
+        transcripts.push(payload.results[0]?.transcript ?? '');
+        throw new Error('subscriber failed');
+      });
+      harness.engine.addListener('end', () => {
+        endCount += 1;
+      });
+      harness.upload.mockResolvedValueOnce({ ok: true, text: 'first segment' });
+
+      harness.engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      expect(transcripts).toEqual(['first segment']);
+
+      // A throwing listener must not keep the next segment from uploading, and
+      // the session must still terminalize once the queue drains.
+      harness.upload.mockResolvedValueOnce({ ok: true, text: 'second segment' });
+      harness.engine.stop();
+      await settle();
+
+      expect(transcripts).toEqual(['first segment', 'second segment']);
+      expect(endCount).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('recording file cleanup', () => {
+  it('deletes the recording file after a successful upload', async () => {
+    const harness = buildEngine();
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+    });
+  });
+
+  it('deletes the recording file after a classified upload failure', async () => {
+    const harness = buildEngine({
+      upload: async (): Promise<TranscribeRecordingResult> => ({
+        ok: false,
+        status: 503,
+        isTimeout: false,
+        isNetworkError: false,
+      }),
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+    });
+  });
+
+  it('deletes the recording file on a model short-circuit', async () => {
+    const harness = buildEngine({ readModelId: async () => null });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+    });
+  });
+
+  it('deletes the recording file when an upload is aborted', async () => {
+    const uploadResolvers: ((value: TranscribeRecordingResult) => void)[] = [];
+    const harness = buildEngine({
+      upload: async () =>
+        new Promise<TranscribeRecordingResult>(resolve => {
+          uploadResolvers.push(resolve);
+        }),
+    });
+
+    await startAndStop(harness);
+    // The upload must be in flight before abort(), so the abort exercises the
+    // upload-abort path; then the bounded drain lets pending continuations land
+    // before the negative check.
+    await vi.waitFor(() => {
+      expect(uploadResolvers).toHaveLength(1);
+    });
+    await drain();
+    expect(harness.deleteRecording).not.toHaveBeenCalled();
+
+    harness.engine.abort();
+    uploadResolvers[0]?.({ ok: true, text: 'too late' });
+    await vi.waitFor(() => {
+      expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+    });
+  });
+
+  it('deletes the recording file when recording is aborted before upload', async () => {
+    const harness = buildEngine();
+
+    harness.engine.start(START_OPTIONS);
+    await vi.waitFor(() => {
+      expect(harness.recorder.record).toHaveBeenCalledTimes(1);
+    });
+    harness.engine.abort();
+    await vi.waitFor(() => {
+      expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+    });
+  });
+});
+
+describe('progressive segment rotation', () => {
+  it('emits a final result while listening when a segment elapses, then stop ends the session', async () => {
+    vi.useFakeTimers();
+    try {
+      const { engine, events } = buildEngine({ segmentDurationMs: 40 });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      expect(events.map(entry => entry.event)).toEqual(['start']);
+
+      await vi.advanceTimersByTimeAsync(40);
+      await settle();
+
+      // The segment transcribed before the user stopped; the status is still
+      // `listening`, so `transcribing` has not fired yet.
+      expect(events.map(entry => entry.event)).toEqual(['start', 'result']);
+      const result = events[1]?.payload as VoiceInputNativeEvent['result'];
+      expect(result.isFinal).toBe(true);
+      expect(result.results[0]?.transcript).toBe('hello world');
+
+      engine.stop();
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual([
+        'start',
+        'result',
+        'transcribing',
+        'result',
+        'end',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stop finalizes the in-flight segment and drains queued uploads in order', async () => {
+    vi.useFakeTimers();
+    try {
+      let sequence = 0;
+      const pending: { uri: string; resolve: (result: TranscribeRecordingResult) => void }[] = [];
+      const { engine, events } = buildEngine({
+        createRecorder: () => {
+          sequence += 1;
+          return makeRecorder(`file:///recordings/segment-${sequence}.m4a`);
+        },
+        segmentDurationMs: 30,
+        upload: async input =>
+          new Promise<TranscribeRecordingResult>(resolve => {
+            pending.push({ uri: input.recordingUri, resolve });
+          }),
+      });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      // Two rotations queued segment 1 and 2; stop captures the in-flight 3.
+      engine.stop();
+      await settle();
+
+      // Uploads are serialized: only the first starts until it resolves.
+      expect(pending.map(entry => entry.uri)).toEqual(['file:///recordings/segment-1.m4a']);
+
+      pending[0]?.resolve({ ok: true, text: 'one' });
+      await settle();
+      expect(pending.map(entry => entry.uri)).toEqual([
+        'file:///recordings/segment-1.m4a',
+        'file:///recordings/segment-2.m4a',
+      ]);
+
+      pending[1]?.resolve({ ok: true, text: 'two' });
+      await settle();
+      // The segment captured by stop() drains last.
+      expect(pending.map(entry => entry.uri)).toEqual([
+        'file:///recordings/segment-1.m4a',
+        'file:///recordings/segment-2.m4a',
+        'file:///recordings/segment-3.m4a',
+      ]);
+
+      pending[2]?.resolve({ ok: true, text: 'three' });
+      await settle();
+
+      const transcripts = events
+        .filter(entry => entry.event === 'result')
+        .map(entry => (entry.payload as VoiceInputNativeEvent['result']).results[0]?.transcript);
+      expect(transcripts).toEqual(['one', 'two', 'three']);
+      expect(events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'result',
+        'result',
+        'result',
+        'end',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports progress for every finished segment, including one without text', async () => {
+    vi.useFakeTimers();
+    try {
+      const { engine, upload } = buildEngine({ segmentDurationMs: 30 });
+      const progress: null[] = [];
+      engine.addListener('progress', payload => {
+        progress.push(payload);
+      });
+      upload.mockResolvedValue({ ok: true, text: '' });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      engine.stop();
+      await settle();
+
+      // Neither segment produced text, and the session still advanced twice:
+      // a stop that waits on this drain measures its silence from here rather
+      // than abandoning a queue that keeps finishing work.
+      expect(progress).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['', '   '])('emits no-speech for empty segments (%j) and allows retry', async text => {
+    vi.useFakeTimers();
+    try {
+      const { engine, events, upload } = buildEngine({
+        segmentDurationMs: 30,
+      });
+      upload.mockResolvedValue({ ok: true, text });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      // Empty segments are skipped silently while listening.
+      expect(events.map(entry => entry.event)).toEqual(['start']);
+
+      engine.stop();
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'error', 'end']);
+      const errorPayload = events[2]?.payload as VoiceInputNativeEvent['error'];
+      expect(errorPayload.error).toBe('no-speech');
+
+      // A silent session never emits a draft write. A new microphone tap can
+      // still transcribe normally using the same engine after the error ends.
+      upload.mockResolvedValue({ ok: true, text: 'retry words' });
+      engine.start(START_OPTIONS);
+      await settle();
+      engine.stop();
+      await settle();
+      expect(events.slice(4).map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'result',
+        'end',
+      ]);
+      const resultPayload = events[6]?.payload as VoiceInputNativeEvent['result'];
+      expect(resultPayload.results[0]?.transcript).toBe('retry words');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a mid-session segment failure emits the gateway error and keeps the earlier result', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const { engine, events } = buildEngine({
+        segmentDurationMs: 30,
+        upload: async (): Promise<TranscribeRecordingResult> => {
+          calls += 1;
+          return calls === 1
+            ? { ok: true, text: 'first words' }
+            : { ok: false, isTimeout: false, isNetworkError: true };
+        },
+      });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      expect(events.map(entry => entry.event)).toEqual(['start', 'result']);
+
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual(['start', 'result', 'error', 'end']);
+      const errorPayload = events[2]?.payload as VoiceInputNativeEvent['error'];
+      expect(errorPayload.error).toBe('gateway-unreachable');
+      const resultPayload = events[1]?.payload as VoiceInputNativeEvent['result'];
+      expect(resultPayload.results[0]?.transcript).toBe('first words');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prepares the successor while the predecessor records, then hands off capture', async () => {
+    vi.useFakeTimers();
+    try {
+      const trace: string[] = [];
+      const recorders: FakeRecorder[] = [];
+      const makeTracedRecorder = (label: string): FakeRecorder => ({
+        uri: `file:///recordings/${label}.m4a`,
+        prepareToRecordAsync: vi.fn(async (): Promise<void> => {
+          trace.push(`${label}:prepare`);
+        }),
+        record: vi.fn((): void => {
+          trace.push(`${label}:record`);
+        }),
+        stop: vi.fn(async (): Promise<void> => {
+          trace.push(`${label}:stop`);
+        }),
+        release: vi.fn((): void => {
+          trace.push(`${label}:release`);
+        }),
+      });
+      const { engine } = buildEngine({
+        createRecorder: () => {
+          const label = `seg-${recorders.length + 1}`;
+          const recorder = makeTracedRecorder(label);
+          recorders.push(recorder);
+          return recorder;
+        },
+        segmentDurationMs: 30,
+      });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      expect(trace).toEqual(['seg-1:prepare', 'seg-1:record']);
+
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+
+      // The microphone is never idle across the rotation: the successor is
+      // created and prepared while the predecessor still captures, and capture
+      // only moves in the stop -> record handoff.
+      expect(trace).toEqual([
+        'seg-1:prepare',
+        'seg-1:record',
+        'seg-2:prepare',
+        'seg-1:stop',
+        'seg-2:record',
+        'seg-1:release',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('abort clears the rotation timer so no further recorder is created', async () => {
+    vi.useFakeTimers();
+    try {
+      const createRecorder = vi.fn(() => makeRecorder());
+      const { engine, events } = buildEngine({ createRecorder, segmentDurationMs: 40 });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      expect(createRecorder).toHaveBeenCalledTimes(1);
+
+      engine.abort();
+      await vi.advanceTimersByTimeAsync(80);
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual(['start', 'end']);
+      expect(createRecorder).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

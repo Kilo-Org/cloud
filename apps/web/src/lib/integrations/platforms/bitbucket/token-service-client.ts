@@ -6,12 +6,12 @@ import {
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
+import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
 import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
-  generateInternalServiceToken,
+  generateBoundedInternalServiceToken,
   TOKEN_EXPIRY,
-} from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/tokens';
 
 export const BitbucketRepositorySchema = z
   .object({
@@ -43,7 +43,7 @@ export async function fetchBitbucketRepositoriesFromTokenService(
   organizationId?: string
 ): Promise<BitbucketRepositoryListResult> {
   if (!GIT_TOKEN_SERVICE_API_URL) return { status: 'temporarily_unavailable' };
-  const serviceToken = generateInternalServiceToken(kiloUserId, {
+  const serviceToken = generateBoundedInternalServiceToken(kiloUserId, {
     expiresIn: TOKEN_EXPIRY.fiveMinutes,
     audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
     organizationId,
@@ -190,10 +190,15 @@ export type BitbucketCodeReviewRepositoryIdentity = {
   repositoryFullName: string;
 };
 
+type BitbucketCodeReviewAudience =
+  | typeof BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE
+  | typeof BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE
+  | typeof BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE;
+
 type TokenServiceCallOptions<Result> = {
   actorUserId: string;
   organizationId: string;
-  audience: string;
+  audience: BitbucketCodeReviewAudience;
   path: string;
   requestBody: object;
   resultSchema: z.ZodType<Result>;
@@ -255,7 +260,7 @@ async function callBitbucketCodeReviewTokenService<Result>(
   }
   let serviceToken: string;
   try {
-    serviceToken = generateInternalServiceToken(options.actorUserId, {
+    serviceToken = generateBoundedInternalServiceToken(options.actorUserId, {
       expiresIn: TOKEN_EXPIRY.fiveMinutes,
       audience: options.audience,
       organizationId: options.organizationId,

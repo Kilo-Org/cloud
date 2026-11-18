@@ -1,29 +1,75 @@
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
-import { type ReactNode, useEffect } from 'react';
-import { FlatList, View } from 'react-native';
+import { memo, type ReactNode, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { QueryError } from '@/components/query-error';
+import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
+import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
-  useOrgCreditTransactions,
+  useOrgCreditTransactionsPage,
 } from '@/lib/hooks/use-organization-queries';
+import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
-import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
-import { cn, firstNonEmpty, formatDate, parseTimestamp } from '@/lib/utils';
+import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import { trpcErrorVariant } from '@/lib/trpc-error';
+import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
-function humanizeCategory(category: string): string {
-  const spaced = category.replaceAll('_', ' ');
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+// FlashList takes `contentContainerStyle` (no className), so the FlatList's
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values: NativeWind's
+// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp (24/16 is the web rem and
+// sits 3 dp inside the skeleton it replaces). FlashList v2 positions every cell
+// absolutely and has no `gap` handling (2.3.2 ships zero `gap` references), so
+// the 12px inter-row gap rides on the measured item separator instead of
+// `contentContainerStyle.gap`. The old container `gap` also sat between the last
+// row and the pagination footer; FlashList's separator only spans items, so that
+// boundary carries the same 12px as `pt-3` on the footer.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  flexGrow: 1,
+  paddingHorizontal: 21,
+  paddingTop: 14,
+} satisfies ViewStyle;
+
+const CreditRowSeparator = () => <View className="h-3" />;
+
+const CREDIT_CATEGORY_KEYS = {
+  organization_custom: 'organization.creditActivity.category.organization_custom',
+  parent_to_child_transfer_in: 'organization.creditActivity.category.parent_to_child_transfer_in',
+  parent_to_child_transfer_out: 'organization.creditActivity.category.parent_to_child_transfer_out',
+  'oss-sponsorship': 'organization.creditActivity.category.oss-sponsorship',
+  'oss-monthly-reset': 'organization.creditActivity.category.oss-monthly-reset',
+  'team-topup-bonus-2025': 'organization.creditActivity.category.team-topup-bonus-2025',
+  accounting_adjustment: 'organization.creditActivity.category.accounting_adjustment',
+  credits_expired: 'organization.creditActivity.category.credits_expired',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
+function categoryLabel(category: string): string {
+  const key = lookup(CREDIT_CATEGORY_KEYS, category);
+  return key ? i18n.t(key) : category;
 }
 
 function CreditRowSkeleton() {
@@ -35,13 +81,16 @@ function CreditRowSkeleton() {
   );
 }
 
-function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>) {
+const CreditRow = memo(function CreditRow({
+  transaction,
+}: Readonly<{ transaction: CreditTransaction }>) {
+  const { t } = useTranslation();
   const amount = fromMicrodollars(transaction.amount_microdollars);
   const isPositive = amount >= 0;
   const title = firstNonEmpty(
     transaction.description,
-    transaction.credit_category ? humanizeCategory(transaction.credit_category) : undefined,
-    'Credit transaction'
+    transaction.credit_category ? categoryLabel(transaction.credit_category) : undefined,
+    t('organization.creditActivity.transactionFallback')
   );
 
   return (
@@ -51,68 +100,69 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
           {title}
         </Text>
         <Text className={cn('text-sm font-medium', isPositive ? 'text-good' : 'text-foreground')}>
-          {isPositive ? '+' : '-'}
-          {formatDollars(Math.abs(amount))}
+          {/* The sign and the symbol are neutral characters, which a
+              right-to-left paragraph may move behind the number; the isolate
+              keeps the amount in its own left-to-right run. */}
+          {isolateLtrBidiText(
+            `${isPositive ? '+' : '-'}${formatPrefixedMoney(Math.abs(amount), i18n.language)}`
+          )}
         </Text>
       </View>
-      <View className="flex-row items-center justify-between">
+      <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <Text className="text-xs text-muted-foreground">
-          {formatDate(parseTimestamp(transaction.created_at))}
+          {formatDate(parseTimestamp(transaction.created_at), i18n.language)}
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            Expires {formatDate(parseTimestamp(transaction.expiry_date))}
+            {keepZoneWithDate(
+              t('organization.creditActivity.expiresUtc', {
+                date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
+                  timeZone: 'UTC',
+                }),
+              })
+            )}
           </Text>
         )}
       </View>
     </View>
   );
-}
-
-function firstSearchParam(value: string | string[] | undefined): string | undefined {
-  if (!Array.isArray(value) && value !== undefined && value.length > 0) {
-    return value;
-  }
-  if (Array.isArray(value) && value[0] !== undefined && value[0].length > 0) {
-    return value[0];
-  }
-  return undefined;
-}
+});
 
 export function OrganizationCreditActivityScreen() {
+  const { t } = useTranslation();
   const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
-  const orgParam = firstSearchParam(orgParamRaw);
+  const orgParam = normalizeOrgQueryParam(orgParamRaw);
 
-  const { organizationId: contextOrganizationId, isLoaded, setOrganizationId } = useOrganization();
+  const { organizationId: contextOrganizationId } = useOrganization();
   // When `org` is present, resolve role/membership against the param only — never
   // the pre-tap context selection — so wrong-org data cannot render.
   const { org, orgs, isLoading: orgsLoading, isResolving, isError } = useOrgBoundary(orgParam);
 
-  // While the list is loading, pass `undefined` so reconcile marks `isResolving`.
-  // Once settled (success or error), pass the array (or empty) so a foreign param
-  // cannot fall through to the context org's transactions.
-  const reconcile = reconcileOrgDeepLink({
+  // The param's organization becomes the selection once it resolves to a
+  // membership, so the rest of the app follows the scope this link opened.
+  const reconcile = useOrgDeepLinkSelection({
     orgParam,
     contextOrganizationId,
-    orgs: orgsLoading ? undefined : (orgs ?? []),
+    orgs,
+    isOrgListLoading: orgsLoading,
   });
-
-  useEffect(() => {
-    // Wait for SecureStore hydration so the deep-link selection always wins over stored org.
-    if (isLoaded && reconcile.shouldPersistOverride && reconcile.effectiveOrganizationId != null) {
-      setOrganizationId(reconcile.effectiveOrganizationId);
-    }
-  }, [
-    isLoaded,
-    reconcile.shouldPersistOverride,
-    reconcile.effectiveOrganizationId,
-    setOrganizationId,
-  ]);
 
   // Key transactions only on the reconcile query id — never the pre-tap context
   // org while a deep-link param is present and unvalidated/invalid.
-  const query = useOrgCreditTransactions(reconcile.queryOrganizationId);
+  const {
+    query,
+    entries: transactions,
+    hasMore,
+  } = useOrgCreditTransactionsPage(reconcile.queryOrganizationId);
   const paddingBottom = useTabBarBottomPadding();
+  useRouteForegroundRefresh([[['organizations']]]);
+
+  // `CreditRow` is memoized at module scope, so the renderer keeps one identity
+  // across data updates and only the changed rows re-render.
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<CreditTransaction>) => <CreditRow transaction={item} />,
+    []
+  );
 
   const showBoundary =
     isResolving ||
@@ -122,12 +172,40 @@ export function OrganizationCreditActivityScreen() {
     org == null;
 
   if (showBoundary) {
-    return <OrganizationBoundary title="Credit activity" organizationIdOverride={orgParam} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.creditActivity.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+        organizationIdOverride={orgParam}
+      />
+    );
   }
 
-  const isLoading = query.isLoading;
-  const isQueryError = query.isError && !query.data;
-  const transactions = query.data ?? [];
+  const isLoading = query.isPending;
+  const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
+  const isFirstPageError = query.isError && !hasLoadedPages;
+
+  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — show
+  // a permanent state with no Retry. Any other first-page error stays retryable.
+  const errorCode = query.error?.data?.code;
+  const isPermanentError =
+    errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
+
+  // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
+  // permission state, and a request that ran out its deadline keeps the
+  // retryable slow-response state. Any other error stays the retryable neutral
+  // state.
+  const classified = trpcErrorVariant(query.error);
+  const errorVariant: QueryErrorVariant =
+    classified === 'not-found' || classified === 'permission' || classified === 'timeout'
+      ? classified
+      : 'neutral';
+
+  // A later-page failure must keep the already-loaded rows and offer an inline
+  // retry instead of replacing the list. Read `isFetchNextPageError`, not
+  // `isError`: a failed background refetch of page 1 also raises `isError`,
+  // and the inline Retry calls `fetchNextPage()`, which can never clear it.
+  const isLaterPageError = query.isFetchNextPageError;
 
   let body: ReactNode = null;
   if (isLoading) {
@@ -138,28 +216,85 @@ export function OrganizationCreditActivityScreen() {
         <CreditRowSkeleton />
       </Animated.View>
     );
-  } else if (isQueryError) {
-    body = (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
-        <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />
-      </Animated.View>
-    );
-  } else {
+  } else if (isFirstPageError) {
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-        <FlatList
+        <QueryError
+          variant={errorVariant}
+          onRetry={isPermanentError ? undefined : () => void query.refetch()}
+          isRetrying={query.isFetching}
+        />
+      </Animated.View>
+    );
+  } else if (transactions.length === 0 && !hasMore && !isLaterPageError) {
+    body = (
+      <EmptyState
+        icon={Receipt}
+        title={t('organization.creditActivity.emptyTitle')}
+        description={t('organization.creditActivity.emptyDescription')}
+      />
+    );
+  } else {
+    const footer = (
+      // The former container gap also separated the last row from this footer
+      // block, which the item separator does not cover.
+      <View className="pt-3">
+        {hasMore && !isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.creditActivity.truncated')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => void query.fetchNextPage()}
+              loading={query.isFetchingNextPage}
+              accessibilityLabel={t('common.loadMore')}
+            >
+              <Text>{t('common.loadMore')}</Text>
+            </Button>
+          </View>
+        )}
+        {isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('common.couldnTLoadMore')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              className={STATE_ACTION_CLASS}
+              onPress={() => void query.fetchNextPage()}
+              loading={query.isFetchingNextPage}
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        )}
+        <View style={{ height: paddingBottom }} pointerEvents="none" />
+      </View>
+    );
+
+    body = (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <FlashList
+          style={listStyle}
           data={transactions}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => <CreditRow transaction={item} />}
-          contentContainerClassName="grow gap-3 px-6 pt-4"
+          renderItem={renderItem}
+          getItemType={() => 'transaction'}
+          ItemSeparatorComponent={CreditRowSeparator}
+          contentContainerStyle={listContentContainerStyle}
           ListEmptyComponent={
             <EmptyState
+              placement="top"
               icon={Receipt}
-              title="No credit activity"
-              description="Purchases, usage, and credit adjustments for this organization will appear here as they happen."
+              title={t('organization.creditActivity.emptyTitle')}
+              description={t('organization.creditActivity.emptyDescription')}
             />
           }
-          ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
+          ListFooterComponent={footer}
         />
       </Animated.View>
     );
@@ -167,7 +302,10 @@ export function OrganizationCreditActivityScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Credit activity" />
+      <ScreenHeader
+        title={t('organization.creditActivity.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
       {body}
     </View>
   );

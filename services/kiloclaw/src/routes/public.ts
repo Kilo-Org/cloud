@@ -9,7 +9,6 @@ import { OPENCLAW_PORT } from '../config';
  */
 const publicRoutes = new Hono<AppEnv>();
 
-// GET /health - Health check endpoint
 publicRoutes.get('/health', c => {
   return c.json({
     status: 'ok',

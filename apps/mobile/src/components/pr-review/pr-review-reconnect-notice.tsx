@@ -1,38 +1,75 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { useTRPC } from '@/lib/trpc';
+import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
+import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
+import { useCheckProviderConnection } from '@/lib/pr-review/use-check-provider-connection';
 
 /**
- * Shared reconnect affordance for PR Review surfaces. A
- * PRECONDITION_FAILED on a query or mutation means the gate's GitHub
- * authorization is no longer valid even though the gate passed. We
- * force a refetch of the gate's query so the wrapping
- * `PrReviewConnectGate` renders its own connect/reconnect CTA. The
- * caller owns section/tab framing; this component is just the
- * message + button.
+ * The mid-session recovery notice for an expired provider connection. The
+ * surface that caught the precondition failure renders it; this component
+ * decides WHICH connection to re-check. A detail route publishes its provider
+ * scope and this reads it — the GitHub route publishes none, so the GitHub arm
+ * (and the original copy) is that fallback. A provider-neutral surface (the
+ * merged inbox) has no route scope at all, so it passes the failing provider
+ * and its organization explicitly. A GitLab or Bitbucket arm re-checks its own
+ * integration status, because a GitHub retry can never fix an expired GitLab
+ * connection.
  */
-export function PrReviewReconnectNotice() {
-  const queryClient = useQueryClient();
-  const trpc = useTRPC();
+type PrReviewReconnectNoticeProps = {
+  /**
+   * The provider whose connection failed. Omitted on surfaces that publish a
+   * route provider scope (the detail routes); the provider-neutral inbox has
+   * no route scope, so it names the failing provider explicitly.
+   */
+  platform?: ProviderPrPlatform;
+  /** The organization scope of that provider; null means the personal scope. */
+  organizationId?: string | null;
+};
 
-  const handleReconnect = () => {
-    void queryClient.invalidateQueries({
-      queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-    });
-  };
+export function PrReviewReconnectNotice({
+  platform: explicitPlatform,
+  organizationId: explicitOrganizationId,
+}: Readonly<PrReviewReconnectNoticeProps> = {}) {
+  const connection = useCheckGitHubConnection();
+  const providerConnection = useCheckProviderConnection();
+  const scope = useProviderPrScopeOrNull();
+  const platform = explicitPlatform ?? scope?.ref.platform ?? 'github';
+  const organizationId =
+    explicitOrganizationId !== undefined ? explicitOrganizationId : (scope?.organizationId ?? null);
+  const providerPlatform = platform === 'github' ? null : platform;
+  const { t } = useTranslation();
+
+  let title = t('prReview.reconnectNotice.title');
+  if (platform === 'gitlab') {
+    title = t('prReview.reconnectNotice.gitlabTitle');
+  } else if (platform === 'bitbucket') {
+    title = t('prReview.reconnectNotice.bitbucketTitle');
+  }
+  // Both arms name their provider in the title above, so the description is
+  // the same key on either side: the title says which connection expired and
+  // the sentence below only says what to do about it.
+  const message = t('prReview.reconnectNotice.message');
 
   return (
     <View className="gap-3 rounded-lg bg-secondary p-4">
-      <Text className="text-sm font-medium text-foreground">GitHub connection expired</Text>
-      <Text className="text-sm text-muted-foreground">
-        Your GitHub connection is no longer valid. Re-check your connection — you&apos;ll be
-        prompted to reconnect if needed.
-      </Text>
-      <Button variant="outline" onPress={handleReconnect} accessibilityLabel="Check connection">
-        <Text>Check connection</Text>
+      <Text className="text-sm font-medium text-foreground">{title}</Text>
+      <Text className="text-sm text-muted-foreground">{message}</Text>
+      <Button
+        variant="outline"
+        onPress={() => {
+          if (providerPlatform) {
+            providerConnection.mutate({ platform: providerPlatform, organizationId });
+            return;
+          }
+          connection.mutate();
+        }}
+        loading={providerPlatform ? providerConnection.isPending : connection.isPending}
+        accessibilityLabel={t('prReview.checkConnection')}
+      >
+        <Text>{t('prReview.checkConnection')}</Text>
       </Button>
     </View>
   );

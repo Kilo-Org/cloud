@@ -1,9 +1,25 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines -- cohesive unit-test suite for session-row a11y label helpers */
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
+
+import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const instance = actual.getI18n();
+      return { t: instance.t.bind(instance), i18n: instance };
+    },
+  };
+});
 
 /**
  * Feature C — a11y labels mirroring visible content.
@@ -40,9 +56,9 @@ describe('formatSpokenTimeAgo', () => {
     expect(formatSpokenTimeAgo(t)).toBe('3 hours ago');
   });
 
-  it('expands "1d ago" to "1 day ago" (singular days)', () => {
+  it('passes "yesterday" through unchanged', () => {
     const t = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('1 day ago');
+    expect(formatSpokenTimeAgo(t)).toBe('yesterday');
   });
 
   it('expands "3d ago" to "3 days ago" (plural days)', () => {
@@ -50,10 +66,10 @@ describe('formatSpokenTimeAgo', () => {
     expect(formatSpokenTimeAgo(t)).toBe('3 days ago');
   });
 
-  it('expands "1mo ago" to "1 month ago" (singular months)', () => {
+  it('passes "last month" through unchanged', () => {
     // 35 days pushes past the 30-day boundary into the months branch
     const t = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('1 month ago');
+    expect(formatSpokenTimeAgo(t)).toBe('last month');
   });
 
   it('expands "2mo ago" to "2 months ago" (plural months)', () => {
@@ -61,10 +77,10 @@ describe('formatSpokenTimeAgo', () => {
     expect(formatSpokenTimeAgo(t)).toBe('2 months ago');
   });
 
-  it('expands "1y ago" to "1 year ago" (singular years)', () => {
+  it('passes "last year" through unchanged', () => {
     // 370 days pushes past the 12-month boundary into the years branch
     const t = new Date(Date.now() - 370 * 24 * 60 * 60 * 1000).toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('1 year ago');
+    expect(formatSpokenTimeAgo(t)).toBe('last year');
   });
 
   it('expands "2y ago" to "2 years ago" (plural years)', () => {
@@ -74,11 +90,176 @@ describe('formatSpokenTimeAgo', () => {
 
   it('leaves "just now" unchanged', () => {
     const t = new Date().toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('just now');
+    expect(formatSpokenTimeAgo(t)).toBe('Just now');
+  });
+  it('omits a missing restored timestamp', () => {
+    expect(formatSpokenTimeAgo(null)).toBe('');
   });
 });
 
 describe('sessionRowAccessibilityLabel', () => {
+  it.each([undefined, false])('preserves nonlive speech for live=%s', live => {
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Fix login bug',
+        needsInput: false,
+        live,
+        badge: 'CLI',
+        meta: '5 minutes ago',
+      })
+    ).toBe('Fix login bug, CLI, and 5 minutes ago');
+  });
+
+  it('speaks live status without dropping provenance, metadata, or platform', () => {
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Fix login bug',
+        needsInput: false,
+        live: true,
+        badge: 'CLOUD',
+        subtitle: 'feature/x',
+        prNumber: 7,
+        meta: '5 minutes ago',
+        platform: 'cloud-agent',
+      })
+    ).toBe(
+      'Fix login bug, LIVE, feature/x, pull request 7, CLOUD, 5 minutes ago, and from CLOUD AGENT'
+    );
+  });
+
+  it('speaks needs input instead of live when attention takes priority', () => {
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Fix login bug',
+        needsInput: true,
+        live: true,
+        badge: 'CLI',
+        meta: null,
+      })
+    ).toBe('Fix login bug, needs input, and CLI');
+  });
+
+  describe('live statusKind — the state word the glyph draws', () => {
+    it('speaks Working for a running live row', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'running',
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, Working, CLI, and 5 minutes ago');
+    });
+
+    it('speaks Idle for an idle live row', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'idle',
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, Idle, CLI, and 5 minutes ago');
+    });
+
+    it('keeps needs input above the state word', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: true,
+          live: true,
+          statusKind: 'running',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, needs input, and CLI');
+    });
+
+    it('keeps the static LIVE word when no statusKind is passed (byte-identical output)', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, LIVE, CLI, and 5 minutes ago');
+      // Explicit null behaves like omission.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: null,
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, LIVE, CLI, and 5 minutes ago');
+    });
+
+    it('speaks Working for a needsInput kind when attention is not raised (the drawn glyph)', () => {
+      // The ui row draws the running glyph for any set kind but idle, so an
+      // acked question or a `retry` row (needs-input flag down, kind
+      // `needsInput`) draws running; the label names that drawn state.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'needsInput',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, Working, and CLI');
+    });
+
+    it('speaks Scheduled instead of Working for a scheduled live row', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'scheduled',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, Scheduled, and CLI');
+    });
+
+    it('appends the wake the meta arg carries beside Scheduled', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'scheduled',
+          badge: 'CLI',
+          meta: '9:00 AM',
+        })
+      ).toBe('Fix login bug, Scheduled, CLI, and 9:00 AM');
+    });
+
+    it('speaks Scheduled for a stored (non-live) scheduled row too', () => {
+      // The scheduled branch keys off the status, not the live flag: a stored
+      // history row reads SCHEDULED visibly, so the label must name it.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: false,
+          statusKind: 'scheduled',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, Scheduled, and CLI');
+    });
+  });
+
   describe('needs-input variant — StoredSessionRow (meta omitted)', () => {
     it('produces "title, needs input, badge" with meta=null', () => {
       // Stored row, needs-input eyebrow wins: meta is NOT rendered.
@@ -90,7 +271,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: null,
         })
-      ).toBe('Fix login bug, needs input, CLI');
+      ).toBe('Fix login bug, needs input, and CLI');
     });
 
     it('includes meta when the caller passes it (caller is responsible for omitting)', () => {
@@ -106,7 +287,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'VSCODE',
           meta: '5 minutes ago',
         })
-      ).toBe('Fix login bug, needs input, VSCODE, 5 minutes ago');
+      ).toBe('Fix login bug, needs input, VSCODE, and 5 minutes ago');
     });
   });
 
@@ -120,7 +301,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: '5 minutes ago',
         })
-      ).toBe('Fix login bug, CLI, 5 minutes ago');
+      ).toBe('Fix login bug, CLI, and 5 minutes ago');
     });
 
     it('produces "title, badge, meta" with "just now"', () => {
@@ -131,7 +312,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLOUD AGENT',
           meta: 'just now',
         })
-      ).toBe('New session, CLOUD AGENT, just now');
+      ).toBe('New session, CLOUD AGENT, and just now');
     });
 
     it('produces "title, badge, meta" with a days-ago spoken form', () => {
@@ -142,7 +323,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'SLACK',
           meta: '3 days ago',
         })
-      ).toBe('Old session, SLACK, 3 days ago');
+      ).toBe('Old session, SLACK, and 3 days ago');
     });
   });
 
@@ -157,7 +338,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: null,
         })
-      ).toBe('Live session, needs input, CLI');
+      ).toBe('Live session, needs input, and CLI');
     });
 
     it('works with the LIVE fallback badge', () => {
@@ -168,7 +349,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'LIVE',
           meta: null,
         })
-      ).toBe('Live session, needs input, LIVE');
+      ).toBe('Live session, needs input, and LIVE');
     });
   });
 
@@ -182,7 +363,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: '2 hours ago',
         })
-      ).toBe('Live session, CLI, 2 hours ago');
+      ).toBe('Live session, CLI, and 2 hours ago');
     });
   });
 
@@ -196,7 +377,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'LIVE',
           meta: null,
         })
-      ).toBe('Live session, LIVE');
+      ).toBe('Live session and LIVE');
     });
   });
 
@@ -209,7 +390,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'B',
           meta: 'C',
         })
-      ).toBe('A, needs input, B, C');
+      ).toBe('A, needs input, B, and C');
     });
 
     it('preserves fixed order with needsInput false and no meta', () => {
@@ -220,7 +401,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'B',
           meta: null,
         })
-      ).toBe('A, B');
+      ).toBe('A and B');
     });
 
     it('preserves fixed order with title and meta only (no badge, no needsInput)', () => {
@@ -233,7 +414,65 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: '',
           meta: '1 day ago',
         })
-      ).toBe('Orphan, 1 day ago');
+      ).toBe('Orphan and 1 day ago');
+    });
+  });
+
+  describe('subtitle and PR provenance (title → needs input → subtitle → pr → badge → meta)', () => {
+    it('speaks "pull request N" after the branch for a PR row, in one button', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          badge: 'CLI',
+          subtitle: 'feature/x',
+          prNumber: 42,
+        })
+      ).toBe('Fix login bug, feature/x, pull request 42, and CLI');
+    });
+
+    it('keeps the fixed order with needs input, branch, PR, badge, and meta', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: true,
+          badge: 'CLI',
+          meta: '5 minutes ago',
+          subtitle: 'feature/x',
+          prNumber: 7,
+        })
+      ).toBe('Fix login bug, needs input, feature/x, pull request 7, CLI, and 5 minutes ago');
+    });
+
+    it('omits the pull-request phrase when the row has no PR', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Plain session',
+          needsInput: false,
+          badge: 'CLI',
+          subtitle: 'feature/x',
+        })
+      ).toBe('Plain session, feature/x, and CLI');
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Plain session',
+          needsInput: false,
+          badge: 'CLI',
+          subtitle: 'feature/x',
+          prNumber: null,
+        })
+      ).toBe('Plain session, feature/x, and CLI');
+    });
+
+    it('omits the branch phrase when no subtitle is present', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Plain session',
+          needsInput: false,
+          badge: 'CLI',
+          prNumber: 42,
+        })
+      ).toBe('Plain session, pull request 42, and CLI');
     });
   });
 
@@ -249,7 +488,7 @@ describe('sessionRowAccessibilityLabel', () => {
           meta: '9 hours ago',
           platform: 'cloud-agent',
         })
-      ).toBe('X, CLOUD, 9 hours ago, from CLOUD AGENT');
+      ).toBe('X, CLOUD, 9 hours ago, and from CLOUD AGENT');
     });
 
     it('platform-badged row without repo: caller omits platform (label unchanged)', () => {
@@ -262,7 +501,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: 'cost 1 dollar 10 cents, 8 hours ago',
         })
-      ).toBe('X, CLI, cost 1 dollar 10 cents, 8 hours ago');
+      ).toBe('X, CLI, and cost 1 dollar 10 cents, 8 hours ago');
     });
 
     it('needs-input row: no platform segment', () => {
@@ -273,7 +512,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLOUD',
           meta: null,
         })
-      ).toBe('X, needs input, CLOUD');
+      ).toBe('X, needs input, and CLOUD');
     });
 
     it('unmapped / absent platform: no segment appended', () => {
@@ -285,7 +524,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'GASTOWN',
           meta: '1 hour ago',
         })
-      ).toBe('X, GASTOWN, 1 hour ago');
+      ).toBe('X, GASTOWN, and 1 hour ago');
       // Direct call with null/undefined also appends nothing.
       expect(
         sessionRowAccessibilityLabel({
@@ -295,7 +534,7 @@ describe('sessionRowAccessibilityLabel', () => {
           meta: '1 hour ago',
           platform: null,
         })
-      ).toBe('X, GASTOWN, 1 hour ago');
+      ).toBe('X, GASTOWN, and 1 hour ago');
       expect(
         sessionRowAccessibilityLabel({
           title: 'X',
@@ -304,7 +543,7 @@ describe('sessionRowAccessibilityLabel', () => {
           meta: '1 hour ago',
           platform: undefined,
         })
-      ).toBe('X, GASTOWN, 1 hour ago');
+      ).toBe('X, GASTOWN, and 1 hour ago');
     });
   });
 
@@ -319,7 +558,142 @@ describe('sessionRowAccessibilityLabel', () => {
           needsInput: false,
           badge: 'CLI',
         })
-      ).toBe('Fix login bug, CLI');
+      ).toBe('Fix login bug and CLI');
     });
+  });
+});
+
+/**
+ * The fragments after the second are clauses, not list items: a relative time,
+ * a cost sentence, an origin phrase. Every locale states the pause before the
+ * last one, because a list conjunction between a label and a clause speaks as a
+ * second item ("AURORA-FATURAMENTO e há 40 minutos"). Two plain labels keep the
+ * locale conjunction.
+ */
+describe('spokenJoiner', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('speaks a German cost row as comma-separated fragments', async () => {
+    await i18n.changeLanguage('de');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Lokale Sitzung',
+        needsInput: false,
+        badge: 'CLI',
+        meta: 'kostet 40 Cent, vor 19 Minuten',
+      })
+    ).toBe('Lokale Sitzung, CLI, kostet 40 Cent, vor 19 Minuten');
+  });
+
+  it('keeps the German conjunction between two plain labels', async () => {
+    await i18n.changeLanguage('de');
+    expect(
+      sessionRowAccessibilityLabel({ title: 'Lokale Sitzung', needsInput: false, badge: 'CLI' })
+    ).toBe('Lokale Sitzung und CLI');
+  });
+
+  it('pauses before the time instead of joining it with a conjunction in Portuguese', async () => {
+    await i18n.changeLanguage('pt');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Conciliação de setembro',
+        needsInput: false,
+        badge: 'AURORA-FATURAMENTO',
+        meta: 'há 40 minutos',
+      })
+    ).toBe('Conciliação de setembro, AURORA-FATURAMENTO, há 40 minutos');
+  });
+
+  it('pauses before the origin phrase that follows a Portuguese cost clause', async () => {
+    await i18n.changeLanguage('pt');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Conciliação de setembro',
+        needsInput: false,
+        badge: 'AURORA-FATURAMENTO',
+        meta: 'custo de 2 cêntimos, há 1 hora',
+        platform: 'cloud-agent',
+      })
+    ).toBe(
+      'Conciliação de setembro, AURORA-FATURAMENTO, custo de 2 cêntimos, há 1 hora, de CLOUD AGENT'
+    );
+  });
+
+  it('keeps the Portuguese conjunction between two plain labels', async () => {
+    await i18n.changeLanguage('pt');
+    expect(
+      sessionRowAccessibilityLabel({ title: 'Correção de login', needsInput: false, badge: 'CLI' })
+    ).toBe('Correção de login e CLI');
+  });
+
+  it('pauses in Brazilian Portuguese too', async () => {
+    await i18n.changeLanguage('pt-BR');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Conciliação de setembro',
+        needsInput: false,
+        badge: 'AURORA-FATURAMENTO',
+        meta: '40 minutos atrás',
+      })
+    ).toBe('Conciliação de setembro, AURORA-FATURAMENTO, 40 minutos atrás');
+  });
+
+  it('binds a mark outside the Western comma set to the word before it', async () => {
+    // The Ethiopic comma is punctuation the previous hand-listed set missed, so
+    // the label kept the formatter's space in front of it (`CLI ፣`).
+    await i18n.changeLanguage('am');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'ርዕስ',
+        needsInput: false,
+        badge: 'CLI',
+        meta: 'ከ40 ደቂቃ በፊት',
+      })
+    ).toBe('ርዕስ፣ CLI፣ ከ40 ደቂቃ በፊት');
+  });
+
+  it('keeps the Arabic word space after the pause mark before the origin', async () => {
+    // The Arabic list formatter spells its conjunction as a prefix (`" و"`),
+    // so its separator carries no trailing space. A pause mark is not that
+    // prefix: the label must still separate it from the next word, or it reads
+    // `…أشهر،من …` as one run-on token.
+    await i18n.changeLanguage('ar');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'الجلسة الأولى',
+        needsInput: false,
+        badge: 'CLOUD AGENT',
+        meta: 'التكلفة 18 سنتًا، قبل 3 أشهر',
+        platform: 'cloud-agent',
+      })
+    ).toBe('الجلسة الأولى وCLOUD AGENT والتكلفة 18 سنتًا، قبل 3 أشهر، من CLOUD AGENT');
+  });
+
+  it('leaves a script that writes no space after its pause mark unchanged', async () => {
+    // Japanese `、` binds the next clause directly; adding a space would put
+    // one where the script never writes it.
+    await i18n.changeLanguage('ja');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'セッション',
+        needsInput: false,
+        badge: 'CLI',
+        meta: '40分前',
+        platform: 'cloud-agent',
+      })
+    ).toBe('セッション、CLI、40分前、CLOUD AGENTから');
+  });
+
+  it('states a pause, never a bare conjunction, in every catalog', async () => {
+    const bare: string[] = [];
+    for (const tag of SUPPORTED_LANGUAGES) {
+      await i18n.changeLanguage(tag); // eslint-disable-line no-await-in-loop -- one catalog at a time mirrors the runtime switch
+      if (!/\p{P}/u.test(i18n.t('agents.sessionRow.spokenJoiner'))) {
+        bare.push(tag);
+      }
+    }
+    expect(bare).toEqual([]);
   });
 });

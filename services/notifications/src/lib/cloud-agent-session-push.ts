@@ -15,17 +15,68 @@ import {
 type CloudAgentNotificationSession = {
   title: string | null;
   organizationId: string | null;
+  /**
+   * The session's pull request, if it has one. Rides on the attention push
+   * `data` so the notification's Open PR action knows where to land; `null`
+   * for a session with no PR (and for every status push).
+   */
+  prUrl: string | null;
+  /**
+   * The stored status and its own time. A waiting row names the raise its
+   * attention push presents (see `raiseIdForWaitingRow`), so the app can
+   * refuse an answer meant for a raise that already moved on. Absent on a row
+   * that never carried a status.
+   */
+  status?: string | null;
+  statusUpdatedAt?: string | Date | null;
 };
+
+/** The statuses that mean the agent waits for the user's answer. */
+const WAITING_STATUS: Record<string, true> = { question: true, permission: true };
+
+/**
+ * The raise a waiting session row presents, in the payload's ISO form, or null
+ * when the row is not waiting or carries no status time.
+ *
+ * The payload crosses to the device as JSON, so a stored `Date` is serialized
+ * explicitly; a row written by a server path that reused a stored time keeps
+ * that instant. A raise cannot be named from a status alone, so a row without
+ * its time yields null and the payload keeps the older shape.
+ */
+export function raiseIdForWaitingRow(row: {
+  status?: string | null;
+  statusUpdatedAt?: string | Date | null;
+}): string | null {
+  const status = row.status ?? null;
+  if (status === null || WAITING_STATUS[status] !== true) {
+    return null;
+  }
+  const at = row.statusUpdatedAt ?? null;
+  if (at === null) {
+    return null;
+  }
+  const time = at instanceof Date ? at.getTime() : Date.parse(at);
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
 
 /** Per-category preference columns, shared with the rest of the notification pipeline. */
 export type UserNotificationPreferences = {
   agentPushEnabled: boolean;
-  chatMessagesEnabled: boolean;
   agentAttentionEnabled: boolean;
   sessionStatusEnabled: boolean;
-  kiloclawActivityEnabled: boolean;
   balanceAlertsEnabled: boolean;
+  spendAlertsEnabled: boolean;
   securityFindingsEnabled: boolean;
+};
+
+/** Default-on value used when a preference read returns no row. */
+export const DEFAULT_USER_NOTIFICATION_PREFERENCES: UserNotificationPreferences = {
+  agentPushEnabled: true,
+  agentAttentionEnabled: true,
+  sessionStatusEnabled: true,
+  balanceAlertsEnabled: true,
+  spendAlertsEnabled: true,
+  securityFindingsEnabled: true,
 };
 
 const TITLE_MAX_LENGTH = 80;
@@ -60,6 +111,16 @@ type SessionPushContent = {
   title: string;
   body: string;
   category: CloudAgentSessionCategory;
+  /**
+   * Which answer the waiting agent wants. Only emitted on an attention push;
+   * absent when the producer did not classify the raise (the read site falls
+   * back to `unknown`).
+   */
+  attentionKind?: SendCloudAgentSessionNotificationParams['attentionKind'];
+  /** The session's PR. Only emitted on an attention push that has one. */
+  prUrl?: string;
+  i18nKey?: string;
+  i18nParams?: Record<string, string>;
 };
 
 async function dispatchSessionPush(
@@ -88,15 +149,7 @@ async function dispatchSessionPush(
   let prefs: UserNotificationPreferences;
   try {
     const row = await deps.readPreferences(userId);
-    prefs = row ?? {
-      agentPushEnabled: true,
-      chatMessagesEnabled: true,
-      agentAttentionEnabled: true,
-      sessionStatusEnabled: true,
-      kiloclawActivityEnabled: true,
-      balanceAlertsEnabled: true,
-      securityFindingsEnabled: true,
-    };
+    prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
   } catch {
     return { dispatched: false, reason: 'dispatch_failed' };
   }
@@ -105,6 +158,10 @@ async function dispatchSessionPush(
   }
 
   const content = buildContent(session);
+  // The raise this attention push presents, named by the session row's own
+  // status time so the app answers that raise and never one that replaced it.
+  // Status pushes carry none, and a non-waiting row names nothing.
+  const raiseId = content.category === 'attention' ? raiseIdForWaitingRow(session) : null;
   const outcome = await deps.dispatchPush({
     userId,
     presenceContext: content.presenceContext,
@@ -113,11 +170,38 @@ async function dispatchSessionPush(
     push: {
       title: content.title,
       body: content.body,
+      ...(content.i18nKey !== undefined && {
+        i18nKey: content.i18nKey,
+        i18nParams: content.i18nParams,
+      }),
       // ponytail: `category` is always set on the emitted pushData so the
       // mobile deep-link handler can dispatch on attention vs. status
       // without a second round-trip. The default covers the rolling-deploy
       // window in which old producers omit the `category` field.
-      data: { type: 'cloud_agent_session', cliSessionId, category: content.category },
+      data: {
+        type: 'cloud_agent_session',
+        cliSessionId,
+        category: content.category,
+        // The session's organization rides on every push, attention or
+        // status, so a tap can switch the app before it opens the session.
+        // Absent for a Personal session (the session row has no
+        // organization_id), which leaves the app on Personal.
+        ...(session.organizationId != null && { organizationId: session.organizationId }),
+        // Raise detail rides only on an attention push: an ordinary status
+        // push keeps the exact pre-existing `data` shape. An old producer
+        // that omits `attentionKind` still sends `category`, and the extras
+        // read site defaults the kind to `unknown`.
+        ...(content.category === 'attention' && {
+          ...(content.attentionKind !== undefined && { attentionKind: content.attentionKind }),
+          // The raise this push presents (see above), so the app answers it
+          // and not a raise that replaced it before the tap.
+          ...(raiseId !== null && { raiseId }),
+          // The payload's `prUrl` is a usable URL or absent: an empty value
+          // would fail the payload schema on the device and cost the whole
+          // notification its route and actions, not just the Open PR action.
+          ...(content.prUrl ? { prUrl: content.prUrl } : {}),
+        }),
+      },
       sound: 'default',
       priority: 'high',
     },
@@ -142,15 +226,29 @@ export async function dispatchCloudAgentSessionPush(
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,
-    session => ({
-      presenceContext: parsed.suppressIfViewingSession
-        ? presenceContextForCliSession(parsed.cliSessionId)
-        : null,
-      idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
-      title: sanitizeTitle(session.title) ?? 'Agent session',
-      body: parsed.body,
-      category,
-    }),
+    session => {
+      const title = sanitizeTitle(session.title) ?? 'Agent session';
+      return {
+        presenceContext: parsed.suppressIfViewingSession
+          ? presenceContextForCliSession(parsed.cliSessionId)
+          : null,
+        idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
+        title,
+        body: parsed.body,
+        // The session title is user-authored; it passes through the catalog
+        // title template as a param. The body is the translated system copy.
+        i18nKey: parsed.i18nKey,
+        i18nParams:
+          parsed.i18nKey !== undefined
+            ? { ...(parsed.i18nParams ?? {}), sessionTitle: title }
+            : undefined,
+        category,
+        // Emitted into `data` only for an attention push (see
+        // `dispatchSessionPush`); inert on the status path.
+        attentionKind: parsed.attentionKind,
+        prUrl: session.prUrl ?? undefined,
+      };
+    },
     prefs => (category === 'attention' ? prefs.agentAttentionEnabled : prefs.sessionStatusEnabled),
     deps
   );
@@ -176,14 +274,19 @@ export async function dispatchSessionReadyPush(
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,
-    session => ({
-      presenceContext: presenceContextForPlatform('app'),
-      idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
-      title:
-        sanitizeTitle(parsed.title ?? null) ?? sanitizeTitle(session.title) ?? 'Kilo session ready',
-      body: 'Your Kilo session is ready to control from your phone',
-      category: 'status',
-    }),
+    session => {
+      const title =
+        sanitizeTitle(parsed.title ?? null) ?? sanitizeTitle(session.title) ?? 'Kilo session ready';
+      return {
+        presenceContext: presenceContextForPlatform('app'),
+        idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
+        title,
+        body: 'Your Kilo session is ready to control from your phone',
+        i18nKey: 'sessionReady',
+        i18nParams: { sessionTitle: title },
+        category: 'status',
+      };
+    },
     prefs => prefs.sessionStatusEnabled,
     deps
   );

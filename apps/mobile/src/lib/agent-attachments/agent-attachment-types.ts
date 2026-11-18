@@ -7,10 +7,17 @@
  * importing from one place.
  */
 
+import { i18n } from '@/i18n';
+
 import { type AgentAttachmentExtension, type AgentAttachmentMime } from './constants';
 
 type AgentAttachmentKind = 'image' | 'document';
-type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error';
+/**
+ * `pending` and `uploading` mean an upload is coming or running. `local` is a
+ * file this device keeps: no upload ever starts for it, so its chip must not
+ * report progress and must not read as uploading.
+ */
+type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'local' | 'error';
 
 export type AgentAttachment = {
   id: string;
@@ -18,6 +25,8 @@ export type AgentAttachment = {
   filename: string;
   /** Basename of the server-side R2 key; set once the upload succeeds. */
   remoteFilename?: string;
+  /** Full server-side R2 key; set once the upload succeeds. */
+  remoteKey?: string;
   kind: AgentAttachmentKind;
   /** Normalized extension used for the R2 key suffix and MIME derivation. */
   extension: AgentAttachmentExtension;
@@ -29,6 +38,10 @@ export type AgentAttachment = {
    */
   size: number;
   localUri: string;
+  /** True when `localUri` is a cache file the app produced and must delete on remove/reset. */
+  localFileOwned?: boolean;
+  /** True when metadata stripping failed and the original file was kept. */
+  metadataStripFailed?: boolean;
   status: AgentAttachmentStatus;
   /** Human-readable error for retryable failures; the chip is the affordance. */
   error?: string;
@@ -79,29 +92,29 @@ export function classifyUploadFailure(error: unknown) {
   const dataMessage = (error as { data?: { code?: string; message?: string } } | null)?.data
     ?.message;
   if (code === 'BAD_REQUEST' || code === 'FORBIDDEN' || code === 'UNPROCESSABLE_CONTENT') {
-    return { retryable: false, reason: dataMessage ?? "This file can't be uploaded." };
+    return { retryable: false, reason: dataMessage ?? i18n.t('chat.attachment.cantUpload') };
   }
   if (code === 'UNAUTHORIZED' || code === 'NOT_FOUND') {
-    return { retryable: false, reason: dataMessage ?? "This file can't be uploaded." };
+    return { retryable: false, reason: dataMessage ?? i18n.t('chat.attachment.cantUpload') };
   }
   if (error instanceof TypeError) {
-    return { retryable: true, reason: 'Network error' };
+    return { retryable: true, reason: i18n.t('chat.attachment.networkError') };
   }
   if (error instanceof Error) {
     if (/abort|cancel|expir/i.test(error.message)) {
-      return { retryable: true, reason: 'Upload failed' };
+      return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     if (/status (408|429|5\d\d)/.test(error.message)) {
-      return { retryable: true, reason: 'Upload failed' };
+      return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     if (/status \d{3}/.test(error.message)) {
       // Any other HTTP error (4xx other than the terminal codes above,
       // 5xx, etc.) is retryable — the plan pins PUT failures as retryable.
-      return { retryable: true, reason: 'Upload failed' };
+      return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
-    return { retryable: true, reason: 'Upload failed' };
+    return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
   }
-  return { retryable: true, reason: 'Upload failed' };
+  return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
 }
 
 /**
@@ -159,12 +172,22 @@ export function buildSubmissionPayload(
   };
 }
 
-/** True when any chip is mid-flight (pending or uploading). */
+/** True when any chip is mid-flight (uploading only — `pending` is not an upload). */
 export function isAnyAttachmentUploading(attachments: AgentAttachment[]): boolean {
-  return attachments.some(item => item.status === 'pending' || item.status === 'uploading');
+  return attachments.some(item => item.status === 'uploading');
 }
 
 /** True when any chip is in a failed state (retryable or terminal). */
 export function hasAnyFailedAttachment(attachments: AgentAttachment[]): boolean {
   return attachments.some(item => item.status === 'error');
+}
+
+/**
+ * True when any chip holds an admitted (presign-returned) object key that has
+ * not been sent. Such a key has a pending-ledger row that must be released on
+ * remove or leave; a chip still in the presign window has no key yet and is
+ * covered by the 24-hour reaper instead.
+ */
+export function hasAnyUnclaimedAttachment(attachments: AgentAttachment[]): boolean {
+  return attachments.some(item => item.remoteKey !== undefined);
 }

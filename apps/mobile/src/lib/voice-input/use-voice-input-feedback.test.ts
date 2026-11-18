@@ -6,7 +6,12 @@ const hapticsMock = vi.hoisted(() => ({ impactAsync: vi.fn().mockResolvedValue(u
 const accessibilityMock = vi.hoisted(() => ({ announceForAccessibility: vi.fn() }));
 const alertMock = vi.hoisted(() => ({ alert: vi.fn() }));
 const linkingMock = vi.hoisted(() => ({ openSettings: vi.fn() }));
-const toastMock = vi.hoisted(() => ({ error: vi.fn() }));
+const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ openTranscriptionModelPicker: vi.fn() }));
+const toastMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  dismiss: vi.fn(),
+}));
 
 vi.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
@@ -19,11 +24,19 @@ vi.mock('expo-speech-recognition', () => ({
   },
 }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
+vi.mock('expo-secure-store', () => ({}));
+vi.mock('expo-router', () => ({ router: routerMock }));
+vi.mock('./gateway/gateway-transcription-preference', () => ({
+  isGatewayTranscriptionEnabled: () => false,
+  readGatewayTranscriptionModel: () => null,
+}));
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,
   Alert: alertMock,
   Linking: linkingMock,
 }));
+
+const NAVIGATION = { openTranscriptionModelPicker: navigation.openTranscriptionModelPicker };
 
 describe('voice input feedback side effects', () => {
   beforeEach(() => {
@@ -31,12 +44,15 @@ describe('voice input feedback side effects', () => {
   });
 
   it('presents settings feedback as an alert with a working settings action', () => {
-    showFeedback({
-      action: 'open-settings',
-      availability: 'available',
-      message: 'Microphone access is off. Enable it in Settings.',
-      retryable: false,
-    });
+    showFeedback(
+      {
+        action: 'open-settings',
+        availability: 'available',
+        message: 'Microphone access is off. Enable it in Settings.',
+        retryable: false,
+      },
+      NAVIGATION
+    );
 
     const buttons = alertMock.alert.mock.calls[0]?.[2] as
       | { text: string; onPress?: () => void }[]
@@ -47,23 +63,58 @@ describe('voice input feedback side effects', () => {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Open Settings', onPress: expect.any(Function) },
-      ]
+      ],
+      { cancelable: true }
     );
     buttons?.find(button => button.text === 'Open Settings')?.onPress?.();
     expect(linkingMock.openSettings).toHaveBeenCalled();
   });
 
+  it('presents gateway picker feedback with an action that names the picker, not the title', () => {
+    showFeedback(
+      {
+        action: 'open-transcription-settings',
+        availability: 'available',
+        message: "This transcription model isn't available. Pick another one in Preferences.",
+        retryable: false,
+      },
+      NAVIGATION
+    );
+
+    const buttons = alertMock.alert.mock.calls[0]?.[2] as
+      | { text: string; onPress?: () => void }[]
+      | undefined;
+    expect(alertMock.alert).toHaveBeenCalledWith(
+      'Transcription model',
+      "This transcription model isn't available. Pick another one in Preferences.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Choose a model', onPress: expect.any(Function) },
+      ],
+      { cancelable: true }
+    );
+    buttons?.find(button => button.text === 'Choose a model')?.onPress?.();
+    // The action reaches the navigation the owning surface supplied, never the
+    // module-level router that the navigation container rebinds across roots.
+    expect(navigation.openTranscriptionModelPicker).toHaveBeenCalledTimes(1);
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
+
   it('presents feedback without an action as a toast', () => {
-    showFeedback({
-      action: 'none',
-      availability: 'available',
-      message: 'No speech detected. Tap the microphone to try again.',
-      retryable: true,
-    });
+    showFeedback(
+      {
+        action: 'none',
+        availability: 'available',
+        message: 'No speech detected. Tap the microphone to try again.',
+        retryable: true,
+      },
+      NAVIGATION
+    );
 
     expect(alertMock.alert).not.toHaveBeenCalled();
     expect(toastMock.error).toHaveBeenCalledWith(
-      'No speech detected. Tap the microphone to try again.'
+      'No speech detected. Tap the microphone to try again.',
+      { id: 'voice-input-feedback' }
     );
   });
 
@@ -75,6 +126,6 @@ describe('voice input feedback side effects', () => {
     expect(hapticsMock.impactAsync).toHaveBeenCalledTimes(1);
     expect(hapticsMock.impactAsync).toHaveBeenCalledWith('light');
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledOnce();
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Listening');
+    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Listening...');
   });
 });

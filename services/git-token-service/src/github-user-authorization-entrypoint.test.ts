@@ -3,11 +3,23 @@ import {
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
   signKiloToken,
 } from '@kilocode/worker-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import { createHmac } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as GitHubTokenServiceModule from './github-token-service.js';
 
 const serviceMocks = vi.hoisted(() => ({
   findManagedInstallationForRepo: vi.fn(),
+  findRefreshCandidates: vi.fn(),
+  updateAccountLogin: vi.fn(),
   getTokenForRepo: vi.fn(),
+  getRepositoryOnlyToken: vi.fn(),
+  refreshInstallationAccountLoginIfDue: vi.fn(),
   selectUserAuthorization: vi.fn(),
   disconnectUserAuthorization: vi.fn(),
   getUserAccessToken: vi.fn(),
@@ -23,15 +35,20 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-vi.mock('./github-token-service.js', () => ({
+vi.mock('./github-token-service.js', async importOriginal => ({
+  ...(await importOriginal<typeof GitHubTokenServiceModule>()),
   GitHubTokenService: class GitHubTokenService {
     getTokenForRepo = serviceMocks.getTokenForRepo;
+    getRepositoryOnlyToken = serviceMocks.getRepositoryOnlyToken;
+    refreshInstallationAccountLoginIfDue = serviceMocks.refreshInstallationAccountLoginIfDue;
   },
 }));
 
 vi.mock('./installation-lookup-service.js', () => ({
   InstallationLookupService: class InstallationLookupService {
     findManagedInstallationForRepo = serviceMocks.findManagedInstallationForRepo;
+    findRefreshCandidates = serviceMocks.findRefreshCandidates;
+    updateAccountLogin = serviceMocks.updateAccountLogin;
   },
 }));
 
@@ -47,12 +64,18 @@ vi.mock('./gitlab-lookup-service.js', () => ({
   GitLabLookupService: class GitLabLookupService {},
 }));
 
+const disconnectExpected = { authorizationId: null, credentialVersion: null };
+
 import handler, { GitTokenRPCEntrypoint } from './index.js';
+import { GitHubSessionCapabilityCodec } from './github-session-capability.js';
+import { GitHubRepositoryPermissionsUnavailableError } from './github-token-service.js';
 
 function createService(): GitTokenRPCEntrypoint {
   return new GitTokenRPCEntrypoint(
     {} as ExecutionContext,
     {
+      GITHUB_APP_CLIENT_ID: 'synthetic-client',
+      GITHUB_APP_CLIENT_SECRET: 'synthetic-secret',
       GITHUB_APP_SLUG: 'kiloconnect',
       GITHUB_APP_BOT_USER_ID: '240665456',
     } as CloudflareEnv
@@ -60,7 +83,27 @@ function createService(): GitTokenRPCEntrypoint {
 }
 
 describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const path = new URL(input).pathname;
+        if (path === '/repos/acme/repo')
+          return Response.json({
+            id: 101,
+            node_id: 'R_repo',
+            name: 'repo',
+            owner: { login: 'acme' },
+          });
+        if (path.endsWith('/token/scoped'))
+          return Response.json({
+            token: 'scoped-user-token',
+            installation: { repository_selection: 'selected' },
+          });
+        throw new Error('Unexpected synthetic request');
+      })
+    );
     vi.clearAllMocks();
     serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
       success: true,
@@ -71,6 +114,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       permissions: { contents: 'write', pull_requests: 'write' },
     });
     serviceMocks.getTokenForRepo.mockResolvedValue('installation-token');
+    serviceMocks.getRepositoryOnlyToken.mockResolvedValue('repository-only-token');
     serviceMocks.selectUserAuthorization.mockResolvedValue({
       selected: true,
       token: 'user-token',
@@ -95,6 +139,89 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
         email: '240665456+kiloconnect[bot]@users.noreply.github.com',
       },
     });
+  });
+
+  it('preserves repository-only legacy authority while denying user attachment escalation', async () => {
+    const key = Buffer.alloc(32, 7).toString('base64');
+    const service = new GitTokenRPCEntrypoint(
+      {} as ExecutionContext,
+      {
+        GITHUB_APP_SLUG: 'kiloconnect',
+        GITHUB_APP_BOT_USER_ID: '240665456',
+        SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: key,
+      } as unknown as CloudflareEnv
+    );
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'allocation-1',
+      allowUserAuthorization: true,
+      permissionScope: 'repository',
+    });
+    if (!issued.success) throw new Error('Expected repository capability');
+    expect(new GitHubSessionCapabilityCodec(key).decode(issued.capability)).toMatchObject({
+      version: 2,
+      source: 'installation',
+      permissionScope: 'repository',
+    });
+    serviceMocks.getRepositoryOnlyToken.mockClear();
+    for (const requestUrl of [
+      'https://api.github.com/graphql',
+      'https://api.github.com/repos/acme/repo/issues/1',
+      'https://uploads.github.com/user-attachments/assets?repository_id=101',
+    ]) {
+      expect(
+        await service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId: 'allocation-1',
+          requestMethod: 'POST',
+          requestUrl,
+        })
+      ).toMatchObject(
+        requestUrl.includes('uploads.github.com')
+          ? { success: false, reason: 'invalid_upstream_request' }
+          : { success: true, source: 'installation', authorization: 'Bearer repository-only-token' }
+      );
+    }
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(2);
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('preserves recoverable permission lookup failures through native resolution and capability issuance', async () => {
+    const service = new GitTokenRPCEntrypoint(
+      {} as ExecutionContext,
+      {
+        GITHUB_APP_SLUG: 'kiloconnect',
+        GITHUB_APP_BOT_USER_ID: '240665456',
+        SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      } as unknown as CloudflareEnv
+    );
+    const params = {
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'allocation-1',
+      allowUserAuthorization: true,
+      permissionScope: 'repository',
+    } as const;
+    serviceMocks.getRepositoryOnlyToken.mockRejectedValueOnce(
+      new GitHubRepositoryPermissionsUnavailableError()
+    );
+    expect(await service.issueGitHubSessionCapability(params)).toEqual({
+      success: false,
+      reason: 'repository_permissions_unavailable',
+    });
+
+    serviceMocks.getRepositoryOnlyToken.mockRejectedValueOnce(
+      new GitHubRepositoryPermissionsUnavailableError()
+    );
+    expect(await service.getCloudAgentAuthForRepo(params)).toEqual({
+      success: false,
+      reason: 'repository_permissions_unavailable',
+    });
+    expect(await service.issueGitHubSessionCapability(params)).toMatchObject({ success: true });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
   });
 
   it('defaults to installation identity when eligibility is omitted', async () => {
@@ -132,25 +259,136 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     });
   });
 
-  it.each(['credential_unreadable', 'credential_configuration_error'] as const)(
-    'uses installation identity when selection reports %s',
+  it('preserves the legacy connected identity without depending on the scoped-token endpoint', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 403 }));
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({ success: true, githubToken: 'user-token', source: 'user' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('repairs stale login metadata before resolving fenced Cloud Agent auth', async () => {
+    const params = {
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      orgId: '00000000-0000-4000-8000-000000000001',
+      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      allowUserAuthorization: true,
+    };
+    serviceMocks.findManagedInstallationForRepo
+      .mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' })
+      .mockResolvedValueOnce({
+        success: true,
+        installationId: '123',
+        accountLogin: 'acme',
+        githubAppType: 'standard',
+        repoName: 'repo',
+        permissions: { contents: 'write', pull_requests: 'write' },
+      });
+    serviceMocks.findRefreshCandidates.mockResolvedValue({
+      success: true,
+      candidates: [
+        {
+          integrationId: params.expectedIntegrationId,
+          installationId: '123',
+          accountLogin: 'old-acme',
+          githubAppType: 'standard',
+        },
+      ],
+    });
+    serviceMocks.refreshInstallationAccountLoginIfDue.mockResolvedValue('acme');
+    serviceMocks.updateAccountLogin.mockResolvedValue(true);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await expect(createService().getCloudAgentAuthForRepo(params)).resolves.toMatchObject({
+      success: true,
+      source: 'user',
+      githubToken: 'user-token',
+    });
+    expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(2);
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params, 'managed');
+    expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
+      params.expectedIntegrationId,
+      'acme'
+    );
+  });
+
+  it.each([
+    'no_user_authorization',
+    'revoked',
+    'refresh_failed',
+    'insufficient_user_access',
+    'credential_unreadable',
+    'credential_configuration_error',
+  ] as const)(
+    'uses repository-scoped bot auth for initial selection when personal auth reports %s',
     async reason => {
       serviceMocks.selectUserAuthorization.mockResolvedValueOnce({ selected: false, reason });
-
       const result = await createService().getCloudAgentAuthForRepo({
         githubRepo: 'acme/repo',
         userId: 'user_1',
         allowUserAuthorization: true,
       });
-
       expect(result).toMatchObject({
         success: true,
-        githubToken: 'installation-token',
         source: 'installation',
+        githubToken: 'installation-token',
         fallbackReason: reason,
       });
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledWith('123', 'repo', 'standard');
+      expect(fetch).not.toHaveBeenCalled();
     }
   );
+
+  it('uses the lite bot without requiring personal authorization', async () => {
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'lite',
+      repoName: 'repo',
+    });
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({
+      success: true,
+      source: 'installation',
+      fallbackReason: 'lite_installation',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('keeps using authorized bot access when installation permissions do not support personal authorization', async () => {
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'standard',
+      repoName: 'repo',
+      permissions: { contents: 'read', pull_requests: 'read' },
+    });
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({
+      success: true,
+      source: 'installation',
+      fallbackReason: 'insufficient_user_access',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
 });
 
 describe('fetch disconnect endpoint', () => {
@@ -168,6 +406,38 @@ describe('fetch disconnect endpoint', () => {
     });
     return `Bearer ${token}`;
   };
+  const modernAuthorizationHeader = async (userId: string, audience: string): Promise<string> => {
+    const { token } = await signModernKiloToken({
+      userId,
+      secret: jwtSecret,
+      expiresInSeconds: 60 * 60,
+      audience,
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+    });
+    return `Bearer ${token}`;
+  };
+  const rawAuthorizationHeader = (
+    aud: unknown,
+    claims: { exp?: number; version?: number } = {}
+  ): string => {
+    const now = Math.floor(Date.now() / 1000);
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(
+      JSON.stringify({
+        version: claims.version ?? 3,
+        kiloUserId: 'user_1',
+        apiTokenPepper: null,
+        aud,
+        iat: now,
+        exp: claims.exp ?? now + 60 * 60,
+      })
+    ).toString('base64url');
+    const token = `${header}.${payload}.${createHmac('sha256', jwtSecret)
+      .update(`${header}.${payload}`)
+      .digest('base64url')}`;
+    return `Bearer ${token}`;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -180,7 +450,7 @@ describe('fetch disconnect endpoint', () => {
       const response = await handler.fetch(
         new Request(
           'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
-          { method: 'POST', headers }
+          { method: 'POST', body: JSON.stringify(disconnectExpected), headers }
         ),
         env
       );
@@ -196,9 +466,119 @@ describe('fetch disconnect endpoint', () => {
         'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
         {
           method: 'POST',
+          body: JSON.stringify(disconnectExpected),
           headers: {
+            'Content-Type': 'application/json',
             Authorization: await authorizationHeader('user_1', BITBUCKET_REPOSITORY_LIST_AUDIENCE),
           },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('accepts a modern internal-service token for the disconnect audience', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
+        {
+          method: 'POST',
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await modernAuthorizationHeader(
+              'user_1',
+              GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE
+            ),
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith(
+      'user_1',
+      disconnectExpected
+    );
+  });
+
+  it('accepts the disconnect audience in a valid unique audience array', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
+        {
+          method: 'POST',
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: rawAuthorizationHeader([
+              KILO_API_AUDIENCE,
+              GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+            ]),
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith(
+      'user_1',
+      disconnectExpected
+    );
+  });
+
+  it.each([
+    KILO_API_AUDIENCE,
+    KILO_GATEWAY_AUDIENCE,
+    'git-token-service',
+    GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+    null,
+    '',
+    [
+      'git-token-service:github-user-authorizations:disconnect',
+      'git-token-service:github-user-authorizations:disconnect',
+    ],
+    ['git-token-service:github-user-authorizations:disconnect', ''],
+  ])('rejects a non-matching or malformed disconnect audience %j', async aud => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
+        {
+          method: 'POST',
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: rawAuthorizationHeader(aud),
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['expired', rawAuthorizationHeader(GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE, { exp: 0 })],
+    [
+      'wrong-version',
+      rawAuthorizationHeader(GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE, { version: 2 }),
+    ],
+    ['bad-signature', 'Bearer invalid'],
+  ])('rejects %s tokens before disconnect', async (_name, authorization) => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
+        {
+          method: 'POST',
+          body: JSON.stringify(disconnectExpected),
+          headers: { 'Content-Type': 'application/json', Authorization: authorization },
         }
       ),
       env
@@ -217,7 +597,11 @@ describe('fetch disconnect endpoint', () => {
         'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
         {
           method: 'POST',
-          headers: { Authorization: await authorizationHeader('user_1') },
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await authorizationHeader('user_1'),
+          },
         }
       ),
       unavailableEnv
@@ -234,7 +618,11 @@ describe('fetch disconnect endpoint', () => {
         'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
         {
           method: 'POST',
-          headers: { Authorization: await authorizationHeader('user_1') },
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await authorizationHeader('user_1'),
+          },
         }
       ),
       env
@@ -242,7 +630,10 @@ describe('fetch disconnect endpoint', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ disconnected: true });
-    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith('user_1');
+    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith(
+      'user_1',
+      disconnectExpected
+    );
 
     const wrongMethod = await handler.fetch(
       new Request(
@@ -266,31 +657,41 @@ describe('fetch disconnect endpoint', () => {
         'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
         {
           method: 'POST',
-          headers: { Authorization: await authorizationHeader('user_1') },
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await authorizationHeader('user_1'),
+          },
         }
       ),
       localEnv
     );
 
     expect(response.status).toBe(200);
-    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith('user_1');
+    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith(
+      'user_1',
+      disconnectExpected
+    );
   });
 
-  it('derives the disconnect identity from the verified token instead of the request body', async () => {
+  it('rejects a request body that attempts to select another disconnect owner', async () => {
     const response = await handler.fetch(
       new Request(
         'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
         {
           method: 'POST',
-          headers: { Authorization: await authorizationHeader('user_1') },
-          body: JSON.stringify({ kiloUserId: 'user_2' }),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await authorizationHeader('user_1'),
+          },
+          body: JSON.stringify({ ...disconnectExpected, kiloUserId: 'user_2' }),
         }
       ),
       env
     );
 
-    expect(response.status).toBe(200);
-    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith('user_1');
+    expect(response.status).toBe(400);
+    expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();
   });
 
   it('returns sanitized failures from disconnect orchestration', async () => {
@@ -300,7 +701,11 @@ describe('fetch disconnect endpoint', () => {
         'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
         {
           method: 'POST',
-          headers: { Authorization: await authorizationHeader('user_1') },
+          body: JSON.stringify(disconnectExpected),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await authorizationHeader('user_1'),
+          },
         }
       ),
       env
@@ -334,6 +739,37 @@ describe('fetch user-access-token endpoint', () => {
       reason: 'not_connected',
     });
   });
+
+  it.each([false, true])(
+    'emits App metadata only after tolerant consumers deploy: %s',
+    async enabled => {
+      const credential = {
+        connected: true,
+        token: 'synthetic-app-token',
+        expiresAtEpochMs: Date.now() + 3600000,
+        githubLogin: 'octocat',
+        authorizationId: 'auth-1',
+        credentialVersion: 1,
+        credentialSource: 'github_app',
+        refreshSupported: true,
+      };
+      serviceMocks.getUserAccessToken.mockResolvedValueOnce(credential);
+      const response = await handler.fetch(
+        new Request('https://git-token-service.example/internal/github-user-authorizations/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+          },
+          body: JSON.stringify({ op: 'fetch' }),
+        }),
+        { ...env, GITHUB_USER_TOKEN_SOURCE_METADATA_ENABLED: String(enabled) }
+      );
+      expect(response.status).toBe(200);
+      const { credentialSource: _source, refreshSupported: _refresh, ...legacy } = credential;
+      await expect(response.json()).resolves.toEqual(enabled ? credential : legacy);
+    }
+  );
 
   it.each([new Headers({ Authorization: 'Bearer invalid' }), new Headers()])(
     'does not run getUserAccessToken before user authentication succeeds (%s)',
@@ -376,6 +812,26 @@ describe('fetch user-access-token endpoint', () => {
           method: 'POST',
           headers: {
             Authorization: await tokenFor('user_1', BITBUCKET_REPOSITORY_LIST_AUDIENCE),
+          },
+          body: JSON.stringify({ op: 'fetch' }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token issued for the disconnect endpoint', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE),
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({ op: 'fetch' }),
         }

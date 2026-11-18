@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Ձեր գործակալի նիստն ունի թարմացում",
+      "lowBalance": "Ձեր մնացորդն ուշադրության կարիք ունի",
+      "spendAlert": "Ձեր ծախսն ուշադրության կարիք ունի",
+      "securityFinding": "Անվտանգության հայտնաբերումն ուշադրության կարիք ունի",
+      "securityUpdate": "Անվտանգության ստուգումն ունի թարմացում",
+      "activeAgentsGlanceable": "Ակտիվ գործակալներն ունեն թարմացում"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Մնացորդի ցածր մակարդակի ծանուցում",
+      "body": "{{organizationName}}-ի մնացորդն իջել է ${{minimumBalanceUsd}}-ից ցածր"
+    },
+    "spendAlert": {
+      "title": "Ծախսի ծանուցում",
+      "body": "{{scopeName}}-ի ծախսը գերազանցել է ${{amountUsd}}-ը"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}}-ը {{repoFullName}}-ում"
+    },
+    "securityFindingNew": {
+      "title": "Նոր անվտանգության հայտնաբերում ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA նախազգուշացում"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA խախտում"
+    }
+  },
+  "sessionReady": {
+    "body": "Ձեր Kilo նիստը պատրաստ է կառավարվելու ձեր հեռախոսից"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

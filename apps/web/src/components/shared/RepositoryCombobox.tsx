@@ -27,6 +27,9 @@ export type RepositoryOption = {
   description?: string;
   platform?: RepositoryPlatform;
   workspaceUuid?: string;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
+  githubAppType?: 'standard' | 'lite';
 };
 
 export type RepositoryComboboxProps = {

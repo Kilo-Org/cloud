@@ -1,23 +1,27 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { restoreSession, extractDiffs } from './restore-session';
+import { restoreSession, extractDiffs, seedSessionIngestRegistration } from './restore-session';
+import { buildRestoreIncompleteReport } from './restore-outcome';
+import { buildWorktreeKiloEnvironment } from './control/worktree-runtime';
+import * as processUtils from './utils';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const SESSION_ID = 'ses_test123';
 
 // Real session-ingest exports always carry a top-level `info` block with at
 // least `id`. The orchestrator's malformed-snapshot guardrail keys off that
 // field, so test fixtures must match real shape.
-function snapshotInfo(): { id: string; version: string } {
-  return { id: 'ses_test_fixture', version: '2' };
+function snapshotInfo(id = SESSION_ID): { id: string; version: string } {
+  return { id, version: '2' };
 }
 
-function makeSnapshot(diffs: Array<{ file: string; after: string; status: string }>): string {
+function makeSnapshot(
+  diffs: Array<{ file: string; after: string; status: string }>,
+  sessionId = SESSION_ID
+): string {
   return JSON.stringify({
-    info: snapshotInfo(),
+    info: snapshotInfo(sessionId),
     messages: [{ info: { summary: { diffs } } }],
   });
 }
@@ -84,6 +88,7 @@ function writeMockKilo(binDir: string, exitCode: number): void {
 function writeCapturingMockKilo(binDir: string, capturePath: string): void {
   const script = `#!/bin/sh
 if [ "$1" = "import" ] && [ -n "$2" ]; then
+  printf '%s' "$2" > "${capturePath}.path"
   cp "$2" "${capturePath}"
 fi
 exit 0
@@ -92,10 +97,24 @@ exit 0
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
-function writeSlowMockKilo(binDir: string): void {
-  const script = '#!/bin/sh\nsleep 1\nexit 0\n';
+function writeSlowMockKilo(binDir: string, startedMarker?: string): void {
+  const script = `#!/bin/sh\n${startedMarker ? `: > "${startedMarker}"\n` : ''}exec sleep 30\n`;
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
+/**
+ * Poll for a file's existence instead of watching events: fs.watch delivery
+ * on macOS lags or drops events when the full suite runs under load.
+ */
+async function waitForFile(filePath: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!fs.existsSync(filePath)) {
+    if (Date.now() > deadline) {
+      throw new Error(`File did not appear within ${timeoutMs}ms: ${filePath}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
 }
 
 function writeSignalTerminatedMockKilo(binDir: string): void {
@@ -106,14 +125,247 @@ function writeSignalTerminatedMockKilo(binDir: string): void {
 
 function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker: string): void {
   const readyMarker = `${descendantMarker}.ready`;
-  const script = `#!/bin/sh\ntrap 'exit 0' TERM\nnode -e 'const fs = require("node:fs"); process.on("SIGTERM", () => {}); fs.writeFileSync(process.argv[1], "ready"); setTimeout(() => fs.writeFileSync(process.argv[2], "alive"), 800); setInterval(() => {}, 1000);' "${readyMarker}" "${descendantMarker}" </dev/null >/dev/null 2>&1 &\nwhile [ ! -f "${readyMarker}" ]; do sleep 0.01; done\nsleep 2\n`;
+  const script = `#!/bin/sh
+trap '' TERM
+sh -c '
+  trap "" TERM
+  printf ready > "$1"
+  sleep 0.8
+  printf alive > "$2"
+  exec sleep 30
+' sh "${readyMarker}" "${descendantMarker}" </dev/null >/dev/null 2>&1 &
+trap 'exit 0' TERM
+wait
+`;
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
-// ---------------------------------------------------------------------------
-// Test suite
-// ---------------------------------------------------------------------------
+async function rejected(operation: Promise<void>): Promise<unknown> {
+  try {
+    await operation;
+  } catch (error) {
+    return error;
+  }
+  throw new Error('Expected operation to reject');
+}
+
+describe('seedSessionIngestRegistration', () => {
+  let tmpDir: string;
+  let dataHome: string;
+  let registrationDirectory: string;
+  const sessionId = 'root_01-kilo';
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seed-ingest-test-'));
+    dataHome = path.join(tmpDir, 'worktree data');
+    registrationDirectory = path.join(dataHome, 'kilo', 'storage', 'session_share');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes only the pinned registration with restrictive permissions in the explicit data home', async () => {
+    const home = path.join(tmpDir, 'unused-home');
+    await seedSessionIngestRegistration(sessionId, {
+      HOME: home,
+      XDG_DATA_HOME: dataHome,
+      KILOCODE_TOKEN: 'managed-token-must-not-persist',
+      KILO_AUTH_CONTENT: '{"kilo":{"type":"api","key":"auth-must-not-persist"}}',
+      SANDBOX_CONTROL_CREDENTIAL: 'control-must-not-persist',
+    });
+
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    const contents = fs.readFileSync(registrationPath, 'utf8');
+    expect(JSON.parse(contents)).toEqual({
+      id: sessionId,
+      ingestPath: `/api/session/${sessionId}/ingest`,
+    });
+    expect(contents).not.toContain('must-not-persist');
+    expect(fs.statSync(registrationPath).mode & 0o777).toBe(0o600);
+    expect(fs.statSync(registrationDirectory).mode & 0o777).toBe(0o700);
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+    expect(fs.existsSync(home)).toBe(false);
+  });
+
+  it('isolates roots and data homes across concurrent and repeated seeds', async () => {
+    const otherRoot = 'kilo_2';
+    const otherDataHome = path.join(tmpDir, 'other-data');
+    await Promise.all([
+      seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }),
+      seedSessionIngestRegistration(otherRoot, { XDG_DATA_HOME: dataHome }),
+      seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }),
+      seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: otherDataHome }),
+    ]);
+
+    expect(fs.readdirSync(registrationDirectory).sort()).toEqual([
+      `${otherRoot}.json`,
+      `${sessionId}.json`,
+    ]);
+    const otherDirectory = path.join(otherDataHome, 'kilo', 'storage', 'session_share');
+    expect(fs.readdirSync(otherDirectory)).toEqual([`${sessionId}.json`]);
+    for (const [directory, root] of [
+      [registrationDirectory, sessionId],
+      [registrationDirectory, otherRoot],
+      [otherDirectory, sessionId],
+    ]) {
+      expect(JSON.parse(fs.readFileSync(path.join(directory, `${root}.json`), 'utf8'))).toEqual({
+        id: root,
+        ingestPath: `/api/session/${root}/ingest`,
+      });
+    }
+  });
+
+  it('accepts a 128-character safe session ID', async () => {
+    const root = 'a'.repeat(128);
+    await seedSessionIngestRegistration(root, { XDG_DATA_HOME: dataHome });
+    expect(
+      JSON.parse(fs.readFileSync(path.join(registrationDirectory, `${root}.json`), 'utf8'))
+    ).toEqual({ id: root, ingestPath: `/api/session/${root}/ingest` });
+  });
+
+  it.each([
+    '',
+    '.',
+    '..',
+    '../root',
+    '/root',
+    'root/other',
+    'root\\other',
+    'root.json',
+    'root?other',
+    'root#other',
+    'root\n',
+    'root\r',
+    'root\0',
+    'røot',
+    'a'.repeat(129),
+  ])('rejects unsafe session ID %j before writing', async root => {
+    expect(
+      await rejected(seedSessionIngestRegistration(root, { XDG_DATA_HOME: dataHome }))
+    ).toEqual(new Error('Invalid Kilo session ID for ingest registration'));
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
+  });
+
+  it.each([undefined, '', 'relative/data', '../data', '~/.local/share'])(
+    'rejects a missing or relative XDG_DATA_HOME %j',
+    async invalidDataHome => {
+      expect(
+        await rejected(
+          seedSessionIngestRegistration(sessionId, {
+            HOME: tmpDir,
+            XDG_DATA_HOME: invalidDataHome,
+          })
+        )
+      ).toEqual(new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME'));
+      expect(fs.readdirSync(tmpDir)).toEqual([]);
+    }
+  );
+
+  it.each(['\0', '\r', '\n'])('rejects XDG_DATA_HOME containing %j', async character => {
+    expect(
+      await rejected(
+        seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: `${dataHome}${character}` })
+      )
+    ).toEqual(new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME'));
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
+  });
+
+  it('does not fall back to process-global XDG_DATA_HOME', async () => {
+    const previous = process.env.XDG_DATA_HOME;
+    process.env.XDG_DATA_HOME = dataHome;
+    try {
+      expect(await rejected(seedSessionIngestRegistration(sessionId, {}))).toEqual(
+        new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME')
+      );
+      expect(fs.readdirSync(tmpDir)).toEqual([]);
+    } finally {
+      if (previous === undefined) delete process.env.XDG_DATA_HOME;
+      else process.env.XDG_DATA_HOME = previous;
+    }
+  });
+
+  it('propagates a storage-directory creation failure without replacing the blocker', async () => {
+    fs.writeFileSync(dataHome, 'not a directory');
+    expect(
+      await rejected(seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }))
+    ).toBeInstanceOf(Error);
+    expect(fs.readFileSync(dataHome, 'utf8')).toBe('not a directory');
+    expect(fs.readdirSync(tmpDir)).toEqual(['worktree data']);
+  });
+
+  it('cleans temporary files when the final rename fails', async () => {
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    fs.mkdirSync(registrationPath, { recursive: true });
+    expect(
+      await rejected(seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }))
+    ).toBeInstanceOf(Error);
+    expect(fs.statSync(registrationPath).isDirectory()).toBe(true);
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+  });
+
+  it('cleans a partial write and preserves the previous registration on write failure', async () => {
+    fs.mkdirSync(registrationDirectory, { recursive: true });
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    fs.writeFileSync(registrationPath, 'previous registration');
+    const writeFile = fs.promises.writeFile.bind(fs.promises);
+    const failure = new Error('registration write failed');
+    const write = spyOn(fs.promises, 'writeFile').mockImplementation(
+      async (file, _data, options) => {
+        await writeFile(file, '{', options);
+        throw failure;
+      }
+    );
+    try {
+      expect(
+        await rejected(seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }))
+      ).toBe(failure);
+    } finally {
+      write.mockRestore();
+    }
+    expect(fs.readFileSync(registrationPath, 'utf8')).toBe('previous registration');
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+  });
+
+  it('does not create storage when already cancelled', async () => {
+    const controller = new AbortController();
+    const reason = new Error('workspace cancelled');
+    controller.abort(reason);
+    expect(
+      await rejected(
+        seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }, controller.signal)
+      )
+    ).toBe(reason);
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
+  });
+
+  it('cleans a completed temporary write without publishing after cancellation', async () => {
+    fs.mkdirSync(registrationDirectory, { recursive: true });
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    fs.writeFileSync(registrationPath, 'previous registration');
+    const controller = new AbortController();
+    const reason = new Error('workspace cancelled');
+    const writeFile = fs.promises.writeFile.bind(fs.promises);
+    const write = spyOn(fs.promises, 'writeFile').mockImplementation(
+      async (file, data, options) => {
+        await writeFile(file, data, options);
+        controller.abort(reason);
+      }
+    );
+    try {
+      expect(
+        await rejected(
+          seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }, controller.signal)
+        )
+      ).toBe(reason);
+    } finally {
+      write.mockRestore();
+    }
+    expect(fs.readFileSync(registrationPath, 'utf8')).toBe('previous registration');
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+  });
+});
 
 describe('restoreSession', () => {
   let tmpDir: string;
@@ -122,8 +374,9 @@ describe('restoreSession', () => {
   let savedEnv: Record<string, string | undefined>;
   let originalFetch: typeof globalThis.fetch;
 
-  const SESSION_ID = 'ses_test123';
-  const TMP_PATH = `/tmp/kilo-session-export-${SESSION_ID}.json`;
+  function snapshotDirectories(): string[] {
+    return fs.readdirSync(tmpDir).filter(entry => entry.startsWith('kilo-session-export-'));
+  }
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'restore-test-'));
@@ -138,13 +391,19 @@ describe('restoreSession', () => {
       KILO_SESSION_INGEST_URL: process.env.KILO_SESSION_INGEST_URL,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
+      SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
+      RESTORE_PROCESS_ONLY: process.env.RESTORE_PROCESS_ONLY,
+      KILO_RUNTIME_CLI_PATH: process.env.KILO_RUNTIME_CLI_PATH,
       PATH: process.env.PATH,
+      TMPDIR: process.env.TMPDIR,
     };
 
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
     process.env.KILOCODE_TOKEN = 'test-token';
     delete process.env.KILOCODE_TOKEN_FILE;
+    delete process.env.KILO_RUNTIME_CLI_PATH;
     process.env.PATH = `${binDir}:${process.env.PATH}`;
+    process.env.TMPDIR = tmpDir;
 
     originalFetch = globalThis.fetch;
   });
@@ -164,14 +423,7 @@ describe('restoreSession', () => {
     } catch {
       // best-effort cleanup
     }
-    try {
-      fs.unlinkSync(TMP_PATH);
-    } catch {
-      // may already be cleaned up
-    }
   });
-
-  // ---- Environment validation ----
 
   it('returns error when KILO_SESSION_INGEST_URL is missing', async () => {
     delete process.env.KILO_SESSION_INGEST_URL;
@@ -195,6 +447,131 @@ describe('restoreSession', () => {
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
     }
+  });
+
+  it('imports history with the selected runtime CLI when the global CLI cannot run', async () => {
+    const selected = '/opt/kilo-cloud/cli/' + 'a'.repeat(64) + '/kilo';
+    const selectedBin = path.join(tmpDir, 'selected-bin');
+    const capturedSnapshot = path.join(tmpDir, 'selected-import.json');
+    fs.mkdirSync(selectedBin);
+    writeCapturingMockKilo(selectedBin, capturedSnapshot);
+    writeMockKilo(binDir, 42);
+    process.env.KILO_RUNTIME_CLI_PATH = selected;
+    mockFetchStatus(200, makeSnapshot([]));
+    const runProcess = processUtils.runProcess;
+    const processSpy = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        runProcess(command === selected ? path.join(selectedBin, 'kilo') : command, args, options)
+    );
+    try {
+      const env = buildWorktreeKiloEnvironment(workspace, path.join(tmpDir, 'home'), {
+        scopeId: 'selected_runtime_restore',
+        token: 'synthetic-guest-token',
+        targets: {
+          backendBaseUrl: 'https://backend.example.test',
+          providerBaseUrl: 'https://provider.example.test',
+          sessionIngestBaseUrl: 'https://ingest.example.test',
+        },
+      });
+      expect(env.KILO_RUNTIME_CLI_PATH).toBeUndefined();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, { env });
+      expect(result.ok).toBe(true);
+      expect(JSON.parse(fs.readFileSync(capturedSnapshot, 'utf8')).info.id).toBe(SESSION_ID);
+    } finally {
+      processSpy.mockRestore();
+    }
+  });
+
+  it('uses the supplied worktree auth for download and import without inheriting wrapper credentials', async () => {
+    process.env.KILOCODE_TOKEN = 'actual-managed-token';
+    process.env.SANDBOX_CONTROL_CREDENTIAL = 'actual-control-credential';
+    process.env.RESTORE_PROCESS_ONLY = 'wrapper-only-value';
+    const capturePath = path.join(tmpDir, 'import-env.json');
+    const home = path.join(tmpDir, 'worktree-home');
+    const kilo = {
+      scopeId: 'worktree_restore',
+      token: 'opaque-guest-token',
+      targets: {
+        backendBaseUrl: 'https://backend.example.test',
+        providerBaseUrl: 'https://provider.example.test',
+        sessionIngestBaseUrl: 'https://ingest.example.test/worktree',
+      },
+    };
+    const env = buildWorktreeKiloEnvironment(
+      workspace,
+      home,
+      kilo,
+      {
+        PATH: process.env.PATH ?? '',
+        RESTORE_CAPTURE_PATH: capturePath,
+      },
+      {}
+    );
+    fs.writeFileSync(
+      path.join(binDir, 'kilo'),
+      `#!${process.execPath}
+await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
+  cwd: process.cwd(),
+  args: process.argv.slice(2),
+  HOME: process.env.HOME,
+  XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+  KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
+  KILO_AUTH_CONTENT: process.env.KILO_AUTH_CONTENT,
+  KILO_CONFIG_CONTENT: process.env.KILO_CONFIG_CONTENT,
+  OPENCODE_CONFIG_CONTENT: process.env.OPENCODE_CONFIG_CONTENT,
+  SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
+  RESTORE_PROCESS_ONLY: process.env.RESTORE_PROCESS_ONLY,
+  ingestRegistration: await Bun.file(process.env.XDG_DATA_HOME + '/kilo/storage/session_share/${SESSION_ID}.json').json(),
+}));
+`,
+      { mode: 0o755 }
+    );
+    const requests: Array<{ url: string; authorization: string | null }> = [];
+    globalThis.fetch = asFetch((url, init) => {
+      requests.push({
+        url: typeof url === 'string' ? url : url instanceof URL ? url.href : url.url,
+        authorization: new Headers(init?.headers).get('Authorization'),
+      });
+      return Promise.resolve(new Response(makeSnapshot([]), { status: 200 }));
+    });
+
+    await seedSessionIngestRegistration(SESSION_ID, env);
+    expect((await restoreSession(SESSION_ID, workspace, undefined, { env })).ok).toBe(true);
+    expect(requests).toEqual([
+      {
+        url: `${kilo.targets.sessionIngestBaseUrl}/api/session/${SESSION_ID}/export`,
+        authorization: `Bearer ${kilo.token}`,
+      },
+    ]);
+    const imported = JSON.parse(fs.readFileSync(capturePath, 'utf8')) as Record<string, unknown>;
+    const importArgs = imported.args as string[];
+    expect(importArgs[0]).toBe('import');
+    expect(importArgs[1]).toMatch(/kilo-session-export-.*\/snapshot\.json$/);
+    expect(imported).toMatchObject({
+      cwd: fs.realpathSync(workspace),
+      HOME: home,
+      XDG_DATA_HOME: env.XDG_DATA_HOME,
+      KILOCODE_TOKEN: kilo.token,
+      KILO_AUTH_CONTENT: env.KILO_AUTH_CONTENT,
+      KILO_CONFIG_CONTENT: env.KILO_CONFIG_CONTENT,
+      OPENCODE_CONFIG_CONTENT: env.OPENCODE_CONFIG_CONTENT,
+      ingestRegistration: { id: SESSION_ID, ingestPath: `/api/session/${SESSION_ID}/ingest` },
+    });
+    expect(JSON.stringify(imported)).not.toContain('actual-');
+    expect(process.env.KILOCODE_TOKEN).toBe('actual-managed-token');
+    expect(process.env.SANDBOX_CONTROL_CREDENTIAL).toBe('actual-control-credential');
+  });
+
+  it('does not fall back to process-global auth when an explicit restore environment omits it', async () => {
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      env: { KILO_SESSION_INGEST_URL: 'https://ingest.example.test' },
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: 'missing env vars: KILOCODE_TOKEN',
+      code: null,
+      step: 'download',
+    });
   });
 
   it('reads KILOCODE_TOKEN_FILE when KILOCODE_TOKEN is missing', async () => {
@@ -245,8 +622,6 @@ describe('restoreSession', () => {
     }
   });
 
-  // ---- Download failures ----
-
   it('returns 404 error when snapshot not found', async () => {
     mockFetchStatus(404);
     const result = await restoreSession(SESSION_ID, workspace);
@@ -269,17 +644,936 @@ describe('restoreSession', () => {
     }
   });
 
-  it('returns a fixed download error when fetch throws', async () => {
-    globalThis.fetch = asFetch(() => Promise.reject(new Error('network token secret')));
+  it('returns an upstream failure for unauthorized snapshot responses', async () => {
+    mockFetchStatus(401);
+
     const result = await restoreSession(SESSION_ID, workspace);
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe('snapshot download failed');
-      expect(result.error).not.toContain('network token secret');
-      expect(result.code).toBeNull();
-      expect(result.step).toBe('download');
+    expect(result).toEqual({
+      ok: false,
+      error: 'download failed status=401',
+      code: 502,
+      step: 'download',
+    });
+  });
+
+  it('returns a fixed download error when fetch throws', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      globalThis.fetch = asFetch(() => Promise.reject(new Error('network token secret')));
+      const result = await restoreSession(SESSION_ID, workspace);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBe('snapshot download failed');
+        expect(result.error).not.toContain('network token secret');
+        expect(result.code).toBeNull();
+        expect(result.step).toBe('download');
+      }
+      const logs = errorSpy.mock.calls.map(args => String(args[0]));
+      expect(logs).toContain('restore-session: snapshot download failed');
+      expect(logs.every(message => !message.includes('network token secret'))).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
     }
+  });
+
+  it('aborts during download without starting import and removes its temp directory', async () => {
+    const downloadStarted = Promise.withResolvers<AbortSignal>();
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+    globalThis.fetch = asFetch((_input, init) => {
+      const signal = init?.signal;
+      if (!signal) throw new Error('Expected download signal');
+      downloadStarted.resolve(signal);
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    });
+    const controller = new AbortController();
+    const restoring = restoreSession(SESSION_ID, workspace, undefined, {
+      signal: controller.signal,
+    });
+
+    try {
+      const signal = await downloadStarted.promise;
+      expect(signal.aborted).toBe(false);
+      expect(snapshotDirectories()).toHaveLength(1);
+      controller.abort();
+      const result = await restoring;
+
+      expect(signal.aborted).toBe(true);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download failed',
+        code: null,
+        step: 'download',
+      });
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      controller.abort();
+      await restoring;
+    }
+  });
+
+  it('settles with a timeout and removes its temp directory when the body stalls', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              return new Promise<void>(() => {});
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        downloadTimeoutMs: 50,
+      });
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download timed out',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+      expect(errorSpy.mock.calls.map(args => String(args[0]))).toContain(
+        'restore-session: snapshot download timed out timeoutMs=50'
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('rejects a stalled complete empty export instead of accepting it as end of body', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    const emptyExport = new TextEncoder().encode('{"info":{},"messages":[],"sessionDiff":[]}');
+    let cancelCalled = false;
+    let enqueued = false;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              if (!enqueued) {
+                enqueued = true;
+                controller.enqueue(emptyExport);
+              }
+              return new Promise<void>(() => {});
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        downloadTimeoutMs: 50,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download timed out',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('does not accept a stream close on abort as end of body', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    const emptyExport = new TextEncoder().encode('{"info":{},"messages":[],"sessionDiff":[]}');
+    let cancelCalled = false;
+    let controllerRef: ReadableStreamDefaultController<Uint8Array> | undefined;
+    let enqueued = false;
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controllerRef = controller;
+      },
+      pull(controller) {
+        if (!enqueued) {
+          enqueued = true;
+          controller.enqueue(emptyExport);
+        }
+        return new Promise<void>(() => {});
+      },
+    });
+    globalThis.fetch = asFetch((_input, init) => {
+      const signal = init?.signal;
+      if (!signal) throw new Error('Expected download signal');
+      signal.addEventListener('abort', () => controllerRef?.close(), { once: true });
+      const realBody = new Response(source, { status: 200 }).body;
+      if (!realBody) throw new Error('Expected response body');
+      const reader = realBody.getReader();
+      const realCancel = reader.cancel.bind(reader);
+      reader.cancel = () => {
+        cancelCalled = true;
+        return realCancel();
+      };
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        body: { getReader: () => reader },
+      } as unknown as Response);
+    });
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        downloadTimeoutMs: 50,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download timed out',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('treats the same empty export bytes on a closed response as not found', async () => {
+    mockFetchOk('{"info":{},"messages":[],"sessionDiff":[]}');
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'snapshot not found (404)',
+      code: 404,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('returns the download failure when the caller aborts after headers while the body stalls', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    const readStarted = Promise.withResolvers<void>();
+    let cancelCalled = false;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              readStarted.resolve();
+              return new Promise<void>(() => {});
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+    const controller = new AbortController();
+    const restoring = restoreSession(SESSION_ID, workspace, undefined, {
+      signal: controller.signal,
+    });
+
+    try {
+      await readStarted.promise;
+      controller.abort();
+      const result = await restoring;
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download failed',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+      expect(errorSpy.mock.calls.map(args => String(args[0]))).toContain(
+        'restore-session: snapshot download aborted'
+      );
+    } finally {
+      errorSpy.mockRestore();
+      controller.abort();
+      await restoring;
+    }
+  }, 2_000);
+
+  it('rejects a snapshot whose streamed bytes exceed the cap', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    let pullCount = 0;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              pullCount += 1;
+              controller.enqueue(new Uint8Array(64));
+            },
+            cancel() {
+              cancelCalled = true;
+              return new Promise<void>(() => {});
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        maxSnapshotBytes: 128,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot exceeded byte cap',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      const pullsAtCancel = pullCount;
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(pullCount).toBe(pullsAtCancel);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+      expect(errorSpy.mock.calls.map(args => String(args[0]))).toContain(
+        'restore-session: snapshot download failed reason=streamed_bytes bytes=192 cap=128'
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('rejects a declared Content-Length over the cap without awaiting a stalled cancel', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(8));
+      },
+      cancel() {
+        cancelCalled = true;
+        return new Promise<void>(() => {});
+      },
+    });
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-length': '1024' }),
+      body,
+    } as unknown as Response;
+    globalThis.fetch = asFetch(() => Promise.resolve(response));
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        maxSnapshotBytes: 512,
+      });
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot exceeded byte cap',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+      expect(errorSpy.mock.calls.map(args => String(args[0]))).toContain(
+        'restore-session: snapshot download failed reason=content_length bytes=1024 cap=512'
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('fails as stalled when headers never arrive and idle is shorter than the overall deadline', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    globalThis.fetch = asFetch((_input, init) => {
+      const signal = init?.signal;
+      if (!signal) throw new Error('Expected download signal');
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    });
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 50,
+        downloadTimeoutMs: 5_000,
+      });
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download stalled',
+        code: null,
+        step: 'download',
+      });
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+      const logs = errorSpy.mock.calls.map(args => String(args[0]));
+      expect(logs).toContain('restore-session: snapshot download stalled idleTimeoutMs=50');
+      expect(logs).not.toContain('restore-session: snapshot download timed out timeoutMs=5000');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('restarts the idle deadline at headers and then fails as stalled', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              return new Promise<void>(() => {});
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 50,
+        downloadTimeoutMs: 5_000,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download stalled',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('fails as stalled when the stream closes on idle after a chunk', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    const chunk = new TextEncoder().encode('{"info":{},"messages":[],"sessionDiff":[]}');
+    let cancelCalled = false;
+    let controllerRef: ReadableStreamDefaultController<Uint8Array> | undefined;
+    let enqueued = false;
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controllerRef = controller;
+      },
+      pull(controller) {
+        if (!enqueued) {
+          enqueued = true;
+          controller.enqueue(chunk);
+        }
+        return new Promise<void>(() => {});
+      },
+    });
+    globalThis.fetch = asFetch((_input, init) => {
+      const signal = init?.signal;
+      if (!signal) throw new Error('Expected download signal');
+      signal.addEventListener('abort', () => controllerRef?.close(), { once: true });
+      const realBody = new Response(source, { status: 200 }).body;
+      if (!realBody) throw new Error('Expected response body');
+      const reader = realBody.getReader();
+      const realCancel = reader.cancel.bind(reader);
+      reader.cancel = () => {
+        cancelCalled = true;
+        return realCancel();
+      };
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        body: { getReader: () => reader },
+      } as unknown as Response);
+    });
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 50,
+        downloadTimeoutMs: 5_000,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download stalled',
+        code: null,
+        step: 'download',
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).not.toBe('snapshot not found (404)');
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('does not extend the idle deadline for empty chunks', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(new Uint8Array(0));
+              return new Promise<void>(resolve => setTimeout(resolve, 10));
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 50,
+        downloadTimeoutMs: 500,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download stalled',
+        code: null,
+        step: 'download',
+      });
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('fails as stalled when empty chunks are enqueued without yielding', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(new Uint8Array(0));
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 40,
+        downloadTimeoutMs: 500,
+      });
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download stalled',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('times out when a chunk write never settles', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    const originalOpen = fs.promises.open;
+    fs.promises.open = (async (...args: Parameters<typeof originalOpen>) => {
+      const handle = await originalOpen(...args);
+      handle.write = (() => new Promise(() => {})) as typeof handle.write;
+      return handle;
+    }) as typeof originalOpen;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new Uint8Array([1]));
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 500,
+        downloadTimeoutMs: 50,
+      });
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download timed out',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      fs.promises.open = originalOpen;
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('cancels the body reader when a chunk write throws', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    const originalOpen = fs.promises.open;
+    fs.promises.open = (async (...args: Parameters<typeof originalOpen>) => {
+      const handle = await originalOpen(...args);
+      handle.write = (() => Promise.reject(new Error('disk full'))) as typeof handle.write;
+      return handle;
+    }) as typeof originalOpen;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new Uint8Array([1]));
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 500,
+        downloadTimeoutMs: 500,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download failed',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      fs.promises.open = originalOpen;
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('times out when non-empty chunks keep the idle deadline alive until the overall deadline', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(new Uint8Array(1));
+              return new Promise<void>(resolve => setTimeout(resolve, 20));
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 100,
+        downloadTimeoutMs: 400,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download timed out',
+        code: null,
+        step: 'download',
+      });
+      expect(errorSpy.mock.calls.map(args => String(args[0]))).toContain(
+        'restore-session: snapshot download timed out timeoutMs=400'
+      );
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('restarts the idle deadline before a slow accepted write', async () => {
+    const snapshot = makeSnapshot([
+      { file: 'src/index.ts', after: 'slow write', status: 'modified' },
+    ]);
+    const bytes = new TextEncoder().encode(snapshot);
+    let phase = 0;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              if (phase === 0) {
+                phase = 1;
+                return new Promise<void>(resolve =>
+                  setTimeout(() => {
+                    controller.enqueue(bytes);
+                    resolve();
+                  }, 70)
+                );
+              }
+              controller.close();
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const realOpen = fs.promises.open.bind(fs.promises);
+    let firstWrite = true;
+    const open = spyOn(fs.promises, 'open').mockImplementation(async (filePath, flags, mode) => {
+      const handle = await realOpen(filePath, flags, mode);
+      return {
+        write: async (
+          buffer: Uint8Array,
+          offset?: number | null,
+          length?: number | null,
+          position?: number | null
+        ) => {
+          if (firstWrite) {
+            firstWrite = false;
+            await new Promise<void>(resolve => setTimeout(resolve, 60));
+          }
+          return handle.write(buffer, offset ?? null, length ?? null, position ?? null);
+        },
+        close: () => handle.close(),
+      } as unknown as fs.promises.FileHandle;
+    });
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 100,
+        downloadTimeoutMs: 2_000,
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      });
+      expect(JSON.parse(fs.readFileSync(capturePath, 'utf8'))).toEqual(JSON.parse(snapshot));
+    } finally {
+      open.mockRestore();
+    }
+  }, 3_000);
+
+  it('times out when the fetch never settles even after its signal aborts', async () => {
+    globalThis.fetch = asFetch(() => new Promise<Response>(() => {}));
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      downloadTimeoutMs: 50,
+      idleTimeoutMs: 500,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'snapshot download timed out',
+      code: null,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  }, 2_000);
+
+  it('fails as caller aborted when the fetch never settles after caller abort', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    globalThis.fetch = asFetch(() => new Promise<Response>(() => {}));
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+    const controller = new AbortController();
+    const restoring = restoreSession(SESSION_ID, workspace, undefined, {
+      signal: controller.signal,
+      downloadTimeoutMs: 5_000,
+      idleTimeoutMs: 500,
+    });
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      controller.abort();
+      const result = await restoring;
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download failed',
+        code: null,
+        step: 'download',
+      });
+      expect(errorSpy.mock.calls.map(args => String(args[0]))).toContain(
+        'restore-session: snapshot download aborted'
+      );
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+      controller.abort();
+      await restoring;
+    }
+  }, 2_000);
+
+  it('restarts the idle deadline when headers arrive', async () => {
+    const snapshot = makeSnapshot([
+      { file: 'src/header.ts', after: 'header restart', status: 'modified' },
+    ]);
+    const bytes = new TextEncoder().encode(snapshot);
+    globalThis.fetch = asFetch(
+      () =>
+        new Promise<Response>(resolve => {
+          setTimeout(() => {
+            resolve(
+              new Response(
+                new ReadableStream<Uint8Array>({
+                  start(controller) {
+                    setTimeout(() => {
+                      controller.enqueue(bytes);
+                      controller.close();
+                    }, 50);
+                  },
+                }),
+                { status: 200 }
+              )
+            );
+          }, 70);
+        })
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      idleTimeoutMs: 100,
+      downloadTimeoutMs: 2_000,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(JSON.parse(fs.readFileSync(capturePath, 'utf8'))).toEqual(JSON.parse(snapshot));
+  }, 3_000);
+
+  it('treats a null body as zero bytes and continues into validation', async () => {
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      body: null,
+    } as unknown as Response;
+    globalThis.fetch = asFetch(() => Promise.resolve(response));
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'snapshot is not valid JSON (0 bytes)',
+      code: null,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
   });
 
   it('returns download error when the snapshot lacks top-level info.id', async () => {
@@ -295,6 +1589,169 @@ describe('restoreSession', () => {
     }
   });
 
+  it('refuses a downloaded snapshot that names a different session', async () => {
+    const snapshot = makeSnapshot(
+      [{ file: 'from-other-session.txt', after: 'other session content', status: 'modified' }],
+      'ses_other_session'
+    );
+    mockFetchOk(snapshot);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const byteLength = new TextEncoder().encode(snapshot).byteLength;
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: `snapshot belongs to a different session (${byteLength} bytes)`,
+      code: null,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(fs.existsSync(path.join(workspace, 'from-other-session.txt'))).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('refuses a provided snapshot file that names a different session', async () => {
+    const provided = makeSnapshot(
+      [{ file: 'from-other-session.txt', after: 'other session content', status: 'modified' }],
+      'ses_other_session'
+    );
+    const providedPath = path.join(tmpDir, 'provided.json');
+    fs.writeFileSync(providedPath, provided);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace, providedPath);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'snapshot belongs to a different session',
+      code: null,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(fs.existsSync(path.join(workspace, 'from-other-session.txt'))).toBe(false);
+    // No sanitized copy is produced: the refusal happens before sanitization.
+    expect(fs.readdirSync(tmpDir).filter(entry => entry.startsWith('.kilo-sanitized-'))).toEqual(
+      []
+    );
+  });
+
+  it.each([
+    JSON.stringify({ info: {}, messages: [], sessionDiff: [] }),
+    JSON.stringify({ info: {}, messages: [], sessionDiff: [], subagents: [] }),
+    ' {\n "sessionDiff": [], "info": {}, "messages": []\n } ',
+  ])('returns 404 for a canonical empty fresh-session export: %j', async snapshot => {
+    mockFetchOk(snapshot);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'snapshot not found (404)',
+      code: 404,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it.each([
+    { bytes: 1_024, code: 404 },
+    { bytes: 1_025, code: null },
+  ])('enforces the canonical empty-snapshot boundary at $bytes bytes', async ({ bytes, code }) => {
+    const snapshot = JSON.stringify({ info: {}, messages: [], sessionDiff: [] });
+    mockFetchOk(`${' '.repeat(bytes - snapshot.length)}${snapshot}`);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe(code);
+      expect(result.step).toBe('download');
+      expect(result.error).toContain(code === 404 ? 'snapshot not found (404)' : 'missing info.id');
+    }
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it.each([
+    '{"info":{},"messages":[],"sessionDiff":[],"messages":[]}',
+    '{"info":{},"messages":[],"sessionDiff":[]} trailing',
+    '{"info":{},"messages":[],"sessionDiff":[',
+  ])('keeps duplicate fields and malformed empty exports fail-closed: %j', async snapshot => {
+    mockFetchOk(snapshot);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('does not treat a mismatched session ID as an empty snapshot', async () => {
+    mockFetchOk(
+      JSON.stringify({ info: { id: 'ses_different_session' }, messages: [], sessionDiff: [] })
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+      expect(result).not.toHaveProperty('emptySnapshot');
+    }
+    expect(fs.existsSync(capturePath)).toBe(false);
+  });
+
+  for (const [description, snapshot] of [
+    ['null session metadata', { info: null, messages: [], sessionDiff: [] }],
+    ['same-size malformed session diffs', { info: {}, messages: [], sessionDiff: {} }],
+    ['missing session diffs', { info: {}, messages: [] }],
+    ['non-array messages', { info: {}, messages: {}, sessionDiff: [] }],
+    ['nonempty subagents', { info: {}, messages: [], sessionDiff: [], subagents: [{}] }],
+    ['non-array subagents', { info: {}, messages: [], sessionDiff: [], subagents: null }],
+    [
+      'session metadata without an id',
+      { info: { title: 'Existing session' }, messages: [], sessionDiff: [] },
+    ],
+    [
+      'existing messages',
+      { info: {}, messages: [{ info: { id: 'msg_existing' } }], sessionDiff: [] },
+    ],
+    ['existing session diffs', { info: {}, messages: [], sessionDiff: [{ file: 'existing.txt' }] }],
+    [
+      'additional export fields',
+      { info: {}, messages: [], sessionDiff: [], detail: 'upstream error' },
+    ],
+  ] as const) {
+    it(`does not identify ${description} as an empty session export`, async () => {
+      mockFetchOk(JSON.stringify(snapshot));
+
+      const result = await restoreSession(SESSION_ID, workspace);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('snapshot missing info.id');
+        expect(result.code).toBeNull();
+        expect(result.step).toBe('download');
+        expect(result).not.toHaveProperty('emptySnapshot');
+      }
+    });
+  }
+
   it('returns download error when the snapshot metadata is not JSON', async () => {
     mockFetchOk('not valid JSON {{{');
 
@@ -309,7 +1766,7 @@ describe('restoreSession', () => {
   });
 
   it('returns download error when JSON after info.id is malformed', async () => {
-    mockFetchOk('{"info":{"id":"ses_test_fixture"},"messages":[not-json]}');
+    mockFetchOk('{"info":{"id":"ses_test123"},"messages":[not-json]}');
 
     const result = await restoreSession(SESSION_ID, workspace);
 
@@ -322,7 +1779,7 @@ describe('restoreSession', () => {
   });
 
   it('returns download error when bytes follow the JSON document', async () => {
-    mockFetchOk('{"info":{"id":"ses_test_fixture"},"messages":[]} trailing');
+    mockFetchOk('{"info":{"id":"ses_test123"},"messages":[]} trailing');
 
     const result = await restoreSession(SESSION_ID, workspace);
 
@@ -346,8 +1803,6 @@ describe('restoreSession', () => {
       expect(result.step).toBe('download');
     }
   });
-
-  // ---- Import failures ----
 
   it('returns import error when kilo import fails', async () => {
     const snapshot = makeSnapshot([{ file: 'src/index.ts', after: 'content', status: 'modified' }]);
@@ -378,30 +1833,37 @@ describe('restoreSession', () => {
       expect(result.error).toContain('kilo import timed out');
       expect(result.detail).toContain('timeout');
     }
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
   });
 
-  it('terminates kilo import when the workspace deadline is aborted', async () => {
+  it('terminates kilo import when the workspace deadline is aborted after import starts', async () => {
     mockFetchOk(makeSnapshot([]));
-    writeSlowMockKilo(binDir);
+    writeSlowMockKilo(binDir, path.join(workspace, 'import-started'));
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 50);
-    const startedAt = Date.now();
-
-    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+    const restoring = restoreSession(SESSION_ID, workspace, undefined, {
       importTimeoutMs: 5_000,
       importTerminationGraceMs: 50,
       signal: controller.signal,
     });
-    const elapsedMs = Date.now() - startedAt;
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.step).toBe('import');
-      expect(result.error).toContain('kilo import failed');
+    try {
+      await waitForFile(path.join(workspace, 'import-started'), 10_000);
+      const startedAt = Date.now();
+      controller.abort();
+      const result = await restoring;
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.step).toBe('import');
+        expect(result.error).toContain('kilo import failed');
+        expect(result.detail).toContain('termination abort');
+      }
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      controller.abort();
+      await restoring;
     }
-    expect(elapsedMs).toBeLessThan(800);
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
   });
 
   it('returns import error when kilo import is terminated by a signal', async () => {
@@ -421,12 +1883,25 @@ describe('restoreSession', () => {
     mockFetchOk(makeSnapshot([]));
     const descendantMarker = path.join(tmpDir, 'import-descendant-survived');
     writeSignalIgnoringDescendantMockKilo(binDir, descendantMarker);
+    const runProcess = processUtils.runProcess;
+    // New executable scripts can consume the import deadline during macOS startup.
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        command === 'kilo'
+          ? runProcess('/bin/sh', [path.join(binDir, 'kilo'), ...args], options)
+          : runProcess(command, args, options)
+    );
     const startedAt = Date.now();
 
-    const result = await restoreSession(SESSION_ID, workspace, undefined, {
-      importTimeoutMs: 500,
-      importTerminationGraceMs: 150,
-    });
+    let result;
+    try {
+      result = await restoreSession(SESSION_ID, workspace, undefined, {
+        importTimeoutMs: 500,
+        importTerminationGraceMs: 150,
+      });
+    } finally {
+      importProcess.mockRestore();
+    }
     const elapsedMs = Date.now() - startedAt;
 
     expect(result.ok).toBe(false);
@@ -434,11 +1909,119 @@ describe('restoreSession', () => {
       expect(result.step).toBe('import');
       expect(result.error).toContain('kilo import timed out');
     }
+    expect(fs.readFileSync(`${descendantMarker}.ready`, 'utf8')).toBe('ready');
     expect(elapsedMs).toBeGreaterThanOrEqual(600);
     expect(fs.existsSync(descendantMarker)).toBe(false);
   });
 
-  // ---- Happy paths ----
+  it('cleans up a CLI that hangs after confirming the requested session import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stderr', 'unrelated diagnostic');
+        options?.onOutput?.('stdout', 'Imported ses');
+        options?.onOutput?.('stdout', `sion: ${SESSION_ID}\n`);
+        await new Promise<void>(resolve => {
+          options?.signal?.addEventListener('abort', () => resolve(), { once: true });
+        });
+        return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'abort' };
+      }
+    );
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        restoreFiles: false,
+      });
+      expect(result.ok).toBe(true);
+      expect(importProcess).toHaveBeenCalledTimes(1);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it.each(['other_session', `${SESSION_ID}_suffix`])(
+    'does not accept an import confirmation for %s instead of the requested session',
+    async reportedSession => {
+      mockFetchOk(makeSnapshot([]));
+      const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+        async (_command, _args, options) => {
+          options?.onOutput?.('stdout', `Imported session: ${reportedSession}\n`);
+          return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'timeout' };
+        }
+      );
+      try {
+        const result = await restoreSession(SESSION_ID, workspace);
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.subtype).toBe('kilo_import_timeout');
+      } finally {
+        importProcess.mockRestore();
+      }
+    }
+  );
+
+  it('terminates a real import child that stays alive after its committed-session marker', async () => {
+    mockFetchOk(makeSnapshot([]));
+    fs.writeFileSync(
+      path.join(binDir, 'kilo'),
+      `#!/bin/sh\nprintf 'Imported session: ${SESSION_ID}\\n'\nexec sleep 30\n`,
+      { mode: 0o755 }
+    );
+    const runProcess = processUtils.runProcess;
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        command === 'kilo'
+          ? runProcess('/bin/sh', [path.join(binDir, 'kilo'), ...args], options)
+          : runProcess(command, args, options)
+    );
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        restoreFiles: false,
+        importTimeoutMs: 10_000,
+        importTerminationGraceMs: 50,
+      });
+      expect(result.ok).toBe(true);
+      expect(Date.now() - startedAt).toBeLessThan(3_000);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it('does not treat a process cleanup error as a completed import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stdout', `Imported session: ${SESSION_ID}\n`);
+        throw new Error('cleanup failed');
+      }
+    );
+    try {
+      const error = await restoreSession(SESSION_ID, workspace).catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(Error);
+      expect(String(error)).toContain('cleanup failed');
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it('does not turn caller cancellation into success after an import confirmation', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const controller = new AbortController();
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stdout', `Imported session: ${SESSION_ID}\n`);
+        controller.abort();
+        return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'abort' };
+      }
+    );
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        signal: controller.signal,
+      });
+      expect(result.ok).toBe(false);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
 
   it('strips transient lifecycle parts from the snapshot before kilo import', async () => {
     const capturePath = path.join(tmpDir, 'import-input.json');
@@ -515,6 +2098,51 @@ describe('restoreSession', () => {
     expect(JSON.parse(fs.readFileSync(capturePath, 'utf-8'))).toEqual(JSON.parse(provided));
   });
 
+  it('persists the complete snapshot when a file write is short', async () => {
+    const snapshot = makeSnapshot([
+      { file: 'src/index.ts', after: 'short write content', status: 'modified' },
+    ]);
+    mockFetchOk(snapshot);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const realOpen = fs.promises.open.bind(fs.promises);
+    let shortened = false;
+    const open = spyOn(fs.promises, 'open').mockImplementation(async (filePath, flags, mode) => {
+      const handle = await realOpen(filePath, flags, mode);
+      return {
+        write: async (
+          buffer: Uint8Array,
+          offset?: number | null,
+          length?: number | null,
+          position?: number | null
+        ) => {
+          if (!shortened && buffer.byteLength > 1) {
+            shortened = true;
+            return handle.write(buffer, 0, Math.floor(buffer.byteLength / 2), position ?? null);
+          }
+          return handle.write(buffer, offset ?? null, length ?? null, position ?? null);
+        },
+        close: () => handle.close(),
+      } as unknown as fs.promises.FileHandle;
+    });
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace);
+
+      expect(result).toEqual({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      });
+      const imported = JSON.parse(fs.readFileSync(capturePath, 'utf8'));
+      expect(imported).toEqual(JSON.parse(snapshot));
+    } finally {
+      open.mockRestore();
+    }
+  });
+
   it('downloads snapshot, imports, and applies diffs', async () => {
     const snapshot = makeSnapshot([
       { file: 'src/index.ts', after: "console.log('hello');", status: 'modified' },
@@ -543,34 +2171,6 @@ describe('restoreSession', () => {
   });
 
   it('prefers top-level patch session diffs over legacy message summaries', async () => {
-    const repo = path.join(tmpDir, 'repo');
-    fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
-    Bun.spawnSync(['git', 'init'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
-    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'before\n');
-    Bun.spawnSync(['git', 'add', '.'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
-    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'after\n');
-    const proc = Bun.spawnSync(['git', 'diff', '--src-prefix=a/', '--dst-prefix=b/'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    const patch = new TextDecoder().decode(proc.stdout);
-
     fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
     Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
     Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
@@ -590,6 +2190,17 @@ describe('restoreSession', () => {
       stdout: 'pipe',
       stderr: 'pipe',
     });
+    const absoluteFile = path.join(workspace, 'src/index.ts');
+    const patch = [
+      `Index: ${absoluteFile}`,
+      '===================================================================',
+      `--- ${absoluteFile}`,
+      `+++ ${absoluteFile}`,
+      '@@ -1 +1 @@',
+      '-before',
+      '+after',
+      '',
+    ].join('\n');
     mockFetchOk(makeSessionDiffSnapshot(patch));
 
     const result = await restoreSession(SESSION_ID, workspace);
@@ -602,6 +2213,131 @@ describe('restoreSession', () => {
     });
     expect(fs.readFileSync(path.join(workspace, 'src/index.ts'), 'utf-8')).toBe('after\n');
     expect(fs.existsSync(path.join(workspace, 'legacy.txt'))).toBe(false);
+  });
+
+  describe('with several git roots', () => {
+    function initRepo(directory: string, file: string, content: string): void {
+      fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
+      const run = (args: string[]) =>
+        Bun.spawnSync(['git', ...args], { cwd: directory, stdout: 'pipe', stderr: 'pipe' });
+      fs.mkdirSync(directory, { recursive: true });
+      run(['init']);
+      run(['config', 'user.email', 'test@example.com']);
+      run(['config', 'user.name', 'Test User']);
+      fs.writeFileSync(path.join(directory, file), content);
+      run(['add', '.']);
+      run(['commit', '-m', 'initial']);
+    }
+
+    function absolutePatch(absoluteFile: string): string {
+      return [
+        `Index: ${absoluteFile}`,
+        '===================================================================',
+        `--- ${absoluteFile}`,
+        `+++ ${absoluteFile}`,
+        '@@ -1 +1 @@',
+        '-before',
+        '+after',
+        '',
+      ].join('\n');
+    }
+
+    function sessionDiffSnapshot(files: Array<{ file: string; patch: string }>): string {
+      return JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: files.map(entry => ({
+          ...entry,
+          additions: 1,
+          deletions: 1,
+          status: 'modified',
+        })),
+        messages: [],
+      });
+    }
+
+    it('applies a patch at the root that contains its absolute path', async () => {
+      const web = path.join(workspace, 'web');
+      const api = path.join(workspace, 'api');
+      initRepo(web, 'src/index.ts', 'before\n');
+      initRepo(api, 'src/index.ts', 'before\n');
+      mockFetchOk(
+        sessionDiffSnapshot([
+          {
+            file: path.join(api, 'src/index.ts'),
+            patch: absolutePatch(path.join(api, 'src/index.ts')),
+          },
+        ])
+      );
+
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        roots: { directories: [web, api] },
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      });
+      expect(fs.readFileSync(path.join(api, 'src/index.ts'), 'utf8')).toBe('after\n');
+      expect(fs.readFileSync(path.join(web, 'src/index.ts'), 'utf8')).toBe('before\n');
+    });
+
+    it('skips a path outside every root, including a sibling that shares a root prefix', async () => {
+      const web = path.join(workspace, 'web');
+      const sibling = path.join(workspace, 'website');
+      initRepo(web, 'src/index.ts', 'before\n');
+      fs.mkdirSync(sibling, { recursive: true });
+      mockFetchOk(
+        makeSnapshot([
+          { file: path.join(web, 'src/new.ts'), after: 'inside', status: 'modified' },
+          { file: path.join(sibling, 'a.ts'), after: 'sibling', status: 'modified' },
+          { file: '/etc/outside.ts', after: 'outside', status: 'modified' },
+        ])
+      );
+
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        roots: { directories: [web] },
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: {
+          applied: 1,
+          skipped: 2,
+          total: 3,
+          skippedDiffs: [
+            { file: path.join(sibling, 'a.ts'), reason: 'outside_workspace' },
+            { file: '/etc/outside.ts', reason: 'outside_workspace' },
+          ],
+        },
+      });
+      expect(fs.readFileSync(path.join(web, 'src/new.ts'), 'utf8')).toBe('inside');
+      expect(fs.existsSync(path.join(sibling, 'a.ts'))).toBe(false);
+    });
+
+    it('leaves a recovered root to its saved worktree snapshot', async () => {
+      const web = path.join(workspace, 'web');
+      const api = path.join(workspace, 'api');
+      fs.mkdirSync(web, { recursive: true });
+      fs.mkdirSync(api, { recursive: true });
+      mockFetchOk(
+        makeSnapshot([
+          { file: path.join(web, 'a.ts'), after: 'older', status: 'modified' },
+          { file: path.join(api, 'b.ts'), after: 'restored', status: 'modified' },
+        ])
+      );
+
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        roots: { directories: [web, api], recovered: [web] },
+      });
+
+      expect(result).toMatchObject({ ok: true, diffs: { applied: 1, skipped: 0, total: 1 } });
+      expect(fs.existsSync(path.join(web, 'a.ts'))).toBe(false);
+      expect(fs.readFileSync(path.join(api, 'b.ts'), 'utf8')).toBe('restored');
+    });
   });
 
   it('succeeds with zero diffs when messages array is empty', async () => {
@@ -630,8 +2366,6 @@ describe('restoreSession', () => {
     });
   });
 
-  // ---- Path traversal protection ----
-
   it('skips diffs with path traversal', async () => {
     const snapshot = makeSnapshot([
       { file: '../escaped.txt', after: 'malicious', status: 'modified' },
@@ -646,6 +2380,9 @@ describe('restoreSession', () => {
       expect(result.diffs.skipped).toBe(1);
       expect(result.diffs.applied).toBe(1);
       expect(result.diffs.total).toBe(2);
+      expect(result.diffs.skippedDiffs).toEqual([
+        { file: '../escaped.txt', reason: 'outside_workspace' },
+      ]);
     }
 
     // Verify traversal target was NOT written outside the workspace
@@ -654,8 +2391,6 @@ describe('restoreSession', () => {
     // Verify safe file was written
     expect(fs.readFileSync(path.join(workspace, 'safe.txt'), 'utf-8')).toBe('safe content');
   });
-
-  // ---- Deduplication ----
 
   it('deduplicates diffs by file path with last-write-wins', async () => {
     const snapshot = makeMultiMessageSnapshot(
@@ -676,8 +2411,6 @@ describe('restoreSession', () => {
     // Second message wins
     expect(fs.readFileSync(path.join(workspace, 'dup.txt'), 'utf-8')).toBe('second version');
   });
-
-  // ---- Empty after-content ----
 
   it('restores non-deleted diffs with empty after content', async () => {
     const snapshot = makeSnapshot([
@@ -729,6 +2462,36 @@ describe('restoreSession', () => {
     );
   });
 
+  it('imports history without applying ingest diffs when file restoration is delegated', async () => {
+    const imported = path.join(tmpDir, 'history-import.json');
+    writeCapturingMockKilo(binDir, imported);
+    const snapshot = JSON.stringify({
+      info: snapshotInfo(),
+      messages: [{ info: { id: 'message-history' } }],
+      sessionDiff: [
+        { file: 'existing.txt', after: 'older ingest', status: 'modified' },
+        { file: 'deleted.txt', status: 'deleted' },
+        { file: 'added.txt', after: 'ingest addition', status: 'added' },
+      ],
+    });
+    fs.writeFileSync(path.join(workspace, 'existing.txt'), 'fresh checkout');
+    fs.writeFileSync(path.join(workspace, 'deleted.txt'), 'still present');
+    mockFetchOk(snapshot);
+    const result = await restoreSession(SESSION_ID, workspace, undefined, { restoreFiles: false });
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 0, skipped: 0, total: 0 },
+    });
+    expect(JSON.parse(fs.readFileSync(imported, 'utf8')).messages).toEqual([
+      { info: { id: 'message-history' } },
+    ]);
+    expect(fs.readFileSync(path.join(workspace, 'existing.txt'), 'utf8')).toBe('fresh checkout');
+    expect(fs.readFileSync(path.join(workspace, 'deleted.txt'), 'utf8')).toBe('still present');
+    expect(fs.existsSync(path.join(workspace, 'added.txt'))).toBe(false);
+  });
+
   it('continues with a partial restore when a patch cannot be applied', async () => {
     fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
     Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
@@ -751,9 +2514,91 @@ describe('restoreSession', () => {
       ok: true,
       downloaded: true,
       imported: true,
-      diffs: { applied: 0, skipped: 1, total: 1 },
+      diffs: {
+        applied: 0,
+        skipped: 1,
+        total: 1,
+        skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+      },
     });
     expect(fs.existsSync(path.join(workspace, 'src/index.ts'))).toBe(false);
+  });
+
+  it('keeps every distinct skip reason and the true path count when the record cap drops the tail', async () => {
+    // 101 path-traversal skips exhaust the 100-record cap before the single
+    // missing-content skip, whose reason must still be reported; the omitted
+    // path count must come from the true total, not the retained records.
+    const diffs = [
+      ...Array.from({ length: 101 }, (_, index) => ({
+        file: `../escaped-${index}.txt`,
+        after: 'malicious',
+        status: 'modified',
+      })),
+      { file: 'src/nocontent.ts', status: 'modified' },
+    ];
+    mockFetchOk(
+      JSON.stringify({ info: snapshotInfo(), messages: [{ info: { summary: { diffs } } }] })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diffs.applied).toBe(0);
+    expect(result.diffs.skipped).toBe(102);
+    expect(result.diffs.skippedDiffs).toHaveLength(100);
+    expect(new Set(result.diffs.skippedDiffs?.map(entry => entry.reason))).toEqual(
+      new Set(['outside_workspace', 'missing_content'])
+    );
+
+    const report = buildRestoreIncompleteReport(result.diffs);
+    expect(report?.reasons).toEqual(['outside_workspace', 'missing_content']);
+    expect(report?.paths).toHaveLength(50);
+    expect(report?.omittedPaths).toBe(52);
+    expect(report?.message.endsWith('and 52 more')).toBe(true);
+  });
+
+  it('logs patch structure and Git parser diagnostics without patch contents', async () => {
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetchOk(
+      JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: [
+          {
+            file: 'src/index.ts',
+            patch: 'not a git patch with private source content',
+            status: 'modified',
+          },
+        ],
+      })
+    );
+
+    try {
+      await restoreSession(SESSION_ID, workspace);
+
+      const logs = errorSpy.mock.calls.map(args => String(args[0]));
+      expect(
+        logs.some(
+          message =>
+            message.includes('patch metadata file=src/index.ts phase=raw') &&
+            message.includes('finalNewline=false') &&
+            message.includes('eofMarkers=0') &&
+            message.includes('hunkHeaders=0')
+        )
+      ).toBe(true);
+      for (const mode of ['stat', 'recount-stat', 'check', 'recount-check']) {
+        expect(
+          logs.some(message =>
+            message.includes(`git patch diagnostic file=src/index.ts mode=${mode}`)
+          )
+        ).toBe(true);
+      }
+      expect(logs.every(message => !message.includes('private source content'))).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('unlinks a deleted file when its patch cannot be applied', async () => {
@@ -847,29 +2692,75 @@ describe('restoreSession', () => {
     expect(new TextDecoder().decode(unmerged.stdout)).toBe('');
   });
 
-  // ---- Temp file cleanup ----
-
   it('cleans up temp file on success', async () => {
     mockFetchOk(makeSnapshot([{ file: 'a.txt', after: 'content', status: 'modified' }]));
 
     const result = await restoreSession(SESSION_ID, workspace);
     expect(result.ok).toBe(true);
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
   });
 
-  it('cleans up temp file when Bun.write throws during download', async () => {
-    // Simulate a partial write: pre-create the temp file so it exists on disk,
-    // then have fetch() reject — the catch path should still unlink it.
-    fs.writeFileSync(TMP_PATH, 'partial snapshot data');
-
-    globalThis.fetch = asFetch(() => Promise.reject(new Error('connection reset')));
+  it('cleans up its temp directory when the body read fails mid-download', async () => {
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(new Uint8Array(16));
+              controller.error(new Error('read failed'));
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
 
     const result = await restoreSession(SESSION_ID, workspace);
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.step).toBe('download');
+    if (!result.ok) expect(result.step).toBe('download');
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('cleans up its temp directory when downloaded metadata is invalid', async () => {
+    mockFetchOk('{"info":{}}');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.step).toBe('download');
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('isolates import snapshot paths for simultaneous restores of the same session', async () => {
+    const secondWorkspace = path.join(tmpDir, 'second-workspace');
+    fs.mkdirSync(secondWorkspace);
+    writeCapturingMockKilo(binDir, 'import-input.json');
+    let downloadCount = 0;
+    globalThis.fetch = asFetch(() => {
+      downloadCount += 1;
+      return Promise.resolve(
+        new Response(
+          makeSnapshot([{ file: 'restored.txt', after: String(downloadCount), status: 'modified' }])
+        )
+      );
+    });
+
+    const results = await Promise.all([
+      restoreSession(SESSION_ID, workspace),
+      restoreSession(SESSION_ID, secondWorkspace),
+    ]);
+
+    expect(results.map(result => result.ok)).toEqual([true, true]);
+    const importedPaths = [workspace, secondWorkspace].map(directory =>
+      fs.readFileSync(path.join(directory, 'import-input.json.path'), 'utf8')
+    );
+    expect(importedPaths[0]).not.toBe(importedPaths[1]);
+    for (const importedPath of importedPaths) {
+      expect(path.dirname(importedPath)).toStartWith(path.join(tmpDir, 'kilo-session-export-'));
+      expect(fs.existsSync(path.dirname(importedPath))).toBe(false);
     }
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(fs.readFileSync(path.join(workspace, 'restored.txt'), 'utf8')).toBe('1');
+    expect(fs.readFileSync(path.join(secondWorkspace, 'restored.txt'), 'utf8')).toBe('2');
+    expect(snapshotDirectories()).toEqual([]);
   });
 
   it('cleans up temp file on import failure', async () => {
@@ -878,10 +2769,8 @@ describe('restoreSession', () => {
 
     const result = await restoreSession(SESSION_ID, workspace);
     expect(result.ok).toBe(false);
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
   });
-
-  // ---- Fetch URL construction ----
 
   it('sends correct URL and auth header', async () => {
     let capturedUrl: string | undefined;
@@ -904,21 +2793,17 @@ describe('restoreSession', () => {
   it('URL-encodes the session ID', async () => {
     let capturedUrl: string | undefined;
 
-    // Use chars that need URL-encoding but are filesystem-safe (the
-    // function writes to /tmp/kilo-session-export-<id>.json)
     const specialId = 'ses special&chars=1';
 
     globalThis.fetch = asFetch(input => {
       capturedUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : '';
-      return Promise.resolve(new Response(makeSnapshot([]), { status: 200 }));
+      return Promise.resolve(new Response(makeSnapshot([], specialId), { status: 200 }));
     });
 
     await restoreSession(specialId, workspace);
 
     expect(capturedUrl).toContain(encodeURIComponent(specialId));
   });
-
-  // ---- Nested directory creation ----
 
   it('creates nested directories for diff file paths', async () => {
     const snapshot = makeSnapshot([
@@ -934,8 +2819,6 @@ describe('restoreSession', () => {
     );
   });
 
-  // ---- Delete of already-absent file ----
-
   it('counts delete as applied even if file does not exist', async () => {
     const snapshot = makeSnapshot([{ file: 'nonexistent.txt', after: '', status: 'deleted' }]);
     mockFetchOk(snapshot);
@@ -949,10 +2832,6 @@ describe('restoreSession', () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// extractDiffs (subprocess-based diff extraction)
-// ---------------------------------------------------------------------------
 
 describe('extractDiffs', () => {
   let tmpDir: string;

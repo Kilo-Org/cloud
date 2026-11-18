@@ -8,7 +8,6 @@ import {
   createInitialAnalyticsSettingsState,
   failAnalyticsSettingsFlip,
   isAnalyticsSettingsInteractive,
-  mapAnalyticsSettingsSaveRejection,
   resolveAnalyticsOptOutIdentity,
   shouldShowFirefoxUsageDataHint,
 } from './analytics-settings-logic';
@@ -152,19 +151,6 @@ describe('analytics-settings-logic', () => {
       expect(retry?.state.phase).toBe('saving');
       expect(retry?.state.errorMessage).toBeNull();
       expect(retry?.optedOut).toBe(true);
-    });
-  });
-
-  describe('unhappy non-retryable — structurally impossible', () => {
-    it('maps every rejection to the retryable save error', () => {
-      expect(mapAnalyticsSettingsSaveRejection(new Error('quota'))).toBe(
-        ANALYTICS_SETTINGS_SAVE_ERROR
-      );
-      expect(mapAnalyticsSettingsSaveRejection('string reject')).toBe(
-        ANALYTICS_SETTINGS_SAVE_ERROR
-      );
-      expect(mapAnalyticsSettingsSaveRejection(null)).toBe(ANALYTICS_SETTINGS_SAVE_ERROR);
-      expect(mapAnalyticsSettingsSaveRejection({ code: 42 })).toBe(ANALYTICS_SETTINGS_SAVE_ERROR);
     });
   });
 

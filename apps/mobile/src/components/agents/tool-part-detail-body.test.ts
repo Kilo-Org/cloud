@@ -1,8 +1,11 @@
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as ReactI18next from 'react-i18next';
 
 import { ToolPartDetailBody } from './tool-part-detail-body';
+import { SuggestToolCardBody } from './suggest-tool-card';
+import { shouldCenterPartDetail } from './part-detail-model';
 import {
   BashToolCardBody,
   EditToolCardBody,
@@ -20,6 +23,14 @@ import {
 import { BashToolCardBody as RealBashToolCardBody } from './tool-cards/bash-tool-card';
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('./suggest-tool-card', () => ({ SuggestToolCardBody: 'SuggestToolCardBody' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('@/components/ui/icons', () => ({ Terminal: 'Terminal' }));
@@ -141,25 +152,8 @@ function findByType(node: unknown, type: string | ToolBody): React.ReactElement[
   return findAll(node, el => el.type === type);
 }
 
-function orderedTypes(node: unknown): (string | React.ComponentType)[] {
-  const types: (string | React.ComponentType)[] = [];
-  function walk(value: unknown): void {
-    if (value == null || typeof value === 'string' || typeof value === 'number') {
-      return;
-    }
-    if (Array.isArray(value)) {
-      for (const child of value) {
-        walk(child);
-      }
-      return;
-    }
-    if (React.isValidElement(value)) {
-      types.push(value.type as string | React.ComponentType);
-      walk((value.props as Record<string, unknown>).children);
-    }
-  }
-  walk(node);
-  return types;
+function orderedTypes(node: unknown): React.ReactElement['type'][] {
+  return findAll(node, () => true).map(el => el.type);
 }
 
 const textChildren = (el: React.ReactElement): unknown =>
@@ -192,6 +186,7 @@ const routingTable: [string, ToolBody][] = [
   ['todoread', TodoToolCardBody],
   ['todowrite', TodoToolCardBody],
   ['task', TaskToolCardBody],
+  ['suggest', SuggestToolCardBody],
 ];
 
 describe('ToolPartDetailBody routing', () => {
@@ -212,37 +207,24 @@ describe('ToolPartDetailBody routing', () => {
     expect(findByType(root, GenericToolCardBody)).toHaveLength(1);
   });
 
-  it('renders no body for suggest parts', () => {
-    const allBodies = [
-      BashToolCardBody,
-      EditToolCardBody,
-      GenericToolCardBody,
-      GlobToolCardBody,
-      GrepToolCardBody,
-      ListToolCardBody,
-      PatchToolCardBody,
-      ReadToolCardBody,
-      TaskToolCardBody,
-      TodoToolCardBody,
-      WebSearchToolCardBody,
-      WriteToolCardBody,
-    ];
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = ToolPartDetailBody({ part: makeToolPart('suggest', completedState) });
-    expect(allBodies.flatMap(body => findByType(root, body))).toHaveLength(0);
-  });
-
-  it('renders attachments above the body when present', () => {
+  it('renders attachments above the body and forwards decode-failure props', () => {
     getToolImageAttachments.mockReturnValue([makeFilePart('img-1', 'image/png')]);
     getToolFileAttachments.mockReturnValue([makeFilePart('file-1', 'application/pdf')]);
+    const part = makeToolPart('bash', completedState);
+    const onImageError = vi.fn<(uri: string) => void>();
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = ToolPartDetailBody({ part: makeToolPart('bash', completedState) });
+    const root = ToolPartDetailBody({ part, imageFailed: true, onImageError });
     expect(orderedTypes(root)).toEqual([
       'View',
       'ToolCardImageAttachments',
       'ToolCardFileAttachments',
       'BashToolCardBody',
     ]);
+    expect(findByType(root, 'ToolCardImageAttachments')[0]?.props).toEqual({
+      part,
+      imageFailed: true,
+      onImageError,
+    });
   });
 });
 
@@ -255,20 +237,20 @@ describe('ToolPartDetailBody status line', () => {
   it('renders the Running… status line for a running part', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ToolPartDetailBody({ part: makeToolPart('bash', runningState) });
-    expect(findAll(root, el => el.type === 'Text' && textChildren(el) === 'Running…')).toHaveLength(
-      1
-    );
-    expect(findAll(root, el => el.type === 'Text' && textChildren(el) === 'Pending…')).toHaveLength(
-      0
-    );
+    expect(
+      findAll(root, el => el.type === 'Text' && textChildren(el) === 'agentChat.partDetail.running')
+    ).toHaveLength(1);
+    expect(
+      findAll(root, el => el.type === 'Text' && textChildren(el) === 'agentChat.partDetail.pending')
+    ).toHaveLength(0);
   });
 
   it('renders the Pending… status line for a pending part', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ToolPartDetailBody({ part: makeToolPart('bash', pendingState) });
-    expect(findAll(root, el => el.type === 'Text' && textChildren(el) === 'Pending…')).toHaveLength(
-      1
-    );
+    expect(
+      findAll(root, el => el.type === 'Text' && textChildren(el) === 'agentChat.partDetail.pending')
+    ).toHaveLength(1);
   });
 
   it('renders no status line for a completed part', () => {
@@ -277,7 +259,9 @@ describe('ToolPartDetailBody status line', () => {
     const statusLines = findAll(
       root,
       el =>
-        el.type === 'Text' && (textChildren(el) === 'Pending…' || textChildren(el) === 'Running…')
+        el.type === 'Text' &&
+        (textChildren(el) === 'agentChat.partDetail.pending' ||
+          textChildren(el) === 'agentChat.partDetail.running')
     );
     expect(statusLines).toHaveLength(0);
   });
@@ -288,10 +272,49 @@ describe('ToolPartDetailBody status line', () => {
     const statusLines = findAll(
       root,
       el =>
-        el.type === 'Text' && (textChildren(el) === 'Pending…' || textChildren(el) === 'Running…')
+        el.type === 'Text' &&
+        (textChildren(el) === 'agentChat.partDetail.pending' ||
+          textChildren(el) === 'agentChat.partDetail.running')
     );
     expect(statusLines).toHaveLength(0);
   });
+});
+
+describe('ToolPartDetailBody error placement', () => {
+  beforeEach(() => {
+    getToolImageAttachments.mockReturnValue([]);
+    getToolFileAttachments.mockReturnValue([]);
+  });
+
+  it.each(routingTable.filter(([tool]) => tool !== 'suggest'))(
+    'centers an error-only %s body',
+    tool => {
+      expect(shouldCenterPartDetail(makeToolPart(tool, errorState), false)).toBe(true);
+    }
+  );
+
+  it('centers an error-only generic body', () => {
+    expect(shouldCenterPartDetail(makeToolPart('custom_tool', errorState), false)).toBe(true);
+  });
+
+  it.each([
+    ['bash', { command: 'pwd' }],
+    ['edit', { oldString: 'old' }],
+    ['edit', { newString: 'new' }],
+    ['patch', { patchText: 'patch' }],
+    ['apply_patch', { patchText: 'patch' }],
+    ['custom_tool', { query: 'data' }],
+    ['write', { content: 'file' }],
+    ['todoread', { todos: [{ content: 'Task' }] }],
+    ['todowrite', { todos: [{ content: 'Task' }] }],
+  ] satisfies [string, Record<string, unknown>][])(
+    'keeps a %s error inline with content',
+    (tool, input) => {
+      expect(shouldCenterPartDetail(makeToolPart(tool, { ...errorState, input }), false)).toBe(
+        false
+      );
+    }
+  );
 });
 
 describe('BashToolCardBody streaming contract', () => {

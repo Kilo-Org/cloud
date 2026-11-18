@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   CloudAgentFailureCodeSchema,
   CloudAgentFailureReasonSchema,
@@ -23,6 +24,10 @@ export const CloudAgentRunFailureClassifications = [
   { failureStage: 'pre_dispatch', failureCode: 'invalid_delivery_request' },
   { failureStage: 'pre_dispatch', failureCode: 'session_metadata_missing' },
   { failureStage: 'pre_dispatch', failureCode: 'model_missing' },
+  { failureStage: 'pre_dispatch', failureCode: 'payment_required' },
+  { failureStage: 'pre_dispatch', failureCode: 'admission_billing_unavailable' },
+  { failureStage: 'pre_dispatch', failureCode: 'container_limit_reached' },
+  { failureStage: 'pre_dispatch', failureCode: 'account_blocked' },
   { failureStage: 'pre_dispatch', failureCode: 'delivery_failure_unknown' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_disconnected' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_no_output' },
@@ -35,6 +40,9 @@ export const CloudAgentRunFailureClassifications = [
   { failureStage: 'agent_activity', failureCode: 'payment_required' },
   { failureStage: 'agent_activity', failureCode: 'model_missing' },
   { failureStage: 'agent_activity', failureCode: 'wrapper_error_after_activity' },
+  { failureStage: 'agent_activity', failureCode: 'wrapper_disconnected' },
+  { failureStage: 'agent_activity', failureCode: 'wrapper_no_output' },
+  { failureStage: 'agent_activity', failureCode: 'wrapper_ping_timeout' },
   { failureStage: 'interruption', failureCode: 'user_interrupt' },
   { failureStage: 'interruption', failureCode: 'container_shutdown' },
   { failureStage: 'interruption', failureCode: 'system_interrupt' },
@@ -47,6 +55,24 @@ export const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const IsoTimestampSchema = z.string().datetime({ offset: true });
 const OperationalIdentifierSchema = z.string().min(1).max(MAX_OPERATIONAL_IDENTIFIER_LENGTH);
+export const CloudAgentRunContainerSchema = z
+  .object({
+    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers']),
+    sandboxId: OperationalIdentifierSchema,
+    allocationId: OperationalIdentifierSchema.optional(),
+    instanceId: OperationalIdentifierSchema.optional(),
+    instanceType: OperationalIdentifierSchema.optional(),
+    region: OperationalIdentifierSchema.optional(),
+    imageRef: z.string().min(1).max(1024).optional(),
+    snapshotId: OperationalIdentifierSchema.optional(),
+    runtimeBuildId: OperationalIdentifierSchema.optional(),
+    startSource: z.enum(['image', 'snapshot']).optional(),
+    runtimeHarness: z.enum(['kilo', 'kilo2']).optional(),
+  })
+  .strict();
+
+export type CloudAgentRunContainer = z.infer<typeof CloudAgentRunContainerSchema>;
+
 const WrapperRunIdentifierSchema = OperationalIdentifierSchema.regex(/^wr_[A-Za-z0-9_-]+$/);
 const validFailureClassifications = new Set(
   CloudAgentRunFailureClassifications.map(
@@ -55,8 +81,27 @@ const validFailureClassifications = new Set(
 );
 
 const CloudAgentQueueSessionIdentitySchema = z
-  .object({ cloudAgentSessionId: OperationalIdentifierSchema })
-  .strict();
+  .object({
+    cloudAgentSessionId: OperationalIdentifierSchema,
+    kiloSessionId: kiloSessionIdSchema.optional(),
+    initialMessageId: OperationalIdentifierSchema.optional(),
+    reportingCreatedAt: IsoTimestampSchema.optional(),
+  })
+  .strict()
+  .superRefine((session, ctx) => {
+    const present = [
+      session.kiloSessionId,
+      session.initialMessageId,
+      session.reportingCreatedAt,
+    ].filter(value => value !== undefined).length;
+    if (present !== 0 && present !== 3) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Reporting anchor fields must be provided together',
+        path: ['kiloSessionId'],
+      });
+    }
+  });
 
 const CloudAgentFailedRunDiagnosticSchema = z
   .object({
@@ -70,6 +115,7 @@ const CloudAgentRunStateSchema = z
     messageId: OperationalIdentifierSchema,
     status: z.enum(CloudAgentRunStatuses),
     wrapperRunId: WrapperRunIdentifierSchema.optional(),
+    container: CloudAgentRunContainerSchema.optional(),
     queuedAt: IsoTimestampSchema.optional(),
     dispatchAcceptedAt: IsoTimestampSchema.optional(),
     agentActivityObservedAt: IsoTimestampSchema.optional(),

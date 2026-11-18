@@ -7,17 +7,19 @@
  */
 
 import type {
+  RefreshGlanceableSessionsParams,
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 export type {
   CloudAgentSessionPushStatus,
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 export type NotificationsBinding = Fetcher & {
+  refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void>;
   sendCloudAgentSessionNotification(
     params: SendCloudAgentSessionNotificationParams
   ): Promise<SendCloudAgentSessionNotificationResult>;

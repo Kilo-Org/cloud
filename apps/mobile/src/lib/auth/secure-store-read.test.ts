@@ -1,0 +1,369 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { INJECTED_FAULT_ERROR_NAME } from '@/lib/telemetry/e2e-fault';
+import { type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
+const getItemAsync = vi.hoisted(() =>
+  vi.fn<(key: string, options?: unknown) => Promise<string | null>>()
+);
+
+vi.mock('expo-secure-store', () => ({
+  getItemAsync,
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+}));
+
+/** A read that rejects, built without `Promise.reject` so the promise rule
+ *  stays satisfied. */
+// eslint-disable-next-line require-await -- an async throw is the rejected promise under test
+async function rejectedRead(message: string): Promise<string | null> {
+  throw new Error(message);
+}
+
+/** A handed-over read that already resolved `null`, built without
+ *  `Promise.resolve` so the promise rule stays satisfied. */
+// eslint-disable-next-line require-await -- an async return is the resolved promise under test
+async function resolvedNullRead(): Promise<string | null> {
+  return null;
+}
+
+/** Replaces the config module before every dynamic import of the helper: the
+ *  real module needs the app build's baked `extra` and cannot load under
+ *  Vitest. Called in each suite's `beforeEach`, so no suite depends on the
+ *  order it runs in. */
+function mockConfig(faultMs: number): void {
+  vi.resetModules();
+  vi.doMock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: faultMs }));
+}
+
+/** Restores the plain registry after a suite, so a later suite's `doMock`
+ *  never inherits this one's registration. */
+function restoreConfig(): void {
+  vi.doUnmock('@/lib/config');
+  vi.resetModules();
+}
+
+async function loadHelper() {
+  const mod = await import('./secure-store-read');
+  return mod.readStoredValueWithRetry;
+}
+
+async function loadNullRetryHelper() {
+  const mod = await import('./secure-store-read');
+  return mod.readStoredValueRetryingNull;
+}
+
+describe('readStoredValueRetryingNull', () => {
+  beforeEach(() => {
+    mockConfig(0);
+    // `mockReset` instead of `clearAllMocks`: one-time implementations queued
+    // by a previous test (`mockRejectedValueOnce`) must not leak into this
+    // suite's defaults.
+    getItemAsync.mockReset();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    restoreConfig();
+  });
+
+  it('returns the value on a healthy first read without waiting', async () => {
+    getItemAsync.mockResolvedValue('stored-token');
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    await expect(readStoredValueRetryingNull('auth-token')).resolves.toBe('stored-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a null and returns the value a later attempt resolves', async () => {
+    getItemAsync
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue('stored-token');
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const read = readStoredValueRetryingNull('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns null after four null resolutions on the 250/500/1000 ms cadence', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const read = readStoredValueRetryingNull('auth-token');
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(getItemAsync).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(getItemAsync).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+
+    // Four attempts is the whole budget: the last null is the answer, and no
+    // further read is issued.
+    await expect(read).resolves.toBeNull();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+  });
+
+  it('propagates a rejection after the budget', async () => {
+    getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const settled = expect(readStoredValueRetryingNull('auth-token')).rejects.toThrow(
+      'keychain unavailable'
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await settled;
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+  });
+
+  it('retries a null first attempt with a fresh read', async () => {
+    getItemAsync.mockResolvedValue('fresh-token');
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const read = readStoredValueRetryingNull('auth-token', undefined, resolvedNullRead());
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(read).resolves.toBe('fresh-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('readStoredValueWithRetry', () => {
+  let events: TelemetryEvent[] = [];
+
+  beforeEach(async () => {
+    mockConfig(0);
+    // `mockReset` instead of `clearAllMocks`: one-time implementations queued
+    // by a previous test (`mockRejectedValueOnce`) must not leak into this
+    // suite's defaults.
+    getItemAsync.mockReset();
+    vi.useFakeTimers();
+    events = [];
+    // `resetModules` gives the helper imported by every test its own fresh
+    // error-sink registry, so the sink is installed on that fresh module —
+    // the same import hands back the instance the helper will read.
+    const { setTelemetrySink: setFreshTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    setFreshTelemetrySink(event => {
+      events.push(event);
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    restoreConfig();
+  });
+
+  it('returns the value on a healthy first read without waiting', async () => {
+    getItemAsync.mockResolvedValue('stored-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    await expect(readStoredValueWithRetry('auth-token')).resolves.toBe('stored-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    expect(getItemAsync).toHaveBeenCalledWith('auth-token');
+  });
+
+  it('passes a null resolution straight through and never retries it', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const readStoredValueWithRetry = await loadHelper();
+
+    await expect(readStoredValueWithRetry('auth-token')).resolves.toBeNull();
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers after transient rejections', async () => {
+    getItemAsync
+      .mockRejectedValueOnce(new Error('keychain unavailable'))
+      .mockRejectedValueOnce(new Error('keychain unavailable'))
+      .mockResolvedValue('stored-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    const read = readStoredValueWithRetry('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(3);
+  });
+
+  it('backs off 250/500/1000 ms and exhausts four attempts before throwing', async () => {
+    getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const readStoredValueWithRetry = await loadHelper();
+
+    // The assertion is attached before the timers run so the rejection is
+    // never momentarily unobserved.
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
+      'keychain unavailable'
+    );
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(getItemAsync).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(getItemAsync).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+
+    // Four attempts is the whole budget: the last error is the answer.
+    await settled;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+  });
+
+  it('reports the exhausted read exactly once at warning level with the stable fingerprint', async () => {
+    getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const readStoredValueWithRetry = await loadHelper();
+
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
+      'keychain unavailable'
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    await settled;
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'secure_store',
+      'error.operation': 'read',
+    });
+    // The key is never attached to the report.
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
+  });
+
+  // The gate is imported like the helper, after the suite's registry resets, so
+  // both share one module instance.
+  it('fails at once and unreported while the device is locked, without calling the keychain', async () => {
+    const { ProtectedDataUnavailableError, setProtectedDataAvailable } =
+      await import('@/lib/protected-data');
+    const readStoredValueWithRetry = await loadHelper();
+    setProtectedDataAvailable(false);
+    try {
+      await expect(readStoredValueWithRetry('auth-token')).rejects.toBeInstanceOf(
+        ProtectedDataUnavailableError
+      );
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+  });
+
+  it('stops retrying when the device locks during the reads and reports nothing', async () => {
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    getItemAsync.mockImplementation(async () => {
+      setProtectedDataAvailable(false);
+      await Promise.resolve();
+      throw new Error('User interaction is not allowed.');
+    });
+    const readStoredValueWithRetry = await loadHelper();
+    try {
+      await expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
+        'User interaction is not allowed.'
+      );
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+  });
+
+  it('reports nothing when a retry recovers the read', async () => {
+    getItemAsync
+      .mockRejectedValueOnce(new Error('keychain unavailable'))
+      .mockResolvedValue('stored-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    const read = readStoredValueWithRetry('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+    expect(events).toHaveLength(0);
+  });
+
+  it('uses the handed-over first attempt and issues fresh reads for the retries', async () => {
+    getItemAsync.mockResolvedValue('fresh-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    await expect(
+      readStoredValueWithRetry('auth-token', undefined, Promise.resolve('preloaded-token'))
+    ).resolves.toBe('preloaded-token');
+    expect(getItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('retries a rejected first attempt with a fresh read', async () => {
+    getItemAsync.mockResolvedValue('fresh-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    const read = readStoredValueWithRetry(
+      'auth-token',
+      undefined,
+      rejectedRead('keychain unavailable')
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('fresh-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards the SecureStore options to every read', async () => {
+    getItemAsync.mockRejectedValueOnce(new Error('keychain unavailable')).mockResolvedValue('v');
+    const readStoredValueWithRetry = await loadHelper();
+
+    const read = readStoredValueWithRetry('auth-token', {
+      keychainService: 'kilo',
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('v');
+    expect(getItemAsync).toHaveBeenNthCalledWith(2, 'auth-token', { keychainService: 'kilo' });
+  });
+
+  it('rejects every read while the E2E fault window is open', async () => {
+    mockConfig(60_000);
+    getItemAsync.mockResolvedValue('stored-token');
+    // The fresh registry has no sink yet: re-install it on the reloaded
+    // error-sink module before the read runs.
+    const { setTelemetrySink: setFreshTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    setFreshTelemetrySink(event => {
+      events.push(event);
+    });
+    const readStoredValueWithRetry = await loadHelper();
+
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toMatchObject({
+      name: INJECTED_FAULT_ERROR_NAME,
+      message: 'E2E secure-store fault window is open: read rejected',
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await settled;
+    // The fault is the reason: the real store is never asked.
+    expect(getItemAsync).not.toHaveBeenCalled();
+    // The exhausted-read report attaches the fault error, so that error must
+    // carry no key — the same invariant the real store's error keeps.
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
+  });
+
+  it('reads normally once the E2E fault window has elapsed', async () => {
+    mockConfig(1000);
+    getItemAsync.mockResolvedValue('stored-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    // The window opens at module load; the 250 ms backoff alone is not enough
+    // to leave it, the 500 ms one is.
+    const read = readStoredValueWithRetry('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+  });
+});

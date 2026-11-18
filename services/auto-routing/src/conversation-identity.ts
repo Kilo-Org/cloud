@@ -38,14 +38,6 @@ export function deriveConversationKey(
   return `user:${identity.userId}:${conversationScope}`;
 }
 
-// The conversation key embeds the raw user id (and the client IP for
-// anonymous users), which must not leave our infrastructure. Outbound
-// session affinity (OpenRouter sticky routing) gets a hash with the same
-// per-conversation stability instead.
-export function deriveOutboundSessionId(conversationKey: string): Promise<string> {
-  return sha256Hex16(conversationKey);
-}
-
 // One-way hash for identifiers that appear in telemetry (logs, analytics):
 // preserves correlation across events without persisting the raw id, which
 // for anonymous users embeds the client IP. Raw identity stays confined to

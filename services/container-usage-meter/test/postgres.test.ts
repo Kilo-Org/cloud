@@ -10,13 +10,18 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import {
+  heartbeatAckSchema,
   heartbeatIdempotencyKey,
   startIdempotencyKey,
   stopIdempotencyKey,
   usageContextFingerprint,
 } from '@kilocode/container-usage';
-import { eq } from 'drizzle-orm';
-import { MINIMUM_REMAINING_MICRODOLLARS, type BillingConfig } from '../src/billing-config';
+import { eq, sql } from 'drizzle-orm';
+import {
+  billingConfigFromEnv,
+  MINIMUM_REMAINING_MICRODOLLARS,
+  type BillingConfig,
+} from '../src/billing-config';
 import {
   applyHeartbeatWithDb,
   applyStartWithDb,
@@ -44,6 +49,8 @@ const paidBillingConfig: BillingConfig = {
   services: new Set(['cloud-agent-next']),
   userIds: new Set([userId]),
   orgIds: new Set([organizationId]),
+  cloudAgentUserIds: new Set([userId]),
+  cloudAgentOrgIds: new Set([organizationId]),
   warnRemainingMicrodollars: 10_000_000,
   enabled: true,
 };
@@ -224,7 +231,7 @@ describe('container usage PostgreSQL application', () => {
     expect(segments).toHaveLength(3);
   });
 
-  it('settles paid personal usage once, stops at the floor, and rejects another start at the floor', async () => {
+  it('settles usage once, admits exactly at the floor, and stops and rejects below it', async () => {
     const startEpochMs = Date.now();
     const paidContext = { ...context, instanceId: `paid-user-${suffix}`, sku: paidSkuId };
     const paidFingerprint = await usageContextFingerprint(paidContext);
@@ -247,7 +254,27 @@ describe('container usage PostgreSQL application', () => {
         startEpochMs,
         paidBillingConfig
       )
-    ).resolves.toEqual({ kind: 'applied', dedup: false, billingMode: 'paid' });
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 10_050_000,
+    });
+    await expect(
+      applyStartWithDb(
+        client.db,
+        start,
+        paidIntervalId,
+        paidFingerprint,
+        startEpochMs + 1,
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: true,
+      billingMode: 'paid',
+      remainingMicrodollars: 10_050_000,
+    });
 
     const heartbeat = {
       service: paidContext.service,
@@ -327,7 +354,7 @@ describe('container usage PostgreSQL application', () => {
         paidBillingConfig
       )
     ).resolves.toMatchObject({
-      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
+      budget: { verdict: 'warn', remainingMicrodollars: 5_000_000 },
     });
     const [user] = await client.db
       .select({ used: kilocode_users.microdollars_used })
@@ -335,16 +362,80 @@ describe('container usage PostgreSQL application', () => {
       .where(eq(kilocode_users.id, userId));
     expect(user?.used).toBe(5_050_000);
 
+    const retryContext = { ...paidContext, instanceId: `paid-user-retry-${suffix}` };
+    const retryEpoch = startEpochMs + 1;
+    const retryIntervalId = `cloud-agent-next:${retryContext.instanceId}:${retryEpoch}`;
+    const retryFingerprint = await usageContextFingerprint(retryContext);
+    const retryStart = {
+      ...retryContext,
+      startEpochMs: retryEpoch,
+      idempotencyKey: startIdempotencyKey(
+        retryContext.service,
+        retryContext.instanceId,
+        retryEpoch
+      ),
+    };
     await expect(
       applyStartWithDb(
         client.db,
-        { ...start, instanceId: `paid-user-retry-${suffix}`, startEpochMs: startEpochMs + 1 },
-        `cloud-agent-next:paid-user-retry-${suffix}:${startEpochMs + 1}`,
-        await usageContextFingerprint({ ...paidContext, instanceId: `paid-user-retry-${suffix}` }),
-        startEpochMs + 1,
+        retryStart,
+        retryIntervalId,
+        retryFingerprint,
+        retryEpoch,
         paidBillingConfig
       )
-    ).resolves.toMatchObject({ kind: 'rejected', code: 'insufficient_credits' });
+    ).resolves.toMatchObject({
+      kind: 'applied',
+      billingMode: 'paid',
+      remainingMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+    });
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: retryContext.service,
+          instanceId: retryContext.instanceId,
+          startEpochMs: retryEpoch,
+          idempotencyKey: heartbeatIdempotencyKey(
+            retryContext.service,
+            retryContext.instanceId,
+            retryEpoch,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          context: retryContext,
+        },
+        retryIntervalId,
+        retryFingerprint,
+        retryEpoch + 1_000,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({ budget: { verdict: 'stop', remainingMicrodollars: 4_990_000 } });
+    const rejectedContext = { ...paidContext, instanceId: `paid-user-below-${suffix}` };
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...rejectedContext,
+          startEpochMs: retryEpoch,
+          idempotencyKey: startIdempotencyKey(
+            rejectedContext.service,
+            rejectedContext.instanceId,
+            retryEpoch
+          ),
+        },
+        `cloud-agent-next:${rejectedContext.instanceId}:${retryEpoch}`,
+        await usageContextFingerprint(rejectedContext),
+        retryEpoch,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'insufficient_credits',
+      remainingMicrodollars: 4_990_000,
+      minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+    });
   });
 
   it('settles paid organization usage against its aggregate wallet', async () => {
@@ -365,22 +456,29 @@ describe('container usage PostgreSQL application', () => {
       startEpochMs,
       1
     );
-    await applyStartWithDb(
-      client.db,
-      {
-        ...organizationContext,
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...organizationContext,
+          startEpochMs,
+          idempotencyKey: startIdempotencyKey(
+            organizationContext.service,
+            organizationContext.instanceId,
+            startEpochMs
+          ),
+        },
+        organizationIntervalId,
+        organizationFingerprint,
         startEpochMs,
-        idempotencyKey: startIdempotencyKey(
-          organizationContext.service,
-          organizationContext.instanceId,
-          startEpochMs
-        ),
-      },
-      organizationIntervalId,
-      organizationFingerprint,
-      startEpochMs,
-      paidBillingConfig
-    );
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 5_100_000,
+    });
     await expect(
       applyHeartbeatWithDb(
         client.db,
@@ -424,6 +522,253 @@ describe('container usage PostgreSQL application', () => {
       rate_cents_per_unit: '1.000000000000',
       amount_microdollars: 200_000,
     });
+  });
+
+  it('reports a zero balance in stop verdicts when a settlement overdraws a personal wallet', async () => {
+    const startEpochMs = Date.now();
+    const overdrawContext = { ...context, instanceId: `overdraw-user-${suffix}`, sku: paidSkuId };
+    const overdrawFingerprint = await usageContextFingerprint(overdrawContext);
+    const overdrawIntervalId = `cloud-agent-next:${overdrawContext.instanceId}:${startEpochMs}`;
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_000_000, microdollars_used: 0 })
+      .where(eq(kilocode_users.id, userId));
+
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...overdrawContext,
+          startEpochMs,
+          idempotencyKey: startIdempotencyKey(
+            overdrawContext.service,
+            overdrawContext.instanceId,
+            startEpochMs
+          ),
+        },
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs,
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 10_000_000,
+    });
+
+    const heartbeat = {
+      service: overdrawContext.service,
+      instanceId: overdrawContext.instanceId,
+      startEpochMs,
+      idempotencyKey: heartbeatIdempotencyKey(
+        overdrawContext.service,
+        overdrawContext.instanceId,
+        startEpochMs,
+        1
+      ),
+      seq: 1,
+      usageSinceLast: 12,
+      context: overdrawContext,
+    };
+    // 12 seconds at 1 cent per second is 120,000 microdollars of usage against
+    // a wallet holding 100,000; the settlement overdraws the stored balance.
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_000_000, microdollars_used: 9_900_000 })
+      .where(eq(kilocode_users.id, userId));
+    const ack = await applyHeartbeatWithDb(
+      client.db,
+      heartbeat,
+      overdrawIntervalId,
+      overdrawFingerprint,
+      startEpochMs + 12_000,
+      paidBillingConfig
+    );
+    expect(ack).toMatchObject({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      budget: { verdict: 'stop', remainingMicrodollars: 0 },
+    });
+    // The verdict must satisfy the shared heartbeat contract at a negative balance.
+    expect(
+      heartbeatAckSchema.safeParse({
+        intervalId: overdrawIntervalId,
+        durable: 'pg',
+        dedup: ack.dedup,
+        billingMode: ack.billingMode,
+        budget: ack.budget,
+      }).success
+    ).toBe(true);
+
+    const [user] = await client.db
+      .select({ used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId));
+    expect(user?.used).toBe(10_020_000);
+
+    // A resend of the settled sequence must produce the same parseable verdict.
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        heartbeat,
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs + 12_000,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({
+      dedup: true,
+      budget: { verdict: 'stop', remainingMicrodollars: 0 },
+    });
+
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, overdrawIntervalId));
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_050_000, microdollars_used: 5_050_000 })
+      .where(eq(kilocode_users.id, userId));
+  });
+
+  it('reports a zero balance in stop verdicts when a settlement overdraws an organization wallet', async () => {
+    const startEpochMs = Date.now();
+    const overdrawContext = {
+      service: context.service,
+      instanceId: `overdraw-org-${suffix}`,
+      sku: paidSkuId,
+      subject: { type: 'org' as const, id: organizationId },
+      actor: { type: 'bot' as const, id: `meter-bot-${suffix}` },
+      onBehalfOf: { type: 'org' as const, id: organizationId },
+    };
+    const overdrawFingerprint = await usageContextFingerprint(overdrawContext);
+    const overdrawIntervalId = `cloud-agent-next:${overdrawContext.instanceId}:${startEpochMs}`;
+    await client.db
+      .update(organizations)
+      .set({
+        total_microdollars_acquired: 5_050_000,
+        microdollars_used: 0,
+        microdollars_balance: 5_050_000,
+      })
+      .where(eq(organizations.id, organizationId));
+
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...overdrawContext,
+          startEpochMs,
+          idempotencyKey: startIdempotencyKey(
+            overdrawContext.service,
+            overdrawContext.instanceId,
+            startEpochMs
+          ),
+        },
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs,
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 5_050_000,
+    });
+
+    // Leave the wallet with 50,000 microdollars so the 8-second settlement
+    // overdraws it.
+    await client.db
+      .update(organizations)
+      .set({ microdollars_used: 5_000_000, microdollars_balance: 50_000 })
+      .where(eq(organizations.id, organizationId));
+
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: overdrawContext.service,
+          instanceId: overdrawContext.instanceId,
+          startEpochMs,
+          idempotencyKey: heartbeatIdempotencyKey(
+            overdrawContext.service,
+            overdrawContext.instanceId,
+            startEpochMs,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 8,
+          context: overdrawContext,
+        },
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs + 8_000,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      budget: { verdict: 'stop', remainingMicrodollars: 0 },
+    });
+
+    const [organization] = await client.db
+      .select({
+        used: organizations.microdollars_used,
+        balance: organizations.microdollars_balance,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    expect(organization).toEqual({ used: 5_080_000, balance: -30_000 });
+
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, overdrawIntervalId));
+    await client.db
+      .update(organizations)
+      .set({
+        total_microdollars_acquired: 5_100_000,
+        microdollars_used: 200_000,
+        microdollars_balance: 4_900_000,
+      })
+      .where(eq(organizations.id, organizationId));
+  });
+
+  it('reports a zero balance when admission rejects an overdrawn wallet', async () => {
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 4_000_000, microdollars_used: 4_500_000 })
+      .where(eq(kilocode_users.id, userId));
+    const rejectedContext = { ...context, instanceId: `overdraw-reject-${suffix}`, sku: paidSkuId };
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...rejectedContext,
+          startEpochMs: 1,
+          idempotencyKey: startIdempotencyKey(
+            rejectedContext.service,
+            rejectedContext.instanceId,
+            1
+          ),
+        },
+        `cloud-agent-next:${rejectedContext.instanceId}:1`,
+        await usageContextFingerprint(rejectedContext),
+        1_000,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'insufficient_credits',
+      remainingMicrodollars: 0,
+      minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+    });
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_050_000, microdollars_used: 5_050_000 })
+      .where(eq(kilocode_users.id, userId));
   });
 
   it('locks the open interval before the payer during paid supersede admission', async () => {
@@ -517,6 +862,7 @@ describe('container usage PostgreSQL application', () => {
       kind: 'applied',
       dedup: false,
       billingMode: 'paid',
+      remainingMicrodollars: 20_000_000,
     });
     await client.db
       .delete(container_usage_interval)
@@ -772,6 +1118,196 @@ describe('container usage PostgreSQL application', () => {
       .where(eq(container_usage_interval.id, recoveryId));
   });
 
+  it('clips a reported total that includes seconds before the interval receipt', async () => {
+    await client.db
+      .update(cloud_billing_sku)
+      .set({ accepts_new_usage: true })
+      .where(eq(cloud_billing_sku.id, skuId));
+    const clipContext = { ...context, instanceId: `clip-before-receipt-${suffix}` };
+    const clipFingerprint = await usageContextFingerprint(clipContext);
+    const clipId = `cloud-agent-next:${clipContext.instanceId}:1000`;
+    const startEpochMs = 1_000;
+    const receivedAtMs = 5_000;
+    await applyStartWithDb(
+      client.db,
+      {
+        ...clipContext,
+        startEpochMs,
+        idempotencyKey: startIdempotencyKey(
+          clipContext.service,
+          clipContext.instanceId,
+          startEpochMs
+        ),
+      },
+      clipId,
+      clipFingerprint,
+      receivedAtMs
+    );
+
+    await applyHeartbeatWithDb(
+      client.db,
+      {
+        service: clipContext.service,
+        instanceId: clipContext.instanceId,
+        startEpochMs,
+        idempotencyKey: heartbeatIdempotencyKey(
+          clipContext.service,
+          clipContext.instanceId,
+          startEpochMs,
+          1
+        ),
+        seq: 1,
+        usageSinceLast: 50,
+        context: clipContext,
+      },
+      clipId,
+      clipFingerprint,
+      receivedAtMs + 10_000
+    );
+
+    const [interval] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, clipId));
+    expect(interval).toMatchObject({ status: 'open', confirmed_seconds: 10 });
+    const [segment] = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, clipId));
+    expect(segment).toMatchObject({ reported_seconds: 50, usage_seconds: 10 });
+    await client.db.delete(container_usage_interval).where(eq(container_usage_interval.id, clipId));
+  });
+
+  it('persists the full reported seconds when the report is entirely after the receipt', async () => {
+    await client.db
+      .update(cloud_billing_sku)
+      .set({ accepts_new_usage: true })
+      .where(eq(cloud_billing_sku.id, skuId));
+    const fullContext = { ...context, instanceId: `clip-after-receipt-${suffix}` };
+    const fullFingerprint = await usageContextFingerprint(fullContext);
+    const fullId = `cloud-agent-next:${fullContext.instanceId}:1000`;
+    const startEpochMs = 1_000;
+    await applyStartWithDb(
+      client.db,
+      {
+        ...fullContext,
+        startEpochMs,
+        idempotencyKey: startIdempotencyKey(
+          fullContext.service,
+          fullContext.instanceId,
+          startEpochMs
+        ),
+      },
+      fullId,
+      fullFingerprint,
+      startEpochMs
+    );
+
+    await applyHeartbeatWithDb(
+      client.db,
+      {
+        service: fullContext.service,
+        instanceId: fullContext.instanceId,
+        startEpochMs,
+        idempotencyKey: heartbeatIdempotencyKey(
+          fullContext.service,
+          fullContext.instanceId,
+          startEpochMs,
+          1
+        ),
+        seq: 1,
+        usageSinceLast: 50,
+        context: fullContext,
+      },
+      fullId,
+      fullFingerprint,
+      startEpochMs + 60_000
+    );
+
+    const [interval] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, fullId));
+    expect(interval).toMatchObject({ status: 'open', confirmed_seconds: 50 });
+    const [segment] = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, fullId));
+    expect(segment).toMatchObject({ reported_seconds: 50, usage_seconds: 50 });
+    await client.db.delete(container_usage_interval).where(eq(container_usage_interval.id, fullId));
+  });
+
+  it('recovers an unstored interval from the stop context and applies the stop segment', async () => {
+    const recoveryContext = { ...context, instanceId: `stop-context-recovery-${suffix}` };
+    const recoveryFingerprint = await usageContextFingerprint(recoveryContext);
+    const startEpochMs = 1_234;
+    const receivedAtMs = 20_000;
+    const recoveryId = `cloud-agent-next:${recoveryContext.instanceId}:${startEpochMs}`;
+    const stop = {
+      service: recoveryContext.service,
+      instanceId: recoveryContext.instanceId,
+      startEpochMs,
+      idempotencyKey: stopIdempotencyKey(
+        recoveryContext.service,
+        recoveryContext.instanceId,
+        startEpochMs
+      ),
+      seq: 1,
+      usageSinceLast: 300,
+      reason: 'exit' as const,
+      exitCode: 0,
+      context: recoveryContext,
+    };
+
+    await expect(
+      applyStopWithDb(client.db, stop, recoveryId, recoveryFingerprint, receivedAtMs)
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'shadow',
+      budget: { verdict: 'continue' },
+    });
+    await expect(
+      applyStopWithDb(client.db, stop, recoveryId, recoveryFingerprint, receivedAtMs + 1_000)
+    ).resolves.toMatchObject({ kind: 'applied', dedup: true, billingMode: 'shadow' });
+
+    const [recovered] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+    expect(recovered).toMatchObject({
+      status: 'closed',
+      close_reason: 'exit',
+      start_epoch_ms: startEpochMs,
+      context_fingerprint: recoveryFingerprint,
+      subject_type: recoveryContext.subject.type,
+      subject_id: recoveryContext.subject.id,
+      actor_type: recoveryContext.actor.type,
+      actor_id: recoveryContext.actor.id,
+      confirmed_seconds: 0,
+    });
+    expect(new Date(recovered.started_at).getTime()).toBe(receivedAtMs);
+    expect(new Date(recovered.last_seen_at).getTime()).toBe(receivedAtMs);
+    const [segment] = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, recoveryId));
+    expect(segment).toMatchObject({
+      seq: 1,
+      idempotency_key: heartbeatIdempotencyKey(
+        recoveryContext.service,
+        recoveryContext.instanceId,
+        startEpochMs,
+        1
+      ),
+      reported_seconds: 300,
+      usage_seconds: 0,
+    });
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+  });
+
   it('rejects missing-interval recovery when a newer generation owns the open slot', async () => {
     await client.db
       .update(cloud_billing_sku)
@@ -930,6 +1466,12 @@ describe('container usage PostgreSQL application', () => {
       raceFingerprint,
       2_000
     );
+    // Attach the rejection assertion before releasing the blocker: otherwise the
+    // expected conflict can reject before it is awaited and Vitest reports it as
+    // an unhandled rejection.
+    const contenderRejection = expect(contender).rejects.toThrow(
+      'Another usage interval is already open'
+    );
     await expect
       .poll(async () => {
         const result = await client.pool.query<{ count: string }>(
@@ -945,7 +1487,7 @@ describe('container usage PostgreSQL application', () => {
     releaseBlocker();
     await blocker;
 
-    await expect(contender).rejects.toThrow('Another usage interval is already open');
+    await contenderRejection;
     const contenders = await client.db
       .select()
       .from(container_usage_interval)
@@ -1031,6 +1573,137 @@ describe('container usage PostgreSQL application', () => {
     await client.db
       .delete(container_usage_interval)
       .where(eq(container_usage_interval.id, targetId));
+  });
+
+  it('opens wildcard-enrolled paid compute and stops future debits with the scoped emergency SQL', async () => {
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 20_000_000, microdollars_used: 0 })
+      .where(eq(kilocode_users.id, userId));
+    const config = billingConfigFromEnv({
+      CONTAINER_BILLING_SERVICES: 'cloud-agent-next,gastown',
+      CONTAINER_BILLING_USER_IDS: userId,
+      CONTAINER_BILLING_ORG_IDS: '',
+      CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: '*',
+      CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: '',
+      CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+    });
+    const startEpochMs = Date.now();
+    const native = {
+      ...context,
+      service: 'cloud-agent-next-sandbox-containers-standard3',
+      instanceId: `emergency-${suffix}`,
+      sku: paidSkuId,
+    };
+    const gastown = {
+      ...context,
+      service: 'gastown',
+      instanceId: `emergency-gastown-${suffix}`,
+      sku: paidSkuId,
+    };
+    const nativeId = `${native.service}:${native.instanceId}:${startEpochMs}`;
+    const gastownId = `${gastown.service}:${gastown.instanceId}:${startEpochMs}`;
+    const nativeFingerprint = await usageContextFingerprint(native);
+    for (const [usage, id] of [
+      [native, nativeId],
+      [gastown, gastownId],
+    ] as const) {
+      expect(
+        await applyStartWithDb(
+          client.db,
+          {
+            ...usage,
+            startEpochMs,
+            idempotencyKey: startIdempotencyKey(usage.service, usage.instanceId, startEpochMs),
+          },
+          id,
+          await usageContextFingerprint(usage),
+          startEpochMs,
+          config
+        )
+      ).toMatchObject({ kind: 'applied', billingMode: 'paid' });
+    }
+    const beat = (seq: number) =>
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: native.service,
+          instanceId: native.instanceId,
+          startEpochMs,
+          seq,
+          idempotencyKey: heartbeatIdempotencyKey(
+            native.service,
+            native.instanceId,
+            startEpochMs,
+            seq
+          ),
+          usageSinceLast: 10,
+          context: native,
+        },
+        nativeId,
+        nativeFingerprint,
+        startEpochMs + seq * 10_000,
+        config
+      );
+    await beat(1);
+    const [before] = await client.db
+      .select({ used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId));
+    expect(before.used).toBe(100_000);
+    await client.db.transaction(tx =>
+      tx.execute(sql`
+      UPDATE container_usage_interval
+      SET billing_mode = 'shadow', rate_cents_per_unit = NULL
+      WHERE status = 'open' AND billing_mode = 'paid'
+        AND service LIKE 'cloud-agent-next-%'
+    `)
+    );
+    expect(await beat(2)).toMatchObject({ billingMode: 'shadow', budget: { verdict: 'continue' } });
+    const [after] = await client.db
+      .select({ used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId));
+    expect(after.used).toBe(before.used);
+    const charges = await client.db
+      .select()
+      .from(compute_usage_charge)
+      .where(
+        eq(
+          compute_usage_charge.usage_source_id,
+          heartbeatIdempotencyKey(native.service, native.instanceId, startEpochMs, 1)
+        )
+      );
+    expect(charges).toHaveLength(1);
+    expect(charges[0].amount_microdollars).toBe(100_000);
+    const uncharged = await client.db
+      .select()
+      .from(compute_usage_charge)
+      .where(
+        eq(
+          compute_usage_charge.usage_source_id,
+          heartbeatIdempotencyKey(native.service, native.instanceId, startEpochMs, 2)
+        )
+      );
+    expect(uncharged).toHaveLength(0);
+    const [converted] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, nativeId));
+    expect(converted).toMatchObject({
+      billing_mode: 'shadow',
+      rate_cents_per_unit: null,
+      confirmed_seconds: 20,
+      settled_billable_seconds: 10,
+    });
+    const [untouched] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, gastownId));
+    expect(untouched).toMatchObject({
+      billing_mode: 'paid',
+      rate_cents_per_unit: '1.000000000000',
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createLinearBotLinkState } from '@/lib/bot/linear-link-state';
 import { verifyLinearLinkToken } from '@/lib/bot/linear-link-token';
 import {
@@ -9,11 +9,11 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { getLinearUserOAuthUrl } from '@/lib/integrations/linear-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { failureResult } from '@/lib/maybe-result';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 const mockIsEnabledForBot = jest.fn();
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/bot/linear-link-state');
 jest.mock('@/lib/bot/linear-link-token');
 jest.mock('@/lib/bot/platform-helpers');

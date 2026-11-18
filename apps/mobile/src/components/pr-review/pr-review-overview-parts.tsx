@@ -4,19 +4,33 @@ import {
   GitMerge,
   GitPullRequest,
   type LucideIcon,
-  Plus,
+  UserRound,
 } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatNumber } from '@/lib/format';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
 
+type PrStateChipLabelKey =
+  | 'prReview.overview.stateMerged'
+  | 'common.closed'
+  | 'common.draft'
+  | 'prReview.overview.stateOpenApproved'
+  | 'prReview.overview.stateOpenChangesRequested'
+  | 'prReview.overview.stateOpenReviewRequired'
+  | 'prReview.overview.stateOpen';
+
 type PrStateChipDescriptor = {
-  label: string;
+  labelKey: PrStateChipLabelKey;
   tone: PrStateChipTone;
   icon: LucideIcon;
 };
@@ -27,31 +41,39 @@ export function describePrState(args: {
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 }): PrStateChipDescriptor {
   if (args.state === 'merged') {
-    return { label: 'Merged', tone: 'muted', icon: GitMerge };
+    return { labelKey: 'prReview.overview.stateMerged', tone: 'muted', icon: GitMerge };
   }
   if (args.state === 'closed') {
-    return { label: 'Closed', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'common.closed', tone: 'muted', icon: GitPullRequest };
   }
   if (args.draft) {
-    return { label: 'Draft', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'common.draft', tone: 'muted', icon: GitPullRequest };
   }
   // state === 'open'
   if (args.reviewDecision === 'APPROVED') {
-    return { label: 'Open · Approved', tone: 'good', icon: GitPullRequest };
+    return { labelKey: 'prReview.overview.stateOpenApproved', tone: 'good', icon: GitPullRequest };
   }
   if (args.reviewDecision === 'CHANGES_REQUESTED') {
-    return { label: 'Open · Changes requested', tone: 'destructive', icon: GitPullRequest };
+    return {
+      labelKey: 'prReview.overview.stateOpenChangesRequested',
+      tone: 'destructive',
+      icon: GitPullRequest,
+    };
   }
   if (args.reviewDecision === 'REVIEW_REQUIRED') {
-    return { label: 'Open · Review required', tone: 'warn', icon: GitPullRequest };
+    return {
+      labelKey: 'prReview.overview.stateOpenReviewRequired',
+      tone: 'warn',
+      icon: GitPullRequest,
+    };
   }
-  return { label: 'Open', tone: 'muted', icon: GitPullRequest };
+  return { labelKey: 'prReview.overview.stateOpen', tone: 'muted', icon: GitPullRequest };
 }
 
-// Theme colors are CSS variables — Tailwind opacity modifiers like
-// `bg-good/10` don't work on them. The chip uses a flat muted background
-// and lets the foreground color carry the tone so it stays legible in
-// both themes without needing per-tone backgrounds.
+// Theme colors are CSS variables, so Tailwind opacity modifiers on them are
+// silently dropped. The chip uses a flat muted background and lets the
+// foreground color carry the tone so it stays legible in both themes
+// without needing per-tone backgrounds.
 const TONE_FG_CLASS = {
   good: 'text-good',
   warn: 'text-warn',
@@ -59,14 +81,65 @@ const TONE_FG_CLASS = {
   muted: 'text-muted-foreground',
 } satisfies Record<PrStateChipTone, string>;
 
+// Lucide icons do not take a `className` color, so the icon reads its tone
+// from the theme color token instead of a Tailwind text class.
+const TONE_FG_COLOR = {
+  good: 'good',
+  warn: 'warn',
+  destructive: 'destructive',
+  muted: 'mutedForeground',
+} satisfies Record<PrStateChipTone, keyof ThemeColors>;
+
 export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDescriptor }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
   const Icon = descriptor.icon;
   return (
     <View className="flex-row items-center gap-1.5 self-start rounded-full bg-secondary px-2.5 py-1">
-      <Icon size={12} className={TONE_FG_CLASS[descriptor.tone]} />
+      <Icon size={12} color={colors[TONE_FG_COLOR[descriptor.tone]]} />
       <Text className={cn('text-xs font-medium', TONE_FG_CLASS[descriptor.tone])}>
-        {descriptor.label}
+        {t(descriptor.labelKey)}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * A GitHub account's avatar at the size every PR-review row uses. Falls back to
+ * the account's initial on a filled disc when GitHub reports no avatar, so a
+ * row without a picture still reads as a person instead of an empty circle.
+ * The fallback is decoration: the login beside it is the text a reader gets, so
+ * the disc stays out of both accessibility trees instead of adding a lone
+ * initial to a row that is announced as one element.
+ */
+export function PrAvatar({
+  avatarUrl,
+  login,
+}: Readonly<{ avatarUrl: string | null; login: string | null }>) {
+  const colors = useThemeColors();
+  if (avatarUrl) {
+    return (
+      <Image
+        source={{ uri: avatarUrl }}
+        className="size-6 rounded-full"
+        transition={0}
+        cachePolicy="memory"
+        accessibilityIgnoresInvertColors
+      />
+    );
+  }
+  const initial = login?.trim().charAt(0).toLocaleUpperCase(i18n.language);
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="size-6 items-center justify-center rounded-full bg-secondary-fill"
+    >
+      {initial ? (
+        <Text className="text-[11px] font-semibold text-secondary-foreground">{initial}</Text>
+      ) : (
+        <UserRound size={12} color={colors.secondaryForeground} />
+      )}
     </View>
   );
 }
@@ -74,28 +147,20 @@ export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDe
 export function PrAuthorRow({
   author,
 }: Readonly<{ author: { login: string; avatarUrl: string | null } | null }>) {
+  const { t } = useTranslation();
   if (!author) {
     return (
       <View className="flex-row items-center gap-2">
-        <View className="size-6 rounded-full bg-muted" />
+        <PrAvatar avatarUrl={null} login={null} />
         <Text variant="muted" className="text-sm">
-          Unknown author
+          {t('prReview.overview.unknownAuthor')}
         </Text>
       </View>
     );
   }
   return (
     <View className="flex-row items-center gap-2">
-      {author.avatarUrl ? (
-        <Image
-          source={{ uri: author.avatarUrl }}
-          className="size-6 rounded-full"
-          transition={0}
-          accessibilityIgnoresInvertColors
-        />
-      ) : (
-        <View className="size-6 rounded-full bg-muted" />
-      )}
+      <PrAvatar avatarUrl={author.avatarUrl} login={author.login} />
       <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
         {author.login}
       </Text>
@@ -118,14 +183,29 @@ export function PrRefsRow({
   return (
     <View className="flex-row items-center gap-2">
       <GitBranch size={14} color={colors.mutedForeground} />
-      <Text variant="mono" className="text-[13px]" numberOfLines={1} ellipsizeMode="middle">
+      {/* The head ref is the row's flexible value: it shrinks so it ellipsizes
+          instead of running past the screen edge, while the short base ref
+          keeps its full width. `min-w-0` lets the text go below its content
+          width; without it the row overflows and hard-clips. */}
+      <Text
+        variant="mono"
+        className="min-w-0 shrink text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {headRepoFullName && isCrossRepo ? `${headRepoFullName}:` : ''}
         {headRef}
       </Text>
-      <Text variant="muted" className="text-sm">
-        ←
-      </Text>
-      <Text variant="mono" className="text-[13px]" numberOfLines={1} ellipsizeMode="middle">
+      {/* The flow reads "head ← base": a mirrored arrow icon sized to the
+          13 px ref text, so its ink centers on the row instead of sitting on
+          the baseline of a text glyph. */}
+      <DirectionalArrowLeft size={13} color={colors.mutedForeground} />
+      <Text
+        variant="mono"
+        className="max-w-1/2 shrink-0 text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {baseRef}
       </Text>
     </View>
@@ -135,34 +215,29 @@ export function PrRefsRow({
 export function PrCountsLine({
   commits,
   changedFiles,
-  additions,
-  deletions,
 }: Readonly<{
-  commits: number;
+  /** Null where the provider reports no commit count; the chip is dropped. */
+  commits: number | null;
   changedFiles: number;
-  additions: number;
-  deletions: number;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
-      <View className="flex-row items-center gap-1.5">
-        <GitCommit size={14} color={colors.mutedForeground} />
-        <Text variant="muted" className="text-sm">
-          {commits.toLocaleString()} {commits === 1 ? 'commit' : 'commits'}
-        </Text>
-      </View>
+      {commits === null ? null : (
+        <View className="flex-row items-center gap-1.5">
+          <GitCommit size={14} color={colors.mutedForeground} />
+          <Text variant="muted" className="text-sm">
+            {formatNumber(commits, i18n.language)}{' '}
+            {t('prReview.overview.commit', { count: commits })}
+          </Text>
+        </View>
+      )}
       <View className="flex-row items-center gap-1.5">
         <GitPullRequest size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="text-sm">
-          {changedFiles.toLocaleString()} {changedFiles === 1 ? 'file' : 'files'}
-        </Text>
-      </View>
-      <View className="flex-row items-center gap-1.5">
-        <Plus size={14} color={colors.good} />
-        <Text className="text-sm text-good">{additions.toLocaleString()}</Text>
-        <Text variant="muted" className="text-sm">
-          / −{deletions.toLocaleString()}
+          {formatNumber(changedFiles, i18n.language)}{' '}
+          {t('prReview.overview.file', { count: changedFiles })}
         </Text>
       </View>
     </View>
@@ -170,9 +245,14 @@ export function PrCountsLine({
 }
 
 function localizeNumber(n: number): string {
-  return n.toLocaleString();
+  return formatNumber(n, i18n.language);
 }
 
+/**
+ * The added/removed counts as one left-to-right run. Without the isolate, bidi
+ * on a right-to-left screen moves each sign behind its number, so the line
+ * reads "3+ / 1−" and the counts look like they added the sign.
+ */
 export function formatPrCounts(additions: number, deletions: number): string {
-  return `+${localizeNumber(additions)} / −${localizeNumber(deletions)}`;
+  return isolateLtrBidiText(`+${localizeNumber(additions)} / −${localizeNumber(deletions)}`);
 }

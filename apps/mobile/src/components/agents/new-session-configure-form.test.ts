@@ -3,9 +3,32 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
+import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import {
+  type NewSessionRepository,
+  type RepositoryGroup,
+} from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
+import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
+import { NewSessionProfileRow } from './new-session-environment-row';
+
+import { i18n as appI18n } from '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 // ── React hooks ────────────────────────────────────────────────────
 vi.mock('react', async () => {
@@ -25,10 +48,58 @@ vi.mock('react', async () => {
 });
 
 // ── react-native ───────────────────────────────────────────────────
+const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The composer-reveal hook arms the did-events through Keyboard.addListener;
+// the captured subscribers let the repro fire `keyboardDidShow` directly.
+const keyboardSubscribers = vi.hoisted(() => ({
+  show: null as (() => void) | null,
+  hide: null as (() => void) | null,
+}));
+
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The profile row and the environment row render the reanimated `Skeleton`
+// while their content loads; its module reaches the Reanimated worklets entry,
+// which this plain Node project cannot resolve, and the loading cases assert
+// the stub by name — its own rendering is not under test here.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Keyboard: {
+    addListener: vi.fn((event: string, listener: () => void) => {
+      const remove = (): void => {
+        if (event === 'keyboardDidShow') {
+          keyboardSubscribers.show = null;
+        }
+        if (event === 'keyboardDidHide') {
+          keyboardSubscribers.hide = null;
+        }
+      };
+      if (event === 'keyboardDidShow') {
+        keyboardSubscribers.show = listener;
+      }
+      if (event === 'keyboardDidHide') {
+        keyboardSubscribers.hide = listener;
+      }
+      return { remove };
+    }),
+  },
+  Platform: platformState,
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  useColorScheme: () => 'light',
+}));
+
+// The profile row's loading state is asserted as a `Skeleton` node. The real
+// component's Reanimated clock cannot load under Node's ESM loader
+// (react-native-worklets ships extensionless imports), and the string host
+// keeps the assertion type-exact without the animation stack.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
+const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insetsState,
 }));
 
 // ── sub-components ─────────────────────────────────────────────────
@@ -40,12 +111,47 @@ vi.mock('@/components/agents/instance-selector', () => ({
   InstanceSelector: 'InstanceSelector',
 }));
 
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/agents/new-session-repository-section', () => ({
   NewSessionRepositorySection: 'NewSessionRepositorySection',
 }));
 
+vi.mock('@/components/agents/new-session-run-target', () => ({
+  NewSessionRunTarget: 'NewSessionRunTarget',
+}));
+
+vi.mock('@/components/agents/folder-selector', () => ({
+  LaunchFolderField: 'LaunchFolderField',
+}));
+
+vi.mock('@/components/agents/new-session-start-button', () => ({
+  NewSessionStartButton: 'NewSessionStartButton',
+}));
+
+// The lift renders the form's body and pinned footer inside one animated
+// container and reads the keyboard's motion value, which needs the app's
+// KeyboardMotionProvider; the tree assertions only need its position, so the
+// string host keeps them type-exact without the animation stack.
+vi.mock('@/components/keyboard-lift-view', () => ({
+  KeyboardLiftView: 'KeyboardLiftView',
+}));
+
+vi.mock('@/components/agents/new-session-cloud-create-error', () => ({
+  NewSessionCloudCreateError: 'NewSessionCloudCreateError',
+}));
+
+vi.mock('@/components/agents/advanced-config-panel', () => ({
+  AdvancedConfigPanel: 'AdvancedConfigPanel',
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
+}));
+vi.mock('@/components/ui/icons', () => ({
+  RefreshCw: 'RefreshCw',
+  ChevronDown: 'ChevronDown',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
@@ -54,6 +160,10 @@ vi.mock('@/components/ui/segmented-control', () => ({
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
+}));
+
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
 }));
 
 // ── hooks ──────────────────────────────────────────────────────────
@@ -107,10 +217,85 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
+function collectElementsByType(node: Node, typeName: string): Record<string, unknown>[] {
+  if (node === null || typeof node !== 'object') {
+    return [];
+  }
+  const props = node.props ?? {};
+  const children = props.children;
+  const type = (node as { type?: unknown }).type;
+  const found: Record<string, unknown>[] = type === typeName ? [props] : [];
+  for (const child of Array.isArray(children) ? children : [children]) {
+    found.push(...collectElementsByType(child as Node, typeName));
+  }
+  return found;
+}
+
+/** True when the tree contains an element of this component type (by reference). */
+function containsComponent(node: Node, component: unknown): boolean {
+  if (node === null || typeof node !== 'object') {
+    return false;
+  }
+  if ((node as { type?: unknown }).type === component) {
+    return true;
+  }
+  const props = node.props ?? {};
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    if (containsComponent(child as Node, component)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** First element of this component type (by reference) in the tree, or null. */
+function findElementByComponent(node: Node, component: unknown): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  if ((node as { type?: unknown }).type === component) {
+    return node.props ?? {};
+  }
+  const props = node.props ?? {};
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElementByComponent(child as Node, component);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
+
+/** The first node of `typeName`, so a test can inspect its position in the tree. */
+function findElement(node: Node, typeName: string): ElementNode {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const typed = node as { type?: unknown; props?: Record<string, unknown> };
+  const children = typed.props?.children;
+  if (typed.type === typeName) {
+    return typed;
+  }
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElement(child as Node, typeName);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 const INSTANCE: InstancePickerInstance = {
   connectionId: 'conn-abc',
   name: 'laptop',
   projectName: 'kilo',
+  kind: 'cli',
+  startedAt: null,
+  gitBranch: null,
 };
 
 function defaultProps() {
@@ -133,6 +318,8 @@ function defaultProps() {
     onAddAttachment: vi.fn(),
     onRemoveAttachment: vi.fn(),
     onRetryAttachment: vi.fn(),
+    onMoveAttachment: vi.fn(),
+    onReorderAttachments: vi.fn(),
     onRefetchModels: vi.fn(),
     onPrefillAttachments: vi.fn(),
     shareId: undefined as string | undefined,
@@ -141,26 +328,35 @@ function defaultProps() {
     runOnInstance: null as InstancePickerInstance | null,
     instanceList: [] as InstancePickerInstance[],
     isLoadingInstances: false,
+    isFetchingInstances: false,
+    onRefreshInstances: vi.fn(),
     onChangeRunOnInstance: vi.fn(),
+    pendingComputer: false,
     showInstanceDisconnectedNote: false,
-    view: 'loading' as RepositorySectionView,
+    folderPath: '',
+    onChangeFolderPath: vi.fn(),
+    groups: [] as RepositoryGroup[],
     isRetrying: false,
+    repositoryRegionSettled: true,
     onChangeRepo: vi.fn(),
-    onOpenGitHubIntegration: vi.fn(),
+    onConnectProvider: vi.fn(),
     onRefreshRepos: vi.fn(),
-    repositories: [] as { fullName: string; isPrivate: boolean }[],
+    repositories: [] as NewSessionRepository[],
+    recents: [] as NewSessionRepository[],
     selectedRepo: '',
-    profile: null as {
-      id: string;
-      name: string;
-      commandCount: number;
-      mcpServerCount: number;
-      skillCount: number;
-      agentCount: number;
-    } | null,
+    organizationId: undefined as string | undefined,
+    profile: null as EffectiveAgentProfile | null,
     isProfileLoading: false,
     isProfileError: false,
+    profileOverrideNeedsAttention: false,
     onRetryProfile: vi.fn(),
+    onOpenProfilePicker: vi.fn(),
+    selectedProfileId: null as string | null,
+    onSelectProfile: vi.fn(),
+    manualVars: [],
+    manualCommands: [],
+    onManualVarsChange: vi.fn(),
+    onManualCommandsChange: vi.fn(),
     autoCommit: false,
     onAutoCommitChange: vi.fn(),
     isSpawningRemote: false,
@@ -170,8 +366,152 @@ function defaultProps() {
 }
 
 describe('NewSessionConfigureForm', () => {
+  it.each([false, true])(
+    'passes the target state to the run-target block while fetching=%s',
+    async isFetchingInstances => {
+      const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
+      const props = {
+        ...defaultProps(),
+        showRunOnSelector: true,
+        runOnInstance: INSTANCE,
+        isFetchingInstances,
+      };
+      const element = renderForm(props);
+      const runTarget = findElementByType(element, 'NewSessionRunTarget');
+      expect(runTarget).toMatchObject({
+        showRunOnSelector: true,
+        runOnInstance: INSTANCE,
+        instanceList: [],
+        isLoadingInstances: false,
+        isFetchingInstances,
+        disabled: false,
+        onChangeRunOnInstance: props.onChangeRunOnInstance,
+        onRefreshInstances: props.onRefreshInstances,
+      });
+    }
+  );
+
+  it('passes the creation busy flag as the run-target disabled state', async () => {
+    const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
+    const element = renderForm({ ...defaultProps(), showRunOnSelector: true, isCreating: true });
+    expect(findElementByType(element, 'NewSessionRunTarget')?.disabled).toBe(true);
+  });
+
+  it('keeps the cloud-create failure with the Start action it answers', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const cloudCreateError = { retryable: true, message: 'prepare failed' };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      cloudCreateError,
+    }) as Node;
+
+    // A failure the user answers at the pinned Start must not end up scrolled
+    // off screen above it: it lives in the pinned footer, not the scroll body.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
+    expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
+    const lift = findElement(element, 'KeyboardLiftView');
+    expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
+
+    // Switching the target to a computer must not surface the stale failure.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      cloudCreateError,
+    }) as Node;
+    expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
+
+  it('shows the plan refusal in the scroll body under the composer, not the footer', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: 'The organization trial has ended.',
+    }) as Node;
+
+    // A three-line explanation in the pinned footer shrinks the scroll frame
+    // and cuts the launch folder on a compact screen, so the body carries it.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
+      message: 'The organization trial has ended.',
+    });
+    // The footer keeps only the start-blocked reason (its own component): the
+    // refusal must not take height from the form a second time. The pinned
+    // footer is the lift's second child, after the scroll body, and it must be
+    // found for the negative assertion to mean anything.
+    const lift = findElementByType(element, 'KeyboardLiftView');
+    const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
+    expect(lift).not.toBeNull();
+    expect(footer).toBeDefined();
+    expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
+    expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
+  });
+
+  it('keeps the uploading-attachment reason in the pinned footer with Start', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // The reported build: a repository is resolved, the prompt is typed, the
+    // attachment chip already shows its uploaded file, and the upload flag is
+    // still true. Start stays disabled with a prompt on screen, so the footer
+    // has to say what it waits for.
+    const reason = resolveNewSessionStartBlockedReason({
+      entry: 'new-session',
+      hasRepositories: true,
+      hasConnectableProvider: false,
+      isLoadingRepositories: false,
+      isRemoteTargetSelected: false,
+      selectedRepo: 'org/repo',
+      hasAttachments: true,
+      selectedRepositoryResolved: true,
+      gate: {
+        attachmentsHasFailed: false,
+        attachmentsIsUploading: true,
+        hasPrompt: true,
+        isCreating: false,
+        isRemoteTargetSelected: false,
+        isSubmitting: false,
+        model: 'claude-opus-4-7',
+        isProfileLoading: false,
+      },
+    });
+    expect(reason).toBe('attachment-uploading');
+
+    // The footer names the escape the chip offers — dropping the attachment
+    // starts the session without it — while the composer keeps its own copy for
+    // the send it refuses to make.
+    const copy = appI18n.t('agentChat.newSession.attachmentUploadingToStart');
+    expect(copy).toBe('An attachment is still uploading. Remove it to start without it.');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      selectedRepo: 'org/repo',
+      isStartDisabled: true,
+      startBlockedReason: copy,
+    }) as Node;
+
+    // The reason rides the lift with Start, not the scroll body above it, so
+    // the keyboard cannot hide the explanation and the control together.
+    const lift = findElement(element, 'KeyboardLiftView');
+    expect(findElementByType(lift, 'NewSessionStartButton')).toMatchObject({
+      isStartDisabled: true,
+      startBlockedReason: copy,
+      // These reasons are a wait or a file fix; neither needs a second control.
+      startBlockedAction: null,
+    });
+  });
+
   // ── Case 1: Cloud, selector shown ──
-  it('renders prompt, repo, and "Run on" label when cloud target with selector shown', async () => {
+  it('renders prompt, repo, and the run-target block when cloud target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -183,8 +523,112 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).not.toBeNull();
-    expect(findTextContent(element, t => t === 'Run on')).toBe(true);
-    expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+    });
+  });
+
+  it('keeps the run-target block while every provider asks to be connected', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // The first-run form with no Git provider connected: the repository section
+    // renders its connect cards, and the run target must stay next to them so a
+    // Cloud Agent pick can still be switched back to a connected computer.
+    const connectGroups: RepositoryGroup[] = [
+      { key: 'github', status: 'connect', repositories: [] },
+      { key: 'gitlab', status: 'connect', repositories: [] },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      groups: connectGroups,
+    }) as Node;
+
+    expect(findElementByType(element, 'NewSessionRepositorySection')).toMatchObject({
+      groups: connectGroups,
+    });
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+      disabled: false,
+    });
+  });
+
+  it('renders the account section above the run-target block', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      accountSection: 'Account section',
+    }) as Node;
+
+    // The labeled section renders inside the same scroll body as the other
+    // form sections (the run-target block itself is a string-host mock here).
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findTextContent(scrollBody as Node, text => text === 'Account section')).toBe(true);
+  });
+
+  it('hides the account section when the caller omits it', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+    }) as Node;
+
+    expect(findTextContent(element, text => text === 'Account section')).toBe(false);
+  });
+
+  // ── Case 1b: ordered repository array passes through unchanged ──
+  it('passes the ordered repository array unchanged into NewSessionRepositorySection', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const orderedRepositories: NewSessionRepository[] = [
+      { platform: 'github', fullName: 'Kilo-Org/cloud', isPrivate: true },
+      { platform: 'github', fullName: 'octocat/Hello-World', isPrivate: false },
+      { platform: 'gitlab', fullName: 'acme/widgets', isPrivate: true },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositories: orderedRepositories,
+    }) as Node;
+
+    const section = findElementByType(element, 'NewSessionRepositorySection');
+    expect(section).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(section!.repositories).toEqual(orderedRepositories);
+  });
+
+  // ── Case 1c: recents pass through unchanged ──
+  it('passes the recents array unchanged into NewSessionRepositorySection', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const recentRows: NewSessionRepository[] = [
+      { platform: 'github', fullName: 'Kilo-Org/cloud', isPrivate: true },
+      { platform: 'gitlab', fullName: 'acme/widgets', isPrivate: true },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      recents: recentRows,
+    }) as Node;
+
+    const section = findElementByType(element, 'NewSessionRepositorySection');
+    expect(section).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(section!.recents).toEqual(recentRows);
   });
 
   // ── Case 2: Cloud, selector hidden ──
@@ -202,10 +646,16 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRepositorySection')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Run on')).toBe(false);
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
   });
 
   // ── Case 3: Remote, selector shown ──
-  it('shows prompt and "Run on" label, hides repo section, when remote target with selector shown', async () => {
+  it('shows prompt and the run-target block, hides repo section, when remote target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -217,8 +667,67 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
-    expect(findTextContent(element, t => t === 'Run on')).toBe(true);
-    expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+      runOnInstance: INSTANCE,
+    });
+    // The bound instance already runs Kilo, and the Run on row and the Folder
+    // field above already name the computer, its project and its folder, so the
+    // slot stays empty instead of repeating them.
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
+    expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(false);
+  });
+
+  // ── Case 3b: a refused spawn resets the target, and the disconnected note owns the copy ──
+  it('leaves the disconnected note alone after a refused spawn resets the computer target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: true,
+      showInstanceDisconnectedNote: true,
+    }) as Node;
+
+    expect(
+      findTextContent(element, t =>
+        t.includes('The selected instance disconnected. Start a session on Cloud Agent')
+      )
+    ).toBe(true);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
+  });
+
+  // ── Case 3c: the unbound computer target keeps the setup sentence ──
+  it('keeps the setup sentence while the computer target has no instance bound', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: true,
+    }) as Node;
+
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(true);
+    expect(findElementByType(element, 'LaunchFolderField')).not.toBeNull();
   });
 
   // ── Case 4: Remote, selector hidden ──
@@ -234,9 +743,10 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
-    expect(findTextContent(element, t => t === 'Run on: ')).toBe(true);
-    expect(findTextContent(element, t => t.includes('laptop'))).toBe(true);
-    expect(findTextContent(element, t => t.includes('kilo'))).toBe(true);
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: false,
+      runOnInstance: INSTANCE,
+    });
   });
 
   // ── Case 5: Disconnected note — three contracts ──
@@ -251,7 +761,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: false,
     }) as Node;
 
-    expect(findTextContent(element, t => t === REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE)).toBe(true);
+    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(true);
   });
 
   it('does not render the disconnected note when showInstanceDisconnectedNote is false', async () => {
@@ -265,9 +775,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: false,
     }) as Node;
 
-    expect(findTextContent(element, t => t === REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE)).toBe(
-      false
-    );
+    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(false);
   });
 
   it('renders the disconnected note even when showRunOnSelector is true', async () => {
@@ -281,7 +789,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
     }) as Node;
 
-    expect(findTextContent(element, t => t === REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE)).toBe(true);
+    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(true);
   });
 
   // ── Case 6: Start spinner switch ──
@@ -295,7 +803,8 @@ describe('NewSessionConfigureForm', () => {
       isSpawningRemote: true,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).not.toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(true);
   });
 
   it('shows spinner for cloud session creation', async () => {
@@ -308,7 +817,8 @@ describe('NewSessionConfigureForm', () => {
       isCreating: true,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).not.toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(true);
   });
 
   it('does not show spinner when neither flag is set', async () => {
@@ -322,11 +832,12 @@ describe('NewSessionConfigureForm', () => {
       isSpawningRemote: false,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(false);
   });
 
   // ── Case 7: remote target keeps its context in the selector value ──
-  it('passes the remote target and loading flag to the selector', async () => {
+  it('passes the remote target and loading flag to the run-target block', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -337,12 +848,12 @@ describe('NewSessionConfigureForm', () => {
       isLoadingInstances: true,
     }) as Node;
 
-    const selector = findElementByType(element, 'InstanceSelector');
-    expect(selector).not.toBeNull();
+    const runTarget = findElementByType(element, 'NewSessionRunTarget');
+    expect(runTarget).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
-    expect(selector!.value).toBe(INSTANCE);
+    expect(runTarget!.runOnInstance).toBe(INSTANCE);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion
-    expect(selector!.isLoading).toBe(true);
+    expect(runTarget!.isLoadingInstances).toBe(true);
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
   });
@@ -383,58 +894,129 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 10: effective profile row ──
-  it('renders the profile name and capability counts when a profile resolves', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+  // The row is a component, so its content tests call it directly (the plain
+  // function call convention of this file); the form only gates its presence.
+  const PROFILE: EffectiveAgentProfile = {
+    id: 'profile-1',
+    name: 'Production',
+    varCount: 2,
+    mcpServerCount: 1,
+    skillCount: 2,
+    kiloCommandCount: 4,
+    commandCount: 3,
+    agentCount: 4,
+  };
 
+  function renderRow(overrides: Partial<Parameters<typeof NewSessionProfileRow>[0]> = {}): Node {
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      runOnInstance: null,
-      profile: {
-        id: 'profile-1',
-        name: 'Production',
-        commandCount: 3,
-        mcpServerCount: 1,
-        skillCount: 2,
-        agentCount: 4,
-      },
+    return NewSessionProfileRow({
+      profile: null,
+      isProfileLoading: false,
+      isProfileError: false,
+      overrideNeedsAttention: false,
+      onRetryProfile: vi.fn<() => void>(),
+      onOpenProfilePicker: vi.fn<() => void>(),
+      ...overrides,
     }) as Node;
+  }
+
+  it('renders the profile name and capability counts when a profile resolves', () => {
+    const element = renderRow({ profile: PROFILE });
 
     expect(findTextContent(element, t => t === 'Production')).toBe(true);
-    expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
-      true
-    );
+    expect(
+      findTextContent(
+        element,
+        t => t === '2 vars · 1 MCP · 2 skills · 4 cmds · 3 setup cmds · 4 agents'
+      )
+    ).toBe(true);
   });
 
-  it('renders "Default environment" when no profile resolves', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      runOnInstance: null,
-      profile: null,
-    }) as Node;
+  it('renders "Default environment" when no profile resolves', () => {
+    const element = renderRow();
 
     expect(findTextContent(element, t => t === 'Default environment')).toBe(true);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
   });
 
-  it('renders an inline error with Retry when the profile query fails', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      runOnInstance: null,
-      isProfileError: true,
-    }) as Node;
+  it('renders an inline error with Retry when the profile query fails', () => {
+    const element = renderRow({ isProfileError: true });
 
     expect(findTextContent(element, t => t.includes("Couldn't load"))).toBe(true);
     expect(findTextContent(element, t => t === 'Retry')).toBe(true);
   });
 
-  it('hides the environment row while the profile query is loading', async () => {
+  it('shows the attention copy when the selected override no longer resolves', () => {
+    // The hook never yields a resolved profile together with a stale override:
+    // an unresolvable pick leaves `profile` null and sets the attention flag.
+    const element = renderRow({ profile: null, overrideNeedsAttention: true });
+
+    expect(findTextContent(element, t => t === 'Config needs attention')).toBe(true);
+  });
+
+  it('renders the loading environment row as its title line', () => {
+    const element = renderRow({ isProfileLoading: true });
+
+    // No blank line is reserved while the query runs: the loading copy is the
+    // row's one line, so the card is as tall as what it shows.
+    expect(findTextContent(element, t => t === 'Environment')).toBe(true);
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
+    expect(findElementByType(element, 'Skeleton')).toBeNull();
+    expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
+    expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('renders no summary line when a resolved profile has nothing configured', () => {
+    const element = renderRow({
+      profile: {
+        ...PROFILE,
+        varCount: 0,
+        mcpServerCount: 0,
+        skillCount: 0,
+        kiloCommandCount: 0,
+        commandCount: 0,
+        agentCount: 0,
+      },
+    });
+
+    // An empty count list renders the title alone instead of a blank slot.
+    expect(findTextContent(element, t => t === 'Production')).toBe(true);
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
+    const slots = collectElementsByType(element, 'View').filter(
+      view => view.importantForAccessibility === 'no-hide-descendants'
+    );
+    expect(slots).toHaveLength(0);
+  });
+
+  it('renders every Environment row state inside the same card', () => {
+    const chrome = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card`;
+
+    for (const row of [
+      renderRow({ isProfileLoading: true }),
+      renderRow({ isProfileError: true }),
+      renderRow({ profile: PROFILE }),
+      renderRow(),
+    ]) {
+      const cards = [
+        ...collectElementsByType(row, 'View'),
+        ...collectElementsByType(row, 'Pressable'),
+      ]
+        .map(element => element.className)
+        .filter(className => typeof className === 'string' && className.includes(chrome));
+      expect(cards).toEqual([expect.stringContaining(chrome)]);
+    }
+  });
+
+  it('opens the profile picker when the row is pressed', () => {
+    const onOpenProfilePicker = vi.fn<() => void>();
+    const element = renderRow({ profile: PROFILE, onOpenProfilePicker });
+
+    // The row body is the pressable that opens the picker.
+    const pressables = collectElementsByType(element, 'Pressable');
+    expect(pressables.some(p => p.onPress === onOpenProfilePicker)).toBe(true);
+  });
+
+  it('explains the pending environment request without hiding the form or showing a default', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -442,10 +1024,22 @@ describe('NewSessionConfigureForm', () => {
       ...defaultProps(),
       runOnInstance: null,
       isProfileLoading: true,
+      isStartDisabled: true,
     }) as Node;
 
-    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
-    expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
+    // The Environment row stays mounted while the request is pending, so the
+    // form is never hidden and no default flashes before the query settles.
+    // The row is a component here, so its content is asserted through the
+    // direct render the same way the row's own cases do.
+    const row = findElementByComponent(element, NewSessionProfileRow);
+    expect(row?.isProfileLoading).toBe(true);
+    const loadingRow = renderRow({ isProfileLoading: true });
+    expect(findTextContent(loadingRow, t => t === 'Environment')).toBe(true);
+    expect(findTextContent(loadingRow, t => t === 'Loading…')).toBe(true);
+    expect(findTextContent(loadingRow, t => t === 'Default environment')).toBe(false);
+    expect(findTextContent(loadingRow, t => t === '\u00A0\n\u00A0')).toBe(false);
+    expect(findElementByType(element, 'NewSessionPrompt')?.isCreating).toBe(false);
+    expect(findElementByType(element, 'NewSessionStartButton')?.isStartDisabled).toBe(true);
   });
 
   it('does not render the environment row for a remote target', async () => {
@@ -455,18 +1049,69 @@ describe('NewSessionConfigureForm', () => {
     const element = NewSessionConfigureForm({
       ...defaultProps(),
       runOnInstance: INSTANCE,
-      profile: {
-        id: 'profile-1',
-        name: 'Production',
-        commandCount: 3,
-        mcpServerCount: 1,
-        skillCount: 2,
-        agentCount: 4,
-      },
+      profile: PROFILE,
     }) as Node;
 
-    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
+    expect(containsComponent(element, NewSessionProfileRow)).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('renders the environment row for a cloud target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      profile: PROFILE,
+    }) as Node;
+
+    expect(containsComponent(element, NewSessionProfileRow)).toBe(true);
+  });
+
+  // ── Case 10b: the advanced-config disclosure ──
+  it('mounts the collapsed advanced-config panel under Environment for a cloud target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      organizationId: 'org-1',
+      selectedProfileId: 'profile-1',
+      onSelectProfile,
+    }) as Node;
+
+    // The panel is controlled by the session, so it gets the same override the
+    // Environment row shows and reports picks back through the same callback.
+    // `onRequestReveal` is how the panel scrolls the composer to its expansion.
+    expect(findElementByType(element, 'AdvancedConfigPanel')).toMatchObject({
+      organizationId: 'org-1',
+      selectedProfileId: 'profile-1',
+      onSelectProfile,
+      disabled: false,
+      onRequestReveal: expect.any(Function),
+    });
+  });
+
+  it('hides the advanced-config panel for a remote target and for the clone entry', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+    }) as Node;
+    expect(findElementByType(remote, 'AdvancedConfigPanel')).toBeNull();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const clone = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      isCloneEntry: true,
+    }) as Node;
+    expect(findElementByType(clone, 'AdvancedConfigPanel')).toBeNull();
   });
 
   // ── Case 11: commit choice (cloud-only, default Leave) ──
@@ -514,5 +1159,126 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'SegmentedControl')).toBeNull();
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
+  });
+
+  it('holds the rows below the repository section until its final height is known', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const unsettled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: false,
+    }) as Node;
+
+    expect(findTextContent(unsettled, t => t === 'Changes')).toBe(false);
+    expect(containsComponent(unsettled, NewSessionProfileRow)).toBe(false);
+    expect(findElementByType(unsettled, 'AdvancedConfigPanel')).toBeNull();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const settled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: true,
+    }) as Node;
+
+    expect(findTextContent(settled, t => t === 'Changes')).toBe(true);
+    expect(containsComponent(settled, NewSessionProfileRow)).toBe(true);
+    expect(findElementByType(settled, 'AdvancedConfigPanel')).not.toBeNull();
+  });
+
+  // ── Case 12: the Run on helper sentence stays in plain language, and only under an unbound computer target ──
+  it('renders the plain help sentence for an unbound computer target and never for a bound instance or the cloud target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
+    const cliTerms = ['kilo remote', '/remote', 'CLI session', 'local kilo process'];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const cloud = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+    }) as Node;
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(false);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(cloud, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
+
+    // The sentence answers "how do I get a computer connected", so it belongs
+    // to the computer target that has none yet.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const unboundComputer = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: false,
+    }) as Node;
+    expect(findTextContent(unboundComputer, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(unboundComputer, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    expect(findTextContent(unboundComputer, t => t.includes('`'))).toBe(false);
+
+    // A bound instance needs no setup sentence: it is already running Kilo.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: false,
+    }) as Node;
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(false);
+    expect(findTextContent(remote, t => t === 'laptop on kilo')).toBe(false);
+  });
+
+  // ── Case 13: reorder wiring lock ──
+  it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const onMoveAttachment = vi.fn<(id: string, direction: 'left' | 'right') => void>();
+    const onReorderAttachments = vi.fn<(fromIndex: number, toIndex: number) => void>();
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      onMoveAttachment,
+      onReorderAttachments,
+    }) as Node;
+
+    const prompt = findElementByType(element, 'NewSessionPrompt');
+    expect(prompt).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.onMoveAttachment).toBe(onMoveAttachment);
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.onReorderAttachments).toBe(onReorderAttachments);
+  });
+
+  // ── Case 14: a cloud-create failure belongs to the cloud target only ──
+  it('renders the cloud-create error on the cloud target but not on a remote one', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const cloudCreateError = { retryable: true, message: 'prepare failed' };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const cloud = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      cloudCreateError,
+    }) as Node;
+    expect(findElementByType(cloud, 'NewSessionCloudCreateError')).not.toBeNull();
+
+    // Switching the target to a computer must not surface the stale failure.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      cloudCreateError,
+    }) as Node;
+    expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 });

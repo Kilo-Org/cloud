@@ -1,0 +1,296 @@
+import { type Href } from 'expo-router';
+import { type ReactNode, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+import { toast } from 'sonner-native';
+
+import { EmptyState } from '@/components/empty-state';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
+import {
+  applyVariableEdit,
+  type ProfileVarSource,
+  type VariableEdit,
+  type VariableRow,
+  variableRows,
+} from '@/components/profiles/profile-variables-model';
+import {
+  VariableEditForm,
+  VariableRowView,
+  VariablesSkeleton,
+} from '@/components/profiles/profile-variables-rows';
+import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { KeyRound } from '@/components/ui/icons';
+import { Text } from '@/components/ui/text';
+import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+
+/** Stable empty fallback so the derived list is not a new array each render. */
+const NO_VARS: readonly ProfileVarSource[] = [];
+
+/**
+ * The mutation hook toasts `error.message`; the screen only supplies a
+ * fallback when the server sent nothing readable.
+ */
+function hasUsableMessage(error: unknown): boolean {
+  return error instanceof Error && error.message.trim().length > 0;
+}
+
+/**
+ * The edit the inline form seeds from. A secret's value is never seeded: the
+ * server returns a masked `***`, and saving that back would overwrite the
+ * secret, so the user must enter a new value.
+ */
+function initialVariableEdit(row: VariableRow | undefined): VariableEdit {
+  if (row === undefined) {
+    return { key: '', value: '', isSecret: false };
+  }
+  if (row.isSecret) {
+    return { key: row.key, value: '', isSecret: true };
+  }
+  return { key: row.key, value: row.value, isSecret: false };
+}
+
+export function ProfileVariablesScreen({
+  profileId,
+  organizationId,
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Profiles list of the stack that mounted this screen. */
+  backFallback: Href;
+}>) {
+  const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
+  const varsQuery = useAgentProfileVars(profileId, organizationId);
+  const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
+
+  const serverVars: readonly ProfileVarSource[] = varsQuery.data ?? NO_VARS;
+  // The screen owns the list so a saved edit shows immediately; the sync below
+  // swaps in the server's copy whenever a refetch lands, so the list never
+  // blanks and never drifts from server truth.
+  const [vars, setVars] = useState<readonly ProfileVarSource[]>(serverVars);
+  const [syncedVars, setSyncedVars] = useState<readonly ProfileVarSource[]>(serverVars);
+  if (serverVars !== syncedVars) {
+    setSyncedVars(serverVars);
+    setVars(serverVars);
+  }
+
+  // `null` = closed, `''` = the add form, any other value = the key being edited.
+  // The form it opens is a draft: it and its fields survive a remount (see
+  // `lib/form-draft`), and saving or cancelling clears it.
+  const draftScope = `profiles:variables:${profileId}`;
+  const [editingKey, setEditingKey] = useFormDraftState<string | null>(
+    draftScope,
+    'editingKey',
+    null
+  );
+
+  const rows = variableRows(vars);
+  // A restored edit whose row is gone, e.g. deleted on another device while
+  // this screen was away, must not leave the screen with no way back to the
+  // add control: it reads as closed, so the form and the add button render.
+  const orphanedEdit =
+    editingKey !== null && editingKey !== '' && !rows.some(row => row.key === editingKey);
+  const isAdding = editingKey === '';
+  const isEditing = editingKey !== null && !isAdding && !orphanedEdit;
+  const atVariableCap = vars.length >= MAX_PROFILE_VARS;
+  // The add control is what an orphaned edit would otherwise leave the reader
+  // without, so it renders for that state exactly as it does when closed.
+  const showAdd = editingKey === null || orphanedEdit;
+
+  const startAdd = () => {
+    clearFormDraft(draftScope);
+    setEditingKey('');
+  };
+
+  const beginEdit = (key: string) => {
+    clearFormDraft(draftScope);
+    setEditingKey(key);
+  };
+
+  const closeForm = () => {
+    setEditingKey(null);
+    clearFormDraft(draftScope);
+  };
+
+  const saveEdit = async (edit: VariableEdit): Promise<boolean> => {
+    const isNewKey = !vars.some(variable => variable.key === edit.key);
+    if (isNewKey && atVariableCap) {
+      toast.error(t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS }));
+      return false;
+    }
+    try {
+      await setVar.mutateAsync({
+        profileId,
+        key: edit.key,
+        value: edit.value,
+        isSecret: edit.isSecret,
+      });
+    } catch (error) {
+      if (!hasUsableMessage(error)) {
+        toast.error(t('profiles.variablesSaveFailed'));
+      }
+      return false;
+    }
+    setVars(current => applyVariableEdit(current, edit));
+    setEditingKey(null);
+    clearFormDraft(draftScope);
+    return true;
+  };
+
+  const runDelete = async (key: string) => {
+    if (deleteVar.isPending) {
+      return;
+    }
+    try {
+      await deleteVar.mutateAsync({ profileId, key });
+    } catch (error) {
+      if (!hasUsableMessage(error)) {
+        toast.error(t('profiles.variablesDeleteFailed'));
+      }
+      return;
+    }
+    setVars(current => current.filter(v => v.key !== key));
+  };
+
+  const confirmDelete = (key: string) => {
+    if (deleteVar.isPending) {
+      return;
+    }
+    confirm({
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.variableDeleteTitle', { key: isolateLtrBidiText(key) }),
+      message: t('profiles.variableDeleteMessage'),
+      confirmLabel: t('profiles.variableDeleteConfirm'),
+      onConfirm: () => {
+        void runDelete(key);
+      },
+    });
+  };
+
+  const renderEditForm = (isNew: boolean, initial: VariableEdit) => (
+    <VariableEditForm
+      key={editingKey ?? 'new'}
+      draftScope={draftScope}
+      isNew={isNew}
+      initial={initial}
+      existingKeys={vars.map(variable => variable.key)}
+      isSaving={setVar.isPending}
+      requireValue
+      onCancel={closeForm}
+      onSave={saveEdit}
+    />
+  );
+
+  let content: ReactNode = null;
+  if (varsQuery.isError) {
+    content = (
+      <QueryError
+        variant="server"
+        placement="top"
+        title={t('profiles.loadFailed')}
+        onRetry={() => void varsQuery.refetch()}
+        isRetrying={varsQuery.isRefetching}
+      />
+    );
+  } else if (varsQuery.isPending) {
+    content = <VariablesSkeleton />;
+  } else if (rows.length === 0 && !isAdding) {
+    content = (
+      <EmptyState
+        icon={KeyRound}
+        title={t('profiles.variablesEmpty')}
+        description={null}
+        placement="top"
+        action={
+          <ProfileManageSlot permission={permission}>
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+              <Text>{t('profiles.addVariable')}</Text>
+            </Button>
+          </ProfileManageSlot>
+        }
+      />
+    );
+  } else {
+    content = (
+      <>
+        {rows.map(row =>
+          isEditing && row.key === editingKey ? (
+            renderEditForm(false, initialVariableEdit(row))
+          ) : (
+            <VariableRowView
+              key={row.key}
+              row={row}
+              isDeleting={deleteVar.isPending}
+              onEdit={
+                canManage
+                  ? () => {
+                      beginEdit(row.key);
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(row.key);
+                    }
+                  : undefined
+              }
+            />
+          )
+        )}
+
+        {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
+
+        <ProfileManageSlot permission={permission}>
+          {showAdd && atVariableCap ? (
+            <AccessibleStatus
+              message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+          {showAdd ? (
+            <Button disabled={atVariableCap} onPress={startAdd}>
+              <Text>{t('profiles.addVariable')}</Text>
+            </Button>
+          ) : null}
+        </ProfileManageSlot>
+      </>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.variablesTitle')}
+        backFallback={backFallback}
+      />
+      <TabScreenScrollView
+        className="flex-1"
+        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
+        {content}
+      </TabScreenScrollView>
+
+      {dialog}
+    </View>
+  );
+}

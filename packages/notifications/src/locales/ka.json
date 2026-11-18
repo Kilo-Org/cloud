@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "თქვენს აგენტის სესიას განახლება აქვს",
+      "lowBalance": "თქვენი ბალანსი ყურადღებას საჭიროებს",
+      "spendAlert": "თქვენი ხარჯი ყურადღებას საჭიროებს",
+      "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს",
+      "securityUpdate": "უსაფრთხოების შემოწმებას განახლება აქვს",
+      "activeAgentsGlanceable": "აქტიურ აგენტებს განახლება აქვთ"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "დაბალი ბალანსის შეტყობინება",
+      "body": "{{organizationName}} ბალანსი დაეცა ${{minimumBalanceUsd}}-ზე ქვემოთ"
+    },
+    "spendAlert": {
+      "title": "ხარჯის შეტყობინება",
+      "body": "{{scopeName}}-ის ხარჯმა გადააჭარბა ${{amountUsd}}-ს"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} {{repoFullName}}-ში"
+    },
+    "securityFindingNew": {
+      "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA გაფრთხილება"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA დარღვევა"
+    }
+  },
+  "sessionReady": {
+    "body": "თქვენი Kilo სესია მზადაა ტელეფონიდან სამართავად"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

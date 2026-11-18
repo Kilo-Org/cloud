@@ -1,10 +1,10 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
+/* eslint-disable max-lines -- the attachment send-admission suite shares one owned test file with the attachment-only send contract */
 /* eslint-disable new-cap -- ChatComposer is called as a plain function, matching repo test convention */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake hooks and handlers settle without await because they resolve immediately */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type AgentMode } from '@/components/agents/mode-selector';
+import { usePreventRemove } from 'expo-router';
 import { type ChatComposer } from './chat-composer';
 
 // The attachment-only send contract: a ready (`uploaded`) attachment with an
@@ -13,7 +13,9 @@ import { type ChatComposer } from './chat-composer';
 // `resolveChatComposerControlState` so `canSend` follows text and ready
 // attachments, and mocks `useAgentAttachmentUpload` with a controllable return.
 
-const onSendMock = vi.fn(async () => undefined);
+const onSendMock = vi.fn(
+  async (_prompt: string, _options?: { onOptimisticSend?: () => void }) => undefined
+);
 
 // ── React hooks (real useEffect needs rendering context, so mock all hooks) ──
 // `useRef` hands out slots in call order and keeps them across calls of the
@@ -25,8 +27,26 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // Controllable upload state. The mock factory reads these at call time, so a
 // test mutates them before mounting to drive the ready vs empty cases.
 const uploadState = vi.hoisted(() => ({
-  attachments: [] as { status?: string; remoteFilename?: string }[],
-  toWirePayload: (() => undefined) as () => unknown,
+  attachments: [] as {
+    status?: string;
+    remoteFilename?: string;
+    remoteKey?: string;
+    metadataStripFailed?: boolean;
+  }[],
+  uploadPending: (() => ({ ok: false })) as () => unknown,
+  isUploading: false,
+}));
+
+const toastErrorMock = vi.hoisted(() => vi.fn());
+const toastWarningMock = vi.hoisted(() => vi.fn());
+
+// Spies for the unclaimed-attachment leave: the composer dispatches the
+// prevented navigation action and releases the uploads only after the in-app
+// confirm runs its `onConfirm`.
+const leaveMock = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  releaseUnclaimedUploads: vi.fn(),
+  confirm: vi.fn(),
 }));
 
 vi.mock('react', async () => {
@@ -35,6 +55,11 @@ vi.mock('react', async () => {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
     useEffect: vi.fn((fn: React.EffectCallback) => {
+      fn();
+    }),
+    // The composer publishes its input growth from a layout effect, which must
+    // run before the frame is painted; the mock runs it like `useEffect`.
+    useLayoutEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
@@ -50,12 +75,25 @@ vi.mock('react', async () => {
 });
 
 // ── react-native and native bridges ────────────────────────────────────────
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
+
+// The composer reads the live system font scale; this suite calls it as a
+// plain function, so the provider's React context cannot answer a hook.
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
+  useSystemFontScale: () => null,
+  useLiveFontScale: () => 1,
+}));
+
 vi.mock('react-native', () => ({
+  Alert: { alert: vi.fn() },
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
   Keyboard: { dismiss: vi.fn() },
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
 }));
 
@@ -76,10 +114,34 @@ vi.mock('react-native-gesture-handler', () => ({
   GestureDetector: () => null,
 }));
 
+vi.mock('expo-router', () => ({
+  usePreventRemove: vi.fn(),
+}));
+
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: () => null,
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T>(value: T) => ({ value }),
+  useAnimatedStyle: (style: () => unknown) => style(),
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  selectReducedMotionEntrance: <T>(_reduced: boolean, entrance: T) => entrance,
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
+
+// The composer reads the keyboard from the provider, not from a listener of its own.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T>(selector: (state: { height: number }) => T) => selector({ height: 0 }),
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: 0 }, height: { value: 0 } }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -92,7 +154,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 }));
 
 vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn() },
+  toast: { error: toastErrorMock, warning: toastWarningMock },
 }));
 
 // ── sub-components (presentation only; the composer logic is under test) ───
@@ -112,6 +174,10 @@ vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
 }));
 
+vi.mock('@/components/agents/suggestion-card', () => ({
+  SuggestionCard: () => null,
+}));
+
 // Marked so the test can locate the input-row element in the returned tree
 // (plain function calls build element objects; child components are not
 // invoked without a renderer).
@@ -126,15 +192,26 @@ vi.mock('@/components/agents/attachment-picker', () => ({
   pickAgentAttachments: vi.fn(),
 }));
 
-vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
+vi.mock('@/components/agents/remote-session-exit-alert', () => {
+  const confirmExit = vi.fn(async () => true);
+  return {
+    useRemoteSessionExitConfirmation: () => ({ confirmExit, exitDialog: null }),
+  };
+});
+
+// The composer reaches this hook; the suite calls the component as a plain
+// function, so every hook on its path is stubbed.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: leaveMock.confirm, dialog: null }),
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
   useTextHeight: () => ({
     height: 88,
+    maxHeight: 124,
     measureElement: null,
     reset: vi.fn(),
+    setNativeContentHeight: vi.fn(),
     setText: vi.fn(),
   }),
 }));
@@ -144,10 +221,6 @@ vi.mock('@/components/agents/use-text-height', () => ({
 
 vi.mock('@/components/ui/blur-bar', () => ({
   BlurBar: () => null,
-}));
-
-vi.mock('@/components/voice-input-control', () => ({
-  VoiceInputStatus: () => null,
 }));
 
 // ── hooks and libs ─────────────────────────────────────────────────────────
@@ -163,6 +236,14 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'u1' }),
 }));
 
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
   useAgentAttachmentUpload: () => ({
     attachments: uploadState.attachments,
@@ -170,11 +251,20 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
-    isUploading: false,
-    hasFailedAttachments: false,
-    toWirePayload: uploadState.toWirePayload,
-    toSubmissionPayload: () => undefined,
+    releaseUnclaimedUploads: leaveMock.releaseUnclaimedUploads,
+    commitSent: vi.fn(() => undefined),
+    clearOptimistic: vi.fn(() => undefined),
+    isUploading: uploadState.isUploading,
+    hasFailedAttachments: uploadState.attachments.some(attachment => attachment.status === 'error'),
+    hasUnclaimedAttachments: uploadState.attachments.some(
+      attachment => attachment.remoteKey !== undefined
+    ),
+    uploadPending: uploadState.uploadPending,
   }),
+}));
+
+vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
+  useAndroidPendingPickerRecovery: () => undefined,
 }));
 
 vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
@@ -197,14 +287,16 @@ vi.mock('@/lib/agent-attachments/validate', () => ({
   describeClassificationFailure: vi.fn(),
 }));
 
+const clearDraftMock = vi.hoisted(() => vi.fn(async () => undefined));
+
 vi.mock('@/lib/persist/drafts', () => ({
   saveDraft: vi.fn(),
   flushDraft: vi.fn(async () => undefined),
-  clearDraft: vi.fn(async () => undefined),
+  clearDraft: clearDraftMock,
 }));
 
 vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: vi.fn(),
+  useSharePrefill: () => ({ failed: false, retry: () => undefined, dismiss: () => undefined }),
 }));
 
 vi.mock('@/lib/voice-input/use-voice-input', () => ({
@@ -231,8 +323,6 @@ function makeProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
     onRestartSession: vi.fn(async () => true),
     onExitSession: vi.fn(async () => undefined),
     onStop: vi.fn(async () => undefined),
-    mode: 'code' as AgentMode,
-    onModeChange: vi.fn(() => undefined),
     model: 'anthropic/claude-sonnet-4',
     variant: 'medium',
     modelOptions: [],
@@ -292,13 +382,18 @@ beforeEach(() => {
   refSlots.slots.length = 0;
   refSlots.cursor = 0;
   uploadState.attachments = [];
-  uploadState.toWirePayload = () => undefined;
+  uploadState.uploadPending = () => ({ ok: false });
+  uploadState.isUploading = false;
 });
 
 describe('ChatComposer attachment-only send', () => {
-  it('sends an empty draft with a ready attachment, passing prompt and the wire payload', async () => {
+  it('sends an empty draft with a ready attachment, passing the returned payload', async () => {
     uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png' }];
-    uploadState.toWirePayload = () => ({ path: 'path-1', files: ['file.png'] });
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+    });
 
     const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
 
@@ -306,7 +401,40 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith('', { path: 'path-1', files: ['file.png'] }, undefined);
+    expect(onSendMock).toHaveBeenCalledWith('', {
+      attachments: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
+  });
+
+  it('treats an invisible draft with a ready attachment as the empty prompt and clears it', async () => {
+    uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png' }];
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+    });
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+    // The live draft holds nothing a reader can see, which is what the composer
+    // sends as an empty prompt; the clear-after-send guard has to agree with
+    // that, or the invisible characters would survive the send.
+    const textRefSlot = refSlots.slots[0];
+    if (textRefSlot === undefined) {
+      throw new Error('ChatComposer did not create its live text ref');
+    }
+    textRefSlot.current = '\u200B\u200B';
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).toHaveBeenCalledTimes(1);
+    const [prompt, options] = onSendMock.mock.calls[0] ?? [];
+    expect(prompt).toBe('');
+    options?.onOptimisticSend?.();
+
+    expect(clearDraftMock).toHaveBeenCalledWith('u1', 'agent-composer:sess-1');
   });
 
   it('does not send an empty draft with no attachments', async () => {
@@ -316,5 +444,123 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks send when a chip failed metadata stripping (terminal)', async () => {
+    uploadState.attachments = [{ status: 'error', metadataStripFailed: true }];
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    // A strip-fail chip is a terminal error: the send is blocked with the
+    // remove-or-retry copy, and onSend never fires.
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove the attachments that failed to upload.');
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks send when a chip failed a retryable upload (non-terminal)', async () => {
+    uploadState.attachments = [{ status: 'error' }];
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    // A retryable error chip also blocks send until it is retried or removed.
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove the attachments that failed to upload.');
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('toasts when a send is blocked by an in-flight upload', async () => {
+    uploadState.attachments = [{ status: 'uploading' }];
+    uploadState.isUploading = true;
+    uploadState.uploadPending = () => ({ ok: false });
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith('Wait for attachments to finish uploading.');
+  });
+
+  it('hands the images of a local delivery to onSend', async () => {
+    uploadState.attachments = [{ status: 'pending' }];
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: undefined,
+      submission: undefined,
+      images: [{ media: 'image/jpeg', data: 'AAAA' }],
+    });
+
+    const render = await mount(makeProps({ attachmentDelivery: 'local' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).toHaveBeenCalledWith('', {
+      attachments: undefined,
+      submission: undefined,
+      images: [{ media: 'image/jpeg', data: 'AAAA' }],
+      onOptimisticSend: expect.any(Function),
+    });
+  });
+
+  it('refuses local images once the model changed to one that reads none', async () => {
+    uploadState.attachments = [{ status: 'pending' }];
+
+    const render = await mount(
+      makeProps({ attachmentDelivery: 'local', attachmentsEnabled: false })
+    );
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'This model does not read images. Remove the images or choose another model.'
+    );
+  });
+});
+
+describe('ChatComposer unclaimed-attachment leave', () => {
+  it('routes the leave through the in-app discard confirm', async () => {
+    uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png', remoteKey: 'k1' }];
+
+    await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    const guard = vi.mocked(usePreventRemove).mock.calls.at(-1);
+    expect(guard?.[0]).toBe(true);
+    const action = { type: 'GO_BACK' };
+    const runGuard = guard?.[1];
+    if (!runGuard) {
+      throw new Error('composer did not register its leave guard');
+    }
+    runGuard({
+      data: { action },
+      repeat: () => {
+        leaveMock.dispatch(action);
+      },
+    });
+
+    expect(leaveMock.confirm).toHaveBeenCalledWith({
+      title: 'Discard attachments?',
+      message: 'Unclaimed uploads will be deleted.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      onConfirm: expect.any(Function),
+    });
+    // The leave stays prevented until the user discards.
+    expect(leaveMock.releaseUnclaimedUploads).not.toHaveBeenCalled();
+    expect(leaveMock.dispatch).not.toHaveBeenCalled();
+
+    const request = leaveMock.confirm.mock.calls.at(-1)?.[0] as { onConfirm: () => void };
+    request.onConfirm();
+
+    expect(leaveMock.releaseUnclaimedUploads).toHaveBeenCalledTimes(1);
+    expect(leaveMock.dispatch).toHaveBeenCalledWith(action);
   });
 });

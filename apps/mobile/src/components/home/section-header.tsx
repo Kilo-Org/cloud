@@ -1,27 +1,156 @@
-import { Pressable, View } from 'react-native';
+import { type ReactNode } from 'react';
+import { I18nManager, Pressable, View } from 'react-native';
 
-import { Text } from '@/components/ui/text';
+import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+  textActionTargetClass,
+} from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
+
+/**
+ * The box a Home section label sits at the bottom of. It is as tall as the
+ * compact action box, so every Home section header has one height and keeps
+ * one gap to the block above it.
+ */
+const LABEL_AIR_CLASS = 'min-h-[28px]';
 
 type SectionHeaderProps = {
   label: string;
-  /** Optional right-aligned link (e.g. "SEE ALL"). */
+  /**
+   * Optional link at the row's outer edge (physical right in LTR, physical left
+   * in RTL), e.g. "SEE ALL".
+   */
   actionLabel?: string;
   onActionPress?: () => void;
+  /**
+   * Keeps the action's box but makes it invisible, inert and hidden from
+   * screen readers, so hiding it cannot change the header's size. Beside a
+   * notice the hidden box is dropped instead: it would hold the notice off the
+   * row edge, over empty space.
+   */
+  actionHidden?: boolean;
+  /**
+   * Optional status between the label and the action. It takes only the free
+   * space on the label's line (zero basis), so it never pushes the action off
+   * the row; a long message wraps inside the slot instead of clipping, which
+   * grows the header by the wrapped line. A divider separates it from a
+   * visible action. Pass null while there is nothing to report.
+   */
+  notice?: ReactNode;
+  /**
+   * Puts the label at the bottom of {@link LABEL_AIR_CLASS} and renders the
+   * action on the compact {@link SECTION_ACTION_BOX_CLASS} box, with
+   * {@link SECTION_HEADER_ROW_PADDING_CLASS} on the row to hold the action's hit
+   * slop. A row with an action and a row without one then have the same height,
+   * so every Home section keeps the same gap to the block above it
+   * (home-header-section-gap). Home passes this for its sections.
+   */
+  reserveLabelAir?: boolean;
 };
 
-export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<SectionHeaderProps>) {
+export function SectionHeader({
+  label,
+  actionLabel,
+  onActionPress,
+  actionHidden = false,
+  notice,
+  reserveLabelAir = false,
+}: Readonly<SectionHeaderProps>) {
+  const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
+  // With a notice the label keeps its own width, so the notice takes all the
+  // free space on the line instead of an equal share of it.
+  const labelText = (
+    <Text variant="eyebrow" className={cn('max-w-full', !reserveLabelAir && !notice && 'grow')}>
+      {label}
+    </Text>
+  );
   return (
-    <View className="flex-row flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-5">
-      <Text variant="eyebrow">{label}</Text>
-      {actionLabel && onActionPress ? (
+    // The label sits on the row's content bottom edge (`items-end`), not on its
+    // vertical centre. An action's touch box is 48 dp tall while the label is
+    // one 11 px line, so a centred row holds the label 17 dp above the rows and
+    // cards it names — twice the gap a header without an action has — and the
+    // same label-to-content relation then reads as two different spacings
+    // (home section-label gap). The box still sets the row's height, so the air
+    // sits above the line instead of between the label and its content, which
+    // is the header's own `pb-2` everywhere.
+    //
+    // With `reserveLabelAir` the label and the action share one compact box
+    // height, and the row's padding holds the action's hit slop inside the row,
+    // so every Home section header has one height (home-header-section-gap).
+    <View
+      className={cn(
+        'flex-row flex-wrap items-end justify-end gap-2 px-4',
+        reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
+      )}
+    >
+      {/* With a notice the label keeps its own width, so the notice takes all
+          the free space on the line instead of an equal share of it. */}
+      {reserveLabelAir ? (
+        <View className={cn('flex-col justify-end', !notice && 'grow', LABEL_AIR_CLASS)}>
+          {labelText}
+        </View>
+      ) : (
+        labelText
+      )}
+      {notice ? (
+        <View className="min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2">
+          {notice}
+        </View>
+      ) : null}
+      {notice && hasAction ? <View className="h-3 w-px self-center bg-border" /> : null}
+      {hasAction ? (
         <Pressable
           onPress={onActionPress}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={actionLabel}
-          className="active:opacity-70"
+          disabled={actionHidden}
+          accessibilityRole={actionHidden ? undefined : 'button'}
+          accessibilityLabel={actionHidden ? undefined : actionLabel}
+          accessibilityElementsHidden={actionHidden}
+          importantForAccessibility={actionHidden ? 'no-hide-descendants' : undefined}
+          // The row packs each flex line to its end (`justify-end`) and only the
+          // label grows, so this box lands on the row's outer edge: the physical
+          // right in LTR, the physical left in RTL. `justify-between` would put a
+          // single item on its own wrapped line at the line start — when a long
+          // label pushes this box onto the next line it must still sit at the
+          // row end, not the margin it wrapped away from. It must NOT grow too:
+          // when both children grew the row split in half, and the action then
+          // sat at the inner edge of its half (the screen centre in Arabic), so
+          // it never reached the margin while the tab bar, cards and rows below
+          // were fully mirrored (home-arabic-rtl, home). Never a physical
+          // `text-left`/`text-right`: React Native swaps those two under RTL
+          // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
+          // is RTL).
+          // The frame is the box, not the 11px label line: a control-size audit
+          // reads the node's own rect and `hitSlop` never widens it. The row
+          // grows to hold the frame — RN stops delivering touches outside the
+          // parent, so a shrunk layout box would leave part of the target dead
+          // (`textActionTargetClass`, `comment-row.tsx`). With `reserveLabelAir`
+          // the box is the compact one, and its hit slop stays inside the row's
+          // own padding. The hidden action keeps the same box, so hiding it
+          // still cannot resize the header.
+          // Its copy sits on the box's bottom edge (`items-end`, the row's own
+          // cross-axis rule), so the action and the section label share one
+          // baseline instead of the action holding the label half a box away
+          // from the content it names.
+          hitSlop={reserveLabelAir ? SECTION_ACTION_HIT_SLOP : undefined}
+          className={cn(
+            reserveLabelAir ? SECTION_ACTION_BOX_CLASS : textActionTargetClass(),
+            'max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
+            actionHidden && 'opacity-0'
+          )}
         >
-          <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+          <Text
+            className={cn(
+              'shrink font-mono-medium text-[11px] text-primary',
+              // LTR-only: the letterspaced capitals break a cursive script's
+              // joins, so an RTL action label drops them (home-ar-loading).
+              // The class string is the eyebrow variant's, so the two labels
+              // cannot drift apart.
+              !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
+            )}
+          >
             {actionLabel}
           </Text>
         </Pressable>

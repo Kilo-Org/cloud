@@ -1,0 +1,746 @@
+import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
+import { afterEach, describe, expect, test } from '@jest/globals';
+import {
+  device_sessions,
+  kilocode_users,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
+import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
+import { NextRequest, NextResponse } from 'next/server';
+import { POST as personalResourcePost } from '@/app/api/auth/resource-token/route';
+import { POST as organizationResourcePost } from '@/app/api/organizations/[id]/user-tokens/route';
+import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+
+const shared = { enabled: true };
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  NEXTAUTH_SECRET: 'resource-delegation-test-secret',
+  isResourceTokenIssuanceEnabled: jest.fn(() => shared.enabled),
+}));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  getUserFromSessionForCredentialIssuance: jest.fn(),
+  getUserFromAuth: jest.fn(),
+}));
+jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => ({
+  createAuditLog: jest.fn(),
+}));
+jest.mock('../../../../../services/ai-attribution/src/util/logger', () => ({ logger: {} }));
+
+import {
+  canIssueLegacyOrganizationToken,
+  createControlTokenForRequest,
+  createDelegatedResourceToken,
+  getResourceDelegationAuthority,
+} from './resource-delegation';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getUserFromAuth,
+  getUserFromSessionForCredentialIssuance,
+} from '@kilocode/web-shared/lib/user/server';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+
+const secret = 'resource-delegation-test-secret';
+const cleanups: string[] = [];
+const { validateKiloToken } = jest.requireActual<{
+  validateKiloToken: (header: string, secret: string) => Promise<{ success: boolean }>;
+}>('../../../../../services/ai-attribution/src/util/auth');
+
+test.each(['owner', 'member', 'admin', 'billing_manager'] as const)(
+  'real attribution route and reader agree for organization role %s',
+  async role => {
+    const current = await user();
+    const organization = await organizationFor(current.id);
+    await db
+      .insert(organization_memberships)
+      .values({ organization_id: organization.id, kilo_user_id: current.id, role });
+    jest.mocked(getUserFromAuth).mockResolvedValue({ user: current, authFailedResponse: null });
+    jest
+      .mocked(getUserFromSessionForCredentialIssuance)
+      .mockResolvedValue({ user: current, authFailedResponse: null });
+    jest.mocked(getAuthorizedOrgContext).mockResolvedValue({
+      success: true,
+      data: { user: { ...current, role }, organization, access: { kind: 'member', role } },
+    });
+    const request = () =>
+      new NextRequest('https://example.test/api/auth/resource-token', {
+        method: 'POST',
+        headers: { origin: 'https://example.test' },
+        body: JSON.stringify({ resource: 'attribution' }),
+      });
+    const personal = await personalResourcePost(request());
+    expect(personal.status).toBe(403);
+    expect(await personal.json()).not.toHaveProperty('token');
+    const response = await organizationResourcePost(request(), {
+      params: Promise.resolve({ id: organization.id }),
+    });
+    if (role === 'admin' || role === 'billing_manager') {
+      expect(response.status).toBe(403);
+      expect(await response.json()).not.toHaveProperty('token');
+      return;
+    }
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(await validateKiloToken(`Bearer ${body.token}`, secret)).toMatchObject({
+      success: true,
+      organizationId: organization.id,
+      organizationRole: role,
+      kiloUserId: current.id,
+    });
+    const claims = jwt.verify(body.token, secret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      aud: 'ai-attribution',
+      apiTokenPepper: current.api_token_pepper,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+    });
+    expect(claims.exp! - claims.iat!).toBe(900);
+    shared.enabled = false;
+    expect(
+      (
+        await organizationResourcePost(request(), {
+          params: Promise.resolve({ id: organization.id }),
+        })
+      ).status
+    ).toBe(503);
+  }
+);
+
+afterEach(async () => {
+  if (cleanups.length) {
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, cleanups));
+    cleanups.length = 0;
+  }
+  shared.enabled = true;
+  jest.clearAllMocks();
+});
+
+async function user() {
+  const row = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+  cleanups.push(row.id);
+  return row;
+}
+
+async function organizationFor(userId: string) {
+  const [organization] = await db
+    .insert(organizations)
+    .values({
+      name: `Resource delegation ${crypto.randomUUID()}`,
+      created_by_kilo_user_id: userId,
+      require_seats: false,
+    })
+    .returning();
+  return organization;
+}
+
+function bearer(token: string) {
+  return new Headers({ authorization: `Bearer ${token}` });
+}
+
+describe('legacy organization token compatibility', () => {
+  test('allows authenticated sessions with absent or empty Authorization and rejects invalid bearers', async () => {
+    const current = await user();
+    await expect(canIssueLegacyOrganizationToken(new Headers(), current)).resolves.toBe(true);
+    await expect(
+      canIssueLegacyOrganizationToken(bearer('restricted-token'), current)
+    ).resolves.toBe(false);
+    await expect(
+      canIssueLegacyOrganizationToken(new Headers({ authorization: '' }), current)
+    ).resolves.toBe(true);
+  });
+
+  test('rejects a verified legacy bearer belonging to a different authenticated user', async () => {
+    const current = await user();
+    const other = await user();
+    const token = jwt.sign(
+      {
+        version: 3,
+        env: process.env.NODE_ENV,
+        kiloUserId: other.id,
+        apiTokenPepper: other.api_token_pepper,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 3600 }
+    );
+    await expect(canIssueLegacyOrganizationToken(bearer(token), current)).resolves.toBe(false);
+  });
+});
+
+function modernToken(
+  user: { id: string; api_token_pepper: string | null },
+  options?: {
+    purpose?: 'human-api' | 'device-access';
+    exchange?: boolean;
+    deviceSessionId?: string;
+  }
+) {
+  const now = Math.floor(Date.now() / 1000);
+  const base = {
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: 'kilo-api',
+    issuedAt: now,
+    expiresAt: now + 1800,
+    extra: options?.deviceSessionId ? { deviceSessionId: options.deviceSessionId } : undefined,
+  };
+  const payload =
+    options?.purpose === 'device-access'
+      ? buildModernKiloTokenPayload({
+          ...base,
+          tokenPurpose: 'device-access',
+          credentialExchange: false,
+        })
+      : buildModernKiloTokenPayload({
+          ...base,
+          tokenPurpose: 'human-api',
+          credentialExchange: options?.exchange ?? true,
+        });
+  return jwt.sign(payload, secret, { algorithm: 'HS256' });
+}
+
+describe('resource delegation authority', () => {
+  test.each([true, false])(
+    'accepts direct billing_manager membership when shared issuance is %s',
+    async enabled => {
+      shared.enabled = enabled;
+      const current = await user();
+      const organization = await organizationFor(current.id);
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: current.id,
+        role: 'billing_manager',
+      });
+      const headers = enabled ? bearer(modernToken(current)) : new Headers();
+      if (!enabled) {
+        jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+          user: current,
+          authFailedResponse: null,
+        });
+      }
+
+      const result = await createControlTokenForRequest(current, 'cloud-agent-next', {
+        headers,
+        organizationId: organization.id,
+      });
+      const claims = jwt.decode(result.token) as jwt.JwtPayload;
+      expect(claims).not.toHaveProperty('organizationRole');
+      if (enabled) {
+        expect(claims.organizationId).toBe(organization.id);
+      } else {
+        expect(claims).not.toHaveProperty('organizationId');
+      }
+    }
+  );
+
+  test.each([
+    [true, 'removed'],
+    [false, 'removed'],
+    [true, 'deleted'],
+    [false, 'deleted'],
+  ] as const)(
+    'denies direct organization access when shared issuance is %s and state is %s',
+    async (enabled, state) => {
+      shared.enabled = enabled;
+      const current = await user();
+      const organization = await organizationFor(current.id);
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: current.id,
+        role: 'billing_manager',
+      });
+      if (state === 'removed') {
+        await db
+          .delete(organization_memberships)
+          .where(eq(organization_memberships.organization_id, organization.id));
+      } else {
+        await db
+          .update(organizations)
+          .set({ deleted_at: new Date().toISOString() })
+          .where(eq(organizations.id, organization.id));
+      }
+
+      const headers = enabled ? bearer(modernToken(current)) : new Headers();
+      if (!enabled) {
+        jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+          user: current,
+          authFailedResponse: null,
+        });
+      }
+
+      await expect(
+        createControlTokenForRequest(current, 'cloud-agent-next', {
+          headers,
+          organizationId: organization.id,
+        })
+      ).rejects.toThrow('Unauthorized resource delegation request');
+    }
+  );
+
+  test('accepts an exchangeable modern human API credential and preserves its provenance', async () => {
+    const current = await user();
+    const authority = await getResourceDelegationAuthority(current, {
+      headers: bearer(modernToken(current)),
+    });
+
+    expect(authority).toMatchObject({
+      credentialKind: 'human-api',
+      isModern: true,
+      runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+  });
+
+  test('preserves verified legacy device sid for separately scoped widget issuance', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'widget-delegation-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 60 * 60 }
+    );
+    const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
+    expect(authority).toMatchObject({
+      credentialKind: 'device-access',
+      deviceSessionId: session.id,
+    });
+  });
+
+  test('accepts a device credential with the fixed legacy lifetime', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'legacy-lifetime-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 5 * 365 * 24 * 60 * 60 }
+    );
+
+    const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
+
+    expect(authority).toMatchObject({
+      credentialKind: 'device-access',
+      isModern: false,
+      deviceSessionId: session.id,
+    });
+  });
+
+  test('rejects a device credential with an unapproved lifetime', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'other-lifetime-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 2 * 60 * 60 }
+    );
+
+    await expect(
+      getResourceDelegationAuthority(current, { headers: bearer(token) })
+    ).rejects.toThrow('Unsupported legacy credential context');
+  });
+
+  test('rejects a device credential after its session is revoked', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'revoked-session-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 5 * 365 * 24 * 60 * 60 }
+    );
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'logout' })
+      .where(eq(device_sessions.id, session.id));
+
+    await expect(
+      getResourceDelegationAuthority(current, { headers: bearer(token) })
+    ).rejects.toThrow('Unauthorized resource delegation request');
+  });
+
+  test('requires an active owned device session for a modern device credential', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'resource-delegation-test' })
+      .returning({ id: device_sessions.id });
+
+    const authority = await getResourceDelegationAuthority(current, {
+      headers: bearer(
+        modernToken(current, {
+          purpose: 'device-access',
+          exchange: false,
+          deviceSessionId: session.id,
+        })
+      ),
+    });
+    expect(authority.credentialKind).toBe('device-access');
+  });
+
+  test('rejects restricted modern principals rather than projecting away their source claim', async () => {
+    const current = await user();
+    const claims = jwt.decode(modernToken(current));
+    if (!claims || typeof claims === 'string') throw new Error('Expected JWT claims');
+    const token = jwt.sign({ ...claims, tokenSource: 'cloud-agent' }, secret, {
+      algorithm: 'HS256',
+    });
+    await expect(
+      getResourceDelegationAuthority(current, { headers: bearer(token) })
+    ).rejects.toThrow('Unauthorized resource delegation request');
+  });
+
+  test('does not fall back to ambient cookies for malformed supplied authorization', async () => {
+    const current = await user();
+    jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+      user: current,
+      authFailedResponse: null,
+    });
+    await expect(
+      getResourceDelegationAuthority(current, {
+        headers: new Headers({ authorization: 'Basic bad' }),
+      })
+    ).rejects.toThrow('Unauthorized resource delegation request');
+  });
+
+  test('mints a bounded single-audience control token from a verified authority', async () => {
+    const current = await user();
+    const result = await createControlTokenForRequest(current, 'cloud-agent-next', {
+      headers: bearer(modernToken(current)),
+      expiresIn: 7200,
+    });
+    const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'human-api',
+      credentialExchange: false,
+      runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+    expect(claims.exp! - claims.iat!).toBeLessThanOrEqual(3600);
+  });
+
+  test('keeps a legitimate legacy session request on the legacy contract when disabled', async () => {
+    shared.enabled = false;
+    const current = await user();
+    jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+      user: current,
+      authFailedResponse: null,
+    });
+    const result = await createControlTokenForRequest(current, 'cloud-agent-next', {
+      headers: new Headers(),
+      legacyExpiresIn: 60,
+    });
+    const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
+    expect(claims.aud).toBeUndefined();
+    expect(claims.exp! - claims.iat!).toBe(60);
+  });
+
+  test('returns migration unavailable for a verified modern user principal when disabled', async () => {
+    shared.enabled = false;
+    const current = await user();
+    await expect(
+      createControlTokenForRequest(current, 'cloud-agent-next', {
+        headers: bearer(modernToken(current)),
+      })
+    ).rejects.toMatchObject({ status: 503, delegationCode: 'MIGRATION_UNAVAILABLE' });
+  });
+
+  test('continues bounded control issuance for an active modern device after shared rollout rollback', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'resource-delegation-test' })
+      .returning({ id: device_sessions.id });
+    const headers = bearer(
+      modernToken(current, {
+        purpose: 'device-access',
+        exchange: false,
+        deviceSessionId: session.id,
+      })
+    );
+
+    const active = await createControlTokenForRequest(current, 'cloud-agent-next', { headers });
+    expect(jwt.verify(active.token, secret)).toMatchObject({
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'device-access',
+      credentialExchange: false,
+      deviceSessionId: session.id,
+      runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+
+    shared.enabled = false;
+    const rollback = await createControlTokenForRequest(current, 'cloud-agent-next', { headers });
+    const claims = jwt.verify(rollback.token, secret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'device-access',
+      credentialExchange: false,
+      deviceSessionId: session.id,
+      runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+    expect(claims.exp! - claims.iat!).toBeLessThanOrEqual(1800);
+
+    const rotatedPepper = crypto.randomUUID();
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: rotatedPepper })
+      .where(eq(kilocode_users.id, current.id));
+    await expect(
+      createControlTokenForRequest(current, 'cloud-agent-next', { headers })
+    ).rejects.toThrow('Unauthorized resource delegation request');
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: current.api_token_pepper })
+      .where(eq(kilocode_users.id, current.id));
+
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'test' })
+      .where(eq(device_sessions.id, session.id));
+    await expect(
+      createControlTokenForRequest(current, 'cloud-agent-next', { headers })
+    ).rejects.toThrow('Unauthorized resource delegation request');
+  });
+
+  test('mints a non-exchangeable delegated token for exactly the selected audience', async () => {
+    const current = await user();
+    const result = await createDelegatedResourceToken(current, 'gateway', {
+      headers: bearer(modernToken(current)),
+    });
+    const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      aud: 'kilo-gateway',
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+    });
+    expect(claims.exp! - claims.iat!).toBeLessThanOrEqual(15 * 60);
+  });
+
+  test.each([
+    ['pages', 'pages'],
+    ['pages-dev', 'pages-dev'],
+  ] as const)('mints a minimal five-minute %s token', async (resource, audience) => {
+    const current = await user();
+    const result = await createDelegatedResourceToken(current, resource, {
+      headers: bearer(modernToken(current)),
+      tokenSource: 'harness',
+      expiresIn: 3600,
+    });
+    const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      aud: audience,
+      kiloUserId: current.id,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+      env: process.env.NODE_ENV,
+    });
+    expect(claims.exp! - claims.iat!).toBe(300);
+    expect(Object.keys(claims).sort()).toEqual(
+      [
+        'aud',
+        'credentialExchange',
+        'env',
+        'exp',
+        'iat',
+        'kiloUserId',
+        'tokenPurpose',
+        'version',
+      ].sort()
+    );
+    expect(new Date(result.expiresAt).getTime() / 1000).toBe(claims.exp);
+  });
+
+  test('mints a Pages token from the legacy five-year device credential', async () => {
+    const current = await user();
+    const now = Math.floor(Date.now() / 1000);
+    const legacy = jwt.sign(
+      {
+        env: process.env.NODE_ENV,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        version: 3,
+        deviceAuthRequestCode: 'ABC123',
+        iat: now,
+        exp: now + 157_788_000,
+      },
+      secret,
+      { algorithm: 'HS256' }
+    );
+    const result = await createDelegatedResourceToken(current, 'pages', {
+      headers: bearer(legacy),
+    });
+    expect(jwt.decode(result.token)).toMatchObject({ aud: 'pages' });
+  });
+
+  test('refuses to mint a Pages token from a gateway-audience token', async () => {
+    const current = await user();
+    const now = Math.floor(Date.now() / 1000);
+    const gateway = jwt.sign(
+      buildModernKiloTokenPayload({
+        userId: current.id,
+        pepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        audience: 'kilo-gateway',
+        issuedAt: now,
+        expiresAt: now + 1800,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+      }),
+      secret,
+      { algorithm: 'HS256' }
+    );
+    await expect(
+      createDelegatedResourceToken(current, 'pages', { headers: bearer(gateway) })
+    ).rejects.toMatchObject({ status: 401 });
+  });
+
+  test('refuses to mint a Pages token with an organization', async () => {
+    const current = await user();
+    const organization = await organizationFor(current.id);
+    await expect(
+      createDelegatedResourceToken(current, 'pages', {
+        headers: bearer(modernToken(current)),
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({ status: 403, delegationCode: 'FORBIDDEN' });
+    expect(getAuthorizedOrgContext).not.toHaveBeenCalled();
+  });
+
+  test('refuses to mint a Pages token while delegated issuance is disabled', async () => {
+    const current = await user();
+    shared.enabled = false;
+    await expect(
+      createDelegatedResourceToken(current, 'pages', { headers: bearer(modernToken(current)) })
+    ).rejects.toMatchObject({ status: 503, delegationCode: 'MIGRATION_UNAVAILABLE' });
+  });
+
+  test('keeps the pepper on api and gateway tokens', async () => {
+    const current = await user();
+    for (const resource of ['api', 'gateway'] as const) {
+      const result = await createDelegatedResourceToken(current, resource, {
+        headers: bearer(modernToken(current)),
+      });
+      expect(jwt.decode(result.token)).toMatchObject({ apiTokenPepper: current.api_token_pepper });
+    }
+  });
+
+  test('caps delegated tokens to the parent credential expiry', async () => {
+    const current = await user();
+    const now = Math.floor(Date.now() / 1000);
+    const claims = buildModernKiloTokenPayload({
+      userId: current.id,
+      pepper: current.api_token_pepper,
+      env: process.env.NODE_ENV,
+      audience: 'kilo-api',
+      issuedAt: now - 1,
+      expiresAt: now + 30,
+      tokenPurpose: 'human-api',
+      credentialExchange: true,
+    });
+    const parent = jwt.sign(claims, secret, { algorithm: 'HS256' });
+    const result = await createDelegatedResourceToken(current, 'api', { headers: bearer(parent) });
+    const delegated = jwt.verify(result.token, secret) as jwt.JwtPayload;
+    expect(delegated.exp! - delegated.iat!).toBeLessThanOrEqual(30);
+  });
+});
+
+test('issues request control tokens only while the cloud-agent-next family is enabled', async () => {
+  const current = await user();
+  jest
+    .mocked(getUserFromSessionForCredentialIssuance)
+    .mockResolvedValue({ user: current, authFailedResponse: null });
+
+  const enabled = await createControlTokenForRequest(current, 'cloud-agent-next', {
+    headers: new Headers(),
+  });
+  expect(isResourceTokenIssuanceEnabled).toHaveBeenLastCalledWith('cloud-agent-next');
+  expect(jwt.decode(enabled.token)).toMatchObject({
+    aud: 'cloud-agent-next',
+    tokenPurpose: 'human-api',
+  });
+
+  shared.enabled = false;
+  const disabled = await createControlTokenForRequest(current, 'cloud-agent-next', {
+    headers: new Headers(),
+  });
+  const claims = jwt.decode(disabled.token) as jwt.JwtPayload;
+  expect(claims.aud).toBeUndefined();
+  expect(claims.tokenPurpose).toBeUndefined();
+
+  await expect(
+    createDelegatedResourceToken(current, 'gateway', { headers: new Headers() })
+  ).rejects.toMatchObject({ status: 503, delegationCode: 'MIGRATION_UNAVAILABLE' });
+  expect(isResourceTokenIssuanceEnabled).toHaveBeenLastCalledWith('delegated-resource');
+});
+
+describe('explicit delegated organization authority', () => {
+  test.each(['missing', 'different-user', 'different-role'] as const)(
+    'fails closed for %s organization authority',
+    async state => {
+      const current = await user();
+      const organization = await organizationFor(current.id);
+      const other = await user();
+      jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+        user: current,
+        authFailedResponse: null,
+      });
+      jest.mocked(getAuthorizedOrgContext).mockResolvedValue(
+        state === 'missing'
+          ? {
+              success: false,
+              nextResponse: NextResponse.json({ error: 'Organization not found' }, { status: 404 }),
+            }
+          : {
+              success: true,
+              data: {
+                user: { ...(state === 'different-user' ? other : current), role: 'member' },
+                organization,
+                access: { kind: 'member', role: 'member' },
+              },
+            }
+      );
+      await expect(
+        createDelegatedResourceToken(current, 'api', {
+          headers: new Headers(),
+          organizationId: organization.id,
+          organizationRole: state === 'different-role' ? 'owner' : 'member',
+        })
+      ).rejects.toMatchObject({ status: 403, delegationCode: 'FORBIDDEN' });
+      expect(getAuthorizedOrgContext).toHaveBeenCalledWith(organization.id);
+    }
+  );
+});

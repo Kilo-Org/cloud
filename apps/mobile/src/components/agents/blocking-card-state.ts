@@ -5,8 +5,11 @@
 // lets the repo's `node` vitest env cover the selection + CTA rules without
 // rendering React Native.
 
-import { type Component, type RefObject } from 'react';
+import { type RefObject } from 'react';
+import { type HostInstance } from 'react-native';
 
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { type BlockingInteraction } from './agent-interaction-policy';
@@ -17,8 +20,21 @@ type BlockingCardUiState = 'happy' | 'retryable' | 'non-retryable';
 
 export type BlockingCardRetryAction = 'answer' | 'reject' | 'respond';
 
+/** Tool-permission decision carried by the submission that failed. */
+export type PermissionResponse = 'once' | 'always' | 'reject';
+
 export type BlockingCardSubmissionError =
-  | { kind: 'retryable'; message: string; action: BlockingCardRetryAction }
+  | {
+      kind: 'retryable';
+      message: string;
+      action: BlockingCardRetryAction;
+      /**
+       * Permission decision the failed submission carried, or `null` for a
+       * question error. The retry CTA re-sends exactly this value, so a
+       * recovery never turns one decision into another.
+       */
+      permissionResponse: PermissionResponse | null;
+    }
   | { kind: 'non-retryable'; message: string };
 
 type BlockingCardPresentation = {
@@ -39,6 +55,12 @@ type BlockingCardPresentation = {
    */
   retryAction: BlockingCardRetryAction | null;
   /**
+   * Permission decision the retry CTA re-sends. Non-null only for a
+   * permission card whose retryable error recorded the failed decision; when
+   * it is `null` the card shows its normal decision controls instead.
+   */
+  retryPermissionResponse: PermissionResponse | null;
+  /**
    * True for the question card's "Skip" affordance. Hidden when the active
    * retry is for a failed skip so the user sees a single "Retry skip" action.
    * Permission cards never have an independent reject path, so this is always
@@ -51,7 +73,8 @@ type BlockingCardPresentation = {
 
 export type BlockingCardA11yDeps = {
   announce: (message: string) => void;
-  focus: (ref: RefObject<Component | null>) => boolean;
+  /** Reports dispatch, not confirmed focus; false allows a mount-race retry. */
+  focus: (ref: RefObject<HostInstance | null>) => boolean;
 };
 
 /**
@@ -94,20 +117,28 @@ export function getBlockingCardPresentationForKind(input: {
       hasPrimaryCta: false,
       hasRetryCta: false,
       retryAction: null,
+      retryPermissionResponse: null,
       hasRejectCta: false,
       errorMessage: submissionError.message,
     };
   }
 
   if (submissionError?.kind === 'retryable') {
+    // A permission retry re-sends the decision that failed. Without a
+    // recorded decision there is nothing safe to re-send, so the card keeps
+    // its explicit Deny / Allow controls instead of guessing one.
+    const retryPermissionResponse =
+      kind === 'permission' ? submissionError.permissionResponse : null;
+    const canRetry = kind !== 'permission' || retryPermissionResponse != null;
     return {
       kind,
       state: 'retryable',
       announcement: buildAnnouncement(kind, 'retryable'),
       protocolExplanation: buildProtocolExplanation(kind, 'retryable'),
-      hasPrimaryCta: false,
-      hasRetryCta: true,
-      retryAction: submissionError.action,
+      hasPrimaryCta: !canRetry,
+      hasRetryCta: canRetry,
+      retryAction: canRetry ? submissionError.action : null,
+      retryPermissionResponse,
       hasRejectCta: kind === 'question' && submissionError.action !== 'reject',
       errorMessage: submissionError.message,
     };
@@ -121,21 +152,20 @@ export function getBlockingCardPresentationForKind(input: {
     hasPrimaryCta: true,
     hasRetryCta: false,
     retryAction: null,
+    retryPermissionResponse: null,
     hasRejectCta: kind === 'question',
     errorMessage: null,
   };
 }
 
 /**
- * Side-effect helper invoked from the card's mount effect. Centralises the
- * "announce + move focus" pair here so the React components execute the same
- * path the unit tests cover. If the focus target has no node handle yet
- * (first-paint race), a follow-up attempt is scheduled on the next tick and the
- * cleanup function clears that timeout on unmount/request change.
+ * Announce the card and request focus. If no request was dispatched, retry once
+ * after the first-paint race; cleanup cancels it on unmount or request change.
+ * A dispatched request is not confirmation that assistive focus moved.
  */
 export function applyBlockingCardAppearance(
   presentation: BlockingCardPresentation,
-  ref: RefObject<Component | null>,
+  ref: RefObject<HostInstance | null>,
   deps: BlockingCardA11yDeps
 ): (() => void) | undefined {
   deps.announce(presentation.announcement);
@@ -167,44 +197,72 @@ export function classifyBlockingSubmissionError(
   kind: BlockingCardKind,
   action: BlockingCardRetryAction = 'answer'
 ): BlockingCardSubmissionError {
+  return classifySubmissionError({ error, kind, action, permissionResponse: null });
+}
+
+/**
+ * Classify a failed tool-permission response. The `response` argument records
+ * the decision the submission carried, so the retry re-sends that exact value
+ * whichever caller sent it (card press, notification action, goal clear).
+ */
+export function classifyPermissionSubmissionError(
+  error: unknown,
+  response: PermissionResponse
+): BlockingCardSubmissionError {
+  return classifySubmissionError({
+    error,
+    kind: 'permission',
+    action: 'respond',
+    permissionResponse: response,
+  });
+}
+
+function classifySubmissionError(input: {
+  error: unknown;
+  kind: BlockingCardKind;
+  action: BlockingCardRetryAction;
+  permissionResponse: PermissionResponse | null;
+}): BlockingCardSubmissionError {
+  const { error, kind, action, permissionResponse } = input;
   const code = readTrpcErrorField(error, 'code');
   if (code === 'NOT_FOUND') {
     return {
       kind: 'non-retryable',
       message:
         kind === 'question'
-          ? 'This question is no longer available.'
-          : 'This permission request is no longer available.',
+          ? i18n.t('agentChat.blockingCard.questionUnavailable')
+          : i18n.t('agentChat.blockingCard.permissionUnavailable'),
     };
   }
   return {
     kind: 'retryable',
     message: buildRetryableMessage(kind, action),
     action,
+    permissionResponse,
   };
 }
 
 function buildRetryableMessage(kind: BlockingCardKind, action: BlockingCardRetryAction): string {
   if (kind === 'question') {
     return action === 'reject'
-      ? 'Failed to skip question. Please try again.'
-      : 'Failed to submit answer. Please try again.';
+      ? i18n.t('agentChat.blockingCard.failedToSkipQuestion')
+      : i18n.t('agentChat.blockingCard.failedToSubmitAnswer');
   }
-  return 'Failed to respond to permission. Please try again.';
+  return i18n.t('agentChat.blockingCard.failedToRespondToPermission');
 }
 
 function buildAnnouncement(kind: BlockingCardKind, state: BlockingCardUiState): string {
   if (state === 'non-retryable') {
     return kind === 'question'
-      ? 'This question is no longer available.'
-      : 'This permission request is no longer available.';
+      ? i18n.t('agentChat.blockingCard.questionUnavailable')
+      : i18n.t('agentChat.blockingCard.permissionUnavailable');
   }
   if (state === 'retryable') {
-    return 'Submission failed. Please try again.';
+    return i18n.t('agentChat.blockingCard.submissionFailed');
   }
   return kind === 'question'
-    ? 'Agent needs your input. The composer is paused while you answer.'
-    : 'Agent needs permission to continue. The composer is paused while you decide.';
+    ? i18n.t('agentChat.blockingCard.questionAnnouncement')
+    : i18n.t('agentChat.blockingCard.permissionAnnouncement');
 }
 
 /**
@@ -214,15 +272,20 @@ function buildAnnouncement(kind: BlockingCardKind, state: BlockingCardUiState): 
  * permissions, so the user sees every waiting request in one number.
  */
 export function formatBlockingCardTitle(baseTitle: string, count: number): string {
-  return count > 1 ? `${baseTitle} (1 of ${count})` : baseTitle;
+  return count > 1
+    ? `${baseTitle} ${i18n.t('agentChat.blockingCard.positionHint', {
+        count,
+        displayCount: formatNumber(count, i18n.language),
+      })}`
+    : baseTitle;
 }
 
 function buildProtocolExplanation(kind: BlockingCardKind, state: BlockingCardUiState): string {
   if (state === 'non-retryable') {
-    return 'The agent has moved past this prompt. This card will close when the session continues.';
+    return i18n.t('agentChat.blockingCard.movedPastPrompt');
   }
   if (kind === 'question') {
-    return 'The agent is waiting for your answer. While this question is open, your message to the agent is paused.';
+    return i18n.t('agentChat.blockingCard.waitingForAnswer');
   }
-  return 'The agent is waiting for permission. While this request is open, your message to the agent is paused.';
+  return i18n.t('agentChat.blockingCard.waitingForPermission');
 }

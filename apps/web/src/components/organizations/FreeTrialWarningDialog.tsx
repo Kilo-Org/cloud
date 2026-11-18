@@ -10,15 +10,13 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/Button';
 import { Lock } from 'lucide-react';
-import type {
-  OrgTrialStatus,
-  OrganizationWithMembers,
-} from '@/lib/organizations/organization-types';
+import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OrganizationTrialDisplayStatus } from '@kilocode/web-shared/lib/organizations/trial-utils';
 
 type FreeTrialWarningDialogProps = {
-  trialStatus: OrgTrialStatus;
+  trialStatus: OrganizationTrialDisplayStatus;
   daysExpired: number;
-  organization: OrganizationWithMembers;
+  organization: OrganizationWithMembersResponse;
   onClose?: () => void;
   onUpgradeClick: () => void;
   container?: HTMLElement | null;

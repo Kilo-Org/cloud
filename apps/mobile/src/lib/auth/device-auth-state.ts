@@ -1,4 +1,18 @@
+import { type AuthErrorMessageKey } from '@/lib/auth/auth-error-messages';
+import { type PendingLinkResult } from '@/lib/auth/native-auth-contract';
+
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
+
+/**
+ * A device-auth error stored untranslated. Every device-auth error is a catalog
+ * key, so the screen translates it at render and a language switch re-renders
+ * the banner in the new language.
+ */
+export type DeviceAuthError = { kind: 'key'; key: AuthErrorMessageKey };
+
+export function deviceAuthErrorKey(key: AuthErrorMessageKey): DeviceAuthError {
+  return { kind: 'key', key };
+}
 
 export type DeviceAuthState = {
   status: DeviceAuthStatus;
@@ -6,13 +20,18 @@ export type DeviceAuthState = {
   token: string | undefined;
   refreshToken: string | undefined;
   expiresIn: number | undefined;
-  error: string | undefined;
+  error: DeviceAuthError | undefined;
   verificationUrl: string | undefined;
+  resumed?: boolean;
+  /** What happened to the pending link the approved code carried. */
+  pendingLink?: PendingLinkResult;
+  /** The pending-link token the device-code route refused as no longer live. */
+  expiredPendingLinkToken?: string;
 };
 
 export function errorDeviceAuthState(
   code: string | undefined,
-  error: string,
+  error: DeviceAuthError,
   previousVerificationUrl: string | undefined
 ): DeviceAuthState {
   return {
@@ -40,7 +59,8 @@ export function idleDeviceAuthState(): DeviceAuthState {
 
 export function pendingDeviceAuthState(
   code: string | undefined,
-  verificationUrl: string | undefined
+  verificationUrl: string | undefined,
+  resumed = false
 ): DeviceAuthState {
   return {
     status: 'pending',
@@ -50,6 +70,7 @@ export function pendingDeviceAuthState(
     expiresIn: undefined,
     error: undefined,
     verificationUrl,
+    resumed,
   };
 }
 
@@ -59,6 +80,7 @@ export function approvedDeviceAuthState(params: {
   refreshToken?: string;
   expiresIn?: number;
   previousVerificationUrl?: string;
+  pendingLink?: PendingLinkResult;
 }): DeviceAuthState {
   return {
     status: 'approved',
@@ -68,13 +90,14 @@ export function approvedDeviceAuthState(params: {
     expiresIn: params.expiresIn,
     error: undefined,
     verificationUrl: params.previousVerificationUrl,
+    ...(params.pendingLink ? { pendingLink: params.pendingLink } : {}),
   };
 }
 
 export function terminalDeviceAuthState(params: {
   status: 'denied' | 'expired';
   code: string;
-  error: string;
+  error: DeviceAuthError;
   previousVerificationUrl?: string;
 }): DeviceAuthState {
   return {

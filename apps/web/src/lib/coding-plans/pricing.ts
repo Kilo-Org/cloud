@@ -1,8 +1,7 @@
-import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import {
   BYTEPLUS_CODING_MODEL_IDS,
   BYTEPLUS_CODING_PROVIDER_ID,
-} from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/byteplus-coding';
 
 export const CODING_PLAN_IDS = [
   'minimax-token-plan-plus',
@@ -27,6 +26,8 @@ export type CodingPlanCatalogEntry = {
   features: readonly string[];
 };
 
+const MINIMAX_M3_MODEL_ID = 'minimax/minimax-m3';
+
 const MINIMAX_COMMON_FEATURES = [
   'Kilo automatically configures MiniMax in your BYOK settings.',
   'Full access to the MiniMax model family (M3, M2.7, image, speech, music).',
@@ -47,7 +48,7 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Plus',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
+    coveredModelIds: [MINIMAX_M3_MODEL_ID],
     costMicrodollars: 20_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~1.7B tokens per month of M3 usage.', 'Run 3-4 concurrent agents.'),
@@ -57,7 +58,7 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Max',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
+    coveredModelIds: [MINIMAX_M3_MODEL_ID],
     costMicrodollars: 50_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~5.1B tokens per month of M3 usage.', 'Run 4-5 concurrent agents.'),
@@ -67,7 +68,7 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Ultra',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
+    coveredModelIds: [MINIMAX_M3_MODEL_ID],
     costMicrodollars: 120_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~12.5B tokens per month of M3 usage.', 'Run 6-7 concurrent agents.'),
@@ -132,4 +133,19 @@ export function hasCodingPlanForModel(providerId: string, modelId: string): bool
 
 export function isMonthlyCodingPlan(planId?: string): boolean {
   return planId ? getCodingPlanPrice(planId)?.billingPeriodDays === 30 : false;
+}
+
+// MiniMax Token Plans (Plus/Max/Ultra) are closed to new subscribers. Existing
+// subscriptions continue unaffected: they keep routing, renewing, and can
+// still be canceled; only new purchases and new "notify me" waitlist entries
+// are rejected. See .specs/coding-plans.md for the governed catalog rules
+// this deliberately overrides for these three plan IDs.
+const CODING_PLANS_DISABLED_FOR_NEW_SIGNUPS = new Set<CodingPlanId>([
+  'minimax-token-plan-plus',
+  'minimax-token-plan-max',
+  'minimax-token-plan-ultra',
+]);
+
+export function isCodingPlanDisabledForNewSignups(planId: CodingPlanId): boolean {
+  return CODING_PLANS_DISABLED_FOR_NEW_SIGNUPS.has(planId);
 }

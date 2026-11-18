@@ -1,9 +1,64 @@
-import { describe, expect, it } from 'vitest';
-import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
+/* eslint-disable max-lines -- one device-auth suite: the poll-request and token-parse contract cases plus the hook mount/state cases share one module-mock scaffold */
+/* eslint-disable import/first -- vi.mock must precede the hook import so the native modules are stubbed */
+import * as React from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
 import {
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
 } from '@/lib/auth/native-auth-contract';
+
+// Mocks for the hook mount tests. `vi.mock` is hoisted above the imports, so
+// the hook under test receives these stubs instead of the native modules.
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
+
+vi.mock('expo-web-browser', () => ({
+  openBrowserAsync: vi.fn(),
+  openAuthSessionAsync: vi.fn(),
+}));
+
+// A product WEB_BASE_URL keeps the SSO case on the native auth session path.
+vi.mock('@/lib/config', () => ({
+  API_BASE_URL: 'http://localhost:3000',
+  WEB_BASE_URL: 'https://app.kilo.ai',
+}));
+
+vi.mock('@/lib/auth/device-auth-poll', () => ({
+  startDeviceAuthPoll: vi.fn(() => ({ cleanup: vi.fn(), pollNow: vi.fn() })),
+}));
+
+vi.mock('@/lib/auth/pending-external-auth', () => ({
+  readPendingExternalAuth: vi.fn(),
+  writePendingExternalAuth: vi.fn(),
+  clearPendingExternalAuth: vi.fn(),
+}));
+
+// The app-shell helper composes the SSO URL with the real base URL; only its
+// launch path reaches the native browser module this project cannot load.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+
+// `app-shell-handoff` also imports the tRPC client, whose module loads the Expo
+// runtime; this suite starts sign-ins over `fetch` and never mints.
+vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
+
+import { useDeviceAuth } from '@/lib/auth/use-device-auth';
+import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
+import { pendingDeviceAuthState } from '@/lib/auth/device-auth-state';
+import { openAuthSessionAsync, openBrowserAsync } from 'expo-web-browser';
+import {
+  clearPendingExternalAuth,
+  readPendingExternalAuth,
+  writePendingExternalAuth,
+} from '@/lib/auth/pending-external-auth';
 
 describe('device-auth polling request', () => {
   it('sends only the device secret as the polling credential', () => {
@@ -14,26 +69,41 @@ describe('device-auth polling request', () => {
   });
 });
 
-// --- Existing 429 tests (unchanged) ---
+// --- Device-auth start refusals ---
 
-describe('use-device-auth start path — 429 rate-limit message', () => {
-  it('extracts the server error field from a 429 JSON body', () => {
+describe('use-device-auth start path — rate-limit refusal', () => {
+  it('reads the stable RATE_LIMITED code and ignores the server sentence', () => {
     const serverBody = {
-      error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.',
+      error: 'RATE_LIMITED',
+      message: 'x',
+      retryAfterSeconds: 30,
     };
-    const message = getDeviceAuth429Message(serverBody);
-    expect(message).toBe(serverBody.error);
+    // A status other than 429, so the code alone decides this case.
+    expect(getDeviceAuthStartRefusalError(serverBody, 400)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
   });
 
-  it('falls back to a fixed string when the server body has no error field', () => {
-    const serverBody: { error?: string } = {};
-    const message = getDeviceAuth429Message(serverBody);
-    expect(message).toBe('Too many sign-in attempts. Please wait and try again.');
+  it('keeps the rate-limit copy for a 429 whose body names no code', () => {
+    expect(getDeviceAuthStartRefusalError(undefined, 429)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
   });
 
-  it('falls back to the fixed string when JSON parsing fails', () => {
-    const message = getDeviceAuth429Message(undefined);
-    expect(message).toBe('Too many sign-in attempts. Please wait and try again.');
+  it('keeps the rate-limit copy for a 429 whose body names another code', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'SOMETHING_ELSE' }, 429)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+  });
+
+  it('falls back to the generic start failure for a non-429 refusal', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'INVALID_REQUESTING_CLIENT' }, 400)).toEqual({
+      kind: 'key',
+      key: 'authErrors.startSignInFailed',
+    });
   });
 });
 
@@ -143,5 +213,380 @@ describe('use-device-auth malformed poll response — terminal state', () => {
   it('parses a valid expired terminal state correctly', () => {
     const result = parseDeviceAuthTokenResponse({ status: 'expired' });
     expect(result).toEqual({ status: 'expired' });
+  });
+});
+
+// --- pendingDeviceAuthState resume flag ---
+
+describe('pendingDeviceAuthState resume flag', () => {
+  it('defaults resumed to false for a fresh flow', () => {
+    expect(pendingDeviceAuthState('UC', 'https://x').resumed).toBe(false);
+  });
+
+  it('sets resumed to true for a restored flow', () => {
+    expect(pendingDeviceAuthState('UC', 'https://x', true).resumed).toBe(true);
+  });
+});
+
+// --- Hook mount tests (restore/start race and resume copy flag) ---
+
+type PendingExternalAuthRecord = {
+  deviceCode: string;
+  userCode: string;
+  verificationUrl: string;
+  startedAt: number;
+};
+
+type DeviceAuthResult = ReturnType<typeof useDeviceAuth>;
+
+function DeviceAuthHarness({ resultRef }: { resultRef: { current: DeviceAuthResult | null } }) {
+  const result = useDeviceAuth();
+  resultRef.current = result;
+  return null;
+}
+
+const fetchMock = vi.fn();
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolveFn: ((value: T) => void) | undefined = undefined;
+  const promise = new Promise<T>(resolve => {
+    resolveFn = resolve;
+  });
+  return {
+    promise,
+    resolve: (value: T) => {
+      resolveFn?.(value);
+    },
+  };
+}
+
+function requireResult(resultRef: { current: DeviceAuthResult | null }): DeviceAuthResult {
+  const result = resultRef.current;
+  if (!result) {
+    throw new Error('useDeviceAuth did not run');
+  }
+  return result;
+}
+
+async function mountSettled(): Promise<{ current: DeviceAuthResult | null }> {
+  const resultRef: { current: DeviceAuthResult | null } = { current: null };
+  await act(async () => {
+    TestRenderer.create(React.createElement(DeviceAuthHarness, { resultRef }));
+    await Promise.resolve();
+  });
+  return resultRef;
+}
+
+/** Runs a fresh sign-in whose server response carries `verificationUrl`, so the
+ *  test observes which browser API the auth host selects. */
+async function startSignin(verificationUrl: string): Promise<void> {
+  vi.mocked(openAuthSessionAsync).mockClear();
+  vi.mocked(openBrowserAsync).mockClear();
+  vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+  fetchMock.mockResolvedValue(Response.json({ code: 'UC', verificationUrl }));
+  const result = requireResult(await mountSettled());
+  await act(async () => {
+    await result.start('signin');
+  });
+}
+
+describe('useDeviceAuth hook', () => {
+  beforeEach(() => {
+    vi.mocked(readPendingExternalAuth).mockReset();
+    vi.mocked(writePendingExternalAuth).mockReset();
+    vi.mocked(clearPendingExternalAuth).mockReset();
+    vi.mocked(startDeviceAuthPoll).mockReset();
+    vi.mocked(startDeviceAuthPoll).mockReturnValue({
+      cleanup: vi.fn<() => void>(),
+      pollNow: vi.fn<() => void>(),
+    });
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('restores a live record into pending state, marks it resumed, and starts the poll', async () => {
+    const record: PendingExternalAuthRecord = {
+      deviceCode: 'device-secret',
+      userCode: 'UC-1234',
+      verificationUrl: 'https://example.com/device-auth?code=UC-1234',
+      startedAt: Date.now(),
+    };
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'valid', record });
+
+    const resultRef = await mountSettled();
+
+    expect(resultRef.current?.status).toBe('pending');
+    expect(resultRef.current?.code).toBe('UC-1234');
+    expect(resultRef.current?.resumed).toBe(true);
+    expect(startDeviceAuthPoll).toHaveBeenCalledTimes(1);
+    // The resumed poll closes whatever the flow opened for this URL.
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('plain-browser');
+  });
+
+  it('lets a start() that runs during the restore read win without a second poll', async () => {
+    const readGate = deferred<Awaited<ReturnType<typeof readPendingExternalAuth>>>();
+    vi.mocked(readPendingExternalAuth).mockReturnValue(readGate.promise);
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'NEW-CODE', verificationUrl: 'https://new.example' })
+    );
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+
+    // start() while the restore read is still held open.
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    // Release the restore read with a stale live record.
+    await act(async () => {
+      readGate.resolve({
+        kind: 'valid',
+        record: {
+          deviceCode: 'stale-device',
+          userCode: 'STALE',
+          verificationUrl: 'https://stale.example',
+          startedAt: Date.now(),
+        },
+      });
+      await Promise.resolve();
+    });
+
+    // The fresh start owns the flow: its code (not the restored one) shows and
+    // the restore did not start a second poll.
+    expect(resultRef.current?.code).toBe('NEW-CODE');
+    expect(resultRef.current?.resumed).toBe(false);
+    expect(startDeviceAuthPoll).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries resumed: false on a fresh start', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'FRESH', verificationUrl: 'https://fresh.example' })
+    );
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    expect(resultRef.current?.code).toBe('FRESH');
+    expect(resultRef.current?.resumed).toBe(false);
+  });
+
+  it('clearError resets a terminal start error to idle so a retry starts clean', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toBeTruthy();
+
+    act(() => {
+      resultRef.current?.clearError();
+    });
+
+    expect(resultRef.current?.status).toBe('idle');
+    expect(resultRef.current?.error).toBeUndefined();
+  });
+
+  it('clearError leaves a live pending flow untouched', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'LIVE', verificationUrl: 'https://live.example' })
+    );
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('signin');
+    });
+    expect(resultRef.current?.status).toBe('pending');
+
+    act(() => {
+      resultRef.current?.clearError();
+    });
+
+    expect(resultRef.current?.status).toBe('pending');
+    expect(resultRef.current?.code).toBe('LIVE');
+  });
+
+  it('clearError tears down the poll behind an open-browser error before resetting', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'LIVE', verificationUrl: 'https://live.example' })
+    );
+    const pollCleanup = vi.fn<() => void>();
+    vi.mocked(startDeviceAuthPoll).mockReturnValue({
+      cleanup: pollCleanup,
+      pollNow: vi.fn<() => void>(),
+    });
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('signin');
+    });
+    expect(resultRef.current?.status).toBe('pending');
+
+    // The pending screen's Open browser control fails: it sets an error state
+    // while the poll stays registered — an `error` that is not terminal.
+    vi.mocked(openBrowserAsync).mockRejectedValueOnce(new Error('browser failed'));
+    await act(async () => {
+      await requireResult(resultRef).openBrowser();
+    });
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.code).toBe('LIVE');
+
+    act(() => {
+      resultRef.current?.clearError();
+    });
+
+    // Clearing the error must kill the still-live poll, not just drop its code.
+    expect(pollCleanup).toHaveBeenCalledTimes(1);
+    expect(resultRef.current?.status).toBe('idle');
+    expect(resultRef.current?.code).toBeUndefined();
+  });
+
+  it('builds the SSO browser URL from start("sso", email) without the organization id', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({
+        code: 'USER-123',
+        verificationUrl: 'https://app.kilo.ai/device-auth?code=USER-123',
+      })
+    );
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('sso', 'user@example.com');
+    });
+
+    expect(vi.mocked(openAuthSessionAsync)).toHaveBeenCalledTimes(1);
+    const url = new URL(vi.mocked(openAuthSessionAsync).mock.calls[0]?.[0] ?? '');
+    expect(url.pathname).toBe('/app-shell/sign-in');
+    expect(url.searchParams.get('email')).toBe('user@example.com');
+    // The approval page the server named is the callback, path and query kept.
+    expect(url.searchParams.get('callbackPath')).toBe('/device-auth?code=USER-123');
+    expect(url.searchParams.has('sso')).toBe(false);
+    expect(url.searchParams.has('ssoOrganizationId')).toBe(false);
+  });
+
+  it('ties the device code to the pending link a browser sign-in resolves', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'UC', verificationUrl: 'https://app.kilo.ai/device-auth?code=UC' })
+    );
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin', undefined, 'link-token');
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe(JSON.stringify({ pendingLinkToken: 'link-token' }));
+  });
+
+  it('sends the device code request without a body when no link is pending', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'UC', verificationUrl: 'https://app.kilo.ai/device-auth?code=UC' })
+    );
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init).not.toHaveProperty('body');
+  });
+
+  it('reports a refused pending link as expired instead of a start error', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(Response.json({ error: 'PENDING_LINK_EXPIRED' }, { status: 400 }));
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin', undefined, 'link-token');
+    });
+
+    expect(resultRef.current?.status).toBe('idle');
+    expect(resultRef.current?.error).toBeUndefined();
+    expect(resultRef.current?.expiredPendingLinkToken).toBe('link-token');
+    expect(startDeviceAuthPoll).not.toHaveBeenCalled();
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
+  });
+
+  it('keeps any other 400 a start error', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(Response.json({ error: 'INVALID_REQUEST' }, { status: 400 }));
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin', undefined, 'link-token');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toEqual({
+      kind: 'key',
+      key: 'authErrors.startSignInFailed',
+    });
+    expect(resultRef.current?.expiredPendingLinkToken).toBeUndefined();
+  });
+
+  it('shows the rate-limit copy for a refused start and opens no browser', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json(
+        { error: 'RATE_LIMITED', message: 'Too many sign-in attempts.', retryAfterSeconds: 600 },
+        { status: 429 }
+      )
+    );
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+    expect(startDeviceAuthPoll).not.toHaveBeenCalled();
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
+  });
+
+  it('opens a plain browser for a non-product auth host (no consent alert)', async () => {
+    const url = 'http://127.0.0.1:3000/device-auth?code=UC-1';
+    await startSignin(url);
+    expect(vi.mocked(openBrowserAsync)).toHaveBeenCalledExactlyOnceWith(url);
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
+    // Approval ends the flow from the poll, so it must know which page to close:
+    // `dismissAuthSession` does nothing to this one.
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('plain-browser');
+  });
+
+  it('keeps the native auth session for a product auth host', async () => {
+    const url = 'https://app.kilo.ai/device-auth?code=UC-2';
+    await startSignin(url);
+    expect(vi.mocked(openAuthSessionAsync)).toHaveBeenCalledExactlyOnceWith(url);
+    expect(vi.mocked(openBrowserAsync)).not.toHaveBeenCalled();
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('auth-session');
   });
 });

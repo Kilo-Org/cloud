@@ -6,8 +6,7 @@
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
-import type { CloudAgentSessionId, KiloSessionId } from './types';
+import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
 /**
@@ -17,8 +16,11 @@ import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
  */
 type CreateRemoteSessionInput = {
   /**
-   * Stable key for a caller retry of the same create intent. The spawn helper
-   * derives distinct durable wire identities from it (`${key}:ext`, `${key}:bare`).
+   * Stable key for a caller retry of the same create intent. Both create
+   * paths derive distinct durable wire identities from it (`${key}:ext`,
+   * `${key}:bare`), so the key is at most
+   * `MAX_CREATE_SESSION_MUTATION_ID_LENGTH` characters; a longer key fails the
+   * create with a clear error before any wire traffic.
    */
   mutationId?: string;
   agent?: string;
@@ -28,6 +30,19 @@ type CreateRemoteSessionInput = {
     variant?: string;
   };
   orgId?: string;
+  /** Launch directory for the new remote session (`create_session` wire data). */
+  directory?: string;
+  /**
+   * Kilo session id to clone from. Old clients omit it; producer must omit
+   * it when the instance lacks sessionClone.
+   */
+  cloneFromKiloSessionId?: string;
+  /**
+   * Inclusive cut for the clone ("Fork from here"). Only valid with
+   * `cloneFromKiloSessionId`; producer must omit it when the instance lacks
+   * sessionCloneAtMessage.
+   */
+  cloneUpToMessageId?: string;
 };
 
 /**
@@ -61,6 +76,8 @@ type CloudAgentStreamTicketResult = string | CloudAgentStreamTicket;
 type TransportSink = {
   onChatEvent: (event: ChatEvent) => void;
   onServiceEvent: (event: ServiceEvent) => void;
+  onReplayStarted?: () => void;
+  onReplayCanceled?: () => void;
   /**
    * Fired once a connect/reconnect cycle has finished replaying history and
    * has switched to delivering live events. Lets consumers distinguish a
@@ -88,6 +105,9 @@ type SendCommandPayload = {
   command: string;
   /** Verbatim args after the command name; kilo expands $1/$2/$ARGUMENTS. */
   arguments: string;
+  mode?: string;
+  model?: ModelRef;
+  variant?: string;
 };
 type TransportSendPayload = SendPromptPayload | SendCommandPayload;
 
@@ -98,21 +118,28 @@ type CloudAgentPromptPayload = {
   model: string;
   variant?: string;
 };
-type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
+type CloudAgentCommandPayload = {
+  type: 'command';
+  command: string;
+  arguments: string;
+  mode?: string;
+  model?: string;
+  variant?: string;
+};
+type CloudAgentSendPayload = CloudAgentPromptPayload | CloudAgentCommandPayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;
   messageId?: string | undefined;
   attachments?: CloudAgentAttachments | undefined;
-  images?: Images | undefined;
   remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
    * array (after the text part). Distinct from the cloud-only `attachments`
-   * field: this path is for CAPABLE remote CLI sessions (the session
-   * advertised `capabilities.attachments: true` in its most recent
-   * heartbeat). Transports that don't support the path (cloud-agent, read-
-   * only, non-capable remote) ignore it.
+   * field: this path is for `remote` sessions whose CLI has not reported
+   * `capabilities.attachments: false` (unknown capabilities are optimistic).
+   * Transports that don't support the path (cloud-agent, read-only, a CLI
+   * that reported `attachments: false`) ignore it.
    */
   attachmentParts?: RemoteAttachmentPart[] | undefined;
 };
@@ -129,6 +156,7 @@ type Transport = {
   retryRemoteModels?: () => void;
   /** Re-discover the remote slash command catalog for the current owner. No-op when no owner is known or a request is already in flight. */
   retryRemoteCommands?: () => void;
+  retryBackgroundActivity?: () => void;
   /**
    * Ask the currently connected CLI owner to create a new remote session and
    * return its branded `KiloSessionId`. Session-scoped: the current Kilo
@@ -136,12 +164,21 @@ type Transport = {
    * connectionId fences the request to the active CLI. Optional inheritance
    * fields ride `protocolVersion: 1`; on a delivered `invalid create_session
    * command` the transport retries once with bare `{protocolVersion: 1}`
-   * (old-CLI degradation). Other failures are hard rejects. The caller does
-   * NOT switch the active session as a side effect.
+   * (old-CLI degradation) only when no clone id is present. A clone id never
+   * bare-retries, because a bare retry would create a fresh session. Other
+   * failures are hard rejects. The caller does NOT switch the active session
+   * as a side effect.
    */
   createSession?: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitSession?: () => Promise<void>;
   interrupt?: () => Promise<unknown>;
+  /**
+   * Drop one queued (not yet accepted) message by its client message id. The
+   * remote CLI transport relays `drop_queued_message`; the cloud-agent transport
+   * calls the `cancelQueuedMessage` tRPC mutation. Old remotes reject the drop
+   * with CLI_UPGRADE_REQUIRED.
+   */
+  dropQueuedMessage?: (messageId: string) => Promise<{ dropped: boolean }>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;
   respondToPermission?: (payload: {
@@ -152,6 +189,12 @@ type Transport = {
   acceptSuggestion?: (payload: { requestId: string; index: number }) => Promise<unknown>;
   /** Dismiss a `suggest` tool request. Requires Kilo CLI >= v7.2.7 on the remote side. */
   dismissSuggestion?: (payload: { requestId: string }) => Promise<unknown>;
+  /**
+   * Seed native part positions from a history page fetched outside the
+   * transport, such as a child session page, so later live deltas for a
+   * message that is still streaming continue after its stored parts.
+   */
+  observeProjected?: (messages: SessionSnapshot['messages']) => void;
 };
 
 /** Factory signature — creates a transport wired to the given sink. */
@@ -163,14 +206,31 @@ type TransportFactory = (sink: TransportSink) => Transport;
  * by closing over the cloudAgentSessionId.
  */
 type CloudAgentApi = {
+  getBackgroundActivity?: (payload: {
+    sessionId: CloudAgentSessionId;
+    signal?: AbortSignal;
+  }) => Promise<unknown>;
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;
-    messageId?: string;
+    /**
+     * Durable user-message identity minted by the caller. The Cloud Agent
+     * replays a repeated id instead of admitting a second turn, so it must be
+     * the same value on a retry of the same turn.
+     */
+    messageId: string;
     attachments?: CloudAgentAttachments;
-    images?: Images;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
+  /**
+   * Cancel one queued message by id (cloud-agent branch of
+   * `dropQueuedMessage`). Optional so legacy providers that predate the
+   * mutation keep compiling; the transport surfaces a clear error when absent.
+   */
+  cancelQueuedMessage?: (payload: {
+    sessionId: CloudAgentSessionId;
+    messageId: string;
+  }) => Promise<{ dropped: boolean }>;
   answer: (payload: {
     sessionId: CloudAgentSessionId;
     requestId: string;
@@ -186,6 +246,7 @@ type CloudAgentApi = {
 
 export type {
   CloudAgentApi,
+  CloudAgentCommandPayload,
   CloudAgentPromptPayload,
   CloudAgentSendPayload,
   CloudAgentStreamTicket,

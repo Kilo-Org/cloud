@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   credit_transactions,
@@ -7,12 +7,22 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
-import { hasOrganizationEverPaid } from '@/lib/creditTransactions';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { hasOrganizationEverPaid } from '@kilocode/web-shared/lib/creditTransactions';
 import type { User, Organization } from '@kilocode/db/schema';
+import * as creditExpiration from '@kilocode/web-shared/lib/creditExpiration';
+
+jest.mock('@kilocode/web-shared/lib/creditExpiration', () => ({
+  __esModule: true,
+  ...jest.requireActual('@kilocode/web-shared/lib/creditExpiration'),
+}));
 
 let ownerUser: User;
+let memberUser: User;
 let parentOrg: Organization;
 let childA: Organization;
 let childB: Organization;
@@ -60,10 +70,18 @@ describe('organization funds router', () => {
       is_admin: false,
     });
 
+    memberUser = await insertTestUser({
+      google_user_email: 'funds-member@example.com',
+      google_user_name: 'Funds Member',
+      is_admin: false,
+    });
+
     parentOrg = await createOrganization('Funds Parent Org', ownerUser.id);
     childA = await createOrganization('Funds Child A', ownerUser.id);
     childB = await createOrganization('Funds Child B', ownerUser.id);
     unrelatedOrg = await createOrganization('Funds Unrelated Org', ownerUser.id);
+
+    await addUserToOrganization(parentOrg.id, memberUser.id, 'member');
 
     await setChildOf(childA.id, parentOrg.id);
     await setChildOf(childB.id, parentOrg.id);
@@ -158,6 +176,50 @@ describe('organization funds router', () => {
       expect(updated.next).toBeNull();
     });
 
+    it('uses current child usage when consumption commits before expiry reconciliation', async () => {
+      const past = '2020-01-01T00:00:00.000Z';
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 2_000_000,
+          microdollars_used: 0,
+          microdollars_balance: 2_000_000,
+          next_credit_expiration_at: past,
+        })
+        .where(eq(organizations.id, childA.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: ownerUser.id,
+        organization_id: childA.id,
+        amount_microdollars: 2_000_000,
+        is_free: false,
+        expiry_date: past,
+        expiration_baseline_microdollars_used: 0,
+      });
+      const reconcile = creditExpiration.processOrganizationExpirations;
+      const interception = jest
+        .spyOn(creditExpiration, 'processOrganizationExpirations')
+        .mockImplementationOnce(async (organizationId, now) => {
+          await db
+            .update(organizations)
+            .set({ microdollars_used: 800_000, microdollars_balance: 1_200_000 })
+            .where(eq(organizations.id, childA.id));
+          return reconcile(organizationId, now);
+        });
+      try {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.organizations.funds.childBalances({
+          organizationId: parentOrg.id,
+        });
+        expect(result.children.find(child => child.id === childA.id)?.balanceMicrodollars).toBe(0);
+        expect(await getOrg(childA.id)).toEqual({
+          total_microdollars_acquired: 800_000,
+          microdollars_used: 800_000,
+        });
+      } finally {
+        interception.mockRestore();
+      }
+    });
+
     it('reports hasExpiringCredits when the parent has a future expiry date', async () => {
       const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await db
@@ -171,6 +233,37 @@ describe('organization funds router', () => {
       });
 
       expect(result.hasExpiringCredits).toBe(true);
+    });
+
+    it('clears hasExpiringCredits once a fully consumed parent lot expires', async () => {
+      const past = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await db
+        .update(organizations)
+        .set({
+          microdollars_used: 2_000_000,
+          microdollars_balance: 3_000_000,
+          next_credit_expiration_at: past,
+        })
+        .where(eq(organizations.id, parentOrg.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: 'system',
+        is_free: true,
+        amount_microdollars: 1_000_000,
+        description: 'Consumed expiring grant',
+        credit_category: 'organization_custom',
+        expiry_date: past,
+        organization_id: parentOrg.id,
+        original_baseline_microdollars_used: 0,
+        expiration_baseline_microdollars_used: 0,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      const result = await caller.organizations.funds.childBalances({
+        organizationId: parentOrg.id,
+      });
+
+      expect(result.parentBalanceMicrodollars).toBe(3_000_000);
+      expect(result.hasExpiringCredits).toBe(false);
     });
   });
 
@@ -277,24 +370,100 @@ describe('organization funds router', () => {
       expect(balanceOf(await getOrg(unrelatedOrg.id))).toBe(0);
     });
 
-    it('rejects while the parent has expiring credits', async () => {
-      const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      await db
-        .update(organizations)
-        .set({ next_credit_expiration_at: future })
-        .where(eq(organizations.id, parentOrg.id));
-
+    it('rejects a nonexistent recipient as a bad request', async () => {
       const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.organizations.funds.distribute({
+          organizationId: parentOrg.id,
+          allocations: [
+            { childOrganizationId: crypto.randomUUID(), amountMicrodollars: 1_000_000 },
+          ],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'All recipients must be direct child organizations.',
+      });
+      expect(balanceOf(await getOrg(parentOrg.id))).toBe(5_000_000);
+    });
+
+    it('rejects a foreign recipient while another transaction holds its row lock', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const outcome = await db.transaction(async tx => {
+        await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.id, unrelatedOrg.id))
+          .for('update');
+        return caller.organizations.funds
+          .distribute({
+            organizationId: parentOrg.id,
+            allocations: [{ childOrganizationId: unrelatedOrg.id, amountMicrodollars: 1_000_000 }],
+          })
+          .catch((error: unknown) => error);
+      });
+
+      expect(outcome).toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('distributes expiring lots without changing deadlines or paid cohorts', async () => {
+      const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      await setBalance(parentOrg.id, 5_000_000, 1_000_000);
+      const [source] = await db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: ownerUser.id,
+          organization_id: parentOrg.id,
+          amount_microdollars: 5_000_000,
+          is_free: false,
+          paid_credit_policy: 'one_year',
+          credit_source: 'stripe',
+          expiry_date: future,
+          original_baseline_microdollars_used: 0,
+          expiration_baseline_microdollars_used: 0,
+        })
+        .returning();
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.funds.distribute({
+        organizationId: parentOrg.id,
+        allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 2_000_000 }],
+      });
+      expect(balanceOf(await getOrg(parentOrg.id))).toBe(2_000_000);
+      expect(balanceOf(await getOrg(childA.id))).toBe(2_000_000);
+      const [incoming] = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, childA.id),
+            eq(credit_transactions.credit_category, 'parent_to_child_transfer_in')
+          )
+        );
+      expect(new Date(incoming.expiry_date ?? '').toISOString()).toBe(future);
+      expect(incoming).toMatchObject({
+        source_transaction_id: source.id,
+        paid_credit_policy: 'one_year',
+        credit_source: 'stripe',
+        is_free: true,
+      });
+    });
+  });
+
+  describe('role matrix', () => {
+    it('rejects member for every funds procedure', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.funds.childBalances({ organizationId: parentOrg.id })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
       await expect(
         caller.organizations.funds.distribute({
           organizationId: parentOrg.id,
           allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 1_000_000 }],
         })
-      ).rejects.toThrow('expiring credits');
-
-      expect(balanceOf(await getOrg(parentOrg.id))).toBe(5_000_000);
-      expect(balanceOf(await getOrg(childA.id))).toBe(0);
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
   });
 });

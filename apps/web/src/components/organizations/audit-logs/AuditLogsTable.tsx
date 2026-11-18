@@ -14,7 +14,7 @@ import { Activity, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { AuditLogDetailModal } from './AuditLogDetailModal';
 import { AuditLogsFilters } from './AuditLogsFilters';
-import type { AuditLogAction } from '@/lib/organizations/organization-audit-logs';
+import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { AuditLogsFilters as AuditLogsFiltersType } from './useAuditLogsFilters';
 
 type AuditLogEntry = {

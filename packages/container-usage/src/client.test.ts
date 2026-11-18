@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ContainerUsageAdmissionError, ContainerUsageClient } from './client';
+import {
+  ContainerUsageAdmissionError,
+  ContainerUsageClient,
+  ContainerUsageContractError,
+  isNonRetryableSkuAdmissionError,
+} from './client';
 import type { ContainerUsageRpcMethods } from './contracts';
 
 function binding(overrides: Partial<ContainerUsageRpcMethods> = {}): ContainerUsageRpcMethods {
@@ -175,5 +180,142 @@ describe('ContainerUsageClient', () => {
       message: 'SKU is not configured',
     });
     expect(recordStart).toHaveBeenCalledOnce();
+  });
+
+  it('preserves insufficient-credit balance details without retrying', async () => {
+    const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
+      success: false,
+      error: {
+        code: 'insufficient_credits',
+        message: 'Insufficient credits',
+        remainingMicrodollars: 5_000_000,
+        minimumRequiredMicrodollars: 10_000_000,
+      },
+    });
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
+    });
+
+    await expect(client.recordStart({ ...context, startEpochMs: 123 })).rejects.toMatchObject({
+      code: 'insufficient_credits',
+      remainingMicrodollars: 5_000_000,
+      minimumRequiredMicrodollars: 10_000_000,
+    });
+    expect(recordStart).toHaveBeenCalledOnce();
+  });
+
+  it('raises a contract error once when a heartbeat verdict violates the budget contract', async () => {
+    const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>().mockResolvedValue({
+      intervalId: 'instance-1:123',
+      durable: 'pg',
+      dedup: false,
+      budget: { verdict: 'stop', remainingMicrodollars: -1 },
+    });
+    const client = new ContainerUsageClient(binding({ recordHeartbeat }), {
+      service: 'cloud-agent-next',
+      retry: { attempts: 3, initialDelayMs: 0 },
+    });
+
+    await expect(
+      client.recordHeartbeat({ instanceId: 'instance-1', startEpochMs: 123, seq: 1, context })
+    ).rejects.toBeInstanceOf(ContainerUsageContractError);
+    expect(recordHeartbeat).toHaveBeenCalledOnce();
+  });
+
+  it('raises a contract error when a start response violates the contract', async () => {
+    // Missing durable: a contract-invalid start response the schema must reject.
+    const invalidStartResult = { success: true, ack: { intervalId: 'instance-1:123' } };
+    const recordStart = vi
+      .fn<ContainerUsageRpcMethods['recordStart']>()
+      .mockResolvedValue(
+        invalidStartResult as unknown as Awaited<
+          ReturnType<ContainerUsageRpcMethods['recordStart']>
+        >
+      );
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
+      retry: { attempts: 3, initialDelayMs: 0 },
+    });
+
+    await expect(client.recordStart({ ...context, startEpochMs: 123 })).rejects.toMatchObject({
+      name: 'ContainerUsageContractError',
+      method: 'recordStart',
+    });
+    expect(recordStart).toHaveBeenCalledOnce();
+  });
+
+  it('raises a contract error when a stop response violates the contract', async () => {
+    // Missing dedup: a contract-invalid stop response the schema must reject.
+    const invalidStopAck = { intervalId: 'instance-1:123', durable: 'pg' };
+    const recordStop = vi
+      .fn<ContainerUsageRpcMethods['recordStop']>()
+      .mockResolvedValue(
+        invalidStopAck as unknown as Awaited<ReturnType<ContainerUsageRpcMethods['recordStop']>>
+      );
+    const client = new ContainerUsageClient(binding({ recordStop }), {
+      service: 'cloud-agent-next',
+      retry: { attempts: 3, initialDelayMs: 0 },
+    });
+
+    await expect(
+      client.recordStop({
+        instanceId: 'instance-1',
+        startEpochMs: 123,
+        seq: 2,
+        usageSinceLast: 5,
+        reason: 'runtime_signal',
+        context,
+      })
+    ).rejects.toMatchObject({
+      name: 'ContainerUsageContractError',
+      method: 'recordStop',
+    });
+    expect(recordStop).toHaveBeenCalledOnce();
+  });
+
+  it('sends the capacity marker and surfaces a container limit without retrying', async () => {
+    const message =
+      'container_limit_reached: The user has reached its limit of 3 concurrent containers.';
+    const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
+      success: false,
+      error: { code: 'container_limit_reached', message },
+    });
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
+    });
+
+    await expect(
+      client.recordStart({ ...context, startEpochMs: 123, enforceCapacity: true })
+    ).rejects.toMatchObject({ code: 'container_limit_reached', message });
+    expect(recordStart).toHaveBeenCalledOnce();
+    expect(recordStart.mock.calls[0]?.[0]).toMatchObject({ enforceCapacity: true });
+  });
+});
+
+describe('isNonRetryableSkuAdmissionError', () => {
+  const skuCodes = ['sku_not_found', 'sku_unit_mismatch', 'sku_not_accepting_new_usage'] as const;
+
+  it.each(skuCodes)('returns true and narrows the code for %s', code => {
+    const error = new ContainerUsageAdmissionError(code, 'Billing SKU rejected');
+
+    expect(isNonRetryableSkuAdmissionError(error)).toBe(true);
+    if (!isNonRetryableSkuAdmissionError(error)) {
+      throw new Error('Expected a non-retryable SKU admission error');
+    }
+    const narrowed: (typeof skuCodes)[number] = error.code;
+    expect(narrowed).toBe(code);
+    // @ts-expect-error insufficient_credits is excluded from the narrowed code type
+    const budgetCode: 'insufficient_credits' = error.code;
+    void budgetCode;
+  });
+
+  it('returns false for insufficient_credits', () => {
+    const error = new ContainerUsageAdmissionError('insufficient_credits', 'Low balance');
+    expect(isNonRetryableSkuAdmissionError(error)).toBe(false);
+  });
+
+  it('returns false for a plain error and a non-error', () => {
+    expect(isNonRetryableSkuAdmissionError(new Error('meter unavailable'))).toBe(false);
+    expect(isNonRetryableSkuAdmissionError('meter unavailable')).toBe(false);
   });
 });

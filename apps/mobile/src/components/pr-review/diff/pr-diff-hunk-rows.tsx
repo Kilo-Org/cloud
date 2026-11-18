@@ -1,10 +1,22 @@
 // Hunk / expand / pagination / empty-state rows for the PR diff FlashList.
+//
+// A hunk header is a code literal, so it names its own LTR base direction
+// (`LTR_TEXT_DIRECTION`): under an RTL interface's base direction its runs
+// reorder — `@@ -0,0 +1,82 @@` draws as `@@ 1,82+ 0,0- @@`. Every other row here
+// is interface copy and keeps the interface's direction.
 
 import { Check, ChevronDown, File, GitCommit, X } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Pressable, type ScrollViewProps, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
+import { cn } from '@/lib/utils';
+import { CenteredState } from '@/components/centered-state';
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 
 const DEFAULT_EXPAND_WINDOW = 20;
@@ -12,15 +24,16 @@ const EXPAND_ALL_MAX = 100;
 
 export function HunkHeaderRow({ header }: { header: string }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View
       className="border-b border-hair-soft bg-secondary px-4 py-1"
-      accessibilityLabel={`Hunk header ${header}`}
+      accessibilityLabel={t('prReview.hunkRows.hunkHeader', { header })}
     >
       <Text
         className="font-mono-medium text-[11px]"
-        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
-        style={{ color: colors.mutedForeground }}
+        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color + the header's code base direction
+        style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
         numberOfLines={1}
       >
         {header}
@@ -37,6 +50,7 @@ export function ExpandSeparatorRow({
   onLoad: (windowSize: number) => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { startLine, endLine } = item.context;
   const isUnknownEnd = !Number.isFinite(endLine);
   const gapSize = isUnknownEnd ? DEFAULT_EXPAND_WINDOW : endLine - startLine + 1;
@@ -48,7 +62,7 @@ export function ExpandSeparatorRow({
       <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
         <X size={12} color={colors.mutedForeground} />
         <Text variant="muted" className="text-xs">
-          Context unavailable at this ref
+          {t('prReview.hunkRows.contextUnavailable')}
         </Text>
       </View>
     );
@@ -60,12 +74,15 @@ export function ExpandSeparatorRow({
         onPress={() => {
           onLoad(DEFAULT_EXPAND_WINDOW);
         }}
-        className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2 active:opacity-70"
+        className={cn(
+          STATE_ACTION_CLASS,
+          'flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2 active:opacity-70'
+        )}
         accessibilityRole="button"
-        accessibilityLabel="Retry loading context"
+        accessibilityLabel={t('prReview.hunkRows.retryLoadingContext')}
       >
         <Text variant="muted" className="text-xs">
-          Failed to load context — tap to retry
+          {t('prReview.hunkRows.failedToLoadContext')}
         </Text>
       </Pressable>
     );
@@ -77,8 +94,11 @@ export function ExpandSeparatorRow({
         <GitCommit size={12} color={colors.mutedForeground} />
         <Text variant="muted" className="text-xs">
           {isUnknownEnd
-            ? 'Loading context…'
-            : `Loading ${Math.min(gapSize, DEFAULT_EXPAND_WINDOW)} of ${gapSize} lines…`}
+            ? t('prReview.hunkRows.loadingContext')
+            : t('prReview.hunkRows.loadingLines', {
+                loaded: formatNumber(Math.min(gapSize, DEFAULT_EXPAND_WINDOW), i18n.language),
+                total: formatNumber(gapSize, i18n.language),
+              })}
         </Text>
       </View>
     );
@@ -87,7 +107,38 @@ export function ExpandSeparatorRow({
   const windowEnd = isUnknownEnd
     ? startLine + DEFAULT_EXPAND_WINDOW - 1
     : Math.min(startLine + DEFAULT_EXPAND_WINDOW - 1, endLine);
-  const expandLabel = isPartial ? 'Expand more' : 'Expand';
+  const windowSize = Math.min(gapSize, DEFAULT_EXPAND_WINDOW);
+  let expandText = isPartial
+    ? t('prReview.hunkRows.expandMoreContext')
+    : t('prReview.hunkRows.expandContext');
+  if (!isUnknownEnd) {
+    // i18n-dup-ok: 'prReview.hunkRows.expandMoreLines_other' and 'prReview.hunkRows.expandLines_other' are these counted messages' plural other categories — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
+    expandText = isPartial
+      ? t('prReview.hunkRows.expandMoreLines', {
+          count: windowSize,
+          displayCount: formatNumber(windowSize, i18n.language),
+          start: formatNumber(startLine, i18n.language),
+          end: formatNumber(windowEnd, i18n.language),
+        })
+      : t('prReview.hunkRows.expandLines', {
+          count: windowSize,
+          displayCount: formatNumber(windowSize, i18n.language),
+          start: formatNumber(startLine, i18n.language),
+          end: formatNumber(windowEnd, i18n.language),
+        });
+  }
+  // The press loads `DEFAULT_EXPAND_WINDOW` and the loader clamps that slice to
+  // `endLine`, so a short known gap reveals `windowSize` lines. The label names
+  // that same window: a row with loaded context announces the visible message
+  // with its range, an untouched row names the window alone.
+  // i18n-dup-ok: 'prReview.hunkRows.expandLinesOfContext_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
+  const expandLabel =
+    isUnknownEnd || isPartial
+      ? expandText
+      : t('prReview.hunkRows.expandLinesOfContext', {
+          count: windowSize,
+          displayCount: formatNumber(windowSize, i18n.language),
+        });
 
   return (
     <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
@@ -97,31 +148,31 @@ export function ExpandSeparatorRow({
         }}
         className="flex-row items-center gap-1 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={
-          isUnknownEnd ? 'Expand context' : `Expand ${DEFAULT_EXPAND_WINDOW} lines of context`
-        }
+        accessibilityLabel={expandLabel}
       >
         <ChevronDown size={12} color={colors.info} />
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}
         <Text className="text-xs" style={{ color: colors.info }}>
-          {isUnknownEnd
-            ? `${expandLabel} context`
-            : `${expandLabel} ${Math.min(gapSize, DEFAULT_EXPAND_WINDOW)} lines (${startLine}–${windowEnd})`}
+          {expandText}
         </Text>
       </Pressable>
       {canExpandAll ? (
+        // i18n-dup-ok: 'prReview.hunkRows.expandAllLines_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
         <Pressable
           onPress={() => {
             onLoad(gapSize);
           }}
           className="ml-3 flex-row items-center gap-1 active:opacity-70"
           accessibilityRole="button"
-          accessibilityLabel={`Expand all ${gapSize} lines`}
+          accessibilityLabel={t('prReview.hunkRows.expandAllLines', {
+            count: gapSize,
+            displayCount: formatNumber(gapSize, i18n.language),
+          })}
         >
           <ChevronDown size={12} color={colors.info} />
           {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}
           <Text className="text-xs" style={{ color: colors.info }}>
-            Expand all
+            {t('prReview.hunkRows.expandAll')}
           </Text>
         </Pressable>
       ) : null}
@@ -143,11 +194,12 @@ export function PaginationRow({
   onFetchAll: () => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   if (state === 'loading') {
     return (
       <View className="flex-row items-center justify-center gap-2 py-4">
         <Text variant="muted" className="text-xs">
-          Loading more files…
+          {t('prReview.hunkRows.loadingMoreFiles')}
         </Text>
       </View>
     );
@@ -158,11 +210,11 @@ export function PaginationRow({
         onPress={onRetry}
         className="flex-row items-center justify-center gap-2 py-4 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel="Retry loading next page"
+        accessibilityLabel={t('prReview.hunkRows.retryLoadingNextPage')}
       >
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic destructive color */}
         <Text className="text-sm" style={{ color: colors.destructive }}>
-          Failed to load more files — tap to retry
+          {t('prReview.hunkRows.failedToLoadMoreFiles')}
         </Text>
       </Pressable>
     );
@@ -171,8 +223,14 @@ export function PaginationRow({
     return (
       <View className="flex-row items-center justify-center gap-2 py-4">
         <Text variant="muted" className="text-xs">
-          Loading all files — {loadedFiles.toLocaleString()}
-          {totalFiles ? ` of ${totalFiles.toLocaleString()}` : ''}…
+          {totalFiles
+            ? t('prReview.hunkRows.loadingAllFilesOf', {
+                loaded: formatNumber(loadedFiles, i18n.language),
+                total: formatNumber(totalFiles, i18n.language),
+              })
+            : t('prReview.hunkRows.loadingAllFiles', {
+                loaded: formatNumber(loadedFiles, i18n.language),
+              })}
         </Text>
       </View>
     );
@@ -181,36 +239,44 @@ export function PaginationRow({
     return (
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
-          {loadedFiles.toLocaleString()} of {totalFiles?.toLocaleString() ?? '?'} files loaded
+          {/* i18n-dup-ok: 'prReview.hunkRows.loadedOfTotalFiles_one' and 'prReview.hunkRows.loadedOfTotalFiles_other' are this counted message's plural categories, not two keys for one string — the label reads the same at every count, but Zulu leads its noun before the numbers and inflects the one-form, so the family stays. */}
+          {t('prReview.hunkRows.loadedOfTotalFiles', {
+            // The loaded count still selects the plural category, although the
+            // copy leads the file noun so that no numeral governs it: the
+            // total is the page set, and a catalog whose noun inflects on the
+            // trailing total would otherwise read a plural noun at 1.
+            count: loadedFiles,
+            loaded: formatNumber(loadedFiles, i18n.language),
+            total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),
+          })}
         </Text>
         <Pressable
           onPress={onFetchAll}
           className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
           accessibilityRole="button"
-          accessibilityLabel="Load all files"
+          accessibilityLabel={t('prReview.hunkRows.loadAllFiles')}
         >
-          <Text className="text-xs font-medium">Load all</Text>
+          <Text className="text-xs font-medium">{t('prReview.hunkRows.loadAll')}</Text>
         </Pressable>
       </View>
     );
+  }
+  let loadedLabel = t('prReview.hunkRows.fileLoadedCount', {
+    count: loadedFiles,
+    displayCount: formatNumber(loadedFiles, i18n.language),
+  });
+  if (totalFiles) {
+    loadedLabel = t('prReview.hunkRows.fileLoadedOfTotalCount', {
+      count: loadedFiles,
+      displayCount: formatNumber(loadedFiles, i18n.language),
+      total: formatNumber(totalFiles, i18n.language),
+    });
   }
   return (
     <View className="flex-row items-center justify-center gap-2 py-4">
       <Check size={12} color={colors.mutedForeground} />
       <Text variant="muted" className="text-xs">
-        {loadedFiles.toLocaleString()} file{loadedFiles === 1 ? '' : 's'} loaded
-        {totalFiles ? ` of ${totalFiles.toLocaleString()}` : ''}
-      </Text>
-    </View>
-  );
-}
-
-export function TabStateMessage({ title, message }: { title: string; message: string }) {
-  return (
-    <View className="flex-1 items-center justify-center gap-2 px-6 py-12">
-      <Text className="text-lg font-semibold text-foreground">{title}</Text>
-      <Text variant="muted" className="text-center">
-        {message}
+        {loadedLabel}
       </Text>
     </View>
   );
@@ -218,31 +284,41 @@ export function TabStateMessage({ title, message }: { title: string; message: st
 
 export function EmptyFilesView({
   changedFiles,
+  noChangesDescription,
   onRequestOverview,
+  refreshControl,
 }: {
   changedFiles: number;
+  /** Provider wording for the 0-changed-files case; GitHub copy when absent. */
+  noChangesDescription?: string;
   onRequestOverview?: () => void;
+  refreshControl?: ScrollViewProps['refreshControl'];
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
-    <View className="flex-1 items-center justify-center gap-3 px-6 py-16">
-      <File size={28} color={colors.mutedForeground} />
-      <Text className="text-lg font-semibold text-foreground">No files changed</Text>
-      <Text variant="muted" className="text-center">
-        {changedFiles === 0
-          ? 'This pull request has no file changes.'
-          : 'Files are still loading. Pull to refresh.'}
-      </Text>
-      {onRequestOverview ? (
-        <Pressable
-          onPress={onRequestOverview}
-          className="mt-2 rounded-md border border-border bg-card px-3 py-2 active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Go to Overview tab"
-        >
-          <Text className="text-sm font-medium">Go to Overview</Text>
-        </Pressable>
-      ) : null}
-    </View>
+    <CenteredState refreshControl={refreshControl}>
+      <View className="items-center gap-3 px-6">
+        <File size={28} color={colors.mutedForeground} />
+        <Text className="text-lg font-semibold text-foreground">
+          {t('prReview.noFilesChanged')}
+        </Text>
+        <Text variant="muted" className="text-center">
+          {changedFiles === 0
+            ? (noChangesDescription ?? t('prReview.noFilesChangedDescription'))
+            : t('prReview.hunkRows.filesStillLoading')}
+        </Text>
+        {onRequestOverview ? (
+          <Pressable
+            onPress={onRequestOverview}
+            className="mt-2 rounded-md border border-border bg-card px-3 py-2 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel={t('prReview.hunkRows.goToOverviewTab')}
+          >
+            <Text className="text-sm font-medium">{t('prReview.hunkRows.goToOverview')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </CenteredState>
   );
 }

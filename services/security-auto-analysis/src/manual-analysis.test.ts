@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
+import { z } from 'zod';
 import {
   markSecurityAgentCommandRetriesExhausted,
   transitionSecurityAgentCommandWithCurrentState,
@@ -6,10 +9,17 @@ import {
 import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
-import { ensureManualAnalysisQueueRow, prepareActiveAnalysisRestart } from './db/queries.js';
+import {
+  ensureManualAnalysisQueueRow,
+  prepareActiveAnalysisRestart,
+  releaseOrphanedStartReservation,
+  tryAcquireAnalysisStartLease,
+} from './db/queries.js';
 import type * as QueriesModule from './db/queries.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
 import {
+  MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
+  RetryableManualAnalysisStartError,
   consumeManualAnalysisBatch,
   processManualAnalysisStart,
   type ManualAnalysisStartCommand,
@@ -33,6 +43,8 @@ vi.mock('./db/queries.js', async importOriginal => {
   return {
     ...actual,
     prepareActiveAnalysisRestart: vi.fn(),
+    tryAcquireAnalysisStartLease: vi.fn(async () => true),
+    releaseOrphanedStartReservation: vi.fn(async () => undefined),
   };
 });
 vi.mock('./analysis-start-lifecycle.js', () => ({
@@ -52,6 +64,7 @@ const command: ManualAnalysisStartCommand = {
 };
 
 const finding = {
+  platform_integration_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   id: command.findingId,
   owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   owned_by_user_id: null,
@@ -61,9 +74,132 @@ const finding = {
   severity: 'high',
 };
 
+/**
+ * Fake db for the serialized manual admission flow. `transaction(work)` runs
+ * `work(tx)`, where `tx` resolves the admission reads in order: owner-state
+ * row (`for('update')`), finding status (`admissionAnalysisStatus`), inflight
+ * total. The outer db resolves the post-admission reads in order: finding
+ * lookup (static `finding`), actor row, config row.
+ */
+function fakeAdmissionDb(options: {
+  admissionAnalysisStatus: string | null;
+  inflightTotal?: number;
+  actorRow?: unknown;
+  configRow?: unknown;
+  queueRowId?: string | null;
+  auditRows?: unknown[];
+  writes?: unknown[];
+}) {
+  const updateReturning = vi.fn(async () =>
+    options.queueRowId ? [{ id: options.queueRowId }] : []
+  );
+  const updateSet = vi.fn((values: unknown) => {
+    options.writes?.push({ kind: 'update', values });
+    return { where: () => ({ returning: updateReturning }) };
+  });
+
+  function makeTxExecutor() {
+    let selectCount = 0;
+    return {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return {
+            from: () => ({
+              where: () => ({
+                for: () => ({ limit: async () => [{ id: 'owner-state-row' }] }),
+              }),
+            }),
+          };
+        }
+        if (selectCount === 2) {
+          return {
+            from: () => ({
+              where: () => ({
+                limit: async () => [
+                  {
+                    analysisStatus: options.admissionAnalysisStatus,
+                    status: 'open',
+                  },
+                ],
+              }),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            leftJoin: () => ({
+              where: async () => [{ total: options.inflightTotal ?? 0 }],
+            }),
+          }),
+        };
+      },
+      insert: () => ({
+        values: () => ({ onConflictDoNothing: async () => undefined }),
+      }),
+      update: () => ({ set: updateSet }),
+    };
+  }
+
+  let outerSelectCount = 0;
+  const db = {
+    select: () => {
+      outerSelectCount += 1;
+      if (outerSelectCount === 1) {
+        // getSecurityFindingById
+        return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+      }
+      if (options.actorRow !== undefined && outerSelectCount === 2) {
+        return {
+          from: () => ({ where: () => ({ limit: async () => [options.actorRow] }) }),
+        };
+      }
+      return {
+        from: () => ({ where: () => ({ limit: async () => [options.configRow ?? {}] }) }),
+      };
+    },
+    insert: () => ({
+      values: (values: unknown) => {
+        options.auditRows?.push(values);
+        options.writes?.push({ kind: 'insert', values });
+        return {
+          onConflictDoUpdate: () => ({
+            returning: async () => (options.queueRowId ? [{ id: options.queueRowId }] : []),
+          }),
+        };
+      },
+    }),
+    update: () => ({ set: updateSet }),
+    execute: vi.fn(async () => ({ rows: [] })),
+    transaction: async (work: (tx: never) => Promise<unknown>) => work(makeTxExecutor() as never),
+  };
+  return db;
+}
+
+function manualStartEnv(): CloudflareEnv {
+  return {
+    GIT_TOKEN_SERVICE: {
+      getTokenForRepo: async () => ({
+        success: true,
+        token: 'github-token',
+        installationId: 'installation-123',
+        accountLogin: 'kilo',
+        appType: 'standard',
+      }),
+    },
+    NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+    INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+    CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+  } as unknown as CloudflareEnv;
+}
+
 beforeEach(() => {
   vi.mocked(startSecurityAnalysis).mockReset();
   vi.mocked(prepareActiveAnalysisRestart).mockReset();
+  vi.mocked(tryAcquireAnalysisStartLease).mockReset();
+  vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(true);
+  vi.mocked(releaseOrphanedStartReservation).mockReset();
+  vi.mocked(releaseOrphanedStartReservation).mockResolvedValue(undefined);
   vi.mocked(transitionAnalysisStartLifecycle).mockReset();
   vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
   vi.mocked(getWorkerDb).mockReturnValue({} as never);
@@ -95,108 +231,166 @@ describe('processManualAnalysisStart', () => {
     };
 
     await expect(
-      processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
+      processManualAnalysisStart({
+        db: db as never,
+        env: {} as CloudflareEnv,
+        command,
+        isFinalAttempt: false,
+      })
     ).resolves.toEqual({ status: 'finding-missing' });
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
   it('enforces owner cap before claiming a manual queue row', async () => {
-    let selectCount = 0;
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        return { from: () => ({ where: async () => [{ total: 3 }] }) };
-      },
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      inflightTotal: 3,
+      queueRowId: null,
+    });
 
     await expect(
-      processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
+      processManualAnalysisStart({
+        db: db as never,
+        env: {} as CloudflareEnv,
+        command,
+        isFinalAttempt: false,
+      })
     ).resolves.toEqual({ status: 'owner-cap' });
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('accepts a pre-reserved pending finding without a second cap count', async () => {
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: 'pending',
+      inflightTotal: 99,
+      queueRowId: 'queue-row',
+    });
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({ started: true, triageOnly: false });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        isFinalAttempt: false,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'started' });
+
+    expect(startSecurityAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ preReserved: true })
+    );
+  });
+
+  it('treats a running finding as an in-progress duplicate', async () => {
+    const db = fakeAdmissionDb({ admissionAnalysisStatus: 'running', queueRowId: null });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {} as CloudflareEnv,
+        command,
+        isFinalAttempt: false,
+      })
+    ).resolves.toEqual({ status: 'duplicate' });
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('skips the launch lease for both pre-reserved and worker-leased admission', async () => {
+    const preReservedDb = fakeAdmissionDb({
+      admissionAnalysisStatus: 'pending',
+      queueRowId: 'queue-row',
+    });
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({ started: true, triageOnly: false });
+    await processManualAnalysisStart({
+      db: preReservedDb as never,
+      isFinalAttempt: false,
+      env: {
+        GIT_TOKEN_SERVICE: { getTokenForRepo: async () => ({ success: true, token: 't' }) },
+        NEXTAUTH_SECRET: { get: async () => 's' },
+        INTERNAL_API_SECRET: { get: async () => 's' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 's' },
+      } as unknown as CloudflareEnv,
+      command,
+    });
+    expect(tryAcquireAnalysisStartLease).not.toHaveBeenCalled();
+
+    vi.mocked(startSecurityAnalysis).mockClear();
+    const unreservedDb = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row',
+    });
+    await processManualAnalysisStart({
+      db: unreservedDb as never,
+      isFinalAttempt: false,
+      env: {
+        GIT_TOKEN_SERVICE: { getTokenForRepo: async () => ({ success: true, token: 't' }) },
+        NEXTAUTH_SECRET: { get: async () => 's' },
+        INTERNAL_API_SECRET: { get: async () => 's' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 's' },
+      } as unknown as CloudflareEnv,
+      command,
+    });
+    expect(tryAcquireAnalysisStartLease).toHaveBeenCalledWith(expect.anything(), command.findingId);
+    expect(startSecurityAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ preReserved: true })
+    );
   });
 
   it('rejects manual starts when the analysis actor is missing', async () => {
-    let selectCount = 0;
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        return { from: () => ({ where: () => ({ limit: async () => [] }) }) };
-      },
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row',
+      actorRow: null,
+    });
 
     await expect(
-      processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
+      processManualAnalysisStart({
+        db: db as never,
+        env: {} as CloudflareEnv,
+        command,
+        isFinalAttempt: false,
+      })
     ).resolves.toEqual({ status: 'actor-missing' });
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
   it('rejects duplicate manual starts after an active queue row wins admission', async () => {
-    let selectCount = 0;
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        return {
-          from: () => ({
-            where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-          }),
-        };
-      },
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({ returning: async () => [] }),
-        }),
-      }),
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: null,
+      actorRow: { id: 'user-123', api_token_pepper: null },
+    });
+    vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(false);
 
     await expect(
-      processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
+      processManualAnalysisStart({
+        db: db as never,
+        env: {} as CloudflareEnv,
+        command,
+        isFinalAttempt: false,
+      })
     ).resolves.toEqual({ status: 'duplicate' });
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
   it('settles queued manual starts when the GitHub token is unavailable', async () => {
-    let selectCount = 0;
-    const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        return {
-          from: () => ({
-            where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-          }),
-        };
-      },
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row-token' }] }),
-        }),
-      }),
-      execute,
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row-token',
+      actorRow: { id: 'user-123', api_token_pepper: null },
+    });
 
     await expect(
       processManualAnalysisStart({
         db: db as never,
+        isFinalAttempt: false,
         env: {
           GIT_TOKEN_SERVICE: {
             getTokenForRepo: async () => ({
@@ -209,62 +403,27 @@ describe('processManualAnalysisStart', () => {
       })
     ).resolves.toEqual({ status: 'token-missing' });
 
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(releaseOrphanedStartReservation).toHaveBeenCalledWith(db, command.findingId);
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
   it('persists actor-selected model context in Worker launch and audit metadata', async () => {
-    let selectCount = 0;
-    let insertCount = 0;
     const auditRows: unknown[] = [];
     const execute = vi.fn().mockResolvedValue({ rows: [] });
     const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        if (selectCount === 3) {
-          return {
-            from: () => ({
-              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-            }),
-          };
-        }
-        return {
-          from: () => ({
-            where: () => ({
-              limit: async () => [
-                {
-                  config: {
-                    analysis_mode: 'deep',
-                    triage_model_slug: 'config/triage',
-                    analysis_model_slug: 'config/analysis',
-                  },
-                },
-              ],
-            }),
-          }),
-        };
-      },
-      insert: () => {
-        insertCount += 1;
-        if (insertCount === 1) {
-          return {
-            values: () => ({
-              onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row' }] }),
-            }),
-          };
-        }
-        return {
-          values: async (values: unknown) => {
-            auditRows.push(values);
+      ...fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: {
+          config: {
+            analysis_mode: 'deep',
+            triage_model_slug: 'config/triage',
+            analysis_model_slug: 'config/analysis',
           },
-        };
-      },
+        },
+        auditRows,
+      }),
       execute,
     };
     vi.mocked(startSecurityAnalysis).mockResolvedValue({ started: true, triageOnly: false });
@@ -272,6 +431,7 @@ describe('processManualAnalysisStart', () => {
     await expect(
       processManualAnalysisStart({
         db: db as never,
+        isFinalAttempt: false,
         env: {
           GIT_TOKEN_SERVICE: {
             getTokenForRepo: async () => ({
@@ -311,7 +471,11 @@ describe('processManualAnalysisStart', () => {
         }),
       })
     );
-    expect(auditRows[0]).toMatchObject({
+    const auditRow = auditRows.find(
+      row =>
+        typeof row === 'object' && row !== null && (row as { action?: string }).action !== undefined
+    );
+    expect(auditRow).toMatchObject({
       actor_id: 'user-123',
       metadata: {
         model: 'request/analysis',
@@ -385,6 +549,7 @@ describe('processManualAnalysisStart', () => {
     await expect(
       processManualAnalysisStart({
         db: db as never,
+        isFinalAttempt: false,
         env: {
           GIT_TOKEN_SERVICE: {
             getTokenForRepo: async () => ({
@@ -461,6 +626,7 @@ describe('processManualAnalysisStart', () => {
     await expect(
       processManualAnalysisStart({
         db: db as never,
+        isFinalAttempt: false,
         env: {
           GIT_TOKEN_SERVICE: {
             getTokenForRepo: async () => ({ success: false, reason: 'no_installation_found' }),
@@ -504,6 +670,7 @@ describe('processManualAnalysisStart', () => {
     await expect(
       processManualAnalysisStart({
         db: db as never,
+        isFinalAttempt: false,
         env: {
           GIT_TOKEN_SERVICE: {
             getTokenForRepo: async () => ({
@@ -526,44 +693,15 @@ describe('processManualAnalysisStart', () => {
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
-  it('settles post-lease manual start failures through the lifecycle transition', async () => {
-    let selectCount = 0;
-    let insertCount = 0;
+  it('settles other ambiguous start failures as terminal on the first delivery', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
     const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        if (selectCount === 3) {
-          return {
-            from: () => ({
-              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-            }),
-          };
-        }
-        return {
-          from: () => ({
-            where: () => ({
-              limit: async () => [{ config: { analysis_mode: 'auto' } }],
-            }),
-          }),
-        };
-      },
-      insert: () => {
-        insertCount += 1;
-        return {
-          values: () => ({
-            onConflictDoUpdate: () => ({
-              returning: async () => [{ id: `queue-row-${insertCount}` }],
-            }),
-          }),
-        };
-      },
+      ...fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: { config: { analysis_mode: 'auto' } },
+      }),
       execute,
     };
     vi.mocked(startSecurityAnalysis).mockResolvedValue({
@@ -575,6 +713,7 @@ describe('processManualAnalysisStart', () => {
     await expect(
       processManualAnalysisStart({
         db: db as never,
+        isFinalAttempt: false,
         env: {
           GIT_TOKEN_SERVICE: {
             getTokenForRepo: async () => ({
@@ -591,7 +730,7 @@ describe('processManualAnalysisStart', () => {
         } as unknown as CloudflareEnv,
         command,
       })
-    ).resolves.toEqual({ status: 'failed' });
+    ).resolves.toEqual({ status: 'failed', resultCode: 'START_CALL_AMBIGUOUS' });
 
     expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
       db,
@@ -610,36 +749,151 @@ describe('processManualAnalysisStart', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('settles thrown manual credit failures before preserving queue retry behavior', async () => {
-    let selectCount = 0;
+  it('persists a refused start admission as a permanent failure on the queue row', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
     const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        if (selectCount === 3) {
-          return {
-            from: () => ({
-              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-            }),
-          };
-        }
-        return {
-          from: () => ({
-            where: () => ({ limit: async () => [{ config: { analysis_mode: 'auto' } }] }),
-          }),
-        };
-      },
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row-credit' }] }),
-        }),
+      ...fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row-refused',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: { config: { analysis_mode: 'auto' } },
       }),
+      execute,
     };
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'Cloud Agent credit admission was refused',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'PERMISSION_DENIED_PERMANENT',
+    });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        isFinalAttempt: false,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: true,
+              token: 'github-token',
+              installationId: 'installation-123',
+              accountLogin: 'kilo',
+              appType: 'standard',
+            }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'failed', resultCode: 'PERMISSION_DENIED_PERMANENT' });
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', findingId: command.findingId }),
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'Cloud Agent credit admission was refused',
+          queueStatus: 'failed',
+          failureCode: 'PERMISSION_DENIED_PERMANENT',
+          incrementAttempt: false,
+          nextRetryAt: null,
+        },
+      })
+    );
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('leaves the queue row and finding untouched when the admission read could not decide before the final attempt', async () => {
+    const writes: unknown[] = [];
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row-retry',
+      actorRow: { id: 'user-123', api_token_pepper: null },
+      configRow: { config: { analysis_mode: 'auto' } },
+      writes,
+    });
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'admission unavailable',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+    });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        isFinalAttempt: false,
+        env: manualStartEnv(),
+        command,
+      })
+    ).rejects.toBeInstanceOf(RetryableManualAnalysisStartError);
+
+    // The claim upsert is the only write: the row keeps the command's claim
+    // and the finding keeps its reservation, so the replay can take both back.
+    expect(writes).toEqual([
+      {
+        kind: 'insert',
+        values: expect.objectContaining({
+          queue_status: 'pending',
+          claimed_by_job_id: `manual:${command.commandId}`,
+          claim_token: expect.any(String),
+        }),
+      },
+    ]);
+    expect(transitionAnalysisStartLifecycle).not.toHaveBeenCalled();
+    expect(releaseOrphanedStartReservation).not.toHaveBeenCalled();
+  });
+
+  it('settles the final delivery of an undecided admission read as a failed queue row', async () => {
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row-retry',
+      actorRow: { id: 'user-123', api_token_pepper: null },
+      configRow: { config: { analysis_mode: 'auto' } },
+    });
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'admission unavailable',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+    });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        isFinalAttempt: true,
+        env: manualStartEnv(),
+        command,
+      })
+    ).resolves.toEqual({ status: 'failed', resultCode: 'REQUEUE_TEMPORARY_PRECONDITION' });
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledTimes(1);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', findingId: command.findingId }),
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'admission unavailable',
+          queueStatus: 'failed',
+          failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+          incrementAttempt: false,
+          nextRetryAt: null,
+        },
+      })
+    );
+  });
+
+  it('settles thrown manual credit failures before preserving queue retry behavior', async () => {
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row-credit',
+      actorRow: { id: 'user-123', api_token_pepper: null },
+      configRow: { config: { analysis_mode: 'auto' } },
+    });
     vi.mocked(startSecurityAnalysis).mockRejectedValue(
       new InsufficientCreditsError('Insufficient credits')
     );
@@ -647,6 +901,7 @@ describe('processManualAnalysisStart', () => {
     await expect(
       processManualAnalysisStart({
         db: db as never,
+        isFinalAttempt: false,
         env: {
           GIT_TOKEN_SERVICE: {
             getTokenForRepo: async () => ({
@@ -791,6 +1046,115 @@ describe('consumeManualAnalysisBatch', () => {
     expect(message.ack).not.toHaveBeenCalled();
     expect(message.retry).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    [1, 30],
+    [2, 60],
+    [3, 120],
+  ])(
+    'replays the start on attempt %i after a %is delay when the admission read could not decide',
+    async (attempts, delaySeconds) => {
+      const message = queueMessage(attempts);
+      const db = fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: { config: { analysis_mode: 'auto' } },
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      vi.mocked(startSecurityAnalysis).mockResolvedValue({
+        started: false,
+        error: 'admission unavailable',
+        failureNeedsLifecycleTransition: true,
+        failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+      });
+
+      const infoCalls: unknown[][] = [];
+      const errorCalls: unknown[][] = [];
+      const info = vi.spyOn(console, 'info').mockImplementation((...args: unknown[]) => {
+        infoCalls.push(args);
+      });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+        errorCalls.push(args);
+      });
+      try {
+        await consumeManualAnalysisBatch(
+          { messages: [message] } as never,
+          {
+            ...manualStartEnv(),
+            HYPERDRIVE: { connectionString: 'postgres://worker' },
+          } as CloudflareEnv
+        );
+      } finally {
+        info.mockRestore();
+        errorSpy.mockRestore();
+      }
+
+      expect(errorCalls).toEqual([]);
+      expect(infoCalls).toEqual([
+        [
+          'Manual security analysis command will replay the start',
+          expect.objectContaining({ attempts, max_attempts: 4 }),
+        ],
+      ]);
+      expect(message.retry).toHaveBeenCalledWith({ delaySeconds });
+      expect(message.ack).not.toHaveBeenCalled();
+      // The command stays running so the next delivery replays the same payload.
+      expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledTimes(1);
+      expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({ status: 'running' })
+      );
+      expect(transitionAnalysisStartLifecycle).not.toHaveBeenCalled();
+      expect(markSecurityAgentCommandRetriesExhausted).not.toHaveBeenCalled();
+    }
+  );
+
+  it('settles the command when the retryable start exhausts its delivery budget', async () => {
+    const message = queueMessage(4);
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row',
+      actorRow: { id: 'user-123', api_token_pepper: null },
+      configRow: { config: { analysis_mode: 'auto' } },
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'admission unavailable',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+    });
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        ...manualStartEnv(),
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        outcome: expect.objectContaining({
+          queueStatus: 'failed',
+          failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+          incrementAttempt: false,
+          nextRetryAt: null,
+        }),
+      })
+    );
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenLastCalledWith(
+      db,
+      expect.objectContaining({
+        status: 'failed',
+        resultCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+      })
+    );
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
 });
 
 describe('ensureManualAnalysisQueueRow', () => {
@@ -857,5 +1221,41 @@ describe('ensureManualAnalysisQueueRow', () => {
         jobId: 'manual-job',
       })
     ).resolves.toBe(false);
+  });
+});
+
+describe('manual analysis command retry budget', () => {
+  it('keeps the deployed consumer retry budget equal to the handler attempt bound', () => {
+    const parseErrors: ParseError[] = [];
+    const config: unknown = parseJsonc(
+      readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'),
+      parseErrors,
+      { allowTrailingComma: true }
+    );
+    expect(parseErrors).toEqual([]);
+    const consumers = z
+      .object({
+        queues: z.object({
+          consumers: z.array(
+            z.object({
+              queue: z.string(),
+              max_retries: z.number(),
+              dead_letter_queue: z.string().optional(),
+            })
+          ),
+        }),
+      })
+      .parse(config).queues.consumers;
+    const consumer = consumers.find(
+      candidate => candidate.queue === 'security-manual-analysis-command-queue'
+    );
+
+    expect(consumer).toBeDefined();
+    expect(consumer?.dead_letter_queue).toBe('security-manual-analysis-command-dlq');
+    // The handler settles the command on the last delivery Cloudflare gives it,
+    // so the queue must deliver exactly MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS
+    // deliveries; a queue change that drops max_retries would otherwise retry the
+    // final delivery into the dead letter queue and strand the command as running.
+    expect((consumer?.max_retries ?? -1) + 1).toBe(MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS);
   });
 });

@@ -8,11 +8,14 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@kilocode/sdk": "7.4.20",
-    "fuzzysort": "3.1.0"
+    "@kilocode/sdk": "7.8.17",
+    "@sentry/bun": "10.69.0",
+    "@sentry/core": "10.69.0",
+    "fuzzysort": "3.1.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/bun": "1.3.14",
+    "@types/bun": "1.4.4",
     "@types/node": "20.19.41",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:"

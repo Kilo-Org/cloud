@@ -1,6 +1,8 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
 
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   processCodingPlanCancellationAtPeriodEnd,
   processCodingPlanRenewal,
@@ -8,9 +10,14 @@ import {
 } from '@/lib/coding-plans/billing-lifecycle-cron';
 import { subscribeToCodingPlan, uploadKeysToInventory } from '@/lib/coding-plans';
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import {
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import {
   byok_api_keys,
   coding_plan_key_inventory,
@@ -20,10 +27,9 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
-jest.mock('@/lib/autoTopUp', () => ({
+jest.mock('@kilocode/web-shared/lib/autoTopUp', () => ({
   maybePerformAutoTopUp: jest.fn(async () => undefined),
 }));
-const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
 const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
@@ -35,21 +41,22 @@ const dueAt = new Date(Date.now() - 60_000).toISOString();
 async function createSubscription(
   balance = COST_MICRODOLLARS,
   autoTopUpEnabled = false,
-  planId: CodingPlanId = PLAN_ID
+  planId: CodingPlanId = BYTEPLUS_PLAN_ID
 ) {
   const user = await insertTestUser({
     total_microdollars_acquired: balance,
     microdollars_used: 0,
     auto_top_up_enabled: autoTopUpEnabled,
   });
+  const upstreamPlanId = `upstream-plan-${crypto.randomUUID()}`;
   await uploadKeysToInventory(
     planId === BYTEPLUS_PLAN_ID || planId === BYTEPLUS_PRO_PLAN_ID ? 'byteplus-coding' : 'minimax',
     planId,
-    [`cron-key-${crypto.randomUUID()}::minimax-plan-${crypto.randomUUID()}`],
+    [`cron-key-${crypto.randomUUID()}::${upstreamPlanId}`],
     {
-      validateCredential: async ({ providerId, planId }) =>
+      validateCredential: async ({ providerId }) =>
         providerId === 'byteplus-coding'
-          ? { valid: true, upstreamUsageId: `seat-${planId}` }
+          ? { valid: true, upstreamUsageId: `seat-${upstreamPlanId}` }
           : { valid: true },
     }
   );
@@ -60,6 +67,59 @@ async function createSubscription(
     .where(eq(coding_plan_subscriptions.id, created.subscriptionId));
   return { user, subscriptionId: created.subscriptionId };
 }
+
+// MiniMax Token Plans are closed to new signups (see pricing.ts). This seeds a
+// pre-existing MiniMax subscription directly, bypassing subscribeToCodingPlan,
+// to confirm the billing lifecycle cron still renews a grandfathered MiniMax
+// subscriber correctly.
+async function createGrandfatheredMiniMaxSubscription(planId: CodingPlanId, cost: number) {
+  const user = await insertTestUser({
+    total_microdollars_acquired: cost * 2,
+    microdollars_used: 0,
+  });
+  const [inventory] = await db
+    .insert(coding_plan_key_inventory)
+    .values({
+      plan_id: planId,
+      provider_id: 'minimax',
+      upstream_plan_id: `minimax-grandfathered-${crypto.randomUUID()}`,
+      encrypted_api_key: encryptApiKey(`grandfathered-${crypto.randomUUID()}`, BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: crypto.randomUUID(),
+      status: 'assigned',
+      assigned_to_user_id: user.id,
+      assigned_at: new Date().toISOString(),
+    })
+    .returning();
+  const [installedByok] = await db
+    .insert(byok_api_keys)
+    .values({
+      kilo_user_id: user.id,
+      provider_id: 'minimax',
+      encrypted_api_key_envelope: testByokEnvelope('grandfathered-installed-key'),
+      management_source: 'coding_plan',
+      created_by: user.id,
+    })
+    .returning();
+  const [subscription] = await db
+    .insert(coding_plan_subscriptions)
+    .values({
+      user_id: user.id,
+      plan_id: planId,
+      provider_id: 'minimax',
+      key_inventory_id: inventory.id,
+      installed_byok_key_id: installedByok.id,
+      status: 'active',
+      cost_microdollars: cost,
+      billing_period_days: 30,
+      current_period_start: new Date().toISOString(),
+      current_period_end: dueAt,
+      credit_renewal_at: dueAt,
+    })
+    .returning();
+  return { user, subscriptionId: subscription.id };
+}
+
+useFakeByokKms();
 
 afterEach(async () => {
   jest.mocked(maybePerformAutoTopUp).mockClear();
@@ -94,25 +154,29 @@ describe('Coding Plan billing lifecycle cron', () => {
         createdAt: credit_transactions.created_at,
       })
       .from(credit_transactions)
-      .where(eq(credit_transactions.description, 'Coding plan renewal: MiniMax Token Plan Plus'));
+      .where(
+        eq(
+          credit_transactions.description,
+          'Coding plan renewal: BytePlus Enterprise Coding Plan Lite'
+        )
+      );
 
     expect(summary.renewals).toBe(1);
     expect(subscription.status).toBe('active');
     expect(terms.map(term => term.kind)).toEqual(['activation', 'renewal']);
     expect(renewalTransaction).toEqual([
       {
-        description: 'Coding plan renewal: MiniMax Token Plan Plus',
+        description: 'Coding plan renewal: BytePlus Enterprise Coding Plan Lite',
         createdAt: expect.any(String),
       },
     ]);
     expect(credential.status).toBe('assigned');
   });
 
-  it('uses the subscribed MiniMax token plan name and snapshotted cost during renewal', async () => {
-    const { subscriptionId } = await createSubscription(
-      MAX_COST_MICRODOLLARS * 2,
-      false,
-      MAX_PLAN_ID
+  it('uses the subscribed MiniMax token plan name and snapshotted cost during renewal for a grandfathered subscriber', async () => {
+    const { subscriptionId } = await createGrandfatheredMiniMaxSubscription(
+      MAX_PLAN_ID,
+      MAX_COST_MICRODOLLARS
     );
 
     const summary = await runCodingPlanBillingLifecycleCron(db);
@@ -217,7 +281,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     ]);
   });
 
-  it('renews after the subscriber deletes the installed MiniMax BYOK key', async () => {
+  it('renews after the subscriber deletes the installed provider BYOK key', async () => {
     const { subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2);
     const [before] = await db
       .select()
@@ -354,6 +418,47 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(maybePerformAutoTopUp).toHaveBeenCalledTimes(1);
   });
 
+  it.each([true, false])(
+    'reconciles expired principal and funds renewal once (balance read=%s)',
+    async readBalance => {
+      const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2, true);
+      const expiry = new Date(Date.now() - 60_000).toISOString();
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        amount_microdollars: COST_MICRODOLLARS,
+        is_free: false,
+        expiry_date: expiry,
+        expiration_baseline_microdollars_used: COST_MICRODOLLARS,
+        original_baseline_microdollars_used: COST_MICRODOLLARS,
+        description: 'Unused principal at renewal',
+      });
+      const [payer] = await db
+        .update(kilocode_users)
+        .set({ next_credit_expiration_at: expiry })
+        .where(eq(kilocode_users.id, user.id))
+        .returning();
+
+      if (readBalance) expect((await getBalanceForUser(payer)).balance).toBe(0);
+      expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
+
+      await runCodingPlanBillingLifecycleCron(db);
+      await runCodingPlanBillingLifecycleCron(db);
+      const [subscription] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.id, subscriptionId));
+      expect(subscription.status).toBe('past_due');
+      expect(maybePerformAutoTopUp).toHaveBeenCalledTimes(1);
+      expect(maybePerformAutoTopUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: user.id,
+          total_microdollars_acquired: COST_MICRODOLLARS,
+          microdollars_used: COST_MICRODOLLARS,
+        })
+      );
+    }
+  );
+
   it('restores active status when credits arrive during grace', async () => {
     const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS, true);
     await runCodingPlanBillingLifecycleCron(db);
@@ -396,7 +501,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(credential.encrypted_api_key).toBeNull();
   });
 
-  it('preserves a replacement MiniMax key when scheduled cancellation is processed', async () => {
+  it('preserves a replacement provider key when scheduled cancellation is processed', async () => {
     const { subscriptionId, user } = await createSubscription(COST_MICRODOLLARS);
     const [subscription] = await db
       .select()

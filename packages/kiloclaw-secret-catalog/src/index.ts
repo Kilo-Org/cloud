@@ -27,7 +27,6 @@ export {
   ENV_VAR_TO_FIELD_KEY,
   FIELD_KEY_TO_ENTRY,
   ALL_SECRET_ENV_VARS,
-  MAX_SECRET_FIELD_LENGTH,
   INTERNAL_SENSITIVE_ENV_VARS,
   RETAINED_SENSITIVE_ENV_VARS,
   getEntriesByCategory,
@@ -38,7 +37,6 @@ export {
   isValidCustomSecretKey,
   isCustomSecretEnvVar,
   isValidConfigPath,
-  getAllowedConfigPathPatterns,
 } from './catalog';
 
 export type { SecretFieldKey } from './catalog';

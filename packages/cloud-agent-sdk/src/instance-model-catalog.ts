@@ -24,15 +24,22 @@ import {
 
 export type { RemoteModelCatalogV1 } from './schemas';
 
-/** Delivered error string an old CLI returns for a sessionless `list_models`. */
-const INVALID_LIST_MODELS_COMMAND = 'invalid list_models command';
+/**
+ * Delivered error strings that mean the CLI cannot serve `list_models` at all:
+ * an old CLI rejects the unknown command, and a newer CLI rejects a malformed
+ * request body. Both repeat identically on retry.
+ */
+const UNSUPPORTED_DELIVERED_ERRORS = [
+  'unknown command: list_models',
+  'invalid list_models command',
+];
 
 /**
  * Relay codes whose failure is transient for this connection. Every other
  * structured relay error repeats identically on retry, so it must not be
  * retried.
  */
-const RETRYABLE_RELAY_CODES = new Set([
+export const RETRYABLE_RELAY_CODES = new Set([
   'SESSION_OWNER_CHANGED',
   'CATALOG_REQUEST_PENDING',
   'COMMAND_EXPIRED',
@@ -41,7 +48,8 @@ const RETRYABLE_RELAY_CODES = new Set([
 
 export type InstanceModelCatalogResult =
   | { ok: true; catalog: RemoteModelCatalogV1 }
-  | { ok: false; reason: 'unsupported' | 'invalid' | 'transport' };
+  | { ok: false; reason: 'unsupported' | 'invalid' }
+  | { ok: false; reason: 'transport'; cause?: unknown };
 
 /**
  * Request the model catalog of a specific CLI connection before a session
@@ -55,10 +63,13 @@ export type InstanceModelCatalogResult =
  * - Resolved but outside the strict schema → `{ ok: false, reason: 'invalid' }`.
  * - Resolved but the strict parse throws unexpectedly → `{ ok: false,
  *   reason: 'transport' }`; the parse never escapes the helper.
- * - Rejected with the old-CLI `invalid list_models command` string or a
+ * - Rejected with an old-CLI unknown-command or invalid-request string, or a
  *   non-retryable relay code → `{ ok: false, reason: 'unsupported' }`.
- * - Rejected with a retryable relay code or a transport-level failure →
- *   `{ ok: false, reason: 'transport' }`.
+ * - Rejected with any other delivered string, a retryable relay code, or a
+ *   transport-level failure → `{ ok: false, reason: 'transport' }`.
+ *
+ * A `transport` outcome carries the caught failure as `cause`, so a caller
+ * that reports it can attach what actually went wrong.
  *
  * Never throws and never logs.
  */
@@ -75,23 +86,23 @@ export async function listInstanceModels(
     });
   } catch (error) {
     if (error instanceof CommandDeliveredError) {
-      return error.message === INVALID_LIST_MODELS_COMMAND
+      return UNSUPPORTED_DELIVERED_ERRORS.includes(error.message)
         ? { ok: false, reason: 'unsupported' }
-        : { ok: false, reason: 'transport' };
+        : { ok: false, reason: 'transport', cause: error };
     }
     if (error instanceof UserWebCommandError) {
       return RETRYABLE_RELAY_CODES.has(error.code)
-        ? { ok: false, reason: 'transport' }
+        ? { ok: false, reason: 'transport', cause: error }
         : { ok: false, reason: 'unsupported' };
     }
-    return { ok: false, reason: 'transport' };
+    return { ok: false, reason: 'transport', cause: error };
   }
 
   try {
     const parsed = remoteModelCatalogV1Schema.safeParse(raw);
     if (!parsed.success) return { ok: false, reason: 'invalid' };
     return { ok: true, catalog: parsed.data };
-  } catch {
-    return { ok: false, reason: 'transport' };
+  } catch (error) {
+    return { ok: false, reason: 'transport', cause: error };
   }
 }

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { Chat } from 'chat';
 import type { LinearAdapter } from '@chat-adapter/linear';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   LINEAR_WEBHOOK_SECRET: 'test-webhook-secret',
 }));
 

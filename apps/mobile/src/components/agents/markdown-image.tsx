@@ -1,93 +1,284 @@
-import { AlertCircle } from '@/components/ui/icons';
-import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { type ReactElement, useState, useSyncExternalStore } from 'react';
+import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
+import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { formatTrustedImageHost } from '@/lib/hooks/use-trusted-image-hosts';
 
+import {
+  isMarkdownImageLoadAllowed,
+  requestMarkdownImageTrust,
+  subscribeMarkdownImageLoadAllowed,
+} from './markdown-image-confirm';
+import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
+import { getLinkAccessibilityActions } from './markdown-link';
 import {
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
   resolveImagePreviewAspectRatio,
 } from './tool-card-attachments';
-import { getFilename } from './tool-card-utils';
+
+type MarkdownImageKind = 'https' | 'http' | 'data' | null;
+
+function classifyUri(uri: string): MarkdownImageKind {
+  if (uri.startsWith('https://')) {
+    return 'https';
+  }
+  if (uri.startsWith('http://')) {
+    return 'http';
+  }
+  if (uri.startsWith('data:image/')) {
+    return 'data';
+  }
+  return null;
+}
+
+function FixedImageSlot({
+  aspectRatio,
+  children,
+}: Readonly<{ aspectRatio: number | undefined; children: ReactElement }>): ReactElement {
+  return (
+    <View
+      className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900"
+      // eslint-disable-next-line react-native/no-inline-styles -- HTML dimensions or the fixed fallback determine this reserved ratio
+      style={{ aspectRatio: aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/** Static chip for http and data URIs: HTTPS-only copy, host name for http. */
+function BlockedImageChip({
+  kind,
+  uri,
+  onShowLinkActions,
+}: Readonly<{ kind: 'http' | 'data'; uri: string; onShowLinkActions?: () => void }>) {
+  const colors = useThemeColors();
+  const { t } = useTranslation();
+  const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
+  const label = host
+    ? `${host} · ${t('agentChat.markdownImage.httpsOnly')}`
+    : t('agentChat.markdownImage.httpsOnly');
+  return (
+    <View
+      className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+      accessibilityRole="text"
+      accessibilityLabel={label}
+      accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+      onAccessibilityAction={event => {
+        if (event.nativeEvent.actionName === 'showLinkActions') {
+          onShowLinkActions?.();
+        }
+      }}
+    >
+      <AlertCircle size={14} color={colors.mutedForeground} />
+      <Text className="shrink text-xs text-muted-foreground" numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** HTTPS, not yet confirmed: source host plus a Load affordance. No Image mounts. */
+function UnconfirmedImageChip({
+  uri,
+  onLoad,
+  onShowLinkActions,
+}: Readonly<{ uri: string; onLoad: () => void; onShowLinkActions?: () => void }>) {
+  const colors = useThemeColors();
+  const { t } = useTranslation();
+  const host = formatTrustedImageHost(uri);
+  return (
+    <View className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
+      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+        {host ?? t('agentChat.markdownImage.httpsOnly')}
+      </Text>
+      <Pressable
+        onPress={onLoad}
+        accessibilityRole="button"
+        accessibilityLabel={
+          host
+            ? t('agentChat.markdownImage.loadWithHost', { host })
+            : t('agentChat.markdownImage.load')
+        }
+        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+        onAccessibilityAction={event => {
+          if (event.nativeEvent.actionName === 'showLinkActions') {
+            onShowLinkActions?.();
+          }
+        }}
+        className="min-h-11 min-w-11 shrink-0 flex-row items-center justify-center gap-1 px-2 active:opacity-70"
+      >
+        <Download size={16} color={colors.mutedForeground} />
+        <Text className="text-xs font-medium text-foreground">
+          {t('agentChat.markdownImage.load')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export function MarkdownImage({
   uri,
   alt,
   aspectRatio,
+  accessibilityLabel,
+  onPress,
+  onShowLinkActions,
 }: Readonly<{
   uri: string;
   alt: string;
   aspectRatio?: number;
+  accessibilityLabel?: string;
+  onPress?: () => void;
+  onShowLinkActions?: () => void;
 }>) {
   const colors = useThemeColors();
+  const { i18n, t } = useTranslation();
+  const [loaded, setLoaded] = useState(false);
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | undefined>(undefined);
   const [failed, setFailed] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  const filename =
-    alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || 'image';
+  // A recycled FlashList cell must not carry the previous uri's fail or viewer
+  // state into the new uri. Reset synchronously during render (React's
+  // "adjust state when a prop changes" pattern) so no frame shows a stale chip.
+  const [prevUri, setPrevUri] = useState(uri);
+  if (prevUri !== uri) {
+    setPrevUri(uri);
+    setFailed(false);
+    setViewerVisible(false);
+    setAttempt(0);
+    setLoaded(false);
+    setMeasuredAspectRatio(undefined);
+  }
+
+  const filename = markdownImageFilename(uri, alt);
+  const imageAccessibilityLabel = alt
+    ? t('agentChat.filePart.viewImageWithAlt', { alt })
+    : t('agentChat.filePart.viewImage');
+
+  const kind = classifyUri(uri);
+  // Only an HTTPS URI can ever auto-load, so a blocked http/data URI answers
+  // from the kind alone. Parsing its URL in the snapshot would run on every
+  // render of every inline data image, before the chip early-returns.
+  const loadAllowed = useSyncExternalStore(subscribeMarkdownImageLoadAllowed, () =>
+    kind === 'https' ? isMarkdownImageLoadAllowed(uri) : false
+  );
+
+  if (kind === 'http' || kind === 'data') {
+    return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
+  }
+
+  if (kind === 'https' && !loadAllowed) {
+    return (
+      <FixedImageSlot aspectRatio={aspectRatio}>
+        <UnconfirmedImageChip
+          uri={uri}
+          onShowLinkActions={onShowLinkActions}
+          onLoad={() => {
+            requestMarkdownImageTrust(uri);
+          }}
+        />
+      </FixedImageSlot>
+    );
+  }
+
+  // Other schemes never reach MarkdownImage from the renderer; keep the alt
+  // text visible so a direct or fallback use never drops the description.
+  if (kind === null) {
+    return <Text className="text-xs text-muted-foreground">{alt || 'image'}</Text>;
+  }
 
   if (failed) {
     return (
-      <Pressable
-        onPress={() => {
-          setFailed(false);
-          setMeasuredAspectRatio(undefined);
-          setAttempt(prev => prev + 1);
-        }}
-        className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
-        accessibilityRole="button"
-        accessibilityLabel="Image unavailable, retry loading"
-      >
-        <AlertCircle size={14} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">
-          {alt ? `Image unavailable ${alt}` : 'Image unavailable'}
-        </Text>
-      </Pressable>
+      <FixedImageSlot aspectRatio={aspectRatio ?? measuredAspectRatio}>
+        <Pressable
+          onPress={() => {
+            setFailed(false);
+            setLoaded(false);
+            setAttempt(prev => prev + 1);
+          }}
+          onLongPress={onShowLinkActions}
+          className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
+          accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+          onAccessibilityAction={event => {
+            if (event.nativeEvent.actionName === 'showLinkActions') {
+              onShowLinkActions?.();
+            }
+          }}
+        >
+          <AlertCircle size={14} color={colors.mutedForeground} />
+          <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
+            {alt ? `${t('common.imageUnavailable')}\n${alt}` : t('common.imageUnavailable')}
+          </Text>
+          <RotateCcw size={14} color={colors.foreground} />
+          <Text className="shrink-0 text-xs font-medium text-foreground">{t('common.retry')}</Text>
+        </Pressable>
+      </FixedImageSlot>
     );
   }
 
   return (
     <>
-      <Pressable
-        onPress={() => {
-          setViewerVisible(true);
-        }}
-        className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 active:opacity-80 dark:bg-neutral-900"
-        accessibilityRole="button"
-        accessibilityLabel={alt ? `View image ${alt}` : 'View image'}
-        // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
-        style={{
-          aspectRatio: measuredAspectRatio ?? aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
-        }}
-      >
-        {measuredAspectRatio === undefined ? <Skeleton className="absolute inset-0" /> : null}
-        <Image
-          key={attempt}
-          source={{ uri }}
-          className="h-full w-full"
-          contentFit="contain"
-          transition={0}
-          accessibilityIgnoresInvertColors
-          onLoad={event => {
-            setMeasuredAspectRatio(
-              resolveImagePreviewAspectRatio(event.source.width, event.source.height)
-            );
+      <FixedImageSlot aspectRatio={aspectRatio ?? measuredAspectRatio}>
+        <Pressable
+          onPress={
+            onPress ??
+            (() => {
+              setViewerVisible(true);
+            })
+          }
+          onLongPress={onShowLinkActions}
+          className="h-full w-full active:opacity-80"
+          accessibilityRole={onPress ? 'link' : 'button'}
+          accessibilityLabel={
+            accessibilityLabel && accessibilityLabel !== alt
+              ? formatList([imageAccessibilityLabel, accessibilityLabel], i18n.language)
+              : imageAccessibilityLabel
+          }
+          accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+          onAccessibilityAction={event => {
+            if (event.nativeEvent.actionName === 'showLinkActions') {
+              onShowLinkActions?.();
+            }
           }}
-          onError={() => {
-            setFailed(true);
-          }}
-        />
-      </Pressable>
+        >
+          {!loaded ? <Skeleton className="absolute inset-0" /> : null}
+          <Image
+            key={attempt}
+            source={{ uri: resolveMarkdownImageSrc(uri) }}
+            recyclingKey={uri}
+            cachePolicy="memory"
+            className="h-full w-full"
+            contentFit="contain"
+            transition={0}
+            accessibilityIgnoresInvertColors
+            onLoad={event => {
+              setMeasuredAspectRatio(
+                resolveImagePreviewAspectRatio(event.source.width, event.source.height)
+              );
+              setLoaded(true);
+            }}
+            onError={() => {
+              setFailed(true);
+            }}
+          />
+        </Pressable>
+      </FixedImageSlot>
       {viewerVisible && (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
-          uri={uri}
+          uri={resolveMarkdownImageSrc(uri)}
           filename={filename}
           onClose={() => {
             setViewerVisible(false);

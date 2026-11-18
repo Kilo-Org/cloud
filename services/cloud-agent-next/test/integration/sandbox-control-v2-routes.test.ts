@@ -1,0 +1,3223 @@
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import { generateKeyPairSync } from 'node:crypto';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { AllocationState } from '../../src/control-plane/sandbox/allocation.js';
+import {
+  allocation as allocationTable,
+  routes as routesTable,
+  scopeGrants as scopeGrantsTable,
+} from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
+import { workerOrganizationMembershipReader } from '../../src/control-plane/sandbox/organization-membership.js';
+import {
+  failExpiredRoutes,
+  onRouteFailed,
+  onRouteProgress,
+  onRouteReady,
+  writeRoute,
+  type RouteContext,
+} from '../../src/control-plane/sandbox/routes.js';
+import { WORKTREE_DELETION_PREFIX } from '../../src/control-plane/sandbox/worktree-deletion.js';
+import type {
+  ProviderAdapter,
+  ProviderCreateIntent,
+  StopResult,
+} from '../../src/sandbox-control/provider.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlaneRouteSpec,
+  type ControlPlaneRouteView,
+} from '../../src/shared/control-plane-protocol.js';
+import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
+import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { logger } from '../../src/logger.js';
+import { encryptWithPublicKey } from '../../src/utils/encryption.js';
+import {
+  createFakeCredentialBroker,
+  installFakeSandboxEnv,
+  type FakeCredentialBroker,
+} from './helpers/fake-credentials.js';
+import { createRuntimeProxyMintingPeer, FakeSessionPeer } from './helpers/fake-session-peer.js';
+import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { pendingNativeStart } from './helpers/pending-native-start.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
+import { waitFor } from './wait-for.js';
+
+const SANDBOX_ID = 'sbx__control_v2_routes';
+const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
+const SESSION_NEXT = 'workspace_22222222-2222-2222-2222-222222222222';
+const SESSION_THIRD = 'workspace_33333333-3333-3333-3333-333333333333';
+const SHARED_DIRECTORY = '/workspace/shared';
+const NATIVE_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
+const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
+
+type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
+const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
+  .SANDBOX_CONTROL;
+
+type FakeProvider = {
+  adapter: ProviderAdapter;
+  createCalls: number;
+  refs: string[];
+  launchEnvs: Record<string, string>[];
+  stopCalls: (string | null)[];
+  leaseCalls: number[];
+  stopGates: Array<(result: StopResult) => void>;
+};
+
+function createFakeProvider(
+  options: { gateStop?: boolean; failCreates?: number } = {}
+): FakeProvider {
+  let remainingCreateFailures = options.failCreates ?? 0;
+  const provider: FakeProvider = {
+    adapter: null as unknown as ProviderAdapter,
+    createCalls: 0,
+    refs: [],
+    launchEnvs: [],
+    stopCalls: [],
+    leaseCalls: [],
+    stopGates: [],
+  };
+  provider.adapter = {
+    async ensureBillingAdmission() {},
+    async create(intent: ProviderCreateIntent) {
+      provider.createCalls += 1;
+      if (remainingCreateFailures > 0) {
+        remainingCreateFailures -= 1;
+        throw new Error('provider unavailable');
+      }
+      const ref = `mem_${intent.intentId}`;
+      provider.refs.push(ref);
+      return { providerRef: ref };
+    },
+    async launch(_ref, { env: launchEnv }) {
+      provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
+    },
+    async observe(ref) {
+      return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
+    },
+    async stop(ref) {
+      provider.stopCalls.push(ref);
+      if (options.gateStop) {
+        return new Promise<StopResult>(resolve => provider.stopGates.push(resolve));
+      }
+      return 'terminal';
+    },
+    async ensureLeaseAtLeast(_ref, minRemainingMs) {
+      provider.leaseCalls.push(minRemainingMs);
+    },
+    async logs() {
+      return '';
+    },
+  };
+  return provider;
+}
+
+function kiloSessionIdFor(sessionId: string): string {
+  if (sessionId === SESSION_NEXT) return 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+  if (sessionId === SESSION_THIRD) return 'ses_cccccccccccccccccccccccccc';
+  return 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+}
+
+function routeSpec(sessionId: string): ControlPlaneRouteSpec {
+  return {
+    sessionId,
+    kiloSessionId: kiloSessionIdFor(sessionId),
+    directory: `/workspace/${sessionId}`,
+    attemptId: `${sessionId}-requested`,
+  };
+}
+
+function prepareInput(sessionId: string, createdOnPlatform?: string) {
+  return {
+    spec: routeSpec(sessionId),
+    credentials: {
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+      kiloToken: NATIVE_KILO_TOKEN,
+      orgId: 'org_123',
+      repository: { type: 'github' as const, repo: 'acme/widgets' },
+      scopeId: sessionId,
+      createdOnPlatform,
+    },
+  };
+}
+
+function configuredPrepareInput(
+  sessionId: string,
+  directory: string,
+  setupCommands: string[] = ['echo shared']
+) {
+  const input = prepareInput(sessionId);
+  return {
+    ...input,
+    spec: {
+      ...input.spec,
+      directory,
+      setupCommands,
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
+      runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
+      kiloCommands: [{ name: 'review', template: 'Review the change' }],
+    },
+    credentials: { ...input.credentials, scopeId: 'shared-worktree' },
+  };
+}
+
+async function patchGrant(
+  stub: DurableObjectStub<SandboxControlV2>,
+  sessionId: string,
+  patch: (grant: Record<string, unknown>) => Record<string, unknown>
+): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+    const row = rows[0];
+    if (row === undefined || row.grant === null) throw new Error('route has no grant');
+    const existing = readScopeGrant(db, row.grant);
+    if (existing === null) throw new Error('scope has no grant');
+    await db
+      .update(scopeGrantsTable)
+      .set({ grant: JSON.stringify(patch(existing)) })
+      .where(eq(scopeGrantsTable.id, row.grant));
+  });
+}
+
+function promptPayload(messageId: string) {
+  return {
+    messageId,
+    turn: { type: 'prompt' as const, prompt: 'hello' },
+    agent: { mode: 'code', model: 'test/model' },
+  };
+}
+
+function readState(stub: DurableObjectStub<SandboxControlV2>) {
+  return stub.getAllocationState();
+}
+
+type NotificationOwner = { notifications: ReturnType<typeof createSandboxNotificationDispatcher> };
+function notificationSnapshot(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, instance =>
+    (instance as unknown as NotificationOwner).notifications.snapshot()
+  );
+}
+
+function readRouteRow(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+    return rows[0] ?? null;
+  });
+}
+
+/** The stored grant's expiry, so a test can prove no re-issue replaced it. */
+function grantExpiry(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+    const id = rows[0]?.grant;
+    if (id === null || id === undefined) throw new Error('route has no grant');
+    return readScopeGrant(db, id)?.expiresAt ?? null;
+  });
+}
+
+/** Grant scopes with a pending renewal retry. */
+
+async function setAllocationField(
+  stub: DurableObjectStub<SandboxControlV2>,
+  patch: Partial<{ last_activity_at: number; last_frame_at: number; create_deadline_at: number }>
+): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    await db.update(allocationTable).set(patch).where(eq(allocationTable.id, 'current'));
+  });
+}
+
+async function setRouteDeadline(
+  stub: DurableObjectStub<SandboxControlV2>,
+  sessionId: string,
+  at: number
+): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    await db
+      .update(routesTable)
+      .set({ attempt_deadline_at: at })
+      .where(eq(routesTable.session_id, sessionId));
+  });
+}
+
+async function runAlarm(stub: DurableObjectStub<SandboxControlV2>): Promise<void> {
+  await runInDurableObject(stub, instance => instance.alarm());
+}
+
+function readAlarm(stub: DurableObjectStub<SandboxControlV2>): Promise<number | null> {
+  return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
+}
+
+async function releaseGate(
+  stub: DurableObjectStub<SandboxControlV2>,
+  release: () => void
+): Promise<void> {
+  await runInDurableObject(stub, async () => {
+    release();
+    await new Promise(resolve => setTimeout(resolve, 25));
+  });
+}
+
+async function setup(
+  provider: FakeProvider,
+  broker: FakeCredentialBroker = createFakeCredentialBroker()
+): Promise<{
+  stub: DurableObjectStub<SandboxControlV2>;
+  peer: FakeSessionPeer;
+}> {
+  const peer = new FakeSessionPeer();
+  peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(env, sessionId => ({
+    userId: 'user_123',
+    kiloSessionId: kiloSessionIdFor(sessionId),
+  }));
+  const stub = sandboxNamespace.getByName(SANDBOX_ID);
+  await runInDurableObject(stub, async instance => {
+    await instance.getAllocationState();
+    installFakeSandboxEnv(instance, broker);
+    Object.assign(instance, {
+      createProviderAdapter: () => provider.adapter,
+      provider: provider.adapter,
+      sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+    });
+  });
+  return { stub, peer };
+}
+
+async function connectAndHello(
+  provider: FakeProvider,
+  wrapperId = 'wr_1',
+  options: {
+    workspaceConfiguration?: boolean;
+    runtimeInstructions?: boolean;
+    runtimeHarness?: string;
+  } = {}
+): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
+  await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  const launchEnv = provider.launchEnvs[0];
+  if (!launchEnv) throw new Error('provider.launch was not called');
+  const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
+  const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
+  if (!credential || !allocationId) throw new Error('launch environment is missing identity');
+  const wrapper = await FakeWrapper.connect({
+    sandboxId: SANDBOX_ID,
+    credential,
+    runtimeInstructions: true,
+    ...options,
+  });
+  const reply = await wrapper.hello({ wrapperId, allocationId });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+  return { wrapper, credential, allocationId };
+}
+
+afterEach(async () => {
+  await reset();
+});
+
+describe('SandboxControlV2 routes and forwarding', () => {
+  it.each(['throw', 'invalid'] as const)(
+    'keeps preparation and delivery healthy when runtime metadata projection is %s',
+    async failure => {
+      const provider = createFakeProvider();
+      provider.adapter.describeRuntime = () => {
+        if (failure === 'throw') throw new Error('metadata projection failed');
+        return { provider: 'cloudflare', sandboxId: '' };
+      };
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper } = await connectAndHello(provider);
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'ready' })
+        )
+      );
+      const status = await stub.status({ sessionId: SESSION });
+      expect(status.view.state).toBe('ready');
+      expect(status.view).not.toHaveProperty('container');
+      expect(await stub.prepare(prepareInput(SESSION))).toMatchObject({ state: 'ready' });
+      expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+        'sent'
+      );
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+      wrapper.close();
+    }
+  );
+
+  it.each(['image', 'repository'] as const)(
+    'publishes %s allocation metadata and rejects stale delivery',
+    async startSource => {
+      const provider = createFakeProvider();
+      provider.adapter.launch = async (_ref, { env: launchEnv }) => {
+        provider.launchEnvs.push({ ...launchEnv });
+        return { startSource };
+      };
+      provider.adapter.describeRuntime = ref => ({
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        instanceId: ref.slice('mem_'.length),
+      });
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper, allocationId } = await connectAndHello(provider);
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      const container = {
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        allocationId,
+        instanceId: allocationId,
+        startSource: startSource === 'repository' ? 'snapshot' : 'image',
+        runtimeHarness: 'kilo',
+      };
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'ready', container })
+        )
+      );
+      expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({ container });
+      expect(await stub.prepare(prepareInput(SESSION))).toMatchObject({ container });
+      expect(
+        await stub.deliver({
+          sessionId: SESSION,
+          allocationId: 'old-allocation',
+          messages: [promptPayload('m1')],
+        })
+      ).toBe('not_ready');
+      expect(
+        await stub.deliver({ sessionId: SESSION, allocationId, messages: [promptPayload('m1')] })
+      ).toBe('sent');
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+      wrapper.close();
+    }
+  );
+
+  // This preinstalled sandbox stores `kilo`. A local v2 image reports `kilo2` and wins;
+  // without a valid report, the run keeps the stored harness.
+  it.each([
+    ['kilo2', { runtimeHarness: 'kilo2' }],
+    ['kilo', { runtimeHarness: 'kilo' }],
+    ['unknown', { runtimeHarness: 'kilo' }],
+    [undefined, { runtimeHarness: 'kilo' }],
+  ] as const)(
+    'records the wrapper runtime harness header %s in the run container',
+    async (header, expected) => {
+      const provider = createFakeProvider();
+      provider.adapter.describeRuntime = ref => ({
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        instanceId: ref.slice('mem_'.length),
+      });
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper, allocationId } = await connectAndHello(
+        provider,
+        'wr_1',
+        header === undefined ? {} : { runtimeHarness: header }
+      );
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      const container = {
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        allocationId,
+        instanceId: allocationId,
+        startSource: 'image',
+        ...expected,
+      };
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'ready', container })
+        )
+      );
+      expect((await stub.status({ sessionId: SESSION })).view).toEqual(
+        expect.objectContaining({ container })
+      );
+      wrapper.close();
+    }
+  );
+
+  it('reconstruction restores no notification backlog or replay and leaves durable route state unchanged', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => ({
+        ...peer.forSession(sessionId),
+        onEvents: async () => {
+          entered = true;
+          await new Promise(() => undefined);
+        },
+      });
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'in-memory',
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(1));
+    const routeBefore = await readRouteRow(stub, SESSION);
+    const allocationBefore = await readState(stub);
+    await evictAllDurableObjects();
+    expect(await notificationSnapshot(stub)).toMatchObject({
+      pending: 0,
+      retained: 0,
+      bytes: 0,
+      active: 0,
+      lanes: 0,
+      losses: [],
+    });
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect(await readState(stub)).toEqual(allocationBefore);
+    const deliveredBeforeReconstruction = peer.outcomes.length;
+    expect(deliveredBeforeReconstruction).toBeLessThanOrEqual(1);
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => peer.forSession(sessionId);
+    });
+    await stub.status({ sessionId: SESSION });
+    expect(peer.outcomes).toHaveLength(deliveredBeforeReconstruction);
+    wrapper.close();
+  });
+
+  it('bounds flood retention while heartbeat, reconnect, alarm and physical stop bypass a held peer', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'ready' })
+      )
+    );
+    let release: (() => void) | undefined;
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => ({
+        ...peer.forSession(sessionId),
+        onEvents: async () => {
+          entered = true;
+          await new Promise<void>(resolve => {
+            release = resolve;
+          });
+        },
+      });
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    await runInDurableObject(stub, instance => {
+      const dispatcher = (instance as unknown as NotificationOwner).notifications;
+      for (let index = 0; index < 1_100; index++) {
+        dispatcher.enqueue(SESSION, {
+          kind: 'events',
+          payload: { events: [{ type: 'text', properties: { text: 'x'.repeat(20_000) } }] },
+        });
+        dispatcher.enqueue(SESSION, {
+          kind: 'route',
+          payload: { state: 'ready', attemptId: `attempt-${index}` },
+        });
+        expect(dispatcher.snapshot().retained).toBeLessThanOrEqual(1_000);
+        expect(dispatcher.snapshot().bytes).toBeLessThanOrEqual(8 * 1024 * 1024);
+      }
+    });
+    const before = await readState(stub);
+    wrapper.heartbeat(true);
+    await waitFor(
+      async () =>
+        expect((await readState(stub)).lastFrameAt).toBeGreaterThan(before.lastFrameAt ?? 0),
+      { timeout: 500 }
+    );
+    const reconnect = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await reconnect.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    expect((await readState(stub)).kind).toBe('connected');
+    await setAllocationField(stub, { last_activity_at: Date.now() - TIMERS.idleMs - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1), { timeout: 500 });
+    expect((await readState(stub)).kind).toBe('stopped');
+    await releaseGate(stub, () => release?.());
+    await waitFor(async () =>
+      expect(await notificationSnapshot(stub)).toMatchObject({
+        retained: 0,
+        bytes: 0,
+        active: 0,
+        lanes: 0,
+      })
+    );
+    wrapper.close();
+    reconnect.close();
+  });
+
+  it('keeps surviving events before outcome and uses only enqueue budget through retries', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    let release: (() => void) | undefined;
+    const entered: number[] = [];
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => {
+        const target = peer.forSession(sessionId);
+        return {
+          ...target,
+          onEvents: async notification => {
+            entered.push(Date.now());
+            if (entered.length === 1)
+              await new Promise<void>(resolve => {
+                release = resolve;
+              });
+            if (notification.events[0]?.properties.text === 'retry')
+              throw Object.assign(new Error('transient transport'), { retryable: true });
+            await target.onEvents(notification);
+          },
+        };
+      };
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toHaveLength(1));
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'a' } }],
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'b' } }],
+    });
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'msg-order',
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(2));
+    await releaseGate(stub, () => release?.());
+    await waitFor(() => expect(peer.outcomes).toHaveLength(1));
+    expect(
+      peer.events.flatMap(entry => entry.notification.events.map(event => event.properties.text))
+    ).toEqual(['held', 'a', 'b']);
+    expect(peer.received.slice(-3).map(entry => entry.kind)).toEqual([
+      'events',
+      'events',
+      'outcome',
+    ]);
+
+    entered.length = 0;
+    release = undefined;
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toHaveLength(1));
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'retry' } }],
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(1));
+    const enqueuedBy = Date.now();
+    await runInDurableObject(stub, async () => {
+      await new Promise(resolve => setTimeout(resolve, 1_850));
+      release?.();
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).retained).toBe(0), {
+      timeout: 500,
+    });
+    expect(entered.length).toBeGreaterThanOrEqual(2);
+    expect(entered.every(at => at <= enqueuedBy + 2_000)).toBe(true);
+    expect(Date.now() - enqueuedBy).toBeLessThan(2_400);
+    wrapper.close();
+  });
+
+  it('release retires queued notifications and reconstruction restores no in-memory backlog', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => ({
+        ...peer.forSession(sessionId),
+        onEvents: async () => {
+          entered = true;
+          await new Promise(() => undefined);
+        },
+      });
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'discarded',
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(1));
+    await stub.release({ sessionId: SESSION });
+    await waitFor(async () =>
+      expect(await notificationSnapshot(stub)).toMatchObject({
+        retained: 0,
+        bytes: 0,
+        active: 0,
+        lanes: 0,
+      })
+    );
+    expect(peer.outcomes).toEqual([]);
+    const before = await readState(stub);
+    await evictAllDurableObjects();
+    expect(await notificationSnapshot(stub)).toMatchObject({
+      pending: 0,
+      retained: 0,
+      bytes: 0,
+      active: 0,
+      lanes: 0,
+      losses: [],
+    });
+    expect(await readState(stub)).toEqual(before);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    wrapper.close();
+  });
+
+  it('accounts for wrapper events_dropped internally without forwarding a public marker', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    const before = peer.received.length;
+    wrapper.send({ type: 'events_dropped', dropped: 321 });
+    await waitFor(
+      async () => {
+        const snapshot = await notificationSnapshot(stub);
+        expect(snapshot.losses).toContainEqual({
+          cause: 'wrapper',
+          droppedCount: 321,
+          droppedBytes: 0,
+          maxQueueAgeMs: 0,
+        });
+      },
+      { timeout: 500 }
+    );
+    expect(peer.received).toHaveLength(before);
+    wrapper.close();
+  });
+
+  it('delivers a healthy sibling outcome while another session notification is held', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    await wrapper.next();
+    let release: (() => void) | undefined;
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => {
+        const target = peer.forSession(sessionId);
+        return sessionId !== SESSION
+          ? target
+          : {
+              ...target,
+              onEvents: async notification => {
+                entered = true;
+                await new Promise<void>(resolve => {
+                  release = resolve;
+                });
+                await target.onEvents(notification);
+              },
+            };
+      };
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    try {
+      wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+      wrapper.send({
+        type: 'session.outcome',
+        sessionId: SESSION_NEXT,
+        status: 'completed',
+        lastMessageId: 'msg-next',
+      });
+      await waitFor(
+        () =>
+          expect(peer.outcomes).toContainEqual(
+            expect.objectContaining({ sessionId: SESSION_NEXT })
+          ),
+        { timeout: 500 }
+      );
+      expect(peer.routeUpdatesFor(SESSION_NEXT)).toContainEqual(
+        expect.objectContaining({ state: 'ready' })
+      );
+    } finally {
+      await releaseGate(stub, () => release?.());
+      wrapper.close();
+    }
+  });
+
+  it('prepares a route and forwards progress and ready notifications', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+
+    const view = await stub.prepare(prepareInput(SESSION));
+    expect(view).toEqual({
+      state: 'preparing',
+      attemptId: expect.any(String),
+      step: 'sandbox_create',
+    });
+
+    const { wrapper } = await connectAndHello(provider);
+    const prepareFrame = await wrapper.next();
+    expect(prepareFrame).toMatchObject({ type: 'session.prepare' });
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(prepareFrame.spec.attemptId).not.toBe(routeSpec(SESSION).attemptId);
+
+    wrapper.send({ type: 'session.progress', sessionId: SESSION, step: 'clone' });
+    wrapper.send({
+      type: 'session.progress',
+      sessionId: SESSION,
+      step: 'clone',
+      detail: 'Cloning repository... Receiving objects: 45%',
+    });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({
+          state: 'preparing',
+          step: 'clone',
+          detail: 'Cloning repository... Receiving objects: 45%',
+        })
+      )
+    );
+    // Until the wrapper connects, the allocation reports its own steps.
+    expect(
+      peer
+        .routeUpdatesFor(SESSION)
+        .flatMap(update =>
+          update.state === 'preparing' ? [[update.step, update.detail ?? null]] : []
+        )
+    ).toEqual([
+      ['sandbox_create', null],
+      ['sandbox_start', null],
+      ['clone', null],
+      ['clone', 'Cloning repository... Receiving objects: 45%'],
+    ]);
+
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'ready' })
+      )
+    );
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('ready');
+    expect(await stub.status({ sessionId: SESSION })).toEqual({
+      sessionId: SESSION,
+      view: { state: 'ready', attemptId: expect.any(String) },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
+    });
+  });
+
+  it('materializes encrypted credential-source MCP into the frame without persisting plaintext', async () => {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const secret = 'live-mcp-secret-value';
+    const envelope = encryptWithPublicKey(secret, publicKey);
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const peer = new FakeSessionPeer();
+    peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+    }));
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      installFakeSandboxEnv(instance, broker, { AGENT_ENV_VARS_PRIVATE_KEY: privateKey });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+      });
+    });
+
+    const input = {
+      spec: routeSpec(SESSION),
+      credentials: {
+        ...prepareInput(SESSION).credentials,
+        mcpServers: {
+          github: {
+            type: 'remote' as const,
+            url: 'https://mcp.example.com/github',
+            headers: { 'X-Neutral-Header': envelope },
+          },
+        },
+      },
+    };
+    const view = await stub.prepare(input);
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+
+    const { wrapper } = await connectAndHello(provider);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.mcp).toEqual({
+      github: {
+        type: 'remote',
+        url: 'https://mcp.example.com/github',
+        headers: { 'X-Neutral-Header': secret },
+      },
+    });
+
+    // At rest the route row keeps the envelope only; the durable spec has no MCP.
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.spec).not.toContain(secret);
+    expect(row?.spec).not.toContain('mcp');
+    expect(row?.credential_source).toContain(envelope.encryptedData);
+    expect(row?.credential_source).not.toContain(secret);
+  });
+
+  it('fails the attempt immediately when credential-source MCP cannot be decrypted', async () => {
+    const provider = createFakeProvider();
+    // No AGENT_ENV_VARS_PRIVATE_KEY binding: decryption fails at send time.
+    const { stub, peer } = await setup(provider);
+    const input = {
+      spec: routeSpec(SESSION),
+      credentials: {
+        ...prepareInput(SESSION).credentials,
+        mcpServers: {
+          github: {
+            type: 'remote' as const,
+            url: 'https://mcp.example.com/github',
+            headers: {
+              Authorization: {
+                encryptedData: 'ZW5jcnlwdGVk',
+                encryptedDEK: 'ZGVr',
+                algorithm: 'rsa-aes-256-gcm' as const,
+                version: 1 as const,
+              },
+            },
+          },
+        },
+      },
+    };
+    await stub.prepare(input);
+    await connectAndHello(provider);
+
+    // Fail fast, not after the route preparation deadline.
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+      )
+    );
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+  });
+
+  it('refuses to prepare a route whose worktree is mid-deletion', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const worktree = 'worktree_11111111-1111-1111-1111-111111111111';
+    const sentPrepares: string[] = [];
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      instance.sendSessionPrepare = (_allocation, route) => {
+        sentPrepares.push(route.sessionId);
+      };
+      // A route row left from an earlier prepare must not survive the guard.
+      const db = drizzle(state.storage, { logger: false });
+      writeRoute(db, {
+        sessionId: SESSION,
+        spec: routeSpec(SESSION),
+        grant: null,
+        credentialSource: null,
+        state: 'ready',
+        attemptId: routeSpec(SESSION).attemptId,
+        attemptDeadlineAt: 0,
+        reason: null,
+      });
+      await state.storage.put(`${WORKTREE_DELETION_PREFIX}${worktree}`, {
+        sessionIds: [kiloSessionIdFor(SESSION)],
+        resourcesCleaned: false,
+        destroyed: false,
+        completed: false,
+        exclusiveTeardown: true,
+      });
+    });
+
+    const input = prepareInput(SESSION);
+    input.credentials.scopeId = worktree;
+    const view = await stub.prepare(input);
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(sentPrepares).toEqual([]);
+    expect(provider.createCalls).toBe(0);
+    expect((await readState(stub)).kind).toBe('stopped');
+    // No route row: a stale failed row would make a later exclusive deletion
+    // look shared and leave the sandbox undestroyed (Shared Worktrees rule 13).
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('delivers prompts only for a connected ready route and counts delivery as activity', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'not_ready'
+    );
+
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    const activityBefore = (await readState(stub)).lastActivityAt;
+    await setAllocationField(stub, { last_activity_at: (activityBefore ?? 0) - 60_000 });
+    const stale = (await readState(stub)).lastActivityAt;
+
+    expect(
+      await stub.deliver({
+        sessionId: SESSION,
+        messages: [promptPayload('m1'), promptPayload('m2')],
+      })
+    ).toBe('sent');
+
+    const first = await wrapper.next();
+    const second = await wrapper.next();
+    expect(first).toMatchObject({
+      type: 'session.prompt',
+      sessionId: SESSION,
+      payload: { messageId: 'm1' },
+    });
+    expect(second).toMatchObject({
+      type: 'session.prompt',
+      sessionId: SESSION,
+      payload: { messageId: 'm2' },
+    });
+    expect((await readState(stub)).lastActivityAt).toBeGreaterThan(stale ?? 0);
+  });
+
+  it('fails a preparing route at its attempt deadline', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    await setRouteDeadline(stub, SESSION, Date.now() - 1);
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId,
+        reason: 'preparation_timeout',
+      })
+    );
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+  });
+
+  it('records route lifecycle diagnostics at the route decision owner', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    if (!attemptId) throw new Error('route attempt was not created');
+
+    const records = await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const ctx = {
+        db,
+        now: () => 5_000,
+        routePreparationMs: 1_000,
+        sendPrepare: () => {},
+        notify: async () => {},
+        issueGrant: async () => {
+          throw new Error('unused');
+        },
+        applyPolicy: async () => true,
+        publishGrant: () => {},
+      } as unknown as RouteContext;
+      const captured: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (
+          typeof bounded.diagnosticEvent === 'string' &&
+          bounded.diagnosticEvent.startsWith('route_')
+        ) {
+          captured.push(bounded);
+        }
+        return logger;
+      });
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const route = {
+        sessionId: SESSION,
+        spec: routeSpec(SESSION),
+        grant: null,
+        credentialSource: null,
+        state: 'preparing' as const,
+        attemptId,
+        attemptDeadlineAt: 5_000,
+        reason: null,
+      };
+      try {
+        writeRoute(db, route);
+        await onRouteProgress(ctx, SESSION, { step: 'setup' }, true);
+        await onRouteReady(ctx, SESSION, true);
+        writeRoute(db, {
+          ...route,
+          attemptId: `${attemptId}-timeout`,
+          attemptDeadlineAt: 5_000,
+        });
+        await failExpiredRoutes(ctx);
+        writeRoute(db, {
+          ...route,
+          attemptId: `${attemptId}-reported`,
+          attemptDeadlineAt: 10_000,
+        });
+        await onRouteFailed(ctx, SESSION, 'workspace_setup_failed', 'git_clone_timeout', true);
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+        warn.mockRestore();
+        error.mockRestore();
+      }
+      return captured;
+    });
+
+    expect(records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          diagnosticEvent: 'route_progress',
+          sessionId: SESSION,
+          attemptId,
+          step: 'setup',
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'route_ready',
+          sessionId: SESSION,
+          attemptId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'route_failed',
+          sessionId: SESSION,
+          attemptId: `${attemptId}-timeout`,
+          reason: 'preparation_timeout',
+          stage: 'attempt_deadline',
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'route_failed',
+          sessionId: SESSION,
+          attemptId: `${attemptId}-reported`,
+          reason: 'workspace_setup_failed',
+          stage: 'wrapper_reported',
+          subtype: 'git_clone_timeout',
+        }),
+      ])
+    );
+  });
+
+  it('fails an expired route immediately when the allocation stops', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    await setRouteDeadline(stub, SESSION, Date.now() - 1);
+
+    // `provider-gone` reaches `stopped`; assert the `onAllocationStopped` sweep
+    // failed the route before any alarm could run.
+    const stateAfterStop = await runInDurableObject(stub, async (instance, state) => {
+      await instance.reportProviderGone();
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, SESSION));
+      return rows[0]?.state ?? null;
+    });
+    expect(stateAfterStop).toBe('failed');
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId,
+        reason: 'preparation_timeout',
+      })
+    );
+    expect(await readAlarm(stub)).toBeNull();
+  });
+
+  it('keeps the attempt deadline across a reallocation', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+
+    const before = await readRouteRow(stub, SESSION);
+    const originalAllocationId = (await readState(stub)).allocationId;
+    await runInDurableObject(stub, instance => instance.reportProviderGone());
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(state.allocationId).not.toBe(originalAllocationId);
+      expect(state.kind).toBe('starting');
+    });
+
+    const after = await readRouteRow(stub, SESSION);
+    expect(after?.attempt_deadline_at).toBe(before?.attempt_deadline_at);
+    expect(after?.attempt_id).toBe(before?.attempt_id);
+  });
+
+  it('retries a failed create after the short pause, not a full create deadline', async () => {
+    const provider = createFakeProvider({ failCreates: 1 });
+    const { stub } = await setup(provider);
+    const preparedAt = Date.now();
+    await stub.prepare(prepareInput(SESSION));
+
+    await waitFor(async () => {
+      expect(provider.createCalls).toBe(1);
+      expect((await readState(stub)).kind).toBe('creating');
+      const alarm = await readAlarm(stub);
+      expect(alarm).not.toBeNull();
+      expect(alarm).toBeLessThanOrEqual(preparedAt + 2 * TIMERS.providerCreateRetryMs);
+    });
+
+    await setAllocationField(stub, { create_deadline_at: Date.now() - 1 });
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect(provider.createCalls).toBe(2);
+    });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+  });
+
+  it('fails the preparing route once the create attempt budget is spent', async () => {
+    const provider = createFakeProvider({ failCreates: 2 });
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    const deadline = (await readRouteRow(stub, SESSION))?.attempt_deadline_at;
+    expect(deadline).toBeGreaterThan(Date.now());
+
+    // Attempt 1 fails, spends the retry pause, and the tick starts the retry.
+    await waitFor(async () => expect(provider.createCalls).toBe(1));
+    await setAllocationField(stub, { create_deadline_at: Date.now() - 1 });
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect(provider.createCalls).toBe(2);
+    });
+    // Attempt 2 fails too: the budget is spent, so the episode stops even though
+    // the attempt deadline still had time left.
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(provider.createCalls).toBe(2);
+    });
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId,
+        reason: 'sandbox_create_failed',
+      })
+    );
+    const route = await readRouteRow(stub, SESSION);
+    expect(route).toMatchObject({ state: 'failed', reason: 'sandbox_create_failed' });
+    expect(route?.attempt_deadline_at).toBe(0);
+    // Budget spent and route failed: the stopped allocation starts no create.
+    expect(await readAlarm(stub)).toBeNull();
+    expect(provider.createCalls).toBe(2);
+  });
+
+  it('sends every attachment its own workspace configuration', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+
+    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
+    const first = await wrapper.next();
+    expect(first?.type).toBe('session.attach');
+    if (first?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(first.spec).not.toHaveProperty('setupCommands');
+    expect(first.spec).not.toHaveProperty('runtimeAgents');
+    expect(first.spec).not.toHaveProperty('runtimeInstructions');
+    expect(first.spec).not.toHaveProperty('modelContextLimits');
+    expect(first.spec).not.toHaveProperty('kiloCommands');
+    expect(first.spec).not.toHaveProperty('env');
+    expect(first.workspace).toMatchObject({
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
+      setupCommands: ['echo shared'],
+      runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
+      kiloCommands: [{ name: 'review', template: 'Review the change' }],
+    });
+
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await stub.prepare(configuredPrepareInput(SESSION_NEXT, SHARED_DIRECTORY));
+    const sibling = await wrapper.next();
+    expect(sibling?.type).toBe('session.attach');
+    if (sibling?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(sibling.spec.sessionId).toBe(SESSION_NEXT);
+    expect(sibling.workspace).toEqual(first.workspace);
+
+    await stub.prepare(configuredPrepareInput(SESSION_THIRD, SHARED_DIRECTORY, ['echo changed']));
+    const changed = await wrapper.next();
+    expect(changed?.type).toBe('session.attach');
+    if (changed?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(changed.spec.sessionId).toBe(SESSION_THIRD);
+    expect(changed.workspace.setupCommands).toEqual(['echo changed']);
+    expect(changed.spec).not.toHaveProperty('setupCommands');
+    expect(changed.spec).not.toHaveProperty('env');
+  });
+
+  it.each([false, true])(
+    'omits profile instructions for pre-deploy wrappers (workspace configuration: %s)',
+    async workspaceConfiguration => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+      const { wrapper } = await connectAndHello(provider, 'wr_old', {
+        workspaceConfiguration,
+        runtimeInstructions: false,
+      });
+      try {
+        const frame = await wrapper.next();
+        expect(frame?.type).toBe(workspaceConfiguration ? 'session.attach' : 'session.prepare');
+        if (frame?.type !== 'session.attach' && frame?.type !== 'session.prepare') {
+          throw new Error('expected a preparation frame');
+        }
+        expect(frame.spec).not.toHaveProperty('runtimeInstructions');
+        if (frame.type === 'session.attach') {
+          expect(frame.workspace).not.toHaveProperty('runtimeInstructions');
+        }
+        const row = await readRouteRow(stub, SESSION);
+        expect(JSON.parse(row?.spec ?? '{}').runtimeInstructions).toEqual([
+          { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+        ]);
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  it('binds sibling MCP credentials to the canonical workspace root rather than the attaching chat', async () => {
+    const root = 'workspace_12345678-1234-4234-8234-123456789abc';
+    const scopeId = 'worktree_12345678-1234-4234-8234-123456789abc';
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const issuances: { sessionId: string; binding: unknown }[] = [];
+    const grant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'workspace-root-grant',
+      expiresAt: 1_900_000_000,
+    };
+    await runInDurableObject(stub, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, sessionId) => {
+        const peer = peerFor(ownerId, sessionId);
+        return peer
+          ? {
+              ...peer,
+              issueCloudAgentMcpGrant: async binding => {
+                issuances.push({ sessionId, binding });
+                return grant;
+              },
+            }
+          : null;
+      };
+    });
+    for (const sessionId of [root, SESSION_NEXT]) {
+      const input = configuredPrepareInput(sessionId, SHARED_DIRECTORY);
+      await stub.prepare({ ...input, credentials: { ...input.credentials, scopeId } });
+    }
+    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
+    const frames = [await wrapper.next(), await wrapper.next()];
+    expect(frames).toHaveLength(2);
+    for (const frame of frames) {
+      if (frame?.type !== 'session.attach') throw new Error('expected session.attach');
+      expect(frame.credentials?.cloudAgentMcp).toEqual(grant);
+    }
+    expect(issuances).toEqual([
+      {
+        sessionId: root,
+        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
+      },
+      {
+        sessionId: root,
+        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
+      },
+    ]);
+  });
+
+  it('keeps sending session.credentials after a workspace attach', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
+    expect((await wrapper.next())?.type).toBe('session.attach');
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.credentials');
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+  });
+
+  it('retires a ready route when its owner is not a current member', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    // The route is ready with a grant that is due, and the membership answer
+    // changes.
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+
+    // The sandbox reads the membership itself: the prompt is answered
+    // not_ready, the route releases, and the stored route is removed.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'not_ready'
+    );
+    expect((await wrapper.next())?.type).toBe('session.release');
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    // A released route stays released for a later prompt.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'not_ready'
+    );
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    wrapper.close();
+  });
+
+  it('retries a renewal whose organization membership read failed', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        throw new Error('membership read unavailable');
+      };
+    });
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    // The issuance reads the membership once more, so a single unanswered read
+    // keeps the grant in place.
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
+    // A membership read that does not answer keeps the route ready on its
+    // grant, and the next send asks for a new grant.
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
+    const before = await grantExpiry(stub, SESSION);
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(reads).toBe(2 * TIMERS.organizationMembershipReadAttempts);
+    expect(await grantExpiry(stub, SESSION)).toBe(before);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
+    wrapper.close();
+  });
+
+  it('requires a current membership to prepare an organization route', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+
+    const view = await stub.prepare(prepareInput(SESSION));
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    // Without a grant the preparation fails and no sandbox starts.
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('recovers a preparation whose first membership read failed', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        if (reads === 1) throw new Error('membership read unavailable');
+        return true;
+      };
+    });
+
+    // The issuance reads again, and the preparation proceeds.
+    expect((await stub.prepare(prepareInput(SESSION))).state).not.toBe('failed');
+    expect(reads).toBe(2);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'preparing' });
+  });
+
+  it('reports an unavailable membership read when its reader throws', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    // This worker binds no Hyperdrive, so the production default reader throws.
+    // An unanswered membership read ends the issuance with its own denial.
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      const production = workerOrganizationMembershipReader(instance.env);
+      instance.organizationMembershipFor = async (userId, organizationId) => {
+        reads += 1;
+        return production(userId, organizationId);
+      };
+    });
+
+    const stages: unknown[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'route_failed') stages.push(bounded.stage);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    let view: ControlPlaneRouteView;
+    try {
+      view = await stub.prepare(prepareInput(SESSION));
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    // The denial names its own cause after the issuance exhausts its reads.
+    expect(stages).toEqual(['organization_membership_unavailable']);
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('keeps personal routes independent of organization membership', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        return false;
+      };
+    });
+    const personal = {
+      spec: routeSpec(SESSION),
+      credentials: {
+        userId: 'user_123',
+        kiloSessionId: kiloSessionIdFor(SESSION),
+        kiloToken: NATIVE_KILO_TOKEN,
+        repository: { type: 'github' as const, repo: 'acme/widgets' },
+        scopeId: SESSION,
+      },
+    };
+
+    expect((await stub.prepare(personal)).state).not.toBe('failed');
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.credentials');
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(reads).toBe(0);
+    wrapper.close();
+  });
+
+  it('replays the workspace configuration when the wrapper is replaced', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1', {
+      workspaceConfiguration: true,
+    });
+    const first = await wrapper.next();
+    if (first?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(first.workspace).toBeDefined();
+    expect(first.workspace.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const replacement = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      workspaceConfiguration: true,
+      runtimeInstructions: true,
+    });
+    try {
+      expect(
+        await replacement.hello({
+          wrapperId: 'wr_2',
+          allocationId,
+        })
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+      const replay = await replacement.next();
+      expect(replay?.type).toBe('session.attach');
+      if (replay?.type !== 'session.attach') throw new Error('expected session.attach');
+      expect(replay.spec.sessionId).toBe(SESSION);
+      expect(replay.workspace).toEqual(first.workspace);
+    } finally {
+      replacement.close();
+    }
+  });
+
+  it('keeps the full legacy session.prepare spec without workspace configuration support', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+    const { wrapper } = await connectAndHello(provider);
+
+    const frame = await wrapper.next();
+    expect(frame?.type).toBe('session.prepare');
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.setupCommands).toEqual(['echo shared']);
+    expect(frame.spec.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
+    expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
+    expect(frame.spec.modelContextLimits).toEqual({ 'example/model': 50_000 });
+    expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
+  });
+
+  it('gives a re-prepare after a wrapper restart a fresh attempt', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    const before = await readRouteRow(stub, SESSION);
+    const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'lost',
+        attemptId: before?.attempt_id,
+        reason: 'agent_restarted',
+      })
+    );
+    const after = await readRouteRow(stub, SESSION);
+    expect(after?.state).toBe('preparing');
+    expect(after?.attempt_id).not.toBe(before?.attempt_id);
+    expect(after?.attempt_deadline_at).toBeGreaterThan(before?.attempt_deadline_at ?? 0);
+
+    const reprepareFrame = await wrapper2.next();
+    expect(reprepareFrame).toMatchObject({ type: 'session.prepare' });
+    if (reprepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(reprepareFrame.spec.attemptId).toBe(after?.attempt_id);
+  });
+
+  it('carries the latest saved worktree recovery into a wrapper restart', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const initial = prepareInput(SESSION);
+    initial.spec = {
+      ...initial.spec,
+      worktreeRecovery: {
+        files: [{ path: 'old.txt', status: 'added', patch: 'old patch' }],
+      },
+    };
+    await stub.prepare(initial);
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    const latest = {
+      files: [{ path: 'src/latest.ts', status: 'modified' as const, patch: 'latest patch' }],
+    };
+    const reprepare = prepareInput(SESSION);
+    reprepare.spec = { ...reprepare.spec, worktreeRecovery: latest };
+    await stub.prepare(reprepare);
+    const row = await readRouteRow(stub, SESSION);
+    expect(row).not.toBeNull();
+    expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(latest);
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
+    const frame = await wrapper2.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(latest);
+    wrapper2.close();
+    wrapper.close();
+  });
+
+  it('adopts a later saved worktree recovery while the route is still preparing', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const prepared = {
+      files: [{ path: 'old.txt', status: 'added' as const, patch: 'old patch' }],
+    };
+    const initial = prepareInput(SESSION);
+    initial.spec = { ...initial.spec, worktreeRecovery: prepared };
+    await stub.prepare(initial);
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
+
+    const late = {
+      files: [{ path: 'src/late.ts', status: 'modified' as const, patch: 'late patch' }],
+    };
+    const reprepare = prepareInput(SESSION);
+    reprepare.spec = { ...reprepare.spec, worktreeRecovery: late };
+    await stub.prepare(reprepare);
+    const row = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(late);
+
+    const { wrapper } = await connectAndHello(provider, 'wr_1');
+    const frame = await wrapper.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(late);
+    wrapper.close();
+  });
+
+  it('re-notifies ready for the same wrapperId after a reconnect', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    wrapper.close();
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'reconnecting' })
+      )
+    );
+    expect(await readState(stub)).toMatchObject({ kind: 'disconnected' });
+
+    const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper2.hello({ wrapperId: 'wr_1', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+    await waitFor(() => {
+      const readyCount = peer
+        .routeUpdatesFor(SESSION)
+        .filter(update => update.state === 'ready').length;
+      expect(readyCount).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it('preserves delivered work and the ready route across disconnect, eviction and same-wrapper reconnect', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    const messageId = 'message-before-reset';
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload(messageId)] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prompt', payload: { messageId } });
+    const routeBefore = await readRouteRow(stub, SESSION);
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const allocationBefore = await readState(stub);
+    const alarmBefore = await readAlarm(stub);
+    await evictAllDurableObjects();
+    expect(await readState(stub)).toEqual(allocationBefore);
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect(await readAlarm(stub)).toBe(alarmBefore);
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+      });
+    });
+
+    const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect((await readState(stub)).lastActivityAt).toBe(allocationBefore.lastActivityAt);
+    expect(await reconnected.next(50)).toBeNull();
+    reconnected.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: messageId,
+    });
+    await waitFor(() =>
+      expect(peer.outcomes).toContainEqual(
+        expect.objectContaining({
+          sessionId: SESSION,
+          status: 'completed',
+          lastMessageId: messageId,
+        })
+      )
+    );
+    expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'lost')).toBe(false);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(provider.stopCalls).toEqual([]);
+    reconnected.close();
+  });
+
+  it('returns the current view from prepare so a lost notification cannot wedge the session', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    // The Session DO may have missed the ready notification; prepare reports it.
+    expect(await stub.prepare(prepareInput(SESSION))).toEqual({
+      state: 'ready',
+      attemptId: expect.any(String),
+    });
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    expect(await stub.prepare(prepareInput(SESSION))).toEqual({
+      state: 'reconnecting',
+      attemptId: expect.any(String),
+    });
+  });
+
+  it('stops an idle sandbox, loses ready routes and deletes them', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+
+    await setAllocationField(stub, {
+      last_activity_at: Date.now() - (TIMERS.idleMs + 1_000),
+    });
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'lost',
+        attemptId,
+        reason: 'sandbox_stopped',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('cancels every chat in the workspace and stops the physical sandbox', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () => {
+      expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready');
+    });
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect(result.stopEpoch).toBe(1);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    await waitFor(() => expect(provider.stopCalls).toEqual([provider.refs[0]]));
+    await waitFor(() =>
+      expect(peer.workspaceStops.map(entry => entry.sessionId).sort()).toEqual(
+        [SESSION, SESSION_NEXT].sort()
+      )
+    );
+    expect(peer.workspaceStops.every(entry => entry.payload.stopEpoch === 1)).toBe(true);
+    expect(peer.routeUpdatesFor(SESSION_NEXT).some(update => update.state === 'lost')).toBe(false);
+  });
+
+  it('replays a dropped workspace_stopped from the alarm until acknowledged', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    peer.workspaceStopOnline = false;
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(peer.workspaceStops).toEqual([]);
+    const prefix = 'control_plane_pending_workspace_stop/';
+    const pending = await runInDurableObject(stub, (_instance, state) =>
+      Array.from(state.storage.kv.list<unknown>({ prefix }))
+    );
+    expect(pending).toHaveLength(2);
+    expect(await readAlarm(stub)).not.toBeNull();
+
+    await runInDurableObject(stub, (_instance, state) => {
+      for (const [key, value] of state.storage.kv.list<{ dueAt: number }>({ prefix })) {
+        state.storage.kv.put(key, { ...value, dueAt: 0 });
+      }
+    });
+    peer.workspaceStopOnline = true;
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.workspaceStops.map(entry => entry.sessionId).sort()).toEqual(
+        [SESSION, SESSION_NEXT].sort()
+      )
+    );
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('does not let an old acknowledgement clear a newer workspace stop', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const original = peer.forSession.bind(peer);
+    peer.forSession = sessionId => {
+      const target = original(sessionId);
+      if (sessionId !== SESSION) return target;
+      return {
+        ...target,
+        onWorkspaceStopped: async payload => {
+          started.resolve();
+          await release.promise;
+          return target.onWorkspaceStopped(payload);
+        },
+      };
+    };
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    await started.promise;
+    const prefix = 'control_plane_pending_workspace_stop/';
+    const key = `${prefix}${SESSION}`;
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put(key, {
+        payload: { requestedAt: Date.now() + 10, stopEpoch: 2, attemptId: 'attempt-newer' },
+        dueAt: 0,
+      });
+    });
+    release.resolve();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toHaveLength(1);
+
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.workspaceStops.at(-1)?.payload).toMatchObject({
+        stopEpoch: 2,
+        attemptId: 'attempt-newer',
+      })
+    );
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('deletes malformed pending workspace stops instead of replaying them', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    const prefix = 'control_plane_pending_workspace_stop/';
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put(`${prefix}fractional-epoch`, {
+        payload: { requestedAt: 1, stopEpoch: 1.5, attemptId: 'attempt-fractional' },
+        dueAt: 0,
+      });
+      state.storage.kv.put(`${prefix}overlong-attempt`, {
+        payload: { requestedAt: 1, stopEpoch: 1, attemptId: 'a'.repeat(129) },
+        dueAt: 0,
+      });
+      state.storage.kv.put(`${prefix}empty-attempt`, {
+        payload: { requestedAt: 1, stopEpoch: 1, attemptId: '' },
+        dueAt: 0,
+      });
+    });
+
+    await runAlarm(stub);
+
+    expect(peer.workspaceStops).toEqual([]);
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('treats a malformed stored workspace stop as unset', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_workspace_stop', { epoch: 2.5, at: -1 })
+    );
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect(result.stopEpoch).toBe(1);
+    expect(Number.isInteger(result.stopAt)).toBe(true);
+  });
+
+  it('refuses stale work after a workspace stop but lets new intent restart it', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const stoppedAt = Date.now();
+    const { stopEpoch, stopAt } = await stub.cancelWorkspace({
+      sessionId: SESSION,
+      requestedAt: stoppedAt,
+    });
+
+    await expect(
+      stub.prepare({
+        ...prepareInput(SESSION_NEXT),
+        stopEpoch: 0,
+        intentAt: stoppedAt,
+      })
+    ).resolves.toEqual({ state: 'unknown', stopEpoch, stopAt });
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+
+    const fresh = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch,
+      intentAt: stoppedAt + 1,
+    });
+    expect(fresh.state).toBe('preparing');
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+  });
+
+  it('accepts a private restart while the sibling never observed the stop', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const stoppedAt = Date.now();
+    const { stopEpoch } = await stub.cancelWorkspace({
+      sessionId: SESSION,
+      requestedAt: stoppedAt,
+    });
+
+    // A message created after Stop is new intent even when this chat still
+    // carries the old epoch because the stop notification was lost.
+    const view = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch: 0,
+      intentAt: Date.now() + 5,
+    });
+    expect(view.state).toBe('preparing');
+    expect(stopEpoch).toBe(1);
+  });
+
+  it('keeps a retried Stop idempotent so it cannot cancel a newer attempt', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const requestedAt = Date.now();
+    const first = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt });
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+
+    const fresh = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch: first.stopEpoch,
+      intentAt: requestedAt + 1,
+    });
+    expect(fresh.state).toBe('preparing');
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+
+    // The same accepted Stop arrives again (retry after a lost response).
+    await expect(stub.cancelWorkspace({ sessionId: SESSION, requestedAt })).resolves.toEqual(first);
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+    expect(provider.stopCalls).toHaveLength(1);
+  });
+
+  it('retires preparation that started after requestedAt but before the Stop ran', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const requestedAt = Date.now() - 10;
+    await stub.prepare(prepareInput(SESSION));
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt });
+
+    expect(result.stopAt).toBeGreaterThan(requestedAt);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+  });
+
+  it('does not prepare a cancelled workspace when a wrapper connects afterwards', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const launchEnv = provider.launchEnvs[0];
+    const credential = launchEnv?.SANDBOX_CONTROL_CREDENTIAL;
+    const allocationId = launchEnv?.CONTROL_PLANE_ALLOCATION_ID;
+    if (!credential || !allocationId) throw new Error('launch environment is missing identity');
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    // A wrapper that opens its socket after Stop finds no route to prepare.
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_late', allocationId });
+    if (reply?.type === 'welcome') expect(await wrapper.next(100)).toBeNull();
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    await waitFor(() => expect(provider.stopGates).toHaveLength(1));
+    await releaseGate(stub, () => provider.stopGates[0]?.('terminal'));
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('leaves an independently placed workspace sandbox untouched', async () => {
+    const provider = createFakeProvider();
+    const otherProvider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const otherStub = sandboxNamespace.getByName(`${SANDBOX_ID}_other`);
+    const otherPeer = new FakeSessionPeer();
+    await runInDurableObject(otherStub, async instance => {
+      await instance.getAllocationState();
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
+      Object.assign(instance, {
+        createProviderAdapter: () => otherProvider.adapter,
+        provider: otherProvider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => otherPeer.forSession(sessionId),
+      });
+    });
+    await stub.prepare(prepareInput(SESSION));
+    await otherStub.prepare(prepareInput(SESSION_THIRD));
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect((await readRouteRow(otherStub, SESSION_THIRD))?.state).toBe('preparing');
+    expect(provider.stopCalls).toHaveLength(1);
+    expect(otherProvider.stopCalls).toEqual([]);
+  });
+
+  it.each([
+    'code-review',
+    'slack',
+    'github',
+    'linear',
+    'discord',
+    'security-agent',
+    'security-remediation',
+    'webhook',
+    'cli',
+    'unrecognized-origin',
+    'cloud-agent-web',
+    undefined,
+  ])('applies the idle timeout for origin %s', async origin => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, origin));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    const shortIdle = origin !== 'cloud-agent-web';
+    const idleMs = shortIdle ? 60_000 : TIMERS.idleMs;
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(idleMs);
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'm1',
+    });
+    await waitFor(() => expect(peer.outcomes).toHaveLength(1));
+    if (origin === 'code-review') {
+      await evictAllDurableObjects();
+      await setup(provider);
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(idleMs);
+    }
+    await setAllocationField(stub, { last_activity_at: Date.now() - 59_000 });
+    const earlyHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(earlyHeartbeatAt)
+    );
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+
+    if (shortIdle) {
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+      expect(provider.stopCalls).toEqual([provider.refs[0]]);
+      expect(await readRouteRow(stub, SESSION)).toBeNull();
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+      await stub.prepare(prepareInput(SESSION, origin));
+      await waitFor(() => expect(provider.createCalls).toBe(2));
+    } else {
+      await waitFor(async () =>
+        expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+      );
+      expect((await readState(stub)).kind).toBe('connected');
+      expect(provider.stopCalls).toEqual([]);
+    }
+    wrapper.close();
+  });
+
+  it('derives only the connected idle window from routes, not shared timers or notifications', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    const allocation = await readState(stub);
+
+    await runInDurableObject(stub, instance => {
+      const owner = instance as unknown as NotificationOwner & {
+        db: ReturnType<typeof drizzle>;
+        sandboxTimers: () => typeof TIMERS;
+        sandboxIdleTimeoutMs: (state: AllocationState | null) => number;
+      };
+      const timers = owner.sandboxTimers();
+      expect(timers).toBe(TIMERS);
+      expect(owner.sandboxIdleTimeoutMs(allocation)).toBe(60_000);
+
+      owner.db
+        .update(routesTable)
+        .set({ credential_source: null })
+        .where(eq(routesTable.session_id, SESSION))
+        .run();
+      expect(owner.sandboxIdleTimeoutMs(allocation)).toBe(60_000);
+      writeRoute(owner.db, {
+        sessionId: SESSION_NEXT,
+        spec: routeSpec(SESSION_NEXT),
+        grant: null,
+        credentialSource: prepareInput(SESSION_NEXT, 'cloud-agent-web').credentials,
+        repoKey: null,
+        state: 'failed',
+        attemptId: 'web-route',
+        attemptDeadlineAt: 0,
+        reason: 'workspace_setup_failed',
+      });
+      expect(owner.sandboxTimers()).toBe(TIMERS);
+      expect(owner.sandboxIdleTimeoutMs(allocation)).toBe(TIMERS.idleMs);
+
+      const select = vi.spyOn(owner.db, 'select');
+      try {
+        expect(owner.sandboxTimers()).toBe(TIMERS);
+        owner.notifications.enqueue(SESSION, {
+          kind: 'route',
+          payload: { state: 'preparing', attemptId: 'notify-without-routes' },
+        });
+        expect(select).not.toHaveBeenCalled();
+      } finally {
+        select.mockRestore();
+      }
+    });
+    wrapper.close();
+  });
+
+  it('keeps the interactive window when a credential source is unreadable', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
+
+    await runInDurableObject(stub, (_instance, state) => {
+      drizzle(state.storage, { logger: false })
+        .update(routesTable)
+        .set({ credential_source: '{not json' })
+        .where(eq(routesTable.session_id, SESSION))
+        .run();
+    });
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+    wrapper.close();
+  });
+
+  it('ignores an unbound idle heartbeat after the unattended idle window', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper, credential } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    const unbound = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    const before = await readState(stub);
+    unbound.heartbeat(false);
+    expect(await unbound.next(50)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    expect(provider.stopCalls).toEqual([]);
+    unbound.close();
+    wrapper.close();
+  });
+
+  it.each(['active', 'idle', 'delivery'] as const)(
+    'preserves unattended reconnect timing after %s activity',
+    async activity => {
+      const provider = createFakeProvider();
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION, 'code-review'));
+      const { wrapper } = await connectAndHello(provider);
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+
+      const heartbeatAt = Date.now();
+      await setAllocationField(stub, {
+        last_activity_at: heartbeatAt - 1_000,
+        last_frame_at: heartbeatAt - 1_000,
+      });
+      wrapper.heartbeat(true);
+      await waitFor(async () =>
+        expect((await readState(stub)).lastActivityAt).toBeGreaterThanOrEqual(heartbeatAt)
+      );
+      if (activity === 'delivery') {
+        await setAllocationField(stub, {
+          last_activity_at: Date.now() - 1_000,
+          last_frame_at: Date.now() - 1_000,
+        });
+        expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+          'sent'
+        );
+        expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+        const delivered = await readState(stub);
+        expect(delivered.lastActivityAt).toBeGreaterThan(delivered.lastFrameAt ?? 0);
+      } else if (activity === 'idle') {
+        await setAllocationField(stub, { last_activity_at: Date.now() - 30_000 });
+        const idleHeartbeatAt = Date.now();
+        wrapper.heartbeat(false);
+        await waitFor(async () =>
+          expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+        );
+      }
+      wrapper.close();
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+
+      const disconnected = await readState(stub);
+      const activityOffset = (disconnected.lastActivityAt ?? 0) - (disconnected.lastFrameAt ?? 0);
+      const activeAt = Date.now() - 65_000;
+      await setAllocationField(stub, {
+        last_activity_at: activeAt + activityOffset,
+        last_frame_at: activeAt,
+      });
+      await runAlarm(stub);
+      expect((await readState(stub)).kind).toBe('disconnected');
+      expect(provider.stopCalls).toEqual([]);
+      expect(await readAlarm(stub)).toBe(activeAt + TIMERS.reconnectMs);
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+
+      const lostAt = Date.now() - (TIMERS.reconnectMs + 1_000);
+      await setAllocationField(stub, {
+        last_activity_at: lostAt + activityOffset,
+        last_frame_at: lostAt,
+      });
+      await runAlarm(stub);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+          state: 'lost',
+          attemptId,
+          reason: 'connection_lost',
+        })
+      );
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    }
+  );
+
+  it('lets active unattended work report activity after a late reconnect', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+
+    const activeAt = Date.now() - 70_000;
+    await setAllocationField(stub, { last_activity_at: activeAt, last_frame_at: activeAt });
+    const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    const state = await readState(stub);
+    expect(state.kind).toBe('connected');
+    expect(state.lastActivityAt).toBe(activeAt);
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    const heartbeatAt = Date.now();
+    reconnected.heartbeat(true);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastActivityAt).toBeGreaterThanOrEqual(heartbeatAt)
+    );
+    reconnected.close();
+  });
+
+  it('retains a late-reconnected sandbox while runtime credentials are still preparing', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const mintingPeer = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+    }));
+    let holdMint = false;
+    let mintStarted = false;
+    let releaseMint: (() => void) | undefined;
+    await runInDurableObject(stub, instance => {
+      instance.env.WORKER_URL = 'https://worker.example.com';
+      instance.sessionPeerFor = (_owner, sessionId) => {
+        const peer = mintingPeer(sessionId);
+        return {
+          ...peer,
+          issueRuntimeCredentialProxyGrant: async fence => {
+            if (holdMint) {
+              mintStarted = true;
+              await new Promise<void>(resolve => {
+                releaseMint = resolve;
+              });
+            }
+            return peer.issueRuntimeCredentialProxyGrant(fence);
+          },
+        };
+      };
+    });
+    const input = prepareInput(SESSION, 'code-review');
+    const payload = btoa(JSON.stringify({ runtimeAuthorization: { id: 'ra_idle' } }))
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replaceAll('=', '');
+    input.credentials.kiloToken = `e30.${payload}.sig`;
+    input.spec.runtimeIsolation = 'per-session';
+    await stub.prepare(input);
+    const { wrapper, credential, allocationId } = await connectAndHello(provider);
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+
+    const activeAt = Date.now() - 70_000;
+    await setAllocationField(stub, { last_activity_at: activeAt, last_frame_at: activeAt });
+    holdMint = true;
+    const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    try {
+      expect(await reconnected.hello({ wrapperId: 'wr_2', allocationId })).toMatchObject({
+        type: 'welcome',
+      });
+      await waitFor(() => expect(mintStarted).toBe(true));
+      expect(await reconnected.next(50)).toBeNull();
+      const heartbeatAt = Date.now();
+      reconnected.heartbeat(false);
+      await waitFor(async () =>
+        expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(heartbeatAt)
+      );
+      expect(await readState(stub)).toMatchObject({ kind: 'connected', allocationId });
+      expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+      expect(provider.stopCalls).toEqual([]);
+      expect(provider.createCalls).toBe(1);
+
+      await releaseGate(stub, () => releaseMint?.());
+      expect(await reconnected.next()).toMatchObject({ type: 'session.prepare' });
+      reconnected.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
+      reconnected.heartbeat(false);
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    } finally {
+      await releaseGate(stub, () => releaseMint?.());
+      reconnected.close();
+    }
+  });
+
+  it('keeps unattended work alive on active heartbeats but not idle heartbeats', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    const heartbeatAt = Date.now();
+    wrapper.heartbeat(true);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastActivityAt).toBeGreaterThanOrEqual(heartbeatAt)
+    );
+    await waitFor(() => expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]));
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    const lastActivityAt = Date.now() - 30_000;
+    await setAllocationField(stub, {
+      last_activity_at: lastActivityAt,
+      last_frame_at: Date.now() - 1_000,
+    });
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    expect((await readState(stub)).lastActivityAt).toBe(lastActivityAt);
+    expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]);
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    wrapper.heartbeat(false);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+  });
+
+  it('keeps the provider lease unchanged when the last unattended route is released', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    wrapper.heartbeat(true);
+    await waitFor(() => expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]));
+    await stub.release({ sessionId: SESSION });
+    expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]);
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+
+    await setAllocationField(stub, { last_activity_at: Date.now() - 121_000 });
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]);
+    expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
+  it('keeps the provider lease unchanged when a web session joins an unattended sandbox', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    wrapper.heartbeat(true);
+    await waitFor(() => expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]));
+    await stub.prepare(prepareInput(SESSION_NEXT, 'cloud-agent-web'));
+    expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () =>
+      expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready')
+    );
+
+    await setAllocationField(stub, { last_activity_at: Date.now() - 121_000 });
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]);
+    expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
+  it('keeps the unattended window when a session without an origin joins', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    wrapper.heartbeat(true);
+    await waitFor(() => expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]));
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () =>
+      expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready')
+    );
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
+    expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]);
+
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+    wrapper.heartbeat(false);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+  });
+
+  it('keeps the unattended window when invalid configuration inserts a route without credentials', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
+
+    wrapper.heartbeat(true);
+    await waitFor(() => expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]));
+    expect(
+      await stub.prepare({
+        ...prepareInput(SESSION_NEXT, 'cloud-agent-web'),
+        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'allowlist' },
+      })
+    ).toMatchObject({ state: 'failed', reason: 'invalid_configuration' });
+    expect(await readRouteRow(stub, SESSION_NEXT)).toMatchObject({
+      state: 'failed',
+      credential_source: null,
+    });
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
+    expect(provider.leaseCalls).toEqual([TIMERS.providerLeaseMs]);
+
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+    wrapper.heartbeat(false);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+  });
+
+  it('preserves the web idle window in a mixed sandbox until the web route is released', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
+    await stub.prepare(prepareInput(SESSION_NEXT, 'cloud-agent-web'));
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () =>
+      expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready')
+    );
+
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    await stub.release({ sessionId: SESSION_NEXT });
+    wrapper.heartbeat(false);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+  });
+
+  it('removes the route on release and tells the wrapper', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await stub.release({ sessionId: SESSION });
+
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    expect(await wrapper.next()).toMatchObject({ type: 'session.release', sessionId: SESSION });
+    expect(await stub.status({ sessionId: SESSION })).toEqual({
+      sessionId: SESSION,
+      view: { state: 'unknown' },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
+    });
+  });
+
+  it('interrupts native preparation before its probe completes and waits only for destroy', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const native = await pendingNativeStart();
+    const provider = createFakeProvider();
+    provider.adapter.launch = async (ref, { env: launchEnv }) => {
+      provider.launchEnvs.push({ ...launchEnv });
+      await native.stub.launchWrapper({
+        allocationRef: ref,
+        command: supervisorStartup(),
+        env: {},
+        instance: 'standard-4',
+        nativeImage: 'runtime-free',
+      });
+      return { startSource: 'image' };
+    };
+    provider.adapter.stop = async ref => {
+      provider.stopCalls.push(ref);
+      return ref === null ? 'terminal' : native.stub.stop(ref);
+    };
+    const { stub } = await setup(provider);
+    try {
+      await stub.prepare(prepareInput(SESSION));
+      await waitFor(() => expect(native.container.probes).toBe(1));
+      expect((await readState(stub)).kind).toBe('creating');
+
+      await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+      await stub.prepare({ ...prepareInput(SESSION), stopEpoch: 1 });
+
+      // The readiness read is still blocked. Destroy must already have started.
+      await waitFor(() => expect(native.container.destroys).toBe(1));
+      expect((await readState(stub)).kind).toBe('stopping');
+      expect(native.container.starts).toBe(1);
+      expect(provider.createCalls).toBe(1);
+
+      native.releaseDestroy();
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+      expect(native.container.starts).toBe(2);
+      const replacement = await readState(stub);
+      expect(replacement.providerRef).toBe(provider.refs[1]);
+
+      native.releaseProbe();
+      await new Promise(resolve => setTimeout(resolve, 25));
+      expect((await readState(stub)).allocationId).toBe(replacement.allocationId);
+      expect(native.container.starts).toBe(2);
+      const diagnostics = fields.mock.calls.map(([record]) => record.diagnosticEvent);
+      expect(diagnostics).toContain('launch_interrupted');
+      expect(diagnostics).not.toContain('create_failed');
+      expect(diagnostics).not.toContain('snapshot_launch_failed');
+    } finally {
+      native.releaseProbe();
+      native.releaseDestroy();
+    }
+  });
+
+  it('returns at once and stores a new route when prepare runs during stopping', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    // Drop the route so prepare must create one while the sandbox is stopping.
+    await stub.release({ sessionId: SESSION });
+    await wrapper.next();
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    await setAllocationField(stub, {
+      last_activity_at: Date.now() - (TIMERS.idleMs + 1_000),
+    });
+    await runAlarm(stub);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopping'));
+
+    const stopping = await readState(stub);
+    expect(await stub.prepare(prepareInput(SESSION))).toEqual({
+      state: 'preparing',
+      attemptId: expect.any(String),
+      step: 'sandbox_create',
+      detail: 'Waiting for the previous sandbox to stop',
+    });
+    expect((await readState(stub)).kind).toBe('stopping');
+    const created = await readRouteRow(stub, SESSION);
+    expect(created?.state).toBe('preparing');
+    expect(created?.attempt_deadline_at ?? 0).toBeGreaterThan(Date.now());
+
+    await releaseGate(stub, () => provider.stopGates[0]('terminal'));
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(state.allocationId).not.toBe(stopping.allocationId);
+      expect(state.kind).toBe('starting');
+    });
+  });
+
+  it('ignores session frames from a socket superseded by stopping', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    await setAllocationField(stub, {
+      last_activity_at: Date.now() - (TIMERS.idleMs + 1_000),
+    });
+    await runAlarm(stub);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopping'));
+
+    // The old socket stays open during stopping; it must not move the route.
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
+    expect(peer.routeUpdatesFor(SESSION).filter(update => update.state === 'ready')).toHaveLength(
+      0
+    );
+
+    await releaseGate(stub, () => provider.stopGates[0]('terminal'));
+  });
+
+  it('keeps the attempt deadline armed while the wrapper is connected and active', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    // Active heartbeats keep the allocation alarm short, but an earlier route
+    // deadline must still win the single alarm.
+    wrapper.heartbeat(true);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
+
+    const deadline = Date.now() + 5_000;
+    await setRouteDeadline(stub, SESSION, deadline);
+    wrapper.heartbeat(true);
+    await waitFor(async () => expect(await readAlarm(stub)).toBe(deadline));
+
+    await setRouteDeadline(stub, SESSION, Date.now() - 1);
+    await runAlarm(stub);
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({
+          state: 'failed',
+          reason: 'preparation_timeout',
+        })
+      )
+    );
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+  });
+
+  it('fails a route with a session.failed subtype and ignores a late ready', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: SESSION,
+      reason: 'workspace_setup_failed',
+      step: 'clone',
+      subtype: 'git_clone_timeout',
+    });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId,
+        reason: 'workspace_setup_failed',
+        subtype: 'git_clone_timeout',
+      })
+    );
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+    expect(peer.routeUpdatesFor(SESSION).filter(update => update.state === 'ready')).toHaveLength(
+      0
+    );
+  });
+
+  it('forwards wrapper events and outcomes to the session peer', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'kilo.chunk', properties: { text: 'hi' } }],
+    });
+    await waitFor(() => expect(peer.events).toHaveLength(1));
+    expect(peer.events[0]).toEqual({
+      sessionId: SESSION,
+      notification: {
+        events: [{ type: 'kilo.chunk', properties: { text: 'hi' } }],
+        delivery: { id: expect.any(String), expiresAt: expect.any(Number) },
+      },
+    });
+
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'failed',
+      reason: 'assistant said no',
+      assistantReason: 'model_unavailable',
+      providerOwnership: 'byok',
+      lastMessageId: 'msg-1',
+    });
+    await waitFor(() => expect(peer.outcomes).toHaveLength(1));
+    expect(peer.outcomes[0]).toEqual({
+      sessionId: SESSION,
+      status: 'failed',
+      reason: 'assistant said no',
+      assistantReason: 'model_unavailable',
+      providerOwnership: 'byok',
+      lastMessageId: 'msg-1',
+    });
+  });
+
+  it('delivers route, events, and outcome notifications in order', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    // The sandbox create/start progress precedes the wrapper's notifications.
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'preparing', step: 'sandbox_start' })
+      )
+    );
+    const before = peer.received.length;
+
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'kilo.chunk', properties: { text: 'hi' } }],
+    });
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'm1',
+    });
+
+    await waitFor(() => expect(peer.received).toHaveLength(before + 3));
+    expect(peer.received.slice(before).map(entry => entry.kind)).toEqual([
+      'route',
+      'events',
+      'outcome',
+    ]);
+  });
+
+  it('does not block prepare on a hanging events notification', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const mint = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+    }));
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sessionPeerFor: (_ownerId: string, sessionId: string) => ({
+          ...mint(sessionId),
+          onRoute: async () => {},
+          onEvents: () => new Promise<void>(() => {}),
+          onOutcome: async () => {},
+        }),
+      });
+    });
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'kilo.chunk', properties: {} }],
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const started = Date.now();
+    const view = await stub.prepare(prepareInput(SESSION_NEXT));
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(view.state).toBe('preparing');
+  });
+
+  it('sends abort and answer when connected and reports not_connected otherwise', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+
+    expect(await stub.abort({ sessionId: SESSION })).toBe('not_connected');
+    expect(
+      await stub.answer({ sessionId: SESSION, reply: { action: 'reject', questionId: 'q1' } })
+    ).toBe('not_connected');
+
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    expect(await stub.abort({ sessionId: SESSION })).toBe('sent');
+    expect(await wrapper.next()).toMatchObject({ type: 'session.abort', sessionId: SESSION });
+
+    const reply = {
+      action: 'permission' as const,
+      permissionId: 'p1',
+      response: 'once' as const,
+    };
+    expect(await stub.answer({ sessionId: SESSION, reply })).toBe('sent');
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.answer',
+      sessionId: SESSION,
+      reply,
+    });
+  });
+
+  it('returns not_ready when the prompt write fails', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        boundWrapperSocket: () => ({
+          send: () => {
+            throw new Error('socket closed');
+          },
+        }),
+      });
+    });
+
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'not_ready'
+    );
+    // A plain write failure keeps the route `ready`: the next send or `onRoute`
+    // retries delivery. Only a credential-policy failure with no due grant left
+    // fails the route.
+    expect(await stub.status({ sessionId: SESSION })).toEqual({
+      sessionId: SESSION,
+      view: { state: 'ready', attemptId: expect.any(String) },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
+    });
+    expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
+  });
+
+  it('starts a new attempt when prepare follows a failed route', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: SESSION,
+      reason: 'workspace_setup_failed',
+    });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('failed'));
+    const failed = await readRouteRow(stub, SESSION);
+
+    expect(await stub.prepare(prepareInput(SESSION))).toEqual({
+      state: 'preparing',
+      attemptId: expect.any(String),
+    });
+    const reprepared = await readRouteRow(stub, SESSION);
+    expect(reprepared?.state).toBe('preparing');
+    expect(reprepared?.attempt_id).not.toBe(failed?.attempt_id);
+    expect(reprepared?.attempt_deadline_at ?? 0).toBeGreaterThan(failed?.attempt_deadline_at ?? 0);
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
+  });
+
+  it('stops after the reconnect window and loses ready routes with connection_lost', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    await setAllocationField(stub, {
+      last_frame_at: Date.now() - (TIMERS.reconnectMs + 1_000),
+    });
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'lost',
+        attemptId,
+        reason: 'connection_lost',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('drops a hanging notification within its deadline without blocking prepare', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const mint = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+    }));
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sessionPeerFor: (_ownerId: string, sessionId: string) => ({
+          ...mint(sessionId),
+          onRoute: () => new Promise<void>(() => {}),
+          onEvents: async () => {},
+          onOutcome: async () => {},
+        }),
+      });
+    });
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    const started = Date.now();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    // Prepare queues after the dropped notification; it must not hang on it.
+    const view = await stub.prepare(prepareInput(SESSION_NEXT));
+    const elapsed = Date.now() - started;
+
+    expect(elapsed).toBeLessThan(4_000);
+    expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+  });
+});

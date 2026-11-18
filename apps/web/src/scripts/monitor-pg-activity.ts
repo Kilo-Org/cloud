@@ -1,4 +1,4 @@
-import { pool } from '@/lib/drizzle';
+import { pool } from '@kilocode/web-shared/lib/drizzle';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { exec } from 'child_process';

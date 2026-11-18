@@ -1,20 +1,27 @@
+/* eslint-disable max-lines -- one screen draws the three automation sections from one draft, and the include-existing rows and severity pickers join their section heading to their accessible name */
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
-import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
-import { toast } from 'sonner-native';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Alert, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatList, formatNumber } from '@/lib/format';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -28,23 +35,36 @@ type ConfidenceThreshold = SecurityAgentConfig['autoDismissConfidenceThreshold']
 
 // Labels mirror apps/web/src/components/security-agent/SecurityConfigSections.tsx
 // so the mobile and web copy for these enums stay in sync.
-const MIN_SEVERITY_OPTIONS: { value: MinSeverity; label: string }[] = [
-  { value: 'critical', label: 'Critical only' },
-  { value: 'high', label: 'High and above' },
-  { value: 'medium', label: 'Medium and above' },
-  { value: 'all', label: 'All severities' },
-];
+const MIN_SEVERITY_OPTIONS = [
+  { value: 'critical', labelKey: 'securityAgent.automation.severityCriticalOnly' },
+  { value: 'high', labelKey: 'securityAgent.automation.severityHighAndAbove' },
+  { value: 'medium', labelKey: 'securityAgent.automation.severityMediumAndAbove' },
+  { value: 'all', labelKey: 'securityAgent.automation.severityAll' },
+] as const satisfies readonly { value: MinSeverity; labelKey: string }[];
 
-const CONFIDENCE_OPTIONS: { value: ConfidenceThreshold; label: string }[] = [
-  { value: 'high', label: 'High confidence only' },
-  { value: 'medium', label: 'Medium or higher' },
-  { value: 'low', label: 'Any confidence' },
-];
+const CONFIDENCE_OPTIONS = [
+  { value: 'high', labelKey: 'securityAgent.automation.confidenceHighOnly' },
+  { value: 'medium', labelKey: 'securityAgent.automation.confidenceMediumOrHigher' },
+  { value: 'low', labelKey: 'securityAgent.automation.confidenceAny' },
+] as const satisfies readonly { value: ConfidenceThreshold; labelKey: string }[];
+
+/** One titled settings group: the section heading above its own tighter stack. */
+function Section({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
+  return (
+    <View className="gap-3">
+      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+        {title}
+      </Text>
+      <View className="gap-3">{children}</View>
+    </View>
+  );
+}
 
 function AutomationSettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Automation" />
+      <ScreenHeader className="px-6" title={t('securityAgent.automation.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-16 w-full rounded-lg" />
@@ -55,9 +75,24 @@ function AutomationSettingsSkeleton() {
 }
 
 export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
+  const minSeverityOptions = MIN_SEVERITY_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const confidenceOptions = CONFIDENCE_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const analysisSection = t('securityAgent.automation.autoAnalysis');
+  const remediationSection = t('securityAgent.automation.autoRemediation');
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const connectivity = useCommittedConnectivityStatus();
+  // This screen announces the outcome itself: the queued count when the save
+  // schedules existing findings, the generic confirmation otherwise.
+  const save = useSaveSecurityAgentConfig(scope, { announceSaved: false, announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
 
   const [autoAnalysisEnabled, setAutoAnalysisEnabled] = useState(false);
@@ -66,32 +101,33 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [autoRemediationEnabled, setAutoRemediationEnabled] = useState(false);
   const [autoRemediationMinSeverity, setAutoRemediationMinSeverity] = useState<MinSeverity>('all');
   const [autoRemediationIncludeExisting, setAutoRemediationIncludeExisting] = useState(false);
+  const [autoRemediationRequireApproval, setAutoRemediationRequireApproval] = useState(true);
   const [autoDismissEnabled, setAutoDismissEnabled] = useState(false);
   const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
     useState<ConfidenceThreshold>('high');
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<FlattenedSecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setAutoAnalysisEnabled(config.data.autoAnalysisEnabled);
     setAutoAnalysisMinSeverity(config.data.autoAnalysisMinSeverity);
     setAutoAnalysisIncludeExisting(config.data.autoAnalysisIncludeExisting);
     setAutoRemediationEnabled(config.data.autoRemediationEnabled);
     setAutoRemediationMinSeverity(config.data.autoRemediationMinSeverity);
     setAutoRemediationIncludeExisting(config.data.autoRemediationIncludeExisting);
+    setAutoRemediationRequireApproval(config.data.autoRemediationRequireApproval);
     setAutoDismissEnabled(config.data.autoDismissEnabled);
     setAutoDismissConfidenceThreshold(config.data.autoDismissConfidenceThreshold);
-  }, [config.data]);
-
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
+  }, [baseline, config.data]);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -117,31 +153,73 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     autoRemediationEnabled,
     autoRemediationMinSeverity,
     autoRemediationIncludeExisting,
+    autoRemediationRequireApproval,
     autoDismissEnabled,
     autoDismissConfidenceThreshold,
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
-  const handleSave = async () => {
-    const result = await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
-    if (result.existingFindingsQueuedCount) {
-      toast.success(
-        `${result.existingFindingsQueuedCount} existing finding${result.existingFindingsQueuedCount === 1 ? '' : 's'} queued for analysis.`
+  const handleSave = () =>
+    feedback.run(async () => {
+      const result = await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+      const queuedCount = result.existingFindingsQueuedCount;
+      announcingToast.success(
+        queuedCount
+          ? t('securityAgent.automation.queued', {
+              count: queuedCount,
+              displayCount: formatNumber(queuedCount, i18n.language),
+            })
+          : t('securityAgent.settingsSave.saved')
       );
+    });
+
+  // Enabling auto-remediation is destructive: it opens PRs without a human in
+  // the loop, so confirm before committing (apps/mobile/AGENTS.md rule).
+  const handleAutoRemediationToggle = (next: boolean) => {
+    if (!next) {
+      setAutoRemediationEnabled(false);
+      return;
     }
+    Alert.alert(
+      t('securityAgent.automation.enableAutoRemediationConfirmTitle'),
+      t('securityAgent.automation.enableAutoRemediationConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('securityAgent.automation.enable'),
+          onPress: () => {
+            setAutoRemediationEnabled(true);
+          },
+        },
+      ],
+      // Android back dismisses, which equals Cancel: auto-remediation stays off.
+      { cancelable: true }
+    );
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
+  });
 
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="Automation"
-        variant="offline"
-        message="Could not load automation settings"
+        title={t('securityAgent.automation.title')}
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
+        message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -149,14 +227,22 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   if (config.isLoading || !config.data) {
     return <AutomationSettingsSkeleton />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
+  }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default toggles and then push every control below them down
+  // when their pickers appear.
+  if (baseline === null) {
+    return <AutomationSettingsSkeleton />;
   }
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Automation"
+        className="px-6"
+        title={t('securityAgent.automation.title')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -170,14 +256,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto analysis
-          </Text>
+      {feedback.node}
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
+        <Section title={analysisSection}>
           <ToggleRow
-            title="Enable auto-analysis"
-            subtitle="Automatically analyze findings as they are synced."
+            title={t('securityAgent.automation.analyzeNewFindings')}
+            subtitle={t('securityAgent.automation.autoAnalysisDescription')}
             value={autoAnalysisEnabled}
             disabled={!canManage}
             onValueChange={setAutoAnalysisEnabled}
@@ -185,82 +269,102 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           {autoAnalysisEnabled && (
             <>
               <PillGroup
-                label="Minimum severity"
-                options={MIN_SEVERITY_OPTIONS}
+                // Both sections repeat this title, so the section joins the
+                // accessible name while the visible label stays the same.
+                accessibilityLabel={formatList(
+                  [t('securityAgent.automation.minimumSeverity'), analysisSection],
+                  i18n.language
+                )}
+                label={t('securityAgent.automation.minimumSeverity')}
+                options={minSeverityOptions}
                 value={autoAnalysisMinSeverity}
                 disabled={!canManage}
                 onChange={setAutoAnalysisMinSeverity}
               />
               <ToggleRow
-                title="Include existing findings"
-                subtitle="Also analyze previously synced findings. This may use additional credits."
+                title={t('securityAgent.automation.includeExistingFindings')}
+                accessibilityLabel={formatList(
+                  [t('securityAgent.automation.includeExistingFindings'), analysisSection],
+                  i18n.language
+                )}
+                subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
                 value={autoAnalysisIncludeExisting}
                 disabled={!canManage}
                 onValueChange={setAutoAnalysisIncludeExisting}
               />
             </>
           )}
-        </View>
+        </Section>
 
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto remediation
-          </Text>
+        <Section title={remediationSection}>
           <ToggleRow
-            title="Enable auto-remediation"
-            subtitle="Automatically open PRs for eligible exploitable findings."
+            title={t('securityAgent.automation.openFixPrs')}
+            subtitle={t('securityAgent.automation.autoRemediationDescription')}
             value={autoRemediationEnabled}
             disabled={!canManage}
-            onValueChange={setAutoRemediationEnabled}
+            onValueChange={handleAutoRemediationToggle}
           />
           {autoRemediationEnabled && (
             <>
               <PillGroup
-                label="Minimum severity"
-                options={MIN_SEVERITY_OPTIONS}
+                accessibilityLabel={formatList(
+                  [t('securityAgent.automation.minimumSeverity'), remediationSection],
+                  i18n.language
+                )}
+                label={t('securityAgent.automation.minimumSeverity')}
+                options={minSeverityOptions}
                 value={autoRemediationMinSeverity}
                 disabled={!canManage}
                 onChange={setAutoRemediationMinSeverity}
               />
               <ToggleRow
-                title="Include existing findings"
-                subtitle="Also queue already-analyzed eligible findings. Duplicate PRs stay suppressed."
+                title={t('securityAgent.automation.includeExistingFindings')}
+                accessibilityLabel={formatList(
+                  [t('securityAgent.automation.includeExistingFindings'), remediationSection],
+                  i18n.language
+                )}
+                subtitle={t('securityAgent.automation.includeExistingFindingsRemediationSubtitle')}
                 value={autoRemediationIncludeExisting}
                 disabled={!canManage}
                 onValueChange={setAutoRemediationIncludeExisting}
               />
+              <ToggleRow
+                title={t('securityAgent.automation.requireApproval')}
+                subtitle={t('securityAgent.automation.requireApprovalSubtitle')}
+                value={autoRemediationRequireApproval}
+                disabled={!canManage}
+                onValueChange={setAutoRemediationRequireApproval}
+              />
             </>
           )}
-        </View>
+        </Section>
 
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto dismiss
-          </Text>
+        <Section title={t('securityAgent.automation.autoDismiss')}>
           <ToggleRow
-            title="Enable auto-dismiss"
-            subtitle="Automatically dismiss findings AI determines are not exploitable."
+            title={t('securityAgent.automation.dismissNonExploitable')}
+            subtitle={t('securityAgent.automation.autoDismissDescription')}
             value={autoDismissEnabled}
             disabled={!canManage}
             onValueChange={setAutoDismissEnabled}
           />
           {autoDismissEnabled && (
             <PillGroup
-              label="Confidence threshold"
-              options={CONFIDENCE_OPTIONS}
+              label={t('securityAgent.automation.confidenceThreshold')}
+              options={confidenceOptions}
               value={autoDismissConfidenceThreshold}
               disabled={!canManage}
               onChange={setAutoDismissConfidenceThreshold}
             />
           )}
-        </View>
+        </Section>
 
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

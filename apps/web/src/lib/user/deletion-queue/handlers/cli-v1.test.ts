@@ -10,11 +10,11 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { deleteBlobs } from '@/lib/r2/cli-sessions';
 import { handleCliV1Blobs } from '@/lib/user/deletion-queue/handlers/cli-v1';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@/lib/r2/cli-sessions', () => ({
   deleteBlobs: jest.fn(async () => undefined),
@@ -92,15 +92,25 @@ describe('handleCliV1Blobs', () => {
   it('deletes R2 blobs and database rows for user shared CLI sessions', async () => {
     const user = await insertTestUser();
 
-    const [shared] = await db
-      .insert(sharedCliSessions)
-      .values({
-        kilo_user_id: user.id,
-        shared_state: 'public',
-        ui_messages_blob_url: 'shared-sessions/test1/ui_messages.json',
-        git_state_blob_url: 'shared-sessions/test1/git_state.json',
-      })
-      .returning();
+    await db.insert(sharedCliSessions).values({
+      kilo_user_id: user.id,
+      shared_state: 'public',
+      ui_messages_blob_url: 'shared-sessions/test1/ui_messages.json',
+      git_state_blob_url: 'shared-sessions/test1/git_state.json',
+      pending_copy_ids: ['prior-copy'],
+    });
+
+    deleteBlobsMock.mockImplementationOnce(async () => {
+      await expect(
+        db.transaction(async tx => {
+          await tx
+            .select({ share_id: sharedCliSessions.share_id })
+            .from(sharedCliSessions)
+            .where(eq(sharedCliSessions.kilo_user_id, user.id))
+            .for('share', { noWait: true });
+        })
+      ).rejects.toMatchObject({ cause: { code: '55P03' } });
+    });
 
     const outcome = await handleCliV1Blobs({
       request: { user_id: user.id } as UserDeletionRequest,
@@ -118,8 +128,19 @@ describe('handleCliV1Blobs', () => {
     });
 
     expect(deleteBlobsMock).toHaveBeenCalledWith(
-      shared.share_id,
+      'test1',
       [
+        { folderName: 'shared-sessions', filename: 'ui_messages' },
+        { folderName: 'shared-sessions', filename: 'git_state' },
+      ],
+      { signal: expect.any(AbortSignal) }
+    );
+
+    expect(deleteBlobsMock).toHaveBeenCalledWith(
+      'prior-copy',
+      [
+        { folderName: 'shared-sessions', filename: 'api_conversation_history' },
+        { folderName: 'shared-sessions', filename: 'task_metadata' },
         { folderName: 'shared-sessions', filename: 'ui_messages' },
         { folderName: 'shared-sessions', filename: 'git_state' },
       ],
@@ -174,7 +195,7 @@ describe('handleCliV1Blobs', () => {
     });
 
     expect(deleteBlobsMock).toHaveBeenCalledWith(
-      crossShared.share_id,
+      'cross',
       [{ folderName: 'shared-sessions', filename: 'api_conversation_history' }],
       { signal: expect.any(AbortSignal) }
     );

@@ -1,8 +1,10 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 
+import { SuggestToolCardBody } from './suggest-tool-card';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import { ToolCardFileAttachments } from './tool-card-file-attachments';
 import { ToolCardImageAttachments } from './tool-card-image-attachments';
@@ -61,7 +63,7 @@ function renderToolBody(part: ToolPart): React.ReactNode {
       return <TaskToolCardBody part={part} />;
     }
     case 'suggest': {
-      return null;
+      return <SuggestToolCardBody part={part} />;
     }
     default: {
       return <GenericToolCardBody part={part} />;
@@ -69,23 +71,29 @@ function renderToolBody(part: ToolPart): React.ReactNode {
   }
 }
 
-/**
- * Sheet body dispatcher for a tool part. Renders a uniform pending/running
- * status line, the attachments above the per-tool body, then the type-specific
- * body. Suggest parts have no body; unknown tools use the generic body.
- */
-export function ToolPartDetailBody({ part }: Readonly<{ part: ToolPart }>) {
+export function ToolPartDetailBody({
+  part,
+  imageFailed,
+  onImageError,
+}: Readonly<{ part: ToolPart; imageFailed?: boolean; onImageError?: (uri: string) => void }>) {
+  const { t } = useTranslation();
   const status = part.state.status;
 
   return (
     <View className="gap-2">
       {status === 'pending' ? (
-        <Text className="text-xs text-muted-foreground">Pending…</Text>
+        <Text className="text-xs text-muted-foreground">{t('agentChat.partDetail.pending')}</Text>
       ) : null}
       {status === 'running' ? (
-        <Text className="text-xs text-muted-foreground">Running…</Text>
+        <Text className="text-xs text-muted-foreground">{t('agentChat.partDetail.running')}</Text>
       ) : null}
-      {getToolImageAttachments(part).length > 0 ? <ToolCardImageAttachments part={part} /> : null}
+      {getToolImageAttachments(part).length > 0 ? (
+        <ToolCardImageAttachments
+          part={part}
+          imageFailed={imageFailed}
+          onImageError={onImageError}
+        />
+      ) : null}
       {getToolFileAttachments(part).length > 0 ? <ToolCardFileAttachments part={part} /> : null}
       {renderToolBody(part)}
     </View>

@@ -9,8 +9,13 @@
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-/** The built-in agent mode slugs. */
-export type BuiltinAgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
+/**
+ * The built-in agent mode slugs, in picker order. The type, the membership
+ * test and the picker rows all derive from this list.
+ */
+export const BUILTIN_AGENT_MODES = ['code', 'plan', 'debug', 'orchestrator', 'ask'] as const;
+
+export type BuiltinAgentMode = (typeof BUILTIN_AGENT_MODES)[number];
 
 /**
  * A valid mode for a session: a built-in slug or any custom profile-agent
@@ -41,23 +46,21 @@ type ProfileAgent = {
   };
 };
 
-/** Structural shape of a session `runtimeAgents` entry. */
+/**
+ * Structural shape of a session `runtimeAgents` entry, or of an agent a CLI
+ * reports through `list_agents`.
+ */
 type RuntimeAgent = {
   slug: string;
   name: string;
+  description?: string;
   model?: string;
   variant?: string;
 };
 
-const BUILTIN_MODE_SET: ReadonlySet<string> = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-]);
+const BUILTIN_MODE_SET: ReadonlySet<string> = new Set(BUILTIN_AGENT_MODES);
 
-/** True when `value` is one of the five built-in slugs. */
+/** True when `value` is one of the built-in slugs. */
 export function isBuiltinAgentMode(value: AgentMode): value is BuiltinAgentMode {
   return BUILTIN_MODE_SET.has(value);
 }
@@ -110,7 +113,7 @@ export function customModeOptionsFromRuntimeAgents(
   return runtimeAgents.map(a => ({
     value: a.slug,
     label: a.name,
-    description: '',
+    description: a.description ?? '',
   }));
 }
 
@@ -165,6 +168,69 @@ export function resolvePinnedAgentModel(input: {
     ...(model ? { model } : {}),
     ...(variant ? { variant } : {}),
     ...(agentName ? { agentName } : {}),
+  };
+}
+
+/** The session kinds whose role view is resolved here. */
+export type SessionRoleType = 'remote' | 'cloud-agent' | 'read-only';
+
+/**
+ * Merge the effective profile's visible custom agents (labels + descriptions)
+ * with the agents the runtime reports: a cloud-agent session's `runtimeAgents`
+ * or a CLI's `list_agents`. Profile agents come first so their metadata wins
+ * on a slug collision.
+ */
+export function mergeProfileAndRuntimeModeOptions(
+  profileAgents: ProfileAgent[] | undefined,
+  runtimeAgents: RuntimeAgent[] | undefined
+): ModeOption[] {
+  const profileOptions = customModeOptionsFromProfileAgents(
+    visibleProfileAgents(profileAgents ?? [])
+  );
+  const profileSlugs = new Set(profileOptions.map(option => option.value));
+  const runtimeOptions = customModeOptionsFromRuntimeAgents(runtimeAgents).filter(
+    option => !profileSlugs.has(option.value)
+  );
+  return [...profileOptions, ...runtimeOptions];
+}
+
+/** The custom-mode picker options and model pin a selected role resolves to. */
+export type SessionRoleView = {
+  customOptions: ModeOption[];
+  pinned: ReturnType<typeof resolvePinnedAgentModel>;
+};
+
+/**
+ * Resolve a session's custom mode options and pinned model from its kind.
+ *
+ * A remote session's custom roles come from the effective profile's visible
+ * agents, merged with the session's runtime-reported agents, because the app
+ * must show the user's profile roles even when the CLI has not (yet) reported
+ * them. Cloud-agent and read-only sessions keep `runtimeAgents` as their only
+ * source. The pin always resolves from `runtimeAgents` alone: a profile agent's
+ * pin must never lock a cloud-agent toolbar or the send model, matching web's
+ * runtime-only lock.
+ */
+export function resolveSessionRoleView(input: {
+  sessionType: SessionRoleType | null;
+  runtimeAgents: RuntimeAgent[] | undefined;
+  profileAgents: ProfileAgent[] | undefined;
+  selectedMode: AgentMode;
+}): SessionRoleView {
+  const customSource =
+    input.sessionType === 'remote'
+      ? mergeProfileAndRuntimeModeOptions(input.profileAgents, input.runtimeAgents)
+      : customModeOptionsFromRuntimeAgents(input.runtimeAgents);
+
+  return {
+    customOptions: ensureSelectedCustomOption(
+      dedupeCustomModeOptions(customSource),
+      input.selectedMode
+    ),
+    pinned: resolvePinnedAgentModel({
+      slug: input.selectedMode,
+      runtimeAgents: input.runtimeAgents,
+    }),
   };
 }
 

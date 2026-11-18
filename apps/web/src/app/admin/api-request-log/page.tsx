@@ -1,143 +1,119 @@
 'use client';
 
-import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import AdminPage from '@/app/admin/components/AdminPage';
+import { LogExportForm } from '@/app/admin/components/LogExportForm';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useStepUpActive } from '@/components/admin/step-up/StepUpProvider';
+
+const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
 export default function ApiRequestLogPage() {
-  const [userId, setUserId] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [model, setModel] = useState('');
-  const [sessionId, setSessionId] = useState('');
-  const [errorsOnly, setErrorsOnly] = useState(false);
-
   const trpc = useTRPC();
-  const oldestEntryQuery = useQuery(trpc.admin.apiRequestLog.getOldestEntry.queryOptions());
+  const queryClient = useQueryClient();
+  const stepUpActive = useStepUpActive();
+  const { canExportApiRequestLogs, isPermissionResolved, isError, refetch } = useAdminPermissions();
+  const summaryQuery = useQuery(
+    trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
+      enabled: canExportApiRequestLogs,
+    })
+  );
 
-  function handleDownload() {
-    const params = new URLSearchParams();
-    if (userId.trim()) {
-      params.set('userId', userId.trim());
-    }
-    if (startDate) {
-      params.set('startDate', startDate);
-    }
-    if (endDate) {
-      params.set('endDate', endDate);
-    }
-    if (model.trim()) {
-      params.set('model', model.trim());
-    }
-    if (sessionId.trim()) {
-      params.set('sessionId', sessionId.trim());
-    }
-    if (errorsOnly) {
-      params.set('errorsOnly', 'true');
-    }
-
-    // Navigate directly to preserve server-side streaming
-    window.location.href = `/admin/api/api-request-log/download?${params}`;
+  async function preflight() {
+    if (!stepUpActive) return;
+    await queryClient.fetchQuery(
+      trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, { staleTime: 0 })
+    );
   }
 
-  return (
-    <AdminPage
-      breadcrumbs={<BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>}
-    >
-      <div className="w-full max-w-xl space-y-4">
-        {oldestEntryQuery.data && (
-          <p className="text-muted-foreground text-sm">
-            Oldest entry is{' '}
-            <span title={new Date(oldestEntryQuery.data.created_at).toLocaleString()}>
-              {formatDistanceToNow(new Date(oldestEntryQuery.data.created_at), {
-                addSuffix: true,
-              })}
-            </span>
-            .
-          </p>
-        )}
-        <Card>
+  const breadcrumbs = <BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>;
+
+  if (isError) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>Download API Request Log</CardTitle>
+            <CardTitle>Could not check API request log export access</CardTitle>
+            <CardDescription>The permission check request failed.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="userId">User ID (optional)</Label>
-              <Input
-                id="userId"
-                placeholder="Enter user ID"
-                value={userId}
-                onChange={e => setUserId(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="model">Model (optional)</Label>
-              <Input
-                id="model"
-                placeholder="e.g. claude-sonnet-4-20250514"
-                value={model}
-                onChange={e => setModel(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sessionId">Session ID (optional)</Label>
-              <Input
-                id="sessionId"
-                placeholder="Enter session ID"
-                value={sessionId}
-                onChange={e => setSessionId(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date (optional)</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={e => setStartDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="endDate">End Date (optional)</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={e => setEndDate(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="errorsOnly"
-                checked={errorsOnly}
-                onCheckedChange={checked => setErrorsOnly(checked === true)}
-              />
-              <Label htmlFor="errorsOnly" className="cursor-pointer">
-                Errors only (status &ge; 400 or error present)
-              </Label>
-            </div>
-
-            <Button onClick={handleDownload} className="w-full">
-              <Download className="mr-2 h-4 w-4" />
-              Download ZIP
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void refetch();
+              }}
+            >
+              Retry
             </Button>
           </CardContent>
         </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!isPermissionResolved) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardContent className="text-muted-foreground py-8 text-center text-sm">
+            Checking API request log export access...
+          </CardContent>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!canExportApiRequestLogs) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>API request log export access required</CardTitle>
+            <CardDescription>
+              Ask a superadmin to grant API request log exporter permission on the Admins page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  return (
+    <AdminPage breadcrumbs={breadcrumbs}>
+      <div className="w-full max-w-3xl space-y-4">
+        {summaryQuery.data && (
+          <p className="text-muted-foreground text-sm tabular-nums">
+            {summaryQuery.data.recordCount.toLocaleString()}{' '}
+            {summaryQuery.data.recordCount === 1 ? 'record' : 'records'} ·{' '}
+            {(summaryQuery.data.sizeBytes / BYTES_PER_GIGABYTE).toFixed(2)} GB
+            {summaryQuery.data.oldestCreatedAt && (
+              <>
+                {' '}
+                · oldest entry{' '}
+                <span title={new Date(summaryQuery.data.oldestCreatedAt).toLocaleString()}>
+                  {formatDistanceToNow(new Date(summaryQuery.data.oldestCreatedAt), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </>
+            )}
+          </p>
+        )}
+        <LogExportForm
+          title="Download API Request Log"
+          description="Requests and responses logged for the opt-ins below, kept for 30 days."
+          downloadPath="/admin/api/api-request-log/download"
+          idLabel="Usage IDs"
+          idPlaceholder="Enter usage UUIDs"
+          showGenerationId
+          multipleIds
+          preflight={preflight}
+        />
       </div>
     </AdminPage>
   );

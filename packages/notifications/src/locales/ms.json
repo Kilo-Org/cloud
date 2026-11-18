@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sesi ejen anda ada kemas kini",
+      "lowBalance": "Baki anda memerlukan perhatian",
+      "spendAlert": "Perbelanjaan anda memerlukan perhatian",
+      "securityFinding": "Penemuan keselamatan memerlukan perhatian",
+      "securityUpdate": "Semakan keselamatan ada kemas kini",
+      "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Amaran baki rendah",
+      "body": "Baki {{organizationName}} jatuh di bawah ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Amaran perbelanjaan",
+      "body": "Perbelanjaan {{scopeName}} melebihi ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} dalam {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Penemuan keselamatan baharu ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Amaran SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Pelanggaran SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "Sesi Kilo anda sedia untuk dikawal daripada telefon anda"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

@@ -1,4 +1,11 @@
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
+import { PAID_CREDIT_EXPIRATION_EFFECTIVE_AT } from '@kilocode/web-shared/lib/config.server';
+import { getPaidCreditPolicyPresentation } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   assertUserCanBeSoftDeleted,
   getUserAuthProviders,
@@ -9,22 +16,32 @@ import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
   sendSignInCodeEmail,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import {
   consumeSignInCode,
   createSignInCode,
   deleteSignInCode,
   releaseSignInCode,
   reserveSignInCode,
-} from '@/lib/auth/magic-link-tokens';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import {
+  deletePasskey as deleteOwnedPasskey,
+  listPasskeysForUser,
+  renamePasskey as renameOwnedPasskey,
+} from '@/lib/auth/passkey';
+import { consumePasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
-import { assertNoTrpcError, successResult } from '@/lib/maybe-result';
-import { db, readDb } from '@/lib/drizzle';
+import { assertNoTrpcError, successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
+import {
+  listNotificationHistory,
+  NOTIFICATION_HISTORY_MAX_PAGE_SIZE,
+} from '@/lib/notification-history';
 import {
   kilocode_users,
   microdollar_usage,
@@ -36,29 +53,85 @@ import {
   kiloclaw_subscriptions,
   user_notification_preferences,
   user_push_tokens,
+  user_activity_tokens,
+  agent_configs,
+  passkey_credentials,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
-import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
-import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
+import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
+import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
+import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { createAutoTopUpSetupCheckoutSession, getStripeInvoicesPage } from '@/lib/stripe';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
-import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
+import type { AutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
   AutoTopUpAmountCentsSchema,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
-} from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
-import { resolveStripeReceiptUrl } from '@/lib/credits';
-import { getBalanceForUser } from '@/lib/user/balance';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
-const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
+/** The description a Stripe automatic top-up writes on its own grant row. */
+const AUTO_TOP_UP_DESCRIPTION = 'Auto top-up via stripe';
+const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', AUTO_TOP_UP_DESCRIPTION];
+
+/**
+ * Resolve one of the user's passkey credential ids from the opaque row id the
+ * management UI holds.
+ *
+ * The client is never told the public key or the WebAuthn credential id: it
+ * names a row by its database id and the server resolves the credential, always
+ * scoped to the caller, before touching the credential.
+ */
+async function findOwnedPasskeyCredentialId(
+  kiloUserId: string,
+  passkeyRowId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ credential_id: passkey_credentials.credential_id })
+    .from(passkey_credentials)
+    .where(
+      and(
+        eq(passkey_credentials.id, passkeyRowId),
+        eq(passkey_credentials.kilo_user_id, kiloUserId)
+      )
+    )
+    .limit(1);
+
+  return row?.credential_id ?? null;
+}
+
+async function assertSelfServiceAccountDeletionAllowed(userId: string): Promise<void> {
+  const [user] = await db
+    .select({ personal_account_disabled: kilocode_users.personal_account_disabled })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .limit(1);
+
+  if (!user || user.personal_account_disabled) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Self-service account deletion is unavailable for organization-managed accounts.',
+    });
+  }
+}
 
 /**
  * Revoke a device session owned by `userId`.
@@ -84,6 +157,7 @@ async function revokeOwnedDeviceSession(
         isNull(device_sessions.revoked_at)
       )
     );
+  invalidateDeviceSession(sessionId);
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
@@ -122,6 +196,13 @@ const AutocompleteMetricsOutputSchema = z.object({
 
 const LinkAuthProviderInputSchema = z.object({
   provider: AuthProviderIdSchema,
+  organizationId: z.uuid().optional(),
+  /** Set when the person connects the organization's shared-services account. */
+  chatGptScope: z.literal('shared_services').optional(),
+});
+
+const UnlinkAuthProviderInputSchema = z.object({
+  provider: AuthProviderIdSchema,
 });
 
 const CreditBlockSchema = z.object({
@@ -143,6 +224,19 @@ const CreditDeductionSchema = z.object({
   description: z.string(),
   amount_mUsd: z.number(),
   kind: CreditDeductionKindSchema,
+  /** The grant this deduction closed, present for an expiry row. */
+  purchase: z
+    .object({
+      id: z.string(),
+      date: z.string(),
+      description: z.string(),
+      amount_mUsd: z.number(),
+      /** True for promotional, referral, and Pass grants the user did not buy. */
+      is_free: z.boolean(),
+      /** The recorded purchase channel, null for legacy and internal grants. */
+      credit_source: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 const GetCreditBlocksOutputSchema = z.object({
@@ -155,15 +249,32 @@ const GetCreditBlocksOutputSchema = z.object({
 
 const CreditPurchaseHistoryInputSchema = z.object({
   cursor: z.number().int().min(0).default(0),
+  organizationId: z.uuid().optional(),
 });
+
+/** How one purchase row earned its credits. */
+const CreditPurchaseKindSchema = z.enum(['purchase', 'auto_top_up']);
+type CreditPurchaseKind = z.infer<typeof CreditPurchaseKindSchema>;
 
 const CreditPurchaseHistoryOutputSchema = z.object({
   entries: z.array(
     z.object({
       id: z.uuid(),
       date: z.iso.datetime(),
-      description: z.string(),
+      /**
+       * A one-off purchase, or the automatic top-up the account ran when its
+       * balance fell below the threshold. The client localizes the row title
+       * from it, so the row reads in the reader's language.
+       */
+      kind: CreditPurchaseKindSchema,
       amount_mUsd: z.number().positive(),
+      expiryDate: z.iso.datetime().nullable(),
+      /**
+       * The recorded purchase channel (`stripe`, `apple`, `google_play`, …),
+       * null for rows recorded before the column existed. A client shows a card
+       * purchase's receipt and points a store purchase at the store instead.
+       */
+      creditSource: z.string().nullable(),
     })
   ),
   nextCursor: z.number().int().positive().nullable(),
@@ -172,16 +283,23 @@ const CreditPurchaseHistoryOutputSchema = z.object({
 
 const CreditPurchaseTransactionInputSchema = z.object({
   transactionId: z.uuid(),
+  organizationId: z.uuid().optional(),
 });
 
 const CreditPurchaseConfirmationOutputSchema = z.object({
   transactionId: z.uuid(),
   amount_mUsd: z.number().positive(),
   purchasedAt: z.iso.datetime(),
+  expiryDate: z.iso.datetime().nullable(),
 });
 
 const CreditPurchaseReceiptOutputSchema = z.object({
   url: z.url().nullable(),
+});
+
+const PersonalInvoicesPageInputSchema = z.object({
+  period: PeriodSchema.default('month'),
+  cursor: z.string().optional(),
 });
 
 type RawDeduction = {
@@ -190,6 +308,14 @@ type RawDeduction = {
   description: string;
   credit_category: string | null;
   amount_mUsd: number;
+  purchase: {
+    id: string;
+    date: string;
+    description: string;
+    amount_mUsd: number;
+    is_free: boolean;
+    credit_source: string | null;
+  } | null;
 };
 
 /**
@@ -239,6 +365,18 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Scope key for the per-(user, organization) activity-token registration lock.
+// The empty organization stands for the personal scope, matching the `coalesce`
+// in `UQ_user_activity_tokens_live_ios_activity`.
+function activityTokenScopeLockKey(userId: string, organizationId: string | null): string {
+  return `user-activity-token-scope:${userId}:${organizationId ?? ''}`;
+}
+
+/** The token kinds that follow one session and carry its `session_id`. */
+function isSessionTokenKind(kind: string): boolean {
+  return kind === 'ios_session_activity' || kind === 'android_session_ongoing';
+}
+
 function getDeductionKind(
   creditCategory: string | null
 ): z.infer<typeof CreditDeductionKindSchema> {
@@ -253,6 +391,8 @@ function getDeductionKind(
   return 'deduction';
 }
 
+const STORE_CREDIT_PURCHASE_SOURCES = ['apple', 'google_play'];
+
 function getPersonalTopUpConditions(userId: string) {
   return and(
     eq(credit_transactions.kilo_user_id, userId),
@@ -260,8 +400,27 @@ function getPersonalTopUpConditions(userId: string) {
     eq(credit_transactions.is_free, false),
     gt(credit_transactions.amount_microdollars, 0),
     isNotNull(credit_transactions.stripe_payment_id),
-    inArray(credit_transactions.description, PERSONAL_TOP_UP_DESCRIPTIONS)
+    // A paid credit grant reaches this list through its purchase channel: a
+    // card top-up through its Stripe description, an in-app pack through the
+    // store that sold it. The store's record is the receipt, so the row is
+    // listed here without a Stripe invoice behind it.
+    or(
+      inArray(credit_transactions.description, PERSONAL_TOP_UP_DESCRIPTIONS),
+      inArray(credit_transactions.credit_source, STORE_CREDIT_PURCHASE_SOURCES)
+    )
   );
+}
+
+function getTopUpConditions(userId: string, organizationId?: string) {
+  return organizationId
+    ? and(
+        eq(credit_transactions.organization_id, organizationId),
+        eq(credit_transactions.is_free, false),
+        gt(credit_transactions.amount_microdollars, 0),
+        isNotNull(credit_transactions.stripe_payment_id),
+        eq(credit_transactions.description, 'Organization top-up via stripe')
+      )
+    : getPersonalTopUpConditions(userId);
 }
 
 /**
@@ -278,6 +437,7 @@ async function enrichDeductionsWithInstanceNames(
     description: string;
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
+    purchase: RawDeduction['purchase'];
   }[]
 > {
   // Collect unique instance IDs from pure-credit deduction categories.
@@ -368,15 +528,209 @@ async function enrichDeductionsWithInstanceNames(
       description,
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
+      purchase: d.purchase,
     };
   });
 }
 
+// The eight notification category keys are owned by the mobile app:
+// `NOTIFICATION_CATEGORY_KEYS` / `NotificationCategoryKey` in
+// `apps/mobile/src/lib/hooks/agent-push-preference.ts`. The server hard-codes
+// the same string literals; do not define a duplicate server category-key type.
+const NOTIFICATION_CATEGORY_KEYS = [
+  'chatMessages',
+  'agentAttention',
+  'agentUpdates',
+  'sessionStatus',
+  'kiloclawActivity',
+  'balanceAlerts',
+  'spendAlerts',
+  'securityFindings',
+] as const;
+
+/** Machine-readable reason a gated category is unavailable. The client owns the
+ *  wording: it maps each code to a catalog key, so the row reads in the reader's
+ *  language. A server sentence rendered in English on every locale. */
+type NotificationCapabilityReason =
+  | 'organizationRequired'
+  | 'securityAgentRequired'
+  | 'kiloclawInstanceRequired';
+
+type NotificationCapability = {
+  available: boolean;
+  unavailableReasonCode: NotificationCapabilityReason | null;
+};
+type NotificationCapabilities = Record<
+  (typeof NOTIFICATION_CATEGORY_KEYS)[number],
+  NotificationCapability
+>;
+
+const ALWAYS_AVAILABLE_CAPABILITY: NotificationCapability = {
+  available: true,
+  unavailableReasonCode: null,
+};
+
+function unavailableCapability(reason: NotificationCapabilityReason): NotificationCapability {
+  return { available: false, unavailableReasonCode: reason };
+}
+
+/**
+ * Compute the per-category availability map for the signed-in user. The five
+ * always-on categories need no data; the three gated categories each run one
+ * read-only existence check.
+ */
+async function computeNotificationCapabilities(userId: string): Promise<NotificationCapabilities> {
+  const organizations = await getUserOrganizationsWithSeats(userId);
+  const organizationIds = organizations.map(organization => organization.organizationId);
+
+  const [securityConfigs, kiloclawInstances] = await Promise.all([
+    db
+      .select({ id: agent_configs.id })
+      .from(agent_configs)
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'security_scan'),
+          eq(agent_configs.is_enabled, true),
+          or(
+            eq(agent_configs.owned_by_user_id, userId),
+            inArray(agent_configs.owned_by_organization_id, organizationIds)
+          )
+        )
+      )
+      .limit(1),
+    db
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+      .limit(1),
+  ]);
+
+  const hasOrganization = organizations.length > 0;
+  const hasSecurityConfig = securityConfigs.length > 0;
+  const hasKiloclawInstance = kiloclawInstances.length > 0;
+
+  return {
+    chatMessages: ALWAYS_AVAILABLE_CAPABILITY,
+    agentAttention: ALWAYS_AVAILABLE_CAPABILITY,
+    agentUpdates: ALWAYS_AVAILABLE_CAPABILITY,
+    sessionStatus: ALWAYS_AVAILABLE_CAPABILITY,
+    balanceAlerts: hasOrganization
+      ? ALWAYS_AVAILABLE_CAPABILITY
+      : unavailableCapability('organizationRequired'),
+    // Every signed-in account has a personal scope, so spend alerts are always
+    // available; the spend view offers the same switch for that scope.
+    spendAlerts: ALWAYS_AVAILABLE_CAPABILITY,
+    securityFindings: hasSecurityConfig
+      ? ALWAYS_AVAILABLE_CAPABILITY
+      : unavailableCapability('securityAgentRequired'),
+    kiloclawActivity: hasKiloclawInstance
+      ? ALWAYS_AVAILABLE_CAPABILITY
+      : unavailableCapability('kiloclawInstanceRequired'),
+  };
+}
+
+// Passkey enrollment and management change which authenticators can sign in
+// as this account, so they are never authorized by a bare bearer token. A
+// browser session keeps its existing rules; a native app session must present
+// the single-use grant minted from a fresh primary proof. The grant is
+// redeemed in the same transaction as the change, so a change that touches no
+// row leaves it unspent.
+async function runWithPasskeyManagement(
+  ctx: TRPCContext,
+  params: { operation: 'rename' | 'remove'; authorization: string | undefined },
+  mutate: (fromDb: DrizzleConnection) => Promise<void>
+): Promise<void> {
+  if (ctx.credential === 'session') {
+    return mutate(db);
+  }
+  // An ordinary API key, a CLI device-auth session, or any delegated
+  // credential can never manage passkeys.
+  if (ctx.credential !== 'human_bearer' || !ctx.deviceSessionId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED',
+    });
+  }
+  if (!params.authorization) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'PASSKEY_MANAGEMENT_REQUIRED' });
+  }
+  const authorization = params.authorization;
+  const deviceSessionId = ctx.deviceSessionId;
+
+  const granted = await db.transaction(async tx => {
+    const spent = await consumePasskeyManagementAuthorization({
+      token: authorization,
+      userId: ctx.user.id,
+      deviceSessionId,
+      operation: params.operation,
+      fromDb: tx,
+    });
+    if (!spent) return false;
+    await mutate(tx);
+    return true;
+  });
+
+  if (!granted) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+  }
+}
+
+// The `uuid` column stores any 8-4-4-4-12 hex value, so the version-strict
+// RFC validator `z.uuid()` refuses ids the database can hold. `z.guid()`
+// matches the column, so the device-session list and revoke agree on the same
+// ids.
+const DeviceSessionIdSchema = z.guid();
+
 export const userRouter = createTRPCRouter({
+  getPaidCreditPolicy: baseProcedure.query(() =>
+    getPaidCreditPolicyPresentation(PAID_CREDIT_EXPIRATION_EFFECTIVE_AT)
+  ),
   // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
-    return successResult({ id: ctx.user.id, email: ctx.user.google_user_email });
+    return successResult({
+      id: ctx.user.id,
+      email: ctx.user.google_user_email,
+      isAdmin: ctx.user.is_admin,
+    });
   }),
+
+  /**
+   * The profile links the account form edits. Separate from `getMe`, which
+   * every screen reads on boot and would otherwise carry fields only one form
+   * needs.
+   */
+  getProfileLinks: baseProcedure
+    .output(z.object({ linkedinUrl: z.string().nullable(), githubUrl: z.string().nullable() }))
+    .query(async ({ ctx }) => {
+      const [row] = await db
+        .select({
+          linkedin_url: kilocode_users.linkedin_url,
+          github_url: kilocode_users.github_url,
+        })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, ctx.user.id))
+        .limit(1);
+
+      return { linkedinUrl: row?.linkedin_url ?? null, githubUrl: row?.github_url ?? null };
+    }),
+
+  // Whether the caller has any Kilo gateway usage. Any `microdollar_usage` row
+  // for the user counts (org-scoped and zero-cost free-model rows included), so
+  // this reads the primary DB rather than a replica that may lag the first
+  // request. The lookup is an indexed `LIMIT 1` on
+  // `idx_kilo_user_id_created_at2`, so a cold-boot call is cheap.
+  hasGatewayUsage: baseProcedure
+    .output(z.object({ hasUsage: z.boolean() }))
+    .query(async ({ ctx }) => {
+      const row = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.kilo_user_id, ctx.user.id),
+        columns: { id: true },
+      });
+      return { hasUsage: row !== undefined };
+    }),
 
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {
     const providers = await getUserAuthProviders(ctx.user.id);
@@ -392,12 +746,127 @@ export const userRouter = createTRPCRouter({
     });
   }),
 
+  // ─── Passkeys ───────────────────────────────────────────────────────
+
+  getPasskeys: baseProcedure.query(async ({ ctx }) => {
+    const passkeys = await listPasskeysForUser(ctx.user.id);
+
+    return successResult({
+      passkeys: passkeys.map(passkey => ({
+        id: passkey.id,
+        name: passkey.name,
+        created_at: passkey.created_at,
+        last_used_at: passkey.last_used_at,
+        device_type: passkey.device_type,
+        backed_up: passkey.backed_up,
+      })),
+    });
+  }),
+
+  renamePasskey: baseProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().trim().min(1).max(64),
+        managementAuthorization: z.string().trim().min(1).max(512).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+      if (!credentialId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+
+      await runWithPasskeyManagement(
+        ctx,
+        { operation: 'rename', authorization: input.managementAuthorization },
+        async fromDb => {
+          const renamed = await renameOwnedPasskey(ctx.user.id, credentialId, input.name, fromDb);
+          if (!renamed) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+          }
+        }
+      );
+      return successResult();
+    }),
+
+  deletePasskey: baseProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        managementAuthorization: z.string().trim().min(1).max(512).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+      if (!credentialId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+
+      await runWithPasskeyManagement(
+        ctx,
+        { operation: 'remove', authorization: input.managementAuthorization },
+        async fromDb => {
+          const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
+          if (!deleted) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+          }
+        }
+      );
+      return successResult();
+    }),
+
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      // Account linking requires the web session that started it. A
+      // provider whose callback cannot carry that session (Apple) completes
+      // through the pending-link bounce instead. Refuse every provider the
+      // metadata does not offer for linking here instead of letting the
+      // round trip end in a failure on /connected-accounts.
+      if (!isAccountLinkingProvider(input.provider)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This sign-in method cannot be added to an account.',
+        });
+      }
+      // An organization-scoped link records the organization on the linking
+      // session so the callback can store the BYOK connection for it. Only the
+      // OpenAI (ChatGPT) provider has an organization-scoped connection, so any
+      // other provider must not carry the organization into its callback. The
+      // connection is the member's own, so membership is enough. The access
+      // denial must surface as-is, so it stays outside the try.
+      if (input.organizationId) {
+        if (input.provider !== 'openai') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Organization connections are only supported for OpenAI.',
+          });
+        }
+        const role = await ensureOrganizationAccess(ctx, input.organizationId);
+        // The shared-services connection is an organization setting, so
+        // membership alone is not enough to connect it.
+        if (input.chatGptScope === 'shared_services' && role !== 'owner' && role !== 'admin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only an organization owner or admin can connect shared services.',
+          });
+        }
+      } else if (input.chatGptScope === 'shared_services') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A shared-services connection needs an organization.',
+        });
+      }
+
       try {
         // Create a secure linking session
-        await createAccountLinkingSession(ctx.user.id, input.provider);
+        await createAccountLinkingSession(
+          ctx.user.id,
+          input.provider,
+          input.organizationId,
+          input.chatGptScope
+        );
 
         return successResult();
       } catch (error) {
@@ -410,7 +879,7 @@ export const userRouter = createTRPCRouter({
     }),
 
   unlinkAuthProvider: baseProcedure
-    .input(LinkAuthProviderInputSchema)
+    .input(UnlinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
       return assertNoTrpcError(await unlinkAuthProviderFromUser(ctx.user.id, input.provider));
     }),
@@ -445,8 +914,8 @@ export const userRouter = createTRPCRouter({
       .orderBy(desc(device_sessions.last_seen_at));
 
     return rows.map(row => ({
-      id: row.id,
-      user_agent: row.user_agent,
+      id: DeviceSessionIdSchema.parse(row.id),
+      ...classifyDeviceSessionClient(row.user_agent),
       // Normalize PostgreSQL timestamp text (e.g. `2026-04-29 01:16:12.945+00`)
       // to UTC ISO before returning it over the tRPC JSON boundary.
       created_at: new Date(row.created_at).toISOString(),
@@ -456,7 +925,7 @@ export const userRouter = createTRPCRouter({
   }),
 
   revokeDeviceSessionById: baseProcedure
-    .input(z.object({ sessionId: z.uuid() }))
+    .input(z.object({ sessionId: DeviceSessionIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
       return successResult();
@@ -501,29 +970,43 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseHistoryInputSchema)
     .output(CreditPurchaseHistoryOutputSchema)
     .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transactions = await db
         .select({
           id: credit_transactions.id,
           date: credit_transactions.created_at,
           description: credit_transactions.description,
           amount_mUsd: credit_transactions.amount_microdollars,
+          expiryDate: credit_transactions.expiry_date,
+          creditSource: credit_transactions.credit_source,
         })
         .from(credit_transactions)
-        .where(getPersonalTopUpConditions(ctx.user.id))
+        .where(getTopUpConditions(ctx.user.id, input.organizationId))
         .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
         .limit(CREDIT_PURCHASE_HISTORY_PAGE_SIZE + 1)
         .offset(input.cursor);
 
       const hasMore = transactions.length > CREDIT_PURCHASE_HISTORY_PAGE_SIZE;
-      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => ({
-        id: transaction.id,
-        date: new Date(transaction.date).toISOString(),
-        description:
-          transaction.description === 'Auto top-up via stripe'
-            ? 'Automatic top-up'
-            : 'Credit purchase',
-        amount_mUsd: transaction.amount_mUsd,
-      }));
+      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => {
+        const kind: CreditPurchaseKind =
+          transaction.description === AUTO_TOP_UP_DESCRIPTION ? 'auto_top_up' : 'purchase';
+        return {
+          id: transaction.id,
+          date: new Date(transaction.date).toISOString(),
+          kind,
+          amount_mUsd: transaction.amount_mUsd,
+          expiryDate: transaction.expiryDate
+            ? new Date(transaction.expiryDate).toISOString()
+            : null,
+          creditSource: transaction.creditSource,
+        };
+      });
 
       return {
         entries,
@@ -537,15 +1020,23 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseTransactionInputSchema)
     .output(CreditPurchaseConfirmationOutputSchema)
     .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transaction = await db.query.credit_transactions.findFirst({
         where: and(
-          getPersonalTopUpConditions(ctx.user.id),
+          getTopUpConditions(ctx.user.id, input.organizationId),
           eq(credit_transactions.id, input.transactionId)
         ),
         columns: {
           id: true,
           amount_microdollars: true,
           created_at: true,
+          expiry_date: true,
         },
       });
 
@@ -557,6 +1048,9 @@ export const userRouter = createTRPCRouter({
         transactionId: transaction.id,
         amount_mUsd: transaction.amount_microdollars,
         purchasedAt: new Date(transaction.created_at).toISOString(),
+        expiryDate: transaction.expiry_date
+          ? new Date(transaction.expiry_date).toISOString()
+          : null,
       };
     }),
 
@@ -564,9 +1058,16 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseTransactionInputSchema)
     .output(CreditPurchaseReceiptOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transaction = await db.query.credit_transactions.findFirst({
         where: and(
-          getPersonalTopUpConditions(ctx.user.id),
+          getTopUpConditions(ctx.user.id, input.organizationId),
           eq(credit_transactions.id, input.transactionId)
         ),
         columns: { stripe_payment_id: true },
@@ -580,6 +1081,28 @@ export const userRouter = createTRPCRouter({
         skipInAutomatedTest: true,
       });
       return { url };
+    }),
+
+  /**
+   * The personal counterpart of `organizations.invoicesPage`: the same
+   * cursor-paginated Stripe invoice page the web `/invoices` page reads, scoped
+   * to the caller's own customer instead of an organization's.
+   */
+  invoicesPage: baseProcedure
+    .input(PersonalInvoicesPageInputSchema)
+    .query(async ({ ctx, input }) => {
+      const stripeCustomerId = ctx.user.stripe_customer_id;
+      if (!stripeCustomerId) {
+        // A person with no Stripe customer has never been billed, so the page
+        // is empty; a read never creates a customer.
+        return { entries: [], hasMore: false, nextCursor: null };
+      }
+      const threshold = getDateThreshold(input.period);
+      return await getStripeInvoicesPage(
+        stripeCustomerId,
+        threshold ? new Date(threshold) : null,
+        input.cursor
+      );
     }),
 
   getBalance: baseProcedure
@@ -698,6 +1221,22 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
+          await assertChargeAllowed({
+            userId: ctx.user.id,
+            flow: 'auto_topup',
+            ip: ctx.ip,
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
+          await reportChargeAttempted({
+            flow: 'auto_topup',
+            userId: ctx.user.id,
+            amountCents,
+            accountCreatedAt: ctx.user.created_at,
+            accountUsedMicrodollars: ctx.user.microdollars_used,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
           const redirectUrl = await createAutoTopUpSetupCheckoutSession(
             ctx.user.id,
             ctx.user.stripe_customer_id,
@@ -720,6 +1259,22 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'auto_topup',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
+      await reportChargeAttempted({
+        flow: 'auto_topup',
+        userId: ctx.user.id,
+        amountCents,
+        accountCreatedAt: ctx.user.created_at,
+        accountUsedMicrodollars: ctx.user.microdollars_used,
+        ip: ctx.ip,
+        ipCountry: ipCountryFromHeaders(ctx.headersList),
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
       const redirectUrl = await createAutoTopUpSetupCheckoutSession(
         ctx.user.id,
         ctx.user.stripe_customer_id,
@@ -896,6 +1451,7 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       const userEmail = ctx.user.google_user_email;
       const userId = ctx.user.id;
+      await assertSelfServiceAccountDeletionAllowed(userId);
 
       const lastRequested = ctx.user.account_deletion_requested_at;
       if (
@@ -953,6 +1509,7 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userEmail = ctx.user.google_user_email;
       const userId = ctx.user.id;
+      await assertSelfServiceAccountDeletionAllowed(userId);
 
       // TODO: remove this branch, and make the input required again, once no
       // shipped client calls this without a challenge. Builds already in the
@@ -1046,20 +1603,43 @@ export const userRouter = createTRPCRouter({
       z.object({
         token: z.string().min(1),
         platform: z.enum(['ios', 'android']),
+        appVersion: z.string().max(64).optional(),
+        // Old clients omit `locale`; null means English. Remove the optional
+        // field when every supported mobile version sends `locale`.
+        locale: z.string().min(1).max(32).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      // A token belongs to the account that registered it. A device that
+      // switches accounts releases the token with unregisterPushToken first.
+      const registered = await db
         .insert(user_push_tokens)
         .values({
           user_id: ctx.user.id,
           token: input.token,
           platform: input.platform,
+          app_version: input.appVersion ?? null,
+          locale: input.locale ?? null,
         })
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
-          set: { user_id: ctx.user.id, platform: input.platform, updated_at: sql`now()` },
+          set: {
+            platform: input.platform,
+            app_version: input.appVersion ?? null,
+            locale: input.locale ?? null,
+            updated_at: sql`now()`,
+          },
+          setWhere: eq(user_push_tokens.user_id, ctx.user.id),
+        })
+        .returning({ id: user_push_tokens.id });
+
+      if (registered.length === 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Push token is registered to another account.',
         });
+      }
+
       return { success: true };
     }),
 
@@ -1078,11 +1658,213 @@ export const userRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  // Activity tokens for glanceable surfaces (Live Activity / push-to-start /
+  // Android ongoing / followed session cards). Upsert on (token, session) so a
+  // re-registration replaces the row instead of failing the unique key, and
+  // retire the scope's previous live `ios_activity` row in the same
+  // transaction so one scope never has two live cards. An Android device
+  // registers its one Expo push token once per followed session.
+
+  registerActivityToken: baseProcedure
+    .input(
+      z
+        .object({
+          token: z.string().min(1),
+          kind: z.enum([
+            'ios_push_to_start',
+            'ios_activity',
+            'ios_session_activity',
+            'android_ongoing',
+            'android_session_ongoing',
+          ]),
+          platform: z.enum(['ios', 'android']),
+          organizationId: z.string().min(1).nullable(),
+          /** The followed session; required for a session kind, rejected for every other kind. */
+          sessionId: z.string().min(1).optional(),
+        })
+        .refine(input => isSessionTokenKind(input.kind) === (input.sessionId !== undefined), {
+          message: 'sessionId is required for a session card and rejected for every other kind',
+          path: ['sessionId'],
+        })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const sessionId = isSessionTokenKind(input.kind) ? (input.sessionId ?? null) : null;
+      if (sessionId !== null) {
+        const platform = input.kind === 'ios_session_activity' ? 'ios' : 'android';
+        if (input.platform !== platform) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `A ${input.kind} token is ${platform} only`,
+          });
+        }
+        // A session card shows the session title on the Lock Screen, so the
+        // caller must own the session in the scope the card counts against.
+        if (input.organizationId !== null) {
+          await ensureOrganizationAccess(ctx, input.organizationId);
+        }
+        const [session] = await db
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              input.organizationId === null
+                ? isNull(cli_sessions_v2.organization_id)
+                : eq(cli_sessions_v2.organization_id, input.organizationId)
+            )
+          )
+          .limit(1);
+        if (!session) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        }
+      }
+
+      const retiredTokens = await db.transaction(async tx => {
+        // Registration is a replace. An `ios_activity` token is the app adopting
+        // its Lock Screen card, and only one card may be live per (user,
+        // organization) scope. Retire the scope's previous live row in the same
+        // transaction as the insert, so two live rows cannot exist and the
+        // partial unique index cannot reject the replacement.
+        let supersededTokens: string[] = [];
+        if (input.kind === 'ios_activity') {
+          // Registration is a replace, so two concurrent registrations for one
+          // scope would both retire the same previous row and then both insert;
+          // the second collides on the partial unique index
+          // `UQ_user_activity_tokens_live_ios_activity` and its transaction
+          // rolls back instead of converging. Serialize the replace per scope
+          // with a transaction-scoped advisory lock, so the later registration
+          // sees and supersedes the earlier one's just-inserted row.
+          const scopeKey = activityTokenScopeLockKey(ctx.user.id, input.organizationId);
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${scopeKey}, 0))`);
+
+          const orgPredicate =
+            input.organizationId === null
+              ? isNull(user_activity_tokens.organization_id)
+              : eq(user_activity_tokens.organization_id, input.organizationId);
+          const superseded = await tx
+            .update(user_activity_tokens)
+            .set({ superseded_at: sql`now()` })
+            .where(
+              and(
+                eq(user_activity_tokens.user_id, ctx.user.id),
+                orgPredicate,
+                eq(user_activity_tokens.kind, 'ios_activity'),
+                isNull(user_activity_tokens.superseded_at),
+                ne(user_activity_tokens.token, input.token)
+              )
+            )
+            // The retired tokens are what the notification below must end.
+            .returning({ token: user_activity_tokens.token });
+          supersededTokens = superseded.map(row => row.token);
+        }
+
+        await tx
+          .insert(user_activity_tokens)
+          .values({
+            user_id: ctx.user.id,
+            token: input.token,
+            kind: input.kind,
+            platform: input.platform,
+            organization_id: input.organizationId,
+            session_id: sessionId,
+          })
+          .onConflictDoUpdate({
+            target: [user_activity_tokens.token, user_activity_tokens.session_id],
+            set: {
+              user_id: ctx.user.id,
+              kind: input.kind,
+              platform: input.platform,
+              organization_id: input.organizationId,
+              session_id: sessionId,
+              // The app re-adopting its own card must not leave its row marked
+              // dead: a re-registration of the same token un-supersedes it.
+              superseded_at: null,
+              updated_at: sql`now()`,
+            },
+          });
+
+        return supersededTokens;
+      });
+
+      // Retiring the row is not enough on its own: the retired card stays
+      // stacked on the Lock Screen until a delivery pass sends it an `end`, and
+      // those are driven by agent-session transitions, which can be minutes
+      // away during a long-running task. Ask the notifications worker for a
+      // scope refresh now so the replaced card is ended at registration. The
+      // row is already retired and the DB holds the one-live-card invariant, so
+      // this is best-effort: a failure only leaves the end to the next
+      // scheduled refresh and must never fail the registration.
+      // A new session card leaves the aggregate count and needs its first
+      // server content (the approval key the app cannot mint), so it asks for
+      // the same scope refresh.
+      if (retiredTokens.length > 0 || sessionId !== null) {
+        await refreshGlanceableScope({
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        }).catch(error => {
+          console.error('[registerActivityToken] Failed to request glanceable refresh:', error);
+        });
+      }
+
+      return { success: true };
+    }),
+
+  unregisterActivityToken: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+        /**
+         * Delete only this session's row. An Android device shares one token
+         * across its followed sessions, so an unfollow names the session.
+         * Without it, every row of the token goes: the device left the scope.
+         */
+        sessionId: z.string().min(1).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const removed = await db
+        .delete(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, ctx.user.id),
+            eq(user_activity_tokens.token, input.token),
+            input.sessionId === undefined
+              ? undefined
+              : eq(user_activity_tokens.session_id, input.sessionId)
+          )
+        )
+        .returning({
+          kind: user_activity_tokens.kind,
+          organizationId: user_activity_tokens.organization_id,
+        });
+      // An unfollowed session counts on the aggregate card again. Best-effort,
+      // as for registration: the next session change carries it otherwise.
+      const scopes = new Set(
+        removed.filter(row => isSessionTokenKind(row.kind)).map(row => row.organizationId)
+      );
+      for (const organizationId of scopes) {
+        await refreshGlanceableScope({ userId: ctx.user.id, organizationId }).catch(error => {
+          console.error('[unregisterActivityToken] Failed to request glanceable refresh:', error);
+        });
+      }
+      return { success: true };
+    }),
+
   getMyPushTokens: baseProcedure.query(async ({ ctx }) => {
     return db
       .select({
         token: user_push_tokens.token,
         platform: user_push_tokens.platform,
+        // The client compares this against the app's active language: the
+        // server row, not a client-side cache, decides whether a re-register
+        // is needed. Null means English.
+        locale: user_push_tokens.locale,
+        // The client compares this against the running app version so an
+        // upgrade re-registers the row. Without that the push route would keep
+        // classifying an upgraded device by the version it first registered
+        // under, and never address the named Android channel.
+        appVersion: user_push_tokens.app_version,
       })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
@@ -1099,7 +1881,9 @@ export const userRouter = createTRPCRouter({
         session_status_enabled: user_notification_preferences.session_status_enabled,
         kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
         balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+        spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
         security_findings_enabled: user_notification_preferences.security_findings_enabled,
+        notification_previews: user_notification_preferences.notification_previews,
       })
       .from(user_notification_preferences)
       .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -1107,6 +1891,7 @@ export const userRouter = createTRPCRouter({
     // `agentUpdates` and legacy `agentPushEnabled` both map to the same physical
     // column `agent_push_enabled`; ship both keys for shipped-client compat.
     const agentPushEnabled = row?.agent_push_enabled ?? true;
+    const capabilities = await computeNotificationCapabilities(ctx.user.id);
     return {
       chatMessages: row?.chat_messages_enabled ?? true,
       agentAttention: row?.agent_attention_enabled ?? true,
@@ -1114,10 +1899,39 @@ export const userRouter = createTRPCRouter({
       sessionStatus: row?.session_status_enabled ?? true,
       kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
       balanceAlerts: row?.balance_alerts_enabled ?? true,
+      spendAlerts: row?.spend_alerts_enabled ?? true,
       securityFindings: row?.security_findings_enabled ?? true,
+      notificationPreviews: row?.notification_previews ?? 'generic',
       agentPushEnabled,
+      capabilities,
     };
   }),
+
+  // ─── Notification History ──────────────────────────────────────────
+
+  getNotificationHistory: baseProcedure
+    .input(
+      z.object({
+        /**
+         * Settings category to filter by, or omitted for every recorded kind.
+         * Bounded rather than enumerated: the column only ever holds a category
+         * the recorder mapped, and a chip for a category with no rows must
+         * answer an empty page, not a validation error.
+         */
+        category: z.string().min(1).max(64).optional(),
+        /** Opaque cursor from a previous page's `nextCursor`. */
+        cursor: z.string().min(1).max(512).optional(),
+        limit: z.number().int().min(1).max(NOTIFICATION_HISTORY_MAX_PAGE_SIZE).optional(),
+      })
+    )
+    .query(({ ctx, input }) =>
+      listNotificationHistory({
+        userId: ctx.user.id,
+        category: input.category,
+        cursor: input.cursor,
+        limit: input.limit,
+      })
+    ),
 
   setNotificationPreferences: baseProcedure
     .input(
@@ -1128,7 +1942,9 @@ export const userRouter = createTRPCRouter({
         sessionStatus: z.boolean().optional(),
         kiloclawActivity: z.boolean().optional(),
         balanceAlerts: z.boolean().optional(),
+        spendAlerts: z.boolean().optional(),
         securityFindings: z.boolean().optional(),
+        notificationPreviews: z.enum(['generic', 'full']).optional(),
         // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
         agentPushEnabled: z.boolean().optional(),
       })
@@ -1142,8 +1958,8 @@ export const userRouter = createTRPCRouter({
       // include a column in the upsert when the caller actually provided it, so
       // omitted columns keep their DB default on insert and are left untouched
       // on update.
-      const set: Record<string, boolean> = {};
-      const values: Record<string, boolean> = {};
+      const set: Record<string, boolean | string> = {};
+      const values: Record<string, boolean | string> = {};
       if (input.chatMessages !== undefined) {
         set.chat_messages_enabled = input.chatMessages;
         values.chat_messages_enabled = input.chatMessages;
@@ -1164,9 +1980,17 @@ export const userRouter = createTRPCRouter({
         set.balance_alerts_enabled = input.balanceAlerts;
         values.balance_alerts_enabled = input.balanceAlerts;
       }
+      if (input.spendAlerts !== undefined) {
+        set.spend_alerts_enabled = input.spendAlerts;
+        values.spend_alerts_enabled = input.spendAlerts;
+      }
       if (input.securityFindings !== undefined) {
         set.security_findings_enabled = input.securityFindings;
         values.security_findings_enabled = input.securityFindings;
+      }
+      if (input.notificationPreviews !== undefined) {
+        set.notification_previews = input.notificationPreviews;
+        values.notification_previews = input.notificationPreviews;
       }
       if (agentPush !== undefined) {
         set.agent_push_enabled = agentPush;
@@ -1193,7 +2017,9 @@ export const userRouter = createTRPCRouter({
           session_status_enabled: user_notification_preferences.session_status_enabled,
           kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
           balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+          spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
           security_findings_enabled: user_notification_preferences.security_findings_enabled,
+          notification_previews: user_notification_preferences.notification_previews,
         })
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -1206,7 +2032,9 @@ export const userRouter = createTRPCRouter({
         sessionStatus: row?.session_status_enabled ?? true,
         kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
         balanceAlerts: row?.balance_alerts_enabled ?? true,
+        spendAlerts: row?.spend_alerts_enabled ?? true,
         securityFindings: row?.security_findings_enabled ?? true,
+        notificationPreviews: row?.notification_previews ?? 'generic',
         agentPushEnabled: effectiveAgentPush,
       };
     }),

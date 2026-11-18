@@ -5,7 +5,7 @@ import { File, Paths } from 'expo-file-system';
  * `dist/storage.js`: `EVENTS_STORAGE_FILE` and `LOGS_STORAGE_FILE`.
  * The key argument to `getItem`/`setItem` is the file name.
  */
-export const POSTHOG_STORAGE_FILES = ['.posthog-rn.json', '.posthog-rn-logs.json'] as const;
+const POSTHOG_STORAGE_FILES = ['.posthog-rn.json', '.posthog-rn-logs.json'] as const;
 
 /**
  * PostHogCustomStorage backed by `Paths.cache`. iOS Caches is not exposed by
@@ -36,10 +36,6 @@ export function unsealPostHogStorage(): void {
   sealed = false;
 }
 
-export function isPostHogStorageSealed(): boolean {
-  return sealed;
-}
-
 // ---- custom storage ----
 
 export const posthogCustomStorage = {
@@ -58,16 +54,14 @@ export const posthogCustomStorage = {
     }
   },
 
-  // The `PostHogCustomStorage` interface allows `void | Promise<void>`.
-  // This implementation is synchronous — remove the `async` keyword instead
-  // of suppressing `require-await`.
+  // Synchronous writes finish before sealing and purging storage.
   setItem(key: string, value: string): void {
     if (sealed) {
       return;
     }
     try {
       const file = new File(Paths.cache, key);
-      file.write(value);
+      file.writeSync(value);
     } catch {
       // best-effort persistence — a failed write is lost queued events,
       // which is acceptable for optional analytics.

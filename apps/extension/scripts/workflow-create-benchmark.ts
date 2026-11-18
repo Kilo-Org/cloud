@@ -1580,7 +1580,7 @@ const computeMetrics = (
   const firstSaveCallOffsetMs =
     firstSaveCall === undefined ? null : (offsetByEventId.get(firstSaveCall.id) ?? null);
 
-  const readTools = new Set(['get_page_snapshot', 'find_in_page', 'get_element_details']);
+  const readTools = new Set(['kilo_browser_snapshot', 'kilo_browser_find']);
   const readCallsBeforeFirstSave = toolCalls.filter(call => {
     if (!readTools.has(call.name)) {
       return false;
@@ -1612,7 +1612,7 @@ const computeMetrics = (
     if (event.type !== 'tool-result' || !event.ok) {
       continue;
     }
-    if (nameByResultId.get(event.id) !== 'get_page_snapshot') {
+    if (nameByResultId.get(event.id) !== 'kilo_browser_snapshot') {
       continue;
     }
     snapshotResultBytes.push(Buffer.byteLength(JSON.stringify(event.value ?? null), 'utf8'));
@@ -1630,11 +1630,10 @@ const computeMetrics = (
 };
 
 const pageContentTools = new Set([
-  'get_page_snapshot',
-  'find_in_page',
-  'get_element_details',
-  'get_viewport_screenshot',
-  'eval',
+  'kilo_browser_snapshot',
+  'kilo_browser_find',
+  'kilo_browser_take_screenshot',
+  'kilo_browser_evaluate',
   'web_search',
 ]);
 
@@ -1810,8 +1809,9 @@ const redactTranscript = (
             ...base,
             arguments: redactSaveWorkflowArguments(event.arguments ?? {}),
           });
-        } else if (event.name === 'eval') {
-          redacted.push({ ...base, codeChars: (event.code ?? '').length });
+        } else if (event.name === 'kilo_browser_evaluate') {
+          const code = event.arguments['function'];
+          redacted.push({ ...base, codeChars: typeof code === 'string' ? code.length : 0 });
         } else {
           redacted.push({
             ...base,

@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx), and this suite's per-state spawn wiring cases exceed the line cap (same carve-out as share-gate-sheet.tsx) */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx), and this suite's per-state spawn wiring cases exceed the line cap (same carve-out as share-gate-sheet.tsx) */
 // P1-A-08b: the share gate must attach one hoisted `operationKey` per
 // share-spawn intent (share + instance) to the `spawn` call, keep it across
 // retryable outcomes (the relay dedupes the same-key retry), and rotate it
@@ -7,15 +7,19 @@
 // real `ShareGateSheet` with every RN-touching dependency stubbed and drives
 // the spawn via the list's captured `onSpawnInstance` prop.
 
-import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement, type ReactNode } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  REMOTE_SPAWN_NON_RETRYABLE_TOAST,
-  REMOTE_SPAWN_RETRYABLE_TOAST,
+  remoteSpawnNonRetryableToast,
+  remoteSpawnRetryableToast,
 } from '@/lib/remote-submit-outcome';
-import { __resetPendingShareNavigationForTests } from '@/lib/share-navigation';
+import {
+  __resetPendingShareNavigationForTests,
+  takePendingShareNavigation,
+} from '@/lib/share-navigation';
+import { i18n } from '@/i18n';
 import {
   __resetSharePayloadStoreForTests,
   peekSharePayload,
@@ -41,6 +45,8 @@ const spawnMock = vi.hoisted(() =>
     })
   )
 );
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 const toastError = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
 const refetchInstancesMock = vi.hoisted(() => vi.fn(() => undefined));
@@ -51,8 +57,15 @@ const shareDestinationListProps = vi.hoisted(() => ({
     instanceRowsDisabled: boolean;
   } | null,
 }));
-const instanceRows = vi.hoisted(() => [
-  { connectionId: 'conn-1', name: 'laptop', projectName: 'kilo' },
+const instanceRows = vi.hoisted((): ShareCliSpawnRow[] => [
+  {
+    connectionId: 'conn-1',
+    name: 'laptop',
+    projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
+  },
 ]);
 
 vi.mock('react-native', () => ({
@@ -76,10 +89,6 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('sonner-native', () => ({
   toast: { error: toastError },
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr_review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
@@ -89,20 +98,43 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({}),
 }));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null, isLoaded: true }),
+const organizationMock = vi.hoisted(() => ({
+  current: { organizationId: null as string | null, isLoaded: true },
 }));
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => organizationMock.current,
+}));
+const organizationsListMock = vi.hoisted(() => ({
+  current: {
+    data: [{ organizationId: 'org-selected' }] as
+      | { organizationId: string; isTrialExpiredForEnforcement?: boolean }[]
+      | undefined,
+    isFetched: true,
+    isFetching: false,
+    isError: false,
+    isRefetchError: false,
+  },
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => organizationsListMock.current,
+}));
+const sessionsMock = vi.hoisted(() => ({
+  current: {
     storedSessions: [],
-    activeSessionIds: new Set(),
+    activeSessionIds: new Set<string>(),
     activeSessions: [],
     storedIsError: false,
     storedIsSuccess: true,
+    storedIsPaused: false,
+    storedErrorCode: undefined as string | undefined,
     activeIsError: false,
+    activeIsPaused: false,
     isLoading: false,
     refetch: vi.fn(),
-  }),
+  },
+}));
+vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  useAgentSessions: () => sessionsMock.current,
 }));
 vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
   useRemoteInstanceSpawn: () => ({ spawn: spawnMock }),
@@ -124,11 +156,25 @@ vi.mock('expo-crypto', () => {
     },
   };
 });
-vi.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: null,
-  copyAsync: vi.fn().mockResolvedValue('/tmp/copy'),
-  deleteAsync: vi.fn().mockResolvedValue(undefined),
-}));
+// The real `share-payload.ts` pulls `registerTempFile` from
+// `@/lib/temp-file-registry`, which imports the modern `expo-file-system` API.
+// Mock the main entry so the `importOriginal()` chain in the
+// `@/lib/share-payload` mock stays harmless.
+vi.mock('expo-file-system', () => {
+  const File = vi.fn(function FileMock(_base: unknown, ..._rest: unknown[]) {
+    return {
+      uri: 'file:///cache/temp-file-registry.json',
+      exists: false,
+      write: vi.fn(),
+      textSync: vi.fn(() => ''),
+      delete: vi.fn(),
+    };
+  });
+  return {
+    File,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
 vi.mock('expo-share-intent', () => ({}));
 // Wrap only `peekSharePayload` so the tests can force a single settle-time
 // miss (a cleared payload) while the real store keeps staging. Everything
@@ -161,9 +207,10 @@ vi.mock('./share-destination-list', () => ({
   ShareDestinationList: (props: {
     onSpawnInstance: (row: ShareCliSpawnRow) => void;
     instanceRowsDisabled: boolean;
-  }) => {
+    headerContent: ReactNode;
+  }): ReactNode => {
     shareDestinationListProps.current = props;
-    return null;
+    return props.headerContent;
   },
 }));
 
@@ -171,6 +218,9 @@ const INSTANCE: ShareCliSpawnRow = {
   connectionId: 'conn-1',
   name: 'laptop',
   projectName: 'kilo',
+  kind: 'cli',
+  startedAt: null,
+  gitBranch: null,
 };
 
 function retryableOutcome() {
@@ -293,7 +343,7 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     const keys = usedOperationKeys();
     expect(keys[0]).toBeDefined();
     expect(keys[1]).toBe(keys[0]);
-    expect(toastError).toHaveBeenCalledWith(REMOTE_SPAWN_RETRYABLE_TOAST);
+    expect(toastError).toHaveBeenCalledWith(remoteSpawnRetryableToast());
     expect(refetchInstancesMock).toHaveBeenCalled();
 
     act(() => {
@@ -369,11 +419,220 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     const keys = usedOperationKeys();
     expect(keys[0]).toBeDefined();
     expect(keys[1]).not.toBe(keys[0]);
-    expect(toastError).toHaveBeenCalledWith(REMOTE_SPAWN_NON_RETRYABLE_TOAST);
+    expect(toastError).toHaveBeenCalledWith(remoteSpawnNonRetryableToast());
     // A non-retryable rejection must not refetch or navigate.
     expect(refetchInstancesMock).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
 
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('numbers a staged GitLab merge request with the provider separator', async () => {
+    const shareId = putSharePayload({
+      text: 'https://gitlab.com/group/sub/repo/-/merge_requests/7',
+      files: [],
+      failedFiles: [],
+    });
+    const renderer = await mountGate(shareId);
+
+    // The Review PR row is the row whose subtitle is the destination identity.
+    const subtitles = renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.className === 'text-sm text-muted-foreground')
+      .map(node => node.children.filter(child => typeof child === 'string').join(''));
+    expect(subtitles).toEqual(['group/sub/repo!7']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('ShareGateSheet new-session organization', () => {
+  function memberships(input: {
+    data: { organizationId: string }[] | undefined;
+    isFetched?: boolean;
+    isFetching?: boolean;
+    isError?: boolean;
+    isRefetchError?: boolean;
+  }) {
+    organizationsListMock.current = {
+      isFetched: true,
+      isFetching: false,
+      isError: false,
+      isRefetchError: false,
+      ...input,
+    };
+  }
+
+  beforeEach(() => {
+    routerBack.mockClear();
+    shareDestinationListProps.current = null;
+    organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-selected' }] });
+    sessionsMock.current = {
+      ...sessionsMock.current,
+      storedErrorCode: undefined,
+    };
+    __resetSharePayloadStoreForTests();
+    __resetPendingShareNavigationForTests();
+  });
+
+  async function commitNewSession(shareId: string): Promise<string> {
+    const renderer = await mountGate(shareId);
+    const row = renderer.root.find(
+      node =>
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityLabel === i18n.t('common.newSession')
+    );
+    const onPress: unknown = row.props.onPress;
+    if (typeof onPress !== 'function') {
+      throw new TypeError('the New session row has no press handler');
+    }
+    act(() => {
+      (onPress as () => void)();
+    });
+    await flushAsync();
+    const pending = takePendingShareNavigation();
+    act(() => {
+      renderer.unmount();
+    });
+    if (pending === null) {
+      throw new TypeError('the gate did not commit a destination');
+    }
+    return pending.href;
+  }
+
+  it('commits into the selected organization while the account holds it', async () => {
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('/agent-chat/new?organizationId=org-selected');
+    expect(href).toContain(`shareId=${shareId}`);
+  });
+
+  it('commits into the account default when the selected organization denies access', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({
+      data: [{ organizationId: 'org-first' }, { organizationId: 'org-second' }],
+    });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-first');
+    expect(href).not.toContain('org-lost');
+  });
+
+  it('commits personal when the account holds no other organization', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [] });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'FORBIDDEN' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('/agent-chat/new?shareId=');
+    expect(href).not.toContain('organizationId=');
+  });
+
+  it('keeps the selection on a membership list miss without an access denial', async () => {
+    organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
+    memberships({ data: [] });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'INTERNAL_SERVER_ERROR' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-selected');
+  });
+
+  it('keeps the selection while the membership list is unsettled', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: undefined, isFetched: false });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+
+  it('keeps the selection while the membership list is refetching', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-first' }], isFetching: true });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+
+  it('keeps the selection after a failed background refresh of the list', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-first' }], isRefetchError: true });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+});
+
+describe('ShareGateSheet organization plan gate', () => {
+  beforeEach(() => {
+    spawnMock.mockClear();
+    toastError.mockClear();
+    shareDestinationListProps.current = null;
+    __resetSharePayloadStoreForTests();
+    __resetPendingShareNavigationForTests();
+  });
+
+  afterEach(() => {
+    organizationMock.current = { organizationId: null, isLoaded: true };
+    organizationsListMock.current = {
+      data: [{ organizationId: 'org-selected' }],
+      isFetched: true,
+      isFetching: false,
+      isError: false,
+      isRefetchError: false,
+    };
+  });
+
+  it('refuses a remote spawn into an organization whose trial has lapsed', async () => {
+    organizationMock.current = { organizationId: 'org-lapsed', isLoaded: true };
+    organizationsListMock.current.data = [
+      { organizationId: 'org-lapsed', isTrialExpiredForEnforcement: true },
+    ];
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+
+    await pressSpawn(captureListProps().onSpawnInstance);
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('still spawns into an organization the gate keeps entitled', async () => {
+    organizationMock.current = { organizationId: 'org-lapsed', isLoaded: true };
+    organizationsListMock.current.data = [
+      { organizationId: 'org-lapsed', isTrialExpiredForEnforcement: false },
+    ];
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+
+    await pressSpawn(captureListProps().onSpawnInstance);
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
     act(() => {
       renderer.unmount();
     });

@@ -1,10 +1,32 @@
 import {
+  deletionNotifyChannel,
+  deletionNotifyStepSkipped,
+  deletionPreflightProgress,
   deletionStepCountLabel,
   deletionStepProgressLabel,
   formatActivityDetail,
   parseDeletionEntries,
   parseDeletionQueueTab,
+  parseHistoricalDeletionUserIds,
 } from './deletion-queue-format';
+
+describe('parseHistoricalDeletionUserIds', () => {
+  it('preserves opaque case-sensitive IDs and deduplicates pasted lines', () => {
+    expect(
+      parseHistoricalDeletionUserIds(
+        ' oauth/GitHub/User+42 \r\noauth/github/user+42\noauth/GitHub/User+42\nexternal|Opaque ID:42\n'
+      )
+    ).toEqual(['oauth/GitHub/User+42', 'oauth/github/user+42', 'external|Opaque ID:42']);
+  });
+
+  it('does not interpret IDs as emails or ticket references', () => {
+    expect(parseHistoricalDeletionUserIds('1234\ncustom,id;value')).toEqual([
+      '1234',
+      'custom,id;value',
+    ]);
+    expect(parseHistoricalDeletionUserIds(' \n\r\n')).toEqual([]);
+  });
+});
 
 describe('parseDeletionEntries', () => {
   it('parses one email per line', () => {
@@ -110,6 +132,105 @@ describe('formatActivityDetail', () => {
         details: { processedCount: 80, scannedCount: 49000, errorCode: null },
       })
     ).toBe('Usage prompts · 80 scrubbed · 49000 scanned');
+  });
+});
+
+describe('deletionPreflightProgress', () => {
+  it('is current while pending without an attention code', () => {
+    expect(deletionPreflightProgress({ status: 'pending', preflightAttentionCode: null })).toBe(
+      'current'
+    );
+  });
+
+  it('is stuck while pending with an attention code', () => {
+    expect(
+      deletionPreflightProgress({
+        status: 'pending',
+        preflightAttentionCode: 'delete_ready_missing',
+      })
+    ).toBe('stuck');
+  });
+
+  it('is finished after promotion', () => {
+    expect(deletionPreflightProgress({ status: 'in_progress', preflightAttentionCode: null })).toBe(
+      'finished'
+    );
+    expect(deletionPreflightProgress({ status: 'completed', preflightAttentionCode: null })).toBe(
+      'finished'
+    );
+  });
+
+  it('stays idle when cancelled before promotion', () => {
+    expect(deletionPreflightProgress({ status: 'cancelled', preflightAttentionCode: null })).toBe(
+      'idle'
+    );
+  });
+});
+
+describe('deletionNotifyChannel', () => {
+  it.each([null, '#1001'])(
+    'has no notification channel for v1 tasks even with ticket %p',
+    pylonTicket => {
+      expect(
+        deletionNotifyChannel({
+          pylonTicket,
+          tasks: [
+            { stepKey: 'customerio', status: 'not_applicable' },
+            { stepKey: 'anonymize', status: 'pending' },
+          ],
+        })
+      ).toBe('none');
+      expect(deletionNotifyStepSkipped('completion_email', 'none')).toBe(true);
+      expect(deletionNotifyStepSkipped('pylon_reply', 'none')).toBe(true);
+      expect(deletionNotifyStepSkipped('pylon_finalize', 'none')).toBe(true);
+      expect(deletionNotifyStepSkipped('anonymize', 'none')).toBe(false);
+    }
+  );
+
+  it('uses the Pylon path when a ticket is present', () => {
+    expect(
+      deletionNotifyChannel({
+        pylonTicket: '#1001',
+        tasks: [
+          { stepKey: 'pylon_reply', status: 'pending' },
+          { stepKey: 'completion_email', status: 'pending' },
+        ],
+      })
+    ).toBe('pylon');
+  });
+
+  it('uses the email path when there is no ticket', () => {
+    expect(
+      deletionNotifyChannel({
+        pylonTicket: null,
+        tasks: [
+          { stepKey: 'pylon_reply', status: 'pending' },
+          { stepKey: 'completion_email', status: 'pending' },
+        ],
+      })
+    ).toBe('email');
+  });
+
+  it('recovers the Pylon path after the ticket is redacted', () => {
+    expect(
+      deletionNotifyChannel({
+        pylonTicket: null,
+        tasks: [
+          { stepKey: 'pylon_reply', status: 'succeeded' },
+          { stepKey: 'completion_email', status: 'not_applicable' },
+        ],
+      })
+    ).toBe('pylon');
+  });
+});
+
+describe('deletionNotifyStepSkipped', () => {
+  it('skips the unused customer notification for each channel', () => {
+    expect(deletionNotifyStepSkipped('completion_email', 'pylon')).toBe(true);
+    expect(deletionNotifyStepSkipped('pylon_reply', 'pylon')).toBe(false);
+    expect(deletionNotifyStepSkipped('pylon_reply', 'email')).toBe(true);
+    expect(deletionNotifyStepSkipped('pylon_finalize', 'email')).toBe(true);
+    expect(deletionNotifyStepSkipped('completion_email', 'email')).toBe(false);
   });
 });
 

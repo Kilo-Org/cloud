@@ -34,7 +34,6 @@ export const GITHUB_EVENT = {
   REPOSITORY: 'repository',
 
   // Issue events
-  ISSUES: 'issues',
   ISSUE_COMMENT: 'issue_comment',
 
   // Pull request events
@@ -82,6 +81,7 @@ export const GITHUB_ACTION = {
   UNLABELED: 'unlabeled',
   READY_FOR_REVIEW: 'ready_for_review',
   CONVERTED_TO_DRAFT: 'converted_to_draft',
+  STACKED: 'stacked',
 
   // Review actions
   SUBMITTED: 'submitted',

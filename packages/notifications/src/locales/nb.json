@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Agentøkten din har en oppdatering",
+      "lowBalance": "Saldoen din krever oppmerksomhet",
+      "spendAlert": "Forbruket ditt krever oppmerksomhet",
+      "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet",
+      "securityUpdate": "En sikkerhetssjekk har en oppdatering",
+      "activeAgentsGlanceable": "Aktive agenter har en oppdatering"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Varsel om lav saldo",
+      "body": "Saldoen til {{organizationName}} falt under ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Forbruksvarsel",
+      "body": "Forbruket til {{scopeName}} oversteg ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nytt sikkerhetsfunn ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-advarsel"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-brudd"
+    }
+  },
+  "sessionReady": {
+    "body": "Kilo-økten din er klar til å styres fra telefonen"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

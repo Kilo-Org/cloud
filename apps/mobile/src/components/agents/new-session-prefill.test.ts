@@ -1,13 +1,20 @@
+/* eslint-disable max-lines -- the prefill resolver suite covers build/append/read/resolve/describe plus the platform-qualified selection resolver */
 import { describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
 
 import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
   describePrefillFallback,
+  isRepoSeedPending,
   type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
   resolvePrefillRepo,
+  resolvePrefillRepoSelection,
+  resolveStoredRepoSelection,
+  shouldAbandonRepoSeed,
 } from './new-session-prefill';
 
 vi.mock('@/components/ui/icons', () => ({
@@ -119,6 +126,18 @@ describe('appendNewSessionPrefill', () => {
       '/agent-chat/new?prefillRepo=owner%2Frepo&prefillModel=kilo-auto%2Fefficient'
     );
   });
+
+  it('appends the prompt, the to-do id, and the to-do title after the targets', () => {
+    const result = appendNewSessionPrefill('/agent-chat/new', {
+      repo: 'owner/repo',
+      prompt: 'Fix login\n\nSee #12 & retry',
+      todoId: 'todo-1',
+      todoTitle: 'Fix login',
+    });
+    expect(result).toBe(
+      '/agent-chat/new?prefillRepo=owner%2Frepo&prefillPrompt=Fix%20login%0A%0ASee%20%2312%20%26%20retry&todoId=todo-1&prefillTodoTitle=Fix%20login'
+    );
+  });
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -175,6 +194,29 @@ describe('readNewSessionPrefill', () => {
 
   it('handles undefined params', () => {
     const prefill = readNewSessionPrefill({ prefillRepo: undefined, prefillMode: undefined });
+    expect(prefill).toEqual({ mode: 'code' });
+  });
+
+  it('reads the prompt, the to-do id, and the to-do title', () => {
+    const prefill = readNewSessionPrefill({
+      prefillPrompt: 'Fix login\n\nnotes',
+      todoId: ['todo-1', 'todo-2'],
+      prefillTodoTitle: 'Fix login',
+    });
+    expect(prefill).toEqual({
+      mode: 'code',
+      prompt: 'Fix login\n\nnotes',
+      todoId: 'todo-1',
+      todoTitle: 'Fix login',
+    });
+  });
+
+  it('treats a blank prompt, an empty to-do id, and a blank to-do title as absent', () => {
+    const prefill = readNewSessionPrefill({
+      prefillPrompt: '  \n ',
+      todoId: '',
+      prefillTodoTitle: '  ',
+    });
     expect(prefill).toEqual({ mode: 'code' });
   });
 });
@@ -251,6 +293,185 @@ describe('resolvePrefillRepo', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
+// resolvePrefillRepoSelection
+// ════════════════════════════════════════════════════════════════
+
+describe('resolvePrefillRepoSelection', () => {
+  const repos = [
+    { platform: 'gitlab', fullName: 'kilo-org/cloud' },
+    { platform: 'bitbucket', fullName: 'kilo-org/cloud' },
+    { platform: 'github', fullName: 'Kilo-Org/cloud' },
+  ];
+
+  it('selects the GitHub row and never a same-named GitLab/Bitbucket row', () => {
+    const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-org/cloud' });
+    expect(result).toBe('github:Kilo-Org/cloud');
+  });
+
+  it('returns the GitHub row when only the GitLab row shares the name', () => {
+    const result = resolvePrefillRepoSelection(
+      [
+        { platform: 'gitlab', fullName: 'owner/repo' },
+        { platform: 'github', fullName: 'owner/repo' },
+      ],
+      { mode: 'code', repo: 'owner/repo' }
+    );
+    expect(result).toBe('github:owner/repo');
+  });
+
+  it('returns null when no GitHub row matches, even if a GitLab row does', () => {
+    const result = resolvePrefillRepoSelection([{ platform: 'gitlab', fullName: 'owner/repo' }], {
+      mode: 'code',
+      repo: 'owner/repo',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('matches case-insensitively and returns the canonical GitHub casing', () => {
+    const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-Org/Cloud' });
+    expect(result).toBe('github:Kilo-Org/cloud');
+  });
+
+  it.each([
+    { repo: 'gh/other', desc: 'no match' },
+    { repo: undefined, desc: 'absent' },
+    { repo: '', desc: 'empty string' },
+  ])('returns null when repo is $desc', ({ repo }) => {
+    expect(resolvePrefillRepoSelection(repos, { mode: 'code', repo })).toBeNull();
+  });
+});
+
+describe('isRepoSeedPending', () => {
+  const base = {
+    prefillRepo: 'owner/repo',
+    applied: false,
+    selectedRepo: '',
+    providerQueriesResolved: false,
+  };
+
+  it('reports a seed pending while a provider query is still in flight', () => {
+    expect(isRepoSeedPending(base)).toBe(true);
+  });
+
+  it('settles once the seed has run for this mount', () => {
+    expect(isRepoSeedPending({ ...base, applied: true })).toBe(false);
+  });
+
+  it('settles a prefill the resolved lists cannot satisfy instead of holding the region', () => {
+    // The regression this clause exists for: the provider queries resolved and
+    // no seed ran (`applied` false, no selection) because the lists have no
+    // match — an error, a disconnected provider, an empty account. No seed can
+    // arrive now, so reporting pending here would keep the region unsettled
+    // forever: the screen would lose the rows below the section and the
+    // section's own retry and reconnect controls.
+    expect(isRepoSeedPending({ ...base, providerQueriesResolved: true })).toBe(false);
+  });
+
+  it('settles when the form already holds a selection', () => {
+    expect(isRepoSeedPending({ ...base, selectedRepo: 'github:owner/repo' })).toBe(false);
+  });
+
+  it('settles a plain New session entry that asked for no repository', () => {
+    // The regression this rule exists for: without a request in the route no
+    // seed is coming, so the form must not wait for one before it paints the
+    // rows below the repository section.
+    expect(
+      isRepoSeedPending({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+});
+
+describe('shouldAbandonRepoSeed', () => {
+  const base = {
+    prefillRepo: 'owner/repo',
+    applied: false,
+    selectedRepo: '',
+    reposSettled: false,
+    providerQueriesResolved: false,
+  };
+
+  it('abandons the request once the bound settles the region without it', () => {
+    // The regression this rule exists for: the lists never answer, the bound
+    // settles the region, and a later answer must not mount a repository the
+    // form already painted without.
+    expect(shouldAbandonRepoSeed({ ...base, providerQueriesResolved: true })).toBe(true);
+  });
+
+  it('keeps waiting while the lists are still within the bound', () => {
+    expect(shouldAbandonRepoSeed(base)).toBe(false);
+  });
+
+  it('leaves a request the lists can satisfy to the seed', () => {
+    // `reposSettled` is the one render in which the seed runs, so dropping the
+    // request there would lose a prefill that can still land.
+    expect(
+      shouldAbandonRepoSeed({ ...base, reposSettled: true, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+
+  it('does not abandon a plain New session entry', () => {
+    expect(
+      shouldAbandonRepoSeed({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+
+  it('does not abandon a request that already ran or was abandoned', () => {
+    expect(shouldAbandonRepoSeed({ ...base, applied: true, providerQueriesResolved: true })).toBe(
+      false
+    );
+  });
+
+  it('does not abandon a request the form already satisfied', () => {
+    expect(
+      shouldAbandonRepoSeed({
+        ...base,
+        selectedRepo: 'github:owner/repo',
+        providerQueriesResolved: true,
+      })
+    ).toBe(false);
+  });
+});
+
+describe('resolveStoredRepoSelection', () => {
+  const storedRepo = 'github:drain-team/kilo-backend';
+
+  it('seeds the durable draft into an empty form', () => {
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo })
+    ).toBe(storedRepo);
+  });
+
+  it('leaves an explicit route prefill in charge', () => {
+    expect(
+      resolveStoredRepoSelection({
+        prefill: { mode: 'code', repo: 'drain-team/kilo-app' },
+        selectedRepo: '',
+        storedRepo,
+      })
+    ).toBeNull();
+  });
+
+  it('never overwrites a choice the person already made', () => {
+    expect(
+      resolveStoredRepoSelection({
+        prefill: { mode: 'code' },
+        selectedRepo: 'gitlab:team/other',
+        storedRepo,
+      })
+    ).toBeNull();
+  });
+
+  it('seeds nothing when no draft is stored or it has not loaded', () => {
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo: null })
+    ).toBeNull();
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo: '' })
+    ).toBeNull();
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
 // describePrefillFallback
 // ════════════════════════════════════════════════════════════════
 
@@ -274,14 +495,16 @@ describe('describePrefillFallback', () => {
       prefill: { mode: 'code', repo: 'owner/repo' } satisfies NewSessionPrefill,
       repos: settled,
       models: unsettled,
-      expected: 'owner/repo is no longer available. Pick a repository below.',
+      expected: i18n.t('agentChat.newSession.prefillRepoUnavailable', { repo: 'owner/repo' }),
     },
     {
       desc: 'model unmatched, repo not requested',
       prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
       repos: unsettled,
       models: settled,
-      expected: 'anthropic/claude-sonnet-4 is no longer available. Using your default model.',
+      expected: i18n.t('agentChat.newSession.prefillModelUnavailable', {
+        model: 'anthropic/claude-sonnet-4',
+      }),
     },
   ])('returns per-field message when $desc', ({ prefill, repos, models, expected }) => {
     expect(describePrefillFallback({ prefill, repos, models })).toBe(expected);
@@ -340,8 +563,6 @@ describe('describePrefillFallback', () => {
       repos: settled,
       models: settled,
     });
-    expect(note).toBe(
-      "The original session's repository and model are no longer available. Pick them below."
-    );
+    expect(note).toBe(i18n.t('agentChat.newSession.prefillRepoAndModelUnavailable'));
   });
 });

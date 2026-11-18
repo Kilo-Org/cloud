@@ -10,8 +10,17 @@ import {
   type AgentAttachmentMime,
 } from './constants';
 import { truncateUtf8, utf8ByteLength } from '../utf8-utils';
+import { i18n } from '@/i18n';
 
-const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>(['png', 'jpg', 'jpeg', 'webp', 'gif']);
+const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>([
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'gif',
+  'heic',
+  'heif',
+]);
 
 /**
  * Normalize a candidate's filename extension.
@@ -74,7 +83,6 @@ export function mimeForExtension(extension: string): AgentAttachmentMime {
  *   or a bare traversal token (`.` or `..`).
  */
 export function sanitizeAttachmentFilename(raw: string): string {
-  // Strip to basename only — drop any directory prefix
   let sanitized = raw.replace(/^.*[/\\]/, '');
 
   // Strip control characters
@@ -90,7 +98,6 @@ export function sanitizeAttachmentFilename(raw: string): string {
     sanitized = out;
   }
 
-  // Strip any remaining path separators
   sanitized = sanitized.replaceAll('/', '').replaceAll('\\', '');
 
   // Truncate to the byte budget, preserving the extension when
@@ -117,12 +124,10 @@ export function sanitizeAttachmentFilename(raw: string): string {
         sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
       }
     } else {
-      // No parsable extension — truncate the whole string.
       sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
     }
   }
 
-  // If empty, use the safe fallback
   if (sanitized.length === 0) {
     return `file.${AGENT_ATTACHMENT_FALLBACK_EXTENSION}`;
   }
@@ -196,10 +201,10 @@ export function canAddAttachments(
 }
 
 const CLASSIFICATION_FAILURE_MESSAGES = {
-  denied: "Executable files can't be attached",
-  empty: 'File is empty',
-  'too-large': 'Files must be 20 MB or smaller',
-  unreadable: "Couldn't read this file",
+  denied: 'chat.attachment.classificationDenied',
+  empty: 'chat.attachment.classificationEmpty',
+  'too-large': 'chat.attachment.classificationTooLarge',
+  unreadable: 'chat.attachment.classificationUnreadable',
 } as const satisfies Record<'denied' | 'empty' | 'too-large' | 'unreadable', string>;
 
 /**
@@ -209,5 +214,5 @@ const CLASSIFICATION_FAILURE_MESSAGES = {
 export function describeClassificationFailure(
   reason: 'denied' | 'empty' | 'too-large' | 'unreadable'
 ): string {
-  return CLASSIFICATION_FAILURE_MESSAGES[reason];
+  return i18n.t(CLASSIFICATION_FAILURE_MESSAGES[reason]);
 }

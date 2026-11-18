@@ -3,6 +3,8 @@ import * as z from 'zod';
 const STORE_JSON_TOKEN_KEYS = new Set([
   'appAccountToken',
   'purchaseToken',
+  'linkedPurchaseToken',
+  'expiredPurchaseToken',
   'signedPayload',
   'signedRenewalInfo',
   'signedTransactionInfo',

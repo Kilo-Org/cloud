@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Text, type TextStyle, View, type ViewStyle } from 'react-native';
+
+import { alignComposerInputHeightToLines } from '@/components/agents/chat-composer-input-height';
 
 type UseTextHeightOptions = {
   minHeight: number;
@@ -8,12 +10,59 @@ type UseTextHeightOptions = {
   textContentWidth: number;
   fontSize: number;
   lineHeight: number;
+  /**
+   * System Dynamic Type scale. When set, the caller pre-scales `fontSize` and
+   * `lineHeight` here and native scaling is disabled on the measure node, so
+   * the scale applies exactly once. When omitted, the base sizes are rendered
+   * and native scaling applies.
+   */
+  fontScale?: number;
   initialText?: string;
 };
+
+/** Plausible band for the native pitch around the requested line height. */
+const NATIVE_PITCH_MIN_RATIO = 0.6;
+const NATIVE_PITCH_MAX_RATIO = 1.4;
+
+/**
+ * How far, in dp, the line pitch a native content-height report implies may
+ * move before it is worth a state update. The report exists only to estimate
+ * the pitch the real input lays lines out at, and that pitch does not move when
+ * the draft grows a line — its content height and its line count grow together.
+ * Half a point is well below the pitch change that can move the snapped cap to
+ * another whole line (`floor(cap / pitch)` needs about half a point at this
+ * line height), so dropping a smaller move loses nothing.
+ */
+const NATIVE_PITCH_STABLE_STEP = 0.5;
 
 /**
  * Mirrors uncontrolled TextInput contents into a hidden Text node so we can
  * measure wrapped height without relying on TextInput.onContentSizeChange.
+ *
+ * The published cap is snapped down to a whole number of the lines the native
+ * input actually renders (see `alignComposerInputHeightToLines`). A capped
+ * multiline input scrolls to the caret by `contentHeight - viewHeight`; if that
+ * difference is not a whole number of rendered lines, the first visible line is
+ * painted cut against the input's top edge. Android's `TextInput` lays lines
+ * out at the font's own line box rather than the requested `lineHeight` — on
+ * this composer's 16dp Roboto at 420dpi the real input reports 49px per line,
+ * 18.67dp against a requested 20dp — so the snap uses the pitch measured from
+ * the real input's reported content height over the mirror's line count, not
+ * the requested line height. The floor is snapped to that same pitch, so a cap
+ * that lands on the minimum stays a whole number of native lines too.
+ *
+ * The caller pushes that report in with `setNativeContentHeight`, which keeps
+ * the height out of the caller's own state: the report is recorded only when
+ * the pitch the snap uses moves, or when it is measured over a new line count,
+ * so a burst of reports at one line count — every native content-size event
+ * while the draft and the transcript stream — never re-renders the caller, and
+ * re-renders only this leaf once when the draft grows a line.
+ *
+ * The mirror is also frozen while the draft only grows past the cap: the
+ * published height is the cap for any taller content, so an append there is
+ * measured by nothing, and laying a long draft out again on every keystroke is
+ * the one cost in this path that grows with the draft's length. `setText`
+ * describes the exact rule.
  */
 export function useTextHeight({
   minHeight,
@@ -22,49 +71,257 @@ export function useTextHeight({
   textContentWidth,
   fontSize,
   lineHeight,
+  fontScale,
   initialText = '',
 }: UseTextHeightOptions) {
   const [text, setMeasuredText] = useState(initialText);
-  const [height, setHeight] = useState(minHeight);
+  // The draft the caller last pushed in, and the text the mirror actually
+  // renders. They diverge while the mirror is frozen for an append that cannot
+  // change the published height (see `setText`), so a native report can tell
+  // whether its line count still describes the text the mirror measured.
+  const draftTextRef = useRef(initialText);
+  const mirrorTextRef = useRef(initialText);
+  // The padded, unclamped mirror height, measured by the hidden Text node.
+  const [contentHeight, setContentHeight] = useState(minHeight);
+  // The content height the caller's real `TextInput` last reported through
+  // `setNativeContentHeight`, in dp, including the input's own vertical
+  // padding. It is the only faithful measure of the pitch that input lays lines
+  // out at: the mirror `Text` honors `lineHeight`, while the native input uses
+  // the platform's own line box.
+  const [nativeContentHeight, setNativeContentHeightInState] = useState<number | null>(null);
+  // The pitch the last recorded report implied and the line count it was
+  // measured over. A report that keeps that pitch within
+  // `NATIVE_PITCH_STABLE_STEP`, at that same line count, is dropped without a
+  // state update: the report arrives on every native content-size event, and
+  // scheduling one per report re-rendered the caller's whole composer and its
+  // input on each one.
+  const acceptedPitchRef = useRef<number | null>(null);
+  const acceptedLineCountRef = useRef<number | null>(null);
+  // The mirror text the recorded report described. While the mirror still holds
+  // that text, its current line count is the denominator the pitch is derived
+  // over; once the mirror holds other text, the recorded count is.
+  const acceptedTextRef = useRef(initialText);
   const measuredText = text.length === 0 || text.endsWith('\n') ? `${text} ` : text;
   const measurementWidth = Math.max(textContentWidth, 0);
+  const scaledFontSize = fontScale == null ? fontSize : fontSize * fontScale;
+  const scaledLineHeight = fontScale == null ? lineHeight : lineHeight * fontScale;
+  // Disable native scaling only when the caller pre-scaled, so the scale is
+  // applied exactly once instead of twice.
+  const maxFontSizeMultiplier = fontScale == null ? undefined : 1;
+  // The mirror and the native input wrap the same text at the same width into
+  // the same number of lines, so the input's rendered pitch is its reported
+  // content height (minus the padding it carries) over the line count it was
+  // measured at. `setNativeContentHeight` records that count with every report,
+  // so a move of the mirror's own height — an unfrozen draft measured again, or
+  // the cap changing — cannot decay the estimate before the input reports
+  // again. A report that follows a line growth is recorded at the new count, so
+  // the estimate still sharpens exactly where it matters: the cap below only
+  // bites once the content is tall enough to scroll, and by then the report is
+  // several lines deep.
+  const mirrorLineCount = Math.max(
+    1,
+    Math.round((contentHeight - verticalPadding) / scaledLineHeight)
+  );
+  const recordedLineCount = acceptedLineCountRef.current;
+  // The report describes the mirror's text at the moment it was recorded. While
+  // the mirror still holds that text its current count is the right
+  // denominator, so a report that arrives before the mirror lays the text out
+  // sharpens once it does. Once the mirror holds other text — an unfrozen draft
+  // measured again, or the cap moving — the recorded height belongs to the
+  // earlier text, and dividing it by the new count would decay the estimated
+  // pitch and unsnap the cap.
+  const pitchLineCount =
+    acceptedTextRef.current === mirrorTextRef.current ? mirrorLineCount : recordedLineCount;
+  const nativePitch =
+    nativeContentHeight != null &&
+    nativeContentHeight > verticalPadding &&
+    pitchLineCount !== null &&
+    pitchLineCount > 0
+      ? (nativeContentHeight - verticalPadding) / pitchLineCount
+      : null;
+  /**
+   * The caller's `onContentSizeChange` report. Records the height only when the
+   * pitch it implies (at the mirror's current line count) has moved by at least
+   * `NATIVE_PITCH_STABLE_STEP`, or when the report is measured over a different
+   * line count than the last recorded one; a report that keeps the pitch where
+   * it was, at the count it was measured over, does not schedule an update at
+   * all, so the caller does not re-render its input on every native
+   * content-size event. The line count is recorded with the height because the
+   * pitch is derived over it: a report that follows a line growth must be
+   * recorded even when the pitch it implies is unchanged, or the recorded pair
+   * would describe the earlier, shorter draft.
+   */
+  function setNativeContentHeight(nextContentHeight: number): void {
+    // The report describes the live input's own draft. While the mirror is
+    // frozen for an append past the cap it holds an older, shorter text, and
+    // the report's height divided by that shorter text's line count would
+    // estimate a pitch several times too large, which unsnaps the cap. Keep the
+    // pitch the last exact measurement accepted instead.
+    if (mirrorTextRef.current !== draftTextRef.current) {
+      return;
+    }
+    const nextPitch =
+      nextContentHeight > verticalPadding && mirrorLineCount > 0
+        ? (nextContentHeight - verticalPadding) / mirrorLineCount
+        : null;
+    const acceptedPitch = acceptedPitchRef.current;
+    if (
+      nextPitch !== null &&
+      acceptedPitch !== null &&
+      acceptedLineCountRef.current === mirrorLineCount &&
+      Math.abs(nextPitch - acceptedPitch) < NATIVE_PITCH_STABLE_STEP
+    ) {
+      return;
+    }
+    acceptedPitchRef.current = nextPitch;
+    acceptedLineCountRef.current = mirrorLineCount;
+    acceptedTextRef.current = mirrorTextRef.current;
+    setNativeContentHeightInState(nextContentHeight);
+  }
+  // `minHeight` is the caller's one-line floor in the requested line box
+  // (`scaledLineHeight + padding`), while the snap floors to the pitch the
+  // native input really renders. A cap that lands on the minimum would publish
+  // that unaligned minimum and clip the first visible line again, so the floor
+  // is re-expressed in whole native lines. It is clamped to the cap, which
+  // keeps the snapped height from ever exceeding the space the composer has.
+  const alignedMinHeight =
+    nativePitch !== null
+      ? Math.min(
+          verticalPadding +
+            Math.max(1, Math.floor((minHeight - verticalPadding) / nativePitch)) * nativePitch,
+          maxHeight
+        )
+      : minHeight;
+  const effectiveMaxHeight =
+    nativePitch !== null &&
+    nativePitch >= scaledLineHeight * NATIVE_PITCH_MIN_RATIO &&
+    nativePitch <= scaledLineHeight * NATIVE_PITCH_MAX_RATIO
+      ? alignComposerInputHeightToLines({
+          height: maxHeight,
+          lineHeight: nativePitch,
+          verticalPadding,
+          minHeight: alignedMinHeight,
+        })
+      : maxHeight;
 
   function handleMeasureLayout(event: LayoutChangeEvent) {
     const textHeight = event.nativeEvent.layout.height;
     const paddedHeight = Math.ceil(textHeight + verticalPadding);
-    const nextHeight = Math.min(Math.max(paddedHeight, minHeight), maxHeight);
-    setHeight(current => (current === nextHeight ? current : nextHeight));
+    setContentHeight(paddedHeight);
   }
+
+  // The clamped height this hook publishes: a pure function of the measured
+  // content, the caller's floor, and the remaining-space cap. It is derived in
+  // render instead of held in state: a state copy re-clamped in an effect
+  // published the previous height together with the new cap — two notifications
+  // of the caller, and so two commits, for one change.
+  const height = Math.min(Math.max(contentHeight, minHeight), effectiveMaxHeight);
 
   function setText(nextText: string) {
-    setMeasuredText(nextText);
+    draftTextRef.current = nextText;
     if (nextText.length === 0) {
-      setHeight(minHeight);
+      mirrorTextRef.current = '';
+      setMeasuredText('');
+      setContentHeight(minHeight);
+      return;
     }
+    if (changeKeepsPublishedHeight(nextText)) {
+      return;
+    }
+    mirrorTextRef.current = nextText;
+    setMeasuredText(nextText);
   }
 
+  /**
+   * True when laying `nextText` out again cannot change the height this hook
+   * publishes, so the mirror keeps the text it has.
+   *
+   * The published height clamps the measured content into `[minHeight, cap]`,
+   * so a draft whose measured content already fills the cap publishes the cap
+   * whatever a taller layout would measure. And text wrapping is monotone in
+   * the prefix: text that keeps the measured draft at its start and is no
+   * shorter never wraps into fewer lines. So a change like that, on a draft the
+   * mirror already measured at or past the cap, cannot move the height the
+   * caller renders — re-measuring it would lay the whole draft out again on
+   * every keystroke, work that grows with the draft's length while the result
+   * cannot change. Any other edit (a delete that cuts into the measured text, a
+   * replacement, a cleared draft) measures the exact new text, and a move of the
+   * wrapping or the cap re-measures the frozen draft through the effect below,
+   * so the mirror is never stale in a way the caller can see.
+   */
+  function changeKeepsPublishedHeight(nextText: string): boolean {
+    const mirroredText = mirrorTextRef.current;
+    return (
+      contentHeight >= effectiveMaxHeight &&
+      nextText.length >= mirroredText.length &&
+      nextText.startsWith(mirroredText)
+    );
+  }
+
+  // The geometry the frozen measurement was taken under: the width, font and
+  // line box re-wrap the draft, so a measurement taken under the old one no
+  // longer describes it — and a change of the text is not what moves these, so
+  // `setText` cannot notice. The cap matters too: a keyboard close or a window
+  // that grows raises it with no text change at all, and the frozen content
+  // height then stops filling the cap, so the caller would publish that shorter
+  // height instead of the taller cap until the next keystroke. Measure the live
+  // draft again when either one leaves the frozen measurement behind.
+  const wrappingKey = `${measurementWidth}|${scaledFontSize}|${scaledLineHeight}|${verticalPadding}`;
+  const measuredWrappingKeyRef = useRef(wrappingKey);
+  useEffect(() => {
+    const wrappingMoved = measuredWrappingKeyRef.current !== wrappingKey;
+    if (wrappingMoved) {
+      measuredWrappingKeyRef.current = wrappingKey;
+    }
+    const draft = draftTextRef.current;
+    if (draft === '' || mirrorTextRef.current === draft) {
+      return;
+    }
+    // The frozen prefix stands in for the draft only while it still fills the
+    // published cap; a cap that grew past its measured content re-opens the
+    // room the draft may grow into.
+    if (!wrappingMoved && contentHeight >= effectiveMaxHeight) {
+      return;
+    }
+    mirrorTextRef.current = draft;
+    setMeasuredText(draft);
+  }, [wrappingKey, contentHeight, effectiveMaxHeight]);
+
   function reset() {
+    draftTextRef.current = '';
+    mirrorTextRef.current = '';
     setMeasuredText('');
-    setHeight(minHeight);
+    setContentHeight(minHeight);
   }
 
   const textStyle: TextStyle = {
-    fontSize,
+    fontSize: scaledFontSize,
     includeFontPadding: false,
-    lineHeight,
+    lineHeight: scaledLineHeight,
     width: measurementWidth,
   };
 
   const measureElement =
     measurementWidth > 0 ? (
       <View style={hiddenContainer} pointerEvents="none">
-        <Text style={textStyle} onLayout={handleMeasureLayout}>
+        <Text
+          style={textStyle}
+          onLayout={handleMeasureLayout}
+          maxFontSizeMultiplier={maxFontSizeMultiplier}
+        >
           {measuredText}
         </Text>
       </View>
     ) : null;
 
-  return { height, measureElement, reset, setText };
+  return {
+    height,
+    maxHeight: effectiveMaxHeight,
+    measureElement,
+    reset,
+    setNativeContentHeight,
+    setText,
+  };
 }
 
 const hiddenContainer: ViewStyle = {

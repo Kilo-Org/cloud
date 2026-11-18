@@ -1,6 +1,8 @@
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
+import { createHash } from 'node:crypto';
 import * as z from 'zod';
+import type { GitHubBrokerRejectionProvenance } from '@kilocode/worker-utils/github-authorization';
 
 type Token = z.infer<typeof Token>;
 const Token = z.object({
@@ -20,6 +22,40 @@ type GitHubAppCredentials = {
  */
 export type GitHubAppType = 'standard' | 'lite';
 
+// GitHub's installation-token permissions parameter excludes omitted permissions.
+// Keep this repository-only allowlist distinct from organization and account permissions.
+const repositoryPermissionSchema = z.object({
+  actions: z.enum(['read', 'write']).optional(),
+  administration: z.enum(['read', 'write']).optional(),
+  artifact_metadata: z.enum(['read', 'write']).optional(),
+  attestations: z.enum(['read', 'write']).optional(),
+  checks: z.enum(['read', 'write']).optional(),
+  code_quality: z.enum(['read', 'write']).optional(),
+  codespaces: z.enum(['read', 'write']).optional(),
+  contents: z.enum(['read', 'write']).optional(),
+  dependabot_secrets: z.enum(['read', 'write']).optional(),
+  deployments: z.enum(['read', 'write']).optional(),
+  discussions: z.enum(['read', 'write']).optional(),
+  environments: z.enum(['read', 'write']).optional(),
+  issues: z.enum(['read', 'write']).optional(),
+  merge_queues: z.enum(['read', 'write']).optional(),
+  metadata: z.enum(['read', 'write']).optional(),
+  packages: z.enum(['read', 'write']).optional(),
+  pages: z.enum(['read', 'write']).optional(),
+  pull_requests: z.enum(['read', 'write']).optional(),
+  repository_custom_properties: z.enum(['read', 'write']).optional(),
+  repository_hooks: z.enum(['read', 'write']).optional(),
+  repository_projects: z.enum(['read', 'write', 'admin']).optional(),
+  secret_scanning_alerts: z.enum(['read', 'write']).optional(),
+  secrets: z.enum(['read', 'write']).optional(),
+  security_events: z.enum(['read', 'write']).optional(),
+  single_file: z.enum(['read', 'write']).optional(),
+  statuses: z.enum(['read', 'write']).optional(),
+  vulnerability_alerts: z.enum(['read', 'write']).optional(),
+  workflows: z.literal('write').optional(),
+});
+type RepositoryPermissions = z.infer<typeof repositoryPermissionSchema>;
+
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const CACHE_KEY_PREFIX = 'gh-token:';
 const MIN_TTL_SECONDS = 60;
@@ -32,6 +68,33 @@ const GitHubInstallationAccountSchema = z.object({
     login: z.string().min(1),
   }),
 });
+
+const GitHubTokenErrorSchema = z.object({
+  status: z.number().int().min(400).max(599),
+  response: z
+    .object({
+      data: z.object({ message: z.string() }),
+    })
+    .optional(),
+});
+
+export class GitHubTokenGenerationError extends Error {
+  constructor(
+    readonly status: number | undefined,
+    readonly reason?: 'no_installation_found' | 'repository_not_installed',
+    readonly rejectionProvenance?: GitHubBrokerRejectionProvenance
+  ) {
+    super('Failed to generate GitHub installation token');
+    this.name = 'GitHubTokenGenerationError';
+  }
+}
+
+export class GitHubRepositoryPermissionsUnavailableError extends Error {
+  constructor() {
+    super('GitHub repository permissions are unavailable; retry the request');
+    this.name = 'GitHubRepositoryPermissionsUnavailableError';
+  }
+}
 
 export class GitHubTokenService {
   constructor(private env: CloudflareEnv) {}
@@ -67,6 +130,67 @@ export class GitHubTokenService {
     const { token, expiresAt } = await this.generateToken(numericId, credentials, [repoName]);
     await this.cacheToken(cacheKey, token, expiresAt);
 
+    return token;
+  }
+
+  async getRepositoryOnlyToken(
+    installationId: string,
+    repoName: string,
+    appType: GitHubAppType,
+    installationPermissions: Record<string, unknown> | null
+  ): Promise<string> {
+    const numericId = this.validateInstallationId(installationId);
+    if (installationPermissions === null || Object.keys(installationPermissions).length === 0) {
+      try {
+        const credentials = this.getCredentials(appType);
+        const auth = createAppAuth(credentials);
+        const { token } = await auth({ type: 'app' });
+        const octokit = new Octokit({ auth: token });
+        const { data } = await octokit.apps.getInstallation({ installation_id: numericId });
+        installationPermissions = data.permissions ?? null;
+      } catch {
+        throw new GitHubRepositoryPermissionsUnavailableError();
+      }
+    }
+    const parsed = repositoryPermissionSchema.safeParse(installationPermissions);
+    if (!parsed.success || Object.keys(parsed.data).length === 0) {
+      throw new GitHubRepositoryPermissionsUnavailableError();
+    }
+    const permissions = parsed.data;
+    const permissionKey = createHash('sha256').update(JSON.stringify(permissions)).digest('hex');
+    const cacheKey = `${installationId}:${appType}:${repoName}:repository-only:v1:${permissionKey}`;
+    const cached = await this.getCachedToken(cacheKey);
+    if (cached) return cached;
+    const { token, expiresAt } = await this.generateToken(
+      numericId,
+      this.getCredentials(appType),
+      [repoName],
+      permissions
+    );
+    await this.cacheToken(cacheKey, token, expiresAt);
+    return token;
+  }
+
+  async getTokenForRepositoryIds(
+    installationId: string,
+    repositoryIds: number[],
+    appType: GitHubAppType = 'standard'
+  ): Promise<string> {
+    const numericId = this.validateInstallationId(installationId);
+    const ids = [...new Set(repositoryIds)].sort((left, right) => left - right);
+    if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0))
+      throw new GitHubTokenGenerationError(undefined);
+    const cacheKey = `${installationId}:${appType}:repository-ids:${ids.join(',')}`;
+    const cached = await this.getCachedToken(cacheKey);
+    if (cached) return cached;
+    const { token, expiresAt } = await this.generateToken(
+      numericId,
+      this.getCredentials(appType),
+      undefined,
+      undefined,
+      ids
+    );
+    await this.cacheToken(cacheKey, token, expiresAt);
     return token;
   }
 
@@ -197,7 +321,9 @@ export class GitHubTokenService {
   private async generateToken(
     installationId: number,
     credentials: GitHubAppCredentials,
-    repositoryNames?: string[]
+    repositoryNames?: string[],
+    permissions?: RepositoryPermissions,
+    repositoryIds?: number[]
   ): Promise<Token> {
     try {
       const auth = createAppAuth({
@@ -209,20 +335,38 @@ export class GitHubTokenService {
       const result = await auth({
         type: 'installation',
         repositoryNames,
+        ...(permissions ? { permissions } : {}),
+        ...(repositoryIds ? { repositoryIds } : {}),
       });
       return {
         token: result.token,
         expiresAt: new Date(result.expiresAt).getTime(),
       };
     } catch (error) {
+      const parsed = GitHubTokenErrorSchema.safeParse(error);
+      const status = parsed.success ? parsed.data.status : undefined;
+      const message = parsed.success ? parsed.data.response?.data.message : undefined;
+      const reason =
+        status === 404
+          ? 'no_installation_found'
+          : (status === 403 && message === 'Resource not accessible by integration') ||
+              (status === 422 &&
+                message ===
+                  'There is at least one repository that does not exist or is not accessible to the parent installation.')
+            ? 'repository_not_installed'
+            : undefined;
       console.error(
         JSON.stringify({
           message: 'Failed to generate GitHub installation token',
-          errorType: error instanceof Error ? error.name : 'UnknownError',
+          status,
+          reason,
         })
       );
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to generate GitHub installation token: ${message}`);
+      throw new GitHubTokenGenerationError(
+        status,
+        reason,
+        status === 404 ? 'installation_token_http404' : undefined
+      );
     }
   }
 

@@ -1,0 +1,201 @@
+import { type ComponentProps, createElement } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
+import { PrDiffFileListHeader } from './pr-diff-file-list-header';
+
+const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+const routerPush = vi.fn();
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
+
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insets,
+}));
+
+vi.mock('@/components/ui/icons', () => ({
+  Columns2: () => null,
+  Rows3: () => null,
+}));
+
+vi.mock('@/components/ui/radio-group', () => ({
+  RadioGroup: 'RadioGroup',
+  radioItemA11y: () => ({}),
+}));
+
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-is-tablet', () => ({ useIsTablet: () => false }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    foreground: '#000000',
+    mutedForeground: '#6F6A61',
+  }),
+}));
+
+const baseProps = {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 7,
+  viewedCount: 1,
+  totalListed: 3,
+  isTruncated: false,
+  viewMode: 'unified' as const,
+  onViewModeChange: vi.fn(),
+};
+
+function mountHeader(
+  overrides: Partial<ComponentProps<typeof PrDiffFileListHeader>> = {}
+): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(PrDiffFileListHeader, { ...baseProps, ...overrides })
+    );
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+function summaryTexts(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return findNavigatorPressable(renderer.root)
+    .findAllByType('Text')
+    .map(node =>
+      node.children.filter((child): child is string => typeof child === 'string').join('')
+    );
+}
+
+function findNavigatorPressable(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance {
+  // By test id, not by label: the label is translated.
+  return root.findByProps({ testID: 'pr-files-summary' });
+}
+
+describe('PrDiffFileListHeader summary copy', () => {
+  beforeAll(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  afterAll(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('counts the viewed files without repeating the Files label', () => {
+    const renderer = mountHeader({ viewedCount: 0, totalListed: 100 });
+
+    // The Files label sits directly above the row, so the summary opens with
+    // the count instead of naming the screen again.
+    expect(summaryTexts(renderer)).toEqual(['0 of 100 viewed']);
+  });
+
+  it('keeps the listed suffix when the file list is truncated', () => {
+    const renderer = mountHeader({ viewedCount: 2, totalListed: 40, isTruncated: true });
+
+    expect(summaryTexts(renderer)).toEqual(['2 of 40 viewed', '(listed)']);
+  });
+
+  it('agrees the French participle with the listed total', async () => {
+    await i18n.changeLanguage('fr');
+    try {
+      // French selects its singular category for 0 and 1, so a one-file list
+      // must render the singular participle the catalogs now carry.
+      expect(summaryTexts(mountHeader({ viewedCount: 0, totalListed: 1 }))).toEqual([
+        '0 sur 1 consulté',
+      ]);
+      expect(summaryTexts(mountHeader({ viewedCount: 3, totalListed: 3 }))).toEqual([
+        '3 sur 3 consultés',
+      ]);
+      expect(
+        summaryTexts(mountHeader({ viewedCount: 1, totalListed: 1, isTruncated: true }))
+      ).toEqual(['1 sur 1 consulté', '(affichés)']);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+});
+
+describe('PrDiffFileListHeader side insets (landscape)', () => {
+  beforeEach(() => {
+    insets.top = 0;
+    insets.bottom = 0;
+    insets.left = 0;
+    insets.right = 0;
+    routerPush.mockClear();
+  });
+
+  it('keeps the row styleless at zero portrait insets', () => {
+    const renderer = mountHeader();
+    const pressable = findNavigatorPressable(renderer.root);
+
+    // Portrait no-op: no wrapper style keys, so the `px-4` className gutter
+    // renders byte-identical to an inset-free header.
+    expect(pressable.parent?.props.style).toBeUndefined();
+  });
+
+  it('clears the sensor housing with the landscape side insets', () => {
+    insets.left = 47;
+    insets.right = 59;
+    const renderer = mountHeader();
+    const pressable = findNavigatorPressable(renderer.root);
+
+    // The insets land on an inner wrapper so they ADD to the `px-4` gutter
+    // (an inline padding on the bordered container would beat the className
+    // and swallow the gutter).
+    expect(pressable.parent?.props.style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+    // The full-width background and hairline stay on the outer container.
+    expect(pressable.parent?.parent?.props.className).toContain('bg-background');
+    expect(pressable.parent?.parent?.props.className).toContain('border-b');
+  });
+
+  it('opens the file navigator when the entry is pressed', () => {
+    const renderer = mountHeader();
+    const pressable = findNavigatorPressable(renderer.root);
+
+    const onPress = (pressable.props as { onPress?: () => void }).onPress;
+    act(() => {
+      onPress?.();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    // GitHub keeps the existing three-segment sibling; `providerPrChildRoutePath`
+    // resolves the ref to a string href (locked by provider-pr-ref.test.ts).
+    expect(routerPush).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello/7/file-navigator');
+  });
+});
+
+describe('PrDiffFileListHeader container padding', () => {
+  beforeEach(() => {
+    insets.top = 0;
+    insets.bottom = 0;
+    insets.left = 0;
+    insets.right = 0;
+  });
+
+  it('pads the summary row above and below the file list', () => {
+    const renderer = mountHeader();
+    const pressable = findNavigatorPressable(renderer.root);
+    const container = pressable.parent?.parent;
+
+    // The owner reported the row sitting flush against the tab bar above and
+    // the first file path below; `py-4` gives 16pt on both edges while the
+    // `px-4` gutter, background and hairline are unchanged.
+    expect(container?.props.className).toContain('px-4');
+    expect(container?.props.className).toContain('py-4');
+    expect(container?.props.className).toContain('bg-background');
+    expect(container?.props.className).toContain('border-b');
+  });
+});

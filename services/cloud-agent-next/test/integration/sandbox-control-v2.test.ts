@@ -1,0 +1,3661 @@
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
+import {
+  env,
+  evictAllDurableObjects,
+  evictDurableObject,
+  reset,
+  runInDurableObject,
+} from 'cloudflare:test';
+import { generateKeyPairSync } from 'node:crypto';
+import { resolveSecret } from '../../src/auth.js';
+import {
+  mintSandboxLaunchCredential,
+  verifySandboxLaunchCredential,
+} from '../../src/sandbox-control/credential.js';
+import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../src/shared/control-plane-protocol.js';
+import type { RuntimeSkillInput } from '../../src/shared/runtime-profile.js';
+import type { Env } from '../../src/types.js';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { type ContainerUsageRpcMethods } from '@kilocode/container-usage';
+import type {
+  SandboxControlV2,
+  StoredProviderPin,
+} from '../../src/control-plane/sandbox/sandbox-do.js';
+import {
+  allocation as allocationTable,
+  routes as routesTable,
+} from '../../src/control-plane/sandbox/sqlite-schema.js';
+import type {
+  ProviderAdapter,
+  ProviderCreateIntent,
+  SandboxProviderConfiguration,
+  StopResult,
+} from '../../src/sandbox-control/provider.js';
+import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
+import { ContainerCapacityUnavailableError } from '../../src/container-concurrency.js';
+import { containerLimitError } from '../../src/container-limit-test-helpers.js';
+import { BILLING_HEARTBEAT_CALLBACK as VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/metered-billing-lifecycle.js';
+import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
+import type { ContainersLaunchInput } from '../../src/sandbox-containers/SandboxContainers.js';
+import {
+  VERCEL_BILLING_SCHEDULE_KEY,
+  type BillingScheduleEntries,
+} from '../../src/sandbox-control/billing-schedule.js';
+import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
+import { logger } from '../../src/logger.js';
+import { encryptWithPublicKey } from '../../src/utils/encryption.js';
+import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fake-credentials.js';
+import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
+import { waitFor } from './wait-for.js';
+import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
+
+const SANDBOX_ID = 'sbx__control_v2_smoke';
+const CUTOVER_SANDBOX_ID = 'sbx__control_v2_cutover';
+const CUSTOM_ALLOCATION_NAME = 'usr-shared-allocation-name';
+const LEGACY_ALLOCATION_NAME = 'usr-legacy-shared-allocation';
+const MINUTE = 60 * 1000;
+const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
+const VERCEL_RUNTIME_DESCRIPTOR = JSON.stringify({
+  format: 1,
+  bootstrap: 1,
+  platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+  abi: RUNTIME_BASE_ABI,
+  cliVersion: '7.8.1',
+  cliExecutable: 'package/bin/kilo',
+  wrapperSdkVersion: '7.8.1',
+  protocol: '1',
+  artifacts: [
+    { role: 'cli', sha256: 'a'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+    { role: 'control', sha256: 'b'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+  ],
+  caps: { maxTransferBytes: 100, maxExpandedBytes: 100, maxFileCount: 10 },
+  inventory: [
+    ['cli', 'package/bin/kilo', 0o755, 1, 'a'.repeat(64)],
+    ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+  ],
+});
+const VERCEL_RUNTIME_ENV = {
+  RUNTIME_RELEASE_DESCRIPTOR: VERCEL_RUNTIME_DESCRIPTOR,
+  RUNTIME_RELEASE_BUCKET: {
+    async head() {
+      return { size: 1 };
+    },
+  },
+};
+
+type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
+const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
+  .SANDBOX_CONTROL;
+
+/** Test token with a runtime authorization claim, enabling the runtime proxy. */
+const RUNTIME_AUTHORIZED_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
+
+type FakeProviderOptions = {
+  failFirstCreate?: boolean;
+  failFirstLaunch?: string;
+  gateCreate?: boolean;
+  gateLaunch?: boolean;
+  gateStop?: boolean;
+};
+
+type FakeProvider = {
+  adapter: ProviderAdapter;
+  createCalls: number;
+  createInputs: ProviderCreateIntent[];
+  refs: string[];
+  launchEnvs: Record<string, string>[];
+  stopCalls: (string | null)[];
+  stopResults: StopResult[];
+  leaseCalls: number[];
+  leaseRefs: string[];
+  createGates: Array<(value: { providerRef: string }) => void>;
+  launchGates: Array<(error?: unknown) => void>;
+  stopGates: Array<(result: StopResult) => void>;
+};
+
+function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
+  const provider: FakeProvider = {
+    adapter: null as unknown as ProviderAdapter,
+    createCalls: 0,
+    createInputs: [],
+    refs: [],
+    launchEnvs: [],
+    stopCalls: [],
+    stopResults: [],
+    leaseCalls: [],
+    leaseRefs: [],
+    createGates: [],
+    launchGates: [],
+    stopGates: [],
+  };
+  provider.adapter = {
+    async ensureBillingAdmission() {},
+    async create(intent: ProviderCreateIntent) {
+      provider.createCalls += 1;
+      provider.createInputs.push(intent);
+      if (options.failFirstCreate && provider.createCalls === 1) {
+        throw new Error('provider create failed');
+      }
+      const ref = `mem_${intent.intentId}`;
+      provider.refs.push(ref);
+      if (options.gateCreate) {
+        return new Promise(resolve => provider.createGates.push(resolve));
+      }
+      return { providerRef: ref };
+    },
+    async launch(_ref, { env }) {
+      provider.launchEnvs.push({ ...env });
+      if (options.failFirstLaunch !== undefined && provider.launchEnvs.length === 1) {
+        throw new Error(options.failFirstLaunch);
+      }
+      if (options.gateLaunch) {
+        await new Promise<void>((resolve, reject) => {
+          provider.launchGates.push(error => (error === undefined ? resolve() : reject(error)));
+        });
+      }
+      return { startSource: 'image' as const };
+    },
+    async observe(ref) {
+      return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
+    },
+    async stop(ref) {
+      provider.stopCalls.push(ref);
+      if (options.gateStop) {
+        return new Promise<StopResult>(resolve => provider.stopGates.push(resolve));
+      }
+      return provider.stopResults.shift() ?? 'terminal';
+    },
+    async ensureLeaseAtLeast(ref, ms) {
+      provider.leaseCalls.push(ms);
+      provider.leaseRefs.push(ref);
+    },
+    async applyContainedCredentials() {},
+    async logs() {
+      return '';
+    },
+  };
+  return provider;
+}
+
+type StartOptions = {
+  sandboxId?: string;
+  allocationName?: string;
+  billing?: unknown;
+  containment?: { kilocode?: boolean; github?: boolean };
+  provider?: 'cloudflare' | 'vercel' | 'cloudflare-containers';
+  configuration?: SandboxProviderConfiguration;
+  meter?: ContainerUsageRpcMethods;
+  preparingRoute?: string;
+  preparingRouteDeadlineAt?: number;
+  environmentSnapshotId?: string;
+  admissionError?: string;
+  billingAdmissionMs?: number;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
+  egressAudit?: boolean;
+  sandboxKind?: StoredProviderPin['sandboxKind'];
+  /** Shrink sandbox timers (e.g. `providerCreateMs`) for expiry tests. */
+  timers?: Partial<typeof TIMERS>;
+};
+
+/** Injects the fake adapter, then triggers `ensure` through a real DO RPC so
+ * `ctx.waitUntil` effects keep a valid event context. */
+async function startAllocation(
+  provider: FakeProvider,
+  options: StartOptions = {}
+): Promise<DurableObjectStub<SandboxControlV2>> {
+  const sandboxId = options.sandboxId ?? SANDBOX_ID;
+  const stub = sandboxNamespace.getByName(sandboxId);
+  await runInDurableObject(stub, async (instance, state) => {
+    await instance.getAllocationState();
+    if (options.provider === 'vercel') Object.assign(instance.env, VERCEL_RUNTIME_ENV);
+    if (options.meter !== undefined) await state.storage.put('control_plane_owner', 'owner-1');
+    Object.assign(instance, {
+      createProviderAdapter: () => provider.adapter,
+      provider: provider.adapter,
+      ...(options.environmentSnapshotId === undefined
+        ? {}
+        : {
+            environmentSnapshotLaunch: async () => ({
+              options: { snapshot: { snapshotId: options.environmentSnapshotId } },
+              selection: { source: 'environment', capturedAt: 1 },
+            }),
+          }),
+      ...(options.billingAdmissionMs === undefined
+        ? {}
+        : { sandboxTimers: () => ({ ...TIMERS, billingAdmissionMs: options.billingAdmissionMs }) }),
+      ...(options.meter === undefined
+        ? {}
+        : {
+            env: {
+              ...instance.env,
+              ...(options.meter === undefined ? {} : { CONTAINER_USAGE_METER: options.meter }),
+            },
+          }),
+      ...(options.timers === undefined
+        ? {}
+        : { sandboxTimers: () => ({ ...TIMERS, ...options.timers }) }),
+    });
+  });
+  if (options.preparingRoute !== undefined) {
+    await insertPreparingRoute(stub, {
+      sessionId: options.preparingRoute,
+      attemptDeadlineAt: options.preparingRouteDeadlineAt ?? Date.now() + MINUTE,
+    });
+  }
+  await stub.ensureAllocation({
+    provider: options.provider ?? 'cloudflare-containers',
+    ...(options.provider === 'vercel'
+      ? { byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' } }
+      : {}),
+    ...(options.configuration === undefined ? {} : { configuration: options.configuration }),
+    allocationName: options.allocationName ?? sandboxId,
+    ...(options.billing === undefined ? {} : { billing: options.billing }),
+    ...(options.containment === undefined ? {} : { containment: options.containment }),
+    ...(options.egressMode === undefined ? {} : { egressMode: options.egressMode }),
+    ...(options.egressAllowlist === undefined ? {} : { egressAllowlist: options.egressAllowlist }),
+    ...(options.egressAudit === undefined ? {} : { egressAudit: options.egressAudit }),
+    ...(options.sandboxKind === undefined ? {} : { sandboxKind: options.sandboxKind }),
+  });
+  return stub;
+}
+
+async function awaitLaunch(provider: FakeProvider): Promise<void> {
+  await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+}
+
+async function awaitStarting(
+  provider: FakeProvider,
+  stub: DurableObjectStub<SandboxControlV2>
+): Promise<void> {
+  await awaitLaunch(provider);
+  await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+}
+
+async function insertPreparingRoute(
+  stub: DurableObjectStub<SandboxControlV2>,
+  input: { sessionId: string; attemptDeadlineAt: number }
+): Promise<void> {
+  const spec = {
+    sessionId: input.sessionId,
+    kiloSessionId: `kilo-${input.sessionId}`,
+    directory: `/workspace/${input.sessionId}`,
+    attemptId: `${input.sessionId}-a1`,
+  };
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    await db.insert(routesTable).values({
+      session_id: input.sessionId,
+      spec: JSON.stringify(spec),
+      state: 'preparing',
+      attempt_id: `${input.sessionId}-a1`,
+      attempt_deadline_at: input.attemptDeadlineAt,
+      reason: null,
+      updated_at: Date.now(),
+    });
+  });
+}
+
+function readState(stub: DurableObjectStub<SandboxControlV2>) {
+  return stub.getAllocationState();
+}
+
+function readAlarm(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
+}
+
+function readProviderPin(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db
+      .select({ pin: allocationTable.provider_pin })
+      .from(allocationTable)
+      .where(eq(allocationTable.id, 'current'));
+    return rows[0]?.pin ?? null;
+  });
+}
+
+async function setDeadline(
+  stub: DurableObjectStub<SandboxControlV2>,
+  patch: Partial<{
+    last_frame_at: number;
+    last_activity_at: number;
+    first_connect_deadline_at: number;
+    create_deadline_at: number;
+    stop_at: number;
+  }>
+): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    await db.update(allocationTable).set(patch).where(eq(allocationTable.id, 'current'));
+  });
+}
+
+async function runAlarm(stub: DurableObjectStub<SandboxControlV2>): Promise<void> {
+  await runInDurableObject(stub, instance => instance.alarm());
+}
+
+/** Resolve a provider gate inside a DO action so the continuation keeps its I/O context. */
+async function releaseGate(
+  stub: DurableObjectStub<SandboxControlV2>,
+  release: () => void
+): Promise<void> {
+  await runInDurableObject(stub, async () => {
+    release();
+    await new Promise(resolve => setTimeout(resolve, 25));
+  });
+}
+
+function launchIdentity(provider: FakeProvider): { credential: string; allocationId: string } {
+  const env = provider.launchEnvs[0];
+  if (!env) throw new Error('provider.launch was not called');
+  const credential = env.SANDBOX_CONTROL_CREDENTIAL;
+  const allocationId = env.CONTROL_PLANE_ALLOCATION_ID;
+  if (!credential || !allocationId) throw new Error('launch environment is missing identity');
+  return { credential, allocationId };
+}
+
+async function connectAndHello(
+  provider: FakeProvider,
+  stub: DurableObjectStub<SandboxControlV2>,
+  wrapperId = 'wr_1'
+): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
+  const { credential, allocationId } = launchIdentity(provider);
+  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+  const reply = await wrapper.hello({ wrapperId, allocationId });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+  await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
+  return { wrapper, credential, allocationId };
+}
+
+type AllocationWriteCounter = {
+  allocationWriteCount: number;
+  writeAllocation: (state: unknown) => Promise<void>;
+};
+
+/**
+ * Counts allocation-row writes (`writeAllocation`) while `action` runs. The
+ * counter is installed on the live instance and read back on the same instance,
+ * so it observes the writes produced by the socket turn under test.
+ */
+async function countAllocationWrites(
+  stub: DurableObjectStub<SandboxControlV2>,
+  action: () => Promise<void>
+): Promise<number> {
+  await runInDurableObject(stub, instance => {
+    const counter = instance as unknown as AllocationWriteCounter;
+    const original = counter.writeAllocation.bind(instance);
+    counter.allocationWriteCount = 0;
+    counter.writeAllocation = async state => {
+      counter.allocationWriteCount += 1;
+      await original(state);
+    };
+  });
+  await action();
+  return runInDurableObject(
+    stub,
+    instance => (instance as unknown as AllocationWriteCounter).allocationWriteCount
+  );
+}
+
+/**
+ * Captures `allocation_transition` diagnostics emitted while `action` runs in
+ * the live DO, so a test can assert on the bounded fields of a real transition.
+ */
+async function captureAllocationTransitions(
+  stub: DurableObjectStub<SandboxControlV2>,
+  action: (instance: SandboxControlV2, state: DurableObjectState) => Promise<void>
+): Promise<Record<string, unknown>[]> {
+  return runInDurableObject(stub, async (instance, state) => {
+    const captured: Record<string, unknown>[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'allocation_transition') captured.push(bounded);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    try {
+      await action(instance, state);
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+    }
+    return captured;
+  });
+}
+
+/**
+ * Captures `route_failed` diagnostics emitted while `action` runs, so a test can
+ * assert the diagnostic stage of a materialization failure.
+ */
+async function captureRouteFailures<T>(
+  action: () => Promise<T>
+): Promise<{ result: T; failures: Record<string, unknown>[] }> {
+  const failures: Record<string, unknown>[] = [];
+  const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+    const bounded = fields as unknown as Record<string, unknown>;
+    if (bounded.diagnosticEvent === 'route_failed') failures.push(bounded);
+    return logger;
+  });
+  const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+  try {
+    const result = await action();
+    return { result, failures };
+  } finally {
+    withFields.mockRestore();
+    info.mockRestore();
+    warn.mockRestore();
+  }
+}
+
+afterEach(async () => {
+  vi.unstubAllGlobals();
+  await reset();
+});
+
+describe('SandboxControlV2 allocation lifecycle', () => {
+  it('logs the persisted attempt number and actual retry decision for snapshot creates', async () => {
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const launch = provider.adapter.launch;
+    provider.adapter = {
+      ...provider.adapter,
+      environmentSnapshots: 'create',
+      async launch(ref, options) {
+        await launch(ref, options);
+        return { startSource: 'repository' };
+      },
+    };
+    const fields = vi.spyOn(logger, 'withFields');
+    try {
+      const stub = await startAllocation(provider, {
+        provider: 'vercel',
+        preparingRoute: 'workspace_vercel_snapshot_retry',
+        environmentSnapshotId: 'test-environment-snapshot',
+      });
+      const creates = () =>
+        fields.mock.calls
+          .map(([record]) => record)
+          .filter(record => record.diagnosticEvent === 'snapshot_restore_attempt_finished');
+      await waitFor(() => expect(creates()).toHaveLength(1));
+      await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+      await runAlarm(stub);
+      await awaitStarting(provider, stub);
+      expect(provider.createInputs.map(input => input.snapshot?.snapshotId)).toEqual([
+        'test-environment-snapshot',
+        'test-environment-snapshot',
+      ]);
+      expect(creates()).toEqual([
+        expect.objectContaining({
+          stage: 'provider_create',
+          allocationId: provider.createInputs[0]?.intentId,
+          attempt: 1,
+          outcome: 'failed',
+          willRetry: true,
+        }),
+        expect.objectContaining({
+          stage: 'provider_create',
+          allocationId: provider.createInputs[1]?.intentId,
+          attempt: 2,
+          outcome: 'restored',
+          willRetry: false,
+        }),
+      ]);
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
+  it.each([
+    { stage: 'create', failure: { failFirstCreate: true } },
+    { stage: 'launch', failure: { failFirstLaunch: 'transient launch failure' } },
+  ])(
+    'refreshes the durable Vercel name after a $stage failure and retry tick',
+    async ({ failure }) => {
+      const provider = createFakeProvider(failure);
+      const stub = await startAllocation(provider, {
+        provider: 'vercel',
+        preparingRoute: 'workspace_vercel_retry',
+      });
+      await waitFor(() => expect(provider.createInputs).toHaveLength(1));
+      const first = provider.createInputs[0];
+      if (!first) throw new Error('Missing first Vercel create');
+      await waitFor(async () => {
+        const state = await readState(stub);
+        expect(state.kind).toBe('creating');
+        expect(state.allocationId).not.toBe(first.intentId);
+        expect(state.providerRef).toBeNull();
+      });
+      const waiting = await readState(stub);
+      expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+        `sbx-${waiting.allocationId?.replaceAll('-', '')}`
+      );
+
+      await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+      await runAlarm(stub);
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+      expect(provider.createInputs).toHaveLength(2);
+      const second = provider.createInputs[1];
+      if (!second) throw new Error('Missing retried Vercel create');
+      expect(second.intentId).not.toBe(waiting.allocationId);
+      expect(second.allocationName).toBe(`sbx-${second.intentId.replaceAll('-', '')}`);
+      expect(second.allocationName).not.toBe(first.allocationName);
+      expect((await stub.status({ sessionId: 'workspace_vercel_retry' })).view.state).not.toBe(
+        'failed'
+      );
+      await evictAllDurableObjects();
+      expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+        second.allocationName
+      );
+    }
+  );
+
+  it('uses a new durable Vercel sandbox name for each allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { provider: 'vercel' });
+    await awaitStarting(provider, stub);
+    const first = provider.createInputs[0];
+    if (!first) throw new Error('Missing first Vercel create');
+    await stub.reportProviderGone();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    await startAllocation(provider, { provider: 'vercel' });
+    await waitFor(() => expect(provider.createInputs).toHaveLength(2));
+    const second = provider.createInputs[1];
+    expect(second?.allocationName).not.toBe(first.allocationName);
+    const saved = JSON.parse((await readProviderPin(stub)) ?? '{}');
+    expect(saved.allocationName).toBe(second?.allocationName);
+    await evictAllDurableObjects();
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+      second?.allocationName
+    );
+  });
+  it.each([
+    { provider: 'vercel' },
+    { provider: 'cloudflare-containers' },
+    { provider: 'cloudflare-containers', instance: 'standard-3' },
+    { provider: 'cloudflare-containers', instance: 'standard-4' },
+  ] as const)(
+    'streams persisted $provider/$instance capacity across activity, eviction, and reconnect without changing idle timing',
+    async configuration => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider, {
+        provider: configuration.provider,
+        configuration,
+      });
+      await awaitStarting(provider, stub);
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.put('control_plane_owner', 'owner-1')
+      );
+      const before = await readState(stub);
+      expect(before.configuration).toEqual(configuration);
+      const pin = await readProviderPin(stub);
+      expect(pin === null ? null : JSON.parse(pin)).toMatchObject({ configuration });
+      const expectedRuntime = (await stub.getStatusSnapshot()).runtime;
+      const alarm = await readAlarm(stub);
+      const url =
+        'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status';
+      const response = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+      expect(response.status).toBe(101);
+      const socket = response.webSocket;
+      if (!socket) throw new Error('Missing status socket');
+      const frames: Array<{ sessionId: string; streamEventType: string; data: unknown }> = [];
+      socket.addEventListener('message', event => {
+        frames.push(JSON.parse(String(event.data)));
+      });
+      socket.accept();
+      await waitFor(() => expect(frames).toHaveLength(1));
+      expect(frames[0]).toMatchObject({
+        sessionId: 'workspace_status',
+        streamEventType: 'cloud.sandbox.status',
+        data: { status: 'starting' },
+      });
+      expect(SandboxStatusSnapshotSchema.safeParse(frames[0]?.data).success).toBe(true);
+      expect(SandboxStatusSnapshotSchema.parse(frames[0]?.data).runtime).toEqual(expectedRuntime);
+      expect(await readState(stub)).toEqual(before);
+      expect(await readAlarm(stub)).toEqual(alarm);
+      socket.send('not-wrapper-activity');
+      const { wrapper } = await connectAndHello(provider, stub);
+      await waitFor(() => expect(frames.at(-1)?.data).toMatchObject({ status: 'active' }));
+      const active = SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data);
+      expect(active.runtime).toEqual(expectedRuntime);
+      expect(active.estimatedSleepAt).toBe((await readState(stub)).lastActivityAt! + TIMERS.idleMs);
+      wrapper.heartbeat(true);
+      await waitFor(() =>
+        expect(
+          SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data).estimatedSleepAt
+        ).toBeGreaterThan(active.estimatedSleepAt!)
+      );
+      await evictAllDurableObjects();
+      await stub.reportProviderGone();
+      await waitFor(() =>
+        expect(frames.at(-1)?.data).toMatchObject({ status: 'sleeping', estimatedSleepAt: null })
+      );
+      expect((await readState(stub)).configuration).toEqual(configuration);
+      expect(await readProviderPin(stub)).toBe(pin);
+      for (const frame of frames) {
+        expect(SandboxStatusSnapshotSchema.parse(frame.data).runtime).toEqual(expectedRuntime);
+      }
+      socket.close();
+      const reconnect = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+      const reconnected = reconnect.webSocket;
+      if (!reconnected) throw new Error('Missing reconnected socket');
+      const snapshot = new Promise<unknown>(resolve =>
+        reconnected.addEventListener(
+          'message',
+          event => resolve(JSON.parse(String(event.data)).data),
+          { once: true }
+        )
+      );
+      reconnected.accept();
+      const reconnectedSnapshot = SandboxStatusSnapshotSchema.parse(await snapshot);
+      expect(reconnectedSnapshot.status).toBe('sleeping');
+      expect(reconnectedSnapshot.runtime).toEqual(expectedRuntime);
+      expect((await stub.getStatusSnapshot()).runtime).toEqual(expectedRuntime);
+      reconnected.close();
+      wrapper.close();
+    }
+  );
+
+  it('does not accept a status socket when reading allocation state fails', async () => {
+    const stub = sandboxNamespace.getByName('sbx__status_read_failure');
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      await state.storage.put('control_plane_owner', 'owner-1');
+      const allocationReader = instance as unknown as {
+        readAllocation: () => Promise<unknown>;
+      };
+      const read = vi
+        .spyOn(allocationReader, 'readAllocation')
+        .mockRejectedValueOnce(new Error('Allocation unavailable'));
+      try {
+        await expect(
+          instance.fetch(
+            new Request(
+              'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status',
+              { headers: { Upgrade: 'websocket' } }
+            )
+          )
+        ).rejects.toThrow('Allocation unavailable');
+        expect(state.getWebSockets('sandbox-status')).toHaveLength(0);
+      } finally {
+        read.mockRestore();
+      }
+    });
+  });
+
+  it('rejects a status subscription without the registered sandbox owner', async () => {
+    const stub = sandboxNamespace.getByName('sbx__status_authorization');
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const request = (ownerId: string) =>
+      new Request(
+        `https://sandbox.internal/status-stream?ownerId=${ownerId}&sessionId=workspace_status`,
+        { headers: { Upgrade: 'websocket' } }
+      );
+    expect((await stub.fetch(request('other-owner'))).status).toBe(403);
+    expect((await stub.fetch(request(''))).status).toBe(403);
+    expect(
+      await runInDurableObject(
+        stub,
+        (_instance, state) => state.getWebSockets('sandbox-status').length
+      )
+    ).toBe(0);
+  });
+
+  it('fails permanent launch configuration promptly while cleanup retains the existing stop ladder and uncertainty', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    provider.stopResults = Array.from(
+      { length: TIMERS.providerStopLadderMs.length + 1 },
+      () => 'retryable'
+    );
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () =>
+      provider.launchGates[0](new ProviderCreationError('invalid_configuration'))
+    );
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopping'));
+    for (let attempt = 1; attempt <= TIMERS.providerStopLadderMs.length + 1; attempt += 1) {
+      await waitFor(() => expect(provider.stopCalls).toHaveLength(attempt));
+      await waitFor(async () => {
+        const state = await readState(stub);
+        expect(state.kind === 'stopped' || state.stopPending).toBe(true);
+      });
+      if ((await readState(stub)).kind === 'stopped') break;
+      await setDeadline(stub, { stop_at: Date.now() - 1 });
+      await runAlarm(stub);
+    }
+    const stopped = await readState(stub);
+    expect(stopped.kind).toBe('stopped');
+    expect(stopped.unconfirmedProviderRef).toBe(provider.refs[0]);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.stopCalls).toEqual(
+      Array.from({ length: TIMERS.providerStopLadderMs.length + 1 }, () => provider.refs[0])
+    );
+  });
+
+  it('fails a persisted retired Cloudflare pin after eviction without retrying or waiting for the route deadline', async () => {
+    const sandboxId = 'sbx__retired_pin_after_eviction';
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const stub = await startAllocation(provider, {
+      sandboxId,
+      provider: 'cloudflare',
+    });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').provider).toBe('cloudflare');
+
+    await evictAllDurableObjects();
+
+    const sessionId = 'workspace_retired_pin';
+    await insertPreparingRoute(stub, {
+      sessionId,
+      attemptDeadlineAt: Date.now() + MINUTE,
+    });
+    const directPrepare = {
+      spec: {
+        sessionId,
+        kiloSessionId: `kilo-${sessionId}`,
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-a1`,
+      },
+      credentials: {
+        userId: 'owner-1',
+        kiloSessionId: `kilo-${sessionId}`,
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
+      },
+    };
+    expect(await stub.prepare(directPrepare)).toMatchObject({ state: 'preparing' });
+
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId })).view).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      })
+    );
+    const stopped = await readState(stub);
+    expect(stopped.kind).toBe('stopped');
+    expect(stopped.allocationId).toBeNull();
+    expect(await readAlarm(stub)).toBeNull();
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').provider).toBe('cloudflare');
+    expect(await stub.getProviderRuntime()).toEqual({
+      provider: 'cloudflare',
+      allocationName: sandboxId,
+    });
+    expect((await stub.getStatusSnapshot()).provider).toBe('Cloudflare');
+  });
+
+  it('fails a container limit denial from the sandbox start without retrying the create', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () =>
+      provider.launchGates[0](new Error(`remote: ${containerLimitError('user', 20).message}`))
+    );
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'container_limit_reached',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it.each([
+    [containerLimitError(), 'container_limit_reached'],
+    [new ContainerCapacityUnavailableError(), 'billing_unavailable'],
+  ] as const)(
+    'fails capacity denial from the sandbox start without retrying creation: %s',
+    async (failure, reason) => {
+      const provider = createFakeProvider({ gateLaunch: true });
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+      await releaseGate(stub, () =>
+        provider.launchGates[0](new Error(`remote: ${failure.message}`))
+      );
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+          state: 'failed',
+          reason,
+        })
+      );
+      await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it('does not reopen native admission after an alarm fails a retry during preflight', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('meter_unavailable');
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    let releasePreflight: () => void = () => {};
+    let enteredPreflight = false;
+    const preflight = new Promise<void>(resolve => {
+      releasePreflight = resolve;
+    });
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        wrapperLaunchEnv: async () => {
+          enteredPreflight = true;
+          await preflight;
+          return {};
+        },
+      });
+    });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(enteredPreflight).toBe(true));
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sessionPeerFor: () => ({
+          notify: async () => {
+            releasePreflight();
+            // Permit the off-queue create continuation to run during notification.
+            for (let i = 0; i < 10; i++) await Promise.resolve();
+          },
+        }),
+      });
+    });
+    try {
+      await runInDurableObject(stub, async (_instance, state) => {
+        const saved = await state.storage.get<{ attemptId: string }>(
+          'native_billing_admission_deadline'
+        );
+        await state.storage.put('native_billing_admission_deadline', {
+          ...saved,
+          deadlineAt: Date.now() - 1,
+        });
+      });
+      await runAlarm(stub);
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      });
+    } finally {
+      await releaseGate(stub, releasePreflight);
+    }
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    expect(provider.createCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('skips native admission when its deadline has no useful time left', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 500,
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      })
+    );
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('bounds stopping retries without reporting a billing admission failure', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('stopping');
+    };
+    const startedAt = Date.now();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 1_500,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    await waitFor(async () => {
+      expect(
+        await runInDurableObject(stub, (_instance, state) =>
+          state.storage.get('native_billing_admission_deadline')
+        )
+      ).toBeUndefined();
+    });
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, startedAt + 1_600 - Date.now())));
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'sandbox_create_failed',
+    });
+    expect((await stub.status({ sessionId: 'waiting' })).view).not.toHaveProperty('billingFailure');
+  });
+
+  it('reconstructs the stored in-flight admission deadline without extending it', async () => {
+    const provider = createFakeProvider();
+    let rejectCreate: (error: Error) => void = () => {};
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      return new Promise((_resolve, reject) => {
+        rejectCreate = reject;
+      });
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 30_000,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, async (_instance, state) => {
+      const saved = await state.storage.get<{ attemptId: string; deadlineAt: number }>(
+        'native_billing_admission_deadline'
+      );
+      expect(saved).toBeDefined();
+      expect(await state.storage.getAlarm()).toBe(saved?.deadlineAt);
+      const allocation = drizzle(state.storage).select().from(allocationTable).get();
+      return { saved, allocation };
+    });
+    // Eviction waits for waitUntil tasks in this harness. Restore the captured
+    // durable in-flight state after draining the task, then reconstruct it.
+    await runInDurableObject(stub, () => {
+      rejectCreate(new ProviderCreationError('meter_unavailable'));
+    });
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      if (!deadline.allocation) throw new Error('Missing allocation snapshot');
+      drizzle(state.storage).update(allocationTable).set(deadline.allocation).run();
+    });
+    await evictDurableObject(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      expect(await state.storage.getAlarm()).toBe(deadline.saved?.deadlineAt);
+      await state.storage.put('native_billing_admission_deadline', {
+        ...deadline.saved,
+        deadlineAt: Date.now() - 1,
+      });
+    });
+    await runAlarm(stub);
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'billing_unavailable',
+    });
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('retries a transient native meter outage within the original preparation attempt', async () => {
+    const provider = createFakeProvider();
+    const create = provider.adapter.create;
+    provider.adapter.create = async intent => {
+      if (provider.createCalls === 0) {
+        provider.createCalls += 1;
+        throw new ProviderCreationError('meter_unavailable');
+      }
+      return create(intent);
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      preparingRouteDeadlineAt: Date.now() + TIMERS.routePreparationMs,
+    });
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(provider.createCalls).toBe(1);
+      expect(state.createDeadlineAt).toBeLessThan(Date.now() + TIMERS.providerCreateMs);
+    });
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    expect(provider.createCalls).toBe(2);
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+  });
+
+  it('reports billing unavailable when immediate meter failures exhaust native create retries', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('meter_unavailable');
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billing: {
+        sandboxId: SANDBOX_ID,
+        subject: { type: 'user', id: 'owner-1' },
+        actor: { type: 'user', id: 'owner-1' },
+        sessionId: 'waiting',
+        metadata: { origin: 'cloud-agent' },
+      },
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ deadlineAt: number }>('native_billing_admission_deadline')
+    );
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+        billingFailure: {
+          code: 'BILLING_UNAVAILABLE',
+          payer: { type: 'user', id: 'owner-1' },
+          retryable: true,
+        },
+      })
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(provider.launchEnvs).toHaveLength(0);
+    expect(Date.now()).toBeLessThan(deadline?.deadlineAt ?? 0);
+  });
+
+  it('bounds a hanging native admission and permits a fresh preparation after recovery', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async intent => {
+      provider.createCalls += 1;
+      provider.createInputs.push(intent);
+      return new Promise(() => {});
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 1_500,
+      billing: {
+        sandboxId: SANDBOX_ID,
+        subject: { type: 'user', id: 'owner-1' },
+        actor: { type: 'user', id: 'owner-1' },
+        sessionId: 'waiting',
+        metadata: { origin: 'cloud-agent' },
+      },
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+        billingFailure: {
+          code: 'BILLING_UNAVAILABLE',
+          payer: { type: 'user', id: 'owner-1' },
+          retryable: true,
+        },
+      })
+    );
+    expect(provider.launchEnvs).toHaveLength(0);
+
+    provider.adapter.create = async intent => ({ providerRef: `mem_${intent.intentId}` });
+    await insertPreparingRoute(stub, {
+      sessionId: 'recovered',
+      attemptDeadlineAt: Date.now() + TIMERS.routePreparationMs,
+    });
+    await stub.ensureAllocation({
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  });
+
+  it('keeps the first native admission deadline when a later retry hangs', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      if (provider.createCalls === 1) throw new ProviderCreationError('meter_unavailable');
+      return new Promise(() => {});
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 2_000,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ deadlineAt: number }>('native_billing_admission_deadline')
+    );
+    expect(deadline).toBeDefined();
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      })
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(Date.now()).toBeLessThan((deadline?.deadlineAt ?? 0) + 1_000);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('gives healthy admission a fresh budget after a nonbilling startup retry', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const create = provider.adapter.create;
+    provider.adapter.create = async intent => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      return create(intent);
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      preparingRouteDeadlineAt: Date.now() + TIMERS.routePreparationMs - 90_000,
+    });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () => provider.launchGates[0](new Error('Transient startup failure')));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('creating'));
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('native_billing_admission_deadline')
+      )
+    ).toBeUndefined();
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(2));
+    expect(provider.createCalls).toBe(2);
+    await releaseGate(stub, () => provider.launchGates[1]());
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+  });
+
+  it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await insertPreparingRoute(stub, {
+      sessionId: 'sibling',
+      attemptDeadlineAt: Date.now() + MINUTE,
+    });
+    const { wrapper } = await connectAndHello(provider, stub);
+    wrapper.send({ type: 'session.ready', sessionId: 'sibling' });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'sibling' })).view.state).toBe('ready')
+    );
+    const before = await readState(stub);
+    await releaseGate(stub, () =>
+      provider.launchGates[0](new ProviderCreationError('invalid_configuration'))
+    );
+    expect(await readState(stub)).toEqual(before);
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    expect((await stub.status({ sessionId: 'sibling' })).view.state).toBe('ready');
+    expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
+  it('routes a fenced native billing stop through the allocation owner with recovery details', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+    });
+    const updates: unknown[] = [];
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', 'owner-1');
+      Object.assign(instance, {
+        sessionPeerFor: () => ({
+          onRoute: async (update: unknown) => {
+            updates.push(update);
+          },
+        }),
+      });
+    });
+    await awaitStarting(provider, stub);
+    const { wrapper } = await connectAndHello(provider, stub);
+    wrapper.send({ type: 'session.ready', sessionId: 'waiting' });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('ready')
+    );
+    const billingFailure = {
+      code: 'INSUFFICIENT_CREDITS' as const,
+      payer: { type: 'user' as const, id: 'owner-1' },
+      retryable: true,
+      remainingMicrodollars: 4_000_000,
+      minimumRequiredMicrodollars: 5_000_000,
+    };
+    await stub.requestBillingStop({ allocationRef: 'stale-ref', billingFailure });
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    await stub.requestBillingStop({ allocationRef: provider.refs[0], billingFailure });
+    await waitFor(() =>
+      expect(updates).toContainEqual({
+        state: 'lost',
+        attemptId: expect.any(String),
+        reason: 'billing_blocked',
+        billingFailure,
+      })
+    );
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+    expect((await readState(stub)).kind).not.toBe('connected');
+    wrapper.close();
+  });
+
+  it('retains at most two unbound candidates without replacing a healthy socket', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, stub);
+    const before = await readState(stub);
+    const first = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const second = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await evictAllDurableObjects();
+    const overflow = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await expect(overflow.waitForClose()).resolves.toBe(1013);
+    expect(await readState(stub)).toEqual(before);
+    expect(await first.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    await expect(wrapper.waitForClose()).resolves.toBe(1000);
+    expect(await second.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it.each(['silent', 'malformed', 'heartbeat'] as const)(
+    'expires %s candidates from attachment deadlines after reconstruction even while stopped',
+    async mode => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider);
+      await awaitStarting(provider, stub);
+      const { credential } = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+      const deadline = await runInDurableObject(stub, (_instance, state) => {
+        const socket = state.getWebSockets()[0];
+        const attachment = socket.deserializeAttachment();
+        expect(attachment.helloDeadlineAt).toBeGreaterThan(Date.now());
+        expect(attachment.helloDeadlineAt).toBeLessThanOrEqual(Date.now() + 30_000);
+        return attachment.helloDeadlineAt as number;
+      });
+      expect(await readAlarm(stub)).toBe(deadline);
+      if (mode === 'malformed') wrapper.sendRaw('{bad');
+      if (mode === 'heartbeat') wrapper.heartbeat(true);
+      await stub.reportProviderGone();
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(await readAlarm(stub)).toBe(deadline);
+      await runInDurableObject(stub, (_instance, state) => {
+        const socket = state.getWebSockets()[0];
+        socket.serializeAttachment({
+          ...socket.deserializeAttachment(),
+          helloDeadlineAt: Date.now() - 1,
+        });
+      });
+      await evictAllDurableObjects();
+      await runAlarm(stub);
+      await expect(wrapper.waitForClose()).resolves.toBe(1008);
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(await readAlarm(stub)).toBeNull();
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([]);
+      expect(provider.leaseCalls).toEqual([]);
+    }
+  );
+
+  it('rejects a signed retired allocation before retaining a candidate on the production route', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential } = launchIdentity(provider);
+    await stub.reportProviderGone();
+    await startAllocation(provider);
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    const current = await readState(stub);
+    const stale = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      path: `/sandbox-control/${SANDBOX_ID}`,
+    });
+    expect(await stale.next()).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await expect(stale.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(current);
+    expect(await runInDurableObject(stub, (_instance, state) => state.getWebSockets().length)).toBe(
+      0
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it('keeps the DO credential hash authoritative for a correctly signed current allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { allocationId } = launchIdentity(provider);
+    const secret = await resolveSecret((env as Env).NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Test signing secret unavailable');
+    const credential = mintSandboxLaunchCredential(
+      { sandboxId: SANDBOX_ID, allocationId, credential: 'f'.repeat(64) },
+      secret
+    );
+    expect(verifySandboxLaunchCredential(credential, secret)).not.toBeNull();
+    const before = await readState(stub);
+    const rejected = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      path: `/sandbox-control/${SANDBOX_ID}`,
+    });
+    expect(await rejected.next()).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await expect(rejected.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(before);
+    expect(await runInDurableObject(stub, (_instance, state) => state.getWebSockets().length)).toBe(
+      0
+    );
+  });
+
+  it('records a distinct hello admission reason for each rejection at the validator', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const secret = await resolveSecret((env as unknown as Env).NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Test signing secret unavailable');
+    const rawCredential = verifySandboxLaunchCredential(credential, secret)?.credential;
+    if (!rawCredential) throw new Error('Launch credential did not verify');
+    const records = await runInDurableObject(stub, async (instance, state) => {
+      const validate = (id: string, presented: string | null) =>
+        (
+          instance as unknown as {
+            validateAllocationCredential(a: string, c: string | null): Promise<boolean>;
+          }
+        ).validateAllocationCredential(id, presented);
+      const captured: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (bounded.diagnosticEvent === 'hello_admission') captured.push(bounded);
+        return logger;
+      });
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      try {
+        await validate(allocationId, rawCredential);
+        await validate('00000000-0000-4000-8000-0000000000ff', rawCredential);
+        await validate(allocationId, null);
+        await validate(allocationId, 'f'.repeat(64));
+        const hash = await state.storage.get<string>('wrapper_credential_hash');
+        await state.storage.delete('wrapper_credential_hash');
+        await validate(allocationId, rawCredential);
+        if (typeof hash === 'string') await state.storage.put('wrapper_credential_hash', hash);
+        const db = drizzle(state.storage, { logger: false });
+        await db
+          .update(allocationTable)
+          .set({ state: 'stopping' })
+          .where(eq(allocationTable.id, 'current'));
+        await validate(allocationId, rawCredential);
+        await db
+          .update(allocationTable)
+          .set({ state: 'stopped' })
+          .where(eq(allocationTable.id, 'current'));
+        await validate(allocationId, rawCredential);
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+      }
+      return captured;
+    });
+
+    expect(records.map(record => record.reason)).toEqual([
+      'accepted',
+      'allocation_mismatch',
+      'missing_credential',
+      'credential_mismatch',
+      'missing_credential_hash',
+      'allocation_stopping',
+      'allocation_stopped',
+    ]);
+    expect(records[1]).toMatchObject({
+      allocationKind: 'starting',
+      expectedAllocationId: allocationId,
+      receivedAllocationId: '00000000-0000-4000-8000-0000000000ff',
+      credentialPresent: true,
+      accepted: false,
+    });
+    expect(records[2]).toMatchObject({ credentialPresent: false });
+    expect(records[4]).toMatchObject({ credentialHashPresent: false });
+    expect(records[5]).toMatchObject({ allocationKind: 'stopping' });
+    expect(JSON.stringify(records)).not.toContain(credential);
+    expect(JSON.stringify(records)).not.toContain(rawCredential);
+  });
+
+  it('records the old and new allocation ids on an allocation transition', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { allocationId } = launchIdentity(provider);
+    const records = await runInDurableObject(stub, async instance => {
+      const captured: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (bounded.diagnosticEvent === 'allocation_transition') captured.push(bounded);
+        return logger;
+      });
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      try {
+        await instance.reportProviderGone();
+        await instance.ensureAllocation();
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+      }
+      return captured;
+    });
+    const reset = records.find(record => record.event === 'provider-gone');
+    expect(reset).toMatchObject({
+      from: 'starting',
+      to: 'stopped',
+      fromAllocationId: allocationId,
+      toAllocationId: null,
+    });
+    const replacement = records.find(record => record.event === 'ensure');
+    const current = await readState(stub);
+    expect(replacement).toMatchObject({
+      from: 'stopped',
+      to: 'creating',
+      fromAllocationId: null,
+      toAllocationId: current.allocationId,
+    });
+    expect(current.allocationId).not.toBe(allocationId);
+  });
+
+  it('records a peer wrapper close as origin=peer on the disconnect transition', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+    const before = await readState(stub);
+    const records = await captureAllocationTransitions(stub, async (instance, state) => {
+      const [socket] = state.getWebSockets();
+      if (socket === undefined) throw new Error('Missing wrapper socket');
+      await (
+        instance as unknown as { webSocketClose(ws: WebSocket): Promise<void> }
+      ).webSocketClose(socket);
+    });
+    const closed = records.find(record => record.event === 'socket-closed');
+    expect(closed).toMatchObject({ from: 'connected', to: 'disconnected', origin: 'peer' });
+    expect(JSON.stringify(closed)).not.toMatch(/https?:\/\/|Bearer |secret|token/i);
+    expect(await readState(stub)).toMatchObject({
+      kind: 'disconnected',
+      connectionId: before.connectionId,
+    });
+  });
+
+  it('records an owner heartbeat-timeout close as origin=heartbeat_timeout', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+    await setDeadline(stub, { last_frame_at: Date.now() - TIMERS.heartbeatMs - 1_000 });
+    const records = await captureAllocationTransitions(stub, instance => instance.alarm());
+    const closed = records.find(record => record.event === 'socket-closed');
+    expect(closed).toMatchObject({
+      from: 'connected',
+      to: 'disconnected',
+      origin: 'heartbeat_timeout',
+    });
+    expect(JSON.stringify(closed)).not.toMatch(/https?:\/\/|Bearer |secret|token/i);
+    expect(await readState(stub)).toMatchObject({ kind: 'disconnected' });
+  });
+
+  it('does not accept a late hello after its deadline or move allocation and route state', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await insertPreparingRoute(stub, {
+      sessionId: 'waiting',
+      attemptDeadlineAt: Date.now() + 12 * MINUTE,
+    });
+    const before = await readState(stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const candidate = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await runInDurableObject(stub, (_instance, state) => {
+      const socket = state.getWebSockets()[0];
+      socket.serializeAttachment({
+        ...socket.deserializeAttachment(),
+        helloDeadlineAt: Date.now() - 1,
+      });
+    });
+    expect(await candidate.hello({ wrapperId: 'wr_late', allocationId })).toBeNull();
+    await expect(candidate.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(before);
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    expect(provider.stopCalls).toEqual([]);
+    expect(provider.leaseCalls).toEqual([]);
+  });
+
+  it('ignores unbound control-result frames instead of settling a bound wrapper request', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { wrapper, credential } = await connectAndHello(provider, stub);
+    const candidate = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    let settled = false;
+    const pending = stub
+      .worktreeCapture({
+        operation: 'summary',
+        session: {
+          sessionId: 'workspace_test',
+          kiloSessionId: 'ses_test',
+          directory: '/workspace/test',
+        },
+        payload: { revision: 1 },
+      })
+      .then(result => {
+        settled = true;
+        return result;
+      });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'worktree.summary') throw new Error('Missing bound request');
+    candidate.send({
+      type: 'worktree.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: { source: 'unbound' },
+    });
+    await candidate.hello({ wrapperId: 'invalid', allocationId: 'stale' });
+    expect(settled).toBe(false);
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: { source: 'bound' },
+    });
+    expect(await pending).toEqual({ ok: true, result: { source: 'bound' } });
+  });
+
+  it('expires a candidate while keeping the healthy bound connection and its alarm unchanged', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { wrapper, credential } = await connectAndHello(provider, stub);
+    const before = await readState(stub);
+    const candidate = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await runInDurableObject(stub, (_instance, state) => {
+      const socket = state
+        .getWebSockets()
+        .find(ws => ws.deserializeAttachment().helloDeadlineAt !== undefined);
+      if (!socket) throw new Error('Missing candidate');
+      socket.serializeAttachment({
+        ...socket.deserializeAttachment(),
+        helloDeadlineAt: Date.now() - 1,
+      });
+    });
+    await evictAllDurableObjects();
+    await runAlarm(stub);
+    await expect(candidate.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(before);
+    expect(await readAlarm(stub)).toBe((before.lastFrameAt ?? 0) + TIMERS.heartbeatMs);
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThan(before.lastFrameAt ?? 0)
+    );
+    expect((await readState(stub)).connectionId).toBe(before.connectionId);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it('acknowledges negotiated current heartbeats but not invalid or unbound frames', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    wrapper.heartbeat(true);
+    wrapper.send({
+      type: 'hello',
+      wrapperId: 'wr_ack',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      heartbeatAck: true,
+    });
+    expect(await wrapper.next()).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      heartbeatAck: true,
+    });
+    const before = await readState(stub);
+    wrapper.send({
+      type: 'hello',
+      wrapperId: 'wr_ack',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.send({ type: 'heartbeat', active: 'invalid', degraded: false });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.heartbeat(false);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect((await readState(stub)).lastActivityAt).toBe(before.lastActivityAt);
+    wrapper.heartbeat(true);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect(provider.leaseCalls).toHaveLength(1);
+    const legacy = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await legacy.hello({ wrapperId: 'wr_legacy', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    legacy.heartbeat(false);
+    expect(await legacy.next(20)).toBeNull();
+    const current = await readState(stub);
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const stale = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: before.connectionId,
+          wrapperId: 'wr_ack',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        stale,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect(await readState(stub)).toEqual(current);
+    await stub.reportProviderGone();
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const terminal = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: current.connectionId,
+          wrapperId: 'wr_legacy',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        terminal,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect((await readState(stub)).kind).toBe('stopped');
+  });
+
+  it.each(['socket', 'allocation'] as const)(
+    'rechecks %s identity after applying a negotiated heartbeat',
+    async identity => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider);
+      await awaitStarting(provider, stub);
+      await connectAndHello(provider, stub);
+      const current = await readState(stub);
+      await runInDurableObject(stub, async instance => {
+        const attachment = {
+          credential: null,
+          allocationId: current.allocationId,
+          connectionId: current.connectionId,
+          wrapperId: current.wrapperId,
+          heartbeatAck: true,
+        };
+        const send = vi.fn();
+        const socket = {
+          readyState: WebSocket.OPEN,
+          deserializeAttachment: () => attachment,
+          serializeAttachment: (next: object) => Object.assign(attachment, next),
+          send,
+        } as unknown as WebSocket;
+        const target = instance as unknown as { applyEvent(event: unknown): Promise<void> };
+        const apply = target.applyEvent.bind(instance);
+        const spy = vi.spyOn(target, 'applyEvent').mockImplementation(async event => {
+          await apply(event);
+          if (identity === 'socket') attachment.connectionId = 'superseded';
+          else await apply({ type: 'provider-gone', at: Date.now() });
+        });
+        try {
+          await instance.webSocketMessage(
+            socket,
+            JSON.stringify({ type: 'heartbeat', active: false, degraded: false })
+          );
+          expect(send).not.toHaveBeenCalled();
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    }
+  );
+
+  it('creates, launches and accepts a hello as connected', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+
+    const starting = await readState(stub);
+    expect(starting.provider).toBe('cloudflare-containers');
+    expect(await readAlarm(stub)).toBe(starting.firstConnectDeadlineAt);
+
+    const { credential, allocationId } = launchIdentity(provider);
+    expect(credential.length).toBeGreaterThan(0);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_hello', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+    const state = await readState(stub);
+    expect(state.kind).toBe('connected');
+    expect(state.wrapperId).toBe('wr_hello');
+    expect(state.allocationId).toBe(allocationId);
+    expect(state.providerRef).toBe(provider.refs[0]);
+    expect(await readAlarm(stub)).toBe((state.lastFrameAt ?? 0) + TIMERS.heartbeatMs);
+  });
+
+  it('passes billing and containment into the create intent', async () => {
+    const provider = createFakeProvider();
+    const billing = { marker: 'billing' };
+    await startAllocation(provider, { billing, containment: { kilocode: true } });
+    await awaitLaunch(provider);
+
+    expect(provider.createInputs[0]?.billing).toEqual(billing);
+    expect(provider.createInputs[0]?.containment).toEqual({
+      kilocode: true,
+      github: true,
+      worktreeScoped: true,
+    });
+  });
+
+  it('stops the sandbox when the wrapper never connects within the first-connect window', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+
+    await setDeadline(stub, { first_connect_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+    expect(await readAlarm(stub)).toBeNull();
+  });
+
+  it('treats a missing heartbeat as a lost socket and marks the allocation disconnected', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { wrapper } = await connectAndHello(provider, stub);
+
+    await setDeadline(stub, { last_frame_at: Date.now() - 60_000 });
+    await runAlarm(stub);
+
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    await expect(wrapper.waitForClose()).resolves.toBe(1000);
+    const state = await readState(stub);
+    expect(await readAlarm(stub)).toBe((state.lastFrameAt ?? 0) + TIMERS.reconnectMs);
+  });
+
+  it('reconnects while the last frame is inside the reconnect window', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { credential, allocationId } = await connectAndHello(provider, stub);
+
+    await setDeadline(stub, { last_frame_at: Date.now() - 60_000 });
+    await runAlarm(stub);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const disconnected = await readState(stub);
+
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_reconnect', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+    const state = await readState(stub);
+    expect(state.kind).toBe('connected');
+    expect(state.wrapperId).toBe('wr_reconnect');
+    // M3: reconnecting refreshes liveness but must not extend the idle window.
+    expect(state.lastActivityAt).toBe(disconnected.lastActivityAt);
+    expect(await readAlarm(stub)).toBe((state.lastFrameAt ?? 0) + TIMERS.heartbeatMs);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it('stops the sandbox after the reconnect window elapses in silence', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await connectAndHello(provider, stub);
+
+    await setDeadline(stub, { last_frame_at: Date.now() - 60_000 });
+    await runAlarm(stub);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+
+    await setDeadline(stub, { last_frame_at: Date.now() - (TIMERS.reconnectMs + 1_000) });
+    await runAlarm(stub);
+
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+  });
+
+  it('rejects a stale hello with shutdown and closes the socket', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { credential } = launchIdentity(provider);
+
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_stale', allocationId: 'stale-allocation' });
+    expect(reply).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await expect(wrapper.waitForClose()).resolves.toBe(1008);
+
+    expect((await readState(stub)).kind).toBe('starting');
+  });
+
+  it('rejects an unsupported protocol version with shutdown', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { credential, allocationId } = launchIdentity(provider);
+
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({
+      wrapperId: 'wr_old',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION - 1,
+    });
+    expect(reply).toEqual({ type: 'shutdown', reason: 'unsupported_protocol_version' });
+    await expect(wrapper.waitForClose()).resolves.toBe(1008);
+    expect((await readState(stub)).kind).toBe('starting');
+  });
+
+  it('sends shutdown (not 401) for a bad credential hello', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { allocationId } = launchIdentity(provider);
+
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential: 'wrong-credential',
+    });
+    const reply = await wrapper.hello({ wrapperId: 'wr_bad', allocationId });
+    expect(reply).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await expect(wrapper.waitForClose()).resolves.toBe(1008);
+    expect((await readState(stub)).kind).toBe('starting');
+  });
+
+  it('ignores a pre-hello heartbeat sent on a second socket while connected', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { credential } = await connectAndHello(provider, stub, 'wr_a');
+
+    const other = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    other.heartbeat(true);
+    // Ordering on one socket: the heartbeat is processed before this hello.
+    const reply = await other.hello({ wrapperId: 'wr_b', allocationId: 'stale' });
+    expect(reply).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await other.waitForClose();
+
+    expect(provider.leaseCalls).toHaveLength(0);
+    const state = await readState(stub);
+    expect(state.kind).toBe('connected');
+    expect(state.wrapperId).toBe('wr_a');
+  });
+
+  it('does not disconnect when a replaced socket closes', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { credential, allocationId } = await connectAndHello(provider, stub, 'wr_first');
+    const firstConnectionId = (await readState(stub)).connectionId;
+    expect(firstConnectionId).not.toBeNull();
+
+    const replacement = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await replacement.hello({ wrapperId: 'wr_second', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(async () => expect((await readState(stub)).wrapperId).toBe('wr_second'));
+
+    // Deliver the replaced socket's close directly, with its stale connection id.
+    await runInDurableObject(stub, async instance => {
+      const stale = {
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: firstConnectionId,
+          wrapperId: 'wr_first',
+        }),
+      } as unknown as WebSocket;
+      await instance.webSocketClose(stale);
+    });
+
+    const state = await readState(stub);
+    expect(state.kind).toBe('connected');
+    expect(state.wrapperId).toBe('wr_second');
+  });
+
+  it('does not disconnect when a rejected socket closes', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { credential } = await connectAndHello(provider, stub);
+
+    const rejected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await rejected.hello({ wrapperId: 'wr_rejected', allocationId: 'stale' });
+    expect(reply).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await rejected.waitForClose();
+
+    expect((await readState(stub)).kind).toBe('connected');
+  });
+
+  it('renews the provider lease for an active heartbeat but not an idle one', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { wrapper } = await connectAndHello(provider, stub);
+
+    wrapper.heartbeat(true);
+    await waitFor(() => expect(provider.leaseCalls).toHaveLength(1));
+    const activeState = await readState(stub);
+    expect(activeState.lastActivityAt).not.toBeNull();
+
+    const activityBefore = activeState.lastActivityAt;
+    wrapper.heartbeat(false);
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(state.lastFrameAt).not.toBe(activeState.lastFrameAt);
+    });
+
+    expect(provider.leaseCalls).toHaveLength(1);
+    expect((await readState(stub)).lastActivityAt).toBe(activityBefore);
+  });
+
+  it('logs a failed lease renewal without disconnecting the allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await connectAndHello(provider, stub);
+
+    await runInDurableObject(stub, async instance => {
+      const renewal = vi
+        .spyOn(provider.adapter, 'ensureLeaseAtLeast')
+        .mockRejectedValue(new Error('provider lease failed'));
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await (instance as unknown as { runLease(): Promise<void> }).runLease();
+
+        expect(withFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'lease_renewal_failed',
+            allocationName: SANDBOX_ID,
+            errorName: 'Error',
+            cause: 'provider_lease_failed',
+          })
+        );
+        expect(warn).toHaveBeenCalledWith('Sandbox control diagnostic');
+        expect((await instance.getAllocationState()).kind).toBe('connected');
+      } finally {
+        renewal.mockRestore();
+        withFields.mockRestore();
+        warn.mockRestore();
+      }
+    });
+  });
+
+  it('persists liveness on the heartbeat, not on every event frame', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    const { wrapper } = await connectAndHello(provider, stub);
+    const leasesBefore = provider.leaseCalls.length;
+    const frameSentAt = Date.now();
+
+    const writes = await countAllocationWrites(stub, async () => {
+      // An event frame only means the socket is alive and persists nothing.
+      wrapper.send({ type: 'session.progress', sessionId: 'sess-no-route', step: 'clone' });
+      // The heartbeat is the periodic write the timers rely on, and the barrier
+      // that proves the event frame ahead of it was processed.
+      wrapper.heartbeat(true);
+      await waitFor(() => expect(provider.leaseCalls.length).toBeGreaterThan(leasesBefore));
+    });
+
+    // Exactly one write: the heartbeat. The event frame persists nothing.
+    expect(writes).toBe(1);
+
+    const persisted = await readState(stub);
+    expect(persisted.lastFrameAt).toBeGreaterThanOrEqual(frameSentAt);
+    expect(await readAlarm(stub)).toBe((persisted.lastFrameAt ?? 0) + TIMERS.heartbeatMs);
+  });
+
+  it('stops immediately when the provider reports the sandbox gone', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await connectAndHello(provider, stub);
+
+    await runInDurableObject(stub, instance => instance.reportProviderGone());
+
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(await readAlarm(stub)).toBeNull();
+  });
+
+  it('retries a failed create while a route attempt deadline remains', async () => {
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await insertPreparingRoute(stub, {
+      sessionId: 'sess-1',
+      // The real 12-min attempt deadline outlasts the 5-min first-connect
+      // deadline, so the allocation alarm stays the earlier of the two.
+      attemptDeadlineAt: Date.now() + 12 * MINUTE,
+    });
+    await startAllocation(provider);
+
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('creating'));
+    let state = await readState(stub);
+    expect(provider.createCalls).toBe(1);
+    expect(state.providerRef).toBeNull();
+    const firstAllocationId = state.allocationId;
+
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    state = await readState(stub);
+    expect(state.allocationId).not.toBe(firstAllocationId);
+    expect(await readAlarm(stub)).toBe(state.firstConnectDeadlineAt);
+  });
+
+  it('stops after a failed create when only a passed route deadline remains', async () => {
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await insertPreparingRoute(stub, {
+      sessionId: 'sess-passed',
+      attemptDeadlineAt: Date.now() - 1_000,
+    });
+    await startAllocation(provider);
+
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.createCalls).toBe(1);
+    expect(await readAlarm(stub)).toBeNull();
+  });
+
+  it('keeps retrying when another route has a later deadline', async () => {
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await insertPreparingRoute(stub, {
+      sessionId: 'sess-passed',
+      attemptDeadlineAt: Date.now() - 1_000,
+    });
+    await insertPreparingRoute(stub, {
+      sessionId: 'sess-later',
+      attemptDeadlineAt: Date.now() + 5 * MINUTE,
+    });
+    await startAllocation(provider);
+
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('creating'));
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+  });
+
+  it('re-issues exactly one stop per backstop and ignores a superseded result', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+
+    await setDeadline(stub, { first_connect_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopGates).toHaveLength(1));
+    let state = await readState(stub);
+    expect(state.kind).toBe('stopping');
+    expect(state.stopAttempt).toBe(1);
+
+    // Backstop fires while attempt 1 is still in flight: supersede once.
+    await setDeadline(stub, { stop_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopGates).toHaveLength(2));
+    expect(provider.stopCalls).toHaveLength(2);
+    state = await readState(stub);
+    expect(state.stopAttempt).toBe(2);
+    const stopAtAfter = state.stopAt;
+
+    // A late result for the superseded attempt must not advance the ladder.
+    await releaseGate(stub, () => provider.stopGates[0]('retryable'));
+    state = await readState(stub);
+    expect(state.stopAttempt).toBe(2);
+    expect(state.stopAt).toBe(stopAtAfter);
+    expect(provider.stopCalls).toHaveLength(2);
+
+    await releaseGate(stub, () => provider.stopGates[1]('terminal'));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(await readAlarm(stub)).toBeNull();
+  });
+
+  it('does not overlap create attempts', async () => {
+    const provider = createFakeProvider({ gateCreate: true, gateLaunch: true });
+    const stub = await startAllocation(provider);
+    await waitFor(() => expect(provider.createGates).toHaveLength(1));
+
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    expect(provider.createCalls).toBe(1);
+
+    await setDeadline(stub, { create_deadline_at: Date.now() + MINUTE });
+    await releaseGate(stub, () => provider.createGates[0]({ providerRef: provider.refs[0] }));
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.launchGates).toHaveLength(1);
+
+    await setDeadline(stub, { create_deadline_at: Date.now() + MINUTE });
+    await releaseGate(stub, () => provider.launchGates[0]());
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+  });
+
+  it('bounds create and launch together by the create deadline', async () => {
+    const provider = createFakeProvider({ gateCreate: true, gateLaunch: true });
+    const stub = await startAllocation(provider);
+    await waitFor(() => expect(provider.createGates).toHaveLength(1));
+
+    // The shared bound is already short when create resolves; launch must obey it.
+    await setDeadline(stub, { create_deadline_at: Date.now() + 150 });
+    await releaseGate(stub, () => provider.createGates[0]({ providerRef: provider.refs[0] }));
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+
+    await waitFor(() => expect(provider.stopCalls).toContain(provider.refs[0]));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+  });
+
+  it('accepts a hello during creating and keeps the persisted ref for a later stop', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+
+    let state = await readState(stub);
+    expect(state.kind).toBe('creating');
+    expect(state.providerRef).toBe(provider.refs[0]);
+
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_early', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    state = await readState(stub);
+    expect(state.kind).toBe('connected');
+    expect(state.providerRef).toBe(provider.refs[0]);
+
+    await releaseGate(stub, () => provider.launchGates[0]());
+    expect((await readState(stub)).kind).toBe('connected');
+
+    await setDeadline(stub, { last_activity_at: Date.now() - (10 * MINUTE + 1_000) });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toContain(provider.refs[0]));
+  });
+
+  it.each(['standard-3', 'standard-4', undefined] as const)(
+    'reports the pinned Containers instance %s without provider calls and after eviction',
+    async instance => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider, {
+        provider: 'cloudflare-containers',
+        ...(instance === undefined
+          ? {}
+          : { configuration: { provider: 'cloudflare-containers', instance } }),
+      });
+      await awaitStarting(provider, stub);
+      expect((await stub.getStatusSnapshot()).runtime).toBeUndefined();
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.put('control_plane_owner', 'owner-1')
+      );
+      const providerCalls = [
+        vi.spyOn(provider.adapter, 'create'),
+        vi.spyOn(provider.adapter, 'launch'),
+        vi.spyOn(provider.adapter, 'observe'),
+        vi.spyOn(provider.adapter, 'stop'),
+        vi.spyOn(provider.adapter, 'ensureLeaseAtLeast'),
+        vi.spyOn(provider.adapter, 'ensureBillingAdmission'),
+      ];
+      const expectedRuntime = {
+        sandboxType: instance === 'standard-4' ? 'containers-standard-4' : 'containers-standard-3',
+        kiloCliVersion: null,
+        wrapperVersion: null,
+        startedAt: null,
+        stoppedAt: null,
+      };
+      const before = await readState(stub);
+      const alarm = await readAlarm(stub);
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        status: 'starting',
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readAlarm(stub)).toEqual(alarm);
+      for (const call of providerCalls) expect(call).not.toHaveBeenCalled();
+
+      await evictAllDurableObjects();
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect((await readState(stub)).allocationId).toBe(before.allocationId);
+    }
+  );
+
+  it('reports versions observed at upgrade for a Vercel allocation with an unknown type', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { provider: 'vercel' });
+    await awaitLaunch(provider);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      kiloCliVersion: '7.4.20',
+      wrapperVersion: '2.4.0',
+    });
+    expect(await wrapper.hello({ wrapperId: 'wr_vercel', allocationId })).toMatchObject({
+      type: 'welcome',
+    });
+
+    expect(await stub.getStatusSnapshot()).toMatchObject({
+      provider: 'Vercel',
+      runtime: {
+        sandboxType: 'unknown',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      },
+    });
+    wrapper.close();
+  });
+
+  it.each([
+    { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
+    { provider: 'vercel', resources: { vcpus: 4, memory: 8192 } },
+    { provider: 'cloudflare-containers', instance: 'standard-3' },
+    { provider: 'cloudflare-containers', instance: 'standard-4' },
+  ] as const)('reads the persisted $provider configuration after eviction', async configuration => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: configuration.provider,
+      configuration,
+    });
+    await awaitStarting(provider, stub);
+    expect((await stub.getAllocationState()).configuration).toEqual(configuration);
+    await evictAllDurableObjects();
+    expect((await stub.getAllocationState()).configuration).toEqual(configuration);
+  });
+
+  it('rebuilds its provider adapter from the stored pin after eviction', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { allocationName: CUSTOM_ALLOCATION_NAME });
+    await awaitLaunch(provider);
+    const { allocationId } = await connectAndHello(provider, stub);
+    const before = await readState(stub);
+    expect(before.provider).toBe('cloudflare-containers');
+
+    await evictAllDurableObjects();
+    // No fake re-install: the reloaded instance must rebuild from the pin.
+    await runInDurableObject(stub, instance => instance.getAllocationState());
+
+    const after = await readState(stub);
+    expect(after.providerRef).toBe(before.providerRef);
+    expect(after.allocationId).toBe(allocationId);
+    expect(after.provider).toBe('cloudflare-containers');
+    const runtime = await runInDurableObject(stub, instance => instance.getProviderRuntime());
+    expect(runtime).toEqual({
+      provider: 'cloudflare-containers',
+      allocationName: CUSTOM_ALLOCATION_NAME,
+    });
+    const pin = await readProviderPin(stub);
+    expect(pin === null ? null : JSON.parse(pin)).toMatchObject({
+      provider: 'cloudflare-containers',
+      allocationName: CUSTOM_ALLOCATION_NAME,
+    });
+  });
+
+  it('renews the lease after eviction using the persisted ref', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { allocationName: CUSTOM_ALLOCATION_NAME });
+    await awaitLaunch(provider);
+    const { credential, allocationId } = await connectAndHello(provider, stub);
+    const before = await readState(stub);
+
+    await evictAllDurableObjects();
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      // Observe the lease call without hiding the rebuild assertion above.
+      Object.assign(instance, { provider: provider.adapter });
+    });
+
+    const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await reconnected.hello({ wrapperId: 'wr_after_evict', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
+
+    reconnected.heartbeat(true);
+    await waitFor(() => expect(provider.leaseRefs.length).toBeGreaterThan(0));
+    expect(provider.leaseRefs[0]).toBe(before.providerRef);
+  });
+
+  it('does not destroy a sandbox that connected while launch was failing', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_n5', allocationId });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    expect((await readState(stub)).kind).toBe('connected');
+
+    await releaseGate(stub, () => provider.launchGates[0](new Error('launch failed')));
+
+    const state = await readState(stub);
+    expect(state.kind).toBe('connected');
+    expect(state.providerRef).toBe(provider.refs[0]);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it('wipes old-plane storage and stops the old allocation before any create', async () => {
+    let stub = sandboxNamespace.getByName(CUTOVER_SANDBOX_ID);
+    // First access establishes the V2 generation and tables.
+    await runInDurableObject(stub, instance => instance.getAllocationState());
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.delete('control_plane_generation');
+      await state.storage.put('provider_kind', 'cloudflare');
+      await state.storage.put('provider_configuration', { provider: 'cloudflare' });
+      await state.storage.put('sandbox_allocation_state', {
+        state: {
+          kind: 'allocated',
+          target: {
+            providerRef: 'legacy-provider-ref',
+            allocationName: LEGACY_ALLOCATION_NAME,
+          },
+        },
+      });
+    });
+
+    // Evict so the cutover wipe runs, and evict again before the stop so the
+    // stop must read the persisted provider ref rather than in-memory state.
+    await evictAllDurableObjects();
+    stub = sandboxNamespace.getByName(CUTOVER_SANDBOX_ID);
+    await runInDurableObject(stub, instance => instance.getAllocationState());
+    await evictAllDurableObjects();
+    stub = sandboxNamespace.getByName(CUTOVER_SANDBOX_ID);
+
+    const provider = createFakeProvider();
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+      });
+      await instance.ensureAllocation({
+        provider: 'cloudflare',
+        allocationName: LEGACY_ALLOCATION_NAME,
+      });
+    });
+
+    const stopping = await readState(stub);
+    expect(stopping.kind).toBe('stopping');
+    expect(stopping.providerRef).toBe('legacy-provider-ref');
+    expect(await readAlarm(stub)).not.toBeNull();
+    expect(provider.createCalls).toBe(0);
+
+    const persistedPin = await readProviderPin(stub);
+    expect(persistedPin === null ? null : JSON.parse(persistedPin)).toMatchObject({
+      provider: 'cloudflare',
+      allocationName: LEGACY_ALLOCATION_NAME,
+      configuration: { provider: 'cloudflare' },
+    });
+    const runtime = await runInDurableObject(stub, instance => instance.getProviderRuntime());
+    expect(runtime).toEqual({ provider: 'cloudflare', allocationName: LEGACY_ALLOCATION_NAME });
+
+    // Move the backstop into the past and let the alarm run the stop ladder.
+    await setDeadline(stub, { stop_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toEqual(['legacy-provider-ref']));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+
+    const leftovers = await runInDurableObject(stub, async (_instance, state) => ({
+      kind: await state.storage.get('provider_kind'),
+      configuration: await state.storage.get('provider_configuration'),
+      allocation: await state.storage.get('sandbox_allocation_state'),
+    }));
+    expect(leftovers.kind).toBeUndefined();
+    expect(leftovers.configuration).toBeUndefined();
+    expect(leftovers.allocation).toBeUndefined();
+  });
+
+  it('preserves the provider ref when the stop ladder is exhausted without confirmation', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+
+    await setDeadline(stub, { first_connect_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopGates).toHaveLength(1));
+
+    const maxAttempts = TIMERS.providerStopLadderMs.length + 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      await waitFor(() => expect(provider.stopGates).toHaveLength(attempt));
+      await releaseGate(stub, () => provider.stopGates[attempt - 1]('retryable'));
+      if (attempt < maxAttempts) {
+        await waitFor(async () => expect((await readState(stub)).stopPending).toBe(true));
+        await setDeadline(stub, { stop_at: Date.now() - 1 });
+        await runAlarm(stub);
+      }
+    }
+
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(state.kind).toBe('stopped');
+      expect(state.providerRef).toBeNull();
+      expect(state.unconfirmedProviderRef).toBe(provider.refs[0]);
+    });
+    expect(await readAlarm(stub)).toBeNull();
+    expect(provider.stopCalls).toHaveLength(maxAttempts);
+  });
+
+  it('preserves retired Vercel billing history without rearming its continuation during legacy cutover', async () => {
+    const sandboxId = `ses-${'e'.repeat(48)}`;
+    let stub = sandboxNamespace.getByName(sandboxId);
+    const billing = {
+      sandboxId,
+      subject: { type: 'user' as const, id: 'owner-1' },
+      actor: { type: 'user' as const, id: 'owner-1' },
+      sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+      metadata: { origin: 'cloud-agent' },
+      enforcementRequested: true,
+    };
+    const dueAtMs = Date.now() + MINUTE;
+    await runInDurableObject(stub, instance => instance.getAllocationState());
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.delete('control_plane_generation');
+      await state.storage.put('provider_kind', 'vercel');
+      await state.storage.put('billing_input', billing);
+      await state.storage.put(VERCEL_BILLING_SCHEDULE_KEY, {
+        [VERCEL_BILLING_SETTLEMENT_CALLBACK]: {
+          dueAtMs,
+          payload: 'generation-1',
+        },
+      });
+      await state.storage.put('container-usage:start-ack-generation:v1', 'generation-1');
+    });
+    await evictAllDurableObjects();
+    stub = sandboxNamespace.getByName(sandboxId);
+    await stub.getAllocationState();
+    const retained = await runInDurableObject(stub, async (_instance, state) => ({
+      schedule: await state.storage.get<BillingScheduleEntries>(VERCEL_BILLING_SCHEDULE_KEY),
+      acknowledgement: await state.storage.get('container-usage:start-ack-generation:v1'),
+    }));
+    expect(retained.schedule?.[VERCEL_BILLING_SETTLEMENT_CALLBACK]?.dueAtMs).toBe(dueAtMs);
+    expect(retained.acknowledgement).toBe('generation-1');
+    expect(await readAlarm(stub)).toBeNull();
+    const { enforcementRequested: _retiredFlag, ...expectedBilling } = billing;
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toEqual(expectedBilling);
+  });
+
+  it('keeps a legacy sandbox recoverable when its optional billing input is malformed', async () => {
+    const sandboxId = `ses-${'e'.repeat(47)}f`;
+    let stub = sandboxNamespace.getByName(sandboxId);
+    await runInDurableObject(stub, instance => instance.getAllocationState());
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.delete('control_plane_generation');
+      await state.storage.put('provider_kind', 'vercel');
+      await state.storage.put('billing_input', { invalid: true });
+    });
+    await evictAllDurableObjects();
+    stub = sandboxNamespace.getByName(sandboxId);
+    expect((await stub.getAllocationState()).kind).toBe('stopped');
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toBeNull();
+  });
+
+  it('retries a transient launch failure after the retry pause', async () => {
+    const provider = createFakeProvider({
+      failFirstLaunch: 'runtime bootstrap failed without a phase receipt',
+    });
+    const stub = await startAllocation(provider, {
+      preparingRoute: 'workspace_cold_retry',
+      timers: { providerCreateRetryMs: MINUTE },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const firstAttempt = launchIdentity(provider);
+    // The first attempt fails after committing its ref; cleanup stops that ref
+    // and the reducer enters the short retry pause with a null ref.
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(state.allocationId).not.toBe(firstAttempt.allocationId);
+      expect(state.providerRef).toBeNull();
+    });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    // A transient launch failure must retain the retry: a second attempt starts.
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    const view = (await stub.status({ sessionId: 'workspace_cold_retry' })).view;
+    expect(view.state).not.toBe('failed');
+  }, 20_000);
+});
+
+describe('SandboxControlV2 allocation egress policy', () => {
+  const sandboxId = `ses-${'a'.repeat(48)}`;
+  const firstSessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+  const nextSessionId = 'workspace_22222222-2222-4222-8222-222222222222';
+  const baseline = [
+    'api.bitbucket.org',
+    'api.github.com',
+    'backend.example.com',
+    'bitbucket.org',
+    'codeload.github.com',
+    'gateway.example.com',
+    'github.com',
+    'gitlab.com',
+    'ingest.example.com',
+    'media.githubusercontent.com',
+    'objects.githubusercontent.com',
+    'raw.githubusercontent.com',
+    'session-sync.kiloapps.io',
+    'uploads.github.com',
+    'worker.example.com',
+  ];
+
+  async function configureEgressSandbox(
+    provider: FakeProvider,
+    id = sandboxId,
+    extraEnv: Record<string, unknown> = {}
+  ) {
+    const stub = sandboxNamespace.getByName(id);
+    const peer = new FakeSessionPeer();
+    const mintsRuntimeProxy = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'owner-1',
+      kiloSessionId:
+        sessionId === firstSessionId
+          ? 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+          : 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+    }));
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
+        WORKER_URL: 'https://worker.example.com',
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
+        KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
+        KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
+        ...extraEnv,
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => {
+          const recording = peer.forSession(sessionId);
+          const minting = mintsRuntimeProxy(sessionId);
+          return {
+            ...recording,
+            getRuntimeProxyDelegationExpiresAt: () => minting.getRuntimeProxyDelegationExpiresAt(),
+            issueRuntimeCredentialProxyGrant: fence =>
+              minting.issueRuntimeCredentialProxyGrant(fence),
+          };
+        },
+      });
+    });
+    return { stub, peer };
+  }
+
+  function prepareInput(
+    sessionId: string,
+    policy: { egressMode?: EgressMode; egressAllowlist?: string[]; egressAudit?: boolean } = {},
+    repositoryUrl = 'https://git.example.com/acme/widgets.git'
+  ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
+    const kiloSessionId =
+      sessionId === firstSessionId
+        ? 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+        : 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    return {
+      spec: {
+        sessionId,
+        kiloSessionId,
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-requested`,
+      },
+      credentials: {
+        userId: 'owner-1',
+        kiloSessionId,
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
+        scopeId: sessionId,
+        repository: { type: 'git', url: repositoryUrl },
+      },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        ...policy,
+      },
+    };
+  }
+
+  it.each(
+    [
+      { egressMode: undefined, policy: undefined, expected: undefined },
+      { egressMode: 'unrestricted' as const, policy: undefined, expected: undefined },
+      { egressMode: 'allowlist' as const, policy: undefined, expected: baseline },
+      { egressMode: 'allowlist' as const, policy: [], expected: baseline },
+      {
+        egressMode: 'allowlist' as const,
+        policy: ['Packages.Example.com.', 'github.com'],
+        expected: [...baseline, 'packages.example.com'].sort(),
+      },
+    ].flatMap(policy => [undefined, false, true].map(egressAudit => ({ ...policy, egressAudit })))
+  )(
+    'persists effective ensure policy %j',
+    async ({ egressMode, policy, expected, egressAudit }) => {
+      const provider = createFakeProvider();
+      await configureEgressSandbox(provider);
+      const stub = await startAllocation(provider, {
+        sandboxId,
+        provider: 'cloudflare-containers',
+        egressMode,
+        egressAllowlist: policy,
+        egressAudit,
+      });
+      await awaitStarting(provider, stub);
+      const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as StoredProviderPin;
+      expect(pin.provider).toBe('cloudflare-containers');
+      expect(pin.egressAllowlist).toEqual(expected);
+      expect(Object.hasOwn(pin, 'egressAllowlist')).toBe(egressMode === 'allowlist');
+      expect(pin.egressAudit).toBe(egressAudit === true ? true : undefined);
+    }
+  );
+
+  it('pins the configured provider origin during prepare', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider, sandboxId, {
+      KILO_OPENROUTER_BASE: 'https://token-provider.example.com/api',
+    });
+    const input = prepareInput(firstSessionId, { egressMode: 'allowlist' });
+    expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
+    await awaitStarting(provider, stub);
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toEqual(
+      [
+        ...baseline.filter(domain => domain !== 'gateway.example.com'),
+        'git.example.com',
+        'token-provider.example.com',
+      ].sort()
+    );
+  });
+
+  it('compiles mode-only deny policy for a placed isolated container', async () => {
+    const provider = createFakeProvider();
+    const placedId = `sbx-${'c'.repeat(48)}`;
+    await configureEgressSandbox(provider, placedId);
+    const stub = await startAllocation(provider, {
+      sandboxId: placedId,
+      sandboxKind: 'isolated',
+      provider: 'cloudflare-containers',
+      egressMode: 'allowlist',
+    });
+    await awaitStarting(provider, stub);
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}')).toMatchObject({
+      sandboxKind: 'isolated',
+      egressAllowlist: baseline,
+    });
+  });
+
+  it('allows explicit unrestricted on a non-container allocation without compiling a policy', async () => {
+    const provider = createFakeProvider();
+    await configureEgressSandbox(provider);
+    const stub = await startAllocation(provider, {
+      sandboxId,
+      provider: 'vercel',
+      egressMode: 'unrestricted',
+    });
+    await awaitStarting(provider, stub);
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toBeUndefined();
+  });
+
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'forwards persisted %s audit policy through the reconstructed native adapter',
+    async egressMode => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      expect(
+        await stub.prepare(
+          prepareInput(firstSessionId, {
+            egressMode,
+            ...(egressMode === 'allowlist' ? { egressAllowlist: ['packages.example.com'] } : {}),
+            egressAudit: true,
+          })
+        )
+      ).toMatchObject({ state: 'preparing' });
+      await awaitStarting(provider, stub);
+      const expected =
+        egressMode === 'allowlist'
+          ? [...baseline, 'git.example.com', 'packages.example.com'].sort()
+          : undefined;
+      const rawPin = await readProviderPin(stub);
+      expect(JSON.parse(rawPin ?? '{}')).toMatchObject({
+        egressAudit: true,
+      });
+      expect(JSON.parse(rawPin ?? '{}').egressAllowlist).toEqual(expected);
+      const before = await readState(stub);
+
+      await evictDurableObject(stub);
+
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(rawPin);
+      const launches: ContainersLaunchInput[] = [];
+      await runInDurableObject(stub, async instance => {
+        const reconstructed = instance as unknown as {
+          provider: ProviderAdapter;
+          providerPin: StoredProviderPin;
+        };
+        expect(reconstructed.providerPin.egressAllowlist).toEqual(expected);
+        expect(reconstructed.providerPin.egressAudit).toBe(true);
+        Object.assign(instance, {
+          env: {
+            ...instance.env,
+            SANDBOX_CONTAINERS: {
+              getByName: (id: string) => {
+                expect(id).toBe(sandboxId);
+                return {
+                  launchWrapper: async (input: ContainersLaunchInput) => {
+                    launches.push(input);
+                    return { startSource: 'image' as const };
+                  },
+                  ensureLeaseAtLeast: async () => undefined,
+                };
+              },
+            },
+          },
+        });
+        const ref = encodeCloudflareProviderRef({
+          sandboxId,
+          containment: false,
+          instanceId: 'reconstructed-allocation',
+        });
+        await reconstructed.provider.launch(ref, {
+          command: supervisorStartup(),
+          env: {},
+        });
+      });
+      expect(launches).toHaveLength(1);
+      expect(launches[0]?.egressAllowlist).toEqual(expected);
+      expect(launches[0]?.egressAudit).toBe(true);
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([]);
+    }
+  );
+
+  it.each(
+    ([undefined, 'unrestricted'] as const).flatMap(egressMode =>
+      (['enabled', 'false', 'omitted', 'selection-omitted'] as const).map(change => ({
+        egressMode,
+        change,
+      }))
+    )
+  )(
+    'rejects changed unrestricted audit on an active allocation: %j',
+    async ({ egressMode, change }) => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      await stub.prepare(
+        prepareInput(firstSessionId, { egressMode, egressAudit: change !== 'enabled' })
+      );
+      await awaitStarting(provider, stub);
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+      const input = prepareInput(nextSessionId, {
+        egressMode,
+        ...(change === 'enabled'
+          ? { egressAudit: true }
+          : change === 'false'
+            ? { egressAudit: false }
+            : {}),
+      });
+      if (change === 'selection-omitted') delete input.sandboxSelection;
+
+      expect(await stub.prepare(input)).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([]);
+    }
+  );
+
+  it.each([undefined, 'unrestricted'] as const)(
+    'reuses an audited %s allocation for an equivalent unrestricted sibling',
+    async egressMode => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      await stub.prepare(prepareInput(firstSessionId, { egressMode, egressAudit: true }));
+      await awaitStarting(provider, stub);
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+      expect(
+        await stub.prepare(
+          prepareInput(nextSessionId, {
+            egressMode: egressMode === undefined ? 'unrestricted' : undefined,
+            egressAudit: true,
+          })
+        )
+      ).toMatchObject({ state: 'preparing' });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it.each([
+    'changed',
+    'removed',
+    'selection-omitted',
+    'repository-changed',
+    'introduced',
+    'mode-only-introduced',
+    'mode-only-removed',
+    'unrestricted',
+    'audit-enabled',
+    'audit-disabled',
+  ] as const)(
+    'rejects a %s active prepare policy immediately without disturbing a ready sibling',
+    async mismatch => {
+      const provider = createFakeProvider();
+      const { stub, peer } = await configureEgressSandbox(provider);
+      const initialPolicy =
+        mismatch === 'introduced' || mismatch === 'mode-only-introduced'
+          ? {}
+          : {
+              egressMode: 'allowlist' as const,
+              ...(mismatch === 'audit-disabled' ? { egressAudit: true } : {}),
+              ...(mismatch === 'mode-only-removed'
+                ? {}
+                : { egressAllowlist: ['packages.example.com'] }),
+            };
+      await stub.prepare(prepareInput(firstSessionId, initialPolicy));
+      await awaitStarting(provider, stub);
+      const { credential, allocationId } = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+      expect(await wrapper.hello({ wrapperId: 'wr_egress', allocationId })).toMatchObject({
+        type: 'welcome',
+      });
+      const frame = await wrapper.next();
+      expect(frame?.type).toBe('session.prepare');
+      wrapper.send({ type: 'session.ready', sessionId: firstSessionId });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: firstSessionId })).view.state).toBe('ready')
+      );
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+      const input = prepareInput(
+        nextSessionId,
+        mismatch === 'removed' || mismatch === 'mode-only-removed'
+          ? {}
+          : mismatch === 'unrestricted'
+            ? { egressMode: 'unrestricted' }
+            : {
+                egressMode: 'allowlist',
+                ...(mismatch === 'mode-only-introduced'
+                  ? {}
+                  : { egressAllowlist: ['different.example.com'] }),
+              },
+        mismatch === 'repository-changed'
+          ? 'https://other-git.example.com/acme/widgets.git'
+          : undefined
+      );
+      if (mismatch === 'repository-changed')
+        input.sandboxSelection = {
+          provider: 'cloudflare-containers',
+          ...initialPolicy,
+        };
+      if (mismatch === 'selection-omitted') delete input.sandboxSelection;
+      if (mismatch === 'audit-enabled' || mismatch === 'audit-disabled') {
+        input.sandboxSelection = {
+          provider: 'cloudflare-containers',
+          ...initialPolicy,
+          egressAudit: mismatch === 'audit-enabled',
+        };
+      }
+
+      const result = await stub.prepare(input);
+
+      expect(result).toMatchObject({ state: 'failed', reason: 'invalid_configuration' });
+      expect((await stub.status({ sessionId: input.spec.sessionId })).view).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      });
+      expect((await stub.status({ sessionId: firstSessionId })).view.state).toBe('ready');
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([]);
+      expect(await wrapper.next(20)).toBeNull();
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(input.spec.sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'invalid_configuration' })
+        )
+      );
+      wrapper.close();
+    }
+  );
+
+  it('accepts an identical normalized active prepare policy without replacing the allocation', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    await stub.prepare(
+      prepareInput(firstSessionId, {
+        egressMode: 'allowlist',
+        egressAllowlist: ['packages.example.com'],
+      })
+    );
+    await awaitStarting(provider, stub);
+    const before = await readState(stub);
+    const pin = await readProviderPin(stub);
+
+    const result = await stub.prepare(
+      prepareInput(nextSessionId, {
+        egressMode: 'allowlist',
+        egressAllowlist: ['Packages.Example.com.', 'packages.example.com', 'github.com'],
+      })
+    );
+
+    expect(result).toMatchObject({ state: 'preparing' });
+    expect(await readState(stub)).toEqual(before);
+    expect(await readProviderPin(stub)).toBe(pin);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it.each([
+    { initialList: undefined, nextList: [] },
+    { initialList: [], nextList: undefined },
+  ])(
+    'accepts equivalent active baseline-only deny policies: %j',
+    async ({ initialList, nextList }) => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      await stub.prepare(
+        prepareInput(firstSessionId, {
+          egressMode: 'allowlist',
+          egressAllowlist: initialList,
+        })
+      );
+      await awaitStarting(provider, stub);
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+      expect(JSON.parse(pin ?? '{}').egressAllowlist).toEqual(
+        [...baseline, 'git.example.com'].sort()
+      );
+      expect(
+        await stub.prepare(
+          prepareInput(nextSessionId, { egressMode: 'allowlist', egressAllowlist: nextList })
+        )
+      ).toMatchObject({ state: 'preparing' });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it.each(['selection-omitted', 'unrestricted'] as const)(
+    'keeps an unrestricted active allocation when %s is requested',
+    async mode => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      await stub.prepare(prepareInput(firstSessionId));
+      await awaitStarting(provider, stub);
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+      const input = prepareInput(nextSessionId, { egressMode: 'unrestricted' });
+      if (mode === 'selection-omitted') delete input.sandboxSelection;
+      expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted' as const, egressAllowlist: [] },
+    { egressMode: 'unrestricted' as const, egressAllowlist: ['example.com'] },
+  ])('rejects list-only or contradictory ensure input before allocation: %j', async policy => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const before = await readState(stub);
+    const pin = await readProviderPin(stub);
+    await expect(
+      startAllocation(provider, { sandboxId, provider: 'cloudflare-containers', ...policy })
+    ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
+    expect(await readState(stub)).toEqual(before);
+    expect(await readProviderPin(stub)).toBe(pin);
+    expect(provider.createCalls).toBe(0);
+  });
+
+  it.each(
+    [
+      { provider: 'cloudflare' as const, sandboxKind: undefined },
+      { provider: 'vercel' as const, sandboxKind: undefined },
+      { provider: 'cloudflare-containers' as const, sandboxKind: 'shared' as const },
+      { provider: 'cloudflare-containers' as const, sandboxKind: 'code-review' as const },
+    ].flatMap(placement =>
+      [
+        { egressMode: 'allowlist' as const },
+        { egressAudit: true },
+        { egressMode: 'unrestricted' as const, egressAudit: true },
+      ].map(policy => ({ ...placement, policy }))
+    )
+  )(
+    'rejects unsupported ensure policy placement before creating an allocation: %j',
+    async ({ provider: kind, sandboxKind, policy }) => {
+      const provider = createFakeProvider();
+      const id = sandboxKind === undefined ? sandboxId : `sbx-${'b'.repeat(48)}`;
+      const { stub } = await configureEgressSandbox(provider, id);
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+
+      await expect(
+        startAllocation(provider, {
+          sandboxId: id,
+          provider: kind,
+          sandboxKind,
+          ...policy,
+        })
+      ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
+
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(0);
+      expect(provider.launchEnvs).toEqual([]);
+      expect(provider.stopCalls).toEqual([]);
+    }
+  );
+
+  it.each([
+    { provider: 'cloudflare', sandboxKind: undefined },
+    { provider: 'vercel', sandboxKind: undefined },
+    { provider: 'cloudflare-containers', sandboxKind: 'shared' },
+    { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
+  ])('rejects unsupported audited unrestricted provider pins on reload: %j', async placement => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    await stub.prepare(prepareInput(firstSessionId, { egressAudit: true }));
+    await awaitStarting(provider, stub);
+    const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as StoredProviderPin;
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ provider_pin: JSON.stringify({ ...pin, ...placement }) })
+        .where(eq(allocationTable.id, 'current'));
+      const persisted = instance as unknown as {
+        readProviderPin(): Promise<StoredProviderPin | null>;
+      };
+      await expect(persisted.readProviderPin()).rejects.toThrow(
+        'Sandbox configuration is invalid or unsupported'
+      );
+    });
+    expect(provider.createCalls).toBe(1);
+  });
+});
+
+describe('SandboxControlV2 prepare frame secrets', () => {
+  const SECRET_VALUE = 'framed-secret-value';
+
+  function generateSecretsKeyPair() {
+    return generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+  }
+
+  function secretsPrepareInput(
+    sessionId: string,
+    encryptedSecrets: Record<string, unknown>
+  ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
+    // `containedKiloSessionIdSchema` requires exactly 26 alphanumerics.
+    const kiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+    return {
+      spec: {
+        sessionId,
+        kiloSessionId,
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-requested`,
+        env: { DATABASE_URL: 'plaintext-db' },
+      },
+      credentials: {
+        userId: 'owner-1',
+        kiloSessionId,
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
+        orgId: 'org-1',
+        repository: { type: 'github', repo: 'acme/widgets' },
+        scopeId: sessionId,
+        encryptedSecrets,
+      },
+    };
+  }
+
+  function skillsPrepareInput(
+    sessionId: string,
+    runtimeSkills: RuntimeSkillInput[]
+  ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
+    const input = secretsPrepareInput(sessionId, {});
+    return { ...input, spec: { ...input.spec, runtimeSkills } };
+  }
+
+  async function startSecrets(
+    provider: FakeProvider,
+    privateKey: string | undefined,
+    peer: FakeSessionPeer
+  ): Promise<DurableObjectStub<SandboxControlV2>> {
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    const mint = createRuntimeProxyMintingPeer(env, () => ({
+      userId: 'owner-1',
+      kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }));
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
+        AGENT_ENV_VARS_PRIVATE_KEY: privateKey,
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => ({
+          ...peer.forSession(sessionId),
+          issueRuntimeCredentialProxyGrant: fence =>
+            mint(sessionId).issueRuntimeCredentialProxyGrant(fence),
+        }),
+      });
+    });
+    return stub;
+  }
+
+  async function connectHello(
+    provider: FakeProvider,
+    redactsNamedSecrets: boolean,
+    installsSkillsSh = false
+  ): Promise<FakeWrapper> {
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({
+      wrapperId: 'wr_secrets',
+      allocationId,
+      ...(redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+      ...(installsSkillsSh ? { installsSkillsSh: true } : {}),
+    });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    return wrapper;
+  }
+
+  function readRouteRow(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+    return runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+      return rows[0] ?? null;
+    });
+  }
+
+  it.each([{ secretValue: SECRET_VALUE }, { secretValue: 'x'.repeat(10000) }])(
+    'delivers profile collections and secrets without persisting plaintext',
+    async ({ secretValue }) => {
+      const { publicKey, privateKey } = generateSecretsKeyPair();
+      const envelope = encryptWithPublicKey(secretValue, publicKey);
+      const provider = createFakeProvider();
+      const peer = new FakeSessionPeer();
+      const stub = await startSecrets(provider, privateKey, peer);
+      const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+      const input = secretsPrepareInput(sessionId, { DATABASE_URL: envelope });
+      const profile = {
+        runtimeSkills: [
+          { name: 'review', rawMarkdown: '# Review', files: { 'guide.txt': 'guide' } },
+        ],
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: { prompt: 'Review' } }],
+        kiloCommands: [{ name: 'review-now', template: 'Review now' }],
+      };
+      await stub.prepare({
+        ...input,
+        spec: { ...input.spec, ...profile, runtimeIsolation: 'per-session' },
+      });
+
+      const wrapper = await connectHello(provider, true);
+      const frame = await wrapper.next();
+      if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+      expect(frame.spec.env?.DATABASE_URL).toBe(secretValue);
+      expect(frame.spec.secretEnvKeys).toEqual(['DATABASE_URL']);
+      expect(frame.spec).toMatchObject(profile);
+      expect(frame.spec.runtimeIsolation).toBeUndefined();
+
+      const row = await readRouteRow(stub, sessionId);
+      expect(row?.spec ?? '').not.toContain(secretValue);
+      expect(row?.spec ?? '').not.toContain('secretEnvKeys');
+      expect(row?.credential_source ?? '').toContain(envelope.encryptedData);
+      expect(row?.credential_source ?? '').not.toContain(secretValue);
+    }
+  );
+
+  it('fails without sending when the wrapper did not advertise named-secret redaction', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, privateKey, peer);
+    const sessionId = 'workspace_22222222-2222-4222-8222-222222222222';
+    await stub.prepare(secretsPrepareInput(sessionId, { DATABASE_URL: envelope }));
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, false);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'wrapper_redaction_unsupported',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+    expect(await readRouteRow(stub, sessionId)).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+  });
+
+  it('sends skills.sh source references to a wrapper that advertises installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_77777777-7777-4777-8777-777777777777';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'find-skills', source: 'vercel-labs/skills' }])
+    );
+
+    const wrapper = await connectHello(provider, true, true);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.runtimeSkills).toEqual([
+      { name: 'find-skills', source: 'vercel-labs/skills' },
+    ]);
+  });
+
+  it('keeps bundle-only skills compatible with a wrapper that does not advertise installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_88888888-8888-4888-8888-888888888888';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'review', rawMarkdown: '# Review' }])
+    );
+
+    const wrapper = await connectHello(provider, true, false);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.runtimeSkills).toEqual([{ name: 'review', rawMarkdown: '# Review' }]);
+  });
+
+  it('fails without sending when a wrapper does not advertise skills.sh installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_99999999-9999-4999-8999-999999999999';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'find-skills', source: 'vercel-labs/skills' }])
+    );
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, true, false);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'wrapper_skills_sh_unsupported',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+    expect(await readRouteRow(stub, sessionId)).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+  });
+
+  it('sends a frame without redaction when every secret key is restored or dropped', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, privateKey, peer);
+    const sessionId = 'workspace_66666666-6666-4666-8666-666666666666';
+    // The grant does not project this key, so the overlay drops it and no secret
+    // value reaches the frame; a wrapper without named-secret redaction can still
+    // receive the frame.
+    await stub.prepare(secretsPrepareInput(sessionId, { KILOCODE_ORGANIZATION_ID: envelope }));
+
+    const wrapper = await connectHello(provider, false);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.secretEnvKeys).toBeUndefined();
+    expect(frame.spec.env?.KILOCODE_ORGANIZATION_ID).toBeUndefined();
+    expect(JSON.stringify(peer.routeUpdatesFor(sessionId))).not.toContain(SECRET_VALUE);
+  });
+
+  it('fails without sending when secrets cannot be decrypted, leaking no value', async () => {
+    const { publicKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_33333333-3333-4333-8333-333333333333';
+    await stub.prepare(secretsPrepareInput(sessionId, { DATABASE_URL: envelope }));
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, true);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'frame_materialization_failed',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+    expect(JSON.stringify(peer.routeUpdatesFor(sessionId))).not.toContain(SECRET_VALUE);
+    expect(JSON.stringify(await readRouteRow(stub, sessionId))).not.toContain(SECRET_VALUE);
+  });
+
+  it('fails without sending when the merged frame env exceeds the schema', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey('x'.repeat(10001), publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, privateKey, peer);
+    const sessionId = 'workspace_44444444-4444-4444-8444-444444444444';
+    await stub.prepare(secretsPrepareInput(sessionId, { DATABASE_URL: envelope }));
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, true);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'frame_materialization_failed',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+  });
+});
+
+describe('SandboxControlV2 previewTarget', () => {
+  const PREVIEW_OWNER = 'preview-owner';
+  const PREVIEW_ORG = 'org-preview';
+  const PREVIEW_WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
+  const PREVIEW_SESSION = 'workspace_22222222-2222-4222-8222-222222222222';
+  const PREVIEW_SIBLING = 'workspace_33333333-3333-4333-8333-333333333333';
+
+  type PreviewScope = Parameters<SandboxControlV2['previewTarget']>[0];
+  type PreviewRouteState = 'preparing' | 'ready' | 'failed';
+  type PreviewRouteSeed = {
+    sessionId: string;
+    state: PreviewRouteState;
+    scopeId?: string;
+    orgId?: string;
+    workspaceId?: string;
+  };
+
+  function previewScope(overrides: Partial<PreviewScope> = {}): PreviewScope {
+    return {
+      ownerId: PREVIEW_OWNER,
+      organizationId: null,
+      scopeId: PREVIEW_WORKSPACE,
+      ...overrides,
+    };
+  }
+
+  async function seedPreviewRoutes(
+    stub: DurableObjectStub<SandboxControlV2>,
+    routes: PreviewRouteSeed[]
+  ): Promise<void> {
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
+      const db = drizzle(state.storage, { logger: false });
+      for (const route of routes) {
+        const spec = {
+          sessionId: route.sessionId,
+          kiloSessionId: `kilo-${route.sessionId}`,
+          directory: `/workspace/${route.sessionId}`,
+          attemptId: `${route.sessionId}-a1`,
+        };
+        const source = {
+          userId: PREVIEW_OWNER,
+          kiloSessionId: spec.kiloSessionId,
+          kiloToken: 'preview-token',
+          ...(route.orgId === undefined ? {} : { orgId: route.orgId }),
+          ...(route.scopeId === undefined ? {} : { scopeId: route.scopeId }),
+          ...(route.workspaceId === undefined ? {} : { workspaceId: route.workspaceId }),
+        };
+        const row = {
+          session_id: route.sessionId,
+          spec: JSON.stringify(spec),
+          credential_source: JSON.stringify(source),
+          state: route.state,
+          attempt_id: spec.attemptId,
+          attempt_deadline_at: route.state === 'preparing' ? Date.now() + MINUTE : null,
+          reason: route.state === 'failed' ? 'preparation_timeout' : null,
+          updated_at: Date.now(),
+        };
+        await db
+          .insert(routesTable)
+          .values(row)
+          .onConflictDoUpdate({ target: routesTable.session_id, set: row });
+      }
+    });
+  }
+
+  function readPreviewRoute(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+    return runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+      return rows[0] ?? null;
+    });
+  }
+
+  async function setPreviewAllocation(
+    stub: DurableObjectStub<SandboxControlV2>,
+    allocation: { state: 'connected' | 'stopped'; providerRef: string | null }
+  ): Promise<void> {
+    await runInDurableObject(stub, async (_instance, storage) => {
+      const db = drizzle(storage.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ state: allocation.state, provider_ref: allocation.providerRef })
+        .where(eq(allocationTable.id, 'current'));
+    });
+  }
+
+  it('answers an unrouted session as not_running and never enqueues', async () => {
+    const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview`);
+    const observed = await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
+      const target = instance as unknown as {
+        enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
+      };
+      let enqueueCalls = 0;
+      const original = target.enqueue.bind(instance);
+      target.enqueue = task => {
+        enqueueCalls += 1;
+        return original(task);
+      };
+      const result = await instance.previewTarget(previewScope());
+      return { result, enqueueCalls };
+    });
+    expect(observed.result).toEqual({ status: 'not_running' });
+    expect(observed.enqueueCalls).toBe(0);
+  });
+
+  it('resolves a connected container preview by workspace scope across absent, failed and preparing routes', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+
+    // A sibling route proves the workspace scope; the viewed chat has no route.
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SIBLING, state: 'failed', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    expect(await readPreviewRoute(stub, PREVIEW_SESSION)).toBeNull();
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({
+      status: 'ok',
+      coordinates: { provider: 'cloudflare-containers', logicalSandboxId: SANDBOX_ID },
+    });
+
+    // The viewed chat's own route is failed, then preparing. Route state is
+    // never readiness: the same connected allocation stays resolvable.
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SESSION, state: 'failed', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    const failed = await readPreviewRoute(stub, PREVIEW_SESSION);
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({ status: 'ok' });
+
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SESSION, state: 'preparing', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({ status: 'ok' });
+
+    expect(provider.createCalls).toBe(1);
+    expect(await readPreviewRoute(stub, PREVIEW_SIBLING)).toMatchObject({ state: 'failed' });
+    expect(failed).toMatchObject({ state: 'failed' });
+  });
+
+  it('denies a foreign owner, organization or workspace and reports stopped or missing refs', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+    await seedPreviewRoutes(stub, [
+      {
+        sessionId: PREVIEW_SESSION,
+        state: 'failed',
+        scopeId: PREVIEW_WORKSPACE,
+        orgId: PREVIEW_ORG,
+        workspaceId: PREVIEW_WORKSPACE,
+      },
+    ]);
+    const seeded = await readPreviewRoute(stub, PREVIEW_SESSION);
+
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toMatchObject({ status: 'ok' });
+    await expect(
+      stub.previewTarget(previewScope({ ownerId: 'other-owner', organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: 'other-org' }))
+    ).resolves.toEqual({ status: 'not_running' });
+    await expect(
+      stub.previewTarget(
+        previewScope({
+          scopeId: 'worktree_99999999-9999-4999-8999-999999999999',
+        })
+      )
+    ).resolves.toEqual({ status: 'not_running' });
+
+    await setPreviewAllocation(stub, { state: 'connected', providerRef: null });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+
+    await setPreviewAllocation(stub, { state: 'stopped', providerRef: 'stopped-ref' });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+
+    // The passive read never prepares a route or starts another allocation.
+    expect(provider.createCalls).toBe(1);
+    expect(await readPreviewRoute(stub, PREVIEW_SESSION)).toEqual(seeded);
+  });
+
+  it('answers an unrouted preview service inquiry as not_running and never enqueues', async () => {
+    const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview_services`);
+    const observed = await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
+      const target = instance as unknown as {
+        enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
+      };
+      let enqueueCalls = 0;
+      const original = target.enqueue.bind(instance);
+      target.enqueue = task => {
+        enqueueCalls += 1;
+        return original(task);
+      };
+      const result = await instance.previewServices(previewScope());
+      return { result, enqueueCalls };
+    });
+    expect(observed.result).toEqual({ services: [], status: 'not_running' });
+    expect(observed.enqueueCalls).toBe(0);
+  });
+});

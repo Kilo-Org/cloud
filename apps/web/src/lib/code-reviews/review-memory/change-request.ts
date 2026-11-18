@@ -1,17 +1,24 @@
 import type { CodeReviewMemoryProposal, PlatformIntegration } from '@kilocode/db/schema';
 import type { ReviewMemoryProposalStatus } from '@kilocode/db/schema-types';
+import {
+  REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY,
+  type ReviewMemoryChangeRequestErrorReason,
+} from '@kilocode/app-shared/code-review';
 
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 import {
   createGitHubBranch,
   createGitHubPullRequest,
   createOrUpdateGitHubRootTextFile,
   fetchGitHubRepositoryDefaultBranch,
+  fetchGitHubPullRequestForHeadBranch,
   fetchGitHubRootTextFileAtRef,
   generateGitHubInstallationToken,
 } from '@/lib/integrations/platforms/github/adapter';
 import {
+  EDITABLE_PROPOSAL_STATUSES,
   getProposal,
   markProposalChangeRequestFailed,
   markProposalChangeRequestOpened,
@@ -25,18 +32,16 @@ const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
 const REVIEW_MEMORY_CHANGE_REQUEST_TITLE = 'docs(review): update REVIEW.md guidance';
 const REVIEW_MEMORY_CHANGE_REQUEST_MARKER = '<!-- kilo-review-memory-change-request -->';
 const OPENING_CHANGE_REQUEST_STALE_MS = 30 * 60 * 1000;
-const APPROVABLE_STATUSES: ReadonlySet<ReviewMemoryProposalStatus> = new Set([
-  'open',
-  'edited',
-  'change_request_failed',
-]);
+const GITHUB_REQUEST_TIMEOUT_MS = 10_000;
+const REVIEW_MEMORY_GATEWAY_TIMEOUT_MS = 120_000;
+const APPROVABLE_STATUSES = new Set<ReviewMemoryProposalStatus>(EDITABLE_PROPOSAL_STATUSES);
 
 export class ReviewMemoryChangeRequestError extends Error {
   constructor(
     public readonly code: 'NOT_FOUND' | 'BAD_REQUEST' | 'CONFLICT',
-    message: string
+    public readonly reason: ReviewMemoryChangeRequestErrorReason
   ) {
-    super(message);
+    super(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY[reason]);
     this.name = 'ReviewMemoryChangeRequestError';
   }
 }
@@ -61,7 +66,7 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
 }): Promise<CodeReviewMemoryProposal> {
   let proposal = await getProposal({ owner: input.owner, proposalId: input.proposalId });
   if (!proposal) {
-    throw new ReviewMemoryChangeRequestError('NOT_FOUND', 'Review memory proposal not found.');
+    throw new ReviewMemoryChangeRequestError('NOT_FOUND', 'proposal_not_found');
   }
   if (proposal.status === 'change_request_opened' && proposal.change_request_url) {
     return proposal;
@@ -69,28 +74,23 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
   if (proposal.status === 'opening_change_request') {
     const recovered = await recoverStaleOpeningChangeRequest(proposal);
     if (!recovered) {
-      throw new ReviewMemoryChangeRequestError(
-        'CONFLICT',
-        'Review memory proposal is already being processed.'
-      );
+      throw new ReviewMemoryChangeRequestError('CONFLICT', 'change_request_in_progress');
     }
     proposal = recovered;
   }
   if (!APPROVABLE_STATUSES.has(proposal.status)) {
-    throw new ReviewMemoryChangeRequestError(
-      'CONFLICT',
-      `Review memory proposal cannot be approved from status ${proposal.status}.`
-    );
+    console.error('[review-memory] approveAndOpenChangeRequest from an inapplicable status', {
+      proposalId: proposal.id,
+      status: proposal.status,
+    });
+    throw new ReviewMemoryChangeRequestError('CONFLICT', 'proposal_not_actionable');
   }
 
   const integration = await findGitHubIntegrationForProposal(input.owner, proposal);
   assertGitHubPermissions(integration);
   const opening = await markProposalOpeningChangeRequest({ proposalId: proposal.id });
   if (!opening) {
-    throw new ReviewMemoryChangeRequestError(
-      'CONFLICT',
-      'Review memory proposal is already being processed.'
-    );
+    throw new ReviewMemoryChangeRequestError('CONFLICT', 'change_request_in_progress');
   }
 
   try {
@@ -102,11 +102,30 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       throw new Error('GitHub installation id is missing.');
     }
 
+    const branchName = `kilo/review-memory/${proposal.id.slice(0, 8)}`;
+
     const tokenData = await generateGitHubInstallationToken(
       integration.platform_installation_id,
-      integration.github_app_type ?? 'standard'
+      integration.github_app_type ?? 'standard',
+      integration.id,
+      'workflow',
+      AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS)
     );
     const token = tokenData.token;
+    const existingPullRequest = await fetchGitHubPullRequestForHeadBranch({
+      token,
+      owner: repoOwner,
+      repo,
+      headBranch: branchName,
+    });
+    if (existingPullRequest) {
+      const resumed = await markProposalChangeRequestOpened({
+        proposalId: proposal.id,
+        changeRequestUrl: existingPullRequest.url,
+      });
+      if (!resumed) throw new Error('Failed to mark proposal change request opened.');
+      return resumed;
+    }
     const defaultBranch = await fetchGitHubRepositoryDefaultBranch({
       token,
       owner: repoOwner,
@@ -125,6 +144,7 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       repoFullName: proposal.repo_full_name,
       existingReviewMd,
       proposal,
+      signal: AbortSignal.timeout(REVIEW_MEMORY_GATEWAY_TIMEOUT_MS),
     });
 
     if (integrationResult.status === 'already_present') {
@@ -136,7 +156,6 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       throw new Error('Integration returned no REVIEW.md content.');
     }
 
-    const branchName = `kilo/review-memory/${proposal.id.slice(0, 8)}`;
     await createGitHubBranch({
       token,
       owner: repoOwner,
@@ -181,7 +200,7 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       message,
     });
     await markProposalChangeRequestFailed({ proposalId: proposal.id });
-    throw new ReviewMemoryChangeRequestError('BAD_REQUEST', message);
+    throw new ReviewMemoryChangeRequestError('BAD_REQUEST', 'change_request_failed');
   }
 }
 
@@ -207,17 +226,14 @@ async function findGitHubIntegrationForProposal(
   const integration = integrations.find(
     integration =>
       integration.platform === PLATFORM.GITHUB &&
-      integration.integration_status === INTEGRATION_STATUS.ACTIVE &&
-      !integration.suspended_at &&
+      integration.github_connection_role === 'workflow' &&
+      isPlatformIntegrationActive(integration) &&
       integration.platform_installation_id &&
       hasRepositoryAccess(integration, proposal.repo_full_name)
   );
 
   if (!integration) {
-    throw new ReviewMemoryChangeRequestError(
-      'BAD_REQUEST',
-      'No active GitHub integration has access to this repository.'
-    );
+    throw new ReviewMemoryChangeRequestError('BAD_REQUEST', 'no_github_integration');
   }
   return integration;
 }
@@ -230,10 +246,7 @@ function hasRepositoryAccess(integration: PlatformIntegration, repoFullName: str
 function assertGitHubPermissions(integration: PlatformIntegration): void {
   const permissions = integration.permissions;
   if (permissions?.contents !== 'write' || permissions.pull_requests !== 'write') {
-    throw new ReviewMemoryChangeRequestError(
-      'BAD_REQUEST',
-      'The GitHub App needs contents:write and pull_requests:write permissions to open a REVIEW.md PR.'
-    );
+    throw new ReviewMemoryChangeRequestError('BAD_REQUEST', 'missing_github_app_permissions');
   }
 }
 

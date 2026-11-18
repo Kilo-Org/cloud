@@ -10,7 +10,7 @@
  */
 
 import crypto from 'crypto';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
@@ -31,17 +31,18 @@ import {
   updateCodeReviewStatusIfNonTerminal,
 } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
-import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '../core/schemas';
 import { DEFAULT_CODE_REVIEW_MODEL } from '../core/constants';
 import { resolveEffectiveModel } from '../core/model-selection';
+import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   CODE_REVIEW_TERMINAL_REASONS,
@@ -67,6 +68,14 @@ import {
   type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
 import { getManualCodeReviewConfig, shouldPublishCodeReviewToProvider } from '../manual-config';
+import {
+  CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+  CODE_REVIEW_RECONNECT_FAILURE_MESSAGE,
+  finalizeCodeReviewBillingFailure,
+  finalizeCodeReviewReconnectFailure,
+} from '../billing';
+import { settleCodeReviewLedgerRow } from '../code-review-ledger';
+import { resolveCodeReviewDispatchBilling } from './dispatch-billing';
 
 export type DispatchResult = {
   dispatched: number;
@@ -103,8 +112,72 @@ class CodeReviewActionRequiredDispatchError extends Error {
   }
 }
 
+/**
+ * The review's paying account cannot cover the worker's minimum admission
+ * balance. Thrown before the worker call so no session is prepared.
+ */
+class CodeReviewInsufficientCreditsDispatchError extends Error {
+  constructor() {
+    super(CODE_REVIEW_BILLING_FAILURE_MESSAGE);
+    this.name = 'CodeReviewInsufficientCreditsDispatchError';
+  }
+}
+
+/**
+ * The organization's Claude billing link needs a reconnect, and routing refuses
+ * every request for the review model until an owner performs it. Thrown before
+ * the worker call so no session is prepared.
+ */
+class CodeReviewReconnectRequiredDispatchError extends Error {
+  constructor() {
+    super(CODE_REVIEW_RECONNECT_FAILURE_MESSAGE);
+    this.name = 'CodeReviewReconnectRequiredDispatchError';
+  }
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Collect the models a review will actually run. A council review pins each
+ * enabled specialist sub-agent to its own model (falling back to the review's
+ * standard model), and every one of them can bill inference.
+ */
+function collectCouncilReviewModels(
+  councilConfig: CodeReviewAgentConfig['council'] | undefined | null,
+  reviewType: string,
+  defaultModel: string,
+  models: string[]
+): void {
+  if (reviewType !== 'council') return;
+  if (!councilConfig || !isCouncilActive(councilConfig)) return;
+  for (const specialist of enabledSpecialists(councilConfig)) {
+    models.push(specialist.model_slug ?? defaultModel);
+  }
+}
+
+/**
+ * True when a worker call failed because nothing was listening at the worker
+ * URL (TCP connection refused). undici wraps that as a `fetch failed`
+ * TypeError whose cause carries the ECONNREFUSED code. Unlike a timeout, a
+ * refusal is unambiguous: the request never reached the orchestrator, so no
+ * Durable Object can have accepted the review.
+ */
+function isWorkerConnectionRefused(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (
+      (current as Error & { code?: unknown }).code === 'ECONNREFUSED' ||
+      current.message.includes('ECONNREFUSED')
+    ) {
+      return true;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 function getActionRequiredReasonFromError(error: unknown): CodeReviewActionRequiredReason | null {
@@ -315,6 +388,25 @@ export async function tryDispatchPendingReviews(
         const reservation = reservations[i];
         const error = result.reason;
         const errorMessage = getErrorMessage(error);
+
+        if (error instanceof CodeReviewInsufficientCreditsDispatchError) {
+          await failReviewForBillingRefusal(reservation.review, reservation.dispatchReservationId, {
+            reason: 'insufficient-credits',
+            message: CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+            finalize: finalizeCodeReviewBillingFailure,
+          });
+          continue;
+        }
+
+        if (error instanceof CodeReviewReconnectRequiredDispatchError) {
+          await failReviewForBillingRefusal(reservation.review, reservation.dispatchReservationId, {
+            reason: 'reconnect-required',
+            message: CODE_REVIEW_RECONNECT_FAILURE_MESSAGE,
+            finalize: finalizeCodeReviewReconnectFailure,
+          });
+          continue;
+        }
+
         const actionRequiredReason = getActionRequiredReasonFromError(error);
         const actionRequiredStateAlreadyPresent =
           error instanceof CodeReviewActionRequiredDispatchError;
@@ -459,6 +551,111 @@ export async function tryDispatchPendingReviews(
   }
 }
 
+/**
+ * A review refusal decided before any worker call: the reason stored on the
+ * review and the attempt, and the provider-side record of it.
+ */
+type DispatchBillingRefusal = {
+  /** Names the refusal in logs and Sentry operation tags. */
+  reason: 'insufficient-credits' | 'reconnect-required';
+  /** Stored on the review and its attempt, and shown in the app. */
+  message: string;
+  /** Closes the provider gate with the copy that matches the reason. */
+  finalize: (review: CloudAgentCodeReview) => Promise<void>;
+};
+
+/**
+ * Terminalize a review refused on billing grounds before any worker call:
+ * persist the refusal, settle the ledger, and close the provider gate the same
+ * way the status callback does for a worker-side billing failure.
+ */
+async function failReviewForBillingRefusal(
+  review: CloudAgentCodeReview,
+  dispatchReservationId: string,
+  refusal: DispatchBillingRefusal
+): Promise<void> {
+  let failed = false;
+  try {
+    failed = await failReservedQueuedReview(
+      review.id,
+      dispatchReservationId,
+      refusal.message,
+      'billing'
+    );
+  } catch (error) {
+    errorExceptInTest(`[dispatchReview] Failed to mark review failed for ${refusal.reason}`, {
+      reviewId: review.id,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: `dispatch-review-${refusal.reason}` },
+      extra: { reviewId: review.id },
+    });
+    try {
+      await releaseQueuedReviewClaim(review.id, dispatchReservationId);
+    } catch (releaseError) {
+      errorExceptInTest('[dispatchReview] Failed to release review claim', {
+        reviewId: review.id,
+        releaseError,
+      });
+      captureException(releaseError, {
+        tags: { operation: `release-${refusal.reason}-review-reservation` },
+        extra: { reviewId: review.id },
+      });
+    }
+    return;
+  }
+
+  if (!failed) {
+    logExceptInTest('[dispatchReview] Review claim changed before the credit refusal landed', {
+      reviewId: review.id,
+    });
+    return;
+  }
+
+  try {
+    const attempt = await ensureCurrentCodeReviewAttemptFromReview(review);
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      attemptId: attempt.id,
+      status: 'failed',
+      errorMessage: refusal.message,
+      terminalReason: 'billing',
+      completedAt: new Date(),
+    });
+  } catch (error) {
+    errorExceptInTest(`[dispatchReview] Failed to record ${refusal.reason} attempt`, {
+      reviewId: review.id,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: `dispatch-review-${refusal.reason}-attempt` },
+      extra: { reviewId: review.id },
+    });
+  }
+
+  try {
+    await settleCodeReviewLedgerRow({
+      reviewId: review.id,
+      status: 'failed',
+      terminalReason: 'billing',
+      triggerSource: review.trigger_source ?? null,
+    });
+  } catch (error) {
+    errorExceptInTest('[dispatchReview] Failed to settle code review ledger row', {
+      reviewId: review.id,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: `dispatch-review-${refusal.reason}-ledger` },
+      extra: { reviewId: review.id },
+    });
+  }
+
+  if (!shouldPublishCodeReviewToProvider(review)) return;
+  await refusal.finalize(review);
+}
+
 async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
   const { review, dispatchReservationId } = reservation;
   const platform = parseCodeReviewPlatform(review.platform);
@@ -478,9 +675,18 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   }
 
   let agentConfig: Parameters<typeof prepareReviewPayload>[0]['agentConfig'];
+  let reviewModel: string;
+  const councilModels: string[] = [];
 
   if (manualConfig) {
     agentConfig = { config: manualConfig.agentConfig };
+    reviewModel = manualConfig.agentConfig.model_slug || DEFAULT_CODE_REVIEW_MODEL;
+    collectCouncilReviewModels(
+      manualConfig.agentConfig.council,
+      review.review_type,
+      reviewModel,
+      councilModels
+    );
   } else {
     const persistedAgentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
     if (!persistedAgentConfig) {
@@ -511,6 +717,13 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       review.repo_full_name,
       DEFAULT_CODE_REVIEW_MODEL
     );
+    reviewModel = effectiveModel.modelSlug;
+    collectCouncilReviewModels(
+      persistedConfig.council,
+      review.review_type,
+      reviewModel,
+      councilModels
+    );
     if (effectiveModel.source === 'repository_override') {
       logExceptInTest('[dispatchReview] Applying per-repository model override', {
         reviewId: review.id,
@@ -528,6 +741,28 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     } else {
       agentConfig = persistedAgentConfig;
     }
+  }
+
+  const billing = await resolveCodeReviewDispatchBilling({
+    owner,
+    models: [reviewModel, ...councilModels],
+  });
+  if (!billing.skipBalanceCheck && billing.reconnectRequired) {
+    logExceptInTest('[dispatchReview] Review waits on a Claude billing reconnect', {
+      reviewId: review.id,
+      owner,
+      models: [reviewModel, ...councilModels],
+    });
+    throw new CodeReviewReconnectRequiredDispatchError();
+  }
+  if (!billing.skipBalanceCheck && !billing.canAfford) {
+    logExceptInTest('[dispatchReview] Review requires more credits than the payer has', {
+      reviewId: review.id,
+      owner,
+      models: [reviewModel, ...councilModels],
+      balanceMicrodollars: billing.balanceMicrodollars,
+    });
+    throw new CodeReviewInsufficientCreditsDispatchError();
   }
 
   const payload = await prepareReviewPayload({
@@ -605,10 +840,10 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     await codeReviewWorkerClient.dispatchReview({
       ...dispatchPayload,
       attemptId: attempt.id,
-      skipBalanceCheck: true,
+      skipBalanceCheck: billing.skipBalanceCheck,
     });
   } catch (dispatchError) {
-    errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {
+    errorExceptInTest('[dispatchReview] Worker dispatch failed', {
       reviewId: review.id,
       error: dispatchError,
     });
@@ -616,7 +851,13 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       tags: { operation: 'dispatch-review-worker-call' },
       extra: { reviewId: review.id, owner },
     });
-    return handleAmbiguousDispatchFailure(review, owner, attempt.id, dispatchReservationId);
+    return handleAmbiguousDispatchFailure(
+      review,
+      owner,
+      attempt.id,
+      dispatchReservationId,
+      dispatchError
+    );
   }
 
   try {
@@ -652,7 +893,8 @@ async function handleAmbiguousDispatchFailure(
   review: CloudAgentCodeReview,
   owner: Owner,
   attemptId: string,
-  dispatchReservationId: string
+  dispatchReservationId: string,
+  dispatchError: unknown
 ): Promise<boolean> {
   try {
     const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id, attemptId);
@@ -736,6 +978,45 @@ async function handleAmbiguousDispatchFailure(
     });
     return true;
   } catch (statusError) {
+    if (
+      getManualCodeReviewConfig(review) !== null &&
+      isWorkerConnectionRefused(dispatchError) &&
+      isWorkerConnectionRefused(statusError)
+    ) {
+      // The worker refused the dispatch and then refused the status probe, so
+      // it never accepted this review. A manual review is started by a user
+      // who is watching the detail screen; leaving it `queued` there would
+      // strand them on "Queued" with the transcript sheet stuck on "Waiting
+      // for the review transcript" and no way out. Surface a retryable
+      // failure instead. Webhook reviews keep the stale-queued cron recovery.
+      const errorMessage =
+        'Dispatch failed: could not reach the code review service. ' +
+        'It may be offline — retry the review once it is running.';
+      await updateCodeReviewAttemptForCallback({
+        codeReviewId: review.id,
+        attemptId,
+        status: 'failed',
+        errorMessage,
+        terminalReason: 'upstream_error',
+        completedAt: new Date(),
+      });
+      await failReservedQueuedReview(
+        review.id,
+        dispatchReservationId,
+        errorMessage,
+        'upstream_error'
+      );
+      errorExceptInTest(
+        '[dispatchReview] Worker refused dispatch and status probe, failing manual review',
+        {
+          reviewId: review.id,
+          attemptId,
+          error: dispatchError,
+        }
+      );
+      return false;
+    }
+
     errorExceptInTest('[dispatchReview] Worker status probe failed, leaving review queued', {
       reviewId: review.id,
       error: statusError,

@@ -2,7 +2,7 @@ import type {
   OrganizationGroupPolicy,
   OrganizationGroupPolicyOf,
   OrganizationGroupPolicyType,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentType } from 'react';
 

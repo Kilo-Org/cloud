@@ -1,0 +1,578 @@
+/* eslint-disable max-lines -- one cohesive suite: the ask selection and its durable store share the fixtures */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
+
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+  _setSecureStoreForTests as _setPersistSecureStoreForTests,
+  restorePersistedGlanceable,
+} from './persist';
+import {
+  _flushWaitingAskMirrorForTests,
+  _resetWaitingAskForTests,
+  _setSecureStoreForTests,
+  getWaitingAsk,
+  readWaitingAsk,
+  recordWaitingAsk,
+  selectWaitingAsk,
+  type WaitingAsk,
+} from './waiting-ask';
+
+const NOW = 1_750_000_000_000;
+const CTX = { userId: 'u1', organizationId: null };
+const ASK_KEY = 'glanceable-waiting-ask';
+const SNAPSHOT_KEY = 'glanceable-snapshot';
+const LEGACY_SCOPE_KEY = 'glanceable-scope-key';
+
+const store = new Map<string, string>();
+
+// Fake SecureStore surface backed by an in-memory Map, injected through the
+// test-only setter so the durable mirror never loads the real native module.
+const secureStoreMock = {
+  setItemAsync: vi.fn(async (key: string, value: string) => {
+    store.set(key, value);
+    await Promise.resolve();
+  }),
+  getItemAsync: vi.fn(async (key: string) => {
+    await Promise.resolve();
+    return store.get(key) ?? null;
+  }),
+  deleteItemAsync: vi.fn(async (key: string) => {
+    store.delete(key);
+    await Promise.resolve();
+  }),
+};
+
+function askFor(overrides: Partial<WaitingAsk> = {}): WaitingAsk {
+  return {
+    kiloSessionId: 's1',
+    status: 'permission',
+    isCloudAgent: false,
+    scopeKey: buildOpaqueScopeKey(CTX),
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    statusUpdatedAt: null,
+    boundPermissionId: null,
+    ...overrides,
+  };
+}
+
+function at(offsetMs: number): string {
+  return new Date(NOW + offsetMs).toISOString();
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let storedResolve: (() => void) | undefined = undefined;
+  const promise = new Promise<void>(resolve => {
+    storedResolve = resolve;
+  });
+  return {
+    promise,
+    resolve: () => {
+      storedResolve?.();
+    },
+  };
+}
+
+describe('selectWaitingAsk', () => {
+  it('picks the oldest permission over a newer question', () => {
+    const ask = selectWaitingAsk(
+      [
+        { id: 'question', status: 'question', statusUpdatedAt: at(-1000) },
+        { id: 'permission', status: 'permission', statusUpdatedAt: at(-60_000) },
+      ],
+      CTX,
+      NOW
+    );
+    expect(ask).toMatchObject({
+      kiloSessionId: 'permission',
+      status: 'permission',
+      organizationId: null,
+      userId: 'u1',
+      recordedAt: NOW,
+      // The identity the binding is carried on, and no binding yet: selection
+      // never reads the control plane.
+      statusUpdatedAt: at(-60_000),
+      boundPermissionId: null,
+    });
+  });
+
+  it("carries the row's status time so the answer can name its raise", () => {
+    const ask = selectWaitingAsk(
+      [{ id: 's9', status: 'permission', statusUpdatedAt: at(-60_000) }],
+      CTX,
+      NOW
+    );
+    expect(ask).toMatchObject({ kiloSessionId: 's9', statusUpdatedAt: at(-60_000) });
+  });
+
+  it('leaves the status time absent when the row carries none', () => {
+    const ask = selectWaitingAsk([{ id: 's9', status: 'permission' }], CTX, NOW);
+    expect(ask?.statusUpdatedAt).toBeUndefined();
+  });
+
+  it('breaks a tie on tray order', () => {
+    const ask = selectWaitingAsk(
+      [
+        { id: 'first', status: 'permission', statusUpdatedAt: at(-5000) },
+        { id: 'second', status: 'question', statusUpdatedAt: at(-5000) },
+      ],
+      CTX,
+      NOW
+    );
+    expect(ask?.kiloSessionId).toBe('first');
+  });
+
+  it('returns null when only busy and idle rows are connected', () => {
+    expect(
+      selectWaitingAsk(
+        [
+          { id: 'busy', status: 'busy' },
+          { id: 'idle', status: 'idle' },
+        ],
+        CTX,
+        NOW
+      )
+    ).toBeNull();
+    expect(selectWaitingAsk([], CTX, NOW)).toBeNull();
+  });
+
+  it('does not treat a retry row as an approvable ask', () => {
+    // The tray folds `retry` into needs-input, but a retry has no permission or
+    // question the activity could approve.
+    expect(selectWaitingAsk([{ id: 'retry', status: 'retry' }], CTX, NOW)).toBeNull();
+  });
+
+  it('skips a waiting row that names no session', () => {
+    expect(selectWaitingAsk([{ status: 'permission' }], CTX, NOW)).toBeNull();
+    expect(
+      selectWaitingAsk([{ status: 'permission' }, { id: 's2', status: 'question' }], CTX, NOW)
+    ).toMatchObject({ kiloSessionId: 's2' });
+  });
+
+  it('names a lone waiting row that carries no status time, after any dated row', () => {
+    expect(selectWaitingAsk([{ id: 'undated', status: 'question' }], CTX, NOW)?.kiloSessionId).toBe(
+      'undated'
+    );
+    expect(
+      selectWaitingAsk(
+        [
+          { id: 'undated', status: 'question' },
+          { id: 'dated', status: 'permission', statusUpdatedAt: at(-1) },
+        ],
+        CTX,
+        NOW
+      )?.kiloSessionId
+    ).toBe('dated');
+  });
+
+  it('marks the cloud-agent row and reuses the snapshot scope key', () => {
+    const cloudCtx = { userId: 'u1', organizationId: 'org-1' };
+    const ask = selectWaitingAsk(
+      [{ id: 'cloud', status: 'permission', connectionId: CLOUD_AGENT_CONNECTION_ID }],
+      cloudCtx,
+      NOW
+    );
+    expect(ask).toMatchObject({
+      isCloudAgent: true,
+      organizationId: 'org-1',
+      scopeKey: buildOpaqueScopeKey(cloudCtx),
+    });
+  });
+
+  it('treats a row with no connectionId as not cloud-agent', () => {
+    const ask = selectWaitingAsk(
+      [{ id: 'cli', status: 'question', connectionId: 'cli-1' }],
+      CTX,
+      NOW
+    );
+    expect(ask?.isCloudAgent).toBe(false);
+    expect(selectWaitingAsk([{ id: 'bare', status: 'question' }], CTX, NOW)?.isCloudAgent).toBe(
+      false
+    );
+  });
+
+  it('names a newer approvable permission over an older question or non-cloud permission', () => {
+    // The widget offers Approve for the oldest permission; the Live Activity and
+    // the ongoing card must name that same row, or they show Open alone.
+    const ask = selectWaitingAsk(
+      [
+        { id: 'old-question', status: 'question', statusUpdatedAt: at(-90_000) },
+        { id: 'old-cli', status: 'permission', statusUpdatedAt: at(-80_000), connectionId: 'cli' },
+        {
+          id: 'newer-cloud',
+          status: 'permission',
+          statusUpdatedAt: at(-10_000),
+          connectionId: CLOUD_AGENT_CONNECTION_ID,
+        },
+      ],
+      CTX,
+      NOW
+    );
+    expect(ask).toMatchObject({ kiloSessionId: 'newer-cloud', isCloudAgent: true });
+  });
+});
+
+describe('waiting ask store', () => {
+  beforeEach(() => {
+    _resetWaitingAskForTests();
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStoreMock);
+    // The restore and the ask read the same keychain, so both modules take the
+    // one fake store.
+    _setPersistSecureStoreForTests(secureStoreMock);
+    store.clear();
+    // The class upgrade has run, so an absent record is absent.
+    store.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    _resetWaitingAskForTests();
+    _resetGlanceablePersistForTests();
+    store.clear();
+  });
+
+  /** Publish the scope this process is on, as the persist sink does on a publish. */
+  function setLocalScope(ctx: { userId: string; organizationId: string | null }): void {
+    _setLastGlanceableSnapshotForTests(
+      buildGlanceableSnapshot({
+        sessions: [],
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        now: NOW,
+      })
+    );
+  }
+
+  it('round-trips the ask and clears both the memory and the mirror', async () => {
+    const ask = askFor();
+    recordWaitingAsk(ask);
+    expect(getWaitingAsk()).toEqual(ask);
+    await _flushWaitingAskMirrorForTests();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(ask));
+
+    recordWaitingAsk(null);
+    expect(getWaitingAsk()).toBeNull();
+    await _flushWaitingAskMirrorForTests();
+    expect(store.has(ASK_KEY)).toBe(false);
+    await expect(readWaitingAsk()).resolves.toBeNull();
+  });
+
+  it('replaces the previous ask with the next one', async () => {
+    recordWaitingAsk(askFor({ kiloSessionId: 's1' }));
+    const second = askFor({ kiloSessionId: 's2', status: 'question' });
+    recordWaitingAsk(second);
+    expect(getWaitingAsk()).toEqual(second);
+    await _flushWaitingAskMirrorForTests();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(second));
+  });
+
+  it('serializes the mirror writes so the last record wins on disk', async () => {
+    const first = deferred();
+    // The first write lands late, after the second record was made: a chained
+    // mirror still stores the newer ask, an unordered one would keep the older.
+    secureStoreMock.setItemAsync.mockImplementationOnce(async (key: string, value: string) => {
+      await first.promise;
+      store.set(key, value);
+    });
+
+    recordWaitingAsk(askFor({ kiloSessionId: 's1' }));
+    const second = askFor({ kiloSessionId: 's2' });
+    recordWaitingAsk(second);
+
+    first.resolve();
+    await _flushWaitingAskMirrorForTests();
+
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(second));
+  });
+
+  it('keeps the in-memory ask when a mirror write rejects', async () => {
+    secureStoreMock.setItemAsync.mockRejectedValueOnce(new Error('SecureStore unavailable'));
+    const ask = askFor();
+
+    recordWaitingAsk(ask);
+    await expect(_flushWaitingAskMirrorForTests()).resolves.toBeUndefined();
+
+    expect(getWaitingAsk()).toEqual(ask);
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
+  });
+
+  it('survives a JS restart through the SecureStore mirror', async () => {
+    const ask = askFor({
+      kiloSessionId: 's7',
+      status: 'question',
+      statusUpdatedAt: at(-60_000),
+    });
+    recordWaitingAsk(ask);
+
+    // A JS restart drops every module-local value; only the mirror remains.
+    _resetWaitingAskForTests();
+    _setSecureStoreForTests(secureStoreMock);
+    // The restart restores the published snapshot scope alongside the ask; the
+    // hydration fences the ask against it.
+    setLocalScope(CTX);
+    expect(getWaitingAsk()).toBeNull();
+
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
+    expect(getWaitingAsk()).toEqual(ask);
+  });
+
+  it('keeps a live record that lands during the hydration read', async () => {
+    const stale = askFor({ kiloSessionId: 'stale' });
+    store.set(ASK_KEY, JSON.stringify(stale));
+
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return JSON.stringify(stale);
+    });
+
+    const pending = readWaitingAsk();
+    const fresh = askFor({ kiloSessionId: 'fresh', status: 'question' });
+    recordWaitingAsk(fresh);
+    gate.resolve();
+
+    await expect(pending).resolves.toEqual(fresh);
+  });
+
+  it('keeps a mirrored ask recorded for the scope this process publishes', async () => {
+    setLocalScope(CTX);
+    const ask = askFor();
+    store.set(ASK_KEY, JSON.stringify(ask));
+
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
+  });
+
+  it('parses a mirror written before asks named their request', async () => {
+    setLocalScope(CTX);
+    // A release without bindings wrote neither key. The record still names the
+    // session, so it parses: an ask with no identity time and no binding, which
+    // keeps Approve off the surface until a live select reads one.
+    store.set(
+      ASK_KEY,
+      JSON.stringify({
+        kiloSessionId: 's1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: buildOpaqueScopeKey(CTX),
+        organizationId: null,
+        userId: 'u1',
+        recordedAt: NOW,
+      })
+    );
+
+    const ask = await readWaitingAsk();
+    expect(ask).toMatchObject({
+      kiloSessionId: 's1',
+      boundPermissionId: null,
+    });
+    // No time was written, so the record keeps none: its binding key is the
+    // session and status alone.
+    expect(ask?.statusUpdatedAt).toBeUndefined();
+  });
+
+  it('drops a mirrored ask recorded for another scope', async () => {
+    // The mirror outlives a sign-out or an org switch: the ask names a session
+    // and an organization the action would answer, so a foreign one must never
+    // reach a surface or an approval.
+    setLocalScope(CTX);
+    const foreign = askFor({
+      scopeKey: buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-1' }),
+    });
+    store.set(ASK_KEY, JSON.stringify(foreign));
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+  });
+
+  it('drops a readable mirror when no snapshot scope could be restored', async () => {
+    // `restorePersistedGlanceable` found no scope (an absent snapshot, or a read
+    // that failed), so this process cannot prove the ask belongs to the account
+    // it is about to answer for. The stored session and organization must not
+    // reach the Open or Approve surfaces.
+    const unverified = askFor({ kiloSessionId: 'unverified', organizationId: 'org-1' });
+    store.set(ASK_KEY, JSON.stringify(unverified));
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(unverified));
+  });
+
+  it('drops a readable mirror when the restored scope was cleared again', async () => {
+    setLocalScope(CTX);
+    const ask = askFor();
+    store.set(ASK_KEY, JSON.stringify(ask));
+
+    // A sign-out or a privacy blank clears the local scope while the ask mirror
+    // is still on disk; hydration must not accept the ask without a scope to
+    // fence it.
+    _resetGlanceablePersistForTests();
+    _setPersistSecureStoreForTests(secureStoreMock);
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+  });
+
+  // The headless paths restore the snapshot, then read the ask. The record on
+  // disk names the account that published it; when that is not the account
+  // holding the device, the ask it was written beside must not be hydrated.
+  it('drops the ask that sits beside a restored record of another account', async () => {
+    const otherScope = buildOpaqueScopeKey({ userId: 'u2', organizationId: null });
+    store.set(
+      SNAPSHOT_KEY,
+      JSON.stringify(
+        buildGlanceableSnapshot({
+          sessions: [],
+          userId: 'u2',
+          organizationId: null,
+          now: NOW,
+        })
+      )
+    );
+    store.set(ASK_KEY, JSON.stringify(askFor({ scopeKey: otherScope, userId: 'u2' })));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+    // The record is not left for whichever account reads the device next.
+    await _flushWaitingAskMirrorForTests();
+    expect(store.has(ASK_KEY)).toBe(false);
+  });
+
+  it('keeps the ask that sits beside a restored record of the signed-in account', async () => {
+    const ask = askFor();
+    store.set(
+      SNAPSHOT_KEY,
+      JSON.stringify(
+        buildGlanceableSnapshot({
+          sessions: [],
+          userId: 'u1',
+          organizationId: null,
+          now: NOW,
+        })
+      )
+    );
+    store.set(ASK_KEY, JSON.stringify(ask));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
+    await _flushWaitingAskMirrorForTests();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(ask));
+  });
+
+  // The previous release kept the scope key in its own entry. It names the
+  // scope that wrote it, so on an account that does not match it must not fence
+  // an ask on its own.
+  it('drops an ask the previous release fenced with another account scope key', async () => {
+    const otherScope = buildOpaqueScopeKey({ userId: 'u2', organizationId: null });
+    store.set(LEGACY_SCOPE_KEY, otherScope);
+    store.set(ASK_KEY, JSON.stringify(askFor({ scopeKey: otherScope, userId: 'u2' })));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+  });
+
+  it('keeps an ask fenced by a legacy scope key of the signed-in account', async () => {
+    const scopeKey = buildOpaqueScopeKey(CTX);
+    store.set(LEGACY_SCOPE_KEY, scopeKey);
+    store.set(ASK_KEY, JSON.stringify(askFor()));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toEqual(askFor());
+  });
+
+  // Every surface reads the ask at draw time. An account switch publishes the
+  // new scope's frame before the next ask selection lands, and the actions of
+  // the scope that just ended must not survive it.
+  it('stops offering the ask once the process publishes another scope', async () => {
+    const ask = askFor();
+    recordWaitingAsk(ask);
+    expect(getWaitingAsk()).toEqual(ask);
+
+    _setLastGlanceableSnapshotForTests(
+      buildGlanceableSnapshot({
+        sessions: [],
+        userId: 'u2',
+        organizationId: null,
+        now: NOW,
+      })
+    );
+
+    expect(getWaitingAsk()).toBeNull();
+    await expect(readWaitingAsk()).resolves.toBeNull();
+  });
+
+  // The platform sinks draw a frame before the persist sink writes it, and the
+  // publisher records the ask before it emits: the record's own scope is the
+  // one the frame belongs to, so the first frame of a new scope already offers
+  // the ask it selected.
+  it('draws the ask the next frame records before that frame reaches the sink', () => {
+    recordWaitingAsk(askFor());
+    _setLastGlanceableSnapshotForTests(
+      buildGlanceableSnapshot({
+        sessions: [],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+      })
+    );
+
+    const nextCtx = { userId: 'u2', organizationId: null };
+    const next = askFor({ scopeKey: buildOpaqueScopeKey(nextCtx), userId: 'u2' });
+    recordWaitingAsk(next);
+
+    expect(getWaitingAsk()).toEqual(next);
+  });
+
+  it('treats a malformed mirror as absent', async () => {
+    store.set(ASK_KEY, JSON.stringify({ kiloSessionId: 42 }));
+    await expect(readWaitingAsk()).resolves.toBeNull();
+  });
+
+  it('hydrates once, so a later read sees a record made after the first read', async () => {
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    const ask = askFor({ kiloSessionId: 'late' });
+    recordWaitingAsk(ask);
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
+  });
+
+  it('does not resurrect an ask this process cleared while its delete is queued', async () => {
+    const ask = askFor({ kiloSessionId: 's1' });
+    recordWaitingAsk(ask);
+    await _flushWaitingAskMirrorForTests();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(ask));
+
+    // The clear is in memory at once, but its mirror delete waits behind the
+    // write chain (a slow native call, or a burst of records). Hydration reads
+    // the mirror in that window and must not bring the cleared ask back.
+    const queuedDelete = deferred();
+    secureStoreMock.deleteItemAsync.mockImplementationOnce(async (key: string) => {
+      await queuedDelete.promise;
+      store.delete(key);
+    });
+    recordWaitingAsk(null);
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+
+    queuedDelete.resolve();
+    await _flushWaitingAskMirrorForTests();
+    expect(store.has(ASK_KEY)).toBe(false);
+  });
+});

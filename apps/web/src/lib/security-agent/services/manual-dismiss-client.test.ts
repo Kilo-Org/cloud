@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { submitManualFindingDismissal } from './manual-dismiss-client';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
   SECURITY_SYNC_WORKER_URL: 'https://security-sync.test',
 }));
@@ -104,6 +104,28 @@ describe('submitManualFindingDismissal', () => {
     ).rejects.toMatchObject({
       name: 'TRPCError',
       code: 'BAD_GATEWAY',
+    });
+  });
+
+  it('classifies a refused connection as a definitive pre-acceptance rejection', async () => {
+    mockFetch.mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      })
+    );
+
+    await expect(
+      submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      })
+    ).rejects.toMatchObject({
+      name: 'TRPCError',
+      code: 'PRECONDITION_FAILED',
+      message: 'Security service is unavailable',
     });
   });
 
@@ -275,7 +297,7 @@ describe('submitManualFindingDismissal env configuration', () => {
 
   it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
     jest.resetModules();
-    jest.doMock('@/lib/config.server', () => ({
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
       INTERNAL_API_SECRET: 'test-internal-secret',
       SECURITY_SYNC_WORKER_URL: '',
     }));
@@ -301,7 +323,7 @@ describe('submitManualFindingDismissal env configuration', () => {
 
   it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
     jest.resetModules();
-    jest.doMock('@/lib/config.server', () => ({
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
       INTERNAL_API_SECRET: '',
       SECURITY_SYNC_WORKER_URL: 'https://security-sync.test',
     }));

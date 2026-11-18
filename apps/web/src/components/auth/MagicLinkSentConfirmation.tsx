@@ -22,7 +22,10 @@ export function MagicLinkSentConfirmation({ email, onBack }: MagicLinkSentConfir
         </p>
       </div>
       {onBack && (
-        <button onClick={onBack} className="text-muted-foreground text-sm hover:underline">
+        <button
+          onClick={onBack}
+          className="text-muted-foreground text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
+        >
           ← Back to sign in
         </button>
       )}

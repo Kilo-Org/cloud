@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ເຊດຊັນຕົວແທນຂອງທ່ານມີການອັບເດດ",
+      "lowBalance": "ຍອດຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
+      "spendAlert": "ລາຍຈ່າຍຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
+      "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ",
+      "securityUpdate": "ການກວດສອບຄວາມປອດໄພມີການອັບເດດ",
+      "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ການແຈ້ງເຕືອນຍອດຕໍ່າ",
+      "body": "ຍອດ {{organizationName}} ຕົກຕໍ່າກວ່າ ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "ການແຈ້ງເຕືອນລາຍຈ່າຍ",
+      "body": "ລາຍຈ່າຍ {{scopeName}} ໄດ້ເກີນ ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "ຄຳເຕືອນ SLA"
+    },
+    "securityFindingSlaBreach": {
+      "title": "ການລະເມີດ SLA"
+    }
+  },
+  "sessionReady": {
+    "body": "ເຊດຊັນ Kilo ຂອງທ່ານພ້ອມຄວບຄຸມຈາກໂທລະສັບຂອງທ່ານ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

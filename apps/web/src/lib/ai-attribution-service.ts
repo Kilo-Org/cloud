@@ -3,7 +3,7 @@
  */
 
 import crypto from 'crypto';
-import { AI_ATTRIBUTION_ADMIN_SECRET } from '@/lib/config.server';
+import { AI_ATTRIBUTION_ADMIN_SECRET } from '@kilocode/web-shared/lib/config.server';
 import 'server-only';
 import { z } from 'zod';
 
@@ -48,6 +48,9 @@ const DebugDataResponse = z.discriminatedUnion('success', [
       doKey: z.string(),
       attributions: z.array(AttributionRecord),
       summary: DebugDataSummary,
+      // Optional because a Worker deploy that fails or runs late leaves the
+      // previous worker answering this route without it.
+      instance_summary: DebugDataSummary.optional(),
     }),
   }),
   z.object({

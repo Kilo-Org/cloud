@@ -1,11 +1,16 @@
 // A single line of a diff, rendered in JetBrains Mono with syntax
-// highlighting, a gutter for old/new line numbers, and a tinted
+// highlighting, a gutter for the line number, and a tinted
 // background that signals add / del / context.
 //
 // Row height scales with the system font scale (bounded — see
 // `diff-font-metrics.ts`). The cap preserves diff density and the
 // 56-point gutter; honouring the raw a11y scale (1.8x at AX5) would
 // overflow the gutter and break the side-by-side grid.
+//
+// The code `Text` names its own LTR base direction (`LTR_TEXT_DIRECTION`):
+// code reads left to right in every interface language, and inheriting an RTL
+// interface's direction would right-align it, so a wrapped line's continuation
+// would start mid-row instead of under the first line's start.
 //
 // S7a adds two opt-in behaviours, both passed from the diff list:
 //   - `onTap` makes the line tappable; the diff list runs the
@@ -30,7 +35,15 @@
 //     nominal 44pt vertical target on contiguous rows.
 
 import { memo, useMemo } from 'react';
-import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import {
+  Pressable,
+  Text as RNText,
+  type TextStyle,
+  useColorScheme,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
@@ -38,18 +51,27 @@ import { hitSlopForRow } from '@/lib/pr-review/diff/diff-target';
 import {
   buildDiffLineAccessibilityLabel,
   diffLineMarker,
+  diffLineNumber,
   type ParsedDiffLine,
 } from '@/lib/pr-review/diff/parse-patch';
-import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 import {
   DIFF_MAX_FONT_SCALE,
   useDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 
 const GUTTER_WIDTH = 56;
 const VERTICAL_PADDING = 2;
-const NO_NEWLINE_INDICATOR = '\u26A0\uFE0F no newline at end of file';
+// The row's only horizontal inset is the gutter's trailing `pr-2`. The row
+// mirrors under an RTL interface, so a physical right inset alone leaves the
+// LTR code Text flush against the physical left edge there. A logical end
+// inset keeps both ends of the mirrored row clear of the edge; 8 dp is this
+// row's chosen inset, while the gutter's `pr-2` utility resolves to 7 dp at
+// this app's rem.
+const CODE_END_PADDING = 8;
 
 type DiffLineProps = {
   line: ParsedDiffLine;
@@ -61,14 +83,13 @@ type DiffLineProps = {
   isSelected?: boolean;
 };
 
+// The gutter shows the same number the row's accessibility label speaks
+// (`diffLineNumber`): new-file numbering, so a context line reads the same
+// when drawn and when announced, matching the add rows and the RIGHT-side
+// comment anchor. A single 56pt gutter has no room for both numbers at the
+// bounded font scale.
 function gutterTextFor(line: ParsedDiffLine): string {
-  if (line.type === 'add') {
-    return `${line.newLine ?? ''}`;
-  }
-  if (line.type === 'del') {
-    return `${line.oldLine ?? ''}`;
-  }
-  return `${line.oldLine ?? line.newLine ?? ''}`;
+  return `${diffLineNumber(line) ?? ''}`;
 }
 
 function rowBackgroundFor(type: ParsedDiffLine['type']): string {
@@ -96,7 +117,9 @@ function markerColorFor(
 
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {
   const colors = useThemeColors();
-  const isDark = colors.background === '#0E0E10';
+  const { t } = useTranslation();
+  // Same signal `useThemeColors` reads; never a background-token equality.
+  const isDark = useColorScheme() === 'dark';
   const metrics = useDiffFontMetrics();
 
   const tokens = useMemo<HighlightToken[]>(
@@ -108,7 +131,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   const rowBackground = rowBackgroundFor(line.type);
   const gutterColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const noNewlineColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
-  const noNewlineLabel = ` ${NO_NEWLINE_INDICATOR}`;
+  const noNewlineLabel = ` ${t('prReview.sideBySide.noNewlineAtEndOfFile')}`;
   const marker = diffLineMarker(line.type);
   const markerColor = markerColorFor(line.type, colors);
   const accessibilityLabel = buildDiffLineAccessibilityLabel(line);
@@ -120,9 +143,18 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   const gutterStyle: ViewStyle = {
     width: GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
+    // Top-aligned with the code's first line: the code container pads both
+    // edges by VERTICAL_PADDING, so a wrapped code line makes the row two
+    // lines tall and a centered number would drift onto the later visual
+    // line instead of lining up with the row's start.
+    paddingTop: VERTICAL_PADDING,
   };
-  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeContainerStyle: ViewStyle = {
+    paddingVertical: VERTICAL_PADDING,
+    paddingEnd: CODE_END_PADDING,
+  };
   const codeBaseStyle: TextStyle = {
+    ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',
     fontSize: metrics.codeFontSize,
     lineHeight: metrics.lineHeight,
@@ -145,7 +177,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
 
   const content = (
     <View className={cn('flex-row items-stretch', rowBackground, selectionClass)} style={rowStyle}>
-      <View className="items-end justify-center pr-2" style={gutterStyle}>
+      <View className="items-end justify-start pr-2" style={gutterStyle}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for gutter */}
         <RNText
           adjustsFontSizeToFit
@@ -180,15 +212,9 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
           selectable
           style={{ ...codeBaseStyle, color: colors.foreground }}
         >
-          {tokens.map((token, index) => {
-            const tokenColor = tokenColorFor(token.className, isDark);
-            return (
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
-                {token.text}
-              </RNText>
-            );
-          })}
+          {/* Untagged runs are raw strings inside this Text, so only the
+              highlighter's tagged runs cost an Android span. */}
+          {highlightRunChildren(tokens, isDark ? 'onDark' : 'onLight')}
           {line.noNewlineAtEndOfFile ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>
@@ -207,8 +233,8 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
       accessibilityRole="button"
       accessibilityLabel={
         isSelected
-          ? `Selected ${accessibilityLabel}, tap to change selection`
-          : `${accessibilityLabel}, tap to comment`
+          ? t('prReview.diff.selectedTapToChange', { label: accessibilityLabel })
+          : t('prReview.diff.tapToComment', { label: accessibilityLabel })
       }
       accessibilityState={{ selected: Boolean(isSelected) }}
       hitSlop={hitSlop}

@@ -1,69 +1,66 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
-import { db } from '@/lib/drizzle';
-import { cli_sessions_v2, cloud_agent_session_runs } from '@kilocode/db/schema';
-import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  activeSessionSchema,
+  listActiveSessions,
+  resolveActiveSessionStatus,
+  CLOUD_AGENT_CONNECTION_ID,
+  type ActiveSession,
+} from '@/lib/active-sessions-list';
+import { homeWidgetResponseSchema } from '@kilocode/app-shared/home-widget';
+import { buildHomeWidgetResponseForUser } from '@/lib/glanceable-agents-snapshot-server';
+import { issueHomeWidgetCredential } from '@/lib/auth/home-widget-credential';
 
-export const activeSessionSchema = z.object({
-  id: z.string(),
-  status: z.string(),
-  title: z.string(),
-  connectionId: z.string(),
-  gitUrl: z.string().optional(),
-  gitBranch: z.string().optional(),
-  createdOnPlatform: z.string().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-  /**
-   * Latest agent activity timestamp from `cli_sessions_v2.last_activity_at`
-   * (raw DB text, same treatment as `createdAt`/`updatedAt`). Omitted when
-   * the column is NULL or the row was never enriched.
-   */
-  lastActivityAt: z.string().optional(),
-  /**
-   * Capabilities advertised by the CLI connection that owns this session.
-   * Omitted when the owning connection's latest heartbeat did not include a
-   * capabilities object (legacy CLI, or a CLI that predates the field).
-   */
-  capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
-  // Optional: legacy CLIs (predating the `kilo remote` spawner) never
-  // report a platform. Only present in the response when the CLI supplied it.
-  platform: z.string().optional(),
-  /**
-   * Optional total session cost from `cli_sessions_v2.total_cost_microdollars`
-   * (microdollars, bigint). Only present when the DB row carries a non-null
-   * value — null never goes on the wire. Unenriched heartbeat rows (no
-   * `cli_sessions_v2` join) omit the key. The wire may legitimately carry
-   * zero; display still omits it via `formatSessionTotalCost`.
-   */
-  totalCostMicrodollars: z.number().optional(),
-});
-
-const activeSessionsResponseSchema = z.object({
-  sessions: z.array(activeSessionSchema),
-});
+// Re-exported for existing consumers and tests.
+export {
+  activeSessionSchema,
+  resolveActiveSessionStatus,
+  CLOUD_AGENT_CONNECTION_ID,
+  type ActiveSession,
+};
 
 const connectedInstanceSchema = z.object({
   connectionId: z.string(),
   name: z.string(),
   projectName: z.string(),
   version: z.string().optional(),
+  // Old CLIs and hibernated attachments omit this metadata. Remove these defaults
+  // only after all supported metadata-free producers and attachments have retired.
+  kind: z.enum(['cli', 'remote']).default('cli'),
+  startedAt: z.string().datetime({ precision: 3 }).length(24).nullable().default(null),
+  gitBranch: z.string().max(24).nullable().default(null),
   /**
    * Capabilities advertised by this connected CLI instance. Omitted when the
    * CLI's latest attachment did not include a capabilities object (legacy CLI
    * or a build that predates the field).
    */
-  capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
+  capabilities: z
+    .object({
+      attachments: z.boolean().optional(),
+      // Old form is absent sessionClone; treat missing as incapable until
+      // every shipped CLI advertises it.
+      sessionClone: z.boolean().optional(),
+      // Absent means the CLI cannot clone up to a message (fork from here).
+      sessionCloneAtMessage: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const connectedInstancesResponseSchema = z.object({
   instances: z.array(connectedInstanceSchema),
 });
+
+export type ConnectedInstance = z.infer<typeof connectedInstanceSchema>;
 
 /**
  * Session Ingest `/api/user/web-ticket` mint response. Parsed at runtime so a
@@ -73,38 +70,6 @@ const webTicketResponseSchema = z.object({
   ticket: z.string().min(1),
   expiresAt: z.number(),
 });
-
-/**
- * A live session as this router returns it: the worker's wire row plus the
- * fields enriched from `cli_sessions_v2`.
- */
-export type ActiveSession = z.infer<typeof activeSessionSchema> & {
-  /**
-   * Owning organization from `cli_sessions_v2`; `null` = personal, which
-   * also covers a live session with no `cli_sessions_v2` row (an
-   * unattributable session — the server attributes it to personal).
-   *
-   * This router sets the field on EVERY row it returns, so an absent value
-   * on a client-cached row means exactly one thing: that row entered the
-   * cache from a WS payload and has never been server-attributed. The
-   * client filter relies on that (see the mobile
-   * `filterActiveSessionsByOrganization`). The field stays optional in the
-   * type only because those WS-inserted cached rows share it.
-   */
-  organizationId?: string | null;
-};
-export type ConnectedInstance = z.infer<typeof connectedInstanceSchema>;
-
-/** Sentinel `connectionId` for cloud-agent rows merged when the flag is on. */
-export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
-
-/**
- * Warm-idle window for live cloud sessions. Mirrors
- * `KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT` in
- * services/cloud-agent-next/src/persistence/CloudAgentSession.ts:189-190.
- * Env override drift is accepted (A2).
- */
-const CLOUD_AGENT_WARM_IDLE_CUTOFF = sql`now() - interval '15 minutes'`;
 
 const listInputSchema = z
   .object({
@@ -124,115 +89,14 @@ const listInputSchema = z
   })
   .optional();
 
-type EnrichmentRow = {
-  session_id: string;
-  created_on_platform: string | null;
-  created_at: string;
-  updated_at: string;
-  status: string | null;
-  title: string | null;
-  organization_id: string | null;
-  last_activity_at: string | null;
-  total_cost_microdollars: number | null;
-};
-
-type CloudCandidateRow = EnrichmentRow & {
-  git_url: string | null;
-  git_branch: string | null;
-  cloud_agent_session_id: string | null;
-};
-
-/**
- * Overlay stored attention (question/permission) onto a live heartbeat
- * status. Non-attention DB values yield to live so busy/idle remain
- * authoritative while the CLI is connected.
- *
- * Must run in the router: client fetchQuery replaces the cache wholesale,
- * so sticky attention held only in client helpers is wiped on every
- * enrichment / reconnect / cli.connected refresh.
- */
-export function resolveActiveSessionStatus(
-  liveStatus: string,
-  storedStatus: string | null | undefined
-): string {
-  if (storedStatus === 'question' || storedStatus === 'permission') {
-    return storedStatus;
-  }
-  return liveStatus;
-}
-
-function mapEnrichedHeartbeatSession(
-  session: ActiveSession,
-  row: EnrichmentRow | undefined
-): ActiveSession {
-  if (!row) {
-    // Always emit the field, `null` included: an absent `organizationId` on
-    // a client-cached row must mean "never server-attributed" and nothing
-    // else, or the client filter cannot tell a heartbeat-inserted row apart
-    // from a server-attributed personal one (D4/D6).
-    return { ...session, organizationId: null };
-  }
-  const mapped: ActiveSession = {
-    ...session,
-    status: resolveActiveSessionStatus(session.status, row.status),
-    // The tray title must be what a rename wrote, not what the CLI still
-    // reports: nothing propagates a cloud rename back to the CLI, so the
-    // heartbeat title stays stale forever. A NULL title (never-ingested
-    // placeholder row) falls back to the live one.
-    title: row.title ?? session.title,
-    organizationId: row.organization_id,
-    createdOnPlatform: row.created_on_platform ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-  if (row.last_activity_at != null) {
-    mapped.lastActivityAt = row.last_activity_at;
-  }
-  if (row.total_cost_microdollars != null) {
-    mapped.totalCostMicrodollars = row.total_cost_microdollars;
-  }
-  return mapped;
-}
-
-function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
-  const mapped: ActiveSession = {
-    id: row.session_id,
-    // Cloud rows have no live heartbeat source — use the stored status as-is
-    // (do NOT run resolveActiveSessionStatus).
-    status: row.status ?? '',
-    title: row.title ?? '',
-    connectionId: CLOUD_AGENT_CONNECTION_ID,
-    gitUrl: row.git_url ?? undefined,
-    gitBranch: row.git_branch ?? undefined,
-    createdOnPlatform: row.created_on_platform ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    // Key ALWAYS emitted, null included (D21) — mobile filter treats an
-    // absent key as never-attributed and would hide personal cloud rows.
-    organizationId: row.organization_id ?? null,
-  };
-  if (row.last_activity_at != null) {
-    mapped.lastActivityAt = row.last_activity_at;
-  }
-  if (row.total_cost_microdollars != null) {
-    mapped.totalCostMicrodollars = row.total_cost_microdollars;
-  }
-  return mapped;
-}
-
-function throwOrgContextFailure(error: unknown): never {
-  throw new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: 'Failed to resolve the organization context for active sessions',
-    cause: error,
-  });
-}
-
 /**
  * Mint a one-use web ticket from Session Ingest for the given user. The
  * returned `token` is the opaque ticket; `expiresAt` is the Unix-seconds
- * expiry from the worker body. A missing worker URL or a non-2xx mint
- * response fails fast with PRECONDITION_FAILED rather than hanging.
+ * expiry from the worker body.
+ *
+ * Only a missing worker URL is PRECONDITION_FAILED. A worker that cannot be
+ * reached or does not answer inside the budget is SERVICE_UNAVAILABLE; a
+ * non-2xx or malformed mint response is BAD_GATEWAY.
  */
 async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt: number }> {
   if (!SESSION_INGEST_WORKER_URL) {
@@ -242,35 +106,51 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
     });
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    // Bounded: a worker that never answers rejects inside the budget with
+    // `ServiceFetchTimeoutError`, which the catch below maps to
+    // SERVICE_UNAVAILABLE exactly as any other transport failure.
+    response = await fetchWithinBudget(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (error) {
     throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Session ingest is not configured',
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session ingest is unavailable',
       cause: error,
     });
   }
 
   if (!response.ok) {
+    // The mint reports a retryable condition with 503: the Durable Object hop
+    // was unavailable or outlived its budget inside the worker, so a retry can
+    // still mint. Keep that retryability instead of flattening it into a
+    // gateway error the client would treat as final.
+    if (response.status === 503 || response.status === 504) {
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+    }
     throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Session ingest is not configured',
+      code: 'BAD_GATEWAY',
+      message: `Session ingest failed to mint a ticket (status ${response.status})`,
     });
   }
 
-  const raw = await response.json();
+  const raw: unknown = await response.json().catch(() => undefined);
   const parsed = webTicketResponseSchema.safeParse(raw);
   if (!parsed.success) {
     throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
+      code: 'BAD_GATEWAY',
       message: 'Invalid ticket response from session ingest',
       cause: parsed.error,
     });
@@ -302,185 +182,35 @@ export const activeSessionsRouter = createTRPCRouter({
     if (typeof organizationId === 'string') {
       await ensureOrganizationAccess(ctx, organizationId);
     }
-
-    // Phase 1: fetch + parse the worker response. Any failure here
-    // (HTTP error, malformed JSON, schema mismatch) degrades to an empty
-    // list exactly as before — these are "no data" outcomes from the
-    // mobile client's point of view. With includeCloudAgentSessions, all
-    // three early exits fall through to the cloud-candidates query (D11).
-    let parsed: { sessions: ActiveSession[] } = { sessions: [] };
-
-    if (!SESSION_INGEST_WORKER_URL) {
-      if (!includeCloudAgentSessions) {
-        return { sessions: [] as ActiveSession[] };
-      }
-    } else {
-      const token = generateInternalServiceToken(ctx.user.id);
-      const url = `${SESSION_INGEST_WORKER_URL}/api/sessions/active`;
-
-      try {
-        const response = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!response.ok) {
-          console.warn(
-            `[active-sessions] fetch failed: ${response.status} ${response.statusText}`,
-            await response.text().catch(() => '')
-          );
-          if (!includeCloudAgentSessions) {
-            return { sessions: [] as ActiveSession[] };
-          }
-        } else {
-          const raw = await response.json();
-          parsed = activeSessionsResponseSchema.parse(raw);
-        }
-      } catch (error) {
-        console.warn('[active-sessions] error:', error);
-        if (!includeCloudAgentSessions) {
-          return { sessions: [] as ActiveSession[] };
-        }
-      }
-    }
-
-    // Phase 2a — Query 1: enrich heartbeat sessions from cli_sessions_v2.
-    // Independent try/catch from Query 2 (D16). Skipped when there are no
-    // heartbeat ids (never an empty inArray).
-    const ids = parsed.sessions.map(s => s.id);
-    let enrichmentRows: EnrichmentRow[] = [];
-    let enrichmentFailed = false;
-
-    if (ids.length > 0) {
-      try {
-        enrichmentRows = await db
-          .select({
-            session_id: cli_sessions_v2.session_id,
-            created_on_platform: cli_sessions_v2.created_on_platform,
-            created_at: cli_sessions_v2.created_at,
-            updated_at: cli_sessions_v2.updated_at,
-            status: cli_sessions_v2.status,
-            title: cli_sessions_v2.title,
-            organization_id: cli_sessions_v2.organization_id,
-            last_activity_at: cli_sessions_v2.last_activity_at,
-            total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
-          })
-          .from(cli_sessions_v2)
-          .where(
-            and(
-              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
-              inArray(cli_sessions_v2.session_id, ids)
-            )
-          );
-      } catch (error) {
-        console.warn('[active-sessions] enrichment db query failed:', error);
-        // Attribution is unknowable without the join. An unfiltered caller (web,
-        // `resolveSession`) keeps the existing best-effort unenriched passthrough —
-        // a DB blip must not collapse its list. A filtered caller cannot be
-        // answered at all: calling every row personal would lie (breaking AC 1)
-        // and returning an empty list would silently blank the tray with no
-        // explanation. So fail the query and let the client's already-shipped
-        // retryable state handle it (D11).
-        if (organizationId === undefined) {
-          enrichmentFailed = true;
-          if (!includeCloudAgentSessions) {
-            return parsed;
-          }
-        } else {
-          throwOrgContextFailure(error);
-        }
-      }
-    } else if (!includeCloudAgentSessions) {
-      // Flag-off empty heartbeats: today's short-circuit (no DB).
-      return parsed;
-    }
-
-    let sessions: ActiveSession[];
-    if (enrichmentFailed) {
-      // Unfiltered + flag on: keep wire rows unenriched, still attempt cloud.
-      sessions = [...parsed.sessions];
-    } else {
-      const byId = new Map(enrichmentRows.map(r => [r.session_id, r]));
-      sessions = [];
-      for (const session of parsed.sessions) {
-        const row = byId.get(session.id);
-        // No `cli_sessions_v2` row → unattributable → personal. An SQL-side filter
-        // could not tell this case apart from "belongs to another organization".
-        const rowOrganizationId = row?.organization_id ?? null;
-        if (organizationId !== undefined && rowOrganizationId !== organizationId) {
-          continue;
-        }
-        sessions.push(mapEnrichedHeartbeatSession(session, row));
-      }
-    }
-
-    // Phase 2b — Query 2: live cloud-agent candidates (flag-on only).
-    // Own try/catch; failure semantics mirror Query 1 (D16).
-    if (includeCloudAgentSessions) {
-      try {
-        const orgPredicate =
-          organizationId === null
-            ? isNull(cli_sessions_v2.organization_id)
-            : typeof organizationId === 'string'
-              ? eq(cli_sessions_v2.organization_id, organizationId)
-              : undefined;
-
-        const livePredicate = or(
-          sql`EXISTS (
-            SELECT 1 FROM ${cloud_agent_session_runs}
-            WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
-              AND ${cloud_agent_session_runs.terminal_at} IS NULL
-          )`,
-          and(
-            eq(cli_sessions_v2.status, 'idle'),
-            gt(cli_sessions_v2.status_updated_at, CLOUD_AGENT_WARM_IDLE_CUTOFF)
-          )
-        );
-
-        const cloudRows: CloudCandidateRow[] = await db
-          .select({
-            session_id: cli_sessions_v2.session_id,
-            created_on_platform: cli_sessions_v2.created_on_platform,
-            created_at: cli_sessions_v2.created_at,
-            updated_at: cli_sessions_v2.updated_at,
-            status: cli_sessions_v2.status,
-            title: cli_sessions_v2.title,
-            organization_id: cli_sessions_v2.organization_id,
-            git_url: cli_sessions_v2.git_url,
-            git_branch: cli_sessions_v2.git_branch,
-            last_activity_at: cli_sessions_v2.last_activity_at,
-            total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
-            cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
-          })
-          .from(cli_sessions_v2)
-          .where(
-            and(
-              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
-              isNull(cli_sessions_v2.parent_session_id),
-              isNotNull(cli_sessions_v2.cloud_agent_session_id),
-              orgPredicate,
-              livePredicate
-            )
-          )
-          .orderBy(desc(cli_sessions_v2.created_at))
-          .limit(50);
-
-        const heartbeatIds = new Set(sessions.map(s => s.id));
-        for (const row of cloudRows) {
-          // CLI adoption wins: keep the worker row's real connectionId/status.
-          if (heartbeatIds.has(row.session_id)) continue;
-          sessions.push(mapCloudCandidateRow(row));
-        }
-      } catch (error) {
-        console.warn('[active-sessions] cloud candidates db query failed:', error);
-        if (organizationId !== undefined) {
-          throwOrgContextFailure(error);
-        }
-        // Unfiltered: skip cloud merge, return heartbeat rows as built.
-      }
-    }
-
-    return { sessions };
+    return listActiveSessions({
+      userId: ctx.user.id,
+      organizationId,
+      includeCloudAgentSessions,
+    });
   }),
+
+  /** Foreground JS consumers use normal user auth; native background reads use the dedicated widget route. */
+  widgetSnapshot: baseProcedure
+    .input(z.object({ organizationId: z.uuid().nullable() }))
+    .output(homeWidgetResponseSchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId !== null) {
+        // A personal widget never uses the platform-admin elevation bypass and
+        // never accepts a support grant.
+        await ensureMemberOrganizationAccess(ctx.user, input.organizationId);
+      }
+      return buildHomeWidgetResponseForUser({
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+      });
+    }),
+
+  widgetCredential: baseProcedure
+    .input(z.object({ organizationId: z.uuid().nullable() }))
+    .output(z.object({ token: z.string().min(1), expiresAt: z.number().int().positive() }))
+    .query(({ ctx, input }) =>
+      issueHomeWidgetCredential(ctx.user, input.organizationId, ctx.headersList)
+    ),
 
   /**
    * Live snapshot of every `kilo remote` instance currently connected for the
@@ -497,12 +227,18 @@ export const activeSessionsRouter = createTRPCRouter({
       });
     }
 
-    const token = generateInternalServiceToken(ctx.user.id);
+    const token = generateBoundedInternalServiceToken(ctx.user.id, {
+      audience: SESSION_INGEST_AUDIENCE,
+      expiresIn: 60 * 60,
+    });
     const url = `${SESSION_INGEST_WORKER_URL}/api/instances/active`;
 
     let response: Response;
     try {
-      response = await fetch(url, {
+      // Bounded: a worker that never answers rejects inside the budget with
+      // `ServiceFetchTimeoutError`, which the catch below maps to the existing
+      // INTERNAL_SERVER_ERROR exactly as any other transport failure.
+      response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (error) {

@@ -28,12 +28,17 @@ function makeSummary(model: string): BenchmarkModelSummary {
     routeKey: '*',
     accuracy: 0.9,
     avgCostUsd: 0.001,
+    avgInputTokens: 100.5,
+    avgCachedInputTokens: 40.25,
+    avgOutputTokens: 20.5,
+    avgReasoningTokens: 10.75,
     avgLatencyMs: 100,
     p50LatencyMs: 90,
     p95LatencyMs: 120,
     cases: 216,
     errors: 0,
     timeouts: 0,
+    routeAccuracy: null,
   };
 }
 
@@ -52,12 +57,42 @@ describe('replaceModelSummaries', () => {
     await replaceModelSummaries({} as D1Database, 'run-1', summaries);
 
     expect(mocks.insertValues).toHaveBeenCalledTimes(2);
-    // 13 bind values per row × 7 rows = 91 < 100 D1 variable ceiling.
+    // 18 bind values per row × 5 rows = 90 < 100 D1 variable ceiling.
     expect(mocks.insertValues.mock.calls.map(([rows]) => (rows as unknown[]).length)).toEqual([
-      7, 3,
+      5, 5,
     ]);
+    expect(mocks.insertValues.mock.calls[0]?.[0]).toContainEqual(
+      expect.objectContaining({
+        avg_input_tokens: 100.5,
+        avg_cached_input_tokens: 40.25,
+        avg_output_tokens: 20.5,
+        avg_reasoning_tokens: 10.75,
+        carried: false,
+      })
+    );
     expect(mocks.batch).toHaveBeenCalledTimes(1);
     expect(mocks.batch.mock.calls[0]?.[0]).toHaveLength(3);
+  });
+
+  it('stores absent token averages from older summaries as null', async () => {
+    await replaceModelSummaries({} as D1Database, 'run-1', [
+      {
+        ...makeSummary('model/legacy'),
+        avgInputTokens: undefined,
+        avgCachedInputTokens: undefined,
+        avgOutputTokens: undefined,
+        avgReasoningTokens: undefined,
+      },
+    ]);
+
+    expect(mocks.insertValues.mock.calls[0]?.[0]).toContainEqual(
+      expect.objectContaining({
+        avg_input_tokens: null,
+        avg_cached_input_tokens: null,
+        avg_output_tokens: null,
+        avg_reasoning_tokens: null,
+      })
+    );
   });
 });
 
@@ -97,7 +132,16 @@ describe('insertRun', () => {
       .map(([rows]) => rows)
       .filter(Array.isArray)
       .map(rows => rows.length);
-    expect(carriedInsertSizes).toEqual([7, 3]);
+    expect(carriedInsertSizes).toEqual([5, 5]);
+    expect(mocks.insertValues.mock.calls[1]?.[0]).toContainEqual(
+      expect.objectContaining({
+        avg_input_tokens: 100.5,
+        avg_cached_input_tokens: 40.25,
+        avg_output_tokens: 20.5,
+        avg_reasoning_tokens: 10.75,
+        carried: true,
+      })
+    );
     expect(mocks.batch).toHaveBeenCalledTimes(1);
     expect(mocks.batch.mock.calls[0]?.[0]).toHaveLength(3);
   });

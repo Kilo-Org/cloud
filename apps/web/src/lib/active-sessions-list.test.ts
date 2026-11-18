@@ -1,0 +1,246 @@
+/**
+ * @jest-environment node
+ *
+ * The cloud-candidate query must keep a hard ceiling. `livePredicate` only
+ * time-bounds its warm-idle branch: an open `cloud_agent_session_runs` row with
+ * no `terminal_at` keeps its session a candidate until the 90-day session
+ * cascade, so a removed `LIMIT` left the tray's row count unbounded. The
+ * ceiling is asserted against a capturing fake so the check needs no database.
+ */
+/* eslint-disable import/first -- the fake db must be installed before the module under test loads */
+
+const limitMock = jest.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a chainable query-builder double
+const chain: Record<string, jest.Mock> = {
+  from: jest.fn((): unknown => chain),
+  leftJoin: jest.fn((): unknown => chain),
+  leftJoinLateral: jest.fn((): unknown => chain),
+  where: jest.fn((): unknown => chain),
+  orderBy: jest.fn((): unknown => chain),
+  limit: limitMock,
+};
+const selectMock = jest.fn((): unknown => chain);
+const dbMock = { select: selectMock };
+
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  get db() {
+    return dbMock;
+  },
+}));
+
+// Undefined skips phase 1 (the worker fetch), leaving the cloud-candidate
+// query as the only db read this test drives.
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  SESSION_INGEST_WORKER_URL: undefined,
+}));
+
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+  generateBoundedInternalServiceToken: () => 'test-token',
+}));
+
+jest.mock('@/lib/session-associated-pr', () => {
+  const { z } = jest.requireActual('zod');
+  const actual = jest.requireActual('@/lib/session-associated-pr');
+  return {
+    sessionAssociatedPr: actual.sessionAssociatedPr,
+    associatedPrSchema: z.object({}).passthrough(),
+    // Mirror the real gate: only a session whose own stored link GitHub has
+    // verified renders an associatedPr; no link or an unverified link renders
+    // nothing.
+    formatAssociatedPr: (session: {
+      pr_url: string | null;
+      pr_number: number | null;
+      pr_link_verified_at: string | null;
+    }) =>
+      session.pr_url === null || session.pr_link_verified_at === null
+        ? null
+        : { number: session.pr_number, verified: true },
+  };
+});
+
+import { CLOUD_AGENT_CANDIDATE_LIMIT, listActiveSessions } from './active-sessions-list';
+
+beforeEach(() => {
+  for (const method of ['from', 'leftJoin', 'leftJoinLateral', 'where', 'orderBy']) {
+    chain[method].mockClear();
+  }
+  selectMock.mockClear();
+  limitMock.mockReset();
+  limitMock.mockResolvedValue([]);
+});
+
+describe('listActiveSessions cloud candidates', () => {
+  it('rejects an unconfigured source instead of confirming empty Home work', async () => {
+    await expect(
+      listActiveSessions({
+        userId: 'user-1',
+        organizationId: null,
+        includeCloudAgentSessions: true,
+        requireCompleteSnapshot: true,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+  it('applies a hard ceiling far above the live-agent target', async () => {
+    const result = await listActiveSessions({
+      userId: 'user-1',
+      organizationId: undefined,
+      includeCloudAgentSessions: true,
+    });
+
+    expect(result).toEqual({ sessions: [] });
+    // The cloud-candidate query is the only db read, and it is ordered
+    // newest-first and then capped.
+    expect(selectMock).toHaveBeenCalledTimes(1);
+    expect(chain.orderBy).toHaveBeenCalledTimes(1);
+    expect(limitMock).toHaveBeenCalledTimes(1);
+    expect(limitMock).toHaveBeenCalledWith(CLOUD_AGENT_CANDIDATE_LIMIT);
+    // The owner's target is 100 live agents; the ceiling sits far above it (a
+    // backstop, not a guarantee — see its doc comment).
+    expect(CLOUD_AGENT_CANDIDATE_LIMIT).toBeGreaterThan(100);
+  });
+
+  it('does not cap the query below the 60 live candidates the tray must show', async () => {
+    const sixty = Array.from({ length: 60 }, (_value, index) => ({
+      session_id: `session-${index}`,
+      created_on_platform: null,
+      created_at: '2026-09-22T09:00:00.000Z',
+      updated_at: '2026-09-22T09:30:00.000Z',
+      status: 'busy',
+      title: `Session ${index}`,
+      organization_id: null,
+      git_url: null,
+      git_branch: null,
+      last_activity_at: null,
+      status_updated_at: null,
+      total_cost_microdollars: null,
+      cloud_agent_session_id: `cas-${index}`,
+      run_open: true,
+      session_pr_platform: null,
+      session_pr_url: null,
+      session_pr_number: null,
+      session_pr_verified_at: null,
+      pr_url: null,
+      pr_number: null,
+      pr_state: null,
+      pr_title: null,
+      pr_head_sha: null,
+      pr_last_synced_at: null,
+      pr_review_decision: null,
+      review_decision_pending: null,
+    }));
+    limitMock.mockResolvedValue(sixty);
+
+    const result = await listActiveSessions({
+      userId: 'user-1',
+      organizationId: undefined,
+      includeCloudAgentSessions: true,
+    });
+
+    expect(limitMock).toHaveBeenCalledWith(CLOUD_AGENT_CANDIDATE_LIMIT);
+    expect(result.sessions).toHaveLength(60);
+  });
+
+  it('forwards the session verified-at so an unverified link renders no associatedPr', async () => {
+    const baseRow = {
+      created_on_platform: null,
+      created_at: '2026-09-22T09:00:00.000Z',
+      updated_at: '2026-09-22T09:30:00.000Z',
+      status: 'busy',
+      title: 'candidate',
+      organization_id: null,
+      git_url: 'https://github.com/kilo/repo',
+      git_branch: 'feature/x',
+      last_activity_at: null,
+      status_updated_at: null,
+      total_cost_microdollars: null,
+      cloud_agent_session_id: 'cas-1',
+      run_open: true,
+      session_pr_platform: 'github',
+      session_pr_url: 'https://github.com/kilo/repo/pull/7',
+      session_pr_number: 7,
+      pr_url: null,
+      pr_number: null,
+      pr_state: null,
+      pr_title: null,
+      pr_head_sha: null,
+      pr_last_synced_at: null,
+      pr_review_decision: null,
+      review_decision_pending: null,
+    };
+
+    limitMock.mockResolvedValue([
+      { ...baseRow, session_id: 'verified', session_pr_verified_at: '2026-01-01T00:00:00.000Z' },
+      { ...baseRow, session_id: 'unverified', session_pr_verified_at: null },
+    ]);
+
+    const result = await listActiveSessions({
+      userId: 'user-1',
+      organizationId: undefined,
+      includeCloudAgentSessions: true,
+    });
+
+    const verified = result.sessions.find(s => s.id === 'verified');
+    const unverified = result.sessions.find(s => s.id === 'unverified');
+    // Only the verified link is surfaced at all; the unverified link is a guess
+    // and the key is omitted rather than emitted as `associatedPr: null`.
+    expect(verified?.associatedPr).toMatchObject({ number: 7, verified: true });
+    expect(unverified?.associatedPr).toBeUndefined();
+  });
+
+  it.each([
+    ['idle', true, 'busy', undefined],
+    ['busy', true, 'busy', '2026-09-22T09:15:00.000Z'],
+    ['question', true, 'question', '2026-09-22T09:15:00.000Z'],
+    ['permission', true, 'permission', '2026-09-22T09:15:00.000Z'],
+    ['idle', false, 'idle', '2026-09-22T09:15:00.000Z'],
+  ])(
+    'dates stored %s with run_open=%s only when the resolved %s status matches',
+    async (storedStatus, runOpen, resolvedStatus, statusUpdatedAt) => {
+      limitMock.mockResolvedValue([
+        {
+          session_id: 'candidate',
+          created_on_platform: null,
+          created_at: '2026-09-22T09:00:00.000Z',
+          updated_at: '2026-09-22T09:30:00.000Z',
+          status: storedStatus,
+          title: 'candidate',
+          organization_id: null,
+          git_url: null,
+          git_branch: null,
+          last_activity_at: null,
+          status_updated_at: '2026-09-22 09:15:00+00',
+          total_cost_microdollars: null,
+          cloud_agent_session_id: 'cas-1',
+          run_open: runOpen,
+          session_pr_platform: null,
+          session_pr_url: null,
+          session_pr_number: null,
+          session_pr_verified_at: null,
+          pr_url: null,
+          pr_number: null,
+          pr_state: null,
+          pr_title: null,
+          pr_head_sha: null,
+          pr_last_synced_at: null,
+          pr_review_decision: null,
+          review_decision_pending: null,
+        },
+      ]);
+
+      const result = await listActiveSessions({
+        userId: 'user-1',
+        organizationId: undefined,
+        includeCloudAgentSessions: true,
+      });
+
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0].status).toBe(resolvedStatus);
+      if (statusUpdatedAt === undefined) {
+        expect(result.sessions[0]).not.toHaveProperty('statusUpdatedAt');
+      } else {
+        expect(result.sessions[0].statusUpdatedAt).toBe(statusUpdatedAt);
+      }
+    }
+  );
+});

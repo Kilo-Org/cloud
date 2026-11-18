@@ -1,6 +1,6 @@
-import { getEnvVariable } from '@/lib/dotenvx';
-import { redisClient } from '@/lib/redis';
-import { posthogQueryRedisKey } from '@/lib/redis-keys';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { posthogQueryRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import * as z from 'zod';
 
 /**

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isNativeIapMutationAllowed,
-  mapKiloPassStatusToClass,
-  resolvePurchasePresentation,
-} from './purchase-presentation';
+import { mapKiloPassStatusToClass, resolvePurchasePresentation } from './purchase-presentation';
 
 describe('resolvePurchasePresentation', () => {
   it('marks iOS credits unavailable with no CTA', () => {
@@ -32,30 +28,25 @@ describe('resolvePurchasePresentation', () => {
     expect(result.cta).toEqual({ action: 'open_web', webPath: '/credits' });
   });
 
-  it('marks iOS App Store Kilo Pass as native_iap', () => {
-    const result = resolvePurchasePresentation({
-      platform: 'ios',
-      storefront: 'app_store',
-      product: 'kilo_pass',
-      hasStripeManagedPass: false,
-    });
+  it.each([
+    ['ios', 'app_store', false],
+    ['ios', 'app_store', true],
+    ['android', 'play', false],
+  ] as const)(
+    'marks %s %s Kilo Pass unavailable when hasStripeManagedPass is %s',
+    (platform, storefront, hasStripeManagedPass) => {
+      const result = resolvePurchasePresentation({
+        platform,
+        storefront,
+        product: 'kilo_pass',
+        hasStripeManagedPass,
+      });
 
-    expect(result.kind).toBe('native_iap');
-    expect(result.cta).toEqual({ action: 'none', webPath: null });
-  });
-
-  it('marks Android Kilo Pass without Stripe as unavailable', () => {
-    const result = resolvePurchasePresentation({
-      platform: 'android',
-      storefront: 'play',
-      product: 'kilo_pass',
-      hasStripeManagedPass: false,
-    });
-
-    expect(result.kind).toBe('unavailable');
-    expect(result.reason).toBe('kilo_pass_not_available_on_android');
-    expect(result.cta).toEqual({ action: 'none', webPath: null });
-  });
+      expect(result.kind).toBe('unavailable');
+      expect(result.reason).toBe('kilo_pass_not_sold_in_app');
+      expect(result.cta).toEqual({ action: 'none', webPath: null });
+    }
+  );
 
   it('marks Android Kilo Pass with Stripe as web_management with a /subscriptions/kilo-pass CTA', () => {
     const result = resolvePurchasePresentation({
@@ -106,7 +97,7 @@ describe('resolvePurchasePresentation', () => {
       hasStripeManagedPass: false,
     });
 
-    expect(result.kind).toBe('native_iap');
+    expect(result.kind).toBe('unavailable');
     expect(result.program).toBe('promo-123');
   });
 
@@ -159,37 +150,5 @@ describe('mapKiloPassStatusToClass', () => {
 
   it('maps no subscription to inactive regardless of status', () => {
     expect(mapKiloPassStatusToClass('active', { hasSubscription: false })).toBe('inactive');
-  });
-});
-
-describe('isNativeIapMutationAllowed', () => {
-  it('is true only for ios + app_store + kilo_pass', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'ios', storefront: 'app_store', product: 'kilo_pass' })
-    ).toBe(true);
-  });
-
-  it('is false for iOS credits', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'ios', storefront: 'app_store', product: 'credits' })
-    ).toBe(false);
-  });
-
-  it('is false for Android Kilo Pass', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'android', storefront: 'play', product: 'kilo_pass' })
-    ).toBe(false);
-  });
-
-  it('is false for a non-App Store storefront', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'ios', storefront: 'web', product: 'kilo_pass' })
-    ).toBe(false);
-  });
-
-  it('is false for a missing platform', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: null, storefront: 'app_store', product: 'kilo_pass' })
-    ).toBe(false);
   });
 });

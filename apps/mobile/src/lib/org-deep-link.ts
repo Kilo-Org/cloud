@@ -1,3 +1,18 @@
+/** Every route that takes an `?org=` scope (credit activity, usage,
+ * integrations) uses the first value of a repeated org query parameter.
+ * Empty first values mean no explicit scope; later values are never a fallback.
+ * Both the route guard and screen use this normalization before membership checks.
+ */
+export function normalizeOrgQueryParam(value: string | string[] | undefined): string | undefined {
+  if (!Array.isArray(value) && value !== undefined && value.length > 0) {
+    return value;
+  }
+  if (Array.isArray(value) && value[0] !== undefined && value[0].length > 0) {
+    return value[0];
+  }
+  return undefined;
+}
+
 export type OrgDeepLinkResolution<T> = {
   effectiveOrganizationId: string | null;
   validatedOrg: T | undefined;

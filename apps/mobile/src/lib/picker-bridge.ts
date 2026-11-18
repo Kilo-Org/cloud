@@ -1,3 +1,5 @@
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -14,10 +16,17 @@ export type ModelPickerSelectionScope = {
   catalogGenerationIdentity: object | null;
 };
 
-type ModelPickerBridge = {
+export type ModelPickerBridge = {
   options: SessionModelOption[];
   currentValue: string;
   currentVariant: string;
+  /**
+   * Whether the caller keeps the thinking effort it picks. A caller that stores
+   * only the model id cannot, so the picker leaves the effort chips out for it
+   * and treats a model tap as the whole selection: offering a choice the caller
+   * must drop would discard the user's pick without saying so.
+   */
+  acceptsVariant: boolean;
   selectionScope: ModelPickerSelectionScope;
   isSelectionCurrent: (scope: ModelPickerSelectionScope) => boolean;
   onSelect: (selection: ModelPickerSelection) => void;
@@ -35,50 +44,132 @@ export function areModelPickerSelectionScopesEqual(
   );
 }
 
-type ModePickerBridge = {
+export type ModePickerBridge = {
   currentValue: AgentMode;
   onSelect: (mode: AgentMode) => void;
   customOptions?: ModeOption[];
 };
 
+export type RepoPlatform = 'github' | 'gitlab' | 'bitbucket';
+
+/** i18n key for each repository provider's display name (rows, closed selector, and group headers). */
+export const REPO_PLATFORM_LABEL_KEYS = {
+  github: 'common.github',
+  gitlab: 'common.gitlab',
+  bitbucket: 'agentChat.repoPicker.platformBitbucket',
+} satisfies Record<RepoPlatform, string>;
+
 export type RepoOption = {
+  platform: RepoPlatform;
   fullName: string;
   isPrivate: boolean;
+  workspaceUuid?: string;
+  repositoryUuid?: string;
 };
 
-type RepoPickerBridge = {
+export type RepoPickerSection = {
+  key: 'recents' | RepoPlatform;
+  /** i18n key the picker resolves for the section header. */
+  titleKey: string;
+  repos: RepoOption[];
+};
+
+export type RepoPickerBridge = {
   repositories: RepoOption[];
+  /** Grouped sections (recents, then providers) shown when the search box is empty. */
+  sections: RepoPickerSection[];
+  /**
+   * The organization scope the rows were loaded under; `null` is personal.
+   * The picker keys its Bitbucket organization-only note on THIS, not on the
+   * app's globally selected organization: a Continue screen opened with a
+   * session's organization must not be described by the global selection.
+   */
+  organizationId: string | null;
   currentValue: string;
   onSelect: (repo: string) => void;
 };
 
 /**
- * One row inside the "Run on" instance picker. Identical to the tRPC
- * `activeSessions.listInstances` output shape so the bridge can hand the
- * server payload straight to the picker without re-derivation.
+ * Bridge for the new-session branch picker. `onSelect` receives the picked
+ * branch NAME; the trigger's closure decides default-vs-override, so the
+ * route stays display-only.
  */
-export type InstancePickerInstance = {
-  connectionId: string;
-  name: string;
-  projectName: string;
-  version?: string;
-  /** Optional capability map carried through from the tRPC row. */
-  capabilities?: { attachments?: boolean };
+export type BranchPickerBridge = {
+  branches: string[];
+  /** The provider's default branch; its row carries the "Default" label. */
+  defaultBranch: string | null;
+  /** The branch the trigger row shows as selected (override or default). */
+  selectedBranch: string | null;
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
+  onSelect: (branch: string) => void;
 };
 
-type InstancePickerBridge = {
+/** The complete normalized router row, including all advertised capabilities. */
+export type InstancePickerInstance =
+  inferRouterOutputs<MobileRouter>['activeSessions']['listInstances']['instances'][number];
+
+export type InstancePickerBridge = {
   instances: InstancePickerInstance[];
   currentValue: InstancePickerInstance | null;
+  /**
+   * The computer target is selected with no computer bound yet (the tour's
+   * computer path with zero connected computers): the picker shows neither
+   * row checked, since the Cloud Agent default is not the current target.
+   */
+  pendingComputer?: boolean;
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 
-let modelBridge: ModelPickerBridge | null = null;
-let modeBridge: ModePickerBridge | null = null;
-let repoBridge: RepoPickerBridge | null = null;
-let instanceBridge: InstancePickerBridge | null = null;
+/**
+ * Bridge for the new-session profile picker. `selectedOverrideProfileId` is the
+ * pick the form already holds (null for the effective default), and
+ * `repoBindingProfileId` is the base layer when the caller knows the target
+ * repo. The picker re-queries its scope so the list is fresh and a failure can
+ * offer Retry.
+ */
+export type ProfilePickerBridge = {
+  organizationId: string | undefined;
+  selectedOverrideProfileId: string | null;
+  repoBindingProfileId: string | null;
+  onSelect: (id: string | null) => void;
+};
+
+/**
+ * Bridge for the new-session folder picker. `currentPath` is `""` at launch
+ * (the CLI's launch directory) and a relative path once the user has drilled
+ * into — and confirmed — a child directory. `onSelect` reports that path back
+ * to the form, which passes it as `create_session.directory`.
+ */
+export type FolderPickerBridge = {
+  connectionId: string;
+  projectName: string;
+  currentPath: string;
+  onSelect: (path: string) => void;
+};
+
+/**
+ * Bridge for the shared account picker route. The caller owns the membership
+ * rows and the pick; the route only renders them, so every surface that opens
+ * the account picker presents the same sheet with its own list.
+ */
+export type ContextPickerBridge = {
+  /** Account labels in list order; a row's index is its selection index. */
+  options: string[];
+  /** The row that carries the check mark, or -1 when nothing is listed for it. */
+  currentIndex: number;
+  onSelect: (index: number) => void;
+};
+
+type LanguagePickerBridge = {
+  beforeReload?: () => Promise<void>;
+  onApplied?: () => void;
+};
+
+let languageBridge: LanguagePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
-  bridge: ModelPickerBridge,
+  bridge: Pick<ModelPickerBridge, 'options'>,
   value: string,
   variant: string
 ): ModelPickerSelection | null {
@@ -94,7 +185,7 @@ export function resolveModelPickerSelection(
 }
 
 export function commitModelPickerSelection(
-  bridge: ModelPickerBridge,
+  bridge: Pick<ModelPickerBridge, 'options' | 'selectionScope' | 'isSelectionCurrent' | 'onSelect'>,
   value: string,
   variant: string
 ): boolean {
@@ -111,42 +202,14 @@ export function commitModelPickerSelection(
   return true;
 }
 
-export function setModelPickerBridge(bridge: ModelPickerBridge) {
-  modelBridge = bridge;
-}
-export function getModelPickerBridge() {
-  return modelBridge;
-}
-export function clearModelPickerBridge() {
-  modelBridge = null;
+export function setLanguagePickerBridge(bridge: LanguagePickerBridge) {
+  languageBridge = bridge;
 }
 
-export function setModePickerBridge(bridge: ModePickerBridge) {
-  modeBridge = bridge;
-}
-export function getModePickerBridge() {
-  return modeBridge;
-}
-export function clearModePickerBridge() {
-  modeBridge = null;
+export function getLanguagePickerBridge() {
+  return languageBridge;
 }
 
-export function setRepoPickerBridge(bridge: RepoPickerBridge) {
-  repoBridge = bridge;
-}
-export function getRepoPickerBridge() {
-  return repoBridge;
-}
-export function clearRepoPickerBridge() {
-  repoBridge = null;
-}
-
-export function setInstancePickerBridge(bridge: InstancePickerBridge) {
-  instanceBridge = bridge;
-}
-export function getInstancePickerBridge() {
-  return instanceBridge;
-}
-export function clearInstancePickerBridge() {
-  instanceBridge = null;
+export function clearLanguagePickerBridge() {
+  languageBridge = null;
 }

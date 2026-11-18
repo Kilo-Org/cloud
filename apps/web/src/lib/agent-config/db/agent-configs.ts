@@ -1,12 +1,65 @@
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
+import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
+import {
+  repositoryModeForPlatform,
+  withPlatformRepositoryMode,
+} from '@/lib/code-reviews/core/repository-mode';
 
-type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
+export type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
+
+/** One stored agent configuration row, as the reader below returns it. */
+export type AgentConfigRow = typeof agent_configs.$inferSelect;
+
+/** Returns the owner column values, where exactly one of the two columns is set. */
+export function agentConfigOwnerValues(
+  owner: AgentConfigOwner
+): Pick<typeof agent_configs.$inferInsert, 'owned_by_organization_id' | 'owned_by_user_id'> {
+  return owner.type === 'org'
+    ? { owned_by_organization_id: owner.id, owned_by_user_id: null }
+    : { owned_by_organization_id: null, owned_by_user_id: owner.id };
+}
+
+/**
+ * Returns the per-owner unique key: one row per owner, agent type and platform.
+ * Every insert that can conflict must use this target.
+ */
+export function agentConfigConflictTarget(owner: AgentConfigOwner) {
+  return owner.type === 'org'
+    ? [agent_configs.owned_by_organization_id, agent_configs.agent_type, agent_configs.platform]
+    : [agent_configs.owned_by_user_id, agent_configs.agent_type, agent_configs.platform];
+}
+
+function agentConfigOwnerConditions(owner: AgentConfigOwner, agentType: string, platform: string) {
+  return [
+    eq(agent_configs.agent_type, agentType),
+    eq(agent_configs.platform, platform),
+    owner.type === 'org'
+      ? eq(agent_configs.owned_by_organization_id, owner.id)
+      : eq(agent_configs.owned_by_user_id, owner.id),
+  ];
+}
+
+/**
+ * Checks the GitHub automation sharing guard. It applies when `is_enabled` is true
+ * or when a feature flag turns the Code Reviewer on, because both make it post to
+ * repositories.
+ */
+export async function assertAgentConfigCanBeEnabled(input: {
+  owner: AgentConfigOwner;
+  platform: string;
+  enabled: boolean;
+  executor?: typeof db | DrizzleTransaction;
+}): Promise<void> {
+  if (input.platform === 'github' && input.enabled) {
+    await assertGitHubAutomationCanBeEnabled(input.owner, input.executor ?? db);
+  }
+}
 
 type AgentConfigUpsertOptions = {
   preserveCodeReviewFeatureSettings?: boolean;
@@ -50,19 +103,7 @@ function configForAtomicUpdate(
  * Gets agent configuration for an organization
  */
 export async function getAgentConfig(organizationId: string, agentType: string, platform: string) {
-  const [config] = await db
-    .select()
-    .from(agent_configs)
-    .where(
-      and(
-        eq(agent_configs.owned_by_organization_id, organizationId),
-        eq(agent_configs.agent_type, agentType),
-        eq(agent_configs.platform, platform)
-      )
-    )
-    .limit(1);
-
-  return config || null;
+  return getAgentConfigForOwner({ type: 'org', id: organizationId }, agentType, platform);
 }
 
 /**
@@ -78,44 +119,11 @@ export async function upsertAgentConfig(
     createdBy: string;
   } & AgentConfigUpsertOptions
 ) {
-  const updateSet = {
-    config: configForAtomicUpdate(data.config, data),
-    updated_at: new Date().toISOString(),
-    ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
-  };
-
-  await db
-    .insert(agent_configs)
-    .values({
-      owned_by_organization_id: data.organizationId,
-      agent_type: data.agentType,
-      platform: data.platform,
-      config: data.config,
-      is_enabled: data.isEnabled ?? false,
-      created_by: data.createdBy,
-    })
-    .onConflictDoUpdate({
-      target: [
-        agent_configs.owned_by_organization_id,
-        agent_configs.agent_type,
-        agent_configs.platform,
-      ],
-      set: updateSet,
-    });
-
-  // Create bot user for code review agents
-  if (data.agentType === 'code_review') {
-    try {
-      await ensureBotUserForOrg(data.organizationId, 'code-review');
-    } catch (error) {
-      // Log warning but don't fail the config save
-      warnExceptInTest('[upsertAgentConfig] Failed to create bot user:', error);
-      captureException(error, {
-        tags: { operation: 'upsert-agent-config', step: 'ensure-bot-user' },
-        extra: { organizationId: data.organizationId, agentType: data.agentType },
-      });
-    }
-  }
+  const { organizationId, ...rest } = data;
+  return upsertAgentConfigForOwner({
+    owner: { type: 'org', id: organizationId },
+    ...rest,
+  });
 }
 
 /**
@@ -127,38 +135,12 @@ export async function setAgentEnabled(
   platform: string,
   isEnabled: boolean
 ) {
-  await db
-    .update(agent_configs)
-    .set({
-      is_enabled: isEnabled,
-      updated_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        eq(agent_configs.owned_by_organization_id, organizationId),
-        eq(agent_configs.agent_type, agentType),
-        eq(agent_configs.platform, platform)
-      )
-    );
-}
-
-/**
- * Deletes agent configuration
- */
-export async function deleteAgentConfig(
-  organizationId: string,
-  agentType: string,
-  platform: string
-) {
-  await db
-    .delete(agent_configs)
-    .where(
-      and(
-        eq(agent_configs.owned_by_organization_id, organizationId),
-        eq(agent_configs.agent_type, agentType),
-        eq(agent_configs.platform, platform)
-      )
-    );
+  return setAgentEnabledForOwner(
+    { type: 'org', id: organizationId },
+    agentType,
+    platform,
+    isEnabled
+  );
 }
 
 /**
@@ -170,22 +152,10 @@ export async function getAgentConfigForOwner(
   agentType: string,
   platform: string
 ) {
-  const conditions = [
-    eq(agent_configs.agent_type, agentType),
-    eq(agent_configs.platform, platform),
-  ];
-
-  // Add owner-specific condition
-  if (owner.type === 'org') {
-    conditions.push(eq(agent_configs.owned_by_organization_id, owner.id));
-  } else {
-    conditions.push(eq(agent_configs.owned_by_user_id, owner.id));
-  }
-
   const [config] = await db
     .select()
     .from(agent_configs)
-    .where(and(...conditions))
+    .where(and(...agentConfigOwnerConditions(owner, agentType, platform)))
     .limit(1);
 
   return config || null;
@@ -205,55 +175,108 @@ export async function upsertAgentConfigForOwner(
     createdBy: string;
   } & AgentConfigUpsertOptions
 ) {
+  const config =
+    data.agentType === 'code_review'
+      ? withPlatformRepositoryMode(data.platform, data.config)
+      : data.config;
   const updateSet = {
-    config: configForAtomicUpdate(data.config, data),
+    config: configForAtomicUpdate(config, data),
     updated_at: new Date().toISOString(),
     ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
   };
 
-  const values =
-    data.owner.type === 'org'
-      ? {
-          owned_by_organization_id: data.owner.id,
-          owned_by_user_id: null,
-          agent_type: data.agentType,
-          platform: data.platform,
-          config: data.config,
-          is_enabled: data.isEnabled ?? false,
-          created_by: data.createdBy,
-        }
-      : {
-          owned_by_organization_id: null,
-          owned_by_user_id: data.owner.id,
-          agent_type: data.agentType,
-          platform: data.platform,
-          config: data.config,
-          is_enabled: data.isEnabled ?? false,
-          created_by: data.createdBy,
-        };
+  const values = {
+    ...agentConfigOwnerValues(data.owner),
+    agent_type: data.agentType,
+    platform: data.platform,
+    config,
+    is_enabled: data.isEnabled ?? false,
+    created_by: data.createdBy,
+  };
 
-  const targetColumns =
-    data.owner.type === 'org'
-      ? [agent_configs.owned_by_organization_id, agent_configs.agent_type, agent_configs.platform]
-      : [agent_configs.owned_by_user_id, agent_configs.agent_type, agent_configs.platform];
-
-  await db.insert(agent_configs).values(values).onConflictDoUpdate({
-    target: targetColumns,
-    set: updateSet,
+  await db.transaction(async tx => {
+    await assertAgentConfigCanBeEnabled({
+      owner: data.owner,
+      platform: data.platform,
+      enabled: data.isEnabled === true,
+      executor: tx,
+    });
+    await tx
+      .insert(agent_configs)
+      .values(values)
+      .onConflictDoUpdate({
+        target: agentConfigConflictTarget(data.owner),
+        set: updateSet,
+      });
   });
 
-  // Create bot user for code review agents (only for organizations)
-  if (data.agentType === 'code_review' && data.owner.type === 'org') {
-    try {
-      await ensureBotUserForOrg(data.owner.id, 'code-review');
-    } catch (error) {
-      // Log warning but don't fail the config save
-      warnExceptInTest('[upsertAgentConfigForOwner] Failed to create bot user:', error);
-      captureException(error, {
-        tags: { operation: 'upsert-agent-config-owner', step: 'ensure-bot-user' },
-        extra: { ownerId: data.owner.id, agentType: data.agentType },
+  await ensureCodeReviewBotUser(data.owner, data.agentType);
+}
+
+/**
+ * Creates an enabled configuration for an owner that has none, or enables an
+ * existing row.
+ *
+ * The conflict branch writes only the enabled flag, so a first enable never
+ * replaces a configuration saved concurrently with the default configuration.
+ */
+export async function createOrEnableAgentConfigForOwner(data: {
+  owner: AgentConfigOwner;
+  agentType: string;
+  platform: string;
+  config: CodeReviewAgentConfig | Record<string, unknown>;
+  createdBy: string;
+}) {
+  const config =
+    data.agentType === 'code_review'
+      ? withPlatformRepositoryMode(data.platform, data.config)
+      : data.config;
+
+  await db.transaction(async tx => {
+    await assertAgentConfigCanBeEnabled({
+      owner: data.owner,
+      platform: data.platform,
+      enabled: true,
+      executor: tx,
+    });
+    await tx
+      .insert(agent_configs)
+      .values({
+        ...agentConfigOwnerValues(data.owner),
+        agent_type: data.agentType,
+        platform: data.platform,
+        config,
+        is_enabled: true,
+        created_by: data.createdBy,
+      })
+      .onConflictDoUpdate({
+        target: agentConfigConflictTarget(data.owner),
+        set: {
+          is_enabled: true,
+          updated_at: new Date().toISOString(),
+        },
       });
-    }
+  });
+
+  await ensureCodeReviewBotUser(data.owner, data.agentType);
+}
+
+async function ensureCodeReviewBotUser(owner: AgentConfigOwner, agentType: string) {
+  if (agentType !== 'code_review' || owner.type !== 'org') return;
+
+  try {
+    await ensureBotUserForOrg(owner.id, 'code-review');
+  } catch (error) {
+    // Log warning but don't fail the config save
+    warnExceptInTest('[upsertAgentConfig] Failed to create bot user:', error);
+    captureException(error, {
+      tags: { operation: 'upsert-agent-config', step: 'ensure-bot-user' },
+      extra: {
+        ownerType: owner.type,
+        ownerId: owner.id,
+        agentType,
+      },
+    });
   }
 }
 
@@ -267,25 +290,21 @@ export async function setAgentEnabledForOwner(
   platform: string,
   isEnabled: boolean
 ) {
-  const conditions = [
-    eq(agent_configs.agent_type, agentType),
-    eq(agent_configs.platform, platform),
-  ];
-
-  // Add owner-specific condition
-  if (owner.type === 'org') {
-    conditions.push(eq(agent_configs.owned_by_organization_id, owner.id));
-  } else {
-    conditions.push(eq(agent_configs.owned_by_user_id, owner.id));
-  }
-
-  await db
-    .update(agent_configs)
-    .set({
-      is_enabled: isEnabled,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
+  await db.transaction(async tx => {
+    await assertAgentConfigCanBeEnabled({
+      owner,
+      platform,
+      enabled: isEnabled,
+      executor: tx,
+    });
+    await tx
+      .update(agent_configs)
+      .set({
+        is_enabled: isEnabled,
+        updated_at: new Date().toISOString(),
+      })
+      .where(and(...agentConfigOwnerConditions(owner, agentType, platform)));
+  });
 }
 
 /**
@@ -312,7 +331,8 @@ export async function resetCodeReviewConfigForOwner(
       ...existingConfig,
       selected_repository_ids: [],
       manually_added_repositories: [],
-      repository_selection_mode: 'all',
+      // repositoryModeForPlatform owns the GitLab-only mode rule.
+      repository_selection_mode: repositoryModeForPlatform(platform, 'all'),
     },
     isEnabled: false,
     createdBy: 'system',

@@ -3,7 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 
 import {
   breakPane,
@@ -31,6 +31,19 @@ const hasTmux = (() => {
     return false;
   }
 })();
+
+const suiteSession = `kilo-tmux-suite-${process.pid}`;
+
+before(() => {
+  if (!hasTmux) return;
+  // Keep the server alive between tests so new-session cannot race its shutdown.
+  execFileSync('tmux', ['new-session', '-d', '-s', suiteSession], { stdio: 'pipe' });
+});
+
+after(() => {
+  if (!hasTmux) return;
+  execFileSync('tmux', ['kill-session', '-t', `=${suiteSession}`], { stdio: 'pipe' });
+});
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
   const startupCommand =
@@ -560,6 +573,13 @@ test(
     // the shell — the marker file records any such swallowed input.
     const script = path.join(os.tmpdir(), `kilo-tmux-test-slow-${process.pid}.js`);
     const swallowedMarker = path.join(os.tmpdir(), `kilo-tmux-test-swallowed-${process.pid}`);
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-tmux-test-slow-'));
+    // The relaunch must be observed by what it DOES, not by what the pane
+    // echoes: a login shell that does not echo typed input (e.g. a harness
+    // wrapper as $SHELL) leaves capture-pane silent while the command still
+    // ran. A fake `tsx` on PATH records the relaunch command's execution.
+    const relaunchMarker = path.join(tempDir, 'relaunched');
+    const fakeTsx = path.join(tempDir, 'tsx');
     fs.writeFileSync(
       script,
       `const fs = require('node:fs');
@@ -569,6 +589,8 @@ process.stdin.on('data', d => {
   fs.appendFileSync(${JSON.stringify(swallowedMarker)}, d);
 });`
     );
+    fs.writeFileSync(fakeTsx, `#!/bin/sh\ntouch "${relaunchMarker}"\n`);
+    fs.chmodSync(fakeTsx, 0o755);
 
     try {
       tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
@@ -615,42 +637,36 @@ process.stdin.on('data', d => {
       // otherwise both would relaunch, and the slower one would interrupt
       // the freshly started service partway through its own poll.
       const supersededRestart = restartServiceInTmux(sessionName, serviceName);
-      const outcome = await restartServiceInTmux(sessionName, serviceName);
+      const outcome = await restartServiceInTmux(sessionName, serviceName, {
+        PATH: `${tempDir}:${process.env.PATH ?? ''}`,
+      });
       assert.equal(await supersededRestart, 'superseded');
       assert.ok(
         outcome === 'relaunched' || outcome === 'recreated',
         `restart should settle with a relaunch, got '${outcome}'`
       );
 
-      await sleep(500); // let the relaunch keystrokes echo before capturing
       // Depending on the wrapper shell's SIGINT semantics the pane either
       // survives (relaunch typed into its shell) or closes with the process
       // (service window recreated). Both count as a restart; the old fixed
       // 1s delay produced neither — the keystrokes vanished into the dying
-      // process and the service stayed stopped.
-      const windowRecreated = listWindows(sessionName).some(window => window.name === serviceName);
-      let paneEchoedCommand = false;
-      try {
-        const paneContent = execFileSync(
-          'tmux',
-          ['capture-pane', '-p', '-J', '-t', `${sessionName}:0.1`],
-          { encoding: 'utf-8' }
-        );
-        paneEchoedCommand = paneContent.includes(buildStartCommand(serviceName));
-      } catch {
-        // Pane closed with the process — the recreate branch applies.
-      }
+      // process and the service stayed stopped. Whichever branch ran, the
+      // relaunch command must have executed: poll for the marker the fake
+      // `tsx` writes (the recreated window inherits the same PATH).
       assert.ok(
         !fs.existsSync(swallowedMarker),
         'relaunch keystrokes must not be fed to the still-running process'
       );
-      assert.ok(
-        windowRecreated || paneEchoedCommand,
-        'service should be relaunched after the slow shutdown completes'
-      );
+      let relaunchRan = false;
+      for (let i = 0; i < 40 && !relaunchRan; i++) {
+        relaunchRan = fs.existsSync(relaunchMarker);
+        if (!relaunchRan) await sleep(250);
+      }
+      assert.ok(relaunchRan, 'service should be relaunched after the slow shutdown completes');
     } finally {
       fs.rmSync(script, { force: true });
       fs.rmSync(swallowedMarker, { force: true });
+      fs.rmSync(tempDir, { force: true, recursive: true });
       try {
         tmux('kill-session', '-t', sessionName);
       } catch {
@@ -694,6 +710,66 @@ test(
       assert.ok(
         listWindows(sessionName).some(window => window.name === serviceName),
         'service window should be recreated after its pane closed on interrupt'
+      );
+    } finally {
+      try {
+        tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);
+
+test(
+  'restartServiceInTmux relaunches promptly when only leftover shells remain',
+  { skip: !hasTmux },
+  async () => {
+    // The §1 repro: the service already exited and ctrl-c left a second login
+    // shell parented to the pane shell. Waiting on that shell made restart
+    // refuse to type for 60s, so wall-clock is part of the assertion.
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const serviceName = 'stripe';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+
+    try {
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
+      tmux('new-window', '-d', '-t', sessionName, '-n', serviceName, '/bin/sh');
+
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+      const paneTarget = `${sessionName}:${serviceWindow.index}.0`;
+
+      // Leftover login shell, exactly what an interrupted service leaves behind.
+      tmux('send-keys', '-t', paneTarget, '/bin/sh -l', 'Enter');
+      let leftoverShellUp = false;
+      for (let i = 0; i < 40 && !leftoverShellUp; i++) {
+        const panePid = execFileSync(
+          'tmux',
+          ['display-message', '-p', '-t', paneTarget, '#{pane_pid}'],
+          { encoding: 'utf-8' }
+        ).trim();
+        try {
+          execFileSync('pgrep', ['-P', panePid], { stdio: 'ignore' });
+          leftoverShellUp = true;
+        } catch {
+          await sleep(50);
+        }
+      }
+      assert.ok(leftoverShellUp, 'leftover shell should be a child of the pane shell');
+
+      const startedAt = Date.now();
+      const outcome = await restartServiceInTmux(sessionName, serviceName);
+      const elapsedMs = Date.now() - startedAt;
+
+      assert.equal(outcome, 'relaunched');
+      assert.ok(elapsedMs < 10_000, `restart should not wait on idle shells, took ${elapsedMs}ms`);
+      const paneContent = execFileSync('tmux', ['capture-pane', '-p', '-J', '-t', paneTarget], {
+        encoding: 'utf-8',
+      });
+      assert.ok(
+        paneContent.includes(buildStartCommand(serviceName)),
+        'start command should be typed into the idle pane'
       );
     } finally {
       try {

@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { TRPCError } from '@trpc/server';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
 import { fetchInstallPayload } from '@/lib/kiloclaw/install';
 import { INSTALL_SOURCES, isInstallSource } from '@/lib/kiloclaw/install-sources';

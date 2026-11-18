@@ -1,0 +1,494 @@
+/* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the layouts reach. */
+import { createElement, type ElementType, type ReactElement, useEffect, useState } from 'react';
+import { type AppStateStatus } from 'react-native';
+import { act, type ReactTestInstance } from '@/test/renderer';
+import { expect, vi } from 'vitest';
+import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { AppRootProviders } from '@/components/app-root-providers';
+import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_layout';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { i18n } from '@/i18n';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
+export function unlockRoot() {
+  if (!view) {
+    throw new Error('Scene not mounted');
+  }
+  return view.renderer.root;
+}
+export async function mount(ui: ReactElement = <OrganizationLayout />, languageReady = true) {
+  view = await renderWithProviders(
+    <AppRootProviders languageReady={languageReady}>{ui}</AppRootProviders>
+  );
+  await flush();
+}
+export function rerender(ui: ReactElement) {
+  view?.renderer.update(
+    <QueryClientProvider client={view.queryClient}>
+      <AppRootProviders languageReady>{ui}</AppRootProviders>
+    </QueryClientProvider>
+  );
+}
+export function retry() {
+  /* The unlock overlay is not the only Pressable in the tree: a scene can hold
+     settings rows whose label is pressable too. The overlay's Retry is the one
+     that names itself, so the label is what tells them apart. */
+  return unlockRoot()
+    .findAllByType('Pressable' as ElementType)
+    .find(node => node.props.accessibilityLabel === i18n.t('common.retry'));
+}
+export async function unmountUnlock() {
+  view?.unmount();
+  view = undefined;
+  vi.restoreAllMocks();
+  i18n.removeResourceBundle('fr', 'translation');
+  await i18n.changeLanguage('en');
+  vi.unstubAllGlobals();
+}
+
+const native = vi.hoisted(() => ({
+  hasHardwareAsync: vi.fn(),
+  isEnrolledAsync: vi.fn(),
+  getEnrolledLevelAsync: vi.fn(),
+  authenticateAsync: vi.fn(),
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+}));
+const storage = vi.hoisted(() => ({ getItemAsync: vi.fn(), setItemAsync: vi.fn() }));
+const catalogs = vi.hoisted(() => ({ fr: vi.fn() }));
+const announcements = vi.hoisted(() => vi.fn());
+const platform = vi.hoisted(() => ({ OS: 'ios' }));
+// The route the mocked expo-router reports, shaped like production: segments
+// carry the group names, the pathname strips them. Defaults to a screen
+// pushed over the tabs, where no tab bar is on screen.
+const route = vi.hoisted(() => ({
+  segments: ['(app)', 'agent-chat'] as string[],
+  pathname: '/agent-chat',
+}));
+// AppState has more than one subscriber on this screen (the query client
+// lifecycle and the keyboard-lift hooks), so the harness keeps every listener
+// and broadcasts to all of them. A single slot let the last registration
+// shadow the earlier ones, which hid the stale-lift defect these mounted tests
+// exist to catch. Ported from the closed #6392.
+const lifecycle = vi.hoisted(() => {
+  const listeners = new Set<(state: AppStateStatus) => void>();
+  return {
+    listeners,
+    change: (state: AppStateStatus) => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+const keyboard = vi.hoisted(() => {
+  // Keyboard has more than one subscriber in production: `AppRootProviders`
+  // mounts the Toaster's shared keyboard hook alongside a screen's, so the mock
+  // keeps every listener in a set per direction. One slot per direction let the
+  // last registration shadow the earlier ones, and a `remove()` that cleared
+  // both slots detached a listener it did not own. The AppState mock below is a
+  // set for the same reason. Same signature for both directions; `hide` is
+  // dispatched with an empty payload.
+  const showListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const hideListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const addListener = (
+    event: string,
+    listener: (event: { endCoordinates: { height: number } }) => void
+  ) => {
+    const listeners =
+      event === 'keyboardDidShow' || event === 'keyboardWillShow' ? showListeners : hideListeners;
+    listeners.add(listener);
+    return {
+      remove: () => {
+        listeners.delete(listener);
+      },
+    };
+  };
+  return {
+    addListener,
+    showListeners,
+    hideListeners,
+    show: (event: { endCoordinates: { height: number } }) => {
+      for (const listener of showListeners) {
+        listener(event);
+      }
+    },
+    hide: () => {
+      for (const listener of hideListeners) {
+        listener({ endCoordinates: { height: 0 } });
+      }
+    },
+  };
+});
+export { announcements, catalogs, lifecycle, native, platform, route, storage };
+vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
+vi.mock('expo-local-authentication', () => native);
+vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
+  Switch: 'Switch',
+  ActivityIndicator: 'ActivityIndicator',
+  Platform: platform,
+  useColorScheme: () => 'light',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
+  StatusBar: { currentHeight: 0 },
+  I18nManager: { isRTL: false },
+  AccessibilityInfo: { announceForAccessibility: announcements },
+  Keyboard: {
+    addListener: keyboard.addListener,
+  },
+  AppState: {
+    currentState: 'active',
+    addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
+      lifecycle.listeners.add(listener);
+      return {
+        remove: () => {
+          lifecycle.listeners.delete(listener);
+        },
+      };
+    },
+  },
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 12, left: 0, right: 0 }),
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  useSharedValue: (value: number) => ({ value }),
+  useAnimatedStyle: (build: () => unknown) => build(),
+}));
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: ({ children }: { children: ReactElement }) => children,
+  StateSurface: 'StateSurface',
+}));
+// The (app) layout's screenLayout is the covered-screen gate; the fake Scene
+// the Stack mock below mounts passes the scene straight through, so the unlock
+// wrapper stays the only hidden/visible surface under test.
+vi.mock('@/components/app-screen-layout', () => ({
+  // Same call shape as production: the layout receives the scene props object.
+  appScreenLayout: (props: { children: ReactElement }) => unlockScene(props.children),
+}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Icon',
+  Brain: 'Icon',
+  CheckCircle2: 'Icon',
+  CornerDownLeft: 'Icon',
+  Cpu: 'Icon',
+  EyeOff: 'Icon',
+  Gauge: 'Icon',
+  Globe: 'Icon',
+  Info: 'Icon',
+  Loader: 'Icon',
+  MessageSquare: 'Icon',
+  Mic: 'Icon',
+  Rows3: 'Icon',
+  Shield: 'Icon',
+  Smartphone: 'Icon',
+  TriangleAlert: 'Icon',
+  XCircle: 'Icon',
+}));
+// The organization and security-agent layouts reach real expo-image through
+// the privacy cover's splash logo; the native module cannot load in this
+// DOM-free harness (its expo root import needs __DEV__ and a native binding).
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+// No Vitest project transforms .png.
+vi.mock('@/../assets/images/logo-mark.png', () => ({ default: 1 }));
+vi.mock('expo-router', () => ({
+  // One mounted descriptor per navigator exercises its production callback.
+  Stack: Object.assign(
+    ({ screenLayout }: { screenLayout: typeof appUnlockScreenLayout }) =>
+      createElement('Scene', null, unlockScene(<Draft />, screenLayout)),
+    { Screen: 'StackScreen' }
+  ),
+  useRouter: () => ({ push: vi.fn() }),
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
+  usePathname: () => route.pathname,
+  useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
+  useSegments: () => route.segments,
+  // The General settings screen retires its attempt feedback on blur; the
+  // announcement suites keep it focused, so the cleanup never runs here.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
+}));
+vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
+vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));
+vi.mock('react-native-gesture-handler', () => ({
+  GestureHandlerRootView: 'GestureHandlerRootView',
+}));
+vi.mock('sonner-native', () => ({ Toaster: 'Toaster' }));
+vi.mock('@/lib/auth/auth-context', () => ({ AuthProvider: 'AuthProvider' }));
+// The PR-review layouts host the one-time feedback prompt through
+// `FeedbackPromptProvider`, whose real `@/lib/feedback` module loads
+// expo-application and expo-store-review — root imports that need `__DEV__`
+// and a native binding, like the expo surfaces mocked above.
+vi.mock('@/lib/feedback', () => ({
+  // eslint-disable-next-line require-await, typescript-eslint/require-await -- the settled mock mirrors the async claim's shape; it has no await to run
+  maybeAskAfterSuccessfulOutcome: vi.fn(async (): Promise<void> => undefined),
+  requestAppRating: vi.fn(),
+  sendAppFeedback: vi.fn(),
+  showFeedbackPrompt: vi.fn(),
+}));
+vi.mock('@/lib/glanceable/org-fence', () => ({ useGlanceableOrgFence: () => undefined }));
+vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null }));
+// The second OS-surface publisher in the (app) layout. It renders nothing and
+// needs the org/session hooks this harness does not provide, so it is stubbed
+// like the glanceable mount — and the stub keeps its `expo` root import (which
+// needs `__DEV__` and a native binding) out of this DOM-free harness.
+vi.mock('@/components/launcher-surfaces-mount', () => ({ LauncherSurfacesMount: () => null }));
+// The briefing mount reads tRPC and the native SQLCipher dismissal journal
+// (expo-crypto needs `__DEV__` and a native binding), so it is a null mount in
+// this DOM-free harness.
+vi.mock('@/components/agent-briefing/briefing-sync-mount', () => ({
+  BriefingSyncMount: () => null,
+}));
+vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
+vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
+vi.mock('@/lib/query-client-lifecycle', () => ({
+  QueryClientNativeLifecycle: 'QueryClientNativeLifecycle',
+}));
+vi.mock('@/lib/query-client', async () => {
+  const { createTestQueryClient } = await import('@/test/render-with-providers');
+  return { queryClient: createTestQueryClient() };
+});
+vi.mock('@/lib/trpc', () => ({
+  TRPCProvider: 'TRPCProvider',
+  trpcClient: {},
+  useTRPC: () => ({
+    user: {
+      getMe: { queryKey: () => [] },
+      // The (app) layout's TourAutoOpen reads the account's gateway usage;
+      // give it a settled zero-usage answer so the tour gate stays closed in
+      // these layout scenes (the signed-out user id already blocks the push).
+      hasGatewayUsage: {
+        queryOptions: () => ({
+          queryKey: ['user', 'hasGatewayUsage'],
+          queryFn: () => ({ hasUsage: false }),
+        }),
+      },
+    },
+    organizations: { list: { queryKey: () => [] } },
+  }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    background: '#ffffff',
+    foreground: '#000000',
+    primaryForeground: '#000000',
+    secondaryForeground: '#000000',
+    mutedForeground: '#000000',
+  }),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useSheetHeaderTopClearance: () => 0,
+  useFormSheetScreenOptions: () => ({
+    presentation: 'formSheet',
+    sheetAllowedDetents: [0.5, 1],
+    sheetGrabberVisible: true,
+    headerShown: false,
+    sheetShouldOverflowTopInset: true,
+  }),
+}));
+vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
+  useRouteForegroundRefresh: vi.fn(),
+  useAppWideForegroundRefresh: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
+  useSecurityLifecycleInvalidation: vi.fn(),
+}));
+vi.mock('@/lib/auth/logout-reconciliation', () => ({ attemptLogoutReconciliation: vi.fn() }));
+vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
+  attemptPushRegistrationReconciliation: vi.fn(),
+}));
+vi.mock('@rn-primitives/slot', () => ({}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  UserWebConnectionProvider: 'UserWebConnectionProvider',
+}));
+vi.mock('@/components/event-service-provider', () => ({
+  EventServiceProvider: 'EventServiceProvider',
+}));
+vi.mock('@/components/share/share-payload-navigator', () => ({
+  SharePayloadNavigator: 'SharePayloadNavigator',
+}));
+vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
+  ActiveSessionsLiveSyncMount: 'ActiveSessionsLiveSyncMount',
+}));
+// The in-app-purchase recovery pass. It renders nothing, and it reaches the
+// store SDK, which needs a React Native runtime this harness does not provide.
+vi.mock('@/lib/iap/store-purchase-recovery-mount', () => ({
+  StorePurchaseRecoveryMount: 'StorePurchaseRecoveryMount',
+}));
+vi.mock('@/lib/artifacts/artifact-mirror-sync-mount', () => ({
+  ArtifactMirrorSyncMount: 'ArtifactMirrorSyncMount',
+}));
+vi.mock('@/lib/persist/cache-persistence-mount', () => ({
+  CachePersistenceMount: 'CachePersistenceMount',
+}));
+vi.mock('@/lib/system-search-index-mount', () => ({
+  SystemSearchIndexMount: 'SystemSearchIndexMount',
+}));
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-retry-mount', () => ({
+  ToolSummaryTranslationRetryMount: 'ToolSummaryTranslationRetryMount',
+}));
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
+vi.mock('@/components/pr-review/pr-review-connect-gate', () => ({
+  PrReviewConnectGate: 'PrReviewConnectGate',
+}));
+vi.mock('@/lib/pr-review/pending-review-provider', () => ({
+  PendingReviewProvider: 'PendingReviewProvider',
+  pendingReviewDraftKey: () => 'draft',
+}));
+vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
+  SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
+}));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// `(app)/_layout` names this boundary in `unstable_settings`; the harness only
+// needs the module to load, not the fallback's own providers.
+vi.mock('@/components/screen-error-boundary', () => ({
+  ScreenErrorBoundary: 'ScreenErrorBoundary',
+}));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getLanguagePreference: () => 'device',
+  hasLanguagePreferenceWriteInFlight: () => false,
+  getResolvedLanguage: () => 'en',
+  useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
+  useKeepScreenOnPreference: () => ({
+    keepScreenOn: false,
+    hasLoaded: true,
+    setKeepScreenOn: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
+  usePrReviewFooterPreference: () => ({
+    prReviewFooter: true,
+    hasLoaded: true,
+    setPrReviewFooter: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
+  useReasoningPreference: () => ({
+    defaultExpanded: false,
+    hasLoaded: true,
+    setDefaultExpanded: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-theme-preference', () => ({
+  setThemePreference: vi.fn(),
+  useThemePreference: () => ({ preference: 'system' }),
+}));
+vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
+  useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
+}));
+vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
+// `subscribeToPostHogReady` is listed because the consent record module
+// (reached through the (app) layout's TourAutoOpen) registers a load-time
+// listener; the real module pulls in expo-application's native chain, which no
+// mounted test loads. These scenes never exercise telemetry readiness.
+vi.mock('@/lib/analytics/posthog', () => ({
+  subscribeToPostHogReady: () => () => undefined,
+}));
+
+function Draft() {
+  const [value, onChange] = useState('saved draft');
+  return createElement('Draft', { value, onChange });
+}
+
+export function resetUnlockMocks() {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', true);
+  vi.resetAllMocks();
+  platform.OS = 'ios';
+  route.segments = ['(app)', 'agent-chat'];
+  route.pathname = '/agent-chat';
+  lifecycle.listeners.clear();
+  keyboard.showListeners.clear();
+  keyboard.hideListeners.clear();
+  storage.getItemAsync.mockResolvedValue('enabled');
+  native.hasHardwareAsync.mockResolvedValue(true);
+  native.isEnrolledAsync.mockResolvedValue(true);
+  native.getEnrolledLevelAsync.mockResolvedValue(3);
+  native.authenticateAsync.mockResolvedValue({ success: true });
+}
+
+export async function flush(update?: () => void) {
+  await act(async () => {
+    update?.();
+    await vi.dynamicImportSettled();
+  });
+}
+
+export { expectHidden, text } from './app-unlock-screen.test-assertions';
+
+function isHidden(node: ReactTestInstance): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (
+      parent.props.accessibilityElementsHidden ||
+      parent.props.importantForAccessibility === 'no-hide-descendants'
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function expectFeedback(root: ReactTestInstance, message: string, copies: number) {
+  const messages = root.findAll(
+    node => (node.type as string) === 'Text' && node.props.children === message
+  );
+  expect(messages).toHaveLength(copies);
+  const visible = messages.filter(node => !isHidden(node));
+  expect(visible).toHaveLength(1);
+  expect(visible[0]?.props.accessibilityLiveRegion).toBe(
+    platform.OS === 'android' ? 'polite' : undefined
+  );
+}
+
+/**
+ * The scene navigation the layouts' `screenLayout` receives. The unlock
+ * surfaces under test read focus and state events; a layout that repairs the
+ * Stack it belongs to (the Security Agent group's dashboard) reads a Stack
+ * that already has its parent, so its repair no-ops here.
+ */
+const SCENE_NAVIGATION = {
+  isFocused: () => true,
+  addListener: () => () => undefined,
+  getState: () => ({ index: 0, routes: [{ key: 'index', name: 'index' }] }),
+  reset: () => undefined,
+};
+
+export function unlockScene(children: ReactElement, layout = appUnlockScreenLayout) {
+  const props = { children, navigation: SCENE_NAVIGATION };
+  // The harness supplies the props these layouts read, not the whole scene.
+  return layout(props as unknown as Parameters<typeof appUnlockScreenLayout>[0]);
+}
+
+export function nestedUnlockScenes(children: ReactElement) {
+  return unlockScene(unlockScene(children));
+}

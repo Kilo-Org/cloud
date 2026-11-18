@@ -6,7 +6,7 @@ import {
   getKiloPassInlineActionModel,
   getKiloPassInlineConfirmationDetails,
 } from './KiloPassDetail.logic';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 describe('KiloPassDetail.logic', () => {
   test('links App Store-managed subscriptions to App Store management', () => {

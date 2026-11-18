@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   createBotRequest as createBotRequestRow,
   linkBotRequestToSession,
@@ -7,7 +7,7 @@ import {
   recordBotRequestCloudAgentSessionResult,
   recordBotRequestCloudAgentSessionResultError,
 } from '@/lib/bot/request-logging';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   bot_request_cloud_agent_sessions,
   bot_requests,

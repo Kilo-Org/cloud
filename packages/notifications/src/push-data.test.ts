@@ -1,0 +1,483 @@
+import { describe, expect, it } from 'vitest';
+
+import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
+import { pushDataSchema } from './push-data';
+
+describe('pushDataSchema agent_briefing', () => {
+  it('accepts only the privacy-minimal available-report list route', () => {
+    expect(
+      pushDataSchema.parse({
+        type: 'agent_briefing',
+        url: '/agent-briefing',
+        reportTitle: 'Private title',
+        organizationId: 'private-org',
+      })
+    ).toEqual({ type: 'agent_briefing', url: '/agent-briefing' });
+  });
+
+  it.each([undefined, '/sessions/private-session', 'https://example.com'])(
+    'rejects a missing or unrelated briefing route: %s',
+    url => {
+      expect(pushDataSchema.safeParse({ type: 'agent_briefing', url }).success).toBe(false);
+    }
+  );
+});
+
+const lifecycleEvents = [
+  'analysis_completed',
+  'analysis_failed',
+  'remediation_queued',
+  'remediation_pr_opened',
+  'remediation_failed',
+  'remediation_blocked',
+  'remediation_no_changes_needed',
+  'remediation_cancelled',
+] as const;
+
+describe('pushDataSchema security_lifecycle', () => {
+  it('parses a round-trip for every event value', () => {
+    for (const event of lifecycleEvents) {
+      const payload = {
+        type: 'security_lifecycle',
+        event,
+        findingId: 'finding-1',
+        scope: 'org',
+      };
+      const parsed = pushDataSchema.parse(payload);
+      expect(parsed).toEqual(payload);
+    }
+  });
+
+  it('parses the optional remediationId and prUrl fields', () => {
+    const payload = {
+      type: 'security_lifecycle',
+      event: 'remediation_pr_opened',
+      findingId: 'finding-1',
+      scope: 'org',
+      remediationId: 'remediation-1',
+      prUrl: 'https://github.com/org/repo/pull/1',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('rejects an unknown event value', () => {
+    const payload = {
+      type: 'security_lifecycle',
+      event: 'sla_warning',
+      findingId: 'finding-1',
+      scope: 'org',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects an empty findingId or scope', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'security_lifecycle',
+        event: 'analysis_completed',
+        findingId: '',
+        scope: 'org',
+      }).success
+    ).toBe(false);
+    expect(
+      pushDataSchema.safeParse({
+        type: 'security_lifecycle',
+        event: 'analysis_completed',
+        findingId: 'finding-1',
+        scope: '',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('pushDataSchema spend_alert', () => {
+  it('parses a personal-scope alert without an organizationId', () => {
+    const payload = { type: 'spend_alert', scope: 'personal' };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('parses an organization-scope alert with its organizationId', () => {
+    const payload = { type: 'spend_alert', scope: 'organization', organizationId: 'org-1' };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('rejects an unknown scope and an empty organizationId', () => {
+    expect(pushDataSchema.safeParse({ type: 'spend_alert', scope: 'team' }).success).toBe(false);
+    expect(
+      pushDataSchema.safeParse({ type: 'spend_alert', scope: 'organization', organizationId: '' })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects an organization-scope alert with no organizationId to route the tap', () => {
+    expect(pushDataSchema.safeParse({ type: 'spend_alert', scope: 'organization' }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects a personal-scope alert that names an organization', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'spend_alert',
+        scope: 'personal',
+        organizationId: 'org-1',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('pushDataSchema active_agents_glanceable', () => {
+  const payload = {
+    type: 'active_agents_glanceable',
+    schemaVersion: 1,
+    revision: 3,
+    scopeKey: 'scope-1',
+    organizationBound: false,
+    status: 'happy',
+    running: 1,
+    needsInput: 0,
+    idle: 0,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    expiresAt: '2026-01-01T08:00:00.000Z',
+    needsInputSince: null,
+  } as const;
+
+  it('retains bounded Home details beside the generic snapshot', () => {
+    const homeWidgetDetails = {
+      primaryTitle: 'Private Home title',
+      waitingAgents: [{ title: 'Awaiting approval', kind: 'permission' }],
+      scheduledAgents: [],
+    };
+    const parsed = pushDataSchema.parse({ ...payload, homeWidgetDetails });
+    expect(parsed).toMatchObject({ homeWidgetDetails });
+    expect(
+      pushDataSchema.safeParse({
+        ...payload,
+        homeWidgetDetails: { ...homeWidgetDetails, primaryTitle: 'x'.repeat(161) },
+      }).success
+    ).toBe(false);
+    expect(
+      pushDataSchema.safeParse({
+        ...payload,
+        homeWidgetDetails: {
+          ...homeWidgetDetails,
+          waitingAgents: Array(4).fill(homeWidgetDetails.waitingAgents[0]),
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it('parses a payload from a server without the newest-result keys as null', () => {
+    const parsed = pushDataSchema.parse(payload);
+    if (parsed.type !== 'active_agents_glanceable') {
+      throw new Error('expected the active_agents_glanceable variant');
+    }
+    expect(parsed.newestResultKind).toBeNull();
+    expect(parsed.newestResultAt).toBeNull();
+  });
+
+  it('round-trips a payload carrying the newest-result keys unchanged', () => {
+    const withNewest = {
+      ...payload,
+      needsApproval: 0,
+      newestResultKind: 'needsInput',
+      newestResultAt: '2025-12-31T23:59:00.000Z',
+    } as const;
+    expect(pushDataSchema.parse(withNewest)).toEqual({
+      ...withNewest,
+      scheduled: 0,
+      scheduledAt: null,
+    });
+  });
+
+  it('parses a payload from a server without the scheduled keys as defaults', () => {
+    const parsed = pushDataSchema.parse(payload);
+    if (parsed.type !== 'active_agents_glanceable') {
+      throw new Error('expected the active_agents_glanceable variant');
+    }
+    expect(parsed.scheduled).toBe(0);
+    expect(parsed.scheduledAt).toBeNull();
+  });
+
+  it('round-trips a payload carrying scheduled count, wake time, and kind', () => {
+    const withScheduled = {
+      ...payload,
+      needsApproval: 0,
+      scheduled: 2,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+      newestResultKind: 'scheduled',
+      newestResultAt: '2026-09-23T18:00:00.000Z',
+    } as const;
+    expect(pushDataSchema.parse(withScheduled)).toEqual(withScheduled);
+  });
+});
+
+describe('pushDataSchema cloud_agent_session', () => {
+  it('parses the optional attentionKind and prUrl of a needs-input raise', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'question',
+      prUrl: 'https://github.com/org/repo/pull/1',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('parses a permission raise without a PR and a status push without either field', () => {
+    const permission = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+    };
+    expect(pushDataSchema.parse(permission)).toEqual(permission);
+
+    const status = { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' };
+    expect(pushDataSchema.parse(status)).toEqual(status);
+  });
+
+  it('rejects an attentionKind outside question/permission', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'unknown',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects a non-string prUrl', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      prUrl: 42,
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects an empty prUrl so the Open PR action never targets nothing', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+      prUrl: '',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('parses an organization session and keeps its organizationId', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      organizationId: 'org-1',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('parses a personal session without an organizationId (optional field)', () => {
+    const payload = { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' };
+    const parsed = pushDataSchema.parse(payload);
+    expect(parsed).toEqual(payload);
+    expect('organizationId' in parsed).toBe(false);
+  });
+
+  it('rejects an empty organizationId', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      organizationId: '',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('parses the raiseId an attention push presents, and keeps it absent when the producer has none', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+      raiseId: '2026-09-18T21:00:00.000Z',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+
+    const withoutRaise = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+    };
+    expect('raiseId' in pushDataSchema.parse(withoutRaise)).toBe(false);
+  });
+
+  it('rejects an empty raiseId', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      raiseId: '',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+});
+
+describe('pushDataSchema unknown type', () => {
+  it('fails to parse an unknown type, proving old-client drop behavior', () => {
+    const payload = {
+      type: 'security_lifecycle_v2',
+      event: 'analysis_completed',
+      findingId: 'finding-1',
+      scope: 'org',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+});
+
+const glanceablePayload = {
+  type: 'active_agents_glanceable',
+  schemaVersion: 1,
+  revision: 2,
+  scopeKey: 'deadbeef',
+  organizationBound: false,
+  status: 'happy',
+  running: 1,
+  needsInput: 2,
+  idle: 0,
+  updatedAt: '2026-08-27T10:00:00.000Z',
+  expiresAt: '2026-08-27T18:00:00.000Z',
+  needsInputSince: '2026-08-27T09:00:00.000Z',
+} as const;
+
+describe('pushDataSchema active_agents_glanceable', () => {
+  it('parses a payload whose server omits needsApproval, defaulting it to 0', () => {
+    const parsed = pushDataSchema.parse(glanceablePayload);
+    // The approval count and the newest-result pair are the defaulted fields:
+    // a server that predates them omits them, and the parsed shape fills 0 or
+    // null so mobile can spread it straight into a snapshot.
+    expect(parsed).toEqual({
+      ...glanceablePayload,
+      needsApproval: 0,
+      scheduled: 0,
+      scheduledAt: null,
+      newestResultKind: null,
+      newestResultAt: null,
+    });
+  });
+
+  it('parses a payload carrying needsApproval', () => {
+    const payload = { ...glanceablePayload, needsApproval: 2 };
+    expect(pushDataSchema.parse(payload)).toEqual({
+      ...payload,
+      scheduled: 0,
+      scheduledAt: null,
+      newestResultKind: null,
+      newestResultAt: null,
+    });
+  });
+
+  it('rejects a negative or fractional needsApproval', () => {
+    expect(pushDataSchema.safeParse({ ...glanceablePayload, needsApproval: -1 }).success).toBe(
+      false
+    );
+    expect(pushDataSchema.safeParse({ ...glanceablePayload, needsApproval: 1.5 }).success).toBe(
+      false
+    );
+  });
+});
+
+describe('pushDataSchema active_agents_glanceable snapshot shape', () => {
+  const fullSnapshot = {
+    schemaVersion: 1,
+    revision: 4,
+    scopeKey: 'deadbeef',
+    organizationBound: true,
+    status: 'waiting',
+    running: 1,
+    needsInput: 2,
+    needsApproval: 1,
+    idle: 0,
+    scheduled: 1,
+    updatedAt: '2026-08-27T10:00:00.000Z',
+    expiresAt: '2026-08-27T18:00:00.000Z',
+    needsInputSince: '2026-08-27T09:00:00.000Z',
+    scheduledAt: '2026-08-27T11:00:00.000Z',
+    newestResultKind: 'needsInput',
+    newestResultAt: '2026-08-27T09:00:00.000Z',
+  } as const;
+
+  it('agrees with the shared snapshot schema on every field bound and default', () => {
+    // The push member carries the one snapshot shape, so a field cannot be
+    // accepted, bounded or defaulted one way here and another way there.
+    const bodies = [
+      fullSnapshot,
+      {
+        schemaVersion: 1,
+        revision: 1,
+        scopeKey: 'deadbeef',
+        organizationBound: false,
+        status: 'happy',
+        running: 0,
+        needsInput: 0,
+        idle: 1,
+        updatedAt: '2026-08-27T10:00:00.000Z',
+        expiresAt: '2026-08-27T18:00:00.000Z',
+        needsInputSince: null,
+      },
+      { ...fullSnapshot, revision: 0 },
+      { ...fullSnapshot, running: -1 },
+      { ...fullSnapshot, needsApproval: 1.5 },
+      { ...fullSnapshot, scopeKey: '' },
+      { ...fullSnapshot, status: 'unknown' },
+      { ...fullSnapshot, needsInputSince: undefined },
+    ];
+    for (const body of bodies) {
+      const member = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...body });
+      const shared = glanceableAgentsSnapshotSchema.safeParse(body);
+      expect(member.success).toBe(shared.success);
+      if (member.success && shared.success) {
+        expect(member.data).toEqual({ type: 'active_agents_glanceable', ...shared.data });
+      }
+    }
+  });
+
+  it('leaves out the client-set account epoch a server could not know', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'active_agents_glanceable',
+      ...fullSnapshot,
+      accountEpoch: 7,
+    });
+    expect('organizationBound' in parsed).toBe(true);
+    expect('accountEpoch' in parsed).toBe(false);
+  });
+});
+
+describe('pushDataSchema session_live_update approvalKey', () => {
+  const sessionLiveUpdate = (approvalKey: unknown) => ({
+    type: 'session_live_update',
+    schemaVersion: 1,
+    event: 'update',
+    content: {
+      sessionId: 'session-1',
+      title: null,
+      statusKind: 'needsInput',
+      statusSince: '2026-11-12T09:00:00.000Z',
+      scheduledAt: null,
+      awaitingPermission: approvalKey !== null,
+      approvalKey,
+      updatedAt: '2026-11-12T09:01:00.000Z',
+    },
+  });
+
+  it('accepts lowercase SHA-256 hex and null, and nothing else', () => {
+    expect(pushDataSchema.safeParse(sessionLiveUpdate('a'.repeat(64))).success).toBe(true);
+    expect(pushDataSchema.safeParse(sessionLiveUpdate(null)).success).toBe(true);
+    for (const key of ['a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'per_raw_permission', '']) {
+      expect(pushDataSchema.safeParse(sessionLiveUpdate(key)).success).toBe(false);
+    }
+  });
+});

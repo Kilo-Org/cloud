@@ -19,13 +19,24 @@ import {
   type SendAgentSessionNotificationResult,
 } from '@kilocode/notifications';
 
-import { sanitizeTitle, type UserNotificationPreferences } from './cloud-agent-session-push';
+import {
+  DEFAULT_USER_NOTIFICATION_PREFERENCES,
+  raiseIdForWaitingRow,
+  sanitizeTitle,
+  type UserNotificationPreferences,
+} from './cloud-agent-session-push';
 
 export type { SendAgentSessionNotificationParams } from '@kilocode/notifications';
 
 type AgentNotificationSession = {
   title: string | null;
   organizationId: string | null;
+  /**
+   * The stored status and its own time, so this push can name the raise it
+   * presents. Absent on a row that never carried a status.
+   */
+  status?: string | null;
+  statusUpdatedAt?: string | Date | null;
 };
 
 export type AgentNotificationSessionPushContent = {
@@ -33,36 +44,45 @@ export type AgentNotificationSessionPushContent = {
   idempotencyKey: string;
   title: string;
   body: string;
+  /**
+   * The session's organization, so a tap can land the app in the context the
+   * session belongs to. Absent for a Personal session (the session row has no
+   * organization_id), which leaves the app on Personal.
+   */
+  organizationId?: string;
+  /**
+   * The raise this push presents, when the session row names one. Absent for a
+   * row that is not waiting or carries no status time; the app then keeps its
+   * previous behaviour.
+   */
+  raiseId?: string;
 };
 
 export function buildAgentSessionNotificationContent(
   params: SendAgentSessionNotificationParams,
   session: AgentNotificationSession
 ): AgentNotificationSessionPushContent {
+  const raiseId = raiseIdForWaitingRow(session);
   return {
     presenceContext: presenceContextForCliSession(params.cliSessionId),
     idempotencyKey: `agent-notification:${params.cliSessionId}:${params.notificationId}`,
     title: sanitizeTitle(session.title) ?? 'Agent session',
     body: params.message,
+    ...(session.organizationId != null && { organizationId: session.organizationId }),
+    ...(raiseId !== null && { raiseId }),
   };
 }
-
-const DEFAULT_PREFERENCES: UserNotificationPreferences = {
-  agentPushEnabled: true,
-  chatMessagesEnabled: true,
-  agentAttentionEnabled: true,
-  sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
-  balanceAlertsEnabled: true,
-  securityFindingsEnabled: true,
-};
 
 export type DispatchAgentSessionNotificationPushDeps = {
   getSession: (userId: string, cliSessionId: string) => Promise<AgentNotificationSession | null>;
   hasOrganizationAccess: (userId: string, organizationId: string) => Promise<boolean>;
   /**
-   * Read the user's notification preferences. The agent-push RPC is
-   * category 3 ("Agent updates") and gates on `agentPushEnabled`. A throw
+   * Read the user's notification preferences. The explicit `notify_user`
+   * push is classified needs-input (see
+   * `buildAgentSessionNotificationDispatchInput`), so it gates on
+   * `agentAttentionEnabled`, the same 'Agent needs you' toggle the
+   * attention producer of `cloud_agent_session` reads — not on
+   * `agentPushEnabled` ('Agent updates'), which no longer governs it. A throw
    * fails closed (§4.5) and propagates as a
    * `{dispatched:false, reason:'failed'}` result; the RPC layer does not
    * translate that into a thrown RPC error because preference read is a
@@ -89,7 +109,24 @@ export function buildAgentSessionNotificationDispatchInput(
     push: {
       title: content.title,
       body: content.body,
-      data: { type: 'cloud_agent_session', cliSessionId: params.cliSessionId },
+      // Session title and agent-authored message are user-authored; both pass
+      // through the catalog templates as params.
+      i18nKey: 'agentSession.notification',
+      i18nParams: { sessionTitle: content.title, message: content.body },
+      // The explicit `notify_user` tool call is a question for the user, so the
+      // push is classified as needs-input (breaks through Do Not Disturb) rather
+      // than falling back to the absent-category default of status.
+      data: {
+        type: 'cloud_agent_session',
+        cliSessionId: params.cliSessionId,
+        category: 'attention',
+        // The session's organization rides on the push so a tap can switch the
+        // app before it opens the session. Absent for a Personal session.
+        ...(content.organizationId != null && { organizationId: content.organizationId }),
+        // The raise the session row names, so a tap answers it and not a
+        // raise that replaced it while this notification stood.
+        ...(content.raiseId !== undefined && { raiseId: content.raiseId }),
+      },
       sound: 'default',
       priority: 'high',
     },
@@ -113,10 +150,13 @@ export function mapAgentDispatchOutcomeToResult(
       return { dispatched: true };
     case 'suppressed_presence':
     case 'suppressed_rate_limit':
+    case 'suppressed_preference':
     case 'no_tokens':
     case 'duplicate':
       return { dispatched: false, reason: outcome.kind };
     case 'failed':
+    case 'suppressed_expired':
+    case 'suppressed_access':
       return { dispatched: false, reason: 'failed' };
   }
 }
@@ -141,11 +181,11 @@ export async function dispatchAgentSessionNotificationPush(
   let prefs: UserNotificationPreferences;
   try {
     const row = await deps.readPreferences(parsed.userId);
-    prefs = row ?? DEFAULT_PREFERENCES;
+    prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
   } catch {
     return { dispatched: false, reason: 'failed' };
   }
-  if (!prefs.agentPushEnabled) {
+  if (!prefs.agentAttentionEnabled) {
     return { dispatched: false, reason: 'suppressed_preference' };
   }
 

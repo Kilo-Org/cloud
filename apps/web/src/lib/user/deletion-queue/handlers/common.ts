@@ -5,11 +5,11 @@ import {
   type UserDeletionStep,
 } from '@kilocode/db/schema';
 import { UserDeletionStepStatus, type UserDeletionTaskProgress } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   USER_DELETION_PROVIDER_TIMEOUT_MS,
   USER_DELETION_STOP_STARTING_RESERVE_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   classifyFetchFailure,
   classifyHttpStatus,

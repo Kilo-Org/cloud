@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
+import { CloudAgentModeCombobox } from './CloudAgentModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
@@ -20,6 +22,7 @@ type MobileToolbarPopoverProps = {
   pinnedModelOption?: ModelOption;
   onModelChange?: (model: string) => void;
   isLoadingModels?: boolean;
+  onModelPickerIntent?: () => void;
   variant?: string;
   availableVariants?: string[];
   onVariantChange?: (variant: string) => void;
@@ -32,6 +35,8 @@ type MobileToolbarPopoverProps = {
   variantPickerTooltip?: string;
   className?: string;
   customModeOptions?: ModeOption[];
+  /** Enables favorite stars in the model picker. */
+  favorites?: boolean;
 };
 
 export function MobileToolbarPopover({
@@ -42,6 +47,7 @@ export function MobileToolbarPopover({
   pinnedModelOption,
   onModelChange,
   isLoadingModels,
+  onModelPickerIntent,
   variant,
   availableVariants = [],
   onVariantChange,
@@ -52,6 +58,7 @@ export function MobileToolbarPopover({
   variantPickerTooltip,
   className,
   customModeOptions,
+  favorites,
 }: MobileToolbarPopoverProps) {
   const [open, setOpen] = useState(false);
 
@@ -60,14 +67,30 @@ export function MobileToolbarPopover({
     ? formatShortModelDisplayName(selectedModel.name)
     : 'Select model';
 
+  if (!selectedModel && isLoadingModels) {
+    return <Skeleton className={cn('h-9 w-36 motion-reduce:animate-none', className)} />;
+  }
+
   return (
-    <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
+    <Popover
+      open={disabled ? false : open}
+      onOpenChange={
+        disabled
+          ? undefined
+          : value => {
+              if (value) onModelPickerIntent?.();
+              setOpen(value);
+            }
+      }
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
           size="sm"
           disabled={disabled}
+          onPointerEnter={onModelPickerIntent}
+          onFocus={onModelPickerIntent}
           className={cn('h-9 min-w-0 justify-between gap-1.5', className)}
         >
           <span className="truncate">{displayName}</span>
@@ -80,10 +103,9 @@ export function MobileToolbarPopover({
         side="top"
       >
         {onModeChange && (
-          <ModeCombobox
+          <CloudAgentModeCombobox
             value={mode}
             onValueChange={onModeChange}
-            options={NEXT_MODE_OPTIONS}
             customOptions={customModeOptions}
             label="Mode"
           />
@@ -100,12 +122,14 @@ export function MobileToolbarPopover({
               </div>
             ) : (
               <ModelCombobox
+                onLoadModels={onModelPickerIntent}
                 models={modelOptions}
                 pinnedModel={pinnedModelOption}
                 value={model}
                 onValueChange={onModelChange}
                 isLoading={isLoadingModels}
                 label=""
+                favorites={favorites}
               />
             )}
           </div>

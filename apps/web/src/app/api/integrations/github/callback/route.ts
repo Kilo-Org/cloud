@@ -1,21 +1,40 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import type { User } from '@kilocode/db/schema';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import {
+  APP_SHELL_ACCOUNT_UNAVAILABLE_PATH,
+  APP_SHELL_EXPIRED_PATH,
+  isAppShellPath,
+} from '@/lib/app-shell/shell-paths';
+import { loadAppShellUser } from '@/lib/app-shell/session';
+import { oauthCallbackRedirectPath } from '@/lib/integrations/oauth/common';
+import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
-import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
 import {
-  getGitHubAppTypeForOrganization,
+  exchangeGitHubOAuthCode,
+  fetchGitHubInstallationRequests,
+} from '@/lib/integrations/platforms/github/adapter';
+import {
   getGitHubAppCredentials,
   assertUserAdministersInstallation,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
+import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  lockGitHubInstallationIdentity,
+  observeGitHubInstallationLifecycle,
+  updateGitHubInstallationRepositories,
+} from '@/lib/integrations/db/github-installations';
+import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   createPendingIntegration,
-  findIntegrationByInstallationId,
-  findPendingInstallationByRequesterId,
+  findGitHubBotLinkIntegrations,
+  findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
 import type {
@@ -23,28 +42,29 @@ import type {
   IntegrationPermissions,
   Owner,
 } from '@/lib/integrations/core/types';
-import { parseStateReturn } from '@/lib/integrations/validate-return-path';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { PLATFORM } from '@/lib/integrations/core/constants';
-import { APP_URL } from '@/lib/constants';
-import { consumeInstallState } from '@/lib/integrations/github/install-state';
-import type { GitHubInstallState } from '@kilocode/db/schema';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import {
+  checkInstallState,
+  consumeInstallState,
+  consumeInstallStateWithoutSession,
+  type InstallStateRejectionReason,
+} from '@/lib/integrations/github/install-state';
+import { verifyAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import { isGitHubSharedInstallationAdmissionEnabled } from '@/lib/integrations/github/multiple-installations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
 
-type InstallStateClass =
-  | 'none'
-  | 'legacy_org'
-  | 'legacy_user'
-  | 'bot_link'
-  | 'install_token'
-  | 'unknown';
+type InstallStateClass = 'none' | 'bot_link' | 'install_token' | 'unknown';
 
 /**
  * Classifies a GitHub callback state value without revealing its contents.
@@ -53,8 +73,6 @@ type InstallStateClass =
  */
 function classifyInstallState(rawState: string | null): InstallStateClass {
   if (!rawState) return 'none';
-  if (rawState.startsWith('org_')) return 'legacy_org';
-  if (rawState.startsWith('user_')) return 'legacy_user';
   if (rawState.includes('.')) return 'bot_link';
   // Database install tokens are 32 random bytes, base64url-encoded (no dots).
   if (/^[A-Za-z0-9_-]{16,}$/.test(rawState)) return 'install_token';
@@ -96,17 +114,26 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     );
   }
 
-  // Bot-link states carry no GitHub app type, so this lookup is intentionally
-  // unscoped; the integration row's own github_app_type drives the OAuth
-  // exchange below. Ownership checks then restrict the result to this user.
-  const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, state.installationId);
+  const stateAppType = state.githubAppType ?? 'standard';
+  const usableCandidates = await findGitHubBotLinkIntegrations({
+    installationId: state.installationId,
+    appType: stateAppType,
+    platformIntegrationId: state.platformIntegrationId,
+  });
+  const legacyAllowed =
+    !isGitHubConnectionManagementEnabled() && !isGitHubSharedInstallationAdmissionEnabled();
+  const integration = state.platformIntegrationId
+    ? usableCandidates[0]
+    : legacyAllowed && usableCandidates.length === 1
+      ? usableCandidates[0]
+      : undefined;
 
   if (!integration) {
     return htmlPage('Link Failed', 'No matching GitHub integration was found.', 404);
   }
 
   if (integration.owned_by_organization_id) {
-    const isMember = await isOrganizationMember(integration.owned_by_organization_id, user.id);
+    const isMember = await isOrganizationMember(db, integration.owned_by_organization_id, user.id);
     if (!isMember) {
       return htmlPage(
         'Link Failed',
@@ -118,7 +145,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     return htmlPage('Link Failed', 'You are not the owner of this GitHub integration.', 403);
   }
 
-  const appType = (integration.github_app_type ?? 'standard') as GitHubAppType;
+  const appType = (integration.github_app_type ?? stateAppType) as GitHubAppType;
   const githubUser = await exchangeGitHubOAuthCode(code, appType);
 
   await bot.initialize();
@@ -128,6 +155,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
       platform: PLATFORM.GITHUB,
       teamId: state.installationId,
       userId: githubUser.id,
+      githubAppType: appType,
     },
     user.id
   );
@@ -145,82 +173,116 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
  */
 export async function GET(request: NextRequest) {
   try {
-    // 1. Verify user authentication
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-    if (authFailedResponse) {
-      return NextResponse.redirect(new URL('/', APP_URL));
-    }
-
-    // 2. Extract parameters
+    // 1. Extract parameters
     const searchParams = request.nextUrl.searchParams;
     const installationId = searchParams.get('installation_id') ?? '';
     const setupAction = searchParams.get('setup_action');
     const rawState = searchParams.get('state');
+    let rejectionReason: InstallStateRejectionReason | 'missing' = 'missing';
 
-    // 3. New database-backed install state — atomically consume the token.
-    // Consumed before any other dispatch so a minted token is unambiguous:
-    // even if a random base64url token's shape began with a legacy org_/user_
-    // prefix, the DB row wins and the state is never misrouted to legacy or
-    // bot-link parsing.
+    // 2. Identify the caller. An in-app-browser install has no web session: its
+    // identity is the single-use install state the app shell minted, which is
+    // bound to one user and carries the shell page as its return path. The
+    // install state is a bearer token, so it is not enough by itself — the
+    // callback also requires the flow cookie the shell's start route set for
+    // this exact state, which no other browser holds. Every other signed-out
+    // visitor keeps the existing redirect.
+    const { user: sessionUser } = await getUserFromAuth({ adminOnly: false });
+    let user = sessionUser;
+    let consumedByShell: GitHubInstallState | null = null;
+    if (!user) {
+      const flow = rawState ? verifyAppShellFlowToken(request, rawState) : null;
+      if (!rawState || !flow) {
+        // A browser that still carries the shell's flow cookie is in the app, so
+        // it gets the shell's terminal page instead of the full web app.
+        return NextResponse.redirect(new URL(oauthCallbackRedirectPath(request, '/'), APP_URL));
+      }
+      // Preflight first so a tampered pair never burns the user's token.
+      const preflight = await checkInstallState(rawState, flow.userId);
+      if (preflight.status !== 'valid') {
+        return NextResponse.redirect(new URL(oauthCallbackRedirectPath(request, '/'), APP_URL));
+      }
+      const consumed = await consumeInstallStateWithoutSession(rawState);
+      if (
+        consumed.status !== 'success' ||
+        consumed.state.kilo_user_id !== flow.userId ||
+        !consumed.state.return_to ||
+        !isAppShellPath(consumed.state.return_to)
+      ) {
+        return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
+      }
+      // The row names the user; the account gates the web session path applies
+      // still decide whether that id becomes a user.
+      const lookup = await loadAppShellUser(flow.userId);
+      if (lookup.status === 'restricted') {
+        return NextResponse.redirect(new URL(APP_SHELL_ACCOUNT_UNAVAILABLE_PATH, APP_URL));
+      }
+      if (lookup.status === 'gone') {
+        return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
+      }
+      user = lookup.user;
+      consumedByShell = consumed.state;
+    }
+
+    // 3. Atomically consume a database-backed install state before attempting
+    // bot-link parsing. Database tokens are opaque and unambiguous once found.
     if (rawState) {
-      const installRow = await consumeInstallState(rawState);
-      if (installRow) {
-        return await handleNewInstallFlow(request, user, installRow, installationId, setupAction);
+      const result =
+        consumedByShell !== null
+          ? ({ status: 'success', state: consumedByShell } as const)
+          : await consumeInstallState(rawState, user.id);
+      if (result.status === 'success') {
+        return await handleNewInstallFlow(request, user, result.state, installationId, setupAction);
       }
-
-      // 4. Legacy plaintext branch — starts with org_ or user_ prefix.
-      // Legacy states are never bot-link or database-minted tokens.
-      // They are accepted only when the GITHUB_LEGACY_INSTALL_STATE flag is enabled.
-      if (rawState.startsWith('org_') || rawState.startsWith('user_')) {
-        const legacyEnabled = (getEnvVariable('GITHUB_LEGACY_INSTALL_STATE') ?? 'true') !== 'false';
-
-        if (legacyEnabled) {
-          // ponytail: the legacy branch is deleted once the legacy-state counter
-          // reports zero for 30 consecutive days.
-          captureMessage('GitHub callback using legacy plaintext install state', {
-            level: 'info',
-            tags: { endpoint: 'github/callback', source: 'legacy_install_state' },
-            extra: { installationId, stateClass: classifyInstallState(rawState) },
-          });
-          return await handleLegacyInstallFlow(
-            request,
-            user,
-            rawState,
-            installationId,
-            setupAction
-          );
-        }
-
-        // Legacy flag disabled: refuse the legacy state.
-        captureMessage('GitHub callback with legacy state refused (flag disabled)', {
+      if (result.status === 'user_mismatch') {
+        captureMessage('GitHub install state presented by different user', {
           level: 'warning',
-          tags: { endpoint: 'github/callback', source: 'legacy_install_state_disabled' },
-          extra: { installationId, stateClass: classifyInstallState(rawState) },
+          tags: { endpoint: 'github/callback', source: 'install_state_user_mismatch' },
         });
-        return NextResponse.redirect(new URL('/', APP_URL));
+        const isAppInitiated = result.returnTo?.startsWith('/cloud/') === true;
+        const query = new URLSearchParams({ error: 'install_state_user_mismatch' });
+        if (isAppInitiated) {
+          query.set('fromApp', '1');
+          if (result.organizationId) query.set('organizationId', result.organizationId);
+        }
+        return NextResponse.redirect(
+          new URL(oauthCallbackRedirectPath(request, `/github-app?${query}`), APP_URL)
+        );
       }
 
-      // 5. Bot-link callback hand-off. Bot-link state tokens use a signed
+      rejectionReason = result.reason;
+
+      // 4. Bot-link callback hand-off. Bot-link state tokens use a signed
       // dot-separated format and never collide with database tokens, which are
-      // base64url (no dots). Tried last, after DB and legacy dispatch.
+      // base64url (no dots).
       const botLinkState = verifyGitHubBotLinkState(rawState);
       if (botLinkState) {
         return await handleGitHubBotLinkCallback(request, user);
       }
     }
 
-    // 6. Both bot-link and database consume returned null.
-    captureMessage('GitHub callback with unrecognized state', {
-      level: 'warning',
-      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-      extra: {
-        installationId,
-        setupAction,
-        stateClass: classifyInstallState(rawState),
-        reason: 'state_not_bot_link_or_install_token',
-      },
-    });
-    return NextResponse.redirect(new URL('/', APP_URL));
+    const expectedRejection = rejectionReason === 'expired' || rejectionReason === 'consumed';
+    captureMessage(
+      expectedRejection
+        ? 'GitHub callback with unusable install state'
+        : 'GitHub callback with unrecognized state',
+      {
+        level: expectedRejection ? 'info' : 'warning',
+        tags: { endpoint: 'github/callback', source: 'github_app_installation', rejectionReason },
+        extra: {
+          hasInstallationId: Boolean(installationId),
+          setupAction,
+          stateClass: classifyInstallState(rawState),
+          reason: 'state_not_bot_link_or_install_token',
+          rejectionReason,
+        },
+      }
+    );
+    const invalidStatePath = oauthCallbackRedirectPath(
+      request,
+      '/github-app?error=install_state_invalid'
+    );
+    return NextResponse.redirect(new URL(invalidStatePath, APP_URL));
   } catch (error) {
     console.error('Error handling GitHub App callback:', error);
 
@@ -240,27 +302,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const { ownerToken: errorOwnerToken, returnTo } = parseStateReturn(rawState);
-
-    let redirectPath = returnTo || '/';
-
-    if (!returnTo && errorOwnerToken.startsWith('org_')) {
-      const orgId = errorOwnerToken.slice(4);
-      redirectPath = `/organizations/${orgId}/integrations/github`;
-    } else if (!returnTo && errorOwnerToken.startsWith('user_')) {
-      redirectPath = `/integrations/github`;
-    }
-
     return NextResponse.redirect(
-      new URL(appendQueryParam(redirectPath, 'error=installation_failed'), APP_URL)
+      new URL(oauthCallbackRedirectPath(request, '/?error=installation_failed'), APP_URL)
     );
   }
 }
 
-/**
- * New database-backed install flow. The state was atomically consumed.
- * Verify the user matches and run the install flow using row data.
- */
 async function handleNewInstallFlow(
   request: NextRequest,
   user: { id: string; google_user_email: string; google_user_name: string },
@@ -268,31 +315,6 @@ async function handleNewInstallFlow(
   installationId: string,
   setupAction: string | null
 ): Promise<Response> {
-  // Verify user identity — a state minted for another user must never be usable.
-  if (installRow.kilo_user_id !== user.id) {
-    captureMessage('GitHub install state consumed by different user', {
-      level: 'warning',
-      tags: { endpoint: 'github/callback', source: 'install_state_user_mismatch' },
-      extra: {
-        tokenUserId: installRow.kilo_user_id,
-        callbackUserId: user.id,
-        installationId,
-      },
-    });
-    // Redirect to the integration page with a specific error so the UI can
-    // display the corrective message.  If the flow was started from the app
-    // (return_to is set to an app route like /cloud/sessions) include fromApp=1
-    // so the /github-app fallback triggers.
-    const returnTo = installRow.return_to;
-    const isAppInitiated = returnTo?.startsWith('/cloud/') === true;
-    const organizationId =
-      installRow.owner_type === 'org' ? `&organizationId=${installRow.owner_id}` : '';
-    const mismatchQuery = isAppInitiated
-      ? `error=install_state_user_mismatch&fromApp=1${organizationId}`
-      : 'error=install_state_user_mismatch';
-    return NextResponse.redirect(new URL(appendQueryParam('/github-app', mismatchQuery), APP_URL));
-  }
-
   const ownerType = installRow.owner_type as Owner['type'];
   const ownerId = installRow.owner_id;
   const owner: Owner = { type: ownerType, id: ownerId };
@@ -311,56 +333,6 @@ async function handleNewInstallFlow(
 }
 
 /**
- * Legacy plaintext install flow. Parses owner from the org_/user_ prefix.
- * Gated by GITHUB_LEGACY_INSTALL_STATE flag.
- */
-async function handleLegacyInstallFlow(
-  request: NextRequest,
-  user: { id: string; google_user_email: string; google_user_name: string },
-  rawState: string,
-  installationId: string,
-  setupAction: string | null
-): Promise<Response> {
-  // Parse owner from state (with optional |return=<path> suffix)
-  const { ownerToken, returnTo } = parseStateReturn(rawState);
-  let owner: Owner;
-  let ownerId: string;
-
-  if (ownerToken.startsWith('org_')) {
-    ownerId = ownerToken.slice(4);
-    owner = { type: 'org', id: ownerId };
-  } else if (ownerToken.startsWith('user_')) {
-    ownerId = ownerToken.slice(5);
-    owner = { type: 'user', id: ownerId };
-  } else {
-    captureMessage('GitHub callback missing or invalid owner in state', {
-      level: 'warning',
-      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-      extra: {
-        installationId,
-        stateClass: classifyInstallState(rawState),
-        reason: 'owner_not_org_or_user_prefix',
-      },
-    });
-    return NextResponse.redirect(new URL('/', APP_URL));
-  }
-
-  const appType = await getGitHubAppTypeForOrganization(owner.type === 'org' ? owner.id : null);
-
-  return handleCoreInstallFlow({
-    request,
-    user,
-    owner,
-    ownerId,
-    returnTo,
-    installationId,
-    setupAction,
-    githubAppType: appType,
-  });
-}
-
-/**
- * Core install flow shared by both legacy and new branches.
  * Handles access checks, pending approval, and installation storage.
  */
 async function handleCoreInstallFlow(params: {
@@ -378,7 +350,11 @@ async function handleCoreInstallFlow(params: {
 
   // Verify user has access to the owner
   if (owner.type === 'org') {
-    await ensureOrganizationAccess({ user: user as unknown as User }, owner.id);
+    await ensureOrganizationAccess(
+      { user: user as unknown as User },
+      owner.id,
+      ORGANIZATION_MANAGE_ROLES
+    );
   } else {
     if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/', APP_URL));
@@ -435,47 +411,86 @@ async function handleCoreInstallFlow(params: {
         }
       }
 
+      let githubRequest: { id: string; accountId: string; accountLogin: string } | undefined;
       if (githubRequester) {
-        const existingPending = await findPendingInstallationByRequesterId(githubRequester.id);
-
-        if (existingPending) {
-          const existingOwnerId =
-            existingPending.owned_by_organization_id || existingPending.owned_by_user_id;
-
-          console.log('User already has a pending installation', {
-            existingPendingId: existingPending.id,
-            existingOwnerId,
-            githubRequesterId: githubRequester.id,
-          });
-
-          const queryParam =
-            owner.type === 'org'
-              ? `error=pending_installation_exists&org=${existingOwnerId}`
-              : 'error=pending_installation_exists';
-
-          return NextResponse.redirect(
-            new URL(
-              isAppInitiated
-                ? appFallbackPath(queryParam)
-                : appendQueryParam(redirectPath, queryParam),
-              APP_URL
+        const requests = await fetchGitHubInstallationRequests(githubAppType);
+        const requesterRequests = requests.filter(
+          request => request.requesterId === githubRequester.id
+        );
+        const recorded = await db
+          .select({ platformAccountId: platform_integrations.platform_account_id })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, 'github'),
+              eq(platform_integrations.github_app_type, githubAppType),
+              eq(platform_integrations.integration_status, 'pending'),
+              isNull(platform_integrations.platform_installation_id)
             )
           );
+        const recordedAccountIds = new Set(recorded.map(row => row.platformAccountId));
+        const unrecorded = requesterRequests.filter(
+          request => !recordedAccountIds.has(request.accountId)
+        );
+        if (unrecorded.length === 1) {
+          githubRequest = unrecorded[0];
+        } else if (requesterRequests.length === 1) {
+          const existing = requesterRequests[0];
+          const [existingPending] = await db
+            .select({ id: platform_integrations.id })
+            .from(platform_integrations)
+            .where(
+              and(
+                owner.type === 'org'
+                  ? eq(platform_integrations.owned_by_organization_id, owner.id)
+                  : eq(platform_integrations.owned_by_user_id, owner.id),
+                eq(platform_integrations.platform, 'github'),
+                eq(platform_integrations.github_app_type, githubAppType),
+                eq(platform_integrations.platform_account_id, existing.accountId),
+                eq(platform_integrations.integration_status, 'pending'),
+                isNull(platform_integrations.platform_installation_id)
+              )
+            )
+            .limit(1);
+          if (existingPending) {
+            githubRequest = existing;
+          }
         }
       }
 
-      await createPendingIntegration({
-        organizationId: owner.type === 'org' ? owner.id : undefined,
-        userId: owner.type === 'user' ? owner.id : undefined,
-        requester: {
-          kilo_user_id: user.id,
-          kilo_user_email: user.google_user_email,
-          kilo_user_name: user.google_user_name,
-          requested_at: new Date().toISOString(),
-        },
-        githubRequester,
-        githubAppType,
-      });
+      if (githubRequest) {
+        const [existingPending] = await db
+          .select({ id: platform_integrations.id })
+          .from(platform_integrations)
+          .where(
+            and(
+              owner.type === 'org'
+                ? eq(platform_integrations.owned_by_organization_id, owner.id)
+                : eq(platform_integrations.owned_by_user_id, owner.id),
+              eq(platform_integrations.platform, 'github'),
+              eq(platform_integrations.github_app_type, githubAppType),
+              eq(platform_integrations.platform_account_id, githubRequest.accountId),
+              eq(platform_integrations.integration_status, 'pending'),
+              isNull(platform_integrations.platform_installation_id)
+            )
+          )
+          .limit(1);
+        if (!existingPending) {
+          await createPendingIntegration({
+            organizationId: owner.type === 'org' ? owner.id : undefined,
+            userId: owner.type === 'user' ? owner.id : undefined,
+            requester: {
+              kilo_user_id: user.id,
+              kilo_user_email: user.google_user_email,
+              kilo_user_name: user.google_user_name,
+              requested_at: new Date().toISOString(),
+            },
+            githubRequester,
+            githubRequest,
+            githubAppType,
+          });
+        }
+      }
 
       const orgParam =
         isAppInitiated && owner.type === 'org'
@@ -528,53 +543,82 @@ async function handleCoreInstallFlow(params: {
     );
   }
 
-  // Admin proof — report mode. The GitHub App does not yet request OAuth
-  // authorization during installation. When `code` is present we verify
-  // administration and log the outcome; when absent we log and proceed.
-  // A follow-up commit will hard-require `code` after the App setting is
-  // enabled in the GitHub App dashboard.
+  // Require proof that the OAuth-authorized GitHub user administers the
+  // installation before using app credentials to fetch or persist it.
+  let verifiedGitHubUserId: string | null = null;
+  let verifiedAccountType: 'Organization' | 'User' | null = null;
+  // The authenticated GitHub identity resolved by the OAuth exchange below,
+  // captured regardless of which authorization check ran. Used to record
+  // authorization provenance even on the legacy access-list admin check
+  // path, which only proves membership (not org ownership) but still
+  // authenticates a real GitHub user via the same code exchange.
+  let exchangedGitHubUserId: string | null = null;
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
+    const rejectUnauthorizedInstallation = () =>
+      NextResponse.redirect(
+        new URL(
+          isAppInitiated
+            ? appFallbackPath('error=not_installation_admin')
+            : appendQueryParam(redirectPath, 'error=not_installation_admin'),
+          APP_URL
+        )
+      );
 
-    if (code) {
-      try {
-        const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
-        const isAdmin = await assertUserAdministersInstallation({
-          accessToken: exchangeResult.accessToken,
-          installationId,
-        });
-
-        if (isAdmin) {
-          console.log('[github_admin_proof:pass]', {
-            github_user_id: exchangeResult.id,
-            github_user_login: exchangeResult.login,
-            installation_id: installationId,
-          });
-        } else {
-          console.log('[github_admin_proof:fail_non_admin]', {
-            github_user_id: exchangeResult.id,
-            github_user_login: exchangeResult.login,
-            installation_id: installationId,
-          });
-        }
-      } catch (error) {
-        console.error('[github_admin_proof:error]', {
-          installation_id: installationId,
-          error: (error as Error).message,
-        });
-        captureException(error, {
-          tags: {
-            endpoint: 'github/callback',
-            source: 'github_admin_proof',
-          },
-          extra: { installationId },
-        });
-      }
-    } else {
+    if (!code) {
       console.log('[github_admin_proof:code_absent]', {
         installation_id: installationId,
         setup_action: setupAction,
       });
+      return rejectUnauthorizedInstallation();
+    }
+
+    try {
+      const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
+      exchangedGitHubUserId = exchangeResult.id;
+      const authorization = isGitHubConnectionManagementEnabled()
+        ? await verifyGitHubInstallationAuthorization({
+            accessToken: exchangeResult.accessToken,
+            expectedAppId: credentials.appId,
+            installationId,
+            githubAppType,
+          })
+        : await assertUserAdministersInstallation({
+            accessToken: exchangeResult.accessToken,
+            installationId,
+          });
+
+      if (!authorization) {
+        console.log('[github_admin_proof:fail_non_admin]', {
+          github_user_id: exchangeResult.id,
+          github_user_login: exchangeResult.login,
+          installation_id: installationId,
+        });
+        return rejectUnauthorizedInstallation();
+      }
+      if (typeof authorization !== 'boolean') {
+        verifiedGitHubUserId = authorization.identity.id;
+        verifiedAccountType = authorization.candidate.accountType;
+      }
+
+      console.log('[github_admin_proof:pass]', {
+        github_user_id: exchangeResult.id,
+        github_user_login: exchangeResult.login,
+        installation_id: installationId,
+      });
+    } catch (error) {
+      console.error('[github_admin_proof:error]', {
+        installation_id: installationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      captureException(error, {
+        tags: {
+          endpoint: 'github/callback',
+          source: 'github_admin_proof',
+        },
+        extra: { installationId },
+      });
+      return rejectUnauthorizedInstallation();
     }
   }
 
@@ -672,31 +716,184 @@ async function handleCoreInstallFlow(params: {
     const accountLogin =
       'login' in account ? account.login : 'slug' in account ? account.slug : accountId;
 
-    const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
-      platform: 'github',
-      integrationType: 'app',
-      platformInstallationId: installationId,
-      platformAccountId: accountId,
-      platformAccountLogin: accountLogin,
-      permissions: installation.permissions as IntegrationPermissions,
-      scopes: installation.events || [],
-      repositoryAccess: installation.repository_selection,
-      repositories: repositories && repositories.length > 0 ? repositories : null,
-      installedAt: installation.created_at
-        ? new Date(installation.created_at).toISOString()
-        : new Date().toISOString(),
-      githubAppType,
-    });
-
-    if (!upsertResult.ok) {
+    const installedAt = installation.created_at
+      ? new Date(installation.created_at).toISOString()
+      : new Date().toISOString();
+    // Capture the verified identity once, narrowing both values here, so the
+    // verified writer and the later bind gating agree on which path ran.
+    const verifiedIdentity =
+      isGitHubConnectionManagementEnabled() && verifiedGitHubUserId && verifiedAccountType
+        ? { githubUserId: verifiedGitHubUserId, accountType: verifiedAccountType }
+        : null;
+    const redirectWithError = (error: string) => {
       if (isAppInitiated) {
-        return NextResponse.redirect(
-          new URL(appFallbackPath('error=installation_already_claimed'), APP_URL)
-        );
+        return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
       }
       return NextResponse.redirect(
-        new URL(appendQueryParam(redirectPath, 'error=installation_already_claimed'), APP_URL)
+        new URL(appendQueryParam(redirectPath, `error=${error}`), APP_URL)
       );
+    };
+    const describeUpsertFailure = (reason: string) =>
+      reason === 'multiple_installations_disabled'
+        ? 'multiple_installations_disabled'
+        : reason === 'shared_installation_disabled'
+          ? 'shared_installation_disabled'
+          : reason === 'incompatible_workflow'
+            ? 'incompatible_workflow'
+            : reason === 'retryable_conflict'
+              ? 'connection_temporarily_unavailable'
+              : reason === 'installation_unavailable'
+                ? 'installation_unavailable'
+                : 'installation_already_claimed';
+
+    if (verifiedIdentity) {
+      // The verified writer admits and commits this association itself
+      // (including sharing admission for a shared installation), so nothing
+      // here needs the legacy competing-tenant guard.
+      const verifiedResult = await connectVerifiedGitHubInstallation(owner, {
+        platformInstallationId: installationId,
+        platformAccountId: accountId,
+        platformAccountLogin: accountLogin,
+        permissions: installation.permissions as IntegrationPermissions,
+        scopes: installation.events || [],
+        repositoryAccess: installation.repository_selection,
+        repositories: repositories && repositories.length > 0 ? repositories : null,
+        installedAt,
+        githubAppType,
+        kiloUserId: user.id,
+        githubUserId: verifiedIdentity.githubUserId,
+        accountType: verifiedIdentity.accountType,
+      });
+      if (!verifiedResult.ok) {
+        return redirectWithError(describeUpsertFailure(verifiedResult.reason));
+      }
+      await observeGitHubInstallationLifecycle({
+        installationId,
+        appType: githubAppType,
+        state: 'active',
+        accountId,
+        accountLogin,
+        accountType:
+          verifiedIdentity.accountType ??
+          (installation.target_type === 'Organization' ? 'Organization' : 'User'),
+        permissions: installation.permissions as IntegrationPermissions,
+        scopes: installation.events || [],
+        repositoryAccess: installation.repository_selection,
+      });
+      const writtenIntegration = await findIntegrationByInstallationIdForOwner(
+        owner,
+        PLATFORM.GITHUB,
+        installationId,
+        githubAppType
+      );
+      if (!writtenIntegration) {
+        throw new Error('GitHub integration writer did not resolve to the verified destination');
+      }
+      await bindGitHubIntegrationToCanonicalInstallation({
+        integrationId: writtenIntegration.id,
+        installationId,
+        appType: githubAppType,
+      });
+    } else {
+      // Legacy (management-disabled) path: the write, the competing-tenant
+      // guard, and the canonical bind are ONE transaction holding the
+      // installation lock. Two transactions would leave a committed active
+      // but unbound association behind whenever the bind fails or the
+      // request is interrupted, and a concurrent pending-install completion
+      // could then attach a second tenant.
+      const legacyResult = await db.transaction(async tx => {
+        await lockGitHubInstallationIdentity(tx, githubAppType, installationId);
+        const [competingAssociation] = await tx
+          .select({ id: platform_integrations.id })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, PLATFORM.GITHUB),
+              effectiveAppTypeCondition(githubAppType),
+              eq(platform_integrations.platform_installation_id, installationId),
+              isNull(platform_integrations.github_disconnected_at),
+              inArray(platform_integrations.integration_status, [
+                INTEGRATION_STATUS.PENDING,
+                INTEGRATION_STATUS.ACTIVE,
+              ]),
+              // IS DISTINCT FROM is NULL-safe (a competitor owned by the
+              // other owner type has NULL in this column, and `<>` would
+              // yield NULL rather than true), and comparing as text keeps a
+              // non-uuid owner value from failing the query outright.
+              owner.type === 'org'
+                ? sql`${platform_integrations.owned_by_organization_id}::text is distinct from ${owner.id}`
+                : sql`${platform_integrations.owned_by_user_id}::text is distinct from ${owner.id}`
+            )
+          );
+        if (competingAssociation) {
+          return { ok: false as const, reason: 'claimed_by_other_owner' as const };
+        }
+        const written = await upsertPlatformIntegrationForOwner(
+          owner,
+          {
+            platform: 'github',
+            integrationType: 'app',
+            platformInstallationId: installationId,
+            platformAccountId: accountId,
+            platformAccountLogin: accountLogin,
+            permissions: installation.permissions as IntegrationPermissions,
+            scopes: installation.events || [],
+            repositoryAccess: installation.repository_selection,
+            repositories: repositories && repositories.length > 0 ? repositories : null,
+            installedAt,
+            githubAppType,
+            // `exchangeGitHubOAuthCode` always resolves a real authenticated
+            // GitHub identity on this path, even when connection management
+            // is disabled and only the weaker access-list admin check ran.
+            // Record it so authorization provenance stays consistent with
+            // the verified writer above.
+            kiloUserId: user.id,
+            githubUserId: exchangedGitHubUserId ?? undefined,
+          },
+          tx
+        );
+        if (!written.ok) return written;
+        await observeGitHubInstallationLifecycle(
+          {
+            installationId,
+            appType: githubAppType,
+            state: 'active',
+            accountId,
+            accountLogin,
+            accountType: installation.target_type === 'Organization' ? 'Organization' : 'User',
+            permissions: installation.permissions as IntegrationPermissions,
+            scopes: installation.events || [],
+            repositoryAccess: installation.repository_selection,
+          },
+          tx
+        );
+        const row = await findIntegrationByInstallationIdForOwner(
+          owner,
+          PLATFORM.GITHUB,
+          installationId,
+          githubAppType,
+          tx
+        );
+        if (!row) {
+          throw new Error('GitHub integration writer did not resolve to the verified destination');
+        }
+        await bindGitHubIntegrationToCanonicalInstallation(
+          { integrationId: row.id, installationId, appType: githubAppType },
+          tx
+        );
+        return { ok: true as const };
+      });
+      if (!legacyResult.ok) {
+        return redirectWithError(describeUpsertFailure(legacyResult.reason));
+      }
+    }
+
+    if (repositories?.length) {
+      await updateGitHubInstallationRepositories({
+        installationId,
+        appType: githubAppType,
+        repositoriesAdded: repositories,
+      });
     }
   }
 

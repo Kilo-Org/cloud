@@ -1,10 +1,14 @@
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 import { MAX_ORGANIZATION_GROUP_ASSIGNMENTS } from '@kilocode/db/schema-types';
 import {
   OrganizationGroupMetadataSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
   OrganizationGroupPolicyTypeSchema,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -21,16 +25,16 @@ import {
   setOrganizationMemberGroups,
   updateOrganizationGroupMetadata,
   updateOrganizationGroupDetails,
-} from '@/lib/organizations/organization-groups';
-import { createTRPCRouter } from '@/lib/trpc/init';
+} from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
   organizationBillingProcedure,
   organizationMemberProcedure,
   organizationAdminMutationProcedure,
-} from '@/routers/organizations/utils';
-import { getModelAccessPolicyEditorData } from '@/lib/organizations/group-policies/model-access/model-access.server';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { getModelAccessPolicyEditorData } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 const GroupIdInputSchema = OrganizationIdInputSchema.extend({ groupId: z.uuid() }).strict();
 
@@ -87,11 +91,15 @@ export const organizationGroupsRouter = createTRPCRouter({
     .input(OrganizationIdInputSchema)
     .query(async ({ input, ctx }) => {
       const role = await ensureOrganizationAccess(ctx, input.organizationId);
-      if (role === 'owner' || role === 'billing_manager') {
+      // The manager shape follows the roles the group writes admit: an admin
+      // creates, updates and deletes a group like an owner, so it must also see
+      // and open the groups it may change. A billing manager reads the same
+      // shape without `canEdit`, which matches `organizationAdminMutationProcedure`.
+      if (canManageOrganizationBilling(role)) {
         return {
           access: 'manager' as const,
           groups: await listOrganizationGroupsForManager(input.organizationId),
-          canEdit: role === 'owner',
+          canEdit: canManageOrganization(role),
         };
       }
       return {

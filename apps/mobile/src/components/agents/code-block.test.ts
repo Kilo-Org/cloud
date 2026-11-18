@@ -1,25 +1,41 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); same pattern as tool-diff-preview.test.ts */
+/* eslint-disable max-lines -- rendering, truncation, accessibility, and pass-through suites share the CodeBlock harness. */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CodeBlock } from './code-block';
-import { tokenizeCodeLines } from './code-block-model';
+import {
+  chunkTokenLines,
+  clearFenceWalkCacheForTests,
+  CODE_CHUNK_TOKENS,
+  fenceWalkCacheStatsForTests,
+} from './code-block-fence-walk';
+import {
+  CODE_CHUNK_MOUNT_BATCH,
+  CODE_FIRST_PAINT_CHUNKS,
+  tokenizeCodeLines,
+} from './code-block-model';
 import { type MonoScrollTextMode } from './mono-scroll-block-model';
 import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import '@/i18n';
 
-const { useMonoScrollSheetMock } = vi.hoisted(() => ({
+const { useMonoScrollSheetMock, useColorSchemeMock, platform } = vi.hoisted(() => ({
   useMonoScrollSheetMock: vi.fn<() => { mode: MonoScrollTextMode; track: () => () => void } | null>(
     () => null
   ),
+  useColorSchemeMock: vi.fn<() => 'dark' | 'light'>(() => 'light'),
+  platform: { OS: 'android' as 'android' | 'ios' },
 }));
 
 // RNGH ships Flow source that the node project cannot parse, so the horizontal
 // ScrollView becomes a string element.
 vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
   View: 'View',
   Text: 'RNText',
+  Platform: platform,
+  useColorScheme: useColorSchemeMock,
 }));
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
@@ -47,7 +63,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -57,25 +73,77 @@ function isMockedStringElement(node: TestRenderer.ReactTestInstance, name: strin
   return typeof node.type === 'string' && node.type === name;
 }
 
-/** Nested RNText token runs: the ones that carry a style.color. */
-function colorRuns(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => {
-    const style = propOf(node, 'style') as { color?: string } | undefined;
-    return typeof style?.color === 'string';
-  });
-}
-
-/** The single parent code RNText (carries the mono sizing className). */
-function codeParent(
-  root: TestRenderer.ReactTestInstance
-): TestRenderer.ReactTestInstance | undefined {
+/** Code Texts carrying the mono sizing: the selectable fence, or one per chunk. */
+function codeLines(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => {
     if (!isMockedStringElement(node, 'RNText')) {
       return false;
     }
     const className = propOf(node, 'className');
     return typeof className === 'string' && className.includes('font-mono text-xs');
+  });
+}
+
+/** The first code Text (the fence, or the first chunk of a chunked fence). */
+function codeParent(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance | undefined {
+  return codeLines(root)[0];
+}
+
+/** Source lines held by one non-selectable code Text: one `Fragment` per line. */
+function chunkLineCount(chunk: TestRenderer.ReactTestInstance): number {
+  const children = propOf(chunk, 'children');
+  return Array.isArray(children) ? children.length : 0;
+}
+
+/** Every string in a node's rendered children, depth first. */
+function renderedStrings(node: unknown): string[] {
+  if (typeof node === 'string') {
+    return [node];
+  }
+  if (Array.isArray(node)) {
+    return node.flatMap(item => renderedStrings(item));
+  }
+  if (node && typeof node === 'object' && 'props' in node) {
+    return renderedStrings((node as { props: { children?: unknown } }).props.children);
+  }
+  return [];
+}
+
+/** The intrinsic-width content wrapper of the sheet scroll mode. */
+function codeScrollContent(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance | undefined {
+  return root.findAll(node => {
+    if (!isMockedStringElement(node, 'View')) {
+      return false;
+    }
+    const className = propOf(node, 'className');
+    return typeof className === 'string' && className.includes('shrink-0 self-start');
   })[0];
+}
+
+/** Nested RNText token runs: the colored runs, never the code chunk Texts. */
+function colorRuns(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => {
+    if (propOf(node, 'className') !== undefined) {
+      return false;
+    }
+    const style = propOf(node, 'style') as { color?: string } | undefined;
+    return typeof style?.color === 'string';
+  });
+}
+
+/**
+ * The fence's accessibility host: the single element that carries the code and
+ * the `copyCode` action. `Text` is one element per chunk on iOS, so the
+ * non-selectable path wraps its chunks in one accessible `View`.
+ */
+function accessibilityHosts(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => propOf(node, 'accessible') === true);
 }
 
 function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
@@ -85,6 +153,57 @@ function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.Re
       (node.type as string) === 'Text' &&
       propOf(node, 'accessibilityLabel') === 'Content truncated'
   );
+}
+
+function pressables(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => isMockedStringElement(node, 'Pressable'));
+}
+
+/** The source lines a fence of `code` needs at one chunk per `Text`. */
+function expectedChunkCount(code: string, language: string | null): number {
+  return chunkTokenLines(tokenizeCodeLines(code, language)).length;
+}
+
+/**
+ * Let the fence's bounded mount batches land. The block mounts
+ * `CODE_FIRST_PAINT_CHUNKS` chunks in its first render and adds one batch per
+ * `setTimeout(0)` tick, so a test that needs the whole fence waits for the
+ * chunk count to stop growing.
+ */
+async function settleChunkMounts(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
+  let mounted = 0;
+  for (let tick = 0; tick < 500; tick += 1) {
+    const current = codeLines(renderer.root).length;
+    if (current === mounted) {
+      return;
+    }
+    mounted = current;
+    // eslint-disable-next-line no-await-in-loop -- one tick per bounded mount batch, in order
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+  }
+  throw new Error('the fence never finished mounting its chunks');
+}
+
+/** The fence's chunk mount counts after each batch, starting with the first paint. */
+async function chunkMountHistory(
+  renderer: TestRenderer.ReactTestRenderer,
+  totalChunks: number
+): Promise<number[]> {
+  const history = [codeLines(renderer.root).length];
+  while ((history.at(-1) ?? 0) < totalChunks) {
+    // eslint-disable-next-line no-await-in-loop -- one tick per bounded mount batch, in order
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+    history.push(codeLines(renderer.root).length);
+  }
+  return history;
 }
 
 async function mount(element: React.ReactElement): Promise<TestRenderer.ReactTestRenderer> {
@@ -100,6 +219,39 @@ async function mount(element: React.ReactElement): Promise<TestRenderer.ReactTes
   return renderer;
 }
 
+/**
+ * Mount without letting the batch timers run: the synchronous act flushes the
+ * mount effects but leaves a `setTimeout(0)` batch pending, so the caller sees
+ * the fence's first commit.
+ */
+function mountFirstCommit(element: React.ReactElement): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(element);
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+/**
+ * Update without letting the batch timers run: the synchronous act flushes the
+ * update's effects but leaves a `setTimeout(0)` batch pending, so the caller
+ * sees the fence's first commit after the update (see `mountFirstCommit`).
+ * Asserting the first commit through an async act is a race — the batch can
+ * land inside that act, and the fence legitimately mounts more than one batch.
+ */
+function updateFirstCommit(
+  renderer: TestRenderer.ReactTestRenderer,
+  element: React.ReactElement
+): void {
+  act(() => {
+    renderer.update(element);
+  });
+}
+
 async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
   await act(async () => {
     await Promise.resolve();
@@ -111,6 +263,11 @@ function blockElement(props?: Partial<BlockProps>): React.ReactElement {
   return React.createElement(CodeBlock, { code: 'const x = 1;', language: 'typescript', ...props });
 }
 
+/** The style.color of every colored run, in render order. */
+function runColorValues(root: TestRenderer.ReactTestInstance): string[] {
+  return colorRuns(root).map(run => (propOf(run, 'style') as { color: string }).color);
+}
+
 function withSheet(
   mode: MonoScrollTextMode,
   track: () => () => void,
@@ -120,11 +277,20 @@ function withSheet(
   return block;
 }
 
+// The light palette is the baseline for the suites that assert concrete token
+// colors; the theme suite overrides it per test.
+beforeEach(() => {
+  useColorSchemeMock.mockReturnValue('light');
+  platform.OS = 'android';
+});
+
 describe('CodeBlock', () => {
-  it('renders one nested RNText per token run', async () => {
-    const renderer = await mount(blockElement());
+  it('renders a short non-selectable fence as one code Text', async () => {
+    const renderer = await mount(blockElement({ selectable: false }));
+    expect(codeLines(renderer.root)).toHaveLength(1);
+
     const expectedRuns = tokenizeCodeLines('const x = 1;', 'typescript').reduce(
-      (total, line) => total + line.length,
+      (total, line) => total + line.filter(token => token.className !== null).length,
       0
     );
     expect(expectedRuns).toBeGreaterThan(0);
@@ -132,7 +298,329 @@ describe('CodeBlock', () => {
     await unmount(renderer);
   });
 
-  it('applies tokenColorFor to tagged runs and baseColor to plain runs', async () => {
+  it('chunks a selectable fence, so no Text holds the whole file', async () => {
+    // Regression: Android selects inside one `ReactTextView` only, but a
+    // whole-fence Text made a selectable fence ONE `SpannableStringBuilder` for
+    // the file the tool detail sheet routes through it (read-tool-card.tsx caps
+    // that at 50,000 characters). Its spans — thousands of
+    // `SetSpanOperation.execute` calls — landed in the frame that opened the
+    // sheet, which stayed on its bare backdrop until they finished. A selectable
+    // fence chunks like every other fence; a press-hold-drag still selects
+    // across lines in one gesture because it selects inside the chunk it starts
+    // in (32 lines).
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = await mount(blockElement({ code, language: 'typescript' }));
+
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBeLessThan(200);
+    for (const chunk of chunks) {
+      expect(propOf(chunk, 'selectable')).toBe(true);
+    }
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root)).toHaveLength(expectedChunkCount(code, 'typescript'));
+
+    // Nothing is dropped by the split: the tagged runs of every line still
+    // total what the highlighter produced.
+    const expectedRuns = tokenizeCodeLines(code, 'typescript').reduce(
+      (total, line) => total + line.filter(token => token.className !== null).length,
+      0
+    );
+    expect(expectedRuns).toBeGreaterThan(0);
+    expect(colorRuns(renderer.root)).toHaveLength(expectedRuns);
+    await unmount(renderer);
+  });
+
+  it('mounts a bounded first paint, then the rest of the fence in batches', async () => {
+    // Regression: the chunk cap bounds the spans one Text holds, but RN applies
+    // every mounted Text's spans in the frame that mounts it, so mounting a
+    // 1,500-line read body at once still held the sheet on its backdrop. The
+    // first render mounts a bounded front of the fence; later commits add
+    // bounded batches, so no single frame carries the whole file.
+    const code = Array.from({ length: 400 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const total = expectedChunkCount(code, 'typescript');
+    expect(total).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS + CODE_CHUNK_MOUNT_BATCH);
+    const renderer = mountFirstCommit(blockElement({ code, language: 'typescript' }));
+
+    // The first commit paints the front of the fence and no more.
+    expect(codeLines(renderer.root)).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+
+    const history = await chunkMountHistory(renderer, total);
+    expect(history.at(-1)).toBe(total);
+    // Every commit after the first adds at most one bounded batch.
+    for (const [index, mounted] of history.entries()) {
+      const previous = index === 0 ? 0 : (history[index - 1] ?? 0);
+      expect(mounted - previous).toBeLessThanOrEqual(CODE_CHUNK_MOUNT_BATCH);
+    }
+    await unmount(renderer);
+  });
+
+  it('starts a changed fence at the bounded first paint, not the last mount count', async () => {
+    const longCode = Array.from(
+      { length: 400 },
+      (_, index) => `const value${index} = ${index};`
+    ).join('\n');
+    const renderer = await mount(blockElement({ code: longCode, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root).length).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS);
+
+    const otherCode = Array.from(
+      { length: 400 },
+      (_, index) => `let other${index} = ${index};`
+    ).join('\n');
+    updateFirstCommit(renderer, blockElement({ code: otherCode, language: 'typescript' }));
+    expect(codeLines(renderer.root)).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+    await unmount(renderer);
+  });
+
+  it('does not resume a replaced fence’s mount count in a later fence that extends it', async () => {
+    // Regression: a replaced fence shorter than the first paint never ran the
+    // batch effect, so the mount state kept the replaced-away text and count.
+    // A later fence that extends that text matched it and mounted more than one
+    // bounded batch in its first commit.
+    const longCode = Array.from(
+      { length: 400 },
+      (_, index) => `const value${index} = ${index};`
+    ).join('\n');
+    const renderer = await mount(blockElement({ code: longCode, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root).length).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS);
+
+    updateFirstCommit(renderer, blockElement({ code: 'short', language: 'typescript' }));
+    expect(codeLines(renderer.root)).toHaveLength(1);
+
+    updateFirstCommit(
+      renderer,
+      blockElement({ code: `${longCode}\nconst appended = true;`, language: 'typescript' })
+    );
+    expect(codeLines(renderer.root)).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+    await unmount(renderer);
+  });
+
+  it('splits one run-dense source line across chunk Texts', async () => {
+    // Regression: chunking by lines alone left a single long source line in one
+    // `Text` with its whole token run set applied in one frame. The tool sheet
+    // routes a read body of up to 50,000 characters through this block, and a
+    // minified file is exactly one such line.
+    const code = JSON.stringify({
+      items: Array.from({ length: 100 }, (_, index) => ({ id: index, name: `name-${index}` })),
+    });
+    expect(code.split('\n')).toHaveLength(1);
+    const totalRuns = tokenizeCodeLines(code, 'json')[0]?.filter(
+      token => token.className !== null
+    ).length;
+    expect(totalRuns).toBeGreaterThan(CODE_CHUNK_TOKENS);
+
+    const renderer = await mount(blockElement({ code, language: 'json', selectable: false }));
+    await settleChunkMounts(renderer);
+    const chunks = codeLines(renderer.root);
+    expect(chunks).toHaveLength(expectedChunkCount(code, 'json'));
+    expect(chunks.length).toBeGreaterThan(1);
+
+    // No chunk Text holds more than the run budget, and the split drops none of
+    // the line's tagged runs.
+    let renderedRuns = 0;
+    for (const chunk of chunks) {
+      const runs = colorRuns(chunk).length;
+      expect(runs).toBeLessThanOrEqual(CODE_CHUNK_TOKENS);
+      renderedRuns += runs;
+    }
+    expect(renderedRuns).toBe(totalRuns);
+    await unmount(renderer);
+  });
+
+  it('keeps a streamed fence mounted when its code only grows', async () => {
+    // Regression: resetting the mount count on every text change dropped and
+    // re-applied the whole fence's spans on each streamed token, which is the
+    // per-frame work the bounded first paint exists to avoid. A fence that only
+    // appends (the transcript streaming a code block) keeps its mounts.
+    const code = Array.from({ length: 400 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = await mount(blockElement({ code, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    const mounted = codeLines(renderer.root).length;
+    expect(mounted).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS);
+
+    const grown = `${code}\nconst appended = true;`;
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(blockElement({ code: grown, language: 'typescript' }));
+    });
+    expect(codeLines(renderer.root).length).toBeGreaterThanOrEqual(mounted);
+    await unmount(renderer);
+  });
+
+  it('keeps an already-mounted chunk’s tree across a streamed append', async () => {
+    // Regression: the fence rebuilt the element tree of every mounted chunk on
+    // each mount batch and each append, so a streaming fence re-rendered the
+    // chunks it had already mounted. The chunk view is memoized on a shared
+    // completed-chunk array (see `extendFenceChunkWalk`), so the first chunk's
+    // rendered children keep their identity while only the rebuilt tail and the
+    // newly mounted chunks construct trees.
+    clearFenceWalkCacheForTests();
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = mountFirstCommit(blockElement({ code, language: 'typescript' }));
+    const before = codeLines(renderer.root)[0];
+    if (!before) {
+      throw new Error('expected a first chunk');
+    }
+    const beforeChildren = propOf(before, 'children');
+    // A full chunk of lines, so the assertion covers a real element tree.
+    expect(chunkLineCount(before)).toBe(32);
+
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root)).toHaveLength(expectedChunkCount(code, 'typescript'));
+    // The mount batches mounted the rest of the fence without rebuilding the
+    // tree of the chunk the first paint already had.
+    const [afterBatches] = codeLines(renderer.root);
+    expect(propOf(afterBatches, 'children')).toBe(beforeChildren);
+
+    const appended = Array.from({ length: 100 }, (_, index) => `const later${index} = ${index};`);
+    const extended = `${code}\n${appended.join('\n')}`;
+    updateFirstCommit(renderer, blockElement({ code: extended, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+
+    const chunks = codeLines(renderer.root);
+    expect(chunks).toHaveLength(expectedChunkCount(extended, 'typescript'));
+    // The first chunk's children are the same array: the memo skipped its
+    // render, so an append cannot rebuild a chunk whose lines are final.
+    expect(propOf(chunks[0], 'children')).toBe(beforeChildren);
+    // The appended text rendered, in the chunk past the shared prefix.
+    const lastChunk = chunks.at(-1);
+    if (!lastChunk) {
+      throw new Error('expected a last chunk');
+    }
+    expect(renderedStrings(propOf(lastChunk, 'children')).join('')).toContain('later99');
+    await unmount(renderer);
+  });
+
+  it('carries the fence walk and mount progress across a streamed append', async () => {
+    // The append must extend the walk the mounted block already holds instead
+    // of caching a second, restarted copy: the block keeps every mount it had,
+    // and one walk is retained while it stays on screen.
+    clearFenceWalkCacheForTests();
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = mountFirstCommit(blockElement({ code, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    const mountedBefore = codeLines(renderer.root).length;
+    expect(mountedBefore).toBe(expectedChunkCount(code, 'typescript'));
+    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 1, held: 1 });
+
+    const extended = `${code}\nconst appendedTail = true;`;
+    updateFirstCommit(renderer, blockElement({ code: extended, language: 'typescript' }));
+    // The append keeps the mounts it already had rather than restarting at the
+    // bounded first paint.
+    expect(codeLines(renderer.root)).toHaveLength(mountedBefore);
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root)).toHaveLength(expectedChunkCount(extended, 'typescript'));
+
+    // One walk, still held by the mounted block: the extension replaced the
+    // cached prefix instead of leaving a second copy of the fence behind.
+    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 1, held: 1 });
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
+  });
+
+  it('costs no token span for an untagged run in a selectable fence', async () => {
+    const code = Array.from({ length: 20 }, (_, index) => `plain output line ${index}`).join('\n');
+    const renderer = await mount(blockElement({ code, language: null }));
+    expect(codeLines(renderer.root)).toHaveLength(1);
+    expect(colorRuns(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('keeps a blank source line as its own node in a selectable fence', async () => {
+    const renderer = await mount(blockElement({ code: 'a\n\nb', language: null }));
+    const [fence] = codeLines(renderer.root);
+    expect(fence).toBeDefined();
+    expect(propOf(fence, 'children')).toHaveLength(3);
+    await unmount(renderer);
+  });
+
+  it('bounds a non-selectable fence to a run of lines per Text, not a Text per line', async () => {
+    // Regression: the fence used to render all lines into one RNText, so a
+    // long file produced one SpannableStringBuilder whose span count scaled
+    // with the whole file (the Android `SetSpanOperation.execute` ANR). One
+    // Text per line moved the same scale onto the native view count, so the
+    // fence renders a chunk of lines per Text instead: no Text holds the whole
+    // fence, and the views a fence needs stay far below its line count.
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = await mount(blockElement({ code, language: 'typescript', selectable: false }));
+    await settleChunkMounts(renderer);
+
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBeLessThan(200);
+
+    // Every chunk but the last holds the same number of lines; the last holds
+    // the remainder. That is what bounds both the views and a Text's spans.
+    const linesPerChunk = chunks.map(chunk => chunkLineCount(chunk));
+    expect(linesPerChunk.reduce((total, lines) => total + lines, 0)).toBe(200);
+    expect(Math.max(...linesPerChunk)).toBeLessThan(200);
+    expect(linesPerChunk.slice(0, -1).every(lines => lines === linesPerChunk[0])).toBe(true);
+    expect(linesPerChunk.at(-1)).toBeLessThanOrEqual(linesPerChunk[0] ?? 0);
+
+    // The tagged runs of the whole fence still total what the highlighter
+    // produced — nothing is dropped by the split.
+    const expectedRuns = tokenizeCodeLines(code, 'typescript').reduce(
+      (total, line) => total + line.filter(token => token.className !== null).length,
+      0
+    );
+    expect(colorRuns(renderer.root)).toHaveLength(expectedRuns);
+    await unmount(renderer);
+  });
+
+  it('costs no token span for an untagged run', async () => {
+    // A fence with no language highlights to plain text; every line is one
+    // raw string, so no code Text carries a nested token Text at all.
+    const code = Array.from({ length: 100 }, (_, index) => `plain output line ${index}`).join('\n');
+    const renderer = await mount(blockElement({ code, language: null, selectable: false }));
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.length).toBeLessThan(100);
+    expect(colorRuns(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('renders no blank code line for an empty fence', async () => {
+    // Regression: the blank-line placeholder keeps the box of a blank line
+    // that sits among other lines. An empty fence has no other line, so it
+    // keeps the zero-height empty code Text the whole-fence RNText rendered
+    // instead of gaining a blank code line.
+    const renderer = await mount(blockElement({ code: '', language: 'typescript' }));
+    const [fence] = codeLines(renderer.root);
+    expect(fence).toBeDefined();
+    expect(renderedStrings(propOf(fence, 'children'))).not.toContain(' ');
+    await unmount(renderer);
+  });
+
+  it('keeps a blank source line as a line box in a chunk', async () => {
+    const renderer = await mount(
+      blockElement({ code: 'a\n\nb', language: null, selectable: false })
+    );
+    const [chunk] = codeLines(renderer.root);
+    expect(chunk).toBeDefined();
+    // One Fragment per source line: a break before every line but the chunk's
+    // first, and a space (never an empty child) for the blank line, so its box
+    // survives wherever it falls in the chunk.
+    const lineChildren = propOf(chunk, 'children') as { props: { children: unknown[] } }[];
+    expect(lineChildren).toHaveLength(3);
+    expect(lineChildren[1]?.props.children).toEqual(['\n', ' ']);
+    await unmount(renderer);
+  });
+
+  it('applies tokenColorFor to tagged runs and baseColor to the line text', async () => {
     const baseColor = '#112233';
     const renderer = await mount(blockElement({ baseColor }));
 
@@ -141,7 +629,9 @@ describe('CodeBlock', () => {
     );
     expect(runColors).toContain(tokenColorFor('keyword', false));
     expect(runColors).toContain(tokenColorFor('number', false));
-    expect(runColors).toContain(baseColor);
+    // Untagged runs are plain strings inside the line Text, so the base ink
+    // moves from a per-token run onto the line itself.
+    expect((propOf(codeParent(renderer.root), 'style') as { color: string }).color).toBe(baseColor);
 
     const keywordRun = colorRuns(renderer.root).find(
       run => (propOf(run, 'style') as { color: string }).color === tokenColorFor('keyword', false)
@@ -153,12 +643,9 @@ describe('CodeBlock', () => {
     await unmount(renderer);
   });
 
-  it('uses the theme foreground for plain runs by default', async () => {
+  it('uses the theme foreground for the line text by default', async () => {
     const renderer = await mount(blockElement());
-    const runColors = colorRuns(renderer.root).map(
-      run => (propOf(run, 'style') as { color: string }).color
-    );
-    expect(runColors).toContain('#14130F');
+    expect((propOf(codeParent(renderer.root), 'style') as { color: string }).color).toBe('#14130F');
     await unmount(renderer);
   });
 
@@ -188,9 +675,12 @@ describe('CodeBlock', () => {
     const renderer = await mount(withSheet('scroll', track, blockElement()));
     const scrollViews = renderer.root.findAll(node => isMockedStringElement(node, 'ScrollView'));
     expect(scrollViews).toHaveLength(1);
-    const parent = codeParent(renderer.root);
-    expect(parent).toBeDefined();
-    expect((propOf(parent, 'className') as string).includes('shrink-0 self-start')).toBe(true);
+    const content = codeScrollContent(renderer.root);
+    expect(content).toBeDefined();
+    expect(codeLines(renderer.root).length).toBeGreaterThan(0);
+    // Each code line keeps the mono sizing inside the intrinsic-width wrapper.
+    const [firstLine] = codeLines(renderer.root);
+    expect((propOf(firstLine, 'className') as string).includes('font-mono text-xs')).toBe(true);
     await unmount(renderer);
   });
 
@@ -216,6 +706,214 @@ describe('CodeBlock', () => {
     const parent = codeParent(renderer.root);
     expect(parent).toBeDefined();
     expect(propOf(parent, 'selectable')).toBe(false);
+    await unmount(renderer);
+  });
+
+  it('renders an iOS selectable fence as UITextView chunks with colored token spans', async () => {
+    platform.OS = 'ios';
+    const renderer = await mount(blockElement({ code: 'const x = 1;', language: 'typescript' }));
+    const chunks = renderer.root.findAll(
+      node => isMockedStringElement(node, 'UITextView') && propOf(node, 'uiTextView') === true
+    );
+    expect(chunks).toHaveLength(1);
+    expect(propOf(chunks[0], 'selectable')).toBe(true);
+    expect(codeLines(renderer.root)).toHaveLength(0);
+    const spans = renderer.root.findAll(
+      node => isMockedStringElement(node, 'UITextView') && propOf(node, 'uiTextView') !== true
+    );
+    expect(spans.length).toBeGreaterThan(0);
+    expect(spans.map(span => span.props.children as unknown)).toContain('const');
+    await unmount(renderer);
+  });
+
+  it('keeps an iOS non-selectable fence on plain Text', async () => {
+    platform.OS = 'ios';
+    const renderer = await mount(
+      blockElement({ code: 'const x = 1;', language: 'typescript', selectable: false })
+    );
+    expect(renderer.root.findAll(node => isMockedStringElement(node, 'UITextView'))).toHaveLength(
+      0
+    );
+    expect(codeLines(renderer.root)).toHaveLength(1);
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock syntax palette follows the color scheme', () => {
+  // The palette must come from the color scheme, not from comparing a theme
+  // token (e.g. `background`) to a hex literal: the generated palette is free
+  // to change and the tokens would silently flip against their surface.
+  it('picks the dark token palette on a dark color scheme', async () => {
+    useColorSchemeMock.mockReturnValue('dark');
+    const renderer = await mount(blockElement());
+    const colors = runColorValues(renderer.root);
+
+    expect(colors).toContain(tokenColorFor('keyword', true));
+    expect(colors).toContain(tokenColorFor('number', true));
+    expect(colors).not.toContain(tokenColorFor('keyword', false));
+    await unmount(renderer);
+  });
+
+  it('picks the light token palette on a light color scheme', async () => {
+    useColorSchemeMock.mockReturnValue('light');
+    const renderer = await mount(blockElement());
+    const colors = runColorValues(renderer.root);
+
+    expect(colors).toContain(tokenColorFor('keyword', false));
+    expect(colors).toContain(tokenColorFor('number', false));
+    expect(colors).not.toContain(tokenColorFor('keyword', true));
+    await unmount(renderer);
+  });
+
+  it('reads the scheme again on a later render instead of caching the palette', async () => {
+    useColorSchemeMock.mockReturnValue('light');
+    const renderer = await mount(blockElement());
+    expect(runColorValues(renderer.root)).toContain(tokenColorFor('keyword', false));
+
+    useColorSchemeMock.mockReturnValue('dark');
+    act(() => {
+      renderer.update(blockElement({ code: 'let y = 2;' }));
+    });
+
+    expect(runColorValues(renderer.root)).toContain(tokenColorFor('keyword', true));
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock accessibility', () => {
+  it('keeps one accessible host, not one per chunk Text', async () => {
+    const code = Array.from({ length: 40 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = await mount(blockElement({ code, selectable: false }));
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(propOf(chunk, 'accessible')).toBe(false);
+      expect(propOf(chunk, 'onAccessibilityAction')).toBeUndefined();
+    }
+
+    const hosts = accessibilityHosts(renderer.root);
+    expect(hosts).toHaveLength(1);
+    expect(propOf(hosts[0], 'onAccessibilityAction')).toBeUndefined();
+    await unmount(renderer);
+  });
+
+  it('keeps a non-selectable fence one accessibility element', async () => {
+    const renderer = await mount(blockElement({ selectable: false }));
+    const hosts = accessibilityHosts(renderer.root);
+    expect(hosts).toHaveLength(1);
+    expect(propOf(hosts[0], 'accessibilityActions')).toBeUndefined();
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock long-press pass-through', () => {
+  it('mounts no responder wrapper in wrap mode', async () => {
+    const renderer = await mount(blockElement());
+    expect(pressables(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('mounts no responder wrapper in sheet scroll mode', async () => {
+    const track = vi.fn(() => () => undefined);
+    const renderer = await mount(withSheet('scroll', track, blockElement()));
+    expect(pressables(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock fence walk lifetime', () => {
+  beforeEach(() => {
+    clearFenceWalkCacheForTests();
+  });
+
+  it('releases the fence walk when the block unmounts', async () => {
+    // Regression: a walk stayed in the module-level cache for the life of the
+    // process, so a transcript of long fences pinned highlighted copies of its
+    // code after the user scrolled past it.
+    const renderer = await mount(blockElement({ code: 'const kept = 1;', language: null }));
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
+  });
+
+  it('keeps the fence walk while the block is mounted', async () => {
+    const renderer = await mount(blockElement({ code: 'const kept = 1;', language: null }));
+    act(() => {
+      renderer.update(blockElement({ code: 'const kept = 1;', language: null }));
+    });
+
+    // A re-render of the same fence reuses the walk, so a FlashList remount and
+    // an unrelated prop change do not re-highlight the fence's lines.
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+    await unmount(renderer);
+  });
+
+  it('keeps the walk while another mounted block renders the same fence', async () => {
+    // The cache is keyed by the fence's value, so two blocks showing the same
+    // fence share one walk; one of them going away must not drop it for the
+    // other, which would re-highlight its prefix on its next mount batch.
+    const twoBlocks = React.createElement(
+      React.Fragment,
+      null,
+      blockElement({ code: 'const shared = 1;', language: null }),
+      blockElement({ code: 'const shared = 1;', language: null })
+    );
+    const renderer = await mount(twoBlocks);
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    act(() => {
+      renderer.update(blockElement({ code: 'const shared = 1;', language: null }));
+    });
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
+  });
+
+  it('keeps the walk when one block replaces another for the same fence', async () => {
+    // A list row can unmount while an identical fence mounts in the same
+    // commit, and that commit's effect cleanups run before its effect creates:
+    // the release must not drop the walk the mounting block is about to use.
+    const code = 'const swapped = 1;';
+    const at = (key: string) =>
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(CodeBlock, { key, code, language: null })
+      );
+    const renderer = await mount(at('first'));
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    act(() => {
+      renderer.update(at('second'));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
+  });
+
+  it('releases the previous fence walk when the fence text is replaced', async () => {
+    const renderer = await mount(blockElement({ code: 'const first = 1;', language: null }));
+    act(() => {
+      renderer.update(blockElement({ code: 'const second = 2;', language: null }));
+    });
+    // The replaced fence's walk is dropped on the task after the commit that
+    // released it, so a block mounting the same fence in that commit keeps it.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const { entries } = fenceWalkCacheStatsForTests();
+    expect(entries).toBe(1);
+    // The one entry left is the fence now rendered, not the replaced one.
+    expect(fenceWalkCacheStatsForTests().weight).toBeGreaterThan(0);
     await unmount(renderer);
   });
 });

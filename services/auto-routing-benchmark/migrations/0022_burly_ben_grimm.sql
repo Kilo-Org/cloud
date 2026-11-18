@@ -1,0 +1,1 @@
+ALTER TABLE `scheduler_executions` ADD `started_at` integer DEFAULT 0 NOT NULL;

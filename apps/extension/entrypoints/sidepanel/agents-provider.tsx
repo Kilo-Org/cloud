@@ -19,6 +19,7 @@ export interface ExtensionAgentsContextValue {
   readonly store: ReturnType<typeof createStore>;
   readonly trpcClient: TrpcClient;
   readonly organizationId: string | null;
+  readonly token: string;
 }
 
 const ExtensionAgentsContext = createContext<ExtensionAgentsContextValue | null>(null);
@@ -34,10 +35,13 @@ export const useExtensionAgents = (): ExtensionAgentsContextValue => {
 export const ExtensionAgentsProvider = ({
   auth,
   children,
+  isActive = true,
   organizationId,
 }: {
   auth: StoredAuth;
   children: ReactNode;
+  /** Retains the live user-web socket only while the Agents view is on screen. */
+  isActive?: boolean;
   organizationId: string | null;
 }): JSX.Element => {
   const apiBaseUrl = getKiloApiBaseUrl();
@@ -69,14 +73,23 @@ export const ExtensionAgentsProvider = ({
       userWebConnection,
     });
 
-    ref.current = { manager, organizationId, store, trpcClient, userWebConnection };
+    ref.current = {
+      manager,
+      organizationId,
+      store,
+      token: auth.token,
+      trpcClient,
+      userWebConnection,
+    };
   }
 
   useEffect(() => {
+    if (!isActive) {
+      return;
+    }
     const { userWebConnection: uwc } = ref.current!;
-    const release = uwc.retain();
-    return release;
-  }, []);
+    return uwc.retain();
+  }, [isActive]);
 
   return (
     <JotaiProvider store={ref.current.store}>

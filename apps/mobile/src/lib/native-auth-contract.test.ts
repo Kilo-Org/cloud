@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  parseAuthErrorCode,
-  parseEmailCodeResponse,
-  parseTokenResponse,
-} from './auth/native-auth-contract';
+import { parseEmailCodeResponse, parseTokenResponse } from './auth/native-auth-contract';
 
 describe('native auth response contracts', () => {
   it('accepts valid token and email-code responses', () => {
@@ -24,10 +20,4 @@ describe('native auth response contracts', () => {
       expect(parseEmailCodeResponse(value)).toBeNull();
     }
   );
-
-  it('extracts only string error codes', () => {
-    expect(parseAuthErrorCode({ error: 'SSO_ERROR' })).toBe('SSO_ERROR');
-    expect(parseAuthErrorCode({ error: 500 })).toBeUndefined();
-    expect(parseAuthErrorCode(null)).toBeUndefined();
-  });
 });

@@ -6,6 +6,11 @@ on:
       - main
   pull_request:
 
+# Cancel in-progress runs when a new commit is pushed to the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -21,4 +26,4 @@ jobs:
       - name: Secret Scanning
         uses: trufflesecurity/trufflehog@7f4e37db2d928c18ddd7ddf0604f8f7d1f5793ec # v3.93.0
         with:
-          extra_args: --results=verified,unknown
+          extra_args: --results=verified,unknown --exclude-paths=.github/trufflehog-exclude-paths.txt

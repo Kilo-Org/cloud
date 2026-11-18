@@ -1,0 +1,137 @@
+import { captureException } from '@sentry/react-native';
+import { useEffect, useState } from 'react';
+import { findNodeHandle, type ViewInstance } from 'react-native';
+
+import {
+  addSurfaceGeometryListener,
+  isNativeSurfaceGeometryAvailable,
+  type NativeSurfaceGeometry,
+  observeSurface,
+  unobserveSurface,
+} from '@/lib/native-surface-geometry';
+
+type Observation = {
+  node: ViewInstance | null;
+  status: 'pending' | 'ready' | 'failed';
+  geometry: NativeSurfaceGeometry | null;
+  failure?: string;
+};
+
+function sameGeometry(left: NativeSurfaceGeometry | null, right: NativeSurfaceGeometry) {
+  return (
+    left?.tag === right.tag &&
+    left.visibleTop === right.visibleTop &&
+    left.visibleBottom === right.visibleBottom &&
+    left.boundsHeight === right.boundsHeight &&
+    left.safeAreaTop === right.safeAreaTop &&
+    left.safeAreaBottom === right.safeAreaBottom
+  );
+}
+
+export function useNativeStateGeometry(node: ViewInstance | null) {
+  const [observation, setObservation] = useState<Observation>({
+    node: null,
+    status: 'pending',
+    geometry: null,
+  });
+
+  useEffect(() => {
+    if (!isNativeSurfaceGeometryAvailable || !node) {
+      return undefined;
+    }
+    const tag = findNodeHandle(node);
+    if (tag == null) {
+      setObservation({
+        node,
+        status: 'failed',
+        geometry: null,
+        failure: 'Native view tag unavailable',
+      });
+      return undefined;
+    }
+    let active = true;
+    let receivedGeometry = false;
+    const publish = (geometry: NativeSurfaceGeometry) => {
+      if (!active || geometry.tag !== tag) {
+        return;
+      }
+      receivedGeometry = true;
+      const valid =
+        Number.isFinite(geometry.visibleTop) &&
+        Number.isFinite(geometry.visibleBottom) &&
+        Number.isFinite(geometry.boundsHeight) &&
+        Number.isFinite(geometry.safeAreaTop) &&
+        Number.isFinite(geometry.safeAreaBottom) &&
+        geometry.visibleBottom >= geometry.visibleTop &&
+        geometry.boundsHeight >= 0;
+      if (!valid) {
+        setObservation({
+          node,
+          status: 'failed',
+          geometry: null,
+          failure: 'Invalid native surface geometry',
+        });
+        return;
+      }
+      // A covered or fully faded scene reports an empty visible range. It keeps
+      // the geometry it was last seen with: an empty range drops its centered
+      // states to the fallback layout, and they jump back only after the
+      // revealed scene reports its range again at the end of the transition.
+      const hidden = geometry.visibleBottom === geometry.visibleTop;
+      setObservation(previous => {
+        const last = previous.node === node ? previous.geometry : null;
+        const keep =
+          last !== null &&
+          (sameGeometry(last, geometry) || (hidden && last.visibleBottom > last.visibleTop));
+        return keep ? previous : { node, status: 'ready', geometry };
+      });
+    };
+    setObservation({ node, status: 'pending', geometry: null });
+    const listener = addSurfaceGeometryListener(publish);
+    const start = async () => {
+      try {
+        const geometry = await observeSurface(tag);
+        if (!receivedGeometry) {
+          publish(geometry);
+        }
+      } catch (error) {
+        if (active) {
+          setObservation({
+            node,
+            status: 'failed',
+            geometry: null,
+            failure: error instanceof Error ? error.message : 'Native observation failed',
+          });
+        }
+      }
+    };
+    const stop = async () => {
+      try {
+        await unobserveSurface(tag);
+      } catch (error) {
+        captureException(error, {
+          tags: { 'error.subsystem': 'surface_geometry', 'error.operation': 'unobserve' },
+        });
+      }
+    };
+    const startFrame = requestAnimationFrame(() => {
+      if (active) {
+        void start();
+      }
+    });
+    return () => {
+      active = false;
+      cancelAnimationFrame(startFrame);
+      listener?.remove();
+      void stop();
+    };
+  }, [node]);
+
+  if (!isNativeSurfaceGeometryAvailable) {
+    return { status: 'unavailable' as const, geometry: null };
+  }
+  if (observation.node !== node) {
+    return { status: 'pending' as const, geometry: null };
+  }
+  return observation;
+}

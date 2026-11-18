@@ -21,10 +21,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { cn } from '@/lib/utils';
 import { useProfileMutations, type ProfileAgent } from '@/hooks/useCloudAgentProfiles';
-import type { AgentConfig, PermissionRule } from '@kilocode/db/schema-types';
+import { isRedundantAgentSlug } from '@kilocode/app-shared/agent-profile';
+import type { AgentConfig } from '@kilocode/db/schema-types';
+import {
+  PERMISSION_TOOLS,
+  mergePermissions,
+  readDisabledTools,
+  readWholeToolAction,
+  type PermissionTool,
+} from './agent-permissions';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
 const BUILTIN_SLUGS = new Set([
@@ -38,36 +46,14 @@ const BUILTIN_SLUGS = new Set([
   'custom',
 ]);
 
-/**
- * Tools the UI exposes as disableable per agent. Cloud sessions run in a
- * sandbox where every tool is allowed by default; the only customization we
- * surface is "turn this tool off for this agent", which emits `deny` for the
- * tool. The CLI's richer permission shapes (per-pattern maps, ask, etc.) are
- * preserved on save but not editable here.
- */
-const PERMISSION_TOOLS = [
-  'read',
-  'edit',
-  'bash',
-  'glob',
-  'grep',
-  'list',
-  'task',
-  'skill',
-  'webfetch',
-  'websearch',
-  'codesearch',
-  'mcp',
-] as const;
-type PermissionTool = (typeof PERMISSION_TOOLS)[number];
-
 type Props = {
   profileId: string;
   organizationId: string | undefined;
   agents: ProfileAgent[];
+  readOnly?: boolean;
 };
 
-export function ProfileAgentsTab({ profileId, organizationId, agents }: Props) {
+export function ProfileAgentsTab({ profileId, organizationId, agents, readOnly = false }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -88,6 +74,7 @@ export function ProfileAgentsTab({ profileId, organizationId, agents }: Props) {
             agent={agent}
             profileId={profileId}
             organizationId={organizationId}
+            readOnly={readOnly}
             onEdit={() => setEditingId(agent.id)}
           />
         )
@@ -100,14 +87,16 @@ export function ProfileAgentsTab({ profileId, organizationId, agents }: Props) {
           onDone={() => setIsAdding(false)}
         />
       ) : (
-        <Button
-          variant="outline"
-          className="h-11 w-full border-dashed"
-          onClick={() => setIsAdding(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add agent
-        </Button>
+        !readOnly && (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-dashed"
+            onClick={() => setIsAdding(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add agent
+          </Button>
+        )
       )}
 
       {agents.length === 0 && !isAdding && (
@@ -121,11 +110,13 @@ function AgentRow({
   agent,
   profileId,
   organizationId,
+  readOnly = false,
   onEdit,
 }: {
   agent: ProfileAgent;
   profileId: string;
   organizationId: string | undefined;
+  readOnly?: boolean;
   onEdit: () => void;
 }) {
   const { deleteAgent } = useProfileMutations({ organizationId });
@@ -140,7 +131,9 @@ function AgentRow({
           <div className="flex flex-wrap items-center gap-2">
             <Bot className="text-muted-foreground h-4 w-4" />
             <span className="text-sm font-medium">{agent.name}</span>
-            <code className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{agent.slug}</code>
+            {isRedundantAgentSlug(agent.name, agent.slug) ? null : (
+              <code className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{agent.slug}</code>
+            )}
             <span className="text-muted-foreground text-xs uppercase tracking-wide">
               {visibility}
             </span>
@@ -166,28 +159,32 @@ function AgentRow({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit agent">
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <InlineDeleteConfirmation
-            onDelete={async () => {
-              setDeleting(true);
-              try {
-                await deleteAgent.mutateAsync({
-                  profileId,
-                  organizationId,
-                  agentId: agent.id,
-                });
-                toast.success(`Agent "${agent.name}" deleted`);
-              } catch (error) {
-                console.error('Failed to delete agent:', error);
-                toast.error('Failed to delete agent');
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            isLoading={deleting}
-          />
+          {!readOnly && (
+            <>
+              <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit agent">
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <InlineDeleteConfirmation
+                onDelete={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteAgent.mutateAsync({
+                      profileId,
+                      organizationId,
+                      agentId: agent.id,
+                    });
+                    toast.success(`Agent "${agent.name}" deleted`);
+                  } catch (error) {
+                    console.error('Failed to delete agent:', error);
+                    toast.error('Failed to delete agent');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                isLoading={deleting}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -210,19 +207,9 @@ type FormState = {
   temperature: string;
   topP: string;
   steps: string;
-  /** Tools the user wants turned off for this agent. Everything else is allowed. */
+  /** Tools the user wants turned off for this agent. Every other stored rule is kept. */
   disabledTools: Set<PermissionTool>;
 };
-
-function readDisabledTools(permission: AgentConfig['permission'] | undefined): Set<PermissionTool> {
-  const out = new Set<PermissionTool>();
-  if (!permission || typeof permission !== 'object') return out;
-  const map = permission as Record<string, PermissionRule>;
-  for (const tool of PERMISSION_TOOLS) {
-    if (map[tool] === 'deny') out.add(tool);
-  }
-  return out;
-}
 
 function buildInitialState(agent: ProfileAgent | undefined): FormState {
   const c = agent?.config ?? {};
@@ -239,28 +226,6 @@ function buildInitialState(agent: ProfileAgent | undefined): FormState {
     steps: c.steps !== undefined ? String(c.steps) : '',
     disabledTools: readDisabledTools(c.permission),
   };
-}
-
-/**
- * Apply UI disable toggles onto the existing permission map, preserving any
- * non-string (per-pattern) rules and any unrelated tool keys a user may have
- * imported. Toggling a tool off writes `deny`; toggling it back on clears a
- * simple string rule but leaves per-pattern maps alone.
- */
-function mergePermissions(
-  existing: AgentConfig['permission'] | undefined,
-  disabledTools: Set<PermissionTool>
-): AgentConfig['permission'] | undefined {
-  const base: Record<string, PermissionRule> =
-    existing && typeof existing === 'object' ? { ...existing } : {};
-  for (const tool of PERMISSION_TOOLS) {
-    if (disabledTools.has(tool)) {
-      base[tool] = 'deny';
-    } else if (typeof base[tool] === 'string') {
-      delete base[tool];
-    }
-  }
-  return Object.keys(base).length > 0 ? base : undefined;
 }
 
 function FieldHint({ hint }: { hint: string }) {
@@ -335,6 +300,9 @@ function AgentForm({
   );
   const availableVariants =
     (state.model && modelOptions.find(m => m.id === state.model)?.variants) || [];
+  // A stored single-rule permission applies to every tool at once, so the
+  // per-tool switches below cannot express a change to it.
+  const wholeToolAction = readWholeToolAction(agent?.config.permission);
 
   const handleSave = async () => {
     const trimmedSlug = state.slug.trim();
@@ -626,7 +594,7 @@ function AgentForm({
                   htmlFor="agent-top-p"
                   hint="Nucleus sampling cutoff. Only tokens within the top `p` probability mass are considered."
                 >
-                  top_p
+                  Top P
                 </FieldLabel>
                 <Input
                   id="agent-top-p"
@@ -639,7 +607,13 @@ function AgentForm({
             </div>
 
             <div className="grid gap-2">
-              <FieldLabel hint="Every tool is allowed by default. Uncheck a tool to deny it for this agent only.">
+              <FieldLabel
+                hint={
+                  wholeToolAction
+                    ? 'This agent stores one rule for every tool at once, so the switches below are read-only.'
+                    : 'Every tool is allowed by default. Uncheck a tool to deny it for this agent only. Other stored rules stay as they are.'
+                }
+              >
                 Tools
               </FieldLabel>
               <div className="bg-background/60 grid grid-cols-2 gap-2 rounded-md border p-3 sm:grid-cols-3">
@@ -648,10 +622,16 @@ function AgentForm({
                   return (
                     <label
                       key={tool}
-                      className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors"
+                      className={cn(
+                        'flex items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors',
+                        wholeToolAction
+                          ? 'cursor-not-allowed opacity-60'
+                          : 'hover:bg-muted/50 cursor-pointer'
+                      )}
                     >
                       <Checkbox
                         checked={enabled}
+                        disabled={wholeToolAction !== undefined}
                         onCheckedChange={checked => {
                           const next = new Set(state.disabledTools);
                           if (checked) next.delete(tool);
@@ -664,6 +644,13 @@ function AgentForm({
                   );
                 })}
               </div>
+              {wholeToolAction && (
+                <p className="text-muted-foreground text-xs">
+                  This agent applies one rule to every tool at once:{' '}
+                  <code className="font-mono">{wholeToolAction}</code>. These switches are
+                  read-only; edit the agent config to change the rule.
+                </p>
+              )}
             </div>
           </div>
         </CollapsibleContent>

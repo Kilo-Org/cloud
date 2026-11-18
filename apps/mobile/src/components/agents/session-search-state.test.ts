@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createSessionSearchController,
+  resolveSearchRestoreDecision,
   SEARCH_DEBOUNCE_MS,
   type SearchTimer,
   type SessionSearchController,
 } from '@/components/agents/session-search-state';
-import { createDefaultAgentSessionFilters } from '@/lib/agent-session-filters';
 
 type FakeTimer = SearchTimer & {
   fire(): void;
@@ -115,55 +115,6 @@ describe('createSessionSearchController', () => {
     expect(commits).toEqual(['']);
   });
 
-  it('clearBroadly commits an empty query AND applies the narrowing-filter reset (preserving sort)', () => {
-    const timer = createFakeTimer();
-    const commits: string[] = [];
-    const controller = createController(timer, commits);
-
-    controller.scheduleSearch('still pending');
-    const before = createDefaultAgentSessionFilters();
-    const current = {
-      ...before,
-      platformFilter: ['macos'],
-      projectFilter: ['git/a'],
-      sortBy: 'updated_at' as const,
-    };
-
-    let receivedPrev: typeof current | null = null;
-    controller.clearBroadly(apply => {
-      receivedPrev = current;
-      const next = apply(current);
-      // sortBy stays — it's a persistent preference, not a filter.
-      expect(next).toEqual({
-        platformFilter: [],
-        projectFilter: [],
-        sortBy: 'updated_at',
-      });
-    });
-
-    expect(receivedPrev).toBe(current);
-    expect(commits).toEqual(['']);
-    expect(controller.hasPending()).toBe(false);
-  });
-
-  it('clearBroadly is safe to call when no debounce is pending and still runs the filter transform', () => {
-    const timer = createFakeTimer();
-    const commits: string[] = [];
-    const controller = createController(timer, commits);
-
-    let applyCalls = 0;
-    controller.clearBroadly(apply => {
-      applyCalls += 1;
-      // The transform is what actually clears the narrowing filters;
-      // the test just proves the controller hands the previous value
-      // through unchanged.
-      const prev = createDefaultAgentSessionFilters();
-      expect(apply(prev)).toEqual(prev);
-    });
-    expect(commits).toEqual(['']);
-    expect(applyCalls).toBe(1);
-  });
-
   it('dispose cancels a pending debounce without committing', () => {
     const timer = createFakeTimer();
     const commits: string[] = [];
@@ -187,5 +138,99 @@ describe('createSessionSearchController', () => {
     controller.scheduleSearch('beta');
     timer.fire();
     expect(commits).toEqual(['', 'beta']);
+  });
+});
+
+describe('resolveSearchRestoreDecision', () => {
+  it('seeds a non-empty restored query and remounts the input', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: 'hello' })
+    ).toEqual({
+      shouldSeed: true,
+      query: 'hello',
+      text: 'hello',
+      hasText: true,
+      shouldRemount: true,
+    });
+  });
+
+  it('does not seed before the load settles', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: false, hasInteracted: false, restoredQuery: 'hello' })
+    ).toEqual({
+      shouldSeed: false,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
+  });
+
+  it('does not overwrite a field the user has already touched', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: true, restoredQuery: 'hello' })
+    ).toEqual({
+      shouldSeed: false,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
+  });
+
+  it('seeds empty when nothing was stored (null)', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: null })
+    ).toEqual({
+      shouldSeed: true,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
+  });
+
+  it('an empty persisted clear does not reload the previous query', () => {
+    // A clear persists '' (not the prior non-empty text); restore must seed the
+    // empty value, never a stale previous query.
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: '' })
+    ).toEqual({
+      shouldSeed: true,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
+  });
+
+  it('commits a whitespace-only draft as an empty query and keeps the field text', () => {
+    // Typing the same five spaces commits '' (the list shows everything), so the
+    // restore must commit '' too; the field still shows the stored spaces.
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: '     ' })
+    ).toEqual({
+      shouldSeed: true,
+      query: '',
+      text: '     ',
+      hasText: true,
+      shouldRemount: true,
+    });
+  });
+
+  it('commits a padded draft as its trimmed term and keeps the padding visible', () => {
+    expect(
+      resolveSearchRestoreDecision({
+        settled: true,
+        hasInteracted: false,
+        restoredQuery: '  alpha ',
+      })
+    ).toEqual({
+      shouldSeed: true,
+      query: 'alpha',
+      text: '  alpha ',
+      hasText: true,
+      shouldRemount: true,
+    });
   });
 });

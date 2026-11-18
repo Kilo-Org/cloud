@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Zure agente-saioak eguneratze bat du",
+      "lowBalance": "Zure saldoak arreta behar du",
+      "spendAlert": "Zure gastuak arreta behar du",
+      "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du",
+      "securityUpdate": "Segurtasun-egiaztapen batek eguneratze bat du",
+      "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Saldo baxuko alerta",
+      "body": "{{organizationName}} saldoa ${{minimumBalanceUsd}} azpitik jaitsi da"
+    },
+    "spendAlert": {
+      "title": "Gastu-alerta",
+      "body": "{{scopeName}} gastuak ${{amountUsd}} gainditu du"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} {{repoFullName}}-n"
+    },
+    "securityFindingNew": {
+      "title": "Aurkitutako segurtasun-arazo berria ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA abisua"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA haustura"
+    }
+  },
+  "sessionReady": {
+    "body": "Zure Kilo saioa prest dago zure telefonotik kontrolatzeko"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

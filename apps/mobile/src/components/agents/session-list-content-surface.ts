@@ -1,51 +1,67 @@
 /**
- * Pure surface decision for the session-list body after the tray moved into
- * the SectionList header. Encodes the single-render-site contract:
- *  - Never early-return on loading — keep one SectionList mounted so the
- *    tray's local expanded state survives skeleton → rows.
- *  - Full-screen error / first-use empty only after loading completes.
- *  - Cold active-only failure gets its own full-screen retry surface once
- *    loading completes, instead of being misreported as first-use empty.
+ * Pure surface decision for the session-list body. Encodes the
+ * single-render-site contract:
+ *  - Keep one FlashList mounted through initial skeleton → rows.
+ *  - Full-screen errors settle after loading, but stay visible with a busy Retry
+ *    control during the refetch.
+ *  - History-empty renders only after loading completes.
  *  - ListEmptyComponent prefers skeletons while loading over any body-empty
- *    kind (avoids flashing "No past sessions" / "No sessions yet" mid-load).
+ *    kind (avoids flashing "No past sessions" mid-load).
+ *  - A stored-list failure with only stale cached rows shows the full-screen
+ *    error when rows were not delivered by this screen's own load. Rows
+ *    delivered this mount keep rendering with the inline refresh error.
  */
 type SessionListContentSurface =
   | { kind: 'full-screen-error' }
-  | { kind: 'active-error-empty' }
-  | { kind: 'first-use-empty' }
-  | { kind: 'section-list'; listEmpty: 'loading-skeletons' | 'body-empty' | 'none' };
+  | { kind: 'history-empty' }
+  | { kind: 'session-list'; listEmpty: 'loading-skeletons' | 'body-empty' | 'none' };
 
 export function selectSessionListContentSurface(input: {
   isLoading: boolean;
   isError: boolean;
-  activeIsError: boolean;
+  isRetrying: boolean;
   hasAnySessions: boolean;
-  hasPinnedActive: boolean;
   hasHistoryContent: boolean;
+  hasActiveQuery: boolean;
+  /** True when the stored query delivered rows since this screen mounted. */
+  hasFreshHistory: boolean;
 }): SessionListContentSurface {
-  const { isLoading, isError, activeIsError, hasAnySessions, hasPinnedActive, hasHistoryContent } =
-    input;
+  const {
+    isLoading,
+    isError,
+    isRetrying,
+    hasAnySessions,
+    hasHistoryContent,
+    hasActiveQuery,
+    hasFreshHistory,
+  } = input;
 
   // Gate non-list surfaces on !isLoading so a cold open (empty cache for the
-  // whole load) cannot flash first-use empty or full-screen error.
-  if (!isLoading && isError && !hasAnySessions && !hasPinnedActive) {
+  // whole load) cannot flash history-empty or full-screen error.
+  //
+  // Two ways to land here: nothing to fall back on at all, or cached rows from
+  // an earlier mount that this screen's own load could not confirm. Keep that
+  // error visible while Retry is pending: React Query can temporarily report a
+  // non-error status during the refetch, but those cached rows are still stale.
+  // An active search/filter owns its own error body (Retry + Clear).
+  if (
+    (isRetrying && !hasActiveQuery && !hasFreshHistory) ||
+    (!isLoading && isError && (!hasAnySessions || (!hasActiveQuery && !hasFreshHistory)))
+  ) {
     return { kind: 'full-screen-error' };
   }
-  // Cold active-only failure: the stored query succeeded empty but the active
-  // poll failed before any data loaded. Retryable, so never claim "No
-  // sessions yet". Stored-query errors above stay first.
-  if (!isLoading && !hasAnySessions && activeIsError) {
-    return { kind: 'active-error-empty' };
-  }
+  // No stored rows and no active query: render the history-empty body (the
+  // screen gates its search chrome on `hasAnySessions` and renders this
+  // full-screen).
   if (!isLoading && !hasAnySessions) {
-    return { kind: 'first-use-empty' };
+    return { kind: 'history-empty' };
   }
 
   if (isLoading) {
-    return { kind: 'section-list', listEmpty: 'loading-skeletons' };
+    return { kind: 'session-list', listEmpty: 'loading-skeletons' };
   }
   if (!hasHistoryContent) {
-    return { kind: 'section-list', listEmpty: 'body-empty' };
+    return { kind: 'session-list', listEmpty: 'body-empty' };
   }
-  return { kind: 'section-list', listEmpty: 'none' };
+  return { kind: 'session-list', listEmpty: 'none' };
 }

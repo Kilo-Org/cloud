@@ -3,169 +3,208 @@
 import { Card, CardContent } from '@/components/ui/card';
 import type { RevenueKpiData } from '@/lib/revenueKpi';
 import { formatDollars } from '@/lib/utils';
-import { parseISO, format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 type ApiResponse = {
   data: RevenueKpiData[];
 };
 
+type NumericKey = Exclude<keyof RevenueKpiData, 'transaction_day'>;
+
+function sumKey(data: RevenueKpiData[], key: NumericKey): number {
+  return data.reduce((sum, item) => sum + item[key], 0);
+}
+
 export function RevenueStats({ data }: ApiResponse) {
+  if (data.length === 0) {
+    return (
+      <Card>
+        <CardContent>
+          <p className="text-muted-foreground py-4 text-sm">No revenue data for this range.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const latestData = data[data.length - 1];
-
-  const totals = data.reduce(
-    (acc, item) => ({
-      paid_total_dollars: acc.paid_total_dollars + item.paid_total_dollars,
-      free_total_dollars: acc.free_total_dollars + item.free_total_dollars,
-      multiplied_total_dollars: acc.multiplied_total_dollars + item.multiplied_total_dollars,
-      unmultiplied_total_dollars: acc.unmultiplied_total_dollars + item.unmultiplied_total_dollars,
-      paid_transaction_count: acc.paid_transaction_count + item.paid_transaction_count,
-      free_transaction_count: acc.free_transaction_count + item.free_transaction_count,
-      multiplied_transaction_count:
-        acc.multiplied_transaction_count + item.multiplied_transaction_count,
-      unmultiplied_transaction_count:
-        acc.unmultiplied_transaction_count + item.unmultiplied_transaction_count,
-    }),
-    {
-      paid_total_dollars: 0,
-      free_total_dollars: 0,
-      multiplied_total_dollars: 0,
-      unmultiplied_total_dollars: 0,
-      paid_transaction_count: 0,
-      free_transaction_count: 0,
-      multiplied_transaction_count: 0,
-      unmultiplied_transaction_count: 0,
-    }
-  );
-
-  const averages =
-    data.length > 0
-      ? {
-          paid_total_dollars: totals.paid_total_dollars / data.length,
-          free_total_dollars: totals.free_total_dollars / data.length,
-          multiplied_total_dollars: totals.multiplied_total_dollars / data.length,
-          unmultiplied_total_dollars: totals.unmultiplied_total_dollars / data.length,
-          paid_transaction_count: totals.paid_transaction_count / data.length,
-          free_transaction_count: totals.free_transaction_count / data.length,
-          multiplied_transaction_count: totals.multiplied_transaction_count / data.length,
-          unmultiplied_transaction_count: totals.unmultiplied_transaction_count / data.length,
-        }
-      : {
-          paid_total_dollars: 0,
-          free_total_dollars: 0,
-          multiplied_total_dollars: 0,
-          unmultiplied_total_dollars: 0,
-          paid_transaction_count: 0,
-          free_transaction_count: 0,
-          multiplied_transaction_count: 0,
-          unmultiplied_transaction_count: 0,
-        };
+  const latestDay = format(parseISO(latestData.transaction_day), 'yyyy-MM-dd');
+  const totals = (key: NumericKey) => sumKey(data, key);
+  const averages = (key: NumericKey) => sumKey(data, key) / data.length;
 
   return (
     <Card>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="text-muted-foreground py-2 pr-3 text-left font-medium">Period</th>
-                <th className="text-muted-foreground px-3 py-2 text-right font-medium">
-                  Paid Revenue
-                </th>
-                <th className="text-muted-foreground px-3 py-2 text-right font-medium">
-                  Free Credits
-                </th>
-                <th className="text-muted-foreground px-3 py-2 text-right font-medium">
-                  Multiplied Revenue
-                </th>
-                <th className="text-muted-foreground px-3 py-2 text-right font-medium">
-                  Unmultiplied Revenue
-                </th>
-                <th className="text-muted-foreground px-3 py-2 text-right font-medium">Paid Tx</th>
-                <th className="text-muted-foreground px-3 py-2 text-right font-medium">Free Tx</th>
-                <th className="text-muted-foreground px-3 py-2 text-right font-medium">
-                  Multiplied Tx
-                </th>
-                <th className="text-muted-foreground py-2 pl-3 text-right font-medium">
-                  Unmultiplied Tx
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b">
-                <td className="py-2 pr-3">
-                  Latest day ({format(parseISO(latestData.transaction_day), 'yyyy-MM-dd')})
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(latestData.paid_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(latestData.free_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(latestData.multiplied_total_dollars ?? 0)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(latestData.unmultiplied_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">{latestData.paid_transaction_count}</td>
-                <td className="px-3 py-2 text-right">{latestData.free_transaction_count}</td>
-                <td className="px-3 py-2 text-right">
-                  {latestData.multiplied_transaction_count ?? 0}
-                </td>
-                <td className="py-2 pl-3 text-right">
-                  {latestData.unmultiplied_transaction_count}
-                </td>
-              </tr>
+      <CardContent className="space-y-6">
+        <div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-muted-foreground py-2 pr-3 text-left font-medium">Period</th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Paid Revenue
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Free Credits
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Multiplied Revenue
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Unmultiplied Revenue
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Paid Tx
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Free Tx
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Multiplied Tx
+                  </th>
+                  <th className="text-muted-foreground py-2 pl-3 text-right font-medium">
+                    Unmultiplied Tx
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <CreditRow
+                  label={`Latest day (${latestDay})`}
+                  value={key => latestData[key]}
+                  countDecimals={false}
+                />
+                <CreditRow
+                  label={`Total (${data.length} ${data.length === 1 ? 'day' : 'days'})`}
+                  value={totals}
+                  countDecimals={false}
+                />
+                <CreditRow label="Average per day" value={averages} countDecimals />
+              </tbody>
+            </table>
+          </div>
+          <p className="text-muted-foreground mt-2 text-xs">
+            These credit-transaction figures keep their existing semantics, including no refund or
+            dispute adjustment.
+          </p>
+        </div>
 
-              <tr className="border-b">
-                <td className="py-2 pr-3">
-                  Total ({data.length} {data.length === 1 ? 'day' : 'days'})
-                </td>
-                <td className="px-3 py-2 text-right">{formatDollars(totals.paid_total_dollars)}</td>
-                <td className="px-3 py-2 text-right">{formatDollars(totals.free_total_dollars)}</td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(totals.multiplied_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(totals.unmultiplied_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">{totals.paid_transaction_count}</td>
-                <td className="px-3 py-2 text-right">{totals.free_transaction_count}</td>
-                <td className="px-3 py-2 text-right">{totals.multiplied_transaction_count}</td>
-                <td className="py-2 pl-3 text-right">{totals.unmultiplied_transaction_count}</td>
-              </tr>
-
-              <tr>
-                <td className="py-2 pr-3">Average per day</td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(averages.paid_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(averages.free_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(averages.multiplied_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {formatDollars(averages.unmultiplied_total_dollars)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {averages.paid_transaction_count.toFixed(1)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {averages.free_transaction_count.toFixed(1)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {averages.multiplied_transaction_count.toFixed(1)}
-                </td>
-                <td className="py-2 pl-3 text-right">
-                  {averages.unmultiplied_transaction_count.toFixed(1)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div>
+          <h3 className="mb-2 text-sm font-medium">Service fees (settled date, UTC)</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-muted-foreground py-2 pr-3 text-left font-medium">Period</th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Collected Fees
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Missed Fees
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Exempted Fees
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Disputed Fees
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">
+                    Charged
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-right font-medium">Missed</th>
+                  <th className="text-muted-foreground py-2 pl-3 text-right font-medium">Exempt</th>
+                </tr>
+              </thead>
+              <tbody>
+                <FeeRow
+                  label={`Latest day (${latestDay} UTC)`}
+                  value={key => latestData[key]}
+                  countDecimals={false}
+                />
+                <FeeRow
+                  label={`Total (${data.length} ${data.length === 1 ? 'day' : 'days'})`}
+                  value={totals}
+                  countDecimals={false}
+                />
+                <FeeRow label="Average per day" value={averages} countDecimals />
+              </tbody>
+            </table>
+          </div>
+          <p className="text-muted-foreground mt-2 text-xs">
+            Fee figures include settled assessments only. They do not make this dashboard a complete
+            Stripe product-revenue report; Kilo Pass product revenue is not added here.
+          </p>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+type RowProps = {
+  label: string;
+  value: (key: NumericKey) => number;
+  countDecimals: boolean;
+};
+
+function formatCount(value: number, decimals: boolean): string | number {
+  return decimals ? value.toFixed(1) : value;
+}
+
+function CreditRow({ label, value, countDecimals }: RowProps) {
+  return (
+    <tr className="border-b last:border-b-0">
+      <td className="py-2 pr-3">{label}</td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('paid_total_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('free_total_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('multiplied_total_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('unmultiplied_total_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatCount(value('paid_transaction_count'), countDecimals)}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatCount(value('free_transaction_count'), countDecimals)}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatCount(value('multiplied_transaction_count'), countDecimals)}
+      </td>
+      <td className="py-2 pl-3 text-right tabular-nums">
+        {formatCount(value('unmultiplied_transaction_count'), countDecimals)}
+      </td>
+    </tr>
+  );
+}
+
+function FeeRow({ label, value, countDecimals }: RowProps) {
+  return (
+    <tr className="border-b last:border-b-0">
+      <td className="py-2 pr-3">{label}</td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('collected_service_fee_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('missed_service_fee_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('exempted_service_fee_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatDollars(value('disputed_service_fee_dollars'))}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatCount(value('service_fee_charged_count'), countDecimals)}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatCount(value('service_fee_missed_count'), countDecimals)}
+      </td>
+      <td className="py-2 pl-3 text-right tabular-nums">
+        {formatCount(value('service_fee_exempt_count'), countDecimals)}
+      </td>
+    </tr>
   );
 }

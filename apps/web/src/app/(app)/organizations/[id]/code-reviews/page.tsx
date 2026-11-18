@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { ReviewAgentPageClient } from './ReviewAgentPageClient';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 

@@ -8,10 +8,6 @@
 import type { Images } from '@/lib/images-schema';
 import type { ToolExecution } from './types';
 
-// ============================================================================
-// Legacy Streaming Message Types
-// ============================================================================
-
 /**
  * Cloud agent message (V1 format)
  * Represents all types of messages in the chat (user, assistant, system)
@@ -29,10 +25,6 @@ export type CloudMessage = {
   toolExecutions?: ToolExecution[]; // Attached tool executions (for completion messages)
   images?: Images; // Image attachments for the message
 };
-
-// ============================================================================
-// Legacy Streaming Event Types (from cloud-agent)
-// ============================================================================
 
 /**
  * Raw Kilocode CLI event - preserved exactly as received from stdout JSON.
@@ -106,10 +98,6 @@ export type StreamEvent =
   | SystemCompleteEvent
   | SystemInterruptedEvent;
 
-// ============================================================================
-// Legacy Message Conversion
-// ============================================================================
-
 /**
  * Convert database message format to CloudMessage format.
  *
@@ -154,12 +142,10 @@ export function convertToCloudMessages(dbMessages: Array<Record<string, unknown>
 
   return dbMessages
     .map((msg): CloudMessage | null => {
-      // Get timestamp
       const ts = msg.ts as number | undefined;
       const timestampStr = msg.timestamp as string | undefined;
       const timestamp = ts || (timestampStr ? new Date(timestampStr).getTime() : Date.now());
 
-      // Get message content
       const text = (msg.text as string) || (msg.content as string) || '';
       const content = (msg.content as string) || (msg.text as string) || '';
       const say = msg.say as string | undefined;
@@ -180,7 +166,6 @@ export function convertToCloudMessages(dbMessages: Array<Record<string, unknown>
         metadata = parseTextMetadata(rawText);
       }
 
-      // Determine message type from various formats
       const rawType = msg.type as string | undefined;
       const rawRole = msg.role as string | undefined;
 
@@ -204,7 +189,6 @@ export function convertToCloudMessages(dbMessages: Array<Record<string, unknown>
       } else if (rawType === 'system' || rawRole === 'system') {
         messageType = 'system';
       } else {
-        // Default to assistant for unknown types
         messageType = 'assistant';
       }
 

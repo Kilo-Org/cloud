@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Aracı oturumunuzda bir güncelleme var",
+      "lowBalance": "Bakiyeniz dikkat gerektiriyor",
+      "spendAlert": "Harcamanız dikkat gerektiriyor",
+      "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",
+      "securityUpdate": "Bir güvenlik kontrolünde güncelleme var",
+      "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Düşük bakiye uyarısı",
+      "body": "{{organizationName}} bakiyesi ${{minimumBalanceUsd}} altına düştü"
+    },
+    "spendAlert": {
+      "title": "Harcama uyarısı",
+      "body": "{{scopeName}} harcaması ${{amountUsd}} değerini aştı"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}} içinde {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Yeni güvenlik bulgusu ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA uyarısı"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ihlali"
+    }
+  },
+  "sessionReady": {
+    "body": "Kilo oturumunuz telefonunuzdan kontrol edilmeye hazır"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

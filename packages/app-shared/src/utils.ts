@@ -3,16 +3,77 @@
  *
  * Hermes (React Native) cannot reliably parse PostgreSQL timestamps
  * ("2026-03-16 15:21:40.957+00") or date-only strings ("2026-09-26") with
- * `new Date()`, so all shared code must go through this helper.
+ * `new Date()`, so all shared code must go through this helper. Missing values
+ * produce an invalid Date; renderers must omit their timestamp label.
+ *
+ * A date-only string is a calendar date, not an instant: it becomes local
+ * midnight, so formatting the result in the device timezone renders that same
+ * day in every timezone. A surface that must render a date-only value in UTC
+ * formats the calendar components directly (mobile: `formatCalendarDate`).
  */
-export function parseTimestamp(value: string): Date {
-  // Date-only: "2026-09-26" → treat as UTC midnight
+export function parseTimestamp(value: string | null | undefined): Date {
+  if (typeof value !== 'string' || value.length === 0) {
+    return new Date(Number.NaN);
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return new Date(`${value}T00:00:00Z`);
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(5, 7));
+    const day = Number(value.slice(8, 10));
+    // The multi-argument constructor maps years 0-99 to 1900-1999, so set the
+    // full year explicitly to keep the backend's four-digit year.
+    const date = new Date(0);
+    date.setFullYear(year, month - 1, day);
+    date.setHours(0, 0, 0, 0);
+    // The Date constructor rolls a non-existent day into the next month. Keep
+    // such input unusable, as the ISO parse did, so callers that check for an
+    // invalid Date still take their fallback.
+    if (date.getMonth() !== month - 1 || date.getDate() !== day) {
+      return new Date(Number.NaN);
+    }
+    return date;
   }
   // PostgreSQL: "2026-03-16 15:21:40.957+00" → need "T" separator and full tz offset "+00:00"
   const iso = value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
   return new Date(iso);
+}
+
+/**
+ * Epoch milliseconds of one backend time, or null when it is missing or does not
+ * parse.
+ *
+ * Every comparison, sort, and duration in the shared surface code reads an
+ * instant through this helper, so they all interpret a timestamp the same way.
+ * A row whose time does not parse yields null and its caller takes its own
+ * fallback — skipped in an aggregation, ranked last in a sort — rather than
+ * being read as now, which would understate a wait or invent activity.
+ */
+export function timestampMs(value: string | null | undefined): number | null {
+  const at = parseTimestamp(value).getTime();
+  return Number.isFinite(at) ? at : null;
+}
+
+/**
+ * ISO 8601 form of one epoch-millisecond instant.
+ *
+ * The one conversion from a stored instant already read as milliseconds (for
+ * example a `timestampMs` result) to the ISO string the payloads carry, so the
+ * precision and format of every published time come from one place.
+ */
+export function epochMsToIso(at: number): string {
+  return new Date(at).toISOString();
+}
+
+/**
+ * ISO 8601 form of one backend time, or null when it is missing or does not
+ * parse.
+ *
+ * The one conversion from a stored time to the ISO string the widget, push and
+ * session-card payloads carry, so a value that does not parse is absent in the
+ * same way on every surface instead of each caller inventing its own fallback.
+ */
+export function timestampToIso(value: string | null | undefined): string | null {
+  const at = timestampMs(value);
+  return at === null ? null : epochMsToIso(at);
 }
 
 /** Returns the first non-empty string, or '' when none is set. */
@@ -29,30 +90,38 @@ export function fromMicrodollars(microdollars: number): number {
   return microdollars / 1000000;
 }
 
+// en-US USD covers nearly every call (formatDollars and the default formatCents
+// argument), so it gets a direct module-level instance; other currencies are
+// memoized by code. Construction is deferred to the first call: mobile bundles
+// import this module before their Intl polyfill warm-up, and the native Intl
+// that exists at import time must not own the cached formatter.
+let usdNumberFormatValue: Intl.NumberFormat | null = null;
+const currencyNumberFormats = new Map<string, Intl.NumberFormat>();
+
+function currencyNumberFormat(currency: string): Intl.NumberFormat {
+  const code = currency.toUpperCase();
+  const cached = currencyNumberFormats.get(code);
+  if (cached) {
+    return cached;
+  }
+  const format = new Intl.NumberFormat('en-US', { style: 'currency', currency: code });
+  currencyNumberFormats.set(code, format);
+  return format;
+}
+
 export function formatDollars(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  // One owner of the en-US USD presentation: Intl derives USD's 2 minor-unit
+  // digits by default, so cents in, dollars out, same string.
+  return formatCents(amount * 100);
 }
 
 export function formatCents(amount: number, currency: string = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
-}
-
-/**
- * Canonical app-wide date format (e.g. "7/11/2026" for en-US).
- *
- * Follows the runtime's default locale (device locale on mobile, browser
- * locale on web) rather than a pinned locale, so it reads naturally for
- * every user. Pass a `Date`, not a raw backend string — parse backend
- * timestamps with `parseTimestamp()` first.
- */
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString();
+  let format: Intl.NumberFormat;
+  if (currency.toUpperCase() === 'USD') {
+    usdNumberFormatValue ??= new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    format = usdNumberFormatValue;
+  } else {
+    format = currencyNumberFormat(currency);
+  }
+  return format.format(amount / 100);
 }

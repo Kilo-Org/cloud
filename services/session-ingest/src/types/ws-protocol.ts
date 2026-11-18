@@ -1,7 +1,6 @@
 import { z } from 'zod';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { SessionItemSchema } from './session-sync';
-
-export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
 export const CLIWebSocketMessageSchema = z.object({
   type: z.literal('ingest'),

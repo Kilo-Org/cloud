@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
 } from '@/components/agents/older-messages-a11y';
 
@@ -79,8 +79,8 @@ describe('shouldAnnounceOlderMessagesArrival', () => {
   });
 });
 
-describe('OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT', () => {
+describe('getOlderMessagesArrivedAnnouncement', () => {
   it('is stable screen-reader copy for both message lists', () => {
-    expect(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT).toBe('Earlier messages loaded');
+    expect(getOlderMessagesArrivedAnnouncement()).toBe('Earlier messages loaded');
   });
 });

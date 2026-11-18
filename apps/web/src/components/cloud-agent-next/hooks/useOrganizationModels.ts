@@ -5,21 +5,19 @@
  */
 
 import { useMemo } from 'react';
-import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { appendCloudAgentNextLocalTestModel } from '@/components/cloud-agent-next/model-preferences';
 import { buildContextLengthByModelId } from '@/components/cloud-agent-next/model-context-lengths';
+import { CLOUD_AGENT_METADATA_STALE_TIME } from '@/lib/cloud-agent/constants';
 
 type UseOrganizationModelsReturn = {
   /** Models formatted for the ModelCombobox component */
   modelOptions: ModelOption[];
   /** Whether models are still loading */
   isLoadingModels: boolean;
+  hasLoadedModels: boolean;
   /** Context windows keyed by exact catalog model ID */
   contextLengthByModelId: ReadonlyMap<string, number>;
-  /** The organization's default model */
-  defaultModel: string | undefined;
 };
 
 /**
@@ -37,14 +35,14 @@ export function useOrganizationModels(
   // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingOpenRouter } = useModelSelectorList(
     organizationId,
-    enabled
+    enabled,
+    'member',
+    { staleTime: CLOUD_AGENT_METADATA_STALE_TIME, gcTime: CLOUD_AGENT_METADATA_STALE_TIME }
   );
-
-  const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
   // Format models for the combobox
   const modelOptions = useMemo<ModelOption[]>(() => {
-    return appendCloudAgentNextLocalTestModel(
+    return (
       openRouterModels?.data.map(model => ({
         id: model.id,
         name: model.name,
@@ -64,7 +62,7 @@ export function useOrganizationModels(
   return {
     modelOptions,
     isLoadingModels: enabled && isLoadingOpenRouter,
+    hasLoadedModels: openRouterModels !== undefined,
     contextLengthByModelId,
-    defaultModel: defaultsData?.defaultModel,
   };
 }

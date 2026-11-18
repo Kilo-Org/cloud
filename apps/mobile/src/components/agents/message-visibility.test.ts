@@ -1,7 +1,11 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { messageRendersContent, partRendersContent } from './message-visibility';
+import {
+  messageRendersContent,
+  partRendersContent,
+  userBubbleRendersContent,
+} from './message-visibility';
 
 function textPart(overrides: Partial<Extract<Part, { type: 'text' }>> = {}): Part {
   return {
@@ -44,6 +48,17 @@ function toolPart(tool: string): Part {
   };
 }
 
+function patchPart(files: string[]): Part {
+  return {
+    id: 'p4',
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'patch',
+    hash: 'abc',
+    files,
+  };
+}
+
 function assistantMessage(parts: Part[]): StoredMessage {
   return {
     info: {
@@ -76,6 +91,11 @@ describe('partRendersContent', () => {
     ).toBe(false);
   });
 
+  it('hides projected compaction summaries but keeps ordinary text visible', () => {
+    expect(partRendersContent(textPart({ metadata: { compactionSummary: true } }))).toBe(false);
+    expect(partRendersContent(textPart())).toBe(true);
+  });
+
   it('returns false for a reasoning part with whitespace-only text', () => {
     expect(partRendersContent(reasoningPart('   \n  '))).toBe(false);
   });
@@ -91,6 +111,17 @@ describe('partRendersContent', () => {
   it('returns false for a whitespace-only text part', () => {
     expect(partRendersContent(textPart({ text: '\n\n' }))).toBe(false);
     expect(partRendersContent(textPart({ text: '   ' }))).toBe(false);
+  });
+
+  it('answers a new part version on its own, as streaming produces one per change', () => {
+    const blank = textPart({ text: '' });
+    expect(partRendersContent(blank)).toBe(false);
+    expect(partRendersContent(blank)).toBe(false);
+    // The session storage replaces the part object when text streams in.
+    const streamed = { ...blank, text: 'hello' };
+    expect(partRendersContent(streamed)).toBe(true);
+    const sanitizedAway = { ...streamed, text: '<script>hidden</script>' };
+    expect(partRendersContent(sanitizedAway)).toBe(false);
   });
 
   it('returns true for a bash tool part', () => {
@@ -118,6 +149,27 @@ describe('partRendersContent', () => {
       url: 'file:///a.txt',
     };
     expect(partRendersContent(part)).toBe(true);
+  });
+
+  it('returns true for a patch part with files', () => {
+    expect(partRendersContent(patchPart(['src/a.ts', 'src/b.ts']))).toBe(true);
+  });
+
+  it('returns false for a patch part with no files', () => {
+    expect(partRendersContent(patchPart([]))).toBe(false);
+  });
+
+  it('returns false for a patch part whose files field the wire omitted', () => {
+    // Sentry KILO-APP-BZ: the live `message.part.updated` payload is parsed
+    // with `.passthrough()`, so a patch part can reach storage without `files`.
+    const part = {
+      id: 'p4',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'patch',
+      hash: 'abc',
+    } as unknown as Part;
+    expect(partRendersContent(part)).toBe(false);
   });
 });
 
@@ -160,5 +212,93 @@ describe('messageRendersContent', () => {
       parts: [],
     };
     expect(messageRendersContent(user)).toBe(true);
+  });
+
+  it('returns false for a user message whose only text is removed during HTML sanitization', () => {
+    const user: StoredMessage = {
+      info: {
+        id: 'm1',
+        sessionID: 's1',
+        role: 'user',
+        time: { created: 1 },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'model' },
+      },
+      parts: [textPart({ text: "<script>alert('bad')</script>" })],
+    };
+    expect(messageRendersContent(user)).toBe(false);
+  });
+
+  it.each([
+    '<!-- hidden -->',
+    '<form><input value="hidden"></form>',
+    '<iframe>hidden</iframe><style>hidden</style>',
+    '<div><script>alert("bad")</script></div>',
+    '<section><form><input></form></section>',
+    '<span><iframe></iframe></span><p></p>',
+  ])('returns false when sanitization removes %s', text => {
+    expect(partRendersContent(textPart({ text }))).toBe(false);
+  });
+
+  it.each(['before<script>hidden</script>', '<section>safe</section>', '<hr>'])(
+    'keeps visible content in %s',
+    text => {
+      expect(partRendersContent(textPart({ text }))).toBe(true);
+    }
+  );
+});
+
+describe('userBubbleRendersContent', () => {
+  it('returns true for a human prompt', () => {
+    expect(userBubbleRendersContent([textPart({ text: 'fix the parser' })])).toBe(true);
+  });
+
+  it('returns false for a row with no parts', () => {
+    expect(userBubbleRendersContent([])).toBe(false);
+  });
+
+  it('returns false when the only text part is the synthetic routing context', () => {
+    // The bubble renders human text through `humanTextParts`, which drops the
+    // server's context wrapper: accepting the wrapper here would draw an empty
+    // bubble inside the row's long-press surface.
+    expect(
+      userBubbleRendersContent([
+        textPart({ synthetic: true, text: '<cloud-agent-context session-id="w1" />' }),
+      ])
+    ).toBe(false);
+  });
+
+  it('returns true when a context wrapper sits beside the prompt', () => {
+    expect(
+      userBubbleRendersContent([
+        textPart({ synthetic: true, text: '<cloud-agent-context session-id="w1" />' }),
+        textPart({ id: 'p2', text: 'fix the parser' }),
+      ])
+    ).toBe(true);
+  });
+
+  it('returns false for blank text and for a prompt sanitization removes', () => {
+    expect(userBubbleRendersContent([textPart({ text: '   \n ' })])).toBe(false);
+    expect(userBubbleRendersContent([textPart({ text: "<script>alert('x')</script>" })])).toBe(
+      false
+    );
+  });
+
+  it('returns false for tool, reasoning and patch parts the bubble never draws', () => {
+    expect(userBubbleRendersContent([toolPart('bash')])).toBe(false);
+    expect(userBubbleRendersContent([reasoningPart('thinking')])).toBe(false);
+    expect(userBubbleRendersContent([patchPart(['src/a.ts'])])).toBe(false);
+  });
+
+  it('returns true for a file attachment', () => {
+    const file: Part = {
+      id: 'p-file',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'file',
+      mime: 'text/plain',
+      url: 'file:///a.txt',
+    };
+    expect(userBubbleRendersContent([file])).toBe(true);
   });
 });

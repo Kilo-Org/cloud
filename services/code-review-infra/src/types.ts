@@ -10,6 +10,7 @@ import type {
 } from '@kilocode/worker-utils/review-agents';
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
 import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
 export type { Owner, MCPServerConfig };
@@ -49,10 +50,12 @@ export interface SessionInput {
   bitbucketPullRequestId?: number;
   /** Head commit SHA that publication must remain fenced to. */
   bitbucketExpectedHeadSha?: string;
+  /** GitHub pull request number the review must publish its summary to. */
+  githubPullRequestNumber?: number;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   /** Council runs only: inline sub-agents (one per specialist), forwarded to cloud-agent-next. */
   runtimeAgents?: RuntimeAgentInput[];
 }
@@ -80,7 +83,7 @@ export interface CodeReview {
   totalTokensOut?: number;
   /** Accumulated cost in dollars across all LLM calls */
   totalCost?: number;
-  skipBalanceCheck?: boolean; // Skip balance validation in cloud agent (for OSS sponsorship)
+  skipBalanceCheck?: boolean; // Skip the cloud agent balance check for a review that does not bill the Kilo balance
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   sandboxRetryAttempted?: boolean;

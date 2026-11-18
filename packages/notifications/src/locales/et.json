@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sinu agendi seansil on uuendus",
+      "lowBalance": "Sinu saldo vajab tähelepanu",
+      "spendAlert": "Sinu kulutused vajavad tähelepanu",
+      "securityFinding": "Turbetuvastus vajab tähelepanu",
+      "securityUpdate": "Turvakontrollil on uuendus",
+      "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Madala saldo hoiatus",
+      "body": "{{organizationName}} saldo langes alla ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Kulutuste hoiatus",
+      "body": "{{scopeName}} kulutused ületasid ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} hoidlas {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Uus turbetuvastus ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA hoiatus"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA rikkumine"
+    }
+  },
+  "sessionReady": {
+    "body": "Sinu Kilo seanss on telefonist juhtimiseks valmis"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

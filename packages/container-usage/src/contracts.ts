@@ -19,6 +19,9 @@ export const billingSubjectSchema = z
   .strict();
 export type BillingSubject = z.infer<typeof billingSubjectSchema>;
 
+export const billingModeSchema = z.enum(['shadow', 'paid']);
+export type BillingMode = z.infer<typeof billingModeSchema>;
+
 export const billingActorSchema = z
   .object({
     type: z.enum(['user', 'bot']),
@@ -88,6 +91,11 @@ export const recordStartInputSchema = usageContextBaseSchema
   .extend({
     idempotencyKey: z.string().min(1).max(1_024),
     startEpochMs: z.number().int().nonnegative().finite(),
+    /**
+     * Set when the container has not launched yet. The meter then applies the
+     * concurrent-container cap in the same transaction that opens the interval.
+     */
+    enforceCapacity: z.literal(true).optional(),
   })
   .strict()
   .superRefine(validateAttribution);
@@ -124,27 +132,53 @@ export const recordAckSchema = z
   .strict();
 export type RecordAck = z.infer<typeof recordAckSchema>;
 
-export const recordStartFailureCodeSchema = z.enum([
+/** Start-failure codes that cannot succeed on retry until SKU configuration changes. */
+export const nonRetryableSkuAdmissionCodes = [
   'sku_not_found',
   'sku_unit_mismatch',
   'sku_not_accepting_new_usage',
+] as const;
+
+export const nonRetryableAdmissionCodes = [
+  ...nonRetryableSkuAdmissionCodes,
+  'invalid_billing_attribution',
+] as const;
+
+export const recordStartFailureCodeSchema = z.enum([
+  ...nonRetryableAdmissionCodes,
   'insufficient_credits',
+  'container_limit_reached',
 ]);
 export type RecordStartFailureCode = z.infer<typeof recordStartFailureCodeSchema>;
 
-export const recordStartResultSchema = z.discriminatedUnion('success', [
-  z.object({ success: z.literal(true), ack: recordAckSchema }).strict(),
+/** Customer-safe billing admission failure carried across Worker and client boundaries. */
+const recordStartFailureSchema = z.discriminatedUnion('code', [
   z
     .object({
-      success: z.literal(false),
-      error: z
-        .object({
-          code: recordStartFailureCodeSchema,
-          message: z.string().min(1),
-        })
-        .strict(),
+      code: z.literal('container_limit_reached'),
+      // The prefix lets callers recognize the limit after Durable Object RPC flattens the error.
+      message: z.string().startsWith('container_limit_reached:'),
     })
     .strict(),
+  z
+    .object({
+      code: z.literal('insufficient_credits'),
+      message: z.string().min(1),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      code: z.enum(nonRetryableAdmissionCodes),
+      message: z.string().min(1),
+    })
+    .strict(),
+]);
+
+export const recordStartResultSchema = z.discriminatedUnion('success', [
+  z.object({ success: z.literal(true), ack: recordAckSchema }).strict(),
+  z.object({ success: z.literal(false), error: recordStartFailureSchema }).strict(),
 ]);
 export type RecordStartResult = z.infer<typeof recordStartResultSchema>;
 
@@ -153,8 +187,8 @@ export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
   z
     .object({
       verdict: z.literal('warn'),
-      remainingMicrodollars: z.number().int().optional(),
-      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
       // Retained while already-deployed producers complete their protocol rollout.
       remaining: z.number().int().optional(),
     })
@@ -162,8 +196,8 @@ export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
   z
     .object({
       verdict: z.literal('stop'),
-      remainingMicrodollars: z.number().int().optional(),
-      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
       remaining: z.number().int().optional(),
     })
     .strict(),
@@ -172,7 +206,7 @@ export type BudgetVerdict = z.infer<typeof budgetVerdictSchema>;
 
 export const heartbeatAckSchema = recordAckSchema
   .extend({
-    billingMode: z.enum(['shadow', 'paid']).optional(),
+    billingMode: billingModeSchema.optional(),
     budget: budgetVerdictSchema,
   })
   .strict();
@@ -182,6 +216,17 @@ export type ContainerUsageRpcMethods = {
   recordStart: (input: RecordStartInput) => Promise<RecordStartResult>;
   recordHeartbeat: (input: RecordHeartbeatInput) => Promise<HeartbeatAck>;
   recordStop: (input: RecordStopInput) => Promise<RecordAck>;
+};
+
+export const containerBillingStatusInputSchema = usageContextBaseSchema.pick({
+  service: true,
+  subject: true,
+});
+
+export type ContainerBillingStatusRpcMethods = {
+  getBillingMode: (
+    input: z.infer<typeof containerBillingStatusInputSchema>
+  ) => Promise<'shadow' | 'paid'>;
 };
 
 export function intervalId(service: string, instanceId: string, startEpochMs: number): string {

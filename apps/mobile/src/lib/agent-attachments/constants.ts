@@ -48,6 +48,8 @@ export const AGENT_ATTACHMENT_MIME_BY_EXTENSION = {
   jpeg: 'image/jpeg',
   webp: 'image/webp',
   gif: 'image/gif',
+  heic: 'image/heic',
+  heif: 'image/heif',
   // Documents
   pdf: 'application/pdf',
   // Text-ish source — server treats all of these as text/plain

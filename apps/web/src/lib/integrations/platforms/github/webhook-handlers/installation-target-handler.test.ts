@@ -13,7 +13,8 @@ const mockFetchGitHubInstallationDetails =
 const mockUpdateIntegrationAccountIdentity =
   jest.fn<
     (
-      integrationId: string,
+      installationId: string,
+      appType: GitHubAppType,
       platformAccountId: string,
       platformAccountLogin: string
     ) => Promise<void>
@@ -24,17 +25,23 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
     mockFetchGitHubInstallationDetails(installationId, appType),
 }));
 
-jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  updateIntegrationAccountIdentity: (
-    integrationId: string,
-    platformAccountId: string,
-    platformAccountLogin: string
-  ) => mockUpdateIntegrationAccountIdentity(integrationId, platformAccountId, platformAccountLogin),
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  updateGitHubInstallationAccountIdentity: (input: {
+    installationId: string;
+    appType: GitHubAppType;
+    accountId: string;
+    accountLogin: string;
+  }) =>
+    mockUpdateIntegrationAccountIdentity(
+      input.installationId,
+      input.appType,
+      input.accountId,
+      input.accountLogin
+    ),
 }));
 
 let handleInstallationTargetRenamed: (
   payload: InstallationTargetRenamedPayload,
-  integrationId: string,
   appType: GitHubAppType
 ) => Promise<Response>;
 
@@ -60,14 +67,14 @@ describe('handleInstallationTargetRenamed', () => {
         changes: { login: { from: 'old-owner' } },
         target_type: 'User',
       },
-      'integration-1',
       'lite'
     );
 
     expect(response.status).toBe(200);
     expect(mockFetchGitHubInstallationDetails).toHaveBeenCalledWith('98765', 'lite');
     expect(mockUpdateIntegrationAccountIdentity).toHaveBeenCalledWith(
-      'integration-1',
+      '98765',
+      'lite',
       '123',
       'authoritative-current-owner'
     );
@@ -87,11 +94,31 @@ describe('handleInstallationTargetRenamed', () => {
           changes: {},
           target_type: 'Organization',
         },
-        'integration-1',
         'standard'
       )
     ).rejects.toThrow('GitHub installation account identity missing after rename event');
 
     expect(mockUpdateIntegrationAccountIdentity).not.toHaveBeenCalled();
+  });
+
+  it('continues canonical identity observation after local disconnect', async () => {
+    const response = await handleInstallationTargetRenamed(
+      {
+        action: 'renamed',
+        installation: { id: 98765 },
+        account: {},
+        changes: {},
+        target_type: 'Organization',
+      },
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(mockFetchGitHubInstallationDetails).toHaveBeenCalledWith('98765', 'standard');
+    expect(mockUpdateIntegrationAccountIdentity).toHaveBeenCalledWith(
+      '98765',
+      'standard',
+      '123',
+      'authoritative-current-owner'
+    );
   });
 });

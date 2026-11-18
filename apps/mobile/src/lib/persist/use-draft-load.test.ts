@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The drafts module imports the native encrypted-kv chain; the fake below is
@@ -24,7 +23,8 @@ vi.mock('@sentry/react-native', () => ({
 }));
 
 /* eslint-disable import/first */
-import { isMergeDraft, prMergeDraftKey } from './drafts';
+import { prMergeDraftKey } from './drafts';
+import { isMergeDraft } from './merge-draft';
 import { useFencedDraftLoad } from './use-draft-load';
 /* eslint-enable import/first */
 
@@ -71,7 +71,9 @@ async function flushMicrotasks(): Promise<void> {
   });
 }
 
-type MergeDraft = { title: string; message: string };
+// Mirrors the persisted shape: every field is optional, because the sheet stores
+// only the fields the person authored.
+type MergeDraft = { title?: string; message?: string; method?: string };
 
 function MergeDraftHarness({
   userId,

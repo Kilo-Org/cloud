@@ -1,0 +1,1456 @@
+/* eslint-disable max-lines -- the suite owns the sign-in hierarchy contract and the inline-link touch-target audit for one screen, and the SSO-recovery, passkey, legal-link, and email-validation suites share one native-auth mock harness; splitting them would duplicate every mock in this file */
+// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
+import { createElement } from 'react';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  INLINE_LINK_BOX_CLASS,
+  INLINE_LINK_CONNECTOR_CLASS,
+  INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
+  INLINE_LINK_LINE_GAP_CLASS,
+  INLINE_LINK_LINE_GAP_DP,
+  INLINE_LINK_OUTER_HIT_SLOP_DP,
+  INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
+  INLINE_LINK_ROW_CLASS,
+  INLINE_LINK_ROW_MARGIN_DP,
+  INLINE_LINK_SENTENCE_LINE_DP,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+import { i18n } from '@/i18n';
+
+import { IdleAuth } from '../idle-auth';
+import { PROVIDER_GLYPH_SLOT_CLASS } from '../provider-buttons';
+
+type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
+
+type SsoRecoveryFixture = { email: string; ssoOrganizationId: string | undefined } | null;
+
+const ssoRecovery: { value: SsoRecoveryFixture } = vi.hoisted(() => ({
+  value: { email: 'user@example.com', ssoOrganizationId: 'org_1' },
+}));
+
+// The native passkey module is absent in the test runtime, so the capability is
+// the one input the screen reads from the client module.
+const passkeySupport = vi.hoisted(() => ({ supported: true }));
+
+// Which provider controls the screen renders: Apple availability and the
+// Google client ID both come from outside the component.
+const providers = vi.hoisted(() => ({ appleAvailable: false, googleConfigured: false }));
+
+// What the screen reads from the hook: a fixed result object plus the one piece
+// of state the busy treatment depends on.
+const nativeAuth = vi.hoisted(() => ({
+  busy: undefined as 'apple' | 'otp-send' | 'passkey' | undefined,
+  emailErrorKey: undefined as 'authErrors.invalidRequest' | 'authErrors.invalidEmail' | undefined,
+  clearEmailError: vi.fn(),
+  requestEmailCode: vi.fn(),
+  signInWithApple: vi.fn(),
+  signInWithPasskey: vi.fn(),
+}));
+
+vi.mock('@/lib/auth/passkey-client', () => ({
+  passkeysSupported: () => passkeySupport.supported,
+}));
+
+vi.mock('@/lib/auth/use-native-auth', () => ({
+  useNativeAuth: () => ({
+    busy: nativeAuth.busy,
+    emailErrorKey: nativeAuth.emailErrorKey,
+    clearEmailError: nativeAuth.clearEmailError,
+    googleConfigured: providers.googleConfigured,
+    signInWithApple: nativeAuth.signInWithApple,
+    signInWithGoogle: vi.fn(),
+    signInWithPasskey: nativeAuth.signInWithPasskey,
+    requestEmailCode: nativeAuth.requestEmailCode,
+    verifyEmailCode: vi.fn(),
+    ssoRecovery: ssoRecovery.value,
+    clearSsoRecovery: vi.fn(),
+    handleSsoError: vi.fn(),
+    pendingLinkFailure: undefined,
+    clearPendingLinkFailure: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/login-draft', () => ({
+  beginLoginEmail: vi.fn(),
+  holdLoginEmail: vi.fn(),
+  holdSsoRecovery: vi.fn(),
+}));
+
+vi.mock('expo-apple-authentication', () => ({
+  isAvailableAsync: vi.fn(async () => {
+    await Promise.resolve();
+    return providers.appleAvailable;
+  }),
+}));
+
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  useColorScheme: () => 'light',
+  View: 'View',
+}));
+
+vi.mock('sonner-native', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
+vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
+vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
+vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
+
+const mockedPush = vi.hoisted(() => vi.fn());
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockedPush }),
+}));
+
+// The real hook pulls expo-router, which the mounted project cannot load.
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#14130f', mutedForeground: '#6f6a61' }),
+}));
+
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
+
+type R = TestRenderer.ReactTestRenderer;
+type I = TestRenderer.ReactTestInstance;
+const renderers: R[] = [];
+
+afterEach(() => {
+  act(() => {
+    for (const renderer of renderers.splice(0)) {
+      renderer.unmount();
+    }
+  });
+});
+
+afterEach(async () => {
+  await i18n.changeLanguage('en');
+});
+
+async function mountIdleAuth(start: StartFn, onSignInStart?: () => void): Promise<R> {
+  const ref: { current: R | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(createElement(IdleAuth, { start, onSignInStart }));
+    await Promise.resolve();
+  });
+  const r = ref.current;
+  if (!r) {
+    throw new Error('renderer was not created');
+  }
+  renderers.push(r);
+  return r;
+}
+
+function texts(root: I): string[] {
+  return root
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        typeof n.props.children === 'string'
+    )
+    .map(n => n.props.children as string);
+}
+
+function findButton(root: I, label: string): I {
+  const buttons = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
+  const btn = buttons.find(b => (b.props.accessibilityLabel as string) === label);
+  if (!btn) {
+    throw new Error(`button "${label}" not found`);
+  }
+  return btn;
+}
+
+/**
+ * The block that reports the action under the landing view's email field, so
+ * the login shell reserves what the keyboard actually covers there.
+ */
+function belowFieldBlock(root: I): I {
+  const field = root.findByType('FormField');
+  const siblings = field.parent?.children ?? [];
+  const next = siblings[siblings.indexOf(field) + 1];
+  if (next === undefined || typeof next === 'string' || next.props.onLayout === undefined) {
+    throw new Error('no measured block follows the email field');
+  }
+  return next;
+}
+
+function linkPressables(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      n.props.accessibilityRole === 'link'
+  );
+}
+
+function findLink(root: I, label: string): I {
+  const links = linkPressables(root).filter(link => link.props.accessibilityLabel === label);
+  const link = links[0];
+  if (!link || links.length !== 1) {
+    throw new Error(`link "${label}" found ${links.length} times, expected once`);
+  }
+  return link;
+}
+
+/** The sentence end a legal link's accessibility label sits at. */
+function linkEdge(label: string | undefined): 'start' | 'end' {
+  return label === 'Terms of Use' ? 'start' : 'end';
+}
+
+/**
+ * The per-side slop the legal link at one end of the sentence must render. The
+ * facing side points at the connector (4dp) or, vertically, at the line the
+ * neighbour can occupy below it (0dp); the outer side reaches over plain prose
+ * (12dp) and past the row's own line (16dp). Each axis still adds to the 44pt
+ * target from the 28dp audit floor. The sentence is LTR in this suite's native
+ * mock.
+ */
+function expectedLinkSlop(edge: 'start' | 'end'): {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+} {
+  return {
+    top:
+      edge === 'start'
+        ? INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP
+        : INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
+    bottom:
+      edge === 'start'
+        ? INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP
+        : INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
+    left: edge === 'start' ? INLINE_LINK_OUTER_HIT_SLOP_DP : INLINE_LINK_FACING_HIT_SLOP_DP,
+    right: edge === 'start' ? INLINE_LINK_FACING_HIT_SLOP_DP : INLINE_LINK_OUTER_HIT_SLOP_DP,
+  };
+}
+
+/**
+ * The legal line's copy in render order: the prefix Text's children plus every
+ * link label, connector, and the suffix, concatenated. The sentence's own word
+ * spaces are what a reader sees, so a doubled space or a floating period shows
+ * up here without measuring pixels.
+ */
+function legalSentence(root: I): string {
+  const row = root.find(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'View' &&
+      String(n.props.className).includes('flex-wrap')
+  );
+  return row
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')
+    .map(node => {
+      const children = node.props.children;
+      if (typeof children === 'string') {
+        return children;
+      }
+      if (Array.isArray(children)) {
+        return children.map(child => (typeof child === 'string' ? child : '')).join('');
+      }
+      return '';
+    })
+    .join('');
+}
+
+/** The box a control's className declares, in dp: its own height and width. */
+function boxDp(className: string): { width: number; height: number } {
+  const size = (axis: 'h' | 'w'): number => {
+    const pattern = new RegExp(`^(?:min-)?${axis}-\\[(\\d+(?:\\.\\d+)?)px\\]$`);
+    for (const part of className.split(/\s+/)) {
+      const match = pattern.exec(part);
+      if (match?.[1]) {
+        return Number(match[1]);
+      }
+    }
+    throw new Error(`no ${axis} size class in "${className}"`);
+  };
+  return { width: size('w'), height: size('h') };
+}
+
+/** The label Text inside a provider Button, whichever icon sits beside it. */
+function labelText(button: I): I {
+  return button.find(n => typeof n.type === 'string' && (n.type as string) === 'Text');
+}
+
+/**
+ * Every node inside a provider Button that carries the reserved glyph-slot
+ * className. The slot is what puts the label on the same axis in all three
+ * rows, so the suite asserts exactly one per row and that all three match.
+ */
+function glyphSlots(button: I): I[] {
+  return button.findAll(n => String(n.props.className).includes(PROVIDER_GLYPH_SLOT_CLASS));
+}
+
+function glyphSlot(button: I): I {
+  const slots = glyphSlots(button);
+  const slot = slots[0];
+  if (!slot || slots.length !== 1) {
+    throw new Error(`expected exactly one glyph slot, found ${slots.length}`);
+  }
+  return slot;
+}
+
+/**
+ * The compiled flex layout of a label's own className, through the app's own
+ * pipeline. Only the classes that decide the label's line allocation are
+ * compiled, so the assertion protects native sizing rather than utility names;
+ * pixel wrapping is verified on device.
+ */
+async function compiledLabelLayout(label: I) {
+  const classes = (label.props.className as string)
+    .split(' ')
+    .filter(className => /^(?:flex-|text-center$)/.test(className))
+    .join(' ');
+  const declarations = classes ? await compiledDeclarations(classes) : [];
+  return declarations;
+}
+
+/** The compiled declarations of an arbitrary className, through the app's pipeline. */
+async function compiledDeclarations(classes: string) {
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../../../global.css"; .target { @apply ${classes}; }`,
+    { from: import.meta.filename }
+  );
+  return (
+    compile(css, { inlineVariables: false })
+      .stylesheet()
+      .s?.find(([name]) => name === 'target')?.[1]
+      .flatMap(rule => rule.d ?? []) ?? []
+  );
+}
+
+/** The numeric value of one compiled declaration, through the app's pipeline. */
+async function compiledNumber(classes: string, property: string): Promise<number | undefined> {
+  for (const declaration of await compiledDeclarations(classes)) {
+    if (!Array.isArray(declaration)) {
+      const plain = declaration as Record<string, unknown>;
+      if (property in plain) {
+        return plain[property] as number;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** The value of one compiled declaration, through the app's pipeline. */
+async function compiledValue(classes: string, property: string): Promise<unknown> {
+  for (const declaration of await compiledDeclarations(classes)) {
+    if (!Array.isArray(declaration) && property in (declaration as object)) {
+      return (declaration as Record<string, unknown>)[property];
+    }
+  }
+  return undefined;
+}
+
+/** A Button that keeps the default (brand-filled) variant is a primary action. */
+function filledPrimaryLabels(root: I): (string | undefined)[] {
+  return root
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button')
+    .filter(b => b.props.variant === undefined)
+    .map(b => b.props.accessibilityLabel as string | undefined);
+}
+
+/** Every provider control that carries a leading glyph before its label. */
+function providerRows(root: I): I[] {
+  return ['Sign in with Apple', 'Sign in with Google', 'Sign in with a passkey'].map(label =>
+    findButton(root, label)
+  );
+}
+
+// Provider controls are opt-in per test; the file default is the plain
+// email-only form every other suite renders.
+beforeEach(() => {
+  providers.appleAvailable = false;
+  providers.googleConfigured = false;
+});
+
+describe('IdleAuth provider chrome parity', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.signInWithApple.mockClear();
+    passkeySupport.supported = true;
+    providers.appleAvailable = true;
+    providers.googleConfigured = true;
+  });
+
+  it('renders Apple, Google and the passkey with one outlined style', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const apple = findButton(renderer.root, 'Sign in with Apple');
+    const google = findButton(renderer.root, 'Sign in with Google');
+    const passkey = findButton(renderer.root, 'Sign in with a passkey');
+
+    // One variant means one border colour and width (border-border) and one
+    // fill (bg-card); one className means one corner radius and height. The
+    // native AppleAuthenticationButton drew its own darker, thicker border, so
+    // Apple now renders the app's own outline Button like its two siblings.
+    for (const button of [apple, google, passkey]) {
+      expect(button.props.variant).toBe('outline');
+      expect(button.props.size).toBe('lg');
+      expect(String(button.props.className)).toContain('min-h-[44px]');
+      expect(String(button.props.className)).toContain('rounded-[8px]');
+    }
+    expect(apple.props.className).toBe(google.props.className);
+    expect(apple.props.className).toBe(passkey.props.className);
+
+    // One label size and weight across the three.
+    const labelClasses = [apple, google, passkey].map(button =>
+      String(labelText(button).props.className)
+    );
+    for (const classes of labelClasses) {
+      expect(classes).toContain('text-[17px]');
+      expect(classes).toContain('font-medium');
+    }
+    expect(labelClasses[0]).toBe(labelClasses[1]);
+    expect(labelClasses[0]).toBe(labelClasses[2]);
+
+    // Apple's HIG mark replaces the native chrome, drawn inside the button.
+    expect(apple.findByType('AppleLogo')).toBeTruthy();
+
+    expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('centers every provider label on the button, not beside its mark', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    for (const button of providerRows(renderer.root)) {
+      // The label owns the whole content width and centers inside it…
+      expect(String(labelText(button).props.className).split(/\s+/)).toContain('flex-1');
+      const rowClasses = String(button.props.className).split(/\s+/);
+      expect(rowClasses).toContain('justify-center');
+      // …and the row adds no gap an in-flow mark could push the label by.
+      expect(rowClasses.filter(name => name.startsWith('gap-'))).toEqual([]);
+      expect(String(glyphSlot(button).props.className)).toBe(PROVIDER_GLYPH_SLOT_CLASS);
+    }
+
+    // Compiled once, because every row shares the slot className asserted above:
+    // the mark sits out of flow at the leading edge, vertically centered, so it
+    // contributes no width to the row the label is centered in.
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'position')).toBe('absolute');
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'justifyContent')).toBe('center');
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'top')).toBe(0);
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'bottom')).toBe(0);
+
+    // The mark is inset off the rounded edge, on the leading edge in either
+    // direction, and the row's content box starts where the mark ends: the
+    // centered copy can never run under the mark, and the two insets being equal
+    // is what keeps the label on the button's own axis.
+    const markInset = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'insetInlineStart');
+    const markWidth = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'width');
+    expect(markInset).toBe(16);
+    expect(markWidth).toBe(18);
+    const rowPaddings = await Promise.all(
+      providerRows(renderer.root).map(button =>
+        compiledNumber(String(button.props.className), 'paddingInline')
+      )
+    );
+    expect(rowPaddings).toHaveLength(3);
+    expect(rowPaddings.every(padding => padding === (markInset ?? 0) + (markWidth ?? 0))).toBe(
+      true
+    );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('sizes the primary Continue label like the provider rows', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const proceed = findButton(renderer.root, 'Continue with email');
+    const google = findButton(renderer.root, 'Sign in with Google');
+    // The filled primary action reads at the provider label size; at the button
+    // variant's 14pt it read weaker than the two outlined ways in above it.
+    expect(await compiledNumber(String(labelText(proceed).props.className), 'fontSize')).toBe(
+      await compiledNumber(String(labelText(google).props.className), 'fontSize')
+    );
+    // It keeps the brand fill, so it still reads as the primary action.
+    expect(proceed.props.variant).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('gives every provider row a leading glyph', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // The three provider rows read as one group: each carries a leading mark in
+    // the same reserved slot (the passkey row used to be label-only text). The
+    // mark lives inside the row's slot, so the slot is what puts the label on
+    // one axis and holds the mark, the spinner, or nothing.
+    const leadingTypes = providerRows(renderer.root).map(
+      row => glyphSlot(row).children.find(child => typeof child !== 'string')?.type
+    );
+    expect(leadingTypes).toEqual(['AppleLogo', 'GoogleLogo', 'KeyRound']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('labels the Apple row from the app catalog, not the device language', async () => {
+    await i18n.changeLanguage('de');
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // Apple's native control titles itself in the device language, which left
+    // English "Sign in with Apple" beside the translated Google row. The Apple
+    // row must use the catalog like every other control on the screen.
+    expect(texts(renderer.root)).toContain('Mit Apple anmelden');
+    expect(texts(renderer.root)).not.toContain('Sign in with Apple');
+    expect(
+      renderer.root.findAll(
+        n => typeof n.type === 'string' && (n.type as string) === 'AppleAuthenticationButton'
+      )
+    ).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('signs in with Apple through the hook handler', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const apple = findButton(renderer.root, 'Sign in with Apple');
+    act(() => {
+      (apple.props.onPress as () => void)();
+    });
+
+    expect(nativeAuth.signInWithApple).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps one filled primary action without Apple sign-in', async () => {
+    providers.appleAvailable = false;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    expect(() => findButton(renderer.root, 'Sign in with Apple')).toThrow(
+      'button "Sign in with Apple" not found'
+    );
+    expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('IdleAuth text action affordance', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = false;
+    providers.appleAvailable = false;
+    providers.googleConfigured = false;
+  });
+
+  it('draws "More sign-in options" as an underlined link, not plain text', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const more = findButton(renderer.root, 'More sign-in options');
+
+    // A tappable control with no underline, chevron or button shape read as a
+    // plain bold sentence next to the underlined Terms and Privacy Policy links.
+    expect(more.props.variant).toBe('link');
+    expect(more.props.className as string).toContain('active:opacity-60');
+    const label = more.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')[0];
+    expect(label?.props.className as string).toContain('underline');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('IdleAuth SSO recovery', () => {
+  beforeEach(() => {
+    ssoRecovery.value = { email: 'user@example.com', ssoOrganizationId: 'org_1' };
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = true;
+  });
+
+  it('shows the recovery copy and forwards the SSO start', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    expect(texts(renderer.root)).toContain('Your organization uses single sign-on.');
+
+    const btn = findButton(renderer.root, 'Continue with SSO');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+
+    // Without a pending link the browser start carries no link token.
+    expect(start).toHaveBeenCalledWith('sso', 'user@example.com', undefined);
+  });
+
+  it('moves the SSO busy spinner inside its primary Button', async () => {
+    const deferred: { resolve: () => void } = { resolve: () => undefined };
+    const pending = new Promise<void>(resolve => {
+      deferred.resolve = resolve;
+    });
+    const start = vi.fn<StartFn>(async () => {
+      await pending;
+    });
+    const renderer = await mountIdleAuth(start);
+
+    const idle = findButton(renderer.root, 'Continue with SSO');
+    expect(idle.props.loading).not.toBe(true);
+
+    act(() => {
+      (idle.props.onPress as () => void)();
+    });
+
+    const busy = findButton(renderer.root, 'Continue with SSO');
+    expect(busy.props.loading).toBe(true);
+    expect(busy.props.disabled).toBe(true);
+    // The busy spinner belongs to Button; the screen adds none of its own.
+    expect(busy.findAllByType('ActivityIndicator')).toHaveLength(0);
+
+    await act(async () => {
+      deferred.resolve();
+      await pending;
+    });
+  });
+});
+
+describe('IdleAuth passkey control', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    passkeySupport.supported = true;
+    nativeAuth.busy = undefined;
+    nativeAuth.signInWithPasskey.mockClear();
+  });
+
+  it('offers the passkey button above the email field', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const btn = findButton(renderer.root, 'Sign in with a passkey');
+    expect(btn.props.variant).toBe('outline');
+    expect(btn.props.size).toBe('lg');
+
+    const order = renderer.root
+      .findAll(n => typeof n.type === 'string' && ['Button', 'FormField'].includes(n.type))
+      .map(n => n.props.accessibilityLabel ?? n.props.label);
+
+    expect(order).toEqual([
+      'Sign in with a passkey',
+      'Email address',
+      'Continue with email',
+      'More sign-in options',
+    ]);
+  });
+
+  it('starts the passkey ceremony on press', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const btn = findButton(renderer.root, 'Sign in with a passkey');
+    act(() => {
+      (btn.props.onPress as () => void)();
+    });
+
+    expect(nativeAuth.signInWithPasskey).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the busy treatment while the ceremony runs', async () => {
+    nativeAuth.busy = 'passkey';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const btn = findButton(renderer.root, 'Sign in with a passkey');
+    expect(btn.props.disabled).toBe(true);
+    expect(
+      btn.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator')
+    ).toHaveLength(1);
+    expect(btn.parent?.props.pointerEvents).toBe('none');
+  });
+
+  it('renders no passkey control without the native module', async () => {
+    passkeySupport.supported = false;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    expect(() => findButton(renderer.root, 'Sign in with a passkey')).toThrow(
+      'button "Sign in with a passkey" not found'
+    );
+    expect(texts(renderer.root)).not.toContain('Sign in with a passkey');
+    // The other ways in are untouched.
+    expect(findButton(renderer.root, 'Continue with email')).toBeTruthy();
+  });
+
+  // The reported capture: the Arabic passkey label ("تسجيل الدخول بمفتاح
+  // المرور") wrapped onto two lines and made the passkey button visibly taller
+  // than the single-line Google button directly above it. Both provider rows
+  // keep the label on the icon's line at one row height: no `flex-wrap` on the
+  // row, and the label's `flex-1` box takes the whole remaining width.
+  it.each(['ar', 'en'])('keeps both provider rows on one line in %s', async language => {
+    providers.googleConfigured = true;
+    passkeySupport.supported = true;
+    await i18n.changeLanguage(language);
+
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const copies = [i18n.t('login.signInWithGoogle'), i18n.t('login.signInWithPasskey')];
+
+    for (const copy of copies) {
+      const text = renderer.root.find(
+        n =>
+          typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === copy
+      );
+      const labelClasses = String(text.props.className).split(/\s+/);
+      expect(labelClasses).toContain('flex-1');
+      expect(labelClasses).toContain('text-center');
+      const button = renderer.root.findByProps({ accessibilityLabel: copy });
+      // The row itself must not wrap either: a wrapping row moves the label
+      // onto a second line and grows the button again.
+      expect(button.props.className).not.toContain('flex-wrap');
+      // The full label stays the control's accessible name.
+      expect(button.props.accessibilityLabel).toBe(copy);
+    }
+
+    await i18n.changeLanguage('en');
+  });
+});
+describe('IdleAuth provider label layout', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = true;
+    providers.appleAvailable = false;
+    providers.googleConfigured = true;
+  });
+
+  it('keeps every provider label on one line at equal button heights', async () => {
+    // The Apple row is a provider row too: left on the pre-fix flex-wrap +
+    // shrink classes it would let its label wrap onto its own flex line and
+    // grow taller than the two siblings it is drawn to match.
+    providers.appleAvailable = true;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const apple = findButton(renderer.root, 'Sign in with Apple');
+    const google = findButton(renderer.root, 'Sign in with Google');
+    const passkey = findButton(renderer.root, 'Sign in with a passkey');
+
+    for (const button of [apple, google, passkey]) {
+      // A label must never be pushed onto its own flex line, so the icon stays
+      // on the label's line and the stacked buttons keep one height.
+      expect(String(button.props.className).split(/\s+/)).not.toContain('flex-wrap');
+      // Keep the 44pt floor so Dynamic Type can still grow the control.
+      expect(String(button.props.className)).toContain('min-h-[44px]');
+
+      const label = labelText(button);
+      // Larger accessibility text may still wrap naturally; never hide part of
+      // the copy and never disable native font scaling.
+      expect(label.props.numberOfLines).toBeUndefined();
+      expect(label.props.adjustsFontSizeToFit).toBeUndefined();
+      expect(label.props.ellipsizeMode).toBeUndefined();
+      expect(label.props.allowFontScaling).not.toBe(false);
+    }
+
+    // The three provider controls carry one row class, so none of them can
+    // drift back to the wrapping chrome on its own.
+    expect(String(apple.props.className)).toBe(String(google.props.className));
+
+    // flexBasis 0% + flexGrow 1 gives each label the whole remaining row width:
+    // the remedy the resend-code label already ships (PR #6384).
+    const oneLineLabel = { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' };
+    expect(await compiledLabelLayout(labelText(apple))).toEqual([oneLineLabel]);
+    expect(await compiledLabelLayout(labelText(google))).toEqual([oneLineLabel]);
+    expect(await compiledLabelLayout(labelText(passkey))).toEqual([oneLineLabel]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the passkey row height while the ceremony runs', async () => {
+    nativeAuth.busy = 'passkey';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const button = findButton(renderer.root, 'Sign in with a passkey');
+    expect(button.props.disabled).toBe(true);
+    expect(
+      button.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator')
+    ).toHaveLength(1);
+    // The inline indicator must not change the row's height: the label keeps its
+    // one-line layout and the button keeps the 44pt floor.
+    expect(String(button.props.className)).toContain('min-h-[44px]');
+    expect(await compiledLabelLayout(labelText(button))).toEqual([
+      { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' },
+    ]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('reserves one identical glyph slot per provider row', async () => {
+    providers.appleAvailable = true;
+    providers.googleConfigured = true;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const buttons = [
+      findButton(renderer.root, 'Sign in with Apple'),
+      findButton(renderer.root, 'Sign in with Google'),
+      findButton(renderer.root, 'Sign in with a passkey'),
+    ];
+    // Exactly one slot per row, with the identical className, so the three
+    // flex-1 labels start from the same x with the marks in the same place.
+    const slotClasses = buttons.map(button => String(glyphSlot(button).props.className));
+    expect(slotClasses[0]).toBe(PROVIDER_GLYPH_SLOT_CLASS);
+    expect(slotClasses[1]).toBe(slotClasses[0]);
+    expect(slotClasses[2]).toBe(slotClasses[0]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the passkey label className byte-identical while the ceremony runs', async () => {
+    const idle = await mountIdleAuth(vi.fn<StartFn>());
+    const idleClasses = String(
+      labelText(findButton(idle.root, 'Sign in with a passkey')).props.className
+    );
+    act(() => {
+      idle.unmount();
+    });
+
+    nativeAuth.busy = 'passkey';
+    const busy = await mountIdleAuth(vi.fn<StartFn>());
+    const busyButton = findButton(busy.root, 'Sign in with a passkey');
+    // The spinner takes the reserved slot, so the label does not move.
+    expect(glyphSlot(busyButton)).toBeTruthy();
+    expect(String(labelText(busyButton).props.className)).toBe(idleClasses);
+
+    act(() => {
+      busy.unmount();
+    });
+  });
+
+  it('keeps the Apple label className byte-identical while the request runs', async () => {
+    providers.appleAvailable = true;
+    const idle = await mountIdleAuth(vi.fn<StartFn>());
+    const idleClasses = String(
+      labelText(findButton(idle.root, 'Sign in with Apple')).props.className
+    );
+    act(() => {
+      idle.unmount();
+    });
+
+    nativeAuth.busy = 'apple';
+    const busy = await mountIdleAuth(vi.fn<StartFn>());
+    const busyButton = findButton(busy.root, 'Sign in with Apple');
+    // Replacing the 18pt mark with the spinner inside the same slot cannot
+    // move the label.
+    expect(glyphSlot(busyButton)).toBeTruthy();
+    expect(String(labelText(busyButton).props.className)).toBe(idleClasses);
+
+    act(() => {
+      busy.unmount();
+    });
+  });
+});
+describe('IdleAuth new-attempt notification', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.emailErrorKey = undefined;
+    nativeAuth.signInWithApple.mockClear();
+    nativeAuth.signInWithPasskey.mockClear();
+    nativeAuth.requestEmailCode.mockReset();
+    passkeySupport.supported = true;
+    providers.appleAvailable = false;
+    providers.googleConfigured = false;
+  });
+
+  it('notifies at the start of an email sign-in attempt', async () => {
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    await act(async () => {
+      (findButton(renderer.root, 'Continue with email').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('notifies when a provider sign-in starts', async () => {
+    providers.appleAvailable = true;
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    act(() => {
+      (findButton(renderer.root, 'Sign in with Apple').props.onPress as () => void)();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('notifies when the passkey ceremony starts', async () => {
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    act(() => {
+      (findButton(renderer.root, 'Sign in with a passkey').props.onPress as () => void)();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('IdleAuth email continue copy', () => {
+  it('shows a Continue button with email accessibility', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    expect(texts(renderer.root)).toContain('Continue');
+    expect(texts(renderer.root)).not.toContain('Sign in or create an account');
+
+    const btn = findButton(renderer.root, 'Continue with email');
+    expect(btn).toBeTruthy();
+  });
+
+  it('shows the Terms and Privacy Policy line', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    expect(texts(renderer.root)).toContain('Terms of Use');
+    expect(texts(renderer.root)).toContain('Privacy Policy');
+  });
+
+  it('offers each legal link as its own pressable target on the audit floor', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    const links = linkPressables(renderer.root);
+    expect(links.map(link => link.props.accessibilityLabel)).toEqual([
+      'Terms of Use',
+      'Privacy Policy',
+    ]);
+
+    for (const link of links) {
+      const box = boxDp(link.props.className as string);
+      expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      // Each link reaches the 44pt design target from its own rect: the facing
+      // side (4dp) points at the connector, the outer side (12dp) reaches over
+      // plain prose, so the two sides are not equal and the reach is
+      // box + facing + outer rather than box + 2 * slop.
+      const slop = link.props.hitSlop as {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+      };
+      expect(slop).toEqual(expectedLinkSlop(linkEdge(link.props.accessibilityLabel as string)));
+      expect(box.width + slop.left + slop.right).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
+
+    // The sentence's copy is unchanged: both links still render, with the
+    // connector and suffix the sentence carried before.
+    expect(texts(renderer.root)).toEqual(
+      expect.arrayContaining(['Terms of Use', 'Privacy Policy', ' and ', '.'])
+    );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('routes the sentence connector through the shared inline-link gap', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    // The connector text is the only node between the two links, so it carries
+    // the shared gap class that keeps their facing reaches off each other in a
+    // catalog with a short conjunction (ru " и ", pl " i ", ar " و ",
+    // zh " 和 "). `tap-target.test.ts` compiles the class's width.
+    const connectors = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === ' and '
+    );
+    expect(connectors).toHaveLength(1);
+    expect(connectors[0]?.props.className).toContain(INLINE_LINK_CONNECTOR_CLASS);
+    // The connector's compiled floor holds both facing reaches apart: 2 * 4dp
+    // plus 2dp of headroom, so the two touch regions never meet between the
+    // links. `tap-target.test.ts` checks the same floor against the constant.
+    const connectorFloorDp = await compiledNumber(INLINE_LINK_CONNECTOR_CLASS, 'minWidth');
+    expect(connectorFloorDp).toBeGreaterThanOrEqual(2 * INLINE_LINK_FACING_HIT_SLOP_DP);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens Terms and Privacy Policy in their native screens', async () => {
+    const start = vi.fn<StartFn>();
+    mockedPush.mockClear();
+    const renderer = await mountIdleAuth(start);
+
+    const terms = findLink(renderer.root, 'Terms of Use');
+    act(() => {
+      (terms.props.onPress as () => void)();
+    });
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'terms' },
+    });
+
+    const privacy = findLink(renderer.root, 'Privacy Policy');
+    act(() => {
+      (privacy.props.onPress as () => void)();
+    });
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'privacy' },
+    });
+  });
+
+  it('reads the whole sentence from one accessible wrapper in visible order', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    // Android's screen reader does not keep the row's visual order once the
+    // line wraps (pt-BR announced the Privacy link before Terms), so the
+    // wrapper — not the flattened children — carries the sentence.
+    const wrapper = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        n.props.accessible === true &&
+        typeof n.props.accessibilityLabel === 'string' &&
+        n.props.accessibilityLabel.includes('By continuing')
+    );
+    expect(wrapper.props.accessibilityRole).toBe('text');
+    expect(wrapper.props.accessibilityLabel).toBe(
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
+    );
+    expect(wrapper.props.accessibilityActions).toEqual([
+      { name: 'openTerms', label: 'Terms' },
+      { name: 'openPrivacy', label: 'Privacy Policy' },
+    ]);
+
+    // The wrapper's action handlers open the same screens the hidden links do.
+    const handleAction = wrapper.props.onAccessibilityAction as (event: {
+      nativeEvent: { actionName: string };
+    }) => void;
+    act(() => {
+      handleAction({ nativeEvent: { actionName: 'openTerms' } });
+    });
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'terms' },
+    });
+    act(() => {
+      handleAction({ nativeEvent: { actionName: 'openPrivacy' } });
+    });
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'privacy' },
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('IdleAuth email validation layout', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.emailErrorKey = undefined;
+    nativeAuth.clearEmailError.mockClear();
+    nativeAuth.requestEmailCode.mockReset();
+  });
+
+  it('keeps validation in the field before an enabled Continue, then accepts a correction', async () => {
+    nativeAuth.emailErrorKey = 'authErrors.invalidRequest';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const field = renderer.root.findByType('FormField');
+    // The hook stores a key; the field receives the catalog message translated
+    // at render, so a language switch re-renders the error in that language.
+    expect(field.props.error).toBe(i18n.t(nativeAuth.emailErrorKey));
+    // The message renders in the field's own flow: no zero-opacity reserve, so
+    // no empty hole under the input on the happy path.
+    expect(field.props.reserveErrorMessages).toBeUndefined();
+    // The legal sentence's wrapper hides its children from the a11y tree; the
+    // field contributes none, so every hidden node belongs to the sentence.
+    expect(field.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })).toHaveLength(
+      0
+    );
+    const button = findButton(renderer.root, 'Continue with email');
+    expect(button.props.disabled).toBe(false);
+    // The action follows the field inside the measured block under it, so the
+    // tree order still reads field, then action.
+    const below = belowFieldBlock(renderer.root);
+    const siblings = field.parent?.children ?? [];
+    expect(siblings[siblings.indexOf(field) + 1]).toBe(below);
+    expect(below.findAllByProps({ accessibilityLabel: 'Continue with email' })).toHaveLength(1);
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('user@example.com');
+    });
+    expect(nativeAuth.clearEmailError).toHaveBeenCalledOnce();
+    nativeAuth.emailErrorKey = undefined;
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    await act(async () => {
+      await (button.props.onPress as () => Promise<void>)();
+    });
+    expect(nativeAuth.requestEmailCode).toHaveBeenCalledWith('user@example.com');
+    expect(renderer.root.findByType('EmailOtpForm').props.email).toBe('user@example.com');
+    nativeAuth.requestEmailCode.mockResolvedValue(false);
+    await act(async () => {
+      (renderer.root.findByType('EmailOtpForm').props.onResend as () => void)();
+      nativeAuth.emailErrorKey = 'authErrors.invalidEmail';
+      renderer.update(createElement(IdleAuth, { start: vi.fn<StartFn>() }));
+      await Promise.resolve();
+    });
+    const remounted = renderer.root.findByType('FormField');
+    const invalidEmailKey = 'authErrors.invalidEmail' as const;
+    expect(remounted.props.error).toBe(i18n.t(invalidEmailKey));
+    // The field remounted when the view returned from OTP: it must show the
+    // rejected address, not blank out while `emailRef` still holds it.
+    expect(remounted.props.defaultValue).toBe('user@example.com');
+  });
+
+  it('keeps one indicator inside Continue and no reserved hole while loading', async () => {
+    nativeAuth.busy = 'otp-send';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    // The loading state adds no reserved error slot under the field (the
+    // base branch removed the zero-opacity reserve).
+    expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toBeUndefined();
+    const continueButton = findButton(renderer.root, 'Continue with email');
+    expect(continueButton.props.disabled).toBe(true);
+    // Button owns the one busy spinner: the screen passes the busy flag and
+    // renders no child indicator of its own, so nothing stacks.
+    expect(continueButton.props.loading).toBe(true);
+    expect(continueButton.findAllByType('ActivityIndicator')).toHaveLength(0);
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+  });
+
+  it('uses the keyboard submit action for an empty field too', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const field = renderer.root.findByType('FormField');
+    expect(field.props.error).toBeUndefined();
+    await act(async () => {
+      (field.props.onSubmitEditing as () => void)();
+      await Promise.resolve();
+    });
+    expect(nativeAuth.requestEmailCode).toHaveBeenCalledWith('');
+    expect(renderer.root.findByType('FormField')).toBeTruthy();
+  });
+
+  // The hook stores a catalog key, so flipping the i18n instance under a
+  // mounted field must re-read the message in the new language — the reported
+  // defect was exactly an inline error that stayed Portuguese after the picker
+  // switched the app to English. The German string is read after the flip:
+  // the de catalog loads lazily, so a `lng: 'de'` lookup before changeLanguage
+  // falls back to English.
+  it('re-translates the inline validation error after changeLanguage', async () => {
+    nativeAuth.emailErrorKey = 'authErrors.invalidRequest';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    expect(renderer.root.findByType('FormField').props.error).toBe(
+      'Check your email address and try again.'
+    );
+
+    await act(async () => {
+      await i18n.changeLanguage('de');
+    });
+    try {
+      expect(renderer.root.findByType('FormField').props.error).toBe(
+        'Prüfe deine E-Mail-Adresse und versuche es erneut.'
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    expect(renderer.root.findByType('FormField').props.error).toBe(
+      'Check your email address and try again.'
+    );
+  });
+});
+
+describe('IdleAuth layout repairs', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.emailErrorKey = undefined;
+    passkeySupport.supported = true;
+    providers.appleAvailable = true;
+    providers.googleConfigured = true;
+  });
+
+  it('leaves no invisible reserved error slot between the field and Continue', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // The field used to reserve its tallest error in zero-opacity copies under
+    // the input; the two-line 'Unable to deliver email...' message reserved a
+    // 35pt hole the owner measured as a 50pt input-to-Continue gap.
+    expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toBeUndefined();
+    // The only `no-hide-descendants` nodes on the screen are the legal
+    // sentence's own five children under its accessible wrapper.
+    const hidden = renderer.root.findAllByProps({
+      importantForAccessibility: 'no-hide-descendants',
+    });
+    expect(hidden).toHaveLength(5);
+    const wrapper = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        n.props.accessible === true &&
+        typeof n.props.accessibilityLabel === 'string' &&
+        n.props.accessibilityLabel.includes('By continuing')
+    );
+    const wrapperNodes = new Set(wrapper.findAll(() => true));
+    expect(hidden.every(node => wrapperNodes.has(node))).toBe(true);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('reports what each step renders below its field and resets on a step change', async () => {
+    const reportBelowField = vi.fn<(height: number) => void>();
+    const ref: { current: R | undefined } = { current: undefined };
+    await act(async () => {
+      ref.current = TestRenderer.create(
+        createElement(IdleAuth, {
+          start: vi.fn<StartFn>(),
+          onBelowFieldHeightChange: reportBelowField,
+        })
+      );
+      await Promise.resolve();
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    renderers.push(renderer);
+
+    // A step change clears the previous step's block before the new one lays out.
+    expect(reportBelowField).toHaveBeenCalledWith(0);
+
+    const layout = (height: number, y = 0) => ({
+      nativeEvent: { layout: { height, y, width: 336, x: 0 } },
+    });
+    const field = renderer.root.findByType('FormField');
+    const action = belowFieldBlock(renderer.root);
+    act(() => {
+      // The field block grows by the message under the input (`text-sm` plus
+      // its 6pt inner gap), which the input's own frame marks.
+      (field.props.containerOnLayout as (event: unknown) => void)(layout(100));
+      (field.props.onLayout as (event: unknown) => void)(layout(44, 32));
+      (action.props.onLayout as (event: unknown) => void)(layout(142));
+    });
+    // Everything under the input: 100 − (32 + 44) of message, then the action.
+    expect(reportBelowField).toHaveBeenLastCalledWith(166);
+
+    // The code step clears the landing view's height, so that content never
+    // sizes the code step; the code step then reports its own.
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    await act(async () => {
+      await (
+        findButton(renderer.root, 'Continue with email').props.onPress as () => Promise<void>
+      )();
+    });
+    expect(renderer.root.findAllByType('EmailOtpForm')).toHaveLength(1);
+    expect(reportBelowField).toHaveBeenCalledWith(0);
+  });
+
+  it('keeps the field-to-Continue gutter on the shared screen gap', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const field = renderer.root.findByType('FormField');
+    const button = findButton(renderer.root, 'Continue with email');
+    // The block under the field is its next sibling in the screen's `gap-3`
+    // column, so with no reserved slot the visible input-to-Continue space is
+    // still exactly `gap-3` (10.5pt / 21px at 2.02 px per point).
+    expect(field.parent?.props.className).toBe('gap-3');
+    const below = belowFieldBlock(renderer.root);
+    expect(below.parent).toBe(field.parent);
+    expect(button.parent).toBe(below);
+    const siblings = field.parent?.children ?? [];
+    expect(siblings[siblings.indexOf(field) + 1]).toBe(below);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders the legal sentence with single word spaces and no extra link padding', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // The whole line reads as plain prose: one space between words, the period
+    // tight against "Privacy Policy". The links' own px-1 padding widened every
+    // boundary it touched.
+    expect(legalSentence(renderer.root)).toBe(
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
+    );
+    for (const link of linkPressables(renderer.root)) {
+      expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);
+      expect(String(link.props.className)).toContain(INLINE_LINK_BOX_CLASS);
+      expect(link.props.hitSlop).toEqual(
+        expectedLinkSlop(linkEdge(link.props.accessibilityLabel as string))
+      );
+    }
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each([
+    ['zh-Hans', '条款', '继续即表示你同意我们的条款和隐私政策。'],
+    ['zh-Hant', '條款', '繼續即表示你同意我們的條款和隱私權政策。'],
+    ['ja', '利用規約', '続行すると、利用規約およびプライバシーポリシーに同意したことになります。'],
+    ['th', 'ข้อกำหนด', 'การดำเนินการต่อแสดงว่าคุณยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว.'],
+    ['lo', 'ຂໍ້ກຳນົດ', 'ການສືບຕໍ່ໝາຍຄວາມວ່າທ່ານຍອມຮັບຂໍ້ກຳນົດແລະນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ.'],
+    ['km', 'លក្ខខណ្ឌ', 'តាមរយៈការបន្ត អ្នកយល់ព្រមតាមលក្ខខណ្ឌនិងគោលការណ៍ឯកជនភាព។'],
+    [
+      'my',
+      'စည်းကမ်းချက်များ',
+      'ဆက်လုပ်ခြင်းဖြင့် သင်သည် ကျွန်ုပ်တို့၏စည်းကမ်းချက်များနှင့်ကိုယ်ရေးအချက်အလက် မူဝါဒကို သဘောတူလက်ခံပါသည်။',
+    ],
+  ])(
+    'abuts the %s legal sentence, the connector and the spoken label to the words',
+    async (language, terms, expected) => {
+      await act(async () => {
+        await i18n.changeLanguage(language);
+      });
+      try {
+        const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+        // Chinese separates no words with spaces, so the catalog carries
+        // neither a separator before the Terms link nor spaces around the
+        // conjunction: the row and the wrapper's label render the same
+        // unspaced sentence.
+        expect(legalSentence(renderer.root)).toBe(expected);
+        const wrapper = renderer.root.find(
+          n =>
+            typeof n.type === 'string' &&
+            (n.type as string) === 'View' &&
+            n.props.accessible === true &&
+            typeof n.props.accessibilityLabel === 'string' &&
+            n.props.accessibilityLabel.includes(terms)
+        );
+        expect(wrapper.props.accessibilityLabel).toBe(expected);
+
+        act(() => {
+          renderer.unmount();
+        });
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage('en');
+        });
+      }
+    }
+  );
+
+  it('cancels the inline link box height so the box never lifts the sentence line', async () => {
+    // The audit floor stays on the node's own rect...
+    expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minHeight')).toBe(28);
+    expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minWidth')).toBe(28);
+    // ...while the vertical cancel keeps its outer at 14dp, below the 17.5dp
+    // text-sm line, so the legal row lays out on the sentence's own line and
+    // never on the box's 28dp floor.
+    expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'marginBlock')).toBe(-7);
+    const cancelDp = (await compiledNumber(INLINE_LINK_BOX_CLASS, 'marginBlock')) ?? 0;
+    expect(28 + 2 * cancelDp).toBeLessThan(INLINE_LINK_SENTENCE_LINE_DP);
+  });
+
+  it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // Each legal link keeps its whole 44pt vertical reach on the far side of the
+    // sentence line (the facing side belongs to the neighbour's line), so a
+    // link's region reaches (28 - 17.5) / 2 + 16 = 21.25dp past that line. The
+    // screen's `gap-3` gutter to the Continue button above the row (and the
+    // ghost button below) is 10.5dp, so the legal row carries its own margin and
+    // the free space is 10.5 + 11 = 21.5dp each side. Without that clearance the
+    // region covered the Continue button's bottom strip and a tap there opened
+    // the link instead of sending the code (the earlier mis-routed-tap finding).
+    expect(INLINE_LINK_ROW_CLASS).toBe(
+      `my-[${INLINE_LINK_ROW_MARGIN_DP}px] ${INLINE_LINK_LINE_GAP_CLASS}`
+    );
+    // Two link boxes on adjacent wrapped lines: the gap beats both overflows
+    // together, and the two facing reaches (which sit on top of those overflows)
+    // still stop short of each other inside it.
+    const overflowDp = (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2;
+    expect(overflowDp).toBe(5.25);
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(2 * overflowDp);
+    expect(2 * (overflowDp + INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP)).toBeLessThan(
+      INLINE_LINK_LINE_GAP_DP
+    );
+    // The far reach is what the screen gutter and the row's margin have to hold.
+    const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
+    expect(overflowDp + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
+
+    const row = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        String(n.props.className).includes('flex-wrap')
+    );
+    expect(String(row.props.className)).toContain(INLINE_LINK_ROW_CLASS);
+
+    for (const link of linkPressables(renderer.root)) {
+      const slop = link.props.hitSlop as {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+      };
+      // The side that points at the other link's line carries no reach; the far
+      // side carries all of it, and the row's gutter has to hold it.
+      expect(Math.min(slop.top, slop.bottom)).toBe(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP);
+      expect(Math.max(slop.top, slop.bottom)).toBe(INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP);
+      expect(overflowDp + Math.max(slop.top, slop.bottom)).toBeLessThanOrEqual(gutterDp);
+      // The region the gutter bounds is still the full design target.
+      const box = boxDp(link.props.className as string);
+      expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});

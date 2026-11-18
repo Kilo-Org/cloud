@@ -1,6 +1,6 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db, sql } from '@/lib/drizzle';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_invitations,
@@ -17,11 +17,12 @@ import {
   sendOssInviteNewUserEmail,
   sendOssInviteExistingUserEmail,
   sendOssExistingOrgProvisionedEmail,
-} from '@/lib/email';
-import { getAcceptInviteUrl } from '@/lib/organizations/organizations';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
+} from '@kilocode/web-shared/lib/email';
+import { getAcceptInviteUrl } from '@kilocode/web-shared/lib/organizations/organizations';
+import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { TRPCError } from '@trpc/server';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
 
 const OssCsvRowSchema = z.object({
@@ -247,6 +248,19 @@ export const ossSponsorshipRouter = createTRPCRouter({
       for (const row of input) {
         const result = await processOssRow(ctx.user, row);
         results.push(result);
+        if (result.success && result.orgId) {
+          await recordAdminAction(ctx, {
+            action: 'oss_sponsorship.enroll',
+            target: organizationActionTarget(result.orgId),
+            message: `Created OSS sponsorship organization (tier ${row.tier})`,
+            metadata: {
+              source: 'csv',
+              githubUrl: row.githubUrl,
+              tier: row.tier,
+              initialCreditsUsd: row.creditsDollars,
+            },
+          });
+        }
       }
 
       return results;
@@ -348,8 +362,8 @@ export const ossSponsorshipRouter = createTRPCRouter({
         const monthlyCredits = org.settings.oss_monthly_credit_amount_microdollars;
 
         // Check GitHub integration status
-        const githubIntegration = await getIntegrationForOrganization(org.id, 'github');
-        const hasGitHubIntegration = githubIntegration?.integration_status === 'active';
+        const githubIntegration = await getPrimaryGitHubIntegrationForOrganization(org.id);
+        const hasGitHubIntegration = githubIntegration !== null;
 
         // Check Code Reviews configuration status
         const codeReviewConfig = await getAgentConfig(org.id, 'code_review', 'github');
@@ -545,6 +559,21 @@ export const ossSponsorshipRouter = createTRPCRouter({
             });
           }
         }
+      });
+
+      await recordAdminAction(ctx, {
+        action: 'oss_sponsorship.enroll',
+        target: organizationActionTarget(organizationId),
+        message: `Enrolled existing organization in OSS sponsorship (tier ${tier})`,
+        metadata: {
+          source: 'existing_organization',
+          tier,
+          previousPlan: existingOrg.plan,
+          previousRequireSeats: existingOrg.require_seats,
+          monthlyTopUpUsd: monthlyTopUpDollars,
+          initialCreditsUsd: addInitialGrant ? monthlyTopUpDollars : 0,
+          ownerEmailRequested: sendEmail,
+        },
       });
 
       // Send email to org owners if requested

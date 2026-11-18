@@ -1,0 +1,298 @@
+import {
+  announcements,
+  catalogs,
+  expectFeedback,
+  expectHidden,
+  flush,
+  lifecycle,
+  mount,
+  native,
+  nestedUnlockScenes,
+  platform,
+  rerender,
+  resetUnlockMocks,
+  retry,
+  unlockRoot as root,
+  storage,
+  text,
+  unmountUnlock,
+} from '@/components/app-unlock-screen.test-helpers';
+import { GeneralSettingsScreen } from '@/components/general-settings-screen';
+import { type ElementType } from 'react';
+import { act } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { i18n } from '@/i18n';
+import fr from '@/i18n/locales/fr.json';
+import AppLayout from '@/app/(app)/_layout';
+import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_layout';
+import SecurityAgentScopeLayout from '@/app/(app)/security-agent/[scope]/_layout';
+import PrReviewNumberLayout from '@/app/(app)/pr-review/[owner]/[repo]/[number]/_layout';
+import { AppUnlockProvider } from '@/lib/app-unlock-context';
+
+beforeEach(resetUnlockMocks);
+afterEach(unmountUnlock);
+
+/** The biometric row's native switch, re-read after each render. */
+function unlockSetting() {
+  const found = root().findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Switch' &&
+      node.props.accessibilityLabel === 'Unlock with biometrics'
+  )[0];
+  if (!found) {
+    throw new Error('Unlock with biometrics switch not found');
+  }
+  return found;
+}
+
+it.each([false, true])(
+  'waits for language across all four layouts and retains the draft on relock; catalog failure=%s',
+  async failed => {
+    catalogs.fr.mockImplementation(() => {
+      if (failed) {
+        throw new Error('catalog failed');
+      }
+      // Reuse existing French text as a distinct catalog fixture, not a new translation.
+      return { preferences: { biometricUnlock: fr.common.retry } };
+    });
+    const auth = Promise.withResolvers<unknown>();
+    native.authenticateAsync.mockReturnValueOnce(auth.promise);
+    const layouts = [AppLayout, PrReviewNumberLayout, OrganizationLayout, SecurityAgentScopeLayout];
+    const ui = (
+      <>
+        {layouts.map(Layout => (
+          <Layout key={Layout.name} />
+        ))}
+      </>
+    );
+    await mount(ui, false);
+    const provider = root().findByType(AppUnlockProvider);
+    expect(provider.parent?.type).toBe('AuthProvider');
+    expectHidden(root(), true);
+    for (const Layout of layouts) {
+      const boundary = root().findByType(Layout);
+      expect(boundary.findAllByType('Scene' as ElementType)).toHaveLength(1);
+    }
+    const observer = root().findByType('SecurityAgentCommandObserver' as ElementType);
+    const scene = root().findByType(OrganizationLayout);
+    const draft = scene.findByType('Draft' as ElementType);
+    await flush(() => {
+      (draft.props.onChange as (value: string) => void)('unsent work');
+    });
+    expect(native.authenticateAsync).not.toHaveBeenCalled();
+    await act(async () => {
+      await i18n.changeLanguage('fr');
+    });
+    expect(native.authenticateAsync).not.toHaveBeenCalled();
+    await flush(() => {
+      rerender(ui);
+    });
+    expectHidden(root(), true);
+    expect(retry()?.props).toMatchObject({ disabled: true, accessibilityState: { busy: true } });
+    expect(root().findAllByType('ActivityIndicator' as ElementType).length).toBeGreaterThan(0);
+    await flush(() => {
+      auth.resolve({ success: true });
+    });
+    expectHidden(root(), false);
+    native.authenticateAsync.mockResolvedValueOnce({ success: false, error: 'user_cancel' });
+    const now = vi.spyOn(Date, 'now').mockReturnValue(0);
+    await flush(() => {
+      lifecycle.change('background');
+      now.mockReturnValue(300_000);
+      lifecycle.change('active');
+    });
+    expectHidden(root(), true);
+    await flush(retry()?.props.onPress as () => void);
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    expectHidden(root(), false);
+    expect(root().findAllByType('Pressable' as ElementType)).toHaveLength(0);
+    expect(scene.findByType('Draft' as ElementType)).toBe(draft);
+    expect(draft.props.value).toBe('unsent work');
+    expect(root().findByType('SecurityAgentCommandObserver' as ElementType)).toBe(observer);
+    expect(root().findByType(AppUnlockProvider)).toBe(provider);
+    expect(root().findAllByType(AppUnlockProvider)).toHaveLength(1);
+    expect(announcements).not.toHaveBeenCalled();
+    expect(native.authenticateAsync).toHaveBeenCalledTimes(3);
+    expect(native.authenticateAsync).toHaveBeenCalledWith({
+      promptMessage: failed ? 'Unlock with biometrics' : fr.common.retry,
+      disableDeviceFallback: false,
+    });
+  }
+);
+
+it.each([null, 'disabled'])('shows the scene without a prompt for %s', async raw => {
+  storage.getItemAsync.mockResolvedValue(raw);
+  await mount();
+  expectHidden(root(), false);
+  expect(text(root())).not.toContain('Unlock with biometrics');
+  expect(announcements).not.toHaveBeenCalled();
+  expect(native.authenticateAsync).not.toHaveBeenCalled();
+});
+
+it('hides scenes during preference loading and recovers a failed read without a gate', async () => {
+  const read = Promise.withResolvers<string | null>();
+  storage.getItemAsync.mockReturnValueOnce(read.promise);
+  await mount();
+  expectHidden(root(), true);
+  expect(root().findAllByType('Skeleton' as ElementType)).toHaveLength(1);
+  expect(root().findByProps({ accessibilityRole: 'progressbar' }).props.accessibilityState).toEqual(
+    { busy: true }
+  );
+  expect(retry()).toBeUndefined();
+  // The read rejects; the bounded read helper re-reads with backoff before
+  // the fresh read answers. Fake timers go in before the rejection lands, so
+  // the backoff runs on the fake clock, and the gate stays on the skeleton
+  // the whole time — never an error state, never a Retry tap.
+  vi.useFakeTimers();
+  try {
+    await flush(() => {
+      read.reject(new Error('read failed'));
+    });
+    expectHidden(root(), true);
+    expect(root().findAllByType('Skeleton' as ElementType)).toHaveLength(1);
+    expect(retry()).toBeUndefined();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+  await flush();
+  expectHidden(root(), false);
+  expect(text(root())).not.toContain('Something went wrong');
+  expect(native.authenticateAsync).toHaveBeenCalledTimes(1);
+});
+
+it.each(['user_cancel', 'authentication_failed', 'lockout'])(
+  'retains the gate after %s and unlocks through Retry',
+  async code => {
+    native.authenticateAsync.mockResolvedValueOnce({ success: false, error: code });
+    await mount();
+    expectHidden(root(), true);
+    expect(text(root())).toContain('Unlock with biometrics');
+    expect(text(root()).includes('Something went wrong')).toBe(code !== 'user_cancel');
+    expect(retry()?.props).toMatchObject({ disabled: false, accessibilityLabel: 'Retry' });
+    await flush(retry()?.props.onPress as () => void);
+    expectHidden(root(), false);
+    expect(native.authenticateAsync).toHaveBeenCalledTimes(2);
+  }
+);
+
+it.each([false, true])(
+  'requires device setup with hardware=%s and rechecks capability on Retry',
+  async hardware => {
+    native.hasHardwareAsync.mockResolvedValue(hardware);
+    native.isEnrolledAsync.mockResolvedValue(false);
+    native.getEnrolledLevelAsync.mockResolvedValue(0);
+    await mount();
+    expectHidden(root(), true);
+    expect(text(root())).toContain('Unavailable');
+    expect(text(root())).toContain('Check your device security settings and try again.');
+    expect(native.authenticateAsync).not.toHaveBeenCalled();
+    native.getEnrolledLevelAsync.mockResolvedValue(1);
+    await flush(retry()?.props.onPress as () => void);
+    expectHidden(root(), false);
+    expect(storage.setItemAsync).not.toHaveBeenCalled();
+  }
+);
+
+describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
+  beforeEach(() => {
+    platform.OS = os;
+  });
+
+  it('waits for localized feedback and keeps one owner on rerender', async () => {
+    // A failed authenticate is the earliest feedback a gate can carry: with
+    // language not ready the prompt is null, so no authenticate can run and
+    // the announcement owner is not mounted yet. The failure lands on the
+    // rerender that readies the language, and the message is the localized one.
+    native.authenticateAsync.mockResolvedValueOnce({
+      success: false,
+      error: 'authentication_failed',
+    });
+    i18n.addResourceBundle('fr', 'translation', fr);
+    const ui = nestedUnlockScenes(<OrganizationLayout />);
+    await mount(ui, false);
+    await act(async () => {
+      await i18n.changeLanguage('fr');
+    });
+    expect(announcements).not.toHaveBeenCalled();
+    await flush(() => {
+      rerender(ui);
+    });
+    const message = fr.common.somethingWentWrong;
+    expectFeedback(root(), message, 3);
+    expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
+    await flush(() => {
+      rerender(ui);
+    });
+    expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
+  });
+
+  it.each([
+    ['authentication_failed', 'Something went wrong'],
+    ['setup', 'Check your device security settings and try again.'],
+  ])('announces %s once across nested gates and again after Retry', async (code, message) => {
+    if (code === 'setup') {
+      native.getEnrolledLevelAsync.mockResolvedValue(0);
+    } else {
+      native.authenticateAsync.mockResolvedValueOnce({ success: false, error: code });
+    }
+    await mount(nestedUnlockScenes(<OrganizationLayout />));
+    expectFeedback(root(), message, 3);
+    expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
+
+    const pending = Promise.withResolvers<number>();
+    native.getEnrolledLevelAsync.mockReturnValueOnce(pending.promise);
+    native.authenticateAsync.mockResolvedValueOnce({ success: false, error: code });
+    await flush(retry()?.props.onPress as () => void);
+    expect(text(root())).not.toContain(message);
+    await flush(() => {
+      pending.resolve(code === 'setup' ? 0 : 3);
+    });
+    expectFeedback(root(), message, 3);
+    expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message], [message]] : []);
+  });
+
+  it.each([false, true])('announces setting feedback once with locked=%s', async locked => {
+    await mount(nestedUnlockScenes(<GeneralSettingsScreen />));
+    const save = Promise.withResolvers<undefined>();
+    storage.setItemAsync.mockReturnValueOnce(save.promise);
+    await flush(() => {
+      (unlockSetting().props.onValueChange as (next: boolean) => void)(false);
+    });
+    expect(unlockSetting().props).toMatchObject({
+      accessibilityState: { busy: true, checked: true },
+    });
+    expect(announcements).not.toHaveBeenCalled();
+    if (locked) {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(0);
+      await flush(() => {
+        lifecycle.change('background');
+        now.mockReturnValue(300_000);
+        lifecycle.change('active');
+      });
+      expect(retry()?.props.disabled).toBe(true);
+    }
+    await flush(() => {
+      save.reject(new Error('save failed'));
+    });
+    const message = 'Could not save setting';
+    expectFeedback(root(), message, locked ? 3 : 1);
+    expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
+    expect(unlockSetting().props).toMatchObject({
+      disabled: locked,
+      accessibilityState: { checked: true },
+    });
+    if (locked) {
+      expect(retry()?.props).toMatchObject({ disabled: false, accessibilityLabel: 'Retry' });
+      await flush(retry()?.props.onPress as () => void);
+      expect(unlockSetting().props.disabled).toBe(false);
+      expect(text(root())).not.toContain(message);
+      expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
+    }
+  });
+});

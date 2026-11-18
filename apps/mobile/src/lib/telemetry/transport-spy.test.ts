@@ -1,0 +1,518 @@
+/* oxlint-disable max-lines -- one transport-spy suite per SDK; splitting would duplicate the shared mock scaffold */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { SENTRY_NATIVE_OPTIONS } from '@/lib/sentry-dsn';
+import { type SentryInitExtras } from '@/lib/sentry-init';
+
+const hoisted = vi.hoisted(() => {
+  const usHost = 'https://us.i.posthog.com';
+
+  const fetch = vi.fn();
+  const flush = vi.fn().mockResolvedValue(undefined);
+
+  // The PostHog client double: `capture` routes through the client's own
+  // `fetch` (not the global fetch), mirroring the real SDK, so a fetch wrap
+  // registered by `wrapPostHogFetchForTests` observes the transport.
+  const client = {
+    register: vi.fn(),
+    setPersonPropertiesForFlags: vi.fn(),
+    onFeatureFlags: vi.fn(),
+    setPersistedProperty: vi.fn(),
+    optOut: vi.fn().mockResolvedValue(undefined),
+    fetch,
+    flush,
+    capture: vi.fn(function capture(this: { fetch: typeof fetch }, name: string) {
+      this.fetch(`${usHost}/batch/`, {
+        method: 'POST',
+        body: JSON.stringify({ event: name }),
+      });
+    }),
+  };
+
+  const holder: { options?: Record<string, unknown> } = {};
+
+  const device = { deviceType: null as number | null };
+
+  const appsFlyer = {
+    init: vi.fn(),
+    registerSessionReadyListener: vi.fn(),
+    isSessionReady: vi.fn(),
+    start: vi.fn(),
+    logEvent: vi.fn(),
+    stop: vi.fn(),
+    setConsentData: vi.fn(),
+    create: vi.fn().mockResolvedValue(undefined),
+    startObservingTransactions: vi.fn(),
+    stopObservingTransactions: vi.fn(),
+  };
+
+  const platform: { OS: string; Version: number | string } = { OS: 'ios', Version: 0 };
+
+  const sentryHolder: { initOptions?: Record<string, unknown> } = { initOptions: undefined };
+  const mobileReplayIntegration = vi.fn();
+  const deeplinkIntegration = vi.fn();
+  // Mirrors the real factory's return shape: `{ name: 'HermesProfiling' }` —
+  // so tests can prove sentry-init renames the instance per consented init.
+  const hermesProfilingIntegration = vi.fn(() => ({ name: 'HermesProfiling' }));
+  const expoRouterIntegration = vi.fn(() => ({ name: 'expo-router-integration' }));
+  const extraErrorDataIntegration = vi.fn(() => ({ name: 'ExtraErrorData' }));
+
+  const storage = {
+    sealPostHogStorage: vi.fn(),
+    unsealPostHogStorage: vi.fn(),
+    purgePostHogPersistence: vi.fn(),
+    // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
+    posthogCustomStorage: {} as Record<string, unknown>,
+  };
+
+  return {
+    client,
+    fetch,
+    flush,
+    usHost,
+    holder,
+    device,
+    appsFlyer,
+    platform,
+    sentryHolder,
+    mobileReplayIntegration,
+    deeplinkIntegration,
+    hermesProfilingIntegration,
+    expoRouterIntegration,
+    extraErrorDataIntegration,
+    storage,
+  };
+});
+
+vi.mock('posthog-react-native', () => ({
+  default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
+    hoisted.holder.options = options;
+    return hoisted.client;
+  }),
+  PostHogPersistedProperty: {
+    Queue: 'queue',
+    LogsQueue: 'logs_queue',
+    AiQueue: 'ai_queue',
+  },
+}));
+
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.2.3',
+  nativeBuildVersion: '45',
+}));
+
+vi.mock('expo-device', () => ({
+  DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
+  get deviceType() {
+    return hoisted.device.deviceType;
+  },
+}));
+
+vi.mock('expo', () => ({
+  isRunningInExpoGo: vi.fn(() => false),
+}));
+
+vi.mock('@/lib/config', () => ({
+  APPSFLYER_DEV_KEY: 'dev-key',
+  APPSFLYER_APP_ID: 'app-id',
+  POSTHOG_API_KEY: 'test-key',
+  SENTRY_ENVIRONMENT: 'test',
+}));
+
+vi.mock('@/lib/telemetry/posthog-storage', () => ({
+  sealPostHogStorage: hoisted.storage.sealPostHogStorage,
+  unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
+  purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
+  posthogCustomStorage: hoisted.storage.posthogCustomStorage,
+}));
+
+vi.mock('react-native', () => ({ Platform: hoisted.platform }));
+
+vi.mock('react-native-appsflyer', () => ({
+  default: {
+    init: hoisted.appsFlyer.init,
+    registerSessionReadyListener: hoisted.appsFlyer.registerSessionReadyListener,
+    isSessionReady: hoisted.appsFlyer.isSessionReady,
+    start: hoisted.appsFlyer.start,
+    logEvent: hoisted.appsFlyer.logEvent,
+    stop: hoisted.appsFlyer.stop,
+    setConsentData: hoisted.appsFlyer.setConsentData,
+  },
+  AppsFlyerPurchaseConnector: {
+    create: hoisted.appsFlyer.create,
+    startObservingTransactions: hoisted.appsFlyer.startObservingTransactions,
+    stopObservingTransactions: hoisted.appsFlyer.stopObservingTransactions,
+  },
+  StoreKitVersion: { SK1: 'SK1', SK2: 'SK2' },
+}));
+
+vi.mock('expo-tracking-transparency', () => ({
+  getTrackingPermissionsAsync: vi.fn().mockResolvedValue({ status: 'granted' }),
+  PermissionStatus: { UNDETERMINED: 'undetermined' },
+}));
+
+vi.mock('@sentry/react-native', () => ({
+  init: vi.fn((options: Record<string, unknown>) => {
+    hoisted.sentryHolder.initOptions = options;
+  }),
+  mobileReplayIntegration: hoisted.mobileReplayIntegration,
+  deeplinkIntegration: hoisted.deeplinkIntegration,
+  hermesProfilingIntegration: hoisted.hermesProfilingIntegration,
+  expoRouterIntegration: hoisted.expoRouterIntegration,
+  extraErrorDataIntegration: hoisted.extraErrorDataIntegration,
+  setUser: vi.fn(),
+  setTag: vi.fn(),
+  captureException: vi.fn(),
+}));
+
+vi.stubGlobal('__DEV__', false);
+
+// Load posthog + appsflyer + the real controller from one module registry so
+// the SDK modules and the controller share a single decision/generation state.
+// oxlint-disable-next-line require-await -- async required by promise-function-async
+async function loadModules() {
+  vi.resetModules();
+  const posthog = await import('@/lib/analytics/posthog');
+  const appsflyer = await import('@/lib/appsflyer');
+  const ctrl = await import('@/lib/telemetry/controller');
+  return { posthog, appsflyer, ctrl };
+}
+
+// oxlint-disable-next-line require-await -- async required by promise-function-async
+async function loadSentryInit() {
+  vi.resetModules();
+  return import('@/lib/sentry-init');
+}
+
+describe('PostHog transport spy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.client.optOut.mockResolvedValue(undefined);
+  });
+
+  it('observes client fetch with the PostHog US host after init + capture of a catalog event', async () => {
+    const { posthog, ctrl } = await loadModules();
+    ctrl.setTelemetryDecision('acct', true);
+    posthog.initPostHog();
+
+    const fetchSpy = vi.fn();
+    // oxlint-disable-next-line require-await -- async required by promise-function-async
+    posthog.wrapPostHogFetchForTests(originalFetch => async (url, init) => {
+      fetchSpy(url, init);
+      return originalFetch(url, init);
+    });
+
+    posthog.captureEvent('session_created');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const firstUrl = fetchSpy.mock.calls[0]?.[0] as string;
+    expect(firstUrl).toContain('us.i.posthog.com');
+    const firstInit = fetchSpy.mock.calls[0]?.[1] as { body?: string };
+    expect(firstInit.body).toBe(JSON.stringify({ event: 'session_created' }));
+  });
+
+  it('applies a wrap registered before init to the client created later', async () => {
+    const { posthog, ctrl } = await loadModules();
+    ctrl.setTelemetryDecision('acct', true);
+
+    const fetchSpy = vi.fn();
+    // oxlint-disable-next-line require-await -- async required by promise-function-async
+    posthog.wrapPostHogFetchForTests(originalFetch => async (url, init) => {
+      fetchSpy(url, init);
+      return originalFetch(url, init);
+    });
+
+    posthog.initPostHog();
+    posthog.captureEvent('session_created');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[0] as string).toContain('us.i.posthog.com');
+  });
+
+  it('does not fetch after clearTelemetryDecision closes the optional gate', async () => {
+    const { posthog, ctrl } = await loadModules();
+    ctrl.setTelemetryDecision('acct', true);
+    posthog.initPostHog();
+
+    const fetchSpy = vi.fn();
+    // oxlint-disable-next-line require-await -- async required by promise-function-async
+    posthog.wrapPostHogFetchForTests(originalFetch => async (url, init) => {
+      fetchSpy(url, init);
+      return originalFetch(url, init);
+    });
+
+    ctrl.clearTelemetryDecision();
+    posthog.captureEvent('session_created');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch after discardPostHog', async () => {
+    const { posthog, ctrl } = await loadModules();
+    ctrl.setTelemetryDecision('acct', true);
+    posthog.initPostHog();
+
+    const fetchSpy = vi.fn();
+    // oxlint-disable-next-line require-await -- async required by promise-function-async
+    posthog.wrapPostHogFetchForTests(originalFetch => async (url, init) => {
+      fetchSpy(url, init);
+      return originalFetch(url, init);
+    });
+
+    await posthog.discardPostHog();
+    posthog.captureEvent('session_created');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('fetches only while optional consent is allowed (consent on then off)', async () => {
+    const { posthog, ctrl } = await loadModules();
+    ctrl.setTelemetryDecision('acct', true);
+    posthog.initPostHog();
+
+    const fetchSpy = vi.fn();
+    // oxlint-disable-next-line require-await -- async required by promise-function-async
+    posthog.wrapPostHogFetchForTests(originalFetch => async (url, init) => {
+      fetchSpy(url, init);
+      return originalFetch(url, init);
+    });
+
+    posthog.captureEvent('session_created');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    ctrl.setTelemetryDecision('acct', false);
+    posthog.captureEvent('session_created');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AppsFlyer transport spy', () => {
+  const logEventSpy =
+    vi.fn<(eventName: string, eventValues: Record<string, string>) => Promise<void>>();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    hoisted.platform.OS = 'ios';
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+    hoisted.appsFlyer.init.mockResolvedValue(undefined);
+    hoisted.appsFlyer.isSessionReady.mockResolvedValue(false);
+    hoisted.appsFlyer.start.mockResolvedValue(undefined);
+    hoisted.appsFlyer.stop.mockResolvedValue(undefined);
+    hoisted.appsFlyer.setConsentData.mockResolvedValue(undefined);
+    // Native reports the session ready as soon as the listener registers.
+    hoisted.appsFlyer.registerSessionReadyListener.mockImplementation(
+      // oxlint-disable-next-line require-await -- async required by promise-function-async
+      async (onReady: () => void) => {
+        onReady();
+      }
+    );
+    logEventSpy.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('observes the logEvent transport after init + trackEvent', async () => {
+    const { appsflyer, ctrl } = await loadModules();
+    appsflyer.wrapAppsFlyerLogEventForTests(() => logEventSpy);
+
+    ctrl.setTelemetryDecision('acct', true);
+    appsflyer.initAppsFlyer();
+    await vi.advanceTimersByTimeAsync(0);
+    appsflyer.trackEvent('login');
+
+    expect(logEventSpy).toHaveBeenCalledTimes(1);
+    expect(logEventSpy).toHaveBeenCalledWith('login', {});
+  });
+
+  it('does not call the logEvent transport after optional consent turns false', async () => {
+    const { appsflyer, ctrl } = await loadModules();
+    appsflyer.wrapAppsFlyerLogEventForTests(() => logEventSpy);
+
+    ctrl.setTelemetryDecision('acct', true);
+    appsflyer.initAppsFlyer();
+    await vi.advanceTimersByTimeAsync(0);
+
+    ctrl.setTelemetryDecision('acct', false);
+    appsflyer.trackEvent('login');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(logEventSpy).not.toHaveBeenCalled();
+  });
+
+  it('drains a queued event through the logEvent transport after start completes', async () => {
+    const { appsflyer, ctrl } = await loadModules();
+    appsflyer.wrapAppsFlyerLogEventForTests(() => logEventSpy);
+
+    ctrl.setTelemetryDecision('acct', true);
+    // Queue before init: initialized is false, so the event is buffered.
+    appsflyer.trackEvent('login');
+    expect(logEventSpy).not.toHaveBeenCalled();
+
+    appsflyer.initAppsFlyer();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(logEventSpy).toHaveBeenCalledTimes(1);
+    expect(logEventSpy).toHaveBeenCalledWith('login', {});
+  });
+});
+
+type IntegrationLike = { name?: string };
+
+// The integrations option is core's function form (see lib/sentry-init.ts):
+// it receives the SDK's default integrations and returns the final merged set.
+// Resolve it against a fake default list carrying the HermesProfiling
+// instance the real default list pushes whenever `profilesSampleRate` is a
+// number (0 included), the TurboModuleContext instance it pushes whenever
+// `enableNative` is on, plus one unrelated default to prove the rest survive.
+// The mocked deeplink/replay factories return undefined, so the result holds
+// sparse entries; filter them out.
+function resolveIntegrations(initOptions: Record<string, unknown> | undefined): IntegrationLike[] {
+  const integrations = initOptions?.integrations as
+    | ((defaults: IntegrationLike[]) => (IntegrationLike | undefined)[])
+    | undefined;
+  const merged = integrations?.([
+    { name: 'HermesProfiling' },
+    { name: 'TurboModuleContext' },
+    { name: 'DeviceContext' },
+  ]);
+  return merged?.filter((integration): integration is IntegrationLike => integration != null) ?? [];
+}
+
+function profilerNames(initOptions: Record<string, unknown> | undefined): string[] {
+  return resolveIntegrations(initOptions)
+    .map(integration => integration.name)
+    .filter((name): name is string => name?.startsWith('HermesProfiling') ?? false);
+}
+
+describe('Sentry transport spy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.sentryHolder.initOptions = undefined;
+  });
+
+  it('passes the transport factory into init and registers masked replay when consented', async () => {
+    const { initSentry } = await loadSentryInit();
+    const transportFactory = vi.fn(() => undefined) as unknown as SentryInitExtras['transport'];
+
+    initSentry(true, { transport: transportFactory });
+
+    expect(hoisted.sentryHolder.initOptions?.transport).toBe(transportFactory);
+    expect(hoisted.mobileReplayIntegration).toHaveBeenCalledWith({
+      maskAllText: true,
+      maskAllImages: true,
+      maskAllVectors: true,
+    });
+    expect(hoisted.sentryHolder.initOptions?.profilesSampleRate).toBe(0.1);
+    expect(hoisted.hermesProfilingIntegration).toHaveBeenCalledTimes(1);
+    // The default HermesProfiling instance is filtered out of the merge and
+    // replaced by the uniquely named consented instance (lifecycle note in
+    // lib/sentry-init.ts).
+    expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual(['HermesProfiling#1']);
+    // Errors' own properties attach even for the consented client.
+    expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
+      'ExtraErrorData'
+    );
+  });
+
+  it('keeps the NDK crash handler only below Android 12, where no tombstone exists', async () => {
+    const { initSentry } = await loadSentryInit();
+
+    // Android 12+ has the tombstone integration, which reports the same native
+    // crashes out of process. The in-process NDK handler only duplicates it and
+    // can abort inside its own unwinder (std::bad_alloc in
+    // sentry__unwind_stack_libunwindstack), which replaces the real crash.
+    for (const [version, expected] of [
+      [36, false],
+      [31, false],
+      [30, true],
+      [24, true],
+    ] as const) {
+      hoisted.platform.OS = 'android';
+      hoisted.platform.Version = version;
+      initSentry(false);
+
+      expect(hoisted.sentryHolder.initOptions?.enableNdk, `API ${version}`).toBe(expected);
+      // The tombstone path stays on at every level: it is the only native
+      // crash source above 31 and harmless duplication below.
+      expect(hoisted.sentryHolder.initOptions?.enableTombstone).toBe(true);
+    }
+
+    // An unreadable version keeps the handler rather than losing native
+    // crash capture.
+    hoisted.platform.Version = 'unknown';
+    initSentry(false);
+    expect(hoisted.sentryHolder.initOptions?.enableNdk).toBe(true);
+
+    // iOS has no NDK option: the property must be absent, not false.
+    hoisted.platform.OS = 'ios';
+    hoisted.platform.Version = 18;
+    initSentry(false);
+    expect(hoisted.sentryHolder.initOptions).not.toHaveProperty('enableNdk');
+    expect(hoisted.sentryHolder.initOptions?.enableTombstone).toBe(true);
+  });
+
+  it('leaves the NDK handler off for the native init that runs before JS', () => {
+    // Native init runs before any JS, so this value decides whether a startup
+    // crash can be replaced by the handler's own unwinder abort. It must stay
+    // off: JS installs the handler again below Android 12.
+    expect(SENTRY_NATIVE_OPTIONS.enableNdk).toBe(false);
+    expect(SENTRY_NATIVE_OPTIONS.enableTombstone).toBe(true);
+  });
+
+  it('registers no replay and disables screenshots when optional consent is false', async () => {
+    const { initSentry } = await loadSentryInit();
+
+    initSentry(false);
+
+    expect(hoisted.mobileReplayIntegration).not.toHaveBeenCalled();
+    expect(hoisted.sentryHolder.initOptions?.attachScreenshot).toBe(false);
+    expect(hoisted.sentryHolder.initOptions?.profilesSampleRate).toBe(0);
+    expect(hoisted.hermesProfilingIntegration).not.toHaveBeenCalled();
+    // The declined init must not consume the once-only 'HermesProfiling'
+    // setupOnce slot: the default instance is filtered out of the merge, so
+    // the consented re-init's profiler still attaches to the new client.
+    expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual([]);
+    expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
+      'DeviceContext'
+    );
+    // Error reporting is mandatory (DEC-02): extra error data attaches before
+    // optional consent is decided too.
+    expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
+      'ExtraErrorData'
+    );
+  });
+
+  it('accept → revoke → re-accept re-registers the profiler under a fresh name per consented client', async () => {
+    const { initSentry } = await loadSentryInit();
+
+    // The consent lifecycle of a session: module-scope declined init
+    // (_layout.tsx), accept, revoke, re-accept.
+    initSentry(false);
+    initSentry(true);
+    const accepted = profilerNames(hoisted.sentryHolder.initOptions);
+    initSentry(false);
+    initSentry(true);
+
+    expect(accepted).toEqual(['HermesProfiling#1']);
+    expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual(['HermesProfiling#2']);
+    expect(hoisted.hermesProfilingIntegration).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([true, false])(
+    'drops the TurboModuleContext scope writer (optional consent %s)',
+    async consented => {
+      const { initSentry } = await loadSentryInit();
+
+      initSentry(consented);
+
+      const names = resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name);
+      expect(names).not.toContain('TurboModuleContext');
+      expect(names).toContain('DeviceContext');
+    }
+  );
+});

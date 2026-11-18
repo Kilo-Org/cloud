@@ -2,14 +2,19 @@
 /* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import {
+  BROWSER_TOOL_MESSAGE,
+  CLAIM_TAB_MESSAGE,
+  TAB_NOT_INSPECTABLE_ERROR,
   WEB_MCP_DISCOVER_MESSAGE,
   WEB_MCP_EXECUTE_MESSAGE,
   discoverWebMcpToolsInTab,
-  evalInTab,
   evalInTabWithScripting,
+  evaluateTabCode,
   executeWebMcpToolInTab,
+  getInspectableTab,
   getPageSnapshotInTabWithScripting,
   getViewportScreenshotWithTabsApi,
+  isInspectablePageUrl,
   isTabDebuggerRequest,
   isTabDebuggerResponse,
   listInspectableTabs,
@@ -47,6 +52,8 @@ const createDebuggerApi = ({
         { tabId: 3, title: 'Local app', type: 'page', url: 'http://localhost:3001/' },
         { tabId: 4, title: 'Local image', type: 'page', url: 'file:///tmp/kilo-image.png' },
       ],
+    onDetach: { addListener: () => {}, removeListener: () => {} },
+    onEvent: { addListener: () => {}, removeListener: () => {} },
     sendCommand:
       sendCommand ??
       ((_target, _method, _params) => {
@@ -98,7 +105,7 @@ const createWebMcpScriptingApi = ({
   ],
 });
 
-// Rebuild the ordered definition signature exactly as the injected executor does, so tests pass a matching signature without hardcoding JSON.
+// Rebuild the definition signature exactly as the injected executor does, so tests pass a matching signature without hardcoding JSON.
 const webMcpDefinitionSignature = (tool: {
   readonly description: string;
   readonly inputSchema: unknown;
@@ -116,8 +123,23 @@ const webMcpDefinitionSignature = (tool: {
   }
   const normalized =
     typeof schema === 'object' && schema !== null && !Array.isArray(schema) ? schema : undefined;
+  const canonicalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map(entry => canonicalize(entry));
+    }
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+    return Object.fromEntries(
+      Object.entries(value)
+        .toSorted(([left], [right]) => (left < right ? -1 : Number(left > right)))
+        .map(([key, entry]) => [key, canonicalize(entry)])
+    );
+  };
 
-  return JSON.stringify([tool.name, tool.title, tool.description, tool.origin, normalized]);
+  return JSON.stringify(
+    canonicalize([tool.name, tool.title, tool.description, tool.origin, normalized])
+  );
 };
 
 describe('tab debugger helpers', () => {
@@ -129,23 +151,19 @@ describe('tab debugger helpers', () => {
     ]);
   });
 
-  it('evaluates dangerous-mode code in the selected tab', async () => {
+  it('evaluates dangerous-mode code through the tab session send', async () => {
     const calls: unknown[] = [];
-    const debuggerApi = createDebuggerApi({
-      sendCommand: (target, method, params) => {
-        calls.push({ method, params, target });
-        return { result: { type: 'number', value: 12_345 } };
-      },
-    });
+    const send = (method: string, params?: Record<string, unknown>) => {
+      calls.push({ method, params });
+      return Promise.resolve({ result: { type: 'number', value: 12_345 } });
+    };
 
     await expect(
-      evalInTab({
+      evaluateTabCode({
         code: 'return document.documentElement.outerHTML.length;',
-        debuggerApi,
-        tabId: 7,
+        send,
       })
     ).resolves.toStrictEqual({ ok: true, value: 12_345 });
-    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
     expect(calls).toStrictEqual([
       {
         method: 'Runtime.evaluate',
@@ -155,61 +173,49 @@ describe('tab debugger helpers', () => {
           returnByValue: true,
           timeout: 5000,
         },
-        target: { tabId: 7 },
       },
     ]);
   });
 
-  it('returns eval errors and still detaches', async () => {
-    const debuggerApi = createDebuggerApi({
-      sendCommand: () => ({
+  it('returns eval errors without detaching the shared attachment', async () => {
+    const send = () =>
+      Promise.resolve({
         exceptionDetails: { text: 'ReferenceError: missingValue is not defined' },
         result: { type: 'object' },
-      }),
-    });
+      });
 
     await expect(
-      evalInTab({
+      evaluateTabCode({
         code: 'return missingValue;',
-        debuggerApi,
-        tabId: 7,
+        send,
       })
     ).resolves.toStrictEqual({
       error: 'Page evaluation failed: ReferenceError: missingValue is not defined',
       ok: false,
     });
-    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
   });
 
-  it('returns the eval result even when detach fails', async () => {
-    const debuggerApi: ChromeDebuggerApi = {
-      attach: () => {},
-      detach: () => {
-        throw new Error('Debugger is not attached to the tab with id: 7');
-      },
-      getTargets: () => [],
-      sendCommand: () => ({ result: { type: 'number', value: 42 } }),
-    };
+  it('reports a session send failure as an eval error', async () => {
+    const send = (): Promise<Record<string, unknown>> =>
+      Promise.reject(new Error('The debugger detached from the tab.'));
 
-    await expect(evalInTab({ code: 'return 42;', debuggerApi, tabId: 7 })).resolves.toStrictEqual({
-      ok: true,
-      value: 42,
+    await expect(evaluateTabCode({ code: 'return 42;', send })).resolves.toStrictEqual({
+      error: 'The debugger detached from the tab.',
+      ok: false,
     });
   });
 
   it('summarizes huge eval string results', async () => {
     const hugeValue = 'x'.repeat(8001);
-    const debuggerApi = createDebuggerApi({
-      sendCommand: () => ({
+    const send = () =>
+      Promise.resolve({
         result: { type: 'string', value: hugeValue },
-      }),
-    });
+      });
 
     await expect(
-      evalInTab({
+      evaluateTabCode({
         code: 'return document.documentElement.outerHTML;',
-        debuggerApi,
-        tabId: 7,
+        send,
       })
     ).resolves.toStrictEqual({
       ok: true,
@@ -655,9 +661,11 @@ describe('tab debugger helpers', () => {
   });
 
   it('executes a tool and returns its JSON string result', async () => {
-    const executeTool = (tool: unknown, argumentsText: string): Promise<string> => {
+    const executeTool = (tool: unknown, args: unknown): Promise<string> => {
       expect(tool).toMatchObject({ name: 'double' });
-      expect(argumentsText).toBe('{"value":21}');
+      // Chromium 158 requires executeTool's second parameter to be an object;
+      // The injected function parses the JSON arguments text before the call.
+      expect(args).toStrictEqual({ value: 21 });
       return resolved('{"doubled":42}');
     };
     setModelContext({
@@ -817,6 +825,132 @@ describe('tab debugger helpers', () => {
     ).toBe(true);
   });
 
+  it('accepts the browser tool request and response shapes', () => {
+    expect(
+      isTabDebuggerRequest({
+        arguments: { element: 'e5' },
+        caller: { kind: 'workflow', runId: 'run-1' },
+        tabId: 7,
+        tool: 'kilo_browser_snapshot',
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(true);
+    expect(
+      isTabDebuggerResponse({
+        ok: true,
+        result: { ok: true, value: { snapshot: 'page' } },
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(true);
+    expect(
+      isTabDebuggerResponse({
+        ok: true,
+        takeOver: { holderKind: 'agent', sessionTitle: 'Kilo CLI session X', tabId: 7 },
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(true);
+    expect(isTabDebuggerResponse({ error: TAB_NOT_INSPECTABLE_ERROR, ok: false })).toBe(true);
+  });
+
+  it('rejects a browser tool request without a tool name, arguments or caller', () => {
+    expect(
+      isTabDebuggerRequest({
+        arguments: {},
+        caller: { kind: 'workflow', runId: 'run-1' },
+        tabId: 7,
+        tool: 5,
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(false);
+    expect(
+      isTabDebuggerRequest({
+        arguments: '{}',
+        caller: { kind: 'workflow', runId: 'run-1' },
+        tabId: 7,
+        tool: 'kilo_browser_snapshot',
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(false);
+    expect(
+      isTabDebuggerRequest({
+        arguments: {},
+        tabId: 7,
+        tool: 'kilo_browser_snapshot',
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(false);
+  });
+
+  it('accepts the claim request and response shapes', () => {
+    expect(
+      isTabDebuggerRequest({
+        caller: { kind: 'workflow', runId: 'run-1' },
+        from: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
+        tabId: 7,
+        type: CLAIM_TAB_MESSAGE,
+      })
+    ).toBe(true);
+    // A run started outside a turn hands over nothing.
+    expect(
+      isTabDebuggerRequest({
+        caller: { kind: 'workflow', runId: 'run-1' },
+        tabId: 7,
+        type: CLAIM_TAB_MESSAGE,
+      })
+    ).toBe(true);
+    expect(isTabDebuggerResponse({ granted: true, ok: true, type: CLAIM_TAB_MESSAGE })).toBe(true);
+    // The schema validates caller shape only: which caller may hand a lease over is the runtime's rule.
+    expect(
+      isTabDebuggerRequest({
+        caller: { kind: 'workflow', runId: 'run-1' },
+        from: { kind: 'workflow', runId: 'run-2' },
+        tabId: 7,
+        type: CLAIM_TAB_MESSAGE,
+      })
+    ).toBe(true);
+  });
+
+  it('reports a browser-internal tab as not inspectable', async () => {
+    const tabsApi: BrowserTabsApi = {
+      get: () => ({ id: 2, title: 'Settings', url: 'chrome://settings' }),
+      query: () => [],
+    };
+
+    await expect(getInspectableTab({ tabId: 2, tabsApi })).resolves.toStrictEqual({
+      error: TAB_NOT_INSPECTABLE_ERROR,
+      ok: false,
+    });
+    expect(isInspectablePageUrl('chrome://settings')).toBe(false);
+    expect(isInspectablePageUrl('moz-extension://id/panel.html')).toBe(false);
+  });
+
+  it('resolves an ordinary page tab as inspectable', async () => {
+    const tabsApi: BrowserTabsApi = {
+      get: () => ({ id: 7, title: 'Kilo', url: 'https://app.kilo.ai/' }),
+      query: () => [],
+    };
+
+    await expect(getInspectableTab({ tabId: 7, tabsApi })).resolves.toStrictEqual({
+      ok: true,
+      tab: { id: 7, title: 'Kilo', url: 'https://app.kilo.ai/' },
+    });
+    expect(isInspectablePageUrl('https://app.kilo.ai/')).toBe(true);
+  });
+
+  it('reports a missing tab as not inspectable', async () => {
+    const tabsApi: BrowserTabsApi = {
+      get: () => {
+        throw new Error('No tab with id: 9');
+      },
+      query: () => [],
+    };
+
+    await expect(getInspectableTab({ tabId: 9, tabsApi })).resolves.toStrictEqual({
+      error: TAB_NOT_INSPECTABLE_ERROR,
+      ok: false,
+    });
+  });
+
   it('passes the definition signature into the injected execute function', async () => {
     const calls: Parameters<BrowserScriptingApi['executeScript']>[0][] = [];
     setModelContext({
@@ -928,8 +1062,58 @@ describe('tab debugger helpers', () => {
         toolName: 'double',
       })
     ).resolves.toStrictEqual({
-      error: 'WebMCP tool execution failed: WebMCP tool "double" changed; refresh the page tools.',
+      error: 'WebMCP tool "double" changed; refresh the page tools.',
       ok: false,
     });
+  });
+
+  it('reports an error when the page returns no execution result', async () => {
+    // Chrome reports a throw inside injected code as a null result with no error, so a missing envelope must fail.
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: () => [{ result: null }],
+    };
+
+    await expect(
+      executeWebMcpToolInTab({
+        arguments: '{}',
+        definitionSignature: 'sig',
+        documentId: 'doc-1',
+        scriptingApi,
+        tabId: 7,
+        toolName: 'double',
+      })
+    ).resolves.toStrictEqual({
+      error: 'WebMCP tool execution failed: the page returned no result.',
+      ok: false,
+    });
+  });
+
+  it('executes a tool whose schema keys arrive in a different order', async () => {
+    // Extension messaging reorders object keys, so the page-side rebuild must not depend on JSON key order.
+    setModelContext({
+      executeTool: () => resolved('{"doubled":42}'),
+      getTools: () =>
+        resolved([
+          {
+            description: 'D',
+            inputSchema: { properties: { value: { type: 'number' } }, type: 'object' },
+            name: 'double',
+            origin: 'https://example.com',
+            title: 'Double',
+          },
+        ]),
+    });
+
+    await expect(
+      executeWebMcpToolInTab({
+        arguments: '{}',
+        definitionSignature:
+          '["double","Double","D","https://example.com",{"properties":{"value":{"type":"number"}},"type":"object"}]',
+        documentId: 'doc-1',
+        scriptingApi: createWebMcpScriptingApi(),
+        tabId: 7,
+        toolName: 'double',
+      })
+    ).resolves.toStrictEqual({ ok: true, value: '{"doubled":42}' });
   });
 });

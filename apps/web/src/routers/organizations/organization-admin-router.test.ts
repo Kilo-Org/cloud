@@ -1,23 +1,47 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  admin_action_audit_logs,
   organizations,
   credit_transactions,
   organization_seats_purchases,
   organization_memberships,
+  organization_service_fee_exemptions,
   platform_integrations,
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plans,
   kilo_pass_org_allocation_plan_rows,
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_term_versions,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { eq, and, inArray, lt, sql } from 'drizzle-orm';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import {
+  addUserToOrganization,
+  markOrganizationAsDeleted,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
+
+const mockAfterResponse = jest.fn(async (_work: () => void | Promise<void>) => {});
+
+jest.mock('@/lib/session-ingest-client', () => ({
+  invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/cloud-agent-next/cloud-agent-internal-api', () => ({
+  closeCloudAgentOrgStreams: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/after-response', () => ({
+  runAfterResponse: (work: () => void | Promise<void>) => mockAfterResponse(work),
+}));
+
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KiloPassOrgBonusMode } from '@kilocode/db/schema-types';
-import { fetchExpiringTransactionsForOrganization } from '@/lib/creditExpiration';
+import { fetchExpiringTransactionsForOrganization } from '@kilocode/web-shared/lib/creditExpiration';
 import type { User, Organization } from '@kilocode/db/schema';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 
@@ -25,12 +49,24 @@ jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_admin_org'),
 }));
 
+async function runScheduledAfterResponse(): Promise<void> {
+  const callbacks = mockAfterResponse.mock.calls.map(([callback]) => callback);
+  mockAfterResponse.mockClear();
+  await Promise.all(callbacks.map(callback => callback()));
+}
+
 let adminUser: User;
 let adminWithoutCreditAccess: User;
 let nonAdminUser: User;
 let testOrganization: Organization;
 
 describe('organization admin router', () => {
+  beforeEach(() => {
+    mockAfterResponse.mockClear();
+    jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+    jest.mocked(closeCloudAgentOrgStreams).mockClear();
+  });
+
   beforeAll(async () => {
     adminUser = await insertTestUser({
       google_user_email: 'admin-org-admin@admin.example.com',
@@ -51,11 +87,261 @@ describe('organization admin router', () => {
       is_admin: false,
     });
 
-    testOrganization = await createOrganization('Test Admin Organization', adminUser.id);
+    testOrganization = await createTestOrganization('Test Admin Organization', adminUser.id, 0);
   });
 
   afterAll(async () => {
     await db.delete(organizations).where(eq(organizations.id, testOrganization.id));
+  });
+
+  describe('admin action audit logging', () => {
+    it('records create, trial override, and delete against the organization', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const { organization } = await caller.organizations.admin.create({ name: 'Audited Org' });
+      await caller.organizations.admin.updateFreeTrialEndAt({
+        organizationId: organization.id,
+        free_trial_end_at: '2099-01-01T00:00:00.000Z',
+      });
+      await caller.organizations.admin.delete({ organizationId: organization.id });
+
+      const audits = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.target_type, 'organization'),
+            eq(admin_action_audit_logs.target_id, organization.id)
+          )
+        );
+
+      expect(audits.map(audit => audit.action).sort()).toEqual([
+        'organization.create',
+        'organization.delete',
+        'organization.free_trial_end.set',
+      ]);
+      expect(audits.every(audit => audit.actor_id === adminUser.id)).toBe(true);
+      expect(
+        audits.find(audit => audit.action === 'organization.free_trial_end.set')?.metadata
+      ).toMatchObject({ freeTrialEndAt: '2099-01-01T00:00:00.000Z' });
+    });
+
+    it('revokes organization shares and invalidates every affected member on delete', async () => {
+      const member = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        `Delete share ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const otherOrganization = await createTestOrganization(
+        `Other share ${crypto.randomUUID()}`,
+        otherUser.id,
+        0
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+
+      const ownerOrgSession = `ses_delete_${crypto.randomUUID()}`;
+      const memberOrgSession = `ses_delete_${crypto.randomUUID()}`;
+      const personalSession = `ses_delete_${crypto.randomUUID()}`;
+      const otherOrgSession = `ses_delete_${crypto.randomUUID()}`;
+      const ownerOrgPublicId = crypto.randomUUID();
+      const memberOrgPublicId = crypto.randomUUID();
+      const personalPublicId = crypto.randomUUID();
+      const otherOrgPublicId = crypto.randomUUID();
+
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      jest.mocked(closeCloudAgentOrgStreams).mockClear();
+
+      try {
+        await db.insert(cli_sessions_v2).values([
+          {
+            session_id: ownerOrgSession,
+            kilo_user_id: adminUser.id,
+            organization_id: organization.id,
+            public_id: ownerOrgPublicId,
+          },
+          {
+            session_id: memberOrgSession,
+            kilo_user_id: member.id,
+            organization_id: organization.id,
+            public_id: memberOrgPublicId,
+          },
+          {
+            session_id: personalSession,
+            kilo_user_id: adminUser.id,
+            organization_id: null,
+            public_id: personalPublicId,
+          },
+          {
+            session_id: otherOrgSession,
+            kilo_user_id: otherUser.id,
+            organization_id: otherOrganization.id,
+            public_id: otherOrgPublicId,
+          },
+        ]);
+
+        const caller = await createCallerForUser(adminUser.id);
+        await caller.organizations.admin.delete({ organizationId: organization.id });
+        await runScheduledAfterResponse();
+
+        const shares = await db
+          .select({
+            sessionId: cli_sessions_v2.session_id,
+            publicId: cli_sessions_v2.public_id,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            inArray(cli_sessions_v2.session_id, [
+              ownerOrgSession,
+              memberOrgSession,
+              personalSession,
+              otherOrgSession,
+            ])
+          );
+        const bySession = new Map(shares.map(share => [share.sessionId, share.publicId]));
+
+        expect(bySession.get(ownerOrgSession)).toBeNull();
+        expect(bySession.get(memberOrgSession)).toBeNull();
+        expect(bySession.get(personalSession)).toBe(personalPublicId);
+        expect(bySession.get(otherOrgSession)).toBe(otherOrgPublicId);
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+          adminUser.id,
+          organization.id
+        );
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+          member.id,
+          organization.id
+        );
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalledWith(
+          otherUser.id,
+          organization.id
+        );
+      } finally {
+        await db
+          .delete(cli_sessions_v2)
+          .where(
+            inArray(cli_sessions_v2.session_id, [
+              ownerOrgSession,
+              memberOrgSession,
+              personalSession,
+              otherOrgSession,
+            ])
+          );
+        await db
+          .delete(organization_memberships)
+          .where(
+            inArray(organization_memberships.organization_id, [
+              organization.id,
+              otherOrganization.id,
+            ])
+          );
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [organization.id, otherOrganization.id]));
+      }
+    });
+
+    it('runs post-delete invalidation after durable deletion, share clearing, and audit recording', async () => {
+      const member = await insertTestUser();
+      const organization = await createTestOrganization(
+        `Delete invalidation ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const organizationSession = `ses_delete_after_response_${crypto.randomUUID()}`;
+      const personalSession = `ses_delete_after_response_${crypto.randomUUID()}`;
+      const organizationPublicId = crypto.randomUUID();
+      const personalPublicId = crypto.randomUUID();
+
+      try {
+        await db.insert(cli_sessions_v2).values([
+          {
+            session_id: organizationSession,
+            kilo_user_id: adminUser.id,
+            organization_id: organization.id,
+            public_id: organizationPublicId,
+          },
+          {
+            session_id: personalSession,
+            kilo_user_id: adminUser.id,
+            organization_id: null,
+            public_id: personalPublicId,
+          },
+        ]);
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.delete({ organizationId: organization.id })
+        ).resolves.toBeDefined();
+
+        // The mutation is durable before the deferred callback is invoked.
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+        expect(mockAfterResponse).toHaveBeenCalledTimes(1);
+
+        const [deleted] = await db
+          .select({ deletedAt: organizations.deleted_at })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(deleted?.deletedAt).not.toBeNull();
+
+        const shares = await db
+          .select({
+            sessionId: cli_sessions_v2.session_id,
+            publicId: cli_sessions_v2.public_id,
+          })
+          .from(cli_sessions_v2)
+          .where(inArray(cli_sessions_v2.session_id, [organizationSession, personalSession]));
+        const bySession = new Map(shares.map(share => [share.sessionId, share.publicId]));
+        expect(bySession.get(organizationSession)).toBeNull();
+        expect(bySession.get(personalSession)).toBe(personalPublicId);
+
+        const audits = await db
+          .select({ action: admin_action_audit_logs.action })
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.target_type, 'organization'),
+              eq(admin_action_audit_logs.target_id, organization.id)
+            )
+          );
+        expect(audits.map(audit => audit.action)).toContain('organization.delete');
+
+        jest
+          .mocked(invalidateOrganizationSessionAccess)
+          .mockRejectedValueOnce(new Error('invalidation unavailable'));
+        await expect(runScheduledAfterResponse()).resolves.toBeUndefined();
+
+        const [stillDeleted] = await db
+          .select({ deletedAt: organizations.deleted_at })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(stillDeleted?.deletedAt).not.toBeNull();
+        const [stillCleared] = await db
+          .select({ publicId: cli_sessions_v2.public_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, organizationSession));
+        expect(stillCleared?.publicId).toBeNull();
+        const stillAudited = await db
+          .select({ action: admin_action_audit_logs.action })
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.target_type, 'organization'),
+              eq(admin_action_audit_logs.target_id, organization.id)
+            )
+          );
+        expect(stillAudited.map(audit => audit.action)).toContain('organization.delete');
+      } finally {
+        await db
+          .delete(cli_sessions_v2)
+          .where(inArray(cli_sessions_v2.session_id, [organizationSession, personalSession]));
+        await db
+          .delete(organization_memberships)
+          .where(eq(organization_memberships.organization_id, organization.id));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+      }
+    });
   });
 
   describe('getDetails', () => {
@@ -112,6 +398,20 @@ describe('organization admin router', () => {
         { platform: PLATFORM.GITHUB, installation_count: 2 },
         { platform: PLATFORM.LINEAR, installation_count: 1 },
       ]);
+    });
+
+    it('returns the Stripe customer id regardless of the admin org role', async () => {
+      await db
+        .update(organizations)
+        .set({ stripe_customer_id: 'cus_admin_details_test' })
+        .where(eq(organizations.id, testOrganization.id));
+
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.organizations.admin.getDetails({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.stripe_customer_id).toBe('cus_admin_details_test');
     });
   });
 
@@ -337,6 +637,26 @@ describe('organization admin router', () => {
         .where(eq(credit_transactions.organization_id, testOrganization.id));
     });
 
+    it('marks explicitly paid grants as principal and ignores promotional expiry overrides', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        creditKind: 'paid',
+        expiry_date: '2030-01-01T00:00:00.000Z',
+        expiry_hours: 1,
+      });
+      const credit = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.organization_id, testOrganization.id),
+      });
+      expect(credit).toMatchObject({
+        is_free: false,
+        credit_source: 'admin',
+        paid_credit_policy: 'legacy',
+        expiry_date: null,
+      });
+    });
+
     it('should successfully grant positive credits', async () => {
       const caller = await createCallerForUser(adminUser.id);
       const amount = 10;
@@ -396,7 +716,34 @@ describe('organization admin router', () => {
 
       expect(creditTransaction).toBeDefined();
       expect(creditTransaction.description).toBe(description);
+      expect(creditTransaction.credit_category).toBe('organization_custom');
       expect(creditTransaction.created_by_kilo_user_id).toBe(adminUser.id);
+    });
+
+    it('records repeated negative grants under the stable organization_custom category', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      for (const description of ['First correction', 'Second correction']) {
+        await caller.organizations.admin.grantCredit({
+          organizationId: testOrganization.id,
+          amount_usd: -2,
+          description,
+        });
+      }
+
+      const debits = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, testOrganization.id),
+            lt(credit_transactions.amount_microdollars, 0)
+          )
+        );
+      expect(debits.map(debit => debit.credit_category)).toEqual([
+        'organization_custom',
+        'organization_custom',
+      ]);
     });
 
     it('should fail to grant negative credits without description', async () => {
@@ -435,7 +782,7 @@ describe('organization admin router', () => {
 
     it('should store expiry_date on credit transaction', async () => {
       const caller = await createCallerForUser(adminUser.id);
-      const expiryDate = '2024-06-01T00:00:00.000Z';
+      const expiryDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
 
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
@@ -451,6 +798,55 @@ describe('organization admin router', () => {
       expect(txn).toBeDefined();
       expect(new Date(txn.expiry_date!).toISOString()).toBe(expiryDate);
       expect(txn.expiration_baseline_microdollars_used).toBe(0);
+    });
+
+    it('should refuse an expiry_date that is not in the future', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.grantCredit({
+          organizationId: testOrganization.id,
+          amount_usd: 10,
+          expiry_date: '2024-06-01T00:00:00.000Z',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Expiry date must be in the future'),
+      });
+
+      const txn = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+      expect(txn).toHaveLength(0);
+    });
+
+    it('should allow a past expiry_date on paid credits and negative grants', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const pastDate = '2024-06-01T00:00:00.000Z';
+
+      // Paid credits store the purchase policy expiry, not the supplied one.
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        creditKind: 'paid',
+        expiry_date: pastDate,
+      });
+      // Negative grants store no expiry at all.
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: -5,
+        description: 'Debit with past expiry',
+        expiry_date: pastDate,
+      });
+
+      const txns = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+      expect(txns).toHaveLength(2);
+      const debit = txns.find(t => t.amount_microdollars < 0)!;
+      expect(debit.expiry_date).toBeNull();
     });
 
     it('should store expiry from expiry_hours', async () => {
@@ -501,7 +897,7 @@ describe('organization admin router', () => {
 
     it('should update next_credit_expiration_at on org', async () => {
       const caller = await createCallerForUser(adminUser.id);
-      const expiryDate = '2024-03-15T00:00:00.000Z';
+      const expiryDate = new Date(Date.now() + 45 * 24 * 3600 * 1000).toISOString();
 
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
@@ -524,14 +920,14 @@ describe('organization admin router', () => {
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
-        expiry_date: '2024-02-01T00:00:00.000Z',
+        expiry_date: '2030-02-01T00:00:00.000Z',
       });
 
       // Second grant with later expiry
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
-        expiry_date: '2024-06-01T00:00:00.000Z',
+        expiry_date: '2030-06-01T00:00:00.000Z',
       });
 
       const [updatedOrg] = await db
@@ -541,7 +937,7 @@ describe('organization admin router', () => {
 
       // Should still be the earlier date
       expect(new Date(updatedOrg.next_credit_expiration_at!).toISOString()).toBe(
-        '2024-02-01T00:00:00.000Z'
+        '2030-02-01T00:00:00.000Z'
       );
     });
 
@@ -576,7 +972,7 @@ describe('organization admin router', () => {
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 10,
-        expiry_date: '2024-06-01T00:00:00.000Z',
+        expiry_date: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
       });
 
       const [txn] = await db
@@ -828,7 +1224,7 @@ describe('organization admin router', () => {
       expect(creditBlocks.totalBalance_mUsd).toBe(40_000_000);
     });
 
-    it('closes out multiple still-open grants on nullification', async () => {
+    it('retires multiple still-open grants on nullification', async () => {
       const caller = await createCallerForUser(adminUser.id);
 
       await caller.organizations.admin.grantCredit({
@@ -847,7 +1243,15 @@ describe('organization admin router', () => {
       });
 
       const expiring = await fetchExpiringTransactionsForOrganization(testOrganization.id);
-      expect(expiring).toHaveLength(0);
+      expect(
+        expiring.every(
+          lot =>
+            lot.amount_microdollars -
+              (lot.retired_microdollars ?? 0) -
+              (lot.consumed_microdollars ?? 0) ===
+            0
+        )
+      ).toBe(true);
 
       const creditBlocks = await caller.organizations.getCreditBlocks({
         organizationId: testOrganization.id,
@@ -923,7 +1327,7 @@ describe('organization admin router', () => {
 
     it('does not overcount multi-member orgs when has_multiple_users is off', async () => {
       const searchName = `Admin Count No Member Join ${crypto.randomUUID()}`;
-      const org = await createOrganization(searchName, adminUser.id);
+      const org = await createTestOrganization(searchName, adminUser.id, 0);
       const member = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@count-no-member-join.example.com`,
       });
@@ -952,7 +1356,7 @@ describe('organization admin router', () => {
 
     it('counts only non-bot non-billing-manager users for has_multiple_users totals', async () => {
       const searchName = `Admin Count Excluded Members ${crypto.randomUUID()}`;
-      const org = await createOrganization(searchName, adminUser.id);
+      const org = await createTestOrganization(searchName, adminUser.id, 0);
       const billingManager = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@billing-manager.example.com`,
       });
@@ -1009,13 +1413,26 @@ describe('organization admin router', () => {
   describe('getHierarchy', () => {
     it('returns parent and child organization summaries', async () => {
       const searchPrefix = `Admin Org Hierarchy ${crypto.randomUUID()}`;
-      const grandparentOrganization = await createOrganization(
+      const grandparentOrganization = await createTestOrganization(
         `${searchPrefix} grandparent`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
-      const siblingOrganization = await createOrganization(`${searchPrefix} sibling`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const siblingOrganization = await createTestOrganization(
+        `${searchPrefix} sibling`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1083,7 +1500,11 @@ describe('organization admin router', () => {
   describe('hierarchy management', () => {
     it('creates an empty child organization under a parent organization', async () => {
       const searchPrefix = `Admin Create Child Org ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
       const caller = await createCallerForUser(adminUser.id);
       let childOrganizationId: string | null = null;
 
@@ -1132,8 +1553,16 @@ describe('organization admin router', () => {
 
     it('sets an existing organization as a child organization', async () => {
       const searchPrefix = `Admin Set Child Org ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
 
       try {
         const caller = await createCallerForUser(adminUser.id);
@@ -1174,17 +1603,31 @@ describe('organization admin router', () => {
 
     it('only returns addable organizations from child autocomplete search', async () => {
       const searchPrefix = `Admin Addable Child Search ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const directChildOrganization = await createOrganization(
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const directChildOrganization = await createTestOrganization(
         `${searchPrefix} direct child`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const parentCandidate = await createOrganization(`${searchPrefix} has child`, adminUser.id);
-      const childOfCandidate = await createOrganization(
+      const parentCandidate = await createTestOrganization(
+        `${searchPrefix} has child`,
+        adminUser.id,
+        0
+      );
+      const childOfCandidate = await createTestOrganization(
         `${searchPrefix} child of candidate`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const addableOrganization = await createOrganization(`${searchPrefix} addable`, adminUser.id);
+      const addableOrganization = await createTestOrganization(
+        `${searchPrefix} addable`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1225,11 +1668,20 @@ describe('organization admin router', () => {
 
     it('returns no addable autocomplete results when the target parent is a child', async () => {
       const searchPrefix = `Admin Child Target Search ${crypto.randomUUID()}`;
-      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
-      const candidateOrganization = await createOrganization(
+      const rootOrganization = await createTestOrganization(
+        `${searchPrefix} root`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const candidateOrganization = await createTestOrganization(
         `${searchPrefix} candidate`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1265,8 +1717,16 @@ describe('organization admin router', () => {
 
     it('rejects hierarchy cycles', async () => {
       const searchPrefix = `Admin Hierarchy Cycle ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1296,11 +1756,20 @@ describe('organization admin router', () => {
 
     it('rejects adding child organizations to a child organization', async () => {
       const searchPrefix = `Admin Child Parent ${crypto.randomUUID()}`;
-      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
-      const newChildOrganization = await createOrganization(
+      const rootOrganization = await createTestOrganization(
+        `${searchPrefix} root`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const newChildOrganization = await createTestOrganization(
         `${searchPrefix} new child`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1346,14 +1815,20 @@ describe('organization admin router', () => {
 
     it('rejects adding a parent to an organization with child organizations', async () => {
       const searchPrefix = `Admin Parent Child ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const existingParentOrganization = await createOrganization(
-        `${searchPrefix} existing parent`,
-        adminUser.id
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
       );
-      const existingChildOrganization = await createOrganization(
+      const existingParentOrganization = await createTestOrganization(
+        `${searchPrefix} existing parent`,
+        adminUser.id,
+        0
+      );
+      const existingChildOrganization = await createTestOrganization(
         `${searchPrefix} existing child`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1389,9 +1864,10 @@ describe('organization admin router', () => {
     });
 
     it('rejects self-parenting', async () => {
-      const organization = await createOrganization(
+      const organization = await createTestOrganization(
         `Admin Hierarchy Self Parent ${crypto.randomUUID()}`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1445,9 +1921,13 @@ describe('organization admin router', () => {
         futureIsEffective?: boolean;
       }) {
         const prefix = `Kilo Pass hierarchy ${crypto.randomUUID()}`;
-        const parent = await createOrganization(`${prefix} parent`, adminUser.id);
-        const child = await createOrganization(`${prefix} child`, adminUser.id);
-        const replacementParent = await createOrganization(`${prefix} replacement`, adminUser.id);
+        const parent = await createTestOrganization(`${prefix} parent`, adminUser.id, 0);
+        const child = await createTestOrganization(`${prefix} child`, adminUser.id, 0);
+        const replacementParent = await createTestOrganization(
+          `${prefix} replacement`,
+          adminUser.id,
+          0
+        );
         organizationIds.push(parent.id, child.id, replacementParent.id);
         await db
           .update(organizations)
@@ -1661,12 +2141,21 @@ describe('organization admin router', () => {
   describe('list — trial active filter', () => {
     it('uses effective trial end date and trial_active threshold', async () => {
       const searchPrefix = `Admin Trial Active ${crypto.randomUUID()}`;
-      const fallbackActiveOrg = await createOrganization(`${searchPrefix} fallback`, adminUser.id);
-      const explicitActiveOrg = await createOrganization(
-        `${searchPrefix} explicit active`,
-        adminUser.id
+      const fallbackActiveOrg = await createTestOrganization(
+        `${searchPrefix} fallback`,
+        adminUser.id,
+        0
       );
-      const endingSoonOrg = await createOrganization(`${searchPrefix} ending soon`, adminUser.id);
+      const explicitActiveOrg = await createTestOrganization(
+        `${searchPrefix} explicit active`,
+        adminUser.id,
+        0
+      );
+      const endingSoonOrg = await createTestOrganization(
+        `${searchPrefix} ending soon`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1722,8 +2211,8 @@ describe('organization admin router', () => {
   describe('list — organization Kilo Pass tier sorting', () => {
     it('sorts by the organization-owned agreement tier selected for display', async () => {
       const searchPrefix = `Admin Kilo Pass Sort ${crypto.randomUUID()}`;
-      const tier19Org = await createOrganization(`${searchPrefix} tier 19`, adminUser.id);
-      const tier49Org = await createOrganization(`${searchPrefix} tier 49`, adminUser.id);
+      const tier19Org = await createTestOrganization(`${searchPrefix} tier 19`, adminUser.id, 0);
+      const tier49Org = await createTestOrganization(`${searchPrefix} tier 49`, adminUser.id, 0);
       const termVersionIds: string[] = [];
       const agreementIds: string[] = [];
 
@@ -1815,15 +2304,262 @@ describe('organization admin router', () => {
     });
   });
 
+  describe('serviceFeeExemption', () => {
+    async function createExemptionTestOrganization(name = 'Service fee exemption') {
+      return createTestOrganization(`${name} ${crypto.randomUUID()}`, adminUser.id, 0);
+    }
+
+    async function cleanupExemptionTestOrganization(organizationId: string) {
+      await db
+        .delete(organization_service_fee_exemptions)
+        .where(eq(organization_service_fee_exemptions.organization_id, organizationId));
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+
+    it('grants an exemption with a trimmed reason, actor, and history row', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: '  nonprofit partner  ',
+        });
+
+        expect(result.current).toMatchObject({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'nonprofit partner',
+          changedByKiloUserId: adminUser.id,
+        });
+        expect(result.current.id).toBe(result.history.id);
+        expect(result.history).toMatchObject({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'nonprofit partner',
+          changedByKiloUserId: adminUser.id,
+        });
+        // Timestamps are normalized to UTC ISO at the API boundary.
+        expect(new Date(result.current.createdAt).toISOString()).toBe(result.current.createdAt);
+        expect(new Date(result.history.createdAt).toISOString()).toBe(result.history.createdAt);
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.current?.isExempt).toBe(true);
+        expect(view.current?.reason).toBe('nonprofit partner');
+        expect(view.history).toHaveLength(1);
+        expect(view.history[0].id).toBe(result.history.id);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('revokes an exemption and returns the newest history first', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'initial grant',
+        });
+        const revoked = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: false,
+          reason: 'revoked after contract review',
+        });
+
+        expect(revoked.current.isExempt).toBe(false);
+        expect(revoked.current.reason).toBe('revoked after contract review');
+        expect(revoked.current.id).toBe(revoked.history.id);
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.current?.isExempt).toBe(false);
+        expect(view.history.map(row => row.reason)).toEqual([
+          'revoked after contract review',
+          'initial grant',
+        ]);
+        expect(view.history.map(row => row.isExempt)).toEqual([false, true]);
+        expect(view.history.every(row => row.changedByKiloUserId === adminUser.id)).toBe(true);
+        expect(
+          view.history.every(row => new Date(row.createdAt).toISOString() === row.createdAt)
+        ).toBe(true);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('allows repeating the same state with a new reason and appends another row', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const first = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'initial grant',
+        });
+        const second = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'renewed with updated documentation',
+        });
+
+        expect(second.current.isExempt).toBe(true);
+        expect(second.current.reason).toBe('renewed with updated documentation');
+        expect(second.current.id).toBe(second.history.id);
+        expect(second.current.id).not.toBe(first.current.id);
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.history).toHaveLength(2);
+        expect(view.history.map(row => row.reason)).toEqual([
+          'renewed with updated documentation',
+          'initial grant',
+        ]);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('rejects non-admin users from reading and mutating exemption state', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(nonAdminUser.id);
+
+        await expect(
+          caller.organizations.admin.getServiceFeeExemption({ organizationId: org.id })
+        ).rejects.toThrow('Admin access required');
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'non-admin attempt',
+          })
+        ).rejects.toThrow('Admin access required');
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('rejects blank and undersized reasons', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: '   ',
+          })
+        ).rejects.toThrow();
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'no',
+          })
+        ).rejects.toThrow();
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.current).toBeNull();
+        expect(view.history).toEqual([]);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('rejects oversized reasons', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'x'.repeat(501),
+          })
+        ).rejects.toThrow();
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('maps deleted and missing organizations to NOT_FOUND', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        await markOrganizationAsDeleted(org.id);
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'deleted organization',
+          })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Organization not found' });
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: '550e8400-e29b-41d4-a716-446655440099',
+            isExempt: true,
+            reason: 'missing organization',
+          })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Organization not found' });
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('does not expose exemption fields through customer organization APIs', async () => {
+      const org = await createTestOrganization(
+        `Customer surface ${crypto.randomUUID()}`,
+        nonAdminUser.id,
+        0
+      );
+      try {
+        const adminCaller = await createCallerForUser(adminUser.id);
+        await adminCaller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'granted for customer surface check',
+        });
+
+        const customerCaller = await createCallerForUser(nonAdminUser.id);
+        const customerOrganizations = await customerCaller.organizations.list();
+        const row = customerOrganizations.find(entry => entry.organizationId === org.id);
+
+        expect(row).toBeDefined();
+        expect(Object.keys(row ?? {}).some(key => /exempt/i.test(key))).toBe(false);
+        expect(JSON.stringify(row)).not.toMatch(
+          /service_fee_exemption|serviceFeeExemption|isExempt/
+        );
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+  });
+
   describe('getKiloPassSummary', () => {
     it('returns the parent agreement as read-only information for a child organization', async () => {
-      const parent = await createOrganization(
+      const parent = await createTestOrganization(
         `Admin pass parent ${crypto.randomUUID()}`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const child = await createOrganization(
+      const child = await createTestOrganization(
         `Admin pass child ${crypto.randomUUID()}`,
-        adminUser.id
+        adminUser.id,
+        0
       );
       await db
         .update(organizations)
@@ -1890,6 +2626,139 @@ describe('organization admin router', () => {
           .where(inArray(organization_memberships.organization_id, [parent.id, child.id]));
         await db.delete(organizations).where(inArray(organizations.id, [parent.id, child.id]));
       }
+    });
+  });
+
+  describe('addMember', () => {
+    it('rejects adding someone who is not a parent organization member to a child organization', async () => {
+      const parent = await createTestOrganization(
+        `Add child parent ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Add child org ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const outsider = await insertTestUser();
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.addMember({
+          organizationId: child.id,
+          userId: outsider.id,
+          role: 'member',
+        })
+      ).rejects.toThrow(
+        'Child organizations can only add people who are already members of the parent organization.'
+      );
+    });
+
+    it('adds a parent organization member to a child organization', async () => {
+      const parent = await createTestOrganization(
+        `Add parent member ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Add parent member child ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const parentMember = await insertTestUser();
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.admin.addMember({
+        organizationId: child.id,
+        userId: parentMember.id,
+        role: 'member',
+      });
+
+      const [membership] = await db
+        .select({ role: organization_memberships.role })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, parentMember.id)
+          )
+        );
+      expect(membership?.role).toBe('member');
+    });
+
+    it('rejects adding a parent member after the parent organization is deleted', async () => {
+      const parent = await createTestOrganization(
+        `Deleted parent ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Deleted parent child ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const parentMember = await insertTestUser();
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await markOrganizationAsDeleted(parent.id);
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.addMember({
+          organizationId: child.id,
+          userId: parentMember.id,
+          role: 'member',
+        })
+      ).rejects.toThrow(
+        'Child organizations can only add people who are already members of the parent organization.'
+      );
+    });
+
+    it('searches only live parent members who are not already in the child organization', async () => {
+      const suffix = crypto.randomUUID();
+      const parent = await createTestOrganization(`Search parent ${suffix}`, adminUser.id, 0);
+      const child = await createTestOrganization(`Search child ${suffix}`, adminUser.id, 0);
+      const match = await insertTestUser({
+        google_user_email: `match-${suffix}@example.com`,
+        google_user_name: `Match ${suffix}`,
+      });
+      const alreadyChild = await insertTestUser({
+        google_user_email: `already-${suffix}@example.com`,
+        google_user_name: `Already ${suffix}`,
+      });
+      const outsider = await insertTestUser({
+        google_user_email: `outsider-${suffix}@example.com`,
+        google_user_name: `Outsider ${suffix}`,
+      });
+      await addUserToOrganization(parent.id, match.id, 'member');
+      await addUserToOrganization(parent.id, alreadyChild.id, 'member');
+      await addUserToOrganization(child.id, alreadyChild.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      const result = await caller.organizations.admin.searchParentMembers({
+        organizationId: child.id,
+        search: suffix,
+      });
+
+      expect(result.users.map(user => user.id)).toEqual([match.id]);
+      expect(result.users.map(user => user.id)).not.toContain(outsider.id);
     });
   });
 });

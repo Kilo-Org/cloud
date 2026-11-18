@@ -2,23 +2,29 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
   isValidDayCount,
-  parseDayCount,
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { SettingsScreenSkeleton } from '@/components/security-agent/settings-screen-skeleton';
+import { i18n } from '@/i18n';
+import { formatList, formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -35,33 +41,23 @@ type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeveri
 // apps/web/src/components/security-agent/SecurityConfigSections.tsx — this
 // is a distinct 4-value enum from the auto-analysis/remediation severity
 // (no 'all' tier; 'low' is the catch-all instead).
-const NOTIFICATION_SEVERITY_OPTIONS: { value: NotificationSeverity; label: string }[] = [
-  { value: 'critical', label: 'Critical only' },
-  { value: 'high', label: 'High and above' },
-  { value: 'medium', label: 'Medium and above' },
-  { value: 'low', label: 'Low and above' },
-];
-
-function NotificationSettingsSkeleton() {
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Notifications" />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-      </View>
-    </View>
-  );
-}
+const NOTIFICATION_SEVERITY_OPTIONS = [
+  { value: 'critical', labelKey: 'common.critical' },
+  { value: 'high', labelKey: 'securityAgent.filter.severityHigh' },
+  { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
+  { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
+] as const satisfies readonly { value: NotificationSeverity; labelKey: string }[];
 
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const personal = isPersonalSecurityScope(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [newFindingNotificationsEnabled, setNewFindingNotificationsEnabled] = useState(false);
   const [newFindingNotificationMinSeverity, setNewFindingNotificationMinSeverity] =
@@ -73,31 +69,31 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   // TextInput on iOS (see apps/mobile/AGENTS.md). The ref holds the raw
   // typed text; `slaNotificationWarningDays` holds the parsed number (or
   // NaN while the text isn't a valid 1-365 integer) purely to drive dirty
-  // and validity checks, mirroring the `canSave` derived-state pattern in
-  // kiloclaw/settings-card.tsx.
+  // and validity checks.
   const warningDaysRef = useRef('');
   const [slaNotificationWarningDays, setSlaNotificationWarningDays] = useState(Number.NaN);
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<SecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setNewFindingNotificationsEnabled(config.data.newFindingNotificationsEnabled);
     setNewFindingNotificationMinSeverity(config.data.newFindingNotificationMinSeverity);
     setSlaNotificationsEnabled(config.data.slaNotificationsEnabled);
     setSlaNotificationMinSeverity(config.data.slaNotificationMinSeverity);
-    warningDaysRef.current = String(config.data.slaNotificationWarningDays);
+    warningDaysRef.current = formatNumber(config.data.slaNotificationWarningDays, i18n.language, {
+      useGrouping: false,
+    });
     setSlaNotificationWarningDays(config.data.slaNotificationWarningDays);
-  }, [config.data]);
-
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
+  }, [baseline, config.data]);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -126,40 +122,70 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     slaNotificationMinSeverity,
     slaNotificationWarningDays: warningDaysValid
       ? slaNotificationWarningDays
-      : (initialConfigRef.current.slaNotificationWarningDays ?? slaNotificationWarningDays),
+      : (baseline?.slaNotificationWarningDays ?? slaNotificationWarningDays),
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  // Same split as the SLA screen: the save payload falls back to the saved
+  // lead time, while the back guard reads the draft the user can see so an
+  // invalid-only edit is not silently classified as clean.
+  const draft = slaNotificationsEnabled ? { ...patch, slaNotificationWarningDays } : patch;
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
+  });
+
+  const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
 
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="Notifications"
-        variant="offline"
-        message="Could not load notification settings"
+        title={t('common.notifications')}
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
+        message={t('securityAgent.notifications.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
   }
   if (config.isLoading || !config.data) {
-    return <NotificationSettingsSkeleton />;
+    return <SettingsScreenSkeleton titleKey="common.notifications" />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
+  }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default toggles and then push every control below them down
+  // when their pickers appear.
+  if (baseline === null) {
+    return <SettingsScreenSkeleton titleKey="common.notifications" />;
   }
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Notifications"
+        className="px-6"
+        title={t('common.notifications')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -173,93 +199,144 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           ) : undefined
         }
       />
+      {feedback.node}
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
+        className="flex-1"
+        // The personal scope has no section heading between its two switches, so
+        // the break between the two groups carries their separation: it has to
+        // read as a group break, not as the 10dp step down to the severity label
+        // or the 7dp step inside its options, and not as the void a removed
+        // heading would leave. The organization scope keeps the standard gap,
+        // next to its headings. The permission note above the groups only
+        // renders for a scope that cannot manage, which the personal scope
+        // never is.
+        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-7' : 'gap-6')}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            New-finding notification
-          </Text>
-          <ToggleRow
-            title={personal ? 'Email me about new findings' : 'Email organization owners'}
-            subtitle="Sent whenever a new finding is synced, including on first sync."
-            value={newFindingNotificationsEnabled}
-            disabled={!canManage}
-            onValueChange={setNewFindingNotificationsEnabled}
-          />
-          {newFindingNotificationsEnabled && (
-            <PillGroup
-              label="New-finding minimum severity"
-              options={NOTIFICATION_SEVERITY_OPTIONS}
-              value={newFindingNotificationMinSeverity}
-              disabled={!canManage}
-              onChange={setNewFindingNotificationMinSeverity}
-            />
+          {!personal && (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.newFindingSection')}
+            </Text>
           )}
+          <View className="gap-3">
+            <ToggleRow
+              title={
+                personal
+                  ? t('securityAgent.notifications.newFindingPersonalTitle')
+                  : t('securityAgent.notifications.emailOwners')
+              }
+              accessibilityLabel={
+                personal
+                  ? undefined
+                  : formatList(
+                      [
+                        t('securityAgent.notifications.newFindingSection'),
+                        t('securityAgent.notifications.emailOwners'),
+                      ],
+                      i18n.language
+                    )
+              }
+              subtitle={t('securityAgent.notifications.newFindingSubtitle')}
+              value={newFindingNotificationsEnabled}
+              disabled={!canManage}
+              onValueChange={setNewFindingNotificationsEnabled}
+            />
+            {newFindingNotificationsEnabled && (
+              <PillGroup
+                label={t('securityAgent.notifications.newFindingSeverityLabel')}
+                options={severityOptions}
+                value={newFindingNotificationMinSeverity}
+                disabled={!canManage}
+                onChange={setNewFindingNotificationMinSeverity}
+              />
+            )}
+          </View>
         </View>
 
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            SLA warning notification
-          </Text>
-          <ToggleRow
-            title={personal ? 'Email me about SLA warnings' : 'Email organization owners'}
-            subtitle="Sent before and when findings approach or breach their SLA deadline."
-            value={slaNotificationsEnabled}
-            disabled={!canManage}
-            onValueChange={setSlaNotificationsEnabled}
-          />
-          {slaNotificationsEnabled && (
-            <>
-              <PillGroup
-                label="SLA notification minimum severity"
-                options={NOTIFICATION_SEVERITY_OPTIONS}
-                value={slaNotificationMinSeverity}
-                disabled={!canManage}
-                onChange={setSlaNotificationMinSeverity}
-              />
-              <View className="gap-2">
-                <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                  SLA warning lead time (days)
-                </Text>
-                <TextInput
-                  accessibilityLabel="SLA warning lead time in days"
-                  accessibilityHint={
-                    isValidDayCount(slaNotificationWarningDays)
-                      ? undefined
-                      : 'Enter a whole number between 1 and 365'
-                  }
-                  className={cn(
-                    'h-11 rounded-lg bg-secondary px-3 text-sm leading-[normal] text-foreground',
-                    !canManage && 'opacity-50'
-                  )}
-                  editable={canManage}
-                  keyboardType="number-pad"
-                  defaultValue={warningDaysRef.current}
-                  placeholder="1-365"
-                  placeholderTextColor={colors.mutedForeground}
-                  onChangeText={text => {
-                    warningDaysRef.current = text;
-                    setSlaNotificationWarningDays(parseDayCount(text));
-                  }}
-                />
-                {!isValidDayCount(slaNotificationWarningDays) && (
-                  <Text className="text-xs text-destructive">
-                    Enter a whole number of days between 1 and 365.
-                  </Text>
-                )}
-              </View>
-            </>
+          {!personal && (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.slaSection')}
+            </Text>
           )}
+          <View className="gap-3">
+            <ToggleRow
+              title={
+                personal
+                  ? t('securityAgent.notifications.slaPersonalTitle')
+                  : t('securityAgent.notifications.emailOwners')
+              }
+              accessibilityLabel={
+                personal
+                  ? undefined
+                  : formatList(
+                      [
+                        t('securityAgent.notifications.slaSection'),
+                        t('securityAgent.notifications.emailOwners'),
+                      ],
+                      i18n.language
+                    )
+              }
+              subtitle={t('securityAgent.notifications.slaSubtitle')}
+              value={slaNotificationsEnabled}
+              disabled={!canManage}
+              onValueChange={setSlaNotificationsEnabled}
+            />
+            {slaNotificationsEnabled && (
+              <>
+                <PillGroup
+                  label={t('securityAgent.notifications.slaSeverityLabel')}
+                  options={severityOptions}
+                  value={slaNotificationMinSeverity}
+                  disabled={!canManage}
+                  onChange={setSlaNotificationMinSeverity}
+                />
+                <View className="gap-1.5">
+                  <Text className="text-sm font-medium text-muted-foreground">
+                    {t('securityAgent.notifications.slaLeadTimeLabel')}
+                  </Text>
+                  <Input
+                    accessibilityLabel={t('securityAgent.notifications.slaLeadTimeLabel')}
+                    accessibilityHint={
+                      isValidDayCount(slaNotificationWarningDays)
+                        ? undefined
+                        : t('securityAgent.sla.enterWholeNumber')
+                    }
+                    className={cn(
+                      'rounded-lg bg-secondary pl-3 pr-3 text-sm text-foreground',
+                      !canManage && 'opacity-50'
+                    )}
+                    editable={canManage}
+                    keyboardType="number-pad"
+                    defaultValue={warningDaysRef.current}
+                    placeholderTextColor={colors.mutedForeground}
+                    onChangeText={text => {
+                      warningDaysRef.current = text;
+                      const value = parseLocalizedNumber(text, i18n.language);
+                      setSlaNotificationWarningDays(
+                        value !== null && Number.isInteger(value) ? value : Number.NaN
+                      );
+                    }}
+                  />
+                  {!isValidDayCount(slaNotificationWarningDays) && (
+                    <Text className="text-xs text-destructive">
+                      {t('securityAgent.notifications.slaLeadTimeError')}
+                    </Text>
+                  )}
+                </View>
+              </>
+            )}
+          </View>
         </View>
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

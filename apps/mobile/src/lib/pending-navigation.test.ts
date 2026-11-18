@@ -11,6 +11,15 @@ describe('pending navigation', () => {
     expect(resolvePendingNavigation('/chat/sandbox/conversation')).toEqual({
       href: '/chat/sandbox/conversation',
       method: 'navigate',
+      withAnchor: true,
+    });
+  });
+
+  it('anchors a review deep link to its initial profile screen', () => {
+    expect(resolvePendingNavigation('/(app)/code-reviewer/personal/reviews/rev_9')).toEqual({
+      href: '/(app)/code-reviewer/personal/reviews/rev_9',
+      method: 'navigate',
+      withAnchor: true,
     });
   });
 });

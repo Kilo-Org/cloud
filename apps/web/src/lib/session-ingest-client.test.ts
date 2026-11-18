@@ -1,5 +1,12 @@
 import { captureException } from '@sentry/nextjs';
-import { generateInternalServiceToken } from '@/lib/tokens';
+// The client deadline the upstream budget must stay under. Imported from source
+// rather than restated so the two constants can never drift apart.
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import {
+  CONTROL_PLANE_UPSTREAM_BUDGET_MS,
+  ServiceFetchTimeoutError,
+} from './bounded-service-fetch';
 import type { SessionSnapshot } from './session-ingest-client';
 import {
   fetchSessionSnapshot,
@@ -7,37 +14,32 @@ import {
   fetchSessionMessagesPage,
   deleteSession,
   shareSession,
+  SessionShareTooLargeError,
   unshareSession,
+  fetchSharedSession,
   fetchSharedSessionMetadata,
+  fetchSharedSessionSnapshot,
   invalidateOrganizationSessionAccess,
 } from './session-ingest-client';
-
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
   INTERNAL_API_SECRET: 'internal-secret',
 }));
 
-jest.mock('@/lib/tokens', () => ({
-  generateInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+  generateBoundedInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
 }));
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const mockCaptureException = jest.mocked(captureException);
-const mockGenerateInternalServiceToken = jest.mocked(generateInternalServiceToken);
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const mockGenerateBoundedInternalServiceToken = jest.mocked(generateBoundedInternalServiceToken);
 
 function makeSnapshot(
   messages: Array<{
@@ -59,15 +61,11 @@ function makeSnapshot(
   };
 }
 
-// ---------------------------------------------------------------------------
-// fetchSessionSnapshot
-// ---------------------------------------------------------------------------
-
 describe('fetchSessionSnapshot', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('returns parsed snapshot with session model metadata on 200 response', async () => {
@@ -183,11 +181,14 @@ describe('fetchSessionSnapshot', () => {
 
     await fetchSessionSnapshot('ses_abc123', 'user_test_456');
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user_test_456', {
+      audience: 'session-ingest',
+      expiresIn: 60 * 60,
+    });
   });
 
   it('uses the generated token in the Authorization header', async () => {
-    mockGenerateInternalServiceToken.mockReturnValue('custom-test-token');
+    mockGenerateBoundedInternalServiceToken.mockReturnValue('custom-test-token');
 
     mockFetch.mockResolvedValue({
       ok: true,
@@ -206,15 +207,11 @@ describe('fetchSessionSnapshot', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// deleteSession
-// ---------------------------------------------------------------------------
-
 describe('deleteSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('resolves successfully on 200', async () => {
@@ -250,7 +247,10 @@ describe('deleteSession', () => {
 
     await deleteSession('ses_abc123', 'user_test_456');
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user_test_456', {
+      audience: 'session-ingest',
+      expiresIn: 60 * 60,
+    });
   });
 
   it('throws and calls captureException on 500', async () => {
@@ -286,6 +286,40 @@ describe('deleteSession', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'workspace_requires_root_session',
+    'workspace_deleting',
+    'workspace_identity_conflict',
+    'worktree_deleting',
+  ])('maps an ingest 409 %s response to TRPC CONFLICT', async reason => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: reason }), {
+        status: 409,
+        statusText: 'Conflict',
+      })
+    );
+
+    await expect(deleteSession('ses_abc123', 'user_123')).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: reason,
+    });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('does not map an unknown ingest 409 reason to TRPC CONFLICT', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: 'session_deleted' }), {
+        status: 409,
+        statusText: 'Conflict',
+      })
+    );
+
+    await expect(deleteSession('ses_abc123', 'user_123')).rejects.toThrow(
+      'Session ingest delete failed: 409 Conflict - {"success":false,"error":"session_deleted"}'
+    );
+    expect(mockCaptureException).toHaveBeenCalled();
+  });
+
   it('encodes session ID in URL', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
@@ -298,18 +332,37 @@ describe('deleteSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// shareSession
-// ---------------------------------------------------------------------------
-
 describe('shareSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
-  it('returns share_token on success', async () => {
+  it.each([
+    [{}, { duration: '7d', include_new_messages: false }],
+    [
+      { duration: 'forever', include_new_messages: true },
+      { duration: 'forever', include_new_messages: true },
+    ],
+  ] as const)('sends validated share options %s', async (options, expected) => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, share_token: 'test-link' }))
+    );
+    await shareSession('ses_abc123', 'user_123', options);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify(expected),
+        headers: {
+          Authorization: 'Bearer mock-jwt-token',
+          'Content-Type': 'application/json',
+        },
+      })
+    );
+  });
+
+  it('returns share_token on success, with a null public_id for an older worker', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -318,7 +371,27 @@ describe('shareSession', () => {
 
     const result = await shareSession('ses_abc123', 'user_123');
 
-    expect(result).toEqual({ share_token: 'share.jwt.token' });
+    expect(result).toEqual({ share_token: 'share.jwt.token', public_id: null });
+  });
+
+  it('returns the public_id the worker created', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          share_token: 'share.jwt.token',
+          public_id: '33333333-3333-4333-8333-333333333333',
+        }),
+    });
+
+    const result = await shareSession('ses_abc123', 'user_123');
+
+    expect(result).toEqual({
+      share_token: 'share.jwt.token',
+      public_id: '33333333-3333-4333-8333-333333333333',
+    });
   });
 
   it('calls POST on the correct URL', async () => {
@@ -347,7 +420,9 @@ describe('shareSession', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ headers: { Authorization: 'Bearer mock-jwt-token' } })
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer mock-jwt-token', 'Content-Type': 'application/json' },
+      })
     );
   });
 
@@ -360,7 +435,18 @@ describe('shareSession', () => {
 
     await shareSession('ses_abc123', 'user_test_456');
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user_test_456', {
+      audience: 'session-ingest',
+      expiresIn: 60 * 60,
+    });
+  });
+
+  it('preserves a specific oversized-share error from the worker', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 413 }));
+    await expect(shareSession('ses_abc123', 'user_123')).rejects.toBeInstanceOf(
+      SessionShareTooLargeError
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('throws on 404', async () => {
@@ -411,15 +497,11 @@ describe('shareSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// unshareSession
-// ---------------------------------------------------------------------------
-
 describe('unshareSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('resolves on success', async () => {
@@ -482,10 +564,6 @@ describe('unshareSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// fetchSharedSessionMetadata
-// ---------------------------------------------------------------------------
-
 describe('fetchSharedSessionMetadata', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -507,10 +585,13 @@ describe('fetchSharedSessionMetadata', () => {
     await expect(fetchSharedSessionMetadata('share.jwt.token')).resolves.toEqual({
       title: 'Shared session',
       ownerName: 'Session owner',
+      gitUrl: null,
+      gitBranch: null,
+      createdAt: null,
     });
     expect(mockFetch).toHaveBeenCalledWith(
       'https://ingest.test.example.com/session/share.jwt.token/metadata',
-      { cache: 'no-store' }
+      expect.objectContaining({ cache: 'no-store' })
     );
   });
 
@@ -565,9 +646,190 @@ describe('fetchSharedSessionMetadata', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// fetchSessionMessages (thin wrapper)
-// ---------------------------------------------------------------------------
+describe('fetchSharedSessionSnapshot', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  it('returns the parsed snapshot and avoids caching', async () => {
+    const snapshot = makeSnapshot([
+      { role: 'assistant', parts: [{ type: 'text', text: 'hello' }] },
+    ]);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(snapshot),
+    });
+
+    await expect(fetchSharedSessionSnapshot('share.jwt.token')).resolves.toEqual(snapshot);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/session/share.jwt.token',
+      expect.objectContaining({ cache: 'no-store' })
+    );
+  });
+
+  it('returns null on 404', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' });
+
+    await expect(fetchSharedSessionSnapshot('share.jwt.token')).resolves.toBeNull();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('throws on an operational response without capturing the token', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+
+    await expect(fetchSharedSessionSnapshot('secret.share.jwt.token')).rejects.toThrow(
+      'Session ingest snapshot failed: 503 Service Unavailable'
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+        extra: { status: 503 },
+      })
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
+  });
+
+  it('throws on a malformed successful response without capturing the token', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ messages: 'nope' }),
+    });
+
+    await expect(fetchSharedSessionSnapshot('secret.share.jwt.token')).rejects.toThrow(
+      'Session ingest snapshot response was malformed'
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
+  });
+});
+
+describe('fetchSharedSession', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  const metadata = {
+    success: true,
+    title: 'Fix the redirect',
+    owner_name: 'Sam',
+    git_url: 'https://github.com/kilo/cloud.git',
+    git_branch: 'main',
+    created_at: '2026-11-01T10:00:00.000Z',
+  };
+
+  const transcriptMessage = {
+    info: {
+      id: 'msg_1',
+      sessionID: 'ses_test',
+      role: 'user',
+      time: { created: 1_700_000_000_000 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    },
+    parts: [
+      {
+        id: 'prt_1',
+        sessionID: 'ses_test',
+        messageID: 'msg_1',
+        type: 'text',
+        text: 'hello',
+      },
+    ],
+  };
+
+  function respondPerRoute(snapshotResponse: unknown) {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.endsWith('/metadata')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(metadata) });
+      }
+      return Promise.resolve(snapshotResponse);
+    });
+  }
+
+  it('returns the metadata and the renderable transcript', async () => {
+    respondPerRoute({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          info: {},
+          messages: [transcriptMessage, { info: { id: 'msg_2' }, parts: [] }],
+        }),
+    });
+
+    const shared = await fetchSharedSession('share.jwt.token');
+
+    expect(shared?.metadata).toEqual({
+      title: 'Fix the redirect',
+      ownerName: 'Sam',
+      gitUrl: 'https://github.com/kilo/cloud.git',
+      gitBranch: 'main',
+      createdAt: '2026-11-01T10:00:00.000Z',
+    });
+    expect(shared?.transcriptUnavailable).toBe(false);
+    expect(shared?.messages.map(message => message.info.id)).toEqual(['msg_1']);
+  });
+
+  it('returns null when the token names no live share', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' });
+
+    await expect(fetchSharedSession('expired.jwt.token')).resolves.toBeNull();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('reads the metadata and the snapshot together, not one after the other', async () => {
+    const metadataGate = Promise.withResolvers<unknown>();
+    const snapshotGate = Promise.withResolvers<unknown>();
+    mockFetch.mockImplementation((url: string) =>
+      url.endsWith('/metadata') ? metadataGate.promise : snapshotGate.promise
+    );
+
+    const outcome = fetchSharedSession('share.jwt.token');
+    await Promise.resolve();
+
+    // Both requests are in flight before either answer exists. A sequential
+    // read would not have issued the snapshot request yet.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    snapshotGate.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ info: {}, messages: [transcriptMessage] }),
+    });
+    metadataGate.resolve({ ok: true, status: 200, json: () => Promise.resolve(metadata) });
+
+    const shared = await outcome;
+    expect(shared?.messages.map(message => message.info.id)).toEqual(['msg_1']);
+  });
+
+  it('answers null for a dead link even when the snapshot read failed', async () => {
+    mockFetch.mockImplementation((url: string) =>
+      url.endsWith('/metadata')
+        ? Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
+        : Promise.resolve({ ok: false, status: 500, statusText: 'Internal Server Error' })
+    );
+
+    await expect(fetchSharedSession('expired.jwt.token')).resolves.toBeNull();
+  });
+
+  it('keeps the session and flags the transcript when the snapshot read fails', async () => {
+    respondPerRoute({ ok: false, status: 503, statusText: 'Service Unavailable' });
+
+    const shared = await fetchSharedSession('share.jwt.token');
+
+    expect(shared?.metadata.ownerName).toBe('Sam');
+    expect(shared?.messages).toEqual([]);
+    expect(shared?.transcriptUnavailable).toBe(true);
+  });
+});
 
 describe('invalidateOrganizationSessionAccess', () => {
   beforeEach(() => {
@@ -626,7 +888,7 @@ describe('invalidateOrganizationSessionAccess', () => {
     );
   });
 
-  it('sets a 30-second invalidation deadline', async () => {
+  it('keeps the 30-second caller deadline and composes it with the budget', async () => {
     const signal = new AbortController().signal;
     const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
     mockFetch.mockResolvedValue({ ok: true, status: 204 });
@@ -639,8 +901,12 @@ describe('invalidateOrganizationSessionAccess', () => {
     expect(timeout).toHaveBeenCalledWith(30_000);
     expect(mockFetch).toHaveBeenCalledWith(
       'https://ingest.test.example.com/internal/session-access/invalidate',
-      expect.objectContaining({ signal })
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
+    // The caller signal is composed into the budget controller rather than
+    // forwarded raw, so the shorter upstream budget still wins.
+    const [, init] = mockFetch.mock.calls[0];
+    expect(init.signal).not.toBe(signal);
     timeout.mockRestore();
   });
 });
@@ -648,7 +914,7 @@ describe('invalidateOrganizationSessionAccess', () => {
 describe('fetchSessionMessages', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   const fakeUser = { id: 'user_123' } as Parameters<typeof fetchSessionMessages>[1];
@@ -676,14 +942,10 @@ describe('fetchSessionMessages', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// fetchSessionMessagesPage (paginated authorized history)
-// ---------------------------------------------------------------------------
-
 describe('fetchSessionMessagesPage', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   const validSessionId = 'ses_12345678901234567890123456';
@@ -848,5 +1110,184 @@ describe('fetchSessionMessagesPage', () => {
     expect(url).toBe(
       'https://ingest.test.example.com/api/session/ses_with%20spaces/messages?limit=50'
     );
+  });
+});
+
+describe('bounded upstream budget', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('rejects a never-answering upstream inside the budget, before the client deadline', async () => {
+    // The same mock-fetch idiom as bounded-service-fetch.test.ts: a fetch
+    // stand-in that never settles.
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = fetchSessionSnapshot('ses_abc123', 'user_123').then(
+      () => null,
+      (error: unknown) => error
+    );
+
+    let settled = false;
+    void outcome.then(() => {
+      settled = true;
+    });
+
+    await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS - 1);
+    expect(settled).toBe(false);
+
+    await jest.advanceTimersByTimeAsync(1);
+
+    const error = await outcome;
+    // The module's existing failure shape: a thrown upstream error that its
+    // router maps to the existing retryable INTERNAL_SERVER_ERROR, never a new
+    // non-retryable outcome.
+    expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect(error).toBeInstanceOf(Error);
+    // The budget is strictly under the app's deadline, so the call settles as a
+    // retryable upstream failure instead of a client-side deadline.
+    expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('leaves a settling upstream unaffected', async () => {
+    const snapshot = makeSnapshot([{ role: 'assistant', parts: [{ type: 'text', text: 'hi' }] }]);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(snapshot),
+    });
+
+    await expect(fetchSessionSnapshot('ses_abc123', 'user_123')).resolves.toEqual(snapshot);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // The budget timer is disarmed once the call has settled.
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('emits one allow-listed timeout line with no session id, token or query string', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = fetchSessionMessagesPage('ses_secret_id', 'user_123', {
+      limit: 50,
+      before: 'cursor-secret',
+    }).catch((error: unknown) => error);
+
+    await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+    await outcome;
+
+    expect(log).toHaveBeenCalledTimes(1);
+    const line = String(log.mock.calls[0]?.[0]);
+    expect(JSON.parse(line)).toEqual({
+      type: 'session_ingest_timeout',
+      route: '/api/session/:sessionId/messages',
+      durationMs: expect.any(Number),
+      outcome: 'timeout',
+    });
+    expect(line).not.toContain('ses_secret_id');
+    expect(line).not.toContain('cursor-secret');
+    expect(line).not.toContain('mock-jwt-token');
+    expect(line).not.toContain('?');
+  });
+});
+
+// `SESSION_INGEST_WORKER_URL` is concatenated as-is at every call site
+// (`config.server.ts:479` returns the env value unchanged), so a configured
+// trailing slash or path prefix shifts the route marker. The redaction must not
+// fail open and emit the raw dynamic segment in those shapes.
+describe('redacted route label', () => {
+  const configServer = jest.requireMock('@kilocode/web-shared/lib/config.server') as {
+    SESSION_INGEST_WORKER_URL: string;
+  };
+  const defaultWorkerUrl = 'https://ingest.test.example.com';
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    configServer.SESSION_INGEST_WORKER_URL = defaultWorkerUrl;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+    configServer.SESSION_INGEST_WORKER_URL = defaultWorkerUrl;
+  });
+
+  function logLineForTimedOutRequest(): Promise<string> {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = fetchSessionMessagesPage('ses_secret_id', 'user_123', {
+      limit: 50,
+    }).catch((error: unknown) => error);
+
+    return jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS).then(async () => {
+      await outcome;
+      expect(log).toHaveBeenCalledTimes(1);
+      return String(log.mock.calls[0]?.[0]);
+    });
+  }
+
+  it('redacts the session id when the worker URL has a trailing slash', async () => {
+    configServer.SESSION_INGEST_WORKER_URL = `${defaultWorkerUrl}/`;
+
+    const line = await logLineForTimedOutRequest();
+
+    expect(JSON.parse(line).route).toBe('/api/session/:sessionId/messages');
+    expect(line).not.toContain('ses_secret_id');
+  });
+
+  it('redacts the session id when the worker URL has a path prefix', async () => {
+    configServer.SESSION_INGEST_WORKER_URL = `${defaultWorkerUrl}/prefix`;
+
+    const line = await logLineForTimedOutRequest();
+
+    // The label is the allow-listed route, never the configured base path.
+    expect(JSON.parse(line).route).toBe('/api/session/:sessionId/messages');
+    expect(line).not.toContain('ses_secret_id');
+    expect(line).not.toContain('/prefix');
+  });
+
+  it('redacts the share token when the worker URL has a path prefix', async () => {
+    configServer.SESSION_INGEST_WORKER_URL = `${defaultWorkerUrl}/prefix`;
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = fetchSharedSessionSnapshot('secret.share.jwt.token').catch(
+      (error: unknown) => error
+    );
+    await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+    await outcome;
+
+    const line = String(log.mock.calls[0]?.[0]);
+    expect(JSON.parse(line).route).toBe('/session/:shareToken');
+    expect(line).not.toContain('secret.share.jwt.token');
+    expect(line).not.toContain('/prefix');
+  });
+
+  it('falls back to a constant for an unmatched route instead of the raw path', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = invalidateOrganizationSessionAccess(
+      'usr_removed',
+      '11111111-1111-4111-8111-111111111111'
+    ).catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+    await outcome;
+
+    const line = String(log.mock.calls[0]?.[0]);
+    expect(JSON.parse(line).route).toBe('unknown');
+    expect(line).not.toContain('session-access');
   });
 });

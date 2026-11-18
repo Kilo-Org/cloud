@@ -61,6 +61,16 @@ describe('parseComposerParams', () => {
     expect(parseComposerParams(valid({ line: 'abc' }))).toBeNull();
   });
 
+  it('rejects a partially numeric line or startLine instead of truncating it', () => {
+    // `Number.parseInt` stops at the first non-digit, so these used to resolve
+    // to lines 1, 12 and 9 and post an inline comment to a line the deep link
+    // never named.
+    expect(parseComposerParams(valid({ line: '1.5' }))).toBeNull();
+    expect(parseComposerParams(valid({ line: '12abc' }))).toBeNull();
+    expect(parseComposerParams(valid({ line: '9x', startLine: '2' }))).toBeNull();
+    expect(parseComposerParams(valid({ line: '9', startLine: '9x' }))).toBeNull();
+  });
+
   it('rejects startLine greater than line', () => {
     expect(parseComposerParams(valid({ line: '5', startLine: '6' }))).toBeNull();
   });

@@ -1,4 +1,6 @@
 import type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+import { z } from 'zod';
+import type { RuntimeSkillInput } from './runtime-profile.js';
 
 export type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 
@@ -35,13 +37,14 @@ export type WrapperBootstrapWorkspace = {
   upstreamBranch?: string;
   strictBranch?: boolean;
   preferSnapshot?: boolean;
-  restoredFromBackup?: boolean;
+  requireSnapshot?: boolean;
 };
 
-export type WrapperBootstrapRuntimeSkill = {
+export type WrapperBootstrapRuntimeSkill = RuntimeSkillInput;
+
+export type WrapperBootstrapRuntimeInstruction = {
   name: string;
-  rawMarkdown: string;
-  files?: Record<string, string>;
+  content: string;
 };
 
 export type WrapperBootstrapAttachment = {
@@ -55,18 +58,19 @@ export type WrapperBootstrapMaterializedConfig = {
   env: Record<string, string>;
   setupCommands?: string[];
   runtimeSkills?: WrapperBootstrapRuntimeSkill[];
+  /** Env key names whose values the wrapper redacts in setup output and diagnostics. */
+  secretEnvKeys?: string[];
+  runtimeInstructions?: WrapperBootstrapRuntimeInstruction[];
 };
 
-export type WrapperDevContainerMetadata = {
-  workspacePath: string;
-  innerWorkspaceFolder: string;
-  wrapperPort: number;
-  configPath: string;
-};
-
-export type WrapperBootstrapDevContainer = {
-  requested: true;
-  resolved?: WrapperDevContainerMetadata;
+export type WrapperRuntimeCredentialProxyConfig = {
+  /** Opaque Worker-issued handle; never the renewable backing credential. */
+  handle: string;
+  targets: {
+    backendBaseUrl: string;
+    providerBaseUrl: string;
+    sessionIngestBaseUrl: string;
+  };
 };
 
 export type WrapperSessionBinding = {
@@ -126,8 +130,8 @@ export type WrapperSessionReadyRequest = {
   kiloSessionId: string;
   workspace: WrapperBootstrapWorkspace;
   repo?: WrapperBootstrapRepoSource;
-  devcontainer?: WrapperBootstrapDevContainer;
   materialized: WrapperBootstrapMaterializedConfig;
+  runtimeCredentialProxy?: WrapperRuntimeCredentialProxyConfig;
   session: WrapperSessionBinding;
   preparation?: {
     attemptId: string;
@@ -146,7 +150,6 @@ export type WrapperWorkspaceReady = {
   gitToken?: string;
   gitlabTokenManaged?: boolean;
   bitbucketTokenManaged?: boolean;
-  devcontainer?: WrapperDevContainerMetadata;
 };
 
 /**
@@ -181,10 +184,56 @@ export type WrapperCloneTelemetry = {
   receivedBytes?: number;
 };
 
-export type WrapperRestoreTelemetry = {
-  path: 'warm' | 'cold' | 'backup';
-  diffs?: { applied: number; skipped: number; total: number };
+export const wrapperRestoreTelemetrySchema = z
+  .object({
+    path: z.enum(['warm', 'cold', 'backup']),
+    diffs: z
+      .object({
+        applied: z.number().int().nonnegative(),
+        skipped: z.number().int().nonnegative(),
+        total: z.number().int().nonnegative(),
+        /** Named skip reasons, first-seen order, capped by the wrapper. Optional for older wrappers. */
+        skippedDiffs: z.array(z.object({ file: z.string(), reason: z.string() })).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export type WrapperRestoreTelemetry = z.infer<typeof wrapperRestoreTelemetrySchema>;
+
+/** Paths and reasons logged for one restore before the remainder is dropped. */
+export const MAX_LOGGED_SKIPPED_DIFFS = 50;
+
+export type RestoreIncompleteLogFields = {
+  restorePath: WrapperRestoreTelemetry['path'];
+  diffsApplied: number;
+  diffsSkipped: number;
+  diffsTotal: number;
+  skippedPaths: string[];
+  skippedReasons: string[];
 };
+
+/**
+ * Named fields for the `cloud_agent_restore_incomplete` event, or `undefined`
+ * when the restore applied every diff. Shared by the `/session/ready` telemetry
+ * path and the runtime-replacement attach result so both emit the same shape.
+ */
+export function restoreIncompleteLogFields(
+  restore: WrapperRestoreTelemetry | undefined
+): RestoreIncompleteLogFields | undefined {
+  const diffs = restore?.diffs;
+  if (!restore || !diffs || diffs.skipped <= 0) return undefined;
+  const skippedDiffs = diffs.skippedDiffs ?? [];
+  return {
+    restorePath: restore.path,
+    diffsApplied: diffs.applied,
+    diffsSkipped: diffs.skipped,
+    diffsTotal: diffs.total,
+    skippedPaths: skippedDiffs.slice(0, MAX_LOGGED_SKIPPED_DIFFS).map(diff => diff.file),
+    skippedReasons: [...new Set(skippedDiffs.map(diff => diff.reason))],
+  };
+}
 
 /**
  * Non-sensitive bootstrap diagnostics, kept as a sibling of `workspaceReady` rather
@@ -193,15 +242,6 @@ export type WrapperRestoreTelemetry = {
  */
 export type WrapperBootstrapTelemetry = {
   workspaceWasWarm: boolean;
-  /**
-   * True when the workspace was populated from an R2 backup rather than
-   * genuinely reused from a prior bootstrap. A restored workspace still
-   * reports `workspaceWasWarm: true` (the bootstrap marker is included in
-   * the backup archive), so this disambiguates "reused as-is" from
-   * "restored over the network," which otherwise inflates apparent
-   * sandbox-reuse rates.
-   */
-  restoredFromBackup: boolean;
   clone?: WrapperCloneTelemetry;
   restore?: WrapperRestoreTelemetry;
 };
@@ -246,18 +286,41 @@ function hasString(value: Record<string, unknown>, key: string): boolean {
   return typeof value[key] === 'string' && value[key].length > 0;
 }
 
-function isWrapperDevContainerMetadata(value: unknown): value is WrapperDevContainerMetadata {
-  if (!isRecord(value)) return false;
-  if (!hasString(value, 'workspacePath')) return false;
-  if (!hasString(value, 'innerWorkspaceFolder')) return false;
-  if (!hasString(value, 'configPath')) return false;
-  const wrapperPort = value.wrapperPort;
-  return (
-    typeof wrapperPort === 'number' &&
-    Number.isInteger(wrapperPort) &&
-    wrapperPort >= 1 &&
-    wrapperPort <= 65535
-  );
+function isRuntimeCredentialProxyConfig(
+  value: unknown
+): value is WrapperRuntimeCredentialProxyConfig {
+  if (!isRecord(value) || !hasString(value, 'handle') || !isRecord(value.targets)) return false;
+  const targets = value.targets;
+  if (
+    Object.keys(value).length !== 2 ||
+    !Object.hasOwn(value, 'handle') ||
+    !Object.hasOwn(value, 'targets') ||
+    Object.keys(targets).length !== 3
+  ) {
+    return false;
+  }
+  const targetKeys = ['backendBaseUrl', 'providerBaseUrl', 'sessionIngestBaseUrl'] as const;
+  if (!targetKeys.every(key => Object.hasOwn(targets, key) && hasString(targets, key))) {
+    return false;
+  }
+  const values = Object.values(targets);
+  if (new Set(values).size !== 1) return false;
+  return targetKeys.every(key => {
+    try {
+      const target = new URL(targets[key] as string);
+      return (
+        target.protocol === 'https:' &&
+        !target.username &&
+        !target.password &&
+        !target.search &&
+        !target.hash &&
+        !target.port &&
+        !target.pathname.split('/').filter(Boolean).includes('api')
+      );
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSessionReadyRequest {
@@ -272,26 +335,26 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
   if (!hasString(workspace, 'workspacePath')) return false;
   if (!hasString(workspace, 'sessionHome')) return false;
   if (!hasString(workspace, 'branchName')) return false;
-  if (
-    workspace.restoredFromBackup !== undefined &&
-    typeof workspace.restoredFromBackup !== 'boolean'
-  ) {
+  if (workspace.requireSnapshot !== undefined && typeof workspace.requireSnapshot !== 'boolean') {
     return false;
   }
 
-  const devcontainer = value.devcontainer;
-  if (devcontainer !== undefined) {
-    if (!isRecord(devcontainer) || devcontainer.requested !== true) return false;
-    if (
-      devcontainer.resolved !== undefined &&
-      !isWrapperDevContainerMetadata(devcontainer.resolved)
-    ) {
-      return false;
-    }
-  }
+  if (
+    value.devcontainer !== undefined ||
+    typeof value.sandboxId !== 'string' ||
+    value.sandboxId.startsWith('dind-')
+  )
+    return false;
 
   const materialized = value.materialized;
   if (!isRecord(materialized) || !isRecord(materialized.env)) return false;
+
+  if (
+    value.runtimeCredentialProxy !== undefined &&
+    !isRuntimeCredentialProxyConfig(value.runtimeCredentialProxy)
+  ) {
+    return false;
+  }
 
   const session = value.session;
   if (!isRecord(session)) return false;

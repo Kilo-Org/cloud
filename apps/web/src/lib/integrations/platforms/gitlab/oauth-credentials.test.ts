@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { OAUTH_STATE_TTL_SECONDS } from '@/lib/integrations/oauth-state';
-import { redisClient } from '@/lib/redis';
-import { gitLabOAuthCredentialsRedisKey } from '@/lib/redis-keys';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { gitLabOAuthCredentialsRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { getGitLabOAuthCredentials, storeGitLabOAuthCredentials } from './oauth-credentials';
 
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(), set: jest.fn() },
 }));
 

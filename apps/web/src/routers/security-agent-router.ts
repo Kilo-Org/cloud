@@ -1,4 +1,4 @@
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { createSecurityAgentHandlers } from '@/lib/security-agent/router/shared-handlers';
 
@@ -70,6 +70,9 @@ export const securityAgentRouter = createTRPCRouter({
   getCommandStatus: baseProcedure
     .input(handlers.getCommandStatus.inputSchema)
     .query(handlers.getCommandStatus.handler),
+  getCommandStatuses: baseProcedure
+    .input(handlers.getCommandStatuses.inputSchema)
+    .query(handlers.getCommandStatuses.handler),
   listActiveCommands: baseProcedure.query(handlers.listActiveCommands),
   getOrphanedRepositories: baseProcedure.query(handlers.getOrphanedRepositories),
   deleteFindingsByRepository: baseProcedure

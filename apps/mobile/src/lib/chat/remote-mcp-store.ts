@@ -1,0 +1,410 @@
+import { useSyncExternalStore } from 'react';
+import { z } from 'zod';
+
+import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
+import { REMOTE_MCP_SERVERS_KEY } from '@/lib/storage-keys';
+
+import { isReservedMcpServerId } from './mcp-server-namespace';
+import { clearRemoteMcpOAuth, forgetRemoteMcpOAuth } from './remote-mcp-oauth-store';
+import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from './remote-mcp-url';
+
+/**
+ * The remote MCP servers the user added, and the one place they are written.
+ *
+ * The app owns the list, not the harness: the SDK is handed one server at a
+ * time and knows nothing about a list, an order, an edit or a delete. So the
+ * list lives here, on the account-scoped secure store, and both the settings
+ * screen and an agent tool call read and write this one value.
+ *
+ * `id` is not decoration. The harness names a server's tools `mcp_<id>_<tool>`,
+ * so the id is part of every tool name a model reads; it is a callable-name
+ * slug of the name, uniquified against the stored ids, and it is stable across
+ * an edit so a rename does not churn the model's tool list.
+ */
+
+/**
+ * How a server is authorized. The token is optional: `bearer` may name it later.
+ * `oauth` keeps its tokens apart, in `remote-mcp-oauth-store.ts`.
+ */
+export type RemoteMcpAuth =
+  | { type: 'none' }
+  | { type: 'bearer'; token?: string }
+  | { type: 'oauth' };
+
+/** One stored server. `id` is the callable-name part of every tool name it offers. */
+export type StoredRemoteMcpServer = {
+  id: string;
+  name: string;
+  url: string;
+  auth: RemoteMcpAuth;
+  enabled: boolean;
+};
+
+/**
+ * `tokenEntered` says the bearer value in this draft or patch was entered in
+ * this edit, rather than read back from the saved server. A bearer value is
+ * kept for the endpoint the edit names, so the flag states that the value
+ * belongs to that endpoint.
+ */
+type EnteredBearerToken = { readonly tokenEntered?: boolean };
+
+/** What a caller hands over to add or edit a server. `id` is ignored on add when taken. */
+export type RemoteMcpServerDraft = Pick<
+  StoredRemoteMcpServer,
+  'name' | 'url' | 'auth' | 'enabled'
+> & { id?: string } & EnteredBearerToken;
+
+/** The fields an edit may change. The id is the handle, not a field. */
+export type RemoteMcpServerPatch = Partial<Omit<StoredRemoteMcpServer, 'id'>> & EnteredBearerToken;
+
+/** A server id is part of a tool name a model must be able to write. */
+const CALLABLE_ID = /^[A-Za-z0-9_-]+$/u;
+
+const remoteMcpAuthSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('none') }).strip(),
+  z.object({ type: z.literal('bearer'), token: z.string().optional() }).strip(),
+  z.object({ type: z.literal('oauth') }).strip(),
+]);
+
+const storedRemoteMcpServerSchema = z
+  .object({
+    id: z.string().regex(CALLABLE_ID),
+    name: z.string(),
+    url: z.string(),
+    auth: remoteMcpAuthSchema,
+    enabled: z.boolean(),
+  })
+  .strip();
+
+/**
+ * The callable-name slug of a server name: lowercase, non-alphanumerics to `-`,
+ * no leading or trailing `-`. A name with no alphanumerics still gets one.
+ */
+function slugFor(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '');
+  return slug.length > 0 ? slug : 'remote-mcp';
+}
+
+/**
+ * An id that is free in `taken` and outside the built-in server's namespace.
+ * The name's slug is the id when nothing holds it. Otherwise the first numeric
+ * suffix that is free is used, which is what keeps two servers with one name
+ * from mapping their tools to the same names. A slug never contains `_`, so a
+ * suffixed id cannot enter the built-in namespace, and the reserved check runs
+ * over it anyway so that this one rule covers every id the app writes.
+ */
+function uniqueId(name: string, taken: ReadonlySet<string>): string {
+  const base = slugFor(name);
+  if (!taken.has(base) && !isReservedMcpServerId(base)) {
+    return base;
+  }
+  let suffix = 2;
+  let candidate = `${base}-${suffix}`;
+  while (taken.has(candidate) || isReservedMcpServerId(candidate)) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
+}
+
+/**
+ * A unique id for a new server. A requested id is kept when it is callable-name
+ * safe and free of the stored ids and of the built-in server's namespace, and
+ * anything else falls back to the name. Two servers with one id would map their
+ * tools to the same names and silently drop each other.
+ */
+function resolveServerId(
+  name: string,
+  requested: string | undefined,
+  servers: readonly StoredRemoteMcpServer[]
+): string {
+  const taken = new Set(servers.map(server => server.id));
+  if (
+    requested !== undefined &&
+    CALLABLE_ID.test(requested) &&
+    !taken.has(requested) &&
+    !isReservedMcpServerId(requested)
+  ) {
+    return requested;
+  }
+  return uniqueId(name, taken);
+}
+
+/** A stored URL is normalized on the way in; an unnormalizable one is dropped. */
+function normalizeStoredUrl(url: string): string | undefined {
+  try {
+    return normalizeRemoteMcpUrl(url);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Parse entries independently so one corrupt server cannot erase healthy
+ * servers and their bearer tokens on the next write. An entry whose stored id
+ * is the built-in server's, or extends it, is loaded under a free id rather
+ * than discarded, so the person keeps the server and the value saved for it.
+ */
+export function parseRemoteMcpServers(raw: string | null): StoredRemoteMcpServer[] {
+  if (raw === null) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    const readable: { readonly server: StoredRemoteMcpServer; readonly url: string }[] = [];
+    for (const entry of parsed) {
+      const result = storedRemoteMcpServerSchema.safeParse(entry);
+      if (result.success) {
+        const url = normalizeStoredUrl(result.data.url);
+        if (url !== undefined) {
+          readable.push({ server: result.data, url });
+        }
+      }
+    }
+    // Every entry is considered in stored order, so an endpoint belongs to the
+    // row that was written first, whichever kind of id that row carries. An
+    // entry already carrying an id of its own keeps it, and claims it before any
+    // entry whose id has to be derived. Only then does an entry whose id belongs
+    // to the built-in server take a free one, against every id claimed so far, so
+    // it can never take the id another entry holds. An entry with no free endpoint
+    // or a duplicated id of its own is left out, which is the same rule a
+    // persisted list has always followed. The accepted list is then drawn in the
+    // persisted order.
+    const ids = new Set<string>();
+    const urls = new Set<string>();
+    const accepted: (StoredRemoteMcpServer | undefined)[] = readable.map(() => undefined);
+    const reserving: {
+      readonly index: number;
+      readonly server: StoredRemoteMcpServer;
+      readonly url: string;
+    }[] = [];
+    for (const [index, { server, url }] of readable.entries()) {
+      const takenEndpoint = urls.has(url);
+      const builtInId = isReservedMcpServerId(server.id);
+      const takenId = ids.has(server.id);
+      if (!takenEndpoint) {
+        if (builtInId) {
+          urls.add(url);
+          reserving.push({ index, server, url });
+        } else if (!takenId) {
+          ids.add(server.id);
+          urls.add(url);
+          accepted[index] = { ...server, url };
+        }
+      }
+    }
+    for (const { index, server, url } of reserving) {
+      const id = uniqueId(server.name, ids);
+      ids.add(id);
+      accepted[index] = { ...server, id, url };
+    }
+    const servers: StoredRemoteMcpServer[] = [];
+    for (const server of accepted) {
+      if (server !== undefined) {
+        servers.push(server);
+      }
+    }
+    return servers;
+  } catch {
+    // Malformed JSON is a corrupt write, not a crash.
+    return [];
+  }
+}
+
+/**
+ * Reconciles a write that raced the initial disk read: the persisted list keeps
+ * its order, a pending server replaces the stored one with the same id, and a
+ * pending server the disk does not know is appended.
+ */
+function mergeRemoteMcpServers(
+  disk: StoredRemoteMcpServer[],
+  pending: StoredRemoteMcpServer[]
+): StoredRemoteMcpServer[] {
+  const merged = [...disk];
+  for (const server of pending) {
+    const index = merged.findIndex(current => current.id === server.id);
+    if (index === -1) {
+      merged.push(server);
+    } else {
+      merged[index] = server;
+    }
+  }
+  return merged;
+}
+
+const store = createSecureStorePreference<StoredRemoteMcpServer[]>({
+  key: REMOTE_MCP_SERVERS_KEY,
+  defaultValue: [],
+  parse: parseRemoteMcpServers,
+  serialize: value => JSON.stringify(value),
+  mergeOnLoad: mergeRemoteMcpServers,
+});
+
+// Warm the disk read at module scope so a settings screen and an agent tool
+// call see the persisted list without waiting for a React mount.
+store.preload();
+
+/** The stored servers, in the order they were added. */
+export function listRemoteMcpServers(): StoredRemoteMcpServer[] {
+  return store.getRequested();
+}
+
+/**
+ * Adds a server and returns it. The id is derived from the name, uniquified
+ * against the stored ids. A URL another server already uses is refused, because
+ * two rows pointing at one endpoint is a user mistake, not two servers.
+ */
+export function addRemoteMcpServer(draft: RemoteMcpServerDraft): StoredRemoteMcpServer {
+  const current = store.getRequested();
+  const url = normalizeRemoteMcpUrl(draft.url);
+  if (current.some(server => server.url === url)) {
+    throw new Error('Remote MCP URL is already saved.');
+  }
+  const server: StoredRemoteMcpServer = {
+    id: resolveServerId(draft.name, draft.id, current),
+    name: draft.name,
+    url,
+    auth: draft.auth,
+    enabled: draft.enabled,
+  };
+  store.set([...current, server]);
+  return server;
+}
+
+/**
+ * The auth an edit leaves behind.
+ *
+ * A value saved for one endpoint is not a value for another. When the endpoint
+ * changes, the bearing value the edit carries forward — no auth field at all, or
+ * the saved auth echoed back — is dropped and the server stays `bearer` with no
+ * value, so the new endpoint's value must be entered for it. This is the rule
+ * the OAuth state already follows. A patch that names a different value, or
+ * another method, is the patch's to set, and so is the value itself when the
+ * caller states it was entered in this edit, because then it belongs to the
+ * endpoint the edit names. No auth at all keeps the method with no value.
+ */
+function authAfterEdit(
+  existing: StoredRemoteMcpServer,
+  url: string,
+  patch: RemoteMcpServerPatch
+): RemoteMcpAuth {
+  const auth = patch.auth;
+  if (sameRemoteMcpEndpoint(existing.url, url)) {
+    return auth ?? existing.auth;
+  }
+  const savedToken = existing.auth.type === 'bearer' ? existing.auth.token : undefined;
+  if (auth === undefined) {
+    return existing.auth.type === 'bearer' ? { type: 'bearer' } : existing.auth;
+  }
+  if (
+    auth.type === 'bearer' &&
+    savedToken !== undefined &&
+    auth.token === savedToken &&
+    patch.tokenEntered !== true
+  ) {
+    return { type: 'bearer' };
+  }
+  return auth;
+}
+
+/**
+ * Replaces one server in place, keeping its id and its position in the list.
+ * A rename does not change the id, so the tool names the model already read
+ * stay the same. A URL another server already uses is refused. A new endpoint,
+ * or a server that no longer signs in with OAuth, drops its OAuth tokens, and
+ * a new endpoint also drops the saved bearer value, keeping it only when the
+ * patch states the value as entered for that endpoint.
+ */
+export function updateRemoteMcpServer(
+  id: string,
+  patch: RemoteMcpServerPatch
+): StoredRemoteMcpServer {
+  const current = store.getRequested();
+  const existing = current.find(server => server.id === id);
+  if (existing === undefined) {
+    throw new Error('Remote MCP server not found.');
+  }
+  const url = normalizeRemoteMcpUrl(patch.url ?? existing.url);
+  if (current.some(server => server.id !== id && server.url === url)) {
+    throw new Error('Remote MCP URL is already saved.');
+  }
+  const updated: StoredRemoteMcpServer = {
+    id,
+    name: patch.name ?? existing.name,
+    url,
+    auth: authAfterEdit(existing, url, patch),
+    enabled: patch.enabled ?? existing.enabled,
+  };
+  store.set(current.map(server => (server.id === id ? updated : server)));
+  if (!sameRemoteMcpEndpoint(existing.url, url) || updated.auth.type !== 'oauth') {
+    void forgetRemoteMcpOAuth(id);
+  }
+  return updated;
+}
+
+/** Removes one server, and its OAuth tokens with it, and returns it. */
+export function deleteRemoteMcpServer(id: string): StoredRemoteMcpServer {
+  const current = store.getRequested();
+  const removed = current.find(server => server.id === id);
+  if (removed === undefined) {
+    throw new Error('Remote MCP server not found.');
+  }
+  store.set(current.filter(server => server.id !== id));
+  void forgetRemoteMcpOAuth(id);
+  return removed;
+}
+
+/** Flips one server's enabled flag and leaves every other server untouched. */
+export function setRemoteMcpServerEnabled(id: string, enabled: boolean): StoredRemoteMcpServer {
+  const current = store.getRequested();
+  const existing = current.find(server => server.id === id);
+  if (existing === undefined) {
+    throw new Error('Remote MCP server not found.');
+  }
+  const updated: StoredRemoteMcpServer = { ...existing, enabled };
+  store.set(current.map(server => (server.id === id ? updated : server)));
+  return updated;
+}
+
+/** Watches the list, the way a screen subscribes to a chat. */
+export function subscribeRemoteMcpServers(listener: () => void): () => void {
+  return store.subscribe(listener);
+}
+
+/**
+ * Whether the persisted list has been read yet.
+ *
+ * Until it has, the store's value is the empty default, so an empty list means
+ * "not read" rather than "none": a screen that draws the empty state from
+ * `length === 0` alone would flash "no servers" at a returning user whose list
+ * is still on disk.
+ */
+export function getRemoteMcpServersHasLoaded(): boolean {
+  return store.getHasLoaded();
+}
+
+/** Resolves once the persisted list has been read, so a caller outside React reads the real list. */
+export async function whenRemoteMcpServersLoaded(): Promise<void> {
+  await store.whenLoaded();
+}
+
+/** The list a screen draws. */
+export function useRemoteMcpServers(): StoredRemoteMcpServer[] {
+  return useSyncExternalStore(store.subscribe, store.get);
+}
+
+/**
+ * Drops every server, and the OAuth tokens behind them, from memory and disk,
+ * which is what signing out does.
+ */
+export function clearRemoteMcpServers(): void {
+  store.clear();
+  clearRemoteMcpOAuth();
+}

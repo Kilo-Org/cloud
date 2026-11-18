@@ -1,0 +1,816 @@
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import 'server-only';
+import {
+  validateAuthorizationHeader,
+  isRejectedCredentialReason,
+} from '@kilocode/web-shared/lib/tokens';
+import {
+  CloudAgentNextRuntimeAuthorizationClaimSchema,
+  RuntimeProxyAttestationAudienceSchema,
+  verifyRuntimeProxyAttestation,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { NextResponse } from 'next/server';
+import { TRPCError } from '@trpc/server';
+import { headers } from 'next/headers';
+
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
+import { getServerSession } from 'next-auth';
+import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
+import { redirect } from 'next/navigation';
+import type { Organization, User } from '@kilocode/db/schema';
+import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
+import {
+  isApiTokenPepperCurrent,
+  requestOrganizationId,
+} from '@kilocode/worker-utils/account-access';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
+import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import jwt from 'jsonwebtoken';
+import {
+  logExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+  emitPrivilegedAccessEvent,
+  methodFromHeaders,
+  routeFromHeaders,
+  userAgentProductFromHeaders,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  deriveCredentialKind,
+  StepUpRequiredError,
+  type PrivilegedActionClass,
+  type PrivilegedCredentialKind,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
+import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import { z } from 'zod';
+import { v5 as uuidv5 } from 'uuid';
+import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  isCloudAgentAuthorityHttpPathAllowed,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  isKiloCredentialExchangeEligible,
+  verifyKiloTokenForPolicy,
+  type KiloCredentialExchangeEligibilityPolicy,
+} from '@kilocode/worker-utils/kilo-token-policy';
+
+// NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
+// and its debug payloads contain sensitive data (tokens, secrets, provider config).
+// Only wire up the debug logger in local development.
+// https://next-auth.js.org/configuration/options
+const logger: LoggerInstance = {
+  debug: IS_DEVELOPMENT ? logExceptInTest : () => {},
+  warn: sentryLogger('NEXTAUTH', 'warning'),
+  error: sentryLogger('NEXTAUTH', 'error'),
+};
+
+/**
+ * The NextAuth options a session read uses. `getServerSession` drops the
+ * providers, and a session read calls the `jwt` callback without a `trigger`,
+ * for which the `authOptions` callback also returns the token unchanged. Reading
+ * a session with these options therefore matches `authOptions`
+ * (lib/user/next-auth-options) without loading the sign-in flows.
+ */
+export const sessionAuthOptions = {
+  secret: NEXTAUTH_SECRET,
+  providers: [],
+  logger, // Surfacing NextAuth internal logs/errors for diagnostics
+  callbacks: {
+    async jwt({ token }) {
+      return token;
+    },
+    async session({ session, token }) {
+      const castToken = token as unknown as JWT;
+      session.user.id = castToken.sub;
+      session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
+      session.kiloUserId = castToken.kiloUserId;
+      session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
+      session.webSessionId = castToken.webSessionId;
+      session.isNewUser = castToken.isNewUser || false;
+      session.authProvider = castToken.authProvider;
+      session.authenticatedAt = castToken.authenticatedAt;
+      session.ssoSourceOrganizationId = castToken.ssoSourceOrganizationId;
+      return session;
+    },
+  },
+  pages: {
+    signIn: '/users/sign_in',
+    error: '/users/sign_in',
+  },
+  debug: !!getEnvVariable('DEBUG_AUTH'),
+} satisfies NextAuthOptions;
+
+/**
+ * Reads the NextAuth session, treating a session read that throws as no
+ * session. With the JWT strategy the read only parses and re-serializes request
+ * cookies, so a throw means the cookies are unusable, for example a malformed
+ * cookie name that `cookie.serialize` rejects while NextAuth clears an invalid
+ * session token. Any other failure is rethrown so it stays visible.
+ */
+async function readSession(): Promise<Session | null> {
+  try {
+    return await getServerSession(sessionAuthOptions);
+  } catch (error) {
+    if (!isCookieValidationError(error)) throw error;
+    warnExceptInTest(
+      'NextAuth session read failed on malformed cookies; treating request as unauthenticated'
+    );
+    return null;
+  }
+}
+
+const COOKIE_VALIDATION_ERROR_MESSAGE = /^(argument|option) \w+ (is invalid|must be a string)$/;
+
+function isCookieValidationError(error: unknown): boolean {
+  return error instanceof TypeError && COOKIE_VALIDATION_ERROR_MESSAGE.test(error.message);
+}
+
+/**
+ * Returns the signed-in user id when the request carries a valid NextAuth
+ * session, or null when it does not. This performs no authorization checks and
+ * never redirects; it is used to decide where an OAuth callback error lands.
+ */
+export async function getUserFromSession(): Promise<{ id: string } | null> {
+  const session = await readSession();
+  return session?.kiloUserId ? { id: session.kiloUserId } : null;
+}
+
+export type RequiredPermissions = {
+  adminOnly: boolean;
+  DANGEROUS_allowBlockedUsers?: boolean;
+  expectedAudience?: string;
+  // Derive from an actual Request URL or fixed route path, never a request header.
+  requestPathname?: string;
+  /** The actual Request method when the caller has one; preferred over headers. */
+  requestMethod?: string;
+  requestHeaders?: Headers;
+  /** How this admin read arrived; server components are not REST routes. */
+  stepUpSurface?: 'rest' | 'server-component';
+  /**
+   * Layout-only escape hatch: authenticate the admin but let the caller render
+   * the verification interstitial instead of returning a 403. Never use on a
+   * data route.
+   */
+  skipStepUpGuard?: boolean;
+};
+
+type GetAuthResponse =
+  | {
+      user: null;
+      authFailedResponse: NextResponse<FailureResult<string>>;
+      /**
+       * True when the request presented a credential that failed verification,
+       * rather than presenting none. Such a request must not be downgraded to
+       * an anonymous identity; see `isRejectedCredentialReason`.
+       *
+       * `authError` always sets this. It is optional only so existing callers
+       * that construct a failure result directly keep compiling; absent means
+       * false.
+       */
+      credentialsRejected?: boolean;
+      /**
+       * True when authorization refused a request that presented a credential.
+       * The authentication response is the answer for such a request.
+       */
+      authorizationRefused?: boolean;
+      rejectionReason?: 'empty_organization_context';
+      isNewUser?: undefined;
+      organizationId?: Organization['id'];
+      internalApiUse?: boolean;
+      botId?: string;
+      tokenSource?: string;
+      deviceSessionId?: string;
+      cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: undefined;
+      webSessionId?: undefined;
+      webSessionPepper?: undefined;
+      authenticatedAt?: undefined;
+      ssoSourceOrganizationId?: undefined;
+    }
+  | {
+      user: User;
+      authFailedResponse: null;
+      credentialsRejected?: undefined;
+      authorizationRefused?: undefined;
+      rejectionReason?: undefined;
+      isNewUser?: boolean;
+      organizationId?: Organization['id'];
+      internalApiUse?: boolean;
+      botId?: string;
+      tokenSource?: string;
+      deviceSessionId?: string;
+      cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: PrivilegedCredentialKind;
+      /** Server-only per-session id for MFA step-up; never sent to the browser. */
+      webSessionId?: string;
+      /** Server-only pepper the session was minted with, for primary re-reads. */
+      webSessionPepper?: string | null;
+      /** Unix seconds when the browser session signed in. */
+      authenticatedAt?: number;
+      /**
+       * The WorkOS organization this browser session authenticated through,
+       * recorded only when the session signed in through SSO. Server-only: it
+       * is the provenance a management approval checks against the
+       * organization the account's domain currently requires.
+       */
+      ssoSourceOrganizationId?: string;
+    };
+
+export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
+  const headersList = opts.requestHeaders ?? (await headers());
+  const result = await resolveUserFromAuth(opts, headersList);
+  // Every admin audit event of one request carries the surface it arrived on,
+  // so the same request lands in one inventory entry whichever way it resolves.
+  const surface = opts.stepUpSurface ?? 'rest';
+
+  const authViaToken = authViaTokenFromHeaders(headersList);
+  const credential = deriveCredentialKind({
+    authViaToken,
+    tokenSource: result.tokenSource ?? null,
+    internalApiUse: result.internalApiUse,
+    delegatedWorkload: result.cloudAgentAuthority !== undefined,
+  });
+
+  // Admin audit trail: emit exactly one identity-attributed event per authorized
+  // admin request. Guarded strictly on adminOnly so the millions of
+  // adminOnly:false calls never log.
+  if (opts.adminOnly === true && (result.user || authViaToken)) {
+    // One header read and one privileged-inventory lookup per admin request, so
+    // the step-up guard and the token outcome event that reports it cannot name
+    // different actions.
+    const route = routeFromHeaders(headersList);
+    const method = methodFromHeaders(headersList, opts.requestMethod);
+    let attribution: { actionClass: PrivilegedActionClass; inventoryId: string | null } | undefined;
+    const routeAttribution = () =>
+      (attribution ??= actionClassForRoute({ surface, route: route ?? '', method }));
+
+    if (result.user) {
+      emitAdminAccessEvent({
+        surface,
+        kind: 'admin_guard',
+        user: result.user,
+        authViaToken,
+        tokenSource: result.tokenSource ?? null,
+        credential,
+        route,
+        method,
+        userAgentProduct: userAgentProductFromHeaders(headersList),
+        ip: clientIpFromHeaders(headersList),
+      });
+
+      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+        const { actionClass, inventoryId } = routeAttribution();
+        try {
+          await runStepUpGuard({
+            userId: result.user.id,
+            credential,
+            webSessionId: result.webSessionId,
+            actionClass,
+            enabled: true,
+            route,
+            method,
+            surface,
+          });
+        } catch (error) {
+          // One privileged-access outcome per guarded non-session request:
+          // `denied` for a policy verdict, `failed` for an unexpected throw.
+          // Session traffic stays on `admin_guard`.
+          const emitOutcome = (outcome: 'denied' | 'failed') => {
+            if (credential === 'session') return;
+            emitPrivilegedAccessEvent({
+              surface,
+              user: result.user,
+              credential,
+              outcome,
+              actionClass,
+              actionId: inventoryId,
+              target: null,
+              wouldBlock: true,
+              userAgentProduct: userAgentProductFromHeaders(headersList),
+              tokenSource: result.tokenSource ?? null,
+              route,
+              method,
+              ip: clientIpFromHeaders(headersList),
+            });
+          };
+          if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+            emitOutcome('denied');
+            return authError(403, error.cause.code, result.user.id);
+          }
+          // Fail closed. The guard normally converts evaluation failures itself;
+          // this covers anything unexpected around it.
+          emitOutcome('failed');
+          reportStepUpFailure('admin_step_up_rest', error);
+          return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
+        }
+      }
+    }
+
+    if (authViaToken) {
+      const { actionClass, inventoryId } = routeAttribution();
+      emitPrivilegedAccessEvent({
+        surface,
+        user: result.user ?? undefined,
+        credential,
+        outcome: result.user ? 'succeeded' : 'denied',
+        actionClass,
+        actionId: inventoryId,
+        target: null,
+        wouldBlock: credential !== 'session',
+        userAgentProduct: userAgentProductFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        route,
+        method,
+        ip: clientIpFromHeaders(headersList),
+      });
+    }
+  }
+
+  if (result.user) {
+    return { ...result, credential };
+  }
+  return result;
+}
+
+/**
+ * Reads the browser session only. A request that presents a credential is
+ * refused, never downgraded to its session, because these callers mint or
+ * exchange credentials and must not do so for a bearer caller.
+ */
+async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthResponse> {
+  if ((await headers()).has('authorization')) {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  return resolveUserFromSession(opts, db);
+}
+
+export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
+  return resolveSessionOnly({ adminOnly: false });
+}
+
+/**
+ * Session-only read for MFA step-up. It refuses any bearer credential and
+ * reads the primary so a proof minted a moment ago is usable immediately. The
+ * caller still enforces the route's Origin check before trusting the session.
+ */
+export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
+  return resolveSessionOnly({ adminOnly: true });
+}
+
+export async function getUserFromSessionForCredentialIssuanceOrRedirect(
+  loggedOutRedirectUrl = '/users/sign_in'
+): Promise<User> {
+  if ((await headers()).has('authorization')) {
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
+  }
+
+  return userOrRedirect(
+    await resolveUserFromSession({ adminOnly: false, DANGEROUS_allowBlockedUsers: true }, db),
+    loggedOutRedirectUrl
+  );
+}
+
+export async function getUserFromBearerForCredentialExchange(
+  requestHeaders: Headers,
+  policy: KiloCredentialExchangeEligibilityPolicy
+): Promise<GetAuthResponse> {
+  const token = extractBearerToken(requestHeaders.get('authorization'));
+  if (!token) return authError(401, 'Unauthorized', '?');
+
+  let auth: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
+  try {
+    auth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+  } catch {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  if (auth.claims.env !== process.env.NODE_ENV) {
+    return authError(401, 'Unauthorized', auth.userId);
+  }
+
+  const user = await findUserById(auth.userId, db);
+  if (
+    auth.claims.apiTokenPepper === undefined ||
+    auth.claims.apiTokenPepper !== user?.api_token_pepper
+  ) {
+    return authError(401, 'Unauthorized', auth.userId);
+  }
+
+  const result = await validateUserAuthorization({
+    kiloUserId: auth.userId,
+    user,
+    opts: { adminOnly: false },
+    isNewUser: false,
+    deviceSessionId: auth.claims.deviceSessionId,
+  });
+  if (!result.user) return result;
+  if (!isKiloCredentialExchangeEligible(auth, policy)) {
+    return authError(401, 'Unauthorized', auth.userId);
+  }
+  return result;
+}
+
+async function resolveUserFromAuth(
+  opts: RequiredPermissions,
+  headersList: Awaited<ReturnType<typeof headers>>
+): Promise<GetAuthResponse> {
+  // This path is executed for non-next-auth requests
+  // all calls from the extension including the openrouter proxy call use this auth method
+  // also val.town and other blessed API users who are given their own custom JWTs use this path
+  if (authViaTokenFromHeaders(headersList)) {
+    const rawAuthorization = headersList.get('Authorization');
+    const bearer = extractBearerToken(rawAuthorization);
+    let decoded: ReturnType<typeof jwt.decode>;
+    try {
+      decoded = bearer ? jwt.decode(bearer) : null;
+    } catch {
+      return authError(401, 'Invalid API token', '?', { credentialsRejected: true });
+    }
+    const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
+    const decodedRuntimeAuthorization: unknown = decodedPayload?.runtimeAuthorization;
+    const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
+      decodedRuntimeAuthorization
+    );
+    const attestationAudience = RuntimeProxyAttestationAudienceSchema.safeParse(
+      opts.expectedAudience ?? KILO_API_AUDIENCE
+    );
+    const runtimeProxyAttestationVerified =
+      bearer !== null &&
+      runtimeAuthorization.success &&
+      attestationAudience.success &&
+      typeof decodedPayload?.kiloUserId === 'string'
+        ? await verifyRuntimeProxyAttestation({
+            value: headersList.get('X-Kilo-Runtime-Proxy-Attestation'),
+            secret: NEXTAUTH_SECRET,
+            audience: attestationAudience.data,
+            userId: decodedPayload.kiloUserId,
+            authorizationId: runtimeAuthorization.data.id,
+            resourceId: runtimeAuthorization.data.resourceId,
+            bearer,
+          })
+        : false;
+    const authorizationValidationResult = validateAuthorizationHeader(headersList, {
+      expectedAudience: opts.expectedAudience,
+      runtimeProxyAttestationVerified,
+      requestPathname: opts.requestPathname,
+    });
+    if (authorizationValidationResult.error != undefined) {
+      return authError(401, authorizationValidationResult.error, '?', {
+        credentialsRejected: isRejectedCredentialReason(authorizationValidationResult.reason),
+      });
+    }
+
+    const internalApiUse = authorizationValidationResult.internalApiUse;
+    const tokenSource = authorizationValidationResult.tokenSource;
+    const scope = authorizationValidationResult.cloudAgentAuthority;
+    if (scope && opts.adminOnly) {
+      return authError(403, 'Scoped credentials cannot access admin APIs', scope.ownerId, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
+      });
+    }
+    const fromDb = scope ? db : readDb;
+    const user = await findUserById(authorizationValidationResult.kiloUserId, fromDb);
+
+    if (
+      user &&
+      (scope
+        ? user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
+        : !isApiTokenPepperCurrent(
+            user.api_token_pepper,
+            authorizationValidationResult.apiTokenPepper
+          ))
+    ) {
+      return authError(401, 'Invalid API token', user.id, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
+      });
+    }
+    // A token-bound organization is signed; the request header is mutable.
+    // Legacy and personal tokens intentionally continue to use the header.
+    const headerOrganizationId = headersList.get(ORGANIZATION_ID_HEADER);
+    if (scope && headerOrganizationId !== null && headerOrganizationId !== scope.organizationId) {
+      return authError(403, 'Scoped organization mismatch', scope.ownerId, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
+      });
+    }
+    const organizationId = scope
+      ? (scope.organizationId ?? undefined)
+      : requestOrganizationId(authorizationValidationResult.organizationId, headerOrganizationId);
+    const botId = authorizationValidationResult.botId;
+    const deviceSessionId = authorizationValidationResult.deviceSessionId;
+
+    const result = await validateUserAuthorization({
+      kiloUserId: authorizationValidationResult.kiloUserId,
+      user,
+      opts,
+      isNewUser: false,
+      organizationId,
+      internalApiUse,
+      fromDb,
+      botId,
+      tokenSource,
+      deviceSessionId,
+      cloudAgentAuthority: scope,
+    });
+    if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
+      return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
+      });
+    }
+    return result.user ? { ...result, cloudAgentAuthority: scope } : result;
+  }
+
+  return resolveUserFromSession(opts, readDb);
+}
+
+async function resolveUserFromSession(
+  opts: RequiredPermissions,
+  fromDb: typeof db
+): Promise<GetAuthResponse> {
+  const session = await readSession();
+  const maybeKiloUserId = session?.kiloUserId;
+
+  if (!maybeKiloUserId) return authError(401, 'Unauthorized', '?');
+
+  const user = await findUserById(maybeKiloUserId, fromDb);
+  if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
+
+  if (!isWebSessionCurrent(session.webSessionPepper, user))
+    return authError(401, 'Reauthentication required', maybeKiloUserId);
+
+  // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
+  return await validateUserAuthorization({
+    kiloUserId: maybeKiloUserId,
+    user,
+    opts,
+    isNewUser: session.isNewUser,
+    fromDb,
+    webSession: {
+      id: session.webSessionId,
+      pepper: session.webSessionPepper,
+      authenticatedAt: session.authenticatedAt,
+      ssoSourceOrganizationId: session.ssoSourceOrganizationId,
+    },
+  });
+}
+
+/**
+ * Returns the resolved user, or redirects a request that has none to the
+ * callback-aware sign-in URL, or a blocked account to the blocked-account
+ * page. This is the one place that answers both redirect cases.
+ */
+async function userOrRedirect(auth: GetAuthResponse, loggedOutRedirectUrl: string): Promise<User> {
+  if (!auth.user) {
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
+  }
+  if (isBlockedAccount(auth.user)) {
+    redirect('/account-blocked');
+  }
+  return auth.user;
+}
+
+export async function getUserFromAuthOrRedirect(
+  loggedOutRedirectUrl = '/users/sign_in'
+): Promise<User> {
+  return userOrRedirect(
+    await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true }),
+    loggedOutRedirectUrl
+  );
+}
+
+export async function signInUrlWithCallbackPath(): Promise<string> {
+  return appendCallbackPath('/users/sign_in');
+}
+
+async function appendCallbackPath(url: string): Promise<string> {
+  if (url.includes('callbackPath')) return url;
+  const headersList = await headers();
+  const pathname = headersList.get('x-pathname');
+  if (pathname && pathname !== '/') {
+    // Keep the request's query in the callback so a resume link does not lose
+    // its `?at=` anchor across sign-in (see the `/cloud/sessions/<id>` route,
+    // whose layout redirects before the page can build its own callbackPath).
+    const search = headersList.get('x-search') ?? '';
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}callbackPath=${encodeURIComponent(`${pathname}${search}`)}`;
+  }
+  return url;
+}
+
+function authError(
+  status: number,
+  error: string,
+  kiloUserId: string,
+  options?: {
+    credentialsRejected?: boolean;
+    authorizationRefused?: boolean;
+    rejectionReason?: 'empty_organization_context';
+    internalApiUse?: boolean;
+    tokenSource?: string;
+    cloudAgentAuthority?: CloudAgentAuthority;
+  }
+) {
+  console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
+  return {
+    user: null,
+    authFailedResponse: NextResponse.json(failureResult(error), { status }),
+    credentialsRejected: options?.credentialsRejected ?? false,
+    authorizationRefused: options?.authorizationRefused ?? false,
+    internalApiUse: options?.internalApiUse,
+    tokenSource: options?.tokenSource,
+    cloudAgentAuthority: options?.cloudAgentAuthority,
+    ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
+  };
+}
+
+type UserAuthorizationRequest = {
+  kiloUserId: string;
+  user: User | undefined;
+  opts: RequiredPermissions;
+  isNewUser?: boolean;
+  organizationId?: Organization['id'];
+  internalApiUse?: boolean;
+  fromDb?: typeof db;
+  botId?: string;
+  tokenSource?: string;
+  deviceSessionId?: string;
+  cloudAgentAuthority?: CloudAgentAuthority;
+  webSession?: {
+    id?: string;
+    pepper?: string | null;
+    authenticatedAt?: number;
+    ssoSourceOrganizationId?: string;
+  };
+};
+
+async function validateUserAuthorization({
+  kiloUserId,
+  user,
+  opts,
+  isNewUser,
+  organizationId,
+  internalApiUse,
+  fromDb = db,
+  botId,
+  tokenSource,
+  deviceSessionId,
+  cloudAgentAuthority,
+  webSession,
+}: UserAuthorizationRequest): Promise<GetAuthResponse> {
+  if (!user) {
+    return authError(401, 'User not found', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
+  } else if (await isUserBlacklistedByDomain(user, readDb)) {
+    return authError(403, 'Access denied (R0)', kiloUserId, {
+      authorizationRefused: true,
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
+  } else if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
+    return authError(403, 'Access denied (R1)', kiloUserId, {
+      authorizationRefused: true,
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
+  } else if (opts.adminOnly && !user.is_admin) {
+    return authError(403, 'Access denied (nonadmin)', kiloUserId, {
+      authorizationRefused: true,
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
+  }
+
+  // A credential bound to a device session is only valid while that session is
+  // active. The answer is cached per instance for
+  // `DEVICE_SESSION_CACHE_TTL_MS`, which is the window in which a revocation
+  // written by another instance takes effect here; a revocation on this
+  // instance invalidates its entry. See `lib/auth/device-session-cache`.
+  if (deviceSessionId !== undefined) {
+    const active = uuid.safeParse(deviceSessionId).success
+      ? await isDeviceSessionActive(deviceSessionId, kiloUserId, () =>
+          readActiveDeviceSession(deviceSessionId, kiloUserId)
+        )
+      : false;
+    if (!active) {
+      // The caller presented a credential that no longer works, so this must
+      // not degrade into an anonymous request.
+      return authError(401, 'Device session is no longer active', kiloUserId, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
+    }
+  }
+
+  if (organizationId !== undefined) {
+    const uuidResult = uuid.safeParse(organizationId);
+    if (!uuidResult.success) {
+      return authError(400, 'Invalid organization ID format', kiloUserId, {
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+        ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
+      });
+    }
+    // An organization context resolves through the effective-membership rule:
+    // the caller holds a direct membership in the live organization, or a
+    // permitted role (owner, admin, billing_manager) on its live parent
+    // organization. The balance and member-allowance rules are separate and do
+    // not follow inheritance.
+    const hasAccess = await hasEffectiveOrganizationAccess(fromDb, {
+      kiloUserId,
+      organizationId,
+    });
+    if (!hasAccess) {
+      return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
+        authorizationRefused: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
+    }
+  }
+
+  return {
+    user,
+    authFailedResponse: null,
+    isNewUser,
+    organizationId,
+    internalApiUse,
+    botId,
+    tokenSource,
+    deviceSessionId,
+    webSessionId: webSession?.id,
+    webSessionPepper: webSession?.pepper,
+    authenticatedAt: webSession?.authenticatedAt,
+    ssoSourceOrganizationId: webSession?.ssoSourceOrganizationId,
+  };
+}
+
+/**
+ * Read a session from the primary: a session created moments ago must
+ * authenticate its first request, which a lagging replica would refuse.
+ */
+async function readActiveDeviceSession(
+  deviceSessionId: string,
+  kiloUserId: string
+): Promise<boolean> {
+  const session = await db.query.device_sessions.findFirst({
+    where: liveDeviceSessionCondition({ deviceSessionId, userId: kiloUserId }),
+    columns: { id: true },
+  });
+  return session !== undefined;
+}
+
+export const uuidSchema = z.uuid();
+const uuid = uuidSchema;
+// Namespace UUID for generating UUIDs from legacy user IDs
+// This is a fixed UUID that serves as the namespace for all user ID conversions
+const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // DNS namespace UUID
+
+export function getUserUUID(user: User): string {
+  if (uuid.safeParse(user.id).success) {
+    return user.id;
+  } else {
+    return uuidv5(user.id, USER_UUID_NAMESPACE);
+  }
+}

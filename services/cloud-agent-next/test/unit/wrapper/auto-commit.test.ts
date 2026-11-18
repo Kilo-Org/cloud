@@ -2,19 +2,21 @@
  * Unit tests for auto-commit branch protection and upstream branch bypass.
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
+import { createKiloClient } from '@kilocode/sdk';
+import {
+  MAX_AUTO_COMMIT_MESSAGE_BYTES,
+  autoCommitRecordSchema,
+} from '@kilocode/worker-utils/cloud-agent-commits';
 import { runAutoCommit, type AutoCommitOptions } from '../../../wrapper/src/auto-commit.js';
-import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
-import type { ExecResult } from '../../../wrapper/src/utils.js';
-
-// ---------------------------------------------------------------------------
-// Mock the utils module (spawns git processes + writes log files)
-// ---------------------------------------------------------------------------
+import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+import type * as Utils from '../../../wrapper/src/utils.js';
 
 vi.mock('../../../wrapper/src/utils.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../wrapper/src/utils.js')>(
-    '../../../wrapper/src/utils.js'
-  );
+  const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
   return {
     ...actual,
     git: vi.fn(),
@@ -25,17 +27,19 @@ vi.mock('../../../wrapper/src/utils.js', async () => {
 });
 
 // Import mocked functions so we can configure per-test return values
-import { git, getCurrentBranch, hasGitUpstream } from '../../../wrapper/src/utils.js';
+import {
+  git,
+  getCurrentBranch,
+  hasGitUpstream,
+  logToFile,
+  withTimeoutAndAbort,
+} from '../../../wrapper/src/utils.js';
 
 const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockHasGitUpstream = vi.mocked(hasGitUpstream);
 const mockGit = vi.mocked(git);
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const ok = (stdout = '', stderr = ''): ExecResult => ({ stdout, stderr, exitCode: 0 });
+const ok = (stdout = '', stderr = ''): Utils.ExecResult => ({ stdout, stderr, exitCode: 0 });
 
 const createMockKiloClient = (): WrapperKiloClient => ({
   createSession: vi.fn(),
@@ -47,9 +51,6 @@ const createMockKiloClient = (): WrapperKiloClient => ({
   answerPermission: vi.fn(),
   answerQuestion: vi.fn(),
   rejectQuestion: vi.fn(),
-  getSessionStatuses: vi.fn(),
-  getQuestions: vi.fn(),
-  getPermissions: vi.fn(),
   getNetworkWaits: vi.fn(),
   resumeNetworkWait: vi.fn(),
   generateCommitMessage: vi.fn().mockResolvedValue({ message: 'test commit' }),
@@ -76,34 +77,58 @@ function createOpts(overrides: Partial<AutoCommitOptions> = {}): {
   return { opts, events };
 }
 
-/** Configure mocks for a full happy-path commit+push (from git status onward). */
-function setupHappyPathGit(): void {
-  // git status --porcelain  →  has changes
-  // git add -A              →  ok
-  // git commit -m ...       →  ok
-  // git rev-parse --short HEAD  →  abc1234
-  // git push ...            →  ok
-  mockGit
-    .mockResolvedValueOnce(ok(' M file.ts')) // status
-    .mockResolvedValueOnce(ok()) // add
-    .mockResolvedValueOnce(ok('[main abc1234] test commit')) // commit
-    .mockResolvedValueOnce(ok('abc1234')) // rev-parse
-    .mockResolvedValueOnce(ok()); // push
+function blockCommitMessageRequest() {
+  const received = Promise.withResolvers<Request>();
+  const response = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((request: Request) => {
+      request.signal.throwIfAborted();
+      received.resolve(request);
+      request.signal.addEventListener('abort', () => response.reject(request.signal.reason), {
+        once: true,
+      });
+      return response.promise;
+    })
+  );
+  const serverUrl = 'http://127.0.0.1:0';
+  return {
+    received: received.promise,
+    response,
+    kiloClient: createWrapperKiloClient(
+      createKiloClient({ baseUrl: serverUrl }),
+      { url: serverUrl },
+      '/workspace'
+    ),
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+const commitHash = 'a'.repeat(40);
+const committedAt = '2026-09-01T00:00:00.000Z';
+const raw = (stdout: string): Utils.ExecResult => ({ ...ok(), stdoutBytes: Buffer.from(stdout) });
+const commitObject = (message: string) =>
+  raw(`tree ${'b'.repeat(40)}\ncommitter Test <test@example.com> 1788220800 +0000\n\n${message}`);
+
+function setupHappyPathGit(): void {
+  let message = 'test commit';
+  mockGit.mockImplementation(async args => {
+    if (args[0] === 'status') return ok(' M file.ts');
+    if (args[0] === 'commit') message = args.at(-1) ?? '';
+    if (args.includes('reflog')) return raw(`${commitHash}\n`);
+    if (args.includes('cat-file')) return commitObject(message);
+    return ok();
+  });
+}
 
 describe('runAutoCommit', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mockHasGitUpstream.mockResolvedValue(true);
   });
 
-  // -------------------------------------------------------------------------
-  // Detached HEAD
-  // -------------------------------------------------------------------------
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('skips on detached HEAD', async () => {
     mockGetCurrentBranch.mockResolvedValue('');
@@ -141,10 +166,6 @@ describe('runAutoCommit', () => {
     expect(mockGit).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // Protected branch — no upstreamBranch
-  // -------------------------------------------------------------------------
-
   it('skips on main when no upstreamBranch is set', async () => {
     mockGetCurrentBranch.mockResolvedValue('main');
 
@@ -176,10 +197,6 @@ describe('runAutoCommit', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // Protected branch — upstreamBranch does NOT match current branch
-  // -------------------------------------------------------------------------
-
   it('skips on main when upstreamBranch is a different branch', async () => {
     mockGetCurrentBranch.mockResolvedValue('main');
 
@@ -209,10 +226,6 @@ describe('runAutoCommit', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // Protected branch — upstreamBranch MATCHES current branch → bypass
-  // -------------------------------------------------------------------------
-
   it('allows commit to main when upstreamBranch is main', async () => {
     mockGetCurrentBranch.mockResolvedValue('main');
     setupHappyPathGit();
@@ -224,7 +237,10 @@ describe('runAutoCommit', () => {
     // Should have emitted autocommit_started and autocommit_completed (success)
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
     expect(completed?.data).toEqual(
-      expect.objectContaining({ success: true, message: 'Changes committed and pushed' })
+      expect.objectContaining({
+        success: true,
+        message: 'Changes committed; push command completed',
+      })
     );
   });
 
@@ -238,13 +254,12 @@ describe('runAutoCommit', () => {
     expect(result).toEqual({ success: true });
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
     expect(completed?.data).toEqual(
-      expect.objectContaining({ success: true, message: 'Changes committed and pushed' })
+      expect.objectContaining({
+        success: true,
+        message: 'Changes committed; push command completed',
+      })
     );
   });
-
-  // -------------------------------------------------------------------------
-  // No uncommitted changes
-  // -------------------------------------------------------------------------
 
   it('skips when there are no uncommitted changes', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/foo');
@@ -261,10 +276,6 @@ describe('runAutoCommit', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // Happy path on a regular feature branch
-  // -------------------------------------------------------------------------
-
   it('commits and pushes on a feature branch', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
     setupHappyPathGit();
@@ -277,11 +288,159 @@ describe('runAutoCommit', () => {
     expect(completed?.data).toEqual(
       expect.objectContaining({
         success: true,
-        message: 'Changes committed and pushed',
-        commitHash: 'abc1234',
+        message: 'Changes committed; push command completed',
+        commitHash,
         commitMessage: 'test commit',
       })
     );
+  });
+
+  it.each(['unknown', 'failed'] as const)(
+    'emits a bounded, anchored shared commit fact with push status %s',
+    async pushStatus => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      setupHappyPathGit();
+      const implementation = mockGit.getMockImplementation();
+      if (!implementation) throw new Error('Missing Git fixture');
+      const actualMessage = 'Hook message\n\n' + '漢'.repeat(MAX_AUTO_COMMIT_MESSAGE_BYTES);
+      mockGit.mockImplementation(async (args, options) => {
+        if (args.includes('cat-file')) return commitObject(actualMessage);
+        if (args[0] === 'push' && pushStatus === 'failed') return { ...ok(), exitCode: 1 };
+        return implementation(args, options);
+      });
+      const { opts, events } = createOpts({ userMessageId: 'user', messageId: 'assistant' });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      const record = autoCommitRecordSchema.parse(events.at(-1)?.data);
+      expect(record).toMatchObject({
+        commitHash,
+        committedAt,
+        userMessageId: 'user',
+        messageId: 'assistant',
+        pushStatus,
+        commitMessageTruncated: true,
+      });
+      expect(Buffer.byteLength(record.commitMessage)).toBeLessThanOrEqual(
+        MAX_AUTO_COMMIT_MESSAGE_BYTES
+      );
+      expect(actualMessage.startsWith(record.commitMessage)).toBe(true);
+      expect(record.commitMessage).not.toContain('�');
+    }
+  );
+
+  it.each(['rejection', 'throw', 'timeout', 'abort'] as const)(
+    'retains immutable local evidence after push %s',
+    async failure => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      setupHappyPathGit();
+      const implementation = mockGit.getMockImplementation();
+      if (!implementation) throw new Error('Missing Git fixture');
+      const controller = new AbortController();
+      mockGit.mockImplementation(async (args, options) => {
+        if (args.includes('cat-file')) return commitObject('actual hook message\n');
+        if (args[0] === 'push') {
+          if (failure === 'throw') throw new Error('Push spawn failed');
+          if (failure === 'abort') controller.abort();
+          return {
+            ...ok(),
+            exitCode: failure === 'rejection' ? 1 : 124,
+            ...(failure === 'timeout' ? { terminationReason: 'timeout' as const } : {}),
+            ...(failure === 'abort' ? { terminationReason: 'abort' as const } : {}),
+          };
+        }
+        return implementation(args, options);
+      });
+      const { opts, events } = createOpts({
+        messageId: 'assistant',
+        userMessageId: 'user',
+        signal: controller.signal,
+      });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      expect(
+        events
+          .filter(event => event.streamEventType === 'autocommit_completed')
+          .map(event => event.data)
+      ).toEqual([
+        expect.objectContaining({
+          success: true,
+          commitHash,
+          commitMessage: 'actual hook message\n',
+          committedAt,
+          messageId: 'assistant',
+          userMessageId: 'user',
+          pushStatus: failure === 'rejection' ? 'failed' : 'unknown',
+        }),
+      ]);
+    }
+  );
+
+  it.each(['returned', 'throw', 'abort'] as const)(
+    'recovers a commit when its process %s after updating the ref',
+    async completion => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      setupHappyPathGit();
+      const implementation = mockGit.getMockImplementation();
+      if (!implementation) throw new Error('Missing Git fixture');
+      const controller = new AbortController();
+      mockGit.mockImplementation(async (args, options) => {
+        if (args[0] === 'commit') {
+          controller.abort();
+          if (completion === 'throw') throw new Error('Commit interrupted after ref update');
+          return completion === 'returned'
+            ? ok()
+            : { ...ok(), exitCode: 124, terminationReason: 'abort' };
+        }
+        if (args.includes('reflog') || args.includes('cat-file'))
+          expect(options?.signal).toBeUndefined();
+        return implementation(args, options);
+      });
+      const { opts, events } = createOpts({
+        signal: controller.signal,
+        userMessageId: 'user',
+        messageId: 'assistant',
+      });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      expect(events.at(-1)?.data).toMatchObject({
+        success: true,
+        commitHash,
+        commitMessage: 'test commit',
+        committedAt,
+        pushStatus: 'not_attempted',
+      });
+      expect(mockGit.mock.calls.filter(([args]) => args[0] === 'commit')).toHaveLength(1);
+      expect(mockGit.mock.calls.some(([args]) => args[0] === 'push')).toBe(false);
+    }
+  );
+
+  it.each(['stage', 'commit'] as const)(
+    'does not invent commit evidence on %s failure',
+    async failure => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      mockGit.mockImplementation(async args => {
+        if (args[0] === 'status') return ok(' M file.ts');
+        if (args.includes('reflog')) return raw('');
+        if (args[0] === 'commit' || (failure === 'stage' && args[0] === 'add'))
+          return { ...ok(), exitCode: 1 };
+        return ok();
+      });
+      const { opts, events } = createOpts();
+      expect((await runAutoCommit(opts)).success).toBe(false);
+      expect(events.at(-1)?.data.commitHash).toBeUndefined();
+      expect(events.at(-1)?.data.success).toBe(false);
+    }
+  );
+
+  it('keeps successful local status without fabricating unreadable metadata', async () => {
+    mockGetCurrentBranch.mockResolvedValue('work');
+    setupHappyPathGit();
+    const implementation = mockGit.getMockImplementation();
+    if (!implementation) throw new Error('Missing Git fixture');
+    mockGit.mockImplementation(async (args, options) =>
+      args.includes('cat-file') ? { ...ok(), exitCode: 1 } : implementation(args, options)
+    );
+    const { opts, events } = createOpts();
+    expect(await runAutoCommit(opts)).toEqual({ success: true });
+    expect(events.at(-1)?.data).toMatchObject({ success: true, commitHash, pushStatus: 'unknown' });
+    expect(events.at(-1)?.data.commitMessage).toBeUndefined();
   });
 
   it('appends the supplied co-author trailer to generated commit messages', async () => {
@@ -308,55 +467,103 @@ describe('runAutoCommit', () => {
     expect(completed?.data).toEqual(expect.objectContaining({ commitMessage }));
   });
 
-  it('uses fallback commit message with a supplied co-author trailer when generation times out', async () => {
-    vi.useFakeTimers();
-    try {
-      mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
-      mockGit
-        .mockResolvedValueOnce(ok(' M file.ts'))
-        .mockResolvedValueOnce(ok())
-        .mockResolvedValueOnce(ok('[feature/cool-stuff abc1234] wip'))
-        .mockResolvedValueOnce(ok('abc1234'))
-        .mockResolvedValueOnce(ok());
-      const kiloClient = createMockKiloClient();
-      vi.mocked(kiloClient.generateCommitMessage).mockReturnValue(new Promise(() => {}));
-      const commitMessage =
-        'wip\n\nCo-authored-by: kiloconnect[bot] <240665456+kiloconnect[bot]@users.noreply.github.com>';
-      const { opts, events } = createOpts({
-        kiloClient,
-        commitCoAuthor: {
-          name: 'kiloconnect[bot]',
-          email: '240665456+kiloconnect[bot]@users.noreply.github.com',
-        },
-      });
+  it.each([false, true])(
+    'aborts the generation request on its deadline and commits the fallback with a caller signal=%s',
+    async withCallerSignal => {
+      vi.useFakeTimers();
+      try {
+        mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+        setupHappyPathGit();
+        const { kiloClient, received } = blockCommitMessageRequest();
+        const controller = new AbortController();
+        const commitMessage =
+          'wip\n\nCo-authored-by: kiloconnect[bot] <240665456+kiloconnect[bot]@users.noreply.github.com>';
+        const { opts, events } = createOpts({
+          kiloClient,
+          signal: withCallerSignal ? controller.signal : undefined,
+          commitCoAuthor: {
+            name: 'kiloconnect[bot]',
+            email: '240665456+kiloconnect[bot]@users.noreply.github.com',
+          },
+        });
 
-      const resultPromise = runAutoCommit(opts);
-      await vi.advanceTimersByTimeAsync(30_000);
-      const result = await resultPromise;
+        const resultPromise = runAutoCommit(opts);
+        const request = await received;
+        expect(request.method).toBe('POST');
+        expect(new URL(request.url).pathname).toBe('/commit-message');
+        await expect(request.json()).resolves.toEqual({ path: '/workspace' });
+        await vi.advanceTimersByTimeAsync(29_999);
+        expect(request.signal.aborted).toBe(false);
+        expect(mockGit).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        const result = await resultPromise;
 
-      expect(result).toEqual({ success: true });
-      expect(mockGit).toHaveBeenNthCalledWith(
-        3,
-        ['commit', '-m', commitMessage],
-        expect.objectContaining({ cwd: '/workspace', timeoutMs: 30_000 })
-      );
-      expect(mockGit).toHaveBeenLastCalledWith(
-        ['push'],
-        expect.objectContaining({ cwd: '/workspace', timeoutMs: 60_000 })
-      );
-      const completed = events.find(e => e.streamEventType === 'autocommit_completed');
-      expect(completed?.data).toEqual(
-        expect.objectContaining({
-          success: true,
-          message: 'Changes committed and pushed',
-          commitHash: 'abc1234',
-          commitMessage,
-        })
-      );
-      expect(vi.getTimerCount()).toBe(0);
-    } finally {
-      vi.useRealTimers();
+        expect(request.signal.aborted).toBe(true);
+        expect(request.signal.reason).toEqual(new Error('Commit message generation timed out'));
+        expect(controller.signal.aborted).toBe(false);
+        expect(result).toEqual({ success: true });
+        expect(mockGit).toHaveBeenNthCalledWith(
+          3,
+          ['commit', '-m', commitMessage],
+          expect.objectContaining({ cwd: '/workspace', timeoutMs: 30_000, signal: opts.signal })
+        );
+        expect(mockGit).toHaveBeenCalledWith(
+          ['push'],
+          expect.objectContaining({ cwd: '/workspace', timeoutMs: 60_000, signal: opts.signal })
+        );
+        const completed = events.find(e => e.streamEventType === 'autocommit_completed');
+        expect(completed?.data).toEqual(
+          expect.objectContaining({
+            success: true,
+            message: 'Changes committed; push command completed',
+            commitHash,
+            commitMessage,
+          })
+        );
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
     }
+  );
+
+  it('commits wip when generation returns an HTTP error without caller cancellation', async () => {
+    mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+    setupHappyPathGit();
+    const { kiloClient, received, response } = blockCommitMessageRequest();
+    const { opts, events } = createOpts({ kiloClient });
+
+    const pending = runAutoCommit(opts);
+    const request = await received;
+    response.resolve(Response.json({ message: 'generation failed' }, { status: 422 }));
+
+    expect(await pending).toEqual({ success: true });
+    expect(request.signal.aborted).toBe(false);
+    const completed = events.find(event => event.streamEventType === 'autocommit_completed');
+    expect(completed?.data.commitMessage).toBe('wip');
+    expect(mockGit).toHaveBeenNthCalledWith(
+      3,
+      ['commit', '-m', 'wip'],
+      expect.objectContaining({ cwd: '/workspace' })
+    );
+  });
+
+  it('does not stage when caller cancellation races a successful generation response', async () => {
+    mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+    mockGit.mockResolvedValueOnce(ok(' M file.ts'));
+    const { kiloClient, received, response } = blockCommitMessageRequest();
+    const controller = new AbortController();
+    const reason = new Error('Task cancelled');
+    const { opts } = createOpts({ kiloClient, signal: controller.signal });
+
+    const pending = runAutoCommit(opts);
+    const request = await received;
+    response.resolve(Response.json({ message: 'too late' }));
+    controller.abort(reason);
+
+    expect(await pending).toEqual({ success: false, error: 'Task cancelled' });
+    expect(request.signal.reason).toBe(reason);
+    expect(mockGit.mock.calls.map(([args]) => args)).toEqual([['status', '--porcelain']]);
   });
 
   it('reports aborted git status distinctly from timeout', async () => {
@@ -379,13 +586,68 @@ describe('runAutoCommit', () => {
     );
   });
 
+  it('redacts explicit worktree profile credentials from finalization failures and logs', async () => {
+    const secret = 'explicit-profile-github-credential';
+    mockGetCurrentBranch.mockResolvedValue('feature/worktree');
+    mockGit
+      .mockResolvedValueOnce(ok(' M file.ts'))
+      .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(ok('[feature/worktree abc1234] test commit'))
+      .mockResolvedValueOnce(raw(`${commitHash}\n`))
+      .mockResolvedValueOnce(commitObject('test commit'))
+      .mockResolvedValueOnce({
+        stdout: '',
+        stderr: `remote: rejected credential ${secret}`,
+        exitCode: 1,
+      });
+    const { opts, events } = createOpts({ env: { GH_TOKEN: secret } });
+
+    await runAutoCommit(opts);
+
+    expect(
+      events.find(event => event.streamEventType === 'autocommit_completed')?.data.message
+    ).toContain('push failed');
+    expect(JSON.stringify(events)).not.toContain(secret);
+    expect(JSON.stringify(vi.mocked(logToFile).mock.calls)).not.toContain(secret);
+  });
+
+  it('redacts a non-heuristic named secret from push failure events and logs', async () => {
+    const secret = 'postgres://user:pass@localhost:5432/prod';
+    mockGetCurrentBranch.mockResolvedValue('feature/worktree');
+    mockGit
+      .mockResolvedValueOnce(ok(' M file.ts'))
+      .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(ok('[feature/worktree abc1234] test commit'))
+      .mockResolvedValueOnce(raw(`${commitHash}\n`))
+      .mockResolvedValueOnce(commitObject('test commit'))
+      .mockResolvedValueOnce({
+        stdout: '',
+        stderr: `fatal: cannot reach ${secret}`,
+        exitCode: 1,
+      });
+    const { opts, events } = createOpts({
+      env: { DATABASE_URL: secret },
+      secretEnvKeys: ['DATABASE_URL'],
+    });
+
+    await runAutoCommit(opts);
+
+    expect(
+      events.find(event => event.streamEventType === 'autocommit_completed')?.data.message
+    ).toContain('push failed');
+    expect(JSON.stringify(events)).toContain('[REDACTED]');
+    expect(JSON.stringify(events)).not.toContain(secret);
+    expect(JSON.stringify(vi.mocked(logToFile).mock.calls)).not.toContain(secret);
+  });
+
   it('redacts authenticated GitHub remotes from push failure events', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
     mockGit
       .mockResolvedValueOnce(ok(' M file.ts'))
       .mockResolvedValueOnce(ok())
       .mockResolvedValueOnce(ok('[feature/cool-stuff abc1234] test commit'))
-      .mockResolvedValueOnce(ok('abc1234'))
+      .mockResolvedValueOnce(raw(`${commitHash}\n`))
+      .mockResolvedValueOnce(commitObject('test commit'))
       .mockResolvedValueOnce({
         stdout: '',
         stderr:
@@ -397,28 +659,520 @@ describe('runAutoCommit', () => {
     await runAutoCommit(opts);
 
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
-    expect(completed?.data.message).toContain('x-access-token:***@github.com');
+    expect(completed?.data.message).toContain('https://[REDACTED]@github.com/acme/repo.git');
     expect(completed?.data.message).not.toContain('user-secret');
   });
 
-  it('clears commit message timeout when lifecycle signal aborts generation', async () => {
+  it('cancels queued auto-commit without releasing its predecessor or blocking other worktrees', async () => {
+    const workspacePath = '/workspace/shared';
+    const otherDirectory = '/workspace/other';
+    const dirty = new Set([workspacePath, otherDirectory]);
+    const pushing = Promise.withResolvers<void>();
+    const stopped = Promise.withResolvers<Utils.ExecResult>();
+    const controllers = [new AbortController(), new AbortController(), new AbortController()];
+    const first = createOpts({ workspacePath, signal: controllers[0].signal });
+    const cancelled = createOpts({ workspacePath, signal: controllers[1].signal });
+    const next = createOpts({ workspacePath, signal: controllers[2].signal });
+    const other = createOpts({ workspacePath: otherDirectory });
+    const pending: ReturnType<typeof runAutoCommit>[] = [];
+    let firstSettled = false;
+    let nextSettled = false;
+    mockGetCurrentBranch.mockResolvedValue('work');
+    mockGit.mockImplementation(async (args, options) => {
+      const directory = options?.cwd ?? '';
+      if (args[0] === 'status') return ok(dirty.has(directory) ? ' M result.txt\n' : '');
+      if (args[0] === 'commit') dirty.delete(directory);
+      if (args.includes('reflog')) return raw(`${commitHash}\n`);
+      if (args.includes('cat-file')) return commitObject('test commit');
+      if (args[0] === 'push' && directory === workspacePath) {
+        pushing.resolve();
+        return stopped.promise;
+      }
+      return ok();
+    });
+    try {
+      const firstCommit = runAutoCommit(first.opts).then(result => {
+        firstSettled = true;
+        return result;
+      });
+      pending.push(firstCommit);
+      await pushing.promise;
+      const cancelledCommit = runAutoCommit(cancelled.opts);
+      pending.push(cancelledCommit);
+      controllers[1].abort(new Error('Queued finalization cancelled'));
+      expect(
+        await withTimeoutAndAbort(cancelledCommit, {
+          timeoutMs: 1_000,
+          timeoutMessage: 'Queued auto-commit cancellation waited for its predecessor',
+          abortMessage: 'Test cancelled',
+        })
+      ).toEqual({ success: false, error: 'Queued finalization cancelled' });
+      expect(cancelled.events).toEqual([
+        expect.objectContaining({
+          streamEventType: 'autocommit_completed',
+          data: expect.objectContaining({ success: false }),
+        }),
+      ]);
+      const nextCommit = runAutoCommit(next.opts).then(result => {
+        nextSettled = true;
+        return result;
+      });
+      const otherCommit = runAutoCommit(other.opts);
+      pending.push(nextCommit, otherCommit);
+      expect(
+        await withTimeoutAndAbort(otherCommit, {
+          timeoutMs: 1_000,
+          timeoutMessage: 'Unrelated worktree auto-commit was blocked',
+          abortMessage: 'Test cancelled',
+        })
+      ).toEqual({ success: true });
+      expect(firstSettled).toBe(false);
+      expect(nextSettled).toBe(false);
+      expect(next.events).toEqual([]);
+
+      controllers[0].abort(new Error('Running finalization cancelled'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(firstSettled).toBe(false);
+      expect(nextSettled).toBe(false);
+      stopped.resolve({ ...ok(), exitCode: 124, terminationReason: 'abort' });
+      await firstCommit;
+      expect(await nextCommit).toEqual({ success: true, skipped: true });
+      expect(cancelled.opts.kiloClient.generateCommitMessage).not.toHaveBeenCalled();
+      expect(next.opts.kiloClient.generateCommitMessage).not.toHaveBeenCalled();
+      expect(mockGetCurrentBranch.mock.calls.map(([directory]) => directory)).toEqual([
+        workspacePath,
+        otherDirectory,
+        workspacePath,
+      ]);
+    } finally {
+      for (const controller of controllers) controller.abort();
+      stopped.resolve({ ...ok(), exitCode: 124, terminationReason: 'abort' });
+      await Promise.allSettled(pending);
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+    }
+  });
+
+  it.each(['sha1', 'sha256'] as const)(
+    'uses invocation reflog identity and hook-authored %s metadata despite a later HEAD',
+    async objectFormat => {
+      const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'owned-commit-'));
+      const env = {
+        PATH: process.env.PATH,
+        HOME: root,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      };
+      const run = async (args: string[]) => {
+        const result = await actual.git(args, { cwd: root, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout.trim();
+      };
+      let ownedHash = '';
+      try {
+        await run(['init', '-b', 'work', `--object-format=${objectFormat}`]);
+        await run(['config', 'user.name', 'Test']);
+        await run(['config', 'user.email', 'test@example.com']);
+        await run(['config', 'commit.gpgsign', 'false']);
+        await fs.writeFile(path.join(root, 'file.txt'), 'owned\n');
+        await fs.writeFile(
+          path.join(root, '.git/hooks/commit-msg'),
+          '#!/bin/sh\nprintf "Hook subject\\n\\nHook body\\n" > "$1"\n',
+          { mode: 0o755 }
+        );
+        mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+        mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+        mockGit.mockImplementation(async (args, options) => {
+          const result = await actual.git(args, options);
+          if (args[0] === 'commit') {
+            ownedHash = await run(['rev-parse', 'HEAD']);
+            await fs.writeFile(path.join(root, 'file.txt'), 'later\n');
+            await run(['add', '-A']);
+            await run(['-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'Unrelated later commit']);
+          }
+          return result;
+        });
+        const { opts, events } = createOpts({
+          workspacePath: root,
+          env,
+          userMessageId: 'user',
+          messageId: 'assistant',
+        });
+        expect(await runAutoCommit(opts)).toEqual({ success: true });
+        expect(ownedHash).toHaveLength(objectFormat === 'sha1' ? 40 : 64);
+        expect(await run(['rev-parse', 'HEAD'])).not.toBe(ownedHash);
+        expect(events.at(-1)?.data).toMatchObject({
+          success: true,
+          commitHash: ownedHash,
+          commitMessage: 'Hook subject\n\nHook body\n',
+          userMessageId: 'user',
+          messageId: 'assistant',
+          pushStatus: 'failed',
+        });
+        expect(events.at(-1)?.data.committedAt).toBe(
+          new Date(await run(['show', '-s', '--format=%cI', ownedHash])).toISOString()
+        );
+        expect(autoCommitRecordSchema.safeParse(events.at(-1)?.data).success).toBe(true);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.each([true, false])(
+    'does not claim the captured commit was pushed after a non-descendant ref move with tracking=%s',
+    async tracking => {
+      const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'moved-autocommit-ref-'));
+      const workspacePath = path.join(root, 'workspace');
+      const remote = path.join(root, 'remote.git');
+      const env = {
+        PATH: process.env.PATH,
+        HOME: root,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      };
+      const run = async (args: string[], cwd = workspacePath) => {
+        const result = await actual.git(args, { cwd, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout.trim();
+      };
+      const pushCalls: string[][] = [];
+      let capturedHash = '';
+      try {
+        await fs.mkdir(workspacePath);
+        await run(['init', '--bare', remote]);
+        await run(['init', '-b', 'work']);
+        await run(['config', 'user.name', 'Test']);
+        await run(['config', 'user.email', 'test@example.com']);
+        await run(['config', 'commit.gpgsign', 'false']);
+        await run(['remote', 'add', 'origin', remote]);
+        await fs.writeFile(path.join(workspacePath, 'file.txt'), 'seed\n');
+        await run(['add', '-A']);
+        await run(['commit', '-m', 'seed']);
+        await run(['push', ...(tracking ? ['-u'] : []), 'origin', 'work']);
+        const replacementHash = await run([
+          'commit-tree',
+          'HEAD^{tree}',
+          '-p',
+          'HEAD',
+          '-m',
+          'Unrelated B',
+        ]);
+        await fs.writeFile(path.join(workspacePath, 'file.txt'), 'managed A\n');
+        mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+        mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+        mockGit.mockImplementation(async (args, options) => {
+          if (args[0] === 'push') {
+            expect(capturedHash).toMatch(/^[0-9a-f]{40}$/);
+            pushCalls.push(args);
+            await run(['update-ref', 'refs/heads/work', replacementHash, capturedHash]);
+          }
+          const result = await actual.git(args, options);
+          if (args.includes('cat-file') && args.includes('commit'))
+            capturedHash = args.at(-1) ?? '';
+          if (args[0] === 'push') expect(result.exitCode).toBe(0);
+          return result;
+        });
+        const { opts, events } = createOpts({
+          workspacePath,
+          env,
+          userMessageId: 'user',
+          messageId: 'assistant',
+        });
+        expect(await runAutoCommit(opts)).toEqual({ success: true });
+        expect(pushCalls).toEqual([tracking ? ['push'] : ['push', '-u', 'origin', 'work']]);
+        expect(await run(['rev-parse', 'refs/heads/work'], remote)).toBe(replacementHash);
+        expect(
+          (
+            await actual.git(['merge-base', '--is-ancestor', capturedHash, replacementHash], {
+              cwd: workspacePath,
+              env,
+              inheritEnv: false,
+            })
+          ).exitCode
+        ).toBe(1);
+        expect(
+          (
+            await actual.git(['cat-file', '-e', `${capturedHash}^{commit}`], {
+              cwd: remote,
+              env,
+              inheritEnv: false,
+            })
+          ).exitCode
+        ).not.toBe(0);
+        expect(events.at(-1)?.data).toMatchObject({
+          success: true,
+          commitHash: capturedHash,
+          commitMessage: 'test commit\n',
+          userMessageId: 'user',
+          messageId: 'assistant',
+          pushStatus: 'unknown',
+          message: 'Changes committed; push command completed',
+        });
+        expect(autoCommitRecordSchema.safeParse(events.at(-1)?.data).success).toBe(true);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('recovers real ref evidence when cancellation kills the post-commit hook', async () => {
+    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aborted-owned-commit-'));
+    const env = {
+      PATH: process.env.PATH,
+      HOME: root,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+    };
+    const run = async (args: string[]) => {
+      const result = await actual.git(args, { cwd: root, env, inheritEnv: false });
+      expect(result.exitCode).toBe(0);
+      return result.stdout.trim();
+    };
+    const controller = new AbortController();
+    try {
+      await run(['init', '-b', 'work']);
+      await run(['config', 'user.name', 'Test']);
+      await run(['config', 'user.email', 'test@example.com']);
+      await run(['config', 'commit.gpgsign', 'false']);
+      await fs.writeFile(path.join(root, 'file.txt'), 'owned\n');
+      await fs.writeFile(
+        path.join(root, '.git/hooks/post-commit'),
+        '#!/bin/sh\nprintf "ref-updated\\n"\nsleep 30\n',
+        { mode: 0o755 }
+      );
+      mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+      mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+      mockGit.mockImplementation((args, options) =>
+        actual.git(args, {
+          ...options,
+          ...(args[0] === 'commit'
+            ? {
+                terminationGraceMs: 100,
+                onOutput: (_stream, output) => {
+                  if (output.includes('ref-updated')) controller.abort();
+                },
+              }
+            : {}),
+        })
+      );
+      const { opts, events } = createOpts({ workspacePath: root, env, signal: controller.signal });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      expect(controller.signal.aborted).toBe(true);
+      expect(events.at(-1)?.data).toMatchObject({
+        success: true,
+        commitHash: await run(['rev-parse', 'HEAD']),
+        commitMessage: 'test commit\n',
+        pushStatus: 'not_attempted',
+      });
+      expect(mockGit.mock.calls.filter(([args]) => args[0] === 'commit')).toHaveLength(1);
+    } finally {
+      controller.abort();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([false, true])(
+    'serializes same-worktree auto-commit through push with new sibling edits=%s',
+    async siblingEdits => {
+      const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'shared-worktree-autocommit-'));
+      const workspacePath = path.join(root, 'workspace');
+      const remote = path.join(root, 'remote.git');
+      const home = path.join(root, 'home');
+      const env = { PATH: process.env.PATH, HOME: home };
+      const generating = Promise.withResolvers<void>();
+      const generated = Promise.withResolvers<{ message: string }>();
+      const pushing = Promise.withResolvers<void>();
+      const pushed = Promise.withResolvers<void>();
+      const controllers = [new AbortController(), new AbortController()];
+      const pending: ReturnType<typeof runAutoCommit>[] = [];
+      const first = createOpts({
+        workspacePath,
+        env,
+        messageId: 'first',
+        signal: controllers[0].signal,
+      });
+      const second = createOpts({
+        workspacePath,
+        env,
+        messageId: 'second',
+        signal: controllers[1].signal,
+      });
+      let secondSettled = false;
+      vi.mocked(first.opts.kiloClient.generateCommitMessage).mockImplementation(() => {
+        generating.resolve();
+        return generated.promise;
+      });
+      mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+      mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+      mockGit.mockImplementation(async (args, options) => {
+        if (args[0] === 'push') {
+          pushing.resolve();
+          await pushed.promise;
+        }
+        return actual.git(args, options);
+      });
+      const git = async (args: string[]) => {
+        const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout;
+      };
+      try {
+        await fs.mkdir(workspacePath);
+        await fs.mkdir(home);
+        await git(['init', '--bare', remote]);
+        await git(['init', '--initial-branch=work']);
+        await git(['config', 'user.name', 'Test Agent']);
+        await git(['config', 'user.email', 'test@example.com']);
+        await git(['config', 'commit.gpgsign', 'false']);
+        await git(['remote', 'add', 'origin', remote]);
+        await fs.writeFile(path.join(workspacePath, 'result.txt'), 'shared changes\n');
+
+        const firstCommit = runAutoCommit(first.opts);
+        pending.push(firstCommit);
+        await generating.promise;
+        const secondCommit = runAutoCommit(second.opts).then(result => {
+          secondSettled = true;
+          return result;
+        });
+        pending.push(secondCommit);
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+        expect(second.events).toEqual([]);
+        expect(secondSettled).toBe(false);
+
+        generated.resolve({ message: 'Commit shared changes' });
+        await pushing.promise;
+        expect(await git(['status', '--porcelain'])).toBe('');
+        expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+        expect(secondSettled).toBe(false);
+        if (siblingEdits) {
+          await fs.writeFile(path.join(workspacePath, 'sibling.txt'), 'later sibling changes\n');
+        }
+        pushed.resolve();
+        expect(await firstCommit).toEqual({ success: true });
+        expect(await secondCommit).toEqual(
+          siblingEdits ? { success: true } : { success: true, skipped: true }
+        );
+        expect(
+          second.events.find(event => event.streamEventType === 'autocommit_completed')?.data
+        ).toMatchObject({ success: true, messageId: 'second' });
+        if (siblingEdits) {
+          expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:sibling.txt'])).toBe(
+            'later sibling changes\n'
+          );
+        } else {
+          expect(second.events).toHaveLength(1);
+          expect(second.events[0].data.skipped).toBe(true);
+        }
+        expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
+          'shared changes\n'
+        );
+        expect(
+          (await git(['--git-dir', remote, 'rev-list', '--count', 'refs/heads/work'])).trim()
+        ).toBe(siblingEdits ? '2' : '1');
+      } finally {
+        for (const controller of controllers) controller.abort();
+        generated.resolve({ message: 'Commit shared changes' });
+        pushed.resolve();
+        await Promise.allSettled(pending);
+        mockGit.mockReset();
+        mockGetCurrentBranch.mockReset();
+        mockHasGitUpstream.mockReset();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+    30_000
+  );
+
+  it('commits and pushes with the isolated worktree environment instead of wrapper credentials', async () => {
+    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'worktree-autocommit-'));
+    const workspacePath = path.join(root, 'workspace');
+    const remote = path.join(root, 'remote.git');
+    const home = path.join(root, 'home');
+    const report = path.join(root, 'hook-env.json');
+    const env = {
+      PATH: process.env.PATH,
+      HOME: home,
+      XDG_DATA_HOME: path.join(home, 'data'),
+      KILOCODE_TOKEN: 'guest-worktree-alias',
+      WORKTREE_ENV_REPORT: report,
+    };
+    vi.stubEnv('AUTOCOMMIT_PARENT_ONLY', 'wrapper-only-value');
+    mockGit.mockImplementation(actual.git);
+    mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+    mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+    try {
+      await fs.mkdir(workspacePath);
+      await fs.mkdir(home);
+      const git = async (args: string[]) => {
+        const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout;
+      };
+      await git(['init', '--bare', remote]);
+      await git(['init', '--initial-branch=work']);
+      await git(['config', 'user.name', 'Test Agent']);
+      await git(['config', 'user.email', 'test@example.com']);
+      await git(['config', 'commit.gpgsign', 'false']);
+      await git(['remote', 'add', 'origin', remote]);
+      await fs.writeFile(path.join(workspacePath, 'result.txt'), 'contained finalization\n');
+      const hook = `#!/bin/sh\nnode -e 'require("node:fs").writeFileSync(process.env.WORKTREE_ENV_REPORT, JSON.stringify({home:process.env.HOME,data:process.env.XDG_DATA_HOME,token:process.env.KILOCODE_TOKEN,parent:process.env.AUTOCOMMIT_PARENT_ONLY ?? null}))'\n`;
+      await fs.writeFile(path.join(workspacePath, '.git', 'hooks', 'pre-commit'), hook, {
+        mode: 0o755,
+      });
+      const { opts } = createOpts({ workspacePath, env });
+
+      await expect(runAutoCommit(opts)).resolves.toEqual({ success: true });
+      expect(JSON.parse(await fs.readFile(report, 'utf8'))).toEqual({
+        home,
+        data: env.XDG_DATA_HOME,
+        token: env.KILOCODE_TOKEN,
+        parent: null,
+      });
+      expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
+        'contained finalization\n'
+      );
+    } finally {
+      vi.unstubAllEnvs();
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('aborts the generation request on caller cancellation without staging, committing, or pushing', async () => {
     vi.useFakeTimers();
     try {
       mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
       mockGit.mockResolvedValue(ok());
       mockGit.mockResolvedValueOnce(ok(' M file.ts'));
       const controller = new AbortController();
-      const kiloClient = createMockKiloClient();
-      vi.mocked(kiloClient.generateCommitMessage).mockReturnValue(new Promise(() => {}));
-      const { opts } = createOpts({ kiloClient, signal: controller.signal });
+      const reason = new Error('Task cancelled');
+      const { kiloClient, received } = blockCommitMessageRequest();
+      const { opts, events } = createOpts({ kiloClient, signal: controller.signal });
 
       const resultPromise = runAutoCommit(opts);
-      await vi.advanceTimersByTimeAsync(1);
-      controller.abort();
+      const request = await received;
+      expect(request.signal.aborted).toBe(false);
+      controller.abort(reason);
       const result = await resultPromise;
 
-      expect(result).toEqual({ success: true });
-      expect(kiloClient.generateCommitMessage).toHaveBeenCalled();
+      expect(request.signal.aborted).toBe(true);
+      expect(request.signal.reason).toBe(reason);
+      expect(result).toEqual({ success: false, error: 'Task cancelled' });
+      expect(mockGit.mock.calls.map(([args]) => args)).toEqual([['status', '--porcelain']]);
+      expect(events.map(event => event.data.message)).toEqual([
+        'Generating commit message...',
+        'Auto-commit failed: Task cancelled',
+      ]);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();

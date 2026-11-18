@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
-import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
+import type { AdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
   buildCodingPlanInventorySlackNotification,
   sendCodingPlanInventorySlackSummary,

@@ -1,0 +1,428 @@
+'use client';
+
+import { useEffect, useId, useRef, useState } from 'react';
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
+import {
+  Box,
+  ChevronRight,
+  Circle,
+  CircleQuestionMark,
+  Clock3,
+  Moon,
+  Power,
+  PowerOff,
+  TriangleAlert,
+  Unplug,
+  type LucideIcon,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
+import { subscribeSandboxStatus } from './sandbox-status-stream';
+import { cn } from '@/lib/utils';
+import {
+  sandboxObservationKey,
+  sandboxStatusPresentation,
+  type SandboxObservation,
+  type SandboxStatusPresentation,
+} from './sandbox-status';
+import { formatSnapshotTime } from './snapshot-display';
+import { SandboxComputeRate } from './SandboxComputeRate';
+
+const statusBadgeIcons = {
+  active: Circle,
+  sleeping: Moon,
+  'sleeping-soon': Clock3,
+  starting: Power,
+  stopping: PowerOff,
+  error: TriangleAlert,
+  unreachable: Unplug,
+  unknown: CircleQuestionMark,
+} satisfies Record<SandboxStatusPresentation['status'], LucideIcon>;
+
+function SandboxStatusDetails({ view }: { view: SandboxStatusPresentation }) {
+  const hasLifecycleDates = view.startedAt !== null || view.stoppedAt !== null;
+  const hasTiming = hasLifecycleDates || view.estimatedSleepAt !== null;
+
+  return (
+    <div className="space-y-3 text-xs">
+      <div className="space-y-1.5">
+        <div className="text-foreground flex items-baseline justify-between gap-4 font-medium">
+          <span>Sandbox</span>
+          <span>{view.label}</span>
+        </div>
+        {view.status !== 'active' && <p className="text-muted-foreground">{view.detail}</p>}
+      </div>
+      <section className="space-y-2 border-t pt-3">
+        <h3 className="text-foreground font-medium">Runtime</h3>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5">
+          <dt className="text-muted-foreground">Provider</dt>
+          <dd className="text-right">{view.provider}</dd>
+          <dt className="text-muted-foreground">Sandbox type</dt>
+          <dd className="text-right">{view.sandboxType}</dd>
+          {view.capacity !== null && (
+            <>
+              <dt className="text-muted-foreground">Capacity</dt>
+              <dd className="text-right tabular-nums">{view.capacity}</dd>
+            </>
+          )}
+        </dl>
+      </section>
+      {view.snapshotCapturedAt !== null && (
+        <section className="space-y-2 border-t pt-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-foreground font-medium">Workspace snapshot</h3>
+            <span className="text-muted-foreground">Local time</span>
+          </div>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5">
+            <dt className="text-muted-foreground">Captured</dt>
+            <dd className="text-right tabular-nums">
+              <time dateTime={new Date(view.snapshotCapturedAt).toISOString()}>
+                {formatSnapshotTime(view.snapshotCapturedAt)}
+              </time>
+            </dd>
+          </dl>
+          <p className="text-muted-foreground">Shared by all chats in this workspace.</p>
+        </section>
+      )}
+      {hasTiming && (
+        <section className="space-y-2 border-t pt-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-foreground font-medium">Timing</h3>
+            {hasLifecycleDates && <span className="text-muted-foreground">Local time</span>}
+          </div>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5">
+            {view.startedAt !== null && (
+              <>
+                <dt className="text-muted-foreground">Started</dt>
+                <dd className="text-right tabular-nums">
+                  <time dateTime={new Date(view.startedAt).toISOString()}>
+                    {new Date(view.startedAt).toLocaleString([], {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
+                </dd>
+              </>
+            )}
+            {view.stoppedAt !== null && (
+              <>
+                <dt className="text-muted-foreground">Stopped</dt>
+                <dd className="text-right tabular-nums">
+                  <time dateTime={new Date(view.stoppedAt).toISOString()}>
+                    {new Date(view.stoppedAt).toLocaleString([], {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
+                </dd>
+              </>
+            )}
+            {view.estimatedSleepAt !== null && (
+              <>
+                <dt className="text-muted-foreground">Sleeps in</dt>
+                <dd className="text-right tabular-nums">
+                  <time dateTime={new Date(view.estimatedSleepAt).toISOString()}>
+                    About {view.sleepMinutesRemaining} min if inactive
+                  </time>
+                </dd>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
+    </div>
+  );
+}
+
+export function SandboxStatusIndicator({
+  scopeId,
+  cloudAgentSessionId,
+  organizationId,
+  sessionActive,
+}: {
+  /** Chats of one worktree share its sandbox, so one observation serves all of them. */
+  scopeId: string;
+  cloudAgentSessionId: string;
+  organizationId?: string;
+  sessionActive: boolean;
+}) {
+  const queryClient = useQueryClient();
+  // Read when a subscription starts: a chat switch in the same sandbox keeps it.
+  const cloudAgentSessionIdRef = useRef(cloudAgentSessionId);
+  cloudAgentSessionIdRef.current = cloudAgentSessionId;
+  const [streamHealthy, setStreamHealthy] = useState(false);
+  const [observation, setObservation] = useState({
+    enabled: false,
+    initialized: false,
+    freshAfter: 0,
+  });
+  const [clock, setClock] = useState(0);
+  const [activity, setActivity] = useState({ active: sessionActive, changedAt: 0 });
+  const [openMode, setOpenMode] = useState<'preview' | 'pinned' | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const debugSummaryRef = useRef<HTMLElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detailsId = useId();
+
+  function cancelPreviewClose() {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+
+  function closePopover() {
+    cancelPreviewClose();
+    setOpenMode(null);
+  }
+
+  function schedulePreviewClose() {
+    cancelPreviewClose();
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      setOpenMode(current => (current === 'preview' ? null : current));
+    }, 150);
+  }
+
+  function pinPopover() {
+    cancelPreviewClose();
+    setOpenMode('pinned');
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  if (activity.active !== sessionActive) {
+    setActivity({ active: sessionActive, changedAt: Date.now() });
+  }
+
+  useEffect(() => {
+    const update = () => {
+      setObservation({
+        enabled: document.visibilityState === 'visible' && navigator.onLine,
+        initialized: true,
+        freshAfter: Date.now(),
+      });
+    };
+    update();
+    document.addEventListener('visibilitychange', update);
+    window.addEventListener('offline', update);
+    window.addEventListener('online', update);
+    window.addEventListener('focus', update);
+    return () => {
+      document.removeEventListener('visibilitychange', update);
+      window.removeEventListener('offline', update);
+      window.removeEventListener('online', update);
+      window.removeEventListener('focus', update);
+    };
+  }, []);
+
+  const observationKey = sandboxObservationKey(scopeId, organizationId);
+  // Filled only by the status stream below, never fetched.
+  const query = useQuery<SandboxObservation>({
+    queryKey: observationKey,
+    queryFn: skipToken,
+    gcTime: 0,
+  });
+
+  useEffect(() => {
+    setStreamHealthy(false);
+    if (!observation.enabled) return;
+    const controller = new AbortController();
+    const cloudAgentSessionId = cloudAgentSessionIdRef.current;
+    const key = sandboxObservationKey(scopeId, organizationId);
+    const getTicket = () =>
+      queryClient.query({
+        queryKey: [...key, cloudAgentSessionId, 'stream-ticket', observation.freshAfter],
+        staleTime: 0,
+        gcTime: 0,
+        retry: 2,
+        retryDelay: 500,
+        queryFn: async () => {
+          const response = await fetch('/api/cloud-agent-next/sessions/stream-ticket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cloudAgentSessionId, organizationId }),
+            signal: controller.signal,
+          });
+          if (!response.ok) throw new Error('Sandbox status authorization failed');
+          return z
+            .object({ ticket: z.string(), expiresAt: z.number() })
+            .parse(await response.json());
+        },
+      });
+    const unsubscribe = subscribeSandboxStatus({
+      baseUrl: CLOUD_AGENT_NEXT_WS_URL,
+      sessionId: cloudAgentSessionId,
+      getTicket,
+      onDisconnected: () => setStreamHealthy(false),
+      onSnapshot: snapshot => {
+        const receivedAt = Date.now();
+        queryClient.setQueryData(key, {
+          snapshot,
+          requestedAt: receivedAt,
+          receivedAt,
+        });
+        setStreamHealthy(true);
+      },
+    });
+    return () => {
+      unsubscribe();
+      controller.abort();
+    };
+  }, [scopeId, organizationId, observation.enabled, observation.freshAfter, queryClient]);
+
+  const now = Math.max(clock, Date.now());
+  const view = sandboxStatusPresentation({
+    data: query.data?.snapshot,
+    observation: !observation.initialized
+      ? 'checking'
+      : !observation.enabled
+        ? 'paused'
+        : !streamHealthy
+          ? query.data
+            ? 'unavailable'
+            : 'checking'
+          : 'observing',
+    live: streamHealthy && observation.enabled,
+    requestedAt: query.data?.requestedAt ?? 0,
+    receivedAt: query.data?.receivedAt ?? 0,
+    freshAfter: observation.freshAfter,
+    estimateAfter: activity.changedAt,
+    sessionActive,
+    now,
+  });
+
+  useEffect(() => {
+    const deadline = view.nextChangeAt;
+    if (deadline === null) return;
+    const timer = setTimeout(
+      () => setClock(current => Math.max(current, deadline, Date.now())),
+      Math.max(0, deadline - Date.now())
+    );
+    return () => clearTimeout(timer);
+  }, [view.nextChangeAt]);
+
+  const StatusBadgeIcon = statusBadgeIcons[view.status];
+
+  return (
+    <Popover
+      open={openMode !== null}
+      onOpenChange={open => {
+        if (open) pinPopover();
+        else closePopover();
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          ref={triggerRef}
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          aria-label={`Sandbox status: ${view.label}`}
+          {...(openMode !== null ? { 'aria-describedby': detailsId } : {})}
+          onPointerEnter={event => {
+            if (event.pointerType !== 'mouse') return;
+            cancelPreviewClose();
+            setOpenMode(current => current ?? 'preview');
+          }}
+          onPointerLeave={schedulePreviewClose}
+          onClick={event => {
+            event.preventDefault();
+            if (openMode === 'pinned') {
+              closePopover();
+            } else {
+              pinPopover();
+              debugSummaryRef.current?.focus();
+            }
+          }}
+        >
+          <span className="relative size-4">
+            <Box aria-hidden="true" className="size-4" />
+            <span className="bg-background absolute -right-1.5 -bottom-1.5 flex size-3.5 items-center justify-center rounded-full">
+              <StatusBadgeIcon
+                aria-hidden="true"
+                className={cn(
+                  view.status === 'active'
+                    ? 'text-status-success-icon size-1.5! fill-current'
+                    : 'size-3!',
+                  view.status === 'error' && 'text-status-destructive-icon',
+                  (view.status === 'sleeping-soon' ||
+                    view.status === 'starting' ||
+                    view.status === 'stopping' ||
+                    view.status === 'unreachable') &&
+                    'text-status-warning-icon'
+                )}
+              />
+            </span>
+          </span>
+        </Button>
+      </PopoverTrigger>
+      {openMode !== null && (
+        <PopoverContent
+          side="bottom"
+          align="end"
+          className="w-80 max-w-[calc(100vw-2rem)] p-4"
+          aria-label="Sandbox status details"
+          onPointerEnter={cancelPreviewClose}
+          onPointerLeave={schedulePreviewClose}
+          onPointerDownCapture={pinPopover}
+          onFocusCapture={pinPopover}
+          onOpenAutoFocus={event => {
+            if (openMode === 'preview') event.preventDefault();
+          }}
+          onCloseAutoFocus={event => {
+            if (openMode === 'preview') event.preventDefault();
+          }}
+          onEscapeKeyDown={() => {
+            if (openMode === 'pinned') triggerRef.current?.focus();
+          }}
+          onKeyDown={event => {
+            if (
+              event.key === 'Tab' &&
+              !event.altKey &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              (event.shiftKey || event.target !== event.currentTarget)
+            ) {
+              triggerRef.current?.focus();
+              closePopover();
+            }
+          }}
+        >
+          <div id={detailsId}>
+            <SandboxStatusDetails view={view} />
+            <SandboxComputeRate snapshot={query.data?.snapshot} organizationId={organizationId} />
+          </div>
+          <details className="group mt-3 border-t text-xs">
+            <summary
+              ref={debugSummaryRef}
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden"
+            >
+              <ChevronRight aria-hidden="true" className="size-3 group-open:rotate-90" />
+              Debug
+            </summary>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5">
+              <dt className="text-muted-foreground">Execution</dt>
+              <dd className="text-right">Control plane</dd>
+              <dt className="text-muted-foreground">Kilo CLI</dt>
+              <dd className="text-right font-mono wrap-anywhere">
+                {view.kiloCliVersion ?? 'Unknown'}
+              </dd>
+              <dt className="text-muted-foreground">Wrapper</dt>
+              <dd className="text-right font-mono wrap-anywhere">
+                {view.wrapperVersion ?? 'Unknown'}
+              </dd>
+            </dl>
+          </details>
+        </PopoverContent>
+      )}
+    </Popover>
+  );
+}

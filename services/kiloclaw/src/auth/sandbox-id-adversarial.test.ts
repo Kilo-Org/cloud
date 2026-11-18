@@ -16,10 +16,6 @@ import { describe, it, expect } from 'vitest';
 import { sandboxIdFromUserId, userIdFromSandboxId } from './sandbox-id';
 import { appNameFromUserId } from '../fly/apps';
 
-// =============================================================================
-// sandboxIdFromUserId — Adversarial Inputs
-// =============================================================================
-
 describe('sandboxIdFromUserId — adversarial inputs', () => {
   // -- Unicode edge cases --
 
@@ -200,10 +196,6 @@ describe('sandboxIdFromUserId — adversarial inputs', () => {
     expect(sandboxId).not.toBe(sandboxPlain);
   });
 });
-
-// =============================================================================
-// appNameFromUserId — Adversarial Inputs
-// =============================================================================
 
 describe('appNameFromUserId — adversarial inputs', () => {
   const adversarialUserIds = [

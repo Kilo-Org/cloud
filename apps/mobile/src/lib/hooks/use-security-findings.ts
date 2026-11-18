@@ -8,9 +8,10 @@ import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import {
-  isSecuritySyncRetryable,
+  localizedSecurityMarkerMessage,
   mapSecurityDismissOperationError,
-} from '@/lib/hooks/use-security-agent-mutations';
+  securityRetainsOperationKey,
+} from '@/lib/security-agent-ledger';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
@@ -98,11 +99,16 @@ function isSecurityAnalysisActive(data: SecurityAnalysis | undefined): boolean {
   return data.remediationAttempts.some(attempt => isActiveRemediationStatus(attempt.status));
 }
 
-export function useSecurityAnalysis(scope: string, findingId: string) {
+/**
+ * The finding's analysis. Pass `enabled: false` while no surface reads it: the
+ * query polls every `ANALYSIS_POLL_INTERVAL_MS` while a run is active, so an
+ * idle tab must not keep it awake.
+ */
+export function useSecurityAnalysis(scope: string, findingId: string, enabled = true) {
   const trpc = useTRPC();
   const personal = useQuery({
     ...trpc.securityAgent.getAnalysis.queryOptions({ findingId }),
-    enabled: isPersonalSecurityScope(scope),
+    enabled: enabled && isPersonalSecurityScope(scope),
     refetchInterval: query =>
       isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });
@@ -111,7 +117,7 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
       organizationId: scope,
       findingId,
     }),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: enabled && !isPersonalSecurityScope(scope),
     refetchInterval: query =>
       isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });
@@ -157,7 +163,7 @@ export function useDismissSecurityFinding(scope: string) {
         rotateKey();
         return result;
       } catch (error) {
-        if (!isSecuritySyncRetryable(error)) {
+        if (!securityRetainsOperationKey(error)) {
           rotateKey();
         }
         // Map the raw `operation_in_progress` CONFLICT marker onto retryable
@@ -187,10 +193,12 @@ export function useStartSecurityAnalysis(scope: string) {
             forceSandbox: true,
           }),
     onError: error => {
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: async (result, vars) => {
-      trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      if (result.commandId) {
+        trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      }
       if (isPersonalSecurityScope(scope)) {
         await Promise.all([
           queryClient.invalidateQueries({
@@ -201,7 +209,7 @@ export function useStartSecurityAnalysis(scope: string) {
           }),
         ]);
         scheduleCacheMaintenance(() => {
-          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+          void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
         });
         return;
       }
@@ -220,7 +228,7 @@ export function useStartSecurityAnalysis(scope: string) {
         }),
       ]);
       scheduleCacheMaintenance(() => {
-        reconcileFirstPage(
+        void reconcileFirstPage(
           queryClient,
           trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
         );

@@ -50,14 +50,25 @@ export const kiloExtras = {
         'Small model to use for tasks like title generation in the format of provider/model',
       ...nullableModel,
     },
+    memory_model: {
+      description:
+        'Model for automatic project memory saves in the format of provider/model. If unset or unavailable, memory uses the session model.',
+      ...nullableModel,
+    },
     remote_control: {
       description:
         'Enable remote control of sessions via Kilo Cloud. Equivalent to running /remote on startup.',
       type: 'boolean',
     },
     auto_collapse_reasoning: {
-      description: 'Automatically collapse reasoning blocks after the agent finishes writing them',
+      description:
+        "@deprecated Use 'reasoning_display' field instead. Automatically collapse reasoning blocks after the agent finishes writing them",
       type: 'boolean',
+    },
+    reasoning_display: {
+      description: 'Controls how reasoning blocks are displayed in the VS Code chat UI',
+      type: 'string',
+      enum: ['expanded', 'preview', 'headline'],
     },
     terminal_command_display: {
       description:
@@ -97,6 +108,61 @@ export const kiloExtras = {
       },
       additionalProperties: false,
     },
+    browser: {
+      description:
+        'Browser automation for agents. Organization policy can turn it off or limit it to the bundled browser.',
+      type: 'object',
+      properties: {
+        backend: {
+          description:
+            'Which browser agents drive: the bundled Playwright browser, the browser connected through the Kilo browser extension, or none',
+          type: 'string',
+          enum: ['playwright', 'extension', 'off'],
+          default: 'playwright',
+        },
+        observation: {
+          description:
+            'What a browser action returns to the model: a full page snapshot after each action, only what changed, or the page URL and title only',
+          type: 'string',
+          enum: ['full', 'diff', 'none'],
+          default: 'full',
+        },
+        allowSensitive: {
+          description:
+            'Let agents complete sensitive browser steps such as passwords, one-time codes, card fields, OAuth consent, uploads, and downloads without asking a human',
+          type: 'boolean',
+          default: false,
+        },
+        target: {
+          description:
+            'Browser or profile id the extension backend drives. Unset means the extension decides.',
+          anyOf: [{ type: 'string' }, { type: 'null' }],
+        },
+      },
+      additionalProperties: false,
+    },
+    retention: {
+      // Effect Schema models maxAgeDays as number|'NaN'|'Infinity'|'-Infinity',
+      // but JSON config can only carry plain numbers, so the editor schema
+      // accepts number only.
+      description:
+        'Machine-wide session retention. Evaluated by the backend; clients only trigger runs.',
+      type: 'object',
+      properties: {
+        enabled: {
+          description:
+            'Enable automatic deletion of old sessions across all projects and every Kilo client on this machine. Defaults to false; deletion is permanent.',
+          type: 'boolean',
+        },
+        maxAgeDays: {
+          description:
+            'Days a session is kept before retention deletes it. Defaults to 30, minimum 1.',
+          type: 'number',
+          minimum: 1,
+        },
+      },
+      additionalProperties: false,
+    },
   },
   agents: {
     ask: agentConfig,
@@ -109,10 +175,6 @@ export const kiloExtras = {
     notebook_execute: { $ref: '#/$defs/PermissionRuleConfig' },
   },
   experimental: {
-    codebase_search: {
-      description: 'Enable AI-powered codebase search',
-      type: 'boolean',
-    },
     agent_requirements: {
       description:
         'Require declared agent skills, MCPs, and VS Code extensions before VS Code prompts can run',
@@ -122,10 +184,21 @@ export const kiloExtras = {
       description: 'Enable native tools for reading, editing, and executing VS Code notebooks',
       type: 'boolean',
     },
+    glob_include_ignored: {
+      description:
+        'Folders or files, as gitignore-style patterns relative to the workspace root, that the glob tool should search even when they are ignored (for example by .gitignore) or hidden. Patterns without a slash match folders at any depth; list a file inside an ignored folder by its path (for example build/report.json). Ignored or hidden folders nested inside a listed folder stay skipped.',
+      type: 'array',
+      items: { type: 'string' },
+    },
     openTelemetry: {
       description: 'Enable telemetry. Set to false to opt-out.',
       default: true,
       type: 'boolean',
+    },
+    chatMaxRetries: {
+      description: 'Number of retries for chat completions on failure',
+      type: 'integer',
+      exclusiveMinimum: 0,
     },
   },
 } as const;

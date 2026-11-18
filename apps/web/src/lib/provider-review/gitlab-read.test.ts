@@ -1,0 +1,1466 @@
+import { describe, expect, it, beforeEach, afterEach } from '@jest/globals';
+import { EventEmitter } from 'events';
+import * as https from 'https';
+import { PassThrough } from 'stream';
+import type { PlatformIntegration } from '@kilocode/db/schema';
+import type { Owner } from '@/lib/integrations/core/types';
+import { GitLabInstanceUrlError } from '@/lib/integrations/platforms/gitlab/instance-url';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
+import {
+  getFileLines,
+  getMergeRequest,
+  getMergeState,
+  listChangedFiles,
+  listChecks,
+  listDiscussions,
+  listInbox,
+} from './gitlab-read';
+import { requestGitLabJson } from './gitlab-http';
+import { GitLabApiStatusError, GitLabReviewError } from './gitlab-authorization';
+
+// The bound transport runs through Node https.request; mirror adapter.test.ts.
+jest.mock('https', () => ({
+  request: jest.fn(),
+}));
+
+const mockGetIntegrationForOwner = jest.fn();
+const mockGetValidGitLabToken = jest.fn();
+const mockFetchGitLabMergeRequest = jest.fn();
+const mockGetMRHeadCommit = jest.fn();
+const mockGetMRDiffRefs = jest.fn();
+const mockFetchGitLabRootTextFileAtRef = jest.fn();
+const mockFetchGitLabUser = jest.fn();
+const mockResolveGitLabUrlSafely = jest.fn();
+
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getIntegrationForOwner: (owner: Owner, platform: string) =>
+    mockGetIntegrationForOwner(owner, platform),
+}));
+
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabToken: (integration: PlatformIntegration, actor: unknown) =>
+    mockGetValidGitLabToken(integration, actor),
+}));
+
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
+  fetchGitLabMergeRequest: (params: unknown) => mockFetchGitLabMergeRequest(params),
+  getMRHeadCommit: (...args: unknown[]) => mockGetMRHeadCommit(...args),
+  getMRDiffRefs: (...args: unknown[]) => mockGetMRDiffRefs(...args),
+  fetchGitLabRootTextFileAtRef: (...args: unknown[]) => mockFetchGitLabRootTextFileAtRef(...args),
+  fetchGitLabUser: (...args: unknown[]) => mockFetchGitLabUser(...args),
+}));
+
+// Keep the real URL builder; stub the resolved-URL guard so unit tests need no
+// network. Default (set in beforeEach): no pinned address, so requests keep the
+// plain fetch transport the assertions read. Transport tests rebind it per test.
+jest.mock('@/lib/integrations/platforms/gitlab/instance-url', () => {
+  const actual = jest.requireActual('@/lib/integrations/platforms/gitlab/instance-url');
+  return {
+    ...actual,
+    resolveGitLabUrlSafely: (urlString: string) => mockResolveGitLabUrlSafely(urlString),
+  };
+});
+
+const mockHttpsRequest = https.request as unknown as jest.Mock;
+
+const OWNER: { type: 'user'; userId: string } = { type: 'user', userId: 'user_1' };
+const ORG_OWNER: { type: 'organization'; organizationId: string; userId: string } = {
+  type: 'organization',
+  organizationId: 'org_1',
+  userId: 'user_1',
+};
+const INSTANCE_URL = 'https://gitlab.example.com';
+const PROJECT_PATH = 'group/sub/repo';
+
+/** Await a rejection and return it typed, without a success-branch union. */
+async function captureRejection(promise: Promise<unknown>): Promise<GitLabReviewError> {
+  try {
+    await promise;
+  } catch (reason) {
+    return reason as GitLabReviewError;
+  }
+  throw new Error('Expected the call to reject.');
+}
+
+const integrationRow = {
+  id: 'intg_1',
+  platform: 'gitlab',
+  integration_status: 'active',
+  owned_by_user_id: 'user_1',
+  owned_by_organization_id: null,
+  metadata: { gitlab_instance_url: INSTANCE_URL },
+  repositories: [{ id: 7, name: 'repo', full_name: PROJECT_PATH, private: true }],
+} as unknown as PlatformIntegration;
+
+const ORG_INTEGRATION_ROW = {
+  ...integrationRow,
+  owned_by_user_id: null,
+  owned_by_organization_id: 'org_1',
+} as unknown as PlatformIntegration;
+
+const mrFixture = {
+  id: 100,
+  iid: 12,
+  title: 'Add nested deploy script',
+  description: 'Body here',
+  state: 'opened',
+  draft: false,
+  source_branch: 'feature/deploy',
+  target_branch: 'main',
+  sha: 'sha-head',
+  diff_refs: { base_sha: 'sha-base', head_sha: 'sha-head', start_sha: 'sha-start' },
+  web_url: `${INSTANCE_URL}/group/sub/repo/-/merge_requests/12`,
+  author: { id: 1, username: 'alice', name: 'Alice', avatar_url: null },
+  created_at: '2026-01-02T00:00:00Z',
+  updated_at: '2026-01-03T00:00:00Z',
+  has_conflicts: false,
+  merge_status: 'can_be_merged',
+  head_pipeline: {
+    id: 1,
+    sha: 'sha-head',
+    ref: 'feature/deploy',
+    status: 'success',
+    web_url: `${INSTANCE_URL}/-/pipelines/1`,
+  },
+  references: { full: 'group/sub/repo!12' },
+};
+
+const diffFixture = [
+  {
+    old_path: 'scripts/deploy.sh',
+    new_path: 'scripts/deploy.sh',
+    new_file: true,
+    renamed_file: false,
+    deleted_file: false,
+    diff: '@@ -0,0 +1,2 @@\n+set -e\n+echo done\n',
+  },
+  {
+    old_path: 'README.md',
+    new_path: 'README.md',
+    new_file: false,
+    renamed_file: false,
+    deleted_file: false,
+    diff: '@@ -1,2 +1,2 @@\n-old\n+new\n',
+  },
+];
+
+const discussionStateCases = [
+  {
+    name: 'resolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: false },
+      { resolvable: true, resolved: true },
+      { resolvable: true, resolved: false },
+    ],
+    resolvable: true,
+    resolved: true,
+  },
+  {
+    name: 'unresolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true, resolved: false },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'missing resolved flag on the first resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'no resolvable notes despite a resolved flag',
+    flags: [{ resolvable: false, resolved: true }],
+    resolvable: false,
+    resolved: false,
+  },
+  {
+    name: 'no notes',
+    flags: [],
+    resolvable: false,
+    resolved: false,
+  },
+];
+
+function discussionWithState(flags: { resolvable: boolean; resolved?: boolean }[]) {
+  return {
+    id: 'disc-state',
+    individual_note: false,
+    notes: flags.map((flag, index) => ({
+      id: index + 1,
+      body: `Note ${index + 1}`,
+      author: { id: 1, username: 'alice', name: 'Alice' },
+      created_at: '2026-01-02T00:00:00Z',
+      updated_at: '2026-01-02T00:00:00Z',
+      system: false,
+      noteable_id: 100,
+      noteable_type: 'MergeRequest',
+      noteable_iid: 12,
+      ...flag,
+    })),
+  };
+}
+
+let fetchMock: jest.Mock;
+
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+function lastFetchUrl(): URL {
+  const last = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+  return new URL(String(last[0]));
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockResolveGitLabUrlSafely.mockImplementation(async (urlString: string) => ({
+    url: new URL(urlString),
+  }));
+  mockGetIntegrationForOwner.mockResolvedValue(integrationRow);
+  mockGetValidGitLabToken.mockResolvedValue('glpat-mock-token');
+  mockFetchGitLabMergeRequest.mockResolvedValue(mrFixture);
+  mockGetMRHeadCommit.mockResolvedValue('sha-head');
+  mockGetMRDiffRefs.mockResolvedValue({
+    baseSha: 'sha-base',
+    headSha: 'sha-head',
+    startSha: 'sha-start',
+  });
+  fetchMock = jest.fn();
+  fetchMock.mockImplementation((url: string) => {
+    const path = new URL(url).pathname;
+    if (path.endsWith('/diffs')) return Promise.resolve(jsonResponse(diffFixture));
+    if (path.endsWith('/discussions')) return Promise.resolve(jsonResponse([]));
+    if (path.endsWith('/pipelines')) return Promise.resolve(jsonResponse([]));
+    if (path.endsWith('/approvals'))
+      return Promise.resolve(jsonResponse({ approvals_required: 0, approvals_left: 0 }));
+    return Promise.resolve(jsonResponse([]));
+  });
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('getMergeRequest', () => {
+  it('maps detail, head sha, diff refs, and diff counts into the s1 summary', async () => {
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary).toMatchObject({
+      ref: { platform: 'gitlab', projectPath: PROJECT_PATH, mrIid: 12, instanceHint: INSTANCE_URL },
+      title: 'Add nested deploy script',
+      body: 'Body here',
+      author: { login: 'alice', avatarUrl: null },
+      state: 'open',
+      draft: false,
+      headRef: 'feature/deploy',
+      baseRef: 'main',
+      headSha: 'sha-head',
+      changedFiles: 2,
+      additions: 3,
+      deletions: 1,
+      createdAt: '2026-01-02T00:00:00Z',
+      updatedAt: '2026-01-03T00:00:00Z',
+    });
+    // Adapter helpers were called with the SERVER-DERIVED instance URL.
+    expect(mockFetchGitLabMergeRequest).toHaveBeenCalledWith({
+      accessToken: 'glpat-mock-token',
+      projectId: PROJECT_PATH,
+      mrIid: 12,
+      instanceUrl: INSTANCE_URL,
+    });
+  });
+
+  it('marks a draft MR draft from the title when the flag is absent', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue({
+      ...mrFixture,
+      draft: undefined,
+      work_in_progress: undefined,
+      title: 'Draft: unfinished work',
+    });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.draft).toBe(true);
+  });
+
+  it('authorizes before any request: an unknown project never reaches GitLab', async () => {
+    await expect(getMergeRequest(OWNER, 'other/project', 12)).rejects.toMatchObject({
+      kind: 'not_found',
+    });
+    expect(mockFetchGitLabMergeRequest).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('tolerates an MR whose diff_refs are absent and falls back to the head sha', async () => {
+    // The adapter's getMRDiffRefs dereferences mr.diff_refs.base_sha and
+    // crashes an MR detail load when GitLab omits diff_refs; the summary
+    // mapping already tolerates absence, so the detail must be read from the
+    // MR response itself instead of through the crashing helper.
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, diff_refs: null });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.headSha).toBe('sha-head');
+    expect(mockGetMRDiffRefs).not.toHaveBeenCalled();
+  });
+
+  it("reports the merge request's own changed-file total on a large MR", async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '1000+' });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    // The diff walk is capped by GitLab's own diff collection, so the total
+    // comes from the MR instead of the truncated walk.
+    expect(summary.changedFiles).toBe(1000);
+  });
+
+  it('falls back to the folded diff count while the MR total is still empty', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '' });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.changedFiles).toBe(2);
+  });
+
+  it('folds diff pages past the old three-page cap so the counts are complete', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, index) => ({
+      old_path: `src/${index}.ts`,
+      new_path: `src/${index}.ts`,
+      new_file: false,
+      renamed_file: false,
+      deleted_file: false,
+      diff: '@@ -1 +1 @@\n-old\n+new\n',
+    }));
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '201' });
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/diffs')) {
+        // Three full pages then a short fourth: the old fold stopped at page
+        // three and reported 150 files as the total.
+        if (parsed.searchParams.get('page') === '4') {
+          return Promise.resolve(
+            jsonResponse([{ ...fullPage[0], diff: '@@ -1 +1,2 @@\n-old\n+new\n+extra\n' }])
+          );
+        }
+        return Promise.resolve(jsonResponse(fullPage));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.changedFiles).toBe(201);
+    expect(summary.additions).toBe(50 * 3 + 2);
+    expect(summary.deletions).toBe(50 * 3 + 1);
+  });
+
+  it('folds each page into the counters as it arrives and stops at the page bound', async () => {
+    // Every page is full, so the walk runs to the bound instead of ending
+    // early. The counts must cover all of them even though no page is kept:
+    // the fold reads a page once and drops it before fetching the next.
+    const fullPage = Array.from({ length: 50 }, (_, index) => ({
+      old_path: `src/${index}.ts`,
+      new_path: `src/${index}.ts`,
+      new_file: false,
+      renamed_file: false,
+      deleted_file: false,
+      diff: '@@ -1 +1 @@\n-old\n+new\n',
+    }));
+    const requestedPages: string[] = [];
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/diffs')) {
+        requestedPages.push(parsed.searchParams.get('page') ?? '');
+        return Promise.resolve(jsonResponse(fullPage));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(requestedPages).toHaveLength(20);
+    expect(requestedPages[19]).toBe('20');
+    expect(summary.additions).toBe(50 * 20);
+    expect(summary.deletions).toBe(50 * 20);
+    expect(summary.changedFiles).toBe(1000);
+  });
+});
+
+describe('listChangedFiles', () => {
+  it('returns mapped files with per-file counts and a next cursor only for a full page', async () => {
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      path: 'scripts/deploy.sh',
+      previousPath: null,
+      status: 'added',
+      additions: 2,
+      deletions: 0,
+      patchMissing: false,
+    });
+    expect(page.files[1]).toMatchObject({ status: 'modified', additions: 1, deletions: 1 });
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('keeps page identity in the cursor and requests the next page', async () => {
+    const manyDiffs = Array.from({ length: 50 }, (_, index) => ({
+      old_path: `f${index}.ts`,
+      new_path: `f${index}.ts`,
+      new_file: false,
+      renamed_file: false,
+      deleted_file: false,
+      diff: '+x\n',
+    }));
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(manyDiffs)));
+
+    const first = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+    expect(first.nextCursor).not.toBeNull();
+    const decoded = JSON.parse(Buffer.from(String(first.nextCursor), 'base64url').toString('utf8'));
+    expect(decoded).toEqual({ identity: PROJECT_PATH, page: 2 });
+
+    await listChangedFiles(OWNER, PROJECT_PATH, 12, String(first.nextCursor));
+    expect(lastFetchUrl().searchParams.get('page')).toBe('2');
+    expect(lastFetchUrl().searchParams.get('per_page')).toBe('50');
+  });
+
+  it('never trusts a foreign cursor to switch project: it restarts at page 1', async () => {
+    const foreign = Buffer.from(
+      JSON.stringify({ identity: 'victim/project', page: 4 }),
+      'utf8'
+    ).toString('base64url');
+
+    await listChangedFiles(OWNER, PROJECT_PATH, 12, foreign);
+
+    expect(lastFetchUrl().searchParams.get('page')).toBe('1');
+    expect(lastFetchUrl().pathname).toContain(encodeURIComponent(PROJECT_PATH));
+    expect(lastFetchUrl().pathname).not.toContain('victim');
+  });
+});
+
+describe('getFileLines', () => {
+  function serveFileBody(body: string) {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/repository/files/file.txt/raw')) {
+        return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      return jsonResponse([]);
+    });
+  }
+
+  it('returns the 1-based inclusive slice with the total line count', async () => {
+    serveFileBody('a\nb\nc\nd\ne');
+
+    const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 2, 4);
+
+    expect(result).toEqual({ lines: ['b', 'c', 'd'], totalLines: 5 });
+    const requested = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requested.pathname).toContain(encodeURIComponent(PROJECT_PATH));
+    expect(
+      requested.pathname.endsWith(`/repository/files/${encodeURIComponent('file.txt')}/raw`)
+    ).toBe(true);
+    expect(requested.searchParams.get('ref')).toBe('sha-head');
+    expect(mockFetchGitLabRootTextFileAtRef).not.toHaveBeenCalled();
+  });
+
+  it('refuses a missing file as non-retryable not_found', async () => {
+    fetchMock.mockImplementation(async () => new Response(null, { status: 404 }));
+
+    await expect(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'gone.txt', 1, 5)
+    ).rejects.toMatchObject({ kind: 'not_found', retryable: false });
+  });
+
+  it('caps the returned window at the shared FILE_LINES_MAX', async () => {
+    const content = Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n');
+    serveFileBody(content);
+
+    const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 600);
+
+    expect(result.totalLines).toBe(600);
+    expect(result.lines).toHaveLength(FILE_LINES_MAX);
+    expect(result.lines[0]).toBe('line 1');
+    expect(result.lines.at(-1)).toBe(`line ${FILE_LINES_MAX}`);
+  });
+
+  it('reads the file body inside the byte budget', async () => {
+    // Three chunks of half the budget: the third one passes the budget, so the
+    // reader stops there and never pulls the remaining chunks.
+    let pulled = 0;
+    const chunk = 'x'.repeat(FILE_READ_MAX_BYTES / 2);
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= 6) {
+          controller.close();
+          return;
+        }
+        pulled += 1;
+        controller.enqueue(new TextEncoder().encode(chunk));
+      },
+    });
+    fetchMock.mockImplementation(async () => new Response(stream, { status: 200 }));
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    // The stream prefetches at most one chunk past the read that crosses the
+    // budget, so the body is abandoned well before its six chunks are pulled.
+    expect(pulled).toBeLessThan(6);
+  });
+
+  it('rejects a declared oversized body without reading it', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          controller.enqueue(new Uint8Array(FILE_READ_MAX_BYTES + 1));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      },
+      { highWaterMark: 0 }
+    );
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'content-length': String(FILE_READ_MAX_BYTES + 1) },
+        })
+    );
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(cancelled).toBe(true);
+  });
+});
+
+describe('listDiscussions', () => {
+  it('maps discussions to threads with path, line, side, resolvable, and resolved', async () => {
+    const discussions = [
+      {
+        id: 'disc-1',
+        individual_note: false,
+        notes: [
+          {
+            id: 11,
+            body: 'Guard this parse',
+            author: { id: 1, username: 'alice', name: 'Alice' },
+            created_at: '2026-01-02T00:00:00Z',
+            updated_at: '2026-01-02T00:00:00Z',
+            system: false,
+            noteable_id: 100,
+            noteable_type: 'MergeRequest',
+            noteable_iid: 12,
+            resolvable: true,
+            resolved: false,
+            position: {
+              base_sha: 'sha-base',
+              start_sha: 'sha-start',
+              head_sha: 'sha-head',
+              old_path: 'src/a.ts',
+              new_path: 'src/a.ts',
+              position_type: 'text',
+              old_line: null,
+              new_line: 42,
+            },
+          },
+          {
+            id: 12,
+            body: 'Merged the guard',
+            author: { id: 2, username: 'bob', name: 'Bob' },
+            created_at: '2026-01-02T01:00:00Z',
+            updated_at: '2026-01-02T01:00:00Z',
+            system: false,
+            noteable_id: 100,
+            noteable_type: 'MergeRequest',
+            noteable_iid: 12,
+            resolvable: true,
+            resolved: false,
+          },
+        ],
+      },
+      {
+        id: 'disc-2',
+        individual_note: true,
+        notes: [
+          {
+            id: 13,
+            body: 'Overall looks good',
+            author: { id: 2, username: 'bob', name: 'Bob' },
+            created_at: '2026-01-02T02:00:00Z',
+            updated_at: '2026-01-02T02:00:00Z',
+            system: false,
+            noteable_id: 100,
+            noteable_type: 'MergeRequest',
+            noteable_iid: 12,
+            resolvable: false,
+          },
+        ],
+      },
+      {
+        id: 'disc-3',
+        individual_note: false,
+        notes: [
+          {
+            id: 14,
+            body: 'resolved thread note',
+            author: { id: 1, username: 'alice', name: 'Alice' },
+            created_at: '2026-01-02T03:00:00Z',
+            updated_at: '2026-01-02T03:00:00Z',
+            system: false,
+            noteable_id: 100,
+            noteable_type: 'MergeRequest',
+            noteable_iid: 12,
+            resolvable: true,
+            resolved: true,
+          },
+          {
+            id: 15,
+            body: '',
+            author: { id: 3, username: 'root', name: 'Root' },
+            created_at: '2026-01-02T04:00:00Z',
+            updated_at: '2026-01-02T04:00:00Z',
+            system: true,
+            noteable_id: 100,
+            noteable_type: 'MergeRequest',
+            noteable_iid: 12,
+            resolvable: false,
+          },
+        ],
+      },
+    ];
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(discussions)));
+
+    const page = await listDiscussions(OWNER, PROJECT_PATH, 12);
+
+    expect(page.threads).toHaveLength(3);
+    expect(page.threads[0]).toMatchObject({
+      threadId: 'disc-1',
+      resolved: false,
+      resolvable: true,
+      path: 'src/a.ts',
+      line: 42,
+      side: 'RIGHT',
+    });
+    expect(page.threads[0]?.comments).toHaveLength(2);
+    expect(page.threads[1]).toMatchObject({
+      threadId: 'disc-2',
+      resolvable: false,
+      path: null,
+      line: null,
+      side: null,
+    });
+    expect(page.threads[2]).toMatchObject({ threadId: 'disc-3', resolved: true });
+    // System notes never appear as comments.
+    expect(page.threads[2]?.comments.map(comment => comment.commentId)).toEqual(['14']);
+  });
+
+  it.each(discussionStateCases)('maps discussion state for $name', async testCase => {
+    fetchMock.mockResolvedValue(jsonResponse([discussionWithState(testCase.flags)]));
+
+    const page = await listDiscussions(OWNER, PROJECT_PATH, 12);
+
+    expect(page.threads).toHaveLength(1);
+    expect(page.threads[0]).toMatchObject({
+      threadId: 'disc-state',
+      resolvable: testCase.resolvable,
+      resolved: testCase.resolved,
+    });
+  });
+
+  it('reuses the same cursor rule: foreign identity restarts at page 1', async () => {
+    const foreign = Buffer.from(
+      JSON.stringify({ identity: 'other/repo', page: 9 }),
+      'utf8'
+    ).toString('base64url');
+
+    await listDiscussions(OWNER, PROJECT_PATH, 12, foreign);
+
+    expect(lastFetchUrl().searchParams.get('page')).toBe('1');
+  });
+});
+
+describe('listChecks', () => {
+  it('lists the MR pipelines endpoint with status and details URL', async () => {
+    const pipelines = [
+      {
+        id: 41,
+        sha: 'merge-ref-sha',
+        ref: 'refs/merge-requests/12/merge',
+        status: 'running',
+        web_url: `${INSTANCE_URL}/group/sub/repo/-/pipelines/41`,
+        name: null,
+      },
+      {
+        id: 42,
+        sha: 'sha-head',
+        ref: 'feature/deploy',
+        status: 'success',
+        web_url: `${INSTANCE_URL}/group/sub/repo/-/pipelines/42`,
+        name: 'e2e',
+      },
+    ];
+    fetchMock.mockImplementation(url => {
+      if (new URL(String(url)).pathname.endsWith('/pipelines')) {
+        return Promise.resolve(jsonResponse(pipelines));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const result = await listChecks(OWNER, PROJECT_PATH, 12);
+
+    // The MR pipelines endpoint is the only listing that includes the MR's
+    // merge-ref pipelines; the project-wide pipelines-by-sha listing misses
+    // them (they run on the merge result sha, not the head sha).
+    const url = lastFetchUrl();
+    expect(url.pathname).toBe(
+      `/api/v4/projects/${encodeURIComponent(PROJECT_PATH)}/merge_requests/12/pipelines`
+    );
+    expect(url.searchParams.get('sha')).toBeNull();
+    expect(url.searchParams.get('per_page')).toBe('50');
+    expect(mockGetMRHeadCommit).not.toHaveBeenCalled();
+    expect(result.checks).toEqual([
+      {
+        name: 'refs/merge-requests/12/merge',
+        status: 'running',
+        conclusion: null,
+        detailsUrl: `${INSTANCE_URL}/group/sub/repo/-/pipelines/41`,
+      },
+      {
+        name: 'e2e',
+        status: 'success',
+        conclusion: 'success',
+        detailsUrl: `${INSTANCE_URL}/group/sub/repo/-/pipelines/42`,
+      },
+    ]);
+  });
+
+  it('folds every page of MR pipelines, not only the first', async () => {
+    const pageOne = Array.from({ length: 50 }, (_, index) => ({
+      id: index + 1,
+      sha: 'sha-head',
+      ref: 'refs/merge-requests/12/merge',
+      status: 'success',
+      web_url: `${INSTANCE_URL}/-/pipelines/${index + 1}`,
+      name: `pipeline-${index + 1}`,
+    }));
+    const failing = {
+      id: 51,
+      sha: 'sha-head',
+      ref: 'feature/deploy',
+      status: 'failed',
+      web_url: `${INSTANCE_URL}/-/pipelines/51`,
+      name: 'failing-overtime',
+    };
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/pipelines')) {
+        return Promise.resolve(
+          jsonResponse(parsed.searchParams.get('page') === '2' ? [failing] : pageOne)
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const result = await listChecks(OWNER, PROJECT_PATH, 12);
+
+    // The failing pipeline lives on page 2: the checks rollup exists to show
+    // it, so the listing must be folded past the first page.
+    expect(result.checks).toHaveLength(51);
+    expect(result.checks[50]).toEqual({
+      name: 'failing-overtime',
+      status: 'failed',
+      conclusion: 'failed',
+      detailsUrl: `${INSTANCE_URL}/-/pipelines/51`,
+    });
+    const pages = fetchMock.mock.calls
+      .map(call => new URL(String(call[0])))
+      .filter(url => url.pathname.endsWith('/pipelines'))
+      .map(url => url.searchParams.get('page'));
+    expect(pages).toEqual(['1', '2']);
+  });
+});
+
+describe('listInbox', () => {
+  const reviewerUser = {
+    id: 1,
+    username: 'reviewer',
+    name: 'Reviewer',
+    email: 'r@example.com',
+    avatar_url: '',
+    web_url: `${INSTANCE_URL}/reviewer`,
+  };
+
+  /** A global-MR row of the fixture shape, forced onto one project path. */
+  function mrRow(iid: number, projectPath: string, overrides: Record<string, unknown> = {}) {
+    return {
+      ...mrFixture,
+      iid,
+      references: { full: `${projectPath}!${iid}` },
+      ...overrides,
+    };
+  }
+
+  /** A full provider page of rows no cached repository holds. */
+  function outOfScopePage(count: number): unknown[] {
+    return Array.from({ length: count }, (_unused, index) => mrRow(200 + index, 'team/other'));
+  }
+
+  function serveMergeRequestPages(pages: Record<string, unknown[]>) {
+    fetchMock.mockImplementation((url: string) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === '/api/v4/merge_requests') {
+        return Promise.resolve(jsonResponse(pages[parsed.searchParams.get('page') ?? '1'] ?? []));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+  }
+
+  function requestedInboxPages(): string[] {
+    return fetchMock.mock.calls
+      .map(call => new URL(String(call[0])))
+      .filter(url => url.pathname === '/api/v4/merge_requests')
+      .map(url => url.searchParams.get('page') ?? '');
+  }
+
+  it('queries opened merge requests where the acting user is the reviewer', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({ '1': [mrRow(12, 'group/sub/repo')] });
+
+    const page = await listInbox(OWNER);
+
+    const url = lastFetchUrl();
+    expect(url.pathname).toBe('/api/v4/merge_requests');
+    // Without a scope the API defaults to authored merge requests
+    // (`created_by_me`); the inbox must ask for review requests.
+    expect(url.searchParams.get('scope')).toBe('reviews_for_me');
+    expect(url.searchParams.get('reviewer_username')).toBe('reviewer');
+    expect(url.searchParams.get('state')).toBe('opened');
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]?.ref).toEqual({
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+      instanceHint: INSTANCE_URL,
+    });
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('emits only rows inside the cached repositories and keeps the stored path', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({
+      '1': [
+        mrRow(12, 'group/sub/repo'),
+        // The integration's catalogue stores `group/sub/repo`; a nested
+        // project, a sibling and a same-named project on another group are all
+        // outside it and cannot be opened through this layer.
+        mrRow(99, 'team/other'),
+        mrRow(100, 'group/sub/repo/nested'),
+        mrRow(101, 'other/group/sub/repo'),
+        // A different casing of a cached path is the same project: the match
+        // authorizeProject performs is case-insensitive.
+        mrRow(102, 'Group/Sub/Repo'),
+        // No `references.full` — the project path comes from the web URL.
+        {
+          ...mrFixture,
+          iid: 103,
+          references: undefined,
+          web_url: `${INSTANCE_URL}/group/sub/repo/-/merge_requests/103`,
+        },
+      ],
+    });
+
+    const page = await listInbox(OWNER);
+
+    expect(page.items.map(item => item.ref)).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12, instanceHint: INSTANCE_URL },
+      { platform: 'gitlab', projectPath: 'Group/Sub/Repo', mrIid: 102, instanceHint: INSTANCE_URL },
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 103, instanceHint: INSTANCE_URL },
+    ]);
+  });
+
+  it('reads on past a page whose rows are all outside the cached repositories', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({
+      '1': outOfScopePage(50),
+      '2': [mrRow(301, 'group/sub/repo')],
+    });
+
+    const page = await listInbox(OWNER);
+
+    // A blank page would leave the reader with nothing to scroll and the row
+    // behind an unreachable cursor.
+    expect(requestedInboxPages()).toEqual(['1', '2']);
+    expect(page.items.map(item => item.ref)).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 301, instanceHint: INSTANCE_URL },
+    ]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('stops at the per-load page bound and hands back the unread page', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({
+      '1': outOfScopePage(50),
+      '2': outOfScopePage(50),
+      '3': outOfScopePage(50),
+      '4': outOfScopePage(50),
+      '5': outOfScopePage(50),
+      '6': [mrRow(401, 'group/sub/repo')],
+    });
+
+    const first = await listInbox(OWNER);
+
+    expect(requestedInboxPages()).toEqual(['1', '2', '3', '4', '5']);
+    expect(first.items).toEqual([]);
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await listInbox(OWNER, first.nextCursor!);
+
+    // The bounded load resumes at the page it never read: no row is skipped.
+    expect(requestedInboxPages()).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(second.items.map(item => item.ref)).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 401, instanceHint: INSTANCE_URL },
+    ]);
+  });
+
+  it('asks the provider for nothing when the connection has no cached repository', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    mockGetIntegrationForOwner.mockResolvedValue({
+      ...integrationRow,
+      repositories: [],
+    } as unknown as PlatformIntegration);
+
+    const page = await listInbox(ORG_OWNER);
+
+    // No repository is openable through this layer, so the list is empty and
+    // the connection's own review queue is never read.
+    expect(page).toEqual({ items: [], nextCursor: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('skips rows with no resolvable project path instead of guessing', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    fetchMock.mockImplementation(url => {
+      if (new URL(String(url)).pathname === '/api/v4/merge_requests') {
+        return Promise.resolve(
+          jsonResponse([{ ...mrFixture, references: undefined, web_url: 'not a url' }])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listInbox(OWNER);
+
+    expect(page.items).toEqual([]);
+  });
+
+  it('reports a provider permission refusal as a reconnect, never as the caller permission', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(OWNER));
+
+    // The inbox lists the account's own review requests: a 403 there is the
+    // connection's, not the organization member's permission.
+    expect(error).toBeInstanceOf(GitLabReviewError);
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
+
+  it('wraps an organization connection refusal with inbox copy', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(ORG_OWNER));
+
+    // The owner-aware classifier resolves the organization connection's 403 to
+    // a reconnect on its own; the inbox keeps copy that names the list the
+    // reader asked for instead of a merge request the request never mentioned.
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/review requests/i);
+  });
+});
+
+describe('getMergeState', () => {
+  function routeResponses(overrides: {
+    settings?: Record<string, unknown>;
+    approvals?: unknown;
+    discussions?: unknown[];
+  }) {
+    fetchMock.mockImplementation(url => {
+      const path = new URL(String(url)).pathname;
+      if (path.endsWith('/approvals')) {
+        return overrides.approvals === undefined
+          ? Promise.resolve(jsonResponse({ message: '404 Not found' }, 404))
+          : Promise.resolve(jsonResponse(overrides.approvals));
+      }
+      if (path.endsWith('/discussions')) {
+        return Promise.resolve(jsonResponse(overrides.discussions ?? []));
+      }
+      if (path.endsWith('/diffs')) return Promise.resolve(jsonResponse([]));
+      return Promise.resolve(jsonResponse(overrides.settings ?? {}));
+    });
+  }
+
+  it('reports blocked reasons from settings, approvals, conflicts, and pipeline', async () => {
+    routeResponses({
+      settings: {
+        only_allow_merge_if_pipeline_succeeds: true,
+        only_allow_merge_if_all_discussions_are_resolved: true,
+      },
+      approvals: { approvals_required: 3, approvals_left: 2 },
+      discussions: [
+        {
+          id: 'd1',
+          individual_note: false,
+          notes: [
+            {
+              id: 1,
+              body: 'x',
+              author: { id: 1, username: 'a', name: 'A' },
+              created_at: '',
+              updated_at: '',
+              system: false,
+              noteable_id: 1,
+              noteable_type: 'MergeRequest',
+              noteable_iid: 12,
+              resolvable: true,
+              resolved: false,
+            },
+          ],
+        },
+      ],
+    });
+    mockFetchGitLabMergeRequest.mockResolvedValue({
+      ...mrFixture,
+      has_conflicts: true,
+      merge_status: 'cannot_be_merged',
+      head_pipeline: { ...mrFixture.head_pipeline, status: 'failed' },
+    });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    expect(state).toMatchObject({
+      canMerge: false,
+      approvalsRequired: 3,
+      pipelineMustSucceed: true,
+      conflicts: true,
+    });
+    expect(state.blockedReasons.map(reason => reason.code)).toEqual(
+      expect.arrayContaining(['conflicts', 'required_approvals', 'failing_pipeline', 'other'])
+    );
+  });
+
+  it('allows merge when every gate is satisfied', async () => {
+    routeResponses({
+      settings: {
+        only_allow_merge_if_pipeline_succeeds: true,
+        only_allow_merge_if_all_discussions_are_resolved: true,
+      },
+      approvals: { approvals_required: 1, approvals_left: 0 },
+      discussions: [],
+    });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    expect(state).toMatchObject({
+      canMerge: true,
+      approvalsRequired: 1,
+      pipelineMustSucceed: true,
+      conflicts: false,
+      blockedReasons: [],
+    });
+  });
+
+  it.each(discussionStateCases)('applies the discussion merge gate for $name', async testCase => {
+    routeResponses({
+      settings: { only_allow_merge_if_all_discussions_are_resolved: true },
+      discussions: [discussionWithState(testCase.flags)],
+    });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    const blocked = testCase.resolvable && !testCase.resolved;
+    expect(state.canMerge).toBe(!blocked);
+    expect(state.blockedReasons).toEqual(
+      blocked ? [{ code: 'other', message: 'Resolve all discussions before merging.' }] : []
+    );
+  });
+
+  it('treats a 404 approvals endpoint (no approval rules) as no approval gate', async () => {
+    routeResponses({ settings: {}, approvals: undefined });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    expect(state.approvalsRequired).toBe(0);
+    expect(state.canMerge).toBe(true);
+  });
+
+  it('blocks a draft with the draft reason', async () => {
+    routeResponses({ settings: {} });
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, draft: true });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    expect(state.canMerge).toBe(false);
+    expect(state.blockedReasons.map(reason => reason.code)).toContain('draft');
+  });
+
+  it('finds an unresolved discussion beyond the first page before allowing merge', async () => {
+    // 100 resolved discussions on page 1 (a full page), one unresolved on
+    // page 2: a gate that only inspects page 1 would allow the merge.
+    const resolvedDiscussion = {
+      id: 'd-resolved',
+      individual_note: false,
+      notes: [
+        {
+          id: 1,
+          body: 'x',
+          author: { id: 1, username: 'a', name: 'A' },
+          created_at: '',
+          updated_at: '',
+          system: false,
+          noteable_id: 1,
+          noteable_type: 'MergeRequest',
+          noteable_iid: 12,
+          resolvable: true,
+          resolved: true,
+        },
+      ],
+    };
+    const fullPage = Array.from({ length: 100 }, (_, index) => ({
+      ...resolvedDiscussion,
+      id: `d-${index}`,
+      notes: [{ ...resolvedDiscussion.notes[0], id: index + 1 }],
+    }));
+    const unresolvedDiscussion = {
+      ...resolvedDiscussion,
+      id: 'd-unresolved',
+      notes: [{ ...resolvedDiscussion.notes[0], resolved: false }],
+    };
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/discussions')) {
+        return parsed.searchParams.get('page') === '2'
+          ? Promise.resolve(jsonResponse([unresolvedDiscussion]))
+          : Promise.resolve(jsonResponse(fullPage));
+      }
+      if (parsed.pathname.endsWith('/approvals')) {
+        return Promise.resolve(jsonResponse({ message: '404 Not found' }, 404));
+      }
+      if (parsed.pathname.endsWith('/diffs')) return Promise.resolve(jsonResponse([]));
+      return Promise.resolve(
+        jsonResponse({ only_allow_merge_if_all_discussions_are_resolved: true })
+      );
+    });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    expect(state.canMerge).toBe(false);
+    expect(state.blockedReasons).toContainEqual({
+      code: 'other',
+      message: 'Resolve all discussions before merging.',
+    });
+  });
+});
+
+describe('provider failures reach the four mobile states', () => {
+  it('classifies a 5xx diffs response as retryable', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ message: 'boom' }, 503)));
+
+    const error = await captureRejection(listChangedFiles(OWNER, PROJECT_PATH, 12));
+    expect(error).toBeInstanceOf(GitLabReviewError);
+    expect(error.kind).toBe('retryable');
+    expect(error.retryable).toBe(true);
+  });
+
+  it('classifies a 404 discussion response as not_found without leaking the instance URL', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ message: '404' }, 404)));
+
+    const error = await captureRejection(listDiscussions(OWNER, PROJECT_PATH, 12));
+    expect(error.kind).toBe('not_found');
+    expect(error.retryable).toBe(false);
+    expect(error.message).not.toContain('gitlab.example.com');
+    expect(error.message).not.toContain('glpat-mock-token');
+  });
+
+  it('classifies an adapter 403 throw as forbidden for a personal connection', async () => {
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 403'));
+
+    await expect(getMergeState(OWNER, PROJECT_PATH, 12)).rejects.toMatchObject({
+      kind: 'forbidden',
+      retryable: false,
+    });
+  });
+
+  // The merge request belongs to the organization's connection: its refusal
+  // says the connection cannot read the project, not that the reader lacks
+  // permission, so the recoverable reconnect state is the honest one.
+  it('classifies an organization connection 403 on the merge request as reconnect', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(ORG_INTEGRATION_ROW);
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 403'));
+
+    const error = await captureRejection(getMergeState(ORG_OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
+
+  it('classifies a refused credential on an organization read as reconnect', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(ORG_INTEGRATION_ROW);
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ message: '401' }, 401)));
+
+    const error = await captureRejection(listChangedFiles(ORG_OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+  });
+
+  it('classifies a network failure as retryable', async () => {
+    fetchMock.mockImplementation(() => Promise.reject(new TypeError('fetch failed')));
+
+    await expect(listChecks(OWNER, PROJECT_PATH, 12)).rejects.toMatchObject({
+      kind: 'retryable',
+      retryable: true,
+    });
+  });
+});
+
+/**
+ * Fake a Node https.request round-trip, mirroring adapter.test.ts's
+ * mockSelfHostedGitLabResponse: the bound transport never touches global
+ * fetch, so the response is streamed through a PassThrough.
+ */
+function mockBoundResponse(args: { status: number; json?: unknown; body?: Buffer }) {
+  mockHttpsRequest.mockImplementationOnce((_options, callback) => {
+    const response = new PassThrough() as PassThrough & {
+      statusCode?: number;
+      statusMessage?: string;
+      headers: Record<string, string>;
+    };
+    response.statusCode = args.status;
+    response.statusMessage = 'OK';
+    response.headers = { 'content-type': 'application/json' };
+    const request = new EventEmitter() as EventEmitter & {
+      write: jest.Mock;
+      end: jest.Mock;
+      destroy: jest.Mock;
+      setTimeout: jest.Mock;
+    };
+    request.write = jest.fn();
+    request.destroy = jest.fn();
+    request.setTimeout = jest.fn();
+    request.end = jest.fn(() => {
+      callback?.(response as never);
+      response.end(args.body ?? Buffer.from(JSON.stringify(args.json ?? {})));
+    });
+    return request as never;
+  });
+}
+
+type BoundRequestOptions = Omit<https.RequestOptions, 'lookup'> & {
+  servername?: string;
+  lookup: (
+    hostname: string,
+    options: unknown,
+    callback: (e: null, a: string, f: number) => void
+  ) => void;
+};
+
+describe('request transport binds to the resolved address (no DNS rebinding)', () => {
+  beforeEach(() => {
+    mockResolveGitLabUrlSafely.mockImplementation(async (urlString: string) => ({
+      url: new URL(urlString),
+      address: '93.184.216.34',
+      family: 4,
+    }));
+  });
+
+  it('sends the self-managed request through the pinned transport, not global fetch', async () => {
+    mockBoundResponse({ status: 200, json: diffFixture });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files).toHaveLength(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+    const options = mockHttpsRequest.mock.calls[0][0] as BoundRequestOptions;
+    expect(options.hostname).toBe('gitlab.example.com');
+    expect(options.path).toContain('/merge_requests/12/diffs');
+    // TLS still verifies the original host, and the socket can only ever get
+    // the address the guard resolved — there is no second DNS lookup.
+    expect(options.servername).toBe('gitlab.example.com');
+    let pinnedAddress = '';
+    options.lookup('gitlab.example.com', {}, (_error, address) => {
+      pinnedAddress = address;
+    });
+    expect(pinnedAddress).toBe('93.184.216.34');
+    const headers = options.headers as Record<string, string>;
+    expect(headers.authorization ?? headers.Authorization).toBe('Bearer glpat-mock-token');
+  });
+
+  it('refuses the request when the guard rejects the resolved host, before any socket', async () => {
+    mockResolveGitLabUrlSafely.mockRejectedValue(
+      new GitLabInstanceUrlError(
+        'GitLab instance URL host resolves to an address that is not allowed.'
+      )
+    );
+
+    await expect(listChangedFiles(OWNER, PROJECT_PATH, 12)).rejects.toMatchObject({
+      kind: 'bad_request',
+      retryable: false,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockHttpsRequest).not.toHaveBeenCalled();
+  });
+
+  it('caps a hostile bound response at the adapter 10 MB limit', async () => {
+    mockBoundResponse({ status: 200, body: Buffer.alloc(10 * 1024 * 1024 + 1, 0x61) });
+
+    await expect(listChangedFiles(OWNER, PROJECT_PATH, 12)).rejects.toMatchObject({
+      kind: 'retryable',
+      retryable: true,
+    });
+  });
+
+  it('stops a bound file read at the shared read budget', async () => {
+    mockBoundResponse({ status: 200, body: Buffer.alloc(FILE_READ_MAX_BYTES + 1, 0x61) });
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('classifies a bound 404 as not_found without leaking the instance URL', async () => {
+    mockBoundResponse({ status: 404, json: { message: '404 Project Not Found' } });
+
+    const error = await captureRejection(listDiscussions(OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('not_found');
+    expect(error.message).not.toContain('gitlab.example.com');
+    expect(error.message).not.toContain('glpat-mock-token');
+  });
+});
+
+describe('plain transport limits the response body', () => {
+  const LIMIT = 10 * 1024 * 1024;
+
+  /** A diffs payload padded with an unescaped run so its JSON is exactly `size` bytes. */
+  function diffBodyOfSize(size: number): Uint8Array<ArrayBuffer> {
+    const undiffed = JSON.stringify([{ ...diffFixture[0], diff: '' }]);
+    const json = JSON.stringify([{ ...diffFixture[0], diff: 'a'.repeat(size - undiffed.length) }]);
+    const body = new Uint8Array(new ArrayBuffer(json.length));
+    body.set(new TextEncoder().encode(json));
+    return body;
+  }
+
+  it('reads a reply at the limit', async () => {
+    const body = diffBodyOfSize(LIMIT);
+    expect(body.byteLength).toBe(LIMIT);
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': String(body.byteLength),
+          },
+        })
+      )
+    );
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files).toHaveLength(1);
+  });
+
+  it('answers a reply one byte over the limit with the retryable error', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(diffBodyOfSize(LIMIT + 1));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(stream, { status: 200, headers: { 'content-type': 'application/json' } })
+      )
+    );
+
+    const error = await captureRejection(listChangedFiles(OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('retryable');
+    expect(error.retryable).toBe(true);
+    expect(cancelled).toBe(true);
+  });
+
+  it('answers a declared length over the limit without reading the body', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(diffFixture)));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(stream, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': String(LIMIT + 1),
+          },
+        })
+      )
+    );
+
+    const error = await captureRejection(listChangedFiles(OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('retryable');
+    expect(cancelled).toBe(true);
+  });
+
+  it('still returns undefined for a 204 with no body', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
+
+    await expect(
+      requestGitLabJson({ accessToken: 'glpat-mock-token', instanceUrl: INSTANCE_URL }, '/api/v4/x')
+    ).resolves.toBeUndefined();
+  });
+});

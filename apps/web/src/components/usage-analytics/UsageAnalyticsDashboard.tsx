@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { UsageTableBase, type UsageTableColumn } from '@/components/usage/UsageTableBase';
-import { UsageAvailabilityBanner } from '@/components/usage/UsageAvailabilityBanner';
 import { UsageWarning } from '@/components/usage/UsageWarning';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import {
@@ -18,7 +17,7 @@ import {
 } from '@/lib/utils';
 import { Download, SlidersHorizontal } from 'lucide-react';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';
@@ -68,6 +67,8 @@ import { AIAdoptionSummaryCard } from './AIAdoptionSummaryCard';
 import { FeatureAdoptionView } from './FeatureAdoptionView';
 import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
+import { SpendAlertsPanel } from '@/components/spend-alerts/SpendAlertsPanel';
+import { ComputeUsageSection } from './ComputeUsageSection';
 
 /**
  * Personal usage never targets a single organization, so org-only props
@@ -82,6 +83,8 @@ type UsageAnalyticsDashboardProps =
       context: 'personal';
       /** Page title override. */
       title?: string;
+      /** Optional content rendered above the usage panels. */
+      notice?: ReactNode;
     }
   | {
       context: 'organization';
@@ -98,8 +101,12 @@ type UsageAnalyticsDashboardProps =
        */
       callerRole?: OrganizationRole;
       organizationPlan?: Organization['plan'];
+      /** Renders the populated sales-demo default view and trims demo-only panels. */
+      isSalesDemo?: boolean;
       /** Page title override. */
       title?: string;
+      /** Optional content rendered above the usage panels. */
+      notice?: ReactNode;
     };
 
 /** Sentinel written by DBT rollups for rows with NULL project_id. */
@@ -141,6 +148,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const organizationId = org?.organizationId ?? null;
   const organizationName = org?.organizationName;
   const callerRole = org?.callerRole;
+  const isSalesDemo = org?.isSalesDemo === true;
 
   const trpc = useTRPC();
   // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
@@ -152,8 +160,17 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     organizationId && searchParams.get('scope') == null && searchParams.get('viewAs') === 'org-wide'
       ? organizationId
       : undefined;
+  const salesDemoDefaults =
+    isSalesDemo && organizationId
+      ? {
+          usageView: 'ai-usage' as const,
+          period: '30d' as const,
+          granularity: 'day' as const,
+          orgScope: organizationId,
+        }
+      : undefined;
   const { state, setState } = useUsageDashboardState(
-    legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined
+    salesDemoDefaults ?? (legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined)
   );
   const {
     period,
@@ -359,6 +376,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     data: summary,
     isLoading: summaryLoading,
     isError: summaryError,
+    error: summaryFailure,
     refetch: refetchSummary,
   } = useUsageSummary({
     ...commonArgs,
@@ -433,6 +451,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     data: tableData,
     isLoading: tableLoading,
     isError: tableError,
+    error: tableFailure,
     refetch: refetchTable,
   } = useUsageTable({
     ...commonArgs,
@@ -461,9 +480,10 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const userLabelFor = useCallback(
     (value: string) => {
       const match = userResolution?.users.find(u => u.id === value);
+      if (isSalesDemo) return match?.name || match?.email || value;
       return match?.email || match?.name || value;
     },
-    [userResolution]
+    [userResolution, isSalesDemo]
   );
 
   const featureLabelFor = useCallback((value: string) => humanize(value), []);
@@ -507,6 +527,10 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     hasActiveFilters: activeFilters.length > 0,
     summary,
     tableRowCount: tableData?.rows.length,
+    // The two queries a workspace cannot show usage without decide whether a
+    // failure is the terminal "no usage source" state or an ordinary one.
+    summaryError: summaryFailure,
+    tableError: tableFailure,
     queries: [
       usageQueryOutcome({
         isLoading: summaryLoading,
@@ -625,24 +649,22 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
         render: renderDatetime,
         sortAccessor: row => (row.datetime as string) ?? '',
       },
-      ...tableGroupBy.map(
-        (d): UsageTableColumn => ({
-          key: `dim_${d}`,
-          label: DIMENSION_LABELS[d],
-          render: (_v, row) => {
-            const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d];
-            if (rawVal == null || (d !== 'project' && rawVal === '')) return '—';
-            return labelForDimensionValue(d, rawVal);
-          },
-          sortAccessor: row => {
-            const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d];
-            if (rawVal == null || (d !== 'project' && rawVal === '')) return '';
-            return labelForDimensionValue(d, rawVal);
-          },
-        })
-      ),
+      ...tableGroupBy.map((d): UsageTableColumn => ({
+        key: `dim_${d}`,
+        label: DIMENSION_LABELS[d],
+        render: (_v, row) => {
+          const dims = (row.dimensions as Record<string, string>) ?? {};
+          const rawVal = dims[d];
+          if (rawVal == null || (d !== 'project' && rawVal === '')) return '—';
+          return labelForDimensionValue(d, rawVal);
+        },
+        sortAccessor: row => {
+          const dims = (row.dimensions as Record<string, string>) ?? {};
+          const rawVal = dims[d];
+          if (rawVal == null || (d !== 'project' && rawVal === '')) return '';
+          return labelForDimensionValue(d, rawVal);
+        },
+      })),
       {
         key: 'costMicrodollars',
         label: costSource === 'market' ? 'Estimated Market Cost' : 'Cost',
@@ -778,20 +800,22 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
         )}
 
         <div className="flex-1 overflow-y-auto">
+          {props.notice}
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
-            <UsageAvailabilityBanner />
-
             {hasEnterpriseUsageViews && (
               <div className="space-y-4">
                 <div>
                   <h1 className="text-2xl font-bold">Usage</h1>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    Track feature adoption and AI assisted work across {organizationName}.
+                    {isSalesDemo
+                      ? `Track AI usage across ${organizationName}.`
+                      : `Track feature adoption and AI assisted work across ${organizationName}.`}
                   </p>
                 </div>
                 <UsageViewNavigation
                   value={usageView}
                   onValueChange={nextView => setState({ usageView: nextView })}
+                  isSalesDemo={isSalesDemo}
                 />
               </div>
             )}
@@ -824,8 +848,36 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
               <>
                 <UsageWarning />
 
+                {/* Spend-alert settings belong to this spend view's owner and
+                    are independent of the usage queries below: they render
+                    above the summary and stay put when a query fails. */}
+                {org ? (
+                  <SpendAlertsPanel
+                    organizationId={org.organizationId}
+                    callerRole={org.callerRole}
+                  />
+                ) : (
+                  <SpendAlertsPanel />
+                )}
+
+                {!isSalesDemo &&
+                  (isOrgContext && effectiveOrgId === null ? (
+                    <p className="text-muted-foreground rounded-lg border p-4 text-sm">
+                      Select one organization to inspect its compute charges.
+                    </p>
+                  ) : (
+                    <ComputeUsageSection
+                      key={`${effectiveOrgId ?? 'personal'}:${effectiveViewAs}:${dateRange.startDate}:${dateRange.endDate}`}
+                      organizationId={effectiveOrgId}
+                      view={effectiveViewAs === 'org-wide' ? 'all' : 'self'}
+                      dateRange={dateRange}
+                    />
+                  ))}
+
                 {usageDashboardState === 'error' ? (
                   <UsageDataErrorState onRetry={retryUsageQueries} />
+                ) : usageDashboardState === 'unavailable' ? (
+                  <UsageDataErrorState variant="unavailable" />
                 ) : usageDashboardState === 'pending' ? (
                   <UsageDataPendingState />
                 ) : (
@@ -833,7 +885,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                     {/* Org-level panels follow the selected single org so they
                         don't mix scopes; hidden in the All Organizations aggregate
                         (effectiveOrgId is null) which they cannot represent. */}
-                    {isOrgContext && effectiveOrgId && (
+                    {!isSalesDemo && isOrgContext && effectiveOrgId && (
                       <AIAdoptionScoreCard organizationId={effectiveOrgId} dateRange={dateRange} />
                     )}
 
@@ -923,7 +975,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                       }
                     />
 
-                    {isOrgAdmin && effectiveOrgId && (
+                    {!isSalesDemo && isOrgAdmin && effectiveOrgId && (
                       <ActiveKiloclawsTable organizationId={effectiveOrgId} />
                     )}
                   </>

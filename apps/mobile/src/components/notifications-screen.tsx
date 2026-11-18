@@ -1,33 +1,38 @@
-/* eslint-disable max-lines -- The dedicated Notifications screen composes the master
- * OS-permission gate, the push-token registration flow, and 7 per-category toggles
- * with their optimistic-mutation + retry + loading patterns. Extracting subcomponents
- * would re-encode the same hooks. The screen stays a single rendered surface. */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+/* eslint-disable max-lines -- notification settings keep OS permission, registration, and preference mutations together. */
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import {
   Bell,
   BellOff,
   Bot,
-  CircleCheck,
   KeyRound,
   ListTodo,
-  type LucideIcon,
-  MessageSquare,
   RefreshCw,
   ShieldAlert,
-  Sparkles,
+  Smartphone,
   Wallet,
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Alert, Linking, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
+import { BriefingNotificationCategoryRow } from '@/components/agent-briefing/briefing-notification-toggle';
+import { IconTile } from '@/components/ui/icon-tile';
+import { Switch } from '@/components/ui/switch';
+import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
+import { createSubmitLock } from '@/lib/submit-lock';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useAuth } from '@/lib/auth/auth-context';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   applyAgentPushOptimistic,
   deriveAgentPushEditable,
@@ -40,17 +45,38 @@ import {
   rollbackAgentPushOptimistic,
 } from '@/lib/hooks/agent-push-preference';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
+import { useLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
+  emitNotificationPermissionResponded,
+  emitNotificationTokenUpdated,
   getDevicePushToken,
   getNotificationPermissionStatus,
   getPlatform,
   registerForPushNotifications,
 } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
+
+/**
+ * The glanceable row's subtitle: what it promises while the OS allows it, and
+ * what to do about it when the OS does not. Each platform names its own surface
+ * and its own setting.
+ */
+function glanceableSubtitleKey(allowed: boolean, isIos: boolean): string {
+  if (!allowed) {
+    return isIos ? 'glanceable.activityKitDisabledBody' : 'notifications.disabledMessage';
+  }
+  return isIos ? 'notifications.liveActivitySubtitle' : 'notifications.liveUpdateSubtitle';
+}
 const deviceTokenQueryKey = ['devicePushToken'] as const;
 
 /**
@@ -68,76 +94,117 @@ function categoryFromVariables(
 type InlineRetryProps = Readonly<{ label: string; color: string; onPress: () => void }>;
 
 function InlineRetry({ label, color, onPress }: InlineRetryProps) {
+  const { t } = useTranslation();
   return (
     <Pressable
-      className="flex-row items-center gap-1 active:opacity-70"
+      className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
       <RefreshCw size={14} color={color} />
-      <Text className="text-xs font-medium text-destructive">Retry</Text>
+      <Text className="text-xs font-medium text-destructive">{t('common.retry')}</Text>
     </Pressable>
   );
 }
 
-type CategoryMeta = Readonly<{
-  key: NotificationCategoryKey;
-  title: string;
-  subtitle: string;
-  icon: LucideIcon;
-}>;
-
-const CATEGORY_META: readonly CategoryMeta[] = [
-  {
-    key: 'chatMessages',
-    title: 'Chat messages',
-    subtitle: 'replies in your conversations',
-    icon: MessageSquare,
-  },
+/** One row per notification category. */
+const CATEGORY_META = [
   {
     key: 'agentAttention',
-    title: 'Agent needs you',
-    subtitle: 'questions, permission, input needed',
+    titleKey: 'notifications.category.agentAttentionTitle',
+    subtitleKey: 'notifications.category.agentAttentionSubtitle',
     icon: KeyRound,
   },
   {
     key: 'agentUpdates',
-    title: 'Agent updates',
-    subtitle: 'mid-task messages from the agent',
+    titleKey: 'notifications.category.agentUpdatesTitle',
+    subtitleKey: 'notifications.category.agentUpdatesSubtitle',
     icon: Bot,
   },
   {
     key: 'sessionStatus',
-    title: 'Session status',
-    subtitle: 'finished / failed / ready to control',
+    titleKey: 'notifications.category.sessionStatusTitle',
+    subtitleKey: 'notifications.category.sessionStatusSubtitle',
     icon: ListTodo,
   },
   {
-    key: 'kiloclawActivity',
-    title: 'KiloClaw activity',
-    subtitle: 'instance ready/failed, scheduled actions',
-    icon: Sparkles,
-  },
-  {
     key: 'balanceAlerts',
-    title: 'Balance alerts',
-    subtitle: 'low organization balance warnings',
+    titleKey: 'notifications.channel.balance',
+    subtitleKey: 'notifications.category.balanceAlertsSubtitle',
     icon: Wallet,
   },
   {
+    key: 'spendAlerts',
+    titleKey: 'notifications.channel.spend',
+    subtitleKey: 'notifications.category.spendAlertsSubtitle',
+    icon: Wallet,
+    // A dedicated label for the device scene: the spend view owns a switch with
+    // the same visible wording, so this row's control must be addressable on
+    // its own. The low-balance sheet uses the same `*A11y` pattern.
+    accessibilityLabelKey: 'notifications.category.spendAlertsToggle',
+  },
+  {
     key: 'securityFindings',
-    title: 'Security findings',
-    subtitle: 'new findings and SLA reminders',
+    titleKey: 'notifications.channel.security',
+    subtitleKey: 'notifications.category.securityFindingsSubtitle',
     icon: ShieldAlert,
   },
 ] as const;
+
+/**
+ * The reason each gated category shows while the server marks it unavailable.
+ * The response's old `unavailableReason` was an English sentence, so the row
+ * renders mobile copy instead: the reason must read in the user's language.
+ * Of the categories mobile renders, only balance alerts and security findings
+ * carry a gate in the server's capability map
+ * (`apps/web/src/routers/user-router.ts: computeNotificationCapabilities`); the
+ * other four are always available there.
+ *
+ * This is the fallback for a response that carries no reason code at all — a
+ * server predating the code sent the very sentence this copy translates — so
+ * such a row keeps the same meaning in the reader's language.
+ */
+const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, string> = new Map([
+  ['balanceAlerts', 'notifications.category.balanceAlertsUnavailable'],
+  ['securityFindings', 'notifications.category.securityFindingsUnavailable'],
+]);
+
+type CategoryMeta = (typeof CATEGORY_META)[number];
+
+/** Per-category availability from the preferences response `capabilities` map. */
+type NotificationPreferencesResponse =
+  inferRouterOutputs<MobileRouter>['user']['getNotificationPreferences'];
+type NotificationCategoryCapability =
+  NotificationPreferencesResponse['capabilities'][NotificationCategoryKey];
+type UnavailableReasonCode = NonNullable<NotificationCategoryCapability['unavailableReasonCode']>;
+
+/**
+ * The server sends a machine-readable reason code, never a sentence: each code
+ * maps to a catalog key so the row reads in the reader's language. Literal
+ * values, never a template, so the catalog check can see the keys.
+ */
+const UNAVAILABLE_REASON_KEY = {
+  organizationRequired: 'notifications.category.balanceAlertsUnavailable',
+  securityAgentRequired: 'notifications.category.securityFindingsUnavailable',
+} satisfies Partial<Record<UnavailableReasonCode, string>>;
+
+/** A code from a newer server must fall back, never render raw. */
+function unavailableReasonKey(code: string | null | undefined): string | undefined {
+  // Object.hasOwn (not `in`) so an inherited member like 'constructor' falls
+  // back to the subtitle instead of handing a prototype member to `t()`.
+  if (code == null || !Object.hasOwn(UNAVAILABLE_REASON_KEY, code)) {
+    return undefined;
+  }
+  return UNAVAILABLE_REASON_KEY[code as keyof typeof UNAVAILABLE_REASON_KEY];
+}
 
 type CategoryRowProps = Readonly<{
   meta: CategoryMeta;
   queryKey: readonly unknown[];
   queryClient: ReturnType<typeof useQueryClient>;
   preferences: NotificationPreferences | undefined;
+  capability: NotificationCategoryCapability | undefined;
   disabled: boolean;
   isPending: boolean;
   onChange: (next: boolean) => void;
@@ -148,11 +215,13 @@ function CategoryRow({
   queryKey,
   queryClient,
   preferences,
+  capability,
   disabled,
   isPending,
   onChange,
 }: CategoryRowProps) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const Icon = meta.icon;
   // Display the optimistic value while a mutation is in flight; otherwise
   // fall back to the persisted value (or the default-ON semantics when the
@@ -161,26 +230,54 @@ function CategoryRow({
     ? readAgentPushPreference(queryClient, queryKey, meta.key)
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
-  const isDisabled = disabled || !editable;
+  // An unavailable category is a terminal, non-retryable state: the switch is
+  // disabled and the row explains itself in the reader's language. The server's
+  // old `unavailableReason` sentence is English prose and must never render — it
+  // cannot be translated — so the reason comes from the code map, or from
+  // `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS` when the response carries no code. A
+  // missing entry (the `noUncheckedIndexedAccess` widening) defaults to
+  // available.
+  const unavailable = capability?.available === false;
+  const unavailableReasonCode = capability?.unavailableReasonCode;
+  const isDisabled = disabled || !editable || unavailable;
+  const title = t(meta.titleKey);
+  // The server names the reason with a code, never a sentence: a known code
+  // resolves to catalog copy, and an unknown one falls back to the category's
+  // own localized subtitle.
+  const reasonKey = unavailable ? unavailableReasonKey(unavailableReasonCode) : undefined;
+  // A response with no code at all comes from a server that predates the code
+  // contract, which sent the sentence the category's catalog reason translates:
+  // the row keeps that meaning in the reader's language.
+  const noCodeFallbackKey =
+    unavailable && unavailableReasonCode == null
+      ? (CATEGORY_UNAVAILABLE_SUBTITLE_KEYS.get(meta.key) ?? meta.subtitleKey)
+      : meta.subtitleKey;
+  const subtitle = t(reasonKey ?? noCodeFallbackKey);
+  // Most rows take the visible title as their control label; the spend row
+  // carries its own so the device scene can address it unambiguously.
+  const accessibilityLabel =
+    'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <Icon size={18} color={colors.secondaryForeground} />
+      <IconTile icon={Icon} tint={NEUTRAL_TINT} />
       <View className="flex-1">
         {/* Disabled cue is the muted title, not row opacity: blanket opacity
-            drops every label below the 4.5:1 text minimum. The Switch renders
-            its own disabled appearance. */}
+            drops every label below the 4.5:1 text minimum. The switch carries
+            the other half: a disabled `Switch` paints the palette's muted pair
+            on Android, where the platform draws none, so an unavailable row
+            never shows a full-strength accent beside it. */}
         <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
-          {meta.title}
+          {title}
         </Text>
         <Text variant="muted" className="mt-0.5 text-xs">
-          {meta.subtitle}
+          {subtitle}
         </Text>
       </View>
       {isPending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
       <Switch
         value={displayedValue}
         disabled={isDisabled}
-        accessibilityLabel={meta.title}
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: isDisabled, busy: isPending }}
         onValueChange={value => {
           if (isDisabled) {
@@ -193,17 +290,27 @@ function CategoryRow({
   );
 }
 
+/**
+ * The master push gate's enable flow: one step at a time, so no second tap can
+ * start the OS permission request or the token registration the first one owns.
+ */
+type EnablePhase = 'requesting-permission' | 'registering-token' | null;
+
 export function NotificationsScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { token: authToken } = useAuth();
   const isAuthenticated = authToken != null;
 
-  const [isTogglingPermission, setIsTogglingPermission] = useState(false);
-  const [isRegisteringToken, setIsRegisteringToken] = useState(false);
-  // The `setNotificationPreferences` mutation object is shared across all five
-  // rows, and its `isPending` is a single flag for the whole procedure. Two
+  const [enablePhase, setEnablePhase] = useState<EnablePhase>(null);
+  // The permission read is a native round trip, and the busy flag renders only
+  // after it: a second tap in that window would request the permission and
+  // register the token twice. Only a synchronous lock closes it.
+  const enableLock = useRef(createSubmitLock());
+  // The `setNotificationPreferences` mutation object is shared across every
+  // category row, and its `isPending` is a single flag for the whole procedure. Two
   // category flips can therefore be in flight at once, so we track the set of
   // in-flight categories explicitly and scope each row's busy state to its own
   // key. Each mutation callback resolves its own category from `variables`
@@ -212,6 +319,14 @@ export function NotificationsScreen() {
   const [pendingCategories, setPendingCategories] = useState<ReadonlySet<NotificationCategoryKey>>(
     () => new Set()
   );
+
+  // The preview row is a single string-enum control (not a boolean category),
+  // so its in-flight, error, and last-intent state is tracked separately from
+  // `pendingCategories`. `previewIntent` remembers the value the user last
+  // tried to set so the inline retry can re-attempt it.
+  const [isPreviewPending, setIsPreviewPending] = useState(false);
+  const [previewErrorCode, setPreviewErrorCode] = useState<string | undefined>(undefined);
+  const [previewIntent, setPreviewIntent] = useState<'generic' | 'full'>('generic');
 
   const {
     data: permissionGranted = false,
@@ -249,7 +364,7 @@ export function NotificationsScreen() {
   });
   const pushTokensQueryKey = trpc.user.getMyPushTokens.queryOptions().queryKey;
   const serverRegistered =
-    deviceToken != null && (pushTokens ?? []).some(t => t.token === deviceToken);
+    deviceToken != null && (pushTokens ?? []).some(pushToken => pushToken.token === deviceToken);
 
   // Each *Settled is isFetched || isError for the enabled query. Do not invent
   // a "disabled → settled" mapping for deviceToken — deriveGateSettled
@@ -276,12 +391,33 @@ export function NotificationsScreen() {
   const notificationsEnabled = permissionGranted && serverRegistered;
   const showEnableCta = deriveShowEnableCta(notificationsEnabled);
 
+  const {
+    liveActivityEnabled,
+    hasLoaded: liveActivityLoaded,
+    setLiveActivityEnabled,
+  } = useLiveActivityPreference();
+  // ActivityKit's own switch. Read on mount and again on every foreground,
+  // because the only way to change it is to leave for Settings and come back.
+  const [systemAllowsLiveActivities, setSystemAllowsLiveActivities] = useState(
+    liveActivitiesAllowedBySystem
+  );
+  const isIos = Platform.OS === 'ios';
+  // The OS switch that governs the glanceable surface: ActivityKit's own on
+  // iOS, the notification permission on Android, which is what a Live Update
+  // posts through.
+  const systemAllowsGlanceable = isIos ? systemAllowsLiveActivities : permissionGranted;
+  // Off in Settings, or a state the screen has not read yet: either way the
+  // switch must not accept a change it cannot honor.
+  const liveActivityRowDisabled =
+    !liveActivityLoaded || !systemAllowsGlanceable || (!isIos && permissionLoading);
+
   // Re-check permission on foreground resume
   const { isActive } = useAppLifecycle();
   const wasActiveRef = useRef(isActive);
   useEffect(() => {
     if (!wasActiveRef.current && isActive) {
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
+      setSystemAllowsLiveActivities(liveActivitiesAllowedBySystem());
     }
     wasActiveRef.current = isActive;
   }, [isActive, queryClient]);
@@ -291,26 +427,40 @@ export function NotificationsScreen() {
     void queryClient.invalidateQueries({ queryKey: preferencesQueryKey });
   }, [queryClient, pushTokensQueryKey, preferencesQueryKey]);
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const registerToken = useMutation(
     trpc.user.registerPushToken.mutationOptions({
       onMutate: async () => {
         await queryClient.cancelQueries({ queryKey: pushTokensQueryKey });
+        const generation = nextMutationGeneration(hashKey(pushTokensQueryKey));
         const previous = queryClient.getQueryData(pushTokensQueryKey);
         if (deviceToken) {
           queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) => [
             ...(old ?? []),
-            { token: deviceToken, platform: getPlatform() },
+            {
+              token: deviceToken,
+              platform: getPlatform(),
+              locale: getResolvedLanguage(),
+              appVersion: Application.nativeApplicationVersion ?? null,
+            },
           ]);
         }
-        return { previous };
+        return { previous, generation };
       },
       onError: (error, _vars, context) => {
-        if (context?.previous) {
+        if (
+          context?.previous &&
+          isLatestMutationGeneration(hashKey(pushTokensQueryKey), context.generation)
+        ) {
           queryClient.setQueryData(pushTokensQueryKey, context.previous);
         }
         toast.error(error.message);
       },
       onSettled: invalidateAll,
+      // One fixed cache entry, so a single static scope id serializes the
+      // network call (rule 2).
+      scope: { id: 'push-tokens' },
     })
   );
 
@@ -318,12 +468,11 @@ export function NotificationsScreen() {
   // category. We pass ONE key per call so the server-side partial update
   // only touches the column the user is flipping; the optimistic helper
   // scopes its in-memory flip to that same key.
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const setPreference = useMutation(
     trpc.user.setNotificationPreferences.mutationOptions({
-      // react-query's onMutate signature requires either an async function or
-      // a plain return of a Promise; we need async semantics so the optimistic
-      // write commits before the mutation body runs.
-      // eslint-disable-next-line require-await, typescript-eslint/return-await
+      // async so the optimistic write commits before the mutation body runs.
       onMutate: async variables => {
         const category = categoryFromVariables(variables);
         if (category == null) {
@@ -333,20 +482,31 @@ export function NotificationsScreen() {
         if (next === undefined) {
           return undefined;
         }
-        return applyAgentPushOptimistic({
+        // The helper stamps its own generation after its `cancelQueries`
+        // await, so the stamp cannot drift from the cache write it guards.
+        const context = await applyAgentPushOptimistic({
           queryClient,
           queryKey: preferencesQueryKey,
           next,
           category,
         });
+        return context;
       },
-      onError: (error, _vars, context) => {
-        rollbackAgentPushOptimistic({
-          queryClient,
-          queryKey: preferencesQueryKey,
-          context,
-        });
+      onError: (error, variables, context) => {
+        if (
+          context &&
+          isLatestMutationGeneration(hashKey(preferencesQueryKey), context.generation)
+        ) {
+          rollbackAgentPushOptimistic({
+            queryClient,
+            queryKey: preferencesQueryKey,
+            context,
+          });
+        }
         toast.error(error.message);
+        if (variables.notificationPreviews !== undefined) {
+          setPreviewErrorCode(readTrpcErrorField(error, 'code'));
+        }
       },
       onSettled: (_data, _error, variables) => {
         const category = categoryFromVariables(variables);
@@ -360,8 +520,14 @@ export function NotificationsScreen() {
             return next;
           });
         }
+        if (variables.notificationPreviews !== undefined) {
+          setIsPreviewPending(false);
+        }
         void queryClient.invalidateQueries({ queryKey: preferencesQueryKey });
       },
+      // One fixed cache entry, so a single static scope id serializes the
+      // network call (rule 2).
+      scope: { id: 'notification-preferences' },
     })
   );
 
@@ -373,65 +539,97 @@ export function NotificationsScreen() {
     [setPreference]
   );
 
+  const handlePreviewChange = useCallback(
+    (next: 'generic' | 'full') => {
+      setPreviewErrorCode(undefined);
+      setPreviewIntent(next);
+      setIsPreviewPending(true);
+      setPreference.mutate({ notificationPreviews: next });
+    },
+    [setPreference]
+  );
+
   const handleEnableNotifications = useCallback(async () => {
-    const currentStatus = await getNotificationPermissionStatus();
-    if (currentStatus === 'denied') {
-      Alert.alert(
-        'Notifications disabled',
-        'To enable notifications, turn them on in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-        ]
-      );
+    const lock = enableLock.current;
+    if (!lock.acquire()) {
       return;
     }
-    setIsTogglingPermission(true);
+    setEnablePhase('requesting-permission');
     try {
+      const currentStatus = await getNotificationPermissionStatus();
+      if (currentStatus === 'denied') {
+        Alert.alert(
+          t('notifications.disabledTitle'),
+          t('notifications.disabledMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+          ],
+          // Android back dismisses, which equals the no-op Cancel.
+          { cancelable: true }
+        );
+        return;
+      }
       const result = await Notifications.requestPermissionsAsync();
+      const granted = result.status === Notifications.PermissionStatus.GRANTED || result.granted;
+      // Only a live permission request emits an outcome. A pre-granted status
+      // returns without prompting, so emitting here would report a spurious
+      // `notification_permission_responded: granted`. This matches the
+      // invariant `registerForPushNotifications` enforces for its own request.
+      if (currentStatus !== 'granted') {
+        emitNotificationPermissionResponded(granted);
+      }
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
-      if (result.status === Notifications.PermissionStatus.GRANTED || result.granted) {
-        // Keep `isTogglingPermission` set through token registration so the
-        // master switch stays busy for the whole enable flow. Clearing it here
-        // (before `isRegisteringToken` is set) would briefly re-enable the
-        // switch mid-flow and allow a re-entrant enable/disable.
-        const token = await registerForPushNotifications();
-        if (!token) {
-          toast.error('Registration failed. Check your notification permissions.');
-          return;
-        }
-        setIsRegisteringToken(true);
-        try {
-          await registerToken.mutateAsync({ token, platform: getPlatform() });
-        } catch {
-          // registerToken's onError already surfaced the toast; swallow here so
-          // the outer catch does not double-report the same failure.
-        } finally {
-          setIsRegisteringToken(false);
-        }
+      if (!granted) {
+        return;
+      }
+      const token = await registerForPushNotifications();
+      if (!token) {
+        toast.error(t('notifications.registrationFailed'));
+        return;
+      }
+      // The switch stays busy through token registration: the phase never leaves
+      // `requesting-permission` while the token is being written.
+      setEnablePhase('registering-token');
+      try {
+        await registerToken.mutateAsync({
+          token,
+          platform: getPlatform(),
+          appVersion: Application.nativeApplicationVersion ?? undefined,
+          // Without this the row is written with a null locale, so every push
+          // to a device enrolled from this screen arrives in English.
+          locale: getResolvedLanguage(),
+        });
+        emitNotificationTokenUpdated('registered');
+      } catch {
+        // registerToken's onError already surfaced the toast; swallow here so
+        // the outer catch does not double-report the same failure.
       }
     } catch {
       // A failure here comes from requestPermissionsAsync or
       // registerForPushNotifications (the registration mutation reports its own
       // error above), so surface the feedback the previous card also showed.
-      toast.error('Could not enable notifications. Please try again.');
+      toast.error(t('notifications.couldNotEnable'));
     } finally {
-      setIsTogglingPermission(false);
+      setEnablePhase(null);
+      lock.release();
     }
-  }, [queryClient, registerToken]);
+  }, [queryClient, registerToken, t]);
 
   const handleDisableNotifications = useCallback(() => {
     Alert.alert(
-      'Disable notifications',
-      'To disable notifications, turn them off in your device settings.',
+      t('notifications.disableTitle'),
+      t('notifications.disableMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-      ]
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+      ],
+      // Android back dismisses, which equals the no-op Cancel.
+      { cancelable: true }
     );
-  }, []);
+  }, [t]);
 
-  const isMasterBusy = isTogglingPermission || isRegisteringToken;
+  const isMasterBusy = enablePhase !== null;
   const masterLeading = deriveMasterGateLeadingPresentation({
     permissionLoading,
     permissionError,
@@ -439,34 +637,98 @@ export function NotificationsScreen() {
     notificationsEnabled,
   });
 
+  // Message-preview row: a single string-enum control rendered from the server
+  // value with no optimistic flip. UNAUTHORIZED is a terminal failure (the row
+  // stays disabled with no retry); any other mutation error is retryable.
+  const previewValue = preferences?.notificationPreviews ?? 'generic';
+  const previewIsFull = previewValue === 'full';
+  const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
+  const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
+
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Notifications" />
+      <ScreenHeader title={t('common.notifications')} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-4 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        {/* The glanceable surface. First on the screen because it is what the
+            user sees without opening the app, and it must not sit below eight
+            category rows. Each platform names it the way its own OS does:
+            a Live Activity on iOS, a Live Update on Android. */}
+        <View className="gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {isIos ? t('notifications.liveActivities') : t('notifications.liveUpdates')}
+          </Text>
+          <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+            <IconTile icon={Smartphone} tint={NEUTRAL_TINT} />
+            <View className="flex-1">
+              {/* Disabled cue is the muted title, not row opacity — the same
+                  pattern as CategoryRow below. */}
+              <Text
+                className={cn(
+                  'text-sm font-medium',
+                  liveActivityRowDisabled && 'text-muted-foreground'
+                )}
+              >
+                {t('glanceable.channelName')}
+              </Text>
+              <Text variant="muted" className="mt-0.5 text-xs">
+                {t(glanceableSubtitleKey(systemAllowsGlanceable, isIos))}
+              </Text>
+            </View>
+            <Switch
+              value={systemAllowsGlanceable && liveActivityEnabled}
+              disabled={liveActivityRowDisabled}
+              accessibilityLabel={t('glanceable.channelName')}
+              accessibilityState={{ disabled: liveActivityRowDisabled }}
+              onValueChange={setLiveActivityEnabled}
+            />
+          </View>
+          {/* Our switch cannot turn ActivityKit's back on, so the row offers
+              the only thing that can instead of pretending otherwise. Android
+              needs no button here: the master gate below already enables the
+              same permission. */}
+          {isIos && !systemAllowsLiveActivities && (
+            <Pressable
+              onPress={() => void Linking.openSettings()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.openSettings')}
+              className="items-center rounded-lg bg-primary py-2.5 active:opacity-80"
+            >
+              <Text className="text-sm font-semibold text-primary-foreground">
+                {t('common.openSettings')}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+
         {/* Master gate */}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Push
+            {t('notifications.push')}
           </Text>
           <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            {masterLeading === 'neutral' && <Skeleton className="h-[18px] w-[18px] rounded" />}
-            {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
-            {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
+            {/* The leading cell keeps the tile's 30 dp frame in all three
+                states, so the title never moves when the permission settles
+                into "on" or "off". */}
+            {masterLeading === 'neutral' ? (
+              <IconTile tint={NEUTRAL_TINT} content={<Skeleton className="h-4 w-4 rounded" />} />
+            ) : (
+              <IconTile icon={masterLeading === 'on' ? Bell : BellOff} tint={NEUTRAL_TINT} />
+            )}
             <View className="flex-1">
-              <Text className="text-sm font-medium">Notifications enabled</Text>
+              <Text className="text-sm font-medium">{t('notifications.deviceTitle')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
-                  Push notifications are on for this device.
+                  {t('notifications.onDescription')}
                 </Text>
               )}
               {masterLeading === 'off' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
-                  Permission or device registration is off.
+                  {t('notifications.offDescription')}
                 </Text>
               )}
             </View>
@@ -478,7 +740,7 @@ export function NotificationsScreen() {
             {permissionLoading && <Skeleton className="h-[31px] w-[51px] rounded-full" />}
             {!permissionLoading && permissionError && (
               <InlineRetry
-                label="Retry checking notification permission"
+                label={t('notifications.retryPermission')}
                 color={colors.destructive}
                 onPress={() => void refetchPermission()}
               />
@@ -492,7 +754,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel="Notifications enabled"
+                  accessibilityLabel={t('notifications.deviceTitle')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {
@@ -514,27 +776,21 @@ export function NotificationsScreen() {
               so a non-retryable CTA is structurally absent. */}
           {!permissionLoading && !permissionError && gateSettled && showEnableCta && (
             <View className="rounded-lg border border-border bg-card p-4">
-              <View className="flex-row items-start gap-3">
-                <CircleCheck size={18} color={colors.foreground} />
-                <View className="flex-1 gap-1">
-                  <Text className="text-sm font-medium">Enable notifications</Text>
-                  <Text variant="muted" className="text-xs">
-                    Turn on push notifications to receive category alerts on this device.
-                  </Text>
-                </View>
-              </View>
+              <Text variant="muted" className="text-xs">
+                {t('notifications.enableDescription')}
+              </Text>
               <Pressable
                 onPress={() => void handleEnableNotifications()}
                 disabled={isMasterBusy}
                 accessibilityRole="button"
-                accessibilityLabel="Enable notifications"
+                accessibilityLabel={t('notifications.enable')}
                 className="mt-3 items-center rounded-lg bg-primary py-2.5 active:opacity-80"
               >
                 {isMasterBusy ? (
                   <ActivityIndicator size="small" color={colors.primaryForeground} />
                 ) : (
                   <Text className="text-sm font-semibold text-primary-foreground">
-                    Enable notifications
+                    {t('notifications.enable')}
                   </Text>
                 )}
               </Pressable>
@@ -542,69 +798,164 @@ export function NotificationsScreen() {
           )}
         </View>
 
-        {/* Categories */}
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Categories
-          </Text>
-          {preferencesLoading && (
-            <>
-              {CATEGORY_META.map(meta => (
-                <View
-                  key={meta.key}
-                  className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
-                >
-                  <Skeleton className="h-[18px] w-[18px] rounded" />
+        {/* Everything below waits for the master gate. The gate's settled
+            height is only known once it settles: the Push row grows by its
+            description line and the Enable card mounts when push is off, which
+            is about 111 dp of content that would otherwise arrive after the
+            reader has already seen the sections below it (design gate
+            `layout-shift` on this screen). Holding them for the gate keeps the
+            first frame that can rest identical to the final one. */}
+        {gateSettled && (
+          <>
+            {/* Categories */}
+            <View className="gap-3">
+              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+                {t('notifications.categories')}
+              </Text>
+              {preferencesLoading && (
+                <>
+                  {CATEGORY_META.map(meta => (
+                    <View
+                      key={meta.key}
+                      className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+                    >
+                      {/* The leading cell reserves the loaded CategoryRow's
+                          30 dp tile frame, so the rows do not move when the
+                          preferences arrive. */}
+                      <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
+                      <View className="flex-1">
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="mt-0.5 h-4 w-40" />
+                      </View>
+                      <Skeleton className="h-[31px] w-[51px] rounded-full" />
+                    </View>
+                  ))}
+                </>
+              )}
+              {preferencesError && (
+                <View className="rounded-lg bg-secondary p-3">
+                  <InlineRetry
+                    label={t('notifications.retryCategories')}
+                    color={colors.destructive}
+                    onPress={() => void refetchPreferences()}
+                  />
+                </View>
+              )}
+              {preferences && (
+                <>
+                  {CATEGORY_META.map(meta => (
+                    <CategoryRow
+                      key={meta.key}
+                      meta={meta}
+                      queryKey={preferencesQueryKey}
+                      queryClient={queryClient}
+                      preferences={preferences}
+                      capability={
+                        // The server type marks `capabilities` required, but a
+                        // backend that predates the field returns none. The guard
+                        // keeps the old response on the always-available path.
+                        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+                        preferences.capabilities?.[meta.key] ?? {
+                          available: true,
+                          unavailableReasonCode: null,
+                        }
+                      }
+                      disabled={!notificationsEnabled}
+                      isPending={pendingCategories.has(meta.key)}
+                      onChange={next => {
+                        handleCategoryChange(meta.key, next);
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+              <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
+            </View>
+
+            {/* Message previews */}
+            <View className="gap-3">
+              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+                {t('notifications.messagePreviews')}
+              </Text>
+              {preferencesLoading && (
+                <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
                   <View className="flex-1">
                     <Skeleton className="h-5 w-24" />
                     <Skeleton className="mt-0.5 h-4 w-40" />
                   </View>
                   <Skeleton className="h-[31px] w-[51px] rounded-full" />
                 </View>
-              ))}
-            </>
-          )}
-          {preferencesError && (
-            <View className="rounded-lg bg-secondary p-3">
-              <InlineRetry
-                label="Retry loading notification categories"
-                color={colors.destructive}
-                onPress={() => void refetchPreferences()}
-              />
+              )}
+              {preferencesError && (
+                <View className="rounded-lg bg-secondary p-3">
+                  <InlineRetry
+                    label={t('notifications.retryPreviews')}
+                    color={colors.destructive}
+                    onPress={() => void refetchPreferences()}
+                  />
+                </View>
+              )}
+              {preferences && (
+                <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+                  <View className="flex-1">
+                    <Text
+                      className={cn(
+                        'text-sm font-medium',
+                        previewDisabled && 'text-muted-foreground'
+                      )}
+                    >
+                      {previewIsFull
+                        ? t('notifications.previewAlways')
+                        : t('notifications.previewWhenUnlocked')}
+                    </Text>
+                    <Text variant="muted" className="mt-0.5 text-xs">
+                      {previewIsFull
+                        ? t('notifications.previewFullDescription')
+                        : t('notifications.previewGenericDescription')}
+                    </Text>
+                  </View>
+                  {isPreviewPending && (
+                    <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  )}
+                  {previewErrorCode !== undefined && !previewTerminal && (
+                    <InlineRetry
+                      label={t('notifications.retrySavingPreviews')}
+                      color={colors.destructive}
+                      onPress={() => {
+                        handlePreviewChange(previewIntent);
+                      }}
+                    />
+                  )}
+                  <Switch
+                    value={previewIsFull}
+                    disabled={previewDisabled}
+                    accessibilityLabel={t('notifications.showFullPreviews')}
+                    accessibilityState={{ disabled: previewDisabled, busy: isPreviewPending }}
+                    onValueChange={value => {
+                      if (previewDisabled) {
+                        return;
+                      }
+                      handlePreviewChange(value ? 'full' : 'generic');
+                    }}
+                  />
+                </View>
+              )}
             </View>
-          )}
-          {preferences && (
-            <>
-              {CATEGORY_META.map(meta => (
-                <CategoryRow
-                  key={meta.key}
-                  meta={meta}
-                  queryKey={preferencesQueryKey}
-                  queryClient={queryClient}
-                  preferences={preferences}
-                  disabled={!notificationsEnabled}
-                  isPending={pendingCategories.has(meta.key)}
-                  onChange={next => {
-                    handleCategoryChange(meta.key, next);
+
+            {/* Device-token / pushTokens error retry block */}
+            {(deviceTokenError || pushTokensError) && !permissionError && (
+              <View className="rounded-lg bg-secondary p-3">
+                <InlineRetry
+                  label={t('notifications.retryDeviceRegistration')}
+                  color={colors.destructive}
+                  onPress={() => {
+                    void refetchDeviceToken();
+                    void refetchPushTokens();
                   }}
                 />
-              ))}
-            </>
-          )}
-        </View>
-
-        {/* Device-token / pushTokens error retry block */}
-        {(deviceTokenError || pushTokensError) && !permissionError && (
-          <View className="rounded-lg bg-secondary p-3">
-            <InlineRetry
-              label="Retry loading device push registration"
-              color={colors.destructive}
-              onPress={() => {
-                void refetchDeviceToken();
-                void refetchPushTokens();
-              }}
-            />
-          </View>
+              </View>
+            )}
+          </>
         )}
       </TabScreenScrollView>
     </View>

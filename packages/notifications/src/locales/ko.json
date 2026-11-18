@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "에이전트 세션에 업데이트가 있습니다",
+      "lowBalance": "잔액 확인이 필요합니다",
+      "spendAlert": "지출 확인이 필요합니다",
+      "securityFinding": "보안 발견 사항 확인이 필요합니다",
+      "securityUpdate": "보안 검사에 업데이트가 있습니다",
+      "activeAgentsGlanceable": "활성 에이전트에 업데이트가 있습니다"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "잔액 부족 알림",
+      "body": "{{organizationName}} 잔액이 ${{minimumBalanceUsd}} 미만으로 떨어졌습니다"
+    },
+    "spendAlert": {
+      "title": "지출 알림",
+      "body": "{{scopeName}} 지출이 ${{amountUsd}}를 초과했습니다"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}}의 {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "새 보안 발견 사항 ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA 경고"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA 위반"
+    }
+  },
+  "sessionReady": {
+    "body": "Kilo 세션을 휴대폰에서 제어할 준비가 되었습니다"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

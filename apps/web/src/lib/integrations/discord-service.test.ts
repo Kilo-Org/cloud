@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   DISCORD_BOT_TOKEN: 'bot-token',
   DISCORD_CLIENT_ID: 'client-id',
   DISCORD_CLIENT_SECRET: 'client-secret',
@@ -11,11 +11,14 @@ const mockUpdateReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
+          orderBy: jest.fn(() => ({
+            limit: mockLimit,
+          })),
           limit: mockLimit,
         })),
       })),
@@ -32,15 +35,16 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getOrganizationById: jest.fn(),
 }));
 
+const mockGetDefaultAllowedModel = jest.fn();
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
-  getDefaultAllowedModel: jest.fn(async () => 'gpt-test'),
+  getDefaultAllowedModel: (...args: unknown[]) => mockGetDefaultAllowedModel(...args),
 }));
 
-jest.mock('@/lib/model-allow.server', () => ({
+jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
   createAllowPredicateFromRestrictions: jest.fn(),
   hasActiveModelRestrictions: jest.fn(() => false),
 }));
@@ -187,5 +191,59 @@ describe('discord-service persisted guild ID validation', () => {
     expect(fetchSpy).toHaveBeenCalledWith('https://discord.com/api/v10/guilds/123456789012345678', {
       headers: { Authorization: 'Bot bot-token' },
     });
+  });
+});
+
+describe('discord-service organization install model', () => {
+  const orgOwner = { type: 'org', id: 'org-1' } satisfies Owner;
+
+  const oauthResponse = {
+    access_token: 'access-token',
+    token_type: 'Bearer',
+    expires_in: 3600,
+    refresh_token: 'refresh-token',
+    scope: 'bot guilds',
+    guild: { id: '123456789012345678', name: 'Test Guild', icon: null },
+  };
+
+  beforeEach(() => {
+    mockLimit.mockReset();
+    mockInsertValues.mockReset();
+    mockInsertReturning.mockReset();
+    mockGetDefaultAllowedModel.mockReset();
+    mockLimit.mockResolvedValue([]);
+    mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
+    mockInsertReturning.mockResolvedValue([buildDiscordIntegration()]);
+  });
+
+  it('stores no model when the organization policy allows none', async () => {
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    await upsertDiscordInstallation(orgOwner, oauthResponse);
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect('model_slug' in inserted.metadata).toBe(false);
+    expect(inserted.metadata).toMatchObject({ guild_icon: null });
+  });
+
+  it('stores the allowed model for the organization', async () => {
+    mockGetDefaultAllowedModel.mockResolvedValue('test/allowed-model');
+
+    await upsertDiscordInstallation(orgOwner, oauthResponse);
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(inserted.metadata.model_slug).toBe('test/allowed-model');
+  });
+
+  it('stores the model the caller resolved', async () => {
+    mockGetDefaultAllowedModel.mockResolvedValue('test/unused-model');
+
+    await upsertDiscordInstallation(orgOwner, oauthResponse, {
+      defaultModel: 'test/caller-model',
+    });
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(inserted.metadata.model_slug).toBe('test/caller-model');
+    expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
   });
 });

@@ -1,16 +1,19 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { sql, eq, isNull } from 'drizzle-orm';
 import type {
   GuiCreditCategoryStatistics,
   CreditCategoriesApiResponse,
-} from '@/lib/PromoCreditCategoryConfig';
-import { toGuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
-import { promoCreditCategories, promoCreditCategoriesByKey } from '@/lib/promoCreditCategories';
-import { getUserFromAuth } from '@/lib/user/server';
-import type { FailureResult } from '@/lib/maybe-result';
+} from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
+import { toGuiCreditCategory } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
+import {
+  promoCreditCategories,
+  promoCreditCategoriesByKey,
+} from '@kilocode/web-shared/lib/promoCreditCategories';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 export async function GET(
   request: NextRequest

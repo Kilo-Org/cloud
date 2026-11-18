@@ -1,29 +1,39 @@
-import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
-import { ActivityIndicator, Switch, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+/* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
+import { selectionHaptic } from '@/lib/haptics';
+import { type Href } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
+import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
-import { getCodeReviewActionRequiredCopy } from '@kilocode/app-shared/code-reviews';
+import { ActionRequiredBanner } from '@/components/code-reviewer/action-required-banner';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
+import { connectNoticeKey } from '@/components/code-reviewer/connect-notice-key';
 import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
-import { PlatformErrorScreen } from '@/components/platform-error-screen';
-import { ScreenHeader } from '@/components/screen-header';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
+import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { canConnectProvider } from '@/lib/code-reviewer-status';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
   classifyProviderState,
-  PERSONAL_SCOPE,
   useGitHubStatus,
   useGitLabStatus,
   useGitLabWebhookWarning,
@@ -32,13 +42,16 @@ import {
   useSaveReviewConfig,
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
+import { useCouncilUiEnabled } from '@/lib/hooks/use-reviewer-council';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function PlatformOverviewScreen({
   scope,
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const githubStatus = useGitHubStatus(scope);
@@ -49,15 +62,19 @@ export function PlatformOverviewScreen({
   const permission = useReviewerPermission(scope);
   const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
-  const { models, isLoading: modelsLoading } = useAvailableModels(
-    scope === PERSONAL_SCOPE ? undefined : scope
-  );
+  const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  const councilUiEnabled = useCouncilUiEnabled(scope);
+  const { reducedMotion } = useMotionPolicy();
+  // The body of the config read has exactly one surface: rows from cache, an
+  // error with retry, or a loading state. Bitbucket renders its own overview,
+  // which owns its restart, so this screen must not run a second one.
+  const configBody = useReviewConfigBody(config, { restartable: platform !== 'bitbucket' });
 
   if (permission.status === 'error') {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow="Code Reviewer"
+        eyebrow={t('common.codeReviewer')}
         onRetry={() => {
           permission.refetch();
         }}
@@ -91,9 +108,9 @@ export function PlatformOverviewScreen({
 
   if (providerState.status === 'error') {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow="Code Reviewer"
+        eyebrow={t('common.codeReviewer')}
         variant={providerState.variant}
         // A permission/not-found error can't be fixed by retrying — hide retry.
         onRetry={
@@ -108,32 +125,58 @@ export function PlatformOverviewScreen({
     );
   }
 
-  const isLoading =
-    providerState.status === 'loading' || config.isLoading || permission.status === 'loading';
+  const isLoading = providerState.status === 'loading' || permission.status === 'loading';
   const connected = providerState.status === 'connected';
+  // The account line under the Automatic reviews label is optional: a provider
+  // that reports no login paints the label alone, so the row keeps one line and
+  // matches the sibling Follow REVIEW.md row.
+  const autoReviewsAccount = status.data?.integration?.accountLogin;
 
-  // A connected provider whose config fails to load (and has no stale cache
-  // to fall back on) has nothing to show — surface a retry instead of a
-  // header over blank space. A background refetch failure with data already
-  // cached falls through to the normal content below, unaffected.
-  if (!isLoading && connected && config.isError && config.data == null) {
+  // A connected provider whose config read failed (no cache to fall back on),
+  // or whose idle read could not be restarted, has nothing to show: surface a
+  // retry instead. Cached config keeps the rows through a background refetch
+  // failure, and an unsettled connectivity still waits on the skeleton.
+  if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow="Code Reviewer"
-        onRetry={() => {
-          void config.refetch();
-        }}
+        eyebrow={t('common.codeReviewer')}
+        variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
+        onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
         isRetrying={config.isFetching}
       />
     );
   }
 
+  const handleConnected = status.refetch;
+  if (!isLoading && !connected) {
+    // The connect card installs the provider's app for the scope, which is a
+    // narrower capability than editing the reviewer settings (see
+    // `canConnectProvider`): the card must follow the install rule, not `canEdit`.
+    const canConnect = canConnectProvider(platform, permission);
+    return (
+      <View className="flex-1 bg-background">
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <CenteredState contentContainerClassName="px-6">
+          {canConnect ? (
+            <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
+          ) : (
+            <Text className="text-center text-xs text-muted-foreground">
+              {t(connectNoticeKey(platform), { platform: capabilities.label })}
+            </Text>
+          )}
+        </CenteredState>
+      </View>
+    );
+  }
+
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
+    pushOnce(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
 
-  const data = config.data;
+  // The classification owns the body state, so the rows are built from the
+  // data it classified as present.
+  const data = configBody.body.status === 'ready' ? config.data : undefined;
   // Repositories must actually be in scope before automatic reviews can run
   // "blind" — 'all' mode always qualifies, 'selected' mode needs at least
   // one chosen repo. Only blocks turning the toggle ON; an already-enabled
@@ -141,6 +184,21 @@ export function PlatformOverviewScreen({
   const hasRepoSelection =
     data != null &&
     (data.repositorySelectionMode === 'all' || data.selectedRepositoryIds.length > 0);
+  const openReviewerModelPicker = () => {
+    if (data == null) {
+      return;
+    }
+    openModelPicker(pushOnce, {
+      options: models,
+      value: data.modelSlug,
+      variant: data.thinkingEffort ?? '',
+      acceptsVariant: true,
+      onSelect: (modelSlug, variant) => {
+        save.mutate({ modelSlug, thinkingEffort: variant || null });
+      },
+    });
+  };
+
   const rows =
     data == null
       ? null
@@ -149,112 +207,93 @@ export function PlatformOverviewScreen({
           capabilities,
           models,
           modelsLoading,
-          onOpenModelPicker: () => {
-            openModelPicker(router, {
-              options: models,
-              value: data.modelSlug,
-              variant: data.thinkingEffort ?? '',
-              onSelect: (modelSlug, variant) => {
-                save.mutate({ modelSlug, thinkingEffort: variant || null });
-              },
-            });
-          },
+          onOpenModelPicker: openReviewerModelPicker,
+          onOpenReviewMemory:
+            platform === 'github'
+              ? () => {
+                  pushOnce(`/(app)/code-reviewer/${scope}/review-memory` as Href);
+                }
+              : undefined,
+          onOpenCouncil:
+            capabilities.council && councilUiEnabled
+              ? () => {
+                  pushField('council');
+                }
+              : undefined,
         });
-
-  const actionRequiredCopy =
-    data?.actionRequired != null
-      ? getCodeReviewActionRequiredCopy(data.actionRequired.reason)
-      : null;
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
-          {isLoading && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <View className="gap-2">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <Skeleton key={index} className="h-12 w-full rounded-lg" />
-                ))}
-              </View>
-            </Animated.View>
-          )}
+          {/* Every read state paints something: while connectivity is unsettled a
+             paused read keeps the skeleton, and a pending read that nothing is
+             fetching also keeps it until its restart runs. */}
+          {(isLoading || configBody.body.status === 'loading') && <PlatformOverviewSkeleton />}
 
-          {!isLoading && !connected && (
-            <Animated.View entering={FadeIn.duration(200)}>
-              {canEdit ? (
-                <ProviderConnectCard
-                  scope={scope}
-                  platform={platform}
-                  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-                  onConnected={() => status.refetch()}
-                />
-              ) : (
-                <Text className="text-center text-xs text-muted-foreground">
-                  {capabilities.label} isn't connected. Only organization owners and billing
-                  managers can connect it.
-                </Text>
-              )}
-            </Animated.View>
-          )}
-
-          {!isLoading && connected && config.data != null && rows != null && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+          {!isLoading && data != null && rows != null && (
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(200))}
+              className="gap-6"
+            >
               {platform === 'gitlab' && hasWebhookSyncWarning && (
                 <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
-                  <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Webhook setup incomplete</Text>
+                  <View className="flex-1 pe-3">
+                    <Text className="text-sm font-medium">{t('codeReviewer.webhookSetup')}</Text>
                     <Text variant="muted" className="text-xs">
-                      Some repositories may not receive automatic reviews.
+                      {t('codeReviewer.webhookSetupDescription')}
                     </Text>
                   </View>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-row gap-2"
-                    disabled={save.isPending}
+                    className={cn(STATE_ACTION_CLASS, 'flex-row gap-2')}
+                    disabled={!canEdit || save.isPending}
                     onPress={() => {
-                      save.mutate({});
+                      // The PATCH routers re-sync project hooks only for a
+                      // patch that carries the repository selection, so the
+                      // retry re-sends the current one. An empty patch neither
+                      // syncs nor proves the hooks healthy.
+                      save.mutate({ selectedRepositoryIds: data.selectedRepositoryIds });
                     }}
                   >
                     {save.isPending ? (
                       <ActivityIndicator size="small" color={colors.mutedForeground} />
                     ) : null}
-                    <Text>Retry</Text>
+                    <Text>{t('common.retry')}</Text>
                   </Button>
                 </View>
               )}
 
-              {actionRequiredCopy != null && (
-                <View className="rounded-lg bg-warn-tile-bg p-4">
-                  <Text className="text-sm font-medium">{actionRequiredCopy.title}</Text>
-                  <Text variant="muted" className="text-xs">
-                    {actionRequiredCopy.description}
-                  </Text>
-                  <Text className="mt-1 text-xs font-medium">
-                    {actionRequiredCopy.recoveryLabel}
-                  </Text>
-                </View>
+              {data.actionRequired != null && (
+                <ActionRequiredBanner
+                  scope={scope}
+                  reason={data.actionRequired.reason}
+                  canEdit={canEdit}
+                  onRefreshConfig={() => void config.refetch()}
+                  onOpenModelPicker={openReviewerModelPicker}
+                />
               )}
 
               <View className="rounded-lg bg-secondary p-4">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Automatic reviews</Text>
-                    <Text variant="muted" className="text-xs">
-                      {status.data?.integration?.accountLogin ?? ''}
-                    </Text>
+                  <View className="flex-1 pe-3">
+                    <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
+                    {autoReviewsAccount ? (
+                      <Text variant="muted" className="text-xs">
+                        {autoReviewsAccount}
+                      </Text>
+                    ) : null}
                   </View>
                   <Switch
-                    accessibilityLabel="Automatic reviews"
-                    value={config.data.isEnabled}
+                    accessibilityLabel={t('codeReviewer.autoReviews')}
+                    value={data.isEnabled}
                     disabled={
-                      !canEdit || toggle.isPending || (!hasRepoSelection && !config.data.isEnabled)
+                      !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled)
                     }
                     onValueChange={value => {
-                      void Haptics.selectionAsync();
+                      selectionHaptic();
                       toggle.mutate({ isEnabled: value });
                     }}
                   />
@@ -262,7 +301,7 @@ export function PlatformOverviewScreen({
                 {!hasRepoSelection && (
                   <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
-                      Select at least one repository to enable automatic reviews.
+                      {t('codeReviewer.selectRepository')}
                     </Text>
                     <Button
                       variant="outline"
@@ -272,7 +311,7 @@ export function PlatformOverviewScreen({
                         pushField('repos');
                       }}
                     >
-                      <Text>Select repositories</Text>
+                      <Text>{t('common.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}
@@ -293,9 +332,9 @@ export function PlatformOverviewScreen({
 
               {capabilities.reviewMd && (
                 <ToggleRow
-                  title="Follow REVIEW.md"
-                  subtitle="Honor per-repo REVIEW.md instruction files"
-                  value={!config.data.disableReviewMd}
+                  title={t('codeReviewer.followReviewMd')}
+                  subtitle={t('codeReviewer.followReviewMdSubtitle')}
+                  value={!data.disableReviewMd}
                   disabled={!canEdit || save.isPending}
                   onValueChange={value => {
                     save.mutate({ disableReviewMd: !value });
@@ -303,9 +342,24 @@ export function PlatformOverviewScreen({
                 />
               )}
 
+              {/* Bot detection relies on GitHub's authoritative user type, which
+                  GitLab and Bitbucket webhooks do not provide, so this setting
+                  exists on GitHub only (same gate as the web form). */}
+              {capabilities.skipBotPullRequests && (
+                <ToggleRow
+                  title={t('codeReviewer.skipBotPullRequests.title')}
+                  subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
+                  value={data.skipBotPullRequests}
+                  disabled={!canEdit || save.isPending}
+                  onValueChange={value => {
+                    save.mutate({ skipBotPullRequests: value });
+                  }}
+                />
+              )}
+
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
-                  Only organization owners and billing managers can change these settings.
+                  {t('securityAgent.sla.permissionNote')}
                 </Text>
               )}
             </Animated.View>

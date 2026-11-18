@@ -5,6 +5,11 @@
 // Either column may be empty (left blank with a placeholder) when the
 // pair is a pure add or pure del.
 //
+// Both column code `Text`s and the hunk header name their own LTR base
+// direction (`LTR_TEXT_DIRECTION`), like the unified `DiffLine`: code reads left
+// to right whatever the interface language, so a wrapped line's continuation
+// starts under the first line's start instead of mid-row.
+//
 // Side-by-side is read-only — commenting is unified-view only — so the
 // row does not accept tap/selection handlers.
 //
@@ -14,25 +19,32 @@
 // overflow at AX5 (1.8x).
 
 import { memo, useMemo } from 'react';
-import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Text as RNText, type TextStyle, useColorScheme, View, type ViewStyle } from 'react-native';
 
+import { type TFunction } from 'i18next';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
 import { type ParsedDiffLine, type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { type SideBySideRow as SideBySideRowData } from '@/lib/pr-review/diff/side-by-side';
-import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 import {
   type BoundedFontMetrics,
   DIFF_MAX_FONT_SCALE,
   useDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 
 const COLUMN_GUTTER_WIDTH = 56;
 const COLUMN_INNER_PADDING = 2;
 const VERTICAL_PADDING = 2;
-const NO_NEWLINE_INDICATOR = '\u26A0\uFE0F no newline at end of file';
+// Same edge as the unified `DiffLine`: the column's only horizontal inset is
+// the gutter's trailing `paddingRight`, which mirrors with the row and leaves
+// the LTR code Text flush against the physical left edge in an RTL interface.
+const CODE_END_PADDING = COLUMN_INNER_PADDING;
 
 type SideBySideRowProps = {
   row: SideBySideRowData;
@@ -73,6 +85,7 @@ type SideColumnProps = {
 
 function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumnProps) {
   const metrics = useDiffFontMetrics();
+  const { t } = useTranslation();
   const tokens = useMemo<HighlightToken[]>(
     () => highlightLine(line.text, language),
     [language, line.text]
@@ -80,15 +93,24 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
   const gutterColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const noNewlineColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const gutterText = sideGutterText(line, side);
-  const noNewlineLabel = line.noNewlineAtEndOfFile ? ` ${NO_NEWLINE_INDICATOR}` : '';
+  const noNewlineLabel = line.noNewlineAtEndOfFile
+    ? ` ${t('prReview.sideBySide.noNewlineAtEndOfFile')}`
+    : '';
 
   const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
   const gutterStyle: ViewStyle = {
     width: COLUMN_GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
+    // Top-aligned with the code's first line (see DiffLine's gutter): a
+    // centered number drifts onto a later visual line when the code wraps.
+    paddingTop: VERTICAL_PADDING,
   };
-  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeContainerStyle: ViewStyle = {
+    paddingVertical: VERTICAL_PADDING,
+    paddingEnd: CODE_END_PADDING,
+  };
   const codeBaseStyle: TextStyle = {
+    ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',
     fontSize: metrics.codeFontSize,
     lineHeight: metrics.lineHeight,
@@ -110,7 +132,7 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
       style={rowStyle}
     >
       <View
-        className="items-end justify-center"
+        className="items-end justify-start"
         style={{ ...gutterStyle, paddingRight: COLUMN_INNER_PADDING }}
       >
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme muted color */}
@@ -128,15 +150,9 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
           selectable
           style={{ ...codeBaseStyle, color: foreground }}
         >
-          {tokens.map((token, index) => {
-            const tokenColor = tokenColorFor(token.className, isDark);
-            return (
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
-                {token.text}
-              </RNText>
-            );
-          })}
+          {/* Untagged runs are raw strings inside this Text, so only the
+              highlighter's tagged runs cost an Android span. */}
+          {highlightRunChildren(tokens, isDark ? 'onDark' : 'onLight')}
           {noNewlineLabel ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>
@@ -159,17 +175,21 @@ const SideColumn = memo(
 );
 
 function EmptySideColumn({ metrics }: { metrics: BoundedFontMetrics }) {
+  const { t } = useTranslation();
   const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
   const gutterStyle: ViewStyle = {
     width: COLUMN_GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
   };
-  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeContainerStyle: ViewStyle = {
+    paddingVertical: VERTICAL_PADDING,
+    paddingEnd: CODE_END_PADDING,
+  };
   return (
     <View
       className="flex-1 flex-row items-stretch bg-transparent"
       style={rowStyle}
-      accessibilityLabel="empty diff column"
+      accessibilityLabel={t('prReview.sideBySide.emptyDiffColumn')}
     >
       <View
         className="items-end justify-center"
@@ -180,23 +200,28 @@ function EmptySideColumn({ metrics }: { metrics: BoundedFontMetrics }) {
   );
 }
 
-function describeRow(row: SideBySideRowData): string {
+function describeRow(row: SideBySideRowData, t: TFunction): string {
   if (row.left && row.right) {
-    return `Old: ${row.left.line.text} | New: ${row.right.line.text}`;
+    return t('prReview.sideBySide.oldNew', {
+      old: row.left.line.text,
+      new: row.right.line.text,
+    });
   }
   if (row.left) {
-    return `Old only: ${row.left.line.text}`;
+    return t('prReview.sideBySide.oldOnly', { text: row.left.line.text });
   }
   if (row.right) {
-    return `New only: ${row.right.line.text}`;
+    return t('prReview.sideBySide.newOnly', { text: row.right.line.text });
   }
-  return 'Empty diff row';
+  return t('prReview.sideBySide.emptyDiffRow');
 }
 
 function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const metrics = useDiffFontMetrics();
-  const isDark = colors.background === '#0E0E10';
+  // Same signal `useThemeColors` reads; never a background-token equality.
+  const isDark = useColorScheme() === 'dark';
   const leftLine = row.left?.line ?? null;
   const rightLine = row.right?.line ?? null;
   const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
@@ -205,7 +230,7 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
     <View
       className="flex-row items-stretch border-b border-hair-soft"
       style={rowStyle}
-      accessibilityLabel={describeRow(row)}
+      accessibilityLabel={describeRow(row, t)}
       testID={rowKeyId}
     >
       {leftLine ? (
@@ -247,15 +272,16 @@ type HunkSideBySideHeaderProps = {
 
 export function HunkSideBySideHeader({ hunk }: Readonly<HunkSideBySideHeaderProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View
       className="border-b border-hair-soft bg-secondary px-4 py-1"
-      accessibilityLabel={`Hunk header ${hunk.header}`}
+      accessibilityLabel={t('prReview.hunkRows.hunkHeader', { header: hunk.header })}
     >
       <Text
         className="font-mono-medium text-[11px]"
-        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
-        style={{ color: colors.mutedForeground }}
+        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color + the header's code base direction
+        style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
         numberOfLines={1}
       >
         {hunk.header}

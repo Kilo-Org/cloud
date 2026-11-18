@@ -19,33 +19,52 @@
 // to the right terminal state.
 
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { flattenFilePages } from '@/lib/pr-review/diff/dedupe-file-pages';
 import { PR_REVIEW_MAX_PAGES } from '@/lib/pr-review/diff/pr-review-file-types';
-import { getViewedFiles, toggleViewedFile } from '@/lib/pr-review/viewed-files';
+import {
+  applyViewedFilesToggle,
+  getViewedFilesSnapshot,
+  subscribeViewedFiles,
+} from '@/lib/pr-review/diff/viewed-files-store';
+import { buildPrFilesQueryOptions } from '@/lib/pr-review/provider-pr-queries';
+import {
+  githubPrRef,
+  type ProviderPrScope,
+  useProviderPrScope,
+} from '@/lib/pr-review/provider-pr-ref';
+import { viewedFilesKey, type ViewedFilesRef } from '@/lib/pr-review/viewed-files';
 import { withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { type SurfaceFeedback } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 
 /**
  * Build the file-list infinite-query options. Kept as a pure builder so the
  * retention bound is testable without mounting the hook.
+ *
+ * The provider is decided by `scope`; without one the caller is on the
+ * GitHub route and the options are the ones that route always used.
  */
 export function buildPrReviewFileListQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
-  args: { owner: string; repo: string; number: number; enabled: boolean }
+  args: {
+    owner: string;
+    repo: string;
+    number: number;
+    enabled: boolean;
+    scope?: ProviderPrScope;
+  }
 ) {
   const { owner, repo, number, enabled } = args;
+  const scope = args.scope ?? {
+    ref: githubPrRef(owner, repo, number),
+    organizationId: null,
+  };
   return withInfiniteRetention(
-    trpc.githubPrReview.listFiles.infiniteQueryOptions(
-      { owner, repo, number },
-      {
-        staleTime: 30_000,
-        enabled,
-        getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
-      }
-    ),
+    buildPrFilesQueryOptions(trpc, scope, enabled),
     // Cap at the server's page ceiling so we never request page 61.
     // 60 pages × 100/page = 6,000 files, which is well above the
     // 3,000 truncation banner so fetch-to-completion still has
@@ -53,6 +72,9 @@ export function buildPrReviewFileListQueryOptions(
     PR_REVIEW_MAX_PAGES
   );
 }
+
+/** The mounted contract the Files tab renders from: the raw infinite query plus the classified error states. */
+export type PrReviewFileListQueryResult = ReturnType<typeof usePrReviewFileListQuery>;
 
 export function usePrReviewFileListQuery(args: {
   owner: string;
@@ -62,8 +84,9 @@ export function usePrReviewFileListQuery(args: {
 }) {
   const { owner, repo, number, enabled } = args;
   const trpc = useTRPC();
+  const scope = useProviderPrScope({ owner, repo, number });
   const query = useInfiniteQuery(
-    buildPrReviewFileListQueryOptions(trpc, { owner, repo, number, enabled })
+    buildPrReviewFileListQueryOptions(trpc, { owner, repo, number, enabled, scope })
   );
 
   const errorState = query.error ? classifyPrReviewQueryState(query.error) : null;
@@ -87,83 +110,49 @@ export function usePrReviewFileListQuery(args: {
 }
 
 /**
- * Subscribes the viewed-files store for a specific PR (keyed by
- * `owner/repo#number` + `headSha`). Returns the current viewed path
- * set plus a `toggle` callback that flips a single path. The
- * underlying store is a single SecureStore key shared across all
- * PRs, so the hook re-reads on toggle rather than maintaining a
- * long-lived in-memory cache.
+ * Reads the viewed-files store for a specific PR (keyed by the ref's
+ * provider-scoped identity + `headSha`, so a GitLab MR and a same-numbered
+ * GitHub PR — or one project on two GitLab instances — never share a set;
+ * identity rule 17) through `useSyncExternalStore`. Returns the current viewed
+ * path set plus a `toggle` callback that flips a single path. The durable map
+ * is a single SecureStore key shared across all PRs; `viewed-files-store.ts`
+ * owns the subscriptions and the read/toggle wiring, so every mounted consumer
+ * (the diff list AND the file-navigator sheet over it) shares one read and one
+ * optimistic publish instead of a private `useState` mirror.
  */
-// Module-level notifier so every mounted viewed-files hook (e.g. the diff list
-// AND the file navigator sheet mounted over it) re-reads after any toggle,
-// keeping their viewed indicators in sync without prop drilling.
-const viewedChangeListeners = new Set<() => void>();
+export function usePrReviewViewedFiles(ref: ViewedFilesRef, headSha: string) {
+  // The latest ref, without re-subscribing: a caller may hand a fresh object
+  // each render while the identity (and so the store key) is unchanged.
+  const refRef = useRef(ref);
+  refRef.current = ref;
 
-function notifyViewedChange(): void {
-  for (const listener of viewedChangeListeners) {
-    listener();
-  }
-}
+  const identity = viewedFilesKey(ref);
+  // `useSyncExternalStore` resubscribes whenever `subscribe` changes, so the
+  // two callbacks are memoized on the identity string — not on the ref object.
+  const subscribe = useMemo(
+    () => (listener: () => void) => subscribeViewedFiles(refRef.current, headSha, listener),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the identity string, not the ref object, is the subscription key
+    [identity, headSha]
+  );
+  const getSnapshot = useMemo(
+    () => () => getViewedFilesSnapshot(refRef.current, headSha),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the identity string, not the ref object, is the subscription key
+    [identity, headSha]
+  );
 
-export function usePrReviewViewedFiles(
-  ref: {
-    owner: string;
-    repo: string;
-    number: number;
-  },
-  headSha: string
-) {
-  const { owner, repo, number } = ref;
-  const [paths, setPaths] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-
-    async function load() {
-      try {
-        const next = await getViewedFiles({ owner, repo, number }, headSha);
-        if (!cancelled) {
-          setPaths(next);
-          setIsLoading(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setPaths([]);
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void load();
-    // Re-read whenever any instance toggles a file so this instance stays in
-    // sync (the navigator sheet and the underlying diff list share the store).
-    const onChange = () => {
-      void load();
-    };
-    viewedChangeListeners.add(onChange);
-    return () => {
-      cancelled = true;
-      viewedChangeListeners.delete(onChange);
-    };
-  }, [owner, repo, number, headSha]);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+  const paths = snapshot.paths;
+  const isLoading = snapshot.isLoading;
 
   const toggle = useCallback(
     async (path: string) => {
-      // Optimistic toggle: flip the local set first so the UI updates
-      // instantly. The store write is durable (SecureStore).
-      setPaths(previous => {
-        if (previous.includes(path)) {
-          return previous.filter(p => p !== path);
-        }
-        return [...previous, path];
-      });
-      await toggleViewedFile({ owner, repo, number, headSha, path });
-      // Notify other mounted instances (they re-read the durable store).
-      notifyViewedChange();
+      // Optimistic toggle: the store publishes the flipped set first so the
+      // UI updates instantly. The write is durable (SecureStore), and the
+      // store re-reads every open key afterwards.
+      await applyViewedFilesToggle(refRef.current, headSha, path);
     },
-    [owner, repo, number, headSha]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the identity string, not the ref object, is the subscription key
+    [identity, headSha]
   );
 
   // Stabilize identities for downstream memos (`items`, `renderItem`). A fresh
@@ -178,23 +167,24 @@ export function usePrReviewViewedFiles(
  * Drives an infinite list query to completion. Used by the file
  * navigator (S6c) which needs the full listed set to offer a working
  * search/scrubber. Returns an imperative `run()` so the consumer can
- * start it from a button or an effect and observe progress via
- * `isRunning` / `loadedFiles` / `error`.
+ * start it from a button or an effect and observe the phase through
+ * `feedback` / `failure`.
  */
+export type PageRunFailure = { readonly kind: 'load-all-failed'; readonly at: number };
+
 export type FetchToCompletionResult = {
   run: () => Promise<void>;
-  isRunning: boolean;
   loadedFiles: number;
   totalFiles: number | null;
-  error: unknown;
+  feedback: SurfaceFeedback<PageRunFailure>;
+  failure: PageRunFailure | null;
 };
 
 export function useFetchToCompletion(
   query: ReturnType<typeof usePrReviewFileListQuery>['query'],
   totalFiles: number | null
 ): FetchToCompletionResult {
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PageRunFailure>();
 
   const loadedFiles = (query.data?.pages ?? []).reduce((sum, page) => sum + page.files.length, 0);
 
@@ -204,11 +194,19 @@ export function useFetchToCompletion(
   queryRef.current = query;
 
   const run = useCallback(async () => {
+    // A background refetch is already running: fetchNextPage would cancel it
+    // (TanStack's default cancelRefetch) and append to the old pages. The
+    // admission below guards this surface's own attempt, not the query's work.
     if (queryRef.current.isFetching || !queryRef.current.hasNextPage) {
       return;
     }
-    setError(null);
-    setIsRunning(true);
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
+    // Authoritative only until the first page result arrives; every result below
+    // replaces it, so the failure records the version the run actually failed at.
+    let at = queryRef.current.dataUpdatedAt;
     try {
       // Loop instead of recursing to keep the call stack flat. Pages must be
       // fetched sequentially because each request needs the previous page's
@@ -219,6 +217,7 @@ export function useFetchToCompletion(
       while (queryRef.current.hasNextPage) {
         // eslint-disable-next-line no-await-in-loop -- sequential cursor pagination
         const result = await queryRef.current.fetchNextPage();
+        at = result.dataUpdatedAt;
         // fetchNextPage resolves (does not throw) on a failed page while
         // keeping prior pages and hasNextPage. Route that through the
         // catch so the load-all retry can render.
@@ -231,12 +230,24 @@ export function useFetchToCompletion(
           break;
         }
       }
-    } catch (caughtError) {
-      setError(caughtError);
-    } finally {
-      setIsRunning(false);
+      attempt.succeed();
+    } catch {
+      attempt.fail({ kind: 'load-all-failed', at });
     }
-  }, []);
+  }, [begin]);
 
-  return { run, isRunning, loadedFiles, totalFiles, error };
+  // A page that landed after the failure makes it false: retire the line
+  // instead of leaving a "stopped" report over a complete list.
+  useEffect(() => {
+    // The failure identity is a dependency, not just the version: a refetch can
+    // move `dataUpdatedAt` while the run is still looping, so the effect that
+    // saw the newer version ran before anything was published. Without this the
+    // failure outlives its own recovery until the user retries.
+    if (failure === null) {
+      return;
+    }
+    clearWhere(f => query.dataUpdatedAt > f.at);
+  }, [clearWhere, failure, query.dataUpdatedAt]);
+
+  return { run, loadedFiles, totalFiles, feedback, failure };
 }

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -13,12 +14,17 @@ import {
   type MonoScrollTextMode,
   nextMonoScrollHeightPin,
   prepareMonoScrollContent,
+  resolveMonoScrollMaxLength,
   resolveMonoScrollPinnedHeight,
 } from './mono-scroll-block-model';
 
 type MonoScrollBlockProps = {
   content: string;
-  /** When set, content longer than this is sliced and a "Truncated" marker is shown. */
+  /**
+   * Display budget in characters. Defaults to
+   * `DEFAULT_MONO_SCROLL_MAX_LENGTH`; the read/write code cards pass their own.
+   * Content longer than the budget is sliced and a "Truncated" marker is shown.
+   */
   maxLength?: number;
   /** Merged onto the mono Text (colors, leading). Base mono sizing is applied. */
   textClassName?: string;
@@ -77,6 +83,12 @@ export function useMonoScrollSheet(): MonoScrollSheetContextValue | null {
  * RN 0.83 Fabric cannot inflate a horizontal ScrollView inside a width-
  * constrained parent (~10× spurious height). The pin is keyed to displayText
  * so a taller payload remeasures instead of clipping into a stale height.
+ *
+ * Display budget: a block never lays out more than its cap (the caller's
+ * `maxLength`, or `DEFAULT_MONO_SCROLL_MAX_LENGTH`). Tool output can be
+ * multiple megabytes, and one `Text`/`TextInput` with that string hangs the
+ * sheet and kills the Android app process, so the visible text is the capped
+ * prefix plus the "Truncated" marker.
  */
 export function MonoScrollBlock({
   content,
@@ -87,9 +99,13 @@ export function MonoScrollBlock({
 }: Readonly<MonoScrollBlockProps>) {
   const textSelectable = useTranscriptTextSelectable();
   const sheet = useMonoScrollSheet();
+  const { t } = useTranslation();
   const textMode = sheet?.mode ?? 'scroll';
   const track = sheet?.track;
-  const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);
+  const { displayText, isTruncated } = prepareMonoScrollContent(
+    content,
+    resolveMonoScrollMaxLength(maxLength)
+  );
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   const contentHeight = resolveMonoScrollPinnedHeight(heightPin, displayText);
 
@@ -107,7 +123,7 @@ export function MonoScrollBlock({
   );
 
   if (textMode === 'wrap') {
-    const wrapContentClasses = 'font-mono text-xs leading-4';
+    const wrapContentClasses = 'font-mono text-xs leading-[1rem]';
     return (
       <View className={containerClassName}>
         {inTranscript ? (
@@ -121,16 +137,16 @@ export function MonoScrollBlock({
         )}
         {isTruncated ? (
           <Text
-            accessibilityLabel="Content truncated"
+            accessibilityLabel={t('common.contentTruncated')}
             className="mt-1 text-xs text-muted-foreground"
           >
-            Truncated
+            {t('common.truncated')}
           </Text>
         ) : null}
       </View>
     );
   }
-  const contentClasses = 'shrink-0 self-start font-mono text-xs leading-4';
+  const contentClasses = 'shrink-0 self-start font-mono text-xs leading-[1rem]';
 
   return (
     <View className={containerClassName}>
@@ -158,8 +174,11 @@ export function MonoScrollBlock({
         )}
       </ScrollView>
       {isTruncated ? (
-        <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">
-          Truncated
+        <Text
+          accessibilityLabel={t('common.contentTruncated')}
+          className="mt-1 text-xs text-muted-foreground"
+        >
+          {t('common.truncated')}
         </Text>
       ) : null}
     </View>

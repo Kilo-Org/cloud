@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import english from '@/i18n/locales/en.json';
 
 import {
   classifyDeviceSessionsState,
@@ -9,7 +10,9 @@ import {
 
 function makeSession(overrides: Partial<DeviceSession> & { id: string }): DeviceSession {
   return {
-    user_agent: 'Kilo-Code/1.2.3',
+    kind: 'cli',
+    platform: null,
+    clientName: null,
     created_at: '2026-04-29 01:16:12.945+00',
     last_seen_at: '2026-04-29 01:16:12.945+00',
     isCurrent: false,
@@ -18,24 +21,46 @@ function makeSession(overrides: Partial<DeviceSession> & { id: string }): Device
 }
 
 describe('deviceSessionLabel', () => {
-  it('falls back to Unknown device for a missing or empty user agent', () => {
-    expect(deviceSessionLabel(null)).toBe('Unknown device');
-    expect(deviceSessionLabel(undefined)).toBe('Unknown device');
-    expect(deviceSessionLabel('')).toBe('Unknown device');
-    expect(deviceSessionLabel('   ')).toBe('Unknown device');
+  it('names the platform of an Android app session', () => {
+    expect(deviceSessionLabel({ kind: 'app', platform: 'android', clientName: null })).toBe(
+      english.deviceSessions.kiloAppAndroid
+    );
   });
 
-  it('maps browser requests to Web browser', () => {
-    expect(
-      deviceSessionLabel(
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
-      )
-    ).toBe('Web browser');
+  it('names the platform of an iOS app session', () => {
+    expect(deviceSessionLabel({ kind: 'app', platform: 'ios', clientName: null })).toBe(
+      english.deviceSessions.kiloAppIos
+    );
   });
 
-  it('keeps the first product token for app and tool user agents', () => {
-    expect(deviceSessionLabel('Kilo-Code/1.2.3 (darwin; arm64)')).toBe('Kilo-Code');
-    expect(deviceSessionLabel('axios/1.7.0')).toBe('axios');
+  it('keeps the app label defined for an app session without a platform', () => {
+    expect(deviceSessionLabel({ kind: 'app', platform: null, clientName: null })).toBe(
+      english.deviceSessions.kiloApp
+    );
+  });
+
+  it('titles a CLI session with the CLI name', () => {
+    expect(deviceSessionLabel({ kind: 'cli', platform: null, clientName: null })).toBe(
+      english.deviceSessions.kiloCli
+    );
+  });
+
+  it('maps a browser session to Web browser', () => {
+    expect(deviceSessionLabel({ kind: 'browser', platform: null, clientName: null })).toBe(
+      english.deviceSessions.webBrowser
+    );
+  });
+
+  it('titles any other client by the product token the server extracted', () => {
+    expect(deviceSessionLabel({ kind: 'other', platform: null, clientName: 'axios' })).toBe(
+      'axios'
+    );
+  });
+
+  it('falls back for a session with no classified client name', () => {
+    expect(deviceSessionLabel({ kind: 'other', platform: null, clientName: null })).toBe(
+      english.deviceSessions.unknownDevice
+    );
   });
 });
 
@@ -73,23 +98,30 @@ describe('classifyDeviceSessionsState', () => {
   it.each([
     {
       name: 'loading ahead of stale data',
-      args: { isLoading: true, isError: false, data: rows },
+      args: { isPending: true, isError: false, data: rows },
+      expected: 'loading',
+    },
+    {
+      // Cold open, first render: the observer has not started fetching yet so
+      // React Query's `isLoading` would be false, but `isPending` is true.
+      name: 'the first render before the request settles as loading, not empty',
+      args: { isPending: true, isError: false, data: undefined },
       expected: 'loading',
     },
     {
       name: 'a query error as retryable error',
-      args: { isLoading: false, isError: true, data: undefined },
+      args: { isPending: false, isError: true, data: undefined },
       expected: 'error',
     },
     {
       name: 'zero rows as empty',
-      args: { isLoading: false, isError: false, data: [] },
+      args: { isPending: false, isError: false, data: [] },
       expected: 'empty',
     },
     {
       name: 'rows with a current row as happy',
       args: {
-        isLoading: false,
+        isPending: false,
         isError: false,
         data: [makeSession({ id: 'b', isCurrent: true }), ...rows],
       },
@@ -97,7 +129,7 @@ describe('classifyDeviceSessionsState', () => {
     },
     {
       name: 'rows without a current row as no-current, never empty',
-      args: { isLoading: false, isError: false, data: rows },
+      args: { isPending: false, isError: false, data: rows },
       expected: 'no-current',
     },
   ])('classifies $name', ({ args, expected }) => {

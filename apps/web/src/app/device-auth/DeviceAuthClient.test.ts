@@ -1,5 +1,8 @@
+import * as React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from '@jest/globals';
 
+import { DeviceAuthClient } from './DeviceAuthClient';
 import {
   buildDeviceAuthVerificationUrl,
   closeDeviceAuthWindowIfAppMode,
@@ -7,6 +10,10 @@ import {
   getDeviceAuthSignInUrl,
   getDeviceAuthShellClassName,
 } from './device-auth-url';
+
+// @swc/jest compiles JSX with the classic runtime, and the component imports no
+// React default, so its `React.createElement` calls need React on the global.
+Object.assign(globalThis, { React });
 
 describe('getDeviceAuthSignInUrl', () => {
   test('preserves the device auth code through sign in', () => {
@@ -67,11 +74,163 @@ describe('getDeviceAuthShellClassName', () => {
     expect(getDeviceAuthShellClassName(true)).toContain('px-4');
   });
 
-  test('uses the dynamic viewport height to center app-mode authorization content', () => {
-    expect(getDeviceAuthShellClassName(true)).toContain('h-dvh');
-    expect(getDeviceAuthShellClassName(true)).toContain('w-full');
-    expect(getDeviceAuthShellClassName(true)).toContain('items-center');
-    expect(getDeviceAuthShellClassName(true)).toContain('justify-center');
+  test('uses the dynamic viewport minimum height to center app-mode authorization content', () => {
+    const tokens = getDeviceAuthShellClassName(true).split(' ');
+    expect(tokens).toContain('min-h-dvh');
+    expect(tokens).not.toContain('h-dvh');
+    expect(tokens).toContain('w-full');
+    expect(tokens).toContain('items-center');
+    expect(tokens).toContain('justify-center');
+    expect(tokens).toContain('max-[22rem]:px-2');
+  });
+});
+
+describe('DeviceAuthClient layout', () => {
+  const renderClient = (user: { name: string; email: string; imageUrl: string }) =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: true,
+        requestingClient: null,
+        pendingLink: null,
+        user,
+      })
+    );
+
+  test('reflows the identity row so the account identity stays visible at narrow width', () => {
+    const html = renderClient({ name: 'Test User', email: 'test@example.com', imageUrl: '' });
+
+    expect(html).toContain('min-h-dvh');
+    expect(html).toContain('max-[22rem]:flex-col');
+    expect(html).toContain('max-[22rem]:items-stretch');
+    expect(html).toContain('class="min-w-0 flex-1"');
+    expect(html).toContain('shrink-0');
+    expect(html).toContain('max-[22rem]:w-full');
+    expect(html).toContain('space-y-4 max-[22rem]:px-2');
+    expect(html).toContain('p-3 max-[22rem]:flex-col max-[22rem]:items-stretch max-[22rem]:p-2');
+    expect(html).toContain(
+      'class="flex min-w-0 flex-1 items-center gap-3 max-[22rem]:flex-col max-[22rem]:items-stretch"'
+    );
+    expect(html).toContain('class="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"');
+    expect(html).toContain('class="flex gap-3 max-[22rem]:flex-col"');
+    expect(html).toContain('flex-1 max-[22rem]:w-full max-[22rem]:px-2');
+    expect(html).toContain('Signed in as');
+    expect(html).toContain('Test User');
+    expect(html).toContain('test@example.com');
+  });
+
+  test('shows the email once as the account name when the viewer has no display name', () => {
+    const html = renderClient({ name: '', email: 'test@example.com', imageUrl: '' });
+
+    expect(html.split('test@example.com')).toHaveLength(2);
+  });
+
+  test('lets the verification code wrap so it stays inside the card border at narrow width', () => {
+    const html = renderClient({ name: 'Test User', email: 'test@example.com', imageUrl: '' });
+
+    expect(html).toContain('class="text-2xl font-bold tracking-wider break-all"');
+  });
+});
+
+describe('DeviceAuthClient requesting app', () => {
+  const requestingClient = {
+    clientId: 'client-abc',
+    clientName: 'Claude Desktop',
+    redirectOrigin: 'https://client.test',
+  };
+
+  const renderClient = (client: typeof requestingClient | null) =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: false,
+        requestingClient: client,
+        pendingLink: null,
+        user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
+      })
+    );
+
+  /** The Authorize button is the primary action on the card. */
+  const authorizeButton = (html: string): string =>
+    html.slice(html.lastIndexOf('<button'), html.indexOf('</button>', html.lastIndexOf('<button')));
+
+  test('names the app, its redirect origin, and its client id', () => {
+    const html = renderClient(requestingClient);
+
+    expect(html).toContain('Requesting app');
+    expect(html).toContain('Claude Desktop');
+    expect(html).toContain('Redirects to');
+    expect(html).toContain('https://client.test');
+    expect(html).toContain('Client ID');
+    expect(html).toContain('client-abc');
+    // The block reports what the requester said; it does not claim verification.
+    expect(html).toContain('These details come from the app that started this request.');
+    expect(html).toContain('I expect this connection and recognize the destination above.');
+  });
+
+  test('names each layout format control in the app details instead of drawing it', () => {
+    const html = renderClient({
+      clientId: 'client-\u2066abc',
+      clientName: 'Claude\u202EDesktop',
+      redirectOrigin: 'https://cli\u202Eent.test',
+    });
+
+    expect(html).toContain('Claude\\u202eDesktop');
+    expect(html).toContain('https://cli\\u202eent.test');
+    expect(html).toContain('client-\\u2066abc');
+    // Nothing in the block draws the control, so the three details read one way.
+    expect(html).not.toContain('\u202e');
+    expect(html).not.toContain('\u2066');
+  });
+
+  test('keeps the approval disabled until the app is confirmed', () => {
+    const html = renderClient(requestingClient);
+
+    expect(authorizeButton(html)).toContain('disabled=""');
+    expect(html).toContain('Confirm the requesting app above to authorize it.');
+    expect(html).toContain('for="confirm-requesting-client"');
+    expect(html).toMatch(/type="checkbox"[^>]*id="confirm-requesting-client"/);
+    expect(html).not.toContain('checked=""');
+  });
+
+  test('renders the plain approval when the request names no app', () => {
+    const html = renderClient(null);
+
+    expect(html).not.toContain('Requesting app');
+    expect(html).not.toContain('Confirm the requesting app');
+    expect(authorizeButton(html)).not.toContain('disabled=""');
+  });
+});
+
+describe('DeviceAuthClient pending link', () => {
+  const renderWithPendingLink = () =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: false,
+        requestingClient: null,
+        pendingLink: { provider: 'github', email: 'octo@example.com', displayName: 'octocat' },
+        user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
+      })
+    );
+
+  const authorizeButton = (html: string): string =>
+    html.slice(html.lastIndexOf('<button'), html.indexOf('</button>', html.lastIndexOf('<button')));
+
+  test('names the pending identity and offers both choices with none preselected', () => {
+    const html = renderWithPendingLink();
+
+    expect(html).toContain('This app also asks to add GitHub (octocat) to your account');
+    expect(html).toContain('Approve and add it');
+    expect(html).toContain('Approve without adding it');
+    expect(html).toContain('id="pending-link-add"');
+    expect(html).toContain('id="pending-link-skip"');
+    expect(html).not.toContain('checked=""');
+    expect(authorizeButton(html)).toContain('disabled=""');
+    expect(html).toContain('Choose whether to add the sign-in method above to authorize.');
   });
 });
 

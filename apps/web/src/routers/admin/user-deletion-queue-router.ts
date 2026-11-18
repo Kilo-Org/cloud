@@ -16,15 +16,19 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { readDb } from '@/lib/drizzle';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_STALE_REQUEST_MS } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_STALE_REQUEST_MS } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   cancelPendingDeletionRequest,
   enqueueUserDeletionTargets,
 } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
+import {
+  enqueueHistoricalUserDeletion,
+  type BackfillResult,
+} from '@/lib/user/deletion-queue/deletion-legacy-backfill';
 import { inspectDeletionTargets } from '@/lib/user/deletion-queue/deletion-preview';
 import {
   markTaskManuallyVerified,
@@ -35,6 +39,7 @@ import {
   deleteSubstackCredential,
   getSubstackCredentialMeta,
   replaceSubstackCredential,
+  SubstackCredentialInputError,
   testStoredSubstackCredential,
   testSubstackCredentialMaterial,
 } from '@/lib/user/deletion-queue/deletion-substack-credential';
@@ -61,7 +66,10 @@ const StepKeySchema = z.enum([
   UserDeletionStepKey.Substack,
   UserDeletionStepKey.Anonymize,
   UserDeletionStepKey.PylonReply,
+  UserDeletionStepKey.PylonFinalize,
+  UserDeletionStepKey.CompletionEmail,
   UserDeletionStepKey.PylonContact,
+  UserDeletionStepKey.CsaSupportDb,
 ]);
 
 const EntrySchema = z
@@ -74,6 +82,30 @@ const EntrySchema = z
 const EntriesInputSchema = z.object({
   entries: z.array(EntrySchema).min(1).max(100),
 });
+
+const HistoricalUserIdSchema = z
+  .string()
+  .refine(
+    userId =>
+      [...userId].every(character => {
+        const code = character.charCodeAt(0);
+        return code > 0x1f && (code < 0x7f || code > 0x9f) && code !== 0x2028 && code !== 0x2029;
+      }),
+    { message: 'User IDs must not contain control characters or line breaks' }
+  )
+  .trim()
+  .min(1)
+  .max(1024);
+
+const HistoricalUsersInputSchema = z
+  .object({
+    userIds: z
+      .array(HistoricalUserIdSchema)
+      .min(1)
+      .max(100)
+      .transform(userIds => [...new Set(userIds)]),
+  })
+  .strict();
 
 const ListInputSchema = z.object({
   tab: ListTabSchema,
@@ -104,11 +136,34 @@ const VerifyTaskInputSchema = z.object({
 
 const ReplaceCredentialInputSchema = z.object({
   material: z.string().min(1).max(16_000),
+  totpSecret: z.string().max(512).optional(),
 });
 
 const COMPLETED_WINDOW_DAYS = 7;
 
 type ListTab = z.infer<typeof ListTabSchema>;
+type HistoricalUserResult = { userId: string } & (BackfillResult | { status: 'failed' });
+
+async function processHistoricalUsers(params: {
+  userIds: string[];
+  adminUserId: string;
+  execute: boolean;
+}): Promise<HistoricalUserResult[]> {
+  const results: HistoricalUserResult[] = [];
+  for (const userId of params.userIds) {
+    try {
+      const result = await enqueueHistoricalUserDeletion({
+        userId,
+        adminUserId: params.adminUserId,
+        execute: params.execute,
+      });
+      results.push({ userId, ...result });
+    } catch {
+      results.push({ userId, status: 'failed' });
+    }
+  }
+  return results;
+}
 
 function iso(value: string): string {
   return new Date(value).toISOString();
@@ -273,6 +328,7 @@ function tabCondition(tab: ListTab) {
         OR EXISTS (
           SELECT 1 FROM user_deletion_steps s
           WHERE s.request_id = ${user_deletion_requests.id}
+            AND s.step_key <> ${UserDeletionStepKey.CsaSupportDb}
             AND s.status IN ('needs_attention', 'manual_action_required')
         )
       )`;
@@ -281,6 +337,7 @@ function tabCondition(tab: ListTab) {
     AND EXISTS (
       SELECT 1 FROM user_deletion_steps s
       WHERE s.request_id = ${user_deletion_requests.id}
+        AND s.step_key <> ${UserDeletionStepKey.CsaSupportDb}
         AND (
           s.rate_limited_since IS NOT NULL
           OR (s.status = 'retry_wait' AND s.last_error_code = 'rate_limited')
@@ -300,8 +357,29 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
     return enqueueUserDeletionTargets({
       actor: { kiloUserId: ctx.user.id, email: ctx.user.google_user_email },
       targets: input.entries,
+      catalogVersion: 2,
     });
   }),
+
+  previewHistoricalUsers: adminProcedure
+    .input(HistoricalUsersInputSchema)
+    .mutation(({ ctx, input }) => {
+      return processHistoricalUsers({
+        userIds: input.userIds,
+        adminUserId: ctx.user.id,
+        execute: false,
+      });
+    }),
+
+  submitHistoricalUsers: adminProcedure
+    .input(HistoricalUsersInputSchema)
+    .mutation(({ ctx, input }) => {
+      return processHistoricalUsers({
+        userIds: input.userIds,
+        adminUserId: ctx.user.id,
+        execute: true,
+      });
+    }),
 
   list: adminProcedure.input(ListInputSchema).query(async ({ input }) => {
     const asOfResult = await readDb.execute<{ as_of: string }>(sql`SELECT now() AS as_of`);
@@ -527,21 +605,35 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
   }),
 
   testSubstackCredential: adminProcedure
-    .input(z.object({ material: z.string().min(1).max(16_000).optional() }))
+    .input(
+      z.object({
+        material: z.string().min(1).max(16_000).optional(),
+        totpSecret: z.string().max(512).optional(),
+      })
+    )
     .mutation(async ({ input }) => {
       if (input.material) {
-        return testSubstackCredentialMaterial(input.material);
+        return testSubstackCredentialMaterial(input.material, input.totpSecret);
       }
-      return testStoredSubstackCredential();
+      const result = await testStoredSubstackCredential();
+      return { result, refreshedCookie: null };
     }),
 
   replaceSubstackCredential: adminProcedure
     .input(ReplaceCredentialInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await replaceSubstackCredential({
-        material: input.material,
-        actorKiloUserId: ctx.user.id,
-      });
+      try {
+        await replaceSubstackCredential({
+          material: input.material,
+          totpSecret: input.totpSecret,
+          actorKiloUserId: ctx.user.id,
+        });
+      } catch (error) {
+        if (error instanceof SubstackCredentialInputError) {
+          failClosed('BAD_REQUEST', error.message);
+        }
+        throw error;
+      }
       return { stored: true as const };
     }),
 

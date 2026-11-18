@@ -1,0 +1,768 @@
+/* eslint-disable max-lines -- the apply and retry suites share one mock harness in this file */
+import { createElement, Fragment, type ReactNode } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { toast } from 'sonner-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
+import { applyLanguagePreference } from '@/i18n/apply-language';
+import type * as ApplyLanguageModule from '@/i18n/apply-language';
+import { LanguagePickerSheet } from '@/components/language-picker-sheet';
+import { LanguageSearchField } from '@/components/language-search-field';
+
+// ── Hoisted mocks ──────────────────────────────────────────────────────────
+
+const reloadAppAsync = vi.hoisted(() => vi.fn());
+const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
+const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
+const writeDirectionAttemptAsync = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
+const registerNeedsInputCategories = vi.hoisted(() => vi.fn());
+const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+// The sheet picks its header shape from the window height, so the harness owns
+// that value: a tall window keeps the pinned search field, a short one hands it
+// to the list.
+const windowSize = vi.hoisted(() => ({ width: 402, height: 874 }));
+const i18nManager = vi.hoisted(() => ({
+  allowRTL: vi.fn(),
+  isRTL: false,
+  forceRTL: vi.fn(),
+}));
+const prevention = vi.hoisted(() => ({ enabled: false, disable: vi.fn() }));
+// FlashList renders through a callback, so a host-string mock would drop every
+// row. This mock calls the render props so the row assertions still see rows.
+const flashListMock = vi.hoisted(
+  () =>
+    ({
+      data,
+      renderItem,
+      keyExtractor,
+      ListHeaderComponent,
+      ListEmptyComponent,
+    }: {
+      data: readonly { tag: string }[];
+      renderItem: (info: { item: unknown; index: number }) => ReactNode;
+      keyExtractor: (item: { tag: string }) => string;
+      ListHeaderComponent?: ReactNode;
+      ListEmptyComponent?: ReactNode;
+    }) => {
+      const rows = data.map((item, index) =>
+        createElement(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
+      );
+      const empty = data.length === 0 ? ListEmptyComponent : null;
+      return createElement('FlashList', null, ListHeaderComponent, ...rows, empty);
+    }
+);
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The sheet clears its uncontrolled search field through the ref (it must not
+// remount the input), so the mock exposes the imperative `clear` the real
+// TextInput has and hosts the props on a `TextInput` node for the assertions.
+const clearSearch = vi.hoisted(() => vi.fn());
+vi.mock('react-native', async () => {
+  const {
+    createElement: createMockElement,
+    forwardRef,
+    useImperativeHandle,
+  } = await import('react');
+  const MockTextInput = forwardRef<{ clear: () => void }, Record<string, unknown>>((props, ref) => {
+    useImperativeHandle(ref, () => ({ clear: clearSearch }));
+    return createMockElement('TextInput', props);
+  });
+  MockTextInput.displayName = 'MockTextInput';
+  return {
+    ActivityIndicator: 'ActivityIndicator',
+    I18nManager: i18nManager,
+    Keyboard: { dismiss: () => undefined },
+    TextInput: MockTextInput,
+    View: 'View',
+    useWindowDimensions: () => windowSize,
+  };
+});
+vi.mock('expo-router', async () => {
+  const { useEffect } = await import('react');
+  return {
+    usePreventRemove: (enabled: boolean) => {
+      prevention.enabled = enabled;
+      return prevention.disable;
+    },
+    // Run the focus effect once on mount, like react-navigation's first focus.
+    useFocusEffect: (effect: () => void) => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- run the focus effect once on mount, like react-navigation's first focus
+      useEffect(effect, []);
+    },
+  };
+});
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insets,
+}));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('expo', () => ({ reloadAppAsync }));
+
+vi.mock('@/i18n/apply-language', async importOriginal => {
+  const actual = await importOriginal<typeof ApplyLanguageModule>();
+  return {
+    ...actual,
+    // Wrap the real implementation so the Cancel test can assert it never runs
+    // while every other suite still exercises the real outcomes.
+    applyLanguagePreference: vi.fn(actual.applyLanguagePreference),
+  };
+});
+// The apply path records the direction relaunch; the record itself is covered
+// by the apply-language suite, and its real store pulls in the native keychain.
+vi.mock('@/i18n/direction-attempt', () => ({
+  writeDirectionAttemptAsync,
+  // No running app path has an attempt record here: the sheet's apply always
+  // relaunches once for the language it names.
+  readDirectionAttemptAsync: vi.fn(() => Promise.resolve(null)),
+}));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/picker-sheet', () => ({
+  // Mirrors the shell: `headerContent` is pinned chrome unless the caller put
+  // it in its own body (`headerInBody`), and the prop is exposed for assertions.
+  PickerSheet: (props: {
+    headerContent?: ReactNode;
+    headerInBody?: boolean;
+    children?: ReactNode;
+  }) =>
+    createElement(
+      'PickerSheet',
+      props,
+      props.headerInBody ? null : props.headerContent,
+      props.children
+    ),
+}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#ffffff', mutedForeground: '#6b7280' }),
+}));
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getLanguagePreference: () => 'device',
+  getResolvedLanguage: () => 'en',
+  setLanguagePreferenceAsync,
+}));
+vi.mock('@/i18n/resolve-language', () => ({
+  resolveDeviceLanguage: () => 'en',
+}));
+vi.mock('@/i18n/return-target', () => ({
+  writeLanguageReturnTarget,
+}));
+vi.mock('@/lib/notifications', () => ({
+  renameAndroidNotificationChannels,
+}));
+vi.mock('@/lib/notification-actions', () => ({
+  registerNeedsInputCategories,
+}));
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function findByType(
+  root: TestRenderer.ReactTestInstance,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+function findChoiceRow(
+  root: TestRenderer.ReactTestInstance,
+  endonym: string
+): TestRenderer.ReactTestInstance {
+  const rows = findByType(root, 'ChoiceRow');
+  for (const row of rows) {
+    const label = row.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === endonym
+    );
+    if (label.length > 0) {
+      return row;
+    }
+  }
+  throw new Error(`ChoiceRow for ${endonym} not found`);
+}
+
+async function mountSheet(
+  onClose: () => void,
+  beforeReload?: () => Promise<void>
+): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(
+      createElement(LanguagePickerSheet, {
+        onClose,
+        returnTarget: 'login',
+        beforeReload,
+      })
+    );
+    await Promise.resolve();
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+async function applySelection(
+  onClose: () => void,
+  endonym: string,
+  beforeReload?: () => Promise<void>
+): Promise<TestRenderer.ReactTestRenderer> {
+  const renderer = await mountSheet(onClose, beforeReload);
+  act(() => {
+    (findChoiceRow(renderer.root, endonym).props.onPress as () => void)();
+  });
+  expect(applyLanguagePreference).not.toHaveBeenCalled();
+  const sheet = findByType(renderer.root, 'PickerSheet')[0];
+  if (!sheet) {
+    throw new Error('PickerSheet not found');
+  }
+  await act(async () => {
+    (sheet.props.onDone as () => void)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return renderer;
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+describe('LanguagePickerSheet apply', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    clearSearch.mockReset();
+    prevention.enabled = false;
+    prevention.disable.mockReset();
+    setLanguagePreferenceAsync.mockReset();
+    setLanguagePreferenceAsync.mockResolvedValue(true);
+    reloadAppAsync.mockReset();
+    writeDirectionAttemptAsync.mockReset();
+    writeDirectionAttemptAsync.mockResolvedValue(true);
+    writeLanguageReturnTarget.mockReset();
+    renameAndroidNotificationChannels.mockReset();
+    registerNeedsInputCategories.mockReset();
+    insets.bottom = 0;
+    windowSize.height = 874;
+    i18nManager.isRTL = false;
+    i18nManager.forceRTL.mockReset();
+    vi.mocked(applyLanguagePreference).mockClear();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('shows the standard empty state when the search matches no languages', async () => {
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('zzzzzz');
+    });
+
+    const emptyState = findByType(renderer.root, 'EmptyState')[0];
+    expect(emptyState?.props).toMatchObject({
+      icon: 'SearchX',
+      title: 'No languages match',
+      description: 'Try a different search term.',
+    });
+    expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
+    // The list keeps its identity across the empty state: the search field is
+    // uncontrolled, so re-parenting it would remount the native input and drop
+    // the typed query.
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    // The list's content box owns where the state sits: it fills the sheet body
+    // and centres the state in it, and the state itself opens no scroller of
+    // its own that would collapse to its own height.
+    expect(emptyState?.props.placement).toBe('static');
+    const emptyContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(emptyContentStyle).toMatchObject({ flexGrow: 1, justifyContent: 'center' });
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('');
+    });
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    // Rows keep the box at its own height, so the first row starts where the
+    // list starts instead of being pushed down a filled body.
+    const listContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(listContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
+
+    renderer.unmount();
+  });
+
+  it('keeps the search field pinned above the list in a window tall enough for a row', async () => {
+    windowSize.height = 874;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    expect(sheet?.props.headerInBody).toBe(false);
+    expect(renderer.root.findByType(flashListMock).props.ListHeaderComponent).toBeUndefined();
+    expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('leads the list with the search field when the window cannot show it with a row', async () => {
+    // A short window (and the keyboard takes more of it) leaves a sheet body
+    // smaller than the pinned header plus one row, which put every filtered
+    // result under the sheet edge.
+    windowSize.height = 500;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    expect(sheet?.props.headerInBody).toBe(true);
+    // The extracted `LanguageSearchField` owns the pill chrome: its own
+    // instance carries no className, so step into its rendered `View`.
+    const field = renderer.root.findByType(LanguageSearchField);
+    const pill = field.findByType('View');
+    expect(String(pill.props.className)).toContain('rounded-full');
+    // The list's content padding replaces the pinned side margin, so the field
+    // keeps its width and lines up with the rows it now scrolls with.
+    expect(String(pill.props.className)).not.toContain('mx-4');
+    expect(String(pill.props.className)).toContain('mx-0');
+    // One field on screen: the list header, not a second copy in the chrome.
+    expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
+
+    renderer.unmount();
+    windowSize.height = 874;
+  });
+
+  it('keeps the typed query in the field when a resize moves it into the list', async () => {
+    // A window that grows or shrinks past the pinned-header threshold moves the
+    // field between the sheet's chrome and the list header. That is a new
+    // native input, so the draft has to reach it: an empty field over a list
+    // still filtered by the old query shows neither what was typed nor why the
+    // rows are few.
+    windowSize.height = 874;
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    const pinnedInput = findByType(renderer.root, 'TextInput')[0];
+    if (!pinnedInput) {
+      throw new Error('language search input not found');
+    }
+
+    act(() => {
+      (pinnedInput.props.onChangeText as (value: string) => void)('german');
+    });
+
+    windowSize.height = 500;
+    await act(async () => {
+      renderer.update(createElement(LanguagePickerSheet, { onClose, returnTarget: 'login' }));
+      await Promise.resolve();
+    });
+
+    const listInput = findByType(renderer.root, 'TextInput')[0];
+    expect(findByType(renderer.root, 'PickerSheet')[0]?.props.headerInBody).toBe(true);
+    expect(listInput).not.toBe(pinnedInput);
+    expect(listInput?.props.defaultValue).toBe('german');
+
+    renderer.unmount();
+    windowSize.height = 874;
+  });
+
+  it('keeps the search field usable when the compact list has no matches', async () => {
+    windowSize.height = 500;
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('zzzzzz');
+    });
+
+    // Same list, same field: the empty state is the list's own empty
+    // component, so a query that matches nothing keeps the input mounted.
+    // The mock gives each element one host instance, so a remounted field
+    // would be a different node here.
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    // The field is the list's own header here, so the content box must stay
+    // top-aligned: centring the empty state would push the field off the top.
+    const compactContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(compactContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('');
+    });
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+
+    renderer.unmount();
+    windowSize.height = 874;
+  });
+
+  it('keeps the same item array identity when the sheet re-renders without a query change', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    const listData = renderer.root.findByType(flashListMock).props.data;
+
+    await act(async () => {
+      renderer.update(createElement(LanguagePickerSheet, { onClose, returnTarget: 'login' }));
+      await Promise.resolve();
+    });
+
+    // The derived list is only rebuilt on a query or applied-language change, so
+    // an unrelated re-render hands the list the same `data` identity and no
+    // mounted row re-renders.
+    expect(renderer.root.findByType(flashListMock).props.data).toBe(listData);
+
+    renderer.unmount();
+  });
+
+  it('marks the tapped row selected and applies that language on Done', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(false);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+    });
+
+    // FlashList's memoized cells only repaint when `data` or `extraData`
+    // changes identity, so the selection has to travel through `extraData`.
+    // Without it the tap leaves `selected` unreadable and the picker inert.
+    expect(renderer.root.findByType(flashListMock).props.extraData).toEqual({
+      selected: 'es',
+      disabled: false,
+    });
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(true);
+    expect(findChoiceRow(renderer.root, 'Français').props.selected).toBe(false);
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('clears the live search field on focus instead of remounting the input', async () => {
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+    // The focus effect empties the field through the ref, so the sheet opens
+    // empty on every focus without recreating the native input.
+    expect(clearSearch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('Deutsch');
+    });
+
+    // Typing must never recreate the field. A remount handed the recreated
+    // native EditText the text it still held, and the next keystrokes appended
+    // to that stale copy: the field read the term twice, as one unbroken run
+    // (language-search-deutsch, language-search-kb-up).
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    expect(clearSearch).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('applies an LTR language on Done without reloading the app', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'Español');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
+    expect(i18n.language).toBe('es');
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    // The needs-input notification buttons were registered under the English
+    // default; the apply must re-register them in the new language.
+    expect(registerNeedsInputCategories).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('waits for Done before applying a language that changes direction', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
+    });
+
+    expect(applyLanguagePreference).not.toHaveBeenCalled();
+    expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it.each(['Cancel', 'back/swipe'])(
+    '%s discards a same-direction language selection',
+    async dismissal => {
+      const onClose = vi.fn<() => void>();
+      const renderer = await mountSheet(onClose);
+
+      await act(async () => {
+        (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      if (dismissal === 'Cancel') {
+        const sheet = findByType(renderer.root, 'PickerSheet')[0];
+        if (!sheet) {
+          throw new Error('PickerSheet not found');
+        }
+        act(() => {
+          (sheet.props.onCancel as () => void)();
+        });
+      }
+      act(() => {
+        renderer.unmount();
+      });
+
+      expect(onClose).toHaveBeenCalledTimes(dismissal === 'Cancel' ? 1 : 0);
+      expect(applyLanguagePreference).not.toHaveBeenCalled();
+      expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+      expect(i18n.language).toBe('en');
+      expect(reloadAppAsync).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the current language and direction when the persist write fails', async () => {
+    setLanguagePreferenceAsync.mockResolvedValue(false);
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(i18n.language).toBe('en');
+    expect(i18nManager.isRTL).toBe(false);
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('keeps the current language and shows Retry when the catalog load fails', async () => {
+    const changeLanguageSpy = vi
+      .spyOn(i18n, 'changeLanguage')
+      .mockRejectedValueOnce(new Error('missing catalog'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'Español');
+
+    expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+    expect(i18n.language).toBe('en');
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Could not load the language. Please try again.');
+
+    changeLanguageSpy.mockRestore();
+    renderer.unmount();
+  });
+
+  it('shows Could not restart and Retry works when the RTL reload fails', async () => {
+    reloadAppAsync.mockRejectedValue(new Error('reload failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.title).toBe('Could not restart');
+    expect(failedSheet.props.disabled).toBe(false);
+
+    await act(async () => {
+      (failedSheet.props.onDone as () => void)();
+      await Promise.resolve();
+    });
+    expect(reloadAppAsync).toHaveBeenCalledTimes(2);
+    expect(prevention.enabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('shows Could not restart without reloading when the relaunch cannot be recorded', async () => {
+    writeDirectionAttemptAsync.mockResolvedValue(false);
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
+    // Without the record a relaunch that did not take the direction would
+    // repeat on every launch, so the sheet refuses it and offers Retry.
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.title).toBe('Could not restart');
+    expect(failedSheet.props.doneLabel).toBe('Retry');
+
+    // Retry has to resume the step that failed: this outcome never forced the
+    // direction, so reloading alone would relaunch into the previous one with
+    // still no record. The apply path runs again, retries the record write and
+    // only then relaunches.
+    writeDirectionAttemptAsync.mockResolvedValue(true);
+    await act(async () => {
+      (failedSheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledTimes(2);
+    expect(i18nManager.forceRTL).toHaveBeenCalledWith(true);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    // The retry re-runs the same apply path, so the idempotent preference write
+    // runs again before the relaunch.
+    expect(setLanguagePreferenceAsync).toHaveBeenLastCalledWith('ar');
+
+    renderer.unmount();
+  });
+
+  it('offers Continue beside Retry so a saved language is not trapped behind the reload', async () => {
+    reloadAppAsync.mockRejectedValue(new Error('reload failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.cancelLabel).toBe('Continue');
+    expect(failedSheet.props.onCancel).toEqual(expect.any(Function));
+    expect(failedSheet.props.doneLabel).toBe('Retry');
+    // The failed state holds the guard while Retry is on screen.
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
+
+    act(() => {
+      (failedSheet.props.onCancel as () => void)();
+    });
+
+    // Continue leaves the failed state without another reload: the preference
+    // was persisted before the reload attempt, so the sheet closes into the
+    // normal picker instead of asking for a retry that may never succeed.
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(findByType(renderer.root, 'PickerSheet')[0]?.props.doneLabel).toBe('Done');
+
+    // Closing releases the guard the failed state held, so the sheet's own
+    // close is the one navigation it lets through.
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
+
+    renderer.unmount();
+  });
+
+  it('still reloads into RTL when the return-target write fails', async () => {
+    writeLanguageReturnTarget.mockRejectedValue(new Error('write failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(writeLanguageReturnTarget).toHaveBeenCalledWith('login');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('does not block the RTL reload when the draft flush fails', async () => {
+    const beforeReload = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('flush failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية', beforeReload);
+
+    expect(beforeReload).toHaveBeenCalledTimes(1);
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('applies a same-direction RTL language on Done without reloading', async () => {
+    i18nManager.isRTL = true;
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar', 'en');
+    expect(i18n.language).toBe('ar');
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('reloads into LTR when the direction changes from RTL', async () => {
+    i18nManager.isRTL = true;
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'Español');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(i18nManager.forceRTL).toHaveBeenCalledWith(false);
+    expect(onClose).not.toHaveBeenCalled();
+    // The restarting screen stays up while the reload is pending.
+    expect(findByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('rolls the copy back when the persist write fails after the catalog loads', async () => {
+    setLanguagePreferenceAsync.mockResolvedValue(false);
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'Español');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
+    expect(i18n.language).toBe('en');
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});

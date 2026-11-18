@@ -1,0 +1,324 @@
+import type { OpenAI } from 'openai';
+import type { EventSourceMessage } from 'eventsource-parser';
+import { captureMessage, startInactiveSpan } from '@sentry/nextjs';
+import type { Span } from '@sentry/nextjs';
+import { z } from 'zod';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type {
+  JustTheCostsUsageStats,
+  MicrodollarUsageStats,
+  NotYetCostedUsageStats,
+  PromptInfo,
+  VercelProviderMetaData,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  contentPartSchema,
+  drainSseStream,
+  extractVercelUpstreamId,
+  nonEmptyStringSchema,
+  reportUpstreamStreamError,
+  selectUsageCostFields,
+  upstreamStreamErrorSchema,
+  usageCostSchema,
+  vercelProviderMetadataSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+
+const responsesUsageSchema = usageCostSchema.extend({
+  input_tokens: z.number().nullish(),
+  output_tokens: z.number().nullish(),
+  input_tokens_details: z
+    .object({ cached_tokens: z.number().nullish(), cache_write_tokens: z.number().nullish() })
+    .nullish(),
+});
+
+type ResponsesApiUsage = z.infer<typeof responsesUsageSchema>;
+
+const responseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  usage: responsesUsageSchema.nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
+  status: z.unknown().optional(),
+});
+
+const responseEventSchema = z
+  .object({
+    type: z.string(),
+    delta: z.unknown().optional(),
+    response: responseSchema.nullish(),
+    error: upstreamStreamErrorSchema.nullish(),
+  })
+  .refine(
+    event =>
+      ![
+        'response.created',
+        'response.in_progress',
+        'response.completed',
+        'response.failed',
+        'response.incomplete',
+        'response.queued',
+      ].includes(event.type) || event.response != null
+  );
+
+// Every `*.delta` event streams generated output: text, refusals, reasoning,
+// tool-call arguments, or audio. A tool call's name arrives with its item.
+const generatedOutputEventSchema = z.union([
+  z.looseObject({ type: z.string().endsWith('.delta'), delta: nonEmptyStringSchema }),
+  z.looseObject({
+    type: z.literal('response.output_item.added'),
+    item: z.looseObject({ name: nonEmptyStringSchema }),
+  }),
+]);
+
+const responseOutputItemSchema = z
+  .object({
+    type: z.string(),
+    content: z.array(contentPartSchema('output_text')).optional(),
+  })
+  .refine(item => item.type !== 'message' || item.content !== undefined);
+
+// Upstream error bodies carry no model; they are recorded as errors, not parse failures.
+const responseBodySchema = responseSchema.extend({
+  output: z.array(responseOutputItemSchema).nullish(),
+});
+
+export function processResponsesApiUsage(
+  usage: ResponsesApiUsage | null | undefined,
+  providerMetadata: VercelProviderMetaData | null | undefined,
+  coreProps: NotYetCostedUsageStats,
+  provider: ProviderType
+): JustTheCostsUsageStats {
+  // OpenAI-style input_tokens already includes cached and cache-write tokens.
+  const inputTokens = usage?.input_tokens ?? 0;
+  const outputTokens = usage?.output_tokens ?? 0;
+  const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+  const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
+
+  const costs = selectUsageCostFields(
+    usage,
+    providerMetadata,
+    coreProps,
+    'responses_sse_processing',
+    provider
+  );
+  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
+}
+
+function extractResponseContent(output: z.infer<typeof responseOutputItemSchema>[]): string {
+  return output
+    .flatMap(item =>
+      item.type === 'message'
+        ? (item.content ?? []).filter(c => c.type === 'output_text').map(c => c.text)
+        : []
+    )
+    .join('');
+}
+
+export async function parseResponsesMicrodollarUsageFromStream(
+  stream: ReadableStream<Uint8Array>,
+  kiloUserId: string,
+  openrouterRequestSpan: Span | undefined,
+  provider: ProviderType,
+  statusCode: number,
+  usesUserCredentials: boolean,
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
+): Promise<MicrodollarUsageStats> {
+  openrouterRequestSpan?.end();
+  const streamProcessingSpan = startInactiveSpan({
+    name: 'responses-stream-processing',
+    op: 'performance',
+  });
+  let messageId: string | null = null;
+  let model: string | null = null;
+  let responseContent = '';
+  let reportedError = statusCode >= 400;
+  let usage: ResponsesApiUsage | null = null;
+  let providerMetadata: VercelProviderMetaData | null = null;
+  let inference_provider: string | null = null;
+  let finish_reason: unknown = null;
+
+  const onEvent = (event: EventSourceMessage) => {
+    if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
+      return false;
+    }
+
+    const payload: unknown = JSON.parse(event.data);
+    metadataCapture?.captureVercelMetadata(payload);
+    const json = responseEventSchema.parse(payload);
+
+    const eventProviderMetadata = json.response?.provider_metadata;
+
+    if (json.error != null) {
+      reportedError = true;
+      reportUpstreamStreamError({
+        label: 'Responses API error',
+        source: 'responses_sse_processing',
+        error: json.error,
+        usesUserCredentials,
+        logContext: { provider, inference_provider, messageId, model },
+        sentryExtra: { kiloUserId, provider, messageId, model },
+      });
+    }
+
+    if (json.type === 'response.output_text.delta') {
+      const delta = z.string().parse(json.delta);
+      if (delta) responseContent += delta;
+    }
+
+    // Extract metadata whenever json.response is present so that aborted
+    // streams still capture messageId/model/usage from early events like
+    // response.created and response.in_progress.
+    if (json.response) {
+      const response = json.response;
+      messageId = response.id ?? messageId;
+      model = response.model ?? model;
+      if (response.usage) {
+        usage = response.usage;
+      }
+      if (eventProviderMetadata) {
+        providerMetadata = eventProviderMetadata;
+        inference_provider =
+          eventProviderMetadata.gateway?.routing?.finalProvider ?? inference_provider;
+      }
+      finish_reason = response.status ?? finish_reason;
+    }
+
+    if (json.type === 'response.failed' || json.type === 'response.incomplete') {
+      reportedError = true;
+    }
+
+    return generatedOutputEventSchema.safeParse(payload).success;
+  };
+
+  const { wasAborted, malformedEventCount, timing } = await drainSseStream(
+    stream,
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt,
+    'responses.time_to_first_token_ms',
+    () => ({ kiloUserId, provider, messageId, model })
+  );
+
+  if (!reportedError && !usage) {
+    captureMessage('SUSPICIOUS: No usage in Responses API stream', {
+      level: 'warning',
+      tags: { source: 'responses_usage_processing' },
+      extra: { kiloUserId, provider, messageId, model },
+    });
+  }
+
+  const coreProps = {
+    messageId,
+    hasError:
+      reportedError || wasAborted || malformedEventCount > 0 || isErrorFinishReason(finish_reason),
+    model,
+    responseContent,
+    inference_provider,
+    finish_reason,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
+    latency: timing.latency,
+    moderation_latency: null,
+    generation_time: timing.generation_time,
+    streamed: true,
+    cancelled: null,
+    status_code: statusCode,
+  } satisfies NotYetCostedUsageStats;
+
+  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps, provider);
+  return { ...coreProps, ...costs };
+}
+
+export function parseResponsesMicrodollarUsageFromString(
+  fullResponse: string,
+  statusCode: number,
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
+): MicrodollarUsageStats {
+  const payload: unknown = JSON.parse(fullResponse);
+  metadataCapture?.captureVercelMetadata(payload);
+  const responseJson = responseBodySchema.parse(payload);
+  const usage = responseJson.usage;
+  const providerMetadata = responseJson.provider_metadata ?? null;
+
+  const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
+
+  const coreProps = {
+    messageId: responseJson.id ?? null,
+    hasError: !responseJson.model || statusCode >= 400 || responseJson.status !== 'completed',
+    model: responseJson.model ?? null,
+    responseContent: responseJson.output ? extractResponseContent(responseJson.output) : '',
+    inference_provider,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
+    finish_reason: responseJson.status ?? null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: null,
+    status_code: statusCode,
+  } satisfies NotYetCostedUsageStats;
+
+  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps, provider);
+  return { ...coreProps, ...costs };
+}
+
+export function extractInputItemTextContent(
+  item: unknown,
+  roles: ReadonlySet<string>
+): string | null {
+  if (typeof item !== 'object' || item === null || !('role' in item) || !('content' in item)) {
+    return null;
+  }
+  if (typeof item.role !== 'string' || !roles.has(item.role)) return null;
+  const { content } = item;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (c: unknown): c is OpenAI.Responses.ResponseInputText =>
+          typeof c === 'object' &&
+          c !== null &&
+          'type' in c &&
+          c.type === 'input_text' &&
+          'text' in c &&
+          typeof c.text === 'string'
+      )
+      .map(c => c.text)
+      .join('\n');
+  }
+  return null;
+}
+
+export function extractResponsesPromptInfo(body: GatewayResponsesRequest): PromptInfo {
+  const input = Array.isArray(body.input) ? body.input : [];
+  const systemRoles = new Set(['system', 'developer']);
+  const userRoles = new Set(['user']);
+  const systemPrompt = [
+    typeof body.instructions === 'string' ? body.instructions : null,
+    ...input.map(item => extractInputItemTextContent(item, systemRoles)),
+  ]
+    .filter((text): text is string => text !== null && text !== '')
+    .join('\n');
+
+  let userPrompt = '';
+  if (typeof body.input === 'string') {
+    userPrompt = body.input;
+  } else {
+    const lastUserText = input
+      .map(item => extractInputItemTextContent(item, userRoles))
+      .filter((t): t is string => t !== null)
+      .at(-1);
+    userPrompt = lastUserText ?? '';
+  }
+
+  return {
+    system_prompt_prefix: systemPrompt.slice(0, 100),
+    system_prompt_length: systemPrompt.length,
+    user_prompt_prefix: userPrompt.slice(0, 100),
+  };
+}

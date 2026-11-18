@@ -1,0 +1,57 @@
+import { NextResponse } from 'next/server';
+import { captureException } from '@sentry/nextjs';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  getEffectiveModelDecision,
+  resolveOrganizationMemberModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+
+/**
+ * Test using:
+ * curl -vvv 'http://localhost:3000/api/gateway/transcription-models'
+ */
+export async function handleTranscriptionModelsRequest(): Promise<
+  NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>
+> {
+  try {
+    const data = await getOpenRouterTranscriptionModels();
+    // Public catalog read. Every caller receives the public catalog, and a
+    // verified organization member receives it filtered to that member's own
+    // model access; `gateway-admission.ts` covers the inference admission rule.
+    const auth = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    }).catch(() => null);
+    if (auth?.organizationId && auth.user && Array.isArray(data.data)) {
+      // Resolve the member's policy once, then evaluate each catalog model.
+      const policy = await resolveOrganizationMemberModelPolicy({
+        organizationId: auth.organizationId,
+        kiloUserId: auth.user.id,
+        fromDb: readDb,
+      });
+      const models = [];
+      for (const model of data.data) {
+        if ((await getEffectiveModelDecision(policy, model.id)).allowed) models.push(model);
+      }
+      return NextResponse.json(
+        { ...data, data: models },
+        { headers: CATALOG_CACHE_HEADERS.perCaller }
+      );
+    }
+    return NextResponse.json(data, { headers: CATALOG_CACHE_HEADERS.shared });
+  } catch (error) {
+    captureException(error, {
+      tags: { endpoint: 'gateway/transcription-models' },
+      extra: { action: 'fetching_transcription_models' },
+    });
+    return NextResponse.json(
+      { error: 'Failed to fetch transcription models', message: 'Error from OpenRouter API' },
+      { status: 500 }
+    );
+  }
+}

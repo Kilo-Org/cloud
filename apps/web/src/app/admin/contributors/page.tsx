@@ -35,6 +35,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SortableButton } from '../components/SortableButton';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 import {
   AlertCircle,
   ArrowUpCircle,
@@ -58,6 +59,9 @@ type ContributorTier = ContributorChampionTier;
 type DrillInWindow = 'all_time' | 'rolling_30_days';
 
 const PAGE_SIZE = 10;
+
+const creditManagerRequirementNote =
+  'Read-only: the credit manager permission is required to enroll or upgrade contributors.';
 
 const breadcrumbs = (
   <>
@@ -341,12 +345,17 @@ export default function ContributorChampionsAdminPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
+  // Enrollment and tier upgrades grant Kilo Credits, so the write controls
+  // require the credit manager permission like the other admin grant surfaces.
+  // While the permission query resolves, the operator counts as unprivileged
+  // and every write control stays disabled.
+  const { canManageCredits, isPermissionResolved } = useAdminCreditManagementPermission();
+  const canManageContributorCredits = isPermissionResolved && canManageCredits;
+
   const [drillInState, setDrillInState] = useState<DrillInState | null>(null);
   const [enrollmentState, setEnrollmentState] = useState<EnrollmentState | null>(null);
   const [upgradeState, setUpgradeState] = useState<UpgradeState | null>(null);
-  // Per-row selected upgrade tier, keyed by contributorId
   const [upgradeSelections, setUpgradeSelections] = useState<Record<string, ContributorTier>>({});
-  // Enrolled table state
   const [enrolledPage, setEnrolledPage] = useState(1);
   const [enrolledFilters, setEnrolledFilters] = useState<EnrolledFilters>({
     githubLogin: '',
@@ -356,7 +365,6 @@ export default function ContributorChampionsAdminPage() {
   });
   const enrolledSort = useTableSort<EnrolledSortField>('contributionsAllTime');
 
-  // Review table state
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewFilters, setReviewFilters] = useState<ReviewFilters>({
     githubLogin: '',
@@ -366,7 +374,6 @@ export default function ContributorChampionsAdminPage() {
   });
   const reviewSort = useTableSort<ReviewSortField>('contributionsAllTime');
 
-  // Manual enrollment state
   const [manualEnrollOpen, setManualEnrollOpen] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
   const [manualGithub, setManualGithub] = useState('');
@@ -449,11 +456,11 @@ export default function ContributorChampionsAdminPage() {
     trpc.admin.contributorChampions.upgradeTier.mutationOptions({
       onSuccess: result => {
         const creditMsg =
-          result.creditDifferentialUsd > 0
-            ? result.creditGranted
-              ? ` — $${result.creditDifferentialUsd} top-up credit granted`
-              : ` — credit pending (no linked account)`
-            : '';
+          result.creditGrantedUsd > 0
+            ? ` — $${result.creditGrantedUsd} top-up credit granted`
+            : result.creditPendingUsd > 0
+              ? ` — credit pending (no linked account)`
+              : '';
         toast.success(`Upgraded to ${result.upgradedTier}${creditMsg}`);
         setUpgradeState(null);
         setUpgradeSelections({});
@@ -479,7 +486,6 @@ export default function ContributorChampionsAdminPage() {
 
   const isLoadingTables = reviewQuery.isLoading || enrolledQuery.isLoading;
 
-  // Enrolled: filter -> sort -> paginate
   const enrolledFiltered = useMemo(() => {
     const rows: LeaderboardRow[] = enrolledQuery.data ?? [];
     return rows.filter(
@@ -521,12 +527,10 @@ export default function ContributorChampionsAdminPage() {
     [enrolledSorted, enrolledPage]
   );
 
-  // Reset enrolled page when filters/sort change
   useEffect(() => {
     setEnrolledPage(1);
   }, [enrolledFilters, enrolledSort.sortConfig]);
 
-  // Review: filter -> sort -> paginate
   const reviewFiltered = useMemo(() => {
     const rows: LeaderboardRow[] = reviewQuery.data ?? [];
     return rows.filter(row => {
@@ -567,7 +571,6 @@ export default function ContributorChampionsAdminPage() {
     [reviewSorted, reviewPage]
   );
 
-  // Reset review page when filters/sort change
   useEffect(() => {
     setReviewPage(1);
   }, [reviewFilters, reviewSort.sortConfig]);
@@ -605,12 +608,22 @@ export default function ContributorChampionsAdminPage() {
             <h2 className="text-2xl font-bold">Enrolled</h2>
             <div className="flex items-center gap-3">
               <p className="text-muted-foreground text-sm">Official contributor champions</p>
-              <Button variant="outline" size="sm" onClick={() => setManualEnrollOpen(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!canManageContributorCredits}
+                onClick={() => setManualEnrollOpen(true)}
+                title={canManageContributorCredits ? undefined : creditManagerRequirementNote}
+              >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Manual enroll
               </Button>
             </div>
           </div>
+
+          {!canManageContributorCredits ? (
+            <p className="text-muted-foreground text-sm">{creditManagerRequirementNote}</p>
+          ) : null}
 
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
@@ -825,6 +838,7 @@ export default function ContributorChampionsAdminPage() {
                           <div className="flex items-center justify-end gap-1">
                             <Select
                               value={upgradeSelections[row.contributorId] ?? '__none__'}
+                              disabled={!canManageContributorCredits}
                               onValueChange={value => {
                                 const parsed = normalizeTier(value);
                                 if (!parsed) return;
@@ -834,7 +848,14 @@ export default function ContributorChampionsAdminPage() {
                                 }));
                               }}
                             >
-                              <SelectTrigger className="h-8 w-[130px]">
+                              <SelectTrigger
+                                className="h-8 w-[130px]"
+                                title={
+                                  canManageContributorCredits
+                                    ? undefined
+                                    : creditManagerRequirementNote
+                                }
+                              >
                                 <SelectValue placeholder="Upgrade to…" />
                               </SelectTrigger>
                               <SelectContent>
@@ -853,7 +874,9 @@ export default function ContributorChampionsAdminPage() {
                               size="icon"
                               className="h-8 w-8"
                               disabled={
-                                !upgradeSelections[row.contributorId] || upgradeMutation.isPending
+                                !canManageContributorCredits ||
+                                !upgradeSelections[row.contributorId] ||
+                                upgradeMutation.isPending
                               }
                               onClick={() => {
                                 const newTier = upgradeSelections[row.contributorId];
@@ -866,9 +889,11 @@ export default function ContributorChampionsAdminPage() {
                                 });
                               }}
                               title={
-                                upgradeSelections[row.contributorId]
-                                  ? `Upgrade to ${upgradeSelections[row.contributorId]}`
-                                  : 'Select a tier to upgrade to'
+                                !canManageContributorCredits
+                                  ? creditManagerRequirementNote
+                                  : upgradeSelections[row.contributorId]
+                                    ? `Upgrade to ${upgradeSelections[row.contributorId]}`
+                                    : 'Select a tier to upgrade to'
                               }
                             >
                               <ArrowUpCircle className="h-4 w-4" />
@@ -900,6 +925,10 @@ export default function ContributorChampionsAdminPage() {
             <h2 className="text-2xl font-bold">Review Queue</h2>
             <p className="text-muted-foreground text-sm">Pending candidates to enroll</p>
           </div>
+
+          {!canManageContributorCredits ? (
+            <p className="text-muted-foreground text-sm">{creditManagerRequirementNote}</p>
+          ) : null}
 
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
@@ -1128,7 +1157,11 @@ export default function ContributorChampionsAdminPage() {
                           <Button
                             size="icon"
                             className="bg-green-600 hover:bg-green-700"
-                            disabled={!effectiveTier || enrollMutation.isPending}
+                            disabled={
+                              !canManageContributorCredits ||
+                              !effectiveTier ||
+                              enrollMutation.isPending
+                            }
                             onClick={() => {
                               if (!effectiveTier) return;
                               setEnrollmentState({
@@ -1138,9 +1171,11 @@ export default function ContributorChampionsAdminPage() {
                               });
                             }}
                             title={
-                              effectiveTier
-                                ? `Add contributor as ${effectiveTier}`
-                                : 'Select a tier before enrolling'
+                              !canManageContributorCredits
+                                ? creditManagerRequirementNote
+                                : effectiveTier
+                                  ? `Add contributor as ${effectiveTier}`
+                                  : 'Select a tier before enrolling'
                             }
                           >
                             <Plus className="h-4 w-4" />
@@ -1280,7 +1315,9 @@ export default function ContributorChampionsAdminPage() {
               </Button>
             </DialogClose>
             <Button
-              disabled={enrollMutation.isPending || enrollmentState === null}
+              disabled={
+                !canManageContributorCredits || enrollMutation.isPending || enrollmentState === null
+              }
               onClick={() => {
                 if (!enrollmentState) return;
                 void enrollMutation.mutateAsync({
@@ -1360,7 +1397,9 @@ export default function ContributorChampionsAdminPage() {
               </Button>
             </DialogClose>
             <Button
-              disabled={upgradeMutation.isPending || upgradeState === null}
+              disabled={
+                !canManageContributorCredits || upgradeMutation.isPending || upgradeState === null
+              }
               onClick={() => {
                 if (!upgradeState) return;
                 void upgradeMutation.mutateAsync({
@@ -1499,6 +1538,7 @@ export default function ContributorChampionsAdminPage() {
             </DialogClose>
             <Button
               disabled={
+                !canManageContributorCredits ||
                 manualEnrollMutation.isPending ||
                 !manualEmail ||
                 !/^[^@]+@[^@]+\.[^@]+$/.test(manualEmail)

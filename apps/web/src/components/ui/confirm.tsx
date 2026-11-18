@@ -18,6 +18,11 @@ export type ConfirmOptions = {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /**
+   * Wait behind an active prompt instead of cancelling it. Use this for a
+   * prompt that must not replace an unrelated confirmation.
+   */
+  queue?: boolean;
 };
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
@@ -25,6 +30,10 @@ type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 const ConfirmContext = React.createContext<ConfirmFn | null>(null);
 
 type ConfirmState = ConfirmOptions & { open: boolean };
+type QueuedConfirmation = {
+  options: ConfirmOptions;
+  resolve: (value: boolean) => void;
+};
 
 /**
  * Mounts a single AlertDialog and exposes an imperative, promise-based
@@ -34,16 +43,35 @@ type ConfirmState = ConfirmOptions & { open: boolean };
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<ConfirmState | null>(null);
   const resolverRef = React.useRef<((value: boolean) => void) | null>(null);
+  const queueRef = React.useRef<QueuedConfirmation[]>([]);
 
   const settle = React.useCallback((result: boolean) => {
-    resolverRef.current?.(result);
+    const resolve = resolverRef.current;
+    if (!resolve) return;
     resolverRef.current = null;
+    resolve(result);
     setState(prev => (prev ? { ...prev, open: false } : prev));
   }, []);
 
+  React.useEffect(() => {
+    if (!state || state.open || queueRef.current.length === 0) return;
+    const next = queueRef.current.shift();
+    if (!next) return;
+    resolverRef.current = next.resolve;
+    setState({ ...next.options, open: true });
+  }, [state]);
+
   const confirm = React.useCallback<ConfirmFn>(options => {
-    // Resolve any in-flight prompt as cancelled before replacing it.
-    resolverRef.current?.(false);
+    if (resolverRef.current) {
+      if (options.queue) {
+        return new Promise<boolean>(resolve => {
+          queueRef.current.push({ options, resolve });
+        });
+      }
+      // Existing callers replace an in-flight prompt rather than queueing.
+      resolverRef.current(false);
+      resolverRef.current = null;
+    }
     return new Promise<boolean>(resolve => {
       resolverRef.current = resolve;
       setState({ ...options, open: true });
@@ -54,6 +82,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     () => () => {
       resolverRef.current?.(false);
       resolverRef.current = null;
+      for (const queued of queueRef.current) queued.resolve(false);
+      queueRef.current = [];
     },
     []
   );

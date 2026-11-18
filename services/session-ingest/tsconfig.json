@@ -10,5 +10,5 @@
     "jsxImportSource": "hono/jsx",
     "types": ["./worker-configuration.d.ts", "node", "@cloudflare/workers-types", "vitest/globals"]
   },
-  "include": ["worker-configuration.d.ts", "src/**/*.ts"]
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "test/postgres/**/*.ts"]
 }

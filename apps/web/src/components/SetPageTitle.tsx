@@ -3,25 +3,30 @@
 import { useEffect, type ReactNode } from 'react';
 import { usePageTitle } from '@/contexts/PageTitleContext';
 
-/** Renders nothing. Sets the topbar page title, icon, and optional extras via context. */
 export function SetPageTitle({
   title,
+  subtitle,
   icon,
   children,
 }: {
   title: string;
+  subtitle?: ReactNode;
   icon?: ReactNode;
   children?: ReactNode;
 }) {
-  const { setTitle, setIcon, setExtras } = usePageTitle();
+  const { setTitle, setSubtitle, setIcon, setExtras } = usePageTitle();
   useEffect(() => {
     setTitle(title);
     return () => setTitle('');
   }, [title, setTitle]);
   useEffect(() => {
+    setSubtitle(subtitle ?? null);
+    return () => setSubtitle(null);
+  }, [subtitle, setSubtitle]);
+  useEffect(() => {
     setIcon(icon ?? null);
     return () => setIcon(null);
-  }, [icon, setExtras]);
+  }, [icon, setIcon]);
   useEffect(() => {
     setExtras(children ?? null);
     return () => setExtras(null);

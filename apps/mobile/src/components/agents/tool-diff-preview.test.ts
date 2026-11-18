@@ -1,8 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/test/render-with-providers.tsx */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 
 import { describe, expect, it, vi } from 'vitest';
+import type * as ReactI18next from 'react-i18next';
 
 import { ToolDiffPreview } from './tool-diff-preview';
 import { type ToolDiffModel } from './tool-diff-model';
@@ -13,7 +13,16 @@ vi.mock('react-native', () => ({
   View: 'View',
   Text: 'RNText',
   Pressable: 'Pressable',
+  // The real DiffLine (mounted below) reads the color scheme for its palette.
+  useColorScheme: () => 'light',
 }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -137,20 +146,24 @@ describe('ToolDiffPreview', () => {
     const root = rootElement(render(makeModel({ truncated: true, language: null })));
     const texts = findByType(root, 'Text');
     const truncatedLabel = texts.find(
-      el => (el.props as { accessibilityLabel?: string }).accessibilityLabel === 'Content truncated'
+      el =>
+        (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
+        'common.contentTruncated'
     );
     expect(truncatedLabel).toBeDefined();
     if (!truncatedLabel) {
       throw new Error('truncatedLabel not found');
     }
-    expect((truncatedLabel.props as { children?: string }).children).toBe('Truncated');
+    expect((truncatedLabel.props as { children?: string }).children).toBe('common.truncated');
   });
 
   it('does not show the Truncated label when the model is not truncated', () => {
     const root = rootElement(render(makeModel({ truncated: false, language: null })));
     const texts = findByType(root, 'Text');
     const truncatedLabel = texts.find(
-      el => (el.props as { accessibilityLabel?: string }).accessibilityLabel === 'Content truncated'
+      el =>
+        (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
+        'common.contentTruncated'
     );
     expect(truncatedLabel).toBeUndefined();
   });

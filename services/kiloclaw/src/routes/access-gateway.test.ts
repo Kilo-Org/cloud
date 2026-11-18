@@ -1,12 +1,28 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AppEnv } from '../types';
+import type * as dbModule from '../db';
+
+vi.mock('../db', async importOriginal => ({
+  ...(await importOriginal<typeof dbModule>()),
+  getWorkerDb: vi.fn(() => ({})),
+  findPepperByUserId: vi.fn(),
+  validateAndRedeemAccessCode: vi.fn(),
+}));
+
 import { accessGatewayRoutes } from './access-gateway';
 import { signKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { sandboxIdFromInstanceId } from '@kilocode/worker-utils/instance-id';
-import { KILOCLAW_AUTH_COOKIE, KILOCLAW_ACTIVE_INSTANCE_COOKIE } from '../config';
+import {
+  KILO_TOKEN_VERSION,
+  KILOCLAW_AUTH_COOKIE,
+  KILOCLAW_ACTIVE_INSTANCE_COOKIE,
+} from '../config';
+import { KILOCLAW_AUDIENCE } from '@kilocode/worker-utils';
+import { SignJWT } from 'jose';
+import { findPepperByUserId, getWorkerDb, validateAndRedeemAccessCode } from '../db';
 
 const NEXTAUTH_SECRET = 'test-nextauth-secret';
 const GATEWAY_TOKEN_SECRET = 'test-gateway-secret';
@@ -50,6 +66,19 @@ async function signedAuthCookie(): Promise<string> {
   });
 }
 
+async function signedAudienceAuthCookie(aud: string | string[]): Promise<string> {
+  return new SignJWT({
+    kiloUserId: USER_ID,
+    apiTokenPepper: null,
+    version: KILO_TOKEN_VERSION,
+    aud,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
+}
+
 function parseSetCookies(response: Response): Record<string, string> {
   const cookies: Record<string, string> = {};
   for (const line of response.headers.getSetCookie?.() ?? []) {
@@ -66,6 +95,7 @@ function envBindings(overrides: Record<string, unknown> = {}) {
     NEXTAUTH_SECRET,
     GATEWAY_TOKEN_SECRET,
     WORKER_ENV: 'test',
+    HYPERDRIVE: { connectionString: 'postgresql://fake' },
     KILOCLAW_INSTANCE: buildInstanceBinding(USER_ID),
     KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
     KILOCLAW_INSTANCE_URL_SCHEME: 'https',
@@ -74,6 +104,48 @@ function envBindings(overrides: Record<string, unknown> = {}) {
 }
 
 describe('access-gateway cookie scoping', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects a wrong-audience cookie without an access-code lookup', async () => {
+    const app = buildApp();
+    const token = await signedAudienceAuthCookie('another-resource');
+
+    const response = await app.fetch(
+      new Request(`https://claw.kilosessions.ai/kilo-access-gateway?userId=${USER_ID}`, {
+        headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` },
+      }),
+      envBindings()
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('Enter the access code');
+    expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    expect(vi.mocked(findPepperByUserId)).not.toHaveBeenCalled();
+    expect(vi.mocked(validateAndRedeemAccessCode)).not.toHaveBeenCalled();
+  });
+
+  it('accepts a correct-audience cookie without a pepper database lookup', async () => {
+    const app = buildApp();
+    const token = await signedAudienceAuthCookie([KILOCLAW_AUDIENCE]);
+
+    const response = await app.fetch(
+      new Request(`https://claw.kilosessions.ai/kilo-access-gateway?userId=${USER_ID}`, {
+        headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` },
+      }),
+      envBindings()
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe(
+      `/#token=${await deriveGatewayToken(sandboxIdFromUserId(USER_ID), GATEWAY_TOKEN_SECRET)}`
+    );
+    expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    expect(vi.mocked(findPepperByUserId)).not.toHaveBeenCalled();
+    expect(vi.mocked(validateAndRedeemAccessCode)).not.toHaveBeenCalled();
+  });
+
   it('sets KILOCLAW_ACTIVE_INSTANCE_COOKIE on legacy host (claw.kilosessions.ai)', async () => {
     const app = buildApp();
     const token = await signedAuthCookie();

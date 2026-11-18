@@ -1,0 +1,163 @@
+import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
+import {
+  type ReasoningDetailEncrypted,
+  type ReasoningDetailText,
+  ReasoningDetailType,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import {
+  ReasoningDetailsTransform,
+  type ProviderResponseTransforms,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+
+function getGoogleExtraContent(value: Record<string, unknown>) {
+  const extraContent = value.extra_content;
+  if (!isRecord(extraContent)) {
+    return null;
+  }
+  const google = extraContent.google;
+  return isRecord(google) ? google : null;
+}
+
+function deleteGoogleExtraContentProperty(value: Record<string, unknown>, property: string) {
+  const extraContent = value.extra_content;
+  const google = getGoogleExtraContent(value);
+  if (!isRecord(extraContent) || !google) {
+    return;
+  }
+
+  delete google[property];
+  if (Object.keys(google).length === 0) {
+    delete extraContent.google;
+  }
+  if (Object.keys(extraContent).length === 0) {
+    delete value.extra_content;
+  }
+}
+
+/** The tag Gemini wraps thoughts in; the request asks for it as `thought_tag_marker`. */
+export const GEMINI_THOUGHT_TAG_MARKER = 'think';
+
+/**
+ * Without streaming, Gemini's OpenAI-compatible endpoint returns the thoughts
+ * and the answer in one content string flagged as a thought, with only the
+ * thoughts wrapped in `<think>` tags. Splits them, or returns null when the
+ * content has no tagged thoughts.
+ */
+function splitTaggedGeminiThought(content: string) {
+  const openTag = `<${GEMINI_THOUGHT_TAG_MARKER}>`;
+  const closeTag = `</${GEMINI_THOUGHT_TAG_MARKER}>`;
+  if (!content.startsWith(openTag)) {
+    return null;
+  }
+  const closeIndex = content.indexOf(closeTag, openTag.length);
+  if (closeIndex === -1) {
+    return null;
+  }
+  return {
+    thought: content.slice(openTag.length, closeIndex).trim(),
+    answer: content.slice(closeIndex + closeTag.length).trimStart(),
+  };
+}
+
+function mapGeminiThoughtToReasoningDetails(value: unknown) {
+  if (!isRecord(value)) {
+    return;
+  }
+
+  // OpenRouter commonly emits every block with index 0. Its AI SDK provider
+  // merges adjacent text by type and always keeps encrypted blocks discrete.
+  const details: Array<ReasoningDetailText | ReasoningDetailEncrypted> = [];
+  const google = getGoogleExtraContent(value);
+  if (typeof value.content === 'string' && google?.thought === true) {
+    const tagged = splitTaggedGeminiThought(value.content);
+    details.push({
+      type: ReasoningDetailType.Text,
+      text: tagged ? tagged.thought : value.content,
+      index: 0,
+      format: ReasoningFormat.GoogleGeminiV1,
+    });
+    if (tagged) {
+      value.content = tagged.answer;
+    } else {
+      delete value.content;
+    }
+    deleteGoogleExtraContentProperty(value, 'thought');
+  }
+
+  if (typeof google?.thought_signature === 'string') {
+    details.push({
+      type: ReasoningDetailType.Encrypted,
+      data: google.thought_signature,
+      index: 0,
+      format: ReasoningFormat.GoogleGeminiV1,
+    });
+    deleteGoogleExtraContentProperty(value, 'thought_signature');
+  }
+
+  if (Array.isArray(value.tool_calls)) {
+    for (const toolCall of value.tool_calls) {
+      if (!isRecord(toolCall)) {
+        continue;
+      }
+
+      const signature = getGoogleExtraContent(toolCall)?.thought_signature;
+      if (typeof signature !== 'string') {
+        continue;
+      }
+
+      details.push({
+        type: ReasoningDetailType.Encrypted,
+        data: signature,
+        id: typeof toolCall.id === 'string' ? toolCall.id : undefined,
+        index: 0,
+        format: ReasoningFormat.GoogleGeminiV1,
+      });
+      deleteGoogleExtraContentProperty(toolCall, 'thought_signature');
+    }
+  }
+
+  if (details.length > 0) {
+    value.reasoning_details = Array.isArray(value.reasoning_details)
+      ? [...(value.reasoning_details as unknown[]), ...details]
+      : details;
+  }
+}
+
+function mapReasoningStringToDetails(value: unknown, field: 'reasoning_content' | 'reasoning') {
+  if (
+    !isRecord(value) ||
+    typeof value[field] !== 'string' ||
+    value.reasoning_details !== undefined
+  ) {
+    return;
+  }
+
+  const detail = {
+    type: ReasoningDetailType.Text,
+    text: value[field],
+    index: 0,
+    format: ReasoningFormat.Unknown,
+  } satisfies ReasoningDetailText;
+  value.reasoning_details = [detail];
+  delete value[field];
+}
+
+export function applyReasoningDetailsResponseTransform(
+  transform: ProviderResponseTransforms | null,
+  value: unknown
+) {
+  switch (transform) {
+    case ReasoningDetailsTransform.GeminiThought:
+      mapGeminiThoughtToReasoningDetails(value);
+      break;
+    case ReasoningDetailsTransform.ReasoningContent:
+      mapReasoningStringToDetails(value, 'reasoning_content');
+      break;
+    case ReasoningDetailsTransform.Reasoning:
+      mapReasoningStringToDetails(value, 'reasoning');
+      break;
+    case null:
+      break;
+  }
+}

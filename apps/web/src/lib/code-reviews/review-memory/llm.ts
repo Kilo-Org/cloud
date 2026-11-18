@@ -5,10 +5,10 @@ import * as z from 'zod';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
-import { APP_URL } from '@/lib/constants';
-import { FEATURE_HEADER } from '@/lib/feature-detection';
-import { generateApiToken } from '@/lib/tokens';
-import { findUserById } from '@/lib/user';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { User } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
@@ -59,6 +59,7 @@ type GenerateReviewMemoryStructuredOutputInput<OUTPUT> = {
   schema: z.ZodType<OUTPUT>;
   wireSchema?: z.ZodType;
   validate: (output: OUTPUT) => OUTPUT;
+  abortSignal?: AbortSignal;
 };
 
 export async function resolveReviewMemoryActor(owner: ReviewMemoryOwner): Promise<User> {
@@ -120,6 +121,32 @@ export function createReviewMemoryGatewayProvider(input: {
   });
 }
 
+/**
+ * The one place that prepares a review-memory LLM call for an owner: resolve the
+ * actor, then the model, then mint a provider from that actor. Callers supply only
+ * their own user-agent label.
+ */
+export async function createReviewMemoryGatewayForOwner(input: {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  userAgent: string;
+}): Promise<{
+  modelSlug: string;
+  provider: ReturnType<typeof createReviewMemoryGatewayProvider>;
+}> {
+  const actor = await resolveReviewMemoryActor(input.owner);
+  const { modelSlug } = await resolveReviewMemoryModel({
+    owner: input.owner,
+    platform: input.platform,
+  });
+  const provider = createReviewMemoryGatewayProvider({
+    owner: input.owner,
+    actor,
+    userAgent: input.userAgent,
+  });
+  return { modelSlug, provider };
+}
+
 export async function generateReviewMemoryStructuredOutput<OUTPUT>(
   input: GenerateReviewMemoryStructuredOutputInput<OUTPUT>
 ): Promise<{
@@ -151,6 +178,7 @@ ${JSON.stringify(transformedProviderSchema)}`;
       schema: wireSchema,
       name: input.schemaName,
     }),
+    abortSignal: input.abortSignal,
   });
 
   return {

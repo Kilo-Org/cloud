@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { rootRouter } from './root-router';
 
@@ -36,6 +36,12 @@ describe('trpc tests', () => {
   });
 
   describe('router composition', () => {
+    it('registers providerReview on the server root so mobile calls resolve', () => {
+      expect(rootRouter._def.record).toHaveProperty('providerReview');
+      expect(rootRouter._def.record).toHaveProperty('providerReview.getPullRequest');
+      expect(rootRouter._def.record).toHaveProperty('providerReview.addComment');
+    });
+
     it('registers Bitbucket only under organizations', () => {
       expect(rootRouter._def.record).not.toHaveProperty('bitbucket');
       expect(rootRouter._def.record).toHaveProperty('organizations.bitbucket');
@@ -84,11 +90,13 @@ describe('trpc tests', () => {
         isSuperadmin: false,
         canViewSessions: false,
         canManageCredits: false,
+        canExportApiRequestLogs: false,
       });
       await expect(creditManagerCaller.admin.getPermissions()).resolves.toEqual({
         isSuperadmin: false,
         canViewSessions: false,
         canManageCredits: true,
+        canExportApiRequestLogs: false,
       });
     });
   });

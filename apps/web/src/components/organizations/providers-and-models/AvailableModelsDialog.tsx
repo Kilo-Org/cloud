@@ -25,7 +25,11 @@ export function AvailableModelsDialog({
   onOpenChange,
   organizationId,
 }: AvailableModelsDialogProps) {
-  const { data: modelsData, isLoading, error } = useOrganizationAvailableModels(organizationId);
+  const {
+    data: modelsData,
+    isLoading,
+    error,
+  } = useOrganizationAvailableModels(organizationId, { enabled: open });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -35,7 +39,11 @@ export function AvailableModelsDialog({
             <List className="h-5 w-5" />
             <span>Available Models</span>
           </DialogTitle>
-          <DialogDescription>All models available to this organization</DialogDescription>
+          <DialogDescription>
+            {modelsData
+              ? `${modelsData.data.length} ${modelsData.data.length === 1 ? 'model' : 'models'} available to you in this organization`
+              : 'All models available to this organization'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[60vh] overflow-y-auto">
@@ -70,7 +78,7 @@ export function AvailableModelsDialog({
                 return (
                   <div
                     key={model.id}
-                    className="bg-card hover:bg-accent/50 rounded-lg border border-yellow-200/20 p-3 transition-colors"
+                    className="bg-card hover:bg-accent/50 rounded-lg border border-primary/20 p-3 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <code className="font-mono text-sm font-medium">{model.id}</code>

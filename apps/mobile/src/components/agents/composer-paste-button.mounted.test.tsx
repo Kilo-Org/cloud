@@ -1,9 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as permission-card.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ComposerPasteButton } from './composer-paste-button';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -75,14 +75,18 @@ describe('ComposerPasteButton mounted', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults to the md size classes and honors the sm size', async () => {
+  it('renders the shared 48dp box on the default size and keeps the compact one', async () => {
     const renderer = await renderButton({ onPress: () => undefined });
 
     const node = findPasteButton(renderer.root);
-    expect(node.props.className).toContain('h-9 w-9');
+    // A control-size audit reads the pressable's own rect, so the default size
+    // carries the shared box and no slop.
+    expect(node.props.className).toContain(ICON_TARGET_BOX_CLASS);
+    expect(node.props.hitSlop).toBeUndefined();
 
     const smRenderer = await renderButton({ onPress: () => undefined, size: 'sm' });
     const smNode = findPasteButton(smRenderer.root);
     expect(smNode.props.className).toContain('h-8 w-8');
+    expect(smNode.props.hitSlop).toEqual({ top: 10, bottom: 10, left: 10, right: 10 });
   });
 });

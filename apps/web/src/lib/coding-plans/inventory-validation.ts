@@ -5,22 +5,22 @@ import { timingSafeEqual } from 'node:crypto';
 import { createGateway, generateText } from 'ai';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 
-import { UserByokTestModels } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { createAiSdkProvider } from '@/lib/ai-gateway/providers/direct-byok';
-import byteplusCoding from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
+import { UserByokTestModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { createAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import byteplusCoding from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/byteplus-coding';
+import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID,
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 import {
   BytePlusControlPlaneError,
   listBytePlusSeatsByUsername,
 } from '@/lib/coding-plans/byteplus-control-plane';
 import type { CodingPlanId, CodingPlanProviderId } from '@/lib/coding-plans/pricing';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
-import { sentryLogger } from '@/lib/utils.server';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const logWarning = sentryLogger('coding-plans-inventory-validation', 'warning');
 const MINIMAX_PROVIDER_ID = 'minimax';
@@ -72,7 +72,7 @@ async function validateMiniMaxCodingPlanCredential(
   });
 
   const output = await generateText({
-    model: createGateway({ apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey })(
+    model: createGateway({ apiKey: VERCEL_AI_GATEWAY.apiKey })(
       UserByokTestModels[MINIMAX_PROVIDER_ID]
     ),
     prompt: 'Say hi',
@@ -105,7 +105,9 @@ async function validateBytePlusCodingPlanCredential(
   let output: Awaited<ReturnType<typeof generateText>>;
   try {
     output = await generateText({
-      model: createAiSdkProvider(byteplusCoding, apiKey)('bytedance-seed-code'),
+      model: (await createAiSdkProvider(byteplusCoding, apiKey, 'bytedance-seed-code'))(
+        'bytedance-seed-code'
+      ),
       prompt: 'Say hi',
       maxOutputTokens: 1,
     });

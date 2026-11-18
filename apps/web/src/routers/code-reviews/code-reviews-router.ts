@@ -5,13 +5,14 @@
  * Supports both organization and personal user code reviews.
  */
 
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationMemberProcedure,
   ensureOrganizationAccess,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
-import { successResult, failureResult } from '@/lib/maybe-result';
+import { captureException } from '@sentry/nextjs';
+import { successResult, failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import * as z from 'zod';
 import {
   listCodeReviews,
@@ -19,17 +20,14 @@ import {
   getCodeReviewById,
   getCodeReviewCouncilResult,
   cancelCodeReview,
-  resetCodeReviewForRetry,
-  updateCheckRunId,
   listCodeReviewAttempts,
   getCodeReviewAttemptForReview,
-  ensureCurrentCodeReviewAttemptFromReview,
-  createCodeReviewAttempt,
   getLatestCodeReviewAttempt,
   getSessionUsageFromBilling,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
+import { readCodeReviewContainerCost } from '@/lib/code-reviews/compute-billing';
+import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { setCommitStatus } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getValidGitLabProjectAccessToken,
@@ -37,9 +35,9 @@ import {
 } from '@/lib/integrations/gitlab-service';
 import type { GitLabCredentialActor } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   ListCodeReviewsInputSchema,
   ListCodeReviewsForUserInputSchema,
@@ -47,106 +45,52 @@ import {
   CancelCodeReviewInputSchema,
   RetriggerCodeReviewInputSchema,
   type Owner,
-  type ListCodeReviewsResponse,
 } from '@/lib/code-reviews/core';
 import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
 import { selectedModelFromReviewSources } from '@/lib/code-reviews/core/model-selection';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
-import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
-import { db } from '@/lib/drizzle';
-import { eq } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { and, eq, isNull } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 import {
-  getManualCodeReviewConfig,
+  getManualCodeReviewConfigForDetail,
   isLocalKiloCodeReview,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
-import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
+import {
+  retryFailedCodeReview,
+  type CodeReviewRetryRefusalReason,
+} from '@/lib/code-reviews/retry-review';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
 
 /**
- * Re-creates the PR gate check (GitHub Check Run / GitLab commit status)
- * after a review has been reset for retry. Without this, `updatePRGateCheck()`
- * would be a no-op for all subsequent status callbacks because `check_run_id`
- * was cleared during reset.
+ * Retryable copy for a code review list that did not settle inside the mobile
+ * procedure budget.
  */
-async function recreatePRGateCheck(review: CloudAgentCodeReview, actor: GitLabCredentialActor) {
-  const platform = CodeReviewPlatformSchema.parse(review.platform);
-  if (!shouldPublishCodeReviewToProvider(review)) return;
-  if (platform === PLATFORM.BITBUCKET || !review.platform_integration_id) return;
+const CODE_REVIEWS_UNAVAILABLE_MESSAGE = 'Your code reviews took too long to load. Try again.';
 
-  const integration = await getIntegrationById(review.platform_integration_id);
-  if (!integration) return;
-
-  const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
-
-  if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
-    const appType = integration.github_app_type ?? 'standard';
-    if (appType === 'lite') return;
-
-    const [repoOwner, repoName] = review.repo_full_name.split('/');
-    const checkRunId = await createCheckRun(
-      integration.platform_installation_id,
-      repoOwner,
-      repoName,
-      review.head_sha,
-      {
-        detailsUrl,
-        output: { title: 'Kilo Code Review queued', summary: 'Waiting for a review slot...' },
-      },
-      appType
-    );
-    try {
-      await updateCheckRunId(review.id, checkRunId);
-    } catch (dbError) {
-      // Cancel the orphaned check run so it doesn't block merging
-      try {
-        await updateCheckRun(
-          integration.platform_installation_id,
-          repoOwner,
-          repoName,
-          checkRunId,
-          { status: 'completed', conclusion: 'cancelled' },
-          appType
-        );
-        logExceptInTest(
-          `[retrigger] Cancelled orphaned check run ${checkRunId} for ${review.repo_full_name}#${review.pr_number}`
-        );
-      } catch (cancelError) {
-        logExceptInTest('[retrigger] Failed to cancel orphaned check run:', cancelError);
-      }
-      throw dbError;
-    }
-    logExceptInTest(
-      `[retrigger] Created check run ${checkRunId} for ${review.repo_full_name}#${review.pr_number}`
-    );
-  } else if (platform === PLATFORM.GITLAB) {
-    const accessToken = review.platform_project_id
-      ? await getValidGitLabProjectAccessToken(integration, review.platform_project_id, actor)
-      : await getValidGitLabToken(integration, actor);
-    const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
-    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
-
-    await setCommitStatus(
-      accessToken,
-      review.platform_project_id ?? review.repo_full_name,
-      review.head_sha,
-      'pending',
-      { targetUrl: detailsUrl, description: 'Kilo Code Review queued' },
-      instanceUrl
-    );
-    logExceptInTest(
-      `[retrigger] Set commit status 'pending' on ${review.repo_full_name}!${review.pr_number}`
-    );
+/**
+ * The answer a person gets when the reviewer configuration refuses a retry.
+ * The sequence owns the decision, so the message is chosen from its reason.
+ */
+function retryRefusalMessage(reason: CodeReviewRetryRefusalReason): string {
+  switch (reason) {
+    case 'local_development_only':
+      return 'Local Code Reviewer jobs can only be retried in local development.';
+    case 'action_required':
+      return 'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.';
+    case 'reviewer_disabled':
+      return 'Enable Code Reviewer before retrying this review.';
   }
 }
 
@@ -207,6 +151,38 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview, actor: GitLabCred
   }
 }
 
+/**
+ * Cancels a review locally, then settles its ledger row and finalizes its PR
+ * gate check — but only when the guarded cancel actually changed a row.
+ *
+ * A review that reached a terminal state between the caller's status read and
+ * this write is left untouched, and then there is nothing to settle: the row's
+ * own terminal transition already settled the ledger. Reporting `false` keeps
+ * the caller from answering with a success it did not achieve.
+ */
+async function cancelReviewLocally(
+  review: CloudAgentCodeReview,
+  credentialActor: GitLabCredentialActor
+): Promise<boolean> {
+  const cancelled = await cancelCodeReview(review.id);
+  if (!cancelled) return false;
+
+  await settleCodeReviewLedgerRow({
+    reviewId: review.id,
+    status: 'cancelled',
+    terminalReason: 'user_cancelled',
+    triggerSource: review.trigger_source,
+  });
+
+  try {
+    await cancelPRGateCheck(review, credentialActor);
+  } catch (gateError) {
+    logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+  }
+
+  return true;
+}
+
 export const codeReviewRouter = createTRPCRouter({
   analytics: codeReviewAnalyticsRouter,
 
@@ -231,31 +207,59 @@ export const codeReviewRouter = createTRPCRouter({
         const limit = fullInput.limit ?? DEFAULT_LIST_LIMIT;
         const offset = fullInput.offset ?? 0;
 
-        const [reviews, total] = await Promise.all([
-          listCodeReviews({
-            owner,
-            limit,
-            offset,
-            status: fullInput.status,
-            repoFullName: fullInput.repoFullName,
-            platform: fullInput.platform,
-          }),
-          countCodeReviews({
-            owner,
-            status: fullInput.status,
-            repoFullName: fullInput.repoFullName,
-            platform: fullInput.platform,
-          }),
-        ]);
+        const [reviews, total] = await withControlPlaneReadBudget({
+          clock: ctx,
+          message: CODE_REVIEWS_UNAVAILABLE_MESSAGE,
+          read: () =>
+            Promise.all([
+              listCodeReviews({
+                owner,
+                limit,
+                offset,
+                status: fullInput.status,
+                repoFullName: fullInput.repoFullName,
+                platform: fullInput.platform,
+              }),
+              countCodeReviews({
+                owner,
+                status: fullInput.status,
+                repoFullName: fullInput.repoFullName,
+                platform: fullInput.platform,
+              }),
+            ]),
+        });
 
-        const response: ListCodeReviewsResponse = {
-          reviews,
+        // Role-gated DTO: raw ledger/transaction identifiers are admin+ only.
+        // Per-field decision:
+        // - session_id: internal cloud agent session id -> null for non-admin.
+        // - cli_session_id: internal CLI session id used to look up the billing
+        //   ledger (getSessionUsageFromBilling) -> null for non-admin.
+        // - dispatch_reservation_id: internal dispatch reservation id -> null
+        //   for non-admin.
+        // - check_run_id: internal GitHub Check Run ID -> null for non-admin.
+        // total_cost_musd (display cost) is retained: the mobile review detail
+        // screen renders it (review-detail-screen.tsx).
+        const callerRole = await ensureOrganizationAccess(ctx, fullInput.organizationId);
+        const canSeeRawIds = callerRole === 'owner' || callerRole === 'admin';
+        const visibleReviews = canSeeRawIds
+          ? reviews
+          : reviews.map(review => ({
+              ...review,
+              session_id: null,
+              cli_session_id: null,
+              dispatch_reservation_id: null,
+              check_run_id: null,
+            }));
+
+        const response = {
+          reviews: visibleReviews,
           total,
           hasMore: offset + reviews.length < total,
         };
 
         return successResult(response);
       } catch (error) {
+        if (error instanceof TRPCError && error.code === 'SERVICE_UNAVAILABLE') throw error;
         return failureResult(
           error instanceof Error ? error.message : 'Failed to list code reviews'
         );
@@ -268,34 +272,41 @@ export const codeReviewRouter = createTRPCRouter({
   listForUser: baseProcedure
     .input(ListCodeReviewsForUserInputSchema)
     .query(async ({ input, ctx }) => {
+      const owner: Owner = {
+        type: 'user',
+        id: ctx.user.id,
+        userId: ctx.user.id,
+      };
+
+      const limit = input.limit ?? DEFAULT_LIST_LIMIT;
+      const offset = input.offset ?? 0;
+
       try {
-        const owner: Owner = {
-          type: 'user',
-          id: ctx.user.id,
-          userId: ctx.user.id,
-        };
+        // Both reads are unbounded lists/counts over one owner, so a slow
+        // database would hold the whole procedure open until its budget fired.
+        const [reviews, total] = await withControlPlaneReadBudget({
+          clock: ctx,
+          message: CODE_REVIEWS_UNAVAILABLE_MESSAGE,
+          read: () =>
+            Promise.all([
+              listCodeReviews({
+                owner,
+                limit,
+                offset,
+                status: input.status,
+                repoFullName: input.repoFullName,
+                platform: input.platform,
+              }),
+              countCodeReviews({
+                owner,
+                status: input.status,
+                repoFullName: input.repoFullName,
+                platform: input.platform,
+              }),
+            ]),
+        });
 
-        const limit = input.limit ?? DEFAULT_LIST_LIMIT;
-        const offset = input.offset ?? 0;
-
-        const [reviews, total] = await Promise.all([
-          listCodeReviews({
-            owner,
-            limit,
-            offset,
-            status: input.status,
-            repoFullName: input.repoFullName,
-            platform: input.platform,
-          }),
-          countCodeReviews({
-            owner,
-            status: input.status,
-            repoFullName: input.repoFullName,
-            platform: input.platform,
-          }),
-        ]);
-
-        const response: ListCodeReviewsResponse = {
+        const response = {
           reviews,
           total,
           hasMore: offset + reviews.length < total,
@@ -303,6 +314,7 @@ export const codeReviewRouter = createTRPCRouter({
 
         return successResult(response);
       } catch (error) {
+        if (error instanceof TRPCError && error.code === 'SERVICE_UNAVAILABLE') throw error;
         return failureResult(
           error instanceof Error ? error.message : 'Failed to list code reviews'
         );
@@ -325,9 +337,11 @@ export const codeReviewRouter = createTRPCRouter({
       }
 
       // Authorization check based on owner type
+      let canSeeRawIds = true;
       if (review.owned_by_organization_id) {
         // Organization review: verify user is org member
-        await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
+        const callerRole = await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
+        canSeeRawIds = callerRole === 'owner' || callerRole === 'admin';
       } else if (review.owned_by_user_id) {
         // Personal review: verify user owns it
         if (review.owned_by_user_id !== ctx.user.id) {
@@ -354,8 +368,9 @@ export const codeReviewRouter = createTRPCRouter({
       // 5s in-flight polls. `getCodeReviewById` omits the heavy JSONB, so the detail screen
       // (the one consumer) loads it explicitly here, in parallel with attempts/billing.
       const shouldLoadCouncilResult = review.review_type === 'council' && isTerminal;
-      const [attempts, billingUsage, council_result] = await Promise.all([
-        listCodeReviewAttempts(input.reviewId),
+      const attemptsPromise = listCodeReviewAttempts(input.reviewId);
+      const [attempts, billingUsage, council_result, containerCostMusd] = await Promise.all([
+        attemptsPromise,
         shouldLoadBillingUsage
           ? getSessionUsageFromBilling(
               cliSessionId,
@@ -366,6 +381,28 @@ export const codeReviewRouter = createTRPCRouter({
         shouldLoadCouncilResult
           ? getCodeReviewCouncilResult(input.reviewId)
           : Promise.resolve(null),
+        attemptsPromise.then(attempts =>
+          readCodeReviewContainerCost(
+            db,
+            review.owned_by_organization_id
+              ? { type: 'org', id: review.owned_by_organization_id }
+              : { type: 'user', id: ctx.user.id },
+            [
+              ...new Set(
+                [review.session_id, ...attempts.map(attempt => attempt.session_id)].filter(
+                  (id): id is string => id !== null
+                )
+              ),
+            ],
+            review.created_at
+          ).catch(error => {
+            captureException(error, {
+              tags: { operation: 'readCodeReviewContainerCost' },
+              extra: { reviewId: input.reviewId },
+            });
+            return null;
+          })
+        ),
       ]);
       const tokenUsage = billingUsage
         ? {
@@ -384,7 +421,10 @@ export const codeReviewRouter = createTRPCRouter({
         selectedModel = selectedModelFromReviewSources({
           persistedModel: null,
           repoFullName: review.repo_full_name,
-          config: getManualCodeReviewConfig(review)?.agentConfig ?? null,
+          // Detail-read tolerance: a legacy row whose stored manual_config
+          // fails the strict schema must not fail the whole load; read it as
+          // "no manual config" and fall through to the owner agent config.
+          config: getManualCodeReviewConfigForDetail(review)?.agentConfig ?? null,
         });
         if (!selectedModel) {
           const owner = review.owned_by_organization_id
@@ -403,15 +443,51 @@ export const codeReviewRouter = createTRPCRouter({
         }
       }
 
+      // Role-gated DTO: raw ledger/transaction identifiers are admin+ only,
+      // matching listForOrganization. Non-owner/non-admin org members get nulls.
+      const visibleReview = canSeeRawIds
+        ? review
+        : {
+            ...review,
+            session_id: null,
+            cli_session_id: null,
+            dispatch_reservation_id: null,
+            check_run_id: null,
+          };
+      const visibleAttempts = canSeeRawIds
+        ? attempts
+        : attempts.map(attempt => ({
+            ...attempt,
+            session_id: null,
+            cli_session_id: null,
+            execution_id: null,
+          }));
+
       return successResult({
-        review: { ...review, council_result, model: selectedModel ?? review.model },
-        attempts,
+        review: {
+          ...visibleReview,
+          rawIdsRedacted: !canSeeRawIds,
+          council_result,
+          model: selectedModel ?? review.model,
+        },
+        attempts: visibleAttempts,
         tokenUsage,
+        sessionCostMusd: billingUsage?.totalCostMusd ?? null,
+        containerCostMusd,
       });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
       }
+      // A non-TRPC failure here resolves to the client as a generic, retryable
+      // `success: false`. Without this line the real cause is invisible in
+      // production: the resolved failure never reaches Sentry and the request
+      // logs show only a 200/207. reviewId identifies the row; the line
+      // carries no user data.
+      logExceptInTest('[codeReviews.get] Failed to load review', {
+        reviewId: input.reviewId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return failureResult(error instanceof Error ? error.message : 'Failed to get code review');
     }
   }),
@@ -485,11 +561,8 @@ export const codeReviewRouter = createTRPCRouter({
                 status: review.status,
               }
             );
-            await cancelCodeReview(input.reviewId);
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled successfully' });
           }
@@ -501,11 +574,8 @@ export const codeReviewRouter = createTRPCRouter({
         } catch (workerError) {
           if (review.status === 'queued' && !review.session_id) {
             console.error('Worker cancel failed, updating DB directly:', workerError);
-            await cancelCodeReview(input.reviewId);
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled (worker unreachable)' });
           }
@@ -515,11 +585,8 @@ export const codeReviewRouter = createTRPCRouter({
       }
 
       // For pending reviews (not yet dispatched to worker), update DB and finalize gate
-      await cancelCodeReview(input.reviewId);
-      try {
-        await cancelPRGateCheck(review, credentialActor);
-      } catch (gateError) {
-        logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+      if (!(await cancelReviewLocally(review, credentialActor))) {
+        return failureResult('Code review is no longer running');
       }
 
       return successResult({ message: 'Code review cancelled successfully' });
@@ -591,67 +658,26 @@ export const codeReviewRouter = createTRPCRouter({
           owner = { type: 'user', id: review.owned_by_user_id as string, userId: ctx.user.id };
         }
 
-        const platform = CodeReviewPlatformSchema.parse(review.platform);
-        const manualConfig = getManualCodeReviewConfig(review);
-        if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Local Code Reviewer jobs can only be retried in local development.',
-          });
+        const retry = await retryFailedCodeReview({
+          review,
+          owner,
+          retryReason: 'manual_retrigger',
+        });
+
+        if (retry.outcome === 'refused') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: retryRefusalMessage(retry.reason) });
         }
 
-        if (!manualConfig) {
-          const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-          const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
-          if (actionRequiredState) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message:
-                'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.',
-            });
-          }
-
-          if (!agentConfig?.is_enabled) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Enable Code Reviewer before retrying this review.',
-            });
-          }
-        }
-
-        const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
-
-        // Reset the review for retry. The reset is a status CAS: it only matches reviews
-        // still in a retriggable terminal state. A concurrent retrigger that already flipped
-        // the row to 'pending' yields zero rows, so we reject the duplicate without dispatching.
-        const resetCount = await resetCodeReviewForRetry(input.reviewId);
-        if (resetCount === 0) {
+        if (retry.outcome === 'already_in_flight') {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'This code review is already being retried.',
           });
         }
 
-        await createCodeReviewAttempt({
-          codeReviewId: input.reviewId,
-          retryOfAttemptId: currentAttempt.id,
-          retryReason: 'manual_retrigger',
-          status: 'pending',
-        });
-
-        // Re-create PR gate check so status callbacks can update it.
-        try {
-          await recreatePRGateCheck(review, {
-            userId: owner.userId,
-            ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
-          });
-        } catch (gateError) {
-          // Non-blocking — the review still retries even if the gate check fails
-          logExceptInTest('[retrigger] Failed to re-create PR gate check:', gateError);
+        if (retry.outcome === 'still_failed') {
+          return failureResult(retry.errorMessage ?? 'The code review retry did not start');
         }
-
-        // Try to dispatch the review
-        await tryDispatchPendingReviews(owner);
 
         return successResult({ message: 'Code review retriggered successfully' });
       } catch (error) {
@@ -734,11 +760,6 @@ export const codeReviewRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Get historical session messages for a completed code review.
-   * Fetches from session-ingest (v2) or R2 blob storage (v1) and returns
-   * pre-formatted log entries for the terminal view.
-   */
   getSessionMessages: baseProcedure
     .input(
       z.object({
@@ -784,35 +805,41 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        const cliSessionId = attempt?.cli_session_id ?? review.cli_session_id;
-        if (!cliSessionId) {
+        const source = attempt ?? review;
+        const cliSessionId = source.cli_session_id;
+        const cloudAgentSessionId = source.session_id;
+        if (!cliSessionId && !cloudAgentSessionId) {
           return successResult({ entries: [] });
         }
 
-        // V2 sessions (ses_* prefix): fetch from session-ingest worker
-        if (isNewSession(cliSessionId)) {
-          const [session] = await db
-            .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
+        if (cliSessionId ? isNewSession(cliSessionId) : review.agent_version === 'v2') {
+          const [session, duplicateSession] = await db
+            .select({
+              session_id: cli_sessions_v2.session_id,
+              kilo_user_id: cli_sessions_v2.kilo_user_id,
+            })
             .from(cli_sessions_v2)
-            .where(eq(cli_sessions_v2.session_id, cliSessionId))
-            .limit(1);
+            .where(
+              and(
+                cloudAgentSessionId
+                  ? eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId)
+                  : undefined,
+                cliSessionId ? eq(cli_sessions_v2.session_id, cliSessionId) : undefined,
+                review.owned_by_organization_id
+                  ? eq(cli_sessions_v2.organization_id, review.owned_by_organization_id)
+                  : and(
+                      eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+                      isNull(cli_sessions_v2.organization_id)
+                    )
+              )
+            )
+            .limit(2);
 
-          if (!session) {
+          if (!session || duplicateSession) {
             return successResult({ entries: [] });
           }
 
-          let snapshot;
-          try {
-            snapshot = await fetchSessionSnapshot(cliSessionId, session.kilo_user_id);
-          } catch (snapshotError) {
-            // Network errors (e.g. session-ingest worker unreachable) should not
-            // bubble up as a hard failure â return empty entries instead.
-            logExceptInTest(
-              `[getSessionMessages] Failed to fetch session snapshot for ${cliSessionId}:`,
-              snapshotError
-            );
-            return successResult({ entries: [] });
-          }
+          const snapshot = await fetchSessionSnapshot(session.session_id, session.kilo_user_id);
           if (!snapshot) {
             return successResult({ entries: [] });
           }
@@ -822,6 +849,10 @@ export const codeReviewRouter = createTRPCRouter({
               includeFullAssistantText: isLocalKiloCodeReview(review),
             }),
           });
+        }
+
+        if (!cliSessionId) {
+          return successResult({ entries: [] });
         }
 
         // V1 sessions (UUID): fetch from R2 blob storage

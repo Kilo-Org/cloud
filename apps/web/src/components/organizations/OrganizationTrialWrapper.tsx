@@ -8,15 +8,19 @@ import {
 import { FreeTrialWarningDialog } from './FreeTrialWarningDialog';
 import { FreeTrialWarningBanner } from './FreeTrialWarningBanner';
 import { UpgradeTrialDialog } from './UpgradeTrialDialog';
-import { getDaysRemainingInTrial, isStatusReadOnly } from '@/lib/organizations/trial-utils';
+import {
+  getDaysRemainingInTrial,
+  isStatusReadOnly,
+} from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { OrganizationUpgradeProvider } from '@/contexts/OrganizationUpgradeContext';
 import { LockableContainerProvider } from '@/contexts/LockableContainerContext';
-import { useUser } from '@/hooks/useUser';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { PageContainer } from '@/components/layouts/PageContainer';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type OrganizationTrialWrapperProps = {
   organizationId: string;
+  role: OrganizationRole;
   children: React.ReactNode;
   /** When true, render children directly without the PageContainer max-width wrapper. */
   fullBleed?: boolean;
@@ -24,6 +28,7 @@ type OrganizationTrialWrapperProps = {
 
 export function OrganizationTrialWrapper({
   organizationId,
+  role,
   children,
   fullBleed = false,
 }: OrganizationTrialWrapperProps) {
@@ -32,7 +37,6 @@ export function OrganizationTrialWrapper({
 
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const trialStatus = useOrganizationTrialStatus(organizationId);
-  const { data: user } = useUser();
   const { assumedRole } = useRoleTesting();
 
   const isTrialLoading = trialStatus === 'loading' || trialStatus === 'error';
@@ -44,12 +48,7 @@ export function OrganizationTrialWrapper({
       )
     : 0;
 
-  const actualRole =
-    organizationData?.members.find(member => {
-      if (member.status !== 'active') return false;
-      return member.id === user?.id;
-    })?.role || 'member';
-  const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || actualRole;
+  const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role;
 
   // Provide upgrade dialog trigger to all child components via context
   const contextValue = useMemo(

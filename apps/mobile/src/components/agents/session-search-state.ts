@@ -3,11 +3,6 @@
 // session-list-screen.tsx so the timing + reset semantics can be unit
 // tested with an injectable timer and no react-native test renderer.
 
-import {
-  type AgentSessionFilters,
-  clearAgentSessionNarrowingFilters,
-} from '@/lib/agent-session-filters';
-
 /** Debounce delay (ms) for trimming + committing the search query. */
 export const SEARCH_DEBOUNCE_MS = 300;
 
@@ -52,15 +47,6 @@ export type SessionSearchController = {
    * "Clear filters" CTA's.
    */
   clearSearchOnly(): void;
-  /**
-   * Broad clear (empty-state "Clear search" / "Clear filters" CTAs):
-   * cancel any pending debounce, commit an empty query, AND apply the
-   * narrowing-filter reset via the provided `applyFilters` callback so
-   * the screen can preserve the persisted sort preference.
-   */
-  clearBroadly(
-    applyFilters: (transform: (prev: AgentSessionFilters) => AgentSessionFilters) => void
-  ): void;
   /** Cancel any pending debounce without committing (used on unmount). */
   dispose(): void;
   /** Test-only: whether a debounce is currently pending. */
@@ -97,12 +83,55 @@ export function createSessionSearchController({
       cancelPending();
       commitSearchQuery('');
     },
-    clearBroadly(applyFilters) {
-      cancelPending();
-      commitSearchQuery('');
-      applyFilters(prev => clearAgentSessionNarrowingFilters(prev));
-    },
     dispose: cancelPending,
     hasPending: () => pending !== null,
+  };
+}
+
+/** The seed applied when a durable search draft finishes restoring. */
+export type SearchRestoreDecision = {
+  /** True when the input should be seeded from the restored value. */
+  shouldSeed: boolean;
+  /**
+   * The committed query: the restored text, trimmed, exactly what typing the
+   * same text commits. A whitespace-only draft commits an empty query, so the
+   * list body matches its appearance in the field.
+   */
+  query: string;
+  /** Visible field text, exactly as stored (may be whitespace only). */
+  text: string;
+  /** Whether the restored field text is non-empty (in-field X). */
+  hasText: boolean;
+  /** True when the uncontrolled input must remount to show the restored text. */
+  shouldRemount: boolean;
+};
+
+/**
+ * Decides whether a restored search draft should seed the input. Seeds only
+ * after the load settles AND only when the user has not touched the field yet
+ * (typed into it, or cleared it). A settled empty value (including the empty
+ * string persisted by a clear) seeds an empty query, so a previously committed
+ * non-empty query is never reloaded; a settle that lands after a clear is
+ * ignored rather than restoring the text the user just removed.
+ *
+ * The committed query is the trimmed text, so a restored draft behaves like
+ * typing it: a whitespace-only draft shows the full list. The field itself
+ * keeps the stored text, spaces included.
+ */
+export function resolveSearchRestoreDecision(input: {
+  settled: boolean;
+  hasInteracted: boolean;
+  restoredQuery: string | null;
+}): SearchRestoreDecision {
+  if (!input.settled || input.hasInteracted) {
+    return { shouldSeed: false, query: '', text: '', hasText: false, shouldRemount: false };
+  }
+  const text = input.restoredQuery ?? '';
+  return {
+    shouldSeed: true,
+    query: text.trim(),
+    text,
+    hasText: text.length > 0,
+    shouldRemount: text.length > 0,
   };
 }

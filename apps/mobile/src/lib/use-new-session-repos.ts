@@ -1,70 +1,674 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+/* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner-native';
 
 import {
-  type RepositorySectionView,
-  resolveRepositorySectionView,
+  bitbucketRowsUnlisted,
+  dedupeRepositoriesByPlatformAndFullName,
+  detectRepositoryPlatform,
+  type NewSessionRepository,
+  type RepositoryGroup,
+  type RepositoryGroupNotice,
+  type RepositoryGroups,
+  repositoryIdentityKey,
+  type RepositoryPlatform,
+  resolveBitbucketStatus,
+  resolveProviderStatus,
+  resolveRepositoryGroups,
 } from '@/components/agents/new-session-repository-state';
+import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
+import { i18n } from '@/i18n';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
+import {
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
+import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type UseNewSessionReposArgs = {
   organizationId: string | undefined;
 };
 
 type UseNewSessionReposResult = {
-  repositories: { fullName: string; isPrivate: boolean }[];
-  view: RepositorySectionView;
+  /** Merged + deduped rows (recents first) for the picker and prefill. */
+  repositories: NewSessionRepository[];
+  /** Recently used rows resolved against connected providers ("Recently used" picker section). */
+  recents: NewSessionRepository[];
+  groups: RepositoryGroup[];
   isRetrying: boolean;
-  openGitHubIntegration: () => void;
+  /** True once every provider query has settled without error and at least one repo is visible. */
+  reposSettled: boolean;
+  /**
+   * True once every provider query has finished its first load, or has outlived
+   * `PROVIDER_QUERY_SETTLE_BOUND_MS` while still loading. Every consumer reads
+   * this bounded value: the form's rows and the route-prefill seed gate alike,
+   * so a list that never answers withholds nothing. A prefill still unanswered
+   * at the bound is given up rather than deferred (`shouldAbandonRepoSeed`), so
+   * a late answer cannot mount a repository the region was declared final
+   * without.
+   *
+   * `isLoading` is false for a query that is paused or disabled, so a screen
+   * that is offline (or a personal scope, where the Bitbucket query is
+   * disabled) still settles and never withholds the form's rows. This
+   * deliberately does not read `resolveProviderStatus`, which reports
+   * `'loading'` whenever a paused query has no data.
+   */
+  providerQueriesResolved: boolean;
+  openIntegration: (platform: RepositoryPlatform) => void;
+  /**
+   * The provider whose connect flow is running, or null. A control that opens
+   * the flow stays busy from the tap until the flow ends, because the first step
+   * is a network round trip (GitHub's install-state mint) that otherwise leaves
+   * the tap looking inert.
+   */
+  connectingProvider: RepositoryPlatform | null;
   refreshReposForceFresh: () => Promise<void>;
 };
+
+/**
+ * How long a provider's repository list stays fresh. Without it the three
+ * queries take the query client's `staleTime: 0` default and refetch a full
+ * repository list per provider on every mount of the new-session form, for
+ * data that changes at the rate of a repository being connected.
+ *
+ * This window is never the only way the lists update: every explicit
+ * invalidation path still writes fresh results into the same `forceRefresh:
+ * false` keys, so the next mount reads them instead of refetching —
+ * `refreshReposForceFresh` (through `fetchQuery` on its own `forceRefresh:
+ * true` keys at `staleTime: 0`), `forceFreshGitLab` and `forceFreshBitbucket`
+ * (`setQueryData` on the normal keys), and the connect/return flow
+ * (`useGitHubReposRefresh.performForceFresh` and
+ * `openAuthorizationAndWaitForReturn`).
+ */
+const NEW_SESSION_REPOS_STALE_TIME_MS = 5 * 60 * 1000;
+
+/**
+ * How long the three provider lists may stay in their first load before the
+ * repository region stops waiting for them.
+ *
+ * Matches the client control-plane deadline (`CONTROL_PLANE_DEADLINE_MS`):
+ * the three lists travel in one batched request, the transport abandons an
+ * attempt after that deadline, and the query retries it, so a throttled link
+ * can keep the whole set pending for minutes. In a scope with no provider
+ * connected every list answers "not connected", which never changes the
+ * region's shape, so a list that cannot complete must not withhold the form's
+ * rows — the Ambiente row, the only entry to the profile picker — behind it.
+ * After the bound the section renders what it has, exactly as it does for a
+ * provider that reports nothing.
+ */
+export const PROVIDER_QUERY_SETTLE_BOUND_MS = 15_000;
 
 export function useNewSessionRepos({
   organizationId,
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
-  const {
-    data: repoData,
-    isLoading: isLoadingRepos,
-    isError: isReposError,
-    isRefetching: isRefetchingRepos,
-  } = useQuery(
+  const queryClient = useQueryClient();
+  const pushOnce = useSinglePushRoute();
+
+  const githubQuery = useQuery(
     organizationId
-      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
-          forceRefresh: false,
-        })
+      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions(
+          {
+            organizationId,
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
+      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions(
+          {
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
   );
 
-  const { openGitHubIntegration, refreshReposForceFresh, isRefreshingRepos, connectCheckFailed } =
-    useGitHubReposRefresh({
-      organizationId,
-      integrationInstalled: repoData?.integrationInstalled,
-    });
+  const gitlabQuery = useQuery(
+    organizationId
+      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions(
+          {
+            organizationId,
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
+      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions(
+          {
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
+  );
 
-  const view = resolveRepositorySectionView({
-    isLoading: isLoadingRepos,
-    isError: isReposError,
-    integrationInstalled: repoData?.integrationInstalled,
-    repositoryCount: repoData?.repositories.length ?? 0,
-    connectCheckFailed,
+  // Bitbucket is organization-only: the query is disabled without an org.
+  const bitbucketQuery = useQuery({
+    ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions(
+      {
+        organizationId: organizationId ?? '',
+        forceRefresh: false,
+      },
+      { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+    ),
+    enabled: Boolean(organizationId),
   });
 
-  const isRetrying = isRefetchingRepos || isRefreshingRepos;
+  const { data: recentRepoData } = useRecentAgentRepositories({ organizationId });
 
-  const repositories = useMemo(() => {
-    if (!repoData?.repositories) {
+  const {
+    openGitHubIntegration,
+    refreshReposForceFresh: refreshGitHubForceFresh,
+    isRefreshingRepos: isRefreshingGitHub,
+  } = useGitHubReposRefresh({
+    organizationId,
+    integrationInstalled: githubQuery.data?.integrationInstalled,
+  });
+
+  const githubRepositories = useMemo<NewSessionRepository[]>(
+    () =>
+      (githubQuery.data?.repositories ?? []).map(repo => ({
+        platform: 'github',
+        fullName: repo.fullName,
+        isPrivate: repo.private,
+      })),
+    [githubQuery.data]
+  );
+
+  const gitlabRepositories = useMemo<NewSessionRepository[]>(
+    () =>
+      (gitlabQuery.data?.repositories ?? []).map(repo => ({
+        platform: 'gitlab',
+        fullName: repo.fullName,
+        isPrivate: repo.private,
+      })),
+    [gitlabQuery.data]
+  );
+
+  const bitbucketRepositories = useMemo<NewSessionRepository[]>(() => {
+    const data = bitbucketQuery.data;
+    if (data?.status !== 'available') {
       return [];
     }
-    return (repoData.repositories as { fullName: string; private: boolean }[]).map(r => ({
-      fullName: r.fullName,
-      isPrivate: r.private,
+    return data.repositories.map(repo => ({
+      platform: 'bitbucket',
+      fullName: repo.fullName,
+      isPrivate: repo.private,
+      workspaceUuid: repo.workspaceUuid,
+      repositoryUuid: repo.id,
     }));
-  }, [repoData]);
+  }, [bitbucketQuery.data]);
 
-  return { repositories, view, isRetrying, openGitHubIntegration, refreshReposForceFresh };
+  // Recently used rows: only recents that resolve to a connected repository
+  // appear, and they are deduped by platform + fullName.
+  const recentlyUsed = useMemo<NewSessionRepository[]>(() => {
+    const recentList = recentRepoData?.repositories;
+    if (!recentList?.length) {
+      return [];
+    }
+    const unified = [...githubRepositories, ...gitlabRepositories, ...bitbucketRepositories];
+    const byKey = new Map(unified.map(repo => [repoKey(repo), repo]));
+    const seen = new Set<string>();
+    const result: NewSessionRepository[] = [];
+    for (const recent of recentList) {
+      const platform = detectRepositoryPlatform(recent.gitUrl);
+      const fullName = formatGitUrlProject(recent.gitUrl);
+      const match =
+        platform && fullName ? byKey.get(`${platform}/${fullName.toLowerCase()}`) : undefined;
+      if (match) {
+        const key = repoKey(match);
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push(match);
+        }
+      }
+    }
+    return result;
+  }, [recentRepoData, githubRepositories, gitlabRepositories, bitbucketRepositories]);
+
+  const repositories = useMemo(
+    () =>
+      dedupeRepositoriesByPlatformAndFullName([
+        ...recentlyUsed,
+        ...githubRepositories,
+        ...gitlabRepositories,
+        ...bitbucketRepositories,
+      ]),
+    [recentlyUsed, githubRepositories, gitlabRepositories, bitbucketRepositories]
+  );
+
+  const githubStatus = resolveProviderStatus({
+    isLoading: githubQuery.isLoading,
+    isError: githubQuery.isError,
+    integrationInstalled: githubQuery.data?.integrationInstalled,
+    repositoryCount: githubRepositories.length,
+    unavailableReason: githubQuery.data?.unavailableReason,
+  });
+  const githubNotice: RepositoryGroupNotice | undefined = githubQuery.data?.partial
+    ? 'partial'
+    : undefined;
+  const gitlabStatus = resolveProviderStatus({
+    isLoading: gitlabQuery.isLoading,
+    isError: gitlabQuery.isError,
+    integrationInstalled: gitlabQuery.data?.integrationInstalled,
+    repositoryCount: gitlabRepositories.length,
+  });
+  const bitbucketStatusRaw = bitbucketQuery.data?.status;
+  const bitbucketStatus = resolveBitbucketStatus({
+    isLoading: bitbucketQuery.isLoading,
+    isError: bitbucketQuery.isError,
+    status: bitbucketStatusRaw,
+    repositoryCount: bitbucketRepositories.length,
+  });
+
+  const { groups, recents } = useMemo<RepositoryGroups>(
+    () =>
+      resolveRepositoryGroups({
+        organizationId,
+        github: {
+          key: 'github',
+          status: githubStatus,
+          repositories: githubRepositories,
+          notice: githubNotice,
+        },
+        gitlab: { key: 'gitlab', status: gitlabStatus, repositories: gitlabRepositories },
+        bitbucket: {
+          key: 'bitbucket',
+          status: bitbucketStatus,
+          repositories: bitbucketRepositories,
+          rowsUnlisted: bitbucketRowsUnlisted(bitbucketStatusRaw),
+        },
+        recents: recentlyUsed,
+      }),
+    [
+      organizationId,
+      githubStatus,
+      githubRepositories,
+      githubNotice,
+      gitlabStatus,
+      gitlabRepositories,
+      bitbucketStatus,
+      bitbucketStatusRaw,
+      bitbucketRepositories,
+      recentlyUsed,
+    ]
+  );
+
+  // ── Force-fresh per-provider refresh ──────────────────────────────
+  const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
+
+  const forceFreshGitLab = useCallback(async () => {
+    const fresh = await queryClient.query({
+      ...(organizationId
+        ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+            organizationId,
+            forceRefresh: true,
+          })
+        : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
+            forceRefresh: true,
+          })),
+      staleTime: 0,
+    });
+    queryClient.setQueryData(
+      organizationId
+        ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryKey({
+            organizationId,
+            forceRefresh: false,
+          })
+        : trpc.cloudAgentNext.listGitLabRepositories.queryKey({
+            forceRefresh: false,
+          }),
+      fresh
+    );
+  }, [organizationId, trpc, queryClient]);
+
+  const forceFreshBitbucket = useCallback(async () => {
+    if (!organizationId) {
+      return;
+    }
+    const fresh = await queryClient.query({
+      ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+        organizationId,
+        forceRefresh: true,
+      }),
+      staleTime: 0,
+    });
+    // A non-`available` force-fresh result is a refresh failure, not a
+    // cacheable snapshot: writing it over an existing `available` cache would
+    // clear good rows on a transient Bitbucket outage. Throw so
+    // `refreshReposForceFresh` toasts `couldNotRefreshRepositories`.
+    if (fresh.status !== 'available') {
+      throw new Error('Bitbucket repositories are not available');
+    }
+    queryClient.setQueryData(
+      trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
+        organizationId,
+        forceRefresh: false,
+      }),
+      fresh
+    );
+  }, [organizationId, trpc, queryClient]);
+
+  const refreshReposForceFresh = useCallback(async () => {
+    setIsRefreshingProviders(true);
+    try {
+      const results = await Promise.allSettled([
+        refreshGitHubForceFresh(),
+        forceFreshGitLab(),
+        forceFreshBitbucket(),
+      ]);
+      // GitHub resolves always (it catches its own errors and toasts), so a
+      // rejection here is a GitLab or Bitbucket force-fresh failure. Toast once.
+      if (results[1].status === 'rejected' || results[2].status === 'rejected') {
+        toast.error(i18n.t('agentChat.newSession.couldNotRefreshRepositories'));
+      }
+    } finally {
+      setIsRefreshingProviders(false);
+    }
+  }, [refreshGitHubForceFresh, forceFreshGitLab, forceFreshBitbucket]);
+
+  // ── Per-provider connect ──────────────────────────────────────────
+  /**
+   * The provider whose browser connect flow is running, or null. Its first step
+   * (GitHub mints an install state over the network, then both open the browser
+   * and refetch on return) takes long enough that a control without this flag
+   * reads as inert: nothing happens until the network settles. Bitbucket never
+   * sets it: its workspace access token is pasted in the app's own connect
+   * sheet, which opens synchronously.
+   */
+  const [connectingProvider, setConnectingProvider] = useState<RepositoryPlatform | null>(null);
+  // Mirrors the state so a second tap inside the same frame — before the
+  // disabled button re-renders — still cannot start a second flow.
+  const connectingProviderRef = useRef<RepositoryPlatform | null>(null);
+
+  const openGitLabIntegration = useCallback(async () => {
+    try {
+      const url = await appShellHandoffUrl({
+        page: 'integration',
+        platform: 'gitlab',
+        ...(organizationId ? { organizationId } : {}),
+      });
+      const wait = await openAuthorizationAndWaitForReturn(url);
+      reportLateLaunchFailure(wait, {
+        onFailure: () => {
+          toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
+        },
+      });
+      await forceFreshGitLab();
+    } catch {
+      toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
+    }
+  }, [organizationId, forceFreshGitLab]);
+
+  const openBitbucketIntegration = useCallback(() => {
+    if (!organizationId) {
+      return;
+    }
+    // The sheet owns the token form and invalidates this hook's repository read
+    // when the connection lands, so there is nothing to wait for here.
+    pushOnce(bitbucketConnectHref(organizationId));
+  }, [organizationId, pushOnce]);
+
+  const openIntegration = useCallback(
+    (platform: RepositoryPlatform) => {
+      if (platform === 'bitbucket') {
+        openBitbucketIntegration();
+        return;
+      }
+      if (connectingProviderRef.current !== null) {
+        return;
+      }
+      connectingProviderRef.current = platform;
+      setConnectingProvider(platform);
+      void (async () => {
+        try {
+          await (platform === 'github' ? openGitHubIntegration() : openGitLabIntegration());
+        } finally {
+          connectingProviderRef.current = null;
+          setConnectingProvider(null);
+        }
+      })();
+    },
+    [openGitHubIntegration, openGitLabIntegration, openBitbucketIntegration]
+  );
+
+  const isRetrying =
+    githubQuery.isRefetching ||
+    gitlabQuery.isRefetching ||
+    bitbucketQuery.isRefetching ||
+    isRefreshingGitHub ||
+    isRefreshingProviders;
+
+  // A provider list can stay pending forever — a throttled link, a paused query,
+  // a provider that never answers. Waiting for it is therefore a bounded state:
+  // after `PROVIDER_QUERY_SETTLE_BOUND_MS` the region stops withholding its rows
+  // for a list that may never land.
+  //
+  // The bound belongs to the SCOPE, not to one request. These queries retry, and
+  // a retry changes the request while the question — what can this scope's
+  // providers list? — stays the same. Re-arming on each request would withhold
+  // the rows for the whole retry chain, and clearing the timer between attempts
+  // would never fire it at all; an expiry tied to a counter that changes with the
+  // request was valid for a single render, so the rows entered and left again.
+  // One scope therefore arms the timer once and then stays settled, and a
+  // different scope arms its own. A retry of the same list can no longer unseat
+  // a row that is already on screen.
+  //
+  // The cost is the one the bound accepts: a list that answers just after the
+  // bound mounts its card then, which can push these rows once. A row that never
+  // appears is the worse failure, because the profile picker has no other entry
+  // from Home.
+  const providerScopeKey = organizationId ?? 'personal';
+  const [settledScopeKey, setSettledScopeKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (settledScopeKey === providerScopeKey) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setSettledScopeKey(providerScopeKey);
+    }, PROVIDER_QUERY_SETTLE_BOUND_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [providerScopeKey, settledScopeKey]);
+  const answersResolved =
+    !githubQuery.isLoading && !gitlabQuery.isLoading && !bitbucketQuery.isLoading;
+
+  const providerQueriesResolved = answersResolved || settledScopeKey === providerScopeKey;
+
+  const reposSettled =
+    !githubQuery.isLoading &&
+    !gitlabQuery.isLoading &&
+    !bitbucketQuery.isLoading &&
+    !githubQuery.isError &&
+    !gitlabQuery.isError &&
+    !bitbucketQuery.isError &&
+    repositories.length > 0;
+
+  return {
+    repositories,
+    recents,
+    groups,
+    isRetrying,
+    reposSettled,
+    providerQueriesResolved,
+    openIntegration,
+    connectingProvider,
+    refreshReposForceFresh,
+  };
+}
+
+function repoKey(repository: NewSessionRepository): string {
+  return `${repository.platform}/${repository.fullName.toLowerCase()}`;
+}
+
+// ── Branches of the selected repository ──────────────────────────────
+
+/**
+ * How long a branch request may look like progress before the row offers the
+ * retry instead. Long enough for a slow provider round trip, short enough that
+ * a stalled request never leaves a spinner that cannot end.
+ */
+const BRANCH_SETTLE_BOUND_MS = 15_000;
+
+export type RepositoryBranchesState = {
+  /** The provider's default branch, or null when it reports none. */
+  defaultBranch: string | null;
+  branches: string[];
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
+  /** The query runs only for a selected repository in a scope that can serve it. */
+  isEnabled: boolean;
+  isLoading: boolean;
+  /** A transient failure: the caller offers a retry. */
+  isRetryableError: boolean;
+  /** A refusal a retry cannot fix (permission, not found, or a refused connection). */
+  isPermanentError: boolean;
+  isRetrying: boolean;
+  retry: () => void;
+};
+
+/**
+ * Branches of the selected repository, from the provider, through the s4
+ * `listRepositoryBranches` procedures (organization variant when the
+ * new-session route carries an organization).
+ *
+ * The query runs only when a repository is selected. Bitbucket is
+ * organization-only, so a personal Bitbucket row never issues a request — the
+ * server would refuse it with the org-only message, and the section explains
+ * the restriction instead.
+ *
+ * The organization scope is the caller's `organizationId` PROP, not a value
+ * read back from a store: the screen owns the route's scope, so passing it in
+ * means a scope change reaches the query key on the same render that changed
+ * it — a store published by a passive effect would leave the previous
+ * organization installed for one render and query it.
+ *
+ * The cache key carries the full repository identity: the procedure input
+ * only accepts `platform` + `fullName`, so the Bitbucket workspace/repository
+ * uuids are appended to the key here. Two same-named rows — across providers,
+ * or across renamed Bitbucket workspaces — can never read each other's
+ * branches out of the cache.
+ */
+export function useRepositoryBranches(
+  repository: NewSessionRepository | null,
+  organizationId: string | undefined
+): RepositoryBranchesState {
+  const trpc = useTRPC();
+
+  const platform: RepositoryPlatform = repository?.platform ?? 'github';
+  const fullName = repository?.fullName ?? '';
+  const isEnabled =
+    repository !== null && fullName !== '' && !(platform === 'bitbucket' && !organizationId);
+
+  const personalInput = { platform, repository: { fullName } };
+  const organizationInput = { organizationId: organizationId ?? '', ...personalInput };
+  const identity = repository ? repositoryIdentityKey(repository) : 'none';
+  // Changes whenever the row asks about a different repository or scope, so the
+  // settle bound below re-arms for the new question instead of inheriting the
+  // previous one's deadline.
+  const settleKey = `${identity}\n${organizationId ?? ''}`;
+
+  const branchQuery = useQuery({
+    queryKey: [
+      ...(organizationId
+        ? trpc.organizations.cloudAgentNext.listRepositoryBranches.queryKey(organizationInput)
+        : trpc.cloudAgentNext.listRepositoryBranches.queryKey(personalInput)),
+      identity,
+    ],
+    queryFn: async () => {
+      const listing = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.listRepositoryBranches.query(
+            organizationInput
+          )
+        : await trpcClient.cloudAgentNext.listRepositoryBranches.query(personalInput);
+      return listing;
+    },
+    enabled: isEnabled,
+  });
+
+  const errorCode = branchQuery.isError
+    ? // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the query fn calls tRPC directly, so the error is a TRPCClientError carrying `data.code`
+      (branchQuery.error as { data?: { code?: string } } | null)?.data?.code
+    : undefined;
+  const { permanent } = classifyProviderErrorCode(errorCode);
+  // The reconnect state (PRECONDITION_FAILED) is a refused provider
+  // connection: this selector has no reconnect control, so it takes the same
+  // permanent note as a permission refusal instead of a retry that cannot
+  // succeed.
+  const permanentFailure = permanent || errorCode === 'PRECONDITION_FAILED';
+
+  // A request can stay pending forever — a stalled connection, a paused query,
+  // a provider that never answers. Loading is therefore a bounded state: after
+  // `BRANCH_SETTLE_BOUND_MS` the row stops presenting a request that may never
+  // land as progress and offers the retry instead. The bound belongs to one
+  // question and one request: `attempt` names the question it was counted for,
+  // so a repository or scope change — including a return to a question that was
+  // pending before — cannot match the previous question's expiry, and a retry or
+  // any new request is a new attempt for the same reason. An earlier expiry can
+  // therefore never present a request that is in flight as stuck.
+  // The query itself keeps running, and the retry cancels it before starting a
+  // fresh request.
+  const isPending = isEnabled && branchQuery.isPending;
+  const isFetching = isEnabled && branchQuery.isFetching;
+  const [attempt, setAttempt] = useState({ settleKey, count: 0 });
+  const [expiry, setExpiry] = useState<{ settleKey: string; attempt: number } | null>(null);
+  // Records the question a frame renders for and counts each request it makes.
+  // It runs after the frame, which is why `overBound` also compares the attempt's
+  // question with this render's: the frame that changes the question is already
+  // clean, not the frame after it.
+  useEffect(() => {
+    setAttempt(current =>
+      current.settleKey === settleKey && !isPending && !isFetching
+        ? current
+        : { settleKey, count: current.count + 1 }
+    );
+  }, [settleKey, isPending, isFetching]);
+  useEffect(() => {
+    if (!isPending && !isFetching) {
+      return undefined;
+    }
+    const armed = { settleKey, attempt: attempt.count };
+    const timer = setTimeout(() => {
+      setExpiry(armed);
+    }, BRANCH_SETTLE_BOUND_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [attempt, settleKey, isPending, isFetching]);
+  // `attempt` names the question it was counted for, so a frame that returns to
+  // a repository another question replaced cannot match the expiry that
+  // repository's previous visit armed, not even before the effect above records
+  // the change.
+  const overBound =
+    isPending &&
+    attempt.settleKey === settleKey &&
+    expiry?.settleKey === settleKey &&
+    expiry.attempt === attempt.count;
+
+  const retry = useCallback(() => {
+    // The retry owns a fresh bound now, so the row returns to the skeleton
+    // instead of the retry row it was tapped on.
+    setAttempt(current => ({ settleKey, count: current.count + 1 }));
+    // A refetch cancels the request that is still running, so the retry works
+    // while the bounded request is stuck instead of waiting behind it.
+    void branchQuery.refetch();
+  }, [branchQuery, settleKey]);
+
+  return {
+    defaultBranch: branchQuery.data?.defaultBranch ?? null,
+    branches: branchQuery.data?.branches ?? [],
+    truncated: branchQuery.data?.truncated === true,
+    isEnabled,
+    isLoading: isPending && !overBound,
+    isRetryableError: (branchQuery.isError && !permanentFailure) || overBound,
+    isPermanentError: branchQuery.isError && permanentFailure,
+    // Only a retry after a real failure reports progress. A request that
+    // outlived the bound keeps the retry enabled, so it can replace it.
+    isRetrying: isFetching && branchQuery.isError,
+    retry,
+  };
 }

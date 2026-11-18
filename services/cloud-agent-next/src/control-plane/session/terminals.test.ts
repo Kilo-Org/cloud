@@ -1,0 +1,298 @@
+import { describe, expect, it, vi } from 'vitest';
+import { parseSessionMetadata } from '../../persistence/session-metadata.js';
+import type { ControlPlaneControlResult } from '../../shared/control-plane-protocol.js';
+import {
+  SANDBOX_STATUS_DETAIL_MESSAGES,
+  type SandboxStatusSnapshot,
+} from '../../shared/sandbox-status.js';
+import { createControlPlaneTerminals } from './terminals.js';
+
+const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
+const SANDBOX_ID = 'ses-11111111111141118111111111111111';
+const DIRECTORY = '/workspace/terminal';
+const CURRENT_WRAPPER = 'wr_current';
+
+function fakeStorage() {
+  const values = new Map<string, unknown>();
+  const storage = {
+    async get<T = unknown>(key: string): Promise<T | undefined> {
+      return structuredClone(values.get(key)) as T | undefined;
+    },
+    async put<T>(key: string, value: T): Promise<void> {
+      values.set(key, structuredClone(value));
+    },
+    async delete(keys: string | string[]): Promise<void> {
+      for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key);
+    },
+    async list<T = unknown>(options?: { prefix?: string }): Promise<Map<string, T>> {
+      const listed = new Map<string, T>();
+      for (const [key, value] of values) {
+        if (!options?.prefix || key.startsWith(options.prefix)) {
+          listed.set(key, structuredClone(value) as T);
+        }
+      }
+      return listed;
+    },
+  };
+  return { storage, values };
+}
+
+function metadata(overrides: { createdOnPlatform?: string; worktreeId?: string } = {}) {
+  return parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: SESSION_ID,
+      userId: 'user_1',
+      createdOnPlatform: overrides.createdOnPlatform ?? 'cloud-agent-web',
+    },
+    auth: { kiloSessionId: 'kilo_session_1' },
+    agent: { mode: 'code', model: 'test-model' },
+    workspace: {
+      sandboxId: SANDBOX_ID,
+      sandboxProvider: 'cloudflare',
+      ...(overrides.worktreeId ? { worktreeId: overrides.worktreeId } : {}),
+    },
+    lifecycle: { version: 1, timestamp: 1 },
+  });
+}
+
+function pty(id: string) {
+  return {
+    id,
+    title: 'Terminal',
+    command: '/bin/sh',
+    args: [],
+    cwd: DIRECTORY,
+    status: 'running' as const,
+    pid: 1,
+  };
+}
+
+function sandboxStatus(status: 'active' | 'sleeping'): SandboxStatusSnapshot {
+  return {
+    status,
+    provider: 'Cloudflare',
+    observedAt: 1,
+    detailCode: status === 'sleeping' ? 'sandbox_stopped' : 'sandbox_ready',
+    inactivityTimeoutMs: 600_000,
+    estimatedSleepAt: null,
+  };
+}
+
+function record(wrapperId: string, ptyId: string) {
+  return {
+    ptyId,
+    ownerId: 'user_1',
+    sessionId: SESSION_ID,
+    kiloSessionId: 'kilo_session_1',
+    directory: DIRECTORY,
+    sandboxId: SANDBOX_ID,
+    wrapperId,
+    state: 'running',
+  };
+}
+
+const BRIDGE_GENERATION = '1f0c6d9a-2b3c-4d5e-8f90-123456789abc';
+
+type FakeSocket = {
+  readyState: number;
+  close: ReturnType<typeof vi.fn>;
+  serializeAttachment: (value: unknown) => void;
+  deserializeAttachment: () => unknown;
+  tags: string[];
+};
+
+function socket(tags: string[], attachment: unknown): FakeSocket {
+  let current = attachment;
+  return {
+    readyState: 1,
+    close: vi.fn(),
+    serializeAttachment: (value: unknown) => {
+      current = value;
+    },
+    deserializeAttachment: () => current,
+    tags,
+  };
+}
+
+function fakeState(values: Map<string, unknown>, sockets: FakeSocket[]): DurableObjectState {
+  return {
+    storage: {
+      async get<T = unknown>(key: string): Promise<T | undefined> {
+        return structuredClone(values.get(key)) as T | undefined;
+      },
+      async put<T = unknown>(key: string, value: T): Promise<void> {
+        values.set(key, structuredClone(value));
+      },
+      async delete(keys: string | string[]): Promise<void> {
+        for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key);
+      },
+      async list<T = unknown>(options?: { prefix?: string }): Promise<Map<string, T>> {
+        const listed = new Map<string, T>();
+        for (const [key, value] of values) {
+          if (!options?.prefix || key.startsWith(options.prefix)) {
+            listed.set(key, structuredClone(value) as T);
+          }
+        }
+        return listed;
+      },
+    },
+    getWebSockets: (tag: string) =>
+      tag === undefined ? sockets : sockets.filter(candidate => candidate.tags.includes(tag)),
+  } as unknown as DurableObjectState;
+}
+
+function fixture(
+  overrides: {
+    isRouteReady?: boolean;
+    getSandboxStatus?: () => Promise<SandboxStatusSnapshot>;
+    sockets?: FakeSocket[];
+    metadata?: ReturnType<typeof metadata>;
+  } = {}
+) {
+  const { values } = fakeStorage();
+  const request = vi.fn(async (): Promise<ControlPlaneControlResult> => ({
+    ok: true,
+    result: { pty: pty('pty_new') },
+  }));
+  const terminals = createControlPlaneTerminals({
+    state: fakeState(values, overrides.sockets ?? []),
+    sessionId: SESSION_ID,
+    getMetadata: () => overrides.metadata ?? metadata(),
+    getDirectory: () => DIRECTORY,
+    getWrapperId: async () => CURRENT_WRAPPER,
+    isRouteReady: () => overrides.isRouteReady ?? true,
+    getSandboxStatus: overrides.getSandboxStatus ?? (async () => sandboxStatus('active')),
+    request,
+  });
+  return { terminals, values, request };
+}
+
+describe('V2 control-plane terminals projection', () => {
+  it('reports a sleeping sandbox without forwarding a terminal request', async () => {
+    const { terminals, request } = fixture({
+      isRouteReady: false,
+      getSandboxStatus: async () => sandboxStatus('sleeping'),
+    });
+
+    await expect(
+      terminals.create({ operationId: '66666666-6666-4666-8666-666666666666' })
+    ).resolves.toEqual({
+      success: false,
+      error: SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped,
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('keeps the workspace message for a sandbox that is not asleep', async () => {
+    const { terminals, request } = fixture({
+      isRouteReady: false,
+      getSandboxStatus: async () => sandboxStatus('active'),
+    });
+
+    await expect(
+      terminals.create({ operationId: '77777777-7777-4777-8777-777777777777' })
+    ).resolves.toEqual({
+      success: false,
+      error: 'Terminal unavailable until the workspace is prepared',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it.each(['desktop', 'agent-manager'])(
+    'allows terminals for an inherited %s hosted worktree session',
+    async createdOnPlatform => {
+      const { terminals, request } = fixture({
+        metadata: metadata({
+          createdOnPlatform,
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        }),
+      });
+
+      await expect(
+        terminals.create({ operationId: '99999999-9999-4999-8999-999999999999' })
+      ).resolves.toMatchObject({ success: true });
+      expect(request).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('denies terminals for a native desktop session without a hosted worktree', async () => {
+    const { terminals, request } = fixture({
+      metadata: metadata({ createdOnPlatform: 'desktop' }),
+    });
+
+    await expect(
+      terminals.create({ operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
+    ).resolves.toEqual({
+      success: false,
+      error:
+        'Terminal access denied: terminals are only available for interactive Cloud Agent sessions',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a real terminal RPC failure instead of the workspace message', async () => {
+    const { terminals, request } = fixture();
+    request.mockRejectedValueOnce(new Error('PTY allocation failed'));
+
+    await expect(
+      terminals.create({ operationId: '88888888-8888-4888-8888-888888888888' })
+    ).resolves.toEqual({ success: false, error: 'PTY allocation failed' });
+  });
+
+  it('ends running records and clears completions for a replaced wrapper', async () => {
+    const { terminals, values, request } = fixture();
+    const operationId = '44444444-4444-4444-8444-444444444444';
+    values.set(`control_terminal:pty_stale`, record('wr_replaced', 'pty_stale'));
+    values.set(`control_terminal_operation:${operationId}`, {
+      operationId,
+      record: record('wr_replaced', 'pty_stale'),
+      result: { pty: pty('pty_stale') },
+    });
+
+    await expect(
+      terminals.create({ operationId: '55555555-5555-4555-8555-555555555555' })
+    ).resolves.toMatchObject({ success: true });
+    expect(request).toHaveBeenCalledOnce();
+
+    expect(values.get(`control_terminal:pty_stale`)).toMatchObject({ state: 'ended' });
+    expect(values.get(`control_terminal_operation:${operationId}`)).toBeUndefined();
+    expect(values.get(`control_terminal:pty_new`)).toMatchObject({
+      wrapperId: CURRENT_WRAPPER,
+      state: 'running',
+    });
+  });
+
+  it('closes browser terminal sockets and leaves wrapper sockets open', () => {
+    const browser = socket(['terminal', 'terminal:browser:pty_1'], {
+      role: 'browser',
+      ptyId: 'pty_1',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+      capabilityHash: 'a'.repeat(64),
+      capabilityExpiresAt: Date.now() + 30_000,
+    });
+    const otherBrowser = socket(['terminal', 'terminal:browser:pty_2'], {
+      role: 'browser',
+      ptyId: 'pty_2',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+    });
+    const wrapperSocket = socket(['terminal', 'terminal:wrapper:pty_1'], {
+      role: 'wrapper',
+      ptyId: 'pty_1',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+    });
+    const { terminals } = fixture({ sockets: [browser, otherBrowser, wrapperSocket] });
+
+    expect(terminals.closeBrowserSockets(1000, 'session access revoked')).toBe(2);
+
+    expect(browser.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(otherBrowser.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(wrapperSocket.close).not.toHaveBeenCalled();
+    expect(browser.deserializeAttachment() as Record<string, unknown>).not.toHaveProperty(
+      'capabilityHash'
+    );
+  });
+});

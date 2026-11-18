@@ -1,224 +1,339 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { type ConnectivityState } from '@/lib/connectivity-online';
 import {
-  type ConnectivitySource,
-  createOfflineBannerStore,
-  OFFLINE_BANNER_SHOW_DELAY_MS,
-  type OfflineBannerStore,
-  type OfflineBannerTimer,
-} from '@/lib/offline-banner-state';
-
-const offlineState: ConnectivityState = { isConnected: false, isInternetReachable: false };
-const onlineState: ConnectivityState = { isConnected: true, isInternetReachable: true };
-const unknownState: ConnectivityState = { isConnected: null, isInternetReachable: null };
-
-function createFakeSource() {
-  const listeners = new Set<(state: ConnectivityState) => void>();
-  const unsubscribe = vi.fn(() => undefined);
-  const source: ConnectivitySource = {
-    subscribe: listener => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-        unsubscribe();
-      };
-    },
-  };
-  return {
-    source,
-    emit(state: ConnectivityState): void {
-      for (const listener of listeners) {
-        listener(state);
-      }
-    },
-    unsubscribe,
-  };
-}
-
-type ScheduledEntry = { callback: () => void; cancelled: boolean; delayMs: number };
-
-function createFakeTimer() {
-  const scheduled: ScheduledEntry[] = [];
-  const timer: OfflineBannerTimer = {
-    // oxlint-disable-next-line promise/prefer-await-to-callbacks -- the fake timer stores callbacks for manual firing
-    set(callback, delayMs) {
-      const entry: ScheduledEntry = { callback, cancelled: false, delayMs };
-      scheduled.push(entry);
-      return {
-        cancel() {
-          entry.cancelled = true;
-        },
-      };
-    },
-  };
-  return {
-    timer,
-    scheduled,
-    firePending(): void {
-      while (scheduled.length > 0) {
-        const entry = scheduled.shift();
-        if (!entry) {
-          return;
-        }
-        if (!entry.cancelled) {
-          entry.callback();
-          return;
-        }
-      }
-    },
-  };
-}
-
-function createStore(
-  source = createFakeSource(),
-  timer = createFakeTimer()
-): {
-  store: OfflineBannerStore;
-  source: ReturnType<typeof createFakeSource>;
-  timer: ReturnType<typeof createFakeTimer>;
-} {
-  return {
-    store: createOfflineBannerStore({ source: source.source, timer: timer.timer }),
-    source,
-    timer,
-  };
-}
+  OFFLINE_BANNER_HEIGHT,
+  offlineHeaderReservation,
+  phaseBlocksWrites,
+  projectBannerState,
+} from './offline-banner-state';
+import {
+  createStore,
+  offlineState,
+  onlineState,
+  outcomes,
+  radioUpUnknownState,
+  unknownState,
+} from './offline-banner-state.test-helpers';
 
 describe('createOfflineBannerStore', () => {
-  it('starts unknown, not offline', () => {
-    const { store } = createStore();
-
-    expect(store.isOffline()).toBe(false);
-  });
-
-  it('does not show the offline banner while connectivity is unknown', () => {
-    const { store, source, timer } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
-
+  it('starts unknown and stays hidden without probing unknown connectivity', () => {
+    const { store, source, timer, probe, changes } = createStore();
+    expect(store.state()).toBe('unknown');
     source.emit(unknownState);
-    timer.firePending();
-
+    timer.advanceBy(10_000);
+    expect(store.state()).toBe('unknown');
     expect(store.isOffline()).toBe(false);
-    expect(listener).not.toHaveBeenCalled();
+    expect(changes).toEqual([]);
+    expect(probe).not.toHaveBeenCalled();
   });
 
-  it('does not notify on unknown → online (the banner stays hidden)', () => {
+  it.each(outcomes)('waits exactly five seconds and one current probe before %s', async outcome => {
+    const { store, source, timer, probe, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(4999);
+    expect(store.state()).toBe('unknown');
+    expect(probe).not.toHaveBeenCalled();
+    timer.advanceBy(1);
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual([]);
+    timer.advanceBy(10_000);
+    expect(probe).toHaveBeenCalledTimes(1);
+    await settle(0, outcome);
+    const expected = outcome === 'online' ? 'online' : 'offline';
+    expect(store.state()).toBe(expected);
+    expect(store.isOffline()).toBe(expected === 'offline');
+    expect(changes).toEqual([expected]);
+  });
+
+  it('handles a synchronous probe throw as a failed confirmation', () => {
+    const { store, source, timer, probe, changes } = createStore();
+    probe.mockImplementationOnce(() => {
+      throw new Error('Probe could not start');
+    });
+    source.emit({ isConnected: false, isInternetReachable: false });
+    timer.advanceBy(5000);
+    expect(store.state()).toBe('offline');
+    expect(changes).toEqual(['offline']);
+  });
+
+  it.each([
+    { event: onlineState, expected: 'online', changes: ['online'] },
+    { event: unknownState, expected: 'unknown', changes: [] },
+  ])('cancels the delay on $expected without probing', ({ event, expected, changes }) => {
+    const fixture = createStore();
+    fixture.source.emit(offlineState);
+    fixture.source.emit(event);
+    fixture.timer.advanceBy(5000);
+    expect(fixture.store.state()).toBe(expected);
+    expect(fixture.store.isOffline()).toBe(false);
+    expect(fixture.changes).toEqual(changes);
+    expect(fixture.probe).not.toHaveBeenCalled();
+  });
+
+  it('restarts the full delay on repeated offline reports and ignores a cancelled callback', async () => {
+    const { store, source, timer, probe, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(4999);
+    source.emit(offlineState);
+    timer.scheduled[0]?.callback();
+    timer.advanceBy(1);
+    expect(store.state()).toBe('unknown');
+    expect(probe).not.toHaveBeenCalled();
+    timer.advanceBy(4999);
+    await settle(0, 'offline');
+    expect(store.isOffline()).toBe(true);
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(outcomes)('hides immediately on recovery and ignores the in-flight %s', async outcome => {
+    const { store, source, timer, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+    expect(store.isOffline()).toBe(true);
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    source.emit(onlineState);
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    await settle(1, outcome);
+    expect(store.state()).toBe('online');
+    expect(changes).toEqual(['offline', 'online']);
+  });
+
+  it.each(outcomes)(
+    'invalidates an in-flight %s on unknown without advancing boot state',
+    async outcome => {
+      const { store, source, timer, changes, settle } = createStore();
+      source.emit(offlineState);
+      timer.advanceBy(5000);
+      source.emit(unknownState);
+      await settle(0, outcome);
+      expect(store.state()).toBe('unknown');
+      expect(store.isOffline()).toBe(false);
+      expect(changes).toEqual([]);
+    }
+  );
+
+  it.each(outcomes)(
+    'invalidates an in-flight %s while a newer offline delay is pending',
+    async outcome => {
+      const { store, source, timer, changes, settle } = createStore();
+      source.emit(offlineState);
+      timer.advanceBy(5000);
+      source.emit(offlineState);
+      await settle(0, outcome);
+      expect(store.state()).toBe('unknown');
+      expect(changes).toEqual([]);
+      timer.advanceBy(5000);
+      await settle(1, 'offline');
+      expect(store.state()).toBe('offline');
+      expect(changes).toEqual(['offline']);
+    }
+  );
+
+  it.each([
+    ['offline', 'online'],
+    ['reject', 'online'],
+    ['online', 'offline'],
+  ] as const)('ignores older %s after a newer %s result', async (older, newer) => {
+    const { store, source, timer, probe, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    source.emit(unknownState);
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(1, newer);
+    expect(store.state()).toBe(newer);
+    await settle(0, older);
+    expect(store.state()).toBe(newer);
+    expect(changes).toEqual([newer]);
+    expect(probe).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the committed online state while the first disconnect is confirmed', () => {
+    const { store, source, timer, changes, probe } = createStore();
+    source.emit(onlineState);
+    expect(changes).toEqual(['online']);
+
+    source.emit(offlineState);
+
+    // The 5 s window is not evidence of a working transport, but it keeps painting online.
+    expect(store.phase().kind).toBe('confirming-offline');
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual(['online']);
+    expect(phaseBlocksWrites(store.phase())).toBe(true);
+    expect(probe).not.toHaveBeenCalled();
+    timer.advanceBy(5000);
+  });
+
+  it('keeps the committed state across repeated disconnect reports', () => {
+    const { store, source, changes } = createStore();
+    source.emit(onlineState);
+    source.emit(offlineState);
+    source.emit(offlineState);
+
+    expect(projectBannerState(store.phase())).toBe('online');
+    expect(store.state()).toBe('online');
+    expect(changes).toEqual(['online']);
+  });
+
+  it('keeps a confirmed offline banner for the whole confirmation window', async () => {
+    const { store, source, timer, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+    expect(changes).toEqual(['offline']);
+
+    source.emit(offlineState);
+
+    // A repeated disconnect copies the state it found: the banner stays offline.
+    expect(store.phase().kind).toBe('confirming-offline');
+    expect(store.state()).toBe('offline');
+    expect(store.isOffline()).toBe(true);
+    expect(changes).toEqual(['offline']);
+    expect(phaseBlocksWrites(store.phase())).toBe(true);
+
+    timer.advanceBy(5000);
+    await settle(1, 'online');
+
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual(['offline', 'online']);
+  });
+
+  it('refuses a write while a disconnect report is being confirmed', () => {
     const { store, source } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
+    expect(phaseBlocksWrites(store.phase())).toBe(false);
+    source.emit(onlineState);
+    expect(phaseBlocksWrites(store.phase())).toBe(false);
+
+    source.emit(offlineState);
+    expect(phaseBlocksWrites(store.phase())).toBe(true);
+  });
+
+  it('preserves confirmed offline on unknown and avoids duplicate offline notifications', async () => {
+    const { store, source, timer, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(1, 'offline');
+    source.emit(unknownState);
+    expect(store.isOffline()).toBe(true);
+    expect(changes).toEqual(['offline']);
+  });
+
+  // The radio-back-without-reachability case (uxs3 spot check, e6-after-net:
+  // airplane mode → 3G while NetInfo's external probe never answers). The
+  // committed offline must not be preserved forever: the app's own probe is
+  // the decider, fired immediately without the five-second delay. The
+  // radioUpUnknownState fixture lives in the test helpers.
+
+  it('probes immediately on unknown with the radio up while committed offline, and clears on a reachable probe', async () => {
+    const { store, source, timer, probe, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+    expect(store.isOffline()).toBe(true);
+
+    source.emit(radioUpUnknownState);
+    // No timer wait: the probe fired on the event itself.
+    expect(probe).toHaveBeenCalledTimes(2);
+    await settle(1, 'online');
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual(['offline', 'online']);
+  });
+
+  it('keeps the offline commit when the radio-up probe fails, without a duplicate notification', async () => {
+    const { store, source, timer, probe, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+
+    source.emit(radioUpUnknownState);
+    expect(probe).toHaveBeenCalledTimes(2);
+    await settle(1, 'offline');
+    expect(store.state()).toBe('offline');
+    expect(store.isOffline()).toBe(true);
+    expect(changes).toEqual(['offline']);
+  });
+
+  it('does not probe on unknown with the radio state itself unknown while committed offline', async () => {
+    // isConnected null means NetInfo has not settled the radio either — no
+    // new information to chase; the last committed state stands (the
+    // pre-existing preserve rule).
+    const { store, source, timer, probe, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
 
     source.emit(unknownState);
-    source.emit(onlineState);
-
-    expect(store.isOffline()).toBe(false);
-    expect(listener).not.toHaveBeenCalled();
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(store.state()).toBe('offline');
   });
 
-  it('commits offline only after the show delay and notifies once', () => {
-    const { store, source, timer } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
-
-    source.emit(offlineState);
-
-    expect(store.isOffline()).toBe(false);
-    expect(listener).not.toHaveBeenCalled();
-
-    expect(timer.scheduled[0]?.delayMs).toBe(OFFLINE_BANNER_SHOW_DELAY_MS);
-
-    timer.firePending();
-
-    expect(store.isOffline()).toBe(true);
-    expect(listener).toHaveBeenCalledTimes(1);
+  it('does not probe on unknown while committed online (no offline to un-stick)', () => {
+    const { store, source, probe, changes } = createStore();
+    source.emit(onlineState);
+    source.emit(radioUpUnknownState);
+    expect(probe).not.toHaveBeenCalled();
+    expect(store.state()).toBe('online');
+    expect(changes).toEqual(['online']);
   });
 
-  it('never commits when the state returns online inside the window', () => {
-    const { store, source, timer } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
-
-    source.emit(offlineState);
-    source.emit(onlineState);
-
-    timer.firePending();
-
-    expect(store.isOffline()).toBe(false);
-    expect(listener).not.toHaveBeenCalled();
-  });
-
-  it('hides immediately when the connection returns after a committed offline', () => {
-    const { store, source, timer } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
-
-    source.emit(offlineState);
-    timer.firePending();
-    expect(store.isOffline()).toBe(true);
-    expect(listener).toHaveBeenCalledTimes(1);
-
-    source.emit(onlineState);
-
-    expect(store.isOffline()).toBe(false);
-    expect(listener).toHaveBeenCalledTimes(2);
-    expect(timer.scheduled.filter(entry => !entry.cancelled)).toEqual([]);
-  });
-
-  it('commits exactly once for rapid alternation, matching the final quiet state', () => {
-    const { store, source, timer } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
-
-    source.emit(offlineState);
-    source.emit(onlineState);
-    source.emit(offlineState);
-    source.emit(onlineState);
-    source.emit(offlineState);
-
-    timer.firePending();
-
-    expect(store.isOffline()).toBe(true);
-    expect(listener).toHaveBeenCalledTimes(1);
-  });
-
-  it('destroy with a pending commit cancels the timer and unsubscribes the source', () => {
-    const { store, source, timer } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
-
+  it('destroy cancels the timer, unsubscribes, and ignores a queued timer callback', () => {
+    const { store, source, timer, probe, changes } = createStore();
     source.emit(offlineState);
     store.destroy();
-
-    timer.firePending();
+    timer.scheduled[0]?.callback();
+    timer.advanceBy(5000);
     source.emit(onlineState);
-
-    expect(store.isOffline()).toBe(false);
-    expect(listener).not.toHaveBeenCalled();
+    expect(store.state()).toBe('unknown');
+    expect(changes).toEqual([]);
+    expect(probe).not.toHaveBeenCalled();
     expect(source.unsubscribe).toHaveBeenCalledTimes(1);
   });
 
-  it('does not notify after destroy when the source emits', () => {
-    const { store, source, timer } = createStore();
-    const listener = vi.fn(() => undefined);
-    store.subscribe(listener);
+  it.each(outcomes)(
+    'ignores %s after destruction without notifying or changing state',
+    async outcome => {
+      const { store, source, timer, changes, settle } = createStore();
+      source.emit(offlineState);
+      timer.advanceBy(5000);
+      store.destroy();
+      await settle(0, outcome);
+      source.emit(onlineState);
+      expect(store.state()).toBe('unknown');
+      expect(store.isOffline()).toBe(false);
+      expect(changes).toEqual([]);
+    }
+  );
 
-    store.destroy();
-    source.emit(offlineState);
-    timer.firePending();
-
-    expect(listener).not.toHaveBeenCalled();
-    expect(source.unsubscribe).toHaveBeenCalledTimes(1);
-  });
-
-  it('unsubscribes a removed listener', () => {
-    const { store, source } = createStore();
-    const listener = vi.fn(() => undefined);
+  it('notifies unknown to online once and removes unsubscribed listeners', () => {
+    const { store, source, changes } = createStore();
+    const listener = vi.fn<() => void>();
     const remove = store.subscribe(listener);
-
     remove();
-    source.emit(offlineState);
-
+    source.emit(onlineState);
+    source.emit(onlineState);
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual(['online']);
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe('offlineHeaderReservation', () => {
+  it('reserves exactly the painted banner height while offline', () => {
+    expect(offlineHeaderReservation(true)).toBe(OFFLINE_BANNER_HEIGHT);
+  });
+
+  it('keeps the header flush while online', () => {
+    expect(offlineHeaderReservation(false)).toBe(0);
   });
 });

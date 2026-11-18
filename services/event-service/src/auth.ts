@@ -1,3 +1,4 @@
+import { EVENT_SERVICE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   type GetKiloUserPepper,
   verifyKiloBearerAgainstCurrentPepper,
@@ -21,6 +22,7 @@ export async function authenticateToken(
     nextAuthSecret: env.NEXTAUTH_SECRET,
     workerEnv: env.WORKER_ENV,
     connectionString: env.HYPERDRIVE.connectionString,
+    resourceAudience: { audience: EVENT_SERVICE_AUDIENCE, mode: 'allow-legacy' },
     ...(options.getUserPepper ? { getUserPepper: options.getUserPepper } : {}),
   });
 }

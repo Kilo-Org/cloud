@@ -4,11 +4,13 @@ This file provides guidance to AI coding agents working in this repository.
 
 ## Project Overview
 
-Cloudflare Worker that powers Kilocode Cloud Agents. It exposes tRPC APIs for starting sessions and sending messages, streams output over WebSockets, and orchestrates Cloudflare Sandbox containers that run the Kilo wrapper.
+Cloudflare Worker that powers Kilocode Cloud Agents. It exposes tRPC APIs for creating sessions and sending messages, streams output over WebSockets, and orchestrates sandboxes through the control plane.
 
-The Durable Object is intentionally a small coordinator: it durably queues messages when a sandbox or wrapper is not ready, owns session metadata and event replay state, schedules alarms, prepares or restores the sandbox, and hands prompts to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DO focused on durable coordination, not feature logic.
+Every session is a `workspace_*` control-plane session. The Session DO (`SandboxSessionV2`, exported as `SandboxSession`) owns message, route and event state. The Sandbox DO (`SandboxControlV2`, exported as `SandboxControl`) owns allocations, provider lifecycle and wrapper connections. The wrapper in `wrapper/src/control-plane/` runs inside the sandbox and supervises Kilo. The retired `agent_*` plane has no code path and old session IDs are rejected.
 
-Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper in `wrapper/` brokers Kilo SDK events into the worker’s `/ingest` WebSocket and owns the job lifecycle inside the sandbox.
+The Durable Objects are durable coordinators: they queue messages when a sandbox or wrapper is not ready, persist metadata and event replay state, schedule alarms, prepare or restore sandboxes, and deliver work to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DOs focused on coordination, not feature logic.
+
+Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper connects to the Sandbox DO, forwards Kilo events through it to the Session DO, and owns the job lifecycle inside the sandbox. In the sandbox, git authenticates through the platform's read-only credential helper (`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`) and the per-session credential record in the runtime home. HTTP(S) worktree remotes use canonical URLs; SSH remotes retain their login.
 
 ## Development Commands
 
@@ -19,19 +21,26 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 
 ### Wrapper Build
 
-- `pnpm run build:wrapper` - Build wrapper bundle (uses Bun in `wrapper/`)
+- `pnpm run build:wrapper` - Build wrapper artifacts for publication (uses Bun in `wrapper/`)
 
 ### Testing
 
 - `pnpm run test` - Unit tests (Vitest Node)
 - `pnpm run test:integration` - Integration tests in Workers runtime (Miniflare)
+- `pnpm run test:fake-llm` - Fake-LLM Worker + Durable Object tests in Miniflare (`vitest.fake-llm.config.ts`)
+- `pnpm run typecheck:fake-llm` - Typecheck for the fake LLM implementation and its Worker test
 - `pnpm run test:all` - Unit + integration
 
 ### Local fake-LLM smoke harness
 
 - `services/cloud-agent-next/test/e2e/README.md` is the source of truth for setup, fake-LLM routing, lifecycle directives, and troubleshooting.
+- The deterministic fake has one runtime-neutral core (`test/e2e/fake-llm-core.ts`) with two adapters: the local Node server (`test/e2e/fake-llm-server.ts`) and the deployed Worker + `FakeLlmState` Durable Object (`test/e2e/fake-llm-worker.ts`, `test/e2e/wrangler.fake-llm.jsonc`). Change the core, not one adapter.
+- Every `/test/*` route needs the admin bearer from `FAKE_LLM_ADMIN_TOKEN` (`test/e2e/fake-llm-admin.ts`). A zero-config local stack falls back to an insecure development default; the public tunnel refuses to publish it and the deploy script rejects it. The deployed profile resolves the bearer env-first and then from the auth file's `fakeLlmAdminToken`, exports the resolved value into `FAKE_LLM_ADMIN_TOKEN` for the run, and never prints it.
+- The deployed Worker additionally authenticates its model routes with a Kilo JWT against the `NEXTAUTH_SECRET` Secrets Store binding. The local Node adapter keeps those routes open for the Next.js gateway.
+- Driven and deployed by `test/e2e/deploy/README.md`; deployment is operator-driven. Do not deploy.
 - Prefer focused scenario debugging first: `pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts <lifecycle> <conversation>`.
-- Run the aggregate local regression matrix with `pnpm exec tsx services/cloud-agent-next/test/e2e/smoke.ts` when validating the full real Worker + DO + sandbox + wrapper path.
+- Run the aggregate local regression matrix with `pnpm --filter cloud-agent-next run e2e:local` (`test/e2e/matrix.ts`, one runner for the local, local-http and deployed profiles) when validating the full real Worker + DO + sandbox + wrapper path. The shared gate stops each scenario's sandboxes when it finishes, so live sandboxes track the pool size.
+- Leave `KILO_OPENROUTER_BASE` on Next.js. Selecting `kilo/fake-deterministic` routes through the gateway to fake-llm; no `.dev.vars` flip.
 - Non-zero `portOffset` sessions (the common case) require `WORKER_URL`/`FAKE_LLM_URL` env overrides on every driver invocation — see README "Running". Discover the offset with `pnpm dev:status --json`.
 - This harness is local/manual rather than part of normal `pnpm test` or CI; use `dev/logs/cloud-agent-next.log` and `dev/logs/fake-llm.log` when debugging it.
 - Read `services/cloud-agent-next/DEBUG.md` when correlating local Wrangler logs with Docker sandbox containers, wrapper log files, Kilo CLI logs, uploaded archives, or stuck session flows.
@@ -41,7 +50,9 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `pnpm run lint` - oxlint
 - `pnpm run format` - oxfmt write (src only)
 - `pnpm run format:check` - oxfmt check (src only)
-- `pnpm run typecheck` - TypeScript (tsgo) + wrapper typecheck
+- `pnpm run typecheck:wrapper` - TypeScript (tsgo) + wrapper typecheck
+- `pnpm run test:checkers` - Duplication checker fixtures
+- `pnpm run check:duplication` - Production duplicate-code ratchet
 
 ### Deployment
 
@@ -51,39 +62,40 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 
 ### Core Worker
 
-- `src/index.ts` - Entry point, request routing
-- `src/router/` - tRPC router and handlers
+- `src/index.ts` - Worker exports, including `SandboxSession` and `SandboxControl`
+- `src/server.ts` - Hono entry: tRPC, `/stream`, terminals, preview, callbacks
+- `src/router.ts` - Router composition
 - `src/router/handlers/session-start.ts` - Primary `start` endpoint
-- `src/router/handlers/session-send.ts` - Primary follow-up `send` endpoint
-- `src/router/handlers/session-prepare.ts` - Legacy `prepareSession` adapter
-- `src/router/handlers/session-execution.ts` - Legacy V2 queue adapters
-- `src/session/session-requests.ts` - Grouped internal session request types
-- `src/session/session-registration.ts` - Grouped start creation/admission and legacy registration-only creation
-- `src/session/queue-message.ts` - Shared grouped queue command helper
-- `src/session-service.ts` - Sandbox/workspace lifecycle orchestration
+- `src/router/handlers/session-send.ts` - Primary `send` endpoint
+- `src/router/handlers/session-prepare.ts` - Retained split `prepareSession`/`updateSession` adapters
+- `src/router/handlers/session-execution.ts` - Retained split `initiateFromKilocodeSessionV2`/`sendMessageV2` adapters
+- `src/session/` - Session requests, preflight, admission, metadata and queue helpers
 - `src/workspace.ts` - Workspace setup and git operations
 - `src/websocket/stream.ts` - Client-facing WebSocket stream
-- `src/websocket/ingest.ts` - Wrapper-facing ingest WebSocket
+- `src/sandbox-session/` - Session DO transport, ingest and report helpers
 
 ### Durable Objects
 
-- `src/persistence/CloudAgentSession.ts` - Session DO storage + lifecycle
-- `src/persistence/session-metadata.ts` - Current grouped metadata schema plus legacy read fallback
-- `src/db/` - SQLite table definitions and store helpers for DOs
+- `src/control-plane/session/session-do.ts` - Session DO
+- `src/control-plane/sandbox/sandbox-do.ts` - Sandbox DO
+- `src/control-plane/*/sqlite-schema.ts` and `src/control-plane/*/drizzle/` - DO SQLite schemas and migrations
+- `src/persistence/StreamTicketNonceDO.ts` - Stream-ticket replay nonce
 
 ### Sandbox + Execution
 
-- `src/execution/` - Orchestrator and execution lifecycle
-- `src/kilo/` - Kilocode CLI wrapper client and helpers
-- `Dockerfile` - Production sandbox image
-- `Dockerfile.dev` - Dev sandbox image (local Kilocode CLI)
-- `cloud-agent-build.sh` - Builds local Kilocode CLI binary for `Dockerfile.dev`
+- `src/sandbox-control/` - Provider adapters, credentials, startup, runtime artifacts and wrapper transport
+- `src/sandbox-containers/` - `SandboxContainers` provider and container outbound handling
+- `src/legacy-runtime-tombstones.ts` - Export-only no-op tombstones for retired SDK sandbox DO names
+- `src/agent-sandbox/` - Provider protocol and provider REST clients
+- `Dockerfile.containers.runtime-free` - Native sandbox base image; CLI and wrapper download at startup
 
 ### Wrapper
 
-- `wrapper/` - Local wrapper bundled into the sandbox image
-- `wrapper/src/main.ts` - Wrapper entrypoint
-- `src/shared/kilo-types.ts` - Types are a subset copied from `~/kilo/packages/sdk/js/src/v2/gen/types.gen.ts` (kilo repo, generated SDK); keep in sync when wrapper/Kilo API changes
+- `wrapper/` - Wrapper runtime published as immutable downloaded artifacts; native and BYOC Vercel sandboxes download it at startup
+- `wrapper/src/control-plane/main.ts` - Wrapper entrypoint
+- `wrapper/control-plane-supervisor.sh` - Container supervisor
+- `wrapper/src/control-plane/session-supervisor.ts` - Per-process Kilo supervision and execution clocks
+- `wrapper/src/control/` - Operations, terminals and worktree helpers
 
 ### Configuration
 
@@ -112,25 +124,30 @@ This pattern blocks API endpoints from running for external contributors who don
 
 ### Cloud Agent Architecture
 
-- Treat `messageId` as the durable user-message identity. Queued/accepted admission may replay idempotently, but completed/failed/interrupted IDs are final and must not be re-admitted. Legacy `executionId` exists only as a compatibility alias in V2 response paths.
-- Public legacy endpoints may accept flat input, but handlers should adapt that input at the boundary into grouped `SessionCreateRequest` or `QueueMessageInput`.
+`docs/control-plane.md` is the spec. Every session is a `workspace_*` control-plane session. The Worker exports `SandboxSessionV2` as `SandboxSession` and `SandboxControlV2` as `SandboxControl`. Implementation is `src/control-plane/session/`, `src/control-plane/sandbox/`, and `wrapper/src/control-plane/`. The split `prepareSession`/`initiateFromKilocodeSessionV2`/`sendMessageV2` endpoints are public compatibility adapters over the same Session DO, not a separate runtime.
+
+- Sandbox ownership has exactly two supported forms: one standalone session without a workspace per sandbox, or one workspace per sandbox with any number of sessions in that workspace. Independent workspaces and standalone sessions never share a sandbox. The `workspace_*` session ID prefix does not imply workspace membership.
+- Build all new functionality for that exclusive ownership model. Do not add support, fallback paths, or test matrices for sandboxes shared across independent workspaces or standalone sessions. Existing legacy shared-sandbox decoding and cleanup are compatibility-only, not a supported topology or a requirement for new features.
+- One state value per message, route, and allocation. Do not add a flag, proof, or counter that encodes a state the spec already names.
+- The wrapper socket is the liveness signal. A close, or 45 seconds without a heartbeat, moves the allocation to `disconnected`. It then stops at the earlier of the reconnect window and the idle deadline (`connection_lost` or `sandbox_stopped`), and the next message prepares a new sandbox. Do not add a provider poll for a killed container. `sandbox_lost` is not that case: a confirmed provider stop during worktree deletion, or a Vercel network-policy failure on session release.
+- A failure the user can hit has a specific reason. A new message or Stop starts recovery. Do not leave a session waiting on a condition the system already knows.
+- Every native Kilo execution, including autonomous and unrouted work, is supervised per process by `wrapper/src/control-plane/session-supervisor.ts`. After 20 minutes without real assistant/tool progress it fails `no_progress`, including silent running tools; user waits pause only that clock. If Kilo was retrying the model request since the last progress, the stall fails as that retried assistant failure (for example a rate limit), not as a platform `no_progress`. The separate 12-hour wall-clock cap fails `execution_limit`; a `superseded` turn-close (Kilo handing off to a queued follow-up) continues the same execution, so follow-ups do not restart either clock. Descendant progress benefits ancestors, never unrelated roots. Runtime supervisors own compute activity, snapshots and bounded interruption; `turn.ts` owns Cloud message delivery, finalization and outcomes and must not regain a native watchdog. Pending delivery is separately bounded. An expired native execution is not re-dispatched.
+- Treat `messageId` as the durable user-message identity. Queued/accepted admission may replay idempotently, but completed/failed/interrupted IDs are final and must not be re-admitted. The split responses keep `executionId` only as a compatibility alias.
+- The split public endpoints accept flat input; handlers adapt it at the boundary into grouped `SessionCreateRequest` or queue input.
+- One workspace (the worktree directory and its shared runtime) owns the runtime and MCP configuration. Configure it once when the workspace is created; a rehydrated workspace restores its stored configuration. Sibling chats in that workspace do not get per-chat isolation or their own MCP configuration, while independent workspaces stay isolated. The built-in Cloud Agent MCP server uses the canonical workspace parent for authority, and credential refresh is not a configuration change.
+- Scoped MCP management is limited to direct spawned children of the canonical workspace parent. Check current parent authorization and child lineage on every operation; an owner-wide list or matching organization is not sufficient. Child registry entries are discovery hints, not authority, and transient access failures must not appear as an empty list. Follow-ups reuse message IDs and existing child delegation rather than creating broader authority.
 - New session metadata writes must use grouped `SessionMetadata` with `metadataSchemaVersion: 2`.
 - Legacy flat metadata reads are allowed only inside `src/persistence/session-metadata.ts` via `parseSessionMetadata`. Application code should consume current grouped metadata only.
-- Grouped `start` sends its already accepted canonical initial turn through `createSessionWithInitialAdmission`; retries must preserve the stored immutable intent and complete queue event/drain side effects without duplicate queue events. Current admission accepts submitted or already-canonical turns only; the retained legacy prepared-session adapter reconstructs stored initial turns before admission.
-- New pending-message writes use a versioned record containing one nested immutable `SessionMessageIntent`, delivery retry state, and callback snapshot; flat pending rows are decoded only inside `src/session/pending-messages.ts`.
-- `SessionMessageState` owns lifecycle/outbox status, terminal effect accounting, and a named immutable `admissionSnapshot` only for post-pending replay validation and recovery; predecessor records normalize into partial `legacyAdmissionConstraints` and never fabricate missing immutable input. Terminal and accepted/sent effects are repairable from pending/alarm replay and events use deterministic uniqueness.
-- Wrapper handoff is currently at-least-once under ambiguous delivery failures: the wrapper forwards prompt/command submissions directly to Kilo and does not query Kilo to suppress or recover duplicate `messageId` submissions. Duplicate prompt/command processing is an accepted edge-case trade-off until Kilo provides an atomic submit-or-return-existing contract.
-- When accepted work has no pending residue and its fenced wrapper runtime/socket is gone, disconnect or liveness expiry first reconciles each accepted message against the DO's stored kilocode events (`getAssistantMessageForUserMessage`): positive terminal evidence (assistant `time.completed` or a terminal assistant error) settles the message as `idle_reconciliation`; anything else terminalizes as wrapper failure without redispatch. There is still no live authoritative Kilo terminal query for redispatch; adding one remains separate lifecycle capability work.
-- Physical wrapper cleanup exhaustion (`WRAPPER_STOP_MAX_ATTEMPTS` reached) is fenced but recoverable: the lease re-observes the sandbox on a slow cadence (`WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS`) and releases to `none` only after a confirmed `absent` observation, so a wedged sandbox reaped later by the container runtime does not brick the session. Recovery is observation-only (`observeWrappersWithoutWaking`) and never issues another stop: the attempt budget and its rollback fence still hold, and the probe must not wake a stopped container to ask about a process that cannot outlive it. Background rechecks stop after `WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS` so an unrecoverable exhaustion stops re-arming the DO alarm; explicit sends still force one probe afterwards.
-- A pending-message flush blocked on exhaustion forces one out-of-cadence recheck (`recoverExhaustedDeliveryBlock` → `recheckExhaustedCleanup`) because a user is actively waiting, then retries on the `WRAPPER_CLEANUP_EXHAUSTED` budget before failing closed. The retry budget is what keeps the two halves consistent — recovery takes minutes, so terminalizing on the first blocked attempt would discard messages a later probe would have delivered — and failing closed at the end of it is what keeps a message from sitting `queued` with no terminal signal. The flush failure code must stay authoritative: `INTERNAL` is treated as non-authoritative by `recordPendingFlushFailure` and would terminalize the message under whatever earlier cause it carried.
+- Grouped `start` sends its already accepted canonical initial turn through `createSessionWithInitialAdmission`; retries must preserve the stored immutable intent and complete queue event/drain side effects without duplicate queue events. The retained prepared-session adapter reconstructs stored initial turns before admission.
 - Callback delivery retry policy is paired with `wrangler.jsonc`: `CALLBACK_DELIVERY_MAX_ATTEMPTS` includes the initial attempt, and each Cloud Agent Next callback queue consumer must configure `max_retries` for the remaining redeliveries.
-- Queue/drain emits unfenced `MessageDeliveryRequest`; only `AgentRuntime` may allocate/reuse current identity and construct `FencedWrapperDispatchRequest` with complete `WrapperRunFence` for downstream dispatch.
-- Session creation selects an explicit `ProfileResolutionPolicy` at the handler boundary. Implicit repository/default profile resolution is limited to the closed set of approved session origins; omitted, unknown, and non-approved automation origins fail closed unless they supply an explicit profile id.
+- Session creation preflight selects an explicit `ProfileResolutionPolicy`. Implicit repository/default profile resolution is limited to the closed set of approved session origins; omitted, unknown, and non-approved automation origins fail closed unless they supply an explicit profile id.
+- Creation admission belongs to `src/router/handlers/session-creation-preflight.ts`. Registration/ledger and stored-session preflight remain separate owners.
+- Wrapper production code may import Worker code only through `src/shared`; Worker production code must not import `wrapper`.
 - Public `start` must authorize any supplied `kilocodeOrganizationId` against `organization_memberships` before resolving profile layers or creating session ownership state. Balance validation is billing-only and `x-skip-balance-check` must never bypass organization authorization.
-- Current wrapper identity is fenced `wrapperRunId` plus generation/connection; do not reintroduce execution-ID-only reconnect, supervision, or pending-drain blocking. Legacy endpoint/result/callback `executionId` fields remain boundary compatibility aliases only.
-- The DO should remain a durable coordinator: queue messages, persist metadata/events, fence wrapper connections, schedule alarms, prepare/restore sandbox state, and hand work to the wrapper.
+- A control-plane session must remain recoverable after the physical sandbox dies: a new message in the same `workspace_*` session prepares a new sandbox (`docs/control-plane.md`).
+- The DOs should remain durable coordinators: queue messages, persist metadata/events, fence wrapper connections, schedule alarms, and prepare/restore sandbox state.
 - Put Kilo/job behavior in `wrapper/` or Kilo SDK integration code when it does not require durable DO coordination.
-- Avoid growing `CloudAgentSession.ts` with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.
+- Avoid growing the control-plane DOs with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.
 
 ### Runtime Guidelines
 
@@ -149,11 +166,12 @@ This pattern blocks API endpoints from running for external contributors who don
 
 ## Key Locations
 
-- `src/router/handlers/` - API endpoints (prepare, initiate, sendMessage, session management)
-- `src/persistence/` - Durable Object schema + migrations
-- `src/websocket/` - WebSocket ingest + filters
+- `src/router/handlers/` - API endpoints (start, send, split prepare/initiate adapters, session management)
+- `src/control-plane/session/` - Session DO schema, messages, routes, callbacks and terminals
+- `src/control-plane/sandbox/` - Sandbox DO allocation, credentials, runtime and worktree state
+- `src/websocket/` - Client stream and filters
 - `src/utils/` - Shared helpers (encryption, retries, SQL helpers)
-- `wrangler.jsonc` - Bindings: R2, Hyperdrive, queues, containers, service bindings (`SESSION_INGEST`, `GIT_TOKEN_SERVICE`)
+- `wrangler.jsonc` - Bindings: R2, Hyperdrive, queues, containers, service bindings (`GIT_TOKEN_SERVICE`)
 - `vitest.config.ts` - Unit test config
 - `vitest.workers.config.ts` - Integration test config
-- `wrapper/` - Wrapper build shipped into the sandbox
+- `wrapper/` - Control wrapper and supervisor shipped into the sandbox

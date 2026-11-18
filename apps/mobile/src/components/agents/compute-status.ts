@@ -1,41 +1,82 @@
 import { type Part } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
+import { type BlockingInteraction } from './agent-interaction-policy';
 import { isSnapshotProgressPart } from './part-types';
 
-const toolStatusMap = {
-  read: 'Exploring',
-  grep: 'Searching the codebase',
-  glob: 'Searching the codebase',
-  list: 'Searching the codebase',
-  edit: 'Making edits',
-  write: 'Making edits',
-  bash: 'Running commands',
-  websearch: 'Searching the web',
-  webfetch: 'Searching the web',
-  codesearch: 'Searching the web',
-  todowrite: 'Planning next steps',
-  todoread: 'Planning next steps',
-  task: 'Delegating work',
-  question: 'Asking a question',
-} satisfies Record<string, string>;
+const toolStatusKeyMap = {
+  read: 'agentChat.computeStatus.exploring',
+  grep: 'agentChat.computeStatus.searchingCodebase',
+  glob: 'agentChat.computeStatus.searchingCodebase',
+  list: 'agentChat.computeStatus.searchingCodebase',
+  edit: 'agentChat.computeStatus.makingEdits',
+  write: 'agentChat.computeStatus.makingEdits',
+  bash: 'agentChat.computeStatus.runningCommands',
+  websearch: 'agentChat.computeStatus.searchingWeb',
+  webfetch: 'agentChat.computeStatus.searchingWeb',
+  codesearch: 'agentChat.computeStatus.searchingWeb',
+  todowrite: 'agentChat.computeStatus.planningNextSteps',
+  todoread: 'agentChat.computeStatus.planningNextSteps',
+  task: 'agentChat.computeStatus.delegatingWork',
+  question: 'agentChat.computeStatus.askingQuestion',
+} as const;
 
 /** Matches CLI PROGRESS_INITIALIZING typography (U+2026 ellipsis). */
 export const SNAPSHOT_PROGRESS_STATUS = 'Initializing snapshot…';
 
 export function computeStatus(part: Part): string {
   if (part.type === 'tool') {
-    return Object.hasOwn(toolStatusMap, part.tool)
-      ? toolStatusMap[part.tool as keyof typeof toolStatusMap]
-      : 'Considering next steps';
+    return Object.hasOwn(toolStatusKeyMap, part.tool)
+      ? i18n.t(toolStatusKeyMap[part.tool as keyof typeof toolStatusKeyMap])
+      : i18n.t('agentChat.computeStatus.consideringNextSteps');
   }
   if (part.type === 'reasoning') {
-    return 'Thinking';
+    return i18n.t('agentChat.partDetail.thinking');
   }
   if (part.type === 'text') {
     if (isSnapshotProgressPart(part)) {
-      return SNAPSHOT_PROGRESS_STATUS;
+      return i18n.t('agentChat.computeStatus.initializingSnapshot');
     }
-    return 'Writing response';
+    return i18n.t('agentChat.computeStatus.writingResponse');
   }
-  return 'Considering next steps';
+  return i18n.t('agentChat.computeStatus.consideringNextSteps');
+}
+
+/**
+ * opencode pre-creates an empty `text` part for the response block before any
+ * token arrives, and its id sorts after the reasoning part (a stream looks
+ * like `[step-start, reasoning, text(0)]`). Reading the raw last part would
+ * therefore label the whole reasoning stream "Writing response", and the
+ * spinner would never read "Thinking". Skip empty text placeholders and
+ * describe the last part that actually carries activity.
+ */
+export function lastActivePart(parts: readonly Part[]): Part | undefined {
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const part = parts[i];
+    if (part !== undefined && !(part.type === 'text' && part.text === '')) {
+      return part;
+    }
+  }
+  return undefined;
+}
+
+/** Spinner label for an assistant message's parts. */
+export function computeMessageStatus(parts: readonly Part[]): string {
+  const part = lastActivePart(parts);
+  return part ? computeStatus(part) : i18n.t('agentChat.computeStatus.consideringNextSteps');
+}
+
+/**
+ * Spinner label while the transcript asks the reader to answer before the agent
+ * can continue. The pending ask owns the label: the last active part is the tool
+ * call the ask blocks, so its activity label ("Running commands") would claim
+ * work that has not started.
+ */
+export function computeBlockingAskStatus(ask: Exclude<BlockingInteraction, 'none'>): string {
+  return i18n.t(
+    ask === 'permission'
+      ? 'agentChat.computeStatus.waitingForPermission'
+      : 'agentChat.computeStatus.askingQuestion'
+  );
 }

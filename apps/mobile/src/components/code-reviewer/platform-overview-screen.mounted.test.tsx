@@ -1,5 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
+/* eslint-disable max-lines -- cohesive mounted suite for the code-reviewer overview states */
 // actionRequired banner contract: a non-null `actionRequired` on the reviewer
 // config renders a distinct banner (title + description + recovery label)
 // above the enable switch. Null renders no banner — including the
@@ -7,10 +6,13 @@
 // not a banner. This is neither the empty state nor a success check.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+
+import '@/i18n';
 
 import { PlatformOverviewScreen } from './platform-overview-screen';
 
@@ -18,35 +20,100 @@ const config = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   isFetching: false,
+  fetchStatus: 'idle' as string,
   data: null as unknown,
   refetch: vi.fn(),
 }));
 
+const provider = vi.hoisted(() => ({ status: 'connected' }));
+const integrationAccount = vi.hoisted(() => ({ login: 'alice' as string | undefined }));
+const connectivity = vi.hoisted(() => ({ known: true }));
+const platformError = vi.hoisted(() => ({
+  variants: [] as string[],
+  backFallbacks: [] as (string | undefined)[],
+  retries: [] as (() => void)[],
+  retrying: [] as boolean[],
+}));
+const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
+const centeredState = vi.hoisted(() => vi.fn());
+const scrollView = vi.hoisted(() => vi.fn());
+
 const permission = vi.hoisted(() => ({
   status: 'ready',
   canEdit: true,
+  canManage: true,
 }));
 
+const webhookWarning = vi.hoisted(() => ({ shown: false }));
+const saveMutation = vi.hoisted(() => ({ isPending: false, mutate: vi.fn() }));
+
+const handoffUrl = vi.hoisted(() =>
+  vi.fn((_target: unknown): Promise<string> =>
+    Promise.resolve('https://app.kilo.ai/app-shell/handoff?token=handoff-token')
+  )
+);
+const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const routerPush = vi.hoisted(() => vi.fn());
+/** Every focus effect the screen registered, in call order; the test re-runs one. */
+const focusEffects = vi.hoisted(() => [] as (() => undefined | (() => void))[]);
+const openExternal = vi.hoisted(() => vi.fn());
+const openPicker = vi.hoisted(() => vi.fn());
+
+const councilUi = vi.hoisted(() => ({ allowed: false }));
+
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
+  Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
+  FadeIn: { duration: (ms: number) => ({ fadeIn: ms }) },
   FadeOut: { duration: vi.fn() },
   LinearTransition: {},
 }));
+const motion = vi.hoisted(() => ({ reducedMotion: false }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: motion.reducedMotion,
+    scrollAnimated: !motion.reducedMotion,
+  }),
+  selectReducedMotionEntrance: <T,>(reducedMotion: boolean, entrance: T) =>
+    reducedMotion ? undefined : entrance,
+}));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
+  // The real hook runs the effect while the screen is focused; recording it
+  // also lets a test re-run the latest one as the screen regains focus.
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    focusEffects.push(effect);
+    effect();
+  },
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
 }));
-vi.mock('@/components/agents/model-selector', () => ({
-  openModelPicker: vi.fn(),
+vi.mock('@/components/centered-state', () => ({
+  CenteredState: (props: { children?: unknown }) => {
+    centeredState(props);
+    return props.children;
+  },
 }));
+vi.mock('@/components/agents/model-selector', () => ({
+  openModelPicker: openPicker,
+}));
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: handoffUrl }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternal }));
+vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
+  openAuthorizationAndWaitForReturn: launchBrowser,
+  reportLateLaunchFailure: vi.fn(),
+}));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/code-reviewer/bitbucket-overview', () => ({
   BitbucketOverview: () => null,
 }));
@@ -55,21 +122,45 @@ vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   resolveRowOnPress: () => undefined,
 }));
 vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
-  ProviderConnectCard: () => null,
+  ProviderConnectCard: 'ProviderConnectCard',
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: () => null,
+  PlatformErrorScreen: (props: {
+    variant?: string;
+    backFallback?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  }) => {
+    platformError.variants.push(props.variant ?? 'server');
+    platformError.backFallbacks.push(props.backFallback);
+    platformError.retrying.push(props.isRetrying ?? false);
+    if (props.onRetry) {
+      platformError.retries.push(props.onRetry);
+    }
+    return null;
+  },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: () => null,
 }));
-vi.mock('@/components/ui/button', () => ({ Button: () => null }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: () => {
+    skeletonRenders.count += 1;
+    return null;
+  },
+}));
+vi.mock('@/components/ui/text', () => ({
+  Text: 'Text',
+  // The real Button wraps its label in this provider.
+  TextClassContext: { Provider: (props: { children?: unknown }) => props.children },
+}));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: ({ children }: { children?: unknown }) => children,
+  TabScreenScrollView: (props: { children?: unknown }) => {
+    scrollView(props);
+    return props.children;
+  },
 }));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: {
@@ -78,34 +169,41 @@ vi.mock('@/lib/code-reviewer-config', () => ({
     bitbucket: { label: 'Bitbucket', reviewMd: false },
   },
 }));
-vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ models: [], isLoading: false }),
+vi.mock('@/lib/hooks/use-reviewer-models', () => ({
+  useReviewerModels: () => ({ models: [], isLoading: false }),
+}));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => ({ allowed: councilUi.allowed, pending: false }),
+  useCouncilUiEnabled: () => councilUi.allowed,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
-  classifyProviderState: () => ({ status: 'connected' }),
+  classifyProviderState: () => provider,
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
   useGitLabStatus: () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
-  useGitLabWebhookWarning: () => ({ hasWebhookSyncWarning: false }),
+  useGitLabWebhookWarning: () => ({ hasWebhookSyncWarning: webhookWarning.shown }),
   useReviewConfig: () => config,
   useReviewerPermission: () => permission,
-  useSaveReviewConfig: () => ({ isPending: false, mutate: vi.fn() }),
+  useSaveReviewConfig: () => saveMutation,
   useToggleReviewer: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
 }));
 
 function makeActionRequired(reason: string) {
@@ -151,29 +249,257 @@ function collectText(node: unknown): string[] {
   return [];
 }
 
-async function renderScreen(): Promise<string[]> {
+async function render(
+  scope = 'personal',
+  platform: 'github' | 'gitlab' = 'github'
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(
-      createElement(PlatformOverviewScreen, { scope: 'personal', platform: 'github' })
-    );
+    ref.current = TestRenderer.create(createElement(PlatformOverviewScreen, { scope, platform }));
     await Promise.resolve();
   });
   const renderer = ref.current;
   if (!renderer) {
     throw new Error('renderer was not created');
   }
+  return renderer;
+}
+
+async function renderScreenHandle(platform: 'github' | 'gitlab' = 'github') {
+  const renderer = await render('personal', platform);
+  return {
+    readTexts: () => collectText(renderer.toJSON()),
+  };
+}
+
+async function renderScreen(platform: 'github' | 'gitlab' = 'github'): Promise<string[]> {
+  const renderer = await render('personal', platform);
   return collectText(renderer.toJSON());
+}
+
+/** The recovery control for a banner label; empty when the label is plain text. */
+function recoveryControls(
+  renderer: TestRenderer.ReactTestRenderer,
+  label: string
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root
+    .findAllByType('Pressable')
+    .filter(node => node.props.accessibilityLabel === label);
+}
+
+async function press(control: TestRenderer.ReactTestInstance): Promise<void> {
+  await act(async () => {
+    await (control.props.onPress as () => Promise<void>)();
+  });
 }
 
 beforeEach(() => {
   config.isLoading = false;
   config.isError = false;
   config.isFetching = false;
+  config.fetchStatus = 'idle';
   config.data = null;
   config.refetch.mockClear();
   permission.status = 'ready';
   permission.canEdit = true;
+  permission.canManage = true;
+  webhookWarning.shown = false;
+  saveMutation.isPending = false;
+  saveMutation.mutate.mockClear();
+  provider.status = 'connected';
+  integrationAccount.login = 'alice';
+  connectivity.known = true;
+  platformError.variants = [];
+  platformError.backFallbacks = [];
+  platformError.retries = [];
+  platformError.retrying = [];
+  skeletonRenders.count = 0;
+  motion.reducedMotion = false;
+  centeredState.mockClear();
+  scrollView.mockClear();
+  handoffUrl.mockClear();
+  launchBrowser.mockClear();
+  routerPush.mockClear();
+  focusEffects.length = 0;
+  openExternal.mockClear();
+  openPicker.mockClear();
+});
+
+describe('PlatformOverviewScreen disconnected setup', () => {
+  it.each([
+    ['an owner or admin', { canEdit: true, canManage: true }, true],
+    ['a billing manager', { canEdit: true, canManage: false }, false],
+    ['a member', { canEdit: false, canManage: false }, false],
+  ] as const)(
+    'offers the GitHub app install to %s only when that role may run it',
+    async (_who, capabilities, showsCard) => {
+      provider.status = 'disconnected';
+      permission.canEdit = capabilities.canEdit;
+      permission.canManage = capabilities.canManage;
+
+      const renderer = await render('org-1', 'github');
+      const texts = collectText(renderer.toJSON());
+
+      expect(centeredState).toHaveBeenCalledOnce();
+      expect(scrollView).not.toHaveBeenCalled();
+      expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(showsCard ? 1 : 0);
+      const notice = "GitHub isn't connected. Only organization owners and admins can connect it.";
+      expect(texts.includes(notice)).toBe(!showsCard);
+    }
+  );
+
+  it('keeps the GitLab account connect card for a billing manager', async () => {
+    provider.status = 'disconnected';
+    permission.canEdit = true;
+    permission.canManage = false;
+
+    const renderer = await render('org-1', 'gitlab');
+
+    expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(1);
+  });
+
+  it.each([
+    ['github', "GitHub isn't connected. Only organization owners and admins can connect it."],
+    [
+      'gitlab',
+      "GitLab isn't connected. Ask an organization owner, admin, or billing manager to connect it.",
+    ],
+  ] as const)('states who can connect %s to a read-only viewer', async (platform, copy) => {
+    provider.status = 'disconnected';
+    permission.canEdit = false;
+    permission.canManage = false;
+
+    const texts = await renderScreen(platform);
+
+    expect(texts).toContain(copy);
+  });
+});
+
+describe('PlatformOverviewScreen connected with unavailable config', () => {
+  it('shows the offline error while the config query is paused with no cache', async () => {
+    // The exact blank-body repro: provider status is cached as connected, the
+    // config query is paused by NetInfo before its first success, and
+    // `config.isLoading` (isPending && isFetching) is false while paused.
+    config.fetchStatus = 'paused';
+    config.data = null;
+
+    await renderScreen();
+
+    expect(platformError.variants).toEqual(['offline']);
+    // The failed state offers Back, so a review screen reached without history
+    // is not a dead end.
+    expect(platformError.backFallbacks).toEqual(['/(app)/(tabs)/(0_home)']);
+    expect(skeletonRenders.count).toBe(0);
+  });
+
+  it('keeps the skeleton while the query is paused and connectivity is unsettled', async () => {
+    config.fetchStatus = 'paused';
+    config.data = null;
+    connectivity.known = false;
+
+    const texts = await renderScreen();
+
+    // Connectivity not yet settled: no confirmed-offline signal, so the
+    // loading skeleton renders while the query waits instead of a blank body.
+    expect(platformError.variants).toEqual([]);
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(texts).not.toContain('Automatic reviews');
+  });
+
+  it('renders content from cache when the config query is paused with data', async () => {
+    config.fetchStatus = 'paused';
+    config.data = makeConfig();
+
+    const texts = await renderScreen();
+
+    expect(platformError.variants).toEqual([]);
+    expect(skeletonRenders.count).toBe(0);
+    expect(texts).toContain('Automatic reviews');
+  });
+
+  it('shows the server error when the config fetch fails with no cache', async () => {
+    config.isError = true;
+    config.data = null;
+
+    await renderScreen();
+
+    expect(platformError.variants).toEqual(['server']);
+    expect(skeletonRenders.count).toBe(0);
+  });
+});
+
+describe('PlatformOverviewScreen pending idle config read', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    // A test's refetch implementation must not reach the next one or the
+    // timers of a later test.
+    config.refetch.mockReset();
+  });
+
+  it('shows the skeleton instead of a blank body while nothing is fetching', async () => {
+    // Pending, idle, no data, no error: exactly the state a cancelled first
+    // fetch reverts to. It matched none of the separate isLoading/isError/
+    // paused tests, so the header painted over an empty scroll area with
+    // nothing that would ever resolve it.
+    config.fetchStatus = 'idle';
+
+    const texts = await renderScreen();
+
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(platformError.variants).toEqual([]);
+    expect(texts).not.toContain('Automatic reviews');
+  });
+
+  it('restarts the idle read on its own and paints the rows once it lands', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    config.refetch.mockImplementation(() => {
+      config.fetchStatus = 'idle';
+      config.data = makeConfig();
+      return Promise.resolve();
+    });
+
+    const { readTexts } = await renderScreenHandle();
+    expect(readTexts()).not.toContain('Automatic reviews');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(platformError.variants).toEqual([]);
+    expect(readTexts()).toContain('Automatic reviews');
+  });
+
+  it('ends on the error with Retry when the idle read cannot restart', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    // This read cannot be restarted: the attempt leaves it exactly as idle.
+    config.refetch.mockImplementation(() => Promise.resolve());
+
+    const { readTexts } = await renderScreenHandle();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    // The single automatic attempt did not get a fetch running, so the body
+    // stops waiting behind a spinner and offers the action that can.
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(platformError.variants).toEqual(['server']);
+    expect(readTexts()).not.toContain('Automatic reviews');
+
+    skeletonRenders.count = 0;
+    await act(() => {
+      platformError.retries.at(-1)?.();
+    });
+
+    // Retry restarts the read and returns the body to the loading state while
+    // a fresh cycle (with its own single automatic attempt) runs.
+    expect(config.refetch).toHaveBeenCalledTimes(2);
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(platformError.variants).toEqual(['server']);
+  });
 });
 
 describe('PlatformOverviewScreen actionRequired banner', () => {
@@ -218,5 +544,272 @@ describe('PlatformOverviewScreen actionRequired banner', () => {
 
       expect(texts).toContain('Code Reviewer needs attention');
     }
+  });
+});
+
+describe('PlatformOverviewScreen actionRequired recovery', () => {
+  async function pressRecovery(
+    label: string,
+    scope = 'personal',
+    platform: 'github' | 'gitlab' = 'github'
+  ): Promise<TestRenderer.ReactTestRenderer> {
+    const renderer = await render(scope, platform);
+    const controls = recoveryControls(renderer, label);
+    expect(controls).toHaveLength(1);
+    await press(controls[0] as TestRenderer.ReactTestInstance);
+    return renderer;
+  }
+
+  it('opens the GitHub App installation and re-reads the config on return', async () => {
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('github_installation_required'),
+    });
+
+    await pressRecovery('Update GitHub App');
+
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
+    expect(launchBrowser).toHaveBeenCalledWith(
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
+    );
+    // Returning from the browser re-reads the config, so a fixed reviewer clears the banner.
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('scopes the GitHub App installation to the organization', async () => {
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('github_installation_required'),
+    });
+
+    await pressRecovery('Update GitHub App', 'org-1');
+
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app', organizationId: 'org-1' });
+    expect(launchBrowser).toHaveBeenCalledWith(
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
+    );
+  });
+
+  it('opens the GitLab integration shell page for a project-access block', async () => {
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('gitlab_project_access_required'),
+    });
+
+    await pressRecovery('Update GitLab integration', 'org-1', 'gitlab');
+
+    expect(handoffUrl).toHaveBeenCalledWith({
+      page: 'integration',
+      platform: 'gitlab',
+      organizationId: 'org-1',
+    });
+    expect(launchBrowser).toHaveBeenCalledWith(
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
+    );
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the app provider-keys screen for an invalid key, without a browser', async () => {
+    config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
+
+    await pressRecovery('Update BYOK settings');
+
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-keys');
+    expect(launchBrowser).not.toHaveBeenCalled();
+  });
+
+  it('scopes the provider-keys screen to the organization', async () => {
+    config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
+
+    await pressRecovery('Update BYOK settings', 'org-1');
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
+      params: { org: 'org-1' },
+    });
+    expect(launchBrowser).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the config when the key screen hands the reviewer back', async () => {
+    config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
+
+    await pressRecovery('Update BYOK settings');
+    // Nothing to re-read yet: the fix happens on the screen just pushed.
+    expect(config.refetch).not.toHaveBeenCalled();
+
+    // Coming back to the reviewer focuses this screen again.
+    const refocus = focusEffects.at(-1);
+    if (refocus === undefined) {
+      throw new Error('the banner registered no focus effect');
+    }
+    act(() => {
+      refocus();
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the reviewer model picker for an unavailable model', async () => {
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('selected_model_unavailable'),
+    });
+
+    await pressRecovery('Update Code Reviewer settings');
+
+    expect(openPicker).toHaveBeenCalledTimes(1);
+    expect(launchBrowser).not.toHaveBeenCalled();
+  });
+
+  it.each(['github_ip_allow_list', 'repeated_repository_clone_timeout'] as const)(
+    'emails support for %s',
+    async reason => {
+      config.data = makeConfig({ actionRequired: makeActionRequired(reason) });
+
+      await pressRecovery('Contact support');
+
+      expect(openExternal).toHaveBeenCalledWith(`mailto:${SUPPORT_EMAIL}`, {
+        label: SUPPORT_EMAIL,
+      });
+      expect(launchBrowser).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the label as plain text for a member who cannot edit the config', async () => {
+    permission.canEdit = false;
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('github_installation_required'),
+    });
+
+    const renderer = await render();
+    const texts = collectText(renderer.toJSON());
+
+    expect(texts).toContain('Update GitHub App');
+    expect(recoveryControls(renderer, 'Update GitHub App')).toHaveLength(0);
+    // The who-can-fix note is the member's explanation, not a control.
+    expect(texts).toContain(
+      'Only organization owners, admins, and billing managers can change these settings.'
+    );
+  });
+});
+
+describe('PlatformOverviewScreen Automatic reviews account line', () => {
+  /** The muted line painted under the Automatic reviews label, when present. */
+  function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.variant === 'muted')
+      .map(node => node.props.children);
+  }
+
+  it('paints the connected account under the label', async () => {
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual(['alice']);
+  });
+
+  it('paints the label alone so the row keeps one line without a login', async () => {
+    // An empty line here made the card taller than the sibling Follow REVIEW.md
+    // row and lifted the label above the switch's centre.
+    integrationAccount.login = undefined;
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual([]);
+  });
+});
+
+describe('PlatformOverviewScreen GitLab webhook warning', () => {
+  const SELECTION = [7, 11];
+
+  /** Rendered copy of an element subtree, before it becomes host nodes. */
+  function elementCopy(node: unknown): string[] {
+    if (node == null) {
+      return [];
+    }
+    if (typeof node === 'string') {
+      return [node];
+    }
+    if (Array.isArray(node)) {
+      return node.flatMap(item => elementCopy(item));
+    }
+    if (typeof node !== 'object') {
+      return [];
+    }
+    if ('children' in node) {
+      return elementCopy(node.children);
+    }
+    if ('props' in node && node.props != null && typeof node.props === 'object') {
+      return 'children' in node.props ? elementCopy(node.props.children) : [];
+    }
+    return [];
+  }
+
+  /** Controls whose own rendered copy includes `label`. */
+  function controlsLabelled(
+    renderer: TestRenderer.ReactTestRenderer,
+    label: string
+  ): TestRenderer.ReactTestInstance[] {
+    return renderer.root
+      .findAllByType('Pressable')
+      .filter(node => elementCopy(node.props.children).includes(label));
+  }
+
+  function renderWarning(scope = 'org-1'): Promise<TestRenderer.ReactTestRenderer> {
+    webhookWarning.shown = true;
+    config.data = makeConfig({
+      repositorySelectionMode: 'selected',
+      selectedRepositoryIds: SELECTION,
+    });
+    return render(scope, 'gitlab');
+  }
+
+  it('re-runs the sync with the current selection for an editor', async () => {
+    const renderer = await renderWarning();
+    const [retry] = controlsLabelled(renderer, 'Retry');
+
+    expect(retry?.props.disabled).toBe(false);
+    await press(retry as TestRenderer.ReactTestInstance);
+    // The PATCH routers sync project hooks only for a patch that carries the
+    // selection, so the retry re-sends the current one.
+    expect(saveMutation.mutate).toHaveBeenCalledWith({ selectedRepositoryIds: SELECTION });
+  });
+
+  it('keeps the retry disabled for a member who cannot edit', async () => {
+    permission.canEdit = false;
+    const renderer = await renderWarning();
+    const [retry] = controlsLabelled(renderer, 'Retry');
+
+    expect(collectText(renderer.toJSON())).toContain('Webhook setup incomplete');
+    expect(retry?.props.disabled).toBe(true);
+  });
+});
+
+describe('PlatformOverviewScreen rows entrance', () => {
+  /** The animated container that holds every configuration row. */
+  function rowsContainer(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Animated.View')
+      .find(node => node.props.className === 'gap-6');
+  }
+
+  it('paints the rows without an entrance animation under reduced motion', async () => {
+    // An entrance that never runs leaves the container at its initial opacity,
+    // so the rows exist but paint nothing and the body stays empty until the
+    // screen remounts.
+    motion.reducedMotion = true;
+    config.data = makeConfig();
+
+    const renderer = await render();
+
+    expect(rowsContainer(renderer)?.props.entering).toBeUndefined();
+  });
+
+  it('keeps the crossfade entrance while motion is allowed', async () => {
+    motion.reducedMotion = false;
+    config.data = makeConfig();
+
+    const renderer = await render();
+
+    expect(rowsContainer(renderer)?.props.entering).toBeDefined();
   });
 });

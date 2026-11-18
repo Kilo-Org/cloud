@@ -1,14 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
-import { client as stripeClient } from '@/lib/stripe-client';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
-  const { email } = await request.json();
+  const body: unknown = await request.json().catch(() => undefined);
+  const email =
+    typeof body === 'object' && body !== null && 'email' in body && typeof body.email === 'string'
+      ? body.email
+      : undefined;
 
-  if (!email || typeof email !== 'string') {
+  if (!email) {
     return NextResponse.json({ error: 'Valid email is required' }, { status: 400 });
   }
 

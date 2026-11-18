@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { CostInsightsDiscontinuedNotice } from '@/components/cost-insights/CostInsightsDiscontinuedNotice';
 import { PageContainer } from '@/components/layouts/PageContainer';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export const metadata: Metadata = {
   title: 'Cost Insights',

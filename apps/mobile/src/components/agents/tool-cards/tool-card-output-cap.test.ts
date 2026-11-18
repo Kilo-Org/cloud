@@ -3,6 +3,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ReadToolMarkdownModule from '../read-tool-markdown';
+import type * as ReactI18next from 'react-i18next';
 
 import { BashToolCardBody } from './bash-tool-card';
 import { GenericToolCardBody } from './generic-tool-card';
@@ -15,7 +16,18 @@ import { TodoToolCardBody } from './todo-tool-card';
 import { WebSearchToolCardBody } from './web-search-tool-card';
 import { prepareMonoScrollContent } from '../mono-scroll-block-model';
 
-vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  View: 'View',
+  TextInput: 'TextInput',
+}));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof React>();
   return {
@@ -61,6 +73,7 @@ vi.mock('../tool-list-model', () => ({ buildResultRowsModel, buildTodoListModel 
 
 const {
   getToolImageAttachments,
+  getToolFileAttachments,
   isMarkdownPath,
   resolveMarkdownBody,
   resolveReadCodeBody,
@@ -71,6 +84,7 @@ const {
   buildTodoListModel,
 } = vi.hoisted(() => ({
   getToolImageAttachments: vi.fn(() => []),
+  getToolFileAttachments: vi.fn(() => []),
   isMarkdownPath: vi.fn(() => false),
   resolveMarkdownBody: vi.fn(),
   resolveReadCodeBody: vi.fn(),
@@ -80,7 +94,7 @@ const {
   buildResultRowsModel: vi.fn(),
   buildTodoListModel: vi.fn(),
 }));
-vi.mock('../tool-card-attachments', () => ({ getToolImageAttachments }));
+vi.mock('../tool-card-attachments', () => ({ getToolImageAttachments, getToolFileAttachments }));
 // The real read model keeps its helpers; the three resolvers are spies so the
 // read body's routing can be driven and asserted.
 vi.mock('../read-tool-markdown', async importOriginal => {
@@ -157,7 +171,7 @@ type MonoBodyCase = {
   name: string;
   body: (props: { part: ToolPart }) => React.ReactElement;
   part: ToolPart;
-  /** Mono blocks per body: the output block, plus the input JSON for generic. */
+  /** Mono blocks per body: the single uncapped output block. */
   blockCount: number;
 };
 
@@ -181,11 +195,12 @@ const monoBodies: MonoBodyCase[] = [
     blockCount: 1,
   },
   {
-    // Generic renders the input JSON block and the output block.
+    // Generic renders only the output block; its argument fields render as
+    // labelled rows, not an input JSON dump.
     name: 'GenericToolCardBody',
     body: GenericToolCardBody,
     part: makeCompletedPart('generic', { command: 'echo hi' }),
-    blockCount: 2,
+    blockCount: 1,
   },
 ];
 
@@ -247,6 +262,31 @@ describe('tool-card output caps removed', () => {
       expect(outputBlocks).toHaveLength(1);
     }
   );
+
+  it('renders generic argument rows beside the single uncapped output block', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = GenericToolCardBody({
+      part: makeCompletedPart('generic', { command: 'echo hi' }),
+    }) as unknown as React.ReactElement;
+    const blocks = findByType(root, 'MonoScrollBlock');
+    expect(blocks).toHaveLength(1);
+    const block = blocks[0];
+    if (!block) {
+      throw new Error('output block not found');
+    }
+    expect((block.props as { content?: unknown }).content).toBe(longOutput);
+    expect((block.props as { maxLength?: unknown }).maxLength).toBeUndefined();
+    const labelTexts = findAll(
+      root,
+      el =>
+        el.type === 'Text' &&
+        (el.props as { children?: unknown }).children === 'profiles.commandLabel'
+    );
+    expect(labelTexts).toHaveLength(1);
+    // The field value flows through `SelectableText`'s read-only TextInput.
+    const inputs = findByType(root, 'TextInput');
+    expect(inputs.some(el => (el.props as { value?: unknown }).value === 'echo hi')).toBe(true);
+  });
 
   it.each(resultRowBodies)(
     '$name passes the full output to buildResultRowsModel and renders the model rows',
@@ -324,7 +364,9 @@ describe('tool-card output caps removed', () => {
     // `SelectableText` renders a read-only `TextInput` whose text flows
     // through the `value` prop, not a `Text` element with children.
     const inputs = findByType(root, 'TextInput');
-    expect(inputs.some(el => (el.props as { value?: unknown }).value === 'No tasks.')).toBe(true);
+    expect(
+      inputs.some(el => (el.props as { value?: unknown }).value === 'agentChat.toolCard.noTasks')
+    ).toBe(true);
     expect(findByType(root, 'TodoTaskRows')).toHaveLength(0);
     expect(findByType(root, 'MonoScrollBlock')).toHaveLength(0);
   });

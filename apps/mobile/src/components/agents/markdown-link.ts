@@ -1,5 +1,7 @@
 import { type ReactNode } from 'react';
-import { type AccessibilityActionInfo, type GestureResponderEvent } from 'react-native';
+import { type AccessibilityActionInfo } from 'react-native';
+
+import { i18n } from '@/i18n';
 
 const URL_HOST_PATTERN = /^[a-z][a-z\d+.-]*:\/\/([^/?#]+)/i;
 
@@ -22,21 +24,10 @@ export function resolveLinkAccessibilityLabel(
   return getUrlHost(href) ?? href;
 }
 
-export const LINK_ACCESSIBILITY_HINT = 'Opens in browser';
-
 export function getLinkAccessibilityActions(
   enabled: boolean
 ): AccessibilityActionInfo[] | undefined {
-  return enabled ? [{ name: 'showLinkActions', label: 'Show link actions' }] : undefined;
-}
-
-export function getLinkLongPressHandler(
-  onLongPressLink: ((href: string, event?: GestureResponderEvent) => void) | undefined,
-  href: string
-): ((event: GestureResponderEvent) => void) | undefined {
-  return onLongPressLink
-    ? event => {
-        onLongPressLink(href, event);
-      }
+  return enabled
+    ? [{ name: 'showLinkActions', label: i18n.t('agentChat.chatLink.showLinkActions') }]
     : undefined;
 }

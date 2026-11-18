@@ -1,0 +1,194 @@
+{
+  "generatedFrom": "workos-directory-events.json",
+  "events": [
+    {
+      "eventId": "event_01M6HD40E0R5Z1JZ1K8RVB101F",
+      "eventType": "dsync.activated",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/organizations/directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+          "body": {
+            "workOSOrganizationId": "org_01M6HCGCHX1X3JZYXAPYG2TKXJ",
+            "name": "z-corp",
+            "capturedDomains": ["integrator-6483000.okta.com"]
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HD40GS99VTWF5T9W3Y6T74",
+      "eventType": "dsync.user.created",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/users/directory_user_01M6HD40G3RJHWSFQCHMWC7Y8D",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "email": "bob.bobert@anaconda.com",
+            "firstName": "Bob",
+            "lastName": "Bobert"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HD989C5EZDMSC7NMJY2QPC",
+      "eventType": "dsync.group.created",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/sub-organizations/directory_group_01M6HD9895EBM5VG540FSMJ055",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "directoryIdpId": "kilo-users",
+            "name": "kilo-users"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HD9P854KJ7DYA5M8EDG1KB",
+      "eventType": "dsync.group.created",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/sub-organizations/directory_group_01M6HD9P7ZTMT8BZAF5D6FNBAS",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "directoryIdpId": "kilo-admins",
+            "name": "kilo-admins"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HDAV7F0QWQ1FXRPNDHWYXJ",
+      "eventType": "dsync.group.updated",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/sub-organizations/directory_group_01M6HD9P7ZTMT8BZAF5D6FNBAS",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "directoryIdpId": "kilo-admins",
+            "name": "kilo-admins"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HDAVA2DN56V4D32CT377W2",
+      "eventType": "dsync.user.created",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/users/directory_user_01M6HDAV9B7FZBJFW72NAX6X42",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "email": "kilo.admin@gmail.com",
+            "firstName": "Kilo",
+            "lastName": "Admin"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HDAVCWN46DVJMV51QWJZX3",
+      "eventType": "dsync.group.user_added",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/sub-organizations/directory_group_01M6HD9P7ZTMT8BZAF5D6FNBAS",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "directoryIdpId": "kilo-admins",
+            "name": "kilo-admins"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/users/directory_user_01M6HDAV9B7FZBJFW72NAX6X42",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "email": "kilo.admin@gmail.com",
+            "firstName": "Kilo",
+            "lastName": "Admin"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/memberships",
+          "body": {
+            "directoryGroupId": "directory_group_01M6HD9P7ZTMT8BZAF5D6FNBAS",
+            "externalId": "directory_user_01M6HDAV9B7FZBJFW72NAX6X42"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HDAXV9BNHXMPMTQ41EW8EB",
+      "eventType": "dsync.user.created",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/users/directory_user_01M6HDAXTKTVWRCFMWJ1P73SSH",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "email": "kilo.user@gmail.com",
+            "firstName": "Kilo",
+            "lastName": "User"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HDAYP6YQGQF22WBJRBCN3E",
+      "eventType": "dsync.group.updated",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/sub-organizations/directory_group_01M6HD9895EBM5VG540FSMJ055",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "directoryIdpId": "kilo-users",
+            "name": "kilo-users"
+          }
+        }
+      ]
+    },
+    {
+      "eventId": "event_01M6HDAZASZDQCSMWVFYG5N1WV",
+      "eventType": "dsync.group.user_added",
+      "calls": [
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/sub-organizations/directory_group_01M6HD9895EBM5VG540FSMJ055",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "directoryIdpId": "kilo-users",
+            "name": "kilo-users"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/users/directory_user_01M6HDAXTKTVWRCFMWJ1P73SSH",
+          "body": {
+            "directoryId": "directory_01M6HCWBKBYRZR9KFSJWJF0CCV",
+            "email": "kilo.user@gmail.com",
+            "firstName": "Kilo",
+            "lastName": "User"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/internal/scim/memberships",
+          "body": {
+            "directoryGroupId": "directory_group_01M6HD9895EBM5VG540FSMJ055",
+            "externalId": "directory_user_01M6HDAXTKTVWRCFMWJ1P73SSH"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import 'server-only';
 import type Stripe from 'stripe';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   insertKiloClawSubscriptionChangeLog,
   isKiloClawPriceVersion,
@@ -11,16 +11,13 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import { kiloclaw_subscriptions, kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
-import {
-  ImpactReferralPaymentProvider,
-  type KiloClawSubscriptionStatus,
-} from '@kilocode/db/schema-types';
+import { type KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import {
   getClawPlanForStripePriceId,
   getStripePriceIdForClawPlan,
   getStripePriceIdMetadata,
   isIntroPriceId,
-} from '@/lib/kiloclaw/stripe-price-ids.server';
+} from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
 import { classifyKiloClawInvoiceLine } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { getStripeFundedKiloClawReportingFields } from '@/lib/kiloclaw/stripe-funded-reporting.server';
@@ -28,16 +25,15 @@ import {
   autoResumeIfSuspended,
   clearTrialInactivityStopAfterTrialTransition,
 } from '@/lib/kiloclaw/instance-lifecycle';
-import { sentryLogger } from '@/lib/utils.server';
-import PostHogClient from '@/lib/posthog';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { runAfterResponse } from '@/lib/after-response';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
-import { client as stripe } from '@/lib/stripe-client';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -1658,11 +1654,20 @@ export async function handleKiloClawScheduleEvent(params: {
         .limit(1);
       if (!before) return;
 
-      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
-        stripe_schedule_id: null,
-        scheduled_plan: null,
-        scheduled_by: null,
-      };
+      const preservePendingCommitConversion =
+        scheduleStatus === 'released' &&
+        before.pending_conversion &&
+        before.plan === 'commit' &&
+        before.scheduled_plan === 'standard' &&
+        before.scheduled_by === 'user';
+      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> =
+        preservePendingCommitConversion
+          ? { stripe_schedule_id: null }
+          : {
+              stripe_schedule_id: null,
+              scheduled_plan: null,
+              scheduled_by: null,
+            };
 
       // Schedule lifecycle never owns Commit retirement plan or boundary
       // mutation. Invoice settlement remains authoritative for every hybrid
@@ -1859,35 +1864,22 @@ export async function handleKiloClawInvoicePaid(params: {
         invoice.status_transitions?.paid_at != null
           ? new Date(invoice.status_transitions.paid_at * 1000)
           : new Date();
-      const conversionDisposition = await processPersonalKiloClawPaidConversion({
+      await enqueueAffiliateEventForUser({
         userId: metadata.kiloUserId,
-        sourcePaymentId: invoice.id,
-        orderId: invoice.id,
-        paymentProvider: ImpactReferralPaymentProvider.Stripe,
-        amount: invoice.amount_paid / 100,
-        currencyCode: invoice.currency ?? 'usd',
-        convertedAt: eventDate,
-        ...reportingFields,
-      });
-
-      if (conversionDisposition.shouldEnqueueAffiliateSale) {
-        await enqueueAffiliateEventForUser({
-          userId: metadata.kiloUserId,
+        provider: 'impact',
+        eventType: 'sale',
+        dedupeKey: buildAffiliateEventDedupeKey({
           provider: 'impact',
           eventType: 'sale',
-          dedupeKey: buildAffiliateEventDedupeKey({
-            provider: 'impact',
-            eventType: 'sale',
-            entityId: invoice.id,
-          }),
-          orderId: invoice.id,
-          amount: invoice.amount_paid / 100,
-          currencyCode: invoice.currency ?? 'usd',
-          eventDate,
-          ...reportingFields,
-          stripeChargeId: chargeId ?? undefined,
-        });
-      }
+          entityId: invoice.id,
+        }),
+        orderId: invoice.id,
+        amount: invoice.amount_paid / 100,
+        currencyCode: invoice.currency ?? 'usd',
+        eventDate,
+        ...reportingFields,
+        stripeChargeId: chargeId ?? undefined,
+      });
     } catch (error) {
       logWarning('Affiliate sale enqueue failed', {
         stripe_event_id: eventId,

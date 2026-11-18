@@ -9,6 +9,7 @@ import { ModelCard } from './ModelCard';
 import { motion, AnimatePresence } from 'motion/react';
 import type { OpenRouterProvider } from './util';
 import { Checkbox } from '@/components/ui/checkbox';
+import { normalizeProviderIconUrl } from '@/components/organizations/providers-and-models/providerIconUrl';
 
 interface ProviderCardProps {
   provider: OpenRouterProvider;
@@ -37,6 +38,8 @@ export function ProviderCard({
   allowAllModels = false,
   onToggleAllowAllModels,
 }: ProviderCardProps) {
+  const iconUrl = normalizeProviderIconUrl(provider.icon?.url);
+
   const handleProviderClick = (e: React.MouseEvent) => {
     // Don't toggle expansion if clicking on the checkbox
     if ((e.target as HTMLElement).closest('[data-provider-checkbox]')) {
@@ -67,15 +70,12 @@ export function ProviderCard({
               />
             </div>
             <div className="flex items-center gap-2">
-              {provider.icon && (
+              {iconUrl && (
                 <img
-                  src={
-                    provider.icon.url.startsWith('http')
-                      ? provider.icon.url
-                      : `https://openrouter.ai${provider.icon.url}`
-                  }
+                  src={iconUrl}
                   alt={provider.displayName}
-                  className={cn('h-5 w-5', provider.icon.className)}
+                  referrerPolicy="no-referrer"
+                  className={cn('h-5 w-5', provider.icon?.className)}
                 />
               )}
               <div className="flex-1">

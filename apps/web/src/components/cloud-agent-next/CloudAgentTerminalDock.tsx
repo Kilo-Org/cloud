@@ -29,8 +29,10 @@ export function CloudAgentTerminalPane({
     onStatusChange?.({ status: terminal.status, statusText: terminal.statusText });
   }, [onStatusChange, terminal.status, terminal.statusText]);
 
+  const terminalSleeping = terminal.status === 'sleeping';
   const waitingForTerminal = terminal.status === 'connecting' || terminal.status === 'reconnecting';
-  const terminalNeedsReconnect = terminal.status === 'error' || terminal.status === 'exited';
+  const terminalNeedsReconnect =
+    terminal.status === 'error' || terminal.status === 'exited' || terminalSleeping;
 
   return (
     <section
@@ -46,8 +48,8 @@ export function CloudAgentTerminalPane({
             )}
           >
             <div
-              role={waitingForTerminal ? 'status' : undefined}
-              aria-live={waitingForTerminal ? 'polite' : undefined}
+              role={waitingForTerminal || terminalSleeping ? 'status' : undefined}
+              aria-live={waitingForTerminal || terminalSleeping ? 'polite' : undefined}
               className={cn(
                 'border-border bg-background/95 text-muted-foreground flex max-w-md items-center rounded-md border px-3 py-3 text-center text-sm',
                 waitingForTerminal ? 'gap-2' : 'flex-col gap-3'
@@ -63,7 +65,11 @@ export function CloudAgentTerminalPane({
             </div>
           </div>
         )}
-        <div ref={terminal.terminalRef} className="h-full w-full overflow-hidden" />
+        <div
+          ref={terminal.terminalRef}
+          className="h-full w-full overflow-hidden"
+          aria-disabled={terminalSleeping}
+        />
       </div>
     </section>
   );

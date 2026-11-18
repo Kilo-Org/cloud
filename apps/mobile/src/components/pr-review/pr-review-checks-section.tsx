@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+/* eslint-disable max-lines -- the section owns every CHECKS state in one file: the card shell, the tone/rollup helpers and the rows share one surface, and splitting the visible-loading fix away from the states it must match scatters it across callers. */
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -8,32 +9,52 @@ import {
   MinusCircle,
   XCircle,
 } from '@/components/ui/icons';
-import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import {
+  type PrReviewChecksStatus,
+  PrReviewChecksStatusRow,
+} from '@/components/pr-review/pr-review-checks-status-row';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Button } from '@/components/ui/button';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useTRPC } from '@/lib/trpc';
+import { type PrChecksModel, useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { providerPrTermKey, useProviderPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
+
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+type CheckRun = RouterOutputs['githubPrReview']['listChecks']['checkRuns'][number];
 
 type PrReviewChecksSectionProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;
-  /** Head SHA to fetch check runs for. */
-  readonly headSha: string;
+  /**
+   * The checks read, owned by the screen. It is passed in already settled
+   * (`isLoading` false), because the card's height depends on the answer: the
+   * screen holds the body until this read answers, so the card's first painted
+   * frame is its final one and the review and merge actions below it never
+   * move. Only the fields the section renders from are named here.
+   */
+  readonly checks: PrReviewChecksRead;
 };
 
-type CheckRun = {
-  name: string;
-  status: string;
-  conclusion: string | null;
-  detailsUrl: string | null;
-  appName: string | null;
+/** The settled `listChecks` read as the section consumes it. */
+type PrReviewChecksRead = {
+  readonly data: PrChecksModel | undefined;
+  readonly error: unknown;
+  readonly isError: boolean;
+  readonly isFetching: boolean;
+  readonly refetch: VoidFunction;
 };
 
 type CheckTone = 'success' | 'failure' | 'pending' | 'skipped' | 'neutral' | 'warning';
@@ -48,8 +69,11 @@ function classifyCheckTone(status: string, conclusion: string | null): CheckTone
     case 'success': {
       return 'success';
     }
+    // GitHub's commit-status `error` state is a real API conclusion the
+    // server already counts as failure (mappers.ts rollupState).
     case 'failure':
-    case 'startup_failure': {
+    case 'startup_failure':
+    case 'error': {
       return 'failure';
     }
     case 'skipped':
@@ -69,6 +93,35 @@ function classifyCheckTone(status: string, conclusion: string | null): CheckTone
       return 'neutral';
     }
   }
+}
+
+/**
+ * Which collapsed row counts a run. The tone above picks the detail row's
+ * icon; this picks the bucket, and the two answer different questions — a
+ * cancelled run keeps its muted circle while it counts as a failure.
+ *
+ * It mirrors the server's `rollupState` (apps/web/src/lib/github-pr-review/
+ * mappers.ts), which is the count the rows replaced: `cancelled`/`stale` are
+ * failures there, and a completed run with a null or unmapped conclusion is
+ * pending, never skipped. The provider read layer agrees (`canceled` blocks a
+ * GitLab merge as a failed pipeline), so the rows cannot contradict the
+ * rollup on either arm.
+ */
+function classifyCheckStatus(status: string, conclusion: string | null): PrReviewChecksStatus {
+  if (status !== 'completed') {
+    return 'pending';
+  }
+  const value = conclusion ?? '';
+  if (/^success$/i.test(value)) {
+    return 'success';
+  }
+  if (/failure|error|cancelled|timed_out|action_required|stale/i.test(value)) {
+    return 'failure';
+  }
+  if (/skipped|neutral/i.test(value)) {
+    return 'skipped';
+  }
+  return 'pending';
 }
 
 const TONE_COLOR = {
@@ -91,6 +144,7 @@ const TONE_ICON = {
 
 function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const tone = classifyCheckTone(run.status, run.conclusion);
   const Icon = TONE_ICON[tone];
   const iconColor = colors[TONE_COLOR[tone]];
@@ -99,7 +153,7 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
 
   const body = (
     <View className={cn('flex-row items-center gap-3 px-4 py-3', 'min-h-11')}>
-      <Icon size={16} color={iconColor} />
+      <SpinningIcon icon={Icon} size={16} color={iconColor} spinning={tone === 'pending'} />
       <View className="flex-1 gap-0.5">
         <Text className="text-sm font-medium" numberOfLines={1}>
           {run.name}
@@ -122,76 +176,65 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
       className="active:opacity-70"
       onPress={() => {
         if (run.detailsUrl) {
-          void openExternalUrl(run.detailsUrl, { label: 'check details' });
+          void openExternalUrl(run.detailsUrl, { label: t('prReview.checks.checkDetails') });
         }
       }}
       accessibilityRole="link"
-      accessibilityLabel={`Open ${run.name} details`}
+      accessibilityLabel={t('prReview.checks.openDetails', { name: run.name })}
     >
       {body}
     </Pressable>
   );
 }
 
-function buildRollupLine(rollup: {
-  total: number;
-  success: number;
-  failure: number;
-  pending: number;
-  skipped: number;
-}): string {
-  if (rollup.total === 0) {
-    return 'No checks reported';
+// The row order the rollup line has always summarised, kept for the groups.
+const STATUS_ORDER = ['success', 'failure', 'pending', 'skipped'] as const;
+
+// React Native on Android keeps a View's contentDescription when a later
+// render drops its `accessibilityLabel` (a loaded card once inherited the
+// placeholder's "Loading…" and a screen reader announced it over the loaded
+// rows, e2-scene.xml). No card here carries a label any more — the card is
+// only ever built from a settled read — so a state switch cannot leave one
+// behind. Every card keeps one stable key so a re-render of the same state
+// does not re-mount it and drop the expanded rows' state.
+const CONTENT_CARD_KEY = 'checks-card';
+
+type CheckRunGroup = {
+  status: PrReviewChecksStatus;
+  runs: CheckRun[];
+};
+
+/**
+ * Group the run list by the rollup status the server counts the run in,
+ * dropping statuses with no runs: a status the head commit has no checks for
+ * renders no row. Every run lands in exactly one bucket, so the row counts
+ * always sum to the card total and no run is dropped.
+ */
+function groupRunsByStatus(runList: readonly CheckRun[]): CheckRunGroup[] {
+  const byStatus = new Map<PrReviewChecksStatus, CheckRun[]>();
+  for (const run of runList) {
+    const status = classifyCheckStatus(run.status, run.conclusion);
+    const bucket = byStatus.get(status);
+    if (bucket) {
+      bucket.push(run);
+    } else {
+      byStatus.set(status, [run]);
+    }
   }
-  const parts: string[] = [];
-  if (rollup.success > 0) {
-    parts.push(`${rollup.success} passed`);
-  }
-  if (rollup.failure > 0) {
-    parts.push(`${rollup.failure} failed`);
-  }
-  if (rollup.pending > 0) {
-    parts.push(`${rollup.pending} pending`);
-  }
-  if (rollup.skipped > 0) {
-    parts.push(`${rollup.skipped} skipped`);
-  }
-  return parts.length > 0 ? parts.join(' · ') : `${rollup.total} checks`;
+  return STATUS_ORDER.flatMap(status => {
+    const runs = byStatus.get(status);
+    return runs ? [{ status, runs }] : [];
+  });
 }
 
-export function PrReviewChecksSection({
-  owner,
-  repo,
-  number,
-  headSha,
-}: PrReviewChecksSectionProps) {
-  const trpc = useTRPC();
+export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewChecksSectionProps) {
+  const queries = useProviderPrQueries({ owner, repo, number });
   const colors = useThemeColors();
-  const prUrl = useMemo(
-    () => `https://github.com/${owner}/${repo}/pull/${number}`,
-    [owner, repo, number]
-  );
-
-  const checks = useQuery(
-    trpc.githubPrReview.listChecks.queryOptions({ owner, repo, ref: headSha })
-  );
-
-  // Loading (first time, no cached data): show three skeleton rows in a
-  // card so the section matches the final dimensions once the data lands.
-  if (checks.isLoading) {
-    return (
-      <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Checks
-        </Text>
-        <View className="gap-2 rounded-lg bg-secondary p-4">
-          <View className="h-3 w-40 rounded bg-muted" />
-          <View className="h-3 w-32 rounded bg-muted" />
-          <View className="h-3 w-44 rounded bg-muted" />
-        </View>
-      </View>
-    );
-  }
+  const { t } = useTranslation();
+  // The loaded PR/MR's own URL, published by the screen. Null until the read
+  // answers (and always the fixed host on GitHub), so the section renders no
+  // link until it has one.
+  const prUrl = useProviderPrWebUrl();
 
   if (checks.isError) {
     const state = classifyPrReviewQueryState(checks.error);
@@ -201,13 +244,10 @@ export function PrReviewChecksSection({
       // installed on the head repo). No retry — just the message.
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Checks
-          </Text>
-          <View className="gap-2 rounded-lg bg-secondary p-4">
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
+          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
             <Text className="text-sm text-muted-foreground">
-              Checks aren&apos;t available yet. The head commit may not have been processed, or the
-              Kilo GitHub App isn&apos;t installed on the head repository.
+              {t('prReview.checks.notAvailable')}
             </Text>
           </View>
         </View>
@@ -216,13 +256,9 @@ export function PrReviewChecksSection({
     if (state.kind === 'permission') {
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Checks
-          </Text>
-          <View className="gap-2 rounded-lg bg-secondary p-4">
-            <Text className="text-sm text-muted-foreground">
-              You don&apos;t have access to checks for this repository.
-            </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
+          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
+            <Text className="text-sm text-muted-foreground">{t('prReview.checks.noAccess')}</Text>
           </View>
         </View>
       );
@@ -230,85 +266,124 @@ export function PrReviewChecksSection({
     if (state.kind === 'reconnect') {
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Checks
-          </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
           <PrReviewReconnectNotice />
         </View>
       );
     }
 
-    // Retryable (server/offline) — section-level retry button.
+    // Retryable / service-unavailable (server/offline) — section-level retry
+    // button. A BAD_GATEWAY names its own cause; every other failure keeps
+    // the generic could-not-load copy.
     return (
       <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Checks
-        </Text>
-        <View className="gap-3 rounded-lg bg-secondary p-4">
-          <Text className="text-sm text-muted-foreground">Couldn&apos;t load checks.</Text>
+        <PrReviewSectionLabel label={t('prReview.checks.title')} />
+        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
+          <Text className="text-sm text-muted-foreground">
+            {state.kind === 'service-unavailable'
+              ? t('prReview.reviewServiceUnavailableDescription')
+              : t('prReview.checks.couldNotLoad')}
+          </Text>
           <Button
             variant="outline"
             onPress={() => {
-              void checks.refetch();
+              checks.refetch();
             }}
             loading={checks.isFetching}
-            accessibilityLabel="Retry checks"
+            accessibilityLabel={t('prReview.checks.retryChecks')}
           >
-            <Text>Retry</Text>
+            <Text>{t('common.retry')}</Text>
           </Button>
         </View>
       </View>
     );
   }
 
+  const viewOnProviderLabel =
+    queries.platform === 'github'
+      ? t('prReview.checks.viewOnGitHub')
+      : t('prReview.terms.viewOnProvider', { provider: reviewerPlatformLabel(queries.platform) });
+
   const data = checks.data;
   const runList = data?.checkRuns ?? [];
-  const rollup = data?.rollup ?? { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
-  const rollupLine = buildRollupLine(rollup);
+  const groups = groupRunsByStatus(runList);
+  // The server reads each listing up to a fixed page ceiling and flags the
+  // response when entries were left behind, so the header prints a lower bound
+  // instead of a total the rows would contradict. The "+" rides inside the
+  // formatted number of the existing count copy, so no locale needs new text.
+  const displayCount = `${formatNumber(runList.length, i18n.language)}${
+    data?.truncated ? '+' : ''
+  }`;
 
   if (runList.length === 0) {
     return (
       <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Checks
-        </Text>
-        <View className="gap-3 rounded-lg bg-secondary p-4">
-          <Text className="text-sm text-muted-foreground">{rollupLine}</Text>
-          <Button
-            variant="outline"
-            onPress={() => {
-              void openExternalUrl(prUrl, { label: 'pull request' });
-            }}
-            accessibilityLabel="View PR on GitHub"
-          >
-            <View className="flex-row items-center gap-2">
-              <ExternalLink size={14} color={colors.foreground} />
-              <Text>View PR on GitHub</Text>
-            </View>
-          </Button>
+        <PrReviewSectionLabel label={t('prReview.checks.title')} />
+        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
+          <Text className="text-sm text-muted-foreground">
+            {t('prReview.checks.noChecksReported')}
+          </Text>
+          {prUrl ? (
+            <Button
+              variant="outline"
+              onPress={() => {
+                void openExternalUrl(prUrl, { label: t(providerPrTermKey(queries.platform)) });
+              }}
+              accessibilityLabel={viewOnProviderLabel}
+            >
+              <View className="flex-row items-center gap-2">
+                <ExternalLink size={14} color={colors.foreground} />
+                <Text>{viewOnProviderLabel}</Text>
+              </View>
+            </Button>
+          ) : null}
         </View>
       </View>
     );
   }
 
+  // The total strip earns its place only where no other row states it. With a
+  // single status group the group's own label is the card total, so the strip
+  // printed the same number twice ("1 check" over "1 passed", design review at
+  // the PR review overview fixture). Two or more groups have no single row
+  // carrying the total, and a listing the server cut needs the `+` to say its
+  // counts are lower bounds.
+  const showTotal = groups.length > 1 || Boolean(data?.truncated);
+
+  // i18n-dup-ok: 'prReview.checks.checksCount_other' repeats the bare
+  // 'prReview.checks.checksCount' by i18next convention — the bare key is the
+  // plural fallback that must carry the `other` copy, so the family is one key
+  // with a plural stem, not two keys for one string.
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Checks
-      </Text>
-      <View className="overflow-hidden rounded-lg bg-secondary">
-        <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
-          <Text variant="muted" className="text-xs">
-            {rollupLine}
-          </Text>
-        </View>
-        {runList.map((run, index) => (
-          <View key={`${run.name}-${index}`}>
-            <CheckRow run={run} />
-            {index < runList.length - 1 ? (
-              <View className="ml-4 border-b-[0.5px] border-hair-soft" />
-            ) : null}
+      <PrReviewSectionLabel label={t('prReview.checks.title')} />
+      <View key={CONTENT_CARD_KEY} className="overflow-hidden rounded-lg bg-secondary">
+        {showTotal ? (
+          <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
+            <Text variant="muted" className="text-xs">
+              {t('prReview.checks.checksCount', {
+                count: runList.length,
+                displayCount,
+              })}
+            </Text>
           </View>
+        ) : null}
+        {groups.map((group, groupIndex) => (
+          <PrReviewChecksStatusRow
+            key={group.status}
+            status={group.status}
+            count={group.runs.length}
+            showSeparator={groupIndex < groups.length - 1}
+          >
+            {group.runs.map((run, runIndex) => (
+              <View key={`${run.name}-${runIndex}`}>
+                <CheckRow run={run} />
+                {runIndex < group.runs.length - 1 ? (
+                  <View className="ml-4 border-b-[0.5px] border-hair-soft" />
+                ) : null}
+              </View>
+            ))}
+          </PrReviewChecksStatusRow>
         ))}
       </View>
     </View>

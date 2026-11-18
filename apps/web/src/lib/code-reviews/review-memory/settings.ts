@@ -1,10 +1,15 @@
 import * as z from 'zod';
-import { and, eq } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
+import {
+  agentConfigConflictTarget,
+  agentConfigOwnerValues,
+  assertAgentConfigCanBeEnabled,
+  getAgentConfigForOwner,
+} from '@/lib/agent-config/db/agent-configs';
 
 const ReviewMemorySettingsSchema = z.object({
   review_memory_enabled: z.boolean().optional(),
@@ -20,8 +25,8 @@ export async function isReviewMemoryEnabled(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
 }): Promise<boolean> {
-  const config = await getReviewMemoryConfigRow(input);
-  return getReviewMemoryEnabledFromConfig(config?.config);
+  const row = await getAgentConfigForOwner(input.owner, 'code_review', input.platform);
+  return getReviewMemoryEnabledFromConfig(row?.config);
 }
 
 export async function setReviewMemoryEnabled(input: {
@@ -30,7 +35,7 @@ export async function setReviewMemoryEnabled(input: {
   enabled: boolean;
   createdBy: string;
 }): Promise<boolean> {
-  const existing = await getReviewMemoryConfigRow(input);
+  const existing = await getAgentConfigForOwner(input.owner, 'code_review', input.platform);
   const existingConfig = existing?.config;
   const config = {
     ...(existingConfig && typeof existingConfig === 'object' && !Array.isArray(existingConfig)
@@ -40,17 +45,19 @@ export async function setReviewMemoryEnabled(input: {
   };
   const now = new Date().toISOString();
 
-  const updateSet: Partial<typeof agent_configs.$inferInsert> = {
-    config,
-    updated_at: now,
-  };
-
-  if (input.owner.type === 'org') {
-    await db
+  await db.transaction(async tx => {
+    await assertAgentConfigCanBeEnabled({
+      owner: input.owner,
+      platform: input.platform,
+      enabled: input.enabled,
+      executor: tx,
+    });
+    // Review memory owns only its own flag: a new row starts disabled, and an
+    // existing row keeps its is_enabled.
+    await tx
       .insert(agent_configs)
       .values({
-        owned_by_organization_id: input.owner.id,
-        owned_by_user_id: null,
+        ...agentConfigOwnerValues(input.owner),
         agent_type: 'code_review',
         platform: input.platform,
         config,
@@ -58,53 +65,10 @@ export async function setReviewMemoryEnabled(input: {
         created_by: input.createdBy,
       })
       .onConflictDoUpdate({
-        target: [
-          agent_configs.owned_by_organization_id,
-          agent_configs.agent_type,
-          agent_configs.platform,
-        ],
-        set: updateSet,
+        target: agentConfigConflictTarget(input.owner),
+        set: { config, updated_at: now },
       });
-  } else {
-    await db
-      .insert(agent_configs)
-      .values({
-        owned_by_organization_id: null,
-        owned_by_user_id: input.owner.id,
-        agent_type: 'code_review',
-        platform: input.platform,
-        config,
-        is_enabled: false,
-        created_by: input.createdBy,
-      })
-      .onConflictDoUpdate({
-        target: [agent_configs.owned_by_user_id, agent_configs.agent_type, agent_configs.platform],
-        set: updateSet,
-      });
-  }
+  });
 
   return input.enabled;
-}
-
-async function getReviewMemoryConfigRow(input: {
-  owner: ReviewMemoryOwner;
-  platform: ReviewMemoryPlatform;
-}) {
-  const conditions = [
-    eq(agent_configs.agent_type, 'code_review'),
-    eq(agent_configs.platform, input.platform),
-  ];
-
-  if (input.owner.type === 'org') {
-    conditions.push(eq(agent_configs.owned_by_organization_id, input.owner.id));
-  } else {
-    conditions.push(eq(agent_configs.owned_by_user_id, input.owner.id));
-  }
-
-  const [config] = await db
-    .select()
-    .from(agent_configs)
-    .where(and(...conditions))
-    .limit(1);
-  return config ?? null;
 }

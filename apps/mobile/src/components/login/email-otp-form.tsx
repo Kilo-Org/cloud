@@ -1,42 +1,102 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { type useNativeAuth } from '@/lib/auth/use-native-auth';
+import { type BusyAction } from '@/lib/auth/use-native-auth';
+import { foldDecimalDigits } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { canSubmitEmailCode } from './email-otp-state';
+
+/**
+ * Marks where the address sits inside the translated sentence. The catalog
+ * message is never rewritten: the address is substituted for this slot and
+ * placed on a line of its own, so a long address starts a fresh line instead of
+ * breaking mid-word (the reported `.com` orphan). A destination above the
+ * display bound is abbreviated in the middle.
+ */
+const ADDRESS_SLOT = '\u0000';
+
+/** Above this, the destination abbreviates in the middle to keep the code controls visible. */
+const DESTINATION_MAX_CHARS = 48;
+const DESTINATION_PREFIX_CHARS = 24;
+const DESTINATION_SUFFIX_CHARS = 23;
+
+/**
+ * Puts the address on its own line without assuming the translation's word
+ * order. Punctuation or a particle written directly after the slot stays on the
+ * address line (Arabic `{{email}}.`); a space-separated phrase starts the next
+ * line. Each line break replaces the space it separates, never adds one beside
+ * it: a break inserted before the space left the wrapped line indented by a
+ * visible space (Hindi `…\n पर भेजा गया…`). Removing the breaks and restoring
+ * one space for each reproduces the catalog message exactly, so the sentence
+ * keeps its own punctuation attached.
+ */
+function formatCodeDestination(message: string, email: string): string {
+  const [before = '', after = ''] = message.split(ADDRESS_SLOT);
+  const lead = before ? `${before.trimEnd()}\n` : '';
+  const trail = after.startsWith(' ') ? `\n${after.slice(1)}` : after;
+  const destination =
+    email.length > DESTINATION_MAX_CHARS
+      ? `${email.slice(0, DESTINATION_PREFIX_CHARS)}…${email.slice(-DESTINATION_SUFFIX_CHARS)}`
+      : email;
+  return `${lead}${destination}${trail}`;
+}
 
 export function EmailOtpForm({
   email,
   busy,
+  error,
   onVerify,
+  onCodeChange,
   onResend,
   onBack,
+  onBelowFieldHeightChange,
 }: Readonly<{
   email: string;
-  busy: ReturnType<typeof useNativeAuth>['busy'];
+  busy: BusyAction;
+  /** A verify refusal in the active language, rendered above the verify button. */
+  error?: string;
   onVerify: (code: string) => void;
+  /** Fires on every code-input change so the caller can retire a stale refusal message. */
+  onCodeChange?: () => void;
   onResend: () => void;
   onBack: () => void;
+  /**
+   * Reports the height of everything below the code field, so the login shell
+   * can keep that much of the form clear of the keyboard. A refusal can wrap,
+   * so the height is measured instead of assumed.
+   */
+  onBelowFieldHeightChange?: (height: number) => void;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const codeRef = useRef('');
   const [hasCompleteCode, setHasCompleteCode] = useState(false);
   const authBusy = busy !== undefined;
+  const destination = formatCodeDestination(
+    t('login.enterCodeSentTo', { email: ADDRESS_SLOT }),
+    email
+  );
 
   return (
     // Keyboard avoidance is owned by the login shell in login-screen.tsx.
     <View className="gap-3">
       <Text variant="muted" className="text-center text-sm">
-        Enter the code sent to {email}
+        {destination}
       </Text>
       <Text variant="muted" className="text-center text-xs">
-        If this address is eligible, the code arrives within a minute.
+        {t('login.codeArrivalHint')}
       </Text>
-      <TextInput
-        className="h-12 rounded-md border border-input bg-background px-3 text-lg leading-[normal] tracking-widest text-foreground"
+      <Input
+        // The shared box supplies the Android center gravity and the
+        // single-line line box; `min-h-[48px]` keeps the one-time-code
+        // field's `h-12`-scale look as a floor (never a fixed height), so
+        // Dynamic Type can still grow it.
+        className="min-h-[48px] rounded-md border border-input bg-background pl-3 pr-3 text-lg leading-[normal] tracking-widest text-foreground"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above
@@ -48,37 +108,71 @@ export function EmailOtpForm({
         textContentType="oneTimeCode"
         maxLength={6}
         onChangeText={value => {
-          codeRef.current = value;
-          setHasCompleteCode(/^\d{6}$/.test(value));
+          // The field keeps what was typed, but validation and the code sent to
+          // the server work on ASCII: the sign-in code is issued in ASCII, and a
+          // keyboard in another script types the same code in its own digits.
+          const digits = foldDecimalDigits(value);
+          codeRef.current = digits;
+          setHasCompleteCode(/^\d{6}$/.test(digits));
+          onCodeChange?.();
         }}
-        accessibilityLabel={formFieldA11y({ label: 'Sign-in code', required: true })}
+        accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
-      <Button
-        size="lg"
-        className="flex-row gap-2"
-        disabled={!hasCompleteCode || authBusy}
-        onPress={() => {
-          if (canSubmitEmailCode(codeRef.current, busy)) {
-            onVerify(codeRef.current);
-          }
+      {/* The refusal and the action it belongs to, as one block: a refusal
+          wraps in some catalogs, so the shell reads this block's measured height
+          instead of assuming the action sits one row below the field. */}
+      <View
+        className="gap-3"
+        onLayout={event => {
+          onBelowFieldHeightChange?.(event.nativeEvent.layout.height);
         }}
-        accessibilityLabel="Verify code"
       >
-        {busy === 'otp-verify' ? <ActivityIndicator size="small" /> : null}
-        <Text>Verify code</Text>
-      </Button>
+        {error ? (
+          <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
+        <Button
+          size="lg"
+          className="flex-row gap-2"
+          disabled={!hasCompleteCode || authBusy}
+          loading={busy === 'otp-verify'}
+          onPress={() => {
+            if (canSubmitEmailCode(codeRef.current, busy)) {
+              onVerify(codeRef.current);
+            }
+          }}
+          accessibilityLabel={t('login.verifyCode')}
+        >
+          <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+            {t('login.verifyCode')}
+          </Text>
+        </Button>
+      </View>
       <Button
         variant="outline"
         className="flex-row gap-2"
         disabled={authBusy}
+        loading={busy === 'otp-send'}
         onPress={onResend}
-        accessibilityLabel="Resend code"
+        accessibilityLabel={t('login.resendCode')}
       >
-        {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text>Resend code</Text>
+        {/* One line, like every other label in this stack: the Arabic secondary
+            label ("إعادة إرسال الرمز") wrapped onto two lines inside the
+            full-width button, so the copy did not fit its control (2026-09-19
+            device finding). Longer locales ellipsize instead of growing a
+            second row; the full label stays the control's accessible name. */}
+        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+          {t('login.resendCode')}
+        </Text>
       </Button>
-      <Button variant="ghost" disabled={authBusy} onPress={onBack} accessibilityLabel="Back">
-        <Text>Back</Text>
+      <Button
+        variant="ghost"
+        disabled={authBusy}
+        onPress={onBack}
+        accessibilityLabel={t('common.back')}
+      >
+        <Text>{t('common.back')}</Text>
       </Button>
     </View>
   );

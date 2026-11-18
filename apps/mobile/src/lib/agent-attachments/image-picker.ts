@@ -1,5 +1,6 @@
 import type * as ImagePicker from 'expo-image-picker';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 export const IMAGE_PICKER_OPTIONS = {
@@ -32,7 +33,7 @@ export async function launchImagePicker(
     const result = await launch;
     return result.canceled ? [] : result.assets;
   } catch {
-    announcingToast.error('Could not open the photo picker. Restart Kilo and try again.');
+    announcingToast.error(i18n.t('agentChat.attachmentPicker.couldNotOpenPhotoPicker'));
     return [];
   }
 }

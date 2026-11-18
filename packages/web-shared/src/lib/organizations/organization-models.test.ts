@@ -1,0 +1,713 @@
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import type { ModelStats, Organization } from '@kilocode/db/schema';
+import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
+import type { OpenRouterModel, OpenRouterModelsResponse } from './organization-types';
+import type {
+  OrganizationGroupPolicyContext,
+  OrganizationPolicySubject,
+} from './organization-group-policy-context.server';
+import type * as Producer from './organization-models';
+import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
+import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
+import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
+
+let mockPublicationEnabled = true;
+let mockAutoEnabled = false;
+let mockContext: OrganizationGroupPolicyContext;
+let mockCatalog: OpenRouterModelsResponse & { fixtureCatalogMarker: string };
+const mockReadRows = jest.fn<Promise<Cache.ModelStatsCacheEntry[]>, []>();
+const mockReplicaRows = jest.fn<Promise<Cache.ModelStatsCacheEntry[]>, []>();
+const mockReplicaSelect = jest.fn(() => ({
+  from: () => ({ orderBy: mockReplicaRows, leftJoin: () => ({ orderBy: mockReplicaRows }) }),
+}));
+const mockGetContext = jest.fn(
+  async (_params: { organizationId: string; subject: OrganizationPolicySubject }) => mockContext
+);
+/** Only the grant mode is read from the policy by the catalog filter under test. */
+type MockModelPolicy = { policyRevision: number; memberGrant: { mode: string } };
+const mockPolicy: MockModelPolicy = {
+  policyRevision: 7,
+  memberGrant: { mode: 'selected' },
+};
+const mockEvaluatePolicy = jest.fn(
+  (_context: OrganizationGroupPolicyContext): MockModelPolicy => mockPolicy
+);
+const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
+const DENIAL_SOURCES: Record<string, string> = {
+  'provider/blocked': 'group_model',
+  'provider/ceiling-inference': 'organization_provider',
+  'provider/ceiling-catalog': 'organization_provider',
+  'provider/ceiling-gateway': 'organization_provider',
+  'provider/deny-listed-inference': 'organization_model',
+  'provider/ungranted-inference': 'no_grant',
+  'provider/ungranted-catalog': 'no_grant',
+};
+const mockDecision = jest.fn(async (_policy: unknown, id: string) =>
+  DENIAL_SOURCES[id]
+    ? { allowed: false, denialSource: DENIAL_SOURCES[id] }
+    : {
+        allowed: true,
+        ...(id === 'provider/allowed' && { eligibleProviderRoutes: ALLOWED_MODEL_ROUTES }),
+      }
+);
+const INFERENCE_PROVIDER_BYOK_MODELS = new Set([
+  'provider/ceiling-inference',
+  'provider/deny-listed-inference',
+  'provider/ungranted-inference',
+]);
+const mockInferenceProviderUserByok = jest.fn(
+  async (modelId: string, _providers: readonly string[]) =>
+    INFERENCE_PROVIDER_BYOK_MODELS.has(modelId)
+);
+const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
+const mockCustom = jest.fn<
+  Promise<OpenRouterModel[]>,
+  [string, readonly string[], string | null]
+>();
+const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
+/** Replica snapshot loads a test expects; anything else fails the test teardown. */
+let expectedReplicaLoads = 0;
+const mockCatalogModelIds = new Set(['provider/allowed']);
+const mockDirectByokCatalogModelIds = jest.fn(
+  async (_organizationId: string, _policy: unknown): Promise<ReadonlySet<string>> =>
+    mockCatalogModelIds
+);
+const mockCatalogAvailability = jest.fn(
+  (models: OpenRouterModel[], _catalogModelIds: ReadonlySet<string>) => models
+);
+const mockAvailability = jest.fn(
+  async (
+    models: OpenRouterModel[],
+    _providers: string[],
+    _getAllowedProviders?: (modelId: string) => ReadonlySet<string> | undefined
+  ) => models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
+);
+const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
+const mockTagClaude = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  requireCustomLlmsById: async () => new Map(),
+}));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  get ENKRYPT_PUBLICATION_ENABLED() {
+    return mockPublicationEnabled;
+  },
+}));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => ({
+      from: () => ({ orderBy: mockReadRows, leftJoin: () => ({ orderBy: mockReadRows }) }),
+    })),
+  },
+  readDb: { select: mockReplicaSelect },
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  getEnhancedOpenRouterModels: jest.fn(async () => mockCatalog),
+  buildAutoModelCatalogEntry: jest.fn(() => catalogModel('kilo-auto/org')),
+}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
+  () => ({
+    getOrganizationGroupPolicyContext: mockGetContext,
+  })
+);
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ).allowsInferenceProviderUserByok,
+    evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
+    getEffectiveModelDecision: mockDecision,
+  })
+);
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms', () => ({
+  listAvailableCustomLlms: mockCustom,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  getDirectByokModelsForOrganization: mockByok,
+}));
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
+  () => ({ getAllowedDirectByokCatalogModelIds: mockDirectByokCatalogModelIds })
+);
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/ai-gateway/auto-model'),
+  ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
+}));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () => ({
+  isOrganizationAutoEnabled: () => mockAutoEnabled,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  addDirectByokCatalogAvailability: mockCatalogAvailability,
+  addUserByokAvailability: mockAvailability,
+  getOrganizationByokProviderIds: mockProviderIds,
+  hasInferenceProviderUserByokForModel: mockInferenceProviderUserByok,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
+  tagOpenAiChatGptByokModels: mockTagChatGpt,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models', () => ({
+  tagClaudeBillingByokModels: mockTagClaude,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
+  openAiChatGptSharedServicesOwner: (organizationId: string) => ({
+    organizationId,
+    scope: 'shared_services',
+  }),
+}));
+
+const checkedAt = '2026-09-01T00:00:00.000Z';
+const benchmark: EnkryptBenchmark = {
+  model_name: 'Fixture model',
+  provider: 'Fixture provider',
+  risk_score: 0,
+  bias_score: null,
+  ingestedAt: '2026-08-27T00:00:00.000Z',
+  evaluatedAt: null,
+};
+const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) };
+const subject: OrganizationPolicySubject = { type: 'member', kiloUserId: 'fixture-user' };
+const terminalBench = { overallScore: 0.7, avgAttemptCostUsd: 12 };
+
+function catalogModel(id: string, overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
+  return {
+    id,
+    name: id,
+    created: 0,
+    description: 'Fixture model',
+    architecture: { input_modalities: ['text'], output_modalities: ['text'], tokenizer: 'fixture' },
+    top_provider: { is_moderated: false },
+    pricing: { prompt: '0.01', completion: '0.02' },
+    context_length: 1000,
+    terminalBench,
+    mayTrainOnYourPrompts: false,
+    ...overrides,
+  };
+}
+
+function entry(
+  id = 'provider/allowed',
+  score = benchmark,
+  check: unknown = verification,
+  isStealth = false
+): Cache.ModelStatsCacheEntry {
+  return {
+    stat: {
+      openrouterId: id,
+      isActive: true,
+      isStealth,
+      benchmarks: { enkrypt: score },
+      openrouterData: {},
+    } as ModelStats,
+    verification: check,
+  };
+}
+
+function organization(): Organization {
+  return {
+    id: 'fixture-org',
+    name: 'Fixture organization',
+    created_at: checkedAt,
+    updated_at: checkedAt,
+    microdollars_used: 0,
+    microdollars_balance: 0,
+    total_microdollars_acquired: 0,
+    next_credit_expiration_at: null,
+    stripe_customer_id: null,
+    auto_top_up_enabled: false,
+    settings: {},
+    seat_count: 0,
+    require_seats: false,
+    created_by_kilo_user_id: null,
+    deleted_at: null,
+    sso_domain: null,
+    parent_organization_id: null,
+    plan: 'enterprise',
+    free_trial_end_at: null,
+    company_domain: null,
+    directory_id: null,
+    directory_group_id: null,
+    directory_idp_id: null,
+    external_org_id: null,
+  };
+}
+
+let producer: typeof Producer;
+let cache: typeof Cache;
+let enkrypt: typeof Enkrypt;
+let mockFetch: jest.SpiedFunction<typeof fetch>;
+
+beforeEach(async () => {
+  jest.resetModules();
+  jest.clearAllMocks();
+  jest.useFakeTimers();
+  jest.setSystemTime(Date.parse(checkedAt));
+  mockFetch = jest
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(new Error('Unexpected network request'));
+  mockPublicationEnabled = true;
+  mockAutoEnabled = false;
+  mockContext = {
+    organization: organization(),
+    groupIds: ['fixture-group'],
+    defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
+    groupPolicies: [
+      [
+        {
+          type: 'model_access',
+          data: {
+            mode: 'selected',
+            model_allow_list: ['provider/allowed'],
+            provider_allow_list: [],
+          },
+        },
+      ],
+    ],
+    policyRevision: 7,
+  };
+  mockCatalog = {
+    fixtureCatalogMarker: 'preserved',
+    data: [
+      catalogModel('provider/allowed'),
+      catalogModel('provider/blocked'),
+      catalogModel('provider/training', { mayTrainOnYourPrompts: true }),
+    ],
+  };
+  mockReadRows.mockReset().mockResolvedValue([entry(), entry('provider/blocked')]);
+  mockReplicaRows.mockReset().mockResolvedValue([entry(), entry('provider/blocked')]);
+  mockReplicaSelect.mockClear();
+  expectedReplicaLoads = 0;
+  mockByok.mockReset().mockResolvedValue([catalogModel('morph-byok/private')]);
+  mockCustom
+    .mockReset()
+    .mockResolvedValue([catalogModel('kilo-internal/private', { mayTrainOnYourPrompts: true })]);
+  mockTagChatGpt.mockReset().mockImplementation(async (_owner, models) => models);
+  mockTagClaude.mockReset().mockImplementation(async (_owner, models) => models);
+  [producer, cache, enkrypt] = await Promise.all([
+    import('./organization-models'),
+    import('@kilocode/web-shared/lib/model-stats/model-stats-cache'),
+    import('@kilocode/web-shared/lib/model-stats/enkrypt'),
+  ]);
+});
+
+afterEach(() => {
+  expect(mockFetch).not.toHaveBeenCalled();
+  expect(mockReplicaSelect).toHaveBeenCalledTimes(expectedReplicaLoads);
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+});
+
+async function primeAnnotatedCatalog() {
+  const snapshot = await enkrypt.getEnkryptBenchmarks();
+  mockCatalog = { ...mockCatalog, data: enkrypt.publishEnkryptModels(mockCatalog.data, snapshot) };
+  for (const model of mockCatalog.data) Object.freeze(model);
+  Object.freeze(mockCatalog.data);
+  expect(mockCatalog.data[0].enkrypt).toMatchObject({
+    lastCheckedAt: checkedAt,
+    freshness: 'fresh',
+  });
+}
+
+function pauseAt(stage: 'byok' | 'custom') {
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const models =
+    stage === 'byok'
+      ? [catalogModel('morph-byok/private')]
+      : [catalogModel('kilo-internal/private', { mayTrainOnYourPrompts: true })];
+  const lookup = stage === 'byok' ? mockByok : mockCustom;
+  lookup.mockImplementationOnce(async () => {
+    entered.resolve();
+    await release.promise;
+    return models;
+  });
+  return { entered: entered.promise, release: release.resolve };
+}
+
+async function resultFor(policySubject = subject, audience: OrganizationModelAudience = 'member') {
+  const result = await producer.getAvailableModelsForOrganization(
+    'fixture-org',
+    policySubject,
+    audience,
+    { countryCode: null }
+  );
+  if (!result) throw new Error('Expected organization catalog');
+  expect(result).toHaveProperty('fixtureCatalogMarker', 'preserved');
+  const serialized = JSON.stringify(result);
+  expect(serialized).not.toContain(verification.scoreHash);
+  for (const field of ['verification', 'scoreHash', 'observedAt', 'generation', 'entries']) {
+    expect(serialized).not.toContain(field);
+  }
+  return result;
+}
+
+describe('organization model producer publication', () => {
+  describe.each(['byok', 'custom'] as const)('during %s lookup', stage => {
+    describe.each(['expiry', 'invalidation'] as const)('%s', boundary => {
+      it.each(['failure', 'hidden', 'verified'] as const)(
+        'uses only final snapshot eligibility after %s refresh',
+        async refresh => {
+          await primeAnnotatedCatalog();
+          const previouslyAnnotated = mockCatalog.data[0].enkrypt;
+          const pending = pauseAt(stage);
+          const response = resultFor();
+          await pending.entered;
+          expect(mockReadRows).toHaveBeenCalledTimes(1);
+          if (boundary === 'expiry') jest.advanceTimersByTime(300_000);
+          else cache.invalidateModelStatsCache();
+          const updated = { ...benchmark, risk_score: 9 };
+          const check = {
+            checkedAt: new Date(Date.now()).toISOString(),
+            scoreHash: fingerprintEnkryptScore(updated),
+          };
+          if (refresh === 'failure') mockReadRows.mockRejectedValue(new Error('Unavailable'));
+          else
+            mockReadRows.mockResolvedValue([
+              entry('provider/allowed', updated, check, refresh === 'hidden'),
+            ]);
+          pending.release();
+          const result = await response;
+          expect(JSON.stringify(result)).not.toContain(check.scoreHash);
+          const model = result.data.find(model => model.id === 'provider/allowed');
+          expect(model).toBeDefined();
+          expect(model?.terminalBench).toEqual(terminalBench);
+          expect(model?.hasUserByokAvailable).toBe(true);
+          if (refresh === 'verified')
+            expect(model?.enkrypt).toMatchObject({
+              risk_score: 9,
+              lastCheckedAt: check.checkedAt,
+              freshness: 'fresh',
+            });
+          else expect(model).not.toHaveProperty('enkrypt');
+          expect(result.data.map(model => model.id)).toEqual([
+            'provider/allowed',
+            'provider/training',
+            'morph-byok/private',
+            'kilo-internal/private',
+          ]);
+          expect(mockCatalog.data[0].enkrypt).toBe(previouslyAnnotated);
+          expect(mockReadRows).toHaveBeenCalledTimes(2);
+        }
+      );
+    });
+
+    it('honors publication disable after earlier annotation without another query', async () => {
+      await primeAnnotatedCatalog();
+      const pending = pauseAt(stage);
+      const response = resultFor();
+      await pending.entered;
+      mockPublicationEnabled = false;
+      pending.release();
+      const result = await response;
+      for (const model of result.data) expect(model).not.toHaveProperty('enkrypt');
+      expect(mockCatalog.data[0].enkrypt).toBeDefined();
+      expect(mockReadRows).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('preserves scoped policy decisions and explicit custom/BYOK access across repeated producer calls', async () => {
+    await primeAnnotatedCatalog();
+    mockAutoEnabled = true;
+    const defaultSubject: OrganizationPolicySubject = { type: 'defaultAccess' };
+    const results = await Promise.all([resultFor(), resultFor(defaultSubject), resultFor()]);
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject })
+    );
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject: defaultSubject })
+    );
+    expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
+    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
+    expect(mockByok).toHaveBeenCalledWith('fixture-org');
+    expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
+    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
+    expect(mockAvailability).toHaveBeenCalledWith(
+      [mockCatalog.data[0], mockCatalog.data[2]],
+      ['openai'],
+      expect.any(Function)
+    );
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), mockCatalogModelIds);
+    const getAllowedProviders = mockAvailability.mock.calls[0][2];
+    expect(getAllowedProviders?.('provider/allowed')).toEqual(ALLOWED_MODEL_ROUTES);
+    expect(getAllowedProviders?.('provider/training')).toBeUndefined();
+    expect(mockDecision.mock.calls.map(([policy, id]) => ({ policy, id }))).toEqual(
+      expect.arrayContaining(mockCatalog.data.map(model => ({ policy: mockPolicy, id: model.id })))
+    );
+    expect(
+      mockDecision.mock.calls.every(([, id]) => mockCatalog.data.some(model => model.id === id))
+    ).toBe(true);
+    for (const result of results) {
+      expect(result.data.map(model => model.id)).toEqual([
+        'provider/allowed',
+        'provider/training',
+        'kilo-auto/org',
+        'morph-byok/private',
+        'kilo-internal/private',
+      ]);
+      expect(result.data[0].enkrypt?.lastCheckedAt).toBe(checkedAt);
+      expect(result.data[2]).not.toHaveProperty('enkrypt');
+    }
+    expect(mockReadRows).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['teams-allow', 'teams-deny', 'enterprise'] as const)(
+    'preserves %s visibility rules while stripping appended raw scores',
+    async mode => {
+      await primeAnnotatedCatalog();
+      mockContext.organization.plan = mode === 'enterprise' ? 'enterprise' : 'teams';
+      mockContext.organization.settings = mode === 'teams-deny' ? { data_collection: 'deny' } : {};
+      const raw = mockCatalog.data[0].enkrypt;
+      const custom = catalogModel('kilo-internal/private', {
+        enkrypt: raw,
+        mayTrainOnYourPrompts: true,
+      });
+      const byok = catalogModel('morph-byok/private', { enkrypt: raw, hasUserByokAvailable: true });
+      mockCustom.mockResolvedValue([custom]);
+      mockByok.mockResolvedValue([byok]);
+      const result = await resultFor();
+      expect(result.data.some(model => model.id === 'provider/training')).toBe(
+        mode !== 'teams-deny'
+      );
+      expect(result.data.some(model => model.id === 'provider/blocked')).toBe(false);
+      for (const input of [custom, byok]) {
+        const expected = { ...input };
+        delete expected.enkrypt;
+        expect(result.data.find(model => model.id === input.id)).toEqual(expected);
+        expect(input.enkrypt).toBe(raw);
+      }
+      expect(mockReadRows).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('reads the snapshot through the read client a gateway caller passes', async () => {
+    const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+    expectedReplicaLoads = 1;
+    const updated = { ...benchmark, risk_score: 9 };
+    mockReplicaRows.mockResolvedValue([
+      entry('provider/allowed', updated, {
+        checkedAt,
+        scoreHash: fingerprintEnkryptScore(updated),
+      }),
+    ]);
+
+    const result = await producer.getAvailableModelsForOrganization(
+      'fixture-org',
+      subject,
+      'member',
+      { fromDb: readDb, countryCode: null }
+    );
+
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', fromDb: readDb })
+    );
+    expect(mockReadRows).not.toHaveBeenCalled();
+    expect(result?.data[0].enkrypt).toMatchObject({
+      risk_score: 9,
+      lastCheckedAt: checkedAt,
+      freshness: 'fresh',
+    });
+  });
+
+  it('builds the public and private custom LLM lists for the requester country', async () => {
+    await producer.getAvailableModelsForOrganization('fixture-org', subject, 'member', {
+      countryCode: 'CU',
+    });
+
+    const { getEnhancedOpenRouterModels } = jest.requireMock<{
+      getEnhancedOpenRouterModels: jest.Mock;
+    }>('@kilocode/web-shared/lib/ai-gateway/providers/openrouter');
+    const { db } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+    expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU', fromDb: db });
+    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], 'CU');
+  });
+
+  it('does not freshen new score content with an old mismatched verification', async () => {
+    await primeAnnotatedCatalog();
+    cache.invalidateModelStatsCache();
+    mockReadRows.mockResolvedValue([
+      entry('provider/allowed', { ...benchmark, risk_score: 9 }, verification),
+    ]);
+    const result = await resultFor();
+    expect(result.data[0].enkrypt).toMatchObject({
+      risk_score: 9,
+      lastCheckedAt: benchmark.ingestedAt,
+      freshness: 'stale',
+    });
+    expect(mockReadRows).toHaveBeenCalledTimes(2);
+  });
+
+  it('tags the member ChatGPT connection and skips the default-access subject', async () => {
+    mockTagChatGpt.mockImplementation(async (_owner, models: OpenRouterModel[]) =>
+      models.map(model =>
+        model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
+      )
+    );
+
+    const memberResult = await resultFor();
+    expect(mockTagChatGpt).toHaveBeenCalledWith(
+      { kiloUserId: 'fixture-user', organizationId: 'fixture-org' },
+      expect.any(Array)
+    );
+    expect(
+      memberResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
+    ).toBe(true);
+
+    mockTagChatGpt.mockClear();
+    const defaultResult = await resultFor({ type: 'defaultAccess' });
+    expect(mockTagChatGpt).not.toHaveBeenCalled();
+    expect(
+      defaultResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
+    ).toBe(false);
+  });
+
+  it('marks a shared-services list only from the shared-services ChatGPT connection', async () => {
+    const connected = { member: true, sharedServices: false };
+    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+      const isShared =
+        typeof owner === 'object' &&
+        owner !== null &&
+        'scope' in owner &&
+        owner.scope === 'shared_services';
+      if (!(isShared ? connected.sharedServices : connected.member)) return models;
+      return models.map(model =>
+        model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
+      );
+    });
+    async function byokFor(audience: OrganizationModelAudience) {
+      const result = await resultFor(subject, audience);
+      return result.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable;
+    }
+
+    // Only the viewing member has a connection: a service run cannot use it.
+    await expect(byokFor('member')).resolves.toBe(true);
+    await expect(byokFor('shared_services')).resolves.toBe(false);
+    expect(mockTagChatGpt).toHaveBeenLastCalledWith(
+      { organizationId: 'fixture-org', scope: 'shared_services' },
+      expect.any(Array)
+    );
+
+    connected.sharedServices = true;
+    await expect(byokFor('shared_services')).resolves.toBe(true);
+
+    // The organization BYOK key path marks a shared-services list as before.
+    const result = await resultFor({ type: 'defaultAccess' }, 'shared_services');
+    expect(result.data.find(model => model.id === 'provider/allowed')?.hasUserByokAvailable).toBe(
+      true
+    );
+  });
+
+  it('tags every list from the organization Claude billing link', async () => {
+    const owner = { kind: 'organization', organizationId: 'fixture-org' };
+
+    await resultFor(subject, 'member');
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
+
+    await resultFor(subject, 'shared_services');
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
+
+    await resultFor({ type: 'defaultAccess' });
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
+  });
+
+  it('lists denied models only when an inference provider key the policy admits serves them', async () => {
+    const catalogModelIds = new Set([
+      'provider/allowed',
+      'provider/ceiling-catalog',
+      'provider/ungranted-catalog',
+    ]);
+    mockDirectByokCatalogModelIds.mockResolvedValueOnce(catalogModelIds);
+    mockProviderIds.mockResolvedValueOnce(['moonshotai', 'openrouter']);
+    mockCatalog = {
+      ...mockCatalog,
+      data: [
+        catalogModel('provider/allowed'),
+        catalogModel('provider/ceiling-inference'),
+        catalogModel('provider/ceiling-catalog'),
+        catalogModel('provider/ceiling-gateway'),
+        catalogModel('provider/deny-listed-inference'),
+        catalogModel('provider/ungranted-inference'),
+        catalogModel('provider/ungranted-catalog'),
+      ],
+    };
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/ceiling-inference',
+      'provider/ceiling-catalog',
+      'provider/ungranted-catalog',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), catalogModelIds);
+    expect(mockInferenceProviderUserByok).toHaveBeenCalledWith('provider/ceiling-gateway', [
+      'moonshotai',
+      'openrouter',
+    ]);
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalledWith(
+      'provider/deny-listed-inference',
+      expect.anything()
+    );
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalledWith(
+      'provider/ceiling-catalog',
+      expect.anything()
+    );
+    const getAllowedProviders = mockAvailability.mock.calls[0][2];
+    expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
+  });
+
+  it('logs one aggregated record for a catalog wider than the allowed models', async () => {
+    mockCatalog = {
+      ...mockCatalog,
+      data: [
+        catalogModel('provider/allowed'),
+        catalogModel('provider/ceiling-inference'),
+        catalogModel('provider/ceiling-gateway'),
+        catalogModel('provider/ungranted-inference'),
+      ],
+    };
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/ceiling-inference',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockInferenceProviderUserByok).toHaveBeenCalledTimes(2);
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(debug.mock.calls[0]?.[0]).toContain('1 of 2 models');
+  });
+
+  it('lists the whole catalog without per-model access lookups for an unrestricted grant', async () => {
+    await primeAnnotatedCatalog();
+    mockEvaluatePolicy.mockReturnValueOnce({
+      policyRevision: 8,
+      memberGrant: { mode: 'unrestricted' },
+    });
+    mockDecision.mockClear();
+    mockInferenceProviderUserByok.mockClear();
+
+    const result = await resultFor();
+
+    // Every catalog model is admitted, including the ones the restricted
+    // fixture denies, and no provider route is recorded in this mode.
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/blocked',
+      'provider/training',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockDecision).not.toHaveBeenCalled();
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalled();
+    expect(mockAvailability.mock.calls[0][2]?.('provider/allowed')).toBeUndefined();
+  });
+});

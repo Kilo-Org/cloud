@@ -1,15 +1,23 @@
 // Pure classification of a device-auth poll response's HTTP status. Kept
 // free of any react-native/expo imports so it can be unit tested directly.
 
+import { parseRetryAfterMs } from '@/lib/auth/auth-response-class';
+import { type DeviceAuthError, deviceAuthErrorKey } from '@/lib/auth/device-auth-state';
+import { parseAuthError } from '@/lib/auth/native-auth-contract';
+
 type PollOutcome =
   | { readonly status: 'approved' }
   | { readonly status: 'pending' }
-  | { readonly status: 'denied'; readonly message: string }
-  | { readonly status: 'expired'; readonly message: string }
-  | { readonly status: 'error'; readonly message: string }
-  | { readonly status: 'retry' };
+  | { readonly status: 'denied'; readonly message: DeviceAuthError }
+  | { readonly status: 'expired'; readonly message: DeviceAuthError }
+  | { readonly status: 'error'; readonly message: DeviceAuthError }
+  | { readonly status: 'retry'; readonly retryAfterMs?: number };
 
-export function classifyPollResponse(httpStatus: number): PollOutcome {
+export function classifyPollResponse(
+  httpStatus: number,
+  retryAfterHeader?: string | null,
+  now?: number
+): PollOutcome {
   if (httpStatus === 200) {
     return { status: 'approved' };
   }
@@ -17,22 +25,35 @@ export function classifyPollResponse(httpStatus: number): PollOutcome {
     return { status: 'pending' };
   }
   if (httpStatus === 403) {
-    return { status: 'denied', message: 'Access denied by user' };
+    return { status: 'denied', message: deviceAuthErrorKey('authErrors.accessDeniedByUser') };
   }
   if (httpStatus === 410) {
-    return { status: 'expired', message: 'Code expired' };
+    return { status: 'expired', message: deviceAuthErrorKey('authErrors.codeExpired') };
   }
-  // 429/5xx are transient (rate limiting or a flaky server) — keep polling.
+  // 429/5xx are transient (rate limiting or a flaky server) — keep polling,
+  // and honour the server's own `Retry-After` when it named one instead of
+  // only our own backoff.
   if (httpStatus === 429 || httpStatus >= 500) {
-    return { status: 'retry' };
+    const retryAfterMs = parseRetryAfterMs(retryAfterHeader, now);
+    return retryAfterMs === undefined ? { status: 'retry' } : { status: 'retry', retryAfterMs };
   }
   // Any other 4xx (400, 401, ...) is not something retrying will fix — and
   // 1xx/3xx are statuses this endpoint never returns, so treat them the same.
-  return { status: 'error', message: 'Sign-in failed. Please try again.' };
+  return { status: 'error', message: deviceAuthErrorKey('authErrors.invalidToken') };
 }
 
-/** Extract the user-facing message from a device-auth start 429 JSON body. */
-export function getDeviceAuth429Message(body: { error?: string } | undefined): string {
-  const fallback = 'Too many sign-in attempts. Please wait and try again.';
-  return body?.error ?? fallback;
+/**
+ * The device-auth start refusal, read from its HTTP status and stable code.
+ * Every non-OK start response uses it, so both the code and the status decide.
+ * A 429 is a rate-limit refusal whether or not its body names the code: an edge
+ * or proxy that answers before the route still means too many attempts. The
+ * server's own sentence is never shown; the catalog owns the copy in the active
+ * language.
+ */
+export function getDeviceAuthStartRefusalError(body: unknown, status: number): DeviceAuthError {
+  return deviceAuthErrorKey(
+    status === 429 || parseAuthError(body)?.code === 'RATE_LIMITED'
+      ? 'authErrors.tooManySignInAttempts'
+      : 'authErrors.startSignInFailed'
+  );
 }

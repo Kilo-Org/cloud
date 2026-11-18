@@ -1,20 +1,27 @@
 import * as z from 'zod';
+import {
+  sessionIdSchema,
+  customerBillingFailureSchema,
+  type CustomerBillingFailure,
+} from '@kilocode/session-ingest-contracts';
+export { customerBillingFailureSchema, type CustomerBillingFailure };
+import type { QuestionInfo } from '@kilocode/app-shared/opencode';
+import { PREPARATION_OUTPUT_MAX_LENGTH } from './limits';
+import { PREPARATION_MAX_DETAIL_LENGTH, preparationStepSchema } from './preparation-step';
+import { mutationCursorSchema } from './cloud-conversation-schemas';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
-import type { KiloSessionId } from './types';
+import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
-// ---------------------------------------------------------------------------
-// Wire-level envelope
-// ---------------------------------------------------------------------------
+export * from './cloud-conversation-schemas';
+export { PREPARATION_MAX_DETAIL_LENGTH, preparationStepSchema } from './preparation-step';
 
-export const cloudAgentEventSchema = z.object({
-  eventId: z.number(),
-  executionId: z.string().nullable().optional(),
-  sessionId: z.string(),
-  streamEventType: z.string(),
-  timestamp: z.string(),
-  data: z.unknown(),
-});
-export type CloudAgentEvent = z.infer<typeof cloudAgentEventSchema>;
+export const cloudWorktreeChangesReadyDataSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
+export const cloudWorkspaceArtifactsChangedDataSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
 
 export const streamErrorSchema = z.object({
   type: z.literal('error'),
@@ -30,21 +37,78 @@ export const streamErrorSchema = z.object({
 });
 export type StreamError = z.infer<typeof streamErrorSchema>;
 
-// ---------------------------------------------------------------------------
-// Session / cloud status discriminated unions
-// ---------------------------------------------------------------------------
+/**
+ * Error code of a WebSocket protocol error. These match the WS_* codes from
+ * cloud-agent-next/src/websocket/types.ts, as the schema's enum does.
+ */
+export type StreamErrorCode = StreamError['code'];
 
-export const sessionStatusSchema = z.discriminatedUnion('type', [
+/** Whether an untrusted WebSocket frame carries a stream error. */
+export function isStreamError(data: unknown): data is StreamError {
+  return streamErrorSchema.safeParse(data).success;
+}
+
+const KNOWN_SESSION_STATUS_TYPES = [
+  'busy',
+  'idle',
+  'retry',
+  'scheduled',
+  'question',
+  'permission',
+] as const;
+
+/**
+ * The live status types this SDK reads precisely. `question` and `permission`
+ * carry no payload here: the pending interaction itself arrives on
+ * `question.asked` / `permission.asked`, and a status-only report names the
+ * state without repeating it.
+ */
+const knownSessionStatusSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('busy') }),
   z.object({ type: z.literal('idle') }),
+  z.object({ type: z.literal('question') }),
+  z.object({ type: z.literal('permission') }),
   z.object({
     type: z.literal('retry'),
     attempt: z.number(),
     message: z.string(),
     next: z.number(),
   }),
+  // A session that is scheduled to wake later and does nothing now. The wake
+  // time is optional: a CLI may report `scheduled` without one, and the reading
+  // then stays "scheduled" with no time. A producer that serializes the absent
+  // time as an explicit null, or sends a value that is not a time, reads as
+  // absent instead of failing the parse.
+  z.object({ type: z.literal('scheduled'), scheduledAt: z.string().optional().catch(undefined) }),
+]);
+export type KnownSessionStatus = z.infer<typeof knownSessionStatusSchema>;
+
+/**
+ * A live status type this SDK does not know yet. It parses so the event is
+ * never dropped and the type is never re-labelled, and its payload is kept as
+ * sent. Known types are excluded so a malformed known variant fails instead of
+ * reading as unrecognized.
+ */
+const unrecognizedSessionStatusSchema = z
+  .object({ type: z.string() })
+  .passthrough()
+  .refine(status => !KNOWN_SESSION_STATUS_TYPES.some(type => type === status.type));
+
+export const sessionStatusSchema = z.union([
+  knownSessionStatusSchema,
+  unrecognizedSessionStatusSchema,
 ]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+
+/**
+ * Read a live status as one of the variants this SDK knows, so callers can use
+ * its payload fields. An unrecognized status still reaches consumers, but it
+ * has no variant payload to read and yields null here.
+ */
+export function knownSessionStatus(status: SessionStatus): KnownSessionStatus | null {
+  const parsed = knownSessionStatusSchema.safeParse(status);
+  return parsed.success ? parsed.data : null;
+}
 
 export const cloudStatusSchema = z.discriminatedUnion('type', [
   z.object({
@@ -61,35 +125,6 @@ export const cloudStatusSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('error'), message: z.string() }),
 ]);
 export type CloudStatus = z.infer<typeof cloudStatusSchema>;
-
-// ---------------------------------------------------------------------------
-// Question / permission payloads
-// ---------------------------------------------------------------------------
-
-export const questionPayloadSchema = z
-  .object({
-    requestId: z.string(),
-    callId: z.string().optional(),
-    questions: z.array(z.record(z.string(), z.unknown())).optional(),
-  })
-  .passthrough();
-export type QuestionState = z.infer<typeof questionPayloadSchema>;
-
-export const permissionPayloadSchema = z
-  .object({
-    requestId: z.string(),
-    callId: z.string().optional(),
-    permission: z.string(),
-    patterns: z.array(z.string()),
-    metadata: z.record(z.string(), z.unknown()).optional().default({}),
-    always: z.array(z.string()).optional().default([]),
-  })
-  .passthrough();
-export type PermissionState = z.infer<typeof permissionPayloadSchema>;
-
-// ---------------------------------------------------------------------------
-// Remote CLI model catalog
-// ---------------------------------------------------------------------------
 
 export const REMOTE_MODEL_MAX_PROVIDERS = 64;
 export const REMOTE_MODEL_MAX_MODELS_PER_PROVIDER = 512;
@@ -148,10 +183,7 @@ const remoteSdkModelSchema = z
         toolcall: z.boolean(),
         input: remoteModelModalitiesSchema,
         output: remoteModelModalitiesSchema,
-        interleaved: z.union([
-          z.boolean(),
-          z.object({ field: z.enum(['reasoning_content', 'reasoning_details']) }).strict(),
-        ]),
+        interleaved: z.union([z.boolean(), z.object({ field: z.string().min(1) }).passthrough()]),
       })
       .strict(),
     cost: z
@@ -196,6 +228,7 @@ export const remoteModelCatalogWireV1Schema = z
     default: z.record(remoteModelIdentitySchema, remoteModelIdentitySchema),
     connected: z.array(remoteModelIdentitySchema).max(REMOTE_MODEL_MAX_PROVIDERS),
     failed: z.array(remoteModelIdentitySchema).max(REMOTE_MODEL_MAX_PROVIDERS),
+    failures: z.array(z.never()).max(0).optional(),
     protocolVersion: z.literal(1),
     currentModel: modelSelectionSchema.optional(),
     defaultModel: modelRefSchema.optional(),
@@ -308,7 +341,11 @@ export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transfo
             ...(model.recommendedIndex !== undefined
               ? { recommendedIndex: model.recommendedIndex }
               : {}),
-            ...(model.isFree !== undefined ? { isFree: model.isFree } : {}),
+            ...(model.hasUserByokAvailable === true
+              ? { isFree: false }
+              : model.isFree !== undefined
+                ? { isFree: model.isFree }
+                : {}),
             ...(model.mayTrainOnYourPrompts !== undefined
               ? { mayTrainOnYourPrompts: model.mayTrainOnYourPrompts }
               : {}),
@@ -334,14 +371,20 @@ export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transfo
 });
 export type RemoteModelCatalogV1 = z.output<typeof remoteModelCatalogV1Schema>;
 
-// ---------------------------------------------------------------------------
-// Remote CLI command catalog
-// ---------------------------------------------------------------------------
-
 export const REMOTE_COMMAND_MAX_COMMANDS = 256;
 export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
+
+export const PREPARATION_MAX_MESSAGE_LENGTH = 16_384;
+export const PREPARATION_MAX_SETUP_LOG_ENTRIES = 100;
+export const PREPARATION_MAX_ATTEMPTS = 10;
+export const PREPARATION_MAX_STEPS = 100;
+
+/** Most message IDs a `session.queue.changed` snapshot may carry. */
+export const SESSION_QUEUE_MAX_IDS = 1_000;
+/** Most questions a `question.asked` event may carry. */
+export const SESSION_QUESTION_MAX_QUESTIONS = 32;
 
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
@@ -397,14 +440,7 @@ export const remoteCommandCatalogV1Schema = z
   .transform(catalog => ({
     protocolVersion: 1 as const,
     canExitSession: catalog.canExitSession,
-    commands: catalog.commands
-      .filter(command => command.source !== 'skill')
-      // SlashCommandInfo requires a `hints` array; remote commands with no
-      // hints still have an empty array after the strict shape parse above.
-      .map(command => ({
-        ...command,
-        hints: command.hints,
-      })),
+    commands: catalog.commands,
   }));
 export type RemoteCommandCatalogV1 = z.output<typeof remoteCommandCatalogV1Schema>;
 
@@ -416,10 +452,6 @@ export const userWebCommandErrorDataSchema = z
   })
   .strict();
 export type UserWebCommandErrorData = z.infer<typeof userWebCommandErrorDataSchema>;
-
-// ---------------------------------------------------------------------------
-// WebSocket inbound message (CLI live transport)
-// ---------------------------------------------------------------------------
 
 export const webInboundMessageSchema = z.discriminatedUnion('type', [
   z.object({
@@ -440,10 +472,6 @@ export const webInboundMessageSchema = z.discriminatedUnion('type', [
 ]);
 export type WebInboundMessage = z.infer<typeof webInboundMessageSchema>;
 
-// ---------------------------------------------------------------------------
-// Active CLI sessions
-// ---------------------------------------------------------------------------
-
 export const activeSessionCapabilitiesSchema = z
   .object({
     attachments: z.boolean().optional(),
@@ -460,10 +488,20 @@ export const activeSessionSchema = z
     gitBranch: z.string().optional(),
     parentSessionId: z.string().optional(),
     /**
+     * ISO-8601 wake time for a `scheduled` session, as advertised by the
+     * owning CLI in its `sessions.list` / `sessions.heartbeat` payload. Absent
+     * when the CLI reports `scheduled` without a wake time, and an explicit
+     * null from a producer that serializes the absent field reads the same way.
+     * Declared here so typed consumers (the mobile session list) can read it
+     * without a cast.
+     */
+    scheduledAt: z.string().optional().catch(undefined),
+    /**
      * Per-session capabilities advertised by the owning CLI in its
-     * `sessions.heartbeat` / `sessions.list` payload. `attachments: true`
-     * gates the remote-CLI attachment path; absent / false means the CLI
-     * either predates the capability or has not yet reported it.
+     * `sessions.heartbeat` / `sessions.list` payload. Only an explicit
+     * `attachments: false` closes the remote-CLI attachment path; absent
+     * (the CLI predates the capability or has not yet reported it) is
+     * treated as supported.
      *
      * Declared here (rather than relying on `.passthrough()`) so typed
      * consumers can reason about the shape without an extra `as` cast. The
@@ -496,11 +534,7 @@ export const cliConnectionDataSchema = z.object({
 });
 export type CliConnectionData = z.infer<typeof cliConnectionDataSchema>;
 
-export const kiloSessionIdSchema = z
-  .string()
-  .startsWith('ses_')
-  .length(30)
-  .transform(id => id as KiloSessionId);
+export const kiloSessionIdSchema = sessionIdSchema.transform(id => id as KiloSessionId);
 export type KiloSessionIdInput = z.input<typeof kiloSessionIdSchema>;
 
 /**
@@ -522,11 +556,65 @@ export const createSessionResponseV1Schema = z
   .strict();
 export type CreateSessionResponseV1 = z.infer<typeof createSessionResponseV1Schema>;
 
-// ---------------------------------------------------------------------------
-// V2 session system events
-// ---------------------------------------------------------------------------
+const REMOTE_DIRECTORY_MAX_ENTRIES = 256;
+const REMOTE_DIRECTORY_MAX_STRING_LENGTH = 2_000;
 
-export const sessionStatusValueSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
+const remoteDirectoryEntrySchema = z
+  .object({
+    name: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
+    path: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
+  })
+  .strict();
+
+/**
+ * Strict `list_directories` success body (protocol v1). The CLI returns the
+ * resolved listing path and up to 256 contained directory entries. Anything
+ * outside this envelope — extra keys, an over-limit entry array, an empty or
+ * over-length entry string, or protocol drift — fails closed as `invalid`.
+ */
+export const listDirectoriesV1Schema = z
+  .object({
+    protocolVersion: z.literal(1),
+    path: z.string(),
+    directories: z.array(remoteDirectoryEntrySchema).max(REMOTE_DIRECTORY_MAX_ENTRIES),
+  })
+  .strict();
+export type ListDirectoriesV1 = z.infer<typeof listDirectoriesV1Schema>;
+
+const REMOTE_AGENT_MAX_ENTRIES = 128;
+const REMOTE_AGENT_MAX_NAME_LENGTH = 256;
+const REMOTE_AGENT_MAX_DESCRIPTION_LENGTH = 1_000;
+
+/**
+ * `list_agents` success body (protocol v1): the agents a CLI can start or
+ * continue a session with, resolved in the requested directory. Unknown keys
+ * are stripped, not rejected, so a CLI can add optional agent fields without
+ * hiding every agent from an older app. Out-of-range values still fail.
+ */
+export const listAgentsV1Schema = z.object({
+  protocolVersion: z.literal(1),
+  agents: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(REMOTE_AGENT_MAX_NAME_LENGTH),
+        displayName: z.string().min(1).max(REMOTE_AGENT_MAX_NAME_LENGTH).optional(),
+        description: z.string().max(REMOTE_AGENT_MAX_DESCRIPTION_LENGTH).optional(),
+      })
+    )
+    .max(REMOTE_AGENT_MAX_ENTRIES),
+});
+export type ListAgentsV1 = z.infer<typeof listAgentsV1Schema>;
+
+/**
+ * Permissive status value for v2 session rows and status-updated payloads.
+ *
+ * Deliberately `z.string()` rather than a closed enum: a newer CLI may report a
+ * status this SDK does not know yet, and that value must still parse so the
+ * event/row is never dropped and the value is never re-labelled. Known values
+ * (`idle`, `busy`, `question`, `permission`, `retry`, `scheduled`) keep working
+ * unchanged.
+ */
+export const sessionStatusValueSchema = z.string();
 
 export const sessionEventV2RowSchema = z.object({
   source: z.literal('v2'),
@@ -539,8 +627,10 @@ export const sessionEventV2RowSchema = z.object({
   gitUrl: z.string().nullable(),
   gitBranch: z.string().nullable(),
   parentSessionId: z.string().nullable(),
+  worktreeId: z.string().nullable().optional(),
   status: sessionStatusValueSchema.nullable(),
   statusUpdatedAt: z.string().nullable(),
+  scheduledAt: z.string().nullable().optional(),
 });
 export type SessionEventV2Row = z.infer<typeof sessionEventV2RowSchema>;
 
@@ -558,6 +648,7 @@ export const sessionStatusUpdatedPayloadSchema = z.union([
     previousStatus: sessionStatusValueSchema.nullable(),
     status: sessionStatusValueSchema.nullable(),
     statusUpdatedAt: z.string().nullable(),
+    scheduledAt: z.string().nullable().optional(),
     changedAt: z.string(),
   }),
   z.object({
@@ -566,6 +657,7 @@ export const sessionStatusUpdatedPayloadSchema = z.union([
     previousStatus: sessionStatusValueSchema.nullable(),
     status: sessionStatusValueSchema.nullable(),
     statusUpdatedAt: z.string().nullable(),
+    scheduledAt: z.string().nullable().optional(),
     updatedAt: z.string().optional(),
     changedAt: z.string(),
   }),
@@ -592,27 +684,73 @@ export const sessionEventPayloadSchema = z.discriminatedUnion('type', [
 ]);
 export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 
-// ---------------------------------------------------------------------------
-// Kilocode payload
-// ---------------------------------------------------------------------------
-
 export const kilocodePayloadSchema = z.object({
   type: z.string(),
   properties: z.unknown(),
 });
 export type KilocodePayload = z.infer<typeof kilocodePayloadSchema>;
 
-// ---------------------------------------------------------------------------
-// Per-event-type data schemas (normalizeInnerEvent)
-// ---------------------------------------------------------------------------
+/**
+ * The time a message carries on the wire: `created` on every message, and the
+ * assistant's `completed` once the turn finishes. Both the transcript's
+ * timestamp and the streaming check read it, so a payload without a readable
+ * `created` has nothing to render.
+ */
+const wireMessageTimeSchema = z
+  .object({ created: z.number(), completed: z.number().optional() })
+  .passthrough();
 
-export const messageUpdatedDataSchema = z.object({
-  info: z.object({ id: z.string(), sessionID: z.string() }).passthrough(),
-});
+/**
+ * The message fields this SDK reads, at the single validation boundary: the
+ * identity, the `role` consumers branch on, and the `time` they render. The
+ * generated `Message` union declares all three, but only this schema makes them
+ * true for a payload that arrives from the wire or a replay.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessageInfoSchema = z
+  .object({ id: z.string(), sessionID: z.string(), role: z.string().min(1) })
+  .passthrough()
+  .refine(info => wireMessageTimeSchema.safeParse(info['time']).success, {
+    message: 'a message requires a time with a numeric created',
+    path: ['time'],
+  });
+
+export const messageUpdatedDataSchema = z.object({ info: wireMessageInfoSchema });
 export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
+/**
+ * The shape of a part as it arrives from the wire or a replay, before the SDK
+ * reads anything off it. Validates the part's identity for every type, and for
+ * a `tool` part additionally requires a `state` object carrying a non-empty
+ * string `status` — the one field every reader of a tool part needs
+ * (`part-utils.ts` ranks `state.status`, the transcript renders the completed
+ * output). A part without a usable state has nothing to show, so it is rejected
+ * at this boundary.
+ *
+ * The state is validated for its identity only, not its contents: attachments
+ * stay unchecked here (`part-utils.ts` filters the non-conforming entries at the
+ * chat-processor seam) because dropping the whole part over one bad attachment
+ * entry would lose a tool call the transcript can still render.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessagePartSchema = z
+  .object({ id: z.string(), sessionID: z.string(), messageID: z.string() })
+  .passthrough()
+  .refine(
+    part =>
+      part['type'] !== 'tool' ||
+      z
+        .object({ status: z.string().min(1) })
+        .passthrough()
+        .safeParse(part['state']).success,
+    { message: 'a tool part requires a state with a non-empty string status', path: ['state'] }
+  );
+
 export const messagePartUpdatedDataSchema = z.object({
-  part: z.object({ id: z.string(), sessionID: z.string(), messageID: z.string() }).passthrough(),
+  part: wireMessagePartSchema,
+  time: z.number().optional(),
 });
 export type MessagePartUpdatedData = z.infer<typeof messagePartUpdatedDataSchema>;
 
@@ -631,6 +769,12 @@ export const messagePartRemovedDataSchema = z.object({
   partID: z.string(),
 });
 export type MessagePartRemovedData = z.infer<typeof messagePartRemovedDataSchema>;
+
+export const messageRemovedDataSchema = z.object({
+  sessionID: z.string(),
+  messageID: z.string(),
+});
+export type MessageRemovedData = z.infer<typeof messageRemovedDataSchema>;
 
 export const sessionStatusDataSchema = z.object({
   sessionID: z.string(),
@@ -679,15 +823,72 @@ export type SessionTurnCloseData = z.infer<typeof sessionTurnCloseDataSchema>;
 export const sessionQueueChangedDataSchema = z
   .object({
     sessionID: z.string(),
-    queued: z.array(z.string()),
+    queued: z.array(z.string()).max(SESSION_QUEUE_MAX_IDS),
   })
   .passthrough();
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
 
+/** Runtime mirror of `QuestionInfo` in `@kilocode/app-shared/opencode`. */
+const questionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+  mode: z.string().optional(),
+});
+
+const questionInfoSchema = z.object({
+  question: z.string(),
+  header: z.string(),
+  options: z.array(questionOptionSchema),
+  multiple: z.boolean().optional(),
+  custom: z.boolean().optional(),
+});
+
+/**
+ * Convert a parsed entry to the shared type. Zod types an absent optional
+ * property as `T | undefined`, which `exactOptionalPropertyTypes` rejects
+ * against `QuestionInfo`, so the optionals are only added when present.
+ */
+function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInfo {
+  return {
+    question: parsed.question,
+    header: parsed.header,
+    options: parsed.options.map(option => ({
+      label: option.label,
+      description: option.description,
+      ...(option.mode === undefined ? {} : { mode: option.mode }),
+    })),
+    ...(parsed.multiple === undefined ? {} : { multiple: parsed.multiple }),
+    ...(parsed.custom === undefined ? {} : { custom: parsed.custom }),
+  };
+}
+
+/**
+ * A question list is positional: the answer payload mirrors the CLI's question
+ * indices (`answerQuestion(requestId, answers: string[][])`). Keep the longest
+ * run of entries that match `QuestionInfo` and stop at the first entry that
+ * does not, so a rendered question keeps its CLI index instead of every later
+ * answer sliding onto the wrong question. No usable entry means the payload
+ * carries no questions the client can render. A list longer than
+ * `SESSION_QUESTION_MAX_QUESTIONS` fails the field, which the caller catches to
+ * `undefined`.
+ */
+const questionListSchema = z
+  .array(z.unknown())
+  .max(SESSION_QUESTION_MAX_QUESTIONS)
+  .transform((entries): QuestionInfo[] | undefined => {
+    const questions: QuestionInfo[] = [];
+    for (const entry of entries) {
+      const parsed = questionInfoSchema.safeParse(entry);
+      if (!parsed.success) break;
+      questions.push(toQuestionInfo(parsed.data));
+    }
+    return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
+  });
+
 export const questionAskedDataSchema = z.object({
   id: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  questions: z.array(z.unknown()).optional().catch(undefined),
+  questions: questionListSchema.optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;
 
@@ -701,15 +902,37 @@ export const questionRejectedDataSchema = z.object({
 });
 export type QuestionRejectedData = z.infer<typeof questionRejectedDataSchema>;
 
+/**
+ * A permission request as it arrives from the wire or a pending-interaction
+ * replay. `id` and `permission` identify the request; `patterns`, `metadata`
+ * and `always` are the scope the consent surface shows before an allow
+ * decision, so each is required and kept only when it parses. A request whose
+ * scope is not the declared shape fails here and is never forwarded with an
+ * empty or partial scope — an approval must never be offered for a scope the
+ * app could not read.
+ */
 export const permissionAskedDataSchema = z.object({
   id: z.string().min(1),
   permission: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  patterns: z.array(z.string()).catch([]),
-  metadata: z.record(z.string(), z.unknown()).catch({}),
-  always: z.array(z.string()).catch([]),
+  patterns: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+  always: z.array(z.string()),
 });
 export type PermissionAskedData = z.infer<typeof permissionAskedDataSchema>;
+
+/**
+ * The part of a permission request that still identifies it when its scope does
+ * not parse. The consent surface cannot offer a decision for such a request,
+ * but the user must learn that one is waiting, so the event boundary forwards
+ * this identity instead of dropping the request silently. A payload with no
+ * readable `id` has nothing to key the notice to and no `permission.replied`
+ * that could clear it, so it is still dropped.
+ */
+export const permissionAskedIdentitySchema = z.object({
+  id: z.string().min(1),
+});
+export type PermissionAskedIdentity = z.infer<typeof permissionAskedIdentitySchema>;
 
 export const permissionRepliedDataSchema = z.object({
   requestID: z.string(),
@@ -767,25 +990,6 @@ export type ErrorData = z.infer<typeof errorDataSchema>;
 export const wrapperDisconnectedDataSchema = z.unknown();
 export type WrapperDisconnectedData = z.infer<typeof wrapperDisconnectedDataSchema>;
 
-const preparationStepSchema = z.object({
-  id: z.string(),
-  key: z.string(),
-  kind: z.enum(['phase', 'setup_command']),
-  label: z.string(),
-  status: z.enum(['running', 'completed', 'failed']),
-  startedAt: z.number(),
-  completedAt: z.number().optional(),
-  revision: z.number(),
-  latestDetail: z.string().optional(),
-  safeError: z.string().optional(),
-  command: z.string().optional(),
-  commandIndex: z.number().optional(),
-  commandCount: z.number().optional(),
-  outputTail: z.string().optional(),
-  outputTruncated: z.boolean().optional(),
-  exitCode: z.number().optional(),
-});
-
 const preparationAttemptSchema = z.object({
   id: z.string(),
   triggerMessageId: z.string(),
@@ -799,7 +1003,7 @@ const preparationAttemptSchema = z.object({
 export const preparingDataSchema = z
   .object({
     step: z.string(),
-    message: z.string(),
+    message: z.string().max(PREPARATION_MAX_MESSAGE_LENGTH),
     branch: z.string().optional(),
     version: z.literal(2).optional(),
     attemptId: z.string().optional(),
@@ -821,13 +1025,15 @@ export const preparingDataSchema = z
       ])
       .optional(),
     stepId: z.string().optional(),
+    parentStepId: z.string().optional(),
     kind: z.enum(['phase', 'setup_command']).optional(),
     label: z.string().optional(),
     command: z.string().optional(),
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
-    detail: z.string().optional(),
-    output: z.string().optional(),
+    detail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
+    snapshotCapturedAt: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
+    output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),
     attempt: preparationAttemptSchema.optional(),
@@ -842,13 +1048,49 @@ export const autocommitStartedDataSchema = z.object({
 });
 export type AutocommitStartedData = z.infer<typeof autocommitStartedDataSchema>;
 
+const commitPushStatusSchema = z.enum(['pushed', 'failed', 'not_attempted', 'unknown']);
+const maxCommitMessageBytes = 16 * 1024;
+
+/**
+ * The commit record, declared once. `sessionCommitDataSchema` is the strict
+ * record the SDK stores; `autocommitCompletedDataSchema` carries the same
+ * fields on the wire, so a new field reaches both paths instead of needing two
+ * synchronized declarations.
+ */
+const commitRecordShape = {
+  repository: z.string().min(1).max(500).optional(),
+  commitHash: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
+  commitMessage: z
+    .string()
+    .max(maxCommitMessageBytes)
+    .refine(value => new TextEncoder().encode(value).byteLength <= maxCommitMessageBytes),
+  messageId: z.string().min(1).max(256),
+  userMessageId: z.string().min(1).max(256),
+  committedAt: z.iso.datetime({ offset: true }),
+  pushStatus: commitPushStatusSchema,
+  commitMessageTruncated: z.literal(true).optional(),
+};
+
+export const sessionCommitDataSchema = z.object(commitRecordShape);
+
 export const autocommitCompletedDataSchema = z.object({
-  messageId: z.string(),
+  repository: commitRecordShape.repository.catch(undefined),
+  messageId: commitRecordShape.messageId,
   success: z.boolean().catch(false),
   message: z.string().optional(),
   skipped: z.boolean().optional(),
-  commitHash: z.string().optional(),
-  commitMessage: z.string().optional(),
+  // The commit half of the event: every field in `commitRecordShape` is
+  // required on a stored record, so a completion that has no commit (skipped,
+  // failed, metadata unavailable) omits them. A value that could not be stored
+  // is dropped by `.catch` instead of failing the event — the completion notice
+  // and the commit count must not depend on metadata quality, and storage still
+  // decides with `sessionCommitDataSchema` from the same definitions.
+  commitHash: commitRecordShape.commitHash.optional().catch(undefined),
+  commitMessage: commitRecordShape.commitMessage.optional().catch(undefined),
+  userMessageId: commitRecordShape.userMessageId.optional().catch(undefined),
+  committedAt: commitRecordShape.committedAt.optional().catch(undefined),
+  pushStatus: commitRecordShape.pushStatus.optional().catch(undefined),
+  commitMessageTruncated: commitRecordShape.commitMessageTruncated.optional().catch(undefined),
 });
 export type AutocommitCompletedData = z.infer<typeof autocommitCompletedDataSchema>;
 
@@ -858,6 +1100,8 @@ export const cloudStatusDataSchema = z.object({
 export type CloudStatusData = z.infer<typeof cloudStatusDataSchema>;
 
 export const connectedDataSchema = z.object({
+  bootstrapPending: z.boolean().optional(),
+  ancillaryOmittedItemCount: mutationCursorSchema.optional().catch(undefined),
   sessionStatus: sessionStatusSchema.optional().catch(undefined),
   cloudStatus: cloudStatusSchema.optional().catch(undefined),
 });
@@ -873,19 +1117,23 @@ export const slashCommandInfoSchema = z.object({
   agent: z.string().optional(),
   model: z.string().optional(),
   source: z.enum(['command', 'mcp', 'skill']).optional(),
-  hints: z.array(z.string()).default([]),
+  hints: z.array(z.string()).max(REMOTE_COMMAND_MAX_HINTS).default([]),
   subtask: z.boolean().optional(),
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
 
+export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatus> = z.object({
+  dropped: z.number().int().nonnegative(),
+  overLimit: z.boolean(),
+});
+
 export const commandsAvailableDataSchema = z.object({
-  commands: z.array(slashCommandInfoSchema),
+  commands: z.array(slashCommandInfoSchema).max(REMOTE_COMMAND_MAX_COMMANDS),
+  // The notice is a nicety and the catalog is essential, so a malformed status
+  // is dropped instead of failing the whole event and losing the catalog.
+  catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),
 });
 export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
-
-// ---------------------------------------------------------------------------
-// Per-message delivery lifecycle (cloud.message.*)
-// ---------------------------------------------------------------------------
 
 export const cloudMessageQueuedDataSchema = z.object({
   messageId: z.string(),
@@ -900,6 +1148,7 @@ export const cloudMessageSentDataSchema = z
     messageId: z.string(),
     executionId: z.string().optional(),
     delivery: z.literal('sent').optional(),
+    turnType: z.literal('command').optional(),
   })
   .passthrough();
 export type CloudMessageSentData = z.infer<typeof cloudMessageSentDataSchema>;
@@ -921,28 +1170,21 @@ export const cloudMessageFailedDataSchema = z
     delivery: z.enum(['queued', 'sent']).optional(),
     attempts: z.number().optional(),
     status: z.string().optional(),
+    billingFailure: customerBillingFailureSchema.optional().catch(undefined),
   })
   .passthrough();
 export type CloudMessageFailedData = z.infer<typeof cloudMessageFailedDataSchema>;
-
-// ---------------------------------------------------------------------------
-// Session snapshot (historical transport / replay)
-// ---------------------------------------------------------------------------
 
 export const sessionSnapshotSchema = z.object({
   info: z.object({ id: z.unknown() }).passthrough(),
   messages: z.array(
     z.object({
-      info: z.object({ id: z.string() }).passthrough(),
-      parts: z.array(z.object({ id: z.string() }).passthrough()),
+      info: wireMessageInfoSchema,
+      parts: z.array(wireMessagePartSchema),
     })
   ),
 });
 export type SessionSnapshotData = z.infer<typeof sessionSnapshotSchema>;
-
-// ---------------------------------------------------------------------------
-// Error shape (session-manager tRPC error extraction)
-// ---------------------------------------------------------------------------
 
 export const errorShapeSchema = z
   .object({
@@ -969,3 +1211,13 @@ export const errorShapeSchema = z
   })
   .passthrough();
 export type ErrorShape = z.infer<typeof errorShapeSchema>;
+
+/** Only accepts the explicit tRPC cause projection; generic 402s stay legacy. */
+export function parseCustomerBillingFailure(error: unknown): CustomerBillingFailure | null {
+  const parsed = errorShapeSchema.safeParse(error);
+  if (!parsed.success) return null;
+  const source =
+    parsed.data.data?.['billingFailure'] ?? parsed.data.shape?.data?.['billingFailure'];
+  const billingFailure = customerBillingFailureSchema.safeParse(source);
+  return billingFailure.success ? billingFailure.data : null;
+}

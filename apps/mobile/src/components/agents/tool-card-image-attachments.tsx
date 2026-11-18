@@ -2,9 +2,10 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { AlertCircle, ImageOff } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -15,7 +16,7 @@ import {
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
   resolveImagePreviewAspectRatio,
 } from './tool-card-attachments';
-import { useToolCardImageUri } from './tool-card-image-cache';
+import { isToolCardImagePending, useToolCardImageUri } from './tool-card-image-cache';
 import { getFilename } from './tool-card-utils';
 
 const toolInputFilePathSchema = z.object({ filePath: z.string() });
@@ -36,24 +37,51 @@ function UnavailableRow({
   );
 }
 
+type ToolCardImageAttachmentsProps = {
+  part: ToolPart;
+  imageFailed?: boolean;
+  onImageError?: (uri: string) => void;
+};
+
 function ToolCardImageAttachment({
   part,
   label,
-}: Readonly<{
-  part: ToolPart;
-  label: string;
-}>) {
+  imageFailed,
+  onImageError,
+}: Readonly<ToolCardImageAttachmentsProps & { label: string }>) {
+  const { t } = useTranslation();
   const uri = useToolCardImageUri(part.id);
+  const pending = isToolCardImagePending(part.id);
   const [aspectRatio, setAspectRatio] = useState<number | undefined>(undefined);
-  const [failed, setFailed] = useState(false);
+  const [failedUri, setFailedUri] = useState<string | undefined>(undefined);
+  const failed = imageFailed ?? failedUri === uri;
   const [viewerVisible, setViewerVisible] = useState(false);
 
   if (uri === undefined) {
-    return <UnavailableRow icon={ImageOff} message="Image preview unavailable in this session." />;
+    if (pending) {
+      return (
+        <View
+          className="w-full overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900"
+          accessible
+          accessibilityState={{ busy: true }}
+          accessibilityLabel={t('agentChat.filePart.loadingImage')}
+          // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
+          style={{ aspectRatio: IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
+        >
+          <Skeleton className="absolute inset-0" />
+        </View>
+      );
+    }
+    return (
+      <UnavailableRow
+        icon={ImageOff}
+        message={t('agentChat.filePart.imagePreviewUnavailableInSession')}
+      />
+    );
   }
 
   if (failed) {
-    return <UnavailableRow icon={AlertCircle} message="Image unavailable" />;
+    return <UnavailableRow icon={AlertCircle} message={t('common.imageUnavailable')} />;
   }
 
   return (
@@ -64,13 +92,14 @@ function ToolCardImageAttachment({
         }}
         className="w-full overflow-hidden rounded-md bg-neutral-100 active:opacity-80 dark:bg-neutral-900"
         accessibilityRole="button"
-        accessibilityLabel={`Open ${label} full screen`}
+        accessibilityLabel={t('agentChat.filePart.openFullScreen', { name: label })}
         // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
         style={{ aspectRatio: aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
       >
         {aspectRatio === undefined ? <Skeleton className="absolute inset-0" /> : null}
         <Image
           source={{ uri }}
+          cachePolicy="memory"
           className="h-full w-full"
           contentFit="contain"
           transition={0}
@@ -78,12 +107,13 @@ function ToolCardImageAttachment({
             setAspectRatio(resolveImagePreviewAspectRatio(event.source.width, event.source.height));
           }}
           onError={() => {
-            setFailed(true);
+            setFailedUri(uri);
+            onImageError?.(uri);
           }}
         />
       </Pressable>
       {viewerVisible ? (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
           uri={uri}
           filename={label}
@@ -96,7 +126,11 @@ function ToolCardImageAttachment({
   );
 }
 
-export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>) {
+export function ToolCardImageAttachments({
+  part,
+  imageFailed,
+  onImageError,
+}: Readonly<ToolCardImageAttachmentsProps>) {
   const attachments = getToolImageAttachments(part);
   if (attachments.length === 0) {
     return null;
@@ -112,7 +146,13 @@ export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>)
 
   return (
     <View className="gap-2">
-      <ToolCardImageAttachment part={part} label={label} />
+      <ToolCardImageAttachment
+        key={part.id}
+        part={part}
+        label={label}
+        imageFailed={imageFailed}
+        onImageError={onImageError}
+      />
     </View>
   );
 }

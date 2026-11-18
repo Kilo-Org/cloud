@@ -1,6 +1,9 @@
 import { captureException } from '@sentry/nextjs';
-import { upstreamRequest } from '../lib/ai-gateway/providers/upstream-request';
-import PROVIDERS from '../lib/ai-gateway/providers/provider-definitions';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  upstreamRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -53,13 +56,15 @@ describe('upstreamRequest timeout', () => {
       global.fetch = mockFetch;
 
       const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
         chatApi,
+        reasoningEffort: null,
         search: '?beta=true',
         method: 'POST',
         body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
         extraHeaders: {},
         provider: {
-          ...PROVIDERS.OPENROUTER,
+          ...OPENROUTER,
           apiUrl: 'https://gateway.example.test/v3',
           apiUrlOverrides,
         },
@@ -70,62 +75,259 @@ describe('upstreamRequest timeout', () => {
     }
   );
 
-  it('reports a client disconnect instead of an upstream disconnect when the caller aborts', async () => {
-    const controller = new AbortController();
-    controller.abort();
-
-    const result = await upstreamRequest({
+  test.each([
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: { messages: 'https://messages.example.test/deployments/model:invoke' },
+      search: '',
+      expectedUrl: 'https://messages.example.test/deployments/model:invoke',
+    },
+    {
+      chatApi: 'responses',
+      apiUrlOverrides: {},
+      search: '',
+      expectedUrl: 'https://gateway.example.test/deployments/model:invoke?api-version=2026-09-01',
+    },
+    {
       chatApi: 'chat_completions',
+      apiUrlOverrides: {},
+      search: '?beta=true&tag=one&tag=two',
+      expectedUrl:
+        'https://gateway.example.test/deployments/model:invoke?api-version=2026-09-01&beta=true&tag=one&tag=two',
+    },
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: { messages: 'https://messages.example.test/invoke/' },
+      search: '?beta=true',
+      expectedUrl: 'https://messages.example.test/invoke/?beta=true',
+    },
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: {
+        messages: 'https://messages.example.test/invoke?tag=one%20two&encoded=%2f#section',
+      },
+      search: '?tag=three+four&beta=true',
+      expectedUrl:
+        'https://messages.example.test/invoke?tag=one%20two&encoded=%2f&tag=three+four&beta=true#section',
+    },
+  ] as const)(
+    'uses the configured $chatApi endpoint without a suffix and preserves query parameters',
+    async ({ chatApi, apiUrlOverrides, search, expectedUrl }) => {
+      const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+      global.fetch = mockFetch;
+
+      const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+        chatApi,
+        reasoningEffort: null,
+        search,
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: {
+          ...OPENROUTER,
+          apiUrl: 'https://gateway.example.test/deployments/model:invoke?api-version=2026-09-01',
+          apiUrlOverrides,
+          disableUrlSuffix: true,
+        },
+      });
+
+      expect(result.type).toBe('success');
+      expect(mockFetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
+    }
+  );
+
+  it('appends the suffix when explicitly enabled', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+    global.fetch = mockFetch;
+
+    await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+      chatApi: 'messages',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
-      body: {
-        model: 'test-model',
-        messages: [{ role: 'user', content: 'test' }],
-      },
+      body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
-      signal: controller.signal,
+      provider: {
+        ...OPENROUTER,
+        apiUrl: 'https://gateway.example.test/v1',
+        apiUrlOverrides: {},
+        disableUrlSuffix: false,
+      },
     });
 
-    expect(result.type).toBe('error');
-    expect(mockCaptureException).not.toHaveBeenCalled();
-    if (result.type !== 'error') throw new Error('expected an error result');
-    expect(result.response.status).toBe(499);
-    await expect(result.response.json()).resolves.toEqual({
-      error:
-        'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
-      error_type: 'client_disconnect',
-      message:
-        'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gateway.example.test/v1/messages',
+      expect.any(Object)
+    );
   });
 
-  it('reports a gateway timeout message when the upstream sends no response headers', async () => {
-    const timeoutError = new DOMException(
-      'The operation was aborted due to timeout',
-      'TimeoutError'
-    );
-    global.fetch = jest.fn().mockRejectedValue(timeoutError);
+  it('uses x-api-key instead of authorization when configured by the provider', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+    global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
-      body: {
-        model: 'test-model',
-        messages: [{ role: 'user', content: 'test' }],
-      },
+      body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: { ...OPENROUTER, apiKey: 'custom-key', apiKeyHeader: 'x-api-key' },
     });
 
-    expect(result.type).toBe('error');
-    if (result.type !== 'error') throw new Error('expected an error result');
-    expect(result.response.status).toBe(503);
-    await expect(result.response.json()).resolves.toEqual({
-      error: 'The upstream provider did not send response headers before the gateway timeout.',
-      error_type: 'upstream_disconnect',
-      message: 'The upstream provider did not send response headers before the gateway timeout.',
+    expect(result.type).toBe('success');
+    const headers = mockFetch.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get('x-api-key')).toBe('custom-key');
+    expect(headers.has('authorization')).toBe(false);
+  });
+
+  it.each(['xhigh', 'max'])(
+    'reports a client disconnect without advice for %s effort when the caller aborts',
+    async reasoningEffort => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: {
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'test' }],
+        },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        signal: controller.signal,
+        reasoningEffort,
+      });
+
+      expect(result.type).toBe('error');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(499);
+      await expect(result.response.json()).resolves.toEqual({
+        error:
+          'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
+        error_type: 'client_disconnect',
+        message:
+          'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
+      });
+    }
+  );
+
+  it.each(['high', 'medium', 'low', 'minimal', 'none', null])(
+    'reports a gateway timeout without advice for %s effort',
+    async reasoningEffort => {
+      const timeoutError = new DOMException(
+        'The operation was aborted due to timeout',
+        'TimeoutError'
+      );
+      global.fetch = jest.fn().mockRejectedValue(timeoutError);
+
+      const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: {
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'test' }],
+        },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        reasoningEffort,
+      });
+
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      await expect(result.response.json()).resolves.toEqual({
+        error: 'The upstream provider did not send response headers before the gateway timeout.',
+        error_type: 'upstream_disconnect',
+        message: 'The upstream provider did not send response headers before the gateway timeout.',
+      });
+    }
+  );
+
+  describe.each(['xhigh', 'max'])('with %s reasoning effort', reasoningEffort => {
+    test.each([
+      { family: 'request_timeout', error: new DOMException('Timed out', 'TimeoutError') },
+      {
+        family: 'headers_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'UND_ERR_HEADERS_TIMEOUT' } }),
+      },
+      {
+        family: 'connect_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } }),
+      },
+      {
+        family: 'read_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'UND_ERR_BODY_TIMEOUT' } }),
+      },
+      {
+        family: 'read_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'ETIMEDOUT' } }),
+      },
+    ])('appends advice for $family before the request id', async ({ error }) => {
+      global.fetch = jest.fn().mockRejectedValue(error);
+
+      const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        reasoningEffort,
+        vercelRequestId: 'iad1::iad1::request-id',
+      });
+
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      const message = `The upstream provider did not send response headers before the gateway timeout. Try lowering the reasoning effort from "${reasoningEffort}" to "high" or lower to reduce the chance of timeouts. (request id: iad1::iad1::request-id)`;
+      await expect(result.response.json()).resolves.toEqual({
+        error: message,
+        error_type: 'upstream_disconnect',
+        message,
+        vercel_request_id: 'iad1::iad1::request-id',
+      });
+    });
+
+    test.each([
+      {
+        family: 'conn_reset',
+        error: new TypeError('fetch failed', { cause: { code: 'ECONNRESET' } }),
+      },
+      { family: 'unknown', error: new TypeError('fetch failed') },
+      { family: 'abort', error: new DOMException('Aborted', 'AbortError') },
+    ])('does not append advice for $family', async ({ error }) => {
+      global.fetch = jest.fn().mockRejectedValue(error);
+
+      const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        reasoningEffort,
+      });
+
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      await expect(result.response.json()).resolves.toEqual({
+        error: 'The upstream provider closed the connection before sending a response.',
+        error_type: 'upstream_disconnect',
+        message: 'The upstream provider closed the connection before sending a response.',
+      });
     });
   });
 
@@ -136,7 +338,9 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -144,7 +348,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -164,7 +368,9 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -172,7 +378,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
       vercelRequestId: 'iad1::iad1::request-id',
     });
 
@@ -199,7 +405,9 @@ describe('upstreamRequest timeout', () => {
     controller.abort();
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -207,7 +415,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
       signal: controller.signal,
       vercelRequestId: 'iad1::iad1::request-id',
     });
@@ -230,7 +438,9 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -238,7 +448,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -266,7 +476,9 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -274,7 +486,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -297,7 +509,9 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '?trace=search-secret',
       method: 'POST',
       body: {
@@ -306,7 +520,7 @@ describe('upstreamRequest timeout', () => {
       },
       extraHeaders: {},
       provider: {
-        ...PROVIDERS.OPENROUTER,
+        ...OPENROUTER,
         apiUrl: 'https://gateway.example.test/v1?token=url-secret',
       },
     });
@@ -346,7 +560,9 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -354,7 +570,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -383,7 +599,9 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '?trace=search-secret',
       method: 'POST',
       body: {
@@ -392,7 +610,7 @@ describe('upstreamRequest timeout', () => {
       },
       extraHeaders: { 'x-safe-extra-header': 'extra-header-secret' },
       provider: {
-        ...PROVIDERS.OPENROUTER,
+        ...OPENROUTER,
         apiUrl: 'https://gateway.example.test/v1?token=url-secret',
         apiKey: 'provider-api-key-secret',
       },

@@ -2,12 +2,12 @@ import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
 import { and, count, eq, gte, lt, type SQL } from 'drizzle-orm';
 import { agent_configs, cloud_agent_code_reviews } from '@kilocode/db/schema';
-import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { sendCodeReviewDisabledEmail } from '@/lib/email';
-import { getOrganizationMembers } from '@/lib/organizations/organizations';
-import { findUserById } from '@/lib/user';
-import { logExceptInTest } from '@/lib/utils.server';
+import { db, sql, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { sendCodeReviewDisabledEmail } from '@kilocode/web-shared/lib/email';
+import { getOrganizationMembers } from '@kilocode/web-shared/lib/organizations/organizations';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import {
@@ -43,7 +43,7 @@ const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
 const BYOK_INVALID_KEY_MESSAGE =
   '[byok] your api key is invalid or has been revoked. please check your api key configuration.';
 const BYOK_PERMISSION_DENIED_MESSAGE =
-  '[byok] your api key does not have permission to access this resource. please check your api key permissions.';
+  '[byok] your api key does not have permission to access this ';
 const REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON =
   'repeated_repository_clone_timeout' satisfies CodeReviewActionRequiredReason;
 const REPOSITORY_CLONE_TIMEOUT_MESSAGE_FRAGMENT = 'repository clone timed out';

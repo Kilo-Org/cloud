@@ -2,19 +2,35 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { X } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+import { TOPUP_TRANSACTION_QUERY_STRING_KEY } from '@kilocode/web-shared/lib/organizations/constants';
+import { z } from 'zod';
 
 type OrganizationTopupSuccessHeaderProps = {
   organizationName: string;
+  organizationId: string;
   amountUsd: string;
   onDismiss: () => void;
 };
 
 export function OrganizationTopupSuccessHeader({
   organizationName,
+  organizationId,
   amountUsd,
   onDismiss,
 }: OrganizationTopupSuccessHeaderProps) {
   const formattedAmount = parseFloat(amountUsd).toFixed(2);
+  const trpc = useTRPC();
+  const searchParams = useSearchParams();
+  const transactionId = searchParams.get(TOPUP_TRANSACTION_QUERY_STRING_KEY) ?? '';
+  const { data: confirmation } = useQuery(
+    trpc.user.getCreditPurchaseConfirmation.queryOptions(
+      { transactionId, organizationId },
+      { enabled: z.uuid().safeParse(transactionId).success, retry: false }
+    )
+  );
   return (
     <Card className="border-green-900 bg-green-950/30">
       <CardContent className="p-6">
@@ -36,10 +52,20 @@ export function OrganizationTopupSuccessHeader({
               </svg>
             </div>
           </div>
-          <div className="flex flex-1 items-center">
+          <div className="flex-1 space-y-1">
             <h3 className="text-xl font-semibold text-green-100">
-              You purchased ${formattedAmount} more credits for {organizationName}. Happy Coding!
+              You purchased ${formattedAmount} in credits for {organizationName}.
             </h3>
+            {confirmation && (
+              <p className="text-muted-foreground text-sm">
+                {confirmation.expiryDate
+                  ? `Purchased credits expire ${new Date(confirmation.expiryDate).toLocaleString(
+                      'en-US',
+                      { timeZone: 'UTC', timeZoneName: 'short' }
+                    )}.`
+                  : 'These purchased credits do not expire.'}
+              </p>
+            )}
           </div>
           <button
             onClick={onDismiss}

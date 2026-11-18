@@ -1,0 +1,532 @@
+import { z } from 'zod';
+
+import { epochMsToIso, timestampMs } from './utils';
+
+/**
+ * One durable, privacy-minimal, versioned snapshot for every glanceable
+ * surface (Live Activity, Dynamic Island, Home Screen widget, Android
+ * widget, Android ongoing notification).
+ *
+ * Privacy contract: the snapshot carries generic status, counts, safe
+ * timestamps, and an opaque scope key only. It must never carry a session
+ * title, prompt, excerpt, organization name, repository name, generated
+ * text, secret, or a raw account/session id.
+ */
+
+export const GLANCEABLE_SNAPSHOT_SCHEMA_VERSION = 1;
+/**
+ * ActivityKit ends a Live Activity after at most 8 hours, so nothing a card
+ * carries may outlive this window. Every glanceable budget counts from here.
+ */
+export const LIVE_ACTIVITY_MAX_LIFETIME_MS = 8 * 60 * 60_000;
+/**
+ * How long a snapshot may claim the card it feeds. It is the whole Live
+ * Activity lifetime: a snapshot older than the card it describes has nothing
+ * left to say.
+ */
+export const GLANCEABLE_SNAPSHOT_EXPIRY_MS = LIVE_ACTIVITY_MAX_LIFETIME_MS;
+/**
+ * Later happy updates are coalesced for at most this long. A tray with many
+ * running sessions heartbeats every few seconds, and each emit re-renders the
+ * native surfaces, so a counts-only change may lag by at most one window. An
+ * actionable needs-input change never waits (the publisher emits it at once).
+ */
+export const GLANCEABLE_COALESCE_MS = 10_000;
+/** Terminal empty lasts at most this long before the activity ends. */
+export const GLANCEABLE_TERMINAL_MS = 8000;
+/**
+ * A Live Activity that has taken no update for this long reads as unknown, not
+ * as current: ActivityKit dims stale content. Every real transition pushes an
+ * update well inside the window, and an idle card is already gone by then.
+ */
+export const GLANCEABLE_STALE_MS = 1_800_000;
+/**
+ * The one display-title cut every glanceable surface shares: a title is trimmed
+ * to a single line of what it draws, then capped at this many characters.
+ * `glanceableTitle` owns the cut; the Home widget's stored details and the
+ * session-card content schema bound their titles with this same value, so the
+ * cap cannot drift between the surfaces.
+ */
+export const GLANCEABLE_TITLE_LIMIT = 120;
+
+export const GLANCEABLE_SNAPSHOT_STATUSES = [
+  'waiting',
+  'empty',
+  'happy',
+  'stale',
+  'expired',
+  'signed_out',
+  'privacy',
+] as const;
+
+export type GlanceableAgentsSnapshotStatus = (typeof GLANCEABLE_SNAPSHOT_STATUSES)[number];
+
+/** The one kind vocabulary every surface reads (membership only; consumers own presentation order). */
+export const GLANCEABLE_STATUS_KINDS = ['needsInput', 'running', 'idle', 'scheduled'] as const;
+
+/** What a session's status means to a user: the one vocabulary every surface reads. */
+export type GlanceableStatusKind = (typeof GLANCEABLE_STATUS_KINDS)[number];
+
+/** Session statuses that mean the agent waits on the user and cannot go on alone. */
+export const GLANCEABLE_NEEDS_INPUT_STATUSES = ['question', 'permission', 'retry'] as const;
+
+export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[number];
+
+export const glanceableAgentsSnapshotSchema = z.object({
+  schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
+  revision: z.number().int().min(1),
+  /** ISO 8601 timestamp. */
+  updatedAt: z.string(),
+  /** ISO 8601 timestamp; `updatedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS`. */
+  expiresAt: z.string(),
+  /** Opaque scope key; never a raw user or organization id. */
+  scopeKey: z.string().min(1),
+  /**
+   * Client-set local auth epoch. Optional on the wire: old and server
+   * producers omit it; the client sets the current local epoch when it
+   * applies a remote snapshot. Remove the optional when every producer
+   * sends it.
+   */
+  accountEpoch: z.number().int().optional(),
+  organizationBound: z.boolean(),
+  status: z.enum(GLANCEABLE_SNAPSHOT_STATUSES),
+  /** Sessions actively doing something. */
+  running: z.number().int().min(0),
+  /** Sessions waiting on the user, including one whose CLI dropped mid-question. */
+  needsInput: z.number().int().min(0),
+  /**
+   * Sessions waiting on a permission prompt: the needs-input rows that can be
+   * approved without choosing an option. Optional on input with a zero
+   * default — an older producer omits it — so the parsed snapshot carries a
+   * total count like the push schema.
+   */
+  needsApproval: z.number().int().min(0).default(0),
+  /** Sessions connected but doing nothing. */
+  idle: z.number().int().min(0),
+  /**
+   * Sessions scheduled to wake later and doing nothing now. Optional on input
+   * with a zero default: a version-1 snapshot persisted by the release before
+   * this count carried no such key, and every reader treats absent as 0.
+   * Remove the default when every producer sends it.
+   */
+  scheduled: z.number().int().min(0).default(0),
+  /**
+   * ISO 8601 timestamp or null: when the longest-waiting needs-input session
+   * entered that state. Null when nothing needs input, or when no row carried
+   * a status timestamp. Only needs-input carries a duration, because a wait is
+   * the one interval the user can act on — see `oldestNeedsInputSince`.
+   */
+  needsInputSince: z.string().nullable(),
+  /**
+   * ISO 8601 timestamp or null: the soonest wake among scheduled sessions.
+   * Null when nothing is scheduled, or when no scheduled row carried a usable
+   * `scheduledAt`. A `scheduled` count with no wake time is representable.
+   * Optional on input with a null default for the same reason as `scheduled`.
+   */
+  scheduledAt: z.string().nullable().default(null),
+  /**
+   * The kind of the most recent agent state change, in the one vocabulary every
+   * surface shows. Null when no row carried a usable status timestamp. A
+   * completed or unknown status folds into `running`, the same fold the counts
+   * use, so the newest-result line can never disagree with the row above it —
+   * see `newestGlanceableResult`.
+   *
+   * Optional on input with a null default: a version-1 snapshot persisted by
+   * the release before this fact carried no such key, and every reader treats
+   * absent as null. Remove the optional and the default when every producer
+   * sends it.
+   */
+  newestResultKind: z.enum(GLANCEABLE_STATUS_KINDS).nullable().default(null),
+  /**
+   * ISO 8601 timestamp or null: when that newest change happened. Null exactly
+   * when `newestResultKind` is null. Optional on input with a null default for
+   * the same reason as the kind.
+   */
+  newestResultAt: z.string().nullable().default(null),
+});
+
+export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSchema>;
+
+export type GlanceableCounts = {
+  running: number;
+  needsInput: number;
+  idle: number;
+  scheduled: number;
+};
+
+/**
+ * The snapshot fields that describe the frame rather than the work in it. A
+ * blank-work record must cover every other field of the snapshot, so a work
+ * field added to the schema fails to compile here until it is either listed as
+ * non-work or blanked by `NO_GLANCEABLE_WORK`.
+ */
+type GlanceableFrameField =
+  | 'schemaVersion'
+  | 'revision'
+  | 'updatedAt'
+  | 'expiresAt'
+  | 'scopeKey'
+  | 'accountEpoch'
+  | 'organizationBound'
+  | 'status'
+  | 'newestResultKind'
+  | 'newestResultAt';
+
+/**
+ * The work fields a frame carries when it asserts no work at all: one that has
+ * lapsed, and one built for a terminal scope. Both producers spread this one
+ * record instead of listing the fields again, so no path can blank a field the
+ * other keeps.
+ */
+export const NO_GLANCEABLE_WORK: Omit<GlanceableAgentsSnapshot, GlanceableFrameField> = {
+  running: 0,
+  needsInput: 0,
+  needsApproval: 0,
+  idle: 0,
+  scheduled: 0,
+  needsInputSince: null,
+  scheduledAt: null,
+};
+
+/**
+ * One session row, as every producer reads it from the active-sessions list.
+ * The two timestamps share one absence policy: a row that does not carry the
+ * fact omits it, and a producer that serializes an absent value may carry an
+ * explicit `null` — the readers (`timestampMs`, the helpers below) treat
+ * `null`, absent and unparseable exactly the same, so a shape may widen in
+ * either direction without a branch at the read site.
+ */
+export type GlanceableSessionRow = {
+  status: string;
+  /** Backend timestamp; when this session's status last changed. Absent on old rows. */
+  statusUpdatedAt?: string | null;
+  /**
+   * Backend wake time. Only a `scheduled` row carries one, and even then the
+   * CLI may omit it — `scheduled` with no time is representable.
+   */
+  scheduledAt?: string | null;
+};
+
+/**
+ * The needs-input kind of a session status, or null when the status is not a
+ * needs-input one. The one lookup every needs-input branch reads. Callers must
+ * not fall back to a default kind: an unknown status drops the row rather than
+ * mislabelling it as a wait.
+ */
+export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKind | null {
+  return (GLANCEABLE_NEEDS_INPUT_STATUSES as readonly string[]).includes(status)
+    ? (status as GlanceableNeedsInputKind)
+    : null;
+}
+
+/**
+ * The snapshot statuses that end the surface: a signed-out or privacy-cleared
+ * scope. Every terminal-status decision reads this one predicate, so the data
+ * payload, presentation, refresh cadence and timeline cannot disagree.
+ */
+export function isTerminalGlanceableStatus(status: GlanceableAgentsSnapshotStatus): boolean {
+  return status === 'signed_out' || status === 'privacy';
+}
+
+/**
+ * Map one session status to the kind the glanceable surfaces and the session
+ * lists both show. Total on strings: needs-input statuses → `needsInput`,
+ * `idle` → `idle`, the literal `scheduled` → `scheduled`, everything else →
+ * `running` (starting, empty, unknown included). A session is idle only when
+ * the agent says so, so a working or unrecognized session can never render
+ * idle and a row can never disagree with the widget beside it.
+ */
+export function glanceableStatusKind(status: string): GlanceableStatusKind {
+  if (glanceableNeedsInputKind(status) !== null) {
+    return 'needsInput';
+  }
+  if (status === 'idle') {
+    return 'idle';
+  }
+  if (status === 'scheduled') {
+    return 'scheduled';
+  }
+  return 'running';
+}
+
+/**
+ * Map session rows to the glanceable counts. `busy` → running,
+ * `question`/`permission`/`retry` → needs-input, `idle` → idle, the literal
+ * `scheduled` → scheduled, and any other status (starting, empty, unknown,
+ * completed) counts as running: a session is idle only when the agent says
+ * so, and no row is dropped from the count its list row shows.
+ *
+ * `retry` folds into needs-input because it means one thing to the user: the
+ * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
+ * disconnects while that session was waiting on an answer, and the CLI writes
+ * it while backing off after a provider error.
+ */
+export function countGlanceableSessions(
+  sessions: readonly GlanceableSessionRow[]
+): GlanceableCounts {
+  const counts = { running: 0, needsInput: 0, idle: 0, scheduled: 0 };
+  for (const session of sessions) {
+    counts[glanceableStatusKind(session.status)] += 1;
+  }
+  return counts;
+}
+
+/**
+ * The number of session rows whose status is exactly `permission`. A
+ * permission wait is the one needs-input kind the user can clear without
+ * choosing an option, so the wrist control offers Approve only against this
+ * count.
+ *
+ * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
+ * `retry` needs the provider to come back, so neither is approvable.
+ */
+export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
+  let approvals = 0;
+  for (const session of sessions) {
+    if (session.status === 'permission') {
+      approvals += 1;
+    }
+  }
+  return approvals;
+}
+
+/**
+ * Order two rows by one of their timestamps. `extreme` uses the vocabulary the
+ * package owns for its extreme-row selector: 'earliest' is oldest first,
+ * 'latest' is newest first. A missing or unparseable time ranks after every
+ * known time in both directions, so the rule is stated once here and not
+ * restated per sort; a tie compares 0, so the caller's stable sort keeps source
+ * order. This is the sort-facing view of the ordering that
+ * `extremeTimestampRow` applies when it picks one winner.
+ */
+export function compareSessionInstant<T extends GlanceableSessionRow>(
+  read: (row: T) => string | null | undefined,
+  extreme: 'earliest' | 'latest'
+): (a: T, b: T) => number {
+  return (a, b) => {
+    const left = timestampMs(read(a));
+    const right = timestampMs(read(b));
+    if (left === null || right === null) {
+      return Number(left === null) - Number(right === null);
+    }
+    return extreme === 'earliest' ? left - right : right - left;
+  };
+}
+
+/**
+ * The row whose chosen timestamp is the earliest or the latest among the rows
+ * that `qualifies` admits, or null when no admitted row carries a parseable
+ * time.
+ *
+ * A row with a missing or unparseable timestamp is skipped rather than read as
+ * now, which would understate a wait or overstate how new a change is — the
+ * selector skips what the sort-facing `compareSessionInstant` would rank last.
+ * Only a strictly earlier or strictly later value replaces the winner, so the
+ * first row of a tie stays the winner.
+ */
+function extremeTimestampRow(
+  sessions: readonly GlanceableSessionRow[],
+  qualifies: (session: GlanceableSessionRow) => boolean,
+  readTimestamp: (session: GlanceableSessionRow) => string | null | undefined,
+  extreme: 'earliest' | 'latest'
+): { at: number; session: GlanceableSessionRow } | null {
+  let winner: { at: number; session: GlanceableSessionRow } | null = null;
+  const compare = compareSessionInstant(readTimestamp, extreme);
+  for (const session of sessions) {
+    if (!qualifies(session)) {
+      continue;
+    }
+    const at = timestampMs(readTimestamp(session));
+    if (at === null) {
+      continue;
+    }
+    if (winner !== null && compare(session, winner.session) >= 0) {
+      continue;
+    }
+    winner = { at, session };
+  }
+  return winner;
+}
+
+/**
+ * The earliest `statusUpdatedAt` among the needs-input sessions as an ISO 8601
+ * timestamp, or null when none waits or none carried a usable timestamp.
+ *
+ * The counts are aggregates, so a single duration can only honestly describe
+ * the oldest wait: it is a floor on how long the user has kept an agent
+ * blocked.
+ */
+export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[]): string | null {
+  const oldest = extremeTimestampRow(
+    sessions,
+    session => glanceableNeedsInputKind(session.status) !== null,
+    session => session.statusUpdatedAt,
+    'earliest'
+  );
+  return oldest === null ? null : epochMsToIso(oldest.at);
+}
+
+/**
+ * The earliest parseable `scheduledAt` among scheduled sessions as an ISO 8601
+ * timestamp, or null when none is scheduled or none carried a usable wake time.
+ * A scheduled row with no wake time still counts as scheduled — only the
+ * timestamp is absent.
+ */
+export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): string | null {
+  const soonest = extremeTimestampRow(
+    sessions,
+    session => session.status === 'scheduled',
+    session => session.scheduledAt,
+    'earliest'
+  );
+  return soonest === null ? null : epochMsToIso(soonest.at);
+}
+
+/**
+ * The most recent status change across the rows as an ISO 8601 timestamp, or
+ * null when no row carried a usable timestamp.
+ *
+ * The counts and the newest-result line must agree, so the kind maps through
+ * `glanceableStatusKind`: a completed or unknown status reads as `running`
+ * exactly as it counts.
+ */
+export function newestGlanceableResult(
+  sessions: readonly GlanceableSessionRow[]
+): { kind: GlanceableStatusKind; at: string } | null {
+  const newest = extremeTimestampRow(
+    sessions,
+    () => true,
+    session => session.statusUpdatedAt,
+    'latest'
+  );
+  return newest === null
+    ? null
+    : { kind: glanceableStatusKind(newest.session.status), at: epochMsToIso(newest.at) };
+}
+
+// FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across
+// Node and Hermes and not reversible to the input, so the raw ids never appear
+// in the key.
+function fnv1a32(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    const code = input.charCodeAt(i);
+    hash = Math.imul(hash ^ (code & 0xff), 0x01000193) >>> 0;
+    hash = Math.imul(hash ^ ((code >>> 8) & 0xff), 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Opaque, stable scope key for a user + optional organization pair. The
+ * client also fences remote snapshots on the local auth epoch, so the epoch
+ * deliberately does not enter this key.
+ */
+export function buildOpaqueScopeKey(input: {
+  userId: string;
+  organizationId: string | null;
+}): string {
+  // Length-delimited by a NUL separator so `user=ab,org=c` and `user=a,org=bc`
+  // cannot hash to the same key.
+  const joined = `${input.userId}\u0000${input.organizationId ?? ''}`;
+  const hash = fnv1a32(joined);
+  return hash.toString(16).padStart(8, '0');
+}
+
+export type BuildGlanceableSnapshotInput = {
+  sessions: readonly GlanceableSessionRow[];
+  userId: string;
+  organizationId: string | null;
+  /** Epoch milliseconds. */
+  now: number;
+  previousRevision?: number;
+  accountEpoch?: number;
+  /** Overrides the happy/empty derivation for waiting, stale, expired, signed_out, privacy. */
+  status?: GlanceableAgentsSnapshotStatus;
+};
+
+/**
+ * Build a snapshot from the current session rows. Revision increases by one
+ * on every build. `needsInputSince` comes straight from the rows, so it needs
+ * no carry-forward across revisions: it is data, not a latch. The newest-result
+ * fact reads the rows the same way.
+ */
+export function buildGlanceableSnapshot(
+  input: BuildGlanceableSnapshotInput
+): GlanceableAgentsSnapshot {
+  const counts = countGlanceableSessions(input.sessions);
+  // Idle and scheduled counts: a connected agent doing nothing, or one that
+  // will wake later, is still something the user wants on the Lock Screen.
+  const eligible = isEligibleGlanceableWork(counts);
+  const now = input.now;
+  const updatedAt = epochMsToIso(now);
+  const newest = newestGlanceableResult(input.sessions);
+
+  return {
+    schemaVersion: GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
+    revision: (input.previousRevision ?? 0) + 1,
+    updatedAt,
+    expiresAt: epochMsToIso(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS),
+    scopeKey: buildOpaqueScopeKey({ userId: input.userId, organizationId: input.organizationId }),
+    ...(input.accountEpoch === undefined ? {} : { accountEpoch: input.accountEpoch }),
+    organizationBound: typeof input.organizationId === 'string',
+    status: input.status ?? (eligible ? 'happy' : 'empty'),
+    running: counts.running,
+    needsInput: counts.needsInput,
+    needsApproval: countGlanceableApprovals(input.sessions),
+    idle: counts.idle,
+    scheduled: counts.scheduled,
+    needsInputSince: oldestNeedsInputSince(input.sessions),
+    scheduledAt: soonestScheduledAt(input.sessions),
+    newestResultKind: newest?.kind ?? null,
+    newestResultAt: newest?.at ?? null,
+  };
+}
+
+/**
+ * True when the given counts contain any connected agent, whether working,
+ * waiting, idle, or scheduled. Takes the counts shape so the snapshot builder
+ * and snapshot-level callers share one rule; a snapshot satisfies it
+ * structurally. A narrower counts object (for example followed-session
+ * counts) works too.
+ */
+export function isEligibleGlanceableWork(counts: GlanceableCounts): boolean {
+  return counts.running + counts.needsInput + counts.idle + counts.scheduled > 0;
+}
+
+/**
+ * True when an agent is working, waiting on the user, or scheduled to wake.
+ * Only this may raise a Live Activity: idle work is worth keeping one alive,
+ * never worth interrupting the Lock Screen for. A scheduled session is worth
+ * a card and must not be treated as idle-only, or the widget would offer
+ * `New agent` and the iOS Live Activity would not raise. The client sink and
+ * the APNs push-to-start share the rule, so neither can resurrect a surface
+ * the other retired. Takes the same counts shape as the eligible rule; the
+ * Home-widget refresh policy calls it instead of restating the sum.
+ */
+export function isStartableGlanceableWork(counts: GlanceableCounts): boolean {
+  return counts.running + counts.needsInput + counts.scheduled > 0;
+}
+
+/** True when every connected agent is idle: eligible work, but nothing happening. */
+export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
+  return isEligibleGlanceableWork(snapshot) && !isStartableGlanceableWork(snapshot);
+}
+
+/**
+ * True when `incoming` must be discarded in favour of `current`: a strictly
+ * lower revision, or the same revision with an older `updatedAt`. ISO 8601
+ * strings from `epochMsToIso` compare correctly as strings.
+ */
+export function shouldDiscardGlanceableRevision(
+  incoming: GlanceableAgentsSnapshot,
+  current: GlanceableAgentsSnapshot
+): boolean {
+  if (incoming.revision < current.revision) {
+    return true;
+  }
+  if (incoming.revision === current.revision) {
+    return incoming.updatedAt < current.updatedAt;
+  }
+  return false;
+}

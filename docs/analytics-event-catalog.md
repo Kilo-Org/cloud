@@ -123,6 +123,20 @@ Captured through the AppsFlyer SDK and mirrored into PostHog via the uncataloged
 |---|---|---|---|---|---|
 | `login` | Auth (mobile) | Login funnel visibility in product analytics | Client: AppsFlyer auth mirror | None (`{}` today; dynamic properties redacted at runtime) | AppsFlyer + best-effort mirror |
 
+### Accepted-phase privacy-minimal events
+
+These accepted-phase events carry only a stable enum (and, for consent, a
+boolean) at the authoritative boundary. None are terminal outcomes; all are
+best-effort.
+
+| Event | Owner | Business question | Source boundary | Privacy class | Delivery |
+|---|---|---|---|---|---|
+| `logout` | Auth (mobile) | Logout occurred | Client: `signOut` before telemetry discard | None (`{}`) | Best-effort (SDK), flush then discard |
+| `consent_outcome` | Consent (mobile) | Consent accept/optional/revoke | Client: storage write on real change | Enum + boolean (`action`, `optional`) | Best-effort (SDK); enable-side on PostHog ready |
+| `notification_permission_responded` | Notifications (mobile) | Permission grant/deny | Client: live permission request returned | Enum (`outcome`) | Best-effort (SDK) |
+| `notification_token_updated` | Notifications (mobile) | Token register/unregister | Client: mutate succeeded | Enum (`action`) | Best-effort (SDK) |
+| `organization_member_joined` | Organizations (web) | Invite accepted into membership | Server: `acceptOrganizationInvite` when `membershipInserted` | Enum (`role`) | Best-effort (server) |
+
 ### Terminal outcome events (durable outbox, Wave 2)
 
 These are the only events the durable outbox may emit. They carry the DEC-05
@@ -135,6 +149,8 @@ receipt.
 | `session_create_settled` | cloud-agent-next handler | Did cloud session creation settle, and how? | Durable DO registration + initial admission succeeded; allocation-failure stages; takeover reconcile | Enums + counts + `duration_ms` + boolean | Durable outbox |
 | `pr_operation_settled` | github-pr-review router | Did the PR operation (merge/review/comment) settle? | GitHub committed response; ambiguity reconciled (or `unresolved`) | Enums + `duration_ms` | Durable outbox |
 | `security_command_settled` | security-sync worker + web handler | Did the security command (sync/dismiss) settle? | Command status transition to terminal; pre-acceptance definitive failure | Enums + counts + `duration_ms` | Durable outbox |
+| `code_review_settled` | code-review router | Did the code review operation settle? | Code review committed response; ambiguity reconciled | Enums (`surface`, `intent`) + `duration_ms` | Durable outbox |
+| `purchase_settled` | kilo-pass store purchase | Did the store purchase settle? | Store purchase post-commit acceptance | Enums (`surface`, `intent`) + `duration_ms` | Durable outbox |
 
 ## Recorded exclusions
 

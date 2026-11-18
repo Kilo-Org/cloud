@@ -37,19 +37,18 @@ describe('buildMembersListItems', () => {
     expect(buildMembersListItems({ activeMembers: [], invitedMembers: [] })).toEqual([]);
   });
 
-  it('builds members only with a Members section and a last flag', () => {
+  it('omits the Members label when active members are the only group', () => {
     const items = buildMembersListItems({
       activeMembers: [activeMember('a'), activeMember('b')],
       invitedMembers: [],
     });
     expect(items).toEqual([
-      { kind: 'section', title: 'Members' },
       { kind: 'member', member: activeMember('a'), last: false },
       { kind: 'member', member: activeMember('b'), last: true },
     ]);
   });
 
-  it('builds members plus invites with both sections and correct last flags', () => {
+  it('labels both groups when members and invites share the list', () => {
     const items = buildMembersListItems({
       activeMembers: [activeMember('a')],
       invitedMembers: [invitedMember('i1'), invitedMember('i2')],

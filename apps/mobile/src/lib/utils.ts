@@ -1,37 +1,62 @@
-import { firstNonEmpty, formatDate, parseTimestamp } from '@kilocode/app-shared/utils';
+import { relativeTimeFormat } from '@/lib/intl-cache';
+import { firstNonEmpty, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+import { i18n } from '@/i18n';
+import { firstGrapheme } from '@/lib/format';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const EMAIL_PATTERN = /.+@.+\..+/;
+// Ordered largest-first so the first unit whose bucket fits wins; the values
+// mirror the original minute/hour/day/month/year buckets.
+const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds: number }[] = [
+  { unit: 'year', seconds: 365 * 24 * 60 * 60 },
+  { unit: 'month', seconds: 30 * 24 * 60 * 60 },
+  { unit: 'day', seconds: 24 * 60 * 60 },
+  { unit: 'hour', seconds: 60 * 60 },
+  { unit: 'minute', seconds: 60 },
+];
 
-/** Returns a human-readable relative time string like "3 days ago". */
-function timeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) {
-    return 'just now';
+/**
+ * Returns a human-readable relative time string like "3 days ago" or "in 2
+ * hours". Uses `Intl.RelativeTimeFormat` with the active i18n language (or the
+ * passed locale) so the unit words and direction are localized. The shared
+ * formatter loads the Hermes polyfill and active locale on demand. Sub-minute
+ * gaps use the catalog's `common.justNow` because RelativeTimeFormat has no
+ * sub-minute bucket.
+ *
+ * The sign decides the direction: an instant ahead of the clock is a wait the
+ * user is looking forward to (a scheduled wake reads "in 2 hours"), so the
+ * magnitude picks the unit and a future value is formatted positive.
+ *
+ * `nowMs` is the caller's clock. A relative label must be derived from a value
+ * the render traces (the ticker's `now`), never from a live `Date.now()` read:
+ * React Compiler is enabled for this app and memoizes render expressions
+ * against their traced inputs, so a label computed from an untracked clock is
+ * cached with the row's unchanged props and the on-screen text freezes
+ * (conversation list, 2026-09-16). Callers that pass `nowMs` own the tick.
+ */
+function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): string {
+  if (Number.isNaN(date.getTime())) {
+    return '';
   }
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
+  const seconds = Math.floor((nowMs - date.getTime()) / 1000);
+  const magnitude = Math.abs(seconds);
+  if (magnitude < 60) {
+    return i18n.t('common.justNow');
   }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h ago`;
+  const resolvedLocale = locale ?? i18n.language;
+  const formatter = relativeTimeFormat(resolvedLocale, { numeric: 'auto' });
+  for (const { unit, seconds: unitSeconds } of RELATIVE_TIME_UNITS) {
+    const value = Math.floor(magnitude / unitSeconds);
+    if (value >= 1) {
+      return formatter.format(seconds < 0 ? value : -value, unit);
+    }
   }
-  const days = Math.floor(hours / 24);
-  if (days < 30) {
-    return `${days}d ago`;
-  }
-  const months = Math.floor(days / 30);
-  if (months < 12) {
-    return `${months}mo ago`;
-  }
-  const years = Math.floor(days / 365);
-  return `${years}y ago`;
+  return i18n.t('common.justNow');
 }
 
 // eslint-disable-next-line no-empty-function -- intentional no-op
@@ -48,17 +73,8 @@ function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): 
 
 /** Uppercases the first letter, e.g. for enum-like values used as labels. */
 function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  const first = firstGrapheme(value, i18n.language);
+  return first.toLocaleUpperCase(i18n.language) + value.slice(first.length);
 }
 
-export {
-  asyncNoop,
-  capitalize,
-  cn,
-  EMAIL_PATTERN,
-  firstNonEmpty,
-  formatDate,
-  parseTimestamp,
-  pick,
-  timeAgo,
-};
+export { asyncNoop, capitalize, cn, firstNonEmpty, parseTimestamp, pick, timeAgo };

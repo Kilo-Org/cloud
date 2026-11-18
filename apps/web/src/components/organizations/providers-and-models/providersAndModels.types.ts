@@ -1,3 +1,5 @@
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+
 export type ModelRow = {
   modelId: string;
   modelName: string;
@@ -19,25 +21,31 @@ export type ProviderRow = {
   headquarters?: string;
   datacenters?: string[];
   unavailableReason?: string;
+  /** Kilo never routes to this provider; it only serves the organization's own keys. */
+  byokOnly?: boolean;
 };
 
-export type ProviderOffering = {
+export type OfferingPricing = {
+  promptPrice: string;
+  completionPrice: string;
+};
+
+export type ProviderOffering = OfferingPricing & {
   providerSlug: string;
   providerDisplayName: string;
   providerIconUrl: string | null;
   trains: boolean;
   retainsPrompts: boolean;
-  promptPrice: string;
-  completionPrice: string;
+  byokOnly?: boolean;
+  /** The regions Vercel AI Gateway can pin the model to at this provider. */
+  vercelInferenceRegions: OrganizationDataRegion[];
 };
 
-export type ProviderModelRow = {
+export type ProviderModelRow = OfferingPricing & {
   modelId: string;
   modelName: string;
   preferredIndex: number | undefined;
   sourceIndex: number;
-  promptPrice: string;
-  completionPrice: string;
   trains: boolean;
   retainsPrompts: boolean;
 };

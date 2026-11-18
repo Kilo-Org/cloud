@@ -90,7 +90,6 @@ test('context donut shows usage after a reply', async () => {
     await sidePanel.reload();
 
     await sidePanel.getByLabel('Message agent').fill('Show me usage');
-    // Wait for send to be enabled (model + target tab ready)
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Donut reply.')).toBeVisible();
@@ -276,7 +275,7 @@ test('session cost accumulates across completions and turns', async () => {
                   {
                     function: {
                       arguments: JSON.stringify({}),
-                      name: 'get_page_snapshot',
+                      name: 'kilo_browser_snapshot',
                     },
                     id: 'call_snapshot_1',
                     index: 0,
@@ -330,7 +329,7 @@ test('session cost accumulates across completions and turns', async () => {
     await sidePanel.getByLabel('Message agent').fill('Turn one');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
     await sidePanel.getByLabel('Message agent').press('Enter');
-    await expect(sidePanel.getByText('get_page_snapshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('Page snapshot completed')).toBeVisible();
     await expect(sidePanel.getByText('Turn one complete.')).toBeVisible();
 
     await donut.click();

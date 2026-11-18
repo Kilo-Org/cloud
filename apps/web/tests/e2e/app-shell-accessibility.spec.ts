@@ -2,7 +2,7 @@ import { test, expect } from '@chromatic-com/playwright';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
 import { randomUUID } from 'node:crypto';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 async function seedFakeUser({ isAdmin }: { isAdmin: boolean }) {
   const uniqueId = randomUUID().slice(0, 8);
@@ -76,15 +76,15 @@ test.describe('authenticated app shell accessibility', () => {
   }) => {
     const testEmail = await seedFakeUser({ isAdmin: false });
     await page.goto(
-      `/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}&callbackPath=${encodeURIComponent('/install')}`
+      `/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}&callbackPath=${encodeURIComponent('/usage')}`
     );
-    await page.waitForURL(url => url.pathname === '/install', { timeout: 30_000 });
+    await page.waitForURL(url => url.pathname === '/usage', { timeout: 30_000 });
 
     await expectShellBasics(page);
     await expect(page.locator('header').first()).toHaveCSS('height', '56px');
 
     await expect(
-      page.locator('[data-sidebar="menu"]').getByRole('link', { name: /^Install$/ })
+      page.locator('[data-sidebar="menu"]').getByRole('link', { name: /^Usage$/ })
     ).toHaveAttribute('aria-current', 'page');
   });
 

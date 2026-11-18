@@ -1,24 +1,94 @@
+import { DatabaseSync } from 'node:sqlite';
 import { describe, it, expect } from 'vitest';
-import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
+import { rankCandidates, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 import {
   exactPairKey,
+  getRoutingCaseResultsForEntries,
   mapRunRow,
   mapSummaryRow,
   routingTableToRows,
   rowsToRoutingTable,
 } from './db';
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
-import {
-  variantFromReasoningEffort,
-  variantFromStorage,
-  variantToStorage,
-} from './reasoning-effort';
+import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
-// ---------------------------------------------------------------------------
-// mapSummaryRow
-// ---------------------------------------------------------------------------
+describe('routing case results provenance read', () => {
+  it('reads only the ready exact pairs from their own measuring runs', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(`
+      CREATE TABLE case_results (
+        run_id TEXT, model TEXT, variant TEXT, case_id TEXT, route_key TEXT,
+        rep INTEGER, score REAL, cost_usd REAL, latency_ms INTEGER, error TEXT
+      );
+      INSERT INTO case_results VALUES
+        ('run-a', 'shared/model', 'low', 'correct-low', 'implementation/code_generation', 0, 1, 0.01, 100, NULL),
+        ('run-b', 'shared/model', 'high', 'correct-high', 'implementation/code_generation', 0, 1, 0.02, 200, NULL),
+        ('run-b', 'shared/model', 'low', 'wrong-run', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-a', 'shared/model', 'high', 'wrong-pair', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-a', 'other/model', 'low', 'wrong-model', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-null', 'null/model', '', 'null-variant', 'debugging/bug_fixing', 0, 1, 0.03, 300, NULL),
+        ('run-null', 'null/model', '', 'no-route', NULL, 0, 1, 0.03, 300, NULL);
+    `);
+    const binding = {
+      prepare(sqlText: string) {
+        const statement = sqlite.prepare(sqlText);
+        return {
+          bind(...params: unknown[]) {
+            return {
+              async raw() {
+                return statement.all(...(params as never[])).map(row => Object.values(row));
+              },
+            };
+          },
+        };
+      },
+    } as D1Database;
+    try {
+      const results = await getRoutingCaseResultsForEntries(binding, [
+        { entry: { model: 'shared/model', variant: 'low' }, runId: 'run-a' },
+        { entry: { model: 'shared/model', variant: 'high' }, runId: 'run-b' },
+        { entry: { model: 'null/model', variant: null }, runId: 'run-null' },
+      ]);
+      expect(results.flatMap(pair => pair.results.map(result => result.caseId)).sort()).toEqual([
+        'correct-high',
+        'correct-low',
+        'null-variant',
+      ]);
+      expect(results.find(pair => pair.model === 'null/model')?.variant).toBeNull();
+      expect(results.flatMap(pair => pair.results).every(result => result.split === 'train')).toBe(
+        true
+      );
+      expect(await getRoutingCaseResultsForEntries(binding, [])).toEqual([]);
+    } finally {
+      sqlite.close();
+    }
+  });
+});
 
+describe('complexity mapping persistence', () => {
+  it('round-trips learned variants through routing table D1 rows', () => {
+    const table: RoutingTable = {
+      version: 'fixture-efforts',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      source: 'benchmark',
+      routes: {
+        'implementation/code_generation': [
+          { model: 'm', variant: 'high', accuracy: 1, avgCostUsd: 1, meetsThreshold: true },
+        ],
+      },
+      effortByComplexity: { 'implementation/code_generation': { m: { low: null, high: 'high' } } },
+    };
+    const rows = routingTableToRows(table, table.generatedAt);
+    expect(rows.tableRow.effort_by_complexity).toEqual(table.effortByComplexity);
+    expect(rowsToRoutingTable(rows.tableRow, rows.candidateRows).effortByComplexity).toEqual(
+      table.effortByComplexity
+    );
+  });
+});
 describe('variant storage helpers', () => {
   it('round-trips null and empty as the D1 null/default convention', () => {
     expect(variantToStorage(null)).toBe('');
@@ -27,11 +97,6 @@ describe('variant storage helpers', () => {
     expect(variantFromStorage('')).toBeNull();
     expect(variantFromStorage(null)).toBeNull();
     expect(variantFromStorage('xhigh')).toBe('xhigh');
-  });
-
-  it('maps platform reasoningEffort to the stored variant value', () => {
-    expect(variantFromReasoningEffort('high')).toBe('high');
-    expect(variantFromReasoningEffort(null)).toBeNull();
   });
 
   it('exactPairKey distinguishes variants of the same model', () => {
@@ -52,12 +117,17 @@ describe('mapSummaryRow', () => {
       route_key: 'implementation/code_generation',
       accuracy: 0.92,
       avg_cost_usd: 0.0015,
+      avg_input_tokens: 100.5,
+      avg_cached_input_tokens: 40.25,
+      avg_output_tokens: 20.5,
+      avg_reasoning_tokens: 10.75,
       avg_latency_ms: 320.5,
       p50_latency_ms: 300.0,
       p95_latency_ms: 300.0,
       cases: 50,
       errors: 2,
       timeouts: 0,
+      route_accuracy: null,
       carried: false,
     };
     const result = mapSummaryRow(row);
@@ -67,12 +137,17 @@ describe('mapSummaryRow', () => {
       routeKey: 'implementation/code_generation',
       accuracy: 0.92,
       avgCostUsd: 0.0015,
+      avgInputTokens: 100.5,
+      avgCachedInputTokens: 40.25,
+      avgOutputTokens: 20.5,
+      avgReasoningTokens: 10.75,
       avgLatencyMs: 320.5,
       p50LatencyMs: 300.0,
       p95LatencyMs: 300.0,
       cases: 50,
       errors: 2,
       timeouts: 0,
+      routeAccuracy: null,
     });
   });
 
@@ -84,17 +159,26 @@ describe('mapSummaryRow', () => {
       route_key: '*',
       accuracy: 0.85,
       avg_cost_usd: null,
+      avg_input_tokens: null,
+      avg_cached_input_tokens: null,
+      avg_output_tokens: null,
+      avg_reasoning_tokens: null,
       avg_latency_ms: 150.0,
       p50_latency_ms: null,
       p95_latency_ms: null,
       cases: 30,
       errors: 0,
       timeouts: 0,
+      route_accuracy: null,
       carried: false,
     };
     const result = mapSummaryRow(row);
     expect(result.variant).toBeNull();
     expect(result.avgCostUsd).toBeNull();
+    expect(result.avgInputTokens).toBeNull();
+    expect(result.avgCachedInputTokens).toBeNull();
+    expect(result.avgOutputTokens).toBeNull();
+    expect(result.avgReasoningTokens).toBeNull();
     expect(result.p50LatencyMs).toBeNull();
     expect(result.p95LatencyMs).toBeNull();
     expect(result.routeKey).toBe('*');
@@ -103,14 +187,13 @@ describe('mapSummaryRow', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// mapRunRow
-// ---------------------------------------------------------------------------
-
 describe('mapRunRow', () => {
   it('maps a RunRow and attaches its summaries', () => {
     const runRow = {
       id: 'run-abc',
+      router: 'efficient' as const,
+      accuracy_noise_band: 0.05,
+      frontier_min_accuracy_delta: 0,
       kind: 'classifier' as const,
       status: 'completed' as const,
       started_at: '2026-06-10T04:10:00.000Z',
@@ -139,6 +222,7 @@ describe('mapRunRow', () => {
         cases: 100,
         errors: 5,
         timeouts: 0,
+        routeAccuracy: null,
       },
     ];
     const result = mapRunRow(runRow, summaries);
@@ -155,6 +239,9 @@ describe('mapRunRow', () => {
   it('attaches an empty summaries array when none are provided', () => {
     const runRow = {
       id: 'run-xyz',
+      router: 'efficient' as const,
+      accuracy_noise_band: 0.05,
+      frontier_min_accuracy_delta: 0,
       kind: 'decider' as const,
       status: 'running' as const,
       started_at: '2026-06-11T05:10:00.000Z',
@@ -177,16 +264,12 @@ describe('mapRunRow', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// routingTableToRows / rowsToRoutingTable round-trip
-// ---------------------------------------------------------------------------
-
 const candidate = (model: string): RankedCandidate => ({
   model,
   accuracy: 0.9,
   avgCostUsd: 0.001,
   meetsThreshold: true,
-  reasoningEffort: null,
+  variant: null,
 });
 
 const sampleTable: RoutingTable = {
@@ -203,6 +286,14 @@ const sampleTable: RoutingTable = {
 };
 
 describe('routingTableToRows', () => {
+  it('stores the selected router without changing artifact reconstruction', () => {
+    const efficient = routingTableToRows(sampleTable, 'now');
+    const frontier = routingTableToRows(sampleTable, 'now', 'frontier');
+    expect(efficient.tableRow.router).toBe('efficient');
+    expect(frontier.tableRow.router).toBe('frontier');
+    expect(rowsToRoutingTable(frontier.tableRow, frontier.candidateRows)).toEqual(sampleTable);
+  });
+
   it('produces a tableRow with the correct scalar fields', () => {
     const { tableRow } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
     expect(tableRow.run_id).toBe('run-test-1');
@@ -228,6 +319,83 @@ describe('routingTableToRows', () => {
 });
 
 describe('rowsToRoutingTable', () => {
+  it.each([
+    { name: 'the strict quality band', noiseBand: 0, expected: 'measured' },
+    { name: 'the latency evidence', noiseBand: 0.05, expected: 'measured' },
+  ])('preserves $name when serving a published table', ({ noiseBand, expected }) => {
+    const published: RoutingTable = {
+      ...sampleTable,
+      minAccuracy: 0.95,
+      accuracyNoiseBand: noiseBand,
+      routes: {
+        'implementation/code_generation': [
+          {
+            ...candidate('measured'),
+            accuracy: 1,
+            cases: 30,
+            p50LatencyMs: noiseBand === 0 ? 1000 : 10_000,
+            p50TtftMs: noiseBand === 0 ? 100 : 1,
+            avgCostUsd: 0.002,
+            pricing: {
+              promptUsdPerToken: 0.000001,
+              completionUsdPerToken: 0.000001,
+              cacheReadUsdPerToken: null,
+            },
+          },
+          {
+            ...candidate('economical'),
+            accuracy: noiseBand === 0 ? 0.93 : 1,
+            cases: 30,
+            p50LatencyMs: noiseBand === 0 ? 10_000 : 5000,
+            p50TtftMs: noiseBand === 0 ? 1000 : 4500,
+            avgCostUsd: noiseBand === 0 ? 0 : 0.001,
+            pricing: {
+              promptUsdPerToken: noiseBand === 0 ? 0 : 0.0000001,
+              completionUsdPerToken: noiseBand === 0 ? 0 : 0.0000001,
+              cacheReadUsdPerToken: null,
+            },
+          },
+        ],
+      },
+    };
+    const rows = routingTableToRows(published, '2026-11-06T00:00:00.000Z');
+    const restored = rowsToRoutingTable(rows.tableRow, rows.candidateRows);
+    const ranked = rankCandidates(
+      (restored.routes['implementation/code_generation'] ?? []).map(candidate => ({
+        ...candidate,
+        p50LatencyMs: candidate.p50LatencyMs ?? null,
+      })),
+      restored.minAccuracy,
+      { requestTokens: 100, accuracyNoiseBand: restored.accuracyNoiseBand }
+    );
+    expect(ranked[0]?.model).toBe(expected);
+  });
+
+  it('preserves production-cost metadata through publication storage', () => {
+    const table: RoutingTable = {
+      ...sampleTable,
+      productionTokenProfile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
+      switchHorizonTurns: 4,
+      lowConfidenceThreshold: 0.8,
+      routes: {
+        'implementation/code_generation': [
+          {
+            ...candidate('synthetic/model'),
+            cases: 30,
+            pricing: {
+              promptUsdPerToken: 0.002,
+              completionUsdPerToken: 0.003,
+              cacheReadUsdPerToken: 0.0001,
+            },
+            estimatedRequestCostUsd: 0.049,
+          },
+        ],
+      },
+    };
+    const rows = routingTableToRows(table, '2026-06-01T11:00:00.000Z');
+    expect(rowsToRoutingTable(rows.tableRow, rows.candidateRows)).toEqual(table);
+  });
+
   it('round-trips: rowsToRoutingTable(routingTableToRows(table)) === table', () => {
     const { tableRow, candidateRows } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
     const reassembled = rowsToRoutingTable(tableRow, candidateRows);
@@ -275,11 +443,17 @@ describe('rowsToRoutingTable', () => {
   it('reads back a reasoning_effort candidate row as effort-only', () => {
     const tableRow = {
       run_id: 'run-effort',
+      router: 'efficient' as const,
       published_at: '2026-06-01T11:00:00.000Z',
       generated_at: '2026-06-01T10:00:00.000Z',
       min_accuracy: 0.7,
+      accuracy_noise_band: null,
       switch_cost_factor: 3,
       best_accuracy_switch_threshold: 0.05,
+      production_token_profile: null,
+      switch_horizon_turns: null,
+      low_confidence_threshold: null,
+      effort_by_complexity: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -289,10 +463,15 @@ describe('rowsToRoutingTable', () => {
         rank: 0,
         model: 'model-a',
         accuracy: 0.9,
+        cases: null,
         avg_cost_usd: 0.001,
         meets_threshold: true,
         reasoning_effort: 'high',
         variant: 'high',
+        pricing: null,
+        estimated_request_cost_usd: null,
+        p50_latency_ms: null,
+        p50_ttft_ms: null,
       },
     ];
     const table = rowsToRoutingTable(tableRow, candidateRows);
@@ -304,11 +483,17 @@ describe('rowsToRoutingTable', () => {
   it('reads back a variant-only candidate row as variant', () => {
     const tableRow = {
       run_id: 'run-variant',
+      router: 'efficient' as const,
       published_at: '2026-06-01T11:00:00.000Z',
       generated_at: '2026-06-01T10:00:00.000Z',
       min_accuracy: 0.7,
+      accuracy_noise_band: null,
       switch_cost_factor: 3,
       best_accuracy_switch_threshold: 0.05,
+      production_token_profile: null,
+      switch_horizon_turns: null,
+      low_confidence_threshold: null,
+      effort_by_complexity: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -318,16 +503,21 @@ describe('rowsToRoutingTable', () => {
         rank: 0,
         model: 'model-a',
         accuracy: 0.9,
+        cases: null,
         avg_cost_usd: 0.001,
         meets_threshold: true,
         reasoning_effort: null,
         variant: 'max',
+        pricing: null,
+        estimated_request_cost_usd: null,
+        p50_latency_ms: null,
+        p50_ttft_ms: null,
       },
     ];
     const table = rowsToRoutingTable(tableRow, candidateRows);
     const cand = table.routes['implementation/code_generation']?.[0];
     expect(cand?.variant).toBe('max');
-    expect(cand?.reasoningEffort).toBeNull();
+    expect(cand).not.toHaveProperty('reasoningEffort');
     expect(RoutingTableSchema.parse(table)).toEqual(table);
   });
 });

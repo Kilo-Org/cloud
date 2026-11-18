@@ -1,7 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-lines -- one mounted chip suite: the share contract, the pending placeholder frame, and the failure toasts share one harness */
+import '@/i18n';
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,7 +18,7 @@ import { __resetToolCardImageCacheForTests, cacheToolAttachment } from './tool-c
 type FileInstance = {
   exists: boolean;
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  write: (content: string) => Promise<void>;
   filename: string;
 };
 
@@ -35,7 +36,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     const instance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
-      write: vi.fn(),
+      write: vi.fn(() => Promise.resolve()),
       filename,
       directory,
     };
@@ -171,6 +172,12 @@ function texts(root: TestRenderer.ReactTestInstance): string[] {
     });
 }
 
+function frameClasses(node: TestRenderer.ReactTestInstance | undefined): string[] {
+  return String(node?.props.className ?? '')
+    .split(' ')
+    .filter(Boolean);
+}
+
 async function pressShare(root: TestRenderer.ReactTestInstance): Promise<void> {
   const button = shareButtons(root)[0];
   if (!button) {
@@ -207,6 +214,88 @@ describe('ToolCardFileAttachments mounted', () => {
         mimeType: 'application/pdf',
       }
     );
+
+    await unmount(renderer);
+  });
+
+  it('keeps the share control at the platform touch size without widening the icon', async () => {
+    await act(async () => {
+      await Promise.resolve();
+      seedFileCache();
+    });
+    const renderer = await mount(makeToolPart('send_file', [reportPdf]));
+    const root = renderer.root;
+
+    const button = shareButtons(root)[0];
+    const frame = frameClasses(button);
+    // The control's own box is what a control-size audit measures, so it clears
+    // the 28 dp floor on its own and the slop lifts the region to 44 dp.
+    expect(frame).toContain('min-h-8');
+    expect(frame).toContain('min-w-8');
+    const slop = button?.props.hitSlop;
+    expect(typeof slop).toBe('number');
+    expect(28 + 2 * (slop as number)).toBeGreaterThanOrEqual(44);
+    const [icon] = root.findAll(node => (node.type as string) === 'Share2');
+    expect(icon?.props.size).toBe(16);
+
+    await unmount(renderer);
+  });
+
+  it('reserves the share slot and reports busy while the cache write is pending', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      directory: { name?: string },
+      filename: string
+    ) {
+      const instance = {
+        exists: false,
+        uri: `file:///cache/tool-card-images/${filename}`,
+        write: vi.fn(() => write.promise),
+        filename,
+        directory,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+    seedFileCache();
+    const renderer = await mount(makeToolPart('send_file', [reportPdf]));
+    const root = renderer.root;
+
+    expect(texts(root)).toContain('report.pdf');
+    expect(texts(root)).not.toContain('File unavailable in this session.');
+    expect(shareButtons(root)).toHaveLength(0);
+    expect(
+      root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          (node.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+      )
+    ).toHaveLength(1);
+    expect(texts(root)).toContain('application/pdf');
+    // The hidden control keeps its box, so the filename cannot re-truncate when
+    // the write lands.
+    expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(1);
+    const placeholder = root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        String(node.props.className).includes('opacity-0')
+    )[0];
+    const placeholderFrame = frameClasses(placeholder).filter(clazz => clazz !== 'opacity-0');
+
+    write.resolve(undefined);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(shareButtons(root)).toHaveLength(1);
+    expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(1);
+    // Same frame in both states: the reserved box is the live control's box.
+    const live = frameClasses(shareButtons(root)[0]).filter(clazz => clazz !== 'active:opacity-60');
+    expect(placeholderFrame.length).toBeGreaterThan(0);
+    expect(placeholderFrame).toEqual(live);
 
     await unmount(renderer);
   });

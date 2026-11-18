@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useQuery } from '@tanstack/react-query';
 import { OrganizationInfoCard } from './OrganizationInfoCard';
 import { OrganizationAdminMembers } from './OrganizationMembersCard';
 import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard';
@@ -17,18 +19,16 @@ import {
   canManageOrganization,
   canManageOrganizationBilling,
 } from '@kilocode/app-shared/organizations';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageCircleQuestion, Terminal } from 'lucide-react';
 import { OrganizationProvidersAndModelsConfigurationCard } from '@/components/organizations/OrganizationProvidersAndModelsConfigurationCard';
+import { OrganizationBrowserControlCard } from '@/components/organizations/OrganizationBrowserControlCard';
 import { OrganizationChildOrganizationsCard } from '@/components/organizations/OrganizationChildOrganizationsCard';
 import { OrganizationEmailPreferencesCard } from '@/components/organizations/OrganizationEmailPreferencesCard';
 import { OrgActiveKiloclawsCard } from '@/components/organizations/OrgActiveKiloclawsCard';
-import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
-import Image from 'next/image';
-import Link from 'next/link';
+import { OrganizationGuardrailsCard } from '@/components/organizations/guardrails/OrganizationGuardrailsCard';
+import { SupportCard } from '@/components/support/SupportCard';
 
 const DISMISSED_BANNERS_KEY = 'org-welcome-banner-dismissed';
 
@@ -59,6 +59,7 @@ type Props = {
   role: OrganizationRole;
   topupAmount: number;
   isAutoTopUpEnabled: boolean;
+  isGuardrailsEnabled: boolean;
 };
 
 export function OrganizationDashboard({
@@ -66,6 +67,7 @@ export function OrganizationDashboard({
   role,
   topupAmount,
   isAutoTopUpEnabled,
+  isGuardrailsEnabled,
 }: Props) {
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [showNewOrgWelcome, setShowNewOrgWelcome] = useState(false);
@@ -77,11 +79,25 @@ export function OrganizationDashboard({
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role;
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
 
+  const trpc = useTRPC();
+  const canBilling = canManageOrganizationBilling(currentRole);
+  const { data: activeKiloclaws, isError: activeKiloclawsError } = useQuery({
+    ...trpc.organizations.kiloclaw.listActiveInstances.queryOptions({ organizationId }),
+    enabled: canBilling,
+  });
+
+  const hasActiveKiloclaws = activeKiloclaws?.some(i => !i.isSuspended) ?? false;
+
   // Check localStorage on component mount to determine if welcome banners should be shown
   useEffect(() => {
     const dismissedOrgs = getDismissedOrganizations();
     const shouldShowBanner = !dismissedOrgs.includes(organizationId);
     if (!organizationData) {
+      return;
+    }
+
+    // Sales-demo orgs skip the welcome banner chrome entirely.
+    if (organizationData.settings.is_sales_demo) {
       return;
     }
 
@@ -111,10 +127,7 @@ export function OrganizationDashboard({
   };
 
   return (
-    <OrganizationAdminContextProvider
-      organizationId={organizationId}
-      isAutoTopUpEnabled={isAutoTopUpEnabled}
-    >
+    <OrganizationAdminContextProvider role={role} isAutoTopUpEnabled={isAutoTopUpEnabled}>
       <div className="flex w-full flex-col gap-y-6">
         <OrganizationPageHeader
           organizationId={organizationId}
@@ -124,6 +137,7 @@ export function OrganizationDashboard({
         {showTopupSuccess && organizationData && (
           <OrganizationTopupSuccessHeader
             organizationName={organizationData.name}
+            organizationId={organizationId}
             amountUsd={topupAmount.toString()}
             onDismiss={() => setShowTopupSuccess(false)}
           />
@@ -147,9 +161,10 @@ export function OrganizationDashboard({
             <LockableContainer>
               <OrganizationInfoCard organizationId={organizationId} />
             </LockableContainer>
-            {canManageOrganizationBilling(currentRole) && (
-              <OrganizationChildOrganizationsCard organizationId={organizationId} />
-            )}
+            {canManageOrganizationBilling(currentRole) &&
+              organizationData?.parent_organization_id === null && (
+                <OrganizationChildOrganizationsCard organizationId={organizationId} />
+              )}
             {organizationData && (
               <>
                 {organizationData.plan === 'teams' ? (
@@ -164,6 +179,15 @@ export function OrganizationDashboard({
                 )}
               </>
             )}
+            {isGuardrailsEnabled && (canManageOrganization(currentRole) || isKiloAdmin) && (
+              <OrganizationGuardrailsCard organizationId={organizationId} />
+            )}
+            {organizationData && (
+              <OrganizationBrowserControlCard
+                organizationId={organizationId}
+                readonly={!(canManageOrganization(currentRole) || isKiloAdmin)}
+              />
+            )}
           </div>
           <div className="space-y-8 lg:col-span-2">
             <LockableContainer>
@@ -174,7 +198,7 @@ export function OrganizationDashboard({
               organizationData?.parent_organization_id === null && (
                 <KiloPassUsageCard organizationId={organizationId} />
               )}
-            {canManageOrganizationBilling(currentRole) && (
+            {canBilling && (activeKiloclawsError || hasActiveKiloclaws) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}
             {organizationData?.plan === 'enterprise' && (
@@ -185,70 +209,7 @@ export function OrganizationDashboard({
             {(canManageOrganization(currentRole) || isKiloAdmin) && (
               <OrganizationEmailPreferencesCard organizationId={organizationId} />
             )}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <MessageCircleQuestion className="mr-2 inline h-5 w-5" />
-                  Support
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground text-sm">
-                  Need help? Have a feature request? Want to chat? Contact us at{' '}
-                  <a
-                    href="mailto:teams@kilocode.ai"
-                    className="text-primary font-medium hover:underline"
-                  >
-                    teams@kilocode.ai
-                  </a>
-                </p>
-                <div className="border-muted-foreground/20 space-y-3 border-t pt-4">
-                  <p className="text-muted-foreground text-sm">
-                    Ready to start coding? Get started with Kilo Code for your organization:
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <OpenInExtensionButton
-                      className="flex h-9 items-center gap-2 px-3 py-2 text-sm"
-                      ideName="VS Code"
-                      source="vscode"
-                    >
-                      <Image
-                        src="/logos/vscode.svg"
-                        alt="VS Code"
-                        width={16}
-                        height={16}
-                        className="shrink-0"
-                      />
-                      <span>VS Code</span>
-                    </OpenInExtensionButton>
-                    <Link
-                      href="https://plugins.jetbrains.com/plugin/28350-kilo-code"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-visible:ring-ring border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium whitespace-nowrap shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Image
-                        src="/logos/idea.svg"
-                        alt="JetBrains"
-                        width={16}
-                        height={16}
-                        className="shrink-0"
-                      />
-                      <span>JetBrains</span>
-                    </Link>
-                    <Link
-                      href="https://kilo.ai/install#cli"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-visible:ring-ring border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium whitespace-nowrap shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Terminal className="h-4 w-4 shrink-0" />
-                      <span>CLI</span>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <SupportCard forOrganization />
           </div>
         </div>
       </div>

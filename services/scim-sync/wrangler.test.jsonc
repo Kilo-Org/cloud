@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration - stripped down for vitest-pool-workers
+  "name": "cloudflare-scim-sync-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The generated `drizzle/migrations.js` barrel imports each `.sql` file.
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SCIM_SYNC_DO",
+        "class_name": "ScimSyncDO",
+      },
+    ],
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ScimSyncDO"],
+    },
+  ],
+
+  // The three secrets are plain vars here rather than Secrets Store bindings,
+  // so the suite never depends on what a developer has seeded locally.
+  // `resolveSecret` takes either. Note a generated `services/scim-sync/.dev.vars`
+  // overrides these, so assertions must compare against the binding rather
+  // than a hardcoded literal.
+  //
+  // `BACKEND_API_URL` and the WorkOS hostname are both stubbed at the `fetch`
+  // boundary rather than served, so these origins are never dialed.
+  "vars": {
+    "ENVIRONMENT": "staging",
+    "BACKEND_API_URL": "https://app.test",
+    "SCIM_POLL_INTERVAL_SECONDS": "60",
+    "WORKOS_EVENT_CURSOR": "",
+    "WORKOS_API_KEY": "sk_test",
+    "WORKOS_CLIENT_ID": "client_test",
+    "INTERNAL_API_SECRET": "internal-test-secret",
+  },
+}

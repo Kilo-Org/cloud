@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 
 import { getCachedSecret } from './cached-secret';
 import { verifyKiloToken } from './kilo-token';
+import { verifyKiloTokenForResource, type KiloResourceAudiencePolicy } from './kilo-token-policy';
 
 export type KiloBearerAuthResult = {
   userId: string;
@@ -14,12 +15,23 @@ export type KiloSecretBinding = {
   get(): Promise<string | null>;
 };
 
-export type KiloUserPepperResult = { pepper: string | null; blockedReason: string | null };
+/** Account availability: a block recorded in either column makes the account blocked. */
+export type KiloUserPepperResult = { pepper: string | null; blocked: boolean };
 
 export type GetKiloUserPepper = (
   connectionString: string,
   userId: string
 ) => Promise<KiloUserPepperResult | null | undefined>;
+
+type KiloBearerAudienceOptions =
+  | {
+      audience?: string;
+      resourceAudience?: never;
+    }
+  | {
+      audience?: never;
+      resourceAudience?: KiloResourceAudiencePolicy;
+    };
 
 export async function findKiloUserPepper(
   connectionString: string,
@@ -29,6 +41,7 @@ export async function findKiloUserPepper(
   const rows = await db
     .select({
       api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_at: kilocode_users.blocked_at,
       blocked_reason: kilocode_users.blocked_reason,
     })
     .from(kilocode_users)
@@ -36,7 +49,10 @@ export async function findKiloUserPepper(
     .limit(1);
   const row = rows[0];
   if (!row) return undefined;
-  return { pepper: row.api_token_pepper ?? null, blockedReason: row.blocked_reason };
+  return {
+    pepper: row.api_token_pepper ?? null,
+    blocked: Boolean(row.blocked_at || row.blocked_reason),
+  };
 }
 
 /**
@@ -47,15 +63,19 @@ export async function findKiloUserPepper(
  * A dependency failure (secret store, database) throws, so a caller can map an
  * outage to a retryable 503 instead of reporting it as an invalid token.
  */
-export async function verifyKiloBearerAgainstCurrentPepper(params: {
-  token: string | null;
-  nextAuthSecret: KiloSecretBinding | string;
-  workerEnv?: string;
-  connectionString: string;
-  getUserPepper?: GetKiloUserPepper;
-  audience?: string;
-  allowBlocked?: boolean;
-}): Promise<KiloBearerAuthResult | null> {
+export async function verifyKiloBearerAgainstCurrentPepper(
+  params: {
+    token: string | null;
+    nextAuthSecret: KiloSecretBinding | string;
+    workerEnv?: string;
+    connectionString: string;
+    getUserPepper?: GetKiloUserPepper;
+    allowBlocked?: boolean;
+  } & KiloBearerAudienceOptions
+): Promise<KiloBearerAuthResult | null> {
+  if (params.audience !== undefined && params.resourceAudience !== undefined) {
+    throw new Error('Bearer audience and resource audience policies are mutually exclusive');
+  }
   if (!params.token) return null;
 
   const getUserPepper = params.getUserPepper ?? findKiloUserPepper;
@@ -67,11 +87,14 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
 
   let payload: Awaited<ReturnType<typeof verifyKiloToken>>;
   try {
-    payload = await verifyKiloToken(
-      params.token,
-      secret,
-      params.audience ? { audience: params.audience } : undefined
-    );
+    payload =
+      params.resourceAudience === undefined
+        ? await verifyKiloToken(
+            params.token,
+            secret,
+            params.audience ? { audience: params.audience } : undefined
+          )
+        : await verifyKiloTokenForResource(params.token, secret, params.resourceAudience);
   } catch {
     return null;
   }
@@ -87,7 +110,7 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
     return null;
   }
 
-  if (result.blockedReason !== null && !params.allowBlocked) {
+  if (result.blocked && !params.allowBlocked) {
     return null;
   }
 

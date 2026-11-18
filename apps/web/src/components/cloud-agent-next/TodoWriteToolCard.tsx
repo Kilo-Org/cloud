@@ -1,116 +1,83 @@
-import { ListChecks } from 'lucide-react';
+import { CircleDot, ListChecks, Square, SquareCheck, SquareX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolPart } from './types';
 import { ToolCardShell } from './ToolCardShell';
+import { getTodoPresentation } from './tool-todos';
 
 type TodoWriteToolCardProps = {
   toolPart: ToolPart;
 };
 
-type TodoItem = {
-  id: string;
-  content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'high' | 'medium' | 'low';
+const todoStatuses = {
+  pending: { icon: Square, label: 'Pending' },
+  in_progress: { icon: CircleDot, label: 'In progress' },
+  completed: { icon: SquareCheck, label: 'Completed' },
+  cancelled: { icon: SquareX, label: 'Cancelled' },
 };
-
-type TodoWriteInput = {
-  todos: TodoItem[];
-};
-
-function getStatusIcon(status: TodoItem['status']): string {
-  switch (status) {
-    case 'completed':
-      return '✓';
-    case 'in_progress':
-      return '→';
-    case 'cancelled':
-      return '✗';
-    case 'pending':
-    default:
-      return '○';
-  }
-}
-
-function getStatusColor(status: TodoItem['status']): string {
-  switch (status) {
-    case 'completed':
-      return 'text-green-500';
-    case 'in_progress':
-      return 'text-blue-500';
-    case 'cancelled':
-    case 'pending':
-    default:
-      return 'text-muted-foreground';
-  }
-}
 
 export function TodoWriteToolCard({ toolPart }: TodoWriteToolCardProps) {
   const state = toolPart.state;
-  const input = state.input as TodoWriteInput;
-  const error = state.status === 'error' ? state.error : undefined;
+  if (state.status !== 'completed') return null;
 
-  const todos = input.todos || [];
-  const completedCount = todos.filter(t => t.status === 'completed').length;
-  const inProgressCount = todos.filter(t => t.status === 'in_progress').length;
-  const pendingCount = todos.filter(t => t.status === 'pending').length;
-
-  // Create a summary for collapsed view
-  const summaryParts: string[] = [];
-  if (pendingCount > 0) summaryParts.push(`${pendingCount} pending`);
-  if (inProgressCount > 0) summaryParts.push(`${inProgressCount} active`);
-  if (completedCount > 0) summaryParts.push(`${completedCount} done`);
+  const { shown, completed, total, hiddenBefore, hiddenAfter } = getTodoPresentation(
+    state.input.todos,
+    state.metadata
+  );
 
   return (
     <ToolCardShell
       icon={ListChecks}
       title="Todos"
       status={state.status}
-      badge={
-        <span className="text-muted-foreground shrink-0 text-xs">
-          {summaryParts.join(', ') || `${todos.length} todos`}
-        </span>
+      subtitle={
+        total > 0 ? (
+          <span aria-label={`${completed} of ${total} todos completed`}>
+            {completed}/{total}
+          </span>
+        ) : undefined
       }
     >
-      {/* Todo list */}
-      {todos.length > 0 && (
-        <div className="space-y-1">
-          {todos.map(todo => (
-            <div key={todo.id} className={cn('text-xs', getStatusColor(todo.status))}>
-              <span className="mr-1 font-mono">{getStatusIcon(todo.status)}</span>
-              <span className={todo.status === 'cancelled' ? 'line-through' : ''}>
-                {todo.content}
-              </span>
-              {todo.priority === 'high' && <span className="ml-1 text-red-400">(high)</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {todos.length === 0 && (
-        <div className="text-muted-foreground text-xs italic">No todos to write</div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div>
-          <div className="text-muted-foreground mb-1 text-xs">Error:</div>
-          <pre className="bg-background overflow-auto rounded-md p-2 text-xs text-red-500">
-            <code>{error}</code>
-          </pre>
-        </div>
-      )}
-
-      {/* Running state */}
-      {state.status === 'running' && (
-        <div className="text-muted-foreground text-xs italic">Writing todos...</div>
-      )}
-
-      {/* Pending state */}
-      {state.status === 'pending' && (
-        <div className="text-muted-foreground text-xs italic">Waiting to write...</div>
-      )}
+      <div className="max-h-60 space-y-2 overflow-auto">
+        {hiddenBefore > 0 && (
+          <div className="text-muted-foreground text-xs">
+            {hiddenBefore} earlier {hiddenBefore === 1 ? 'to-do' : 'to-dos'} hidden
+          </div>
+        )}
+        {shown.length > 0 && (
+          <ul className="space-y-1">
+            {shown.map((todo, index) => {
+              const { icon: Icon, label } = todoStatuses[todo.status];
+              return (
+                <li key={index} className="flex items-start gap-2 text-xs">
+                  <Icon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                  <span
+                    className={cn(
+                      'min-w-0 break-words',
+                      (todo.status === 'completed' || todo.status === 'cancelled') &&
+                        'text-muted-foreground line-through',
+                      todo.changed && 'font-medium'
+                    )}
+                  >
+                    <span className="sr-only">{label}: </span>
+                    {todo.content}
+                  </span>
+                  {todo.priority === 'high' && (
+                    <span className="text-destructive shrink-0">(high)</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {hiddenAfter > 0 && (
+          <div className="text-muted-foreground text-xs">
+            {hiddenAfter} later {hiddenAfter === 1 ? 'to-do' : 'to-dos'} hidden
+          </div>
+        )}
+        {shown.length === 0 && hiddenBefore === 0 && hiddenAfter === 0 && (
+          <div className="text-muted-foreground text-xs italic">No todos to display</div>
+        )}
+      </div>
     </ToolCardShell>
   );
 }

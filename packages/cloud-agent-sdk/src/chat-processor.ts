@@ -1,22 +1,140 @@
-import { stripPartContentIfFile } from './part-utils';
+import {
+  normalizeMissingPartText,
+  normalizeMissingPatchFiles,
+  normalizeToolPartState,
+  stripPartContentIfFile,
+  toolPartAttachments,
+} from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
+import { MAX_REMOVAL_VERSIONS, storageVersions } from './storage/versions';
 import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
 
 type ChatProcessor = {
-  process(event: ChatEvent): void;
+  process(event: ChatEvent): boolean;
   /**
    * Materialize a synthetic user message from a `cloud.message.queued` server
    * event, unless an authoritative message with the same id already exists.
    * The synthetic message is overwritten when the wrapper later emits the
-   * real `message.updated` payload for the same id.
+   * real `message.updated` payload for the same id. The server queue time is
+   * recorded as `queuedAt`, also on an existing optimistic row, so the row is
+   * ordered by server time until its native row arrives.
    */
   synthesizeQueuedUserMessage(input: {
     messageId: string;
     sessionId: string;
     content: string | undefined;
+    createdAt?: number | undefined;
   }): void;
 };
+
+function acceptVersion(sessionStorage: SessionStorage, event: ChatEvent): boolean {
+  const info = event.type === 'message.updated' ? event.info : undefined;
+  const part = event.type === 'message.part.updated' ? event.part : undefined;
+  const sessionId =
+    info?.sessionID ?? part?.sessionID ?? ('sessionId' in event ? event.sessionId : '');
+  const messageId = info?.id ?? part?.messageID ?? ('messageId' in event ? event.messageId : '');
+  const partId = part?.id ?? ('partId' in event ? event.partId : undefined);
+  const messageKey = `${sessionId}\u0000${messageId}`;
+  const key = partId === undefined ? messageKey : `${messageKey}\u0000${partId}`;
+  let versions = storageVersions.get(sessionStorage);
+  if (!versions && !event.version) return true;
+  if (!versions) {
+    versions = {
+      rows: new Map(),
+      messages: new Map(),
+      removals: new Map(),
+      removalFloors: new Map(),
+    };
+    storageVersions.set(sessionStorage, versions);
+  }
+  const previous = versions.rows.get(key);
+  const removedMessage = versions.rows.get(messageKey);
+  const version = event.version;
+  const floors = versions.removalFloors.get(sessionId);
+  if (!version) return previous === undefined && !removedMessage?.removed && !floors;
+  // Evicted tombstones conservatively fence older pages, not newer history reloads.
+  if (
+    !previous &&
+    floors &&
+    (version.cursor <= (floors.get(version.sourceId) ?? -1) ||
+      (version.eventId === undefined && !floors.has(version.sourceId)))
+  ) {
+    return false;
+  }
+
+  const current =
+    event.type === 'message.removed'
+      ? (versions.messages.get(messageKey) ?? previous?.version)
+      : previous?.version;
+  if (current) {
+    if (current.sourceId === version.sourceId) {
+      if (version.cursor < current.cursor) return false;
+      // Presence is only read here, so resolve it lazily: most events move the
+      // cursor and can never dedupe, and resolving it eagerly would read (and
+      // on the snapshot backends, rebuild) the message's whole part list per
+      // event.
+      if (version.cursor === current.cursor) {
+        if (previous?.removed) return false;
+        const rowPresent =
+          partId === undefined
+            ? sessionStorage.getMessageInfo(messageId) !== undefined
+            : sessionStorage.getPart(messageId, partId) !== undefined;
+        if (rowPresent) return false;
+      }
+    } else if (current.eventId !== undefined && version.eventId === undefined) {
+      return false;
+    }
+  }
+  if (partId !== undefined && removedMessage?.removed) {
+    if (
+      removedMessage.version.sourceId !== version.sourceId ||
+      version.cursor <= removedMessage.version.cursor
+    )
+      return false;
+  }
+  const row = {
+    version,
+    removed: event.type === 'message.removed' || event.type === 'message.part.removed',
+    messageId,
+    sessionId,
+  };
+  versions.rows.set(key, row);
+  versions.removals.delete(key);
+  if (row.removed) {
+    versions.removals.set(key, row);
+    if (versions.removals.size > MAX_REMOVAL_VERSIONS) {
+      const oldest = versions.removals.entries().next().value;
+      if (oldest) {
+        const [oldKey, oldRow] = oldest;
+        versions.removals.delete(oldKey);
+        versions.rows.delete(oldKey);
+        const oldMessageKey = `${oldRow.sessionId}\u0000${oldRow.messageId}`;
+        if (
+          ![...versions.rows.keys()].some(
+            rowKey => rowKey === oldMessageKey || rowKey.startsWith(`${oldMessageKey}\u0000`)
+          )
+        ) {
+          versions.messages.delete(oldMessageKey);
+        }
+        let sourceFloors = versions.removalFloors.get(oldRow.sessionId);
+        if (!sourceFloors) {
+          sourceFloors = new Map();
+          versions.removalFloors.set(oldRow.sessionId, sourceFloors);
+        }
+        sourceFloors.set(
+          oldRow.version.sourceId,
+          Math.max(sourceFloors.get(oldRow.version.sourceId) ?? 0, oldRow.version.cursor)
+        );
+      }
+    }
+  }
+  const latest = versions.messages.get(messageKey);
+  if (!latest || latest.sourceId !== version.sourceId || latest.cursor < version.cursor) {
+    versions.messages.set(messageKey, version);
+  }
+  return true;
+}
 
 type ChatProcessorOptions = {
   /**
@@ -62,15 +180,14 @@ function emitToolAttachmentsBeforeStrip(
   onToolAttachment: NonNullable<ChatProcessorOptions['onToolAttachment']>
 ): void {
   if (part.type !== 'tool') return;
-  const toolPart = part;
-  if (toolPart.state.status !== 'completed' || !toolPart.state.attachments) return;
-
-  for (const attachment of toolPart.state.attachments) {
+  // Reads the state defensively: an un-normalized part can carry no usable
+  // `state` at all, and the emitter must not throw on one.
+  for (const attachment of toolPartAttachments(part)) {
     const isImage = attachment.mime.startsWith('image/');
-    if (!isImage && toolPart.tool !== 'send_file') continue;
+    if (!isImage && part.tool !== 'send_file') continue;
     if (attachment.url === '') continue;
     try {
-      onToolAttachment(toolPart.id, {
+      onToolAttachment(part.id, {
         mime: attachment.mime,
         ...(attachment.filename ? { filename: attachment.filename } : {}),
         dataUrl: attachment.url,
@@ -104,26 +221,53 @@ function createChatProcessor(
 ): ChatProcessor {
   return {
     process(event) {
+      if (!acceptVersion(sessionStorage, event)) return false;
       switch (event.type) {
         case 'message.updated':
           sessionStorage.upsertMessage(event.info);
           break;
         case 'message.part.updated': {
+          // Normalize BEFORE the strip/guard logic: the wire can omit `text` on
+          // text/reasoning parts (KILO-APP-99) and `files` on patch parts
+          // (KILO-APP-BZ), and the empty-text guard below must also see
+          // textless updates so they cannot clobber already streamed text.
+          // A `tool` part with no readable state is skipped.
+          // Identity-preserving for everything else.
+          const normalized = normalizeToolPartState(
+            normalizeMissingPatchFiles(normalizeMissingPartText(event.part))
+          );
+          if (normalized === null) {
+            break;
+          }
+          const textOmitted =
+            event.textOmitted === true ||
+            ((event.part.type === 'text' || event.part.type === 'reasoning') &&
+              typeof event.part.text !== 'string');
           if (options?.onToolAttachment) {
-            emitToolAttachmentsBeforeStrip(event.part, options.onToolAttachment);
+            emitToolAttachmentsBeforeStrip(normalized, options.onToolAttachment);
           }
           if (options?.onFilePart) {
-            emitFilePartBeforeStrip(event.part, options.onFilePart);
+            emitFilePartBeforeStrip(normalized, options.onFilePart);
           }
-          const stripped = stripPartContentIfFile(event.part);
-          if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {
-            const existingParts = sessionStorage.getParts(stripped.messageID);
-            const existing = existingParts.find(p => p.id === stripped.id);
+          let stripped = stripPartContentIfFile(normalized);
+          if (
+            (!event.version || textOmitted) &&
+            hasTextField(stripped) &&
+            stripped.text === '' &&
+            !isSyntheticPart(stripped)
+          ) {
+            const existing = sessionStorage.getPart(stripped.messageID, stripped.id);
             if (existing && hasTextField(existing) && existing.text.length > 0) {
-              break;
+              if (!event.version) break;
+              stripped = { ...stripped, text: existing.text };
             }
           }
-          sessionStorage.upsertPart(stripped.messageID, stripped);
+          sessionStorage.upsertPart(
+            stripped.messageID,
+            stripped,
+            event.time,
+            event.version !== undefined
+          );
           break;
         }
         case 'message.part.delta':
@@ -132,22 +276,49 @@ function createChatProcessor(
         case 'message.part.removed':
           sessionStorage.deletePart(event.messageId, event.partId);
           break;
+        // The CLI drops messages it no longer serves (compaction scaffolding,
+        // reverted turns). Keep the local store in step with the durable
+        // transcript so a removed message cannot keep supplying state — e.g. a
+        // context reading — that a reopened session no longer has.
+        case 'message.removed':
+          sessionStorage.deleteMessage(event.messageId);
+          break;
       }
+      return true;
     },
 
-    synthesizeQueuedUserMessage({ messageId, sessionId, content }) {
+    synthesizeQueuedUserMessage({ messageId, sessionId, content, createdAt }) {
+      const existing = sessionStorage.getMessageInfo(messageId);
+      if (existing) {
+        if (
+          createdAt !== undefined &&
+          existing.role === 'user' &&
+          existing.sessionID === sessionId &&
+          existing.synthetic === true &&
+          existing.queuedAt === undefined
+        ) {
+          sessionStorage.upsertMessage({ ...existing, queuedAt: createdAt });
+        }
+        return;
+      }
       // Empty or missing content can't form a renderable user message; wait for
       // the authoritative `message.updated` payload from the wrapper instead.
       if (!content) return;
-      if (sessionStorage.getMessageInfo(messageId)) return;
 
+      // Same unconfirmed marker as the optimistic send-time row: the
+      // authoritative `message.updated` for this id replaces the info (role and
+      // synthetic flag) and its non-synthetic parts drop this placeholder part
+      // (`upsertPartDroppingStaleSyntheticParts`), so a confirmed record wins
+      // the role and the parts.
       const syntheticMessage: UserMessage = {
         id: messageId,
         sessionID: sessionId,
         role: 'user',
-        time: { created: Date.now() },
+        time: { created: createdAt ?? Date.now() },
         agent: '',
         model: { providerID: '', modelID: '' },
+        synthetic: true,
+        ...(createdAt === undefined ? {} : { queuedAt: createdAt }),
       };
       sessionStorage.upsertMessage(syntheticMessage);
 

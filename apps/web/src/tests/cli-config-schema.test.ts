@@ -86,11 +86,59 @@ describe('kilo config.json schema merge', () => {
     expect(props.remote_control).toBeDefined();
     expect(props.auto_expand_history).toBeDefined();
     expect(props.auto_collapse_reasoning).toBeDefined();
+    expect(props.reasoning_display).toBeDefined();
     expect(props.terminal_command_display).toBeDefined();
     expect(props.code_edit_display).toBeDefined();
     expect(props.hide_prompt_training_models).toBeDefined();
     expect(props.web_search).toEqual(expect.objectContaining({ type: 'boolean', default: false }));
     expect(props.privacy_mode).toBeDefined();
+    expect(props.retention).toBeDefined();
+    expect(props.memory_model).toBeDefined();
+    expect(props.browser).toBeDefined();
+  });
+
+  test('browser exposes backend, observation, allowSensitive and target', () => {
+    const browser = props.browser as {
+      type: string;
+      additionalProperties: boolean;
+      properties: {
+        backend: { type: string; enum: string[]; default: string };
+        observation: { type: string; enum: string[]; default: string };
+        allowSensitive: { type: string; default: boolean };
+        target: { anyOf: Array<{ type?: string }> };
+      };
+    };
+    expect(browser.type).toBe('object');
+    expect(browser.additionalProperties).toBe(false);
+    expect(browser.properties.backend).toEqual(
+      expect.objectContaining({
+        type: 'string',
+        enum: ['playwright', 'extension', 'off'],
+        default: 'playwright',
+      })
+    );
+    expect(browser.properties.observation).toEqual(
+      expect.objectContaining({ type: 'string', enum: ['full', 'diff', 'none'], default: 'full' })
+    );
+    expect(browser.properties.allowSensitive).toEqual(
+      expect.objectContaining({ type: 'boolean', default: false })
+    );
+    expect(browser.properties.target.anyOf.some(variant => variant.type === 'string')).toBe(true);
+    expect(browser.properties.target.anyOf.some(variant => variant.type === 'null')).toBe(true);
+  });
+
+  test('retention exposes enabled boolean and maxAgeDays number', () => {
+    const retention = props.retention as {
+      type: string;
+      additionalProperties: boolean;
+      properties: { enabled: unknown; maxAgeDays: unknown };
+    };
+    expect(retention.type).toBe('object');
+    expect(retention.additionalProperties).toBe(false);
+    expect(retention.properties.enabled).toEqual(expect.objectContaining({ type: 'boolean' }));
+    expect(retention.properties.maxAgeDays).toEqual(
+      expect.objectContaining({ type: 'number', minimum: 1 })
+    );
   });
 
   test('privacy_mode is a boolean', () => {
@@ -116,16 +164,24 @@ describe('kilo config.json schema merge', () => {
     expect(ced.enum).toEqual(['expanded', 'collapsed']);
   });
 
+  test('reasoning_display is an enum of expanded/preview/headline', () => {
+    const rd = props.reasoning_display as { type: string; enum: string[] };
+    expect(rd.type).toBe('string');
+    expect(rd.enum).toEqual(['expanded', 'preview', 'headline']);
+  });
+
   test('commit_message has a prompt string property', () => {
     const cm = props.commit_message as { properties: { prompt: unknown } };
     expect(cm.properties.prompt).toEqual(expect.objectContaining({ type: 'string' }));
   });
 
-  test('allows null on model and small_model', () => {
+  test('allows null on model, small_model and memory_model', () => {
     const model = props.model as { anyOf: Array<{ type?: string }> };
     expect(model.anyOf.some(m => m.type === 'null')).toBe(true);
     const small = props.small_model as { anyOf: Array<{ type?: string }> };
     expect(small.anyOf.some(m => m.type === 'null')).toBe(true);
+    const memory = props.memory_model as { anyOf: Array<{ type?: string }> };
+    expect(memory.anyOf.some(m => m.type === 'null')).toBe(true);
   });
 
   test('adds kilo primary agents', () => {
@@ -157,14 +213,21 @@ describe('kilo config.json schema merge', () => {
     expect(permissionObject.properties.read).toBeDefined();
   });
 
-  test('adds kilo experimental keys without dropping upstream', () => {
+  test('merges kilo experimental keys without restoring retired keys', () => {
     const exp = props.experimental as { properties: Record<string, unknown> };
-    expect(exp.properties.codebase_search).toBeDefined();
+    expect(exp.properties.codebase_search).toBeUndefined();
+    expect(exp.properties.browser_extension).toBeUndefined();
     expect(exp.properties.agent_requirements).toEqual(expect.objectContaining({ type: 'boolean' }));
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })
     );
+    expect(exp.properties.glob_include_ignored).toEqual(
+      expect.objectContaining({ type: 'array', items: { type: 'string' } })
+    );
     expect(exp.properties.openTelemetry).toBeDefined();
+    expect(exp.properties.chatMaxRetries).toEqual(
+      expect.objectContaining({ type: 'integer', exclusiveMinimum: 0 })
+    );
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved
   });
 
@@ -195,8 +258,10 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.orchestrator).toBeDefined();
     expect(agent.properties.build).toBeDefined();
 
-    const experimental = props.experimental as { properties: Record<string, unknown> };
-    expect(experimental.properties.codebase_search).toBeDefined();
+    const experimental = props.experimental as {
+      properties: Record<string, unknown>;
+    };
+    expect(experimental.properties.codebase_search).toBeUndefined();
     expect(experimental.properties.batch_tool).toBeDefined();
     expect(config.additionalProperties).toBe(false);
     expect(out.properties).toBeUndefined();

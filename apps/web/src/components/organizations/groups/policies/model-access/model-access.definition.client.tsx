@@ -3,7 +3,7 @@
 import {
   DEFAULT_GROUP_MODEL_ACCESS_POLICY,
   DEFAULT_ORGANIZATION_MODEL_ACCESS_POLICY,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { Layers } from 'lucide-react';
 import type { OrganizationGroupPolicyClientDefinition } from '@/components/organizations/groups/policies/types';
 import { ModelAccessPolicyEditor } from './ModelAccessPolicyEditor';

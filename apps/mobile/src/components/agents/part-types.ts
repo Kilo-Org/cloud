@@ -2,7 +2,9 @@ import {
   type CompactionPart,
   type FilePart,
   type Part,
+  type PatchPart,
   type ReasoningPart,
+  type StoredMessage,
   type TextPart,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -12,13 +14,37 @@ export function isTextPart(part: Part): part is TextPart {
 }
 
 /**
- * Returns the first text part's text, or '' when there is none.
- * The human-authored prompt is always the first text part, so only `ignored`
- * parts are skipped. A file-only message yields an empty string.
+ * Server-injected routing context. The wrapper prepends this synthetic part to
+ * every prompt, so it is present even on an attachment-only row.
+ */
+function isCloudAgentContextPart(part: TextPart): boolean {
+  return part.synthetic === true && part.text.includes('<cloud-agent-context');
+}
+
+/**
+ * The human-authored text parts of a message.
+ *
+ * The server may prepend a synthetic `cloud-agent-context` part to a user
+ * message. When a non-synthetic text part exists it is the human prompt, so
+ * synthetic parts are transcript chrome and are left out. A row whose only
+ * text parts are synthetic is an optimistic or queued prompt, which still
+ * belongs to the human; server context is never part of that fallback.
+ */
+export function humanTextParts(parts: readonly Part[]): TextPart[] {
+  const textParts = parts.filter(
+    (part): part is TextPart =>
+      isTextPart(part) && part.ignored !== true && !isCloudAgentContextPart(part)
+  );
+  const nonSynthetic = textParts.filter(part => part.synthetic !== true);
+  return nonSynthetic.length > 0 ? nonSynthetic : textParts;
+}
+
+/**
+ * Returns the first human-authored text part's text, or '' when there is none.
+ * A file-only message yields an empty string.
  */
 export function firstHumanText(parts: readonly Part[]): string {
-  const part = parts.find((p): p is TextPart => isTextPart(p) && p.ignored !== true);
-  return part?.text ?? '';
+  return humanTextParts(parts)[0]?.text ?? '';
 }
 
 /** CLI snapshot-init progress injected as a synthetic text part (matches kilo-vscode). */
@@ -34,12 +60,56 @@ export function isFilePart(part: Part): part is FilePart {
   return part.type === 'file';
 }
 
+export function isPatchPart(part: Part): part is PatchPart {
+  return part.type === 'patch';
+}
+
 export function isReasoningPart(part: Part): part is ReasoningPart {
   return part.type === 'reasoning';
 }
 
+/**
+ * Per-message memo for the stripped message. The SDK keeps a row's
+ * `StoredMessage` object identity across a streamed delta on another row, so an
+ * unchanged message must map to the same derived object every pass; otherwise
+ * every stripped message loses its memo identity on every publish. WeakMap so a
+ * discarded message takes its derived copy with it.
+ */
+const withoutReasoningPartsMemo = new WeakMap<StoredMessage, StoredMessage>();
+
+function withoutReasoningPartsOfMessage(message: StoredMessage): StoredMessage {
+  const cached = withoutReasoningPartsMemo.get(message);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const parts = message.parts.filter(part => !isReasoningPart(part));
+  const derived = parts.length === message.parts.length ? message : { ...message, parts };
+  withoutReasoningPartsMemo.set(message, derived);
+  return derived;
+}
+
+/**
+ * Returns the messages with every reasoning part removed, for the
+ * "Hide thinking details" option. A message that has no reasoning part keeps
+ * its identity, and the input array itself is returned when nothing changed,
+ * so memoized consumers do not churn when thinking is already absent. A message
+ * that does carry reasoning maps to the same derived object each pass, so an
+ * unchanged row keeps its identity while thinking is hidden.
+ */
+export function withoutReasoningParts(messages: readonly StoredMessage[]): StoredMessage[] {
+  const next = messages.map(message => withoutReasoningPartsOfMessage(message));
+  const changed = next.some((message, index) => message !== messages[index]);
+  // Hand back the input array itself when nothing was removed. Callers only
+  // read the result, so widening the readonly view is safe.
+  return changed ? next : (messages as StoredMessage[]);
+}
+
 export function isCompactionPart(part: Part): part is CompactionPart {
   return part.type === 'compaction';
+}
+
+function isOpenEndedTime(time: { end?: number } | undefined): boolean {
+  return time !== undefined && !time.end;
 }
 
 export function isPartStreaming(part: Part): boolean {
@@ -47,7 +117,7 @@ export function isPartStreaming(part: Part): boolean {
     return !part.time?.end;
   }
   if (part.type === 'reasoning') {
-    return !part.time.end;
+    return isOpenEndedTime(part.time);
   }
   if (part.type === 'tool') {
     return part.state.status === 'pending' || part.state.status === 'running';
@@ -55,9 +125,34 @@ export function isPartStreaming(part: Part): boolean {
   return false;
 }
 
+/**
+ * `text.trim() !== ''` without allocating the trimmed copy. The transcript
+ * asks this of every part on every streamed publish, and a streamed reasoning
+ * part can hold hundreds of kilobytes, so the allocation-free predicate keeps
+ * the per-publish cost from scaling with the accumulated text.
+ */
+export function hasNonWhitespaceText(text: string): boolean {
+  // `\S` is the exact complement of the whitespace class `String#trim` strips.
+  return /\S/.test(text);
+}
+
+function hasReasoningText(text: string | undefined): boolean {
+  return text != null && hasDisplayableReasoningText(text);
+}
+
+/**
+ * Whether a reasoning body has anything a reader can see.
+ *
+ * Whitespace draws nothing, and neither does a body made only of the zero-width
+ * and format characters a provider can leave in a block it never put into words.
+ * Either would leave a disclosure that opens onto an empty body, so neither is
+ * content. The row and the transcript's content check share this one answer, so
+ * a part that draws nothing can never be counted as content.
+ */
+export function hasDisplayableReasoningText(text: string): boolean {
+  return /[^\s\u00AD\u200B-\u200F\u2060\uFEFF]/.test(text);
+}
+
 export function shouldRenderReasoningPart(part: Part, _isStreaming: boolean): boolean {
-  if (!isReasoningPart(part)) {
-    return false;
-  }
-  return part.text.trim() !== '';
+  return isReasoningPart(part) && hasReasoningText(part.text);
 }

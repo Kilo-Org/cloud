@@ -4,7 +4,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { UserDetailProps } from '@/types/admin';
-import type { GuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
+import type { GuiCreditCategory } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 import { UserAdminCreditGrant } from './UserAdminCreditGrant';
 import { UserAdminCreditTransactions } from './UserAdminCreditTransactions';
 import { UserAdminPaymentMethods } from './UserAdminPaymentMethods';
@@ -18,9 +18,9 @@ import { UserAdminInvoices } from './UserAdminInvoices';
 import { UserAdminOrganizations } from './UserAdminOrganizations';
 import { UserAdminKiloPass } from './UserAdminKiloPass';
 import { UserAdminKiloClaw } from './UserAdminKiloClaw';
-import { UserAdminGastown } from './UserAdminGastown';
+import { ReleaseEmailAddressButton } from './ReleaseEmailAddressButton';
 
-const VALID_TABS = ['billing', 'organizations', 'kiloclaw', 'gastown', 'admin-tools'] as const;
+const VALID_TABS = ['billing', 'organizations', 'kiloclaw', 'admin-tools'] as const;
 type Tab = (typeof VALID_TABS)[number];
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && (VALID_TABS as readonly string[]).includes(value);
@@ -68,9 +68,6 @@ export function UserAdminTabbedSections(
           <TabsTrigger value="kiloclaw" className={tabTriggerClass}>
             KiloClaw
           </TabsTrigger>
-          <TabsTrigger value="gastown" className={tabTriggerClass}>
-            Gas Town
-          </TabsTrigger>
           <TabsTrigger value="admin-tools" className={tabTriggerClass}>
             Admin Tools
           </TabsTrigger>
@@ -99,15 +96,12 @@ export function UserAdminTabbedSections(
           </div>
         </TabsContent>
 
-        <TabsContent value="gastown" className="mt-4">
-          <UserAdminGastown userId={user.id} />
-        </TabsContent>
-
         <TabsContent value="admin-tools" className="mt-4">
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <UserAdminNotes {...user} />
             <UserAdminStytchFingerprints {...user} />
             <UserAdminReferrals kilo_user_id={user.id} />
+            <ReleaseEmailAddressButton userId={user.id} email={user.google_user_email} />
             <UserAdminGdprRemoval {...user} />
           </div>
         </TabsContent>

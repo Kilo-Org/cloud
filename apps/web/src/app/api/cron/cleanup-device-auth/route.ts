@@ -7,9 +7,13 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
+import { cleanupExpiredDeviceRefreshTokens } from '@/lib/auth/device-sessions';
+import { cleanupExpiredPasskeyRows } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
+import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
-import { sentryLogger } from '@/lib/utils.server';
+import { cleanupExpiredAppShellHandoffTokens } from '@/lib/app-shell/handoff-token';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const CRON_SECRET = process.env['CRON_SECRET'];
 if (!CRON_SECRET) {
@@ -43,8 +47,29 @@ export async function GET(request: Request) {
     const deletedCount = await cleanupExpiredDeviceAuthRequests();
     sentryLogger('cron', 'info')(`Cleaned up ${deletedCount} expired device auth requests`);
 
+    const refreshTokensDeleted = await cleanupExpiredDeviceRefreshTokens();
+    sentryLogger('cron', 'info')(`Cleaned up ${refreshTokensDeleted} expired refresh tokens`);
+
     const challengesDeleted = await cleanupExpiredAdmissionChallenges();
     sentryLogger('cron', 'info')(`Cleaned up ${challengesDeleted} expired admission challenges`);
+
+    const passkeyRowsDeleted = await cleanupExpiredPasskeyRows();
+    sentryLogger(
+      'cron',
+      'info'
+    )(`Cleaned up ${passkeyRowsDeleted.challenges} expired passkey challenges`);
+
+    sentryLogger(
+      'cron',
+      'info'
+    )(`Cleaned up ${passkeyRowsDeleted.tickets} expired passkey sign-in tickets`);
+
+    sentryLogger(
+      'cron',
+      'info'
+    )(
+      `Cleaned up ${passkeyRowsDeleted.managementAuthorizations} expired passkey management authorizations`
+    );
 
     const accessCodesDeleted = await cleanupExpiredAccessCodes();
     sentryLogger('cron', 'info')(`Cleaned up ${accessCodesDeleted} expired access codes`);
@@ -52,21 +77,49 @@ export async function GET(request: Request) {
     const installStatesDeleted = await cleanupExpiredInstallStates();
     sentryLogger('cron', 'info')(`Cleaned up ${installStatesDeleted} expired install states`);
 
+    const handoffTokensDeleted = await cleanupExpiredAppShellHandoffTokens();
+    sentryLogger(
+      'cron',
+      'info'
+    )(`Cleaned up ${handoffTokensDeleted} expired or consumed app-shell hand-off tokens`);
+
+    const stepUpDeleted = await cleanupExpiredSessionStepUpRows();
+    sentryLogger(
+      'cron',
+      'info'
+    )(
+      `Cleaned up ${stepUpDeleted.challenges} expired step-up challenges and ${stepUpDeleted.proofs} proofs`
+    );
+
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         deleted_device_auth_request_count: deletedCount,
+        deleted_refresh_token_count: refreshTokensDeleted,
         deleted_admission_challenge_count: challengesDeleted,
+        deleted_passkey_challenge_count: passkeyRowsDeleted.challenges,
+        deleted_passkey_sign_in_ticket_count: passkeyRowsDeleted.tickets,
+        deleted_passkey_management_authorization_count: passkeyRowsDeleted.managementAuthorizations,
         deleted_access_code_count: accessCodesDeleted,
         deleted_install_state_count: installStatesDeleted,
+        deleted_app_shell_handoff_token_count: handoffTokensDeleted,
+        deleted_step_up_challenge_count: stepUpDeleted.challenges,
+        deleted_step_up_proof_count: stepUpDeleted.proofs,
       })
     );
 
     return NextResponse.json({
       success: true,
       deletedCount,
+      refreshTokensDeleted,
       challengesDeleted,
+      passkeyChallengesDeleted: passkeyRowsDeleted.challenges,
+      passkeySignInTicketsDeleted: passkeyRowsDeleted.tickets,
+      passkeyManagementAuthorizationsDeleted: passkeyRowsDeleted.managementAuthorizations,
       accessCodesDeleted,
       installStatesDeleted,
+      handoffTokensDeleted,
+      stepUpChallengesDeleted: stepUpDeleted.challenges,
+      stepUpProofsDeleted: stepUpDeleted.proofs,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

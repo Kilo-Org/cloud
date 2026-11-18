@@ -1,0 +1,143 @@
+'use client';
+import React from 'react';
+
+import {
+  MessagePrimitive,
+  type TextMessagePartProps,
+  type ReasoningMessagePartProps,
+  type DataMessagePartProps,
+  type ToolCallMessagePartProps,
+  type EnrichedPartState,
+} from '@assistant-ui/react';
+import {
+  TextPartRenderer,
+  ReasoningPartRenderer,
+  FilePartRenderer,
+  SubtaskPartRenderer,
+  UnknownPartRenderer,
+} from '../part-content';
+import { MessageErrorBoundary } from '../MessageErrorBoundary';
+import { isPartStreaming, type Part } from '../types';
+import { getToolActivity } from '../toolCardUtils';
+import { getVisibleAssistantParts } from '../message-presentation';
+import { summarizeAgentWork } from '../shared-transcript-presentation';
+import { AgentWorkGroup } from './AgentWorkGroup';
+import { CloudToolRenderer } from './CloudToolRenderer';
+import {
+  useCloudMessagePresentation,
+  findCloudPartPresentation,
+} from './cloud-presentation-context';
+
+type CloudPartProps = TextMessagePartProps | ReasoningMessagePartProps | DataMessagePartProps;
+
+function CloudPartContent({ part, isStreaming }: { part: Part | undefined; isStreaming: boolean }) {
+  if (!part) return <p className="text-muted-foreground px-2 text-xs">Content is unavailable.</p>;
+  const streaming = isStreaming && isPartStreaming(part);
+  switch (part.type) {
+    case 'text':
+      return <TextPartRenderer text={part.text} isStreaming={streaming} />;
+    case 'reasoning':
+      return <ReasoningPartRenderer part={part} isStreaming={streaming} />;
+    case 'file':
+      return <FilePartRenderer part={part} />;
+    case 'subtask':
+      return <SubtaskPartRenderer part={part} />;
+    case 'step-start':
+    case 'step-finish':
+    case 'patch':
+      return null;
+    default:
+      return <UnknownPartRenderer part={part} />;
+  }
+}
+
+function CloudPart(nativePart: CloudPartProps) {
+  const presentation = useCloudMessagePresentation();
+  const part = findCloudPartPresentation(presentation, nativePart)?.source;
+  return (
+    <MessageErrorBoundary
+      fallback={<p className="text-destructive text-xs">Failed to render content</p>}
+    >
+      {part && <span hidden data-scroll-anchor={part.id} />}
+      <CloudPartContent part={part} isStreaming={presentation.isStreaming} />
+    </MessageErrorBoundary>
+  );
+}
+function CloudTool(nativePart: ToolCallMessagePartProps) {
+  const presentation = useCloudMessagePresentation();
+  const part = findCloudPartPresentation(presentation, nativePart)?.source;
+  if (part?.type !== 'tool') return null;
+  return (
+    <MessageErrorBoundary
+      fallback={<p className="text-destructive text-xs">Failed to render tool</p>}
+    >
+      <span hidden data-scroll-anchor={part.id} />
+      <CloudToolRenderer part={part} />
+    </MessageErrorBoundary>
+  );
+}
+const components = {
+  Text: CloudPart,
+  Reasoning: CloudPart,
+  data: { Fallback: CloudPart },
+  tools: { Override: CloudTool },
+  Empty: () => null,
+};
+
+function renderCloudPart({ part }: { part: EnrichedPartState }) {
+  switch (part.type) {
+    case 'tool-call':
+      return <CloudTool {...part} />;
+    case 'text':
+      // The public callback synthesizes an identity-free empty running text
+      // when the assistant has no SDK parts. Cloud owns its waiting indicator.
+      if (!part.id && part.text === '') return null;
+      return <CloudPart {...part} />;
+    case 'reasoning':
+    case 'data':
+      return <CloudPart {...part} />;
+    default:
+      return null;
+  }
+}
+
+export function CloudMessageParts({ collapseTools = false }: { collapseTools?: boolean }) {
+  const presentation = useCloudMessagePresentation();
+  if (!collapseTools) return <MessagePrimitive.Parts>{renderCloudPart}</MessagePrimitive.Parts>;
+
+  const parts = getVisibleAssistantParts(presentation.parts.map(part => part.source));
+  const indices = new Map(parts.map((part, index) => [part, index]));
+  return presentation.segments.map(segment => {
+    const content = segment.parts.map(part => {
+      const index = indices.get(part);
+      return index === undefined ? null : <CloudMessagePartByIndex key={part.id} index={index} />;
+    });
+    if (segment.type === 'chat') return <React.Fragment key={segment.id}>{content}</React.Fragment>;
+    const activePart = presentation.isStreaming
+      ? segment.parts.findLast(isPartStreaming)
+      : undefined;
+    const working = activePart !== undefined;
+    return (
+      <div key={segment.id} className="py-1">
+        <AgentWorkGroup
+          scrollAnchorIds={segment.parts.map(part => part.id)}
+          summary={summarizeAgentWork(segment.parts, working)}
+          working={working}
+          activity={
+            activePart?.type === 'tool'
+              ? getToolActivity(activePart)
+              : working
+                ? 'Thinking'
+                : undefined
+          }
+        >
+          {content}
+        </AgentWorkGroup>
+      </div>
+    );
+  });
+}
+
+export function CloudMessagePartByIndex({ index }: { index: number }) {
+  return <MessagePrimitive.PartByIndex index={index} components={components} />;
+}

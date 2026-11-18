@@ -1,14 +1,15 @@
-import { allow_fake_login } from '@/lib/constants';
+import { allow_fake_login } from '@kilocode/web-shared/lib/constants';
 import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
+import React from 'react';
 
 export default async function SignInPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const { params, error } = await getAuthPageProps(searchParams);
+  const { params, error, accountMismatch } = await getAuthPageProps(searchParams);
   const ssoMode = params['sso'] === 'true' || !!params['domain'];
   const isSignUp = params['signup'] === 'true';
 
@@ -20,7 +21,7 @@ export default async function SignInPage({
           error={error}
           isSignUp={isSignUp}
           allowFakeLogin={allow_fake_login}
-          title={ssoMode ? 'Enterprise SSO' : isSignUp ? 'Create your account' : 'Welcome back'}
+          title={ssoMode ? 'Enterprise SSO' : isSignUp ? 'Create your account' : 'Welcome.'}
           subtitle={
             ssoMode
               ? "Enter your work email address to sign in with your organization's Single Sign-On"
@@ -30,6 +31,7 @@ export default async function SignInPage({
           }
           ssoMode={ssoMode}
           emailOnly={ssoMode}
+          accountMismatch={accountMismatch}
         />
       </div>
     </AuthPageLayout>

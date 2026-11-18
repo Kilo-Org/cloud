@@ -1,12 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { findUserById } from '@/lib/user';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
-import { countAndStoreUsage } from '@/lib/ai-gateway/processUsage';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
+import { countAndStoreUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { captureException } from '@sentry/nextjs';
-import { getFraudDetectionHeaders } from '@/lib/utils';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Check if we're in development mode
@@ -74,6 +74,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ),
       provider: 'dev-tools',
       requested_model: 'manual-consumption',
+      is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: '',
         system_prompt_length: 0,
@@ -94,11 +96,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       session_id: null,
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
     };
 
-    // Use the existing countAndStoreUsage function
-    await countAndStoreUsage(mockResponse, usageContext, undefined);
+    await countAndStoreUsage(mockResponse, usageContext, undefined).usagePromise;
 
     // Reset the balance cache using the proper function
     await forceImmediateExpirationRecomputation(kiloUserId);

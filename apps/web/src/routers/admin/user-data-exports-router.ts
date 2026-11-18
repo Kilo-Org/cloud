@@ -1,10 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { db, readDb } from '@/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   classifyExportHealth,
   type ExportEmailStatus,
@@ -163,11 +163,15 @@ async function lockRecoveryTarget(
   if (subjectLockKey !== ownerId) {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerId}, 0))`);
   }
-  const owner = await tx.execute<{ id: string; blocked_reason: string | null }>(sql`
-    SELECT id, blocked_reason FROM kilocode_users WHERE id = ${ownerId} FOR UPDATE
+  const owner = await tx.execute<{
+    id: string;
+    blocked_at: string | null;
+    blocked_reason: string | null;
+  }>(sql`
+    SELECT id, blocked_at, blocked_reason FROM kilocode_users WHERE id = ${ownerId} FOR UPDATE
   `);
   const ownerRow = owner.rows[0];
-  if (!ownerRow || ownerRow.blocked_reason !== null) {
+  if (!ownerRow || ownerRow.blocked_at !== null || ownerRow.blocked_reason !== null) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'The export owner is no longer eligible for recovery',

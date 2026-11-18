@@ -1,0 +1,558 @@
+import { z } from 'zod';
+import {
+  WORKTREE_CHANGES_SCHEMA_VERSION,
+  finalizeWorktreeChangesSnapshot,
+  worktreeChangesCaptureSchema,
+  worktreeChangesSnapshotSchema,
+  worktreeChangesRevisionSchema,
+  worktreeFileQuerySchema,
+  worktreeFileIdentity,
+  worktreeFileRecordSchema,
+  type GetWorktreeChangesOutput,
+  type GetWorktreeFileOutput,
+  type RefreshWorktreeChangesOutput,
+  type WorktreeChangesCaptureRequest,
+  type WorktreeChangesSnapshot,
+  type WorktreeFileRecord,
+  type WorktreeFileQuery,
+  type WorktreeSnapshotCapture,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
+import { getSandboxProvider } from '../persistence/session-metadata.js';
+import type { AgentSandboxProvider } from '../types.js';
+import type { HostedWorkspaceChangeState } from '../shared/hosted-workspace-changes.js';
+import { sameRepositoryIdentity } from '@kilocode/cloud-agent-profile';
+import { launchRepositoryIdentity } from '../session/environment-launch.js';
+import {
+  ISOLATED_CONTAINER_WORKSPACE_PATH,
+  environmentWorkspace,
+  isMultiRepositoryEnvironment,
+} from '../shared/environment-workspace.js';
+import { WORKTREE_CHANGED_EVENT, worktreeChangesBaseRef } from '../shared/worktree-changes-wire.js';
+import { parseReportedSnapshot, type RouteRepository } from '../shared/worktree-groups.js';
+import {
+  MAX_WORKTREE_CHANGES_BYTES,
+  worktreeRecoverySchema,
+  type WorktreeRecovery,
+} from '../shared/worktree-changes-wire.js';
+
+export const WORKTREE_CHANGES_KEY = 'worktree_changes';
+export const WORKTREE_FILE_PREFIX = 'worktree_file:';
+export const WORKTREE_RECOVERY_KEY = 'worktree_recovery';
+
+const worktreeRecoverySnapshotSchema = z
+  .object({
+    revision: worktreeChangesRevisionSchema,
+    recovery: worktreeRecoverySchema,
+  })
+  .strict();
+
+/** Result of a control-plane worktree capture. */
+export type WorktreeCaptureOutcome =
+  | { ok: true; result: unknown }
+  | { ok: false; code: string; message: string; retryable: boolean };
+
+export type WorktreeChangesContext = {
+  session: { sessionId: string; kiloSessionId: string; directory: string };
+  ownerId: string;
+  orgId?: string;
+  sandboxId: string;
+  worktreeId?: NonNullable<SessionMetadata['workspace']>['worktreeId'];
+  provider: AgentSandboxProvider;
+  providerRuntime?: NonNullable<SessionMetadata['workspace']>['providerRuntime'];
+  repository: { type: string; source: string };
+  baseRef?: string;
+  /** The repositories of a V2 route, which is what its wrapper reports on. Absent for a V1 route. */
+  roots?: RouteRepository[];
+};
+
+type CaptureTrigger = { generation: number; context?: WorktreeChangesContext };
+
+type WorktreeChangesDependencies = {
+  storage: {
+    kv: {
+      get(key: string): unknown;
+      put(
+        key: string,
+        value:
+          | WorktreeChangesSnapshot
+          | WorktreeFileRecord
+          | z.infer<typeof worktreeRecoverySnapshotSchema>
+      ): void;
+      delete(key: string): boolean;
+      list(options: { prefix: string }): Iterable<[string, unknown]>;
+    };
+    transactionSync<T>(callback: () => T): T;
+  };
+  saveSnapshotEvent?(snapshot: WorktreeChangesSnapshot): (() => void) | undefined;
+  refreshSnapshot?(
+    context: WorktreeChangesContext
+  ): Promise<RefreshWorktreeChangesOutput | undefined>;
+  readContext(): Promise<WorktreeChangesContext | null>;
+  requestCapture(
+    context: WorktreeChangesContext,
+    payload: WorktreeChangesCaptureRequest,
+    operation: 'snapshot' | 'summary'
+  ): Promise<WorktreeCaptureOutcome>;
+  waitUntil(promise: Promise<unknown>): void;
+};
+
+const idleStatusSchema = z.object({ status: z.object({ type: z.literal('idle') }) });
+
+function environmentRoots(metadata: SessionMetadata): RouteRepository[] | undefined {
+  if (!isMultiRepositoryEnvironment(metadata.environment)) return undefined;
+  const launch =
+    metadata.repository === undefined ? undefined : launchRepositoryIdentity(metadata.repository);
+  return environmentWorkspace({
+    sessionDirectory: ISOLATED_CONTAINER_WORKSPACE_PATH,
+    environment: metadata.environment,
+    isLaunch: member => launch !== undefined && sameRepositoryIdentity(member.identity, launch),
+  }).roots.flatMap(root =>
+    root.repository === null
+      ? []
+      : [
+          {
+            directory: root.directory,
+            repoFullName: root.repository.repoFullName,
+            launch: root.launch,
+          },
+        ]
+  );
+}
+
+export function worktreeChangesContext(
+  metadata: SessionMetadata,
+  directory: string
+): WorktreeChangesContext | null {
+  const sandboxId = metadata.workspace?.sandboxId;
+  const kiloSessionId = metadata.auth.kiloSessionId;
+  const repository = metadata.repository;
+  if (!sandboxId || !kiloSessionId || !repository || !directory) return null;
+  const roots = environmentRoots(metadata);
+  return {
+    session: { sessionId: metadata.identity.sessionId, kiloSessionId, directory },
+    ownerId: metadata.identity.userId,
+    orgId: metadata.identity.orgId,
+    sandboxId,
+    worktreeId: metadata.workspace?.worktreeId,
+    provider: getSandboxProvider(metadata),
+    providerRuntime: metadata.workspace?.providerRuntime,
+    repository: {
+      type: repository.type,
+      source: repository.type === 'github' ? repository.repo : repository.url,
+    },
+    // A V2 route compares each repository with its own base, which the wrapper chooses.
+    baseRef: isMultiRepositoryEnvironment(metadata.environment)
+      ? undefined
+      : worktreeChangesBaseRef(repository.baseBranch),
+    ...(roots === undefined ? {} : { roots }),
+  };
+}
+
+function sameContext(left: WorktreeChangesContext, right: WorktreeChangesContext | null): boolean {
+  return right !== null && JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
+  let generation = 0;
+  let revision = 0;
+  let suppressed = false;
+  let preparing = false;
+  let inFlight: Promise<RefreshWorktreeChangesOutput> | undefined;
+  let pending: CaptureTrigger | undefined;
+  let pendingInterruption: { generation: number; context: WorktreeChangesContext } | undefined;
+
+  function readSnapshot(): WorktreeChangesSnapshot | null {
+    const parsed = worktreeChangesSnapshotSchema.safeParse(
+      deps.storage.kv.get(WORKTREE_CHANGES_KEY)
+    );
+    return parsed.success ? parsed.data : null;
+  }
+
+  function readRecordAgainstManifest(
+    snapshot: WorktreeChangesSnapshot,
+    identity: Pick<WorktreeFileQuery, 'path' | 'scope'>
+  ) {
+    const listed = snapshot.files.find(
+      file => worktreeFileIdentity(file) === worktreeFileIdentity(identity)
+    );
+    if (!listed) return null;
+    const parsed = worktreeFileRecordSchema.safeParse(
+      deps.storage.kv.get(`${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(identity)}`)
+    );
+    if (
+      !parsed.success ||
+      parsed.data.revision !== listed.revision ||
+      parsed.data.path !== listed.path ||
+      parsed.data.scope !== listed.scope ||
+      (parsed.data.content.status === 'available' &&
+        parsed.data.content.source !==
+          (listed.status === 'deleted' ? 'deleted-original' : 'current'))
+    ) {
+      return null;
+    }
+    return { listed, record: parsed.data };
+  }
+
+  function readStates(snapshot: WorktreeChangesSnapshot): HostedWorkspaceChangeState[] {
+    return snapshot.files.map(listed => {
+      const selected = readRecordAgainstManifest(snapshot, listed);
+      if (!selected) {
+        return {
+          path: listed.path,
+          ...(listed.scope === undefined ? {} : { scope: listed.scope }),
+          revision: listed.revision,
+          diff: { status: 'omitted', reason: 'inconsistent' },
+          content: { status: 'unavailable', reason: 'inconsistent' },
+        };
+      }
+      const { record } = selected;
+      return {
+        path: record.path,
+        ...(record.scope === undefined ? {} : { scope: record.scope }),
+        revision: record.revision,
+        diff:
+          record.diff.status === 'available'
+            ? { status: 'available' }
+            : { status: 'omitted', reason: record.diff.reason },
+        content:
+          record.content.status === 'available'
+            ? { status: 'available', source: record.content.source }
+            : { status: 'unavailable', reason: record.content.reason },
+      };
+    });
+  }
+
+  function readRecovery(): WorktreeRecovery | undefined {
+    const snapshot = readSnapshot();
+    if (!snapshot) return undefined;
+    const savedRecovery = deps.storage.kv.get(WORKTREE_RECOVERY_KEY);
+    if (savedRecovery !== undefined) {
+      const parsed = worktreeRecoverySnapshotSchema.safeParse(savedRecovery);
+      return parsed.success &&
+        parsed.data.revision === snapshot.revision &&
+        parsed.data.recovery.files.length > 0
+        ? parsed.data.recovery
+        : undefined;
+    }
+    if (snapshot.files.length === 0 || snapshot.files.some(file => file.scope !== undefined))
+      return undefined;
+    const files: WorktreeRecovery['files'] = snapshot.files.map(file => ({
+      path: file.path,
+      status: file.status,
+    }));
+    const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+    let remaining = MAX_WORKTREE_CHANGES_BYTES - bytes({ files });
+    for (const [index, file] of files.entries()) {
+      const record = readRecordAgainstManifest(snapshot, snapshot.files[index])?.record;
+      if (record?.diff.status === 'available') {
+        const extra = bytes({ ...file, patch: record.diff.patch }) - bytes(file);
+        if (extra <= remaining) {
+          file.patch = record.diff.patch;
+          remaining -= extra;
+        }
+      }
+    }
+    const parsed = worktreeRecoverySchema.safeParse({ files });
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  function canReuseFileRevision(previous: WorktreeFileRecord, next: WorktreeFileRecord): boolean {
+    return (
+      (next.diff.status === 'available' || next.content.status === 'available') &&
+      JSON.stringify(previous.diff) === JSON.stringify(next.diff) &&
+      JSON.stringify(previous.content) === JSON.stringify(next.content)
+    );
+  }
+
+  function replaceSnapshot(
+    snapshot: WorktreeChangesSnapshot,
+    files: WorktreeFileRecord[],
+    recovery?: WorktreeRecovery
+  ): void {
+    const broadcast = deps.storage.transactionSync(() => {
+      const keys = new Set(
+        files.map(file => `${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(file)}`)
+      );
+      for (const [key] of deps.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })) {
+        if (!keys.has(key)) deps.storage.kv.delete(key);
+      }
+      for (const file of files) {
+        deps.storage.kv.put(`${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(file)}`, file);
+      }
+      deps.storage.kv.put(WORKTREE_CHANGES_KEY, snapshot);
+      if (recovery === undefined) deps.storage.kv.delete(WORKTREE_RECOVERY_KEY);
+      else deps.storage.kv.put(WORKTREE_RECOVERY_KEY, { revision: snapshot.revision, recovery });
+      return deps.saveSnapshotEvent?.(snapshot);
+    });
+    broadcast?.();
+  }
+
+  async function capture(trigger: CaptureTrigger): Promise<RefreshWorktreeChangesOutput> {
+    let snapshot: WorktreeChangesSnapshot | null = null;
+    try {
+      snapshot = readSnapshot();
+      if (trigger.generation !== generation) return { status: 'failed', snapshot };
+      if (suppressed || preparing) return { status: 'offline', snapshot };
+      const context = await deps.readContext();
+      if (trigger.generation !== generation) return { status: 'failed', snapshot };
+      if (!context) return { status: 'offline', snapshot };
+      if (trigger.context && !sameContext(trigger.context, context)) {
+        return { status: 'failed', snapshot };
+      }
+      const shared = await deps.refreshSnapshot?.(context);
+      if (shared !== undefined) {
+        if (trigger.generation !== generation || suppressed || preparing) {
+          return { status: 'failed', snapshot: shared.snapshot };
+        }
+        if (shared.status === 'refreshed' && shared.snapshot) {
+          deps.saveSnapshotEvent?.(shared.snapshot)?.();
+        }
+        return shared;
+      }
+      revision = Math.max(revision, snapshot?.revision ?? 0) + 1;
+      if (!Number.isSafeInteger(revision)) return { status: 'failed', snapshot };
+      const requestedRevision = revision;
+      const payload = {
+        revision: requestedRevision,
+        ...(context.baseRef ? { baseRef: context.baseRef } : {}),
+      };
+      let outcome = await deps.requestCapture(context, payload, 'snapshot');
+      if (trigger.generation !== generation) return { status: 'failed', snapshot };
+      const legacy = !outcome.ok && outcome.code === 'unknown_operation';
+      if (legacy) {
+        outcome = await deps.requestCapture(context, payload, 'summary');
+        if (trigger.generation !== generation) return { status: 'failed', snapshot };
+      }
+      if (!outcome.ok) {
+        return { status: outcome.code === 'not_ready' ? 'offline' : 'failed', snapshot };
+      }
+      let captured: WorktreeSnapshotCapture;
+      let repositories: WorktreeChangesSnapshot['repositories'];
+      if (legacy) {
+        const parsed = worktreeChangesCaptureSchema.safeParse(outcome.result);
+        if (!parsed.success) return { status: 'failed', snapshot };
+        captured = { summary: parsed.data, files: [] };
+      } else {
+        const reported = parseReportedSnapshot(
+          outcome.result,
+          context.session.directory,
+          context.roots
+        );
+        if (reported === null) return { status: 'failed', snapshot };
+        captured = reported.capture;
+        repositories = reported.repositories;
+      }
+      const fallback = captured.summary.comparison.baseRefFallback;
+      const comparisonBaseMatches =
+        context.baseRef === undefined ||
+        captured.summary.comparison.baseRef === context.baseRef ||
+        (fallback?.requested === context.baseRef &&
+          captured.summary.comparison.baseRef === fallback.used);
+      if (
+        captured.summary.revision !== requestedRevision ||
+        new Set(captured.summary.files.map(worktreeFileIdentity)).size !==
+          captured.summary.files.length ||
+        !comparisonBaseMatches
+      ) {
+        return { status: 'failed', snapshot };
+      }
+      const current = await deps.readContext();
+      if (
+        suppressed ||
+        preparing ||
+        trigger.generation !== generation ||
+        captured.summary.revision !== revision ||
+        !sameContext(context, current)
+      ) {
+        return { status: 'failed', snapshot };
+      }
+      const capturedRecords = new Map(
+        captured.files.map(file => [worktreeFileIdentity(file), file])
+      );
+      const selectedFiles = captured.summary.files.map(file => {
+        const capturedRecord = capturedRecords.get(worktreeFileIdentity(file));
+        const previous =
+          capturedRecord && snapshot ? readRecordAgainstManifest(snapshot, file) : null;
+        const selectedRevision =
+          previous && capturedRecord && canReuseFileRevision(previous.record, capturedRecord)
+            ? previous.listed.revision
+            : requestedRevision;
+        return { ...file, revision: selectedRevision };
+      });
+      const saved = finalizeWorktreeChangesSnapshot({
+        ...captured.summary,
+        schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
+        capturedAt: new Date().toISOString(),
+        files: selectedFiles,
+        ...(repositories === undefined ? {} : { repositories }),
+      });
+      if (!saved) return { status: 'failed', snapshot };
+      const retainedRevisions = new Map(
+        saved.files.map(file => [worktreeFileIdentity(file), file.revision])
+      );
+      const records = captured.files.flatMap(file => {
+        const selectedRevision = retainedRevisions.get(worktreeFileIdentity(file));
+        return selectedRevision === undefined ? [] : [{ ...file, revision: selectedRevision }];
+      });
+      replaceSnapshot(saved, records, captured.recovery);
+      return { status: 'refreshed', snapshot: saved };
+    } catch {
+      return { status: 'failed', snapshot };
+    }
+  }
+
+  function start(trigger: CaptureTrigger): Promise<RefreshWorktreeChangesOutput> {
+    if (inFlight) return inFlight;
+    inFlight = Promise.resolve().then(async () => {
+      try {
+        let next = trigger;
+        while (true) {
+          const result = await capture(next);
+          const trailing = pending;
+          pending = undefined;
+          if (!trailing) return result;
+          next = trailing;
+        }
+      } finally {
+        inFlight = undefined;
+      }
+    });
+    return inFlight;
+  }
+
+  function schedule(context: WorktreeChangesContext): void {
+    if (suppressed || preparing) return;
+    const trigger = { generation, context };
+    if (inFlight) pending = trigger;
+    deps.waitUntil(start(trigger));
+  }
+
+  function invalidate(): void {
+    generation++;
+    pending = undefined;
+    pendingInterruption = undefined;
+  }
+
+  return {
+    saved():
+      | {
+          snapshot: WorktreeChangesSnapshot;
+          files: WorktreeFileRecord[];
+          recovery?: WorktreeRecovery;
+        }
+      | undefined {
+      const snapshot = readSnapshot();
+      if (!snapshot) return undefined;
+      const recovery = readRecovery();
+      return {
+        snapshot,
+        files: snapshot.files.flatMap(file => {
+          const selected = readRecordAgainstManifest(snapshot, file);
+          return selected ? [selected.record] : [];
+        }),
+        ...(recovery === undefined ? {} : { recovery }),
+      };
+    },
+    recovery(): WorktreeRecovery | undefined {
+      if (suppressed) return undefined;
+      return readRecovery();
+    },
+    savedStates(): {
+      snapshot: WorktreeChangesSnapshot | null;
+      states: HostedWorkspaceChangeState[];
+    } {
+      const snapshot = readSnapshot();
+      return { snapshot, states: snapshot === null ? [] : readStates(snapshot) };
+    },
+    async get(): Promise<GetWorktreeChangesOutput> {
+      return { snapshot: readSnapshot() };
+    },
+
+    getFile(input: unknown): GetWorktreeFileOutput {
+      const query = worktreeFileQuerySchema.safeParse(input);
+      if (!query.success) throw new Error('Invalid worktree file query');
+      if (suppressed) return { status: 'not_captured' };
+      return deps.storage.transactionSync((): GetWorktreeFileOutput => {
+        const snapshot = readSnapshot();
+        if (!snapshot) return { status: 'not_captured' };
+        const listed = snapshot.files.find(
+          file => worktreeFileIdentity(file) === worktreeFileIdentity(query.data)
+        );
+        if (!listed) return { status: 'no_longer_listed', currentRevision: snapshot.revision };
+        if (listed.revision !== query.data.expectedRevision)
+          return { status: 'stale', currentRevision: listed.revision };
+        const selected = readRecordAgainstManifest(snapshot, query.data);
+        if (!selected) return { status: 'not_captured' };
+        return {
+          status: selected.record.diff.status,
+          file: selected.record,
+          capturedAt: snapshot.capturedAt,
+          comparison: snapshot.comparison,
+        };
+      });
+    },
+
+    refresh(): Promise<RefreshWorktreeChangesOutput> {
+      return start({ generation });
+    },
+
+    beginPreparation(): number {
+      invalidate();
+      preparing = true;
+      return generation;
+    },
+
+    finishPreparation(preparationGeneration: number): void {
+      if (preparationGeneration === generation) preparing = false;
+    },
+
+    attached(preparationGeneration: number, context: WorktreeChangesContext | null): void {
+      if (preparationGeneration !== generation || suppressed) return;
+      preparing = false;
+      if (context) schedule(context);
+    },
+
+    markInterrupted(context: WorktreeChangesContext | null): void {
+      if (context && !suppressed && !preparing) pendingInterruption = { generation, context };
+    },
+
+    onEvent(
+      context: WorktreeChangesContext | null,
+      eventKiloSessionId: string | undefined,
+      type: string,
+      properties: Record<string, unknown>
+    ): void {
+      if (!context || eventKiloSessionId !== context.session.kiloSessionId) return;
+      if (type === WORKTREE_CHANGED_EVENT) {
+        schedule(context);
+        return;
+      }
+      const terminal =
+        type === 'session.turn.close' ||
+        type === 'session.error' ||
+        type === 'session.message.outcome';
+      const interruptionSettled =
+        pendingInterruption?.generation === generation &&
+        sameContext(pendingInterruption.context, context) &&
+        (type === 'session.idle' ||
+          (type === 'session.status' && idleStatusSchema.safeParse(properties).success));
+      if (!terminal && !interruptionSettled) return;
+      pendingInterruption = undefined;
+      schedule(context);
+    },
+
+    suppress(): void {
+      suppressed = true;
+      invalidate();
+    },
+
+    purge(): void {
+      deps.storage.kv.delete(WORKTREE_CHANGES_KEY);
+      deps.storage.kv.delete(WORKTREE_RECOVERY_KEY);
+      for (const [key] of deps.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })) {
+        deps.storage.kv.delete(key);
+      }
+    },
+  };
+}

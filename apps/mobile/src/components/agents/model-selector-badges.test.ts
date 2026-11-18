@@ -56,4 +56,14 @@ describe('modelSelectorBadges', () => {
     expect(badges.free).toBe(false);
     expect(badges.collectsData).toBe(false);
   });
+
+  it('shows the tools and images a custom or on-device model states', () => {
+    const badges = modelSelectorBadges({
+      id: 'local:gguf:model',
+      showGatewayMetadata: false,
+      capabilities: { tools: true, images: false },
+    });
+    expect(badges.tools).toBe(true);
+    expect(badges.images).toBe(false);
+  });
 });

@@ -1,7 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
@@ -12,15 +11,22 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { APP_URL } from '@/lib/constants';
-import { createHash } from 'crypto';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   type VerifiedGitLabOAuthState,
   verifyGitLabOAuthState,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
-import { appendIntegrationOAuthRedirectQuery } from '@/lib/integrations/oauth/common';
+import {
+  appendIntegrationOAuthRedirectQuery,
+  oauthCallbackRedirectPath,
+  organizationAccessDenialErrorCode,
+  resolveOAuthCallbackActor,
+} from '@/lib/integrations/oauth/common';
 import { storeGitLabOAuthIntegration } from '@/lib/integrations/platforms/gitlab/oauth-integration-writer';
+import { oauthStateHash } from '@/lib/integrations/oauth/callback-safety';
+import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 function buildGitLabRedirectPath(
   state: Pick<VerifiedGitLabOAuthState, 'owner' | 'returnTo'> | null | undefined,
@@ -52,7 +58,7 @@ function gitLabOAuthSentryContext(searchParams: URLSearchParams): {
   return {
     hasCode: !!searchParams.get('code'),
     hasState: !!state,
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
+    stateHash: oauthStateHash(state),
     error: searchParams.get('error'),
     errorDescription: searchParams.get('error_description'),
   };
@@ -66,24 +72,34 @@ function gitLabOAuthSentryContext(searchParams: URLSearchParams): {
  */
 export async function handleGitLabOAuthCallback(request: NextRequest) {
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-    if (authFailedResponse) {
-      return NextResponse.redirect(new URL('/', APP_URL));
-    }
-
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
     const verifiedState = verifyGitLabOAuthState(state);
+
+    // The caller is the web session, or — only for a state the app shell
+    // minted — the shell's signed state plus its flow cookie.
+    const actor = await resolveOAuthCallbackActor({
+      request,
+      rawState: state,
+      verified: verifiedState,
+    });
+    if (actor.status === 'unauthenticated') {
+      return NextResponse.redirect(new URL(oauthCallbackRedirectPath(request, '/'), APP_URL));
+    }
+    const user = actor.user;
+
     if (!verifiedState) {
       captureMessage('GitLab callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
         extra: gitLabOAuthSentryContext(searchParams),
       });
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+      );
     }
 
     if (verifiedState.userId !== user.id) {
@@ -92,16 +108,27 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
         tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
         extra: { stateUserId: verifiedState.userId, sessionUserId: user.id },
       });
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+      );
     }
 
     const { owner, instanceUrl, customCredentialsRef } = verifiedState;
     const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
 
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      // Replacing an existing org GitLab integration is a billing-scoped action;
+      // a first-time connect keeps member-level access.
+      const existingIntegration = await getIntegrationForOrganization(owner.id, PLATFORM.GITLAB);
+      await ensureOrganizationAccess(
+        { user },
+        owner.id,
+        existingIntegration ? ORGANIZATION_BILLING_ROLES : undefined
+      );
     } else if (user.id !== owner.id) {
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+      );
     }
 
     if (error) {
@@ -172,7 +199,7 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
       repositories: repositories && repositories.length > 0 ? repositories : null,
     });
 
-    if (stored.instanceChanged) {
+    if (stored.instanceChanged || stored.accountChanged) {
       await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
     }
 
@@ -189,17 +216,20 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
 
-    captureException(error, {
-      tags: {
-        endpoint: 'gitlab/callback',
-        source: 'gitlab_oauth',
-      },
-      extra: gitLabOAuthSentryContext(searchParams),
-    });
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: 'gitlab/callback',
+          source: 'gitlab_oauth',
+        },
+        extra: gitLabOAuthSentryContext(searchParams),
+      });
+    }
 
     const redirectPath = buildGitLabRedirectPath(
       verifyGitLabOAuthState(state),
-      'error=connection_failed'
+      denialCode ? `error=${denialCode}` : 'error=connection_failed'
     );
     return NextResponse.redirect(new URL(redirectPath, APP_URL));
   }

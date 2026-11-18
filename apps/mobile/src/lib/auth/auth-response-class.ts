@@ -1,0 +1,235 @@
+/**
+ * One classification for a sign-in HTTP response, shared by the native auth
+ * POST helper (`auth-fetch`) and the refresh rotation (`credentials`).
+ *
+ * The production defect this encodes: a terminal refusal (the credential is
+ * gone, or the server sent a 4xx with no retry guidance) was treated as a
+ * transient one, so the client kept the dead credential and kept asking — the
+ * same request reported over and over. A terminal answer must stop the loop,
+ * clear the credential it proves dead, and put the person back on sign-in.
+ *
+ * Pure apart from the telemetry sink and the zod schema that reads one refusal
+ * body, so both the fetch boundary and the node test environment can import it.
+ */
+
+import * as z from 'zod';
+
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
+
+/**
+ * The one route whose 401 proves the *stored* credential is gone.
+ *
+ * `native/refresh` consumes the stored refresh token, so a 401 there (unknown,
+ * expired, or reused refresh token — see the frozen route contract) is the
+ * pair itself being refused: it is cleared, the loop stops, and the person
+ * signs in again. A 401 on `native/token` is different: that route takes no
+ * bearer, so it refuses the provider credential the *attempt* presented (an
+ * email code, a one-time ticket, an Apple/Google ID token). It is terminal for
+ * that attempt — never retried — but it is not proof a stored session is dead,
+ * and clearing one on a mistyped code would sign out a healthy device.
+ */
+const STORED_CREDENTIAL_ROUTE = '/api/auth/native/refresh';
+
+/**
+ * The refusal bodies the frozen native refresh contract lets that route write
+ * beside a refusal of the *stored* credential:
+ * `401 { error: 'INVALID_REFRESH_TOKEN' | 'SESSION_REVOKED' | 'USER_BLOCKED' }`.
+ * The route's fourth body, `400 { error: 'INVALID_REQUEST' }`, is its
+ * unreadable-body answer: it says nothing about a stored pair, and a 400 is
+ * already terminal here, so it has no place in a 403 discriminator — a gateway
+ * that answers 403 with the same generic word would otherwise end a session the
+ * route never refused. The route has no other status, so a body outside this
+ * schema did not come from it.
+ */
+const RefreshRefusalBodySchema = z.object({
+  error: z.enum(['INVALID_REFRESH_TOKEN', 'SESSION_REVOKED', 'USER_BLOCKED']),
+});
+
+/** True when a response body is one the native refresh route writes for a refusal. */
+function isRefreshRefusalBody(body: unknown): boolean {
+  return RefreshRefusalBodySchema.safeParse(body).success;
+}
+
+/**
+ * Every route whose terminal refusal {@link reportAuthTerminalFailure} reports:
+ * the native auth POSTs (`postAuth`) and the refresh rotation. The
+ * network-error fetch wrapper reads this list so it does not file a second
+ * event for the same refusal (KILO-APP-2N2 duplicated KILO-APP-2VV). Typing
+ * the callers' `route` with it keeps the list complete.
+ */
+const AUTH_TERMINAL_ROUTES = [
+  '/api/auth/native/otp',
+  '/api/auth/native/token',
+  STORED_CREDENTIAL_ROUTE,
+  '/api/auth/passkey/authenticate',
+  '/api/auth/passkey/register',
+  '/api/auth/passkey/management/authorize',
+  '/api/auth/passkey/management/sso/start',
+  '/api/auth/passkey/management/sso/collect',
+] as const;
+
+export type AuthTerminalRoute = (typeof AUTH_TERMINAL_ROUTES)[number];
+
+/** True when the auth layer reports this route's terminal refusals itself. */
+export function isAuthTerminalRoute(path: string): path is AuthTerminalRoute {
+  return AUTH_TERMINAL_ROUTES.some(route => route === path);
+}
+
+export type AuthResponseClass =
+  /** 2xx: the route answered. */
+  | { readonly kind: 'success' }
+  /**
+   * Do not retry. `clearCredential` is true when the refusal proves the stored
+   * pair is dead (a 401 on the refresh route).
+   */
+  | { readonly kind: 'terminal'; readonly status: number; readonly clearCredential: boolean }
+  /** Retryable: a 408, 429 or 5xx carries the server's own back-off, if it named one. */
+  | { readonly kind: 'retry'; readonly status: number; readonly retryAfterMs: number | undefined };
+
+/**
+ * `Retry-After` as milliseconds from `now`. Accepts both forms RFC 9110 allows
+ * — delta-seconds and an HTTP-date — and returns `undefined` for anything else
+ * so an unparseable header never invents a wait. A date in the past is 0.
+ */
+export function parseRetryAfterMs(
+  header: string | null | undefined,
+  now: number = Date.now()
+): number | undefined {
+  if (header === null || header === undefined) {
+    return undefined;
+  }
+  const trimmed = header.trim();
+  if (trimmed === '') {
+    return undefined;
+  }
+  if (/^\d+$/u.test(trimmed)) {
+    return Number(trimmed) * 1000;
+  }
+  const parsed = Date.parse(trimmed);
+  if (Number.isNaN(parsed)) {
+    return undefined;
+  }
+  return Math.max(0, parsed - now);
+}
+
+/**
+ * Classify a sign-in response. A 401 is terminal (and clears the stored
+ * credential on a credential route). A 408, 429 or 5xx is retryable and carries
+ * the server's `Retry-After` when it sent one. A 403 on the refresh route is
+ * retryable too unless its body is one the route itself writes: the route has
+ * no 403 branch, so the answer came from an intermediary in front of it. Every
+ * other 4xx — and the 1xx/3xx a sign-in route never returns — is terminal:
+ * retrying it cannot change it.
+ */
+export function classifyAuthResponse(args: {
+  path: string;
+  status: number;
+  retryAfterHeader?: string | null;
+  /**
+   * The parsed response body, when the caller read it. Only the refresh route
+   * consults it: an intermediary's 403 is told apart from the route's own
+   * refusal by the body the route writes.
+   */
+  body?: unknown;
+  now?: number;
+}): AuthResponseClass {
+  const { path, status } = args;
+  if (status >= 200 && status < 300) {
+    return { kind: 'success' };
+  }
+  if (status === 401) {
+    return { kind: 'terminal', status, clearCredential: path === STORED_CREDENTIAL_ROUTE };
+  }
+  if (status === 408 || status === 429 || status >= 500) {
+    return {
+      kind: 'retry',
+      status,
+      retryAfterMs: parseRetryAfterMs(args.retryAfterHeader, args.now),
+    };
+  }
+  // A 403 on the refresh route without the route's refusal body is an edge or
+  // proxy refusal (a WAF blocks a region, a VPN exit, or a network that answers
+  // every request): it proves nothing about the stored pair, so the session
+  // stays and the rotation retries later instead of signing the person out.
+  if (status === 403 && path === STORED_CREDENTIAL_ROUTE && !isRefreshRefusalBody(args.body)) {
+    return {
+      kind: 'retry',
+      status,
+      retryAfterMs: parseRetryAfterMs(args.retryAfterHeader, args.now),
+    };
+  }
+  return { kind: 'terminal', status, clearCredential: false };
+}
+
+/**
+ * The stable fingerprint of one terminal sign-in failure. It names the route
+ * and the status only — never the retry count, a duration, or a token — so
+ * every repeat collapses into the same issue instead of counting once per try.
+ */
+export function authTerminalFingerprint(route: string, status: number): string[] {
+  return ['auth-terminal', route, String(status)];
+}
+
+// One report per terminal failure per app process, keyed by the same route and
+// status the fingerprint names. The retry loop is what produced a report per
+// try; once it stops, this is the belt-and-braces that keeps a late duplicate
+// from opening a second event for the same dead credential.
+const reportedTerminalFailures = new Set<string>();
+
+/** Test seam: forget the process's terminal reports. */
+export function resetAuthTerminalReports(): void {
+  reportedTerminalFailures.clear();
+}
+
+/**
+ * Claim the one report this process may file for this route and status: true
+ * on the first call, false on every repeat.
+ *
+ * The call itself marks the failure as reported, so it is not a question to ask
+ * out of curiosity: a claim spends the process's single report for that
+ * failure, and a `reportAuthTerminalFailure` after it files nothing.
+ */
+export function claimAuthTerminalFailureReport(route: string, status: number): boolean {
+  const key = `${route}:${status}`;
+  if (reportedTerminalFailures.has(key)) {
+    return false;
+  }
+  reportedTerminalFailures.add(key);
+  return true;
+}
+
+/**
+ * Report one terminal sign-in failure, at most once per process, with the
+ * stable fingerprint above. Two answers are expected rather than defects, and
+ * they are filed at warning level: the expiry of the stored credential on the
+ * refresh route, and a 401 on an attempt route, which refuses the code,
+ * ticket, ID token or passkey the attempt presented. Every other terminal
+ * refusal names a defect and stays at error. Same tags and fingerprint either
+ * way, so one route and status keeps one issue and only its severity moves.
+ * Never throws; a no-op until a telemetry sink is installed.
+ */
+export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: number): void {
+  if (!claimAuthTerminalFailureReport(route, status)) {
+    return;
+  }
+  // Both expected cases are a 401, and every route reported here is either the
+  // stored credential route or an attempt route: the stored credential's own
+  // expiry ends a session the person renews by signing in, and an attempt
+  // route's 401 refuses the credential the attempt presented (the server's
+  // INVALID_CODE, INVALID_TOKEN, INVALID_TICKET or a PasskeyVerificationError
+  // code), which a mistyped code, a reused ticket or a cancelled ceremony
+  // produces. Any other terminal status names a defect and stays at error.
+  const expectedRefusal = status === 401;
+  captureTelemetry({
+    level: expectedRefusal ? 'warning' : 'error',
+    error: new Error(`Terminal sign-in failure: ${status} on ${route}`),
+    tags: {
+      'error.subsystem': 'auth',
+      'auth.outcome': 'terminal',
+      'auth.route': route,
+      'http.status': status,
+    },
+    contexts: { auth: { route, status, outcome: 'terminal' } },
+    fingerprint: authTerminalFingerprint(route, status),
+  });
+}

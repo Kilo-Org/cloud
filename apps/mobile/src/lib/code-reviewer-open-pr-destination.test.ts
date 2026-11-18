@@ -3,50 +3,59 @@ import { describe, expect, it } from 'vitest';
 import { resolveCodeReviewerOpenPrDestination } from './code-reviewer-open-pr-destination';
 
 describe('resolveCodeReviewerOpenPrDestination', () => {
-  it('routes a valid github.com PR URL in-app when the flag is on', () => {
+  it('routes a valid github.com PR URL in-app', () => {
     expect(
-      resolveCodeReviewerOpenPrDestination('https://github.com/octocat/hello-world/pull/42', true)
+      resolveCodeReviewerOpenPrDestination('https://github.com/octocat/hello-world/pull/42')
     ).toEqual({
       kind: 'in-app',
-      owner: 'octocat',
-      repo: 'hello-world',
-      number: 42,
+      href: '/(app)/pr-review/octocat/hello-world/42',
+      platform: 'github',
     });
   });
 
-  it('opens the browser for a GitLab PR URL', () => {
+  it('routes a gitlab.com merge request in-app to the provider route with its instance', () => {
     expect(
-      resolveCodeReviewerOpenPrDestination('https://gitlab.com/octocat/hello-world/pull/42', true)
-    ).toEqual({ kind: 'browser' });
+      resolveCodeReviewerOpenPrDestination('https://gitlab.com/group/sub/repo/-/merge_requests/7')
+    ).toEqual({
+      kind: 'in-app',
+      href: '/(app)/pr-review/gitlab/group/sub/repo/7?instance=https%3A%2F%2Fgitlab.com',
+      platform: 'gitlab',
+    });
   });
 
-  it('opens the browser for a Bitbucket PR URL', () => {
+  it('routes a self-managed GitLab merge request in-app', () => {
     expect(
       resolveCodeReviewerOpenPrDestination(
-        'https://bitbucket.org/octocat/hello-world/pull-requests/42',
-        true
+        'https://gitlab.example.com/team/repo/-/merge_requests/9'
       )
-    ).toEqual({ kind: 'browser' });
+    ).toEqual({
+      kind: 'in-app',
+      href: '/(app)/pr-review/gitlab/team/repo/9?instance=https%3A%2F%2Fgitlab.example.com',
+      platform: 'gitlab',
+    });
+  });
+
+  it('routes a Bitbucket pull request in-app', () => {
+    expect(
+      resolveCodeReviewerOpenPrDestination(
+        'https://bitbucket.org/acme/api/pull-requests/42/overview'
+      )
+    ).toEqual({
+      kind: 'in-app',
+      href: '/(app)/pr-review/bitbucket/acme/api/42',
+      platform: 'bitbucket',
+    });
   });
 
   it('opens the browser for a GitHub Enterprise host', () => {
     expect(
-      resolveCodeReviewerOpenPrDestination(
-        'https://github.example.com/octocat/hello-world/pull/42',
-        true
-      )
+      resolveCodeReviewerOpenPrDestination('https://github.example.com/octocat/hello-world/pull/42')
     ).toEqual({ kind: 'browser' });
   });
 
   it('opens the browser for a malformed URL', () => {
-    expect(resolveCodeReviewerOpenPrDestination('not a url at all', true)).toEqual({
+    expect(resolveCodeReviewerOpenPrDestination('not a url at all')).toEqual({
       kind: 'browser',
     });
-  });
-
-  it('opens the browser when the flag is off even for a valid github.com PR URL', () => {
-    expect(
-      resolveCodeReviewerOpenPrDestination('https://github.com/octocat/hello-world/pull/42', false)
-    ).toEqual({ kind: 'browser' });
   });
 });

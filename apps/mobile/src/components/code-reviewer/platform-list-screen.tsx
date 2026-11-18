@@ -1,19 +1,34 @@
 import { useQuery } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
-import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/components/ui/icons';
+import { type Href } from 'expo-router';
+import {
+  CirclePlus,
+  GitBranch,
+  GitMerge,
+  GitPullRequest,
+  History,
+  LineChart,
+} from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { ScreenHeader } from '@/components/screen-header';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import {
   PERSONAL_SCOPE,
   useBitbucketReadiness,
   useGitHubStatus,
   useGitLabStatus,
 } from '@/lib/hooks/use-code-reviewer';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
+import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
@@ -33,33 +48,79 @@ function connectionSubtitle(status: {
   // omitting it — otherwise the row grows by a line once the real status
   // arrives, popping the layout.
   if (status.isLoading) {
-    return 'Checking…';
+    return i18n.t('codeReviewer.platformList.checking');
   }
   // A failed status query must not read as "Not connected" — that's a false
   // disconnected signal. Say the state is unavailable; tapping in shows the
   // full error + retry.
   if (status.isError) {
-    return 'Status unavailable';
+    return i18n.t('codeReviewer.platformList.statusUnavailable');
   }
-  return status.data?.connected ? 'Connected' : 'Not connected';
+  return status.data?.connected ? i18n.t('common.connected') : i18n.t('common.notConnected');
 }
 
 export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
+  const { t } = useTranslation();
   const trpc = useTRPC();
   const isPersonal = scope === PERSONAL_SCOPE;
 
-  const { data: orgs } = useQuery({
+  const organizations = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: !isPersonal,
   });
-  const scopeTitle = isPersonal
-    ? 'Personal'
-    : (orgs?.find(org => org.organizationId === scope)?.organizationName ?? 'Organization');
+  // This screen fetches the memberships itself — its access classification and
+  // its Retry read that query — so it resolves the title from the same rule the
+  // screens without a list use, over the list it already has, and remembers the
+  // name that list delivers for a scope the reader may lose next.
+  const knownScopeName = useReviewerScopeName(scope, organizations.data);
+  const scopeTitle = reviewerScopeTitle(
+    scope,
+    organizations.data,
+    {
+      personal: t('common.personal'),
+      organization: t('common.organization'),
+    },
+    knownScopeName
+  );
 
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const bitbucketReadiness = useBitbucketReadiness(scope);
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: !isPersonal,
+    errors: [githubStatus.error, gitlabStatus.error, bitbucketReadiness.error],
+  });
+
+  // Re-resolve membership and every platform status together: a restored
+  // membership must land the real rows, and a live installer account must not
+  // wait on a serially refreshed status.
+  const retryAccess = async () => {
+    await Promise.allSettled([
+      organizations.refetch(),
+      githubStatus.refetch(),
+      gitlabStatus.refetch(),
+      bitbucketReadiness.refetch(),
+    ]);
+  };
+
+  if (access !== 'granted') {
+    return (
+      <ScopeAccessDeniedScreen
+        title={scopeTitle}
+        eyebrow={t('common.codeReviewer')}
+        backFallback={CODE_REVIEWER_HOME_PATH}
+        kind={access}
+        onRetry={() => void retryAccess()}
+        isRetrying={
+          organizations.isFetching ||
+          githubStatus.isFetching ||
+          gitlabStatus.isFetching ||
+          bitbucketReadiness.isFetching
+        }
+      />
+    );
+  }
 
   const statusFor = (platform: ReviewerPlatform) => {
     if (platform === 'gitlab') {
@@ -77,11 +138,19 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={scopeTitle} eyebrow="Code Reviewer" />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <ReviewerHeader
+        title={scopeTitle}
+        // The same one-line header the review list for this scope paints, so
+        // both scopes report one header height and the platform rows never move
+        // when the name arrives with the membership read: a longer name
+        // tail-truncates inside that line.
+        titleNumberOfLines={1}
+        eyebrow={t('common.codeReviewer')}
+      />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Platforms
+            {t('codeReviewer.platformList.platforms')}
           </Text>
           <View>
             {platforms.map((platform, index) => {
@@ -94,9 +163,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                   subtitle={connectionSubtitle(status)}
                   last={index === platforms.length - 1}
                   onPress={() => {
-                    router.push(
-                      `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}` as Href
-                    );
+                    pushOnce(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}
                 />
               );
@@ -106,26 +173,36 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Activity
+            {t('codeReviewer.platformList.activity')}
           </Text>
           <View>
             <ConfigureRow
               icon={History}
-              title="Recent reviews"
+              title={t('codeReviewer.reviewList.title')}
               onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews` as Href);
+                pushOnce(`/(app)/code-reviewer/${scope}/reviews` as Href);
               }}
             />
             <ConfigureRow
               icon={CirclePlus}
-              title="Manual review"
-              last
+              title={t('codeReviewer.manualReview.title')}
+              last={isPersonal}
               onPress={() => {
-                router.push(
-                  `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review` as Href
-                );
+                pushOnce(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
             />
+            {/* Review analytics is an organization surface (the dashboard query
+                needs an organization id), so a personal scope has no row. */}
+            {!isPersonal && (
+              <ConfigureRow
+                icon={LineChart}
+                title={t('codeReviewer.analytics.title')}
+                last
+                onPress={() => {
+                  pushOnce(`/(app)/code-reviewer/${scope}/analytics` as Href);
+                }}
+              />
+            )}
           </View>
         </View>
       </TabScreenScrollView>

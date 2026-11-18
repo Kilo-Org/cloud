@@ -25,7 +25,7 @@ export function createMemoryEventQueries(): EventQueries {
         stream_event_type: params.streamEventType,
         payload: params.payload,
         timestamp: params.timestamp,
-      } as StoredEvent);
+      });
       return id;
     },
     findByEntityId: (entityId: string) => rows.get(entityId) ?? null,

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import {
   containerCapacityForService,
@@ -263,6 +263,7 @@ export async function getSessionContainerInfo(
     scope: !sandboxId
       ? 'unknown'
       : sandboxId.startsWith('ses-') ||
+          sandboxId.startsWith('istd-') ||
           sandboxId.startsWith('crv-') ||
           sandboxId.startsWith('dind-')
         ? 'isolated'

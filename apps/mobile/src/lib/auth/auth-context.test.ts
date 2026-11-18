@@ -43,6 +43,7 @@ vi.mock('expo-secure-store', () => ({
 
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
+  E2E_SECURE_STORE_FAULT_MS: 0,
 }));
 
 vi.mock('@/lib/analytics/posthog', () => ({
@@ -50,26 +51,34 @@ vi.mock('@/lib/analytics/posthog', () => ({
 }));
 
 vi.mock('@/lib/appsflyer', () => ({ resetAppsFlyerState: vi.fn(), trackEvent: vi.fn() }));
-vi.mock('@sentry/react-native', () => ({ setUser: vi.fn() }));
+vi.mock('@sentry/react-native', () => ({ setUser: vi.fn(), setTag: vi.fn() }));
 vi.mock('@/lib/telemetry/controller', () => ({ clearTelemetryDecision: vi.fn() }));
 vi.mock('@/lib/telemetry/posthog-storage', () => ({ purgePostHogPersistence: vi.fn() }));
 // sonner-native pulls in react-native at runtime, whose Flow-only `import
 // typeof` syntax crashes Node's parser in the pure (node) test environment.
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
+// `exchange-legacy-token` builds the app `User-Agent` through
+// `client-metadata` -> `expo-application`; that module's expo root needs
+// `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
+
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/environment-choice', () => ({
+  clearEnvironmentChoices: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   clearReasoningPreference: vi.fn(),
 }));
 
-vi.mock('@/lib/last-active-instance', () => ({
-  clearLastActiveInstance: vi.fn(),
-}));
-
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
+vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 
@@ -89,7 +98,18 @@ vi.mock('@/lib/auth/logout-cleanup', () => ({
   runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/auth/admission', () => ({
+  getAdmission: vi.fn().mockResolvedValue({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'integrity-token',
+  }),
+  clearAttestKeyOnRefusal: vi.fn(),
+}));
+
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   AppState: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },
@@ -97,7 +117,7 @@ vi.mock('react-native', () => ({
 
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
-import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
@@ -105,6 +125,7 @@ import {
   TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
 import { clearActiveToken, getActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
 import * as SecureStore from 'expo-secure-store';
 /* eslint-enable import/first */
 
@@ -127,9 +148,31 @@ describe('performRefresh', () => {
     setSignOutTeardownActive(false);
   });
 
-  it('returns refused when no refresh token is stored', async () => {
+  it('returns unrenewable, not refused, when no refresh token is stored but a token is', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: true });
+
+    // A set with no refresh token can never rotate. It is not a refusal — the
+    // caller ends the session once with the branch it records — and it is not a
+    // failed read either: the device was unlocked, so the null is an absence.
+    expect(outcome).toEqual({
+      kind: 'unrenewable',
+      sessionVersion: currentAuthEpoch(),
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('returns unreadable, not refused, for an empty credential set', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ kind: 'unreadable' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
   it('returns refused when the server responds with 401', async () => {
@@ -139,7 +182,10 @@ describe('performRefresh', () => {
     );
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: true });
+    expect(outcome).toEqual({
+      kind: 'refused',
+      sessionVersion: currentAuthEpoch(),
+    });
   });
 
   it('returns transient when the server responds with a non-401 error', async () => {
@@ -149,7 +195,7 @@ describe('performRefresh', () => {
     );
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
   });
 
   it('returns transient when the response body fails validation (missing fields)', async () => {
@@ -159,7 +205,7 @@ describe('performRefresh', () => {
     );
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
     // Must not write partial data.
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
   });
@@ -169,7 +215,7 @@ describe('performRefresh', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('not json', { status: 200 }));
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
   });
 
   it('returns success and persists the new token pair on valid response', async () => {
@@ -187,8 +233,8 @@ describe('performRefresh', () => {
     const outcome = await performRefresh();
     const after = Date.now();
 
-    expect(outcome.ok).toBe(true);
-    if (outcome.ok) {
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind === 'ok') {
       expect(outcome.token).toBe('new-token');
       expect(outcome.refreshToken).toBe('new-refresh');
       expect(outcome.expiresIn).toBe(3600);
@@ -206,7 +252,7 @@ describe('performRefresh', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
     // Old credentials are untouched.
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
   });
@@ -230,7 +276,7 @@ describe('performRefresh', () => {
 
     // Must be the same outcome — single-flight.
     expect(outcome1).toEqual(outcome2);
-    if (outcome1.ok) {
+    if (outcome1.kind === 'ok') {
       expect(outcome1.token).toBe('shared');
     }
     // fetch must be called exactly once.
@@ -258,7 +304,7 @@ describe('performRefresh', () => {
       Response.json({ token: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 })
     );
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
   });
@@ -286,7 +332,7 @@ describe('performRefresh', () => {
       Response.json({ token: 'old-token', refreshToken: 'old-refresh-2', expiresIn: 3600 })
     );
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(AUTH_TOKEN_KEY)).toBe('newer-token');
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('newer-refresh');
   });
@@ -311,7 +357,7 @@ describe('performRefresh', () => {
     store.set(REFRESH_TOKEN_KEY, 'newer-refresh');
     resolveResponse?.(Response.json({ error: 'expired' }, { status: 401 }));
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('newer-refresh');
   });
 
@@ -324,7 +370,7 @@ describe('performRefresh', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(outcome).toEqual({ kind: 'superseded' });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -341,7 +387,7 @@ describe('performRefresh', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(outcome).toEqual({ kind: 'superseded' });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
     fetchSpy.mockRestore();
@@ -371,7 +417,7 @@ describe('performRefresh', () => {
       Response.json({ token: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 })
     );
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
     expect(getActiveToken()).toBeNull();
@@ -409,7 +455,7 @@ describe('performRefresh', () => {
       await vi.advanceTimersByTimeAsync(15_001);
 
       // A timed-out refresh is transient: the old credentials stay untouched.
-      await expect(promise).resolves.toEqual({ ok: false, refused: false });
+      await expect(promise).resolves.toEqual({ kind: 'transient' });
       expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeDefined();
@@ -515,7 +561,7 @@ describe('persistSignInCredentialsAtEpoch', () => {
     releaseCredentialWrites();
 
     const result = await refresh;
-    expect(result).toEqual({ ok: false, refused: false, superseded: true });
+    expect(result).toEqual({ kind: 'superseded' });
     expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
     expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
     expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);
@@ -549,6 +595,20 @@ describe('exchangeLegacyToken', () => {
     const result = await exchangeLegacyToken();
     expect(result).toBeNull();
     // Must not set the done marker — retry on next launch.
+    expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+  });
+
+  it('drops the stored attest key when the exchange is refused admission', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 })
+    );
+
+    const result = await exchangeLegacyToken();
+    expect(result).toBeNull();
+    expect(clearAttestKeyOnRefusal).toHaveBeenCalledWith('ADMISSION_REQUIRED');
+    // Retry on next launch: the old token stays and no done marker is set.
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
     expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
   });
 

@@ -9,36 +9,89 @@ import { inlineSqlPlugin } from './vitest.sql-plugin';
 // unaffected by the mounted-test harness.
 export default defineProject({
   plugins: [inlineSqlPlugin()],
+  // Vendored text assets resolve to a URL, like images, instead of being run as JS.
+  assetsInclude: ['**/*.txt'],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': fileURLToPath(new URL('src', import.meta.url)),
     },
   },
   test: {
     name: 'mobile-pure',
     environment: 'node',
+    // The app build's config module cannot load in this project; the setup
+    // file stubs the exports its importers read.
+    setupFiles: ['./vitest.setup.ts'],
+    // The mobile-app gate runs `vitest related` over the branch's changed files
+    // (170+ suites) beside Metro, the simulator, and the local services. On that
+    // loaded machine the first transform/import of a heavy dependency
+    // (react-native-render-html, react-native-marked) can exceed the 5 s default
+    // and fail a test that passes in isolation. The slow suite moves between
+    // files from run to run, so the headroom belongs at the project level, not
+    // in a single test file.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+    // encrypted-kv.test.ts imports node:sqlite on purpose (it is the only way
+    // to run real SQL semantics under Node), and Node prints an
+    // ExperimentalWarning for that API on every worker start. Pass the warning
+    // class down to the workers so the suite prints no warnings.
+    execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
+      'plugins/**/*.test.ts',
+      'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
+      'src/lib/byok/**/*.test.ts',
+      'src/lib/chat/**/*.test.ts',
+      'src/lib/design-gate/**/*.test.ts',
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
+      'src/lib/billing/**/*.test.ts',
+      'src/lib/artifacts/**/*.test.ts',
+      'src/lib/glanceable/**/*.test.ts',
+      'src/glanceable-ios/**/*.test.ts',
+      'src/glanceable-android/**/*.test.ts',
+      'src/lib/font-scale/**/*.test.ts',
       'src/lib/hooks/**/*.test.ts',
+      'src/lib/integrations/**/*.test.ts',
+      'src/lib/iap/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
-      'src/lib/kilo-pass/**/*.test.tsx',
+      'src/lib/native-remote/**/*.test.ts',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/lib/kilo-pass/**/!(*.mounted).test.tsx',
+      'src/lib/credits/**/*.test.ts',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/lib/credits/**/!(*.mounted).test.tsx',
+      'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
+      'src/lib/organization/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',
+      'src/lib/passkeys/**/*.test.ts',
       'src/lib/pr-review/**/*.test.ts',
+      'src/lib/app-actions/**/*.test.ts',
+      'src/lib/cloud-environments/**/*.test.ts',
+      'src/lib/cloud-triggers/**/*.test.ts',
+      'src/lib/app-actions/**/!(*.mounted).test.tsx',
+      'modules/kilo-app-actions/*.test.ts',
+      'modules/kilo-apple-model/*.test.ts',
+      'modules/kilo-launcher-surfaces/*.test.ts',
       'src/lib/query/**/*.test.ts',
+      'src/lib/settings/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
+      'src/lib/tool-summary-translation/**/*.test.ts',
+      'src/lib/todos/**/*.test.ts',
       'src/components/**/*.test.ts',
-      'src/components/pr-review/**/*.test.tsx',
-      'src/components/kiloclaw/**/*.test.tsx',
-      'src/components/login/**/*.test.tsx',
+      'src/components/agents/**/!(*.mounted).test.tsx',
+      'src/components/pr-review/**/!(*.mounted).test.tsx',
       'src/lib/telemetry/**/*.test.ts',
+      'src/lib/tour/**/*.test.ts',
+      'modules/kilo-surface-geometry/*.test.ts',
     ],
   },
 });

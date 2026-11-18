@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getSecurityCommandFailureMessage,
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
   mergeTrackedCommandIds,
+  SECURITY_COMMAND_TYPES,
   type SecurityCommand,
 } from './commands';
 
@@ -38,7 +40,19 @@ describe('security agent command helpers', () => {
     ]);
   });
 
+  it('maps every command type to a non-empty invalidation scope list', () => {
+    for (const commandType of SECURITY_COMMAND_TYPES) {
+      expect(getSecurityCommandInvalidationScopes(commandType).length).toBeGreaterThan(0);
+    }
+  });
+
   it('deduplicates recovered and locally tracked command ids', () => {
     expect(mergeTrackedCommandIds(['a', 'b'], ['b', 'c'])).toEqual(['a', 'b', 'c']);
+  });
+
+  it('uses actionable GitHub authorization copy when a token is unavailable', () => {
+    expect(
+      getSecurityCommandFailureMessage(command({ resultCode: 'GITHUB_TOKEN_UNAVAILABLE' }))
+    ).toBe('GitHub authorization needs attention. Re-authorize GitHub App, then retry.');
   });
 });

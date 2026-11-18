@@ -10,13 +10,15 @@ import {
 import {
   getRawOpenRouterModels,
   getEnhancedOpenRouterModels,
-} from '@/lib/ai-gateway/providers/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
-import { CRON_SECRET } from '@/lib/config.server';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 
 /**
  * Vercel Cron Job: Sync Model Stats
@@ -26,7 +28,7 @@ import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
  * - Artificial Analysis benchmarks
  * - Internal usage statistics from Posthog
  *
- * It ensures all models in the preferredModels list are tracked and marked as active.
+ * It ensures concrete models in the preferredModels list are tracked and marked as active.
  * It also updates OpenRouter data for any other models already in the database.
  * Note: Models are never automatically deactivated - only users can deactivate models.
  */
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all models from OpenRouter (raw, unfiltered data)
     const openRouterResponse = await getRawOpenRouterModels();
-    const enhancedOpenRouterResponse = await getEnhancedOpenRouterModels();
+    const enhancedOpenRouterResponse = await getEnhancedOpenRouterModels({ countryCode: null });
 
     // Create a map of enhanced models for pricing lookup (includes Kilo free models with $0 pricing)
     const enhancedModelsMap = new Map(
@@ -75,19 +77,40 @@ export async function GET(request: NextRequest) {
       `[sync-model-stats] Found ${preferredModelData.length} preferred models out of ${allModels.length} total`
     );
 
-    // Sync OpenRouter model data to database
-    const syncResult = await syncOpenRouterModels(allModels, monitoredModels);
-    const { newModels, updatedModels, totalProcessed } = syncResult;
+    const additionalModelIds = ENKRYPT_SYNC_ENABLED
+      ? [...new Set(ENKRYPT_MODEL_MAPPINGS.map(({ modelId }) => modelId))].filter(modelId =>
+          enhancedModelsMap.has(modelId)
+        )
+      : [];
+    if (additionalModelIds.length > 0) {
+      const rawModelIds = new Set(allModels.map(model => model.id));
+      for (const modelId of additionalModelIds) {
+        const enhancedModel = enhancedModelsMap.get(modelId);
+        if (!rawModelIds.has(modelId) && enhancedModel) {
+          allModels.push(enhancedModel);
+        }
+      }
+    }
+
+    const catalogSync = ENKRYPT_SYNC_ENABLED
+      ? syncOpenRouterModels(allModels, monitoredModels, additionalModelIds)
+      : syncOpenRouterModels(allModels, monitoredModels);
+    const [catalogResult, ...otherResults] = await Promise.allSettled([
+      catalogSync,
+      catalogSync.then(() => syncArtificialAnalysisBenchmarks()),
+      catalogSync.then(() => syncInternalUsageStats()),
+    ]);
+    invalidateModelStatsCache();
+
+    if (catalogResult.status === 'rejected') throw catalogResult.reason;
+    for (const result of otherResults) {
+      if (result.status === 'rejected') throw result.reason;
+    }
+    const { newModels, updatedModels, totalProcessed } = catalogResult.value;
 
     console.log(
       `[sync-model-stats] Synced ${totalProcessed} models: ${newModels.length} new, ${updatedModels.length} updated`
     );
-
-    // Fetch and update Artificial Analysis benchmarks for ALL models with aaSlug
-    await syncArtificialAnalysisBenchmarks();
-
-    // Calculate and update internal usage statistics from Posthog
-    await syncInternalUsageStats();
 
     const duration = Date.now() - startTime;
     const summary = {

@@ -6,10 +6,41 @@ import {
   estimateSerializedBytes,
   isLifecycleIngestEvent,
   prepareIngestFrame,
+  slimPersistedKilocodeEvent,
 } from './ingest-frame.js';
+import { MAX_INLINE_FILE_URL_LENGTH } from './trim-payload.js';
 import type { IngestEvent } from './protocol.js';
+import {
+  classifyAssistantFailure,
+  isAssistantInterrupt,
+  projectSafeAssistantError,
+} from './assistant-failure.js';
 
 describe('prepareIngestFrame', () => {
+  it.each(['autocommit_started', 'autocommit_completed'] as const)(
+    'keeps the repository of a %s event through compaction, so two repositories stay apart',
+    streamEventType => {
+      const frame = prepareIngestFrame({
+        streamEventType,
+        timestamp: '2026-04-14T08:00:00.000Z',
+        data: {
+          messageId: 'msg_1',
+          success: true,
+          message: 'acme/web: committed',
+          commitMessage: 'x'.repeat(2_000_000),
+          repository: 'acme/web',
+        },
+      });
+      expect(frame.kind).toBe('send');
+      if (frame.kind !== 'send') return;
+      expect(frame.compacted).toBe(true);
+      expect(JSON.parse(frame.serialized).data).toMatchObject({
+        messageId: 'msg_1',
+        repository: 'acme/web',
+      });
+    }
+  );
+
   it('passes small events through unchanged', () => {
     const event: IngestEvent = {
       streamEventType: 'kilocode',
@@ -23,8 +54,32 @@ describe('prepareIngestFrame', () => {
     expect(frame.bytes).toBeLessThanOrEqual(MAX_INGEST_EVENT_BYTES);
   });
 
-  it('applies payload trimming to file parts before serialization', () => {
+  it('preserves a small inline data: URL on a top-level file part and strips source.text.value', () => {
     const rawDataUrl = 'data:image/png;base64,wrapper-private-image';
+    const rawSourceText = 'wrapper private source text';
+
+    const frame = prepareIngestFrame({
+      streamEventType: 'kilocode',
+      data: {
+        event: 'message.part.updated',
+        type: 'message.part.updated',
+        part: {
+          type: 'file',
+          url: rawDataUrl,
+          source: { text: { value: rawSourceText } },
+        },
+      },
+      timestamp: '2026-04-14T08:00:00.000Z',
+    });
+
+    expect(frame.kind).toBe('send');
+    if (frame.kind !== 'send') return;
+    expect(frame.serialized).toContain(rawDataUrl);
+    expect(frame.serialized).not.toContain(rawSourceText);
+  });
+
+  it('strips a large inline data: URL from a top-level file part and strips source.text.value', () => {
+    const rawDataUrl = 'data:image/png;base64,' + 'x'.repeat(MAX_INLINE_FILE_URL_LENGTH);
     const rawSourceText = 'wrapper private source text';
 
     const frame = prepareIngestFrame({
@@ -73,6 +128,7 @@ describe('prepareIngestFrame', () => {
           part: {
             type: 'tool',
             id: 'part_1',
+            sessionID: 'sess_1',
             messageID: 'msg_1',
             state: {
               status: 'completed',
@@ -99,6 +155,7 @@ describe('prepareIngestFrame', () => {
     expect(sent.streamEventType).toBe('kilocode');
     const part = sent.data.properties.part;
     expect(part.id).toBe('part_1');
+    expect(part.sessionID).toBe('sess_1');
     expect(part.messageID).toBe('msg_1');
     expect(part.state.status).toBe('completed');
   });
@@ -135,6 +192,240 @@ describe('prepareIngestFrame', () => {
     expect(info.role).toBe('assistant');
     expect(info.parts).toBeUndefined();
   });
+
+  it.each([
+    [undefined, false],
+    [null, false],
+    ['', true],
+    [false, true],
+    [0, true],
+    [true, true],
+    [1, true],
+    [[], true],
+    [{}, true],
+    [{ message: '' }, true],
+    [{ data: {} }, true],
+    [{ data: { message: '' } }, true],
+    [
+      {
+        responseBody: 'poison-body',
+        headers: { authorization: 'poison-header' },
+        metadata: 'poison-metadata',
+      },
+      true,
+    ],
+    ...[
+      'ProviderAuthError',
+      'UnknownError',
+      'MessageOutputLengthError',
+      'MessageAbortedError',
+      'StructuredOutputError',
+      'ContextOverflowError',
+      'ContentFilterError',
+      'APIError',
+    ].map(name => [{ name, data: {} }, true] as const),
+  ] as const)(
+    'preserves non-null error presence through projection and compaction: %j',
+    (error, hasError) => {
+      const projected = projectSafeAssistantError(error);
+      expect(projected !== undefined).toBe(hasError);
+      const frame = prepareIngestFrame({
+        streamEventType: 'kilocode',
+        timestamp: '2026-04-14T08:00:00.000Z',
+        data: {
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: 'asst_presence',
+              role: 'assistant',
+              parentID: 'msg_parent',
+              error,
+              metadata: 'poison-metadata'.repeat(MAX_INGEST_EVENT_BYTES),
+            },
+          },
+        },
+      });
+      expect(frame.kind).toBe('send');
+      if (frame.kind !== 'send') return;
+      expect(frame.compacted).toBe(true);
+      expect(frame.serialized).not.toContain('poison');
+      const compactInfo = JSON.parse(frame.serialized).data.properties.info;
+      expect(compactInfo.error !== undefined && compactInfo.error !== null).toBe(hasError);
+      expect(compactInfo.error).toEqual(projected);
+      expect(isAssistantInterrupt(compactInfo.error)).toBe(isAssistantInterrupt(error));
+      if (!isAssistantInterrupt(error)) {
+        expect(classifyAssistantFailure(compactInfo.error)).toEqual(
+          classifyAssistantFailure(error)
+        );
+      }
+    }
+  );
+
+  it.each([
+    ['APIError', 'Payment required: insufficient credits'],
+    ['APIError', 'Unknown model'],
+    ['APIError', '[BYOK] Rate limit exceeded'],
+    ['APIError', 'Provider timeout'],
+    ['ProviderAuthError', '[BYOK] Provider authentication failed'],
+    ['APIError', 'Invalid request'],
+    ['APIError', 'Service unavailable'],
+    ['APIError', 'Unrecognized failure'],
+    ['ContextOverflowError', 'Unrecognized failure'],
+    ['MessageOutputLengthError', '[BYOK] Unrecognized failure'],
+    ['ContentFilterError', 'Unrecognized failure'],
+    ['StructuredOutputError', 'Unrecognized failure'],
+    ['UnknownError', 'Unrecognized failure'],
+    ['MessageAbortedError', 'aborted'],
+    ['MessageAbortedError', '[BYOK] aborted'],
+    ['FutureError', 'Unrecognized failure'],
+  ])(
+    'round-trips canonical error and interruption meaning through compaction for %s: %s',
+    (name, message) => {
+      const error = {
+        name,
+        data: {
+          message,
+          statusCode: 503,
+          isRetryable: false,
+          responseBody: 'poison-body'.repeat(MAX_INGEST_EVENT_BYTES),
+          responseHeaders: { authorization: 'poison-header' },
+          metadata: { url: 'https://poison.example' },
+        },
+      };
+      const safeError = projectSafeAssistantError(error);
+      for (const source of [error, safeError]) {
+        const info = {
+          id: 'asst_compacted',
+          parentID: 'msg_parent',
+          sessionID: 'session_root',
+          role: 'assistant',
+          modelID: 'vendor/model',
+          providerID: 'kilo',
+          error: source,
+          time: { created: 1, completed: 2 },
+          metadata: {
+            prompt: 'poison-prompt'.repeat(MAX_INGEST_EVENT_BYTES),
+            toolArguments: 'poison-arguments',
+          },
+        };
+        const frame = prepareIngestFrame({
+          streamEventType: 'kilocode',
+          timestamp: '2026-04-14T08:00:00.000Z',
+          data: { event: 'message.updated', properties: { info } },
+        });
+
+        expect(frame.kind).toBe('send');
+        if (frame.kind !== 'send') return;
+        expect(frame.compacted).toBe(true);
+        expect(frame.bytes).toBeLessThanOrEqual(MAX_INGEST_EVENT_BYTES);
+        expect(frame.serialized).not.toContain('poison');
+        const compactInfo = JSON.parse(frame.serialized).data.properties.info;
+        expect(compactInfo).toEqual({
+          id: info.id,
+          parentID: info.parentID,
+          sessionID: info.sessionID,
+          role: 'assistant',
+          time: info.time,
+          error: safeError,
+        });
+        expect(compactInfo.error).toBeTypeOf('string');
+        expect(isAssistantInterrupt(compactInfo.error)).toBe(isAssistantInterrupt(error));
+        expect(projectSafeAssistantError(compactInfo.error)).toBe(safeError);
+        if (!isAssistantInterrupt(error)) {
+          expect(classifyAssistantFailure(compactInfo.error)).toEqual(
+            classifyAssistantFailure(error)
+          );
+        }
+      }
+    }
+  );
+
+  it.each([400, 402, 403, 408])(
+    'preserves BYOK APIError %s ownership and cause through compaction',
+    statusCode => {
+      for (const marked of [false, true]) {
+        const gatewayMessage =
+          statusCode === 408
+            ? '[BYOK] Your provider rejected the request. Check your provider account and settings.'
+            : '[BYOK] Provider rejected the request: poison-message';
+        const error = {
+          name: 'APIError',
+          data: {
+            statusCode,
+            message: marked ? gatewayMessage : 'Opaque SDK failure: poison-message',
+            responseBody: JSON.stringify({
+              error: gatewayMessage,
+              error_type: 'byok_error',
+              message: gatewayMessage,
+            }),
+          },
+        };
+        const failure = classifyAssistantFailure(error);
+        if (statusCode === 408) {
+          expect(failure).toEqual({
+            reason: 'timeout',
+            providerOwnership: 'byok',
+            safeMessage: 'Assistant request timed out',
+          });
+        }
+        const frame = prepareIngestFrame({
+          streamEventType: 'kilocode',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          data: {
+            event: 'message.updated',
+            properties: {
+              info: {
+                id: 'asst_byok',
+                parentID: 'msg_parent',
+                role: 'assistant',
+                error,
+                metadata: 'poison-metadata'.repeat(MAX_INGEST_EVENT_BYTES),
+              },
+            },
+          },
+        });
+
+        expect(frame.kind).toBe('send');
+        if (frame.kind !== 'send') return;
+        expect(frame.compacted).toBe(true);
+        expect(frame.serialized).not.toContain('poison');
+        const compactError = JSON.parse(frame.serialized).data.properties.info.error;
+        expect(compactError).toBe(`[BYOK] ${failure.safeMessage}`);
+        expect(classifyAssistantFailure(compactError)).toEqual(failure);
+        expect(projectSafeAssistantError(compactError)).toBe(compactError);
+      }
+    }
+  );
+
+  it.each(['legacy error with poison-message', { metadata: 'poison-metadata' }])(
+    'preserves terminal error presence without SDK metadata for %j',
+    error => {
+      const frame = prepareIngestFrame({
+        streamEventType: 'kilocode',
+        timestamp: '2026-04-14T08:00:00.000Z',
+        data: {
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: 'asst_legacy',
+              role: 'assistant',
+              modelID: 'https://poison.example/model',
+              providerID: 'kilo',
+              error,
+              parts: ['poison-prompt'.repeat(MAX_INGEST_EVENT_BYTES)],
+            },
+          },
+        },
+      });
+      expect(frame.kind).toBe('send');
+      if (frame.kind !== 'send') return;
+      expect(frame.serialized).not.toContain('poison');
+      const info = JSON.parse(frame.serialized).data.properties.info;
+      expect(info.error).toBe('Assistant request failed');
+      expect(info).not.toHaveProperty('modelID');
+      expect(info).not.toHaveProperty('providerID');
+    }
+  );
 
   it('still sends a compact fatal event for a terminal error with huge diagnostics', () => {
     const event: IngestEvent = {
@@ -421,5 +712,285 @@ describe('IngestEventBuffer', () => {
         data: {},
       })
     ).toBe(false);
+  });
+});
+
+describe('slimPersistedKilocodeEvent', () => {
+  it('keeps cheap user message fields and drops summary diffs plus raw errors', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'msg_user',
+            sessionID: 'kilo_1',
+            role: 'user',
+            model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+            variant: 'high',
+            agent: 'code',
+            time: { created: 1 },
+            summary: { title: 'compact', diffs: [{ before: 'large diff' }] },
+            error: { data: { message: 'failed', responseBody: 'private' } },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_user',
+          sessionID: 'kilo_1',
+          role: 'user',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+          agent: 'code',
+          time: { created: 1 },
+          summary: { title: 'compact' },
+          error: 'Assistant request failed',
+        },
+      },
+    });
+  });
+
+  it('keeps cheap assistant identity fields', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'msg_asst',
+            sessionID: 'kilo_1',
+            role: 'assistant',
+            parentID: 'msg_user',
+            providerID: 'anthropic',
+            modelID: 'claude-sonnet-4',
+            agent: 'code',
+            variant: 'high',
+            time: { created: 1, completed: 2 },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_asst',
+          sessionID: 'kilo_1',
+          role: 'assistant',
+          parentID: 'msg_user',
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          agent: 'code',
+          variant: 'high',
+          time: { created: 1, completed: 2 },
+        },
+      },
+    });
+  });
+
+  it('keeps reasoning text and time while dropping patch, snapshot, and data URLs', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          sessionID: 'kilo_1',
+          part: {
+            type: 'reasoning',
+            id: 'part_1',
+            sessionID: 'kilo_1',
+            messageID: 'msg_asst',
+            text: 'thinking',
+            time: { start: 1 },
+            metadata: { diff: 'large' },
+            snapshot: { huge: true },
+            patch: 'large patch',
+            url: 'data:image/png;base64,abc',
+            source: { content: 'large source', text: { value: 'secret', start: 0, end: 1 } },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        sessionID: 'kilo_1',
+        part: {
+          type: 'reasoning',
+          id: 'part_1',
+          sessionID: 'kilo_1',
+          messageID: 'msg_asst',
+          text: 'thinking',
+          time: { start: 1 },
+          url: '',
+          source: { text: { value: '', start: 0, end: 1 } },
+        },
+      },
+    });
+  });
+
+  it('keeps trimmed tool input/output and drops tool metadata', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_tool',
+            messageID: 'msg_asst',
+            state: {
+              status: 'running',
+              input: { path: 'src/a.ts' },
+              output: 'ok',
+              metadata: { diff: 'large' },
+            },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_tool',
+          messageID: 'msg_asst',
+          state: {
+            status: 'running',
+            input: { path: 'src/a.ts' },
+            output: 'ok',
+          },
+        },
+      },
+    });
+  });
+
+  it('keeps task child-session linkage and routed model while dropping other tool metadata', () => {
+    const childSessionId = `ses_${'a'.repeat(26)}`;
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_task',
+            messageID: 'msg_asst',
+            tool: 'task',
+            state: {
+              status: 'running',
+              input: { description: 'Explore repo', subagent_type: 'explore' },
+              metadata: {
+                sessionId: childSessionId,
+                model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
+                diff: 'large',
+                snapshot: { huge: true },
+              },
+            },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_task',
+          messageID: 'msg_asst',
+          tool: 'task',
+          state: {
+            status: 'running',
+            input: { description: 'Explore repo', subagent_type: 'explore' },
+            metadata: {
+              sessionId: childSessionId,
+              model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it.each([
+    ['no linkage fields', { diff: 'large' }],
+    ['malformed session id', { sessionId: 42 }],
+    ['incomplete model only', { model: { providerID: 'kilo' } }],
+  ])('drops tool metadata that carries no usable child-session linkage (%s)', (_name, metadata) => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_task',
+            messageID: 'msg_asst',
+            tool: 'task',
+            state: { status: 'running', input: {}, metadata },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_task',
+          messageID: 'msg_asst',
+          tool: 'task',
+          state: { status: 'running', input: {} },
+        },
+      },
+    });
+  });
+
+  it('drops wrapper top-level info and part aliases from persist payload', () => {
+    const info = {
+      id: 'msg_user',
+      role: 'user',
+      model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+      summary: { diffs: [{ before: 'large diff' }] },
+      error: { data: { message: 'failed', responseBody: 'private' } },
+    };
+    const messageProperties = { info };
+    expect(
+      slimPersistedKilocodeEvent({
+        ...messageProperties,
+        event: 'message.updated',
+        type: 'message.updated',
+        properties: messageProperties,
+      })
+    ).toEqual({
+      event: 'message.updated',
+      type: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_user',
+          role: 'user',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          error: 'Assistant request failed',
+        },
+      },
+    });
+
+    const part = {
+      type: 'reasoning',
+      id: 'part_1',
+      text: 'thinking',
+      time: { start: 1 },
+      snapshot: { huge: true },
+      patch: 'large patch',
+    };
+    const partProperties = { sessionID: 'kilo_1', part };
+    expect(
+      slimPersistedKilocodeEvent({
+        ...partProperties,
+        event: 'message.part.updated',
+        type: 'message.part.updated',
+        properties: partProperties,
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      type: 'message.part.updated',
+      properties: {
+        sessionID: 'kilo_1',
+        part: { type: 'reasoning', id: 'part_1', text: 'thinking', time: { start: 1 } },
+      },
+    });
   });
 });

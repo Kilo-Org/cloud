@@ -56,12 +56,15 @@ describe('Cloud Agent session scope internal authentication', () => {
     expect(response.status).toBe(401);
   });
 
-  it('rejects a JWT-only request', async () => {
+  it('rejects a JWT-only request even with a trusted lineage marker', async () => {
     const response = await app.request(
       '/internal/cloud-agent/v1/session',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer valid-user-token' },
+        headers: {
+          Authorization: 'Bearer valid-user-token',
+          'X-Kilo-Trusted-Session-Lineage': '1',
+        },
       },
       env
     );

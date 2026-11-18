@@ -1,9 +1,11 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import {
+  cloud_agent_code_reviews,
   user_deletion_activity,
   user_deletion_audit_events,
   user_deletion_requests,
   user_deletion_steps,
+  webhook_events,
   type UserDeletionRequest,
   type UserDeletionStep,
 } from '@kilocode/db/schema';
@@ -14,36 +16,86 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { catalogForVersion, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_CATALOG_VERSION } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
+import {
+  deleteOwnedByUserIdPage,
+  OWNED_BY_USER_DELETE_PAGE_SIZE,
+} from '@/lib/user/owned-by-user-batch-delete';
+import type * as OwnedByUserBatchDelete from '@/lib/user/owned-by-user-batch-delete';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcomes';
 import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-runner';
 import { handleAnonymize } from '@/lib/user/deletion-queue/handlers/anonymize';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-
-jest.mock('@/lib/ai-gateway/abuse-service', () => ({
-  reportEvents: jest.fn(async () => undefined),
-}));
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import * as ClaudeProfileDeletion from '@/lib/claude-billing/delete';
 
 jest.mock('@/lib/user', () => ({
   anonymizeCloudUserData: jest.fn(async () => undefined),
 }));
 
-const reportEventsMock = jest.mocked(reportEvents);
+jest.mock('@/lib/claude-billing/delete', () => {
+  const actual = jest.requireActual<typeof ClaudeProfileDeletion>('@/lib/claude-billing/delete');
+  return { ...actual, deleteUserClaudeProfiles: jest.fn(actual.deleteUserClaudeProfiles) };
+});
+
+jest.mock('@/lib/user/owned-by-user-batch-delete', () => {
+  const actual = jest.requireActual(
+    '@/lib/user/owned-by-user-batch-delete'
+  ) as typeof OwnedByUserBatchDelete;
+  return {
+    ...actual,
+    deleteOwnedByUserIdPage: jest.fn(actual.deleteOwnedByUserIdPage),
+  };
+});
+
 const anonymizeCloudUserDataMock = jest.mocked(anonymizeCloudUserData);
+const deleteOwnedByUserIdPageMock = jest.mocked(deleteOwnedByUserIdPage);
 
 describe('handleAnonymize', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
-    reportEventsMock.mockClear();
     anonymizeCloudUserDataMock.mockClear();
+    jest
+      .mocked(ClaudeProfileDeletion.deleteUserClaudeProfiles)
+      .mockReset()
+      .mockImplementation(
+        jest.requireActual<typeof ClaudeProfileDeletion>('@/lib/claude-billing/delete')
+          .deleteUserClaudeProfiles
+      );
+    deleteOwnedByUserIdPageMock.mockReset();
+    deleteOwnedByUserIdPageMock.mockImplementation(
+      (jest.requireActual('@/lib/user/owned-by-user-batch-delete') as typeof OwnedByUserBatchDelete)
+        .deleteOwnedByUserIdPage
+    );
   });
+
+  it.each([true, false])(
+    'retains local data when remote profile cleanup fails (retryable=%s)',
+    async retryable => {
+      const { request, step, claimToken } = await prepareRunningAnonymize(
+        `profile-cleanup-${crypto.randomUUID()}@example.com`
+      );
+      jest
+        .mocked(ClaudeProfileDeletion.deleteUserClaudeProfiles)
+        .mockRejectedValueOnce(new ClaudeProfileDeletion.ClaudeProfileDeletionError(retryable));
+      const outcome = await handleAnonymize({
+        request,
+        step,
+        context: handlerContext(request.id, claimToken),
+      });
+      expect(outcome).toEqual({
+        kind: retryable ? 'retry' : 'needs_attention',
+        errorCode: 'claude_profile_cleanup_failed',
+      });
+      expect(deleteOwnedByUserIdPageMock).not.toHaveBeenCalled();
+      expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not mark the step terminal or write generic disposition evidence', async () => {
     const { request, step, claimToken } = await prepareRunningAnonymize(
@@ -75,7 +127,6 @@ describe('handleAnonymize', () => {
           event.event_type === UserDeletionAuditEventType.Anonymized
       )
     ).toBe(false);
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('does not emit user.deleted when the Cloud subject is authoritatively absent', async () => {
@@ -110,19 +161,80 @@ describe('handleAnonymize', () => {
 
     expect(outcome).toEqual({ kind: 'not_applicable', errorCode: 'authoritative_absence' });
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
+  });
+
+  it('commits webhook and code-review pages before returning succeeded', async () => {
+    const { user, request, step, claimToken } = await prepareRunningAnonymize(
+      `anon-drain-${crypto.randomUUID()}@example.com`
+    );
+    await insertWebhookEvents(user.id, 2);
+    await insertCodeReviews(user.id, 1);
+
+    const outcome = await handleAnonymize({
+      request,
+      step,
+      context: handlerContext(request.id, claimToken),
+    });
+
+    expect(outcome).toEqual({ kind: 'succeeded', progress: { processed_count: 3 } });
+    expect(await countOwnedWebhookEvents(user.id)).toBe(0);
+    expect(await countOwnedCodeReviews(user.id)).toBe(0);
+  });
+
+  it('returns continue after a committed page when the claim is out of time', async () => {
+    const { user, request, step, claimToken } = await prepareRunningAnonymize(
+      `anon-continue-${crypto.randomUUID()}@example.com`
+    );
+    await insertWebhookEvents(user.id, OWNED_BY_USER_DELETE_PAGE_SIZE + 1);
+    let remainingCalls = 0;
+    const context = {
+      ...handlerContext(request.id, claimToken),
+      remainingMs: () => {
+        remainingCalls += 1;
+        return remainingCalls >= 3 ? 5_000 : 60_000;
+      },
+    };
+
+    const outcome = await handleAnonymize({ request, step, context });
+
+    expect(outcome).toEqual({
+      kind: 'continue',
+      progress: { processed_count: OWNED_BY_USER_DELETE_PAGE_SIZE },
+    });
+    expect(await countOwnedWebhookEvents(user.id)).toBe(1);
+  });
+
+  it('retries with anonymize_page_timeout when a page hits statement timeout', async () => {
+    const { request, step, claimToken } = await prepareRunningAnonymize(
+      `anon-timeout-${crypto.randomUUID()}@example.com`
+    );
+    deleteOwnedByUserIdPageMock.mockRejectedValueOnce(
+      Object.assign(new Error('timeout'), { code: '57014' })
+    );
+
+    const outcome = await handleAnonymize({
+      request,
+      step,
+      context: handlerContext(request.id, claimToken),
+    });
+
+    expect(outcome).toEqual({
+      kind: 'retry',
+      errorCode: 'anonymize_page_timeout',
+      httpStatusClass: 'error',
+      progress: {},
+    });
   });
 });
 
 describe('anonymize shared persistence', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
-    reportEventsMock.mockClear();
     anonymizeCloudUserDataMock.mockClear();
   });
 
   it('commits the Cloud scrub, anonymized_at, terminal step, audits, and activity together', async () => {
-    const { user, request, claimToken } = await prepareRunningAnonymize(
+    const { request, claimToken } = await prepareRunningAnonymize(
       `anon-runner-${crypto.randomUUID()}@example.com`
     );
 
@@ -161,9 +273,6 @@ describe('anonymize shared persistence', () => {
       .from(user_deletion_activity)
       .where(eq(user_deletion_activity.request_id, request.id));
     expect(activities.some(event => event.event_type === 'succeeded')).toBe(true);
-    expect(reportEventsMock).toHaveBeenCalledWith({
-      events: [{ type: 'user.deleted', data: { kilo_user_id: user.id } }],
-    });
   });
 
   it('rolls back request writes when anonymizeCloudUserData throws', async () => {
@@ -193,7 +302,6 @@ describe('anonymize shared persistence', () => {
       .where(eq(user_deletion_steps.id, step.id));
     expect(updatedStep?.status).toBe(UserDeletionStepStatus.Running);
     expect(updatedStep?.claim_token).toBe(claimToken);
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('does not scrub or emit when the claim is lost', async () => {
@@ -211,7 +319,6 @@ describe('anonymize shared persistence', () => {
 
     expect(result).toEqual({ kind: 'stale_claim' });
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('records teardown_incomplete without scrubbing when teardown is no longer complete', async () => {
@@ -244,7 +351,6 @@ describe('anonymize shared persistence', () => {
       });
     }
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('does not emit user.deleted when replaying an already-terminal step', async () => {
@@ -259,7 +365,6 @@ describe('anonymize shared persistence', () => {
       handlerDeadlineAt: Date.now() + 60_000,
     });
     expect(first.kind).toBe('applied');
-    reportEventsMock.mockClear();
     anonymizeCloudUserDataMock.mockClear();
 
     const replay = await persistHandlerOutcome({
@@ -271,7 +376,6 @@ describe('anonymize shared persistence', () => {
     });
     expect(replay.kind).toBe('already_terminal');
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 });
 
@@ -346,4 +450,56 @@ async function prepareRunningAnonymize(userEmail: string) {
 
   const { request, step } = await loadRequestAndStep(enqueued.requestId);
   return { user, request, step, claimToken };
+}
+
+async function insertWebhookEvents(userId: string, count: number): Promise<void> {
+  await db.insert(webhook_events).values(
+    Array.from({ length: count }, (_, index) => ({
+      owned_by_user_id: userId,
+      platform: 'github',
+      event_type: 'push',
+      event_action: 'created',
+      payload: { index },
+      headers: {},
+      event_signature: `sig-${userId}-${index}-${crypto.randomUUID()}`,
+    }))
+  );
+}
+
+async function insertCodeReviews(userId: string, count: number): Promise<void> {
+  await db.insert(cloud_agent_code_reviews).values(
+    Array.from({ length: count }, (_, index) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        owned_by_user_id: userId,
+        repo_full_name: `anon-test/repo-${id}`,
+        pr_number: index + 1,
+        pr_url: `https://example.com/anon-test/repo-${id}/pull/${index + 1}`,
+        pr_title: 'Test PR',
+        pr_author: 'author',
+        base_ref: 'main',
+        head_ref: `feature-${id}`,
+        head_sha: id.replaceAll('-', ''),
+        platform: 'github' as const,
+        status: 'completed',
+      };
+    })
+  );
+}
+
+async function countOwnedWebhookEvents(userId: string): Promise<number> {
+  const rows = await db
+    .select({ id: webhook_events.id })
+    .from(webhook_events)
+    .where(eq(webhook_events.owned_by_user_id, userId));
+  return rows.length;
+}
+
+async function countOwnedCodeReviews(userId: string): Promise<number> {
+  const rows = await db
+    .select({ id: cloud_agent_code_reviews.id })
+    .from(cloud_agent_code_reviews)
+    .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+  return rows.length;
 }

@@ -1,23 +1,110 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree, and @testing-library/react-native cannot be transformed by the current vitest pipeline (react-native ships Flow). See src/test/render-with-providers.tsx. */
-import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- mounted route outcomes and Settings recovery share the native boundary harness. */
+import { createElement, type ReactElement, type ReactNode } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  buildGlanceableSnapshot,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import AgentSessionList, { buildGitHubInstallOutcomeAlert } from './index';
 import {
   getGitHubInstallReturnOutcome,
   setGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+} from '@/lib/glanceable/persist';
+import {
+  type GlanceableSink,
+  registerGlanceableSink,
+  unregisterGlanceableSink,
+} from '@/lib/glanceable/sink-registry';
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 const alertMock = vi.hoisted(() => vi.fn());
 const platformMock = vi.hoisted(() => ({ OS: 'ios' }));
-const mintInstallStateMock = vi.hoisted(() => vi.fn());
+const handoffUrlMock = vi.hoisted(() => vi.fn());
 const openAuthSessionMock = vi.hoisted(() => vi.fn());
 const openBrowserMock = vi.hoisted(() => vi.fn());
+const focusedRoute = vi.hoisted(() => ({ focused: true }));
+const appStateListeners = vi.hoisted(() => new Set<(state: string) => void>());
+const activityKit = vi.hoisted(() => ({ denied: false, available: false, settingsOpen: false }));
+// The widget press sweep pulls the widget layout, expo-widgets, and the
+// glanceable action chain (expo-crypto and friends) into the route. None of
+// that native boundary runs under the mounted renderer, so the sweep is mocked
+// at its module boundary like `@/glanceable-ios/ios-sink` above.
+const widgetActionsMock = vi.hoisted(() => ({ runPendingWidgetActions: vi.fn() }));
+// The account scope line and the Sessions | To-dos switch are built once by the
+// route and handed to whichever view renders, so capture both deliveries.
+const tabHeader = vi.hoisted(() => ({
+  sessions: undefined as ReactNode,
+  todos: undefined as ReactNode,
+  onChange: undefined as ((view: 'sessions' | 'todos') => void) | undefined,
+}));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
   Platform: platformMock,
+  View: 'View',
+  AppState: {
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      appStateListeners.add(listener);
+      return {
+        remove: () => {
+          appStateListeners.delete(listener);
+        },
+      };
+    },
+  },
+  Linking: {
+    openSettings: () => {
+      activityKit.settingsOpen = true;
+    },
+  },
+}));
+
+vi.mock('expo-router', async () => {
+  const { useEffect } = await import('react');
+  return {
+    useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+      const focused = focusedRoute.focused;
+      useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+    },
+  };
+});
+
+// `failIdentityReadOnce` fails the identity read alone. The master-switch read
+// runs first, and its own failure keeps the surfaces on rather than skipping
+// recovery, so a first-call rejection would not exercise the identity path.
+const storage = vi.hoisted(() => ({ failIdentityReadOnce: false }));
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn((key: string) => {
+    if (key !== ACTIVE_USER_ID_KEY) {
+      return null;
+    }
+    if (storage.failIdentityReadOnce) {
+      storage.failIdentityReadOnce = false;
+      throw new Error('storage unavailable');
+    }
+    return 'u1';
+  }),
+}));
+
+vi.mock('@/glanceable-ios/ios-sink', () => ({
+  getActivityKitDenied: () => activityKit.denied,
+  clearActivityKitDeniedIfAvailable: () => {
+    if (!activityKit.denied || !activityKit.available) {
+      return false;
+    }
+    activityKit.denied = false;
+    return true;
+  },
+}));
+
+vi.mock('@/glanceable-ios/widget-actions', () => ({
+  runPendingWidgetActions: widgetActionsMock.runPendingWidgetActions,
 }));
 
 vi.mock('expo-web-browser', () => ({
@@ -29,16 +116,29 @@ vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://web.test',
 }));
 
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: {
-    githubApps: {
-      mintInstallState: { mutate: mintInstallStateMock },
-    },
-  },
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: handoffUrlMock,
 }));
 
 vi.mock('@/components/agents/session-list-screen', () => ({
-  AgentSessionListScreen: () => null,
+  AgentSessionListScreen: (props: { tabHeader?: ReactNode }) => {
+    tabHeader.sessions = props.tabHeader;
+    return props.tabHeader === undefined ? null : (props.tabHeader as ReactElement);
+  },
+}));
+
+vi.mock('@/components/todos/agents-view-segment', () => ({
+  AgentsViewSegment: (props: { onChange?: (view: string) => void }) => {
+    tabHeader.onChange = props.onChange;
+    return null;
+  },
+}));
+
+vi.mock('@/components/todos/todo-lists-screen', () => ({
+  TodoListsScreen: (props: { tabHeader?: ReactNode }) => {
+    tabHeader.todos = props.tabHeader;
+    return props.tabHeader === undefined ? null : (props.tabHeader as ReactElement);
+  },
 }));
 
 type AlertButton = { text: string; onPress?: () => void };
@@ -105,6 +205,8 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       'install_state_user_mismatch',
       'not_installation_admin',
       'installation_already_claimed',
+      'installation_unavailable',
+      'multiple_installations_disabled',
     ] as const) {
       const alert = buildGitHubInstallOutcomeAlert({ kind: 'error', code }, () => undefined);
       expect(alert?.buttons).toEqual([{ text: 'Back' }]);
@@ -122,14 +224,32 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
         () => undefined
       )?.title
     ).toBe('Cannot complete installation');
+    expect(
+      buildGitHubInstallOutcomeAlert(
+        { kind: 'error', code: 'installation_unavailable' },
+        () => undefined
+      )?.message
+    ).toBe(
+      'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.'
+    );
+    expect(
+      buildGitHubInstallOutcomeAlert(
+        { kind: 'error', code: 'multiple_installations_disabled' },
+        () => undefined
+      )
+    ).toEqual({
+      title: 'Cannot complete installation',
+      message: 'This Kilo organization can currently connect only one GitHub organization.',
+      buttons: [{ text: 'Back' }],
+    });
   });
 });
 
 describe('Agents tab return-outcome rendering', () => {
   beforeEach(() => {
     alertMock.mockReset();
-    mintInstallStateMock.mockReset();
-    mintInstallStateMock.mockResolvedValue({ token: 'fresh-token' });
+    handoffUrlMock.mockReset();
+    handoffUrlMock.mockResolvedValue('https://web.test/app-shell/handoff?token=fresh-token');
     openAuthSessionMock.mockReset();
     openAuthSessionMock.mockResolvedValue(undefined);
     openBrowserMock.mockReset();
@@ -154,7 +274,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'GitHub App installed',
       'Your repositories are now connected.',
-      [{ text: 'Continue' }]
+      [{ text: 'Continue' }],
+      { cancelable: true }
     );
     expect(getGitHubInstallReturnOutcome()).toBeNull();
     act(() => {
@@ -174,9 +295,9 @@ describe('Agents tab return-outcome rendering', () => {
     });
     await flushMicrotasks();
 
-    expect(mintInstallStateMock).toHaveBeenCalledWith({ returnTo: '/cloud/sessions' });
+    expect(handoffUrlMock).toHaveBeenCalledWith({ page: 'github-app' });
     expect(openAuthSessionMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     expect(openBrowserMock).not.toHaveBeenCalled();
     act(() => {
@@ -200,12 +321,12 @@ describe('Agents tab return-outcome rendering', () => {
     });
     await flushMicrotasks();
 
-    expect(mintInstallStateMock).toHaveBeenCalledWith({
+    expect(handoffUrlMock).toHaveBeenCalledWith({
+      page: 'github-app',
       organizationId: 'org-123',
-      returnTo: '/cloud/sessions',
     });
     expect(openAuthSessionMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?organizationId=org-123&installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     act(() => {
       renderer.unmount();
@@ -216,7 +337,7 @@ describe('Agents tab return-outcome rendering', () => {
     setGitHubInstallReturnOutcome({ kind: 'error', code: 'installation_failed' });
     const renderer = mountRoute();
 
-    mintInstallStateMock.mockRejectedValueOnce(new Error('network'));
+    handoffUrlMock.mockRejectedValueOnce(new Error('network'));
     const tryAgain = lastAlertButtons()?.find(button => button.text === 'Try again');
     act(() => {
       tryAgain?.onPress?.();
@@ -232,9 +353,9 @@ describe('Agents tab return-outcome rendering', () => {
       failureButtons?.[0]?.onPress?.();
     });
     await flushMicrotasks();
-    expect(mintInstallStateMock).toHaveBeenCalledTimes(2);
+    expect(handoffUrlMock).toHaveBeenCalledTimes(2);
     expect(openAuthSessionMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     act(() => {
       renderer.unmount();
@@ -249,7 +370,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'Awaiting admin approval',
       'An organization admin must approve the installation request.',
-      [{ text: 'Done' }]
+      [{ text: 'Done' }],
+      { cancelable: true }
     );
     expect(getGitHubInstallReturnOutcome()).toBeNull();
     act(() => {
@@ -265,7 +387,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'Cannot complete installation',
       'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
-      [{ text: 'Back' }]
+      [{ text: 'Back' }],
+      { cancelable: true }
     );
     const backButton = lastAlertButtons()?.[0];
     expect(backButton?.text).toBe('Back');
@@ -289,9 +412,176 @@ describe('Agents tab return-outcome rendering', () => {
     await flushMicrotasks();
 
     expect(openBrowserMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     expect(openAuthSessionMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('Agents tab header', () => {
+  beforeEach(() => {
+    tabHeader.sessions = undefined;
+    tabHeader.todos = undefined;
+    tabHeader.onChange = undefined;
+  });
+
+  it('gives both views the same lightweight view switch', () => {
+    const renderer = mountRoute();
+
+    expect(tabHeader.sessions).toBeDefined();
+    expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
+
+    act(() => {
+      tabHeader.onChange?.('todos');
+    });
+    expect(tabHeader.todos).toBeDefined();
+    expect((tabHeader.todos as ReactElement<{ value: string }>).props.value).toBe('todos');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('Agents ActivityKit Settings recovery', () => {
+  const surface: { activity: GlanceableAgentsSnapshot | null } = { activity: null };
+  const sink: GlanceableSink = {
+    publish: () => undefined,
+    endImmediate() {
+      surface.activity = null;
+    },
+    startOrUpdate(snapshot) {
+      surface.activity = snapshot;
+    },
+  };
+  const snapshot = buildGlanceableSnapshot({
+    sessions: [{ status: 'busy' }, { status: 'question' }],
+    userId: 'u1',
+    organizationId: null,
+    now: 1_750_000_000_000,
+  });
+
+  beforeEach(() => {
+    alertMock.mockClear();
+    platformMock.OS = 'ios';
+    focusedRoute.focused = true;
+    activityKit.denied = false;
+    activityKit.available = false;
+    activityKit.settingsOpen = false;
+    surface.activity = null;
+    appStateListeners.clear();
+    setGitHubInstallReturnOutcome(null);
+    _resetGlanceablePersistForTests();
+    _setLastGlanceableSnapshotForTests(snapshot);
+    registerGlanceableSink(sink);
+  });
+
+  afterEach(() => {
+    unregisterGlanceableSink(sink);
+    storage.failIdentityReadOnce = false;
+  });
+
+  function changeAppState(state: string) {
+    act(() => {
+      for (const listener of appStateListeners) {
+        listener(state);
+      }
+    });
+  }
+
+  it('recovers on direct Settings return without refocusing, and never alerts', async () => {
+    activityKit.denied = true;
+    const renderer = mountRoute();
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+    // This screen used to alert on every cold launch, asking the user to undo a
+    // choice they had just made. The state now lives on the notifications
+    // screen, where they went to set it.
+    expect(alertMock).not.toHaveBeenCalled();
+
+    changeAppState('background');
+    changeAppState('active');
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+
+    changeAppState('background');
+    activityKit.available = true;
+    changeAppState('inactive');
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+    changeAppState('active');
+    await flushMicrotasks();
+
+    expect(surface.activity).toEqual(snapshot);
+    expect(alertMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('retries the same snapshot after a failed Settings-return identity read', async () => {
+    activityKit.denied = true;
+    const renderer = mountRoute();
+    await flushMicrotasks();
+    alertMock.mockClear();
+
+    changeAppState('background');
+    activityKit.available = true;
+    storage.failIdentityReadOnce = true;
+    changeAppState('active');
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+
+    changeAppState('background');
+    changeAppState('active');
+    await flushMicrotasks();
+
+    expect(surface.activity).toEqual(snapshot);
+    expect(alertMock.mock.calls).toHaveLength(0);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each(['blur', 'unmount'])('stops foreground recovery after route %s', async transition => {
+    const renderer = mountRoute();
+    if (transition === 'blur') {
+      focusedRoute.focused = false;
+      act(() => {
+        renderer.update(createElement(AgentSessionList));
+      });
+    } else {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+    activityKit.denied = true;
+    activityKit.available = true;
+    changeAppState('active');
+    await flushMicrotasks();
+
+    expect(surface.activity).toBeNull();
+    expect(appStateListeners.size).toBe(0);
+    if (transition === 'blur') {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  });
+
+  it('sweeps a pending widget press on focus and on every foreground', async () => {
+    widgetActionsMock.runPendingWidgetActions.mockClear();
+    const renderer = mountRoute();
+    await flushMicrotasks();
+    expect(widgetActionsMock.runPendingWidgetActions).toHaveBeenCalledTimes(1);
+
+    changeAppState('background');
+    changeAppState('active');
+    await flushMicrotasks();
+    expect(widgetActionsMock.runPendingWidgetActions).toHaveBeenCalledTimes(2);
     act(() => {
       renderer.unmount();
     });

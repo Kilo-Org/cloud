@@ -7,10 +7,16 @@ const mockGetIntegrationForOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration | null>>();
 const mockGetIntegrationForOwner =
   jest.fn<(owner: Owner, platform: string) => Promise<PlatformIntegration | null>>();
+const mockGetPrimaryGitHubIntegrationForOrganization =
+  jest.fn<(organizationId: string) => Promise<PlatformIntegration | null>>();
 const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
+const mockGetIntegrationsByOrganization =
+  jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration[]>>();
 const mockFetchGitHubRepositories =
-  jest.fn<(installationId: string, appType: string) => Promise<unknown[]>>();
+  jest.fn<
+    (installationId: string, appType: string, expectedIntegrationId?: string) => Promise<unknown[]>
+  >();
 const mockGenerateGitHubInstallationToken =
   jest.fn<(installationId: string, appType: string) => Promise<{ token: string }>>();
 const mockCheckExistingFork =
@@ -27,6 +33,8 @@ const mockCheckExistingFork =
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOrganization: mockGetIntegrationForOrganization,
   getIntegrationForOwner: mockGetIntegrationForOwner,
+  getPrimaryGitHubIntegrationForOrganization: mockGetPrimaryGitHubIntegrationForOrganization,
+  getIntegrationsByOrganization: mockGetIntegrationsByOrganization,
   updateRepositoriesForIntegration: mockUpdateRepositoriesForIntegration,
 }));
 
@@ -72,9 +80,29 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'repo', fullName: 'org/repo', private: false },
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'org/repo',
+          private: false,
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
+        },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('returns a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: [] }));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('user-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
     it('returns integrationInstalled false when no integration exists', async () => {
@@ -101,6 +129,7 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(false);
       expect(result.repositories).toEqual([]);
+      expect(result.errorMessage).toBe('GitHub integration is suspended');
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
 
@@ -130,6 +159,26 @@ describe('github-integration-helpers', () => {
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
+    it('does not return cached repositories for a locally disconnected integration', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildIntegration({
+          github_disconnected_at: '2026-09-04T00:00:00.000Z',
+          integration_status: 'suspended',
+          suspended_at: '2026-09-04T00:00:00.000Z',
+        })
+      );
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('user-123');
+
+      expect(result).toMatchObject({
+        integrationInstalled: false,
+        repositories: [],
+        errorMessage: 'GitHub integration is disconnected',
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
     it('fetches fresh repositories when forceRefresh is true', async () => {
       mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
       mockFetchGitHubRepositories.mockResolvedValue([
@@ -141,7 +190,15 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 2, name: 'fresh', fullName: 'org/fresh', private: true },
+        {
+          id: 2,
+          name: 'fresh',
+          fullName: 'org/fresh',
+          private: true,
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
+        },
       ]);
       expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
         { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
@@ -149,62 +206,356 @@ describe('github-integration-helpers', () => {
     });
   });
 
-  describe('fetchGitHubRepositoriesForOrganization', () => {
+  describe('fetchAllGitHubRepositoriesForOrganization', () => {
     it('returns cached repositories for an active integration', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue(buildIntegration());
+      mockGetIntegrationsByOrganization.mockResolvedValue([buildIntegration()]);
 
-      const { fetchGitHubRepositoriesForOrganization } =
+      const { fetchAllGitHubRepositoriesForOrganization } =
         await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'repo', fullName: 'org/repo', private: false },
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'org/repo',
+          private: false,
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
+        },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
 
-    it('returns integrationInstalled false when no integration exists', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue(null);
+    it('returns a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([buildIntegration({ repositories: [] })]);
 
-      const { fetchGitHubRepositoriesForOrganization } =
+      const { fetchAllGitHubRepositoriesForOrganization } =
         await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
 
-      expect(result.integrationInstalled).toBe(false);
+      expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
-    it('returns no repositories when the integration is suspended', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue(
+    it('preserves installation provenance across multiple GitHub organizations', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_account_login: 'acme-core',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme-security',
+          repositories: [
+            { id: 2, name: 'scanner', full_name: 'acme-security/scanner', private: true },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: 'acme-core',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-security/scanner',
+          platformIntegrationId: 'integration-2',
+          platformAccountLogin: 'acme-security',
+        }),
+      ]);
+    });
+
+    it('preserves both association choices when two installations expose one repository', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_account_login: 'acme-core',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme-labs',
+          repositories: [
+            { id: 3, name: 'scanner', full_name: 'acme-labs/scanner', private: true },
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-labs/scanner',
+          platformIntegrationId: 'integration-2',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-2',
+        }),
+      ]);
+    });
+
+    it('drops exact duplicate entries within a single installation without touching cross-installation duplicates', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_account_login: 'acme-core',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            // Duplicate entry within the same installation's own cached list
+            // (for example, a corrupted or duplicated cache) should collapse.
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme-labs',
+          repositories: [
+            // Same repository as integration-1's "shared" repo, granted through
+            // a different installation: this association is kept, not deduped.
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          id: 1,
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          id: 2,
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          id: 2,
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-2',
+        }),
+      ]);
+    });
+
+    it('returns repositories from healthy installations when a sibling fetch fails', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.partial).toBe(true);
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+      ]);
+    });
+
+    it('reports the suspended reason when a suspended installation is the only one', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({
           integration_status: 'suspended',
           suspended_at: '2026-06-25 18:00:00+00',
-          suspended_by: 'someone',
-        })
-      );
+          suspended_by: 'github_deleted',
+        }),
+      ]);
 
-      const { fetchGitHubRepositoriesForOrganization } =
+      const { fetchAllGitHubRepositoriesForOrganization } =
         await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
 
-      expect(result.integrationInstalled).toBe(false);
-      expect(result.repositories).toEqual([]);
+      expect(result).toEqual({
+        integrationInstalled: false,
+        repositories: [],
+        syncedAt: null,
+        errorMessage: 'GitHub integration is suspended',
+        unavailableReason: 'suspended',
+      });
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
 
-    it('does not refresh repositories for a suspended integration even with forceRefresh', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue(
-        buildIntegration({ integration_status: 'suspended' })
-      );
+    it('reports the reauthorization reason when every installation is auth-invalid', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ auth_invalid_at: '2026-06-25 18:00:00+00' }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          auth_invalid_at: '2026-06-25 18:00:00+00',
+        }),
+      ]);
 
-      const { fetchGitHubRepositoriesForOrganization } =
+      const { fetchAllGitHubRepositoriesForOrganization } =
         await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123', true);
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result).toMatchObject({
+        integrationInstalled: false,
+        errorMessage: 'GitHub integration requires reauthorization',
+        unavailableReason: 'reauth_required',
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('reports only the reachable repositories and flags the list as partial when an installation is suspended', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.partial).toBe(true);
+      expect(result.unavailableReason).toBeUndefined();
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+      ]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('keeps the retry affordance when a rejected read sits beside an unusable installation', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
 
       expect(result.integrationInstalled).toBe(false);
+      expect(result.unavailableReason).toBe('suspended');
+      // The sibling's read can clear on retry, so the list is not settled.
+      expect(result.partial).toBe(true);
+    });
+
+    it('treats an installation without a platform installation id as unavailable', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ platform_installation_id: null }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result).toEqual({
+        integrationInstalled: false,
+        repositories: [],
+        syncedAt: null,
+        errorMessage: 'GitHub integration is not properly configured',
+        unavailableReason: 'not_configured',
+      });
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('reports configured repositories from one installation while another lacks an installation id', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+        }),
+        buildIntegration({ id: 'integration-2', platform_installation_id: null }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.partial).toBe(true);
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+      ]);
+    });
+
+    it('fails when no installation can provide repositories', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ repositories: null }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+
+      await expect(fetchAllGitHubRepositoriesForOrganization('org-123')).rejects.toThrow(
+        'Failed to fetch GitHub repositories'
+      );
     });
   });
 });

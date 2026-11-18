@@ -4,8 +4,8 @@ import type Stripe from 'stripe';
 import { and, eq, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 
-import { db } from '@/lib/drizzle';
-import { client as stripe } from '@/lib/stripe-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import {
   classifyKiloClawCommitInvoice,
   deriveKiloClawCommitFinalBoundary,
@@ -18,8 +18,8 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
-import { getStripePriceIdForClawPlan } from '@/lib/kiloclaw/stripe-price-ids.server';
-import { sentryLogger } from '@/lib/utils.server';
+import { getStripePriceIdForClawPlan } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const RETIREMENT_ACTOR = { actorType: 'system', actorId: 'kiloclaw-commit-retirement' } as const;
 const logWarning = sentryLogger('kiloclaw-commit-retirement', 'warning');

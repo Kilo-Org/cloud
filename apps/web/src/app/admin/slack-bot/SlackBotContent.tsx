@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -533,7 +535,7 @@ export function SlackBotContent() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-slack-bot-stats'],
     queryFn: async () => {
-      const response = await fetch('/admin/api/slack-bot/stats');
+      const response = await adminFetch('/admin/api/slack-bot/stats');
 
       if (!response.ok) {
         throw new Error('Failed to fetch Slack bot statistics');

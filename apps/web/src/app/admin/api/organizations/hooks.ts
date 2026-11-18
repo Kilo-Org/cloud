@@ -1,9 +1,9 @@
 import type { OrganizationSortableField } from '@/types/admin';
-import type { PageSize } from '@/types/pagination';
+import type { PageSize } from '@kilocode/web-shared/types/pagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useInvalidateAllOrganizationData } from '@/app/api/organizations/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { StripeSubscriptionStatusValue } from '@/lib/admin/stripe-subscription-statuses';
 import { useEffect } from 'react';
 
@@ -121,6 +121,16 @@ export function useOrganizationsList(params: UseOrganizationsListParams) {
   );
 }
 
+export function useSearchParentMembers(organizationId: string, search: string, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.searchParentMembers.queryOptions(
+      { organizationId, search },
+      { enabled: enabled && search.trim().length > 0 }
+    )
+  );
+}
+
 export function useAddMember(organizationId: string) {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
@@ -134,12 +144,15 @@ export function useAddMember(organizationId: string) {
   );
 }
 
-export function useAdminOrganizationDetails(organizationId: string) {
+export function useAdminOrganizationDetails(organizationId: string, enabled = true) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.organizations.admin.getDetails.queryOptions({
-      organizationId,
-    })
+    trpc.organizations.admin.getDetails.queryOptions(
+      {
+        organizationId,
+      },
+      { enabled }
+    )
   );
 }
 
@@ -148,6 +161,36 @@ export function useAdminOrganizationKiloPassSummary(organizationId: string) {
   return useQuery(
     trpc.organizations.admin.getKiloPassSummary.queryOptions({
       organizationId,
+    })
+  );
+}
+
+export function useAdminOrganizationServiceFeeExemption(organizationId: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.getServiceFeeExemption.queryOptions({
+      organizationId,
+    })
+  );
+}
+
+export function useSetOrganizationServiceFeeExemption() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.admin.setServiceFeeExemption.mutationOptions({
+      onSuccess: (_data, variables) => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getServiceFeeExemption.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getDetails.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
+      },
     })
   );
 }

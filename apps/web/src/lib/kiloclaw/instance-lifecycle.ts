@@ -2,14 +2,14 @@ import 'server-only';
 
 import { eq, and, isNull, inArray } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
 } from '@kilocode/db/schema';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';

@@ -16,6 +16,12 @@ type PrReviewFilesTabProps = {
  * Files tab: hosts the S6b diff file list (a virtualized FlashList, so the
  * screen renders this outside its Overview ScrollView). S6c layers the file
  * navigator sheet and the tablet unified/side-by-side toggle on top of this.
+ *
+ * Provider-agnostic (s5): the identity below is the GitHub-shaped triple the
+ * list and its stores are written against, while the list's own queries
+ * (`usePrReviewFileListQuery`, `usePrDiffContextLoader`) resolve the real
+ * `ProviderPrRef` from the provider scope, so the same list renders GitLab
+ * and Bitbucket diffs without a per-provider copy of this tree.
  */
 export function PrReviewFilesTab({
   owner,

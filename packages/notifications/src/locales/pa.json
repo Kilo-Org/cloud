@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ਤੁਹਾਡੇ ਏਜੰਟ ਸੈਸ਼ਨ ਵਿੱਚ ਇੱਕ ਅੱਪਡੇਟ ਹੈ",
+      "lowBalance": "ਤੁਹਾਡੇ ਬੈਲੰਸ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+      "spendAlert": "ਤੁਹਾਡੇ ਖਰਚ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+      "securityFinding": "ਇੱਕ ਸੁਰੱਖਿਆ ਲੱਭਤ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+      "securityUpdate": "ਇੱਕ ਸੁਰੱਖਿਆ ਜਾਂਚ ਵਿੱਚ ਇੱਕ ਅੱਪਡੇਟ ਹੈ",
+      "activeAgentsGlanceable": "ਸਰਗਰਮ ਏਜੰਟਾਂ ਵਿੱਚ ਇੱਕ ਅੱਪਡੇਟ ਹੈ"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ਘੱਟ ਬੈਲੰਸ ਚੇਤਾਵਨੀ",
+      "body": "{{organizationName}} ਬੈਲੰਸ ${{minimumBalanceUsd}} ਤੋਂ ਹੇਠਾਂ ਆ ਗਿਆ"
+    },
+    "spendAlert": {
+      "title": "ਖਰਚ ਚੇਤਾਵਨੀ",
+      "body": "{{scopeName}} ਦਾ ਖਰਚ ${{amountUsd}} ਤੋਂ ਵੱਧ ਗਿਆ"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}} ਵਿੱਚ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "ਨਵੀਂ ਸੁਰੱਖਿਆ ਲੱਭਤ ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ਚੇਤਾਵਨੀ"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ਉਲੰਘਣਾ"
+    }
+  },
+  "sessionReady": {
+    "body": "ਤੁਹਾਡਾ Kilo ਸੈਸ਼ਨ ਤੁਹਾਡੇ ਫ਼ੋਨ ਤੋਂ ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ ਹੈ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

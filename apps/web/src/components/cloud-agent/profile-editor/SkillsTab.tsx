@@ -1,34 +1,35 @@
 /** Skills tab for the profile editor. */
 'use client';
 
-import { useState, type DragEvent } from 'react';
+import { useState, type DragEvent, type FormEvent } from 'react';
 import { toast } from 'sonner';
-import { unzipSync, strFromU8 } from 'fflate';
-import { Loader2, Plus, Sparkles, Upload, FileText, X, Pencil } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Upload, FileText, X, Pencil, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
+import { parseSkillsShSource } from '@kilocode/cloud-agent-profile/skills-sh';
 import { useProfileMutations, type ProfileSkill } from '@/hooks/useCloudAgentProfiles';
 import { cn } from '@/lib/utils';
+import { extractSkillZip, MAX_COMPANION_FILES, parseSkillFrontmatter } from './skill-archive';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
-const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
-
-// Keep in sync with apps/web/src/lib/agent/profile-skills-service.ts limits.
-const MAX_SKILL_MARKDOWN_LENGTH = 100_000;
-const MAX_COMPANION_FILES = 40;
-const MAX_COMPANION_FILE_SIZE = 100_000;
-const MAX_COMPANION_FILES_TOTAL = 500_000;
-const MAX_PATH_LENGTH = 200;
+const SKILLS_SH_DIRECTORY_URL = 'https://skills.sh';
+const SKILLS_SH_EXAMPLE = 'anthropics/skills@frontend-design';
+const SKILLS_SH_SOURCE_ERROR =
+  'Enter a skills.sh reference such as owner/repo@skill or https://skills.sh/owner/repo/skill.';
+const SKILLS_SH_SUBMIT_ERROR = 'Could not add skill. Check the skills.sh reference and try again.';
 
 type Props = {
   profileId: string;
   organizationId: string | undefined;
   skills: ProfileSkill[];
+  readOnly?: boolean;
 };
 
-export function SkillsTab({ profileId, organizationId, skills }: Props) {
+export function SkillsTab({ profileId, organizationId, skills, readOnly = false }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dragDepth, setDragDepth] = useState(0);
@@ -92,20 +93,20 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
         isDragging && 'border-primary bg-primary/5 border-2 border-dashed'
       )}
       onDragEnter={event => {
-        if (!dragHasZip(event)) return;
+        if (readOnly || !dragHasZip(event)) return;
         event.preventDefault();
         setDragDepth(d => d + 1);
       }}
       onDragLeave={() => setDragDepth(d => Math.max(0, d - 1))}
       onDragOver={event => {
-        if (!dragHasZip(event)) return;
+        if (readOnly || !dragHasZip(event)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'copy';
       }}
-      onDrop={handleDrop}
+      onDrop={readOnly ? undefined : handleDrop}
     >
       {skills.map(skill =>
-        editingId === skill.id ? (
+        editingId === skill.id && skill.sourceType !== 'skills-sh' ? (
           <SkillForm
             key={skill.id}
             mode="edit"
@@ -120,6 +121,7 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
             skill={skill}
             profileId={profileId}
             organizationId={organizationId}
+            readOnly={readOnly}
             onEdit={() => {
               setEditingId(skill.id);
               setIsAdding(false);
@@ -127,6 +129,16 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
           />
         )
       )}
+
+      {skills.length === 0 && !isAdding && !importing && (
+        <p className="text-muted-foreground py-2 text-center text-sm">
+          {readOnly
+            ? 'No skills yet.'
+            : 'No skills yet. Add one from skills.sh below, or drop a skill folder .zip here.'}
+        </p>
+      )}
+
+      {!readOnly && <SkillsShForm profileId={profileId} organizationId={organizationId} />}
 
       {isAdding ? (
         <SkillForm
@@ -136,29 +148,27 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
           onDone={() => setIsAdding(false)}
         />
       ) : (
-        <Button
-          variant="outline"
-          className="h-11 w-full border-dashed"
-          onClick={() => {
-            setIsAdding(true);
-            setEditingId(null);
-          }}
-          disabled={importing}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add skill manually (or drop a .zip)
-        </Button>
+        !readOnly && (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-dashed"
+            onClick={() => {
+              setIsAdding(true);
+              setEditingId(null);
+            }}
+            disabled={importing}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add skill manually (or drop a .zip)
+          </Button>
+        )
       )}
 
-      <p className="text-muted-foreground text-center text-xs">
-        Drag and drop a skill folder{' '}
-        <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a new
-        skill. Up to {MAX_COMPANION_FILES} companion files per skill.
-      </p>
-
-      {skills.length === 0 && !isAdding && !importing && (
-        <p className="text-muted-foreground py-2 text-center text-sm">
-          No skills yet. Drop a skill folder .zip here to add one.
+      {!readOnly && (
+        <p className="text-muted-foreground text-center text-xs">
+          Drag and drop a skill folder{' '}
+          <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a
+          new skill. Up to {MAX_COMPANION_FILES} companion files per skill.
         </p>
       )}
 
@@ -208,33 +218,55 @@ function SkillRow({
   skill,
   profileId,
   organizationId,
+  readOnly = false,
   onEdit,
 }: {
   skill: ProfileSkill;
   profileId: string;
   organizationId: string | undefined;
+  readOnly?: boolean;
   onEdit: () => void;
 }) {
-  const { deleteSkill } = useProfileMutations({ organizationId });
+  const { deleteSkill, setSkillEnabled } = useProfileMutations({ organizationId });
   const [deleting, setDeleting] = useState(false);
+  const isSkillsSh = skill.sourceType === 'skills-sh';
+  const skillsShSource = isSkillsSh ? formatSkillsShSource(skill.sourceUrl) : null;
 
   const fileCount = Object.keys(skill.files ?? {}).length;
   const companionBytes = Object.values(skill.files ?? {}).reduce((sum, c) => sum + c.length, 0);
   const totalBytes = skill.rawMarkdown.length + companionBytes;
   const sizeKb = (totalBytes / 1024).toFixed(1);
 
+  const handleToggleEnabled = async (enabled: boolean) => {
+    try {
+      await setSkillEnabled.mutateAsync({
+        profileId,
+        organizationId,
+        skillId: skill.id,
+        enabled,
+      });
+    } catch (error) {
+      console.error('Failed to update skill:', error);
+      toast.error('Failed to update skill');
+    }
+  };
+
   return (
     <div className="hover:bg-accent/50 rounded-lg border p-3 transition-colors">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Sparkles className="text-muted-foreground h-4 w-4" />
-            <code className="bg-muted rounded px-2 py-0.5 font-mono text-sm">{skill.name}</code>
+            <code className="bg-muted max-w-full truncate rounded px-2 py-0.5 font-mono text-sm">
+              {skill.name}
+            </code>
             <span className="text-muted-foreground text-xs uppercase tracking-wide">
-              {skill.sourceType}
+              {isSkillsSh ? 'skills.sh' : skill.sourceType}
             </span>
-            <span className="text-muted-foreground text-xs">{sizeKb} KB</span>
-            {fileCount > 0 && (
+            <span className="text-muted-foreground text-xs">
+              {isSkillsSh ? 'Installed during container setup' : `${sizeKb} KB`}
+            </span>
+            {!isSkillsSh && fileCount > 0 && (
               <span className="text-muted-foreground text-xs">
                 +{fileCount} file{fileCount === 1 ? '' : 's'}
               </span>
@@ -243,185 +275,177 @@ function SkillRow({
           {skill.description && (
             <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{skill.description}</p>
           )}
+          {skillsShSource && skill.sourceUrl && (
+            <a
+              href={skill.sourceUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-primary mt-1 inline-flex max-w-full items-center gap-1 text-xs hover:underline"
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" />
+              <span className="min-w-0 truncate">{skillsShSource}</span>
+            </a>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7"
-            onClick={onEdit}
-            disabled={deleting}
-            aria-label="Edit skill"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <InlineDeleteConfirmation
-            onDelete={async () => {
-              setDeleting(true);
-              try {
-                await deleteSkill.mutateAsync({
-                  profileId,
-                  organizationId,
-                  skillId: skill.id,
-                });
-                toast.success(`Skill "${skill.name}" deleted`);
-              } catch (error) {
-                console.error('Failed to delete skill:', error);
-                toast.error('Failed to delete skill');
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            isLoading={deleting}
-          />
+          <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs">
+            <span>{skill.enabled ? 'Enabled' : 'Disabled'}</span>
+            <Switch
+              checked={skill.enabled}
+              onCheckedChange={enabled => {
+                void handleToggleEnabled(enabled);
+              }}
+              disabled={readOnly || deleting || setSkillEnabled.isPending}
+              aria-label={`${skill.enabled ? 'Disable' : 'Enable'} skill ${skill.name}`}
+            />
+          </label>
+          {!readOnly && (
+            <>
+              {!isSkillsSh && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7"
+                  onClick={onEdit}
+                  disabled={deleting || setSkillEnabled.isPending}
+                  aria-label={`Edit skill ${skill.name}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <InlineDeleteConfirmation
+                onDelete={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteSkill.mutateAsync({
+                      profileId,
+                      organizationId,
+                      skillId: skill.id,
+                    });
+                    toast.success(`Skill "${skill.name}" deleted`);
+                  } catch (error) {
+                    console.error('Failed to delete skill:', error);
+                    toast.error('Failed to delete skill');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                isLoading={deleting}
+                disabled={setSkillEnabled.isPending}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-/**
- * Parse frontmatter `name` and `description` out of a SKILL.md body.
- * Matches the minimal extension parser (only these two fields).
- */
-function parseSkillFrontmatter(rawMarkdown: string): { name?: string; description?: string } {
-  const match = rawMarkdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n/);
-  if (!match) return {};
-  const strip = (v: string) => {
-    const t = v.trim();
-    if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
-      return t.slice(1, -1);
-    }
-    return t;
-  };
-  const nameMatch = match[1].match(/^name\s*:\s*(.+)$/m);
-  const descMatch = match[1].match(/^description\s*:\s*(.+)$/m);
-  return {
-    name: nameMatch ? strip(nameMatch[1]) : undefined,
-    description: descMatch ? strip(descMatch[1]) : undefined,
-  };
+function formatSkillsShSource(sourceUrl: string | null): string | null {
+  if (!sourceUrl) return null;
+  return sourceUrl.replace(/^https?:\/\/(www\.)?/, '');
 }
 
-type ExtractedSkill = {
-  rawMarkdown: string;
-  files: Record<string, string>;
-  fileCount: number;
-  totalBytes: number;
-  frontmatterName?: string;
-  frontmatterDescription?: string;
-};
-
-/**
- * Returns true for OS-generated metadata that shouldn't count as skill content:
- * macOS `__MACOSX/...` and `._*` AppleDouble files, Finder `.DS_Store`,
- * Windows `Thumbs.db` and `desktop.ini`. Matches at any depth.
- */
-function isJunkEntry(path: string): boolean {
-  if (path.startsWith('__MACOSX/') || path.includes('/__MACOSX/')) return true;
-  const base = path.slice(path.lastIndexOf('/') + 1);
-  if (base.startsWith('._')) return true;
-  return base === '.DS_Store' || base === 'Thumbs.db' || base === 'desktop.ini';
+export function skillsShSourceError(source: string): string | null {
+  const trimmed = source.trim();
+  if (!trimmed) return 'Enter a skills.sh source.';
+  return parseSkillsShSource(trimmed) ? null : SKILLS_SH_SOURCE_ERROR;
 }
 
-/**
- * Extract a skill bundle from a zip. Looks for `SKILL.md` at the root; if the
- * archive uses a single top-level directory, strips it (matches the extension
- * marketplace's `tar --strip-components=1` behavior).
- *
- * Throws an Error with a user-facing message on invalid archives.
- */
-async function extractSkillZip(file: File): Promise<ExtractedSkill> {
-  if (!file.name.toLowerCase().endsWith('.zip')) {
-    throw new Error('Expected a .zip file');
+export function skillsShSubmitError(error: unknown): string {
+  if (!(error instanceof Error)) return SKILLS_SH_SUBMIT_ERROR;
+  const message = error.message.trim();
+  if (!message || message.startsWith('[') || message.startsWith('{')) {
+    return SKILLS_SH_SUBMIT_ERROR;
   }
-  const buf = new Uint8Array(await file.arrayBuffer());
-  if (buf.byteLength > 5 * 1024 * 1024) {
-    throw new Error('Zip file is larger than 5 MB');
-  }
+  return message;
+}
 
-  let entries: Record<string, Uint8Array>;
-  try {
-    entries = unzipSync(buf, {
-      filter(entry) {
-        return entry.size <= MAX_COMPANION_FILE_SIZE * 2; // trust but verify below
-      },
-    });
-  } catch (error) {
-    throw new Error(`Unable to read zip: ${error instanceof Error ? error.message : 'unknown'}`);
-  }
+function SkillsShForm({
+  profileId,
+  organizationId,
+}: {
+  profileId: string;
+  organizationId: string | undefined;
+}) {
+  const { createSkillsShSkill } = useProfileMutations({ organizationId });
+  const [source, setSource] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const pending = createSkillsShSkill.isPending;
 
-  // Drop directory entries (keys ending with '/') and OS-generated junk
-  // (Finder's __MACOSX/ + ._* AppleDouble files, Windows Thumbs.db / desktop.ini)
-  // so a folder zipped via Finder still has a single detectable top-level dir.
-  const filePaths = Object.keys(entries).filter(k => !k.endsWith('/') && !isJunkEntry(k));
-  if (filePaths.length === 0) {
-    throw new Error('Zip is empty');
-  }
-  // Detect a single top-level directory to strip. Allow a stray root file
-  // (e.g. a README sibling) to still trigger stripping when all *other* paths
-  // share one top dir.
-  const rootDirs = new Set<string>();
-  for (const p of filePaths) {
-    const slash = p.indexOf('/');
-    if (slash > 0) rootDirs.add(p.slice(0, slash));
-  }
-  const stripPrefix =
-    rootDirs.size === 1 && filePaths.every(p => p.startsWith(`${[...rootDirs][0]}/`))
-      ? `${[...rootDirs][0]}/`
-      : '';
-
-  let skillMd: string | null = null;
-  const files: Record<string, string> = {};
-  let totalBytes = 0;
-  let fileCount = 0;
-
-  for (const path of filePaths) {
-    const rel = stripPrefix && path.startsWith(stripPrefix) ? path.slice(stripPrefix.length) : path;
-    if (!rel || rel === '') continue;
-
-    if (rel.includes('..') || rel.startsWith('/') || rel.length > MAX_PATH_LENGTH) {
-      throw new Error(`Rejected file path "${rel}"`);
-    }
-    if (rel.toLowerCase() === 'skill.md') {
-      const content = strFromU8(entries[path]);
-      if (content.length > MAX_SKILL_MARKDOWN_LENGTH) {
-        throw new Error(`SKILL.md exceeds ${MAX_SKILL_MARKDOWN_LENGTH} bytes`);
-      }
-      skillMd = content;
-      continue;
-    }
-    if (!SKILL_FILE_PATH_PATTERN.test(rel)) {
-      throw new Error(`File "${rel}" contains disallowed characters`);
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = source.trim();
+    const validationError = skillsShSourceError(trimmed);
+    if (validationError) {
+      setError(validationError);
+      return;
     }
 
-    const content = strFromU8(entries[path]);
-    if (content.length > MAX_COMPANION_FILE_SIZE) {
-      throw new Error(`File "${rel}" exceeds ${MAX_COMPANION_FILE_SIZE} bytes`);
+    setError(null);
+    try {
+      await createSkillsShSkill.mutateAsync({
+        profileId,
+        organizationId,
+        source: trimmed,
+      });
+      setSource('');
+      toast.success('Skill added. It will be installed during container setup.');
+    } catch (submitError) {
+      setError(skillsShSubmitError(submitError));
     }
-    fileCount += 1;
-    totalBytes += content.length;
-    if (fileCount > MAX_COMPANION_FILES) {
-      throw new Error(`Skill may have at most ${MAX_COMPANION_FILES} companion files`);
-    }
-    if (totalBytes > MAX_COMPANION_FILES_TOTAL) {
-      throw new Error(`Companion files exceed ${MAX_COMPANION_FILES_TOTAL} bytes total`);
-    }
-    files[rel] = content;
-  }
-
-  if (!skillMd) {
-    throw new Error('Zip must contain SKILL.md at the root');
-  }
-
-  const frontmatter = parseSkillFrontmatter(skillMd);
-  return {
-    rawMarkdown: skillMd,
-    files,
-    fileCount,
-    totalBytes,
-    frontmatterName: frontmatter.name,
-    frontmatterDescription: frontmatter.description,
   };
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-2 rounded-lg border p-3">
+      <Label htmlFor="skills-sh-source">Add from skills.sh</Label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          id="skills-sh-source"
+          value={source}
+          onChange={event => {
+            setSource(event.target.value);
+            if (error) setError(null);
+          }}
+          placeholder={SKILLS_SH_EXAMPLE}
+          aria-describedby={error ? 'skills-sh-help skills-sh-error' : 'skills-sh-help'}
+          aria-invalid={error ? true : undefined}
+          autoComplete="off"
+          spellCheck={false}
+          className="flex-1 font-mono"
+          disabled={pending}
+        />
+        <Button type="submit" variant="outline" disabled={pending}>
+          {pending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Adding skill…
+            </>
+          ) : (
+            'Add skill'
+          )}
+        </Button>
+      </div>
+      <p id="skills-sh-help" className="text-muted-foreground text-xs">
+        Use <code className="bg-muted rounded px-1 py-0.5 font-mono">owner/repo@skill</code> or a
+        skills.sh URL. Example:{' '}
+        <code className="bg-muted rounded px-1 py-0.5 font-mono">{SKILLS_SH_EXAMPLE}</code>.{' '}
+        <a
+          href={SKILLS_SH_DIRECTORY_URL}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-primary hover:underline"
+        >
+          Browse skills.sh
+        </a>
+      </p>
+      {error && (
+        <p id="skills-sh-error" role="alert" className="text-destructive text-xs">
+          {error}
+        </p>
+      )}
+    </form>
+  );
 }
 
 // -------------------------------------------------------------------

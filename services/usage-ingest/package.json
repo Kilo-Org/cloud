@@ -1,0 +1,27 @@
+{
+  "name": "cloudflare-usage-ingest",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --env staging",
+    "types": "wrangler types --include-runtime=false --env-interface CloudflareEnv worker-configuration.d.ts",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/usage-ingest/src services/usage-ingest/scripts",
+    "test": "node --test scripts/*.test.mjs && vitest run",
+    "queues:prepare": "node scripts/provision-queues.mjs staging",
+    "test:queues": "node --test scripts/*.test.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "wrangler": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:vitest5"
+  },
+  "dependencies": {
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*"
+  }
+}

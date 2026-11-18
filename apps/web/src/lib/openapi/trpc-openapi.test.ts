@@ -9,7 +9,7 @@ import {
   UpstreamApiError,
   trpcErrorFormatter,
   trpcSuccessResponseSchema,
-} from '@/lib/trpc/transport';
+} from '@kilocode/web-shared/lib/trpc/transport';
 
 const t = initTRPC.create({ errorFormatter: trpcErrorFormatter });
 
@@ -23,6 +23,29 @@ const verificationRouter = t.router({
       message: 'Config was modified',
       cause: new UpstreamApiError('etag_mismatch'),
     });
+  }),
+  computeBillingFailure: t.procedure
+    .input(z.enum(['PAYMENT_REQUIRED', 'CONFLICT', 'SERVICE_UNAVAILABLE']))
+    .query(({ input }) => {
+      const billingFailureByCode = {
+        PAYMENT_REQUIRED: 'INSUFFICIENT_CREDITS',
+        CONFLICT: 'COMPUTE_STOPPING',
+        SERVICE_UNAVAILABLE: 'BILLING_UNAVAILABLE',
+      } as const;
+      throw new TRPCError({
+        code: input,
+        message: 'Compute is stopping',
+        cause: {
+          billingFailure: {
+            code: billingFailureByCode[input],
+            payer: { type: 'org', id: 'org-1' },
+            retryable: true,
+          },
+        },
+      });
+    }),
+  legacyPaymentFailure: t.procedure.query(() => {
+    throw new TRPCError({ code: 'PAYMENT_REQUIRED', message: 'Insufficient credits' });
   }),
 });
 
@@ -159,7 +182,18 @@ describe('generateTrpcOpenApiDocument', () => {
                 properties: {
                   groupBy: {
                     type: 'array',
-                    items: { enum: ['feature', 'model', 'mode', 'user', 'provider', 'project'] },
+                    items: {
+                      enum: [
+                        'feature',
+                        'model',
+                        'mode',
+                        'user',
+                        'provider',
+                        'project',
+                        'autoModel',
+                        'inferenceProvider',
+                      ],
+                    },
                   },
                   limit: { default: 1000 },
                 },
@@ -249,5 +283,31 @@ describe('generateTrpcOpenApiDocument', () => {
     expect(upstreamFailure.error.data.httpStatus).toBe(409);
     expect(upstreamFailure.error.data.zodError).toBeNull();
     expect(upstreamFailure.error.data.upstreamCode).toBe('etag_mismatch');
+  });
+});
+
+describe('browser tRPC billing error boundary', () => {
+  it.each([
+    ['PAYMENT_REQUIRED', 'INSUFFICIENT_CREDITS', 402],
+    ['CONFLICT', 'COMPUTE_STOPPING', 409],
+    ['SERVICE_UNAVAILABLE', 'BILLING_UNAVAILABLE', 503],
+  ] as const)('projects explicit %s billing failures', async (code, billingCode, httpStatus) => {
+    const response = TrpcErrorResponseSchema.parse(
+      await callVerificationProcedure('computeBillingFailure', code)
+    );
+    expect(response.error.data.httpStatus).toBe(httpStatus);
+    expect(response.error.data.billingFailure).toEqual({
+      code: billingCode,
+      payer: { type: 'org', id: 'org-1' },
+      retryable: true,
+    });
+  });
+
+  it('does not mark a legacy generic 402 as structured billing failure', async () => {
+    const response = TrpcErrorResponseSchema.parse(
+      await callVerificationProcedure('legacyPaymentFailure')
+    );
+    expect(response.error.data.httpStatus).toBe(402);
+    expect(response.error.data.billingFailure).toBeUndefined();
   });
 });

@@ -1,0 +1,952 @@
+import { createRequire } from 'node:module';
+import React, { act, createElement, startTransition } from 'react';
+import { flushSync } from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
+import { atom, createStore, Provider } from 'jotai';
+import type {
+  ChildSessionHydrationState,
+  KiloSessionId,
+  SessionManager,
+} from '@kilocode/cloud-agent-sdk';
+import type { ChildSessionDrawerEntry } from './ChildSessionSection';
+import type { ChildSessionDrawer as ChildSessionDrawerComponent } from './ChildSessionDrawer';
+import type { StoredMessage, ToolPart } from './types';
+import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
+
+jest.mock('./CloudAgentProvider', () => ({
+  useManager: jest.fn(),
+  ReadOnlyCloudAgentBoundary: ({ children }: { children: React.ReactNode }) => children,
+  useOptionalManager: jest.fn(),
+}));
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) => createElement('p', null, children),
+}));
+jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
+jest.mock('./worktree-review', () => ({ parseWorktreeReviewMessage: () => null }));
+jest.mock('@/components/ui/sheet', () => {
+  const stub =
+    (slot: string) =>
+    ({ children }: { children?: React.ReactNode }) =>
+      React.createElement('div', { 'data-slot': slot }, children);
+  return {
+    Sheet: stub('sheet'),
+    SheetContent: stub('sheet-content'),
+    SheetHeader: stub('sheet-header'),
+    SheetTitle: stub('sheet-title'),
+    SheetDescription: stub('sheet-description'),
+  };
+});
+
+import { useOptionalManager } from './CloudAgentProvider';
+import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
+
+function installDom() {
+  const requireFromHere = createRequire(__filename);
+  const requireFromNext = createRequire(requireFromHere.resolve('next/package.json'));
+  const { window, document } = (
+    requireFromNext('linkedom') as {
+      parseHTML: (html: string) => { window: Record<string, unknown>; document: Document };
+    }
+  ).parseHTML('<!doctype html><html><body><div id="root"></div></body></html>');
+  const globals = globalThis as typeof globalThis & Record<string, unknown>;
+  const values = {
+    React,
+    window,
+    document,
+    HTMLElement: window.HTMLElement,
+    Element: window.Element,
+    Node: window.Node,
+    Event: window.Event,
+    getComputedStyle: () => ({ animationName: 'none', display: 'block' }),
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    },
+    cancelAnimationFrame: () => undefined,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  };
+  const previous = new Map(Object.keys(values).map(name => [name, globals[name]]));
+  Object.assign(globals, values);
+  const container = document.getElementById('root');
+  if (!container) throw new Error('ChildSessionSection test root missing');
+  return {
+    container,
+    cleanup: () => previous.forEach((value, name) => (globals[name] = value)),
+  };
+}
+
+const childSessionId = `ses_${'a'.repeat(26)}` as KiloSessionId;
+
+function readToolPart(id: string): ToolPart {
+  return {
+    id,
+    sessionID: childSessionId,
+    messageID: 'child-1',
+    type: 'tool',
+    callID: id,
+    tool: 'read',
+    state: {
+      status: 'completed',
+      input: { filePath: '/repo/file.ts' },
+      output: 'content',
+      title: 'Read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+function childMessageWithTools(count: number): StoredMessage {
+  return {
+    info: {
+      id: 'child-1',
+      sessionID: childSessionId,
+      role: 'assistant',
+      time: { created: 1, completed: 2 },
+      parentID: 'parent-1',
+      modelID: 'test-model',
+      providerID: 'test-provider',
+      mode: 'code',
+      agent: 'test-agent',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
+    parts: Array.from({ length: count }, (_, index) => readToolPart(`tool-${index}`)),
+  };
+}
+
+const parentPart: ToolPart = {
+  id: 'task-1',
+  sessionID: 'ses-root',
+  messageID: 'parent-1',
+  type: 'tool',
+  callID: 'task-1',
+  tool: 'task',
+  state: {
+    status: 'running',
+    input: { description: 'Explore repo', subagent_type: 'explore' },
+    metadata: { sessionId: childSessionId },
+    time: { start: 1 },
+  },
+};
+
+function click(target: Element) {
+  act(() => {
+    target.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+  });
+}
+
+function taskToolPart(metadata: Record<string, unknown>): ToolPart {
+  return {
+    id: 'task-part',
+    sessionID: 'ses-1',
+    messageID: 'assistant-1',
+    type: 'tool',
+    callID: 'call-1',
+    tool: 'task',
+    state: {
+      status: 'completed',
+      input: { description: 'Inspect the parser', subagent_type: 'explore' },
+      output: 'done',
+      title: 'Inspect the parser',
+      metadata,
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+describe('ChildSessionSection live subscription', () => {
+  let root: Root | undefined;
+  let container: HTMLElement;
+  let cleanup: () => void;
+
+  beforeAll(() => {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+  });
+
+  afterAll(() => cleanup());
+
+  beforeEach(() => {
+    container.textContent = '';
+    jest.mocked(useOptionalManager).mockReturnValue(null);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+  });
+
+  it('updates the child tool count from the manager atom without new props', () => {
+    const store = createStore();
+    const sourceAtom = atom<{ getter: (sessionId: string) => StoredMessage[] }>({
+      getter: () => [],
+    });
+    const childMessagesAtom = atom(get => get(sourceAtom).getter);
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: { childMessages: childMessagesAtom },
+    } as unknown as SessionManager);
+
+    act(() => {
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: parentPart,
+            sessionId: childSessionId,
+          })
+        )
+      );
+    });
+    expect(container.textContent).not.toContain('tool call');
+
+    act(() => {
+      store.set(sourceAtom, { getter: () => [childMessageWithTools(2)] });
+    });
+    expect(container.textContent).toContain('2 tool calls');
+  });
+
+  it('keeps a completed background launch working until its child finishes', () => {
+    const child = childMessageWithTools(1);
+    if (child.info.role !== 'assistant') throw new Error('Expected assistant fixture');
+    child.info = { ...child.info, time: { created: 3 } };
+    const source = atom<StoredMessage[]>([child]);
+    const store = createStore();
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: {
+        childMessages: atom(get => {
+          const messages = get(source);
+          return () => messages;
+        }),
+      },
+    } as unknown as SessionManager);
+    act(() =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      )
+    );
+    expect(container.textContent).not.toContain('Completed');
+    expect(container.querySelector('button')?.getAttribute('aria-busy')).toBe('true');
+    const finished: StoredMessage = {
+      ...child,
+      info: { ...child.info, time: { created: 3, completed: 4 } },
+    };
+    act(() => store.set(source, [finished]));
+    expect(container.textContent).toContain('Completed');
+    expect(container.querySelector('button')?.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it('updates a background row from live child status without transcript changes', () => {
+    const status = atom({ type: 'busy' });
+    const store = createStore();
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: {
+        childMessages: atom(() => () => [childMessageWithTools(1)]),
+        childSessionStatus: atom(get => {
+          const current = get(status);
+          return (id: string) => (id === childSessionId ? current : undefined);
+        }),
+      },
+    } as unknown as SessionManager);
+    act(() =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      )
+    );
+    expect(container.textContent).not.toContain('Completed');
+    act(() => store.set(status, { type: 'idle' }));
+    expect(container.textContent).toContain('Completed');
+    act(() => store.set(status, { type: 'busy' }));
+    expect(container.textContent).not.toContain('Completed');
+    expect(container.querySelector('button')?.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it.each([
+    ['running', 'Working'],
+    ['completed', 'Completed'],
+    ['pending', 'Delegating'],
+    ['error', 'Failed'],
+  ] as const)(
+    'keeps the %s status in the header without an empty activity line',
+    (status, label) => {
+      const state: ToolPart['state'] =
+        status === 'running'
+          ? { status, input: {}, time: { start: 1 } }
+          : status === 'completed'
+            ? {
+                status,
+                input: {},
+                output: 'done',
+                title: 'done',
+                metadata: {},
+                time: { start: 1, end: 2 },
+              }
+            : status === 'error'
+              ? { status, input: {}, error: 'Task failed', time: { start: 1, end: 2 } }
+              : { status, input: {}, raw: '' };
+      act(() =>
+        root?.render(
+          createElement(ChildSessionSection, {
+            taskToolPart: { ...parentPart, state },
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      );
+      const button = container.querySelector('button');
+      const summary = button?.firstElementChild?.children[2];
+      expect(summary?.firstElementChild?.textContent).toBe(label);
+      expect(button?.children).toHaveLength(1);
+    }
+  );
+
+  it('keeps the status and tool count in the header and only tool activity below it', () => {
+    act(() =>
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: parentPart,
+          sessionId: childSessionId,
+          childMessages: [childMessageWithTools(1)],
+          onOpenChildSession: jest.fn(),
+        })
+      )
+    );
+    const button = container.querySelector('button');
+    const summary = button?.firstElementChild?.children[2];
+    expect(summary?.firstElementChild?.textContent).toBe('Working');
+    expect(summary?.lastElementChild?.textContent).toBe('1 tool call');
+    expect(button?.children).toHaveLength(2);
+    expect(button?.lastElementChild?.textContent).toBe('Read /repo/file.ts');
+  });
+
+  it('loads child history after reload instead of keeping completed background work active', async () => {
+    const store = createStore();
+    const messages = atom<StoredMessage[]>([]);
+    const hydrateChildSession = jest.fn(async () => {
+      store.set(messages, [childMessageWithTools(1)]);
+    });
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: {
+        childMessages: atom(get => {
+          const current = get(messages);
+          return () => current;
+        }),
+      },
+      hydrateChildSession,
+    } as unknown as SessionManager);
+    await act(async () =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      )
+    );
+    expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+    expect(hydrateChildSession).toHaveBeenCalledWith(childSessionId);
+    expect(container.textContent).toContain('Completed');
+    expect(container.querySelector('button')?.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it.each([
+    { status: 'error', message: 'Synthetic history failure' },
+    {
+      status: 'ready',
+      cursor: null,
+      hasOlder: false,
+      isLoadingOlder: false,
+      olderError: null,
+      omittedItemCount: 0,
+    },
+  ] satisfies ChildSessionHydrationState[])(
+    'shows unavailable status after history becomes $status without messages and recovers when messages arrive',
+    async hydrationResult => {
+      const store = createStore();
+      const messages = atom<StoredMessage[]>([]);
+      const hydration = atom<ChildSessionHydrationState>({ status: 'idle' });
+      const hydrateChildSession = jest.fn(async () => {
+        store.set(hydration, hydrationResult);
+      });
+      const onOpenChildSession = jest.fn();
+      jest.mocked(useOptionalManager).mockReturnValue({
+        atoms: {
+          childMessages: atom(get => {
+            const current = get(messages);
+            return () => current;
+          }),
+          childSessionHydrationState: atom(get => {
+            const current = get(hydration);
+            return () => current;
+          }),
+        },
+        hydrateChildSession,
+      } as unknown as SessionManager);
+      await act(async () =>
+        root?.render(
+          createElement(
+            Provider,
+            { store },
+            createElement(ChildSessionSection, {
+              taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+              sessionId: childSessionId,
+              onOpenChildSession,
+            })
+          )
+        )
+      );
+      expect(container.textContent).toContain('Status unavailable');
+      expect(container.textContent).not.toContain('Failed');
+      const button = container.querySelector('button');
+      if (!button) throw new Error('Missing child transcript control');
+      expect(button.hasAttribute('aria-busy')).toBe(false);
+      expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+      click(button);
+      expect(onOpenChildSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: childSessionId })
+      );
+      act(() => store.set(hydration, { status: 'loading' }));
+      expect(container.textContent).toContain('Working');
+      expect(button.getAttribute('aria-busy')).toBe('true');
+      act(() => store.set(messages, [childMessageWithTools(1)]));
+      expect(container.textContent).toContain('Completed');
+      expect(container.textContent).not.toContain('Status unavailable');
+      expect(button.hasAttribute('aria-busy')).toBe(false);
+      expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('uses completed tool status for a background task without a manager or child history', () => {
+    act(() =>
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+          sessionId: childSessionId,
+        })
+      )
+    );
+    expect(container.textContent).toContain('Completed');
+    expect(container.textContent).not.toContain('Working');
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('passes the current live getter into an open recursive transcript and refreshes it from SDK state', () => {
+    const store = createStore();
+    const grandchildId = 'ses_00000000000000000000000001';
+    const child = childMessageWithTools(1);
+    const initialGetter = (id: string) =>
+      id === childSessionId
+        ? [child]
+        : id === grandchildId
+          ? [
+              {
+                ...child,
+                parts: [
+                  {
+                    id: 'grand-text',
+                    sessionID: grandchildId,
+                    messageID: 'grand',
+                    type: 'text' as const,
+                    text: 'Grandchild initial',
+                  },
+                ],
+              },
+            ]
+          : [];
+    const sourceAtom = atom({ getter: initialGetter });
+    const childMessagesAtom = atom(get => get(sourceAtom).getter);
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: { childMessages: childMessagesAtom },
+    } as unknown as SessionManager);
+    act(() =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: parentPart,
+            sessionId: childSessionId,
+            renderChildTranscript: (_messages, _depth, currentGetter) => {
+              const grandchild = currentGetter?.(grandchildId)[0];
+              return createElement(
+                'p',
+                null,
+                grandchild?.parts
+                  .filter(part => part.type === 'text')
+                  .map(part => part.text)
+                  .join('')
+              );
+            },
+          })
+        )
+      )
+    );
+    const button = container.querySelector('button');
+    if (!button) throw new Error('Missing child expansion control');
+    click(button);
+    expect(container.textContent).toContain('Grandchild initial');
+    act(() =>
+      store.set(sourceAtom, {
+        getter: (id: string) =>
+          id === grandchildId
+            ? [
+                {
+                  ...child,
+                  parts: [
+                    {
+                      id: 'grand-text',
+                      sessionID: grandchildId,
+                      messageID: 'grand',
+                      type: 'text',
+                      text: 'Grandchild updated',
+                    },
+                  ],
+                },
+              ]
+            : initialGetter(id),
+      })
+    );
+    expect(container.textContent).toContain('Grandchild updated');
+    expect(container.textContent).not.toContain('Grandchild initial');
+  });
+
+  it('falls back to the childMessages prop when the manager has no childMessages atom', () => {
+    jest.mocked(useOptionalManager).mockReturnValue({ atoms: {} } as unknown as SessionManager);
+
+    act(() => {
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: parentPart,
+          sessionId: childSessionId,
+          childMessages: [childMessageWithTools(3)],
+        })
+      );
+    });
+    expect(container.textContent).toContain('3 tool calls');
+  });
+
+  it('falls back to the childMessages prop when no manager is present', () => {
+    act(() => {
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: parentPart,
+          sessionId: childSessionId,
+          childMessages: [childMessageWithTools(1)],
+        })
+      );
+    });
+    expect(container.textContent).toContain('1 tool call');
+  });
+
+  it.each([
+    [
+      'read',
+      { filePath: '/cloud-agent/sessions/ses_test/src/nested/read.ts' },
+      'Read src/nested/read.ts',
+    ],
+    ['edit', { filePath: '/cloud-agent/sessions/ses_test/src/edit.ts' }, 'Edit src/edit.ts'],
+    ['write', { filePath: '/cloud-agent/sessions/ses_test/src/write.ts' }, 'Write src/write.ts'],
+    ['read', { filePath: '/cloud-agent/sessions/ses_test' }, 'Read .'],
+    ['list', { path: '/cloud-agent/sessions/ses_test/src' }, 'List src'],
+    [
+      'bash',
+      { command: 'pnpm test', cwd: '/cloud-agent/sessions/ses_test/src' },
+      'Shell pnpm · src',
+    ],
+    ['custom', { root: '/cloud-agent/sessions/ses_test/src/root.ts' }, 'Custom src/root.ts'],
+    ['glob', { path: '/cloud-agent/sessions/ses_test', pattern: '*.ts' }, 'Glob . · *.ts'],
+    [
+      'grep',
+      { path: '/cloud-agent/sessions/ses_test/src', pattern: 'needle' },
+      'Grep src · needle',
+    ],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { filepath: '/cloud-agent/sessions/ses_test/src/mcp.ts' },
+      },
+      'Mcp src/mcp.ts',
+    ],
+  ] satisfies [string, Record<string, unknown>, string][])(
+    'normalizes file and directory context in child %s activity',
+    (tool, input, expected) => {
+      const child = childMessageWithTools(1);
+      const part = readToolPart('tool-1');
+      part.tool = tool;
+      part.state = { status: 'running', input, time: { start: 1 } };
+      child.parts = [part];
+
+      act(() =>
+        root?.render(
+          createElement(ChildSessionSection, {
+            taskToolPart: parentPart,
+            sessionId: childSessionId,
+            childMessages: [child],
+          })
+        )
+      );
+
+      expect(container.textContent).toContain(expected);
+      expect(container.innerHTML).not.toContain('ses_test');
+      expect(container.textContent).not.toContain('/cloud-agent/');
+    }
+  );
+
+  it('shows native v2 child commands and opens the linked child session', () => {
+    const session = {
+      id: `ses_${'c'.repeat(26)}`,
+      location: { directory: '/workspace' },
+      time: { created: 1, updated: 2 },
+    };
+    const parent = readKilo2Messages(session, [
+      {
+        id: 'msg_parent',
+        type: 'assistant',
+        time: { created: 1 },
+        content: [
+          {
+            type: 'tool',
+            id: 'call_delegate',
+            name: 'subagent',
+            state: {
+              status: 'running',
+              input: { agent: 'explore', description: 'Inspect commands' },
+              metadata: { sessionID: childSessionId },
+            },
+          },
+        ],
+      },
+    ])[0];
+    const task = parent.parts[0];
+    if (task.type !== 'tool') throw new Error('Expected a projected subagent tool');
+    const childMessages = readKilo2Messages({ ...session, id: childSessionId }, [
+      {
+        id: 'msg_child',
+        type: 'assistant',
+        time: { created: 2 },
+        content: [
+          {
+            type: 'tool',
+            id: 'call_shell',
+            name: 'shell',
+            state: { status: 'running', input: { command: 'pwd' } },
+          },
+        ],
+      },
+    ]);
+    const onOpenChildSession = jest.fn();
+    act(() => {
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: task,
+          sessionId: getTaskToolSessionId(task),
+          childMessages,
+          onOpenChildSession,
+        })
+      );
+    });
+    expect(container.textContent).toContain('Shell pwd');
+    expect(container.textContent).toContain('Explore');
+    const trigger = container.querySelector('button');
+    if (!trigger) throw new Error('Native v2 child session trigger missing');
+    click(trigger);
+    expect(onOpenChildSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: childSessionId,
+        description: 'Inspect commands',
+        agent: 'explore',
+      })
+    );
+  });
+});
+
+describe('ChildSessionSection drawer entry', () => {
+  let root: Root | undefined;
+  let container: HTMLElement;
+  let cleanup: () => void;
+
+  beforeAll(() => {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+  });
+
+  afterAll(() => {
+    cleanup();
+  });
+
+  function renderSection(
+    metadata: Record<string, unknown>,
+    onOpenChildSession: (entry: ChildSessionDrawerEntry) => void
+  ) {
+    const sessionId = `ses_${'a'.repeat(26)}` as KiloSessionId;
+    act(() => {
+      root = createRoot(container);
+      root.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: taskToolPart({ sessionId, ...metadata }),
+          sessionId,
+          onOpenChildSession,
+        })
+      );
+    });
+  }
+
+  it.each([
+    [
+      'with routed model',
+      { model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' } },
+      'claude-opus-4.6',
+    ],
+    ['without model metadata', {}, undefined],
+    ['with malformed model metadata', { model: { providerID: 'kilo' } }, undefined],
+    ['with empty model fields', { model: { providerID: '', modelID: '' } }, undefined],
+  ])('builds the drawer entry %s', (_name, metadata, expectedModel) => {
+    const onOpenChildSession = jest.fn();
+    renderSection(metadata, onOpenChildSession);
+    const trigger = container.querySelector('button');
+    if (!trigger) throw new Error('child session trigger missing');
+    click(trigger);
+
+    expect(onOpenChildSession).toHaveBeenCalledWith({
+      sessionId: `ses_${'a'.repeat(26)}`,
+      description: 'Inspect the parser',
+      agent: 'explore',
+      model: expectedModel,
+    });
+  });
+});
+
+describe('ChildSessionDrawer header', () => {
+  let ChildSessionDrawer: typeof ChildSessionDrawerComponent;
+  let root: Root | undefined;
+  let container: HTMLElement;
+  let cleanup: () => void;
+  const readDrawerMessages = jest.fn((messages: StoredMessage[]) => [...messages]);
+  const drawerSource = atom<StoredMessage[]>([]);
+  const hasOlderMessages = atom(false);
+  const drawerStore = createStore();
+  const manager = {
+    atoms: {
+      isStreaming: atom(false),
+      activeQuestion: atom(null),
+      childMessages: atom(get => {
+        const messages = get(drawerSource);
+        return (_sessionId: string): StoredMessage[] => readDrawerMessages(messages);
+      }),
+      childSessionHydrationState: atom(get => {
+        const hasOlder = get(hasOlderMessages);
+        return (_sessionId: string): ChildSessionHydrationState => ({
+          status: 'ready',
+          cursor: null,
+          hasOlder,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
+        });
+      }),
+    },
+    hydrateChildSession: jest.fn(),
+    loadOlderChildMessages: jest.fn(),
+  };
+
+  beforeAll(async () => {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+    const provider = await import('./CloudAgentProvider');
+    (provider.useManager as unknown as jest.Mock).mockReturnValue(manager);
+    ({ ChildSessionDrawer } = await import('./ChildSessionDrawer'));
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+    drawerStore.set(hasOlderMessages, false);
+  });
+
+  afterAll(() => {
+    cleanup();
+  });
+
+  function renderDrawer(entry: ChildSessionDrawerEntry) {
+    act(() => {
+      root = createRoot(container);
+      root.render(
+        createElement(
+          Provider,
+          { store: drawerStore },
+          createElement(ChildSessionDrawer, {
+            stack: [entry],
+            onBack: () => undefined,
+            onOpenChange: () => undefined,
+            onOpenChildSession: () => undefined,
+          })
+        )
+      );
+    });
+  }
+
+  it('reuses the child snapshot on unrelated drawer updates', () => {
+    drawerStore.set(drawerSource, [childMessageWithTools(1)]);
+    renderDrawer({ sessionId: childSessionId, description: 'Child snapshot' });
+    readDrawerMessages.mockClear();
+    act(() => drawerStore.set(manager.atoms.isStreaming, true));
+    expect(readDrawerMessages).not.toHaveBeenCalled();
+    act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
+    expect(readDrawerMessages).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll('[data-message-id="child-1"]')).toHaveLength(1);
+  });
+
+  it('keeps a reader above the bottom when a message commits before the scroll state', () => {
+    drawerStore.set(drawerSource, [childMessageWithTools(1)]);
+    renderDrawer({ sessionId: childSessionId, description: 'Reading child history' });
+    const scroller = container.querySelector<HTMLElement>('.overflow-y-auto');
+    if (!scroller) throw new Error('Child drawer scroller missing');
+    Object.defineProperties(scroller, {
+      clientHeight: { value: 100 },
+      scrollHeight: { value: 1000 },
+    });
+    act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
+    expect(scroller.scrollTop).toBe(1000);
+    const propsKey = Object.keys(scroller).find(key => key.startsWith('__reactProps$'));
+    if (!propsKey) throw new Error('Child drawer scroll handler missing');
+    const props = (scroller as unknown as Record<string, { onScroll: () => void }>)[propsKey];
+
+    act(() => {
+      scroller.scrollTop = 500;
+      startTransition(() => props.onScroll());
+      flushSync(() => drawerStore.set(drawerSource, [childMessageWithTools(3)]));
+      expect(readDrawerMessages).toHaveBeenLastCalledWith([childMessageWithTools(3)]);
+      expect(scroller.scrollTop).toBe(500);
+    });
+    expect(scroller.scrollTop).toBe(500);
+  });
+
+  it('keeps earlier child history available through an explicit load button', () => {
+    drawerStore.set(hasOlderMessages, true);
+    manager.loadOlderChildMessages.mockClear();
+    renderDrawer({ sessionId: childSessionId, description: 'Earlier child history' });
+    const loadButton = [...container.querySelectorAll('button')].find(
+      button => button.textContent === 'Load earlier messages'
+    );
+    if (!loadButton) throw new Error('Earlier child history button missing');
+    expect(manager.loadOlderChildMessages).not.toHaveBeenCalled();
+    click(loadButton);
+    expect(manager.loadOlderChildMessages).toHaveBeenCalledWith(childSessionId);
+  });
+
+  it('shows the routed model next to the agent', () => {
+    renderDrawer({
+      sessionId: `ses_${'b'.repeat(26)}` as KiloSessionId,
+      description: 'Inspect the parser',
+      agent: 'explore',
+      model: 'claude-opus-4.6',
+    });
+
+    expect(container.innerHTML).toContain('Agent: explore');
+    expect(container.innerHTML).toContain('Model: claude-opus-4.6');
+  });
+
+  it('omits the model row when the entry has none', () => {
+    renderDrawer({
+      sessionId: `ses_${'c'.repeat(26)}` as KiloSessionId,
+      description: 'Inspect the parser',
+      agent: 'explore',
+    });
+
+    expect(container.innerHTML).toContain('Agent: explore');
+    expect(container.innerHTML).not.toContain('Model:');
+  });
+  it('keeps completed child rows idle while unfinished text and reasoning stream, then completes them', () => {
+    const completed = {
+      ...childMessageWithTools(0),
+      parts: [
+        {
+          id: 'done-text',
+          type: 'text' as const,
+          sessionID: childSessionId,
+          messageID: 'child-1',
+          text: 'Completed answer',
+          time: { start: 1, end: 2 },
+        },
+      ],
+    };
+    const running: StoredMessage = {
+      ...completed,
+      info: { ...completed.info, id: 'running-child', time: { created: 3 } },
+      parts: [
+        {
+          id: 'running-text',
+          type: 'text',
+          sessionID: childSessionId,
+          messageID: 'running-child',
+          text: 'Streaming answer',
+          time: { start: 3 },
+        },
+        {
+          id: 'running-reason',
+          type: 'reasoning',
+          sessionID: childSessionId,
+          messageID: 'running-child',
+          text: 'Inspecting the next step',
+          time: { start: 3 },
+        },
+      ],
+    };
+    drawerStore.set(drawerSource, [completed, running]);
+    renderDrawer({ sessionId: childSessionId, description: 'Streaming child' });
+    expect(container.querySelector('[data-message-id="running-child"] .invisible')).not.toBeNull();
+    expect(container.querySelector('[data-message-id="child-1"] .invisible')).toBeNull();
+    expect(container.querySelector('[data-message-id="running-child"]')?.textContent).toContain(
+      'Thinking'
+    );
+    if (running.info.role !== 'assistant') throw new Error('Expected assistant fixture');
+    const finished: StoredMessage = {
+      ...running,
+      info: { ...running.info, time: { created: 3, completed: 4 } },
+      parts: running.parts.map(part =>
+        part.type === 'text' || part.type === 'reasoning'
+          ? { ...part, time: { start: 3, end: 4 } }
+          : part
+      ),
+    };
+    act(() => drawerStore.set(drawerSource, [completed, finished]));
+    expect(container.querySelector('[data-message-id="running-child"] .invisible')).toBeNull();
+    expect(container.querySelector('[data-message-id="running-child"]')?.textContent).not.toContain(
+      'Thinking'
+    );
+  });
+});

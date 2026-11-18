@@ -1,0 +1,231 @@
+export type StateFrame = Readonly<{ top: number; bottom: number }>;
+
+type CenteredStateBandInput = {
+  window: StateFrame;
+  viewport: StateFrame;
+  topInset?: number;
+  bottomInset?: number;
+  nativeViewportFillsSurface?: boolean;
+  nativeViewportBottom?: number;
+};
+
+type CenteredStateLayoutInput = CenteredStateBandInput & {
+  contentHeight: number;
+  roundToPixel?: (value: number) => number;
+};
+
+const STATE_GAP = 16;
+
+export function getStateSurfaceInsets({
+  surface,
+  bounds,
+  top,
+  bottom,
+}: {
+  surface: StateFrame;
+  bounds: StateFrame;
+  top: number;
+  bottom: number;
+}) {
+  return {
+    topInset: Math.max(0, bounds.top + top - surface.top),
+    bottomInset: Math.max(0, surface.bottom - (bounds.bottom - bottom)),
+  };
+}
+
+/**
+ * The smallest short edge a tablet can have: Android's `sw600dp` qualifier. A
+ * phone's short edge tops out around 480dp, so this sits above every phone; a
+ * landscape window at or above it is a tablet, whose band between the page
+ * header and the fixed tab bar is taller than any centered state's full stack
+ * and nothing needs to give. The boundary is exclusive — a 600dp-short-edge
+ * tablet (the 1024x600 emulator) is a tablet, not a phone held sideways.
+ */
+const TABLET_SHORT_EDGE_MIN = 600;
+
+/**
+ * Whether the window is a short one — a phone held sideways.
+ *
+ * A centered state is centered in the band the surface leaves between the page
+ * header and the fixed bottom tab bar, and that band is only tall while the
+ * window is taller than it is wide. On a 411dp-tall landscape window the band
+ * is ~120dp — and ~49dp once the FAB's own 72dp strip is reserved as well —
+ * against the ~167dp the Agents no-match state's icon bubble, its copy and its
+ * action need stacked, so `getCenteredStateLayout` cannot fit it: the body is
+ * pinned to the top of the band and the copy and the action spill under the
+ * tab bar, which owns the taps there, and only a scroll brings them back.
+ * Callers that can drop decoration for a short window ask this.
+ *
+ * Both halves matter: a portrait window is tall even when the keyboard shortens
+ * it, and a tablet in landscape is wide but tall enough to keep the full stack.
+ * A landscape window whose short edge reaches the tablet qualifier is a tablet,
+ * not a short phone window. An unavailable dimension (a partial platform mock)
+ * is never a short window.
+ *
+ * `CenteredState` owns the band, so it is the one that asks this and publishes
+ * the answer as the short-centered-band flag; a state that can drop decoration
+ * for a short band reads that (`useShortCenteredBand`). Nothing outside a
+ * centered scroller is short.
+ */
+export function isShortViewport(width: number, height: number): boolean {
+  return (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > height &&
+    height < TABLET_SHORT_EDGE_MIN
+  );
+}
+
+export function intersectStateFrames(frame: StateFrame, clip: StateFrame): StateFrame {
+  const top = Math.max(clip.top, Math.min(frame.top, clip.bottom));
+  return { top, bottom: Math.max(top, Math.min(frame.bottom, clip.bottom)) };
+}
+
+/**
+ * The band a centered state may occupy: the scroller's viewport clipped to the
+ * window and to the reserved top/bottom insets. `getCenteredStateLayout`
+ * centers inside it; a state that cannot fit it renders its compact form, so
+ * the two must read the same numbers.
+ *
+ * Both frames are window coordinates, the space `measureInWindow` reports, so
+ * the clip cannot move the band for a reason the state cannot see. The
+ * surface's own frame is not part of the band: it comes from the native
+ * observer, whose clip edges are measured in the window root's screen space and
+ * differ from the child frames by that root's offset on an edge-to-edge
+ * window.
+ */
+export function getCenteredStateBand({
+  window,
+  viewport,
+  topInset = 0,
+  bottomInset = 0,
+}: {
+  window: StateFrame;
+  viewport: StateFrame;
+  topInset?: number;
+  bottomInset?: number;
+}) {
+  const visible = intersectStateFrames(viewport, window);
+  const top = Math.max(visible.top, window.top + topInset);
+  const bottom = Math.min(visible.bottom, window.bottom - bottomInset);
+  return { top, bottom, band: Math.max(0, bottom - top) };
+}
+
+/**
+ * The bottom reserve a nested surface resolves: the larger of the inherited
+ * reserve and the inset the nested surface asks for, so a nested reservation
+ * can never shrink a surface's clearance. The tabs layout reserves the tab bar
+ * alone (its 16dp content gap is content-only), so the Agents screen's centered
+ * states resolve exactly the bar plus the FAB band they ask for.
+ */
+export function getBottomReservation({
+  inherited,
+  bottomInset,
+}: {
+  inherited: number;
+  bottomInset: number;
+}) {
+  return Math.max(inherited, bottomInset);
+}
+
+export function getCenteredStateLayout({
+  window: windowFrame,
+  viewport,
+  contentHeight,
+  topInset = 0,
+  bottomInset = 0,
+  nativeViewportFillsSurface = false,
+  nativeViewportBottom = windowFrame.bottom,
+  roundToPixel = (value: number) => value,
+}: CenteredStateLayoutInput) {
+  const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
+  const { top, bottom } = getCenteredStateBand({
+    window: windowFrame,
+    viewport,
+    topInset,
+    bottomInset,
+  });
+  // Center in the band, and center alone: `getCenteredStateBandStyle` paints the
+  // same point before the content height is known, so a state keeps its position
+  // once it is painted except inside the strip that docstring names, where the
+  // two boxes differ by at most one gap. A rule that pushes the content
+  // off-centre to keep it clear of a crowded band edge would have no counterpart
+  // in that first paint, so the content would jump by the amount it pushed for
+  // every band, not only for that strip. A band narrow enough to crowd the state
+  // is also short enough that the state scrolls there.
+  const bandHeight = bottom - top;
+  const fits = contentHeight <= roundToPixel(bandHeight);
+  const contentTop = fits ? top + (bandHeight - contentHeight) / 2 : top + STATE_GAP;
+
+  const paddingTop = Math.max(0, contentTop - viewport.top);
+  const paddingBottom = fits
+    ? Math.max(0, viewportBottom - contentTop - contentHeight)
+    : Math.max(STATE_GAP, viewportBottom - bottom + STATE_GAP);
+  const roundedPaddingTop = roundToPixel(paddingTop);
+
+  return {
+    minHeight: roundToPixel(Math.max(0, viewportBottom - viewport.top)),
+    paddingTop: roundedPaddingTop,
+    paddingBottom: roundToPixel(paddingTop + paddingBottom) - roundedPaddingTop,
+  };
+}
+
+/**
+ * The content box that places a state in the band before its content height is
+ * known: the layout engine centers the content, and the two paddings carry the
+ * band's own asymmetry — how far the band's top sits below the scroller's top,
+ * and how far its bottom sits above the scroller's bottom.
+ *
+ * This reproduces `getCenteredStateLayout` exactly while the content is at
+ * least `2 * STATE_GAP` shorter than the band (both center it) or taller than
+ * the band (both pin it one gap below the band's top). Inside that narrow
+ * strip the layout engine pins the content where the measured layout would
+ * still center it, so the content can move by up to `STATE_GAP` (16 dp) when
+ * its height lands; the state is scrollable there either way. The bands the
+ * app paints are tens of dp away from their content's height, so no screen in
+ * the design-gate matrix lands in that strip.
+ */
+export function getCenteredStateBandStyle({
+  window: windowFrame,
+  viewport,
+  topInset = 0,
+  bottomInset = 0,
+  nativeViewportFillsSurface = false,
+  nativeViewportBottom = windowFrame.bottom,
+}: CenteredStateBandInput) {
+  const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
+  const { top, bottom } = getCenteredStateBand({
+    window: windowFrame,
+    viewport,
+    topInset,
+    bottomInset,
+  });
+  return {
+    minHeight: Math.max(0, viewportBottom - viewport.top),
+    justifyContent: 'center' as const,
+    paddingTop: Math.max(0, top - viewport.top) + STATE_GAP,
+    paddingBottom: Math.max(0, viewportBottom - bottom) + STATE_GAP,
+  };
+}
+
+/**
+ * The content box a centered state paints before the scroller reports its
+ * viewport, for a band that starts at the scroller's top and ends at the
+ * scroller's bottom: the layout engine centers the content in the scroller and
+ * the bottom reserve keeps it above the tab bar. That is exactly what
+ * `getCenteredStateBandStyle` returns for that band, the case of a scroller
+ * below the page header.
+ *
+ * A reserved top inset moves the band's top below the scroller's top, and a
+ * native-filled viewport moves its bottom below the scroller's bottom. This box
+ * cannot follow either move, so `CenteredState` keeps its content back until the
+ * scroller measures for such a band, and paints this box there only when the
+ * measurement cannot place the state at all.
+ */
+export function getPendingCenteredStateStyle(bottomInset: number) {
+  return {
+    justifyContent: 'center' as const,
+    paddingTop: STATE_GAP,
+    paddingBottom: STATE_GAP + bottomInset,
+  };
+}

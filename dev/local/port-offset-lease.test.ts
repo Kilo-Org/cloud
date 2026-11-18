@@ -11,6 +11,7 @@ import {
   releasePortOffsetClaims,
 } from './cli';
 import { acquireProcessLock } from './process-lock';
+import { currentComposeProject } from './infra-env';
 import { applyPortOffset, portOffset } from './services';
 
 test('reuses a running stack only when every requested service is live', async () => {
@@ -72,11 +73,10 @@ test('reuse waits through the normal service boot window', async () => {
 
 test('port conflict scan includes worker inspector ports', async () => {
   let probes = 0;
-  const result = await findPortConflicts(
-    ['event-service'],
-    async () => ++probes === 2,
-    async () => false
-  );
+  const result = await findPortConflicts(['event-service'], {
+    portProbe: async () => ++probes === 2,
+    dockerProbe: async () => false,
+  });
   assert.equal(probes, 2);
   assert.match(result.conflicts[0], /^event-service-inspector:/);
 });
@@ -233,6 +233,148 @@ test('does not abort claim cleanup when removing a claim fails', async () => {
       throw new Error('read-only filesystem');
     });
   } finally {
+    fs.rmSync(leases, { recursive: true, force: true });
+  }
+});
+
+test('infra ports count as conflicts unless this worktree already owns them', async () => {
+  const initialOffset = portOffset;
+  try {
+    applyPortOffset(2500);
+    const occupied = async () => true;
+
+    const foreign = await findPortConflicts(['postgres'], {
+      portProbe: occupied,
+      ownProject: 'kilo-dev-sticky-slider-2500',
+      portOwners: [
+        { port: 7932, project: 'kilo-dev-other-2500', container: 'kilo-dev-other-2500-postgres-1' },
+      ],
+    });
+    assert.deepEqual(foreign.conflicts, ['postgres:7932']);
+    assert.deepEqual(foreign.infraConflicts, ['postgres:7932']);
+    assert.deepEqual(
+      foreign.foreignInfraOwners?.map(owner => owner.project),
+      ['kilo-dev-other-2500']
+    );
+
+    const ours = await findPortConflicts(['postgres'], {
+      portProbe: occupied,
+      ownProject: 'kilo-dev-sticky-slider-2500',
+      portOwners: [
+        {
+          port: 7932,
+          project: 'kilo-dev-sticky-slider-2500',
+          container: 'kilo-dev-sticky-slider-2500-postgres-1',
+        },
+      ],
+    });
+    assert.deepEqual(ours.conflicts, []);
+
+    // Occupied by something Docker does not own: still a conflict, and no
+    // owner to name in the message.
+    const stranger = await findPortConflicts(['postgres'], {
+      portProbe: occupied,
+      ownProject: 'kilo-dev-sticky-slider-2500',
+      portOwners: [],
+    });
+    assert.deepEqual(stranger.conflicts, ['postgres:7932']);
+    assert.deepEqual(stranger.foreignInfraOwners, []);
+
+    // No snapshot at all — a stopped or wedged docker daemon. Ownership is
+    // unknowable, so the infra port is left to the compose error rather than
+    // blocking a start that has nothing wrong with it.
+    const noSnapshot = await findPortConflicts(['postgres'], {
+      portProbe: occupied,
+      ownProject: 'kilo-dev-sticky-slider-2500',
+    });
+    assert.deepEqual(noSnapshot.conflicts, []);
+  } finally {
+    applyPortOffset(initialOffset);
+  }
+});
+
+test('the primary checkout does not mistake its own default project for a squatter', async () => {
+  const initialOffset = portOffset;
+  try {
+    applyPortOffset(0);
+    const scan = await findPortConflicts(['postgres'], {
+      portProbe: async () => true,
+      ownProject: currentComposeProject('/repo', 0),
+      portOwners: [{ port: 5432, project: 'dev', container: 'dev-postgres-1' }],
+    });
+    assert.deepEqual(scan.conflicts, []);
+  } finally {
+    applyPortOffset(initialOffset);
+  }
+});
+
+test('an occupied infra port on the persisted offset stops the start instead of moving it', async () => {
+  const leases = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-port-lease-'));
+  const initialOffset = portOffset;
+  try {
+    applyPortOffset(3000);
+    let scans = 0;
+    await assert.rejects(
+      acquirePortOffsetLease(
+        [],
+        false,
+        '/worktree/one',
+        'missing-session-one',
+        leases,
+        async () => {
+          scans++;
+          return {
+            conflicts: ['postgres:8432'],
+            infraConflicts: ['postgres:8432'],
+            foreignInfraOwners: [
+              { port: 8432, project: 'kilo-dev-other-3000', container: 'other-postgres-1' },
+            ],
+            reusedHostServices: new Set<string>(),
+          };
+        },
+        3000
+      ),
+      /holds this stack's database[\s\S]*kilo-dev-other-3000[\s\S]*KILO_PORT_OFFSET/
+    );
+    // Stopped at the persisted offset rather than walking 50 candidates.
+    assert.equal(scans, 1);
+  } finally {
+    applyPortOffset(initialOffset);
+    fs.rmSync(leases, { recursive: true, force: true });
+  }
+});
+
+test('an infra conflict away from the persisted offset just moves on', async () => {
+  const leases = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-port-lease-'));
+  const initialOffset = portOffset;
+  try {
+    applyPortOffset(3000);
+    let scans = 0;
+    await acquirePortOffsetLease(
+      [],
+      false,
+      '/worktree/one',
+      'missing-session-one',
+      leases,
+      async () => {
+        scans++;
+        return scans === 1
+          ? {
+              conflicts: ['postgres:8432'],
+              infraConflicts: ['postgres:8432'],
+              foreignInfraOwners: [],
+              reusedHostServices: new Set<string>(),
+            }
+          : { conflicts: [], reusedHostServices: new Set<string>() };
+      },
+      // No persisted offset: nothing of this worktree's lives at 3000 yet.
+      undefined
+    );
+    assert.equal(scans, 2);
+    assert.equal(portOffset, 3100);
+    await releasePortOffsetClaims('/worktree/one', 'missing-session-one', leases);
+  } finally {
+    applyPortOffset(initialOffset);
     fs.rmSync(leases, { recursive: true, force: true });
   }
 });

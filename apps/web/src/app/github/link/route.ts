@@ -1,12 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { APP_URL } from '@/lib/constants';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_CALLBACK_PATH = '/api/integrations/github/callback';
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (integration.owned_by_organization_id) {
-    const isMember = await isOrganizationMember(integration.owned_by_organization_id, user.id);
+    const isMember = await isOrganizationMember(db, integration.owned_by_organization_id, user.id);
     if (!isMember) {
       return errorPage(
         'Access Denied',
@@ -82,7 +83,13 @@ export async function GET(request: NextRequest) {
   );
   authorizeUrl.searchParams.set(
     'state',
-    createGitHubBotLinkState(user.id, verifiedToken.installationId)
+    createGitHubBotLinkState(
+      user.id,
+      verifiedToken.installationId,
+      '/github/link',
+      appType,
+      integration.id
+    )
   );
   authorizeUrl.searchParams.set('scope', 'read:user');
 

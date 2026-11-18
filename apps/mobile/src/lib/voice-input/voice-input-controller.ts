@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the controller owns the full start/stop/abort lifecycle and session state machine. */
 import { type ExpoSpeechRecognitionResultEvent } from 'expo-speech-recognition';
 
 import {
@@ -20,11 +21,20 @@ import {
   isPendingStartCancelled,
   type Lifecycle,
   type PendingVoiceInputStart,
-  waitForTerminal,
+  waitForTerminalOutcome,
 } from './voice-input-controller-helpers';
 
 export type VoiceInputNativeEvent = {
   start: null;
+  /** Emitted when the recording stopped and the upload/processing phase began. */
+  transcribing: null;
+  /**
+   * Emitted when the session advanced its pending work without reporting a
+   * transcript: the gateway engine sends it once per finished segment upload,
+   * an empty segment included. The bounded terminal wait measures its silence
+   * from here, so a queue that keeps draining is never cut short.
+   */
+  progress: null;
   result: ExpoSpeechRecognitionResultEvent;
   nomatch: null;
   error: { code?: number; error: string; message: string };
@@ -42,6 +52,7 @@ export type VoiceInputNativeStartOptions = {
   interimResults: true;
   lang: string;
   maxAlternatives: 1;
+  requiresOnDeviceRecognition: boolean;
 };
 
 export type VoiceInputNative = {
@@ -53,6 +64,7 @@ export type VoiceInputNative = {
   requestPermissions(): Promise<VoiceInputNativePermission>;
   isRecognitionAvailable(): boolean;
   supportsContinuousRecognition(): boolean;
+  supportsOnDevice(): boolean;
   start(options: VoiceInputNativeStartOptions): void;
   stop(): void;
   abort(): void;
@@ -70,7 +82,20 @@ export type VoiceInputStartOptions = {
   onDraftChange: (nextDraft: string) => void;
   onFeedback: (feedback: VoiceInputFeedback) => void;
   owner: string;
+  requiresOnDeviceRecognition: boolean;
 };
+
+/**
+ * Bound on how long `stop`, `abort` and the next `start` wait for a session
+ * without progress. A healthy session settles in well under a second, and the
+ * gateway engine drains one queued segment per request, so the wait measures
+ * silence rather than elapsed time: every finished segment pushes the deadline
+ * out, and a bridge that stops answering releases the caller after this much
+ * no progress. Two transcription request timeouts
+ * (`TRANSCRIPTION_REQUEST_TIMEOUT_MS`) is the longest a healthy request can
+ * take without reporting anything.
+ */
+const VOICE_INPUT_TERMINAL_TIMEOUT_MS = 60_000;
 
 export function createVoiceInputController(native: VoiceInputNative) {
   let availability: VoiceInputAvailability = native.isRecognitionAvailable()
@@ -97,6 +122,23 @@ export function createVoiceInputController(native: VoiceInputNative) {
     snapshot = next;
     for (const subscriber of subscribers) {
       subscriber(snapshot);
+    }
+  };
+
+  /**
+   * Recompute `availability` from the current native binding and notify on
+   * change. The initial value is captured once at construction, so a change
+   * of the native binding's answer (e.g. gateway transcription mode toggled
+   * on for a device whose OS recognizer is unavailable) is invisible until
+   * this runs.
+   */
+  const refreshAvailability = (): void => {
+    const next: VoiceInputAvailability = native.isRecognitionAvailable()
+      ? 'available'
+      : 'unavailable';
+    if (next !== availability) {
+      availability = next;
+      notify();
     }
   };
 
@@ -154,13 +196,37 @@ export function createVoiceInputController(native: VoiceInputNative) {
     }
   };
 
+  /**
+   * Abandon a session whose terminal `end` never arrived within the bound. The
+   * mic and any in-flight upload are released, the session settles, and the
+   * caller learns the stop did not complete normally. `report` tells the user
+   * why: a failed stop keeps their words unsent, while a requested cancel is
+   * silent by contract.
+   */
+  const releaseStalledSession = (current: VoiceInputSession, report: boolean): void => {
+    if (report) {
+      current.failed = true;
+      reportFeedback(classifyVoiceInputError('client'), current.onFeedback);
+    }
+    try {
+      native.abort();
+    } catch {
+      // Best-effort: releasing the recognizer must not stop the release below.
+    }
+    terminalize(true);
+  };
+
   const serializeOwnership = async (): Promise<boolean> => {
     const previous = session;
     if (!previous) {
       return true;
     }
     abortActive(previous);
-    await waitForTerminal(previous);
+    const outcome = await waitForTerminalOutcome(previous, VOICE_INPUT_TERMINAL_TIMEOUT_MS);
+    if (outcome.kind === 'timeout') {
+      // The previous session's bridge is not answering; start anyway.
+      releaseStalledSession(previous, false);
+    }
     return !isDisposed(lifecycle);
   };
 
@@ -201,6 +267,8 @@ export function createVoiceInputController(native: VoiceInputNative) {
       onDraftChange: options.onDraftChange,
       onFeedback: options.onFeedback,
       owner: options.owner,
+      progressAt: Date.now(),
+      started: false,
       terminalPromise: terminal.promise,
       terminalResolve: terminal.resolve,
       terminalized: false,
@@ -217,6 +285,7 @@ export function createVoiceInputController(native: VoiceInputNative) {
         interimResults: true,
         lang: options.languageTag,
         maxAlternatives: 1,
+        requiresOnDeviceRecognition: options.requiresOnDeviceRecognition,
       });
     } catch {
       reportClientAndTerminalize(next);
@@ -260,8 +329,14 @@ export function createVoiceInputController(native: VoiceInputNative) {
       terminalize(true);
       return false;
     }
-    const result = await current.terminalPromise;
-    return result;
+    const outcome = await waitForTerminalOutcome(current, VOICE_INPUT_TERMINAL_TIMEOUT_MS);
+    if (outcome.kind === 'timeout') {
+      // The recorder stopped but the recognizer never reported the final
+      // transcript: settle anyway so the compose send lock is released.
+      releaseStalledSession(current, true);
+      return false;
+    }
+    return outcome.ok;
   };
 
   const abort = async (ownerArg?: string): Promise<boolean> => {
@@ -282,8 +357,13 @@ export function createVoiceInputController(native: VoiceInputNative) {
       terminalize(true);
       return false;
     }
-    const result = await current.terminalPromise;
-    return result;
+    const outcome = await waitForTerminalOutcome(current, VOICE_INPUT_TERMINAL_TIMEOUT_MS);
+    if (outcome.kind === 'timeout') {
+      // A cancel is silent by contract; it only has to free the caller.
+      releaseStalledSession(current, false);
+      return false;
+    }
+    return outcome.ok;
   };
 
   const dispose = (): void => {
@@ -321,8 +401,10 @@ export function createVoiceInputController(native: VoiceInputNative) {
     abort,
     dispose,
     getSnapshot: () => snapshot,
+    refreshAvailability,
     start,
     stop,
     subscribe,
+    supportsOnDevice: () => native.supportsOnDevice(),
   };
 }

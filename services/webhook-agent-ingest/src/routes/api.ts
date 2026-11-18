@@ -1,11 +1,12 @@
-/**
- * API Routes (internal API key auth required)
- *
- * These routes provide CRUD operations for triggers and requests.
- * - Personal triggers: /triggers/user/:userId/:triggerId
- * - Organization triggers: /triggers/org/:orgId/:triggerId
- */
-
+import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
+import {
+  existingChatWorkspaceSettingsError,
+  hasExistingChatWorkspaceSettings,
+  triggerChatIdRequired,
+  triggerChatIdSchema,
+  triggerChatRequiresCreator,
+  webhookTriggerTargetSchema,
+} from '@kilocode/worker-utils/webhook-trigger-target';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../index';
@@ -14,21 +15,19 @@ import { resError, resSuccess } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
 import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
-import { decodeUserIdFromPath, encodeUserIdForPath } from '../util/user-id-encoding';
+import { decodeUserIdFromPath, encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
+import type {
+  ScheduledInvocationResult,
+  TriggerConfigResponse,
+  TriggerConfig,
+} from '../dos/TriggerDO';
 
 const api = new Hono<HonoContext>();
 
-// Apply internal API key middleware to all API routes
 api.use('*', internalApiMiddleware);
 
-// ----------------------------------------------------------------------------
-// Personal Trigger Routes (/triggers/user/:userId/:triggerId)
-// ----------------------------------------------------------------------------
-
-/**
- * Create/configure a new personal trigger
- */
 api.post('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -38,9 +37,12 @@ api.post('/triggers/user/:userId/:triggerId', async c => {
   return handleCreateTrigger(c, namespace, triggerId, doKey);
 });
 
-/**
- * List captured requests for a personal trigger
- */
+api.post('/triggers/user/:userId/:triggerId/invoke', async c => {
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
+  return handleInvokeScheduled(c, `user/${userId}`, triggerId);
+});
+
 api.get('/triggers/user/:userId/:triggerId/requests', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -49,9 +51,6 @@ api.get('/triggers/user/:userId/:triggerId/requests', async c => {
   return handleListRequests(c, namespace, triggerId);
 });
 
-/**
- * Get a single captured request from a personal trigger
- */
 api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
   const { triggerId, requestId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -60,9 +59,6 @@ api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
   return handleGetRequest(c, namespace, triggerId, requestId);
 });
 
-/**
- * Get a personal trigger's configuration
- */
 api.get('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -71,9 +67,6 @@ api.get('/triggers/user/:userId/:triggerId', async c => {
   return handleGetTrigger(c, namespace, triggerId);
 });
 
-/**
- * Update a personal trigger's configuration
- */
 api.put('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -82,9 +75,6 @@ api.put('/triggers/user/:userId/:triggerId', async c => {
   return handleUpdateTrigger(c, namespace, triggerId);
 });
 
-/**
- * Delete a personal trigger and all its data
- */
 api.delete('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -93,13 +83,6 @@ api.delete('/triggers/user/:userId/:triggerId', async c => {
   return handleDeleteTrigger(c, namespace, triggerId);
 });
 
-// ----------------------------------------------------------------------------
-// Organization Trigger Routes (/triggers/org/:orgId/:triggerId)
-// ----------------------------------------------------------------------------
-
-/**
- * Create/configure a new organization trigger
- */
 api.post('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -108,9 +91,11 @@ api.post('/triggers/org/:orgId/:triggerId', async c => {
   return handleCreateTrigger(c, namespace, triggerId, doKey);
 });
 
-/**
- * List captured requests for an organization trigger
- */
+api.post('/triggers/org/:orgId/:triggerId/invoke', async c => {
+  const { orgId, triggerId } = c.req.param();
+  return handleInvokeScheduled(c, `org/${orgId}`, triggerId);
+});
+
 api.get('/triggers/org/:orgId/:triggerId/requests', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -118,9 +103,6 @@ api.get('/triggers/org/:orgId/:triggerId/requests', async c => {
   return handleListRequests(c, namespace, triggerId);
 });
 
-/**
- * Get a single captured request from an organization trigger
- */
 api.get('/triggers/org/:orgId/:triggerId/requests/:requestId', async c => {
   const { orgId, triggerId, requestId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -128,9 +110,6 @@ api.get('/triggers/org/:orgId/:triggerId/requests/:requestId', async c => {
   return handleGetRequest(c, namespace, triggerId, requestId);
 });
 
-/**
- * Get an organization trigger's configuration
- */
 api.get('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -138,9 +117,6 @@ api.get('/triggers/org/:orgId/:triggerId', async c => {
   return handleGetTrigger(c, namespace, triggerId);
 });
 
-/**
- * Update an organization trigger's configuration
- */
 api.put('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -148,9 +124,6 @@ api.put('/triggers/org/:orgId/:triggerId', async c => {
   return handleUpdateTrigger(c, namespace, triggerId);
 });
 
-/**
- * Delete an organization trigger and all its data
- */
 api.delete('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -158,21 +131,23 @@ api.delete('/triggers/org/:orgId/:triggerId', async c => {
   return handleDeleteTrigger(c, namespace, triggerId);
 });
 
-// ============================================================================
-// Route Handlers
-// ============================================================================
-
 type RouteContext = Context<HonoContext>;
 
-const TriggerConfigInput = z
+export const TriggerConfigInput = z
   .object({
-    targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    targetType: webhookTriggerTargetSchema.default('cloud_agent'),
+    cloudAgentSessionId: triggerChatIdSchema.optional(),
+    executionUserId: z.string().min(1).optional(),
     kiloclawInstanceId: z.string().uuid().optional(),
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
     model: z.string().trim().min(1, 'model is required').optional(),
+    variant: z.string().min(1).max(50).optional(),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().optional(),
     condenseOnComplete: z.boolean().optional(),
     webhookAuth: z
@@ -186,6 +161,32 @@ const TriggerConfigInput = z
     cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (
+      data.bodySchema != null &&
+      (data.targetType === 'kiloclaw_chat' || data.activationMode !== 'webhook')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Body validation is only available for Cloud Agent webhooks',
+        path: ['bodySchema'],
+      });
+    }
+    if (data.executionUserId !== undefined) {
+      if (data.targetType === 'kiloclaw_chat') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'executionUserId is only supported for Cloud Agent triggers',
+          path: ['executionUserId'],
+        });
+      }
+      if (data.activationMode !== 'scheduled' && !data.webhookAuth) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Webhook auth is required for creator execution',
+          path: ['webhookAuth'],
+        });
+      }
+    }
     if (data.activationMode === 'scheduled') {
       if (!data.cronExpression) {
         ctx.addIssue({
@@ -224,13 +225,14 @@ const TriggerConfigInput = z
         });
       }
     }
-    if (data.targetType === 'cloud_agent') {
-      if (!data.githubRepo)
-        ctx.addIssue({
-          code: 'custom',
-          message: 'githubRepo is required for cloud_agent triggers',
-          path: ['githubRepo'],
-        });
+    if (data.targetType === 'cloud_agent' && !data.githubRepo) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'githubRepo is required for cloud_agent triggers',
+        path: ['githubRepo'],
+      });
+    }
+    if (data.targetType !== 'kiloclaw_chat') {
       if (!data.mode)
         ctx.addIssue({
           code: 'custom',
@@ -243,12 +245,24 @@ const TriggerConfigInput = z
           message: 'model is required for cloud_agent triggers',
           path: ['model'],
         });
-      if (!data.profileId)
+    }
+    if (data.targetType === 'cloud_agent_chat') {
+      if (!data.cloudAgentSessionId) {
         ctx.addIssue({
           code: 'custom',
-          message: 'profileId is required for cloud_agent triggers',
-          path: ['profileId'],
+          message: triggerChatIdRequired,
+          path: ['cloudAgentSessionId'],
         });
+      }
+      if (hasExistingChatWorkspaceSettings(data)) {
+        ctx.addIssue({ code: 'custom', message: existingChatWorkspaceSettingsError });
+      }
+    } else if (data.cloudAgentSessionId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A chat ID is only used for an existing chat target.',
+        path: ['cloudAgentSessionId'],
+      });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -257,20 +271,38 @@ const TriggerConfigInput = z
           message: 'kiloclawInstanceId is required for kiloclaw_chat triggers',
           path: ['kiloclawInstanceId'],
         });
+      if (data.sandboxAllocation !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'sandboxAllocation is not applicable for kiloclaw_chat triggers',
+          path: ['sandboxAllocation'],
+        });
+      }
+      if (data.environmentId != null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'environmentId is not applicable for kiloclaw_chat triggers',
+          path: ['environmentId'],
+        });
+      }
     }
   });
 
 // Schema for partial updates (PUT endpoint)
 // null = explicitly clear the field, undefined = leave unchanged
-// Note: targetType and kiloclawInstanceId are intentionally excluded — they are
-// immutable after creation. To change target type or instance, delete and recreate.
-const TriggerConfigUpdateInput = z
+export const TriggerConfigUpdateInput = z
   .object({
+    executionUserId: z.never().optional(),
+    cloudAgentSessionId: z.never().optional(),
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
+    variant: z.string().min(1).max(50).nullable().optional(),
+    sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
     webhookAuth: z
@@ -329,6 +361,16 @@ async function handleCreateTrigger(
   }
 
   const config = parsedConfig.data;
+  if (config.executionUserId !== undefined && !namespace.startsWith('org/')) {
+    return c.json(resError('executionUserId is only supported for organization triggers'), 400);
+  }
+  if (
+    config.targetType === 'cloud_agent_chat' &&
+    namespace.startsWith('org/') &&
+    !config.executionUserId
+  ) {
+    return c.json(resError(triggerChatRequiresCreator), 400);
+  }
 
   try {
     const result = await withDORetry(
@@ -361,8 +403,11 @@ async function handleCreateTrigger(
       201
     );
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Webhook auth')) {
-      logger.warn('Failed to create trigger due to invalid webhook auth', {
+    if (
+      error instanceof Error &&
+      (error.message.startsWith('Webhook auth') || error.message.startsWith('Execution user'))
+    ) {
+      logger.warn('Failed to create trigger due to invalid configuration', {
         namespace,
         triggerId,
         error: error.message,
@@ -384,7 +429,7 @@ async function handleGetTrigger(c: RouteContext, namespace: string, triggerId: s
   try {
     const config = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfigForResponse(),
+      async (stub): Promise<TriggerConfigResponse | null> => await stub.getConfigForResponse(),
       'getConfigForResponse'
     );
 
@@ -399,6 +444,38 @@ async function handleGetTrigger(c: RouteContext, namespace: string, triggerId: s
       triggerId,
       error: error instanceof Error ? error.message : String(error),
     });
+    return c.json(resError('Internal server error'), 500);
+  }
+}
+
+async function handleInvokeScheduled(c: RouteContext, namespace: string, triggerId: string) {
+  const doKey = buildDOKey(namespace, triggerId);
+  try {
+    const result: ScheduledInvocationResult = await withDORetry(
+      () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
+      async stub => {
+        const result = await stub.invokeScheduled();
+        return result;
+      },
+      'invokeScheduled',
+      { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 }
+    );
+
+    if (result.success) {
+      return c.json(resSuccess({ requestId: result.requestId }), 202);
+    }
+
+    const statusByError = {
+      NOT_FOUND: 404,
+      NOT_SCHEDULED: 400,
+      INACTIVE: 409,
+      INFLIGHT_LIMIT: 429,
+      QUEUE_FAILED: 500,
+    } as const;
+    const status = statusByError[result.error];
+    return c.json(resError(result.error), status);
+  } catch {
+    logger.error('Failed to invoke scheduled trigger', { namespace, triggerId });
     return c.json(resError('Internal server error'), 500);
   }
 }
@@ -421,21 +498,43 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
 
   const updates = parsedUpdates.data;
 
-  // Check if there are any updates to apply
   if (Object.keys(updates).length === 0) {
     return c.json(resError('No updates provided'), 400);
   }
 
   try {
-    // First check if trigger exists
     const existingConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfig(),
+      async (stub): Promise<TriggerConfig | null> => await stub.getConfig(),
       'getConfig'
     );
 
     if (!existingConfig) {
       return c.json(resError('Trigger not found'), 404);
+    }
+
+    if (
+      updates.bodySchema != null &&
+      (existingConfig.targetType === 'kiloclaw_chat' || existingConfig.activationMode !== 'webhook')
+    ) {
+      return c.json(resError('Body validation is only available for Cloud Agent webhooks'), 400);
+    }
+    if (
+      existingConfig.targetType === 'cloud_agent_chat' &&
+      hasExistingChatWorkspaceSettings(updates)
+    ) {
+      return c.json(resError(existingChatWorkspaceSettingsError), 400);
+    }
+
+    if (existingConfig.targetType === 'kiloclaw_chat' && updates.sandboxAllocation !== undefined) {
+      return c.json(
+        resError('sandboxAllocation is not applicable for kiloclaw_chat triggers'),
+        400
+      );
+    }
+
+    if (existingConfig.targetType === 'kiloclaw_chat' && updates.environmentId != null) {
+      return c.json(resError('environmentId is not applicable for kiloclaw_chat triggers'), 400);
     }
 
     const result = await withDORetry(
@@ -453,10 +552,9 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
       triggerId,
     });
 
-    // Return updated config (without encryptedSecrets)
     const updatedConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfigForResponse(),
+      async (stub): Promise<TriggerConfigResponse | null> => await stub.getConfigForResponse(),
       'getConfigForResponse'
     );
 
@@ -484,14 +582,13 @@ async function handleListRequests(c: RouteContext, namespace: string, triggerId:
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists
-    const isActive = await withDORetry(
+    const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.isActive(),
-      'isActive'
+      stub => stub.exists(),
+      'exists'
     );
 
-    if (!isActive) {
+    if (!exists) {
       return c.json(resError('Trigger not found'), 404);
     }
 
@@ -521,14 +618,13 @@ async function handleGetRequest(
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists
-    const isActive = await withDORetry(
+    const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.isActive(),
-      'isActive'
+      stub => stub.exists(),
+      'exists'
     );
 
-    if (!isActive) {
+    if (!exists) {
       return c.json(resError('Trigger not found'), 404);
     }
 
@@ -558,14 +654,13 @@ async function handleDeleteTrigger(c: RouteContext, namespace: string, triggerId
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists
-    const isActive = await withDORetry(
+    const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.isActive(),
-      'isActive'
+      stub => stub.exists(),
+      'exists'
     );
 
-    if (!isActive) {
+    if (!exists) {
       return c.json(resError('Trigger not found'), 404);
     }
 
@@ -599,14 +694,6 @@ async function handleDeleteTrigger(c: RouteContext, namespace: string, triggerId
   }
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Build DO key from namespace and triggerId.
- * Format: "namespace/triggerId" (e.g., "user/abc123/my-webhook" or "org/xyz789/my-webhook")
- */
 function buildDOKey(namespace: string, triggerId: string): string {
   return `${namespace}/${triggerId}`;
 }

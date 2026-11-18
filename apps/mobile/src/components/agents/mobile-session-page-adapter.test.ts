@@ -6,6 +6,10 @@ import {
   type KiloSessionId,
   type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
+import {
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  getSessionMessagesPageInputSchema,
+} from '@kilocode/session-ingest-contracts';
 
 const mocks = vi.hoisted(() => ({
   getSessionMessagesPageQuery: vi.fn(),
@@ -73,6 +77,10 @@ async function importAdapter(): Promise<{
     kiloSessionId: KiloSessionId,
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome>;
+  readMobileSessionSnapshotPage: (
+    kiloSessionId: KiloSessionId,
+    options: { cursor?: string }
+  ) => Promise<{ outcome: SessionSnapshotPageOutcome; parentSessionId?: string | null }>;
 }> {
   const adapter = await import('@/components/agents/mobile-session-page-adapter');
   return adapter;
@@ -225,10 +233,10 @@ describe('fetchMobileSessionSnapshotPage', () => {
     expect(results).toEqual(histories);
   });
 
-  it('lets the tRPC input schema default the limit to 50 on the initial read', async () => {
-    // The mobile adapter never sets `limit` itself so the shared contract
-    // default of 50 always applies. This test pins that contract: any
-    // future change here must keep the request bounded by default.
+  it('sends no limit so the server applies its own page default', async () => {
+    // The adapter never sets `limit`: the outbound request carries only the
+    // session id, so the server's input schema bounds the read by applying its
+    // own page default. The wire assertion below pins that omission.
     mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
       kiloSessionId: 'ses_123',
       history: historyPage({ nextCursor: null }),
@@ -237,9 +245,47 @@ describe('fetchMobileSessionSnapshotPage', () => {
     const { fetchMobileSessionSnapshotPage } = await importAdapter();
     await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
 
-    const call = mocks.getSessionMessagesPageQuery.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(call).toBeDefined();
-    expect(call.limit).toBeUndefined();
+    expect(mocks.getSessionMessagesPageQuery).toHaveBeenCalledWith({ session_id: 'ses_123' });
+  });
+
+  it('defaults the wire limit to the shared page size when only the session id is sent', () => {
+    const parsed = getSessionMessagesPageInputSchema.parse({ session_id: 'ses_123' });
+    expect(parsed.limit).toBe(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE);
+    expect(parsed.cursor).toBeUndefined();
+  });
+
+  it('projects the session goal from the messages page into the snapshot info', async () => {
+    const goal = { text: 'Ship p7 objective', status: 'paused' as const };
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_123',
+      history: historyPage({ nextCursor: null }),
+      sessionGoal: goal,
+    });
+
+    const { fetchMobileSessionSnapshotPage } = await importAdapter();
+    const result = await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
+
+    // The transport replays this `info` as `session.created`, so the goal
+    // must be present or the fixed goal section is lost on open/reconnect.
+    expect(result).toMatchObject({ kind: 'success', info: { id: 'ses_123', goal } });
+  });
+
+  it('carries the goal into an empty (history:null) snapshot page', async () => {
+    const goal = { text: 'Ship p7 objective', status: 'paused' as const };
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_empty',
+      history: null,
+      sessionGoal: goal,
+    });
+
+    const { fetchMobileSessionSnapshotPage } = await importAdapter();
+    const result = await fetchMobileSessionSnapshotPage(kiloSessionId('ses_empty'), {});
+
+    expect(result).toMatchObject({
+      kind: 'success',
+      info: { id: 'ses_empty', goal },
+      messages: [],
+    });
   });
 
   it('carries watermarkEventId through when the web router includes it', async () => {
@@ -266,5 +312,56 @@ describe('fetchMobileSessionSnapshotPage', () => {
 
     expect(result).toMatchObject({ kind: 'success' });
     expect((result as Record<string, unknown>).watermarkEventId).toBeUndefined();
+  });
+
+  it('returns the parent session id the messages page carried, without folding it into info', async () => {
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_child',
+      history: historyPage({ nextCursor: null }),
+      parentSessionId: 'ses_parent',
+    });
+
+    const { readMobileSessionSnapshotPage } = await importAdapter();
+    const { outcome, parentSessionId } = await readMobileSessionSnapshotPage(
+      kiloSessionId('ses_child'),
+      {}
+    );
+
+    expect(parentSessionId).toBe('ses_parent');
+    // The transport replays `info` as `session.created`, where a parent id would
+    // make the opened session a child of itself in the SDK's bookkeeping.
+    expect(outcome).toMatchObject({ kind: 'success', info: { id: 'ses_child' } });
+    const replayedInfo = outcome.kind === 'success' ? outcome.info : {};
+    expect('parentID' in replayedInfo).toBe(false);
+  });
+
+  it('separates an answered root from a payload that cannot answer', async () => {
+    const { readMobileSessionSnapshotPage } = await importAdapter();
+
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_root',
+      history: null,
+      parentSessionId: null,
+    });
+    await expect(readMobileSessionSnapshotPage(kiloSessionId('ses_root'), {})).resolves.toEqual({
+      parentSessionId: null,
+      outcome: {
+        kind: 'success',
+        info: { id: 'ses_root' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      },
+    });
+
+    // A server that predates the projection cannot answer it: the caller must
+    // keep its own fallback rather than read a missing field as "root".
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_old_server',
+      history: null,
+    });
+    const olderServer = await readMobileSessionSnapshotPage(kiloSessionId('ses_old_server'), {});
+    expect(olderServer.parentSessionId).toBeUndefined();
+    expect(olderServer.outcome).toMatchObject({ kind: 'success', info: { id: 'ses_old_server' } });
   });
 });

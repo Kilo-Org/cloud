@@ -1,120 +1,48 @@
-// Inline error area for the comment composer. Local empty-body validation has
-// no toast owner, so AccessibleStatus announces it on both platforms;
-// mutation-classified errors are toast-owned (announcingToast) and stay
-// visual-only so they never double-announce.
-
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+// Inline error area for the composer family. The failure arrives as the one
+// object the surface published, so its kind, its copy and its announcer can
+// never disagree. A locally raised validation ("here") announces through
+// AccessibleStatus on both platforms; a mutation-derived failure was already
+// toasted by the mutation hook and stays visual-only.
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
-import {
-  ensureTermsAcceptedOutcome,
-  TERMS_CHECK_RETRY_COPY,
-  TERMS_OUTDATED_COPY,
-} from '@/components/pr-review/discussion/reply-input';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
+import { View } from 'react-native';
 
-export type ComposerInlineErrorKind =
-  | 'retryable'
-  | 'bad-request'
-  | 'forbidden'
-  | 'reconnect'
-  | null;
+import { type PrInlineFailure } from '@/lib/pr-review/inline-failure';
+import { assertSurfaceFailureHandled, type SurfaceFeedback } from '@/lib/surface-feedback';
 
 type ComposerInlineErrorProps = {
-  readonly inlineError: string | null;
-  readonly inlineErrorKind: ComposerInlineErrorKind;
-  readonly inlineErrorIsLocal: boolean;
+  readonly feedback: SurfaceFeedback<PrInlineFailure>;
 };
 
-export function ComposerInlineError({
-  inlineError,
-  inlineErrorKind,
-  inlineErrorIsLocal,
-}: Readonly<ComposerInlineErrorProps>) {
-  return (
-    <>
-      {inlineError && inlineErrorKind !== 'reconnect' ? (
+export function ComposerInlineError({ feedback }: Readonly<ComposerInlineErrorProps>) {
+  if (feedback.status !== 'failed') {
+    return null;
+  }
+  switch (feedback.failure.kind) {
+    case 'reconnect': {
+      return <PrReviewReconnectNotice />;
+    }
+    case 'body-empty':
+    case 'not-recorded':
+    case 'retryable':
+    case 'bad-request':
+    case 'forbidden':
+    case 'not-found':
+    case 'ambiguous': {
+      return (
         <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
-          {inlineErrorIsLocal ? (
-            <AccessibleStatus message={inlineError} tone="error" className="text-xs" />
+          {feedback.failure.announce === 'here' ? (
+            <AccessibleStatus message={feedback.failure.message} tone="error" className="text-xs" />
           ) : (
-            <Text className="text-xs text-destructive">{inlineError}</Text>
+            <Text className="text-xs text-destructive">{feedback.failure.message}</Text>
           )}
         </View>
-      ) : null}
-      {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
-    </>
-  );
-}
-
-/**
- * Inline-error state for the composer. Mirrors the create-comment mutation
- * error into the inline box, and clears the recoverable bad-request state
- * when the body changes. The Terms gate is prompted here on a terms-required
- * classification.
- */
-export function useComposerInlineError(error: unknown, isEdit: boolean) {
-  const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<ComposerInlineErrorKind>(null);
-  // True when `inlineError` is a local empty-body validation error (no
-  // mutation toast owns it), so it must announce through AccessibleStatus;
-  // mutation-classified errors are toast-owned and stay visual-only.
-  const [inlineErrorIsLocal, setInlineErrorIsLocal] = useState(false);
-
-  useEffect(() => {
-    if (isEdit || !error) {
-      return;
+      );
     }
-    const classification = classifyPrReviewMutationError(error);
-    if (classification.kind === 'terms-required') {
-      void (async () => {
-        const outcome = await ensureTermsAcceptedOutcome();
-        if (outcome.kind === 'accepted') {
-          setInlineError(null);
-          setInlineErrorKind(null);
-          setInlineErrorIsLocal(false);
-        } else if (outcome.kind === 'outdated') {
-          setInlineError(TERMS_OUTDATED_COPY);
-          setInlineErrorKind('bad-request');
-          setInlineErrorIsLocal(false);
-        } else if (outcome.kind === 'unknown') {
-          setInlineError(TERMS_CHECK_RETRY_COPY);
-          setInlineErrorKind('retryable');
-          setInlineErrorIsLocal(false);
-        } else {
-          setInlineError('You must accept the Terms of Service to post.');
-          setInlineErrorKind(null);
-          setInlineErrorIsLocal(true);
-        }
-      })();
-      return;
-    }
-    const display = mutationErrorDisplay('composer', classification, error);
-    setInlineError(display.message);
-    setInlineErrorKind(display.kind);
-    setInlineErrorIsLocal(false);
-  }, [error, isEdit]);
-
-  function clearBadRequestOnBodyEdit() {
-    // bad-request clears on body change; forbidden stays for the session.
-    if (inlineErrorKind === 'bad-request') {
-      setInlineError(null);
-      setInlineErrorKind(null);
-      setInlineErrorIsLocal(false);
+    default: {
+      return assertSurfaceFailureHandled(feedback.failure);
     }
   }
-
-  return {
-    inlineError,
-    inlineErrorKind,
-    inlineErrorIsLocal,
-    setInlineError,
-    setInlineErrorKind,
-    setInlineErrorIsLocal,
-    clearBadRequestOnBodyEdit,
-  };
 }

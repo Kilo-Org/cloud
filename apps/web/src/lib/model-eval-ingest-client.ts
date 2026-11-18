@@ -1,6 +1,6 @@
 import 'server-only';
 import * as z from 'zod';
-import { INTERNAL_API_SECRET, MODEL_EVAL_INGEST_URL } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, MODEL_EVAL_INGEST_URL } from '@kilocode/web-shared/lib/config.server';
 
 const ModelEvalSyncResultSchema = z.object({
   success: z.literal(true),

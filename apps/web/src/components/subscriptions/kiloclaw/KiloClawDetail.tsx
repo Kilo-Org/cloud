@@ -13,7 +13,6 @@ import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { DetailRow } from '@/components/subscriptions/DetailRow';
 import { StripePortalLink } from '@/components/subscriptions/StripePortalLink';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
-import { ReferralRewardsSummary } from '@/app/(app)/claw/components/billing/ReferralRewardsSummary';
 import { useInvalidateKiloClawBilling } from '@/components/subscriptions/kiloclaw/useKiloClawBillingQueries';
 import {
   AlertDialog,
@@ -454,8 +453,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
           ) : null}
         </div>
       )}
-
-      <ReferralRewardsSummary rewards={subscription.referralRewards} />
 
       <Card>
         <CardHeader className="pb-4">

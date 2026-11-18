@@ -136,7 +136,7 @@ describe('executeChatComposerSubmission', () => {
   });
 
   describe('prompt submission', () => {
-    it('clears the draft, resets attachments, and dismisses once when the prompt resolves', async () => {
+    it('delegates clearing to the composer and leaves cleanup untouched when the prompt resolves', async () => {
       const handlers = makeHandlers({
         onSendPrompt: async () => {
           await Promise.resolve();
@@ -152,9 +152,11 @@ describe('executeChatComposerSubmission', () => {
 
       expect(handlers.onSendPrompt).toHaveBeenCalledTimes(1);
       expect(handlers.onSendPrompt).toHaveBeenCalledWith('hello world');
-      expect(cleanup.clearDraft).toHaveBeenCalledTimes(1);
-      expect(cleanup.resetAttachments).toHaveBeenCalledTimes(1);
-      expect(cleanup.dismiss).toHaveBeenCalledTimes(1);
+      // The optimistic prompt path clears the composer via the SDK's
+      // onOptimisticSend signal, so the submission helper leaves cleanup to
+      // the caller and never clobbers a draft typed during the round-trip.
+      expect(cleanup.clearDraft).not.toHaveBeenCalled();
+      expect(cleanup.dismiss).not.toHaveBeenCalled();
     });
 
     it('preserves draft and attachments when the prompt send rejects', async () => {

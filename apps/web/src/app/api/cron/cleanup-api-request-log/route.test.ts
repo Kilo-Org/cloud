@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
@@ -14,14 +14,15 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-import { api_request_log } from '@kilocode/db/schema';
-import { db, sql } from '@/lib/drizzle';
+import { ai_gateway_request_logging_opt_ins, api_request_log_2 } from '@kilocode/db/schema';
+import { getRequestLoggingOptIns } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 
-const BATCH_SIZE = 1_000;
+const BATCH_SIZE = 10_000;
 
 function daysAgo(days: number): string {
   const date = new Date();
@@ -36,24 +37,31 @@ function makeRequest(headers?: Record<string, string>) {
   });
 }
 
-async function insertApiRequestLogRecord(created_at: string, provider = 'test-provider') {
-  const [row] = await db.insert(api_request_log).values({ created_at, provider }).returning();
+function logRecord(created_at: string) {
+  return {
+    id: crypto.randomUUID(),
+    created_at,
+    kilo_user_id: 'cleanup-test-user',
+    requested_model: 'test/model',
+  };
+}
+
+async function insertApiRequestLogRecord(created_at: string) {
+  const [row] = await db.insert(api_request_log_2).values(logRecord(created_at)).returning();
   return row;
 }
 
 async function insertApiRequestLogRecords(count: number, created_at: string) {
-  await db.insert(api_request_log).values(
-    Array.from({ length: count }, (_, index) => ({
-      created_at,
-      provider: `test-provider-${index}`,
-    }))
-  );
+  await db
+    .insert(api_request_log_2)
+    .values(Array.from({ length: count }, () => logRecord(created_at)));
 }
 
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
-    await db.delete(api_request_log).where(sql`true`);
+    await db.delete(api_request_log_2).where(sql`true`);
+    await db.delete(ai_gateway_request_logging_opt_ins).where(sql`true`);
   });
 
   it('rejects requests without authorization header', async () => {
@@ -70,6 +78,7 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.deletedCount).toBe(0);
+    expect(body.deletedOptInCount).toBe(0);
     expect(body.batchSize).toBe(BATCH_SIZE);
     expect(body.hasMore).toBe(false);
     expect(body.cutoffDate).toEqual(expect.any(String));
@@ -77,16 +86,51 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
       outcome: 'succeeded',
       deleted_api_request_log_count: 0,
+      deleted_request_logging_opt_in_count: 0,
       deleted_count: 0,
       batch_size: BATCH_SIZE,
       has_more: false,
     });
   });
 
-  it('deletes expired records and preserves recent records', async () => {
+  it('deletes expired opt-ins while preserving future and non-expiring rules', async () => {
+    const makeOptIn = (expires_at?: string) => ({
+      id: crypto.randomUUID(),
+      target_type: 'account' as const,
+      target_id: `oauth/cleanup/${crypto.randomUUID()}`,
+      reason: 'Investigate errors',
+      added_by_email: 'admin@example.com',
+      added_at: '2020-01-01T00:00:00.000Z',
+      errors_only: true,
+      ...(expires_at ? { expires_at } : {}),
+    });
+    const now = Date.now();
+    const rules = [
+      makeOptIn(new Date(now - 1).toISOString()),
+      makeOptIn(new Date(now).toISOString()),
+      makeOptIn(new Date(now + 60_000).toISOString()),
+      makeOptIn(),
+    ];
+    await db.insert(ai_gateway_request_logging_opt_ins).values({ opt_ins: rules });
+
+    const unauthorized = await GET(makeRequest());
+    expect(unauthorized.status).toBe(401);
+    expect(await getRequestLoggingOptIns()).toEqual(rules);
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ deletedCount: 0, deletedOptInCount: 2 });
+    expect(await getRequestLoggingOptIns()).toEqual(rules.slice(2));
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ deleted_request_logging_opt_in_count: 2 })
+    );
+  });
+
+  it('deletes records older than thirty days and preserves recent records', async () => {
     await insertApiRequestLogRecord(daysAgo(45));
     await insertApiRequestLogRecord(daysAgo(31));
-    const recent = await insertApiRequestLogRecord(daysAgo(1));
+    const recent = await insertApiRequestLogRecord(daysAgo(29));
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
@@ -102,15 +146,31 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
       })
     );
 
-    const remaining = await db.select().from(api_request_log);
+    const remaining = await db.select().from(api_request_log_2);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe(recent.id);
   });
 
+  it('still enforces log retention when persisted opt-in state cannot be parsed', async () => {
+    await insertApiRequestLogRecord(daysAgo(45));
+    const recent = await insertApiRequestLogRecord(daysAgo(1));
+    await db.insert(ai_gateway_request_logging_opt_ins).values({ opt_ins: [{ id: 'invalid' }] });
+
+    await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow();
+
+    const remaining = await db.select({ id: api_request_log_2.id }).from(api_request_log_2);
+    expect(remaining).toEqual([{ id: recent.id }]);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledTimes(1);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
+      outcome: 'failed',
+      exception_name: 'ZodError',
+    });
+  });
+
   it('deletes at most one batch per request', async () => {
     await insertApiRequestLogRecords(BATCH_SIZE + 5, daysAgo(45));
-    const recent1 = await insertApiRequestLogRecord(daysAgo(1), 'recent-1');
-    const recent2 = await insertApiRequestLogRecord(new Date().toISOString(), 'recent-2');
+    const recent1 = await insertApiRequestLogRecord(daysAgo(1));
+    const recent2 = await insertApiRequestLogRecord(new Date().toISOString());
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
@@ -120,13 +180,11 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(body.batchSize).toBe(BATCH_SIZE);
     expect(body.hasMore).toBe(true);
 
-    const remaining = await db.select().from(api_request_log);
+    const remaining = await db.select().from(api_request_log_2);
     expect(remaining).toHaveLength(7);
 
-    const remainingIds = remaining.map(row => row.id.toString()).sort();
-    expect(remainingIds).toEqual(
-      expect.arrayContaining([recent1.id.toString(), recent2.id.toString()])
-    );
+    const remainingIds = remaining.map(row => row.id).sort();
+    expect(remainingIds).toEqual(expect.arrayContaining([recent1.id, recent2.id]));
   });
 
   it('emits one failure event and preserves rejected database failure semantics', async () => {

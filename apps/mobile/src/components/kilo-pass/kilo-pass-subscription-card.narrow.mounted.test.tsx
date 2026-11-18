@@ -1,0 +1,138 @@
+import { createElement } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { act, TestRenderer } from '@/test/renderer';
+
+import { KiloPassSubscriptionCard } from './kilo-pass-subscription-card';
+
+const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
+
+type CardContent = {
+  kind: string;
+  title?: string;
+  description?: string;
+  accessibilityLabel?: string;
+};
+
+const cardState = vi.hoisted(() => {
+  const card: CardContent = {
+    kind: 'card',
+    title: 'Kilo Pass',
+    description: 'Active',
+    accessibilityLabel: 'Kilo Pass. Active',
+  };
+  return { content: card };
+});
+
+const CARD_CONTENT: CardContent = {
+  kind: 'card',
+  title: 'Kilo Pass',
+  description: 'Active',
+  accessibilityLabel: 'Kilo Pass. Active',
+};
+
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    kiloPass: {
+      getState: { queryOptions: () => ({ queryKey: ['kiloPass', 'getState'] as const }) },
+    },
+  }),
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
+}));
+
+vi.mock('@/lib/kilo-pass/state', () => ({
+  getKiloPassCardContentState: () => cardState.content,
+}));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ primary: '#fff' }),
+}));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/kilo-pass/kilo-pass-icon', () => ({ KiloPassIcon: 'KiloPassIcon' }));
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+  useWindowDimensions: () => windowDims,
+}));
+
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+function renderCard(hideLoadingSkeleton = true) {
+  act(() => {
+    const element = createElement(KiloPassSubscriptionCard, { hideLoadingSkeleton });
+    if (renderer) {
+      renderer.update(element);
+    } else {
+      renderer = TestRenderer.create(element);
+    }
+  });
+  if (!renderer) {
+    throw new Error('Missing KiloPassSubscriptionCard renderer');
+  }
+  return renderer.root;
+}
+
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  windowDims.width = 390;
+  cardState.content = CARD_CONTENT;
+});
+
+describe('KiloPassSubscriptionCard mounted layout', () => {
+  it('moves the copy below the tile row in a narrow window and keeps one pressable', () => {
+    // A narrow window puts the copy on its own row below the icon tile row.
+    windowDims.width = 160;
+    const root = renderCard();
+    const cards = root.findAllByProps({ accessibilityRole: 'button' });
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.props.accessibilityLabel).toBe('Kilo Pass. Active');
+
+    const tileRow = root.find(node => Object.is(node.type, 'KiloPassIcon')).parent?.parent;
+    expect(tileRow?.findAll(node => Object.is(node.type, 'Text'))).toHaveLength(0);
+    expect(
+      root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Kilo Pass')
+    ).toHaveLength(1);
+  });
+});
+
+describe('KiloPassSubscriptionCard loading layout', () => {
+  it('clamps both loading bars to the narrow card', () => {
+    cardState.content = { kind: 'loading' };
+    windowDims.width = 160;
+    const root = renderCard(false);
+    const bars = root
+      .findAll(
+        node => Object.is(node.type, 'Skeleton') && /w-(28|48)/.test(String(node.props.className))
+      )
+      .map(node => String(node.props.className));
+    expect(bars).toHaveLength(2);
+    for (const className of bars) {
+      expect(className).toContain('max-w-full');
+    }
+  });
+
+  it('reserves the stacked card height while the balance skeleton owns the section', () => {
+    cardState.content = { kind: 'loading' };
+    windowDims.width = 160;
+    const root = renderCard(true);
+    expect(String(root.findByProps({ className: 'h-[114px]' }).props.className)).toBe('h-[114px]');
+  });
+
+  it('reserves the single-row card height at phone widths', () => {
+    cardState.content = { kind: 'loading' };
+    const root = renderCard(true);
+    // The card's rem is 14 pt: p-3 (21) + the h-10 icon row (35) + the two
+    // 1 px borders, matching the loaded card the reserve stands in for.
+    expect(String(root.findByProps({ className: 'h-[58px]' }).props.className)).toBe('h-[58px]');
+  });
+});

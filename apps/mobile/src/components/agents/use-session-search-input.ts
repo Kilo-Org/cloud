@@ -5,23 +5,57 @@ import { selectAwaitingCommit } from '@/components/agents/session-list-search-bu
 import {
   createDefaultSearchTimer,
   createSessionSearchController,
+  resolveSearchRestoreDecision,
   type SessionSearchController,
 } from '@/components/agents/session-search-state';
+import { saveDraft, SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
-type UseSessionSearchInputResult = {
+/**
+ * TextInput remount key prefix. The visible text of this field changes only
+ * through a remount: the field is uncontrolled, so a value written by native
+ * code (a restored draft's `defaultValue`) is invisible to the JS TextInput's
+ * event count, and the imperative `clear()` command that count gates is then
+ * dropped on Android. Every replacement of the visible text therefore bumps the
+ * epoch and mounts a fresh input with that text as its `defaultValue`.
+ */
+const SESSION_SEARCH_INPUT_KEY_PREFIX = 'session-search-input';
+
+export type UseSessionSearchInputParams = {
+  /** Signed-in user id; persistence is skipped when empty. */
+  userId: string | undefined;
+  /** Durable draft value once loaded (null while not yet restored). */
+  restoredQuery: string | null;
+  /** True once the durable draft load has settled (identity or entity). */
+  restoreSettled: boolean;
+};
+
+export type UseSessionSearchInputResult = {
   /** Committed (debounced) search query that drives the list body. */
   searchQuery: string;
+  /**
+   * True while the durable draft has not reached the search state yet: the
+   * settle is still pending, or it has landed and this mount has not applied
+   * it. The committed query and the visible text change in the same commit as
+   * this clears, so a list body can wait one paint instead of rendering the
+   * previous no-query state and then replacing it.
+   */
+  restorePending: boolean;
   /** Ref for the uncontrolled search TextInput. */
   searchInputRef: React.RefObject<TextInput | null>;
   /** Whether the search TextInput currently has non-empty text. */
   hasText: boolean;
   /** True while typed text is ahead of the committed (debounced) query. */
   awaitingCommit: boolean;
+  /** TextInput remount key; a new value mounts the input with `searchDefaultValue`. */
+  searchInputKey: string;
+  /** Content the next remounted TextInput shows; '' after a clear. */
+  searchDefaultValue: string | undefined;
   /** Call on every `onChangeText` from the search TextInput. */
   handleSearchInputChange: (text: string) => void;
-  /** In-field X: imperatively clear the typed text, blur, and drop the query. */
+  /** In-field X: empty the visible text through a remount, blur, drop the query. */
   handleClearSearchInput: () => void;
-  /** Imperatively clear the typed text and reset `hasText` (no blur). */
+  /** Empty the visible text through a remount and reset `hasText` (no blur). */
   clearSearchInput: () => void;
   /** Pure search controller for broader clear semantics (e.g. empty-state CTA). */
   searchController: SessionSearchController;
@@ -29,11 +63,16 @@ type UseSessionSearchInputResult = {
 
 /**
  * Encapsulates the Agents search input's debounced commit, uncontrolled
- * TextInput ref, and the two clear paths (search-only vs. broad). Keeps the
- * screen focused on layout/query consumption while preserving the exact 300ms
- * debounce and dispose-on-unmount behavior.
+ * TextInput ref, durable draft persistence, and the two clear paths
+ * (search-only vs. broad). Keeps the screen focused on layout/query
+ * consumption while preserving the exact 300ms debounce, dispose-on-unmount
+ * behavior, and the restored-draft remount contract.
  */
-export function useSessionSearchInput(): UseSessionSearchInputResult {
+export function useSessionSearchInput({
+  userId,
+  restoredQuery,
+  restoreSettled,
+}: UseSessionSearchInputParams): UseSessionSearchInputResult {
   const [searchQuery, setSearchQuery] = useState('');
   // Stale-closure guard: the ref is read by handleSearchInputChange so
   // selectAwaitingCommit always sees the latest committed query without
@@ -45,6 +84,18 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   // itself. Only the boolean awaitingCommit state drives the busy
   // indicator.
   const lastTypedRef = useRef('');
+
+  // Whether the user has touched this field in this mount (typed or cleared).
+  // Separate from `lastTypedRef`, whose emptiness also means "the user cleared
+  // it": a late draft settle must not seed a field the user has already
+  // emptied, and it must not undo a clear.
+  const userInteractedRef = useRef(false);
+
+  // Whether this mount has applied the settled draft to the search state. It is
+  // state, not a ref: a settled empty draft leaves `searchQuery` and `hasText`
+  // as they already are, so a ref would leave the body loading for a render
+  // that never comes.
+  const [seedApplied, setSeedApplied] = useState(false);
 
   // Boolean state whose setter returns its previous value while it stays
   // true, so extra keystrokes before the debounce commits are free of
@@ -68,6 +119,38 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   });
   const searchController = searchControllerRef.current;
 
+  // Visible-text state. The field is uncontrolled, so the only way to replace
+  // its text is a remount: `inputEpoch` makes every replacement a new mount,
+  // and `searchDefaultValue` is what that mount shows. Typing never touches
+  // these, so a keystroke never remounts the field.
+  const [inputEpoch, setInputEpoch] = useState(0);
+  const [searchDefaultValue, setSearchDefaultValue] = useState<string | undefined>(undefined);
+  const replaceInputText = useCallback((text: string) => {
+    setSearchDefaultValue(text);
+    setInputEpoch(epoch => epoch + 1);
+  }, []);
+  const searchInputKey = `${SESSION_SEARCH_INPUT_KEY_PREFIX}-${inputEpoch}`;
+
+  // Persist the visible typed string through the 500 ms durable draft
+  // debounce — the per-key pending timer is left to commit on its own so
+  // typing never forces an encrypted write per keystroke. Skipped while the
+  // account has not resolved (DEC-01 account scope).
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+
+  // The debounced write still has to survive a background/kill inside the
+  // window, so flush the pending search draft when the app leaves `active`
+  // and on unmount.
+  useDraftFlushOnBackground(userId, SESSION_SEARCH_DRAFT_KEY, true);
+
+  const saveSearchDraft = useCallback((text: string) => {
+    const uid = userIdRef.current;
+    if (!uid) {
+      return;
+    }
+    saveDraft(uid, SESSION_SEARCH_DRAFT_KEY, text);
+  }, []);
+
   const handleSearchChange = useCallback(
     (text: string) => {
       searchController.scheduleSearch(text);
@@ -79,22 +162,28 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   // query without touching the persisted platform/project narrowing
   // filters — the broad empty-state clear still owns that.
   const handleClearSearchOnly = useCallback(() => {
+    userInteractedRef.current = true;
     searchController.clearSearchOnly();
     lastTypedRef.current = '';
     setAwaitingCommit(false);
-  }, [searchController]);
+    saveSearchDraft('');
+  }, [searchController, saveSearchDraft]);
 
   // The search TextInput lives above the pinned "Active now" tray (so it's
   // always visible) but must stay uncontrolled — see iOS TextInput rules.
   const searchInputRef = useRef<TextInput>(null);
+
+  const refocusAfterRemountRef = useRef(false);
   const [hasText, setHasText] = useState(false);
 
   const handleSearchInputChange = useCallback(
     (text: string) => {
       const hasTextNow = text.length > 0;
+      userInteractedRef.current = true;
       setHasText(hasTextNow);
       lastTypedRef.current = text;
       handleSearchChange(text);
+      saveSearchDraft(text);
 
       // Only trigger a render when awaitingCommit transitions.
       // The functional updater returns prev when it already equals
@@ -108,28 +197,67 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
       });
       setAwaitingCommit(prev => (prev === shouldAwait ? prev : shouldAwait));
     },
-    [handleSearchChange]
+    [handleSearchChange, saveSearchDraft]
   );
 
-  // In-field X: imperatively clear what's visibly typed + dismiss the
-  // keyboard, then drop the debounced query. Persisted filters are left
+  // In-field X: empty the visible text through a remount, dismiss the
+  // keyboard, then drop the debounced query. The remount is what makes the
+  // field empty: the dropped native `clear()` left a restored draft's text on
+  // screen while the state already said "no text". Persisted filters are left
   // alone — the empty-state "Clear filters" CTA still owns the broad reset.
   const handleClearSearchInput = useCallback(() => {
-    searchInputRef.current?.clear();
     searchInputRef.current?.blur();
+    replaceInputText('');
     setHasText(false);
     handleClearSearchOnly();
-  }, [handleClearSearchOnly]);
+  }, [handleClearSearchOnly, replaceInputText]);
 
-  // Broad clear primitive: reset the uncontrolled TextInput's visible text
-  // and `hasText` flag without blurring. The caller still orchestrates the
-  // query/filters reset via `searchController.clearBroadly`.
+  // Broad clear primitive: empty the visible text through a remount and reset
+  // `hasText` without blurring. If the field owned focus before the remount,
+  // return it to the new input after React attaches the ref.
   const clearSearchInput = useCallback(() => {
-    searchInputRef.current?.clear();
+    userInteractedRef.current = true;
+    refocusAfterRemountRef.current = searchInputRef.current?.isFocused() ?? false;
+    replaceInputText('');
     setHasText(false);
     lastTypedRef.current = '';
     setAwaitingCommit(false);
-  }, []);
+    saveSearchDraft('');
+  }, [replaceInputText, saveSearchDraft]);
+
+  useEffect(() => {
+    if (!refocusAfterRemountRef.current) {
+      return;
+    }
+    refocusAfterRemountRef.current = false;
+    searchInputRef.current?.focus();
+  }, [searchInputKey]);
+
+  // Seed the input once the durable draft settles and the user has not touched
+  // it. An empty persisted value (including '' persisted by a clear) seeds
+  // empty, so a previously committed non-empty query is never reloaded, and a
+  // settle that lands after a clear is ignored rather than restoring the text
+  // the user just removed. The committed query is the restored text trimmed,
+  // the same value typing that text commits, so a whitespace-only draft keeps
+  // the full list; a non-empty restored value remounts the uncontrolled input
+  // so it shows the restored text exactly as stored.
+  useEffect(() => {
+    const decision = resolveSearchRestoreDecision({
+      settled: restoreSettled,
+      hasInteracted: userInteractedRef.current,
+      restoredQuery,
+    });
+    if (!decision.shouldSeed) {
+      return;
+    }
+    setSeedApplied(true);
+    lastTypedRef.current = decision.text;
+    setHasText(decision.hasText);
+    setSearchQuery(decision.query);
+    if (decision.shouldRemount) {
+      replaceInputText(decision.text);
+    }
+  }, [restoreSettled, restoredQuery, replaceInputText]);
 
   useEffect(
     () => () => {
@@ -138,11 +266,19 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
     [searchController]
   );
 
+  // A pending restore outranks any query state: the body must not claim a
+  // result for a search text it is about to receive. Interaction wins, so a
+  // user who types or clears before the draft lands never waits on it.
+  const restorePending = !seedApplied && !userInteractedRef.current;
+
   return {
     searchQuery,
+    restorePending,
     searchInputRef,
     hasText,
     awaitingCommit,
+    searchInputKey,
+    searchDefaultValue,
     handleSearchInputChange,
     handleClearSearchInput,
     clearSearchInput,

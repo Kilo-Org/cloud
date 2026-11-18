@@ -1,0 +1,865 @@
+import { constants } from 'node:fs';
+import fsp from 'node:fs/promises';
+import {
+  CONTROL_PLANE_ALLOCATION_ID_ENV,
+  type ControlPlaneWrapperFrame,
+} from '../../../src/shared/control-plane-protocol.js';
+import {
+  createControlDiagnosticProjector,
+  diagnosticDetail,
+  nativeControlPlaneLogsEnabled,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
+import { resolveControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import { installInterceptTrustIfEnabled } from '../control/cert.js';
+import { createControlDiagnostics, type ControlDiagnostics } from '../control/diagnostics.js';
+import {
+  closeControlWorkload,
+  initializeControlWorkload,
+  readWorkloadStats,
+} from '../control/workload-cgroup.js';
+import { createSetupSpawn } from '../control/setup-cgroup.js';
+import {
+  createControlFileLogUploader,
+  type ControlFileLogUploader,
+} from '../control/file-log-uploader.js';
+import { logToFile } from '../utils.js';
+import {
+  createWrapperSentryReporter,
+  type WrapperSentryContext,
+  type WrapperSentryReporter,
+} from '../sentry.js';
+import { createControlPlaneConnection, type ControlPlaneConnection } from './connection.js';
+import {
+  cleanupStaleKiloPidfiles,
+  createKiloRuntimes,
+  defaultKiloPidfileDirectory,
+  type KiloRuntimesOptions,
+  liveRuntimeClient,
+} from './kilo-runtime.js';
+import { createPreparationManager, runtimeKey, type PreparationManager } from './prepare.js';
+import { createTurnManager, type TurnManager, type TurnManagerDeps } from './turn.js';
+import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
+import { createNativeStatusReporter } from './native-status.js';
+import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
+import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
+import { createControlPlaneWorktreeGit, type PreparedGitContext } from './worktree-git.js';
+import { createControlPlaneKiloRequests } from './kilo-requests.js';
+import { createControlPlanePreviewServices } from './preview-services.js';
+import { createHistoryRequests } from './history-requests.js';
+import { runtimeHarness } from './runtime-harness.js';
+import { readKiloCliVersion } from './runtime-versions.js';
+import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
+import { createTransferGrantRequests } from './transfer-grant-requests.js';
+import { createSandboxTransferClient } from '../control/sandbox-transfer-client.js';
+import {
+  WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS,
+  WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS,
+} from '../../../src/shared/workspace-artifacts.js';
+import {
+  createWorkspaceArtifactSync,
+  WORKSPACE_ARTIFACT_ROOT,
+  WORKSPACE_ARTIFACT_STATE_PATH,
+  type WorkspaceArtifactSync,
+} from './workspace-artifacts.js';
+import { transferUrlForWrapperInstance } from './wrapper-identity.js';
+import {
+  CONTROL_SANDBOX_PROVIDER_ENV,
+  parseAgentSandboxProvider,
+} from '../../../src/shared/sandbox-provider.js';
+import { reservedPreviewPorts } from '../../../src/shared/reserved-ports.js';
+
+const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
+const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function transferGrantHasArtifactsScope(grant: string): boolean {
+  const encoded = grant.split('.')[1];
+  if (encoded === undefined) return false;
+  try {
+    const payload: unknown = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (typeof payload !== 'object' || payload === null) return false;
+    const scopes = (payload as { scopes?: unknown }).scopes;
+    return Array.isArray(scopes) && scopes.includes('workspace_artifacts');
+  } catch {
+    return false;
+  }
+}
+
+export async function ensureWorkspaceArtifactRoot(
+  root: string = WORKSPACE_ARTIFACT_ROOT
+): Promise<boolean> {
+  try {
+    await fsp.mkdir(root, { recursive: true });
+    await fsp.access(root, constants.W_OK);
+    return true;
+  } catch (error) {
+    logToFile(`workspace artifact root is unavailable: ${messageOf(error)}`);
+    return false;
+  }
+}
+
+export type ControlPlaneExitEvent =
+  | 'shutdown'
+  | 'sigterm'
+  | 'uncaught_exception'
+  | 'unhandled_rejection';
+
+/**
+ * Spec §7 "Crash resistance": the wrapper exits only on `shutdown` (exit 0 so
+ * the supervisor does not restart it), a wrapper-only SIGTERM (exit 1 so the
+ * supervisor restarts it within its existing budget), or an uncaught exception
+ * (exit 1). An unhandled rejection is logged and does not exit. The supervisor's
+ * own TERM/INT trap forwards SIGTERM here too and then exits terminally whatever
+ * this exit code is.
+ */
+export function controlPlaneExitPolicy(event: ControlPlaneExitEvent): number | null {
+  switch (event) {
+    case 'shutdown':
+      return 0;
+    case 'sigterm':
+    case 'uncaught_exception':
+      return 1;
+    case 'unhandled_rejection':
+      return null;
+  }
+}
+
+export type ControlPlaneProcess = {
+  once(event: 'SIGTERM' | 'uncaughtException', listener: (error: unknown) => void): unknown;
+  on(event: 'unhandledRejection', listener: (reason: unknown) => void): unknown;
+};
+
+type ControlPlaneSentryContext = Pick<
+  WrapperSentryContext,
+  'allocationId' | 'providerInstanceId' | 'wrapperInstanceId'
+>;
+
+export type ControlPlaneLifecycleDeps = {
+  connection: ControlPlaneConnection;
+  diagnostics: Pick<ControlDiagnostics, 'onDiagnostic' | 'finalize'>;
+  fileLogs: Pick<ControlFileLogUploader, 'finalize'>;
+  onNativeDiagnostic?: ControlDiagnosticReporter;
+  exit: (code: number) => void;
+  process?: ControlPlaneProcess;
+  log?: (message: string) => void;
+  sentry?: WrapperSentryReporter;
+  sentryContext?: ControlPlaneSentryContext;
+  /** Stops owned Kilo runtimes before the process exits. */
+  stop?: () => Promise<void>;
+};
+
+export type ControlPlaneLifecycle = {
+  start(): void;
+  shutdown(exitCode: number, reason: string): Promise<void>;
+  recycle(): void;
+};
+
+function rejectionDetail(reason: unknown): string {
+  const text = reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : '';
+  return diagnosticDetail(text) ?? '';
+}
+
+async function settle(action: () => Promise<void>): Promise<void> {
+  try {
+    await action();
+  } catch {
+    // Diagnostics and log upload must never block the exit.
+  }
+}
+
+export function createControlPlaneLifecycle(
+  deps: ControlPlaneLifecycleDeps
+): ControlPlaneLifecycle {
+  const log = deps.log ?? ((): void => undefined);
+  const proc = deps.process ?? process;
+  let shuttingDown = false;
+
+  async function shutdown(
+    exitCode: number,
+    reason: string,
+    phase: 'stopping' | 'failed' = exitCode === 0 ? 'stopping' : 'failed',
+    flushSentry = false
+  ): Promise<void> {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
+    const sentryFlush = flushSentry ? deps.sentry?.flush() : undefined;
+    deps.connection.close();
+    await settle(() => deps.stop?.() ?? Promise.resolve());
+    const detail = diagnosticDetail(reason);
+    deps.diagnostics.onDiagnostic('wrapper.lifecycle', {
+      phase,
+      exitCode,
+      ...(detail ? { detail } : {}),
+    });
+    await settle(() => deps.diagnostics.finalize(DIAGNOSTICS_FINALIZE_TIMEOUT_MS));
+    await settle(() => deps.fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
+    if (sentryFlush) await settle(() => sentryFlush);
+    deps.exit(exitCode);
+  }
+
+  function handleExitEvent(event: ControlPlaneExitEvent, reason: string, error?: unknown): void {
+    const exitCode = controlPlaneExitPolicy(event);
+    if (exitCode === null) {
+      log(`control-plane wrapper ignored ${reason}`);
+      return;
+    }
+    if (shuttingDown) return;
+    if (event === 'uncaught_exception') {
+      deps.sentry?.capture(error, {
+        ...deps.sentryContext,
+        operation: 'uncaught_exception',
+        exitCode,
+      });
+    }
+    // SIGTERM is a stop, not a wrapper failure: the wrapper cannot tell the
+    // supervisor's forwarded TERM from a stray one, and the supervisor's
+    // `wrapper_restart` or `supervisor_exit` line records which it was.
+    void shutdown(
+      exitCode,
+      reason,
+      event === 'sigterm' ? 'stopping' : 'failed',
+      event === 'uncaught_exception'
+    );
+  }
+
+  proc.once('SIGTERM', () => handleExitEvent('sigterm', 'SIGTERM'));
+  proc.once('uncaughtException', error =>
+    handleExitEvent('uncaught_exception', 'uncaught exception', error)
+  );
+  proc.on('unhandledRejection', reason => {
+    if (!shuttingDown) {
+      deps.sentry?.capture(reason, {
+        ...deps.sentryContext,
+        operation: 'unhandled_rejection',
+      });
+    }
+    // Closed native record: the free-text reason stays in the file log only.
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'failed',
+      retirementCause: 'unhandled_rejection',
+    });
+    const detail = rejectionDetail(reason);
+    handleExitEvent('unhandled_rejection', `unhandled rejection${detail ? `: ${detail}` : ''}`);
+  });
+
+  return {
+    start(): void {
+      deps.connection.start();
+    },
+    shutdown,
+    recycle(): void {
+      if (shuttingDown) return;
+      deps.connection.recycle();
+    },
+  };
+}
+
+/** The production composition of native supervision, Cloud turns and heartbeat activity. */
+export function createControlPlaneSessionHost(options: {
+  runtime: Omit<
+    KiloRuntimesOptions,
+    | 'onEvent'
+    | 'onHarnessActivity'
+    | 'onRestart'
+    | 'onUnavailable'
+    | 'onDeadline'
+    | 'onActivityChange'
+    | 'onMemoryHold'
+    | 'onFeedInterrupted'
+  >;
+  turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
+  isPreparing(): boolean;
+  isWorkspaceBusy?(): boolean;
+  /** True while the turn-end artifact flush is running. */
+  isFlushingArtifacts?(): boolean;
+}) {
+  const runtimes = createKiloRuntimes({
+    ...options.runtime,
+    onEvent: event => turns?.observeKiloEvent(event),
+    onHarnessActivity: event => turns?.observeActivity(event),
+    onActivityChange: key => turns?.refreshActivity(key),
+    onFeedInterrupted: (id, key) => turns?.onFeedInterrupted(id, key),
+    onDeadline: (identity, reason, retry, key, stopped) =>
+      turns?.onNativeDeadline(identity, reason, retry, key, stopped),
+    onRestart: info => turns?.onRuntimeRestart(info),
+    onUnavailable: (directory, key) => turns?.onRuntimeUnavailable(directory, key),
+    onMemoryHold: info => turns?.onRuntimeMemoryHold(info),
+  });
+  const turns = createTurnManager({ ...options.turn, timers: options.runtime.timers, runtimes });
+  const manager = turns;
+  return {
+    runtimes,
+    turns: manager,
+    getHeartbeat: () => ({
+      active:
+        options.isPreparing() ||
+        runtimes.needsCompute() ||
+        manager.hasPendingWork() ||
+        (options.isFlushingArtifacts?.() ?? false),
+      workspaceBusy: options.isWorkspaceBusy?.() ?? false,
+      degraded: runtimes.suspected(),
+    }),
+  };
+}
+
+/**
+ * The `session.*`/`terminal.*`/`worktree.*` frame dispatcher, split out of
+ * {@link runControlPlaneWrapper} so the production routing can be constructed
+ * with real managers in a test. The holder objects are read at frame time, so
+ * construction order does not change behavior.
+ */
+export type ControlPlaneFrameDispatcherDeps = {
+  preparation: { current?: PreparationManager };
+  turns: { current?: TurnManager };
+  terminals: { current?: ControlPlaneTerminalRuntime };
+  worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
+  worktreeGit?: { current?: ReturnType<typeof createControlPlaneWorktreeGit> };
+  worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
+  kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
+  previewServices?: { current?: ReturnType<typeof createControlPlanePreviewServices> };
+  historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
+  transferGrants?: { current?: ReturnType<typeof createTransferGrantRequests> };
+  send: (frame: ControlPlaneWrapperFrame) => void;
+  log: (message: string) => void;
+};
+
+export function createControlPlaneFrameDispatcher(
+  deps: ControlPlaneFrameDispatcherDeps
+): (frame: ControlPlaneWrapperFrame) => void {
+  return function onFrame(frame: ControlPlaneWrapperFrame): void {
+    switch (frame.type) {
+      case 'worktree.git':
+        void deps.worktreeGit?.current?.handle(frame);
+        return;
+      case 'session.attach': {
+        const preparation = deps.preparation.current;
+        if (preparation === undefined) return;
+        onFrame({
+          type: 'session.prepare',
+          spec: {
+            ...frame.spec,
+            ...preparation.workspaceConfiguration(frame.spec, frame.workspace),
+          },
+          credentials: frame.credentials,
+        });
+        return;
+      }
+      case 'session.prepare':
+        void deps.preparation.current
+          ?.prepare(frame.spec, frame.credentials)
+          .then(() => {
+            if (deps.preparation.current?.isPrepared(frame.spec.sessionId)) {
+              try {
+                deps.terminals.current?.rememberAttachedSession(
+                  {
+                    sessionId: frame.spec.sessionId,
+                    kiloSessionId: frame.spec.kiloSessionId,
+                    directory: frame.spec.directory,
+                  },
+                  runtimeKey(frame.spec)
+                );
+              } catch {
+                // Terminal attachment is best-effort; a missing runtime is
+                // reported as `not_ready` when a terminal is requested.
+              }
+            }
+            return deps.turns.current?.publishCommands(frame.spec.sessionId);
+          })
+          .catch(() => undefined);
+        return;
+      case 'workspace.captured':
+        // Sessions never capture; a reply to a pre-change request is ignored.
+        return;
+      case 'session.credentials':
+        void deps.preparation.current?.installCredentials(frame).catch(() => {
+          deps.log('control-plane session credential refresh failed');
+        });
+        return;
+      case 'session.prompt':
+        deps.turns.current?.submit(frame.sessionId, frame.payload);
+        return;
+      case 'session.abort':
+        deps.turns.current?.abort(frame.sessionId);
+        return;
+      case 'session.answer':
+        void deps.turns.current?.answer(frame.sessionId, frame.reply);
+        return;
+      case 'session.release':
+        deps.turns.current?.release(frame.sessionId);
+        deps.preparation.current?.release(frame.sessionId);
+        void deps.terminals.current?.forgetSession(frame.sessionId);
+        return;
+      case 'worktree.snapshot':
+      case 'worktree.summary':
+        void deps.worktreeChanges.current?.handle(frame);
+        return;
+      case 'worktree.prepareDeletion':
+      case 'worktree.delete':
+        void (
+          deps.turns.current?.cancelInterruptedFinalizations(frame.payload.directory) ??
+          Promise.resolve()
+        ).then(() => deps.worktreeDeletion.current?.handle(frame));
+        return;
+      case 'kilo.request':
+        void deps.kiloRequests.current?.handle(frame);
+        return;
+      case 'preview.list':
+        void deps.previewServices?.current?.handle(frame);
+        return;
+      case 'history.result':
+        deps.historyRequests?.current?.handle(frame);
+        return;
+      case 'transfer.grant.result':
+        deps.transferGrants?.current?.handle(frame);
+        return;
+      case 'terminal.create':
+      case 'terminal.resize':
+      case 'terminal.close':
+      case 'terminal.connect':
+        void deps.terminals.current
+          ?.handle(frame)
+          .then(result => deps.send(result))
+          .catch(() => undefined);
+        return;
+      default:
+        deps.log(`control-plane frame ${frame.type}`);
+    }
+  };
+}
+
+async function main(
+  env: Record<string, string | undefined>,
+  sentry: WrapperSentryReporter,
+  sentryContext: ControlPlaneSentryContext
+): Promise<ControlPlaneLifecycle | undefined> {
+  const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
+  const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
+  const url = env.SANDBOX_CONTROL_URL;
+  const credential = env.SANDBOX_CONTROL_CREDENTIAL;
+  const allocationId = env[CONTROL_PLANE_ALLOCATION_ID_ENV];
+  // The runtime bootstrap exports inherited names as empty strings when the
+  // launch did not set them, so an empty transfer configuration is absent.
+  const transferUrl = env.SANDBOX_TRANSFER_URL || undefined;
+  const transferGrant = env.SANDBOX_TRANSFER_GRANT || undefined;
+  // The launch identity is reused by the supervisor for every restart, so the
+  // process identity must be generated here and used for both `hello` and the
+  // transfer path and grant. The launch-time identity stays only in the path
+  // string we rewrite below.
+  const wrapperInstanceId = crypto.randomUUID();
+  const currentTransferUrl =
+    transferUrl === undefined
+      ? undefined
+      : transferUrlForWrapperInstance(transferUrl, wrapperInstanceId);
+  const artifactsEnabled =
+    transferUrl !== undefined &&
+    transferGrant !== undefined &&
+    transferGrantHasArtifactsScope(transferGrant);
+  // The grant requester answers over the connection created below, so every
+  // transfer client reaches it through a holder.
+  const transferGrantsRef: {
+    current?: ReturnType<typeof createTransferGrantRequests>;
+  } = {};
+  const transferRenewal = (): Promise<{ grant: string; expiresAt: number }> => {
+    const requests = transferGrantsRef.current;
+    return requests === undefined
+      ? Promise.reject(new Error('transfer grants are unavailable'))
+      : requests.requestGrant();
+  };
+  const logClient =
+    currentTransferUrl !== undefined && transferUrl !== undefined && transferGrant !== undefined
+      ? createSandboxTransferClient({
+          baseUrl: currentTransferUrl,
+          renewGrant: transferRenewal,
+          // Older Workers cannot renew, and uploads before the first welcome
+          // still use the launch-time route and grant.
+          fallback: { baseUrl: transferUrl, grant: transferGrant },
+          attempts: 1,
+          log: logToFile,
+        })
+      : undefined;
+  const projector = createControlDiagnosticProjector({
+    enabled: nativeControlPlaneLogsEnabled(env),
+  });
+  const diagnostics = createControlDiagnostics({
+    uploadUrl,
+    uploadGrant,
+    ...(logClient === undefined ? {} : { client: logClient, logPathPrefix: 'logs' }),
+    projector,
+  });
+  const fileLogs = createControlFileLogUploader({
+    uploadUrl,
+    uploadGrant,
+    ...(logClient === undefined ? {} : { client: logClient, logPathPrefix: 'logs' }),
+    wrapperLogPath: env.WRAPPER_LOG_PATH,
+    environment: env,
+    onDiagnostic: diagnostics.onDiagnostic,
+    projector,
+  });
+  delete env.SANDBOX_CONTROL_CREDENTIAL;
+  delete env.CONTROL_LOG_UPLOAD_URL;
+  delete env.CONTROL_LOG_UPLOAD_GRANT;
+  delete env.SANDBOX_TRANSFER_URL;
+  delete env.SANDBOX_TRANSFER_GRANT;
+  delete env.CONTROL_WRAPPER_INSTANCE_ID;
+
+  diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
+  await installInterceptTrustIfEnabled(logToFile, undefined, projector);
+  diagnostics.start();
+  fileLogs.start();
+
+  if (!url || !credential || !allocationId) {
+    logToFile('control-plane wrapper is missing its launch environment');
+    diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'start_failed' });
+    await settle(() => diagnostics.finalize(DIAGNOSTICS_FINALIZE_TIMEOUT_MS));
+    await settle(() => fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
+    return undefined;
+  }
+
+  // Spec §7 "Crash resistance": clear stale Kilo process groups before any Kilo spawn.
+  await cleanupStaleKiloPidfiles({
+    directory: defaultKiloPidfileDirectory(env),
+    log: logToFile,
+  }).catch(() => 0);
+
+  const timers = resolveControlPlaneTimers(env);
+  // Keep the tool/workload cgroup placement for the Kilo server chain.
+  const workload = initializeControlWorkload({ env, report: diagnostics.onDiagnostic });
+  const artifactsReady = artifactsEnabled && (await ensureWorkspaceArtifactRoot());
+  // The connection's shutdown callback needs the lifecycle that owns the same
+  // connection, so route it through a holder assigned after construction.
+  const shutdownRef: { current?: (reason: string | undefined) => void } = {};
+  // Preparation is created after the connection (it emits through it), so the
+  // connection reaches it through a holder.
+  const preparationRef: { current?: ReturnType<typeof createPreparationManager> } = {};
+  // Turns share work with preparation but need the runtimes' restart callbacks,
+  // so both sides reach each other through holders.
+  const turnsRef: { current?: TurnManager } = {};
+  // Worktree-change requests are answered over the same connection, which is
+  // created below, so the adapter reaches it through a holder.
+  const worktreeChangesRef: {
+    current?: ReturnType<typeof createControlPlaneWorktreeChanges>;
+  } = {};
+  // Branch operations (Sync/Restack) answer over the same connection.
+  const worktreeGitRef: {
+    current?: ReturnType<typeof createControlPlaneWorktreeGit>;
+  } = {};
+  // Terminal requests also answer over the same connection, so the adapter
+  // reaches it through a holder.
+  const terminalsRef: { current?: ReturnType<typeof createControlPlaneTerminals> } = {};
+  // Worktree-deletion requests also answer over the same connection (R2).
+  const worktreeDeletionRef: {
+    current?: ReturnType<typeof createControlPlaneWorktreeDeletion>;
+  } = {};
+  // Allowlisted native reads answer over the same connection.
+  const kiloRequestsRef: {
+    current?: ReturnType<typeof createControlPlaneKiloRequests>;
+  } = {};
+  const previewServicesRef: {
+    current?: ReturnType<typeof createControlPlanePreviewServices>;
+  } = {};
+  // Wrapper-initiated Cloud history reads answer over the same connection.
+  const historyRequestsRef: { current?: ReturnType<typeof createHistoryRequests> } = {};
+  const transferClientRef: { current?: ReturnType<typeof createSandboxTransferClient> } = {};
+  const artifactSyncRef: { current?: WorkspaceArtifactSync } = {};
+  const artifactDiagnostic = (message: string): void => {
+    logToFile(message);
+    diagnostics.onDiagnostic('control.event', {
+      category: 'other',
+      detail: message.slice(0, 128),
+    });
+  };
+  const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
+  const host = createControlPlaneSessionHost({
+    runtime: {
+      timers,
+      ...(sandboxProvider ? { sandboxProvider } : {}),
+      artifacts: artifactsReady,
+      log: logToFile,
+      workload,
+      onNativeDiagnostic: projector,
+    },
+    turn: {
+      emit: frame => connection.send(frame),
+      log: logToFile,
+      onDiagnostic: diagnostics.onDiagnostic,
+      onNativeDiagnostic: projector,
+      flushArtifacts: () => {
+        const sync = artifactSyncRef.current;
+        if (sync === undefined) return;
+        void sync.flush(WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS).catch(error => {
+          logToFile(`workspace artifact flush failed: ${messageOf(error)}`);
+        });
+      },
+    },
+    isPreparing: () => preparationRef.current?.isPreparing() ?? false,
+    isWorkspaceBusy: () => terminalsRef.current?.hasActivePty() ?? false,
+    isFlushingArtifacts: () => artifactSyncRef.current?.isFlushing() ?? false,
+  });
+  const { runtimes } = host;
+  turnsRef.current = host.turns;
+  const harness = runtimeHarness(env);
+  const kiloCliVersion = await readKiloCliVersion(harness.cli);
+  const connection = createControlPlaneConnection({
+    url,
+    credential,
+    allocationId,
+    runtimeHarness: harness.kind,
+    runtimeVersions: { kiloCliVersion, wrapperVersion: WRAPPER_VERSION },
+    wrapperId: wrapperInstanceId,
+    timers,
+    log: logToFile,
+    onNativeDiagnostic: projector,
+    getHeartbeat: host.getHeartbeat,
+    onFrame: createControlPlaneFrameDispatcher({
+      preparation: preparationRef,
+      turns: turnsRef,
+      terminals: terminalsRef,
+      worktreeChanges: worktreeChangesRef,
+      worktreeGit: worktreeGitRef,
+      worktreeDeletion: worktreeDeletionRef,
+      kiloRequests: kiloRequestsRef,
+      previewServices: previewServicesRef,
+      historyRequests: historyRequestsRef,
+      transferGrants: transferGrantsRef,
+      send: frame => connection.send(frame),
+      log: logToFile,
+    }),
+    onShutdown: reason => shutdownRef.current?.(reason),
+    onConnected: () => {
+      const canRenew = connection.supportsTransferGrants();
+      transferClientRef.current?.setConnected(canRenew);
+      logClient?.setConnected(canRenew);
+      diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true });
+    },
+    onDisconnected: reason => {
+      historyRequestsRef.current?.disconnected();
+      transferGrantsRef.current?.disconnected();
+      transferClientRef.current?.setConnected(false);
+      logClient?.setConnected(false);
+      logToFile(`control-plane disconnected: ${reason}`);
+    },
+  });
+  const historyRequests = createHistoryRequests({ send: frame => connection.send(frame) });
+  historyRequestsRef.current = historyRequests;
+  sentryContext.wrapperInstanceId = connection.wrapperId;
+  const transferGrants = createTransferGrantRequests({
+    send: frame => connection.send(frame),
+  });
+  transferGrantsRef.current = transferGrants;
+  if (artifactsReady && currentTransferUrl !== undefined) {
+    const client = createSandboxTransferClient({
+      baseUrl: `${currentTransferUrl.replace(/\/$/, '')}/artifacts`,
+      renewGrant: () => transferGrants.requestGrant(),
+      timeoutMs: WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS,
+      log: logToFile,
+    });
+    transferClientRef.current = client;
+    artifactSyncRef.current = createWorkspaceArtifactSync({
+      root: WORKSPACE_ARTIFACT_ROOT,
+      statePath: WORKSPACE_ARTIFACT_STATE_PATH,
+      allocationId,
+      client,
+      timers: {
+        setTimeout: (handler, ms) => setTimeout(handler, ms),
+        clearTimeout: handle => clearTimeout(handle),
+      },
+      log: logToFile,
+      onDiagnostic: artifactDiagnostic,
+    });
+  }
+  artifactSyncRef.current?.start();
+  terminalsRef.current = createControlPlaneTerminals({
+    controlUrl: url,
+    wrapperId: connection.wrapperId,
+    runtimes,
+  });
+  preparationRef.current = createPreparationManager({
+    timers,
+    onNativeDiagnostic: projector,
+    allocationId,
+    onPreparedRoute: spec => turnsRef.current?.registerRoute(spec),
+    runtimes: {
+      ensure: input => runtimes.ensure(input),
+      installCredentials: async (key, nextEnv, cloudAgentMcp) => {
+        await runtimes.get(key)?.installCredentials(nextEnv, cloudAgentMcp);
+        turnsRef.current?.credentialsInstalled(key);
+      },
+      isUnavailable: key => {
+        const runtime = runtimes.get(key);
+        return !runtime || runtime.isUnavailable();
+      },
+      getLiveClient: key => liveRuntimeClient(runtimes.get(key)),
+      remove: key => runtimes.remove(key),
+      release: key => runtimes.remove(key),
+    },
+    // Route preparation output (progress/ready/failed) out over the connection.
+    emit: frame => connection.send(frame),
+    readHistoryPage: request => historyRequests.readPage(request),
+    readRecentHistory: request => historyRequests.readRecent(request),
+    log: logToFile,
+    inheritedEnv: env,
+    spawnSetup: createSetupSpawn(workload),
+  });
+  // The runtime holds the exact prepared environment: per-worktree HOME, the
+  // pinned credential helper and the profile values. Never the raw wrapper env.
+  const preparedGitContext = (sessionId: string): PreparedGitContext | null => {
+    const route = preparationRef.current?.preparedRoute(sessionId);
+    if (route === undefined || route === null) return null;
+    const runtime = runtimes.get(route.runtimeKey);
+    if (runtime === undefined) return null;
+    const spec = turnsRef.current?.routeSpec(sessionId);
+    return {
+      directory: route.directory,
+      env: runtime.env,
+      ...(spec === undefined ? {} : { spec }),
+    };
+  };
+  worktreeChangesRef.current = createControlPlaneWorktreeChanges({
+    emit: frame => connection.send(frame),
+    isPrepared: sessionId => preparationRef.current?.isPrepared(sessionId) ?? false,
+    roots: sessionId => preparationRef.current?.preparedRoute(sessionId)?.roots,
+    gitContext: preparedGitContext,
+    log: logToFile,
+  });
+  worktreeGitRef.current = createControlPlaneWorktreeGit({
+    emit: frame => connection.send(frame),
+    isPrepared: sessionId => preparationRef.current?.isPrepared(sessionId) ?? false,
+    gitContext: preparedGitContext,
+    hasActiveTurnInDirectory: directory =>
+      turnsRef.current?.hasActiveTurnInDirectory(directory) ?? false,
+    resumeDirectory: directory => turnsRef.current?.resumeDirectory(directory),
+    log: logToFile,
+  });
+  worktreeDeletionRef.current = createControlPlaneWorktreeDeletion({
+    emit: frame => connection.send(frame),
+    clients: directory =>
+      runtimes.runtimesForDirectory(directory).map(runtime => runtime.client.worktree),
+    retireDirectory: async directory => {
+      await turnsRef.current?.cancelInterruptedFinalizations(directory);
+      await runtimes.retireDirectory(directory);
+    },
+    detachTerminals: directory =>
+      terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
+    onDiagnostic: diagnostics.onDiagnostic,
+    log: logToFile,
+  });
+  kiloRequestsRef.current = createControlPlaneKiloRequests({
+    emit: frame => connection.send(frame),
+    preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
+    clientFor: key => liveRuntimeClient(runtimes.get(key))?.reads ?? null,
+    log: logToFile,
+  });
+  previewServicesRef.current = createControlPlanePreviewServices({
+    emit: frame => connection.send(frame),
+    ...(sandboxProvider === undefined
+      ? {}
+      : { excludedPorts: reservedPreviewPorts(sandboxProvider) }),
+    log: logToFile,
+  });
+  const nativeStatus = createNativeStatusReporter({
+    enabled: projector.enabled,
+    project: projector,
+    snapshot: () => {
+      const connectionState = connection.snapshot();
+      const runtimeSummary = runtimes.summary();
+      const placement = workload.placement;
+      let stats: ReturnType<typeof readWorkloadStats> | undefined;
+      if (placement) {
+        try {
+          stats = readWorkloadStats(placement.parentReference);
+        } catch {
+          stats = undefined;
+        }
+      }
+      return {
+        nativeConnectionPhase: connectionState.phase,
+        attempt: connectionState.attempt,
+        outboxBytes: connectionState.outboxBytes,
+        sessionCount: preparationRef.current?.sessionCount() ?? 0,
+        preparingCount: preparationRef.current?.preparingCount() ?? 0,
+        activeTurnCount: turnsRef.current?.activeTurnCount() ?? 0,
+        recentTerminalCount: terminalsRef.current?.recentInputCount() ?? 0,
+        ...runtimeSummary,
+        ...(workload.failure !== undefined ? { workloadFailure: workload.failure } : {}),
+        ...(placement
+          ? {
+              appliedMaxBytes: placement.aggregateMaxBytes,
+              cpuController: placement.cpuController,
+            }
+          : {}),
+        ...(stats?.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
+        ...(stats?.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
+        ...(allocationId !== undefined ? { allocationId } : {}),
+        wrapperInstanceId: connection.wrapperId,
+      };
+    },
+  });
+  const lifecycle = createControlPlaneLifecycle({
+    connection,
+    diagnostics,
+    fileLogs,
+    onNativeDiagnostic: projector,
+    sentry,
+    sentryContext,
+    exit: code => process.exit(code),
+    log: logToFile,
+    stop: async () => {
+      await artifactSyncRef.current?.stop();
+      transferGrantsRef.current?.disconnected();
+      transferClientRef.current?.stop();
+      nativeStatus.stop();
+      turnsRef.current?.shutdown();
+      terminalsRef.current?.shutdown();
+      await runtimes.shutdown();
+      closeControlWorkload(workload);
+    },
+  });
+  shutdownRef.current = reason => {
+    void lifecycle.shutdown(controlPlaneExitPolicy('shutdown') ?? 0, reason ?? 'sandbox shutdown');
+  };
+  process.on('SIGUSR1', () => lifecycle.recycle());
+  nativeStatus.start();
+  lifecycle.start();
+  return lifecycle;
+}
+
+/**
+ * Process entry for the control-plane wrapper. Runs forever until `shutdown`
+ * frame, SIGTERM or an uncaught exception; a disconnect never exits.
+ */
+export async function runControlPlaneWrapper(
+  env: Record<string, string | undefined> = process.env,
+  sentry?: WrapperSentryReporter
+): Promise<ControlPlaneLifecycle | undefined> {
+  sentry ??= await createWrapperSentryReporter({
+    env: {
+      CLOUD_AGENT_SENTRY_DSN: env.CLOUD_AGENT_SENTRY_DSN,
+      CLOUD_AGENT_SENTRY_ENVIRONMENT: env.CLOUD_AGENT_SENTRY_ENVIRONMENT,
+    },
+    log: message => {
+      logToFile(message);
+      console.error(message);
+    },
+  });
+  const sentryContext: ControlPlaneSentryContext = {
+    allocationId: env[CONTROL_PLANE_ALLOCATION_ID_ENV],
+    providerInstanceId: env.PROVIDER_INSTANCE_ID,
+    wrapperInstanceId: env.CONTROL_WRAPPER_INSTANCE_ID,
+  };
+  try {
+    return await main(env, sentry, sentryContext);
+  } catch (error) {
+    sentry.capture(error, { ...sentryContext, operation: 'startup', exitCode: 1 });
+    await sentry.flush();
+    throw error;
+  }
+}
+
+if (import.meta.main) {
+  await runControlPlaneWrapper();
+}

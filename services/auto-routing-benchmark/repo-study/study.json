@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "mini_revision": "04d809ceab9df28f9adaed044884180159172930",
+  "swebench_revision": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+  "dataset": "SWE-bench/SWE-bench_Verified",
+  "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+  "seed": "router-repository-study-v1",
+  "families": [
+    "psf/requests",
+    "pytest-dev/pytest",
+    "pylint-dev/pylint",
+    "pydata/xarray",
+    "sphinx-doc/sphinx",
+    "matplotlib/matplotlib"
+  ],
+  "tasks_per_family": 2,
+  "discovery_families": 3,
+  "validation_families": 1,
+  "step_limit": 24,
+  "max_output_tokens": 4096,
+  "max_input_tokens": 98304,
+  "run_token_limit": 262144,
+  "wall_seconds": 1200,
+  "run_cost_limit_usd": "0",
+  "study_cost_limit_usd": "0",
+  "total_cost_limit_usd": "0",
+  "prior_committed_usd": "0",
+  "prior_unknown_bound_usd": "0",
+  "prior_unknown_included_in_committed": true,
+  "candidates": [],
+  "limitations": [
+    "Classic Verified contains historical public tasks: benchmark exposure and contamination remain possible.",
+    "Twelve tasks across six repository families are a feasibility panel, not sufficient evidence for a general routing advantage.",
+    "Discovery has two repetitions per candidate/task; validation and untouched holdout have one.",
+    "Unknown costs stop all new inference and retain their full request reservation; an unknown request is never retried.",
+    "Money limits and candidates are intentionally empty here: paid execution is authorized only through the coordinator's frozen campaign ledger, never from this file."
+  ]
+}

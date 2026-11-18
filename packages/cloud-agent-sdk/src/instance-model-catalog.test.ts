@@ -199,11 +199,12 @@ describe('listInstanceModels', () => {
     });
   });
 
-  it('classifies the old-CLI invalid list_models command as unsupported', async () => {
+  it.each([
+    new CommandDeliveredError('unknown command: list_models'),
+    new CommandDeliveredError('invalid list_models command'),
+  ])('classifies %p as unsupported', async error => {
     const connection = makeFakeConnection();
-    connection.sendCommandToConnection.mockRejectedValue(
-      new CommandDeliveredError('invalid list_models command')
-    );
+    connection.sendCommandToConnection.mockRejectedValue(error);
 
     await expect(listInstanceModels(connection, 'cli-owner-1')).resolves.toEqual({
       ok: false,
@@ -212,15 +213,15 @@ describe('listInstanceModels', () => {
     expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
   });
 
-  it('classifies any other delivered CommandDeliveredError as transport', async () => {
+  it('classifies any other delivered CommandDeliveredError as transport with its cause', async () => {
     const connection = makeFakeConnection();
-    connection.sendCommandToConnection.mockRejectedValue(
-      new CommandDeliveredError('failed to list models')
-    );
+    const failure = new CommandDeliveredError('failed to list models');
+    connection.sendCommandToConnection.mockRejectedValue(failure);
 
     await expect(listInstanceModels(connection, 'cli-owner-1')).resolves.toEqual({
       ok: false,
       reason: 'transport',
+      cause: failure,
     });
   });
 
@@ -258,24 +259,26 @@ describe('listInstanceModels', () => {
 
     for (const code of retryableCodes) {
       const connection = makeFakeConnection();
-      connection.sendCommandToConnection.mockRejectedValue(
-        new UserWebCommandError({ code, message: 'try again' })
-      );
+      const failure = new UserWebCommandError({ code, message: 'try again' });
+      connection.sendCommandToConnection.mockRejectedValue(failure);
 
       await expect(listInstanceModels(connection, 'cli-owner-1')).resolves.toEqual({
         ok: false,
         reason: 'transport',
+        cause: failure,
       });
     }
   });
 
-  it('classifies a plain transport-level rejection as transport', async () => {
+  it('classifies a plain transport-level rejection as transport with its cause', async () => {
     const connection = makeFakeConnection();
-    connection.sendCommandToConnection.mockRejectedValue(new Error('Command timed out'));
+    const failure = new Error('Command timed out');
+    connection.sendCommandToConnection.mockRejectedValue(failure);
 
     await expect(listInstanceModels(connection, 'cli-owner-1')).resolves.toEqual({
       ok: false,
       reason: 'transport',
+      cause: failure,
     });
   });
 
@@ -293,13 +296,15 @@ describe('listInstanceModels', () => {
   it('classifies an unexpected strict-parse throw as transport and never rejects', async () => {
     const connection = makeFakeConnection();
     connection.sendCommandToConnection.mockResolvedValue({ any: 'payload' });
+    const failure = new Error('strict parse exploded');
     const parseSpy = jest.spyOn(remoteModelCatalogV1Schema, 'safeParse').mockImplementation(() => {
-      throw new Error('strict parse exploded');
+      throw failure;
     });
     try {
       await expect(listInstanceModels(connection, 'cli-owner-1')).resolves.toEqual({
         ok: false,
         reason: 'transport',
+        cause: failure,
       });
     } finally {
       parseSpy.mockRestore();

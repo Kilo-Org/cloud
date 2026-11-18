@@ -1,87 +1,121 @@
 /* eslint-disable max-lines -- The profile screen composes Credits, Agents, Reviews, Organization, Linked accounts, App, Restore Purchases, and Actions; each section is a small rendered surface that mirrors the shared ConfigureRow/Text-header pattern. Splitting would re-encode the same hooks. */
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
+  BookOpenCheck,
   Building2,
   GitMerge,
   GitPullRequest,
   KeyRound,
+  LineChart,
   Lock,
-  LogOut,
   MessageSquare,
+  Plug,
+  Plus,
   ShieldCheck,
   SlidersHorizontal,
-  Smartphone,
+  Sparkles,
   Trash2,
+  Users,
+  Workflow,
 } from '@/components/ui/icons';
-import { Alert, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { useContextPicker } from '@/components/context-control';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
+import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { useAuth } from '@/lib/auth/auth-context';
-import { showFeedbackPrompt } from '@/lib/feedback';
+import { providerLabel } from '@/lib/auth/provider-label';
+import { SESSION_SYNC_URL } from '@/lib/config';
+import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
+import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
+import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
+  getProfilesPath,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
-const PROVIDER_LABELS = {
-  anaconda: 'Anaconda',
-  apple: 'Apple',
-  discord: 'Discord',
-  email: 'Email',
-  'fake-login': 'Test Account',
-  github: 'GitHub',
-  gitlab: 'GitLab',
-  google: 'Google',
-  linkedin: 'LinkedIn',
-  workos: 'Enterprise SSO',
-} satisfies Record<string, string>;
+type AuthProvider =
+  inferRouterOutputs<MobileRouter>['user']['getAuthProviders']['providers'][number];
 
-/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
-function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
-  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
-}
+/**
+ * What the Linked accounts section shows. One arm at a time, so rows and a load
+ * error can never stand together, and a failed refetch over retained rows is its
+ * own arm instead of claiming the accounts could not be loaded.
+ */
+type LinkedAccountsView =
+  | { readonly kind: 'hidden' }
+  | { readonly kind: 'skeleton' }
+  | { readonly kind: 'error' }
+  | { readonly kind: 'rows'; readonly providers: readonly AuthProvider[] }
+  | { readonly kind: 'rowsStale'; readonly providers: readonly AuthProvider[] };
 
-function providerLabel(provider: string) {
-  return lookup(PROVIDER_LABELS, provider) ?? provider;
+/** One answer for the Linked accounts section: rows and a load error never coexist. */
+function linkedAccountsView(
+  providers: readonly AuthProvider[] | undefined,
+  failed: boolean
+): LinkedAccountsView {
+  if (providers === undefined) {
+    return failed ? { kind: 'error' } : { kind: 'skeleton' };
+  }
+  if (providers.length === 0) {
+    // A settled empty read keeps the section hidden, as it always has.
+    return failed ? { kind: 'error' } : { kind: 'hidden' };
+  }
+  return failed ? { kind: 'rowsStale', providers } : { kind: 'rows', providers };
 }
 
 export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const colors = useThemeColors();
+  const deleteScrollRef = useRef<ScrollViewInstance>(null);
+  const [deleteKeyboardOcclusion, setDeleteKeyboardOcclusion] = useState(0);
+  const [deleteScrollFrameHeight, setDeleteScrollFrameHeight] = useState(0);
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  const afterIdle = useAfterIdle();
+  // Both destructive confirms on this screen go through the app's dialog: it
+  // carries the destructive (red) affordance on iOS and Android alike, because
+  // Android's native `AlertDialog` paints every button with the theme accent.
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
-    isLoading,
     isError: providersError,
     isFetching: providersFetching,
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && afterIdle,
+    // A paused read leaves the Linked accounts row with neither content nor an
+    // error surface.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const {
     data: orgs,
@@ -90,78 +124,194 @@ export function ProfileScreen() {
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && afterIdle,
+    // The Agents section resolves its scope from this list, so a paused read
+    // leaves the organization section and its rows waiting.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching)
+    ? getProfileAgentScope(organizationId, orgs)
     : undefined;
+  const { openPicker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
-  const orgName = selectedOrg?.organizationName;
+  // A settled read that lists no memberships still keeps the section: its Create
+  // organization row is the app's only entry to that flow, so an account with no
+  // organization has to be able to start one. The account-picker row is dropped
+  // in that case alone — it would list Personal and nothing else.
+  const hasOrganizations = (orgs?.length ?? 0) > 0;
+  // The Organization section stays on Profile in every credit-account context:
+  // a Personal context still offers the account picker when the account has
+  // memberships, so organization management is not gated behind the credits
+  // account control. The restore decides the context first, so the chooser never
+  // paints for a frame before the active organization's row replaces it. A
+  // memberships read that failed keeps the section too: its error and Retry live
+  // inside this block, so hiding the section while the list is unavailable would
+  // drop the only retry. A read that is still loading, or paused offline before
+  // it ever fetched, keeps the section hidden: no empty state paints before the
+  // list settles.
+  const showOrganizationSection =
+    organizationId != null ||
+    (organizationContextLoaded && (organizationsError || orgs !== undefined));
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
+  // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
+  // the tile requests it and the screen renders whichever one applies.
+  const feedbackPrompt = useFeedbackPrompt();
+
+  const { t } = useTranslation();
+  // Reactive: a connectivity commit re-renders the error-variant selection, so
+  // a read that settled by failing while the device is confirmed offline says
+  // so instead of presenting itself as a server fault.
+  const committedConnectivity = useCommittedConnectivityStatus();
+
+  // Personal context has no selected organization to label, so its row opens
+  // the account picker; otherwise the row names the destination for the active
+  // organization's role.
+  const organizationRow =
+    organizationId == null ? (
+      <ConfigureRow
+        icon={Building2}
+        title={t('organization.boundary.selectOrganization')}
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        last
+        onPress={openPicker}
+      />
+    ) : (
+      <ConfigureRow
+        icon={Building2}
+        title={
+          orgRole === 'member' ? t('profile.viewOrganization') : t('profile.manageOrganization')
+        }
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        disabled={!orgRole}
+        last
+        onPress={() => {
+          router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
+        }}
+      />
+    );
+
+  const requestSignOut = () => {
+    confirm({
+      title: t('profile.signOutTitle'),
+      message: t('profile.signOutMessage'),
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => {
+        void signOut();
+      },
+    });
+  };
 
   const {
     phase: deletePhase,
     isPending: deletePending,
     devCode,
+    canSubmitCode,
     beginDelete,
     submitCode,
     setCode,
   } = useDeleteAccount();
 
-  const confirmDeleteAccount = () => {
-    Alert.alert(
-      'Delete account?',
-      'This permanently deletes your account and signs you out. We will email a confirmation code.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete account',
-          style: 'destructive',
-          onPress: beginDelete,
-        },
-      ]
-    );
-  };
+  // The confirmation code renders one row above the destructive submit. The
+  // block is appended below the offset the user was parked at, and Android's
+  // edge-to-edge window does not resize for the IME, so the submit stays below
+  // the viewport (and, with the keyboard up, behind the IME). The shared scroll
+  // view ends its viewport at the IME's top edge; reveal the block when it
+  // appears and again once the IME's occlusion lands, so the submit clears the
+  // tab bar and the keyboard. Android may commit the IME lift after
+  // `keyboardDidShow` reports, so the reveal also watches the scroll view's
+  // committed frame height and reruns once that frame reaches its final size.
+  // The occlusion arrives from the shared scroll view that already tracks it,
+  // so this screen does not read the keyboard itself.
+  useEffect(() => {
+    if (deletePhase !== 'awaiting-code' && deletePhase !== 'executing') {
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() => {
+      deleteScrollRef.current?.scrollToEnd({ animated: false });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [deletePhase, deleteKeyboardOcclusion, deleteScrollFrameHeight]);
 
-  const confirmSignOut = () => {
-    Alert.alert('Sign out?', 'You will need to sign in again to access your workspace.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: () => {
-          void signOut();
-        },
-      },
-    ]);
+  const onDeleteScrollLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    // A guarded update: an equal height leaves the state identity untouched so
+    // the reveal effect does not rerun on every unrelated layout pass.
+    setDeleteScrollFrameHeight(current => (current === height ? current : height));
+  }, []);
+
+  // The confirmation is the app's own dialog, not the native alert: Android's
+  // `AlertDialog` paints every button with the theme accent, so
+  // `style: 'destructive'` never reaches the screen there. The Profile screen
+  // is a tab, so nothing can be presented over it and the portal dialog is
+  // always visible.
+  const confirmDeleteAccount = () => {
+    confirm({
+      title: t('profile.deleteAccountTitle'),
+      message: t('profile.deleteAccountMessage'),
+      confirmLabel: t('profile.deleteAccountConfirm'),
+      onConfirm: beginDelete,
+    });
   };
 
   const showPrivacyChoices = () => {
     router.push('/(app)/consent?mode=review' as Href);
   };
 
+  // One answer per render: the section exists only where it has content, rows
+  // and an error never stand together, and a failed refetch over rows keeps
+  // them with a stale line instead of claiming the accounts could not load.
+  const linkedAccounts = linkedAccountsView(data?.providers, providersError);
+  const listedProviders =
+    linkedAccounts.kind === 'rows' || linkedAccounts.kind === 'rowsStale'
+      ? linkedAccounts.providers
+      : null;
+
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Profile" size="large" showBackButton={false} />
+      <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="pt-4"
+        ref={deleteScrollRef}
+        className="flex-1"
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
+        onKeyboardOcclusionChange={setDeleteKeyboardOcclusion}
+        onLayout={onDeleteScrollLayout}
       >
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
 
+        {/* Usage: one row on the balance's own section, because spend and
+            remaining credits are the two halves of the same question. */}
+        <View className="mt-3">
+          <ConfigureRow
+            icon={LineChart}
+            title={t('usage.title')}
+            subtitle={t('usage.entrySubtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/usage' as Href);
+            }}
+          />
+        </View>
+
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Agents
+            {t('common.agents')}
           </Text>
           <ConfigureRow
             icon={GitPullRequest}
-            title="Code Reviewer"
-            subtitle="Automatic PR reviews"
+            title={t('common.codeReviewer')}
+            subtitle={t('profile.codeReviewerSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             onPress={() => {
@@ -172,132 +322,255 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={ShieldCheck}
-            title="Security Agent"
-            subtitle="Find and remediate vulnerabilities"
+            title={t('common.securityAgent')}
+            subtitle={t('profile.securityAgentSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
-            last
             onPress={() => {
               if (agentScope) {
                 router.push(getSecurityAgentPath(agentScope));
               }
             }}
           />
+          <ConfigureRow
+            icon={Users}
+            title={t('profiles.title')}
+            subtitle={t('profiles.entrySubtitle')}
+            // Agents step: the row lists the agent profiles, and its two
+            // siblings in this section already carry `honey`. The neutral tile
+            // made one row of three read as disabled.
+            hue="honey"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push(getProfilesPath());
+            }}
+          />
+          {/* Cloud Agent triggers are a native screen, for the scope in view:
+              the personal triggers, or the selected organization's. */}
+          <ConfigureRow
+            icon={Workflow}
+            title={t('cloudAgent.triggers.title')}
+            subtitle={t('cloudAgent.triggers.subtitle')}
+            hue="honey"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(triggersListHref(organizationId ?? undefined));
+            }}
+          />
         </View>
 
         {/* PR Review */}
-        {prReviewEnabled && (
-          <View className="mt-6 gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Reviews
-            </Text>
-            <ConfigureRow
-              icon={GitMerge}
-              title="PR Review"
-              subtitle="Review pull requests on mobile"
-              className="rounded-lg bg-secondary px-3"
-              last
-              onPress={() => {
-                router.push(getPrReviewEntryPath());
-              }}
-            />
-          </View>
-        )}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('profile.reviews')}
+          </Text>
+          <ConfigureRow
+            icon={GitMerge}
+            title={t('common.prReview')}
+            subtitle={t('common.prReviewSubtitle')}
+            hue="gold"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getPrReviewEntryPath());
+            }}
+          />
+        </View>
 
         {/* Organization */}
-        {organizationId != null && (
+        {showOrganizationSection && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Organization
+              {t('common.organization')}
             </Text>
             {organizationsError ? (
               <QueryError
-                variant="server"
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
-                title="Could not load organization"
-                message="Organization and agent settings are unavailable until this loads."
+                title={t('profile.couldNotLoadOrganization')}
+                message={t('profile.couldNotLoadOrganizationDescription')}
                 onRetry={() => void refetchOrganizations()}
                 isRetrying={organizationsFetching}
               />
             ) : (
-              <ConfigureRow
-                icon={Building2}
-                title={orgRole === 'member' ? 'View organization' : 'Manage organization'}
-                subtitle={orgName}
-                className="rounded-lg bg-secondary px-3"
-                disabled={!orgRole}
-                last
-                onPress={() => {
-                  router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
-                }}
-              />
-            )}
-          </View>
-        )}
-
-        {/* Linked accounts — hide the whole section when there are no linked
-            providers (and we're not loading/erroring) so the header never dangles. */}
-        {/* No layout animation on this section: siblings above mount/resize
-            asynchronously; LinearTransition would animate this container's
-            position lag as a visible header overlap. Opacity fades are safe. */}
-        {(isLoading || providersError || (data?.providers.length ?? 0) > 0) && (
-          <View className="mt-6 gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Linked accounts
-            </Text>
-
-            {isLoading && (
-              <Animated.View exiting={FadeOut.duration(150)}>
-                <Skeleton className="h-12 w-full rounded-lg" />
-              </Animated.View>
-            )}
-
-            {providersError && (
-              <QueryError
-                variant="server"
-                placement="top"
-                title="Could not load accounts"
-                onRetry={() => void refetchProviders()}
-                isRetrying={providersFetching}
-              />
-            )}
-
-            {data?.providers.map((p, index) => (
-              <Animated.View key={`${p.provider}-${p.email}`} entering={FadeIn.duration(200)}>
+              <>
+                {(organizationId != null || hasOrganizations) && organizationRow}
                 <ConfigureRow
-                  icon={KeyRound}
-                  title={providerLabel(p.provider)}
-                  subtitle={p.email}
+                  icon={Plus}
+                  title={t('organization.create.title')}
+                  hue="lime"
                   className="rounded-lg bg-secondary px-3"
-                  last={index === data.providers.length - 1}
+                  last
+                  onPress={() => {
+                    router.push(CREATE_ORGANIZATION_HREF);
+                  }}
                 />
-              </Animated.View>
-            ))}
+              </>
+            )}
           </View>
         )}
 
         {/* App */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            App
+            {t('profile.app')}
           </Text>
+          {__DEV__ && SESSION_SYNC_URL && (
+            <ConfigureRow
+              icon={SlidersHorizontal}
+              title={t('nativeRemote.title')}
+              hue="sage"
+              className="rounded-lg bg-secondary px-3"
+              onPress={() => {
+                router.push('/(app)/native-remote' as Href);
+              }}
+            />
+          )}
           <ConfigureRow
             icon={SlidersHorizontal}
-            title="Preferences"
-            subtitle="Appearance, notifications, thinking, and screen behavior"
+            title={t('common.preferences')}
+            subtitle={t('profile.preferencesSubtitle')}
+            hue="sage"
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
             }}
           />
           <ConfigureRow
-            icon={Smartphone}
-            title="Device sessions"
-            subtitle="Review and sign out other devices"
+            icon={BookOpenCheck}
+            title={t('agentBriefing.title')}
+            subtitle={t('agentBriefing.historyHint')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push('/(app)/agent-briefing' as Href);
+            }}
+          />
+          {/* Permanent replay entry: opens the tour at any time, including
+              after the account finished or skipped it. Opening it is an
+              explicit user action, never a re-arm of the auto-open. */}
+          <ConfigureRow
+            icon={BookOpenCheck}
+            title={t('tour.tutorialLabel')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push('/(app)/tour' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Sparkles}
+            title={t('profile.changelog')}
+            hue="sage"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
-              router.push('/(app)/device-sessions' as Href);
+              router.push('/(app)/changelog' as Href);
+            }}
+          />
+        </View>
+
+        {/* Linked accounts — hide the whole section when there are no linked
+            providers (and we're not loading/erroring) so the header never dangles. */}
+        {/* No layout animation on this section: siblings above mount/resize
+            asynchronously; LinearTransition would animate this container's
+            position lag as a visible header overlap.
+            The rows below carry no entering fade either: a Reanimated entering
+            animation does not run while the app is backgrounded, so the row
+            stayed mounted at opacity 0 and left the header alone above the tab
+            bar (Android `profile-error`, 2026-09-22). The skeleton reserves the
+            row's height, so painting a row directly cannot shift the sections
+            below — only the skeleton's exit fade remains. */}
+        {linkedAccounts.kind === 'hidden' ? null : (
+          <View className="mt-6 gap-3">
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('profile.linkedAccounts')}
+            </Text>
+
+            {linkedAccounts.kind === 'skeleton' ? (
+              <Animated.View exiting={FadeOut.duration(150)}>
+                {/* Content-shaped skeleton (icon tile + two text bars in the
+                    row's own bg-secondary card): a plain block read as an
+                    empty box in the e5 spot check (2026-09-07). Heights sum to
+                    the ConfigureRow row (py-3 + 38 text block) so the swap to
+                    real rows does not shift the sections below. Bars are
+                    bg-muted-soft: the theme's bg-muted equals bg-secondary,
+                    so default-tone bars were invisible here (b911 e2 spot
+                    check). */}
+                <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-3 py-3">
+                  <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg bg-muted-soft" />
+                  <View className="flex-1 gap-0.5">
+                    <Skeleton className="h-5 w-32 rounded bg-muted-soft" />
+                    <Skeleton className="h-4 w-48 rounded bg-muted-soft" />
+                  </View>
+                </View>
+              </Animated.View>
+            ) : null}
+
+            {linkedAccounts.kind === 'error' ? (
+              <QueryError
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+                placement="top"
+                title={t('profile.couldNotLoadAccounts')}
+                onRetry={() => void refetchProviders()}
+                isRetrying={providersFetching}
+              />
+            ) : null}
+
+            {listedProviders === null
+              ? null
+              : listedProviders.map((p, index) => (
+                  <View key={`${p.provider}-${p.email}`}>
+                    <ConfigureRow
+                      icon={KeyRound}
+                      title={providerLabel(p.provider)}
+                      subtitle={p.email}
+                      subtitleNumberOfLines={1}
+                      hue="moss"
+                      className="rounded-lg bg-secondary px-3"
+                      last={index === listedProviders.length - 1}
+                    />
+                  </View>
+                ))}
+
+            {linkedAccounts.kind === 'rowsStale' ? (
+              <View className="flex-row items-center gap-3">
+                <AccessibleStatus
+                  tone="warn"
+                  className="flex-1 text-xs"
+                  message={t('agents.sessionList.couldNotRefresh')}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => void refetchProviders()}
+                  loading={providersFetching}
+                >
+                  {t('common.refresh')}
+                </Button>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        {/* Connected services — the integrations hub. Its own section rather
+            than a row in App: the hub manages external accounts, and its row
+            takes the next curated hue step in reading order. */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('integrations.sectionTitle')}
+          </Text>
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            subtitle={t('integrations.entrySubtitle')}
+            hue="pine"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
             }}
           />
         </View>
@@ -306,28 +579,28 @@ export function ProfileScreen() {
         <View className="mt-6 gap-3">
           <ActionTile
             icon={MessageSquare}
-            label="Feedback"
-            color={colors.mutedForeground}
+            label={t('profile.feedback')}
+            hue="fern"
             onPress={() => {
-              showFeedbackPrompt(userId);
+              void feedbackPrompt.requestPrompt(userId);
             }}
           />
           <ActionTile
             icon={Lock}
-            label="Privacy choices"
-            color={colors.mutedForeground}
+            label={t('profile.privacyChoices')}
+            hue="fern"
             onPress={showPrivacyChoices}
           />
           <ActionTile
-            icon={LogOut}
-            label="Sign Out"
-            color={colors.mutedForeground}
-            onPress={confirmSignOut}
+            icon={DirectionalLogOut}
+            label={t('common.signOut')}
+            hue="fern"
+            onPress={requestSignOut}
           />
           <ActionTile
             icon={Trash2}
-            label="Delete Account"
-            color={colors.destructive}
+            label={t('profile.deleteAccount')}
+            hue="fern"
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}
@@ -336,9 +609,17 @@ export function ProfileScreen() {
           {(deletePhase === 'awaiting-code' || deletePhase === 'executing') && (
             <View className="gap-3 rounded-lg bg-secondary p-3">
               <FormField
-                label="Confirmation code"
-                placeholder="6-digit code"
+                label={t('profile.confirmationCode')}
+                placeholder={t('profile.confirmationCodePlaceholder')}
                 keyboardType="number-pad"
+                // Android only: keep the IME docked to the number-pad instead
+                // of swapping to its full-screen extract editor, whose window
+                // parks over the whole screen and buries the destructive submit
+                // below it. The shared scroll view already reserves the docked
+                // IME height and the reveal scrolls the block to its end, so
+                // `TabScreenScrollView`'s occlusion reservation leaves the
+                // submit above the keyboard without a dimensions change here.
+                disableFullscreenUI
                 defaultValue={devCode ?? undefined}
                 onChangeText={setCode}
                 editable={deletePhase !== 'executing'}
@@ -346,10 +627,10 @@ export function ProfileScreen() {
               <Button
                 variant="destructive"
                 loading={deletePhase === 'executing'}
-                disabled={deletePhase === 'executing'}
+                disabled={deletePhase === 'executing' || !canSubmitCode}
                 onPress={submitCode}
               >
-                <Text>Confirm deletion</Text>
+                <Text>{t('profile.confirmDeletion')}</Text>
               </Button>
             </View>
           )}
@@ -359,6 +640,10 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
+
+      {confirmDialog}
+
+      {feedbackPrompt.promptDialog}
     </View>
   );
 }

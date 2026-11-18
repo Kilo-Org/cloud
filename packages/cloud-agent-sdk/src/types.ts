@@ -2,6 +2,7 @@ export type {
   Part,
   TextPart,
   ToolPart,
+  ToolState,
   FilePart,
   ReasoningPart,
   StepStartPart,
@@ -23,12 +24,22 @@ export type {
 } from '@kilocode/app-shared/opencode';
 
 import type { UserMessage, AssistantMessage, Part } from '@kilocode/app-shared/opencode';
+import type * as z from 'zod';
+import type { cloudSessionMetadataSchema } from './schemas';
 
 export type {
   KiloSdkMessageHistory,
   KiloSdkMessageHistoryPage,
   KiloSdkStoredMessage,
 } from '@kilocode/session-ingest-contracts';
+
+/**
+ * A part as a storage reader sees it. `createReadonlyPartView` re-routes
+ * writes to nowhere at runtime, so the view's top-level fields are declared
+ * `readonly` — writing to a returned part is a compile error, passing one
+ * where `Part` is expected still typechecks.
+ */
+export type ReadonlyPart = Readonly<Part>;
 
 /**
  * Payload sent to a cloud agent session transport — either a chat prompt or a
@@ -46,11 +57,12 @@ export type SendMessagePayload =
       type: 'command';
       command: string;
       arguments: string;
+      mode?: string;
+      model?: string;
+      variant?: string;
     };
 
-// ---------------------------------------------------------------------------
 // Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs
-// ---------------------------------------------------------------------------
 
 /** Kilo platform session ID (e.g. `ses_abc123…`). Used for DB lookups and CLI sessions. */
 export type KiloSessionId = string & { readonly __brand: 'KiloSessionId' };
@@ -64,10 +76,21 @@ export type ProcessedMessage = {
   parts: Part[];
 };
 
+/** Goal status reported by the CLI in session metadata. */
+export type SessionGoalStatus = 'active' | 'complete' | 'blocked' | 'paused';
+
+/** Session goal projected from CLI metadata under `kilo.goal`. */
+export type SessionGoal = {
+  text: string;
+  status: SessionGoalStatus;
+  reason?: string | undefined;
+};
+
 /** Minimal session metadata — only the fields the SDK actually reads. */
 export type SessionInfo = {
   id: string;
   parentID?: string | undefined;
+  title?: string | undefined;
   model?:
     | {
         providerID: string;
@@ -75,6 +98,7 @@ export type SessionInfo = {
         variant?: string | undefined;
       }
     | undefined;
+  goal?: SessionGoal | undefined;
 };
 
 export type SessionPhase =
@@ -83,10 +107,6 @@ export type SessionPhase =
   | { status: 'idle' }
   | { status: 'stopped'; reason: 'interrupted' | 'error' | 'disconnected' }
   | { status: 'retrying'; attempt: number; message: string; next: number };
-
-// ---------------------------------------------------------------------------
-// Service state types — separated from chat data
-// ---------------------------------------------------------------------------
 
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 
@@ -97,13 +117,49 @@ export type SessionActivity =
   | { type: 'idle' }
   | { type: 'retrying'; attempt: number; message: string };
 
+/**
+ * Stable, locale-free code for every user-visible string the SDK writes
+ * itself. A localized client renders its own copy from the code; the web app
+ * keeps rendering `message` unchanged.
+ */
+export type SdkStatusMessageCode =
+  | 'agent-connection-lost'
+  | 'session-stopped'
+  | 'session-terminated'
+  | 'setting-up-environment'
+  | 'wrapping-up'
+  | 'committing'
+  | 'committed'
+  | 'commit-failed'
+  | 'message-delivery-failed'
+  | 'failed-to-stop-execution'
+  | 'child-session-not-found'
+  | 'selected-model-unavailable'
+  | 'insufficient-credits'
+  | 'not-authorized'
+  | 'service-unavailable'
+  | 'previous-task-in-progress'
+  | 'workspace-deleting'
+  | 'service-temporarily-unavailable'
+  | 'generic-error'
+  | 'connection-lost'
+  | 'connection-failed';
+
 /** Lifecycle outcome — drives bottom bar content (one thing at a time). */
 export type AgentStatus =
   | { type: 'idle' }
-  | { type: 'autocommit'; step: string; message: string }
-  | { type: 'error'; message: string }
+  | {
+      type: 'autocommit';
+      step: string;
+      message: string;
+      commitHash?: string;
+      code?: SdkStatusMessageCode;
+    }
+  | { type: 'error'; message: string; code?: SdkStatusMessageCode }
   | { type: 'disconnected' }
-  | { type: 'interrupted' };
+  | { type: 'interrupted' }
+  /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
+  | { type: 'scheduled'; scheduledAt?: string };
 
 /** Cloud infrastructure status — independent from agent activity. */
 export type CloudStatus =
@@ -123,6 +179,15 @@ export type PermissionState = {
   patterns: string[];
   metadata: Record<string, unknown>;
   always: string[];
+};
+
+/**
+ * A permission request that is still pending for the CLI while this app cannot
+ * read its scope. No consent card can be offered for it, so the surfaces show a
+ * notice that names the request and points the user at the CLI.
+ */
+export type UnreadablePermissionState = {
+  requestId: string;
 };
 
 export type SuggestionAction = {
@@ -154,6 +219,20 @@ export type SlashCommandInfo = {
   subtask?: boolean | undefined;
 };
 
+/**
+ * Bound status the wrapper reports beside a `commands.available` catalog.
+ *
+ * Present only when the wrapper bounded the catalog to the shared 256-command
+ * and 512 KiB limits: `dropped` counts the non-skill rows it removed, and
+ * `overLimit` means the rows it kept still exceed a bound because the skill
+ * rows alone are over it (a skill row is never truncated). A consumer shows a
+ * notice for it, so a catalog that is missing rows is never silent.
+ */
+export type SlashCommandCatalogStatus = {
+  dropped: number;
+  overLimit: boolean;
+};
+
 /** Per-user-message delivery state, tracked via server-emitted cloud.message.* events. */
 export type MessageDeliveryState =
   | { status: 'queued' }
@@ -163,6 +242,18 @@ export type MessageDeliveryState =
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
     };
+
+export type SessionCommit = {
+  repository?: string | undefined;
+  commitHash: string;
+  commitMessage: string;
+  messageId: string;
+  userMessageId: string;
+  committedAt: string;
+  timestamp?: string | undefined;
+  pushStatus: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
+  commitMessageTruncated?: true | undefined;
+};
 
 export type PreparationAttemptStatus = 'running' | 'completed' | 'failed';
 export type PreparationStepKind = 'phase' | 'setup_command';
@@ -175,9 +266,13 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number | undefined;
+  parentStepId?: string | undefined;
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number | undefined;
   safeError?: string | undefined;
   command?: string | undefined;
   commandIndex?: number | undefined;
@@ -198,6 +293,33 @@ export type PreparationAttempt = {
   steps: PreparationStepSnapshot[];
 };
 
+/**
+ * One of the run's queued or failed turns, as the `connected` event replays it.
+ * `terminalFailure` is the settled failure a client shows in place of the
+ * message: the page's copy lets an opened session paint the question row and
+ * its failure without a socket.
+ */
+export type QueuedMessageSnapshot = {
+  messageId: string;
+  content: string;
+  timestamp: number;
+  delivery?: 'queued' | 'sent' | undefined;
+  turnType?: 'command' | undefined;
+  completedAt?: number | undefined;
+  terminalFailure?:
+    | {
+        messageId: string;
+        status?: string | undefined;
+        delivery?: 'queued' | 'sent' | undefined;
+        accepted?: boolean | undefined;
+        error?: string | undefined;
+        reason?: string | undefined;
+        billingFailure?: unknown;
+        timestamp: number;
+      }
+    | undefined;
+};
+
 /** Full service state — all non-chat state in one place. */
 export type ServiceStateSnapshot = {
   activity: SessionActivity;
@@ -206,16 +328,15 @@ export type ServiceStateSnapshot = {
   /** @deprecated Legacy transient setup output. v2 preparation uses preparationAttempts. */
   setupLog: readonly string[];
   preparationAttempts: readonly PreparationAttempt[];
+  commits: readonly SessionCommit[];
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  unreadablePermissions: readonly UnreadablePermissionState[];
   suggestion: SuggestionState | null;
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
 };
-
-// ---------------------------------------------------------------------------
-// Session resolution — determines session type and transport routing
-// ---------------------------------------------------------------------------
 
 export type ResolvedSession =
   | {
@@ -223,19 +344,16 @@ export type ResolvedSession =
       kiloSessionId: KiloSessionId;
       /**
        * Per-session capabilities reported by the owning CLI's most recent
-       * heartbeat or `sessions.list`. A `remote` session supports attachments
-       * only when `capabilities?.attachments === true`; absent / false is a
-       * structural no-attachments state (older CLIs, CLIs that have not yet
-       * advertised the capability, or CLIs that have downgraded).
+       * heartbeat or `sessions.list`. The gate is optimistic: a `remote`
+       * session supports attachments while the capability is unknown
+       * (`undefined` — older CLIs, CLIs that have not yet advertised it, or a
+       * mid-reconnect snapshot). Only an explicit `attachments: false`
+       * downgrades it.
        */
       capabilities?: { attachments?: boolean };
     }
   | { type: 'cloud-agent'; kiloSessionId: KiloSessionId; cloudAgentSessionId: CloudAgentSessionId }
   | { type: 'read-only'; kiloSessionId: KiloSessionId };
-
-// ---------------------------------------------------------------------------
-// Historical session snapshot — used by CLI historical transport
-// ---------------------------------------------------------------------------
 
 export type SessionSnapshot = {
   info: SessionInfo;
@@ -260,11 +378,59 @@ export type SessionSnapshot = {
  * existing `replay=false` behaviour.
  */
 export type SessionSnapshotPage = {
+  sourceVersion?: 'v1' | 'v2';
   info: SessionInfo;
   messages: SessionSnapshot['messages'];
   nextCursor: string | null;
   omittedItemCount: number;
   watermarkEventId?: number | null;
+  updateCursor?: number;
+  totalCostMicrodollars?: number | null | undefined;
+  /** The preparation rows the stream replays first, so the first page can show them. */
+  preparationAttempts?: readonly PreparationAttempt[] | undefined;
+  /**
+   * The run's queued and failed turns the socket replays on connect, so a page
+   * opened without a socket still shows the question row and its failure.
+   */
+  queuedMessages?: readonly QueuedMessageSnapshot[] | undefined;
+};
+
+export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;
+
+export type CloudSessionSnapshotPage = SessionSnapshotPage & {
+  kind: 'success';
+  updateCursor: number;
+};
+
+export type SessionConfig = {
+  sessionId: CloudAgentSessionId | KiloSessionId;
+  repository: string;
+  mode: string;
+  model: string;
+  providerID?: string | null | undefined;
+  variant?: string | null | undefined;
+  /** Installed custom agents, including picker visibility and model overrides. */
+  runtimeAgents?:
+    | Array<{
+        slug: string;
+        name: string;
+        mode?: 'primary' | 'subagent' | 'all' | undefined;
+        hidden?: boolean | undefined;
+        disable?: boolean | undefined;
+        model?: string | undefined;
+        variant?: string | undefined;
+      }>
+    | undefined;
+};
+
+/**
+ * A caller-cached transcript page plus the rows the transcript draws from
+ * service state, so a cached repaint matches the live transcript's layout.
+ */
+export type CachedSessionSnapshotPage = SessionSnapshotPage & {
+  commits?: readonly SessionCommit[];
+  /** A Cloud Agent session's last settings, shown on reopen until its metadata loads. */
+  sessionConfig?: SessionConfig;
 };
 
 /**

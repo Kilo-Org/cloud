@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["KiloFileHashModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.kilofilehash.KiloFileHashModule"]
+  }
+}

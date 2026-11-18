@@ -1,4 +1,3 @@
-import { timingSafeEqual as nodeTimingSafeEqual } from 'crypto';
 import { getWorkerDb } from '@kilocode/db/client';
 import {
   buildScheduledJobFailureEvent,
@@ -6,19 +5,11 @@ import {
   createScheduledJobRunContext,
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
+import { timingSafeEqual } from '@kilocode/encryption';
 import * as z from 'zod';
 import { createPromotionStore, syncPromotionsFromBench } from './sync.js';
 
 const SyncRequestSchema = z.object({ promotionName: z.string().min(1).optional() }).optional();
-
-async function timingSafeEqual(left: string, right: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const [leftDigest, rightDigest] = await Promise.all([
-    crypto.subtle.digest('SHA-256', encoder.encode(left)),
-    crypto.subtle.digest('SHA-256', encoder.encode(right)),
-  ]);
-  return nodeTimingSafeEqual(new Uint8Array(leftDigest), new Uint8Array(rightDigest));
-}
 
 async function runSync(env: CloudflareEnv, promotionName?: string) {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
@@ -50,7 +41,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
 
   const internalSecret = await getInternalApiSecret(env.INTERNAL_API_SECRET);
   const authHeader = request.headers.get('x-internal-api-key');
-  if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+  if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

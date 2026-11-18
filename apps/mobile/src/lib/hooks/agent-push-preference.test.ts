@@ -2,13 +2,16 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_NOTIFICATION_PREFERENCE,
+  applyAgentPushOptimistic,
   deriveAgentPushEditable,
   deriveGateSettled,
   deriveShowEnableCta,
   NOTIFICATION_CATEGORY_KEYS,
   type NotificationPreferences,
   readAgentPushPreference,
+  readAgentPushPreferenceIfLoaded,
+  readNotificationPreviewsIfLoaded,
+  rollbackAgentPushOptimistic,
 } from './agent-push-preference';
 
 const key = ['user', 'getNotificationPreferences'] as const;
@@ -19,33 +22,25 @@ function makeQueryClient(): QueryClient {
 
 function fullRow(overrides: Partial<NotificationPreferences> = {}): NotificationPreferences {
   return {
-    chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
-    agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
-    agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
-    sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-    kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
-    balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
-    securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
-    agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentAttention: true,
+    agentUpdates: true,
+    sessionStatus: true,
+    balanceAlerts: true,
+    spendAlerts: true,
+    securityFindings: true,
+    agentPushEnabled: true,
     ...overrides,
   };
 }
 
-describe('DEFAULT_NOTIFICATION_PREFERENCE', () => {
-  it('is true (default ON per plan)', () => {
-    expect(DEFAULT_NOTIFICATION_PREFERENCE).toBe(true);
-  });
-});
-
 describe('NOTIFICATION_CATEGORY_KEYS', () => {
-  it('lists the categories rendered on the dedicated screen including balance and security', () => {
+  it('lists the categories rendered on the dedicated screen including balance, spend and security', () => {
     expect([...NOTIFICATION_CATEGORY_KEYS]).toEqual([
-      'chatMessages',
       'agentAttention',
       'agentUpdates',
       'sessionStatus',
-      'kiloclawActivity',
       'balanceAlerts',
+      'spendAlerts',
       'securityFindings',
     ]);
   });
@@ -119,28 +114,26 @@ describe('readAgentPushPreference', () => {
   it('returns the default for the requested category when the cache has no snapshot', () => {
     const qc = makeQueryClient();
     for (const category of NOTIFICATION_CATEGORY_KEYS) {
-      expect(readAgentPushPreference(qc, key, category)).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+      expect(readAgentPushPreference(qc, key, category)).toBe(true);
     }
   });
 
   it('returns the cached value for each category when the full row is present', () => {
     const qc = makeQueryClient();
     qc.setQueryData(key, {
-      chatMessages: true,
       agentAttention: false,
       agentUpdates: true,
       sessionStatus: false,
-      kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: false,
       securityFindings: true,
       agentPushEnabled: true,
     });
-    expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'agentAttention')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'sessionStatus')).toBe(false);
-    expect(readAgentPushPreference(qc, key, 'kiloclawActivity')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
   });
 
@@ -150,16 +143,77 @@ describe('readAgentPushPreference', () => {
     expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(false);
     // Non-agentUpdates categories fall back to the default when only the
     // legacy field is present.
-    expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
-    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
-    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(
-      DEFAULT_NOTIFICATION_PREFERENCE
-    );
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
   });
 
   it('defaults to the agentUpdates category when no category is passed', () => {
     const qc = makeQueryClient();
     qc.setQueryData(key, fullRow({ agentUpdates: false }));
     expect(readAgentPushPreference(qc, key)).toBe(false);
+  });
+});
+
+describe('spendAlerts optimistic flip (agreement with the spend view column)', () => {
+  it('applies the optimistic flip to spendAlerts and rolls back on error', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ spendAlerts: true, balanceAlerts: true }));
+
+    const context = await applyAgentPushOptimistic({
+      queryClient: qc,
+      queryKey: key,
+      next: false,
+      category: 'spendAlerts',
+    });
+    // The flip lands on spendAlerts only: the sibling balance row is untouched.
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(true);
+
+    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
+    // Rollback restores the previous snapshot, so a failed save cannot leave
+    // the screen disagreeing with the column the spend view writes.
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(true);
+    expect(qc.getQueryData(key)).toEqual(fullRow({ spendAlerts: true, balanceAlerts: true }));
+  });
+});
+
+describe('readAgentPushPreferenceIfLoaded', () => {
+  it('reports the row as unknown while the cache is empty', () => {
+    const qc = makeQueryClient();
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBeUndefined();
+  });
+
+  it('reports the stored value instead of defaulting to ON once the row is cached', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ agentAttention: false, agentUpdates: true }));
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(false);
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentUpdates')).toBe(true);
+  });
+
+  it('keeps the legacy `agentPushEnabled` mapping for a legacy snapshot', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, { agentPushEnabled: false });
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentUpdates')).toBe(false);
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(true);
+  });
+});
+
+describe('readNotificationPreviewsIfLoaded', () => {
+  it('reports the choice as unknown while the cache is empty', () => {
+    const qc = makeQueryClient();
+    expect(readNotificationPreviewsIfLoaded(qc, key)).toBeUndefined();
+  });
+
+  it('returns the server-resolved choice', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ notificationPreviews: 'full' }));
+    expect(readNotificationPreviewsIfLoaded(qc, key)).toBe('full');
+  });
+
+  it('reports a legacy snapshot as unknown rather than claiming full previews', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, { agentPushEnabled: true });
+    expect(readNotificationPreviewsIfLoaded(qc, key)).toBeUndefined();
   });
 });

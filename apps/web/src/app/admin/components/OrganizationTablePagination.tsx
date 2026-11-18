@@ -8,8 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { PageSize, PaginationMetadata } from '@/types/pagination';
-import { getPaginationHelpers, PAGE_SIZE_OPTIONS } from '@/types/pagination';
+import type { PageSize, PaginationMetadata } from '@kilocode/web-shared/types/pagination';
+import { getPaginationHelpers, PAGE_SIZE_OPTIONS } from '@kilocode/web-shared/types/pagination';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 interface OrganizationTablePaginationProps {

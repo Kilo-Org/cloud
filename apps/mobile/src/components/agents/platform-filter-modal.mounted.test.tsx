@@ -1,0 +1,634 @@
+/* eslint-disable max-lines -- cohesive mounted-test suite for the session filter sheet */
+import { act, type ComponentProps } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { type Pressable, ScrollView, View } from 'react-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { Button } from '@/components/ui/button';
+import { Sheet } from '@/components/ui/sheet';
+import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { type AgentSessionFilters } from '@/lib/agent-session-filters';
+import { renderWithProviders } from '@/test/render-with-providers';
+import * as PlatformFilterRows from './platform-filter-rows';
+import { SessionFilterModal } from './platform-filter-modal';
+
+let windowDimensions = { width: 400, height: 700, fontScale: 1, scale: 1 };
+let insets = { top: 0, bottom: 0, left: 0, right: 0 };
+// Mutable so one test can read the rows through iOS's role mapping.
+const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
+
+vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
+  Modal: 'Modal',
+  Platform: platform,
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
+  View: 'View',
+  useWindowDimensions: () => windowDimensions,
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insets,
+}));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ primaryForeground: '#1a1a10' }),
+}));
+// Spies around the real derivations: the modal must build them only when the
+// props they read change, so the tests count the builds instead of inspecting
+// the private memos.
+vi.mock('./platform-filter-rows', async importOriginal => {
+  const actual = await importOriginal<typeof PlatformFilterRows>();
+  return {
+    ...actual,
+    mergePlatformOptions: vi.fn(actual.mergePlatformOptions),
+    buildProjectRows: vi.fn(actual.buildProjectRows),
+  };
+});
+
+const firstProject = {
+  gitUrl: 'https://github.com/iscekic/kilo-workflow.git',
+  displayName: 'ISCEKIC/KILO-WORKFLOW',
+};
+const secondProject = {
+  gitUrl: 'https://github.com/Kilo-Org/kilocode.git',
+  displayName: 'KILO-ORG/KILOCODE',
+};
+const projects = [firstProject, secondProject];
+const unavailable = 'https://github.com/unavailable/saved-repository.git';
+type RenderedView = Awaited<ReturnType<typeof renderWithProviders>>;
+const mounted: RenderedView[] = [];
+
+async function renderModal(overrides: Partial<ComponentProps<typeof SessionFilterModal>> = {}) {
+  const props = {
+    visible: true,
+    selectedPlatforms: [],
+    selectedProjects: [],
+    projectOptions: projects,
+    onApply: vi.fn<(filters: AgentSessionFilters) => void>(),
+    onClose: vi.fn<() => void>(),
+    ...overrides,
+  };
+  const view = await renderWithProviders(<SessionFilterModal {...props} />);
+  mounted.push(view);
+  return { renderer: view.renderer, queryClient: view.queryClient, props };
+}
+
+/** The role these rows carry on the platform under test. */
+function rowRole() {
+  return platform.OS === 'ios' ? 'button' : 'checkbox';
+}
+
+function findRow(renderer: RenderedView['renderer'], label: string) {
+  const row = renderer.root
+    .findAllByProps({ accessibilityRole: rowRole() })
+    .find(node => node.findByType(Text).props.children === label);
+  if (!row) {
+    throw new Error(`missing row: ${label}`);
+  }
+  return row;
+}
+
+function pressButton(renderer: RenderedView['renderer'], label: string) {
+  const button = renderer.root
+    .findAllByType(Button)
+    .find(row => row.findByType(Text).props.children === label);
+  if (!button) {
+    throw new Error(`missing button: ${label}`);
+  }
+  act(() => {
+    (button.props.onPress as () => void)();
+  });
+}
+
+/** The sheet's content column: it fills the detent and pads the bottom inset. */
+function findSheetContent(renderer: RenderedView['renderer']) {
+  const content = renderer.root
+    .findAllByType(View)
+    .find(view => view.props.className === 'flex-1 gap-4 p-5');
+  if (!content) {
+    throw new Error('missing sheet content');
+  }
+  return content;
+}
+
+/** Project rows only, in render order, so a toggle's reorder would show up. */
+function projectRowLabels(renderer: RenderedView['renderer']) {
+  return renderer.root
+    .findAllByProps({ accessibilityRole: rowRole() })
+    .map(row => row.findByType(Text).props.children)
+    .filter(label => label === firstProject.displayName || label === secondProject.displayName);
+}
+
+describe('SessionFilterModal', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    windowDimensions = { width: 400, height: 700, fontScale: 1, scale: 1 };
+    insets = { top: 0, bottom: 0, left: 0, right: 0 };
+    platform.OS = 'android';
+    vi.mocked(PlatformFilterRows.mergePlatformOptions).mockClear();
+    vi.mocked(PlatformFilterRows.buildProjectRows).mockClear();
+  });
+
+  afterEach(() => {
+    for (const view of mounted) {
+      view.unmount();
+    }
+    mounted.length = 0;
+  });
+
+  it('keeps the native sheet and draft content unmounted while closed', async () => {
+    const { renderer } = await renderModal({ visible: false });
+
+    expect(renderer.root.findAll(node => (node.type as unknown) === 'BottomSheet')).toHaveLength(0);
+    expect(renderer.root.findAllByType(ScrollView)).toHaveLength(0);
+    expect(PlatformFilterRows.mergePlatformOptions).not.toHaveBeenCalled();
+    expect(PlatformFilterRows.buildProjectRows).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancel', 'apply', 'sheet'] as const)(
+    'retains the filter content during %s dismissal and resets the draft on reopening',
+    async dismissal => {
+      platform.OS = 'ios';
+      const { renderer, queryClient, props } = await renderModal({
+        selectedPlatforms: ['cli'],
+        selectedProjects: [firstProject.gitUrl],
+      });
+      act(() => {
+        (findRow(renderer, secondProject.displayName).props.onPress as () => void)();
+      });
+      const content = findSheetContent(renderer);
+
+      if (dismissal === 'sheet') {
+        act(() => {
+          const native = renderer.root.find(node => (node.type as unknown) === 'BottomSheet');
+          (native.props.onClose as () => void)();
+        });
+      } else {
+        pressButton(renderer, i18n.t(`common.${dismissal}`));
+      }
+      expect(props.onClose).toHaveBeenCalledOnce();
+      expect(props.onApply).toHaveBeenCalledTimes(dismissal === 'apply' ? 1 : 0);
+
+      act(() => {
+        renderer.update(
+          <QueryClientProvider client={queryClient}>
+            <SessionFilterModal {...props} visible={false} />
+          </QueryClientProvider>
+        );
+      });
+
+      const closing = renderer.root.find(node => (node.type as unknown) === 'BottomSheet');
+      expect(closing.props.index).toBe(-1);
+      expect(findSheetContent(renderer)).toBe(content);
+      expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
+        selected: true,
+      });
+      expect(renderer.root.findAllByType(Button)).toHaveLength(2);
+
+      act(() => {
+        (closing.props.onDismiss as () => void)();
+      });
+      expect(renderer.root.findAll(node => (node.type as unknown) === 'BottomSheet')).toHaveLength(
+        0
+      );
+      expect(renderer.root.findAllByType(ScrollView)).toHaveLength(0);
+
+      act(() => {
+        renderer.update(
+          <QueryClientProvider client={queryClient}>
+            <SessionFilterModal {...props} selectedPlatforms={['cloud-agent']} />
+          </QueryClientProvider>
+        );
+      });
+      expect(findRow(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+        selected: true,
+      });
+      expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
+        selected: false,
+      });
+      expect(
+        findRow(renderer, i18n.t('agentChat.sessionFilter.platformCli')).props.accessibilityState
+      ).toEqual({ selected: false });
+      expect(
+        findRow(renderer, i18n.t('agentChat.sessionFilter.platformCloud')).props.accessibilityState
+      ).toEqual({ selected: true });
+    }
+  );
+
+  it('renders the default options with the current selections checked', async () => {
+    const { renderer } = await renderModal({
+      selectedPlatforms: ['cloud-agent'],
+      selectedProjects: [firstProject.gitUrl],
+    });
+    expect(renderer.root.findByType(Sheet).props.visible).toBe(true);
+    expect(renderer.root.findAllByType(ScrollView)).toHaveLength(1);
+    expect(renderer.root.findByType(ScrollView).props.horizontal).toBeUndefined();
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes.map(row => row.findByType(Text).props.children)).toEqual([
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      i18n.t('agentChat.sessionFilter.platformExtension'),
+      i18n.t('agentChat.sessionFilter.platformDesktop'),
+      i18n.t('agentChat.sessionFilter.platformCli'),
+      i18n.t('agentChat.sessionFilter.platformSlack'),
+      i18n.t('common.github'),
+      i18n.t('agentChat.sessionFilter.platformLinear'),
+      i18n.t('agentChat.sessionFilter.platformOther'),
+      firstProject.displayName,
+      secondProject.displayName,
+    ]);
+    expect(
+      checkboxes.map(
+        row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
+      )
+    ).toEqual([true, false, false, false, false, false, false, false, true, false]);
+  });
+
+  it('exposes every option as a selected button on iOS, where React Native has no checkbox role', async () => {
+    platform.OS = 'ios';
+    const { renderer } = await renderModal({
+      selectedPlatforms: ['cli'],
+      selectedProjects: [firstProject.gitUrl],
+    });
+    const rows = renderer.root.findAllByProps({ accessibilityRole: 'button' });
+    expect(rows.map(row => row.findByType(Text).props.children)).toEqual([
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      i18n.t('agentChat.sessionFilter.platformExtension'),
+      i18n.t('agentChat.sessionFilter.platformDesktop'),
+      i18n.t('agentChat.sessionFilter.platformCli'),
+      i18n.t('agentChat.sessionFilter.platformSlack'),
+      i18n.t('common.github'),
+      i18n.t('agentChat.sessionFilter.platformLinear'),
+      i18n.t('agentChat.sessionFilter.platformOther'),
+      firstProject.displayName,
+      secondProject.displayName,
+    ]);
+    expect(rows.map(row => row.props.accessibilityState)).toEqual([
+      { selected: false },
+      { selected: false },
+      { selected: false },
+      { selected: true },
+      { selected: false },
+      { selected: false },
+      { selected: false },
+      { selected: false },
+      { selected: true },
+      { selected: false },
+    ]);
+    act(() => {
+      (
+        findRow(renderer, i18n.t('agentChat.sessionFilter.platformCli')).props.onPress as () => void
+      )();
+    });
+    expect(
+      findRow(renderer, i18n.t('agentChat.sessionFilter.platformCli')).props.accessibilityState
+    ).toEqual({ selected: false });
+  });
+
+  it('keeps the action row out of the scrollable option list', async () => {
+    const { renderer } = await renderModal();
+    const options = renderer.root.findByType(ScrollView);
+    expect(renderer.root.findAllByType(ScrollView)).toHaveLength(1);
+    expect(options.findAllByType(Button)).toHaveLength(0);
+    expect(renderer.root.findAllByType(Button)).toHaveLength(2);
+  });
+
+  it('reserves the bottom safe-area inset in the sheet padding', async () => {
+    insets = { top: 47, bottom: 34, left: 0, right: 0 };
+    const { renderer } = await renderModal();
+    expect(findSheetContent(renderer).props.style).toMatchObject({ paddingBottom: 34 + 20 });
+  });
+
+  it('uses the supplied platform options and omits an empty project section', async () => {
+    const { renderer } = await renderModal({
+      platformOptions: ['cli', 'future-platform'],
+      selectedPlatforms: ['future-platform'],
+      projectOptions: [],
+    });
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes.map(row => row.findByType(Text).props.children)).toEqual([
+      i18n.t('agentChat.sessionFilter.platformCli'),
+      'FUTURE-PLATFORM',
+    ]);
+    expect(
+      checkboxes.map(
+        row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
+      )
+    ).toEqual([false, true]);
+    expect(renderer.root.findAllByType(Text).map(text => text.props.children)).not.toContain(
+      i18n.t('agentChat.sessionFilter.project')
+    );
+  });
+
+  it('omits an empty platform section instead of rendering an orphaned label', async () => {
+    // A live list whose rows all have an unknown origin offers no platform
+    // option (`buildLiveFilterOptions` only offers the origins that are
+    // running), so the section must be omitted exactly as PROJECT already is
+    // when it has no rows — otherwise the sheet shows a bare PLATFORM label
+    // with nothing under it (spot defect e4-filter).
+    const { renderer } = await renderModal({
+      platformOptions: [],
+      selectedPlatforms: [],
+      projectOptions: [firstProject],
+    });
+    const labels = renderer.root.findAllByType(Text).map(text => text.props.children);
+    expect(labels).not.toContain(i18n.t('common.platform'));
+    expect(labels).toContain(i18n.t('agentChat.sessionFilter.project'));
+    expect(
+      renderer.root
+        .findAllByProps({ accessibilityRole: 'checkbox' })
+        .map(row => row.findByType(Text).props.children)
+    ).toEqual([firstProject.displayName]);
+  });
+
+  it('commits both draft arrays only on Apply and preserves unavailable selections', async () => {
+    const selectedPlatforms = ['cli', 'future-platform'];
+    const selectedProjects = [firstProject.gitUrl, unavailable];
+    const { renderer, props } = await renderModal({ selectedPlatforms, selectedProjects });
+    const changes = [
+      { label: firstProject.displayName, checked: false },
+      { label: secondProject.displayName, checked: true },
+      { label: i18n.t('agentChat.sessionFilter.platformCloud'), checked: true },
+      { label: i18n.t('agentChat.sessionFilter.platformCli'), checked: false },
+    ];
+    for (const change of changes) {
+      act(() => {
+        (findRow(renderer, change.label).props.onPress as () => void)();
+      });
+      expect(findRow(renderer, change.label).props.accessibilityState).toEqual({
+        checked: change.checked,
+      });
+    }
+    expect(props.onApply).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(selectedPlatforms).toEqual(['cli', 'future-platform']);
+    expect(selectedProjects).toEqual([firstProject.gitUrl, unavailable]);
+
+    pressButton(renderer, i18n.t('common.apply'));
+
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: ['future-platform', 'cloud-agent'],
+      projectFilter: [unavailable, secondProject.gitUrl],
+    });
+    expect(props.onClose).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { name: 'other live sessions', platformOptions: ['cli'], projectOptions: [firstProject] },
+    { name: 'no live sessions', platformOptions: [], projectOptions: [] },
+  ])('lets users remove unavailable saved filters with $name', async options => {
+    const { renderer, props } = await renderModal({
+      platformOptions: options.platformOptions,
+      projectOptions: options.projectOptions,
+      selectedPlatforms: ['cli', 'cloud-agent'],
+      selectedProjects: [firstProject.gitUrl, unavailable],
+    });
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes).toHaveLength(4);
+    expect(new Set(checkboxes.map(row => row.findByType(Text).props.children)).size).toBe(4);
+
+    for (const label of [
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      'unavailable/saved-repository',
+    ]) {
+      expect(findRow(renderer, label).props.accessibilityState).toEqual({ checked: true });
+      act(() => {
+        (findRow(renderer, label).props.onPress as () => void)();
+      });
+      expect(findRow(renderer, label).props.accessibilityState).toEqual({ checked: false });
+    }
+
+    expect(props.onApply).not.toHaveBeenCalled();
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: ['cli'],
+      projectFilter: [firstProject.gitUrl],
+    });
+    expect(props.onClose).toHaveBeenCalledOnce();
+  });
+
+  it('renders one platform row per bucket and collapses a persisted variant', async () => {
+    const { renderer } = await renderModal({
+      platformOptions: ['cloud-agent', 'extension'],
+      selectedPlatforms: ['cloud-agent-web', 'vscode'],
+      projectOptions: [],
+    });
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes.map(row => row.findByType(Text).props.children)).toEqual([
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      i18n.t('agentChat.sessionFilter.platformExtension'),
+    ]);
+    expect(
+      checkboxes.map(
+        row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
+      )
+    ).toEqual([true, true]);
+  });
+
+  it('renders one project row per visible label and stores every alias on toggle', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [],
+    });
+    const labels = renderer.root
+      .findAllByProps({ accessibilityRole: 'checkbox' })
+      .map(row => row.findByType(Text).props.children);
+    expect(labels.filter(label => label === firstProject.displayName)).toHaveLength(1);
+    expect(findRow(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    act(() => {
+      (findRow(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findRow(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [firstProject.gitUrl, sshAlias.gitUrl],
+    });
+  });
+
+  it('toggles off every alias of a merged project when any is stored', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [sshAlias.gitUrl],
+    });
+    expect(findRow(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    act(() => {
+      (findRow(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findRow(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [],
+    });
+  });
+
+  it('applies empty filters after deselecting both dimensions', async () => {
+    const { renderer, props } = await renderModal({
+      selectedPlatforms: ['cli'],
+      selectedProjects: [firstProject.gitUrl],
+    });
+    for (const label of [firstProject.displayName, i18n.t('agentChat.sessionFilter.platformCli')]) {
+      act(() => {
+        (findRow(renderer, label).props.onPress as () => void)();
+      });
+    }
+    expect(
+      renderer.root
+        .findAllByProps({ accessibilityRole: 'checkbox' })
+        .every(
+          row =>
+            (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked === false
+        )
+    ).toBe(true);
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [],
+    });
+    expect(props.onClose).toHaveBeenCalledOnce();
+  });
+
+  it.each(['cancel', 'sheet'] as const)(
+    'dismisses through %s without applying draft selections',
+    async dismissal => {
+      const { renderer, props } = await renderModal();
+      act(() => {
+        (findRow(renderer, firstProject.displayName).props.onPress as () => void)();
+      });
+      if (dismissal === 'cancel') {
+        pressButton(renderer, i18n.t('common.cancel'));
+      } else {
+        // Android Back, a swipe down, and a backdrop tap all dismiss through
+        // the native sheet's one `onClose` path.
+        act(() => {
+          const close = renderer.root.find(node => (node.type as unknown) === 'BottomSheet').props
+            .onClose as () => void;
+          close();
+        });
+      }
+      expect(props.onClose).toHaveBeenCalledOnce();
+      expect(props.onApply).not.toHaveBeenCalled();
+    }
+  );
+
+  // The sheet offers one row per recent repository (up to the server's LIMIT)
+  // plus one per selected project. The sheet fills its detent, so the single
+  // list takes the slack and scrolls; a long list can never push the
+  // Apply/Cancel row off-screen.
+  it('gives the single list the sheet slack so extra project rows stay reachable', async () => {
+    const { renderer } = await renderModal();
+    const content = findSheetContent(renderer);
+    const scrollViews = renderer.root.findAllByType(ScrollView);
+    expect(scrollViews).toHaveLength(1);
+    const scrollView = renderer.root.findByType(ScrollView);
+    expect(String(scrollView.props.className)).toContain('flex-1');
+    expect(content.findAllByType(ScrollView)).toHaveLength(1);
+  });
+
+  // The sheet re-derives its rows only when the props they read change. A
+  // re-render with unchanged props must hand the list the same platform array
+  // identity, so no mounted platform row re-renders.
+  it('hands the list the same merged platform array identity on an unchanged re-render', async () => {
+    const platformOptions = ['cli', 'future-platform'];
+    const { renderer, queryClient, props } = await renderModal({
+      platformOptions,
+      selectedPlatforms: ['future-platform'],
+    });
+    const merge = vi.mocked(PlatformFilterRows.mergePlatformOptions);
+    expect(merge).toHaveBeenCalledTimes(1);
+    const labelsBefore = renderer.root
+      .findAllByProps({ accessibilityRole: 'checkbox' })
+      .map(row => row.findByType(Text).props.children);
+
+    act(() => {
+      renderer.update(
+        <QueryClientProvider client={queryClient}>
+          <SessionFilterModal {...props} />
+        </QueryClientProvider>
+      );
+    });
+
+    // The merge derivation is memoized on its props, so an unchanged re-render
+    // must not run it again: that is what keeps the list's array identity (and
+    // therefore every mounted row) stable. The labels stay put as a result.
+    expect(merge).toHaveBeenCalledTimes(1);
+    expect(
+      renderer.root
+        .findAllByProps({ accessibilityRole: 'checkbox' })
+        .map(row => row.findByType(Text).props.children)
+    ).toEqual(labelsBefore);
+  });
+
+  // A checkbox toggle changes the draft selection only. The memoized rows are
+  // keyed on the props, so toggling must neither rebuild the project map nor
+  // reorder the rows: the selected project keeps its (first) row.
+  it('keeps the selected project sorting first after toggling another project checkbox', async () => {
+    const { renderer } = await renderModal({
+      selectedProjects: [firstProject.gitUrl],
+      projectOptions: [firstProject, secondProject],
+    });
+    const build = vi.mocked(PlatformFilterRows.buildProjectRows);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(projectRowLabels(renderer)).toEqual([
+      firstProject.displayName,
+      secondProject.displayName,
+    ]);
+
+    act(() => {
+      (findRow(renderer, secondProject.displayName).props.onPress as () => void)();
+    });
+
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(projectRowLabels(renderer)).toEqual([
+      firstProject.displayName,
+      secondProject.displayName,
+    ]);
+    expect(findRow(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+    expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+  });
+
+  // The size audit reads the row node's own rect, so the 48dp selection-row
+  // frame must be that node's class — a hitSlop around a smaller box never
+  // lifts the audited frame (see the tap-target rules in DESIGN.md).
+  it('carries the shared row floor on every option row node itself', async () => {
+    const { renderer } = await renderModal({
+      selectedPlatforms: ['cli'],
+      selectedProjects: [firstProject.gitUrl],
+    });
+    const rows = renderer.root.findAllByProps({ accessibilityRole: rowRole() });
+    expect(rows).toHaveLength(10);
+    for (const row of rows) {
+      expect(String(row.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(row.props.hitSlop).toBeUndefined();
+    }
+  });
+});

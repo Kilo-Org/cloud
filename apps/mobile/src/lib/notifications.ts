@@ -1,13 +1,81 @@
+/* eslint-disable max-lines -- notification wiring: foreground/background handlers, channels, and push-token plumbing are kept together. */
+import * as BackgroundTask from 'expo-background-task';
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { type Href, router } from 'expo-router';
-import { Platform } from 'react-native';
+import * as TaskManager from 'expo-task-manager';
+import { AppState, Platform } from 'react-native';
 import { z } from 'zod';
 
-import { type PushData, pushDataSchema } from '@kilocode/notifications';
+import * as Sentry from '@sentry/react-native';
+import {
+  agentNotificationKindForPushData,
+  ANDROID_NOTIFICATION_CHANNELS,
+  type AndroidNotificationChannelId,
+  type PushData,
+  pushDataSchema,
+} from '@kilocode/notifications/schemas';
+import {
+  NOTIFICATION_PERMISSION_RESPONDED_EVENT,
+  NOTIFICATION_TOKEN_UPDATED_EVENT,
+} from '@kilocode/app-shared/analytics';
+import {
+  buildOpaqueScopeKey,
+  GLANCEABLE_TERMINAL_MS,
+  type GlanceableAgentsSnapshot,
+  isEligibleGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
+import { captureEvent } from '@/lib/analytics/posthog';
+import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
+import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '@/lib/android-notification-channels';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
+import { releaseAndroidSessionToken } from '@/lib/glanceable/session-activity-tokens-android';
+import {
+  applySessionLiveUpdate,
+  isSessionFollowed,
+  restoreFollowedSessionsFromStorage,
+} from '@/lib/glanceable/session-follow';
+import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import {
+  rememberHomeWidgetSnapshot,
+  setHomeWidgetDetails,
+} from '@/lib/glanceable/home-widget-data';
+import {
+  getGlanceableSnapshotForSignedInScope,
+  getLastGlanceableSnapshot,
+  getLocalScopeKey,
+  persistGlanceableSink,
+  restorePersistedGlanceable,
+} from '@/lib/glanceable/persist';
+import { setNotificationPermissionGrantedValue } from '@/lib/glanceable/live-activity-switch';
+import { getActiveUserId, getSelectedOrganizationId } from '@/lib/glanceable/scope';
+import {
+  getGlanceableSinks,
+  type GlanceableSink,
+  registerGlanceableSink,
+} from '@/lib/glanceable/sink-registry';
+import { publishTrayOnce } from '@/lib/glanceable/tray-refresh';
+import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { chainSave } from '@/lib/hooks/save-chain';
+import { getDndAccessGranted } from '@/glanceable-android/live-update';
+import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
+import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
+import {
+  handleNeedsInputNotificationResponse,
+  isNeedsInputActionIdentifier,
+  type NeedsInputActionDeps,
+  pendingDeepLinkOptionsForData,
+} from './notification-actions';
+import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
+import { isRetiredPushType } from './retired-push-types';
+import {
+  isAppOwnedNeedsInputNotification,
+  readNeedsInputPresentation,
+} from './needs-input-presentation';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
 
@@ -19,25 +87,215 @@ function getProjectId(): string {
   return parsed.data.projectId;
 }
 
-// Tracks which conversation screen is currently focused.
-// Read by the foreground notification handler to suppress notifications
-// when the user is already viewing that conversation.
-// A module-level variable (not React state) because the notification handler
-// is registered once and must always read the latest value without stale closures.
-let activeChatLocation: { sandboxId: string; conversationId: string } | null = null;
+let appBadgeWrite: Promise<void> | null = null;
 
-export function setActiveChatLocation(
-  location: { sandboxId: string; conversationId: string } | null
-) {
-  activeChatLocation = location;
+// The count the last successful native write put on the launcher badge. The
+// badge is shared with iOS itself: a visible push that carries its own badge
+// moves the icon through the shouldSetBadge path without the app writing.
+let badgeWrittenCount: number | null = null;
+
+async function setAppBadge(count: number): Promise<void> {
+  try {
+    await chainSave('glanceable-app-badge', async () => {
+      await Notifications.setBadgeCountAsync(count);
+    });
+    badgeWrittenCount = count;
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'set_glanceable_badge',
+      },
+    });
+  }
+}
+
+function syncAppBadge(count: number): void {
+  // Only a change of the needs-input count owns a badge write. Re-asserting
+  // an unchanged count would undo a badge iOS applied from a visible push
+  // payload (e7: foreground push badge 2 was clobbered back to needsInput 1
+  // before the app was terminated).
+  if (count === badgeWrittenCount) {
+    return;
+  }
+  appBadgeWrite = setAppBadge(count);
+}
+
+const appBadgeSink: GlanceableSink = {
+  publish(snapshot) {
+    syncAppBadge(snapshot.needsInput);
+  },
+  async waitForNativeTerminal() {
+    if (appBadgeWrite) {
+      await appBadgeWrite;
+    }
+  },
+  endImmediate() {
+    // A terminal snapshot already published zero.
+  },
+  startOrUpdate() {
+    // The publish operation owns every badge write.
+  },
+};
+
+/** The one field the retirement check needs from a raw push payload. */
+const pushTypeCarrierSchema = z.object({ type: z.string() });
+
+/**
+ * The `type` discriminator of a raw push payload, when it carries one. Read
+ * straight off the payload, before the push-data parse, so a kind this build no
+ * longer declares still reaches the retirement check (`isRetiredPushType`).
+ */
+function rawPushType(data: unknown): string | null {
+  const parsed = pushTypeCarrierSchema.safeParse(data);
+  return parsed.success ? parsed.data.type : null;
 }
 
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
+// A payload this build's schema does not declare — a kind the server removed,
+// or one a newer server added — parses to null and its tap does nothing. A kind
+// this build retired is suppressed by the foreground handler instead
+// (`isRetiredPushType`), which runs before this parse.
 export function parseNotificationData(data: unknown): PushData | null {
   const parsed = pushDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
+}
+
+// Fallback terminal end for sinks without a native terminal contract.
+// Native sinks submit dismissal during publish and never receive this later end.
+// A newer eligible snapshot or terminal-blank epoch cancels the fallback.
+let glanceableTerminalTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelGlanceableTerminalEnd(): void {
+  if (glanceableTerminalTimer !== null) {
+    clearTimeout(glanceableTerminalTimer);
+    glanceableTerminalTimer = null;
+  }
+}
+
+function scheduleGlanceableTerminalEnd(): void {
+  cancelGlanceableTerminalEnd();
+  const blankEpoch = getTerminalBlankEpoch();
+  glanceableTerminalTimer = setTimeout(() => {
+    glanceableTerminalTimer = null;
+    // A terminal blank (logout/org switch) that landed during the window
+    // already ended the surface; do not end the new scope's activity.
+    if (getTerminalBlankEpoch() !== blankEpoch) {
+      return;
+    }
+    // Eligible work published during the window restarted the activity (the
+    // in-app publisher owns the foreground path and never cancels this timer);
+    // do not end a restarted activity.
+    const last = getGlanceableSnapshotForSignedInScope();
+    if (last !== null && isEligibleGlanceableWork(last)) {
+      return;
+    }
+    for (const sink of getGlanceableSinks()) {
+      if (!sink.waitForNativeTerminal) {
+        sink.endImmediate();
+      }
+    }
+  }, GLANCEABLE_TERMINAL_MS);
+}
+
+/**
+ * Apply an `active_agents_glanceable` background push to the glanceable sinks
+ * (widgets, Android ongoing, iOS Live Activity). Returns false when the push
+ * must be dropped: its opaque scope key does not match the persisted local
+ * scope key, or it is not newer than the last applied snapshot.
+ *
+ * The server builds every remote snapshot with revision 1 (it never chains
+ * `previousRevision` across requests), so the revision cannot fence against the
+ * local monotonic sequence. Fence on `updatedAt` instead and rebase the remote
+ * revision onto the local sequence so the sinks' monotonic guards keep
+ * accepting it.
+ *
+ * The server omits `accountEpoch`, so it is set to the current local epoch
+ * before publishing. Never opens a session chat.
+ */
+export async function applyGlanceablePushData(
+  data: Extract<PushData, { type: 'active_agents_glanceable' }>
+): Promise<boolean> {
+  const authEpoch = currentAuthEpoch();
+  const blankEpoch = getTerminalBlankEpoch();
+  const scopeKey = getLocalScopeKey();
+  const capturedSnapshot = getLastGlanceableSnapshot();
+  if (data.scopeKey !== scopeKey) {
+    return false;
+  }
+
+  const organizationId = await getSelectedOrganizationId();
+  const userId = await getActiveUserId();
+  if (
+    currentAuthEpoch() !== authEpoch ||
+    getTerminalBlankEpoch() !== blankEpoch ||
+    getLocalScopeKey() !== scopeKey ||
+    userId === null ||
+    buildOpaqueScopeKey({ userId, organizationId }) !== scopeKey
+  ) {
+    return false;
+  }
+
+  // Fence and rebase against the latest publication after storage reads.
+  // A publication during the reads also wins a timestamp tie.
+  const { type: _type, homeWidgetDetails, ...fields } = data;
+  const current = getLastGlanceableSnapshot();
+  if (
+    current !== null &&
+    (fields.updatedAt < current.updatedAt ||
+      (current !== capturedSnapshot && fields.updatedAt === current.updatedAt))
+  ) {
+    return false;
+  }
+
+  const snapshot: GlanceableAgentsSnapshot = {
+    ...fields,
+    revision: current === null ? fields.revision : current.revision + 1,
+    accountEpoch: authEpoch,
+  };
+  setHomeWidgetDetails(homeWidgetDetails ?? emptyHomeWidgetDetails());
+  rememberHomeWidgetSnapshot(snapshot);
+
+  const ctx = { userId, organizationId };
+  const eligible = isEligibleGlanceableWork(snapshot);
+  if (eligible) {
+    cancelGlanceableTerminalEnd();
+    for (const sink of getGlanceableSinks()) {
+      sink.publish(snapshot);
+      sink.startOrUpdate(snapshot, ctx);
+    }
+    // A headless background task resolves when this function returns and its
+    // process is torn down shortly after, so hold the task open until each
+    // asynchronous surface submission landed. A native failure rejects here,
+    // which the background path relies on so the OS retries the push.
+    await Promise.all(
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeStart?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
+    );
+  } else {
+    for (const sink of getGlanceableSinks()) {
+      sink.publish(snapshot);
+    }
+    // Native sinks already submitted their terminal work during publish.
+    // Keep the existing fallback for other sinks; widgets retain their timeline.
+    scheduleGlanceableTerminalEnd();
+  }
+  if (appBadgeWrite) {
+    await appBadgeWrite;
+  }
+  // Do not finish a background task before ActivityKit accepts a native end.
+  // Idle work keeps the same card, so only ineligible snapshots wait here.
+  if (!eligible) {
+    await Promise.all(
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeTerminal?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
+    );
+  }
+  return true;
 }
 
 const shown = {
@@ -56,15 +314,83 @@ const suppressed = {
 
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
-    // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
-      const data = parseNotificationData(notification.request.content.data);
+      const retiredType = rawPushType(notification.request.content.data);
+      if (retiredType !== null && isRetiredPushType(retiredType)) {
+        // A kind this app retired still arrives from a server that has not
+        // stopped sending it. It no longer parses and the catalog no longer has
+        // its copy, but its banner would still be drawn from the
+        // server-supplied title and body, so this check is the only thing
+        // between it and a foreground banner whose tap resolves no route.
+        return suppressed;
+      }
 
+      const parsed = pushDataSchema.safeParse(notification.request.content.data);
+      const data = parsed.success ? parsed.data : null;
+
+      if (data?.type === 'session_live_update') {
+        // The session carrier is data-only: the app draws the ongoing
+        // notification itself, so this message never becomes a banner.
+        return suppressed;
+      }
+
+      if (data?.type === 'active_agents_glanceable') {
+        // The aggregate glanceable push is a data carrier for the ongoing
+        // notification/widgets, never a visible banner: the local ongoing owns
+        // the display. Apply it to the sinks regardless of the discard outcome.
+        const applied = await applyGlanceablePushData(data);
+        if (applied) {
+          refreshActiveSessionsFromPush();
+        }
+        if (!applied) {
+          setTimeout(() => {
+            // A discarded push carries no new count, so the local truth is
+            // unchanged. Re-asserting it here would undo a badge iOS applied
+            // from a later visible push (the same e7 clobber as an unchanged
+            // re-publication), so it goes through the guarded write too.
+            syncAppBadge(getGlanceableSnapshotForSignedInScope()?.needsInput ?? 0);
+          }, 0);
+        }
+        return { ...suppressed, shouldSetBadge: applied };
+      }
+
+      // A per-Focus choice covers agent progress only. The glanceable carrier
+      // above already returned (it must still reach the sinks), and anything
+      // the user has not excluded stays visible. This is the foreground half of
+      // the choice: a background or killed-app delivery never reaches this
+      // handler, so the NotificationServiceExtension target in
+      // `modules/notification-focus-filter/ios` applies the same stored choice
+      // on that path.
       if (
-        data?.type === 'chat.message' &&
-        activeChatLocation?.sandboxId === data.sandboxId &&
-        activeChatLocation.conversationId === data.conversationId
+        data &&
+        agentNotificationKindForPushData(data) === 'progress' &&
+        !isAgentProgressAllowedInActiveFocus()
       ) {
+        return suppressed;
+      }
+
+      // The app's own needs-input notification is already the presentation for
+      // this raise: suppressing the server's attention push keeps one OS
+      // notification per raise instead of a duplicate banner. The app's own
+      // post carries the same parsed payload, so it is exempted by its
+      // reserved identifier — suppressing it would drop the only notification
+      // the foregrounded app ever presents for the raise (the schedule
+      // resolves before the handler consults the posted marker).
+      if (
+        data?.type === 'cloud_agent_session' &&
+        data.category === 'attention' &&
+        !isAppOwnedNeedsInputNotification(notification.request.identifier) &&
+        (await readNeedsInputPresentation(data.cliSessionId)) === 'presented'
+      ) {
+        return suppressed;
+      }
+      // A delivered push with no visible title or body has nothing the OS can
+      // present: the notification-library default would show a bare app-name row
+      // (the empty "Kilo" notification in the report). Whitespace-only fields
+      // are just as invisible, so trim before deciding. Never let that surface
+      // on either platform — suppress it unless it carries real content.
+      const { title, body } = notification.request.content;
+      if (!title?.trim() && !body?.trim()) {
         return suppressed;
       }
       return shown;
@@ -72,24 +398,245 @@ export function setupNotificationHandler() {
   });
 }
 
-export function setupNotificationResponseHandler() {
-  const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-    const data = parseNotificationData(response.notification.request.content.data);
-    if (!data) {
-      return;
-    }
+// Expo wraps the data payload of a background notification in a JSON string on
+// both platforms; decode that envelope before parsing the push data itself.
+const headlessTaskDataSchema = z.object({ dataString: z.string() });
 
-    const path = notificationPathForData(data);
-    Notifications.clearLastNotificationResponse();
-    // If the router is ready, navigate immediately; otherwise store as pending.
-    // navigate (not replace) so the target screen keeps a back stack — replace
-    // on a stack root leaves canGoBack() false and strands the user — while
-    // still deduplicating if the route is already on top.
-    try {
-      router.navigate(path as Href);
-    } catch {
-      setPendingDeepLink(path, 'notification');
+// Test-only override so the background-handler suite never loads the platform
+// sink register files (expo-widgets / react-native-android-widget native loads).
+let glanceableSinksLoaderForTests: (() => void) | null = null;
+
+export function _setGlanceableSinksLoaderForTests(loader: (() => void) | null): void {
+  glanceableSinksLoaderForTests = loader;
+}
+
+/**
+ * Register the persist sink and the platform sinks so a headless apply has
+ * somewhere to publish. The root layout imports the platform register files in
+ * the foreground; the headless task context loads only this module, so the
+ * sinks must be registered here before `applyGlanceablePushData` runs.
+ */
+function ensureGlanceableSinksLoaded(): void {
+  registerGlanceableSink(appBadgeSink);
+  if (glanceableSinksLoaderForTests) {
+    glanceableSinksLoaderForTests();
+    return;
+  }
+  registerGlanceableSink(persistGlanceableSink);
+  // Side-effect imports register the platform sinks.
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy platform sink load
+  require('@/glanceable-ios/register');
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy platform sink load
+    require('@/glanceable-android/register');
+  } catch {
+    // react-native-android-widget is absent on iOS; the iOS sink still loaded.
+  }
+}
+
+/** Recover the typed push data from the headless payload envelope. */
+function parseHeadlessPushData(data: unknown): PushData | null {
+  const envelope = headlessTaskDataSchema.safeParse(data);
+  if (!envelope.success) {
+    return parseNotificationData(data);
+  }
+  try {
+    return parseNotificationData(JSON.parse(envelope.data.dataString));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Headless background-notification executor. Runs when a data-only push is
+ * delivered while the app is backgrounded or killed, and when the app is closed
+ * and the user taps a needs-input action button. Reuses
+ * `applyGlanceablePushData` so the scope-key fence, revision discard, and org
+ * re-register behave identically to the foreground path.
+ *
+ * One task name serves both payload shapes: the native side hands a
+ * notification *response* to every registered consumer, so a second name would
+ * run an Approve / Reply twice (the second run rewrites the result or answers
+ * again). Keep exactly one registered name.
+ */
+async function handleBackgroundNotificationTask(
+  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
+): Promise<Notifications.BackgroundNotificationTaskResult> {
+  const { data, error } = body;
+  if (error) {
+    return Notifications.BackgroundNotificationTaskResult.Failed;
+  }
+  // A notification *response* (an action button or a body tap) is not a
+  // delivered push: dispatch it to the needs-input action handler — this is
+  // the app-closed path on Android — and keep the glanceable apply for
+  // delivered data-only pushes only.
+  if ('actionIdentifier' in data) {
+    const handled = await handleNeedsInputNotificationResponse(data);
+    // An answered raise replaced its notification: report NewData so iOS does
+    // not throttle later content-available wakes (repeated NoData reduces them).
+    return handled
+      ? Notifications.BackgroundNotificationTaskResult.NewData
+      : Notifications.BackgroundNotificationTaskResult.NoData;
+  }
+
+  const pushData = parseHeadlessPushData(data.data);
+  if (pushData?.type === 'session_live_update') {
+    // One followed session's Android notification
+    // (`.specs/mobile-session-live-activity.md` "Android"). The in-memory
+    // follow map is empty in this fresh process, so hydrate it first: without
+    // that, a push for a followed session reads as one for a stranger and its
+    // server row would be dropped.
+    await restorePersistedGlanceable();
+    const followsKnown = await restoreFollowedSessionsFromStorage();
+    const applied = await applySessionLiveUpdate(
+      pushData.event,
+      pushData.content,
+      pushData.dismissAfterMs
+    );
+    // A session this device no longer follows (a dismissal, or a follow cleared
+    // on another surface) renders nothing and drops its row, so the server stops
+    // addressing this token for it. A followed session keeps its row: a push
+    // that merely changed nothing must never unfollow it.
+    // An unreadable keychain leaves the set empty without meaning "unfollowed",
+    // so the row stays until a read can tell.
+    if (!applied && followsKnown && !isSessionFollowed(pushData.content.sessionId)) {
+      // Awaited: the headless task ends with this promise.
+      await releaseAndroidSessionToken(pushData.content.sessionId);
     }
+    return applied
+      ? Notifications.BackgroundNotificationTaskResult.NewData
+      : Notifications.BackgroundNotificationTaskResult.NoData;
+  }
+  if (pushData?.type !== 'active_agents_glanceable') {
+    return Notifications.BackgroundNotificationTaskResult.NoData;
+  }
+
+  // The headless process is fresh: restore the persisted snapshot and scope key
+  // so the fence and revision discard below compare against durable state.
+  await restorePersistedGlanceable();
+  // The recorded ask is part of that durable state, and the sinks read it
+  // synchronously to stamp `canApprove` on the content state. Hydrate the
+  // mirror before the apply, or the sink reports no approvable ask and the
+  // card hides an Approve that a tap still answers.
+  await readWaitingAsk();
+  const applied = await applyGlanceablePushData(pushData);
+  // A successful apply delivered new sink data: report NewData so iOS does not
+  // throttle later content-available wakes (repeated NoData reduces them).
+  return applied
+    ? Notifications.BackgroundNotificationTaskResult.NewData
+    : Notifications.BackgroundNotificationTaskResult.NoData;
+}
+
+/**
+ * The setup every headless glanceable run needs before it touches a sink:
+ * the stored language, the glanceable sinks — a fresh headless process has none
+ * registered — the Android channels, and the notification permission read.
+ */
+async function prepareHeadlessGlanceableRun(): Promise<void> {
+  // A killed process starts on the bundled English catalog, and nothing else on
+  // this path applies the stored language. Apply it before the channels are
+  // written, or the names below revert the user's notification settings to
+  // English until the app is next opened.
+  await applyStoredLanguage();
+  ensureGlanceableSinksLoaded();
+  // A headless start never evaluates the root layout, so the Android channels
+  // the server routes pushes to (`agent-progress` among them) do not exist yet.
+  // Create them before the first post: Android drops a notification addressed
+  // to a channel the app never created, and FirebaseMessaging logs the miss on
+  // every message. Idempotent and never rejecting.
+  await ensureAndroidNotificationChannels();
+  // A headless start never runs `setupNotificationPermissionGate`, so the Live
+  // Activity gate would read "not granted" on an install that granted it. Read
+  // the permission before the sinks see the push.
+  try {
+    await getNotificationPermissionStatus();
+  } catch {
+    // An unknown answer stays "not granted": the next foreground reads again.
+  }
+}
+
+/**
+ * Executor entry for the background notification task, exported for
+ * `notification-background-task.ts`, whose task executor lazy-loads this module
+ * when a task fires (a headless start evaluates only the app entry, so this
+ * graph must not load at entry).
+ */
+export async function runBackgroundNotificationTask(
+  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
+): Promise<Notifications.BackgroundNotificationTaskResult> {
+  await prepareHeadlessGlanceableRun();
+  return handleBackgroundNotificationTask(body);
+}
+
+/**
+ * Executor entry for the periodic glanceable refresh, exported for
+ * `glanceable-refresh-task.ts`, which lazy-loads this module like the
+ * notification task does. It is the fallback for a data-only push the OS
+ * dropped or throttled: it reads the tray once and republishes the surfaces.
+ * Signed out, it does nothing. A failed read or native write reports `Failed`
+ * and leaves the last published snapshot in place.
+ */
+export async function runGlanceableBackgroundRefresh(): Promise<BackgroundTask.BackgroundTaskResult> {
+  await prepareHeadlessGlanceableRun();
+  // The same durable state the push path restores: the persisted snapshot
+  // seeds the revision, and the sinks read the recorded ask synchronously.
+  await restorePersistedGlanceable();
+  await readWaitingAsk();
+  const userId = await getActiveUserId();
+  if (userId === null) {
+    return BackgroundTask.BackgroundTaskResult.Success;
+  }
+  const organizationId = await getSelectedOrganizationId();
+  try {
+    await publishTrayOnce({ userId, organizationId });
+  } catch {
+    return BackgroundTask.BackgroundTaskResult.Failed;
+  }
+  return BackgroundTask.BackgroundTaskResult.Success;
+}
+
+async function registerBackgroundNotificationTask(): Promise<void> {
+  try {
+    await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'register_background_task',
+      },
+    });
+  }
+}
+
+/**
+ * Register the background notification task so a data-only
+ * `active_agents_glanceable` push is applied while the app is backgrounded or
+ * killed, and a notification response (an Approve / Reply tap with the app
+ * closed) is dispatched headless. One name only: the native side delivers a
+ * response to every registered consumer, so a second name would run the action
+ * twice.
+ *
+ * The same task name is also defined and registered from the app entry
+ * (`notification-background-task.ts`, executor lazy-loading this module): a
+ * headless JS start — an action tap with the app closed — evaluates only the
+ * entry and never this module, so the entry must define the task too or the
+ * app-closed path never runs. Both definitions overwrite the same name, and
+ * the native registration is idempotent.
+ */
+export function setupNotificationBackgroundHandler(): void {
+  ensureGlanceableSinksLoaded();
+  TaskManager.defineTask<Notifications.NotificationTaskPayload>(
+    BACKGROUND_NOTIFICATION_TASK,
+    handleBackgroundNotificationTask
+  );
+  void registerBackgroundNotificationTask();
+}
+
+export function setupNotificationResponseHandler(deps: NeedsInputActionDeps = {}) {
+  const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+    // Our four action ids run headless or stash the deep link; any other
+    // identifier keeps the tap path inside the handler.
+    void handleNeedsInputNotificationResponse(response, deps);
   });
 
   return subscription;
@@ -101,21 +648,319 @@ export function checkInitialNotification(): void {
   if (!response) {
     return;
   }
+  // An action response that launched the app (Open PR / Open session
+  // foreground it) goes through the same dispatch as a warm response.
+  if (isNeedsInputActionIdentifier(response.actionIdentifier)) {
+    void handleNeedsInputNotificationResponse(response);
+    return;
+  }
   const data = parseNotificationData(response.notification.request.content.data);
   if (data) {
-    setPendingDeepLink(notificationPathForData(data), 'notification');
+    const href = notificationPathForData(data);
+    if (href !== null) {
+      // Stash the session's destination the same way the warm tap paths do
+      // (notification-actions.ts), so a session push that launches the app lands
+      // in the session's organization instead of the previously selected one.
+      setPendingDeepLink(href, 'notification', pendingDeepLinkOptionsForData(data));
+    }
   }
   Notifications.clearLastNotificationResponse();
 }
 
+// Single-flight promise so concurrent callers share one channel-creation pass.
+// The promise never rejects: a per-channel failure is reported to Sentry and
+// the remaining channels still get created, and the pass retries once before it
+// settles. A pass that failed both attempts is not cached (see
+// `ensureAndroidNotificationChannels`), so a later start retries before it posts
+// to a channel that may not exist.
+let androidChannelsPromise: Promise<boolean> | null = null;
+
+// The channels the two named kinds replaced. Android keeps an app-created
+// channel until the app deletes it, so a stale one would still appear in the
+// system settings list after the upgrade.
+const LEGACY_ANDROID_NOTIFICATION_CHANNELS = [
+  'agent',
+  'chat',
+  'kiloclaw',
+  'active-agents',
+  'followed-sessions',
+] as const;
+
+/** What one Android channel write asks the framework for. */
+export type AndroidChannelWritePlan = {
+  /** The Do Not Disturb override to ask the framework for. */
+  bypassDnd: boolean;
+};
+
+/**
+ * One channel write's Do Not Disturb override.
+ *
+ * The framework applies the Do Not Disturb access gate only while it *creates*
+ * a channel and then keeps the value it stored. A write to an existing channel
+ * updates its name and description but never its override — measured on API 35
+ * on 2026-09-17: with the user's Do Not Disturb access granted, requesting
+ * `true` for a needs-input channel stored with `false` still reads back
+ * `mBypassDnd=false`. A channel created before the user granted access can
+ * therefore never gain the override from a later write. The override cannot be
+ * taken back either: a recreate of a channel that stored `true` reads back
+ * `true` even while the grant is absent, because the framework un-deletes the
+ * channel with its previous settings. `writeAndroidNotificationChannel`
+ * recreates a channel whose stored override is still `false`, so the framework
+ * applies the gate to the grant the user holds now.
+ */
+export function planAndroidChannelWrite(
+  requestedBypassDnd: boolean,
+  dndAccessGranted: boolean | null
+): AndroidChannelWritePlan {
+  if (!requestedBypassDnd) {
+    return { bypassDnd: false };
+  }
+  // An unreadable access state (no native module) keeps the pre-existing
+  // request: the framework still decides, and the feature is not silently lost.
+  return { bypassDnd: dndAccessGranted !== false };
+}
+
+// The typechecked half of the silent-channel contract: the JSDoc type in the
+// plain-JS list is only a cast, so this binding is what fails if it goes away.
+const silentAndroidChannelIds: readonly AndroidNotificationChannelId[] =
+  SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS;
+
+/** Every channel re-write (create and rename) must pass the same sound policy. */
+function androidChannelConfiguration(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
+  name: string,
+  bypassDnd: boolean
+): Notifications.NotificationChannelInput {
+  return {
+    name,
+    importance: {
+      high: Notifications.AndroidImportance.HIGH,
+      default: Notifications.AndroidImportance.DEFAULT,
+      low: Notifications.AndroidImportance.LOW,
+    }[channel.importance],
+    bypassDnd,
+    // An absent sound is the system default; an explicit null is silence, and a
+    // silent channel must not vibrate either (the default is enabled).
+    ...(silentAndroidChannelIds.includes(channel.id) ? { sound: null, enableVibrate: false } : {}),
+  };
+}
+
+/** The user's Do Not Disturb grant as the native module reports it. */
+function androidDndAccessGranted(): boolean | null {
+  try {
+    return getDndAccessGranted();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a channel's stored override is a stale `false` that this write must
+ * replace by recreating the channel.
+ *
+ * Only the raise needs a recreate: the framework restores the stored override
+ * when the app recreates a channel it previously deleted, so a recreate
+ * installs an override that was never applied but cannot take one back, and the
+ * delete would cost the user the ongoing card for nothing.
+ */
+export function shouldRecreateAndroidChannel(
+  storedBypassDnd: boolean | null,
+  desiredBypassDnd: boolean
+): boolean {
+  return desiredBypassDnd && storedBypassDnd === false;
+}
+
+/** The override the framework stores for a channel, or null when it has none. */
+async function storedAndroidChannelBypassDnd(
+  channelId: AndroidNotificationChannelId
+): Promise<boolean | null> {
+  try {
+    const channel = await Notifications.getNotificationChannelAsync(channelId);
+    return channel?.bypassDnd ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write one channel with the override the user's grant allows. A channel whose
+ * stored override is still `false` while the plan asks for `true` is deleted
+ * first, so the framework's create-time gate applies the user's grant; that
+ * delete also cancels an ongoing card posted to the channel, so it happens only
+ * for the one-time upgrade of a channel created before the user granted access.
+ */
+async function writeAndroidNotificationChannel(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
+  name: string,
+  dndAccessGranted: boolean | null
+): Promise<void> {
+  const plan = planAndroidChannelWrite(channel.bypassDnd, dndAccessGranted);
+  const stored = await storedAndroidChannelBypassDnd(channel.id);
+  if (shouldRecreateAndroidChannel(stored, plan.bypassDnd)) {
+    await Notifications.deleteNotificationChannelAsync(channel.id);
+  }
+  await Notifications.setNotificationChannelAsync(
+    channel.id,
+    androidChannelConfiguration(channel, name, plan.bypassDnd)
+  );
+}
+
+const CHANNEL_NAME_KEYS = {
+  'needs-input': 'glanceable.needsInput',
+  'agent-progress': 'notifications.channel.agentProgress',
+  'agent-briefing': 'agentBriefing.title',
+  balance: 'notifications.channel.balance',
+  security: 'notifications.channel.security',
+  'followed-sessions-lock-screen': 'notifications.channel.followedSessions',
+} as const;
+
+/** The android channel ids this app posts to and has a translated name for. */
+type MobileAndroidNotificationChannelId = keyof typeof CHANNEL_NAME_KEYS;
+
+/** Whether this app creates and posts to the shared channel. */
+function isMobileAndroidChannel(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number]
+): channel is (typeof ANDROID_NOTIFICATION_CHANNELS)[number] & {
+  id: MobileAndroidNotificationChannelId;
+} {
+  return channel.id in CHANNEL_NAME_KEYS;
+}
+
+/**
+ * The channels this app creates. `ANDROID_NOTIFICATION_CHANNELS` is shared with
+ * the push producers, so it can carry a channel for a product this app has no
+ * screen for; creating one of those would add a row to the system settings list
+ * for a notification the app can never post.
+ */
+const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filter(channel =>
+  isMobileAndroidChannel(channel)
+);
+
+/**
+ * The user-visible name for one channel in the active catalog language. Creation
+ * and rename both read this, so a channel the headless executor creates while
+ * the process was killed carries the same translated name a foreground start
+ * installs, never the shared package's static English `channel.name`.
+ */
+function androidChannelName(
+  channel: (typeof MOBILE_ANDROID_NOTIFICATION_CHANNELS)[number]
+): string {
+  return i18n.t(CHANNEL_NAME_KEYS[channel.id]);
+}
+
+async function createAndroidNotificationChannels(): Promise<boolean> {
+  const dndAccessGranted = androidDndAccessGranted();
+  let allChannelsWritten = true;
+  for (const channel of MOBILE_ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
+      await writeAndroidNotificationChannel(channel, androidChannelName(channel), dndAccessGranted);
+    } catch (error) {
+      allChannelsWritten = false;
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'create_android_channel',
+          'notification.channel': channel.id,
+        },
+      });
+    }
+  }
+  for (const legacy of LEGACY_ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are deleted sequentially so a per-channel failure is isolated
+      await Notifications.deleteNotificationChannelAsync(legacy);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'delete_android_channel',
+          'notification.channel': legacy,
+        },
+      });
+    }
+  }
+  return allChannelsWritten;
+}
+
+/**
+ * Create the Android notification channels once. No-op on iOS. Resolves `true` there.
+ * Idempotent and single-flight: every call returns the same module-level
+ * promise, and a per-channel failure never rejects it (reported to Sentry
+ * instead).
+ *
+ * Resolves `true` when every required channel exists. A failed pass is retried
+ * once before the shared promise settles, so no concurrent poster proceeds
+ * against a half-created set; only then does it resolve `false` and drop the
+ * memo, so the next start runs a fresh pass. A poster must not post on `false` —
+ * the framework silently drops a notification addressed to a channel the app
+ * never created.
+ */
+// eslint-disable-next-line promise-function-async -- must return the same module-level promise for single-flight
+export function ensureAndroidNotificationChannels(): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return Promise.resolve(true);
+  }
+  androidChannelsPromise ??= (async () => {
+    if (await createAndroidNotificationChannels()) {
+      return true;
+    }
+    // One retry before the shared promise settles, so no concurrent poster
+    // proceeds against a half-created set.
+    if (await createAndroidNotificationChannels()) {
+      return true;
+    }
+    androidChannelsPromise = null;
+    return false;
+  })();
+  return androidChannelsPromise;
+}
+
+/**
+ * Re-set every Android channel name with the active catalog translation. Not
+ * single-flight and never cached: a language change must always re-write the
+ * names, even when `ensureAndroidNotificationChannels` already returned its
+ * cached promise. No-op on iOS.
+ *
+ * The re-write also reconciles the Do Not Disturb override: a channel still
+ * stored without it is recreated, so access the user granted after the channel
+ * was first created is applied on the next app start.
+ */
+export async function renameAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+  const dndAccessGranted = androidDndAccessGranted();
+  for (const channel of MOBILE_ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are renamed sequentially so a per-channel failure is isolated
+      await writeAndroidNotificationChannel(channel, androidChannelName(channel), dndAccessGranted);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'rename_android_channel',
+          'notification.channel': channel.id,
+        },
+      });
+    }
+  }
+}
+
 export async function registerForPushNotifications(): Promise<string | null> {
+  await ensureAndroidNotificationChannels();
+
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
   let finalStatus = existingStatus;
   if (existingStatus !== Notifications.PermissionStatus.GRANTED) {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
+    // Only a live permission request emits an outcome; a pre-granted status
+    // does not. Any non-granted result maps to denied.
+    emitNotificationPermissionResponded(finalStatus === Notifications.PermissionStatus.GRANTED);
   }
+  setNotificationPermissionGrantedValue(finalStatus === Notifications.PermissionStatus.GRANTED);
 
   if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
     return null;
@@ -128,6 +973,18 @@ export async function registerForPushNotifications(): Promise<string | null> {
   return tokenResponse.data;
 }
 
+/** Emit the permission-request outcome as an accepted-phase event. */
+export function emitNotificationPermissionResponded(granted: boolean): void {
+  captureEvent(NOTIFICATION_PERMISSION_RESPONDED_EVENT, {
+    outcome: granted ? 'granted' : 'denied',
+  });
+}
+
+/** Emit a token register/unregister outcome as an accepted-phase event. */
+export function emitNotificationTokenUpdated(action: 'registered' | 'unregistered'): void {
+  captureEvent(NOTIFICATION_TOKEN_UPDATED_EVENT, { action });
+}
+
 /**
  * The stable per-device Expo push token, or null when the permission is not
  * granted (denied or undetermined), so the device never obtained a token this
@@ -135,6 +992,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
  * treat a failed lookup.
  */
 export async function getDevicePushToken(): Promise<string | null> {
+  await ensureAndroidNotificationChannels();
+
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== Notifications.PermissionStatus.GRANTED) {
     return null;
@@ -171,7 +1030,30 @@ export async function getNotificationPermissionStatus(): Promise<
   'granted' | 'denied' | 'undetermined'
 > {
   const { status } = await Notifications.getPermissionsAsync();
+  setNotificationPermissionGrantedValue(status === Notifications.PermissionStatus.GRANTED);
   return status;
+}
+
+/**
+ * Keep the glanceable permission gate current: read it at launch and on every
+ * foreground, since the user can change it in Settings while the app is away.
+ * The Live Activity and push-to-start wait for a grant (see
+ * `live-activity-switch`).
+ */
+export function setupNotificationPermissionGate(): void {
+  const refresh = async () => {
+    try {
+      await getNotificationPermissionStatus();
+    } catch {
+      // Keep the last answer; the next foreground reads again.
+    }
+  };
+  void refresh();
+  AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      void refresh();
+    }
+  });
 }
 
 export function getPlatform(): 'ios' | 'android' {

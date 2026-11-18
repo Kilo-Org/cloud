@@ -1,19 +1,29 @@
 'use client';
 
 import { MagicLinkSentConfirmation } from '@/components/auth/MagicLinkSentConfirmation';
+import { SsoAccountMismatchNotice } from '@/components/auth/SsoAccountMismatchNotice';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { TurnstileView } from '@/components/auth/sign-in/TurnstileView';
 import { ProviderSelectView } from '@/components/auth/sign-in/ProviderSelectView';
 import { EmailInputForm } from '@/components/auth/sign-in/EmailInputForm';
 import { AuthProviderButtons } from '@/components/auth/sign-in/AuthProviderButtons';
+import { PasskeySignInButton } from '@/components/auth/sign-in/PasskeySignInButton';
 import { SignInButton } from '@/components/auth/SigninButton';
+import { Separator } from '@/components/ui/separator';
 import { FakeLoginForm } from '@/components/auth/FakeLoginForm';
 import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
+import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import { AnimatedLogoMark } from '@/components/AnimatedLogoMark';
 import Link from 'next/link';
-import { Mail, SquareUserRound } from 'lucide-react';
+import { SquareUserRound } from 'lucide-react';
+import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
+import { useClaudeSignInConfigured } from '@/lib/auth/claude/use-claude-sign-in-configured';
+import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+import { SIGNUP_STEP_UP_METHODS_PARAM } from '@/lib/auth/redirect-urls';
+import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
+import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -24,15 +34,14 @@ type SignInFormProps = {
   subtitle?: string;
   emailOnly?: boolean; // If true, only show email input (for SSO page)
   ssoMode?: boolean; // If true, triggers SSO-specific messaging and email input view
+  accountMismatch?: SsoAccountMismatch; // SSO request for a different account than the session
   storybookInitialState?: SignInFormInitialState;
+  /**
+   * True inside the app shell, which may not link to any page outside it: the
+   * "back to sign in options" link is the one exit this form renders.
+   */
+  shell?: boolean;
 };
-
-function signInHrefFromSearchParams(searchParams: Record<string, string>): string {
-  const params = new URLSearchParams(searchParams);
-  params.delete('signup');
-  const query = params.toString();
-  return query ? `/users/sign_in?${query}` : '/users/sign_in';
-}
 
 export function SignInForm({
   searchParams,
@@ -43,7 +52,9 @@ export function SignInForm({
   subtitle,
   emailOnly = false,
   ssoMode = false,
+  accountMismatch,
   storybookInitialState,
+  shell = false,
 }: SignInFormProps) {
   const flow = useSignInFlow({
     searchParams,
@@ -52,6 +63,17 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
+  const claudeConfigured = useClaudeSignInConfigured();
+  const offeredOAuthProviderIds = OAuthProviderIds.filter(
+    id => id !== 'claude' || claudeConfigured
+  );
+
+  // An Enterprise SSO request for a different address than the signed-in
+  // session cannot proceed; offer the one-tap switch before any normal
+  // sign-in UI renders (including the returning-user hint loading state).
+  if (accountMismatch) {
+    return <SsoAccountMismatchNotice mismatch={accountMismatch} searchParams={searchParams} />;
+  }
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI
@@ -68,8 +90,13 @@ export function SignInForm({
     );
   }
 
-  // Show error notification at the top level for all states that can display errors
-  const errorNotification = flow.error ? <AuthErrorNotification error={flow.error} /> : null;
+  const errorNotification = flow.error ? (
+    <AuthErrorNotification
+      error={flow.error}
+      stepUpMethods={searchParams[SIGNUP_STEP_UP_METHODS_PARAM]}
+      shell={shell}
+    />
+  ) : null;
 
   // Turnstile overlay
   if (flow.showTurnstile) {
@@ -79,6 +106,8 @@ export function SignInForm({
         pendingSignIn={flow.pendingSignIn}
         turnstileError={flow.turnstileError}
         isVerifying={flow.isVerifying}
+        isDeliveringMagicLink={flow.isDeliveringMagicLink}
+        attemptId={flow.turnstileAttemptId}
         onSuccess={flow.handleTurnstileSuccess}
         onError={flow.handleTurnstileError}
         onBack={flow.handleBack}
@@ -126,6 +155,7 @@ export function SignInForm({
           providers={flow.availableProviders}
           onProviderSelect={flow.handleProviderSelect}
           onBack={flow.handleBack}
+          purpose={flow.isNewUser ? 'sign-up' : 'sign-in'}
         />
       </div>
     );
@@ -133,6 +163,9 @@ export function SignInForm({
 
   // Landing state - render based on tier
   // ────────────────────────────────────
+
+  // A passkey sign-in lands where the other providers land.
+  const passkeyCallbackUrl = getSignInCallbackUrl(searchParams);
 
   return (
     <>
@@ -164,7 +197,7 @@ export function SignInForm({
                   <p className="text-foreground mb-2 text-xl font-medium">{flow.hint.lastEmail}</p>
                   <button
                     onClick={flow.handleClearHint}
-                    className="text-muted-foreground mb-8 cursor-pointer text-sm hover:underline"
+                    className="text-muted-foreground mb-8 cursor-pointer text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                   >
                     Not you? Use a different account
                   </button>
@@ -179,13 +212,16 @@ export function SignInForm({
                 const lastAuthMethod = hint.lastAuthMethod;
 
                 if (lastAuthMethod === 'workos' && hint.orgId) {
-                  // SSO user - only show SSO button, no "other methods" option
+                  // SSO user - no "other methods" discovery, so the SSO button is
+                  // the whole list of remembered methods; a passkey the user
+                  // registered is offered beside it rather than behind a link.
                   const orgId = hint.orgId;
                   return (
                     <div className="mx-auto max-w-md space-y-4">
                       <SignInButton onClick={() => flow.handleSSOContinue(orgId)}>
                         Sign in with Enterprise SSO
                       </SignInButton>
+                      <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     </div>
                   );
                 }
@@ -197,18 +233,26 @@ export function SignInForm({
                     ? { email: 'Email me a magic link' }
                     : undefined;
 
+                // The remembered provider is the whole list; "see other
+                // sign-in methods" below opens the full group.
+                const displayedProviders =
+                  lastAuthMethod === 'claude' && !claudeConfigured ? [] : [lastAuthMethod];
+
                 return (
                   <div className="mx-auto max-w-md space-y-4">
+                    {/* A passkey sits beside the remembered provider, never replacing it */}
+                    <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
+
                     {/* Preferred provider button only */}
                     <AuthProviderButtons
-                      providers={[lastAuthMethod]}
+                      providers={displayedProviders}
                       onProviderClick={flow.handleOAuthClick}
                       customLabels={emailCustomLabel}
                     />
 
                     <button
                       onClick={flow.handleClearHint}
-                      className="text-muted-foreground text-sm hover:underline"
+                      className="text-muted-foreground text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       or see other sign-in methods
                     </button>
@@ -224,15 +268,15 @@ export function SignInForm({
               <EmailInputForm
                 email={flow.email}
                 emailValidation={flow.emailValidation}
-                error={flow.error}
                 onSubmit={flow.handleEmailSubmit}
                 onEmailChange={flow.handleEmailChange}
                 placeholder="you@example.com"
                 autoFocus={true}
+                isLoading={flow.showTurnstile || flow.isVerifying}
               />
               <button
                 onClick={flow.handleBack}
-                className="text-muted-foreground mt-6 text-sm hover:underline"
+                className="text-muted-foreground mt-6 text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
               >
                 ← Back to sign in options
               </button>
@@ -257,7 +301,7 @@ export function SignInForm({
                   </div>
                   <button
                     onClick={flow.handleClearInvite}
-                    className="text-muted-foreground mt-6 cursor-pointer text-sm hover:underline"
+                    className="text-muted-foreground mt-6 cursor-pointer text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                   >
                     Use a different account
                   </button>
@@ -268,48 +312,86 @@ export function SignInForm({
           {/* Tier 2: New User (default) */}
           {flow.tier === 'new' && (
             <>
-              {emailOnly || ssoMode || flow.showEmailInput ? (
+              {!isSignUp || emailOnly || ssoMode || flow.showEmailInput ? (
                 // Email input view (shown after clicking "Continue with Email" or in emailOnly/SSO mode)
                 <>
                   <EmailInputForm
                     email={flow.email}
                     emailValidation={flow.emailValidation}
-                    error={flow.error}
                     onSubmit={flow.handleEmailSubmit}
                     onEmailChange={flow.handleEmailChange}
                     placeholder="you@example.com"
                     autoFocus={true}
+                    isLoading={flow.showTurnstile || flow.isVerifying}
+                    submitLabel={
+                      !isSignUp && !emailOnly && !ssoMode ? 'Continue with Email' : undefined
+                    }
                   />
 
                   {ssoMode ? (
-                    // In SSO mode, show a link back to the main sign-in page
-                    <Link
-                      href="/users/sign_in"
-                      className="text-muted-foreground mt-6 inline-block text-sm hover:underline"
-                    >
-                      ← Back to sign in options
-                    </Link>
-                  ) : !emailOnly ? (
+                    // In SSO mode, show a link back to the main sign-in page,
+                    // except inside the app shell, which has no page to go back to.
+                    shell ? null : (
+                      <Link
+                        href={buildNormalSignInHref(searchParams)}
+                        className="text-muted-foreground mt-6 inline-block text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
+                      >
+                        ← Back to sign in options
+                      </Link>
+                    )
+                  ) : !emailOnly && isSignUp ? (
                     // In regular email input mode (not emailOnly), show back button
                     <button
                       onClick={flow.handleBack}
-                      className="text-muted-foreground mt-6 text-sm hover:underline"
+                      className="text-muted-foreground mt-6 text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       ← Back to sign in options
                     </button>
                   ) : null}
+                  {!isSignUp && !emailOnly && !ssoMode && (
+                    <>
+                      {/* The sign-in page keeps the email prompt first, but the
+                          OAuth providers (including 'Sign in with ChatGPT') are
+                          offered beside it, as they are on sign-up. ChatGPT is a
+                          plain provider here: the access flag gates the BYOK
+                          connection, not this option. */}
+                      <div className="my-6 flex items-center gap-3">
+                        <Separator className="flex-1" />
+                        <span className="text-muted-foreground text-xs font-medium">or</span>
+                        <Separator className="flex-1" />
+                      </div>
+                      <div className="space-y-2">
+                        <AuthProviderButtons
+                          providers={offeredOAuthProviderIds}
+                          onProviderClick={flow.handleOAuthClick}
+                        />
+                      </div>
+                      <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
+                        By continuing, you are agreeing to the{' '}
+                        <a
+                          href="https://kilo.ai/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`hover:text-foreground underline underline-offset-4 transition-colors ${INLINE_LINK_TOUCH_TARGET}`}
+                        >
+                          Terms &amp; Conditions
+                        </a>
+                      </p>
+                    </>
+                  )}
                 </>
               ) : (
                 // Provider buttons view (initial state)
                 <>
                   <div className="space-y-2">
+                    {/* Passkey sign-in sits above the OAuth providers; none of them move */}
+                    <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
-                      providers={OAuthProviderIds}
+                      providers={offeredOAuthProviderIds}
                       onProviderClick={flow.handleOAuthClick}
                     />
                     <SignInButton onClick={flow.handleShowEmailInput}>
-                      <Mail />
                       Continue with Email
                     </SignInButton>
                   </div>
@@ -320,7 +402,7 @@ export function SignInForm({
                       href="https://kilo.ai/terms"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-foreground underline underline-offset-4 transition-colors"
+                      className={`hover:text-foreground underline underline-offset-4 transition-colors ${INLINE_LINK_TOUCH_TARGET}`}
                     >
                       Terms &amp; Conditions
                     </a>
@@ -330,22 +412,24 @@ export function SignInForm({
             </>
           )}
 
-          {/* Secondary actions footer - hidden in emailOnly or SSO mode and only on the new-user landing screen */}
-          {!emailOnly && !ssoMode && flow.tier === 'new' && !flow.showEmailInput && !isSignUp && (
+          {/* Keep Enterprise SSO available for normal sign-in; the install link belongs to one footer only. */}
+          {!emailOnly && !ssoMode && flow.tier === 'new' && !isSignUp && (
             <div className="border-border mt-8 flex flex-col items-center gap-3 border-t pt-6">
               <Link
-                href="/users/sign_in?sso=true"
-                className="w-full flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0"
+                href={buildEnterpriseSsoHref(searchParams)}
+                className="w-full flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0 pointer-coarse:min-h-11"
               >
                 <SquareUserRound className="size-4" />
                 Enterprise SSO
               </Link>
-              <Link
-                href="/get-started"
-                className="mt-4 text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
-              >
-                Install Kilo Code
-              </Link>
+              {!flow.showEmailInput && (
+                <Link
+                  href="/get-started"
+                  className="mt-4 inline-block text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
+                >
+                  Install Kilo Code
+                </Link>
+              )}
             </div>
           )}
 
@@ -356,8 +440,8 @@ export function SignInForm({
                 <p className="text-muted-foreground text-sm">
                   Already have an account?{' '}
                   <Link
-                    href={signInHrefFromSearchParams(searchParams)}
-                    className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                    href={buildNormalSignInHref(searchParams)}
+                    className={`text-brand-primary font-medium underline-offset-4 hover:underline ${INLINE_LINK_TOUCH_TARGET}`}
                   >
                     Sign in
                   </Link>
@@ -375,7 +459,7 @@ export function SignInForm({
               <p className="text-muted-foreground text-sm">
                 <Link
                   href="/get-started"
-                  className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                  className="text-brand-primary font-medium underline-offset-4 hover:underline pointer-coarse:inline-block pointer-coarse:min-h-11 pointer-coarse:content-center"
                 >
                   Install Kilo Code
                 </Link>

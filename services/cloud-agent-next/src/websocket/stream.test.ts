@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { createStreamHandler, formatStreamEvent } from './stream.js';
+import { parseStreamFilters } from './filters.js';
+import { WORKTREE_CHANGES_READY_EVENT } from '../shared/worktree-changes-wire.js';
 import type { StoredEvent, StreamFilters } from './types.js';
 import type { SessionId, EventId } from '../types/ids.js';
 import type { EventQueries, EventQueryFilters } from '../session/queries/index.js';
 import { DEFAULT_SLASH_COMMANDS } from '../shared/default-slash-commands.generated';
+import { normalize, isChatEvent } from '../../../../packages/cloud-agent-sdk/src/normalizer';
+import { createServiceState } from '../../../../packages/cloud-agent-sdk/src/service-state';
 
 const SESSION_ID = 'sess_test' as SessionId;
 
@@ -29,9 +33,28 @@ function makePayload(bytes: number): string {
 
 function makeFakeEventQueries(events: StoredEvent[]): EventQueries {
   return {
-    *iterateByFilters({ fromId }: Omit<EventQueryFilters, 'limit'>) {
+    *iterateByFilters(filters: Omit<EventQueryFilters, 'limit'>) {
       for (const e of events) {
-        if (fromId !== undefined && e.id <= fromId) continue;
+        if (filters.fromId !== undefined && e.id <= filters.fromId) continue;
+        if (filters.afterCursor !== undefined && (e.mutation_cursor ?? 0) <= filters.afterCursor)
+          continue;
+        if (filters.throughCursor !== undefined && (e.mutation_cursor ?? 0) > filters.throughCursor)
+          continue;
+        if (filters.eventTypes?.length && !filters.eventTypes.includes(e.stream_event_type))
+          continue;
+        if (filters.executionIds?.length && !filters.executionIds.includes(e.execution_id))
+          continue;
+        if (filters.startTime !== undefined && e.timestamp < filters.startTime) continue;
+        if (filters.endTime !== undefined && e.timestamp > filters.endTime) continue;
+        if (filters.materialized) {
+          if (e.stream_event_type !== 'kilocode') continue;
+          const payload = JSON.parse(e.payload) as { event?: string };
+          const names =
+            filters.materialized === 'updates'
+              ? ['message.updated', 'message.part.updated', 'autocommit_completed']
+              : ['message.removed', 'message.part.removed'];
+          if (!payload.event || !names.includes(payload.event)) continue;
+        }
         yield e;
       }
     },
@@ -50,6 +73,17 @@ function makeFakeEventQueries(events: StoredEvent[]): EventQueries {
     countByExecutionId: vi.fn(),
     getLatestEventId: vi.fn(),
   } as unknown as EventQueries;
+}
+
+function makeKiloEvent(
+  id: number,
+  event: string,
+  properties: Record<string, unknown>
+): StoredEvent {
+  return {
+    ...makeEvent(id, JSON.stringify({ event, type: event, properties })),
+    stream_event_type: 'kilocode',
+  };
 }
 
 function makeFakeState(): DurableObjectState {
@@ -72,7 +106,107 @@ function makeFakeWebSocket(): WebSocket & { sentMessages: string[] } {
   } as unknown as WebSocket & { sentMessages: string[] };
 }
 
+function processSdkFrame(
+  state: ReturnType<typeof createServiceState>,
+  frame: ReturnType<typeof formatStreamEvent>
+): void {
+  const event = normalize(frame);
+  expect(event).not.toBeNull();
+  if (event && !isChatEvent(event)) state.process(event);
+}
+
+type SentStreamMessage = {
+  eventId: number;
+  sessionId: SessionId;
+  streamEventType: string;
+  timestamp: string;
+  data: Record<string, unknown>;
+};
+
+function parseSentMessages(webSocket: { sentMessages: string[] }): SentStreamMessage[] {
+  return webSocket.sentMessages.map(message => JSON.parse(message) as SentStreamMessage);
+}
+
 describe('stream handler replayEvents', () => {
+  it('preserves legacy fromId replay on cursor-enabled sessions', async () => {
+    const rows = [
+      { ...makeEvent(9), mutation_cursor: 20 },
+      { ...makeEvent(2), mutation_cursor: 21 },
+      { ...makeEvent(12), mutation_cursor: 22 },
+    ];
+    const queries = makeFakeEventQueries(rows);
+    const iterate = vi.spyOn(queries, 'iterateByFilters');
+    const handler = createStreamHandler(makeFakeState(), queries, SESSION_ID, {
+      getUpdateCursor: () => 22,
+    });
+    const ws = makeFakeWebSocket();
+    expect(await handler.replayEvents(ws, { sessionId: SESSION_ID, fromId: 9 })).toBe(true);
+    expect(parseSentMessages(ws).map(event => event.eventId)).toEqual([12]);
+    expect(iterate.mock.calls[0][0]).toMatchObject({ fromId: 9 });
+    expect(iterate.mock.calls[0][0].afterCursor).toBeUndefined();
+  });
+
+  it('replays newer mutations of older row identities in cursor order', async () => {
+    const rows = [
+      { ...makeEvent(9), mutation_cursor: 20 },
+      { ...makeEvent(2), mutation_cursor: 21 },
+      { ...makeEvent(12), mutation_cursor: 22 },
+    ];
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries(rows), SESSION_ID, {
+      getUpdateCursor: () => 22,
+    });
+    const ws = makeFakeWebSocket();
+    expect(
+      await handler.replayEvents(ws, { sessionId: SESSION_ID, fromId: 9, afterCursor: 20 })
+    ).toBe(true);
+    expect(ws.sentMessages.map(message => JSON.parse(message))).toMatchObject([
+      { eventId: 2, cursor: 21 },
+      { eventId: 12, cursor: 22 },
+    ]);
+  });
+
+  it('projects completed tool bodies in replay only when previews are requested', async () => {
+    const output = 'x'.repeat(20_000);
+    const part = {
+      id: 'prt_1',
+      messageID: 'msg_1',
+      sessionID: 'ses_1',
+      type: 'tool',
+      callID: 'call_1',
+      tool: 'bash',
+      state: { status: 'completed', input: { command: 'ls' }, output, time: { start: 1, end: 2 } },
+    };
+    const rows = [{ ...makeKiloEvent(4, 'message.part.updated', { part }), mutation_cursor: 30 }];
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries(rows), SESSION_ID, {
+      getUpdateCursor: () => 30,
+    });
+    const full = makeFakeWebSocket();
+    await handler.replayEvents(full, { sessionId: SESSION_ID, afterCursor: 0 });
+    expect(parseSentMessages(full)[0]?.data).toMatchObject({ properties: { part } });
+
+    const preview = makeFakeWebSocket();
+    await handler.replayEvents(preview, {
+      sessionId: SESSION_ID,
+      afterCursor: 0,
+      toolDisplay: 'preview',
+    });
+    const replayed = parseSentMessages(preview)[0]?.data as {
+      properties: { part: { state: { output: string }; cloudDetail: unknown } };
+    };
+    expect(replayed.properties.part.state.output.length).toBeLessThan(output.length);
+    expect(replayed.properties.part.cloudDetail).toMatchObject({ revision: 30 });
+    expect(parseStreamFilters(new URL('https://w/stream?toolDisplay=preview'), SESSION_ID)).toEqual(
+      expect.objectContaining({ toolDisplay: 'preview' })
+    );
+  });
+
+  it('retains persisted cursor when formatting mutable rows', () => {
+    expect(formatStreamEvent({ ...makeEvent(2), mutation_cursor: 77 }, SESSION_ID)).toMatchObject({
+      eventId: 2,
+      cursor: 77,
+    });
+  });
+
   it('sends all events when total size is within byte budget', async () => {
     const events = [makeEvent(1), makeEvent(2), makeEvent(3)];
     const eq = makeFakeEventQueries(events);
@@ -199,6 +333,59 @@ describe('stream handler replayEvents', () => {
   });
 });
 
+describe('worktree changes ready streaming', () => {
+  const readyEvents: StoredEvent[] = [5, 7].map((id, index) => ({
+    ...makeEvent(id, JSON.stringify({ revision: index + 1 })),
+    execution_id: '',
+    stream_event_type: WORKTREE_CHANGES_READY_EVENT,
+  }));
+
+  it.each([
+    { query: '', replayIds: [5, 7], live: true },
+    {
+      query: 'fromId=5&eventTypes=cloud.worktree.changes.ready',
+      replayIds: [7],
+      live: true,
+    },
+    { query: 'eventTypes=kilocode', replayIds: [], live: false },
+    { query: 'executionIds=exec_1', replayIds: [], live: false },
+    { query: 'startTime=1007&endTime=1007', replayIds: [7], live: true },
+    { query: 'endTime=1006', replayIds: [5], live: false },
+  ])(
+    'applies stream filters to replay and live delivery: $query',
+    async ({ query, replayIds, live }) => {
+      const state = makeFakeState();
+      const handler = createStreamHandler(state, makeFakeEventQueries(readyEvents), SESSION_ID);
+      const filters = parseStreamFilters(
+        new URL(`https://example.com/stream?${query}`),
+        SESSION_ID
+      );
+      const replaySocket = makeFakeWebSocket();
+      await handler.replayEvents(replaySocket, filters);
+      const replay = parseSentMessages(replaySocket);
+      expect(replay.map(event => event.eventId)).toEqual(replayIds);
+      for (const event of replay) {
+        expect(event).toEqual({
+          eventId: event.eventId,
+          sessionId: SESSION_ID,
+          streamEventType: 'cloud.worktree.changes.ready',
+          timestamp: new Date(1000 + event.eventId).toISOString(),
+          data: { revision: event.eventId === 5 ? 1 : 2 },
+        });
+      }
+
+      const liveSocket = Object.assign(makeFakeWebSocket(), {
+        deserializeAttachment: () => ({ filters, connectedAt: 0 }),
+      });
+      vi.spyOn(state, 'getWebSockets').mockReturnValue([liveSocket]);
+      handler.broadcastEvent(readyEvents[1]);
+      expect(parseSentMessages(liveSocket)).toEqual(
+        live ? [formatStreamEvent(readyEvents[1], SESSION_ID)] : []
+      );
+    }
+  );
+});
+
 describe('stream handler handleStreamRequest', () => {
   const OriginalResponse = Response;
 
@@ -250,13 +437,94 @@ describe('stream handler handleStreamRequest', () => {
     expect(parsed.data).toEqual({ cloudStatus: { type: 'preparing' } });
   });
 
+  it.each(['', '&fromId=0', '&replay=false'])(
+    'finishes negotiated bootstrap after all state snapshots: %s',
+    async suffix => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const notifications = vi.fn();
+      const errors = vi.fn();
+      const observed = createServiceState({ rootSessionId: 'root-1', onError: errors });
+      observed.subscribe(notifications);
+      observed.beginReplay();
+      const handler = createStreamHandler(
+        makeFakeState(),
+        makeFakeEventQueries([
+          makeKiloEvent(1, 'session.error', { sessionID: 'root-1', error: 'Old overload' }),
+          makeKiloEvent(2, 'session.status', { sessionID: 'root-1', status: { type: 'busy' } }),
+          makeKiloEvent(3, 'session.status', { sessionID: 'root-1', status: { type: 'idle' } }),
+        ]),
+        SESSION_ID,
+        {
+          deriveCloudStatus: async () => ({ type: 'preparing' }),
+          readPendingInteractions: () => ({
+            questions: [{ id: 'current-question', sessionID: 'root-1', questions: [] }],
+            permissions: [],
+          }),
+          getPreparationSnapshots: async () => [
+            {
+              ...makeEvent(4, JSON.stringify({ step: 'setup_commands', message: 'Current setup' })),
+              stream_event_type: 'preparing',
+            },
+          ],
+          deriveQueuedMessages: async () => [
+            {
+              messageId: 'current-message',
+              content: 'Current prompt',
+              timestamp: 10,
+              delivery: 'queued',
+            },
+          ],
+          getAvailableCommands: async () => ({ commands: [] }),
+        }
+      );
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?bootstrap=true${suffix}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+      const frames = parseSentMessages(serverWs);
+      expect(
+        frames.find(frame => frame.streamEventType === 'connected')?.data.bootstrapPending
+      ).toBe(true);
+      expect(frames.at(-1)).toMatchObject({
+        eventId: 0,
+        streamEventType: 'bootstrap.complete',
+        data: {},
+      });
+      expect(frames.slice(-4).map(frame => frame.streamEventType)).toEqual([
+        'preparing',
+        'cloud.message.queued',
+        'commands.available',
+        'bootstrap.complete',
+      ]);
+      for (const message of serverWs.sentMessages.slice(0, -1)) {
+        processSdkFrame(observed, JSON.parse(message));
+        expect(notifications).not.toHaveBeenCalled();
+        expect(errors).not.toHaveBeenCalled();
+      }
+      observed.endReplay();
+      expect(notifications).toHaveBeenCalledTimes(1);
+      expect(observed.getStatus()).toEqual({ type: 'idle' });
+      expect(observed.getCloudStatus()).toMatchObject({
+        type: 'preparing',
+        step: 'setup_commands',
+      });
+      expect(observed.getQuestion()?.requestId).toBe('current-question');
+      expect(observed.getPendingMessages().get('current-message')).toEqual({ status: 'queued' });
+      expect(errors).not.toHaveBeenCalled();
+    }
+  );
+
   it('sends cached commands.available on connect when no eventTypes filter is set', async () => {
     const serverWs = makeFakeWebSocket();
     mockWebSocketPair(serverWs);
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      }),
     });
 
     const request = new Request('https://example.com/stream', {
@@ -275,13 +543,44 @@ describe('stream handler handleStreamRequest', () => {
     ]);
   });
 
+  it('replays the catalog bound status so a bounded catalog reaches the client', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const eq = makeFakeEventQueries([]);
+    const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+        catalogStatus: { dropped: 7, overLimit: false },
+      }),
+    });
+
+    const request = new Request('https://example.com/stream', {
+      headers: { Upgrade: 'websocket' },
+    });
+    await handler.handleStreamRequest(request);
+
+    const catalogMessage = serverWs.sentMessages.find(m => {
+      const parsed = JSON.parse(m) as Record<string, unknown>;
+      return parsed.streamEventType === 'commands.available';
+    });
+    expect(catalogMessage).toBeDefined();
+    const parsed = JSON.parse(catalogMessage!) as Record<string, unknown>;
+    expect(parsed.data).toEqual({
+      commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      catalogStatus: { dropped: 7, overLimit: false },
+    });
+  });
+
   it('skips commands.available on connect when eventTypes excludes it', async () => {
     const serverWs = makeFakeWebSocket();
     mockWebSocketPair(serverWs);
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      }),
     });
 
     const request = new Request('https://example.com/stream?eventTypes=output', {
@@ -302,7 +601,9 @@ describe('stream handler handleStreamRequest', () => {
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      }),
     });
 
     const request = new Request('https://example.com/stream?eventTypes=output,commands.available', {
@@ -323,7 +624,7 @@ describe('stream handler handleStreamRequest', () => {
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => DEFAULT_SLASH_COMMANDS,
+      getAvailableCommands: async () => ({ commands: DEFAULT_SLASH_COMMANDS }),
     });
 
     const request = new Request('https://example.com/stream', {
@@ -338,6 +639,942 @@ describe('stream handler handleStreamRequest', () => {
     expect(catalogMessage).toBeDefined();
     const parsed = JSON.parse(catalogMessage!) as Record<string, unknown>;
     expect((parsed.data as Record<string, unknown>).commands).toEqual(DEFAULT_SLASH_COMMANDS);
+  });
+
+  it('preserves legacy rebuild preparation over historical readiness on reconnect', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+    const state = createServiceState({ rootSessionId: 'ses_root' });
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      deriveCloudStatus: async () => ({ type: 'ready' }),
+      deriveQueuedMessages: async () => [
+        { messageId: 'rebuild-message', content: 'Resume work', timestamp: 1000 },
+      ],
+      getPreparationSnapshots: async () => [
+        {
+          ...makeEvent(
+            10,
+            JSON.stringify({
+              version: 2,
+              attemptId: 'prepare-rebuild',
+              triggerMessageId: 'rebuild-message',
+              revision: 1,
+              timestamp: 2000,
+              step: 'workspace_restore',
+              message: 'Restoring workspace',
+              action: 'attempt_snapshot',
+              attempt: {
+                id: 'prepare-rebuild',
+                triggerMessageId: 'rebuild-message',
+                status: 'running',
+                startedAt: 2000,
+                revision: 1,
+              },
+            })
+          ),
+          stream_event_type: 'preparing',
+        },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    for (const message of serverWs.sentMessages) processSdkFrame(state, JSON.parse(message));
+    expect(state.getCloudStatus()).toMatchObject({ type: 'preparing' });
+    expect(state.getPreparationAttempts()).toEqual([
+      expect.objectContaining({ id: 'prepare-rebuild', status: 'running' }),
+    ]);
+    expect(state.getPendingMessages().get('rebuild-message')).toEqual({ status: 'queued' });
+  });
+
+  it.each([
+    { client: 'fresh', completedPreparation: false },
+    { client: 'stale queued A', completedPreparation: false },
+    { client: 'fresh', completedPreparation: true },
+    { client: 'stale queued A', completedPreparation: true },
+  ])(
+    'keeps B queued and preparing after A history for $client, completedPreparation=$completedPreparation',
+    async ({ client, completedPreparation }) => {
+      const state = createServiceState({ rootSessionId: 'ses_root' });
+      if (client === 'stale queued A') {
+        state.process({ type: 'cloud.message.queued', messageId: 'A' });
+        state.process({ type: 'cloud.status', cloudStatus: { type: 'preparing' } });
+        state.process({ type: 'stopped', reason: 'transport-disconnected' });
+        expect(state.getPendingMessages().get('A')).toEqual({ status: 'queued' });
+      }
+      const preparationSnapshot: StoredEvent = {
+        ...makeEvent(
+          10,
+          JSON.stringify({
+            version: 2,
+            attemptId: 'prepare-A',
+            triggerMessageId: 'A',
+            revision: 5,
+            timestamp: 2000,
+            step: 'workspace_setup',
+            message: 'Preparation snapshot',
+            action: 'attempt_snapshot',
+            attempt: {
+              id: 'prepare-A',
+              triggerMessageId: 'A',
+              status: 'completed',
+              startedAt: 1000,
+              completedAt: 2000,
+              revision: 5,
+            },
+          })
+        ),
+        stream_event_type: 'preparing',
+        timestamp: 2000,
+      };
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        getPreparationSnapshots: async () => (completedPreparation ? [preparationSnapshot] : []),
+        deriveCloudStatus: async () => ({ type: 'preparing' }),
+        deriveSessionStatus: async () => ({ type: 'idle' }),
+        derivePendingInteractions: async () => ({ questions: [], permissions: [] }),
+        deriveQueuedMessages: async () => [
+          {
+            messageId: 'A',
+            content: 'Old prompt',
+            timestamp: 1000,
+            terminalFailure: {
+              messageId: 'A',
+              status: 'failed',
+              delivery: 'queued',
+              accepted: false,
+              reason: 'execution',
+              error: 'A delivery failed',
+              timestamp: 2000,
+            },
+          },
+          { messageId: 'B', content: 'Recovery', timestamp: 3000 },
+        ],
+      });
+
+      await handler.handleStreamRequest(
+        new Request('https://example.com/stream?replay=false', {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+      for (const frame of frames) processSdkFrame(state, frame);
+      expect(frames.at(-2)).toMatchObject({
+        eventId: 0,
+        streamEventType: 'connected',
+        data: { activeMessageId: null, cloudStatus: { type: 'preparing' } },
+      });
+      expect(frames.at(-1)).toMatchObject({
+        streamEventType: 'cloud.message.queued',
+        data: { messageId: 'B' },
+      });
+      expect(state.getCloudStatus()).toEqual({ type: 'preparing' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(state.getPreparationAttempts().map(attempt => attempt.status)).toEqual(
+        completedPreparation ? ['completed'] : []
+      );
+      expect.soft(new Map(state.getPendingMessages())).toEqual(
+        new Map([
+          ['B', { status: 'queued' }],
+          ['A', { status: 'failed', error: 'A delivery failed', reason: 'execution' }],
+        ])
+      );
+
+      processSdkFrame(
+        state,
+        formatStreamEvent(
+          {
+            ...makeEvent(
+              21,
+              JSON.stringify({
+                messageId: 'B',
+                delivery: 'queued',
+                accepted: false,
+                error: 'B preparation failed',
+              })
+            ),
+            stream_event_type: 'cloud.message.failed',
+          },
+          SESSION_ID
+        )
+      );
+      expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'B preparation failed' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getPendingMessages().get('B')).toMatchObject({
+        status: 'failed',
+        error: 'B preparation failed',
+      });
+    }
+  );
+
+  it('projects accepted work and pending child interactions after historical failures', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+    const state = createServiceState({ rootSessionId: 'ses_root' });
+    const pendingInteractions = {
+      questions: [
+        {
+          id: 'question-child',
+          sessionID: 'ses_child',
+          questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+        },
+      ],
+      permissions: [],
+    };
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      reconcileMaterializedEvents: true,
+      deriveCloudStatus: async () => ({ type: 'ready' }),
+      deriveSessionStatus: async () => ({ type: 'busy' }),
+      derivePendingInteractions: async () => pendingInteractions,
+      deriveQueuedMessages: async () => [
+        {
+          messageId: 'old',
+          content: 'Old prompt',
+          timestamp: 1000,
+          terminalFailure: {
+            messageId: 'old',
+            status: 'failed',
+            delivery: 'sent',
+            accepted: true,
+            error: 'Execution failed',
+            reason: 'execution',
+            timestamp: 2000,
+          },
+        },
+        { messageId: 'current', content: 'Current prompt', timestamp: 3000, delivery: 'sent' },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request('https://example.com/stream?fromId=20', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+    expect(frames.find(frame => frame.streamEventType === 'connected')?.data).toEqual({
+      cloudStatus: { type: 'ready' },
+      sessionStatus: { type: 'busy' },
+      activeMessageId: 'current',
+      pendingInteractions,
+    });
+    const sentIndex = frames.findIndex(frame => frame.streamEventType === 'cloud.message.sent');
+    const failureIndex = frames.findIndex(
+      frame => frame.streamEventType === 'cloud.message.failed'
+    );
+    const connectedIndex = frames.findIndex(frame => frame.streamEventType === 'connected');
+    expect(failureIndex).toBeGreaterThan(-1);
+    expect(failureIndex).toBeLessThan(connectedIndex);
+    expect(connectedIndex).toBeLessThan(sentIndex);
+    expect(frames[sentIndex].data).toEqual({ messageId: 'current', delivery: 'sent' });
+    expect(
+      frames
+        .filter(frame => frame.streamEventType === 'cloud.message.queued')
+        .every(frame => frame.data.delivery === 'queued')
+    ).toBe(true);
+    expect(frames.at(-1).streamEventType).toBe('cloud.message.sent');
+    for (const frame of frames) processSdkFrame(state, frame);
+    expect(state.getCloudStatus()).toEqual({ type: 'ready' });
+    expect(state.getActivity()).toEqual({ type: 'busy' });
+    expect(state.getStatus()).toEqual({ type: 'idle' });
+    expect(state.getQuestion()).toEqual({
+      requestId: 'question-child',
+      questions: pendingInteractions.questions[0].questions,
+    });
+    expect(state.getPendingMessages().get('old')).toMatchObject({
+      status: 'failed',
+      error: 'Execution failed',
+    });
+    processSdkFrame(
+      state,
+      formatStreamEvent(
+        {
+          ...makeEvent(
+            22,
+            JSON.stringify({ messageId: 'current', accepted: true, error: 'Current turn failed' })
+          ),
+          stream_event_type: 'cloud.message.failed',
+        },
+        SESSION_ID
+      )
+    );
+    expect(state.getPendingMessages().get('current')).toMatchObject({
+      status: 'failed',
+      error: 'Current turn failed',
+    });
+  });
+
+  it.each(['', 'fromId=20', 'replay=false'])(
+    'restores current root and child interactions only on the reconnecting socket: %s',
+    async query => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const existingWs = Object.assign(makeFakeWebSocket(), {
+        deserializeAttachment: () => ({ filters: { sessionId: SESSION_ID }, connectedAt: 0 }),
+      });
+      const doState = makeFakeState();
+      vi.spyOn(doState, 'getWebSockets').mockReturnValue([existingWs, serverWs]);
+      const state = createServiceState({ rootSessionId: 'ses_root' });
+      const history = [
+        makeKiloEvent(1, 'question.asked', {
+          id: 'stale-question',
+          sessionID: 'ses_root',
+          questions: [{ question: 'Old question', header: 'Old', options: [] }],
+        }),
+        makeKiloEvent(2, 'permission.asked', {
+          id: 'stale-permission',
+          sessionID: 'ses_child',
+          permission: 'edit',
+          patterns: ['old.txt'],
+          metadata: {},
+          always: [],
+        }),
+      ];
+      for (const event of history) processSdkFrame(state, formatStreamEvent(event, SESSION_ID));
+      expect(state.getQuestion()?.requestId).toBe('stale-question');
+      expect(state.getPermission()?.requestId).toBe('stale-permission');
+
+      const questions = [
+        {
+          id: 'question-root',
+          sessionID: 'ses_root',
+          questions: [
+            {
+              question: 'Which provider?',
+              header: 'Provider',
+              options: [{ label: 'Both', description: 'Cloudflare and Vercel' }],
+              custom: false,
+            },
+            {
+              question: 'Which checks?',
+              header: 'Checks',
+              options: [{ label: 'Reconnect', description: 'Restore pending interactions' }],
+              multiple: true,
+            },
+          ],
+          tool: { messageID: 'message-root', callID: 'call-root' },
+        },
+        {
+          id: 'question-child',
+          sessionID: 'ses_child',
+          questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+          tool: { messageID: 'message-child', callID: 'call-child' },
+        },
+      ];
+      const permission = {
+        id: 'permission-child',
+        sessionID: 'ses_child',
+        permission: 'bash',
+        patterns: ['pnpm test', 'pnpm lint'],
+        metadata: { command: 'pnpm test', cwd: '/workspace/project' },
+        always: ['pnpm *'],
+        tool: { messageID: 'message-child', callID: 'call-permission' },
+      };
+      const eq = makeFakeEventQueries(history);
+      const insertSpy = vi.spyOn(eq, 'insert');
+      const handler = createStreamHandler(doState, eq, SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        deriveCloudStatus: async () => ({ type: 'ready' }),
+        deriveSessionStatus: async () => ({ type: 'busy' }),
+        derivePendingInteractions: async () => ({ questions, permissions: [permission] }),
+      });
+
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+      expect(frames[0].streamEventType).toBe('connected');
+      expect(frames.slice(1)).toEqual(
+        [
+          ...questions.map(properties => ({
+            type: 'question.asked',
+            event: 'question.asked',
+            properties,
+          })),
+          { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        ].map(data => ({
+          eventId: 0,
+          sessionId: SESSION_ID,
+          streamEventType: 'kilocode',
+          timestamp: expect.any(String),
+          data,
+        }))
+      );
+      expect(existingWs.sentMessages).toEqual([]);
+      expect(insertSpy).not.toHaveBeenCalled();
+
+      for (const frame of frames) processSdkFrame(state, frame);
+      expect(state.getPermission()).toEqual({
+        requestId: permission.id,
+        permission: permission.permission,
+        patterns: permission.patterns,
+        metadata: permission.metadata,
+        always: permission.always,
+      });
+      for (const [index, question] of questions.entries()) {
+        expect(state.getQuestion()).toEqual({
+          requestId: question.id,
+          questions: question.questions,
+        });
+        processSdkFrame(
+          state,
+          formatStreamEvent(
+            makeKiloEvent(21 + index, 'question.replied', {
+              requestID: question.id,
+              sessionID: question.sessionID,
+            }),
+            SESSION_ID
+          )
+        );
+      }
+      expect(state.getQuestion()).toBeNull();
+      processSdkFrame(
+        state,
+        formatStreamEvent(
+          makeKiloEvent(23, 'permission.replied', {
+            requestID: permission.id,
+            sessionID: permission.sessionID,
+          }),
+          SESSION_ID
+        )
+      );
+      expect(state.getPermission()).toBeNull();
+    }
+  );
+
+  it.each([
+    { query: 'eventTypes=kilocode', replayed: true },
+    { query: 'eventTypes=output', replayed: false },
+    { query: 'executionIds=exec_1', replayed: false },
+    { query: 'startTime=2001', replayed: false },
+    { query: 'endTime=1999', replayed: false },
+    { query: 'startTime=2000&endTime=2000', replayed: true },
+  ])('filters pending interaction snapshots: $query', async ({ query, replayed }) => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(2000);
+    try {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        derivePendingInteractions: async () => ({
+          questions: [{ id: 'question-root', sessionID: 'ses_root', questions: [] }],
+          permissions: [{ id: 'permission-child', sessionID: 'ses_child', permission: 'bash' }],
+        }),
+      });
+
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?replay=false&fromId=20&${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+      expect(frames[0].streamEventType).toBe('connected');
+      expect(frames.slice(1)).toEqual(
+        replayed
+          ? ['question.asked', 'permission.asked'].map(type => ({
+              eventId: 0,
+              sessionId: SESSION_ID,
+              streamEventType: 'kilocode',
+              timestamp: new Date(2000).toISOString(),
+              data: { type, event: type, properties: expect.any(Object) },
+            }))
+          : []
+      );
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('awaits the legacy async input getter before deriving the remaining connection state', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+    const pending = Promise.withResolvers<{ questions: unknown[]; permissions: unknown[] }>();
+    const reading = Promise.withResolvers<void>();
+    const status = vi.fn(async () => ({ type: 'busy' as const }));
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      derivePendingInteractions: () => {
+        reading.resolve();
+        return pending.promise;
+      },
+      deriveSessionStatus: status,
+    });
+    const connecting = handler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', { headers: { Upgrade: 'websocket' } })
+    );
+    await reading.promise;
+    expect(status).not.toHaveBeenCalled();
+    expect(serverWs.sentMessages).toEqual([]);
+    pending.resolve({ questions: [{ id: 'legacy-question', questions: [] }], permissions: [] });
+    await connecting;
+    expect(status).toHaveBeenCalledOnce();
+    expect(parseSentMessages(serverWs).map(frame => frame.streamEventType)).toEqual([
+      'connected',
+      'kilocode',
+    ]);
+  });
+
+  it.each([undefined, { questions: [], permissions: [] }])(
+    'distinguishes unknown interactions from an authoritative empty snapshot: %j',
+    async pendingInteractions => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const state = createServiceState({ rootSessionId: 'ses_root' });
+      state.process({ type: 'question.asked', requestId: 'stale-question' });
+      state.process({
+        type: 'permission.asked',
+        requestId: 'stale-permission',
+        permission: 'edit',
+        patterns: [],
+        metadata: {},
+        always: [],
+      });
+      const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        deriveSessionStatus: async () => ({ type: 'idle' }),
+        derivePendingInteractions: async () => pendingInteractions,
+      });
+
+      await handler.handleStreamRequest(
+        new Request('https://example.com/stream?replay=false', {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+      const connected = frames.find(frame => frame.streamEventType === 'connected');
+      expect(connected.data.activeMessageId).toBeNull();
+      if (pendingInteractions)
+        expect(connected.data.pendingInteractions).toEqual(pendingInteractions);
+      else expect(connected.data).not.toHaveProperty('pendingInteractions');
+      expect(frames).toHaveLength(1);
+      for (const frame of frames) processSdkFrame(state, frame);
+      expect(state.getQuestion()).toBeNull();
+      expect(state.getPermission()).toBeNull();
+    }
+  );
+
+  it.each(['fromId=20', 'replay=false'])(
+    'reconciles materialized updates and removals without replaying old turn events: %s',
+    async query => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const events = [
+        makeKiloEvent(1, 'message.updated', { info: { id: 'assistant', role: 'assistant' } }),
+        makeKiloEvent(2, 'message.part.updated', {
+          part: { id: 'text', messageID: 'assistant', type: 'text', text: 'Complete answer' },
+        }),
+        makeKiloEvent(3, 'message.part.delta', {
+          messageID: 'assistant',
+          partID: 'text',
+          field: 'text',
+          delta: 'already materialized',
+        }),
+        makeKiloEvent(4, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' }),
+        makeKiloEvent(5, 'message.part.removed', { messageID: 'assistant', partID: 'old-tool' }),
+        makeKiloEvent(6, 'message.removed', { messageID: 'removed-message' }),
+        makeKiloEvent(7, 'autocommit_completed', {
+          messageId: 'user',
+          success: true,
+          commitHash: 'abc123',
+          message: 'Committed',
+        }),
+        makeKiloEvent(8, 'session.status', { sessionID: 'ses_root', status: { type: 'busy' } }),
+      ];
+      const handler = createStreamHandler(
+        makeFakeState(),
+        makeFakeEventQueries(events),
+        SESSION_ID,
+        {
+          reconcileMaterializedEvents: true,
+        }
+      );
+
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+      const snapshots = frames.filter(frame => frame.streamEventType === 'kilocode');
+      expect(snapshots.map(frame => frame.data.type)).toEqual([
+        'message.updated',
+        'message.part.updated',
+        'autocommit_completed',
+        'message.part.removed',
+        'message.removed',
+      ]);
+      expect(snapshots.every(frame => frame.eventId === 0)).toBe(true);
+      expect(snapshots[1].data.properties.part.text).toBe('Complete answer');
+    }
+  );
+
+  it('filters each snapshot by its actual event type', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+    const handler = createStreamHandler(
+      makeFakeState(),
+      makeFakeEventQueries([makeKiloEvent(1, 'message.updated', { info: { id: 'assistant' } })]),
+      SESSION_ID,
+      {
+        reconcileMaterializedEvents: true,
+        deriveQueuedMessages: async () => [
+          {
+            messageId: 'failed',
+            content: 'Prompt',
+            timestamp: 1000,
+            terminalFailure: {
+              messageId: 'failed',
+              status: 'failed',
+              delivery: 'queued',
+              accepted: false,
+              reason: 'exhausted',
+              error: 'Execution failed',
+              timestamp: 2000,
+            },
+          },
+        ],
+      }
+    );
+
+    await handler.handleStreamRequest(
+      new Request('https://example.com/stream?eventTypes=cloud.message.failed', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+    expect(frames.map(frame => frame.streamEventType)).toEqual([
+      'cloud.message.failed',
+      'connected',
+    ]);
+  });
+
+  it.each([undefined, 'command'] as const)(
+    'corrects accepted %s delivery after reconnect user-message materialization',
+    async turnType => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+
+      const messageId = 'msg_accepted';
+      const timestamp = 1_700_000_000_000;
+      const persistedSentEvent: StoredEvent = {
+        ...makeEvent(7, JSON.stringify({ messageId, delivery: 'sent' })),
+        execution_id: '',
+        stream_event_type: 'cloud.message.sent',
+        timestamp,
+      };
+      const handler = createStreamHandler(
+        makeFakeState(),
+        makeFakeEventQueries([persistedSentEvent]),
+        SESSION_ID,
+        {
+          deriveQueuedMessages: async () => [
+            {
+              messageId,
+              content: 'already running',
+              timestamp,
+              delivery: 'sent',
+              ...(turnType ? { turnType } : {}),
+            },
+          ],
+        }
+      );
+
+      await handler.handleStreamRequest(
+        new Request('https://example.com/stream', {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const events = parseSentMessages(serverWs);
+      expect(events.map(event => [event.eventId, event.streamEventType])).toEqual([
+        [7, 'cloud.message.sent'],
+        [0, 'connected'],
+        [0, 'cloud.message.queued'],
+        [0, 'cloud.message.sent'],
+      ]);
+      expect(events[2]).toEqual({
+        eventId: 0,
+        sessionId: SESSION_ID,
+        streamEventType: 'cloud.message.queued',
+        timestamp: new Date(timestamp).toISOString(),
+        data: { messageId, content: 'already running', delivery: 'queued' },
+      });
+      expect(events[3]).toEqual({
+        eventId: 0,
+        sessionId: SESSION_ID,
+        streamEventType: 'cloud.message.sent',
+        timestamp: new Date(timestamp).toISOString(),
+        data: { messageId, delivery: 'sent', ...(turnType ? { turnType } : {}) },
+      });
+    }
+  );
+
+  it('leaves genuinely queued and legacy snapshots queued without a sent correction', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      deriveQueuedMessages: async () => [
+        { messageId: 'msg_queued', content: 'waiting', timestamp: 1000 },
+        { messageId: 'msg_legacy', content: 'legacy pending', timestamp: 1001 },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    const events = parseSentMessages(serverWs).filter(
+      event => event.streamEventType !== 'connected'
+    );
+    expect(
+      events.map(event => ({ streamEventType: event.streamEventType, data: event.data }))
+    ).toEqual([
+      {
+        streamEventType: 'cloud.message.queued',
+        data: { messageId: 'msg_queued', content: 'waiting', delivery: 'queued' },
+      },
+      {
+        streamEventType: 'cloud.message.queued',
+        data: { messageId: 'msg_legacy', content: 'legacy pending', delivery: 'queued' },
+      },
+    ]);
+  });
+
+  it.each([
+    { accepted: false, delivery: 'queued' as const },
+    { accepted: true, delivery: 'sent' as const },
+  ])('preserves queued-then-failed ordering for $delivery terminal failures', async failure => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const messageId = `msg_failed_${failure.delivery}`;
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      deriveQueuedMessages: async () => [
+        {
+          messageId,
+          content: 'failed message',
+          timestamp: 1000,
+          terminalFailure: {
+            messageId,
+            status: 'failed',
+            delivery: failure.delivery,
+            accepted: failure.accepted,
+            reason: 'wrapper_failed',
+            timestamp: 1005,
+          },
+        },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request(
+        'https://example.com/stream?replay=false&eventTypes=cloud.message.queued,cloud.message.failed',
+        {
+          headers: { Upgrade: 'websocket' },
+        }
+      )
+    );
+
+    const events = parseSentMessages(serverWs).filter(
+      event => event.streamEventType !== 'connected'
+    );
+    expect(events.map(event => event.streamEventType)).toEqual([
+      'cloud.message.queued',
+      'cloud.message.failed',
+    ]);
+    expect(events[1]?.data).toEqual({
+      messageId,
+      status: 'failed',
+      delivery: failure.delivery,
+      accepted: failure.accepted,
+      reason: 'wrapper_failed',
+    });
+  });
+
+  it.each([
+    {
+      query: '',
+      expected: [
+        'cloud.message.completed',
+        'connected',
+        'cloud.message.queued',
+        'cloud.message.sent',
+      ],
+    },
+    {
+      query: '&eventTypes=cloud.message.completed',
+      expected: ['cloud.message.completed', 'connected'],
+    },
+    { query: '&eventTypes=cloud.message.sent', expected: ['connected', 'cloud.message.sent'] },
+  ])(
+    'restores completed command receipts without making them active for $query',
+    async ({ query, expected }) => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        deriveQueuedMessages: async () => [
+          {
+            messageId: 'command',
+            content: '',
+            timestamp: 1000,
+            completedAt: 1005,
+            turnType: 'command',
+          },
+          { messageId: 'active', content: 'Still running', timestamp: 1010, delivery: 'sent' },
+        ],
+      });
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?replay=false${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+      const events = parseSentMessages(serverWs);
+      expect(events.map(event => event.streamEventType)).toEqual(expected);
+      expect(
+        events.find(event => event.streamEventType === 'connected')?.data.activeMessageId
+      ).toBe('active');
+      const completion = events.find(event => event.streamEventType === 'cloud.message.completed');
+      if (completion)
+        expect(completion).toMatchObject({
+          eventId: 0,
+          timestamp: new Date(1005).toISOString(),
+          data: { messageId: 'command' },
+        });
+    }
+  );
+
+  it.each([
+    {
+      query: 'eventTypes=cloud.message.queued,cloud.message.sent',
+      expected: ['cloud.message.queued', 'cloud.message.sent'],
+    },
+    { query: 'eventTypes=cloud.message.queued', expected: ['cloud.message.queued'] },
+    { query: 'eventTypes=cloud.message.sent', expected: ['cloud.message.sent'] },
+    { query: 'eventTypes=output', expected: [] },
+    { query: 'executionIds=exec_other', expected: [] },
+    { query: 'startTime=1001', expected: [] },
+    { query: 'endTime=999', expected: [] },
+  ])('preserves existing accepted snapshot filters for $query', async ({ query, expected }) => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      deriveQueuedMessages: async () => [
+        {
+          messageId: 'msg_accepted',
+          content: 'already running',
+          timestamp: 1000,
+          delivery: 'sent',
+        },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request(`https://example.com/stream?replay=false&${query}`, {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    expect(
+      parseSentMessages(serverWs)
+        .filter(event => event.streamEventType !== 'connected')
+        .map(event => event.streamEventType)
+    ).toEqual(expected);
+  });
+
+  it('keeps accepted delivery corrections isolated to their owning session', async () => {
+    const siblingSessionId = 'sess_sibling' as SessionId;
+    const acceptedSocket = makeFakeWebSocket();
+    const queuedSocket = makeFakeWebSocket();
+    const acceptedHandler = createStreamHandler(
+      makeFakeState(),
+      makeFakeEventQueries([]),
+      SESSION_ID,
+      {
+        deriveQueuedMessages: async () => [
+          {
+            messageId: 'msg_accepted',
+            content: 'first session',
+            timestamp: 1000,
+            delivery: 'sent',
+          },
+        ],
+      }
+    );
+    const queuedHandler = createStreamHandler(
+      makeFakeState(),
+      makeFakeEventQueries([]),
+      siblingSessionId,
+      {
+        deriveQueuedMessages: async () => [
+          { messageId: 'msg_sibling', content: 'second session', timestamp: 1000 },
+        ],
+      }
+    );
+
+    mockWebSocketPair(acceptedSocket);
+    await acceptedHandler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    mockWebSocketPair(queuedSocket);
+    await queuedHandler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    expect(
+      parseSentMessages(acceptedSocket)
+        .filter(event => event.streamEventType !== 'connected')
+        .map(event => ({
+          sessionId: event.sessionId,
+          streamEventType: event.streamEventType,
+          messageId: event.data.messageId,
+        }))
+    ).toEqual([
+      {
+        sessionId: SESSION_ID,
+        streamEventType: 'cloud.message.queued',
+        messageId: 'msg_accepted',
+      },
+      { sessionId: SESSION_ID, streamEventType: 'cloud.message.sent', messageId: 'msg_accepted' },
+    ]);
+    expect(
+      parseSentMessages(queuedSocket)
+        .filter(event => event.streamEventType !== 'connected')
+        .map(event => ({
+          sessionId: event.sessionId,
+          streamEventType: event.streamEventType,
+          messageId: event.data.messageId,
+        }))
+    ).toEqual([
+      {
+        sessionId: siblingSessionId,
+        streamEventType: 'cloud.message.queued',
+        messageId: 'msg_sibling',
+      },
+    ]);
   });
 });
 

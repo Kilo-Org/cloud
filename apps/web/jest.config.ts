@@ -31,35 +31,41 @@ const config: Config = {
     '^@kilocode/worker-utils/(.*)$': '<rootDir>/../../packages/worker-utils/src/$1',
     '^@kilocode/worker-utils$': '<rootDir>/../../packages/worker-utils/src/index.ts',
     '^@kilocode/app-shared/(.*)$': '<rootDir>/../../packages/app-shared/src/$1',
+    '^@kilocode/web-shared/(.*)$': '<rootDir>/../../packages/web-shared/src/$1',
+    '^@cloud-agent-shared/(.*)$': '<rootDir>/../../services/cloud-agent-next/src/shared/$1',
+    '^@cloud-agent-shared$':
+      '<rootDir>/../../services/cloud-agent-next/src/shared/slash-commands.ts',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
   },
+  roots: ['<rootDir>', '<rootDir>/../../packages/web-shared', '<rootDir>/../ai-gateway'],
   testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',
     '<rootDir>/../../services/cloud-agent-next/',
-    '<rootDir>/../../services/app-builder/',
     '<rootDir>/../../services/webhook-agent-ingest/',
     '<rootDir>/../../services/session-ingest/',
-    '<rootDir>/../../services/gastown/',
     '<rootDir>/../../services/gmail-push/',
     '<rootDir>/../../services/security-auto-analysis/',
     '<rootDir>/../../services/kiloclaw/',
     '<rootDir>/../../packages/encryption/',
     '<rootDir>/../../packages/worker-utils/',
-    '<rootDir>/src/scripts/',
+    // Script tests are DB-backed and run via `pnpm script`, not jest — except
+    // the mcp-catalog unit tests, which only exercise pure library code.
+    '<rootDir>/src/scripts/(?!mcp-catalog/)',
     '<rootDir>/../../.worktrees/',
   ],
   modulePathIgnorePatterns: ['<rootDir>/../../.worktrees/'],
   transformIgnorePatterns: [
-    'node_modules/.pnpm/(?!(@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af))',
+    'node_modules/.pnpm/(?!(@assistant-ui|assistant-cloud|assistant-stream|radix-ui|zustand|safe-content-frame|nanoid@|@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|jose@|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af|htmlparser2@|domhandler@|domutils@|dom-serializer@|domelementtype@|entities@))',
   ],
 
   // Parallel execution configuration
   maxWorkers: process.env.JEST_MAX_WORKERS ? process.env.JEST_MAX_WORKERS : '50%',
 
   globalSetup: '<rootDir>/src/tests/setup/globalSetup.ts',
+  setupFiles: ['<rootDir>/src/tests/setup/domGlobals.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/workerSetup.ts'],
 
   silent: process.env.JEST_SILENT === 'true',

@@ -1,36 +1,63 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
-  cloud_agent_webhook_triggers,
   cli_sessions_v2,
   github_branch_pull_requests,
-  agent_environment_profiles,
+  kilocode_users,
   organizations,
   organization_memberships,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
+import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
+import type * as GitHubAdapterModule from '@/lib/integrations/platforms/github/adapter';
+import {
+  createEmptyPrObservations,
+  type PrObservations,
+} from '@/lib/integrations/platforms/github/pr-observations';
+import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import {
+  getPrLinkVerificationKey,
   parseGitHubOwnerRepo,
   parseGitHubPrUrl,
-  computeSearchNextCursor,
+  projectAssociatedPr,
 } from '@/routers/cli-sessions-v2-router';
-import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
+import type {
+  fetchSessionDiff as FetchSessionDiffType,
+  fetchSessionMessagesPage as FetchSessionMessagesPageType,
+} from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
+import { ServiceFetchTimeoutError } from '@/lib/bounded-service-fetch';
 import { captureException } from '@sentry/nextjs';
+
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
 
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
+const mockGetPreparationAttempts = jest.fn().mockResolvedValue([]);
+const mockDeleteCloudAgentSession = jest.fn().mockResolvedValue({ success: true });
+const mockDeleteHostedWorkspaceSession = jest.fn().mockResolvedValue({
+  success: true,
+  workspaceId: 'worktree_12345678-1234-4234-9234-123456789abc',
+  sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+});
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,
+    getPreparationAttempts: mockGetPreparationAttempts,
+    deleteSession: mockDeleteCloudAgentSession,
+    deleteHostedWorkspaceSession: mockDeleteHostedWorkspaceSession,
   })),
-  rethrowAsPaymentRequired: jest.fn(),
+  rethrowCloudAgentError: jest.fn(),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
     constructor(message = 'Insufficient credits') {
       super(message);
@@ -39,8 +66,12 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   },
 }));
 
-jest.mock('@/lib/tokens', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/tokens');
+jest.mock('@/lib/auth/resource-delegation', () => ({
+  createControlTokenForRequest: jest.fn(async () => ({ token: 'test-cloud-agent-control-token' })),
+}));
+
+jest.mock('@kilocode/web-shared/lib/tokens', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@kilocode/web-shared/lib/tokens');
   return {
     ...actual,
     generateApiToken: jest.fn(() => 'test-api-token'),
@@ -48,8 +79,10 @@ jest.mock('@/lib/tokens', () => {
   };
 });
 
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',
@@ -84,14 +117,24 @@ jest.mock('@sentry/nextjs', () => {
 // module members fails. Replace `fetchPullRequestByNumber` on the already-mocked
 // adapter module with a fresh `jest.fn()` so individual tests can drive it.
 jest.mock('@/lib/integrations/platforms/github/adapter', () => {
-  const actual: Record<string, unknown> = jest.requireActual(
+  const actual = jest.requireActual<typeof GitHubAdapterModule>(
     '@/lib/integrations/platforms/github/adapter'
   );
   return {
     ...actual,
     fetchPullRequestByNumber: jest.fn(),
+    toGitHubRateLimitError: jest.fn(actual.toGitHubRateLimitError),
   };
 });
+
+jest.mock('@/lib/integrations/platforms/github/pr-refresh-budget', () => ({
+  claimPrRefresh: jest.fn(async () => ({ allowed: true })),
+  deferPrRefresh: jest.fn(async () => undefined),
+}));
+
+jest.mock('@/lib/integrations/platforms/github/pr-status', () => ({
+  fetchPullRequestObservations: jest.fn(),
+}));
 
 // Same trick for the paginated session-message client. The web router only
 // calls `fetchSessionMessagesPage`; the rest of the module keeps its real
@@ -101,6 +144,7 @@ jest.mock('@/lib/session-ingest-client', () => {
   return {
     ...actual,
     fetchSessionMessagesPage: jest.fn(),
+    fetchSessionDiff: jest.fn(),
   };
 });
 
@@ -118,16 +162,140 @@ const mockedFetchPullRequestByNumber =
   githubAdapter.fetchPullRequestByNumber as jest.MockedFunction<
     typeof githubAdapter.fetchPullRequestByNumber
   >;
+const mockedFetchPullRequestObservations = (
+  jest.requireMock('@/lib/integrations/platforms/github/pr-status') as {
+    fetchPullRequestObservations: jest.Mock;
+  }
+).fetchPullRequestObservations;
 
 let regularUser: User;
 let otherUser: User;
 let adminUser: User;
 let testOrganization: Organization;
 
+describe('projectAssociatedPr', () => {
+  const row = {
+    session_id: 'ses_projection',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    git_url: 'https://github.com/kilo/repo',
+    pr_url: null,
+    pr_number: null,
+    pr_state: null,
+    pr_title: null,
+    pr_head_sha: null,
+    pr_last_synced_at: null,
+    pr_review_decision: null,
+    review_decision_pending: null,
+    session_pr_platform: 'github',
+    session_pr_url: 'https://github.com/kilo/repo/pull/42',
+    session_pr_number: 42,
+    session_pr_head_ref: 'feature',
+    session_pr_head_sha: null,
+    session_pr_verified_at: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('omits the optional verification key for an already verified link', () => {
+    const session = projectAssociatedPr(row);
+    expect(Object.keys(session).sort()).toEqual(
+      ['session_id', 'updated_at', 'git_url', 'associatedPr'].sort()
+    );
+    expect(session).not.toHaveProperty('prLinkVerificationKey');
+    expect(session.associatedPr).toMatchObject({ number: 42, platform: 'github' });
+  });
+
+  it('includes the verification key for an unverified candidate', () => {
+    const session = projectAssociatedPr({ ...row, session_pr_verified_at: null });
+    expect(session.prLinkVerificationKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(session.associatedPr).toBeNull();
+  });
+
+  it('omits the optional verification key when there is no stored link', () => {
+    const session = projectAssociatedPr({
+      ...row,
+      session_pr_url: null,
+      session_pr_number: null,
+      session_pr_verified_at: null,
+    });
+    expect(session).not.toHaveProperty('prLinkVerificationKey');
+    expect(session.associatedPr).toBeNull();
+  });
+});
+
+describe('getPrLinkVerificationKey', () => {
+  const candidate = {
+    platform: 'github',
+    pr_url: 'https://github.com/kilo/repo/pull/77',
+    pr_number: 77,
+    pr_link_verified_at: null,
+    git_url: 'https://github.com/kilo/repo',
+    pr_head_ref: 'feature/list-x',
+    pr_head_sha: 'cafef00d',
+  };
+
+  it.each([
+    'https://github.com/Kilo/Repo.git',
+    'git@github.com:Kilo/Repo.git',
+    'ssh://git@github.com/Kilo/Repo.git',
+  ])('detects an unverified GitHub link matching repository %s', git_url => {
+    expect(getPrLinkVerificationKey({ ...candidate, git_url })).toEqual(expect.any(String));
+  });
+
+  it('accepts a PR URL subpath without requiring head evidence', () => {
+    expect(
+      getPrLinkVerificationKey({
+        ...candidate,
+        pr_url: `${candidate.pr_url}/files?diff=split#top`,
+        pr_head_ref: null,
+        pr_head_sha: null,
+      })
+    ).toEqual(expect.any(String));
+  });
+
+  it.each([
+    { platform: null },
+    { platform: 'gitlab' },
+    { pr_link_verified_at: '2026-01-01 00:00:00+00' },
+    { pr_url: null },
+    { pr_url: 'not a URL' },
+    { pr_url: 'https://gitlab.com/kilo/repo/pull/77' },
+    { pr_url: 'https://github.com/kilo/other/pull/77' },
+    { pr_url: 'https://github.com/kilo/repo/pull/78' },
+    { pr_number: null },
+    { pr_number: 0 },
+    { pr_number: -1 },
+    { pr_number: 77.5 },
+    { pr_number: 2_147_483_648 },
+    { git_url: null },
+    { git_url: 'not a repository' },
+    { git_url: 'https://github.com/kilo/repo/nested' },
+  ])('rejects non-candidate evidence %j', overrides => {
+    expect(getPrLinkVerificationKey({ ...candidate, ...overrides })).toBeUndefined();
+  });
+
+  it.each([
+    { pr_url: `${candidate.pr_url}/files` },
+    { pr_url: 'https://github.com/kilo/repo/pull/78', pr_number: 78 },
+    { git_url: 'git@github.com:kilo/repo.git' },
+    { pr_head_ref: 'feature/new-head' },
+    { pr_head_sha: 'new-sha' },
+  ])('changes the opaque key when stored link or head evidence changes: %j', overrides => {
+    const key = getPrLinkVerificationKey(candidate);
+    expect(key).toMatch(/^[a-f0-9]{64}$/);
+    expect(getPrLinkVerificationKey({ ...candidate, ...overrides })).not.toBe(key);
+    expect(getPrLinkVerificationKey({ ...candidate })).toBe(key);
+  });
+});
+
 describe('cli-sessions-v2-router', () => {
   beforeEach(() => {
     afterCallbacks.length = 0;
     mockedNotifyCliSessionRenamed.mockReset().mockResolvedValue({ delivered: true });
+    mockDeleteCloudAgentSession.mockReset().mockResolvedValue({ success: true });
+    mockDeleteHostedWorkspaceSession.mockReset().mockResolvedValue({
+      success: true,
+      workspaceId: 'worktree_12345678-1234-4234-9234-123456789abc',
+      sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    });
     mockedCaptureException.mockClear();
   });
 
@@ -213,6 +381,332 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('projects every grouped snapshot path into the distinct public chat directory', async () => {
+      const privateDirectory =
+        '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
+      const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            info: {
+              id: sessionId,
+              directory: privateDirectory,
+              path: `${privateDirectory}/session.json`,
+              summary: { diffs: [{ file: `${privateDirectory}/src/app.ts` }] },
+              permission: [{ pattern: `${privateDirectory}/src` }],
+            },
+            messages: [
+              {
+                info: {
+                  id: 'msg_assistant',
+                  role: 'assistant',
+                  path: { cwd: privateDirectory, root: privateDirectory },
+                },
+                parts: [
+                  {
+                    id: 'prt_file',
+                    type: 'file',
+                    url: `file://${privateDirectory}/attachment.txt`,
+                    source: { type: 'file', path: `${privateDirectory}/attachment.txt` },
+                  },
+                  {
+                    id: 'prt_tool',
+                    type: 'tool',
+                    state: {
+                      status: 'completed',
+                      input: {
+                        filePath: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                      },
+                      output: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
+                      metadata: {
+                        filediff: {
+                          file: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                        },
+                        outputs: [
+                          `${privateDirectory}/result.txt`,
+                          {
+                            output: `Read ${privateDirectory}/nested.txt`,
+                            relative: 'src/relative.ts',
+                          },
+                        ],
+                      },
+                      attachments: [
+                        {
+                          id: 'prt_nested',
+                          type: 'file',
+                          url: `file://${privateDirectory}/nested.txt`,
+                          source: { type: 'symbol', path: `${privateDirectory}/nested.ts` },
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    id: 'prt_patch',
+                    type: 'patch',
+                    files: [`${privateDirectory}/src/app.ts`, 'relative.ts'],
+                  },
+                  {
+                    id: 'prt_text',
+                    type: 'text',
+                    text: `Read ${privateDirectory}/src/app.ts and src/relative.ts`,
+                  },
+                ],
+              },
+              {
+                info: {
+                  id: 'msg_user',
+                  role: 'user',
+                  editorContext: {
+                    visibleFiles: [`${privateDirectory}/visible.ts`],
+                    openTabs: [`${privateDirectory}/open.ts`],
+                    activeFile: `${privateDirectory}/active.ts`,
+                  },
+                  summary: { diffs: [{ file: `${privateDirectory}/summary.ts` }] },
+                },
+                parts: [],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+      expect(result.info).toMatchObject({
+        directory: publicDirectory,
+        path: `${publicDirectory}/session.json`,
+        summary: { diffs: [{ file: `${publicDirectory}/src/app.ts` }] },
+        permission: [{ pattern: `${publicDirectory}/src` }],
+      });
+      expect(result.messages[0]).toMatchObject({
+        info: { path: { cwd: publicDirectory, root: publicDirectory } },
+        parts: [
+          { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+          {
+            state: {
+              input: { filePath: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example` },
+              output: `Updated ${publicDirectory}/src/app.ts and src/relative.ts`,
+              metadata: {
+                filediff: {
+                  file: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                },
+                outputs: [
+                  `${publicDirectory}/result.txt`,
+                  { output: `Read ${publicDirectory}/nested.txt`, relative: 'src/relative.ts' },
+                ],
+              },
+              attachments: [{ url: '', source: { path: `${publicDirectory}/nested.ts` } }],
+            },
+          },
+          { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
+          { text: `Read ${publicDirectory}/src/app.ts and src/relative.ts` },
+        ],
+      });
+      expect(result.messages[1]).toMatchObject({
+        info: {
+          editorContext: {
+            visibleFiles: [`${publicDirectory}/visible.ts`],
+            openTabs: [`${publicDirectory}/open.ts`],
+            activeFile: `${publicDirectory}/active.ts`,
+          },
+          summary: { diffs: [{ file: `${publicDirectory}/summary.ts` }] },
+        },
+      });
+      expect(JSON.stringify(result)).not.toContain(privateDirectory);
+    });
+
+    it.each([
+      ['src/relative.ts', 'src/relative.ts'],
+      ['/workspace/app/src/app.ts', `/cloud-agent/sessions/${sessionId}/src/app.ts`],
+      [
+        '/workspace/app/sessions/ses_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/app/worktrees/worktree_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/user-1/worktrees/worktree_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/org-1/user-1/sessions/ses_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      ['/workspace/application/src/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['/workspace/app/../private/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      [
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [`/cloud-agent/sessions/${sessionId}-other/src/app.ts`, `/cloud-agent/sessions/${sessionId}`],
+      ['/unrecognized/private/src/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['C:\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['\\\\server\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+    ])('projects grouped snapshot file path %s to %s', async (path, expected) => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            info: { id: sessionId, summary: { diffs: [{ file: path }] } },
+            messages: [
+              {
+                info: { id: 'msg_assistant', role: 'assistant' },
+                parts: [
+                  { id: 'prt_patch', type: 'patch', files: [path] },
+                  {
+                    id: 'prt_read',
+                    type: 'tool',
+                    tool: 'read',
+                    state: {
+                      input: {
+                        filePath: path,
+                        file_path: path,
+                        directory: path,
+                        cwd: path,
+                        root: path,
+                        workdir: path,
+                        movePath: path,
+                      },
+                    },
+                  },
+                  {
+                    id: 'prt_grep',
+                    type: 'tool',
+                    tool: 'grep',
+                    state: { input: { path, pattern: 'needle' } },
+                  },
+                  {
+                    id: 'prt_glob',
+                    type: 'tool',
+                    tool: 'glob',
+                    state: { input: { path, pattern: '**/*.ts' } },
+                  },
+                ],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+      expect(result.info).toMatchObject({ summary: { diffs: [{ file: expected }] } });
+      expect(result.messages[0].parts[0]).toMatchObject({ files: [expected] });
+      expect(result.messages[0].parts[1]).toMatchObject({
+        state: {
+          input: {
+            filePath: expected,
+            file_path: expected,
+            directory: expected,
+            cwd: expected,
+            root: expected,
+            workdir: expected,
+            movePath: expected,
+          },
+        },
+      });
+      expect(result.messages[0].parts[2]).toMatchObject({
+        state: { input: { path: expected, pattern: 'needle' } },
+      });
+      expect(result.messages[0].parts[3]).toMatchObject({
+        state: { input: { path: expected, pattern: '**/*.ts' } },
+      });
+    });
+
+    it.each([true, false])(
+      'uses validated snapshot metadata rather than discovering prefixes in free text (metadata=%s)',
+      async hasDirectoryMetadata => {
+        const privateDirectory =
+          '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        fetchSpy.mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              info: { id: sessionId, directory: hasDirectoryMetadata ? privateDirectory : '/' },
+              messages: [
+                {
+                  info: { id: 'msg_user', role: 'user' },
+                  parts: [
+                    { id: 'prt_text', type: 'text', text: `Read ${privateDirectory}/file.txt` },
+                  ],
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        );
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+        expect(result.messages[0].parts[0]).toMatchObject({
+          text: `Read ${hasDirectoryMetadata ? `/cloud-agent/sessions/${sessionId}` : privateDirectory}/file.txt`,
+        });
+      }
+    );
+
+    it('preserves private-path fields unchanged for legacy ungrouped snapshots', async () => {
+      const privateDirectory = '/legacy/unchanged/workspace';
+      const snapshot = {
+        info: { id: sessionId, directory: privateDirectory },
+        messages: [
+          {
+            info: {
+              id: 'msg_legacy',
+              role: 'assistant',
+              path: { cwd: privateDirectory, root: privateDirectory },
+            },
+            parts: [
+              {
+                id: 'prt_legacy',
+                type: 'file',
+                url: `file://${privateDirectory}/legacy.txt`,
+              },
+            ],
+          },
+        ],
+      };
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify(snapshot), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessages({ session_id: sessionId })
+      ).resolves.toEqual(snapshot);
+    });
+
+    it('keeps a grouped sibling without persisted history blank and writable', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 404 }));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessages({ session_id: sessionId })
+      ).resolves.toEqual({ info: {}, messages: [] });
+    });
+
     it('does not fetch a snapshot for a session owned by another user', async () => {
       const caller = await createCallerForUser(otherUser.id);
 
@@ -225,7 +719,85 @@ describe('cli-sessions-v2-router', () => {
 
   describe('getSessionMessagesPage', () => {
     const sessionId = 'ses_messages_page_test_1234';
+    const privateDirectory =
+      '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
     let fetchSessionMessagesPage: jest.MockedFunction<typeof FetchSessionMessagesPageType>;
+
+    function privateAssistantMessage(directory = privateDirectory): KiloSdkStoredMessage {
+      return {
+        info: {
+          id: 'msg_assistant_01',
+          sessionID: sessionId,
+          role: 'assistant',
+          time: { created: 1761000000100 },
+          parentID: 'msg_user_01',
+          modelID: 'kilo/test-model',
+          providerID: 'openrouter',
+          mode: 'code',
+          agent: 'code',
+          path: { cwd: directory, root: directory },
+          cost: 0,
+          tokens: {
+            input: 1,
+            output: 1,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+        },
+        parts: [
+          {
+            id: 'prt_file_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'file',
+            mime: 'text/plain',
+            url: `file://${directory}/attachment.txt`,
+            source: {
+              type: 'file',
+              text: { value: 'attachment', start: 0, end: 10 },
+              path: `${directory}/attachment.txt`,
+            },
+          },
+          {
+            id: 'prt_patch_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'patch',
+            hash: 'patch',
+            files: [`${directory}/src/app.ts`, 'relative.ts'],
+          },
+          {
+            id: 'prt_tool_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'tool',
+            callID: 'call_read',
+            tool: 'read',
+            state: {
+              status: 'completed',
+              input: { filePath: `${directory}/src/app.ts` },
+              output: `Read ${directory}/src/app.ts and src/relative.ts`,
+              title: 'Read file',
+              time: { start: 1761000000100, end: 1761000000200 },
+              metadata: {
+                filediff: { file: `${directory}/src/app.ts` },
+                outputs: [
+                  `${directory}/result.txt`,
+                  { output: `Read ${directory}/nested.txt`, relative: 'src/relative.ts' },
+                ],
+              },
+            },
+          },
+          {
+            id: 'prt_text_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'text',
+            text: `Updated ${directory}/src/app.ts and src/relative.ts`,
+          },
+        ],
+      };
+    }
 
     beforeEach(async () => {
       const { fetchSessionMessagesPage: imported } = jest.requireMock(
@@ -290,11 +862,188 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
+        preparationAttempts: [],
       });
       expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
         limit: 50,
       });
     });
+
+    it('projects the parent session id so a client needs no second session read', async () => {
+      const parentSessionId = 'ses_messages_page_parent_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: parentSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ parent_session_id: parentSessionId })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+      ).resolves.toEqual({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        watermarkEventId: null,
+        parentSessionId,
+        preparationAttempts: [],
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ parent_session_id: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, parentSessionId));
+    });
+
+    it('projects grouped paginated assistant and attachment paths into their own public directory', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const message = privateAssistantMessage();
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: {
+          messages: [message],
+          nextCursor: 'opaque-next-cursor',
+          omittedItemCount: 2,
+        },
+      });
+      const caller = await createCallerForUser(regularUser.id);
+      const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
+
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 50,
+      });
+
+      expect(result).toMatchObject({
+        kiloSessionId: sessionId,
+        history: {
+          messages: [
+            {
+              info: { path: { cwd: publicDirectory, root: publicDirectory } },
+              parts: [
+                { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+                { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
+                {
+                  state: {
+                    input: { filePath: `${publicDirectory}/src/app.ts` },
+                    output: `Read ${publicDirectory}/src/app.ts and src/relative.ts`,
+                    metadata: {
+                      filediff: { file: `${publicDirectory}/src/app.ts` },
+                      outputs: [
+                        `${publicDirectory}/result.txt`,
+                        {
+                          output: `Read ${publicDirectory}/nested.txt`,
+                          relative: 'src/relative.ts',
+                        },
+                      ],
+                    },
+                  },
+                },
+                { text: `Updated ${publicDirectory}/src/app.ts and src/relative.ts` },
+              ],
+            },
+          ],
+          nextCursor: 'opaque-next-cursor',
+          omittedItemCount: 2,
+        },
+        watermarkEventId: null,
+        parentSessionId: null,
+        preparationAttempts: [],
+      });
+      expect(JSON.stringify(result)).not.toContain(privateDirectory);
+      expect(message).toEqual(privateAssistantMessage());
+    });
+
+    it.each([
+      '/workspace/app',
+      '/workspace/user-1/worktrees/worktree_abc',
+      '/workspace/org-1/user-1/sessions/ses_abc',
+    ])(
+      'preserves known workspace filenames in grouped paginated history from %s',
+      async directory => {
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        const message = privateAssistantMessage(directory);
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: sessionId,
+          history: { messages: [message], nextCursor: null, omittedItemCount: 0 },
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId });
+        const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
+
+        expect(result.history).toMatchObject({
+          messages: [
+            {
+              parts: [
+                { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+                { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
+                {
+                  state: {
+                    input: { filePath: `${publicDirectory}/src/app.ts` },
+                    output: `Read ${directory}/src/app.ts and src/relative.ts`,
+                  },
+                },
+                { text: `Updated ${directory}/src/app.ts and src/relative.ts` },
+              ],
+            },
+          ],
+        });
+        expect(message).toEqual(privateAssistantMessage(directory));
+      }
+    );
+
+    it('preserves private-path fields unchanged for ungrouped paginated history', async () => {
+      const message = privateAssistantMessage();
+      const history = { messages: [message], nextCursor: null, omittedItemCount: 0 };
+      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+      ).resolves.toEqual({
+        kiloSessionId: sessionId,
+        history,
+        watermarkEventId: null,
+        parentSessionId: null,
+        preparationAttempts: [],
+      });
+    });
+
+    it.each([null, { kind: 'retryable_failure' as const, phase: 'page_parts' as const }])(
+      'preserves grouped absent or failed history without fabricating a transcript: %j',
+      async history => {
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+        const caller = await createCallerForUser(regularUser.id);
+
+        await expect(
+          caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+        ).resolves.toEqual({
+          kiloSessionId: sessionId,
+          history,
+          watermarkEventId: null,
+          parentSessionId: null,
+          preparationAttempts: [],
+        });
+      }
+    );
 
     it('forwards the continuation cursor to the client', async () => {
       fetchSessionMessagesPage.mockResolvedValueOnce({
@@ -360,6 +1109,31 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('projects the session goal from the snapshot metadata and never leaks the raw metadata', async () => {
+      const goal = { text: 'Ship p7 objective', status: 'paused' as const };
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        sessionMetadata: { 'kilo.goal': goal, 'kilo.somethingPrivate': '/srv/secret' },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 50,
+      });
+
+      expect(result).toEqual({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        watermarkEventId: null,
+        parentSessionId: null,
+        preparationAttempts: [],
+        sessionGoal: goal,
+      });
+      expect(result).not.toHaveProperty('sessionMetadata');
+    });
+
     it('preserves retryable_failure so the UI can offer Retry', async () => {
       const history = {
         kind: 'retryable_failure' as const,
@@ -380,6 +1154,8 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
+        preparationAttempts: [],
       });
     });
 
@@ -406,6 +1182,8 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: sessionId,
           history,
           watermarkEventId: null,
+          parentSessionId: null,
+          preparationAttempts: [],
         });
       }
     });
@@ -426,6 +1204,8 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        parentSessionId: null,
+        preparationAttempts: [],
       });
     });
 
@@ -541,6 +1321,27 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('maps a budget expiry to the retryable SERVICE_UNAVAILABLE', async () => {
+      // The worker did not answer inside the control-plane budget. That is a
+      // stalled upstream, not a defect here, so the client must see the
+      // retryable code instead of INTERNAL_SERVER_ERROR.
+      const timeoutError = new ServiceFetchTimeoutError(8000);
+      fetchSessionMessagesPage.mockRejectedValueOnce(timeoutError);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = await caller.cliSessionsV2
+        .getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+        .catch(err => err);
+
+      expect(rejection).toBeInstanceOf(TRPCError);
+      expect(rejection).toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to fetch session messages page',
+      });
+      // The timeout stays attributable rather than being swallowed.
+      expect(rejection.cause).toBe(timeoutError);
+    });
+
     it('rejects a continuation cursor without a positive limit', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
@@ -566,7 +1367,20 @@ describe('cli-sessions-v2-router', () => {
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
 
-    it('rejects an invalid session id before calling the client', async () => {
+    it('rejects an over-length continuation cursor before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 10,
+          cursor: 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1),
+        })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects a session id that matches no owned row before calling the client', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(
@@ -577,6 +1391,59 @@ describe('cli-sessions-v2-router', () => {
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
+
+    it.each([
+      'ses_123/other',
+      'ses_123 456',
+      'ses_123\u0000456',
+      'ses_123:456',
+      'a'.repeat(256),
+      '',
+    ])(
+      'rejects the session id %j at the tRPC boundary before calling the client',
+      async session_id => {
+        const caller = await createCallerForUser(regularUser.id);
+
+        await expect(
+          caller.cliSessionsV2.getSessionMessagesPage({ session_id, limit: 50 })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['xmw2l780h18', '0b6f5a9e-9a0e-4dbb-9a4a-2a0d9c6f5e11'])(
+      'forwards the stored session id %s to the reader and returns its page',
+      async stored_id => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: stored_id,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+        });
+
+        try {
+          fetchSessionMessagesPage.mockResolvedValueOnce({
+            kiloSessionId: stored_id,
+            history: null,
+          });
+          const caller = await createCallerForUser(regularUser.id);
+
+          await expect(
+            caller.cliSessionsV2.getSessionMessagesPage({ session_id: stored_id, limit: 50 })
+          ).resolves.toEqual({
+            kiloSessionId: stored_id,
+            history: null,
+            watermarkEventId: null,
+            parentSessionId: null,
+            preparationAttempts: [],
+          });
+          expect(fetchSessionMessagesPage).toHaveBeenCalledWith(stored_id, regularUser.id, {
+            limit: 50,
+          });
+        } finally {
+          await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, stored_id));
+        }
+      }
+    );
 
     describe('watermark', () => {
       const cloudAgentSessionId = 'agent_wm123456-1234-1234-1234-123456789abc';
@@ -613,6 +1480,8 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 42,
+          parentSessionId: null,
+          preparationAttempts: [],
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
         // Verify both the watermark and the page were fetched.
@@ -636,6 +1505,8 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
+          preparationAttempts: [],
         });
       });
 
@@ -657,6 +1528,42 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
+          preparationAttempts: [],
+        });
+      });
+
+      it('carries the preparation attempts and fails open to none', async () => {
+        const attempt = {
+          id: 'attempt-1',
+          triggerMessageId: 'msg-1',
+          status: 'completed',
+          startedAt: 1000,
+          completedAt: 2000,
+          revision: 3,
+          steps: [],
+        };
+        mockGetSession.mockResolvedValue({ latestEventId: 42 });
+        mockGetPreparationAttempts.mockResolvedValueOnce([attempt]);
+        fetchSessionMessagesPage.mockResolvedValue({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const read = () =>
+          caller.cliSessionsV2.getSessionMessagesPage({
+            session_id: watermarkSessionId,
+            limit: 50,
+          });
+
+        await expect(read()).resolves.toMatchObject({ preparationAttempts: [attempt] });
+        expect(mockGetPreparationAttempts).toHaveBeenCalledWith(cloudAgentSessionId);
+
+        mockGetPreparationAttempts.mockRejectedValueOnce(new Error('No procedure found'));
+        await expect(read()).resolves.toMatchObject({
+          watermarkEventId: 42,
+          parentSessionId: null,
+          preparationAttempts: [],
         });
       });
 
@@ -683,6 +1590,8 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
+          preparationAttempts: [],
         });
       });
 
@@ -708,25 +1617,19 @@ describe('cli-sessions-v2-router', () => {
         expect(result.watermarkEventId).toBeNull();
       });
 
-      it('resolves getSession before fetchSessionMessagesPage starts (deferred-promise order proof)', async () => {
-        // Deferred promise proves the router awaits getSession before calling
-        // fetchSessionMessagesPage. Without this ordering, the watermark
-        // read could race with the page fetch.
-        let getSessionResolved = false;
+      it('starts fetchSessionMessagesPage while getSession is still unresolved (concurrency proof)', async () => {
+        // A deferred getSession proves the router starts the worker page fetch
+        // concurrently with the watermark read instead of awaiting the
+        // watermark round trip first.
         let resolveGetSession!: (value: { latestEventId: number }) => void;
-
         const getSessionPromise = new Promise<{ latestEventId: number }>(resolve => {
           resolveGetSession = resolve;
         });
         mockGetSession.mockReturnValue(getSessionPromise);
 
         let fetchPageCalled = false;
-        let pageResolved = false;
         fetchSessionMessagesPage.mockImplementationOnce(async () => {
           fetchPageCalled = true;
-          // If getSession hasn't resolved yet, the ordering is broken.
-          expect(getSessionResolved).toBe(true);
-          pageResolved = true;
           return {
             kiloSessionId: watermarkSessionId,
             history: { messages: [], nextCursor: null, omittedItemCount: 0 },
@@ -739,259 +1642,266 @@ describe('cli-sessions-v2-router', () => {
           limit: 50,
         });
 
-        // Let the router reach the getSession call.
-        await new Promise(r => setTimeout(r, 0));
+        // Wait until both operations have started. The watermark read stays
+        // pending (its deferred promise is unresolved), so a serial
+        // implementation would never call fetchSessionMessagesPage here.
+        const deadline = Date.now() + 2000;
+        while (
+          (!fetchPageCalled || mockGetSession.mock.calls.length === 0) &&
+          Date.now() < deadline
+        ) {
+          await new Promise(r => setTimeout(r, 5));
+        }
 
-        // Neither getSession nor fetchPage has resolved yet.
-        expect(getSessionResolved).toBe(false);
-        expect(fetchPageCalled).toBe(false);
+        expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        expect(fetchPageCalled).toBe(true);
 
-        // Resolve getSession — the router must then call fetchSessionMessagesPage.
-        getSessionResolved = true;
+        // Resolve the watermark read and confirm it is still merged into the
+        // page response.
         resolveGetSession({ latestEventId: 99 });
-
         const result = await resultPromise;
-        expect(result.watermarkEventId).toBe(99);
-        expect(pageResolved).toBe(true);
+        expect(result).toEqual({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          watermarkEventId: 99,
+          parentSessionId: null,
+          preparationAttempts: [],
+        });
+      });
+
+      it('maps a page failure to INTERNAL_SERVER_ERROR while the watermark read is still pending', async () => {
+        // The page fetch rejects while the concurrent watermark read is still
+        // in flight. The error contract must be unchanged, and the pending
+        // watermark read must settle without becoming an unhandled rejection.
+        let resolveGetSession!: (value: { latestEventId: number }) => void;
+        mockGetSession.mockReturnValue(
+          new Promise<{ latestEventId: number }>(resolve => {
+            resolveGetSession = resolve;
+          })
+        );
+        fetchSessionMessagesPage.mockRejectedValueOnce(new Error('worker down'));
+
+        const caller = await createCallerForUser(regularUser.id);
+        const rejection = await caller.cliSessionsV2
+          .getSessionMessagesPage({ session_id: watermarkSessionId, limit: 50 })
+          .catch(err => err);
+
+        expect(rejection).toBeInstanceOf(TRPCError);
+        expect(rejection).toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session messages page',
+        });
+
+        // Let the still-pending watermark read settle cleanly.
+        resolveGetSession({ latestEventId: 7 });
+        await new Promise(r => setTimeout(r, 0));
       });
     });
   });
 
-  describe('shareForWebhookTrigger', () => {
-    let triggerId: string;
-    let profileId: string;
-    const testTriggerId = 'test-trigger-share-v2';
+  describe('getSessionDiff', () => {
+    const sessionId = 'ses_session_diff_test_1234';
+    let fetchSessionDiff: jest.MockedFunction<typeof FetchSessionDiffType>;
 
-    beforeAll(async () => {
-      const [profile] = await db
-        .insert(agent_environment_profiles)
-        .values({
-          owned_by_user_id: regularUser.id,
-          name: 'share-test-profile-v2',
-        })
-        .returning({ id: agent_environment_profiles.id });
-      profileId = profile.id;
-
-      const [trigger] = await db
-        .insert(cloud_agent_webhook_triggers)
-        .values({
-          trigger_id: testTriggerId,
-          user_id: regularUser.id,
-          github_repo: 'test/repo',
-          profile_id: profileId,
-        })
-        .returning({ id: cloud_agent_webhook_triggers.id });
-      triggerId = trigger.id;
+    beforeEach(async () => {
+      ({ fetchSessionDiff } = jest.requireMock('@/lib/session-ingest-client') as {
+        fetchSessionDiff: jest.MockedFunction<typeof FetchSessionDiffType>;
+      });
+      fetchSessionDiff.mockReset();
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
     });
 
-    afterAll(async () => {
-      await db
-        .delete(cloud_agent_webhook_triggers)
-        .where(eq(cloud_agent_webhook_triggers.id, triggerId));
-      await db
-        .delete(agent_environment_profiles)
-        .where(eq(agent_environment_profiles.id, profileId));
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
     });
 
-    const v2SessionId = 'ses_test_share_v2_session_1234';
+    it('does not read the diff of a session owned by another user', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })).rejects.toThrow(
+        'Session not found'
+      );
+      expect(fetchSessionDiff).not.toHaveBeenCalled();
+    });
+
+    it('maps stored files and the oversized outcome to typed results', async () => {
+      const files = [
+        {
+          file: 'src/a.ts',
+          patch: 'diff --git a/src/a.ts b/src/a.ts\n',
+          additions: 1,
+          deletions: 0,
+        },
+      ];
+      fetchSessionDiff
+        .mockResolvedValueOnce({ kind: 'value', files })
+        .mockResolvedValueOnce({ kind: 'too_large', maximumBytes: 1 });
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })).resolves.toEqual(
+        { kind: 'files', files }
+      );
+      await expect(caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })).resolves.toEqual(
+        { kind: 'too_large' }
+      );
+    });
+
+    it('surfaces unreadable stored diffs as a retryable server error', async () => {
+      fetchSessionDiff
+        .mockResolvedValueOnce({ kind: 'retryable_failure' })
+        .mockResolvedValueOnce({ kind: 'invalid_data' });
+      const caller = await createCallerForUser(regularUser.id);
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await expect(
+          caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })
+        ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+      }
+    });
+
+    it('maps a budget expiry to the retryable SERVICE_UNAVAILABLE', async () => {
+      fetchSessionDiff.mockRejectedValueOnce(new ServiceFetchTimeoutError(8000));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to fetch session diff',
+      });
+    });
+  });
+
+  describe('runtime session deletion', () => {
+    const sessionId = 'ses_runtime_delete_grouped_1234';
+    const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
     let fetchSpy: jest.SpyInstance;
 
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values({
-        session_id: v2SessionId,
+        session_id: sessionId,
         kilo_user_id: regularUser.id,
-        created_on_platform: 'webhook',
+        cloud_agent_session_id: cloudAgentSessionId,
+        created_on_platform: 'cloud-agent-web',
       });
-
-      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ success: true, share_token: 'test.share.token' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
+      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
     });
 
     afterEach(async () => {
       fetchSpy.mockRestore();
-      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, v2SessionId));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
     });
 
-    it('should share a v2 session via the session-ingest worker', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      const result = await caller.cliSessionsV2.shareForWebhookTrigger({
-        kilo_session_id: v2SessionId,
-        trigger_id: testTriggerId,
-      });
-
-      expect(result).toEqual({
-        share_token: 'test.share.token',
-        session_id: v2SessionId,
-      });
-
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const [fetchUrl, fetchOpts] = fetchSpy.mock.calls[0];
-      expect(fetchUrl).toBe(
-        `https://test-ingest.example.com/api/session/${encodeURIComponent(v2SessionId)}/share`
-      );
-      expect(fetchOpts.method).toBe('POST');
-      expect(fetchOpts.headers.Authorization).toMatch(/^Bearer .+/);
-    });
-
-    it('should throw NOT_FOUND for non-existent v2 session', async () => {
-      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, v2SessionId));
-
-      const caller = await createCallerForUser(regularUser.id);
-
-      await expect(
-        caller.cliSessionsV2.shareForWebhookTrigger({
-          kilo_session_id: 'ses_nonexistent_session_12345',
-          trigger_id: testTriggerId,
-        })
-      ).rejects.toThrow('Session not found');
-    });
-
-    it('should throw INTERNAL_SERVER_ERROR when session-ingest returns an error', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        new Response('Internal Server Error', {
-          status: 500,
-          statusText: 'Internal Server Error',
-        })
-      );
-
-      const caller = await createCallerForUser(regularUser.id);
-
-      await expect(
-        caller.cliSessionsV2.shareForWebhookTrigger({
-          kilo_session_id: v2SessionId,
-          trigger_id: testTriggerId,
-        })
-      ).rejects.toThrow('Session ingest share failed: 500 Internal Server Error');
-    });
-
-    it('should throw NOT_FOUND when session belongs to a different user (personal trigger)', async () => {
-      // Session is created by regularUser (via beforeEach), but otherUser tries to share it
-      // otherUser needs their own trigger to pass verifyWebhookTriggerAccess
-      const [otherProfile] = await db
-        .insert(agent_environment_profiles)
-        .values({
-          owned_by_user_id: otherUser.id,
-          name: 'other-user-share-profile-v2',
-        })
-        .returning({ id: agent_environment_profiles.id });
-
-      const otherTriggerId = 'test-trigger-share-other-user-v2';
-      const [otherTrigger] = await db
-        .insert(cloud_agent_webhook_triggers)
-        .values({
-          trigger_id: otherTriggerId,
-          user_id: otherUser.id,
-          github_repo: 'test/other-repo',
-          profile_id: otherProfile.id,
-        })
-        .returning({ id: cloud_agent_webhook_triggers.id });
-
-      try {
-        const caller = await createCallerForUser(otherUser.id);
-        await expect(
-          caller.cliSessionsV2.shareForWebhookTrigger({
-            kilo_session_id: v2SessionId,
-            trigger_id: otherTriggerId,
-          })
-        ).rejects.toThrow('Session not found');
-      } finally {
-        await db
-          .delete(cloud_agent_webhook_triggers)
-          .where(eq(cloud_agent_webhook_triggers.id, otherTrigger.id));
-        await db
-          .delete(agent_environment_profiles)
-          .where(eq(agent_environment_profiles.id, otherProfile.id));
-      }
-    });
-
-    it('should throw NOT_FOUND when session belongs to a different org (org trigger)', async () => {
-      // Create a session belonging to testOrganization
-      const orgSessionId = 'ses_test_share_v2_org_session_1234';
-      await db.insert(cli_sessions_v2).values({
-        session_id: orgSessionId,
-        kilo_user_id: regularUser.id,
-        created_on_platform: 'webhook',
-        organization_id: testOrganization.id,
-      });
-
-      // Create a second org and an org trigger for it
-      const [otherOrg] = await db
-        .insert(organizations)
-        .values({
-          name: 'Other Org for Share Test V2',
-          created_by_kilo_user_id: regularUser.id,
-        })
-        .returning();
-
-      await db.insert(organization_memberships).values({
-        organization_id: otherOrg.id,
-        kilo_user_id: regularUser.id,
-        role: 'owner',
-      });
-
-      const [otherProfile] = await db
-        .insert(agent_environment_profiles)
-        .values({
-          name: 'other-org-share-profile-v2',
-          owned_by_organization_id: otherOrg.id,
-        })
-        .returning({ id: agent_environment_profiles.id });
-
-      const otherOrgTriggerId = 'test-trigger-share-other-org-v2';
-      const [otherOrgTrigger] = await db
-        .insert(cloud_agent_webhook_triggers)
-        .values({
-          trigger_id: otherOrgTriggerId,
-          organization_id: otherOrg.id,
-          github_repo: 'test/other-org-repo',
-          profile_id: otherProfile.id,
-        })
-        .returning({ id: cloud_agent_webhook_triggers.id });
-
-      try {
+    it.each([
+      [
+        'reports unsuccessful deletion',
+        () => mockDeleteCloudAgentSession.mockResolvedValueOnce({ success: false }),
+      ],
+      [
+        'throws an operational failure',
+        () => mockDeleteCloudAgentSession.mockRejectedValueOnce(new Error('Worker unavailable')),
+      ],
+    ])(
+      'continues ingest cleanup with pending cleanup when the Worker %s',
+      async (_, failDeletion) => {
+        failDeletion();
         const caller = await createCallerForUser(regularUser.id);
-        // Try to share orgSession (belongs to testOrganization) via otherOrg's trigger
-        await expect(
-          caller.cliSessionsV2.shareForWebhookTrigger({
-            kilo_session_id: orgSessionId,
-            trigger_id: otherOrgTriggerId,
-            organization_id: otherOrg.id,
-          })
-        ).rejects.toThrow('Session not found');
-      } finally {
-        await db
-          .delete(cloud_agent_webhook_triggers)
-          .where(eq(cloud_agent_webhook_triggers.id, otherOrgTrigger.id));
-        await db
-          .delete(agent_environment_profiles)
-          .where(eq(agent_environment_profiles.id, otherProfile.id));
-        await db
-          .delete(organization_memberships)
-          .where(
-            and(
-              eq(organization_memberships.organization_id, otherOrg.id),
-              eq(organization_memberships.kilo_user_id, regularUser.id)
-            )
-          );
-        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, orgSessionId));
-        await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
-      }
-    });
 
-    it('should throw NOT_FOUND for non-existent trigger', async () => {
+        await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+          success: true,
+          session_id: sessionId,
+          cleanup: 'pending',
+        });
+
+        expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+          expect.objectContaining({ method: 'DELETE' })
+        );
+        expect(jest.mocked(captureException)).toHaveBeenCalled();
+      }
+    );
+
+    it('continues idempotent ownership cleanup after a typed runtime NOT_FOUND', async () => {
+      const error = new TRPCClientError('Runtime session not found', {
+        result: {
+          error: {
+            code: -32004,
+            message: 'Runtime session not found',
+            data: { code: 'NOT_FOUND', httpStatus: 404 },
+          },
+        },
+      });
+      mockDeleteCloudAgentSession.mockRejectedValueOnce(error);
       const caller = await createCallerForUser(regularUser.id);
 
-      await expect(
-        caller.cliSessionsV2.shareForWebhookTrigger({
-          kilo_session_id: v2SessionId,
-          trigger_id: 'non-existent-trigger',
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+        success: true,
+        session_id: sessionId,
+        cleanup: 'complete',
+      });
+
+      expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
+
+    it('forwards the worker workspace conflict so the client can cascade', async () => {
+      // The ingest client maps the worker's 409 to `CONFLICT` carrying the
+      // worker's error token. The app reads both to delete the workspace next,
+      // so this hop must not replace them with a generic failure.
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'workspace_requires_root_session' }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' },
         })
-      ).rejects.toThrow('Trigger not found');
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'workspace_requires_root_session',
+      });
+    });
+
+    it('maps an ingest delete budget expiry to the retryable answer', async () => {
+      // The ingest delete is the last hop of a mutation the caller already
+      // completed. A worker that never answers must read as retryable upstream,
+      // not as an internal defect. `fetchWithinBudget` rejects with this error
+      // when the hop outlives `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+      fetchSpy.mockRejectedValueOnce(new ServiceFetchTimeoutError(8000));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to delete session',
+      });
+    });
+
+    it('deletes a legacy agent session through ingest without a runtime call', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_session_id: 'agent_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+        success: true,
+        session_id: sessionId,
+        cleanup: 'complete',
+      });
+
+      expect(mockDeleteCloudAgentSession).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
     });
   });
 
@@ -1059,6 +1969,27 @@ describe('cli-sessions-v2-router', () => {
       }
     });
 
+    it('list omits organization sessions after the organization is soft-deleted', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ deleted_at: new Date().toISOString() })
+          .where(eq(organizations.id, testOrganization.id));
+
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(
+          organizationSessionId
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ deleted_at: null })
+          .where(eq(organizations.id, testOrganization.id));
+      }
+    });
+
     it('list preserves platform-admin access without organization membership', async () => {
       const adminSessionId = 'ses_read_auth_admin_1234';
       await db.insert(cli_sessions_v2).values({
@@ -1078,6 +2009,26 @@ describe('cli-sessions-v2-router', () => {
       }
     });
 
+    it('support access removes the platform-admin cross-organization list bypass', async () => {
+      const adminSessionId = 'ses_read_auth_admin_enforce_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: adminSessionId,
+        kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      enableSupportAccess(true);
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(adminSessionId);
+      } finally {
+        enableSupportAccess(false);
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
+      }
+    });
+
     it('search omits organization sessions after their creator loses membership', async () => {
       await db
         .update(cli_sessions_v2)
@@ -1091,7 +2042,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results).toEqual([]);
-      expect(result.total).toBe(0);
     });
 
     it('recentRepositories omits organization sessions after their creator loses membership', async () => {
@@ -1240,6 +2190,81 @@ describe('cli-sessions-v2-router', () => {
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
 
+    it('get answers a spent mobile budget retryably instead of reading the session', async () => {
+      // The mobile procedure budget must not be consumed by this read: the
+      // caller sees a retryable answer instead of an opaque internal error.
+      const caller = await createCallerForUser(regularUser.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session details took too long to load. Try again.',
+      });
+    });
+
+    it('get distinguishes a session owned by another account from one that does not exist', async () => {
+      // The session exists (created for regularUser in beforeEach) but the
+      // caller is a different signed-in account: an access denial, not a
+      // missing row. The session-resume gate and the mobile session route
+      // render these two denials with different copy, so the lookup must say
+      // which one happened.
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: 'ses_never_ingested_unknown_id' })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('get returns the owner row when the same session_id exists for two accounts', async () => {
+      // `cli_sessions_v2`'s primary key is `(session_id, kilo_user_id)`, so a
+      // lookup on `session_id` alone can match more than one row. The owner's
+      // row must win even when the other account's row is the one the lookup
+      // reads first — a first-row lookup denied the owner their own session.
+      // The colliding account's id sorts before every other test user's, so it
+      // is the row a plain `limit(1)` returns, whichever plan the database
+      // picks.
+      const collidingUserId = '0000-cli-sessions-v2-collision';
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, collidingUserId));
+      await insertTestUser({
+        id: collidingUserId,
+        google_user_email: 'cli-sessions-v2-collision@example.com',
+        google_user_name: 'CLI Sessions V2 Collision User',
+      });
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: organizationSessionId,
+          kilo_user_id: collidingUserId,
+          created_on_platform: 'cloud-agent',
+        },
+        {
+          session_id: organizationSessionId,
+          kilo_user_id: regularUser.id,
+          organization_id: testOrganization.id,
+          created_on_platform: 'cloud-agent',
+        },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const session = await caller.cliSessionsV2.get({ session_id: organizationSessionId });
+
+        expect(session.kilo_user_id).toBe(regularUser.id);
+      } finally {
+        await db
+          .delete(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, collidingUserId));
+      }
+    });
+
     it('getByCloudAgentSessionId rejects an organization session after its creator loses membership', async () => {
       await removeCreatorMembership();
 
@@ -1290,6 +2315,20 @@ describe('cli-sessions-v2-router', () => {
         repo: 'repo',
       });
     });
+    it('strips trailing .git after trailing slashes', () => {
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo.git/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+      expect(parseGitHubOwnerRepo('git@github.com:kilo/repo.git/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+    });
     it('parses ssh URLs', () => {
       expect(parseGitHubOwnerRepo('git@github.com:kilo/repo.git')).toEqual({
         owner: 'kilo',
@@ -1310,6 +2349,14 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubOwnerRepo('https://github.com/kilo')).toBeNull();
       expect(parseGitHubOwnerRepo('https://github.com/kilo/repo/tree/main')).toBeNull();
       expect(parseGitHubOwnerRepo('not-a-url')).toBeNull();
+    });
+    it('rejects owner and repo values outside GitHub name charset for every URL form', () => {
+      expect(parseGitHubOwnerRepo('https://github.com/acme.corp/repo')).toBeNull();
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo[1]')).toBeNull();
+      expect(parseGitHubOwnerRepo('git@github.com:acme corp/repo.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('git@github.com:kilo/repo;1.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('ssh://git@github.com/acme.corp/repo.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('ssh://git@github.com/kilo/repo[1].git')).toBeNull();
     });
   });
 
@@ -1350,12 +2397,188 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubPrUrl('https://github.com/kilo/repo/pull/abc')).toBeNull();
       expect(parseGitHubPrUrl('not-a-url')).toBeNull();
     });
+    it('rejects owner and repo values outside GitHub name charset', () => {
+      expect(parseGitHubPrUrl('https://github.com/acme.corp/repo/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/repo[1]/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('git@github.com:acme corp/repo/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/re po/pull/42')).toBeNull();
+    });
+  });
+
+  describe('getWithRuntimeState stored runtime identifiers', () => {
+    const sessionId = 'ses_stored_runtime_identifier';
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      mockGetSession.mockReset();
+      mockGetSession.mockRejectedValue(new Error('not mocked'));
+    });
+
+    it.each([
+      '11111111-1111-4111-8111-111111111111',
+      'agent_legacy',
+      'agent_11111111-1111-4111-8111-111111111111',
+    ])(
+      'returns historical metadata for unsupported runtime identifier %s',
+      async cloudAgentSessionId => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          title: 'Stored conversation',
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: cloudAgentSessionId,
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+        expect(result).toMatchObject({
+          session_id: sessionId,
+          title: 'Stored conversation',
+          cloud_agent_session_id: cloudAgentSessionId,
+          runtimeState: null,
+        });
+      }
+    );
+
+    it.each(['workspace'])(
+      'preserves runtime failures for current %s identifiers',
+      async prefix => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: `${prefix}_11111111-1111-4111-8111-111111111111`,
+        });
+        mockGetSession.mockRejectedValue(new Error('Runtime unavailable'));
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+        ).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session runtime state',
+        });
+      }
+    );
+
+    function workerTrpcError(code: string, httpStatus: number, retryable: boolean) {
+      return new TRPCClientError(`Worker ${code}`, {
+        result: {
+          error: {
+            code: -32603,
+            message: `Worker ${code}`,
+            data: { code, httpStatus, clientError: { code, message: code, retryable } },
+          },
+        },
+      });
+    }
+
+    async function insertWorkspaceSession() {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+        cloud_agent_session_id: 'workspace_11111111-1111-4111-8111-111111111111',
+      });
+    }
+
+    const headersTimeout = Object.assign(new Error('Headers Timeout Error'), {
+      name: 'HeadersTimeoutError',
+    });
+
+    it.each([
+      [
+        'a worker SERVICE_UNAVAILABLE envelope',
+        () => workerTrpcError('SERVICE_UNAVAILABLE', 503, true),
+      ],
+      ['a worker TIMEOUT envelope', () => workerTrpcError('TIMEOUT', 408, true)],
+      ['a worker 504 response', () => workerTrpcError('UNKNOWN', 504, false)],
+      [
+        'a fetch failure',
+        () => TRPCClientError.from(new TypeError('fetch failed', { cause: headersTimeout })),
+      ],
+      ['a headers timeout', () => TRPCClientError.from(headersTimeout)],
+      [
+        'an AbortSignal timeout',
+        () =>
+          TRPCClientError.from(
+            new Error('The operation was aborted', {
+              cause: new DOMException('The operation timed out', 'TimeoutError'),
+            })
+          ),
+      ],
+      [
+        'a non-Error abort cause',
+        () =>
+          TRPCClientError.from(
+            new Error('The operation was aborted', {
+              cause: { name: 'AbortError', message: 'This operation was aborted' },
+            })
+          ),
+      ],
+    ])('reports %s as temporarily unavailable', async (_label, createError) => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(createError());
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session runtime state is temporarily unavailable',
+      });
+    });
+
+    it.each([
+      [
+        'a worker INTERNAL_SERVER_ERROR envelope',
+        () => workerTrpcError('INTERNAL_SERVER_ERROR', 500, true),
+      ],
+      [
+        'an unparseable worker response',
+        () =>
+          TRPCClientError.from(
+            Object.assign(new Error('Unable to transform response from server'), {
+              name: 'TransformResultError',
+            })
+          ),
+      ],
+    ])('keeps %s as an internal error', async (_label, createError) => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(createError());
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch session runtime state',
+      });
+    });
+
+    it('returns metadata without runtime state when the worker reports NOT_FOUND', async () => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(workerTrpcError('NOT_FOUND', 404, false));
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).resolves.toMatchObject({ session_id: sessionId, runtimeState: null });
+    });
+
+    it('checks ownership before reading runtime state', async () => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(workerTrpcError('SERVICE_UNAVAILABLE', 503, true));
+      const caller = await createCallerForUser(otherUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      expect(mockGetSession).not.toHaveBeenCalled();
+    });
   });
 
   describe('getWithRuntimeState associatedPr', () => {
     const sessionWithPr = 'ses_assoc_pr_present_1234';
     const sessionWithoutPr = 'ses_assoc_pr_absent_1234';
+    const sessionBranchOnly = 'ses_assoc_pr_branch_only_1234';
+    const sessionUnverified = 'ses_assoc_pr_unverified_1234';
     const CACHE_GIT_URL = 'https://github.com/kilo/repo';
+    const VERIFIED_AT = '2026-01-01T00:00:00.000Z';
 
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values([
@@ -1365,6 +2588,12 @@ describe('cli-sessions-v2-router', () => {
           created_on_platform: 'cloud-agent',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/42',
+          pr_number: 42,
+          pr_head_ref: 'feature/x',
+          pr_head_sha: 'deadbeefcafe',
+          pr_link_verified_at: VERIFIED_AT,
         },
         {
           session_id: sessionWithoutPr,
@@ -1372,6 +2601,25 @@ describe('cli-sessions-v2-router', () => {
           created_on_platform: 'cloud-agent',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/y',
+        },
+        // Same repo + branch as the cache row, but no verified link of its own.
+        {
+          session_id: sessionBranchOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/x',
+        },
+        // Stored link that has not passed GitHub verification: must not render.
+        {
+          session_id: sessionUnverified,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/42',
+          pr_number: 42,
         },
       ]);
       await db.insert(github_branch_pull_requests).values({
@@ -1397,9 +2645,11 @@ describe('cli-sessions-v2-router', () => {
         );
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithPr));
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithoutPr));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionBranchOnly));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionUnverified));
     });
 
-    it('returns associatedPr when the per-tenant cache has a row for (git_url, git_branch)', async () => {
+    it('returns associatedPr when the session has its own verified link', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
         session_id: sessionWithPr,
@@ -1415,11 +2665,73 @@ describe('cli-sessions-v2-router', () => {
       expect(typeof result.associatedPr?.lastSyncedAt).toBe('string');
     });
 
-    it('returns null associatedPr when the per-tenant cache has no row for (git_url, git_branch)', async () => {
+    it('returns compact webhook observations without exposing raw evidence', async () => {
+      const head = 'a'.repeat(40);
+      await db
+        .update(github_branch_pull_requests)
+        .set({
+          pr_head_sha: head,
+          pr_observations: {
+            version: 1,
+            headSha: head,
+            checks: [
+              { key: 'check:1:test', id: '1', attempt: 1, at: null, phase: 2, failed: true },
+            ],
+            threads: [{ rootId: '2', threadId: null, state: 'unresolved' }],
+            threadsObserved: true,
+            threadsUnknown: false,
+            checksTruncated: false,
+            threadsTruncated: false,
+          },
+        })
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionWithPr });
+      expect(result.associatedPr?.observations).toEqual({
+        checks: {
+          total: 1,
+          failed: 1,
+          passed: 0,
+          pending: 0,
+          skipped: 0,
+          unknown: 0,
+          complete: false,
+        },
+        unresolvedThreads: 1,
+        threadsComplete: false,
+        truncated: false,
+      });
+      expect(result).not.toHaveProperty('pr_observations');
+    });
+
+    it('returns null associatedPr when the session has no stored link', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
         session_id: sessionWithoutPr,
       });
+      expect(result.associatedPr).toBeNull();
+    });
+
+    it('shows no PR for a session with no link even when its branch has a cache row', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionBranchOnly,
+      });
+      expect(result.associatedPr).toBeNull();
+    });
+
+    it('shows no PR for a stored link that has not been verified', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionUnverified,
+      });
+      // An unverified link is a guess. It must never render a badge or an
+      // Open-on-GitHub link, even when the branch cache row exists.
       expect(result.associatedPr).toBeNull();
     });
 
@@ -1444,6 +2756,45 @@ describe('cli-sessions-v2-router', () => {
         await db
           .delete(cli_sessions_v2)
           .where(eq(cli_sessions_v2.session_id, crossTenantSessionId));
+      }
+    });
+
+    it('does not show another user’s PR to an older session on the reused branch', async () => {
+      // otherUser opened pull/700 on the same branch name. regularUser's old
+      // session has no verified link, so it must show nothing.
+      const otherPrSessionId = 'ses_assoc_pr_other_user_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: otherPrSessionId,
+        kilo_user_id: otherUser.id,
+        created_on_platform: 'cloud-agent',
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/x',
+        platform: 'github',
+        pr_url: 'https://github.com/kilo/repo/pull/700',
+        pr_number: 700,
+        pr_link_verified_at: VERIFIED_AT,
+      });
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/x',
+        owned_by_user_id: otherUser.id,
+        pr_url: 'https://github.com/kilo/repo/pull/700',
+        pr_number: 700,
+        pr_state: 'open',
+        pr_title: 'Someone else',
+        pr_head_sha: 'other',
+      });
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({
+          session_id: sessionBranchOnly,
+        });
+        expect(result.associatedPr).toBeNull();
+      } finally {
+        await db
+          .delete(github_branch_pull_requests)
+          .where(eq(github_branch_pull_requests.owned_by_user_id, otherUser.id));
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, otherPrSessionId));
       }
     });
 
@@ -1591,33 +2942,33 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: true,
+        observations: null,
         platform: 'github',
       });
     });
 
-    it('uses the branch fallback when the session has no stored link', async () => {
-      // sessionWithPr has no pr_url; the branch cache row (pull/42) is used.
+    it('shows no PR for a session with no link even when its branch has a cache row', async () => {
+      // sessionBranchOnly sits on feature/x, which has a cache row (pull/42),
+      // but has no verified link of its own: no branch-name fallback.
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
-        session_id: sessionWithPr,
+        session_id: sessionBranchOnly,
       });
 
-      expect(result.associatedPr).toMatchObject({
-        url: 'https://github.com/kilo/repo/pull/42',
-        number: 42,
-        state: 'open',
-        platform: 'github',
-      });
+      expect(result.associatedPr).toBeNull();
     });
   });
 
   describe('list / search associatedPr', () => {
-    // Same fixtures as the getWithRuntimeState block: one session with a
-    // matching cache row, one without. Both sessions are recent so they fall
-    // inside the default `updatedSince` window of `list`.
+    // Same fixtures as the getWithRuntimeState block: one session with its own
+    // verified link + matching cache row, one without. Both sessions are recent
+    // so they fall inside the default `updatedSince` window of `list`.
     const sessionWithPr = 'ses_list_pr_present_5678';
     const sessionWithoutPr = 'ses_list_pr_absent_5678';
+    const sessionBranchOnly = 'ses_list_pr_branch_only_5678';
+    const sessionUnverified = 'ses_list_pr_unverified_5678';
     const CACHE_GIT_URL = 'https://github.com/kilo/repo';
+    const VERIFIED_AT = '2026-01-01T00:00:00.000Z';
 
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values([
@@ -1628,6 +2979,12 @@ describe('cli-sessions-v2-router', () => {
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/list-x',
           title: 'session with PR',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77',
+          pr_number: 77,
+          pr_head_ref: 'feature/list-x',
+          pr_head_sha: 'cafef00d',
+          pr_link_verified_at: VERIFIED_AT,
         },
         {
           session_id: sessionWithoutPr,
@@ -1636,6 +2993,25 @@ describe('cli-sessions-v2-router', () => {
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/list-y',
           title: 'session without PR',
+        },
+        {
+          session_id: sessionBranchOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/list-x',
+          title: 'session branch only',
+        },
+        {
+          session_id: sessionUnverified,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/list-x',
+          title: 'session unverified link',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77',
+          pr_number: 77,
         },
       ]);
       await db.insert(github_branch_pull_requests).values({
@@ -1661,14 +3037,18 @@ describe('cli-sessions-v2-router', () => {
         );
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithPr));
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithoutPr));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionBranchOnly));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionUnverified));
     });
 
-    it('list returns associatedPr per row from the per-tenant cache', async () => {
+    it('list returns associatedPr per row: live for a verified link, nothing for an unverified one', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.list({});
 
       const withPr = result.cliSessions.find(s => s.session_id === sessionWithPr);
       const withoutPr = result.cliSessions.find(s => s.session_id === sessionWithoutPr);
+      const branchOnly = result.cliSessions.find(s => s.session_id === sessionBranchOnly);
+      const unverified = result.cliSessions.find(s => s.session_id === sessionUnverified);
 
       expect(withPr?.associatedPr).toMatchObject({
         url: 'https://github.com/kilo/repo/pull/77',
@@ -1680,6 +3060,34 @@ describe('cli-sessions-v2-router', () => {
       });
       expect(typeof withPr?.associatedPr?.lastSyncedAt).toBe('string');
       expect(withoutPr?.associatedPr).toBeNull();
+      // Branch name + repo + tenant is not evidence.
+      expect(branchOnly?.associatedPr).toBeNull();
+      // An unverified stored link must not render a badge or an Open-on-GitHub
+      // link, even when the branch cache row exists.
+      expect(unverified?.associatedPr).toBeNull();
+      expect(unverified?.prLinkVerificationKey).toEqual(expect.any(String));
+      expect(withPr?.prLinkVerificationKey).toBeUndefined();
+      expect(withoutPr?.prLinkVerificationKey).toBeUndefined();
+      expect(branchOnly?.prLinkVerificationKey).toBeUndefined();
+      expect(unverified).not.toHaveProperty('session_pr_url');
+      expect(unverified).not.toHaveProperty('session_pr_head_ref');
+      expect(unverified).not.toHaveProperty('session_pr_head_sha');
+    });
+
+    it('search and get emit the same candidate key as list without displaying an unverified PR', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const list = await caller.cliSessionsV2.list({});
+      const search = await caller.cliSessionsV2.search({
+        search_string: 'session unverified link',
+      });
+      const session = await caller.cliSessionsV2.get({ session_id: sessionUnverified });
+      const listRow = list.cliSessions.find(row => row.session_id === sessionUnverified);
+      const searchRow = search.results.find(row => row.session_id === sessionUnverified);
+
+      expect(listRow?.prLinkVerificationKey).toEqual(expect.any(String));
+      expect(searchRow?.prLinkVerificationKey).toBe(listRow?.prLinkVerificationKey);
+      expect(session.prLinkVerificationKey).toBe(listRow?.prLinkVerificationKey);
+      expect(searchRow?.associatedPr).toBeNull();
     });
 
     it('list returns live cache fields when the stored link has a trailing subpath', async () => {
@@ -1876,6 +3284,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
@@ -1902,35 +3311,37 @@ describe('cli-sessions-v2-router', () => {
         number: 999,
         state: 'unknown',
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
 
-    it('list row count does not increase when two cache rows share a PR URL', async () => {
-      // Two sessions on different branches whose cache rows point at the same
-      // PR URL. The JOIN is on (git_url, git_branch, tenant), not pr_url, so
-      // each session must appear exactly once (no fan-out).
-      const sharedPrUrl = 'https://github.com/kilo/repo/pull/77';
-      const secondSessionId = 'ses_list_pr_shared_url_5678';
-      const secondBranch = 'feature/list-b';
-
+    it('list shows each of several sessions on one repo+branch only its own PR', async () => {
+      // Two sessions share one repo + branch name but each has its own verified
+      // link and its own cache row. The join is by PR identity, so neither
+      // session can pick up the other's PR.
+      const secondSessionId = 'ses_list_pr_same_branch_5678';
       await db.insert(cli_sessions_v2).values({
         session_id: secondSessionId,
         kilo_user_id: regularUser.id,
         created_on_platform: 'cloud-agent',
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
-        title: 'second session shared PR',
+        git_branch: 'feature/list-x',
+        title: 'second session same branch',
+        platform: 'github',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_link_verified_at: VERIFIED_AT,
       });
       await db.insert(github_branch_pull_requests).values({
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
+        git_branch: 'feature/list-x',
         owned_by_user_id: regularUser.id,
-        pr_url: sharedPrUrl,
-        pr_number: 77,
-        pr_state: 'open',
-        pr_title: 'List endpoint feature',
-        pr_head_sha: 'cafef00d',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_state: 'closed',
+        pr_title: 'Second session PR',
+        pr_head_sha: 'secondsha',
       });
 
       try {
@@ -1940,62 +3351,237 @@ describe('cli-sessions-v2-router', () => {
         const ids = result.cliSessions.map(s => s.session_id);
         expect(ids.filter(id => id === sessionWithPr)).toHaveLength(1);
         expect(ids.filter(id => id === secondSessionId)).toHaveLength(1);
+        expect(
+          result.cliSessions.find(s => s.session_id === sessionWithPr)?.associatedPr
+        ).toMatchObject({ number: 77 });
+        expect(
+          result.cliSessions.find(s => s.session_id === secondSessionId)?.associatedPr
+        ).toMatchObject({ number: 88, state: 'closed' });
       } finally {
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, secondSessionId));
+        await db
+          .delete(github_branch_pull_requests)
+          .where(eq(github_branch_pull_requests.pr_number, 88));
       }
     });
 
-    it('search row count does not increase when two cache rows share a PR URL', async () => {
-      // Same fan-out guard as the list case: the JOIN is on (git_url,
-      // git_branch, tenant), not pr_url, so each session must appear exactly
-      // once in search results even when both cache rows point at one PR URL.
-      const sharedPrUrl = 'https://github.com/kilo/repo/pull/77';
-      const secondSessionId = 'ses_search_pr_shared_url_5678';
-      const secondBranch = 'feature/list-c';
-
+    it('search shows each of several sessions on one repo+branch only its own PR', async () => {
+      const secondSessionId = 'ses_search_pr_same_branch_5678';
       await db.insert(cli_sessions_v2).values({
         session_id: secondSessionId,
         kilo_user_id: regularUser.id,
         created_on_platform: 'cloud-agent',
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
-        title: 'second session shared PR',
+        git_branch: 'feature/list-x',
+        title: 'second session same branch',
+        platform: 'github',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_link_verified_at: VERIFIED_AT,
       });
       await db.insert(github_branch_pull_requests).values({
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
+        git_branch: 'feature/list-x',
         owned_by_user_id: regularUser.id,
-        pr_url: sharedPrUrl,
-        pr_number: 77,
-        pr_state: 'open',
-        pr_title: 'List endpoint feature',
-        pr_head_sha: 'cafef00d',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_state: 'closed',
+        pr_title: 'Second session PR',
+        pr_head_sha: 'secondsha',
       });
 
       try {
         const caller = await createCallerForUser(regularUser.id);
         const result = await caller.cliSessionsV2.search({ search_string: 'session' });
 
-        const ids = result.results.map(s => s.session_id);
-        expect(ids.filter(id => id === sessionWithPr)).toHaveLength(1);
-        expect(ids.filter(id => id === secondSessionId)).toHaveLength(1);
+        expect(
+          result.results.find(s => s.session_id === sessionWithPr)?.associatedPr
+        ).toMatchObject({ number: 77 });
+        expect(
+          result.results.find(s => s.session_id === secondSessionId)?.associatedPr
+        ).toMatchObject({ number: 88, state: 'closed' });
       } finally {
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, secondSessionId));
+        await db
+          .delete(github_branch_pull_requests)
+          .where(eq(github_branch_pull_requests.pr_number, 88));
       }
+    });
+
+    it('list shows no PR for a session whose branch name is reused in another repo', async () => {
+      const otherRepoSessionId = 'ses_list_pr_other_repo_5678';
+      await db.insert(cli_sessions_v2).values({
+        session_id: otherRepoSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+        git_url: 'https://github.com/kilo/other-repo',
+        git_branch: 'feature/list-x',
+        title: 'other repo same branch',
+      });
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.list({});
+        expect(
+          result.cliSessions.find(s => s.session_id === otherRepoSessionId)?.associatedPr
+        ).toBeNull();
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, otherRepoSessionId));
+      }
+    });
+  });
+
+  describe('search provenance', () => {
+    const sessionByUrl = 'ses_search_prov_url_0001';
+    const sessionByBranch = 'ses_search_prov_branch_0001';
+    const sessionByPr = 'ses_search_prov_pr_0001';
+    const sessionTitleOnly = 'ses_search_prov_title_0001';
+    const allProvIds = [sessionByUrl, sessionByBranch, sessionByPr, sessionTitleOnly];
+    const CACHE_GIT_URL = 'https://github.com/kilo/search-provenance-repo';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sessionByUrl,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'url session',
+          git_url: 'https://github.com/kilo/alpha-repo',
+          git_branch: 'main',
+        },
+        {
+          session_id: sessionByBranch,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'branch session',
+          git_url: 'https://github.com/kilo/beta-repo',
+          git_branch: 'feature/awesome-work',
+        },
+        {
+          session_id: sessionByPr,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'pr session',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/pr-x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/search-provenance-repo/pull/42',
+          pr_number: 42,
+          pr_link_verified_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          session_id: sessionTitleOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'title only session',
+          git_url: 'https://github.com/kilo/gamma-repo',
+          git_branch: 'main',
+        },
+      ]);
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/pr-x',
+        owned_by_user_id: regularUser.id,
+        pr_url: 'https://github.com/kilo/search-provenance-repo/pull/42',
+        pr_number: 42,
+        pr_state: 'open',
+        pr_title: 'Searchable PR title',
+        pr_head_sha: 'beef42',
+      });
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(github_branch_pull_requests)
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allProvIds));
+    });
+
+    it('matches by git_url substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'alpha-repo' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByUrl]);
+    });
+
+    it('matches by git_branch substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'awesome-work' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByBranch]);
+    });
+
+    it('matches by pr_title substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'Searchable PR' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('matches by exact pr_number 42', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '42' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('matches by #42 after stripping one leading hash', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '#42' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('does not match a title-only session with no provenance for 42', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '42' });
+      expect(result.results.map(s => s.session_id)).not.toContain(sessionTitleOnly);
+    });
+
+    it('returns no matches for a hash-only needle', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '#' });
+      expect(result.results).toEqual([]);
+    });
+
+    it('returns no matches for a whitespace-only needle', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '  ' });
+      expect(result.results).toEqual([]);
     });
   });
 
   describe('refreshAssociatedPullRequest', () => {
     const sessionId = 'ses_refresh_pr_1234';
     // Session git_url is stored in the canonical normalized shape that the
-    // queue-consumer would persist for a new session, so the tenant-scoped
-    // cache JOIN can match.
+    // queue-consumer would persist for a new session, so the identity-scoped
+    // cache upsert can match.
     const SESSION_GIT_URL = 'https://github.com/kilo/repo';
     const SESSION_BRANCH = 'feature/z';
     // The session's stored PR link, set by the CLI when it links a PR.
     const SESSION_PR_URL = 'https://github.com/kilo/repo/pull/7';
     const SESSION_PR_NUMBER = 7;
     let integrationId: string;
+
+    // The GitHub facts a correct fetch returns for the session's own PR.
+    type PrFacts = NonNullable<Awaited<ReturnType<typeof githubAdapter.fetchPullRequestByNumber>>>;
+    function ownPrFacts(overrides: Partial<PrFacts> = {}): PrFacts {
+      return {
+        number: SESSION_PR_NUMBER,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Feature Z',
+        headSha: 'abc123',
+        updatedAt: '2026-01-01T00:00:00Z',
+        baseRepoFullName: 'kilo/repo',
+        headRepoFullName: 'kilo/repo',
+        headRef: SESSION_BRANCH,
+        baseRef: 'main',
+        stackNumber: 2,
+        stackPosition: 1,
+        stackSize: 3,
+        ...overrides,
+      };
+    }
 
     async function readCacheRows(opts: { orgId?: string | null } = {}) {
       const tenantClause = opts.orgId
@@ -2023,6 +3609,7 @@ describe('cli-sessions-v2-router', () => {
         platform: 'github',
         pr_url: SESSION_PR_URL,
         pr_number: SESSION_PR_NUMBER,
+        pr_head_ref: SESSION_BRANCH,
       });
 
       const [integration] = await db
@@ -2030,6 +3617,7 @@ describe('cli-sessions-v2-router', () => {
         .values({
           owned_by_user_id: regularUser.id,
           platform: 'github',
+          github_connection_role: 'workflow',
           integration_type: 'app',
           platform_installation_id: '12345',
           github_app_type: 'standard',
@@ -2039,6 +3627,11 @@ describe('cli-sessions-v2-router', () => {
       integrationId = integration.id;
 
       mockedFetchPullRequestByNumber.mockReset();
+      mockedFetchPullRequestObservations.mockReset().mockResolvedValue({
+        observations: createEmptyPrObservations(),
+        reviewDecision: 'approved',
+        reviewDecisionFetched: true,
+      });
     });
 
     afterEach(async () => {
@@ -2056,15 +3649,13 @@ describe('cli-sessions-v2-router', () => {
       await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
     });
 
-    it('upserts when GitHub returns the stored-link PR', async () => {
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'abc123',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+    it("verifies and shows the session's own PR with live state and review decision", async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: 'abc123' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const fetched = ownPrFacts();
+      mockedFetchPullRequestByNumber.mockResolvedValue(fetched);
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
@@ -2078,37 +3669,279 @@ describe('cli-sessions-v2-router', () => {
         repo: 'repo',
         number: 7,
         appType: 'standard',
+        includeCommits: true,
+        expectedHeadSha: 'abc123',
+        signal: expect.any(AbortSignal),
       });
+      expect(mockedFetchPullRequestObservations).toHaveBeenCalledTimes(1);
+      expect(mockedFetchPullRequestObservations).toHaveBeenCalledWith({
+        installationId: '12345',
+        integrationId,
+        owner: 'kilo',
+        repo: 'repo',
+        number: 7,
+        appType: 'standard',
+        pullRequest: fetched,
+        existing: null,
+        signal: expect.any(AbortSignal),
+      });
+      expect(mockedFetchPullRequestObservations.mock.calls[0][0].pullRequest).toBe(fetched);
       expect(result.associatedPr).toMatchObject({
         url: SESSION_PR_URL,
         number: 7,
         state: 'open',
         title: 'Feature Z',
         headSha: 'abc123',
+        reviewDecision: 'approved',
+        reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
+        baseRef: 'main',
+        stackNumber: 2,
+        stackPosition: 1,
+        stackSize: 3,
       });
 
       const [persisted] = await readCacheRows();
       expect(persisted).toMatchObject({
         git_url: SESSION_GIT_URL,
-        git_branch: SESSION_BRANCH,
         owned_by_user_id: regularUser.id,
         owned_by_organization_id: null,
         pr_url: SESSION_PR_URL,
         pr_number: 7,
         pr_state: 'open',
       });
+
+      const [sessionRow] = await db
+        .select({ verifiedAt: cli_sessions_v2.pr_link_verified_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(sessionRow.verifiedAt).not.toBeNull();
     });
 
-    it('writes one cache row per (url, branch, tenant) across repeated refreshes', async () => {
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'x',
-        headSha: 's1',
-        updatedAt: '2026-01-01T00:00:00Z',
+    it('persists fetched observations and returns their derived summary', async () => {
+      const head = 'd'.repeat(40);
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: head })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const observations: PrObservations = {
+        ...createEmptyPrObservations(),
+        headSha: head,
+        checksObserved: true,
+        checksComplete: true,
+        checks: [
+          {
+            key: 'check:1:ci',
+            id: '1',
+            attempt: 1,
+            at: null,
+            phase: 2,
+            failed: false,
+            outcome: 'passed',
+          },
+        ],
+        threadsObserved: true,
+        threadsComplete: true,
+        threads: [{ rootId: '2', threadId: 'thread-1', state: 'unresolved' }],
+      };
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: head }));
+      mockedFetchPullRequestObservations.mockResolvedValue({
+        observations,
+        reviewDecision: 'approved',
+        reviewDecisionFetched: true,
       });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr?.observations).toEqual({
+        checks: {
+          total: 1,
+          failed: 0,
+          passed: 1,
+          pending: 0,
+          skipped: 0,
+          unknown: 0,
+          complete: true,
+        },
+        unresolvedThreads: 1,
+        truncated: false,
+        threadsComplete: true,
+      });
+      const [persisted] = await readCacheRows();
+      expect(persisted.pr_observations).toEqual(observations);
+      expect(persisted.pr_head_sha).toBe(head);
+    });
+
+    it('preserves an existing review decision when the observation helper cannot fetch reviews', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_link_verified_at: new Date().toISOString() })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        pr_url: SESSION_PR_URL,
+        pr_number: SESSION_PR_NUMBER,
+        pr_state: 'open',
+        pr_title: 'Existing cache title',
+        pr_head_sha: 'old-sha',
+        pr_review_decision: 'approved',
+        pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
+      });
+      const fetched = ownPrFacts();
+      mockedFetchPullRequestByNumber.mockResolvedValue(fetched);
+      mockedFetchPullRequestObservations.mockResolvedValue({
+        observations: createEmptyPrObservations(),
+        reviewDecision: null,
+        reviewDecisionFetched: false,
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr?.reviewDecision).toBe('approved');
+      const [persisted] = await readCacheRows();
+      expect(persisted).toMatchObject({
+        pr_head_sha: fetched.headSha,
+        pr_review_decision: 'approved',
+      });
+    });
+
+    it('rejects a PR whose head repository is a fork', async () => {
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headRepoFullName: 'forkowner/repo' })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+      const [sessionRow] = await db
+        .select({ verifiedAt: cli_sessions_v2.pr_link_verified_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(sessionRow.verifiedAt).toBeNull();
+    });
+
+    it('rejects a PR opened from a different head ref', async () => {
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headRef: 'someone-elses-branch' })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('rejects a stored link whose URL names another repository without calling GitHub', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_url: 'https://github.com/other/thing/pull/7' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('rejects when GitHub does not confirm the session head SHA', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: 'session-sha' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headSha: 'other-head', commitShas: ['a', 'b'] })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('accepts when the session head SHA is one of the PR commits', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: 'session-sha' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headSha: 'other-head', commitShas: ['a', 'session-sha'] })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+      expect(await readCacheRows()).toHaveLength(1);
+    });
+
+    it('verifies the PR when its head ref is the branch the session reported pushing', async () => {
+      // The session recorded `feature/z` as its branch but pushed the PR from
+      // `feature/pushed`, which is the branch the CLI reported with the link.
+      const pushedBranch = 'feature/pushed';
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_ref: pushedBranch, pr_head_sha: 'abc123' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headRef: pushedBranch, headSha: 'abc123' })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+      expect(await readCacheRows()).toHaveLength(1);
+      const [sessionRow] = await db
+        .select({ verifiedAt: cli_sessions_v2.pr_link_verified_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(sessionRow.verifiedAt).not.toBeNull();
+    });
+
+    it('returns null for a non-GitHub session without calling GitHub', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ platform: 'gitlab' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toBeNull();
+    });
+
+    it('shows nothing and does not call GitHub when the repo/branch identity is missing', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ git_url: null, git_branch: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('keeps one cache row per PR identity across repeated refreshes', async () => {
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: 's1' }));
 
       const caller = await createCallerForUser(regularUser.id);
       await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
@@ -2120,19 +3953,11 @@ describe('cli-sessions-v2-router', () => {
         .where(
           and(
             eq(github_branch_pull_requests.git_url, SESSION_GIT_URL),
-            eq(github_branch_pull_requests.git_branch, SESSION_BRANCH),
             eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
           )
         );
 
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'x',
-        headSha: 's2',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: 's2' }));
       await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
 
       const rows = await readCacheRows();
@@ -2140,8 +3965,8 @@ describe('cli-sessions-v2-router', () => {
       expect(rows[0].pr_head_sha).toBe('s2');
     });
 
-    it('does not overwrite a different branch-cache PR when refreshing by number', async () => {
-      // Branch cache holds a DIFFERENT PR than the session's stored link.
+    it('keeps a different branch-cache PR and adds the session PR keyed by identity', async () => {
+      // The cache already holds a DIFFERENT PR (99) on the same branch.
       await db.insert(github_branch_pull_requests).values({
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
@@ -2154,104 +3979,33 @@ describe('cli-sessions-v2-router', () => {
         pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
       });
 
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'abc123',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts());
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
         sessionId,
       });
 
-      // Fetched the session's own PR by number...
-      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledWith({
-        installationId: 12345,
-        owner: 'kilo',
-        repo: 'repo',
-        number: 7,
-        appType: 'standard',
-      });
-      // ...and returned it for this session only.
       expect(result.associatedPr).toMatchObject({
         url: SESSION_PR_URL,
         number: 7,
         state: 'open',
       });
 
-      // The branch cache row for the other PR is untouched.
+      // Both PRs coexist: the identity-keyed cache row for PR 7 is added and
+      // the unrelated PR 99 row is untouched.
       const rows = await readCacheRows();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        pr_url: 'https://github.com/kilo/repo/pull/99',
-        pr_number: 99,
-      });
+      expect(rows).toHaveLength(2);
+      const byNumber = new Map(rows.map(row => [row.pr_number, row]));
+      expect(byNumber.get(7)).toMatchObject({ pr_url: SESSION_PR_URL, pr_number: 7 });
+      expect(byNumber.get(99)).toMatchObject({ pr_url: 'https://github.com/kilo/repo/pull/99' });
     });
 
-    it('returns the pending partial for a non-GitHub session without calling GitHub', async () => {
+    it('short-circuits on the recent-sync throttle when the session link is verified and matches', async () => {
       await db
         .update(cli_sessions_v2)
-        .set({ platform: 'gitlab' })
+        .set({ pr_link_verified_at: new Date().toISOString() })
         .where(eq(cli_sessions_v2.session_id, sessionId));
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
-        sessionId,
-      });
-
-      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
-      expect(result.associatedPr).toMatchObject({
-        state: 'unknown',
-        title: null,
-        headSha: null,
-        reviewDecision: null,
-        reviewDecisionPending: true,
-        platform: 'gitlab',
-      });
-    });
-
-    it('fetches by number but does not write the cache when git_url/git_branch are missing', async () => {
-      await db
-        .update(cli_sessions_v2)
-        .set({ git_url: null, git_branch: null })
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'abc123',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
-        sessionId,
-      });
-
-      // Fetch-by-number still runs (pr_url parses)...
-      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledTimes(1);
-      // ...returns the fetched payload for this session only...
-      expect(result.associatedPr).toMatchObject({
-        url: SESSION_PR_URL,
-        number: 7,
-        state: 'open',
-        platform: 'github',
-      });
-      // ...with reviewDecisionPending false: no cache row is written on this
-      // path, so no batch worker can ever clear a pending flag.
-      expect(result.associatedPr?.reviewDecisionPending).toBe(false);
-      // ...and writes no cache row (no branch identity).
-      const rows = await readCacheRows();
-      expect(rows).toHaveLength(0);
-    });
-
-    it('short-circuits on the recent-sync throttle when the cache matches the stored link', async () => {
       await db.insert(github_branch_pull_requests).values({
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
@@ -2292,14 +4046,7 @@ describe('cli-sessions-v2-router', () => {
         .set({ pr_url: 'https://github.com/kilo/repo/pull/7/files' })
         .where(eq(cli_sessions_v2.session_id, sessionId));
 
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'new-sha',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: 'new-sha' }));
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
@@ -2308,8 +4055,6 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
 
-      // The write guard treated the subpath link as the same PR and updated the
-      // existing row in place — no duplicate row and no stale fields.
       const rows = await readCacheRows();
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -2383,12 +4128,14 @@ describe('cli-sessions-v2-router', () => {
 
       await db
         .update(cli_sessions_v2)
-        .set({ organization_id: otherOrg.id })
+        .set({
+          organization_id: otherOrg.id,
+          pr_link_verified_at: new Date().toISOString(),
+        })
         .where(eq(cli_sessions_v2.session_id, sessionId));
 
-      // Fresh sentinel row owned by the *org* that would normally short-circuit
-      // via the throttle. Using owned_by_organization_id matches how the JOIN
-      // would attach the PR to the now-org-scoped session.
+      // Fresh cache row owned by the *org* that would normally short-circuit
+      // via the throttle.
       await db.insert(github_branch_pull_requests).values({
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
@@ -2411,7 +4158,7 @@ describe('cli-sessions-v2-router', () => {
       } finally {
         await db
           .update(cli_sessions_v2)
-          .set({ organization_id: null })
+          .set({ organization_id: null, pr_link_verified_at: null })
           .where(eq(cli_sessions_v2.session_id, sessionId));
         await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
       }
@@ -2520,7 +4267,6 @@ describe('cli-sessions-v2-router', () => {
       const result = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
 
       expect(result.results).toHaveLength(2);
-      expect(result.total).toBe(3);
       expect(result.offset).toBe(0);
       expect(result.nextCursor).toBe(2);
       // Default sort is updated_at descending.
@@ -2539,7 +4285,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(page2.results).toHaveLength(1);
-      expect(page2.total).toBe(3);
       expect(page2.offset).toBe(2);
       expect(page2.nextCursor).toBeNull();
       expect(page1Ids.has(page2.results[0].session_id)).toBe(false);
@@ -2568,28 +4313,21 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results).toHaveLength(2);
-      expect(result.total).toBe(3);
       expect(result.offset).toBe(0);
     });
 
-    it('returns null nextCursor on an empty page even when nextOffset < total', () => {
-      // Empty page: results.length === 0, nextOffset === pageOffset.
-      // When pageOffset (2) < total (3), the naive formula
-      //   nextOffset < total ? nextOffset : null
-      // returns 2 — a non-null cursor that would cause an infinite loop.
-      // The empty-results guard prevents this.
-      const resultsLength = 0;
-      const nextOffset = 2;
-      const total = 3;
+    it('returns null nextCursor on a page past the last row', async () => {
+      // A cursor beyond the result set yields an empty page. `hasMore` is
+      // false there, so paging stops instead of handing back the same cursor.
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 4,
+      });
 
-      const withGuard = computeSearchNextCursor(resultsLength, nextOffset, total);
-      expect(withGuard).toBeNull();
-
-      // Old formula:  nextOffset < total → truthy, returns nextOffset (wrong)
-      // Empty guard:  resultsLength > 0 → false → null (correct)
-      const oldFormula: number | null = nextOffset < total ? nextOffset : null;
-      expect(oldFormula).toBe(nextOffset);
-      expect(withGuard).not.toBe(oldFormula);
+      expect(result.results).toEqual([]);
+      expect(result.nextCursor).toBeNull();
     });
   });
 
@@ -2728,7 +4466,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results.map(session => session.session_id)).not.toContain(placeholderId);
-      expect(result.total).toBe(0);
     });
   });
 
@@ -2786,6 +4523,76 @@ describe('cli-sessions-v2-router', () => {
       expect(result.results.find(session => session.session_id === sharedId)).not.toHaveProperty(
         'public_id'
       );
+    });
+  });
+
+  describe('share result', () => {
+    const sessionId = 'ses_share_public_id_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Shared session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns the public_id the worker wrote beside the token', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            share_token: 'test.share.token',
+            public_id: '22222222-2222-4222-8222-222222222222',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).resolves.toEqual({
+          share_token: 'test.share.token',
+          public_id: '22222222-2222-4222-8222-222222222222',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('share size result', () => {
+    const sessionId = 'ses_share_oversized_info_0001';
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Large session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns PAYLOAD_TOO_LARGE with the size message from an HTTP 413', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: false, error: 'share_snapshot_too_large' }), {
+          status: 413,
+        })
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Session details are too large to share. Existing links are unchanged.',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 

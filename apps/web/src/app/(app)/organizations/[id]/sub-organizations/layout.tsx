@@ -1,13 +1,10 @@
 import type { ReactNode } from 'react';
-import { and, eq, isNull } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 
-import { organizations } from '@kilocode/db/schema';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { db } from '@/lib/drizzle';
 
-async function AuthorizedSubOrganizationsLayout({
+export function AuthorizedSubOrganizationsLayout({
   organizationId,
   parentOrganizationId,
   children,
@@ -17,18 +14,6 @@ async function AuthorizedSubOrganizationsLayout({
   children: ReactNode;
 }) {
   if (parentOrganizationId !== null) redirect(`/organizations/${organizationId}`);
-
-  const [child] = await db
-    .select({ id: organizations.id })
-    .from(organizations)
-    .where(
-      and(
-        eq(organizations.parent_organization_id, organizationId),
-        isNull(organizations.deleted_at)
-      )
-    )
-    .limit(1);
-  if (!child) redirect(`/organizations/${organizationId}`);
 
   return children;
 }

@@ -1,7 +1,6 @@
 import type { ClientConfig } from 'pg';
 
 export function computeDatabaseUrl(): string {
-  // Check if we should use production database
   const useProductionDb = process.env.USE_PRODUCTION_DB === 'true';
 
   const postgresUrl = useProductionDb
@@ -14,30 +13,75 @@ export function computeDatabaseUrl(): string {
     );
   }
 
-  return process.env.NODE_ENV === 'test'
-    ? `${postgresUrl}-${process.env.JEST_WORKER_ID || '1'}`
-    : postgresUrl;
+  if (process.env.NODE_ENV !== 'test') {
+    return postgresUrl;
+  }
+
+  // Isolate each Jest worker's database. Append to the path segment so query
+  // parameters such as sslmode stay valid instead of becoming part of the
+  // last parameter's value.
+  const workerId = process.env.JEST_WORKER_ID || '1';
+  const url = new URL(postgresUrl);
+  url.pathname = `${url.pathname}-${workerId}`;
+  return url.toString();
 }
 
+/**
+ * WHATWG `URL` keeps the user, password, host and database name percent-encoded, while `pg` only
+ * decodes parts it parses itself out of a `connectionString`. The config here is built by hand and
+ * handed to `pg.Pool` without one, so the escapes must be decoded before they reach the server. A
+ * malformed escape throws `URIError`, matching `pg-connection-string`.
+ */
 export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
   const databaseUrl = new URL(postgresUrl);
+  const host = decodeURIComponent(databaseUrl.hostname);
   const clientConfig: ClientConfig = {
-    user: databaseUrl.username,
-    password: databaseUrl.password,
-    host: databaseUrl.hostname,
+    user: decodeURIComponent(databaseUrl.username),
+    password: decodeURIComponent(databaseUrl.password),
+    host,
     port: Number(databaseUrl.port),
-    database: databaseUrl.pathname.slice(1),
+    database: decodeURIComponent(databaseUrl.pathname.slice(1)),
   };
 
   if (process.env.DATABASE_CA) {
     clientConfig.ssl = {
       ca: process.env.DATABASE_CA.replace(/\\n/g, '\n'),
       rejectUnauthorized: true,
-      servername: databaseUrl.hostname,
+      servername: host,
     };
   } else {
-    clientConfig.ssl = false;
+    clientConfig.ssl = resolveSslFromSslmode(databaseUrl);
   }
 
   return clientConfig;
+}
+
+/**
+ * The connection string's sslmode decides whether TLS is used when `DATABASE_CA`
+ * is unset. `require`, `prefer` and `no-verify` select the encrypted mode;
+ * `verify-ca`/`verify-full` select the encrypted mode that also verifies the
+ * server certificate against the Node system trust store. `allow` negotiates
+ * plaintext first and upgrades to TLS, which Node's `pg` cannot retry, so it is
+ * treated like `disable` rather than forcing a connection style the caller did
+ * not pin down.
+ */
+const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
+  prefer: false,
+  require: false,
+  'no-verify': false,
+  'verify-ca': true,
+  'verify-full': true,
+};
+
+function resolveSslFromSslmode(databaseUrl: URL): ClientConfig['ssl'] {
+  const sslmode = databaseUrl.searchParams.get('sslmode')?.trim().toLowerCase();
+
+  if (!sslmode || sslmode === 'disable' || sslmode === 'allow') return false;
+
+  // Object.hasOwn so inherited keys like 'constructor' never resolve to a mode.
+  if (!Object.hasOwn(VERIFY_CERTIFICATE_BY_SSLMODE, sslmode)) {
+    throw new Error(`Unsupported sslmode in database URL: ${sslmode}`);
+  }
+
+  return { rejectUnauthorized: VERIFY_CERTIFICATE_BY_SSLMODE[sslmode] };
 }

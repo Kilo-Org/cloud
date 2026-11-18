@@ -1,5 +1,6 @@
 const mockGithubWebhook = jest.fn();
 const mockHandleGitHubWebhook = jest.fn();
+const mockAssertRuntimeAuthorized = jest.fn();
 
 let afterCallbacks: Array<() => Promise<void> | void> = [];
 
@@ -26,7 +27,16 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handler', () => ({
     mockHandleGitHubWebhook(request, appType),
 }));
 
-import { POST } from './route';
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {},
+  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
+    mockAssertRuntimeAuthorized(installationId, appType),
+}));
+
+import { maxDuration, POST } from './route';
+import { maxDuration as liteMaxDuration } from '../github-lite/route';
+import { GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS } from '@/lib/integrations/db/github-installations';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 
 function githubRequest(
   eventType: string,
@@ -57,6 +67,7 @@ describe('GitHub webhook route', () => {
     jest.clearAllMocks();
     mockHandleGitHubWebhook.mockResolvedValue(new Response('legacy ok'));
     mockGithubWebhook.mockResolvedValue(new Response('bot ok'));
+    mockAssertRuntimeAuthorized.mockResolvedValue(undefined);
   });
 
   it('clones the request body for legacy handling and bot handling', async () => {
@@ -113,5 +124,32 @@ describe('GitHub webhook route', () => {
 
     expect(mockHandleGitHubWebhook).toHaveBeenCalledTimes(1);
     expect(mockGithubWebhook).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses only expected local disconnect denial', async () => {
+    mockAssertRuntimeAuthorized.mockRejectedValue(new GitHubRuntimeAuthorizationError());
+    const response = await POST(
+      githubRequest('issue_comment', { installation: { id: 98765 } }) as never
+    );
+    await flushAfterCallbacks();
+    expect(response.status).toBe(200);
+    expect(mockGithubWebhook).not.toHaveBeenCalled();
+  });
+
+  it('returns retryable failure when Chat authorization infrastructure fails', async () => {
+    mockAssertRuntimeAuthorized.mockRejectedValue(new Error('database unavailable'));
+    const response = await POST(
+      githubRequest('issue_comment', { installation: { id: 98765 } }) as never
+    );
+    expect(response.status).toBe(503);
+    expect(mockGithubWebhook).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitHub webhook delivery-claim window', () => {
+  it('keeps every webhook route maxDuration below the stale-claim reclaim window', () => {
+    const staleWindowMs = GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS;
+    expect(maxDuration * 1000).toBeLessThan(staleWindowMs);
+    expect(liteMaxDuration * 1000).toBeLessThan(staleWindowMs);
   });
 });

@@ -1,5 +1,5 @@
 export const GITHUB_CLOUD_REVIEW_SKILL_NAME = 'github-cloud-review';
-export const GITHUB_CLOUD_REVIEW_SKILL_VERSION = '1';
+export const GITHUB_CLOUD_REVIEW_SKILL_VERSION = '3';
 
 const rawMarkdown = `---
 name: github-cloud-review
@@ -58,6 +58,16 @@ gh api repos/<OWNER>/<REPO>/pulls/<PR>/reviews --input -
 The body must include current commit_id, event: "COMMENT", and one comments array.
 
 - Never use gh pr review, gh pr comment, or individual inline-comment writes.
+- If that call fails for any reason other than a locked issue, including a call rejected for invalid or empty arguments, do not resend it unchanged. Publish the summary next. Then re-read reviews, drop comments that already posted, and retry the rest once as batches of at most 3 comments, each with the same reviews --input form. Stop inline writes after a failed batch; the summary already lists every Code Review Finding.
+## Publish The Summary
+
+- If a tool named code_review_publish_review_summary is listed, publish the summary by calling it with the final summary wording only. The tool owns the comment target, marker, history, footer, idempotency, and verification, so do not build those yourself.
+- When that tool is listed, do not use gh for the summary. The gh summary commands below are the fallback only when the tool is not listed.
+- Inline review writes are unchanged: keep using the gh api reviews --input form above.
+- If the tool returns a recoverable error (rejected_body or unverified), fix the wording and call the tool once more. Do not fall back to gh for the summary.
+
+## Update The Summary With Gh (Fallback Only)
+
 - Create the summary only with:
 
 \`\`\`bash
@@ -75,7 +85,8 @@ gh api repos/<OWNER>/<REPO>/issues/comments/<COMMENT_ID> -X PATCH --input -
 
 ## Fail Safely
 
-- Retry a failed read once; stop without writing after a second failure.
+- A failed or rejected read never blocks publication. Retry it once or use another allowed read, then continue with the evidence you have and note any gaps in the summary.
+- If existing Kilo comments cannot be read, publish the summary with the trusted prompt's create or update command as given.
 - Before retrying an ambiguous write or 422, re-read HEAD and remote comments/reviews to determine whether it succeeded and whether targets are still valid.
 - Retry a write at most once, never blindly, and never loop on secondary rate limits.
 - If publication remains uncertain, stop rather than creating duplicates.
@@ -93,6 +104,7 @@ gh api repos/<OWNER>/<REPO>/issues/comments/<COMMENT_ID> -X PATCH --input -
 - Trusted summary target verified.
 - One atomic inline review prepared.
 - One logical summary write prepared.
+- Summary published by running the summary command, not only written in the final reply.
 `;
 
 export const GITHUB_CLOUD_REVIEW_SKILL = {

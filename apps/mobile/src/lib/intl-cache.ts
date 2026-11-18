@@ -1,0 +1,373 @@
+import { shouldPolyfill as shouldPolyfillDurationFormat } from '@formatjs/intl-durationformat/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillListFormat } from '@formatjs/intl-listformat/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillLocale } from '@formatjs/intl-locale/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillNumberFormat } from '@formatjs/intl-numberformat/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillPluralRules } from '@formatjs/intl-pluralrules/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillRelativeTimeFormat } from '@formatjs/intl-relativetimeformat/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillSegmenter } from '@formatjs/intl-segmenter/should-polyfill.js';
+
+import { isSupportedLanguage, type SupportedLanguage } from '@/i18n/languages';
+import {
+  loadListFormatLocaleData,
+  loadNumberFormatLocaleData,
+  loadPluralRulesLocaleData,
+} from '@/lib/formatjs-locale-data';
+import { RELATIVE_TIME_LOCALE_LOADERS } from '@/lib/relative-time-locales';
+
+/**
+ * Cached `Intl` formatters.
+ *
+ * Constructing a formatter is the expensive part; formatting with one is
+ * cheap. A session list formats a cost and a relative time per row per render,
+ * so a fresh formatter per call showed up as list-scroll jank. The cache is
+ * keyed by locale plus options, and 87 languages times a handful of option
+ * shapes is a small, bounded set.
+ */
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+const relativeTimeFormats = new Map<string, Intl.RelativeTimeFormat>();
+const listFormats = new Map<string, Intl.ListFormat>();
+const durationFormats = new Map<string, Intl.DurationFormat>();
+const collators = new Map<string, Intl.Collator>();
+const segmenters = new Map<string, Intl.Segmenter>();
+let usesNumberFormatPolyfill = false;
+let usesPluralRulesPolyfill = false;
+let usesListFormatPolyfill = false;
+let usesRelativeTimePolyfill = false;
+let usesDurationFormatPolyfill = false;
+let usesSegmenterPolyfill = false;
+
+/**
+ * The tag every formatter is built with.
+ *
+ * A bare tag can resolve to data the catalog does not use. `pt` resolves to
+ * Brazilian data while the `pt` catalog is European Portuguese, and `sr`
+ * resolves to Cyrillic while the `sr` catalog is written in Latin — a Serbian
+ * user would read Latin copy beside a Cyrillic month name. Name the script or
+ * the region so every Intl surface agrees with the catalog.
+ */
+function localeOrEnglish(locale: string): string {
+  if (!locale) {
+    return 'en';
+  }
+  if (locale === 'pt') {
+    return 'pt-PT';
+  }
+  return locale === 'sr' ? 'sr-Latn' : locale;
+}
+
+function localeDataLanguage(locale: string): SupportedLanguage {
+  if (isSupportedLanguage(locale)) {
+    return locale;
+  }
+  const base = locale.split('-')[0] ?? 'en';
+  return isSupportedLanguage(base) ? base : 'en';
+}
+
+/**
+ * Install the `Intl.Locale` polyfill. Every `ensure*` below calls this before
+ * its own `shouldPolyfill(locale)`, and it must stay that way.
+ *
+ * `shouldPolyfill` runs the CLDR locale matcher, whose best-fit path
+ * constructs `Intl.Locale` for a tag the package's locale list does not carry:
+ * `zh-Hans`, `zh-Hant`, `ht`, `mi` and `pt-BR` all miss the plural-rules list.
+ * Hermes ships no `Intl.Locale`, so the first formatter call in one of those
+ * languages threw "undefined cannot be used as a constructor" before any
+ * polyfill could install, and every formatted number, list and duration on the
+ * screen fell back to its raw value.
+ */
+function ensureLocale(): void {
+  if (!shouldPolyfillLocale()) {
+    return;
+  }
+  // The class, not `polyfill-force`. That entry point assigns onto whichever
+  // `Intl` was global the first time it ran, and a second `require` is a cache
+  // hit that assigns nothing, so a later `Intl` would keep no `Locale` at all.
+  // Assigning here depends on the current `Intl` alone, and `shouldPolyfill`
+  // already returns false once a usable `Intl.Locale` is in place.
+  // eslint-disable-next-line typescript-eslint/no-require-imports, unicorn/prefer-module -- the polyfill is a lazy native-weight load, like every other one here
+  const { Locale } = require('@formatjs/intl-locale') as { Locale: unknown };
+  Object.defineProperty(Intl, 'Locale', { value: Locale, configurable: true, writable: true });
+}
+
+// Hermes ships without Intl.PluralRules, and the NumberFormat and
+// RelativeTimeFormat polyfills construct one.
+function ensurePluralRules(language: SupportedLanguage): void {
+  ensureLocale();
+  if (!usesPluralRulesPolyfill && shouldPolyfillPluralRules(language)) {
+    require('@formatjs/intl-pluralrules/polyfill-force.js');
+    usesPluralRulesPolyfill = true;
+  }
+  if (usesPluralRulesPolyfill) {
+    ensureLocale();
+    loadPluralRulesLocaleData(language);
+  }
+}
+
+function ensureNumberFormat(locale: string): void {
+  const language = localeDataLanguage(locale);
+  ensurePluralRules(language);
+  ensureLocale();
+  if (!usesNumberFormatPolyfill && shouldPolyfillNumberFormat(locale)) {
+    require('@formatjs/intl-numberformat/polyfill-force.js');
+    usesNumberFormatPolyfill = true;
+  }
+  if (usesNumberFormatPolyfill) {
+    ensureLocale();
+    loadNumberFormatLocaleData(language);
+  }
+}
+
+function ensureListFormat(locale: string): void {
+  const language = localeDataLanguage(locale);
+  ensureLocale();
+  if (!usesListFormatPolyfill && shouldPolyfillListFormat(locale)) {
+    require('@formatjs/intl-listformat/polyfill-force.js');
+    usesListFormatPolyfill = true;
+  }
+  if (usesListFormatPolyfill) {
+    ensureLocale();
+    loadListFormatLocaleData(language);
+  }
+}
+
+function ensureRelativeTimeFormat(locale: string): void {
+  const language = localeDataLanguage(locale);
+  ensureNumberFormat(locale);
+  ensureLocale();
+  if (!usesRelativeTimePolyfill && shouldPolyfillRelativeTimeFormat(language)) {
+    require('@formatjs/intl-relativetimeformat/polyfill-force.js');
+    usesRelativeTimePolyfill = true;
+  }
+  if (!usesRelativeTimePolyfill) {
+    return;
+  }
+  ensureLocale();
+  RELATIVE_TIME_LOCALE_LOADERS[language]();
+}
+
+export function numberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const activeLocale = localeOrEnglish(locale);
+  ensureNumberFormat(activeLocale);
+  const key = `${JSON.stringify(activeLocale)}|${JSON.stringify(options)}`;
+  let format = numberFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(activeLocale, options);
+    numberFormats.set(key, format);
+  }
+  return format;
+}
+
+/** Memoized answer of the device locale read below; `undefined` until it runs. */
+let deviceDecimalSeparatorValue: string | null | undefined = undefined;
+
+/**
+ * The decimal separator of the device's own number keyboard.
+ *
+ * iOS and Android draw `decimal-pad` with the *device* locale's separator, not
+ * the app language's, so a typed amount can carry the device's character while
+ * the rest of the field follows the active language: a German app language on a
+ * `.` keypad offers only `.`. `expo-localization` reports the first preferred
+ * locale's separator, which is the locale the keypad follows.
+ *
+ * Read lazily: the module is native, so the Node test projects cannot import it
+ * at load time. A runtime that cannot answer reports no separator, which leaves
+ * the language-only behaviour. Memoized because a region change does not reach
+ * an open app on either platform; the field reads it on every keystroke.
+ */
+export function deviceDecimalSeparator(): string | null {
+  if (deviceDecimalSeparatorValue !== undefined) {
+    return deviceDecimalSeparatorValue;
+  }
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, unicorn/prefer-module -- the native module is absent from the Node test projects, so it cannot be a top-level import
+    const { getLocales } = require('expo-localization') as {
+      getLocales: () => readonly { decimalSeparator: string | null }[];
+    };
+    const separator = getLocales()[0]?.decimalSeparator;
+    deviceDecimalSeparatorValue = separator?.length === 1 ? separator : null;
+  } catch {
+    deviceDecimalSeparatorValue = null;
+  }
+  return deviceDecimalSeparatorValue;
+}
+
+/**
+ * How often the cached date formatters re-check the device time zone. `Intl`
+ * fixes a formatter's zone when it is constructed, so a formatter cached
+ * before the device zone moved writes the old wall clock for the rest of the
+ * process — the session list showed yesterday's clock time for a session whose
+ * detail already read the new zone. A fresh formatter resolves the zone the
+ * device is in now, so one probe per second detects the move and drops the
+ * cached formatters; the next caller builds them in the new zone. The interval
+ * keeps the probe (one formatter construction) away from every format call a
+ * list makes inside that second.
+ */
+const DEVICE_TIME_ZONE_CHECK_MS = 1000;
+
+/** The zone the cached date formatters were built in; `null` before the first check. */
+let cachedDeviceTimeZone: string | null = null;
+let deviceTimeZoneCheckedAt = 0;
+
+/**
+ * Drop the cached date formatters when the device time zone moved. A clock that
+ * stepped backwards reads as a stale check rather than a negative age, so the
+ * next call probes again instead of waiting for the clock to catch up.
+ */
+function dropDateFormattersForNewDeviceZone(): void {
+  const now = Date.now();
+  const sinceLastCheck = now - deviceTimeZoneCheckedAt;
+  if (
+    cachedDeviceTimeZone !== null &&
+    sinceLastCheck >= 0 &&
+    sinceLastCheck < DEVICE_TIME_ZONE_CHECK_MS
+  ) {
+    return;
+  }
+  deviceTimeZoneCheckedAt = now;
+  const zone = new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+  if (zone === cachedDeviceTimeZone) {
+    return;
+  }
+  cachedDeviceTimeZone = zone;
+  dateTimeFormats.clear();
+}
+
+/**
+ * The device's time zone as `Intl` resolves it now.
+ *
+ * `Date`'s local getters are not a substitute: the JavaScript runtime caches the
+ * zone it started in, so a device that changed zone while the app ran keeps
+ * answering the old wall clock for the rest of the process. This is the same
+ * probe `dropDateFormattersForNewDeviceZone` makes, exposed for callers that
+ * bucket by calendar day: a section heading and the device clock must name the
+ * same day, so they read the same signal.
+ */
+export function deviceTimeZone(): string {
+  dropDateFormattersForNewDeviceZone();
+  return cachedDeviceTimeZone ?? new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+}
+
+export function dateTimeFormat(
+  /** Omitted only to read the device's own resolved options, e.g. its time zone. */
+  locale: string | undefined,
+  options: Intl.DateTimeFormatOptions
+): Intl.DateTimeFormat {
+  dropDateFormattersForNewDeviceZone();
+  // Through `localeOrEnglish` like every other formatter: this used to carry
+  // its own `pt` special case and so missed the `sr` one added beside it.
+  const activeLocale = locale === undefined ? undefined : localeOrEnglish(locale);
+  const key = `${JSON.stringify(activeLocale)}|${JSON.stringify(options)}`;
+  let format = dateTimeFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(activeLocale, options);
+    dateTimeFormats.set(key, format);
+  }
+  return format;
+}
+
+export function relativeTimeFormat(
+  locale: string,
+  options: Intl.RelativeTimeFormatOptions
+): Intl.RelativeTimeFormat {
+  const activeLocale = localeOrEnglish(locale);
+  ensureRelativeTimeFormat(activeLocale);
+  const key = `${activeLocale}|${JSON.stringify(options)}`;
+  let format = relativeTimeFormats.get(key);
+  if (!format) {
+    format = new Intl.RelativeTimeFormat(activeLocale, options);
+    relativeTimeFormats.set(key, format);
+  }
+  return format;
+}
+
+export function listFormat(locale: string, options: Intl.ListFormatOptions): Intl.ListFormat {
+  const activeLocale = localeOrEnglish(locale);
+  ensureListFormat(activeLocale);
+  const key = `${activeLocale}|${JSON.stringify(options)}`;
+  let format = listFormats.get(key);
+  if (!format) {
+    format = new Intl.ListFormat(activeLocale, options);
+    listFormats.set(key, format);
+  }
+  return format;
+}
+
+export function durationFormat(
+  locale: string,
+  options: Intl.DurationFormatOptions
+): Intl.DurationFormat {
+  const activeLocale = localeOrEnglish(locale);
+  ensureNumberFormat(activeLocale);
+  ensureListFormat(activeLocale);
+  if (!usesDurationFormatPolyfill && shouldPolyfillDurationFormat()) {
+    require('@formatjs/intl-durationformat/polyfill-force.js');
+    usesDurationFormatPolyfill = true;
+  }
+  const key = `${activeLocale}|${JSON.stringify(options)}`;
+  let format = durationFormats.get(key);
+  if (!format) {
+    format = new Intl.DurationFormat(activeLocale, options);
+    durationFormats.set(key, format);
+  }
+  return format;
+}
+
+export function collator(locale: string, options: Intl.CollatorOptions = {}): Intl.Collator {
+  const activeLocale = localeOrEnglish(locale);
+  const key = `${activeLocale}|${JSON.stringify(options)}`;
+  let format = collators.get(key);
+  if (!format) {
+    format = new Intl.Collator(activeLocale, options);
+    collators.set(key, format);
+  }
+  return format;
+}
+
+export function segmenter(locale: string, options: Intl.SegmenterOptions): Intl.Segmenter {
+  const activeLocale = localeOrEnglish(locale);
+  if (!usesSegmenterPolyfill && shouldPolyfillSegmenter()) {
+    require('@formatjs/intl-segmenter/polyfill-force.js');
+    usesSegmenterPolyfill = true;
+  }
+  const key = `${activeLocale}|${JSON.stringify(options)}`;
+  let format = segmenters.get(key);
+  if (!format) {
+    format = new Intl.Segmenter(activeLocale, options);
+    segmenters.set(key, format);
+  }
+  return format;
+}
+
+export function prewarmIntl(locale: string): void {
+  try {
+    numberFormat(locale, {});
+    listFormat(locale, { type: 'conjunction' });
+    relativeTimeFormat(locale, { numeric: 'auto' });
+    durationFormat(locale, { style: 'short' });
+    segmenter(locale, { granularity: 'grapheme' });
+  } catch {
+    // A prewarm is only a cache fill. Every formatter is built again on demand
+    // at the real call site, so a failure must not block the app.
+  }
+}
+
+/**
+ * Install the grapheme segmenter for text a headless surface cuts itself.
+ *
+ * Session card titles, targets and commands are cut on character boundaries
+ * through `@kilocode/session-ingest-contracts`, which reads `Intl.Segmenter`
+ * when the runtime has one. Hermes does not, so a headless process that draws a
+ * widget or a notification before the root layout has run would cut those
+ * strings by code unit and could end one inside an emoji sequence. The widget,
+ * Approve and notification entries apply the stored language before they build
+ * any text, and this fills the same lazy polyfill the foreground path warms.
+ */
+export function prewarmSegmenter(locale: string): void {
+  try {
+    segmenter(locale, { granularity: 'grapheme' });
+  } catch {
+    // A prewarm is only a cache fill: a failed install leaves the cut on its
+    // code unit boundary, which is what a runtime without one has today.
+  }
+}

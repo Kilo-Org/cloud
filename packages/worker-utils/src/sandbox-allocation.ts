@@ -1,0 +1,294 @@
+import { z } from 'zod';
+
+export const sandboxAllocationSchema = z.enum([
+  'isolated-standard',
+  'cloudflare-single',
+  'cloudflare-shared',
+  'cloudflare-containers-standard-3',
+  'cloudflare-containers-standard-4',
+  'vercel-small',
+  'vercel-large',
+]);
+
+export type SandboxAllocation = z.infer<typeof sandboxAllocationSchema>;
+
+/**
+ * Cloudflare instance types offered for DO-managed containers. The allocation
+ * `instanceType` is the physical instance the container starts with, so the
+ * picker and the provider launch size cannot drift.
+ */
+export const CLOUDFLARE_CONTAINERS_INSTANCES = ['standard-3', 'standard-4'] as const;
+
+export type CloudflareContainersInstance = (typeof CLOUDFLARE_CONTAINERS_INSTANCES)[number];
+
+/**
+ * Allocations a new session may choose. The legacy Cloudflare Sandbox SDK
+ * allocations (`cloudflare-single`, `cloudflare-shared`, `isolated-standard`)
+ * stay in {@link sandboxAllocationSchema} so persisted sessions, settings and
+ * triggers still decode, but they are retired for new compute.
+ */
+export const SELECTABLE_SANDBOX_ALLOCATIONS = [
+  'cloudflare-containers-standard-3',
+  'cloudflare-containers-standard-4',
+  'vercel-small',
+  'vercel-large',
+] as const satisfies readonly SandboxAllocation[];
+
+/** Allocation auto-routed containers sessions run when the owner picks nothing. */
+export const CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION = 'cloudflare-containers-standard-3' as const;
+
+/**
+ * Native containers size for new sessions that would have used Cloudflare
+ * sandbox small: 2 vCPU / 8 GiB. Existing sessions keep their stored runtime.
+ */
+export const CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION =
+  'cloudflare-containers-standard-3' as const satisfies SandboxAllocation;
+
+export type SelectableSandboxAllocation = (typeof SELECTABLE_SANDBOX_ALLOCATIONS)[number];
+
+const cloudflareAllocationRequestSchema = z
+  .object({
+    provider: z.object({ id: z.literal('cloudflare'), account: z.literal('kilo') }).strict(),
+    instanceType: z.enum(['single', 'shared', 'isolated-standard']),
+  })
+  .strict();
+
+const vercelAllocationRequestSchema = z
+  .object({
+    provider: z.object({ id: z.literal('vercel'), account: z.literal('byoc') }).strict(),
+    instanceType: z.enum(['small', 'large']),
+  })
+  .strict();
+
+const containersAllocationRequestSchema = z
+  .object({
+    provider: z
+      .object({ id: z.literal('cloudflare-containers'), account: z.literal('kilo') })
+      .strict(),
+    instanceType: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES),
+  })
+  .strict();
+
+export const sandboxAllocationRequestSchema = z.union([
+  cloudflareAllocationRequestSchema,
+  vercelAllocationRequestSchema,
+  containersAllocationRequestSchema,
+]);
+
+export type SandboxAllocationRequest = z.infer<typeof sandboxAllocationRequestSchema>;
+
+type CloudflareContainersAllocationRequest = z.infer<typeof containersAllocationRequestSchema>;
+
+function isContainersAllocationRequest(
+  request: SandboxAllocationRequest
+): request is CloudflareContainersAllocationRequest {
+  return request.provider.id === 'cloudflare-containers';
+}
+
+const selectableSandboxAllocationRequestSchema = z.union([
+  vercelAllocationRequestSchema,
+  containersAllocationRequestSchema,
+]);
+
+export type SelectableSandboxAllocationRequest = z.infer<
+  typeof selectableSandboxAllocationRequestSchema
+>;
+
+const allocationRequests = {
+  'isolated-standard': {
+    provider: { id: 'cloudflare', account: 'kilo' },
+    instanceType: 'isolated-standard',
+  },
+  'cloudflare-single': {
+    provider: { id: 'cloudflare', account: 'kilo' },
+    instanceType: 'single',
+  },
+  // Legacy decode only: one sandbox serves one workspace, so nothing creates a
+  // shared sandbox.
+  'cloudflare-shared': {
+    provider: { id: 'cloudflare', account: 'kilo' },
+    instanceType: 'shared',
+  },
+  'cloudflare-containers-standard-3': {
+    provider: { id: 'cloudflare-containers', account: 'kilo' },
+    instanceType: 'standard-3',
+  },
+  'cloudflare-containers-standard-4': {
+    provider: { id: 'cloudflare-containers', account: 'kilo' },
+    instanceType: 'standard-4',
+  },
+  'vercel-small': {
+    provider: { id: 'vercel', account: 'byoc' },
+    instanceType: 'small',
+  },
+  'vercel-large': {
+    provider: { id: 'vercel', account: 'byoc' },
+    instanceType: 'large',
+  },
+} as const satisfies Record<SandboxAllocation, SandboxAllocationRequest>;
+
+/** Physical instance of {@link CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION}. */
+export const CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE: CloudflareContainersInstance =
+  allocationRequests[CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION].instanceType;
+
+export function getSandboxAllocationRequest<T extends SandboxAllocation>(allocation: T) {
+  return allocationRequests[allocation];
+}
+
+export function getSandboxAllocationKey(
+  allocation: SandboxAllocationRequest | SandboxDestination
+): string {
+  return `${allocation.provider.id}:${allocation.provider.account}:${allocation.instanceType}`;
+}
+
+export function getSandboxAllocation(
+  request: SandboxAllocationRequest
+): SandboxAllocation | undefined {
+  const key = getSandboxAllocationKey(request);
+  return sandboxAllocationSchema.options.find(
+    allocation => getSandboxAllocationKey(allocationRequests[allocation]) === key
+  );
+}
+
+/**
+ * The Cloudflare container instance a DO-managed containers allocation runs.
+ * `undefined` for every other provider, whose sandbox shape is not an instance type.
+ */
+export function getSandboxAllocationInstance(
+  allocation: SandboxAllocation | undefined
+): CloudflareContainersInstance | undefined {
+  if (allocation === undefined) return undefined;
+  const request = allocationRequests[allocation];
+  return isContainersAllocationRequest(request) ? request.instanceType : undefined;
+}
+
+export const sandboxAllocationInputSchema = z.union([
+  sandboxAllocationRequestSchema,
+  sandboxAllocationSchema.transform(allocation => getSandboxAllocationRequest(allocation)),
+]);
+
+export type SandboxAllocationInput = z.input<typeof sandboxAllocationInputSchema>;
+
+export const selectableSandboxAllocationInputSchema = z.union([
+  selectableSandboxAllocationRequestSchema,
+  z
+    .enum(SELECTABLE_SANDBOX_ALLOCATIONS)
+    .transform(allocation => getSandboxAllocationRequest(allocation)),
+]);
+
+export const sandboxDestinationSchema = z.union([
+  cloudflareAllocationRequestSchema.extend({
+    instanceType: z.enum(['single', 'shared', 'isolated-standard', 'devcontainer']),
+  }),
+  vercelAllocationRequestSchema.extend({ instanceType: z.enum(['small', 'large', 'default']) }),
+  containersAllocationRequestSchema,
+]);
+
+export type SandboxDestination = z.infer<typeof sandboxDestinationSchema>;
+
+export function isSelectableSandboxAllocation(
+  allocation: SandboxAllocation | undefined
+): allocation is SelectableSandboxAllocation {
+  return (
+    allocation !== undefined &&
+    (SELECTABLE_SANDBOX_ALLOCATIONS as readonly string[]).includes(allocation)
+  );
+}
+
+export const vercelSandboxResourcesSchema = z.union([
+  z.object({ vcpus: z.literal(2), memory: z.literal(4096) }).strict(),
+  z.object({ vcpus: z.literal(4), memory: z.literal(8192) }).strict(),
+]);
+
+export type VercelSandboxResources = z.infer<typeof vercelSandboxResourcesSchema>;
+
+export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
+  return allocationRequests[allocation].provider.id;
+}
+
+/**
+ * A multi-repository environment keeps every repository in one workspace, so it
+ * needs a sandbox that one session owns. The retired shared Cloudflare sandbox
+ * and Vercel cannot give it one.
+ */
+export function allocationSupportsMultiRepository(allocation: SandboxAllocation): boolean {
+  return (
+    allocation !== 'cloudflare-shared' && getSandboxAllocationProvider(allocation) !== 'vercel'
+  );
+}
+
+/**
+ * Vercel and DO-managed Cloudflare containers exist only on the control plane, so
+ * their allocations force a control-plane session. Cloudflare allocations pick the
+ * sandbox shape only and leave the plane decision to the session origin.
+ */
+export function sandboxAllocationRequiresControlPlane(
+  allocation: SandboxAllocation | undefined
+): boolean {
+  return allocation !== undefined && getSandboxAllocationProvider(allocation) !== 'cloudflare';
+}
+
+export function getSandboxAllocationResources(
+  allocation: SandboxAllocation | undefined
+): VercelSandboxResources | undefined {
+  switch (allocation) {
+    case 'vercel-small':
+      return { vcpus: 2, memory: 4096 };
+    case 'vercel-large':
+      return { vcpus: 4, memory: 8192 };
+    default:
+      return undefined;
+  }
+}
+
+export const sandboxSelectionCapabilitiesSchema = z
+  .object({
+    enabled: z.boolean(),
+    /** Where a session runs when nothing is saved or chosen. Reported even when selection is disabled. */
+    defaultDestination: sandboxDestinationSchema.optional(),
+    /**
+     * Where a new session in the requested repository runs: the saved repository
+     * override, else the saved owner default, else `defaultDestination`. Present
+     * only when the request named a repository type.
+     */
+    effectiveDestination: sandboxDestinationSchema.optional(),
+    options: z.array(
+      z.object({
+        allocation: selectableSandboxAllocationInputSchema,
+        unavailableReason: z.string().optional(),
+        repositoryUnavailableReason: z.string().optional(),
+      })
+    ),
+  })
+  .refine(value => value.enabled || value.options.length === 0, {
+    message: 'Disabled sandbox selection must not expose options',
+    path: ['options'],
+  });
+
+export type SandboxSelectionCapabilities = z.infer<typeof sandboxSelectionCapabilitiesSchema>;
+
+/**
+ * The compatibility alias for the retired Cloudflare sandbox small allocation.
+ * New compute runs on the native containers size; persisted values still decode.
+ */
+export function normalizeSandboxAllocation(allocation: SandboxAllocation): SandboxAllocation {
+  return allocation === 'cloudflare-single'
+    ? CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
+    : allocation;
+}
+
+export function isSandboxAllocationAvailable(
+  capabilities: SandboxSelectionCapabilities,
+  allocation: SandboxAllocation
+): boolean {
+  const requested = normalizeSandboxAllocation(allocation);
+  return (
+    capabilities.enabled &&
+    capabilities.options.some(
+      option =>
+        getSandboxAllocation(option.allocation) === requested &&
+        option.unavailableReason === undefined &&
+        option.repositoryUnavailableReason === undefined
+    )
+  );
+}

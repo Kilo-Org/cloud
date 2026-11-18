@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { KILOCLAW_KILO_PROVIDER_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { KILOCLAW_KILO_PROVIDER_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 export function getDefaultSelectedModel(
   kilocodeDefaultModel: string | null | undefined,

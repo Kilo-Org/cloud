@@ -2,10 +2,8 @@ import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentSessionRouterLike } from '@/components/agents/session-router-like';
-import {
-  RESTART_EXIT_FAILED_MESSAGE,
-  restartAgentSession,
-} from '@/components/agents/restart-agent-session';
+import { restartAgentSession } from '@/components/agents/restart-agent-session';
+import { i18n } from '@/i18n';
 
 const SESSION_ID: KiloSessionId = 'new-session-id' as KiloSessionId;
 
@@ -86,7 +84,7 @@ describe('restartAgentSession', () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(exit).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(RESTART_EXIT_FAILED_MESSAGE);
+    expect(onError).toHaveBeenCalledWith(i18n.t('agentChat.remoteSession.restartExitFailed'));
     expect(router.replace).toHaveBeenCalledTimes(1);
   });
 

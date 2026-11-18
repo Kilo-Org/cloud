@@ -1,5 +1,5 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
@@ -9,6 +9,7 @@ import {
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, inArray, type SQL } from 'drizzle-orm';
 import {
+  nonTerminalCodeReviewStatusListSql,
   reconsiderableCodeReviewWorkCondition,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
@@ -95,6 +96,7 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   byok_invalid_key: 'Action Required',
   selected_model_unavailable: 'Action Required',
   billing: 'Billing',
+  account_blocked: 'Account Blocked',
   model_not_found: 'Model Not Found',
   workspace_capacity: 'Sandbox Capacity',
   sandbox_connection: 'Sandbox Connection',
@@ -108,9 +110,16 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   assistant_rate_limited_byok: 'Rate Limited (customer key)',
   assistant_rate_limited_managed: 'Rate Limited (Kilo key)',
   assistant_unavailable: 'Assistant Unavailable',
+  assistant_provider_disconnect: 'Assistant Provider Disconnect',
+  assistant_gateway_unavailable: 'Assistant Gateway Unavailable',
   assistant_timeout: 'Assistant Timeout',
   assistant_unauthorized: 'Assistant Unauthorized',
   assistant_invalid_request: 'Assistant Invalid Request',
+  assistant_invalid_request_byok: 'Request Rejected (customer provider)',
+  assistant_context_limit: 'Assistant Context Limit',
+  assistant_output_limit: 'Assistant Output Limit',
+  assistant_content_filter: 'Assistant Content Filter',
+  assistant_structured_output: 'Assistant Structured Output',
   assistant_failed: 'Assistant Error',
   assistant_no_reply: 'Assistant No Reply',
   wrapper_failed: 'Agent Wrapper Failure',
@@ -436,7 +445,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         failed_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
         cancelled_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
-        in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
+        in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN (${nonTerminalCodeReviewStatusListSql()}))`,
         // Reaped reviews get completed_at stamped at reap time, ~48h+ after they
         // started, so a handful of them would dominate an average built from
         // minutes-long real runs. They are closures, not measurements.
@@ -536,7 +545,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
         cancelled: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
-        in_progress: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
+        in_progress: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN (${nonTerminalCodeReviewStatusListSql()}))`,
         billing_errors: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${billingError})`,
       })
       .from(cloud_agent_code_reviews);

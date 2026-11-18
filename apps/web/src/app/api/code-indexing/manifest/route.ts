@@ -1,7 +1,15 @@
 import type { NextRequest } from 'next/server';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
+import {
+  codeIndexingGoneResponse,
+  isCodeIndexingEnabled,
+} from '@/lib/code-indexing/availability.server';
 
 export async function GET(request: NextRequest) {
+  if (!isCodeIndexingEnabled()) {
+    return codeIndexingGoneResponse();
+  }
+
   const { searchParams } = new URL(request.url);
   const organizationId = searchParams.get('organizationId') || undefined;
   const projectId = searchParams.get('projectId');

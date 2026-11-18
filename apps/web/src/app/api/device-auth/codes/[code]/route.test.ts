@@ -3,13 +3,17 @@ process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 import { NextRequest } from 'next/server';
 
 jest.mock('@/lib/device-auth/device-auth');
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/device-auth/device-auth-viewer-token');
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
 
-import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@/lib/user/server';
+import {
+  pollDeviceAuthRequest,
+  denyDeviceAuthRequest,
+  cancelDeviceAuthRequest,
+} from '@/lib/device-auth/device-auth';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
 import * as Sentry from '@sentry/nextjs';
@@ -17,6 +21,7 @@ import { GET, DELETE } from './route';
 
 const mockPoll = jest.mocked(pollDeviceAuthRequest);
 const mockDeny = jest.mocked(denyDeviceAuthRequest);
+const mockCancel = jest.mocked(cancelDeviceAuthRequest);
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockVerifyToken = jest.mocked(verifyDeviceAuthViewerToken);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
@@ -24,6 +29,8 @@ const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const fakeUser = { id: 'user-1' } as never;
 
 describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
+  const pollSecret = 'poll-secret-value-for-the-requesting-client';
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -32,10 +39,13 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     mockPoll.mockResolvedValue({ status: 'pending' });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ status: 'pending' });
+    expect(mockPoll).toHaveBeenCalledWith(pollSecret);
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   test('returns 200 with token for approved', async () => {
@@ -47,7 +57,7 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -55,6 +65,37 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
       token: 'jwt',
       userId: 'user-1',
       userEmail: 'user@example.com',
+      requestingClient: null,
+      clientConfirmed: false,
+    });
+  });
+
+  test('returns the confirmed client with an approved pairing', async () => {
+    mockPoll.mockResolvedValue({
+      status: 'approved',
+      token: 'jwt',
+      userId: 'user-1',
+      userEmail: 'user@example.com',
+      requestingClient: {
+        clientId: 'client-abc',
+        clientName: 'Claude Desktop',
+        redirectOrigin: 'https://client.test',
+      },
+      clientConfirmed: true,
+    });
+
+    const response = await GET(new NextRequest('http://localhost:3000'), {
+      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'approved',
+      requestingClient: {
+        clientId: 'client-abc',
+        clientName: 'Claude Desktop',
+        redirectOrigin: 'https://client.test',
+      },
+      clientConfirmed: true,
     });
   });
 
@@ -62,7 +103,7 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     mockPoll.mockResolvedValue({ status: 'denied' });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(403);
   });
@@ -71,7 +112,7 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     mockPoll.mockResolvedValue({ status: 'expired' });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(410);
   });
@@ -81,23 +122,6 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
       params: Promise.resolve({ code: '' }),
     });
     expect(response.status).toBe(400);
-  });
-
-  test('legacy poll counts without user code in Sentry extras', async () => {
-    const sentrySpy = jest.spyOn(Sentry, 'captureMessage');
-    mockPoll.mockResolvedValue({ status: 'pending' });
-
-    await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
-    });
-
-    expect(sentrySpy).toHaveBeenCalledWith('legacy-poll-device-auth-count: 1', {
-      level: 'info',
-    });
-    // The user code must never appear in Sentry extras.
-    const call = sentrySpy.mock.calls[0]!;
-    expect(call[1] as Record<string, unknown>).not.toHaveProperty('extra');
-    sentrySpy.mockRestore();
   });
 });
 
@@ -127,14 +151,15 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
     expect(mockDeny).toHaveBeenCalledWith('ABCD-EFGH');
   });
 
-  test('returns 403 without viewer token', async () => {
+  test('returns 403 when the viewer token cannot be verified', async () => {
     mockVerifyToken.mockReturnValue(null);
 
-    const response = await DELETE(createRequest('ABCD-EFGH'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
-    });
+    const response = await DELETE(
+      createRequest('ABCD-EFGH', { 'x-device-auth-viewer-token': 'expired-token' }),
+      { params: Promise.resolve({ code: 'ABCD-EFGH' }) }
+    );
     expect(response.status).toBe(403);
-    expect(response.statusText).toBeDefined(); // invalid or expired
+    expect(await response.json()).toEqual({ error: 'Invalid or expired viewer token' });
     expect(mockDeny).not.toHaveBeenCalled();
   });
 
@@ -215,5 +240,67 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
     );
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'Not found' });
+  });
+});
+
+describe('DELETE /api/device-auth/codes/[code] (cancel from the device)', () => {
+  const pollSecret = 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function createRequest(code: string) {
+    return new NextRequest(`http://localhost:3000/api/device-auth/codes/${code}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  test('cancels by poll secret without a browser session', async () => {
+    const response = await DELETE(createRequest(pollSecret), {
+      params: Promise.resolve({ code: pollSecret }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(mockCancel).toHaveBeenCalledWith(pollSecret);
+    expect(mockGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockDeny).not.toHaveBeenCalled();
+  });
+
+  test('returns 404 for a poll secret that matches no request', async () => {
+    mockCancel.mockRejectedValue(new Error('Device authorization request not found'));
+
+    const response = await DELETE(createRequest(pollSecret), {
+      params: Promise.resolve({ code: pollSecret }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Not found' });
+  });
+
+  test('returns 409 when the request was already approved', async () => {
+    mockCancel.mockRejectedValue(new Error('Device authorization request is not pending'));
+
+    const response = await DELETE(createRequest(pollSecret), {
+      params: Promise.resolve({ code: pollSecret }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'Device authorization request can no longer be cancelled',
+    });
+  });
+
+  test('returns 429 when a device cancel is rate limited', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true } as never);
+
+    const response = await DELETE(createRequest(pollSecret), {
+      params: Promise.resolve({ code: pollSecret }),
+    });
+
+    expect(response.status).toBe(429);
+    expect(mockCancel).not.toHaveBeenCalled();
   });
 });

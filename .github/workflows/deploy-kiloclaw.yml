@@ -1,8 +1,22 @@
 name: Deploy KiloClaw
 
+# Manual-only deploy: run from the Actions tab. The scheduled production
+# pipeline (deploy-production.yml) no longer calls this workflow.
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'Exact tested commit to deploy (defaults to the selected ref)'
+        required: false
+        default: ''
+        type: string
   workflow_call:
+    inputs:
+      source_sha:
+        description: 'Exact tested commit to deploy (defaults to the caller SHA)'
+        required: false
+        default: ''
+        type: string
 
 # Least-privilege default for the whole workflow. Each job opts into only the
 # scopes it needs via its own `permissions:` block below.
@@ -11,6 +25,10 @@ permissions:
 
 jobs:
   deploy:
+    # Guard: this workflow_dispatch is reachable from a fork, and it builds and
+    # pushes a container image to Fly and GHCR using repo secrets. Only the
+    # canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Deploy KiloClaw
@@ -38,6 +56,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           dissociate: true
+          ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -161,9 +180,9 @@ jobs:
             registry.fly.io/kiloclaw-machines:${{ steps.image-hash.outputs.tag }}
             registry.fly.io/kiloclaw-machines:latest
             ghcr.io/kilo-org/kiloclaw:${{ steps.image-hash.outputs.tag }}
-            ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}
+            ghcr.io/kilo-org/kiloclaw:sha-${{ inputs.source_sha || github.sha }}
           build-args: |
-            CONTROLLER_COMMIT=${{ github.sha }}
+            CONTROLLER_COMMIT=${{ inputs.source_sha || github.sha }}
 
       # ── Ensure GHCR has the tag when the build was skipped ──────
       # When check-image finds the tag already in Fly registry, the build is
@@ -188,7 +207,7 @@ jobs:
         run: |
           FLY_IMAGE="registry.fly.io/kiloclaw-machines:${{ steps.image-hash.outputs.tag }}"
           GHCR_IMAGE="ghcr.io/kilo-org/kiloclaw:${{ steps.image-hash.outputs.tag }}"
-          GHCR_SHA_IMAGE="ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}"
+          GHCR_SHA_IMAGE="ghcr.io/kilo-org/kiloclaw:sha-${{ inputs.source_sha || github.sha }}"
 
           echo "Pulling ${FLY_IMAGE}..."
           docker pull "${FLY_IMAGE}"
@@ -251,7 +270,7 @@ jobs:
   # when its content was last built, so we don't pull a large unchanged image.
   attest-sbom:
     needs: deploy
-    if: needs.deploy.outputs.image-built == 'true' && needs.deploy.outputs.image-digest != ''
+    if: needs.deploy.outputs.image-built == 'true' && needs.deploy.outputs.image-digest != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     name: Attest image SBOM
@@ -291,6 +310,7 @@ jobs:
   # continue-on-error ensures a dev push failure never blocks prod.
   push-dev-image:
     needs: [deploy]
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     name: Push Dev Image

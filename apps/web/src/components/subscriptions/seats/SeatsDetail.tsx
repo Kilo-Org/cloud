@@ -20,13 +20,17 @@ import {
 import { useConfirm } from '@/components/ui/confirm';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { capitalize } from '@/lib/utils';
-import { SEAT_PRICING } from '@/lib/organizations/constants';
+import { SEAT_PRICING } from '@kilocode/web-shared/lib/organizations/constants';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
 import { formatDateLabel, isSeatsTerminal } from '@/components/subscriptions/helpers';
 import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
 import { formatSeatPrice, getSeatPriceInterval } from './seat-price';
+import {
+  CreditExpiryNotice,
+  usePaidCreditPolicyReady,
+} from '@/components/payment/CreditExpiryNotice';
 
 export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
@@ -39,6 +43,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [isUpdatingSeats, setIsUpdatingSeats] = useState(false);
   const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
+  const policyReady = usePaidCreditPolicyReady();
   const [isCancelingCycleChange, setIsCancelingCycleChange] = useState(false);
 
   const organizationQuery = useOrganizationWithMembers(organizationId, {
@@ -382,9 +387,17 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
             newSeats={Number(seatCount)}
             hasKiloPass={hasKiloPass}
           />
+          {hasKiloPass && Number(seatCount) > (subscriptionQuery.data?.totalSeats ?? 0) ? (
+            <CreditExpiryNotice purchase="pass" />
+          ) : null}
           <DialogFooter>
             <SeatUpdateActions
               isUpdating={isUpdatingSeats}
+              disabled={
+                hasKiloPass &&
+                Number(seatCount) > (subscriptionQuery.data?.totalSeats ?? 0) &&
+                !policyReady
+              }
               onCancel={() => setSeatDialogOpen(false)}
               onSave={() =>
                 void (async () => {
@@ -483,10 +496,12 @@ export function ScheduledSeatCountNotice({
 
 export function SeatUpdateActions({
   isUpdating,
+  disabled = false,
   onCancel,
   onSave,
 }: {
   isUpdating: boolean;
+  disabled?: boolean;
   onCancel: () => void;
   onSave: () => void;
 }) {
@@ -495,7 +510,7 @@ export function SeatUpdateActions({
       <Button variant="outline" onClick={onCancel} disabled={isUpdating}>
         Cancel
       </Button>
-      <Button disabled={isUpdating} aria-busy={isUpdating} onClick={onSave}>
+      <Button disabled={isUpdating || disabled} aria-busy={isUpdating} onClick={onSave}>
         {isUpdating ? (
           <>
             <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />

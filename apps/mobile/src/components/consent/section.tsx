@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 
@@ -26,12 +27,13 @@ function Field({ label, value }: FieldProps) {
 }
 
 export function Section({ title, what, why, who, footer }: SectionProps) {
+  const { t } = useTranslation();
   return (
     <View className="border-t border-border py-4">
       <Text className="text-base font-semibold text-foreground">{title}</Text>
-      <Field label="What" value={what} />
-      <Field label="Why" value={why} />
-      <Field label="Who" value={who} />
+      <Field label={t('consent.what')} value={what} />
+      <Field label={t('consent.why')} value={why} />
+      <Field label={t('consent.who')} value={who} />
       {footer}
     </View>
   );

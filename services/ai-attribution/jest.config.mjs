@@ -1,17 +1,24 @@
 /** @type {import('jest').Config} */
+// TypeScript 7 is the native compiler and ships no compiler JS API. @swc/jest
+// transpiles the tests without one; `tsgo --noEmit` remains the type check.
 export default {
-  preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/*.test.ts'],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
+  transformIgnorePatterns: ['/node_modules/(?!.*(?:jose|workers-tagged-logger))'],
   transform: {
-    '^.+\\.ts$': [
-      'ts-jest',
+    '^.+\\.[tj]s$': [
+      '@swc/jest',
       {
-        tsconfig: {
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
+        jsc: {
+          parser: {
+            syntax: 'typescript',
+            allowJs: true,
+          },
+          target: 'es2022',
         },
-        useESM: true,
       },
     ],
   },

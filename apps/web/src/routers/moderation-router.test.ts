@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   content_moderation_reports,
   user_github_app_tokens,
@@ -11,7 +11,7 @@ import {
 } from '@kilocode/db/schema';
 import { CURRENT_UGC_TERMS_VERSION } from '@kilocode/app-shared/moderation';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
 let user: User;
@@ -100,6 +100,85 @@ describe('moderation-router', () => {
         context: { platform: 'mobile', body: 'secret message text' },
       })
     ).rejects.toBeInstanceOf(TRPCError);
+  });
+
+  it('refuses metadata longer than the declared maximum', async () => {
+    const caller = await createCallerForUser(user.id);
+    const base = {
+      surface: 'ai_output' as const,
+      targetKind: 'message' as const,
+      targetId: 'msg-123',
+      reason: 'other' as const,
+      context: { platform: 'mobile' },
+    };
+
+    const oversizedCalls = [
+      () => caller.moderation.reportContent({ ...base, targetId: 't'.repeat(256) }),
+      () => caller.moderation.reportContent({ ...base, modelId: 'm'.repeat(201) }),
+      () => caller.moderation.reportContent({ ...base, sessionId: 's'.repeat(256) }),
+      () => caller.moderation.reportContent({ ...base, context: { platform: 'p'.repeat(65) } }),
+      () =>
+        caller.moderation.reportContent({
+          ...base,
+          context: { platform: 'mobile', storefront: 'f'.repeat(65) },
+        }),
+      () => caller.moderation.reportUser({ targetId: 'u'.repeat(256), reason: 'other' }),
+    ];
+
+    for (const call of oversizedCalls) {
+      await expect(call()).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
+
+    const rows = await db
+      .select()
+      .from(content_moderation_reports)
+      .where(eq(content_moderation_reports.kilo_user_id, user.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('accepts metadata at the declared maximum', async () => {
+    const caller = await createCallerForUser(user.id);
+    const targetId = 't'.repeat(255);
+    const modelId = 'm'.repeat(200);
+    const sessionId = 's'.repeat(255);
+    const platform = 'p'.repeat(64);
+    const storefront = 'f'.repeat(64);
+
+    const { receiptId } = await caller.moderation.reportContent({
+      surface: 'ai_output',
+      targetKind: 'message',
+      targetId,
+      modelId,
+      sessionId,
+      reason: 'other',
+      context: { platform, storefront },
+    });
+
+    const [row] = await db
+      .select()
+      .from(content_moderation_reports)
+      .where(eq(content_moderation_reports.receipt_id, receiptId));
+    expect(row.target_id).toBe(targetId);
+    expect(row.model_id).toBe(modelId);
+    expect(row.session_id).toBe(sessionId);
+    expect(row.context_json).toEqual({ platform, storefront });
+
+    const nulled = await caller.moderation.reportContent({
+      surface: 'ai_output',
+      targetKind: 'message',
+      targetId: 'msg-null',
+      modelId: null,
+      sessionId: null,
+      reason: 'other',
+      context: { platform: 'mobile' },
+    });
+    const [nullRow] = await db
+      .select()
+      .from(content_moderation_reports)
+      .where(eq(content_moderation_reports.receipt_id, nulled.receiptId));
+    expect(nullRow.model_id).toBeNull();
+    expect(nullRow.session_id).toBeNull();
+    expect(nullRow.context_json).toEqual({ platform: 'mobile' });
   });
 
   it('rejects blocking the caller own GitHub login', async () => {

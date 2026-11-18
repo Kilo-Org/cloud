@@ -13,24 +13,15 @@ import {
   TerminalSquare,
   WifiOff,
 } from 'lucide-react';
+import { z } from 'zod';
 import { displayRepoName, relativeTime } from './agents-format';
 import { useExtensionAgents } from './agents-provider';
-
-// ---------------------------------------------------------------------------
-// Pinned query keys — same constants for queries and invalidations
-// ---------------------------------------------------------------------------
-
-const activeSessionsQueryKey = (organizationId: string | null) =>
-  ['agents', 'active-sessions', organizationId] as const;
-
-const sessionHistoryQueryKey = (organizationId: string | null) =>
-  ['agents', 'session-history', organizationId] as const;
-
-const sessionSearchQueryKey = (organizationId: string | null, query: string) =>
-  ['agents', 'session-search', organizationId, query] as const;
-
-// Exported for focused test coverage.
-export { activeSessionsQueryKey, sessionHistoryQueryKey, sessionSearchQueryKey };
+import { describeFetchError, ErrorNotice } from './error-notice';
+import {
+  activeSessionsQueryKey,
+  sessionHistoryQueryKey,
+  sessionSearchQueryKey,
+} from '@/src/shared/side-panel-query-options';
 
 /**
  * Input for `activeSessions.list`. Both the Active section and the History
@@ -50,9 +41,27 @@ const ACTIVE_POLL_DISCONNECTED_MS = 10_000;
 /** Suppress the Offline pill during the initial dial and transient blips. */
 const OFFLINE_PILL_GRACE_MS = 5000;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+/** One scheduled grace window: when the timer was armed, and when it is due. */
+interface GraceWindow {
+  readonly dueAt: number;
+  readonly startedAt: number;
+}
+
+const errorStatusShapeSchema = z.looseObject({
+  data: z.looseObject({ httpStatus: z.number().optional() }).optional(),
+  shape: z
+    .looseObject({ data: z.looseObject({ httpStatus: z.number().optional() }).optional() })
+    .optional(),
+});
+
+/** HTTP status a tRPC client error carries, so the copy names the real cause. */
+export const queryErrorStatus = (error: unknown): number | undefined => {
+  const parsed = errorStatusShapeSchema.safeParse(error);
+  if (!parsed.success) {
+    return undefined;
+  }
+  return parsed.data.data?.httpStatus ?? parsed.data.shape?.data?.httpStatus;
+};
 
 interface ActiveSessionRow {
   id: string;
@@ -109,10 +118,6 @@ export function mapHistorySessionRow(params: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Status badge classifier
-// ---------------------------------------------------------------------------
-
 /**
  * Map a wire status to one badge vocabulary. The wire carries `busy` for a
  * cloud agent and `running` for a CLI session; both mean the same thing to a
@@ -139,10 +144,6 @@ export const sessionStatusBadge = (
     label: lowerStatus.charAt(0).toUpperCase() + lowerStatus.slice(1),
   };
 };
-
-// ---------------------------------------------------------------------------
-// Shared layout + copy
-// ---------------------------------------------------------------------------
 
 /** One vertical rhythm for both sections. */
 const sectionClass = 'space-y-2 px-4 py-2';
@@ -176,10 +177,6 @@ export const historyEmptyMessage = ({
     : 'No sessions yet. Start your first session above.';
 };
 
-// ---------------------------------------------------------------------------
-// Active sessions section
-// ---------------------------------------------------------------------------
-
 const ActiveSessionsSection = ({
   onOpenSession,
   organizationId,
@@ -187,10 +184,14 @@ const ActiveSessionsSection = ({
   onOpenSession: (kiloSessionId: string) => void;
   organizationId: string | null;
 }): JSX.Element => {
-  const { trpcClient, userWebConnection } = useExtensionAgents();
+  const { token, trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
   const [connected, setConnected] = useState(() => userWebConnection.isConnected());
   const [showOffline, setShowOffline] = useState(false);
+  // The grace window the effect below schedules, exposed for the E2E.
+  // The effect runs after real async work: auth, storage, or the connect attempt.
+  // `Date.now()` is the page clock the test drives, so both instants are exact in its frame.
+  const [offlineGrace, setOfflineGrace] = useState<GraceWindow | null>(null);
 
   useEffect(() => {
     const unsubscribe = userWebConnection.onConnectionChange((connectedStatus: boolean) => {
@@ -203,8 +204,11 @@ const ActiveSessionsSection = ({
   useEffect(() => {
     if (connected) {
       setShowOffline(false);
+      setOfflineGrace(null);
       return;
     }
+    const startedAt = Date.now();
+    setOfflineGrace({ dueAt: startedAt + OFFLINE_PILL_GRACE_MS, startedAt });
     const timer = setTimeout(() => {
       setShowOffline(true);
     }, OFFLINE_PILL_GRACE_MS);
@@ -224,7 +228,9 @@ const ActiveSessionsSection = ({
 
     const unsubs = eventNames.map(event =>
       userWebConnection.onSessionEvent(event, () => {
-        void queryClient.invalidateQueries({ queryKey: activeSessionsQueryKey(organizationId) });
+        void queryClient.invalidateQueries({
+          queryKey: activeSessionsQueryKey({ organizationId, token }),
+        });
       })
     );
 
@@ -233,11 +239,11 @@ const ActiveSessionsSection = ({
         unsub();
       }
     };
-  }, [userWebConnection, queryClient, organizationId]);
+  }, [userWebConnection, queryClient, organizationId, token]);
 
   const { data, error, isError, isLoading, refetch, isRefetching } = useQuery({
     queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
-    queryKey: activeSessionsQueryKey(organizationId),
+    queryKey: activeSessionsQueryKey({ organizationId, token }),
     refetchInterval: connected ? ACTIVE_POLL_CONNECTED_MS : ACTIVE_POLL_DISCONNECTED_MS,
   });
 
@@ -245,6 +251,8 @@ const ActiveSessionsSection = ({
     () => data?.sessions.map(session => mapActiveSessionRow(session)) ?? [],
     [data]
   );
+
+  const errorDescription = describeFetchError(error, queryErrorStatus(error));
 
   if (isLoading) {
     return (
@@ -265,32 +273,27 @@ const ActiveSessionsSection = ({
           <Bot className="size-4 text-foreground-muted" />
           <span className="type-label text-foreground-muted">Active</span>
         </div>
-        <div className="rounded-lg border border-border bg-surface-raised p-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-red-400" />
-            <div className="min-w-0 flex-1">
-              <p className="type-label text-status-red-400">Failed to load active sessions</p>
-              <p className="type-label mt-0.5 text-foreground-muted">
-                {error instanceof Error ? error.message : 'An unexpected error occurred'}
-              </p>
-            </div>
-            <button
-              className="h-8 shrink-0 rounded-md border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-              disabled={isRefetching}
-              onClick={() => void refetch()}
-              type="button"
-            >
-              {isRefetching ? 'Retrying…' : 'Retry'}
-            </button>
-          </div>
-        </div>
+        <ErrorNotice
+          action={errorDescription.action}
+          busy={isRefetching}
+          detail={errorDescription.detail}
+          onRetry={() => void refetch()}
+          retryable={errorDescription.retryable}
+          title={errorDescription.title}
+        />
       </div>
     );
   }
 
   return (
     <div className={sectionClass}>
-      <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-2"
+        data-offline-grace-due-at={offlineGrace === null ? undefined : String(offlineGrace.dueAt)}
+        data-offline-grace-started-at={
+          offlineGrace === null ? undefined : String(offlineGrace.startedAt)
+        }
+      >
         <Bot className="size-4 text-foreground-muted" />
         <span className="type-label text-foreground-muted">Active</span>
         {showOffline ? (
@@ -303,17 +306,17 @@ const ActiveSessionsSection = ({
       {isError ? (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-raised p-2">
           <AlertTriangle className="size-4 shrink-0 text-status-red-400" />
-          <p className="min-w-0 flex-1 truncate type-label text-status-red-400">
-            Failed to refresh active sessions
-          </p>
-          <button
-            className="h-7 shrink-0 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-            disabled={isRefetching}
-            onClick={() => void refetch()}
-            type="button"
-          >
-            {isRefetching ? 'Retrying…' : 'Retry'}
-          </button>
+          <p className="min-w-0 flex-1 type-label text-status-red-400">{errorDescription.title}</p>
+          {errorDescription.retryable ? (
+            <button
+              className="h-7 shrink-0 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+              disabled={isRefetching}
+              onClick={() => void refetch()}
+              type="button"
+            >
+              {isRefetching ? 'Retrying…' : 'Retry'}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {sessions.length === 0 ? (
@@ -333,6 +336,7 @@ const ActiveSessionsSection = ({
             return (
               <button
                 className="w-full rounded-md px-2 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+                data-session-id={session.id}
                 key={session.id}
                 onClick={() => {
                   onOpenSession(session.id);
@@ -374,10 +378,6 @@ const ActiveSessionsSection = ({
   );
 };
 
-// ---------------------------------------------------------------------------
-// History sessions section
-// ---------------------------------------------------------------------------
-
 const HistorySessionsSection = ({
   onOpenSession,
   organizationId,
@@ -385,7 +385,7 @@ const HistorySessionsSection = ({
   onOpenSession: (kiloSessionId: string) => void;
   organizationId: string | null;
 }): JSX.Element => {
-  const { trpcClient } = useExtensionAgents();
+  const { token, trpcClient } = useExtensionAgents();
   const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -394,7 +394,7 @@ const HistorySessionsSection = ({
   // Sections consistent on every refetch.
   const { data: activeData } = useQuery({
     queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
-    queryKey: activeSessionsQueryKey(organizationId),
+    queryKey: activeSessionsQueryKey({ organizationId, token }),
   });
   const activeIds = useMemo(
     () => new Set((activeData?.sessions ?? []).map(session => session.id)),
@@ -428,7 +428,7 @@ const HistorySessionsSection = ({
         organizationId,
         search_string: searchQuery.trim(),
       }),
-    queryKey: sessionSearchQueryKey(organizationId, searchQuery.trim()),
+    queryKey: sessionSearchQueryKey({ organizationId, token }, searchQuery.trim()),
   });
 
   const {
@@ -455,7 +455,7 @@ const HistorySessionsSection = ({
         organizationId,
         ...(pageParam === undefined ? {} : { cursor: pageParam }),
       }),
-    queryKey: sessionHistoryQueryKey(organizationId),
+    queryKey: sessionHistoryQueryKey({ organizationId, token }),
   });
 
   /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion -- tRPC infinite query page type is unknown */
@@ -479,12 +479,9 @@ const HistorySessionsSection = ({
     [searchData]
   );
 
-  const errorMessage =
-    (searchError instanceof Error ? searchError.message : undefined) ??
-    (historyError instanceof Error ? historyError.message : undefined) ??
-    'Failed to load history';
-
   const hasError = isSearching ? isSearchError : isHistoryError;
+  const activeError = isSearching ? searchError : historyError;
+  const errorDescription = describeFetchError(activeError, queryErrorStatus(activeError));
   const isLoading = isSearching ? isSearchLoading : isHistoryLoading;
   const refetch = () => {
     if (isSearching) {
@@ -525,25 +522,14 @@ const HistorySessionsSection = ({
 
       {/* Error state */}
       {hasError ? (
-        <div className="rounded-lg border border-border bg-surface-raised p-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-red-400" />
-            <div className="min-w-0 flex-1">
-              <p className="type-label text-status-red-400">
-                {isSearching ? 'Search failed' : 'Failed to load sessions'}
-              </p>
-              <p className="type-label mt-0.5 break-words text-foreground-muted">{errorMessage}</p>
-            </div>
-            <button
-              className="h-8 shrink-0 rounded-md border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-              disabled={isRefetching}
-              onClick={refetch}
-              type="button"
-            >
-              {isRefetching ? 'Retrying…' : 'Retry'}
-            </button>
-          </div>
-        </div>
+        <ErrorNotice
+          action={errorDescription.action}
+          busy={isRefetching}
+          detail={errorDescription.detail}
+          onRetry={refetch}
+          retryable={errorDescription.retryable}
+          title={errorDescription.title}
+        />
       ) : null}
 
       {/* Loading state */}
@@ -571,6 +557,7 @@ const HistorySessionsSection = ({
           {rows.map(session => (
             <button
               className={`w-full rounded-md text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ${rowTextColumnClass}`}
+              data-session-id={session.id}
               key={session.id}
               onClick={() => {
                 onOpenSession(session.id);
@@ -608,10 +595,6 @@ const HistorySessionsSection = ({
     </div>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Session list root
-// ---------------------------------------------------------------------------
 
 // eslint-disable-next-line max-lines -- Cohesive list component; splitting Active/History sections would reduce clarity
 export const AgentsSessionList = ({

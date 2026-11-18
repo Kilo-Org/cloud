@@ -4,8 +4,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@kilocode/web-shared/*": ["../../packages/web-shared/src/*"],
       "@kilocode/db": ["../../packages/db/src/index.ts"],
       "@kilocode/db/*": ["../../packages/db/src/*"],
+      "@cloud-agent-shared": ["../../services/cloud-agent-next/src/shared/slash-commands.ts"],
+      "@cloud-agent-shared/*": ["../../services/cloud-agent-next/src/shared/*"],
       "server-only": ["src/scripts/lib/server-only-shim.ts"]
     }
   }

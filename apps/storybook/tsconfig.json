@@ -9,6 +9,7 @@
   },
   "include": [
     "../web/src/**/*",
+    "../../packages/web-shared/src/types/*.d.ts",
     "../web/.next/types/**/*.ts",
     ".storybook/**/*",
     "stories/**/*",

@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +13,7 @@ import { UserTablePagination } from './UserTablePagination';
 import { UserFilters } from './UserFilters';
 import type { UsersApiResponse, SortConfig, SortableField } from '@/types/admin';
 import { ascendingFirstFields } from '@/types/admin';
-import type { PageSize } from '@/types/pagination';
+import type { PageSize } from '@kilocode/web-shared/types/pagination';
 
 function toSortedSearchParams(obj: Record<string, unknown>): URLSearchParams {
   const params = new URLSearchParams();
@@ -58,9 +60,12 @@ export function UsersTable() {
   const { data, isLoading, error, isFetching } = useQuery({
     queryKey: ['admin-users', queryStringState] as const,
     queryFn: async ({ queryKey: [, params], signal }) => {
-      const response = await fetch(`/admin/api/users?${toSortedSearchParams(params).toString()}`, {
-        signal,
-      });
+      const response = await adminFetch(
+        `/admin/api/users?${toSortedSearchParams(params).toString()}`,
+        {
+          signal,
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch users');

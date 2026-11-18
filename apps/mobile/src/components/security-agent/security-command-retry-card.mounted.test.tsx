@@ -1,13 +1,12 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
 // Retry-card contract: a retryable failure shows the stored error plus Retry
 // and Discard; a non-retryable failure keeps the card but hides Retry (the
 // draft stays so the state survives restart).
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { SecurityCommandRetryCard } from './security-command-retry-card';
 
 vi.mock('react-native', () => ({
@@ -53,11 +52,26 @@ function renderedTexts(root: I): string[] {
 
 describe('SecurityCommandRetryCard', () => {
   it('shows the stored error and both actions for a retryable failure', () => {
-    const root = renderCard({ lastError: 'Network error', retryable: true });
+    const root = renderCard({
+      lastError: 'Network error',
+      retryable: true,
+      onDiscard: vi.fn((): void => undefined),
+    });
 
     expect(renderedTexts(root.root)).toContain('Network error');
     expect(renderedTexts(root.root)).toContain('Retry');
     expect(renderedTexts(root.root)).toContain('Discard');
+  });
+
+  it('omits Discard when no discard handler is provided', () => {
+    const root = renderCard({
+      lastError: 'Network error',
+      retryable: true,
+      onRetry: vi.fn((): void => undefined),
+    });
+
+    expect(renderedTexts(root.root)).toContain('Retry');
+    expect(renderedTexts(root.root)).not.toContain('Discard');
   });
 
   it('hides Retry for a non-retryable failure but keeps the card', () => {

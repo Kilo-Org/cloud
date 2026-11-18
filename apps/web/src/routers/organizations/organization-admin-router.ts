@@ -1,5 +1,11 @@
-import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { resolvePaidCreditPolicy } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 import {
   organizations,
   organization_memberships,
@@ -31,24 +37,28 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { getLowerDomainFromEmail, isValidUUID, toMicrodollars } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { isValidUUID } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
   getOrganizationById,
   addUserToOrganization,
   markOrganizationAsDeleted,
-} from '@/lib/organizations/organizations';
-import { OrganizationRoleSchema } from '@/lib/organizations/organization-types';
+  mutateOrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { TRPCError } from '@trpc/server';
-import { successResult } from '@/lib/maybe-result';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { getAdminCreditTransactionsForOrganization } from '@kilocode/web-shared/lib/creditTransactions';
 import {
   assertOrganizationHierarchyChangeAllowed,
   KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
@@ -58,8 +68,7 @@ import {
   fetchExpiringTransactionsForOrganization,
   computeNextExpirationAmount,
   processOrganizationExpirations,
-  closeOutExpiringOrganizationCredits,
-} from '@/lib/creditExpiration';
+} from '@kilocode/web-shared/lib/creditExpiration';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
@@ -70,6 +79,16 @@ import {
   createChildOrganization,
   validateParentOrganizationChange,
 } from '@/lib/organizations/organization-hierarchy';
+import {
+  getOrganizationServiceFeeExemption,
+  OrganizationServiceFeeExemptionError,
+  ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH,
+  ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH,
+  setOrganizationServiceFeeExemption,
+} from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import { createDefaultOrganizationServiceFeeExemptionStore } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { invalidateOrganizationSessionAccessForUsers } from '@/lib/organizations/organization-member-removal';
+import { runAfterResponse } from '@/lib/after-response';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -117,7 +136,11 @@ const OrganizationSearchResultSchema = z.object({
 });
 
 const OrganizationCreateInputSchema = z.object({
-  name: z.string().min(1, 'Organization name is required').trim(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Organization name is required')
+    .refine(hasVisibleText, 'Organization name is required'),
   parentOrganizationId: z.uuid().nullable().optional(),
 });
 
@@ -145,6 +168,11 @@ const UpdateSuppressTrialMessagingInputSchema = z.object({
   suppress_trial_messaging: z.boolean(),
 });
 
+const UpdateKiloEncryptInputSchema = z.object({
+  organizationId: z.uuid(),
+  kilo_encrypt: z.boolean(),
+});
+
 const AdminOrganizationDetailsSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -155,6 +183,7 @@ const AdminOrganizationDetailsSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
+  stripe_customer_id: z.string().nullable(),
   integrations: z.array(
     z.object({
       platform: z.string(),
@@ -203,11 +232,36 @@ const AdminOrganizationHierarchySchema = z.object({
   children: z.array(OrganizationHierarchySummarySchema),
 });
 
+const SetServiceFeeExemptionInputSchema = z.object({
+  organizationId: z.uuid(),
+  isExempt: z.boolean(),
+  reason: z
+    .string()
+    .trim()
+    .min(ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH)
+    .max(ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH),
+});
+
+const AdminOrganizationServiceFeeExemptionRecordSchema = z.object({
+  id: z.uuid(),
+  organizationId: z.uuid(),
+  isExempt: z.boolean(),
+  reason: z.string(),
+  changedByKiloUserId: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+const AdminOrganizationServiceFeeExemptionViewSchema = z.object({
+  current: AdminOrganizationServiceFeeExemptionRecordSchema.nullable(),
+  history: z.array(AdminOrganizationServiceFeeExemptionRecordSchema),
+});
+
 const GrantCreditInputSchema = z
   .object({
     organizationId: z.uuid(),
     amount_usd: z.number().refine(n => n !== 0, 'Amount cannot be zero'),
     description: z.string().optional(),
+    creditKind: z.enum(['paid', 'promotional']).default('promotional'),
     expiry_date: z.string().datetime().nullable().optional(),
     expiry_hours: z.number().positive().nullable().optional(),
   })
@@ -217,6 +271,20 @@ const GrantCreditInputSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Description is required when granting negative credits',
         path: ['description'],
+      });
+    }
+    // Negative grants and paid credits store no admin expiry, so their supplied
+    // expiry_date has no effect and is not validated here.
+    if (
+      data.amount_usd > 0 &&
+      data.creditKind !== 'paid' &&
+      data.expiry_date &&
+      new Date(data.expiry_date).getTime() <= Date.now()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Expiry date must be in the future',
+        path: ['expiry_date'],
       });
     }
   });
@@ -249,103 +317,156 @@ const AddMemberInputSchema = z.object({
   role: OrganizationRoleSchema,
 });
 
-export const organizationAdminRouter = createTRPCRouter({
-  create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async opts => {
-    const parentOrganizationId = opts.input.parentOrganizationId ?? null;
+const SearchParentMembersInputSchema = z.object({
+  organizationId: z.uuid(),
+  search: z.string().trim().min(1).max(200),
+});
 
-    if (!parentOrganizationId) {
-      const organization = await createOrganization(opts.input.name);
+export const organizationAdminRouter = createTRPCRouter({
+  create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async ({ input, ctx }) => {
+    const parentOrganizationId = input.parentOrganizationId ?? null;
+
+    let organization;
+    if (parentOrganizationId) {
+      organization = await createChildOrganization(input.name, parentOrganizationId);
+    } else {
+      organization = await createOrganization(input.name);
       await getOrCreateStripeCustomerIdForOrganization(organization.id);
-      return { organization };
     }
 
-    const organization = await createChildOrganization(opts.input.name, parentOrganizationId);
+    await recordAdminAction(ctx, {
+      action: 'organization.create',
+      target: organizationActionTarget(organization.id),
+      message: parentOrganizationId ? 'Created child organization' : 'Created organization',
+      metadata: { name: input.name, parentOrganizationId },
+    });
+
     return { organization };
   }),
 
-  setParent: adminProcedure.input(SetParentOrganizationInputSchema).mutation(async ({ input }) => {
-    try {
-      await db.transaction(async tx => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
-        await validateParentOrganizationChange(
-          input.organizationId,
-          input.parentOrganizationId,
-          tx
-        );
+  setParent: adminProcedure
+    .input(SetParentOrganizationInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      let previous;
+      try {
+        previous = await db.transaction(async tx => {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+          await validateParentOrganizationChange(
+            input.organizationId,
+            input.parentOrganizationId,
+            tx
+          );
 
-        await assertOrganizationHierarchyChangeAllowed(
-          tx,
-          input.organizationId,
-          input.parentOrganizationId
-        );
-
-        await tx
-          .update(organizations)
-          .set(
+          await assertOrganizationHierarchyChangeAllowed(
+            tx,
+            input.organizationId,
             input.parentOrganizationId
-              ? {
-                  parent_organization_id: input.parentOrganizationId,
-                  require_seats: false,
-                  free_trial_end_at: null,
-                  settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
-                }
-              : { parent_organization_id: input.parentOrganizationId }
-          )
-          .where(eq(organizations.id, input.organizationId));
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+          );
+
+          const [before] = await tx
+            .select({
+              parent_organization_id: organizations.parent_organization_id,
+              require_seats: organizations.require_seats,
+              free_trial_end_at: organizations.free_trial_end_at,
+            })
+            .from(organizations)
+            .where(eq(organizations.id, input.organizationId));
+
+          await tx
+            .update(organizations)
+            .set(
+              input.parentOrganizationId
+                ? {
+                    parent_organization_id: input.parentOrganizationId,
+                    require_seats: false,
+                    free_trial_end_at: null,
+                    settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
+                  }
+                : { parent_organization_id: input.parentOrganizationId }
+            )
+            .where(eq(organizations.id, input.organizationId));
+
+          return before;
         });
+      } catch (error) {
+        if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+          });
+        }
+        throw error;
       }
-      throw error;
-    }
 
-    return successResult();
-  }),
-
-  updateCreatedBy: adminProcedure.input(UpdateCreatedByInputSchema).mutation(async ({ input }) => {
-    const { organizationId, userId } = input;
-
-    // Validate that the organization exists
-    const organization = await db.query.organizations.findFirst({
-      where: eq(organizations.id, organizationId),
-    });
-
-    if (!organization) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Organization not found',
-      });
-    }
-
-    // If userId is provided, validate that the user exists
-    if (userId !== null) {
-      const user = await db.query.kilocode_users.findFirst({
-        where: eq(kilocode_users.id, userId),
+      await recordAdminAction(ctx, {
+        action: 'organization.parent.set',
+        target: organizationActionTarget(input.organizationId),
+        message: input.parentOrganizationId
+          ? 'Set parent organization'
+          : 'Removed parent organization',
+        metadata: {
+          previousParentOrganizationId: previous?.parent_organization_id ?? null,
+          parentOrganizationId: input.parentOrganizationId,
+          previousRequireSeats: previous?.require_seats ?? null,
+          previousFreeTrialEndAt: previous?.free_trial_end_at ?? null,
+        },
       });
 
-      if (!user) {
+      return successResult();
+    }),
+
+  updateCreatedBy: adminProcedure
+    .input(UpdateCreatedByInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, userId } = input;
+
+      // Validate that the organization exists
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+      });
+
+      if (!organization) {
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'User not found',
+          message: 'Organization not found',
         });
       }
-    }
 
-    await db
-      .update(organizations)
-      .set({ created_by_kilo_user_id: userId })
-      .where(eq(organizations.id, organizationId));
+      // If userId is provided, validate that the user exists
+      if (userId !== null) {
+        const user = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, userId),
+        });
 
-    return successResult();
-  }),
+        if (!user) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User not found',
+          });
+        }
+      }
+
+      await db
+        .update(organizations)
+        .set({ created_by_kilo_user_id: userId })
+        .where(eq(organizations.id, organizationId));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.created_by.set',
+        target: organizationActionTarget(organizationId),
+        message: userId ? 'Changed organization creator' : 'Cleared organization creator',
+        metadata: {
+          previousCreatedByKiloUserId: organization.created_by_kilo_user_id,
+          createdByKiloUserId: userId,
+        },
+      });
+
+      return successResult();
+    }),
 
   updateFreeTrialEndAt: adminProcedure
     .input(UpdateFreeTrialEndAtInputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { organizationId, free_trial_end_at } = input;
 
       // Validate that the organization exists
@@ -361,12 +482,22 @@ export const organizationAdminRouter = createTRPCRouter({
         .set({ free_trial_end_at })
         .where(eq(organizations.id, organizationId));
 
+      await recordAdminAction(ctx, {
+        action: 'organization.free_trial_end.set',
+        target: organizationActionTarget(organizationId),
+        message: 'Changed free trial end date',
+        metadata: {
+          previousFreeTrialEndAt: organization.free_trial_end_at,
+          freeTrialEndAt: free_trial_end_at,
+        },
+      });
+
       return successResult();
     }),
 
   updateSuppressTrialMessaging: adminProcedure
     .input(UpdateSuppressTrialMessagingInputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { organizationId, suppress_trial_messaging } = input;
 
       // Validate that the organization exists
@@ -387,6 +518,47 @@ export const organizationAdminRouter = createTRPCRouter({
         .update(organizations)
         .set({ settings: updatedSettings })
         .where(eq(organizations.id, organizationId));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.trial_messaging.set',
+        target: organizationActionTarget(organizationId),
+        message: suppress_trial_messaging
+          ? 'Suppressed trial messaging'
+          : 'Restored trial messaging',
+        metadata: {
+          previousSuppressTrialMessaging: organization.settings.suppress_trial_messaging ?? null,
+          suppressTrialMessaging: suppress_trial_messaging,
+        },
+      });
+
+      return successResult();
+    }),
+
+  updateKiloEncrypt: adminProcedure
+    .input(UpdateKiloEncryptInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, kilo_encrypt } = input;
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+      });
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      await mutateOrganizationSettings(organizationId, current => ({
+        ...current.settings,
+        kilo_encrypt,
+      }));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.kilo_encrypt.set',
+        target: organizationActionTarget(organizationId),
+        message: kilo_encrypt ? 'Enabled AI Guardrails' : 'Disabled AI Guardrails',
+        metadata: {
+          previousKiloEncrypt: organization.settings.kilo_encrypt ?? null,
+          kiloEncrypt: kilo_encrypt,
+        },
+      });
 
       return successResult();
     }),
@@ -409,6 +581,7 @@ export const organizationAdminRouter = createTRPCRouter({
             created_by_kilo_user_id: organizations.created_by_kilo_user_id,
             created_by_user_email: kilocode_users.google_user_email,
             created_by_user_name: kilocode_users.google_user_name,
+            stripe_customer_id: organizations.stripe_customer_id,
           })
           .from(organizations)
           .leftJoin(kilocode_users, eq(organizations.created_by_kilo_user_id, kilocode_users.id))
@@ -529,6 +702,47 @@ export const organizationAdminRouter = createTRPCRouter({
       })
     ),
 
+  getServiceFeeExemption: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(AdminOrganizationServiceFeeExemptionViewSchema)
+    .query(({ input }) =>
+      getOrganizationServiceFeeExemption({
+        store: createDefaultOrganizationServiceFeeExemptionStore(),
+        organizationId: input.organizationId,
+      })
+    ),
+
+  setServiceFeeExemption: adminProcedure
+    .input(SetServiceFeeExemptionInputSchema)
+    .output(
+      z.object({
+        current: AdminOrganizationServiceFeeExemptionRecordSchema,
+        history: AdminOrganizationServiceFeeExemptionRecordSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await setOrganizationServiceFeeExemption({
+          store: createDefaultOrganizationServiceFeeExemptionStore(),
+          organizationId: input.organizationId,
+          isExempt: input.isExempt,
+          reason: input.reason,
+          changedByKiloUserId: ctx.user.id,
+        });
+      } catch (error) {
+        if (
+          error instanceof OrganizationServiceFeeExemptionError &&
+          error.code === 'organization_not_found'
+        ) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Organization not found',
+          });
+        }
+        throw error;
+      }
+    }),
+
   getHierarchy: adminProcedure
     .input(OrganizationIdInputSchema)
     .output(AdminOrganizationHierarchySchema)
@@ -636,16 +850,8 @@ export const organizationAdminRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        await processOrganizationExpirations(
-          {
-            id: organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        organization = (await getOrganizationById(organizationId)) ?? organization;
+        const expiryResult = await processOrganizationExpirations(organizationId, new Date());
+        organization = { ...organization, ...expiryResult };
       }
 
       const next_credit_expiration_at = organization.next_credit_expiration_at
@@ -683,6 +889,15 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       const amountMicrodollars = toMicrodollars(amount_usd);
+      const issuedAt = new Date();
+      const paidPolicy =
+        input.creditKind === 'paid' && amount_usd > 0
+          ? resolvePaidCreditPolicy({
+              source: 'admin',
+              purchasedAt: issuedAt,
+              terms: getPaidCreditTerms('admin', issuedAt),
+            })
+          : null;
 
       const explicit_expiry_date = input.expiry_date ? new Date(input.expiry_date) : null;
       const expiryFromHours = input.expiry_hours
@@ -690,34 +905,60 @@ export const organizationAdminRouter = createTRPCRouter({
         : null;
       // Negative grants must not expire (expiring a negative would mint credits)
       const credit_expiry_date =
-        amount_usd < 0
+        amount_usd < 0 || paidPolicy
           ? null
           : explicit_expiry_date && expiryFromHours
             ? explicit_expiry_date < expiryFromHours
               ? explicit_expiry_date
               : expiryFromHours
             : (explicit_expiry_date ?? expiryFromHours);
+      const expiresAt = paidPolicy?.expiry_date ?? credit_expiry_date?.toISOString() ?? null;
 
       await db.transaction(async tx => {
-        const [org] = await tx
-          .select({ microdollars_used: organizations.microdollars_used })
-          .from(organizations)
-          .where(eq(organizations.id, organizationId))
-          .for('update');
+        if (amountMicrodollars < 0) {
+          await retireCreditBalance(tx, {
+            owner: { type: 'organization', id: organizationId },
+            actorId: user.id,
+            creditCategory: 'organization_custom',
+            description: description?.trim() || 'Admin credit debit',
+            amountMicrodollars: -amountMicrodollars,
+            now: issuedAt,
+          });
+          return;
+        }
+        const org = await reconcileCreditExpirationsInTransaction(
+          { type: 'organization', id: organizationId },
+          tx,
+          issuedAt
+        );
 
-        await tx.insert(credit_transactions).values({
-          kilo_user_id: user.id,
-          created_by_kilo_user_id: user.id,
-          is_free: true,
-          amount_microdollars: amountMicrodollars,
-          description: description?.trim() || 'Admin credit grant',
-          credit_category: 'organization_custom',
-          expiry_date: credit_expiry_date?.toISOString() ?? null,
-          organization_id: organizationId,
-          original_baseline_microdollars_used: org?.microdollars_used ?? 0,
-          expiration_baseline_microdollars_used: credit_expiry_date
-            ? (org?.microdollars_used ?? 0)
-            : null,
+        const [grant] = await tx
+          .insert(credit_transactions)
+          .values({
+            kilo_user_id: user.id,
+            created_by_kilo_user_id: user.id,
+            is_free: input.creditKind !== 'paid',
+            amount_microdollars: amountMicrodollars,
+            description: description?.trim() || 'Admin credit grant',
+            credit_category: 'organization_custom',
+            ...(paidPolicy ?? {}),
+            credit_source: paidPolicy?.credit_source ?? 'promotion',
+            expiry_date: expiresAt,
+            organization_id: organizationId,
+            original_baseline_microdollars_used: org.microdollars_used,
+            expiration_baseline_microdollars_used: Math.min(
+              org.microdollars_used,
+              org.total_microdollars_acquired
+            ),
+          })
+          .returning({ id: credit_transactions.id });
+        if (!grant) throw new Error('Organization grant insertion failed');
+        await recordRefundDebtRepayment(tx, {
+          owner: { type: 'organization', id: organizationId },
+          transactionId: grant.id,
+          priorAcquired: org.total_microdollars_acquired,
+          priorUsed: org.microdollars_used,
+          amountMicrodollars,
         });
 
         await tx
@@ -725,26 +966,12 @@ export const organizationAdminRouter = createTRPCRouter({
           .set({
             total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
             microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
-            ...(credit_expiry_date && {
-              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
+            ...(expiresAt && {
+              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${expiresAt}), ${expiresAt})`,
             }),
           })
           .where(eq(organizations.id, organizationId));
       });
-
-      if (amountMicrodollars > 0 && existingOrg.created_by_kilo_user_id) {
-        void reportEvents({
-          events: [
-            {
-              type: 'billing.credit_purchased',
-              data: {
-                kilo_user_id: existingOrg.created_by_kilo_user_id,
-                microdollars_acquired: amountMicrodollars,
-              },
-            },
-          ],
-        });
-      }
 
       return {
         message: `Successfully granted $${amount_usd} credits to organization ${existingOrg.name}`,
@@ -777,52 +1004,22 @@ export const organizationAdminRouter = createTRPCRouter({
           });
         }
 
-        const currentBalance = lockedOrg.total_microdollars_acquired - lockedOrg.microdollars_used;
-
-        if (currentBalance <= 0) {
+        const retired = await retireCreditBalance(tx, {
+          owner: { type: 'organization', id: organizationId },
+          actorId: user.id,
+          creditCategory: 'organization_custom',
+          description: description?.trim() || 'Admin credit nullification',
+        });
+        if (retired <= 0) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Organization has no credits to nullify',
           });
         }
 
-        // Close out any still-open expiring grants first, so their expiry claim
-        // can never be counted again (e.g. by the Balance page's "credits
-        // expiring soon" total) once this organization's credits are re-granted
-        // later with a different expiration date.
-        const closedOutExpiring = await closeOutExpiringOrganizationCredits(
-          organizationId,
-          lockedOrg.microdollars_used,
-          tx
-        );
-        const remainingToOffset = Math.max(0, currentBalance + closedOutExpiring);
-
-        if (remainingToOffset > 0) {
-          await tx.insert(credit_transactions).values({
-            kilo_user_id: user.id,
-            created_by_kilo_user_id: user.id,
-            is_free: true,
-            amount_microdollars: -remainingToOffset,
-            description: description?.trim() || 'Admin credit nullification',
-            credit_category: 'organization_custom',
-            expiry_date: null,
-            organization_id: organizationId,
-            original_baseline_microdollars_used: lockedOrg.microdollars_used,
-          });
-        }
-
-        await tx
-          .update(organizations)
-          .set({
-            total_microdollars_acquired: sql`${organizations.microdollars_used}`,
-            microdollars_balance: 0,
-            next_credit_expiration_at: null,
-          })
-          .where(eq(organizations.id, organizationId));
-
         return {
           orgName: lockedOrg.name,
-          amountUsdNullified: currentBalance / 1_000_000,
+          amountUsdNullified: retired / 1_000_000,
         };
       });
 
@@ -870,6 +1067,53 @@ export const organizationAdminRouter = createTRPCRouter({
     };
   }),
 
+  searchParentMembers: adminProcedure
+    .input(SearchParentMembersInputSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization?.parent_organization_id) {
+        return { users: [] };
+      }
+
+      const childMemberships = alias(organization_memberships, 'child_memberships');
+      const pattern = `%${input.search}%`;
+      const users = await db
+        .select({
+          id: kilocode_users.id,
+          google_user_email: kilocode_users.google_user_email,
+          google_user_name: kilocode_users.google_user_name,
+        })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .leftJoin(
+          childMemberships,
+          and(
+            eq(childMemberships.organization_id, organization.id),
+            eq(childMemberships.kilo_user_id, kilocode_users.id)
+          )
+        )
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(kilocode_users.is_bot, false),
+            isNull(childMemberships.id),
+            or(
+              ilike(kilocode_users.google_user_email, pattern),
+              ilike(kilocode_users.google_user_name, pattern)
+            )
+          )
+        )
+        .limit(10);
+
+      return { users };
+    }),
   addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, userId, role } = input;
 
@@ -887,6 +1131,35 @@ export const organizationAdminRouter = createTRPCRouter({
         code: 'NOT_FOUND',
         message: 'User not found',
       });
+    }
+
+    if (organization.parent_organization_id) {
+      const [parentMembership] = await db
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(organization_memberships.kilo_user_id, userId),
+            eq(kilocode_users.is_bot, false)
+          )
+        )
+        .limit(1);
+      if (!parentMembership || existingUser.is_bot) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Child organizations can only add people who are already members of the parent organization.',
+        });
+      }
     }
 
     const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);
@@ -933,7 +1206,7 @@ export const organizationAdminRouter = createTRPCRouter({
     return successResult();
   }),
 
-  delete: adminProcedure.input(OrganizationIdInputSchema).mutation(async ({ input }) => {
+  delete: adminProcedure.input(OrganizationIdInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId } = input;
 
     const existingOrg = await getOrganizationById(organizationId);
@@ -968,11 +1241,12 @@ export const organizationAdminRouter = createTRPCRouter({
       }
     }
 
+    let affectedUserIds: string[] = [];
     try {
       await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
         await assertOrganizationHierarchyChangeAllowed(tx, organizationId);
-        await markOrganizationAsDeleted(organizationId, tx);
+        affectedUserIds = await markOrganizationAsDeleted(organizationId, tx);
       });
     } catch (error) {
       if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
@@ -984,19 +1258,20 @@ export const organizationAdminRouter = createTRPCRouter({
       throw error;
     }
 
-    if (existingOrg.created_by_kilo_user_id) {
-      void reportEvents({
-        events: [
-          {
-            type: 'org.deleted',
-            data: {
-              kilo_user_id: existingOrg.created_by_kilo_user_id,
-              organization_id: organizationId,
-            },
-          },
-        ],
-      });
-    }
+    await recordAdminAction(ctx, {
+      action: 'organization.delete',
+      target: organizationActionTarget(organizationId),
+      message: 'Deleted organization',
+      metadata: { name: existingOrg.name },
+    });
+
+    // The database already denies access: the organization is soft-deleted.
+    // Cached grants expire within the documented cache bound, so fan-out is
+    // best-effort and bounded after the response instead of extending the
+    // admin mutation for every member.
+    await runAfterResponse(() =>
+      invalidateOrganizationSessionAccessForUsers(organizationId, affectedUserIds)
+    );
 
     return successResult();
   }),
@@ -1243,30 +1518,45 @@ export const organizationAdminRouter = createTRPCRouter({
         : baseQueryWithCommonJoins;
 
       // Add mode-based and stripe_status conditions
-      const statusConditions = whereCondition ? [whereCondition] : [];
+      const statusConditions: (SQL | undefined)[] = whereCondition ? [whereCondition] : [];
 
       if (mode === 'paying') {
-        // Paying: has at least one seats purchase record (active or churned customers)
+        // Old form required a seats purchase; sales-demo orgs have none;
+        // include them so admins can reopen.
         statusConditions.push(
-          sql`EXISTS (
-            SELECT 1 FROM ${organization_seats_purchases}
-            WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-          )`
+          or(
+            sql`EXISTS (
+              SELECT 1 FROM ${organization_seats_purchases}
+              WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+            )`,
+            sql`${organizations.settings}->>'is_sales_demo' = 'true'`
+          )
         );
       } else if (mode === 'trial') {
-        // Trial: has never had a seats purchase
+        // Trial: has never had a seats purchase. Exclude sales-demo orgs so
+        // they don't appear on both the paying and trial lists.
         statusConditions.push(
           sql`NOT EXISTS (
             SELECT 1 FROM ${organization_seats_purchases}
             WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
           )`
         );
+        statusConditions.push(
+          sql`${organizations.settings}->>'is_sales_demo' IS DISTINCT FROM 'true'`
+        );
       }
       // mode === 'all': no subscription filter
 
       // Filter by Stripe subscription status (latest subscription for this org)
       if (stripe_status) {
-        statusConditions.push(sql`${latestSubscriptions.subscription_status} = ${stripe_status}`);
+        // Old form required the latest subscription status to match; sales-demo
+        // orgs have no seats purchase, so include them for admins.
+        statusConditions.push(
+          or(
+            sql`${latestSubscriptions.subscription_status} = ${stripe_status}`,
+            sql`${organizations.settings}->>'is_sales_demo' = 'true'`
+          )
+        );
       }
 
       const finalWhereCondition =

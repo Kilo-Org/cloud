@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   verifyUserOwnsSessionV2ByCloudAgentId,
   verifyOrgOwnsSessionV2ByCloudAgentId,
@@ -9,6 +9,7 @@ import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const streamTicketSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
@@ -49,7 +50,7 @@ function handleTRPCError(error: unknown): NextResponse {
  *
  * Ticket expires in 60 seconds to limit replay window.
  */
-export async function POST(request: Request) {
+async function postStreamTicketHandler(request: Request) {
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
 
@@ -80,50 +81,39 @@ export async function POST(request: Request) {
 
     const { cloudAgentSessionId, organizationId } = validation.data;
 
-    if (organizationId) {
-      const sessionOwnership = await verifyOrgOwnsSessionV2ByCloudAgentId(
-        db,
-        organizationId,
-        user.id,
-        cloudAgentSessionId
-      );
+    const sessionAccess = organizationId
+      ? {
+          verify: () =>
+            verifyOrgOwnsSessionV2ByCloudAgentId(db, organizationId, user.id, cloudAgentSessionId),
+          refusal: 'Organization does not own this session',
+          ticketFields: { organizationId },
+        }
+      : {
+          verify: () => verifyUserOwnsSessionV2ByCloudAgentId(db, user.id, cloudAgentSessionId),
+          refusal: 'Session not found or access denied',
+          ticketFields: {},
+        };
 
-      if (!sessionOwnership) {
-        return NextResponse.json(
-          { error: 'Organization does not own this session' },
-          { status: 403 }
-        );
-      }
-      const kiloSessionId: string | undefined = sessionOwnership.kiloSessionId;
+    const sessionOwnership = await sessionAccess.verify();
 
-      const result = signStreamTicket({
-        userId: user.id,
-        kiloSessionId,
-        cloudAgentSessionId,
-        organizationId,
-      });
-      return NextResponse.json(result);
-    } else {
-      // Personal context: verify user owns the session
-      const sessionOwnership = await verifyUserOwnsSessionV2ByCloudAgentId(
-        db,
-        user.id,
-        cloudAgentSessionId
-      );
-
-      if (!sessionOwnership) {
-        return NextResponse.json({ error: 'Session not found or access denied' }, { status: 403 });
-      }
-      const kiloSessionId: string | undefined = sessionOwnership.kiloSessionId;
-
-      const result = signStreamTicket({
-        userId: user.id,
-        kiloSessionId,
-        cloudAgentSessionId,
-      });
-      return NextResponse.json(result);
+    if (!sessionOwnership) {
+      return NextResponse.json({ error: sessionAccess.refusal }, { status: 403 });
     }
+
+    return NextResponse.json(
+      signStreamTicket({
+        userId: user.id,
+        kiloSessionId: sessionOwnership.kiloSessionId,
+        cloudAgentSessionId,
+        ...sessionAccess.ticketFields,
+      })
+    );
   } catch (error) {
     return handleTRPCError(error);
   }
 }
+
+export const POST = withRestTiming(
+  '/api/cloud-agent-next/sessions/stream-ticket',
+  postStreamTicketHandler
+);

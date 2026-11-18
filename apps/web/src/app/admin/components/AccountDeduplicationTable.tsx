@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -47,7 +49,7 @@ export function AccountDeduplicationTable() {
     [searchParams, router, pathname]
   );
 
-  const { data, isLoading } = useQuery<AccountDeduplicationResponse>({
+  const { data, isLoading, isError } = useQuery<AccountDeduplicationResponse>({
     queryKey: ['account-deduplication', page, minAccounts, hideAllBlocked],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -56,7 +58,10 @@ export function AccountDeduplicationTable() {
         minAccounts: String(minAccounts),
         hideAllBlocked: String(hideAllBlocked),
       });
-      const res = await fetch(`/admin/api/account-deduplication?${params}`);
+      const res = await adminFetch(`/admin/api/account-deduplication?${params}`);
+      if (!res.ok) {
+        throw new Error(`Failed to load duplicate accounts (${res.status})`);
+      }
       return res.json() as Promise<AccountDeduplicationResponse>;
     },
   });
@@ -135,6 +140,12 @@ export function AccountDeduplicationTable() {
                   ))}
                 </TableRow>
               ))
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center">
+                  <p className="text-destructive">Could not load duplicate accounts.</p>
+                </TableCell>
+              </TableRow>
             ) : groups.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">
@@ -146,6 +157,7 @@ export function AccountDeduplicationTable() {
                 <DuplicateGroupRows
                   key={group.normalized_email}
                   normalizedEmail={group.normalized_email}
+                  accountCount={group.account_count}
                   users={group.users}
                 />
               ))
@@ -185,11 +197,14 @@ export function AccountDeduplicationTable() {
 
 function DuplicateGroupRows({
   normalizedEmail,
+  accountCount,
   users,
 }: {
   normalizedEmail: string;
+  accountCount: number;
   users: AccountDeduplicationResponse['groups'][number]['users'];
 }) {
+  const isPartial = users.length < accountCount;
   return (
     <>
       {users.map((user, i) => (
@@ -202,8 +217,18 @@ function DuplicateGroupRows({
               <div className="flex flex-col gap-1">
                 <span>{normalizedEmail}</span>
                 <div className="flex items-center gap-1">
-                  <Badge variant="secondary">{users.length}</Badge>
-                  <CopyTextButton text={users.map(u => u.google_user_email).join('\n')} showText />
+                  <Badge variant="secondary">
+                    {isPartial ? `${users.length} of ${accountCount}` : accountCount}
+                  </Badge>
+                  <CopyTextButton
+                    text={users.map(u => u.google_user_email).join('\n')}
+                    description={
+                      isPartial
+                        ? `Copy the ${users.length} listed email addresses; ${accountCount - users.length} more accounts in this group are not listed`
+                        : undefined
+                    }
+                    showText
+                  />
                 </div>
               </div>
             </TableCell>

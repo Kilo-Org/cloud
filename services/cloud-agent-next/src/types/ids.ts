@@ -22,25 +22,17 @@ export type ExecutionId = `exc_${string}`;
  */
 export type EventSourceId = ExecutionId;
 
-/**
- * Session identifier - supports both:
- * - `sess_*` for new WebSocket sessions
- * - `agent_*` for backward compatibility with existing session format
- */
-export type SessionId = `sess_${string}` | `agent_${string}`;
+/** Cloud session identity. */
+export type SessionId = `workspace_${string}`;
 
 /** Unique identifier for an execution lease */
 export type LeaseId = `lease_${string}`;
 
 /** User identifier from the authentication system */
-export type UserId = `user_${string}`;
+export type UserId = string;
 
 /** Auto-incrementing event ID in SQLite storage */
 export type EventId = number;
-
-// ---------------------------------------------------------------------------
-// ID Generators
-// ---------------------------------------------------------------------------
 
 /** Generate a new unique execution ID (exc_<ulid> format for execution tracking) */
 export const createExecutionId = (): ExecutionId => `exc_${ulid()}`;
@@ -48,16 +40,11 @@ export const createExecutionId = (): ExecutionId => `exc_${ulid()}`;
 /** Generate a new unique lease ID */
 export const createLeaseId = (): LeaseId => `lease_${crypto.randomUUID()}`;
 
-// ---------------------------------------------------------------------------
-// Type Guards
-// ---------------------------------------------------------------------------
-
 /** Check if a string is a valid ExecutionId (exc_<ulid> format) */
 export const isExecutionId = (s: string): s is ExecutionId => s.startsWith('exc_');
 
-/** Check if a string is a valid SessionId (supports both sess_ and agent_ prefixes) */
-export const isSessionId = (s: string): s is SessionId =>
-  s.startsWith('sess_') || s.startsWith('agent_');
+/** Check whether an ID uses the cloud session namespace. */
+export const isSessionId = (s: string): s is SessionId => s.startsWith('workspace_');
 
 /** Check if a string is a valid LeaseId */
 export const isLeaseId = (s: string): s is LeaseId => s.startsWith('lease_');

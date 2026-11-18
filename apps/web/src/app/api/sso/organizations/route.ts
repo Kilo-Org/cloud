@@ -1,13 +1,25 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import type { SSOOrganizationsResponse } from '@/lib/schemas/sso-organizations';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import {
+  SignInDiscoveryRequestSchema,
+  SignInDiscoveryResponseSchema,
+  type SignInDiscoveryResponse,
+} from '@/lib/schemas/sso-organizations';
+import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
+import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
+import { CLAUDE_SIGN_IN_CLIENT_ID } from '@kilocode/web-shared/lib/auth/claude/config';
 
 const warnInSentry = sentryLogger('sso-organizations', 'warning');
+
+function discoveryResponse(response: SignInDiscoveryResponse, init?: ResponseInit): NextResponse {
+  return NextResponse.json(SignInDiscoveryResponseSchema.parse(response), init);
+}
 
 /**
  * Checks if an email domain has SSO configured and returns the WorkOS organization ID.
@@ -32,29 +44,32 @@ export async function POST(request: Request): Promise<NextResponse> {
       return turnstileResult.response;
     }
 
-    const { email } = await request.json();
-    if (!email || typeof email !== 'string') {
-      const response: SSOOrganizationsResponse = {
-        providers: [],
-        newUser: true,
-      };
-      return NextResponse.json(response, { status: 200 });
+    const body = await request.json().catch(() => undefined);
+    const parsedRequest = SignInDiscoveryRequestSchema.safeParse(body);
+    if (!parsedRequest.success) {
+      return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 });
     }
+    const { email } = parsedRequest.data;
 
-    const userProviderInfo = await getAllUserProviders(email);
-    if (userProviderInfo) {
+    const providerLookup = await getAllUserProviders(email);
+    if (providerLookup.kind === 'ambiguous') {
+      warnInSentry('Ambiguous sign-in provider lookup');
+      return NextResponse.json(
+        { error: 'Unable to find sign-in methods. Please try again.' },
+        { status: 503 }
+      );
+    }
+    if (providerLookup.kind === 'found') {
+      const userProviderInfo = providerLookup.user;
       userProviders = userProviderInfo.providers;
 
       // User already has WorkOS linked → enforce SSO via their linked domain
       if (userProviderInfo.workosHostedDomain) {
-        const ssoResponse = await tryGetSSOResponse(userProviderInfo.workosHostedDomain, {
-          email,
-          workosHostedDomain: userProviderInfo.workosHostedDomain,
-        });
+        const ssoResponse = await tryGetSSOResponse(userProviderInfo.workosHostedDomain);
         if (ssoResponse) return ssoResponse;
 
         warnInSentry('User has workos provider but no active SSO authority', {
-          extra: { email, workosHostedDomain: userProviderInfo.workosHostedDomain },
+          extra: { workosHostedDomain: userProviderInfo.workosHostedDomain },
         });
       }
 
@@ -62,52 +77,54 @@ export async function POST(request: Request): Promise<NextResponse> {
       // This prevents SSO bypass via linked personal accounts (gmail, etc.)
       const primaryEmailDomain = getLowerDomainFromEmail(userProviderInfo.primaryEmail);
       if (primaryEmailDomain) {
-        const ssoResponse = await tryGetSSOResponse(primaryEmailDomain, {
-          loginEmail: email,
-          primaryEmail: userProviderInfo.primaryEmail,
-        });
+        const ssoResponse = await tryGetSSOResponse(primaryEmailDomain);
         if (ssoResponse) {
           return ssoResponse;
         }
       }
 
-      // No SSO requirement → return all available providers for user to choose
-      if (userProviderInfo.providers.length > 0) {
-        const response: SSOOrganizationsResponse = {
-          providers: userProviderInfo.providers,
-          newUser: false,
-        };
-        return NextResponse.json(response);
-      }
+      // Return the matched account even when its methods are unsupported. The
+      // client presents a recoverable error rather than broadening to signup.
+      const providers = userProviderInfo.providers.filter(
+        provider => provider !== 'claude' || Boolean(CLAUDE_SIGN_IN_CLIENT_ID)
+      );
+      return discoveryResponse({ kind: 'existing', providers });
     }
 
     // ─── New User Flow ────────────────────────────────────────────────────
     // Check if their email domain has SSO configured
     const domain = getLowerDomainFromEmail(email);
     if (domain) {
-      const ssoResponse = await tryGetSSOResponse(domain, { email });
+      const ssoResponse = await tryGetSSOResponse(domain);
       if (ssoResponse) {
         return ssoResponse;
       }
     }
 
-    // No organization or provider found → new user signup flow
-    const response: SSOOrganizationsResponse = {
-      providers: [],
-      newUser: true,
-    };
-    return NextResponse.json(response);
+    // No organization or provider found → new user signup flow. Resolve the
+    // email option on the server so account-creation rules remain authoritative
+    // without spending the magic-link rate-limit allowance during discovery.
+    const offeredProviders = ProdNonSSOAuthProviders.filter(
+      provider => provider !== 'claude' || Boolean(CLAUDE_SIGN_IN_CLIENT_ID)
+    );
+    const providers = (await isNewAccountEligibleForMagicLink(email))
+      ? offeredProviders
+      : offeredProviders.filter(provider => provider !== 'email');
+    return discoveryResponse({
+      kind: 'new',
+      providers,
+      ...(isEmailSignupDisabled() ? { emailSignupDisabled: true } : {}),
+    });
   } catch (err: unknown) {
-    warnInSentry('sso error', { extra: { err } });
+    warnInSentry('sso error');
     captureException(err, {
       tags: { source: 'sso/organizations' },
-      extra: { userProviders },
+      extra: { providerCount: userProviders?.length ?? 0 },
     });
-    const response: SSOOrganizationsResponse = {
-      providers: [],
-      newUser: false,
-    };
-    return NextResponse.json(response, { status: 503 });
+    return NextResponse.json(
+      { error: 'Unable to find sign-in methods. Please try again.' },
+      { status: 503 }
+    );
   }
 }
 
@@ -115,34 +132,32 @@ export async function POST(request: Request): Promise<NextResponse> {
  * If the domain has SSO configured, returns a WorkOS response.
  * Returns null if no SSO is configured or if WorkOS organization lookup fails.
  */
-async function tryGetSSOResponse(
-  domain: string,
-  warningContext: Record<string, unknown>
-): Promise<NextResponse | null> {
+async function tryGetSSOResponse(domain: string): Promise<NextResponse | null> {
   const authority = await resolveSsoAuthorityForDomain(domain);
   if (authority.status === 'not_required') {
     return null;
   }
   if (authority.status === 'misconfigured') {
     warnInSentry('Local SSO authority is misconfigured', {
-      extra: { ...warningContext, domain, reason: authority.reason },
+      extra: { domain, reason: authority.reason },
     });
-    return NextResponse.json({ providers: [], newUser: false }, { status: 503 });
+    return NextResponse.json(
+      { error: 'Unable to find sign-in methods. Please try again.' },
+      { status: 503 }
+    );
   }
 
   const organization = await getWorkOSOrganization(domain);
   if (organization) {
-    const response: SSOOrganizationsResponse = {
-      providers: ['workos'],
-      organizationId: organization.id,
-      newUser: false,
-    };
-    return NextResponse.json(response);
+    return discoveryResponse({ kind: 'sso', organizationId: organization.id });
   }
 
   // DB says SSO exists but WorkOS doesn't have it - this is a config error
   warnInSentry('Local organization has SSO but WorkOS organization not found', {
-    extra: { ...warningContext, domain, localOrgId: authority.sourceOrganizationId },
+    extra: { domain, localOrgId: authority.sourceOrganizationId },
   });
-  return NextResponse.json({ providers: [], newUser: false }, { status: 503 });
+  return NextResponse.json(
+    { error: 'Unable to find sign-in methods. Please try again.' },
+    { status: 503 }
+  );
 }

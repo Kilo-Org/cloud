@@ -15,6 +15,7 @@ import { withDORetry } from '@kilocode/worker-utils';
 import { applyMetadataChanges, flushPartialMetadataChanges } from './ingest/metadata';
 export { createItemExtractor } from './ingest/item-extractor';
 import { createItemExtractor } from './ingest/item-extractor';
+import { toRpcBody } from './ingest/stage-and-enqueue';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import type { AttentionSignal } from './dos/session-ingest-attention';
 import {
@@ -31,6 +32,16 @@ export interface IngestQueueMessage {
 }
 
 export const QUEUE_RETRY_DELAY_SECONDS = 5 * 60;
+
+export class MalformedIngestPayloadError extends Error {
+  constructor(
+    readonly r2Key: string,
+    readonly parseError: Error
+  ) {
+    super(`Malformed JSON in staging object ${r2Key}: ${parseError.message}`);
+    this.name = 'MalformedIngestPayloadError';
+  }
+}
 
 // A queue message is an envelope for one POST's R2 payload for one session.
 // That payload can contain many session items. Batch those items into chunked
@@ -141,7 +152,7 @@ async function ingestStagedSessionItems(
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
   if (parseError) {
-    throw new Error(`Malformed JSON in staging object ${msg.r2Key}: ${parseError.message}`);
+    throw new MalformedIngestPayloadError(msg.r2Key, parseError);
   }
 
   // Handle any remaining items not flushed yet.
@@ -191,18 +202,31 @@ async function streamSessionItems(
   }
 }
 
-function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
+// An offloaded item crosses RPC as this projection: its storage identity plus the
+// metadata the DO folds into Postgres. Identity segments are ≤256 bytes and the
+// metadata fields are schema-bounded, so a projection is a few KiB at most; the
+// measured cap turns that into an invariant, including for `session`, whose loose item
+// data is not otherwise bounded by the schema.
+const MAX_PROJECTED_ITEM_BYTES = 8 * 1024;
+
+const projectionEncoder = new TextEncoder();
+
+function projectItemForRpc(item: SessionDataItem): SessionDataItem | null {
   switch (item.type) {
     case 'message':
       return { type: 'message', data: { id: item.data.id } };
     case 'part':
       return { type: 'part', data: { id: item.data.id, messageID: item.data.messageID } };
-    case 'agent_notification':
-      // Bounded: id ≤64 + message ≤500 ⇒ well under MAX_INGEST_ITEM_BYTES, so the slim
-      // path is never triggered for this kind. Return the item unchanged to keep the
-      // signal's `message` available to the DO's in-batch capture.
-      return item;
+    case 'agent_notification': {
+      // Bounded by its schema (id ≤64, message ≤500). The DO needs `message` to
+      // re-emit the signal on replay, so the projection carries it.
+      const { id, message } = item.data;
+      return { type: 'agent_notification', data: { id, message } };
+    }
     case 'session': {
+      // `title` and `parentID` are what the DO folds into Postgres. Both are
+      // unbounded in the loose item schema, so the measured budget in
+      // `slimItemForR2Reference` decides whether a projection can carry them.
       const data: Record<string, unknown> = {};
       if ('title' in item.data) data.title = item.data.title;
       if ('parentID' in item.data) data.parentID = item.data.parentID;
@@ -213,13 +237,52 @@ function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
     case 'model':
       return { type: 'model', data: [] };
     case 'session_open':
-    case 'session_close':
-    case 'session_status':
-    case 'kilo_meta':
-    case 'session_pr_link':
-      return item;
+      return { type: 'session_open', data: {} };
+    case 'session_close': {
+      const { reason } = item.data;
+      return { type: 'session_close', data: { reason } };
+    }
+    case 'session_status': {
+      const { status, scheduledAt, occurredAt, previousStatus, transitionId } = item.data;
+      return {
+        type: 'session_status',
+        data: { status, scheduledAt, occurredAt, previousStatus, transitionId },
+      };
+    }
+    case 'kilo_meta': {
+      const { platform, orgId, gitUrl, gitBranch } = item.data;
+      return { type: 'kilo_meta', data: { platform, orgId, gitUrl, gitBranch } };
+    }
+    case 'session_pr_link': {
+      const { platform, prUrl, prNumber, headRef, headSha } = item.data;
+      return { type: 'session_pr_link', data: { platform, prUrl, prNumber, headRef, headSha } };
+    }
+    default: {
+      // A union member this build does not know. Fail closed instead of handing its
+      // unbounded data to the DO; the compiler proves this branch is unreachable for
+      // the members above, so it only guards a future schema addition.
+      const unhandled: never = item;
+      void unhandled;
+      return null;
+    }
   }
 }
+
+/**
+ * The payload sent in place of an offloaded item. Returns null when the projection
+ * cannot be bounded, and the caller skips that item instead of overrunning one ingest
+ * RPC.
+ */
+function slimItemForR2Reference(item: SessionDataItem): SessionDataItem | null {
+  const projection = projectItemForRpc(item);
+  if (projection === null) return null;
+  return projectionEncoder.encode(JSON.stringify(projection)).byteLength <= MAX_PROJECTED_ITEM_BYTES
+    ? projection
+    : null;
+}
+
+// The `[` and `]` a chunk's item array adds around the per-item counts.
+const CHUNK_ARRAY_FRAMING_BYTES = 2;
 
 function createIngestChunker(
   env: Env,
@@ -283,23 +346,73 @@ function createIngestChunker(
     }
 
     // Offload data above the DO SQLite row limit to R2; the DO stores a
-    // reference and an empty inline blob. Send only identity fields over RPC so
-    // a single oversized item cannot exceed Cloudflare's RPC payload limit.
-    const itemForRpc = itemDataBytes > MAX_INGEST_ITEM_BYTES ? slimItemForR2Reference(item) : item;
-    const itemForRpcDataBytes =
-      itemDataBytes > MAX_INGEST_ITEM_BYTES
-        ? encoder.encode(JSON.stringify(itemForRpc.data)).byteLength
-        : itemDataBytes;
-    if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
+    // reference and an empty inline blob. Send only a bounded projection over RPC so
+    // a single item, whatever its kind, cannot exceed the RPC payload budget.
+    const offloadToR2 = itemDataBytes > MAX_INGEST_ITEM_BYTES;
+    const itemForRpc = offloadToR2 ? slimItemForR2Reference(item) : item;
+    if (itemForRpc === null) {
+      // Fail closed: the item has no projection within MAX_PROJECTED_ITEM_BYTES, so
+      // skipping it is the only way to keep the RPC bounded. Log the kind only.
+      console.warn('Skipping item without a bounded RPC projection', {
+        r2Key,
+        type: item.type,
+      });
+      return true;
+    }
+    const itemForRpcDataBytes = offloadToR2
+      ? encoder.encode(JSON.stringify(itemForRpc.data)).byteLength
+      : itemDataBytes;
+    // What the item adds to an ingest call: its `{"type":…,"data":…}` envelope, the
+    // data, its storage identity (also sent as an r2References key) and the array
+    // separator. Per-call framing is covered by the conservative budget.
+    const itemRpcBytes =
+      itemForRpcDataBytes +
+      encoder.encode(`{"type":"${item.type}","data":}`).byteLength +
+      encoder.encode(item_id).byteLength +
+      1;
+
+    // A single item that cannot fit one chunk would overrun the RPC budget on its own.
+    // Never send it; the other items in the payload still ingest.
+    if (itemRpcBytes + CHUNK_ARRAY_FRAMING_BYTES > INGEST_CHUNK_MAX_BYTES) {
+      console.warn('Skipping item larger than one ingest RPC', { r2Key, type: item.type });
+      return true;
+    }
+    // Flush before adding, so a chunk never exceeds the byte budget: splitting is still
+    // possible here, and nothing over-budget ever reaches the DO.
+    if (
+      chunk.length > 0 &&
+      chunkBytes + itemRpcBytes + CHUNK_ARRAY_FRAMING_BYTES > INGEST_CHUNK_MAX_BYTES
+    ) {
+      await flushChunkToSessionDO();
+      if (!accepted) return false;
+    }
+
+    if (offloadToR2) {
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
-      await env.SESSION_INGEST_R2.put(itemR2Key, itemDataJson);
+      const staged = await withDORetry(
+        () => getSessionIngestDO(env, { kiloUserId, sessionId }),
+        async stub => {
+          const itemBytes = encoder.encode(itemDataJson);
+          return stub.stageR2Object(
+            { kiloUserId, sessionId, key: itemR2Key },
+            await toRpcBody(itemBytes, itemBytes.byteLength)
+          );
+        },
+        'SessionIngestDO.stageR2Object'
+      );
+      if (!staged) {
+        accepted = false;
+        return false;
+      }
       chunkR2References[item_id] = itemR2Key;
     }
 
     chunk.push(itemForRpc);
     chunkItemIds.add(item_id);
-    chunkBytes += itemForRpcDataBytes;
-    if (chunk.length >= INGEST_CHUNK_MAX_ITEMS || chunkBytes >= INGEST_CHUNK_MAX_BYTES) {
+    chunkBytes += itemRpcBytes;
+    // Byte budget is enforced before an item is added, so only the item count can
+    // still cap a chunk here.
+    if (chunk.length >= INGEST_CHUNK_MAX_ITEMS) {
       await flushChunkToSessionDO();
     }
     return accepted;
@@ -502,12 +615,43 @@ export async function queue(
       await processMessage(env, msg.body, ctx);
       msg.ack();
     } catch (err) {
+      if (err instanceof MalformedIngestPayloadError) {
+        console.error(
+          'Staged ingest object is not parseable JSON; object removed and message acknowledged',
+          {
+            r2Key: msg.body.r2Key,
+            sessionId: msg.body.sessionId,
+            error: err.message,
+          }
+        );
+        await deleteStagedObject(env, msg.body.r2Key);
+        msg.ack();
+        continue;
+      }
+
+      // A transient failure keeps the staged object. The queue records only the
+      // key, and the client already handed the payload off, so the staged bytes
+      // are the whole message for an operator replaying a dead-letter record.
+      // The staging bucket's lifecycle policy bounds how long an abandoned
+      // object stays.
       console.error('Queue message processing failed, will retry', {
         r2Key: msg.body.r2Key,
         sessionId: msg.body.sessionId,
+        attempts: msg.attempts,
         error: err instanceof Error ? err.message : String(err),
       });
       msg.retry({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     }
+  }
+}
+
+async function deleteStagedObject(env: Env, r2Key: string): Promise<void> {
+  try {
+    await env.SESSION_INGEST_R2.delete(r2Key);
+  } catch (error) {
+    console.error('Failed to delete a staged ingest object', {
+      r2Key,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }

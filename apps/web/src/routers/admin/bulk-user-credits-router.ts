@@ -1,9 +1,10 @@
-import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { inArray } from 'drizzle-orm';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 
 const BulkUserCreditsInputSchema = z.object({
   emails: z.array(z.string().email()).max(1000),
@@ -17,6 +18,17 @@ const BulkUserCreditsInputSchema = z.object({
         return !isNaN(date.getTime());
       },
       { message: 'Invalid date' }
+    )
+    .refine(
+      dateStr => {
+        const time = new Date(dateStr).getTime();
+        // An unparseable value is already reported as an invalid date above.
+        if (isNaN(time)) return true;
+        // A YYYY-MM-DD date is interpreted as midnight UTC, so a same-day
+        // expiry is still an instant in the past and must be refused.
+        return time > Date.now();
+      },
+      { message: 'Expiration date must be in the future' }
     )
     .optional(),
   description: z.string().optional(),

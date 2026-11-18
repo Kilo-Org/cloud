@@ -11,10 +11,10 @@ import { getMiniMaxUsage } from '@/lib/coding-plans/minimax-usage';
 import {
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID,
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY,
-} from '@/lib/config.server';
-import { redisClient } from '@/lib/redis';
-import { codingPlanUsageRedisKey, type RedisKey } from '@/lib/redis-keys';
-import { sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/config.server';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { codingPlanUsageRedisKey, type RedisKey } from '@kilocode/web-shared/lib/redis-keys';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   CodingPlanUsageError,
   CodingPlanUsageSnapshotSchema,

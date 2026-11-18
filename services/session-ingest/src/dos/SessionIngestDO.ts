@@ -1,5 +1,29 @@
 import { DurableObject } from 'cloudflare:workers';
-import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
+import {
+  getSessionShareExpiresAt,
+  sessionIdSchema,
+  sessionShareDurationSchema,
+  sessionLiveSummarySchema,
+  type SessionShareDuration,
+  type SessionLiveSummary,
+} from '@kilocode/session-ingest-contracts';
+import {
+  desc,
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  lte,
+  and,
+  or,
+  inArray,
+  isNull,
+  isNotNull,
+  like,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -7,9 +31,16 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
+import { MAX_INGEST_ITEM_BYTES, CLONE_WINDOW_MAX_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
-import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
+import {
+  getItemIdentity,
+  getPreviousPartItemIdentity,
+  streamMessagePartRows,
+} from '../util/compaction';
+import { isItemWithinMessageCut } from '../util/message-cut';
+import { cloneSourceRowBytes } from '../util/clone-window';
 import {
   extractNormalizedGitBranchFromItem,
   extractNormalizedGitUrlFromItem,
@@ -19,37 +50,82 @@ import {
   extractNormalizedTitleFromItem,
   extractSessionPrLink,
   extractStatusFromItem,
+  extractStatusOccurredAtFromItem,
+  extractStatusTransitionIdFromItem,
 } from './session-ingest-extractors';
 import {
+  assistantExcerptIsComplete,
+  attentionKindForNeedsInputStatus,
   buildAssistantExcerpt,
   completedAssistantMessageIdFromItemData,
+  extractTextFromPartItemData,
   isCompletedStatus,
   isNeedsInputStatus,
   type AttentionSignal,
 } from './session-ingest-attention';
 import {
-  computeRunningAssistantCostUsd,
+  adjustRunningAssistantCostUsd,
+  assistantMessageCostUsd,
   computeSessionMetrics,
+  COST_DIVERGENCE_TOLERANCE_USD,
   COST_PERSIST_THROTTLE_MS,
   decideLivePersist,
   INACTIVITY_TIMEOUT_MS,
   POST_CLOSE_DRAIN_MS,
+  RUNNING_ASSISTANT_COST_META_KEY,
+  runningAssistantCostMicrodollars,
+  storedAssistantMessageCostUsd,
+  storedMessageCostUsd,
   type TerminationReason,
 } from './session-metrics';
+import { readSessionMetricsWindow } from './session-metrics-window';
+import { readStoredRunningAssistantCostUsd } from './running-cost-seed';
 import migrations from '../../drizzle/migrations';
+import { refreshGlanceableSessions } from '../remote-session-notifications';
+import {
+  applySessionLiveSummaryStatus,
+  decideLiveSummaryPersist,
+  EMPTY_SESSION_LIVE_SUMMARY_STATE,
+  foldSessionLiveSummary,
+  sessionLiveSummaryChanged,
+  type SessionLiveSummaryState,
+} from './session-live-summary';
 import {
   readKiloSdkMessages,
   readKiloSdkSessionSnapshot,
+  readSessionDiff,
   type KiloSdkSessionSnapshotRead,
 } from './kilo-sdk-materialization';
-import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
+import type { SessionDiffRead } from '@kilocode/session-ingest-contracts';
+import { precedesStatusTransition, resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
+import {
+  BRIEFING_MAX_INLINE_BYTES,
+  BRIEFING_MAX_EXCERPT_SOURCE_ROWS,
+  briefingExcerptUpdate,
+  buildBriefingExcerpt,
+  completedBriefingResponse,
+  isFinalizedBriefingText,
+  type BriefingExcerpt,
+} from '../ingest/briefing-excerpt';
+import {
+  SHARE_INFO_KEY_PREFIX,
+  shareInfoKey,
+  readShareInfo,
+  projectSharedSessionInfo,
+  type ShareInfoMetaKey,
+} from './session-share-info';
 
 type LiveThrottleMetaKey =
   | 'lastActivityValueMs'
   | 'lastActivityPersistedAtMs'
   | 'lastActivityPersistedValueMs'
   | 'lastCostPersistedAtMs'
-  | 'lastCostPersistedMicrodollars';
+  | 'lastCostPersistedMicrodollars'
+  | 'lastLiveSummaryPersistedAtMs';
+
+type AlarmMetaKey = 'metricsAlarmAt';
+
+type NumericMetaKey = LiveThrottleMetaKey | AlarmMetaKey | typeof RUNNING_ASSISTANT_COST_META_KEY;
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -60,7 +136,13 @@ type IngestMetaKey =
   | 'metricsEmitted'
   | 'deleted'
   | 'sessionReadyNotified'
-  | LiveThrottleMetaKey;
+  | 'liveSummaryState'
+  | 'lastLiveSummaryPersisted'
+  | 'lastBriefingExcerptPersisted'
+  | NumericMetaKey
+  | ShareInfoMetaKey;
+
+export const SHARE_INFO_TOO_LARGE_ERROR = 'Share snapshot is too large';
 
 type ExtractableMetaKey =
   | 'title'
@@ -70,9 +152,13 @@ type ExtractableMetaKey =
   | 'gitUrl'
   | 'gitBranch'
   | 'status'
+  | 'statusOccurredAt'
+  | 'statusTransitionId'
   | 'prPlatform'
   | 'prUrl'
-  | 'prNumber';
+  | 'prNumber'
+  | 'prHeadRef'
+  | 'prHeadSha';
 
 function writeIngestMetaIfChanged(
   db: DrizzleSqliteDODatabase,
@@ -104,10 +190,95 @@ function hasIngestMeta(db: DrizzleSqliteDODatabase, key: IngestMetaKey): boolean
   );
 }
 
-function readIngestMetaNumber(
+function readIngestMetaValue(db: DrizzleSqliteDODatabase, key: IngestMetaKey): string | null {
+  const row = db
+    .select({ value: ingestMeta.value })
+    .from(ingestMeta)
+    .where(eq(ingestMeta.key, key))
+    .get();
+  return row?.value ?? null;
+}
+
+function writeIngestMetaValue(
   db: DrizzleSqliteDODatabase,
-  key: LiveThrottleMetaKey
-): number | null {
+  key: IngestMetaKey,
+  value: string
+): void {
+  db.insert(ingestMeta)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+    .run();
+}
+
+/** The running summary the previous batches left, or the empty value. */
+function readLiveSummaryState(db: DrizzleSqliteDODatabase): SessionLiveSummaryState {
+  const raw = readIngestMetaValue(db, 'liveSummaryState');
+  if (raw === null) return EMPTY_SESSION_LIVE_SUMMARY_STATE;
+  const parsed = sessionLiveSummarySchema.safeParse(JSON.parse(raw));
+  return parsed.success ? parsed.data : EMPTY_SESSION_LIVE_SUMMARY_STATE;
+}
+
+/** The value the last successful persist wrote, or null when none did. */
+function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSummary | null {
+  const raw = readIngestMetaValue(db, 'lastLiveSummaryPersisted');
+  if (raw === null) return null;
+  const parsed = sessionLiveSummarySchema.safeParse(JSON.parse(raw));
+  return parsed.success ? parsed.data : null;
+}
+
+type BriefingExcerptIdentity = Pick<BriefingExcerpt, 'messageId' | 'completedAt'>;
+
+/** The excerpt identity the last live persist handed to Postgres, or null when none did. */
+function readBriefingExcerptPersisted(db: DrizzleSqliteDODatabase): BriefingExcerptIdentity | null {
+  const raw = readIngestMetaValue(db, 'lastBriefingExcerptPersisted');
+  if (raw === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { messageId, completedAt } = parsed as { messageId?: unknown; completedAt?: unknown };
+  if (typeof messageId !== 'string' || messageId.length === 0) return null;
+  if (typeof completedAt !== 'string') return null;
+  return { messageId, completedAt };
+}
+
+/**
+ * Mirrors the SQL ordering in `briefingExcerptUpdate`: a candidate is newer on a later
+ * `completedAt`, or on an equal one and a greater `messageId`. Both times are canonical ISO
+ * strings, so comparing them as text matches comparing them as timestamps. The SQL guard orders
+ * the ids with `COLLATE "C"`, which is byte order, so the ids are compared as their UTF-8 bytes
+ * rather than by UTF-16 code unit.
+ */
+function briefingExcerptIsNewer(
+  next: BriefingExcerptIdentity,
+  last: BriefingExcerptIdentity | null
+): boolean {
+  if (last === null) return true;
+  if (next.completedAt !== last.completedAt) return next.completedAt > last.completedAt;
+  const left = new TextEncoder().encode(next.messageId);
+  const right = new TextEncoder().encode(last.messageId);
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return left[index] > right[index];
+  }
+  return left.length > right.length;
+}
+
+/** Records the excerpt the object is sending, so the next identical batch adds no column. */
+function writeBriefingExcerptPersisted(
+  db: DrizzleSqliteDODatabase,
+  identity: BriefingExcerptIdentity
+): void {
+  writeIngestMetaValue(
+    db,
+    'lastBriefingExcerptPersisted',
+    JSON.stringify({ messageId: identity.messageId, completedAt: identity.completedAt })
+  );
+}
+
+function readIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey): number | null {
   const row = db
     .select({ value: ingestMeta.value })
     .from(ingestMeta)
@@ -120,7 +291,7 @@ function readIngestMetaNumber(
 
 function writeIngestMetaNumber(
   db: DrizzleSqliteDODatabase,
-  key: LiveThrottleMetaKey,
+  key: NumericMetaKey,
   value: number
 ): void {
   const serialized = String(value);
@@ -130,20 +301,91 @@ function writeIngestMetaNumber(
     .run();
 }
 
+type CloneMetaKey =
+  | 'cloneSourceSessionId'
+  | 'cloneDestinationSessionId'
+  | 'cloneNextCursor'
+  | 'cloneRollingDigest'
+  | 'cloneCopiedItemCount'
+  | 'cloneCompleteSourceId'
+  | 'cloneUpToMessageId'
+  | 'cloneVerifyCursor'
+  | 'cloneVerifyChain'
+  | 'cloneVerifyRows';
+
+function readCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey): string | null {
+  const row = db
+    .select({ value: ingestMeta.value })
+    .from(ingestMeta)
+    .where(eq(ingestMeta.key, key))
+    .get();
+  return row?.value ?? null;
+}
+
+function writeCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey, value: string): void {
+  db.insert(ingestMeta)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+    .run();
+}
+
 /**
- * Monotonic live-column write for cost and/or last_activity_at.
- * Per-column CASE guards so concurrent waitUntil tasks commute.
+ * Verification progress of a clone stage. It starts empty and advances one
+ * source window at a time, so a source larger than one request budget is
+ * verified over several requests instead of restarting.
+ */
+function readCloneVerification(db: DrizzleSqliteDODatabase): CloneVerificationProgress {
+  const raw = readCloneMeta(db, 'cloneVerifyCursor');
+  let verifyCursor: IngestOrderCursor | null = null;
+  if (raw !== null) {
+    try {
+      verifyCursor = JSON.parse(raw) as IngestOrderCursor;
+    } catch {
+      verifyCursor = null;
+    }
+  }
+  return {
+    verifyCursor,
+    verifyChain: readCloneMeta(db, 'cloneVerifyChain') ?? '',
+    verifyRows: Number(readCloneMeta(db, 'cloneVerifyRows') ?? '0') || 0,
+  };
+}
+
+function writeCloneVerification(
+  db: DrizzleSqliteDODatabase,
+  progress: CloneVerificationProgress
+): void {
+  writeCloneMeta(db, 'cloneVerifyCursor', JSON.stringify(progress.verifyCursor));
+  writeCloneMeta(db, 'cloneVerifyChain', progress.verifyChain);
+  writeCloneMeta(db, 'cloneVerifyRows', String(progress.verifyRows));
+}
+
+/**
+ * Monotonic live-column write for cost, last_activity_at, and the session
+ * card summary. Per-column CASE guards so concurrent waitUntil tasks commute.
  * Used by live ingest persists and the close-path emitSessionMetrics write.
+ *
+ * The summary has no order of its own, so it carries the activity time of
+ * the batch that produced it (`atIso`) and is written only when that time is
+ * not older than the stored activity. A slower in-flight write of an older
+ * batch then leaves the newer summary in place, as the activity guard does.
  */
 export async function persistLiveSessionColumns(
   connectionString: string,
   kiloUserId: string,
   sessionId: string,
-  columns: { costMicrodollars?: number; lastActivityAtIso?: string }
+  columns: {
+    costMicrodollars?: number;
+    lastActivityAtIso?: string;
+    liveSummary?: { summary: SessionLiveSummary; atIso: string };
+    briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
+  }
 ): Promise<void> {
   const set: {
-    total_cost_microdollars?: ReturnType<typeof sql>;
-    last_activity_at?: ReturnType<typeof sql>;
+    total_cost_microdollars?: SQL;
+    last_activity_at?: SQL;
+    live_summary?: SQL;
+    briefing_excerpt?: SQL;
   } = {};
 
   if (columns.costMicrodollars !== undefined) {
@@ -164,6 +406,23 @@ export async function persistLiveSessionColumns(
       THEN ${activity}
       ELSE ${cli_sessions_v2.last_activity_at}
     END`;
+  }
+
+  if (columns.liveSummary !== undefined) {
+    // Postgres reads every SET expression against the old row, so this guard
+    // compares with the stored activity, not the value set beside it.
+    const { summary, atIso } = columns.liveSummary;
+    set.live_summary = sql`CASE
+      WHEN ${cli_sessions_v2.last_activity_at} IS NULL
+        OR ${cli_sessions_v2.last_activity_at} <= ${atIso}
+      THEN ${JSON.stringify(summary)}::jsonb
+      ELSE ${cli_sessions_v2.live_summary}
+    END`;
+  }
+
+  if (columns.briefingExcerpt !== undefined) {
+    const { excerpt, receivedAtIso } = columns.briefingExcerpt;
+    set.briefing_excerpt = briefingExcerptUpdate(excerpt, receivedAtIso);
   }
 
   if (Object.keys(set).length === 0) return;
@@ -187,6 +446,8 @@ const INGEST_META_EXTRACTORS: Array<{
   { key: 'gitUrl', extract: extractNormalizedGitUrlFromItem },
   { key: 'gitBranch', extract: extractNormalizedGitBranchFromItem },
   { key: 'status', extract: extractStatusFromItem },
+  { key: 'statusOccurredAt', extract: extractStatusOccurredAtFromItem },
+  { key: 'statusTransitionId', extract: extractStatusTransitionIdFromItem },
 ];
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
@@ -196,6 +457,21 @@ export type IngestResult =
   | { accepted: false; reason: 'deleted'; changes: never[] };
 /** How many of the newest message rows to inspect when pairing an idle transition with the assistant turn that just finished. */
 const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
+
+type PartExcerptRow = {
+  id: number;
+  ingested_at: number | null;
+  item_id: string;
+  item_data: string;
+};
+
+type PartExportRow = {
+  id: number;
+  ingested_at: number | null;
+  item_id: string;
+  item_data: string;
+  item_data_r2_key: string | null;
+};
 
 type IngestLifecycleEvent =
   | { type: 'session_open' }
@@ -227,8 +503,163 @@ export function ingestOrderCursor(row: {
   return { ingestedAt: row.ingested_at, id: row.id };
 }
 
+export type CloneItemType = 'session' | 'message' | 'part' | 'session_diff';
+
+export const CLONE_ITEM_TYPES: CloneItemType[] = ['session', 'message', 'part', 'session_diff'];
+
+export type CloneBatchRow = {
+  itemId: string;
+  itemType: CloneItemType;
+  itemData: string;
+  itemDataR2Key: string | null;
+  ingestedAt: number | null;
+};
+
+export type ExportCloneBatchResult = {
+  rows: CloneBatchRow[];
+  nextCursor: IngestOrderCursor | null;
+  done: boolean;
+};
+
+/**
+ * A clone stage is identified by source, destination, and the optional
+ * inclusive message cut. Absent `upToMessageId` means the full transcript.
+ */
+export type CloneStageIdentity = {
+  sourceSessionId: string;
+  destinationSessionId: string;
+  upToMessageId?: string;
+};
+
+export type StageCloneBatchParams = CloneStageIdentity & {
+  rows: CloneBatchRow[];
+  nextCursor: IngestOrderCursor | null;
+  rollingDigest: string;
+  copiedItemCount: number;
+};
+
+export type StageCloneBatchResult =
+  | {
+      status: 'staged';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      nextCursor: IngestOrderCursor | null;
+      rollingDigest: string;
+      copiedItemCount: number;
+    }
+  | { status: 'complete'; sourceSessionId: string; destinationSessionId: string }
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
+    };
+
+export type InspectCloneStageParams = CloneStageIdentity;
+
+/** Verification progress a resumed clone request continues from. */
+export type CloneVerificationProgress = {
+  verifyCursor: IngestOrderCursor | null;
+  verifyChain: string;
+  verifyRows: number;
+};
+
+export type InspectCloneStageResult =
+  | { status: 'empty' }
+  | {
+      /**
+       * A finalized stage is trusted: the item count and digest it recorded are
+       * returned so a repeat clone request never re-reads the source.
+       */
+      status: 'complete';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      rollingDigest: string;
+      copiedItemCount: number;
+    }
+  | ({
+      status: 'in_progress';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      nextCursor: IngestOrderCursor | null;
+      rollingDigest: string;
+      copiedItemCount: number;
+    } & CloneVerificationProgress)
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
+      storedStage: 'complete' | 'in_progress';
+    };
+
+export type StageCloneVerificationParams = CloneStageIdentity & CloneVerificationProgress;
+
+export type StageCloneVerificationResult =
+  | { status: 'staged' }
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
+    };
+
+export type FinalizeCloneStageParams = CloneStageIdentity & {
+  finalDigest: string;
+  finalItemCount: number;
+};
+
+export type FinalizeCloneStageResult =
+  | { status: 'complete'; sourceSessionId: string; destinationSessionId: string }
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
+    }
+  | {
+      status: 'digest_mismatch';
+      expectedDigest: string;
+      actualDigest: string;
+      expectedItemCount: number;
+      actualItemCount: number;
+    }
+  | { status: 'empty' };
+
+type CloneStageState =
+  | { kind: 'empty' }
+  | {
+      kind: 'complete';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      upToMessageId: string | null;
+      rollingDigest: string;
+      copiedItemCount: number;
+    }
+  | ({
+      kind: 'in_progress';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      upToMessageId: string | null;
+      nextCursor: IngestOrderCursor | null;
+      rollingDigest: string;
+      copiedItemCount: number;
+    } & CloneVerificationProgress);
+
+/** A stage built for another source, destination, or cut is a different clone. */
+function isSameCloneStage(
+  stage: Exclude<CloneStageState, { kind: 'empty' }>,
+  params: CloneStageIdentity
+): boolean {
+  return (
+    stage.sourceSessionId === params.sourceSessionId &&
+    stage.destinationSessionId === params.destinationSessionId &&
+    stage.upToMessageId === (params.upToMessageId ?? null)
+  );
+}
+
 export class SessionIngestDO extends DurableObject<Env> {
   private db: DrizzleSqliteDODatabase;
+  private readonly activeR2Writes = new Set<Promise<unknown>>();
+  private cleanupOperation: Promise<void> | undefined;
+  /** The excerpt a scheduled live persist carries, so an identical batch adds no column. */
+  private briefingExcerptInFlight: BriefingExcerptIdentity | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -278,9 +709,13 @@ export class SessionIngestDO extends DurableObject<Env> {
       gitUrl: undefined,
       gitBranch: undefined,
       status: undefined,
+      statusOccurredAt: undefined,
+      statusTransitionId: undefined,
       prPlatform: undefined,
       prUrl: undefined,
       prNumber: undefined,
+      prHeadRef: undefined,
+      prHeadSha: undefined,
     };
 
     const lifecycleEvents: IngestLifecycleEvent[] = [];
@@ -288,160 +723,320 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Executed upserts only (not stale-skipped). Activity = message|part; cost gate = message.
     let wroteActivityItem = false;
     let wroteAssistantMessageItem = false;
+    // Sums of the message-row costs this batch replaces and stores, in USD. The running
+    // session cost moves by (added - replaced) instead of re-reading the whole history.
+    let replacedMessageCostUsd = 0;
+    let addedMessageCostUsd = 0;
     // §4.10: in-batch {notificationId -> message} so the post-loop signal builder can
     // re-emit on replay without re-reading item_data from SQLite.
     const pendingAgentNotifications = new Map<string, string>();
 
-    for (const item of payload) {
-      const { item_id, item_type } = getItemIdentity(item);
+    // The items this batch actually stored. The session card summary folds
+    // only these: a stale item is an older version of a row the DO already
+    // holds a newer one of, and folding it would move the summary back (an
+    // old running state of a tool that already finished would revive its step).
+    const storedItems: IngestBatch[number][] = [];
 
-      // Check timestamp guard: skip if existing row has a newer ingested_at.
-      // Also read the existing R2 key so we can clean up orphaned blobs.
-      if (ingestedAt !== undefined) {
-        const existing = this.db
-          .select({
-            ingested_at: ingestItems.ingested_at,
-            item_data_r2_key: ingestItems.item_data_r2_key,
-          })
-          .from(ingestItems)
-          .where(eq(ingestItems.item_id, item_id))
-          .get();
-        if (
-          existing?.ingested_at !== null &&
-          existing?.ingested_at !== undefined &&
-          existing.ingested_at > ingestedAt
-        ) {
-          // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
-          const newR2Key = r2References?.[item_id];
-          if (newR2Key) orphanedR2Keys.push(newR2Key);
-          continue;
+    // The stored rows and the running cost total commit together. A request that fails after
+    // storing rows must not leave their contributions missing from the total: a retried batch
+    // replaces identical rows, so it moves nothing, and a total that exists is never re-seeded.
+    this.ctx.storage.transactionSync(() => {
+      for (const item of payload) {
+        const { item_id, item_type } = getItemIdentity(item);
+
+        // The row this item replaces. A message row's contribution is stored beside the body
+        // it was decided from, so this reads a column; only a row that predates the column
+        // reads the body, which the projection returns for that case alone.
+        const replacedMessageRow =
+          item.type === 'message'
+            ? this.db
+                .select({
+                  ingested_at: ingestItems.ingested_at,
+                  item_data_r2_key: ingestItems.item_data_r2_key,
+                  cost_usd: ingestItems.cost_usd,
+                  legacy_item_data: sql<
+                    string | null
+                  >`CASE WHEN ${ingestItems.cost_usd} IS NULL THEN ${ingestItems.item_data} END`,
+                })
+                .from(ingestItems)
+                .where(eq(ingestItems.item_id, item_id))
+                .get()
+            : undefined;
+        const replacedItemRow =
+          item.type === 'message' || ingestedAt === undefined
+            ? undefined
+            : this.db
+                .select({
+                  ingested_at: ingestItems.ingested_at,
+                  item_data_r2_key: ingestItems.item_data_r2_key,
+                })
+                .from(ingestItems)
+                .where(eq(ingestItems.item_id, item_id))
+                .get();
+        const replacedRow = replacedMessageRow ?? replacedItemRow;
+
+        // Check timestamp guard: skip if existing row has a newer ingested_at.
+        // Also read the existing R2 key so we can clean up orphaned blobs.
+        if (ingestedAt !== undefined) {
+          const existingIngestedAt = replacedRow?.ingested_at;
+          const existingR2Key = replacedRow?.item_data_r2_key;
+          const previousItem =
+            item.type === 'part'
+              ? this.db
+                  .select({ ingested_at: ingestItems.ingested_at })
+                  .from(ingestItems)
+                  .where(
+                    and(
+                      eq(
+                        ingestItems.item_id,
+                        getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+                      ),
+                      eq(ingestItems.item_type, 'part')
+                    )
+                  )
+                  .get()
+              : undefined;
+          const existingIsNewer =
+            existingIngestedAt !== null &&
+            existingIngestedAt !== undefined &&
+            existingIngestedAt > ingestedAt;
+          const previousIsNewer =
+            previousItem?.ingested_at !== null &&
+            previousItem?.ingested_at !== undefined &&
+            previousItem.ingested_at > ingestedAt;
+          if (existingIsNewer || previousIsNewer) {
+            // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
+            const newR2Key = r2References?.[item_id];
+            if (newR2Key) orphanedR2Keys.push(newR2Key);
+            continue;
+          }
+          // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
+          const newR2Key = r2References?.[item_id] ?? null;
+          if (existingR2Key && existingR2Key !== newR2Key) {
+            orphanedR2Keys.push(existingR2Key);
+          }
         }
 
-        // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
-        const newR2Key = r2References?.[item_id] ?? null;
-        if (existing?.item_data_r2_key && existing.item_data_r2_key !== newR2Key) {
-          orphanedR2Keys.push(existing.item_data_r2_key);
-        }
-      }
+        const r2Key = r2References?.[item_id];
+        const itemDataJson = r2Key ? '{}' : JSON.stringify(item.data);
+        const itemDataR2Key = r2Key ?? null;
+        // A message row stores its contribution beside the body it was decided from, so a
+        // later version of the row moves the running total without reading that body. An
+        // offloaded body is not read by the recomputation either, so it contributes nothing.
+        const itemCostUsd =
+          item.type === 'message'
+            ? itemDataR2Key === null
+              ? assistantMessageCostUsd(item.data)
+              : 0
+            : null;
 
-      const r2Key = r2References?.[item_id];
-      const itemDataJson = r2Key ? '{}' : JSON.stringify(item.data);
-      const itemDataR2Key = r2Key ?? null;
-
-      this.db
-        .insert(ingestItems)
-        .values({
-          item_id,
-          item_type,
-          item_data: itemDataJson,
-          item_data_r2_key: itemDataR2Key,
-          ingested_at: ingestedAt ?? null,
-        })
-        .onConflictDoUpdate({
-          target: ingestItems.item_id,
-          set: {
+        this.db
+          .insert(ingestItems)
+          .values({
+            item_id,
             item_type,
             item_data: itemDataJson,
             item_data_r2_key: itemDataR2Key,
             ingested_at: ingestedAt ?? null,
-          },
-        })
-        .run();
+            cost_usd: itemCostUsd,
+          })
+          .onConflictDoUpdate({
+            target: ingestItems.item_id,
+            set: {
+              item_type,
+              item_data: itemDataJson,
+              item_data_r2_key: itemDataR2Key,
+              ingested_at: ingestedAt ?? null,
+              cost_usd: itemCostUsd,
+            },
+          })
+          .run();
+        if (item.type === 'part') {
+          // A part row can also exist under the older `<messageID>/<partID>` id. The row just
+          // written supersedes it, so remove it to leave one row per part; the item-type and
+          // timestamp guards keep the delete on a superseded copy of the same part.
+          const superseded = this.db
+            .delete(ingestItems)
+            .where(
+              and(
+                eq(
+                  ingestItems.item_id,
+                  getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+                ),
+                eq(ingestItems.item_type, 'part'),
+                ingestedAt === undefined
+                  ? undefined
+                  : or(isNull(ingestItems.ingested_at), lte(ingestItems.ingested_at, ingestedAt))
+              )
+            )
+            .returning({ item_data_r2_key: ingestItems.item_data_r2_key })
+            .all();
+          for (const row of superseded) {
+            if (row.item_data_r2_key) orphanedR2Keys.push(row.item_data_r2_key);
+          }
+        }
+        storedItems.push(item);
 
-      if (item.type === 'message' || item.type === 'part') {
-        wroteActivityItem = true;
-      }
-      // Cost gate is assistant-only (computeRunningAssistantCostUsd sums role:assistant).
-      // data is looseObject — role is optional at the type level; cheap property check, no parse.
-      if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
-        wroteAssistantMessageItem = true;
-      }
+        if (item.type === 'message' || item.type === 'part') {
+          wroteActivityItem = true;
+        }
+        // Cost gate is assistant-only (computeRunningAssistantCostUsd sums role:assistant).
+        // data is looseObject — role is optional at the type level; cheap property check, no parse.
+        if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
+          wroteAssistantMessageItem = true;
+        }
+        // An offloaded body is not scanned, so it contributes nothing — the same rule the
+        // full recomputation applies to a stored row.
+        if (item.type === 'message') {
+          replacedMessageCostUsd += storedMessageCostUsd(replacedMessageRow);
+          addedMessageCostUsd += itemCostUsd ?? 0;
+        }
 
-      // §4.10: agent_notification items carry no state transition, so the DO durably tracks
-      // per-identity dispatch state alongside the item. Insert-if-absent keeps replays from
-      // re-arming an already-pending identity; the row is only flipped to `dispatched` after
-      // the caller reports a terminal local decision. The ingest response will emit the
-      // signal below whenever this row's state is `pending`.
-      if (item.type === 'agent_notification') {
-        const identity = `agent_notification/${item.data.id}`;
-        const inserted = this.db
-          .insert(agentNotificationDispatch)
-          .values({ identity, state: 'pending', created_at: Date.now() })
-          .onConflictDoNothing({ target: agentNotificationDispatch.identity })
-          .returning({ state: agentNotificationDispatch.state })
-          .get();
-        // Insert-if-absent: only a fresh row (returning populated) is `pending` for this batch.
-        // A replay where the row was already `dispatched` must not re-emit the signal.
-        if (inserted) {
-          pendingAgentNotifications.set(item.data.id, item.data.message);
-        } else {
-          const existing = this.db
-            .select({ state: agentNotificationDispatch.state })
-            .from(agentNotificationDispatch)
-            .where(eq(agentNotificationDispatch.identity, identity))
+        // §4.10: agent_notification items carry no state transition, so the DO durably tracks
+        // per-identity dispatch state alongside the item. Insert-if-absent keeps replays from
+        // re-arming an already-pending identity; the row is only flipped to `dispatched` after
+        // the caller reports a terminal local decision. The ingest response will emit the
+        // signal below whenever this row's state is `pending`.
+        if (item.type === 'agent_notification') {
+          const identity = `agent_notification/${item.data.id}`;
+          const inserted = this.db
+            .insert(agentNotificationDispatch)
+            .values({ identity, state: 'pending', created_at: Date.now() })
+            .onConflictDoNothing({ target: agentNotificationDispatch.identity })
+            .returning({ state: agentNotificationDispatch.state })
             .get();
-          if (existing?.state === 'pending') {
+          // Insert-if-absent: only a fresh row (returning populated) is `pending` for this batch.
+          // A replay where the row was already `dispatched` must not re-emit the signal.
+          if (inserted) {
             pendingAgentNotifications.set(item.data.id, item.data.message);
+          } else {
+            const existing = this.db
+              .select({ state: agentNotificationDispatch.state })
+              .from(agentNotificationDispatch)
+              .where(eq(agentNotificationDispatch.identity, identity))
+              .get();
+            if (existing?.state === 'pending') {
+              pendingAgentNotifications.set(item.data.id, item.data.message);
+            }
+          }
+        }
+
+        const olderThanIncomingStatus =
+          item.type === 'session_status' &&
+          precedesStatusTransition(
+            {
+              occurredAt: item.data.occurredAt ?? null,
+              transitionId: item.data.transitionId ?? null,
+            },
+            {
+              occurredAt: incomingByKey.statusOccurredAt ?? null,
+              transitionId: incomingByKey.statusTransitionId ?? null,
+            }
+          );
+        for (const extractor of INGEST_META_EXTRACTORS) {
+          if (
+            olderThanIncomingStatus &&
+            (extractor.key === 'status' ||
+              extractor.key === 'statusOccurredAt' ||
+              extractor.key === 'statusTransitionId')
+          )
+            continue;
+          const maybeValue = extractor.extract(item);
+          if (maybeValue !== undefined) {
+            incomingByKey[extractor.key] = maybeValue;
+          }
+        }
+
+        // session_pr_link emits the whole tuple atomically (or nothing), so the change
+        // map always receives all five keys together.
+        const prLink = extractSessionPrLink(item);
+        if (prLink !== undefined) {
+          incomingByKey.prPlatform = prLink.prPlatform;
+          incomingByKey.prUrl = prLink.prUrl;
+          incomingByKey.prNumber = prLink.prNumber;
+          incomingByKey.prHeadRef = prLink.prHeadRef;
+          incomingByKey.prHeadSha = prLink.prHeadSha;
+        }
+
+        if (ingestVersion >= 1) {
+          if (item.type === 'session_open') {
+            lifecycleEvents.push({ type: 'session_open' });
+          } else if (item.type === 'session_close') {
+            lifecycleEvents.push({ type: 'session_close', reason: item.data.reason });
           }
         }
       }
 
-      for (const extractor of INGEST_META_EXTRACTORS) {
-        const maybeValue = extractor.extract(item);
-        if (maybeValue !== undefined) {
-          incomingByKey[extractor.key] = maybeValue;
-        }
+      // Same transaction as the rows, so the total cannot miss a stored contribution.
+      const priorRunningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
+      if (priorRunningCostUsd !== null && replacedMessageCostUsd !== addedMessageCostUsd) {
+        writeIngestMetaNumber(
+          this.db,
+          RUNNING_ASSISTANT_COST_META_KEY,
+          adjustRunningAssistantCostUsd(
+            priorRunningCostUsd,
+            replacedMessageCostUsd,
+            addedMessageCostUsd
+          )
+        );
       }
+    });
 
-      // session_pr_link emits the whole triple atomically (or nothing), so the change
-      // map always receives all three keys together.
-      const prLink = extractSessionPrLink(item);
-      if (prLink !== undefined) {
-        incomingByKey.prPlatform = prLink.prPlatform;
-        incomingByKey.prUrl = prLink.prUrl;
-        incomingByKey.prNumber = prLink.prNumber;
-      }
-
-      if (ingestVersion >= 1) {
-        if (item.type === 'session_open') {
-          lifecycleEvents.push({ type: 'session_open' });
-        } else if (item.type === 'session_close') {
-          lifecycleEvents.push({ type: 'session_close', reason: item.data.reason });
-        }
-      }
-    }
-
+    // Lifecycle side effects (metrics alarm, open/close meta) run before any incoming
+    // metadata is committed, so a failed alarm write leaves that metadata unreported.
+    if (this.isDeleted()) return { accepted: false, reason: 'deleted', changes: [] };
     if (ingestVersion >= 1) {
       // v1 clients send explicit open/close pairs. Only those events drive alarms.
       for (const event of lifecycleEvents) {
+        if (this.isDeleted()) return { accepted: false, reason: 'deleted', changes: [] };
         if (event.type === 'session_open') {
           // New turn starting — clear prior emission so metrics are re-computed.
           this.db
             .delete(ingestMeta)
             .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
             .run();
-          await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+          await this.scheduleAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
         } else {
           writeIngestMetaIfChanged(this.db, {
             key: 'closeReason',
             incomingValue: event.reason,
           });
-          await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+          await this.scheduleAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
         }
       }
       // Events without open/close (stragglers) don't touch the alarm.
     } else {
       // v0 (legacy): no open/close signals, rely on inactivity timeout.
-      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+      await this.scheduleAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
     }
 
     // Read before the write loop below persists incoming values: whether this session had ever
     // reported a status. The first-ever status write also registers as a change, and a
     // full-history backfill of an already-idle session must not push about an old turn.
     const hadPriorStatus = hasIngestMeta(this.db, 'status');
+    const previousStatusOccurredAt = incomingByKey.statusOccurredAt
+      ? readIngestMetaValue(this.db, 'statusOccurredAt')
+      : null;
+    const previousStatusTransitionId = incomingByKey.statusOccurredAt
+      ? readIngestMetaValue(this.db, 'statusTransitionId')
+      : null;
+    const historicalStatus =
+      incomingByKey.statusOccurredAt != null &&
+      precedesStatusTransition(
+        {
+          occurredAt: incomingByKey.statusOccurredAt,
+          transitionId: incomingByKey.statusTransitionId ?? null,
+        },
+        { occurredAt: previousStatusOccurredAt, transitionId: previousStatusTransitionId }
+      );
 
     const changes: Changes = [];
     for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
+      if (
+        historicalStatus &&
+        (key === 'status' || key === 'statusOccurredAt' || key === 'statusTransitionId')
+      )
+        continue;
       const incoming = incomingByKey[key];
       if (incoming === undefined) continue;
       const meta = writeIngestMetaIfChanged(this.db, {
@@ -450,6 +1045,30 @@ export class SessionIngestDO extends DurableObject<Env> {
       });
       if (meta.changed) {
         changes.push({ name: key, value: meta.value });
+      }
+    }
+    const localStatusChange = changes.find(change => change.name === 'status');
+    if (
+      incomingByKey.status !== undefined &&
+      (historicalStatus ||
+        changes.some(
+          change =>
+            change.name === 'status' ||
+            change.name === 'statusOccurredAt' ||
+            change.name === 'statusTransitionId'
+        ))
+    ) {
+      if (!changes.some(change => change.name === 'status')) {
+        changes.push({ name: 'status', value: incomingByKey.status });
+      }
+      if (!changes.some(change => change.name === 'statusOccurredAt')) {
+        changes.push({ name: 'statusOccurredAt', value: incomingByKey.statusOccurredAt ?? null });
+      }
+      if (!changes.some(change => change.name === 'statusTransitionId')) {
+        changes.push({
+          name: 'statusTransitionId',
+          value: incomingByKey.statusTransitionId ?? null,
+        });
       }
     }
 
@@ -471,11 +1090,44 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     // Live activity + cost Postgres persist (items 7 + 17). Not via applyMetadataChanges
     // (avoids per-tick WS fanout). Throttle meta advances only after a successful write.
-    const statusChangeForLive = changes.find(change => change.name === 'status');
+    const statusChangeForLive = localStatusChange;
     const idleTransition =
       statusChangeForLive !== undefined && isCompletedStatus(statusChangeForLive.value);
+    const statusValue = statusChangeForLive?.value ?? readIngestMetaValue(this.db, 'status');
+    const nowMsLive = Date.now();
 
-    // Only scan all inline messages when the cost-persist window is open (KB-3).
+    // Session card summary: fold this batch into the running value and apply
+    // the status transition. Only the derived summary leaves the DO.
+    const priorLiveSummary = readLiveSummaryState(this.db);
+    const foldedLiveSummary = foldSessionLiveSummary(priorLiveSummary, storedItems, statusValue);
+    const currentLiveSummaryState =
+      statusChangeForLive === undefined
+        ? foldedLiveSummary
+        : applySessionLiveSummaryStatus(foldedLiveSummary, statusChangeForLive.value);
+    const currentLiveSummaryChanged = sessionLiveSummaryChanged(
+      priorLiveSummary,
+      currentLiveSummaryState
+    );
+    if (currentLiveSummaryChanged) {
+      writeIngestMetaValue(this.db, 'liveSummaryState', JSON.stringify(currentLiveSummaryState));
+    }
+    const lastPersistedLiveSummary = readLiveSummaryPersisted(this.db);
+    const currentLiveSummary = currentLiveSummaryState;
+    const liveSummaryVisibleChanged = sessionLiveSummaryChanged(
+      lastPersistedLiveSummary ?? EMPTY_SESSION_LIVE_SUMMARY_STATE,
+      currentLiveSummary
+    );
+    const liveSummaryFailureChanged =
+      (lastPersistedLiveSummary?.failure?.kind ?? null) !==
+      (currentLiveSummary.failure?.kind ?? null);
+    const liveSummaryDecision = decideLiveSummaryPersist({
+      nowMs: nowMsLive,
+      statusTransition: statusChangeForLive !== undefined,
+      failureChanged: liveSummaryFailureChanged,
+      lastPersistedAtMs: readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs'),
+    });
+
+    // Only read the stored cost total when the cost-persist window is open (KB-3).
     // Window needs no cost value: idle forces (D17), else assistant upsert + 30s throttle.
     const nowMs = Date.now();
     const lastCostPersistedAtMs = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
@@ -485,16 +1137,22 @@ export class SessionIngestDO extends DurableObject<Env> {
         (lastCostPersistedAtMs === null ||
           nowMs - lastCostPersistedAtMs >= COST_PERSIST_THROTTLE_MS));
 
-    let currentCostMicrodollars: number | null = null;
-    if (costWindowOpen) {
-      const messageRows = this.db
-        .select({ item_data: ingestItems.item_data })
-        .from(ingestItems)
-        .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
-        .all();
-      const usd = computeRunningAssistantCostUsd(messageRows);
-      currentCostMicrodollars = Math.max(0, Math.round(usd * 1_000_000));
+    // The running cost is committed with the rows, so a persist reads a stored total instead
+    // of the session's message history. A session without one — created before the total
+    // existed, or a clone destination — seeds it from its stored rows once: bounded batches
+    // that sum the stored contribution of every message row, reading a body only for a row
+    // that predates the column. The write lands after the last batch, so the key marks a
+    // complete seed and a later batch never repeats it.
+    let runningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
+    if (runningCostUsd === null && costWindowOpen) {
+      runningCostUsd = readStoredRunningAssistantCostUsd(this.db);
+      writeIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY, runningCostUsd);
     }
+
+    const currentCostMicrodollars =
+      costWindowOpen && runningCostUsd !== null
+        ? runningAssistantCostMicrodollars(runningCostUsd)
+        : null;
 
     const lastActivityValueMs = ingestedAt ?? nowMs;
     const decision = decideLivePersist({
@@ -510,21 +1168,97 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastCostPersistedMicrodollars: readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars'),
     });
 
-    if (decision.persistActivity || decision.persistCost) {
-      const columns: { costMicrodollars?: number; lastActivityAtIso?: string } = {};
+    const briefingResponseChanged = storedItems.some(
+      item =>
+        (item.type === 'message' && completedBriefingResponse(item.data) !== undefined) ||
+        (item.type === 'part' && isFinalizedBriefingText(item.data))
+    );
+    if (decision.persistActivity || decision.persistCost || briefingResponseChanged) {
+      const columns: {
+        costMicrodollars?: number;
+        lastActivityAtIso?: string;
+        liveSummary?: { summary: SessionLiveSummary; atIso: string };
+        briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
+      } = {};
       if (decision.persistCost && currentCostMicrodollars !== null) {
         columns.costMicrodollars = currentCostMicrodollars;
       }
       if (decision.persistActivity) {
         columns.lastActivityAtIso = new Date(lastActivityValueMs).toISOString();
       }
+      // The live summary rides the activity write: a summary change with no
+      // activity (a metadata-only or lifecycle-only batch) must not open a
+      // persist of its own, and the next activity carries the newer summary.
+      if (decision.persistActivity && liveSummaryDecision) {
+        columns.liveSummary = {
+          summary: currentLiveSummary,
+          atIso: new Date(lastActivityValueMs).toISOString(),
+        };
+      }
       const costToPersist = columns.costMicrodollars;
       const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
+      const summaryToPersist = columns.liveSummary;
+      // The excerpt gate runs before the write is scheduled: a batch that repeats a response the
+      // object already persisted, or one a scheduled write still carries, adds no excerpt column.
+      // The in-flight identity is memory, so it lapses with the instance and a write that never
+      // runs leaves no trace.
+      let excerptInFlight: BriefingExcerptIdentity | undefined;
+      if (briefingResponseChanged) {
+        try {
+          const excerpt = this.latestBriefingExcerpt(storedItems);
+          const inFlight = this.briefingExcerptInFlight;
+          const alreadyInFlight =
+            inFlight !== null &&
+            inFlight.messageId === excerpt?.messageId &&
+            inFlight.completedAt === excerpt?.completedAt;
+          if (
+            excerpt &&
+            !alreadyInFlight &&
+            briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))
+          ) {
+            excerptInFlight = excerpt;
+            this.briefingExcerptInFlight = excerpt;
+            columns.briefingExcerpt = {
+              excerpt,
+              receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
+            };
+          }
+        } catch (error) {
+          console.error('SessionIngestDO failed to read completed briefing response', {
+            kiloUserId,
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       const connectionString = this.env.HYPERDRIVE.connectionString;
       this.ctx.waitUntil(
         (async () => {
           try {
+            if (this.isDeleted()) return;
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
+            if (this.isDeleted()) return;
+            if (excerptInFlight !== undefined) {
+              // Max-merge, so a slower batch that carried an older excerpt cannot replace the
+              // identity of the newer one already recorded.
+              if (briefingExcerptIsNewer(excerptInFlight, readBriefingExcerptPersisted(this.db))) {
+                writeBriefingExcerptPersisted(this.db, excerptInFlight);
+              }
+              this.releaseBriefingExcerptInFlight(excerptInFlight);
+            }
+            if (summaryToPersist !== undefined) {
+              const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
+              if (prevSummaryAt === null || nowMsLive > prevSummaryAt) {
+                writeIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs', nowMsLive);
+                if (liveSummaryVisibleChanged) {
+                  writeIngestMetaValue(
+                    this.db,
+                    'lastLiveSummaryPersisted',
+                    JSON.stringify(summaryToPersist.summary)
+                  );
+                }
+              }
+            }
             // Max-merge post-await so out-of-order concurrent ingests cannot regress throttle meta.
             if (activityValueMs !== undefined) {
               const prevAt = readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs');
@@ -553,7 +1287,29 @@ export class SessionIngestDO extends DurableObject<Env> {
                 writeIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars', costToPersist);
               }
             }
+            // The card reads the persisted row, so refresh only after the write
+            // landed and only when a card follows this session: the follow gate
+            // saves the whole snapshot build for a session nobody watches.
+            if (summaryToPersist !== undefined && liveSummaryVisibleChanged) {
+              try {
+                await refreshGlanceableSessions(this.env, {
+                  userId: kiloUserId,
+                  cliSessionIds: [sessionId],
+                  cardFollowSessionIds: [sessionId],
+                });
+              } catch (refreshError) {
+                console.error('SessionIngestDO failed to refresh the session card', {
+                  kiloUserId,
+                  sessionId,
+                  error:
+                    refreshError instanceof Error ? refreshError.message : String(refreshError),
+                });
+              }
+            }
           } catch (error) {
+            // Nothing was recorded, because the record is written after the statement. The
+            // in-flight identity still has to go, or the next batch would skip the same excerpt.
+            if (excerptInFlight !== undefined) this.releaseBriefingExcerptInFlight(excerptInFlight);
             console.error('SessionIngestDO failed to persist live session columns', {
               kiloUserId,
               sessionId,
@@ -585,6 +1341,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       attentionSignals.push({
         signalId: `status:${statusChange.value}:${ingestedAt ?? Date.now()}`,
         kind: 'needs_input',
+        attentionKind: attentionKindForNeedsInputStatus(statusChange.value),
         messageExcerpt: '',
       });
     }
@@ -665,28 +1422,184 @@ export class SessionIngestDO extends DurableObject<Env> {
     await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
   }
 
-  /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
-  private buildAssistantExcerptForMessage(messageId: string): string {
-    const range = getPartItemIdentityRange(messageId);
-    const rows = this.db
-      .select({
-        item_data: ingestItems.item_data,
-      })
-      .from(ingestItems)
-      .where(
-        and(
-          eq(ingestItems.item_type, 'part'),
-          gte(ingestItems.item_id, range.start),
-          lt(ingestItems.item_id, range.end),
-          isNull(ingestItems.item_data_r2_key)
-        )
-      )
-      .orderBy(ingestItems.ingested_at, ingestItems.id)
-      .all();
+  /** Drops the in-flight identity, unless a later batch already replaced it. */
+  private releaseBriefingExcerptInFlight(identity: BriefingExcerptIdentity): void {
+    const inFlight = this.briefingExcerptInFlight;
+    const sameIdentity =
+      inFlight !== null &&
+      inFlight.messageId === identity.messageId &&
+      inFlight.completedAt === identity.completedAt;
+    if (sameIdentity) this.briefingExcerptInFlight = null;
+  }
 
-    // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather
-    // than fetching from R2 — this is a best-effort excerpt, not a full transcript.
-    return buildAssistantExcerpt(rows.map(row => row.item_data));
+  private latestBriefingExcerpt(items: IngestBatch): BriefingExcerpt | undefined {
+    const messageIds = new Set<string>();
+    for (const item of items) {
+      if (item.type === 'message' && completedBriefingResponse(item.data)) {
+        messageIds.add(item.data.id);
+      } else if (item.type === 'part' && isFinalizedBriefingText(item.data)) {
+        messageIds.add(item.data.messageID);
+      }
+      if (messageIds.size > BRIEFING_MAX_EXCERPT_SOURCE_ROWS) return undefined;
+    }
+    const encoder = new TextEncoder();
+    let latestMessage: unknown;
+    let latestMessageId = '';
+    let latestCompletedAt = -Infinity;
+    let messageBytes = 0;
+    for (const messageId of messageIds) {
+      const row = this.db
+        .select({
+          item_data: ingestItems.item_data,
+          item_data_r2_key: ingestItems.item_data_r2_key,
+        })
+        .from(ingestItems)
+        .where(
+          and(
+            eq(ingestItems.item_id, `message/${messageId}`),
+            isNull(ingestItems.item_data_r2_key),
+            sql`length(${ingestItems.item_data}) <= ${BRIEFING_MAX_INLINE_BYTES}`
+          )
+        )
+        .get();
+      if (!row || row.item_data_r2_key || row.item_data.length > BRIEFING_MAX_INLINE_BYTES)
+        continue;
+      const bytes = encoder.encode(row.item_data).byteLength;
+      if (bytes > BRIEFING_MAX_INLINE_BYTES) continue;
+      const message = completedBriefingResponse(JSON.parse(row.item_data));
+      if (
+        message &&
+        (message.time.completed > latestCompletedAt ||
+          (message.time.completed === latestCompletedAt && message.id > latestMessageId))
+      ) {
+        latestMessage = message;
+        latestMessageId = message.id;
+        latestCompletedAt = message.time.completed;
+        messageBytes = bytes;
+      }
+    }
+    if (latestMessage === undefined) return undefined;
+    let fetchedRows = 0;
+    let inlineBytes = messageBytes;
+    const parts: unknown[] = [];
+    for (const row of streamMessagePartRows<PartExportRow & { oversized_inline: number }>({
+      messageId: latestMessageId,
+      order: 'row-id',
+      batchSize: BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1,
+      fetchPage: (range, after, limit) => {
+        const remaining = BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1 - fetchedRows;
+        if (remaining <= 0) return [];
+        const rows = this.db
+          .select({
+            id: ingestItems.id,
+            ingested_at: ingestItems.ingested_at,
+            item_id: ingestItems.item_id,
+            item_data: sql<string>`CASE
+              WHEN ${ingestItems.item_data_r2_key} IS NOT NULL
+                OR length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES} THEN ''
+              WHEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
+                THEN ${ingestItems.item_data}
+              ELSE ''
+            END`,
+            item_data_r2_key: ingestItems.item_data_r2_key,
+            oversized_inline: sql<number>`CASE
+              WHEN ${ingestItems.item_data_r2_key} IS NULL
+                AND length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES}
+                THEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
+              ELSE 0
+            END`,
+          })
+          .from(ingestItems)
+          .where(
+            and(
+              eq(ingestItems.item_type, 'part'),
+              gte(ingestItems.item_id, range.start),
+              lt(ingestItems.item_id, range.end),
+              after ? gt(ingestItems.id, after.id) : undefined
+            )
+          )
+          .orderBy(ingestItems.id)
+          .limit(Math.min(limit, remaining))
+          .all();
+        fetchedRows += rows.length;
+        return rows;
+      },
+    })) {
+      if (fetchedRows > BRIEFING_MAX_EXCERPT_SOURCE_ROWS || row.oversized_inline === 1) {
+        return undefined;
+      }
+      if (row.item_data_r2_key || !row.item_data) continue;
+      if (row.item_data.length > BRIEFING_MAX_INLINE_BYTES) return undefined;
+      inlineBytes += encoder.encode(row.item_data).byteLength;
+      if (inlineBytes > BRIEFING_MAX_INLINE_BYTES) return undefined;
+      parts.push(JSON.parse(row.item_data));
+    }
+    return buildBriefingExcerpt(latestMessage, parts);
+  }
+
+  /**
+   * Builds a text excerpt for a completed assistant message from its already-ingested text parts.
+   *
+   * This runs inside the status-change ingest request, so it is bounded like
+   * `latestBriefingExcerpt`: at most `BRIEFING_MAX_EXCERPT_SOURCE_ROWS` text-part rows and
+   * `BRIEFING_MAX_INLINE_BYTES` of text, and it stops as soon as the excerpt is complete. A
+   * message may hold an arbitrary number of parts, and the push only ever shows the start of its
+   * text, so a capped read still returns the excerpt of the text read so far: the caps drop only
+   * text the snippet would not have shown.
+   */
+  private buildAssistantExcerptForMessage(messageId: string): string {
+    const encoder = new TextEncoder();
+    let fetchedRows = 0;
+    let consumedRows = 0;
+    let textBytes = 0;
+    let text = '';
+    for (const row of streamMessagePartRows<PartExcerptRow>({
+      messageId,
+      order: 'ingest',
+      batchSize: BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1,
+      fetchPage: (range, after, limit) => {
+        const remaining = BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1 - fetchedRows;
+        if (remaining <= 0) return [];
+        const rows = this.db
+          .select({
+            id: ingestItems.id,
+            ingested_at: ingestItems.ingested_at,
+            item_id: ingestItems.item_id,
+            item_data: ingestItems.item_data,
+          })
+          .from(ingestItems)
+          .where(
+            and(
+              eq(ingestItems.item_type, 'part'),
+              gte(ingestItems.item_id, range.start),
+              lt(ingestItems.item_id, range.end),
+              // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather than
+              // fetching from R2 — this is a best-effort excerpt, not a full transcript.
+              isNull(ingestItems.item_data_r2_key),
+              // Only text parts carry excerpt text. Filtering them in SQL keeps every other part
+              // body (tool arguments, tool output) out of the row cap and out of the DO's memory.
+              sql`json_extract(${ingestItems.item_data}, '$.type') = 'text'`,
+              after
+                ? afterIngestOrderCursor({ ingestedAt: after.ingested_at, id: after.id })
+                : undefined
+            )
+          )
+          .orderBy(ingestItems.ingested_at, ingestItems.id)
+          .limit(Math.min(limit, remaining))
+          .all();
+        fetchedRows += rows.length;
+        return rows;
+      },
+    })) {
+      if (++consumedRows > BRIEFING_MAX_EXCERPT_SOURCE_ROWS) break;
+      const partText = extractTextFromPartItemData(row.item_data);
+      if (!partText) continue;
+      text += partText;
+      textBytes += encoder.encode(partText).byteLength;
+      if (textBytes >= BRIEFING_MAX_INLINE_BYTES || assistantExcerptIsComplete(text)) break;
+    }
+
+    return buildAssistantExcerpt([text]);
   }
 
   /**
@@ -722,32 +1635,144 @@ export class SessionIngestDO extends DurableObject<Env> {
     return readKiloSdkMessages(this.db, this.env.SESSION_INGEST_R2, params);
   }
 
-  async getAllStream(): Promise<ReadableStream<Uint8Array>> {
+  async readSessionDiff(): Promise<SessionDiffRead> {
+    return readSessionDiff(this.db, this.env.SESSION_INGEST_R2);
+  }
+
+  /**
+   * Stream the session export. With `upToMessageId`, keep only messages inside
+   * the inclusive cut (see `isItemWithinMessageCut`) and emit an empty
+   * `sessionDiff`; without it the output is the full export.
+   */
+  async getAllStream(upToMessageId?: string): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({ upToMessageId });
+  }
+
+  /** Include later messages using the same session-info projection as snapshot shares. */
+  async getLiveSharedSessionStream(): Promise<ReadableStream<Uint8Array>> {
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    // Session details are optional for reading an existing transcript.
+    const shareInfo = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
+    return this.buildSessionExportStream({ includeSessionDiff: false, shareInfo });
+  }
+
+  /**
+   * Freeze the session info a public share exposes. Snapshots are keyed by the
+   * public generation so a later share cannot replace an earlier snapshot while
+   * its capability is still valid. Snapshot retention matches the link lifetime.
+   */
+  async captureShareInfo(publicId: string, duration: SessionShareDuration = '7d'): Promise<number> {
+    const shareDuration = sessionShareDurationSchema.parse(duration);
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    if (snapshot.kind === 'too_large') throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    if (snapshot.kind !== 'value' && snapshot.kind !== 'pending') {
+      throw new Error('Share snapshot is unavailable');
+    }
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const info = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
+    const now = Date.now();
+    const expiresAtSeconds = getSessionShareExpiresAt(shareDuration, Math.floor(now / 1000));
+    const expiresAt = expiresAtSeconds === null ? null : expiresAtSeconds * 1000;
+    const value = JSON.stringify({ capturedAt: now, expiresAt, info });
+    if (new TextEncoder().encode(value).byteLength > MAX_INGEST_ITEM_BYTES) {
+      throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    }
+
+    this.db
+      .insert(ingestMeta)
+      .values({ key: shareInfoKey(publicId), value })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+      .run();
+    this.pruneShareInfo(now);
+    return now;
+  }
+
+  async deleteShareInfo(publicId: string): Promise<void> {
+    this.db
+      .delete(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .run();
+  }
+
+  private pruneShareInfo(now: number): void {
+    const rows = this.db
+      .select({ key: ingestMeta.key, value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(like(ingestMeta.key, `${SHARE_INFO_KEY_PREFIX}%`))
+      .all();
+    for (const row of rows) {
+      if (readShareInfo(row.value, now) === null) {
+        this.db.delete(ingestMeta).where(eq(ingestMeta.key, row.key)).run();
+      }
+    }
+  }
+
+  /**
+   * Stream the frozen boundary of a public share. Only items persisted strictly
+   * before `ingestedBeforeMs` are included, the session info is the snapshot
+   * captured when the share was created, and the cumulative whole-session diff
+   * is never exposed. Message-summary diffs remain part of the transcript so
+   * `kilo import` can still restore intentional file changes.
+   */
+  async getSharedSessionStream(params: {
+    publicId: string;
+    ingestedBeforeMs: number;
+  }): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({
+      ingestedBeforeMs: params.ingestedBeforeMs,
+      includeSessionDiff: false,
+      shareInfo: this.readShareInfo(params.publicId),
+    });
+  }
+
+  private readShareInfo(publicId: string): string | null {
+    const row = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .get();
+    return readShareInfo(row?.value ?? null, Date.now());
+  }
+
+  private buildSessionExportStream(options: {
+    upToMessageId?: string;
+    ingestedBeforeMs?: number;
+    includeSessionDiff?: boolean;
+    shareInfo?: string | null;
+  }): ReadableStream<Uint8Array> {
     const db = this.db;
     const r2 = this.env.SESSION_INGEST_R2;
     const encoder = new TextEncoder();
+    const upToMessageId = options.upToMessageId;
+    const ingestedBeforeCondition =
+      options.ingestedBeforeMs === undefined
+        ? undefined
+        : lt(ingestItems.ingested_at, options.ingestedBeforeMs);
 
     return new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
-          // --- session info ---
           controller.enqueue(encoder.encode('{"info":'));
-          const sessionRow = db
-            .select({
-              item_data: ingestItems.item_data,
-              item_data_r2_key: ingestItems.item_data_r2_key,
-            })
-            .from(ingestItems)
-            .where(eq(ingestItems.item_type, 'session'))
-            .limit(1)
-            .get();
-          if (sessionRow) {
-            await enqueueItemData(controller, sessionRow, r2, encoder);
+          if (options.shareInfo !== undefined) {
+            controller.enqueue(encoder.encode(options.shareInfo ?? '{}'));
           } else {
-            controller.enqueue(encoder.encode('{}'));
+            const sessionRow = db
+              .select({
+                item_data: ingestItems.item_data,
+                item_data_r2_key: ingestItems.item_data_r2_key,
+              })
+              .from(ingestItems)
+              .where(eq(ingestItems.item_type, 'session'))
+              .limit(1)
+              .get();
+            if (sessionRow) {
+              await enqueueItemData(controller, sessionRow, r2, encoder);
+            } else {
+              controller.enqueue(encoder.encode('{}'));
+            }
           }
 
-          // --- messages ---
           const CURSOR_BATCH = 10;
           controller.enqueue(encoder.encode(',"messages":['));
           let msgCursor: IngestOrderCursor | undefined;
@@ -766,6 +1791,7 @@ export class SessionIngestDO extends DurableObject<Env> {
               .where(
                 and(
                   eq(ingestItems.item_type, 'message'),
+                  ingestedBeforeCondition,
                   msgCursor ? afterIngestOrderCursor(msgCursor) : undefined
                 )
               )
@@ -777,50 +1803,63 @@ export class SessionIngestDO extends DurableObject<Env> {
             msgCursor = ingestOrderCursor(msgBatch[msgBatch.length - 1]);
 
             for (const msgRow of msgBatch) {
+              if (
+                upToMessageId !== undefined &&
+                !isItemWithinMessageCut(
+                  { itemType: 'message', itemId: msgRow.item_id },
+                  upToMessageId
+                )
+              ) {
+                continue;
+              }
               if (!firstMsg) controller.enqueue(encoder.encode(','));
               firstMsg = false;
 
-              // message info
               controller.enqueue(encoder.encode('{"info":'));
               await enqueueItemData(controller, msgRow, r2, encoder);
 
-              // parts for this message: item_id = '{msgId}/{partId}'
+              // parts for this message: `part/{msgId}/{partId}`, and `{msgId}/{partId}` for rows
+              // in the older layout
               const msgId = msgRow.item_id.slice('message/'.length);
-              const partRange = getPartItemIdentityRange(msgId);
               controller.enqueue(encoder.encode(',"parts":['));
-              let partCursor: IngestOrderCursor | undefined;
               let firstPart = true;
 
-              while (true) {
-                const partBatch = db
-                  .select({
-                    id: ingestItems.id,
-                    ingested_at: ingestItems.ingested_at,
-                    item_data: ingestItems.item_data,
-                    item_data_r2_key: ingestItems.item_data_r2_key,
-                  })
-                  .from(ingestItems)
-                  .where(
-                    and(
-                      eq(ingestItems.item_type, 'part'),
-                      gte(ingestItems.item_id, partRange.start),
-                      lt(ingestItems.item_id, partRange.end),
-                      partCursor ? afterIngestOrderCursor(partCursor) : undefined
+              for (const partRow of streamMessagePartRows<PartExportRow>({
+                messageId: msgId,
+                order: 'ingest',
+                batchSize: CURSOR_BATCH,
+                fetchPage: (range, after, limit) =>
+                  db
+                    .select({
+                      id: ingestItems.id,
+                      ingested_at: ingestItems.ingested_at,
+                      item_id: ingestItems.item_id,
+                      item_data: ingestItems.item_data,
+                      item_data_r2_key: ingestItems.item_data_r2_key,
+                    })
+                    .from(ingestItems)
+                    .where(
+                      and(
+                        eq(ingestItems.item_type, 'part'),
+                        gte(ingestItems.item_id, range.start),
+                        lt(ingestItems.item_id, range.end),
+                        ingestedBeforeCondition,
+                        after
+                          ? afterIngestOrderCursor({
+                              ingestedAt: after.ingested_at,
+                              id: after.id,
+                            })
+                          : undefined
+                      )
                     )
-                  )
-                  .orderBy(ingestItems.ingested_at, ingestItems.id)
-                  .limit(CURSOR_BATCH)
-                  .all();
+                    .orderBy(ingestItems.ingested_at, ingestItems.id)
+                    .limit(limit)
+                    .all(),
+              })) {
+                if (!firstPart) controller.enqueue(encoder.encode(','));
+                firstPart = false;
 
-                if (partBatch.length === 0) break;
-                partCursor = ingestOrderCursor(partBatch[partBatch.length - 1]);
-
-                for (const partRow of partBatch) {
-                  if (!firstPart) controller.enqueue(encoder.encode(','));
-                  firstPart = false;
-
-                  await enqueueItemData(controller, partRow, r2, encoder);
-                }
+                await enqueueItemData(controller, partRow, r2, encoder);
               }
 
               controller.enqueue(encoder.encode(']}'));
@@ -829,15 +1868,18 @@ export class SessionIngestDO extends DurableObject<Env> {
 
           controller.enqueue(encoder.encode(']'));
           controller.enqueue(encoder.encode(',"sessionDiff":'));
-          const diffRow = db
-            .select({
-              item_data: ingestItems.item_data,
-              item_data_r2_key: ingestItems.item_data_r2_key,
-            })
-            .from(ingestItems)
-            .where(eq(ingestItems.item_type, 'session_diff'))
-            .limit(1)
-            .get();
+          const diffRow =
+            upToMessageId === undefined && options.includeSessionDiff !== false
+              ? db
+                  .select({
+                    item_data: ingestItems.item_data,
+                    item_data_r2_key: ingestItems.item_data_r2_key,
+                  })
+                  .from(ingestItems)
+                  .where(and(eq(ingestItems.item_type, 'session_diff'), ingestedBeforeCondition))
+                  .limit(1)
+                  .get()
+              : undefined;
           if (diffRow) {
             await enqueueItemData(controller, diffRow, r2, encoder, '[]');
           } else {
@@ -871,25 +1913,39 @@ export class SessionIngestDO extends DurableObject<Env> {
       return false;
     }
 
-    // Note: items that exceeded the DO SQLite row limit (~1.94MB) are stored in R2
-    // with item_data='{}'. Metrics reads only item_data from SQLite, so those items
-    // contribute empty data. This is acceptable — oversized items are rare edge cases
-    // (giant tool results) and metrics only needs small fields (timestamps, types).
-    const rows = this.db
-      .select({
-        item_type: ingestItems.item_type,
-        item_data: ingestItems.item_data,
-      })
-      .from(ingestItems)
-      .where(ne(ingestItems.item_type, 'session_diff'))
-      .orderBy(ingestItems.ingested_at, ingestItems.id)
-      .all();
-
-    if (rows.length === 0) {
+    // The scan reads the newest stored rows that fit in its fixed row and byte ceiling. The
+    // window row does not hand the isolate a whole large body, and the emitted record states
+    // whether the counted figures cover the whole session.
+    const window = readSessionMetricsWindow(this.db);
+    if (window.rowCount === 0) {
       return false;
     }
 
-    const metrics = computeSessionMetrics(rows, closeReason);
+    const computed = computeSessionMetrics(window.rows, closeReason, { bounded: window.bounded });
+
+    // The running total moves with each accepted batch. A read that counted every stored row
+    // recomputes the cost from the rows: a divergence means some path wrote message rows
+    // without adjusting the total, which the monotonic persist could never correct. A partial
+    // read cannot recompute the whole cost, so the stored total is the exact figure there.
+    const storedRunningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
+    if (!window.bounded) {
+      if (
+        storedRunningCostUsd !== null &&
+        Number.isFinite(computed.totalCost) &&
+        Math.abs(storedRunningCostUsd - computed.totalCost) > COST_DIVERGENCE_TOLERANCE_USD
+      ) {
+        console.warn('SessionIngestDO session cost total diverges from its stored rows', {
+          sessionId,
+          kiloUserId,
+          storedUsd: storedRunningCostUsd,
+          recomputedUsd: computed.totalCost,
+        });
+      }
+    }
+    const metrics =
+      window.bounded && storedRunningCostUsd !== null
+        ? { ...computed, totalCost: Math.max(0, storedRunningCostUsd) }
+        : computed;
 
     const modelRow = this.db
       .select({ item_data: ingestItems.item_data })
@@ -934,6 +1990,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       });
     }
 
+    if (this.isDeleted()) return false;
     await this.env.O11Y.ingestSessionMetrics({
       kiloUserId,
       sessionId,
@@ -942,23 +1999,26 @@ export class SessionIngestDO extends DurableObject<Env> {
       ...metrics,
     });
 
-    // Mark metrics as emitted to prevent duplicates
+    if (this.isDeleted()) return false;
     this.db
       .insert(ingestMeta)
       .values({ key: 'metricsEmitted', value: 'true' })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
       .run();
 
-    await this.ctx.storage.deleteAlarm();
-
     return true;
   }
 
-  /**
-   * Alarm fires either after POST_CLOSE_DRAIN_MS (session closed) or
-   * INACTIVITY_TIMEOUT_MS (no activity). Reads the close reason from
-   * ingest_meta if present, otherwise falls back to 'abandoned'.
-   */
+  private async scheduleAlarm(metricsAlarmAt?: number): Promise<void> {
+    if (metricsAlarmAt !== undefined) {
+      writeIngestMetaNumber(this.db, 'metricsAlarmAt', metricsAlarmAt);
+    }
+    const dueAt = metricsAlarmAt ?? readIngestMetaNumber(this.db, 'metricsAlarmAt');
+    if (dueAt === null) await this.ctx.storage.deleteAlarm();
+    else await this.ctx.storage.setAlarm(dueAt);
+  }
+
+  /** Emits session metrics after close drain or inactivity, once per turn. */
   async alarm(): Promise<void> {
     const metaRows = this.db
       .select()
@@ -970,6 +2030,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           'closeReason',
           'ingestVersion',
           'deleted',
+          'metricsEmitted',
         ])
       )
       .all();
@@ -982,6 +2043,16 @@ export class SessionIngestDO extends DurableObject<Env> {
     const sessionId = meta['sessionId'];
 
     if (!kiloUserId || !sessionId) return;
+
+    const metricsAlarmAt = readIngestMetaValue(this.db, 'metricsAlarmAt');
+    const metricsDue =
+      metricsAlarmAt !== null
+        ? Number(metricsAlarmAt) <= Date.now()
+        : meta['metricsEmitted'] !== 'true';
+    if (!metricsDue) {
+      await this.scheduleAlarm();
+      return;
+    }
 
     const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
     const ingestVersion = Number(meta['ingestVersion'] ?? '0') || 0;
@@ -1002,6 +2073,16 @@ export class SessionIngestDO extends DurableObject<Env> {
 
       throw error;
     }
+
+    if (this.isDeleted()) return;
+    // A lifecycle event that interleaved with emission armed a newer metrics time; keep it.
+    if (
+      metricsAlarmAt !== null &&
+      readIngestMetaValue(this.db, 'metricsAlarmAt') === metricsAlarmAt
+    ) {
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, 'metricsAlarmAt')).run();
+    }
+    await this.scheduleAlarm();
   }
 
   /** Returns true when no ingest data has been stored for this session. */
@@ -1018,26 +2099,633 @@ export class SessionIngestDO extends DurableObject<Env> {
     return true;
   }
 
+  isDeleted(): boolean {
+    return (
+      this.db
+        .select({ value: ingestMeta.value })
+        .from(ingestMeta)
+        .where(eq(ingestMeta.key, 'deleted'))
+        .get()?.value === 'true'
+    );
+  }
+
+  async stageR2Object(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown> | Uint8Array
+  ): Promise<boolean> {
+    const result = await this.stageR2ObjectInternal(params, body);
+    if (result === 'too_large') throw new Error('Unbounded staging returned a byte-limit result');
+    return result;
+  }
+  async stageBoundedR2Object(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown> | Uint8Array,
+    maxBytes: number
+  ): Promise<boolean | 'too_large'> {
+    return this.stageR2ObjectInternal(params, body, maxBytes);
+  }
+
+  private async stageR2ObjectInternal(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown> | Uint8Array,
+    maxBytes?: number
+  ): Promise<boolean | 'too_large'> {
+    const cancelBody = async (): Promise<void> => {
+      if (body instanceof ReadableStream) await body.cancel();
+    };
+    sessionIdSchema.parse(params.sessionId);
+    const doKey = `${params.kiloUserId}/${params.sessionId}`;
+    if (
+      (this.ctx.id.name && this.ctx.id.name !== doKey) ||
+      !['ingest', 'items'].some(prefix => params.key.startsWith(`${prefix}/${doKey}/`))
+    ) {
+      throw new Error('Session R2 identity conflict');
+    }
+    if (maxBytes !== undefined && body instanceof Uint8Array && body.byteLength > maxBytes) {
+      return 'too_large';
+    }
+    if (this.isDeleted()) {
+      await cancelBody();
+      return false;
+    }
+    writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: params.kiloUserId });
+    writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: params.sessionId });
+    const pendingKey = `pendingR2/${params.key}`;
+    this.db
+      .insert(ingestMeta)
+      .values({ key: pendingKey, value: params.key })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.key } })
+      .run();
+    // Every stage outcome ends with the key in its final state, whichever way
+    // the conditional upload resolved.
+    const operation = (async (): Promise<boolean | 'too_large'> => {
+      // The key holds this attempt's stored body once the conditional upload
+      // completes.
+      let ownsStagedObject = false;
+      let published = false;
+      let reservationEtag: string | undefined;
+      // True when the key holds nothing this attempt wrote.
+      const releaseStagedObject = async (): Promise<boolean> => {
+        try {
+          if (!ownsStagedObject) {
+            if (!reservationEtag) return true;
+            const current = await this.env.SESSION_INGEST_R2.head(params.key);
+            if (current?.etag !== reservationEtag) return true;
+          }
+          await this.env.SESSION_INGEST_R2.delete(params.key);
+          return true;
+        } catch (error) {
+          console.error('Failed to release a session ingest staging reservation', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return false;
+        }
+      };
+      try {
+        const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
+          onlyIf: new Headers({ 'If-None-Match': '*' }),
+        });
+        reservationEtag =
+          reservation?.etag ?? (await this.env.SESSION_INGEST_R2.head(params.key))?.etag;
+        if (this.isDeleted()) {
+          await cancelBody();
+          return false;
+        }
+        if (!reservationEtag) throw new Error('Session R2 reservation disappeared');
+
+        let written: R2Object | null;
+        if (maxBytes === undefined) {
+          written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+            onlyIf: { etagMatches: reservationEtag },
+          });
+        } else if (body instanceof Uint8Array) {
+          written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+            onlyIf: { etagMatches: reservationEtag },
+          });
+        } else {
+          const result = await this.writeBoundedMultipart(
+            params.key,
+            body,
+            maxBytes,
+            reservationEtag
+          );
+          if (result === 'too_large') return result;
+          written = result;
+        }
+        const deleted = this.isDeleted();
+        if (!written && !deleted) throw new Error('Session R2 reservation changed');
+        ownsStagedObject = written !== null;
+        published = written !== null && !deleted;
+        return !deleted;
+      } finally {
+        if (published || (await releaseStagedObject()))
+          this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
+      }
+    })();
+    this.activeR2Writes.add(operation);
+    return operation.finally(() => this.activeR2Writes.delete(operation));
+  }
+
+  private async writeBoundedMultipart(
+    key: string,
+    body: ReadableStream<unknown>,
+    maxBytes: number,
+    reservationEtag: string
+  ): Promise<R2Object | null | 'too_large'> {
+    const partSize = 5 * 1024 * 1024;
+    const reader = body.getReader();
+    let buffer = new Uint8Array(partSize);
+    let buffered = 0;
+    let total = 0;
+    let upload: R2MultipartUpload | undefined;
+    const uploadedParts: R2UploadedPart[] = [];
+    try {
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        if (!(result.value instanceof Uint8Array)) {
+          throw new TypeError('Staging stream yielded a non-byte chunk');
+        }
+        total += result.value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel('ingest body exceeded the staging byte budget').catch(() => {});
+          await upload?.abort().catch(() => {});
+          return 'too_large';
+        }
+        let offset = 0;
+        while (offset < result.value.byteLength) {
+          const count = Math.min(partSize - buffered, result.value.byteLength - offset);
+          buffer.set(result.value.subarray(offset, offset + count), buffered);
+          buffered += count;
+          offset += count;
+          if (buffered === partSize) {
+            upload ??= await this.env.SESSION_INGEST_R2.createMultipartUpload(key);
+            uploadedParts.push(await upload.uploadPart(uploadedParts.length + 1, buffer));
+            buffer = new Uint8Array(partSize);
+            buffered = 0;
+          }
+        }
+      }
+
+      if (!upload) {
+        return this.env.SESSION_INGEST_R2.put(key, buffer.subarray(0, buffered), {
+          onlyIf: { etagMatches: reservationEtag },
+        });
+      }
+      if (buffered > 0) {
+        uploadedParts.push(
+          await upload.uploadPart(uploadedParts.length + 1, buffer.subarray(0, buffered))
+        );
+      }
+      if (this.isDeleted()) {
+        await upload.abort();
+        return null;
+      }
+      const current = await this.env.SESSION_INGEST_R2.head(key);
+      if (current?.etag !== reservationEtag) {
+        await upload.abort();
+        return null;
+      }
+      return await upload.complete(uploadedParts);
+    } catch (error) {
+      await upload?.abort().catch(() => {});
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  async clearForWorktree(kiloUserId: string, sessionId: string): Promise<void> {
+    sessionIdSchema.parse(sessionId);
+    const doKey = `${kiloUserId}/${sessionId}`;
+    if (this.ctx.id.name && this.ctx.id.name !== doKey)
+      throw new Error('Session identity conflict');
+    await this.clearSessionData({ kiloUserId, sessionId });
+  }
+
   async clear(): Promise<void> {
-    // Delete any R2-backed item blobs before wiping SQLite
+    const meta = this.db
+      .select()
+      .from(ingestMeta)
+      .where(inArray(ingestMeta.key, ['kiloUserId', 'sessionId']))
+      .all();
+    const kiloUserId = meta.find(row => row.key === 'kiloUserId')?.value;
+    const sessionId = meta.find(row => row.key === 'sessionId')?.value;
+    await this.clearSessionData(kiloUserId && sessionId ? { kiloUserId, sessionId } : undefined);
+  }
+
+  private async clearSessionData(identity?: {
+    kiloUserId: string;
+    sessionId: string;
+  }): Promise<void> {
+    this.db
+      .insert(ingestMeta)
+      .values({ key: 'deleted', value: 'true' })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
+      .run();
+    if (!this.cleanupOperation) {
+      this.cleanupOperation = this.clearFencedSessionData(identity).finally(() => {
+        this.cleanupOperation = undefined;
+      });
+    }
+    await this.cleanupOperation;
+  }
+
+  private async clearFencedSessionData(identity?: {
+    kiloUserId: string;
+    sessionId: string;
+  }): Promise<void> {
+    await this.ctx.storage.deleteAlarm();
+    await Promise.allSettled([...this.activeR2Writes]);
+    const keys = new Set(
+      this.db
+        .select({ item_data_r2_key: ingestItems.item_data_r2_key })
+        .from(ingestItems)
+        .where(isNotNull(ingestItems.item_data_r2_key))
+        .all()
+        .flatMap(row => (row.item_data_r2_key ? [row.item_data_r2_key] : []))
+    );
+    for (const row of this.db.select().from(ingestMeta).all()) {
+      if (row.key.startsWith('pendingR2/') && row.value) keys.add(row.value);
+    }
+    const knownKeys = [...keys];
+    for (let offset = 0; offset < knownKeys.length; offset += 1000) {
+      await this.env.SESSION_INGEST_R2.delete(knownKeys.slice(offset, offset + 1000));
+    }
+    if (identity) {
+      for (const namespace of ['ingest', 'items']) {
+        const prefix = `${namespace}/${identity.kiloUserId}/${identity.sessionId}/`;
+        let cursor: string | undefined;
+        do {
+          const page = await this.env.SESSION_INGEST_R2.list({ prefix, cursor, limit: 1000 });
+          if (page.objects.length > 0)
+            await this.env.SESSION_INGEST_R2.delete(page.objects.map(object => object.key));
+          cursor = page.truncated ? page.cursor : undefined;
+        } while (cursor);
+      }
+    }
+    this.ctx.storage.transactionSync(() => {
+      this.db.delete(ingestItems).run();
+      this.db.delete(agentNotificationDispatch).run();
+      this.db.delete(ingestMeta).where(ne(ingestMeta.key, 'deleted')).run();
+    });
+    await this.ctx.storage.deleteAlarm();
+  }
+
+  private async wipeStorage(): Promise<void> {
+    // Capture the R2 keys first (synchronous SQLite). The SQLite wipe below must
+    // never be separated from this key read by an R2 await: an R2 await opens the
+    // Durable Object input gate, so a same-destination stageCloneBatch could commit
+    // rows and clone meta, then the reset would delete that commit.
     const r2Rows = this.db
       .select({ item_data_r2_key: ingestItems.item_data_r2_key })
       .from(ingestItems)
       .where(isNotNull(ingestItems.item_data_r2_key))
       .all();
     const r2Keys = r2Rows.map(r => r.item_data_r2_key).filter((k): k is string => k !== null);
-    if (r2Keys.length > 0) {
-      await this.env.SESSION_INGEST_R2.delete(r2Keys);
-    }
 
     await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
-    await migrate(this.db, migrations);
-    this.db
-      .insert(ingestMeta)
-      .values({ key: 'deleted', value: 'true' })
-      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
-      .run();
+    if (this.isDeleted()) throw new Error('Session deleted');
+    this.ctx.storage.transactionSync(() => {
+      this.db.delete(ingestItems).run();
+      this.db.delete(agentNotificationDispatch).run();
+      this.db.delete(ingestMeta).run();
+    });
+
+    // Delete the captured R2 objects last, after the SQLite wipe is complete.
+    if (r2Keys.length > 0) {
+      try {
+        await this.env.SESSION_INGEST_R2.delete(r2Keys);
+      } catch (error) {
+        console.error('Failed to delete wiped session ingest R2 bodies', {
+          count: r2Keys.length,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /**
+   * Read the next bounded clone window of clone-eligible ingest rows in
+   * (ingested_at, id) order after `cursor`. Returns the rows, the next cursor
+   * (null when done), and a `done` flag. R2 bodies are not read here.
+   *
+   * The window holds at most `limit` rows and at most
+   * {@link CLONE_WINDOW_MAX_BYTES} of stored row data, always keeping the first
+   * row so a large row cannot stall the cursor, so the returned payload cannot
+   * grow past one window.
+   */
+  async exportCloneBatch(
+    cursor: IngestOrderCursor | null,
+    limit: number
+  ): Promise<ExportCloneBatchResult> {
+    const rows = this.db
+      .select({
+        id: ingestItems.id,
+        item_id: ingestItems.item_id,
+        item_type: ingestItems.item_type,
+        item_data: ingestItems.item_data,
+        item_data_r2_key: ingestItems.item_data_r2_key,
+        ingested_at: ingestItems.ingested_at,
+      })
+      .from(ingestItems)
+      .where(
+        and(
+          inArray(ingestItems.item_type, CLONE_ITEM_TYPES),
+          cursor ? afterIngestOrderCursor(cursor) : undefined
+        )
+      )
+      .orderBy(ingestItems.ingested_at, ingestItems.id)
+      .limit(limit)
+      .all();
+
+    const fetched: CloneBatchRow[] = rows.map(row => ({
+      itemId: row.item_id,
+      itemType: row.item_type as CloneItemType,
+      itemData: row.item_data,
+      itemDataR2Key: row.item_data_r2_key,
+      ingestedAt: row.ingested_at,
+    }));
+
+    const window: CloneBatchRow[] = [];
+    let windowBytes = 0;
+    let lastKept = -1;
+    for (const [index, row] of fetched.entries()) {
+      const rowBytes = cloneSourceRowBytes(row);
+      if (window.length > 0 && windowBytes + rowBytes > CLONE_WINDOW_MAX_BYTES) break;
+      window.push(row);
+      windowBytes += rowBytes;
+      lastKept = index;
+    }
+
+    const truncated = window.length < fetched.length;
+    const done = !truncated && fetched.length < limit;
+    const lastRow = lastKept < 0 ? undefined : rows[lastKept];
+    const nextCursor = done || lastRow === undefined ? null : ingestOrderCursor(lastRow);
+
+    return { rows: window, nextCursor, done };
+  }
+
+  /** True when this session holds a `message` row with exactly this message ID. */
+  hasMessageItem(messageId: string): boolean {
+    const row = this.db
+      .select({ id: ingestItems.id })
+      .from(ingestItems)
+      .where(
+        and(eq(ingestItems.item_type, 'message'), eq(ingestItems.item_id, `message/${messageId}`))
+      )
+      .get();
+    return row !== undefined;
+  }
+
+  private readCloneStage(): CloneStageState {
+    const completeSource = readCloneMeta(this.db, 'cloneCompleteSourceId');
+    const upToMessageId = readCloneMeta(this.db, 'cloneUpToMessageId');
+    if (completeSource !== null) {
+      return {
+        kind: 'complete',
+        sourceSessionId: completeSource,
+        destinationSessionId: readCloneMeta(this.db, 'cloneDestinationSessionId') ?? '',
+        upToMessageId,
+        rollingDigest: readCloneMeta(this.db, 'cloneRollingDigest') ?? '',
+        copiedItemCount: Number(readCloneMeta(this.db, 'cloneCopiedItemCount') ?? '0') || 0,
+      };
+    }
+
+    const source = readCloneMeta(this.db, 'cloneSourceSessionId');
+    const destination = readCloneMeta(this.db, 'cloneDestinationSessionId');
+    if (source !== null && destination !== null) {
+      const nextCursorRaw = readCloneMeta(this.db, 'cloneNextCursor');
+      let nextCursor: IngestOrderCursor | null = null;
+      if (nextCursorRaw !== null) {
+        try {
+          nextCursor = JSON.parse(nextCursorRaw) as IngestOrderCursor;
+        } catch {
+          nextCursor = null;
+        }
+      }
+      return {
+        kind: 'in_progress',
+        sourceSessionId: source,
+        destinationSessionId: destination,
+        upToMessageId,
+        nextCursor,
+        rollingDigest: readCloneMeta(this.db, 'cloneRollingDigest') ?? '',
+        copiedItemCount: Number(readCloneMeta(this.db, 'cloneCopiedItemCount') ?? '0') || 0,
+        ...readCloneVerification(this.db),
+      };
+    }
+
+    return { kind: 'empty' };
+  }
+
+  /**
+   * Persist one batch of already-rewritten clone rows and advance the clone stage
+   * state. Idempotent for the same source: re-staging the same batch upserts the
+   * same rows and rewrites the same meta. A different stored source, destination,
+   * or message cut is rejected without mutation.
+   */
+  stageCloneBatch(params: StageCloneBatchParams): StageCloneBatchResult {
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const stage = this.readCloneStage();
+
+    if (stage.kind === 'complete') {
+      if (isSameCloneStage(stage, params)) {
+        return {
+          status: 'complete',
+          sourceSessionId: stage.sourceSessionId,
+          destinationSessionId: stage.destinationSessionId,
+        };
+      }
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    if (stage.kind === 'in_progress' && !isSameCloneStage(stage, params)) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    for (const row of params.rows) {
+      // A copied message row keeps the same contribution rule the ingest path stores, so a
+      // replacement in the destination never reads the copied body either.
+      const costUsd =
+        row.itemType === 'message'
+          ? storedAssistantMessageCostUsd({
+              item_data: row.itemData,
+              item_data_r2_key: row.itemDataR2Key,
+            })
+          : null;
+      this.db
+        .insert(ingestItems)
+        .values({
+          item_id: row.itemId,
+          item_type: row.itemType,
+          item_data: row.itemData,
+          item_data_r2_key: row.itemDataR2Key,
+          ingested_at: row.ingestedAt,
+          cost_usd: costUsd,
+        })
+        .onConflictDoUpdate({
+          target: ingestItems.item_id,
+          set: {
+            item_type: row.itemType,
+            item_data: row.itemData,
+            item_data_r2_key: row.itemDataR2Key,
+            ingested_at: row.ingestedAt,
+            cost_usd: costUsd,
+          },
+        })
+        .run();
+    }
+
+    writeCloneMeta(this.db, 'cloneSourceSessionId', params.sourceSessionId);
+    writeCloneMeta(this.db, 'cloneDestinationSessionId', params.destinationSessionId);
+    // Staged rows are written here, outside the ingest loop, so the running cost no longer
+    // describes them: drop it and let the destination seed from its copied rows once.
+    this.db.delete(ingestMeta).where(eq(ingestMeta.key, RUNNING_ASSISTANT_COST_META_KEY)).run();
+    // Keep "no cut key <=> full clone" true on every write, without relying on
+    // resets wiping the whole meta table.
+    if (params.upToMessageId !== undefined) {
+      writeCloneMeta(this.db, 'cloneUpToMessageId', params.upToMessageId);
+    } else {
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, 'cloneUpToMessageId')).run();
+    }
+    writeCloneMeta(this.db, 'cloneNextCursor', JSON.stringify(params.nextCursor));
+    writeCloneMeta(this.db, 'cloneRollingDigest', params.rollingDigest);
+    writeCloneMeta(this.db, 'cloneCopiedItemCount', String(params.copiedItemCount));
+
+    return {
+      status: 'staged',
+      sourceSessionId: params.sourceSessionId,
+      destinationSessionId: params.destinationSessionId,
+      nextCursor: params.nextCursor,
+      rollingDigest: params.rollingDigest,
+      copiedItemCount: params.copiedItemCount,
+    };
+  }
+
+  inspectCloneStage(params: InspectCloneStageParams): InspectCloneStageResult {
+    const stage = this.readCloneStage();
+
+    if (stage.kind === 'empty') {
+      return { status: 'empty' };
+    }
+
+    if (!isSameCloneStage(stage, params)) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+        storedStage: stage.kind === 'complete' ? 'complete' : 'in_progress',
+      };
+    }
+
+    if (stage.kind === 'complete') {
+      return {
+        status: 'complete',
+        sourceSessionId: stage.sourceSessionId,
+        destinationSessionId: stage.destinationSessionId,
+        rollingDigest: stage.rollingDigest,
+        copiedItemCount: stage.copiedItemCount,
+      };
+    }
+
+    return {
+      status: 'in_progress',
+      sourceSessionId: stage.sourceSessionId,
+      destinationSessionId: stage.destinationSessionId,
+      nextCursor: stage.nextCursor,
+      rollingDigest: stage.rollingDigest,
+      copiedItemCount: stage.copiedItemCount,
+      verifyCursor: stage.verifyCursor,
+      verifyChain: stage.verifyChain,
+      verifyRows: stage.verifyRows,
+    };
+  }
+
+  /**
+   * Persist how far the source verification of an in-progress stage has read.
+   * Idempotent for the same stage identity; a stage of another source,
+   * destination, or cut is reported as a mismatch without mutation.
+   */
+  stageCloneVerification(params: StageCloneVerificationParams): StageCloneVerificationResult {
+    const stage = this.readCloneStage();
+
+    if (stage.kind !== 'in_progress' || !isSameCloneStage(stage, params)) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.kind === 'empty' ? null : stage.sourceSessionId,
+        storedDestinationSessionId: stage.kind === 'empty' ? null : stage.destinationSessionId,
+      };
+    }
+
+    // One transaction: a cursor, chain, and row count from different write
+    // attempts would make the resumed chain disagree with itself.
+    this.ctx.storage.transactionSync(() => {
+      writeCloneVerification(this.db, {
+        verifyCursor: params.verifyCursor,
+        verifyChain: params.verifyChain,
+        verifyRows: params.verifyRows,
+      });
+    });
+    return { status: 'staged' };
+  }
+
+  finalizeCloneStage(params: FinalizeCloneStageParams): FinalizeCloneStageResult {
+    const stage = this.readCloneStage();
+
+    if (stage.kind === 'empty') {
+      return { status: 'empty' };
+    }
+
+    if (!isSameCloneStage(stage, params)) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    if (stage.kind === 'complete') {
+      return {
+        status: 'complete',
+        sourceSessionId: stage.sourceSessionId,
+        destinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    if (
+      stage.rollingDigest !== params.finalDigest ||
+      stage.copiedItemCount !== params.finalItemCount
+    ) {
+      return {
+        status: 'digest_mismatch',
+        expectedDigest: params.finalDigest,
+        actualDigest: stage.rollingDigest,
+        expectedItemCount: params.finalItemCount,
+        actualItemCount: stage.copiedItemCount,
+      };
+    }
+
+    writeCloneMeta(this.db, 'cloneCompleteSourceId', params.sourceSessionId);
+    return {
+      status: 'complete',
+      sourceSessionId: params.sourceSessionId,
+      destinationSessionId: params.destinationSessionId,
+    };
+  }
+
+  /** Delete every staged row, any R2 objects the stage wrote, and the clone state markers. */
+  async resetCloneStage(): Promise<void> {
+    if (this.isDeleted()) throw new Error('Session deleted');
+    await this.wipeStorage();
   }
 }
 

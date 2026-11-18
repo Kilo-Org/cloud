@@ -1,7 +1,9 @@
-import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
+import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
@@ -24,7 +26,7 @@ import {
 } from '@/lib/impact/referral-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { isOpenclawAdvisorCallback } from '@/lib/signup-source';
 import { isCreditCampaignCallback, lookupCampaignBySlug } from '@/lib/credit-campaigns';
@@ -79,7 +81,6 @@ async function resolveSignupProduct(
   if (callbackPath.startsWith('/claw')) return 'kiloclaw';
   if (callbackPath.startsWith('/cloud')) return 'cloud-agent';
   if (callbackPath.startsWith('/code-reviews')) return 'code-reviews';
-  if (callbackPath.startsWith('/app-builder')) return 'app-builder';
   if (callbackPath.startsWith('/install')) return 'kilo-code';
   // Exact-pathname match via shared helper — a naive startsWith check would
   // also attribute `/openclaw-advisor-fake` and any sibling path sharing the
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
 
   if (!user) {
     responsePath = signInPathWithPreservedTrackingParams(url);
-  } else if (user.blocked_reason) {
+  } else if (isBlockedAccount(user)) {
     responsePath = '/account-blocked';
   } else {
     const callbackPath = url.searchParams.get('callbackPath');

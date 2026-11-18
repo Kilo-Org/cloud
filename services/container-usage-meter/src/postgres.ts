@@ -5,18 +5,32 @@ import {
   container_usage_segment,
   getWorkerDb,
   kilocode_users,
+  organization_seats_purchases,
   organizations,
   type WorkerDb,
 } from '@kilocode/db';
-import { and, eq, gt, lt, ne, sql } from 'drizzle-orm';
+import { getOrganizationTrialEndDate } from '@kilocode/organization-entitlement';
+import { and, desc, eq, gt, lt, ne, sql } from 'drizzle-orm';
 import type {
   RecordHeartbeatInput,
   RecordStartFailureCode,
   RecordStartInput,
   RecordStopInput,
   UsageContext,
+  BillingSubject,
 } from '@kilocode/container-usage';
 import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
+import { computeMemberId } from '@kilocode/worker-utils/compute-member';
+import { checkContainerCapacity } from './capacity';
+import {
+  findOrganizationMemberBalanceRow,
+  organizationMemberBalance,
+} from '@kilocode/worker-utils/account-access';
+import { recordOrganizationConsumption } from '@kilocode/worker-utils/organization-consumption';
+import {
+  parentOrganizationJoinCondition,
+  parentOrganizationsTable,
+} from '@kilocode/worker-utils/organization-membership';
 import {
   billingModeFor,
   MINIMUM_REMAINING_MICRODOLLARS,
@@ -50,13 +64,26 @@ export function getContainerUsageDb(env: Cloudflare.Env): WorkerDb {
 }
 
 export type StartSkuAdmission =
-  | { kind: 'applied'; dedup: boolean; billingMode: 'shadow' | 'paid' }
-  | { kind: 'rejected'; code: RecordStartFailureCode; message: string };
+  | { kind: 'applied'; dedup: boolean; billingMode: 'shadow' }
+  | { kind: 'applied'; dedup: boolean; billingMode: 'paid'; remainingMicrodollars: number }
+  | {
+      kind: 'rejected';
+      code: Exclude<RecordStartFailureCode, 'insufficient_credits'>;
+      message: string;
+    }
+  | {
+      kind: 'rejected';
+      code: 'insufficient_credits';
+      message: string;
+      remainingMicrodollars: number;
+      minimumRequiredMicrodollars: number;
+    };
 
 export type ApplyResult = {
   kind: 'applied';
   dedup: boolean;
   billingMode: 'shadow' | 'paid';
+  organizationBalanceAlert?: string;
   budget:
     | { verdict: 'continue' }
     | {
@@ -121,11 +148,35 @@ function intervalValues(
   } as const;
 }
 
-async function balanceForSubject(
+type BillingAttribution = Pick<UsageContext, 'service' | 'subject' | 'actor' | 'metadata'>;
+
+function isNativeOrganizationUsage(context: BillingAttribution): boolean {
+  return (
+    context.subject.type === 'org' &&
+    context.service.startsWith('cloud-agent-next-sandbox-containers-')
+  );
+}
+
+function organizationMemberId(context: BillingAttribution): string | undefined {
+  return computeMemberId(context.actor, context.metadata);
+}
+
+function intervalAttribution(
+  interval: typeof container_usage_interval.$inferSelect
+): BillingAttribution {
+  return {
+    service: interval.service,
+    subject: { type: interval.subject_type, id: interval.subject_id },
+    actor: { type: interval.actor_type, id: interval.actor_id },
+    ...(interval.metadata ? { metadata: interval.metadata } : {}),
+  };
+}
+
+async function balanceForUsage(
   tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
-  subject: UsageContext['subject'],
-  lock = false
+  context: BillingAttribution
 ): Promise<number> {
+  const subject = context.subject;
   const query =
     subject.type === 'user'
       ? tx
@@ -142,10 +193,13 @@ async function balanceForSubject(
           .from(organizations)
           .where(eq(organizations.id, subject.id))
           .limit(1);
-  const rows = lock ? await query.for('update') : await query;
-  const row = rows[0];
+  const [row] = await query.for('update');
   if (!row) throw new UsageMutationConflictError('Billing subject not found');
-  return Number(row.remaining);
+  if (!isNativeOrganizationUsage(context)) return Number(row.remaining);
+  const userId = organizationMemberId(context);
+  if (!userId) return 0;
+  const member = await findOrganizationMemberBalanceRow(tx, subject.id, userId);
+  return member ? organizationMemberBalance(member).balanceMicrodollars : 0;
 }
 
 function budgetForRemaining(
@@ -154,17 +208,20 @@ function budgetForRemaining(
   warnRemainingMicrodollars: number
 ): ApplyResult['budget'] {
   if (billingMode === 'shadow') return { verdict: 'continue' };
-  if (remainingMicrodollars <= MINIMUM_REMAINING_MICRODOLLARS) {
+  // The budget contract reports a nonnegative balance; the stored balance
+  // stays exact even when a settlement overdraws it.
+  const reportedMicrodollars = Math.max(0, remainingMicrodollars);
+  if (remainingMicrodollars < MINIMUM_REMAINING_MICRODOLLARS) {
     return {
       verdict: 'stop',
-      remainingMicrodollars,
+      remainingMicrodollars: reportedMicrodollars,
       minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
     };
   }
   if (remainingMicrodollars < warnRemainingMicrodollars) {
     return {
       verdict: 'warn',
-      remainingMicrodollars,
+      remainingMicrodollars: reportedMicrodollars,
       minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
     };
   }
@@ -178,7 +235,7 @@ async function settleSegment(
   appliedSeconds: number,
   receivedAt: string,
   billingConfig: BillingConfig
-): Promise<ApplyResult['budget']> {
+): Promise<Pick<ApplyResult, 'budget' | 'organizationBalanceAlert'>> {
   if (interval.billing_mode === 'shadow') {
     await tx
       .update(container_usage_interval)
@@ -186,7 +243,7 @@ async function settleSegment(
         confirmed_seconds: sql`${container_usage_interval.confirmed_seconds} + ${appliedSeconds}`,
       })
       .where(eq(container_usage_interval.id, interval.id));
-    return { verdict: 'continue' };
+    return { budget: { verdict: 'continue' } };
   }
   if (!interval.rate_cents_per_unit) {
     throw new UsageMutationConflictError('Paid usage interval is missing its rate snapshot');
@@ -212,6 +269,10 @@ async function settleSegment(
     .where(eq(container_usage_interval.id, interval.id));
 
   let remainingMicrodollars: number;
+  let organizationBalanceAlert: string | undefined;
+  const attribution = intervalAttribution(interval);
+  const nativeOrganization = isNativeOrganizationUsage(attribution);
+  const memberId = nativeOrganization ? organizationMemberId(attribution) : undefined;
   if (amountMicrodollars > 0) {
     const charge: typeof compute_usage_charge.$inferInsert = {
       usage_source: 'container_usage_segment',
@@ -238,6 +299,22 @@ async function settleSegment(
         });
       if (!payer) throw new UsageMutationConflictError('Billing subject not found');
       remainingMicrodollars = Number(payer.remaining);
+    } else if (memberId) {
+      const result = await recordOrganizationConsumption(tx, {
+        organizationId: interval.subject_id,
+        kiloUserId: memberId,
+        amountMicrodollars,
+        occurredAt: receivedAt,
+        source: 'compute',
+        sourceId: usageSourceId,
+      });
+      if (!result.recorded)
+        throw new UsageMutationConflictError(
+          'Compute consumption was already recorded without its segment'
+        );
+      if (result.organizationUsage.crossedMinimumBalance)
+        organizationBalanceAlert = interval.subject_id;
+      remainingMicrodollars = await balanceForUsage(tx, attribution);
     } else {
       const [payer] = await tx
         .update(organizations)
@@ -254,13 +331,17 @@ async function settleSegment(
       remainingMicrodollars = Number(payer.remaining);
     }
   } else {
-    remainingMicrodollars = await balanceForSubject(
-      tx,
-      { type: interval.subject_type, id: interval.subject_id },
-      true
-    );
+    remainingMicrodollars = await balanceForUsage(tx, attribution);
   }
-  return budgetForRemaining('paid', remainingMicrodollars, billingConfig.warnRemainingMicrodollars);
+  if (nativeOrganization && !memberId) remainingMicrodollars = 0;
+  return {
+    budget: budgetForRemaining(
+      'paid',
+      remainingMicrodollars,
+      billingConfig.warnRemainingMicrodollars
+    ),
+    ...(organizationBalanceAlert ? { organizationBalanceAlert } : {}),
+  };
 }
 
 function assertMatchingContext(
@@ -331,6 +412,90 @@ async function recoverMissingInterval(
   return existing;
 }
 
+// Enterprise contracts can lock in prices, so enterprise organizations are not
+// charged until their contract is reviewed and the organization is enrolled by
+// ID. Enterprise trials that have not started paying are still charged. Child
+// organizations use their live parent's plan, trial and subscription. The
+// hierarchy is one level deep.
+async function isUnreviewedEnterpriseOrganization(
+  tx: WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  organizationId: string,
+  now: Date
+): Promise<boolean> {
+  const [row] = await tx
+    .select({
+      id: organizations.id,
+      plan: organizations.plan,
+      freeTrialEndAt: organizations.free_trial_end_at,
+      createdAt: organizations.created_at,
+      parentId: parentOrganizationsTable.id,
+      parentPlan: parentOrganizationsTable.plan,
+      parentFreeTrialEndAt: parentOrganizationsTable.free_trial_end_at,
+      parentCreatedAt: parentOrganizationsTable.created_at,
+    })
+    .from(organizations)
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!row) return false;
+  if (row.plan !== 'enterprise' && row.parentPlan !== 'enterprise') return false;
+  const owner =
+    row.parentId && row.parentCreatedAt
+      ? {
+          id: row.parentId,
+          freeTrialEndAt: row.parentFreeTrialEndAt,
+          createdAt: row.parentCreatedAt,
+        }
+      : row;
+  if (getOrganizationTrialEndDate(owner.freeTrialEndAt, owner.createdAt) <= now) return true;
+
+  // A child organization can also hold its own subscription.
+  if (await hasStartedPayingForSeats(tx, row.id)) return true;
+  return owner.id !== row.id && hasStartedPayingForSeats(tx, owner.id);
+}
+
+// Unlike PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES in
+// @kilocode/organization-entitlement, this excludes `trialing`: a trialing
+// subscription has not started paying, so it remains billable.
+const STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
+  'active',
+  'past_due',
+]);
+
+async function hasStartedPayingForSeats(
+  tx: WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  organizationId: string
+): Promise<boolean> {
+  // Read the latest event, not any historical active subscription.
+  const [purchase] = await tx
+    .select({ status: organization_seats_purchases.subscription_status })
+    .from(organization_seats_purchases)
+    .where(eq(organization_seats_purchases.organization_id, organizationId))
+    .orderBy(desc(organization_seats_purchases.created_at))
+    .limit(1);
+  return purchase !== undefined && STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES.has(purchase.status);
+}
+
+export async function resolveBillingMode(
+  database: WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  billingConfig: BillingConfig,
+  service: string,
+  subject: BillingSubject,
+  now: Date
+): Promise<'shadow' | 'paid'> {
+  const mode = billingModeFor(billingConfig, service, subject);
+  if (
+    mode === 'paid' &&
+    service.startsWith('cloud-agent-next-') &&
+    subject.type === 'org' &&
+    !billingConfig.cloudAgentOrgIds.has(subject.id) &&
+    (await isUnreviewedEnterpriseOrganization(database, subject.id, now))
+  ) {
+    return 'shadow';
+  }
+  return mode;
+}
+
 export async function applyStart(
   env: Cloudflare.Env,
   input: RecordStartInput,
@@ -357,7 +522,9 @@ export async function applyStartWithDb(
   receivedAtMs: number,
   billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<StartSkuAdmission> {
-  const operation: Promise<StartSkuAdmission> = db.transaction(async tx => {
+  const admit = async (
+    tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0]
+  ): Promise<StartSkuAdmission> => {
     const [existing] = await tx
       .select()
       .from(container_usage_interval)
@@ -365,7 +532,15 @@ export async function applyStartWithDb(
       .limit(1);
     if (existing) {
       assertMatchingContext(existing, input, contextFingerprint);
-      return { kind: 'applied', dedup: true, billingMode: existing.billing_mode };
+      if (existing.billing_mode === 'paid') {
+        return {
+          kind: 'applied',
+          dedup: true,
+          billingMode: 'paid',
+          remainingMicrodollars: await balanceForUsage(tx, input),
+        };
+      }
+      return { kind: 'applied', dedup: true, billingMode: 'shadow' };
     }
 
     const [sku] = await tx
@@ -393,7 +568,13 @@ export async function applyStartWithDb(
       };
     }
 
-    const billingMode = billingModeFor(billingConfig, input.service, input.subject);
+    const billingMode = await resolveBillingMode(
+      tx,
+      billingConfig,
+      input.service,
+      input.subject,
+      new Date(receivedAtMs)
+    );
     const [open] = await tx
       .select()
       .from(container_usage_interval)
@@ -413,13 +594,28 @@ export async function applyStartWithDb(
       }
     }
 
+    if (input.enforceCapacity) {
+      const rejection = await checkContainerCapacity(tx, input);
+      if (rejection) return rejection;
+    }
+
     if (billingMode === 'paid') {
-      const remaining = await balanceForSubject(tx, input.subject, true);
-      if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
+      if (isNativeOrganizationUsage(input) && !organizationMemberId(input)) {
+        return {
+          kind: 'rejected',
+          code: 'invalid_billing_attribution',
+          message: 'Native organization compute requires an acting member',
+        };
+      }
+      const remaining = await balanceForUsage(tx, input);
+      if (remaining < MINIMUM_REMAINING_MICRODOLLARS) {
         return {
           kind: 'rejected',
           code: 'insufficient_credits',
           message: 'Container billing requires at least $5.00 in remaining credits',
+          // Reported balances are nonnegative even when the stored balance is overdrawn.
+          remainingMicrodollars: Math.max(0, remaining),
+          minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
         };
       }
     }
@@ -459,11 +655,31 @@ export async function applyStartWithDb(
         .limit(1);
       if (!winner) throw new Error('Container usage interval insert lost without a winner');
       assertMatchingContext(winner, input, contextFingerprint);
-      return { kind: 'applied', dedup: true, billingMode: winner.billing_mode };
+      if (winner.billing_mode === 'paid') {
+        return {
+          kind: 'applied',
+          dedup: true,
+          billingMode: 'paid',
+          remainingMicrodollars: await balanceForUsage(tx, input),
+        };
+      }
+      return { kind: 'applied', dedup: true, billingMode: 'shadow' };
     }
-    return { kind: 'applied', dedup: false, billingMode };
-  });
-  return operation.catch(mapSingleOpenIntervalConflict);
+    if (billingMode === 'paid') {
+      return {
+        kind: 'applied',
+        dedup: false,
+        billingMode: 'paid',
+        remainingMicrodollars: await balanceForUsage(tx, input),
+      };
+    }
+    return { kind: 'applied', dedup: false, billingMode: 'shadow' };
+  };
+  // Read committed: the capacity count after the lock must see intervals that
+  // other admissions committed while this transaction waited.
+  return db
+    .transaction(admit, { isolationLevel: 'read committed' })
+    .catch(mapSingleOpenIntervalConflict);
 }
 
 export async function applyHeartbeat(
@@ -529,9 +745,7 @@ export async function applyHeartbeatWithDb(
         throw new UsageMutationConflictError('Heartbeat sequence has conflicting payload');
       }
       const remaining =
-        interval.billing_mode === 'paid'
-          ? await balanceForSubject(tx, input.context.subject, true)
-          : 0;
+        interval.billing_mode === 'paid' ? await balanceForUsage(tx, input.context) : 0;
       return {
         kind: 'applied',
         dedup: true,
@@ -581,7 +795,7 @@ export async function applyHeartbeatWithDb(
       usage_seconds: appliedSeconds,
       received_at: receivedAt,
     });
-    const budget = await settleSegment(
+    const settlement = await settleSegment(
       tx,
       interval,
       input.idempotencyKey,
@@ -596,7 +810,7 @@ export async function applyHeartbeatWithDb(
         last_heartbeat_seq: sql`GREATEST(${container_usage_interval.last_heartbeat_seq}, ${input.seq})`,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, budget };
+    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, ...settlement };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }
@@ -673,9 +887,7 @@ export async function applyStopWithDb(
         throw new UsageMutationConflictError('Closed interval has conflicting stop details');
       }
       const remaining =
-        interval.billing_mode === 'paid'
-          ? await balanceForSubject(tx, input.context.subject, true)
-          : 0;
+        interval.billing_mode === 'paid' ? await balanceForUsage(tx, input.context) : 0;
       return {
         kind: 'applied',
         dedup: true,
@@ -716,14 +928,16 @@ export async function applyStopWithDb(
       ? (interval.stopped_at ?? interval.last_seen_at)
       : timestamp(Math.max(new Date(interval.last_seen_at).getTime(), receivedAtMs));
 
-    const budget = wasReconciled
+    const settlement = wasReconciled
       ? interval.billing_mode === 'paid'
-        ? budgetForRemaining(
-            'paid',
-            await balanceForSubject(tx, input.context.subject, true),
-            billingConfig.warnRemainingMicrodollars
-          )
-        : { verdict: 'continue' as const }
+        ? {
+            budget: budgetForRemaining(
+              'paid',
+              await balanceForUsage(tx, input.context),
+              billingConfig.warnRemainingMicrodollars
+            ),
+          }
+        : { budget: { verdict: 'continue' as const } }
       : await settleSegment(tx, interval, finalSegmentKey, finalSeconds, receivedAt, billingConfig);
 
     await tx
@@ -741,7 +955,7 @@ export async function applyStopWithDb(
           : interval.confirmed_seconds + finalSeconds,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, budget };
+    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, ...settlement };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }

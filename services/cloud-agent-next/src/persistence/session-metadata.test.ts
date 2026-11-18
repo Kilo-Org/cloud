@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
+import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  CLOUDFLARE_RUNTIME_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
+  DEVCONTAINER_RETIRED_MESSAGE,
   getEffectiveCredentialContainment,
   getSandboxProvider,
+  hasCredentialContainment,
   parseSessionMetadata,
   requiresContainmentSandbox,
+  retiredRuntimeMessage,
   serializeSessionMetadata,
+  updateProviderRuntime,
 } from './session-metadata.js';
 
 const callbackTarget = {
@@ -27,6 +33,180 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it.each(
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      ...[undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].map(egressAllowlist => ({
+        egressMode: 'allowlist' as const,
+        egressAllowlist,
+      })),
+    ].flatMap(policy => [undefined, false, true].map(egressAudit => ({ ...policy, egressAudit })))
+  )(
+    'preserves canonical egress policy through serialization: %j',
+    ({ egressMode, egressAllowlist, egressAudit }) => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+          egressAllowlist,
+          egressAudit,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      const expected =
+        egressAllowlist === undefined
+          ? undefined
+          : egressAllowlist.length === 0
+            ? []
+            : ['example.com', 'z.example.com'];
+      expect(metadata.workspace?.egressAllowlist).toEqual(expected);
+      expect(metadata.workspace?.egressMode).toBe(egressMode);
+      expect(metadata.workspace?.egressAudit).toBe(egressAudit);
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAudit).toBe(
+        egressAudit
+      );
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
+        egressMode
+      );
+      expect(
+        parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
+      ).toEqual(expected);
+    }
+  );
+
+  it.each([
+    {
+      sessionId: 'agent_test',
+      provider: 'cloudflare-containers',
+      sandboxId: 'ses-0123456789abcdef',
+    },
+    { sessionId: 'workspace_test', provider: 'cloudflare', sandboxId: 'ses-0123456789abcdef' },
+    { sessionId: 'workspace_test', provider: 'vercel', sandboxId: 'ses-0123456789abcdef' },
+    {
+      sessionId: 'workspace_test',
+      provider: 'cloudflare-containers',
+      sandboxId: 'usr-0123456789abcdef',
+    },
+    {
+      sessionId: 'workspace_test',
+      provider: 'cloudflare-containers',
+      sandboxId: `sbx-${'a'.repeat(48)}`,
+      sandboxKind: 'shared',
+    },
+  ])(
+    'rejects unsupported egress placement %j',
+    ({ sessionId, provider, sandboxId, ...workspace }) => {
+      for (const policy of [
+        { egressMode: 'allowlist', egressAllowlist: undefined },
+        { egressMode: 'allowlist', egressAllowlist: [] },
+        { egressAudit: true },
+        { egressMode: 'unrestricted', egressAudit: true },
+      ]) {
+        expect(
+          CurrentSessionMetadataSchema.safeParse({
+            metadataSchemaVersion: 2,
+            identity: { sessionId, userId: 'user' },
+            auth: {},
+            workspace: {
+              ...workspace,
+              sandboxId,
+              sandboxProvider: provider,
+              ...policy,
+            },
+            lifecycle: { version: 1, timestamp: 1 },
+          }).success
+        ).toBe(false);
+      }
+    }
+  );
+
+  it.each(['cloudflare', 'vercel', 'cloudflare-containers'] as const)(
+    'preserves explicit unrestricted for provider %s without adding a list',
+    sandboxProvider => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider,
+          egressMode: 'unrestricted',
+          egressAudit: false,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      expect(metadata.workspace?.egressMode).toBe('unrestricted');
+      expect(metadata.workspace?.egressAllowlist).toBeUndefined();
+      expect(metadata.workspace?.egressAudit).toBe(false);
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace).toEqual(
+        metadata.workspace
+      );
+    }
+  );
+
+  it('accepts explicit unrestricted in legacy shared metadata', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_test', userId: 'user' },
+      auth: {},
+      workspace: {
+        sandboxId: 'usr-0123456789abcdef',
+        egressMode: 'unrestricted',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(metadata.workspace?.egressMode).toBe('unrestricted');
+    expect(metadata.workspace?.egressAllowlist).toBeUndefined();
+  });
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'invalid' },
+    { egressMode: null },
+    { egressMode: 'allowlist', egressAudit: null },
+  ])('rejects invalid persisted egress policy %j', policy => {
+    expect(
+      CurrentSessionMetadataSchema.safeParse({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          ...policy,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each(['github', 'gitlab', 'bitbucket', 'kilocode'] as const)(
+    'uses the same containment predicate for computed and persisted %s flags',
+    flag => {
+      const disabled = { github: false, gitlab: false, bitbucket: false, kilocode: false };
+      expect(hasCredentialContainment(disabled)).toBe(false);
+      const enabled = { ...disabled, [flag]: true };
+      expect(hasCredentialContainment(enabled)).toBe(true);
+      expect(
+        requiresContainmentSandbox({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'agent_containment', userId: 'user_containment' },
+          auth: {},
+          workspace: { credentialContainment: enabled },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      ).toBe(true);
+    }
+  );
+
   it('maps legacy managed SCM containment to GitHub and Kilo only', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
@@ -80,6 +260,163 @@ describe('session metadata boundary', () => {
     expect(requiresContainmentSandbox(metadata)).toBe(false);
   });
 
+  describe.each(['cloudflare', 'vercel'] as const)(
+    '%s control-plane containment',
+    sandboxProvider => {
+      it.each([
+        {
+          name: 'GitHub',
+          repository: { type: 'github', repo: 'acme/repo' },
+          expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'GitLab',
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'Bitbucket',
+          repository: {
+            type: 'bitbucket',
+            url: 'https://bitbucket.org/acme/repo.git',
+            workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
+            repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
+          },
+          expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
+        },
+        {
+          name: 'generic Git with a GitHub platform alias',
+          repository: { type: 'git', url: 'https://github.com/acme/repo.git', platform: 'github' },
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'generic Git with a GitLab platform alias',
+          repository: { type: 'git', url: 'https://gitlab.com/acme/repo.git', platform: 'gitlab' },
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'no repository',
+          repository: undefined,
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+      ])(
+        'defaults missing policy to Kilo and the typed $name repository',
+        ({ repository, expected }) => {
+          const workspace = {
+            sandboxId: 'ses-abcdef',
+            sandboxProvider,
+            managedScmContainment: true,
+          };
+          const metadata = parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+            auth: {},
+            repository,
+            workspace,
+            lifecycle: { version: 1, timestamp: 1 },
+          });
+
+          expect(getEffectiveCredentialContainment(metadata)).toEqual(expected);
+          expect(requiresContainmentSandbox(metadata)).toBe(true);
+          expect(serializeSessionMetadata(metadata).workspace).toEqual(workspace);
+        }
+      );
+
+      it.each([
+        { github: false, gitlab: false, bitbucket: false, kilocode: false },
+        { github: true, gitlab: true, bitbucket: true, kilocode: true },
+        { github: false, gitlab: true, bitbucket: true, kilocode: false },
+      ])('honors historical explicit flags without rewriting them: %j', credentialContainment => {
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+          auth: {},
+          repository: { type: 'github', repo: 'acme/repo' },
+          workspace: {
+            sandboxId: 'ses-abcdef',
+            sandboxProvider,
+            credentialContainment,
+            managedScmContainment: true,
+          },
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+
+        expect(getEffectiveCredentialContainment(metadata)).toEqual(credentialContainment);
+        expect(requiresContainmentSandbox(metadata)).toBe(
+          Object.values(credentialContainment).some(Boolean)
+        );
+        expect(serializeSessionMetadata(metadata).workspace?.credentialContainment).toEqual(
+          credentialContainment
+        );
+      });
+
+      it.each([
+        { name: 'missing policy', fields: {} },
+        { name: 'disabled legacy alias', fields: { managedScmContainment: false } },
+        { name: 'enabled legacy alias', fields: { managedScmContainment: true } },
+      ])('defaults $name without rewriting stored fields', ({ fields }) => {
+        const workspace = { sandboxId: 'ses-abcdef', sandboxProvider, ...fields };
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+          auth: {},
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          workspace,
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+
+        expect(getEffectiveCredentialContainment(metadata)).toEqual({
+          github: false,
+          gitlab: true,
+          bitbucket: false,
+          kilocode: true,
+        });
+        expect(requiresContainmentSandbox(metadata)).toBe(true);
+        expect(serializeSessionMetadata(metadata).workspace).toEqual(workspace);
+      });
+    }
+  );
+
+  it('requires Kilo containment for a control-plane session without workspace metadata', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'workspace_no_workspace', userId: 'user_containment' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: false,
+      bitbucket: false,
+      kilocode: true,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(true);
+    expect(metadata.workspace).toBeUndefined();
+  });
+
+  it('preserves legacy policy even when its SCM flags do not match the repository', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_mixed_containment', userId: 'user_containment' },
+      auth: {},
+      repository: { type: 'github', repo: 'acme/repo' },
+      workspace: {
+        credentialContainment: { github: false, gitlab: true, bitbucket: true, kilocode: false },
+        managedScmContainment: true,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: true,
+      bitbucket: true,
+      kilocode: false,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(true);
+  });
+
   it('parses and serializes current grouped metadata with canonical attachments', () => {
     const current = {
       metadataSchemaVersion: 2 as const,
@@ -98,6 +435,7 @@ describe('session metadata boundary', () => {
         type: 'github' as const,
         repo: 'acme/repo',
         token: 'github-token',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
         githubInstallationId: '987',
         githubAppType: 'standard' as const,
         upstreamBranch: 'main',
@@ -150,6 +488,230 @@ describe('session metadata boundary', () => {
     expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
   });
 
+  it('keeps existing GitHub metadata valid when the integration id is omitted', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_legacy_github', userId: 'user_legacy_github' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo' },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
+  });
+
+  it('preserves the GitHub pull request number for a review session', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 17 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current).repository).toMatchObject({ pullRequestNumber: 17 });
+  });
+
+  it('rejects a non-positive GitHub pull request number', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 0 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(() => parseSessionMetadata(current)).toThrow();
+  });
+
+  it('preserves a validated worktree ID and its canonical workspace path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+        userId: 'oauth/google:1234',
+      },
+      auth: {},
+      workspace: {
+        worktreeId,
+        workspacePath: `/workspace/oauth-google-1234/worktrees/${worktreeId}`,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+  });
+
+  it.each([
+    'worktree_invalid',
+    'worktree_../outside',
+    'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+  ])('rejects malformed persisted worktree ID %s', worktreeId => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user_test' },
+        auth: {},
+        workspace: { worktreeId },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it.each([undefined, '2026-08-29T10:00:00.000Z'])(
+    'round-trips clone metadata without inventing a reporting creation time (%s)',
+    reportingCreatedAt => {
+      const current = {
+        metadataSchemaVersion: 2 as const,
+        identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+        auth: {},
+        clone: {
+          cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          ...(reportingCreatedAt ? { reportingCreatedAt } : {}),
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      };
+
+      expect(parseSessionMetadata(current)).toEqual(current);
+      expect(serializeSessionMetadata(current)).toEqual(current);
+      expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+    }
+  );
+
+  it.each(['invalid', '2026-08-29', '2026-02-30T10:00:00.000Z', 1_700_000_000_000, null])(
+    'rejects an invalid clone reporting creation time (%s)',
+    reportingCreatedAt => {
+      expect(() =>
+        parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+          auth: {},
+          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', reportingCreatedAt },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      ).toThrow('Invalid current session metadata');
+    }
+  );
+
+  it('round-trips a clone cut and rejects a malformed one', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+      auth: {},
+      clone: {
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(() =>
+      parseSessionMetadata({ ...current, clone: { ...current.clone, cloneUpToMessageId: 'x' } })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('keeps metadata without clone as an empty-session bootstrap', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_no_clone', userId: 'user_no_clone' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current)).not.toHaveProperty('clone');
+  });
+
+  describe('placed sandbox metadata', () => {
+    const placedId = `sbx-${'a'.repeat(48)}`;
+    const base = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'workspace_placed', userId: 'user_placed', orgId: 'org-id' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+    const withWorkspace = (workspace: Record<string, unknown>) => ({ ...base, workspace });
+
+    it.each([
+      ['isolated Cloudflare', 'cloudflare', 'isolated'],
+      ['isolated Standard Cloudflare', 'cloudflare', 'isolated-standard'],
+      ['code-review Cloudflare', 'cloudflare', 'code-review'],
+      ['shared Cloudflare', 'cloudflare', 'shared'],
+      ['isolated Vercel', 'vercel', 'isolated'],
+      ['isolated Containers', 'cloudflare-containers', 'isolated'],
+    ] as const)('round-trips a placed %s sandbox', (_label, sandboxProvider, sandboxKind) => {
+      const current = withWorkspace({ sandboxId: placedId, sandboxProvider, sandboxKind });
+
+      expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+    });
+
+    it.each([
+      ['a placed key without its kind', { sandboxId: placedId }],
+      [
+        'a kind on a legacy prefixed key',
+        { sandboxId: `ses-${'a'.repeat(48)}`, sandboxKind: 'isolated' },
+      ],
+      ['a kind without a key', { sandboxKind: 'isolated' }],
+      [
+        'a shared Vercel sandbox',
+        { sandboxId: placedId, sandboxProvider: 'vercel', sandboxKind: 'shared' },
+      ],
+      [
+        'a shared failover route on a placed key',
+        {
+          sandboxId: placedId,
+          sandboxKind: 'shared',
+          sandboxRoute: { kind: 'shared', routeKey: `usr-${'a'.repeat(48)}` },
+        },
+      ],
+      ['an unknown kind', { sandboxId: placedId, sandboxKind: 'devcontainer' }],
+    ])('rejects %s', (_label, workspace) => {
+      expect(() => parseSessionMetadata(withWorkspace(workspace))).toThrow();
+    });
+
+    it('rejects a kind on a legacy-plane session', () => {
+      expect(() =>
+        parseSessionMetadata({
+          ...withWorkspace({ sandboxId: placedId, sandboxKind: 'isolated' }),
+          identity: { sessionId: 'agent_placed', userId: 'user_placed' },
+        })
+      ).toThrow();
+    });
+
+    it.each([
+      ['cloudflare-single', 'isolated', true],
+      ['isolated-standard', 'isolated-standard', true],
+      ['isolated-standard', 'isolated', false],
+      ['cloudflare-single', 'isolated-standard', false],
+      ['cloudflare-single', 'shared', false],
+      ['cloudflare-single', 'code-review', false],
+      ['cloudflare-shared', 'shared', true],
+      ['cloudflare-shared', 'isolated', false],
+    ] as const)(
+      'checks a %s allocation against kind %s',
+      (sandboxAllocation, sandboxKind, valid) => {
+        const current = withWorkspace({
+          sandboxId: placedId,
+          sandboxProvider: 'cloudflare',
+          sandboxAllocation,
+          sandboxKind,
+        });
+        if (valid) {
+          expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+        } else {
+          expect(() => parseSessionMetadata(current)).toThrow();
+        }
+      }
+    );
+  });
+
   it('rejects shared route metadata without a compatible assigned sandbox', () => {
     const base = {
       metadataSchemaVersion: 2 as const,
@@ -176,6 +738,98 @@ describe('session metadata boundary', () => {
     ).toThrow();
   });
 
+  it.each([
+    'cloudflare-single',
+    'cloudflare-shared',
+    'cloudflare-containers-standard-4',
+    'vercel-small',
+    'vercel-large',
+  ] as const)(
+    'round-trips the immutable %s preset and rejects inconsistent allocations',
+    sandboxAllocation => {
+      const sandboxId = `${sandboxAllocation === 'cloudflare-shared' ? 'org' : 'ses'}-${'a'.repeat(48)}`;
+      const provider = getSandboxAllocationProvider(sandboxAllocation);
+      const current = {
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_preset', userId: 'oauth/user', orgId: 'org-id' },
+        auth: {},
+        workspace: {
+          sandboxId,
+          sandboxAllocation,
+          sandboxProvider: provider,
+          ...(sandboxAllocation === 'cloudflare-shared'
+            ? { sandboxRoute: { kind: 'shared', routeKey: sandboxId } }
+            : {}),
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      };
+      expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+      const controlPlaneOnly = provider !== 'cloudflare';
+      for (const workspace of [
+        { ...current.workspace, sandboxId: `dind-${'a'.repeat(48)}` },
+        {
+          ...current.workspace,
+          sandboxProvider: provider === 'vercel' ? 'cloudflare' : 'vercel',
+        },
+        { ...current.workspace, devcontainerRequested: true },
+        // `istd-` is the only identity Isolated Standard accepts.
+        { ...current.workspace, sandboxAllocation: 'isolated-standard' },
+        { ...current.workspace, sandboxAllocation: 'custom' },
+        ...(controlPlaneOnly ? [{ ...current.workspace, sandboxProvider: undefined }] : []),
+      ]) {
+        expect(() => parseSessionMetadata({ ...current, workspace })).toThrow();
+      }
+      if (!controlPlaneOnly) {
+        // Metadata written before the explicit provider field defaults to Cloudflare.
+        const implicit = {
+          ...current,
+          workspace: { ...current.workspace, sandboxProvider: undefined },
+        };
+        expect(parseSessionMetadata(implicit).workspace?.sandboxAllocation).toBe(sandboxAllocation);
+      }
+      // An internally selected allocation keeps its normal identity for a Code
+      // Reviewer session, so a matching allocation/id-class is accepted.
+      for (const identity of [{ ...current.identity, billingOrigin: 'code-review' }]) {
+        expect(parseSessionMetadata({ ...current, identity }).workspace?.sandboxAllocation).toBe(
+          sandboxAllocation
+        );
+      }
+      // The trusted Code Reviewer namespace cannot carry a selectable allocation.
+      expect(() =>
+        parseSessionMetadata({
+          ...current,
+          workspace: { ...current.workspace, sandboxId: `crv-${'a'.repeat(48)}` },
+        })
+      ).toThrow();
+      // Selectable allocations are authorized per owner (user or organization) at
+      // creation, so a personal session without an org is valid metadata.
+      expect(
+        parseSessionMetadata({
+          ...current,
+          identity: { ...current.identity, orgId: undefined },
+        }).workspace?.sandboxAllocation
+      ).toBe(sandboxAllocation);
+      // Cloudflare presets keep the owner's plane; the other providers exist only on control.
+      const legacy = { ...current, identity: { ...current.identity, sessionId: 'agent_legacy' } };
+      if (controlPlaneOnly) {
+        expect(() => parseSessionMetadata(legacy)).toThrow('control-plane session');
+      } else {
+        expect(serializeSessionMetadata(parseSessionMetadata(legacy))).toEqual(legacy);
+      }
+      expect(() =>
+        parseSessionMetadata({
+          ...current,
+          devcontainer: {
+            workspacePath: '/repo',
+            innerWorkspaceFolder: '/repo',
+            wrapperPort: 3000,
+            configPath: '/repo/devcontainer.json',
+          },
+        })
+      ).toThrow();
+    }
+  );
+
   it('accepts legacy current metadata without an explicit sandbox provider as Cloudflare', () => {
     const current = {
       metadataSchemaVersion: 2 as const,
@@ -195,6 +849,294 @@ describe('session metadata boundary', () => {
 
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(getSandboxProvider(parseSessionMetadata(current))).toBe('cloudflare');
+  });
+
+  it('reports devcontainer retirement before a retired provider and ignores a missing workspace', () => {
+    const devcontainer = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_retired_devcontainer', userId: 'user_retired' },
+      auth: {},
+      workspace: {
+        sandboxId: 'dind-abcdef',
+        sandboxProvider: 'cloudflare',
+        devcontainerRequested: true,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(devcontainer)).toBe(DEVCONTAINER_RETIRED_MESSAGE);
+
+    const retiredProvider = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_retired_provider', userId: 'user_retired' },
+      auth: {},
+      workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(retiredProvider)).toBe(CLOUDFLARE_RUNTIME_RETIRED_MESSAGE);
+
+    const activeProvider = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user_active',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        sandboxProvider: 'cloudflare-containers',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(activeProvider)).toBeNull();
+
+    const noWorkspace = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_no_workspace', userId: 'user_no_workspace' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(noWorkspace)).toBeNull();
+  });
+
+  it.each(['agent_isolated_standard', 'workspace_isolated_standard'])(
+    'round-trips isolated Standard allocation metadata as Cloudflare for %s',
+    sessionId => {
+      const current = {
+        metadataSchemaVersion: 2 as const,
+        identity: {
+          sessionId,
+          userId: 'user_isolated_standard',
+        },
+        auth: {},
+        workspace: {
+          sandboxId: 'istd-abcdef' as const,
+          sandboxAllocation: 'isolated-standard' as const,
+        },
+        lifecycle: {
+          version: 1,
+          timestamp: 1,
+        },
+      };
+
+      const parsed = parseSessionMetadata(current);
+      expect(parsed).toEqual(current);
+      expect(getSandboxProvider(parsed)).toBe('cloudflare');
+      expect(parseSessionMetadata(serializeSessionMetadata(parsed))).toEqual(current);
+    }
+  );
+
+  it('accepts Vercel metadata only for an isolated non-devcontainer sandbox', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_vercel_provider',
+        userId: 'user_vercel_provider',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef' as const,
+        sandboxProvider: 'vercel' as const,
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: 1,
+      },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(getSandboxProvider(parseSessionMetadata(current))).toBe('vercel');
+  });
+
+  it('persists one immutable Vercel session locator and mutable wrapper lease', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_vercel_runtime', userId: 'user_vercel_runtime' },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        sandboxProvider: 'vercel',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    const runtimeLocator = {
+      provider: 'vercel' as const,
+      sessionId: 'session-1',
+      projectId: 'project-1',
+      snapshotId: 'snapshot-1',
+      runtimeBuildId: 'build-1',
+      runtime: 'node24' as const,
+    };
+    const located = updateProviderRuntime(metadata, runtimeLocator);
+    const launched = updateProviderRuntime(located, {
+      ...runtimeLocator,
+      wrapper: {
+        launchId: 'launch-1',
+        commandId: 'command-1',
+        instanceId: 'instance-1',
+        instanceGeneration: 2,
+      },
+    });
+
+    expect(serializeSessionMetadata(launched).workspace?.providerRuntime).toEqual({
+      ...runtimeLocator,
+      wrapper: {
+        launchId: 'launch-1',
+        commandId: 'command-1',
+        instanceId: 'instance-1',
+        instanceGeneration: 2,
+      },
+    });
+    expect(updateProviderRuntime(launched, runtimeLocator).workspace?.providerRuntime).toEqual(
+      runtimeLocator
+    );
+    expect(() =>
+      updateProviderRuntime(located, { ...runtimeLocator, sessionId: 'session-2' })
+    ).toThrow('Vercel session ID is immutable');
+    expect(() =>
+      updateProviderRuntime(located, { ...runtimeLocator, runtimeBuildId: 'build-2' })
+    ).toThrow('Vercel runtimeBuildId is immutable');
+  });
+
+  it('rejects provider runtime mismatches and devcontainers', () => {
+    const base = {
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_runtime_mismatch', userId: 'user_runtime_mismatch' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(() =>
+      parseSessionMetadata({
+        ...base,
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'cloudflare',
+          providerRuntime: { provider: 'vercel', sessionId: 'session-1' },
+        },
+      })
+    ).toThrow('Invalid current session metadata');
+    expect(() =>
+      parseSessionMetadata({
+        ...base,
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'vercel',
+          providerRuntime: { provider: 'vercel', sessionId: 'session-1' },
+          devcontainerRequested: true,
+        },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects Vercel metadata pinned to a shared sandbox identity', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_vercel_shared', userId: 'user_vercel_shared' },
+        auth: {},
+        workspace: { sandboxId: 'org-abcdef', sandboxProvider: 'vercel' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects Vercel metadata requesting a devcontainer runtime', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_vercel_dind', userId: 'user_vercel_dind' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'vercel',
+          devcontainerRequested: true,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects Vercel metadata carrying an already prepared devcontainer', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_vercel_prepared_dind', userId: 'user_vercel_dind' },
+        auth: {},
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'vercel' },
+        devcontainer: {
+          workspacePath: '/workspace/user/sessions/agent_vercel_prepared_dind',
+          innerWorkspaceFolder: '/workspaces/repo',
+          wrapperPort: 4173,
+          configPath: '.devcontainer/devcontainer.json',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('round-trips cloudflare-containers metadata on the control plane', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'workspace_containers_provider',
+        userId: 'user_containers_provider',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef' as const,
+        sandboxProvider: 'cloudflare-containers' as const,
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: 1,
+      },
+    };
+
+    const parsed = parseSessionMetadata(current);
+    expect(parsed).toEqual(current);
+    expect(getSandboxProvider(parsed)).toBe('cloudflare-containers');
+    expect(parseSessionMetadata(serializeSessionMetadata(parsed))).toEqual(current);
+  });
+
+  it('rejects cloudflare-containers metadata on a legacy session', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_containers_legacy', userId: 'user_containers_legacy' },
+        auth: {},
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare-containers' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects cloudflare-containers metadata pinned to a shared sandbox identity', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_containers_shared', userId: 'user_containers_shared' },
+        auth: {},
+        workspace: { sandboxId: 'org-abcdef', sandboxProvider: 'cloudflare-containers' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects cloudflare-containers metadata requesting a devcontainer runtime', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_containers_dind', userId: 'user_containers_dind' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          devcontainerRequested: true,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
   });
 
   it('parses and serializes current grouped DIND workspace metadata', () => {
@@ -651,5 +1593,29 @@ describe('session metadata boundary', () => {
         userId: 'user_123',
       })
     ).toThrow('Invalid current session metadata');
+  });
+});
+
+describe('continuation agent variant', () => {
+  const base = {
+    metadataSchemaVersion: 2 as const,
+    identity: { sessionId: 'agent_variant', userId: 'user_variant' },
+    auth: {},
+    lifecycle: { version: 1, timestamp: 1 },
+  };
+
+  it('keeps an empty variant distinct from an absent variant', () => {
+    expect(parseSessionMetadata({ ...base, agent: { variant: '' } }).agent?.variant).toBe('');
+    expect(parseSessionMetadata({ ...base, agent: {} }).agent?.variant).toBeUndefined();
+  });
+
+  it('accepts a long provider variant such as budget-32768', () => {
+    expect(
+      parseSessionMetadata({ ...base, agent: { variant: 'budget-32768' } }).agent?.variant
+    ).toBe('budget-32768');
+  });
+
+  it('rejects a variant longer than 50 characters', () => {
+    expect(() => parseSessionMetadata({ ...base, agent: { variant: 'x'.repeat(51) } })).toThrow();
   });
 });

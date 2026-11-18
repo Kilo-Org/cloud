@@ -1,17 +1,27 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- the SSO recovery and created-account announcement suites share one hook harness */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
+import * as React from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+
+import { getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
+import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
+import type * as PasskeyClientTypes from '@/lib/auth/passkey-client';
+import { type SignInResponse } from '@react-native-google-signin/google-signin';
 
 import {
   buildChallengeEntry,
   type ChallengeEntry,
-  parseAuthErrorCode,
   parseEmailCodeResponse,
   parseTokenPair,
   parseTokenResponse,
+  type PendingLinkOffer,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
+
+// The hook's sign-in call is the observable end of every provider path.
+const authMock = vi.hoisted(() => ({ signIn: vi.fn() }));
 
 // Mock @/lib/config to avoid pulling in react-native at module import time.
 vi.mock('@/lib/config', () => ({
@@ -23,6 +33,10 @@ vi.mock('@/lib/config', () => ({
 // Mock react-native Platform for admission module import.
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+}));
+
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
 }));
 
 // The admission module is imported for real (importOriginal), and these native
@@ -43,10 +57,12 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 // Mock dependencies of use-native-auth.ts so we can import production helpers.
+const appleMock = vi.hoisted(() => ({ isAvailableAsync: vi.fn() }));
 vi.mock('expo-apple-authentication', () => ({
   AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
   formatFullName: vi.fn(),
   signInAsync: vi.fn(),
+  isAvailableAsync: appleMock.isAvailableAsync,
 }));
 
 vi.mock('@react-native-google-signin/google-signin', () => ({
@@ -57,6 +73,10 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
 
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: { SHA256: 1 },
   digestStringAsync: vi.fn(),
@@ -64,8 +84,18 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: vi.fn(() => ({ signIn: vi.fn() })),
+  useAuth: () => ({ signIn: authMock.signIn }),
 }));
+
+// The passkey ceremony itself is covered by passkey-client.test.ts; only the
+// hook's toast/sign-in wiring over its result is under test here.
+vi.mock('@/lib/auth/passkey-client', async importOriginal => {
+  const mod = await importOriginal<typeof PasskeyClientTypes>();
+  return {
+    ...mod,
+    signInWithPasskey: vi.fn(),
+  };
+});
 
 // Mock getAdmission so resolveAdmission tests can control the three paths:
 // success with payload, success with undefined, and throw.
@@ -77,20 +107,39 @@ vi.mock('@/lib/auth/admission', async importOriginal => {
   };
 });
 
+const sentryMock = vi.hoisted(() => ({ addBreadcrumb: vi.fn() }));
+vi.mock('@sentry/react-native', () => sentryMock);
+
+// postAuth is the single fetch boundary for native auth; stub it so the SSO
+// recovery path can be driven without a network.
+vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
+  const mod = await importOriginal<typeof AuthFetchTypes>();
+  return {
+    ...mod,
+    postAuth: vi.fn(),
+  };
+});
+
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const {
-  AUTH_ERROR_MESSAGES,
-  DEFAULT_ERROR_MESSAGE,
-  mapError,
-  RETRYABLE_ADMISSION_ERROR,
-  resolveAdmission,
-} = await import('@/lib/auth/use-native-auth');
+const { defaultErrorMessage, mapError, mapErrorKey, retryableAdmissionError } =
+  await import('@/lib/auth/auth-error-messages');
+
+const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 
 const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
 const { toast } = await import('sonner-native');
+const { announcingToast } = await import('@/lib/a11y/announcing-toast');
+const { i18n } = await import('@/i18n');
 
 const mockGetAdmission = vi.mocked(getAdmission);
+
+const { useNativeAuth } = await import('@/lib/auth/use-native-auth');
+const { postAuth } = await import('@/lib/auth/auth-fetch');
+const mockPostAuth = vi.mocked(postAuth);
+const { signInWithPasskey: runPasskeySignIn } = await import('@/lib/auth/passkey-client');
+const mockRunPasskeySignIn = vi.mocked(runPasskeySignIn);
+const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
 
 // ── C12: Config invariant ────────────────────────────────────────────────
 
@@ -168,21 +217,6 @@ describe('native-auth-contract (used by use-native-auth)', () => {
       expect(parseTokenPair(undefined)).toBeNull();
     });
   });
-
-  describe('parseAuthErrorCode', () => {
-    it('extracts error code', () => {
-      expect(parseAuthErrorCode({ error: 'BLOCKED' })).toBe('BLOCKED');
-    });
-
-    it('returns undefined for non-error objects', () => {
-      expect(parseAuthErrorCode({ success: true })).toBeUndefined();
-    });
-
-    it('returns undefined for non-objects', () => {
-      expect(parseAuthErrorCode(null)).toBeUndefined();
-      expect(parseAuthErrorCode(undefined)).toBeUndefined();
-    });
-  });
 });
 
 // ── Production error mapping ────────────────────────────────────────────
@@ -195,11 +229,12 @@ describe('use-native-auth error mapping', () => {
   it.each([
     ['INVALID_CODE', 'That code is incorrect. Please try again.'],
     ['TOO_MANY_ATTEMPTS', 'Too many attempts. Please request a new code.'],
+    ['RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.'],
     ['CODE_IN_PROGRESS', 'Your code is being processed. Wait a moment and try again.'],
     ['INVALID_EMAIL', 'Unable to deliver email to this address. Please use a different email.'],
     ['EMAIL_DELIVERY_FAILED', 'Email delivery is temporarily unavailable. Please try again later.'],
   ] as const)('maps %s to a user-facing message', (code, message) => {
-    // Exercise production mapError against the production AUTH_ERROR_MESSAGES map.
+    // Exercise production mapError against the production AUTH_ERROR_KEYS map.
     const result = mapError(code);
     expect(result).toBe(message);
 
@@ -208,29 +243,29 @@ describe('use-native-auth error mapping', () => {
   });
 
   it('returns the default error message for an undefined code', () => {
-    expect(mapError(undefined)).toBe(DEFAULT_ERROR_MESSAGE);
+    expect(mapError(undefined)).toBe(defaultErrorMessage());
+  });
+
+  it('returns the default error message for an empty-string code', () => {
+    expect(mapError('')).toBe(defaultErrorMessage());
   });
 
   it('returns the default error message for an unknown code', () => {
-    expect(mapError('NONEXISTENT_CODE')).toBe(DEFAULT_ERROR_MESSAGE);
+    expect(mapError('NONEXISTENT_CODE')).toBe(defaultErrorMessage());
   });
 
   it('has a retryable admission error constant', () => {
-    expect(RETRYABLE_ADMISSION_ERROR).toBe(
+    expect(retryableAdmissionError()).toBe(
       'We could not verify this device. Check your connection and try again.'
     );
-    expect(RETRYABLE_ADMISSION_ERROR).toMatch(/try again/i);
+    expect(retryableAdmissionError()).toMatch(/try again/i);
   });
 
   it('ADMISSION_REQUIRED message includes the More sign-in options CTA', () => {
-    const message = AUTH_ERROR_MESSAGES.ADMISSION_REQUIRED;
+    const message = mapError('ADMISSION_REQUIRED');
     expect(message).toContain('More sign-in options');
     // Non-retryable: must not suggest trying again.
     expect(message).not.toMatch(/try again|retry/i);
-  });
-
-  it('ADMISSION_CHALLENGE_FAILED sentinel exists for catch blocks', () => {
-    expect(ADMISSION_CHALLENGE_FAILED).toBe('admission_challenge_failed');
   });
 });
 
@@ -265,14 +300,14 @@ describe('resolveAdmission', () => {
     mockGetAdmission.mockRejectedValue(new Error('Network error'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 
   it('shows retryable toast and throws on JSON parse failure', async () => {
     mockGetAdmission.mockRejectedValue(new SyntaxError('Unexpected token'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 });
 
@@ -307,6 +342,773 @@ describe('challenge binding', () => {
 
     it('returns undefined when the entry is null (no server challenge)', () => {
       expect(selectChallengeId(null, email)).toBeUndefined();
+    });
+  });
+});
+
+// ── SSO recovery (hook) ────────────────────────────────────────────────
+
+type NativeAuthResult = ReturnType<typeof useNativeAuth>;
+
+function NativeAuthHarness({ resultRef }: { resultRef: { current: NativeAuthResult | null } }) {
+  const result = useNativeAuth();
+  resultRef.current = result;
+  return null;
+}
+
+async function mountNativeAuth(): Promise<{ current: NativeAuthResult | null }> {
+  const resultRef: { current: NativeAuthResult | null } = { current: null };
+  await act(async () => {
+    TestRenderer.create(React.createElement(NativeAuthHarness, { resultRef }));
+    await Promise.resolve();
+  });
+  return resultRef;
+}
+
+describe('useNativeAuth SSO recovery', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('exposes ssoRecovery (initially null) and clearSsoRecovery', async () => {
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+
+    expect(result).not.toBeNull();
+    expect(result?.ssoRecovery).toBeNull();
+    expect(typeof result?.clearSsoRecovery).toBe('function');
+  });
+
+  it('sets ssoRecovery on an SSO_ERROR and clears it on a new attempt', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(resultRef.current?.ssoRecovery).toEqual({
+      email: 'user@example.com',
+      ssoOrganizationId: 'org_1',
+    });
+    expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
+
+    // A new attempt clears the recovery state before posting.
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    await act(async () => {
+      await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(resultRef.current?.ssoRecovery).toBeNull();
+  });
+});
+
+describe('useNativeAuth email validation feedback', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(['INVALID_REQUEST', 'INVALID_EMAIL'])(
+    'keeps %s beside the email field instead of overlaying Continue with a toast',
+    async errorCode => {
+      mockPostAuth.mockResolvedValue({ ok: false, errorCode, ssoOrganizationId: undefined });
+      const resultRef = await mountNativeAuth();
+
+      await act(async () => {
+        await resultRef.current?.requestEmailCode('user@example.com');
+      });
+
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey(errorCode));
+      expect(resultRef.current?.busy).toBeUndefined();
+    }
+  );
+
+  it.each(['http://localhost:3000/device-auth?code=test', 'user@example', 'user'])(
+    'keeps malformed address %s inline as INVALID_REQUEST without sending a request',
+    async address => {
+      const resultRef = await mountNativeAuth();
+      await act(async () => {
+        expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
+      });
+      expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey('INVALID_REQUEST'));
+      expect(mockPostAuth).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([255, 3508])('rejects an address of %i characters before delivery', async length => {
+    const address = `${'a'.repeat(length - 12)}@example.com`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
+    });
+    expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey('INVALID_REQUEST'));
+    expect(mockPostAuth).not.toHaveBeenCalled();
+  });
+
+  it('allows the 254-character boundary after normalization', async () => {
+    const address = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(` ${address.toUpperCase()} `)).toBe(true);
+    });
+    expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', { email: address });
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
+  });
+
+  it('keeps an empty-email error inline without sending a request', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('   ');
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(mockPostAuth).not.toHaveBeenCalled();
+    expect(resultRef.current?.emailErrorKey).toBe('login.pleaseEnterEmail');
+  });
+
+  it('clears validation on edit and allows a corrected address to request a code', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('');
+    });
+    act(() => {
+      resultRef.current?.clearEmailError();
+    });
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
+
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(' User@Example.com ')).toBe(true);
+    });
+    expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', {
+      email: 'user@example.com',
+    });
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('clears old validation while a request is pending and preserves retryable delivery feedback', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('');
+    });
+    let finish: ((result: Awaited<ReturnType<typeof postAuth>>) => void) | undefined = undefined;
+    mockPostAuth.mockReturnValueOnce(
+      new Promise(resolve => {
+        finish = resolve;
+      })
+    );
+    act(() => {
+      void resultRef.current?.requestEmailCode('user@example.com');
+    });
+    expect(resultRef.current?.busy).toBe('otp-send');
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
+    await act(async () => {
+      finish?.({ ok: false, errorCode: 'EMAIL_DELIVERY_FAILED', ssoOrganizationId: undefined });
+      await Promise.resolve();
+    });
+    expect(toast.error).toHaveBeenCalledWith(mapError('EMAIL_DELIVERY_FAILED'));
+    expect(resultRef.current?.busy).toBeUndefined();
+
+    mockPostAuth.mockResolvedValueOnce({ ok: true, data: { success: true } });
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode('user@example.com')).toBe(true);
+    });
+  });
+});
+
+// ── In-flight refusal ──────────────────────────────────────────────────
+
+type PostAuthResult = Awaited<ReturnType<typeof postAuth>>;
+
+describe('useNativeAuth in-flight refusal', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('surfaces the reason and does not post again when a second submit is refused', async () => {
+    let resolvePost: ((value: PostAuthResult) => void) | undefined = undefined;
+    mockPostAuth.mockImplementation(async () => {
+      const held = await new Promise<PostAuthResult>(resolve => {
+        resolvePost = resolve;
+      });
+      return held;
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    // Hold the first request pending so the busy guard stays set.
+    let firstSubmit: Promise<boolean> | undefined = undefined;
+    act(() => {
+      firstSubmit = result?.requestEmailCode('user@example.com');
+    });
+    expect(resultRef.current?.busy).toBe('otp-send');
+
+    let secondResult: boolean | undefined = undefined;
+    await act(async () => {
+      secondResult = await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(secondResult).toBe(false);
+    expect(mockPostAuth).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith('Could not complete sign in. Please try again.');
+
+    await act(async () => {
+      resolvePost?.({ ok: true, data: { success: true } });
+      await firstSubmit;
+    });
+
+    expect(resultRef.current?.busy).toBeUndefined();
+  });
+});
+
+// ── Created-account announcement ────────────────────────────────────────
+
+describe('useNativeAuth created-account announcement', () => {
+  beforeEach(() => {
+    // A prior resolveAdmission test sets a rejection that only clearAllMocks
+    // (not resetAllMocks) runs; reset it so admission resolves to undefined.
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('announces account creation when the token response has created: true', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600, created: true },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).toHaveBeenCalledWith('Account created. Welcome to Kilo.');
+  });
+
+  it('stays silent when created is absent', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600 },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('stays silent when created is false', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600, created: false },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+});
+
+// ── Signup step-up ──────────────────────────────────────────────────────
+
+describe('useNativeAuth signup step-up', () => {
+  beforeEach(() => {
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // This harness runs as iOS with Google configured; Apple shows when Apple says it is available.
+  it.each([
+    [['google', 'apple'], true, 'authErrors.signupStepUpApple'],
+    [['google', 'apple'], false, 'authErrors.signupStepUpGoogle'],
+    [['apple'], false, 'authErrors.signupStepUp'],
+    [['apple', 'passkey'], true, 'authErrors.signupStepUpApple'],
+    [undefined, true, 'authErrors.signupStepUp'],
+  ] as const)(
+    'names only an allowed button on this screen: methods %j, Apple shown %s',
+    async (signupMethods, appleShown, key) => {
+      appleMock.isAvailableAsync.mockResolvedValue(appleShown);
+      mockPostAuth.mockResolvedValue({
+        ok: false,
+        errorCode: 'SIGNUP-STEP-UP',
+        ssoOrganizationId: undefined,
+        signupMethods: signupMethods && [...signupMethods],
+        httpStatus: 403,
+      });
+      const resultRef = await mountNativeAuth();
+
+      await act(async () => {
+        const outcome = await resultRef.current?.verifyEmailCode('user@example.com', '123456');
+        expect(outcome).toEqual({ ok: false, message: i18n.t(key) });
+      });
+
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(authMock.signIn).not.toHaveBeenCalled();
+    }
+  );
+});
+
+// ── Passkey sign-in (hook wiring) ───────────────────────────────────────
+
+describe('useNativeAuth passkey sign-in', () => {
+  beforeEach(() => {
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('signs in with the token pair the ceremony returned', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'ok',
+      token: 'at',
+      refreshToken: 'rt',
+      expiresIn: 3600,
+      created: false,
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(authMock.signIn).toHaveBeenCalledWith('at', 'rt', 3600);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('announces the account the ceremony created', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'ok',
+      token: 'at',
+      refreshToken: 'rt',
+      expiresIn: 3600,
+      created: true,
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(announcingToast.success).toHaveBeenCalledWith('Account created. Welcome to Kilo.');
+  });
+
+  it('toasts the retryable copy a dismissed sheet carries', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'cancelled' });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Passkey sign-in was cancelled. Please try again.');
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
+  it('toasts the no-passkey copy that names the other methods', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'no-passkey' });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    const message = vi.mocked(toast.error).mock.calls[0]?.[0];
+    expect(message).toBe(
+      'No passkey is saved for this device. Sign in with Apple, Google, or your email instead.'
+    );
+    expect(message).not.toMatch(/try again/i);
+  });
+
+  it('toasts the non-retryable passkey copy that names the other methods', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'failed' });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    // The server knew the passkey and the assertion did not verify, so the same
+    // button fails identically. The toast names the way out instead of a retry.
+    const message = vi.mocked(toast.error).mock.calls[0]?.[0];
+    expect(message).toBe(
+      'That passkey could not sign you in. Sign in with Apple, Google, or your email instead.'
+    );
+    expect(message).not.toMatch(/try again/i);
+  });
+
+  it('prefers the server copy when the refusal carries a code', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'BLOCKED',
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'This account has been blocked. Please contact support.'
+    );
+  });
+
+  it('routes a forced-SSO refusal to the recovery block instead of a toast', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    // The usernameless ceremony names no address, so the block is seeded with
+    // the empty email Apple's credential omits on a later sign-in.
+    expect(resultRef.current?.ssoRecovery).toEqual({ email: '', ssoOrganizationId: 'org_1' });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
+  it('does not add a second toast when the failure reported itself', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'cancelled',
+      reported: true,
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('ignores a second tap while a passkey ceremony is running', async () => {
+    let resolveCeremony:
+      | ((result: Awaited<ReturnType<typeof runPasskeySignIn>>) => void)
+      | undefined = undefined;
+    const pending = new Promise<Awaited<ReturnType<typeof runPasskeySignIn>>>(resolve => {
+      resolveCeremony = resolve;
+    });
+    mockRunPasskeySignIn.mockReturnValue(pending);
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      void result?.signInWithPasskey();
+      void result?.signInWithPasskey();
+      await Promise.resolve();
+    });
+    expect(mockRunPasskeySignIn).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCeremony?.({
+        status: 'ok',
+        token: 'at',
+        refreshToken: 'rt',
+        expiresIn: 3600,
+        created: false,
+      });
+      await Promise.resolve();
+    });
+    expect(authMock.signIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a thrown ceremony error as the generic message', async () => {
+    mockRunPasskeySignIn.mockRejectedValue(new Error('boom'));
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+  });
+});
+
+// ── Pending account link ────────────────────────────────────────────────
+
+const pendingOffer: PendingLinkOffer = {
+  token: 'link-token',
+  provider: 'github',
+  email: 'person@example.com',
+  methods: ['google', 'passkey'],
+  emailCode: true,
+  expiresAt: Date.now() + 15 * 60 * 1000,
+};
+
+function BoundNativeAuthHarness({
+  resultRef,
+  pendingLink,
+  onPendingLinkOffer,
+  onPendingLinkResolved,
+}: {
+  resultRef: { current: NativeAuthResult | null };
+  pendingLink: PendingLinkOffer | null;
+  onPendingLinkOffer: (offer: PendingLinkOffer) => void;
+  onPendingLinkResolved: () => void;
+}) {
+  resultRef.current = useNativeAuth({ pendingLink, onPendingLinkOffer, onPendingLinkResolved });
+  return null;
+}
+
+async function mountBoundNativeAuth(
+  pendingLink: PendingLinkOffer | null,
+  onPendingLinkOffer = vi.fn<(offer: PendingLinkOffer) => void>(),
+  onPendingLinkResolved = vi.fn<() => void>()
+): Promise<{ current: NativeAuthResult | null; onResolved: () => void }> {
+  const resultRef: { current: NativeAuthResult | null } = { current: null };
+  await act(async () => {
+    TestRenderer.create(
+      React.createElement(BoundNativeAuthHarness, {
+        resultRef,
+        pendingLink,
+        onPendingLinkOffer,
+        onPendingLinkResolved,
+      })
+    );
+    await Promise.resolve();
+  });
+  return Object.assign(resultRef, { onResolved: onPendingLinkResolved });
+}
+
+function googleChoosesAccount() {
+  const response: SignInResponse = {
+    type: 'success',
+    data: {
+      serverAuthCode: 'server-code',
+      idToken: null,
+      scopes: [],
+      user: {
+        id: 'google-user',
+        name: null,
+        email: 'person@example.com',
+        photo: null,
+        familyName: null,
+        givenName: null,
+      },
+    },
+  };
+  vi.mocked(GoogleSignin.signIn).mockResolvedValue(response);
+}
+
+describe('useNativeAuth pending account link', () => {
+  beforeEach(() => {
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hands the offer a DIFFERENT-OAUTH refusal makes to the screen instead of a toast', async () => {
+    googleChoosesAccount();
+    const offer = { ...pendingOffer };
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'DIFFERENT-OAUTH',
+      ssoOrganizationId: undefined,
+      pendingLink: offer,
+    });
+    const onOffer = vi.fn<(offer: PendingLinkOffer) => void>();
+    const resultRef = await mountBoundNativeAuth(null, onOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithGoogle();
+    });
+
+    expect(onOffer).toHaveBeenCalledWith(offer);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
+  it('keeps the plain refusal toast when the screen takes no offers', async () => {
+    googleChoosesAccount();
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'DIFFERENT-OAUTH',
+      ssoOrganizationId: undefined,
+      pendingLink: { ...pendingOffer },
+    });
+    const resultRef = await mountNativeAuth();
+
+    await act(async () => {
+      await resultRef.current?.signInWithGoogle();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(mapError('DIFFERENT-OAUTH'));
+  });
+
+  it('keeps the plain refusal toast when an older server sends no offer', async () => {
+    googleChoosesAccount();
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'DIFFERENT-OAUTH',
+      ssoOrganizationId: undefined,
+    });
+    const onOffer = vi.fn<(offer: PendingLinkOffer) => void>();
+    const resultRef = await mountBoundNativeAuth(null, onOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithGoogle();
+    });
+
+    expect(onOffer).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(mapError('DIFFERENT-OAUTH'));
+  });
+
+  it('carries the link token on the email code exchange and confirms the added provider', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', pendingLink: { status: 'linked', provider: 'github' } },
+    });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await resultRef.current?.verifyEmailCode('person@example.com', '123456');
+    });
+
+    expect(mockPostAuth).toHaveBeenCalledWith(
+      '/api/auth/native/token',
+      expect.objectContaining({
+        provider: 'email',
+        email: 'person@example.com',
+        pendingLinkToken: 'link-token',
+      })
+    );
+    expect(authMock.signIn).toHaveBeenCalledWith('at', undefined, undefined);
+    expect(announcingToast.success).toHaveBeenCalledWith('GitHub was added to your account.');
+  });
+
+  it('keeps the person signed in and warns when the link did not happen', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', pendingLink: { status: 'failed', reason: 'WRONG_ACCOUNT' } },
+    });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      const outcome = await resultRef.current?.verifyEmailCode('person@example.com', '123456');
+      expect(outcome).toEqual({ ok: true });
+    });
+
+    expect(authMock.signIn).toHaveBeenCalledTimes(1);
+    expect(announcingToast.warning).toHaveBeenCalledWith(
+      "GitHub wasn't added because you signed in to a different account."
+    );
+  });
+
+  it('sends no link token while no pending link is being resolved', async () => {
+    mockPostAuth.mockResolvedValue({ ok: true, data: { token: 'at' } });
+    const resultRef = await mountBoundNativeAuth(null);
+
+    await act(async () => {
+      await resultRef.current?.verifyEmailCode('person@example.com', '123456');
+    });
+
+    expect(mockPostAuth.mock.calls[0]?.[1]).not.toHaveProperty('pendingLinkToken');
+  });
+
+  it('forwards the link token to the passkey ceremony', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'ok', token: 'at' });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(mockRunPasskeySignIn).toHaveBeenCalledWith(undefined, 'link-token');
+  });
+
+  it('retires the offer once a sign-in resolved it, and not when no link was open', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'ok', token: 'at' });
+    const bound = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await bound.current?.signInWithPasskey();
+    });
+
+    expect(bound.onResolved).toHaveBeenCalledTimes(1);
+
+    const plain = await mountBoundNativeAuth(null);
+
+    await act(async () => {
+      await plain.current?.signInWithPasskey();
+    });
+
+    expect(plain.onResolved).not.toHaveBeenCalled();
+  });
+
+  it('keeps refusals inline and marks the ones no other method can change', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'BLOCKED',
+    });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(resultRef.current?.pendingLinkFailure).toEqual({
+      message: 'This account has been blocked. Please contact support.',
+      retryable: false,
+    });
+
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'cancelled' });
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(resultRef.current?.pendingLinkFailure).toEqual({
+      message: 'Passkey sign-in was cancelled. Please try again.',
+      retryable: true,
     });
   });
 });

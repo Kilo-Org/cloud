@@ -1,19 +1,24 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'tsconfig-paths/register';
 
-import { cleanupDbForTest, closeAllDrizzleConnections, Pool, Client } from '@/lib/drizzle';
+import {
+  cleanupDbForTest,
+  closeAllDrizzleConnections,
+  Pool,
+  Client,
+} from '@kilocode/web-shared/lib/drizzle';
 import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import {
   provisionComputeUsageChargePartitions,
+  provisionEnkryptUsagePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/usage-partitions';
-import { provisionModelExperimentRequestPartitions } from '@/lib/model-experiment-request-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { shutdownPosthog } from '@/lib/posthog';
+import { shutdownPosthog } from '@kilocode/web-shared/lib/posthog';
 
 // Use a file-system flag to ensure this setup runs only once per worker across all test files
 const getSetupFlagPath = (workerId: string) =>
@@ -76,12 +81,11 @@ beforeAll(async () => {
       );
     }
 
-    const { errors: modelExperimentPartitionErrors } =
-      await provisionModelExperimentRequestPartitions(testDb);
-    if (modelExperimentPartitionErrors.length > 0) {
-      const [{ name, error }] = modelExperimentPartitionErrors;
+    const { errors: enkryptPartitionErrors } = await provisionEnkryptUsagePartitions(testDb);
+    if (enkryptPartitionErrors.length > 0) {
+      const [{ name, error }] = enkryptPartitionErrors;
       throw new Error(
-        `Failed to create model experiment request partition ${name}: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to create Enkrypt usage partition ${name}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   } finally {

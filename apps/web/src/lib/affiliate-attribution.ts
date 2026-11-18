@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
-import { sentryLogger } from '@/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { user_affiliate_attributions } from '@kilocode/db/schema';
 import type { AffiliateProvider } from '@kilocode/db/schema-types';
 import { and, eq } from 'drizzle-orm';

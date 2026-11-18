@@ -1,6 +1,6 @@
 'use client';
 
-import type { OrganizationGroupModelAccessPolicy } from '@/lib/organizations/group-policies/organization-group-policies';
+import type { OrganizationGroupModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { ModelsTab } from '@/components/organizations/providers-and-models/ModelsTab';
@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useTRPC } from '@/lib/trpc/utils';
 
 type Mode = OrganizationGroupModelAccessPolicy['data']['mode'];
@@ -76,41 +76,21 @@ export function ModelAccessPolicyEditor({
 
   const selectedModels = useMemo(() => new Set(modelIds.map(normalizeModelId)), [modelIds]);
   const selectedProviders = useMemo(() => new Set(providerSlugs), [providerSlugs]);
-  const deniedModels = useMemo(
-    () => new Set((editorData?.modelDenyList ?? []).map(normalizeModelId)),
-    [editorData]
-  );
-  const providerCeiling = editorData?.providerAllowList;
-  const providerCeilingSet = useMemo(
-    () => (providerCeiling ? new Set(providerCeiling) : null),
-    [providerCeiling]
-  );
   const providerIndex = useMemo(() => buildModelProvidersIndex(providers), [providers]);
 
   const modelRows = useMemo((): ModelRow[] => {
-    return models
-      .map((model, sourceIndex) => {
-        const modelId = normalizeModelId(model.slug);
-        const routes = [...(providerIndex.get(modelId) ?? [])];
-        const eligibleRoutes = providerCeilingSet
-          ? routes.filter(route => providerCeilingSet.has(route))
-          : routes;
-        const unavailableReason = deniedModels.has(modelId)
-          ? 'Unavailable under organization model settings'
-          : eligibleRoutes.length === 0
-            ? 'No route is available under organization provider settings'
-            : undefined;
-        return {
-          modelId,
-          modelName: model.name,
-          providerSlugs: eligibleRoutes,
-          preferredIndex: undefined,
-          sourceIndex,
-          unavailableReason,
-        };
-      })
-      .filter(row => selectedModels.has(row.modelId) || !row.unavailableReason);
-  }, [deniedModels, models, providerCeilingSet, providerIndex, selectedModels]);
+    return models.map((model, sourceIndex) => {
+      const modelId = normalizeModelId(model.slug);
+      const routes = [...(providerIndex.get(modelId) ?? [])];
+      return {
+        modelId,
+        modelName: model.name,
+        providerSlugs: routes,
+        preferredIndex: undefined,
+        sourceIndex,
+      };
+    });
+  }, [models, providerIndex]);
 
   const filteredModels = useMemo(() => {
     const search = modelSearch.trim().toLowerCase();
@@ -127,29 +107,20 @@ export function ModelAccessPolicyEditor({
 
   const providerRows = useMemo((): ProviderRow[] => {
     return providers
-      .filter(
-        provider =>
-          selectedProviders.has(provider.slug) ||
-          !providerCeilingSet ||
-          providerCeilingSet.has(provider.slug)
-      )
       .map(provider => ({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
-        providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
+        providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         modelCount: provider.models.filter(model => model.endpoint).length,
         trains: provider.dataPolicy.training,
         retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
         datacenters: provider.datacenters,
-        unavailableReason:
-          providerCeilingSet && !providerCeilingSet.has(provider.slug)
-            ? 'Unavailable under organization provider settings'
-            : undefined,
+        byokOnly: provider.byokOnly,
       }))
       .filter(provider => provider.modelCount > 0)
       .sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
-  }, [providerCeilingSet, providers, selectedProviders]);
+  }, [providers]);
 
   const locationOptions = useMemo(() => {
     const values = new Set<string>();
@@ -240,7 +211,7 @@ export function ModelAccessPolicyEditor({
             <SelectContent className="z-[70]">
               <SelectItem value="all">All organization-approved models</SelectItem>
               <SelectItem value="none">No model access</SelectItem>
-              <SelectItem value="selected">Selected models and providers</SelectItem>
+              <SelectItem value="selected">Specific models and providers</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -258,9 +229,9 @@ export function ModelAccessPolicyEditor({
                 isLoading={false}
                 canEdit
                 search={modelSearch}
-                selectedOnly={selectedModelsOnly}
+                enabledOnly={selectedModelsOnly}
                 onSearchChange={setModelSearch}
-                onSelectedOnlyChange={setSelectedModelsOnly}
+                onEnabledOnlyChange={setSelectedModelsOnly}
                 allowedModelIds={selectedModels}
                 enabledProviderSlugs={selectedProviders}
                 filteredModelRows={filteredModels}
@@ -271,6 +242,14 @@ export function ModelAccessPolicyEditor({
                       : current.filter(value => value !== modelId)
                   )
                 }
+                onSetModelsAllowed={(modelIds, enabled) => {
+                  const affectedIds = new Set(modelIds);
+                  setModelIds(current =>
+                    enabled
+                      ? sortUniqueStrings([...current, ...affectedIds])
+                      : current.filter(value => !affectedIds.has(value))
+                  );
+                }}
                 onOpenModelDetails={() => undefined}
               />
             </TabsContent>
@@ -301,13 +280,22 @@ export function ModelAccessPolicyEditor({
                       : current.filter(value => value !== providerSlug)
                   )
                 }
+                onSetProvidersEnabled={(providerSlugs, enabled) => {
+                  const affectedSlugs = new Set(providerSlugs);
+                  setProviderSlugs(current =>
+                    enabled
+                      ? sortUniqueStrings([...current, ...affectedSlugs])
+                      : current.filter(value => !affectedSlugs.has(value))
+                  );
+                }}
                 onOpenProviderDetails={() => undefined}
               />
             </TabsContent>
           </Tabs>
         )}
         <p className="type-label text-muted-foreground">
-          Direct BYOK models remain available organization-wide.
+          Direct BYOK models with a provider prefix remain available organization-wide. Keys that
+          use Kilo catalog model IDs follow this policy.
         </p>
       </div>
       <PolicyEditorFooter

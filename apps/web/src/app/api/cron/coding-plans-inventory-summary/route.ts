@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { isCronAuthorizationValid } from '@/lib/cron-auth';
 import { sendCodingPlanInventorySlackSummary } from '@/lib/coding-plans/inventory-slack-summary';
 

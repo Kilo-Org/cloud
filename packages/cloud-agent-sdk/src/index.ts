@@ -1,8 +1,42 @@
-export { isStreamError, isValidCloudAgentEvent } from './event-types';
-export type { CloudAgentEvent, StreamError, StreamErrorCode } from './event-types';
+export { NativeSyncClient, NativeSyncError } from './native-sync';
+export type {
+  NativeSyncOptions,
+  NativeEvent,
+  NativeSessionSummary,
+  NativePresenceState,
+  NativeSessionState,
+  NativePresenceConnection,
+  NativeSessionConnection,
+  NativeInstanceReply,
+  NativeSocket,
+  NativeSocketConstructor,
+} from './native-sync';
+export { listNativeModels } from './native-sync-discovery';
+export type { NativeDiscoveredModel } from './native-sync-discovery';
+export { projectNativeSnapshot } from './native-sync-snapshot';
+export type {
+  NativeEntity,
+  NativeAssetReader,
+  NativeSnapshot,
+  NativeSnapshotMessage,
+  NativeSnapshotProjection,
+  NativeSnapshotSession,
+} from './native-sync-snapshot';
+export { readNativeConversation } from './native-conversation-source';
+export type {
+  NativeConversation,
+  NativePendingRequests,
+  NativePendingQuestion,
+} from './native-conversation-source';
+
+export { isStreamError, isValidCloudAgentEvent } from './schemas';
+export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
 export { formatError as formatSessionError } from './session-manager';
-export { createSessionManager } from './session-manager';
+export { createSessionManager, RETAINED_MESSAGE_WINDOW } from './session-manager';
+export { sessionConfigFromFetchedSession } from './session-config';
+export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
+export type { CustomerBillingFailure } from './schemas';
 export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 export type {
   ActiveSessionType,
@@ -10,6 +44,8 @@ export type {
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,
+  WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,
@@ -17,6 +53,8 @@ export type {
   StandaloneSuggestion,
   ChildSessionHydrationState,
   StoredMessage,
+  DeliveredFailedPrompt,
+  PendingSendConfirmation,
   FetchedSessionData,
   AssociatedPrData,
   PrepareInput,
@@ -36,8 +74,9 @@ export type {
   PermissionResponse,
 } from './session';
 
-export { normalize, normalizeCliEvent, isChatEvent, isServiceEvent } from './normalizer';
-export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
+export { cloudMessageInfoSchema, cloudMessagePartSchema } from './cloud-conversation-schemas';
+export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
+export type { NormalizedEvent, ChatEvent, ChatEventVersion, ServiceEvent } from './normalizer';
 
 export { reduce } from './reducer';
 
@@ -130,7 +169,7 @@ export type { Connection, ConnectionConfig } from './cloud-agent-connection';
 export { createMemoryStorage } from './storage/memory';
 export { createJotaiStorage } from './storage/jotai';
 export type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
-export type { SessionStorage, StorageMutation } from './storage/types';
+export type { SessionStorage, SessionSubscriptionKey, StorageMutation } from './storage/types';
 
 export { stripPartContentIfFile, getStepFinishRoutedModel } from './part-utils';
 export type { RoutedModelRef } from './part-utils';
@@ -139,7 +178,10 @@ export { splitByContiguousPrefix } from './array-utils';
 export { calculateContextUsagePercentage } from './context-usage';
 export type { ContextUsage } from './context-usage';
 
-export { isNoOpCompletedPreparationAttempt } from './preparation-attempts';
+export {
+  isNoOpCompletedPreparationAttempt,
+  isPreparationCancellation,
+} from './preparation-attempts';
 
 export type {
   KiloSdkMessageHistory,
@@ -150,13 +192,17 @@ export type {
   SessionPhase,
   SessionActivity,
   AgentStatus,
+  SdkStatusMessageCode,
   CloudStatus,
   QuestionState,
   PermissionState,
+  UnreadablePermissionState,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
+  SessionCommit,
   PreparationAttempt,
   PreparationAttemptStatus,
   PreparationStepKind,
@@ -164,14 +210,18 @@ export type {
   PreparationStepStatus,
   ServiceStateSnapshot,
   SessionInfo,
+  SessionGoal,
+  SessionGoalStatus,
   KiloSessionId,
   CloudAgentSessionId,
+  CloudSessionMetadata,
+  CloudSessionSnapshotPage,
   ResolvedSession,
   SessionSnapshot,
   SessionSnapshotPage,
+  CachedSessionSnapshotPage,
   SessionSnapshotPageOutcome,
   OlderMessagesError,
-  // Re-exported opencode types
   Part,
   TextPart,
   ToolPart,
@@ -189,3 +239,13 @@ export type {
   QuestionInfo,
   SendMessagePayload,
 } from './types';
+
+// Canonical default-title contract from the ingest package, surfaced for app
+// clients: a session created before auto-titling carries a
+// `New session - <ISO>` placeholder that no display surface should show as
+// the session's title.
+export { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
+
+export { createConversationSourceReader } from './conversation-source';
+export type { ConversationSource } from './conversation-source';
+export type { CloudSessionMessagesWirePage } from './schemas';

@@ -1,0 +1,696 @@
+name: Kilo MCP catalog
+
+# Keeps services/kilo-mcp/catalog.json and the generated
+# .kilo/skills/kilo-mcp/SKILL.md in lockstep with the tRPC router graph.
+#
+# - PR job: regenerates the catalog with the real dump script, then the
+#   kilo-mcp skill from that catalog. Same-repo PRs get both artifacts
+#   committed back to the PR branch (requirement 5); fork PRs cannot be pushed
+#   to, so the diff ships as a `catalog.patch` artifact, a one-line PR comment
+#   points at it, and the job fails (requirement 6). A fork PR also gets no
+#   catalog credential (GitHub withholds secrets from fork events), so when the
+#   dump itself cannot run, a dedicated step posts the credential-free recovery
+#   — hand-written summaries in catalog.json, which the keep-edit rule preserves
+#   — and fails the job, so requirement 6 holds on that path too. The PR job
+#   never touches Vectorize or the embed script (requirement 10) and never
+#   generates summaries at runtime — only the dump does, and it preserves
+#   author-edited summaries (requirement 2, s1 keep-edit rule).
+#   `catalog (PR)` is a REQUIRED check on main, so this workflow runs on every
+#   PR (no pull_request path filter). The job is always reported; the
+#   change-detection step gates the heavy work on the catalog's source paths so
+#   an unrelated PR still gets a fast, green check instead of "Expected".
+# - Merge job: gated to main pushes only, so PRs structurally cannot reach it
+#   (requirement 10). The workflow triggers on every main push — the merge job
+#   is required on main and must always report — and its own change-detection
+#   step diff against `github.event.before` gates the dump, the skill
+#   regeneration, and the Vectorize upsert, so an unrelated main push still
+#   gets a fast, green check. Re-runs the dump to fill any summaries that
+#   slipped through (requirement 8), regenerates the skill from it, and fails
+#   when either catalog.json or SKILL.md is stale (requirement 22) before
+#   upserting the Vectorize index (requirement 9). Production deploys from
+#   main, so the committed bundled catalog and the upserted index stay in
+#   lockstep.
+#
+# The dump's `kilo run` never uses a maintainer's personal credential: both jobs
+# mint a short-lived benchmarking-service-account token from apps/web
+# (POST /api/internal/mcp-catalog/token) using MCP_CATALOG_TOKEN_SECRET, a
+# shared secret whose only purpose is that mint.
+#
+# The CI wiring of this file is asserted by scripts/kilo-mcp-catalog.test.mjs
+# (same pattern as scripts/stacked-ci.test.mjs in .github/workflows/ci.yml).
+
+on:
+  # No paths filter: `catalog (PR)` is a required status check, and a
+  # path-filtered workflow leaves that check "Expected" (blocking) on every PR
+  # it skips. The job gates its own work instead. Same for push: the merge job
+  # is required on main, so every main push triggers the workflow and the job
+  # gates its own work against the pushed diff.
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+# New commits to the same PR supersede in-progress runs; a main push must not
+# be cancelled mid-Vectorize-upsert.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-pr:
+    name: catalog (PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    # contents: write lets the bot commit the refreshed catalog back to a
+    # same-repo PR branch; pull-requests: write lets it comment on fork PRs.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # Full history so the change-detection step below can diff against the
+      # PR's base sha.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+
+      # The job always reports (required check); only the catalog's own paths
+      # justify the expensive dump. The pattern must cover two kinds of input:
+      # the artifacts themselves, and every workspace the router sources read
+      # schemas from — a schema-only change there changes catalog.json without
+      # touching apps/web. scripts/kilo-mcp-catalog.test.mjs derives that second
+      # set from the routers' imports and fails when a workspace is missing, and
+      # also asserts this pattern equals the merge job's.
+      - name: Detect catalog-relevant changes
+        id: catalog_changes
+        run: |
+          set -euo pipefail
+          # If the base object is unavailable, run the catalog work rather than
+          # skip it: a false "no changes" would break the required check's
+          # promise, while a redundant dump is harmless.
+          base="${{ github.event.pull_request.base.sha }}"
+          if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD \
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "catalog=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # The shared store keeps this install warm when a pull request moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # The dump shells out to `kilo run` to generate missing summaries.
+      # A cold install downloads large platform packages, so it legitimately
+      # takes minutes, and its postinstall can run a nested npm install. The
+      # version is resolved first so the cache key and the pinned install name
+      # the same release; the tree is cached per version below.
+      - name: Resolve Kilo CLI version
+        id: kilo_cli_version
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        timeout-minutes: 2
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 60))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Resolving the Kilo CLI version did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Could not resolve the Kilo CLI version from the registry"
+          exit 1
+
+      # The installed tree is one release per platform and is ~200 MB
+      # compressed, so the cache only pays off when the prefix holds exactly the
+      # resolved version. A miss, or a cache failure, costs the registry install
+      # and never fails the job. An entry that fails the check in the install
+      # step is not replaced under an unchanged key, so it costs that install in
+      # every job until the release changes.
+      #
+      # This job only reads the entry: a save from a pull_request run is scoped
+      # to that pull request, so it would upload the tree once per
+      # catalog-relevant PR and only that PR's later runs could restore it. The
+      # merge job writes the entry on main, and every PR restores that one.
+      - name: Restore Kilo CLI
+        id: kilo_cli_cache
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        continue-on-error: true
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ runner.temp }}/kilo-cli
+          # The tree holds the @kilocode/cli-<os>-<arch> platform packages, so an
+          # entry from another architecture cannot be reused.
+          key: ${{ runner.os }}-${{ runner.arch }}-kilo-cli-${{ steps.kilo_cli_version.outputs.version }}
+
+      # One stalled registry request would hold the runner until the job
+      # timeout, so the miss path bounds the whole install with a budget instead
+      # of bounding each attempt: a slow but moving download gets to finish, an
+      # early failure is retried, and a stall fails this step by name instead of
+      # cancelling the job.
+      - name: Install Kilo CLI
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        timeout-minutes: 14
+        env:
+          KILO_CLI_PREFIX: ${{ runner.temp }}/kilo-cli
+          KILO_CLI_VERSION: ${{ steps.kilo_cli_version.outputs.version }}
+          CACHE_HIT: ${{ steps.kilo_cli_cache.outputs.cache-hit }}
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget. Inherited by the postinstall's
+          # nested npm install as well.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          echo "$KILO_CLI_PREFIX/bin" >> "$GITHUB_PATH"
+
+          manifest="$KILO_CLI_PREFIX/lib/node_modules/@kilocode/cli/package.json"
+          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
+
+          # A miss, a tree of another version, or a tree the binary cannot start
+          # from takes the registry path.
+          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$KILO_CLI_VERSION" ] \
+            && "$KILO_CLI_PREFIX/bin/kilo" --version > /dev/null 2>&1; then
+            echo "Restored @kilocode/cli@$installed from the cache"
+            "$KILO_CLI_PREFIX/bin/kilo" --version
+            exit 0
+          fi
+
+          rm -rf "$KILO_CLI_PREFIX"
+          deadline=$((SECONDS + 720))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install --global --prefix "$KILO_CLI_PREFIX" "@kilocode/cli@$KILO_CLI_VERSION" --no-audit --no-fund; then
+              installed=$(node -p "require('$manifest').version")
+              if [ "$installed" != "$KILO_CLI_VERSION" ]; then
+                echo "::error::Installed @kilocode/cli@$installed but resolved version $KILO_CLI_VERSION"
+                exit 1
+              fi
+              "$KILO_CLI_PREFIX/bin/kilo" --version
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Kilo CLI install did not finish"
+          exit 1
+
+      # One install pass serves both the wiring check and the dump: the root
+      # project the check reads, the web closure the dump parses, and
+      # `cloud-agent-next`. That last project is not in web's dependency
+      # closure, but `apps/web/src/routers/cloud-agent-next-schemas.ts` imports
+      # schemas from it by relative path. Without that project installed, its
+      # bare `zod` import falls back to pnpm's hoisted copy, which can be a
+      # different version from the one the tests use, and the dump then rewrites
+      # the catalog with that version's JSON Schema output. Scripts stay
+      # enabled, as they are for the merge job, so the web closure's postinstalls
+      # run the way they do there.
+      - name: Install dependencies
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        run: pnpm install --frozen-lockfile --filter 'web...' --filter cloud-agent-next --filter kilocode-monorepo
+
+      - name: Check catalog workflow wiring
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        run: node --test scripts/kilo-mcp-catalog.test.mjs
+
+      # Same dummies the jest suite already tolerates (ci.yml does the same for
+      # the production build). The dump itself layers apps/web/.env.test under
+      # any real env, and dotenv never overrides exported values, so the minted
+      # token below always wins over any placeholder.
+      - name: Setup dummy env
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        working-directory: apps/web
+        run: cp .env.test .env
+
+      # Mint a short-lived token for the benchmarking service account so the
+      # dump's `kilo run` never uses a maintainer's personal credential. The
+      # mint endpoint ships with the PR that adds this step, so before that
+      # merge the endpoint 404s; the dump only needs the credential when
+      # summaries are missing, and it still fails loudly if it does.
+      - name: Mint catalog token
+        id: mint
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        continue-on-error: true
+        env:
+          MCP_CATALOG_TOKEN_SECRET: ${{ secrets.MCP_CATALOG_TOKEN_SECRET }}
+          WEB_API_BASE_URL: https://app.kilo.ai
+        run: |
+          set -euo pipefail
+          # `curl -f` discards the response body on an HTTP error, which turned
+          # a diagnosable 404 into a bare "curl: (22)". Capture the status and
+          # surface the body so the next failure names its cause.
+          status="$(curl -sS -o /tmp/catalog-mint.json -w '%{http_code}' \
+            -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+            -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
+            -H 'content-type: application/json' \
+            -d '{}')"
+          if [ "$status" != "200" ]; then
+            echo "::error::The catalog token mint returned HTTP $status: $(cat /tmp/catalog-mint.json)"
+            exit 1
+          fi
+          response="$(cat /tmp/catalog-mint.json)"
+          token="$(printf '%s' "$response" | jq -r '.token')"
+          org="$(printf '%s' "$response" | jq -r '.organizationId')"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::The catalog token mint returned no token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "KILO_API_KEY=$token" >> "$GITHUB_ENV"
+          echo "KILO_ORG_ID=$org" >> "$GITHUB_ENV"
+
+      - name: Regenerate catalog.json
+        id: dump
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        # Fork PRs never receive MCP_CATALOG_TOKEN_SECRET (GitHub withholds
+        # secrets from fork pull_request events), so a fork PR that adds a
+        # query without committed summaries always fails the dump here.
+        # Tolerate that on forks so the guidance step below can still honour
+        # requirement 6; a same-repo dump failure stays fatal.
+        continue-on-error: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
+
+      # Generate the kilo-mcp skill from the catalog.json the dump just wrote,
+      # so the skill can never fall behind the catalog. It needs no
+      # credentials: it reads the committed (and now refreshed) catalog only.
+      - name: Regenerate kilo-mcp skill
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        run: pnpm --filter web script src/scripts/mcp-catalog/skill.ts
+
+      # Requirement 6 when the dump itself cannot run: the drift-gated fork
+      # steps below never see a diff (the dump exits without writing), so this
+      # step posts the recovery that works without CI credentials — the
+      # keep-edit rule preserves hand-written summaries in the committed
+      # catalog — and fails the job. Must run before drift detection.
+      - name: Guide fork PR past an un-runnable catalog dump
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.dump.outcome == 'failure' &&
+          github.event.pull_request.head.repo.fork == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMENT_BODY: >-
+            The MCP catalog dump failed on this fork PR. Fork PRs never get
+            CI's catalog credentials (GitHub withholds secrets from fork
+            events), so summaries for new query paths cannot be generated here.
+            To recover, hand-write a summary for each new path in
+            `services/kilo-mcp/catalog.json` (committed summaries are kept by
+            the dump), or run
+            `pnpm --filter web script src/scripts/mcp-catalog/dump.ts`
+            locally with your own signed-in Kilo CLI (`kilo auth login`) and
+            push. If the log shows a different error than missing credentials,
+            fix that and push.
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$COMMENT_BODY" || true
+          echo "::error::The MCP catalog dump failed on this fork PR (fork PRs get no catalog credentials). Hand-write a summary for each new path in services/kilo-mcp/catalog.json — the dump keeps committed summaries — or run the dump locally with a signed-in Kilo CLI and push."
+          exit 1
+
+      # Drift covers both generated artifacts: a hand-edited skill marks the PR
+      # stale exactly like a stale catalog.
+      - name: Detect catalog and skill drift
+        id: drift
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        run: |
+          if git diff --exit-code -- services/kilo-mcp/catalog.json .kilo/skills/kilo-mcp/SKILL.md > /dev/null; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Same-repo PR: commit the catalog and the generated skill to the PR
+      # branch under the actions-bot identity (requirement 5). The dump's
+      # keep-edit rule means an author-edited summary in the committed file
+      # survives the regen, so this push never reverts a human edit.
+      - name: Commit catalog and skill to PR branch
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          cp services/kilo-mcp/catalog.json /tmp/catalog.json
+          cp .kilo/skills/kilo-mcp/SKILL.md /tmp/kilo-mcp-SKILL.md
+          # apps/web/.env is tracked and the dummy-env copy dirties it; reset
+          # the worktree so the branch switch below cannot be refused.
+          git checkout -- services/kilo-mcp/catalog.json .kilo/skills/kilo-mcp/SKILL.md apps/web/.env
+          git fetch --no-tags origin "refs/heads/$HEAD_BRANCH"
+          git checkout -B "$HEAD_BRANCH" FETCH_HEAD
+          cp /tmp/catalog.json services/kilo-mcp/catalog.json
+          cp /tmp/kilo-mcp-SKILL.md .kilo/skills/kilo-mcp/SKILL.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/kilo-mcp/catalog.json .kilo/skills/kilo-mcp/SKILL.md
+          git diff --cached --quiet || git commit -m "chore(kilo-mcp): refresh catalog.json and SKILL.md from CI"
+          git push origin "HEAD:$HEAD_BRANCH"
+
+      # Fork PR: GITHUB_TOKEN cannot push to the fork, so hand the author the
+      # patch and fail loudly instead of silently leaving the artifacts stale
+      # (requirement 6).
+      - name: Export catalog and skill patch (fork PRs)
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
+        run: git diff -- services/kilo-mcp/catalog.json .kilo/skills/kilo-mcp/SKILL.md > catalog.patch
+
+      - name: Upload catalog patch artifact
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: catalog.patch
+          path: catalog.patch
+
+      # Best-effort: GitHub forces GITHUB_TOKEN read-only on fork PR events,
+      # so this 403s unless a write-capable token is configured. continue-on-error
+      # keeps the job failing with the deliberate ::error annotation below rather
+      # than with a raw comment-permission failure.
+      - name: Comment on fork PR
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMENT_BODY: >-
+            The MCP catalog or the kilo-mcp skill is stale and this PR comes
+            from a fork, so CI cannot commit
+            `services/kilo-mcp/catalog.json` or
+            `.kilo/skills/kilo-mcp/SKILL.md`: download the `catalog.patch`
+            artifact of
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            and apply it, or run
+            `pnpm --filter web script src/scripts/mcp-catalog/dump.ts` and
+            `pnpm --filter web script src/scripts/mcp-catalog/skill.ts` locally
+            and push.
+        run: gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$COMMENT_BODY"
+
+      - name: Fail fork PR with a stale catalog or skill
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
+        run: |
+          echo "::error::services/kilo-mcp/catalog.json or .kilo/skills/kilo-mcp/SKILL.md is stale and cannot be committed from a fork PR. Apply the catalog.patch artifact attached to this run, or run the dump and the skill generator locally and push."
+          exit 1
+
+  catalog-merge:
+    name: catalog + Vectorize (main)
+    # Main pushes only — a pull_request run can never reach this job, so no PR
+    # writes to Vectorize (requirement 10).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      # Full history so the change-detection step can diff the pushed commit
+      # against `github.event.before`.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+
+      # The job always reports (required on main); only the catalog's own paths
+      # justify the expensive dump and the Vectorize upsert. The pattern is the
+      # PR job's, byte for byte — scripts/kilo-mcp-catalog.test.mjs asserts the
+      # equality and derives the workspace set the router sources read.
+      - name: Detect catalog-relevant changes
+        id: merge_changes
+        run: |
+          set -euo pipefail
+          # If the pushed commit's parent is unavailable (first push, forced
+          # push, unknown `before`), run the catalog work rather than skip it: a
+          # false "no changes" would break the required check's promise, while a
+          # redundant dump is harmless.
+          before="${{ github.event.before }}"
+          if ! git rev-parse --verify "${before}^{commit}" > /dev/null 2>&1; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$before" HEAD \
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "catalog=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.merge_changes.outputs.catalog == 'true'
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # The shared store keeps this install warm when a main push moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        if: steps.merge_changes.outputs.catalog == 'true'
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        if: steps.merge_changes.outputs.catalog == 'true'
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # The dump shells out to `kilo run` to fill any straggler summaries. Same
+      # version resolution and per-version cache as the PR job: the key and the
+      # pinned install name the same release, so a restored tree is either that
+      # release or falls back to the registry.
+      - name: Resolve Kilo CLI version
+        id: kilo_cli_version
+        if: steps.merge_changes.outputs.catalog == 'true'
+        timeout-minutes: 2
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 60))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Resolving the Kilo CLI version did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Could not resolve the Kilo CLI version from the registry"
+          exit 1
+
+      # The only writer of the Kilo CLI tree: this job runs on main, so its
+      # entry is visible to every catalog PR, which restores it with
+      # actions/cache/restore and never saves its own. A miss or a cache failure
+      # costs the registry install and never fails the job.
+      - name: Restore Kilo CLI
+        id: kilo_cli_cache
+        if: steps.merge_changes.outputs.catalog == 'true'
+        continue-on-error: true
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ runner.temp }}/kilo-cli
+          # The tree holds the @kilocode/cli-<os>-<arch> platform packages, so an
+          # entry from another architecture cannot be reused.
+          key: ${{ runner.os }}-${{ runner.arch }}-kilo-cli-${{ steps.kilo_cli_version.outputs.version }}
+
+      # Same budget as the PR job: a slow download gets to finish, and a stalled
+      # registry request costs minutes instead of the job timeout.
+      - name: Install Kilo CLI
+        if: steps.merge_changes.outputs.catalog == 'true'
+        timeout-minutes: 14
+        env:
+          KILO_CLI_PREFIX: ${{ runner.temp }}/kilo-cli
+          KILO_CLI_VERSION: ${{ steps.kilo_cli_version.outputs.version }}
+          CACHE_HIT: ${{ steps.kilo_cli_cache.outputs.cache-hit }}
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget. Inherited by the postinstall's
+          # nested npm install as well.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          echo "$KILO_CLI_PREFIX/bin" >> "$GITHUB_PATH"
+
+          manifest="$KILO_CLI_PREFIX/lib/node_modules/@kilocode/cli/package.json"
+          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
+
+          # A miss, a tree of another version, or a tree the binary cannot start
+          # from takes the registry path.
+          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$KILO_CLI_VERSION" ] \
+            && "$KILO_CLI_PREFIX/bin/kilo" --version > /dev/null 2>&1; then
+            echo "Restored @kilocode/cli@$installed from the cache"
+            "$KILO_CLI_PREFIX/bin/kilo" --version
+            exit 0
+          fi
+
+          rm -rf "$KILO_CLI_PREFIX"
+          deadline=$((SECONDS + 720))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install --global --prefix "$KILO_CLI_PREFIX" "@kilocode/cli@$KILO_CLI_VERSION" --no-audit --no-fund; then
+              installed=$(node -p "require('$manifest').version")
+              if [ "$installed" != "$KILO_CLI_VERSION" ]; then
+                echo "::error::Installed @kilocode/cli@$installed but resolved version $KILO_CLI_VERSION"
+                exit 1
+              fi
+              "$KILO_CLI_PREFIX/bin/kilo" --version
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Kilo CLI install did not finish"
+          exit 1
+
+      # Same install scope as the PR job: the dump statically imports schemas
+      # from `cloud-agent-next`, so that project must be installed for its
+      # `zod` to resolve to the workspace version rather than the hoisted one.
+      - name: Install web dependencies
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: pnpm install --frozen-lockfile --filter web... --filter cloud-agent-next
+
+      - name: Setup dummy env
+        if: steps.merge_changes.outputs.catalog == 'true'
+        working-directory: apps/web
+        run: cp .env.test .env
+
+      # The first main run after this workflow lands may race the apps/web
+      # deploy that adds the mint endpoint; the dump only needs the credential
+      # when summaries are missing, so a failed mint is tolerated here too.
+      - name: Mint catalog token
+        if: steps.merge_changes.outputs.catalog == 'true'
+        id: mint
+        continue-on-error: true
+        env:
+          MCP_CATALOG_TOKEN_SECRET: ${{ secrets.MCP_CATALOG_TOKEN_SECRET }}
+          WEB_API_BASE_URL: https://app.kilo.ai
+        run: |
+          set -euo pipefail
+          # `curl -f` discards the response body on an HTTP error, which turned
+          # a diagnosable 404 into a bare "curl: (22)". Capture the status and
+          # surface the body so the next failure names its cause.
+          status="$(curl -sS -o /tmp/catalog-mint.json -w '%{http_code}' \
+            -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+            -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
+            -H 'content-type: application/json' \
+            -d '{}')"
+          if [ "$status" != "200" ]; then
+            echo "::error::The catalog token mint returned HTTP $status: $(cat /tmp/catalog-mint.json)"
+            exit 1
+          fi
+          response="$(cat /tmp/catalog-mint.json)"
+          token="$(printf '%s' "$response" | jq -r '.token')"
+          org="$(printf '%s' "$response" | jq -r '.organizationId')"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::The catalog token mint returned no token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "KILO_API_KEY=$token" >> "$GITHUB_ENV"
+          echo "KILO_ORG_ID=$org" >> "$GITHUB_ENV"
+
+      # Fill any summaries that slipped through before the index is updated
+      # (requirement 8); keep-edit semantics leave author edits alone.
+      - name: Regenerate catalog.json
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
+
+      # Regenerate the skill from the catalog the dump just wrote, so the
+      # committed skill cannot drift from its source on main either.
+      - name: Regenerate kilo-mcp skill
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: pnpm --filter web script src/scripts/mcp-catalog/skill.ts
+
+      # The bundled catalog a production deploy serves must match the index this
+      # run upserts. If the dump or the skill generator changes the checked-in
+      # files, main was stale (the PR job never landed the refresh): fail
+      # instead of indexing content the Worker bundle does not carry
+      # (requirement 22).
+      - name: Fail if the regenerated catalog or skill is not the committed one
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: |
+          if ! git diff --exit-code -- services/kilo-mcp/catalog.json .kilo/skills/kilo-mcp/SKILL.md > /dev/null; then
+            echo "::error::The dump or the skill generator changed services/kilo-mcp/catalog.json or .kilo/skills/kilo-mcp/SKILL.md on main. Commit the regenerated artifacts before the Vectorize upsert; otherwise the deployed Worker bundle and the index diverge."
+            exit 1
+          fi
+
+      # The ids to delete are the procedures the index was ever built from that
+      # the current catalog no longer has. That union comes from git history, not
+      # from listing the index: a full list of the production index through the
+      # REST API times out, and a single-step diff would strand the ids of a run
+      # whose prune failed (the next run no longer sees them in its base).
+      # Deleting an id the index never had is a no-op.
+      - name: Collect every id the index was ever built from
+        id: prune_ids
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/catalog-ever-ids.txt"
+          : > "$out"
+          for sha in $(git log --format=%H -- services/kilo-mcp/catalog.json); do
+            git show "${sha}:services/kilo-mcp/catalog.json" 2>/dev/null | jq -r 'keys[]' >> "$out" || true
+          done
+          sort -u "$out" -o "$out"
+          echo "file=$out" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert Vectorize index and prune removed procedures
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: node services/kilo-mcp/scripts/embed-catalog.ts upsert
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: e115e769bcdd4c3d66af59d3332cb394
+          VECTORIZE_INDEX_NAME: kilo-mcp-catalog
+          MCP_CATALOG_PRUNE_IDS: ${{ steps.prune_ids.outputs.file }}

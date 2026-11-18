@@ -10,15 +10,143 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/text';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type CollapsibleSectionProps = {
   title: string;
   defaultExpanded?: boolean;
+  /** Controlled expanded state. When set, the parent owns it and `onToggle` is
+   *  the only way it changes; omit it to keep the internal (uncontrolled) state. */
+  expanded?: boolean;
+  /** Called on every header press, before the uncontrolled fallback toggles. */
+  onToggle?: () => void;
+  /**
+   * Whether siblings above this section may mount or resize asynchronously.
+   * A layout transition animates this box's position, and Reanimated keeps the
+   * box painted at its pre-change position until the transition ends, so
+   * siblings that shifted are covered. Pass `false` for such a section: opacity
+   * fades stay safe and the position snap does not lag. `profile-screen.tsx`
+   * names the same hazard on a sibling section; see `DisclosureLayout` for the
+   * transition it drops.
+   */
+  animateLayout?: boolean;
+  /**
+   * The surface inset the section supplies around its header and body. The
+   * header's frame is the row, so it has to carry this inset itself; a caller
+   * that wants a wider card picks a preset here instead of padding the card,
+   * which would leave the row's frame short of the card's edges.
+   */
+  inset?: keyof typeof SECTION_INSET_CLASSES;
   className?: string;
-  children: ReactNode;
+  titleClassName?: string;
+  contentClassName?: string;
+  /**
+   * The section body, or a function that builds it. Pass the function when the
+   * body is expensive to build (a long list, per-row formatting): it is
+   * evaluated only inside the expanded branch, so a collapsed section costs
+   * nothing but its header. A plain node is still rendered as given.
+   */
+  children: ReactNode | (() => ReactNode);
 };
+
+/**
+ * The insets a section's surface supplies. The header and the body read the
+ * same entry, so the row's frame stays flush with the card's edges and the body
+ * keeps the horizontal and bottom inset whichever preset a caller picks.
+ */
+const SECTION_INSET_CLASSES = {
+  standard: { header: 'px-3 pt-3 pb-3', body: 'px-3 pb-3' },
+  roomy: { header: 'px-4 pt-4 pb-4', body: 'px-4 pb-4' },
+} as const;
+
+/**
+ * The rotating disclosure carat, shared so the app animates a carat in one
+ * place. `targetAngle` is the angle the carat settles at (180 is up, 0 is
+ * down); each caller owns its own direction. Reanimated ships the same
+ * implementation on iOS and Android, so this animates both platforms with one
+ * implementation and is not a platform fork. Reduced motion jumps straight to
+ * the angle instead of a 200ms timing.
+ */
+function useDisclosureRotation(targetAngle: 0 | 180) {
+  const { reducedMotion } = useMotionPolicy();
+  const rotation = useSharedValue(targetAngle);
+
+  useEffect(() => {
+    rotation.value = reducedMotion ? targetAngle : withTiming(targetAngle, { duration: 200 });
+  }, [targetAngle, reducedMotion, rotation]);
+
+  return useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+}
+
+/**
+ * Height transition for a block that grows or shrinks — the same Reanimated
+ * layout transition on iOS and Android, so one implementation covers both and
+ * the change animates instead of snapping. Reduced motion drops the transition.
+ *
+ * `animateLayout={false}` drops it too, for a section whose siblings above it
+ * mount or resize asynchronously, and for a caller that stacks this block under
+ * plain siblings in a scroll column: the transition interpolates this block's
+ * frame while the siblings snap, so for its 200ms it can be drawn over the row
+ * above it (the new-session connect card over the repository picker, e5 spot
+ * check, 2026-09-21). Reanimated has no way to clip a transition to its own
+ * box, so the caller that cannot afford the overlap opts out.
+ */
+export function DisclosureLayout({
+  className,
+  animateLayout = true,
+  children,
+}: Readonly<{ className?: string; animateLayout?: boolean; children: ReactNode }>) {
+  const { reducedMotion } = useMotionPolicy();
+
+  return (
+    <Animated.View
+      layout={reducedMotion || !animateLayout ? undefined : LinearTransition.duration(200)}
+      className={className}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * The disclosure carat as its own pressable, for a row that already owns an
+ * action: the two stay siblings, because a nested pressable disappears from
+ * assistive technology inside an accessible parent. It points down when
+ * expanded and up when collapsed, the goal row's affordance; `label` names the
+ * action the carat performs and `expanded` is what the carat points at.
+ */
+export function DisclosureChevron({
+  expanded,
+  label,
+  onPress,
+}: Readonly<{
+  expanded: boolean;
+  label: string;
+  onPress: () => void;
+}>) {
+  const colors = useThemeColors();
+  const chevronStyle = useDisclosureRotation(expanded ? 0 : 180);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      className="h-6 w-6 shrink-0 items-center justify-center active:opacity-70"
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={label}
+    >
+      <Animated.View style={chevronStyle}>
+        <ChevronDown size={16} color={colors.mutedForeground} />
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 // Shared collapsible section for finding-details/-analysis/-remediation
 // panels (source record, technical report, attempt history) — the
@@ -28,46 +156,70 @@ type CollapsibleSectionProps = {
 export function CollapsibleSection({
   title,
   defaultExpanded = false,
+  expanded,
+  onToggle,
+  animateLayout = true,
+  inset = 'standard',
   className,
+  titleClassName,
+  contentClassName,
   children,
 }: Readonly<CollapsibleSectionProps>) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  // A controlled parent wins over the internal state so the persisted value
+  // (s3's connect card) is what the chevron, the body, and a11y report.
+  const resolvedExpanded = expanded ?? internalExpanded;
   const colors = useThemeColors();
-  const rotation = useSharedValue(defaultExpanded ? 180 : 0);
-
-  useEffect(() => {
-    rotation.value = withTiming(expanded ? 180 : 0, { duration: 200 });
-  }, [expanded, rotation]);
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  const { reducedMotion } = useMotionPolicy();
+  // This section's carat points up while it is expanded ("collapse me").
+  const chevronStyle = useDisclosureRotation(resolvedExpanded ? 180 : 0);
+  const insetClasses = SECTION_INSET_CLASSES[inset];
 
   return (
-    <Animated.View
-      layout={LinearTransition.duration(200)}
-      className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
+    <DisclosureLayout
+      className={cn('rounded-lg bg-secondary', className)}
+      animateLayout={animateLayout}
     >
+      {/* The card is the surface; this pressable's own box is the row. It
+          carries the section's inset and ROW_TARGET_CLASS — the shared 48 dp
+          row frame, which also clears DESIGN.md's 44 pt — so the whole row a
+          reader sees is the row a tap and the control audit measure, instead of
+          a 28 dp text line leaning on a `hitSlop` the audit cannot read. A
+          title that wraps grows the frame with its own text, and the inset stays
+          a property of this box, so no caller padding can desynchronise the
+          frame from the card's edges. */}
       <Pressable
-        className="flex-row items-center justify-between gap-2"
-        hitSlop={12}
+        className={cn(
+          ROW_TARGET_CLASS,
+          'flex-row items-center justify-between gap-2',
+          insetClasses.header
+        )}
         onPress={() => {
-          setExpanded(current => !current);
+          onToggle?.();
+          if (expanded === undefined) {
+            setInternalExpanded(current => !current);
+          }
         }}
         accessibilityRole="button"
-        accessibilityState={{ expanded }}
+        accessibilityState={{ expanded: resolvedExpanded }}
         accessibilityLabel={title}
       >
-        <Text className="flex-1 text-sm font-medium">{title}</Text>
+        <Text className={cn('flex-1 text-sm font-medium', titleClassName)}>{title}</Text>
         <Animated.View style={chevronStyle}>
           <ChevronDown size={16} color={colors.mutedForeground} />
         </Animated.View>
       </Pressable>
-      {expanded && (
-        <Animated.View entering={FadeIn.duration(150)} className="gap-2">
-          {children}
+      {resolvedExpanded && (
+        <Animated.View
+          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+          className={cn('gap-2', insetClasses.body, contentClassName)}
+        >
+          {
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the children union has no non-typeof way to tell a body builder from a rendered node
+            typeof children === 'function' ? children() : children
+          }
         </Animated.View>
       )}
-    </Animated.View>
+    </DisclosureLayout>
   );
 }

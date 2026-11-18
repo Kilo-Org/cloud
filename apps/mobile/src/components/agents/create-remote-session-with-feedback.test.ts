@@ -1,10 +1,9 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  CREATE_REMOTE_SESSION_FALLBACK_MESSAGE,
-  createRemoteSessionWithFeedback,
-} from '@/components/agents/create-remote-session-with-feedback';
+import { i18n } from '@/i18n';
+
+import { createRemoteSessionWithFeedback } from '@/components/agents/create-remote-session-with-feedback';
 
 describe('createRemoteSessionWithFeedback', () => {
   it('returns success and the new session ID when create resolves', async () => {
@@ -39,6 +38,6 @@ describe('createRemoteSessionWithFeedback', () => {
 
     expect(result).toEqual({ success: false });
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(CREATE_REMOTE_SESSION_FALLBACK_MESSAGE);
+    expect(onError).toHaveBeenCalledWith(i18n.t('agentChat.remoteSession.failedToCreate'));
   });
 });

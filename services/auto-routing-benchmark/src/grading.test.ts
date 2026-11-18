@@ -3,6 +3,7 @@ import type { ClassifierOutput } from '@kilocode/auto-routing-contracts';
 import {
   CLASSIFIER_FIELD_WEIGHTS,
   gradeClassifierOutput,
+  gradeDeciderOutput,
   normalizeAnswer,
   runDeciderCheck,
   type ClassifierExpectation,
@@ -128,5 +129,73 @@ describe('runDeciderCheck: json_equal', () => {
     expect(runDeciderCheck({ kind: 'json_equal', value: { a: 1, b: 2 } }, '{"b": 2, "a": 1}')).toBe(
       false
     );
+  });
+});
+
+describe('gradeDeciderOutput', () => {
+  const check = {
+    kind: 'judged',
+    rubric: 'Explains the trade-off',
+    reference: 'A reference',
+  } as const;
+
+  it('passes through the judge probability and cost', async () => {
+    const result = await gradeDeciderOutput(check, {
+      userPrompt: 'Choose a design',
+      output: 'An answer',
+      judge: async input => {
+        expect(input).toEqual({
+          userPrompt: 'Choose a design',
+          output: 'An answer',
+          rubric: check.rubric,
+          reference: check.reference,
+        });
+        return { probability: 0.73, costUsd: 0.002 };
+      },
+    });
+    expect(result).toEqual({ score: 0.73, costUsd: 0.002, graderError: null });
+  });
+
+  it('reports unavailable judging as retryable without a final score', async () => {
+    expect(await gradeDeciderOutput(check, { userPrompt: '', output: '', judge: null })).toEqual({
+      score: null,
+      costUsd: 0,
+      graderError: 'Decider judge is unavailable',
+    });
+  });
+
+  it('reports a judge failure', async () => {
+    const result = await gradeDeciderOutput(check, {
+      userPrompt: '',
+      output: '',
+      judge: async () => {
+        throw new Error('Provider failed');
+      },
+    });
+    expect(result).toEqual({ score: null, costUsd: 0, graderError: 'Decider judge failed' });
+  });
+
+  it.each([-0.1, 1.1, NaN, Infinity])('rejects invalid probability %s', async probability => {
+    const result = await gradeDeciderOutput(check, {
+      userPrompt: '',
+      output: '',
+      judge: async () => ({ probability, costUsd: 0 }),
+    });
+    expect(result.score).toBeNull();
+    expect(result.graderError).toBe('Decider judge failed');
+  });
+
+  it.each([
+    { check: { kind: 'exact', value: 'YES' } as const, output: 'yes', score: 1 },
+    { check: { kind: 'exact', value: 'YES' } as const, output: 'no', score: 0 },
+    { check: { kind: 'contains_all', values: ['a', 'b'] } as const, output: 'BA', score: 1 },
+    { check: { kind: 'regex', pattern: '^42$' } as const, output: '42', score: 1 },
+    { check: { kind: 'json_equal', value: { a: 1 } } as const, output: '{"a":1}', score: 1 },
+  ])('preserves mechanical verdicts: $output', async ({ check, output, score }) => {
+    expect(await gradeDeciderOutput(check, { userPrompt: '', output, judge: null })).toEqual({
+      score,
+      costUsd: 0,
+      graderError: null,
+    });
   });
 });

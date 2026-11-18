@@ -1,5 +1,5 @@
 import { createHash, createHmac } from 'crypto';
-import { USER_DELETION_AUDIT_HMAC_KEY } from '@/lib/config.server';
+import { USER_DELETION_AUDIT_HMAC_KEY } from '@/lib/web-config.server';
 
 export class DeletionHmacError extends Error {
   constructor(message: string) {
@@ -30,6 +30,24 @@ export function hmacDeletionEmail(normalizedEmail: string, key = getDeletionHmac
 
 export function deletionAdvisoryLockKey(normalizedEmail: string): bigint {
   return createHash('sha256').update(normalizedEmail, 'utf8').digest().readBigInt64BE(0);
+}
+
+export function deletionTicketAdvisoryLockKey(ticket: string): bigint {
+  return createHash('sha256')
+    .update(`pylon-ticket:${ticket.replace(/^#/, '')}`, 'utf8')
+    .digest()
+    .readBigInt64BE(0);
+}
+
+export function deletionRequestAuditHmac(params: {
+  targetEmailHmac?: string | null;
+  pylonTicketRef?: string | null;
+}): string {
+  if (params.targetEmailHmac) return params.targetEmailHmac;
+  if (params.pylonTicketRef) {
+    return hmacDeletionEmail(`ticket:${params.pylonTicketRef.replace(/^#/, '')}`);
+  }
+  return hmacDeletionEmail('unresolved');
 }
 
 export function hmacResourceRef(resourceId: string, key = getDeletionHmacKey()): string {

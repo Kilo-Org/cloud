@@ -1,0 +1,1 @@
+ALTER TABLE "magic_link_tokens" ADD COLUMN "legacy_attempts" integer DEFAULT 0 NOT NULL;

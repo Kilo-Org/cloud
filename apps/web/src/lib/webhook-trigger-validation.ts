@@ -1,5 +1,14 @@
 import * as z from 'zod';
 
+export const webhookTriggerModeSchema = z
+  .string()
+  .min(1, 'Agent mode is required')
+  .max(50, 'Agent mode must be 50 characters or less')
+  .regex(
+    /^(?!custom$)[a-z][a-z0-9-]*$/,
+    'Use a named agent other than custom, starting with a lowercase letter and containing only lowercase letters, numbers, and hyphens'
+  );
+
 /**
  * Reserved trigger IDs that cannot be used by users.
  * These are reserved for routing purposes in the UI.
@@ -42,6 +51,13 @@ export const triggerIdCreateSchema = triggerIdSchema.refine(
   id => id.length >= 8,
   'Trigger ID must be at least 8 characters'
 );
+
+// Creator-run webhooks act as a person and the inbound URL is not secret, so the
+// shared secret is the only barrier against impersonation.
+export const MIN_CREATOR_WEBHOOK_SECRET_LENGTH = 16;
+export const CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE = `Webhook auth secret must be at least ${MIN_CREATOR_WEBHOOK_SECRET_LENGTH} characters when running as the creator`;
+
+export type WebhookTriggerEditRestriction = 'creator_run' | 'role' | null;
 
 /**
  * Transform user input to a valid trigger ID format.

@@ -3,6 +3,8 @@ const SENSITIVE_HEADERS = new Set([
   'proxy-authorization',
   'cookie',
   'set-cookie',
+  'x-api-key',
+  'x-kilo-briefing-settlement',
   'x-gitlab-token',
   'x-hub-signature',
   'x-hub-signature-256',

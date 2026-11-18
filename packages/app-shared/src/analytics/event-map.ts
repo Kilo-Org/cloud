@@ -13,6 +13,8 @@
  */
 import { z } from 'zod';
 
+import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
+
 import { ORGANIZATION_ROLES } from '../organizations/roles';
 
 // ----- shared enums -------------------------------------------------------
@@ -27,18 +29,13 @@ export const ANALYTICS_OUTCOMES = [
   'ambiguous',
 ] as const;
 
-/** Legacy mobile surface values (existing payloads, unchanged). */
-export const ANALYTICS_SURFACES = ['claw', 'cloud-agent', 'remote-session'] as const;
+export const ANALYTICS_SURFACES = ['cloud-agent', 'remote-session'] as const;
 export const SESSION_OPENED_VIA = ['push', 'app'] as const;
-export const INSTANCE_ACTIONS = [
-  'destroy',
-  'redeploy',
-  'start',
-  'stop',
-  'restart_openclaw',
-] as const;
 export const PERMISSION_RESPONSES = ['once', 'always', 'reject'] as const;
 export const FEEDBACK_SENTIMENTS = ['positive', 'negative'] as const;
+export const CONSENT_OUTCOME_ACTIONS = ['accepted', 'optional_changed', 'revoked'] as const;
+export const NOTIFICATION_PERMISSION_OUTCOMES = ['granted', 'denied'] as const;
+export const NOTIFICATION_TOKEN_ACTIONS = ['registered', 'unregistered'] as const;
 
 /** App cold-start outcome values (mirrors apps/mobile/src/lib/startup-timing.ts). */
 export const STARTUP_OUTCOMES = [
@@ -48,17 +45,7 @@ export const STARTUP_OUTCOMES = [
   'force-update',
   'user-error',
   'consent-error',
-] as const;
-
-/** KiloClaw onboarding enum values (grandfathered; mirrors onboarding-events.ts). */
-export const PROVISION_FAILED_CATEGORIES = ['lock', 'quarantine', 'access', 'generic'] as const;
-export const ACCESS_REQUIRED_SUBCASES = [
-  'trial_expired',
-  'subscription_canceled',
-  'subscription_past_due',
-  'quarantined',
-  'multiple_current_conflict',
-  'non_canonical_earlybird',
+  'language-error',
 ] as const;
 
 /** Terminal-outcome base fields (DEC-05). */
@@ -70,13 +57,37 @@ export const SESSION_CREATE_FAILURE_STAGES = [
   'initial_admission',
 ] as const;
 export const SESSION_CREATE_ADMISSIONS = ['new', 'takeover'] as const;
+// The four provider-review intents beyond the GitHub set belong to the
+// GitLab/Bitbucket operation ledger (provider-review-router.ts); the ledger
+// taxonomy and the analytics vocabulary stay one list.
 export const PR_INTENTS = [
   'merge',
   'submit_review',
   'create_review_comment',
   'reply_comment',
+  'add_pr_comment',
+  'resolve_thread',
+  'unresolve_thread',
+  'enable_auto_merge',
+  'disable_auto_merge',
 ] as const;
-export const SECURITY_INTENTS = ['manual_sync', 'dismiss_finding'] as const;
+export const SECURITY_INTENTS = [
+  'manual_sync',
+  'dismiss_finding',
+  'start_analysis',
+  'apply_auto_remediation',
+] as const;
+
+/**
+ * Ledger intent per security command type. The ledger intent names predate the
+ * command tuple: the `sync` command type uses the `manual_sync` intent.
+ */
+export const SECURITY_INTENT_FOR_COMMAND_TYPE = {
+  sync: 'manual_sync',
+  dismiss_finding: 'dismiss_finding',
+  start_analysis: 'start_analysis',
+  apply_auto_remediation: 'apply_auto_remediation',
+} as const satisfies Record<SecurityCommandType, (typeof SECURITY_INTENTS)[number]>;
 export const PR_RECONCILE_RESULTS = [
   'confirmed_completed',
   'confirmed_absent',
@@ -91,8 +102,6 @@ export const MESSAGE_SENT_EVENT = 'message_sent';
 export const SESSION_CREATED_EVENT = 'session_created';
 export const PERMISSION_RESPONDED_EVENT = 'permission_responded';
 export const QUESTION_ANSWERED_EVENT = 'question_answered';
-export const CONVERSATION_CREATED_EVENT = 'conversation_created';
-export const INSTANCE_ACTION_EVENT = 'instance_action';
 export const FEEDBACK_SUBMITTED_EVENT = 'feedback_submitted';
 export const ORGANIZATION_MEMBER_INVITED_EVENT = 'organization_member_invited';
 export const KILO_PASS_PURCHASE_STARTED_EVENT = 'kilo_pass_purchase_started';
@@ -100,24 +109,26 @@ export const KILO_PASS_PURCHASE_COMPLETED_EVENT = 'kilo_pass_purchase_completed'
 export const KILO_PASS_PURCHASE_FAILED_EVENT = 'kilo_pass_purchase_failed';
 export const APP_STARTUP_EVENT = 'app_startup';
 
-// KiloClaw onboarding events. Names are locked to AppsFlyer dashboards; the
-// mobile constants live in apps/mobile/src/lib/analytics/onboarding-events.ts.
-export const ONBOARDING_ENTERED_EVENT = 'onboarding-entered';
-export const PROVISION_REQUESTED_EVENT = 'provision-requested';
-export const PROVISION_SUCCEEDED_EVENT = 'provision-succeeded';
-export const PROVISION_FAILED_EVENT = 'provision-failed';
-export const ACCESS_REQUIRED_SHOWN_EVENT = 'access-required-shown';
-export const COMPLETION_REACHED_EVENT = 'completion-reached';
 export const CLAW_WEATHER_LOCATION_SELECTED_EVENT = 'claw_weather_location_selected';
 export const CLAW_WEATHER_LOCATION_SKIPPED_EVENT = 'claw_weather_location_skipped';
 
 /** AppsFlyer-only mirrored event (raw string at the auth call site). */
 export const LOGIN_EVENT = 'login';
 
+// New accepted-phase privacy-minimal events (P1-A-07d). Each captures only the
+// stable enum (and, for consent, boolean) outcome at the authoritative client
+// or server boundary — no free text, no PII.
+export const LOGOUT_EVENT = 'logout';
+export const CONSENT_OUTCOME_EVENT = 'consent_outcome';
+export const NOTIFICATION_PERMISSION_RESPONDED_EVENT = 'notification_permission_responded';
+export const NOTIFICATION_TOKEN_UPDATED_EVENT = 'notification_token_updated';
+export const ORGANIZATION_MEMBER_JOINED_EVENT = 'organization_member_joined';
+
 // New terminal outcome events (Wave 2 ledger settle path only).
 export const SESSION_CREATE_SETTLED_EVENT = 'session_create_settled';
 export const PR_OPERATION_SETTLED_EVENT = 'pr_operation_settled';
 export const SECURITY_COMMAND_SETTLED_EVENT = 'security_command_settled';
+export const CODE_REVIEW_SETTLED_EVENT = 'code_review_settled';
 export const PURCHASE_SETTLED_EVENT = 'purchase_settled';
 
 /**
@@ -125,12 +136,6 @@ export const PURCHASE_SETTLED_EVENT = 'purchase_settled';
  * the snake-case unit test asserts this exact set and forbids additions.
  */
 export const LEGACY_EVENT_NAMES: ReadonlySet<string> = new Set([
-  ONBOARDING_ENTERED_EVENT,
-  PROVISION_REQUESTED_EVENT,
-  PROVISION_SUCCEEDED_EVENT,
-  PROVISION_FAILED_EVENT,
-  ACCESS_REQUIRED_SHOWN_EVENT,
-  COMPLETION_REACHED_EVENT,
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
   CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
 ]);
@@ -143,6 +148,7 @@ export const TERMINAL_PHASE_EVENTS = [
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  CODE_REVIEW_SETTLED_EVENT,
   PURCHASE_SETTLED_EVENT,
 ] as const;
 
@@ -189,17 +195,6 @@ export const ANALYTICS_EVENT_SCHEMAS = {
       skipped: z.boolean(),
     })
     .strict(),
-  [CONVERSATION_CREATED_EVENT]: z
-    .object({
-      surface: z.literal('claw'),
-    })
-    .strict(),
-  [INSTANCE_ACTION_EVENT]: z
-    .object({
-      surface: z.literal('claw'),
-      action: z.enum(INSTANCE_ACTIONS),
-    })
-    .strict(),
   [FEEDBACK_SUBMITTED_EVENT]: z
     .object({
       sentiment: z.enum(FEEDBACK_SENTIMENTS),
@@ -227,26 +222,35 @@ export const ANALYTICS_EVENT_SCHEMAS = {
     })
     .strict() as z.ZodType<Record<string, string | number>>,
 
-  // --- KiloClaw onboarding events (kebab-case, AppsFlyer-locked) ---
-  [ONBOARDING_ENTERED_EVENT]: z.object({}).strict(),
-  [PROVISION_REQUESTED_EVENT]: z.object({}).strict(),
-  [PROVISION_SUCCEEDED_EVENT]: z.object({}).strict(),
-  [PROVISION_FAILED_EVENT]: z
-    .object({
-      category: z.enum(PROVISION_FAILED_CATEGORIES),
-    })
-    .strict(),
-  [ACCESS_REQUIRED_SHOWN_EVENT]: z
-    .object({
-      subcase: z.enum(ACCESS_REQUIRED_SUBCASES),
-    })
-    .strict(),
-  [COMPLETION_REACHED_EVENT]: z.object({}).strict(),
   [CLAW_WEATHER_LOCATION_SELECTED_EVENT]: z.object({}).strict(),
   [CLAW_WEATHER_LOCATION_SKIPPED_EVENT]: z.object({}).strict(),
 
   // AppsFlyer-only mirrored auth event (no properties today).
   [LOGIN_EVENT]: z.object({}).strict(),
+
+  // --- new accepted-phase privacy-minimal events (P1-A-07d) ---
+  [LOGOUT_EVENT]: z.object({}).strict(),
+  [CONSENT_OUTCOME_EVENT]: z
+    .object({
+      action: z.enum(CONSENT_OUTCOME_ACTIONS),
+      optional: z.boolean(),
+    })
+    .strict(),
+  [NOTIFICATION_PERMISSION_RESPONDED_EVENT]: z
+    .object({
+      outcome: z.enum(NOTIFICATION_PERMISSION_OUTCOMES),
+    })
+    .strict(),
+  [NOTIFICATION_TOKEN_UPDATED_EVENT]: z
+    .object({
+      action: z.enum(NOTIFICATION_TOKEN_ACTIONS),
+    })
+    .strict(),
+  [ORGANIZATION_MEMBER_JOINED_EVENT]: z
+    .object({
+      role: z.enum(ORGANIZATION_ROLES),
+    })
+    .strict(),
 
   // --- new terminal outcome events (DEC-05 base fields) ---
   [SESSION_CREATE_SETTLED_EVENT]: z
@@ -276,6 +280,14 @@ export const ANALYTICS_EVENT_SCHEMAS = {
       intent: z.enum(SECURITY_INTENTS),
       repo_count: metric.optional(),
       error_count: metric.optional(),
+      duration_ms: metric,
+    })
+    .strict(),
+  [CODE_REVIEW_SETTLED_EVENT]: z
+    .object({
+      ...terminalBase,
+      surface: z.literal('code_review'),
+      intent: z.enum(['manual', 'webhook']),
       duration_ms: metric,
     })
     .strict(),

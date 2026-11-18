@@ -1,40 +1,502 @@
+import React, {
+  act,
+  createElement,
+  useEffect,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { createRequire } from 'node:module';
+import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
+import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
+import type { ChatHeader } from './ChatHeader';
+import type { SetPageTitle } from '@/components/SetPageTitle';
+import type { WorktreeChangesView } from './WorktreeChanges';
+import type { WorkspaceArtifactsView } from './WorkspaceArtifacts';
+import type { ConversationMessages } from './assistant-ui/test-renderers';
+import type { StoredMessage, StoredSession } from './types';
+import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
+import type { useWorktreeReview } from './useWorktreeReview';
+import type { WorktreeReviewDialog } from './WorktreeReviewDialog';
+import type { WorktreeReviewComment } from './worktree-review';
+import type {
+  usePreviewController as UsePreviewController,
+  PreviewControllerInput,
+} from './use-preview-controller';
+import { worktreeFileIdentity } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   CHAT_TAB_ID,
   addTerminalTab,
   closeTerminalTab,
   createWorkspaceTabsState,
+  fileTabId,
+  getWorkspaceTabScope,
   resetWorkspaceTabs,
   selectWorkspaceTab,
+  terminalIdFromTabId,
   terminalTabId,
-} from './terminal-tabs';
+} from './workspace-tabs';
+
+Object.assign(globalThis, { React });
+
+let mockSessionId: string | null = 'ses_recent';
+let mockAtParam: string | null = null;
+let mockWorktreeId: string | null = 'worktree_shared';
+let mockTabs: ComponentProps<typeof CloudAgentWorkspaceTabs>;
+let mockReview: Partial<ReturnType<typeof useWorktreeReview>> = { scope: null };
+let mockReviewDialog: ComponentProps<typeof WorktreeReviewDialog>;
+let mockChanges: ComponentProps<typeof WorktreeChangesView>;
+let mockArtifacts: ComponentProps<typeof WorkspaceArtifactsView>;
+let mockConversation: ComponentProps<typeof ConversationMessages>;
+let mockAtomValues: Record<string, unknown>;
+let mockPageTitle: ComponentProps<typeof SetPageTitle>;
+let mockParentSession:
+  | { session_id: string; title: string | null; organization_id: string | null }
+  | undefined;
+const mockSkipToken = Symbol('skip');
+const mockParentQuery = jest.fn();
+const mockPreviewOptions = jest.fn(
+  (_target: unknown, _organizationId?: string): string | null => null
+);
+const mockParentQueryOptions = jest.fn((input: unknown) => ({
+  queryKey: [['worktreeParent'], input],
+}));
+const mockClosedPtys: string[] = [];
+const mockChats = [
+  {
+    sessionId: 'ses_recent',
+    cloudAgentSessionId: 'workspace_recent',
+    worktreeId: 'worktree_shared',
+  },
+  {
+    sessionId: 'ses_historical',
+    cloudAgentSessionId: 'workspace_historical',
+    worktreeId: 'worktree_shared',
+  },
+] as StoredSession[];
+const mockSetAtom = jest.fn();
+const mockOpenSession = jest.fn();
+const mockRequestOlderMessages = jest.fn();
+let mockChatInput: Record<string, unknown> | null = null;
+const mockManager = {
+  atoms: new Proxy({}, { get: (_target, key) => key }),
+  switchSession: jest.fn(),
+  destroy: jest.fn(),
+  send: jest.fn(async () => true),
+};
+const mockQueryClient = { invalidateQueries: jest.fn(), query: jest.fn() };
+const mockUploadEndpoint = { mutationOptions: () => ({}) };
+const mockWorkspaceSnapshotRecovery = {
+  queryOptions: (input: unknown) => ({ queryKey: [['getWorkspaceSnapshotRecovery'], input] }),
+  pathFilter: () => ({ queryKey: [['getWorkspaceSnapshotRecovery']] }),
+};
+const mockCloudAgentNext = {
+  getAttachmentUploadUrl: mockUploadEndpoint,
+  getWorkspaceSnapshotRecovery: mockWorkspaceSnapshotRecovery,
+};
+const mockGetWithRuntimeState = { queryOptions: (input: unknown) => input };
+const mockTrpc = {
+  cloudAgentNext: mockCloudAgentNext,
+  organizations: { cloudAgentNext: mockCloudAgentNext },
+  cliSessionsV2: {
+    getWithRuntimeState: mockGetWithRuntimeState,
+    worktreeParent: { queryOptions: mockParentQueryOptions },
+  },
+};
+
+jest.mock('jotai', () => ({
+  useAtomValue: (key: string) => mockAtomValues[key] ?? null,
+  useSetAtom: () => mockSetAtom,
+}));
+jest.mock('next/navigation', () => ({
+  useSearchParams: () =>
+    new URLSearchParams({
+      ...(mockSessionId ? { sessionId: mockSessionId } : {}),
+      ...(mockAtParam ? { at: mockAtParam } : {}),
+    }),
+}));
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: ComponentProps<'a'>) => createElement('a', props, children),
+}));
+jest.mock('@tanstack/react-query', () => ({
+  skipToken: mockSkipToken,
+  queryOptions: (options: unknown) => options,
+  useMutation: () => ({ mutateAsync: jest.fn() }),
+  useQuery: (options: { queryKey: unknown[] }) => {
+    const queryScope = options.queryKey[0];
+    if ((queryScope as unknown[] | undefined)?.[0] === 'getWorkspaceSnapshotRecovery') {
+      return { data: undefined };
+    }
+    mockParentQuery(options);
+    return { data: options.queryKey[1] === mockSkipToken ? undefined : mockParentSession };
+  },
+  useQueryClient: () => mockQueryClient,
+}));
+jest.mock('@/lib/trpc/utils', () => ({
+  useTRPC: () => mockTrpc,
+  useRawTRPCClient: () => ({ cliSessionsV2: { worktreeParent: { query: jest.fn() } } }),
+}));
+jest.mock('./useSavedWorktreeChanges', () => ({
+  useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
+}));
+jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
+jest.mock('./useChatStackInfo', () => ({ useChatStackInfo: () => null }));
+jest.mock('./use-preview', () => ({
+  ...jest.requireActual('./use-preview'),
+  usePreviewUrlTemplate: (target: unknown, organizationId?: string) =>
+    mockPreviewOptions(target, organizationId),
+  useOpenPreview: () => ({ openPreview: jest.fn(), isOpening: false }),
+}));
+jest.mock('./CloudAgentProvider', () => ({
+  useManager: () => mockManager,
+  useCloudAgent: () => ({}),
+}));
+jest.mock('./useWorktreeReview', () => ({ useWorktreeReview: () => mockReview }));
+jest.mock('./WorktreeReviewDialog', () => ({
+  WorktreeReviewDialog: (props: ComponentProps<typeof WorktreeReviewDialog>) => {
+    mockReviewDialog = props;
+    return null;
+  },
+}));
+jest.mock('./CloudSidebarLayout', () => ({
+  useWorktreeChatCreation: () => ({
+    createWorktreeChat: jest.fn(),
+    creatingWorktreeSourceSessionId: null,
+  }),
+  useWorktreeChatTabs: () => ({
+    selectedWorktreeId: mockWorktreeId,
+    // Like the real sidebar, which lists only chats of the selected worktree in this scope.
+    worktreeChats: mockWorktreeId ? mockChats : [],
+    openWorktreeChats: mockWorktreeId ? mockChats : [],
+    closedWorktreeChats: [],
+    deletingSessionIds: [],
+    openSession: mockOpenSession,
+    closeSession: jest.fn(),
+    renameSession: jest.fn(),
+  }),
+}));
+jest.mock('./CloudAgentWorkspaceTabs', () => ({
+  CloudAgentWorkspaceTabs: (props: ComponentProps<typeof CloudAgentWorkspaceTabs>) => {
+    mockTabs = props;
+    return null;
+  },
+}));
+jest.mock('./CloudAgentTerminalDock', () => ({
+  CloudAgentTerminalPane: ({
+    cloudAgentSessionId,
+    organizationId,
+  }: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+  }) => {
+    useEffect(
+      () => () => void mockClosedPtys.push(cloudAgentSessionId),
+      [cloudAgentSessionId, organizationId]
+    );
+    return createElement('pre', { 'data-pty-owner': cloudAgentSessionId });
+  },
+}));
+jest.mock('@/hooks/useCloudAgentProfiles', () => ({
+  useCombinedProfiles: () => ({}),
+  useProfiles: () => ({}),
+  useProfile: () => ({}),
+}));
+jest.mock('@/hooks/useCloudAgentEnvironments', () => ({
+  useCloudAgentEnvironment: () => ({ data: undefined }),
+}));
+jest.mock('@/hooks/useSlashCommandSets', () => ({
+  useSlashCommandSets: () => ({ availableCommands: [] }),
+}));
+jest.mock('@/hooks/useCelebrationSound', () => ({
+  useCelebrationSound: () => ({ play: jest.fn(), soundEnabled: false, setSoundEnabled: jest.fn() }),
+}));
+jest.mock('@/hooks/useCliSessionPresence', () => ({ useCliSessionPresence: jest.fn() }));
+jest.mock('./hooks/useSessionModels', () => ({
+  useSessionModels: () => ({
+    modelOptions: [],
+    gatewayContextLengthByModelId: new Map(),
+    remoteContextLengthByProviderAndModel: new Map(),
+  }),
+}));
+jest.mock('./older-messages-scroll', () => ({
+  useOlderMessagesPagination: () => ({
+    requestOlderMessages: mockRequestOlderMessages,
+    tryLoadOlderFromScroll: jest.fn(),
+  }),
+  shouldAnnounceOlderMessagesArrival: () => false,
+}));
+jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
+jest.mock('./ChatHeader', () => ({
+  ChatHeader: ({
+    onToggleChanges,
+    changesOpen,
+    onToggleArtifacts,
+    artifactsOpen,
+  }: ComponentProps<typeof ChatHeader>) =>
+    createElement(
+      'div',
+      null,
+      onToggleChanges
+        ? createElement('button', {
+            'data-changes-trigger': true,
+            'aria-expanded': changesOpen,
+            onClick: onToggleChanges,
+          })
+        : null,
+      onToggleArtifacts
+        ? createElement('button', {
+            'data-artifacts-trigger': true,
+            'aria-expanded': artifactsOpen,
+            onClick: onToggleArtifacts,
+          })
+        : null
+    ),
+}));
+jest.mock('./WorkspaceArtifacts', () => ({
+  WorkspaceArtifactsView: (props: ComponentProps<typeof WorkspaceArtifactsView>) => {
+    mockArtifacts = props;
+    return props.open
+      ? createElement('aside', {
+          'data-artifacts-owner': props.cloudAgentSessionId,
+          id: 'workspace-artifacts-panel',
+        })
+      : null;
+  },
+}));
+jest.mock('./WorktreeChanges', () => ({
+  WorktreeChangesView: (props: ComponentProps<typeof WorktreeChangesView>) => {
+    mockChanges = props;
+    const { cloudAgentSessionId, organizationId, open } = props;
+    const [selected, setSelected] = useState(false);
+    useEffect(() => {
+      if (!open) setSelected(false);
+    }, [open]);
+    return createElement(
+      'aside',
+      {
+        'data-changes-owner': cloudAgentSessionId,
+        'data-changes-organization': organizationId ?? 'personal',
+        hidden: !open,
+      },
+      createElement('button', {
+        'data-changes-select': true,
+        onClick: () => setSelected(true),
+      }),
+      selected ? createElement('pre', { 'data-changes-diff': true }) : null
+    );
+  },
+}));
+jest.mock('./WorktreeFilePane', () => ({
+  WorktreeFilePane: ({
+    cloudAgentSessionId,
+    organizationId,
+    path,
+    scope,
+  }: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+    path: string;
+    scope?: WorktreeReviewComment['anchor']['capture']['scope'];
+  }) =>
+    createElement('pre', {
+      'data-file-owner': cloudAgentSessionId,
+      'data-file-organization': organizationId ?? 'personal',
+      'data-file-path': path,
+      'data-file-scope': scope,
+    }),
+}));
+jest.mock('./assistant-ui/CloudComposer', () => ({
+  CloudComposer: (props: Record<string, unknown>) => {
+    mockChatInput = props;
+    return createElement('input', { 'data-composer': true });
+  },
+}));
+jest.mock('./assistant-ui/CloudChatRuntimeProvider', () => ({
+  CloudChatRuntimeProvider: ({
+    projection,
+    children,
+  }: {
+    projection: {
+      messages: StoredMessage[];
+      commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
+    };
+    children: ReactNode;
+  }) => {
+    mockConversation = {
+      ...projection,
+      staticMessages: projection.messages,
+      dynamicMessages: [],
+      pendingMessages: new Map(),
+      preparationByMessageId: new Map(),
+    };
+    return children;
+  },
+}));
+jest.mock('./assistant-ui/CloudThread', () => ({
+  CloudThread: () => createElement('section', { 'data-conversation': true }),
+}));
+jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
+jest.mock('./ChildSessionDrawer', () => ({ ChildSessionDrawer: () => null }));
+jest.mock('./PreparationDrawer', () => ({ PreparationDrawer: () => null }));
+jest.mock('./SessionContinuationPanel', () => ({ SessionContinuationPanel: () => null }));
+jest.mock('@/components/SetPageTitle', () => ({
+  SetPageTitle: (props: ComponentProps<typeof SetPageTitle>) => {
+    mockPageTitle = props;
+    return props.subtitle ?? null;
+  },
+}));
+jest.mock('./QuestionContext', () => ({
+  QuestionContextProvider: ({ children }: { children: ReactNode }) => children,
+}));
+jest.mock('./PermissionCard', () => ({
+  PermissionContextProvider: ({ children }: { children: ReactNode }) => children,
+  PermissionCard: () => null,
+}));
+jest.mock('./SuggestionCard', () => ({
+  SuggestionContextProvider: ({ children }: { children: ReactNode }) => children,
+}));
+
+function installTerminalTestDom() {
+  const requireFromHere = createRequire(__filename);
+  const { parseHTML } = requireFromHere(
+    '../../../../../node_modules/.pnpm/linkedom@0.18.12/node_modules/linkedom'
+  ) as { parseHTML: (html: string) => { window: typeof globalThis; document: Document } };
+  const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>');
+  const previous = {
+    window: globalThis.window,
+    document: globalThis.document,
+    HTMLElement: globalThis.HTMLElement,
+    Element: globalThis.Element,
+    Node: globalThis.Node,
+    getComputedStyle: globalThis.getComputedStyle,
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+    cancelAnimationFrame: globalThis.cancelAnimationFrame,
+    IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT,
+  };
+  Object.assign(globalThis, {
+    window,
+    document,
+    HTMLElement: window.HTMLElement,
+    Element: window.Element,
+    Node: window.Node,
+    getComputedStyle: () => ({ animationName: 'none', display: 'block' }),
+    requestAnimationFrame: () => 0,
+    cancelAnimationFrame: () => {},
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  const container = document.getElementById('root');
+  if (!container) throw new Error('Missing terminal test root');
+  return { container, cleanup: () => Object.assign(globalThis, previous) };
+}
+
+describe('preview dialog lifecycle', () => {
+  let usePreviewController: typeof UsePreviewController;
+  let dom: ReturnType<typeof installTerminalTestDom>;
+  let root: Root;
+  const input: PreviewControllerInput = {
+    selectedWorktreeId: 'worktree_shared',
+    sessionId: 'workspace_recent',
+    canOpenPreview: true,
+    organizationId: undefined,
+  };
+
+  function PreviewControllerTest(props: PreviewControllerInput) {
+    const preview = usePreviewController(props);
+    return createElement(
+      'button',
+      { onClick: preview.openDialog, 'data-dialog-open': preview.dialog?.open },
+      'Preview'
+    );
+  }
+
+  function render(props: Partial<PreviewControllerInput> = {}) {
+    act(() => root.render(createElement(PreviewControllerTest, { ...input, ...props })));
+  }
+
+  const dialogOpen = () => dom.container.querySelector('button')?.getAttribute('data-dialog-open');
+
+  beforeAll(async () => {
+    ({ usePreviewController } = await import('./use-preview-controller'));
+  });
+
+  beforeEach(() => {
+    mockPreviewOptions.mockReturnValue('https://preview.example/{port}');
+    dom = installTerminalTestDom();
+    root = createRoot(dom.container);
+    render();
+    act(() => dom.container.querySelector('button')?.click());
+    expect(dialogOpen()).toBe('true');
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    dom.cleanup();
+    mockPreviewOptions.mockReturnValue(null);
+  });
+
+  it('stays closed when preview access returns for the same cached target', () => {
+    render({ canOpenPreview: false });
+    expect(dialogOpen()).toBeNull();
+    render();
+    expect(dialogOpen()).toBe('false');
+    act(() => dom.container.querySelector('button')?.click());
+    expect(dialogOpen()).toBe('true');
+  });
+
+  it.each<Partial<PreviewControllerInput>>([
+    { selectedWorktreeId: 'worktree_other' },
+    { organizationId: 'organization_other' },
+    { selectedWorktreeId: null, sessionId: 'workspace_other' },
+  ])('closes when the preview scope changes: %j', props => {
+    render(props);
+    expect(dialogOpen()).toBe('false');
+  });
+
+  it('stays open across chats within the same worktree', () => {
+    render({ sessionId: 'workspace_sibling' });
+    expect(dialogOpen()).toBe('true');
+  });
+});
 
 describe('cloud agent workspace terminal tabs', () => {
   it('starts on the chat tab without terminals', () => {
     expect(createWorkspaceTabsState()).toEqual({
       activeTabId: CHAT_TAB_ID,
+      files: [],
       terminals: [],
       nextTerminalNumber: 1,
     });
   });
 
-  it('adds terminal tabs with stable ids and human labels', () => {
-    const first = addTerminalTab(createWorkspaceTabsState(), 'tab-a');
-    const second = addTerminalTab(first, 'tab-b');
+  it('adds terminal tabs with stable ids, human labels, and their original session owners', () => {
+    const first = addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a');
+    const second = addTerminalTab(first, 'tab-b', 'cloud-agent-session-b');
 
     expect(second).toEqual({
       activeTabId: terminalTabId('tab-b'),
       nextTerminalNumber: 3,
+      files: [],
       terminals: [
-        { id: 'tab-a', title: 'Terminal 1' },
-        { id: 'tab-b', title: 'Terminal 2' },
+        { id: 'tab-a', title: 'Terminal 1', cloudAgentSessionId: 'cloud-agent-session-a' },
+        { id: 'tab-b', title: 'Terminal 2', cloudAgentSessionId: 'cloud-agent-session-b' },
       ],
     });
   });
 
+  it('distinguishes chat from terminal IDs', () => {
+    expect(terminalIdFromTabId(CHAT_TAB_ID)).toBeNull();
+    expect(terminalIdFromTabId(terminalTabId('tab-a'))).toBe('tab-a');
+  });
+
   it('selects chat and existing terminal tabs only', () => {
-    const state = addTerminalTab(createWorkspaceTabsState(), 'tab-a');
+    const state = addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a');
 
     expect(selectWorkspaceTab(state, CHAT_TAB_ID).activeTabId).toBe(CHAT_TAB_ID);
+    expect(selectWorkspaceTab(state, 'changes')).toBe(state);
+    expect(selectWorkspaceTab(state, 'unknown')).toBe(state);
     expect(selectWorkspaceTab(state, terminalTabId('tab-a')).activeTabId).toBe(
       terminalTabId('tab-a')
     );
@@ -43,31 +505,1158 @@ describe('cloud agent workspace terminal tabs', () => {
 
   it('keeps the current tab when a background terminal closes', () => {
     const state = selectWorkspaceTab(
-      addTerminalTab(addTerminalTab(createWorkspaceTabsState(), 'tab-a'), 'tab-b'),
+      addTerminalTab(
+        addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a'),
+        'tab-b',
+        'cloud-agent-session-b'
+      ),
       terminalTabId('tab-a')
     );
 
     expect(closeTerminalTab(state, 'tab-b')).toEqual({
       activeTabId: terminalTabId('tab-a'),
       nextTerminalNumber: 3,
-      terminals: [{ id: 'tab-a', title: 'Terminal 1' }],
+      files: [],
+      terminals: [
+        { id: 'tab-a', title: 'Terminal 1', cloudAgentSessionId: 'cloud-agent-session-a' },
+      ],
     });
   });
 
   it('activates the left neighbor when the active terminal closes', () => {
-    const state = addTerminalTab(addTerminalTab(createWorkspaceTabsState(), 'tab-a'), 'tab-b');
+    const state = addTerminalTab(
+      addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a'),
+      'tab-b',
+      'cloud-agent-session-b'
+    );
 
     expect(closeTerminalTab(state, 'tab-b')).toEqual({
       activeTabId: terminalTabId('tab-a'),
       nextTerminalNumber: 3,
-      terminals: [{ id: 'tab-a', title: 'Terminal 1' }],
+      files: [],
+      terminals: [
+        { id: 'tab-a', title: 'Terminal 1', cloudAgentSessionId: 'cloud-agent-session-a' },
+      ],
     });
   });
 
+  it('activates the right neighbor when the first active terminal closes', () => {
+    const state = selectWorkspaceTab(
+      addTerminalTab(
+        addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a'),
+        'tab-b',
+        'cloud-agent-session-b'
+      ),
+      terminalTabId('tab-a')
+    );
+
+    expect(closeTerminalTab(state, 'tab-a')).toEqual({
+      activeTabId: terminalTabId('tab-b'),
+      nextTerminalNumber: 3,
+      files: [],
+      terminals: [
+        { id: 'tab-b', title: 'Terminal 2', cloudAgentSessionId: 'cloud-agent-session-b' },
+      ],
+    });
+  });
+
+  it('preserves chat selection and numbering when its background terminal closes', () => {
+    const state = selectWorkspaceTab(
+      addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a'),
+      CHAT_TAB_ID
+    );
+
+    expect(closeTerminalTab(state, 'tab-a')).toEqual({
+      activeTabId: CHAT_TAB_ID,
+      files: [],
+      terminals: [],
+      nextTerminalNumber: 2,
+    });
+  });
+
+  it('ignores attempts to close a terminal that does not exist', () => {
+    const state = addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a');
+
+    expect(closeTerminalTab(state, 'missing')).toBe(state);
+  });
+
   it('returns to chat when the last terminal closes or the session resets', () => {
-    const state = addTerminalTab(createWorkspaceTabsState(), 'tab-a');
+    const state = addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a');
 
     expect(closeTerminalTab(state, 'tab-a')).toEqual(createWorkspaceTabsState());
     expect(resetWorkspaceTabs(state)).toEqual(createWorkspaceTabsState());
+  });
+});
+
+describe('CloudChatPage terminal ownership across navigation', () => {
+  let CloudChatPage: typeof CloudChatPageComponent;
+  let dom: ReturnType<typeof installTerminalTestDom>;
+  let root: Root;
+
+  beforeAll(async () => {
+    ({ CloudChatPage } = await import('./CloudChatPage'));
+    const { default: loadable } = await import('next/dist/shared/lib/loadable.shared-runtime');
+    await loadable.preloadAll();
+  });
+
+  beforeEach(() => {
+    mockReview = { scope: null };
+    mockOpenSession.mockClear();
+    mockSessionId = 'ses_recent';
+    mockAtParam = null;
+    mockWorktreeId = 'worktree_shared';
+    mockClosedPtys.length = 0;
+    mockQueryClient.query.mockReset();
+    mockParentSession = undefined;
+    mockParentQuery.mockClear();
+    mockPreviewOptions.mockClear();
+    mockParentQueryOptions.mockClear();
+    mockAtomValues = {
+      sessionId: 'workspace_recent',
+      fetchedSessionData: {
+        kiloSessionId: 'ses_recent',
+        organizationId: null,
+        worktreeId: 'worktree_shared',
+      },
+      activity: { type: 'idle' },
+      backgroundActivity: { status: 'inactive' },
+      activeSessionType: 'cloud-agent',
+      staticMessages: [],
+      dynamicMessages: [],
+      pendingMessages: new Map(),
+      resolvedDeliveryFailures: new Set(),
+      supersededInFlightMessageIds: new Set(),
+      preparationAttempts: [],
+      commits: [],
+      unreadablePermissions: [],
+      chatUI: { shouldAutoScroll: false },
+    };
+    dom = installTerminalTestDom();
+    root = createRoot(dom.container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    dom.cleanup();
+  });
+
+  function render(props: Partial<ComponentProps<typeof CloudChatPageComponent>> = {}) {
+    const { currentUserId = 'owner', ...rest } = props;
+    act(() => root.render(createElement(CloudChatPage, { ...rest, currentUserId })));
+  }
+
+  it('keeps preview workspace-scoped across main, unregistered sibling and worktree-only views', () => {
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+
+    mockSessionId = 'ses_new_sibling';
+    mockAtomValues.sessionId = null;
+    mockAtomValues.fetchedSessionData = null;
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+
+    mockSessionId = null;
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+  });
+
+  it('preserves parent navigation across sibling, terminal, and worktree-only views', () => {
+    mockParentSession = {
+      session_id: 'ses_parent',
+      title: 'Investigate login failures',
+      organization_id: null,
+    };
+    render();
+    const queryKey = mockParentQuery.mock.lastCall?.[0].queryKey;
+    const parentLink = () =>
+      dom.container.querySelector<HTMLAnchorElement>('[aria-label^="View parent session:"]');
+    expect(parentLink()?.getAttribute('href')).toBe('/cloud/chat?sessionId=ses_parent');
+
+    mockSessionId = 'ses_historical';
+    mockAtomValues.fetchedSessionData = null;
+    render();
+    expect(mockParentQuery.mock.lastCall?.[0].queryKey).toEqual(queryKey);
+    expect(parentLink()?.textContent).toContain('Investigate login failures');
+
+    resolveSession('worktree_shared');
+    openTerminal();
+    expect(parentLink()?.getAttribute('href')).toBe('/cloud/chat?sessionId=ses_parent');
+
+    mockSessionId = null;
+    render();
+    expect(mockPageTitle.title).toBe('Worktree');
+    expect(parentLink()).not.toBeNull();
+  });
+
+  it('partitions parent lookup by worktree, organization, and user without stale placeholders', () => {
+    mockParentSession = { session_id: 'ses_parent', title: 'Parent', organization_id: null };
+    render();
+    expect(mockParentQuery.mock.lastCall?.[0].queryKey).toEqual([
+      ['worktreeParent', 'owner'],
+      { worktreeId: 'worktree_shared', organizationId: null },
+    ]);
+
+    mockWorktreeId = 'worktree_other';
+    mockParentSession = undefined;
+    render({ currentUserId: 'other-owner', organizationId: 'other-org' });
+    expect(mockParentQuery.mock.lastCall?.[0].queryKey).toEqual([
+      ['worktreeParent', 'other-owner'],
+      { worktreeId: 'worktree_other', organizationId: 'other-org' },
+    ]);
+    expect(mockParentQuery.mock.lastCall?.[0]).not.toHaveProperty('placeholderData');
+    expect(dom.container.querySelector('[aria-label^="View parent session:"]')).toBeNull();
+  });
+
+  it('skips parent lookups outside a worktree', () => {
+    mockWorktreeId = null;
+    render();
+    expect(mockParentQueryOptions).toHaveBeenLastCalledWith(mockSkipToken);
+    expect(mockParentQuery.mock.lastCall?.[0].staleTime).toBe(60_000);
+    expect(mockPageTitle.subtitle).toBeNull();
+  });
+
+  it('keeps the composer and its owner mounted through read-only conversation switches', () => {
+    render();
+    const composer = dom.container.querySelector<HTMLInputElement>('[data-composer]');
+    if (!composer) throw new Error('Missing composer');
+    mockSessionId = 'ses_history';
+    mockAtomValues.isReadOnly = true;
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(composer.closest('[hidden]')).not.toBeNull();
+    mockSessionId = 'ses_writable_b';
+    mockAtomValues.isReadOnly = false;
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    mockSessionId = 'ses_recent';
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+  });
+
+  function openTerminal() {
+    act(() => mockTabs.onCreateTerminal());
+    const terminal = dom.container.querySelector('[data-pty-owner]');
+    expect(terminal).not.toBeNull();
+    return terminal;
+  }
+
+  function openChanges() {
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-changes-trigger]');
+    if (!trigger) throw new Error('Missing changes trigger');
+    act(() => trigger.click());
+    const drawer = dom.container.querySelector<HTMLElement>('[data-changes-owner]');
+    expect(drawer?.hidden).toBe(false);
+    return drawer;
+  }
+
+  function openArtifacts() {
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-artifacts-trigger]');
+    if (!trigger) throw new Error('Missing artifacts trigger');
+    act(() => trigger.click());
+    const drawer = dom.container.querySelector<HTMLElement>('[data-artifacts-owner]');
+    expect(drawer).not.toBeNull();
+    return drawer;
+  }
+
+  function resolveSession(worktreeId: string | null) {
+    mockWorktreeId = worktreeId;
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: mockSessionId,
+      organizationId: null,
+      worktreeId,
+    };
+    mockAtomValues.sessionId = `workspace_${mockSessionId}`;
+    render();
+  }
+
+  function reviewComment(
+    id: string,
+    scope?: WorktreeReviewComment['anchor']['capture']['scope'],
+    source = 'workspace_recent'
+  ): WorktreeReviewComment {
+    return {
+      id,
+      text: 'Feedback',
+      anchor: {
+        capture: {
+          userId: 'owner',
+          organizationId: undefined,
+          workspaceScope: 'worktree:worktree_shared',
+          sourceCloudAgentSessionId: source,
+          revision: 1,
+          scope,
+          capturedAt: '2026-10-13T10:00:00Z',
+          comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
+        },
+        path: 'src/example.ts',
+        range: { side: 'additions', startLine: 1, endLine: 1 },
+        quote: {
+          source: 'saved-patch',
+          lines: [{ lineNumber: 1, kind: 'addition', text: 'new\n' }],
+        },
+      },
+    };
+  }
+
+  function enableReview(comments: WorktreeReviewComment[]) {
+    const scope = {
+      userId: 'owner',
+      organizationId: undefined,
+      workspaceScope: 'worktree:worktree_shared',
+    };
+    mockReview = {
+      scope,
+      locked: false,
+      setOpen: jest.fn(),
+      destinations: mockChats.map(chat => ({
+        sessionId: chat.sessionId,
+        cloudAgentSessionId: chat.cloudAgentSessionId ?? '',
+        title: 'Chat',
+      })),
+      draft: {
+        scope,
+        comments,
+        editor: null,
+        overall: '',
+        destinationKiloSessionId: 'ses_recent',
+        allowOlderCapture: false,
+        delivery: { phase: 'idle' },
+      },
+    };
+  }
+
+  it('opens the exact review scope and preserves separate modes and closing at the same path', () => {
+    const uncommitted = reviewComment('uncommitted', 'uncommitted');
+    const committed = reviewComment('committed', 'against-base-branch');
+    enableReview([uncommitted, committed]);
+    render();
+    act(() => mockReviewDialog.onOpenComment(uncommitted));
+    expect(mockTabs.activeTabId).toBe(fileTabId(uncommitted.anchor.path, 'uncommitted'));
+    act(() => mockReviewDialog.onOpenComment(committed));
+    expect(mockTabs.activeTabId).toBe(fileTabId(committed.anchor.path, 'against-base-branch'));
+    expect(mockTabs.files).toEqual([
+      { path: committed.anchor.path, scope: 'uncommitted', mode: 'diff' },
+      { path: committed.anchor.path, scope: 'against-base-branch', mode: 'diff' },
+    ]);
+    expect(
+      dom.container
+        .querySelector('[data-file-scope="against-base-branch"]')
+        ?.getAttribute('data-file-path')
+    ).toBe(committed.anchor.path);
+    act(() => mockTabs.onCloseFile(committed.anchor.path, 'against-base-branch'));
+    expect(mockTabs.files).toEqual([
+      { path: committed.anchor.path, scope: 'uncommitted', mode: 'diff' },
+    ]);
+    expect(dom.container.querySelector('[data-file-scope="uncommitted"]')).not.toBeNull();
+  });
+
+  it('preserves review scope while navigating to its source chat before opening the file', () => {
+    const committed = reviewComment('committed', 'against-base-branch', 'workspace_historical');
+    enableReview([committed]);
+    render();
+    act(() => mockReviewDialog.onOpenComment(committed));
+    expect(mockOpenSession).toHaveBeenCalledWith('ses_historical');
+    expect(mockTabs.files).toEqual([]);
+    mockSessionId = 'ses_historical';
+    mockAtomValues.sessionId = 'workspace_historical';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_historical',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+    };
+    render();
+    expect(mockTabs.activeTabId).toBe(fileTabId(committed.anchor.path, 'against-base-branch'));
+    expect(mockTabs.files).toEqual([
+      { path: committed.anchor.path, scope: 'against-base-branch', mode: 'diff' },
+    ]);
+    expect(
+      dom.container
+        .querySelector('[data-file-scope="against-base-branch"]')
+        ?.getAttribute('data-file-owner')
+    ).toBe('workspace_historical');
+  });
+
+  it('counts review comments by exact layer and source while preserving legacy path keys', () => {
+    const comments = [
+      reviewComment('uncommitted-1', 'uncommitted'),
+      reviewComment('uncommitted-2', 'uncommitted'),
+      reviewComment('committed', 'against-base-branch'),
+      reviewComment('legacy'),
+      reviewComment('other-source', 'uncommitted', 'workspace_historical'),
+    ];
+    enableReview(comments);
+    render();
+    expect(mockChanges.commentCounts).toEqual(
+      new Map([
+        [worktreeFileIdentity({ path: comments[0].anchor.path, scope: 'uncommitted' }), 2],
+        [worktreeFileIdentity({ path: comments[0].anchor.path, scope: 'against-base-branch' }), 1],
+        [comments[0].anchor.path, 1],
+      ])
+    );
+  });
+
+  it('binds the terminal to the viewed worktree session when its route is ready', () => {
+    mockAtomValues.sessionId = 'workspace_recent';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_recent',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+      routeReady: true,
+    };
+    render();
+
+    const terminal = openTerminal();
+    expect(terminal?.getAttribute('data-pty-owner')).toBe('workspace_recent');
+  });
+
+  it('binds the terminal to the ready sibling when the viewed route is not ready', async () => {
+    mockAtomValues.sessionId = 'workspace_recent';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_recent',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+      routeReady: false,
+    };
+    mockQueryClient.query.mockImplementation(async ({ session_id }: { session_id: string }) => ({
+      runtimeState: { routeReady: session_id === 'ses_historical' },
+    }));
+    render();
+
+    await act(async () => {
+      mockTabs.onCreateTerminal();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(dom.container.querySelector('[data-pty-owner]')?.getAttribute('data-pty-owner')).toBe(
+      'workspace_historical'
+    );
+  });
+
+  it('keeps the viewed session as owner when no sibling route is ready', async () => {
+    mockAtomValues.sessionId = 'workspace_recent';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_recent',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+      routeReady: false,
+    };
+    mockQueryClient.query.mockImplementation(async () => ({
+      runtimeState: { routeReady: false },
+    }));
+    render();
+
+    await act(async () => {
+      mockTabs.onCreateTerminal();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(dom.container.querySelector('[data-pty-owner]')?.getAttribute('data-pty-owner')).toBe(
+      'workspace_recent'
+    );
+  });
+
+  it('keeps the mounted PTY and original owner through an uncached historical sibling and Back', () => {
+    render();
+    const terminal = openTerminal();
+    mockSessionId = 'ses_historical';
+    mockWorktreeId = null;
+    render();
+    expect(mockTabs.terminals).toHaveLength(1);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+
+    mockAtomValues.fetchedSessionData = null;
+    mockAtomValues.sessionId = null;
+    render();
+    resolveSession('worktree_shared');
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockTabs.terminals[0]?.cloudAgentSessionId).toBe('workspace_recent');
+    expect(mockTabs.activeTabId).toBe(CHAT_TAB_ID);
+
+    mockSessionId = 'ses_recent';
+    mockWorktreeId = null;
+    render();
+    resolveSession('worktree_shared');
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('keeps terminals when the final chat closes to the worktree-only route', () => {
+    render();
+    const terminal = openTerminal();
+    mockSessionId = null;
+    mockAtomValues.fetchedSessionData = null;
+    mockAtomValues.sessionId = null;
+    render();
+
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockTabs.terminals[0]?.cloudAgentSessionId).toBe('workspace_recent');
+    expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('passes current session progress to the matching URL session tab', () => {
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Preparing workspace' };
+    render();
+
+    expect(mockTabs.currentChatProgress).toEqual({
+      sessionId: 'ses_recent',
+      message: 'Preparing workspace',
+    });
+  });
+
+  it('does not pass stale progress while the URL and fetched session differ', () => {
+    mockSessionId = 'ses_historical';
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Preparing workspace' };
+    render();
+
+    expect(mockTabs.currentChatProgress).toBeNull();
+  });
+
+  it('does not pass progress without a URL session even when fetched session data remains', () => {
+    mockSessionId = null;
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Preparing workspace' };
+    render();
+
+    expect(mockTabs.currentChatProgress).toBeNull();
+  });
+
+  it.each([null, { type: 'error', message: 'Failed to prepare workspace' }])(
+    'does not pass a non-progress status indicator: %j',
+    statusIndicator => {
+      mockAtomValues.statusIndicator = statusIndicator;
+      render();
+
+      expect(mockTabs.currentChatProgress).toBeNull();
+    }
+  );
+
+  it('passes URL session progress while preparation suppresses the transcript status row', () => {
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Installing dependencies' };
+    mockAtomValues.preparationAttempts = [{ status: 'running', steps: [] }];
+    render();
+
+    expect(mockTabs.currentChatProgress).toEqual({
+      sessionId: 'ses_recent',
+      message: 'Installing dependencies',
+    });
+  });
+
+  it('keeps the conversation, composer and PTY mounted while a file is selected in the changes view', () => {
+    render();
+    const conversation = dom.container.querySelector('[data-conversation]');
+    const composer = dom.container.querySelector('[data-composer]');
+    const terminal = openTerminal();
+    const view = openChanges();
+    const select = view?.querySelector<HTMLButtonElement>('[data-changes-select]');
+    act(() => select?.click());
+    expect(dom.container.querySelector('[data-changes-diff]')).not.toBeNull();
+    expect(mockTabs.files).toEqual([]);
+    expect(view?.hidden).toBe(false);
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+
+    mockSessionId = 'ses_historical';
+    render();
+    // A sibling chat shares the worktree, so the same changes view stays, closed.
+    expect(dom.container.querySelector('[data-changes-owner]')).toBe(view);
+    expect(view?.hidden).toBe(true);
+    resolveSession('worktree_shared');
+    expect(dom.container.querySelector('[data-changes-owner]')).toBe(view);
+    expect(view?.getAttribute('data-changes-owner')).toBe('workspace_ses_historical');
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    // The organization's sidebar lists no chat of this worktree.
+    mockWorktreeId = null;
+    render({ organizationId: 'organization-a' });
+    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
+    expect(mockTabs.files).toEqual([]);
+  });
+
+  it('closes the changes view when a terminal becomes the active tab', () => {
+    render();
+    const view = openChanges();
+    expect(view?.hidden).toBe(false);
+
+    openTerminal();
+
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+  });
+
+  it('suppresses workspace tab selection while the changes view is open without changing the active tab', () => {
+    render();
+    const activeTabId = mockTabs.activeTabId;
+    expect(mockTabs.selectionSuppressed).toBe(false);
+
+    openChanges();
+    expect(mockTabs.selectionSuppressed).toBe(true);
+    expect(mockTabs.activeTabId).toBe(activeTabId);
+
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-changes-trigger]');
+    if (!trigger) throw new Error('Missing changes trigger');
+    act(() => trigger.click());
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    expect(mockTabs.selectionSuppressed).toBe(false);
+    expect(mockTabs.activeTabId).toBe(activeTabId);
+  });
+
+  it('shows artifacts in a drawer over the transcript without suppressing tab selection', () => {
+    render();
+    const conversation = dom.container.querySelector('[data-conversation]');
+    const composer = dom.container.querySelector('[data-composer]');
+    const activeTabId = mockTabs.activeTabId;
+    expect(mockTabs.selectionSuppressed).toBe(false);
+
+    openArtifacts();
+    expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(conversation?.closest('[inert]')).not.toBeNull();
+    expect(mockTabs.selectionSuppressed).toBe(false);
+    expect(mockTabs.activeTabId).toBe(activeTabId);
+
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-artifacts-trigger]');
+    act(() => trigger?.click());
+    expect(dom.container.querySelector('[data-artifacts-owner]')).toBeNull();
+    expect(conversation?.closest('[inert]')).toBeNull();
+  });
+
+  it('swaps between the changes view and the artifacts drawer', () => {
+    render();
+    openChanges();
+    expect(mockChanges.open).toBe(true);
+
+    openArtifacts();
+    expect(mockChanges.open).toBe(false);
+    expect(mockArtifacts.open).toBe(true);
+
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-changes-trigger]');
+    act(() => trigger?.click());
+    expect(mockArtifacts.open).toBe(false);
+    expect(mockChanges.open).toBe(true);
+  });
+
+  it('closes the artifacts drawer when a terminal becomes the active tab', () => {
+    render();
+    openArtifacts();
+
+    openTerminal();
+
+    expect(dom.container.querySelector('[data-artifacts-owner]')).toBeNull();
+  });
+
+  function receiveCommit() {
+    const commitHash = 'a'.repeat(40);
+    const commits: SessionCommit[] = [
+      {
+        commitHash,
+        commitMessage: 'Actual commit',
+        messageId: 'assistant',
+        userMessageId: 'user',
+        committedAt: '2026-09-01T10:00:00.000Z',
+        pushStatus: 'pushed',
+      },
+    ];
+    mockAtomValues.commits = commits;
+    mockAtomValues.dynamicMessages = [
+      {
+        info: {
+          id: 'assistant',
+          sessionID: 'ses_recent',
+          role: 'assistant',
+          time: { created: 1, completed: 2 },
+          parentID: 'user',
+          modelID: 'test',
+          providerID: 'test',
+          mode: 'code',
+          agent: 'code',
+          path: { cwd: '/', root: '/' },
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+        parts: [],
+      },
+    ] satisfies StoredMessage[];
+    render();
+    const anchors = mockConversation.commitsAfterMessage;
+    expect(anchors?.get('assistant')).toEqual(commits);
+    render();
+    expect(mockConversation.commitsAfterMessage).toBe(anchors);
+    return anchors;
+  }
+
+  it('adds commit metadata without changing workspace tabs, chats, the draft, or the mounted PTY', () => {
+    render();
+    const composer = dom.container.querySelector<HTMLInputElement>('[data-composer]');
+    if (!composer) throw new Error('Missing composer');
+    composer.value = 'Unsent draft';
+    const conversation = dom.container.querySelector('[data-conversation]');
+    const terminal = openTerminal();
+    const tabId = mockTabs.activeTabId;
+    const terminals = mockTabs.terminals;
+    const files = mockTabs.files;
+    const switches = mockManager.switchSession.mock.calls.length;
+    receiveCommit();
+    expect(mockTabs.activeTabId).toBe(tabId);
+    expect(mockTabs.terminals).toBe(terminals);
+    expect(mockTabs.files).toBe(files);
+    expect(mockTabs).not.toHaveProperty('commits');
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(composer.value).toBe('Unsent draft');
+    expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockSessionId).toBe('ses_recent');
+    expect(mockManager.switchSession.mock.calls.length).toBe(switches);
+    expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('withholds old commit metadata before sibling atoms resolve while preserving the worktree PTY', () => {
+    render();
+    const terminal = openTerminal();
+    receiveCommit();
+    mockSessionId = 'ses_historical';
+    mockAtomValues.dynamicMessages = [];
+    mockAtomValues.commits = [];
+    render();
+    expect(dom.container.querySelector('[data-conversation]')).toBeNull();
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+  });
+
+  it('withholds commit metadata when the organization does not match the loaded session', () => {
+    receiveCommit();
+    render({ organizationId: 'another-organization' });
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+  });
+
+  it('withholds commit metadata when access becomes read-only', () => {
+    receiveCommit();
+    mockAtomValues.isReadOnly = true;
+    render();
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+  });
+
+  it('keeps one changes view across sibling chats without replacing its worktree terminal', () => {
+    render();
+    const terminal = openTerminal();
+    const activeTabId = mockTabs.activeTabId;
+    const changes = openChanges();
+    expect(changes?.getAttribute('data-changes-owner')).toBe('workspace_recent');
+    expect(mockTabs.activeTabId).toBe(activeTabId);
+
+    mockSessionId = 'ses_historical';
+    render();
+    // While the sibling loads, the worktree's control chat serves the shared changes.
+    expect(dom.container.querySelector('[data-changes-owner]')).toBe(changes);
+    expect(changes?.getAttribute('data-changes-owner')).toBe('workspace_recent');
+    expect(dom.container.querySelector('[data-changes-trigger]')).not.toBeNull();
+
+    resolveSession('worktree_shared');
+    expect(changes?.hidden).toBe(true);
+    const siblingChanges = openChanges();
+    expect(siblingChanges).toBe(changes);
+    expect(siblingChanges?.getAttribute('data-changes-owner')).toBe('workspace_ses_historical');
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('keeps workspace changes available when the last chat closes and its session atoms clear', () => {
+    render();
+    const terminal = openTerminal();
+    openChanges();
+
+    mockSessionId = null;
+    render();
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    expect(dom.container.querySelector('[data-changes-trigger]')).not.toBeNull();
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+
+    mockAtomValues.sessionId = null;
+    mockAtomValues.fetchedSessionData = null;
+    render();
+    const workspaceChanges = openChanges();
+    expect(workspaceChanges?.getAttribute('data-changes-owner')).toBe('workspace_recent');
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+
+    mockSessionId = 'ses_recent';
+    resolveSession('worktree_shared');
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+  });
+
+  it('keeps changes hidden across organization navigation until matching session data resolves', () => {
+    render();
+    const personalChanges = openChanges();
+    expect(personalChanges?.getAttribute('data-changes-organization')).toBe('personal');
+
+    // The organization's sidebar lists no personal chat, so it selects no worktree.
+    mockWorktreeId = null;
+    render({ organizationId: 'organization-a' });
+    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
+    expect(dom.container.querySelector('[data-changes-trigger]')).toBeNull();
+
+    mockWorktreeId = 'worktree_shared';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: mockSessionId,
+      organizationId: 'organization-a',
+      worktreeId: mockWorktreeId,
+    };
+    render({ organizationId: 'organization-a' });
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    const organizationChanges = openChanges();
+    expect(organizationChanges?.getAttribute('data-changes-organization')).toBe('organization-a');
+    expect(organizationChanges).not.toBe(personalChanges);
+  });
+
+  it.each(['worktree_other', null])(
+    'closes the original PTY only after a different destination resolves to %s',
+    destinationWorktreeId => {
+      render();
+      openTerminal();
+      mockSessionId = 'ses_other';
+      mockWorktreeId = null;
+      mockAtomValues.fetchedSessionData = null;
+      render();
+      expect(mockClosedPtys).toEqual([]);
+
+      resolveSession(destinationWorktreeId);
+      expect(mockTabs.terminals).toEqual([]);
+      expect(dom.container.querySelector('[data-pty-owner]')).toBeNull();
+      expect(mockClosedPtys).toEqual(['workspace_recent']);
+    }
+  );
+
+  it.each([{ currentUserId: 'another-owner' }, { organizationId: 'another-organization' }])(
+    'resets immediately across tenant changes even while identity is unresolved: %j',
+    props => {
+      render();
+      openTerminal();
+      mockSessionId = 'ses_unresolved';
+      mockWorktreeId = null;
+      render(props);
+
+      expect(dom.container.querySelector('[data-pty-owner]')).toBeNull();
+      expect(mockClosedPtys).toEqual(['workspace_recent']);
+    }
+  );
+
+  it('resolves a direct link before opening terminals and resets when leaving all chats', () => {
+    mockWorktreeId = null;
+    mockAtomValues.fetchedSessionData = null;
+    mockAtomValues.sessionId = null;
+    render();
+    resolveSession('worktree_shared');
+    openTerminal();
+    expect(mockTabs.terminals).toHaveLength(1);
+
+    mockSessionId = null;
+    mockWorktreeId = null;
+    mockAtomValues.fetchedSessionData = null;
+    mockAtomValues.sessionId = null;
+    render();
+    expect(dom.container.querySelector('[data-pty-owner]')).toBeNull();
+    expect(mockClosedPtys).toEqual(['workspace_ses_recent']);
+  });
+
+  it('hands an unresolvable ?at= link back to the tail, like a link without it', () => {
+    mockAtParam = 'msg_gone';
+    mockAtomValues.staticMessages = [
+      {
+        info: {
+          id: 'msg_1',
+          role: 'user',
+          sessionID: 'ses_recent',
+          parentID: 'ses_recent',
+          error: null,
+        },
+        parts: [],
+      },
+    ];
+    mockSetAtom.mockClear();
+
+    render();
+
+    const chatUiWrites = mockSetAtom.mock.calls
+      .map(call => call[0] as { shouldAutoScroll?: boolean } | null)
+      .filter(
+        (value): value is { shouldAutoScroll: boolean } =>
+          typeof value === 'object' && value !== null && 'shouldAutoScroll' in value
+      );
+
+    // The resume paused follow while it looked for the anchor...
+    expect(chatUiWrites).toContainEqual({ shouldAutoScroll: false });
+    // ...and an anchor the session no longer has opens at the bottom, following
+    // new output, exactly as a link without `at=` does.
+    expect(chatUiWrites.at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  /** A transcript row the resume can group; the harness renders no DOM rows. */
+  function anchorMessage(id: string): { info: Record<string, unknown>; parts: never[] } {
+    return {
+      info: { id, role: 'user', sessionID: 'ses_recent', parentID: 'ses_recent', error: null },
+      parts: [],
+    };
+  }
+
+  /** Every `chatUI` write the render made, in order. */
+  function chatUiWrites(): { shouldAutoScroll: boolean }[] {
+    return mockSetAtom.mock.calls
+      .map(call => call[0] as { shouldAutoScroll?: boolean } | null)
+      .filter(
+        (value): value is { shouldAutoScroll: boolean } =>
+          typeof value === 'object' && value !== null && 'shouldAutoScroll' in value
+      );
+  }
+
+  it('hands a resolved but unrendered ?at= anchor back to the tail', () => {
+    mockAtParam = 'msg_1';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    // Older history exists, so the tail hand-off can only come from the anchor
+    // being resolved-but-unrendered. Without it the exhausted-history branch
+    // writes the same value and the test would not discriminate.
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+
+    // The anchor is in the loaded window, but the group that holds it drew no
+    // row. No older page can change that, so the open must land at the bottom
+    // and follow new output instead of paging for an id it already has.
+    expect(mockRequestOlderMessages).not.toHaveBeenCalled();
+    expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  it('keeps waiting when a retried older page is in flight', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    // A retry of a failed page leaves the error set while it loads (see the
+    // manager's `loadOlderMessages`), so both flags are true for the whole
+    // request.
+    mockAtomValues.isLoadingOlderMessages = true;
+    mockAtomValues.olderMessagesError = { kind: 'retryable' };
+    mockSetAtom.mockClear();
+
+    render();
+
+    // The page the resume is waiting for may hold the anchor: staying paused
+    // is the only answer that can still land it. Giving up here would open at
+    // the bottom even though the retry arrives with the anchor.
+    expect(chatUiWrites()).toContainEqual({ shouldAutoScroll: false });
+    expect(chatUiWrites()).not.toContainEqual({ shouldAutoScroll: true });
+  });
+
+  it('keeps a ?at= resume when the send is refused', async () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockManager.send.mockResolvedValueOnce(false);
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+    mockSetAtom.mockClear();
+
+    await act(async () => {
+      await (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.(
+        'hello'
+      );
+    });
+
+    // The refused send is not a position take-over: no follow write, so the
+    // reader stays where the resume left them.
+    expect(chatUiWrites()).toEqual([]);
+
+    // The transcript re-renders (the dropped optimistic row): the resume must
+    // still be pending and pause follow, exactly as it did before the send.
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+    expect(chatUiWrites()).toContainEqual({ shouldAutoScroll: false });
+  });
+
+  it('gives up a ?at= resume when an older page fails instead of waiting forever', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockAtomValues.olderMessagesError = { kind: 'retryable' };
+    mockSetAtom.mockClear();
+
+    render();
+
+    // A failed page cannot reach the anchor, and the one-shot resume would
+    // otherwise sit paused on it: give up the way a link without `at=` opens.
+    expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  it('ends a ?at= resume when a message is sent, so the send is not re-paused', async () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+
+    // The accepted send takes the position over.
+    await act(async () => {
+      await (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.(
+        'hello'
+      );
+    });
+
+    // The sent message lands and the resume effect re-runs over the new rows.
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+
+    // The send owns the position now: the effect must not pause follow again
+    // (which also cancels the send's scheduled scroll).
+    expect(chatUiWrites()).toEqual([]);
+  });
+
+  it('ends a ?at= resume when a slash command is sent, so the command is not re-paused', async () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+
+    // The accepted command takes the position over.
+    await act(async () => {
+      await (
+        mockChatInput?.onSendCommand as
+          | ((command: string, args: string) => Promise<unknown>)
+          | undefined
+      )?.('review', '');
+    });
+
+    // The command's output lands and the resume effect re-runs over the new
+    // rows. The command send owns the position now: the effect must not pause
+    // follow again (which also cancels the command's scheduled scroll).
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+
+    expect(chatUiWrites()).toEqual([]);
+  });
+
+  it('carries the selected model and variant when a slash command is sent', async () => {
+    mockAtomValues.sessionConfig = {
+      sessionId: 'workspace_recent',
+      repository: 'owner/repo',
+      mode: 'plan',
+      model: 'selected/model',
+      variant: 'high',
+      runtimeAgents: [],
+    };
+    mockManager.send.mockClear();
+    render();
+
+    await act(async () => {
+      await (
+        mockChatInput?.onSendCommand as
+          | ((command: string, args: string) => Promise<unknown>)
+          | undefined
+      )?.('review', 'main');
+    });
+
+    expect(mockManager.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          type: 'command',
+          command: 'review',
+          arguments: 'main',
+          mode: 'plan',
+          model: 'selected/model',
+          variant: 'high',
+        },
+      })
+    );
+  });
+
+  it('carries a pinned runtime-agent model and variant when a slash command is sent', async () => {
+    mockAtomValues.sessionConfig = {
+      sessionId: 'workspace_recent',
+      repository: 'owner/repo',
+      mode: 'reviewer',
+      model: 'session/model',
+      variant: 'session-variant',
+      runtimeAgents: [
+        {
+          slug: 'reviewer',
+          name: 'Reviewer',
+          model: 'pinned/model',
+          variant: 'pinned-variant',
+        },
+      ],
+    };
+    mockManager.send.mockClear();
+    render();
+
+    await act(async () => {
+      await (
+        mockChatInput?.onSendCommand as
+          | ((command: string, args: string) => Promise<unknown>)
+          | undefined
+      )?.('review', 'main');
+    });
+
+    expect(mockManager.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          type: 'command',
+          command: 'review',
+          arguments: 'main',
+          mode: 'reviewer',
+          model: 'pinned/model',
+          variant: 'pinned-variant',
+        },
+      })
+    );
+  });
+});
+
+describe('getWorkspaceTabScope', () => {
+  it('keeps sibling chats in the same worktree scope', () => {
+    const first = getWorkspaceTabScope('worktree-a', 'session-a');
+    const second = getWorkspaceTabScope('worktree-a', 'session-b');
+
+    expect(first).toBe('worktree:worktree-a');
+    expect(second).toBe(first);
+  });
+
+  it('isolates distinct worktrees even when their session identity matches', () => {
+    expect(getWorkspaceTabScope('worktree-a', 'shared-session')).toBe('worktree:worktree-a');
+    expect(getWorkspaceTabScope('worktree-b', 'shared-session')).toBe('worktree:worktree-b');
+  });
+
+  it('isolates standalone sessions from each other and grouped identities', () => {
+    expect(getWorkspaceTabScope(null, 'session-a')).toBe('session:session-a');
+    expect(getWorkspaceTabScope(undefined, 'session-b')).toBe('session:session-b');
+    expect(getWorkspaceTabScope('shared-id', 'shared-id')).toBe('worktree:shared-id');
+    expect(getWorkspaceTabScope(null, 'shared-id')).toBe('session:shared-id');
+  });
+
+  it('returns null when no worktree or standalone session is available', () => {
+    expect(getWorkspaceTabScope(null, null)).toBeNull();
+    expect(getWorkspaceTabScope(undefined, undefined)).toBeNull();
+    expect(getWorkspaceTabScope(null, undefined)).toBeNull();
+    expect(getWorkspaceTabScope(undefined, null)).toBeNull();
   });
 });

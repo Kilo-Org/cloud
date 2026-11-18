@@ -46,7 +46,6 @@ import { syncInstanceTypeToPostgresHelper } from './postgres';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
-import { maybeDispatchStartFailurePush } from './lifecycle-push';
 
 export type FinalizeDestroyRetention = {
   entries: Record<string, unknown>;
@@ -147,14 +146,11 @@ export async function maybeEmitDestroyStuckTelemetry(
 }
 
 /**
- * Record a start-attempt failure: write the analytics event and dispatch the
- * one-shot mobile push for this attempt. Single entry point so callers can't
- * accidentally emit one without the other.
+ * Record a start-attempt failure: write the analytics event for this attempt.
  */
 async function recordStartFailure(
   env: KiloClawEnv,
   state: InstanceMutableState,
-  ctx: DurableObjectState,
   label: string,
   error?: string | null
 ): Promise<void> {
@@ -166,7 +162,6 @@ async function recordStartFailure(
     error: error ?? undefined,
     ...eventContextFromState(state),
   });
-  await maybeDispatchStartFailurePush(env, state, ctx, label, error);
 }
 
 /**
@@ -240,8 +235,6 @@ export async function reconcileWithFly(
   await reconcileApiKeyExpiry(flyConfig, ctx, state, env, rctx);
   return result;
 }
-
-// ---- API key proactive refresh ----
 
 const MINT_TIMEOUT_MS = 15_000;
 
@@ -400,8 +393,6 @@ async function reconcileApiKeyExpiry(
   });
 }
 
-// ---- Starting reconciliation ----
-
 /**
  * Reconcile a 'starting' instance.
  *
@@ -447,7 +438,7 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      await recordStartFailure(env, state, ctx, 'starting_timeout', state.lastStartErrorMessage);
+      await recordStartFailure(env, state, 'starting_timeout', state.lastStartErrorMessage);
       return;
     }
     // start() hasn't persisted a machine ID yet — still in progress, wait.
@@ -494,7 +485,6 @@ async function reconcileStarting(
       await recordStartFailure(
         env,
         state,
-        ctx,
         'starting_timeout_with_machine',
         state.lastStartErrorMessage
       );
@@ -523,13 +513,7 @@ async function reconcileStarting(
           })
         )
       );
-      await recordStartFailure(
-        env,
-        state,
-        ctx,
-        'starting_machine_gone',
-        'machine gone during start'
-      );
+      await recordStartFailure(env, state, 'starting_machine_gone', 'machine gone during start');
     } else if (isTimedOut) {
       // Transient Fly API error but we've exceeded the starting timeout.
       // Fall back to 'stopped' so the user can retry instead of staying
@@ -556,7 +540,6 @@ async function reconcileStarting(
       await recordStartFailure(
         env,
         state,
-        ctx,
         'starting_timeout_transient_error',
         err instanceof Error ? err.message : String(err)
       );
@@ -761,8 +744,6 @@ async function reconcileRestarting(
   }
 }
 
-// ---- Volume reconciliation ----
-
 async function reconcileVolume(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
@@ -771,7 +752,7 @@ async function reconcileVolume(
   rctx: ReconcileContext
 ): Promise<void> {
   if (!state.flyVolumeId) {
-    const providerState = await ensureVolume(
+    const { providerState } = await ensureVolume(
       flyConfig,
       state,
       getFlyProviderState(state),
@@ -800,7 +781,7 @@ async function reconcileVolume(
       await ctx.storage.put(
         storageUpdate(syncProviderStateForStorage(state, { flyVolumeId: null }))
       );
-      const providerState = await ensureVolume(
+      const { providerState, adoptedVolumeId } = await ensureVolume(
         flyConfig,
         state,
         getFlyProviderState(state),
@@ -817,7 +798,7 @@ async function reconcileVolume(
         )
       );
       rctx.log('replace_lost_volume', {
-        data_loss: true,
+        data_loss: adoptedVolumeId === null,
         old_volume_id: oldVolumeId,
         new_volume_id: state.flyVolumeId,
         durationMs: performance.now() - repairStart,
@@ -834,8 +815,6 @@ async function reconcileVolume(
     }
   }
 }
-
-// ---- Machine reconciliation ----
 
 /**
  * @returns true if machine state was conclusively determined.
@@ -1113,7 +1092,6 @@ export async function syncStatusWithFly(
       await recordStartFailure(
         rctx.env,
         state,
-        ctx,
         'fly_failed_state',
         'fly machine entered failed state'
       );
@@ -1395,9 +1373,7 @@ async function handleMachineGone(
   );
 }
 
-// ========================================================================
 // Two-phase destroy helpers
-// ========================================================================
 
 const MACHINE_ID_RE = /^[a-z0-9]+$/;
 

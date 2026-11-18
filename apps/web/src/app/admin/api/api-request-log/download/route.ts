@@ -1,10 +1,30 @@
 import { connection, type NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
-import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
-import archiver from 'archiver';
-import { Readable } from 'node:stream';
+import * as z from 'zod';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { api_request_log_2 } from '@kilocode/db/schema';
+import { and, gte, lte, eq, asc, gt, count, inArray, like, or, type SQL } from 'drizzle-orm';
+import {
+  apiRequestLogBlobKey,
+  apiRequestLogBlobSchema,
+  getApiRequestLogBlob,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
+import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
+import { adminActionContextFromHeaders, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  formatTimestamp,
+  isJson,
+  jsonError,
+  logExportAuditDetails,
+  logExportFilename,
+  parseLogExportFilters,
+  streamBatchedZipExport,
+  tryFormatJson,
+  zipDownloadResponse,
+  type LogExportFilters,
+} from '@/lib/admin/log-export';
+import { escapeLikePattern } from '@/lib/sql-like';
+import { MAX_LOG_EXPORT_IDS, splitIdList } from '@/lib/admin/log-export-ids';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -12,237 +32,178 @@ import { Readable } from 'node:stream';
 // extract it ("Error 79 - Inappropriate file type or format").
 export const maxDuration = 800;
 
-const BATCH_SIZE = 25;
+const BATCH_SIZE = 10;
 
-function formatTimestamp(isoString: string): string {
-  return isoString.replaceAll(':', '-').replaceAll(' ', '_');
-}
+type Row = { id: string; created_at: string };
 
-function tryFormatJson(value: unknown): string {
-  if (typeof value === 'string') {
-    try {
-      return JSON.stringify(JSON.parse(value), null, 2);
-    } catch {
-      return value;
-    }
+type LoadedBlob = { files: { kind: string; value: string | null }[] } | { loadError: string };
+
+async function loadBlob(row: Row): Promise<LoadedBlob> {
+  let key: string;
+  try {
+    key = apiRequestLogBlobKey(row);
+  } catch (error) {
+    return { loadError: `Failed to derive the R2 key of ${row.id}: ${String(error)}` };
   }
-  if (value !== null && value !== undefined) {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return String(value);
-    }
+  let body: string | null;
+  try {
+    body = await getApiRequestLogBlob(key);
+  } catch (error) {
+    return { loadError: `Failed to load ${key} from R2: ${String(error)}` };
   }
-  return '';
-}
-
-function isJson(value: unknown): boolean {
-  if (typeof value === 'object' && value !== null) return true;
-  if (typeof value === 'string') {
-    try {
-      JSON.parse(value);
-      return true;
-    } catch {
-      return false;
-    }
+  if (body === null) {
+    return { loadError: `Failed to load ${key} from R2: Object not found` };
   }
-  return false;
-}
-
-function parseDate(value: string): Date | null {
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return null;
-  return d;
-}
-
-function jsonError(message: string, status: number) {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  try {
+    const blob = apiRequestLogBlobSchema.parse(JSON.parse(body));
+    return {
+      files: [
+        { kind: 'request', value: JSON.stringify(blob.request) },
+        { kind: 'response', value: blob.response },
+        ...(blob.enkrypt?.length ? [{ kind: 'enkrypt', value: JSON.stringify(blob.enkrypt) }] : []),
+        ...(blob.error ? [{ kind: 'error', value: JSON.stringify(blob.error) }] : []),
+      ],
+    };
+  } catch {
+    return { loadError: `Failed to decode ${key} from R2: Invalid API request log envelope` };
+  }
 }
 
 function buildFilter(
-  userId: string | null,
-  parsedStart: Date | null,
-  parsedEnd: Date | null,
-  model: string | null,
-  sessionId: string | null,
-  errorsOnly: boolean
+  { userId, organizationId, start, end, modelPrefix, sessionId }: LogExportFilters,
+  ids: string[],
+  generationIds: string[]
 ) {
   const conditions: SQL[] = [];
+  if (ids.length > 0) {
+    conditions.push(inArray(api_request_log_2.id, ids));
+  }
+  if (generationIds.length > 0) {
+    conditions.push(inArray(api_request_log_2.generation_id, generationIds));
+  }
   if (userId) {
-    conditions.push(eq(api_request_log.kilo_user_id, userId));
+    conditions.push(eq(api_request_log_2.kilo_user_id, userId));
   }
-  if (parsedStart) {
-    conditions.push(gte(api_request_log.created_at, parsedStart.toISOString()));
+  if (organizationId) {
+    conditions.push(eq(api_request_log_2.organization_id, organizationId));
   }
-  if (parsedEnd) {
-    conditions.push(lte(api_request_log.created_at, parsedEnd.toISOString()));
+  if (start) {
+    conditions.push(gte(api_request_log_2.created_at, start.toISOString()));
   }
-  if (model) {
-    conditions.push(eq(api_request_log.model, model));
+  if (end) {
+    conditions.push(lte(api_request_log_2.created_at, end.toISOString()));
+  }
+  if (modelPrefix) {
+    conditions.push(like(api_request_log_2.requested_model, `${escapeLikePattern(modelPrefix)}%`));
   }
   if (sessionId) {
-    conditions.push(eq(api_request_log.session_id, sessionId));
-  }
-  if (errorsOnly) {
-    const errorsCondition = or(
-      gte(api_request_log.status_code, 400),
-      isNotNull(api_request_log.error)
-    );
-    if (errorsCondition) {
-      conditions.push(errorsCondition);
-    }
+    conditions.push(eq(api_request_log_2.session_id, sessionId));
   }
   return and(...conditions);
 }
 
+/** Keyset condition for rows after `row` in (created_at, id) order. */
+function after(row: Row) {
+  return and(
+    gte(api_request_log_2.created_at, row.created_at),
+    or(gt(api_request_log_2.created_at, row.created_at), gt(api_request_log_2.id, row.id))
+  );
+}
+
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   await connection();
 
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
     return authFailedResponse;
   }
-
-  const searchParams = request.nextUrl.searchParams;
-  const userId = searchParams.get('userId');
-  const startDate = searchParams.get('startDate');
-  const endDate = searchParams.get('endDate');
-  const model = searchParams.get('model');
-  const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
-  const errorsOnly = searchParams.get('errorsOnly') === 'true';
-
-  const parsedStart = startDate ? parseDate(startDate) : null;
-  const parsedEnd = endDate ? parseDate(endDate + 'T23:59:59.999Z') : null;
-  if ((startDate && !parsedStart) || (endDate && !parsedEnd)) {
-    return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
+  if (!user || !(await canCurrentUserExportApiRequestLogs(user.id))) {
+    return jsonError('API request log export access required', 403);
   }
 
-  const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId, errorsOnly);
+  const searchParams = request.nextUrl.searchParams;
+  const ids = splitIdList(...searchParams.getAll('id'));
+  const generationIds = splitIdList(...searchParams.getAll('generationId'));
+  if (ids.length > MAX_LOG_EXPORT_IDS || generationIds.length > MAX_LOG_EXPORT_IDS) {
+    return jsonError(
+      `Too many IDs. Use at most ${MAX_LOG_EXPORT_IDS} log IDs and ${MAX_LOG_EXPORT_IDS} generation IDs.`,
+      400
+    );
+  }
+  const invalidId = ids.find(id => !z.uuid().safeParse(id).success);
+  if (invalidId !== undefined) {
+    return jsonError(`Invalid log ID ${JSON.stringify(invalidId)}. Use the usage UUID.`, 400);
+  }
 
-  const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
+  const parsedFilters = await parseLogExportFilters(searchParams);
+  if (!parsedFilters.ok) {
+    return parsedFilters.response;
+  }
+  const { filters } = parsedFilters;
+  const filter = buildFilter(filters, ids, generationIds);
+
+  const [result] = await db.select({ total: count() }).from(api_request_log_2).where(filter);
   if (result.total === 0) {
     return jsonError('No records found for the given criteria', 404);
   }
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
-  let totalAppendedEntries = 0;
-  let totalProcessedEntries = 0;
-
-  archive.on('entry', () => {
-    totalProcessedEntries += 1;
-  });
-
-  const waitForEntries = (target: number) => {
-    if (totalProcessedEntries >= target) return Promise.resolve();
-    if (archive.destroyed) {
-      return Promise.reject(new Error('Archive closed before all entries were processed'));
+  const audit = logExportAuditDetails(filters);
+  await recordAdminAction(
+    {
+      ...adminActionContextFromHeaders(user, request.headers),
+      trpcPath: '/admin/api/api-request-log/download',
+    },
+    {
+      action: 'api_request_log.download',
+      target: audit.target,
+      message: 'Started API request log ZIP export',
+      metadata: {
+        logIds: ids.length > 0 ? ids : null,
+        generationIdCount: generationIds.length,
+        ...audit.metadata,
+        matchingRows: result.total,
+      },
     }
+  );
 
-    return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        archive.off('entry', onEntry);
-        archive.off('error', onError);
-        archive.off('close', onClose);
-      };
-      const onEntry = () => {
-        if (totalProcessedEntries >= target) {
-          cleanup();
-          resolve();
+  const stream = streamBatchedZipExport<Row>({
+    startedAt,
+    maxDurationSeconds: maxDuration,
+    order: 'creation time',
+    fetchBatch: lastRow =>
+      db
+        .select({ id: api_request_log_2.id, created_at: api_request_log_2.created_at })
+        .from(api_request_log_2)
+        .where(lastRow ? and(filter, after(lastRow)) : filter)
+        .orderBy(asc(api_request_log_2.created_at), asc(api_request_log_2.id))
+        .limit(BATCH_SIZE),
+    remainingRows: async lastRow => {
+      const [remaining] = await db
+        .select({ total: count() })
+        .from(api_request_log_2)
+        .where(and(filter, after(lastRow)));
+      return remaining.total;
+    },
+    writeRows: async (rows, append) => {
+      const blobs = await Promise.all(rows.map(loadBlob));
+      for (const [index, row] of rows.entries()) {
+        const prefix = `${formatTimestamp(row.created_at)}_${row.id}`;
+        const blob = blobs[index];
+        if ('loadError' in blob) {
+          append(blob.loadError, `${prefix}_load-error.txt`);
+          continue;
         }
-      };
-      const onError = (error: Error) => {
-        cleanup();
-        reject(error);
-      };
-      const onClose = () => {
-        cleanup();
-        reject(new Error('Archive closed before all entries were processed'));
-      };
-
-      archive.on('entry', onEntry);
-      archive.once('error', onError);
-      archive.once('close', onClose);
-    });
-  };
-
-  // Fetch and archive rows in batches using cursor-based pagination to
-  // avoid loading the entire result set into memory at once.
-  const appendRows = async () => {
-    let cursor: bigint | null = null;
-    for (;;) {
-      const rows = await db
-        .select()
-        .from(api_request_log)
-        .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
-        .orderBy(asc(api_request_log.id))
-        .limit(BATCH_SIZE);
-
-      if (rows.length === 0) break;
-
-      for (const row of rows) {
-        const ts = formatTimestamp(row.created_at);
-        const id = String(row.id);
-
-        const requestExt = isJson(row.request) ? 'json' : 'txt';
-        const requestContent = tryFormatJson(row.request);
-        if (requestContent) {
-          totalAppendedEntries += 1;
-          archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
-        }
-
-        const responseExt = isJson(row.response) ? 'json' : 'txt';
-        const responseContent = tryFormatJson(row.response);
-        if (responseContent) {
-          totalAppendedEntries += 1;
-          archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
-        }
-
-        if (row.error !== null && row.error !== undefined) {
-          const errorContent = tryFormatJson(row.error);
-          if (errorContent) {
-            totalAppendedEntries += 1;
-            archive.append(errorContent, { name: `${ts}_${id}_error.json` });
+        for (const { kind, value } of blob.files) {
+          const content = tryFormatJson(value);
+          if (content) {
+            append(content, `${prefix}_${kind}.${isJson(value) ? 'json' : 'txt'}`);
           }
         }
       }
-
-      cursor = rows[rows.length - 1].id;
-
-      // Archiver maintains its own input queue, which is not reflected by the
-      // readable stream's high-water mark. Wait until this batch is emitted so
-      // large exports remain bounded even when compression is slower than DB reads.
-      await waitForEntries(totalAppendedEntries);
-    }
-
-    await archive.finalize();
-  };
-
-  void appendRows().catch(error => archive.destroy(error));
-
-  // Readable.toWeb propagates end, errors and backpressure correctly, unlike
-  // a hand-rolled PassThrough -> ReadableStream bridge which eagerly pushed
-  // chunks into the controller with no pull() and could drop bytes on a slow
-  // or cancelled consumer - causing truncated ZIPs that macOS Archive Utility
-  // refuses to extract.
-  // Readable.toWeb returns the node-types flavoured ReadableStream, which is
-  // structurally identical to the DOM lib ReadableStream accepted by Response
-  // but TypeScript treats them as distinct - hence the cast.
-  const webStream = Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>;
-
-  const sanitize = (value: string) => value.replaceAll(/[^a-zA-Z0-9._-]/g, '-');
-  const safeUserId = userId ? sanitize(userId) : 'all-users';
-  const safeModel = model ? `_${sanitize(model)}` : '';
-  const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
-  const safeErrorsOnly = errorsOnly ? '_errors-only' : '';
-  const filename = `api-request-log_${safeUserId}_${startDate ?? 'any-start'}_${endDate ?? 'any-end'}${safeModel}${safeSessionId}${safeErrorsOnly}.zip`;
-
-  return new Response(webStream, {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
     },
   });
+
+  const suffix = ids.length === 1 ? `_id-${ids[0]}` : ids.length > 1 ? `_${ids.length}-ids` : '';
+  return zipDownloadResponse(stream, logExportFilename('api-request-log', filters, suffix));
 }

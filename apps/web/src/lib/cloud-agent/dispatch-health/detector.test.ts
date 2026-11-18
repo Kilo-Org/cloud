@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import { evaluateDispatchHealth } from './detector';

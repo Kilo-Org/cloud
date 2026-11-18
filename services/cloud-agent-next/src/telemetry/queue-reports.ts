@@ -1,36 +1,16 @@
+import { type CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+
 import {
-  CloudAgentQueueReportSchema,
-  DIAGNOSTIC_RETENTION_MS,
-  type CloudAgentQueueReport,
-  type CloudAgentRunStateReport,
-} from '@kilocode/worker-utils/cloud-agent-queue-report';
-import { logger } from '../logger.js';
-import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
-import { admittedAgentModel, type SessionMessageState } from '../session/session-message-state.js';
-import {
-  classifyCloudAgentFailure,
-  isWorkspaceFailureSubtype,
+  userVisibleFailureMessage,
+  type CloudAgentFailureCode,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 
-type ReportQueue = {
-  send(report: CloudAgentQueueReport): Promise<unknown>;
-};
-
-type ReportLogContext = {
-  cloudAgentSessionId: string;
-  messageId: string;
-  status: string;
-};
-
-const INSUFFICIENT_CREDIT_TERMINAL_ERRORS = new Set([
-  'insufficient credits',
-  'insufficient credits: payment_required',
-  'insufficient credits: insufficient_funds',
-  'payment required',
-]);
-const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
-  Record<NonNullable<SessionMessageState['failureCode']>, string>
-> = {
+/**
+ * Operator-grade diagnostic copied into cloud_agent_session_runs.error_message_redacted.
+ * Keep separate from USER_FAILURE_MESSAGES: this text is what support reads in a
+ * diagnostics export and must not be softened into user-facing copy.
+ */
+export const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<Record<CloudAgentFailureCode, string>> = {
   sandbox_connect_failed: 'Sandbox connection failed',
   workspace_setup_failed: 'Workspace setup failed',
   kilo_server_failed: 'Kilo server failed to start',
@@ -40,7 +20,7 @@ const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
   model_missing: 'No model is available for this run',
   delivery_failure_unknown: 'Message delivery outcome is unknown',
   wrapper_disconnected: 'Wrapper disconnected before completion',
-  wrapper_no_output: 'Wrapper produced no output before timeout',
+  wrapper_no_output: 'Wrapper made no execution progress during the watchdog window',
   wrapper_ping_timeout: 'Wrapper health check timed out',
   wrapper_error_before_activity: 'Wrapper failed before agent activity',
   assistant_error: 'Assistant request failed',
@@ -50,157 +30,40 @@ const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
   unclassified: 'Run failed without a classified cause',
 };
 
-function timestamp(value: number): string {
-  return new Date(value).toISOString();
+export function failedRunDiagnosticMessage(code: CloudAgentFailureCode): string {
+  // Codes added after this map was written still get a specific diagnostic
+  // instead of falling through to the unclassified fallback.
+  return FAILED_RUN_DIAGNOSTIC_MESSAGES[code] ?? userVisibleFailureMessage(code);
 }
 
-function usedManagedModelSelection(state: SessionMessageState): boolean {
-  const model = admittedAgentModel(state);
-  return model === undefined ? false : /^(?:kilo\/)?kilo-auto\//.test(model);
-}
+export type RunReportAnchor = {
+  kiloSessionId?: string;
+  initialMessageId?: string;
+  reportingCreatedAt?: string;
+};
 
-function isKnownInsufficientCreditFailure(state: SessionMessageState): boolean {
-  if (
-    state.failureCode !== 'assistant_error' &&
-    state.failureCode !== 'wrapper_error_before_activity' &&
-    state.failureCode !== 'wrapper_error_after_activity'
-  ) {
-    return false;
-  }
-  if (state.error === undefined) return false;
-  return INSUFFICIENT_CREDIT_TERMINAL_ERRORS.has(state.error.trim().toLowerCase());
-}
-
-function diagnosticForFailedRun(
-  state: SessionMessageState
-): CloudAgentRunStateReport['run']['diagnostic'] | undefined {
-  if (state.status !== 'failed' || state.terminalAt === undefined) return undefined;
-
-  let errorMessageRedacted =
-    state.failureCode === undefined ? undefined : FAILED_RUN_DIAGNOSTIC_MESSAGES[state.failureCode];
-  if (state.failureCode === 'workspace_setup_failed') {
-    errorMessageRedacted = isWorkspaceFailureSubtype(state.failureSubtype)
-      ? workspaceFailureMessage(state.failureSubtype)
-      : 'Workspace setup failed';
-  } else if (isKnownInsufficientCreditFailure(state)) {
-    errorMessageRedacted = 'Model request failed: insufficient credits';
-  } else if (state.assistantFailureReason === 'rate_limited') {
-    errorMessageRedacted = 'Assistant request was rate limited';
-  }
-  if (errorMessageRedacted === undefined) return undefined;
-
-  return {
-    errorMessageRedacted,
-    errorExpiresAt: timestamp(state.terminalAt + DIAGNOSTIC_RETENTION_MS),
-  };
-}
-
-function logReportFailure(context: ReportLogContext, phase: 'validation' | 'send'): void {
-  logger
-    .withFields({
-      sessionId: context.cloudAgentSessionId,
-      messageId: context.messageId,
-      reportType: 'run.state',
-      reportStatus: context.status,
-      reportFailurePhase: phase,
-    })
-    .warn('Cloud Agent report emission skipped');
-}
-
-async function trySendReport(
-  queue: ReportQueue | undefined,
-  report: unknown,
-  context: ReportLogContext
-): Promise<void> {
-  if (!queue) return;
-  const validated = CloudAgentQueueReportSchema.safeParse(report);
-  if (!validated.success) {
-    logReportFailure(context, 'validation');
-    return;
-  }
-  try {
-    await queue.send(validated.data);
-  } catch {
-    logReportFailure(context, 'send');
-  }
-}
-
-export async function emitRunStateReport(params: {
-  queue?: ReportQueue;
+/** Assembles a validated queue report from already-decided run facts. */
+export function buildRunStateReport(params: {
   cloudAgentSessionId: string;
-  state: SessionMessageState;
-  occurredAt?: number;
-}): Promise<void> {
-  const { state } = params;
-  const observedDispatchAcceptedAt =
-    state.dispatchAcceptanceKind === 'observed' ? state.acceptedAt : undefined;
-  const failureCode = state.failureCode;
-  const diagnostic = diagnosticForFailedRun({ ...state, failureCode });
-  const failureClassification =
-    state.status === 'failed' && state.failureStage !== undefined && failureCode !== undefined
-      ? classifyCloudAgentFailure({
-          source: 'run',
-          stage: state.failureStage,
-          code: failureCode,
-          ...(isWorkspaceFailureSubtype(state.failureSubtype)
-            ? { workspaceSubtype: state.failureSubtype }
-            : {}),
-          ...(state.assistantFailureReason === undefined
-            ? {}
-            : { assistantReason: state.assistantFailureReason }),
-          ...(state.providerOwnership === undefined
-            ? {}
-            : { providerOwnership: state.providerOwnership }),
-          ...(failureCode === 'model_missing'
-            ? { managedModelSelection: usedManagedModelSelection(state) }
-            : {}),
-        })
-      : undefined;
-  const report: CloudAgentRunStateReport = {
+  anchor?: RunReportAnchor;
+  run: CloudAgentRunStateReport['run'];
+  occurredAt: number;
+}): CloudAgentRunStateReport {
+  const { anchor } = params;
+  return {
     version: 1,
     type: 'run.state',
-    occurredAt: new Date(params.occurredAt ?? Date.now()).toISOString(),
-    session: { cloudAgentSessionId: params.cloudAgentSessionId },
-    run: {
-      messageId: state.messageId,
-      status: state.status,
-      ...(state.wrapperRunId === undefined ? {} : { wrapperRunId: state.wrapperRunId }),
-      ...(state.queuedAt === undefined ? {} : { queuedAt: timestamp(state.queuedAt) }),
-      ...(observedDispatchAcceptedAt === undefined
+    occurredAt: new Date(params.occurredAt).toISOString(),
+    session: {
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      ...(anchor?.kiloSessionId === undefined ? {} : { kiloSessionId: anchor.kiloSessionId }),
+      ...(anchor?.initialMessageId === undefined
         ? {}
-        : { dispatchAcceptedAt: timestamp(observedDispatchAcceptedAt) }),
-      ...(state.agentActivityObservedAt === undefined
+        : { initialMessageId: anchor.initialMessageId }),
+      ...(anchor?.reportingCreatedAt === undefined
         ? {}
-        : { agentActivityObservedAt: timestamp(state.agentActivityObservedAt) }),
-      ...(state.terminalAt === undefined ? {} : { terminalAt: timestamp(state.terminalAt) }),
-      ...(state.failureStage === undefined ? {} : { failureStage: state.failureStage }),
-      ...(failureCode === undefined ? {} : { failureCode }),
-      ...(state.failureCode === 'workspace_setup_failed' &&
-      isWorkspaceFailureSubtype(state.failureSubtype)
-        ? { workspaceFailureSubtype: state.failureSubtype }
-        : {}),
-      ...(failureClassification === undefined
-        ? {}
-        : {
-            failureResponsibility: failureClassification.responsibility,
-            failureReason: failureClassification.reason,
-          }),
-      ...(diagnostic === undefined ? {} : { diagnostic }),
+        : { reportingCreatedAt: anchor.reportingCreatedAt }),
     },
+    run: params.run,
   };
-  if (failureClassification !== undefined) {
-    console.info('Cloud Agent failure classified', {
-      metric: 'cloud_agent_failure_classified',
-      count: 1,
-      responsibility: failureClassification.responsibility,
-      reason: failureClassification.reason,
-      stage: state.failureStage,
-      code: failureCode,
-    });
-  }
-  await trySendReport(params.queue, report, {
-    cloudAgentSessionId: params.cloudAgentSessionId,
-    messageId: state.messageId,
-    status: state.status,
-  });
 }

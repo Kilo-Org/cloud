@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-test-secret',
   KILOCLAW_API_URL: 'https://claw.test',
 }));

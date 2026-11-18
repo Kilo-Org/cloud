@@ -1,7 +1,7 @@
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { orgnaization_modes, ORGANIZATION_MODES_ORG_SLUG_CONSTRAINT } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import type { OrganizationModeConfig } from '@/lib/organizations/organization-types';
+import type { OrganizationModeConfig } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 export type OrganizationMode = typeof orgnaization_modes.$inferSelect;
 
@@ -120,7 +120,6 @@ export async function updateOrganizationMode(
 
     return mode ? { ...mode, config: mergeToSatisfy(mode.config) } : null;
   } catch (error) {
-    // Check if it's a unique constraint violation
     if (error instanceof Error && error.message.includes(ORGANIZATION_MODES_ORG_SLUG_CONSTRAINT)) {
       return null;
     }

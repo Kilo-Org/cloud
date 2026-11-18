@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -6,14 +7,38 @@ import {
 } from '@/lib/integrations/db/platform-integrations';
 import { getGitLabIntegration, getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { fetchGitLabProjects } from '@/lib/integrations/platforms/gitlab/adapter';
+import type { GitLabCredentialActor } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
+import {
+  isPlatformIntegrationHealthy,
+  isPlatformIntegrationSuspended,
+} from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
+
+const gitLabInstanceUrlFromIntegration = (integration: { metadata: unknown }): string => {
+  const metadata = integration.metadata as GitLabMetadata | null;
+  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+};
+
+async function resolveGitLabToken(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  actor: GitLabCredentialActor
+): Promise<string> {
+  try {
+    return await getValidGitLabToken(integration, actor);
+  } catch {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to authenticate with GitLab integration',
+    });
+  }
+}
 
 type GitLabRepositoriesResult = {
   integrationInstalled: boolean;
@@ -46,6 +71,26 @@ const missingIntegrationResponse = (message: string): GitLabRepositoriesResult =
   errorMessage: message,
 });
 
+/**
+ * The message a stored GitLab connection answers with when the shared health
+ * predicate declines it. A suspension is reported first: the disconnect and
+ * authorizing-user-removal writers both set a credential marker as well, and
+ * the reconnect step is the action that helps.
+ */
+const unavailableMessageForIntegration = (integration: {
+  integration_status: string | null;
+  suspended_at: string | null;
+  auth_invalid_at: string | null;
+}): string => {
+  if (isPlatformIntegrationSuspended(integration)) {
+    return 'GitLab integration is suspended';
+  }
+  if (integration.auth_invalid_at) {
+    return 'GitLab integration requires reauthorization';
+  }
+  return 'GitLab integration is not properly configured';
+};
+
 type GitLabMetadata = {
   access_token?: string;
   refresh_token?: string;
@@ -69,18 +114,10 @@ export async function getGitLabTokenForOrganization(
     return undefined;
   }
 
-  try {
-    const token = await getValidGitLabToken(integration, {
-      userId: actorUserId,
-      organizationId,
-    });
-    return token;
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to authenticate with GitLab integration',
-    });
-  }
+  return resolveGitLabToken(integration, {
+    userId: actorUserId,
+    organizationId,
+  });
 }
 
 /**
@@ -94,20 +131,14 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
     return undefined;
   }
 
-  try {
-    const token = await getValidGitLabToken(integration, { userId });
-    return token;
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to authenticate with GitLab integration',
-    });
-  }
+  return resolveGitLabToken(integration, { userId });
 }
 
 /**
  * Fetch GitLab repositories for an organization
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
+ * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true.
+ * Only a connection the shared health predicate accepts answers from the
+ * snapshot; any other connection answers the unavailable result.
  */
 export async function fetchGitLabRepositoriesForOrganization(
   organizationId: string,
@@ -120,8 +151,8 @@ export async function fetchGitLabRepositoriesForOrganization(
     return missingIntegrationResponse('No GitLab integration found for this organization');
   }
 
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitLab integration is suspended');
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return missingIntegrationResponse(unavailableMessageForIntegration(integration));
   }
 
   const metadata = integration.metadata as GitLabMetadata | null;
@@ -129,8 +160,16 @@ export async function fetchGitLabRepositoriesForOrganization(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitLab on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const accessToken = await getValidGitLabToken(integration, {
         userId: actorUserId,
         organizationId,
@@ -145,10 +184,9 @@ export async function fetchGitLabRepositoriesForOrganization(
       };
     }
 
-    // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories ?? []),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };
@@ -162,7 +200,9 @@ export async function fetchGitLabRepositoriesForOrganization(
 
 /**
  * Fetch GitLab repositories for a user
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
+ * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true.
+ * Only a connection the shared health predicate accepts answers from the
+ * snapshot; any other connection answers the unavailable result.
  */
 export async function fetchGitLabRepositoriesForUser(
   userId: string,
@@ -174,8 +214,8 @@ export async function fetchGitLabRepositoriesForUser(
     return missingIntegrationResponse('No GitLab integration found for this user');
   }
 
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitLab integration is suspended');
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return missingIntegrationResponse(unavailableMessageForIntegration(integration));
   }
 
   const metadata = integration.metadata as GitLabMetadata | null;
@@ -183,8 +223,16 @@ export async function fetchGitLabRepositoriesForUser(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitLab on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const accessToken = await getValidGitLabToken(integration, { userId });
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
@@ -196,10 +244,9 @@ export async function fetchGitLabRepositoriesForUser(
       };
     }
 
-    // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories ?? []),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };
@@ -295,8 +342,7 @@ export async function getGitLabInstanceUrlForUser(userId: string): Promise<strin
     return DEFAULT_GITLAB_URL;
   }
 
-  const metadata = integration.metadata as GitLabMetadata | null;
-  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+  return gitLabInstanceUrlFromIntegration(integration);
 }
 
 /**
@@ -311,6 +357,5 @@ export async function getGitLabInstanceUrlForOrganization(organizationId: string
     return DEFAULT_GITLAB_URL;
   }
 
-  const metadata = integration.metadata as GitLabMetadata | null;
-  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+  return gitLabInstanceUrlFromIntegration(integration);
 }

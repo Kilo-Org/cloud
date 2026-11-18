@@ -1,0 +1,5 @@
+# latency-ingest has no secrets. MIN_APP_VERSION is a plain wrangler var (see
+# wrangler.jsonc), and the per-session limiter key is derived from the caller's
+# bearer with crypto.subtle, so nothing here is required for local dev.
+#
+# Copy this file to .dev.vars only when a local-only override is needed.

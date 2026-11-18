@@ -3,7 +3,7 @@ import { createGateway, generateText } from 'ai';
 import { listBytePlusSeatsByUsername } from '@/lib/coding-plans/byteplus-control-plane';
 import { validateCodingPlanCredential } from '@/lib/coding-plans/inventory-validation';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-byteplus-access',
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-byteplus-secret',
 }));
@@ -17,7 +17,7 @@ jest.mock('@/lib/coding-plans/byteplus-control-plane', () => ({
   listBytePlusSeatsByUsername: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   createAiSdkProvider: jest.fn(() => mockDirectModel),
 }));
 
@@ -26,14 +26,14 @@ jest.mock('ai', () => ({
   generateText: jest.fn(),
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => jest.fn()),
 }));
 
 const mockedGenerateText = jest.mocked(generateText);
 const mockedListBytePlusSeatsByUsername = jest.mocked(listBytePlusSeatsByUsername);
 const mockedSentryLogger = jest.mocked(
-  jest.requireMock('@/lib/utils.server').sentryLogger as () => jest.Mock
+  jest.requireMock('@kilocode/web-shared/lib/utils.server').sentryLogger as () => jest.Mock
 );
 const mockLogWarning = mockedSentryLogger.mock.results[0]?.value as jest.Mock;
 

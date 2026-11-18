@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["KiloSurfaceGeometryModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.kilosurfacegeometry.KiloSurfaceGeometryModule"]
+  }
+}

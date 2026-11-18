@@ -1,0 +1,102 @@
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  AUTO_SMALL_TARGET_MODELS,
+  customRouterAutoModel,
+  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
+  KILO_AUTO_SMALL_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getAutoFreeCandidates } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import {
+  isVirtualAutoModelId,
+  type CustomRouterDefinition,
+} from '@kilocode/auto-routing-contracts';
+import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { buildAutoModelCatalogEntry } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+
+function visibleConcreteModelIds(models: Iterable<string>, availableModelIds: ReadonlySet<string>) {
+  return [
+    ...new Set([...models].filter(id => availableModelIds.has(id) && !isVirtualAutoModelId(id))),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
+export async function addAutoRoutingModels(
+  models: OpenRouterModelsResponse['data']
+): Promise<OpenRouterModelsResponse['data']> {
+  const availableModelIds = new Set(models.map(model => model.id));
+  if (
+    !availableModelIds.has(KILO_AUTO_FRONTIER_MODEL.id) &&
+    !availableModelIds.has(KILO_AUTO_BALANCED_MODEL.id) &&
+    !availableModelIds.has(KILO_AUTO_EFFICIENT_MODEL.id) &&
+    !availableModelIds.has(KILO_AUTO_FREE_MODEL.id) &&
+    !availableModelIds.has(KILO_AUTO_SMALL_MODEL.id)
+  ) {
+    return models;
+  }
+
+  const [table, frontierTable, autoFreeCandidates] = await Promise.all([
+    getCachedRoutingTable(),
+    getCachedRoutingTable('frontier'),
+    getAutoFreeCandidates(null).catch(() => null),
+  ]);
+
+  const efficientModelIds = visibleConcreteModelIds(
+    Object.values(table?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model),
+    availableModelIds
+  );
+  const frontierModelIds = visibleConcreteModelIds(
+    Object.values(frontierTable?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model),
+    availableModelIds
+  );
+  const freeModelIds = visibleConcreteModelIds(autoFreeCandidates ?? [], availableModelIds);
+  const smallModelIds = visibleConcreteModelIds(
+    Object.values(AUTO_SMALL_TARGET_MODELS),
+    availableModelIds
+  );
+  const hideAutoFreeModel = autoFreeCandidates !== null && freeModelIds.length === 0;
+  const autoRoutingChoices = new Map([
+    [KILO_AUTO_FRONTIER_MODEL.id, frontierModelIds],
+    [KILO_AUTO_BALANCED_MODEL.id, efficientModelIds],
+    [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
+    [KILO_AUTO_FREE_MODEL.id, freeModelIds],
+    [KILO_AUTO_SMALL_MODEL.id, smallModelIds],
+  ]);
+
+  return models.flatMap(model => {
+    const modelIds = autoRoutingChoices.get(model.id);
+    if (hideAutoFreeModel && model.id === KILO_AUTO_FREE_MODEL.id) {
+      return [];
+    }
+    return [modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model];
+  });
+}
+
+export function addCustomRouterModels(
+  models: OpenRouterModelsResponse['data'],
+  routers: CustomRouterDefinition[]
+): OpenRouterModelsResponse['data'] {
+  if (routers.length === 0) return models;
+  const availableModelIds = new Set(models.map(model => model.id));
+  const customRouterModels = routers.map(router => {
+    const model = buildAutoModelCatalogEntry(
+      customRouterAutoModel({
+        scope: router.ownerType,
+        slug: router.slug,
+        name: router.name,
+        baseRouter: router.baseRouter,
+      })
+    );
+    const modelIds = visibleConcreteModelIds(
+      router.entries.flatMap(entry => (entry.kind === 'gateway' ? [entry.model] : [])),
+      availableModelIds
+    );
+    return modelIds.length ? { ...model, autoRouting: { models: modelIds } } : model;
+  });
+  return models.concat(customRouterModels);
+}

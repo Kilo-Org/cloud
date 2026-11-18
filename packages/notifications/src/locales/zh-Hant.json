@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "您的代理工作階段有更新",
+      "lowBalance": "您的餘額需要留意",
+      "spendAlert": "您的支出需要留意",
+      "securityFinding": "安全發現需要留意",
+      "securityUpdate": "安全檢查有更新",
+      "activeAgentsGlanceable": "使用中的代理有更新"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "餘額不足提醒",
+      "body": "{{organizationName}} 的餘額已低於 ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "支出提醒",
+      "body": "{{scopeName}} 的支出已超過 ${{amountUsd}}"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "新的安全發現 ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA 警告"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA 違規"
+    }
+  },
+  "sessionReady": {
+    "body": "您的 Kilo 工作階段已就緒，可從手機控制"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

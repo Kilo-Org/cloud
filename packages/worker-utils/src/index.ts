@@ -1,7 +1,12 @@
 export { getCachedSecret, clearSecretCacheForTest } from './cached-secret.js';
 
 export { withDORetry, DEFAULT_DO_RETRY_CONFIG } from './do-retry.js';
-export type { DORetryConfig } from './do-retry.js';
+export type { DORetryConfig, DORetryScope } from './do-retry.js';
+
+export {
+  isTransientDurableObjectFailure,
+  isDurableObjectRetryDeadline,
+} from './durable-object-failure.js';
 
 export { backendAuthMiddleware } from './backend-auth-middleware.js';
 
@@ -19,6 +24,8 @@ export { formatError } from './format-error.js';
 
 export { extractBearerToken } from './extract-bearer-token.js';
 
+export { sha256Hex } from './sha256.js';
+
 export { createErrorHandler } from './error-handler.js';
 
 export { createNotFoundHandler } from './not-found-handler.js';
@@ -26,7 +33,6 @@ export { createNotFoundHandler } from './not-found-handler.js';
 export type { Owner, MCPServerConfig } from './types.js';
 
 export {
-  AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE,
   CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS,
   createCloudAgentNextFetchClient,
   isCloudAgentNextBillingErrorBody,
@@ -53,9 +59,22 @@ export type {
 export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
 export {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+  KILO_CHAT_AUDIENCE,
+  EVENT_SERVICE_AUDIENCE,
+  NOTIFICATIONS_AUDIENCE,
+  CLOUD_AGENT_NEXT_AUDIENCE,
+  KILOCLAW_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+  AI_ATTRIBUTION_AUDIENCE,
+  HTML_DEPLOY_AUDIENCE,
+  PAGES_AUDIENCE,
+  PAGES_DEV_AUDIENCE,
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from './internal-service-token-audiences.js';
 export {
@@ -126,6 +145,26 @@ export {
   KILO_TOKEN_VERSION,
 } from './kilo-token.js';
 export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
+export {
+  KILO_TOKEN_PURPOSES,
+  LEGACY_API_TOKEN_LIFETIMES_SECONDS,
+  buildModernKiloTokenPayload,
+  signModernKiloToken,
+  isKiloCredentialExchangeEligible,
+  isKiloResourceAudienceAllowed,
+  verifyKiloSessionForPolicy,
+  verifyKiloTokenForResource,
+  verifyKiloTokenForPolicy,
+} from './kilo-token-policy.js';
+export type {
+  KiloCredentialExchangeEligibilityPolicy,
+  KiloResourceAudiencePolicy,
+  KiloTokenPolicyClaims,
+  ModernKiloTokenClaims,
+  ModernKiloTokenPurpose,
+  SignModernKiloTokenParams,
+  VerifiedKiloAuthContext,
+} from './kilo-token-policy.js';
 
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
@@ -134,7 +173,12 @@ export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
 
+export { getVercelExecutionRegion } from './vercel-execution-region.js';
+export type { VercelExecutionRegion } from './vercel-execution-region.js';
+
 export { normalizeGitUrl } from './normalize-git-url.js';
+
+export { chunkArray } from './chunk-array.js';
 
 export { deriveCallbackToken, verifyCallbackToken } from './callback-token.js';
 export type { CallbackTokenParams, VerifyCallbackTokenParams } from './callback-token.js';
@@ -196,10 +240,12 @@ export {
   buildSecurityFindingAuditSnapshot,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
+  insertSecurityFindingAuditEvents,
 } from './security-finding-audit.js';
 export type {
   NewSecurityFindingAuditLogValues,
   SecurityFindingAuditActor,
+  SecurityFindingAuditBatchWriterDb,
   SecurityFindingAuditEventFinding,
   SecurityFindingAuditEventInput,
   SecurityFindingAuditHumanActor,
@@ -211,4 +257,29 @@ export type {
   SecurityFindingAuditWriterDb,
 } from './security-finding-audit.js';
 
-export { hasOrganizationAccess } from './organization-membership.js';
+export {
+  activeOrganizationAccessSql,
+  activeOrganizationJoinCondition,
+  findEffectiveOrganizationMemberRole,
+  hasEffectiveOrganizationAccess,
+  hasOrganizationAccess,
+  inheritedParentMembershipJoinCondition,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrActiveOrganizationCondition,
+  personalOrInheritedOrganizationCondition,
+} from './organization-membership.js';
+export type {
+  OrganizationColumns,
+  OrganizationMembershipColumns,
+} from './organization-membership.js';
+
+export {
+  MAX_AUTO_COMMIT_MESSAGE_BYTES,
+  commitHashSchema,
+  autoCommitRecordSchema,
+} from './cloud-agent-commits.js';
+export type { AutoCommitRecord } from './cloud-agent-commits.js';

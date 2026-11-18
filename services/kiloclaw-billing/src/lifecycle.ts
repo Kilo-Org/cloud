@@ -2,6 +2,7 @@ import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } f
 import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import {
   countUnresolvedTerminalRenewalFailures,
   findLatestPreCutoffUserCommitSwitchQualification,
@@ -33,6 +34,7 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import {
   BILLING_FLOW,
   createBillingCorrelationHeaders,
@@ -366,20 +368,6 @@ type SideEffectRequest =
       };
     }
   | {
-      action: 'process_paid_conversion';
-      input: {
-        userId: string;
-        dedupeKey: string;
-        eventDateIso: string;
-        orderId: string;
-        amount: number;
-        currencyCode: string;
-        itemCategory: string;
-        itemName: string;
-        itemSku?: string;
-      };
-    }
-  | {
       action: 'issue_kilo_pass_bonus_from_usage_threshold';
       input: { userId: string; nowIso: string };
     };
@@ -396,14 +384,7 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
           ? { guarded: boolean }
           : T['action'] extends 'report_commit_retirement_anomaly'
             ? { ok: true }
-            : T['action'] extends 'process_paid_conversion'
-              ? {
-                  affiliateSaleEnqueued: boolean;
-                  winningTouchType: 'referral' | 'affiliate' | 'none';
-                  conversionId: string | null;
-                  disqualificationReason: string | null;
-                }
-              : { ok: true };
+            : { ok: true };
 
 export class KiloClawApiError extends Error {
   readonly statusCode: number;
@@ -1171,14 +1152,6 @@ function isEnvFlagEnabled(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-function chunkArray<T>(values: T[], chunkSize: number): T[][] {
-  const chunks: T[][] = [];
-  for (let index = 0; index < values.length; index += chunkSize) {
-    chunks.push(values.slice(index, index + chunkSize));
-  }
-  return chunks;
-}
-
 async function getPlatformStatus(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
@@ -1514,7 +1487,7 @@ async function enqueueAffiliateEvent(
   );
 }
 
-type PaidConversionParams = {
+type CreditRenewalSaleParams = {
   userId: string;
   dedupeKey: string;
   eventDateIso: string;
@@ -1526,31 +1499,23 @@ type PaidConversionParams = {
   itemSku?: string;
 };
 
-async function processPaidConversion(
+/**
+ * Affiliate SALE reporting for a settled credit renewal. Reporting must never
+ * fail a renewal, so delivery problems are logged and swallowed.
+ */
+async function enqueueCreditRenewalSaleBestEffort(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
-  params: PaidConversionParams
-): Promise<void> {
-  await callBillingSideEffect(
-    env,
-    context,
-    {
-      action: 'process_paid_conversion',
-      input: params,
-    },
-    { userId: params.userId }
-  );
-}
-
-async function processPaidConversionBestEffort(
-  env: BillingWorkerEnv,
-  context: SweepExecutionContext,
-  params: PaidConversionParams
+  params: CreditRenewalSaleParams
 ): Promise<void> {
   try {
-    await processPaidConversion(env, context, params);
+    await enqueueAffiliateEvent(env, context, {
+      ...params,
+      provider: 'impact',
+      eventType: 'sale',
+    });
   } catch (error) {
-    log('error', 'Paid conversion side effect failed after credit renewal', {
+    log('error', 'Affiliate sale side effect failed after credit renewal', {
       userId: params.userId,
       dedupeKey: params.dedupeKey,
       error: error instanceof Error ? error.message : String(error),
@@ -1877,6 +1842,7 @@ async function processCreditRenewalRow(
     await tx.execute(
       sql`SELECT ${kilocode_users.id} FROM ${kilocode_users} WHERE ${kilocode_users.id} = ${row.user_id} FOR UPDATE`
     );
+    await reconcileCreditExpirationsInTransaction({ type: 'user', id: row.user_id }, tx);
 
     const current = await fetchLockedCreditRenewalItemRow(tx, row.id, renewalAt, row.user_id);
     if (!current || current.user_id !== row.user_id || isSoftDeletedUserEmail(current.email)) {
@@ -2203,7 +2169,7 @@ async function processCreditRenewalRow(
       outcome.wasPastDue
     );
 
-    await processPaidConversionBestEffort(env, context, {
+    await enqueueCreditRenewalSaleBestEffort(env, context, {
       userId: outcome.userId,
       dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
       eventDateIso: serializeBillingTimestamp(outcome.renewalAt),
@@ -2256,7 +2222,7 @@ async function processCreditRenewalRow(
       outcome.wasPastDue
     );
 
-    await processPaidConversionBestEffort(env, context, {
+    await enqueueCreditRenewalSaleBestEffort(env, context, {
       userId: outcome.userId,
       dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
       eventDateIso: serializeBillingTimestamp(outcome.renewalAt),

@@ -1,4 +1,5 @@
-import { formatDollars, formatLargeNumber, fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, formatLargeNumber } from '@/lib/utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import type { MetricKey } from './types';
 

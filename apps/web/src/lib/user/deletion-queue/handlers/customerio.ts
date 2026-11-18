@@ -1,5 +1,5 @@
-import { getEnvVariable } from '@/lib/dotenvx';
-import { USER_DELETION_CUSTOMERIO_TRACK_BASE } from '@/lib/user/deletion-queue/deletion-constants';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { USER_DELETION_CUSTOMERIO_TRACK_BASE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import type { DeletionHandler } from '@/lib/user/deletion-queue/handlers/common';
 import {
   classifyResponse,

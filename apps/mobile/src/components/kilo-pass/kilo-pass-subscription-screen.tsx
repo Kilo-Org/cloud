@@ -1,438 +1,301 @@
-/* eslint-disable max-lines -- The Kilo Pass screen composes the presentation gate, loading, error, unavailable, and native-IAP surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
-import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 
+import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
+import { EmptyState } from '@/components/empty-state';
+import {
+  KiloPassBillingHistorySection,
+  KiloPassCreditHistorySection,
+} from '@/components/kilo-pass/kilo-pass-history-sections';
+import {
+  KiloPassManagementSections,
+  type KiloPassScheduledChange,
+} from '@/components/kilo-pass/kilo-pass-management';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Crown } from '@/components/ui/icons';
+import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getKiloPassLegalLinks, KILO_PASS_LEGAL_DISCLOSURE } from '@/lib/kilo-pass/legal-links';
-import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
+import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import {
-  formatKiloPassTierDescription,
-  KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION,
-} from '@/lib/kilo-pass/subscription-page-copy';
-import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
-import { useInlinePurchaseErrorOwnership } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+  type KiloPassBillingHistory,
+  type KiloPassCreditHistory,
+  useKiloPassBillingHistory,
+  useKiloPassCreditHistory,
+} from '@/lib/hooks/use-kilo-pass-history';
+import { isStoreManagedPass, type KiloPassSubscriptionState } from '@/lib/kilo-pass/management';
+import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import {
-  KILO_PASS_MANAGE_CTA_LABEL,
-  KILO_PASS_TITLE,
-  KILO_PASS_UNAVAILABLE_DESCRIPTION,
-  KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
-  type PurchasePresentationKind,
-} from '@kilocode/app-shared/commerce';
-import { KiloPassNativeIapOwner, useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
-import { RestorePurchasesButton } from './restore-purchases-button';
-
-type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
-
-/** Shown when the App Store account already owns a pass on another Kilo account. */
-export const KILO_PASS_OTHER_ACCOUNT_COPY =
-  'This App Store subscription belongs to another Kilo account. Sign in to that account to manage it.';
 
 /**
- * A failed preflight is either retryable (transient network/5xx) or
- * non-retryable (the server refused the purchase). The retryable variant keeps
- * the product so the "Try again" CTA can re-run preflight without starting IAP.
+ * The screen's frame: one header for every state, above the body it owns. The
+ * route presents as a full-screen modal on Android, so the sheet edge reaches
+ * the window top there and this frame clears the status-bar inset itself; the
+ * iOS page sheet presents below the status bar, reserves nothing, and the
+ * header keeps its own grabber clearance.
  */
-type PreflightFailure =
-  | { kind: 'retryable'; message: string; product: AppStoreKiloPassProduct }
-  | { kind: 'nonRetryable'; message: string };
-
-function formatTier(product: AppStoreKiloPassProduct): string {
-  return `$${product.webMonthlyPriceUsd} in credits`;
-}
-
-function formatStorePrice(product: AppStoreKiloPassProduct): string {
-  return `${product.displayPrice}/mo`;
+function KiloPassFrame({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  const windowTopClearance = useSheetHeaderTopClearance('android-window-top');
+  const surfaceOwnsWindowTop = windowTopClearance > 0;
+  return (
+    <View className="flex-1 bg-background">
+      {/* `safeAreaTop` only draws the inset inside the header, so the surface
+          that owns the window top pads it here instead. */}
+      <View style={surfaceOwnsWindowTop ? { paddingTop: windowTopClearance } : undefined}>
+        <ScreenHeader
+          title={t('kiloPass.title')}
+          modal
+          safeAreaTop={!surfaceOwnsWindowTop}
+          className={surfaceOwnsWindowTop ? 'pt-2' : undefined}
+        />
+      </View>
+      {children}
+    </View>
+  );
 }
 
 function KiloPassLoadingScreen() {
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
+    <KiloPassFrame>
       <View className="flex-1 px-5">
+        {/* The scroller applies the landscape side insets, so a cutout window
+            cannot paint the reserved blocks under the sensor area. */}
         <DetailScreenScrollView
           className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1"
+          contentContainerClassName="grow gap-5 px-1 py-4"
           showsVerticalScrollIndicator={false}
         >
-          <Skeleton className="h-4 w-64 rounded" />
-          {[0, 1, 2].map(index => (
-            <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
-          ))}
+          {/* The page prints once, at its final height: every block the pass
+              state introduces is held until it has one answer, so this
+              skeleton stands in for a page that would otherwise grow under
+              the reader and push the ledgers down. */}
+          <View className="gap-1">
+            <Skeleton className="h-5 w-40 rounded" />
+            <Skeleton className="h-4 w-24 rounded" />
+          </View>
+          <Skeleton className="h-[132px] w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
         </DetailScreenScrollView>
       </View>
-    </View>
+    </KiloPassFrame>
   );
 }
 
-function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
+function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
-      <View className="flex-1 items-center justify-center gap-3 px-6">
-        <Text className="text-center font-semibold text-foreground">Kilo Pass unavailable</Text>
-        <Text className="text-center text-sm text-muted-foreground">
-          Kilo Pass could not be loaded. Try again.
-        </Text>
-        <Button accessibilityLabel="Retry loading Kilo Pass" onPress={onRetry} variant="outline">
-          <Text>Retry</Text>
-        </Button>
-      </View>
-    </View>
+    <KiloPassFrame>
+      <CenteredState>
+        <View className="items-center gap-3 px-6">
+          <Text className="text-center font-semibold text-foreground">
+            {t('kiloPass.unavailable')}
+          </Text>
+          <Text className="text-center text-sm text-muted-foreground">
+            {t('kiloPass.couldNotLoad')}
+          </Text>
+          <Button
+            accessibilityLabel={t('kiloPass.retryLoading')}
+            onPress={onRetry}
+            variant="outline"
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      </CenteredState>
+    </KiloPassFrame>
   );
 }
 
 /**
- * Rendered when the server presentation is not `native_iap`. Shows truthful
- * copy and, for `web_management`, a Manage action that opens the web URL.
- * Never imports `expo-iap`, so Android never initializes Play Billing here.
+ * A resolved pass: the same details the web console prints, the actions the
+ * subscriber can take from the phone, and both ledgers.
  */
-function KiloPassUnavailableScreen({
-  presentation,
-}: {
-  presentation: { kind: PurchasePresentationKind; webUrl: string | null };
-}) {
-  const isWebManagement = presentation.kind === 'web_management';
-  const description = isWebManagement
-    ? KILO_PASS_WEB_MANAGEMENT_DESCRIPTION
-    : KILO_PASS_UNAVAILABLE_DESCRIPTION;
-
+function KiloPassDetailBody({
+  subscription,
+  detail,
+  scheduledChange,
+  creditHistory,
+  billingHistory,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  detail: Extract<KiloPassDetail, { kind: 'active' }>;
+  scheduledChange: KiloPassScheduledChange | null;
+  creditHistory: KiloPassCreditHistory;
+  billingHistory: KiloPassBillingHistory;
+}>) {
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
-      <View className="flex-1 px-5">
-        <DetailScreenScrollView
-          className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text className="px-1 text-sm leading-5 text-muted-foreground">
-            {KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION}
+    <KiloPassFrame>
+      <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
+        <View className="gap-1">
+          <Text variant="large" className="text-foreground">
+            {detail.planLabel}
           </Text>
-          <View className="rounded-xl border border-border bg-card p-5">
-            <Text className="font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
-            <Text className="mt-1 text-sm text-muted-foreground">{description}</Text>
-            {isWebManagement && presentation.webUrl ? (
-              <Button
-                accessibilityLabel={KILO_PASS_MANAGE_CTA_LABEL}
-                className="mt-4 self-start"
-                onPress={() => {
-                  if (!presentation.webUrl) {
-                    return;
-                  }
-                  void openExternalUrl(presentation.webUrl, {
-                    label: 'Kilo Pass management',
-                  });
-                }}
-                variant="outline"
-              >
-                {KILO_PASS_MANAGE_CTA_LABEL}
-              </Button>
-            ) : null}
+          <Text
+            className={cn(
+              'text-sm',
+              detail.statusTone === 'danger' ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          >
+            {detail.statusLabel}
+          </Text>
+        </View>
+        {detail.rows.length > 0 ? (
+          <View className="rounded-lg bg-secondary px-3">
+            {detail.rows.map((row, index) => (
+              <KvRow
+                key={row.id}
+                label={row.label}
+                value={row.value}
+                last={index === detail.rows.length - 1}
+                valueFace={row.id === 'renewal' ? 'text' : 'numeric'}
+                valueDirection={row.id === 'renewal' ? undefined : 'ltr'}
+              />
+            ))}
           </View>
-        </DetailScreenScrollView>
-      </View>
-    </View>
+        ) : null}
+        <KiloPassManagementSections subscription={subscription} scheduledChange={scheduledChange} />
+        <KiloPassCreditHistorySection history={creditHistory} />
+        {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
+        {!isStoreManagedPass(subscription) && (
+          <KiloPassBillingHistorySection history={billingHistory} />
+        )}
+      </DetailScreenScrollView>
+    </KiloPassFrame>
   );
 }
 
-function KiloPassNativeIapContent() {
-  const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const trpc = useTRPC();
-  const {
-    clearError,
-    errorMessage,
-    isPending,
-    products,
-    productsError,
-    productsIsLoading,
-    productsIsRefetching,
-    productsRefetch,
-    purchase,
-    ownedByAnotherAccount,
-  } = useKiloPassNativeIap();
-  useInlinePurchaseErrorOwnership();
-  const preflightPurchase = useMutation(trpc.kiloPass.preflightPurchase.mutationOptions());
-  const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
-  const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
-  let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
-  if (ownedByAnotherAccount) {
-    feedback = { type: 'error', text: KILO_PASS_OTHER_ACCOUNT_COPY };
-  } else if (errorMessage) {
-    feedback = { type: 'error', text: errorMessage };
-  } else if (preflightFailure) {
-    feedback = { type: 'error', text: preflightFailure.message };
-  }
-  const preflightBlocked = preflightFailure?.kind === 'nonRetryable';
-  const isRetryDisabled = isPending || productsIsRefetching;
-  const tilesDisabled =
-    isPending || preflightBlocked || preflightPurchase.isPending || ownedByAnotherAccount;
-  const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  useEffect(
-    () => () => {
-      clearError();
-    },
-    [clearError]
-  );
-
-  const runPreflight = async (product: AppStoreKiloPassProduct) => {
-    setPreflightFailure(null);
-    // eslint-disable-next-line init-declarations -- assigned in the try block below
-    let preflight: Awaited<ReturnType<typeof preflightPurchase.mutateAsync>>;
-    try {
-      preflight = await preflightPurchase.mutateAsync({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: product.appleProductId,
-      });
-    } catch {
-      setPreflightFailure({
-        kind: 'retryable',
-        message: "Couldn't verify your purchase. Check your connection and try again.",
-        product,
-      });
-      return;
-    }
-
-    if (!preflight.allowed) {
-      setPreflightFailure({
-        kind: 'nonRetryable',
-        message:
-          preflight.reason === 'already_subscribed'
-            ? 'You already have a Kilo Pass subscription.'
-            : 'Kilo Pass purchase is not available right now.',
-      });
-      return;
-    }
-
-    if (!mountedRef.current) {
-      return;
-    }
-
-    await purchase(product, {
-      onCompleted: () => {
-        ensureProfileAfterKiloPassPurchase(router);
-      },
-    });
-  };
-
-  const handleProductPress = (product: AppStoreKiloPassProduct) => {
-    void Haptics.selectionAsync();
-    void runPreflight(product);
-  };
-
+function KiloPassMessageBody({ message }: { message: string }) {
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
-      <View className="flex-1 px-5">
-        <DetailScreenScrollView
-          className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text className="px-1 text-sm leading-5 text-muted-foreground">
-            {KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION}
-          </Text>
-
-          {feedback && (
-            <Text
-              className={cn('px-1 text-sm', {
-                'text-destructive': feedback.type === 'error',
-                'text-good': feedback.type === 'success',
-                'text-muted-foreground': feedback.type === 'info',
-              })}
-            >
-              {feedback.text}
-            </Text>
-          )}
-
-          {preflightFailure?.kind === 'retryable' && (
-            <Button
-              accessibilityLabel="Try verifying purchase again"
-              className="self-start"
-              onPress={() => {
-                void runPreflight(preflightFailure.product);
-              }}
-              variant="outline"
-            >
-              <Text>Try again</Text>
-            </Button>
-          )}
-
-          {productsIsLoading &&
-            [0, 1, 2].map(index => (
-              <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
-            ))}
-
-          {!productsIsLoading && products.length === 0 && (
-            <Pressable
-              accessibilityLabel="Try loading Kilo Pass products again"
-              accessibilityRole="button"
-              accessibilityState={{
-                busy: productsIsRefetching,
-                disabled: isRetryDisabled,
-              }}
-              className="rounded-xl border border-border bg-card p-5 active:opacity-80"
-              disabled={isRetryDisabled}
-              onPress={() => {
-                void productsRefetch();
-              }}
-            >
-              <Text className="font-semibold text-foreground">App Store products unavailable</Text>
-              <Text className="mt-1 text-sm text-muted-foreground">
-                {productsError ?? 'Kilo Pass products could not be loaded from App Store.'}
-              </Text>
-              <Text className="mt-3 text-sm font-medium text-primary">
-                {productsIsRefetching ? 'Trying again...' : 'Try again'}
-              </Text>
-            </Pressable>
-          )}
-
-          {!productsIsLoading &&
-            products.map(product => (
-              <Pressable
-                key={product.appleProductId}
-                accessibilityLabel={`${formatTier(product)}, ${formatStorePrice(product)}`}
-                accessibilityRole="button"
-                accessibilityState={{
-                  busy: isPending || preflightPurchase.isPending,
-                  disabled: tilesDisabled,
-                }}
-                className={cn(
-                  'rounded-xl border border-border bg-card p-5 active:opacity-80',
-                  tilesDisabled && 'opacity-50'
-                )}
-                disabled={tilesDisabled}
-                onPress={() => {
-                  handleProductPress(product);
-                }}
-              >
-                <View className="flex-row items-start justify-between gap-4">
-                  <View className="flex-1 gap-1.5">
-                    <Text className="font-semibold text-foreground">{formatTier(product)}</Text>
-                    <Text className="text-xs text-muted-foreground">
-                      {formatKiloPassTierDescription(product.webMonthlyPriceUsd)}
-                    </Text>
-                  </View>
-                  <Text className="text-base font-semibold text-foreground tabular-nums">
-                    {formatStorePrice(product)}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-
-          <RestorePurchasesButton
-            onResult={result => {
-              if (result === 'restored') {
-                setRestoreFeedback({ type: 'success', text: 'Subscription restored.' });
-              } else if (result === 'empty') {
-                setRestoreFeedback({ type: 'info', text: 'No purchases to restore.' });
-              } else {
-                setRestoreFeedback(null);
-              }
-            }}
-          />
-
-          <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
-            {KILO_PASS_LEGAL_DISCLOSURE}
-            {' By subscribing, you agree to the '}
-            <Text
-              accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
-              onPress={() => {
-                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-              }}
-            >
-              {termsOfUseLink.label}
-            </Text>
-            {' and acknowledge the '}
-            <Text
-              accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
-              onPress={() => {
-                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-              }}
-            >
-              {privacyPolicyLink.label}
-            </Text>
-            .
-          </Text>
-        </DetailScreenScrollView>
-
-        {isPending && (
-          <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
-            <Button
-              accessibilityLabel="Completing Kilo Pass purchase"
-              accessibilityState={{ busy: true, disabled: true }}
-              className="mt-4"
-              disabled
-            >
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-              <Text>Completing purchase</Text>
-            </Button>
-          </View>
-        )}
+    <KiloPassFrame>
+      <View className="flex-1 justify-center">
+        <EmptyState placement="static" icon={Crown} title={message} />
       </View>
-    </View>
+    </KiloPassFrame>
+  );
+}
+
+/**
+ * A lapsed pass keeps the receipts: the plan it was, the day it stopped, and
+ * both ledgers the account already paid for. It offers no action, because the
+ * app sells nothing here and the pass can no longer change.
+ */
+function KiloPassEndedBody({
+  subscription,
+  detail,
+  creditHistory,
+  billingHistory,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  detail: Extract<KiloPassDetail, { kind: 'ended' }>;
+  creditHistory: KiloPassCreditHistory;
+  billingHistory: KiloPassBillingHistory;
+}>) {
+  return (
+    <KiloPassFrame>
+      <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
+        <View className="gap-1">
+          <Text variant="large" className="text-foreground">
+            {detail.planLabel}
+          </Text>
+          <Text className="text-sm text-muted-foreground">{detail.endedLabel}</Text>
+        </View>
+        {/* A section break larger than the gaps inside a section, so the plan
+            summary and the ledgers do not read as one block. */}
+        <View className="mt-2">
+          <KiloPassCreditHistorySection history={creditHistory} />
+        </View>
+        {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
+        {!isStoreManagedPass(subscription) && (
+          <KiloPassBillingHistorySection history={billingHistory} />
+        )}
+      </DetailScreenScrollView>
+    </KiloPassFrame>
   );
 }
 
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
-  const presentationQuery = useQuery(
-    trpc.kiloPass.getPurchasePresentation.queryOptions({
-      platform,
-      storefront,
-      product: 'kilo_pass',
-    })
-  );
+  const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
+  const subscription = stateQuery.data?.subscription;
+  const detail = getKiloPassDetailState({
+    subscription,
+    isError: stateQuery.isError,
+    isPending: stateQuery.isPending,
+  });
+  const { t } = useTranslation();
 
-  if (presentationQuery.isPending) {
+  // The pass state introduces three more reads, and each one adds or removes
+  // height below the state rows. Hold the page until every read the state shows
+  // has answered: a ledger or a scheduled plan change that landed afterwards
+  // would push the blocks under it. An ended page waits on its own ledgers the
+  // same way, so its last row does not move once it prints.
+  const hasDetail = (detail.kind === 'active' || detail.kind === 'ended') && subscription != null;
+  const activeDetail = detail.kind === 'active' && subscription != null;
+  const storeManaged = subscription != null && isStoreManagedPass(subscription);
+  const creditHistory = useKiloPassCreditHistory(hasDetail);
+  const billingHistory = useKiloPassBillingHistory(hasDetail && !storeManaged);
+  // The page waits on this read before it prints, so it must settle even while
+  // the online manager reports offline: a paused query never errors and never
+  // answers, and the screen would hold its loading state with no retry.
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: activeDetail && !storeManaged,
+    ...SETTLE_WHILE_OFFLINE,
+  });
+  // A store-managed pass has neither a Stripe schedule nor invoices, so those
+  // two stay disabled and their pending status says nothing.
+  const blocksPending =
+    (hasDetail &&
+      (creditHistory.query.isPending || (!storeManaged && billingHistory.query.isPending))) ||
+    (activeDetail && !storeManaged && scheduledChangeQuery.isPending);
+
+  if (detail.kind === 'loading' || blocksPending) {
     return <KiloPassLoadingScreen />;
   }
-
-  if (presentationQuery.isError) {
+  if (detail.kind === 'error') {
     return (
-      <KiloPassPresentationErrorScreen
+      <KiloPassErrorScreen
         onRetry={() => {
-          void presentationQuery.refetch();
+          void stateQuery.refetch();
         }}
       />
     );
   }
-
-  const presentation = presentationQuery.data;
-  if (presentation.kind !== 'native_iap' || Platform.OS !== 'ios') {
-    return <KiloPassUnavailableScreen presentation={presentation} />;
+  if (detail.kind === 'none') {
+    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
   }
-
+  if (subscription == null) {
+    // A detail — active or ended — is derived from a subscription, so this only
+    // narrows the type; the message keeps the screen total rather than throwing
+    // on it.
+    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+  }
+  if (detail.kind === 'ended') {
+    return (
+      <KiloPassEndedBody
+        subscription={subscription}
+        detail={detail}
+        creditHistory={creditHistory}
+        billingHistory={billingHistory}
+      />
+    );
+  }
   return (
-    <KiloPassNativeIapOwner>
-      <KiloPassNativeIapContent />
-    </KiloPassNativeIapOwner>
+    <KiloPassDetailBody
+      subscription={subscription}
+      detail={detail}
+      scheduledChange={scheduledChangeQuery.data?.scheduledChange ?? null}
+      creditHistory={creditHistory}
+      billingHistory={billingHistory}
+    />
   );
 }

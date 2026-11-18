@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, Clock, Cloud, GitBranch, Puzzle, Terminal } from 'lucide-react';
+import { Bot, Clock, Cloud, GitBranch, Monitor, Puzzle, Terminal } from 'lucide-react';
 import type { StoredSession } from './types';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import Link from 'next/link';
@@ -67,6 +67,13 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
               <Bot className="h-3 w-3" />
               Agent Manager
+            </span>
+          );
+        } else if (platform === 'desktop') {
+          badge = (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-cyan-500/20 px-2 py-0.5 text-xs font-medium text-cyan-400">
+              <Monitor className="h-3 w-3" />
+              Desktop
             </span>
           );
         } else if (platform === 'slack') {

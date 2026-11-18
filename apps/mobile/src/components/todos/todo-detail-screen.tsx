@@ -1,0 +1,199 @@
+import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
+import { type Href } from 'expo-router';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { SectionHeader } from '@/components/home/section-header';
+import { QueryError } from '@/components/query-error';
+import { RenameModal } from '@/components/rename-modal';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
+import { TodoNotesSection } from '@/components/todos/todo-notes-section';
+import { TodoSessionRow } from '@/components/todos/todo-session-row';
+import { TodoStartActions } from '@/components/todos/todo-start-actions';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
+import { Circle, CircleCheck } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTodoItem, useTodoItemMutations } from '@/lib/hooks/use-todos';
+import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
+import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
+import { type TodoItemDetail } from '@/lib/todos/todo-types';
+
+const LISTS_HREF = '/(app)/(tabs)/(2_agents)' as Href;
+
+/** One done circle, and it means task completion only. */
+function TodoCompletionCircle({ todo }: Readonly<{ todo: TodoItemDetail }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const { update } = useTodoItemMutations(todo.listId);
+  const done = todo.doneAt !== null;
+
+  return (
+    <IconButton
+      onPress={() => {
+        if (!done) {
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
+        }
+        update.mutate({ id: todo.id, done: !done });
+      }}
+      {...selectableRowA11y({ multi: true, selected: done })}
+      accessibilityLabel={done ? t('todos.item.markOpen') : t('todos.item.markDone')}
+    >
+      {done ? (
+        <CircleCheck size={24} color={colors.primary} />
+      ) : (
+        <Circle size={24} color={colors.mutedForeground} />
+      )}
+    </IconButton>
+  );
+}
+
+/** Marks a not-done task done once one of its sessions' pull request is verified. */
+function TodoDonePrompt({ todo }: Readonly<{ todo: TodoItemDetail }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const { update } = useTodoItemMutations(todo.listId);
+  const mayBeDone = todo.doneAt === null && todo.sessions.some(session => session.prVerified);
+  if (!mayBeDone) {
+    return null;
+  }
+  return (
+    <View className="flex-row px-4 pt-2">
+      <Pressable
+        onPress={() => {
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
+          update.mutate({ id: todo.id, done: true });
+        }}
+        accessibilityRole="button"
+        className="flex-row items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 active:opacity-70"
+      >
+        <CircleCheck size={14} color={colors.primaryForeground} />
+        <Text className="text-sm font-medium text-primary-foreground">
+          {t('todos.item.markDonePrompt')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
+  const { t } = useTranslation();
+  const { bottom } = useSafeAreaInsets();
+  const { update, unlinkSession } = useTodoItemMutations(todo.listId);
+  const now = useNowTicker(60_000);
+  const [renaming, setRenaming] = useState(false);
+  const listLabel = [todo.list.emoji, todo.list.name].filter(Boolean).join(' ');
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        title={todo.title}
+        eyebrow={listLabel}
+        titleNumberOfLines={2}
+        reserveTitleSpace
+        backFallback={LISTS_HREF}
+        onTitlePress={() => {
+          setRenaming(true);
+        }}
+        onTitlePressAccessibilityHint={t('todos.item.renameTitle')}
+        inlineActions={<TodoCompletionCircle todo={todo} />}
+      />
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: bottom + 24 }}
+        >
+          <TodoDonePrompt todo={todo} />
+          <TodoNotesSection todo={todo} />
+          {/* The notes block above ends flush, so the sessions header owns the
+              break between the two sections: `reserveLabelAir` puts the label at
+              the bottom of the 28 dp air box with the row's 9 dp padding above
+              it (about 23 dp of air) and the same 9 dp below it that the notes
+              header leaves before its body. */}
+          <SectionHeader label={t('todos.item.sessions')} reserveLabelAir />
+          {todo.sessions.length === 0 ? (
+            <Text className="px-4 pb-2 text-sm text-ink2">{t('todos.item.noSessions')}</Text>
+          ) : (
+            todo.sessions.map(session => (
+              <TodoSessionRow
+                key={session.sessionId}
+                todo={todo}
+                session={session}
+                now={now}
+                onUnlink={sessionId => {
+                  unlinkSession.mutate({ id: todo.id, sessionId });
+                }}
+              />
+            ))
+          )}
+          <TodoStartActions todo={todo} organizationId={todo.list.organizationId} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+      {renaming ? (
+        <RenameModal
+          title={t('todos.item.renameTitle')}
+          placeholder={t('todos.item.titleLabel')}
+          initialValue={todo.title}
+          maxLength={TODO_TITLE_MAX_LENGTH}
+          onSave={async name => {
+            await update.mutateAsync({ id: todo.id, title: name });
+          }}
+          onClose={() => {
+            setRenaming(false);
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/** One to-do: its title over its list, Markdown notes, linked sessions, and the ways to reach or start one. */
+export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
+  const query = useTodoItem(itemId);
+  const todo = query.data;
+  const errorView = selectTodoQueryErrorView(query.error);
+
+  if (todo) {
+    return <TodoDetailBody key={todo.id} todo={todo} />;
+  }
+
+  // The loaded screen draws the to-do's list on the eyebrow line. A to-do that
+  // loads always carries its list, so this shell keeps the line reserved: while
+  // the read runs it carries the placeholder bar, and after the read fails the
+  // same line stays blank, so the title holds the position the payload gives it
+  // without an animation that the failure cannot finish.
+  const eyebrow: HeaderEyebrow =
+    query.isFetching && !query.isError ? { kind: 'loading' } : { kind: 'held' };
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        title=""
+        titleNumberOfLines={2}
+        reserveTitleSpace
+        {...eyebrowHeaderProps(eyebrow)}
+        backFallback={LISTS_HREF}
+      />
+      {query.isError ? (
+        <QueryError
+          variant={errorView.variant}
+          placement="top"
+          onRetry={errorView.showRetry ? () => void query.refetch() : undefined}
+          isRetrying={query.isFetching}
+        />
+      ) : (
+        <View className="gap-3 px-4 pt-4">
+          <Skeleton className="h-7 w-3/4 rounded" />
+          <Skeleton className="h-4 w-1/2 rounded" />
+        </View>
+      )}
+    </View>
+  );
+}

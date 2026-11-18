@@ -9,7 +9,7 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 
-import { formatCost } from './context-usage-display';
+import { CURRENCY_ZERO_THRESHOLD } from '@/lib/format';
 
 type SessionCostBreakdownTotals = {
   input: number;
@@ -216,7 +216,7 @@ export function getOlderActivityCostUsd(
   if (residualUsd <= COST_RECONCILIATION_EPSILON_USD) {
     return 0;
   }
-  return formatCost(residualUsd) === '$0.0000' ? 0 : residualUsd;
+  return residualUsd < CURRENCY_ZERO_THRESHOLD ? 0 : residualUsd;
 }
 
 /**

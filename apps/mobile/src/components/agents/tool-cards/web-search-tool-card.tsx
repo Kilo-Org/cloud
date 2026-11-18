@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Globe } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 
@@ -8,6 +9,7 @@ import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 
 /**
  * Sheet body for a websearch/codesearch/webfetch tool part: the output block
@@ -29,6 +31,7 @@ export function WebSearchToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -36,8 +39,12 @@ export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={Globe}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: toolStatusLabel(t, part.state.status),
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

@@ -76,18 +76,31 @@ test('Android fingerprint skips only Expo extra beyond defaults', () => {
   assert.deepEqual(options.platforms, ['android']);
   assert.equal(options.silent, true);
   assert.notEqual(options.sourceSkips, 0);
+  // The generated tree is ignored so the hash is input-deterministic across
+  // worktrees and machines, and module JS and tests stay out of it.
+  assert.deepEqual(options.ignorePaths, [
+    'android/**',
+    'modules/**/build/**',
+    'modules/*/src/**',
+    'modules/**/*.test.ts',
+  ]);
   assert.deepEqual(
     options.extraSources.map(source => ({
       type: source.type,
       id: source.id,
       contents: source.contents,
+      filePath: source.filePath,
     })),
     [
       {
         type: 'contents',
         id: 'repoRootNativeInputs',
         contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+        filePath: undefined,
       },
+      // A local module carries no package.json identity for Expo to hash, so
+      // its Android sources only key a build through this directory.
+      { type: 'dir', id: undefined, contents: undefined, filePath: 'modules' },
     ]
   );
 });
@@ -197,6 +210,27 @@ test('Android cache miss builds once, publishes, then reuses the APK', async () 
   assert.equal(builds, 1);
   assert.equal(installed.length, 2);
   assert.equal(installed[0], installed[1]);
+});
+
+test('Android remote miss with requireRemote fails without a local build', async () => {
+  const d = deps();
+  const serial = 'emulator-required';
+  writeClaim(d.claimRoot, serial, d.worktreeRoot);
+  let builds = 0;
+  let installs = 0;
+  d.fetchRemote = async () => undefined;
+  d.requireRemote = true;
+  d.build = async () => {
+    builds += 1;
+    throw new Error('local build must not run');
+  };
+  d.install = () => {
+    installs += 1;
+  };
+
+  await assert.rejects(() => runAndroidBuild(serial, d), /KILO_REMOTE_NATIVE=required/);
+  assert.equal(builds, 0);
+  assert.equal(installs, 0);
 });
 
 test('Android cache hit with the wrong actual package id rebuilds before install', async () => {

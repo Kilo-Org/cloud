@@ -8,7 +8,10 @@ KILO_WEB_API_BASE_URL=http://localhost:3000
 # as KILO_API_URL). Containers cannot use localhost (that resolves to the
 # container itself). host.docker.internal works under OrbStack; on Docker
 # Desktop the wrangler container network may not get that mapping — use the
-# Docker Desktop host gateway IP http://192.168.65.254:3000 instead (same
-# convention as services/wasteland).
+# Docker Desktop host gateway IP http://192.168.65.254:3000 instead.
 # @url nextjs
 KILO_CLI_API_URL=http://host.docker.internal:3000
+
+# Where a benchmark container posts a case outcome after losing its caller. It
+# must reach this worker's dev port from inside the container.
+BENCH_RESULT_URL=http://host.docker.internal:8814/container/case-result

@@ -1,22 +1,31 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useCallback } from 'react';
 import { ActionSheetIOS, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { collectCopyableText } from './collect-copyable-text';
+import { i18n } from '@/i18n';
+
+import { collectCopyableText, messageTextParts } from './collect-copyable-text';
+import { COPY_TOAST_DURATION_MS } from './copy-toast-duration';
 
 export function useMessageCopy() {
   const copyMessage = useCallback(async (message: StoredMessage) => {
-    const text = collectCopyableText(message);
+    // Copy message puts the message's own text on the clipboard: the thinking
+    // block above a reply and its tool calls are not message content.
+    const text = collectCopyableText({ parts: messageTextParts(message.parts) });
     if (!text) {
       return;
     }
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Copy Text', 'Cancel'], cancelButtonIndex: 1 },
+        {
+          options: [i18n.t('agentChat.messageDetails.copyText'), i18n.t('common.cancel')],
+          cancelButtonIndex: 1,
+        },
         buttonIndex => {
           if (buttonIndex === 0) {
             void performCopy(text);
@@ -40,9 +49,9 @@ export function useMessageCopy() {
 export async function performCopy(text: string): Promise<void> {
   try {
     await Clipboard.setStringAsync(text);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    toast.success('Copied to clipboard');
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
+    toast.success(i18n.t('common.copiedToClipboard'), { duration: COPY_TOAST_DURATION_MS });
   } catch {
-    toast.error('Could not copy to clipboard');
+    toast.error(i18n.t('common.couldNotCopyToClipboard'));
   }
 }

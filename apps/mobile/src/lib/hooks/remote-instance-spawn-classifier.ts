@@ -74,6 +74,91 @@ export type { CreateRemoteSessionInput };
  */
 export const SESSION_OWNER_NOT_FOUND_LITERAL = 'Session owner not found';
 
+/**
+ * Clone/import delivered-error literals from the CLI `create_session` reply.
+ * The clone flow reuses the connection-scoped spawn command with a
+ * `cloneFromKiloSessionId` field; the CLI answers failures with these exact
+ * bare strings, which the route maps to the inline "cannot continue" reasons
+ * instead of the generic spawn toast. `cloud session import failed` is
+ * deliberately not a named literal: it shares the every-other-delivered-string
+ * fallback (`agentChat.newSession.importFailed`).
+ */
+const CLOUD_SESSION_NOT_FOUND_LITERAL = 'cloud session not found';
+const CLOUD_SESSION_IMPORT_UNAUTHORIZED_LITERAL = 'cloud session import unauthorized';
+const CLOUD_SESSION_IMPORT_ACCESS_DENIED_LITERAL = 'cloud session import access denied';
+// The fork cut message is not in the synced source yet: a retry can succeed.
+const CLOUD_SESSION_CUT_NOT_FOUND_LITERAL = 'cloud session cut not found';
+
+/**
+ * Inline reason for a fork cut the source has not synced yet (CLI literal
+ * above, or the cloud-destination `clone_cut_not_found` code). Unlike the
+ * other clone failures it keeps Start enabled: a retry can succeed.
+ */
+export const FORK_CUT_NOT_SYNCED_KEY = 'agentChat.newSession.forkCutNotSynced';
+
+/**
+ * Map a delivered clone/import error string to the i18n key shown inline under
+ * "Run on". `cloud session not found` → notFound; `cloud session cut not
+ * found` → forkCutNotSynced; unauthorized/denied → accessDenied; every other
+ * delivered string (including `cloud session import failed`) → importFailed.
+ */
+export function resolveCloneImportFailureKey(message: string): string {
+  if (message === CLOUD_SESSION_NOT_FOUND_LITERAL) {
+    return 'common.notFound';
+  }
+  if (message === CLOUD_SESSION_CUT_NOT_FOUND_LITERAL) {
+    return FORK_CUT_NOT_SYNCED_KEY;
+  }
+  if (
+    message === CLOUD_SESSION_IMPORT_UNAUTHORIZED_LITERAL ||
+    message === CLOUD_SESSION_IMPORT_ACCESS_DENIED_LITERAL
+  ) {
+    return 'common.accessDenied';
+  }
+  return 'agentChat.newSession.importFailed';
+}
+
+/**
+ * Classify a non-retryable spawn outcome for the clone/import flow. Returns
+ * the inline failure i18n key when the cause is a delivered
+ * `CommandDeliveredError` (the CLI's own clone/import reply), or null when the
+ * outcome is not a delivered string (a structured `UserWebCommandError`, a
+ * malformed envelope, or a retryable outcome) — callers then fall back to the
+ * ordinary spawn handling.
+ */
+export function resolveCloneImportFailure(outcome: CreateSessionOutcome): string | null {
+  if (outcome.status !== 'nonRetryable') {
+    return null;
+  }
+  if (!(outcome.cause instanceof CommandDeliveredError)) {
+    return null;
+  }
+  return resolveCloneImportFailureKey(outcome.cause.message);
+}
+
+/**
+ * Capability gate for a clone spawn, checked before the spawn is sent. A full
+ * clone is optimistic: only an explicit `sessionClone: false` refuses it. A
+ * fork cut fails closed: it needs `sessionCloneAtMessage: true`, because a CLI
+ * without it ignores the cut and clones the whole session. Returns the inline
+ * i18n key for a refusal, or null when the spawn may go ahead.
+ */
+export function resolveCloneCapabilityRefusal(
+  fields: { cloneFromKiloSessionId?: string | null; cloneUpToMessageId?: string | null },
+  instance: { capabilities?: { sessionClone?: boolean; sessionCloneAtMessage?: boolean } }
+): string | null {
+  if (!fields.cloneFromKiloSessionId) {
+    return null;
+  }
+  if (instance.capabilities?.sessionClone === false) {
+    return 'agentChat.newSession.cliCannotContinue';
+  }
+  if (fields.cloneUpToMessageId && instance.capabilities?.sessionCloneAtMessage !== true) {
+    return 'agentChat.newSession.cliCannotFork';
+  }
+  return null;
+}
+
 export type CreateSessionOutcome =
   | { status: 'ready'; sessionID: KiloSessionId }
   | { status: 'retryable'; reason: string; cause: unknown }
@@ -163,6 +248,11 @@ export function buildCreateRemoteSessionInput(fields: {
   mode?: string;
   selection?: ModelSelection;
   organizationId?: string | null;
+  /** Relative launch directory; omitted when empty (the CLI falls back to its launch directory). */
+  directory?: string;
+  cloneFromKiloSessionId?: string | null;
+  /** Inclusive fork cut; sent only together with `cloneFromKiloSessionId`. */
+  cloneUpToMessageId?: string | null;
 }): CreateRemoteSessionInput | undefined {
   const input: CreateRemoteSessionInput = {};
   if (fields.mode) {
@@ -178,7 +268,20 @@ export function buildCreateRemoteSessionInput(fields: {
   if (fields.organizationId) {
     input.orgId = fields.organizationId;
   }
-  return input.agent !== undefined || input.model !== undefined || input.orgId !== undefined
+  if (fields.directory) {
+    input.directory = fields.directory;
+  }
+  if (fields.cloneFromKiloSessionId) {
+    input.cloneFromKiloSessionId = fields.cloneFromKiloSessionId;
+    if (fields.cloneUpToMessageId) {
+      input.cloneUpToMessageId = fields.cloneUpToMessageId;
+    }
+  }
+  return input.agent !== undefined ||
+    input.model !== undefined ||
+    input.orgId !== undefined ||
+    input.directory !== undefined ||
+    input.cloneFromKiloSessionId !== undefined
     ? input
     : undefined;
 }

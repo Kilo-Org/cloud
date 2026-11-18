@@ -30,10 +30,6 @@ import {
   generateDevVars,
 } from './parse';
 
-// ---------------------------------------------------------------------------
-// Auto-created local secrets
-// ---------------------------------------------------------------------------
-
 const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
 const FLY_ORG_SLUG_ENV_KEY = 'FLY_ORG_SLUG';
 const DEFAULT_FLY_ORG_SLUG = 'kilo-dev';
@@ -43,7 +39,9 @@ const GENERATED_LOCAL_SECRET_KEYS = new Set([
   'INTERNAL_API_SECRET',
   'CALLBACK_TOKEN_SECRET',
   'BYOK_ENCRYPTION_KEY',
+  'SESSION_SYNC_SECRET',
 ]);
+const PUBLIC_SANDBOX_TUNNEL_HOST = /\.trycloudflare\.com(?:\/|$)/i;
 
 function createFlyTokenAutoCreate(flyOrgSlug: string): EnvLocalAutoCreate {
   return {
@@ -70,10 +68,6 @@ function maybeAddEnvLocalAutoCreate(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Source key derivation (for cross-worker consistency checks)
-// ---------------------------------------------------------------------------
-
 function getEnvLocalSourceKey(key: string, annotation: Annotation): string | undefined {
   switch (annotation.type) {
     case 'from':
@@ -89,10 +83,6 @@ function getEnvLocalSourceKey(key: string, annotation: Annotation): string | und
       return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Discovery
-// ---------------------------------------------------------------------------
 
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -129,10 +119,6 @@ function findDevVarsExamples(repoRoot: string): string[] {
   return results.sort();
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler env detection from package.json dev script
-// ---------------------------------------------------------------------------
-
 function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefined {
   const pkgPath = path.join(repoRoot, workerDir, 'package.json');
   if (!fs.existsSync(pkgPath)) return undefined;
@@ -146,10 +132,6 @@ function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefi
     return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Wrangler config: extract vars and secrets_store_secrets bindings
-// ---------------------------------------------------------------------------
 
 type JsonObject = Record<string, unknown>;
 
@@ -372,10 +354,6 @@ function extractSecretsStoreBindings(repoRoot: string, workerDir: string): Secre
   return bindings;
 }
 
-// ---------------------------------------------------------------------------
-// Local secrets store check (via wrangler CLI)
-// ---------------------------------------------------------------------------
-
 const execFileAsync = promisify(execFile);
 
 type SecretsStoreQuery = {
@@ -551,10 +529,6 @@ function collectLocalSecretSources(
   return sources;
 }
 
-// ---------------------------------------------------------------------------
-// Plan computation
-// ---------------------------------------------------------------------------
-
 function computePlan(
   repoRoot: string,
   serviceFilter?: Set<string>,
@@ -725,6 +699,7 @@ function computePlan(
         const source = resolvedSources.get(key);
         if (key === FLY_TOKEN_ENV_KEY && shouldCreateFlyToken) continue;
         if (oldVal && source === 'default') continue;
+        if (oldVal && PUBLIC_SANDBOX_TUNNEL_HOST.test(oldVal)) continue;
         if (oldVal !== newVal) {
           keyChanges.push({ key, oldValue: oldVal, newValue: newVal });
         }
@@ -747,7 +722,9 @@ function computePlan(
 
   // --- .env.development.local changes ---
   const envDevLocalChanges: EnvDevLocalChange[] = [];
-  const processEnvDevLocal = !serviceFilter || serviceFilter.has('nextjs');
+  // apps/ai-gateway runs with the web app's env files (see its scripts/dev.sh).
+  const processEnvDevLocal =
+    !serviceFilter || serviceFilter.has('nextjs') || serviceFilter.has('ai-gateway');
 
   const envDevLocalExamplePath = path.join(repoRoot, 'apps/web/.env.development.local.example');
   if (processEnvDevLocal && fs.existsSync(envDevLocalExamplePath)) {

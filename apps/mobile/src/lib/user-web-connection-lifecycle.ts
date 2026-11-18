@@ -5,7 +5,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
 
 type NativeLifecycleSources = {
-  getAppState: () => AppStateStatus;
+  getAppState: () => typeof AppState.currentState;
   onAppStateChange: (listener: (state: AppStateStatus) => void) => () => void;
   onConnectivityChange: (listener: (state: ConnectivityState) => void) => () => void;
 };
@@ -21,10 +21,17 @@ const nativeLifecycleSources: NativeLifecycleSources = {
   onConnectivityChange: listener => addEventListener(listener),
 };
 
+// A socket outlives short trips out of the app (app switcher, notification
+// shade, a quick reply). After this delay in the background it closes, and no
+// socket or ticket is opened until the app is active again, so a backgrounded
+// app streams and renders nothing.
+export const HIDDEN_SOCKET_PAUSE_DELAY_MS = 15_000;
+
 export function createNativeUserWebConnectionLifecycleHooks(
   sources: NativeLifecycleSources = nativeLifecycleSources
 ): ConnectionLifecycleHooks {
   return {
+    hiddenPauseDelayMs: HIDDEN_SOCKET_PAUSE_DELAY_MS,
     onVisibilityChange: (onResume, onHidden) => {
       let state = sources.getAppState();
       return sources.onAppStateChange(nextState => {
@@ -40,11 +47,19 @@ export function createNativeUserWebConnectionLifecycleHooks(
       });
     },
     onOnline: onOnline => {
-      // Boot is unknown: until NetInfo settles we cannot claim the socket is
-      // reachable, so the first confirmed online is a recovery from unknown.
-      let previousStatus: 'online' | 'offline' | 'unknown' = 'unknown';
+      // NetInfo replays the current connectivity to every new listener, so the
+      // first emission after subscribing is a baseline, not a recovery. Only a
+      // later offline/unknown → online transition is a real recovery. Firing on
+      // the baseline re-entered the SDK metadata-recovery retry on every failed
+      // open (the hook is re-registered per failure), an endless retry loop
+      // that kept the skeleton up and never surfaced the terminal load error.
+      let previousStatus: 'online' | 'offline' | 'unknown' | null = null;
       return sources.onConnectivityChange(state => {
         const status = connectivityStatus(state);
+        if (previousStatus === null) {
+          previousStatus = status;
+          return;
+        }
         // Resume only on a real recovery: offline → online, or the first
         // online after an unknown boot. Never while unknown, and never on
         // unknown → offline.

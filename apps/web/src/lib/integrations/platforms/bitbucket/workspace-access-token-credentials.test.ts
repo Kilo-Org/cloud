@@ -6,9 +6,9 @@ import {
   BitbucketWorkspaceAccessTokenCredentialRowSchema,
   buildBitbucketWorkspaceAccessTokenAad,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
-import { db } from '@/lib/drizzle';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   kilocode_users,
   organization_audit_logs,
@@ -18,8 +18,8 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import type * as OrganizationAuditLogsModule from '@/lib/organizations/organization-audit-logs';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type * as OrganizationAuditLogsModule from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
 import {
   connectBitbucketWorkspaceAccessToken,
@@ -31,15 +31,15 @@ import {
   readCachedBitbucketWorkspaceAccessTokenRepositories,
 } from './workspace-access-token-repository-cache';
 
-jest.mock('@/lib/organizations/organization-audit-logs', () => {
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => {
   const actual = jest.requireActual<typeof OrganizationAuditLogsModule>(
-    '@/lib/organizations/organization-audit-logs'
+    '@kilocode/web-shared/lib/organizations/organization-audit-logs'
   );
   return { ...actual, createAuditLog: jest.fn(actual.createAuditLog) };
 });
 
 const actualCreateAuditLog = jest.requireActual<typeof OrganizationAuditLogsModule>(
-  '@/lib/organizations/organization-audit-logs'
+  '@kilocode/web-shared/lib/organizations/organization-audit-logs'
 ).createAuditLog;
 const mockCreateAuditLog = jest.mocked(createAuditLog);
 
@@ -53,7 +53,7 @@ const mockBitbucketCredentialEncryptionConfig = {
   publicKey: Buffer.from(testKeyPair.publicKey).toString('base64'),
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID() {
     return mockBitbucketCredentialEncryptionConfig.keyId;
   },
@@ -1144,6 +1144,31 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     await db
       .update(kilocode_users)
       .set({ blocked_reason: 'policy_violation' })
+      .where(eq(kilocode_users.id, actor.id));
+    const fetchMock = jest.spyOn(global, 'fetch');
+
+    await expect(
+      connectBitbucketWorkspaceAccessToken({
+        organizationId: organization.id,
+        actorUserId: actor.id,
+        accessToken: ACCESS_TOKEN,
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(
+      db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organization.id))
+    ).resolves.toEqual([]);
+  });
+
+  it('rejects an organization owner whose block timestamp is set before sending the credential', async () => {
+    const actor = await insertTestUser();
+    const organization = await createTestOrganization('Timestamp Owner Organization', actor.id, 0);
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
       .where(eq(kilocode_users.id, actor.id));
     const fetchMock = jest.spyOn(global, 'fetch');
 

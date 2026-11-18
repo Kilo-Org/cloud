@@ -8,8 +8,22 @@
  * in the prompt (`__fake__:<scenario>[:<args>]`) and interpreted by that fake.
  */
 
+import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
-import { mintApiToken, mintStreamTicket, type TestUser } from './auth.js';
+import { z } from 'zod';
+import {
+  getSandboxAllocationRequest,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import type {
+  CloudAgentWorkspaceSummary,
+  CloudAgentWorkspacesPage,
+  GetCloudAgentWorkspaceResult,
+} from '@kilocode/session-ingest-contracts';
+import { mintApiToken, mintStreamTicket } from './auth.js';
+import { resolveFakeAdminToken } from './fake-llm-admin.js';
+import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
+import type { FakeScenarioStatus } from './fake-llm-server.js';
 
 /**
  * Which tRPC surface the driver exercises.
@@ -28,18 +42,61 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
+/**
+ * Identity-only user shape for the driver. The local profile's `TestUser`
+ * (which also carries `api_token_pepper`) satisfies it; the deployed profile
+ * supplies identity only and authenticates with a bearer token.
+ */
+export type DriverUser = { id: string; email?: string; api_token_pepper?: string | null };
+
 export type DriverConfig = {
+  /**
+   * Track returned session IDs, including prepare success followed by initiation
+   * failure. The Kilo root id rides along so local reclaim can prove which
+   * sandbox the session owned.
+   */
+  onSessionCreated?: (sessionId: string, kiloSessionId: string) => void;
   workerUrl: string;
-  user: TestUser;
-  nextAuthSecret: string;
+  expectControlPlane?: boolean;
+  user: DriverUser;
+  /** Local profile only: mints JWTs. Deployed profile uses `bearerToken`. */
+  nextAuthSecret?: string;
+  /**
+   * Deployed profile: the source personal API token. Used verbatim only when
+   * `getBearerToken` is absent. Takes precedence over `nextAuthSecret` minting.
+   */
+  bearerToken?: string;
+  /**
+   * Deployed profile: resolves the bearer for each tRPC call. The control token
+   * is short-lived, so the provider refreshes it. Takes precedence over
+   * `bearerToken`.
+   */
+  getBearerToken?: () => Promise<string>;
+  /** Deployed profile: fetches a fresh stream ticket for a session. */
+  fetchStreamTicket?: (sessionId: string) => Promise<string>;
+  /**
+   * When explicitly `false`, omit `x-skip-balance-check`. Both e2e profiles
+   * send it: the deterministic fake LLM performs no billable inference, so the
+   * driver never needs a funded user.
+   */
+  skipBalanceCheck?: boolean;
   /**
    * Shared internal-API secret required by `prepareSession` /
-   * `updateSession`. Only the legacy flow needs it; unified `start` is
-   * `protectedProcedure`. Loaded from `.dev.vars` in the runner.
+   * `updateSession`. The legacy flow and the e2e surface both present it; it is
+   * loaded from `.dev.vars` for the Docker profile and resolved from the
+   * deployed/local-HTTP profile environment otherwise.
    */
   internalApiSecret?: string;
   /** HTTPS git URL to bootstrap the workspace. Public tiny repos work fine. */
   gitUrl: string;
+  /**
+   * GitHub `owner/repo` for token-backed clones (prepareSession `githubRepo`
+   * / unified `repository.type: 'github'`). Mutually exclusive with `gitUrl`
+   * on the wire. Use the cloud-worktree-setup user's installation.
+   */
+  githubRepo?: string;
+  /** Optional checkout ref forwarded on start (`upstreamBranch` / `repository.branch`). */
+  branch?: string;
   /**
    * Model ID sent to tRPC `start`. Must be accepted by the fake LLM gateway's
    * `/api/openrouter/models/validate` response - the default
@@ -55,6 +112,13 @@ export type DriverConfig = {
    * `/test/release`, `/test/gate-status`, and `/test/requests`.
    */
   fakeLlmUrl: string;
+  /**
+   * Explicit sandbox allocation every session this driver starts must use.
+   * Scenarios call `startSession` with a prompt only, so the driver owns both
+   * the value and the forwarding to the unified `runtime.sandboxAllocation`.
+   * Absent keeps the default allocation path and changes nothing.
+   */
+  sandboxAllocation?: SandboxAllocation;
 };
 
 export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
@@ -63,10 +127,6 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
   model: 'kilo/fake-deterministic',
   fakeLlmUrl: process.env.FAKE_LLM_URL ?? 'http://localhost:8811',
 };
-
-// ---------------------------------------------------------------------------
-// tRPC helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Minimal tRPC HTTP-link client. The cloud-agent-next server mounts tRPC
@@ -79,25 +139,77 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
  * The web client uses `httpLink` (see apps/web/src/lib/cloud-agent/
  * cloud-agent-client.ts) so we match that exact wire format.
  */
+function summarizeTrpcError(text: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return 'unparseable error response';
+  }
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('error' in parsed) ||
+    typeof parsed.error !== 'object' ||
+    parsed.error === null
+  ) {
+    return 'invalid error response';
+  }
+  const message =
+    'message' in parsed.error && typeof parsed.error.message === 'string'
+      ? parsed.error.message
+          .replace(
+            /(?:file:\/\/)?\/(?:Users|home|workspace|private|var|tmp)\/[^\s"')]+/g,
+            '[redacted-path]'
+          )
+          .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer [redacted]')
+          .slice(0, 240)
+      : 'request rejected';
+  if (
+    'data' in parsed.error &&
+    typeof parsed.error.data === 'object' &&
+    parsed.error.data !== null &&
+    'code' in parsed.error.data &&
+    typeof parsed.error.data.code === 'string'
+  ) {
+    return `${parsed.error.data.code}: ${message}`;
+  }
+  return message;
+}
+
 export async function trpcCall<T>(
   config: DriverConfig,
   procedure: string,
   input: unknown,
-  opts?: { internalApiSecret?: string; method?: 'GET' | 'POST' }
+  opts?: {
+    internalApiSecret?: string;
+    method?: 'GET' | 'POST';
+    signal?: AbortSignal;
+  }
 ): Promise<T> {
   const method = opts?.method ?? 'POST';
   const url = new URL(`/trpc/${procedure}`, config.workerUrl);
+  const bearer = config.getBearerToken
+    ? await config.getBearerToken()
+    : (config.bearerToken ??
+      mintApiToken(config.user, config.nextAuthSecret, 60 * 60, config.kilocodeOrganizationId));
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${mintApiToken(config.user, config.nextAuthSecret)}`,
-    // cloud-agent-client.ts sends this for App Builder callers; it cleanly
-    // skips dev billing checks and is safe to always send from the driver.
-    'x-skip-balance-check': 'true',
+    Authorization: `Bearer ${bearer}`,
   };
+  if (config.skipBalanceCheck !== false) {
+    // cloud-agent-client.ts sends this for skipped-balance callers; it cleanly
+    // skips dev billing checks. Both e2e profiles send it, because the fake
+    // LLM performs no billable inference.
+    headers['x-skip-balance-check'] = 'true';
+    if (config.internalApiSecret) {
+      headers['x-internal-api-key'] = config.internalApiSecret;
+    }
+  }
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;
   }
-  const fetchOpts: RequestInit = { method, headers };
+  const fetchOpts: RequestInit = { method, headers, signal: opts?.signal };
   if (method === 'POST') {
     fetchOpts.body = JSON.stringify(input);
   } else {
@@ -107,16 +219,111 @@ export async function trpcCall<T>(
   const text = await response.text();
   if (!response.ok) {
     throw new Error(
-      `tRPC ${procedure} failed: ${response.status} ${response.statusText} — ${text}`
+      `tRPC ${procedure} failed: ${response.status} ${response.statusText} — ${summarizeTrpcError(text)}`
     );
   }
-  const parsed = JSON.parse(text);
-  return parsed?.result?.data as T;
+  const parsed: unknown = JSON.parse(text);
+  const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
+  return envelope.result.data as T;
 }
 
-// ---------------------------------------------------------------------------
-// High-level session operations
-// ---------------------------------------------------------------------------
+export function listHostedWorkspaces(
+  config: DriverConfig,
+  input: { repositoryUrl?: string; limit?: number; sessionLimit?: number },
+  signal?: AbortSignal
+): Promise<CloudAgentWorkspacesPage> {
+  return trpcCall<CloudAgentWorkspacesPage>(config, 'listHostedWorkspaces', input, {
+    method: 'GET',
+    signal,
+  });
+}
+
+export function getHostedWorkspace(
+  config: DriverConfig,
+  workspaceId: string,
+  signal?: AbortSignal
+): Promise<GetCloudAgentWorkspaceResult> {
+  return trpcCall<GetCloudAgentWorkspaceResult>(
+    config,
+    'getHostedWorkspace',
+    { workspaceId, sessionLimit: 100 },
+    { method: 'GET', signal }
+  );
+}
+
+export type { CloudAgentWorkspaceSummary };
+
+/**
+ * Passive, workspace-keyed status projection. Mirrors the fields the proof
+ * asserts; the full output schema is owned by
+ * `src/router/handlers/hosted-workspace-status.ts`.
+ */
+export type HostedWorkspaceStatus = {
+  workspaceId: string;
+  userId: string;
+  organizationId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  observedAt: number;
+  compute: {
+    status: string;
+    detailCode: string;
+    provider: string;
+    observedAt: number;
+    estimatedSleepAt: number | null;
+  };
+  activity: { activeSessionCount: number; hasActiveTurn: boolean };
+  wakeOnInput: {
+    available: boolean;
+    blockedReason: 'deleting' | 'deleted' | 'billing_blocked' | 'billing_status_unavailable' | null;
+  };
+  billing: {
+    payer: { type: 'user' | 'org'; id: string } | null;
+    actor: { type: 'user' | 'bot'; id: string } | null;
+    onBehalfOf: { type: 'user' | 'org'; id: string } | null;
+    sku: string | null;
+    blocked: boolean | null;
+    enforcementRequested: boolean;
+    intervalStartedAt: number | null;
+    rate: { rateCentsPerSecond: string; estimatedHourlyMicrodollars: number } | null;
+  };
+  deletion: {
+    started: boolean;
+    completed: boolean;
+    startedAt: number | null;
+    phase: 'not_started' | 'runtime_cleanup' | 'finalizing' | 'completed';
+    sessionCount: number;
+    runtimeLocationCount: number;
+    completedRuntimeLocationCount: number;
+    remainingRuntimeLocationCount: number;
+    deletedSessionIds: string[];
+  };
+};
+
+export function getHostedWorkspaceStatus(
+  config: DriverConfig,
+  input: { workspaceId: string; kilocodeOrganizationId?: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceStatus> {
+  return trpcCall<HostedWorkspaceStatus>(config, 'getHostedWorkspaceStatus', input, {
+    method: 'GET',
+    signal,
+  });
+}
+
+/**
+ * Destroy one Cloud workspace and every remaining root through the journaled
+ * `deleteWorktree` operation. A completed workspace replays its tombstone.
+ */
+export function deleteWorktree(
+  config: DriverConfig,
+  input: { worktreeId: string; kilocodeOrganizationId?: string; onlyIfSoleSessionId?: string },
+  signal?: AbortSignal
+): Promise<{ success: true; deletedSessionIds: string[] }> {
+  return trpcCall<{ success: true; deletedSessionIds: string[] }>(config, 'deleteWorktree', input, {
+    internalApiSecret: config.internalApiSecret,
+    ...(signal ? { signal } : {}),
+  });
+}
 
 export type StartSessionResult = {
   cloudAgentSessionId: string;
@@ -130,12 +337,20 @@ export type StartSessionArgs = {
   prompt: string;
   mode?: string;
   shallow?: boolean;
+  branch?: string;
   callbackTarget?: CallbackTarget;
   messageId?: string;
+  /** Bounds the start HTTP call(s) from the caller's scenario deadline. */
+  signal?: AbortSignal;
 };
 
 /**
  * Start a new session using whichever API surface the scenario asked for.
+ *
+ * `config.sandboxAllocation` is the single owner of the explicit allocation:
+ * scenarios pass only a prompt, so the unified start reads it from the driver
+ * config. The legacy surface has no supported explicit-allocation contract
+ * here, so it refuses before any request is issued.
  *
  * Both branches return the same `StartSessionResult` shape so downstream
  * scenario code (event assertions, callback assertions, etc.) doesn't care
@@ -146,37 +361,121 @@ export async function startSession(
   args: StartSessionArgs,
   api: ApiVersion = 'unified'
 ): Promise<StartSessionResult> {
-  if (api === 'legacy') return startSessionLegacy(config, args);
-  return startSessionUnified(config, args);
+  const allocation = config.sandboxAllocation;
+  if (api === 'legacy' && allocation !== undefined) {
+    throw new Error(
+      'explicit sandbox allocation requires the unified API; rerun with --api=unified'
+    );
+  }
+  const started = {
+    ...args,
+    branch: args.branch ?? config.branch,
+  };
+  const result =
+    api === 'legacy'
+      ? await startSessionLegacy(config, started)
+      : await startSessionUnified(config, started, allocation);
+  if (api === 'unified') {
+    config.onSessionCreated?.(result.cloudAgentSessionId, result.kiloSessionId);
+  }
+  if (config.expectControlPlane && !result.cloudAgentSessionId.startsWith('workspace_')) {
+    throw new Error(
+      `Started ${result.cloudAgentSessionId}, but expected an enrolled workspace_* session; do not retry start`
+    );
+  }
+  return result;
 }
 
 async function startSessionUnified(
   config: DriverConfig,
-  args: StartSessionArgs
+  args: StartSessionArgs,
+  allocation: SandboxAllocation | undefined
 ): Promise<StartSessionResult> {
-  return trpcCall<StartSessionResult>(config, 'start', {
-    message: {
-      prompt: args.prompt,
-      ...(args.messageId ? { id: args.messageId } : {}),
-    },
-    agent: {
-      mode: args.mode ?? 'code',
-      model: config.model,
-    },
-    repository: {
-      type: 'git',
-      url: config.gitUrl,
-    },
-    ...(args.callbackTarget || config.kilocodeOrganizationId
-      ? {
-          options: {
-            ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
-            ...(config.kilocodeOrganizationId
-              ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
-              : {}),
+  if (args.callbackTarget) {
+    throw new Error('callbackTarget is accepted by prepareSession only; rerun with --api=legacy');
+  }
+  return trpcCall<StartSessionResult>(
+    config,
+    'start',
+    {
+      message: {
+        prompt: args.prompt,
+        ...(args.messageId ? { id: args.messageId } : {}),
+      },
+      agent: {
+        mode: args.mode ?? 'code',
+        model: config.model,
+      },
+      repository: config.githubRepo
+        ? {
+            type: 'github' as const,
+            repo: config.githubRepo,
+            ...(args.branch !== undefined ? { branch: args.branch } : {}),
+          }
+        : {
+            type: 'git' as const,
+            url: config.gitUrl,
+            ...(args.branch !== undefined ? { branch: args.branch } : {}),
           },
-        }
-      : {}),
+      ...(allocation === undefined
+        ? {}
+        : { runtime: { sandboxAllocation: getSandboxAllocationRequest(allocation) } }),
+      options: {
+        createdOnPlatform: 'cloud-agent-web',
+        ...(config.kilocodeOrganizationId
+          ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+          : {}),
+      },
+    },
+    { signal: args.signal }
+  );
+}
+
+/**
+ * Register a callback target on a session created through the unified `start`
+ * procedure. The unified input does not accept `callbackTarget`; the control
+ * plane reads the target from session metadata, and `updateSession` is the
+ * retained internal mutation that rewrites that field.
+ */
+export async function registerSessionCallback(
+  config: DriverConfig,
+  cloudAgentSessionId: string,
+  callbackTarget: CallbackTarget,
+  signal?: AbortSignal
+): Promise<void> {
+  if (!config.internalApiSecret) {
+    throw new Error(
+      'registerSessionCallback requires the e2e INTERNAL_API_SECRET (from .dev.vars for the Docker profile, or the resolved e2e secret for the deployed/local-HTTP profile)'
+    );
+  }
+  await trpcCall<{ success: boolean }>(
+    config,
+    'updateSession',
+    { cloudAgentSessionId, callbackTarget },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+}
+
+/**
+ * Dispatch the `prepareSession` procedure to the internal
+ * `/trpc/prepareSession` endpoint with the shared internal API secret. Both
+ * callers of the procedure — the legacy start and the browser-equivalent
+ * prepare — go through here so there is one place that decides, and the
+ * production tRPC handler stays the only prepare mutation.
+ */
+async function prepareSessionCall<T>(
+  config: DriverConfig,
+  input: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<T> {
+  if (!config.internalApiSecret) {
+    throw new Error(
+      'prepareSession requires the e2e INTERNAL_API_SECRET (from .dev.vars for the Docker profile, or the resolved e2e secret for the deployed/local-HTTP profile)'
+    );
+  }
+  return trpcCall<T>(config, 'prepareSession', input, {
+    internalApiSecret: config.internalApiSecret,
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -194,32 +493,27 @@ async function startSessionLegacy(
   config: DriverConfig,
   args: StartSessionArgs
 ): Promise<StartSessionResult> {
-  if (!config.internalApiSecret) {
-    throw new Error(
-      'legacy startSession requires INTERNAL_API_SECRET from .dev.vars — add it or pass api=unified'
-    );
-  }
-
   type PrepareResult = {
     cloudAgentSessionId: string;
     kiloSessionId: string;
   };
-  const prepared = await trpcCall<PrepareResult>(
+  const prepared = await prepareSessionCall<PrepareResult>(
     config,
-    'prepareSession',
     {
       prompt: args.prompt,
       mode: args.mode ?? 'code',
       model: config.model,
-      gitUrl: config.gitUrl,
+      ...(config.githubRepo ? { githubRepo: config.githubRepo } : { gitUrl: config.gitUrl }),
+      createdOnPlatform: 'cloud-agent-web',
       shallow: args.shallow ?? true,
+      ...(args.branch !== undefined ? { upstreamBranch: args.branch } : {}),
       ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
       ...(args.messageId ? { initialMessageId: args.messageId } : {}),
       ...(config.kilocodeOrganizationId
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),
     },
-    { internalApiSecret: config.internalApiSecret }
+    args.signal
   );
 
   type InitiateResult = {
@@ -230,9 +524,15 @@ async function startSessionLegacy(
     streamUrl?: string;
     status?: string;
   };
-  const initiated = await trpcCall<InitiateResult>(config, 'initiateFromKilocodeSessionV2', {
-    cloudAgentSessionId: prepared.cloudAgentSessionId,
-  });
+  config.onSessionCreated?.(prepared.cloudAgentSessionId, prepared.kiloSessionId);
+  const initiated = await trpcCall<InitiateResult>(
+    config,
+    'initiateFromKilocodeSessionV2',
+    {
+      cloudAgentSessionId: prepared.cloudAgentSessionId,
+    },
+    { signal: args.signal }
+  );
 
   return {
     cloudAgentSessionId: prepared.cloudAgentSessionId,
@@ -243,17 +543,303 @@ async function startSessionLegacy(
   };
 }
 
+export type WorktreeSessionResult = {
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+  worktreeId?: string;
+  cloudAgentWorktreeId?: string;
+  replayed?: boolean;
+};
+
+export async function prepareBrowserSession(
+  config: DriverConfig,
+  input: { prompt: string; operationKey?: string; autoCommit?: boolean },
+  signal?: AbortSignal
+): Promise<WorktreeSessionResult> {
+  const prepared = await prepareSessionCall<WorktreeSessionResult>(
+    config,
+    {
+      prompt: input.prompt,
+      mode: 'code',
+      model: config.model,
+      ...(config.githubRepo ? { githubRepo: config.githubRepo } : { gitUrl: config.gitUrl }),
+      shallow: true,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
+      autoInitiate: true,
+      operationKey: input.operationKey ?? randomUUID(),
+      autoCommit: input.autoCommit ?? true,
+      // The prepare schema accepts the same structured allocation request as the
+      // unified start; forward the driver selection so the browser helper never
+      // silently drops it.
+      ...(config.sandboxAllocation !== undefined
+        ? { sandboxAllocation: getSandboxAllocationRequest(config.sandboxAllocation) }
+        : {}),
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    signal
+  );
+  // Success only: a rejected prepare never produced a session to clean up.
+  config.onSessionCreated?.(prepared.cloudAgentSessionId, prepared.kiloSessionId);
+  return prepared;
+}
+
+export async function createWorktreeChat(
+  config: DriverConfig,
+  input: {
+    sourceKiloSessionId: string;
+    sourceCloudAgentSessionId: string;
+    operationKey?: string;
+  },
+  signal?: AbortSignal
+): Promise<WorktreeSessionResult> {
+  // A worktree chat creation does not allocate a new physical sandbox: the
+  // handler derives the child allocation from the source session's persisted
+  // workspace metadata, so `config.sandboxAllocation` is not read here and is
+  // not silently dropped. The source session's own start carried it.
+  const created = await trpcCall<WorktreeSessionResult>(
+    config,
+    'createWorktreeChat',
+    {
+      sourceKiloSessionId: input.sourceKiloSessionId,
+      sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'browser',
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+  // Success only, matching the legacy/unified start pattern.
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
+  return created;
+}
+
+type HostedWorkspaceCreateResponse = {
+  workspaceId: string;
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+  messageId?: string;
+  replayed?: boolean;
+};
+
+export type HostedWorkspaceCreateResult = HostedWorkspaceCreateResponse & {
+  messageId: string;
+};
+
+export type EmptyHostedWorkspaceCreateResult = HostedWorkspaceCreateResponse;
+
+export type HostedWorkspaceRepository =
+  | { type: 'github'; repo: string }
+  | { type: 'git'; url: string };
+
+export type HostedWorkspaceCreateInput = {
+  operationKey?: string;
+  profileId: string;
+  prompt?: string;
+  repository?: HostedWorkspaceRepository;
+};
+
+/**
+ * Create a hosted workspace and its first root session through the
+ * `agent-manager` mutation. Requires an explicit, authorized Cloud profile.
+ *
+ * Omitting `prompt` creates an empty workspace whose first turn is the later
+ * IDE prompt. `repository` overrides the driver's repository so the proof can
+ * create a workspace for a second repository; omitted keeps the driver's repo.
+ */
+export function createHostedWorkspace(
+  config: DriverConfig,
+  input: HostedWorkspaceCreateInput & { prompt: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult>;
+export function createHostedWorkspace(
+  config: DriverConfig,
+  input: HostedWorkspaceCreateInput & { prompt?: undefined },
+  signal?: AbortSignal
+): Promise<EmptyHostedWorkspaceCreateResult>;
+export async function createHostedWorkspace(
+  config: DriverConfig,
+  input: HostedWorkspaceCreateInput,
+  signal?: AbortSignal
+): Promise<EmptyHostedWorkspaceCreateResult> {
+  const created = await trpcCall<EmptyHostedWorkspaceCreateResult>(
+    config,
+    'createHostedWorkspace',
+    {
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'agent-manager',
+      repository:
+        input.repository ??
+        (config.githubRepo
+          ? { type: 'github', repo: config.githubRepo }
+          : { type: 'git', url: config.gitUrl }),
+      profile: { id: input.profileId },
+      ...(input.prompt === undefined ? {} : { message: { prompt: input.prompt } }),
+      agent: { mode: 'code', model: config.model },
+      ...(config.kilocodeOrganizationId
+        ? { options: { kilocodeOrganizationId: config.kilocodeOrganizationId } }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
+  return created;
+}
+
+/**
+ * Add a root session to an existing hosted workspace by workspace id only.
+ * The workspace supplies repository, ref, profile, environment, sandbox and
+ * clone; the caller supplies only session-scoped agent/model/prompt.
+ */
+export async function createHostedWorkspaceSession(
+  config: DriverConfig,
+  input: { workspaceId: string; operationKey?: string; prompt: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult> {
+  const created = await trpcCall<HostedWorkspaceCreateResult>(
+    config,
+    'createHostedWorkspaceSession',
+    {
+      workspaceId: input.workspaceId,
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'agent-manager',
+      message: { prompt: input.prompt },
+      agent: { mode: 'code', model: config.model },
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
+  return created;
+}
+
+/** Delete one hosted root session while preserving its workspace and siblings. */
+export async function deleteHostedWorkspaceSession(
+  config: DriverConfig,
+  input: { workspaceId: string; sessionId: string; operationKey?: string },
+  signal?: AbortSignal
+): Promise<{ success: true; workspaceId: string; sessionId: string }> {
+  return trpcCall<{ success: true; workspaceId: string; sessionId: string }>(
+    config,
+    'deleteHostedWorkspaceSession',
+    {
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      operationKey: input.operationKey ?? randomUUID(),
+    },
+    { internalApiSecret: config.internalApiSecret, ...(signal ? { signal } : {}) }
+  );
+}
+
+/**
+ * Set or clear the callback target of an existing session through the internal
+ * `updateSession` endpoint.
+ *
+ * The public grouped `start` schema rejects `callbackTarget`, so the new plane's
+ * callback harness registers the sink after `start` through the same endpoint
+ * `services/code-review-infra` uses on session continuations. Internal-API
+ * authenticated.
+ */
+export async function updateSessionCallbackTarget(
+  config: DriverConfig,
+  cloudAgentSessionId: string,
+  callbackTarget: CallbackTarget | null,
+  signal?: AbortSignal
+): Promise<{ success: boolean }> {
+  return trpcCall<{ success: boolean }>(
+    config,
+    'updateSession',
+    { cloudAgentSessionId, callbackTarget },
+    { internalApiSecret: config.internalApiSecret, ...(signal ? { signal } : {}) }
+  );
+}
+
+export type SessionSnapshot = {
+  sessionId: string;
+  kiloSessionId?: string;
+  userId: string;
+  orgId?: string;
+  sandboxId?: string;
+  githubRepo?: string;
+  gitUrl?: string;
+  platform?: string;
+  upstreamBranch?: string;
+  autoCommit?: boolean;
+  worktreeId?: string | null;
+  parentSessionId?: string | null;
+  cloudAgentSessionScopeId?: string | null;
+  cloudAgentWorktreeId?: string;
+  initialMessageId?: string;
+  latestEventId?: number | null;
+  execution: { id: string; status: string } | null;
+};
+
+export async function getSessionSnapshot(
+  config: DriverConfig,
+  cloudAgentSessionId: string,
+  signal?: AbortSignal
+): Promise<SessionSnapshot> {
+  return trpcCall<SessionSnapshot>(
+    config,
+    'getSession',
+    { cloudAgentSessionId },
+    { method: 'GET', signal }
+  );
+}
+
 export type SendMessageResult = {
   executionId?: string;
   messageId: string;
   delivery: 'sent' | 'queued';
 };
 
+/**
+ * Send a slash-command turn. The unified `send` schema accepts prompts and
+ * attachments only, so a command turn goes through `sendMessageV2` with the
+ * discriminated command payload; after the C1 cutover that endpoint resolves
+ * the `workspace_*` session to the new plane, where the DO stores a command
+ * intent and the wrapper runs it (for `compact`, a real summarization).
+ */
+export async function sendCommand(
+  config: DriverConfig,
+  args: {
+    cloudAgentSessionId: string;
+    command: string;
+    arguments?: string;
+    messageId?: string;
+    signal?: AbortSignal;
+  }
+): Promise<SendMessageResult> {
+  return trpcCall<SendMessageResult>(
+    config,
+    'sendMessageV2',
+    {
+      cloudAgentSessionId: args.cloudAgentSessionId,
+      payload: {
+        type: 'command',
+        command: args.command,
+        arguments: args.arguments ?? '',
+      },
+      ...(args.messageId ? { messageId: args.messageId } : {}),
+    },
+    { signal: args.signal }
+  );
+}
+
 export type SendMessageArgs = {
   cloudAgentSessionId: string;
   prompt: string;
   mode?: string;
   messageId?: string;
+  /** Canonical R2 attachment reference; unified `send` only. */
+  attachments?: { path: string; files: string[] };
+  signal?: AbortSignal;
 };
 
 export async function sendMessage(
@@ -262,30 +848,66 @@ export async function sendMessage(
   api: ApiVersion = 'unified'
 ): Promise<SendMessageResult> {
   if (api === 'legacy') {
-    return trpcCall<SendMessageResult>(config, 'sendMessageV2', {
-      cloudAgentSessionId: args.cloudAgentSessionId,
-      prompt: args.prompt,
-      mode: args.mode ?? 'code',
-      model: config.model,
-      ...(args.messageId ? { messageId: args.messageId } : {}),
-    });
+    if (args.attachments) {
+      throw new Error('attachments are accepted by the unified send only');
+    }
+    return trpcCall<SendMessageResult>(
+      config,
+      'sendMessageV2',
+      {
+        cloudAgentSessionId: args.cloudAgentSessionId,
+        prompt: args.prompt,
+        mode: args.mode ?? 'code',
+        model: config.model,
+        ...(args.messageId ? { messageId: args.messageId } : {}),
+      },
+      { signal: args.signal }
+    );
   }
-  return trpcCall<SendMessageResult>(config, 'send', {
-    cloudAgentSessionId: args.cloudAgentSessionId,
-    message: {
-      prompt: args.prompt,
-      ...(args.messageId ? { id: args.messageId } : {}),
+  return trpcCall<SendMessageResult>(
+    config,
+    'send',
+    {
+      cloudAgentSessionId: args.cloudAgentSessionId,
+      message: {
+        prompt: args.prompt,
+        ...(args.attachments ? { attachments: args.attachments } : {}),
+        ...(args.messageId ? { id: args.messageId } : {}),
+      },
+      agent: {
+        mode: args.mode ?? 'code',
+        model: config.model,
+      },
     },
-    agent: {
-      mode: args.mode ?? 'code',
-      model: config.model,
-    },
-  });
+    { signal: args.signal }
+  );
 }
 
-// ---------------------------------------------------------------------------
-// Control-plane helpers
-// ---------------------------------------------------------------------------
+const messageResultSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  messageId: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+});
+
+export async function getMessageResult(
+  config: DriverConfig,
+  sessionId: string,
+  messageId: string,
+  signal?: AbortSignal
+) {
+  const result = messageResultSchema.parse(
+    await trpcCall<unknown>(
+      config,
+      'getMessageResult',
+      { cloudAgentSessionId: sessionId, messageId },
+      { method: 'GET', signal }
+    )
+  );
+  if (result.cloudAgentSessionId !== sessionId || result.messageId !== messageId) {
+    throw new Error('Message result identity did not match the requested turn');
+  }
+  return result;
+}
 
 export type InterruptResult = {
   success: boolean;
@@ -295,9 +917,10 @@ export type InterruptResult = {
 
 export async function interruptSession(
   config: DriverConfig,
-  sessionId: string
+  sessionId: string,
+  signal?: AbortSignal
 ): Promise<InterruptResult> {
-  return trpcCall<InterruptResult>(config, 'interruptSession', { sessionId });
+  return trpcCall<InterruptResult>(config, 'interruptSession', { sessionId }, { signal });
 }
 
 export async function answerPermission(
@@ -313,18 +936,52 @@ export async function answerPermission(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Fake-LLM gate helpers
-// ---------------------------------------------------------------------------
+export async function answerQuestion(
+  config: DriverConfig,
+  sessionId: string,
+  questionId: string,
+  answers: string[][],
+  signal?: AbortSignal
+): Promise<{ success: boolean }> {
+  return trpcCall<{ success: boolean }>(
+    config,
+    'answerQuestion',
+    { sessionId, questionId, answers },
+    { signal }
+  );
+}
+
+export async function deleteSession(
+  config: DriverConfig,
+  sessionId: string,
+  signal?: AbortSignal
+): Promise<{ success: boolean }> {
+  return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId }, { signal });
+}
+
+/**
+ * Headers for the fake LLM `/test/*` side channel.
+ *
+ * The token comes from `resolveFakeAdminToken()` — the same resolver the local
+ * Node fake server uses — so one `FAKE_LLM_ADMIN_TOKEN` value reaches both ends.
+ * A deployed fake Worker needs the driver's value configured as its secret.
+ */
+function fakeControlHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${resolveFakeAdminToken()}` };
+}
 
 /**
  * Release a `gate:<tag>` scenario parked on the fake LLM server. The driver
  * uses this to unblock a turn that's been holding the wrapper busy, typically
  * after queueing follow-up messages.
  */
-export async function releaseGate(fakeLlmUrl: string, tag: string): Promise<void> {
+export async function releaseGate(
+  fakeLlmUrl: string,
+  tag: string,
+  signal?: AbortSignal
+): Promise<void> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/release?tag=${encodeURIComponent(tag)}`;
-  const res = await fetch(url, { method: 'POST' });
+  const res = await fetch(url, { method: 'POST', signal, headers: fakeControlHeaders() });
   if (!res.ok) {
     throw new Error(`releaseGate(${tag}) failed: ${res.status} ${res.statusText}`);
   }
@@ -341,7 +998,7 @@ export type FakeWaitersSnapshot = {
 
 export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersSnapshot> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/waiters`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: fakeControlHeaders() });
   if (!res.ok) {
     throw new Error(`fetchFakeWaiters failed: ${res.status} ${res.statusText}`);
   }
@@ -350,11 +1007,18 @@ export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersS
 
 export type FakeRequestSnapshot = {
   chatCompletions: number;
+  /** Present when the query was scoped; echoes the requested scope. */
+  scope?: string;
 };
 
-export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequestSnapshot> {
-  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests`;
-  const res = await fetch(url);
+export async function fetchFakeRequests(
+  fakeLlmUrl: string,
+  signal?: AbortSignal
+): Promise<FakeRequestSnapshot> {
+  const scope = resolveFakeScope();
+  const query = scope === undefined ? '' : `?scope=${encodeURIComponent(scope)}`;
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests${query}`;
+  const res = await fetch(url, { headers: fakeControlHeaders(), signal });
   if (!res.ok) {
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
   }
@@ -362,52 +1026,122 @@ export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequest
 }
 
 /**
+ * The last user-message text the fake LLM adapter saw. Used by the attachment
+ * scenario to assert the attachment content reached the model rather than only
+ * that a file was read.
+ */
+export async function fetchFakeLastPrompt(
+  fakeLlmUrl: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/last-prompt`;
+  const res = await fetch(url, { headers: fakeControlHeaders(), signal });
+  if (!res.ok) {
+    throw new Error(`fetchFakeLastPrompt failed: ${res.status} ${res.statusText}`);
+  }
+  const body = (await res.json()) as { text?: unknown };
+  return typeof body.text === 'string' ? body.text : '';
+}
+
+export async function fetchFakeScenarioStatus(
+  fakeLlmUrl: string,
+  tag: string,
+  signal?: AbortSignal
+): Promise<FakeScenarioStatus> {
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/scenario-status?tag=${encodeURIComponent(tag)}`;
+  const response = await fetch(url, { headers: fakeControlHeaders(), signal });
+  if (!response.ok) {
+    throw new Error(`fetchFakeScenarioStatus(${tag}) failed: ${response.status}`);
+  }
+  return (await response.json()) as FakeScenarioStatus;
+}
+
+/**
+ * Diagnostic detail for a gate that never engaged. The boolean wait alone
+ * cannot distinguish "the model request was never sent" (requests=0, a sandbox
+ * or startup stall) from "the model answered without running the gate tool"
+ * (requests>0), so report the fake-server counters too.
+ */
+export async function gateEngagementDetail(
+  config: DriverConfig,
+  tag: string,
+  timeoutMs: number
+): Promise<string> {
+  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag).catch(() => null);
+  const detail = status
+    ? `requests=${status.requests}; toolCalls=${JSON.stringify(status.toolCalls)}; toolResults=${JSON.stringify(status.toolResults)}`
+    : 'fake scenario status unavailable';
+  return `gate:${tag} did not engage within ${timeoutMs}ms; ${detail}`;
+}
+
+/**
+ * A `setTimeout` that settles early when `signal` aborts, so an aborted poll
+ * stops immediately instead of waiting out the interval.
+ */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise(resolve => {
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+/**
  * Poll the fake LLM server until a `gate:<tag>` scenario is actively parked —
  * meaning kilo has dialed the fake and the turn is blocked mid-stream.
- * Returns true on success, false on timeout.
+ * Returns true on success, false on timeout. An abort stops the polling and
+ * returns false; the caller owns the abort accounting.
  */
 export async function waitForGateEngaged(
   config: DriverConfig,
   tag: string,
   timeoutMs = 120_000,
-  pollIntervalMs = 100
+  pollIntervalMs = 100,
+  signal?: AbortSignal
 ): Promise<boolean> {
   const base = config.fakeLlmUrl.replace(/\/$/, '');
   const url = `${base}/test/gate-status?tag=${encodeURIComponent(tag)}`;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (signal?.aborted) return false;
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: fakeControlHeaders(), signal });
       if (res.ok) {
         const body = (await res.json()) as { engaged?: boolean };
         if (body.engaged === true) return true;
       }
     } catch {
-      // Server not ready yet — keep polling until the deadline.
+      // Server not ready yet — keep polling until the deadline. An abort is
+      // also caught here; the loop-top check returns false on the next pass.
     }
-    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    await abortableDelay(pollIntervalMs, signal);
   }
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// WebSocket stream
-// ---------------------------------------------------------------------------
+export const streamEventSchema = z.object({
+  eventId: z.number(),
+  executionId: z.string().nullable().default(null),
+  sessionId: z.string(),
+  streamEventType: z.string(),
+  timestamp: z.string(),
+  data: z.record(z.string(), z.unknown()),
+});
 
-export type StreamEvent = {
-  eventId: number;
-  executionId: string | null;
-  sessionId: string;
-  streamEventType: string;
-  timestamp: string;
-  data: Record<string, unknown>;
-};
+export type StreamEvent = z.infer<typeof streamEventSchema>;
 
 export type StreamConnection = {
   events: StreamEvent[];
   close: () => void;
   /** Resolves when a terminal event arrives or timeout elapses. */
-  waitForTerminal: (timeoutMs: number) => Promise<StreamEvent | null>;
+  waitForTerminal: (timeoutMs: number, messageId?: string) => Promise<StreamEvent | null>;
   /** Resolves the first event matching the predicate. */
   waitFor: (
     predicate: (event: StreamEvent) => boolean,
@@ -417,15 +1151,120 @@ export type StreamConnection = {
   get receivedCount(): number;
   /** Whether the socket is still open. */
   get isOpen(): boolean;
+  /**
+   * Close code/reason of the first socket close observed on this connection, or
+   * `null` while no close frame has been seen. It lets a caller tell an observed
+   * transport drop from a wait that simply timed out on a live socket.
+   */
+  closeInfo: { code: number; reason: string } | null;
 };
 
 export type StreamOptions = {
   replay?: boolean;
   onEvent?: (event: StreamEvent) => void;
+  signal?: AbortSignal;
+  /** A pre-fetched stream ticket. Deployed callers must supply one. */
+  ticket?: string;
 };
 
 /** Event types we treat as terminal for scenario purposes. */
-const TERMINAL_STREAM_TYPES = new Set(['complete', 'error', 'interrupted', 'cloud.message.failed']);
+const TERMINAL_STREAM_TYPES = new Set([
+  'complete',
+  'error',
+  'interrupted',
+  'cloud.message.completed',
+  'cloud.message.failed',
+]);
+
+export function messageIdFromEvent(event: StreamEvent): string | undefined {
+  if (!event.data || typeof event.data !== 'object') return undefined;
+  if (typeof event.data.messageId === 'string') return event.data.messageId;
+  const payload = event.data.payload;
+  return payload &&
+    typeof payload === 'object' &&
+    'messageId' in payload &&
+    typeof payload.messageId === 'string'
+    ? payload.messageId
+    : undefined;
+}
+
+export type QueuedOrCompleted = 'queued' | 'completed' | 'failed';
+
+/** Classify a message lifecycle event, or null for a non-message event. */
+export function messagePhase(event: StreamEvent): QueuedOrCompleted | null {
+  switch (event.streamEventType) {
+    case 'cloud.message.queued':
+      return 'queued';
+    case 'cloud.message.completed':
+      return 'completed';
+    case 'cloud.message.failed':
+      return 'failed';
+    default:
+      return null;
+  }
+}
+
+export function isMessageCompleted(
+  event: StreamEvent | null,
+  messageId: string
+): event is StreamEvent {
+  return (
+    event !== null &&
+    ((event.streamEventType === 'cloud.message.completed' &&
+      messageIdFromEvent(event) === messageId) ||
+      (event.streamEventType === 'complete' &&
+        Array.isArray(event.data.messageIds) &&
+        event.data.messageIds.includes(messageId)))
+  );
+}
+
+/**
+ * The control-plane failure reason carried by a terminal `cloud.message.failed`
+ * event (`data.reason`, set from the message's stored reason). Returns
+ * `undefined` for a non-failure or a legacy event shape.
+ */
+export function failureReasonFromEvent(event: StreamEvent | null): string | undefined {
+  if (event === null || event.streamEventType !== 'cloud.message.failed') return undefined;
+  return typeof event.data.reason === 'string' ? event.data.reason : undefined;
+}
+
+/**
+ * Thrown by `resolveStreamTicket` only when neither `config.fetchStreamTicket`
+ * nor `config.nextAuthSecret` is configured. It gives the "no source" condition
+ * a name the resolver owns, so the retry path can fall back to `null` for it
+ * while every real ticket-acquisition failure propagates and is logged.
+ */
+export class NoStreamTicketSourceError extends Error {
+  constructor() {
+    super(
+      'openStream requires options.ticket or a stream-ticket source (config.fetchStreamTicket or config.nextAuthSecret)'
+    );
+    this.name = 'NoStreamTicketSourceError';
+  }
+}
+
+/**
+ * The single owner of the connected-stream credential: `config.fetchStreamTicket`
+ * wins, else a synchronous mint from `config.nextAuthSecret`, else it throws
+ * `NoStreamTicketSourceError`.
+ * The `string | Promise<string>` return is deliberate: the local socket is
+ * created synchronously while deployed ticket fetching is asynchronous.
+ */
+export function resolveStreamTicket(
+  config: DriverConfig,
+  sessionId: string
+): string | Promise<string> {
+  if (config.fetchStreamTicket) return config.fetchStreamTicket(sessionId);
+  if (config.nextAuthSecret)
+    return mintStreamTicket(
+      config.user,
+      sessionId,
+      config.nextAuthSecret,
+      120,
+      config.kilocodeOrganizationId
+    );
+  throw new NoStreamTicketSourceError();
+}
 
 export function openStream(
   config: DriverConfig,
@@ -433,28 +1272,56 @@ export function openStream(
   options: StreamOptions = {}
 ): StreamConnection {
   const wsBase = config.workerUrl.replace(/^http/, 'ws');
-  const url = new URL(`/stream`, wsBase);
-  url.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
-  url.searchParams.set(
-    'ticket',
-    mintStreamTicket(config.user, cloudAgentSessionId, config.nextAuthSecret)
-  );
-  if (options.replay === false) {
-    url.searchParams.set('replay', 'false');
-  }
-
-  const ws = new WebSocket(url.toString());
   const events: StreamEvent[] = [];
+  let abortListener: (() => void) | undefined;
   let closed = false;
+  let retried = false;
+  let retryPending = false;
+  let currentGeneration = 0;
+  let currentWs: WebSocket | undefined;
+  let closeInfo: { code: number; reason: string } | null = null;
   const listeners: Array<{
     predicate: (event: StreamEvent) => boolean;
     resolve: (event: StreamEvent | null) => void;
   }> = [];
 
-  ws.on('message', raw => {
+  function buildUrl(ticket: string): string {
+    const url = new URL(`/stream`, wsBase);
+    url.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
+    url.searchParams.set('ticket', ticket);
+    if (options.replay === false) {
+      url.searchParams.set('replay', 'false');
+    }
+    return url.toString();
+  }
+
+  function initialTicket(): string | Promise<string> {
+    return options.ticket ?? resolveStreamTicket(config, cloudAgentSessionId);
+  }
+
+  async function acquireFreshTicket(): Promise<string | null> {
+    try {
+      return await resolveStreamTicket(config, cloudAgentSessionId);
+    } catch (error) {
+      // Only "no source configured" is a soft fallback. A real acquisition
+      // failure (ticket fetch or mint rejection) must reach the retry catch so
+      // it is logged as the refresh error rather than masked by the handshake error.
+      if (error instanceof NoStreamTicketSourceError) return null;
+      throw error;
+    }
+  }
+
+  function handleMessage(raw: unknown): void {
     let parsed: StreamEvent;
     try {
-      parsed = JSON.parse(raw.toString());
+      const text =
+        raw instanceof ArrayBuffer
+          ? Buffer.from(raw).toString('utf8')
+          : Array.isArray(raw)
+            ? Buffer.concat(raw).toString('utf8')
+            : (raw as Buffer).toString('utf8');
+      const decoded: unknown = JSON.parse(text);
+      parsed = streamEventSchema.parse(decoded);
     } catch {
       return;
     }
@@ -467,27 +1334,137 @@ export function openStream(
         listeners.splice(i, 1);
       }
     }
-  });
+  }
 
-  ws.on('close', () => {
+  function openSocket(ticket: string): void {
+    const generation = ++currentGeneration;
+    const ws = new WebSocket(buildUrl(ticket));
+    currentWs = ws;
+    let opened = false;
+
+    ws.on('open', () => {
+      if (generation !== currentGeneration) return;
+      opened = true;
+    });
+
+    ws.on('message', raw => {
+      if (generation !== currentGeneration) return;
+      handleMessage(raw);
+    });
+
+    ws.on('close', (code, reason) => {
+      if (generation !== currentGeneration) return;
+      // `ws` emits `error` then `close` for a rejected handshake. While the
+      // single retry is pending, this socket's close must not end the shared
+      // connection or drop pending waits.
+      if (retryPending) return;
+      // First cause wins: a later close (an explicit close after the server
+      // already closed, or a stale socket) must not overwrite the drop evidence.
+      if (closeInfo === null) closeInfo = { code, reason: reason.toString('utf8') };
+      finalizeClose();
+    });
+
+    ws.on('error', error => {
+      // A superseded socket may still emit an error after the retry; ignore it.
+      if (generation !== currentGeneration) return;
+      // Runtime errors after a successful open are not handshake rejections.
+      if (opened) {
+        console.error('session stream connection failed', error);
+        return;
+      }
+      // Claim the single retry synchronously so a second error on this socket
+      // cannot schedule another one.
+      if (retried || closed) {
+        console.error('session stream connection failed', error);
+        return;
+      }
+      retried = true;
+      retryPending = true;
+      acquireFreshTicket()
+        .then(freshTicket => {
+          retryPending = false;
+          if (generation !== currentGeneration) return;
+          if (closed) {
+            // The caller closed while the fresh ticket was in flight; settle waits.
+            finalizeClose();
+            return;
+          }
+          if (freshTicket === null) {
+            console.error('session stream connection failed', error);
+            finalizeClose();
+            return;
+          }
+          openSocket(freshTicket);
+        })
+        .catch(retryError => {
+          retryPending = false;
+          console.error('session stream connection failed', retryError);
+          if (generation !== currentGeneration) return;
+          finalizeClose();
+        });
+    });
+  }
+
+  /**
+   * Open the initial socket. An explicit or locally minted ticket is a string
+   * and opens synchronously. A fetched ticket is a promise: the socket opens
+   * when it settles, a ticket resolved after close/abort is discarded so no
+   * socket is created, and a rejected acquisition settles the connection
+   * instead of surfacing an unhandled rejection.
+   */
+  function openInitialSocket(ticket: string | Promise<string>): void {
+    if (typeof ticket === 'string') {
+      openSocket(ticket);
+      return;
+    }
+    ticket.then(
+      resolved => {
+        if (closed) return;
+        openSocket(resolved);
+      },
+      error => {
+        console.error('session stream connection failed', error);
+        if (closed) return;
+        finalizeClose();
+      }
+    );
+  }
+
+  function finalizeClose(): void {
+    detachAbortListener();
     closed = true;
     for (const listener of listeners.splice(0)) {
       listener.resolve(null);
     }
-  });
-
-  ws.on('error', err => {
-    console.error('stream error:', err);
-  });
+  }
 
   function close(): void {
     if (closed) return;
+    // Settle the shared connection now. An explicit close must not leave pending
+    // waits unresolved while a ticket refresh is still in flight: the socket
+    // `close` event is ignored during that window, so the retry path cannot be
+    // relied on to settle them. `closed` still prevents a replacement socket.
+    finalizeClose();
     try {
-      ws.close();
+      currentWs?.close();
     } catch {
       /* ignore */
     }
-    closed = true;
+  }
+
+  function detachAbortListener(): void {
+    if (abortListener === undefined) return;
+    options.signal?.removeEventListener('abort', abortListener);
+    abortListener = undefined;
+  }
+
+  openInitialSocket(initialTicket());
+
+  if (options.signal?.aborted) {
+    close();
+  } else {
+    abortListener = close;
+    options.signal?.addEventListener('abort', abortListener, { once: true });
   }
 
   function waitFor(
@@ -498,6 +1475,7 @@ export function openStream(
     // the target is already in history.
     const existing = events.find(predicate);
     if (existing) return Promise.resolve(existing);
+    if (closed) return Promise.resolve(null);
     return new Promise(resolve => {
       const timer = setTimeout(() => {
         const idx = listeners.findIndex(l => l.resolve === resolveOnce);
@@ -516,15 +1494,90 @@ export function openStream(
     events,
     close,
     waitFor,
-    waitForTerminal: timeoutMs =>
-      waitFor(event => TERMINAL_STREAM_TYPES.has(event.streamEventType), timeoutMs),
+    waitForTerminal: (timeoutMs, messageId) =>
+      waitFor(
+        event =>
+          messageId === undefined
+            ? TERMINAL_STREAM_TYPES.has(event.streamEventType)
+            : (event.streamEventType === 'cloud.message.failed' &&
+                messageIdFromEvent(event) === messageId) ||
+              isMessageCompleted(event, messageId),
+        timeoutMs
+      ),
     get receivedCount() {
       return events.length;
     },
     get isOpen() {
       return !closed;
     },
+    get closeInfo() {
+      return closeInfo;
+    },
   };
+}
+
+/** Require the `connected` handshake event, closing the stream if it never arrives. */
+async function requireConnected(
+  stream: StreamConnection,
+  sessionId: string
+): Promise<StreamConnection> {
+  const connected = await stream.waitFor(event => event.streamEventType === 'connected', 10_000);
+  if (!connected) {
+    stream.close();
+    throw new Error(`Stream did not connect for ${sessionId}`);
+  }
+  return stream;
+}
+
+export async function openConnectedStream(
+  config: DriverConfig,
+  sessionId: string,
+  replay = true,
+  onEvent?: (event: StreamEvent) => void,
+  signal?: AbortSignal
+): Promise<StreamConnection> {
+  const ticket = await resolveStreamTicket(config, sessionId);
+  const stream = openStream(
+    config,
+    sessionId,
+    onEvent === undefined ? { replay, signal, ticket } : { replay, onEvent, signal, ticket }
+  );
+  return requireConnected(stream, sessionId);
+}
+
+export function fakeDirective(conversation: string): string {
+  const scope = resolveFakeScope();
+  const directive = `__fake__:${conversation}`;
+  return scope === undefined ? directive : `${FAKE_SCOPE_MARKER_PREFIX}${scope}\n${directive}`;
+}
+
+/**
+ * Parallel matrix shards set `E2E_FAKE_SCOPE` to a unique token so the shared
+ * fake attributes that shard's completions to it. Absent means the global
+ * counters, which is what a single focused run uses.
+ */
+export function resolveFakeScope(): string | undefined {
+  const raw = process.env.E2E_FAKE_SCOPE;
+  if (raw === undefined || raw === '') return undefined;
+  if (!isFakeScopeToken(raw)) {
+    throw new Error(`E2E_FAKE_SCOPE must match [A-Za-z0-9_-]{1,64}; got ${JSON.stringify(raw)}`);
+  }
+  return raw;
+}
+
+export function hasPreparationForMessage(events: StreamEvent[], messageId: string): boolean {
+  return events.some(
+    event => event.streamEventType === 'preparing' && event.data.triggerMessageId === messageId
+  );
+}
+
+export async function collectUntilTerminal(
+  stream: StreamConnection,
+  messageId: string,
+  timeoutMs: number
+): Promise<{ terminal: StreamEvent | null; events: StreamEvent[] }> {
+  const terminal = await stream.waitForTerminal(timeoutMs, messageId);
+  return { terminal, events: [...stream.events] };
 }
 
 /** Wait for the WebSocket to actually open (not just for instantiation). */
@@ -542,10 +1595,6 @@ export function waitForOpen(ws: WebSocket, timeoutMs = 5_000): Promise<void> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Assertions
-// ---------------------------------------------------------------------------
 
 export type AssertionResult = { ok: boolean; message: string };
 

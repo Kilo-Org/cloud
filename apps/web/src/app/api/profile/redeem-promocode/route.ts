@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { redeemSelfServicePromoCode } from '@/lib/promotionalCredits';
-import { promoCreditCategoriesByKey } from '@/lib/promoCreditCategories';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { redeemSelfServicePromoCode } from '@kilocode/web-shared/lib/promotionalCredits';
+import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCreditCategories';
 
 export type RedemptionResult = {
   message: string;

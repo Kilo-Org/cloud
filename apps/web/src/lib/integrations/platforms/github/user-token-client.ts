@@ -1,8 +1,8 @@
 import 'server-only';
 
 import { z } from 'zod';
-import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
-import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
+import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { GITHUB_USER_ACCESS_TOKEN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 export const GitHubUserAccessTokenOpSchema = z.discriminatedUnion('op', [
@@ -24,34 +24,28 @@ export const GitHubUserAccessTokenOpSchema = z.discriminatedUnion('op', [
 ]);
 export type GitHubUserAccessTokenOp = z.infer<typeof GitHubUserAccessTokenOpSchema>;
 
-const GitHubUserAccessTokenRequestBodySchema = z.union([
-  z.object({ op: z.literal('fetch') }).strict(),
-  z
-    .object({
-      op: z.literal('rotate'),
-      staleAuthorizationId: z.string(),
-      staleCredentialVersion: z.number(),
-    })
-    .strict(),
-  z
-    .object({
-      op: z.literal('reportRejected'),
-      authorizationId: z.string(),
-      credentialVersion: z.number(),
-    })
-    .strict(),
-]);
-
 const GitHubUserAccessTokenConnectedSchema = z
   .object({
     connected: z.literal(true),
     token: z.string().min(1),
-    expiresAtEpochMs: z.number().int().positive(),
+    expiresAtEpochMs: z.number().int().positive().nullable(),
+    credentialSource: z.enum(['github_app', 'provided_token']).optional(),
+    refreshSupported: z.boolean().optional(),
     githubLogin: z.string().min(1),
     authorizationId: z.string().min(1),
     credentialVersion: z.number().int().nonnegative(),
   })
-  .strict();
+  .strict()
+  .refine(value => {
+    if (value.credentialSource === undefined && value.refreshSupported === undefined) {
+      return value.expiresAtEpochMs !== null;
+    }
+    return value.credentialSource === 'provided_token'
+      ? value.refreshSupported === false
+      : value.credentialSource === 'github_app' &&
+          value.refreshSupported === true &&
+          value.expiresAtEpochMs !== null;
+  });
 
 const GitHubUserAccessTokenDisconnectedSchema = z
   .object({
@@ -76,7 +70,7 @@ export type GitHubUserAccessTokenResult =
 const CACHE_REFRESH_HEADROOM_MS = 5 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
-type CachedCredential = GitHubUserAccessTokenConnected;
+type CachedCredential = { credential: GitHubUserAccessTokenConnected; validUntil: number };
 
 const cache = new Map<string, CachedCredential>();
 const queue = new Map<string, Promise<unknown>>();
@@ -104,22 +98,37 @@ async function enqueueForUser<T>(userId: string, op: () => Promise<T>): Promise<
   }
 }
 
-function readCache(userId: string): CachedCredential | undefined {
+function readCache(userId: string): GitHubUserAccessTokenConnected | undefined {
   const entry = cache.get(userId);
   if (!entry) return undefined;
-  if (entry.expiresAtEpochMs - Date.now() <= CACHE_REFRESH_HEADROOM_MS) {
+  if (entry.validUntil <= Date.now()) {
     cache.delete(userId);
     return undefined;
   }
-  return entry;
+  return entry.credential;
 }
 
-function cacheForUser(userId: string, credential: CachedCredential | null): void {
+/**
+ * An expired entry is otherwise removed only when the same user fetches again,
+ * so a user who never returns would keep a live token in memory indefinitely.
+ */
+function sweepExpiredCacheEntries(now: number): void {
+  for (const [userId, entry] of cache) {
+    if (entry.validUntil <= now) cache.delete(userId);
+  }
+}
+
+function cacheForUser(userId: string, credential: GitHubUserAccessTokenConnected | null): void {
   if (credential === null) {
     cache.delete(userId);
     return;
   }
-  cache.set(userId, credential);
+  sweepExpiredCacheEntries(Date.now());
+  const validUntil =
+    credential.credentialSource === 'provided_token'
+      ? Math.min(Date.now() + 60_000, credential.expiresAtEpochMs ?? Infinity)
+      : (credential.expiresAtEpochMs ?? 0) - CACHE_REFRESH_HEADROOM_MS;
+  cache.set(userId, { credential, validUntil });
 }
 
 async function callTokenService(
@@ -129,11 +138,7 @@ async function callTokenService(
   if (!GIT_TOKEN_SERVICE_API_URL) {
     return { status: 'temporarily_unavailable' };
   }
-  const parsedBody = GitHubUserAccessTokenRequestBodySchema.safeParse(body);
-  if (!parsedBody.success) {
-    return { status: 'temporarily_unavailable' };
-  }
-  const serviceToken = generateInternalServiceToken(userId, {
+  const serviceToken = generateBoundedInternalServiceToken(userId, {
     expiresIn: TOKEN_EXPIRY.fiveMinutes,
     audience: GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
   });
@@ -148,7 +153,7 @@ async function callTokenService(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${serviceToken}`,
         },
-        body: JSON.stringify(parsedBody.data),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }
     );
@@ -239,11 +244,41 @@ export async function getGitHubUserAccessToken(
 }
 
 /**
+ * Drop the cached credential for a Kilo user so the next fetch re-consults the
+ * token service. Call it whenever the authoritative authorization for that user
+ * changes: disconnect, revocation, or a newly stored grant.
+ *
+ * The delete is synchronous so a fetch that starts after this call cannot be
+ * served from the cache fast path, and so webhook callers never wait on another
+ * in-flight token-service call for the same user. An operation that was already
+ * enqueued for the user can still write the credential when it settles, so the
+ * delete is also queued behind it.
+ */
+export function evictGitHubUserAccessTokenCache(kiloUserId: string): void {
+  cache.delete(kiloUserId);
+  void enqueueForUser(kiloUserId, async () => {
+    cache.delete(kiloUserId);
+  });
+}
+
+/**
  * Test-only helper: reset the in-process cache and per-user queue. NOT exported
  * via the module's public API surface — only consumed by jest tests in the
  * same package.
+ *
+ * Queued work is settled before the reset clears. An operation a test started —
+ * a fetch that writes the cache, or a queued eviction — therefore cannot run
+ * after the reset and reach the next test's state.
  */
-export function __resetGitHubUserAccessTokenClientForTests(): void {
+export async function __resetGitHubUserAccessTokenClientForTests(): Promise<void> {
+  while (queue.size > 0) {
+    await Promise.allSettled([...queue.values()]);
+  }
   cache.clear();
   queue.clear();
+}
+
+/** Test-only helper: the Kilo user ids that currently hold a cache entry. */
+export function __cachedGitHubUserIdsForTests(): string[] {
+  return [...cache.keys()];
 }

@@ -1,87 +1,83 @@
-import { type ReactNode, type RefObject } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+/* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
+import { useCallback, useRef, useState } from 'react';
+import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
+import { useKeyboardState, useWindowDimensions } from 'react-native-keyboard-controller';
+import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { InstanceSelector } from '@/components/agents/instance-selector';
+import { LaunchFolderField } from '@/components/agents/folder-selector';
+import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
+import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
+import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
+import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
+import { NEW_SESSION_PROMPT_DEFAULT_LINES } from '@/components/agents/chat-composer-input-height';
+import {
+  resolveNewSessionFormFrameHeight,
+  resolveNewSessionPromptLineCount,
+} from '@/components/agents/new-session-prompt-fit';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
-import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
-import { type AgentMode } from '@/components/agents/mode-selector';
-import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
-import { type ModeOption } from '@/components/agents/mode-normalize';
-import { Button } from '@/components/ui/button';
+import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
+import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
+import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
+import { KeyboardLiftView } from '@/components/keyboard-lift-view';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
+import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import {
-  type AgentAttachment,
-  type AgentAttachmentCandidate,
-} from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { type ModelOption } from '@/lib/hooks/use-available-models';
-import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
-import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
-const COMMIT_CHOICE_OPTIONS = [
-  { value: 'leave', label: 'Leave changes' },
-  { value: 'commit', label: 'Commit and push' },
-] as const;
-
-type NewSessionConfigureFormProps = {
-  // Prompt / model / attachments (Cloud Agent only).
-  attachments: AgentAttachment[];
-  attachmentMax: number;
-  isCreating: boolean;
-  isModelsError: boolean;
-  isLoadingModels: boolean;
-  mode: AgentMode;
-  model: string;
-  variant: string;
-  modelOptions: (ModelOption | SessionModelOption)[];
-  onChangeText: (text: string) => void;
-  onModeChange: (mode: AgentMode) => void;
-  onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
-  /** Custom mode options shown under the built-ins in the mode picker. */
-  customOptions?: ModeOption[];
-  /** Locks the model picker to the pinned agent model (Cloud Agent only). */
-  modelLocked?: boolean;
-  /** Agent name shown in the locked model chip's accessibility label. */
-  modelLockLabel?: string;
-  onAddAttachment: () => void;
-  onRemoveAttachment: (id: string) => void;
-  onRetryAttachment: (id: string) => void;
-  onRefetchModels: () => void;
-  onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
-  shareId: string | undefined;
-  voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
-  initialPrompt?: string;
-  // Run target.
-  showRunOnSelector: boolean;
-  runOnInstance: InstancePickerInstance | null;
-  instanceList: InstancePickerInstance[];
-  isLoadingInstances: boolean;
-  onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
-  showInstanceDisconnectedNote: boolean;
-  // Repository (Cloud Agent only).
-  view: RepositorySectionView;
-  isRetrying: boolean;
-  onChangeRepo: (fullName: string) => void;
-  onOpenGitHubIntegration: () => void;
-  onRefreshRepos: () => void;
-  repositories: { fullName: string; isPrivate: boolean }[];
-  selectedRepo: string;
-  // Environment profile (Cloud Agent only).
-  profile: EffectiveAgentProfile | null;
-  isProfileLoading: boolean;
-  isProfileError: boolean;
-  onRetryProfile: () => void;
-  // Commit choice (Cloud Agent only).
-  autoCommit: boolean;
-  onAutoCommitChange: (next: boolean) => void;
-  // Start.
-  isSpawningRemote: boolean;
-  isStartDisabled: boolean;
-  onStartSession: () => void;
+/**
+ * The profile override the new-session screen adds to the shared contract: the
+ * Environment row owns selection; advanced configuration edits manual drafts.
+ * The base fields live in `new-session-configure-form-props`, extracted so this
+ * file stays within the repo's line cap.
+ */
+type NewSessionProfileOverrideProps = {
+  /** The picked override no longer resolves to a profile. */
+  profileOverrideNeedsAttention: boolean;
+  /** Opens the profile picker sheet. */
+  onOpenProfilePicker: () => void;
+  /**
+   * The session's profile override; null keeps the effective default.
+   */
+  selectedProfileId: string | null;
+  /** Selects a newly saved profile from advanced configuration. */
+  onSelectProfile: (id: string | null) => void;
+  /**
+   * The session's manual environment variables and setup commands. Owned by the
+   * new-session body (not the panel) so the create carries them; the advanced
+   * config editors only report changes.
+   */
+  manualVars: readonly VariableEdit[];
+  manualCommands: readonly string[];
+  onManualVarsChange: (next: VariableEdit[]) => void;
+  onManualCommandsChange: (next: string[]) => void;
+  /** Opens the repo default-profile bindings screen from the advanced config. */
+  onOpenRepoDefaults?: () => void;
+  /**
+   * The Account section above Run on: the active account the create is
+   * attributed to, personal or organization. The body renders it for every
+   * entry point — switchable on the ordinary entry, a read-only scope row on
+   * the clone entry.
+   */
+  accountSection?: React.ReactNode;
+  /**
+   * The Cloud environment row under the repository picker: the environment the
+   * session starts in, from the environments that contain the selected
+   * repository. Cloud-only, like the repository section it follows.
+   */
+  environmentSection?: React.ReactNode;
 };
+
+/**
+ * Space the advanced configuration keeps above itself when its expansion
+ * scrolls the composer, so the disclosure row it just revealed does not sit
+ * flush against the frame's top edge.
+ */
+const ADVANCED_CONFIG_REVEAL_GAP = 16;
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,
@@ -108,6 +104,8 @@ export function NewSessionConfigureForm({
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
+  onMoveAttachment,
+  onReorderAttachments,
   onRefetchModels,
   onPrefillAttachments,
   shareId,
@@ -117,152 +115,275 @@ export function NewSessionConfigureForm({
   runOnInstance,
   instanceList,
   isLoadingInstances,
+  isFetchingInstances,
+  onRefreshInstances,
   onChangeRunOnInstance,
+  pendingComputer,
   showInstanceDisconnectedNote,
-  view,
+  folderPath,
+  onChangeFolderPath,
+  runOnInlineNote,
+  isCloneEntry = false,
+  autoFocusPrompt = true,
+  groups,
   isRetrying,
+  repositoryRegionSettled,
   onChangeRepo,
-  onOpenGitHubIntegration,
+  onConnectProvider,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
+  recents,
   selectedRepo,
+  organizationId,
   profile,
   isProfileLoading,
   isProfileError,
+  profileOverrideNeedsAttention,
   onRetryProfile,
+  onOpenProfilePicker,
+  selectedProfileId,
+  onSelectProfile,
+  manualVars,
+  manualCommands,
+  onManualVarsChange,
+  onManualCommandsChange,
+  onOpenRepoDefaults,
+  accountSection,
+  environmentSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
   isStartDisabled,
+  startBlockedReason = null,
+  startBlockedAction = null,
   onStartSession,
-}: Readonly<NewSessionConfigureFormProps>) {
-  const colors = useThemeColors();
-  const isRemote = runOnInstance !== null;
-  const isStarting = isRemote ? isSpawningRemote : isCreating;
-  const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
-  let runTargetBlock: ReactNode = null;
-  if (showRunOnSelector) {
-    runTargetBlock = (
-      <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
-        <InstanceSelector
-          value={runOnInstance}
-          instances={instanceList}
-          isLoading={isLoadingInstances}
-          onChange={onChangeRunOnInstance}
+  cloudCreateError = null,
+  onRetryCloudCreate,
+  planRefusal = null,
+  remoteSpawnFailure = null,
+  onRetryRemoteSpawn,
+}: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
+  const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
+  // The footer reserves the platform inset. The lift above moves the scroll
+  // body and footer together; the prompt yields height to the viewport.
+  // The scroll view takes no keyboard inset of its own: iOS sized that inset
+  // before the lift, so the frame was cleared twice and the content scrolled
+  // the composer's mode and model row out of view once the keyboard settled.
+  // A focused field below the fold still scrolls into view through the text
+  // input's own caret reveal. (The picker-sheet sliver of the e1 spot check is
+  // fixed at the sheet triggers: a formSheet anchors over the keyboard that is
+  // up at its first layout and never re-anchors, so the keyboard must be
+  // dismissed before the sheet opens.)
+  const bottomClearance = useDetailScreenBottomPadding();
+  const { bottom } = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
+  // The container's bottom edge is the window's on every entry this form
+  // mounts through — the pushed card and the Tour modal's sheet both reach it —
+  // so its top follows from its own measured height and the window. A second
+  // measurement of the top (`measureInWindow`) can report a stale zero on the
+  // pass that stores it, and the fit would then claim the band the keyboard
+  // takes as room of its own.
+  const containerY = Math.max(0, windowHeight - containerHeight);
+  // The fit reads the same space the keyboard occupies: the container's top as
+  // the window places it, and its height. Its offset is the reduction the lift
+  // applies, so the frame reserves exactly the band the lift takes and never
+  // more; the footer's own bottom padding covers the rest of the inset.
+  const frame = {
+    containerY,
+    containerHeight,
+    footerHeight,
+    windowHeight,
+    keyboardVerticalOffset: -bottom,
+  };
+  // Fit against the keyboard's destination, not each intermediate viewport.
+  // The prompt interpolates to that whole-line fit on the UI thread.
+  const frameHeight = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight });
+  const keyboardClosedFrameHeight = resolveNewSessionFormFrameHeight({
+    ...frame,
+    keyboardHeight: 0,
+  });
+  // The host includes the scroll content's top padding in the card offset.
+  const [composerTop, setComposerTop] = useState(0);
+  // The remote surface (launch folder, remote hint, no repository section)
+  // covers both a bound computer and the tour's computer target with none
+  // connected yet — the target is the computer either way.
+  const isRemote = runOnInstance !== null || pendingComputer === true;
+  const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
+  // The composer keeps its three-line floor wherever the form's first screenful
+  // still holds the repository picker under it, and takes one line where it
+  // cannot. The window decides, not the measured frame, so the card cannot
+  // reflow after the first layout; with the keyboard up the frame owns the fit.
+  const promptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight,
+    keyboardVisible,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
+  const keyboardClosedPromptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight,
+    keyboardVisible: false,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
+  const runOnNote =
+    runOnInlineNote ??
+    (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
+
+  function handleContainerLayout(event: LayoutChangeEvent) {
+    const height = event.nativeEvent.layout.height;
+    setContainerHeight(current => (current === height ? current : height));
+  }
+
+  // The composer's scroll body, so the advanced configuration can bring its
+  // expanded content into view instead of growing below the fold. The panel
+  // reports its own offset once per expansion, after that content has laid
+  // out; the clamp keeps a panel near the top from overshooting.
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const revealAdvancedConfig = useCallback((contentOffset: number) => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, contentOffset - ADVANCED_CONFIG_REVEAL_GAP),
+      animated: true,
+    });
+  }, []);
+
+  const body = (
+    <ScrollView
+      ref={scrollRef}
+      className="flex-1"
+      contentContainerClassName="flex-grow px-4 pt-4 pb-4"
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
+      <View
+        onLayout={event => {
+          const nextTop = Math.max(Math.round(event.nativeEvent.layout.y), 0);
+          setComposerTop(current => (current === nextTop ? current : nextTop));
+        }}
+      >
+        <NewSessionPrompt
+          attachments={attachments}
+          attachmentMax={attachmentMax}
+          isCreating={isStarting}
+          isModelsError={isModelsError}
+          isLoadingModels={isLoadingModels}
+          mode={mode}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onChangeText={onChangeText}
+          onModeChange={onModeChange}
+          onModelSelect={onModelSelect}
+          customOptions={customOptions}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          onAddAttachment={onAddAttachment}
+          onRemoveAttachment={onRemoveAttachment}
+          onRetryAttachment={onRetryAttachment}
+          onMoveAttachment={onMoveAttachment}
+          onReorderAttachments={onReorderAttachments}
+          onRefetchModels={onRefetchModels}
+          onPrefillAttachments={onPrefillAttachments}
+          shareId={shareId}
+          voiceInputSettlerRef={voiceInputSettlerRef}
+          initialPrompt={initialPrompt}
+          frameHeight={frameHeight}
+          keyboardClosedFrameHeight={keyboardClosedFrameHeight}
+          cardTop={composerTop}
+          lineCount={promptLineCount}
+          keyboardClosedLineCount={keyboardClosedPromptLineCount}
+          onStartSession={isStartDisabled ? undefined : onStartSession}
+          isCloneEntry={isCloneEntry}
+          autoFocusOnMount={autoFocusPrompt}
+        />
+      </View>
+
+      {/* The block under the card: the Account section when the entry point
+          renders one, then the Run on row and its refresh control. */}
+      <View>
+        {/* The plan refusal is known before the press, so it sits in the scroll
+            content under the composer rather than in the pinned footer: it
+            never takes height from the fields, the launch folder included. */}
+        {planRefusal !== null ? (
+          <OrganizationPlanRefusal message={planRefusal} className="mt-5" />
+        ) : null}
+        {accountSection}
+        <NewSessionRunTarget
+          showRunOnSelector={showRunOnSelector}
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          isFetchingInstances={isFetchingInstances}
+          onChangeRunOnInstance={onChangeRunOnInstance}
+          onRefreshInstances={onRefreshInstances}
+          pendingComputer={pendingComputer}
           disabled={isStarting}
         />
       </View>
-    );
-  } else if (targetLabel) {
-    runTargetBlock = (
-      <View className="mt-2">
-        <Text className="text-sm text-muted-foreground">Run on: {targetLabel}</Text>
-      </View>
-    );
-  }
 
-  // Read-only effective-profile row. Hidden while the profile query loads so a
-  // resolved name never flashes a "Default environment" placeholder first.
-  function renderProfileRow(): ReactNode {
-    if (isProfileLoading) {
-      return null;
-    }
-    if (isProfileError) {
-      return (
-        <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">Environment</Text>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-sm text-destructive">Couldn't load your environment</Text>
-            <Button
-              variant="link"
-              size="sm"
-              onPress={onRetryProfile}
-              accessibilityLabel="Retry loading environment"
-            >
-              <Text>Retry</Text>
-            </Button>
-          </View>
-        </View>
-      );
-    }
-    return (
-      <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">Environment</Text>
-        {profile ? (
-          <View className="gap-1">
-            <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
-            <Text className="text-sm text-muted-foreground">
-              {`${profile.commandCount} commands · ${profile.mcpServerCount} MCP · ${profile.skillCount} skills · ${profile.agentCount} agents`}
-            </Text>
-          </View>
-        ) : (
-          <Text className="text-sm text-foreground">Default environment</Text>
-        )}
-      </View>
-    );
-  }
+      {isRemote ? (
+        <LaunchFolderField
+          folderPath={folderPath}
+          runOnInstance={runOnInstance}
+          onChangeFolderPath={onChangeFolderPath}
+          disabled={isStarting}
+        />
+      ) : null}
 
-  return (
-    <ScrollView
-      className="flex-1"
-      contentContainerClassName="flex-grow px-4 pb-8 pt-4"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
-      <NewSessionPrompt
-        attachments={attachments}
-        attachmentMax={attachmentMax}
-        isCreating={isStarting}
-        isModelsError={isModelsError}
-        isLoadingModels={isLoadingModels}
-        mode={mode}
-        model={model}
-        variant={variant}
-        modelOptions={modelOptions}
-        onChangeText={onChangeText}
-        onModeChange={onModeChange}
-        onModelSelect={onModelSelect}
-        customOptions={customOptions}
-        modelLocked={modelLocked}
-        modelLockLabel={modelLockLabel}
-        onAddAttachment={onAddAttachment}
-        onRemoveAttachment={onRemoveAttachment}
-        onRetryAttachment={onRetryAttachment}
-        onRefetchModels={onRefetchModels}
-        onPrefillAttachments={onPrefillAttachments}
-        shareId={shareId}
-        voiceInputSettlerRef={voiceInputSettlerRef}
-        initialPrompt={initialPrompt}
-      />
-
-      {runTargetBlock}
-
-      {showInstanceDisconnectedNote ? (
+      {/* Under the folder field: only the computer target with no instance yet
+          carries the setup sentence, because that is the one state where it is
+          the instruction for connecting a computer. A bound instance already
+          runs Kilo, and the Run on row and Folder field above it already name
+          the computer, its project and its folder, so an empty slot repeats
+          nothing. A refused spawn resets the target and raises the
+          disconnected note, which owns that copy. */}
+      {isRemote && runOnInstance === null && !showInstanceDisconnectedNote ? (
         <Text className="mt-2 text-sm text-muted-foreground">
-          {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
+          {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}
+
+      {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
       {!isRemote ? (
         <NewSessionRepositorySection
           disabled={isCreating}
-          view={view}
+          groups={groups}
           isRetrying={isRetrying}
+          settled={repositoryRegionSettled}
           onChange={onChangeRepo}
-          onOpenGitHubIntegration={onOpenGitHubIntegration}
+          onConnect={onConnectProvider}
+          connectingProvider={connectingProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
+          recents={recents}
           value={selectedRepo}
+          organizationId={organizationId}
+          isCloneEntry={isCloneEntry}
         />
       ) : null}
 
-      {!isRemote ? (
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? environmentSection : null}
+
+      {/*
+        Everything below the repository section waits for that section's final
+        height. A connect card's height is data-dependent, so painting these
+        rows first and letting the cards arrive above them would push the rows
+        (and the rest of the form) down after it has settled.
+      */}
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
         <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">Changes</Text>
+          <Text className="mb-2 text-sm font-medium text-muted-foreground">
+            {t('common.changes')}
+          </Text>
           <SegmentedControl
-            accessibilityLabel="Changes"
-            options={COMMIT_CHOICE_OPTIONS}
+            accessibilityLabel={t('common.changes')}
+            options={[
+              { value: 'leave', label: t('agentChat.newSession.leaveChanges') },
+              { value: 'commit', label: t('agentChat.newSession.commitAndPush') },
+            ]}
             value={autoCommit ? 'commit' : 'leave'}
             onChange={next => {
               onAutoCommitChange(next === 'commit');
@@ -271,15 +392,99 @@ export function NewSessionConfigureForm({
         </View>
       ) : null}
 
-      {!isRemote ? renderProfileRow() : null}
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
+        <NewSessionProfileRow
+          profile={profile}
+          isProfileLoading={isProfileLoading}
+          isProfileError={isProfileError}
+          overrideNeedsAttention={profileOverrideNeedsAttention}
+          onRetryProfile={onRetryProfile}
+          onOpenProfilePicker={onOpenProfilePicker}
+        />
+      ) : null}
 
-      <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStartSession}>
-        {isStarting ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : (
-          <Text>Start session</Text>
-        )}
-      </Button>
+      {
+        // The advanced configuration disclosure sits under Environment. It is
+        // collapsed by default, so the screen is unchanged until it is tapped;
+        // both the profile pick and the manual env/command draft are the
+        // session's own state, so one submitted create carries them all.
+      }
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
+        <AdvancedConfigPanel
+          organizationId={organizationId}
+          selectedProfileId={selectedProfileId}
+          onSelectProfile={onSelectProfile}
+          manualVars={manualVars}
+          manualCommands={manualCommands}
+          onManualVarsChange={onManualVarsChange}
+          onManualCommandsChange={onManualCommandsChange}
+          disabled={isStarting}
+          onRepoDefaults={onOpenRepoDefaults}
+          onRequestReveal={revealAdvancedConfig}
+        />
+      ) : null}
     </ScrollView>
+  );
+
+  // Persistent failure feedback for the cloud create, in the reserved spot
+  // directly above Start. A retryable rejection carries the retry control; a
+  // terminal one says what the server reported instead. The form owns this
+  // feedback, so the creator hook stays silent for it. It rides the pinned
+  // footer with Start so the recovery control is visible with the keyboard up
+  // too. Cloud-only: the route also clears the failure when the target
+  // changes, and this gate keeps a stale one off a remote target no matter
+  // which path selected it.
+  const footer = (
+    <View
+      className="bg-background px-4 pt-3"
+      style={{ paddingBottom: bottomClearance }}
+      onLayout={event => {
+        setFooterHeight(event.nativeEvent.layout.height);
+      }}
+    >
+      {cloudCreateError && !isRemote ? (
+        <NewSessionCloudCreateError
+          failure={cloudCreateError}
+          onRetry={onRetryCloudCreate}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
+
+      {isRemote && remoteSpawnFailure !== null ? (
+        <NewSessionRemoteSpawnFailure
+          failure={remoteSpawnFailure}
+          onRetry={onRetryRemoteSpawn}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
+
+      <NewSessionStartButton
+        isCloneEntry={isCloneEntry}
+        isRemote={isRemote}
+        isStartDisabled={isStartDisabled}
+        isStarting={isStarting}
+        startBlockedReason={startBlockedReason}
+        startBlockedAction={startBlockedAction}
+        onStartSession={onStartSession}
+      />
+    </View>
+  );
+
+  // Shrink the scroll viewport with the keyboard; a footer-only lift grows
+  // below its full-height sibling and leaves Start behind the keyboard. The
+  // padding is the keyboard's own measured height, less the bottom inset the
+  // footer already pads, so the button sits just above the keyboard instead of
+  // a navigation-bar height above it. It follows the keyboard and never
+  // depends on a frame the platform reported late.
+  return (
+    <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
+      <KeyboardLiftView
+        className="flex-1 bg-background"
+        height={Math.max(0, keyboardHeight - bottom)}
+      >
+        {body}
+        {footer}
+      </KeyboardLiftView>
+    </View>
   );
 }

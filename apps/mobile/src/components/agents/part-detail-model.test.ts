@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive suite for the sheet title, the centering rule and the auto-follow rule */
 import {
   type Part,
   type ReasoningPart,
@@ -6,7 +7,13 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { findPartById, getPartDetailTitle, shouldAutoFollowPartDetail } from './part-detail-model';
+import {
+  findPartById,
+  getPartDetailTitle,
+  type PartDetailTitle,
+  shouldAutoFollowPartDetail,
+  shouldCenterPartDetail,
+} from './part-detail-model';
 
 const { getToolDisplay } = vi.hoisted(() => ({
   getToolDisplay: vi.fn(),
@@ -14,7 +21,7 @@ const { getToolDisplay } = vi.hoisted(() => ({
 vi.mock('./tool-card-display', () => ({ getToolDisplay }));
 
 function makeToolPart(
-  overrides: { tool?: string; input?: Record<string, unknown> } = {}
+  overrides: { tool?: string; input?: Record<string, unknown>; state?: ToolPart['state'] } = {}
 ): ToolPart {
   return {
     id: 'tool-1',
@@ -23,7 +30,7 @@ function makeToolPart(
     type: 'tool',
     callID: 'call-1',
     tool: overrides.tool ?? 'bash',
-    state: {
+    state: overrides.state ?? {
       status: 'completed',
       input: overrides.input ?? { command: 'echo hi' },
       output: '',
@@ -93,31 +100,232 @@ describe('findPartById', () => {
   });
 });
 
+/** A prefixless, non-translatable title: reasoning and the non-tool fallback. */
+function untranslated(text: string): PartDetailTitle {
+  return { prefix: null, text, translatable: false };
+}
+
 describe('getPartDetailTitle', () => {
   beforeEach(() => {
     getToolDisplay.mockReset();
   });
 
-  it('combines the display title and subtitle for tools', () => {
-    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi' });
-    expect(getPartDetailTitle(makeToolPart())).toBe('bash: echo hi');
+  it('translates the row subtitle under the display title prefix and carries its provenance', () => {
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual({
+      prefix: 'bash',
+      text: 'echo hi',
+      translatable: true,
+    });
+    getToolDisplay.mockReturnValue({ title: 'glob', translatable: false });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toEqual(untranslated('glob'));
   });
 
-  it('uses the display title alone when the tool has no subtitle', () => {
-    getToolDisplay.mockReturnValue({ title: 'glob' });
-    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toBe('glob');
+  it('falls back to the tool title when the row subtitle is empty', () => {
+    // A bash call whose `description` is '' projects an empty subtitle; the
+    // header must show the tool title rather than a blank.
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: '', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual(untranslated('bash'));
   });
 
-  it('labels streaming reasoning as Thinking', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toBe('Thinking');
+  it('shows the label alone when the sheet body already shows the subtitle', () => {
+    // The sent-file chip names the file, so the header keeps the label and
+    // never repeats the name or the raw tool id.
+    getToolDisplay.mockReturnValue({
+      title: 'Sent file',
+      subtitle: 'random.txt',
+      translatable: true,
+      headerTitleOnly: true,
+    });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'send_file' }))).toEqual(
+      untranslated('Sent file')
+    );
   });
 
-  it('labels completed reasoning as Thought', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toBe('Thought');
+  it('keeps the file name in the header while a send is unfinished', () => {
+    // The body renders no chip until the delivery completes, so the header is
+    // the only place that names the file.
+    getToolDisplay.mockReturnValue({
+      title: 'Send file',
+      subtitle: 'random.txt',
+      translatable: true,
+    });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'send_file' }))).toEqual({
+      prefix: 'Send file',
+      text: 'random.txt',
+      translatable: true,
+    });
   });
 
-  it('falls back to Details for other part types', () => {
-    expect(getPartDetailTitle(makeTextPart())).toBe('Details');
+  it('never marks reasoning or other part types translatable', () => {
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual(
+      untranslated('Thinking')
+    );
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toEqual(
+      untranslated('Thought')
+    );
+    expect(getPartDetailTitle(makeTextPart())).toEqual(untranslated('Details'));
+  });
+});
+
+const completedState: Extract<ToolPart['state'], { status: 'completed' }> = {
+  status: 'completed',
+  input: {},
+  output: '',
+  title: '',
+  metadata: {},
+  time: { start: 1, end: 2 },
+};
+const errorState: Extract<ToolPart['state'], { status: 'error' }> = {
+  status: 'error',
+  input: {},
+  error: 'Failed',
+  time: { start: 1, end: 2 },
+};
+
+describe('shouldCenterPartDetail', () => {
+  it('centers missing details, but not reasoning', () => {
+    expect(shouldCenterPartDetail(null, false)).toBe(true);
+    expect(shouldCenterPartDetail(makeReasoningPart(''), false)).toBe(false);
+  });
+
+  it.each(['file.ts', 'file.md', 'file.mdx'])('centers only an empty read of %s', filePath => {
+    for (const text of ['', 'content', ' ']) {
+      const part = makeToolPart({
+        tool: 'read',
+        state: {
+          ...completedState,
+          input: { filePath },
+          output: 'raw envelope',
+          metadata: {
+            display: {
+              type: 'file',
+              path: filePath,
+              text,
+              lineStart: 1,
+              lineEnd: 0,
+              totalLines: 0,
+            },
+          },
+        },
+      });
+      expect(shouldCenterPartDetail(part, false)).toBe(text === '');
+    }
+  });
+
+  it.each(['file.ts', 'file.md'])(
+    'centers final empty writes of %s, including errors',
+    filePath => {
+      for (const state of [completedState, errorState]) {
+        for (const content of ['', undefined, 42, 'body', ' ']) {
+          const part = makeToolPart({
+            tool: 'write',
+            state: { ...state, input: { filePath, content } },
+          });
+          expect(shouldCenterPartDetail(part, false)).toBe(!content || content === 42);
+        }
+      }
+    }
+  );
+
+  it.each(['todoread', 'todowrite'])('centers empty %s without a completed-status guard', tool => {
+    const states: ToolPart['state'][] = [
+      completedState,
+      errorState,
+      { status: 'pending', input: {}, raw: '' },
+      { status: 'running', input: {}, time: { start: 1 } },
+    ];
+    for (const state of states) {
+      for (const content of ['', ' ', 'Task']) {
+        const part = makeToolPart({ tool, state: { ...state, input: { todos: [{ content }] } } });
+        expect(shouldCenterPartDetail(part, false)).toBe(content.trim() === '');
+      }
+      expect(shouldCenterPartDetail(makeToolPart({ tool: 'write', state }), false)).toBe(
+        state.status === 'completed' || state.status === 'error'
+      );
+    }
+    expect(
+      shouldCenterPartDetail(
+        makeToolPart({ tool, state: { ...completedState, output: 'raw fallback' } }),
+        false
+      )
+    ).toBe(false);
+  });
+
+  it.each(['glob', 'grep'])('centers only status-only %s results', tool => {
+    for (const output of [
+      'No files found',
+      'Found 0 files',
+      'No files found\n(Results truncated)',
+    ]) {
+      expect(
+        shouldCenterPartDetail(makeToolPart({ tool, state: { ...completedState, output } }), false)
+      ).toBe(true);
+    }
+    for (const output of ['Found 1 file\nfile.ts', 'raw fallback', '', ' ']) {
+      expect(
+        shouldCenterPartDetail(makeToolPart({ tool, state: { ...completedState, output } }), false)
+      ).toBe(false);
+    }
+  });
+
+  it.each(['image/png', 'application/pdf'])(
+    'centers only unavailable %s attachments without other content',
+    mime => {
+      const attachment = {
+        id: 'file-1',
+        sessionID: 's1',
+        messageID: 'm1',
+        type: 'file' as const,
+        mime,
+        url: '',
+      };
+      const tool = mime === 'image/png' ? 'read' : 'send_file';
+      const state = {
+        ...completedState,
+        attachments: [attachment],
+        output: tool === 'read' ? 'Image read successfully' : '',
+      };
+      const part = makeToolPart({ tool, state });
+      expect(shouldCenterPartDetail(part, false)).toBe(true);
+      expect(shouldCenterPartDetail(part, true)).toBe(false);
+      expect(
+        shouldCenterPartDetail(
+          makeToolPart({ tool: 'custom_tool', state: { ...state, input: { path: 'file' } } }),
+          false
+        )
+      ).toBe(false);
+      expect(
+        shouldCenterPartDetail(
+          makeToolPart({ tool: 'send_file', state: { ...state, output: 'result' } }),
+          false
+        )
+      ).toBe(false);
+    }
+  );
+
+  it('keeps an empty state inline beside available attachments', () => {
+    const attachment = {
+      id: 'file-1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'file' as const,
+      mime: 'image/png',
+      url: '',
+    };
+    for (const tool of ['write', 'todoread', 'todowrite', 'glob', 'grep']) {
+      const part = makeToolPart({
+        tool,
+        state: {
+          ...completedState,
+          input: { todos: [] },
+          output: 'No files found',
+          attachments: [attachment],
+        },
+      });
+      expect(shouldCenterPartDetail(part, false)).toBe(true);
+      expect(shouldCenterPartDetail(part, true)).toBe(false);
+    }
   });
 });
 

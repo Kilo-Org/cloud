@@ -7,9 +7,11 @@
  */
 
 import { createMiddleware } from 'hono/factory';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
+import { getSecretValue } from './secret';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';
@@ -26,7 +28,7 @@ export function validateInternalApiKey(
     return { success: false, error: 'Missing internal API key' };
   }
 
-  if (apiKeyHeader !== secret) {
+  if (!timingSafeEqual(apiKeyHeader, secret)) {
     return { success: false, error: 'Invalid internal API key' };
   }
 
@@ -51,7 +53,7 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
   }
 
   const apiKeyHeader = c.req.header(INTERNAL_API_KEY_HEADER);
-  const secret = await c.env.INTERNAL_API_SECRET.get();
+  const secret = await getSecretValue(c.env.INTERNAL_API_SECRET);
 
   if (!secret) {
     logger.error('INTERNAL_API_SECRET not configured');

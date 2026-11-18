@@ -1,0 +1,365 @@
+import { createElement, type ReactNode } from 'react';
+import { act } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import '@/i18n';
+import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
+import {
+  findAll,
+  findOne,
+  groupChildren,
+  profile,
+  type ProfileSummary,
+  rowTitles,
+  textChildren,
+} from '@/components/profiles/profiles-list-screen.test-helpers';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+// ── Hoisted mocks ──────────────────────────────────────────────────────────
+
+type ListResult = {
+  orgProfiles: ProfileSummary[];
+  personalProfiles: ProfileSummary[];
+  effectiveDefaultId: string | null;
+  isLoading: boolean;
+  isError: boolean;
+  error?: unknown;
+  isRefetching: boolean;
+  refetch: () => void;
+};
+
+const refetchFn = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
+const connectivityState = vi.hoisted(() => ({ value: 'online' as string }));
+const organizationState = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
+const listState = vi.hoisted<ListResult>(() => ({
+  orgProfiles: [],
+  personalProfiles: [],
+  effectiveDefaultId: null,
+  isLoading: true,
+  isError: false,
+  isRefetching: false,
+  refetch: () => {
+    refetchFn();
+  },
+}));
+
+vi.mock('@/lib/hooks/use-agent-profiles', () => ({
+  useAgentProfileList: () => listState,
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => connectivityState.value,
+  useCommittedConnectivityStatus: () => connectivityState.value,
+}));
+
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({
+    organizationId: organizationState.organizationId,
+    isLoaded: true,
+  }),
+}));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
+
+vi.mock('@/lib/profile-agent-navigation', () => ({
+  getNewProfilePath: (stack: 'app' | 'profileTab') =>
+    stack === 'app' ? '/app-stack/profiles/new' : '/(app)/(tabs)/(3_profile)/profiles/new',
+  getProfileOverviewPath: (
+    profileId: string,
+    options: { organizationId?: string; stack?: string } = {}
+  ) =>
+    `${options.stack === 'app' ? '/app-stack' : ''}/profiles/${profileId}${
+      options.organizationId ? `?org=${options.organizationId}` : ''
+    }`,
+  getRepoBindingsPath: (options: { organizationId?: string; stack?: string } = {}) =>
+    `${options.stack === 'app' ? '/app-stack' : '/(app)/(tabs)/(3_profile)/profiles'}/repo-bindings${
+      options.organizationId ? `?organizationId=${options.organizationId}` : ''
+    }`,
+}));
+
+vi.mock('react-native', () => ({
+  View: 'View',
+}));
+
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    primary: '#4F5A10',
+    primaryForeground: '#FFFFFF',
+    mutedForeground: '#6F6A61',
+  }),
+}));
+
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) => headerRight ?? null,
+}));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/ui/icons', () => ({
+  Building2: 'Building2',
+  GitBranch: 'GitBranch',
+  Plus: 'Plus',
+  SlidersHorizontal: 'SlidersHorizontal',
+  Star: 'Star',
+  User: 'User',
+}));
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+async function mount(stack: 'app' | 'profileTab' = 'profileTab') {
+  const result = await renderWithProviders(createElement(ProfilesListScreen, { stack }));
+  return result;
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+describe('ProfilesListScreen', () => {
+  beforeEach(() => {
+    refetchFn.mockReset();
+    routerPush.mockReset();
+    organizationState.organizationId = 'org-1';
+    connectivityState.value = 'online';
+    Object.assign(listState, {
+      orgProfiles: [],
+      personalProfiles: [],
+      effectiveDefaultId: null,
+      isLoading: false,
+      isError: false,
+      error: undefined,
+      isRefetching: false,
+    });
+  });
+
+  it('loading: renders content-shaped skeleton rows and no profile rows', async () => {
+    listState.isLoading = true;
+
+    const { renderer, unmount } = await mount();
+
+    // 3 placeholder rows x (icon tile + title bar + subtitle bar).
+    expect(findAll(renderer.root, 'Skeleton')).toHaveLength(9);
+    expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('error: renders QueryError and Retry refetches', async () => {
+    listState.isError = true;
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.title).toBe("Couldn't load profiles");
+    expect(queryError.props.variant).toBe('server');
+    act(() => {
+      (queryError.props as { onRetry: () => void }).onRetry();
+    });
+    expect(refetchFn).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a lost organization access renders the permission state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'UNAUTHORIZED' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('permission');
+    // The variant's own copy names the cause; the load-failure title would not.
+    expect(queryError.props.title).toBeUndefined();
+    expect(queryError.props.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('a deleted organization renders the not-found state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'NOT_FOUND' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('not-found');
+    expect(queryError.props.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('empty: renders EmptyState with the create CTA', async () => {
+    organizationState.organizationId = null;
+
+    const { renderer, unmount } = await mount();
+
+    const emptyState = findOne(renderer.root, 'EmptyState');
+    expect(emptyState.props.title).toBe('No profiles yet');
+    // The repo-defaults entry needs a profile to bind, so it stays out of the
+    // empty state the brief leaves unchanged.
+    expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+
+    const action = emptyState.props.action as { props: { onPress: () => void } };
+    act(() => {
+      action.props.onPress();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/profiles/new');
+
+    unmount();
+  });
+
+  it('happy: renders org then personal rows, marks the effective default, and opens a profile', async () => {
+    listState.orgProfiles = [
+      profile({ id: 'org-1-profile', name: 'Org profile', varCount: 1, ownerType: 'organization' }),
+    ];
+    listState.personalProfiles = [
+      profile({
+        id: 'personal-1',
+        name: 'Personal profile',
+        commandCount: 9,
+        mcpServerCount: 2,
+        isDefault: true,
+      }),
+    ];
+    listState.effectiveDefaultId = 'personal-1';
+
+    const { renderer, unmount } = await mount();
+
+    // The rows sit under the screen's own title, which the header renders, so
+    // the body does not repeat it as a section heading.
+    expect(textChildren(renderer.root)).not.toContain('Profiles');
+    expect(textChildren(renderer.root)).toContain('Organization');
+    expect(textChildren(renderer.root)).toContain('Personal');
+    expect(rowTitles(renderer.root)).toEqual([
+      'Org profile',
+      'Personal profile',
+      'Default profiles',
+    ]);
+
+    const personalRow = findAll(renderer.root, 'ConfigureRow').find(
+      row => row.props.title === 'Personal profile'
+    );
+    if (!personalRow) {
+      throw new Error('personal row missing');
+    }
+    expect(personalRow.props.subtitle).toBe('2 MCP · 9 setup cmds');
+    // The row's own name carries what the visual row shows plus what
+    // activating it does: the count summary, the default mark and the hint.
+    expect(personalRow.props.accessibilityLabel).toBe(
+      'Personal profile, 2 MCP · 9 setup cmds, Default profile, Opens the profile'
+    );
+    const star = personalRow.props.trailing as { type: string; props: object };
+    expect(star.type).toBe('Star');
+    // The mark is inside the row's name, so it is not a control of its own.
+    expect(star.props).not.toHaveProperty('accessibilityLabel');
+
+    const orgRow = findAll(renderer.root, 'ConfigureRow').find(
+      row => row.props.title === 'Org profile'
+    );
+    if (!orgRow) {
+      throw new Error('org row missing');
+    }
+    expect(orgRow.props.subtitle).toBe('1 var');
+    expect(orgRow.props.accessibilityLabel).toBe('Org profile, 1 var, Opens the profile');
+    // The row's leading icon names its owner.
+    expect(orgRow.props.icon).toBe('Building2');
+    expect(personalRow.props.icon).toBe('User');
+    // Only the resolved effective default gets the filled star.
+    expect(orgRow.props.trailing).toBeUndefined();
+    act(() => {
+      (orgRow.props as { onPress: () => void }).onPress();
+    });
+    // An org-owned profile carries its organization id into the editor.
+    expect(routerPush).toHaveBeenCalledWith('/profiles/org-1-profile?org=org-1');
+
+    act(() => {
+      (personalRow.props as { onPress: () => void }).onPress();
+    });
+    // A personal profile keeps no owner context, even from an org list.
+    expect(routerPush).toHaveBeenCalledWith('/profiles/personal-1');
+
+    const createButton = findAll(renderer.root, 'IconButton').find(
+      button => button.props.accessibilityLabel === 'New profile'
+    );
+    if (!createButton) {
+      throw new Error('header create action was not rendered');
+    }
+    act(() => {
+      (createButton.props as { onPress: () => void }).onPress();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/profiles/new');
+
+    unmount();
+  });
+
+  it('personal context: renders no owner heading', async () => {
+    organizationState.organizationId = null;
+    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
+
+    const { renderer, unmount } = await mount();
+
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default profiles']);
+    // No owner groups means no owner heading, and the rows repeat no heading
+    // above them; only the settings group names itself.
+    expect(textChildren(renderer.root)).toEqual(['Repositories']);
+    // The scroll holds the profile rows and the labeled settings group, and no
+    // third orphan row.
+    expect(groupChildren(findOne(renderer.root, 'ScrollView'))).toHaveLength(2);
+    // `agentProfiles.list` does not tag owner, so every row is personal.
+    expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
+
+    unmount();
+  });
+
+  it('offline refetch failure keeps the cached rows and names connectivity', async () => {
+    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
+    listState.isError = true;
+    connectivityState.value = 'offline';
+
+    const { renderer, unmount } = await mount();
+
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('offline');
+    // The cached rows stay usable under the banner.
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default profiles']);
+
+    unmount();
+  });
+
+  it('error without cached rows renders no rows, and connectivity unknown keeps server variant', async () => {
+    listState.isError = true;
+    connectivityState.value = 'unknown';
+
+    const { renderer, unmount } = await mount();
+
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('server');
+    expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('opens the profile it is mounted in the root stack for, not the Profile tab one', async () => {
+    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
+
+    const { renderer, unmount } = await mount('app');
+
+    const row = findAll(renderer.root, 'ConfigureRow').find(
+      candidate => candidate.props.title === 'Personal profile'
+    );
+    if (!row) {
+      throw new Error('profile row missing');
+    }
+    act(() => {
+      (row.props as { onPress: () => void }).onPress();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/app-stack/profiles/personal-1');
+
+    unmount();
+  });
+});

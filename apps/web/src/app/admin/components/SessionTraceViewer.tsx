@@ -10,9 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MessageBubble as V1MessageBubble } from '@/components/cloud-agent/MessageBubble';
 import { MessageErrorBoundary as V1MessageErrorBoundary } from '@/components/cloud-agent/MessageErrorBoundary';
-import { convertToCloudMessages } from '@/components/cloud-agent/store/db-session-atoms';
-import { MessageBubble as V2MessageBubble } from '@/components/cloud-agent-next/MessageBubble';
+import { convertToCloudMessages } from '@/components/cloud-agent-next/legacy-session-types';
+import { CloudReadOnlyThread } from '@/components/cloud-agent-next/assistant-ui/CloudThread';
+import { CloudMessage as V2Message } from '@/components/cloud-agent-next/assistant-ui/CloudMessage';
+import { useCloudMessagePresentation } from '@/components/cloud-agent-next/assistant-ui/cloud-presentation-context';
 import { MessageErrorBoundary as V2MessageErrorBoundary } from '@/components/cloud-agent-next/MessageErrorBoundary';
+import {
+  formatSessionCost,
+  isRenderableSessionCost,
+} from '@/components/cloud-agent-next/session-cost-breakdown';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import {
   useAdminSessionTrace,
@@ -31,6 +37,7 @@ import {
   Download,
   Server,
   Tag,
+  DollarSign,
 } from 'lucide-react';
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
@@ -39,7 +46,11 @@ import { SessionContainerTelemetryContent } from './SessionContainerTelemetry';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SES_PREFIX = 'ses_';
-const AGENT_PREFIX = 'agent_';
+const CLOUD_AGENT_SESSION_PREFIXES = ['agent_', 'workspace_'] as const;
+
+function isCloudAgentSessionId(value: string): boolean {
+  return CLOUD_AGENT_SESSION_PREFIXES.some(prefix => value.startsWith(prefix));
+}
 
 function formatModelLabel(providerId: unknown, modelId: unknown): string | null {
   if (typeof providerId !== 'string' || typeof modelId !== 'string') {
@@ -67,6 +78,25 @@ function getV2MessageModelLabel(message: StoredMessage): string | null {
   }
 
   return formatModelLabel(message.info.providerID, message.info.modelID);
+}
+
+function V2TraceMessage() {
+  const presentation = useCloudMessagePresentation();
+  const message = presentation.sources[0];
+  const model = message?.info.role === 'user' ? getV2MessageModelLabel(message) : null;
+  return (
+    <V2MessageErrorBoundary>
+      <div className="mb-2 space-y-1 last:mb-0">
+        {model && (
+          <div className="text-muted-foreground flex items-center gap-2 px-3 text-xs">
+            <span className="font-medium">Model:</span>
+            <code className="bg-muted rounded px-1 py-0.5 font-mono">{model}</code>
+          </div>
+        )}
+        <V2Message />
+      </div>
+    </V2MessageErrorBoundary>
+  );
 }
 
 function convertToMessage(cloudMessage: CloudMessage): Message & {
@@ -107,7 +137,6 @@ export function SessionTraceViewer() {
 
   const resolveQuery = useAdminResolveCloudAgentSession(pendingAgentId, canViewSessions);
 
-  // When the agent ID resolves, transition to the CLI session ID
   useEffect(() => {
     if (resolveQuery.data?.session_id && pendingAgentId) {
       const resolved = resolveQuery.data.session_id;
@@ -118,10 +147,9 @@ export function SessionTraceViewer() {
     }
   }, [resolveQuery.data, pendingAgentId, router]);
 
-  // Initialize from URL parameter on mount
   useEffect(() => {
     if (!sessionIdFromUrl) return;
-    if (sessionIdFromUrl.startsWith(AGENT_PREFIX)) {
+    if (isCloudAgentSessionId(sessionIdFromUrl)) {
       setInputValue(sessionIdFromUrl);
       setPendingAgentId(sessionIdFromUrl);
       setSearchedSessionId(null);
@@ -152,10 +180,10 @@ export function SessionTraceViewer() {
       return;
     }
 
-    const isAgent = trimmed.startsWith(AGENT_PREFIX);
-    if (!UUID_REGEX.test(trimmed) && !trimmed.startsWith(SES_PREFIX) && !isAgent) {
+    const isCloudAgent = isCloudAgentSessionId(trimmed);
+    if (!UUID_REGEX.test(trimmed) && !trimmed.startsWith(SES_PREFIX) && !isCloudAgent) {
       setValidationError(
-        'Invalid session ID. Expected a UUID, a v2 ID (ses_...), or a cloud agent session ID (agent_...)'
+        'Invalid session ID. Expected a UUID, a v2 ID (ses_...), or a cloud agent session ID (agent_... or workspace_...)'
       );
       return;
     }
@@ -163,7 +191,7 @@ export function SessionTraceViewer() {
     setValidationError(null);
     setResolvedFromAgent(null);
 
-    if (isAgent) {
+    if (isCloudAgent) {
       setPendingAgentId(trimmed);
       setSearchedSessionId(null);
     } else {
@@ -224,6 +252,8 @@ export function SessionTraceViewer() {
     return messagesQuery.data.messages as unknown as StoredMessage[];
   }, [messagesQuery.data]);
 
+  const v2MessageGroups = useMemo(() => v2Messages.map(message => [message]), [v2Messages]);
+
   const messageCount = isV2 ? v2Messages.length : v1Messages.length;
 
   const v2SummaryModel = useMemo(() => {
@@ -278,14 +308,14 @@ export function SessionTraceViewer() {
           <CardHeader>
             <CardTitle>Session Trace Viewer</CardTitle>
             <CardDescription>
-              Enter a CLI session ID (UUID or ses_...) or a cloud agent session ID (agent_...) to
-              view the full session trace
+              Enter a CLI session ID (UUID or ses_...) or a cloud agent session ID (agent_... or
+              workspace_...) to view the full session trace
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000, ses_abc123..., or agent_..."
+                placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000, ses_abc123..., agent_..., or workspace_..."
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -403,6 +433,18 @@ export function SessionTraceViewer() {
                   </span>
                 </div>
               )}
+              {sessionQuery.data.total_cost_microdollars != null &&
+                isRenderableSessionCost(sessionQuery.data.total_cost_microdollars / 1_000_000) && (
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="text-muted-foreground h-4 w-4" />
+                    <span className="text-sm">
+                      Cost:{' '}
+                      <span className="font-mono tabular-nums">
+                        {formatSessionCost(sessionQuery.data.total_cost_microdollars / 1_000_000)}
+                      </span>
+                    </span>
+                  </div>
+                )}
               {latestContainerInterval?.cloudflareInstanceId && (
                 <div className="flex min-w-0 items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
@@ -474,26 +516,11 @@ export function SessionTraceViewer() {
                 <p className="text-muted-foreground">No messages in this session</p>
               ) : isV2 ? (
                 <div className="space-y-2">
-                  {v2Messages.map((msg, index) => {
-                    const userMessageModel =
-                      msg.info.role === 'user' ? getV2MessageModelLabel(msg) : null;
-
-                    return (
-                      <V2MessageErrorBoundary key={`${msg.info.id}-${index}`}>
-                        <div className="space-y-1">
-                          {userMessageModel && (
-                            <div className="text-muted-foreground flex items-center gap-2 px-3 text-xs">
-                              <span className="font-medium">Model:</span>
-                              <code className="bg-muted rounded px-1 py-0.5 font-mono">
-                                {userMessageModel}
-                              </code>
-                            </div>
-                          )}
-                          <V2MessageBubble message={msg} isStreaming={false} />
-                        </div>
-                      </V2MessageErrorBoundary>
-                    );
-                  })}
+                  <CloudReadOnlyThread
+                    messages={v2Messages}
+                    messageGroups={v2MessageGroups}
+                    messageComponent={V2TraceMessage}
+                  />
                 </div>
               ) : (
                 <div className="space-y-2">

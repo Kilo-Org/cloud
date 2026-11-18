@@ -1,0 +1,1 @@
+ALTER TABLE "byok_api_keys" ADD COLUMN "encrypted_api_key_envelope" jsonb;

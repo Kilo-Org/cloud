@@ -14,6 +14,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { AlertCircle, FileCode } from 'lucide-react';
 import { toast } from 'sonner';
+import { ENVIRONMENT_LIMITS } from '@kilocode/cloud-agent-profile';
+import { profileVarKeyError } from '@/lib/profile-var-key';
 import { MonacoJsonEditor } from './MonacoJsonEditor';
 
 type EnvVarsDialogProps = {
@@ -22,7 +24,6 @@ type EnvVarsDialogProps = {
 };
 
 const MAX_VARS = 50;
-const MAX_KEY_LENGTH = 256;
 const MAX_VALUE_LENGTH = 256;
 
 const EXAMPLE_JSON = `{
@@ -39,7 +40,6 @@ export function EnvVarsDialog({ value, onChange }: EnvVarsDialogProps) {
   const handleOpen = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {
-      // Reset to current value when opening
       setJsonText(JSON.stringify(value, null, 2));
       setError(null);
     }
@@ -49,27 +49,21 @@ export function EnvVarsDialog({ value, onChange }: EnvVarsDialogProps) {
     try {
       const parsed = JSON.parse(jsonText);
 
-      // Validate it's an object
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         setError('Must be a valid JSON object');
         return;
       }
 
-      // Validate count
       const keys = Object.keys(parsed);
       if (keys.length > MAX_VARS) {
         setError(`Maximum ${MAX_VARS} environment variables allowed`);
         return;
       }
 
-      // Validate keys and values
       for (const [key, val] of Object.entries(parsed)) {
-        if (typeof key !== 'string' || key.length === 0) {
-          setError('All keys must be non-empty strings');
-          return;
-        }
-        if (key.length > MAX_KEY_LENGTH) {
-          setError(`Key "${key}" exceeds ${MAX_KEY_LENGTH} characters`);
+        const keyError = profileVarKeyError(key);
+        if (keyError !== null) {
+          setError(keyError);
           return;
         }
         if (typeof val !== 'string') {
@@ -82,7 +76,6 @@ export function EnvVarsDialog({ value, onChange }: EnvVarsDialogProps) {
         }
       }
 
-      // All validations passed
       onChange(parsed as Record<string, string>);
       setError(null);
       setOpen(false);
@@ -131,7 +124,8 @@ export function EnvVarsDialog({ value, onChange }: EnvVarsDialogProps) {
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="envVars">
-              JSON Configuration (max {MAX_VARS} variables, {MAX_KEY_LENGTH} chars per key/value)
+              JSON Configuration (max {MAX_VARS} variables, {ENVIRONMENT_LIMITS.MAX_KEY_LENGTH}{' '}
+              chars per key, {MAX_VALUE_LENGTH} per value)
             </Label>
             <MonacoJsonEditor
               value={jsonText}

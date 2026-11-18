@@ -1,0 +1,371 @@
+/* eslint-disable require-await, @typescript-eslint/require-await, max-lines -- the fake mutate/outbox factories settle without await; the full and fork Continue suites share one hook harness */
+import * as React from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
+import { useContinueCloudCreate } from './use-continue-cloud-create';
+
+const prepareSessionMutate = vi.hoisted(() => vi.fn());
+const routerReplace = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
+const captureEventMock = vi.hoisted(() => vi.fn());
+const invalidateAgentSessionQueries = vi.hoisted(() => vi.fn(async () => undefined));
+
+const operationKeyMock = vi.hoisted(() => ({
+  getKey: vi.fn((_fingerprint: string): string => 'op-key-1'),
+  rotateKey: vi.fn(),
+}));
+
+const outboxMock = vi.hoisted(() => ({
+  getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
+  writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
+  remove: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
+}));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ replace: routerReplace, push: routerPush }),
+}));
+
+// `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
+// Android Fabric alive (KILO-APP-25); its own mechanics are covered in
+// src/lib/navigation/stack-safe-replace.mounted.test.tsx. Here it stands in for
+// the navigation call so these assertions stay about the destination href.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: routerReplace }),
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({}),
+}));
+
+vi.mock('expo-haptics', () => ({
+  notificationAsync: async (): Promise<void> => undefined,
+  NotificationFeedbackType: { Success: 'success' },
+}));
+
+vi.mock('@/lib/agent-session-cache', () => ({
+  invalidateAgentSessionQueries,
+}));
+
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: captureEventMock,
+  SESSION_CREATED_EVENT: 'session_created',
+}));
+
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } },
+    organizations: { cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } } },
+  },
+  useTRPC: () => ({}),
+}));
+
+vi.mock('@/lib/operation-key', () => ({
+  useHoistedOperationKey: () => operationKeyMock,
+}));
+
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outboxMock,
+}));
+
+const putSharePayloadMock = vi.hoisted(() => vi.fn((_payload: unknown) => 'share-fork-1'));
+vi.mock('@/lib/share-payload', () => ({ putSharePayload: putSharePayloadMock }));
+
+// Mirror of the real retryability predicate (covered by its own suite); this
+// test only needs to distinguish one retryable and one terminal shape so the
+// hook's key/outbox behavior is exercised per branch.
+vi.mock('@/components/agents/mobile-session-manager', () => ({
+  isCloudPrepareRetryableError: (error: unknown) => {
+    const record = error as { data?: { code?: string }; code?: string; message?: string };
+    const code = record.data?.code ?? record.code;
+    if (code === undefined) {
+      return true;
+    }
+    if (code === 'CONFLICT') {
+      return record.message === 'creation_in_progress';
+    }
+    return new Set([
+      'INTERNAL_SERVER_ERROR',
+      'BAD_GATEWAY',
+      'SERVICE_UNAVAILABLE',
+      'GATEWAY_TIMEOUT',
+      'TIMEOUT',
+      'TOO_MANY_REQUESTS',
+    ]).has(code);
+  },
+}));
+
+type RunContinue = ReturnType<typeof useContinueCloudCreate>;
+
+function Harness({
+  organizationId,
+  onCreated,
+  resultRef,
+}: {
+  organizationId: string | undefined;
+  onCreated: (() => void) | undefined;
+  resultRef: { current: RunContinue | null };
+}) {
+  const run = useContinueCloudCreate(organizationId, onCreated);
+  resultRef.current = run;
+  return null;
+}
+
+function mountContinue(organizationId?: string, onCreated?: () => void): RunContinue {
+  const resultRef: { current: RunContinue | null } = { current: null };
+  act(() => {
+    TestRenderer.create(React.createElement(Harness, { organizationId, onCreated, resultRef }));
+  });
+  const run = resultRef.current;
+  if (run === null) {
+    throw new Error('useContinueCloudCreate did not run');
+  }
+  return run;
+}
+
+const SOURCE_SESSION = 'ses_source' as KiloSessionId;
+// The resolved repository row, never the `platform:fullName` picker key. The
+// happy-path assertion pins `githubRepo` to the bare fullName, so a regression
+// that reintroduces a picker key (`github:owner/repo`) fails.
+const GITHUB_REPO: NewSessionRepository = {
+  platform: 'github',
+  fullName: 'owner/repo',
+  isPrivate: false,
+};
+const GITLAB_REPO: NewSessionRepository = {
+  platform: 'gitlab',
+  fullName: 'group/project',
+  isPrivate: false,
+};
+const BITBUCKET_REPO: NewSessionRepository = {
+  platform: 'bitbucket',
+  fullName: 'workspace/repo',
+  isPrivate: true,
+  workspaceUuid: 'ws-1234',
+  repositoryUuid: 'repo-5678',
+};
+const DEST = { repository: GITHUB_REPO, model: 'claude-x', variant: 'high' };
+const SESSION_RESULT = { kiloSessionId: 'ses_12345678901234567890123456' };
+
+function creationInProgressError(): Error {
+  return Object.assign(new Error('creation_in_progress'), { data: { code: 'CONFLICT' } });
+}
+
+function badRequestError(): Error {
+  return Object.assign(new Error('session_creation_failed'), { data: { code: 'BAD_REQUEST' } });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  prepareSessionMutate.mockResolvedValue(SESSION_RESULT);
+  invalidateAgentSessionQueries.mockResolvedValue(undefined);
+  operationKeyMock.getKey.mockReturnValue('op-key-1');
+  outboxMock.getStoredOperationKey.mockReturnValue(null);
+  outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+  outboxMock.remove.mockResolvedValue(undefined);
+  outboxMock.whenLoaded.mockResolvedValue(true);
+});
+
+describe('useContinueCloudCreate', () => {
+  it('success replaces the route (replaceWithAgentSession, never push)', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith(
+      expect.stringContaining('agent-chat/ses_12345678901234567890123456')
+    );
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('runs a clone-only prepare: no prompt or initialMessageId', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
+      mode: 'code',
+      model: 'claude-x',
+      variant: 'high',
+      githubRepo: 'owner/repo',
+      autoCommit: false,
+      autoInitiate: true,
+      cloneFromKiloSessionId: 'ses_source',
+      operationKey: 'op-key-1',
+      organizationId: 'org-1',
+    });
+    expect(input).not.toHaveProperty('prompt');
+    expect(input).not.toHaveProperty('initialMessageId');
+  });
+
+  it('sends the fork cut and keys the retry on it, leaving a full Continue fingerprint unchanged', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+    await act(async () => {
+      await run(
+        SOURCE_SESSION,
+        { ...DEST, cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn' },
+        'code'
+      );
+    });
+
+    const fullInput = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    const forkInput = prepareSessionMutate.mock.calls[1]?.[0] as Record<string, unknown>;
+    expect(fullInput).not.toHaveProperty('cloneUpToMessageId');
+    expect(forkInput).toMatchObject({
+      cloneFromKiloSessionId: 'ses_source',
+      cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+    const [fullFingerprint, forkFingerprint] = operationKeyMock.getKey.mock.calls.map(
+      ([fingerprint]) => fingerprint
+    );
+    expect(fullFingerprint).not.toContain('cloneUpToMessageId');
+    expect(forkFingerprint).toContain('"cloneUpToMessageId":"msg_018f1e2d3c4bAbCdEfGhIjKlMn"');
+  });
+
+  it('prefills a forked user message in the new composer without auto-send', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(
+        SOURCE_SESSION,
+        {
+          ...DEST,
+          cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          forkPrefillText: 'Second question',
+        },
+        'code'
+      );
+    });
+
+    expect(putSharePayloadMock).toHaveBeenCalledWith({
+      text: 'Second question',
+      files: [],
+      failedFiles: [],
+    });
+    const href = routerReplace.mock.calls[0]?.[0] as string;
+    expect(href).toContain('agent-chat/ses_12345678901234567890123456');
+    expect(href).toContain('shareId=share-fork-1');
+    expect(href).not.toContain('autoSend=');
+  });
+
+  it('writes gitlabProject (never githubRepo) for a GitLab repository', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, { ...DEST, repository: GITLAB_REPO }, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({ gitlabProject: 'group/project' });
+    expect(input).not.toHaveProperty('githubRepo');
+  });
+
+  it('writes bitbucketRepo (only) with both uuids for a Bitbucket repository, and never upstreamBranch', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, { ...DEST, repository: BITBUCKET_REPO }, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
+      bitbucketRepo: {
+        fullName: 'workspace/repo',
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+    expect(input).not.toHaveProperty('githubRepo');
+    expect(input).not.toHaveProperty('gitlabProject');
+    expect(input).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('writes no repository field for a Bitbucket repository missing its uuids', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(
+        SOURCE_SESSION,
+        {
+          ...DEST,
+          repository: {
+            platform: 'bitbucket',
+            fullName: 'workspace/repo',
+            isPrivate: true,
+          },
+        },
+        'code'
+      );
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).not.toHaveProperty('githubRepo');
+    expect(input).not.toHaveProperty('gitlabProject');
+    expect(input).not.toHaveProperty('bitbucketRepo');
+    expect(input).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('rethrows a retryable prepare error without rotating the key or removing the row (route toasts cloneFailedRetry and re-enables)', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(creationInProgressError());
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await expect(run(SOURCE_SESSION, DEST, 'code')).rejects.toThrow('creation_in_progress');
+    });
+
+    // The retry keeps the same operation key and the safe-retry row, so the
+    // next Start tap replays the intent instead of minting a duplicate.
+    expect(operationKeyMock.rotateKey).not.toHaveBeenCalled();
+    expect(outboxMock.remove).not.toHaveBeenCalled();
+  });
+
+  it('rethrows a non-retryable prepare error after rotating the key and removing the row (route toasts the message)', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(badRequestError());
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await expect(run(SOURCE_SESSION, DEST, 'code')).rejects.toThrow('session_creation_failed');
+    });
+
+    expect(operationKeyMock.rotateKey).toHaveBeenCalledTimes(1);
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires the onCreated bypass right before the success replace', async () => {
+    const onCreated = vi.fn(() => undefined);
+    const run = mountContinue('org-1', onCreated);
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    // The route arms its busy leave-lock bypass before the replace lands.
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares against the personal router when no organization is scoped', async () => {
+    const run = mountContinue(undefined);
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).not.toHaveProperty('organizationId');
+    expect(input).toMatchObject({ cloneFromKiloSessionId: 'ses_source' });
+  });
+});

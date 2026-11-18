@@ -16,10 +16,6 @@ export type {
   KilocodeEventData,
 } from '../shared/protocol.js';
 
-// ---------------------------------------------------------------------------
-// Stream Event Types
-// ---------------------------------------------------------------------------
-
 /**
  * Types of events that can flow through the streaming system.
  * These map to execution lifecycle events and output streams.
@@ -40,15 +36,13 @@ export type StreamEventType =
   | 'commands.available' // catalog of kilo slash commands
   | 'preparing' // lazy workspace preparation step progress
   | 'cloud.status' // cloud infrastructure status
+  | 'cloud.worktree.changes.ready'
+  | 'cloud.workspace.artifacts.changed'
   | 'cloud.message.queued' // user message accepted into pending queue
   | 'cloud.message.sent' // queued user message delivered to Kilo
   | 'cloud.message.completed' // accepted user message completed execution
   | 'cloud.message.failed' // user message delivery failed or was canceled
   | 'wrapper_event_truncated'; // internal size-safety signal (not persisted or broadcast)
-
-// ---------------------------------------------------------------------------
-// Server -> Client Events (/stream endpoint)
-// ---------------------------------------------------------------------------
 
 /**
  * Event envelope sent to clients connected to the /stream endpoint.
@@ -57,6 +51,7 @@ export type StreamEventType =
 export type StreamEvent = {
   /** Auto-incrementing event ID from SQLite storage */
   eventId: EventId;
+  cursor?: number;
   /** Execution this event belongs to (absent for message-based events) */
   executionId?: ExecutionId;
   /** Session this event belongs to */
@@ -68,10 +63,6 @@ export type StreamEvent = {
   /** Event payload - structure depends on streamEventType */
   data: unknown;
 };
-
-// ---------------------------------------------------------------------------
-// Wrapper -> DO Events (/ingest endpoint)
-// ---------------------------------------------------------------------------
 
 /**
  * Event envelope sent by the wrapper to the Durable Object via /ingest.
@@ -85,10 +76,6 @@ export type IngestEvent = {
   /** Event payload - structure depends on streamEventType */
   data: unknown;
 };
-
-// ---------------------------------------------------------------------------
-// Error Handling
-// ---------------------------------------------------------------------------
 
 /** Error codes for WebSocket protocol errors */
 export type StreamErrorCode =
@@ -108,10 +95,6 @@ export type StreamError = {
   message: string;
 };
 
-// ---------------------------------------------------------------------------
-// Stream Filtering
-// ---------------------------------------------------------------------------
-
 /**
  * Filter options for the /stream endpoint.
  * These are passed via query parameters and control which events are returned.
@@ -121,6 +104,7 @@ export type StreamFilters = {
   sessionId: SessionId;
   /** Only return events with ID > fromId (exclusive, for pagination) */
   fromId?: EventId;
+  afterCursor?: number;
   /** Only return events for these execution IDs */
   executionIds?: ExecutionId[];
   /** Only return events of these types */
@@ -129,6 +113,8 @@ export type StreamFilters = {
   startTime?: number;
   /** Only return events at or before this timestamp (Unix ms, inclusive) */
   endTime?: number;
+  /** `preview` bounds completed tool bodies in historical replay; live events stay complete. */
+  toolDisplay?: 'preview';
 };
 
 /**
@@ -137,15 +123,12 @@ export type StreamFilters = {
 export type ParsedStreamParams = {
   sessionId: SessionId;
   fromId?: EventId;
+  afterCursor?: number;
   executionIds?: ExecutionId[];
   eventTypes?: StreamEventType[];
   startTime?: number;
   endTime?: number;
 };
-
-// ---------------------------------------------------------------------------
-// SQLite Storage
-// ---------------------------------------------------------------------------
 
 /**
  * Row structure for events stored in SQLite.
@@ -164,11 +147,8 @@ export type StoredEvent = {
   payload: string;
   /** Unix timestamp in milliseconds */
   timestamp: number;
+  mutation_cursor?: number;
 };
-
-// ---------------------------------------------------------------------------
-// WebSocket Hibernation
-// ---------------------------------------------------------------------------
 
 /**
  * Attachment data stored with hibernating WebSocket connections.

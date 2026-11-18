@@ -10,7 +10,11 @@ import {
   useState,
 } from 'react';
 import { z } from 'zod';
+
+import { type ProviderPrRef, providerPrRefKey } from '@kilocode/app-shared/provider-review';
+
 import { clearDraft, loadDraft, prReviewDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
 // One queued inline comment in the pending review. The composer fills
@@ -60,6 +64,8 @@ function keepValidPendingReviewItems(restored: unknown[]): PendingReviewItem[] {
   if (valid.length !== restored.length) {
     Sentry.captureException(new Error('stored pending review dropped invalid items'), {
       level: 'warning',
+      tags: { 'error.subsystem': 'pending-review', 'error.operation': 'hydrate' },
+      fingerprint: ['pending-review-invalid-items'],
       extra: { dropped: restored.length - valid.length, kept: valid.length },
     });
   }
@@ -76,8 +82,32 @@ export function pendingReviewDraftKey(owner: string, repo: string, number: numbe
   return prReviewDraftKey(owner.toLowerCase(), repo.toLowerCase(), number);
 }
 
+/**
+ * Draft entity key for one PR/MR on ANY provider (s6, identity rule 17). The
+ * GitHub arm returns the legacy `pendingReviewDraftKey` bytes unchanged, so a
+ * queue persisted before the provider surface keeps loading. A GitLab or
+ * Bitbucket ref folds the s1 collision-free `providerPrRefKey` into the same
+ * key, so a GitLab MR and a same-numbered GitHub PR — and one project reached
+ * on two GitLab instances — can never share a queue.
+ */
+export function providerPendingReviewDraftKey(ref: ProviderPrRef): string {
+  const triple = providerPrTriple(ref);
+  const legacy = pendingReviewDraftKey(triple.owner, triple.repo, triple.number);
+  if (ref.platform === 'github') {
+    return legacy;
+  }
+  return `${legacy}@${providerPrRefKey(ref)}`;
+}
+
 type PendingReviewContextValue = {
   items: PendingReviewItem[];
+  /**
+   * True once nothing is still going to load into the queue: the stored draft
+   * for this account and PR has settled, or there is no persisted queue to
+   * read. A sheet that paints its body from the queue waits for it, so the
+   * first body frame already carries the rows the queue holds.
+   */
+  hydrated: boolean;
   addComment: (item: PendingReviewItem) => void;
   updateComment: (id: string, body: string) => void;
   removeComment: (id: string) => void;
@@ -136,6 +166,10 @@ export function PendingReviewProvider({
     hydrationGenerationRef.current += 1;
     const generation = hydrationGenerationRef.current;
     if (!userId || !draftEntityKey) {
+      // Memory-only queue: no read will ever start, so the empty queue is
+      // already final. Without this a body that waits for hydration would
+      // wait for a load that never runs.
+      setHydrated(true);
       return undefined;
     }
     void (async () => {
@@ -231,8 +265,8 @@ export function PendingReviewProvider({
   }, [userId, draftEntityKey]);
 
   const value = useMemo<PendingReviewContextValue>(
-    () => ({ items, addComment, updateComment, removeComment, removeComments, clear }),
-    [items, addComment, updateComment, removeComment, removeComments, clear]
+    () => ({ items, hydrated, addComment, updateComment, removeComment, removeComments, clear }),
+    [items, hydrated, addComment, updateComment, removeComment, removeComments, clear]
   );
 
   return <PendingReviewContext value={value}>{children}</PendingReviewContext>;

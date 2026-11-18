@@ -1,0 +1,689 @@
+import {
+  sessionTerminalCreateResultSchema,
+  sessionTerminalResizeResultSchema,
+  type ControlErrorCode,
+  type SessionRequestIdentity,
+  type SessionTerminalClosePayload,
+  type SessionTerminalCloseResult,
+  type SessionTerminalConnectPayload,
+  type SessionTerminalConnectResult,
+  type SessionTerminalCreatePayload,
+  type SessionTerminalCreateResult,
+  type SessionTerminalResizePayload,
+  type SessionTerminalResizeResult,
+} from '../../../src/shared/sandbox-control-protocol.js';
+import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../../src/shared/runtime-environment.js';
+import { isKiloServerUnreachableError } from '../kilo-api.js';
+import { directoryForSession, forgetAttachedRoot, rootForSession } from './session-directories.js';
+import type { HarnessTerminals } from '../control-plane/harness.js';
+
+export type TerminalRuntimePort = {
+  identity?: SessionRequestIdentity;
+  isolation?: 'per-session' | 'directory-shared';
+  env: Record<string, string>;
+  kiloClient: Pick<HarnessTerminals, 'createPty' | 'resizePty' | 'deletePty' | 'connectPty'>;
+};
+
+type AttachedTerminalSession = SessionRequestIdentity & {
+  wrapperInstanceId: string;
+};
+
+type OwnedTerminal = AttachedTerminalSession & {
+  ptyId: string;
+  operationId: string;
+  ownerId?: string;
+  state: 'running' | 'ended';
+};
+
+type TerminalCreationOperation = AttachedTerminalSession & {
+  cols?: number;
+  rows?: number;
+  promise: Promise<SessionTerminalCreateResult>;
+};
+
+type TerminalBridge = {
+  terminal: OwnedTerminal;
+  ownerId: string;
+  bridgeGeneration: string;
+  reverse: WebSocket;
+  local?: WebSocket;
+  connection?: Promise<SessionTerminalConnectResult>;
+  closing: boolean;
+};
+
+type AuthenticatedWebSocketConstructor = typeof WebSocket & {
+  new (url: string, options: { headers: Record<string, string> }): WebSocket;
+};
+
+const MAX_TERMINAL_BUFFERED_BYTES = 1024 * 1024;
+
+const WORKSPACE_TERMINAL_ENV = {
+  PROMPT_COMMAND: "PS1='\\n\\W\\n\\$ '",
+  PS1: '\\n\\W\\n\\$ ',
+  [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
+} satisfies Record<string, string>;
+
+export class ControlTerminalRuntimeError extends Error {
+  constructor(
+    readonly code: ControlErrorCode,
+    message: string,
+    readonly retryable: boolean
+  ) {
+    super(message);
+    this.name = 'ControlTerminalRuntimeError';
+  }
+}
+
+export type ControlTerminalRuntime = {
+  rememberAttachedSession(identity: SessionRequestIdentity): void;
+  detachSession(identity: SessionRequestIdentity): Promise<void>;
+  detachDirectory(directory: string): Promise<void>;
+  hasActivePty(identity: SessionRequestIdentity): boolean;
+  beginRecoveryRetirement(identity: SessionRequestIdentity): void;
+  endRecoveryRetirement(identity: SessionRequestIdentity): void;
+  create(
+    identity: SessionRequestIdentity,
+    payload: SessionTerminalCreatePayload
+  ): Promise<SessionTerminalCreateResult>;
+  resize(
+    identity: SessionRequestIdentity,
+    payload: SessionTerminalResizePayload
+  ): Promise<SessionTerminalResizeResult>;
+  close(
+    identity: SessionRequestIdentity,
+    payload: SessionTerminalClosePayload
+  ): Promise<SessionTerminalCloseResult>;
+  connect(
+    identity: SessionRequestIdentity,
+    payload: SessionTerminalConnectPayload
+  ): Promise<SessionTerminalConnectResult>;
+  shutdown(): void;
+};
+
+function sameSession(left: SessionRequestIdentity, right: SessionRequestIdentity): boolean {
+  return (
+    left.sessionId === right.sessionId &&
+    left.kiloSessionId === right.kiloSessionId &&
+    left.directory === right.directory
+  );
+}
+
+const SESSION_UNAUTHORIZED = {
+  shutDown: 'Session runtime is shut down',
+  kiloRuntimeMissing: 'Session kilo runtime missing',
+  directoryMapMismatch: 'Session directory map mismatch',
+  rootMapMismatch: 'Session root map mismatch',
+  kiloSessionMismatch: 'Session kilo session mismatch',
+  attachedDirectoryMismatch: 'Session attached directory mismatch',
+  staleKiloRuntime: 'Session stale kilo runtime',
+  duplicateKiloSession: 'Session duplicate kilo session',
+  wrapperMismatch: 'Session wrapper mismatch',
+} as const;
+
+function rejectUnauthorized(reason: keyof typeof SESSION_UNAUTHORIZED): never {
+  throw new ControlTerminalRuntimeError('unauthorized', SESSION_UNAUTHORIZED[reason], false);
+}
+
+function safeKiloFailure(error: unknown, message: string): ControlTerminalRuntimeError {
+  if (error instanceof ControlTerminalRuntimeError) return error;
+  return new ControlTerminalRuntimeError('not_ready', message, isKiloServerUnreachableError(error));
+}
+
+function closeSocket(socket: WebSocket | undefined, code: number, reason: string): void {
+  if (
+    !socket ||
+    (socket.readyState !== WebSocket.CONNECTING && socket.readyState !== WebSocket.OPEN)
+  ) {
+    return;
+  }
+  try {
+    socket.close(code, reason);
+  } catch {
+    return;
+  }
+}
+
+function waitForSocketOpen(socket: WebSocket): Promise<void> {
+  if (socket.readyState === WebSocket.OPEN) return Promise.resolve();
+  if (socket.readyState !== WebSocket.CONNECTING) {
+    return Promise.reject(
+      new ControlTerminalRuntimeError('not_ready', 'Terminal transport failed', true)
+    );
+  }
+
+  return new Promise((resolve, reject) => {
+    const onOpen = () => {
+      cleanup();
+      resolve();
+    };
+    const onFailure = () => {
+      cleanup();
+      reject(new ControlTerminalRuntimeError('not_ready', 'Terminal transport failed', true));
+    };
+    const cleanup = () => {
+      socket.removeEventListener('open', onOpen);
+      socket.removeEventListener('error', onFailure);
+      socket.removeEventListener('close', onFailure);
+    };
+
+    socket.addEventListener('open', onOpen);
+    socket.addEventListener('error', onFailure);
+    socket.addEventListener('close', onFailure);
+  });
+}
+
+export function createControlTerminalRuntime(options: {
+  controlUrl: string;
+  wrapperInstanceId: string;
+  getKiloRuntime: (identity: SessionRequestIdentity) => TerminalRuntimePort | undefined;
+  getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => TerminalRuntimePort | undefined;
+  onInput?: (identity: SessionRequestIdentity) => void;
+}): ControlTerminalRuntime {
+  const { wrapperInstanceId } = options;
+  const controlOrigin = new URL(options.controlUrl).origin;
+  const attachedSessions = new Map<string, AttachedTerminalSession>();
+  const terminals = new Map<string, OwnedTerminal>();
+  const operations = new Map<string, TerminalCreationOperation>();
+  const bridges = new Map<string, TerminalBridge>();
+  const recoveringSessions = new Set<string>();
+  let shutDown = false;
+
+  function currentKiloRuntime(identity: SessionRequestIdentity): TerminalRuntimePort {
+    const kiloRuntime = options.getKiloRuntime(identity);
+    if (!kiloRuntime) {
+      throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
+    }
+    return kiloRuntime;
+  }
+
+  function requireAttached(identity: SessionRequestIdentity): AttachedTerminalSession {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (!attached || shutDown || recoveringSessions.has(identity.sessionId)) {
+      throw new ControlTerminalRuntimeError('not_ready', 'Terminal session is not attached', true);
+    }
+    if (attached.wrapperInstanceId !== wrapperInstanceId) rejectUnauthorized('wrapperMismatch');
+    if (attached.kiloSessionId !== identity.kiloSessionId)
+      rejectUnauthorized('kiloSessionMismatch');
+    if (attached.directory !== identity.directory) rejectUnauthorized('attachedDirectoryMismatch');
+    if (directoryForSession(identity.kiloSessionId) !== identity.directory)
+      rejectUnauthorized('directoryMapMismatch');
+    if (rootForSession(identity.kiloSessionId) !== identity.kiloSessionId)
+      rejectUnauthorized('rootMapMismatch');
+    const runtime = options.getKiloRuntime(identity);
+    if (
+      !runtime ||
+      (runtime.isolation === 'per-session' &&
+        (!runtime.identity || !sameSession(runtime.identity, identity)))
+    ) {
+      throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
+    }
+    return attached;
+  }
+
+  function requireTerminal(
+    identity: SessionRequestIdentity,
+    ptyId: string,
+    allowEnded = false
+  ): OwnedTerminal {
+    const attached = requireAttached(identity);
+    const terminal = terminals.get(ptyId);
+    if (
+      !terminal ||
+      terminal.wrapperInstanceId !== attached.wrapperInstanceId ||
+      !sameSession(terminal, attached)
+    ) {
+      throw new ControlTerminalRuntimeError('unauthorized', 'Terminal ownership mismatch', false);
+    }
+    if (!allowEnded && terminal.state !== 'running') {
+      throw new ControlTerminalRuntimeError('not_ready', 'PTY session ended', false);
+    }
+    return terminal;
+  }
+
+  function isCurrentBridge(bridge: TerminalBridge): boolean {
+    return (
+      !bridge.closing &&
+      bridges.get(bridge.terminal.ptyId) === bridge &&
+      terminals.get(bridge.terminal.ptyId) === bridge.terminal &&
+      attachedSessions.get(bridge.terminal.sessionId)?.wrapperInstanceId === wrapperInstanceId
+    );
+  }
+
+  function closeBridge(bridge: TerminalBridge, code: number, reason: string): void {
+    if (bridge.closing) return;
+    bridge.closing = true;
+    if (bridges.get(bridge.terminal.ptyId) === bridge) {
+      bridges.delete(bridge.terminal.ptyId);
+    }
+    closeSocket(bridge.reverse, code, reason);
+    closeSocket(bridge.local, code, reason);
+  }
+
+  function forwardMessage(
+    bridge: TerminalBridge,
+    target: WebSocket | undefined,
+    data: unknown
+  ): void {
+    if (!isCurrentBridge(bridge)) return;
+    if (
+      !target ||
+      target.readyState !== WebSocket.OPEN ||
+      (typeof data !== 'string' && !(data instanceof ArrayBuffer))
+    ) {
+      closeBridge(bridge, 1011, 'Terminal transport failed');
+      return;
+    }
+
+    const messageBytes = typeof data === 'string' ? Buffer.byteLength(data) : data.byteLength;
+    if (messageBytes > MAX_TERMINAL_BUFFERED_BYTES) {
+      closeBridge(bridge, 1009, 'Terminal message too large');
+      return;
+    }
+    if (target.bufferedAmount + messageBytes > MAX_TERMINAL_BUFFERED_BYTES) {
+      closeBridge(bridge, 1011, 'Terminal transport overloaded');
+      return;
+    }
+
+    try {
+      target.send(data);
+    } catch {
+      closeBridge(bridge, 1011, 'Terminal transport failed');
+    }
+  }
+
+  async function createTerminal(
+    attached: AttachedTerminalSession,
+    payload: SessionTerminalCreatePayload
+  ): Promise<SessionTerminalCreateResult> {
+    let createdPtyId: string | undefined;
+    const { kiloClient, env } = currentKiloRuntime(attached);
+    try {
+      const created = await kiloClient.createPty({
+        cwd: attached.directory,
+        title: 'Workspace terminal',
+        env: { ...env, ...WORKSPACE_TERMINAL_ENV },
+      });
+      createdPtyId = created.id;
+      if (attachedSessions.get(attached.sessionId) !== attached) {
+        throw new ControlTerminalRuntimeError(
+          'not_ready',
+          'Terminal session is no longer attached',
+          false
+        );
+      }
+
+      const pty =
+        payload.cols !== undefined && payload.rows !== undefined
+          ? await kiloClient.resizePty(
+              created.id,
+              { cols: payload.cols, rows: payload.rows },
+              attached.directory
+            )
+          : created;
+      if (attachedSessions.get(attached.sessionId) !== attached) {
+        throw new ControlTerminalRuntimeError(
+          'not_ready',
+          'Terminal session is no longer attached',
+          false
+        );
+      }
+
+      const result = sessionTerminalCreateResultSchema.safeParse({ pty });
+      if (
+        !result.success ||
+        result.data.pty.id !== created.id ||
+        result.data.pty.cwd !== attached.directory
+      ) {
+        throw new ControlTerminalRuntimeError('protocol_error', 'Invalid terminal response', false);
+      }
+      if (terminals.has(created.id)) {
+        throw new ControlTerminalRuntimeError('unauthorized', 'Terminal ownership mismatch', false);
+      }
+
+      terminals.set(created.id, {
+        ...attached,
+        ptyId: created.id,
+        operationId: payload.operationId,
+        state: 'running',
+      });
+      return result.data;
+    } catch (error) {
+      if (createdPtyId !== undefined) {
+        await kiloClient.deletePty(createdPtyId, attached.directory).catch(() => undefined);
+      }
+      throw safeKiloFailure(error, 'Terminal creation failed');
+    }
+  }
+
+  async function establishBridge(bridge: TerminalBridge): Promise<SessionTerminalConnectResult> {
+    try {
+      await waitForSocketOpen(bridge.reverse);
+      if (!isCurrentBridge(bridge)) {
+        throw new ControlTerminalRuntimeError(
+          'not_ready',
+          'Terminal connection was replaced',
+          true
+        );
+      }
+
+      const local = currentKiloRuntime(bridge.terminal).kiloClient.connectPty(
+        bridge.terminal.ptyId,
+        bridge.terminal.directory
+      );
+      local.binaryType = 'arraybuffer';
+      bridge.local = local;
+      local.onmessage = event => forwardMessage(bridge, bridge.reverse, event.data);
+      local.onerror = () => {
+        if (isCurrentBridge(bridge)) closeBridge(bridge, 1011, 'Terminal transport failed');
+      };
+      local.onclose = event => {
+        if (!isCurrentBridge(bridge)) return;
+        if (event.code === 1000) {
+          bridge.terminal.state = 'ended';
+          closeBridge(bridge, 1000, 'PTY session ended');
+          return;
+        }
+        closeBridge(bridge, 1011, 'Terminal transport failed');
+      };
+
+      await waitForSocketOpen(local);
+      if (!isCurrentBridge(bridge)) {
+        throw new ControlTerminalRuntimeError(
+          'not_ready',
+          'Terminal connection was replaced',
+          true
+        );
+      }
+      return { connected: true };
+    } catch (error) {
+      closeBridge(bridge, 1011, 'Terminal transport failed');
+      if (error instanceof ControlTerminalRuntimeError) throw error;
+      throw new ControlTerminalRuntimeError('not_ready', 'Terminal transport failed', true);
+    }
+  }
+
+  async function detachSession(identity: SessionRequestIdentity): Promise<void> {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (!attached) return;
+    if (attached.kiloSessionId !== identity.kiloSessionId)
+      rejectUnauthorized('kiloSessionMismatch');
+    if (attached.directory !== identity.directory) rejectUnauthorized('attachedDirectoryMismatch');
+
+    attachedSessions.delete(identity.sessionId);
+
+    const pending: Promise<unknown>[] = [];
+    for (const [operationId, operation] of operations) {
+      if (!sameSession(operation, attached)) continue;
+      operations.delete(operationId);
+      pending.push(operation.promise);
+    }
+
+    for (const [ptyId, terminal] of terminals) {
+      if (!sameSession(terminal, attached)) continue;
+      const bridge = bridges.get(ptyId);
+      if (bridge) closeBridge(bridge, 1000, 'PTY session ended');
+      terminals.delete(ptyId);
+      // Best-effort cleanup. A runtime that is merely starting (for example a
+      // credential-refresh idle probe) is absent from the current lookup while
+      // its server and PTYs are still live, so fall back to the retained
+      // runtime. Skip only when both are gone (truly retired).
+      const kiloRuntime =
+        options.getKiloRuntime(terminal) ?? options.getRetainedKiloRuntime?.(terminal);
+      if (kiloRuntime) {
+        pending.push(kiloRuntime.kiloClient.deletePty(ptyId, terminal.directory));
+      }
+    }
+
+    await Promise.allSettled(pending);
+  }
+
+  function hasActivePty(identity: SessionRequestIdentity): boolean {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (!attached || !sameSession(attached, identity)) return false;
+    for (const operation of operations.values()) {
+      if (sameSession(operation, attached)) return true;
+    }
+    for (const terminal of terminals.values()) {
+      if (sameSession(terminal, attached) && terminal.state === 'running') return true;
+    }
+    return false;
+  }
+
+  function beginRecoveryRetirement(identity: SessionRequestIdentity): void {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (attached && !sameSession(attached, identity)) {
+      throw new ControlTerminalRuntimeError(
+        'unauthorized',
+        'Terminal session ownership mismatch',
+        false
+      );
+    }
+    if (hasActivePty(identity)) {
+      throw new ControlTerminalRuntimeError('session_busy', 'Session has an active PTY', true);
+    }
+    recoveringSessions.add(identity.sessionId);
+  }
+
+  function endRecoveryRetirement(identity: SessionRequestIdentity): void {
+    recoveringSessions.delete(identity.sessionId);
+  }
+
+  return {
+    rememberAttachedSession(identity) {
+      const kiloRuntime = options.getKiloRuntime(identity);
+      if (shutDown) rejectUnauthorized('shutDown');
+      if (!kiloRuntime) rejectUnauthorized('kiloRuntimeMissing');
+      if (
+        kiloRuntime.isolation === 'per-session' &&
+        (!kiloRuntime.identity || !sameSession(kiloRuntime.identity, identity))
+      ) {
+        rejectUnauthorized('kiloSessionMismatch');
+      }
+      if (directoryForSession(identity.kiloSessionId) !== identity.directory)
+        rejectUnauthorized('directoryMapMismatch');
+      if (rootForSession(identity.kiloSessionId) !== identity.kiloSessionId)
+        rejectUnauthorized('rootMapMismatch');
+
+      const existing = attachedSessions.get(identity.sessionId);
+      if (existing) {
+        if (existing.kiloSessionId !== identity.kiloSessionId)
+          rejectUnauthorized('kiloSessionMismatch');
+        if (existing.directory !== identity.directory)
+          rejectUnauthorized('attachedDirectoryMismatch');
+        if (existing.wrapperInstanceId !== wrapperInstanceId) {
+          existing.wrapperInstanceId = wrapperInstanceId;
+        }
+        return;
+      }
+
+      for (const attached of attachedSessions.values()) {
+        if (attached.kiloSessionId === identity.kiloSessionId)
+          rejectUnauthorized('duplicateKiloSession');
+      }
+
+      attachedSessions.set(identity.sessionId, { ...identity, wrapperInstanceId });
+    },
+
+    detachSession,
+
+    async detachDirectory(directory) {
+      const sessions = [...attachedSessions.values()].filter(
+        session => session.directory === directory
+      );
+      await Promise.all(sessions.map(detachSession));
+    },
+
+    async create(identity, payload) {
+      const existing = operations.get(payload.operationId);
+      if (existing) {
+        if (
+          existing.wrapperInstanceId !== wrapperInstanceId ||
+          !sameSession(existing, identity) ||
+          existing.cols !== payload.cols ||
+          existing.rows !== payload.rows
+        ) {
+          throw new ControlTerminalRuntimeError(
+            'idempotency_conflict',
+            'Terminal operation identity mismatch',
+            false
+          );
+        }
+        requireAttached(identity);
+        return existing.promise;
+      }
+
+      const attached = requireAttached(identity);
+      const promise = Promise.resolve().then(() => createTerminal(attached, payload));
+      const operation: TerminalCreationOperation = {
+        ...attached,
+        ...(payload.cols !== undefined ? { cols: payload.cols } : {}),
+        ...(payload.rows !== undefined ? { rows: payload.rows } : {}),
+        promise,
+      };
+      operations.set(payload.operationId, operation);
+      void promise.catch(() => {
+        if (operations.get(payload.operationId) === operation) {
+          operations.delete(payload.operationId);
+        }
+      });
+      return promise;
+    },
+
+    async resize(identity, payload) {
+      const terminal = requireTerminal(identity, payload.ptyId);
+      try {
+        const pty = await currentKiloRuntime(terminal).kiloClient.resizePty(
+          payload.ptyId,
+          { cols: payload.cols, rows: payload.rows },
+          terminal.directory
+        );
+        if (terminals.get(payload.ptyId) !== terminal) {
+          throw new ControlTerminalRuntimeError(
+            'unauthorized',
+            'Terminal ownership mismatch',
+            false
+          );
+        }
+        const result = sessionTerminalResizeResultSchema.safeParse({ pty });
+        if (
+          !result.success ||
+          result.data.pty.id !== payload.ptyId ||
+          result.data.pty.cwd !== terminal.directory
+        ) {
+          throw new ControlTerminalRuntimeError(
+            'protocol_error',
+            'Invalid terminal response',
+            false
+          );
+        }
+        return result.data;
+      } catch (error) {
+        throw safeKiloFailure(error, 'Terminal resize failed');
+      }
+    },
+
+    async close(identity, payload) {
+      const terminal = requireTerminal(identity, payload.ptyId, true);
+      try {
+        const success = await currentKiloRuntime(terminal).kiloClient.deletePty(
+          payload.ptyId,
+          terminal.directory
+        );
+        if (success && terminals.get(payload.ptyId) === terminal) {
+          const bridge = bridges.get(payload.ptyId);
+          if (bridge) closeBridge(bridge, 1000, 'PTY session ended');
+          terminals.delete(payload.ptyId);
+          const operation = operations.get(terminal.operationId);
+          if (operation && sameSession(operation, terminal)) {
+            operations.delete(terminal.operationId);
+          }
+        }
+        return { success };
+      } catch (error) {
+        throw safeKiloFailure(error, 'Terminal closure failed');
+      }
+    },
+
+    async connect(identity, payload) {
+      const terminal = requireTerminal(identity, payload.ptyId);
+      if (terminal.ownerId !== undefined && terminal.ownerId !== payload.ownerId) {
+        throw new ControlTerminalRuntimeError('unauthorized', 'Terminal owner mismatch', false);
+      }
+
+      const current = bridges.get(payload.ptyId);
+      if (current?.bridgeGeneration === payload.bridgeGeneration) {
+        if (current.ownerId !== payload.ownerId || !current.connection) {
+          throw new ControlTerminalRuntimeError(
+            'unauthorized',
+            'Terminal connection ownership mismatch',
+            false
+          );
+        }
+        return current.connection;
+      }
+      if (current) closeBridge(current, 4000, 'Terminal connection replaced');
+
+      terminal.ownerId = payload.ownerId;
+      const reverseUrl = new URL(controlOrigin);
+      reverseUrl.pathname = `/sandbox-terminal/${encodeURIComponent(payload.ownerId)}/${encodeURIComponent(identity.sessionId)}/${encodeURIComponent(payload.ptyId)}`;
+      reverseUrl.search = '';
+      reverseUrl.hash = '';
+
+      let reverse: WebSocket;
+      try {
+        const WebSocketImpl = WebSocket as AuthenticatedWebSocketConstructor;
+        reverse = new WebSocketImpl(reverseUrl.toString(), {
+          headers: { Authorization: `Bearer ${payload.capability}` },
+        });
+      } catch {
+        throw new ControlTerminalRuntimeError('not_ready', 'Terminal transport failed', true);
+      }
+      reverse.binaryType = 'arraybuffer';
+
+      const bridge: TerminalBridge = {
+        terminal,
+        ownerId: payload.ownerId,
+        bridgeGeneration: payload.bridgeGeneration,
+        reverse,
+        closing: false,
+      };
+      bridges.set(payload.ptyId, bridge);
+      reverse.onmessage = event => {
+        options.onInput?.(terminal);
+        forwardMessage(bridge, bridge.local, event.data);
+      };
+      reverse.onerror = () => {
+        if (isCurrentBridge(bridge)) closeBridge(bridge, 1011, 'Terminal transport failed');
+      };
+      reverse.onclose = event => {
+        if (!isCurrentBridge(bridge)) return;
+        if (event.code === 1000 && event.reason === 'PTY session ended') {
+          terminal.state = 'ended';
+        }
+        closeBridge(bridge, 1000, 'Terminal connection closed');
+      };
+      const connection = establishBridge(bridge);
+      bridge.connection = connection;
+      return connection;
+    },
+
+    hasActivePty,
+    beginRecoveryRetirement,
+    endRecoveryRetirement,
+    shutdown() {
+      if (shutDown) return;
+      shutDown = true;
+      for (const bridge of bridges.values()) {
+        closeBridge(bridge, 1000, 'PTY session ended');
+      }
+      for (const attached of attachedSessions.values()) {
+        forgetAttachedRoot(attached.kiloSessionId, attached.directory);
+      }
+      bridges.clear();
+      terminals.clear();
+      operations.clear();
+      attachedSessions.clear();
+      recoveringSessions.clear();
+    },
+  };
+}

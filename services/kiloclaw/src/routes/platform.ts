@@ -828,7 +828,6 @@ function getErrorCode(err: unknown): string | undefined {
 }
 
 function statusCodeFromError(err: unknown): number {
-  // Extract a valid HTTP status from the error or its cause, defaulting to 500.
   for (const candidate of [err, err instanceof Error ? err.cause : undefined]) {
     if (isHttpStatus(candidate) && candidate.status >= 400 && candidate.status < 600) {
       return candidate.status;
@@ -1298,7 +1297,6 @@ async function parseBody<T extends z.ZodTypeAny>(
   return { data: parsed.data };
 }
 
-// POST /api/platform/provision
 platform.post('/provision', async c => {
   const result = await parseBody(c, ProvisionRequestSchema);
   if ('error' in result) return result.error;
@@ -1994,7 +1992,6 @@ platform.post('/provision/repair-reservation', async c => {
   }
 });
 
-// POST /api/platform/provision/release-reservation
 // Admin break-glass: release a stuck provision reservation (`in_progress` or
 // `failed_requires_reconciliation`) so the user can provision again. A failed
 // fresh provision can leave such a row behind (e.g. `provider_provision_failed`
@@ -2083,8 +2080,6 @@ platform.post('/provision/release-reservation', async c => {
   }
 });
 
-// PATCH /api/platform/kilocode-config
-
 platform.patch('/kilocode-config', async c => {
   const result = await parseBody(c, KiloCodeConfigPatchSchema);
   if ('error' in result) return result.error;
@@ -2125,7 +2120,6 @@ platform.patch('/kilocode-config', async c => {
   }
 });
 
-// PATCH /api/platform/web-search-config
 platform.patch('/web-search-config', async c => {
   const result = await parseBody(c, WebSearchConfigPatchSchema);
   if ('error' in result) return result.error;
@@ -2150,7 +2144,6 @@ platform.patch('/web-search-config', async c => {
   }
 });
 
-// PATCH /api/platform/channels
 platform.patch('/channels', async c => {
   const result = await parseBody(c, ChannelsPatchSchema);
   if ('error' in result) return result.error;
@@ -2175,7 +2168,6 @@ platform.patch('/channels', async c => {
   }
 });
 
-// PATCH /api/platform/exec-preset
 const ExecPresetPatchSchema = z.object({
   userId: z.string().min(1),
   security: z.string().optional(),
@@ -2238,7 +2230,6 @@ platform.patch('/bot-identity', async c => {
   }
 });
 
-// POST /api/platform/google-credentials
 const GoogleCredentialsPatchSchema = z.object({
   userId: z.string().min(1),
   googleCredentials: GoogleCredentialsSchema,
@@ -2268,7 +2259,6 @@ platform.post('/google-credentials', async c => {
   }
 });
 
-// DELETE /api/platform/google-credentials?userId=...
 platform.delete('/google-credentials', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
@@ -2291,7 +2281,6 @@ platform.delete('/google-credentials', async c => {
   }
 });
 
-// POST /api/platform/gmail-notifications
 platform.post('/gmail-notifications', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -2316,7 +2305,6 @@ platform.post('/gmail-notifications', async c => {
   }
 });
 
-// DELETE /api/platform/gmail-notifications?userId=...
 platform.delete('/gmail-notifications', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
@@ -2344,7 +2332,6 @@ const GoogleOAuthConnectionPatchSchema = z.object({
   googleOAuthConnection: GoogleOAuthConnectionSchema,
 });
 
-// POST /api/platform/google-oauth-connection
 platform.post('/google-oauth-connection', async c => {
   const result = await parseBody(c, GoogleOAuthConnectionPatchSchema);
   if ('error' in result) return result.error;
@@ -2377,7 +2364,6 @@ platform.post('/google-oauth-connection', async c => {
   }
 });
 
-// DELETE /api/platform/google-oauth-connection?userId=...
 platform.delete('/google-oauth-connection', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
@@ -2425,7 +2411,6 @@ platform.post('/gmail-history-id', async c => {
   }
 });
 
-// GET /api/platform/gmail-oidc-email?userId=...
 // Lightweight lookup for the push worker — no Fly live check.
 platform.get('/gmail-oidc-email', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -2449,7 +2434,6 @@ platform.get('/gmail-oidc-email', async c => {
   }
 });
 
-// PATCH /api/platform/secrets
 platform.patch('/secrets', async c => {
   const result = await parseBody(c, SecretsPatchSchema);
   if ('error' in result) return result.error;
@@ -2474,7 +2458,6 @@ platform.patch('/secrets', async c => {
   }
 });
 
-// GET /api/platform/pairing?userId=...&refresh=true
 platform.get('/pairing', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
@@ -2499,7 +2482,6 @@ platform.get('/pairing', async c => {
   }
 });
 
-// POST /api/platform/pairing/approve
 const PairingApproveSchema = z.object({
   userId: z.string().min(1),
   channel: z.string().min(1),
@@ -2530,7 +2512,6 @@ platform.post('/pairing/approve', async c => {
   }
 });
 
-// GET /api/platform/device-pairing?userId=...&refresh=true
 platform.get('/device-pairing', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
@@ -2555,7 +2536,6 @@ platform.get('/device-pairing', async c => {
   }
 });
 
-// POST /api/platform/device-pairing/approve
 const DevicePairingApproveSchema = z.object({
   userId: z.string().min(1),
   requestId: z.string().uuid(),
@@ -2585,7 +2565,6 @@ platform.post('/device-pairing/approve', async c => {
   }
 });
 
-// GET /api/platform/gateway/status?userId=...
 platform.get('/gateway/status', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -2613,7 +2592,6 @@ platform.get('/gateway/status', async c => {
   }
 });
 
-// GET /api/platform/gateway/ready?userId=...
 // Non-fatal polling endpoint — always returns 200 so the frontend poll
 // doesn't generate a wall of errors during startup. Polled aggressively
 // (every 5s on the user dashboard) so it shares the wake-bug exposure with
@@ -2650,7 +2628,6 @@ platform.get('/gateway/ready', async c => {
   }
 });
 
-// GET /api/platform/controller-version?userId=...
 platform.get('/controller-version', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -2681,7 +2658,6 @@ platform.get('/controller-version', async c => {
   }
 });
 
-// POST /api/platform/gateway/start
 platform.post('/gateway/start', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -2704,7 +2680,6 @@ platform.post('/gateway/start', async c => {
   }
 });
 
-// POST /api/platform/gateway/stop
 platform.post('/gateway/stop', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -2727,7 +2702,6 @@ platform.post('/gateway/stop', async c => {
   }
 });
 
-// POST /api/platform/gateway/restart
 platform.post('/gateway/restart', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -2750,7 +2724,6 @@ platform.post('/gateway/restart', async c => {
   }
 });
 
-// POST /api/platform/config/restore
 const ConfigRestoreSchema = z.object({
   userId: z.string().min(1),
   version: z.literal('base'),
@@ -2782,7 +2755,6 @@ platform.post('/config/restore', async c => {
   }
 });
 
-// GET /api/platform/openclaw-config?userId=...
 // Returns the live openclaw.json from the running machine.
 platform.get('/openclaw-config', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -2811,7 +2783,6 @@ platform.get('/openclaw-config', async c => {
   }
 });
 
-// POST /api/platform/openclaw-config
 // Replace the entire openclaw.json on the running machine.
 const ReplaceOpenclawConfigSchema = z.object({
   userId: z.string().min(1),
@@ -2846,7 +2817,6 @@ platform.post('/openclaw-config', async c => {
   }
 });
 
-// PATCH /api/platform/openclaw-config
 // Deep-merge a JSON patch into the live openclaw.json on the running machine.
 const PatchOpenclawConfigSchema = z.object({
   userId: z.string().min(1),
@@ -2877,16 +2847,13 @@ platform.patch('/openclaw-config', async c => {
   }
 });
 
-// ──────────────────────────────────────────────────────────────────────
 // Agent config CRUD (controller: /_kilo/config/agents*)
 // Mirrors the openclaw-config proxy: x-internal-api-key auth (mount-level),
 // userId + optional instanceId resolution, opaque payload forwarding (deep
 // validation lives at the tRPC layer and the controller), and typed
 // error-code passthrough via sanitizeAgentConfigError. Each DO method fails
 // closed (501 capability_unavailable) on controllers that lack the capability.
-// ──────────────────────────────────────────────────────────────────────
 
-// GET /api/platform/agents?userId=...&instanceId=...
 platform.get('/agents', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -2915,7 +2882,6 @@ platform.get('/agents', async c => {
   }
 });
 
-// GET /api/platform/agents/:agentId?userId=...&instanceId=...
 platform.get('/agents/:agentId', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -3055,7 +3021,6 @@ platform.patch('/agent-defaults', async c => {
   }
 });
 
-// DELETE /api/platform/agents/:agentId?userId=...&instanceId=...
 platform.delete('/agents/:agentId', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -3204,7 +3169,6 @@ async function withMorningBriefingWarmupRetry<T>(
   throw lastError instanceof Error ? lastError : new Error('Gateway warming up');
 }
 
-// GET /api/platform/morning-briefing/status?userId=...
 platform.get('/morning-briefing/status', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -3262,7 +3226,6 @@ platform.get('/morning-briefing/status', async c => {
   }
 });
 
-// POST /api/platform/morning-briefing/enable
 platform.post('/morning-briefing/enable', async c => {
   const result = await parseBody(c, MorningBriefingSetupSchema);
   if ('error' in result) return result.error;
@@ -3298,7 +3261,6 @@ platform.post('/morning-briefing/enable', async c => {
   }
 });
 
-// POST /api/platform/morning-briefing/disable
 platform.post('/morning-briefing/disable', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -3333,7 +3295,6 @@ platform.post('/morning-briefing/disable', async c => {
   }
 });
 
-// POST /api/platform/morning-briefing/interests
 platform.post('/morning-briefing/interests', async c => {
   const result = await parseBody(c, MorningBriefingInterestsSchema);
   if ('error' in result) return result.error;
@@ -3372,7 +3333,6 @@ platform.post('/morning-briefing/interests', async c => {
   }
 });
 
-// POST /api/platform/morning-briefing/user-location
 platform.post('/morning-briefing/user-location', async c => {
   const result = await parseBody(c, MorningBriefingUserLocationSchema);
   if ('error' in result) return result.error;
@@ -3412,7 +3372,6 @@ platform.post('/morning-briefing/user-location', async c => {
   }
 });
 
-// POST /api/platform/morning-briefing/run
 platform.post('/morning-briefing/run', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -3456,7 +3415,6 @@ platform.post('/morning-briefing/run', async c => {
   }
 });
 
-// POST /api/platform/morning-briefing/onboarding-briefing
 platform.post('/morning-briefing/onboarding-briefing', async c => {
   // `settingsHref` is the org-aware Settings link the web router derived for
   // the briefing's "Connect more" items. The plugin re-validates it.
@@ -3501,7 +3459,6 @@ platform.post('/morning-briefing/onboarding-briefing', async c => {
   }
 });
 
-// GET /api/platform/morning-briefing/read/{today|yesterday}?userId=...
 platform.get('/morning-briefing/read/:day', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -3541,7 +3498,6 @@ platform.get('/morning-briefing/read/:day', async c => {
   }
 });
 
-// GET /api/platform/files/tree?userId=...[&path=...]
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
   const filePath = c.req.query('path');
@@ -3574,7 +3530,6 @@ platform.get('/files/tree', async c => {
   }
 });
 
-// GET /api/platform/files/read?userId=...&path=...
 platform.get('/files/read', async c => {
   const userId = setValidatedQueryUserId(c);
   const filePath = c.req.query('path');
@@ -3643,7 +3598,6 @@ const OpenclawWorkspaceExportSchema = z.object({
   password: z.string().min(1).max(256).optional(),
 });
 
-// POST /api/platform/files/write
 platform.post('/files/write', async c => {
   const result = await parseBody(c, WriteFileSchema);
   if ('error' in result) return result.error;
@@ -3674,7 +3628,6 @@ platform.post('/files/write', async c => {
   }
 });
 
-// POST /api/platform/files/write-openclaw-config
 platform.post('/files/write-openclaw-config', async c => {
   const result = await parseBody(c, WriteOpenclawConfigFileSchema);
   if ('error' in result) return result.error;
@@ -3708,7 +3661,6 @@ platform.post('/files/write-openclaw-config', async c => {
   }
 });
 
-// POST /api/platform/files/import-openclaw-workspace
 platform.post('/files/import-openclaw-workspace', async c => {
   const result = await parseBody(c, OpenclawWorkspaceImportSchema);
   if ('error' in result) return result.error;
@@ -3755,7 +3707,6 @@ platform.post('/files/import-openclaw-workspace', async c => {
   }
 });
 
-// POST /api/platform/files/export-openclaw-workspace
 // Returns a binary archive of the OpenClaw workspace (not JSON). The optional
 // passphrase rides in the POST body (never the URL) and is used transiently by
 // the controller to AES-encrypt a zip; it is never stored or logged.
@@ -3821,7 +3772,6 @@ platform.post('/files/export-openclaw-workspace', async c => {
   }
 });
 
-// POST /api/platform/doctor
 platform.post('/doctor', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -3844,7 +3794,6 @@ platform.post('/doctor', async c => {
   }
 });
 
-// POST /api/platform/doctor-controller/start
 //
 // Starts `openclaw doctor` via the machine's controller HTTP API (NOT the Fly
 // Machines exec API). The run is async and status/output is polled separately.
@@ -3892,7 +3841,6 @@ platform.post('/doctor-controller/start', async c => {
   }
 });
 
-// GET /api/platform/doctor-controller/status?userId=...
 platform.get('/doctor-controller/status', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -3926,7 +3874,6 @@ platform.get('/doctor-controller/status', async c => {
   }
 });
 
-// POST /api/platform/doctor-controller/cancel
 platform.post('/doctor-controller/cancel', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -3958,14 +3905,11 @@ platform.post('/doctor-controller/cancel', async c => {
   }
 });
 
-// ── Kilo CLI Run ──────────────────────────────────────────────────────
-
 const KiloCliRunStartSchema = z.object({
   userId: z.string().min(1),
   prompt: z.string().min(1).max(10_000),
 });
 
-// POST /api/platform/kilo-cli-run/start
 platform.post('/kilo-cli-run/start', async c => {
   const result = await parseBody(c, KiloCliRunStartSchema);
   if ('error' in result) return result.error;
@@ -4000,7 +3944,6 @@ platform.post('/kilo-cli-run/start', async c => {
   }
 });
 
-// GET /api/platform/kilo-cli-run/status?userId=...
 platform.get('/kilo-cli-run/status', async c => {
   const userId = c.req.query('userId');
   if (!userId) return jsonError('Missing userId', 400);
@@ -4022,7 +3965,6 @@ platform.get('/kilo-cli-run/status', async c => {
   }
 });
 
-// POST /api/platform/kilo-cli-run/cancel
 platform.post('/kilo-cli-run/cancel', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -4048,7 +3990,6 @@ platform.post('/kilo-cli-run/cancel', async c => {
   }
 });
 
-// POST /api/platform/start
 const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),
   reason: KiloclawStartReasonSchema.optional(),
@@ -4138,7 +4079,6 @@ platform.post('/start-async', async c => {
   return handleStartRequest(c, 'async');
 });
 
-// POST /api/platform/force-retry-recovery
 platform.post('/force-retry-recovery', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -4178,7 +4118,6 @@ platform.post('/force-retry-recovery', async c => {
   }
 });
 
-// POST /api/platform/cleanup-recovery-previous-volume
 platform.post('/cleanup-recovery-previous-volume', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
@@ -4205,7 +4144,6 @@ const StopRequestSchema = UserIdRequestSchema.extend({
   reason: KiloclawStopReasonSchema.optional(),
 });
 
-// POST /api/platform/stop
 platform.post('/stop', async c => {
   const result = await parseBody(c, StopRequestSchema);
   if ('error' in result) return result.error;
@@ -4230,7 +4168,6 @@ platform.post('/stop', async c => {
   }
 });
 
-// POST /api/platform/destroy
 platform.post('/destroy', async c => {
   const result = await parseBody(c, DestroyRequestSchema);
   if ('error' in result) return result.error;
@@ -4321,7 +4258,6 @@ platform.post('/destroy', async c => {
   }
 });
 
-// GET /api/platform/status?userId=...&instanceId=...
 platform.get('/status', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -4434,7 +4370,6 @@ async function resolveInboundEmailDoKey(
   return doKeyFromActiveInstance(instance);
 }
 
-// POST /api/platform/inbound-email
 // Deliver a Cloudflare Email Routing message to an instance's OpenClaw hook endpoint.
 platform.post('/inbound-email', async c => {
   const startedAt = performance.now();
@@ -4641,7 +4576,6 @@ platform.post('/inbound-email', async c => {
   }
 });
 
-// GET /api/platform/debug-status?userId=...&instanceId=...
 // Internal/admin-only debug status that includes DO destroy internals.
 platform.get('/debug-status', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -4670,7 +4604,6 @@ platform.get('/debug-status', async c => {
   }
 });
 
-// GET /api/platform/registry-entries?userId=...&orgId=...
 // Returns all registry entries (including destroyed) for admin inspection.
 // Queries the personal registry and optionally the org registry.
 platform.get('/registry-entries', async c => {
@@ -4723,7 +4656,6 @@ platform.get('/registry-entries', async c => {
   }
 });
 
-// GET /api/platform/gateway-token?userId=...&instanceId=...
 // Returns the derived gateway token for a user's sandbox. The Next.js
 // dashboard calls this so it never needs GATEWAY_TOKEN_SECRET directly.
 platform.get('/gateway-token', async c => {
@@ -4760,7 +4692,6 @@ platform.get('/gateway-token', async c => {
   }
 });
 
-// GET /api/platform/volume-snapshots?userId=...
 // Returns the list of Fly volume snapshots for the user's instance.
 platform.get('/volume-snapshots', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -4796,7 +4727,6 @@ platform.get('/volume-snapshots', async c => {
   }
 });
 
-// GET /api/platform/candidate-volumes?userId=...
 // Returns all usable volumes in the user's Fly app for admin volume reassociation.
 platform.get('/candidate-volumes', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -4832,7 +4762,6 @@ platform.get('/candidate-volumes', async c => {
   }
 });
 
-// POST /api/platform/reassociate-volume
 // Changes the flyVolumeId on a stopped instance. Requires reason for audit trail.
 const ReassociateVolumeSchema = z.object({
   userId: z.string().min(1),
@@ -4872,7 +4801,6 @@ platform.post('/reassociate-volume', async c => {
   }
 });
 
-// ── Admin orphan-volume reaper ────────────────────────────────────────────
 //
 // Two admin-only endpoints that back the web app's "Orphan volumes" admin
 // tab. They exist because the web app has no Fly API token — every Fly call
@@ -4949,7 +4877,6 @@ async function resolveOrphanVolumeFlyAppName(
   return (await appStub.getAppName()) ?? fallbackAppName;
 }
 
-// GET /api/platform/admin/orphan-volume-scan?userId=&instanceId=&sandboxId=
 // Lists the Fly volumes in the instance's app and annotates each with whether
 // it belongs to this instance (exact name match) and whether a live DO still
 // tracks it. Read-only — never deletes anything.
@@ -5043,7 +4970,6 @@ platform.get('/admin/orphan-volume-scan', async c => {
   });
 });
 
-// POST /api/platform/admin/orphan-volume-destroy
 // Destroys a single orphaned Fly volume. Re-verifies every Fly/DO-side
 // invariant server-side; never trusts the caller's view of the volume.
 const OrphanVolumeDestroySchema = OrphanVolumeIdentitySchema.extend({
@@ -5285,7 +5211,6 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   });
 });
 
-// POST /api/platform/resize-machine
 // Updates the machine size for an instance. Takes effect on next start/restart.
 const ResizeMachineSchema = z.object({
   userId: z.string().min(1),
@@ -5321,7 +5246,6 @@ platform.post('/resize-machine', async c => {
   }
 });
 
-// POST /api/platform/admin-size-override/set
 // Admin-only: set a temporary CPU/RAM override that wins over the
 // tier-derived machineSize until cleared. Does NOT change instanceType
 // or volumeSizeGb (billing stays on the tier). Stopped-machine-only.
@@ -5361,7 +5285,6 @@ platform.post('/admin-size-override/set', async c => {
   }
 });
 
-// POST /api/platform/admin-size-override/clear
 const ClearAdminSizeOverrideSchema = z.object({
   userId: z.string().min(1),
   reason: z.string().min(10).max(500),
@@ -5396,7 +5319,6 @@ platform.post('/admin-size-override/clear', async c => {
   }
 });
 
-// POST /api/platform/restore-volume-snapshot
 // Enqueues a snapshot restore job. Returns immediately; restore runs async via CF Queue.
 const RestoreVolumeSnapshotSchema = z.object({
   userId: z.string().min(1),
@@ -5435,7 +5357,6 @@ platform.post('/restore-volume-snapshot', async c => {
   }
 });
 
-// GET /api/platform/versions
 // Lists all registered image versions from KV.
 // Used by admin triggerSync for reconciliation/backfill.
 platform.get('/versions', async c => {
@@ -5448,7 +5369,6 @@ platform.get('/versions', async c => {
   }
 });
 
-// GET /api/platform/versions/latest
 // Resolves the image version this caller should be on next.
 //
 // Without rolloutSubject or instanceId, returns the current :latest pointer for
@@ -5506,14 +5426,12 @@ platform.get('/versions/latest', async c => {
   }
 });
 
-// POST /api/platform/versions/rollout
 // Set an image's rollout percent (0..100). Updates Postgres + KV pointers.
 const SetRolloutPercentBody = z.object({
   imageTag: z.string().min(1),
   percent: z.number().int().min(0).max(100),
 });
 
-// POST /api/platform/versions/disable-with-clear
 // Mark a tag as disabled AND set its rollout_percent to 0 atomically.
 // Used by the admin "Disable image" flow so a disabled tag never lingers as
 // a rollout candidate.
@@ -5543,7 +5461,6 @@ platform.post('/versions/disable-with-clear', async c => {
   }
 });
 
-// POST /api/platform/users/:userId/kiloclaw-early-access
 // Toggle the per-user kiloclaw_early_access flag. Affects all of the user's
 // instances (personal + every org instance they own).
 const SetEarlyAccessBody = z.object({
@@ -5602,7 +5519,6 @@ platform.post('/versions/rollout', async c => {
   }
 });
 
-// POST /api/platform/versions/mark-latest
 // Mark an image as the production :latest for its variant. Atomically clears
 // is_latest from the previous :latest in the same variant. Independent of
 // rollout_percent.
@@ -5610,7 +5526,6 @@ const MarkLatestBody = z.object({
   imageTag: z.string().min(1),
 });
 
-// POST /api/platform/versions/apply-pin
 // Pushes a resolved admin pin (or pin clear) into the target instance's DO
 // state so the next redeploy/restart boots the pinned image. Does NOT
 // restart the machine — the caller triggers that separately if desired.
@@ -5664,7 +5579,6 @@ platform.post('/versions/mark-latest', async c => {
   }
 });
 
-// POST /api/platform/publish-image-version
 // Manual fallback for publishing/correcting version entries. Newly published
 // images land at rollout_percent=0 (not exposed). Ops slides the percent up
 // from the admin Versions page.
@@ -5750,10 +5664,6 @@ platform.post('/publish-image-version', async c => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// Region configuration
-// ---------------------------------------------------------------------------
-
 import { FLY_REGIONS_KV_KEY, parseRegions, ALL_VALID_REGIONS } from '../durable-objects/regions';
 import { DEFAULT_FLY_REGION } from '../config';
 import { FLY_API_BASE } from '../fly/client';
@@ -5768,7 +5678,6 @@ const UpdateRegionsSchema = z.object({
     ),
 });
 
-// GET /api/platform/regions
 // Returns the current region configuration with its source.
 platform.get('/regions', async c => {
   try {
@@ -5783,7 +5692,6 @@ platform.get('/regions', async c => {
   }
 });
 
-// PUT /api/platform/regions
 // Updates the region configuration in KV.
 platform.put('/regions', async c => {
   const result = await parseBody(c, UpdateRegionsSchema);
@@ -5801,7 +5709,6 @@ platform.put('/regions', async c => {
   return c.json({ ok: true, regions: result.data.regions, raw });
 });
 
-// GET /api/platform/providers/rollout
 // Returns runtime provider rollout configuration from KV.
 platform.get('/providers/rollout', async c => {
   try {
@@ -5817,7 +5724,6 @@ platform.get('/providers/rollout', async c => {
   }
 });
 
-// PUT /api/platform/providers/rollout
 // Updates runtime provider rollout configuration in KV.
 platform.put('/providers/rollout', async c => {
   const result = await parseBody(c, ProviderRolloutConfigSchema);
@@ -5836,7 +5742,6 @@ platform.put('/providers/rollout', async c => {
   }
 });
 
-// POST /api/platform/destroy-fly-machine
 // This is for admin cleanup only.
 // It directly destroys a Fly machine via the Machines API (force=true).
 // It does not destroy the Fly app or volume.
@@ -5917,7 +5822,6 @@ platform.post('/destroy-fly-machine', async c => {
   }
 });
 
-// POST /api/platform/extend-volume
 // Admin workaround for granting users temporary additional storage.
 // Fly volumes can grow but cannot shrink, so once extended an instance
 // is effectively pinned to the larger size — flips DO instanceType to
@@ -6027,7 +5931,6 @@ platform.post('/extend-volume', async c => {
   }
 });
 
-// POST /api/platform/scheduled-action/wake
 //
 // Called by the web's scheduleAction tRPC right after persisting a new
 // scheduled-action row in Postgres. Resolves the target instance's DO
@@ -6066,7 +5969,6 @@ platform.post('/scheduled-action/wake', async c => {
   }
 });
 
-// POST /api/platform/scheduled-action/run-notice-sweep
 //
 // Synchronously runs the notice sweep that the cron normally drives.
 // Useful for local dev (where wrangler does not fire scheduled() on

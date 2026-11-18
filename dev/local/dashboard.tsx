@@ -9,9 +9,16 @@ import {
   getAlwaysOnGroupIds,
   resolveGroups,
   resolveGroupTransitiveDeps,
+  planTunnelRestart,
 } from './services';
 import type { ServiceGroup } from './services';
-import { getSessionName, killSession, findOtherKiloDevSessions } from './tmux';
+import {
+  getSessionName,
+  killSession,
+  findOtherKiloDevSessions,
+  findServicePane,
+  paneHasRunningService,
+} from './tmux';
 import {
   findRepoRoot,
   probePort,
@@ -24,11 +31,11 @@ import {
   readEnvValue,
   readEnvMtime,
   waitForEnvValueChange,
+  ensureDeadServiceLogPipes,
+  snapshotCloudAgentPublicTunnelEnv,
+  waitForCloudAgentPublicTunnelCapture,
 } from './runner';
-
-// ---------------------------------------------------------------------------
-// Types & constants
-// ---------------------------------------------------------------------------
+import { isPortlessServiceHealthy, readCapturedTunnelUrl } from './tunnel-health';
 
 type ServiceStatus = 'up' | 'down' | 'starting';
 type GroupStatus = 'on' | 'off' | 'partial';
@@ -50,22 +57,18 @@ type ViewedTarget =
   | null;
 
 const REFRESH_MS = 2000;
+const TUNNEL_REFRESH_MS = 15_000;
 const STARTING_GRACE_MS = 30_000;
 const START_DELAY_MS = 300;
 const SIDEBAR_WIDTH = 40;
 const CAPTURE_TIMEOUT_MS = 30_000;
 
-// Resolved once at module level
 const sessionName = getSessionName();
 const repoRoot = findRepoRoot();
 const kiloclawDevVarsPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
 const alwaysOnGroupIds = new Set(getAlwaysOnGroupIds());
 const groupsById = new Map(getGroups().map(g => [g.id, g]));
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-
-// ---------------------------------------------------------------------------
-// Sidebar item list builder
-// ---------------------------------------------------------------------------
 
 function buildSidebarItems(enabledGroups: Set<string>): SidebarItem[] {
   const items: SidebarItem[] = [];
@@ -82,10 +85,6 @@ function buildSidebarItems(enabledGroups: Set<string>): SidebarItem[] {
   }
   return items;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function computeGroupStatus(groupId: string, statuses: Map<string, ServiceStatus>): GroupStatus {
   const members = getGroupServiceNames(groupId);
@@ -187,10 +186,6 @@ function getServicesNeededByEnabledGroups(enabledGroups: Set<string>): Set<strin
   if (groupIds.length === 0) return new Set();
   return new Set(resolveGroups(groupIds));
 }
-
-// ---------------------------------------------------------------------------
-// Components
-// ---------------------------------------------------------------------------
 
 const GroupHeader = React.memo(function GroupHeader({
   group,
@@ -296,7 +291,6 @@ function Dashboard({
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 24;
 
-  // --- State ---
   const [enabledGroups, setEnabledGroups] = useState<Set<string>>(
     () => new Set(initialEnabledGroupIds)
   );
@@ -307,6 +301,13 @@ function Dashboard({
     () => new Map(initialServiceNames.map(n => [n, 'starting' as const]))
   );
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [stackIssues, setStackIssues] = useState<string[]>([]);
+  const refreshInFlight = useRef(false);
+  const lastPublicTunnelSnapshot = useRef<
+    ReturnType<typeof snapshotCloudAgentPublicTunnelEnv> | undefined
+  >(undefined);
+  const reloadingWorker = useRef(false);
+  const lastTunnelProbe = useRef(new Map<string, { at: number; up: boolean }>());
   const [, bumpViewedRevision] = useState(0);
 
   const viewedRef = useRef<ViewedTarget>(
@@ -316,7 +317,6 @@ function Dashboard({
   const startTimeRef = useRef(Date.now());
   const togglingRef = useRef(false);
 
-  // --- Mouse refs (read current values in the stable stdin listener) ---
   const mouseStateRef = useRef({
     sidebarItems: [] as SidebarItem[],
     enabledGroups: new Set<string>(),
@@ -327,7 +327,6 @@ function Dashboard({
     showService: (_serviceName: string) => {},
   });
 
-  // --- Restore sidebar width after terminal resize / tab switch ---
   // The dashboard runs in pane 0, so it receives SIGWINCH whenever tmux
   // proportionally resizes it (e.g. on client resize or terminal tab switch).
   // If the width drifts from SIDEBAR_WIDTH, force it back via resize-pane.
@@ -349,7 +348,6 @@ function Dashboard({
     };
   }, []);
 
-  // --- Derived ---
   const sidebarItems = useMemo(() => buildSidebarItems(enabledGroups), [enabledGroups]);
 
   const showServiceView = useCallback((serviceName: string) => {
@@ -368,35 +366,104 @@ function Dashboard({
     }
   }, []);
 
-  // --- Status polling ---
   useEffect(() => {
     const refresh = async () => {
-      const servicesToProbe = [...runningServices];
-      if (servicesToProbe.length === 0) return;
+      if (refreshInFlight.current) return;
+      refreshInFlight.current = true;
+      try {
+        const servicesToProbe = [...runningServices];
+        if (servicesToProbe.length === 0) return;
 
-      const inGrace = Date.now() - startTimeRef.current < STARTING_GRACE_MS;
-      const entries = await Promise.all(
-        servicesToProbe.map(async (name): Promise<[string, ServiceStatus]> => {
-          const svc = getService(name);
-          if (svc.port === 0) return [name, 'up'];
-          const up = await probePort(svc.port);
-          return [name, up ? 'up' : inGrace ? 'starting' : 'down'];
-        })
-      );
-      setStatuses(prev => {
-        const changed = entries.some(([name, status]) => prev.get(name) !== status);
-        if (!changed) return prev;
-        return new Map(entries);
-      });
+        const repairedPipes = ensureDeadServiceLogPipes(sessionName, servicesToProbe);
+        const inGrace = Date.now() - startTimeRef.current < STARTING_GRACE_MS;
+        const entries = await Promise.all(
+          servicesToProbe.map(async (name): Promise<[string, ServiceStatus]> => {
+            const svc = getService(name);
+            if (svc.port === 0) {
+              const pane = findServicePane(sessionName, name);
+              const paneAlive = pane !== undefined && paneHasRunningService(sessionName, pane);
+              const url = readCapturedTunnelUrl(repoRoot, name);
+              let up: boolean;
+              if (url === undefined) {
+                up = paneAlive;
+              } else {
+                const now = Date.now();
+                const cached = lastTunnelProbe.current.get(url);
+                if (cached !== undefined && now - cached.at < TUNNEL_REFRESH_MS) {
+                  up = cached.up;
+                } else {
+                  up = await isPortlessServiceHealthy(repoRoot, name, paneAlive, 1500);
+                  lastTunnelProbe.current.set(url, { at: now, up });
+                }
+              }
+              return [name, up ? 'up' : inGrace ? 'starting' : 'down'];
+            }
+            const up = await probePort(svc.port);
+            return [name, up ? 'up' : inGrace ? 'starting' : 'down'];
+          })
+        );
+        setStatuses(prev => {
+          const changed = entries.some(([name, status]) => prev.get(name) !== status);
+          if (!changed) return prev;
+          return new Map(entries);
+        });
+
+        const issues: string[] = [];
+        const down = entries.filter(([, status]) => status === 'down').map(([name]) => name);
+        if (down.includes('cloud-agent-public-tunnels')) {
+          issues.push('tunnels: public URL is down');
+        }
+        for (const name of down) {
+          if (name === 'cloud-agent-public-tunnels') continue;
+          issues.push(`${name} is down`);
+        }
+        if (repairedPipes.length > 0) {
+          issues.push(`reattached logs: ${repairedPipes.join(', ')}`);
+        }
+        const publicTunnelSnapshot = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+        const previousPublicTunnelSnapshot = lastPublicTunnelSnapshot.current;
+        const { reloadTarget } = planTunnelRestart([...runningServices]);
+        if (
+          previousPublicTunnelSnapshot?.values.WORKER_URL !== undefined &&
+          publicTunnelSnapshot.values.WORKER_URL !== undefined &&
+          publicTunnelSnapshot.values.WORKER_URL !==
+            previousPublicTunnelSnapshot.values.WORKER_URL &&
+          reloadTarget !== undefined &&
+          !reloadingWorker.current
+        ) {
+          reloadingWorker.current = true;
+          issues.push('reloading worker for new tunnel URL');
+          void waitForCloudAgentPublicTunnelCapture(
+            repoRoot,
+            previousPublicTunnelSnapshot,
+            CAPTURE_TIMEOUT_MS
+          )
+            .then(captured =>
+              captured ? restartServiceInTmux(sessionName, reloadTarget) : undefined
+            )
+            .finally(() => {
+              reloadingWorker.current = false;
+            });
+        }
+        lastPublicTunnelSnapshot.current = publicTunnelSnapshot;
+        setStackIssues(prev => {
+          if (prev.length === issues.length && prev.every((item, i) => item === issues[i])) {
+            return prev;
+          }
+          return issues;
+        });
+      } finally {
+        refreshInFlight.current = false;
+      }
     };
     void refresh().catch(error => {
+      refreshInFlight.current = false;
       console.error('Failed to refresh service statuses:', error);
     });
     const timer = setInterval(refresh, REFRESH_MS);
     return () => clearInterval(timer);
   }, [runningServices]);
 
-  // --- Toggle group ON ---
   const toggleGroupOn = useCallback(
     (groupId: string) => {
       if (togglingRef.current) return;
@@ -404,10 +471,14 @@ function Dashboard({
 
       void (async () => {
         try {
-          // Resolve transitive group-level deps (e.g. app-builder → cloud-agent)
           const allGroupIds = resolveGroupTransitiveDeps([groupId]);
           const allNeeded = resolveGroups(allGroupIds);
           const toStart = allNeeded.filter(name => !runningServices.has(name));
+          // The command typed into the pane is built from the selection, and a
+          // later restart or recreate rebuilds it from the same one, so a start
+          // has to pass it: `serviceCommand` only adds the Snowflake mock's CA
+          // export to the web app when the mock is in the selection.
+          const selection = [...new Set([...runningServices, ...allNeeded])];
 
           const gatedStarts: string[] = [];
           const immediateStarts: string[] = [];
@@ -433,7 +504,7 @@ function Dashboard({
           const startedNow: string[] = [];
           for (const name of immediateStarts) {
             try {
-              startServiceInTmux(sessionName, name);
+              startServiceInTmux(sessionName, name, undefined, selection);
               startedNow.push(name);
             } catch {
               // tmux command failed
@@ -463,11 +534,9 @@ function Dashboard({
           });
 
           if (startedNow.length > 0) {
-            // Reset starting grace for newly started services
             startTimeRef.current = Date.now();
           }
 
-          // Show the group in multi-pane view
           const running = getGroupServiceNames(groupId).filter(n => nextRunningServices.has(n));
           showGroupView(groupId, running);
 
@@ -504,7 +573,7 @@ function Dashboard({
               continue;
             }
             try {
-              startServiceInTmux(sessionName, name);
+              startServiceInTmux(sessionName, name, undefined, selection);
               startedAfterCapture.push(name);
             } catch {
               // tmux command failed
@@ -552,7 +621,6 @@ function Dashboard({
     [runningServices, showGroupView]
   );
 
-  // --- Toggle group OFF ---
   const toggleGroupOff = useCallback(
     (groupId: string) => {
       if (togglingRef.current) return;
@@ -560,15 +628,12 @@ function Dashboard({
 
       const directMembers = getGroupServiceNames(groupId);
 
-      // Calculate which services are needed by OTHER enabled groups
       const otherEnabledGroups = new Set(enabledGroups);
       otherEnabledGroups.delete(groupId);
       const neededByOthers = getServicesNeededByEnabledGroups(otherEnabledGroups);
 
-      // Only stop direct members that aren't needed by other groups
       const toStop = directMembers.filter(name => !neededByOthers.has(name));
 
-      // If the current view is affected by the stopped services, switch to another
       const viewed = viewedRef.current;
       const viewedAffected =
         viewed !== null &&
@@ -582,7 +647,6 @@ function Dashboard({
         }
       }
 
-      // Stop services
       for (const name of toStop) {
         try {
           stopServiceInTmux(sessionName, name);
@@ -629,7 +693,6 @@ function Dashboard({
     showService: showServiceView,
   };
 
-  // --- Keyboard ---
   useInput((input, key) => {
     if (key.upArrow) {
       setSelectedIdx(prev => {
@@ -653,17 +716,14 @@ function Dashboard({
 
       if (item.kind === 'group') {
         if (enabledGroups.has(item.groupId)) {
-          // Group is running — show all its services in multi-pane view
           const running = getGroupServiceNames(item.groupId).filter(n => runningServices.has(n));
           showGroupView(item.groupId, running);
         } else {
-          // Group is off — start it (which will also show it)
           if (!alwaysOnGroupIds.has(item.groupId)) {
             toggleGroupOn(item.groupId);
           }
         }
       } else {
-        // Service: show single pane
         if (runningServices.has(item.name)) {
           showServiceView(item.name);
         }
@@ -675,7 +735,6 @@ function Dashboard({
       if (!item) return;
 
       if (item.kind === 'group') {
-        // Space stops the group (if it can be stopped)
         if (alwaysOnGroupIds.has(item.groupId)) return;
         if (enabledGroups.has(item.groupId)) {
           toggleGroupOff(item.groupId);
@@ -683,7 +742,6 @@ function Dashboard({
           toggleGroupOn(item.groupId);
         }
       } else {
-        // Service: show single pane (same as Enter for services)
         if (runningServices.has(item.name)) {
           showServiceView(item.name);
         }
@@ -694,7 +752,49 @@ function Dashboard({
       const item = sidebarItems[selectedIdx];
       if (!item || item.kind !== 'service') return;
       if (!runningServices.has(item.name)) return;
-      void restartServiceInTmux(sessionName, item.name);
+      if (item.name !== 'cloud-agent-public-tunnels') {
+        // A restart rebuilds the command from the selection (a recreate does
+        // too), so it travels with the running set: without it the web app
+        // loses the Snowflake mock's CA export.
+        void restartServiceInTmux(sessionName, item.name, undefined, [...runningServices]);
+        return;
+      }
+      if (reloadingWorker.current) return;
+      const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+      const { selection, reloadTarget } = planTunnelRestart([...runningServices]);
+      reloadingWorker.current = true;
+      void (async () => {
+        try {
+          // The active selection must travel with the restart: without it a
+          // tunnels relaunch (or a recreate after the pane vanishes) falls back
+          // to the three-port form and the fake-LLM tunnel URL is never
+          // published.
+          const outcome = await restartServiceInTmux(sessionName, item.name, undefined, selection);
+          if (outcome === 'gave-up') {
+            setStackIssues(['tunnels: restart did not finish']);
+            return;
+          }
+          const captured = await waitForCloudAgentPublicTunnelCapture(
+            repoRoot,
+            previous,
+            CAPTURE_TIMEOUT_MS
+          );
+          if (!captured) {
+            setStackIssues(['tunnels: no new public URL captured']);
+            return;
+          }
+          if (
+            reloadTarget === undefined ||
+            (!runningServices.has(reloadTarget) && !findServicePane(sessionName, reloadTarget))
+          ) {
+            return;
+          }
+          setStackIssues(['reloading worker for new tunnel URL']);
+          await restartServiceInTmux(sessionName, reloadTarget);
+        } finally {
+          reloadingWorker.current = false;
+        }
+      })();
       return;
     }
     if (input === 'q') {
@@ -703,7 +803,6 @@ function Dashboard({
     }
   });
 
-  // --- Mouse tracking ---
   useEffect(() => {
     // Enable SGR extended mouse tracking so tmux forwards clicks to us
     process.stdout.write('\x1b[?1000h\x1b[?1006h');
@@ -761,10 +860,8 @@ function Dashboard({
 
         if (item.kind === 'group') {
           if (groups.has(item.groupId)) {
-            // Click on running group header = show group view
             onShowGroup(item.groupId);
           } else {
-            // Click on stopped group header = start it
             if (!alwaysOnGroupIds.has(item.groupId)) {
               onGroupOn(item.groupId);
             }
@@ -787,9 +884,8 @@ function Dashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Scrolling ---
   const headerCount = 2;
-  const footerCount = 1;
+  const footerCount = stackIssues.length > 0 ? 2 : 1;
   const visibleCount = Math.max(1, rows - headerCount - footerCount);
   if (selectedIdx >= scrollRef.current + visibleCount) {
     scrollRef.current = selectedIdx - visibleCount + 1;
@@ -843,6 +939,14 @@ function Dashboard({
         })}
       </Box>
 
+      {stackIssues.length > 0 && (
+        <Text color="yellow">
+          {' '}
+          {stackIssues[0].length > SIDEBAR_WIDTH - 1
+            ? `${stackIssues[0].slice(0, SIDEBAR_WIDTH - 2)}\u2026`
+            : stackIssues[0]}
+        </Text>
+      )}
       <Text dimColor>
         {' '}
         {'\u2191\u2193'} navigate {'\u23ce'} view/start space stop r restart q quit
@@ -850,10 +954,6 @@ function Dashboard({
     </Box>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
 
 const serviceNames: string[] = JSON.parse(process.argv[2] ?? '[]');
 const initialViewed = process.argv[3] ?? '';

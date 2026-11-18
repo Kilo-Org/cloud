@@ -7,7 +7,7 @@ import {
   KiloPassReferralPageContent,
 } from './KiloPassReferralPageContent';
 import type { KiloPassReferralRewardSummary } from './KiloPassReferralPageContent';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 const emptySummary: KiloPassReferralRewardSummary = {
   totals: {

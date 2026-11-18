@@ -1,0 +1,2 @@
+ALTER TABLE `history_import` ADD `kilo_session_id` text DEFAULT '' NOT NULL;--> statement-breakpoint
+CREATE INDEX `idx_history_import_scope_timestamp_entity` ON `history_import` (`kilo_session_id`,`timestamp`,`entity_id`);

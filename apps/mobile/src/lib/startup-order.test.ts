@@ -1,0 +1,129 @@
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+// Text-contract guard over the root layout source. The module-scope bootstrap
+// kicks (Sentry init, notification wiring, prefetch, theme preload) must stay
+// in _layout.tsx, and the deferred connections/analytics must stay out of it.
+const layoutPath = fileURLToPath(new URL('../app/_layout.tsx', import.meta.url));
+const layoutSource = readFileSync(layoutPath, 'utf8');
+
+// The startup language preparation (channel rename, category re-registration,
+// return navigation) lives in the extracted hook since the startup-once fix;
+// contracts over that section read its source.
+const languagePreparationPath = fileURLToPath(
+  new URL('hooks/use-language-startup-preparation.ts', import.meta.url)
+);
+const languagePreparationSource = readFileSync(languagePreparationPath, 'utf8');
+
+const FORBIDDEN_IDENTIFIERS = [
+  'createUserWebConnection',
+  'EventServiceClient',
+  'useIAP',
+  'initPostHog',
+  'initAppsFlyer',
+  'new WebSocket',
+] as const;
+
+// Removes `//` line comments and `/* */` block comments while preserving line
+// breaks, so a comment mentioning the call cannot satisfy the module-scope
+// assertion.
+function stripComments(source: string): string {
+  return source
+    .replaceAll(/\/\*[\s\S]*?\*\//g, match => match.replaceAll(/[^\n]/g, ''))
+    .replaceAll(/\/\/[^\n]*/g, '');
+}
+
+describe('root layout startup order (text contract)', () => {
+  it('calls initSentry(false) at module scope', () => {
+    const codeSource = stripComments(layoutSource);
+    const hasModuleScopeCall = codeSource
+      .split('\n')
+      .some(line => /^initSentry\(false\);$/.test(line));
+    expect(
+      hasModuleScopeCall,
+      '_layout.tsx must call initSentry(false); at module scope (column 0)'
+    ).toBe(true);
+  });
+
+  it('excludes the held restore-error surface from bootstrap loading', () => {
+    // A successful retry clears restoreFailed before the hidden gate settles.
+    // The held error screen still owns feedback, including its inline spinner.
+    const excludesHeldError =
+      /\{showBootstrapLoading\s*&&\s*!showRestoreError\s*\?\s*<BootstrapLoadingSurface\s*\/>\s*:\s*null\}/.test(
+        stripComments(layoutSource)
+      );
+    expect(excludesHeldError, 'the held restore error must exclude BootstrapLoadingSurface').toBe(
+      true
+    );
+  });
+
+  // The persisted deep-link record is account-bound. Auth bootstrap publishes
+  // the signed-in user id before it clears `authLoading`, so a restore that
+  // runs on an empty dependency array reads a null user id and deletes the
+  // record it was meant to restore. A FAILED restore is not a signed-out
+  // answer either: the credential reads never resolved, so the account
+  // binding is unknown and the restore must also wait out the retryable
+  // error surface until bootstrap settles signed-in or signed-out.
+  it('gates the persisted deep-link restore on the bootstrap outcome', () => {
+    const hookPath = fileURLToPath(
+      new URL('hooks/use-pending-deep-link-restore.ts', import.meta.url)
+    );
+    const hookSource = stripComments(readFileSync(hookPath, 'utf8'));
+    const restoreEffect =
+      /restorePersistedPendingDeepLink\(\);[\s\S]{0,60}?\}, \[([^\]]*)\]\)/.exec(hookSource);
+    expect(
+      restoreEffect,
+      'use-pending-deep-link-restore.ts must call restorePersistedPendingDeepLink in an effect'
+    ).not.toBe(null);
+    expect(
+      restoreEffect?.[1]?.includes('authLoading'),
+      'the restore effect must depend on authLoading, not run on mount'
+    ).toBe(true);
+    expect(
+      restoreEffect?.[1]?.includes('restoreFailed'),
+      'the restore effect must depend on restoreFailed: a failed restore is not a signed-out answer'
+    ).toBe(true);
+
+    // The layout owns no inline restore effect: it wires the gate through the
+    // hook with both bootstrap inputs.
+    const codeSource = stripComments(layoutSource);
+    expect(
+      codeSource.includes('usePendingDeepLinkRestore({ authLoading, restoreFailed })'),
+      '_layout.tsx must gate the persisted deep-link restore through usePendingDeepLinkRestore'
+    ).toBe(true);
+  });
+
+  // The module-scope category registration runs under the English default
+  // while the stored preference is still loading, so the post-preference
+  // language apply must re-register the needs-input categories next to the
+  // channel rename — or every non-English user keeps English Approve / Reply
+  // buttons for the whole session.
+  it('re-registers the needs-input categories next to the language-apply channel rename', () => {
+    const codeSource = stripComments(languagePreparationSource);
+    const pair =
+      /void renameAndroidNotificationChannels\(\);\s*void registerNeedsInputCategories\(\);/.exec(
+        codeSource
+      );
+    expect(
+      pair,
+      'use-language-startup-preparation.ts must re-register the needs-input categories right after renameAndroidNotificationChannels in prepareLanguage'
+    ).not.toBe(null);
+    // The language preparation itself must still stay wired into the layout.
+    expect(
+      stripComments(layoutSource).includes(
+        'useLanguageStartupPreparation({\n    navigationReady,\n    setLanguageReady,\n  })'
+      ),
+      '_layout.tsx must keep the startup language preparation wired through the hook'
+    ).toBe(true);
+  });
+
+  it.each(FORBIDDEN_IDENTIFIERS)('does not reference %s', identifier => {
+    expect(layoutSource.includes(identifier), `_layout.tsx must not contain "${identifier}"`).toBe(
+      false
+    );
+  });
+});

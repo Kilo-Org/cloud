@@ -1,8 +1,44 @@
 /* eslint-disable max-lines -- one cohesive pure-projection suite for getToolDisplay and toolPartHasDetails */
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  Cpu,
+  Eye,
+  FileDiff,
+  FilePlus,
+  FileSearch,
+  FolderOpen,
+  Globe,
+  ListTodo,
+  Pencil,
+  Plug,
+  Search,
+  Sparkles,
+  Terminal,
+} from '@/components/ui/icons';
 
 import { getToolDisplay, type ToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { getToolRowIcon } from './tool-row-icon';
+
+// tool-card-display imports the Lucide icon components; the pure project cannot
+// parse the Flow-sourced react-native runtime, so stub the module with distinct
+// sentinels and assert the exact icon each tool maps to.
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
+}));
 
 function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
   return {
@@ -16,7 +52,10 @@ function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
   };
 }
 
-function completed(input: Record<string, unknown> = {}, output = ''): ToolPart['state'] {
+function completed(
+  input: Record<string, unknown> = {},
+  output = ''
+): Extract<ToolPart['state'], { status: 'completed' }> {
   return {
     status: 'completed',
     input,
@@ -46,12 +85,38 @@ function makeAttachment(mime: string): FilePart {
   };
 }
 
-/** Typed read of the projection — pins the exported `ToolDisplay` shape. */
-function getDisplay(part: ToolPart): ToolDisplay {
-  return getToolDisplay(part);
+/**
+ * Typed read of the visible projection. The `translatable` provenance flag has
+ * its own suite below, so it is dropped here to keep the title/subtitle/badge
+ * assertions exact.
+ */
+function getDisplay(part: ToolPart): Omit<ToolDisplay, 'translatable'> {
+  const display = getToolDisplay(part);
+  return { title: display.title, subtitle: display.subtitle, badge: display.badge };
 }
 
 describe('getToolDisplay mapping', () => {
+  it('labels a projected agent notice with its description instead of its tool id', () => {
+    const description = 'The active agent has changed from dev to Code.';
+    const output = `${description}\nThe new agent can edit files.`;
+    const part = makeToolPart('agent_notice', {
+      ...completed({}, output),
+      title: 'agent_notice',
+      metadata: {
+        backgroundResult: {
+          kind: 'notice',
+          state: 'unknown',
+          outcome: 'unknown',
+          description,
+          output,
+        },
+      },
+    });
+
+    expect(getToolDisplay(part)).toEqual({ title: description, translatable: true });
+    expect(toolPartHasDetails(part)).toBe(true);
+  });
+
   it('maps read with and without a file path', () => {
     expect(getDisplay(makeToolPart('read', completed({ filePath: '/repo/src/app.ts' })))).toEqual({
       title: 'read',
@@ -155,6 +220,12 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('names a patch file from an absolute cloud workspace path', () => {
+    const patchText =
+      '*** Begin Patch\n*** Update File: /workspace/user-1/sessions/ses_abc123/src/app.ts\n@@\n-old\n+new\n*** End Patch';
+    expect(getDisplay(makeToolPart('patch', completed({ patchText }))).subtitle).toBe('app.ts');
+  });
+
   it('maps a multi-file patch to the file count', () => {
     const patchText =
       '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n' +
@@ -186,36 +257,36 @@ describe('getToolDisplay mapping', () => {
 
   it('maps websearch, codesearch, and webfetch from query or url', () => {
     expect(getDisplay(makeToolPart('websearch', completed({ query: 'search terms' })))).toEqual({
-      title: 'websearch',
+      title: 'searching online',
       subtitle: 'search terms',
     });
     expect(
       getDisplay(makeToolPart('websearch', completed({ url: 'https://example.com' })))
-    ).toEqual({ title: 'websearch', subtitle: 'https://example.com' });
+    ).toEqual({ title: 'searching online', subtitle: 'https://example.com' });
     expect(
       getDisplay(makeToolPart('websearch', completed({ query: '', url: 'https://example.com' })))
-    ).toEqual({ title: 'websearch', subtitle: 'https://example.com' });
+    ).toEqual({ title: 'searching online', subtitle: 'https://example.com' });
     expect(getDisplay(makeToolPart('websearch', completed()))).toEqual({
-      title: 'websearch',
-      subtitle: 'websearch',
+      title: 'searching online',
+      subtitle: 'searching online',
     });
     expect(getDisplay(makeToolPart('codesearch', completed({ query: 'foo' })))).toEqual({
-      title: 'codesearch',
+      title: 'searching code',
       subtitle: 'foo',
     });
     expect(getDisplay(makeToolPart('webfetch', completed({ url: 'https://example.com' })))).toEqual(
-      { title: 'webfetch', subtitle: 'https://example.com' }
+      { title: 'fetching a web page', subtitle: 'https://example.com' }
     );
   });
 
-  it('maps todo read and todo write', () => {
+  it('maps todo read and todo write to the one todo list label', () => {
     expect(getDisplay(makeToolPart('todoread', completed()))).toEqual({
-      title: 'todoread',
-      subtitle: 'Read todos',
+      title: 'todo list',
+      subtitle: 'Read plan',
     });
     expect(getDisplay(makeToolPart('todowrite', completed()))).toEqual({
-      title: 'todowrite',
-      subtitle: 'Update todos',
+      title: 'todo list',
+      subtitle: 'Update plan',
     });
   });
 
@@ -245,6 +316,23 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('uses the suggest input text and recognizes completed dismissal metadata', () => {
+    expect(
+      getDisplay(makeToolPart('suggest', completed({ suggest: 'Review the changes?' })))
+    ).toEqual({
+      title: 'Suggestion',
+      subtitle: 'Review the changes?',
+    });
+    expect(
+      getDisplay(
+        makeToolPart('suggest', {
+          ...completed({ suggest: 'Review the changes?' }),
+          metadata: { dismissed: true, truncated: false },
+        })
+      )
+    ).toEqual({ title: 'Suggestion', subtitle: 'Suggestion dismissed' });
+  });
+
   it('maps an MCP tool to server/tool title', () => {
     expect(
       getDisplay(
@@ -253,11 +341,90 @@ describe('getToolDisplay mapping', () => {
     ).toEqual({ title: 'mcp', subtitle: 'filesystem/read_file' });
   });
 
+  it('falls back to the tool name for an incomplete MCP envelope', () => {
+    expect(getDisplay(makeToolPart('mcp', completed({ server_name: 'github' })))).toEqual({
+      title: 'mcp',
+      subtitle: 'mcp',
+    });
+  });
+
   it('falls back to the tool name for unknown tools', () => {
     expect(getDisplay(makeToolPart('unknown-tool', completed()))).toEqual({
       title: 'unknown-tool',
       subtitle: 'unknown-tool',
     });
+  });
+
+  it('maps a sent file to its label and the file name', () => {
+    const attachment: FilePart = { ...makeAttachment('text/plain'), filename: 'random.txt' };
+    expect(
+      getDisplay(
+        makeToolPart('send_file', {
+          ...completed({ path: '/tmp/random.txt' }),
+          attachments: [attachment],
+        })
+      )
+    ).toEqual({ title: 'Sent file', subtitle: 'random.txt' });
+  });
+
+  it('names the sent file from the input path until the attachment arrives', () => {
+    expect(getDisplay(makeToolPart('send_file', completed({ filePath: '/w/report.pdf' })))).toEqual(
+      {
+        title: 'Sent file',
+        subtitle: 'report.pdf',
+      }
+    );
+  });
+
+  it('reports the action, not the outcome, while a send is unfinished', () => {
+    // A running call must not claim a delivery, and a failed one must not read
+    // as a successful send.
+    expect(getDisplay(makeToolPart('send_file', running({ path: '/tmp/random.txt' })))).toEqual({
+      title: 'Send file',
+      subtitle: 'random.txt',
+    });
+    expect(getDisplay(makeToolPart('send_file', errorState({ path: '/tmp/random.txt' })))).toEqual({
+      title: 'Send file',
+      subtitle: 'random.txt',
+    });
+  });
+
+  it('marks only the completed send for a header without the repeated name', () => {
+    // The completed part renders a file chip that names the file, so its header
+    // shows the label alone. An unfinished part has no chip yet, so its header
+    // keeps the name in the prefix.
+    expect(
+      getToolDisplay(makeToolPart('send_file', completed({ path: '/a.txt' }))).headerTitleOnly
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('send_file', running({ path: '/a.txt' }))).headerTitleOnly
+    ).toBe(undefined);
+  });
+
+  it('keeps the sent-file label alone when the part carries no file name', () => {
+    expect(getDisplay(makeToolPart('send_file', completed()))).toEqual({
+      title: 'Sent file',
+      subtitle: undefined,
+    });
+  });
+
+  it('summarizes a generic tool from its arguments', () => {
+    expect(
+      getDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+    ).toEqual({ title: 'lookup', subtitle: 'Find matching records' });
+  });
+
+  it('summarizes a question row from its first question text', () => {
+    expect(
+      getDisplay(
+        makeToolPart(
+          'question',
+          completed({
+            questions: [{ header: 'E2E', question: 'Which fields should the sheet show?' }],
+          })
+        )
+      )
+    ).toEqual({ title: 'asking you questions', subtitle: 'Which fields should the sheet show?' });
   });
 
   it('uses the running/completed state title for the generic subtitle', () => {
@@ -279,7 +446,7 @@ describe('getToolDisplay badge rules', () => {
     expect(
       getDisplay(makeToolPart('read', completed({ filePath: '/a/b.ts', offset: 10, limit: 25 })))
         .badge
-    ).toBe('L10, 25 lines');
+    ).toBe('L10 and 25 lines');
     expect(
       getDisplay(makeToolPart('read', completed({ filePath: '/a/b.ts', offset: 10 }))).badge
     ).toBe('L10');
@@ -363,12 +530,12 @@ describe('getToolDisplay badge rules — live CLI shapes', () => {
     ).toBeUndefined();
   });
 
-  it('badges a single glob path as 1 files', () => {
+  it('badges a single glob path as 1 file', () => {
     expect(
       getDisplay(
         makeToolPart('glob', completed({ pattern: '**/*.ts' }, '/repo/apps/mobile/AGENTS.md'))
       ).badge
-    ).toBe('1 files');
+    ).toBe('1 file');
   });
 
   it('does not count the opencode truncated note as a file', () => {
@@ -408,9 +575,148 @@ describe('getToolDisplay badge rules — live CLI shapes', () => {
   });
 });
 
+describe('getToolDisplay translatable provenance', () => {
+  it('keeps the fallback read/edit/write label out of translation', () => {
+    expect(getToolDisplay(makeToolPart('read', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('edit', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('write', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('read', completed({ filePath: 'a.ts' }))).translatable).toBe(
+      true
+    );
+    expect(getToolDisplay(makeToolPart('send_file', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('send_file', completed({ path: '/tmp/random.txt' }))).translatable
+    ).toBe(true);
+  });
+
+  it('keeps the fallback bash/glob/grep/list/patch labels out of translation', () => {
+    expect(getToolDisplay(makeToolPart('bash', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('bash', completed({ command: 'ls' }))).translatable).toBe(
+      true
+    );
+    expect(
+      getToolDisplay(makeToolPart('bash', completed({ description: 'List files' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('glob', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('glob', completed({ pattern: '**/*.ts' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('grep', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('grep', completed({ pattern: 'foo' }))).translatable).toBe(
+      true
+    );
+    expect(getToolDisplay(makeToolPart('list', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('list', completed({ path: '/repo/src' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('patch', completed())).translatable).toBe(false);
+  });
+
+  it('keeps the web search, code search and web fetch labels out of translation', () => {
+    expect(getToolDisplay(makeToolPart('websearch', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('websearch', completed({ query: 'search terms' }))).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('websearch', completed({ url: 'https://example.com' })))
+        .translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('codesearch', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('webfetch', completed())).translatable).toBe(false);
+  });
+
+  it('never translates the todo read/write UI copy', () => {
+    expect(getToolDisplay(makeToolPart('todoread', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('todowrite', running())).translatable).toBe(false);
+  });
+
+  it('keeps the task and suggestion fallbacks out of translation', () => {
+    expect(getToolDisplay(makeToolPart('task', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('task', completed({ description: 'Do the thing' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('suggest', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('suggest', completed({ suggest: 'Review?' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('suggest', errorState())).translatable).toBe(false);
+  });
+
+  it('keeps a multi-file patch count and generic raw ids out of translation', () => {
+    const multi =
+      '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-a\n+b\n*** Add File: src/b.ts\n+x\n*** End Patch';
+    expect(
+      getToolDisplay(makeToolPart('apply_patch', completed({ patchText: multi }))).translatable
+    ).toBe(false);
+    expect(getToolDisplay(makeToolPart('unknown-tool', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(
+        makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
+      ).translatable
+    ).toBe(false);
+  });
+
+  it('translates the projected argument summary that becomes the subtitle', () => {
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+        .translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('question', completed({ question: 'Pick a color' }))).translatable
+    ).toBe(true);
+  });
+
+  it('keeps a projected name out of translation even when a summary exists', () => {
+    // `mcp` resolves to `server/tool`, an identifier, so the summary is not the
+    // shown subtitle and neither is agent prose to translate.
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'mcp',
+          completed({
+            server_name: 'filesystem',
+            tool_name: 'read_file',
+            arguments: { path: '/a' },
+          })
+        )
+      ).translatable
+    ).toBe(false);
+    // A summary-less generic tool falls back to its raw id.
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ nested: { a: 1 } }))).translatable
+    ).toBe(false);
+    // An incomplete envelope has no summary, so its raw fields never reach the
+    // translation gateway.
+    expect(
+      getToolDisplay(makeToolPart('mcp', completed({ server_name: 'github' }))).translatable
+    ).toBe(false);
+  });
+
+  it('translates the generic state title the tool summarized', () => {
+    expect(
+      getToolDisplay({
+        ...makeToolPart('mcp', completed()),
+        state: {
+          status: 'completed',
+          input: {},
+          output: '',
+          title: 'Custom title',
+          metadata: {},
+          time: { start: 0, end: 1 },
+        },
+      }).translatable
+    ).toBe(true);
+  });
+});
+
 describe('toolPartHasDetails', () => {
-  it('returns false for suggest even with input', () => {
-    expect(toolPartHasDetails(makeToolPart('suggest', completed({ prompt: 'hi' })))).toBe(false);
+  it('opens suggestion details when input or output exists', () => {
+    expect(
+      toolPartHasDetails(makeToolPart('suggest', completed({ suggest: 'Review the changes?' })))
+    ).toBe(true);
+    expect(
+      toolPartHasDetails(makeToolPart('suggest', completed({}, 'User dismissed the suggestion.')))
+    ).toBe(true);
   });
 
   it('returns false for a running part with empty input and no output', () => {
@@ -448,5 +754,36 @@ describe('toolPartHasDetails', () => {
       attachments: [makeAttachment('image/png')],
     });
     expect(toolPartHasDetails(part)).toBe(true);
+  });
+});
+
+describe('getToolRowIcon mapping', () => {
+  // Every tool named in the ToolPartRenderer switch maps to the exact icon its
+  // card renders.
+  const expectedIcons: [string, unknown][] = [
+    ['read', Eye],
+    ['edit', Pencil],
+    ['write', FilePlus],
+    ['bash', Terminal],
+    ['glob', Search],
+    ['grep', FileSearch],
+    ['list', FolderOpen],
+    ['patch', FileDiff],
+    ['apply_patch', FileDiff],
+    ['todoread', ListTodo],
+    ['todowrite', ListTodo],
+    ['websearch', Globe],
+    ['codesearch', Globe],
+    ['webfetch', Globe],
+    ['task', Cpu],
+    ['suggest', Sparkles],
+  ];
+
+  it.each(expectedIcons)('maps %s to its card icon', (tool, icon) => {
+    expect(getToolRowIcon(tool)).toBe(icon);
+  });
+
+  it('defaults unknown tools to the generic Plug icon', () => {
+    expect(getToolRowIcon('unknown-tool')).toBe(Plug);
   });
 });

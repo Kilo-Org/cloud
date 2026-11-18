@@ -1,7 +1,12 @@
 import { TRPCError } from '@trpc/server';
+import { isCloudDataExportUIEnabled } from '@/lib/user-data-export-ui';
+
+jest.mock('@/lib/user-data-export-ui', () => ({
+  isCloudDataExportUIEnabled: jest.fn(async () => false),
+}));
 import { eq, sql } from 'drizzle-orm';
 import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   magic_link_tokens,
   organization_memberships,
@@ -10,14 +15,14 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { createCallerForUser } from '@/routers/test-utils';
-import { __test__ } from '@/routers/user-exports-router';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { __test__, userExportsRouter } from '@/routers/user-exports-router';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
-// Partial mocks: `@/lib/email` also exports the template registry that sibling
+// Partial mocks: `@kilocode/web-shared/lib/email` also exports the template registry that sibling
 // routers read at import time, so the real module must stay intact.
-jest.mock('@/lib/email', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/email', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@kilocode/web-shared/lib/email');
   return { ...actual, sendDataExportDownloadCodeEmail: jest.fn() };
 });
 // The firewall check needs a request scope, which the tRPC caller does not have.
@@ -36,7 +41,7 @@ jest.mock('@/lib/user-data-export-worker-client', () => {
 });
 
 import { isDataExportDownloadCodeRateLimited } from '@/lib/auth/data-export-download-code-rate-limit';
-import { sendDataExportDownloadCodeEmail } from '@/lib/email';
+import { sendDataExportDownloadCodeEmail } from '@kilocode/web-shared/lib/email';
 import { requestUserDataExportDownload } from '@/lib/user-data-export-worker-client';
 
 const mockRateLimited = jest.mocked(isDataExportDownloadCodeRateLimited);
@@ -123,10 +128,48 @@ async function requestCode(kiloUserId: string, exportId: string) {
   return { caller, challengeId, code: lastEmailedCode() };
 }
 
+describe('user export UI access', () => {
+  it('rejects token authentication before evaluating UI eligibility', async () => {
+    const caller = userExportsRouter.createCaller({ user: stranger, authViaToken: true });
+
+    await expect(caller.uiAccess()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(isCloudDataExportUIEnabled).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])(
+    'evaluates %s for the authenticated email, not the user ID',
+    async enabled => {
+      jest.mocked(isCloudDataExportUIEnabled).mockResolvedValueOnce(enabled);
+      const caller = await createCallerForUser(stranger.id);
+
+      await expect(caller.userExports.uiAccess()).resolves.toEqual({
+        enabled,
+        email: stranger.google_user_email,
+      });
+      expect(isCloudDataExportUIEnabled).toHaveBeenCalledWith(stranger.google_user_email);
+    }
+  );
+
+  it('keeps existing export APIs available when the UI flag is off', async () => {
+    const caller = await createCallerForUser(stranger.id);
+    await expect(caller.userExports.uiAccess()).resolves.toMatchObject({ enabled: false });
+    await expect(caller.userExports.request()).resolves.toMatchObject({
+      subjectType: 'user',
+      status: 'queued',
+    });
+  });
+});
+
 describe('user exports router guards and serialization', () => {
-  it('rejects API-token authentication for data export procedures', () => {
-    expect(() => __test__.requireWebSession(true)).toThrow(TRPCError);
-    expect(() => __test__.requireWebSession(false)).not.toThrow();
+  it('rejects a bearer token that is not a device session', () => {
+    expect(() => __test__.requireSignedInSession({ authViaToken: true })).toThrow(TRPCError);
+    expect(() => __test__.requireSignedInSession({ authViaToken: false })).not.toThrow();
+  });
+
+  it('accepts the mobile app device session, which is a first-party sign-in', () => {
+    expect(() =>
+      __test__.requireSignedInSession({ authViaToken: true, deviceSessionId: 'device-session' })
+    ).not.toThrow();
   });
 
   it('allows non-admin users to access their personal exports', async () => {
@@ -412,6 +455,62 @@ describe('user exports router guards and serialization', () => {
     if (allowed) await expect(request).resolves.toMatchObject({ subjectType: 'organization' });
     else await expect(request).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
+
+  it.each(['owner', 'admin'] as const)(
+    'resolves child export access across organization lifecycle states for %s',
+    async role => {
+      const parent = await createTestOrganization('Export Lifecycle Parent', stranger.id, 0);
+      const child = await createTestOrganization('Export Lifecycle Child', stranger.id, 0);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await db.insert(organization_memberships).values({
+        organization_id: parent.id,
+        kilo_user_id: owner.id,
+        role,
+      });
+      const caller = await createCallerForUser(owner.id);
+      expect(
+        (await caller.userExports.exportableOrganizations()).organizations.map(org => org.id)
+      ).toContain(child.id);
+
+      await expect(
+        caller.userExports.requestOrganization({ organizationId: child.id })
+      ).resolves.toMatchObject({ subjectType: 'organization' });
+      const exportId = await insertReadyOrganizationExport(owner.id, child.id);
+
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, parent.id));
+      expect(
+        (await caller.userExports.exportableOrganizations()).organizations.map(org => org.id)
+      ).not.toContain(child.id);
+
+      await expect(
+        caller.userExports.requestOrganization({ organizationId: child.id })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+
+      await db.insert(organization_memberships).values({
+        organization_id: child.id,
+        kilo_user_id: owner.id,
+        role,
+      });
+      expect(
+        (await caller.userExports.exportableOrganizations()).organizations.map(org => org.id)
+      ).toContain(child.id);
+      await expect(
+        caller.userExports.requestOrganization({ organizationId: child.id })
+      ).resolves.toMatchObject({ subjectType: 'organization' });
+      await expect(caller.userExports.requestDownloadCode({ exportId })).resolves.toHaveProperty(
+        'challengeId'
+      );
+    }
+  );
 
   // A regular member of the organization exports their own data and nothing else. They
   // are not an owner or admin, so the organization's export is not theirs to request,

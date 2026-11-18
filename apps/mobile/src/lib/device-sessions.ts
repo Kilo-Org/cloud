@@ -1,29 +1,43 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { i18n } from '@/i18n';
 
 /** One active device session as returned by `user.listDeviceSessions`. */
 export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDeviceSessions'][number];
 
-const UNKNOWN_DEVICE_LABEL = 'Unknown device';
-
 /**
- * Derive a short, human-readable label from the raw `user_agent` HTTP header
- * stored on the session row.
+ * Title one session row from the client the server classified for it.
  *
- * Browser requests always lead with the `Mozilla/5.0` compatibility token, so
- * those collapse to "Web browser". Everything else keeps its first product
- * token ("Kilo-Code/1.2.3" → "Kilo-Code", "axios/1.7.0" → "axios"), and a
- * missing or empty header falls back to "Unknown device".
+ * The server reads the recorded `user_agent` header once and returns the kind
+ * with the row, so the app never parses a header itself. An app session also
+ * carries the platform it runs on, the CLI and a browser keep one name each,
+ * and any other client is titled by the product token the server extracted
+ * (`axios/1.7.0` → "axios") — or "Unknown device" when the row recorded no
+ * header at all.
+ *
+ * `device_auth_request_id` is not a CLI marker: the app's own browser sign-in
+ * sets it too. The client kind therefore comes from the recorded user agent.
  */
-export function deviceSessionLabel(userAgent: string | null | undefined): string {
-  const trimmed = userAgent?.trim() ?? '';
-  if (!trimmed) {
-    return UNKNOWN_DEVICE_LABEL;
+export function deviceSessionLabel(
+  session: Pick<DeviceSession, 'kind' | 'platform' | 'clientName'>
+): string {
+  if (session.kind === 'app') {
+    if (session.platform === 'android') {
+      return i18n.t('deviceSessions.kiloAppAndroid');
+    }
+    if (session.platform === 'ios') {
+      return i18n.t('deviceSessions.kiloAppIos');
+    }
+    // An app row always names its platform today; the unqualified app name
+    // keeps the label defined if the server ever reports another one.
+    return i18n.t('deviceSessions.kiloApp');
   }
-  if (trimmed.startsWith('Mozilla/')) {
-    return 'Web browser';
+  if (session.kind === 'cli') {
+    return i18n.t('deviceSessions.kiloCli');
   }
-  // "Kilo-Code/1.2.3 (darwin; arm64)" → "Kilo-Code" (drop the version and the rest).
-  return trimmed.split(/[\s/]/)[0] ?? UNKNOWN_DEVICE_LABEL;
+  if (session.kind === 'browser') {
+    return i18n.t('deviceSessions.webBrowser');
+  }
+  return session.clientName ?? i18n.t('deviceSessions.unknownDevice');
 }
 
 /**
@@ -41,7 +55,14 @@ export function sortDeviceSessions(sessions: readonly DeviceSession[]): DeviceSe
 type DeviceSessionsQueryState = 'loading' | 'error' | 'empty' | 'happy' | 'no-current';
 
 type ClassifyArgs = {
-  isLoading: boolean;
+  /**
+   * `isPending` (no data yet), NOT React Query v5's `isLoading`
+   * (`isPending && isFetching`): the first render before the observer starts
+   * the fetch and a paused (offline) query are pending but not fetching, so
+   * `isLoading` would classify a cold open as `empty` and flash the empty
+   * state before the request settles.
+   */
+  isPending: boolean;
   isError: boolean;
   data: DeviceSession[] | undefined;
 };
@@ -54,11 +75,11 @@ type ClassifyArgs = {
  * note — never the empty state.
  */
 export function classifyDeviceSessionsState({
-  isLoading,
+  isPending,
   isError,
   data,
 }: ClassifyArgs): DeviceSessionsQueryState {
-  if (isLoading) {
+  if (isPending) {
     return 'loading';
   }
   if (isError) {

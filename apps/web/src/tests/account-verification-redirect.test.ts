@@ -32,7 +32,7 @@ jest.mock('next/headers', () => ({
 }));
 
 const mockGetUserFromAuthOrRedirect = jest.fn<Promise<User>, [string?]>();
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuthOrRedirect: (...args: [string?]) => mockGetUserFromAuthOrRedirect(...args),
 }));
 
@@ -178,7 +178,9 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect directly to an org callbackPath', async () => {
+    // `/organizations/<id>` is claimed by the app, so the redirect goes through
+    // the app-link interstitial like every other app-owned destination.
+    it('should route an org callbackPath through the app-link interstitial', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -186,7 +188,9 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/organizations/some-org-id' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith('/organizations/some-org-id');
+      expect(mockRedirect).toHaveBeenCalledWith(
+        '/users/continue?to=%2Forganizations%2Fsome-org-id'
+      );
     });
   });
 
@@ -217,7 +221,7 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect directly to an org callbackPath when customer_source is set', async () => {
+    it('should route an org callbackPath through the interstitial when customer_source is set', async () => {
       const user = makeUser({ customer_source: 'A friend or colleague' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -225,7 +229,9 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/organizations/some-org-id' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith('/organizations/some-org-id');
+      expect(mockRedirect).toHaveBeenCalledWith(
+        '/users/continue?to=%2Forganizations%2Fsome-org-id'
+      );
     });
 
     it('should redirect to /get-started when customer_source is empty string (skipped survey)', async () => {
@@ -577,7 +583,7 @@ describe('account-verification redirect logic', () => {
   // App-link-safe-redirect interstitial: claimed callback paths
   // ---------------------------------------------------------------
   describe('app-link-safe-redirect interstitial', () => {
-    it('routes callbackPath=/claw through the interstitial', async () => {
+    it('keeps the web-only Claw callback outside the mobile interstitial', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -585,7 +591,7 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/claw' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith('/users/continue?to=%2Fclaw');
+      expect(mockRedirect).toHaveBeenCalledWith('/claw');
     });
 
     it('routes callbackPath=/profile through the interstitial', async () => {

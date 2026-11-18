@@ -27,6 +27,56 @@ describe('getCodeReviewTerminalReasonCopy', () => {
     });
   });
 
+  it('explains the model-limitation reasons', () => {
+    expect(getCodeReviewTerminalReasonCopy('assistant_output_limit')).toMatchObject({
+      label: 'Output limit reached',
+      checkTitle: 'Kilo Code Review hit the output limit',
+    });
+    expect(getCodeReviewTerminalReasonCopy('assistant_context_limit')).toMatchObject({
+      label: 'Context limit reached',
+      checkTitle: 'Kilo Code Review exceeded the context window',
+    });
+    expect(getCodeReviewTerminalReasonCopy('assistant_content_filter')).toMatchObject({
+      label: 'Blocked by content filter',
+      checkTitle: 'Kilo Code Review blocked by content filter',
+    });
+    expect(getCodeReviewTerminalReasonCopy('assistant_structured_output')).toMatchObject({
+      label: 'Unexpected model output',
+      checkTitle: 'Kilo Code Review produced unusable output',
+    });
+  });
+
+  it('describes BYOK request rejection without claiming an invalid key or disabling reviews', () => {
+    const copy = getCodeReviewTerminalReasonCopy('assistant_invalid_request_byok');
+    expect(copy).toMatchObject({
+      label: 'Provider rejected request',
+      message: 'Your provider rejected the request. Check your provider account and settings.',
+      checkTitle: 'Kilo Code Review request rejected by your provider',
+      checkSummary: 'Your provider rejected the request. Check your provider account and settings.',
+    });
+    expect(copy?.summaryBody.replace(/\s+/g, ' ')).toContain('Kilo does not retry automatically');
+    expect(copy?.summaryBody).toContain('inline comments');
+    expect(copy?.summaryBody).not.toMatch(/disabled|invalid key/i);
+    expect(getCodeReviewTerminalReasonCopy('assistant_invalid_request')).toBeNull();
+  });
+
+  it('tells the customer how to recover from each model-limit failure', () => {
+    const remedies: Record<string, string> = {
+      assistant_output_limit: 'thinking effort',
+      assistant_context_limit: 'split the change',
+      assistant_content_filter: 'different model',
+      assistant_structured_output: 'different model',
+    };
+
+    for (const [reason, remedy] of Object.entries(remedies)) {
+      const wording = getCodeReviewTerminalReasonCopy(reason)?.summaryBody.replace(/\s+/g, ' ');
+      // Inline comments survive the notice, so each summary has to say they are
+      // stale rather than let them read as current findings.
+      expect(wording).toContain('inline comments');
+      expect(wording).toContain(remedy);
+    }
+  });
+
   // The summary body replaces the PR comment in place. Losing the marker would
   // orphan the existing comment and post a duplicate on the next run, because
   // that marker is how the comment is found.

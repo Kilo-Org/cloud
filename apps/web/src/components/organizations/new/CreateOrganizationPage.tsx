@@ -21,7 +21,8 @@ import {
   Coins,
   type LucideIcon,
 } from 'lucide-react';
-import { OrganizationNameSchema } from '@/lib/organizations/organization-types';
+import { OrganizationNameSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCreateOrganization } from '@/app/api/organizations/hooks';
 import { SubscriptionsSeatQuantitySchema } from '@/app/payments/subscriptions/types';
@@ -84,7 +85,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
   const [companyDomain, setCompanyDomain] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
-    name?: string;
+    organizationName?: string;
     general?: string;
   }>({});
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -104,12 +105,13 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
 
     if (!validationResult.success) {
       const fieldErrors: typeof errors = {};
-      validationResult.error.issues.forEach(issue => {
-        const field = issue.path[0] as keyof typeof errors;
-        if (field && field !== 'general') {
-          fieldErrors[field] = issue.message;
+      for (const issue of validationResult.error.issues) {
+        if (issue.path[0] === 'organizationName') {
+          fieldErrors.organizationName = issue.message;
+        } else {
+          fieldErrors.general = issue.message;
         }
-      });
+      }
       setErrors(fieldErrors);
       setIsSubmitting(false);
       return;
@@ -134,7 +136,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
     }
   };
 
-  const isFormValid = name.trim().length > 0;
+  const isFormValid = hasVisibleText(name);
 
   return (
     <div className="bg-background mx-auto h-full w-full max-w-[1200px] px-4 py-8 md:px-6 md:py-12">
@@ -202,7 +204,9 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
                   placeholder="Company Name"
                   className={`h-12 text-center text-lg transition-all duration-200 focus:ring-2 ${
-                    errors.name ? 'border-red-400 focus:ring-red-400/20' : 'focus:ring-blue-500/20'
+                    errors.organizationName
+                      ? 'border-red-400 focus:ring-red-400/20'
+                      : 'focus:ring-blue-500/20'
                   }`}
                   autoFocus
                 />
@@ -217,7 +221,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
                   className={`h-12 text-center text-lg transition-all duration-200 focus:ring-2 focus:ring-blue-500/20`}
                 />
                 <AnimatePresence>
-                  {errors.name && (
+                  {errors.organizationName && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
@@ -225,7 +229,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
                       className="flex items-center justify-center gap-2 text-sm text-red-400"
                     >
                       <AlertCircle className="h-4 w-4" />
-                      <span>{errors.name}</span>
+                      <span>{errors.organizationName}</span>
                     </motion.div>
                   )}
                 </AnimatePresence>

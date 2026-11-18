@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+  <!-- Both GenAI AARs declare API 26 but register no startup components.
+       ML Kit common's initialization provider is API 21-compatible. All GenAI
+       references are isolated in MlKitPromptBackend, instantiated only on 26+.
+       Preserve the application's existing API 24 minimum. -->
+  <uses-sdk tools:overrideLibrary="com.google.mlkit.genai.prompt,com.google.mlkit.genai.common" />
+</manifest>

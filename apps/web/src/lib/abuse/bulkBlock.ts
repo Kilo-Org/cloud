@@ -1,9 +1,7 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
-import { successResult, type CustomResult } from '@/lib/maybe-result';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
-import { revokeGatewayGrantsForBlockedUsers } from '@/lib/mcp-gateway/blocking-service';
+import { successResult, type CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 
 export type BulkBlockResponse = CustomResult<
   { updatedCount: number },
@@ -69,16 +67,6 @@ export async function bulkBlockUsers(
     .where(and(inArray(kilocode_users.id, valid), isNull(kilocode_users.blocked_reason)))
     .returning({ id: kilocode_users.id });
 
-  if (updated.length > 0) {
-    await revokeGatewayGrantsForBlockedUsers(updated.map(u => u.id));
-    void reportEvents({
-      events: updated.map(u => ({
-        type: 'user.blocked' as const,
-        data: { kilo_user_id: u.id, reason, actor_email: null },
-      })),
-    });
-  }
-
   // A short update count means some of the selected users were concurrently
   // blocked between the read and the guarded update. Surface that as a
   // retryable conflict so the caller can re-run and confirm their final state.
@@ -120,14 +108,5 @@ export async function unblockBulkBlockedUsers(
     )
     .returning({ id: kilocode_users.id });
 
-  if (rows.length > 0) {
-    void reportEvents({
-      events: rows.map(u => ({
-        type: 'user.unblocked' as const,
-        data: { kilo_user_id: u.id },
-      })),
-    });
-  }
-
-  return { updatedCount: rows.length };
+  return { updatedCount: rows.length, unblockedUserIds: rows.map(row => row.id) };
 }

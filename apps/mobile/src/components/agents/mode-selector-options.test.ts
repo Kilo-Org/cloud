@@ -7,10 +7,10 @@ import {
   type ModeOption,
 } from '@/components/agents/mode-normalize';
 
-// Local copy of the built-in rows (same values as `MODE_OPTIONS` in
-// `mode-options.ts`). Kept local so this suite never imports `mode-options`,
-// which pulls in the Lucide / React Native tree and cannot load under the
-// plain Node vitest environment.
+// Local copy of the built-in rows in their pre-i18n shape (label/description
+// strings; `MODE_OPTIONS` in `mode-options.ts` now holds catalog keys). Kept
+// local so this suite never imports `mode-options`, which pulls in the Lucide /
+// React Native tree and cannot load under the plain Node vitest environment.
 const BUILTIN_OPTIONS: ModeOption[] = [
   { value: 'code', label: 'Code', description: 'Write and modify code' },
   { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },

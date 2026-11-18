@@ -1,4 +1,8 @@
+/* oxlint-disable max-lines -- one tRPC client suite; the auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
+import { type TelemetryBreadcrumb, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const httpLinkMock = vi.hoisted(() => vi.fn());
 const httpBatchLinkMock = vi.hoisted(() => vi.fn());
@@ -6,6 +10,8 @@ const createTRPCClientMock = vi.hoisted(() => vi.fn());
 const splitLinkMock = vi.hoisted(() =>
   vi.fn((opts: { condition: unknown; true: unknown; false: unknown }) => [opts.true, opts.false])
 );
+
+const randomUUIDMock = vi.hoisted(() => vi.fn(() => 'test-request-id'));
 
 const secureStoreMock = vi.hoisted(() => {
   const store = new Map<string, string>();
@@ -68,18 +74,26 @@ vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
   E2E_LATENCY_MESSAGES_MS: 0,
   E2E_LATENCY_SESSION_MS: 0,
+  // The secure-store read path reads this fault window; keep it closed.
+  E2E_SECURE_STORE_FAULT_MS: 0,
+  // The ingest endpoint stays unset so a wiring test never posts latency.
+  LATENCY_INGEST_URL: undefined,
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
+  ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
+  ORGANIZATION_STORAGE_KEY: 'organization',
+  REFRESH_TOKEN_KEY: 'auth-refresh-token',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
 
-// auth-context pulls in react-native, Sentry and the telemetry modules.
-// This test only inspects link options, so stub the two symbols trpc.ts uses.
-vi.mock('@/lib/auth/auth-context', () => ({
-  performRefresh: vi.fn().mockResolvedValue({ ok: false, refused: false }),
-  REFRESH_MARGIN_MS: 60_000,
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+}));
+
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
 }));
 
 afterEach(() => {
@@ -87,32 +101,8 @@ afterEach(() => {
   httpLinkMock.mockClear();
   httpBatchLinkMock.mockClear();
   createTRPCClientMock.mockClear();
-});
-
-describe('tRPC client link options', () => {
-  it('passes methodOverride: "POST" to httpLink', async () => {
-    httpLinkMock.mockReturnValue({});
-    httpBatchLinkMock.mockReturnValue({});
-    createTRPCClientMock.mockReturnValue({});
-
-    await import('./trpc');
-
-    expect(httpLinkMock).toHaveBeenCalledTimes(1);
-    const httpLinkOpts = httpLinkMock.mock.calls[0]?.[0];
-    expect(httpLinkOpts).toHaveProperty('methodOverride', 'POST');
-  });
-
-  it('passes methodOverride: "POST" to httpBatchLink', async () => {
-    httpLinkMock.mockReturnValue({});
-    httpBatchLinkMock.mockReturnValue({});
-    createTRPCClientMock.mockReturnValue({});
-
-    await import('./trpc');
-
-    expect(httpBatchLinkMock).toHaveBeenCalledTimes(1);
-    const httpBatchLinkOpts = httpBatchLinkMock.mock.calls[0]?.[0];
-    expect(httpBatchLinkOpts).toHaveProperty('methodOverride', 'POST');
-  });
+  splitLinkMock.mockClear();
+  randomUUIDMock.mockClear();
 });
 
 type AuthHeadersFn = () => Promise<Record<string, string>>;
@@ -150,14 +140,24 @@ describe('getAuthHeaders', () => {
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const headers = await loadHeaders();
 
-    await expect(headers()).resolves.toEqual({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     // Cold path: one token read plus one expiry read.
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
 
     // The resolved expiry was published into the owner: a normal request
     // rereads neither key.
-    await expect(headers()).resolves.toEqual({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends the app product token as the User-Agent on every tRPC call', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toMatchObject({
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
+    });
   });
 
   it('uses the newest owner token published while the cold expiry was read', async () => {
@@ -173,22 +173,301 @@ describe('getAuthHeaders', () => {
       expect(vi.mocked(secureStoreMock.getItemAsync)).toHaveBeenCalledWith('token-expires-at');
     });
     // Publish a newer owner while the cold expiry read is still in flight.
-    const { setActiveToken } = await import('@/lib/auth/token-owner');
-    setActiveToken('newer-token', Date.now() + 3_600_000);
+    const newerExpiresAt = Date.now() + 3_600_000;
+    // `afterEach` resets the module registry, so the owner must be loaded from
+    // the same graph as `./trpc` inside the case rather than imported statically.
+    const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
+    setActiveToken('newer-token', newerExpiresAt);
     secureStoreMock.releaseHeldExpiryRead();
 
     // The request uses the newest owner token, not the cold-read token, and
     // the newer owner's expiry is not overwritten by the stale read.
-    await expect(pending).resolves.toEqual({ Authorization: 'Bearer newer-token' });
+    await expect(pending).resolves.toMatchObject({ Authorization: 'Bearer newer-token' });
+    // The stale read resolved to an expired value; the owner must still hold
+    // the newer expiry instead of having been overwritten by it.
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'newer-token',
+      expiresAtMs: newerExpiresAt,
+    });
+  });
+
+  it('sends the held token without touching the keychain while protected data is unavailable', async () => {
+    // `afterEach` resets the module registry, so the owner and the gate must be
+    // loaded from the same graph as `./trpc` inside the case.
+    const headers = await loadHeaders();
+    const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    // The production precondition: a held owner with no expiry, then a lock.
+    setActiveToken('held-token', null);
+    setProtectedDataAvailable(false);
+    try {
+      await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+      // The refused read never reaches the keychain, so the refusal cannot fail
+      // the request.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      // An unknown expiry is not published as a known one.
+      expect(getActiveTokenSnapshot()).toMatchObject({ token: 'held-token', expiresAtMs: null });
+
+      // A later request behaves the same: the expiry is still unknown.
+      await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+
+    // After unlock the expiry is read once and published into the same owner.
+    const storedExpiresAt = Date.now() + 3_600_000;
+    secureStoreMock.store.set('token-expires-at', String(storedExpiresAt));
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('token-expires-at');
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'held-token',
+      expiresAtMs: storedExpiresAt,
+    });
+  });
+
+  it('still fails the request when the cold expiry read fails for another reason', async () => {
+    const headers = await loadHeaders();
+    const { setActiveToken } = await import('@/lib/auth/token-owner');
+    setActiveToken('held-token', null);
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      throw new Error('keychain unavailable');
+    });
+
+    await expect(headers()).rejects.toThrow('keychain unavailable');
+  });
+
+  it('holds an unauthenticated request until the unlock instead of sending it bare', async () => {
+    // `afterEach` resets the module registry, so the sink, the owner, and the
+    // gate must be loaded from the same graph as `./trpc` inside the case.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const events: TelemetryEvent[] = [];
+    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    const headers = await loadHeaders();
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    setProtectedDataAvailable(false);
+    try {
+      // A locked keychain can supply no bearer, so the request waits instead of
+      // going out unauthenticated: the server would refuse it as no-session.
+      let settled = false;
+      const pending = (async () => {
+        try {
+          return await headers();
+        } finally {
+          settled = true;
+        }
+      })();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+
+      // The unlock releases it, and the same request reaches the wire with the
+      // stored credential.
+      setProtectedDataAvailable(true);
+      await expect(pending).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('auth-token');
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+  });
+
+  it('shares one unlock wait across concurrent requests and releases both', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+    // `afterEach` resets the module registry: the gate must come from the same
+    // graph as `./trpc`, so it is loaded here rather than statically.
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const first = headers();
+      const second = headers();
+      await vi.advanceTimersByTimeAsync(1);
+      // One lock window, one shared wait: a second request joins the first
+      // instead of registering its own deadline timer.
+      expect(vi.getTimerCount()).toBe(1);
+
+      setProtectedDataAvailable(true);
+      await vi.advanceTimersByTimeAsync(1);
+      const [firstHeaders, secondHeaders] = await Promise.all([first, second]);
+      expect(firstHeaders).toMatchObject({ Authorization: 'Bearer stored-token' });
+      expect(secondHeaders).toMatchObject({ Authorization: 'Bearer stored-token' });
+      // The shared wait cleared itself, so the next lock starts a fresh one.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends an unauthenticated request without waiting while protected data is available', async () => {
+    // Android has no protected-data source, so the gate always reports
+    // available there and this is the only path a foreground request takes: no
+    // wait, no timer, and therefore no way for the deferral to hold up the UI.
+    const headers = await loadHeaders();
+    vi.useFakeTimers();
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(0);
+      const sent = await pending;
+      expect(sent).not.toHaveProperty('Authorization');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends the request unauthenticated when the lock outlasts the request budget', async () => {
+    // Not resolving is worse than sending: a background request must not
+    // outlive the app's own control-plane budget. Past the bound the request
+    // proceeds exactly as it did before the deferral — no credential, no event.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const events: TelemetryEvent[] = [];
+    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    const headers = await loadHeaders();
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
+
+      const unauthenticated = await pending;
+      expect(unauthenticated).not.toHaveProperty('Authorization');
+      // The refused read never reached the keychain, and the lock state is not
+      // a reportable failure.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts the request budget before the unlock wait it may spend', async () => {
+    // The wait is part of the request's own control-plane budget, not a free
+    // prelude to it: the header build records the instant the wait began, so
+    // the fetch that follows can be given only what the wait left.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const startedAtMs = Date.now();
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS - 5_000);
+      setProtectedDataAvailable(true);
+
+      const sent = await pending;
+      expect(sent).toMatchObject({ Authorization: 'Bearer stored-token' });
+      // Ten of the fifteen seconds went to the wait, and the stamp still names
+      // the start.
+      expect(Number(sent['x-kilo-request-budget-start'])).toBe(startedAtMs);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the request budget whole across a slow proactive refresh', async () => {
+    // A refresh has its own deadline and is no part of the request's: the
+    // build that waits ten seconds on it must not hand the request five.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('auth-refresh-token', 'stored-refresh');
+    // Inside the five-minute refresh margin, so the build rotates first.
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 60_000));
+    const fetchMock = vi.fn();
+    fetchMock.mockImplementationOnce(async () => {
+      // A refresh that takes ten seconds of the request's fifteen.
+      const refreshDelay = Promise.withResolvers<undefined>();
+      setTimeout(refreshDelay.resolve, 10_000);
+      await refreshDelay.promise;
+      return Response.json({ token: 'refreshed-token', refreshToken: 'r2', expiresIn: 3600 });
+    });
+    // The request that follows never settles: only its deadline can end it.
+    fetchMock.mockImplementation(() => Promise.withResolvers<Response>().promise);
+    // Stubbed before the module graph loads, so the link's captured fetch is
+    // the same mock the refresh uses.
+    vi.stubGlobal('fetch', fetchMock);
+    const headers = await loadHeaders();
+    const { deadlineFetch } = await import('./trpc');
+    vi.useFakeTimers();
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(10_000);
+      const sent = await pending;
+      expect(sent).toMatchObject({ Authorization: 'Bearer refreshed-token' });
+      // The refresh spent its ten seconds, not the request's: no stamp means
+      // the fetch gets the whole deadline.
+      expect(sent).not.toHaveProperty('x-kilo-request-budget-start');
+
+      const request = deadlineFetch('https://api.example.com/api/trpc', { headers: sent });
+      const outcome = (async () => {
+        try {
+          await request;
+          return 'resolved';
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+      })();
+      // Ten seconds in, the request is still inside its own budget.
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(Promise.race([outcome, Promise.resolve('still waiting')])).resolves.toBe(
+        'still waiting'
+      );
+      await vi.advanceTimersByTimeAsync(5_001);
+      await expect(outcome).resolves.toBe('Request timed out after 15000ms');
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('sends a request the app knows is signed out without waiting for the unlock', async () => {
+    // A signed-out device has no credential to bring back at unlock: the
+    // sign-out flags are the app's own answer, need no keychain read, and a
+    // locked request must not sit behind a wait that can only end bare.
+    const headers = await loadHeaders();
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    const { setSignOutActive } = await import('@/lib/auth/sign-out-state');
+    const { setSignOutTeardownActive } = await import('@/lib/auth/token-owner');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    setSignOutActive(true);
+    setSignOutTeardownActive(true);
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(0);
+      const sent = await pending;
+      expect(sent).not.toHaveProperty('Authorization');
+      // No wait was registered, so the lock cannot hold this request.
+      expect(vi.getTimerCount()).toBe(0);
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    } finally {
+      setSignOutTeardownActive(false);
+      setSignOutActive(false);
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
   });
 });
 
 const mockFetch = vi.fn();
-
-// Suppress Node.js 24 unhandledRejection from AbortController.abort()
-// with a non-DOMException reason during fake-timer tests.
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-function swallowUnhandledRejection(): void {}
 
 describe('deadlineFetch', () => {
   beforeEach(() => {
@@ -213,12 +492,10 @@ describe('deadlineFetch', () => {
 
   it('rejects with RequestDeadlineError when the deadline expires', async () => {
     vi.useFakeTimers();
-    process.on('unhandledRejection', swallowUnhandledRejection);
     try {
       // Fetch never resolves unless its signal aborts — simulates a hanging
       // backend where the only thing that cancels the request is the deadline.
       mockFetch.mockImplementation(
-        // eslint-disable-next-line typescript-eslint/promise-function-async
         (_url, init?: RequestInit) =>
           new Promise<Response>((resolve, reject) => {
             const signal = init?.signal;
@@ -236,16 +513,63 @@ describe('deadlineFetch', () => {
       const { deadlineFetch } = await import('./trpc');
       const promise = deadlineFetch('https://api.example.com/api/trpc');
 
-      vi.advanceTimersByTime(15_001);
-      // eslint-disable-next-line typescript-eslint/await-thenable
-      await vi.runAllTicks();
-
-      await expect(promise).rejects.toThrow('timed out after 15000ms');
+      // Attach the rejection handler before the fake clock reaches the
+      // deadline, so the settled promise never goes unhandled.
+      const rejection = expect(promise).rejects.toThrow('timed out after 15000ms');
+      await vi.advanceTimersByTimeAsync(15_001);
+      await rejection;
     } finally {
-      process.off('unhandledRejection', swallowUnhandledRejection);
       vi.useRealTimers();
     }
   });
+
+  it.each([
+    [
+      'header record',
+      (startedAtMs: number) => ({ 'x-kilo-request-budget-start': String(startedAtMs) }),
+    ],
+    [
+      'Headers instance',
+      (startedAtMs: number) => new Headers({ 'x-kilo-request-budget-start': String(startedAtMs) }),
+    ],
+  ] as [string, (startedAtMs: number) => HeadersInit][])(
+    'gives a request only the budget its auth headers left (%s)',
+    async (_shape, buildHeaders) => {
+      vi.useFakeTimers();
+      try {
+        let sentHeaders: RequestInit['headers'] = undefined;
+        mockFetch.mockImplementation((_url, init?: RequestInit) => {
+          sentHeaders = init?.headers;
+          // Never settles: only the deadline can end this request.
+          return Promise.withResolvers<Response>().promise;
+        });
+        const { deadlineFetch } = await import('./trpc');
+        // The auth header build spent ten of the fifteen seconds waiting for
+        // the unlock before this request started, so the request gets the five
+        // left instead of a fresh full deadline.
+        const promise = deadlineFetch('https://api.example.com/api/trpc', {
+          headers: buildHeaders(Date.now() - 10_000),
+        });
+        const outcome = (async () => {
+          try {
+            await promise;
+            return 'resolved';
+          } catch (error) {
+            return error instanceof Error ? error.message : String(error);
+          }
+        })();
+
+        await vi.advanceTimersByTimeAsync(5_001);
+        await expect(Promise.race([outcome, Promise.resolve('still waiting')])).resolves.toBe(
+          'Request timed out after 5000ms'
+        );
+        // The bookkeeping entry is the client's: it never reaches the wire.
+        expect(new Headers(sentHeaders).get('x-kilo-request-budget-start')).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('rejects immediately when the caller signal is already aborted', async () => {
     const { deadlineFetch } = await import('./trpc');
@@ -265,7 +589,6 @@ describe('deadlineFetch', () => {
     try {
       // Fetch hangs unless its signal aborts.
       mockFetch.mockImplementation(
-        // eslint-disable-next-line typescript-eslint/promise-function-async
         (_url, init?: RequestInit) =>
           new Promise<Response>((_resolve, reject) => {
             const signal = init?.signal;
@@ -285,16 +608,252 @@ describe('deadlineFetch', () => {
         signal: controller.signal,
       });
 
-      // Let the fetch start, then abort from the caller side.
-      await vi.advanceTimersByTimeAsync(0);
+      // Let the fetch start, then abort from the caller side. Attach the
+      // rejection handler before aborting, so the settled promise never goes
+      // unhandled.
+      const rejection = expect(promise).rejects.toThrow('caller cancelled mid-flight');
       controller.abort(new Error('caller cancelled mid-flight'));
 
-      // eslint-disable-next-line typescript-eslint/await-thenable
-      await vi.runAllTicks();
+      await vi.advanceTimersByTimeAsync(0);
 
-      await expect(promise).rejects.toThrow('caller cancelled mid-flight');
+      await rejection;
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('network error reporting', () => {
+  let events: TelemetryEvent[] = [];
+  let breadcrumbs: TelemetryBreadcrumb[] = [];
+
+  beforeEach(() => {
+    events = [];
+    breadcrumbs = [];
+    mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // `vi.resetModules()` (outer afterEach) drops the module registry, so the
+  // error-sink used by the freshly imported trpc.ts must be the same instance
+  // the fake sink is installed on. Import the sink from that registry first.
+  async function loadObservedFetch(): Promise<typeof fetch> {
+    httpLinkMock.mockReturnValue({});
+    httpBatchLinkMock.mockReturnValue({});
+    createTRPCClientMock.mockReturnValue({});
+
+    const { setBreadcrumbSink, setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    await import('./trpc');
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    setBreadcrumbSink(breadcrumb => {
+      breadcrumbs.push(breadcrumb);
+    });
+
+    const httpLinkOpts = httpLinkMock.mock.calls[0]?.[0] as { fetch?: typeof fetch } | undefined;
+    if (!httpLinkOpts?.fetch) {
+      throw new Error('fetch option was not captured from httpLink');
+    }
+    return httpLinkOpts.fetch;
+  }
+
+  it('leaves one network breadcrumb and no event for a transport failure', async () => {
+    const original = new Error('socket closed');
+    mockFetch.mockRejectedValue(original);
+    const observedFetch = await loadObservedFetch();
+
+    await expect(
+      observedFetch('https://api.example.com/api/trpc/session.list?batch=1')
+    ).rejects.toBe(original);
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      category: 'network',
+      data: { source: 'trpc', path: '/api/trpc/session.list', outcome: 'failed' },
+    });
+  });
+
+  it('reports a non-2xx response', async () => {
+    mockFetch.mockResolvedValue(
+      new Response('nope', { status: 503, statusText: 'Service Unavailable' })
+    );
+    const observedFetch = await loadObservedFetch();
+
+    const response = await observedFetch('https://api.example.com/api/trpc/session.list');
+
+    expect(response.status).toBe(503);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.tags).toMatchObject({
+      'error.source': 'trpc',
+      'http.status': 503,
+      'http.status_class': '5xx',
+      'network.outcome': 'http_error',
+    });
+  });
+
+  it('reports a 207 batched response once and still returns it', async () => {
+    const body = [
+      { result: { data: 'ok' } },
+      {
+        error: {
+          message: 'bad request',
+          code: -32_600,
+          data: { code: 'BAD_REQUEST', httpStatus: 400, path: 'session.list' },
+        },
+      },
+    ];
+    mockFetch.mockResolvedValue(Response.json(body, { status: 207 }));
+    const observedFetch = await loadObservedFetch();
+
+    const response = await observedFetch('https://api.example.com/api/trpc/session.list?batch=1');
+
+    expect(response.status).toBe(207);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.tags).toMatchObject({
+      'error.subsystem': 'network',
+      'error.source': 'trpc',
+      'http.status': 207,
+      'network.outcome': 'http_error',
+      'trpc.procedure': 'session.list',
+      'trpc.code': 'BAD_REQUEST',
+    });
+  });
+});
+
+type SplitCondition = (op: { path: string; context: { skipBatch?: boolean } }) => boolean;
+
+describe('latency wiring', () => {
+  beforeEach(() => {
+    secureStoreMock.store.clear();
+    mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+    // The platform `crypto` API the request-id generator reads; the stub makes
+    // the id deterministic. The same shape exists on iOS and Android Hermes.
+    vi.stubGlobal('crypto', { randomUUID: randomUUIDMock });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function loadLatencyLinks(): Promise<{
+    condition: SplitCondition;
+    httpFetch: typeof fetch;
+    batchFetch: typeof fetch;
+  }> {
+    httpLinkMock.mockReturnValue({});
+    httpBatchLinkMock.mockReturnValue({});
+    createTRPCClientMock.mockReturnValue({});
+
+    await import('./trpc');
+
+    const splitOpts = splitLinkMock.mock.calls.at(-1)?.[0] as
+      | { condition: SplitCondition }
+      | undefined;
+    const httpOpts = httpLinkMock.mock.calls.at(-1)?.[0] as { fetch?: typeof fetch } | undefined;
+    const batchOpts = httpBatchLinkMock.mock.calls.at(-1)?.[0] as
+      | { fetch?: typeof fetch }
+      | undefined;
+    if (!splitOpts || !httpOpts?.fetch || !batchOpts?.fetch) {
+      throw new Error('tRPC link options were not captured');
+    }
+    return {
+      condition: splitOpts.condition,
+      httpFetch: httpOpts.fetch,
+      batchFetch: batchOpts.fetch,
+    };
+  }
+
+  it('routes each unbatch candidate to the single link and the rest to the batch link', async () => {
+    const { condition } = await loadLatencyLinks();
+
+    for (const path of [
+      'user.getMe',
+      'activeSessions.list',
+      'cliSessionsV2.getSessionMessagesPage',
+    ]) {
+      expect(condition({ path, context: {} })).toBe(true);
+    }
+    expect(condition({ path: 'kiloPass.getState', context: {} })).toBe(false);
+    expect(condition({ path: 'some.unlisted.procedure', context: {} })).toBe(false);
+  });
+
+  it('keeps the explicit skipBatch override for every path', async () => {
+    const { condition } = await loadLatencyLinks();
+
+    expect(condition({ path: 'kiloPass.getState', context: { skipBatch: true } })).toBe(true);
+    expect(condition({ path: 'user.getMe', context: { skipBatch: true } })).toBe(true);
+  });
+
+  it('gives the single and batch links the same latency-wrapped fetch', async () => {
+    const { httpFetch, batchFetch } = await loadLatencyLinks();
+    expect(httpFetch).toBe(batchFetch);
+
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+    await httpFetch('https://api.example.com/api/trpc/user.getMe', {
+      headers: { authorization: 'Bearer token' },
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    const sent = new Headers(init?.headers);
+    expect(sent.get('x-kilo-request-id')).toBe('test-request-id');
+    expect(sent.get('authorization')).toBe('Bearer token');
+  });
+
+  // The id comes from the platform `crypto` API every build carries; a
+  // runtime that omits `randomUUID` still stamps a unique id, so neither
+  // platform loses a sample (or needs a native module just for the id).
+  it('stamps a unique request id when the platform crypto API has no randomUUID', async () => {
+    vi.stubGlobal('crypto', {});
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/user.getMe', {});
+    await httpFetch('https://api.example.com/api/trpc/user.getMe', {});
+
+    const firstInit = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    const secondInit = mockFetch.mock.calls[1]?.[1] as RequestInit | undefined;
+    const first = new Headers(firstInit?.headers).get('x-kilo-request-id');
+    const second = new Headers(secondInit?.headers).get('x-kilo-request-id');
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    expect(first).not.toBe(second);
+  });
+
+  // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
+  // and the server's fetch adapter rejects that empty body with 400. The
+  // shared fetch sends `{}` so an unbatched no-input query reaches its
+  // procedure.
+  it('sends an empty JSON object body when a POST has none', async () => {
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/activeSessions.list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe('{}');
+  });
+
+  it('keeps a body the caller already provided', async () => {
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/activeSessions.list', {
+      method: 'POST',
+      body: '{"organizationId":null}',
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe('{"organizationId":null}');
   });
 });

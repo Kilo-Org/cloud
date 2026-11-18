@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EDITOR_OPTIONS, DEFAULT_EDITOR, type EditorOption } from '@/lib/editorOptions';
 import { EDITOR_SOURCE_COOKIE_NAME } from '@/lib/editorSource.client';
+import { buildOpenInEditorUrl } from './open-in-editor-url';
 
 const validEditorOptions = EDITOR_OPTIONS.filter(
   editor => editor.visibilityOnInstallPage !== 'hide' || editor.source === 'idea'
@@ -32,10 +33,7 @@ export function OpenInEditorButton({ sessionId, defaultEditor, pathOverride }: P
     defaultEditor ?? DEFAULT_EDITOR
   );
 
-  const buildUrl = (editor: EditorOption) =>
-    pathOverride
-      ? `${editor.scheme}://${editor.host}${editor.path}${pathOverride}`
-      : `${editor.scheme}://${editor.host}${editor.path}/fork?id=${sessionId}`;
+  const buildUrl = (editor: EditorOption) => buildOpenInEditorUrl(editor, sessionId, pathOverride);
 
   const handleEditorClick = (editor: EditorOption) => {
     setCookie(EDITOR_SOURCE_COOKIE_NAME, editor.source);

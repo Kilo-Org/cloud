@@ -1,18 +1,43 @@
-import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+/* eslint-disable max-lines -- cohesive chip: thumbnail, status overlays, retry/remove controls, viewer, text preview, and reorder drag/actions share one strip component */
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
+  type LayoutChangeEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+  type ViewInstance,
+} from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import {
+  Gesture,
+  GestureDetector,
+  ScrollView as GestureScrollView,
+} from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File } from 'expo-file-system';
 import { toast } from 'sonner-native';
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
+import { requestA11yFocus } from '@/lib/a11y/announce';
+import { AttachmentChipErrorBoundary } from '@/components/agents/attachment-chip-error-boundary';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { cn } from '@/lib/utils';
-import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AgentAttachment,
+  type AttachmentMoveDirection,
+} from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeAttachmentChip } from '@/components/agents/attachment-chip-description';
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { CenteredState } from '@/components/centered-state';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import {
@@ -22,47 +47,143 @@ import {
 } from '@/lib/share-remote-file';
 import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { getDocumentPreviewTarget, previewLocalDocument } from '@/lib/document-preview';
 
 type Props = {
   attachments: AgentAttachment[];
   onRemove: (id: string) => void;
   onRetry: (id: string) => void;
+  /** Move a chip one position. The composer wires this to `useAgentAttachmentUpload.moveAttachment`. */
+  onMove: (id: string, direction: AttachmentMoveDirection) => void;
+  /** Reorder a chip by index (drag). The composer wires this to `useAgentAttachmentUpload.reorderAttachments`. */
+  onReorder: (fromIndex: number, toIndex: number) => void;
 };
 
-/** 28pt visible button + 8pt slop on every side = 44pt effective target. */
-const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+/**
+ * Remove's visible badge is `h-8 w-8`. NativeWind's rem is 14, so that badge is
+ * 28 dp — the minimum a pressable may be — and the slop on every side brings the
+ * target to the platform minimum. Read at render time so it follows the
+ * platform, never captured once at module load.
+ */
+const REMOVE_BADGE_DP = 28;
 
-const UNKNOWN_OPEN_OPTIONS = ['Open as text', 'Open in external app', 'Cancel'] as const;
-const UNKNOWN_OPEN_CANCEL_INDEX = UNKNOWN_OPEN_OPTIONS.length - 1;
+function removeHitSlop() {
+  const slop = ((Platform.OS === 'android' ? 48 : REMOVE_BADGE_DP + 16) - REMOVE_BADGE_DP) / 2;
+  return { top: slop, bottom: slop, left: slop, right: slop };
+}
+
+/**
+ * The document chip is 46 px tall so its body — the whole tap target — is the
+ * 44 dp minimum after the 1 dp border on each side. The chip surface clips its
+ *  children, so slop on the body could not grow that target past the surface.
+ */
+const DOCUMENT_CHIP_SIZE_CLASS = 'h-[46px] w-48';
+
+/** Drag arms only after a long press, so ordinary horizontal scroll still wins. */
+const LONG_PRESS_MS = 300;
+
+/** Inter-chip spacing, kept in sync with each chip's `mr-2` class. */
+const CHIP_GAP = 8;
+
+/**
+ * Map a drag's horizontal translation to a target slot. Walks from the start
+ * slot and crosses to the next/previous slot once the finger passes the
+ * midpoint between the two chips (half of each width plus the inter-chip gap).
+ * Clamped to the list bounds. Pure so both the unit test and the mounted drag
+ * test share one deterministic contract.
+ */
+export function dragTargetIndex(
+  startIndex: number,
+  widths: number[],
+  translationX: number
+): number {
+  const count = widths.length;
+  let target = startIndex;
+  if (translationX > 0) {
+    let traveled = 0;
+    for (let i = startIndex; i < count - 1; i += 1) {
+      traveled += (widths[i] ?? 0) / 2 + CHIP_GAP + (widths[i + 1] ?? 0) / 2;
+      if (translationX >= traveled) {
+        target = i + 1;
+      } else {
+        break;
+      }
+    }
+  } else if (translationX < 0) {
+    let traveled = 0;
+    for (let i = startIndex; i > 0; i -= 1) {
+      traveled -= (widths[i] ?? 0) / 2 + CHIP_GAP + (widths[i - 1] ?? 0) / 2;
+      if (translationX <= traveled) {
+        target = i - 1;
+      } else {
+        break;
+      }
+    }
+  }
+  return target;
+}
 
 function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string }) {
-  if (preview.text === '') {
-    return <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
-  }
   if (preview.mode === 'markdown') {
     return <MarkdownText value={preview.text} />;
   }
   return (
-    <SelectableText className="text-sm leading-5 text-foreground">{preview.text}</SelectableText>
+    <SelectableText className="text-sm leading-[1.25rem] text-foreground">
+      {preview.text}
+    </SelectableText>
   );
 }
 
-function AttachmentChip({
+type AttachmentChipProps = {
+  attachment: AgentAttachment;
+  index: number;
+  count: number;
+  /**
+   * Chip-scoped controls take the attachment id, so the strip hands out one
+   * function for every chip instead of a fresh closure per chip per render
+   * (a progress tick would otherwise re-render the whole strip's chips).
+   */
+  onRemove: (id: string) => void;
+  onRetry: (id: string) => void;
+  onMove: (id: string, direction: AttachmentMoveDirection) => void;
+  onReorder: (fromIndex: number, toIndex: number) => void;
+  getOrderedWidths: () => number[];
+  onLayoutWidth: (id: string, width: number) => void;
+};
+
+/**
+ * Memoized: the strip re-renders on every upload progress tick, and the upload
+ * hook replaces only the chip whose state changed, so every other chip's props
+ * are unchanged and its render body — the drag gesture, the class merges, the
+ * description — must not run again.
+ */
+const AttachmentChip = memo(function AttachmentChip({
   attachment,
+  index,
+  count,
   onRemove,
   onRetry,
-}: {
-  attachment: AgentAttachment;
-  onRemove: () => void;
-  onRetry: () => void;
-}) {
+  onMove,
+  onReorder,
+  getOrderedWidths,
+  onLayoutWidth,
+}: Readonly<AttachmentChipProps>) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
+  const { t } = useTranslation();
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const [textPreview, setTextPreview] = useState<{
     mode: 'markdown' | 'text';
     text: string;
   } | null>(null);
+  // A device with no viewer keeps that verdict for the chip: its sheet drops the
+  // preview choice and leaves the text and share choices it always had.
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
+  const documentTarget = getDocumentPreviewTarget(attachment.mimeType);
   const isImage = attachment.kind === 'image';
   const isUploading = attachment.status === 'pending' || attachment.status === 'uploading';
   const isErrored = attachment.status === 'error';
@@ -74,12 +195,82 @@ function AttachmentChip({
     terminal: attachment.terminal,
   });
 
+  // The chip body is the single accessible element; focus restoration targets
+  // it after a move so VoiceOver/TalkBack stays on the chip that changed slot.
+  const bodyRef = useRef<ViewInstance>(null);
+  const focusPendingRef = useRef(false);
+  const [focusEpoch, setFocusEpoch] = useState(0);
+
+  const requestFocusRestore = useCallback(() => {
+    focusPendingRef.current = true;
+    setFocusEpoch(epoch => epoch + 1);
+  }, []);
+
+  useEffect(() => {
+    if (focusPendingRef.current) {
+      focusPendingRef.current = false;
+      requestA11yFocus(bodyRef);
+    }
+  }, [focusEpoch]);
+
+  // One drag-slot reorder per long-press gesture. The start index is captured
+  // at gesture start; `runOnJS(true)` lets the callbacks call the reorder and
+  // focus helpers without a worklet. Built once per chip (and rebuilt only when
+  // the slot or a handler identity changes) so another chip's upload progress
+  // cannot re-create this chip's native gesture handler.
+  const dragStartIndexRef = useRef(index);
+
+  const panGesture = useMemo(
+    () =>
+      // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
+      Gesture.Pan()
+        .runOnJS(true)
+        .activateAfterLongPress(LONG_PRESS_MS)
+        .onStart(() => {
+          dragStartIndexRef.current = index;
+        })
+        .onEnd(event => {
+          const startIndex = dragStartIndexRef.current;
+          const targetIndex = dragTargetIndex(startIndex, getOrderedWidths(), event.translationX);
+          if (targetIndex !== startIndex) {
+            onReorder(startIndex, targetIndex);
+            requestFocusRestore();
+          }
+        }),
+    [index, getOrderedWidths, onReorder, requestFocusRestore]
+  );
+
+  const moveActions: AccessibilityActionInfo[] = [];
+  if (index > 0) {
+    moveActions.push({
+      name: 'moveLeft',
+      label: t('agentChat.attachmentPreview.moveLeft', { filename: attachment.filename }),
+    });
+  }
+  if (index < count - 1) {
+    moveActions.push({
+      name: 'moveRight',
+      label: t('agentChat.attachmentPreview.moveRight', { filename: attachment.filename }),
+    });
+  }
+
+  function handleAccessibilityAction(event: AccessibilityActionEvent) {
+    const action = event.nativeEvent.actionName;
+    if (action === 'moveLeft') {
+      onMove(attachment.id, 'left');
+      requestFocusRestore();
+    } else if (action === 'moveRight') {
+      onMove(attachment.id, 'right');
+      requestFocusRestore();
+    }
+  }
+
   async function openLocalText(mode: 'markdown' | 'text') {
     try {
       const text = await new File(attachment.localUri).text();
       setTextPreview({ mode, text });
     } catch {
-      toast.error('Failed to open file. Please try again.');
+      toast.error(t('agentChat.attachmentPreview.openFailedRetry'));
     }
   }
 
@@ -89,14 +280,29 @@ function AttachmentChip({
     } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
       if (reason === 'sharing-unavailable') {
-        toast.error('File sharing is not available on this device.');
+        toast.error(t('agentChat.filePart.sharingUnavailable'));
         return;
       }
       if (error instanceof ShareRemoteFileError) {
-        toast.error('Failed to share file. Please try again.');
+        toast.error(t('agentChat.filePart.shareFailedRetry'));
         return;
       }
-      toast.error('Share failed');
+      toast.error(t('agentChat.filePart.shareFailed'));
+    }
+  }
+
+  async function previewDocument() {
+    const outcome = await previewLocalDocument({
+      key: attachment.id,
+      uri: attachment.localUri,
+      mimeType: attachment.mimeType,
+      filename: attachment.filename,
+    });
+    if (outcome === 'unavailable') {
+      setPreviewUnavailable(true);
+      toast.error(t('agentChat.filePart.previewUnavailable'));
+    } else if (outcome === 'failed') {
+      toast.error(t('agentChat.attachmentPreview.openFailedRetry'));
     }
   }
 
@@ -109,15 +315,28 @@ function AttachmentChip({
       void openLocalText('markdown');
       return;
     }
+    const offerPreview = documentTarget !== null && !previewUnavailable;
+    const previewIndex = offerPreview ? 0 : -1;
+    const textIndex = previewIndex + 1;
+    const shareIndex = textIndex + 1;
+    const cancelIndex = shareIndex + 1;
     showActionSheetWithOptions(
       {
-        options: [...UNKNOWN_OPEN_OPTIONS],
-        cancelButtonIndex: UNKNOWN_OPEN_CANCEL_INDEX,
+        ...themedSheet,
+        options: [
+          ...(offerPreview ? [t('agentChat.filePart.preview', { name: attachment.filename })] : []),
+          t('agentChat.filePart.openAsText'),
+          t('agentChat.filePart.openInExternalApp'),
+          t('common.cancel'),
+        ],
+        cancelButtonIndex: cancelIndex,
       },
-      index => {
-        if (index === 0) {
+      optionIndex => {
+        if (optionIndex === previewIndex) {
+          void previewDocument();
+        } else if (optionIndex === textIndex) {
           void openLocalText('text');
-        } else if (index === 1) {
+        } else if (optionIndex === shareIndex) {
           void shareUnknown();
         }
       }
@@ -131,6 +350,25 @@ function AttachmentChip({
   const accessibilityState =
     isUploading && attachment.progress === null ? { busy: true } : undefined;
 
+  const imageThumbnail = imageFailed ? (
+    <View className="h-full w-full items-center justify-center">
+      <AlertCircle size={20} color={colors.mutedForeground} />
+    </View>
+  ) : (
+    <Image
+      source={{ uri: attachment.localUri }}
+      className="h-full w-full"
+      contentFit="cover"
+      transition={0}
+      allowDownscaling
+      recyclingKey={attachment.id}
+      cachePolicy="memory"
+      onError={() => {
+        setImageFailed(true);
+      }}
+    />
+  );
+
   const bodyContent = (
     // Visual descendants are excluded from the accessibility tree so
     // the body stays the single announced element: the nested Texts,
@@ -142,23 +380,16 @@ function AttachmentChip({
       importantForAccessibility="no-hide-descendants"
     >
       {isImage ? (
-        <Image
-          source={{ uri: attachment.localUri }}
-          className="h-full w-full"
-          contentFit="cover"
-          transition={0}
-          allowDownscaling
-          recyclingKey={attachment.id}
-          cachePolicy="memory"
-        />
+        imageThumbnail
       ) : (
         <View
           className={cn(
             'h-full w-full flex-row items-center gap-2',
-            // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
-            // the retryable chip's file content shifts right of its 44pt
-            // target instead of being hidden underneath it.
-            description.showRetry ? 'pl-10 pr-2' : 'px-2'
+            // Row 3.3: the Retry control sits in the bottom-start corner, so
+            // the retryable chip's file content shifts start-ward of its badge
+            // instead of being hidden underneath it. A chip without Retry keeps
+            // the symmetric `px-2` row inset.
+            description.showRetry ? 'ps-10 pe-2' : 'px-2'
           )}
         >
           {isErrored ? (
@@ -166,25 +397,36 @@ function AttachmentChip({
           ) : (
             <FileIcon size={14} color={colors.mutedForeground} />
           )}
-          <View className="min-w-0 flex-1">
-            <Text numberOfLines={1} className="text-xs text-foreground">
+          {/* The text column reserves the Remove badge's own width (`pe-8`) so
+              both lines ellipsize before the absolutely positioned badge. The
+              reserve rides here, not on the row, because the row's opposite
+              insets stay equal; the badge box itself is unchanged. Removing it
+              puts the filename back under the control. */}
+          <View className={cn('min-w-0 flex-1', description.showRemove && 'pe-8')}>
+            {/* The filename loses its middle, so the name's start and the file
+                type both stay readable. A tail ellipsis drops the extension
+                and leaves similar names of one type indistinguishable. */}
+            <Text className="text-xs text-foreground" numberOfLines={1} ellipsizeMode="middle">
               {description.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {description.message ?? `${description.sizeText} · ${description.progressText}`}
+              {description.message ??
+                (description.progressText === ''
+                  ? description.sizeText
+                  : `${description.sizeText} · ${description.progressText}`)}
             </Text>
           </View>
         </View>
       )}
 
       {isImage && isUploading ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
+        <View className="absolute inset-0 items-center justify-center bg-[#0000004D]">
           <ActivityIndicator size="small" color={colors.foreground} />
         </View>
       ) : null}
 
       {isImage && isErrored ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
+        <View className="absolute inset-0 items-center justify-center bg-[#0000004D]">
           <AlertCircle size={20} color="white" />
         </View>
       ) : null}
@@ -197,82 +439,117 @@ function AttachmentChip({
           the absolute Retry/Remove controls. It has NO overflow-hidden, so a
           parent never clips the controls' hitSlop; the rounded-image clipping
           lives on the surface view below, which is not their ancestor. Each
-          control keeps its full 44pt effective target at runtime. */}
-      <View className="relative mr-2">
-        {/* Chip surface — the single accessible element describing the
-            attachment. The container above stays non-accessible so the sibling
-            Retry and Remove controls are individually reachable instead of
-            being shadowed by an accessible parent. */}
+          control keeps its full platform-minimum effective target at runtime. */}
+      <GestureDetector gesture={panGesture}>
         <View
-          className={cn(
-            'overflow-hidden rounded-md border border-border bg-card',
-            isImage ? 'h-16 w-20' : 'h-12 w-48',
-            description.showRetry && 'border-destructive',
-            isErrored && !description.showRetry && 'border-destructive/60'
-          )}
+          className="relative mr-2"
+          collapsable={false}
+          onLayout={(event: LayoutChangeEvent) => {
+            onLayoutWidth(attachment.id, event.nativeEvent.layout.width);
+          }}
         >
+          {/* Chip surface — the single accessible element describing the
+              attachment. The container above stays non-accessible so the sibling
+              Retry and Remove controls are individually reachable instead of
+              being shadowed by an accessible parent. */}
+          <View
+            className={cn(
+              'overflow-hidden rounded-md border border-border bg-card',
+              isImage ? 'h-16 w-20' : DOCUMENT_CHIP_SIZE_CLASS,
+              description.showRetry && 'border-destructive',
+              isErrored && !description.showRetry && 'border-danger-tile-border'
+            )}
+          >
+            {description.showRetry ? (
+              // A retryable chip keeps the body as a non-interactive View: the
+              // full-chip Retry overlay below is the tap target.
+              <View
+                ref={bodyRef}
+                className="h-full w-full"
+                accessible
+                accessibilityLabel={description.accessibilityLabel}
+                accessibilityRole={isUploading ? 'progressbar' : undefined}
+                accessibilityValue={accessibilityValue}
+                accessibilityState={accessibilityState}
+                accessibilityActions={moveActions.length > 0 ? moveActions : undefined}
+                onAccessibilityAction={handleAccessibilityAction}
+              >
+                {bodyContent}
+              </View>
+            ) : (
+              // A non-retryable chip body opens the file on tap.
+              <Pressable
+                ref={bodyRef}
+                className="h-full w-full active:opacity-70"
+                accessible
+                onPress={handleOpen}
+                accessibilityLabel={description.accessibilityLabel}
+                accessibilityRole="button"
+                accessibilityValue={accessibilityValue}
+                accessibilityState={accessibilityState}
+                accessibilityActions={moveActions.length > 0 ? moveActions : undefined}
+                onAccessibilityAction={handleAccessibilityAction}
+              >
+                {bodyContent}
+              </Pressable>
+            )}
+          </View>
+
+          {/* Retry covers the whole chip, restoring the tap-anywhere target a
+              failed chip has always had, while staying a SIBLING of the surface and
+              of Remove — nesting it as their parent would shadow both for assistive
+              technology. It renders before Remove, so Remove wins the overlap. The
+              badge is the visible affordance; the content is padded clear of it. */}
           {description.showRetry ? (
-            // A retryable chip keeps the body as a non-interactive View: the
-            // full-chip Retry overlay below is the tap target.
-            <View
-              className="h-full w-full"
-              accessible
-              accessibilityLabel={description.accessibilityLabel}
-              accessibilityRole={isUploading ? 'progressbar' : undefined}
-              accessibilityValue={accessibilityValue}
-              accessibilityState={accessibilityState}
-            >
-              {bodyContent}
-            </View>
-          ) : (
-            // A non-retryable chip body opens the file on tap.
             <Pressable
-              className="h-full w-full active:opacity-70"
-              accessible
-              onPress={handleOpen}
-              accessibilityLabel={description.accessibilityLabel}
+              onPress={() => {
+                onRetry(attachment.id);
+              }}
+              className="absolute inset-0 items-start justify-end p-1 active:opacity-70"
               accessibilityRole="button"
-              accessibilityValue={accessibilityValue}
-              accessibilityState={accessibilityState}
+              accessibilityLabel={t('agentChat.attachmentPreview.retryUploading', {
+                filename: attachment.filename,
+              })}
             >
-              {bodyContent}
+              <View className="h-7 w-7 items-center justify-center rounded-full bg-secondary">
+                <RotateCcw size={14} color={colors.foreground} />
+              </View>
             </Pressable>
-          )}
-        </View>
+          ) : null}
 
-        {/* Retry covers the whole chip, restoring the tap-anywhere target a
-            failed chip has always had, while staying a SIBLING of the surface and
-            of Remove — nesting it as their parent would shadow both for assistive
-            technology. It renders before Remove, so Remove wins the overlap. The
-            badge is the visible affordance; the content is padded clear of it. */}
-        {description.showRetry ? (
-          <Pressable
-            onPress={onRetry}
-            className="absolute inset-0 items-start justify-end p-1 active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel={`Retry uploading ${attachment.filename}`}
-          >
-            <View className="h-7 w-7 items-center justify-center rounded-full bg-background">
-              <RotateCcw size={14} color={colors.foreground} />
+          {description.showRemove ? (
+            // The badge rides in a full-surface row so it centers on the chip's
+            // height in both shapes — the 46 dp document chip and the 64 dp
+            // image thumbnail — instead of pinning to a corner. `box-none`
+            // leaves the chip body's tap target whole; only the badge itself
+            // takes a touch. Its `pe-2` end inset matches the content's own
+            // `ps-2` inner inset, so the badge clears the surface's rounded
+            // corner, and the text column reserves the badge's width
+            // (`pe-8`) so no filename runs underneath it.
+            <View
+              className="absolute inset-0 items-end justify-center pe-2"
+              pointerEvents="box-none"
+            >
+              <Pressable
+                onPress={() => {
+                  onRemove(attachment.id);
+                }}
+                hitSlop={removeHitSlop()}
+                className="h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70"
+                accessibilityRole="button"
+                accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
+                  filename: attachment.filename,
+                })}
+              >
+                <X size={14} color={colors.foreground} />
+              </Pressable>
             </View>
-          </Pressable>
-        ) : null}
-
-        {description.showRemove ? (
-          <Pressable
-            onPress={onRemove}
-            hitSlop={REMOVE_HIT_SLOP}
-            className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel={`Remove attachment ${attachment.filename}`}
-          >
-            <X size={14} color={colors.foreground} />
-          </Pressable>
-        ) : null}
-      </View>
+          ) : null}
+        </View>
+      </GestureDetector>
 
       {viewerVisible ? (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
           uri={attachment.localUri}
           filename={attachment.filename}
@@ -283,56 +560,123 @@ function AttachmentChip({
       ) : null}
 
       {textPreview !== null ? (
-        <Modal
+        <SessionPageSheet
+          dismissible
           visible
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => {
+          onClose={() => {
             setTextPreview(null);
           }}
         >
-          <View className="flex-1 bg-background">
-            <SheetHeader
-              title={attachment.filename}
-              onDone={() => {
-                setTextPreview(null);
-              }}
-              doneLabel="Done"
-            />
-            <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
-              {renderPreviewBody(textPreview)}
-            </ScrollView>
-          </View>
-        </Modal>
+          <SheetHeader
+            title={attachment.filename}
+            titleEllipsis="middle"
+            onDone={() => {
+              setTextPreview(null);
+            }}
+            doneLabel={t('common.done')}
+            topInset="ios-page-sheet"
+          />
+          {textPreview.text === '' ? (
+            <CenteredState>
+              <Text className="px-6 text-center text-xs text-muted-foreground">
+                {t('agentChat.filePart.fileEmpty')}
+              </Text>
+            </CenteredState>
+          ) : (
+            <>
+              <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+                {renderPreviewBody(textPreview)}
+              </ScrollView>
+              <View style={{ height: insets.bottom }} className="bg-background" />
+            </>
+          )}
+        </SessionPageSheet>
       ) : null}
     </>
   );
-}
+});
 
-export function AttachmentPreviewStrip({ attachments, onRemove, onRetry }: Readonly<Props>) {
+export function AttachmentPreviewStrip({
+  attachments,
+  onRemove,
+  onRetry,
+  onMove,
+  onReorder,
+}: Readonly<Props>) {
+  // Per-chip measured widths keyed by id, so a drag can map its translation to
+  // a target slot even when image (w-20) and document (w-48) chips interleave.
+  const chipWidthsRef = useRef<Record<string, number>>({});
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
+
+  // The caller's controls change identity whenever the chip list does — the
+  // upload hook rebuilds `retryAttachment` on every attachment change — so the
+  // chips take these lifetime-stable dispatchers instead and read the current
+  // control at call time, the same way `attachmentsRef` tracks the current list.
+  // Without it a progress tick for one file would hand every memoized chip a new
+  // prop and re-render the whole strip.
+  const handlersRef = useRef({ onRemove, onRetry, onMove, onReorder });
+  handlersRef.current = { onRemove, onRetry, onMove, onReorder };
+
+  const recordChipWidth = useCallback((id: string, width: number) => {
+    chipWidthsRef.current[id] = width;
+  }, []);
+
+  const removeChip = useCallback((id: string) => {
+    handlersRef.current.onRemove(id);
+  }, []);
+
+  const retryChip = useCallback((id: string) => {
+    handlersRef.current.onRetry(id);
+  }, []);
+
+  const moveChip = useCallback((id: string, direction: AttachmentMoveDirection) => {
+    handlersRef.current.onMove(id, direction);
+  }, []);
+
+  const reorderChips = useCallback((fromIndex: number, toIndex: number) => {
+    handlersRef.current.onReorder(fromIndex, toIndex);
+  }, []);
+
+  const getOrderedWidths = useCallback(
+    () => attachmentsRef.current.map(item => chipWidthsRef.current[item.id] ?? 0),
+    []
+  );
+
   if (attachments.length === 0) {
     return null;
   }
   return (
-    <ScrollView
+    <GestureScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       className="mb-2"
-      contentContainerClassName="items-center"
+      // pl-3 matches the composer toolbar's px-3 so the first thumbnail's
+      // left edge lines up with the mode/model chips. No right padding: each
+      // chip carries its own mr-2 and the scroll container clips at the edge.
+      contentContainerClassName="items-center pl-3"
       keyboardShouldPersistTaps="handled"
     >
-      {attachments.map(attachment => (
-        <AttachmentChip
+      {attachments.map((attachment, index) => (
+        <AttachmentChipErrorBoundary
           key={attachment.id}
-          attachment={attachment}
-          onRemove={() => {
-            onRemove(attachment.id);
-          }}
-          onRetry={() => {
-            onRetry(attachment.id);
-          }}
-        />
+          attachmentId={attachment.id}
+          filename={attachment.filename}
+          onRemove={removeChip}
+        >
+          <AttachmentChip
+            attachment={attachment}
+            index={index}
+            count={attachments.length}
+            onRemove={removeChip}
+            onRetry={retryChip}
+            onMove={moveChip}
+            onReorder={reorderChips}
+            getOrderedWidths={getOrderedWidths}
+            onLayoutWidth={recordChipWidth}
+          />
+        </AttachmentChipErrorBoundary>
       ))}
-    </ScrollView>
+    </GestureScrollView>
   );
 }

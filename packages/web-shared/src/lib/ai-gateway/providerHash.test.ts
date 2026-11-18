@@ -1,0 +1,207 @@
+import crypto from 'crypto';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  applyTrackingIds,
+  generateOpenRouterDownstreamSafetyIdentifier,
+  generateOpenRouterUpstreamSafetyIdentifier,
+  generateProviderSpecificHash,
+  generateProviderSpecificSessionHash,
+  generateVercelDownstreamSafetyIdentifier,
+} from './providerHash';
+
+describe('generateProviderSpecificHash', () => {
+  const testUserId = 'test-user-123';
+
+  it('should generate different hashes for different providers', () => {
+    const openRouterHash = generateProviderSpecificHash(testUserId, OPENROUTER);
+    const vercelHash = generateProviderSpecificHash(testUserId, VERCEL_AI_GATEWAY);
+
+    expect(openRouterHash).not.toBe(vercelHash);
+  });
+
+  it('should generate consistent hashes for the same provider and user', () => {
+    const hash1 = generateProviderSpecificHash(testUserId, OPENROUTER);
+    const hash2 = generateProviderSpecificHash(testUserId, OPENROUTER);
+
+    expect(hash1).toBe(hash2);
+  });
+
+  it('should generate different hashes for different users on the same provider', () => {
+    const user1Hash = generateProviderSpecificHash('user1', OPENROUTER);
+    const user2Hash = generateProviderSpecificHash('user2', OPENROUTER);
+
+    expect(user1Hash).not.toBe(user2Hash);
+  });
+
+  it('should return a base64 encoded string', () => {
+    const hash = generateProviderSpecificHash(testUserId, VERCEL_AI_GATEWAY);
+
+    // Base64 pattern check
+    expect(hash).toMatch(/^[A-Za-z0-9+/]+=*$/);
+  });
+});
+
+describe('session tracking identifiers', () => {
+  const userId = 'oauth/test-user';
+  const sessionId = 'conversation-1';
+
+  it('preserves the existing session hash format', () => {
+    expect(generateProviderSpecificSessionHash(userId, sessionId, OPENROUTER)).toBe(
+      generateProviderSpecificHash(userId + '-' + sessionId, OPENROUTER)
+    );
+  });
+
+  const requests: GatewayRequest[] = [
+    { kind: 'chat_completions', body: { model: 'test-model', messages: [] } },
+    { kind: 'messages', body: { model: 'test-model', messages: [], max_tokens: 100 } },
+    { kind: 'responses', body: { model: 'test-model', input: 'Hello' } },
+  ];
+
+  it.each(requests)('uses the shared session hash for $kind tracking', request => {
+    const trackedRequest = structuredClone(request);
+    applyTrackingIds(trackedRequest, OPENROUTER, userId, sessionId);
+
+    const trackedSession =
+      trackedRequest.kind === 'messages'
+        ? trackedRequest.body.session_id
+        : trackedRequest.body.prompt_cache_key;
+    expect(trackedSession).toBe(generateProviderSpecificSessionHash(userId, sessionId, OPENROUTER));
+  });
+
+  it.each(requests)('omits $kind session tracking when the task ID is absent', request => {
+    const trackedRequest = structuredClone(request);
+    applyTrackingIds(trackedRequest, OPENROUTER, userId, null);
+
+    const trackedSession =
+      trackedRequest.kind === 'messages'
+        ? trackedRequest.body.session_id
+        : trackedRequest.body.prompt_cache_key;
+    expect(trackedSession).toBeUndefined();
+  });
+
+  it.each(requests)('uses the shared session hash for Vercel $kind tracking', request => {
+    const trackedRequest = structuredClone(request);
+    applyTrackingIds(trackedRequest, VERCEL_AI_GATEWAY, userId, sessionId);
+
+    const trackedSession =
+      trackedRequest.kind === 'messages'
+        ? trackedRequest.body.session_id
+        : trackedRequest.body.prompt_cache_key;
+    expect(trackedSession).toBe(
+      generateProviderSpecificSessionHash(userId, sessionId, VERCEL_AI_GATEWAY)
+    );
+  });
+
+  it('sets the Vercel user hash on Vercel messages requests', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: { model: 'test-model', messages: [], max_tokens: 100 },
+    };
+    applyTrackingIds(request, VERCEL_AI_GATEWAY, userId, null);
+
+    expect(request.body).toHaveProperty('user', generateVercelDownstreamSafetyIdentifier(userId));
+    expect(request.body).not.toHaveProperty('session_id');
+  });
+
+  const promptCacheKeyRequests = (promptCacheKey: string): GatewayRequest[] => [
+    {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [], prompt_cache_key: promptCacheKey },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'test-model', input: 'Hello', prompt_cache_key: promptCacheKey },
+    },
+  ];
+
+  it.each(promptCacheKeyRequests('k'.repeat(64)))(
+    'keeps a client $kind prompt cache key within the length limit',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, null);
+
+      expect(request.body).toHaveProperty('prompt_cache_key', 'k'.repeat(64));
+    }
+  );
+
+  it.each(promptCacheKeyRequests('k'.repeat(65)))(
+    'hashes a client $kind prompt cache key over the length limit',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, null);
+
+      expect(request.body).toHaveProperty(
+        'prompt_cache_key',
+        generateProviderSpecificSessionHash(userId, 'k'.repeat(65), OPENROUTER)
+      );
+    }
+  );
+
+  it.each(promptCacheKeyRequests('k'.repeat(65)))(
+    'prefers the task session hash over a long client $kind prompt cache key',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, sessionId);
+
+      expect(request.body).toHaveProperty(
+        'prompt_cache_key',
+        generateProviderSpecificSessionHash(userId, sessionId, OPENROUTER)
+      );
+    }
+  );
+});
+
+describe('downstream safety identifiers', () => {
+  const testUserId = 'test-user-123';
+
+  it('uses the OpenRouter-specific user hash for OpenRouter', () => {
+    expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).toBe(
+      generateProviderSpecificHash(testUserId, OPENROUTER)
+    );
+  });
+
+  it('keeps OpenRouter and Vercel identifiers distinct', () => {
+    expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).not.toBe(
+      generateVercelDownstreamSafetyIdentifier(testUserId)
+    );
+  });
+});
+
+describe('generateOpenRouterUpstreamSafetyIdentifier', () => {
+  const userId = 'synthetic-upstream-user';
+  const orgId = 'synthetic-upstream-org';
+
+  beforeEach(() => {
+    jest.replaceProperty(process, 'env', { ...process.env, OPENROUTER_ORG_ID: orgId });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('hashes the organization ID and both downstream user hashes with hyphen separators', () => {
+    const userHash = generateOpenRouterDownstreamSafetyIdentifier(userId);
+    const expected = crypto
+      .createHash('sha256')
+      .update(orgId + '-' + userHash + '-' + userHash)
+      .digest('hex');
+
+    expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBe(expected);
+  });
+
+  it('matches the fixed synthetic organization and user vector', () => {
+    expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBe(
+      'f6b8e246e58becc0d9c05e2bf93eea9f011ba14a6f572a12e2dc7ab6a89c13d2'
+    );
+  });
+
+  it.each([undefined, ''])('logs an error and returns null when OPENROUTER_ORG_ID is %p', value => {
+    jest.replaceProperty(process, 'env', { ...process.env, OPENROUTER_ORG_ID: value });
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBeNull();
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledWith(
+      '[generateOpenRouterUpstreamSafetyIdentifier] OPENROUTER_ORG_ID is not set, please run vercel env pull'
+    );
+  });
+});

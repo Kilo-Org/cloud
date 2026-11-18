@@ -8,6 +8,8 @@ import {
   extractNormalizedGitUrlFromItem,
   extractNormalizedGitBranchFromItem,
   extractSessionPrLink,
+  extractStatusOccurredAtFromItem,
+  extractStatusTransitionIdFromItem,
 } from './session-ingest-extractors';
 
 function sessionItem(data: Record<string, unknown>): IngestBatch[number] {
@@ -26,6 +28,40 @@ function kiloMetaItem(data: {
 function messageItem(): IngestBatch[number] {
   return { type: 'message', data: { id: 'msg-1' } } as IngestBatch[number];
 }
+describe('extractStatusOccurredAtFromItem', () => {
+  it('carries a producer occurrence time and explicitly marks legacy status time unknown', () => {
+    expect(
+      extractStatusOccurredAtFromItem({
+        type: 'session_status',
+        data: {
+          status: 'question',
+          occurredAt: '2026-07-24T07:59:00.000Z',
+        },
+      })
+    ).toBe('2026-07-24T07:59:00.000Z');
+    expect(
+      extractStatusOccurredAtFromItem({ type: 'session_status', data: { status: 'question' } })
+    ).toBeNull();
+    expect(extractStatusOccurredAtFromItem(messageItem())).toBeUndefined();
+  });
+});
+describe('extractStatusTransitionIdFromItem', () => {
+  it('carries source identity and explicitly clears identity for a legacy status', () => {
+    expect(
+      extractStatusTransitionIdFromItem({
+        type: 'session_status',
+        data: {
+          status: 'question',
+          transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        },
+      })
+    ).toBe('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+    expect(
+      extractStatusTransitionIdFromItem({ type: 'session_status', data: { status: 'question' } })
+    ).toBeNull();
+    expect(extractStatusTransitionIdFromItem(messageItem())).toBeUndefined();
+  });
+});
 
 describe('extractNormalizedTitleFromItem', () => {
   it('extracts title from session item', () => {
@@ -241,7 +277,27 @@ describe('extractSessionPrLink', () => {
     return { type: 'session_pr_link', data } as IngestBatch[number];
   }
 
-  it('extracts the full triple for a valid set', () => {
+  it('extracts the full tuple for a valid set, with head evidence', () => {
+    expect(
+      extractSessionPrLink(
+        prLinkItem({
+          platform: 'github',
+          prUrl: 'https://github.com/acme/widgets/pull/42',
+          prNumber: 42,
+          headRef: 'fix/typo',
+          headSha: 'abc123',
+        })
+      )
+    ).toEqual({
+      prPlatform: 'github',
+      prUrl: 'https://github.com/acme/widgets/pull/42',
+      prNumber: '42',
+      prHeadRef: 'fix/typo',
+      prHeadSha: 'abc123',
+    });
+  });
+
+  it('reads absent head evidence as null for an older producer', () => {
     expect(
       extractSessionPrLink(
         prLinkItem({
@@ -254,25 +310,47 @@ describe('extractSessionPrLink', () => {
       prPlatform: 'github',
       prUrl: 'https://github.com/acme/widgets/pull/42',
       prNumber: '42',
+      prHeadRef: null,
+      prHeadSha: null,
     });
   });
 
-  it('clears all three keys when platform is null', () => {
+  it('reads a malformed head field as absent rather than dropping the link', () => {
+    expect(
+      extractSessionPrLink(
+        prLinkItem({
+          platform: 'github',
+          prUrl: 'https://github.com/acme/widgets/pull/42',
+          prNumber: 42,
+          headRef: 123,
+          headSha: '   ',
+        })
+      )
+    ).toEqual({
+      prPlatform: 'github',
+      prUrl: 'https://github.com/acme/widgets/pull/42',
+      prNumber: '42',
+      prHeadRef: null,
+      prHeadSha: null,
+    });
+  });
+
+  it('clears all five keys when platform is null', () => {
     expect(
       extractSessionPrLink(prLinkItem({ platform: null, prUrl: 'https://x', prNumber: 1 }))
-    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null });
+    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null, prHeadRef: null, prHeadSha: null });
   });
 
-  it('clears all three keys when prUrl is null', () => {
+  it('clears all five keys when prUrl is null', () => {
     expect(
       extractSessionPrLink(prLinkItem({ platform: 'github', prUrl: null, prNumber: 1 }))
-    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null });
+    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null, prHeadRef: null, prHeadSha: null });
   });
 
-  it('clears all three keys when prNumber is null', () => {
+  it('clears all five keys when prNumber is null', () => {
     expect(
       extractSessionPrLink(prLinkItem({ platform: 'github', prUrl: 'https://x', prNumber: null }))
-    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null });
+    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null, prHeadRef: null, prHeadSha: null });
   });
 
   it('returns undefined for a non-session_pr_link item', () => {

@@ -3,13 +3,13 @@ const mockDeleteBitbucketWorkspaceWebhooksFromTokenService = jest.fn();
 let mockAppUrl = 'https://app.kilo.ai';
 let mockWebhookBaseUrl = '';
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   get APP_URL() {
     return mockAppUrl;
   },
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL() {
     return mockWebhookBaseUrl;
   },
@@ -24,6 +24,13 @@ jest.mock('./token-service-client', () => ({
     mockEnsureBitbucketWorkspaceWebhookFromTokenService(...args),
   deleteBitbucketWorkspaceWebhooksFromTokenService: (...args: unknown[]) =>
     mockDeleteBitbucketWorkspaceWebhooksFromTokenService(...args),
+}));
+
+const mockBotUserId = 'bot-code-review-org';
+jest.mock('@/lib/bot-users/bot-user-service', () => ({
+  ensureBotUserForOrg: jest.fn(async () => ({
+    id: mockBotUserId,
+  })),
 }));
 
 import {
@@ -87,11 +94,10 @@ describe('stateless Bitbucket Code Reviewer workspace webhook caller', () => {
     mockDeleteBitbucketWorkspaceWebhooksFromTokenService.mockResolvedValue({ success: true });
   });
 
-  it('ensures one integration callback using typed workspace identity and the current manager', async () => {
+  it('ensures one integration callback using typed workspace identity and the organization bot user', async () => {
     await expect(
       ensureBitbucketCodeReviewWorkspaceWebhook({
         organizationId,
-        currentManagerId: 'manager-user',
         workspace,
       })
     ).resolves.toEqual(
@@ -104,7 +110,7 @@ describe('stateless Bitbucket Code Reviewer workspace webhook caller', () => {
     expect(buildBitbucketCodeReviewWebhookUrl(workspace.integrationId)).toBe(callbackUrl);
     expect(mockEnsureBitbucketWorkspaceWebhookFromTokenService).toHaveBeenCalledTimes(1);
     expect(mockEnsureBitbucketWorkspaceWebhookFromTokenService).toHaveBeenCalledWith({
-      managerUserId: 'manager-user',
+      managerUserId: mockBotUserId,
       organizationId,
       workspace,
       callbackUrl,
@@ -122,13 +128,12 @@ describe('stateless Bitbucket Code Reviewer workspace webhook caller', () => {
     mockAppUrl = 'http://localhost:3000';
 
     await withNodeEnv('development', async () => {
-      expect(() =>
+      await expect(
         ensureBitbucketCodeReviewWorkspaceWebhook({
           organizationId,
-          currentManagerId: 'manager-user',
           workspace,
         })
-      ).toThrow(BitbucketCodeReviewWebhookConfigurationError);
+      ).rejects.toThrow(BitbucketCodeReviewWebhookConfigurationError);
     });
 
     expect(mockEnsureBitbucketWorkspaceWebhookFromTokenService).not.toHaveBeenCalled();
@@ -143,7 +148,6 @@ describe('stateless Bitbucket Code Reviewer workspace webhook caller', () => {
       await expect(
         ensureBitbucketCodeReviewWorkspaceWebhook({
           organizationId,
-          currentManagerId: 'manager-user',
           workspace,
         })
       ).resolves.toEqual(
@@ -166,13 +170,12 @@ describe('stateless Bitbucket Code Reviewer workspace webhook caller', () => {
     await expect(
       deleteBitbucketCodeReviewWorkspaceWebhooksBestEffort({
         organizationId,
-        currentManagerId: 'manager-user',
         workspace,
       })
     ).resolves.toBeUndefined();
 
     expect(mockDeleteBitbucketWorkspaceWebhooksFromTokenService).toHaveBeenCalledWith({
-      managerUserId: 'manager-user',
+      managerUserId: mockBotUserId,
       organizationId,
       workspace,
       callbackUrl,

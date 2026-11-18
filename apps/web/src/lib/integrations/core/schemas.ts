@@ -2,7 +2,36 @@
  * Zod schemas for runtime validation of integration metadata
  */
 import * as z from 'zod';
+import type { PlatformRepository } from '@kilocode/db/schema-types';
 import { PENDING_APPROVAL_STATUS } from './constants';
+
+/**
+ * Persisted GitHub/GitLab repository inventory cached on platform integration rows.
+ * Unknown keys are stripped so forward-compatible cache fields do not invalidate the row.
+ */
+export const PlatformRepositoryCacheSchema = z
+  .array(
+    z.object({
+      id: z.number().int(),
+      name: z.string(),
+      full_name: z.string(),
+      private: z.boolean(),
+      default_branch: z.string().optional(),
+    })
+  )
+  .nullable();
+
+export function parsePlatformRepositoryCache(
+  value: unknown,
+  onInvalid?: () => void
+): PlatformRepository[] {
+  const parsed = PlatformRepositoryCacheSchema.safeParse(value ?? null);
+  if (!parsed.success) {
+    onInvalid?.();
+    return [];
+  }
+  return parsed.data ?? [];
+}
 
 /**
  * GitHub requester schema
@@ -11,6 +40,9 @@ export const GitHubRequesterSchema = z.object({
   id: z.string(),
   login: z.string(),
 });
+
+/** The persisted GitHub requester shape. Its runtime schema is the single declaration. */
+export type GitHubRequester = z.infer<typeof GitHubRequesterSchema>;
 
 /**
  * Kilo User requester schema
@@ -22,6 +54,9 @@ export const KiloRequesterSchema = z.object({
   requested_at: z.string(),
 });
 
+/** The persisted Kilo requester shape. Its runtime schema is the single declaration. */
+export type KiloRequester = z.infer<typeof KiloRequesterSchema>;
+
 /**
  * Pending approval metadata schema
  */
@@ -29,7 +64,14 @@ export const PendingApprovalMetadataSchema = z.object({
   status: z.enum([PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION]),
   requester: KiloRequesterSchema.optional(),
   github_requester: GitHubRequesterSchema.optional(),
+  github_request_id: z.string().optional(),
 });
+
+/**
+ * The persisted pending-approval metadata shape. Its runtime schema is the
+ * single declaration.
+ */
+export type PendingApprovalMetadata = z.infer<typeof PendingApprovalMetadataSchema>;
 
 /**
  * Completed installation metadata schema

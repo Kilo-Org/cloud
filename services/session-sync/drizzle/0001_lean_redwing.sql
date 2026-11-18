@@ -1,0 +1,1 @@
+CREATE INDEX `blobs_cleanup_idx` ON `blobs` (`deadline`,`hash`) WHERE "blobs"."state" <> 'ready';

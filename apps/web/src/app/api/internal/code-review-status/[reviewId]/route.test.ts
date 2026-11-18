@@ -14,6 +14,10 @@ import {
   COUNCIL_RESULT_MARKER_TAG,
   COUNCIL_VERDICT_BLOCK_START,
 } from '@kilocode/worker-utils/code-review-council';
+import { sql } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
+import { admitOperation } from '@kilocode/db/operation-ledger';
 
 // --- Mock functions ---
 
@@ -26,8 +30,8 @@ const mockUpdateCodeReviewStatus = jest.fn() as jest.MockedFunction<
 const mockUpdateCodeReviewStatusIfNonTerminal = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewStatusIfNonTerminal
 >;
-const mockUpdateCodeReviewUsage = jest.fn() as jest.MockedFunction<
-  typeof codeReviewsDbModule.updateCodeReviewUsage
+const mockBackfillCodeReviewUsage = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.backfillCodeReviewUsage
 >;
 const mockGetSessionUsageFromBilling = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.getSessionUsageFromBilling
@@ -40,6 +44,9 @@ const mockGetLatestCodeReviewAttempt = jest.fn() as jest.MockedFunction<
 >;
 const mockCreateInfraRetryAttemptIfMissing = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.createInfraRetryAttemptIfMissing
+>;
+const mockRecordCodeReviewAttemptPublicationStatus = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.recordCodeReviewAttemptPublicationStatus
 >;
 const mockSetCodeReviewCouncilResult = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.setCodeReviewCouncilResult
@@ -94,6 +101,10 @@ const mockRetryReviewFresh = jest.fn<any>();
 const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDisableCodeReviewForRepeatedCloneTimeoutsToday = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockClassifyCodeReviewPublication = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockRecordCodeReviewPublicationOutcome = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -114,7 +125,7 @@ jest.mock('next/server', () => {
   };
 });
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@/lib/web-config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
@@ -122,12 +133,13 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   getCodeReviewById: mockGetCodeReviewById,
   updateCodeReviewStatus: mockUpdateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal: mockUpdateCodeReviewStatusIfNonTerminal,
-  updateCodeReviewUsage: mockUpdateCodeReviewUsage,
+  backfillCodeReviewUsage: mockBackfillCodeReviewUsage,
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing: mockCreateInfraRetryAttemptIfMissing,
   setCodeReviewCouncilResult: mockSetCodeReviewCouncilResult,
+  recordCodeReviewAttemptPublicationStatus: mockRecordCodeReviewAttemptPublicationStatus,
 }));
 
 jest.mock('@/lib/code-reviews/analytics/db', () => ({
@@ -187,6 +199,15 @@ jest.mock('@/lib/code-reviews/summary/history', () => ({
     mockAppendPreviousReviewSummaryHistory(...args),
 }));
 
+jest.mock('@/lib/code-reviews/summary/publication-status', () => ({
+  classifyCodeReviewPublication: (...args: unknown[]) => mockClassifyCodeReviewPublication(...args),
+}));
+
+jest.mock('@/lib/code-reviews/summary/record-publication-outcome', () => ({
+  recordCodeReviewPublicationOutcome: (...args: unknown[]) =>
+    mockRecordCodeReviewPublicationOutcome(...args),
+}));
+
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
   appendReviewSummaryFooter: (...args: unknown[]) => mockAppendReviewSummaryFooter(...args),
   buildReviewSummaryFooter: (...args: unknown[]) => mockBuildReviewSummaryFooter(...args),
@@ -203,7 +224,7 @@ jest.mock('@/lib/code-reviews/action-required', () => {
   };
 });
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
 }));
 
@@ -275,9 +296,12 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     repository_review_instructions_used: false,
     repository_review_instructions_ref: null,
     repository_review_instructions_truncated: false,
+    repository_review_instructions_imports: null,
     previous_summary_body: null,
     previous_summary_head_sha: null,
+    previous_summary_observed: null,
     manual_config: null,
+    manual_operation_key: null,
     review_type: 'standard',
     trigger_source: null,
     council_result: null,
@@ -311,6 +335,7 @@ function makeAttempt(
     terminal_reason: null,
     started_at: '2025-01-01T00:00:00Z',
     completed_at: null,
+    publication_status: null,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,
@@ -342,11 +367,23 @@ function makeIntegration(overrides: Partial<PlatformIntegration> = {}): Platform
     suspended_at: null,
     suspended_by: null,
     github_app_type: 'standard',
+    github_installation_id: null,
+    github_disconnected_at: null,
+    github_connection_role: 'workflow',
+    github_authorized_by_user_id: null,
+    github_authorized_user_id: null,
+    github_authorized_at: null,
     installed_at: '2025-01-01T00:00:00Z',
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,
   };
+}
+
+function mockGitLabReviewIntegration() {
+  mockGetIntegrationById.mockResolvedValue(
+    makeIntegration({ platform: 'gitlab', platform_installation_id: null })
+  );
 }
 
 function mockCreatedInfraRetryFlow(
@@ -438,9 +475,16 @@ beforeEach(async () => {
   mockFindKiloReviewNote.mockResolvedValue({ noteId: 88, body: 'existing note body' });
   mockUpdateKiloReviewNote.mockResolvedValue(undefined);
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
-  mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
+  mockBackfillCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
   mockSetCodeReviewCouncilResult.mockResolvedValue(undefined);
+  mockRecordCodeReviewAttemptPublicationStatus.mockResolvedValue(undefined);
+  mockRecordCodeReviewPublicationOutcome.mockResolvedValue('recorded');
+  mockClassifyCodeReviewPublication.mockImplementation((observation: { kind: string }) => {
+    if (observation.kind === 'not_applicable') return 'not_applicable';
+    if (observation.kind === 'unknown') return 'unknown';
+    return 'published';
+  });
   mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'applied' });
   mockAppendPreviousReviewSummaryHistory.mockImplementation((body: string) => body);
   mockBuildReviewSummaryFooter.mockImplementation(
@@ -653,10 +697,30 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockGetIntegrationById).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockAddReactionToPR).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 for an analytics repair whose publication write failed without replaying effects', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'completed' }));
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ status: 'completed', analytics_enabled_at_dispatch: true })
+      );
+      mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'repaired' });
+      mockRecordCodeReviewPublicationOutcome.mockResolvedValue('write_failed');
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(500);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewId: REVIEW_ID, platform: 'github' })
+      );
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
     });
   });
 
@@ -820,7 +884,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it('infers BYOK permission callbacks as action-required failures', async () => {
       const errorMessage =
-        'Forbidden: [BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.';
+        'Forbidden: [BYOK] Your API key does not have permission to access this model. Please check your API key permissions.';
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       const response = await POST(
@@ -855,6 +919,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
 
       const response = await POST(
         makeRequest({
@@ -912,6 +977,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           platform: 'bitbucket',
           integration_type: 'workspace_access_token',
           platform_installation_id: null,
+          owned_by_user_id: null,
+          owned_by_organization_id: '123e4567-e89b-12d3-a456-426614174099',
         })
       );
 
@@ -1363,6 +1430,161 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it.each(['byok', 'managed', 'unknown', undefined] as const)(
+      'handles invalid-request callback ownership %s without disabling reviews',
+      async providerOwnership => {
+        const retryFlow = mockCreatedInfraRetryFlow();
+        mockGetCodeReviewById.mockResolvedValue(makeReview({ session_id: retryFlow.sessionId }));
+        const byok = providerOwnership === 'byok';
+        const errorMessage = byok
+          ? 'Your provider rejected the request. Check your provider account and settings.'
+          : 'Assistant request was invalid';
+        const terminalReason = byok
+          ? 'assistant_invalid_request_byok'
+          : 'assistant_invalid_request';
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            errorMessage,
+            failure: {
+              code: 'assistant_error',
+              assistantReason: 'invalid_request',
+              providerOwnership,
+              message: errorMessage,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'failed', terminalReason })
+        );
+        expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+        if (byok) {
+          expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+          expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+          expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+            REVIEW_ID,
+            'failed',
+            expect.objectContaining({ terminalReason })
+          );
+          expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+            'inst-1',
+            'owner',
+            'repo',
+            12345,
+            expect.objectContaining({
+              conclusion: 'failure',
+              output: expect.objectContaining({
+                title: 'Kilo Code Review request rejected by your provider',
+                summary: errorMessage,
+              }),
+            }),
+            'standard'
+          );
+          expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+            'inst-1',
+            'owner',
+            'repo',
+            99,
+            expect.stringContaining('Your provider rejected the request.'),
+            'standard'
+          );
+        } else {
+          await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+          expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+            codeReviewId: REVIEW_ID,
+            retryOfAttemptId: retryFlow.failedAttemptId,
+          });
+          expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+            sessionId: retryFlow.sessionId,
+            reason: errorMessage,
+            failedAttemptId: retryFlow.failedAttemptId,
+            retryAttemptId: retryFlow.retryAttemptId,
+          });
+          expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+        }
+      }
+    );
+
+    it('accepts explicit assistant_invalid_request_byok without a fresh retry or action-required disable', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          terminalReason: 'assistant_invalid_request_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'assistant_invalid_request_byok' })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+    });
+
+    // cloud-agent-next projects the raw provider body down to 'Assistant request
+    // was not authorized' before the callback, so the message-based BYOK
+    // detection can never fire. Ownership on the structured failure is the only
+    // signal that routes this onto the actionable disable + email path.
+    it('routes a structured BYOK provider-authentication failure to the actionable path', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was not authorized',
+          failure: {
+            code: 'assistant_error',
+            assistantReason: 'provider_authentication',
+            providerOwnership: 'byok',
+            message: 'Assistant request was not authorized',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'byok_invalid_key' })
+      );
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'byok_invalid_key' })
+      );
+    });
+
+    it('keeps a managed provider-authentication failure generic and non-actionable', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was not authorized',
+          failure: {
+            code: 'assistant_error',
+            assistantReason: 'provider_authentication',
+            providerOwnership: 'managed',
+            message: 'Assistant request was not authorized',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'assistant_unauthorized' })
+      );
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+    });
+
     // model_missing arrives with the generic message 'No model was selected',
     // which the message-based model-not-found check cannot match. Without the
     // structured path re-applying normalization the row would stay 'failed' and
@@ -1801,6 +2023,109 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
+    it('allows one fresh retry for a pre-dispatch workspace setup failure when usage is unavailable', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-workspace-setup-failed',
+        cliSessionId: 'ses_workspace_setup_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Workspace setup failed',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            message: 'Workspace setup failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_workspace_setup_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Workspace setup failed',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        name: 'runtime start failure',
+        code: 'wrapper_start_failed',
+        message: 'Environment preparation timed out',
+      },
+      {
+        name: 'Kilo server failure',
+        code: 'kilo_server_failed',
+        message: 'Kilo server failed to start',
+      },
+    ])(
+      'allows one fresh retry for a pre-dispatch $name when usage is unavailable',
+      async ({ code, message }) => {
+        // Both codes classify before the agent runs, so an unusable usage read
+        // must not forfeit the retry.
+        const retryFlow = mockCreatedInfraRetryFlow({
+          sessionId: `agent-pre-dispatch-${code}`,
+          cliSessionId: `ses_pre_dispatch_${code}`,
+        });
+        mockGetCodeReviewById.mockResolvedValue(
+          makeReview({ status: 'running', session_id: retryFlow.sessionId })
+        );
+        mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            kiloSessionId: retryFlow.cliSessionId,
+            errorMessage: message,
+            terminalReason: 'sandbox_error',
+            failure: {
+              stage: 'pre_dispatch',
+              code,
+              message,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+        expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+          codeReviewId: REVIEW_ID,
+          retryOfAttemptId: retryFlow.failedAttemptId,
+        });
+        expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+          sessionId: retryFlow.sessionId,
+          reason: message,
+          failedAttemptId: retryFlow.failedAttemptId,
+          retryAttemptId: retryFlow.retryAttemptId,
+        });
+        expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      }
+    );
+
     it('does not infer the unavailable-usage exception from sandbox connection error text', async () => {
       const retryFlow = mockCreatedInfraRetryFlow({
         sessionId: 'agent-sandbox-connect-text-only',
@@ -1842,8 +2167,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failure: { stage: 'agent_activity', code: 'sandbox_connect_failed' },
       },
       {
-        name: 'different pre-dispatch failure code',
-        failure: { stage: 'pre_dispatch', code: 'workspace_setup_failed' },
+        name: 'workspace setup failure after dispatch',
+        failure: { stage: 'post_dispatch_no_activity', code: 'workspace_setup_failed' },
       },
       {
         name: 'incomplete failure data',
@@ -2460,11 +2785,12 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           conclusion: 'failure',
           output: expect.objectContaining({
             title: 'Kilo Code Review failed',
-            summary: expect.stringContaining(errorMessage),
+            summary: 'Review failed.',
           }),
         }),
         'standard'
       );
+      expect(JSON.stringify(mockUpdateCheckRun.mock.calls)).not.toContain(errorMessage);
     });
 
     it('publishes action-required GitHub check output on the third repository clone timeout', async () => {
@@ -2528,7 +2854,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           output: expect.objectContaining({
             title: 'Code Reviewer disabled: clone timeouts',
             summary:
-              'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+              'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again.',
           }),
         }),
         'standard'
@@ -2664,6 +2990,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockUpdateCodeReviewStatus.mockImplementation(async () => {
         callOrder.push('persist');
       });
@@ -2833,6 +3160,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           check_run_id: null,
         })
       );
+      mockGitLabReviewIntegration();
 
       await POST(
         makeRequest({
@@ -3026,6 +3354,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
 
       await POST(
         makeRequest({
@@ -3088,6 +3417,82 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           }),
         }),
         'standard'
+      );
+    });
+
+    it('publishes fixed failure copy on the GitHub check run', async () => {
+      const errorMessage =
+        'Execution exceeded maximum runtime: upstream 502 from the assistant service; owner user:8f14e45f-ceea-467a-9f1a-2f3f4b8b7d21';
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review failed',
+            summary: 'Review failed.',
+          }),
+        }),
+        'standard'
+      );
+      const published = JSON.stringify(mockUpdateCheckRun.mock.calls);
+      expect(published).not.toContain('upstream 502');
+      expect(published).not.toContain('8f14e45f');
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage })
+      );
+    });
+
+    it('publishes fixed failure copy on the GitLab commit status', async () => {
+      const errorMessage =
+        'Execution exceeded maximum runtime: upstream 502 from the assistant service; owner user:8f14e45f-ceea-467a-9f1a-2f3f4b8b7d21';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockGetIntegrationById.mockResolvedValue(
+        makeIntegration({ platform: 'gitlab', platform_installation_id: null })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({ description: 'Kilo Code Review failed' }),
+        'https://gitlab.com'
+      );
+      const published = JSON.stringify(mockSetCommitStatus.mock.calls);
+      expect(published).not.toContain('upstream 502');
+      expect(published).not.toContain('8f14e45f');
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage })
       );
     });
 
@@ -3206,6 +3611,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockHasMRNoteWithMarker.mockResolvedValue(false);
 
       await POST(
@@ -3237,6 +3643,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockHasMRNoteWithMarker.mockResolvedValue(true);
 
       await POST(
@@ -3339,6 +3746,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockFindKiloReviewNote.mockResolvedValue(null);
       const detailedErrorMessage =
         'Model not found: kilo/retired-model. Available runtime models: 3. Closest matches: vendor/alpha, vendor/beta.';
@@ -3487,6 +3895,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockFindKiloReviewNote.mockResolvedValue(null);
 
       await POST(
@@ -3508,7 +3917,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
       mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
-      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+      mockGitLabReviewIntegration();
       mockFindKiloReviewNote.mockResolvedValue({ noteId: 321, body: 'old summary' });
 
       await POST(
@@ -3664,7 +4073,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         '2025-01-01T00:00:00Z',
         '2025-01-01T00:10:00Z'
       );
-      expect(mockUpdateCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
+      expect(mockBackfillCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
         totalTokensIn: 1000,
         totalTokensOut: 200,
         totalCostMusd: 100,
@@ -3701,6 +4110,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         total_tokens_out: 200,
       });
       mockGetCodeReviewById.mockResolvedValue(review);
+      mockGitLabReviewIntegration();
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
@@ -3830,6 +4240,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockAppendPreviousReviewSummaryHistory.mockReturnValue('notice with history');
 
       await POST(makeRequest(byokRateLimitRequest), makeParams(REVIEW_ID));
@@ -3902,6 +4313,411 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
       expect(mockCreatePRComment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('code_review_settled outbox emission', () => {
+    beforeEach(async () => {
+      await db.delete(analytics_event_outbox).where(sql`true`);
+      await db.delete(operation_ledgers).where(sql`true`);
+    });
+
+    afterAll(async () => {
+      await db.delete(analytics_event_outbox).where(sql`true`);
+      await db.delete(operation_ledgers).where(sql`true`);
+    });
+
+    async function admitReview(userId = 'user-1') {
+      return admitOperation(db, {
+        userId,
+        domain: 'code_review',
+        intent: 'manual',
+        operationKey: `review:${REVIEW_ID}`,
+        taxonomy: 'never-replay',
+        leaseSeconds: 60,
+      });
+    }
+
+    it('emits one code_review_settled row from the analytics completion branch', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ analytics_enabled_at_dispatch: true })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'completed', intent: 'manual' });
+    });
+
+    it('emits one code_review_settled row from the model-not-found terminal branch', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'no_op' });
+    });
+
+    it('emits one code_review_settled row from the generic terminal branch', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'completed' });
+    });
+
+    it('settles on the terminal short-circuit when a terminal callback is redelivered', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'failed', terminal_reason: 'timeout' })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Execution exceeded maximum runtime' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        message: 'Review already in terminal state',
+      });
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'failed' });
+    });
+  });
+
+  describe('publication recording', () => {
+    const attemptId = '00000000-0000-0000-0000-000000000101';
+
+    const makeKiloReview = (overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCodeReview =>
+      makeReview({
+        manual_config: {
+          instructions: null,
+          outputMode: 'kilo',
+          agentConfig: {
+            review_style: 'balanced',
+            focus_areas: [],
+            model_slug: 'base/model',
+          },
+        },
+        ...overrides,
+      });
+
+    it('records the GitHub summary observation before patching the comment', async () => {
+      const review = makeReview({
+        previous_summary_body: '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings',
+        previous_summary_observed: true,
+        model: 'anthropic/claude-sonnet-4.6',
+        total_tokens_in: 1000,
+        total_tokens_out: 200,
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+      mockFindKiloReviewComment.mockResolvedValue({ commentId: 99, body: 'lookup body' });
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith({
+        attemptId,
+        reviewId: REVIEW_ID,
+        platform: 'github',
+        platformIntegrationId: review.platform_integration_id,
+        repoFullName: review.repo_full_name,
+        prNumber: review.pr_number,
+        previousSummaryBody: review.previous_summary_body,
+        previousSummaryObserved: true,
+        shouldPublish: true,
+      });
+      expect(mockRecordCodeReviewPublicationOutcome.mock.invocationCallOrder[0]).toBeLessThan(
+        mockUpdateKiloReviewComment.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('records the GitLab note observation before patching the note', async () => {
+      const review = makeReview({
+        platform: 'gitlab',
+        platform_project_id: 42,
+        check_run_id: null,
+        previous_summary_body: '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings',
+        previous_summary_observed: true,
+        model: 'anthropic/claude-sonnet-4.6',
+        total_tokens_in: 1000,
+        total_tokens_out: 200,
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+      mockGitLabReviewIntegration();
+      mockFindKiloReviewNote.mockResolvedValue({ noteId: 88, body: 'note lookup body' });
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockClassifyCodeReviewPublication).toHaveBeenCalledWith({
+        kind: 'summary',
+        summaryBody: 'note lookup body',
+        previousSummaryBody: review.previous_summary_body,
+        previousSummaryObserved: true,
+      });
+      expect(mockRecordCodeReviewAttemptPublicationStatus).toHaveBeenCalledWith(
+        attemptId,
+        'published'
+      );
+      expect(mockRecordCodeReviewAttemptPublicationStatus.mock.invocationCallOrder[0]).toBeLessThan(
+        mockUpdateKiloReviewNote.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('leaves the GitHub publication outcome to the helper when the summary lookup rejects', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockRejectedValue(new Error('summary lookup failed'));
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalled();
+      expect(mockClassifyCodeReviewPublication).not.toHaveBeenCalled();
+      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+    });
+
+    it('records unknown and skips the patch when the GitLab summary lookup rejects', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockFindKiloReviewNote.mockRejectedValue(new Error('summary lookup failed'));
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockClassifyCodeReviewPublication).toHaveBeenCalledWith({ kind: 'unknown' });
+      expect(mockClassifyCodeReviewPublication).not.toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'summary' })
+      );
+      expect(mockRecordCodeReviewAttemptPublicationStatus).toHaveBeenCalledWith(
+        attemptId,
+        'unknown'
+      );
+      expect(mockUpdateKiloReviewNote).not.toHaveBeenCalled();
+    });
+
+    it('records not_applicable through the helper for a kilo-mode completion without a provider lookup', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeKiloReview());
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ attemptId, platform: 'github', shouldPublish: false })
+      );
+      expect(mockGetIntegrationById).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewNote).not.toHaveBeenCalled();
+    });
+
+    it('leaves the GitHub publication outcome to the helper when provider mode has no integration', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetIntegrationById.mockResolvedValue(null as unknown as PlatformIntegration);
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ attemptId, platform: 'github', shouldPublish: true })
+      );
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewNote).not.toHaveBeenCalled();
+    });
+
+    it('skips provider effects when the review integration belongs to another owner', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration({ owned_by_user_id: 'other-user' }));
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ platformIntegrationId: null, shouldPublish: true })
+      );
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+    });
+
+    it('records unknown for a completed Bitbucket review without a provider read', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'bitbucket', check_run_id: null })
+      );
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockClassifyCodeReviewPublication).toHaveBeenCalledWith({ kind: 'unknown' });
+      expect(mockRecordCodeReviewAttemptPublicationStatus).toHaveBeenCalledWith(
+        attemptId,
+        'unknown'
+      );
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewNote).not.toHaveBeenCalled();
+    });
+
+    it('still runs provider effects then returns 500 when the publication write fails', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({
+          model: 'anthropic/claude-sonnet-4.6',
+          total_tokens_in: 1000,
+          total_tokens_out: 200,
+        })
+      );
+      mockFindKiloReviewComment.mockResolvedValue({ commentId: 99, body: 'lookup body' });
+      mockRecordCodeReviewPublicationOutcome.mockResolvedValue('write_failed');
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(500);
+      expect(mockFindKiloReviewComment).toHaveBeenCalled();
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalled();
+      expect(mockAddReactionToPR).toHaveBeenCalled();
+    });
+
+    it('returns 500 for an already-terminal completed replay whose publication write failed', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'completed' }));
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({ status: 'completed' })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt({ status: 'completed' }));
+      mockRecordCodeReviewPublicationOutcome.mockResolvedValue('write_failed');
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(500);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewId: REVIEW_ID, platform: 'github', shouldPublish: true })
+      );
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+    });
+
+    it('does not record a failed Bitbucket callback even with an integration', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'bitbucket', check_run_id: null })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          terminalReason: 'billing',
+          errorMessage: 'Insufficient credits',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      // A billing failure is unretryable, so the callback must have walked past
+      // the infra-retry short-circuit into the provider block rather than
+      // returning early with a retry outcome.
+      expect(json).not.toMatchObject({ skipped: 'already-retried' });
+      expect(json).not.toMatchObject({ retried: true });
+      expect(mockRecordCodeReviewAttemptPublicationStatus).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewNote).not.toHaveBeenCalled();
+    });
+
+    it('does not record a failed GitHub callback whose reaction rejects', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockAddReactionToPR.mockRejectedValueOnce(new Error('reaction failed'));
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          terminalReason: 'billing',
+          errorMessage: 'Insufficient credits',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      // Reaching the reaction proves the provider block ran; its rejection must
+      // be swallowed without recording a publication status for the failure.
+      expect(mockAddReactionToPR).toHaveBeenCalled();
+      expect(mockRecordCodeReviewAttemptPublicationStatus).not.toHaveBeenCalled();
+    });
+
+    it('does not call the publication helper for non-applied callbacks', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      await POST(makeRequest({ status: 'failed' }), makeParams(REVIEW_ID));
+
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      await POST(makeRequest({ status: 'running' }), makeParams(REVIEW_ID));
+
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      await POST(
+        makeRequest({ status: 'interrupted', errorMessage: 'User interrupted' }),
+        makeParams(REVIEW_ID)
+      );
+
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({ id: '00000000-0000-0000-0000-000000000201' })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ id: '00000000-0000-0000-0000-000000000202' })
+      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'completed' }));
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ status: 'completed', analytics_enabled_at_dispatch: true })
+      );
+      mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'stale' });
+      await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockRecordCodeReviewPublicationOutcome).not.toHaveBeenCalled();
+      expect(mockRecordCodeReviewAttemptPublicationStatus).not.toHaveBeenCalled();
+    });
+
+    it('records the publication outcome for an analytics duplicate replay', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'completed' }));
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ status: 'completed', analytics_enabled_at_dispatch: true })
+      );
+      mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'duplicate' });
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledTimes(1);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewId: REVIEW_ID, platform: 'github' })
+      );
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
     });
   });
 });

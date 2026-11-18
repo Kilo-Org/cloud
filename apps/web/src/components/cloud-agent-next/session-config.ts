@@ -4,6 +4,7 @@
  * Centralized logic for building, validating, and deriving SessionConfig.
  */
 
+import type { SessionConfig as CloudAgentSessionConfig } from '@kilocode/cloud-agent-sdk';
 import type { SessionConfig, ResumeConfig, AgentMode } from './types';
 
 // Re-export AgentMode for backwards compatibility
@@ -100,7 +101,8 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
  * Check if a SessionConfig has valid mode and model for sendMessage.
  *
  * The sendMessage schema requires:
- * - mode: one of the valid agent modes (code, plan, debug, orchestrator, ask)
+ * - mode: any non-empty slug after alias normalization (`build` → `code`,
+ *   `architect` → `plan`)
  * - model: non-empty string (min 1 character)
  *
  * @param config - SessionConfig to validate
@@ -109,11 +111,131 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
 export function isValidSessionConfig(config: SessionConfig | null): config is SessionConfig {
   if (!config) return false;
 
-  const validModes: AgentMode[] = ['code', 'plan', 'debug', 'orchestrator', 'ask'];
-  const hasValidMode = (validModes as string[]).includes(config.mode);
+  const mode = normalizeAlias(config.mode);
+  const hasValidMode = mode.length > 0;
   const hasValidModel = config.model.length > 0;
 
   return hasValidMode && hasValidModel;
+}
+
+/**
+ * Map legacy mode aliases to their canonical built-in slugs.
+ *
+ * `build` → `code` and `architect` → `plan`. Empty, null, and undefined stay
+ * empty so the mode control shows "Select mode" rather than "Code". Any other
+ * non-empty slug passes through unchanged.
+ */
+export function normalizeAlias(mode: string | null | undefined): string {
+  if (mode === 'build') return 'code';
+  if (mode === 'architect') return 'plan';
+  return mode ?? '';
+}
+
+/**
+ * Resolve a mode for the mode control. Empty, null, and undefined become
+ * `undefined` so the picker shows its "Select mode" placeholder instead of
+ * defaulting to "Code".
+ */
+export function modeControlValue(mode: string | null | undefined): string | undefined {
+  return normalizeAlias(mode) || undefined;
+}
+
+/** The five built-in agent mode slugs. */
+const BUILTIN_MODE_SET: ReadonlySet<string> = new Set([
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+]);
+
+/** True when `value` is one of the five built-in slugs. */
+export function isBuiltinAgentMode(value: string): boolean {
+  return BUILTIN_MODE_SET.has(value);
+}
+
+/** One custom-mode row in the mode picker. */
+export type CustomModeOption = {
+  value: string;
+  label: string;
+  description: string;
+};
+
+/**
+ * Drop custom options that collide with a built-in slug and de-duplicate by
+ * value (first occurrence wins).
+ */
+export function dedupeCustomModeOptions(options: CustomModeOption[]): CustomModeOption[] {
+  const seen = new Set<string>();
+  const result: CustomModeOption[] = [];
+  for (const option of options) {
+    if (option.value === '' || isBuiltinAgentMode(option.value) || seen.has(option.value)) {
+      continue;
+    }
+    seen.add(option.value);
+    result.push(option);
+  }
+  return result;
+}
+
+/**
+ * Append the selected slug once when it is neither a built-in nor already in
+ * the custom list, so a prefill or inherited custom slug stays visible.
+ */
+export function ensureSelectedCustomOption(
+  custom: CustomModeOption[],
+  selected: string
+): CustomModeOption[] {
+  if (!selected || isBuiltinAgentMode(selected) || custom.some(o => o.value === selected)) {
+    return custom;
+  }
+  return [...custom, { value: selected, label: selected, description: '' }];
+}
+
+export type SendSelection = {
+  mode: string;
+  model: string;
+  variant: string | undefined;
+};
+
+/**
+ * A runtime agent's model pin wins because the worker materializes that agent
+ * with its own model. Variants are model-specific and stay with their model.
+ * Without a pin, the current picker model and variant take precedence over
+ * session metadata.
+ */
+export function resolveSendSelection(
+  config:
+    | Pick<CloudAgentSessionConfig, 'mode' | 'model' | 'variant' | 'runtimeAgents'>
+    | null
+    | undefined,
+  currentModel?: { model: string | undefined; variant: string | undefined }
+): SendSelection {
+  const selectedAgent = config?.runtimeAgents?.find(agent => agent.slug === config?.mode);
+  const agentModel = selectedAgent?.model?.trim() || undefined;
+  const agentVariant = agentModel ? selectedAgent?.variant?.trim() || undefined : undefined;
+
+  return {
+    mode: normalizeAlias(config?.mode) || 'code',
+    model: agentModel ?? currentModel?.model ?? config?.model ?? '',
+    variant: agentModel
+      ? agentVariant
+      : currentModel?.model !== undefined
+        ? currentModel.variant
+        : (config?.variant ?? undefined),
+  };
+}
+
+export function filterSessionCustomModeOptions(
+  options: CustomModeOption[],
+  runtimeAgents: CloudAgentSessionConfig['runtimeAgents']
+): CustomModeOption[] {
+  const excludedSlugs = new Set(
+    (runtimeAgents ?? [])
+      .filter(agent => agent.disable || agent.hidden || agent.mode === 'subagent')
+      .map(agent => agent.slug)
+  );
+  return options.filter(option => !excludedSlugs.has(option.value));
 }
 
 /**
@@ -136,7 +258,6 @@ export function getModeModelWithSource(options: {
   let modeSource = 'default';
   let modelSource = 'default';
 
-  // Check dbSession first (lower priority)
   if (dbSession?.last_mode) {
     mode = dbSession.last_mode;
     modeSource = 'dbSession';
@@ -146,7 +267,6 @@ export function getModeModelWithSource(options: {
     modelSource = 'dbSession';
   }
 
-  // Then resumeConfig (higher priority - overwrites)
   if (resumeConfig?.mode) {
     mode = resumeConfig.mode;
     modeSource = 'resumeConfig';

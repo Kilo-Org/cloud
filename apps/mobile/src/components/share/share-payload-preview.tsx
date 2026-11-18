@@ -1,10 +1,12 @@
-import { formatFileSize } from '@kilocode/kilo-chat';
 import { File as FileIcon } from '@/components/ui/icons';
 import { ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatFileSize, formatNumber } from '@/lib/format';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -40,6 +42,7 @@ function PreviewImages({ files }: { files: readonly AcceptedShareFile[] }) {
           className="h-16 w-16 rounded-md bg-muted"
           contentFit="cover"
           transition={0}
+          cachePolicy="memory"
           accessibilityLabel={file.name}
         />
       ))}
@@ -61,7 +64,9 @@ function PreviewDocuments({ files }: { files: readonly AcceptedShareFile[] }) {
           <Text numberOfLines={1} className="min-w-0 flex-1 text-sm text-foreground">
             {file.name}
           </Text>
-          <Text className="text-xs text-muted-foreground">{formatFileSize(file.measuredSize)}</Text>
+          <Text className="text-xs text-muted-foreground">
+            {formatFileSize(file.measuredSize, i18n.language)}
+          </Text>
         </View>
       ))}
     </View>
@@ -89,6 +94,7 @@ function RejectionNotes({ notes }: { notes: readonly RejectedNote[] }) {
  * Text → clamped to 3 lines. Skeleton while async measurement runs.
  */
 export function SharePayloadPreview({ payload, validation }: Readonly<SharePayloadPreviewProps>) {
+  const { t } = useTranslation();
   if (validation === null) {
     return (
       <View className="gap-2 px-4 pb-2">
@@ -98,7 +104,25 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
   }
 
   if (validation.kind === 'all-rejected') {
-    return null;
+    // Only the names belong here: the terminal message already says why the
+    // gate cannot continue, and these say which file was unreadable. Other
+    // all-rejected outcomes stay a bare message.
+    if (validation.failedCopies.length === 0) {
+      return null;
+    }
+    return (
+      <View className="gap-0.5 px-4 pb-2">
+        {validation.failedCopies.map((name, index) => (
+          <Text
+            key={`${name}-${index}`}
+            numberOfLines={1}
+            className="text-xs text-muted-foreground"
+          >
+            {name}
+          </Text>
+        ))}
+      </View>
+    );
   }
 
   const text = payload.text.trim();
@@ -108,7 +132,7 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
   return (
     <View className="gap-2 px-4 pb-2">
       {hasText ? (
-        <Text numberOfLines={3} className="text-sm leading-5 text-foreground">
+        <Text numberOfLines={3} className="text-sm leading-[1.25rem] text-foreground">
           {text}
         </Text>
       ) : null}
@@ -120,7 +144,11 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
       ) : null}
       {validation.truncated ? (
         <Text className="text-xs text-muted-foreground">
-          Only the first {AGENT_ATTACHMENT_MAX_FILES} files will be attached.
+          {/* i18n-dup-ok: 'share.onlyFirstFilesAttached_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
+          {t('share.onlyFirstFilesAttached', {
+            count: AGENT_ATTACHMENT_MAX_FILES,
+            displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
+          })}
         </Text>
       ) : null}
       <RejectionNotes notes={validation.rejectedNotes} />

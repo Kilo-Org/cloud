@@ -13,16 +13,20 @@ const VIEW_LABELS: Array<{ value: OrganizationUsageView; label: string }> = [
 export function UsageViewNavigation({
   value,
   onValueChange,
+  isSalesDemo = false,
 }: {
   value: OrganizationUsageView;
   onValueChange: (value: OrganizationUsageView) => void;
+  isSalesDemo?: boolean;
 }) {
+  const views = isSalesDemo ? VIEW_LABELS.filter(view => view.value === 'ai-usage') : VIEW_LABELS;
+
   return (
     <nav
       className="bg-muted flex w-full gap-1 overflow-x-auto rounded-lg p-1 sm:w-fit"
       aria-label="Usage reports"
     >
-      {VIEW_LABELS.map(view => (
+      {views.map(view => (
         <Button
           key={view.value}
           type="button"

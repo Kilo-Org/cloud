@@ -1,10 +1,14 @@
 /* eslint-disable max-lines -- cohesive unit suite for the encrypted-kv open/recovery contract, key validation, and KV behavior */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake native lifecycle methods and vi.fn factories settle without await because node:sqlite calls are synchronous */
-// eslint-disable-next-line import/no-nodejs-modules -- node:sqlite is the only way to run real SQL semantics in a node test; the expo-sqlite native module cannot load here
-import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
+/* eslint-disable import/no-nodejs-modules -- node:sqlite is the only way to run real SQL semantics in a node test, and a file-backed database is the only way to prove a reopen keeps the file; the expo-sqlite native module cannot load here */
+import { rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+/* eslint-enable import/no-nodejs-modules */
 import * as Sentry from '@sentry/react-native';
 import * as Crypto from 'expo-crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The native modules cannot run in a node test, so they are mocked. Drizzle's
 // expo driver drives the *synchronous* expo-sqlite API (`openDatabaseSync`,
@@ -14,15 +18,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // recovery behavior is driven by the test seams below.
 
 const store = new Map<string, string>();
-// Every SQL statement Drizzle prepares, in order. `PRAGMA key`, the probes, and
-// the migration all pass through `prepareSync`, so this is the whole statement
-// stream for one open.
+// Every SQL statement in the order it ran. All three seams append: `getFirstSync`
+// (the cipher and journal-mode probes), `execSync` (`PRAGMA key`, busy_timeout),
+// and `prepareSync` (Drizzle's queries and the migration), so this is the whole
+// statement stream for one open.
 const sqlLog: string[] = [];
 let randomCallCount = 0;
 let failNextProbe = false;
 let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
+// `PRAGMA journal_mode = WAL` returns the mode the connection switched to.
+// node:sqlite's `:memory:` database cannot use WAL, so the fake answers with
+// this seam and the test can force a rejected switch.
+let journalMode = 'wal';
+// Simulates an engine that rejects the pragma outright instead of answering
+// with the mode it kept.
+let failJournalMode = false;
+// Simulates a native handle that will not close. A leaked handle must not be
+// replaced by a second connection to the same file.
+let failClose = false;
 // Simulates a native build without SQLCipher: `PRAGMA cipher_version` returns
 // no row, exactly as plain SQLite does for an unrecognized pragma.
 let hasSQLCipher = true;
@@ -68,12 +83,16 @@ function fakeRows(rows: () => Record<string, unknown>[]): FakeStatement {
   };
 }
 
-/** A statement executed by node:sqlite, in expo-sqlite's result shape. */
-function nativeStatement(statement: StatementSync): FakeStatement {
-  const returnsRows = statement.columns().length > 0;
+/**
+ * A statement executed by the handle open when it runs, in expo-sqlite's result
+ * shape: a close or a reset between the prepare and the execute must not reach a
+ * handle the connection no longer has.
+ */
+function nativeStatement(source: string): FakeStatement {
   return {
     executeSync: (params = []) => {
-      if (!returnsRows) {
+      const statement = currentHandle().prepare(source);
+      if (statement.columns().length === 0) {
         const { changes, lastInsertRowid } = statement.run(...params);
         return {
           changes,
@@ -91,12 +110,16 @@ function nativeStatement(statement: StatementSync): FakeStatement {
       };
     },
     executeForRawResultSync: (params = []) => ({
-      getAllSync: () => statement.all(...params).map(row => Object.values(row)),
+      getAllSync: () =>
+        currentHandle()
+          .prepare(source)
+          .all(...params)
+          .map(row => Object.values(row)),
     }),
   };
 }
 
-function createFakeStatement(native: DatabaseSync, source: string): FakeStatement {
+function createFakeStatement(source: string): FakeStatement {
   // Probe failure seam: a wrong key or corrupt file throws at the probe.
   if (source.includes('sqlite_master')) {
     return fakeRows(() => {
@@ -110,11 +133,37 @@ function createFakeStatement(native: DatabaseSync, source: string): FakeStatemen
       return [{ 'count(*)': 0 }];
     });
   }
-  return nativeStatement(native.prepare(source));
+  return nativeStatement(source);
+}
+
+/**
+ * The one database every open shares. It is a file, not `:memory:`: a reopen
+ * after a close must find the schema and the rows the closed connection wrote,
+ * which a fresh in-memory handle can never show.
+ */
+const databasePath = join(tmpdir(), `kilo-persist-${process.pid}.db`);
+
+/** The handle the open connections use; dropped on close or delete so the next
+ * open creates a new one, as the native module does. */
+let openHandle: DatabaseSync | undefined = undefined;
+
+function currentHandle(): DatabaseSync {
+  openHandle ??= new DatabaseSync(databasePath);
+  return openHandle;
+}
+
+function closeHandle(): void {
+  openHandle?.close();
+  openHandle = undefined;
+}
+
+/** Drop the handle and its file: the next open starts from an empty database. */
+function resetDatabaseFile(): void {
+  closeHandle();
+  rmSync(databasePath, { force: true });
 }
 
 function createFakeDatabase(): FakeDatabase {
-  const native = new DatabaseSync(':memory:');
   return {
     // SQLCipher presence seam. node:sqlite has no `cipher_version` pragma, so
     // the fake answers it directly.
@@ -124,7 +173,13 @@ function createFakeDatabase(): FakeDatabase {
         cipherProbedAtSqlCount = sqlLog.length - 1;
         return hasSQLCipher ? { cipher_version: '4.5.5 community' } : null;
       }
-      return native.prepare(source).get() ?? null;
+      if (source.startsWith('PRAGMA journal_mode')) {
+        if (failJournalMode) {
+          throw new Error('PRAGMA journal_mode failed');
+        }
+        return { journal_mode: journalMode };
+      }
+      return currentHandle().prepare(source).get() ?? null;
     },
     // PRAGMA failure seam: the key call can fail after the handle opened.
     execSync: source => {
@@ -133,15 +188,18 @@ function createFakeDatabase(): FakeDatabase {
         failNextPragma = false;
         throw new Error('PRAGMA key failed');
       }
-      native.exec(source);
+      currentHandle().exec(source);
     },
     prepareSync: source => {
       sqlLog.push(source);
-      return createFakeStatement(native, source);
+      return createFakeStatement(source);
     },
     closeAsync: async () => {
       closeCallCount += 1;
-      native.close();
+      if (failClose) {
+        throw new Error('handle is stuck open');
+      }
+      closeHandle();
     },
   };
 }
@@ -163,27 +221,42 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('expo-sqlite', () => ({
-  openDatabaseSync: vi.fn(() => createFakeDatabase()),
-  deleteDatabaseAsync: vi.fn(async () => undefined),
+  openDatabaseSync: vi.fn(() => {
+    // One live handle to the file, shared by every connection, as the native
+    // module keeps one database per name.
+    currentHandle();
+    return createFakeDatabase();
+  }),
+  // The native delete drops the file under the handle, so the next open starts
+  // from an empty database.
+  deleteDatabaseAsync: vi.fn(async () => {
+    resetDatabaseFile();
+  }),
 }));
 
 vi.mock('@sentry/react-native', () => ({
+  addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
 }));
 
 /* eslint-disable import/first */
+import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
+import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   clearScope,
   clearScopePrefix,
   getItem,
   isValidDbKey,
   listEntries,
+  listValues,
   MissingSQLCipherError,
   removeItem,
+  removeItemIfValue,
   resetEncryptedKvOpenForTests,
   setItem,
+  setItemWithSignal,
   validateItemKey,
   validateScope,
 } from './encrypted-kv';
@@ -198,10 +271,22 @@ beforeEach(() => {
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
+  journalMode = 'wal';
+  failJournalMode = false;
+  failClose = false;
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
+  // Each test starts from its own empty file, and the handle is dropped: the
+  // recovery tests count opens and closes, so a closed handle must force a new one.
+  resetDatabaseFile();
+  setProtectedDataAvailable(true);
   resetEncryptedKvOpenForTests();
+});
+
+// The fake database is a real file, so the run removes the last one it made.
+afterAll(() => {
+  resetDatabaseFile();
 });
 
 describe('scope and key validation', () => {
@@ -209,19 +294,23 @@ describe('scope and key validation', () => {
     await expect(getItem('', 'k')).rejects.toThrow(TypeError);
     await expect(setItem('', 'k', 'v')).rejects.toThrow(TypeError);
     await expect(removeItem('', 'k')).rejects.toThrow(TypeError);
+    await expect(removeItemIfValue('', 'k', 'v')).rejects.toThrow(TypeError);
     await expect(clearScope('')).rejects.toThrow(TypeError);
     await expect(clearScopePrefix('')).rejects.toThrow(TypeError);
     await expect(listEntries('')).rejects.toThrow(TypeError);
+    await expect(listValues('')).rejects.toThrow(TypeError);
   });
 
   it('rejects an empty key', async () => {
     await expect(getItem('s', '')).rejects.toThrow(TypeError);
     await expect(setItem('s', '', 'v')).rejects.toThrow(TypeError);
     await expect(removeItem('s', '')).rejects.toThrow(TypeError);
+    await expect(removeItemIfValue('s', '', 'v')).rejects.toThrow(TypeError);
   });
 
   it('rejects a non-string value', async () => {
     await expect(setItem('s', 'k', 123 as unknown as string)).rejects.toThrow(TypeError);
+    await expect(removeItemIfValue('s', 'k', 123 as unknown as string)).rejects.toThrow(TypeError);
   });
 
   it('validates before opening the database', async () => {
@@ -281,6 +370,11 @@ describe('SQLCipher presence', () => {
     await expect(clearScope('s')).rejects.toThrow(MissingSQLCipherError);
     expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(MissingSQLCipherError), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+      fingerprint: ['encrypted-kv-missing-sqlcipher'],
+    });
   });
 });
 
@@ -332,14 +426,157 @@ describe('single-flight open contract', () => {
     expect(createSql).toContain('`v` text NOT NULL');
   });
 
-  it('records the applied migration so a reopened database does not re-run it', async () => {
+  it('reopens the file without re-running the schema migration', async () => {
     await setItem('s', 'a', 'x');
-    // Drizzle owns the bookkeeping: it creates its ledger, reads the last
-    // applied entry, and records the migration it just ran.
-    expect(
-      sqlLog.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS "__drizzle_migrations"'))
-    ).toBe(true);
-    expect(sqlLog.some(sql => sql.includes('INSERT INTO "__drizzle_migrations"'))).toBe(true);
+
+    // A relaunch: a fresh module state opens the same file again.
+    resetEncryptedKvOpenForTests();
+    const opensBefore = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+    sqlLog.length = 0;
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+
+    // The second open ran, and the ledger the first one wrote in the file kept
+    // it from creating the table again.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(opensBefore + 1);
+    expect(sqlLog.some(sql => sql.includes('CREATE TABLE `kv`'))).toBe(false);
+  });
+});
+
+describe('transient keychain read', () => {
+  it('retries a rejected key read instead of memoizing the open failure', async () => {
+    // The keychain read can reject transiently (device just rebooted, keystore
+    // still locked). The open must retry it: a memoized rejection here would
+    // reject every KV caller for the rest of the process.
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+
+    // The retry read the stored key and the store opened on it.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(sqlLog).toContain(`PRAGMA key = "x'${storedKey}'"`);
+  });
+});
+
+describe('locked device', () => {
+  it('waits for unlock before it reads the key or opens the database', async () => {
+    store.set(PERSIST_DB_KEY, 'a'.repeat(64));
+    setProtectedDataAvailable(false);
+
+    const read = getItem('s', 'k');
+    await Promise.resolve();
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+
+    setProtectedDataAvailable(true);
+    await expect(read).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resets the database when the device locks during the open, and opens again after unlock', async () => {
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    failNextProbe = true;
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      return storedKey;
+    });
+
+    await expect(getItem('s', 'k')).rejects.toBeInstanceOf(ProtectedDataUnavailableError);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    expect(closeCallCount).toBe(1);
+
+    setProtectedDataAvailable(true);
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('opens again after unlock when the key read rejects because the device locked', async () => {
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    const refusal = new Error('keychain refused: device locked');
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      throw refusal;
+    });
+
+    await expect(getItem('s', 'k')).rejects.toBe(refusal);
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+
+    // The raw native refusal must not keep the open memo rejected until relaunch.
+    setProtectedDataAvailable(true);
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+  });
+});
+
+describe('connection configuration', () => {
+  it('configures busy_timeout and WAL after the key and before the first schema read', async () => {
+    await setItem('s', 'a', 'x');
+    const cipherIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA cipher_version'));
+    const keyIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA key'));
+    const busyIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA busy_timeout'));
+    const walIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA journal_mode'));
+    const probeIndex = sqlLog.findIndex(source => source.includes('sqlite_master'));
+
+    // The full SQL order: cipher_version, key, busy_timeout, WAL, then the probe.
+    expect(cipherIndex).toBe(0);
+    expect(keyIndex).toBeGreaterThan(cipherIndex);
+    expect(busyIndex).toBeGreaterThan(keyIndex);
+    expect(walIndex).toBeGreaterThan(busyIndex);
+    expect(probeIndex).toBeGreaterThan(walIndex);
+  });
+
+  it('sets a non-zero busy timeout value on the connection', async () => {
+    await setItem('s', 'a', 'x');
+    const busy = sqlLog.find(source => source.startsWith('PRAGMA busy_timeout'));
+    expect(busy).toBe('PRAGMA busy_timeout = 5000');
+  });
+
+  it('accepts the journal mode the engine reports when WAL is refused', async () => {
+    journalMode = 'delete';
+    await setItem('s', 'a', 'x');
+
+    // The store opened, kept its file, and serves reads from it.
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    // The refusal is visible in the diagnostic trail without filing an event.
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'encrypted-kv',
+      level: 'warning',
+      message: 'journal_mode did not switch to WAL',
+      data: { journal_mode: 'delete' },
+    });
+  });
+
+  it('opens when the engine rejects the journal_mode pragma', async () => {
+    failJournalMode = true;
+    await setItem('s', 'a', 'x');
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'encrypted-kv',
+      level: 'warning',
+      message: 'PRAGMA journal_mode = WAL was rejected',
+      data: { journal_mode: 'unknown' },
+    });
+  });
+
+  it('records no journal-mode breadcrumb when WAL takes effect', async () => {
+    await setItem('s', 'a', 'x');
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
   });
 });
 
@@ -370,6 +607,10 @@ describe('open failure recovery', () => {
       expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
       expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
       expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+        level: 'warning',
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+      });
 
       // The store works on the recovered database.
       await expect(getItem('s', 'a')).resolves.toBe('x');
@@ -426,6 +667,36 @@ describe('open failure recovery', () => {
       await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
     }
   );
+
+  it('aborts the reset without opening a second connection when the previous handle does not close', async () => {
+    failNextProbe = true;
+    failClose = true;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('file is not a database');
+
+    // The probed handle never closed, so recovery must not delete the file or
+    // open a second connection to it.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    // The original open error is reported under the existing subsystem tag.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+  });
+
+  it('aborts the reset when the failed open could not close its handle', async () => {
+    failNextPragma = true;
+    failClose = true;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('PRAGMA key failed');
+
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+  });
 });
 
 describe('database key validation', () => {
@@ -470,6 +741,20 @@ describe('database key validation', () => {
   );
 });
 
+describe('cancelled writes after the database await', () => {
+  it.each(['write', 'delete'])('does not execute an aborted %s', async operation => {
+    await setItem('s', 'key', 'original');
+    const controller = new AbortController();
+    const pending =
+      operation === 'write'
+        ? setItemWithSignal('s', 'key', { value: 'replacement', signal: controller.signal })
+        : removeItem('s', 'key', controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toThrow('cancelled');
+    await expect(getItem('s', 'key')).resolves.toBe('original');
+  });
+});
+
 describe('kv behavior', () => {
   it('stores and reads a value', async () => {
     await setItem('draft:u1', 'agent-composer:new', 'hello');
@@ -509,6 +794,32 @@ describe('kv behavior', () => {
 
   it('removeItem on a missing key is a no-op', async () => {
     await expect(removeItem('s', 'missing')).resolves.toBeUndefined();
+  });
+
+  it('removeItemIfValue removes only the matching value', async () => {
+    await setItem('s', 'a', 'x');
+
+    // A newer write replaced the value: the stale caller's conditional delete
+    // must not remove it.
+    await setItem('s', 'a', 'y');
+    await expect(removeItemIfValue('s', 'a', 'x')).resolves.toBe(false);
+    await expect(getItem('s', 'a')).resolves.toBe('y');
+
+    // The current value matches: the delete runs.
+    await expect(removeItemIfValue('s', 'a', 'y')).resolves.toBe(true);
+    await expect(getItem('s', 'a')).resolves.toBeNull();
+  });
+
+  it('removeItemIfValue leaves other keys and scopes alone', async () => {
+    await setItem('s', 'a', 'x');
+    await setItem('s', 'b', 'x');
+    await setItem('other', 'a', 'x');
+
+    await expect(removeItemIfValue('s', 'a', 'x')).resolves.toBe(true);
+
+    await expect(getItem('s', 'a')).resolves.toBeNull();
+    await expect(getItem('s', 'b')).resolves.toBe('x');
+    await expect(getItem('other', 'a')).resolves.toBe('x');
   });
 
   it('clearScope removes only the exact scope', async () => {
@@ -587,5 +898,23 @@ describe('kv behavior', () => {
 
   it('listEntries returns an empty array for an absent scope', async () => {
     await expect(listEntries('nope')).resolves.toEqual([]);
+  });
+
+  it('listValues reads only the requested scope oldest-first with one statement', async () => {
+    const clock = vi.spyOn(Date, 'now');
+    try {
+      clock.mockReturnValue(2000);
+      await setItem('s', 'newer', 'new');
+      clock.mockReturnValue(1000);
+      await setItem('s', 'older', 'old');
+      await setItem('other', 'older', 'private');
+      sqlLog.length = 0;
+
+      await expect(listValues('s')).resolves.toEqual(['old', 'new']);
+      expect(sqlLog).toHaveLength(1);
+      await expect(listValues('missing')).resolves.toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

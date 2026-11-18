@@ -1,27 +1,61 @@
 import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
-import { sql, eq, and, inArray, isNull, or, isNotNull } from 'drizzle-orm';
+import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
+  messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
+  sessionDiffReadSchema,
+  sessionIdSchema,
+  sessionShareOptionsSchema,
+  storedSessionIdSchema,
+  type KiloSdkMessageHistory,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
-import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
-import { getSessionIngestDO } from '../dos/SessionIngestDO';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
+  zodJsonValidator,
+  DEFAULT_DO_RETRY_CONFIG,
+  isDurableObjectRetryDeadline,
+  isTransientDurableObjectFailure,
+  withDORetry,
+} from '@kilocode/worker-utils';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
+import { getSessionIngestDO, SHARE_INFO_TOO_LARGE_ERROR } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
+import { createConnectionTicket } from '../dos/connection-ticket';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
-import { isDefaultSessionTitle } from '../ingest/default-session-title';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import {
+  applyReportedSessionTitle,
+  reportSessionTitleSchema,
+  sessionTitleSchema,
+} from '../services/session-title';
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
+import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
+import { clearSessionLocalState } from '../services/session-local-state';
+import {
+  lockAndAssertWorkspaceRootSurvives,
+  HostedWorkspaceSessionDeleteError,
+} from '../services/hosted-workspace-session';
 
 export type ApiContext = {
   Bindings: Env;
@@ -74,23 +108,6 @@ function notifyUserSessionEventFromContext(
 
 type SessionDeleteRow = typeof cli_sessions_v2.$inferSelect;
 
-async function clearSessionLocalState(
-  env: Env,
-  kiloUserId: string,
-  sessionId: string
-): Promise<void> {
-  await withDORetry(
-    () => getSessionAccessCacheDO(env, { kiloUserId }),
-    sessionCache => sessionCache.remove(sessionId),
-    'SessionAccessCacheDO.remove'
-  );
-  await withDORetry(
-    () => getSessionIngestDO(env, { kiloUserId, sessionId }),
-    stub => stub.clear(),
-    'SessionIngestDO.clear'
-  );
-}
-
 function notifySessionDeleted(
   c: Context<ApiContext>,
   kiloUserId: string,
@@ -126,6 +143,12 @@ async function deleteOwnedLeafSession(
   sessionId: string
 ) {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  // The worktree deletion owns its members' rows while it runs; deleting one
+  // here would race that delete and strand local session state.
+  if (await isWorktreeSessionDeleting(db, kiloUserId, sessionId)) {
+    return c.json({ success: false, error: 'worktree_deleting' }, 409);
+  }
+
   const existingRows = await db
     .select()
     .from(cli_sessions_v2)
@@ -140,55 +163,69 @@ async function deleteOwnedLeafSession(
     return c.json({ success: false, error: 'session_not_found', cleanup: 'done' }, 404);
   }
 
-  const outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
-    if (existing.cloud_agent_session_scope_id) {
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
+  let outcome: 'deleted' | 'gone' | 'not_leaf';
+  try {
+    outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
+      if (existing.cloud_agent_session_scope_id) {
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
+          )
+          .limit(1)
+          .for('update');
+      }
+
+      const lockedRows = await tx
+        .select()
         .from(cli_sessions_v2)
         .where(
           and(
-            eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
           )
         )
         .limit(1)
         .for('update');
-    }
+      if (!lockedRows[0]) {
+        return 'gone';
+      }
 
-    const lockedRows = await tx
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      )
-      .limit(1)
-      .for('update');
-    if (!lockedRows[0]) {
-      return 'gone';
-    }
-
-    const childRows = await tx
-      .select({ session_id: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.parent_session_id, sessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+      const childRows = await tx
+        .select({ session_id: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.parent_session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
         )
-      )
-      .limit(1);
-    if (childRows[0]) {
-      return 'not_leaf';
-    }
+        .limit(1);
+      if (childRows[0]) {
+        return 'not_leaf';
+      }
 
-    await tx
-      .delete(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      );
-    return 'deleted';
-  });
+      await tx
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+      return 'deleted';
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
+    }
+    throw error;
+  }
 
   if (outcome === 'not_leaf') {
     return c.json({ success: false, error: 'session_not_leaf' }, 409);
@@ -205,15 +242,36 @@ async function deleteOwnedLeafSession(
 }
 
 const createSessionSchema = z.object({
-  sessionId: z.string().startsWith('ses_').length(30),
+  sessionId: sessionIdSchema,
 });
-
-const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
 const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
+
+  // Reject known retired ids before inserting. If this initial probe fails,
+  // the required post-insert tombstone check must still confirm availability.
+  try {
+    const retired = await withDORetry(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId: c.get('user_id'),
+          sessionId: body.sessionId,
+        }),
+      stub => stub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+    if (retired) {
+      return c.json({ success: false, error: 'session_retired' }, 409);
+    }
+  } catch (error) {
+    console.error('Failed to probe session availability before create', {
+      kiloUserId: c.get('user_id'),
+      sessionId: body.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
@@ -244,6 +302,43 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   }
 
   const { createdRow } = result;
+
+  // Worktree deletion writes this tombstone before deleting rows. Checking after
+  // insertion prevents a still-running runtime from recreating deleted history.
+  let ingestDeleted: boolean;
+  try {
+    ingestDeleted = await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: body.sessionId }),
+      async sessionStub => sessionStub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+  } catch (error) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    throw error;
+  }
+
+  if (ingestDeleted) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    return c.json({ success: false, error: 'session_deleted' }, 409);
+  }
 
   if (createdRow) {
     const session = mapSessionEventRow(createdRow);
@@ -297,6 +392,9 @@ api.delete('/session/:sessionId', async c => {
   if (c.get('deletionAudience')) {
     return deleteOwnedLeafSession(c, kiloUserId, parsed.data);
   }
+  if (await isWorktreeSessionDeleting(db, kiloUserId, parsed.data)) {
+    return c.json({ success: false, error: 'worktree_deleting' }, 409);
+  }
 
   const accessibleSession = await resolveAccessibleKiloSession(c.env, {
     kiloUserId,
@@ -348,7 +446,8 @@ api.delete('/session/:sessionId', async c => {
     )
     SELECT
       tree.session_id,
-      tree.organization_id IS NULL OR EXISTS (
+      tree.organization_id IS NULL
+      OR EXISTS (
         SELECT 1
         FROM ${organization_memberships}
         INNER JOIN ${organizations}
@@ -356,6 +455,22 @@ api.delete('/session/:sessionId', async c => {
           AND ${organizations.deleted_at} IS NULL
         WHERE ${organization_memberships.organization_id} = tree.organization_id
           AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM ${organizations} AS active_target_organization
+        INNER JOIN ${organizations} AS active_parent_organization
+          ON active_parent_organization.id = active_target_organization.parent_organization_id
+          AND active_parent_organization.deleted_at IS NULL
+        INNER JOIN ${organization_memberships} AS active_parent_membership
+          ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+          AND active_parent_membership.kilo_user_id = ${kiloUserId}
+          AND active_parent_membership.role IN (${sql.join(
+            ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+            sql`, `
+          )})
+        WHERE active_target_organization.id = tree.organization_id
+          AND active_target_organization.deleted_at IS NULL
       ) AS has_access
     FROM tree
     ORDER BY depth DESC
@@ -378,35 +493,54 @@ api.delete('/session/:sessionId', async c => {
   const deletionSessionScopeId = deletedRows.find(
     row => row.session_id === parsed.data
   )?.cloud_agent_session_scope_id;
+  const deletionTarget = deletedRows.find(row => row.session_id === parsed.data);
 
-  await db.transaction(async tx => {
-    if (deletionSessionScopeId) {
-      // Bootstrap and metadata mutations lock the session scope root before children.
-      // Match that order even when deleting a subtree rooted at a child.
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+  try {
+    await db.transaction(async tx => {
+      if (deletionTarget) {
+        await lockAndAssertWorkspaceRootSurvives(tx, {
+          kiloUserId,
+          row: {
+            session_id: deletionTarget.session_id,
+            cloud_agent_session_id: deletionTarget.cloud_agent_session_id,
+            cloud_agent_worktree_id: deletionTarget.cloud_agent_worktree_id,
+            parent_session_id: deletionTarget.parent_session_id,
+          },
+        });
+      }
+      if (deletionSessionScopeId) {
+        // Bootstrap and metadata mutations lock the session scope root before children.
+        // Match that order even when deleting a subtree rooted at a child.
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
           )
-        )
-        .limit(1)
-        .for('update');
+          .limit(1)
+          .for('update');
+      }
+      for (const sessionId of orderedSessionIds) {
+        await tx
+          .delete(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          );
+      }
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
     }
-    for (const sessionId of orderedSessionIds) {
-      await tx
-        .delete(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        );
-    }
-  });
+    throw error;
+  }
 
   const deletedAt = new Date().toISOString();
   const deletedRowsBySessionId = new Map(deletedRows.map(row => [row.session_id, row]));
@@ -465,24 +599,165 @@ api.post('/session/:sessionId/ingest', async c => {
   return c.json(result.body, result.status);
 });
 
+/**
+ * The stored session snapshot for one Kilo session the user can read. Its id
+ * takes `storedSessionIdSchema` for the same reason the message page does: a
+ * session created before the canonical `ses_…` shape keeps the id it was
+ * created with, and its stored transcript is exported by that id.
+ */
 api.get('/session/:sessionId/export', async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  const parsed = storedSessionIdSchema.safeParse(rawSessionId);
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  // Optional inclusive cut: export only the transcript up to this message.
+  const rawUpToMessageId = c.req.query('upToMessageId');
+  let upToMessageId: string | undefined;
+  if (rawUpToMessageId !== undefined) {
+    const parsedCut = messageIdSchema.safeParse(rawUpToMessageId);
+    if (!parsedCut.success) {
+      return c.json(
+        { success: false, error: 'Invalid upToMessageId', issues: parsedCut.error.issues },
+        400
+      );
+    }
+    upToMessageId = parsedCut.data;
+  }
+
+  const kiloUserId = c.get('user_id');
+  const result = await getSessionExport(c.env, parsed.data, kiloUserId, upToMessageId);
+
+  if (result.status !== 'ok') {
+    return c.json({ success: false, error: result.status }, 404);
+  }
+
+  return c.body(result.stream, 200, {
+    'content-type': 'application/json; charset=utf-8',
+  });
+});
+
+/**
+ * The stored cumulative session diff (`session_diff` item) for one Kilo
+ * session the user can read. Reads only that row, never the transcript.
+ *
+ * The id takes `storedSessionIdSchema`, like every other read of a stored
+ * session: a session created before the canonical `ses_…` shape keeps the id it
+ * was created with, and the details surface of such a session reads its
+ * changes through this route.
+ */
+api.get('/session/:sessionId/diff', async c => {
+  const parsed = storedSessionIdSchema.safeParse(c.req.param('sessionId'));
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
   const kiloUserId = c.get('user_id');
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
-
-  if (stream === null) {
+  const session = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!session) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  return c.body(stream, 200, {
-    'content-type': 'application/json; charset=utf-8',
+  const rawDiff = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+    stub => stub.readSessionDiff(),
+    'SessionIngestDO.readSessionDiff'
+  );
+  const read = sessionDiffReadSchema.safeParse(rawDiff);
+  const diff: SessionDiffRead = read.success ? read.data : { kind: 'invalid_data' };
+  console.log({
+    event: 'session_diff_read',
+    sessionId: parsed.data,
+    outcome: diff.kind,
+    fileCount: diff.kind === 'value' ? diff.files.length : 0,
   });
+
+  return c.json({ success: true, kiloSessionId: parsed.data, diff }, 200);
 });
+
+/**
+ * Deadline for the best-effort session-metadata read on the initial page.
+ *
+ * The read runs alongside the history read and the page is complete without
+ * its result, so it may never extend the page. It is a `withDORetry` scope
+ * rather than `withinBudget` because a retry scope also stops the remaining
+ * attempts and aborts the in-flight one; abandoning only our wait would leave
+ * the retry loop running for seconds after the page has already answered.
+ * Comfortably above this read's normal cost and above the history read's own
+ * p95, and far below the budget the control plane allows the page.
+ */
+const SESSION_METADATA_READ_DEADLINE_MS = 2_000;
+
+/**
+ * Budget for one paged history read against the session's Durable Object.
+ * Strictly below the control plane's 8s upstream budget: a read that has not
+ * answered by then is already lost to the caller, so it answers as a
+ * retryable read failure here instead of holding the request open.
+ */
+const SESSION_HISTORY_READ_BUDGET_MS = 5_000;
+
+type SessionHistoryReadOutcome = 'ok' | 'none' | 'too_large' | 'retryable_failure' | 'invalid_data';
+
+type SessionHistoryRead = {
+  history: KiloSdkMessageHistory | null;
+  outcome: SessionHistoryReadOutcome;
+};
+
+/**
+ * The read did not answer, so nothing is known about the stored page: a retry
+ * can still succeed and the caller must not be told its history is gone.
+ */
+const TRANSIENT_HISTORY_READ: SessionHistoryRead = {
+  history: { kind: 'retryable_failure', phase: 'message_scan' },
+  outcome: 'retryable_failure',
+};
+
+/**
+ * A page the contract can validate has no `kind`; every failure variant has one.
+ * A page also carries its next-page cursor, so a body with only a `messages`
+ * array is not a page the worker failed to read — it is a body this worker
+ * cannot attribute to the stored page, and must stay retryable.
+ */
+function isPageShapedHistory(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'messages' in value &&
+    Array.isArray(value.messages) &&
+    'nextCursor' in value
+  );
+}
+
+function historyReadOutcome(history: KiloSdkMessageHistory | null): SessionHistoryReadOutcome {
+  if (history === null) return 'none';
+  return 'kind' in history ? history.kind : 'ok';
+}
+
+/**
+ * Classify what the Durable Object answered.
+ *
+ * Three outcomes are told apart, because the caller's recovery differs:
+ * - a validated typed answer (a page, `too_large`, `retryable_failure`,
+ *   `invalid_data`, or none) is returned verbatim;
+ * - an answer shaped like a page that the contract rejects is the stored page
+ *   itself, so it stays the terminal `invalid_data`;
+ * - anything else — an unknown failure kind, a body this worker cannot read —
+ *   is not evidence that the stored page is unreadable. Retrying a read that
+ *   never answered is always safe, so it is reported as retryable.
+ */
+function classifyHistoryRead(rawHistory: unknown): SessionHistoryRead {
+  const parsed = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+  if (parsed.success) {
+    return { history: parsed.data, outcome: historyReadOutcome(parsed.data) };
+  }
+  return isPageShapedHistory(rawHistory)
+    ? { history: { kind: 'invalid_data' }, outcome: 'invalid_data' }
+    : TRANSIENT_HISTORY_READ;
+}
 
 /**
  * Paginated session-message history for any Kilo session the user owns.
@@ -491,10 +766,15 @@ api.get('/session/:sessionId/export', async c => {
  * read to `SessionIngestDO.readKiloSdkMessages`. Mobile uses the default
  * page size of 50; the existing max of 100 is honored for callers that
  * request more.
+ *
+ * The id takes `storedSessionIdSchema`: a session created before the
+ * canonical `ses_…` shape was issued keeps the id it was created with, and
+ * this read is what shows its stored transcript. The access check below, not
+ * the id shape, decides who may read it.
  */
 api.get('/session/:sessionId/messages', async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  const parsed = storedSessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
@@ -521,7 +801,7 @@ api.get('/session/:sessionId/messages', async c => {
   const beforeParsed =
     beforeParam === undefined
       ? { success: true as const, data: undefined }
-      : z.string().min(1).max(1024).safeParse(beforeParam);
+      : z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).safeParse(beforeParam);
   if (!beforeParsed.success) {
     return c.json({ success: false, error: 'Invalid before' }, 400);
   }
@@ -552,16 +832,19 @@ api.get('/session/:sessionId/messages', async c => {
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-        eq(organization_memberships.kilo_user_id, kiloUserId)
-      )
+      organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id)
+    )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(kiloUserId)
     )
     .where(
       and(
         eq(cli_sessions_v2.session_id, inputParse.data.kiloSessionId),
         eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-        or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id))
+        personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
       )
     )
     .limit(1);
@@ -569,72 +852,290 @@ api.get('/session/:sessionId/messages', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-    () =>
-      getSessionIngestDO(c.env, {
-        kiloUserId,
+  // The initial page also carries the session metadata. That read is
+  // best-effort and independent of the history read, so it starts alongside it
+  // rather than after it: a second serial Durable Object round trip is pure
+  // added latency on the page the caller is waiting for. Its own deadline
+  // means a stalled RPC cannot hold the page open, and the rejection is
+  // absorbed here so a failed metadata read can never fail the page — or
+  // surface as an unhandled rejection when the history read throws first.
+  const sessionInfoPromise =
+    inputParse.data.before === undefined
+      ? withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+          () =>
+            getSessionIngestDO(c.env, {
+              kiloUserId,
+              sessionId: inputParse.data.kiloSessionId,
+            }),
+          stub => stub.readKiloSdkSessionSnapshot(),
+          'SessionIngestDO.readKiloSdkSessionSnapshot',
+          {
+            ...DEFAULT_DO_RETRY_CONFIG,
+            scope: { deadlineAt: Date.now() + SESSION_METADATA_READ_DEADLINE_MS },
+          }
+        ).catch((error: unknown) => {
+          console.warn(
+            `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,
+            error instanceof Error ? error.message : error
+          );
+          return undefined;
+        })
+      : undefined;
+
+  const readStartedAt = Date.now();
+  // One budget for the read and its confirming retry, so neither can push the
+  // answer past what the caller can still use.
+  const readDeadlineAt = readStartedAt + SESSION_HISTORY_READ_BUDGET_MS;
+
+  const readOnce = async (): Promise<SessionHistoryRead | 'transient'> => {
+    try {
+      const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+        () =>
+          getSessionIngestDO(c.env, {
+            kiloUserId,
+            sessionId: inputParse.data.kiloSessionId,
+          }),
+        stub =>
+          stub.readKiloSdkMessages({
+            limit: inputParse.data.limit,
+            before: inputParse.data.before,
+          }),
+        'SessionIngestDO.readKiloSdkMessages',
+        {
+          ...DEFAULT_DO_RETRY_CONFIG,
+          scope: { deadlineAt: readDeadlineAt },
+        }
+      );
+      return classifyHistoryRead(rawHistory);
+    } catch (error) {
+      // A DO isolate reset is `retryable:false` upstream and would otherwise
+      // leave the read unattributable in production. Log it once.
+      console.warn({
+        event: 'kilo_sdk_history_read_failed',
         sessionId: inputParse.data.kiloSessionId,
-      }),
-    stub =>
-      stub.readKiloSdkMessages({
         limit: inputParse.data.limit,
-        before: inputParse.data.before,
-      }),
-    'SessionIngestDO.readKiloSdkMessages'
-  );
-  const history = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+        hasCursor: inputParse.data.before !== undefined,
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: Date.now() - readStartedAt,
+      });
+      // The platform dropped the hop or the read outlived its budget: the read
+      // never answered, which says nothing about the stored page. Answer the
+      // retryable read failure instead of a 500 the caller cannot classify.
+      if (!isTransientDurableObjectFailure(error) && !isDurableObjectRetryDeadline(error)) {
+        throw error;
+      }
+      return 'transient';
+    }
+  };
+
+  let read = await readOnce();
+  if (read !== 'transient' && read.outcome === 'invalid_data') {
+    // Ingest rewrites a session's rows while the client reads them, so one read
+    // can see a page whose stored identities do not line up yet — the same page
+    // then answers a page a moment later. Only an answer that repeats is
+    // evidence the stored page itself is unreadable, and only then may the
+    // caller be told its history is gone.
+    read = await readOnce();
+  }
+  // A read that never answered on the confirming attempt says nothing about the
+  // stored page either, so it is never reported as the terminal kind.
+  const history = read === 'transient' ? TRANSIENT_HISTORY_READ.history : read.history;
+  const outcome = read === 'transient' ? TRANSIENT_HISTORY_READ.outcome : read.outcome;
+  const page = history !== null && !('kind' in history) ? history : null;
+  // Exactly one structured read-outcome line per request, in the same plain
+  // object shape as `direct_ingest_ok`, so `cloudflare-logpush` names the read
+  // (and its typed outcome) that a stale-transcript report blames.
+  console.log({
+    event: 'kilo_sdk_history_read',
+    sessionId: inputParse.data.kiloSessionId,
+    limit: inputParse.data.limit,
+    hasCursor: inputParse.data.before !== undefined,
+    outcome,
+    messageCount: page?.messages.length ?? 0,
+    omittedItemCount: page?.omittedItemCount ?? 0,
+    hasNextCursor: page ? page.nextCursor !== null : false,
+    durationMs: Date.now() - readStartedAt,
+  });
+
+  // Session-level state travels with the bounded message page so a client can
+  // restore it on open and on reconnect without a second snapshot round trip.
+  // The CLI goal lives in `session.info.metadata`, so only the metadata is
+  // forwarded (never the whole session info). Only the initial page (no
+  // cursor) carries it: older-message pages never rebuild the session header.
+  // Best-effort: a snapshot read failure must not fail the message page; the
+  // live session events still carry goal updates.
+  let sessionMetadata: Record<string, unknown> | null = null;
+  const rawSessionInfo = await sessionInfoPromise;
+  if (typeof rawSessionInfo === 'object' && rawSessionInfo !== null) {
+    const info =
+      'kind' in rawSessionInfo && rawSessionInfo.kind === 'value' && 'info' in rawSessionInfo
+        ? rawSessionInfo.info
+        : undefined;
+    if (typeof info === 'object' && info !== null && 'metadata' in info) {
+      const metadata = info.metadata;
+      if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+        sessionMetadata = metadata as Record<string, unknown>;
+      }
+    }
+  }
 
   return c.json(
     {
       success: true,
       kiloSessionId: inputParse.data.kiloSessionId,
-      history: history.success ? history.data : { kind: 'invalid_data' },
+      history,
+      sessionMetadata,
     },
     200
   );
 });
 
-api.post('/session/:sessionId/share', async c => {
+api.post('/session/:sessionId/share', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
+  const shareOptions = sessionShareOptionsSchema.safeParse(
+    c.req.raw.body === null ? {} : await c.req.json().catch(() => null)
+  );
+  if (!shareOptions.success) {
+    return c.json({ success: false, error: 'Invalid share options' }, 400);
+  }
+
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
-  const publicId = crypto.randomUUID();
-  const shareResult = await db.execute<{ public_id: string }>(sql`
-    UPDATE ${cli_sessions_v2}
-    SET public_id = COALESCE(${cli_sessions_v2.public_id}, ${publicId})
-    WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
-      AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
-      AND (
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          INNER JOIN ${organizations}
-            ON ${organizations.id} = ${organization_memberships.organization_id}
-            AND ${organizations.deleted_at} IS NULL
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
-        )
-      )
-    RETURNING ${cli_sessions_v2.public_id}
-  `);
-
-  const sharedSession = shareResult.rows[0];
-  if (!sharedSession) {
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!accessibleSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const shareToken = await signSessionShareToken(c.env, {
-    sessionId: parsed.data,
-    publicId: sharedSession.public_id,
-  });
+  const publicId = crypto.randomUUID();
+  const removeSnapshot = () =>
+    withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(publicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
 
-  return c.json({ success: true, share_token: shareToken }, 200);
+  // Freeze the public info and mint the capability before mutating the row so
+  // a snapshot or signing failure leaves the previous generation untouched.
+  let sharedAt = Date.now();
+  try {
+    if (!shareOptions.data.include_new_messages) {
+      sharedAt = await withDORetry(
+        () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+        stub => stub.captureShareInfo(publicId, shareOptions.data.duration),
+        'SessionIngestDO.captureShareInfo'
+      );
+    }
+  } catch (error) {
+    await removeSnapshot();
+    if (error instanceof Error && error.message === SHARE_INFO_TOO_LARGE_ERROR) {
+      return c.json({ success: false, error: 'share_snapshot_too_large' }, 413);
+    }
+    if (error instanceof Error && error.message === 'Session deleted') {
+      return c.json({ success: false, error: 'session_not_found' }, 404);
+    }
+    throw error;
+  }
+
+  let shareToken: string;
+  try {
+    shareToken = await signSessionShareToken(
+      c.env,
+      {
+        sessionId: parsed.data,
+        publicId,
+        ...shareOptions.data,
+      },
+      { now: () => new Date(sharedAt) }
+    );
+  } catch (error) {
+    await removeSnapshot();
+    throw error;
+  }
+
+  // Every share rotates `public_id`, which invalidates the predecessor even
+  // while its signature is still valid. Snapshot links use the capture timestamp
+  // as their signed cutoff and expiry origin.
+  const sharedSession = await db
+    .transaction(async tx => {
+      const [previous] = await tx
+        .select({ publicId: cli_sessions_v2.public_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.data),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (!previous) return null;
+      const result = await tx.execute<{ public_id: string }>(sql`
+      UPDATE ${cli_sessions_v2}
+      SET public_id = ${publicId}
+      WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
+        AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
+        AND (
+          ${cli_sessions_v2.organization_id} IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM ${organization_memberships}
+            INNER JOIN ${organizations}
+              ON ${organizations.id} = ${organization_memberships.organization_id}
+              AND ${organizations.deleted_at} IS NULL
+            WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
+              AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM ${organizations} AS active_target_organization
+            INNER JOIN ${organizations} AS active_parent_organization
+              ON active_parent_organization.id = active_target_organization.parent_organization_id
+              AND active_parent_organization.deleted_at IS NULL
+            INNER JOIN ${organization_memberships} AS active_parent_membership
+              ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+              AND active_parent_membership.kilo_user_id = ${kiloUserId}
+              AND active_parent_membership.role IN (${sql.join(
+                ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+                sql`, `
+              )})
+            WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
+              AND active_target_organization.deleted_at IS NULL
+          )
+        )
+      RETURNING ${cli_sessions_v2.public_id}
+    `);
+      return result.rows[0] ? previous : null;
+    })
+    .catch(async error => {
+      await removeSnapshot();
+      throw error;
+    });
+
+  if (!sharedSession) {
+    await removeSnapshot();
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+  const previousPublicId = sharedSession.publicId;
+  if (previousPublicId) {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
+  }
+
+  /* The capability it just wrote, not only the token: the app compares it with
+     the one a later read reports, which is what says the link it is showing is
+     still the live one. */
+  return c.json({ success: true, share_token: shareToken, public_id: publicId }, 200);
 });
 
 api.post('/session/:sessionId/unshare', async c => {
@@ -655,34 +1156,51 @@ api.post('/session/:sessionId/unshare', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const sessionRows = await db
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  if (!sessionRows[0]) {
+  const previous = await db.transaction(async tx => {
+    const [session] = await tx
+      .select({ publicId: cli_sessions_v2.public_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1)
+      .for('update');
+    if (!session) return null;
+    await tx
+      .update(cli_sessions_v2)
+      .set({ public_id: null })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      );
+    return session;
+  });
+  if (!previous) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  await db
-    .update(cli_sessions_v2)
-    .set({ public_id: null })
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    );
+  const previousPublicId = previous.publicId;
+  if (previousPublicId) {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(error => {
+      console.warn('Failed to clear share snapshot after unshare', {
+        sessionId: parsed.data,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
 
   return c.json({ success: true }, 200);
 });
 
-const reportSessionTitleSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  generated: z.boolean(),
-});
-
-api.post('/session/:sessionId/rename-notify', async c => {
+api.post('/session/:sessionId/rename-notify', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -690,7 +1208,7 @@ api.post('/session/:sessionId/rename-notify', async c => {
   }
 
   const bodyParse = z
-    .object({ title: z.string().trim().min(1) })
+    .object({ title: sessionTitleSchema })
     .safeParse(await c.req.json().catch(() => null));
   if (!bodyParse.success) {
     return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
@@ -710,7 +1228,7 @@ api.post('/session/:sessionId/rename-notify', async c => {
   return c.json({ delivered }, 200);
 });
 
-api.post('/session/:sessionId/title', async c => {
+api.post('/session/:sessionId/title', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -724,67 +1242,64 @@ api.post('/session/:sessionId/title', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
-  const { title, generated } = bodyParse.data;
 
-  const existingRows = await db
-    .select()
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  const existing = existingRows[0];
-  if (!existing) {
+  const result = await applyReportedSessionTitle(db, {
+    sessionId: parsed.data,
+    kiloUserId,
+    input: bodyParse.data,
+  });
+  if (result.kind === 'not_found') {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  // generated: true applies only over NULL or default-pattern titles (Decision 8).
-  // generated: false is last-write-wins.
-  if (generated && !isDefaultSessionTitle(existing.title)) {
+  if (result.kind === 'refused') {
     return c.json({ applied: false }, 200);
   }
 
-  // Ownership filter shared by both paths. For generated writes, also CAS on the
-  // title observed at read time so a concurrent rename (or other non-default write)
-  // between select and update cannot be clobbered — Decision 8 must hold at write time.
-  const ownership = and(
-    eq(cli_sessions_v2.session_id, parsed.data),
-    eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-  );
-  const writeWhere = generated
-    ? and(
-        ownership,
-        existing.title == null
-          ? isNull(cli_sessions_v2.title)
-          : eq(cli_sessions_v2.title, existing.title)
-      )
-    : ownership;
-
-  // Preserve updated_at so title-only writes do not reorder activity lists
-  // (same as the web rename path).
-  const [updatedRow] = await db
-    .update(cli_sessions_v2)
-    .set({ title, updated_at: existing.updated_at })
-    .where(writeWhere)
-    .returning();
-
-  if (!updatedRow) {
-    // Generated CAS miss (intervening rename / non-default write) → refused, not 404.
-    if (generated) {
-      return c.json({ applied: false }, 200);
-    }
-    return c.json({ success: false, error: 'session_not_found' }, 404);
-  }
-
-  const session = mapSessionEventRow(updatedRow);
+  const session = mapSessionEventRow(result.row);
   notifyUserSessionEventFromContext(c, kiloUserId, {
     type: 'session.updated',
     data: { source: 'v2', session, changedAt: session.updatedAt },
   });
 
-  return c.json({ title: session.title ?? title, applied: true }, 200);
+  return c.json({ title: session.title ?? bodyParse.data.title, applied: true }, 200);
 });
+
+/**
+ * Budget for the best-effort `cli_sessions_v2` title overlay on
+ * `/sessions/active`. The heartbeat answer is already complete without it, so
+ * the overlay may never extend the request: a stalled Postgres hop falls back
+ * to the heartbeat titles instead of spending the caller's budget. Generous
+ * against this route's normal p99, and a small fraction of the budget its
+ * control-plane caller allows.
+ */
+const ACTIVE_SESSION_TITLE_OVERLAY_BUDGET_MS = 1_500;
+
+/**
+ * Resolve with `work` when it settles inside `budgetMs`, otherwise reject with
+ * a budget error. `PromiseLike` rather than `Promise` because the caller passes
+ * a Drizzle query builder, which is thenable but not a platform promise, and
+ * `Promise.resolve` is what normalizes a thenable that forwards its own pending
+ * value onward. `work` keeps its handlers, so an abandoned query that settles
+ * late is consumed instead of surfacing as an unhandled rejection.
+ */
+function withinBudget<T>(work: PromiseLike<T>, budgetMs: number, label: string): Promise<T> {
+  const { promise, resolve, reject } = Promise.withResolvers<T>();
+  const timer = setTimeout(
+    () => reject(new Error(`${label} exceeded its ${budgetMs}ms budget`)),
+    budgetMs
+  );
+  Promise.resolve(work).then(
+    value => {
+      clearTimeout(timer);
+      resolve(value);
+    },
+    error => {
+      clearTimeout(timer);
+      reject(error);
+    }
+  );
+  return promise;
+}
 
 api.get('/sessions/active', async c => {
   const kiloUserId = c.get('user_id');
@@ -796,23 +1311,29 @@ api.get('/sessions/active', async c => {
   // only to Postgres) is reflected on the next poll instead of waiting for
   // the CLI's next heartbeat. The overlay is best-effort: a DB failure must
   // not blank the entire Remote section, so we fall back to the heartbeat
-  // titles and return 200.
+  // titles and return 200. It is also bounded: it is an embellishment on an
+  // answer that is already complete, so it may never hold the request open
+  // and spend the caller's budget on a stalled Postgres hop.
   if (sessions.length > 0) {
     const ids = sessions.map(s => s.id);
     try {
       const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
-      const titleRows = await db
-        .select({
-          session_id: cli_sessions_v2.session_id,
-          title: cli_sessions_v2.title,
-        })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            inArray(cli_sessions_v2.session_id, ids)
-          )
-        );
+      const titleRows = await withinBudget(
+        db
+          .select({
+            session_id: cli_sessions_v2.session_id,
+            title: cli_sessions_v2.title,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              inArray(cli_sessions_v2.session_id, ids)
+            )
+          ),
+        ACTIVE_SESSION_TITLE_OVERLAY_BUDGET_MS,
+        'active-session title overlay'
+      );
 
       const titleBySessionId = new Map<string, string>();
       for (const row of titleRows) {
@@ -887,18 +1408,48 @@ api.get('/user/web', async c => {
 });
 
 // Web UI mints a one-use ticket before opening /api/user/web. The ticket is
-// opaque (UUID); the DO stores { userId, expiresAt } keyed by the ticket and
-// the websocket upgrade consumes it exactly once.
+// opaque; its object stores { userId, expiresAt, secret } and the websocket
+// upgrade consumes it exactly once.
+//
+// The mint is the caller's only answer, and it targets a fresh — therefore
+// cold — Durable Object, so it is bounded below the control plane's 8s
+// upstream budget: a mint that has not answered by then is answered here as
+// retryable, instead of letting the caller's fetch budget expire with no
+// attributable response.
+const WEB_TICKET_MINT_BUDGET_MS = 3_000;
+
 api.post('/user/web-ticket', async c => {
   const kiloUserId = c.get('user_id');
-  const ticket = crypto.randomUUID();
+  const { ticket, secret, getStub } = createConnectionTicket(c.env.CONNECTION_TICKET_DO);
   const doExpiresAt = Date.now() + 60_000;
 
-  const stub = c.env.CONNECTION_TICKET_DO.get(c.env.CONNECTION_TICKET_DO.idFromName(ticket));
-  await stub.mint({
-    userId: kiloUserId,
-    expiresAt: doExpiresAt,
-  });
+  try {
+    await withDORetry(
+      getStub,
+      stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
+      'ConnectionTicketDO.mint',
+      {
+        ...DEFAULT_DO_RETRY_CONFIG,
+        scope: { deadlineAt: Date.now() + WEB_TICKET_MINT_BUDGET_MS },
+      }
+    );
+  } catch (error) {
+    if (!isTransientDurableObjectFailure(error) && !isDurableObjectRetryDeadline(error)) {
+      throw error;
+    }
+    // The mint may not have run, so a retry can still succeed. It may also have
+    // committed: the retry scope re-checks its deadline after the operation
+    // resolves, so an attempt that committed can still be reported here as a
+    // timeout. That is safe because `createConnectionTicket` picks one object id
+    // and one secret before the retry, so every attempt re-mints the same
+    // ticket slot, and this response never returns that secret: an orphaned
+    // ticket is unreachable and expires with its own TTL.
+    console.warn({
+      event: 'web_ticket_mint_unavailable',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'ticket_mint_unavailable' }, 503);
+  }
 
   return c.json({ ticket, expiresAt: Math.floor(doExpiresAt / 1000) }, 200);
 });

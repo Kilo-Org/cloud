@@ -1,0 +1,289 @@
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test reads the server cap constants off disk, which is the only place a mobile mirror that drifted from them is observable */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  addCommand,
+  cleanVariableKey,
+  isValidVariableKey,
+  MAX_PROFILE_AGENTS,
+  MAX_PROFILE_KILO_COMMANDS,
+  MAX_PROFILE_MCP_SERVERS,
+  MAX_SETUP_COMMANDS,
+  moveCommand,
+  parseSkillFrontmatter,
+  removeCommand,
+  replaceCommand,
+  SKILL_NAME_MAX_LENGTH,
+  skillNameFromMarkdown,
+  validateProfileDescription,
+  validateProfileName,
+  validateSkillInput,
+} from '@/lib/agent-profile-forms';
+
+describe('validateProfileName', () => {
+  it('accepts a trimmed name within the 1..100 bound', () => {
+    expect(validateProfileName('Backend debugging')).toBeNull();
+    expect(validateProfileName('  padded  ')).toBeNull();
+  });
+
+  it('reports an empty name after trimming', () => {
+    expect(validateProfileName('')).toBe('empty');
+    expect(validateProfileName('   ')).toBe('empty');
+  });
+
+  it('reports a name longer than 100 characters', () => {
+    expect(validateProfileName('a'.repeat(100))).toBeNull();
+    expect(validateProfileName('a'.repeat(101))).toBe('too-long');
+  });
+});
+
+describe('validateProfileDescription', () => {
+  it('accepts a trimmed description within the 500 bound', () => {
+    expect(validateProfileDescription('Reviews a diff')).toBeNull();
+    expect(validateProfileDescription('  padded  ')).toBeNull();
+    expect(validateProfileDescription('')).toBeNull();
+    expect(validateProfileDescription('a'.repeat(500))).toBeNull();
+  });
+
+  it('reports a description longer than 500 characters', () => {
+    expect(validateProfileDescription('a'.repeat(501))).toBe('too-long');
+  });
+
+  it('measures the trimmed length, not the raw length', () => {
+    expect(validateProfileDescription(`  ${'a'.repeat(500)}  `)).toBeNull();
+    expect(validateProfileDescription(`  ${'a'.repeat(501)}  `)).toBe('too-long');
+  });
+});
+
+describe('parseSkillFrontmatter', () => {
+  it('parses unquoted name and description', () => {
+    const markdown = ['---', 'name: code-review', 'description: Reviews a diff', '---', ''].join(
+      '\n'
+    );
+    expect(parseSkillFrontmatter(markdown)).toEqual({
+      name: 'code-review',
+      description: 'Reviews a diff',
+    });
+  });
+
+  it('strips matching double and single quotes', () => {
+    expect(
+      parseSkillFrontmatter(
+        ['---', 'name: "code-review"', "description: 'Reviews a diff'", '---', ''].join('\n')
+      )
+    ).toEqual({ name: 'code-review', description: 'Reviews a diff' });
+  });
+
+  it('handles CRLF line endings', () => {
+    const markdown = '---\r\nname: crlf-skill\r\ndescription: Windows file\r\n---\r\nbody';
+    expect(parseSkillFrontmatter(markdown)).toEqual({
+      name: 'crlf-skill',
+      description: 'Windows file',
+    });
+  });
+
+  it('returns nothing without a leading frontmatter block', () => {
+    expect(parseSkillFrontmatter('# Just markdown')).toEqual({});
+    expect(parseSkillFrontmatter('')).toEqual({});
+  });
+
+  it('ignores unrelated frontmatter fields and missing fields', () => {
+    expect(parseSkillFrontmatter(['---', 'name: only-name', '---', ''].join('\n'))).toEqual({
+      name: 'only-name',
+      description: undefined,
+    });
+    expect(parseSkillFrontmatter(['---', 'license: MIT', '---', ''].join('\n'))).toEqual({
+      name: undefined,
+      description: undefined,
+    });
+  });
+});
+
+describe('validateSkillInput', () => {
+  const content = ['---', 'name: my-skill', 'description: Does a thing', '---', 'Body'].join('\n');
+
+  it('accepts a valid name and content', () => {
+    expect(validateSkillInput({ name: 'my-skill', content })).toEqual({
+      error: null,
+      description: 'Does a thing',
+    });
+  });
+
+  it('accepts valid input without frontmatter and returns no description', () => {
+    expect(validateSkillInput({ name: 'my-skill', content: 'Body only' })).toEqual({ error: null });
+  });
+
+  it('reports an empty name even with content present', () => {
+    expect(validateSkillInput({ name: '   ', content })).toEqual({ error: 'empty' });
+  });
+
+  it('reports a name the server pattern rejects', () => {
+    expect(validateSkillInput({ name: 'My Skill', content })).toEqual({ error: 'bad-name' });
+    expect(validateSkillInput({ name: '-leading-dash', content })).toEqual({ error: 'bad-name' });
+    expect(validateSkillInput({ name: 'Upper', content })).toEqual({ error: 'bad-name' });
+  });
+
+  it('reports a name over the server length bound', () => {
+    expect(validateSkillInput({ name: 'a'.repeat(101), content })).toEqual({ error: 'too-long' });
+    expect(validateSkillInput({ name: 'a'.repeat(120), content })).toEqual({ error: 'too-long' });
+  });
+
+  it('accepts a name at the server length bound', () => {
+    expect(validateSkillInput({ name: 'a'.repeat(SKILL_NAME_MAX_LENGTH), content })).toEqual({
+      error: null,
+      description: 'Does a thing',
+    });
+  });
+
+  it('reports the length rule, not the pattern, for an over-long name the pattern also rejects', () => {
+    expect(validateSkillInput({ name: 'A'.repeat(120), content })).toEqual({ error: 'too-long' });
+  });
+
+  it('reports empty content', () => {
+    expect(validateSkillInput({ name: 'my-skill', content: '   ' })).toEqual({
+      error: 'no-content',
+    });
+  });
+});
+
+/** A SKILL.md whose frontmatter carries `name`. */
+function skillMarkdown(name: string): string {
+  return ['---', `name: ${name}`, 'description: Does a thing', '---', 'Body'].join('\n');
+}
+
+describe('skillNameFromMarkdown', () => {
+  it('reduces a frontmatter name to the server name rule', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('My Skill'))).toBe('my-skill');
+    expect(skillNameFromMarkdown(skillMarkdown('-leading-dash'))).toBe('leading-dash');
+    expect(skillNameFromMarkdown(skillMarkdown('code_review.v2'))).toBe('code-review-v2');
+  });
+
+  it('keeps a name that already satisfies the rule', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('code-review'))).toBe('code-review');
+  });
+
+  it('folds an accented name into one word instead of splitting it', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('naïve café'))).toBe('naive-cafe');
+  });
+
+  it('fills nothing for a name written in another script', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('مراجعة الجودة'))).toBeUndefined();
+  });
+
+  it('fills nothing without frontmatter or without a name', () => {
+    expect(skillNameFromMarkdown('# Just markdown')).toBeUndefined();
+    expect(
+      skillNameFromMarkdown(['---', 'description: Only a description', '---', 'Body'].join('\n'))
+    ).toBeUndefined();
+  });
+
+  it('accepts the slug it returns', () => {
+    const name = skillNameFromMarkdown(skillMarkdown('Quality Review'));
+    expect(name).toBe('quality-review');
+    expect(
+      validateSkillInput({ name: name ?? '', content: skillMarkdown('Quality Review') })
+    ).toMatchObject({ error: null });
+  });
+});
+
+describe('variable keys', () => {
+  it('cleans a typed key into the stored shape', () => {
+    expect(cleanVariableKey('api key')).toBe('API_KEY');
+    expect(cleanVariableKey('api-key.v2')).toBe('API_KEY_V2');
+    expect(cleanVariableKey('ALREADY_OK')).toBe('ALREADY_OK');
+  });
+
+  it('keeps a cleaned key starting with a digit acceptable to the server', () => {
+    expect(cleanVariableKey('1var')).toBe('_1VAR');
+    expect(cleanVariableKey('2.0-version')).toBe('_2_0_VERSION');
+    expect(cleanVariableKey('_1VAR')).toBe('_1VAR');
+  });
+
+  it('validates the 1..128 non-empty bound', () => {
+    expect(isValidVariableKey('API_KEY')).toBe(true);
+    expect(isValidVariableKey('a'.repeat(128))).toBe(true);
+    expect(isValidVariableKey('a'.repeat(129))).toBe(false);
+    expect(isValidVariableKey('   ')).toBe(false);
+  });
+});
+
+describe('setup command list operations', () => {
+  const commands = ['pnpm install', 'pnpm build', 'pnpm test'];
+
+  it('appends a blank command', () => {
+    expect(addCommand(commands)).toEqual(['pnpm install', 'pnpm build', 'pnpm test', '']);
+    expect(addCommand([])).toEqual(['']);
+  });
+
+  it('refuses a command beyond the server list cap', () => {
+    const atCap = Array.from({ length: MAX_SETUP_COMMANDS }, (_, index) => `cmd ${index}`);
+    expect(addCommand(atCap)).toEqual(atCap);
+  });
+
+  it('replaces the command at an index', () => {
+    expect(replaceCommand(commands, 1, 'pnpm lint')).toEqual([
+      'pnpm install',
+      'pnpm lint',
+      'pnpm test',
+    ]);
+    expect(replaceCommand(commands, 7, 'ignored')).toEqual(commands);
+  });
+
+  it('removes the command at an index without touching the source list', () => {
+    expect(removeCommand(commands, 0)).toEqual(['pnpm build', 'pnpm test']);
+    expect(removeCommand(commands, 7)).toEqual(commands);
+    expect(commands).toEqual(['pnpm install', 'pnpm build', 'pnpm test']);
+  });
+
+  it('moves a command up and down', () => {
+    expect(moveCommand(commands, 2, -1)).toEqual(['pnpm install', 'pnpm test', 'pnpm build']);
+    expect(moveCommand(commands, 0, 1)).toEqual(['pnpm build', 'pnpm install', 'pnpm test']);
+  });
+
+  it('clamps a move at both edges and returns new arrays', () => {
+    expect(moveCommand(commands, 0, -1)).toEqual(commands);
+    expect(moveCommand(commands, 2, 1)).toEqual(commands);
+    expect(moveCommand(commands, 5, -1)).toEqual(commands);
+    expect(moveCommand(commands, 0, -1)).not.toBe(commands);
+    expect(commands).toEqual(['pnpm install', 'pnpm build', 'pnpm test']);
+  });
+});
+
+describe('profile list caps', () => {
+  // The mobile bundle cannot import the server packages, so each cap is a mirror.
+  // These assertions read the server source, so raising a server cap fails here
+  // in the same change instead of leaving a screen that disables the add early.
+  // The path resolves from this test file, so a runner launched from any working
+  // directory reads the same checkout's server packages.
+  const serverCap = (file: string, name: string): number => {
+    const fromHere = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', file);
+    const source = readFileSync(fromHere, 'utf8');
+    const match = new RegExp(`export const ${name} = (\\d+);`).exec(source);
+    if (match === null) {
+      throw new Error(`${name} is not declared in ${file}`);
+    }
+    return Number(match[1]);
+  };
+
+  it('mirrors the agent, MCP server and slash command caps', () => {
+    expect(MAX_PROFILE_AGENTS).toBe(
+      serverCap('packages/cloud-agent-profile/src/contracts/agents.ts', 'MAX_PROFILE_AGENTS')
+    );
+    expect(MAX_PROFILE_MCP_SERVERS).toBe(
+      serverCap(
+        'packages/cloud-agent-profile/src/profile-mcp-service.ts',
+        'MAX_PROFILE_MCP_SERVERS'
+      )
+    );
+    expect(MAX_PROFILE_KILO_COMMANDS).toBe(
+      serverCap(
+        'packages/cloud-agent-profile/src/contracts/kilo-commands.ts',
+        'MAX_PROFILE_KILO_COMMANDS'
+      )
+    );
+  });
+});

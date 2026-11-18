@@ -2,27 +2,48 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import {
-  clearAnalysisStatus,
+  clearSupersededAnalysisStatus,
   getSecurityAgentConfigForOwner,
   getSecurityFindingById,
   setFindingPending,
   tryAcquireAnalysisStartLease,
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
-import { buildSecurityAnalysisCallbackTarget, startSecurityAnalysis } from './launch.js';
-import { generateApiToken } from './token.js';
+import { readAnalysisCreditAdmission } from './credit-admission.js';
+import {
+  InsufficientCreditsError,
+  buildSecurityAnalysisCallbackTarget,
+  startSecurityAnalysis,
+} from './launch.js';
+import { generateControlToken, generateTriageToken } from './token.js';
+import type * as SessionInterruptModule from './session-interrupt.js';
+import {
+  SESSION_CLEANUP_TIMEOUT_MS,
+  interruptAnalysisCloudAgentSession,
+} from './session-interrupt.js';
 import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
-  clearAnalysisStatus: vi.fn(),
+  clearSupersededAnalysisStatus: vi.fn(),
   getSecurityAgentConfigForOwner: vi.fn(),
   getSecurityFindingById: vi.fn(),
   setFindingPending: vi.fn(),
   tryAcquireAnalysisStartLease: vi.fn(),
 }));
 vi.mock('./analysis-start-lifecycle.js', () => ({ transitionAnalysisStartLifecycle: vi.fn() }));
-vi.mock('./token.js', () => ({ generateApiToken: vi.fn() }));
+vi.mock('./token.js', () => ({ generateControlToken: vi.fn(), generateTriageToken: vi.fn() }));
 vi.mock('./triage.js', () => ({ triageSecurityFinding: vi.fn() }));
+vi.mock('./credit-admission.js', () => ({ readAnalysisCreditAdmission: vi.fn() }));
+vi.mock('./session-interrupt.js', async importOriginal => {
+  const actual = await importOriginal<typeof SessionInterruptModule>();
+  return {
+    ...actual,
+    // The cleanup's bound is asserted through the `timeoutMs` the start passes,
+    // so the mock still runs the real interrupt and its request reaches the
+    // stubbed fetch instead of hanging the test until the deadline.
+    interruptAnalysisCloudAgentSession: vi.fn(actual.interruptAnalysisCloudAgentSession),
+  };
+});
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const workerConfig = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
@@ -123,6 +144,26 @@ function createAutoDismissDb() {
   return { db, updates, auditRows };
 }
 
+function prepareSessionResponse(cloudAgentSessionId = 'agent-session') {
+  return Response.json({
+    result: { data: { cloudAgentSessionId, kiloSessionId: 'ses-123' } },
+  });
+}
+
+function requestsTo(calls: unknown[][], urlPart: string): Request[] {
+  return calls
+    .map(call => call[0])
+    .filter(
+      (request): request is Request => request instanceof Request && request.url.includes(urlPart)
+    );
+}
+
+function firstCallOrder(mock: { mock: { invocationCallOrder: number[] } }): number {
+  const [order] = mock.mock.invocationCallOrder;
+  if (order === undefined) throw new Error('Expected at least one call');
+  return order;
+}
+
 function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch, db: unknown = {}) {
   return {
     db: db as never,
@@ -141,7 +182,6 @@ function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch, 
     triageModel: 'triage/model',
     analysisModel: 'analysis/model',
     analysisMode: 'auto' as const,
-    organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     nextAuthSecret: 'next-auth-secret',
     internalApiSecret: 'internal-api-secret',
     callbackTokenSecret: CALLBACK_SECRET,
@@ -225,14 +265,16 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(true);
-    vi.mocked(generateApiToken).mockResolvedValue('auth-token');
+    vi.mocked(generateControlToken).mockResolvedValue('control-token');
+    vi.mocked(generateTriageToken).mockResolvedValue('triage-token');
     vi.mocked(getSecurityAgentConfigForOwner).mockResolvedValue({
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',
     } as never);
     vi.mocked(setFindingPending).mockResolvedValue(undefined);
-    vi.mocked(clearAnalysisStatus).mockResolvedValue(undefined);
+    vi.mocked(clearSupersededAnalysisStatus).mockResolvedValue(undefined);
     vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({ outcome: 'admitted' });
   });
 
   it('stores scoped callback token instead of raw internal API secret', async () => {
@@ -270,6 +312,47 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(prepareBody).not.toMatchObject({
       callbackTarget: { headers: { 'X-Internal-Secret': expect.any(String) } },
     });
+  });
+
+  it('passes the prepareSession organization to the modern control token', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+    const params = createParams(
+      false,
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({
+            result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+          })
+        )
+        .mockResolvedValueOnce(
+          Response.json({ result: { data: { executionId: 'exec-123', status: 'running' } } })
+        ) as never
+    );
+
+    await expect(startSecurityAnalysis(params)).resolves.toEqual({
+      started: true,
+      triageOnly: false,
+    });
+
+    expect(generateControlToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-123' }),
+      'next-auth-secret',
+      'development',
+      undefined,
+      organizationId
+    );
+    expect(generateTriageToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-123' }),
+      'next-auth-secret',
+      'development',
+      undefined,
+      organizationId
+    );
+    expect(triageSecurityFinding).toHaveBeenCalledWith(expect.objectContaining({ organizationId }));
   });
 
   it('reuses existing triage and launches sandbox without retriaging', async () => {
@@ -367,7 +450,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
         }),
       })
     );
-    expect(clearAnalysisStatus).not.toHaveBeenCalled();
+    expect(clearSupersededAnalysisStatus).not.toHaveBeenCalled();
   });
 
   it('launches sandbox analysis when explicitly forced by remediation', async () => {
@@ -563,6 +646,332 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
       {},
       expect.objectContaining({ outcome: expect.objectContaining({ type: 'sandbox-running' }) })
+    );
+  });
+
+  it('applies the credit admission before triage and session preparation', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({
+      outcome: 'insufficient_credits',
+      message: 'Insufficient credits: $1 minimum required',
+    });
+    const cloudAgentFetch = vi.fn();
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).rejects.toBeInstanceOf(InsufficientCreditsError);
+
+    expect(triageSecurityFinding).not.toHaveBeenCalled();
+    expect(setFindingPending).not.toHaveBeenCalled();
+    expect(cloudAgentFetch).not.toHaveBeenCalled();
+  });
+
+  it('reads admission with the organization id of an organization-owned finding', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({
+      outcome: 'insufficient_credits',
+      message: 'Insufficient credits',
+    });
+
+    await expect(
+      startSecurityAnalysis(createParams(false, vi.fn() as never))
+    ).rejects.toBeInstanceOf(InsufficientCreditsError);
+
+    expect(readAnalysisCreditAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authToken: 'control-token',
+        organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      })
+    );
+  });
+
+  it('reads admission without an organization id for a personally owned finding', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({
+      ...finding,
+      owned_by_organization_id: null,
+      owned_by_user_id: 'user-123',
+    } as never);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({
+      outcome: 'insufficient_credits',
+      message: 'Insufficient credits',
+    });
+
+    await expect(
+      startSecurityAnalysis(createParams(false, vi.fn() as never))
+    ).rejects.toBeInstanceOf(InsufficientCreditsError);
+
+    expect(readAnalysisCreditAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: undefined })
+    );
+  });
+
+  it('treats an unavailable admission read as a retryable failure without paid work', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({
+      outcome: 'unavailable',
+      message: 'Cloud Agent credit admission returned HTTP 503',
+    });
+    const cloudAgentFetch = vi.fn();
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'Cloud Agent credit admission returned HTTP 503',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+    });
+
+    expect(triageSecurityFinding).not.toHaveBeenCalled();
+    expect(setFindingPending).not.toHaveBeenCalled();
+    expect(cloudAgentFetch).not.toHaveBeenCalled();
+  });
+
+  it('declares a refused admission as a permanent failure without paid work', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({
+      outcome: 'refused',
+      message: 'Cloud Agent credit admission was refused',
+    });
+    const cloudAgentFetch = vi.fn();
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'Cloud Agent credit admission was refused',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'PERMISSION_DENIED_PERMANENT',
+    });
+
+    expect(triageSecurityFinding).not.toHaveBeenCalled();
+    expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/prepareSession')).toHaveLength(0);
+    expect(
+      requestsTo(cloudAgentFetch.mock.calls, '/trpc/initiateFromKilocodeSessionV2')
+    ).toHaveLength(0);
+  });
+
+  it('releases the prepared session when the start reports insufficient credits', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse())
+      .mockResolvedValueOnce(new Response('insufficient credits', { status: 402 }))
+      .mockResolvedValue(new Response('', { status: 200 }));
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).rejects.toBeInstanceOf(InsufficientCreditsError);
+
+    const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');
+    expect(interrupts).toHaveLength(1);
+    const interrupt = interrupts[0];
+    if (!(interrupt instanceof Request)) throw new Error('Expected interrupt request');
+    await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session' });
+  });
+
+  it('releases the prepared session when the start fails after the running transition', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse('agent-session-503'))
+      .mockResolvedValueOnce(new Response('initiate unavailable', { status: 503 }))
+      .mockResolvedValue(new Response('interrupt unavailable', { status: 500 }));
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'initiate unavailable',
+      failureNeedsLifecycleTransition: true,
+    });
+
+    const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');
+    expect(interrupts).toHaveLength(1);
+    const interrupt = interrupts[0];
+    if (!(interrupt instanceof Request)) throw new Error('Expected interrupt request');
+    await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session-503' });
+  });
+
+  it('keeps the initiate failure outcome when the interrupt itself fails', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse())
+      .mockResolvedValueOnce(new Response('initiate unavailable', { status: 503 }))
+      .mockRejectedValue(new Error('interrupt unavailable'));
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'initiate unavailable',
+      failureNeedsLifecycleTransition: true,
+    });
+
+    expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession')).toHaveLength(1);
+  });
+
+  it('bounds the cleanup interrupt to the cleanup constant', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse('agent-session-cleanup'))
+      .mockResolvedValueOnce(new Response('initiate unavailable', { status: 503 }))
+      .mockResolvedValue(new Response('', { status: 200 }));
+
+    const params = createParams(false, cloudAgentFetch as never);
+    await expect(startSecurityAnalysis(params)).resolves.toEqual({
+      started: false,
+      error: 'initiate unavailable',
+      failureNeedsLifecycleTransition: true,
+    });
+
+    // The settlement stays observable: the start resolves and the cleanup
+    // interrupts exactly the session this attempt prepared.
+    const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');
+    expect(interrupts).toHaveLength(1);
+    const interrupt = interrupts[0];
+    if (!(interrupt instanceof Request)) throw new Error('Expected interrupt request');
+    await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session-cleanup' });
+
+    // The cleanup carries SESSION_CLEANUP_TIMEOUT_MS, not the interrupt
+    // default: the start outcome is already decided, so it must not hold the
+    // queue consumer message for the restart path's longer deadline.
+    expect(vi.mocked(interruptAnalysisCloudAgentSession)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(interruptAnalysisCloudAgentSession)).toHaveBeenCalledWith({
+      env: params.env,
+      authToken: 'control-token',
+      cloudAgentSessionId: 'agent-session-cleanup',
+      findingId: finding.id,
+      timeoutMs: SESSION_CLEANUP_TIMEOUT_MS,
+    });
+  });
+
+  it('does not interrupt the prepared session when the start succeeds', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse())
+      .mockResolvedValueOnce(
+        Response.json({ result: { data: { executionId: 'exec-123', status: 'running' } } })
+      );
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({ started: true, triageOnly: false });
+
+    expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession')).toHaveLength(0);
+    expect(cloudAgentFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not prepare or interrupt a session for a triage-only result', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'Maintain manual review.',
+      suggestedAction: 'manual_review',
+    });
+    const cloudAgentFetch = vi.fn();
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({ started: true, triageOnly: true });
+
+    expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/prepareSession')).toHaveLength(0);
+    expect(
+      requestsTo(cloudAgentFetch.mock.calls, '/trpc/initiateFromKilocodeSessionV2')
+    ).toHaveLength(0);
+    expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession')).toHaveLength(0);
+  });
+
+  it("clears only this claim's status when a triage-only start was superseded", async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'Maintain manual review.',
+      suggestedAction: 'manual_review',
+    });
+    vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: false });
+
+    await expect(startSecurityAnalysis(createParams(false, vi.fn() as never))).resolves.toEqual({
+      started: false,
+      error: 'Finding was superseded during analysis',
+    });
+
+    expect(clearSupersededAnalysisStatus).toHaveBeenCalledWith(
+      {},
+      {
+        findingId: finding.id,
+        claimToken: 'manual-claim-token',
+      }
+    );
+  });
+
+  it("releases only this attempt's prepared session when the claim was superseded", async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({ outcome: 'admitted' });
+    vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValueOnce({ transitioned: false });
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse('agent-session-superseded'))
+      .mockResolvedValue(new Response('', { status: 200 }));
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({ started: false, error: 'Finding was superseded during analysis' });
+
+    expect(clearSupersededAnalysisStatus).toHaveBeenCalledWith(
+      {},
+      {
+        findingId: finding.id,
+        claimToken: 'manual-claim-token',
+      }
+    );
+    // The interrupt must carry the prepared id from this attempt, never an id
+    // read from the finding row, because a newer attempt may already own that row.
+    const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');
+    expect(interrupts).toHaveLength(1);
+    const interrupt = interrupts[0];
+    if (!(interrupt instanceof Request)) throw new Error('Expected interrupt request');
+    await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session-superseded' });
+    expect(
+      requestsTo(cloudAgentFetch.mock.calls, '/trpc/initiateFromKilocodeSessionV2')
+    ).toHaveLength(0);
+  });
+
+  it('reads admission before the triage call and before session preparation', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({ outcome: 'admitted' });
+    vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse())
+      .mockResolvedValueOnce(
+        Response.json({ result: { data: { executionId: 'exec-123', status: 'running' } } })
+      );
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({ started: true, triageOnly: false });
+
+    expect(firstCallOrder(vi.mocked(generateControlToken))).toBeLessThan(
+      firstCallOrder(vi.mocked(readAnalysisCreditAdmission))
+    );
+    expect(firstCallOrder(vi.mocked(readAnalysisCreditAdmission))).toBeLessThan(
+      firstCallOrder(vi.mocked(triageSecurityFinding))
+    );
+    expect(firstCallOrder(vi.mocked(triageSecurityFinding))).toBeLessThan(
+      firstCallOrder(cloudAgentFetch)
     );
   });
 });

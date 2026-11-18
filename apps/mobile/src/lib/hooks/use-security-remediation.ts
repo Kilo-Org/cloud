@@ -1,16 +1,20 @@
 // Remediation write hooks for a security finding: start, retry, and cancel.
 // Split out of `use-security-findings.ts` (which keeps the finding queries and
 // the dismiss hook) so each file stays under the max-lines limit.
-import {
-  getRemediationUnavailableCopy,
-  isPersonalSecurityScope,
-} from '@kilocode/app-shared/security-agent';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
+import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
+import { i18n } from '@/i18n';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
+import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
+import { localizedSecurityMarkerMessage } from '@/lib/security-agent-ledger';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 async function invalidateRemediationQueries(
@@ -31,7 +35,7 @@ async function invalidateRemediationQueries(
       queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
     ]);
     scheduleCacheMaintenance(() => {
-      reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+      void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
     });
     return;
   }
@@ -51,7 +55,7 @@ async function invalidateRemediationQueries(
     }),
   ]);
   scheduleCacheMaintenance(() => {
-    reconcileFirstPage(
+    void reconcileFirstPage(
       queryClient,
       trpc.organizations.securityAgent.listFindings.queryKey(ownerInput)
     );
@@ -71,16 +75,17 @@ export function useStartSecurityRemediation(scope: string) {
             ...vars,
           }),
     onError: error => {
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: async (result, vars) => {
       if (!result.queued) {
         toast.error(
-          getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
+          i18n.t(
+            getRemediationUnavailableKey(result.reason) ?? 'securityAgent.remediation.unavailable'
+          )
         );
       } else {
-        toast.success('Remediation queued');
+        toast.success(i18n.t('securityAgent.remediation.queued'));
       }
       await invalidateRemediationQueries(
         { trpc, queryClient },
@@ -103,16 +108,17 @@ export function useRetrySecurityRemediation(scope: string) {
             ...vars,
           }),
     onError: error => {
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: async (result, vars) => {
       if (!result.queued) {
         toast.error(
-          getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
+          i18n.t(
+            getRemediationUnavailableKey(result.reason) ?? 'securityAgent.remediation.unavailable'
+          )
         );
       } else {
-        toast.success('Remediation retry queued');
+        toast.success(i18n.t('securityAgent.remediation.retryQueued'));
       }
       await invalidateRemediationQueries(
         { trpc, queryClient },
@@ -141,6 +147,8 @@ function getSecurityAnalysisQueryKey(
 export function useCancelSecurityRemediation(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { attemptId: string; findingId: string }) =>
@@ -153,6 +161,7 @@ export function useCancelSecurityRemediation(scope: string) {
     onMutate: async vars => {
       const analysisQueryKey = getSecurityAnalysisQueryKey(trpc, scope, vars.findingId);
       await queryClient.cancelQueries({ queryKey: analysisQueryKey });
+      const generation = nextMutationGeneration(hashKey(analysisQueryKey));
       const previous = queryClient.getQueryData<SecurityAnalysis>(analysisQueryKey);
       queryClient.setQueryData<SecurityAnalysis>(analysisQueryKey, old =>
         old
@@ -166,21 +175,24 @@ export function useCancelSecurityRemediation(scope: string) {
             }
           : old
       );
-      return { previous, analysisQueryKey };
+      return { previous, analysisQueryKey, generation };
     },
     onError: (error, _vars, context) => {
-      if (context?.previous) {
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(hashKey(context.analysisQueryKey), context.generation)
+      ) {
         queryClient.setQueryData(context.analysisQueryKey, context.previous);
       }
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: result => {
       // 'cancellation_requested' means the attempt was already running and
       // was only asked to stop — it may still finish and produce a PR.
       toast.success(
         result.status === 'cancellation_requested'
-          ? 'Cancellation requested'
-          : 'Remediation cancelled'
+          ? i18n.t('securityAgent.remediation.cancellationRequested')
+          : i18n.t('securityAgent.remediation.cancelled')
       );
     },
     onSettled: async (_result, _error, vars) => {

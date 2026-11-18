@@ -5,7 +5,7 @@ import type Stripe from 'stripe';
 import {
   getKnownStripePriceIdsForKiloClaw,
   getStripePriceIdMetadata,
-} from '@/lib/kiloclaw/stripe-price-ids.server';
+} from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import type { KiloClawPriceVersion } from '@kilocode/db';
 
 type KiloClawInvoiceLineClassification = {

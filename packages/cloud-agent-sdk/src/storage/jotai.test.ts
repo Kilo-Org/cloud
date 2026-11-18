@@ -165,6 +165,47 @@ describe('createJotaiStorage', () => {
     });
   });
 
+  describe('deleteMessage', () => {
+    test('removes parts a delta created before the message row', () => {
+      const partsCb = jest.fn();
+      const messageCb = jest.fn();
+      const idsCb = jest.fn();
+      s.subscribe('parts:msg-1', partsCb);
+      s.subscribe('message:msg-1', messageCb);
+      s.subscribe('messageIds', idsCb);
+
+      s.applyPartDelta('msg-1', 'p-1', 'text', 'hello');
+
+      s.deleteMessage('msg-1');
+
+      expect(s.getParts('msg-1')).toEqual([]);
+      expect(s.getMessageIds()).toEqual([]);
+      expect(partsCb).toHaveBeenCalled();
+      expect(messageCb).not.toHaveBeenCalled();
+      expect(idsCb).not.toHaveBeenCalled();
+    });
+
+    test('removes parts that arrived before a later message row', () => {
+      s.applyPartDelta('msg-1', 'p-1', 'text', 'hello');
+      s.upsertMessage(makeMsg('msg-1'));
+
+      s.deleteMessage('msg-1');
+
+      expect(s.getParts('msg-1')).toEqual([]);
+      expect(s.getMessageIds()).toEqual([]);
+      expect(s.getMessageInfo('msg-1')).toBeUndefined();
+    });
+
+    test('keeps the parts of another id', () => {
+      s.upsertPart('msg-2', makePart('p-2', 'msg-2', 'kept'));
+      s.applyPartDelta('msg-1', 'p-1', 'text', 'hello');
+
+      s.deleteMessage('msg-1');
+
+      expect(s.getParts('msg-2').map(p => p.id)).toEqual(['p-2']);
+    });
+  });
+
   describe('getParts', () => {
     test('returns empty array for unknown messageId', () => {
       expect(s.getParts('unknown')).toEqual([]);
@@ -335,6 +376,61 @@ describe('createJotaiStorage', () => {
       // getParts must rebuild from the freshly written parts, not the stale
       // cached snapshot, even though the flush has not run yet.
       expect((coalesced.getParts('msg-1')[0] as Part & { text: string }).text).toBe('hello');
+    });
+
+    test('buffers a burst of deltas without touching the stored part until the flush', () => {
+      let flush: (() => void) | null = null;
+      const coalesced = createJotaiStorage(store, {
+        schedule: cb => {
+          flush = cb;
+        },
+      });
+      coalesced.upsertPart('msg-1', makePart('p-1', 'msg-1', 'start:'));
+
+      const partsCb = jest.fn();
+      coalesced.subscribe('parts:msg-1', partsCb);
+      const readStoredText = () =>
+        (
+          (store.get(coalesced.atoms.parts).get('msg-1') ?? [])[0] as
+            | (Part & { text: string })
+            | undefined
+        )?.text ?? '';
+
+      const tokens = Array.from({ length: 2000 }, (_, i) => `${i % 10}`);
+      for (const token of tokens) {
+        coalesced.applyPartDelta('msg-1', 'p-1', 'text', token);
+      }
+
+      // Every token is a buffered push: the stored part is untouched (no
+      // O(n) concatenation per token) and the whole burst is published once.
+      expect(readStoredText()).toBe('start:');
+      expect(partsCb).not.toHaveBeenCalled();
+      expect(flush).not.toBeNull();
+
+      flush!();
+
+      expect(readStoredText()).toBe(`start:${tokens.join('')}`);
+      expect(partsCb).toHaveBeenCalledTimes(1);
+    });
+
+    test('seeds a new part from buffered deltas at flush, not per token', () => {
+      let flush: (() => void) | null = null;
+      const coalesced = createJotaiStorage(store, {
+        schedule: cb => {
+          flush = cb;
+        },
+      });
+
+      coalesced.applyPartDelta('msg-2', 'new-part', 'text', 'he');
+      coalesced.applyPartDelta('msg-2', 'new-part', 'text', 'llo');
+
+      expect(store.get(coalesced.atoms.parts).has('msg-2')).toBe(false);
+
+      flush!();
+
+      const parts = coalesced.getParts('msg-2');
+      expect(parts).toHaveLength(1);
+      expect((parts[0] as Part & { text: string }).text).toBe('hello');
     });
   });
 

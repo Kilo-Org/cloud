@@ -2,10 +2,13 @@
 // discussion thread. Reuses DiffLine (no onTap — static quote only).
 // When truncated, hidden lines are at the TOP (cap keeps the tail).
 
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { type ThreadDiffSnippet as ThreadDiffSnippetData } from '@/lib/pr-review/discussion/thread-diff-snippet';
 
 type ThreadDiffSnippetProps = {
@@ -13,15 +16,22 @@ type ThreadDiffSnippetProps = {
 };
 
 export function ThreadDiffSnippet({ snippet }: Readonly<ThreadDiffSnippetProps>) {
+  const { t } = useTranslation();
   const truncatedCount = snippet.totalLineCount - snippet.lines.length;
   return (
     <View
-      accessibilityLabel="Quoted diff snippet"
+      accessibilityLabel={t('prReview.discussion.quotedDiffSnippet')}
       className="overflow-hidden rounded-lg border border-border"
     >
       {truncatedCount > 0 ? (
         <View className="border-b border-hair-soft px-3 py-1">
-          <Text className="text-xs text-muted-foreground">… {truncatedCount} more lines above</Text>
+          {/* i18n-dup-ok: 'prReview.discussion.moreLinesAbove_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
+          <Text className="text-xs text-muted-foreground">
+            {t('prReview.discussion.moreLinesAbove', {
+              count: truncatedCount,
+              displayCount: formatNumber(truncatedCount, i18n.language),
+            })}
+          </Text>
         </View>
       ) : null}
       {snippet.lines.map((line, index) => (

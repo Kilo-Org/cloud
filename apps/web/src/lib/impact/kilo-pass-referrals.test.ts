@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { captureMessage } from '@sentry/nextjs';
 
 jest.mock('@/lib/impact', () => {
   const actual = jest.requireActual('@/lib/impact');
@@ -37,7 +38,7 @@ jest.mock('@/lib/impact/advocate', () => {
   };
 });
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: {
       update: jest.fn(async () => ({})),
@@ -45,7 +46,13 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  startInactiveSpan: jest.fn(),
+}));
+
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import type { isImpactConfigured, sendImpactConversionPayload } from '@/lib/impact';
 import type {
   isImpactAdvocateConfigured,
@@ -57,8 +64,11 @@ import {
   markPersonalKiloPassReferralPaymentAdverse,
   processPersonalKiloPassStripePaidConversion,
 } from '@/lib/impact/kilo-pass-referrals';
-import { dispatchQueuedImpactAdvocateRewardRedemptions } from '@/lib/impact/kiloclaw-referrals';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import {
+  dispatchQueuedImpactAdvocateRewardRedemptions,
+  queueImpactAdvocateRewardRedemption,
+} from '@/lib/impact/referral-delivery';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   deleted_user_email_tombstones,
   impact_advocate_participants,
@@ -74,6 +84,7 @@ import {
 } from '@kilocode/db/schema';
 import {
   ImpactAdvocateProgramKey,
+  ImpactAdvocateRewardRedemptionState,
   ImpactAttributionTouchProvider,
   ImpactAttributionTouchType,
   ImpactConversionReportState,
@@ -111,6 +122,7 @@ const mockSendImpactAdvocateRewardLookupPayload =
 const mockSendImpactAdvocateRewardRedemptionPayload =
   advocateMock.sendImpactAdvocateRewardRedemptionPayload;
 const mockSendImpactConversionPayload = impactMock.sendImpactConversionPayload;
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -526,6 +538,53 @@ describe('Kilo Pass Impact referral conversions', () => {
     expect(await db.select().from(impact_referral_rewards)).toHaveLength(0);
   });
 
+  test('concurrent deliveries of one invoice create a single conversion and keep the affiliate SALE', async () => {
+    const referee = await insertTestUser({ created_at: '2026-01-02T00:00:00.000Z' });
+    await db.insert(user_affiliate_attributions).values({
+      user_id: referee.id,
+      provider: 'impact',
+      tracking_id: '',
+    });
+    const subscriptionId = await insertKiloPassSubscription({ userId: referee.id });
+    const invoiceId = `inv_${randomUUID()}`;
+    await seedCurrentIssuance(subscriptionId, invoiceId);
+
+    const runConversion = () =>
+      processPersonalKiloPassStripePaidConversion({
+        userId: referee.id,
+        kiloPassSubscriptionId: subscriptionId,
+        sourcePaymentId: invoiceId,
+        orderId: invoiceId,
+        amount: 49,
+        currencyCode: 'usd',
+        itemCategory: 'kilo-pass-tier-49-monthly',
+        itemName: 'Kilo Pass Tier 49 Monthly',
+        itemSku: 'price_kilo_pass_49_monthly',
+        sourceTier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        convertedAt: new Date('2026-01-03T00:00:00.000Z'),
+      });
+
+    const dispositions = await Promise.all([runConversion(), runConversion()]);
+
+    expect(dispositions).toEqual([
+      expect.objectContaining({
+        shouldEnqueueAffiliateSale: true,
+        winningTouchType: ImpactReferralWinningTouchType.Affiliate,
+      }),
+      expect.objectContaining({
+        shouldEnqueueAffiliateSale: true,
+        winningTouchType: ImpactReferralWinningTouchType.Affiliate,
+      }),
+    ]);
+    const conversions = await db
+      .select()
+      .from(impact_referral_conversions)
+      .where(eq(impact_referral_conversions.source_payment_id, invoiceId));
+    expect(conversions).toHaveLength(1);
+    expect(await db.select().from(impact_referral_rewards)).toHaveLength(0);
+  });
+
   test('missing attribution and expired product-scoped touches suppress affiliate SALE reporting', async () => {
     const noTouchReferee = await insertTestUser({ created_at: '2026-01-02T00:00:00.000Z' });
     const noTouchSubscriptionId = await insertKiloPassSubscription({
@@ -857,6 +916,135 @@ describe('Kilo Pass Impact referral conversions', () => {
     );
   });
 
+  test('queued reward redemptions stop when the linked reward is no longer redeemable', async () => {
+    const blockedStatuses: ImpactReferralRewardStatus[] = [
+      ImpactReferralRewardStatus.Canceled,
+      ImpactReferralRewardStatus.Expired,
+      ImpactReferralRewardStatus.ReviewRequired,
+      ImpactReferralRewardStatus.Reversed,
+    ];
+    const queued: Array<{ rewardId: string; status: ImpactReferralRewardStatus }> = [];
+
+    for (const status of blockedStatuses) {
+      const { rewardIds } = await seedKiloPassReferralRewardsForAdversePayment({
+        statuses: [ImpactReferralRewardStatus.Pending],
+      });
+      const rewardId = rewardIds[0];
+      if (!rewardId) throw new Error('Missing seeded reward');
+      await queueImpactAdvocateRewardRedemption({ rewardId, database: db });
+      await db
+        .update(impact_referral_rewards)
+        .set({ status })
+        .where(eq(impact_referral_rewards.id, rewardId));
+      await db
+        .update(impact_advocate_reward_redemptions)
+        .set({ response_status_code: 503 })
+        .where(eq(impact_advocate_reward_redemptions.reward_id, rewardId));
+      queued.push({ rewardId, status });
+    }
+
+    const summary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+    expect(summary).toEqual({ claimed: 4, redeemed: 0, retried: 0, failed: 4 });
+    expect(mockSendImpactAdvocateRewardLookupPayload).not.toHaveBeenCalled();
+    expect(mockSendImpactAdvocateRewardRedemptionPayload).not.toHaveBeenCalled();
+
+    const redemptions = await db.select().from(impact_advocate_reward_redemptions);
+    expect(redemptions).toHaveLength(4);
+    for (const entry of queued) {
+      expect(redemptions).toContainEqual(
+        expect.objectContaining({
+          reward_id: entry.rewardId,
+          state: ImpactAdvocateRewardRedemptionState.Failed,
+          next_retry_at: null,
+          response_status_code: null,
+          redeem_response_payload: {
+            error: 'referral_reward_not_redeemable',
+            rewardStatus: entry.status,
+          },
+        })
+      );
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        'impact_advocate_reward_redeem_stopped_by_local_state',
+        expect.objectContaining({
+          level: 'error',
+          tags: { source: 'impact_advocate_reward_redemption_blocked' },
+          extra: {
+            args: [
+              expect.objectContaining({
+                rewardId: entry.rewardId,
+                rewardStatus: entry.status,
+              }),
+            ],
+          },
+        })
+      );
+    }
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(4);
+    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('@example.com');
+
+    const retrySummary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+    expect(retrySummary).toEqual({ claimed: 0, redeemed: 0, retried: 0, failed: 0 });
+    expect(mockSendImpactAdvocateRewardLookupPayload).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(4);
+  });
+
+  test('an applied reward redemption reaches Impact', async () => {
+    const { rewardIds } = await seedKiloPassReferralRewardsForAdversePayment({
+      statuses: [ImpactReferralRewardStatus.Applied],
+    });
+    const rewardId = rewardIds[0];
+    if (!rewardId) throw new Error('Missing seeded reward');
+    await queueImpactAdvocateRewardRedemption({ rewardId, database: db });
+
+    const summary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+    expect(summary).toEqual({ claimed: 1, redeemed: 1, retried: 0, failed: 0 });
+    expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledWith(
+      { rewardId: 'impact-kilo-pass-reward', amount: 24.5, unit: 'Kilo Pass Bonus Credits' },
+      { programKey: ImpactAdvocateProgramKey.KiloPass }
+    );
+  });
+
+  test('a redemption whose reward row is gone fails without an Impact call', async () => {
+    const { rewardIds } = await seedKiloPassReferralRewardsForAdversePayment({
+      statuses: [ImpactReferralRewardStatus.Pending],
+    });
+    const rewardId = rewardIds[0];
+    if (!rewardId) throw new Error('Missing seeded reward');
+    await queueImpactAdvocateRewardRedemption({ rewardId, database: db });
+    await db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL session_replication_role = replica`);
+      await tx.delete(impact_referral_rewards).where(eq(impact_referral_rewards.id, rewardId));
+    });
+
+    const summary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+    expect(summary).toEqual({ claimed: 1, redeemed: 0, retried: 0, failed: 1 });
+    expect(mockSendImpactAdvocateRewardLookupPayload).not.toHaveBeenCalled();
+    const [redemption] = await db.select().from(impact_advocate_reward_redemptions);
+    expect(redemption).toEqual(
+      expect.objectContaining({
+        reward_id: rewardId,
+        state: ImpactAdvocateRewardRedemptionState.Failed,
+        response_status_code: null,
+        redeem_response_payload: { error: 'referral_reward_not_found', rewardStatus: null },
+      })
+    );
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'impact_advocate_reward_redeem_stopped_by_local_state',
+      expect.objectContaining({
+        level: 'error',
+        tags: { source: 'impact_advocate_reward_redemption_blocked' },
+        extra: {
+          args: [expect.objectContaining({ rewardId, rewardStatus: null })],
+        },
+      })
+    );
+  });
+
   test('expires stale pending and earned Kilo Pass referral rewards independently of issuance', async () => {
     const { rewardIds } = await seedKiloPassReferralRewardsForAdversePayment({
       statuses: [ImpactReferralRewardStatus.Pending, ImpactReferralRewardStatus.Earned],
@@ -921,6 +1109,7 @@ describe('Kilo Pass Impact referral conversions', () => {
       canceledRewards: 2,
       reviewRequiredRewards: 0,
     });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
     const rewardsAfterFirst = await db
       .select({
         status: impact_referral_rewards.status,
@@ -988,6 +1177,55 @@ describe('Kilo Pass Impact referral conversions', () => {
     );
     expect(new Date(reward?.reversed_at ?? '').toISOString()).toBe('2026-01-12T00:00:00.000Z');
     expect(new Date(reward?.applied_at ?? '').toISOString()).toBe('2026-02-01T00:00:00.000Z');
+  });
+
+  test('adverse Stripe dispute reports applied referral rewards with identifiers only', async () => {
+    const { invoiceId, conversionId, rewardIds } =
+      await seedKiloPassReferralRewardsForAdversePayment({
+        statuses: [ImpactReferralRewardStatus.Applied, ImpactReferralRewardStatus.Applied],
+      });
+
+    const summary = await markPersonalKiloPassReferralPaymentAdverse({
+      sourcePaymentId: invoiceId,
+      reason: 'chargeback',
+      occurredAt: new Date('2026-01-12T00:00:00.000Z'),
+    });
+
+    expect(summary).toEqual({
+      conversionId,
+      canceledRewards: 0,
+      reviewRequiredRewards: 2,
+    });
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'kilo_pass_referral_applied_rewards_need_review',
+      expect.objectContaining({
+        level: 'error',
+        tags: { source: 'impact_referral_adverse_payment_applied_rewards' },
+        extra: {
+          args: [
+            expect.objectContaining({
+              conversionId,
+              rewardIds: expect.arrayContaining(rewardIds),
+              sourcePaymentId: invoiceId,
+              paymentProvider: ImpactReferralPaymentProvider.Stripe,
+              reason: 'chargeback',
+            }),
+          ],
+        },
+      })
+    );
+    const reported = JSON.stringify(mockCaptureMessage.mock.calls);
+    expect(reported).not.toContain('@example.com');
+    expect(reported).not.toContain('24.5');
+
+    await markPersonalKiloPassReferralPaymentAdverse({
+      sourcePaymentId: invoiceId,
+      reason: 'chargeback',
+      occurredAt: new Date('2026-01-13T00:00:00.000Z'),
+    });
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
   });
 
   test('Kilo Pass adverse payment lookup is scoped to Stripe invoice conversion identity', async () => {

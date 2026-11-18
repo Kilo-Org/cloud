@@ -1,5 +1,5 @@
 /* oxlint-disable max-lines */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
   const client = {
@@ -20,19 +20,14 @@ const hoisted = vi.hoisted(() => {
   const holder: { options?: Record<string, unknown> } = {};
   const device = { deviceType: null as number | null };
   const controller = {
+    allowsMandatory: vi.fn().mockReturnValue(true),
     allowsOptional: vi.fn().mockReturnValue(true),
     currentGeneration: vi.fn().mockReturnValue(0),
   };
-  let sealedState = false;
   const storage = {
-    sealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = true;
-    }),
-    unsealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = false;
-    }),
+    sealPostHogStorage: vi.fn(),
+    unsealPostHogStorage: vi.fn(),
     purgePostHogPersistence: vi.fn(),
-    isPostHogStorageSealed: vi.fn().mockImplementation(() => sealedState),
     // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
     posthogCustomStorage: {} as Record<string, unknown>,
   };
@@ -66,6 +61,7 @@ vi.mock('expo-application', () => ({
 vi.mock('@/lib/config', () => ({ POSTHOG_API_KEY: 'test-key' }));
 
 vi.mock('@/lib/telemetry/controller', () => ({
+  allowsMandatory: hoisted.controller.allowsMandatory,
   allowsOptional: hoisted.controller.allowsOptional,
   currentGeneration: hoisted.controller.currentGeneration,
 }));
@@ -74,7 +70,6 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   sealPostHogStorage: hoisted.storage.sealPostHogStorage,
   unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
   purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
-  isPostHogStorageSealed: hoisted.storage.isPostHogStorageSealed,
   posthogCustomStorage: hoisted.storage.posthogCustomStorage,
 }));
 
@@ -93,12 +88,6 @@ function readCustomAppProperties(): (
   const fn = hoisted.holder.options?.customAppProperties;
   expect(fn).toEqual(expect.any(Function));
   return fn as (properties: Record<string, unknown>) => Record<string, unknown>;
-}
-
-async function loadInitPostHog() {
-  vi.resetModules();
-  const module = await import('./posthog');
-  return module.initPostHog;
 }
 
 // oxlint-disable-next-line require-await -- async required by promise-function-async
@@ -127,7 +116,7 @@ describe('initPostHog device_form_factor', () => {
     'maps deviceType $deviceType to device_form_factor $expected',
     async ({ deviceType, expected }) => {
       hoisted.device.deviceType = deviceType;
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const customAppProperties = readCustomAppProperties();
@@ -140,7 +129,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('registers platform: mobile once', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.client.register).toHaveBeenCalledTimes(1);
@@ -149,7 +138,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('constructs PostHog only once when init is called twice', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     const posthogModule = await import('posthog-react-native');
     const PostHog = posthogModule.default;
 
@@ -160,7 +149,7 @@ describe('initPostHog device_form_factor', () => {
   });
 
   it('passes customStorage to PostHog', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
@@ -172,11 +161,13 @@ describe('initPostHog gate', () => {
     vi.clearAllMocks();
     hoisted.holder.options = undefined;
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
+    hoisted.controller.allowsOptional.mockReturnValue(true);
   });
 
-  it('returns early when optional consent is not given', async () => {
-    hoisted.controller.allowsOptional.mockReturnValue(false);
-    const initPostHog = await loadInitPostHog();
+  it('returns early when no account decision exists', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -185,11 +176,87 @@ describe('initPostHog gate', () => {
 
   it('initializes when optional consent is true', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
     expect(posthogModule.default).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a capture-free client when optional consent is not given', async () => {
+    // Feature-flag evaluation is functional: the client exists for the signed-in
+    // account, but every switch that would send analytics on its own is off and
+    // the SDK starts opted out, so capture is dropped.
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog } = await loadModule();
+    initPostHog();
+
+    const posthogModule = await import('posthog-react-native');
+    expect(posthogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.holder.options).toMatchObject({
+      defaultOptIn: false,
+      captureAppLifecycleEvents: false,
+      sendFeatureFlagEvent: false,
+      capturePushNotificationSubscriptions: false,
+      capturePushNotificationOpened: false,
+      disableSurveys: true,
+    });
+    expect(hoisted.client.setPersonPropertiesForFlags).not.toHaveBeenCalled();
+  });
+
+  it('keeps capture on when optional consent is given', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    const { initPostHog } = await loadModule();
+    initPostHog();
+
+    expect(hoisted.holder.options).toMatchObject({
+      defaultOptIn: true,
+      captureAppLifecycleEvents: true,
+      sendFeatureFlagEvent: true,
+      disableSurveys: false,
+    });
+    expect(hoisted.client.setPersonPropertiesForFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts no client in a development build without a dev host', async () => {
+    // A dev build must not contact the production project: without an explicit
+    // dev host every flag falls back to its default.
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    vi.stubGlobal('__DEV__', true);
+    try {
+      const { initPostHog } = await loadModule();
+      initPostHog();
+
+      const posthogModule = await import('posthog-react-native');
+      expect(posthogModule.default).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal('__DEV__', false);
+    }
+  });
+
+  it('evaluates flags against a dev host without capturing', async () => {
+    // The explicit dev host is the only way a development build evaluates
+    // flags; capture stays closed because dev builds never capture.
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://10.0.2.2:8123';
+    try {
+      const { initPostHog } = await loadModule();
+      initPostHog();
+
+      const posthogModule = await import('posthog-react-native');
+      expect(posthogModule.default).toHaveBeenCalledTimes(1);
+      expect(hoisted.holder.options).toMatchObject({
+        host: 'http://10.0.2.2:8123',
+        defaultOptIn: false,
+        captureAppLifecycleEvents: false,
+        sendFeatureFlagEvent: false,
+      });
+      expect(hoisted.client.setPersonPropertiesForFlags).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
+      vi.stubGlobal('__DEV__', false);
+    }
   });
 });
 
@@ -201,7 +268,7 @@ describe('capture gate and generation scoping', () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
   });
 
-  it('captureEvent returns early when optional consent is not given', async () => {
+  it('captureEvent is dropped for a flags-only client', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(false);
     const { initPostHog, captureEvent } = await loadModule();
     initPostHog();
@@ -244,10 +311,20 @@ describe('capture gate and generation scoping', () => {
     expect(hoisted.client.screen).not.toHaveBeenCalled();
   });
 
-  it('identifyUser returns early when optional consent is not given', async () => {
+  it('identifyUser sets the identity without person properties when optional consent is not given', async () => {
+    // A flags-only client still needs the web's distinct ID so the same person
+    // resolves the same flag value; it writes no person properties.
     hoisted.controller.allowsOptional.mockReturnValue(false);
     const { initPostHog, identifyUser } = await loadModule();
     initPostHog();
+    identifyUser('test@test.com');
+
+    expect(hoisted.client.identify).toHaveBeenCalledWith('test@test.com', undefined);
+    expect(hoisted.client.reloadFeatureFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it('identifyUser is a no-op when no client exists', async () => {
+    const { identifyUser } = await loadModule();
     identifyUser('test@test.com');
 
     expect(hoisted.client.identify).not.toHaveBeenCalled();
@@ -265,8 +342,8 @@ describe('captureEvent privacy and gates', () => {
   it('drops payload keys that name a prohibited data class before capture', async () => {
     const { initPostHog, captureEvent } = await loadModule();
     initPostHog();
-    captureEvent(dynamicName('onboarding-entered'), {
-      surface: 'claw',
+    captureEvent(dynamicName('sample-event'), {
+      surface: 'agents',
       email: 'a@b.co',
       session_id: 'x',
       repo_name: 'acme/app',
@@ -274,8 +351,8 @@ describe('captureEvent privacy and gates', () => {
       ok_count: 1,
     });
 
-    expect(hoisted.client.capture).toHaveBeenCalledWith('onboarding-entered', {
-      surface: 'claw',
+    expect(hoisted.client.capture).toHaveBeenCalledWith('sample-event', {
+      surface: 'agents',
       ok_count: 1,
     });
   });
@@ -283,19 +360,22 @@ describe('captureEvent privacy and gates', () => {
   it('warns in development and names every dropped key', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.stubGlobal('__DEV__', true);
+    // A dev client only exists against an explicit dev host.
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
     try {
       const { initPostHog, captureEvent } = await loadModule();
       initPostHog();
-      captureEvent(dynamicName('onboarding-entered'), {
-        surface: 'claw',
+      captureEvent(dynamicName('sample-event'), {
+        surface: 'agents',
         repo_name: 'acme/app',
         session_id: 'x',
       });
 
       expect(warn).toHaveBeenCalledWith(
-        'Analytics onboarding-entered: redacted prohibited properties repo_name, session_id'
+        'Analytics sample-event: redacted prohibited properties repo_name, session_id'
       );
     } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
       vi.stubGlobal('__DEV__', false);
       warn.mockRestore();
     }
@@ -437,6 +517,42 @@ describe('discardPostHog', () => {
   });
 });
 
+describe('flushLastPostHogEvent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('calls client.flush after initPostHog', async () => {
+    const { initPostHog, flushLastPostHogEvent } = await loadModule();
+    initPostHog();
+
+    await flushLastPostHogEvent();
+
+    expect(hoisted.client.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows a flush rejection', async () => {
+    const { initPostHog, flushLastPostHogEvent } = await loadModule();
+    initPostHog();
+    hoisted.client.flush.mockRejectedValueOnce(new Error('flush down'));
+
+    await expect(flushLastPostHogEvent()).resolves.toBeUndefined();
+
+    expect(hoisted.client.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when no client exists', async () => {
+    const { flushLastPostHogEvent } = await loadModule();
+
+    await expect(flushLastPostHogEvent()).resolves.toBeUndefined();
+
+    expect(hoisted.client.flush).not.toHaveBeenCalled();
+  });
+});
+
 describe('identifyUser person properties', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -484,10 +600,63 @@ describe('initPostHog constructor options', () => {
   });
 
   it('passes disableGeoip: true to the constructor', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.disableGeoip).toBe(true);
+  });
+});
+
+describe('livePostHogClient', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('reports what the client was built for, null when none runs', async () => {
+    const { initPostHog, identifyUser, discardPostHog, livePostHogClient } = await loadModule();
+    expect(livePostHogClient()).toBeNull();
+
+    initPostHog();
+    expect(livePostHogClient()).toEqual({
+      generation: 0,
+      optionalConsent: true,
+      identifiedEmail: undefined,
+    });
+
+    identifyUser('test@test.com');
+    expect(livePostHogClient()?.identifiedEmail).toBe('test@test.com');
+
+    await discardPostHog();
+    expect(livePostHogClient()).toBeNull();
+  });
+
+  it('reports the optional-consent level the client was built with', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, livePostHogClient } = await loadModule();
+    initPostHog();
+
+    expect(livePostHogClient()?.optionalConsent).toBe(false);
+  });
+
+  it('records the consent level a development build cannot capture', async () => {
+    // A dev build captures nothing even with a dev host, so the captured flag
+    // says false either way; the recorded level must still follow consent.
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
+    try {
+      const { initPostHog, livePostHogClient } = await loadModule();
+      initPostHog();
+
+      expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+      expect(livePostHogClient()?.optionalConsent).toBe(true);
+    } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
+      vi.stubGlobal('__DEV__', false);
+    }
   });
 });
 
@@ -496,50 +665,50 @@ describe('resumePostHog', () => {
     vi.clearAllMocks();
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.useFakeTimers();
   });
 
-  it('returns a Promise and unseals storage after the 110 ms debounce', async () => {
-    vi.useFakeTimers();
+  // Restore the clock on the failing path too: a leftover fake clock makes the
+  // later suites' real timer waits hang instead of reporting their own failure.
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('returns a Promise and unseals storage after the 110 ms debounce', async () => {
     const { resumePostHog } = await loadModule();
     const promise = resumePostHog();
     expect(promise).toBeInstanceOf(Promise);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
     // advanceTimersByTimeAsync processes microtasks (the await discardChain
-    // continuation), then the 110 ms setTimeout, then the microtask from the
+    // continuation), then the 110 ms setTimeout, then the microtask from the
     // resolved setTimeout promise, so unsealPostHogStorage runs synchronously.
     await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
     await promise;
-    vi.useRealTimers();
   });
 
   it('awaits active discard before unsealing', async () => {
     const { initPostHog, discardPostHog, resumePostHog } = await loadModule();
     initPostHog();
 
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
 
+    // The synchronous part of the discard (seal, clear queues, client = null)
+    // runs inside the call, before it awaits optOut.
     const discardPromise = discardPostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 0);
-    });
-
     const resumePromise = resumePostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 10);
-    });
 
-    // Unseal must not have been called — discard is still in flight.
+    // The discard is still unresolved, so resumePostHog cannot reach its
+    // 110 ms debounce. Moving past that window must not unseal: this fails
+    // when resumePostHog stops awaiting the discard chain.
+    await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await discardPromise;
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -551,6 +720,14 @@ describe('discard serialization', () => {
     vi.clearAllMocks();
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.useFakeTimers();
+  });
+
+  // Restore the clock on the failing path too: a leftover fake clock makes the
+  // later suites' real timer waits hang instead of reporting their own failure.
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('resumePostHog awaits a slow discard even when a later fast discard overwrites the tail', async () => {
@@ -558,39 +735,33 @@ describe('discard serialization', () => {
     initPostHog();
 
     // First discard: slow optOut.
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
 
     const firstDiscard = discardPostHog();
 
-    // Let the synchronous part of the first discard run (seal, clear
-    // queues, client=null, flagListeners.clear).
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 0);
-    });
-
-    // Second discard: client is already null, so the IIFE returns early.
+    // Second discard: client is already null, so the IIFE returns early. No
+    // timer flush is needed between the two — the first discard's synchronous
+    // part (seal, clear queues, client = null) runs inside its call, before it
+    // awaits optOut.
     const secondDiscard = discardPostHog();
 
     // resumePostHog captures the chain tail. The tail includes the second
     // discard. Since the second discard chains after the first, awaiting
     // the tail must await the first discard too.
     const resumePromise = resumePostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 10);
-    });
 
-    // Unseal must not have been called — the first discard is still in flight.
+    // The first discard is still unresolved, so the tail cannot settle and
+    // resumePostHog cannot reach its 110 ms debounce. Moving past that window
+    // must not unseal: this fails when resumePostHog stops awaiting the
+    // discard chain.
+    await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await firstDiscard;
     await secondDiscard;
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -604,12 +775,8 @@ describe('discard serialization', () => {
     await discardPostHog();
 
     // Second discard: slow optOut, but starts after resumePostHog captures the tail.
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
     // Re-create a client so the second discard has something to opt out.
     const posthogModule = await import('posthog-react-native');
     (posthogModule.default as ReturnType<typeof vi.fn>).mockClear();
@@ -622,8 +789,9 @@ describe('discard serialization', () => {
     const secondDiscard = discardPostHog();
 
     // resumePostHog captured the tail before the second discard was
-    // appended. The tail should resolve when the first discard's
-    // completion resolves (already done).
+    // appended. The tail resolves when the first discard's completion
+    // resolves (already done), so only the 110 ms debounce is left.
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     // The second discard is still in flight, but resumePostHog has
@@ -631,8 +799,7 @@ describe('discard serialization', () => {
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
 
     // Clean up: resolve the second discard.
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await secondDiscard;
   });
 
@@ -643,8 +810,10 @@ describe('discard serialization', () => {
     // Off: discard the client.
     await discardPostHog();
 
-    // On: resume and re-init.
-    await resumePostHog();
+    // On: resume and re-init. resumePostHog waits out its 110 ms debounce.
+    const resumePromise = resumePostHog();
+    await vi.advanceTimersByTimeAsync(110);
+    await resumePromise;
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
 
     const posthogModule = await import('posthog-react-native');
@@ -670,6 +839,7 @@ describe('isPostHogReady and subscribeToPostHogReady', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.holder.options = undefined;
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
   });
@@ -710,12 +880,22 @@ describe('isPostHogReady and subscribeToPostHogReady', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('isPostHogReady returns false when consent is not allowed', async () => {
+  it('isPostHogReady returns false when no account decision exists', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
+    const { initPostHog, isPostHogReady } = await loadModule();
+    initPostHog();
+
+    expect(isPostHogReady()).toBe(false);
+  });
+
+  it('isPostHogReady returns true for a flags-only client', async () => {
+    // Flag evaluation does not need optional consent, so a signed-in account
+    // still has a live client; capture stays closed.
     hoisted.controller.allowsOptional.mockReturnValue(false);
     const { initPostHog, isPostHogReady } = await loadModule();
     initPostHog();
-    // initPostHog returns early when consent is not allowed.
-    expect(isPostHogReady()).toBe(false);
+
+    expect(isPostHogReady()).toBe(true);
   });
 
   it('isPostHogReady stays true after a second initPostHog call', async () => {

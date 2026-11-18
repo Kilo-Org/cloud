@@ -155,4 +155,57 @@ describe('fitCallbackJobToQueueLimit', () => {
       maximumByteLength: CALLBACK_QUEUE_MAX_SERIALIZED_BYTES,
     });
   });
+
+  it('retains activity as fallback when oversized final text is omitted', () => {
+    const job = callbackJob('x'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES));
+    job.payload.recentActivity = JSON.stringify({
+      partial: true,
+      messages: [{ text: 'Earlier progress', tools: [{ name: 'bash', status: 'completed' }] }],
+    });
+    const result = fitCallbackJobToQueueLimit(job);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.job.payload.lastAssistantMessageText).toBeUndefined();
+    expect(result.job.payload.recentActivity).toBe(job.payload.recentActivity);
+    expect(actualSerializedCallbackJobByteLength(result.job)).toBe(result.serializedByteLength);
+  });
+
+  it('drops activity rather than changing an otherwise fitting final answer', () => {
+    const job = callbackJob('Complete answer');
+    job.target.headers = { context: 'x'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES - 1_000) };
+    job.payload.recentActivity = '\u{1f600}"\\\n'.repeat(2_000);
+    const result = fitCallbackJobToQueueLimit(job);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.job.payload.lastAssistantMessageText).toBe('Complete answer');
+    expect(result.job.payload.recentActivity).toBeUndefined();
+    expect(job.payload.recentActivity).toBeDefined();
+    expect(actualSerializedCallbackJobByteLength(result.job)).toBeLessThanOrEqual(
+      CALLBACK_QUEUE_MAX_SERIALIZED_BYTES
+    );
+  });
+
+  it('drops activity after omitting oversized final text if both cannot fit', () => {
+    const job = callbackJob('x'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES));
+    job.target.headers = { context: 'x'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES - 1_000) };
+    job.payload.recentActivity = '\u{1f600}"\\\n'.repeat(2_000);
+    const result = fitCallbackJobToQueueLimit(job);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.job.payload.lastAssistantMessageText).toBeUndefined();
+    expect(result.job.payload.lastAssistantMessageTextTruncation).toBeDefined();
+    expect(result.job.payload.recentActivity).toBeUndefined();
+    expect(actualSerializedCallbackJobByteLength(result.job)).toBe(result.serializedByteLength);
+    expect(result.serializedByteLength).toBeLessThanOrEqual(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
+  });
+
+  it('drops activity with no final text rather than rejecting callback delivery', () => {
+    const job = callbackJob('');
+    delete job.payload.lastAssistantMessageText;
+    job.payload.recentActivity = '\u{1f600}'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
+    const result = fitCallbackJobToQueueLimit(job);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.job.payload.recentActivity).toBeUndefined();
+  });
 });

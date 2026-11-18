@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 jest.mock('@/lib/kilo-pass-org/bonus-repair-cron', () => ({
   runOrganizationPassBonusRepairCron: jest.fn(),
 }));
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => jest.fn()) }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 
 import { runOrganizationPassBonusRepairCron } from '@/lib/kilo-pass-org/bonus-repair-cron';
 import { GET } from './route';

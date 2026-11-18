@@ -83,7 +83,7 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
           onClick={handleClick}
           className={cn(
             'text-foreground group/logo ring-foreground/15 pointer-events-auto flex w-56 items-center gap-4 self-start pr-4 whitespace-nowrap backdrop-blur-xl outline-none ring-inset',
-            'hover:text-yellow-200 hover:ring-yellow-200/40',
+            'hover:text-brand-primary hover:ring-brand-primary/40',
             'focus:text-brand-primary focus:ring-brand-primary focus:ring-3',
             className
           )}

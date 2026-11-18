@@ -1,26 +1,39 @@
 /* eslint-disable max-lines -- cohesive unit-test suite for session-list-helpers pure functions */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
   activeSessionMetaTimestamp,
+  canExitSessionFromList,
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
-  excludeActiveFromGroups,
   expandPlatformFilter,
+  formatGitUrlProject,
   formatMeta,
-  platformLabel,
+  formatScheduledWake,
+  knownPlatformBucket,
+  normalisePlatformSelection,
+  PLATFORM_FILTERS,
+  projectOptionKey,
   remoteAgentLabel,
   remoteMeta,
   remoteSessionEyebrowLabel,
+  remoteSessionEyebrowState,
   repoNameFromGitUrl,
-  selectPinnedActiveSessions,
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
+  storedSessionEyebrowState,
 } from './session-list-helpers';
-import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
+import { sectionAwareTimeMeta } from './session-row-time-meta';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
+
+afterEach(async () => {
+  await i18n.changeLanguage('en');
+});
 
 function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
   return {
@@ -32,305 +45,43 @@ function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
   };
 }
 
-describe('selectPinnedActiveSessions', () => {
-  it('does not dedup against stored pages (returns actives regardless)', () => {
-    // The helper intentionally has no stored-sessions parameter. The
-    // exclusivity contract lives on the history side (Task 3); the pinned
-    // set is driven by the search query, the platform/project filters, and the active input.
-    const actives: ActiveSession[] = [makeActive({ id: 'a1' }), makeActive({ id: 'a2' })];
-    const result = selectPinnedActiveSessions({
-      activeSessions: actives,
-      projectFilter: [],
-      platformFilter: [],
-      searchQuery: '',
-    });
-    expect(result).toEqual(actives);
+describe('composeSessionProvenanceSubtitle', () => {
+  it('returns "branch · #N" when both branch and PR number exist', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: 42 })).toBe(
+      'feature/x · #42'
+    );
   });
 
-  describe('search rules', () => {
-    it('empty query performs no narrowing', () => {
-      const a = makeActive({ id: 'a', title: 'Fix login' });
-      const b = makeActive({ id: 'b', title: 'Other work' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [a, b],
-        projectFilter: [],
-        platformFilter: [],
-        searchQuery: '',
-      });
-      expect(result).toEqual([a, b]);
-    });
-
-    it('whitespace-only query performs no narrowing', () => {
-      const a = makeActive({ id: 'a', title: 'Fix login' });
-      const b = makeActive({ id: 'b', title: 'Other work' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [a, b],
-        projectFilter: [],
-        platformFilter: [],
-        searchQuery: '   ',
-      });
-      expect(result).toEqual([a, b]);
-    });
-
-    it('matches a title substring mid-string', () => {
-      const match = makeActive({ id: 'm', title: 'Fix login bug' });
-      const other = makeActive({ id: 'o', title: 'Deploy release' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [match, other],
-        projectFilter: [],
-        platformFilter: [],
-        searchQuery: 'login',
-      });
-      expect(result.map(s => s.id)).toEqual(['m']);
-    });
-
-    it('title match is case-insensitive both ways', () => {
-      const lower = makeActive({ id: 'lower', title: 'Fix login bug' });
-      const upper = makeActive({ id: 'upper', title: 'FIX LOGIN BUG' });
-      expect(
-        selectPinnedActiveSessions({
-          activeSessions: [lower],
-          projectFilter: [],
-          platformFilter: [],
-          searchQuery: 'LOGIN',
-        }).map(s => s.id)
-      ).toEqual(['lower']);
-      expect(
-        selectPinnedActiveSessions({
-          activeSessions: [upper],
-          projectFilter: [],
-          platformFilter: [],
-          searchQuery: 'fix',
-        }).map(s => s.id)
-      ).toEqual(['upper']);
-    });
-
-    it('matches a session id substring, case-insensitively', () => {
-      const match = makeActive({ id: 'ses-ABC123', title: 'Unrelated title' });
-      const other = makeActive({ id: 'ses-xyz', title: 'Also unrelated' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [match, other],
-        projectFilter: [],
-        platformFilter: [],
-        searchQuery: 'abc123',
-      });
-      expect(result.map(s => s.id)).toEqual(['ses-ABC123']);
-    });
-
-    it('excludes sessions matching neither title nor id', () => {
-      const a = makeActive({ id: 'ses-a', title: 'Fix login' });
-      const b = makeActive({ id: 'ses-b', title: 'Deploy' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [a, b],
-        projectFilter: [],
-        platformFilter: [],
-        searchQuery: 'zzz',
-      });
-      expect(result).toEqual([]);
-    });
-
-    it('applies the text query in conjunction with platform and project filters', () => {
-      const pass = makeActive({
-        id: 'pass',
-        title: 'Fix login bug',
-        gitUrl: 'git@github.com:org/repo.git',
-        createdOnPlatform: 'cli',
-      });
-      const wrongPlatform = makeActive({
-        id: 'wrongPlatform',
-        title: 'Fix login bug',
-        gitUrl: 'git@github.com:org/repo.git',
-        createdOnPlatform: 'slack',
-      });
-      const wrongProject = makeActive({
-        id: 'wrongProject',
-        title: 'Fix login bug',
-        gitUrl: 'git@github.com:org/other.git',
-        createdOnPlatform: 'cli',
-      });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [pass, wrongPlatform, wrongProject],
-        projectFilter: ['git@github.com:org/repo.git'],
-        platformFilter: ['cli'],
-        searchQuery: 'login',
-      });
-      expect(result.map(s => s.id)).toEqual(['pass']);
-    });
-
-    it('treats LIKE metacharacters literally (parity with server position() search)', () => {
-      const percent = makeActive({ id: 'pct', title: '100% done' });
-      const noPercent = makeActive({ id: 'nop', title: '1000 done' });
-      expect(
-        selectPinnedActiveSessions({
-          activeSessions: [percent, noPercent],
-          projectFilter: [],
-          platformFilter: [],
-          searchQuery: '100%',
-        }).map(s => s.id)
-      ).toEqual(['pct']);
-    });
+  it('returns the branch when only branch is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: null })).toBe(
+      'feature/x'
+    );
+    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: undefined })).toBe(
+      'feature/x'
+    );
   });
 
-  describe('project rules', () => {
-    it('excludes rows with missing gitUrl under an active project filter', () => {
-      const withUrl = makeActive({ id: 'with', gitUrl: 'git@github.com:org/repo.git' });
-      const withoutUrl = makeActive({ id: 'without' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [withUrl, withoutUrl],
-        projectFilter: ['git@github.com:org/repo.git'],
-        platformFilter: [],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id)).toEqual(['with']);
-    });
-
-    it('includes rows whose gitUrl is in the active project filter', () => {
-      const match = makeActive({ id: 'match', gitUrl: 'git@github.com:org/repo.git' });
-      const other = makeActive({ id: 'other', gitUrl: 'git@github.com:org/other.git' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [match, other],
-        projectFilter: ['git@github.com:org/repo.git'],
-        platformFilter: [],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id)).toEqual(['match']);
-    });
-
-    it('includes every active session when no project filter is set', () => {
-      const a = makeActive({ id: 'a' });
-      const b = makeActive({ id: 'b', gitUrl: 'git@github.com:org/repo.git' });
-      const c = makeActive({ id: 'c', gitUrl: 'git@github.com:org/other.git' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [a, b, c],
-        projectFilter: [],
-        platformFilter: [],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id)).toEqual(['a', 'b', 'c']);
-    });
+  it('returns "#N" when only a PR number is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: 7 })).toBe('#7');
+    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: 7 })).toBe('#7');
   });
 
-  describe('platform rules', () => {
-    it('includes rows whose createdOnPlatform matches a concrete filter', () => {
-      const cli = makeActive({ id: 'cli', createdOnPlatform: 'cli' });
-      const slack = makeActive({ id: 'slack', createdOnPlatform: 'slack' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [cli, slack],
-        projectFilter: [],
-        platformFilter: ['cli'],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id)).toEqual(['cli']);
-    });
+  it('returns null when neither branch nor PR number is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: null })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: undefined })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branch: '', prNumber: null })).toBeNull();
+  });
+});
 
-    it('expands a cloud-agent filter to also match cloud-agent-web', () => {
-      const web = makeActive({ id: 'web', createdOnPlatform: 'cloud-agent-web' });
-      const ca = makeActive({ id: 'ca', createdOnPlatform: 'cloud-agent' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [web, ca],
-        projectFilter: [],
-        platformFilter: ['cloud-agent'],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id).toSorted()).toEqual(['ca', 'web']);
-    });
-
-    it('expands an extension filter to vscode and agent-manager', () => {
-      const vscode = makeActive({ id: 'vscode', createdOnPlatform: 'vscode' });
-      const am = makeActive({ id: 'am', createdOnPlatform: 'agent-manager' });
-      const slack = makeActive({ id: 'slack', createdOnPlatform: 'slack' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [vscode, am, slack],
-        projectFilter: [],
-        platformFilter: ['extension'],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id).toSorted()).toEqual(['am', 'vscode']);
-    });
-
-    it("'other' filter matches an unknown platform", () => {
-      const weird = makeActive({ id: 'weird', createdOnPlatform: 'my-new-platform' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [weird],
-        projectFilter: [],
-        platformFilter: ['other'],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id)).toEqual(['weird']);
-    });
-
-    it("'other' filter rejects a known platform", () => {
-      const cli = makeActive({ id: 'cli', createdOnPlatform: 'cli' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [cli],
-        projectFilter: [],
-        platformFilter: ['other'],
-        searchQuery: '',
-      });
-      expect(result).toEqual([]);
-    });
-
-    it("'other' combined with a concrete filter accepts both", () => {
-      const cli = makeActive({ id: 'cli', createdOnPlatform: 'cli' });
-      const weird = makeActive({ id: 'weird', createdOnPlatform: 'my-new-platform' });
-      const vscode = makeActive({ id: 'vscode', createdOnPlatform: 'vscode' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [cli, weird, vscode],
-        projectFilter: [],
-        platformFilter: ['cli', 'other'],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id).toSorted()).toEqual(['cli', 'weird']);
-    });
-
-    it('excludes rows with undefined createdOnPlatform under any platform filter', () => {
-      const unknown = makeActive({ id: 'unknown' });
-      const cli = makeActive({ id: 'cli', createdOnPlatform: 'cli' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [unknown, cli],
-        projectFilter: [],
-        platformFilter: ['cli'],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id)).toEqual(['cli']);
-    });
-
-    it('includes rows with undefined createdOnPlatform when no platform filter is set', () => {
-      const unknown = makeActive({ id: 'unknown' });
-      const cli = makeActive({ id: 'cli', createdOnPlatform: 'cli' });
-      const result = selectPinnedActiveSessions({
-        activeSessions: [unknown, cli],
-        projectFilter: [],
-        platformFilter: [],
-        searchQuery: '',
-      });
-      expect(result.map(s => s.id).toSorted()).toEqual(['cli', 'unknown']);
-    });
+describe('canExitSessionFromList', () => {
+  it('returns true for a real CLI connection id', () => {
+    expect(canExitSessionFromList(makeActive({ connectionId: 'c1' }))).toBe(true);
   });
 
-  it('combines project and platform filters with AND semantics', () => {
-    const pass = makeActive({
-      id: 'pass',
-      gitUrl: 'git@github.com:org/repo.git',
-      createdOnPlatform: 'cli',
-    });
-    const wrongProject = makeActive({
-      id: 'wrongProject',
-      gitUrl: 'git@github.com:org/other.git',
-      createdOnPlatform: 'cli',
-    });
-    const wrongPlatform = makeActive({
-      id: 'wrongPlatform',
-      gitUrl: 'git@github.com:org/repo.git',
-      createdOnPlatform: 'slack',
-    });
-    const result = selectPinnedActiveSessions({
-      activeSessions: [pass, wrongProject, wrongPlatform],
-      projectFilter: ['git@github.com:org/repo.git'],
-      platformFilter: ['cli'],
-      searchQuery: '',
-    });
-    expect(result.map(s => s.id)).toEqual(['pass']);
+  it('returns false for the cloud-agent sentinel connection id', () => {
+    expect(canExitSessionFromList(makeActive({ connectionId: CLOUD_AGENT_CONNECTION_ID }))).toBe(
+      false
+    );
   });
 });
 
@@ -390,6 +141,24 @@ describe('remoteMeta', () => {
     expect(remoteMeta({ lastActivityAt, updatedAt })).toBe(formatMeta(lastActivityAt));
   });
 
+  it('formats the relative time from the caller\u2019s sampled clock', () => {
+    // A memoized row cannot read the wall clock behind the memo, so the caller
+    // passes the tick that re-rendered it. The same timestamp therefore reads
+    // differently for two sampled clocks, and each matches `timeAgo`.
+    const updatedAt = '2026-01-01T00:00:00.000Z';
+    const base = parseTimestamp(updatedAt).getTime();
+    const firstTick = base + 5 * 60_000;
+    const laterTick = base + 20 * 60_000;
+
+    expect(remoteMeta({ updatedAt }, firstTick)).toBe(
+      timeAgo(parseTimestamp(updatedAt), undefined, firstTick).toUpperCase()
+    );
+    expect(remoteMeta({ updatedAt }, laterTick)).toBe(
+      timeAgo(parseTimestamp(updatedAt), undefined, laterTick).toUpperCase()
+    );
+    expect(remoteMeta({ updatedAt }, laterTick)).not.toBe(remoteMeta({ updatedAt }, firstTick));
+  });
+
   it('falls back to updatedAt when lastActivityAt is absent', () => {
     const updatedAt = '2024-01-01T00:00:00.000Z';
     expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
@@ -418,79 +187,173 @@ describe('remoteMeta', () => {
   });
 });
 
-describe('platformLabel (moved helper, regression guard)', () => {
-  it('matches the original mapping', () => {
-    expect(platformLabel('cloud-agent')).toBe('CLOUD AGENT');
-    expect(platformLabel('cloud-agent-web')).toBe('CLOUD AGENT');
-    expect(platformLabel('vscode')).toBe('VSCODE');
-    expect(platformLabel('agent-manager')).toBe('VSCODE');
-    expect(platformLabel('slack')).toBe('SLACK');
-    expect(platformLabel('cli')).toBe('CLI');
-    expect(platformLabel('my-new-platform')).toBe('MY-NEW-PLATFORM');
-  });
-});
-
 describe('formatMeta (moved helper, regression guard)', () => {
   it('matches the original timeAgo + toUpperCase behavior', () => {
     expect(formatMeta('2024-01-01T00:00:00.000Z')).toBe(
       timeAgo(parseTimestamp('2024-01-01T00:00:00.000Z')).toUpperCase()
     );
   });
+  it('omits a missing restored timestamp', () => {
+    expect(formatMeta(null)).toBe('');
+  });
 });
 
-type ExcludeRow = { session_id: string; created_at: string; updated_at: string };
+describe('sectionAwareTimeMeta', () => {
+  // 2026-10-30T19:00Z is a Friday. The rows below land on the calendar days the
+  // Agents list buckets as Today/Yesterday/a weekday in UTC, so each heading is
+  // the one that section really renders above the row. The zone is passed in so
+  // the suite never depends on the machine it runs on.
+  const NOW = new Date('2026-10-30T19:00:00.000Z').getTime();
+  const ZONE = 'UTC';
+  const HOUR = 60 * 60 * 1000;
 
-function makeGroup(label: string, ids: string[]): AgentSessionDateGroup<ExcludeRow> {
-  return {
-    label,
-    sessions: ids.map(id => ({ session_id: id, created_at: '', updated_at: '' })),
-  };
-}
+  function clockOf(iso: string): string {
+    return new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: ZONE,
+    }).format(new Date(iso));
+  }
 
-describe('excludeActiveFromGroups', () => {
-  type Row = ExcludeRow;
+  it('shows the clock time of the row timestamp when the relative label restates the heading', () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    // The premise: the relative label is the section heading itself.
+    expect(formatMeta(iso, NOW)).toBe('YESTERDAY');
 
-  it('drops matching sessions and drops groups that become empty', () => {
-    const groups: AgentSessionDateGroup<Row>[] = [
-      makeGroup('Today', ['a', 'b', 'c']),
-      makeGroup('Yesterday', ['d', 'e']),
-      makeGroup('Older', ['f']),
-    ];
-    const result = excludeActiveFromGroups(groups, new Set(['b', 'e', 'f']));
-    expect(result.map(g => g.label)).toEqual(['Today', 'Yesterday']);
-    expect(result[0]?.sessions.map(s => s.session_id)).toEqual(['a', 'c']);
-    expect(result[1]?.sessions.map(s => s.session_id)).toEqual(['d']);
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', { nowMs: NOW, timeZone: ZONE })).toEqual({
+      visible: clockOf(iso),
+      clock: clockOf(iso),
+      spoken: clockOf(iso),
+    });
   });
 
-  it('preserves order when nothing is excluded', () => {
-    const groups: AgentSessionDateGroup<Row>[] = [
-      makeGroup('Today', ['a']),
-      makeGroup('Yesterday', ['b']),
-      makeGroup('Older', ['c']),
-    ];
-    const result = excludeActiveFromGroups(groups, new Set());
-    expect(result.map(g => g.label)).toEqual(['Today', 'Yesterday', 'Older']);
-    expect(result.map(g => g.sessions.map(s => s.session_id))).toEqual([['a'], ['b'], ['c']]);
+  it('matches a heading already in the eyebrow casing, and every locale casing', async () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(iso, 'YESTERDAY', { nowMs: NOW, timeZone: ZONE }).clock).toBe(
+      clockOf(iso)
+    );
+
+    // German heads the section "Gestern" while RelativeTimeFormat says "gestern".
+    await i18n.changeLanguage('de');
+    expect(formatMeta(iso, NOW)).toBe('GESTERN');
+    expect(
+      sectionAwareTimeMeta(iso, 'Gestern', { nowMs: NOW, timeZone: ZONE }).clock
+    ).not.toBeNull();
   });
 
-  it('returns an empty array when every session is active', () => {
-    const groups: AgentSessionDateGroup<Row>[] = [
-      makeGroup('Today', ['a']),
-      makeGroup('Yesterday', ['b']),
-    ];
-    const result = excludeActiveFromGroups(groups, new Set(['a', 'b']));
-    expect(result).toEqual([]);
+  it('counts calendar days, so a 47-hour-old row is not "yesterday"', () => {
+    // The shape the History list showed: read on local Tuesday 20:52, a session
+    // from local Sunday 21:00 is 47 h 52 m old, so the elapsed-time word is
+    // "yesterday" while the heading above it names Sunday.
+    const now = new Date('2026-11-10T20:52:00.000Z').getTime();
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    expect(formatMeta(iso, now)).toBe('YESTERDAY');
+
+    expect(sectionAwareTimeMeta(iso, 'Sunday', { nowMs: now, timeZone: ZONE })).toEqual({
+      visible: '2 DAYS AGO',
+      clock: null,
+      spoken: '2 days ago',
+    });
   });
 
-  it('preserves group label and remaining session order when partially excluded', () => {
-    const groups: AgentSessionDateGroup<Row>[] = [
-      makeGroup('Today', ['x', 'y', 'z']),
-      makeGroup('Older', ['p', 'q']),
-    ];
-    const result = excludeActiveFromGroups(groups, new Set(['y']));
-    expect(result.map(g => g.label)).toEqual(['Today', 'Older']);
-    expect(result[0]?.sessions.map(s => s.session_id)).toEqual(['x', 'z']);
-    expect(result[1]?.sessions.map(s => s.session_id)).toEqual(['p', 'q']);
+  it('still reaches the clock time for a row the calendar really places yesterday', () => {
+    // 26 hours old, but the previous local date: the day word agrees with the
+    // heading, so the row shows its clock instead of repeating the section.
+    const now = new Date('2026-11-10T12:00:00.000Z').getTime();
+    const iso = new Date('2026-11-09T10:00:00.000Z').toISOString();
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', { nowMs: now, timeZone: ZONE })).toEqual({
+      visible: clockOf(iso),
+      clock: clockOf(iso),
+      spoken: clockOf(iso),
+    });
+  });
+
+  it('names the day the given zone shows, not the one the runtime started in', () => {
+    // Sunday 21:00 UTC is Monday 11:00 in Kiritimati, and the clock reads
+    // Tuesday 23:00 there, so the row is the previous local date and its
+    // heading is that day's weekday. In UTC the same row is two dates back, so
+    // the label cannot name yesterday under a weekday heading.
+    const now = new Date('2026-11-10T09:00:00.000Z').getTime();
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    expect(
+      sectionAwareTimeMeta(iso, 'Monday', { nowMs: now, timeZone: 'Pacific/Kiritimati' })
+    ).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+      spoken: 'yesterday',
+    });
+    expect(sectionAwareTimeMeta(iso, 'Sunday', { nowMs: now, timeZone: 'UTC' }).spoken).toBe(
+      '2 days ago'
+    );
+  });
+
+  it('keeps the relative label under a heading it does not repeat', () => {
+    const today = new Date(NOW - 3 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(today, 'Today', { nowMs: NOW, timeZone: ZONE })).toEqual({
+      visible: '3 HOURS AGO',
+      clock: null,
+      spoken: '3 hours ago',
+    });
+
+    const midWeek = new Date(NOW - 51 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(midWeek, 'Wednesday', { nowMs: NOW, timeZone: ZONE })).toEqual({
+      visible: '2 DAYS AGO',
+      clock: null,
+      spoken: '2 days ago',
+    });
+  });
+
+  it('keeps the elapsed-time label on a row with no section (Home card, share sheet)', () => {
+    // Scope: only rows under a date heading read the calendar. A 47-hour-old
+    // row with no heading keeps the label every other surface renders.
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    const nowMs = new Date('2026-11-10T20:52:00.000Z').getTime();
+    expect(sectionAwareTimeMeta(iso, null, { nowMs, timeZone: ZONE })).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+      spoken: 'yesterday',
+    });
+    expect(sectionAwareTimeMeta(iso, undefined, { nowMs, timeZone: ZONE })).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+      spoken: 'yesterday',
+    });
+    // And it is exactly what `formatMeta` draws, not merely a similar word.
+    expect(sectionAwareTimeMeta(iso, null, { nowMs, timeZone: ZONE }).visible).toBe(
+      formatMeta(iso, nowMs)
+    );
+  });
+
+  it('omits the meta for an unparseable timestamp instead of inventing a clock', () => {
+    expect(
+      sectionAwareTimeMeta('not-a-timestamp', 'Yesterday', { nowMs: NOW, timeZone: ZONE })
+    ).toEqual({
+      visible: '',
+      clock: null,
+      spoken: '',
+    });
+  });
+});
+
+describe('formatScheduledWake', () => {
+  it('returns null when the timestamp does not parse', () => {
+    expect(formatScheduledWake('not-a-timestamp')).toBeNull();
+    expect(formatScheduledWake('')).toBeNull();
+    expect(formatScheduledWake('2026-13-45T99:99:99Z')).toBeNull();
+  });
+
+  it('formats a valid ISO wake as a clock time with an hour and a minute', () => {
+    const wake = formatScheduledWake('2026-09-24T09:00:00.000Z');
+    expect(wake).not.toBeNull();
+    expect(wake).toMatch(/\d/);
+    expect(wake).toContain(':');
+  });
+
+  it('follows the active language (German uses a 24-hour clock)', async () => {
+    await i18n.changeLanguage('de');
+    const wake = formatScheduledWake('2026-09-24T09:00:00.000Z');
+    expect(wake).not.toBeNull();
+    expect(wake).not.toMatch(/AM|PM/);
   });
 });
 
@@ -509,6 +372,126 @@ describe('expandPlatformFilter (regression guard for filter expansion)', () => {
 
   it('passes through unknown concrete values unchanged', () => {
     expect(expandPlatformFilter(['cli', 'other'])).toEqual(['cli', 'other']);
+  });
+});
+
+describe('knownPlatformBucket (inverse of expandPlatformFilter)', () => {
+  it('folds a platform variant into its filter bucket', () => {
+    expect(knownPlatformBucket('cloud-agent-web')).toBe('cloud-agent');
+    expect(knownPlatformBucket('vscode')).toBe('extension');
+    expect(knownPlatformBucket('agent-manager')).toBe('extension');
+  });
+
+  it('returns the bucket itself for a bucket', () => {
+    for (const bucket of PLATFORM_FILTERS) {
+      expect(knownPlatformBucket(bucket)).toBe(bucket);
+    }
+  });
+
+  it('returns null for an unknown platform', () => {
+    expect(knownPlatformBucket('future-platform')).toBeNull();
+    expect(knownPlatformBucket('')).toBeNull();
+  });
+
+  it('inverts expandPlatformFilter on every bucket', () => {
+    for (const bucket of PLATFORM_FILTERS) {
+      for (const platform of expandPlatformFilter([bucket])) {
+        expect(knownPlatformBucket(platform)).toBe(bucket);
+      }
+    }
+  });
+});
+
+describe('normalisePlatformSelection (persisted selection → sheet rows)', () => {
+  it('collapses a stored variant into its bucket and keeps an unknown platform', () => {
+    expect(normalisePlatformSelection(['cloud-agent-web', 'vscode'])).toEqual([
+      'cloud-agent',
+      'extension',
+    ]);
+    expect(normalisePlatformSelection(['jetbrains'])).toEqual(['jetbrains']);
+  });
+
+  it('dedupes a bucket saved alongside one of its variants', () => {
+    expect(normalisePlatformSelection(['cloud-agent', 'cloud-agent-web'])).toEqual(['cloud-agent']);
+    expect(normalisePlatformSelection(['extension', 'vscode', 'agent-manager'])).toEqual([
+      'extension',
+    ]);
+  });
+
+  it('expands to every raw platform of the checked row, so the history query covers the bucket', () => {
+    expect(
+      expandPlatformFilter(normalisePlatformSelection(['cloud-agent-web'])).toSorted()
+    ).toEqual(['cloud-agent', 'cloud-agent-web'].toSorted());
+  });
+});
+
+describe('formatGitUrlProject (percent-decoded segments)', () => {
+  it('decodes an encoded CJK repository name in an https URL', () => {
+    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
+      'org/山田-API'
+    );
+    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API')).toBe(
+      'org/山田-API'
+    );
+  });
+
+  it('decodes an encoded CJK repository name in an ssh URL', () => {
+    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
+      'org/山田-API'
+    );
+    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API')).toBe('org/山田-API');
+  });
+
+  it('decodes every path segment, not only the repository name', () => {
+    expect(
+      formatGitUrlProject(
+        'https://gitlab.com/%E7%A7%BB%E5%8A%A8%E7%AB%AF/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git'
+      )
+    ).toBe('移动端/метаданные');
+  });
+
+  it('keeps the GitLab dash-separated project form while decoding', () => {
+    expect(
+      formatGitUrlProject('https://gitlab.com/group/%E7%A7%BB%E5%8A%A8%E7%AB%AF/-/tree/main')
+    ).toBe('group/移动端');
+  });
+
+  it('keeps a malformed escape raw instead of throwing', () => {
+    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%ZZ-repo.git')).toBe(
+      'org/%E5%B1%B1%ZZ-repo'
+    );
+    expect(formatGitUrlProject('https://github.com/org/100%-repo.git')).toBe('org/100%-repo');
+    expect(formatGitUrlProject('git@github.com:org/100%-repo.git')).toBe('org/100%-repo');
+  });
+
+  it('decodes %25 to a single % and never decodes the value twice', () => {
+    expect(formatGitUrlProject('https://github.com/org/50%2525-off.git')).toBe('org/50%25-off');
+    expect(formatGitUrlProject('https://github.com/org/50%25-off.git')).toBe('org/50%-off');
+  });
+
+  it('leaves an already-decoded URL unchanged', () => {
+    expect(formatGitUrlProject('https://github.com/org/山田-API.git')).toBe('org/山田-API');
+    expect(formatGitUrlProject('git@github.com:org/метаданные.git')).toBe('org/метаданные');
+  });
+});
+
+describe('projectOptionKey (visible-label identity)', () => {
+  it('folds https, ssh, and a .git suffix into one key', () => {
+    const key = projectOptionKey('https://github.com/org/repo.git');
+    expect(key).toBe('org/repo');
+    expect(projectOptionKey('https://github.com/org/repo')).toBe(key);
+    expect(projectOptionKey('git@github.com:org/repo.git')).toBe(key);
+    expect(projectOptionKey('git@github.com:org/repo')).toBe(key);
+  });
+
+  it('trims and lowercases the formatted label', () => {
+    expect(projectOptionKey('https://github.com/Kilo-Org/KiloCode.git')).toBe('kilo-org/kilocode');
+  });
+
+  it('folds an encoded URL and the decoded repository name into one key', () => {
+    const encoded = 'https://github.com/org/%E5%B1%B1%E7%94%B0-API.git';
+    expect(projectOptionKey(encoded)).toBe(projectOptionKey('git@github.com:org/山田-API.git'));
+    expect(projectOptionKey(encoded)).toBe('org/山田-api');
   });
 });
 
@@ -546,6 +529,17 @@ describe('repoNameFromGitUrl', () => {
     // are >=2 leading parts, so the last segment is the repo name.
     expect(repoNameFromGitUrl('https://gitlab.com/group/sub/my-repo.git')).toBe('my-repo');
   });
+
+  it('returns the decoded repository name for a percent-encoded git URL', () => {
+    expect(repoNameFromGitUrl('https://github.com/org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
+      '山田-API'
+    );
+    expect(
+      repoNameFromGitUrl(
+        'git@github.com:org/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git'
+      )
+    ).toBe('метаданные');
+  });
 });
 
 describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', () => {
@@ -575,6 +569,35 @@ describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
     expect(storedSessionEyebrowLabel({ git_url: '', created_on_platform: 'cloud-agent' })).toBe(
       'CLOUD AGENT'
     );
+  });
+
+  it('labels a stored session of unknown origin without a live status', () => {
+    const neutral = i18n.t('common.unknown');
+    const live = i18n.t('agents.sessionList.live');
+    // The backend's `'unknown'` sentinel is the reachable unrecorded origin;
+    // the empty string is the same class through a data anomaly. `platformLabel`'s
+    // own tests cover null and undefined with their nullable signature.
+    for (const created_on_platform of ['', 'unknown']) {
+      const label = storedSessionEyebrowLabel({ git_url: null, created_on_platform });
+      expect(label).toBe(neutral);
+      expect(label).not.toBe(live);
+    }
+  });
+
+  it('shows the decoded repository name for a percent-encoded git_url', () => {
+    expect(
+      storedSessionEyebrowLabel({
+        git_url:
+          'https://github.com/org/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git',
+        created_on_platform: 'cloud-agent-web',
+      })
+    ).toBe('МЕТАДАННЫЕ');
+    expect(
+      storedSessionEyebrowLabel({
+        git_url: 'git@github.com:org/%E5%B1%B1%E7%94%B0-API.git',
+        created_on_platform: 'cli',
+      })
+    ).toBe('山田-API');
   });
 });
 
@@ -617,6 +640,16 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
     ).toBe('CLOUD AGENT');
   });
 
+  it('shows the decoded repository name for a percent-encoded gitUrl', () => {
+    expect(
+      remoteSessionEyebrowLabel({
+        gitUrl:
+          'https://github.com/org/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).toBe('МЕТАДАННЫЕ');
+  });
+
   it('repo name wins over a known platform origin', () => {
     expect(
       remoteSessionEyebrowLabel({
@@ -624,6 +657,93 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
         createdOnPlatform: 'cli',
       })
     ).toBe('MY-REPO');
+  });
+});
+
+describe('storedSessionEyebrowState (the tint key beside the label)', () => {
+  it('names the placeholder for an origin the row cannot name', () => {
+    for (const created_on_platform of ['', 'unknown']) {
+      expect(storedSessionEyebrowState({ git_url: null, created_on_platform })).toBe('unknown');
+    }
+  });
+
+  it('names the platform for an eyebrow that only states the agent type', () => {
+    // The type is metadata: the row takes the muted pair instead of an
+    // accent, so the session title leads. `CLOUD AGENT` hashed to the amber
+    // ramp entry before this key existed, and drew the eye away from the title.
+    expect(
+      storedSessionEyebrowState({ git_url: null, created_on_platform: 'cloud-agent-web' })
+    ).toBe('platform');
+    expect(storedSessionEyebrowState({ git_url: null, created_on_platform: 'cli' })).toBe(
+      'platform'
+    );
+  });
+
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    // The repository names the row's context, not the session: with the
+    // session title leading, the label and its strip take the muted pair
+    // instead of a saturated ramp entry.
+    expect(
+      storedSessionEyebrowState({
+        git_url: 'https://github.com/org/my-repo.git',
+        created_on_platform: 'cloud-agent-web',
+      })
+    ).toBe('repository');
+    // A git URL whose project segment is empty renders the label fallback, so
+    // the tint falls back with it.
+    expect(
+      storedSessionEyebrowState({ git_url: 'git@github.com:/', created_on_platform: 'cli' })
+    ).toBe('platform');
+  });
+});
+
+describe('remoteSessionEyebrowState (the tint key beside the label)', () => {
+  it('names the live state for every unrecorded origin the label renders as LIVE', async () => {
+    for (const createdOnPlatform of [undefined, '', 'unknown']) {
+      expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform })).toBe('live');
+    }
+    // The word is catalog copy: the tint keys off the state, not its text.
+    await i18n.changeLanguage('de');
+    expect(remoteSessionEyebrowLabel({ gitUrl: null, createdOnPlatform: undefined })).toBe(
+      i18n.t('agents.sessionList.live')
+    );
+    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: undefined })).toBe('live');
+    await i18n.changeLanguage('en');
+  });
+
+  it('names the platform for an eyebrow that only states the agent type', () => {
+    // The type is metadata: the row takes the muted pair instead of an
+    // accent, so the session title leads. `CLOUD AGENT` hashed to the amber
+    // ramp entry before this key existed, and drew the eye away from the title.
+    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: 'cli' })).toBe('platform');
+    expect(remoteSessionEyebrowState({ gitUrl: '', createdOnPlatform: 'cloud-agent-web' })).toBe(
+      'platform'
+    );
+  });
+
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    expect(remoteSessionEyebrowState({ gitUrl: 'https://github.com/org/my-repo.git' })).toBe(
+      'repository'
+    );
+  });
+});
+
+describe('eyebrow casing follows the active locale (Turkish i → İ)', () => {
+  it('uppercases the stored-session repo name with the locale', async () => {
+    await i18n.changeLanguage('tr');
+    expect(
+      storedSessionEyebrowLabel({
+        git_url: 'git@github.com:org/instance.git',
+        created_on_platform: 'cli',
+      })
+    ).toBe('İNSTANCE');
+  });
+
+  it('uppercases the remote-session repo name with the locale', async () => {
+    await i18n.changeLanguage('tr');
+    expect(remoteSessionEyebrowLabel({ gitUrl: 'https://github.com/org/instance.git' })).toBe(
+      'İNSTANCE'
+    );
   });
 });
 
@@ -670,52 +790,68 @@ describe('composeActiveSessionSpokenMeta', () => {
 });
 
 describe('selectRemoteRowSpokenMeta', () => {
-  const costSpoken = '12 cents';
-  const timeSpoken = '5 minutes ago';
-
-  it('needsInput + cost + time → null', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken })).toBeNull();
-  });
-
-  it('needsInput + cost only → null', () => {
+  it('separates metadata clauses with the catalog’s own comma, never a conjunction', async () => {
+    await i18n.changeLanguage('ar');
     expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken: null })
-    ).toBeNull();
+      selectRemoteRowSpokenMeta({
+        variant: 'list',
+        needsInput: false,
+        scheduled: true,
+        scheduledWake: 'wake',
+        costSpoken: null,
+        timeSpoken: 'activity',
+      })
+    ).toBe('wake\u060C activity');
   });
 
-  it('needsInput + time only → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken })
-    ).toBeNull();
+  it('keeps cost and activity alongside a scheduled wake', () => {
+    const result = selectRemoteRowSpokenMeta({
+      variant: 'list',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: 'tomorrow',
+      costSpoken: '12 cents',
+      timeSpoken: '5 minutes ago',
+    });
+    expect(result).toContain('tomorrow');
+    expect(result).toContain('12 cents');
+    expect(result).toContain('5 minutes ago');
   });
 
-  it('needsInput + neither → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken: null })
-    ).toBeNull();
-  });
-
-  it('cost + time → combined spoken form', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken })).toBe(
-      'cost 12 cents, 5 minutes ago'
-    );
-  });
-
-  it('cost only → spoken cost alone', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken: null })).toBe(
-      'cost 12 cents'
-    );
-  });
-
-  it('time only → spoken time alone', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken })).toBe(
-      '5 minutes ago'
-    );
-  });
-
-  it('neither → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken: null })
-    ).toBeNull();
-  });
+  it.each([
+    {
+      variant: 'list',
+      needsInput: true,
+      scheduled: false,
+      scheduledWake: null,
+      expected: 'cost 12 cents, 5 minutes ago',
+    },
+    {
+      variant: 'list',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: null,
+      expected: 'cost 12 cents, 5 minutes ago',
+    },
+    { variant: 'card', needsInput: true, scheduled: false, scheduledWake: null, expected: null },
+    {
+      variant: 'card',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: 'tomorrow',
+      expected: 'tomorrow',
+    },
+    { variant: 'card', needsInput: false, scheduled: true, scheduledWake: null, expected: null },
+  ] as const)(
+    'preserves $variant metadata precedence for needsInput=$needsInput, scheduled=$scheduled, wake=$scheduledWake',
+    ({ expected, ...state }) => {
+      expect(
+        selectRemoteRowSpokenMeta({
+          ...state,
+          costSpoken: '12 cents',
+          timeSpoken: '5 minutes ago',
+        })
+      ).toBe(expected);
+    }
+  );
 });

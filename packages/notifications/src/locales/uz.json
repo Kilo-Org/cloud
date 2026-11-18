@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Agent sessiyangizda yangilanish bor",
+      "lowBalance": "Balansingiz e'tibor talab qiladi",
+      "spendAlert": "Xarajatingiz e'tibor talab qiladi",
+      "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi",
+      "securityUpdate": "Xavfsizlik tekshiruvida yangilanish bor",
+      "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Past balans ogohlantirishi",
+      "body": "{{organizationName}} balansi ${{minimumBalanceUsd}} dan pastga tushdi"
+    },
+    "spendAlert": {
+      "title": "Xarajat ogohlantirishi",
+      "body": "{{scopeName}} xarajati ${{amountUsd}} dan oshdi"
+    },
+    "securityFinding": {
+      "body": "{{repoFullName}} ichida {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Yangi xavfsizlik xulosasi ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ogohlantirishi"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA buzilishi"
+    }
+  },
+  "sessionReady": {
+    "body": "Kilo sessiyangiz telefoningizdan boshqarishga tayyor"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

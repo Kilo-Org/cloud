@@ -1,6 +1,7 @@
 // Pure selection of the inline mutation-error copy shown in the
-// comment-composer and review-submit formSheets. Classification lives in
-// `classifyPrReviewMutationError`; this helper maps kind → display message.
+// comment-composer, review-submit and own-comment edit formSheets.
+// Classification lives in `classifyPrReviewMutationError`; this helper maps
+// kind → display message.
 //
 // FORBIDDEN always passes the server-provided classification.message
 // through verbatim (the server already sanitizes it to actionable copy).
@@ -9,72 +10,152 @@
 // have committed, so the user must verify the PR instead of being shown the
 // generic retryable copy.
 
+import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
-  PR_OPERATION_AMBIGUOUS_MESSAGE,
-  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
-type MutationErrorDisplaySurface = 'composer' | 'submit';
+export type MutationErrorDisplaySurface = 'composer' | 'conversation' | 'submit' | 'edit-comment';
 
-type MutationErrorDisplayKind = 'retryable' | 'bad-request' | 'forbidden' | 'reconnect';
+/**
+ * The inline-error kinds the display helper can return. `not-found` is the
+ * edit surface's terminal 404 (the posted comment no longer exists); it renders
+ * like the other inline kinds but keeps the surface's primary control down.
+ */
+export type MutationErrorDisplayKind =
+  | 'retryable'
+  | 'bad-request'
+  | 'forbidden'
+  | 'reconnect'
+  | 'not-found';
 
 type MutationErrorDisplay = {
   kind: MutationErrorDisplayKind;
   message: string;
 };
 
-const COMPOSER_BAD_REQUEST =
-  "This comment can't be posted. The selected line may have changed, or the PR may have been updated.";
-const SUBMIT_BAD_REQUEST =
-  "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.";
-const COMPOSER_RETRYABLE_FALLBACK = 'Could not post comment.';
-const SUBMIT_RETRYABLE = 'Could not submit review. Check your connection and try again.';
-const RECONNECT_MESSAGE = 'GitHub connection expired.';
-
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
+type MutationErrorDisplayOptions = {
+  /** The raw thrown error, read for the ambiguous / persistence markers and the 404 code. */
+  readonly rawError?: unknown;
+  /**
+   * The connected provider's noun, already translated (s6f): on the submit
+   * surface a bad-request then reads "The merge request may have changed, or
+   * you can't review your own merge request." instead of the hardcoded
+   * GitHub copy. Absent (GitHub), the exact pre-s6 copy stays.
+   */
+  readonly term?: string;
+  /**
+   * The surface's connected provider: the reconnect copy names it so a GitLab
+   * or Bitbucket surface never announces a GitHub connection. Absent (GitHub)
+   * keeps `prReview.connectionExpired` byte-for-byte.
+   */
+  readonly platform?: ProviderPrPlatform;
+};
+
 /**
- * Maps a mutation classification (and optional raw error for retryable
- * composer copy) to the inline message the sheet should show.
+ * The reconnect message for a surface's connected provider. GitHub (and an
+ * unknown platform) keeps `prReview.connectionExpired`; the provider arms
+ * reuse the reconnect notice's own titles, which every catalog already
+ * translates, so the announced status and the visible notice agree.
+ */
+export function reconnectExpiredMessage(platform: ProviderPrPlatform | undefined): string {
+  if (platform === 'gitlab') {
+    return i18n.t('prReview.reconnectNotice.gitlabTitle');
+  }
+  if (platform === 'bitbucket') {
+    return i18n.t('prReview.reconnectNotice.bitbucketTitle');
+  }
+  return i18n.t('prReview.connectionExpired');
+}
+
+/**
+ * The bad-request inline copy per surface. The submit surface words the
+ * rejection after the connected provider when a term rides (s6f); the
+ * edit-comment surface says the posted comment can no longer be edited.
+ */
+function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string): string {
+  if (surface === 'edit-comment') {
+    return i18n.t('prReview.discussion.commentEditUnavailable');
+  }
+  if (surface === 'conversation') {
+    return i18n.t('prReview.discussion.commentBadRequest');
+  }
+  if (surface === 'composer') {
+    return i18n.t('prReview.mutationError.commentNotPosted');
+  }
+  return term === undefined
+    ? i18n.t('prReview.mutationError.reviewNotSubmitted')
+    : i18n.t('prReview.mutationError.reviewNotSubmittedTerm', { term });
+}
+
+/**
+ * Maps a mutation classification (and the raw error for the ambiguous /
+ * persistence / 404 markers) to the inline message the sheet should show.
  */
 export function mutationErrorDisplay(
   surface: MutationErrorDisplaySurface,
   classification: Classification,
-  rawError?: unknown
+  options?: MutationErrorDisplayOptions
 ): MutationErrorDisplay {
+  const rawError = options?.rawError;
   // The ambiguous outcome is NOT the generic retryable copy: the effect may
   // have committed, so the user must verify the PR. Verbatim on both surfaces.
   if (isPrOperationAmbiguous(rawError)) {
-    return { kind: 'retryable', message: PR_OPERATION_AMBIGUOUS_MESSAGE };
+    return { kind: 'retryable', message: i18n.t('prReview.operation.ambiguous') };
   }
   // The persistence-failure marker is retry-BLOCKING: the row never became
   // `reconcile_pending`. Use the bad-request kind (no retry CTA) with the
   // honest server copy, not the surface-specific validation copy.
   if (isPrOperationPersistenceFailed(rawError)) {
-    return { kind: 'bad-request', message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE };
+    return { kind: 'bad-request', message: i18n.t('common.actionNotRecorded') };
   }
   if (classification.kind === 'forbidden') {
-    return { kind: 'forbidden', message: classification.message };
+    // The conversation surface words its own refusal; every other surface
+    // passes the server's sanitized classification message through.
+    const message =
+      surface === 'conversation'
+        ? i18n.t('prReview.discussion.commentForbidden')
+        : classification.message;
+    return { kind: 'forbidden', message };
   }
   if (classification.kind === 'bad-request') {
-    return {
-      kind: 'bad-request',
-      message: surface === 'composer' ? COMPOSER_BAD_REQUEST : SUBMIT_BAD_REQUEST,
-    };
+    return { kind: 'bad-request', message: badRequestMessage(surface, options?.term) };
+  }
+  // A 404 on the own-comment edit surface means the posted comment is gone
+  // (GitHub 404s a deleted comment): terminal, so the sheet shows the "can't
+  // be edited" copy and keeps Save down instead of offering a retry that can
+  // never succeed. Other surfaces keep the retryable fall-through — their
+  // 404s (a missing PR / App access) are outside this slice.
+  if (surface === 'edit-comment' && readTrpcErrorField(rawError, 'code') === 'NOT_FOUND') {
+    return { kind: 'not-found', message: i18n.t('prReview.discussion.commentEditUnavailable') };
   }
   if (classification.kind === 'reconnect') {
-    return { kind: 'reconnect', message: RECONNECT_MESSAGE };
+    return { kind: 'reconnect', message: reconnectExpiredMessage(options?.platform) };
+  }
+  // The server's raw text never reaches the inline box, whatever the
+  // retryable carrier was. A rate limit gets the localized wait copy (the
+  // server's "try again in about N minutes" is English-only); a conflict
+  // names the reload-and-retry recovery. Both before the submit return, so
+  // every surface gets them.
+  if (readTrpcErrorField(rawError, 'code') === 'TOO_MANY_REQUESTS') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.rateLimited') };
+  }
+  if (readTrpcErrorField(rawError, 'code') === 'CONFLICT') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.conflict') };
   }
   if (surface === 'submit') {
-    return { kind: 'retryable', message: SUBMIT_RETRYABLE };
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
   const message =
-    rawError instanceof Error && rawError.message.length > 0
-      ? rawError.message
-      : COMPOSER_RETRYABLE_FALLBACK;
+    surface === 'edit-comment'
+      ? i18n.t('prReview.discussion.commentEditFailed')
+      : i18n.t('prReview.mutationError.couldNotPostComment');
   return { kind: 'retryable', message };
 }
 
@@ -84,7 +165,11 @@ export function mutationErrorDisplay(
  */
 export function mutationErrorDisplayFromError(
   surface: MutationErrorDisplaySurface,
-  error: unknown
+  error: unknown,
+  term?: string
 ): MutationErrorDisplay {
-  return mutationErrorDisplay(surface, classifyPrReviewMutationError(error), error);
+  return mutationErrorDisplay(surface, classifyPrReviewMutationError(error), {
+    rawError: error,
+    term,
+  });
 }

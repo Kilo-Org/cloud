@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { Lock } from '@/components/ui/icons';
-import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type PermissionDeniedProps = Readonly<{
   description: string;
@@ -17,24 +18,25 @@ type PermissionDeniedProps = Readonly<{
  */
 export function PermissionDenied({ description }: PermissionDeniedProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
-    <View className="flex-1 bg-background">
-      <EmptyState
-        icon={Lock}
-        title="Access denied"
-        description={description}
-        action={
-          <Button
-            variant="outline"
-            onPress={() => {
-              router.back();
-            }}
-          >
-            <Text>Back</Text>
-          </Button>
-        }
-      />
-    </View>
+    <EmptyState
+      className="bg-background"
+      icon={Lock}
+      title={t('common.accessDenied')}
+      description={description}
+      action={
+        <Button
+          variant="outline"
+          className={STATE_ACTION_CLASS}
+          onPress={() => {
+            router.back();
+          }}
+        >
+          <Text>{t('common.back')}</Text>
+        </Button>
+      }
+    />
   );
 }

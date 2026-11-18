@@ -1,11 +1,85 @@
+import { sql } from 'drizzle-orm';
+import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 import {
   USER_DELETION_ANONYMIZE_MIN_STATEMENT_TIMEOUT_MS,
+  USER_DELETION_ANONYMIZE_PAGE_TIMEOUT_MS,
   USER_DELETION_ANONYMIZE_TIMEOUT_BUFFER_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
-import { continueIfLowTime, type DeletionHandler } from '@/lib/user/deletion-queue/handlers/common';
+import type {
+  DeletionHandlerContext,
+  DeletionHandlerOutcome,
+} from '@/lib/user/deletion-queue/deletion-types';
+import {
+  continueIfLowTime,
+  incrementProcessed,
+  type DeletionHandler,
+} from '@/lib/user/deletion-queue/handlers/common';
+import {
+  deleteOwnedByUserIdPage,
+  OWNED_BY_USER_DELETE_PAGE_SIZE,
+  OWNED_BY_USER_DELETE_TABLES,
+  type OwnedByUserDeleteTable,
+} from '@/lib/user/owned-by-user-batch-delete';
+import { ClaudeProfileDeletionError, deleteUserClaudeProfiles } from '@/lib/claude-billing/delete';
 
-export const handleAnonymize: DeletionHandler = async ({ request, context }) => {
+type DrainResult =
+  | { kind: 'drained'; progress: UserDeletionTaskProgress | undefined }
+  | DeletionHandlerOutcome;
+
+async function drainOwnedTable(params: {
+  userId: string;
+  table: OwnedByUserDeleteTable;
+  context: DeletionHandlerContext;
+  progress: UserDeletionTaskProgress | undefined;
+}): Promise<DrainResult> {
+  let progress = params.progress;
+  while (true) {
+    const stop = continueIfLowTime(params.context, progress);
+    if (stop) return stop;
+
+    let deleted: number;
+    try {
+      deleted = await db.transaction(async tx => {
+        await tx.execute(
+          sql.raw(`SET LOCAL statement_timeout = ${USER_DELETION_ANONYMIZE_PAGE_TIMEOUT_MS}`)
+        );
+        return deleteOwnedByUserIdPage(
+          tx,
+          params.table,
+          params.userId,
+          OWNED_BY_USER_DELETE_PAGE_SIZE
+        );
+      });
+    } catch (error) {
+      const code = getPostgresErrorCode(error);
+      if (code === '57014') {
+        return {
+          kind: 'retry',
+          errorCode: 'anonymize_page_timeout',
+          httpStatusClass: 'error',
+          progress,
+        };
+      }
+      if (code === '40001' || code === '40P01') {
+        return {
+          kind: 'retry',
+          errorCode: 'anonymize_page_failed',
+          httpStatusClass: 'error',
+          progress,
+        };
+      }
+      throw error;
+    }
+
+    if (deleted === 0) return { kind: 'drained', progress };
+    progress = incrementProcessed(progress, deleted);
+  }
+}
+
+export const handleAnonymize: DeletionHandler = async ({ request, step, context }) => {
   const absence = userIdKeyedAbsenceOutcome(request);
   if (absence) return absence;
   const userId = request.user_id;
@@ -13,14 +87,34 @@ export const handleAnonymize: DeletionHandler = async ({ request, context }) => 
 
   const stop = continueIfLowTime(context);
   if (stop) return stop;
+  try {
+    await deleteUserClaudeProfiles(userId);
+  } catch (error) {
+    return {
+      kind:
+        error instanceof ClaudeProfileDeletionError && !error.retryable
+          ? 'needs_attention'
+          : 'retry',
+      errorCode: 'claude_profile_cleanup_failed',
+    };
+  }
+
+  let progress = step.progress_json;
+  for (const table of OWNED_BY_USER_DELETE_TABLES) {
+    const drained = await drainOwnedTable({ userId, table, context, progress });
+    if (drained.kind !== 'drained') return drained;
+    progress = drained.progress ?? progress;
+  }
 
   const remainingMs = context.remainingMs();
   if (
     remainingMs - USER_DELETION_ANONYMIZE_TIMEOUT_BUFFER_MS <
     USER_DELETION_ANONYMIZE_MIN_STATEMENT_TIMEOUT_MS
   ) {
-    return { kind: 'continue' };
+    return { kind: 'continue', progress };
   }
 
-  return { kind: 'succeeded' };
+  return (progress?.processed_count ?? 0) > 0
+    ? { kind: 'succeeded', progress }
+    : { kind: 'succeeded' };
 };

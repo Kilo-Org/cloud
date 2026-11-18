@@ -53,6 +53,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(result).toBe(false);
@@ -102,6 +103,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(result).toBe(false);
@@ -139,6 +141,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(result).toBe(false);
@@ -166,6 +169,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(result).toBe(false);
@@ -193,6 +197,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(result).toBe(false);
@@ -232,6 +237,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(result).toBe(false);
@@ -262,6 +268,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(started).toBe(true);
@@ -271,6 +278,7 @@ describe('createVoiceInputController - start and permission', () => {
         interimResults: true,
         lang: 'fr-FR',
         maxAlternatives: 1,
+        requiresOnDeviceRecognition: false,
       });
 
       const startingSnap = observed.find(snap => snap.status === 'starting');
@@ -289,6 +297,7 @@ describe('createVoiceInputController - start and permission', () => {
         interimResults: true,
         lang: 'en-US',
         maxAlternatives: 1,
+        requiresOnDeviceRecognition: false,
       });
     });
 
@@ -305,6 +314,7 @@ describe('createVoiceInputController - start and permission', () => {
         onDraftChange: (): void => undefined,
         onFeedback: fb.onFeedback,
         owner: 'A',
+        requiresOnDeviceRecognition: false,
       });
 
       expect(result).toBe(false);

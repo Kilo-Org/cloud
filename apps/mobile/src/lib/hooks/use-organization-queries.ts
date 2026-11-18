@@ -1,33 +1,27 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import { useQuery } from '@tanstack/react-query';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
-import { useAuth } from '@/lib/auth/auth-context';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useOrganization } from '@/lib/organization-context';
+import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+
 /**
- * The current user's role in the active organization. `trpc.organizations.list`
- * requires auth (not an active org selection), so it's gated on the token
- * rather than on `organizationId` — mirrors profile-screen's `orgs` query.
+ * The current user's role in the active organization, resolved from the shared
+ * membership list (`useOrganizationsList`).
  *
  * Pass `organizationIdOverride` to resolve role/membership against an explicit
  * org id (e.g. a deep-link `?org=` param) instead of the persisted selection.
  */
 function useOrgRole(organizationIdOverride?: string) {
-  const trpc = useTRPC();
-  const { token } = useAuth();
   const { organizationId: contextOrganizationId } = useOrganization();
   const organizationId = organizationIdOverride ?? contextOrganizationId;
-  const {
-    data: orgs,
-    isLoading,
-    isError,
-    isFetching,
-    refetch,
-  } = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: token != null,
-  });
+  const { data: orgs, isLoading, isError, isFetching, refetch } = useOrganizationsList();
   const org = orgs?.find(entry => entry.organizationId === organizationId);
   return {
     organizationId,
@@ -99,17 +93,62 @@ export function useOrgWithMembers(organizationId: string | null) {
   );
 }
 
+/**
+ * Whether the organization is a child of another one, from the two payloads
+ * that report the link, plus the membership query those callers also read.
+ *
+ * `organizations.list` carries the parent link, so a billing screen knows from
+ * its first frame whether the organization has a Kilo Pass row instead of
+ * adding one a request later and pushing the rows under it down. A device that
+ * persisted the list before that field existed hydrates an entry without it,
+ * and an entry written before an admin moved the organization under a parent
+ * still says `null`, so the membership payload fills the gap in both
+ * directions: a parent id from either payload makes this a child, because only
+ * an admin change moves an organization under a parent after creation and that
+ * id is never the stale side. A `null` confirms a top-level organization only
+ * from the freshly fetched membership payload; the list's own `null` is a
+ * cached value and leaves the link unknown until membership answers.
+ */
+export function useOrgParentLink(
+  organizationId: string | null,
+  listParentLink: string | null | undefined
+) {
+  const membership = useOrgWithMembers(organizationId);
+  const membershipParentLink = membership.data?.parent_organization_id;
+  const reportedParentLink = listParentLink ?? membershipParentLink;
+  const topLevelConfirmed = membershipParentLink === null;
+  const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
+  // No membership payload and a failed or paused fetch: the payload that would
+  // settle anything waiting on it will not arrive on its own.
+  const membershipUnavailable =
+    membership.data == null && (membership.isError || membership.isPaused);
+  return { membership, parentLink, membershipUnavailable };
+}
+
 export type OrgWithMembers = NonNullable<ReturnType<typeof useOrgWithMembers>['data']>;
-type OrgMember = OrgWithMembers['members'][number];
+export type OrgMember = OrgWithMembers['members'][number];
 export type ActiveOrgMember = Extract<OrgMember, { status: 'active' }>;
 export type InvitedOrgMember = Extract<OrgMember, { status: 'invited' }>;
+
+export function isActiveOrgMember(member: OrgMember): member is ActiveOrgMember {
+  return member.status === 'active';
+}
+
+export function isInvitedOrgMember(member: OrgMember): member is InvitedOrgMember {
+  return member.status === 'invited';
+}
 
 /**
  * Parent organization's Kilo Pass for Orgs summary. The API is restricted to
  * the parent agreement owner (`organizationParentBillingProcedure` rejects
  * child orgs and non-billing roles), so `enabled` must only be true when the
- * user has a billing-capable role AND `withMembers` confirmed
- * `parent_organization_id === null` — children must never fire this query.
+ * user has a billing-capable role AND no payload reports a parent id AND the
+ * membership payload confirmed this organization is top-level
+ * (`parent_organization_id === null` on `withMembers`). A child organization —
+ * from either payload — and one whose parent link is still unknown must never
+ * fire this query. A `null` in an `organizations.list` entry is not
+ * confirmation on its own: that entry can be a persisted value written before
+ * an admin moved the organization under a parent.
  */
 export function useOrgKiloPassSummary(organizationId: string | null, enabled: boolean) {
   const trpc = useTRPC();
@@ -131,28 +170,100 @@ export function useOrgUsageStats(organizationId: string | null) {
   );
 }
 
-export function useOrgCreditTransactions(organizationId: string | null) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.creditTransactions.queryOptions(
+export type CreditTransaction =
+  RouterOutputs['organizations']['creditTransactionsPage']['entries'][number];
+
+/**
+ * Build the credit-transactions infinite-query options. Kept as a pure builder
+ * so the retention bound and the cursor passthrough are testable without
+ * mounting the hook.
+ *
+ * Both org lists order `created_at desc`, so page one holds the newest entries
+ * and each screen renders every retained page as one flattened list. Reaching
+ * the shared retention bound by refusing the next page (rather than letting
+ * React Query's `maxPages` trim drop index 0) keeps the newest rows on screen;
+ * see `hasRetentionBudget`.
+ */
+export function buildOrgCreditTransactionsPageQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  organizationId: string | null
+) {
+  return withInfiniteRetention(
+    trpc.organizations.creditTransactionsPage.infiniteQueryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: organizationId != null }
+      {
+        enabled: organizationId != null,
+        getNextPageParam: (lastPage, pages) =>
+          lastPage.hasMore && hasRetentionBudget(pages.length)
+            ? (lastPage.nextCursor ?? undefined)
+            : undefined,
+      }
     )
   );
 }
 
-export type CreditTransaction = NonNullable<
-  ReturnType<typeof useOrgCreditTransactions>['data']
->[number];
-
-export function useOrgInvoices(organizationId: string | null) {
+/**
+ * Cursor-paginated credit transactions for an organization. Mirrors the legacy
+ * `useOrgCreditTransactions` surface (flat `entries`) but pages through
+ * `organizations.creditTransactionsPage` with `useInfiniteQuery` so the screen
+ * can offer \"Load more\" instead of scanning every row at once.
+ */
+export function useOrgCreditTransactionsPage(organizationId: string | null) {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.invoices.queryOptions(
+  const query = useInfiniteQuery(buildOrgCreditTransactionsPageQueryOptions(trpc, organizationId));
+
+  const pages = query.data?.pages;
+  const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
+  // `hasNextPage` folds the builder's refusal bound into the server's last-page
+  // `hasMore`, so the "Load more" control hides at the retention bound.
+  const hasMore = query.hasNextPage;
+
+  return { query, entries, hasMore };
+}
+
+/**
+ * Build the invoices infinite-query options. Kept as a pure builder so the
+ * retention bound, the fixed `period: 'year'` input, and the cursor
+ * passthrough are testable without mounting the hook.
+ *
+ * The first page waits on the screen's loading branch, so a read that never
+ * settles would leave its skeleton rows with no exit.
+ */
+export function buildOrgInvoicesPageQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  organizationId: string | null
+) {
+  return withInfiniteRetention(
+    trpc.organizations.invoicesPage.infiniteQueryOptions(
       { organizationId: organizationId ?? '', period: 'year' },
-      { enabled: organizationId != null }
+      {
+        enabled: organizationId != null,
+        getNextPageParam: (lastPage, pages) =>
+          lastPage.hasMore && hasRetentionBudget(pages.length)
+            ? (lastPage.nextCursor ?? undefined)
+            : undefined,
+        // A paused first page leaves the skeleton rows with no exit.
+        ...SETTLE_WHILE_OFFLINE,
+      }
     )
   );
 }
 
-export type OrgInvoice = NonNullable<ReturnType<typeof useOrgInvoices>['data']>[number];
+/**
+ * Cursor-paginated invoices for an organization. Mirrors the legacy
+ * `useOrgInvoices` surface (flat `entries`) but pages through
+ * `organizations.invoicesPage` with `useInfiniteQuery` so the screen can offer
+ * \"Load more\" instead of loading every invoice at once.
+ */
+export function useOrgInvoicesPage(organizationId: string | null) {
+  const trpc = useTRPC();
+  const query = useInfiniteQuery(buildOrgInvoicesPageQueryOptions(trpc, organizationId));
+
+  const pages = query.data?.pages;
+  const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
+  // `hasNextPage` folds the builder's refusal bound into the server's last-page
+  // `hasMore`, so the "Load more" control hides at the retention bound.
+  const hasMore = query.hasNextPage;
+
+  return { query, entries, hasMore };
+}

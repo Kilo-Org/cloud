@@ -31,11 +31,12 @@ import {
   DRAFT_MAX_ENTRIES,
   draftScope,
   flushDraft,
-  isMergeDraft,
   isStringDraft,
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
+  newSessionRepositoryDraftKey,
   prCommentDraftKey,
+  prConversationCommentDraftKey,
   prMergeDraftKey,
   prReplyDraftKey,
   prReviewDraftKey,
@@ -44,6 +45,8 @@ import {
   saveDraft,
   securityDismissDraftKey,
 } from './drafts';
+import { forgetShapeMismatchesForTests } from './draft-read-report';
+import { isMergeDraft } from './merge-draft';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
 /* eslint-enable import/first */
@@ -93,6 +96,7 @@ beforeEach(() => {
   kvStore.clear();
   nextUpdatedAt = 1;
   resetDraftTimersForTests();
+  forgetShapeMismatchesForTests();
   kvMock.getItem.mockImplementation(
     async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
   );
@@ -126,6 +130,11 @@ describe('draft scope and entity keys', () => {
     );
   });
 
+  it('scopes the new-session repository draft to the organization', () => {
+    expect(newSessionRepositoryDraftKey(null)).toBe('agent-composer:new:repository:personal');
+    expect(newSessionRepositoryDraftKey('org-1')).toBe('agent-composer:new:repository:org-1');
+  });
+
   it('builds the merge, reply, and comment draft entity keys', () => {
     expect(prMergeDraftKey('acme', 'kilo', 42)).toBe('pr-merge:acme/kilo#42');
     expect(prReplyDraftKey('acme', 'kilo', 42, 7)).toBe('pr-reply:acme/kilo#42:7');
@@ -137,11 +146,25 @@ describe('draft scope and entity keys', () => {
     );
   });
 
-  it('isMergeDraft accepts a title+message object and rejects other shapes', () => {
+  it('builds the per-PR conversation comment draft entity key', () => {
+    expect(prConversationCommentDraftKey('acme', 'kilo', 42)).toBe(
+      'pr-conversation-comment:acme/kilo#42'
+    );
+  });
+
+  it('isMergeDraft accepts any subset of the authored fields and rejects other shapes', () => {
     expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
     expect(isMergeDraft({ title: '', message: '' })).toBe(true);
-    expect(isMergeDraft({ title: 'T' })).toBe(false);
-    expect(isMergeDraft({ message: 'M' })).toBe(false);
+    // Every field is optional: the sheet persists only what the person authored,
+    // so a method-only tap stores `{ method }` and a text-only edit stores none.
+    expect(isMergeDraft({})).toBe(true);
+    expect(isMergeDraft({ title: 'T' })).toBe(true);
+    expect(isMergeDraft({ message: 'M' })).toBe(true);
+    expect(isMergeDraft({ method: 'squash' })).toBe(true);
+    // The method is an open string, narrowed against the pull request's allowed
+    // methods at restore, so another build's record still loads its text.
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 'octopus' })).toBe(true);
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 1 })).toBe(false);
     expect(isMergeDraft({ title: 1, message: 'M' })).toBe(false);
     expect(isMergeDraft({ title: 'T', message: 2 })).toBe(false);
     expect(isMergeDraft('not an object')).toBe(false);
@@ -155,7 +178,20 @@ describe('draft scope and entity keys', () => {
     expect(resolvePrefillOverDraft(null, 'draft text')).toBe('draft text');
     expect(resolvePrefillOverDraft('  ', 'draft text')).toBe('draft text');
     expect(resolvePrefillOverDraft(null, null)).toBeUndefined();
-    expect(resolvePrefillOverDraft('', '')).toBe('');
+    expect(resolvePrefillOverDraft('', '')).toBeUndefined();
+  });
+
+  // b911 spot check p7-nav.png: a draft that holds only whitespace survives
+  // sign-out, restores as the uncontrolled input's defaultValue, and hides the
+  // placeholder while showing nothing — the prompt reads as blank. A draft
+  // with no visible content must never seed the input.
+  it('resolvePrefillOverDraft never seeds a whitespace-only stored draft', () => {
+    expect(resolvePrefillOverDraft(null, ' ')).toBeUndefined();
+    expect(resolvePrefillOverDraft(undefined, '   ')).toBeUndefined();
+    expect(resolvePrefillOverDraft(null, '\n')).toBeUndefined();
+    expect(resolvePrefillOverDraft(null, ' \t\n ')).toBeUndefined();
+    // Visible content keeps its surrounding whitespace untouched.
+    expect(resolvePrefillOverDraft('  ', ' hi there \n')).toBe(' hi there \n');
   });
 });
 
@@ -210,6 +246,34 @@ describe('merge, reply, and comment keys restore per account and destination', (
     await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({ title: 'T', message: 'M' });
   });
 
+  it('round-trips the chosen merge method with the draft', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, { title: 'T', message: 'M', method: 'squash' });
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({
+      title: 'T',
+      message: 'M',
+      method: 'squash',
+    });
+  });
+
+  it('keeps the user text of a record whose method this build cannot restore', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    // Another build persisted a method this one does not know. The text is
+    // still the person's, so the record must load rather than be classified as
+    // a shape mismatch (which `drafts.ts` leaves stored for the other build).
+    seedStoredValue(
+      draftScope('u1'),
+      key,
+      JSON.stringify({ title: 'T', message: 'M', method: 'octopus' })
+    );
+    await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({
+      title: 'T',
+      message: 'M',
+      method: 'octopus',
+    });
+  });
+
   it('does not restore a merge draft under a different account or PR', async () => {
     const key = prMergeDraftKey('acme', 'kilo', 42);
     saveDraft('u1', key, { title: 'T', message: 'M' });
@@ -254,24 +318,46 @@ describe('merge, reply, and comment keys restore per account and destination', (
     ).resolves.toBeNull();
   });
 
+  it('saves and restores a conversation comment draft under the same account and PR', async () => {
+    const key = prConversationCommentDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, 'a conversation comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isStringDraft)).resolves.toBe('a conversation comment');
+  });
+
+  it('does not restore a conversation comment draft under a different account or PR', async () => {
+    const key = prConversationCommentDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, 'a conversation comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u2', key, isStringDraft)).resolves.toBeNull();
+    await expect(
+      loadDraft('u1', prConversationCommentDraftKey('acme', 'kilo', 43), isStringDraft)
+    ).resolves.toBeNull();
+  });
+
   it('clear removes the merge, reply, and comment entries', async () => {
     const mergeKey = prMergeDraftKey('acme', 'kilo', 42);
     const replyKey = prReplyDraftKey('acme', 'kilo', 42, 7);
     const commentKey = prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10);
+    const conversationKey = prConversationCommentDraftKey('acme', 'kilo', 42);
     saveDraft('u1', mergeKey, { title: 'T', message: 'M' });
     saveDraft('u1', replyKey, 'a reply');
     saveDraft('u1', commentKey, 'a comment');
+    saveDraft('u1', conversationKey, 'a conversation comment');
     await Promise.all([
       flushDraft('u1', mergeKey),
       flushDraft('u1', replyKey),
       flushDraft('u1', commentKey),
+      flushDraft('u1', conversationKey),
     ]);
     await clearDraft('u1', mergeKey);
     await clearDraft('u1', replyKey);
     await clearDraft('u1', commentKey);
+    await clearDraft('u1', conversationKey);
     await expect(loadDraft('u1', mergeKey, isMergeDraft)).resolves.toBeNull();
     await expect(loadDraft('u1', replyKey, isStringDraft)).resolves.toBeNull();
     await expect(loadDraft('u1', commentKey, isStringDraft)).resolves.toBeNull();
+    await expect(loadDraft('u1', conversationKey, isStringDraft)).resolves.toBeNull();
   });
 });
 
@@ -292,7 +378,6 @@ describe('debounce', () => {
     vi.useFakeTimers();
     saveDraft('u1', 'A', 'va');
     saveDraft('u1', 'B', 'vb');
-    // Flushing only A writes A's value under A's key; B stays pending.
     await flushDraft('u1', 'A');
     expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'A', '"va"');
     expect(kvMock.setItem).not.toHaveBeenCalledWith('draft:u1', 'B', expect.anything());
@@ -407,35 +492,39 @@ describe('size cap', () => {
 });
 
 describe('unsupported serialization boundary', () => {
-  it('does not throw and reports Sentry for a circular value without scheduling a write', async () => {
+  it('does not throw on a circular value, reports Sentry when the debounce fires, and writes nothing', async () => {
     vi.useFakeTimers();
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     expect(() => {
       saveDraft('u1', 'k', circular);
     }).not.toThrow();
+    // Serialization is the debounced write's own work, so the report lands
+    // when that write would have: the keystroke that scheduled it pays nothing.
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+        tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
       })
     );
-    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).not.toHaveBeenCalled();
   });
 
-  it('does not throw and reports Sentry for an undefined value without scheduling a write', async () => {
+  it('does not throw on an undefined value, reports Sentry when the debounce fires, and writes nothing', async () => {
     vi.useFakeTimers();
     expect(() => {
       saveDraft('u1', 'k', undefined);
     }).not.toThrow();
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+        tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
+        fingerprint: ['draft-write-unsupported-value'],
       })
     );
-    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).not.toHaveBeenCalled();
   });
 
@@ -456,15 +545,13 @@ describe('corrupt read', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('reports the scope and entity key to Sentry', async () => {
+  it('reports safe fixed context without overriding native error grouping', async () => {
     seedStoredValue('draft:u1', 'k', 'not-json{{{');
     await loadDraft('u1', 'k', isStringDraft);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
-      })
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'drafts', 'error.operation': 'read' },
+    });
   });
 });
 
@@ -491,15 +578,89 @@ describe('shape validation', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('reports the scope and entity key for a shape mismatch', async () => {
+  it('uses a fixed fingerprint for a recognized shape mismatch', async () => {
     seedStoredValue('draft:u1', 'k', '{}');
     await loadDraft('u1', 'k', isStringDraft);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
-      })
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'drafts', 'error.operation': 'read' },
+      fingerprint: ['draft-read-shape-mismatch'],
+    });
+  });
+});
+
+describe('unloadable entry handling', () => {
+  it('removes a value that is not valid JSON, so the next load reports nothing', async () => {
+    seedStoredValue('draft:u1', 'k', 'not-json{{{');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a value that fails its shape guard and reports it once per process', async () => {
+    seedStoredValue('draft:u1', 'k', '42');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    // Valid JSON that another build can read: it may be that build's draft, so
+    // a failed load here must not discard it.
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(true);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('reports a mismatch again after a write replaced the stored value', async () => {
+    seedStoredValue('draft:u1', 'k', '42');
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+
+    saveDraft('u1', 'k', 'repaired');
+    await flushDraft('u1', 'k');
+    seedStoredValue('draft:u1', 'k', '7');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it('removes a value over the size cap', async () => {
+    seedStoredValue('draft:u1', 'k', `"${'x'.repeat(DRAFT_MAX_BYTES + 1)}"`);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a draft written after the failed read', async () => {
+    let reads = 0;
+    kvMock.getItem.mockImplementation(async () => {
+      reads += 1;
+      return reads === 1 ? 'not-json{{{' : '"newer"';
+    });
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+
+    expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the read report and the removal failure as separate events', async () => {
+    seedStoredValue('draft:u1', 'k', 'not-json{{{');
+    // A persistent implementation, not a `Once` queue: a change that skips the
+    // removal must not leave a queued rejection for the next case.
+    kvMock.removeItem.mockRejectedValue(new Error('store busy'));
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+    expect(Sentry.captureException).toHaveBeenLastCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'drafts', 'error.operation': 'clear' },
+    });
   });
 });
 
@@ -512,7 +673,7 @@ describe('write rejection boundary', () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+        tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
       })
     );
   });
@@ -562,7 +723,6 @@ describe('eviction at the entry cap', () => {
 
     const entries = await kvMock.listEntries('draft:u1');
     expect(entries).toHaveLength(DRAFT_MAX_ENTRIES);
-    // The two oldest seeds were evicted; the newest key survived.
     expect(entries.some(entry => entry.k === 'old-0')).toBe(false);
     expect(entries.some(entry => entry.k === 'old-1')).toBe(false);
     expect(entries.some(entry => entry.k === 'newest')).toBe(true);

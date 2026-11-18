@@ -1,7 +1,7 @@
-import { getUserFromAuth } from '@/lib/user/server';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 import { redirect } from 'next/navigation';
 import { AdminWebhookTriggersList } from '@/app/admin/webhooks/AdminWebhookTriggersList';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -10,9 +10,9 @@ export default async function AdminUserWebhooksPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) {
-    redirect('/admin/unauthorized');
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
   }
 
   const { id } = await params;

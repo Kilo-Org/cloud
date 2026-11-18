@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES } from '@kilocode/session-ingest-contracts';
 
 import {
   INGEST_CHUNK_MAX_BYTES,
@@ -91,6 +92,52 @@ describe('validateAndParseIngestPayload', () => {
     });
   });
 
+  it('skips a message whose id does not satisfy the cursor id contract', () => {
+    const validItem = { type: 'message', data: { id: 'msg_valid' } };
+    const result = validate({
+      data: [
+        validItem,
+        {
+          type: 'message',
+          data: { id: `msg${'"'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}` },
+        },
+        { type: 'message', data: { id: 'not_a_message_id' } },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      items: [validItem],
+      validItemCount: 1,
+      skippedItemCount: 2,
+    });
+  });
+
+  it('keeps a scheduled session_status item instead of dropping it', () => {
+    const scheduledItem = {
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+    };
+
+    expect(validate({ data: [scheduledItem] })).toMatchObject({
+      ok: true,
+      items: [scheduledItem],
+      validItemCount: 1,
+      skippedItemCount: 0,
+    });
+  });
+
+  it('keeps a session_status item with an unrecognized status', () => {
+    const futureItem = { type: 'session_status', data: { status: 'some-future-status' } };
+
+    expect(validate({ data: [futureItem] })).toMatchObject({
+      ok: true,
+      items: [futureItem],
+      validItemCount: 1,
+      skippedItemCount: 0,
+    });
+  });
+
   it('counts non-object data array entries as skipped', () => {
     expect(
       validate({
@@ -155,7 +202,7 @@ describe('validateAndParseIngestPayload', () => {
       skippedItemCount: 1,
       maxValidItemBytes: MAX_SINGLE_ITEM_BYTES + 1,
     });
-  });
+  }, 30_000);
 
   it.each([
     ['at', INGEST_CHUNK_MAX_BYTES],

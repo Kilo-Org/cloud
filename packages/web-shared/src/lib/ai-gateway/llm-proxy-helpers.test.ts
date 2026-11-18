@@ -1,0 +1,3076 @@
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { captureException, captureMessage } from '@sentry/nextjs';
+import { after } from 'next/server';
+import * as sharedUsage from './processUsage.shared';
+import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
+import type { GatewayRequest, VercelProviderConfig } from './providers/openrouter/types';
+import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
+import type { Provider } from './providers/types';
+import { createUserOpenRouterProvider } from './providers/definitions/openrouter';
+import { createUserVercelAiGatewayProvider } from './providers/definitions/vercel';
+
+// `countAndStoreEditUsage` schedules the usage write through `next/server`'s
+// `after()` post-response hook, which only works in a request context. Replace
+// it with an immediate invocation so the test can await the work synchronously.
+jest.mock('next/server', () => ({
+  ...(jest.requireActual('next/server') as Record<string, unknown>),
+  after: jest.fn((work: Promise<unknown> | (() => Promise<unknown>)) => {
+    void (typeof work === 'function' ? work() : work);
+  }),
+}));
+
+// Capture writes that would otherwise hit the database. The helper passes
+// the final, post-zeroing `usageStats` to the billing wrapper, so spying
+// here lets us assert on the persisted billing shape directly.
+const mockedLogMicrodollarUsage = jest.fn(
+  async (_stats: MicrodollarUsageStats, _ctx: MicrodollarUsageContext) => null
+);
+const mockedProcessTokenData = jest.fn(
+  async (
+    _stats: MicrodollarUsageStats | null,
+    _ctx: MicrodollarUsageContext,
+    _servingProvider?: Provider
+  ) => {}
+);
+jest.mock('./processUsage', () => ({
+  ...(jest.requireActual('./processUsage') as Record<string, unknown>),
+  logMicrodollarUsageAndReportToBouncer: (
+    stats: MicrodollarUsageStats,
+    ctx: MicrodollarUsageContext
+  ) => mockedLogMicrodollarUsage(stats, ctx),
+  processTokenData: (
+    stats: MicrodollarUsageStats | null,
+    ctx: MicrodollarUsageContext,
+    servingProvider?: Provider
+  ) => mockedProcessTokenData(stats, ctx, servingProvider),
+}));
+
+jest.mock('./custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(async () => ({ models: [] })),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureMessage: jest.fn(),
+  captureException: jest.fn(),
+}));
+
+jest.mock('./processUsage.shared', () => {
+  const actual = jest.requireActual<typeof sharedUsage>('./processUsage.shared');
+  return {
+    ...actual,
+    computeOpenRouterCostFields: jest.fn(actual.computeOpenRouterCostFields),
+    selectUsageCostFields: jest.fn(actual.selectUsageCostFields),
+  };
+});
+
+const mockedErrorExceptInTest = jest.fn();
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
+}));
+
+import {
+  captureProxyError,
+  countAndStoreEditUsage,
+  countAndStoreFimUsage,
+  countAndStoreEmbeddingUsage,
+  countAndStoreTranscriptionUsage,
+  extractEditPromptInfo,
+  extractEmbeddingPromptInfo,
+  extractHeaderAndLimitLength,
+  extractReasoningSetting,
+  extractInferenceRegion,
+  getOrganizationProviderPrivacy,
+  getOutputHeaders,
+  lastUserPromptText,
+  makeErrorReadable,
+  parseEmbeddingUsageFromResponse,
+  parseEditUsageFromResponse,
+  parseTranscriptionUsageFromResponse,
+  requestedLogprobs,
+  requestedSamples,
+  claudeBillingReconnectResponse,
+} from './llm-proxy-helpers';
+import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+
+const clock = createControlledClock();
+
+const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
+
+describe('claudeBillingReconnectResponse', () => {
+  it('points the owner at the organization billing page', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000042';
+    const response = claudeBillingReconnectResponse('The connector is unusable.', organizationId);
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('retry-after')).toBeNull();
+    const body = (await response.json()) as { error: string; error_type: string; message: string };
+    expect(body.error_type).toBe(ProxyErrorType.byok_error);
+    expect(body.message).toContain('An organization owner must link Claude billing again');
+    expect(body.message).toContain(`/organizations/${organizationId}/byok`);
+    expect(body.error).toBe(body.message);
+  });
+});
+
+describe('getOutputHeaders', () => {
+  it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
+    'prevents intermediary compression and caching of %s responses',
+    contentType => {
+      const response = new Response(null, {
+        headers: { 'content-type': contentType, 'cache-control': 'public, max-age=3600' },
+      });
+
+      const headers = getOutputHeaders(response);
+
+      expect(headers.get('content-type')).toBe(contentType);
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+      expect(response.headers.get('cache-control')).toBe('public, max-age=3600');
+    }
+  );
+
+  it.each(['application/json', 'text/plain', 'text/event-stream-other'])(
+    'prevents intermediary caching and compression of %s responses',
+    contentType => {
+      const headers = getOutputHeaders(
+        new Response(null, { headers: { 'content-type': contentType } })
+      );
+
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+    }
+  );
+});
+
+describe('extractInferenceRegion', () => {
+  const body = (gateway?: VercelProviderConfig['gateway']) =>
+    ({ model: 'anthropic/claude-haiku-4.5', messages: [], providerOptions: { gateway } }) as never;
+
+  it('returns the pinned zone', () => {
+    expect(
+      extractInferenceRegion(body({ inferenceRegion: { scope: 'zone', geoRegion: 'eu' } }))
+    ).toBe('eu');
+  });
+
+  it('returns null for global or unset regions', () => {
+    expect(extractInferenceRegion(body({ inferenceRegion: { scope: 'global' } }))).toBeNull();
+    expect(extractInferenceRegion(body({}))).toBeNull();
+    expect(extractInferenceRegion({ model: 'x', messages: [] } as never)).toBeNull();
+  });
+});
+
+describe('extractReasoningSetting', () => {
+  it.each<{ name: string; body: unknown; expected: string | null }>([
+    { name: 'absent fields', body: {}, expected: null },
+    { name: 'null body', body: null, expected: null },
+    { name: 'undefined body', body: undefined, expected: null },
+    { name: 'primitive body', body: 'high', expected: null },
+    { name: 'array body', body: [], expected: null },
+    {
+      name: 'enabled thinking',
+      body: { thinking: { type: 'enabled' } },
+      expected: 'thinking:enabled',
+    },
+    {
+      name: 'adaptive thinking',
+      body: { thinking: { type: 'adaptive' } },
+      expected: 'thinking:adaptive',
+    },
+    {
+      name: 'disabled thinking',
+      body: { thinking: { type: 'disabled' } },
+      expected: 'thinking:disabled',
+    },
+    ...[
+      [0, 'le1k'],
+      [1_000, 'le1k'],
+      [1_001, 'le4k'],
+      [4_000, 'le4k'],
+      [4_001, 'le16k'],
+      [16_000, 'le16k'],
+      [16_001, 'le64k'],
+      [32_000, 'le64k'],
+      [64_000, 'le64k'],
+      [64_001, 'gt64k'],
+    ].flatMap(([budget, bucket]) => [
+      {
+        name: `thinking budget ${budget}`,
+        body: { thinking: { type: 'enabled', budget_tokens: budget } },
+        expected: `thinking:enabled:${bucket}`,
+      },
+      {
+        name: `reasoning budget ${budget}`,
+        body: { reasoning: { max_tokens: budget } },
+        expected: `reasoning:budget:${bucket}`,
+      },
+    ]),
+    ...['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].flatMap(effort => [
+      {
+        name: `chat effort ${effort}`,
+        body: { reasoning_effort: effort },
+        expected: `effort:${effort}`,
+      },
+      {
+        name: `messages effort ${effort}`,
+        body: { output_config: { effort } },
+        expected: `effort:${effort}`,
+      },
+      {
+        name: `responses effort ${effort}`,
+        body: { reasoning: { effort } },
+        expected: `effort:${effort}`,
+      },
+    ]),
+    ...['HIGH', '', 'unbounded-client-label'.repeat(100)].flatMap(effort => [
+      { name: 'unknown chat effort', body: { reasoning_effort: effort }, expected: 'effort:other' },
+      {
+        name: 'unknown messages effort',
+        body: { output_config: { effort } },
+        expected: 'effort:other',
+      },
+      {
+        name: 'unknown reasoning effort',
+        body: { reasoning: { effort } },
+        expected: 'effort:other',
+      },
+    ]),
+    {
+      name: 'reasoning disabled',
+      body: { reasoning: { enabled: false } },
+      expected: 'reasoning:disabled',
+    },
+    { name: 'reasoning exclude ignored', body: { reasoning: { exclude: true } }, expected: null },
+    { name: 'reasoning enabled ignored', body: { reasoning: { enabled: true } }, expected: null },
+    {
+      name: 'fixed label order',
+      body: {
+        reasoning: { effort: 'high', enabled: false, max_tokens: 4_000, exclude: true },
+        thinking: { type: 'adaptive', budget_tokens: 32_000 },
+      },
+      expected: 'thinking:adaptive:le64k+effort:high+reasoning:disabled+reasoning:budget:le4k',
+    },
+    {
+      name: 'effort alias precedence',
+      body: {
+        output_config: { effort: 'low' },
+        reasoning_effort: 'medium',
+        reasoning: { effort: 'high' },
+      },
+      expected: 'effort:low',
+    },
+    ...[
+      { thinking: { type: 'client-supplied', budget_tokens: 32_000 } },
+      { thinking: 'enabled', reasoning: 'high', output_config: 'high' },
+      { thinking: [], reasoning: [], output_config: [] },
+      { thinking: null, reasoning: null, output_config: null },
+      { thinking: { type: 123 }, reasoning: { enabled: 'false', max_tokens: '1000' } },
+      { reasoning_effort: 123, output_config: { effort: {} }, reasoning: { effort: false } },
+      { reasoning: { max_tokens: NaN } },
+      { reasoning: { max_tokens: Infinity } },
+    ].map(body => ({ name: 'malformed input', body, expected: null })),
+    {
+      name: 'malformed budget does not discard known thinking type',
+      body: { thinking: { type: 'enabled', budget_tokens: '32000' } },
+      expected: 'thinking:enabled',
+    },
+  ])('$name', ({ body, expected }) => {
+    expect(extractReasoningSetting(body)).toBe(expected);
+  });
+});
+
+describe('getOrganizationProviderPrivacy', () => {
+  it.each(['allow', 'deny'] as const)('returns data_collection=%s', dataCollection => {
+    expect(getOrganizationProviderPrivacy({ data_collection: dataCollection })).toEqual({
+      data_collection: dataCollection,
+    });
+  });
+
+  it('leaves Enterprise model and provider restrictions to the member decision', () => {
+    expect(
+      getOrganizationProviderPrivacy({
+        provider_allow_list: ['openai', 'virtual'],
+        model_deny_list: ['anthropic/claude-3-opus'],
+        data_collection: 'deny',
+      })
+    ).toEqual({ data_collection: 'deny' });
+  });
+
+  it('returns no provider config without privacy settings', () => {
+    expect(getOrganizationProviderPrivacy(undefined)).toBeUndefined();
+    expect(getOrganizationProviderPrivacy({ provider_allow_list: ['openai'] })).toBeUndefined();
+  });
+});
+
+describe('extractEmbeddingPromptInfo', () => {
+  it('should extract prefix from a single string input', () => {
+    const result = extractEmbeddingPromptInfo({ input: 'Hello world' });
+
+    expect(result.user_prompt_prefix).toBe('Hello world');
+    expect(result.system_prompt_prefix).toBe('');
+    expect(result.system_prompt_length).toBe(0);
+  });
+
+  it('should extract the first element from a string array input', () => {
+    const result = extractEmbeddingPromptInfo({ input: ['First sentence', 'Second sentence'] });
+
+    expect(result.user_prompt_prefix).toBe('First sentence');
+  });
+
+  it('should fall back to JSON.stringify for an empty array', () => {
+    const result = extractEmbeddingPromptInfo({ input: [] });
+
+    expect(result.user_prompt_prefix).toBe('[]');
+  });
+
+  it('should fall back to JSON.stringify for a number array (token input)', () => {
+    const result = extractEmbeddingPromptInfo({ input: [1, 2, 3] });
+
+    expect(result.user_prompt_prefix).toBe('[1,2,3]');
+  });
+
+  it('should fall back to JSON.stringify for a nested number array (token batch)', () => {
+    const result = extractEmbeddingPromptInfo({
+      input: [
+        [1, 2],
+        [3, 4],
+      ],
+    });
+
+    expect(result.user_prompt_prefix).toBe('[[1,2],[3,4]]');
+  });
+
+  it('should truncate long string input to 100 characters', () => {
+    const longInput = 'x'.repeat(200);
+    const result = extractEmbeddingPromptInfo({ input: longInput });
+
+    expect(result.user_prompt_prefix).toHaveLength(100);
+    expect(result.user_prompt_prefix).toBe('x'.repeat(100));
+  });
+
+  it('should truncate long first element of string array to 100 characters', () => {
+    const longInput = 'y'.repeat(200);
+    const result = extractEmbeddingPromptInfo({ input: [longInput] });
+
+    expect(result.user_prompt_prefix).toHaveLength(100);
+  });
+
+  it('should always return empty system_prompt_prefix and zero system_prompt_length', () => {
+    const result = extractEmbeddingPromptInfo({ input: 'any input' });
+
+    expect(result.system_prompt_prefix).toBe('');
+    expect(result.system_prompt_length).toBe(0);
+  });
+});
+
+describe('extractEditPromptInfo', () => {
+  it('uses zero system prompt length because edit has no explicit system prompt', () => {
+    const result = extractEditPromptInfo({
+      messages: [{ role: 'user', content: '<|code_to_edit|>const a = 1<|/code_to_edit|>' }],
+    });
+
+    expect(result.system_prompt_prefix).toBe('');
+    expect(result.system_prompt_length).toBe(0);
+    expect(result.user_prompt_prefix).toBe('<|code_to_edit|>const a = 1<|/code_to_edit|>');
+  });
+});
+
+describe('parseEditUsageFromResponse', () => {
+  it('prices cached Inception input tokens at the discounted rate', () => {
+    const result = parseEditUsageFromResponse(
+      JSON.stringify({
+        id: 'edit-123',
+        model: 'mercury-edit-2',
+        usage: {
+          prompt_tokens: 100_000,
+          cached_input_tokens: 90_000,
+          completion_tokens: 0,
+          total_tokens: 100_000,
+        },
+        choices: [],
+      }),
+      'inception',
+      200
+    );
+
+    expect(result.inputTokens).toBe(100_000);
+    expect(result.cacheHitTokens).toBe(90_000);
+    expect(result.cost_mUsd).toBe(4_750);
+    expect(result.cacheDiscount_mUsd).toBe(20_250);
+  });
+
+  it('falls back to flat Inception pricing when cached_input_tokens is absent', () => {
+    const result = parseEditUsageFromResponse(
+      JSON.stringify({
+        id: 'edit-456',
+        model: 'mercury-edit-2',
+        usage: {
+          prompt_tokens: 1_000,
+          completion_tokens: 100,
+          total_tokens: 1_100,
+        },
+        choices: [{ message: { role: 'assistant', content: 'edited' } }],
+      }),
+      'inception',
+      200
+    );
+
+    expect(result.cacheHitTokens).toBe(0);
+    expect(result.cost_mUsd).toBe(Math.round(1_000 * 0.25 + 100 * 0.75));
+    expect(result.cacheDiscount_mUsd).toBe(0);
+    expect(result.hasError).toBe(false);
+  });
+
+  it('returns zero cost when usage is absent', () => {
+    const result = parseEditUsageFromResponse(
+      JSON.stringify({
+        id: 'edit-789',
+        model: 'mercury-edit-2',
+        choices: [],
+      }),
+      'inception',
+      200
+    );
+
+    expect(result.inputTokens).toBe(0);
+    expect(result.outputTokens).toBe(0);
+    expect(result.cacheHitTokens).toBe(0);
+    expect(result.cost_mUsd).toBe(0);
+    expect(result.cacheDiscount_mUsd).toBeUndefined();
+  });
+
+  it('flags an error and zero cost on upstream 4xx responses', () => {
+    const result = parseEditUsageFromResponse(
+      JSON.stringify({ error: { message: 'bad request' } }),
+      'inception',
+      400
+    );
+
+    expect(result.hasError).toBe(true);
+    expect(result.cost_mUsd).toBe(0);
+    expect(result.model).toBeNull();
+  });
+
+  it('clamps cached_input_tokens that exceed prompt_tokens', () => {
+    const result = parseEditUsageFromResponse(
+      JSON.stringify({
+        id: 'edit-clamp',
+        model: 'mercury-edit-2',
+        usage: {
+          prompt_tokens: 1_000,
+          cached_input_tokens: 5_000,
+          completion_tokens: 0,
+          total_tokens: 1_000,
+        },
+        choices: [],
+      }),
+      'inception',
+      200
+    );
+
+    // Without the clamp, uncachedInputTokens would be negative and produce a
+    // negative cost. The clamp pins cacheHitTokens at prompt_tokens.
+    expect(result.cacheHitTokens).toBe(1_000);
+    expect(result.cost_mUsd).toBe(25);
+  });
+});
+
+describe('countAndStoreEmbeddingUsage', () => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+    jest.mocked(after).mockClear();
+    jest.mocked(sharedUsage.selectUsageCostFields).mockClear();
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  describe.each(['openrouter', 'vercel'] as const)('%s generation recovery', provider => {
+    const servingProvider =
+      provider === 'openrouter'
+        ? createUserOpenRouterProvider('test-openrouter-key')
+        : createUserVercelAiGatewayProvider('test-vercel-key');
+
+    it.each([
+      { name: 'missing body', body: () => null },
+      { name: 'invalid JSON', body: () => 'invalid JSON' },
+      { name: 'unexpected shape', body: () => '{"usage":[]}' },
+      {
+        name: 'read interruption',
+        body: () =>
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.error(new TypeError('terminated'));
+            },
+          }),
+      },
+    ])(
+      'passes $name to generation accounting with the header id and response status',
+      async ({ body }) => {
+        const context: MicrodollarUsageContext = {
+          ...createMockUsageContext('embedding-user', 'unused@example.com', 0),
+          api_kind: 'embeddings',
+          provider,
+          requested_model: 'test/embedding',
+          status_code: 200,
+          user_byok: true,
+        };
+        countAndStoreEmbeddingUsage(
+          new Response(body(), {
+            status: 202,
+            headers: { 'x-generation-id': 'embedding-generation' },
+          }),
+          context,
+          undefined,
+          servingProvider
+        );
+        await waitForUsageWrite();
+
+        expect(mockedProcessTokenData).toHaveBeenCalledTimes(1);
+        expect(mockedProcessTokenData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messageId: 'embedding-generation',
+            status_code: 202,
+            hasError: true,
+            model: null,
+            responseContent: '',
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheHitTokens: 0,
+            cacheWriteTokens: 0,
+            cost_mUsd: 0,
+            is_byok: null,
+          }),
+          context,
+          servingProvider
+        );
+        expect(mockedProcessTokenData.mock.calls[0][2]).toBe(servingProvider);
+        expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+        expect(sharedUsage.selectUsageCostFields).not.toHaveBeenCalled();
+      }
+    );
+
+    it('does not swallow generation-accounting failures after parse recovery', async () => {
+      const accountingError = new Error('generation accounting failed');
+      mockedProcessTokenData.mockRejectedValueOnce(accountingError);
+      countAndStoreEmbeddingUsage(
+        new Response('invalid JSON', { headers: { 'x-generation-id': 'embedding-generation' } }),
+        {
+          ...createMockUsageContext('embedding-user', 'unused@example.com', 0),
+          api_kind: 'embeddings',
+          provider,
+        },
+        undefined
+      );
+
+      await expect(jest.mocked(after).mock.calls[0][0]).rejects.toBe(accountingError);
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    });
+
+    it('keeps successfully parsed embeddings on the direct pricing path', async () => {
+      const context: MicrodollarUsageContext = {
+        ...createMockUsageContext('embedding-user', 'unused@example.com', 0),
+        api_kind: 'embeddings',
+        provider,
+        requested_model: 'test/embedding',
+      };
+      const upstreamCost =
+        provider === 'openrouter'
+          ? { usage: { prompt_tokens: 10, cost: 0.001, is_byok: false } }
+          : {
+              usage: { prompt_tokens: 10 },
+              providerMetadata: { gateway: { cost: '0.001', marketCost: '0.001' } },
+            };
+      countAndStoreEmbeddingUsage(
+        Response.json({ id: 'embedding-body-id', model: 'test/embedding', ...upstreamCost }),
+        context,
+        undefined,
+        servingProvider
+      );
+      await waitForUsageWrite();
+
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 'embedding-body-id',
+          status_code: 200,
+          hasError: false,
+          inputTokens: 10,
+          outputTokens: 0,
+          cost_mUsd: 1000,
+          market_cost: 1000,
+        }),
+        context
+      );
+      expect(mockedProcessTokenData).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    });
+  });
+
+  it('hands the read body and the billed stats to the response', async () => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+    };
+    const text = JSON.stringify({
+      id: 'embedding-id',
+      model: 'test/embedding',
+      usage: { prompt_tokens: 10, cost: 0.001, is_byok: false },
+    });
+
+    const accounting = countAndStoreEmbeddingUsage(new Response(text), usageContext, undefined);
+    await accounting.usagePromise;
+
+    await expect(accounting.bodyPromise).resolves.toEqual({
+      text,
+      json: { value: JSON.parse(text) },
+    });
+    const billed = await accounting.pricedStatsPromise;
+    expect(billed).toMatchObject({ cost_mUsd: 1000, market_cost: 1000 });
+    expect(mockedLogMicrodollarUsage.mock.calls[0]?.[0]).toBe(billed);
+  });
+
+  it('rejects the read body and prices nothing when the body cannot be read', async () => {
+    const readError = new TypeError('terminated');
+    const accounting = countAndStoreEmbeddingUsage(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.error(readError);
+          },
+        })
+      ),
+      {
+        ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+        api_kind: 'embeddings',
+      },
+      undefined
+    );
+    await accounting.usagePromise;
+
+    await expect(accounting.bodyPromise).rejects.toBe(readError);
+    await expect(accounting.pricedStatsPromise).resolves.toBeNull();
+    expect(mockedProcessTokenData).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 429])(
+    'records an upstream %i error body as errored usage without reporting it',
+    async status => {
+      const usageContext: MicrodollarUsageContext = {
+        ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+        api_kind: 'embeddings',
+        requested_model: 'test/embedding',
+        status_code: status,
+      };
+      const response = new Response(
+        JSON.stringify({ error: { code: status, message: 'upstream rejected the request' } }),
+        { status }
+      );
+
+      countAndStoreEmbeddingUsage(response, usageContext, undefined);
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hasError: true,
+          model: null,
+          inputTokens: 0,
+          cost_mUsd: 0,
+          status_code: status,
+        }),
+        usageContext
+      );
+      expect(captureMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['an empty body', ''],
+    ['an HTML error page', '<html><body>502 Bad Gateway</body></html>'],
+  ])('records an upstream error with %s as errored usage without reporting it', async (_, body) => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      status_code: 502,
+    };
+
+    countAndStoreEmbeddingUsage(new Response(body, { status: 502 }), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, inputTokens: 0, cost_mUsd: 0, status_code: 502 }),
+      usageContext
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports a successful response without usage', async () => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      status_code: 200,
+    };
+    const response = new Response(JSON.stringify({ id: 'embedding-id', model: 'test/embedding' }));
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      'SUSPICIOUS: No embedding usage information',
+      expect.anything()
+    );
+  });
+
+  it.each([
+    { is_free: false, user_byok: false, expectedCost: 1000 },
+    { is_free: true, user_byok: false, expectedCost: 0 },
+    { is_free: false, user_byok: true, expectedCost: 0 },
+  ])('uses the free/BYOK snapshots for embedding cost: %j', async testCase => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      is_free: testCase.is_free,
+      user_byok: testCase.user_byok,
+    };
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'test/embedding',
+        usage: { prompt_tokens: 10, cost: 0.001 },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: testCase.expectedCost, market_cost: 1000 }),
+      usageContext
+    );
+  });
+});
+
+describe.each([
+  {
+    apiKind: 'embeddings' as const,
+    countUsage: countAndStoreEmbeddingUsage,
+    recordedStats: () => mockedLogMicrodollarUsage.mock.calls[0]?.[0],
+    chunks: [
+      [500, '{"id":"embedding-timed","model":"test/embedding",'],
+      [540, '"usage":{"prompt_tokens":10,"cost":0.001,"is_byok":false}}'],
+    ] satisfies [number, string][],
+  },
+  {
+    apiKind: 'audio_transcriptions' as const,
+    countUsage: countAndStoreTranscriptionUsage,
+    recordedStats: () => mockedProcessTokenData.mock.calls[0]?.[0],
+    chunks: [
+      [500, '{"id":"transcription-timed","model":"test/transcribe",'],
+      [540, '"text":"hello","usage":{"cost":0.001,"is_byok":false}}'],
+    ] satisfies [number, string][],
+  },
+])('$apiKind response timing', ({ apiKind, countUsage, recordedStats, chunks }) => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+  });
+
+  it('measures the response from the request start', async () => {
+    const clockSpy = clock.install();
+    try {
+      countUsage(
+        new Response(clock.bodyArrivingAt(chunks)),
+        {
+          ...createMockUsageContext('timing-user', 'unused@example.com', 0),
+          api_kind: apiKind,
+          requested_model: 'test/model',
+          requestStartedAt: 200,
+        },
+        undefined
+      );
+      await waitForUsageWrite();
+    } finally {
+      clockSpy.mockRestore();
+    }
+
+    expect(recordedStats()).toMatchObject({ latency: 300, generation_time: 40 });
+  });
+});
+
+describe.each(['openrouter', 'vercel'] as const)(
+  'countAndStoreTranscriptionUsage %s credentials',
+  provider => {
+    beforeEach(() => {
+      mockedProcessTokenData.mockClear();
+    });
+
+    it.each([
+      { name: 'parse recovery', body: 'invalid JSON', hasError: true, inputTokens: 0 },
+      {
+        name: 'successful parsing',
+        body: JSON.stringify({
+          text: 'transcription',
+          usage: { input_tokens: 10, output_tokens: 4, cost: 0, is_byok: true },
+        }),
+        hasError: false,
+        inputTokens: 10,
+      },
+    ])(
+      'forwards the exact serving provider after $name',
+      async ({ body, hasError, inputTokens }) => {
+        const servingProvider =
+          provider === 'openrouter'
+            ? createUserOpenRouterProvider('test-openrouter-key')
+            : createUserVercelAiGatewayProvider('test-vercel-key');
+        const context: MicrodollarUsageContext = {
+          ...createMockUsageContext('audio-user', 'unused@example.com', 0),
+          api_kind: 'audio_transcriptions',
+          provider,
+          user_byok: true,
+        };
+        countAndStoreTranscriptionUsage(
+          new Response(body, { status: 202, headers: { 'x-generation-id': 'audio-generation' } }),
+          context,
+          undefined,
+          servingProvider
+        );
+        await waitForUsageWrite();
+
+        expect(mockedProcessTokenData).toHaveBeenCalledTimes(1);
+        expect(mockedProcessTokenData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messageId: 'audio-generation',
+            status_code: 202,
+            hasError,
+            inputTokens,
+          }),
+          context,
+          servingProvider
+        );
+        expect(mockedProcessTokenData.mock.calls[0][2]).toBe(servingProvider);
+      }
+    );
+  }
+);
+
+describe('countAndStoreFimUsage', () => {
+  function makeUsageContext(
+    overrides: Partial<MicrodollarUsageContext> = {}
+  ): MicrodollarUsageContext {
+    return {
+      api_kind: 'fim_completions',
+      kiloUserId: 'user-fim-test',
+      provider: 'inception',
+      requested_model: 'inception/mercury-edit-2',
+      promptInfo: {
+        system_prompt_prefix: '',
+        system_prompt_length: 0,
+        user_prompt_prefix: '',
+      },
+      max_tokens: 100,
+      has_middle_out_transform: null,
+      fraudHeaders: {},
+      isStreaming: false,
+      organizationId: undefined,
+      prior_microdollar_usage: 0,
+      posthog_distinct_id: undefined,
+      project_id: null,
+      status_code: 200,
+      editor_name: null,
+      machine_id: null,
+      user_byok: false,
+      is_free: false,
+      has_tools: false,
+      feature: null,
+      session_id: null,
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+      ...overrides,
+    } as MicrodollarUsageContext;
+  }
+
+  function makeUpstreamResponse(): Response {
+    return new Response(
+      JSON.stringify({
+        id: 'fim-test',
+        model: 'mercury-edit-2',
+        usage: {
+          prompt_tokens: 1_000,
+          completion_tokens: 100,
+          total_tokens: 1_100,
+        },
+        choices: [{ text: 'completion' }],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedLogMicrodollarUsage.mockResolvedValue(null);
+  });
+
+  it('bills the Inception model', async () => {
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(325);
+    expect(stats.market_cost).toBe(325);
+  });
+
+  it('bills other FIM models', async () => {
+    countAndStoreFimUsage(
+      makeUpstreamResponse(),
+      makeUsageContext({
+        provider: 'mistral',
+        requested_model: 'mistralai/codestral-2508',
+      }),
+      undefined
+    );
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(390);
+    expect(stats.market_cost).toBe(390);
+  });
+
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('does not bill BYOK or free requests: %j', async overrides => {
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(overrides), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBe(0);
+    expect(stats.market_cost).toBe(325);
+  });
+
+  it('accounts for a malformed successful response instead of dropping the request', async () => {
+    jest.mocked(captureException).mockClear();
+    const response = new Response('not JSON');
+
+    countAndStoreFimUsage(response, makeUsageContext(), undefined);
+    await waitForUsageWrite();
+
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      expect.objectContaining({
+        tags: { source: 'usage_response_parsing', api_kind: 'fim_completions' },
+      })
+    );
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: 200 }),
+      expect.anything()
+    );
+  });
+
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
+  it.each([
+    ['not JSON containing private-response-content', { errorName: 'SyntaxError' }],
+    ['null', rootZodIssue],
+    ['false', rootZodIssue],
+    ['[]', rootZodIssue],
+    ['42', rootZodIssue],
+    [
+      '{"usage":{"prompt_tokens":"private-response-content","completion_tokens":1}}',
+      { errorName: 'ZodError', issues: [{ path: 'usage.prompt_tokens', code: 'invalid_type' }] },
+    ],
+    [
+      '{"choices":{"text":"private-response-content"}}',
+      { errorName: 'ZodError', issues: [{ path: 'choices', code: 'invalid_type' }] },
+    ],
+    [
+      '{"choices":[{"delta":[]}]}',
+      { errorName: 'ZodError', issues: [{ path: 'choices.0.delta', code: 'invalid_type' }] },
+    ],
+  ])('retains later FIM usage after a malformed event: %s', async (malformedEvent, readError) => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response(
+        `data: ${malformedEvent}\n\n` +
+          'data: {"id":"fim-recovered","model":"mercury-edit-2","choices":[{"text":"completion"}],"usage":{"prompt_tokens":1000,"completion_tokens":100}}\n\n' +
+          'data: [DONE]\n\n'
+      ),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasError: true,
+        messageId: 'fim-recovered',
+        responseContent: 'completion',
+        inputTokens: 1000,
+        outputTokens: 100,
+        cost_mUsd: 325,
+      }),
+      expect.anything()
+    );
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+    expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
+      level: 'error',
+      tags: { source: 'usage_stream_parsing' },
+      extra: {
+        messageId: 'fim-recovered',
+        model: 'mercury-edit-2',
+        malformedEventCount: 1,
+        ...readError,
+      },
+    });
+    expect(captureException).not.toHaveBeenCalled();
+    expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain(
+      'private-response-content'
+    );
+  });
+
+  it('does not treat a null stream error as a failure', async () => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response(
+        'data: {"error":null}\n\n' +
+          'data: {}\n\n' +
+          'data: {"id":"fim-ok","model":"mercury-edit-2","error":null,"usage":{"prompt_tokens":1000,"completion_tokens":100},"choices":[]}\n\n'
+      ),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: false, cost_mUsd: 325 }),
+      expect.anything()
+    );
+    expect(captureException).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { error: { code: 429, message: 'rate limited' }, userByok: false, captured: false },
+    { error: { code: 503, message: 'overloaded' }, userByok: false, captured: false },
+    { error: { type: 'server_error', message: 'failed' }, userByok: false, captured: false },
+    { error: { code: 401, message: 'invalid key' }, userByok: false, captured: true },
+    { error: { type: 'billing_error', message: 'no credit' }, userByok: false, captured: true },
+    { error: { code: 401, message: 'invalid key' }, userByok: true, captured: false },
+    { error: { type: 'billing_error', message: 'no credit' }, userByok: true, captured: false },
+  ])('filters upstream FIM stream errors: %j', async ({ error, userByok, captured }) => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      countAndStoreFimUsage(
+        new Response(`data: ${JSON.stringify({ error })}\n\ndata: [DONE]\n\n`),
+        makeUsageContext({ isStreaming: true, user_byok: userByok }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      expect(captureException).toHaveBeenCalledTimes(captured ? 1 : 0);
+      expect(warn).toHaveBeenCalledTimes(captured ? 0 : 1);
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: error.code ?? 200 }),
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('preserves partial usage when an upstream FIM stream fails', async () => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response(
+        'data: {"id":"fim-partial","model":"mercury-edit-2","choices":[{"text":"partial"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n' +
+          'data: {"error":{"code":503,"message":"overloaded"}}\n\n'
+      ),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasError: true,
+        messageId: 'fim-partial',
+        responseContent: 'partial',
+        inputTokens: 1000,
+        outputTokens: 100,
+        cost_mUsd: 325,
+        status_code: 503,
+      }),
+      expect.anything()
+    );
+    expect(captureException).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('still reports a successful FIM stream without usage', async () => {
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response('data: {"model":"mercury-edit-2","choices":[]}\n\n'),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      'SUSPICIOUS: No usage info in FIM stream',
+      expect.anything()
+    );
+  });
+
+  describe('response timing', () => {
+    let clockSpy: ReturnType<typeof clock.install>;
+
+    beforeEach(() => {
+      clockSpy = clock.install();
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    afterEach(() => {
+      clockSpy.mockRestore();
+    });
+
+    it('measures a JSON response from the request start', async () => {
+      const body = clock.bodyArrivingAt([
+        [400, '{"id":"fim-test","model":"mercury-edit-2",'],
+        [450, '"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100},'],
+        [460, '"choices":[{"text":"completion"}]}'],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ requestStartedAt: 100 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: 300, generation_time: 60, cost_mUsd: 325 });
+    });
+
+    it('measures a streamed response by its SSE events', async () => {
+      const body = clock.bodyArrivingAt([
+        [300, ': keep-alive\n\n'],
+        [
+          350,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"comp"}}]}\n\n',
+        ],
+        [
+          700,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"letion"}}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n',
+        ],
+        [720, 'data: [DONE]\n\n'],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({
+          provider: 'mistral',
+          requested_model: 'mistralai/codestral-2508',
+          isStreaming: true,
+          requestStartedAt: 50,
+        }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({
+        responseContent: 'completion',
+        hasError: false,
+        latency: 300,
+        generation_time: 370,
+        cost_mUsd: 390,
+      });
+    });
+
+    it('times a streamed response from its first generated token', async () => {
+      const body = clock.bodyArrivingAt([
+        [
+          100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+        ],
+        [
+          2_000,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"completion"}}]}\n\n',
+        ],
+        [
+          2_100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n',
+        ],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: 2_000, generation_time: 100 });
+    });
+
+    it('reports no timing for a streamed response without generated tokens', async () => {
+      const body = clock.bodyArrivingAt([
+        [
+          100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+        ],
+        [
+          300,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":0,"total_tokens":1000}}\n\n',
+        ],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: null, generation_time: null });
+    });
+
+    it('records an interrupted stream as an error', async () => {
+      const body = clock.bodyArrivingAt(
+        [
+          [
+            200,
+            'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"comp"}}]}\n\n',
+          ],
+        ],
+        new TypeError('terminated')
+      );
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({
+        hasError: true,
+        latency: 200,
+        generation_time: 0,
+        cost_mUsd: 0,
+      });
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe.each<{
+  apiKind: MicrodollarUsageContext['api_kind'];
+  countUsage: typeof countAndStoreFimUsage;
+}>([
+  { apiKind: 'fim_completions', countUsage: countAndStoreFimUsage },
+  { apiKind: 'edit_completions', countUsage: countAndStoreEditUsage },
+  { apiKind: 'embeddings', countUsage: countAndStoreEmbeddingUsage },
+  { apiKind: 'audio_transcriptions', countUsage: countAndStoreTranscriptionUsage },
+])('$apiKind upstream error accounting', ({ apiKind, countUsage }) => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  it.each([400, 401, 402, 403, 429, 502])(
+    'does not re-report HTTP %i error bodies',
+    async status => {
+      const context = {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        provider: 'inception',
+        status_code: status,
+      } satisfies MicrodollarUsageContext;
+
+      for (const body of [
+        JSON.stringify({ error: { message: 'rejected' } }),
+        '',
+        '<html>error</html>',
+      ]) {
+        countUsage(new Response(body, { status }), context, undefined);
+        await waitForUsageWrite();
+      }
+
+      const storeUsage =
+        apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+      expect(storeUsage).toHaveBeenCalledTimes(3);
+      expect(storeUsage.mock.calls.at(-1)).toEqual([
+        expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: status }),
+        context,
+        ...(apiKind === 'audio_transcriptions' ? [undefined] : []),
+      ]);
+      expect(captureException).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['missing', 'unreadable'])('accounts for a %s HTTP error body', async kind => {
+    const body =
+      kind === 'missing'
+        ? null
+        : new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.error(new Error('upstream disconnected'));
+            },
+          });
+    countUsage(
+      new Response(body, { status: 429 }),
+      {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        status_code: 429,
+      },
+      undefined
+    );
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' || apiKind === 'embeddings'
+        ? mockedProcessTokenData
+        : mockedLogMicrodollarUsage;
+    expect(storeUsage.mock.calls[0]).toEqual([
+      expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: 429 }),
+      expect.anything(),
+      ...(apiKind === 'audio_transcriptions' || apiKind === 'embeddings' ? [undefined] : []),
+    ]);
+    if (apiKind === 'embeddings') expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      expect.objectContaining({ tags: { source: 'usage_response_parsing', api_kind: apiKind } })
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('still reports a malformed successful response', async () => {
+    countUsage(
+      new Response('not JSON'),
+      {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        status_code: 200,
+      },
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      expect.objectContaining({ tags: { source: 'usage_response_parsing', api_kind: apiKind } })
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe.each<{
+  apiKind: MicrodollarUsageContext['api_kind'];
+  countUsage: typeof countAndStoreFimUsage;
+}>([
+  { apiKind: 'fim_completions', countUsage: countAndStoreFimUsage },
+  { apiKind: 'edit_completions', countUsage: countAndStoreEditUsage },
+  { apiKind: 'embeddings', countUsage: countAndStoreEmbeddingUsage },
+  { apiKind: 'audio_transcriptions', countUsage: countAndStoreTranscriptionUsage },
+])('$apiKind usage recovery', ({ apiKind, countUsage }) => {
+  const makeContext = (): MicrodollarUsageContext => ({
+    ...createMockUsageContext('usage-user', 'unused@example.com', 0),
+    api_kind: apiKind,
+    provider: 'inception',
+    status_code: 200,
+    usageId: 'usage-recovery-id',
+    organizationId: 'usage-organization',
+    promptInfo: {
+      system_prompt_prefix: 'private-prompt',
+      user_prompt_prefix: 'private-prompt',
+      system_prompt_length: 14,
+    },
+  });
+
+  const validPayload = {
+    model: 'test/model',
+    text: 'transcription',
+    choices: [{ text: 'completion', message: { content: 'edit' } }],
+    usage: {
+      prompt_tokens: 1000,
+      completion_tokens: 100,
+      input_tokens: 10,
+      output_tokens: 4,
+      cost: 0.001,
+      is_byok: false,
+    },
+    error: null,
+  };
+
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+    jest.mocked(after).mockClear();
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
+  const invalidTokenPath =
+    apiKind === 'audio_transcriptions' ? 'usage.input_tokens' : 'usage.prompt_tokens';
+
+  it.each([
+    { name: 'missing body', body: () => null, error: { errorName: 'Error' } },
+    {
+      name: 'read interruption',
+      body: () =>
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.error(new TypeError('terminated private-response-content'));
+          },
+        }),
+      error: { errorName: 'TypeError' },
+    },
+    {
+      name: 'invalid JSON',
+      body: () => 'invalid JSON private-response-content',
+      error: { errorName: 'SyntaxError' },
+    },
+    { name: 'null', body: () => 'null', error: rootZodIssue },
+    { name: 'array', body: () => '[]', error: rootZodIssue },
+    { name: 'primitive', body: () => '42', error: rootZodIssue },
+    {
+      name: 'unexpected object',
+      body: () => '{"unrecognized":"private-response-content"}',
+      error: { errorName: 'Error' },
+    },
+    {
+      name: 'invalid model type',
+      body: () =>
+        JSON.stringify({ ...validPayload, model: { secret: 'private-response-content' } }),
+      error: { errorName: 'ZodError', issues: [{ path: 'model', code: 'invalid_type' }] },
+    },
+    {
+      name: 'invalid token type',
+      body: () =>
+        JSON.stringify({
+          ...validPayload,
+          usage: {
+            ...validPayload.usage,
+            prompt_tokens: 'private-response-content',
+            input_tokens: 'private-response-content',
+          },
+        }),
+      error: {
+        errorName: 'ZodError',
+        issues: [{ path: invalidTokenPath, code: 'invalid_type' }],
+      },
+    },
+  ])('persists errored usage for $name with sanitized diagnostics', async ({ body, error }) => {
+    const context = makeContext();
+    countUsage(
+      new Response(body(), { headers: { 'x-generation-id': 'generation-recovery' } }),
+      context,
+      undefined
+    );
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' || apiKind === 'embeddings'
+        ? mockedProcessTokenData
+        : mockedLogMicrodollarUsage;
+    expect(storeUsage).toHaveBeenCalledTimes(1);
+    expect(storeUsage.mock.calls[0]).toEqual([
+      expect.objectContaining({
+        messageId: 'generation-recovery',
+        hasError: true,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheHitTokens: 0,
+        cacheWriteTokens: 0,
+        cost_mUsd: 0,
+        status_code: 200,
+      }),
+      context,
+      ...(apiKind === 'audio_transcriptions' || apiKind === 'embeddings' ? [undefined] : []),
+    ]);
+    if (apiKind === 'embeddings') expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      {
+        tags: { source: 'usage_response_parsing', api_kind: apiKind },
+        extra: {
+          usageId: 'usage-recovery-id',
+          kiloUserId: context.kiloUserId,
+          organizationId: context.organizationId,
+          provider: 'inception',
+          messageId: 'generation-recovery',
+          ...error,
+        },
+      }
+    );
+    expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain('private-');
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { id: undefined, expectedId: 'generation-header' },
+    { id: 'generation-body', expectedId: 'generation-body' },
+  ])('uses the generation id $expectedId on successful usage', async ({ id, expectedId }) => {
+    const context = makeContext();
+    countUsage(
+      new Response(JSON.stringify({ ...validPayload, id }), {
+        headers: { 'x-generation-id': 'generation-header' },
+      }),
+      context,
+      undefined
+    );
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+    expect(storeUsage.mock.calls[0]).toEqual([
+      expect.objectContaining({ messageId: expectedId, hasError: false }),
+      context,
+      ...(apiKind === 'audio_transcriptions' ? [undefined] : []),
+    ]);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('keeps the reported usage of a body without a model', async () => {
+    const context = makeContext();
+    const { model: _model, ...payloadWithoutModel } = validPayload;
+    countUsage(new Response(JSON.stringify(payloadWithoutModel)), context, undefined);
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+    const stats = storeUsage.mock.calls[0]?.[0];
+    expect(stats?.inputTokens).toBeGreaterThan(0);
+    // Transcriptions fall back to the requested model; the others record the missing model as an error.
+    if (apiKind !== 'audio_transcriptions') {
+      expect(stats).toMatchObject({ model: null, hasError: true });
+    }
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not recover from persistence failures', async () => {
+    const accountingError = new Error('usage persistence failed');
+    if (apiKind === 'audio_transcriptions') {
+      mockedProcessTokenData.mockRejectedValueOnce(accountingError);
+    } else {
+      mockedLogMicrodollarUsage.mockRejectedValueOnce(accountingError);
+    }
+
+    countUsage(new Response(JSON.stringify(validPayload)), makeContext(), undefined);
+
+    await expect(jest.mocked(after).mock.calls[0][0]).rejects.toBe(accountingError);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  if (apiKind === 'embeddings' || apiKind === 'audio_transcriptions') {
+    it('does not recover from pricing failures', async () => {
+      const accountingError = new Error('usage pricing failed');
+      const pricing =
+        apiKind === 'embeddings'
+          ? sharedUsage.selectUsageCostFields
+          : sharedUsage.computeOpenRouterCostFields;
+      jest.mocked(pricing).mockImplementationOnce(() => {
+        throw accountingError;
+      });
+      countUsage(new Response(JSON.stringify(validPayload)), makeContext(), undefined);
+
+      await expect(jest.mocked(after).mock.calls[0][0]).rejects.toBe(accountingError);
+      expect(captureException).not.toHaveBeenCalled();
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+      expect(mockedProcessTokenData).not.toHaveBeenCalled();
+    });
+  }
+});
+
+describe('countAndStoreEditUsage', () => {
+  function makeUsageContext(
+    overrides: Partial<MicrodollarUsageContext> = {}
+  ): MicrodollarUsageContext {
+    return {
+      api_kind: 'edit_completions',
+      kiloUserId: 'user-edit-test',
+      provider: 'inception',
+      requested_model: 'inception/mercury-edit-2',
+      promptInfo: {
+        system_prompt_prefix: '',
+        system_prompt_length: 0,
+        user_prompt_prefix: '',
+      },
+      max_tokens: 100,
+      has_middle_out_transform: null,
+      fraudHeaders: {},
+      isStreaming: false,
+      organizationId: undefined,
+      prior_microdollar_usage: 0,
+      posthog_distinct_id: undefined,
+      project_id: null,
+      status_code: 200,
+      editor_name: null,
+      machine_id: null,
+      user_byok: false,
+      is_free: false,
+      has_tools: false,
+      feature: null,
+      session_id: null,
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+      ...overrides,
+    } as MicrodollarUsageContext;
+  }
+
+  function makeUpstreamResponse(payload: unknown): Response {
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedLogMicrodollarUsage.mockResolvedValue(null);
+  });
+
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('zeros costs for BYOK or free requests: %j', async overrides => {
+    const response = makeUpstreamResponse({
+      id: 'edit-byok',
+      model: 'mercury-edit-2',
+      usage: {
+        prompt_tokens: 100_000,
+        cached_input_tokens: 90_000,
+        completion_tokens: 0,
+        total_tokens: 100_000,
+      },
+      choices: [],
+    });
+
+    countAndStoreEditUsage(response, makeUsageContext(overrides), undefined);
+
+    // Allow the async usage parse + after() callback to settle.
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBe(0);
+    // The pre-zeroed value is preserved in `market_cost` for reporting.
+    expect(stats.market_cost).toBe(4_750);
+  });
+
+  it('bills non-BYOK requests', async () => {
+    const response = makeUpstreamResponse({
+      id: 'edit-paid',
+      model: 'mercury-edit-2',
+      usage: {
+        prompt_tokens: 100_000,
+        cached_input_tokens: 90_000,
+        completion_tokens: 0,
+        total_tokens: 100_000,
+      },
+      choices: [],
+    });
+
+    countAndStoreEditUsage(response, makeUsageContext({ user_byok: false }), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(4_750);
+    expect(stats.cacheDiscount_mUsd).toBe(20_250);
+    expect(stats.market_cost).toBe(4_750);
+  });
+
+  it('measures the response from the request start', async () => {
+    const clockSpy = clock.install();
+    try {
+      const body = clock.bodyArrivingAt([
+        [500, '{"id":"edit-timed","model":"mercury-edit-2",'],
+        [540, '"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15},"choices":[]}'],
+      ]);
+
+      countAndStoreEditUsage(
+        new Response(body),
+        makeUsageContext({ requestStartedAt: 200 }),
+        undefined
+      );
+      await waitForUsageWrite();
+    } finally {
+      clockSpy.mockRestore();
+    }
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats).toMatchObject({ messageId: 'edit-timed', latency: 300, generation_time: 40 });
+  });
+
+  it('logs errored usage when the upstream body is missing', async () => {
+    const bodylessResponse = new Response(null, { status: 502 });
+
+    countAndStoreEditUsage(bodylessResponse, makeUsageContext({ status_code: 502 }), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: 502 }),
+      expect.anything()
+    );
+  });
+});
+
+describe('parseEmbeddingUsageFromResponse', () => {
+  function makeResponse(overrides: Record<string, unknown> = {}) {
+    return JSON.stringify({
+      id: 'embd-123',
+      object: 'list',
+      model: 'text-embedding-3-small',
+      usage: { prompt_tokens: 100, total_tokens: 100 },
+      data: [{ object: 'embedding', embedding: [0.1, 0.2], index: 0 }],
+      ...overrides,
+    });
+  }
+
+  it('should use upstream cost field when available', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 100, total_tokens: 100, cost: 0.00005 },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(50);
+  });
+
+  it('should default to 0 cost when upstream cost field is absent', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 1000, total_tokens: 1000 },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(0);
+  });
+
+  it('should extract id as messageId', () => {
+    const response = makeResponse({ id: 'embd-abc' });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.messageId).toBe('embd-abc');
+  });
+
+  it('should set messageId to null when id is absent', () => {
+    const response = makeResponse({});
+    const parsed = JSON.parse(response);
+    delete parsed.id;
+
+    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200, 'openrouter');
+
+    expect(result.messageId).toBeNull();
+  });
+
+  it('should set hasError to true when model is empty', () => {
+    const response = makeResponse({ model: '' });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.hasError).toBe(true);
+  });
+
+  it('should set hasError to false when model is present', () => {
+    const response = makeResponse({ model: 'text-embedding-3-small' });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.hasError).toBe(false);
+  });
+
+  it('should always set outputTokens to 0 and streamed/cancelled to false', () => {
+    const response = makeResponse();
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.outputTokens).toBe(0);
+    expect(result.streamed).toBe(false);
+    expect(result.cancelled).toBe(false);
+  });
+
+  it('should extract prompt_tokens as inputTokens', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 42, total_tokens: 42 },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.inputTokens).toBe(42);
+  });
+
+  it('extracts the inference provider OpenRouter reports', () => {
+    const result = parseEmbeddingUsageFromResponse(
+      makeResponse({ provider: 'OpenAI' }),
+      200,
+      'openrouter'
+    );
+
+    expect(result.inference_provider).toBe('OpenAI');
+  });
+
+  it('sets the inference provider to null when the response has none', () => {
+    const result = parseEmbeddingUsageFromResponse(makeResponse(), 200, 'openrouter');
+
+    expect(result.inference_provider).toBeNull();
+  });
+});
+
+describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
+  it('bills the upstream inference cost of a BYOK-served OpenRouter embedding', () => {
+    const response = JSON.stringify({
+      id: 'gen-emb-123',
+      object: 'list',
+      model: 'codestral-embed-2505',
+      usage: {
+        prompt_tokens: 3000,
+        total_tokens: 3000,
+        cost: 0.0000225,
+        is_byok: true,
+        cost_details: { upstream_inference_cost: 0.00045 },
+      },
+      provider: 'Mistral',
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('reads Vercel AI Gateway cost and credential type from providerMetadata', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      model: 'mistral/codestral-embed',
+      usage: { prompt_tokens: 3000, total_tokens: 3000 },
+      providerMetadata: {
+        gateway: {
+          routing: {
+            modelAttempts: [
+              {
+                success: true,
+                providerAttempts: [{ provider: 'mistral', credentialType: 'byok', success: true }],
+              },
+            ],
+          },
+          cost: '0',
+          marketCost: '0.00045',
+        },
+      },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'vercel');
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('reads Vercel AI Gateway cost from snake_case provider_metadata, as the response does', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      model: 'mistral/codestral-embed',
+      usage: { prompt_tokens: 3000, total_tokens: 3000 },
+      provider_metadata: { gateway: { cost: '0.00045', marketCost: '0.00045' } },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(450);
+  });
+});
+
+describe('parseTranscriptionUsageFromResponse', () => {
+  function makeResponse(overrides: Record<string, unknown> = {}) {
+    return JSON.stringify({
+      id: 'stt-123',
+      model: 'openai/gpt-4o-mini-transcribe',
+      text: 'hello world',
+      usage: {
+        seconds: 2.5,
+        input_tokens: 10,
+        output_tokens: 4,
+        total_tokens: 14,
+        cost: 0.00002,
+        is_byok: false,
+      },
+      ...overrides,
+    });
+  }
+
+  it('uses upstream cost and token fields', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse(),
+      200,
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
+    );
+
+    expect(result.cost_mUsd).toBe(20);
+    expect(result.inputTokens).toBe(10);
+    expect(result.outputTokens).toBe(4);
+  });
+
+  it('uses BYOK upstream inference cost when present', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse({
+        usage: {
+          seconds: 2.5,
+          input_tokens: 10,
+          output_tokens: 4,
+          total_tokens: 14,
+          cost: 0,
+          is_byok: true,
+          cost_details: { upstream_inference_cost: 0.00004 },
+        },
+      }),
+      200,
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
+    );
+
+    expect(result.cost_mUsd).toBe(40);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('does not store the audio duration as generation time', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse(),
+      200,
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
+    );
+
+    expect(result.generation_time).toBeNull();
+  });
+
+  it('falls back to requested model when response model is absent', () => {
+    const parsed = JSON.parse(makeResponse());
+    delete parsed.model;
+
+    const result = parseTranscriptionUsageFromResponse(
+      JSON.stringify(parsed),
+      200,
+      'openai/whisper-1',
+      'openrouter',
+      null
+    );
+
+    expect(result.model).toBe('openai/whisper-1');
+  });
+
+  it('marks non-text responses as errors', () => {
+    const parsed = JSON.parse(makeResponse());
+    delete parsed.text;
+
+    const result = parseTranscriptionUsageFromResponse(
+      JSON.stringify(parsed),
+      200,
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
+    );
+
+    expect(result.hasError).toBe(true);
+  });
+
+  describe('OpenRouter response without BYOK status', () => {
+    // Shape OpenRouter returns for a BYOK-served whisper-1 transcription: `cost`
+    // is only the 5% BYOK fee, and neither is_byok nor cost_details is present.
+    const openRouterWhisperResponse = JSON.stringify({
+      text: 'This is a short transcription test.',
+      usage: { seconds: 2, cost: 0.00001 },
+    });
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    it('uses the x-generation-id header so the generation lookup can resolve the cost', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        'gen-stt-123'
+      );
+
+      expect(result.messageId).toBe('gen-stt-123');
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it('reports the unresolvable cost when there is no generation id', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        null
+      );
+
+      expect(result.messageId).toBeNull();
+      expect(captureMessage).toHaveBeenCalledWith(
+        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        expect.anything()
+      );
+    });
+  });
+});
+
+describe('captureProxyError', () => {
+  beforeEach(() => {
+    mockedErrorExceptInTest.mockClear();
+    jest.mocked(captureMessage).mockClear();
+    jest.mocked(captureException).mockClear();
+  });
+
+  async function capturedErrorData() {
+    for (
+      let attempt = 0;
+      attempt < 20 && mockedErrorExceptInTest.mock.calls.length === 0;
+      attempt++
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    expect(mockedErrorExceptInTest).toHaveBeenCalledTimes(1);
+    return mockedErrorExceptInTest.mock.calls[0][1] as Record<string, unknown>;
+  }
+
+  it.each(
+    [500, 502, 503, 504].flatMap(status =>
+      [false, true].map(isUserByok => ({ status, isUserByok }))
+    )
+  )(
+    'keeps upstream $status diagnostics in logs without Sentry events with BYOK=$isUserByok',
+    async ({ status, isUserByok }) => {
+      const response = Response.json({ error: 'upstream unavailable' }, { status });
+      const replacement = await applyUpstreamErrorPolicy({
+        response,
+        providerId: 'openrouter',
+        isUserByok,
+        user: { id: 'user-1' },
+        request: { model: 'vendor/model' },
+        organizationId: undefined,
+        model: 'vendor/model',
+      });
+
+      expect(await capturedErrorData()).toMatchObject({
+        status,
+        model: 'vendor/model',
+        first4kOfResponse: '{"error":"upstream unavailable"}',
+      });
+      expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
+        `openrouter returned error ${status}`,
+        expect.anything()
+      );
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+      expect(replacement).toBeUndefined();
+      expect(await response.json()).toEqual({ error: 'upstream unavailable' });
+    }
+  );
+
+  it('logs the gateway model, BYOK providers, and request field names', async () => {
+    await captureProxyError({
+      errorMessage: 'direct-byok returned error 400',
+      user: { id: 'user-1' },
+      request: {
+        model: 'glm-5.3-flash',
+        reasoning: { effort: 'high' },
+        messages: [
+          { role: 'user', content: 'secret prompt' },
+          { role: 'assistant', content: 'hi', reasoning: 'secret thoughts' },
+        ],
+      },
+      response: new Response('{"error":"unknown field"}', {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { 'content-type': 'application/json' },
+      }),
+      organizationId: undefined,
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: ['opencode-go'],
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).toMatchObject({
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: 'opencode-go',
+      requestFields: 'messages,model,reasoning',
+      messageFields: 'content,reasoning,role',
+      first4kOfResponse: '{"error":"unknown field"}',
+    });
+    expect(JSON.stringify(data)).not.toContain('secret');
+  });
+
+  async function captureResponsesError(
+    request: unknown,
+    response = Response.json({ error: {} }, { status: 400 })
+  ) {
+    await captureProxyError({
+      errorMessage: 'openai-chatgpt returned error 400',
+      user: { id: 'synthetic-user' },
+      request,
+      response,
+      organizationId: undefined,
+      model: 'openai/gpt-6.1-sol',
+      trackInSentry: false,
+    });
+    return capturedErrorData();
+  }
+
+  it('logs Responses item types, sorted field unions, and message content types without values', async () => {
+    const data = await captureResponsesError({
+      model: 'openai/gpt-6.1-sol',
+      input: [
+        'private string',
+        {
+          type: 'message',
+          role: 'user',
+          content: [
+            { type: 'input_text', text: 'private prompt' },
+            { type: 'input_image', image_url: 'private image' },
+            { type: 'input_text', text: 'private prompt' },
+          ],
+        },
+        { role: 'assistant', content: [{ type: 'output_text', text: 'private output' }] },
+        { type: 'message', role: 'assistant', status: 'completed', content: 'private output' },
+        { type: 'reasoning', id: 'private-id', encrypted_content: 'private encrypted content' },
+        {
+          type: 'function_call',
+          name: 'private-tool',
+          call_id: 'private-id',
+          arguments: 'private arguments',
+        },
+        { type: 'future_item', content: [{ type: 'not_a_message_part' }] },
+      ],
+    });
+
+    expect(data).toMatchObject({
+      requestFields: 'input,model',
+      inputItemTypes: 'function_call,future_item,message,reasoning,string',
+      inputItemFields:
+        'function_call:arguments,call_id,name,type;future_item:content,type;message:content,role,status,type;reasoning:encrypted_content,id,type;string:',
+      inputContentPartTypes: 'input_image,input_text,output_text',
+    });
+    expect(JSON.stringify(data)).not.toContain('private');
+    expect(data).not.toHaveProperty('messageFields');
+  });
+
+  it('bounds shape diagnostics to 512 characters and the item-type list to 12 entries', async () => {
+    const key = 'synthetic_field_'.repeat(40);
+    const data = await captureResponsesError({
+      [key]: 'private value',
+      messages: [{ [key]: 'private value' }],
+      input: [
+        ...Array.from({ length: 20 }, (_, index) => ({
+          type: `item_${index}`,
+          [key]: 'private value',
+        })),
+        {
+          type: 'message',
+          content: [{ type: 'synthetic_content_type_'.repeat(40), text: 'private prompt' }],
+        },
+      ],
+    });
+
+    for (const field of [
+      'requestFields',
+      'messageFields',
+      'inputItemTypes',
+      'inputItemFields',
+      'inputContentPartTypes',
+    ]) {
+      expect(typeof data[field]).toBe('string');
+      expect(String(data[field]).length).toBeLessThanOrEqual(512);
+    }
+    expect(String(data.inputItemTypes).split(',')).toHaveLength(12);
+    expect(JSON.stringify(data)).not.toContain('private');
+  });
+
+  it.each([null, 42, [], true, { type: null }, { type: 42 }])(
+    'handles malformed input items without logging their values: %j',
+    async item => {
+      const data = await captureResponsesError({
+        input: [item, { type: 'message', content: [null, 42, { type: null }] }],
+      });
+
+      expect(data.inputItemTypes).toBe('message,unknown');
+      expect(data.inputContentPartTypes).toBe('');
+    }
+  );
+
+  it('does not describe a plain Responses input string', async () => {
+    const data = await captureResponsesError({ input: 'private prompt' });
+
+    expect(data).not.toHaveProperty('inputItemTypes');
+    expect(data).not.toHaveProperty('inputItemFields');
+    expect(data).not.toHaveProperty('inputContentPartTypes');
+    expect(JSON.stringify(data)).not.toContain('private');
+  });
+
+  it('extracts upstream error.param and error.code from the same response read', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message: 'rejected',
+          param: 'input[3].call_id',
+          code: 'string_above_max_length',
+        },
+      },
+      { status: 400 }
+    );
+    const data = await captureResponsesError({ input: [] }, response);
+
+    expect(data).toMatchObject({
+      upstreamErrorParam: 'input[3].call_id',
+      upstreamErrorCode: 'string_above_max_length',
+    });
+    expect(response.bodyUsed).toBe(false);
+    expect(await response.json()).toMatchObject({ error: { param: 'input[3].call_id' } });
+  });
+
+  it('extracts error fields after the first 4k and bounds them to 512 characters', async () => {
+    const data = await captureResponsesError(
+      {},
+      Response.json(
+        {
+          padding: 'x'.repeat(4096),
+          error: { param: 'a'.repeat(600), code: 'b'.repeat(600) },
+        },
+        { status: 400 }
+      )
+    );
+
+    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data.upstreamErrorParam).toBe('a'.repeat(512));
+    expect(data.upstreamErrorCode).toBe('b'.repeat(512));
+  });
+
+  it('does not parse error JSON beyond the 16 KiB diagnostic limit', async () => {
+    const response = Response.json(
+      { padding: 'x'.repeat(16 * 1024), error: { param: 'input', code: 'unknown_parameter' } },
+      { status: 400 }
+    );
+    const data = await captureResponsesError({}, response);
+
+    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data).not.toHaveProperty('upstreamErrorParam');
+    expect(data).not.toHaveProperty('upstreamErrorCode');
+    expect(await response.json()).toMatchObject({ error: { param: 'input' } });
+  });
+
+  it.each(['not JSON', 'null', '[]', '{"error":null}', '{"error":{"param":null,"code":{}}}'])(
+    'does not extract malformed error fields from %s',
+    async body => {
+      const data = await captureResponsesError({}, new Response(body, { status: 400 }));
+
+      expect(data).not.toHaveProperty('upstreamErrorParam');
+      expect(data).not.toHaveProperty('upstreamErrorCode');
+    }
+  );
+
+  it('omits optional fields that add no information', async () => {
+    await captureProxyError({
+      errorMessage: 'openrouter returned error 400',
+      user: { id: 'user-1' },
+      request: null,
+      response: new Response('', { status: 400 }),
+      organizationId: undefined,
+      model: 'vendor/model',
+      gatewayModel: 'vendor/model',
+      byokProviderIds: null,
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).not.toHaveProperty('gatewayModel');
+    expect(data).not.toHaveProperty('byokProviderIds');
+    expect(data).not.toHaveProperty('requestFields');
+    expect(data).not.toHaveProperty('messageFields');
+  });
+});
+
+describe('makeErrorReadable', () => {
+  const request = {
+    kind: 'chat_completions',
+    body: { model: 'test', messages: [], stream: false },
+  } satisfies GatewayRequest;
+
+  it('returns undefined for non-error responses', async () => {
+    const response = new Response('{}', { status: 200 });
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'anything',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+    expect(result).toBeUndefined();
+  });
+
+  it('reports a rejected Vercel AI Gateway key without Vercel setup instructions', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            'Authentication failed. Create an API key and set in AI_GATEWAY_API_KEY environment variable: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys%3FshowCreateKeyModal',
+          type: 'authentication_error',
+        },
+      },
+      { status: 401 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-4.5',
+      request,
+      response,
+      userByokProviderIds: ['vercel-ai-gateway'],
+    });
+
+    const message =
+      '[BYOK] Vercel AI Gateway rejected your API key. Check that the key is correct and has not been revoked.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: message,
+      error_type: 'byok_error',
+      message,
+    });
+  });
+
+  it('keeps the provider message for other Vercel AI Gateway key errors', async () => {
+    const response = Response.json(
+      { error: { message: 'Insufficient credits.', type: 'insufficient_funds' } },
+      { status: 402 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-4.5',
+      request,
+      response,
+      userByokProviderIds: ['vercel-ai-gateway'],
+    });
+
+    await expect(result?.json()).resolves.toMatchObject({
+      message:
+        '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider. Provider message: Insufficient credits.',
+    });
+  });
+
+  it('explains a missing model for a Vertex user BYOK request', async () => {
+    const response = Response.json({ error: { message: 'AI_APICallError' } }, { status: 404 });
+
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response,
+      userByokProviderIds: ['vertex'],
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error:
+        '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.',
+      error_type: 'byok_error',
+      message:
+        '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.',
+    });
+  });
+
+  it('does not label other user BYOK 404 responses as Vertex errors', async () => {
+    const response = Response.json({ error: { message: 'Model not found' } }, { status: 404 });
+
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response,
+      userByokProviderIds: ['anthropic'],
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error: '[BYOK] Model not found',
+      error_type: 'byok_error',
+      message: '[BYOK] Model not found',
+    });
+  });
+
+  it.each([
+    {
+      provider: 'direct-byok',
+      userByokProviderIds: ['opencode-go'],
+      body: {
+        error: { type: 'server_error', message: 'A synthetic region setting blocks this model.' },
+      },
+      expectedMessage: 'A synthetic region setting blocks this model.',
+    },
+    {
+      provider: 'vercel',
+      userByokProviderIds: ['anthropic'],
+      body: {
+        error: {
+          message: 'Synthetic provider account configuration needs attention.',
+          metadata: { routing: { credentialType: 'byok' } },
+        },
+        isRetryable: false,
+      },
+      expectedMessage: 'Synthetic provider account configuration needs attention.',
+    },
+    {
+      provider: 'vercel',
+      userByokProviderIds: [],
+      body: { message: 'Synthetic request option is unsupported.' },
+      expectedMessage: 'Synthetic request option is unsupported.',
+    },
+  ] as const)('marks a $provider BYOK 400 without forwarding upstream metadata', async fixture => {
+    const result = await makeErrorReadable({
+      provider: fixture.provider,
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(fixture.body, { status: 400 }),
+      userByokProviderIds: [...fixture.userByokProviderIds],
+    });
+
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      error: `[BYOK] ${fixture.expectedMessage}`,
+      error_type: 'byok_error',
+      message: `[BYOK] ${fixture.expectedMessage}`,
+    });
+  });
+
+  it.each([400, 404, 405, 408, 409, 422, 499])(
+    'preserves the upstream status for a generic BYOK %i',
+    async status => {
+      const result = await makeErrorReadable({
+        provider: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        response: Response.json({}, { status }),
+        userByokProviderIds: [],
+      });
+
+      expect(result?.status).toBe(status);
+      await expect(result?.json()).resolves.toEqual({
+        error:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        error_type: 'byok_error',
+        message:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      });
+    }
+  );
+
+  it('keeps context overflow ahead of generic BYOK rejection', async () => {
+    const body = {
+      error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
+    };
+    const result = await makeErrorReadable({
+      provider: 'direct-byok',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(body, { status: 400 }),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      ...body,
+      error_type: 'context_length_exceeded',
+    });
+  });
+
+  it.each([
+    [401, []],
+    [402, ['anthropic']],
+    [403, ['anthropic']],
+    [403, ['opencode-go']],
+    [429, []],
+    [404, ['vertex']],
+  ] as const)(
+    'keeps the specific BYOK %i mapping ahead of an upstream overflow body for %j',
+    async (status, providerIds) => {
+      const options = {
+        provider: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        userByokProviderIds: [...providerIds],
+      } satisfies Omit<Parameters<typeof makeErrorReadable>[0], 'response'>;
+      const baseline = await makeErrorReadable({
+        ...options,
+        response: Response.json({}, { status }),
+      });
+      const result = await makeErrorReadable({
+        ...options,
+        response: Response.json(
+          {
+            error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
+          },
+          { status }
+        ),
+      });
+
+      expect(result?.status).toBe(status);
+      const body = await result?.json();
+      const baselineBody = await baseline?.json();
+      expect(body).toMatchObject({ error_type: 'byok_error' });
+      expect(body.message.startsWith(baselineBody.message)).toBe(true);
+    }
+  );
+
+  it('appends the provider explanation to a specific BYOK 401 message', async () => {
+    const result = await makeErrorReadable({
+      provider: 'direct-byok',
+      requestedModel: 'opencode-go/glm-5.3-flash',
+      request,
+      response: Response.json(
+        {
+          error: {
+            type: 'authentication_error',
+            code: 'api_key_expired',
+            message:
+              'This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.',
+          },
+        },
+        { status: 401 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration. Provider message: This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('appends the provider explanation to the OpenCode Go BYOK permission message', async () => {
+    const result = await makeErrorReadable({
+      provider: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json(
+        { message: 'Synthetic data collection opt-in required.' },
+        { status: 403 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go. Provider message: Synthetic data collection opt-in required.';
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('removes control characters and bounds provider text appended to a specific BYOK message', async () => {
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n${'x'.repeat(400)}  ` } },
+        { status: 429 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider. Provider message: ${`Synthetic  ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it.each([400, 500, 502, 503])(
+    'leaves non-BYOK errors and BYOK outages unchanged for status %i',
+    async status => {
+      for (const userByokProviderIds of status === 400 ? [null] : [null, ['anthropic'] as const]) {
+        await expect(
+          makeErrorReadable({
+            provider: 'vercel',
+            requestedModel: 'synthetic-model',
+            request,
+            response: Response.json(
+              { error: { message: 'Synthetic provider failure.' } },
+              { status }
+            ),
+            userByokProviderIds: userByokProviderIds === null ? null : [...userByokProviderIds],
+          })
+        ).resolves.toBeUndefined();
+      }
+    }
+  );
+
+  it('removes control characters and bounds generic BYOK provider text', async () => {
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n\u007f\u0085${'x'.repeat(400)}  ` } },
+        { status: 400 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] ${`Synthetic    ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it.each(['not json', '{}', '{"error":{"message":42}}', '{"message":"\\u0000\\n"}'])(
+    'falls back to fixed BYOK text for an unusable provider body: %s',
+    async body => {
+      const result = await makeErrorReadable({
+        provider: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        response: new Response(body, { status: 400 }),
+        userByokProviderIds: ['anthropic'],
+      });
+
+      await expect(result?.json()).resolves.toEqual({
+        error:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        error_type: 'byok_error',
+        message:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      });
+    }
+  );
+
+  it.each([
+    [401, []],
+    [402, ['anthropic']],
+    [403, []],
+    [429, ['anthropic']],
+  ] as const)('treats a non-null provider set as user BYOK for status %i', async (status, ids) => {
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response: Response.json({}, { status }),
+      userByokProviderIds: [...ids],
+    });
+
+    expect(result).toBeDefined();
+    if (!result) throw new Error('Expected a readable BYOK error response');
+    expect((await result.json()).error_type).toBe('byok_error');
+  });
+
+  it('names the model in a generic BYOK permission error', async () => {
+    const result = await makeErrorReadable({
+      provider: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response: Response.json({}, { status: 403 }),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    await expect(result?.json()).resolves.toEqual({
+      error:
+        '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+      error_type: 'byok_error',
+      message:
+        '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+    });
+  });
+
+  it('mentions OpenCode Go opt-in requirements on a BYOK permission error', async () => {
+    const result = await makeErrorReadable({
+      provider: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json({ model: 'mimo-v2.5' }, { status: 403 }),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    await expect(result?.json()).resolves.toEqual({
+      error:
+        '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
+      error_type: 'byok_error',
+      message:
+        '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
+    });
+  });
+
+  it('does not use generic BYOK errors for a null provider set', async () => {
+    await expect(
+      makeErrorReadable({
+        provider: 'vercel',
+        requestedModel: 'anthropic/claude-sonnet-5',
+        request,
+        response: Response.json({}, { status: 401 }),
+        userByokProviderIds: null,
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([null, ['anthropic']] as const)(
+    'keeps provider routing errors ahead of generic BYOK rejection with provider set %j',
+    async providerIds => {
+      const response = Response.json(
+        {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: {
+            available_providers: ['alibaba'],
+            requested_providers: ['anthropic', 'openai'],
+          },
+        },
+        { status: 404 }
+      );
+
+      const result = await makeErrorReadable({
+        provider: 'openrouter',
+        requestedModel: 'qwen/qwen3.7-plus',
+        request,
+        response,
+        userByokProviderIds: providerIds === null ? null : [...providerIds],
+      });
+
+      expect(result?.status).toBe(404);
+      await expect(result?.json()).resolves.toEqual({
+        error: 'No eligible provider can serve the selected model.',
+        error_type: 'provider_not_allowed',
+        message:
+          'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+      });
+    }
+  );
+
+  it('recognizes the wrapped OpenRouter error response', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: {
+            available_providers: ['alibaba'],
+            requested_providers: ['openai'],
+          },
+        },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'qwen/qwen3.7-plus',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect(result).toBeDefined();
+    if (!result) throw new Error('Expected a readable provider error response');
+    expect(result.status).toBe(404);
+    expect((await result.json()).error_type).toBe('provider_not_allowed');
+  });
+
+  it('recognizes the current OpenRouter error with explanatory text appended to the message', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            "No allowed providers are available for the selected model. Providers serving openai/gpt-4o-mini: azure, openai, but your request's provider.only preference permits only: nonexistent-provider-slug.",
+          code: 404,
+          metadata: {
+            available_providers: ['azure', 'openai'],
+            requested_providers: ['nonexistent-provider-slug'],
+            routing_funnel: [
+              { step: 'Initial Endpoints', endpoint_count: 3 },
+              { step: 'Filter by Regional Surcharge', endpoint_count: 2 },
+            ],
+            failed_routing_step: 'Filter by Allowed Providers',
+          },
+        },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'openai/gpt-4o-mini',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: 'provider_not_allowed',
+      message:
+        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+    });
+  });
+
+  it('recognizes an unwrapped error with appended message text', async () => {
+    const response = Response.json(
+      {
+        message: 'No allowed providers are available for the selected model. Extra detail.',
+        code: 404,
+        metadata: { available_providers: ['alibaba'], requested_providers: ['openai'] },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'qwen/qwen3.7-plus',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect((await result?.json())?.error_type).toBe('provider_not_allowed');
+  });
+
+  it('does not rewrite matching errors from other providers', async () => {
+    const response = Response.json(
+      {
+        message: 'No allowed providers are available for the selected model.',
+        code: 404,
+        metadata: {
+          available_providers: ['alibaba'],
+          requested_providers: ['openai'],
+        },
+      },
+      { status: 404 }
+    );
+
+    await expect(
+      makeErrorReadable({
+        provider: 'vercel',
+        requestedModel: 'anything',
+        request,
+        response,
+        userByokProviderIds: null,
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('leaves unrelated and malformed upstream errors unchanged', async () => {
+    const responses = [
+      Response.json(
+        {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: { available_providers: ['alibaba'] },
+        },
+        { status: 404 }
+      ),
+      Response.json({ message: 'Model not found', code: 404 }, { status: 404 }),
+      Response.json(
+        {
+          error: {
+            message: 'No endpoints found for this model.',
+            code: 404,
+            metadata: { available_providers: ['alibaba'], requested_providers: ['openai'] },
+          },
+        },
+        { status: 404 }
+      ),
+      new Response('not json', { status: 404 }),
+    ];
+
+    for (const response of responses) {
+      await expect(
+        makeErrorReadable({
+          provider: 'openrouter',
+          requestedModel: 'anything',
+          request,
+          response,
+          userByokProviderIds: null,
+        })
+      ).resolves.toBeUndefined();
+    }
+  });
+
+  it('does not redact errors for custom model provider', async () => {
+    const response = Response.json(
+      { error: { message: 'Custom endpoint failure details' } },
+      { status: 500 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'custom',
+      requestedModel: 'kilo-internal/custom-endpoint',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect(result).toBeUndefined();
+  });
+});
+
+describe('extractHeaderAndLimitLength', () => {
+  // The auto-routing mirror contract relies on this helper never returning
+  // an empty or whitespace-only string: MirrorPayloadSchema rejects the
+  // whole payload on `.min(1)` identity fields, so '' must coerce to null.
+  it('returns null for missing, empty, and whitespace-only headers', () => {
+    const request = new Request('http://localhost', {
+      headers: { 'x-empty': '', 'x-blank': '   ', 'x-padded': '  value  ' },
+    }) as unknown as Parameters<typeof extractHeaderAndLimitLength>[0];
+
+    expect(extractHeaderAndLimitLength(request, 'x-missing')).toBeNull();
+    expect(extractHeaderAndLimitLength(request, 'x-empty')).toBeNull();
+    expect(extractHeaderAndLimitLength(request, 'x-blank')).toBeNull();
+    expect(extractHeaderAndLimitLength(request, 'x-padded')).toBe('value');
+  });
+
+  it('caps header values at 500 characters before trimming', () => {
+    const request = new Request('http://localhost', {
+      headers: { 'x-long': 'a'.repeat(600) },
+    }) as unknown as Parameters<typeof extractHeaderAndLimitLength>[0];
+
+    expect(extractHeaderAndLimitLength(request, 'x-long')).toBe('a'.repeat(500));
+  });
+});
+describe('lastUserPromptText', () => {
+  it('returns the last user message of a chat request', () => {
+    expect(
+      lastUserPromptText({
+        kind: 'chat_completions',
+        body: {
+          messages: [
+            { role: 'system', content: 'be terse' },
+            { role: 'user', content: 'first' },
+            { role: 'assistant', content: 'ok' },
+            { role: 'user', content: 'second' },
+          ],
+        },
+      })
+    ).toBe('second');
+  });
+
+  it('joins the text parts of array content and ignores non-text parts', () => {
+    expect(
+      lastUserPromptText({
+        kind: 'chat_completions',
+        body: {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'look at this' },
+                { type: 'image_url', image_url: { url: 'https://example.com/a.png' } },
+                { type: 'text', text: 'and this' },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe('look at this\nand this');
+  });
+
+  it('reads a responses input string', () => {
+    expect(lastUserPromptText({ kind: 'responses', body: { input: 'plain prompt' } })).toBe(
+      'plain prompt'
+    );
+  });
+
+  it('reads the last user item of a responses input list, including input_text parts', () => {
+    expect(
+      lastUserPromptText({
+        kind: 'responses',
+        body: {
+          input: [
+            { role: 'user', content: [{ type: 'input_text', text: 'older' }] },
+            { role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] },
+            { role: 'user', content: [{ type: 'input_text', text: 'newest' }] },
+          ],
+        },
+      })
+    ).toBe('newest');
+  });
+
+  it('reads a FIM prompt', () => {
+    expect(lastUserPromptText({ kind: 'fim_completions', body: { prompt: 'fn main() {' } })).toBe(
+      'fn main() {'
+    );
+  });
+
+  it('returns null when the request has no user turn', () => {
+    expect(lastUserPromptText({ kind: 'chat_completions', body: { messages: [] } })).toBeNull();
+    expect(lastUserPromptText({ kind: 'messages', body: {} })).toBeNull();
+    expect(lastUserPromptText({ kind: 'responses', body: { input: 42 } })).toBeNull();
+  });
+});
+
+describe('requestedLogprobs', () => {
+  it('is true for logprobs, top_logprobs, or a non-empty logit_bias', () => {
+    expect(requestedLogprobs({ logprobs: true })).toBe(true);
+    expect(requestedLogprobs({ top_logprobs: 5 })).toBe(true);
+    expect(requestedLogprobs({ logit_bias: { '50256': -100 } })).toBe(true);
+  });
+
+  it('is false when the request asked for none of them', () => {
+    expect(requestedLogprobs({})).toBe(false);
+    expect(requestedLogprobs({ logprobs: false, top_logprobs: null, logit_bias: {} })).toBe(false);
+  });
+});
+
+describe('requestedSamples', () => {
+  it('returns the n sampling parameter, or null when it is absent', () => {
+    expect(requestedSamples({ n: 3 })).toBe(3);
+    expect(requestedSamples({})).toBeNull();
+    expect(requestedSamples({ n: null })).toBeNull();
+  });
+});

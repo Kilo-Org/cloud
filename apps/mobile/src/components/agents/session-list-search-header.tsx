@@ -1,9 +1,22 @@
 import { Search, X } from '@/components/ui/icons';
-import { type RefObject } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { type RefObject, useMemo } from 'react';
+import { Pressable, type TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
-import { Text } from '@/components/ui/text';
+import { Input } from '@/components/ui/input';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+// NativeWind's gap-2 is 7pt; cap the clear target's facing slop at that gap.
+const CLEAR_HIT_SLOP = {
+  top: COMPACT_CONTROL_HIT_SLOP_DP,
+  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+  right: COMPACT_CONTROL_HIT_SLOP_DP,
+  left: 7,
+};
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -11,63 +24,116 @@ type SessionListSearchHeaderProps = {
    * parent so the TextInput itself stays uncontrolled (iOS TextInput rules). */
   hasText: boolean;
   showSearchBusy: boolean;
-  showInlineError: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  compact?: boolean;
+  inline?: boolean;
+  /** Initial content for the uncontrolled input, applied on a restore remount. */
+  defaultValue?: string;
+  /** Remount key: changes once when a stored non-empty draft is restored. */
+  inputKey?: string;
 };
 
 export function SessionListSearchHeader({
   inputRef,
   hasText,
   showSearchBusy,
-  showInlineError,
   onChangeText,
   onClearSearch,
+  onFocus,
+  onBlur,
+  compact = false,
+  inline = false,
+  defaultValue,
+  inputKey,
 }: Readonly<SessionListSearchHeaderProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
+  // The landscape side insets keep the field's rounded border and left tap
+  // area clear of the sensor housing; portrait insets are 0, keeping the
+  // fixed 22px margin unchanged.
+  const { left, right } = useSafeAreaInsets();
+  const fieldMargins = useMemo(
+    () => ({ marginLeft: 22 + left, marginRight: 22 + right }),
+    [left, right]
+  );
   return (
-    <View>
-      <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
+    <View className={inline ? 'min-w-0 flex-1' : undefined}>
+      <View
+        style={inline ? undefined : fieldMargins}
+        className={cn(
+          // Dark keeps the same two-part definition the light cell gets from its
+          // near-white page: an elevated fill (the compact/inline field carries
+          // none in light) and the input border token every other text field in
+          // the app uses, because `--border` is 7% white and disappears on the
+          // dark page.
+          'flex-row items-center gap-2 rounded-[10px] border border-border dark:border-input',
+          !inline && 'my-2',
+          compact
+            ? 'min-h-[44px] px-2 dark:bg-secondary'
+            : 'min-h-[51px] bg-card px-4 py-1.5 dark:bg-secondary'
+        )}
+      >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
           {showSearchBusy ? (
             <ActivityIndicator
               size="small"
               color={colors.mutedForeground}
-              accessibilityLabel="Searching"
+              accessibilityLabel={t('agents.search.searching')}
             />
           ) : (
             <Search size={18} color={colors.mutedForeground} />
           )}
         </View>
-        <TextInput
+        <Input
+          key={inputKey}
           ref={inputRef}
-          accessibilityLabel="Search sessions"
-          className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
-          placeholder="Search sessions..."
+          accessibilityLabel={t('agents.search.searchSessions')}
+          // The shared box supplies the height (`min-h-[44px]`, never `py`: iOS
+          // insets the already-centered text rect by padding and draws the
+          // placeholder low) and the RTL content alignment, so this field keeps
+          // only its own size and text size.
+          className="flex-1 text-[15px] text-foreground"
+          // One line, always: at a narrow width with a large font scale the
+          // placeholder wrapped inside the field and the field grew with it.
+          numberOfLines={1}
+          placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          defaultValue={defaultValue}
           returnKeyType="search"
+          // Keep Android landscape searches in the app instead of the IME's fullscreen editor.
+          disableFullscreenUI
           autoCapitalize="none"
           autoCorrect={false}
         />
         {hasText ? (
           <Pressable
             onPress={onClearSearch}
-            accessibilityLabel="Clear search"
+            accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={12}
-            className="active:opacity-70"
+            // The frame, not the 16pt glyph, is what the size audit measures.
+            // One size, spelled as whole pixels the mounted test compiles: the
+            // 38pt box clears the 28dp floor, and the shared 8pt slop carries the
+            // reach past the 44pt target rather than onto it, because
+            // `@/lib/a11y/tap-target` records a 44dp target measuring 43.81dp at
+            // density 420. The row's `min-h-[51px]` already holds this box plus
+            // the field's 10.5pt padding and 2pt border. A second `h-*`/`w-*`
+            // pair here would set the same properties and leave the real size to
+            // Tailwind's emit order. `-mr-2` keeps the glyph near its old inset
+            // and the frame's left edge inside the field's right padding.
+            hitSlop={CLEAR_HIT_SLOP}
+            className="-mr-2 h-[38px] w-[38px] items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>
         ) : null}
       </View>
-      {showInlineError ? (
-        <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
-          Couldn't refresh. Pull down to try again.
-        </Text>
-      ) : null}
     </View>
   );
 }

@@ -1,0 +1,39 @@
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  apiKeyUpstream,
+  COMPATIBLE_USER_AGENT,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+
+export default {
+  id: 'kimi-coding',
+  openrouter_inference_provider_id: 'moonshotai',
+  ...apiKeyUpstream({
+    apiUrl: 'https://api.kimi.com/coding/v1',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
+  transformRequest(context) {
+    applyThinkingToggleAndReasoningEffort(context.request);
+    if (
+      context.request.kind === 'chat_completions' &&
+      context.request.body.reasoning_effort === 'none'
+    ) {
+      delete context.request.body.reasoning_effort;
+    }
+    context.extraHeaders['user-agent'] = COMPATIBLE_USER_AGENT;
+  },
+  models: () =>
+    Promise.resolve([
+      {
+        id: 'kimi-for-coding',
+        name: 'Kimi for Coding',
+        flags: ['vision', 'reasoning'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description:
+          'Kimi Code is a premium subscription tier within the Kimi ecosystem, specifically engineered to empower developers with advanced AI capabilities for coding.',
+      },
+    ]),
+} satisfies DirectByokProvider;

@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/nextjs';
 import type { ElementType, ReactNode } from 'react';
 import {
   Bot,
-  BookOpen,
   Building2,
   Cable,
   ChartColumnIncreasing,
@@ -11,24 +10,16 @@ import {
   Cloud,
   Coins,
   CreditCard,
-  Database,
-  Download,
-  Factory,
-  Gift,
   Key,
   List,
-  ListChecks,
   MessageSquare,
-  Plus,
   Receipt,
-  Rocket,
   Settings,
   Shield,
   Sparkles,
   User,
   UserCog,
   Webhook,
-  Wrench,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import {
@@ -46,7 +37,7 @@ import {
   type OrganizationSwitcherOrganization,
 } from '@/app/(app)/components/OrganizationSwitcher';
 import SidebarMenuList from '@/app/(app)/components/SidebarMenuList';
-import SidebarUserFooter from '@/app/(app)/components/SidebarUserFooter';
+import { SidebarUserFooterView as SidebarUserFooter } from '@/app/(app)/components/SidebarUserFooter';
 
 const meta: Meta = {
   title: 'Components/Layout/Sidebar',
@@ -141,21 +132,9 @@ const kiloClawItems: SidebarStoryItem[] = [
     icon: Sparkles,
     url: '/claw/changelog',
   },
-  {
-    title: 'Refer & Earn',
-    subtitle: 'Get 1 Month Free',
-    badge: 'NEW',
-    icon: Gift,
-    url: '/claw/refer',
-  },
 ];
 
 const cloudItems: SidebarStoryItem[] = [
-  {
-    title: 'App Builder',
-    icon: Plus,
-    url: '/app-builder',
-  },
   {
     title: 'Cloud Agent',
     icon: Cloud,
@@ -180,36 +159,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Security Agent',
     icon: Shield,
     url: '/security-agent',
-  },
-  {
-    title: 'Auto Triage',
-    icon: ListChecks,
-    url: '/auto-triage',
-  },
-  {
-    title: 'Auto Fix',
-    icon: Wrench,
-    url: '/auto-fix',
-  },
-  {
-    title: 'Deploy',
-    icon: Rocket,
-    url: '/deploy',
-  },
-  {
-    title: 'Gas Town',
-    icon: Factory,
-    url: '/gastown',
-  },
-  {
-    title: 'Managed Indexing',
-    icon: Database,
-    url: '/code-indexing',
-  },
-  {
-    title: 'MCP Gateway',
-    icon: Cable,
-    url: '/cloud/mcp-gateway',
   },
 ];
 
@@ -246,19 +195,6 @@ const accountItems: SidebarStoryItem[] = [
   },
 ];
 
-const startItems: SidebarStoryItem[] = [
-  {
-    title: 'Install',
-    icon: Download,
-    url: '/install',
-  },
-  {
-    title: 'Learn',
-    icon: BookOpen,
-    url: '/learn',
-  },
-];
-
 const kiloClawEntryItems: SidebarStoryItem[] = [
   {
     title: 'KiloClaw',
@@ -283,7 +219,6 @@ const allUrls = [
   ...kiloClawItems,
   ...cloudItems,
   ...accountItems,
-  ...startItems,
 ].flatMap(item => (typeof item === 'string' ? [item] : item.url ? [item.url] : []));
 
 function StoryOrganizationSwitcher() {
@@ -365,7 +300,6 @@ function PersonalSidebar({ menu }: { menu: 'main' | 'kiloClaw' }) {
             <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
             <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
-            <SidebarMenuList label="Start" items={startItems} allUrls={allUrls} />
           </>
         )}
       </SidebarContent>

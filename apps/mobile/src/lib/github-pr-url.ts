@@ -14,10 +14,10 @@ function isValidIdentifier(value: string): boolean {
 /**
  * Parse a GitHub pull request URL into its owner, repo and PR number.
  *
- * Matches `http(s)://(www.)github.com/<owner>/<repo>/pull/<digits>` and
- * tolerates any trailing subpath (e.g. `/files`), query string and trailing
- * slash. Returns `null` for non-PR URLs (issues, tree, plain repo), uppercase
- * host, non-GitHub hosts, or malformed input.
+ * Matches `http(s)://(www.)github.com/<owner>/<repo>/pull/<digits>`
+ * case-insensitively and tolerates any trailing subpath (e.g. `/files`), query
+ * string and trailing slash. Returns `null` for non-PR URLs (issues, tree, plain
+ * repo), non-GitHub hosts, or malformed input.
  */
 export function parseGitHubPrUrl(href: string): GitHubPrUrl | null {
   if (href.length === 0) {
@@ -42,27 +42,4 @@ export function parseGitHubPrUrl(href: string): GitHubPrUrl | null {
     return null;
   }
   return { owner, repo, number };
-}
-
-/**
- * Find the first GitHub PR URL in free text. Tries the whole trimmed string
- * first, then each whitespace-separated token, so a title or surrounding words
- * do not hide the URL. Returns `null` when no token parses as a PR URL.
- */
-export function findFirstGitHubPrUrl(text: string): GitHubPrUrl | null {
-  if (text.length === 0) {
-    return null;
-  }
-  const trimmed = text.trim();
-  const whole = parseGitHubPrUrl(trimmed);
-  if (whole) {
-    return whole;
-  }
-  for (const token of trimmed.split(/\s+/)) {
-    const parsed = parseGitHubPrUrl(token);
-    if (parsed) {
-      return parsed;
-    }
-  }
-  return null;
 }

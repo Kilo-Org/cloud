@@ -1,18 +1,28 @@
-import { describe, expect, it } from 'vitest';
-import { createEvalToolCall } from './agent-conversation';
+import { describe, expect, it, vi } from 'vitest';
+import { createToolCall } from './agent-conversation';
 import { runToolCalls } from './agent-tool-results';
+import type { EvalTabResult } from './tab-debugger';
 
 describe('agent tool results', () => {
-  it('runs eval tool calls sequentially', async () => {
+  it('runs browser tool calls sequentially', async () => {
     const events: string[] = [];
-    const firstToolCall = createEvalToolCall({ code: 'first', tabId: 1 });
-    const secondToolCall = createEvalToolCall({ code: 'second', tabId: 1 });
+    const firstToolCall = createToolCall({
+      arguments: { function: 'first' },
+      name: 'kilo_browser_evaluate',
+      tabId: 1,
+    });
+    const secondToolCall = createToolCall({
+      arguments: { function: 'second' },
+      name: 'kilo_browser_evaluate',
+      tabId: 1,
+    });
 
     const results = await runToolCalls([firstToolCall, secondToolCall], async toolCall => {
-      events.push(`start:${toolCall.code}`);
+      const code = toolCall.arguments['function'];
+      events.push(`start:${String(code)}`);
       await Promise.resolve();
-      events.push(`end:${toolCall.code}`);
-      return { ok: true, value: toolCall.code };
+      events.push(`end:${String(code)}`);
+      return { ok: true, value: code };
     });
 
     expect(events).toStrictEqual(['start:first', 'end:first', 'start:second', 'end:second']);
@@ -25,20 +35,53 @@ describe('agent tool results', () => {
   it('stops before later tool calls once the signal is aborted', async () => {
     const events: string[] = [];
     const controller = new AbortController();
-    const firstToolCall = createEvalToolCall({ code: 'first', tabId: 1 });
-    const secondToolCall = createEvalToolCall({ code: 'second', tabId: 1 });
+    const firstToolCall = createToolCall({
+      arguments: { function: 'first' },
+      name: 'kilo_browser_evaluate',
+      tabId: 1,
+    });
+    const secondToolCall = createToolCall({
+      arguments: { function: 'second' },
+      name: 'kilo_browser_evaluate',
+      tabId: 1,
+    });
 
     const results = await runToolCalls(
       [firstToolCall, secondToolCall],
       toolCall => {
-        events.push(toolCall.code);
+        events.push(String(toolCall.arguments['function']));
         controller.abort();
-        return Promise.resolve({ ok: true, value: toolCall.code });
+        return Promise.resolve({ ok: true, value: toolCall.arguments['function'] });
       },
       controller.signal
     );
 
     expect(events).toStrictEqual(['first']);
     expect(results.map(result => result.toolCallId)).toStrictEqual([firstToolCall.id]);
+  });
+
+  it('keeps the result of a call that finished when a later call is aborted', async () => {
+    const firstToolCall = createToolCall({
+      arguments: { function: 'first' },
+      name: 'kilo_browser_evaluate',
+      tabId: 1,
+    });
+    const secondToolCall = createToolCall({
+      arguments: { function: 'second' },
+      name: 'kilo_browser_evaluate',
+      tabId: 1,
+    });
+
+    const abortError = new Error('The user aborted a request.');
+    abortError.name = 'AbortError';
+    const executeToolCall = vi
+      .fn<() => Promise<EvalTabResult>>()
+      .mockResolvedValueOnce({ ok: true, value: 'clicked' })
+      .mockRejectedValueOnce(abortError);
+
+    const results = await runToolCalls([firstToolCall, secondToolCall], executeToolCall);
+
+    expect(results.map(result => result.toolCallId)).toStrictEqual([firstToolCall.id]);
+    expect(results[0]).toMatchObject({ ok: true, value: 'clicked' });
   });
 });

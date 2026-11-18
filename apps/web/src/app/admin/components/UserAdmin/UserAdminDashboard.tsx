@@ -7,8 +7,8 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { UserAdminTabbedSections } from '@/app/admin/components/UserAdmin/UserAdminTabbedSections';
-import { promoCreditCategories } from '@/lib/promoCreditCategories';
-import { toGuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
+import { promoCreditCategories } from '@kilocode/web-shared/lib/promoCreditCategories';
+import { toGuiCreditCategory } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 
 const guiCreditCategories = promoCreditCategories.map(toGuiCreditCategory);
 

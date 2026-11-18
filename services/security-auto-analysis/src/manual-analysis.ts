@@ -7,22 +7,31 @@ import {
   transitionSecurityAgentCommandWithCurrentState,
   type SecurityAgentCommandTransitionOutcome,
 } from '@kilocode/db';
-import { security_audit_log } from '@kilocode/db/schema';
+import {
+  security_audit_log,
+  security_analysis_owner_state,
+  security_analysis_queue,
+  security_findings,
+} from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
-  countOwnerInflightAnalyses,
   ensureManualAnalysisQueueRow,
   getAnalysisActorById,
   getSecurityAgentConfigForOwner,
   getSecurityFindingById,
   prepareActiveAnalysisRestart,
+  releaseOrphanedStartReservation,
   transitionManualAnalysisQueueFromStart,
+  tryAcquireAnalysisStartLease,
   type SecurityFindingRecord,
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
-import { generateApiToken } from './token.js';
+import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
+import { generateControlToken } from './token.js';
 import {
   resolveSecurityAgentModels,
   SECURITY_ANALYSIS_OWNER_CAP,
@@ -62,7 +71,38 @@ export const ManualAnalysisStartRequestSchema = ManualAnalysisStartCommandSchema
 
 export type ManualAnalysisStartCommand = z.infer<typeof ManualAnalysisStartCommandSchema>;
 
-const MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS = 4;
+/**
+ * Deliveries a manual start command may take. The `security-manual-analysis-command-queue`
+ * consumer in wrangler.jsonc allows `max_retries: 3`, so the last delivery the handler sees
+ * is attempt `max_retries + 1`; the exhaustion path below relies on that equality to settle
+ * the command instead of retrying it into the dead letter queue. manual-analysis.test.ts
+ * reads wrangler.jsonc and fails when the two drift apart.
+ */
+export const MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS = 4;
+
+/**
+ * Backoff for a replayed start: 30s, 60s, then 120s, capped there. Without it the deliveries
+ * are consumed back to back and the whole budget settles within seconds although the reason
+ * for the replay (an admission read that could not decide) is transient.
+ */
+function manualAnalysisRetryDelaySeconds(attempts: number): number {
+  const baseDelaySeconds = 30;
+  const maxDelaySeconds = 120;
+  return Math.min(maxDelaySeconds, baseDelaySeconds * 2 ** Math.max(0, attempts - 1));
+}
+
+/**
+ * A manual start whose credit admission read could not decide. Nothing is
+ * written for it: the queue row keeps this command's claim and the finding
+ * keeps its pending reservation, so the consumer's retry replays the same
+ * command payload with the same parameters.
+ */
+export class RetryableManualAnalysisStartError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RetryableManualAnalysisStartError';
+  }
+}
 
 function commandOwner(command: ManualAnalysisStartCommand): QueueOwner {
   return command.owner.organizationId
@@ -79,40 +119,16 @@ function findingMatchesOwner(
     : finding.owned_by_user_id === owner.id;
 }
 
-async function interruptActiveAnalysisSession(params: {
-  env: CloudflareEnv;
-  authToken: string;
-  cloudAgentSessionId: string;
-  commandId: string;
-}): Promise<void> {
-  try {
-    const response = await params.env.CLOUD_AGENT_NEXT.fetch(
-      new Request('https://cloud-agent-next/trpc/interruptSession', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${params.authToken}`,
-        },
-        body: JSON.stringify({ sessionId: params.cloudAgentSessionId }),
-      })
-    );
-    if (!response.ok) {
-      console.warn('Cloud Agent analysis restart interrupt returned non-OK status', {
-        command_id: params.commandId,
-        status: response.status,
-      });
-    }
-  } catch {
-    console.warn('Cloud Agent analysis restart interrupt failed', {
-      command_id: params.commandId,
-    });
-  }
-}
-
 export async function processManualAnalysisStart(params: {
   db: WorkerDb;
   env: CloudflareEnv;
   command: ManualAnalysisStartCommand;
+  /**
+   * Whether this delivery is the last one the consumer's attempt budget
+   * allows. A start that could not decide is replayed through the command
+   * message until then, and settled as failed on the final delivery.
+   */
+  isFinalAttempt: boolean;
 }): Promise<{
   status:
     | 'started'
@@ -130,13 +146,111 @@ export async function processManualAnalysisStart(params: {
     return { status: 'finding-missing' };
   }
   const isActiveRestart = params.command.restartActive === true;
+  if (!finding.platform_integration_id) {
+    // The command has no launch path; clear the pending admission state.
+    await releaseOrphanedStartReservation(params.db, finding.id);
+    return { status: 'token-missing' };
+  }
+  let preReserved = false;
   if (!isActiveRestart) {
-    const inflight = await countOwnerInflightAnalyses(params.db, owner);
-    if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };
+    // Admission decision under the per-owner lock (the same
+    // `security_analysis_owner_state` row the scheduled claim path locks).
+    // A finding already `pending` carries the web's admission reservation, so
+    // its slot is already counted at reservation time and the count here must
+    // not include it again.
+    const admission = await params.db.transaction(async tx => {
+      const ownerValues =
+        owner.type === 'org'
+          ? { owned_by_organization_id: owner.id, owned_by_user_id: null }
+          : { owned_by_organization_id: null, owned_by_user_id: owner.id };
+      await tx.insert(security_analysis_owner_state).values(ownerValues).onConflictDoNothing();
+      await tx
+        .select({ id: security_analysis_owner_state.id })
+        .from(security_analysis_owner_state)
+        .where(
+          owner.type === 'org'
+            ? eq(security_analysis_owner_state.owned_by_organization_id, owner.id)
+            : eq(security_analysis_owner_state.owned_by_user_id, owner.id)
+        )
+        .for('update')
+        .limit(1);
+
+      const [findingStatus] = await tx
+        .select({
+          analysisStatus: security_findings.analysis_status,
+          status: security_findings.status,
+        })
+        .from(security_findings)
+        .where(eq(security_findings.id, params.command.findingId))
+        .limit(1);
+      const status = findingStatus?.analysisStatus ?? null;
+      if (findingStatus && findingStatus.status !== 'open') {
+        return { kind: 'not_eligible' } as const;
+      }
+      if (status === 'running') {
+        return { kind: 'in_progress' } as const;
+      }
+      if (status === 'pending') {
+        return { kind: 'pre_reserved' } as const;
+      }
+
+      // Inflight = findings already pending/running plus scheduled queue
+      // claims that reserve a slot while the finding status is still null.
+      // Distinct by finding so a counted finding cannot add a second slot.
+      const [inflight] = await tx
+        .select({ total: sql<number>`count(distinct ${security_findings.id})` })
+        .from(security_findings)
+        .leftJoin(
+          security_analysis_queue,
+          eq(security_analysis_queue.finding_id, security_findings.id)
+        )
+        .where(
+          and(
+            owner.type === 'org'
+              ? eq(security_findings.owned_by_organization_id, owner.id)
+              : eq(security_findings.owned_by_user_id, owner.id),
+            or(
+              inArray(security_findings.analysis_status, ['pending', 'running']),
+              and(
+                isNull(security_findings.analysis_status),
+                inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+              )
+            ),
+            ne(security_findings.id, params.command.findingId)
+          )
+        );
+      if ((inflight?.total ?? 0) >= SECURITY_ANALYSIS_OWNER_CAP) {
+        return { kind: 'owner_cap' } as const;
+      }
+      const leased = await tryAcquireAnalysisStartLease(tx, params.command.findingId);
+      if (!leased) {
+        return { kind: 'in_progress' } as const;
+      }
+      return { kind: 'leased' } as const;
+    });
+
+    if (admission.kind === 'owner_cap') {
+      await releaseOrphanedStartReservation(params.db, finding.id);
+      return { status: 'owner-cap' };
+    }
+    if (admission.kind === 'not_eligible') {
+      await releaseOrphanedStartReservation(params.db, finding.id);
+      return { status: 'finding-missing' };
+    }
+    if (admission.kind === 'in_progress') {
+      return { status: 'duplicate' };
+    }
+    // Both `pre_reserved` (web admission) and `leased` (taken here) leave the
+    // finding `pending`; the lease step in `startSecurityAnalysis` must not
+    // run again against that state.
+    preReserved = true;
   }
 
   const actor = await getAnalysisActorById(params.db, params.command.actorUserId);
-  if (!actor) return { status: 'actor-missing' };
+  if (!actor) {
+    await releaseOrphanedStartReservation(params.db, finding.id);
+    return { status: 'actor-missing' };
+  }
 
   let claimToken: string;
   let tokenResult: GitTokenForRepoResult;
@@ -152,6 +266,9 @@ export async function processManualAnalysisStart(params: {
           githubRepo: finding.repo_full_name,
           userId: actor.id,
           orgId: owner.type === 'org' ? owner.id : undefined,
+          ...(finding.platform_integration_id
+            ? { expectedIntegrationId: finding.platform_integration_id }
+            : {}),
         }),
         getSecurityAgentConfigForOwner(params.db, owner),
         params.env.NEXTAUTH_SECRET.get(),
@@ -160,10 +277,12 @@ export async function processManualAnalysisStart(params: {
       ]);
     if (!tokenResult.success) return { status: 'token-missing' };
 
-    const authToken = await generateApiToken(
+    const authToken = await generateControlToken(
       actor,
       nextAuthSecret,
-      params.env.ENVIRONMENT === 'production' ? 'production' : 'development'
+      resolveRuntimeEnvironment(params.env.ENVIRONMENT),
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      owner.type === 'org' ? owner.id : undefined
     );
     const restart = await prepareActiveAnalysisRestart(params.db, {
       findingId: finding.id,
@@ -174,16 +293,20 @@ export async function processManualAnalysisStart(params: {
 
     claimToken = restart.claimToken;
     if (restart.oldCloudAgentSessionId) {
-      await interruptActiveAnalysisSession({
+      await interruptAnalysisCloudAgentSession({
         env: params.env,
         authToken,
         cloudAgentSessionId: restart.oldCloudAgentSessionId,
+        findingId: finding.id,
         commandId: params.command.commandId,
       });
     }
   } else {
     claimToken = randomUUID();
-    const jobId = `manual:${claimToken}`;
+    // The job id is stable for the command, so a re-delivered command revives
+    // the pending row its earlier delivery claimed instead of reading it as
+    // another launch's duplicate.
+    const jobId = `manual:${params.command.commandId}`;
     if (!(await ensureManualAnalysisQueueRow(params.db, { finding, claimToken, jobId }))) {
       return { status: 'duplicate' };
     }
@@ -192,6 +315,9 @@ export async function processManualAnalysisStart(params: {
       githubRepo: finding.repo_full_name,
       userId: actor.id,
       orgId: owner.type === 'org' ? owner.id : undefined,
+      ...(finding.platform_integration_id
+        ? { expectedIntegrationId: finding.platform_integration_id }
+        : {}),
     });
     if (!tokenResult.success) {
       await transitionManualAnalysisQueueFromStart(params.db, {
@@ -201,6 +327,7 @@ export async function processManualAnalysisStart(params: {
         failureCode: 'GITHUB_TOKEN_UNAVAILABLE',
         errorMessage: 'GitHub token unavailable',
       });
+      await releaseOrphanedStartReservation(params.db, finding.id);
       return { status: 'token-missing' };
     }
 
@@ -232,12 +359,12 @@ export async function processManualAnalysisStart(params: {
       triageModel,
       analysisModel,
       analysisMode: config.analysis_mode,
-      organizationId: owner.type === 'org' ? owner.id : undefined,
       nextAuthSecret,
       internalApiSecret,
       callbackTokenSecret,
       forceSandbox: isActiveRestart ? true : params.command.forceSandbox,
       retrySandboxOnly: isActiveRestart ? true : params.command.retrySandboxOnly,
+      preReserved: isActiveRestart ? false : preReserved,
       lifecycleClaim: {
         source: 'manual',
         findingId: finding.id,
@@ -266,6 +393,38 @@ export async function processManualAnalysisStart(params: {
   }
   if (!result.started) {
     if (result.failureNeedsLifecycleTransition) {
+      if (result.failureCode === 'REQUEUE_TEMPORARY_PRECONDITION') {
+        if (!params.isFinalAttempt) {
+          // The admission read could not decide and no paid work ran, so this
+          // attempt writes nothing: the queue row keeps this command's claim
+          // and the finding keeps its reservation. The consumer retries the
+          // command message, and the next delivery replays the same payload
+          // with the same parameters.
+          throw new RetryableManualAnalysisStartError(
+            result.error ?? 'Security analysis start failed'
+          );
+        }
+        // The last allowed delivery gives up. The row is settled terminal, so
+        // the stale-row reconciler cannot hand it to the scheduled consumer,
+        // which would drop a request the user never enabled for automatic
+        // analysis.
+        await transitionAnalysisStartLifecycle(params.db, {
+          claim: {
+            source: 'manual',
+            findingId: finding.id,
+            claimToken,
+          },
+          outcome: {
+            type: 'start-failed',
+            errorMessage: result.error ?? 'Security analysis start failed',
+            queueStatus: 'failed',
+            failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+            incrementAttempt: false,
+            nextRetryAt: null,
+          },
+        });
+        return { status: 'failed', resultCode: 'REQUEUE_TEMPORARY_PRECONDITION' };
+      }
       await transitionAnalysisStartLifecycle(params.db, {
         claim: {
           source: 'manual',
@@ -276,7 +435,7 @@ export async function processManualAnalysisStart(params: {
           type: 'start-failed',
           errorMessage: result.error ?? 'Security analysis start failed',
           queueStatus: 'failed',
-          failureCode: 'START_CALL_AMBIGUOUS',
+          failureCode: result.failureCode ?? 'START_CALL_AMBIGUOUS',
           incrementAttempt: false,
           nextRetryAt: null,
         },
@@ -286,11 +445,15 @@ export async function processManualAnalysisStart(params: {
         findingId: finding.id,
         claimToken,
         status: 'failed',
-        failureCode: 'START_CALL_AMBIGUOUS',
+        failureCode: result.failureCode ?? 'START_CALL_AMBIGUOUS',
         errorMessage: result.error ?? null,
       });
+      await releaseOrphanedStartReservation(params.db, finding.id);
     }
-    return { status: 'failed' };
+    // The command settles with the same code the queue row recorded, so a
+    // declared failure keeps its reason instead of collapsing into the generic
+    // launch failure.
+    return { status: 'failed', resultCode: result.failureCode ?? 'START_CALL_AMBIGUOUS' };
   }
 
   await params.db.insert(security_audit_log).values({
@@ -380,7 +543,12 @@ export async function consumeManualAnalysisBatch(
         continue;
       }
 
-      const result = await processManualAnalysisStart({ db, env, command: parsed.data });
+      const result = await processManualAnalysisStart({
+        db,
+        env,
+        command: parsed.data,
+        isFinalAttempt: message.attempts >= MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
+      });
       const terminal = manualAnalysisCommandTerminalState(result);
       const terminalTransition = await transitionSecurityAgentCommandWithCurrentState(db, {
         commandId: parsed.data.commandId,
@@ -398,6 +566,21 @@ export async function consumeManualAnalysisBatch(
       });
       message.ack();
     } catch (error) {
+      if (
+        error instanceof RetryableManualAnalysisStartError &&
+        message.attempts < MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS
+      ) {
+        console.info('Manual security analysis command will replay the start', {
+          command_id: parsed.data.commandId,
+          command_type: 'start_analysis',
+          owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+          attempts: message.attempts,
+          max_attempts: MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
+        });
+        message.retry({ delaySeconds: manualAnalysisRetryDelaySeconds(message.attempts) });
+        continue;
+      }
+
       let exhaustionOutcome: SecurityAgentCommandTransitionOutcome | undefined;
       if (message.attempts >= MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS) {
         try {

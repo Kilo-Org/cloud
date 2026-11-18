@@ -3,25 +3,39 @@ import type { TriggerConfig, TriggerDO } from './dos/TriggerDO';
 import { renderPromptTemplate } from './util/prompt-template';
 import { logger } from './util/logger';
 import { withDORetry } from './util/do-retry';
-import { getTokenMintingService } from './services/token-minting-service.js';
+import {
+  CreatorExecutionAuthorizationError,
+  getTokenMintingService,
+} from './services/token-minting-service.js';
 import { classifyInitiateResponse } from './initiate-response';
 import { findActiveSandboxIdForInstance, getWorkerDb } from './db/queries';
 import { getKiloChat } from './kilo-chat-binding';
 import type { PostMessageAsUserResult } from '@kilocode/kilo-chat';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
+import {
+  isSelectableSandboxAllocation,
+  normalizeSandboxAllocation,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
+import { getSecretValue } from './util/secret';
+import { deliverExistingChatMessage, ExistingChatDeliveryError } from './existing-chat-delivery';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
 const TOKEN_CACHE_TTL_SECONDS = 30 * 60;
 
-// Maximum number of retry attempts for failed webhook processing
 const MAX_RETRY_ATTEMPTS = 3;
 
-function tokenCacheKey(triggerConfig: TriggerConfig): string {
-  // Cache key is based on userId or orgId, not namespace
-  // This ensures token caching is per-user or per-org
+function tokenCacheKey(
+  triggerConfig: TriggerConfig,
+  sharedResourceTokensEnabled: string | boolean | undefined
+): string {
   const principal = triggerConfig.userId ?? triggerConfig.orgId;
-  return `webhook-token:${principal}`;
+  const format =
+    sharedResourceTokensEnabled === true || sharedResourceTokensEnabled === 'true'
+      ? 'modern'
+      : 'legacy';
+  return `webhook-token:${format}:${principal}`;
 }
 
 const PrepareSessionResponseSchema = z.object({
@@ -49,17 +63,21 @@ async function failRequest(
   );
 }
 
-/**
- * Get or mint a webhook API token.
- * First checks KV cache, then mints via Hyperdrive if not cached.
- */
 async function getOrMintToken(
   env: Env,
   triggerConfig: TriggerConfig
 ): Promise<{ token: string; cached: boolean }> {
-  const cacheKey = tokenCacheKey(triggerConfig);
+  if (triggerConfig.executionUserId != null) {
+    const result = await getTokenMintingService(env).mintToken({
+      userId: triggerConfig.userId,
+      orgId: triggerConfig.orgId,
+      executionUserId: triggerConfig.executionUserId,
+      triggerId: triggerConfig.triggerId,
+    });
+    return { token: result.token, cached: false };
+  }
+  const cacheKey = tokenCacheKey(triggerConfig, env.SHARED_RESOURCE_TOKENS_ENABLED);
 
-  // Check KV cache first
   const cachedToken = await env.WEBHOOK_TOKEN_CACHE.get(cacheKey);
   if (cachedToken) {
     logger.debug('Token cache hit', { triggerId: triggerConfig.triggerId });
@@ -68,7 +86,6 @@ async function getOrMintToken(
 
   logger.debug('Token cache miss, minting new token', { triggerId: triggerConfig.triggerId });
 
-  // Mint token locally via Hyperdrive (singleton for connection pooling)
   const tokenMintingService = getTokenMintingService(env);
   const result = await tokenMintingService.mintToken({
     userId: triggerConfig.userId,
@@ -118,7 +135,6 @@ export async function processKiloclawChatMessage(
   triggerConfig: TriggerConfig,
   env: Env
 ): Promise<void> {
-  // Skip if already delivered (idempotency guard for queue retries)
   if (
     request.processStatus === 'success' ||
     request.processStatus === 'failed' ||
@@ -135,7 +151,6 @@ export async function processKiloclawChatMessage(
     return;
   }
 
-  // KiloClaw Chat triggers require a user-scoped trigger (KiloClaw instances are personal)
   if (!triggerConfig.userId) {
     await failRequest(
       stub,
@@ -258,6 +273,7 @@ async function processWebhookMessage(
   let sessionCreated = false;
   let canRetryInitiate = false;
   let cloudAgentSessionId: string | null = null;
+  let isExistingChatDelivery = false;
 
   logger.info('Processing webhook delivery', {
     namespace: webhook.namespace,
@@ -278,7 +294,7 @@ async function processWebhookMessage(
       ),
       withDORetry(
         () => stub,
-        doStub => doStub.getConfig(),
+        async (doStub): Promise<TriggerConfig | null> => await doStub.getConfig(),
         'getConfig'
       ),
     ]);
@@ -314,6 +330,20 @@ async function processWebhookMessage(
       return;
     }
 
+    if (triggerConfig.targetType === 'cloud_agent_chat') {
+      isExistingChatDelivery = true;
+      if (request.processStatus === 'captured' || request.processStatus === 'inprogress') {
+        await deliverExistingChatMessage(
+          env,
+          () => env.TRIGGER_DO.get(doId),
+          request,
+          triggerConfig
+        );
+      }
+      message.ack();
+      return;
+    }
+
     if (request.processStatus === 'inprogress' && request.cloudAgentSessionId) {
       cloudAgentSessionId = request.cloudAgentSessionId;
       sessionCreated = true;
@@ -327,8 +357,12 @@ async function processWebhookMessage(
       return;
     }
 
-    // Branch based on target type
     if (triggerConfig.targetType === 'kiloclaw_chat') {
+      if (triggerConfig.executionUserId != null) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution is not supported for KiloClaw triggers'
+        );
+      }
       await processKiloclawChatMessage(stub, webhook, request, triggerConfig, env);
       message.ack();
       return;
@@ -342,11 +376,11 @@ async function processWebhookMessage(
       githubRepo: triggerGithubRepo,
       profileId: triggerProfileId,
     } = triggerConfig;
-    if (!triggerMode || !triggerModel || !triggerGithubRepo || !triggerProfileId) {
+    if (!triggerMode || !triggerModel || !triggerGithubRepo) {
       await failRequest(
         stub,
         webhook.requestId,
-        'Cloud Agent trigger missing required fields (mode, model, githubRepo, or profileId)'
+        'Cloud Agent trigger missing required fields (mode, model, githubRepo)'
       );
       message.ack();
       return;
@@ -354,10 +388,9 @@ async function processWebhookMessage(
 
     const { token } = await getOrMintToken(env, triggerConfig);
 
-    // Fetch callback signing and internal API credentials once for Cloud Agent calls.
     const [internalApiSecret, callbackTokenSecret] = await Promise.all([
-      env.INTERNAL_API_SECRET.get(),
-      env.CALLBACK_TOKEN_SECRET.get(),
+      getSecretValue(env.INTERNAL_API_SECRET),
+      getSecretValue(env.CALLBACK_TOKEN_SECRET),
     ]);
 
     if (!cloudAgentSessionId) {
@@ -376,7 +409,6 @@ async function processWebhookMessage(
         promptLength: renderedPrompt.length,
       });
 
-      // Build callback target for completion notifications
       const callbackUrl = `${env.WEBHOOK_AGENT_URL}/api/callbacks/execution`;
       const callbackToken = await deriveCallbackToken({
         secret: callbackTokenSecret,
@@ -394,29 +426,22 @@ async function processWebhookMessage(
       };
 
       // Profile resolution (repo binding + default + explicit override) happens
-      // inside cloud-agent-next. A trigger must still have a profile assigned;
-      // cloud-agent-next returns 404 if the id is stale/revoked and we let that
-      // flow through the existing non-5xx failure path below.
-      if (!triggerProfileId) {
-        logger.error('No Agent Env Profile found.', {
-          triggerId: triggerConfig.triggerId,
-          requestId: webhook.requestId,
-        });
-        await failRequest(stub, webhook.requestId, 'No Agent Env Profile found.');
-        message.ack();
-        return;
-      }
+      // inside cloud-agent-next. Omit the explicit override to use those defaults.
 
       const prepareSessionBody: {
         prompt: string;
         mode: string;
         model: string;
+        variant?: string;
+        sandboxAllocation?: SandboxAllocation;
+        requestedEnvironment?: { id: string };
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
-        profileId: string;
+        profileId?: string;
         autoCommit?: boolean;
         condenseOnComplete?: boolean;
+        allowUserAuthorization?: boolean;
         createdOnPlatform: string;
       } = {
         prompt: renderedPrompt,
@@ -424,7 +449,7 @@ async function processWebhookMessage(
         model: triggerModel,
         githubRepo: triggerGithubRepo,
         callbackTarget,
-        profileId: triggerProfileId,
+        ...(triggerProfileId ? { profileId: triggerProfileId } : {}),
         createdOnPlatform: request.method === 'SCHEDULED' ? 'scheduled' : 'webhook',
       };
 
@@ -432,12 +457,28 @@ async function processWebhookMessage(
         prepareSessionBody.kilocodeOrganizationId = triggerConfig.orgId;
       }
 
-      // Behavior flags from trigger config (not profile-related)
+      if (triggerConfig.executionUserId != null) {
+        prepareSessionBody.allowUserAuthorization = true;
+      }
+
       if (triggerConfig.autoCommit !== undefined) {
         prepareSessionBody.autoCommit = triggerConfig.autoCommit;
       }
       if (triggerConfig.condenseOnComplete !== undefined) {
         prepareSessionBody.condenseOnComplete = triggerConfig.condenseOnComplete;
+      }
+      if (triggerConfig.variant !== undefined) {
+        prepareSessionBody.variant = triggerConfig.variant;
+      }
+      if (triggerConfig.environmentId) {
+        prepareSessionBody.requestedEnvironment = { id: triggerConfig.environmentId };
+      }
+      const sandboxAllocation =
+        triggerConfig.sandboxAllocation !== undefined
+          ? normalizeSandboxAllocation(triggerConfig.sandboxAllocation)
+          : undefined;
+      if (isSelectableSandboxAllocation(sandboxAllocation)) {
+        prepareSessionBody.sandboxAllocation = sandboxAllocation;
       }
 
       logger.debug('Calling prepareSession', {
@@ -608,16 +649,30 @@ async function processWebhookMessage(
         throw new Error(initiateAction.errorMessage);
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isUnexpectedChatError =
+      isExistingChatDelivery && !(error instanceof ExistingChatDeliveryError);
+    const errorMessage = isUnexpectedChatError
+      ? 'Could not confirm delivery to the target Cloud Agent chat. Check the chat before retrying.'
+      : error instanceof Error
+        ? error.message
+        : String(error);
     logger.error('Failed to process webhook', {
       requestId: webhook.requestId,
       namespace: webhook.namespace,
       triggerId: webhook.triggerId,
       error: errorMessage,
+      ...(isUnexpectedChatError && {
+        errorType: error instanceof Error ? error.name : typeof error,
+      }),
       attempts: message.attempts,
     });
 
-    if ((!sessionCreated || canRetryInitiate) && message.attempts < MAX_RETRY_ATTEMPTS) {
+    if (
+      !(error instanceof CreatorExecutionAuthorizationError) &&
+      (!(error instanceof ExistingChatDeliveryError) || error.retryable) &&
+      (!sessionCreated || canRetryInitiate) &&
+      message.attempts < MAX_RETRY_ATTEMPTS
+    ) {
       logger.info('Retrying message', {
         requestId: webhook.requestId,
         attempt: message.attempts,

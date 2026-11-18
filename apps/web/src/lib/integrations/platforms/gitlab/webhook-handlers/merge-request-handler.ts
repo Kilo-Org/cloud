@@ -1,17 +1,8 @@
-/**
- * GitLab Merge Request Event Handler
- *
- * Handles merge request events that trigger code review:
- * - open: New MR created
- * - update: MR updated (new commits pushed)
- * - reopen: MR reopened
- */
-
 import { NextResponse } from 'next/server';
 import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { MergeRequestPayload } from '../webhook-schemas';
 import { GITLAB_ACTION, PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   cancelActiveCodeReviewsById,
   createCodeReview,
@@ -32,24 +23,23 @@ import { addReactionToMR, isMergeCommit, setCommitStatus } from '../adapter';
 import { normalizeGitLabInstanceUrl } from '../instance-url';
 import { resolveMergeRequestCheckoutRef } from './merge-request-checkout-ref';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  getIntegrationById,
+  type GitLabWebhookIntegration,
+} from '@/lib/integrations/db/platform-integrations';
 import {
   getOrCreateProjectAccessToken,
   getValidGitLabToken,
 } from '@/lib/integrations/gitlab-service';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { GitLabCredentialActor } from '../credential-broker-client';
 
 const SUPERSEDED_BY_NEW_PUSH_REASON = 'Superseded by new push';
 const DUPLICATE_MERGE_CONTINUATION_REASON = 'Superseded by duplicate merge-commit continuation';
 
-/**
- * Handles merge request events that trigger code review
- * (open, update, reopen)
- */
 export async function handleMergeRequestCodeReview(
   payload: MergeRequestPayload,
-  integration: PlatformIntegration
+  integration: GitLabWebhookIntegration
 ) {
   const { object_attributes: mr, project } = payload;
 
@@ -62,7 +52,6 @@ export async function handleMergeRequestCodeReview(
       author: payload.user?.username,
     });
 
-    // Skip draft/WIP MRs - only trigger code review for ready MRs
     if (mr.draft === true || mr.work_in_progress === true) {
       logExceptInTest('Skipping draft/WIP MR:', {
         mr_iid: mr.iid,
@@ -71,7 +60,6 @@ export async function handleMergeRequestCodeReview(
       return NextResponse.json({ message: 'Skipped draft MR' }, { status: 200 });
     }
 
-    // Debug: Log integration fields
     logExceptInTest('Integration fields:', {
       id: integration.id,
       owned_by_organization_id: integration.owned_by_organization_id,
@@ -79,8 +67,6 @@ export async function handleMergeRequestCodeReview(
       kilo_requester_user_id: integration.kilo_requester_user_id,
     });
 
-    // 1. Determine owner from integration
-    // For orgs: use bot user, fallback to integration creator
     const orgBotUserId = integration.owned_by_organization_id
       ? await getBotUserId(integration.owned_by_organization_id, 'code-review')
       : null;
@@ -89,7 +75,6 @@ export async function handleMergeRequestCodeReview(
       ? {
           type: 'org',
           id: integration.owned_by_organization_id,
-          // Use bot user if available, fallback to integration creator
           userId: (orgBotUserId ?? integration.kilo_requester_user_id) as string,
         }
       : {
@@ -98,7 +83,6 @@ export async function handleMergeRequestCodeReview(
           userId: integration.owned_by_user_id as string,
         };
 
-    // Validate we have a valid user ID
     if (!owner.userId) {
       logExceptInTest('No valid user ID found for integration:', {
         integrationId: integration.id,
@@ -113,7 +97,6 @@ export async function handleMergeRequestCodeReview(
       ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
     };
 
-    // 2. Check if code review agent is enabled for this owner (GitLab platform)
     const agentConfig = await getAgentConfigForOwner(owner, 'code_review', PLATFORM.GITLAB);
 
     if (!agentConfig || !agentConfig.is_enabled) {
@@ -130,35 +113,34 @@ export async function handleMergeRequestCodeReview(
       `Code review agent enabled for ${owner.type} ${owner.id}, processing ${project.path_with_namespace}!${mr.iid}`
     );
 
-    // 3. Check if repository is in allowed list (when using selected repositories mode)
     const config = agentConfig.config as CodeReviewAgentConfig;
-    if (
-      config?.repository_selection_mode === 'selected' &&
-      Array.isArray(config?.selected_repository_ids)
-    ) {
-      // Check both selected_repository_ids and manually_added_repositories
-      const isInSelectedList = config.selected_repository_ids.includes(project.id);
-      const isInManuallyAddedList = Array.isArray(config.manually_added_repositories)
-        ? config.manually_added_repositories.some(repo => repo.id === project.id)
-        : false;
-      const isRepositoryAllowed = isInSelectedList || isInManuallyAddedList;
+    // GitLab code review has no 'all' repository mode, so the allowlist applies to
+    // every delivery: a project is reviewed only when it is selected or was added
+    // manually. A legacy row stored with 'all' therefore reviews nothing until it
+    // selects repositories, which is what the config reads report.
+    const selectedRepositoryIds = Array.isArray(config?.selected_repository_ids)
+      ? config.selected_repository_ids
+      : [];
+    const isInSelectedList = selectedRepositoryIds.includes(project.id);
+    const isInManuallyAddedList = Array.isArray(config?.manually_added_repositories)
+      ? config.manually_added_repositories.some(repo => repo.id === project.id)
+      : false;
+    const isRepositoryAllowed = isInSelectedList || isInManuallyAddedList;
 
-      if (!isRepositoryAllowed) {
-        logExceptInTest(
-          `Project ${project.path_with_namespace} (ID: ${project.id}) not in allowed list for ${owner.type} ${owner.id}`
-        );
-        return NextResponse.json(
-          { message: 'Project not configured for code reviews' },
-          { status: 200 }
-        );
-      }
-
+    if (!isRepositoryAllowed) {
       logExceptInTest(
-        `Project ${project.path_with_namespace} (ID: ${project.id}) is in allowed list, proceeding with review`
+        `Project ${project.path_with_namespace} (ID: ${project.id}) not in allowed list for ${owner.type} ${owner.id}`
+      );
+      return NextResponse.json(
+        { message: 'Project not configured for code reviews' },
+        { status: 200 }
       );
     }
 
-    // Get the head SHA from the last commit
+    logExceptInTest(
+      `Project ${project.path_with_namespace} (ID: ${project.id}) is in allowed list, proceeding with review`
+    );
+
     const headSha = mr.last_commit?.id;
     if (!headSha) {
       logExceptInTest('No head commit SHA found in MR payload:', {
@@ -176,7 +158,7 @@ export async function handleMergeRequestCodeReview(
       platformIntegrationId: integration.id,
     } satisfies ReviewScope;
 
-    // 4. Skip merge commits on update (e.g. merging base branch into feature branch).
+    // Skip merge commits on update (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
     if (
@@ -217,8 +199,8 @@ export async function handleMergeRequestCodeReview(
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
-    // 5. Cancel any existing reviews for this MR (different SHA)
-    // This prevents spam when user pushes multiple commits quickly
+    // Cancel any existing reviews for this MR (different SHA).
+    // This prevents spam when user pushes multiple commits quickly.
     const cancelledReviews = await cancelSupersededReviewsForPR(reviewScope, headSha);
 
     if (cancelledReviews.length > 0) {
@@ -239,9 +221,9 @@ export async function handleMergeRequestCodeReview(
       });
     }
 
-    // 6. Get integration details needed for best-effort GitLab status cleanup.
-    // This must run before duplicate-review return so redeliveries still clean up
-    // stale statuses on superseded SHAs even when the new review already exists.
+    // Status cleanup must run before the duplicate-review return so
+    // redeliveries still clean up stale statuses on superseded SHAs even
+    // when the new review already exists.
     const fullIntegration = await getIntegrationById(integration.id);
     const metadata = fullIntegration?.metadata as {
       gitlab_instance_url?: string;
@@ -258,7 +240,6 @@ export async function handleMergeRequestCodeReview(
       });
     }
 
-    // 7. Check for duplicate review (same project, MR, SHA)
     const existingReview = await findExistingReview(reviewScope, headSha);
 
     if (existingReview) {
@@ -275,10 +256,9 @@ export async function handleMergeRequestCodeReview(
       );
     }
 
-    // 8. Resolve checkout ref (fork MRs use refs/merge-requests/<iid>/head)
     const { checkoutRef } = resolveMergeRequestCheckoutRef(payload);
 
-    // 9. Create review record (session_id will be updated async)
+    // The review record's session_id is updated async.
     const reviewId = await createCodeReview({
       owner,
       platformIntegrationId: integration.id,
@@ -297,7 +277,6 @@ export async function handleMergeRequestCodeReview(
 
     logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);
 
-    // 10. Post 👀 reaction and set commit status (using PrAT for bot identity)
     if (fullIntegration) {
       try {
         const pratToken = await getOrCreateProjectAccessToken(
@@ -342,7 +321,6 @@ export async function handleMergeRequestCodeReview(
       }
     }
 
-    // 11. Try to dispatch pending reviews (including this new one)
     // Review is created with status='pending' and dispatch will pick it up if slots available
     try {
       const dispatchResult = await tryDispatchPendingReviews(owner);
@@ -367,7 +345,6 @@ export async function handleMergeRequestCodeReview(
       // Don't throw - review record created as pending, will be picked up later
     }
 
-    // 12. Return 202 Accepted (always succeeds, review queued as pending)
     return NextResponse.json(
       {
         message: 'Code review queued',
@@ -608,12 +585,9 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   }
 }
 
-/**
- * Main router for merge request events
- */
 export async function handleMergeRequest(
   payload: MergeRequestPayload,
-  integration: PlatformIntegration
+  integration: GitLabWebhookIntegration
 ) {
   const { action } = payload.object_attributes;
 

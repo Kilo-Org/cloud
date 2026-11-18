@@ -25,10 +25,8 @@ function loadLocalEnv(): void {
   process.env.POSTGRES_CONNECT_TIMEOUT ??= '30000';
   process.env.POSTGRES_MAX_QUERY_TIME ??= '30000';
   process.env.POSTGRES_SCRIPT_URL ??= process.env.POSTGRES_URL;
-  process.env.NEXT_PUBLIC_GASTOWN_URL ??= 'http://localhost:8787';
   process.env.NEXT_PUBLIC_KILO_CHAT_URL ??= 'http://localhost:8788';
   process.env.NEXT_PUBLIC_EVENT_SERVICE_URL ??= 'http://localhost:8789';
-  process.env.NEXT_PUBLIC_WASTELAND_URL ??= 'http://localhost:8790';
 }
 
 function printUsage(): void {
@@ -83,17 +81,19 @@ async function main(): Promise<void> {
     dayjsModule,
     enums,
     issuance,
+    issueMonthModule,
     state,
     schema,
   ] = await Promise.all([
     import('drizzle-orm'),
-    import('@/lib/balanceCache'),
-    import('@/lib/drizzle'),
-    import('@/lib/kilo-pass/constants'),
-    import('@/lib/kilo-pass/dayjs'),
-    import('@/lib/kilo-pass/enums'),
-    import('@/lib/kilo-pass/issuance'),
-    import('@/lib/kilo-pass/state'),
+    import('@kilocode/web-shared/lib/balanceCache'),
+    import('@kilocode/web-shared/lib/drizzle'),
+    import('@kilocode/web-shared/lib/kilo-pass/constants'),
+    import('@kilocode/web-shared/lib/kilo-pass/dayjs'),
+    import('@kilocode/web-shared/lib/kilo-pass/enums'),
+    import('@kilocode/web-shared/lib/kilo-pass/issuance'),
+    import('@kilocode/web-shared/lib/kilo-pass/issue-month'),
+    import('@kilocode/web-shared/lib/kilo-pass/state'),
     import('@kilocode/db/schema'),
   ]);
 
@@ -105,10 +105,10 @@ async function main(): Promise<void> {
   const { KiloPassCadence, KiloPassIssuanceSource } = enums;
   const {
     applyPendingKiloPassReferralBonusForIssuance,
-    computeIssueMonth,
     createOrGetIssuanceHeader,
     issueBaseCreditsForIssuance,
   } = issuance;
+  const { computeIssueMonth } = issueMonthModule;
   const { getKiloPassStateForUser } = state;
   const { kilo_pass_issuances, kilocode_users } = schema;
 

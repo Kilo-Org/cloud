@@ -5,8 +5,14 @@ import { addDays } from 'date-fns';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
-import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { getByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  createByokDataKey,
+  encryptByokWithDataKey,
+  type ByokDataKey,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   getCodingPlanValidationResult,
@@ -14,10 +20,16 @@ import {
   type CodingPlanCredentialValidationResult,
   validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
-import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { sentryLogger } from '@/lib/utils.server';
+import {
+  getCodingPlanPrice,
+  isCodingPlanDisabledForNewSignups,
+  isCodingPlanId,
+  type CodingPlanId,
+} from '@/lib/coding-plans/pricing';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   byok_api_keys,
   coding_plan_availability_intents,
@@ -44,8 +56,26 @@ export class CodingPlanInventoryReplacementError extends Error {
   }
 }
 
+export class CodingPlanInventoryReductionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodingPlanInventoryReductionError';
+  }
+}
+
 function inventoryReplacementError(message: string): CodingPlanInventoryReplacementError {
   return new CodingPlanInventoryReplacementError(message);
+}
+
+export class CodingPlanCredentialReassignmentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodingPlanCredentialReassignmentError';
+  }
+}
+
+function credentialReassignmentError(message: string): CodingPlanCredentialReassignmentError {
+  return new CodingPlanCredentialReassignmentError(message);
 }
 
 function databaseConstraint(error: unknown): string | null {
@@ -170,10 +200,24 @@ export async function subscribeToCodingPlan(
   }
 
   const requestKey = idempotencyFingerprint(idempotencyKey);
+  // The data key request carries no plaintext, so it is issued before the transaction to
+  // keep the network call from holding the user's kilocode_users row lock. A purchase that
+  // later fails or replays an idempotent request leaves this data key unused.
+  const installedByokKeyId = crypto.randomUUID();
+  const byokDataKey = await createByokDataKey({
+    context: {
+      key_id: installedByokKeyId,
+      owner_type: 'user',
+      owner_id: userId,
+      provider_id: plan.providerId,
+    },
+    actorUserId: userId,
+  });
   const outcome = await db.transaction(async tx => {
+    await reconcileCreditExpirationsInTransaction({ type: 'user', id: userId }, tx);
     const { rows: lockedUsers } = await tx.execute<{
-      total_microdollars_acquired: number;
-      microdollars_used: number;
+      total_microdollars_acquired: string;
+      microdollars_used: string;
     }>(sql`
       SELECT total_microdollars_acquired, microdollars_used
       FROM kilocode_users
@@ -201,6 +245,10 @@ export async function subscribeToCodingPlan(
         subscriptionId: priorTerm.subscriptionId,
         charged: false,
       } satisfies SubscriptionOutcome;
+    }
+
+    if (isCodingPlanDisabledForNewSignups(plan.planId)) {
+      throw new Error(`${plan.providerName} ${plan.name} is not currently accepting new signups.`);
     }
 
     const [liveSubscription] = await tx
@@ -240,7 +288,7 @@ export async function subscribeToCodingPlan(
     const periodEndIso = periodEnd.toISOString();
     const transactionId = crypto.randomUUID();
 
-    const { rows: chargedUsers } = await tx.execute<{ microdollars_used: number }>(sql`
+    const { rows: chargedUsers } = await tx.execute<{ microdollars_used: string }>(sql`
       UPDATE kilocode_users
       SET microdollars_used = microdollars_used + ${plan.costMicrodollars}
       WHERE id = ${userId}
@@ -259,7 +307,7 @@ export async function subscribeToCodingPlan(
       description: `Coding plan: ${plan.providerName} ${plan.name}`,
       credit_category: `coding-plan:${plan.planId}:${requestKey}`,
       check_category_uniqueness: true,
-      original_baseline_microdollars_used: lockedUser.microdollars_used,
+      original_baseline_microdollars_used: Number(lockedUser.microdollars_used),
       created_at: periodStartIso,
     });
     const { rows: inventoryRows } = await tx.execute<{
@@ -289,10 +337,11 @@ export async function subscribeToCodingPlan(
     const [installedByok] = await tx
       .insert(byok_api_keys)
       .values({
+        id: installedByokKeyId,
         kilo_user_id: userId,
         organization_id: null,
         provider_id: plan.providerId,
-        encrypted_api_key: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: encryptByokWithDataKey(plaintext, byokDataKey),
         management_source: 'coding_plan',
         created_by: userId,
       })
@@ -377,25 +426,24 @@ export async function terminateCodingPlanImmediately(
   subscriptionId: string,
   reason: CancellationReason = 'administrative_termination'
 ): Promise<void> {
-  const [subscription] = await db
-    .select({
-      id: coding_plan_subscriptions.id,
-      installed_byok_key_id: coding_plan_subscriptions.installed_byok_key_id,
-      key_inventory_id: coding_plan_subscriptions.key_inventory_id,
-    })
-    .from(coding_plan_subscriptions)
-    .where(
-      and(
-        eq(coding_plan_subscriptions.id, subscriptionId),
-        inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
-      )
-    )
-    .limit(1);
-  if (!subscription) {
-    throw new Error('No live subscription found.');
-  }
-
   await db.transaction(async tx => {
+    // Lock the subscription row before reading it so this can't act on a
+    // stale installed_byok_key_id / key_inventory_id snapshot if it races
+    // with a concurrent credential reassignment for the same subscription.
+    const [subscription] = await tx
+      .select({
+        id: coding_plan_subscriptions.id,
+        status: coding_plan_subscriptions.status,
+        installed_byok_key_id: coding_plan_subscriptions.installed_byok_key_id,
+        key_inventory_id: coding_plan_subscriptions.key_inventory_id,
+      })
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, subscriptionId))
+      .for('update');
+    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'past_due')) {
+      throw new Error('No live subscription found.');
+    }
+
     await tx
       .update(coding_plan_subscriptions)
       .set({
@@ -436,6 +484,186 @@ export async function terminateCodingPlanImmediately(
     subscriptionId,
     reason,
   });
+}
+
+// Moves a live subscription off its currently assigned credential onto the
+// next available one from the pool for the same plan/provider, then queues
+// the vacated credential for manual upstream revocation. Unlike
+// replaceInventoryCredential, this never requires an admin to supply key
+// material: the pooled credential is decrypted server-side and re-encrypted
+// straight into the existing installed BYOK row, so plaintext never leaves
+// the transaction. Nothing here touches billing fields (cost, period dates,
+// renewal, status) on coding_plan_subscriptions.
+export async function reassignSubscriptionCredential(
+  subscriptionId: string,
+  adminUserId: string
+): Promise<{ inventoryKeyId: string }> {
+  if (!BYOK_ENCRYPTION_KEY) {
+    throw credentialReassignmentError('BYOK encryption is not configured');
+  }
+
+  // The data key request carries no plaintext, so it is issued before the transaction to
+  // keep the network call from holding the subscription and inventory row locks. The
+  // identifiers it binds to are re-checked under the lock.
+  const [preview] = await db
+    .select({
+      userId: coding_plan_subscriptions.user_id,
+      providerId: coding_plan_subscriptions.provider_id,
+      installedByokKeyId: coding_plan_subscriptions.installed_byok_key_id,
+    })
+    .from(coding_plan_subscriptions)
+    .where(eq(coding_plan_subscriptions.id, subscriptionId))
+    .limit(1);
+  let byokDataKey: ByokDataKey | null = null;
+  if (preview?.installedByokKeyId) {
+    try {
+      byokDataKey = await createByokDataKey({
+        context: {
+          key_id: preview.installedByokKeyId,
+          owner_type: 'user',
+          owner_id: preview.userId,
+          provider_id: preview.providerId,
+        },
+        actorUserId: adminUserId,
+      });
+    } catch (error) {
+      logError('Coding plan credential reassignment could not create a data key', {
+        subscriptionId,
+        message: error instanceof Error ? error.message : undefined,
+      });
+      throw credentialReassignmentError(
+        'Unable to create an encryption key for the credential. Try again.'
+      );
+    }
+  }
+
+  try {
+    const { newInventoryId, previousInventoryId } = await db.transaction(async tx => {
+      // Lock the subscription row before reading it so a concurrent
+      // cancellation/termination can't act on a stale key_inventory_id /
+      // installed_byok_key_id snapshot while this reassignment is in
+      // flight (and vice versa) - whichever transaction locks the row
+      // first always sees, and leaves, consistent data for the other.
+      const [subscription] = await tx
+        .select({
+          id: coding_plan_subscriptions.id,
+          userId: coding_plan_subscriptions.user_id,
+          status: coding_plan_subscriptions.status,
+          planId: coding_plan_subscriptions.plan_id,
+          providerId: coding_plan_subscriptions.provider_id,
+          keyInventoryId: coding_plan_subscriptions.key_inventory_id,
+          installedByokKeyId: coding_plan_subscriptions.installed_byok_key_id,
+        })
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.id, subscriptionId))
+        .for('update');
+      if (
+        !subscription ||
+        (subscription.status !== 'active' && subscription.status !== 'past_due')
+      ) {
+        throw new Error('No live subscription found.');
+      }
+      const previousInventoryId = subscription.keyInventoryId;
+      const installedByokKeyId = subscription.installedByokKeyId;
+      if (!previousInventoryId || !installedByokKeyId) {
+        throw credentialReassignmentError('Subscription has no assigned credential to reassign.');
+      }
+      if (
+        !byokDataKey ||
+        installedByokKeyId !== preview?.installedByokKeyId ||
+        subscription.userId !== preview.userId ||
+        subscription.providerId !== preview.providerId
+      ) {
+        throw credentialReassignmentError(
+          'Subscription changed during reassignment. Refresh and try again.'
+        );
+      }
+
+      const { rows: lockedRows } = await tx.execute<{ id: string; status: string }>(sql`
+        SELECT id, status FROM coding_plan_key_inventory
+        WHERE id = ${previousInventoryId}
+        FOR UPDATE
+      `);
+      const locked = lockedRows[0];
+      if (!locked || locked.status !== 'assigned') {
+        throw credentialReassignmentError('Credential is not eligible for reassignment.');
+      }
+
+      const { rows: claimedRows } = await tx.execute<{
+        id: string;
+        encrypted_api_key: { iv: string; data: string; authTag: string } | null;
+      }>(sql`
+        UPDATE coding_plan_key_inventory
+        SET status = 'assigned',
+            assigned_to_user_id = ${subscription.userId},
+            assigned_at = now(),
+            updated_at = now()
+        WHERE id = (
+          SELECT id FROM coding_plan_key_inventory
+          WHERE plan_id = ${subscription.planId}
+            AND provider_id = ${subscription.providerId}
+            AND status = 'available'
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, encrypted_api_key
+      `);
+      const claimed = claimedRows[0];
+      if (!claimed?.encrypted_api_key) {
+        throw credentialReassignmentError(
+          `No available credential in the pool for plan "${subscription.planId}".`
+        );
+      }
+
+      const plaintext = decryptApiKey(claimed.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+      const byokUpdateResult = await tx
+        .update(byok_api_keys)
+        .set({ encrypted_api_key_envelope: encryptByokWithDataKey(plaintext, byokDataKey) })
+        .where(
+          and(
+            eq(byok_api_keys.id, installedByokKeyId),
+            eq(byok_api_keys.management_source, 'coding_plan')
+          )
+        );
+      if ((byokUpdateResult.rowCount ?? 0) === 0) {
+        throw credentialReassignmentError(
+          'Subscription credential could not be updated; it may have just been removed.'
+        );
+      }
+
+      await tx
+        .update(coding_plan_subscriptions)
+        .set({ key_inventory_id: claimed.id })
+        .where(eq(coding_plan_subscriptions.id, subscription.id));
+
+      await tx
+        .update(coding_plan_key_inventory)
+        .set({
+          status: 'revocation_pending',
+          encrypted_api_key: null,
+          revocation_requested_at: sql`now()`,
+          last_revocation_error: null,
+        })
+        .where(eq(coding_plan_key_inventory.id, previousInventoryId));
+
+      return { newInventoryId: claimed.id, previousInventoryId };
+    });
+
+    logInfo('Coding plan subscription credential reassigned from pool', {
+      subscriptionId,
+      previousInventoryId,
+      newInventoryId,
+      adminUserId,
+    });
+
+    return { inventoryKeyId: newInventoryId };
+  } catch (error) {
+    if (error instanceof CodingPlanCredentialReassignmentError) throw error;
+    if (error instanceof Error && error.message === 'No live subscription found.') throw error;
+    throw credentialReassignmentError(
+      'Unable to reassign the subscription credential due to a database error.'
+    );
+  }
 }
 
 type InventoryCredentialValidator = (
@@ -609,6 +837,9 @@ export async function requestCodingPlanAvailabilityNotification(
   if (!plan) {
     throw new Error(`Plan "${planId}" is not available as a coding plan.`);
   }
+  if (isCodingPlanDisabledForNewSignups(plan.planId)) {
+    throw new Error(`${plan.providerName} ${plan.name} is not currently accepting new signups.`);
+  }
 
   return db.transaction(async tx => {
     const [availableCredential] = await tx
@@ -654,6 +885,72 @@ export async function getKeyInventoryCounts(
     status: row.status,
     count: Number.parseInt(row.count, 10),
   }));
+}
+
+export async function queueAvailableInventoryForRevocation(
+  planId: CodingPlanId,
+  count: number,
+  adminUserId: string
+): Promise<{ queued: Array<{ id: string; upstreamPlanId: string }> }> {
+  const plan = getCodingPlanPrice(planId);
+  if (!plan) {
+    throw new CodingPlanInventoryReductionError(
+      `Plan "${planId}" is not available as a coding plan.`
+    );
+  }
+
+  // Claims up to `count` unassigned, never-issued rows the same way
+  // subscribeToCodingPlan claims one: a raw UPDATE against a
+  // WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) subquery, generalized
+  // from LIMIT 1 to LIMIT count; SKIP LOCKED lets this run safely alongside
+  // a concurrent subscribe claiming a row for the same plan. Claimed rows
+  // move into the same revocation_pending state that
+  // terminateCodingPlanImmediately and the billing-lifecycle-cron sweeps
+  // use, so they surface in the existing Pending Key Rotation queue with
+  // their retained upstream_plan_id for a human to deprovision in the
+  // provider's own console and confirm with Revoke/Replace; no separate
+  // admin queue is needed for this. Raw SQL bypasses Drizzle's
+  // $onUpdateFn, so updated_at is set explicitly here, matching
+  // subscribeToCodingPlan's claim query. assigned_to_user_id and
+  // assigned_at exclude anything already assigned, and the NOT EXISTS check
+  // only counts *live* (non-canceled) subscriptions, since a row recycled
+  // back to "available" via replaceManualCredentialRevocation can still
+  // carry a stale key_inventory_id pointer from its old, now-canceled
+  // subscription. ORDER BY created_at ASC claims the oldest stock first.
+  const { rows } = await db.execute<{ id: string; upstream_plan_id: string }>(sql`
+    UPDATE coding_plan_key_inventory
+    SET status = 'revocation_pending',
+        encrypted_api_key = NULL,
+        revocation_requested_at = now(),
+        updated_at = now()
+    WHERE id IN (
+      SELECT id
+      FROM coding_plan_key_inventory
+      WHERE plan_id = ${plan.planId}
+        AND status = 'available'
+        AND assigned_to_user_id IS NULL
+        AND assigned_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM coding_plan_subscriptions
+          WHERE coding_plan_subscriptions.key_inventory_id = coding_plan_key_inventory.id
+            AND coding_plan_subscriptions.status != 'canceled'
+        )
+      ORDER BY created_at ASC
+      LIMIT ${count}
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, upstream_plan_id
+  `);
+
+  const queued = rows.map(row => ({ id: row.id, upstreamPlanId: row.upstream_plan_id }));
+  logInfo('Coding plan available inventory queued for manual revocation', {
+    planId: plan.planId,
+    requested: count,
+    queued: queued.length,
+    adminUserId,
+  });
+  return { queued };
 }
 
 export async function adminCancelCodingPlanSubscription(subscriptionId: string): Promise<void> {
@@ -758,6 +1055,7 @@ type InventoryReplacementOptions = {
 export async function replaceInventoryCredential(
   inventoryKeyId: string,
   apiKey: string,
+  adminUserId: string,
   options: InventoryReplacementOptions = {}
 ): Promise<void> {
   if (!BYOK_ENCRYPTION_KEY) {
@@ -842,6 +1140,53 @@ export async function replaceInventoryCredential(
       ? validationResult.upstreamUsageId
       : credential.upstreamUsageId;
 
+  // Each installed key binds its data key to its own row id. The requests carry no
+  // plaintext, so they are issued before the transaction to keep the network calls from
+  // holding the inventory row lock. The set of installed keys is re-checked under the lock.
+  const previewKeys = await db
+    .select({
+      id: byok_api_keys.id,
+      organization_id: byok_api_keys.organization_id,
+      kilo_user_id: byok_api_keys.kilo_user_id,
+      provider_id: byok_api_keys.provider_id,
+    })
+    .from(coding_plan_subscriptions)
+    .innerJoin(
+      byok_api_keys,
+      and(
+        eq(byok_api_keys.id, coding_plan_subscriptions.installed_byok_key_id),
+        eq(byok_api_keys.management_source, 'coding_plan')
+      )
+    )
+    .where(
+      and(
+        eq(coding_plan_subscriptions.key_inventory_id, inventoryKeyId),
+        inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
+      )
+    );
+  const dataKeys = new Map<string, ByokDataKey>();
+  try {
+    await Promise.all(
+      previewKeys.map(async installedKey => {
+        dataKeys.set(
+          installedKey.id,
+          await createByokDataKey({
+            context: getByokKmsContext(installedKey),
+            actorUserId: adminUserId,
+          })
+        );
+      })
+    );
+  } catch (error) {
+    logError('Coding plan credential replacement could not create data keys', {
+      inventoryKeyId,
+      message: error instanceof Error ? error.message : undefined,
+    });
+    throw inventoryReplacementError(
+      'Unable to create encryption keys for the installed credentials. Try again.'
+    );
+  }
+
   try {
     await db.transaction(async tx => {
       const { rows: lockedRows } = await tx.execute<{
@@ -905,15 +1250,36 @@ export async function replaceInventoryCredential(
           );
         const installedKeyIds = liveInstalledKeys.flatMap(row => (row.id ? [row.id] : []));
         if (installedKeyIds.length > 0) {
-          await tx
-            .update(byok_api_keys)
-            .set({ encrypted_api_key: encryptedApiKey })
+          const installedKeys = await tx
+            .select({
+              id: byok_api_keys.id,
+              organization_id: byok_api_keys.organization_id,
+              kilo_user_id: byok_api_keys.kilo_user_id,
+              provider_id: byok_api_keys.provider_id,
+            })
+            .from(byok_api_keys)
             .where(
               and(
                 eq(byok_api_keys.management_source, 'coding_plan'),
                 inArray(byok_api_keys.id, installedKeyIds)
               )
             );
+          // The envelope's KMS context binds to each row's id, so every installed
+          // key needs its own envelope rather than one shared value.
+          for (const installedKey of installedKeys) {
+            const dataKey = dataKeys.get(installedKey.id);
+            if (!dataKey) {
+              throw inventoryReplacementError(
+                'Assigned subscriptions changed during replacement. Refresh and try again.'
+              );
+            }
+            await tx
+              .update(byok_api_keys)
+              .set({
+                encrypted_api_key_envelope: encryptByokWithDataKey(normalizedApiKey, dataKey),
+              })
+              .where(eq(byok_api_keys.id, installedKey.id));
+          }
         }
       }
     });

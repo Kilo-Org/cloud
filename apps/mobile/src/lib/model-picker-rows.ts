@@ -1,12 +1,27 @@
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { i18n } from '@/i18n';
+import { autoModelLabel } from '@/lib/auto-model-name';
 
 export type ModelPickerRow =
   | { key: string; title: string; type: 'header' }
-  | { key: string; model: SessionModelOption; isFavorite: boolean; type: 'model' };
+  | {
+      key: string;
+      model: SessionModelOption;
+      isFavorite: boolean;
+      /**
+       * Whether the row still shows the provider line. A provider group's header
+       * already names the provider, so its rows drop the line; the FAVORITES,
+       * recommended and all-models sections do not name one, and a favorite list
+       * spans providers, so their rows keep it.
+       */
+      showsProvider: boolean;
+      type: 'model';
+    };
 
 type ModelGroup = {
   key: string;
   title: string;
+  namesProvider: boolean;
   models: SessionModelOption[];
 };
 
@@ -90,9 +105,19 @@ export function buildModelPickerRows({
   const rows: ModelPickerRow[] = [];
 
   if (favorites.length > 0) {
-    rows.push({ key: 'favorites', title: 'FAVORITES', type: 'header' });
+    rows.push({
+      key: 'favorites',
+      title: i18n.t('agentChat.modelPicker.favorites'),
+      type: 'header',
+    });
     for (const model of favorites) {
-      rows.push({ key: `model:${model.id}`, model, isFavorite: true, type: 'model' });
+      rows.push({
+        key: `model:${model.id}`,
+        model,
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      });
     }
   }
 
@@ -110,7 +135,13 @@ export function buildModelPickerRows({
   for (const group of groups.values()) {
     rows.push({ key: group.key, title: group.title, type: 'header' });
     for (const model of group.models) {
-      rows.push({ key: `model:${model.id}`, model, isFavorite: false, type: 'model' });
+      rows.push({
+        key: `model:${model.id}`,
+        model,
+        isFavorite: false,
+        showsProvider: !group.namesProvider,
+        type: 'model',
+      });
     }
   }
 
@@ -118,21 +149,35 @@ export function buildModelPickerRows({
 }
 
 function searchableText(model: SessionModelOption): string {
-  return [model.name, model.displayId, model.provider?.name, model.provider?.id]
+  return [
+    model.name,
+    // The row renders an auto model's catalog name (`Auto Efficiente` in
+    // Italian), so that translated name must be searchable too; matching only
+    // the gateway's English spelling answered "No matches" for the name the
+    // user could see.
+    model.displayId,
+    model.provider?.name,
+    model.provider?.id,
+    autoModelLabel(model.displayId, model.name),
+  ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
 }
 
-function groupForModel(model: SessionModelOption): Pick<ModelGroup, 'key' | 'title'> {
+function groupForModel(
+  model: SessionModelOption
+): Pick<ModelGroup, 'key' | 'namesProvider' | 'title'> {
   if (model.provider) {
     return {
       key: `provider:${model.provider.id}`,
-      title: model.provider.name.toUpperCase(),
+      namesProvider: true,
+      // Locale-aware: a Turkish provider name uppercases `i` to `İ`.
+      title: model.provider.name.toLocaleUpperCase(i18n.language),
     };
   }
   if (model.isPreferred) {
-    return { key: 'recommended', title: 'RECOMMENDED' };
+    return { key: 'recommended', namesProvider: false, title: i18n.t('common.recommended') };
   }
-  return { key: 'all', title: 'ALL MODELS' };
+  return { key: 'all', namesProvider: false, title: i18n.t('common.allModels') };
 }

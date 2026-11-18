@@ -1,7 +1,13 @@
 /* eslint-disable max-lines -- cohesive unit suite for the read-cache allowlist, budget, fences, takeover, mismatch, and cleanup contract */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
-import { type Query, QueryClient } from '@tanstack/react-query';
-import { type PersistedClient } from '@tanstack/react-query-persist-client';
+import {
+  type DehydratedState,
+  hashKey,
+  type Query,
+  QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query';
+import { type PersistedClient, persistQueryClientSave } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -100,6 +106,46 @@ function makeAuthoritativeQueryClient(userId: string): QueryClient {
   return queryClient;
 }
 
+/** One dehydrated query in a persisted blob fixture. */
+type PersistedEntry = DehydratedState['queries'][number];
+
+/** A successful dehydrated query state for a persisted blob fixture. */
+function successState(data: unknown) {
+  return {
+    data,
+    dataUpdateCount: 0,
+    dataUpdatedAt: Date.now(),
+    error: null,
+    errorUpdateCount: 0,
+    errorUpdatedAt: 0,
+    fetchFailureCount: 0,
+    fetchFailureReason: null,
+    fetchMeta: null,
+    isInvalidated: false,
+    status: 'success' as const,
+    fetchStatus: 'idle' as const,
+  };
+}
+
+/** One dehydrated query in a persisted blob fixture. */
+function persistedEntry(queryKey: QueryKey, data: unknown): PersistedEntry {
+  return {
+    queryHash: hashKey(queryKey),
+    queryKey,
+    dehydratedAt: Date.now(),
+    state: successState(data),
+  };
+}
+
+/** A stored blob, serialized the way the persister writes it. */
+function storedBlob(queries: readonly PersistedEntry[]): string {
+  return JSON.stringify({
+    timestamp: Date.now(),
+    buster: '',
+    clientState: { mutations: [], queries },
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   store.clear();
@@ -108,13 +154,73 @@ beforeEach(() => {
 
 describe('scope derivation', () => {
   it('derives one scope per user per schema version', () => {
-    expect(SCHEMA_VERSION).toBe(1);
-    expect(readCacheScope('u1')).toBe('cache:u1:1');
-    expect(readCacheScope('u2')).toBe('cache:u2:1');
+    expect(readCacheScope('u1')).toBe(`cache:u1:${SCHEMA_VERSION}`);
+    expect(readCacheScope('u2')).not.toBe(readCacheScope('u1'));
   });
 });
 
 describe('allowlist filter', () => {
+  it('persists bounded briefing lists and viewed details, but not paid estimates or cursor variants', () => {
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { currentOnly: true, limit: 100 },
+        },
+      ])
+    ).toBe(true);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'get'],
+        {
+          type: 'query',
+          input: { reportId: 'report-1' },
+        },
+      ])
+    ).toBe(true);
+    // A key that names an organization is not cached in any scope: those rows
+    // come from the server, so the key denies the scope itself.
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { scope: 'organization', organizationId: 'org-1', currentOnly: true, limit: 30 },
+        },
+      ])
+    ).toBe(false);
+    // The personal caller passes `organizationId` as an own undefined key, which
+    // the strict input object must still accept.
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { scope: 'personal', organizationId: undefined, currentOnly: true, limit: 30 },
+        },
+      ])
+    ).toBe(true);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { currentOnly: false, limit: 30, cursor: 'next-page' },
+        },
+      ])
+    ).toBe(false);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'estimateSummary'],
+        {
+          type: 'query',
+          input: {},
+        },
+      ])
+    ).toBe(false);
+  });
+
   it('allows the default no-input procedures', () => {
     expect(isReadCacheAllowedKey([['user', 'getMe'], { type: 'query' }])).toBe(true);
     expect(isReadCacheAllowedKey([['organizations', 'list'], { type: 'query' }])).toBe(true);
@@ -147,6 +253,20 @@ describe('allowlist filter', () => {
             gitUrl: undefined,
             organizationId: undefined,
           },
+        },
+      ])
+    ).toBe(true);
+  });
+
+  it('allows the serialized form of the default list input', () => {
+    // A restored key has been through serialization, which drops the fields the
+    // default builder left `undefined`.
+    expect(
+      isReadCacheAllowedKey([
+        ['cliSessionsV2', 'list'],
+        {
+          type: 'infinite',
+          input: { limit: 30, orderBy: 'updated_at', includeChildren: false, organizationId: null },
         },
       ])
     ).toBe(true);
@@ -291,13 +411,12 @@ describe('allowlist filter', () => {
   it('denies unknown, flat, and malformed shapes without throwing', () => {
     expect(isReadCacheAllowedKey([['unknown', 'procedure'], { type: 'query' }])).toBe(false);
     // Every sensitive path is off the allowlist, so it is denied for that
-    // reason alone: transcripts, patches, diffs, tokens, secrets, kiloclaw.
+    // reason alone: transcripts, patches, diffs, tokens and secrets.
     expect(
       isReadCacheAllowedKey([['cliSessionsV2', 'getSessionMessagesPage'], { type: 'query' }])
     ).toBe(false);
     expect(isReadCacheAllowedKey([['git', 'getPatch'], { type: 'query' }])).toBe(false);
     expect(isReadCacheAllowedKey([['auth', 'getToken'], { type: 'query' }])).toBe(false);
-    expect(isReadCacheAllowedKey([['kiloclaw', 'list'], { type: 'query' }])).toBe(false);
     expect(isReadCacheAllowedKey(FLAT_APPLICATION_KEY)).toBe(false);
     expect(isReadCacheAllowedKey('flat-key')).toBe(false);
     expect(isReadCacheAllowedKey(null)).toBe(false);
@@ -310,6 +429,33 @@ describe('allowlist filter', () => {
 });
 
 describe('dehydration filter', () => {
+  const briefingReport = (organizationId: string | null) => ({ context: { organizationId } });
+  const personalReport = briefingReport(null);
+  const organizationReport = briefingReport('org-1');
+  const briefingListKey: readonly unknown[] = [
+    ['agentBriefing', 'list'],
+    { type: 'query', input: { scope: 'all', currentOnly: true, limit: 30 } },
+  ];
+  const briefingHistoryKey: readonly unknown[] = [
+    ['agentBriefing', 'list'],
+    { type: 'infinite', input: { scope: 'all', currentOnly: false, limit: 30 } },
+  ];
+  const briefingOrganizationListKey: readonly unknown[] = [
+    ['agentBriefing', 'list'],
+    {
+      type: 'query',
+      input: { scope: 'organization', organizationId: 'org-1', currentOnly: true, limit: 30 },
+    },
+  ];
+  const briefingReportKey: readonly unknown[] = [
+    ['agentBriefing', 'get'],
+    { type: 'query', input: { reportId: 'report-1' } },
+  ];
+  const briefingPreferencesKey: readonly unknown[] = [
+    ['agentBriefing', 'preferences'],
+    { type: 'query', input: { timezone: 'UTC' } },
+  ];
+
   it('persists only successful queries on allowlisted shapes', () => {
     expect(shouldPersistReadCacheQuery(queryLike({ status: 'success' }, GET_ME_QUERY_KEY))).toBe(
       true
@@ -367,6 +513,111 @@ describe('dehydration filter', () => {
       )
     ).toBe(false);
   });
+
+  it('persists a briefing list only when every report names no organization', () => {
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { reports: [personalReport], nextCursor: null } },
+          briefingListKey
+        )
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          {
+            status: 'success',
+            data: { reports: [personalReport, organizationReport], nextCursor: null },
+          },
+          briefingListKey
+        )
+      )
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          {
+            status: 'success',
+            data: {
+              pages: [{ reports: [personalReport], nextCursor: null }],
+              pageParams: [undefined],
+            },
+          },
+          briefingHistoryKey
+        )
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          {
+            status: 'success',
+            data: {
+              pages: [{ reports: [organizationReport], nextCursor: null }],
+              pageParams: [undefined],
+            },
+          },
+          briefingHistoryKey
+        )
+      )
+    ).toBe(false);
+    // An empty organization page names no organization in its content, so the
+    // key must deny it: nothing else in the snapshot can.
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { reports: [], nextCursor: null } },
+          briefingOrganizationListKey
+        )
+      )
+    ).toBe(false);
+  });
+
+  it('persists a briefing report and its preferences only in personal context', () => {
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike({ status: 'success', data: personalReport }, briefingReportKey)
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike({ status: 'success', data: organizationReport }, briefingReportKey)
+      )
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { contexts: [personalReport] } },
+          briefingPreferencesKey
+        )
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { contexts: [personalReport, organizationReport] } },
+          briefingPreferencesKey
+        )
+      )
+    ).toBe(false);
+  });
+
+  it('persists no briefing payload whose shape does not name its own context', () => {
+    // A shape the filter cannot read is not restored: the server answer decides
+    // what a briefing surface paints.
+    expect(
+      shouldPersistReadCacheQuery(queryLike({ status: 'success', data: {} }, briefingListKey))
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(queryLike({ status: 'success', data: {} }, briefingReportKey))
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike({ status: 'success', data: {} }, briefingPreferencesKey)
+      )
+    ).toBe(false);
+  });
 });
 
 describe('readCachedUserId', () => {
@@ -399,18 +650,18 @@ describe('publication budget', () => {
 
     expect(kv.setItem).toHaveBeenCalledTimes(1);
     const [scope, key, value] = vi.mocked(kv.setItem).mock.calls[0] ?? [];
-    expect(scope).toBe('cache:u1:1');
+    expect(scope).toBe(readCacheScope('u1'));
     expect(key).toBe('read-cache');
     expect(JSON.parse(value ?? '{}') as PersistedClient).toMatchObject({
       clientState: { queries: [{ queryKey: GET_ME_QUERY_KEY }] },
     });
-    expect(scopes.get('cache:u1:1')?.get('read-cache')).toBe(value);
+    expect(scopes.get(readCacheScope('u1'))?.get('read-cache')).toBe(value);
   });
 
   it('drops a blob over 2 MB and removes the previous blob for the scope', async () => {
     const { kv, scopes } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u1');
-    scopes.set('cache:u1:1', new Map([['read-cache', 'stale-blob']]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', 'stale-blob']]));
     const persister = createReadCachePersister({
       queryClient,
       userId: 'u1',
@@ -421,16 +672,16 @@ describe('publication budget', () => {
     await persister.persistClient(oversized);
 
     // Never written partially: the previous blob for the scope is removed.
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
+    expect(kv.removeItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
     expect(kv.setItem).not.toHaveBeenCalled();
-    expect(scopes.get('cache:u1:1')?.has('read-cache')).toBe(false);
+    expect(scopes.get(readCacheScope('u1'))?.has('read-cache')).toBe(false);
   });
 
   it('restores from the scope even when the publication fence would block a write', async () => {
     const { scopes } = createFakeKv();
     const queryClient = new QueryClient();
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const persister = createReadCachePersister({
@@ -442,6 +693,50 @@ describe('publication budget', () => {
 
     const restored = await persister.restoreClient();
     expect(restored?.clientState.queries[0]?.state.data).toEqual({ id: 'u1' });
+  });
+});
+
+describe('bounded serialization', () => {
+  it('serializes and writes once per throttle window, not once per cache change', async () => {
+    const { kv, scopes } = createFakeKv();
+    const queryClient = makeAuthoritativeQueryClient('u1');
+    // The blob carries this payload, so the serializer reaches its `toJSON` on
+    // every whole-blob serialization. That observes the work the un-throttled
+    // per-change path must not do; the write count cannot see it, because only
+    // a throttled save ever reaches the storage.
+    let blobSerializations = 0;
+    const burst: PersistedClient[] = Array.from({ length: 5 }, () =>
+      makePersistedClient({
+        id: 'u1',
+        toJSON: () => {
+          blobSerializations += 1;
+          return { id: 'u1' };
+        },
+      })
+    );
+    const persister = createReadCachePersister({
+      queryClient,
+      userId: 'u1',
+      epoch: currentAuthEpoch(),
+    });
+
+    // Five query-cache changes inside one throttle window. The un-throttled
+    // wrapper path must serialize none of them: only the throttled save already
+    // running has serialized, exactly once for the whole burst.
+    const inFlight = burst
+      .map(client => persister.persistClient(client))
+      .filter((pending): pending is Promise<void> => pending !== undefined);
+    expect(blobSerializations).toBe(1);
+
+    await Promise.all(inFlight);
+
+    // The coalesced trailing save serializes at most once more, so the count is
+    // bounded by the throttle window, never by the number of changes.
+    expect(blobSerializations).toBeLessThanOrEqual(2);
+    expect(kv.setItem).toHaveBeenCalledTimes(2);
+    const stored = scopes.get(readCacheScope('u1'))?.get('read-cache');
+    const blob = JSON.parse(stored ?? '{}') as PersistedClient;
+    expect(blob.clientState.queries[0]?.queryKey).toEqual(GET_ME_QUERY_KEY);
   });
 });
 
@@ -497,7 +792,7 @@ describe('cold-start restore and takeover', () => {
     const { scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const queryClient = new QueryClient();
@@ -506,9 +801,164 @@ describe('cold-start restore and takeover', () => {
 
     // The allowlisted getMe query was hydrated from the hint account's scope.
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
-    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+    expect(takeOverColdStartRestore()).toBe(readCacheScope('u1'));
     // A completed restore is reported exactly once.
     expect(takeOverColdStartRestore()).toBeNull();
+  });
+
+  it('drops a briefing entry an earlier blob holds but the current rule never restores', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    const briefingKey = (reportId: string) => [
+      ['agentBriefing', 'get'],
+      { type: 'query', input: { reportId } },
+    ];
+    const personalKey = briefingKey('personal-report');
+    const organizationKey = briefingKey('organization-report');
+    scopes.set(
+      readCacheScope('u1'),
+      new Map([
+        [
+          'read-cache',
+          storedBlob([
+            persistedEntry(GET_ME_QUERY_KEY, { id: 'u1' }),
+            persistedEntry(personalKey, { context: { organizationId: null } }),
+            persistedEntry(organizationKey, { context: { organizationId: 'org-1' } }),
+          ]),
+        ],
+      ])
+    );
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    expect(queryClient.getQueryData(personalKey)).toEqual({ context: { organizationId: null } });
+    expect(queryClient.getQueryData(organizationKey)).toBeUndefined();
+  });
+
+  it('drops a stored organization list even when its first page is empty', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    const personalListKey = [
+      ['agentBriefing', 'list'],
+      { type: 'query', input: { scope: 'personal', currentOnly: true, limit: 30 } },
+    ];
+    const organizationListKey = [
+      ['agentBriefing', 'list'],
+      {
+        type: 'query',
+        input: { scope: 'organization', organizationId: 'org-1', currentOnly: true, limit: 30 },
+      },
+    ];
+    scopes.set(
+      readCacheScope('u1'),
+      new Map([
+        [
+          'read-cache',
+          storedBlob([
+            persistedEntry(GET_ME_QUERY_KEY, { id: 'u1' }),
+            persistedEntry(personalListKey, { reports: [], nextCursor: null }),
+            persistedEntry(organizationListKey, { reports: [], nextCursor: null }),
+          ]),
+        ],
+      ])
+    );
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    // An empty organization page carries no report that names the organization,
+    // so the key is the only evidence for its scope and must deny it.
+    expect(queryClient.getQueryData(organizationListKey)).toBeUndefined();
+    expect(queryClient.getQueryData(personalListKey)).toEqual({ reports: [], nextCursor: null });
+  });
+
+  it('hydrates a stored session-list snapshot from its path and payload', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    const writtenKey = [
+      ['cliSessionsV2', 'list'],
+      {
+        type: 'infinite',
+        input: {
+          limit: 30,
+          orderBy: 'updated_at',
+          includeChildren: false,
+          createdOnPlatform: undefined,
+          gitUrl: undefined,
+          organizationId: null,
+        },
+      },
+    ];
+    // Serialization drops the two `undefined` fields, so the restored key has
+    // four input fields instead of the six the persister wrote.
+    const restoredKey = [
+      ['cliSessionsV2', 'list'],
+      {
+        type: 'infinite',
+        input: { limit: 30, orderBy: 'updated_at', includeChildren: false, organizationId: null },
+      },
+    ];
+    scopes.set(
+      readCacheScope('u1'),
+      new Map([
+        [
+          'read-cache',
+          storedBlob([
+            persistedEntry(GET_ME_QUERY_KEY, { id: 'u1' }),
+            persistedEntry(writtenKey, { pages: [{ cliSessions: [] }], pageParams: [undefined] }),
+          ]),
+        ],
+      ])
+    );
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    expect(queryClient.getQueryData(restoredKey)).toEqual({
+      pages: [{ cliSessions: [] }],
+      pageParams: [null],
+    });
+
+    // The restored key keeps its four-field input, so the next save must accept
+    // it and write the snapshot again: a cold start after that save still
+    // paints the list.
+    await persistQueryClientSave({
+      queryClient,
+      persister: createReadCachePersister({
+        queryClient,
+        userId: 'u1',
+        epoch: currentAuthEpoch(),
+      }),
+      dehydrateOptions: {
+        shouldDehydrateQuery: shouldPersistReadCacheQuery,
+        shouldDehydrateMutation: () => false,
+      },
+    });
+    const resaved = new QueryClient();
+    await restorePersistedCacheOnColdStart(resaved);
+    expect(resaved.getQueryData(restoredKey)).toEqual({
+      pages: [{ cliSessions: [] }],
+      pageParams: [null],
+    });
+  });
+
+  it('retries a rejected identity-hint read and still hydrates the cache', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    scopes.set(
+      readCacheScope('u1'),
+      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
+    );
+    // The keychain read can reject transiently; the restore must retry it
+    // rather than abandoning the whole cold-start restore.
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
+    expect(takeOverColdStartRestore()).toBe(readCacheScope('u1'));
   });
 
   it('drops an expired blob instead of hydrating it', async () => {
@@ -516,41 +966,41 @@ describe('cold-start restore and takeover', () => {
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     const expired = makePersistedClient({ id: 'u1' });
     expired.timestamp = Date.now() - READ_CACHE_MAX_AGE_MS - 1;
-    scopes.set('cache:u1:1', new Map([['read-cache', JSON.stringify(expired)]]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', JSON.stringify(expired)]]));
     const queryClient = new QueryClient();
 
     await restorePersistedCacheOnColdStart(queryClient);
 
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+    expect(kv.removeItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
+    expect(takeOverColdStartRestore()).toBe(readCacheScope('u1'));
   });
 
   it('never restores a blob written by an older schema: it lives in another scope', async () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
-    // The previous schema version wrote into `cache:u1:0`; the current scope is
-    // `cache:u1:1`, so the old blob is never read and never hydrated.
+    // The previous schema version wrote into its own scope, so the old blob is
+    // never read and never hydrated.
     const oldSchemaBlob = JSON.stringify(makePersistedClient({ id: 'u1' }));
-    scopes.set('cache:u1:0', new Map([['read-cache', oldSchemaBlob]]));
+    scopes.set(`cache:u1:${SCHEMA_VERSION - 1}`, new Map([['read-cache', oldSchemaBlob]]));
     const queryClient = new QueryClient();
 
     await restorePersistedCacheOnColdStart(queryClient);
 
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(kv.getItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-    expect(kv.getItem).not.toHaveBeenCalledWith('cache:u1:0', 'read-cache');
+    expect(kv.getItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
+    expect(kv.getItem).not.toHaveBeenCalledWith(`cache:u1:${SCHEMA_VERSION - 1}`, 'read-cache');
   });
 
   it('is best effort: a corrupt blob never blocks startup and is discarded', async () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
-    scopes.set('cache:u1:1', new Map([['read-cache', 'not-json']]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', 'not-json']]));
     const queryClient = new QueryClient();
 
     await expect(restorePersistedCacheOnColdStart(queryClient)).resolves.toBeUndefined();
 
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
+    expect(kv.removeItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
     expect(takeOverColdStartRestore()).toBeNull();
   });
 
@@ -566,8 +1016,12 @@ describe('cold-start restore and takeover', () => {
     const queryClient = new QueryClient();
 
     const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+    await vi.waitFor(() => {
+      expect(SecureStore.getItemAsync).toHaveBeenCalled();
+    });
     // The mount takes over while the hint read is still in flight.
     expect(takeOverColdStartRestore()).toBeNull();
+    expect(hintRead.resolve).not.toBeNull();
     hintRead.resolve?.('u1');
     await restorePromise;
 
@@ -579,7 +1033,7 @@ describe('cold-start restore and takeover', () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
@@ -609,7 +1063,7 @@ describe('cold-start restore and takeover', () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
@@ -648,9 +1102,13 @@ describe('cold-start restore and takeover', () => {
     const queryClient = new QueryClient();
 
     const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+    await vi.waitFor(() => {
+      expect(SecureStore.getItemAsync).toHaveBeenCalled();
+    });
     // The epoch moved before the hint read settled: the restore is abandoned
     // before it can even read the cache.
     bumpAuthEpoch();
+    expect(hintRead.resolve).not.toBeNull();
     hintRead.resolve?.('u1');
     await restorePromise;
 
@@ -686,16 +1144,16 @@ describe('sign-out cleanup', () => {
 
   it('keeps the other account cache and every draft when one user signs out', async () => {
     const { scopes } = createFakeKv();
-    scopes.set('cache:u1:0', new Map([['read-cache', 'u1-previous-schema']]));
-    scopes.set('cache:u1:1', new Map([['read-cache', 'u1-current-schema']]));
-    scopes.set('cache:u12:1', new Map([['read-cache', 'other-user']]));
+    scopes.set(`cache:u1:${SCHEMA_VERSION - 1}`, new Map([['read-cache', 'u1-previous-schema']]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', 'u1-current-schema']]));
+    scopes.set(readCacheScope('u12'), new Map([['read-cache', 'other-user']]));
     scopes.set('draft:u1', new Map([['agent-composer:new', '"unsent text"']]));
 
     await clearCacheScopeForSignOut('u1');
 
-    expect(scopes.has('cache:u1:0')).toBe(false);
-    expect(scopes.has('cache:u1:1')).toBe(false);
-    expect(scopes.get('cache:u12:1')?.get('read-cache')).toBe('other-user');
+    expect(scopes.has(`cache:u1:${SCHEMA_VERSION - 1}`)).toBe(false);
+    expect(scopes.has(readCacheScope('u1'))).toBe(false);
+    expect(scopes.get(readCacheScope('u12'))?.get('read-cache')).toBe('other-user');
     expect(scopes.get('draft:u1')?.get('agent-composer:new')).toBe('"unsent text"');
   });
 

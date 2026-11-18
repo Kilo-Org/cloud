@@ -1,0 +1,223 @@
+import { createElement } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  containsJoinedScript,
+  hasRtlScript,
+  ltrValueTextStyle,
+  rtlBlockTextAlign,
+  withoutMonoFamily,
+} from './rtl-text';
+
+// `rtl-text` imports `I18nManager` for its direction helpers; the real module
+// is Flow-syntax source this node project cannot load. Hoisted so a test can
+// flip the interface direction between calls.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
+vi.mock('react-native', () => ({ I18nManager: i18nManager }));
+
+// U+0870 and U+089F are the first and last characters of Arabic Extended-B,
+// the block between Arabic Supplement (ends U+077F) and Arabic Extended-A
+// (starts U+08A0). A label using only its characters must still get the
+// joining font the Arabic blocks select.
+const FIRST_EXTENDED_B = '\u0870';
+const LAST_EXTENDED_B = '\u089F';
+
+describe('hasRtlScript', () => {
+  it('detects a label written only in Arabic Extended-B characters', () => {
+    expect(hasRtlScript(FIRST_EXTENDED_B + LAST_EXTENDED_B)).toBe(true);
+  });
+
+  it('detects the Arabic blocks around Arabic Extended-B', () => {
+    expect(hasRtlScript('\u06FF')).toBe(true);
+    expect(hasRtlScript('\u077F')).toBe(true);
+    expect(hasRtlScript('\u08A0')).toBe(true);
+    expect(hasRtlScript('\uFB50')).toBe(true);
+    expect(hasRtlScript('\uFE70')).toBe(true);
+  });
+
+  // Hebrew is an RTL locale the app ships (`RTL_LANGUAGES` in
+  // `@/i18n/languages`) and is not Arabic script, so the Arabic-only predicate
+  // this replaced left its copy treated like Latin.
+  it('detects the Hebrew block and its presentation forms', () => {
+    expect(hasRtlScript('\u0590')).toBe(true);
+    expect(hasRtlScript('\u05FF')).toBe(true);
+    expect(hasRtlScript('\uFB1D')).toBe(true);
+    expect(hasRtlScript('\uFB4F')).toBe(true);
+  });
+
+  it('detects a Hebrew label', () => {
+    expect(hasRtlScript('פעילים עכשיו')).toBe(true);
+  });
+
+  it('walks the child tree to reach an Extended-B label', () => {
+    expect(hasRtlScript(createElement('Text', null, FIRST_EXTENDED_B))).toBe(true);
+  });
+
+  it('leaves Latin copy alone', () => {
+    expect(hasRtlScript('Live now')).toBe(false);
+  });
+
+  // The script detection the RTL label treatment was first built on: a plain
+  // string, a mixed array, and a nested element all reach the copy, so a label
+  // that mixes scripts counts as RTL script.
+  it('detects an Arabic string', () => {
+    expect(hasRtlScript('الجلسات الجارية الآن')).toBe(true);
+  });
+
+  it('detects Arabic inside a mixed array of strings', () => {
+    expect(hasRtlScript(['LIVE NOW', 'عرض الكل'])).toBe(true);
+  });
+
+  it('checks every item of an array', () => {
+    expect(hasRtlScript(['LIVE', 'NOW'])).toBe(false);
+  });
+
+  it('recurses into a nested element', () => {
+    expect(hasRtlScript(createElement('Text', null, 'استكشاف'))).toBe(true);
+  });
+
+  it('is false for a number, a boolean and null', () => {
+    expect(hasRtlScript(42)).toBe(false);
+    expect(hasRtlScript(true)).toBe(false);
+    expect(hasRtlScript(null)).toBe(false);
+  });
+});
+
+describe('containsJoinedScript', () => {
+  it.each([
+    ['Arabic heading', 'التفصيلات'],
+    ['Arabic section label', 'أعلام المميزات'],
+    ['Farsi', 'تنظیمات'],
+    ['Urdu', 'ترجیحات'],
+    ['Kurdish (Sorani)', 'ڕێکخستنەکان'],
+    ['Pashto', 'تنظیمات'],
+    ['Arabic presentation form', '\uFB50\uFB51'],
+    ['a Latin run quoting an Arabic word', 'Saved · محفوظ'],
+  ])('reads a joined script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(true);
+  });
+
+  it.each([
+    ['Arabic base', '\u0600'],
+    ['Arabic Supplement', '\u0750'],
+    ['Arabic Extended-B', '\u0870'],
+    ['Arabic Extended-A', '\u08A0'],
+    ['Arabic Presentation Forms-A', '\uFB50'],
+    ['Arabic Presentation Forms-B', '\uFE70'],
+  ])('detects a glyph from %s', (_name, value) => {
+    expect(containsJoinedScript(value)).toBe(true);
+  });
+
+  // Arabic Extended-B sits between Arabic Supplement and Arabic Extended-A;
+  // `hasRtlScript` reads it for the mono family, so the reset reads it too.
+  it('detects a label written only in Arabic Extended-B', () => {
+    expect(containsJoinedScript(FIRST_EXTENDED_B + LAST_EXTENDED_B)).toBe(true);
+  });
+
+  it.each(['الجلسات الجارية الآن', 'الرئيسية', 'الوكلاء', 'الملف الشخصي', 'عرض الكل'])(
+    'detects Arabic in %j',
+    value => {
+      expect(containsJoinedScript(value)).toBe(true);
+    }
+  );
+
+  it.each([
+    ['English', 'Preferences'],
+    ['Hebrew (right-to-left, not joined)', 'הגדרות'],
+    ['Greek', 'Ρυθμίσεις'],
+    ['Cyrillic', 'Настройки'],
+    ['a number', '1.0.12'],
+  ])('does not read a joined script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(false);
+  });
+
+  it('detects Arabic inside a mixed array of strings', () => {
+    expect(containsJoinedScript(['عرض', ' ', 'الكل'])).toBe(true);
+    expect(containsJoinedScript(['Live now', 'عرض الكل'])).toBe(true);
+  });
+
+  it('reads every string in a child array and ignores non-text children', () => {
+    expect(containsJoinedScript(['المظهر', undefined, 3, null])).toBe(true);
+    expect(containsJoinedScript(['Appearance', 3])).toBe(false);
+    expect(containsJoinedScript(3)).toBe(false);
+  });
+
+  it('is false for Latin, Hebrew, digits and punctuation', () => {
+    expect(containsJoinedScript('Live now')).toBe(false);
+    expect(containsJoinedScript('SEE ALL')).toBe(false);
+    expect(containsJoinedScript('שלום')).toBe(false);
+    expect(containsJoinedScript('1234 56.7%!?')).toBe(false);
+    expect(containsJoinedScript(['Live now', '1234'])).toBe(false);
+  });
+
+  it('is false for empty children', () => {
+    expect(containsJoinedScript(undefined)).toBe(false);
+    expect(containsJoinedScript(null)).toBe(false);
+    expect(containsJoinedScript(false)).toBe(false);
+    expect(containsJoinedScript([])).toBe(false);
+    expect(containsJoinedScript('')).toBe(false);
+  });
+
+  it('is false for number and element children', () => {
+    expect(containsJoinedScript(4)).toBe(false);
+    expect(containsJoinedScript(createElement('Text', null, 'الرئيسية'))).toBe(false);
+  });
+
+  it('leaves a nested element to its own run', () => {
+    // A nested Text is a separate run and applies its own letter spacing.
+    expect(containsJoinedScript(createElement('Text', null, 'التفصيلات'))).toBe(false);
+  });
+});
+
+describe('withoutMonoFamily', () => {
+  it('drops the mono family and preserves the remaining order', () => {
+    expect(withoutMonoFamily('font-mono-medium text-[10px] uppercase text-muted-foreground')).toBe(
+      'text-[10px] uppercase text-muted-foreground'
+    );
+  });
+
+  it('drops a variant-prefixed mono family', () => {
+    expect(withoutMonoFamily('dark:font-mono-semibold text-sm')).toBe('text-sm');
+  });
+
+  it('keeps an unrelated token that merely starts with font-mono', () => {
+    expect(withoutMonoFamily('font-mono-bold text-sm')).toBe('font-mono-bold text-sm');
+  });
+});
+
+describe('rtlBlockTextAlign', () => {
+  // A native markdown paragraph resolves its direction from its first strong
+  // character, so an English reply would sit at the left edge of an Arabic
+  // interface while the rows around it sit on the start edge.
+  it('names the start edge in a right-to-left interface', () => {
+    expect(rtlBlockTextAlign(true)).toEqual({ textAlign: 'right' });
+  });
+
+  it('leaves the renderer its natural alignment in a left-to-right interface', () => {
+    expect(rtlBlockTextAlign(false)).toEqual({});
+  });
+});
+
+describe('ltrValueTextStyle', () => {
+  it('keeps a value in its natural left alignment in a left-to-right interface', () => {
+    expect(ltrValueTextStyle()).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+
+  // A path starts with a neutral character and a number can carry a sign, so a
+  // right-to-left paragraph would move either to the other end of the run. The
+  // alignment puts the block under its label, which already uses that edge.
+  it('pins a value to left-to-right order on the interface start edge in a right-to-left interface', () => {
+    i18nManager.isRTL = true;
+    try {
+      expect(ltrValueTextStyle()).toEqual({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+        textAlign: 'right',
+      });
+    } finally {
+      i18nManager.isRTL = false;
+    }
+    expect(ltrValueTextStyle().textAlign).toBeUndefined();
+  });
+});

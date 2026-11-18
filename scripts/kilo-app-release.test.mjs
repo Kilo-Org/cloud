@@ -1,0 +1,2876 @@
+import assert from 'node:assert/strict';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import http from 'node:http';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { deflateRawSync } from 'node:zlib';
+
+import {
+  hasSectionHeading,
+  insertSection,
+  isVersionBumpCommit,
+  linkPullRequest,
+  noteLineProblem,
+  notesRetryBaseMs,
+  notesRetryDelayMs,
+  parseConfigVersion,
+  readerFacingSubject,
+  sectionHeading,
+  splitSections,
+  versionPauseMs,
+} from './kilo-app-release-notes.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const NOTES = join(HERE, 'kilo-app-release-notes.mjs');
+const REWRITE_HISTORY = join(HERE, 'kilo-app-changelog-rewrite-history.mjs');
+const CAP = join(HERE, 'kilo-app-release-upload-cap.mjs');
+
+// A developer's own key must never turn a unit test into a live gateway call,
+// so every run starts with the rewrite's environment blank and a test opts in
+// with its own `env`.
+function scriptEnv(options = {}) {
+  return {
+    ...process.env,
+    KILO_CHANGELOG_API_KEY: '',
+    KILO_CHANGELOG_BASE_URL: '',
+    KILO_CHANGELOG_TIMEOUT_MS: '',
+    KILO_CHANGELOG_RETRY_BASE_MS: '',
+    // The history rewrite pauses 3 s between versions; a unit test must not.
+    KILO_CHANGELOG_VERSION_PAUSE_MS: '0',
+    ...options.env,
+  };
+}
+
+function runScript(script, args, options = {}) {
+  return spawnSync(process.execPath, [script, ...args], {
+    encoding: 'utf8',
+    ...options,
+    env: scriptEnv(options),
+  });
+}
+
+/**
+ * The same run without blocking this process: the fake gateway lives here, so a
+ * synchronous spawn would stall the server that has to answer it.
+ */
+function runScriptAsync(script, args, options = {}) {
+  return new Promise(resolve => {
+    const child = spawn(process.execPath, [script, ...args], {
+      ...options,
+      env: scriptEnv(options),
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    child.on('close', status => resolve({ status, stdout, stderr }));
+  });
+}
+
+function git(cwd, args, options = {}) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    ...options,
+  });
+}
+
+function tempDir(prefix) {
+  return mkdtempSync(join(tmpdir(), prefix));
+}
+
+function initRepo(prefix) {
+  const dir = tempDir(prefix);
+  git(dir, ['init', '-q', '-b', 'main']);
+  git(dir, ['config', 'user.name', 'Kilo Test']);
+  git(dir, ['config', 'user.email', 'test@kilo.ai']);
+  git(dir, ['config', 'commit.gpgsign', 'false']);
+  git(dir, ['config', 'tag.gpgsign', 'false']);
+  return dir;
+}
+
+function writeFixture(dir, rel, content) {
+  const full = join(dir, rel);
+  mkdirSync(dirname(full), { recursive: true });
+  writeFileSync(full, content);
+  return full;
+}
+
+function commit(dir, files, subject, env = {}) {
+  for (const [rel, content] of Object.entries(files)) {
+    writeFixture(dir, rel, content);
+  }
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', subject], { env: { ...process.env, ...env } });
+}
+
+function tagAt(dir, name, unixSeconds) {
+  git(dir, ['tag', '-a', name, '-m', name], {
+    env: { ...process.env, GIT_COMMITTER_DATE: new Date(unixSeconds * 1000).toISOString() },
+  });
+}
+
+// The version-bump branch the release workflow creates: main plus a commit that
+// changes the app.config.ts version line and nothing else. A land only accepts
+// a branch of that shape.
+function pushBumpBranch(seed, branch, fromVersion, toVersion) {
+  const configPath = 'apps/mobile/app.config.ts';
+  const config = readFileSync(join(seed, configPath), 'utf8');
+  git(seed, ['checkout', '-q', '-b', branch]);
+  writeFixture(
+    seed,
+    configPath,
+    config.replace(`  version: '${fromVersion}',`, `  version: '${toVersion}',`)
+  );
+  git(seed, ['add', '-A']);
+  git(seed, ['commit', '-q', '-m', `chore(kilo-app): bump version to ${toVersion}`]);
+  git(seed, ['push', '-q', 'origin', branch]);
+}
+
+function cleanup(dir) {
+  rmSync(dir, { recursive: true, force: true });
+}
+
+// Minimal ZIP writer (local headers + central directory + EOCD), copied from
+// scripts/inspect-mobile-artifacts.test.mjs so the IPA fixture is self-contained.
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function writeZip(outputPath, entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  for (const [name, content] of entries) {
+    const nameBuffer = Buffer.from(name, 'utf8');
+    const dataBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+    const compressed = deflateRawSync(dataBuffer);
+    const entryCrc = crc32(dataBuffer);
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(8, 8);
+    localHeader.writeUInt16LE(0, 10);
+    localHeader.writeUInt16LE(0, 12);
+    localHeader.writeUInt32LE(entryCrc, 14);
+    localHeader.writeUInt32LE(compressed.length, 18);
+    localHeader.writeUInt32LE(dataBuffer.length, 22);
+    localHeader.writeUInt16LE(nameBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+    localParts.push(localHeader, nameBuffer, compressed);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x0800, 8);
+    centralHeader.writeUInt16LE(8, 10);
+    centralHeader.writeUInt16LE(0, 12);
+    centralHeader.writeUInt16LE(0, 14);
+    centralHeader.writeUInt32LE(entryCrc, 16);
+    centralHeader.writeUInt32LE(compressed.length, 20);
+    centralHeader.writeUInt32LE(dataBuffer.length, 24);
+    centralHeader.writeUInt16LE(nameBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralParts.push(centralHeader, nameBuffer);
+
+    offset += localHeader.length + nameBuffer.length + compressed.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralDirectory.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  writeFileSync(outputPath, Buffer.concat([...localParts, centralDirectory, eocd]));
+}
+
+function plistWith({ bundleVersion, shortVersion }) {
+  const keys = [];
+  if (bundleVersion !== undefined) {
+    keys.push(`  <key>CFBundleVersion</key>\n  <string>${bundleVersion}</string>`);
+  }
+  if (shortVersion !== undefined) {
+    keys.push(`  <key>CFBundleShortVersionString</key>\n  <string>${shortVersion}</string>`);
+  }
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    '<dict>',
+    ...keys,
+    '</dict>',
+    '</plist>',
+    '',
+  ].join('\n');
+}
+
+function ipaFixture(dir, plist) {
+  const path = join(dir, 'app.ipa');
+  writeZip(path, [['Payload/Kilo.app/Info.plist', plist]]);
+  return path;
+}
+
+test('body lists app PRs oldest first and drops bumps, non-app, app-local, changelog and unnumbered commits', () => {
+  const dir = initRepo('kilo-notes-body-');
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(dir, { 'apps/mobile/src/second.ts': 'second\n' }, 'fix(mobile): second (#101)');
+    commit(dir, { 'apps/web/src/third.ts': 'third\n' }, 'feat(web): third (#102)');
+    commit(
+      dir,
+      { 'apps/mobile/app.config.ts': "  version: '1.0.13',\n" },
+      'chore(kilo-app): bump version to 1.0.13 (#103)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/CHANGELOG.md': '# changelog\n' },
+      'docs(kilo-app): changelog for 1.0.12 (build 42) (#104)'
+    );
+    commit(dir, { 'apps/mobile/src/fourth.ts': 'fourth\n' }, 'fix(mobile): no pull request ref');
+    // App-local files cannot reach the bundle, so the release workflow does not
+    // treat them as a release reason and the notes must not list them either.
+    commit(dir, { 'apps/mobile/src/second.test.ts': 'test\n' }, 'test(mobile): second (#105)');
+    commit(dir, { 'apps/mobile/.oxlintrc.json': '{}\n' }, 'chore(mobile): lint config (#106)');
+    commit(dir, { 'apps/mobile/README.md': '# readme\n' }, 'docs(mobile): readme (#107)');
+    git(dir, ['tag', 'nopr']);
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
+
+    const empty = runScript(NOTES, ['body', '--from', 'nopr'], { cwd: dir });
+    assert.equal(empty.status, 0, empty.stderr);
+    assert.equal(empty.stdout, '- No user-visible changes since the previous build.\n');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('body keeps the subjects a reader sees and drops the rest', () => {
+  const dir = initRepo('kilo-notes-reader-');
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(
+      dir,
+      { 'apps/mobile/src/demo.ts': 'demo\n' },
+      'feat(mobile): add flag-gated native remote demo (#110)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/sync.ts': 'sync\n' },
+      'fix(mobile): bound native sync recovery by socket generation (#111)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/padding.ts': 'padding\n' },
+      'fix(mobile): align Spend alerts card padding with the info card (#112)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/label.ts': 'label\n' },
+      'fix(mobile): drop the redundant Members section label (#113)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/glance.ts': 'glance\n' },
+      'fix(mobile): answer the request a glanceable approval names (#114)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/signin.ts': 'signin\n' },
+      'fix(auth): link same-email sign-ins (#115)'
+    );
+    // A catalog fix stays: the screen folds a version's language bullets into
+    // one line in the reader's own language, so it needs them.
+    commit(
+      dir,
+      { 'apps/mobile/src/igbo.ts': 'igbo\n' },
+      'fix(mobile): correct the Igbo code reviewer copy (#116)'
+    );
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    // The catalog fix's `mobile` scope names no area, and `auth` maps, so the
+    // section names the one area its fixes reached.
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: signIn', ''].join('\n'));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('body lists the newest features under New and the fix areas under Fixes', () => {
+  const dir = initRepo('kilo-notes-curated-');
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(dir, { 'apps/mobile/src/a.ts': 'a\n' }, 'feat(chat): keep the composer visible (#121)');
+    commit(dir, { 'apps/mobile/src/b.ts': 'b\n' }, 'feat(security-agent): name the scope (#122)');
+    commit(dir, { 'apps/mobile/src/c.ts': 'c\n' }, 'fix(auth): link same-email sign-ins (#123)');
+    commit(dir, { 'apps/mobile/src/d.ts': 'd\n' }, 'fix(chat): steady the toolbar (#124)');
+    commit(
+      dir,
+      { 'apps/mobile/src/e.ts': 'e\n' },
+      'fix(notifications): lead with the message (#125)'
+    );
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- feat(security-agent): name the scope ([#122](https://github.com/Kilo-Org/cloud/pull/122))',
+        '- feat(chat): keep the composer visible ([#121](https://github.com/Kilo-Org/cloud/pull/121))',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat, signIn, notifications',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('readerFacingSubject classifies a subject and links it', () => {
+  assert.deepEqual(readerFacingSubject('Quick Chat polish: bubble width (#117)'), {
+    kind: 'new',
+    text: 'Quick Chat polish: bubble width ([#117](https://github.com/Kilo-Org/cloud/pull/117))',
+    scope: undefined,
+  });
+  assert.deepEqual(readerFacingSubject('feat(mobile): add on-device Gemini Nano (#118)'), {
+    kind: 'new',
+    text: 'feat(mobile): add on-device Gemini Nano ([#118](https://github.com/Kilo-Org/cloud/pull/118))',
+    scope: 'mobile',
+  });
+  assert.equal(readerFacingSubject('fix(security-agent): name the scope (#121)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('docs(mobile): correct a comment (#119)'), null);
+  assert.equal(
+    readerFacingSubject('feat(mobile): add shared client transport and web demo (#120)'),
+    null
+  );
+  // Backend, web and API work never reaches the phone app's notes.
+  assert.equal(readerFacingSubject('feat(ai-gateway): serve /api/v1 (#126)'), null);
+  assert.equal(readerFacingSubject('feat(web-shared): add a header (#127)'), null);
+  assert.equal(readerFacingSubject('feat(mobile): record push history over tRPC (#128)'), null);
+  assert.equal(readerFacingSubject('feat(chat): expose the API route (#129)'), null);
+  // A removal or a restriction is a change, but it is not a new feature.
+  assert.equal(readerFacingSubject('feat(kilo-pass): stop in-app sales (#130)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('feat(credits): expire paid credits (#131)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('feat(chat): remove the old composer (#132)')?.kind, 'fix');
+});
+
+test('linkPullRequest links only the trailing pull-request ref', () => {
+  assert.equal(
+    linkPullRequest('fix(mobile): keep (#4) open (#101)'),
+    'fix(mobile): keep (#4) open ([#101](https://github.com/Kilo-Org/cloud/pull/101))'
+  );
+  assert.equal(linkPullRequest('feat(mobile): no ref'), 'feat(mobile): no ref');
+});
+
+test('body prints the initial-release marker without --from', () => {
+  const result = runScript(NOTES, ['body']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '- Initial release: no earlier build to compare against.\n');
+});
+
+test('body exits 2 naming an unresolvable --from ref', () => {
+  const dir = initRepo('kilo-notes-badref-');
+  try {
+    const result = runScript(NOTES, ['body', '--from', 'no-such-ref'], { cwd: dir });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /no-such-ref/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+/**
+ * A local OpenAI-compatible gateway. `answer` writes one completion for each
+ * request, so a test can return canned JSON, invalid JSON, or leave the request
+ * hanging for the timeout path. Nothing here reaches the network.
+ */
+async function fakeGateway(answer) {
+  const requests = [];
+  const server = http.createServer((request, response) => {
+    let body = '';
+    request.on('data', chunk => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      const parsed = {
+        authorization: request.headers.authorization,
+        url: request.url,
+        body: JSON.parse(body),
+        at: Date.now(),
+      };
+      requests.push(parsed);
+      answer(response, parsed);
+    });
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    requests,
+    close: () =>
+      new Promise(resolve => {
+        server.close(resolve);
+        server.closeAllConnections();
+      }),
+  };
+}
+
+/** A chat completion carrying `answer` as its message. */
+function completion(answer) {
+  return { choices: [{ message: { role: 'assistant', content: JSON.stringify(answer) } }] };
+}
+
+function reply(response, payload) {
+  response.writeHead(200, { 'content-type': 'application/json' });
+  response.end(JSON.stringify(payload));
+}
+
+/** A non-200 answer, the shape the gateway uses when it rate-limits a call. */
+function replyStatus(response, status, headers = {}) {
+  response.writeHead(status, { 'content-type': 'text/plain', ...headers });
+  response.end(`status ${status}`);
+}
+
+/** Two shippable commits after the `base` tag: one feature, one fix. */
+function rewriteRepo(prefix) {
+  const dir = initRepo(prefix);
+  commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+  git(dir, ['tag', 'base']);
+  commit(dir, { 'apps/mobile/src/a.ts': 'a\n' }, 'feat(chat): keep the composer visible (#121)');
+  commit(dir, { 'apps/mobile/src/b.ts': 'b\n' }, 'fix(auth): link same-email sign-ins (#123)');
+  return dir;
+}
+
+/** The deterministic block `body` writes when the rewrite is unavailable. */
+const DETERMINISTIC_BODY = [
+  '### New',
+  '',
+  '- feat(chat): keep the composer visible ([#121](https://github.com/Kilo-Org/cloud/pull/121))',
+  '',
+  '### Fixes',
+  '',
+  '- areas: signIn',
+  '',
+].join('\n');
+
+test('noteLineProblem rejects a pull request reference but not a counted number', () => {
+  assert.equal(noteLineProblem('Keep the composer visible (#121)'), 'a pull request reference');
+  assert.equal(noteLineProblem('Keep the composer visible #121)'), 'a pull request reference');
+  assert.equal(noteLineProblem('Keep the composer visible #121'), 'a pull request reference');
+  assert.equal(noteLineProblem('See [#121]'), 'a pull request reference');
+  assert.equal(noteLineProblem('See pull/121'), 'a pull request reference');
+  // A number the copy counts is not a pull request reference.
+  assert.equal(noteLineProblem('Ranked #1 for speed in the store'), null);
+  assert.equal(noteLineProblem('The #1 request from users is now one tap away'), null);
+});
+
+test('body writes the generic fixes line when the answer names no area', async () => {
+  const dir = initRepo('kilo-notes-generic-');
+  const gateway = await fakeGateway(response =>
+    reply(response, completion({ new: [], changes: [], areas: [] }))
+  );
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    // An unscoped fix names no product area, so the model has nothing to list.
+    commit(
+      dir,
+      { 'apps/mobile/src/a.ts': 'a\n' },
+      'fix(mobile): keep the sheet from jumping (#130)'
+    );
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when the answer names the generic area itself', async () => {
+  const dir = initRepo('kilo-notes-generic-reject-');
+  const gateway = await fakeGateway(response =>
+    reply(response, completion({ new: [], changes: [], areas: ['app'] }))
+  );
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(
+      dir,
+      { 'apps/mobile/src/a.ts': 'a\n' },
+      'fix(mobile): keep the sheet from jumping (#130)'
+    );
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /unknown area: app/);
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body writes the model rewrite when the gateway answers with valid notes', async () => {
+  const dir = rewriteRepo('kilo-notes-model-');
+  const gateway = await fakeGateway(response =>
+    reply(
+      response,
+      completion({
+        new: ['Keep the composer visible while you read older messages'],
+        changes: [],
+        areas: ['chat', 'signIn'],
+      })
+    )
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat, signIn',
+        '',
+      ].join('\n')
+    );
+    assert.equal(gateway.requests.length, 1, 'one rewrite per version');
+    const request = gateway.requests[0];
+    assert.equal(request.authorization, 'Bearer test-key');
+    // The briefing's working call: the chat completions route under
+    // `/api/openrouter`, a non-streamed body, and a cap sized for a reasoning
+    // model's hidden tokens before the answer.
+    assert.equal(request.url, '/api/openrouter/chat/completions');
+    assert.equal(request.body.stream, false);
+    assert.equal(request.body.max_tokens, 16_384);
+    assert.equal('temperature' in request.body, false);
+    assert.equal(request.body.model, '~deepseek/deepseek-flash-latest');
+    const prompt = request.body.messages.map(message => message.content).join('\n');
+    assert.match(prompt, /new \| chat \| feat\(chat\): keep the composer visible/);
+    assert.match(prompt, /fix \| signIn \| fix\(auth\): link same-email sign-ins/);
+    assert.doesNotMatch(prompt, /first \(#100\)/, 'a pre-range commit must not reach the model');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body reads the answer past a reasoning field, a preamble and a fence', async () => {
+  const dir = rewriteRepo('kilo-notes-reasoning-');
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            reasoning: 'One object, three lists, plain words.',
+            content: [
+              'Here are the notes:',
+              '```json',
+              JSON.stringify({
+                new: ['Keep the composer visible while you read older messages'],
+                changes: [],
+                areas: ['chat'],
+              }),
+              '```',
+              'That is all.',
+            ].join('\n'),
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body skips an echoed placeholder shape and reads the answer after it', async () => {
+  const dir = rewriteRepo('kilo-notes-placeholder-');
+  const placeholder = '{"new":["..."],"changes":["..."],"areas":["..."]}';
+  const answer = JSON.stringify({
+    new: ['Keep the composer visible while you read older messages'],
+    changes: [],
+    areas: ['chat'],
+  });
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: `I will reply in the requested shape:\n${placeholder}\n\n${answer}`,
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body keeps a URL reason when the answer carries an object of its own', async () => {
+  const dir = rewriteRepo('kilo-notes-nested-object-');
+  // The only answer: one line quotes an empty object and one carries a URL, so
+  // validation fails for the URL. A scan that resumes inside the answer collects
+  // the `{}` as a later answer and reports its shape error instead.
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              new: ['Tap {} to collapse a group', 'Download at https://example.com'],
+              changes: [],
+              areas: ['chat'],
+            }),
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /contained a URL/);
+    assert.doesNotMatch(result.stderr, /expected shape/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body names a reasoning-only answer, and does not log its reasoning', async () => {
+  const dir = rewriteRepo('kilo-notes-reasoning-only-');
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'length',
+          message: { role: 'assistant', content: '', reasoning: 'First I read\nthe diff.' },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+    assert.match(result.stderr, /finish_reason length/);
+    assert.match(result.stderr, /0 content characters/);
+    assert.match(result.stderr, /a reasoning field present/);
+    assert.doesNotMatch(result.stderr, /First I read/, 'the reasoning is not the answer');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body names a truncated answer with the start of its content', async () => {
+  const dir = rewriteRepo('kilo-notes-truncated-');
+  const truncated = '{"new":["Keep the composer visible while you';
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [{ finish_reason: 'length', message: { role: 'assistant', content: truncated } }],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+    assert.match(result.stderr, /finish_reason length/);
+    assert.match(result.stderr, new RegExp(`${truncated.length} content characters`));
+    assert.match(result.stderr, /no reasoning field/);
+    // The excerpt is JSON-quoted, so a quote in the model's text cannot end it.
+    assert.ok(
+      result.stderr.includes(`content starts ${JSON.stringify(truncated)}`),
+      `the diagnostic must show the content's start: ${result.stderr}`
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back to the deterministic block when the answer is not JSON', async () => {
+  const dir = rewriteRepo('kilo-notes-invalid-json-');
+  const gateway = await fakeGateway(response =>
+    reply(response, { choices: [{ message: { content: 'I cannot help with that.' } }] })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when the answer does not match the schema', async () => {
+  const dir = rewriteRepo('kilo-notes-schema-');
+  const gateway = await fakeGateway(response =>
+    reply(response, completion({ new: 'one line', changes: [], areas: [] }))
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /expected shape/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when a line names a code identifier', async () => {
+  const dir = rewriteRepo('kilo-notes-code-');
+  const gateway = await fakeGateway(response =>
+    reply(
+      response,
+      completion({
+        new: ['Call getUser() from apps/mobile to keep the composer'],
+        changes: [],
+        areas: ['chat', 'signIn'],
+      })
+    )
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /code identifier/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when a line carries a pull request reference', async () => {
+  const dir = rewriteRepo('kilo-notes-pr-');
+  const gateway = await fakeGateway(response =>
+    reply(
+      response,
+      completion({
+        new: ['Keep the composer visible (#121)'],
+        changes: [],
+        areas: ['chat', 'signIn'],
+      })
+    )
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /pull request reference/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when the gateway does not answer before the timeout', async () => {
+  const dir = rewriteRepo('kilo-notes-timeout-');
+  const gateway = await fakeGateway(() => {
+    // Leave the request open: only the client's own timeout ends it.
+  });
+  try {
+    const started = Date.now();
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_TIMEOUT_MS: '200',
+      },
+    });
+    const elapsed = Date.now() - started;
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /did not answer within 200ms/);
+    assert.ok(elapsed < 10_000, `the timeout must end the wait, took ${elapsed}ms`);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body retries a rate-limited call and writes the curated answer', async () => {
+  const dir = rewriteRepo('kilo-notes-429-');
+  let calls = 0;
+  const gateway = await fakeGateway(response => {
+    calls += 1;
+    if (calls === 1) {
+      replyStatus(response, 429);
+      return;
+    }
+    reply(
+      response,
+      completion({
+        new: ['Keep the composer visible while you read older messages'],
+        changes: [],
+        areas: ['chat'],
+      })
+    );
+  });
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_RETRY_BASE_MS: '1',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(gateway.requests.length, 2, 'one retry after the 429');
+    assert.match(result.stderr, /answered HTTP 429; retrying in \d+ms \(retry 1 of 3\)/);
+    assert.doesNotMatch(result.stderr, /test-key/, 'the retry line must not carry the key');
+    assert.match(result.stdout, /^- Keep the composer visible while you read older messages$/m);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back after three retries of a rate-limited gateway', async () => {
+  const dir = rewriteRepo('kilo-notes-429-all-');
+  const gateway = await fakeGateway(response => replyStatus(response, 429));
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_RETRY_BASE_MS: '1',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.equal(gateway.requests.length, 4, 'the first call plus three retries');
+    assert.equal(result.stderr.match(/retrying in/g)?.length, 3);
+    assert.match(result.stderr, /answered HTTP 429/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body retries while the gateway sheds load and then writes the curated answer', async () => {
+  const dir = rewriteRepo('kilo-notes-503-');
+  let calls = 0;
+  const gateway = await fakeGateway(response => {
+    calls += 1;
+    if (calls === 1) {
+      replyStatus(response, 503);
+      return;
+    }
+    reply(
+      response,
+      completion({
+        new: ['Keep the composer visible while you read older messages'],
+        changes: [],
+        areas: ['chat'],
+      })
+    );
+  });
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_RETRY_BASE_MS: '1',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(gateway.requests.length, 2, 'one retry after the 503');
+    assert.match(result.stderr, /answered HTTP 503; retrying in \d+ms \(retry 1 of 3\)/);
+    assert.match(result.stdout, /^- Keep the composer visible while you read older messages$/m);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the retry base defaults to 5 s unless it is a number', () => {
+  assert.equal(notesRetryBaseMs(''), 5000, 'a blank override is unset');
+  assert.equal(notesRetryBaseMs('   '), 5000);
+  assert.equal(notesRetryBaseMs('not-a-number'), 5000);
+  assert.equal(notesRetryBaseMs('-1'), 5000);
+  assert.equal(notesRetryBaseMs('1'), 1);
+  assert.equal(notesRetryBaseMs('0'), 0);
+});
+
+test('body honors a short Retry-After before retrying', async () => {
+  const dir = rewriteRepo('kilo-notes-429-after-');
+  let calls = 0;
+  const gateway = await fakeGateway(response => {
+    calls += 1;
+    if (calls === 1) {
+      replyStatus(response, 429, { 'retry-after': '0.2' });
+      return;
+    }
+    reply(
+      response,
+      completion({ new: ['Keep the composer visible while you read older messages'], changes: [] })
+    );
+  });
+  try {
+    const started = Date.now();
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_RETRY_BASE_MS: '1',
+      },
+    });
+    const elapsed = Date.now() - started;
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(gateway.requests.length, 2);
+    assert.match(result.stderr, /retrying in 200ms/);
+    assert.ok(elapsed >= 190, `the header's wait must be observed, took ${elapsed}ms`);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('a retry wait takes Retry-After but never more than 30 s', () => {
+  assert.equal(notesRetryDelayMs(1, '2'), 2000);
+  assert.equal(notesRetryDelayMs(1, '3600'), 30_000, 'a header over the cap is clamped');
+  const inFive = new Date(Date.now() + 5000).toUTCString();
+  const dated = notesRetryDelayMs(1, inFive);
+  assert.ok(dated > 3000 && dated <= 5000, `an HTTP date is honored, got ${dated}`);
+  // Without the header the wait doubles from the injected base, with jitter.
+  assert.ok(notesRetryDelayMs(1, null, 1) >= 1 && notesRetryDelayMs(1, null, 1) <= 2);
+  assert.ok(notesRetryDelayMs(3, null, 1) >= 4 && notesRetryDelayMs(3, null, 1) <= 5);
+  const unreadable = notesRetryDelayMs(1, 'not-a-date', 100);
+  assert.ok(
+    unreadable >= 100 && unreadable <= 125,
+    `an unreadable header backs off, got ${unreadable}`
+  );
+});
+
+test('body does not retry a gateway error that is not rate limiting', async () => {
+  const dir = rewriteRepo('kilo-notes-500-');
+  const gateway = await fakeGateway(response => replyStatus(response, 500));
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_RETRY_BASE_MS: '1',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.equal(gateway.requests.length, 1, 'a 500 is not retried');
+    assert.match(result.stderr, /answered HTTP 500/);
+    assert.doesNotMatch(result.stderr, /retrying in/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the version pause defaults to 3 s and reads its override', () => {
+  assert.equal(versionPauseMs(''), 3000);
+  assert.equal(versionPauseMs('not-a-number'), 3000);
+  assert.equal(versionPauseMs('0'), 0);
+  assert.equal(versionPauseMs('750'), 750);
+});
+
+test('body writes the deterministic block without calling the gateway when the key is unset', async () => {
+  const dir = rewriteRepo('kilo-notes-nokey-');
+  const gateway = await fakeGateway(response => reply(response, completion({ new: [] })));
+  try {
+    const result = runScript(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /KILO_CHANGELOG_API_KEY is not set/);
+    assert.equal(gateway.requests.length, 0, 'no key means no call');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+const HISTORY_CHANGELOG = `# Kilo App Changelog
+
+Newest first: one section per store build.
+
+## 1.0.15 (build 710 iOS, 711 Android)
+
+- feat(auth): link same-email sign-ins ([#10334](https://github.com/Kilo-Org/cloud/pull/10334))
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+- fix(chat): steady the toolbar ([#101](https://github.com/Kilo-Org/cloud/pull/101))
+
+## 1.0.14 (build 700 iOS, 701 Android)
+
+- feat(chat): keep the composer visible ([#99](https://github.com/Kilo-Org/cloud/pull/99))
+`;
+
+/** The history rewrite's canned answers, chosen by the subject in the prompt. */
+function historyAnswer(request) {
+  const prompt = request.body.messages[request.body.messages.length - 1].content;
+  if (prompt.includes('link same-email sign-ins')) {
+    return {
+      new: ['Sign in once and stay signed in'],
+      changes: [],
+      areas: ['chat'],
+    };
+  }
+  return {
+    new: ['Keep the composer visible while you read older messages'],
+    changes: [],
+    areas: [],
+  };
+}
+
+test('the history rewrite curates every shipped version and is idempotent', async () => {
+  const dir = initRepo('kilo-notes-history-');
+  const changelog = writeFixture(dir, 'apps/mobile/CHANGELOG.md', HISTORY_CHANGELOG);
+  const gateway = await fakeGateway((response, request) =>
+    reply(response, completion(historyAnswer(request)))
+  );
+  try {
+    const env = {
+      KILO_CHANGELOG_API_KEY: 'test-key',
+      KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+    };
+    const result = await runScriptAsync(REWRITE_HISTORY, [], { cwd: dir, env });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /curated 2 version\(s\)/);
+    const written = readFileSync(changelog, 'utf8');
+    assert.equal(
+      written,
+      `# Kilo App Changelog
+
+Newest first: one section per store build.
+
+## 1.0.15 (build 710 iOS, 711 Android)
+
+### New
+
+- Sign in once and stay signed in
+
+### Fixes
+
+- areas: chat
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+_Its notes are on the newest 1.0.15 section above._
+
+## 1.0.14 (build 700 iOS, 701 Android)
+
+### New
+
+- Keep the composer visible while you read older messages
+`
+    );
+    const second = await runScriptAsync(REWRITE_HISTORY, [], { cwd: dir, env });
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(gateway.requests.length, 2, 'a curated file is not sent again');
+    assert.equal(readFileSync(changelog, 'utf8'), written, 'a second run changes nothing');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the history rewrite pauses between versions', async () => {
+  const dir = initRepo('kilo-notes-history-pause-');
+  writeFixture(dir, 'apps/mobile/CHANGELOG.md', HISTORY_CHANGELOG);
+  const gateway = await fakeGateway((response, request) =>
+    reply(response, completion(historyAnswer(request)))
+  );
+  try {
+    const result = await runScriptAsync(REWRITE_HISTORY, [], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_VERSION_PAUSE_MS: '300',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(gateway.requests.length, 2);
+    const gap = gateway.requests[1].at - gateway.requests[0].at;
+    assert.ok(gap >= 250, `the second version waits for the pause, got ${gap}ms`);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the history rewrite lands a partial success and names the versions it left', async () => {
+  const dir = initRepo('kilo-notes-history-partial-');
+  const changelog = writeFixture(dir, 'apps/mobile/CHANGELOG.md', HISTORY_CHANGELOG);
+  const gateway = await fakeGateway((response, request) => {
+    const prompt = request.body.messages[request.body.messages.length - 1].content;
+    if (prompt.includes('link same-email sign-ins')) {
+      reply(response, completion(historyAnswer(request)));
+      return;
+    }
+    reply(response, { choices: [{ message: { content: 'not json' } }] });
+  });
+  try {
+    const result = await runScriptAsync(REWRITE_HISTORY, [], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 3, 'a partial rewrite is not a failed run');
+    assert.match(result.stdout, /curated 1 version\(s\)/);
+    assert.match(result.stderr, /1\.0\.14: .*invalid JSON/);
+    assert.match(result.stderr, /still need the rewrite: 1\.0\.14$/m);
+    assert.equal(
+      readFileSync(changelog, 'utf8'),
+      `# Kilo App Changelog
+
+Newest first: one section per store build.
+
+## 1.0.15 (build 710 iOS, 711 Android)
+
+### New
+
+- Sign in once and stay signed in
+
+### Fixes
+
+- areas: chat
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+_Its notes are on the newest 1.0.15 section above._
+
+## 1.0.14 (build 700 iOS, 701 Android)
+
+- feat(chat): keep the composer visible ([#99](https://github.com/Kilo-Org/cloud/pull/99))
+`
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the history rewrite leaves a version it could not curate and exits 1', async () => {
+  const dir = initRepo('kilo-notes-history-fail-');
+  const changelog = writeFixture(dir, 'apps/mobile/CHANGELOG.md', HISTORY_CHANGELOG);
+  const gateway = await fakeGateway(response =>
+    reply(response, { choices: [{ message: { content: 'not json' } }] })
+  );
+  try {
+    const result = await runScriptAsync(REWRITE_HISTORY, [], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /1\.0\.15: .*invalid JSON/);
+    assert.match(result.stderr, /still need the rewrite: 1\.0\.15, 1\.0\.14/);
+    assert.equal(
+      readFileSync(changelog, 'utf8'),
+      HISTORY_CHANGELOG,
+      'a failed version is untouched'
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the history rewrite requires the gateway key', () => {
+  const dir = initRepo('kilo-notes-history-nokey-');
+  try {
+    const result = runScript(REWRITE_HISTORY, [], { cwd: dir });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /KILO_CHANGELOG_API_KEY is required/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('sectionHeading names one build or two', () => {
+  assert.equal(sectionHeading('1.0.12', '42', '42'), '## 1.0.12 (build 42)');
+  assert.equal(sectionHeading('1.0.12', '42', ''), '## 1.0.12 (build 42)');
+  assert.equal(sectionHeading('1.0.12', '42', undefined), '## 1.0.12 (build 42)');
+  assert.equal(sectionHeading('1.0.12', '42', '43'), '## 1.0.12 (build 42 iOS, 43 Android)');
+});
+
+test('parseConfigVersion and isVersionBumpCommit follow the workflow contracts', () => {
+  assert.equal(parseConfigVersion("const c = {\n  version: '1.0.12',\n};\n"), '1.0.12');
+  assert.equal(parseConfigVersion('no version here'), null);
+  assert.equal(
+    isVersionBumpCommit(
+      ['apps/mobile/app.config.ts'],
+      "-  version: '1.0.11',\n+  version: '1.0.12',\n"
+    ),
+    true
+  );
+  assert.equal(
+    isVersionBumpCommit(['apps/mobile/app.config.ts'], "+  version: '1.0.12',\n+  extra: true,\n"),
+    false
+  );
+  assert.equal(isVersionBumpCommit(['apps/mobile/src/a.ts'], "+  version: '1.0.12',\n"), false);
+  assert.equal(
+    isVersionBumpCommit(
+      ['apps/mobile/app.config.ts', 'apps/mobile/CHANGELOG.md'],
+      "-  version: '1.0.11',\n+  version: '1.0.12',\n"
+    ),
+    true
+  );
+  assert.equal(
+    isVersionBumpCommit(
+      ['apps/mobile/app.config.ts', 'apps/mobile/CHANGELOG.md', 'apps/mobile/src/a.ts'],
+      "-  version: '1.0.11',\n+  version: '1.0.12',\n"
+    ),
+    false
+  );
+});
+
+test('body drops the squashed version-bump merge that carries the changelog', () => {
+  const dir = initRepo('kilo-notes-bump-merge-');
+  try {
+    commit(
+      dir,
+      {
+        'apps/mobile/app.config.ts': "  version: '1.0.12',\n",
+        'apps/mobile/CHANGELOG.md':
+          '# Kilo App Changelog\n\n## 1.0.11 (build 56)\n\n- old (#90)\n\n',
+      },
+      'chore(kilo-app): bump version to 1.0.12 (#6999)'
+    );
+    git(dir, ['tag', 'base']);
+    commit(
+      dir,
+      {
+        'apps/mobile/app.config.ts': "  version: '1.0.13',\n",
+        'apps/mobile/CHANGELOG.md':
+          '# Kilo App Changelog\n\n## 1.0.12 (build 57)\n\n- old (#90)\n\n## 1.0.11 (build 56)\n\n- old (#90)\n\n',
+      },
+      'chore(kilo-app): bump version to 1.0.13 (#7000)'
+    );
+    const bumpMerge = git(dir, ['rev-parse', 'HEAD']).trim();
+    commit(dir, { 'apps/mobile/src/next.ts': 'next\n' }, 'fix(mobile): a real fix (#7002)');
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
+
+    const onlyBump = runScript(NOTES, ['body', '--from', 'base', '--to', bumpMerge], { cwd: dir });
+    assert.equal(onlyBump.status, 0, onlyBump.stderr);
+    assert.equal(onlyBump.stdout, '- No user-visible changes since the previous build.\n');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('insertSection keeps every older line and hasSectionHeading detects a duplicate', () => {
+  const older = '# Kilo App Changelog\n\nprose\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n';
+  const section = '## 1.0.12 (build 42)\n\n- new (#91)\n\n';
+  const inserted = insertSection(older, section);
+  assert.equal(
+    inserted,
+    '# Kilo App Changelog\n\nprose\n\n## 1.0.12 (build 42)\n\n- new (#91)\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+  );
+  for (const line of older.split('\n')) {
+    assert.ok(inserted.split('\n').includes(line), `lost older line: ${line}`);
+  }
+  assert.equal(hasSectionHeading(inserted, '## 1.0.12 (build 42)'), true);
+  assert.equal(hasSectionHeading(inserted, '## 1.0.13 (build 43)'), false);
+});
+
+test('write inserts above the newest section and is a no-op on a duplicate heading', () => {
+  const dir = initRepo('kilo-notes-write-');
+  try {
+    const changelog = writeFixture(
+      dir,
+      'apps/mobile/CHANGELOG.md',
+      '# Kilo App Changelog\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+    writeFixture(dir, 'notes.md', '- new (#91)\n- another (#92)\n');
+    const first = runScript(
+      NOTES,
+      ['write', '--version', '1.0.12', '--ios-build', '42', '--body-file', 'notes.md'],
+      { cwd: dir }
+    );
+    assert.equal(first.status, 0, first.stderr);
+    const content = readFileSync(changelog, 'utf8');
+    assert.equal(
+      content,
+      '# Kilo App Changelog\n\n## 1.0.12 (build 42)\n\n- new (#91)\n- another (#92)\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+
+    const second = runScript(
+      NOTES,
+      ['write', '--version', '1.0.12', '--ios-build', '42', '--body-file', 'notes.md'],
+      { cwd: dir }
+    );
+    assert.equal(second.status, 0, second.stderr);
+    assert.match(second.stdout, /changelog: ## 1\.0\.12 \(build 42\) already present/);
+    assert.equal(readFileSync(changelog, 'utf8'), content);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('write --print-only prints the section and touches no file', () => {
+  const dir = initRepo('kilo-notes-print-');
+  try {
+    writeFixture(dir, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--android-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--print-only',
+      ],
+      { cwd: dir }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, '## 1.0.12 (build 42 iOS, 43 Android)\n\n- new (#91)\n\n');
+    assert.equal(existsSync(join(dir, 'apps/mobile/CHANGELOG.md')), false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('identity reads the IPA Info.plist and the Android build number', () => {
+  const dir = initRepo('kilo-notes-identity-');
+  try {
+    writeFixture(dir, 'app.config.ts', "const config = {\n  version: '1.0.12',\n};\n");
+    ipaFixture(dir, plistWith({ bundleVersion: '42', shortVersion: '1.0.12' }));
+    writeFixture(
+      dir,
+      'build.json',
+      JSON.stringify([{ platform: 'ANDROID', metadata: { appBuildVersion: '43' } }])
+    );
+    const result = runScript(
+      NOTES,
+      ['identity', '--config', 'app.config.ts', '--ipa', 'app.ipa', '--build-json', 'build.json'],
+      { cwd: dir }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^version=1\.0\.12$/m);
+    assert.match(result.stdout, /^ios_build=42$/m);
+    assert.match(result.stdout, /^android_build=43$/m);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('identity exits 1 when the IPA version disagrees with the config', () => {
+  const dir = initRepo('kilo-notes-mismatch-');
+  try {
+    writeFixture(dir, 'app.config.ts', "const config = {\n  version: '1.0.12',\n};\n");
+    ipaFixture(dir, plistWith({ bundleVersion: '42', shortVersion: '1.0.99' }));
+    const result = runScript(NOTES, ['identity', '--config', 'app.config.ts', '--ipa', 'app.ipa'], {
+      cwd: dir,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /1\.0\.99/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('identity exits 1 when the IPA has no CFBundleVersion', () => {
+  const dir = initRepo('kilo-notes-nobuild-');
+  try {
+    writeFixture(dir, 'app.config.ts', "const config = {\n  version: '1.0.12',\n};\n");
+    ipaFixture(dir, plistWith({ shortVersion: '1.0.12' }));
+    const result = runScript(NOTES, ['identity', '--config', 'app.config.ts', '--ipa', 'app.ipa'], {
+      cwd: dir,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /CFBundleVersion/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('identity exits 1 when the IPA cannot be read', () => {
+  const dir = initRepo('kilo-notes-noipa-');
+  try {
+    writeFixture(dir, 'app.config.ts', "const config = {\n  version: '1.0.12',\n};\n");
+    const result = runScript(
+      NOTES,
+      ['identity', '--config', 'app.config.ts', '--ipa', 'missing.ipa'],
+      { cwd: dir }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /cannot read --ipa/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// build.json is the only source of the Android build number, so an unreadable,
+// partial or versionless one is an identity error: the run must fail before the
+// submission instead of labelling the Android store build `unknown`.
+test('identity exits 1 when build.json cannot name the Android build', () => {
+  const cases = [
+    ['unparseable JSON', '{ not json', /cannot read build\.json/],
+    ['not a JSON array', JSON.stringify({ platform: 'ANDROID' }), /not a JSON array/],
+    ['no ANDROID build', JSON.stringify([{ platform: 'IOS' }]), /has no ANDROID build/],
+    [
+      'no appBuildVersion',
+      JSON.stringify([{ platform: 'ANDROID', metadata: {} }]),
+      /has no appBuildVersion/,
+    ],
+    [
+      'empty appBuildVersion',
+      JSON.stringify([{ platform: 'ANDROID', metadata: { appBuildVersion: '' } }]),
+      /has no appBuildVersion/,
+    ],
+  ];
+  for (const [label, contents, expected] of cases) {
+    const dir = initRepo('kilo-notes-android-');
+    try {
+      writeFixture(dir, 'app.config.ts', "const config = {\n  version: '1.0.12',\n};\n");
+      ipaFixture(dir, plistWith({ bundleVersion: '42', shortVersion: '1.0.12' }));
+      writeFixture(dir, 'build.json', contents);
+      const result = runScript(
+        NOTES,
+        ['identity', '--config', 'app.config.ts', '--ipa', 'app.ipa', '--build-json', 'build.json'],
+        { cwd: dir }
+      );
+      assert.equal(result.status, 1, `${label}: ${result.stdout}${result.stderr}`);
+      assert.match(result.stderr, expected, label);
+      assert.equal(
+        result.stdout.includes('android_build='),
+        false,
+        `${label} must print no store identity for the submission to read`
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test('write --land retries a rejected push once and lands one section', () => {
+  const root = tempDir('kilo-notes-land-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // A second writer that advances the branch between the script's attempts.
+    const other = join(root, 'other');
+    git(root, ['clone', '-q', remote, other]);
+    git(other, ['config', 'user.name', 'Kilo Other']);
+    git(other, ['config', 'user.email', 'other@kilo.ai']);
+    git(other, ['config', 'commit.gpgsign', 'false']);
+    git(other, ['checkout', '-q', 'bump']);
+    writeFixture(
+      other,
+      'apps/mobile/CHANGELOG.md',
+      '# Kilo App Changelog\n\nprose\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+    git(other, ['add', '-A']);
+    git(other, ['commit', '-q', '-m', 'docs(kilo-app): older section (#105)']);
+
+    // The first push is rejected after the branch has moved; the retry wins.
+    const flag = join(seed, '.git', 'kilo-first-push');
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      `#!/bin/sh\nif [ ! -f "${flag}" ]; then\n  : > "${flag}"\n  git -C "${other}" push -q origin bump:bump || true\n  echo "kilo-test: the branch advanced; rejecting this push" >&2\n  exit 1\nfi\nexit 0\n`
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /changelog: attempt 1 rejected/);
+    assert.match(result.stdout, /changelog: landed ## 1\.0\.12 \(build 42\) on bump as [0-9a-f]+/);
+
+    git(other, ['fetch', '-q', 'origin', 'bump']);
+    const landed = git(other, ['show', 'origin/bump:apps/mobile/CHANGELOG.md']);
+    assert.equal(
+      landed,
+      '# Kilo App Changelog\n\nprose\n\n## 1.0.12 (build 42)\n\n- new (#91)\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+    assert.equal(landed.match(/^## /gm).length, 2);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land exits 1 when the section can be neither landed nor carried', () => {
+  const root = tempDir('kilo-notes-land-fail-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // Every push is refused, the pending carry included: nothing can be saved,
+    // so the failure is real and must be reported.
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(hook, '#!/bin/sh\necho "kilo-test: rejected" >&2\nexit 1\n');
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /could not land/);
+    assert.match(result.stderr, /or carry it to kilo-app-changelog-pending/);
+    assert.equal(result.stdout.match(/changelog: attempt \d rejected/g).length, 4);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('a land whose branch is gone carries the section to the pending branch', () => {
+  const root = tempDir('kilo-notes-carry-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(
+      seed,
+      'apps/mobile/CHANGELOG.md',
+      '# Kilo App Changelog\n\nprose\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // The bump branch was merged and auto-deleted while the build ran: its push
+    // is refused, but the pending branch still accepts the section.
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      '#!/bin/sh\nwhile read -r _ _ remote_ref _; do\n  case "$remote_ref" in\n    refs/heads/bump) echo "kilo-test: bump is gone" >&2; exit 1 ;;\n  esac\ndone\nexit 0\n'
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const carried = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(carried.status, 0, carried.stderr);
+    assert.match(
+      carried.stdout,
+      /changelog: pending ## 1\.0\.12 \(build 42\) carried to kilo-app-changelog-pending/
+    );
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.12 (build 42)\n\n- new (#91)\n\n'
+    );
+
+    // The next build's branch accepts the section again: its own section goes
+    // above the carried one, and the pending branch is dropped.
+    writeFileSync(hook, '#!/bin/sh\nexit 0\n');
+    writeFixture(seed, 'next.md', '- next (#92)\n');
+    const landed = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'next.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(landed.status, 0, landed.stderr);
+    assert.match(landed.stdout, /changelog: landed ## 1\.0\.13 \(build 43\) on bump as [0-9a-f]+/);
+
+    git(seed, ['fetch', '-q', 'origin', 'bump']);
+    const content = git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.md']);
+    assert.equal(
+      content,
+      '# Kilo App Changelog\n\nprose\n\n## 1.0.13 (build 43)\n\n- next (#92)\n\n## 1.0.12 (build 42)\n\n- new (#91)\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+
+    const pendingRefs = git(seed, ['ls-remote', '--heads', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(pendingRefs, '', 'the pending branch must be dropped once its sections land');
+
+    // A re-run of the same build is a no-op that still reports the section as
+    // landed, so the changelog job opens or refreshes the PR for it.
+    const rerun = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'next.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(rerun.status, 0, rerun.stderr);
+    assert.match(
+      rerun.stdout,
+      /changelog: landed ## 1\.0\.13 \(build 43\) on bump \(already present\)/
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land retries a branch it cannot read and carries the section instead of failing', () => {
+  const root = tempDir('kilo-notes-land-retry-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // The branch is deleted from the remote while the land runs, after the
+    // composition fetch but before the provenance check's own fetches: the check
+    // cannot read it, which says nothing about its shape, so the land retries
+    // and finally carries the section instead of refusing it.
+    const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+    const bin = join(root, 'bin');
+    mkdirSync(bin, { recursive: true });
+    const marker = join(root, 'fetch-intercepted');
+    const wrapper = join(bin, 'git');
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh\nif [ ! -f '${marker}' ]; then\n  for arg in "$@"; do\n    if [ "$arg" = '--no-tags' ]; then\n      : > '${marker}'\n      '${realGit}' -C '${remote}' update-ref -d refs/heads/bump\n      break\n    fi\n  done\nfi\nexec '${realGit}' "$@"\n`
+    );
+    chmodSync(wrapper, 0o755);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } }
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stdout,
+      /changelog: attempt 1 rejected \(it could not be read: bump does not exist on origin\)/
+    );
+    assert.match(result.stdout, /carried to kilo-app-changelog-pending/);
+    assert.doesNotMatch(result.stdout, /changelog: landed/);
+    // Back to refusing would carry and exit 1; the run must stay green instead.
+    assert.doesNotMatch(result.stdout, /refusing to land/);
+    assert.doesNotMatch(result.stderr, /refusing to land/);
+
+    assert.equal(git(seed, ['ls-remote', '--heads', 'origin', 'refs/heads/bump']), '');
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('two failed lands accumulate in the pending branch, newest first', () => {
+  const root = tempDir('kilo-notes-carry-many-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(
+      seed,
+      'apps/mobile/CHANGELOG.md',
+      '# Kilo App Changelog\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      '#!/bin/sh\nwhile read -r _ _ remote_ref _; do\n  case "$remote_ref" in\n    refs/heads/bump) echo "kilo-test: bump is gone" >&2; exit 1 ;;\n  esac\ndone\nexit 0\n'
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'a.md', '- a (#91)\n');
+    const first = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'a.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(first.status, 0, first.stderr);
+    writeFixture(seed, 'b.md', '- b (#92)\n');
+    const second = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'b.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(second.status, 0, second.stderr);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- b (#92)\n\n## 1.0.12 (build 42)\n\n- a (#91)\n\n'
+    );
+
+    // The third build's branch accepts the section: all three land in order.
+    writeFileSync(hook, '#!/bin/sh\nexit 0\n');
+    writeFixture(seed, 'c.md', '- c (#93)\n');
+    const third = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.14',
+        '--ios-build',
+        '44',
+        '--body-file',
+        'c.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(third.status, 0, third.stderr);
+    git(seed, ['fetch', '-q', 'origin', 'bump']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.md']),
+      '# Kilo App Changelog\n\n## 1.0.14 (build 44)\n\n- c (#93)\n\n## 1.0.13 (build 43)\n\n- b (#92)\n\n## 1.0.12 (build 42)\n\n- a (#91)\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
+    );
+    assert.equal(git(seed, ['ls-remote', '--heads', 'origin', 'kilo-app-changelog-pending']), '');
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land refuses a branch that carries files the version bump did not write', () => {
+  const root = tempDir('kilo-notes-verify-files-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // A commit that is not part of the version bump rides on the same ref.
+    writeFixture(seed, 'apps/mobile/src/a.ts', 'export const a = 1;\n');
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'feat(kilo-app): unrelated change']);
+    git(seed, ['push', '-q', 'origin', 'bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /refusing to land ## 1\.0\.13 \(build 43\) on bump/);
+    assert.match(result.stderr, /apps\/mobile\/src\/a\.ts/);
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+
+    const tip = before.split(/\s/)[0];
+    assert.doesNotMatch(
+      git(seed, ['show', `${tip}:apps/mobile/CHANGELOG.md`]),
+      /## 1\.0\.13 \(build 43\)/
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land refuses a branch whose version line is not the only config change', () => {
+  const root = tempDir('kilo-notes-verify-config-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n  name: 'kilo',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // The bump commit also renames the app: the diff is not the version line.
+    writeFixture(
+      seed,
+      'apps/mobile/app.config.ts',
+      "  version: '1.0.13',\n  name: 'kilo-renamed',\n"
+    );
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore(kilo-app): rename']);
+    git(seed, ['push', '-q', 'origin', 'bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /its apps\/mobile\/app\.config\.ts diff changes more than the version line/
+    );
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land accepts a conforming branch and reports the verified head and files', () => {
+  const root = tempDir('kilo-notes-verify-report-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const land = (version, iosBuild) =>
+      runScript(
+        NOTES,
+        [
+          'write',
+          '--version',
+          version,
+          '--ios-build',
+          iosBuild,
+          '--body-file',
+          'notes.md',
+          '--land',
+          'origin:bump',
+        ],
+        { cwd: seed }
+      );
+
+    const expectedFiles = ['apps/mobile/CHANGELOG.md', 'apps/mobile/app.config.ts'];
+    const reportedFiles = stdout => {
+      const match = stdout.match(/^changelog-files=(.*)$/m);
+      assert.ok(match, `no changelog-files line in:\n${stdout}`);
+      const files = match[1].split(', ');
+      assert.equal(files.length, 2, `expected two files, got ${files.join(', ')}`);
+      assert.deepEqual([...files].sort(), [...expectedFiles].sort());
+    };
+
+    const first = land('1.0.13', '43');
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stdout, /changelog: landed/);
+    const firstHead = first.stdout.match(/^changelog-head=([0-9a-f]{40})$/m);
+    assert.ok(firstHead, `no changelog-head line in:\n${first.stdout}`);
+    assert.equal(
+      firstHead[1],
+      git(seed, ['ls-remote', 'origin', 'refs/heads/bump']).split(/\s/)[0]
+    );
+    reportedFiles(first.stdout);
+
+    const second = land('1.0.14', '44');
+    assert.equal(second.status, 0, second.stderr);
+    const secondHead = second.stdout.match(/^changelog-head=([0-9a-f]{40})$/m);
+    assert.ok(secondHead, `no changelog-head line in:\n${second.stdout}`);
+    assert.notEqual(secondHead[1], firstHead[1]);
+    assert.equal(
+      secondHead[1],
+      git(seed, ['ls-remote', 'origin', 'refs/heads/bump']).split(/\s/)[0]
+    );
+    reportedFiles(second.stdout);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land accepts a conforming branch in a shallow clone and after main advanced', () => {
+  const root = tempDir('kilo-notes-verify-shallow-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // Main advances during the build window, so the branch base is two commits
+    // behind main's tip when the changelog job checks out.
+    git(seed, ['checkout', '-q', 'main']);
+    writeFixture(seed, 'README.md', 'first\n');
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'docs: first']);
+    writeFixture(seed, 'README.md', 'second\n');
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'docs: second']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+
+    // The changelog job's checkout: fetch-depth 1.
+    const shallow = join(root, 'shallow');
+    git(root, ['clone', '-q', '--depth=1', '--branch', 'main', `file://${remote}`, shallow]);
+    git(shallow, ['config', 'user.name', 'Kilo Test']);
+    git(shallow, ['config', 'user.email', 'test@kilo.ai']);
+    git(shallow, ['config', 'commit.gpgsign', 'false']);
+    assert.equal(git(shallow, ['rev-parse', '--is-shallow-repository']).trim(), 'true');
+
+    writeFixture(shallow, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: shallow }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /changelog: landed/);
+    assert.match(result.stdout, /^changelog-head=[0-9a-f]{40}$/m);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land refuses a branch that shares no history with main', () => {
+  const root = tempDir('kilo-notes-verify-orphan-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+
+    // An unrelated tree that still looks like a version bump by its files.
+    git(seed, ['checkout', '-q', '--orphan', 'orphan-bump']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Other Changelog\n\n## 9.9.9\n\n- other\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '9.9.9',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'feat: unrelated history']);
+    git(seed, ['push', '-q', 'origin', 'orphan-bump:bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /refusing to land/);
+    assert.match(result.stderr, /it shares no history with main/);
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+// A branch whose diff from its merge base is empty carries no version line, so
+// it is not the bump this run built: it must be refused, never accepted as a
+// land that reports no changed files to the workflow.
+test('write --land refuses a branch with no version bump of its own', () => {
+  const root = tempDir('kilo-notes-verify-empty-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+
+    // The ref names main's own tip: the branch has no commit of its own.
+    git(seed, ['branch', 'bump', 'main']);
+    git(seed, ['push', '-q', 'origin', 'bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /refusing to land ## 1\.0\.13 \(build 43\) on bump/);
+    assert.match(result.stderr, /it carries no apps\/mobile\/app\.config\.ts version line/);
+    assert.doesNotMatch(result.stdout, /^changelog-files=/m);
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+// Two runs can fail to land in the same window. Each one carries the sections it
+// read and writes the whole pending branch, so without a compare-and-swap on the
+// commit it read, the second push would drop the section the first one just
+// carried there.
+test('a carry whose pending branch advanced under it keeps both sections', () => {
+  const root = tempDir('kilo-notes-carry-race-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+    const seedBranch = git(seed, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+
+    // An earlier build already carried one section to the pending branch.
+    const carried = '## 1.0.11 (build 41)\n\n- older (#90)\n\n';
+    git(seed, ['checkout', '-q', '-b', 'carried']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.pending.md', carried);
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: carried']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:kilo-app-changelog-pending']);
+    git(seed, ['checkout', '-q', seedBranch]);
+
+    // A second run holds its own carry of another build's section, ready to land
+    // on the pending branch at the instant this run pushes its own.
+    const other = '## 1.0.13 (build 43)\n\n- other (#93)\n\n';
+    const writer = join(root, 'writer');
+    git(root, ['clone', '-q', remote, writer]);
+    git(writer, ['config', 'user.name', 'Kilo Test']);
+    git(writer, ['config', 'user.email', 'test@kilo.ai']);
+    git(writer, ['config', 'commit.gpgsign', 'false']);
+    git(writer, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    git(writer, ['checkout', '-q', '--detach', 'FETCH_HEAD']);
+    writeFixture(writer, 'apps/mobile/CHANGELOG.pending.md', `${other}${carried}`);
+    git(writer, ['add', '-A']);
+    git(writer, ['commit', '-q', '-m', 'chore: competing carry']);
+    const competing = git(writer, ['rev-parse', 'HEAD']).trim();
+
+    // This run's first push to the pending branch loses that race exactly as a
+    // stale compare-and-swap would: the other run's carry lands first and the
+    // push is refused. The push after the re-read sees the advanced branch and
+    // is allowed through.
+    const raced = join(root, 'raced');
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      [
+        '#!/bin/sh',
+        'while read -r _ _ remote_ref _; do',
+        '  case "$remote_ref" in',
+        '    refs/heads/bump) echo "kilo-test: bump is gone" >&2; exit 1 ;;',
+        '    refs/heads/kilo-app-changelog-pending)',
+        `      if [ ! -f "${raced}" ]; then`,
+        `        : > "${raced}"`,
+        `        git -C "${writer}" push -q --force origin "${competing}:refs/heads/kilo-app-changelog-pending" || exit 1`,
+        '        echo "kilo-test: the pending branch advanced under this run" >&2',
+        '        exit 1',
+        '      fi',
+        '      ;;',
+        '  esac',
+        'done',
+        'exit 0',
+        '',
+      ].join('\n')
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'notes.md', '- mine (#92)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stdout,
+      /changelog: pending ## 1\.0\.12 \(build 42\) carried to kilo-app-changelog-pending/
+    );
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      `## 1.0.12 (build 42)\n\n- mine (#92)\n\n${other}${carried}`,
+      'the section this run carried and the one it raced must both survive'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+// A land reads the pending branch, incorporates its sections, and then deletes
+// the branch. A carry that lands in that window must not be deleted with it.
+test('a land keeps a pending branch that advanced after its snapshot', () => {
+  const root = tempDir('kilo-notes-clear-race-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(
+      seed,
+      'apps/mobile/CHANGELOG.md',
+      '# Kilo App Changelog\n\n## 1.0.10 (build 40)\n\n- oldest (#89)\n\n'
+    );
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+    const seedBranch = git(seed, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+
+    const carried = '## 1.0.11 (build 41)\n\n- older (#90)\n\n';
+    git(seed, ['checkout', '-q', '-b', 'carried']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.pending.md', carried);
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: carried']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:kilo-app-changelog-pending']);
+    git(seed, ['checkout', '-q', seedBranch]);
+
+    const other = '## 1.0.13 (build 43)\n\n- other (#93)\n\n';
+    const writer = join(root, 'writer');
+    git(root, ['clone', '-q', remote, writer]);
+    git(writer, ['config', 'user.name', 'Kilo Test']);
+    git(writer, ['config', 'user.email', 'test@kilo.ai']);
+    git(writer, ['config', 'commit.gpgsign', 'false']);
+    git(writer, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    git(writer, ['checkout', '-q', '--detach', 'FETCH_HEAD']);
+    writeFixture(writer, 'apps/mobile/CHANGELOG.pending.md', `${other}${carried}`);
+    git(writer, ['add', '-A']);
+    git(writer, ['commit', '-q', '-m', 'chore: competing carry']);
+    const competing = git(writer, ['rev-parse', 'HEAD']).trim();
+
+    // The other run's carry lands on the pending branch while this run pushes
+    // its changelog onto the version-bump branch: after this run read the
+    // pending branch, before it clears it. The clear must then refuse.
+    const raced = join(root, 'raced');
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      [
+        '#!/bin/sh',
+        'while read -r _ _ remote_ref _; do',
+        '  case "$remote_ref" in',
+        '    refs/heads/bump)',
+        `      if [ ! -f "${raced}" ]; then`,
+        `        : > "${raced}"`,
+        `        git -C "${writer}" push -q --force origin "${competing}:refs/heads/kilo-app-changelog-pending" || exit 1`,
+        '        echo "kilo-test: another run carried a section while this run landed" >&2',
+        '      fi',
+        '      ;;',
+        '  esac',
+        'done',
+        'exit 0',
+        '',
+      ].join('\n')
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'notes.md', '- mine (#92)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /changelog: landed ## 1\.0\.12 \(build 42\) on bump as [0-9a-f]+/);
+
+    const pendingRefs = git(seed, ['ls-remote', '--heads', 'origin', 'kilo-app-changelog-pending']);
+    assert.notEqual(
+      pendingRefs,
+      '',
+      'the branch advanced after the read, so the clear must refuse'
+    );
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      `${other}${carried}`,
+      'the carry that landed in the window must stay on the branch'
+    );
+
+    git(seed, ['fetch', '-q', 'origin', 'bump']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.md']),
+      '# Kilo App Changelog\n\n## 1.0.12 (build 42)\n\n- mine (#92)\n\n## 1.0.11 (build 41)\n\n- older (#90)\n\n## 1.0.10 (build 40)\n\n- oldest (#89)\n\n'
+    );
+
+    // The next build lands its own section, carries the section the refused
+    // clear left behind, and clears the branch because nothing advanced since
+    // it read them.
+    writeFileSync(hook, '#!/bin/sh\nexit 0\n');
+    writeFixture(seed, 'next.md', '- next (#94)\n');
+    const next = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.14',
+        '--ios-build',
+        '44',
+        '--body-file',
+        'next.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(next.status, 0, next.stderr);
+    assert.equal(
+      git(seed, ['ls-remote', '--heads', 'origin', 'kilo-app-changelog-pending']),
+      '',
+      'the branch matches the snapshot the next land read, so it is dropped'
+    );
+    git(seed, ['fetch', '-q', 'origin', 'bump']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.md']),
+      '# Kilo App Changelog\n\n## 1.0.14 (build 44)\n\n- next (#94)\n\n## 1.0.13 (build 43)\n\n- other (#93)\n\n## 1.0.12 (build 42)\n\n- mine (#92)\n\n## 1.0.11 (build 41)\n\n- older (#90)\n\n## 1.0.10 (build 40)\n\n- oldest (#89)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('a retry of a carried build writes its section once', () => {
+  const root = tempDir('kilo-notes-carry-retry-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      '#!/bin/sh\nwhile read -r _ _ remote_ref _; do\n  case "$remote_ref" in\n    refs/heads/bump) echo "kilo-test: bump is gone" >&2; exit 1 ;;\n  esac\ndone\nexit 0\n'
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'a.md', '- a (#91)\n');
+    const args = [
+      'write',
+      '--version',
+      '1.0.12',
+      '--ios-build',
+      '42',
+      '--body-file',
+      'a.md',
+      '--land',
+      'origin:bump',
+    ];
+    assert.equal(runScript(NOTES, args, { cwd: seed }).status, 0);
+
+    // The same build runs again and its branch accepts the section now: the
+    // carried copy must not be written a second time.
+    writeFileSync(hook, '#!/bin/sh\nexit 0\n');
+    const retry = runScript(NOTES, args, { cwd: seed });
+    assert.equal(retry.status, 0, retry.stderr);
+    git(seed, ['fetch', '-q', 'origin', 'bump']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.md']),
+      '# Kilo App Changelog\n\n## 1.0.12 (build 42)\n\n- a (#91)\n\n'
+    );
+    assert.equal(git(seed, ['ls-remote', '--heads', 'origin', 'kilo-app-changelog-pending']), '');
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('splitSections keeps every carried section and its heading', () => {
+  assert.deepEqual(splitSections(''), []);
+  assert.deepEqual(splitSections('## 1.0.12 (build 42)\n\n- new (#91)\n\n'), [
+    '## 1.0.12 (build 42)\n\n- new (#91)\n\n',
+  ]);
+  assert.deepEqual(
+    splitSections(
+      '## 1.0.13 (build 43)\n\n- next (#92)\n\n## 1.0.12 (build 42)\n\n- new (#91)\n\n'
+    ),
+    ['## 1.0.13 (build 43)\n\n- next (#92)\n\n', '## 1.0.12 (build 42)\n\n- new (#91)\n\n']
+  );
+});
+
+test('notes usage errors exit 2', () => {
+  assert.equal(runScript(NOTES, ['write']).status, 2);
+  assert.equal(runScript(NOTES, ['unknown']).status, 2);
+});
+
+const NOW = '2026-09-23T06:44:56Z';
+const NOW_MS = Date.parse(NOW);
+const NOW_S = Math.floor(NOW_MS / 1000);
+const WINDOW_START_S = Math.floor((NOW_MS - 24 * 3_600_000) / 1000);
+
+test('the cap window counts a tag exactly at now and drops one at the window start', () => {
+  const dir = initRepo('kilo-cap-edge-');
+  try {
+    commit(dir, { 'README.md': 'x\n' }, 'chore: seed');
+    tagAt(dir, 'kilo-app-upload/at-window-start', WINDOW_START_S);
+    tagAt(dir, 'kilo-app-upload/just-inside', WINDOW_START_S + 1);
+    tagAt(dir, 'kilo-app-upload/at-now', NOW_S);
+    const result = runScript(CAP, ['--cap', '10', '--now', NOW], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.trimEnd().split('\n');
+    assert.equal(
+      lines[0],
+      'kilo-app release upload cap: 2 App Store Connect uploads in the last 24h (cap 10, window 2026-09-22T06:44:56Z..2026-09-23T06:44:56Z)'
+    );
+    assert.equal(lines[1], 'kilo-app release upload cap: 2 of 10 slots used - proceeding');
+    assert.equal(lines[2], 'allowed=true');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('21 uploads in the window hold the release; a different now sees none', () => {
+  const dir = initRepo('kilo-cap-hold-');
+  try {
+    commit(dir, { 'README.md': 'x\n' }, 'chore: seed');
+    const base = Math.floor(Date.parse('2026-09-23T00:00:00Z') / 1000);
+    for (let index = 0; index < 21; index += 1) {
+      tagAt(dir, `kilo-app-upload/2026-09-23-${String(index).padStart(3, '0')}`, base + index * 60);
+    }
+    const held = runScript(CAP, ['--cap', '10', '--now', NOW], { cwd: dir });
+    assert.equal(held.status, 0, held.stderr);
+    const lines = held.stdout.trimEnd().split('\n');
+    assert.equal(
+      lines[0],
+      'kilo-app release upload cap: 21 App Store Connect uploads in the last 24h (cap 10, window 2026-09-22T06:44:56Z..2026-09-23T06:44:56Z)'
+    );
+    assert.equal(
+      lines[1],
+      'kilo-app release upload cap: HOLD - nothing is built; the oldest upload in the window (kilo-app-upload/2026-09-23-000, 2026-09-23T00:00:00Z) frees a slot at 2026-09-24T00:00:00Z; the next run (a push, or the hourly schedule) picks the release up'
+    );
+    assert.equal(lines[2], 'allowed=false');
+
+    const earlier = runScript(CAP, ['--cap', '10', '--now', '2026-09-21T00:00:00Z'], {
+      cwd: dir,
+    });
+    assert.equal(earlier.status, 0, earlier.stderr);
+    const earlierLines = earlier.stdout.trimEnd().split('\n');
+    assert.equal(
+      earlierLines[0],
+      'kilo-app release upload cap: 0 App Store Connect uploads in the last 24h (cap 10, window 2026-09-20T00:00:00Z..2026-09-21T00:00:00Z)'
+    );
+    assert.equal(earlierLines[1], 'kilo-app release upload cap: 0 of 10 slots used - proceeding');
+    assert.equal(earlierLines[2], 'allowed=true');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('no tags at all proceeds and an unreadable tag history exits 1', () => {
+  const dir = initRepo('kilo-cap-empty-');
+  try {
+    commit(dir, { 'README.md': 'x\n' }, 'chore: seed');
+    const empty = runScript(CAP, ['--now', NOW], { cwd: dir });
+    assert.equal(empty.status, 0, empty.stderr);
+    assert.equal(empty.stdout.trimEnd().split('\n')[2], 'allowed=true');
+  } finally {
+    cleanup(dir);
+  }
+
+  const outside = tempDir('kilo-cap-nogit-');
+  try {
+    const result = runScript(CAP, ['--now', NOW], { cwd: outside });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /cannot list the upload markers/);
+  } finally {
+    cleanup(outside);
+  }
+});
+
+test('the cap counts iOS upload markers and ignores release tags', () => {
+  const dir = initRepo('kilo-cap-markers-');
+  try {
+    commit(dir, { 'README.md': 'x\n' }, 'chore: seed');
+    const base = Math.floor(Date.parse('2026-09-23T00:00:00Z') / 1000);
+    // A release tag is written only after Submit iOS *and* Submit Android, so a
+    // partial run has an upload marker and no release tag: only markers count.
+    for (let index = 0; index < 9; index += 1) {
+      tagAt(dir, `kilo-app-upload/2026-09-23-${index}`, base + index * 60);
+    }
+    for (let index = 0; index < 2; index += 1) {
+      tagAt(dir, `kilo-app-release/2026-09-23-${index}`, base + 600 + index * 60);
+    }
+    const result = runScript(CAP, ['--cap', '10', '--now', NOW], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.trimEnd().split('\n');
+    assert.equal(
+      lines[0],
+      'kilo-app release upload cap: 9 App Store Connect uploads in the last 24h (cap 10, window 2026-09-22T06:44:56Z..2026-09-23T06:44:56Z)'
+    );
+    assert.equal(lines[1], 'kilo-app release upload cap: 9 of 10 slots used - proceeding');
+    assert.equal(lines[2], 'allowed=true');
+
+    // Nine markers plus the two release tags stay under the cap: only the
+    // markers count. A tenth marker is the upload that holds the gate.
+    tagAt(dir, 'kilo-app-upload/2026-09-23-tenth', base + 1200);
+    const held = runScript(CAP, ['--cap', '10', '--now', NOW], { cwd: dir });
+    assert.equal(held.status, 0, held.stderr);
+    assert.equal(held.stdout.trimEnd().split('\n')[2], 'allowed=false');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('--prefix narrows the count to the named marker prefix', () => {
+  const dir = initRepo('kilo-cap-prefix-');
+  try {
+    commit(dir, { 'README.md': 'x\n' }, 'chore: seed');
+    const base = Math.floor(Date.parse('2026-09-23T00:00:00Z') / 1000);
+    tagAt(dir, 'kilo-app-upload/2026-09-23-000', base);
+    tagAt(dir, 'other-prefix/2026-09-23-000', base + 60);
+    const result = runScript(CAP, ['--cap', '10', '--now', NOW, '--prefix', 'other-prefix/'], {
+      cwd: dir,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trimEnd().split('\n')[2], 'allowed=true');
+    assert.match(result.stdout, /1 App Store Connect uploads in the last 24h/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('cap usage errors exit 2', () => {
+  assert.equal(runScript(CAP, ['--cap', 'nope']).status, 2);
+  assert.equal(runScript(CAP, ['--now', 'not-a-date']).status, 2);
+  assert.equal(runScript(CAP, ['--unknown']).status, 2);
+});
+
+// `--cap 9.5` would admit a run with nine markers and raise the count to ten,
+// above the count the caller asked to hold, so a fractional cap is a usage
+// error rather than a rounded one.
+test('a fractional cap exits 2 instead of admitting one upload too many', () => {
+  const dir = initRepo('kilo-cap-fraction-');
+  try {
+    commit(dir, { 'README.md': 'x\n' }, 'chore: seed');
+    for (let index = 0; index < 9; index += 1) {
+      tagAt(dir, `kilo-app-upload/marker-${index}`, NOW_S - 60);
+    }
+    const result = runScript(CAP, ['--cap', '9.5', '--now', NOW], { cwd: dir });
+    assert.equal(result.status, 2, result.stdout);
+    assert.match(result.stderr, /--cap must be a positive whole number/);
+    assert.equal(result.stdout.includes('allowed=true'), false);
+  } finally {
+    cleanup(dir);
+  }
+});

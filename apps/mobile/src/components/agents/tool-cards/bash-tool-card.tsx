@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Terminal } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -9,6 +10,7 @@ import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 
 const bashToolInputSchema = z.object({ command: z.string() });
 
@@ -29,7 +31,7 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     <View className="gap-2">
       {command.length > 0 ? (
         <View className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-900">
-          <SelectableText className="font-mono text-xs leading-4 text-foreground">
+          <SelectableText className="font-mono text-xs leading-[1rem] text-foreground">
             {commandText}
           </SelectableText>
         </View>
@@ -42,6 +44,7 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -49,8 +52,12 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={Terminal}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: toolStatusLabel(t, part.state.status),
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

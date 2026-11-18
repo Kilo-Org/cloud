@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Ihre Agentensitzung hat ein Update",
+      "lowBalance": "Ihr Guthaben benötigt Aufmerksamkeit",
+      "spendAlert": "Ihre Ausgaben benötigen Aufmerksamkeit",
+      "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit",
+      "securityUpdate": "Eine Sicherheitsprüfung hat ein Update",
+      "activeAgentsGlanceable": "Aktive Agenten haben ein Update"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "body": "{{message}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Warnung bei niedrigem Guthaben",
+      "body": "Das Guthaben von {{organizationName}} fiel unter ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Ausgaben-Warnung",
+      "body": "Die Ausgaben von {{scopeName}} haben ${{amountUsd}} überschritten"
+    },
+    "securityFinding": {
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Neuer Sicherheitsbefund ({{severity}})"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-Warnung"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-Verletzung"
+    }
+  },
+  "sessionReady": {
+    "body": "Ihre Kilo-Sitzung ist bereit, von Ihrem Telefon aus gesteuert zu werden"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
+  }
+}

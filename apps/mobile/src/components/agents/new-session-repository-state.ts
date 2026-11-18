@@ -1,48 +1,478 @@
-export type RepositorySectionView =
+/* eslint-disable max-lines -- The new-session screen reads these repository helpers together: provider status, grouping, stored-selection validity, the region-settle signal, and branch state all describe one section, and splitting them would scatter the rules that must agree on `platform:fullName`. */
+import { type RepoPlatform } from '@/lib/picker-bridge';
+import { dedupeBy } from '@/lib/query/dedupe-by-id';
+
+export type RepositoryPlatform = RepoPlatform;
+
+/**
+ * One selectable repository row. `platform` is required so two rows with the
+ * same `fullName` on different providers stay distinct in the picker and in
+ * the create payload. `workspaceUuid`/`repositoryUuid` are only present on
+ * Bitbucket rows (`repositoryUuid` = the Bitbucket repository `id`).
+ */
+export type NewSessionRepository = {
+  platform: RepositoryPlatform;
+  fullName: string;
+  isPrivate: boolean;
+  workspaceUuid?: string;
+  repositoryUuid?: string;
+};
+
+export type RepositoryProviderStatus =
   | 'loading'
   | 'error'
   | 'connect'
-  | 'connect-fallback'
   | 'connected-empty'
+  | 'unavailable'
   | 'repos';
 
-export function resolveRepositorySectionView({
+/**
+ * Why a provider's stored installation cannot list repositories. The provider
+ * is connected in principle, so the card asks for the reconnect step instead of
+ * offering to connect it for the first time.
+ */
+export type RepositoryUnavailableReason =
+  | 'suspended'
+  | 'disconnected'
+  | 'reauth_required'
+  | 'not_configured';
+
+export type RepositoryGroupNotice = 'partial';
+
+export type RepositoryGroup = {
+  key: RepositoryPlatform;
+  status: RepositoryProviderStatus;
+  repositories: NewSessionRepository[];
+  /** Set when the provider answered with only some of its installations' repositories. */
+  notice?: RepositoryGroupNotice;
+  /**
+   * Set when the provider's answer did not list rows that may still exist: the
+   * Bitbucket states that ask for a workspace selection or new credentials
+   * report the same status as "not connected" but keep the repositories behind
+   * that fix. A row missing from such a group is not evidence it is gone.
+   */
+  rowsUnlisted?: boolean;
+};
+
+export type RepositoryGroups = {
+  /** Recently used rows, resolved against connected providers. */
+  recents: NewSessionRepository[];
+  /** Ordered groups: GitHub, GitLab, then Bitbucket (only when an organization is set). */
+  groups: RepositoryGroup[];
+};
+
+// ── Per-provider status helpers ─────────────────────────────────────
+
+/**
+ * Resolve the status for a GitHub or GitLab group. They share the same
+ * `{ repositories, integrationInstalled }` response shape.
+ */
+export function resolveProviderStatus({
   isLoading,
   isError,
   integrationInstalled,
   repositoryCount,
-  connectCheckFailed,
+  unavailableReason,
 }: {
   isLoading: boolean;
   isError: boolean;
   integrationInstalled: boolean | undefined;
   repositoryCount: number;
-  connectCheckFailed: boolean;
-}): RepositorySectionView {
+  unavailableReason?: RepositoryUnavailableReason;
+}): RepositoryProviderStatus {
   if (isLoading) {
     return 'loading';
   }
   if (isError && repositoryCount === 0) {
     return 'error';
   }
-  if (connectCheckFailed) {
-    return 'connect-fallback';
+  // `undefined` means the query has produced no data at all, not "not
+  // installed": a paused query (iOS boot / the NetInfo probe not settled yet)
+  // reports `isLoading === false` and leaves `data` undefined, so the flag is
+  // undefined too. A provider whose list is not known yet must never read as
+  // settled, or the section renders its heading with no control under it.
+  if (integrationInstalled === undefined) {
+    return 'loading';
   }
-  if (integrationInstalled === false) {
-    return 'connect';
+  if (!integrationInstalled) {
+    // An installation exists but cannot list anything: the person fixes it by
+    // reconnecting, not by connecting the provider for the first time.
+    return unavailableReason ? 'unavailable' : 'connect';
   }
-  if (integrationInstalled === true && repositoryCount === 0) {
+  if (repositoryCount === 0) {
     return 'connected-empty';
   }
   return 'repos';
 }
 
-export function shouldShowRepositoryError({
+/**
+ * Resolve the status for the organization-only Bitbucket group, whose
+ * response is a discriminated union on `status` rather than a boolean
+ * `integrationInstalled` flag.
+ *
+ *  - `available`             -> repos / connected-empty
+ *  - connect-shaped statuses -> connect (open the Bitbucket settings page)
+ *  - transient/invalid       -> error (retry)
+ */
+export function resolveBitbucketStatus({
+  isLoading,
   isError,
+  status,
   repositoryCount,
 }: {
+  isLoading: boolean;
   isError: boolean;
+  status: string | undefined;
   repositoryCount: number;
+}): RepositoryProviderStatus {
+  if (isLoading) {
+    return 'loading';
+  }
+  if (isError && repositoryCount === 0) {
+    return 'error';
+  }
+  if (status === undefined) {
+    return 'loading';
+  }
+  if (status === 'available') {
+    return repositoryCount === 0 ? 'connected-empty' : 'repos';
+  }
+  if (status === 'temporarily_unavailable' || status === 'invalid_request') {
+    return 'error';
+  }
+  // not_connected, workspace_selection_required, reconnect_required,
+  // insufficient_permissions -> the user must (re)establish the connection.
+  return 'connect';
+}
+
+/** Bitbucket states that must (re)establish the connection before it lists rows. */
+const BITBUCKET_UNLISTED_STATUSES: ReadonlySet<string> = new Set([
+  'workspace_selection_required',
+  'reconnect_required',
+  'insufficient_permissions',
+]);
+
+/**
+ * Whether a Bitbucket answer left repositories unlisted behind a fixable state.
+ *
+ * `not_connected` is an answer: nothing is connected, so nothing exists to
+ * list. The states above share that status but do have repositories, which
+ * return once the workspace is selected or the credentials are replaced.
+ */
+export function bitbucketRowsUnlisted(status: string | undefined): boolean {
+  return status !== undefined && BITBUCKET_UNLISTED_STATUSES.has(status);
+}
+
+// ── Dedup and grouping ───────────────────────────────────────────────
+
+/**
+ * Whether one provider's group accounts for every repository row it has.
+ *
+ * A provider that is still loading, a read that failed, a provider that
+ * reported only some of its installations (`notice: 'partial'`), and one whose
+ * answer left rows unlisted behind a fixable state (`rowsUnlisted`) each omit
+ * rows without the app knowing which. A provider that is connected but cannot
+ * be read right now (`unavailable`, e.g. a suspended installation) is unknown
+ * for the same reason. `repos`, `connected-empty`, and `connect` are answers
+ * that account for the rows.
+ */
+function isRepositoryGroupComplete(group: RepositoryGroup): boolean {
+  if (group.notice === 'partial' || group.rowsUnlisted === true) {
+    return false;
+  }
+  return (
+    group.status === 'repos' || group.status === 'connected-empty' || group.status === 'connect'
+  );
+}
+
+/**
+ * Whether a stored selection must be dropped because its provider answered with
+ * its complete list and that list does not contain it.
+ *
+ * Only the provider that holds the selection decides: another provider's error
+ * says nothing about this repository, and a list that is missing rows (see
+ * `isRepositoryGroupComplete`) leaves the selection and its stored copy alone.
+ * The comparison is the picker's platform-qualified key, so a row on another
+ * provider with the same `fullName` is not a match. A key that names no
+ * provider group in this scope (Bitbucket outside an organization) is reported
+ * gone: that scope cannot offer the repository at all.
+ */
+export function isStoredRepoSelectionGone(input: {
+  groups: readonly RepositoryGroup[];
+  repositories: readonly NewSessionRepository[];
+  selectedRepo: string;
 }): boolean {
-  return isError && repositoryCount === 0;
+  const separator = input.selectedRepo.indexOf(':');
+  if (separator === -1) {
+    return false;
+  }
+  const platform = input.selectedRepo.slice(0, separator);
+  const group = input.groups.find(candidate => candidate.key === platform);
+  if (group !== undefined && !isRepositoryGroupComplete(group)) {
+    return false;
+  }
+  return !input.repositories.some(
+    repository => `${repository.platform}:${repository.fullName}` === input.selectedRepo
+  );
+}
+
+const repositoryKey = (repository: NewSessionRepository): string =>
+  `${repository.platform}/${repository.fullName}`;
+
+/**
+ * Deduplicate repository rows by `platform + fullName`, so the same
+ * `fullName` on two platforms stays two rows.
+ */
+export function dedupeRepositoriesByPlatformAndFullName(
+  repositories: readonly NewSessionRepository[]
+): NewSessionRepository[] {
+  return dedupeBy(repositories, repositoryKey);
+}
+
+/**
+ * Assemble the ordered provider groups for the section. The Bitbucket group
+ * is dropped when no organization is set (Bitbucket is organization-only).
+ * Each group keeps its own status, so one provider's error never clears
+ * another provider's rows.
+ */
+export function resolveRepositoryGroups(input: {
+  organizationId: string | undefined;
+  github: RepositoryGroup;
+  gitlab: RepositoryGroup;
+  bitbucket: RepositoryGroup;
+  recents: NewSessionRepository[];
+}): RepositoryGroups {
+  const groups: RepositoryGroup[] = [
+    {
+      key: 'github',
+      status: input.github.status,
+      repositories: input.github.repositories,
+      notice: input.github.notice,
+    },
+    {
+      key: 'gitlab',
+      status: input.gitlab.status,
+      repositories: input.gitlab.repositories,
+      notice: input.gitlab.notice,
+    },
+  ];
+  if (input.organizationId) {
+    groups.push({
+      key: 'bitbucket',
+      status: input.bitbucket.status,
+      repositories: input.bitbucket.repositories,
+      notice: input.bitbucket.notice,
+      rowsUnlisted: input.bitbucket.rowsUnlisted,
+    });
+  }
+  return { recents: input.recents, groups };
+}
+
+/**
+ * Detect the repository provider from a git URL host. Returns `undefined`
+ * for unknown or self-hosted hosts (those recents are dropped because they
+ * cannot be attributed to a connected provider).
+ */
+export function detectRepositoryPlatform(
+  gitUrl: string | null | undefined
+): RepositoryPlatform | undefined {
+  if (!gitUrl) {
+    return undefined;
+  }
+  // An scp-style value keeps its host exactly as written, and the URL parser
+  // preserves it for non-special schemes (`ssh://`), so both forms meet here
+  // and are compared in one case.
+  let hostname: string | undefined = /^git@([^:]+):/.exec(gitUrl)?.[1];
+  if (hostname === undefined) {
+    try {
+      hostname = new URL(gitUrl).hostname;
+    } catch {
+      return undefined;
+    }
+  }
+  const host = hostname.toLowerCase();
+  if (host === 'github.com') {
+    return 'github';
+  }
+  if (host === 'gitlab.com') {
+    return 'gitlab';
+  }
+  if (host === 'bitbucket.org') {
+    return 'bitbucket';
+  }
+  return undefined;
+}
+
+// ── Branch selection state ───────────────────────────────────────────
+
+/**
+ * The full identity of one repository row: provider, path, and (Bitbucket
+ * only) the workspace/repository uuids. Two same-named rows on two providers,
+ * or two same-named Bitbucket rows in renamed workspaces, never share a key,
+ * so a branch chosen for one can never be read back for the other.
+ */
+export function repositoryIdentityKey(repository: NewSessionRepository): string {
+  return [
+    repository.platform,
+    repository.fullName,
+    repository.workspaceUuid ?? '',
+    repository.repositoryUuid ?? '',
+  ].join('\n');
+}
+
+/**
+ * New-session branch state, shared by the repository section (which owns the
+ * picker) and `useNewSessionCreator` (which sends the checkout branch).
+ *
+ * It is a module store rather than props because the branch picker is a
+ * separate route (`agent-chat/branch-picker`) that reports the choice through
+ * the slot, and the creator reads it outside the section's subtree. The store
+ * holds nothing durable: the screen body clears it on mount and on unmount, so
+ * a branch never outlives the screen that chose it.
+ *
+ * `overrides` only ever holds a *non-default* branch, keyed by
+ * `repositoryIdentityKey`. Reading with another repository's key yields
+ * `null` — that is the identity rule: a branch that belongs to one repository
+ * can never survive a repository change onto another.
+ *
+ * The organization scope is NOT stored here: the branch query reads it from
+ * the new-session route's own `organizationId` prop, so a scope change lands
+ * on the same render that changed it. A store copy would be published by a
+ * passive effect and leave the previous organization installed for one
+ * render — long enough for a branch query to run under it.
+ */
+export type NewSessionBranchSnapshot = {
+  overrides: ReadonlyMap<string, string>;
+};
+
+const EMPTY_OVERRIDES: ReadonlyMap<string, string> = new Map();
+
+let branchSnapshot: NewSessionBranchSnapshot = {
+  overrides: EMPTY_OVERRIDES,
+};
+
+const branchListeners = new Set<() => void>();
+
+function publishBranchSnapshot(next: NewSessionBranchSnapshot): void {
+  branchSnapshot = next;
+  for (const listener of branchListeners) {
+    listener();
+  }
+}
+
+export function subscribeNewSessionBranchState(listener: () => void): () => void {
+  branchListeners.add(listener);
+  return () => {
+    branchListeners.delete(listener);
+  };
+}
+
+/** Stable between mutations, so `useSyncExternalStore` never loops. */
+export function getNewSessionBranchState(): NewSessionBranchSnapshot {
+  return branchSnapshot;
+}
+
+/**
+ * Record the branch override for one repository. `null` (the provider default
+ * was chosen) drops the entry, so the create body carries no `upstreamBranch`
+ * and the server checks out the provider's own default.
+ */
+export function setSelectedBranchOverride(
+  repository: NewSessionRepository,
+  branch: string | null
+): void {
+  const key = repositoryIdentityKey(repository);
+  const current = branchSnapshot.overrides.get(key) ?? null;
+  if (current === branch) {
+    return;
+  }
+  const overrides = new Map(branchSnapshot.overrides);
+  if (branch === null) {
+    overrides.delete(key);
+  } else {
+    overrides.set(key, branch);
+  }
+  publishBranchSnapshot({ ...branchSnapshot, overrides });
+}
+
+/** The non-default branch chosen for exactly this repository, or `null`. */
+export function getSelectedBranchOverride(repository: NewSessionRepository | null): string | null {
+  if (!repository) {
+    return null;
+  }
+  return branchSnapshot.overrides.get(repositoryIdentityKey(repository)) ?? null;
+}
+
+/** Drop every override (screen mount/unmount); the published scope is a prop. */
+export function resetSelectedBranchOverrides(): void {
+  if (branchSnapshot.overrides.size === 0) {
+    return;
+  }
+  publishBranchSnapshot({ ...branchSnapshot, overrides: EMPTY_OVERRIDES });
+}
+
+/**
+ * The one state the branch row shows, as a single discriminant. The row renders
+ * from this value alone, so "loading" and a message can never be on screen
+ * together: there is no second node to keep in sync, and no flag combination
+ * that renders two of them.
+ */
+export type BranchSectionState =
+  /** Bitbucket is organization-only: a personal row never queries branches. */
+  | { kind: 'bitbucket-organizations-only' }
+  /** The request is still in flight (bounded by the hook's settle bound). */
+  | { kind: 'loading' }
+  /** A refusal a retry cannot fix (no access, repository gone). */
+  | { kind: 'unavailable' }
+  /** A transient failure, or a request that outlived the settle bound. */
+  | { kind: 'retryable'; isRetrying: boolean }
+  /** The provider listed no branches. */
+  | { kind: 'empty' }
+  /** The provider's branches, with the default the create checks out. */
+  | {
+      kind: 'list';
+      branches: readonly string[];
+      defaultBranch: string | null;
+      truncated: boolean;
+    };
+
+export type BranchSectionInput = {
+  platform: RepositoryPlatform;
+  isEnabled: boolean;
+  isLoading: boolean;
+  isPermanentError: boolean;
+  isRetryableError: boolean;
+  isRetrying: boolean;
+  branches: readonly string[];
+  defaultBranch: string | null;
+  truncated: boolean;
+};
+
+/**
+ * Resolve the branch row's single state. The order is the priority: a provider
+ * that cannot be queried at all is explained before any request state, a
+ * running request beats a stale result, and a refusal beats an empty list.
+ */
+export function resolveBranchSectionState(input: BranchSectionInput): BranchSectionState {
+  if (!input.isEnabled && input.platform === 'bitbucket') {
+    return { kind: 'bitbucket-organizations-only' };
+  }
+  if (input.isLoading || !input.isEnabled) {
+    return { kind: 'loading' };
+  }
+  if (input.isPermanentError) {
+    return { kind: 'unavailable' };
+  }
+  if (input.isRetryableError) {
+    return { kind: 'retryable', isRetrying: input.isRetrying };
+  }
+  if (input.branches.length === 0) {
+    return { kind: 'empty' };
+  }
+  return {
+    kind: 'list',
+    branches: input.branches,
+    defaultBranch: input.defaultBranch,
+    truncated: input.truncated,
+  };
 }

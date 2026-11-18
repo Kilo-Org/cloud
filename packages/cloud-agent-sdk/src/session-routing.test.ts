@@ -7,10 +7,6 @@ import type { ResolvedSession } from './types';
 import type { SessionActivity, AgentStatus } from './types';
 import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage, stubTextPart } from './test-helpers';
 
-// ---------------------------------------------------------------------------
-// WebSocket mock
-// ---------------------------------------------------------------------------
-
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
   onmessage: ((ev: MessageEvent) => void) | null;
@@ -47,10 +43,6 @@ afterEach(() => {
   delete global.WebSocket;
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const SES_ID = 'ses-1';
 
 type StateCapture = { activity: SessionActivity; status: AgentStatus };
@@ -66,20 +58,15 @@ function captureStates(session: ReturnType<typeof createCloudAgentSession>): Sta
   return states;
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('session transport routing', () => {
   describe('resolveSession returning Cloud Agent session', () => {
     it('creates Cloud Agent transport with resolved cloudAgentSessionId', async () => {
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'cloud-agent',
-            kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: cloudAgentId('do-456'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: cloudAgentId('do-456'),
+        })
       );
 
       const session = createCloudAgentSession({
@@ -114,12 +101,11 @@ describe('session transport routing', () => {
 
   describe('resolveSession returning remote session', () => {
     it('creates CLI live transport using its required injected user web connection', async () => {
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'remote',
-            kiloSessionId: kiloId('ses-1'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'remote',
+          kiloSessionId: kiloId('ses-1'),
+        })
       );
       const release = jest.fn();
       const userWebConnection = {
@@ -129,6 +115,9 @@ describe('session transport routing', () => {
         destroy: jest.fn(),
         isConnected: jest.fn(() => false),
         onConnectionChange: jest.fn(() => jest.fn()),
+        isReconnectExhausted: jest.fn(() => false),
+        onReconnectExhaustionChange: jest.fn(() => jest.fn()),
+        retryConnection: jest.fn(),
         subscribeToCliSession: jest.fn(() => release),
         sendCommand: jest.fn(() => Promise.resolve()),
         sendCommandToConnection: jest.fn(() => Promise.resolve()),
@@ -166,12 +155,11 @@ describe('session transport routing', () => {
         },
       ]);
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'read-only',
-            kiloSessionId: kiloId('ses-1'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'read-only',
+          kiloSessionId: kiloId('ses-1'),
+        })
       );
 
       const fetchSnapshot = jest.fn(() => Promise.resolve(snapshot));
@@ -185,19 +173,14 @@ describe('session transport routing', () => {
       });
 
       session.connect();
-      // resolveSession resolves
       await Promise.resolve();
-      // fetchSnapshot resolves
       await Promise.resolve();
 
-      // Session info set from snapshot
       expect(session.state.getSessionInfo()).toEqual({ id: 'ses-1', parentID: undefined });
 
-      // Messages in storage
       const messageIds = session.storage.getMessageIds();
       expect(messageIds).toContain('msg-1');
 
-      // Historical session should not be interactive
       expect(session.canSend).toBe(false);
       expect(session.canInterrupt).toBe(false);
 
@@ -219,6 +202,9 @@ describe('session transport routing', () => {
           destroy: jest.fn(),
           isConnected: jest.fn(() => false),
           onConnectionChange: jest.fn(() => jest.fn()),
+          isReconnectExhausted: jest.fn(() => false),
+          onReconnectExhaustionChange: jest.fn(() => jest.fn()),
+          retryConnection: jest.fn(),
           subscribeToCliSession: jest.fn(() => subscribeRelease),
           sendCommand: jest.fn(() => Promise.resolve()),
           sendCommandToConnection: jest.fn(() => Promise.resolve()),
@@ -287,7 +273,6 @@ describe('session transport routing', () => {
       });
       expect(resolveSession).toHaveBeenCalledTimes(1);
 
-      // The watched session shows up in a heartbeat → upgrade to live.
       fake.emitSystemEvent('sessions.heartbeat', {
         connectionId: 'conn-1',
         sessions: [{ id: SES_ID, status: 'busy', title: 'Review' }],
@@ -304,9 +289,8 @@ describe('session transport routing', () => {
     });
 
     it('disarms the watcher on destroy without re-resolving', async () => {
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
       );
 
       const fake = makeFakeUserWebConnection();
@@ -346,8 +330,8 @@ describe('session transport routing', () => {
     it('sets error state and fires onError', async () => {
       const onError = jest.fn();
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> => Promise.reject(new Error('Session not found'))
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.reject(new Error('Session not found'))
       );
 
       const session = createCloudAgentSession({
@@ -360,12 +344,10 @@ describe('session transport routing', () => {
       const states = captureStates(session);
 
       session.connect();
-      // resolveSession rejects
       await Promise.resolve();
 
       expect(onError).toHaveBeenCalledWith('Session not found');
 
-      // Should have connecting → idle+error
       const errorState = states.find(s => s.status.type === 'error');
       expect(errorState).toBeDefined();
       expect(errorState!.activity).toEqual({ type: 'idle' });
@@ -377,8 +359,8 @@ describe('session transport routing', () => {
     it('uses generic message for non-Error throws', async () => {
       const onError = jest.fn();
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> => Promise.reject('plain string error')
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.reject('plain string error')
       );
 
       const session = createCloudAgentSession({
@@ -401,13 +383,12 @@ describe('session transport routing', () => {
     it('sets error state when Cloud Agent session lacks getTicket', async () => {
       const onError = jest.fn();
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'cloud-agent',
-            kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: cloudAgentId('do-1'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: cloudAgentId('do-1'),
+        })
       );
 
       const session = createCloudAgentSession({
@@ -435,13 +416,12 @@ describe('session transport routing', () => {
     it('sets error state when Cloud Agent session lacks fetchSnapshot', async () => {
       const onError = jest.fn();
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'cloud-agent',
-            kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: cloudAgentId('do-1'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: cloudAgentId('do-1'),
+        })
       );
 
       const session = createCloudAgentSession({
@@ -466,13 +446,12 @@ describe('session transport routing', () => {
     it('sets error state when Cloud Agent session lacks api', async () => {
       const onError = jest.fn();
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'cloud-agent',
-            kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: cloudAgentId('do-1'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: cloudAgentId('do-1'),
+        })
       );
 
       const session = createCloudAgentSession({
@@ -500,12 +479,11 @@ describe('session transport routing', () => {
     it('sets error state when remote session lacks required config', async () => {
       const onError = jest.fn();
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'remote',
-            kiloSessionId: kiloId('ses-1'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'remote',
+          kiloSessionId: kiloId('ses-1'),
+        })
       );
 
       const session = createCloudAgentSession({
@@ -530,12 +508,11 @@ describe('session transport routing', () => {
     it('sets error state when read-only session lacks fetchSnapshot', async () => {
       const onError = jest.fn();
 
-      const resolveSession = jest.fn(
-        (): Promise<ResolvedSession> =>
-          Promise.resolve({
-            type: 'read-only',
-            kiloSessionId: kiloId('ses-1'),
-          })
+      const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+        Promise.resolve({
+          type: 'read-only',
+          kiloSessionId: kiloId('ses-1'),
+        })
       );
 
       const session = createCloudAgentSession({

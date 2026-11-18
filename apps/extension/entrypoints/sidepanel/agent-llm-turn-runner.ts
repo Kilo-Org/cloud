@@ -1,17 +1,16 @@
 /* eslint-disable import/max-dependencies */
 import type {
   AgentConversationEvent,
+  KiloBrowserToolCallEvent,
   RemoteMcpToolCallEvent,
   WebMcpToolCallEvent,
 } from '@/src/shared/agent-conversation';
-import {
-  createEvalToolDefinition,
-  createSafeToolDefinitions,
-} from '@/src/shared/agent-llm-harness';
+import { createSafeToolDefinitions } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
 import type { OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
 import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
+import type { BrowserCaller } from '@/src/shared/browser-caller';
 import type {
   KiloGatewayToolCallRequest,
   KiloGatewayToolDefinition,
@@ -19,17 +18,20 @@ import type {
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { buildWebMcpToolDefinitions } from '@/src/shared/web-mcp-tools';
 import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
-import { executeEvalToolCall } from './agent-eval-runtime';
 import { createSafeToolExecutor } from './agent-safe-tool-runtime';
 import {
+  isKiloBrowserToolCallEvent,
+  isKiloBrowserToolCallName,
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
   isWebMcpToolCallEvent,
   isWorkflowToolCallEvent,
+  toBrowserToolTurnEvents,
   toDangerousToolCallEvents,
   toWebMcpToolCallEvents,
 } from './agent-tool-call-events';
 import { discoverWebMcpTools, executeWebMcpToolCall } from './agent-web-mcp-tool-runtime';
+import { executeKiloBrowserToolCall } from './browser-tool-runtime';
 import { createWebSearchExecutor } from './agent-web-search-tool-runtime';
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
@@ -38,6 +40,7 @@ interface RunDangerousLlmTurnOptions {
   readonly allowWebMcpInSafeMode?: boolean;
   readonly apiBaseUrl: string;
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
+  readonly browserCaller: BrowserCaller;
   readonly conversationEvents: AgentConversationEvent[];
   readonly fetch: FetchLike;
   readonly model: string;
@@ -63,13 +66,17 @@ interface RunDangerousLlmTurnOptions {
   readonly maxToolRounds?: number | undefined;
 }
 
+type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+
 type DangerousToolCallEvent =
   | ReturnType<typeof toDangerousToolCallEvents>[number]
+  | KiloBrowserToolCallEvent
   | RemoteMcpToolCallEvent
   | WebMcpToolCallEvent;
 
 export const runDangerousLlmTurn = ({
   allowWebMcpInSafeMode: _allowWebMcpInSafeMode,
+  browserCaller,
   executeRemoteMcpToolCall,
   maxToolRounds = maxAgentToolRounds,
   remoteMcpTools = [],
@@ -81,7 +88,7 @@ export const runDangerousLlmTurn = ({
   ...options
 }: RunDangerousLlmTurnOptions): Promise<void> => {
   // One executor per turn: a fresh unchanged-snapshot memory, so a new conversation's first snapshot is served in full.
-  const executeSafeToolCall = createSafeToolExecutor();
+  const executeSafeToolCall = createSafeToolExecutor(browserCaller);
   // One executor per turn: it carries the abort signal and caps the searches this turn may bill.
   const runWebSearch = createWebSearchExecutor({
     apiBaseUrl: options.apiBaseUrl,
@@ -93,8 +100,7 @@ export const runDangerousLlmTurn = ({
 
   // The fixed tool set never changes within a turn; WebMCP page tools are appended per-request by prepareTools.
   const fixedTools = [
-    ...createSafeToolDefinitions({ supportsImages }),
-    createEvalToolDefinition(),
+    ...createSafeToolDefinitions('dangerous'),
     ...workflowTools,
     ...remoteMcpTools,
   ];
@@ -105,6 +111,10 @@ export const runDangerousLlmTurn = ({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
+      if (isKiloBrowserToolCallEvent(toolCall)) {
+        return executeKiloBrowserToolCall(toolCall, browserCaller);
+      }
+
       if (isWebMcpToolCallEvent(toolCall)) {
         return executeWebMcpToolCall(toolCall);
       }
@@ -125,18 +135,12 @@ export const runDangerousLlmTurn = ({
           : executeRemoteMcpToolCall(toolCall);
       }
 
-      if (toolCall.name === 'eval') {
-        return executeEvalToolCall(toolCall);
-      }
-
       if (toolCall.name === 'web_search') {
         return runWebSearch(toolCall);
       }
 
       return executeSafeToolCall(toolCall);
     },
-    failureMessage: error =>
-      `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     maxToolRounds,
     noResponseMessage: 'The model did not return a response.',
     prepareTools: async () => {
@@ -167,7 +171,11 @@ export const runDangerousLlmTurn = ({
     },
     supportsImages,
     toToolCallEvents: toolCalls =>
-      toolCalls.flatMap<DangerousToolCallEvent>(toolCall => {
+      toolCalls.flatMap<DangerousToolCallEvent | ToolResultEvent>(toolCall => {
+        if (isKiloBrowserToolCallName(toolCall.name)) {
+          return toBrowserToolTurnEvents([toolCall], selectedTabId, 'dangerous');
+        }
+
         const webMcpEvents = toWebMcpToolCallEvents([toolCall], webMcpRoutes);
 
         if (webMcpEvents.length > 0) {
@@ -179,7 +187,7 @@ export const runDangerousLlmTurn = ({
           : toDangerousToolCallEvents([toolCall], selectedTabId);
       }),
     tooManyToolRoundsMessage:
-      'The model requested too many eval rounds. Send another message to continue.',
+      'The model requested too many tool rounds. Send another message to continue.',
     tools: fixedTools,
   });
 };

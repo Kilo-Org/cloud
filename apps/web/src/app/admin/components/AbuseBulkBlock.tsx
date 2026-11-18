@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -43,7 +45,7 @@ function BulkBlockTab() {
 
   const mutation = useMutation<BulkBlockResponse>({
     mutationFn: async () => {
-      const res = await fetch('/admin/api/abuse/bulk-block', {
+      const res = await adminFetch('/admin/api/abuse/bulk-block', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kilo_user_emails_or_ids: ids.slice(0, 2000), block_reason: reason }),

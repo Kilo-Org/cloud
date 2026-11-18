@@ -1,6 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 
-import { showSessionActionMenu } from './session-row-actions';
+import {
+  buildSessionActionMenuItems,
+  copySessionLink,
+  showRenamePrompt,
+} from './session-row-actions';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -10,137 +17,149 @@ const reactNativeMock = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   Alert: { alert: reactNativeMock.alert, prompt: reactNativeMock.prompt },
 }));
+// `useSessionDeleteConfirm` builds the in-app dialog, whose tree pulls the real
+// react-native Flow source this node project cannot parse; no suite here covers
+// that surface.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
+}));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
-  NotificationFeedbackType: { Warning: 'warning', Success: 'success' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning' },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-type SheetOptions = {
-  options: string[];
-  cancelButtonIndex?: number;
-  destructiveButtonIndex?: number | number[];
-  containerStyle?: { paddingBottom?: number };
-};
-
-type Captured = {
-  sheetOptions: SheetOptions;
-  onSelect: (index?: number) => void;
-};
-
-function openMenu(args: {
-  onRename?: () => void;
-  onDelete?: () => void;
-  bottomInset?: number;
-}): Captured & {
-  onCopySessionId: ReturnType<typeof vi.fn>;
-  onRename: ReturnType<typeof vi.fn> | undefined;
-  onDelete: ReturnType<typeof vi.fn> | undefined;
-} {
-  const onCopySessionId = vi.fn(() => undefined);
-  const onRename = args.onRename ? vi.fn(() => undefined) : undefined;
-  const onDelete = args.onDelete ? vi.fn(() => undefined) : undefined;
-  const captured: { current: Captured | null } = { current: null };
-
-  showSessionActionMenu({
-    showActionSheetWithOptions: (options, select) => {
-      captured.current = {
-        sheetOptions: options as SheetOptions,
-        onSelect: select,
-      };
-    },
-    onCopySessionId,
-    ...(onRename ? { onRename } : {}),
-    ...(onDelete ? { onDelete } : {}),
-    bottomInset: args.bottomInset ?? 12,
-  });
-
-  if (!captured.current) {
-    throw new Error('showActionSheetWithOptions was not called');
-  }
-  return {
-    ...captured.current,
-    onCopySessionId,
-    onRename,
-    onDelete,
-  };
-}
-
-describe('showSessionActionMenu', () => {
+describe('copySessionLink', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('builds copy + cancel when rename and delete are omitted', () => {
-    const { sheetOptions } = openMenu({});
+  it('copies the anchored resume URL and commits with the success haptic', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
 
-    expect(sheetOptions.options).toEqual(['Copy session ID', 'Cancel']);
-    expect(sheetOptions.cancelButtonIndex).toBe(1);
-    expect(sheetOptions.destructiveButtonIndex).toBeUndefined();
-    expect(sheetOptions.containerStyle).toEqual({ paddingBottom: 12 });
+    await expect(copySessionLink('ses-1', 'msg_7')).resolves.toBe(true);
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'ses-1', anchorMessageId: 'msg_7' })
+    );
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith(
+      Haptics.NotificationFeedbackType.Success
+    );
   });
 
-  it('includes rename when onRename is provided', () => {
-    const { sheetOptions } = openMenu({ onRename: () => undefined });
+  it('copies the session-top link when the position is unknown', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
 
-    expect(sheetOptions.options).toEqual(['Copy session ID', 'Rename', 'Cancel']);
-    expect(sheetOptions.cancelButtonIndex).toBe(2);
-    expect(sheetOptions.destructiveButtonIndex).toBeUndefined();
+    await expect(copySessionLink('ses-1', null)).resolves.toBe(true);
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'ses-1', anchorMessageId: null })
+    );
   });
 
-  it('includes delete with destructive index when onDelete is provided', () => {
-    const { sheetOptions } = openMenu({ onDelete: () => undefined });
+  it('reports failure without the success haptic when the clipboard rejects', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockRejectedValue(new Error('clipboard unavailable'));
 
-    expect(sheetOptions.options).toEqual(['Copy session ID', 'Delete session', 'Cancel']);
-    expect(sheetOptions.cancelButtonIndex).toBe(2);
-    expect(sheetOptions.destructiveButtonIndex).toBe(1);
+    await expect(copySessionLink('ses-1', 'msg_7')).resolves.toBe(false);
+
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
 
-  it('includes copy, rename, delete, cancel in that order for full menu', () => {
-    const { sheetOptions } = openMenu({
-      onRename: () => undefined,
-      onDelete: () => undefined,
-      bottomInset: 34,
-    });
+  it('reports failure when the clipboard resolves false', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(false);
 
-    expect(sheetOptions.options).toEqual(['Copy session ID', 'Rename', 'Delete session', 'Cancel']);
-    expect(sheetOptions.cancelButtonIndex).toBe(3);
-    expect(sheetOptions.destructiveButtonIndex).toBe(2);
-    expect(sheetOptions.containerStyle).toEqual({ paddingBottom: 34 });
+    await expect(copySessionLink('ses-1', null)).resolves.toBe(false);
+
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+type PromptButton = {
+  text?: string;
+  style?: string;
+  onPress?: (value?: string) => void;
+};
+
+/** Invoke the confirm button of the last `Alert.prompt` with `value`. */
+function confirmWith(value: string) {
+  const call = reactNativeMock.prompt.mock.calls.at(-1);
+  if (!call) {
+    throw new Error('Alert.prompt was not called');
+  }
+  const buttons = call[2] as unknown as PromptButton[];
+  const rename = buttons.find(button => button.style !== 'cancel');
+  rename?.onPress?.(value);
+}
+
+describe('showRenamePrompt', () => {
+  afterEach(() => {
+    reactNativeMock.prompt.mockClear();
   });
 
-  it('dispatches copy / rename / delete by index and ignores cancel', () => {
-    const { onSelect, onCopySessionId, onRename, onDelete } = openMenu({
-      onRename: () => undefined,
-      onDelete: () => undefined,
-    });
-
-    onSelect(0);
-    expect(onCopySessionId).toHaveBeenCalledTimes(1);
+  it('does not rename when the prefilled title is confirmed unchanged', () => {
+    // Confirming the seeded value without editing must be a no-op, not a
+    // rename to that value.
+    const onRename = vi.fn<(newTitle: string) => void>();
+    showRenamePrompt('Untitled session', onRename);
+    confirmWith('Untitled session');
     expect(onRename).not.toHaveBeenCalled();
-    expect(onDelete).not.toHaveBeenCalled();
-
-    onSelect(1);
-    expect(onRename).toHaveBeenCalledTimes(1);
-
-    onSelect(2);
-    expect(onDelete).toHaveBeenCalledTimes(1);
-
-    onSelect(3);
-    onSelect(undefined);
-    expect(onCopySessionId).toHaveBeenCalledTimes(1);
-    expect(onRename).toHaveBeenCalledTimes(1);
-    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
-  it('dispatches rename at index 1 when delete is absent', () => {
-    const { onSelect, onRename, onCopySessionId } = openMenu({
-      onRename: () => undefined,
+  it('renames with the trimmed value when the title changed', () => {
+    const onRename = vi.fn<(newTitle: string) => void>();
+    showRenamePrompt('Untitled session', onRename);
+    confirmWith('  Fix login  ');
+    expect(onRename).toHaveBeenCalledWith('Fix login');
+  });
+
+  it('does not rename to a blank value', () => {
+    const onRename = vi.fn<(newTitle: string) => void>();
+    showRenamePrompt('Untitled session', onRename);
+    confirmWith('   ');
+    expect(onRename).not.toHaveBeenCalled();
+  });
+});
+
+const noop = () => undefined;
+
+describe('buildSessionActionMenuItems', () => {
+  it('omits exit without onExit, marks delete destructive and reuses labels', () => {
+    const { items, cancelLabel } = buildSessionActionMenuItems({
+      onOpen: noop,
+      onRename: noop,
+      onDelete: noop,
     });
 
-    onSelect(1);
-    expect(onRename).toHaveBeenCalledTimes(1);
-    expect(onCopySessionId).not.toHaveBeenCalled();
+    expect(items.map(item => item.key)).toEqual(['open', 'rename', 'delete']);
+    expect(items.map(item => item.label)).toEqual(['Open', 'Rename', 'Delete session']);
+    expect(items[2]?.destructive).toBe(true);
+    expect(cancelLabel).toBe('Cancel');
+  });
+
+  it('marks exit destructive only when delete is absent', () => {
+    const { items } = buildSessionActionMenuItems({ onOpen: noop, onExit: noop });
+
+    expect(items.map(item => item.key)).toEqual(['open', 'exit']);
+    expect(items[1]?.destructive).toBe(true);
+  });
+
+  it('adds Copy session ID and View PR only when their callbacks are passed', () => {
+    const onCopySessionId = vi.fn<() => void>();
+    const onViewPr = vi.fn<() => void>();
+    const { items } = buildSessionActionMenuItems({ onOpen: noop, onCopySessionId, onViewPr });
+
+    expect(items.map(item => item.key)).toEqual(['open', 'copy', 'view-pr']);
+    expect(items.map(item => item.label)).toEqual(['Open', 'Copy session ID', 'View PR']);
+    items[1]?.run();
+    items[2]?.run();
+    expect(onCopySessionId).toHaveBeenCalledTimes(1);
+    expect(onViewPr).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits View PR for a session with no associated PR callback', () => {
+    const { items } = buildSessionActionMenuItems({ onOpen: noop, onDelete: noop });
+
+    expect(items.map(item => item.key)).not.toContain('view-pr');
   });
 });

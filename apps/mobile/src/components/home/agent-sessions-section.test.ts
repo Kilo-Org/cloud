@@ -1,94 +1,520 @@
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- one suite covering every Home live state: pending, card, zero state, and header notices */
+import { type ComponentProps, createElement, type ReactNode } from 'react';
+import * as ReactQuery from '@tanstack/react-query';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { hasDisplayableAgentSessions } from '@/components/home/agent-sessions-section';
-import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { i18n } from '@/i18n';
+import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { formatScheduledWake } from '@/components/agents/session-list-helpers';
+import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
+const navigateSpy = vi.hoisted(() => vi.fn());
+const dismissToSpy = vi.hoisted(() => vi.fn());
+const sessionDestination = vi.hoisted(() => ({ id: '' }));
+const connectivity = vi.hoisted(() => ({ offline: false, connected: true, exhausted: false }));
+const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
-  useRouter: vi.fn(),
-  useFocusEffect: vi.fn(),
+  useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
 }));
-
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  LinearTransition: {},
+  FadeIn: { duration: () => ({}) },
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: (_reduced: boolean, crossfade: unknown) => crossfade,
+}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   View: 'View',
+  Pressable: 'Pressable',
+  Platform: { OS: 'ios' },
+  I18nManager: { isRTL: false },
 }));
-
-vi.mock('@/components/home/section-header', () => ({
-  SectionHeader: () => null,
+vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
-
-vi.mock('@/components/agents/remote-session-row', () => ({
-  RemoteSessionRow: () => null,
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  ImpactFeedbackStyle: { Medium: 'medium' },
 }));
-
-vi.mock('@/components/agents/session-row', () => ({
-  StoredSessionRow: () => null,
+vi.mock('@tanstack/react-query', async importOriginal => ({
+  ...(await importOriginal<typeof ReactQuery>()),
+  useQueryClient: () => queryClient,
 }));
-
-vi.mock('@/components/ui/text', () => ({
-  Text: () => null,
-}));
-
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
-    activeSessions: [],
-    storedSessions: [],
-    activeSessionIds: new Set(),
-    activeIsError: false,
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    activeSessions: {
+      list: {
+        queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
+      },
+    },
   }),
 }));
-
-function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
+vi.mock('@/lib/hooks/use-session-mutations', () => ({
+  useSessionMutations: () => ({ renameSession: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedSoft: '#777777', warn: '#ff9900', good: '#22aa22' }),
+}));
+vi.mock('@/components/rename-modal', () => ({ RenameModal: () => null }));
+vi.mock('@/components/agents/session-platform-icon', () => ({
+  selectRowPlatformPresentation: () => ({ iconKind: null, spokenPlatform: null }),
+  SessionPlatformIcon: () => null,
+}));
+vi.mock('@/components/agents/session-row-actions', () => ({
+  buildSessionActionMenuItems: vi.fn(),
+  useSessionDeleteConfirm: () => ({ confirmDelete: vi.fn(), deleteDialog: null }),
+}));
+vi.mock('@/components/agents/remote-session-exit-alert', () => ({
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: vi.fn().mockResolvedValue(true),
+    exitDialog: null,
+  }),
+}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: vi.fn(), success: vi.fn() },
+}));
+vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
+vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
+// The zero state's glyph comes from the icon set, whose native renderer the
+// pure project does not load.
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+// The briefing card reaches the native SQLCipher dismissal journal; these
+// assertions cover the live card and the section header only.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: 'BriefingCard',
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
+}));
+// A host element that still renders the header notice. The factory is hoisted
+// above the static imports, so it loads React itself.
+vi.mock('@/components/home/section-header', async () => {
+  const { createElement: create } = await import('react');
   return {
-    id: 'a1',
-    status: 'running',
-    title: 'test',
-    connectionId: 'c1',
-    ...over,
+    SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
   };
+});
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared empty state is measured on the device; the section only decides
+// which state it draws, so the mock keeps its title and hint readable as Text.
+// The factory is hoisted above the static imports, so it loads React itself.
+vi.mock('@/components/empty-state', async () => {
+  const { createElement: create } = await import('react');
+  return {
+    EmptyState: (props: { icon: unknown; title: string; description?: ReactNode }) =>
+      create(
+        'EmptyState',
+        props,
+        create('Text', {}, props.title),
+        props.description === undefined ? null : create('Text', {}, props.description)
+      ),
+  };
+});
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({ useOrgBoundary: vi.fn() }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.offline ? 'offline' : 'online'),
+}));
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionHealth: () => ({
+    isConnected: connectivity.connected && !connectivity.offline,
+    reconnectExhausted: connectivity.exhausted,
+  }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({}),
+}));
+vi.mock('@/components/agents/use-agent-session-navigator', () => ({
+  useAgentSessionNavigator: () => (id: string) => {
+    sessionDestination.id = id;
+  },
+}));
+vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  useAgentSessions: () => {
+    throw new Error('Home must not mount stored history');
+  },
+  useLiveAgentSessions: () => {
+    throw new Error('The section must not mount another live query');
+  },
+}));
+
+type Props = ComponentProps<typeof AgentSessionsSection>;
+const context: Props['context'] = {
+  organizationId: 'org-1',
+  isReady: true,
+  isResolving: false,
+  isError: false,
+  label: 'Engineering',
+  refetch: vi.fn(),
+};
+const settled: Props['sessions'] = {
+  activeSessions: [],
+  hasAcceptedSuccess: true,
+  terminalError: null,
+  isLoading: false,
+  isError: false,
+  isFetching: false,
+  isPaused: false,
+  refetch: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+};
+function session(
+  id: string,
+  status = 'running',
+  extra: Partial<ActiveSession> = {}
+): ActiveSession {
+  return { id, status, title: id, connectionId: 'c1', ...extra };
+}
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+function nodes(type: string) {
+  if (!renderer) {
+    throw new Error('Missing renderer');
+  }
+  return renderer.root.findAll(
+    candidate => typeof candidate.type === 'string' && candidate.type === type
+  );
+}
+function node(type: string, index = 0) {
+  const result = nodes(type)[index];
+  if (!result) {
+    throw new Error(`Missing ${type}`);
+  }
+  return result;
+}
+function text() {
+  return nodes('Text')
+    .map(textNode => textNode.children.filter(child => typeof child === 'string').join(''))
+    .join('\n');
+}
+async function render(sessions = settled, contextOverride = context, briefing?: Props['briefing']) {
+  await act(async () => {
+    const tree = createElement(AgentSessionsSection, {
+      context: contextOverride,
+      sessions,
+      briefing,
+    });
+    if (renderer) {
+      renderer.update(tree);
+    } else {
+      renderer = TestRenderer.create(tree);
+    }
+    await Promise.resolve();
+  });
+}
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  navigateSpy.mockClear();
+  dismissToSpy.mockClear();
+  sessionDestination.id = '';
+  connectivity.offline = false;
+  connectivity.connected = true;
+  connectivity.exhausted = false;
+});
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  queryClient.clear();
+});
+
+function newestButton() {
+  // Count rows are buttons too; the newest block is drawn after them, so the
+  // last button is the one that opens the session.
+  const button = nodes('Pressable').findLast(
+    candidate => candidate.props.accessibilityRole === 'button'
+  );
+  if (!button) {
+    throw new Error('Missing newest session button');
+  }
+  return button;
 }
 
-function makeStored(over: Partial<StoredSession> = {}): StoredSession {
-  return {
-    session_id: 's1',
-    title: 'Untitled',
-    cloud_agent_session_id: null,
-    parent_session_id: null,
-    organization_id: null,
-    created_on_platform: 'cli',
-    git_url: null,
-    git_branch: null,
-    status: null,
-    status_updated_at: null,
-    total_cost_microdollars: null,
-    created_at: '2026-07-01 00:00:00+00',
-    updated_at: '2026-07-01 00:00:00+00',
-    version: 0,
-    associatedPr: null,
-    ...over,
-  };
-}
-
-describe('hasDisplayableAgentSessions', () => {
-  it('returns true when there is at least one active session', () => {
-    expect(hasDisplayableAgentSessions([], [makeActive()])).toBe(true);
+describe('Home live section', () => {
+  it('draws the four ranked state counts with the shared state dots', async () => {
+    await render({
+      ...settled,
+      activeSessions: [
+        session('need', 'question'),
+        session('work', 'busy'),
+        session('idle', 'idle'),
+        session('later', 'scheduled', { scheduledAt: '2026-10-03T09:00:00.000Z' }),
+      ],
+    });
+    expect(
+      nodes('SessionStatusIcon')
+        .map(icon => icon.props.kind)
+        .slice(0, 4)
+    ).toEqual(['needsInput', 'running', 'scheduled', 'idle']);
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).toContain(label);
+    }
+    // The soonest scheduled wake rides the scheduled row.
+    expect(text()).toContain(formatScheduledWake('2026-10-03T09:00:00.000Z') ?? '');
   });
 
-  it('returns true when a cloud-agent stored session exists', () => {
-    expect(
-      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent' })], [])
-    ).toBe(true);
-    expect(
-      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent-web' })], [])
-    ).toBe(true);
+  it('shows the newest session with its state and relative age and opens it', async () => {
+    await render({
+      ...settled,
+      activeSessions: [
+        session('older', 'idle', { statusUpdatedAt: '2026-10-02T09:00:00.000Z' }),
+        session('newer', 'running', { statusUpdatedAt: new Date().toISOString() }),
+      ],
+    });
+    expect(text()).toContain('newer');
+    expect(text()).toContain('Working');
+    expect(text()).toContain('Just now');
+    expect(newestButton().props.accessibilityLabel).toBe('newer, Working, Just now');
+    (newestButton().props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('newer');
   });
 
-  it('returns false when only non-cloud-agent stored sessions exist', () => {
-    expect(hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cli' })], [])).toBe(
-      false
+  it('never leaves the newest block blank while a session is live', async () => {
+    // No row carries a status time and the only title is the backend
+    // placeholder: the block still names the session, as the list rows do.
+    await render({
+      ...settled,
+      activeSessions: [
+        session('fresh', 'busy', { title: 'New session - 2026-10-04T08:00:00.000Z' }),
+      ],
+    });
+    expect(text()).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(text()).toContain('Working');
+    expect(text()).not.toContain('2026-10-04');
+    (newestButton().props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('fresh');
+  });
+
+  it('keeps See all navigation to the Agents live index', async () => {
+    await render({ ...settled, activeSessions: [session('a1')] });
+    expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
+    (node('SectionHeader').props.onActionPress as () => void)();
+    // An empty params object is what clears a lingering status filter.
+    expect(navigateSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: {},
+    });
+    expect(dismissToSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: {},
+    });
+    expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
   });
 
-  it('returns false when both arrays are empty', () => {
-    expect(hasDisplayableAgentSessions([], [])).toBe(false);
+  it('opens the agents index narrowed to the tapped status', async () => {
+    await render({
+      ...settled,
+      activeSessions: [session('older', 'idle', { statusUpdatedAt: new Date().toISOString() })],
+    });
+
+    const row = nodes('Pressable').find(candidate => candidate.props.testID === 'home-status-idle');
+    if (!row) {
+      throw new Error('Missing idle status row');
+    }
+    expect(row.props.accessibilityRole).toBe('button');
+    (row.props.onPress as () => void)();
+
+    expect(navigateSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: { status: 'idle' },
+    });
+    expect(dismissToSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: { status: 'idle' },
+    });
+  });
+
+  it('shows a skeleton until the live list resolves', async () => {
+    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+    expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
+
+    await render({ ...settled, activeSessions: [session('a1')] });
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(text()).toContain('a1');
+  });
+
+  it('draws the zero state as its one message, without four zero counts', async () => {
+    await render();
+    // The zero state is the shared empty state: a title and one hint, so the
+    // card does not read as a blank frame with a lone line in it.
+    expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    expect(text()).toContain(i18n.t('agents.sessionList.noSessionsYetDescription'));
+    expect(nodes('EmptyState')).toHaveLength(1);
+    // The count rows' labels are the only place the card names the four
+    // states, so their absence proves the card dropped the zero counts.
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).not.toContain(label);
+    }
+    // Nothing to open: the newest block is not a button.
+    expect(
+      nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')
+    ).toBe(false);
+    // The header keeps See all's box but hides it.
+    expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
+    expect(node('SectionHeader').props.actionHidden).toBe(true);
+  });
+
+  it('leaves the live card without a single pressable while the briefing holds the frame', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    expect(typeof newestButton().props.onPress).toBe('function');
+
+    // The briefing layer is drawn; the live card stays mounted underneath only
+    // to reserve the frame's height, so it renders no press target at all: a
+    // mounted Pressable is a touch area even without its onPress.
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] }, context, {
+      visible: true,
+      card: createElement('BriefingCard'),
+    });
+    expect(nodes('Pressable')).toHaveLength(0);
+    expect(text()).toContain('live-1');
+  });
+
+  it('leaves no button behind when the card settles into the zero state', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    const live = newestButton();
+    expect(live.props.accessibilityLabel).toContain('live-1');
+
+    await render();
+    // The zero state draws no press target at all, so the Android view that
+    // announced the previous session and its button role has nothing to reuse.
+    expect(nodes('Pressable')).toHaveLength(0);
+    expect(nodes('EmptyState')).toHaveLength(1);
+
+    // Returning to a session mounts a labelled control again.
+    await render({ ...settled, activeSessions: [session('live-2', 'busy')] });
+    const revived = newestButton();
+    expect(revived).not.toBe(live);
+    expect(revived.props.accessibilityLabel).toContain('live-2');
+  });
+
+  it('moves the offline notice into the header and keeps the card in place', async () => {
+    const sessions = {
+      ...settled,
+      activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+    };
+    // The header's own views (the notice's status dot) are not the section body.
+    const bodyClasses = () => {
+      const header = new Set(
+        node('SectionHeader').findAll(candidate => Object.is(candidate.type, 'View'))
+      );
+      return nodes('View')
+        .filter(candidate => !header.has(candidate))
+        .map(candidate => String(candidate.props.className ?? ''));
+    };
+    await render(sessions);
+    const before = bodyClasses();
+    const newest = newestButton();
+    connectivity.offline = true;
+    await render(sessions);
+    // No view joins the section body: the notice lives in the header row.
+    expect(bodyClasses()).toEqual(before);
+    expect(newestButton()).toBe(newest);
+    // The notice renders inside the header row, not in the section body.
+    expect(text()).toContain('No internet connection');
+    expect(
+      node('SectionHeader').findAll(candidate =>
+        candidate.children.includes('No internet connection')
+      )
+    ).not.toHaveLength(0);
+  });
+});
+
+describe('Home live section status box', () => {
+  // Home reports the live facts in the section header, so the feedback column
+  // must add no box of its own: the card column's `gap-2` would then place the
+  // card below an invisible child, twice as far from the section label as the
+  // Explore rows are from theirs (home section-label gap).
+  function mountFeedback(
+    sessions: Props['sessions'] = settled,
+    contextOverride: Props['context'] = context
+  ) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: contextOverride,
+          sessions,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+  }
+
+  it.each([
+    ['the accepted list is empty', settled, context],
+    [
+      'the list is still resolving',
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isResolving: true },
+    ],
+    [
+      'rows are shown',
+      {
+        ...settled,
+        activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+      },
+      context,
+    ],
+  ])('draws no box between the label and the card while %s', (_state, sessions, ctx) => {
+    mountFeedback(sessions, ctx);
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('keeps announcing a pending list without drawing a box', () => {
+    mountFeedback({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    expect(nodes('AccessibleStatus').map(status => status.props.message)).toContain(
+      i18n.t('common.loading')
+    );
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('draws the column when the failure block owns the surface', () => {
+    mountFeedback(settled, { ...context, isError: true });
+    expect(nodes('View').length).toBeGreaterThan(0);
+    expect(nodes('QueryError')).toHaveLength(1);
+  });
+
+  it('keeps the status announcement mounted when the visible column appears', () => {
+    // Home flips this way while the socket still reports the same connection
+    // state: the load fails and the column is drawn. A remounted announcement
+    // starts its dedupe from nothing and speaks the unchanged message again, so
+    // the node has to survive the flip.
+    connectivity.connected = false;
+    mountFeedback();
+    const before = nodes('AccessibleStatus').find(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(before).toBeDefined();
+    expect(nodes('QueryError')).toHaveLength(0);
+
+    act(() => {
+      renderer?.update(
+        createElement(LiveSessionFeedback, {
+          context: { ...context, isError: true },
+          sessions: settled,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+    expect(nodes('QueryError')).toHaveLength(1);
+    const after = nodes('AccessibleStatus').filter(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(after).toHaveLength(1);
+    expect(after[0]).toBe(before);
   });
 });

@@ -1,7 +1,5 @@
-// P1-F-46b: the "Submit review" affordance must be reachable from the
-// Overview tab (header right) and the Files tab (floating action bar,
-// see `pr-diff-floating-actions.test.tsx`). The Discussion tab is
-// intentionally left without a submit affordance.
+/* eslint-disable max-lines -- Submit-review, share, merge, and inset reachability tests share the direct-invocation screen harness. */
+// Share, Submit review, and Merge remain in the header on every tab.
 //
 // This test renders the screen shell as a plain function call (the
 // same pattern used by `pr-merge-sheet.test.tsx`) and walks the
@@ -13,12 +11,27 @@
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { PrReviewScreen } from './pr-review-screen';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
+import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 const routerPush = vi.fn();
 const routerBack = vi.fn();
 const routerCanGoBack = vi.fn(() => true);
+const routerDismissTo = vi.fn();
 const shareMock = vi.hoisted(() => vi.fn(() => ({ action: 'sharedAction' })));
 
 vi.mock('react', async () => {
@@ -29,13 +42,16 @@ vi.mock('react', async () => {
       <T,>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]
     ),
     useMemo: vi.fn(<T,>(factory: () => T) => factory()),
+    // The provider scope context is only mounted by the provider route; the
+    // GitHub route reads the fallback triple, which a null context selects.
+    useContext: vi.fn(() => null),
     useRef: vi.fn(<T,>(initial: T) => {
       const ref: React.RefObject<T> = { current: initial };
       return ref;
     }),
     useEffect: vi.fn((_effect: React.EffectCallback) => {
       // no-op; the recents backfill and merge banner focus effect
-      // aren't part of P1-F-46b's reachability contract.
+      // aren't part of the header actions' reachability contract.
     }),
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
   };
@@ -43,10 +59,17 @@ vi.mock('react', async () => {
 
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
-  useRouter: () => ({ push: routerPush, back: routerBack, canGoBack: routerCanGoBack }),
+  useRouter: () => ({
+    push: routerPush,
+    back: routerBack,
+    canGoBack: routerCanGoBack,
+    dismissTo: routerDismissTo,
+  }),
 }));
 
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
@@ -55,7 +78,13 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 
-let prQueryResult: { data: unknown; isLoading: boolean; isError: boolean; isFetching: boolean } = {
+let prQueryResult: {
+  data: unknown;
+  isLoading: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  error?: unknown;
+} = {
   data: undefined,
   isLoading: true,
   isError: false,
@@ -69,8 +98,12 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/components/ui/icons', () => ({
   Check: () => null,
+  GitMerge: () => null,
+  GitPullRequest: () => null,
   Share: () => null,
 }));
+
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -83,8 +116,13 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     githubPrReview: {
-      getPullRequest: { queryOptions: () => ({}), queryKey: () => [] },
-      listChecks: { queryKey: () => [] },
+      getPullRequest: { queryOptions: () => ({ queryKey: [] }) },
+      listChecks: { queryOptions: () => ({ queryKey: [] }) },
+    },
+    providerReview: {
+      getPullRequest: { queryOptions: () => ({ queryKey: [] }) },
+      listChecks: { queryOptions: () => ({ queryKey: [] }) },
+      getMergeState: { queryOptions: () => ({ queryKey: [] }) },
     },
     githubApps: { getUserAuthorization: { queryKey: () => [] } },
   }),
@@ -96,24 +134,17 @@ vi.mock('@/lib/pr-review/merge/merge-result-banner-store', () => ({
 
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   upsertRecentPr: vi.fn(),
+  markRecentPrFailed: vi.fn(),
 }));
 
-vi.mock('@/components/screen-header', () => {
-  // The screen passes `headerRight` as a named slot prop. We render it
-  // alongside the `children` slot so the tree walk can find the
-  // Submit-review Button inside.
-  const MockScreenHeader = (props: {
-    headerRight?: React.ReactNode;
-    children?: React.ReactNode;
-  }): React.ReactElement =>
-    React.createElement(
-      'ScreenHeader',
-      { hasHeaderRight: props.headerRight != null },
-      props.headerRight,
-      props.children
-    );
-  return { ScreenHeader: MockScreenHeader };
-});
+// A host-node mock keeps every prop the screen passes (including
+// `eyebrowNumberOfLines`) on the node the `findElement` walk inspects, so the
+// test can assert the header's contract directly. `headerRight` stays a named
+// slot prop, which the walker follows into.
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/organization/organization-boundary', () => ({
+  OrganizationBoundary: 'OrganizationBoundary',
+}));
 vi.mock('@/components/pr-review/merge/pr-merge-partial-success-banner', () => ({
   PrMergePartialSuccessBanner: 'PrMergePartialSuccessBanner',
 }));
@@ -128,6 +159,9 @@ vi.mock('@/components/pr-review/pr-review-overview', () => ({
 }));
 vi.mock('@/components/pr-review/pr-review-tab-selector', () => ({
   PrReviewTabSelector: 'PrReviewTabSelector',
+}));
+vi.mock('@/components/detail-screen', () => ({
+  DetailScreenScrollView: 'DetailScreenScrollView',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -212,7 +246,7 @@ function findScreenHeaderSubmitButton(): React.ReactElement | null {
   });
 }
 
-describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
+describe('PrReviewScreen Submit review reachability', () => {
   beforeEach(() => {
     routerPush.mockClear();
   });
@@ -224,6 +258,66 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
     const button = findScreenHeaderSubmitButton();
     expect(button).not.toBeNull();
   });
+
+  it.each(['overview', 'files', 'discussion'] as const)(
+    'keeps compact actions on the %s tab',
+    tab => {
+      // A loaded request is what makes Share and Submit review actionable; the
+      // tabs keep their own reachability contract per tab.
+      prQueryResult = {
+        data: {
+          title: 'Fix the thing',
+          state: 'open',
+          mergeable: true,
+          headSha: 'head-1',
+          counts: { changedFiles: 1 },
+        },
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+      };
+      vi.mocked(React.useState).mockReturnValueOnce([tab, vi.fn<() => void>()]);
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+      for (const label of ['Share pull request', 'Submit review', 'Merge now']) {
+        const button = findElement({
+          node: element,
+          type: 'Button',
+          prop: 'accessibilityLabel',
+          value: label,
+        });
+        expect(button).not.toBeNull();
+        expect(button?.props).toEqual(expect.objectContaining({ size: 'icon' }));
+        if (label !== 'Merge now') {
+          expect(button?.props).toEqual(expect.objectContaining({ disabled: false }));
+        }
+      }
+      const submit = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: 'Submit review',
+      });
+      const submitProps = submit?.props as { onPress: () => void };
+      submitProps.onPress();
+      expect(routerPush).toHaveBeenCalledWith({
+        pathname: '/(app)/pr-review/[owner]/[repo]/[number]/review-submit',
+        params: { owner: 'octocat', repo: 'hello', number: 7 },
+      });
+      expect(
+        findElement({
+          node: element,
+          type: {
+            overview: 'PrReviewOverview',
+            files: 'PrReviewFilesTab',
+            discussion: 'PrReviewDiscussionTab',
+          }[tab],
+          prop: 'owner',
+          value: 'octocat',
+        })
+      ).not.toBeNull();
+    }
+  );
 
   it('navigates to the review-submit route with owner/repo/number on press (Overview)', () => {
     const button = findScreenHeaderSubmitButton();
@@ -238,6 +332,37 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
       pathname: '/(app)/pr-review/[owner]/[repo]/[number]/review-submit',
       params: { owner: 'octocat', repo: 'hello', number: 7 },
     });
+  });
+
+  it.each([
+    {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 },
+      href: '/(app)/pr-review/gitlab/group/repo/12/review-submit',
+    },
+    {
+      ref: { platform: 'bitbucket', workspace: 'team', repoSlug: 'repo', prId: 12 },
+      href: '/(app)/pr-review/bitbucket/team/repo/12/review-submit',
+    },
+  ])('keeps the $ref.platform review-submit route', ({ ref, href }) => {
+    vi.mocked(React.useContext).mockReturnValue({ ref, organizationId: 'org' });
+    prQueryResult = {
+      data: { title: 'Bump the dep', state: 'open', mergeable: true },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    try {
+      const button = findScreenHeaderSubmitButton();
+      if (!button) {
+        throw new Error('Provider Submit review button not found');
+      }
+      expect(button.props).toEqual(expect.objectContaining({ disabled: false }));
+      const buttonProps = button.props as { onPress: () => void };
+      buttonProps.onPress();
+      expect(routerPush).toHaveBeenCalledWith(href);
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
   });
 });
 
@@ -257,32 +382,28 @@ describe('PrReviewScreen share action', () => {
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
     const shareButton = findElement({
       node: element,
-      type: 'Pressable',
+      type: 'Button',
       prop: 'accessibilityLabel',
       value: 'Share pull request',
     });
     expect(shareButton).not.toBeNull();
   });
 
-  it('shares the URL only when no PR data is loaded yet', () => {
+  it('keeps Share inert until the request has loaded', () => {
     // eslint-disable-next-line new-cap
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
     const shareButton = findElement({
       node: element,
-      type: 'Pressable',
+      type: 'Button',
       prop: 'accessibilityLabel',
       value: 'Share pull request',
     });
     if (!shareButton) {
       throw new Error('Share button not found');
     }
-    const onPress = (shareButton.props as { onPress?: () => void }).onPress;
-    onPress?.();
-
-    expect(shareMock).toHaveBeenCalledTimes(1);
-    expect(shareMock).toHaveBeenCalledWith({
-      message: 'https://github.com/octocat/hello/pull/7',
-    });
+    // The harness invokes `onPress` directly, so only the affordance's state is
+    // asserted here: a disabled control is what the reader meets.
+    expect(shareButton.props).toEqual(expect.objectContaining({ disabled: true }));
   });
 
   it('shares the title and URL when the PR title is loaded', () => {
@@ -296,7 +417,7 @@ describe('PrReviewScreen share action', () => {
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
     const shareButton = findElement({
       node: element,
-      type: 'Pressable',
+      type: 'Button',
       prop: 'accessibilityLabel',
       value: 'Share pull request',
     });
@@ -310,5 +431,635 @@ describe('PrReviewScreen share action', () => {
     expect(shareMock).toHaveBeenCalledWith({
       message: 'Fix the thing\nhttps://github.com/octocat/hello/pull/7',
     });
+  });
+
+  it('keeps Share disabled when a provider URL is unavailable', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 },
+      organizationId: null,
+    });
+    try {
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'group', repo: 'repo', number: 12 });
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: 'Share merge request',
+      });
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+      const buttonProps = button?.props as { onPress: () => void };
+      buttonProps.onPress();
+      expect(shareMock).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
+  });
+
+  it('shares the merge request URL the read returned', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/repo',
+        mrIid: 12,
+        // The instance the reader opened on, kept as identity.
+        instanceHint: 'https://gitlab.staging.example',
+      },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: {
+        title: 'Bump the dep',
+        webUrl: 'https://gl.example.com/group/repo/-/merge_requests/12',
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    try {
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'group', repo: 'repo', number: 12 });
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: 'Share merge request',
+      });
+      if (!button) {
+        throw new Error('Share button not found');
+      }
+      expect(button.props).toEqual(expect.objectContaining({ disabled: false }));
+      (button.props as { onPress: () => void }).onPress();
+
+      expect(shareMock).toHaveBeenCalledWith({
+        message: 'Bump the dep\nhttps://gl.example.com/group/repo/-/merge_requests/12',
+      });
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
+  });
+});
+
+describe('PrReviewScreen Merge action', () => {
+  const MERGEABLE_OVERVIEW = {
+    state: 'open',
+    mergeable: true,
+    mergeableState: 'clean',
+    number: 7,
+    counts: { changedFiles: 1 },
+    repo: { allowMergeCommit: true, allowSquashMerge: true, allowRebaseMerge: false },
+  };
+
+  function findHeaderMergeButton(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    return findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Merge now',
+    });
+  }
+
+  beforeEach(() => {
+    routerPush.mockClear();
+  });
+  afterEach(() => {
+    routerPush.mockReset();
+    vi.mocked(React.useContext).mockReturnValue(null);
+  });
+
+  it('renders the Merge affordance for a mergeable open pull request', () => {
+    prQueryResult = {
+      data: MERGEABLE_OVERVIEW,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    expect(findHeaderMergeButton()).not.toBeNull();
+  });
+
+  it.each(['overview', 'files', 'discussion'])(
+    'opens the merge confirmation sheet from %s',
+    tab => {
+      vi.mocked(React.useState).mockReturnValueOnce([tab, vi.fn<() => void>()]);
+      prQueryResult = {
+        data: MERGEABLE_OVERVIEW,
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+      };
+      const button = findHeaderMergeButton();
+      if (!button) {
+        throw new Error('Merge button not found');
+      }
+      expect(button.props).toEqual(expect.objectContaining({ disabled: false }));
+      const buttonProps = button.props as { onPress?: () => void };
+      buttonProps.onPress?.();
+
+      expect(routerPush).toHaveBeenCalledTimes(1);
+      expect(routerPush).toHaveBeenCalledWith({
+        pathname: '/(app)/pr-review/[owner]/[repo]/[number]/merge',
+        params: { owner: 'octocat', repo: 'hello', number: '7', mode: 'merge', method: 'merge' },
+      });
+    }
+  );
+
+  it.each(['merged', 'closed', 'open'])(
+    'disables Merge for an unavailable %s pull request',
+    state => {
+      prQueryResult = {
+        data: { state, mergeable: null, mergeableState: null },
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+      };
+      const button = findHeaderMergeButton();
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+    }
+  );
+
+  it('disables Merge while the PR data has not loaded', () => {
+    prQueryResult = { data: undefined, isLoading: true, isError: false, isFetching: false };
+    const button = findHeaderMergeButton();
+    expect(button).not.toBeNull();
+    expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+  });
+
+  it('offers Merge for an open provider merge request and pushes its own sheet route', () => {
+    // A GitLab/Bitbucket arm normalizes `mergeable` to null, so the gate keys
+    // off the request state and the sheet reads the provider restrictions.
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: {
+        state: 'open',
+        mergeable: null,
+        mergeableState: null,
+        number: 12,
+        repo: { allowMergeCommit: true, allowSquashMerge: true, allowRebaseMerge: false },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    const button = findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Merge now',
+    });
+    expect(button).not.toBeNull();
+    if (!button) {
+      throw new Error('Merge button not found for the provider arm');
+    }
+    const onPress = (button.props as { onPress?: () => void }).onPress;
+    onPress?.();
+
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/merge?mode=merge&method=merge'
+    );
+  });
+});
+
+describe('PrReviewScreen Overview scrolling', () => {
+  beforeEach(() => {
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+  });
+
+  function findOverviewScroll(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    return findElement({
+      node: element,
+      type: 'DetailScreenScrollView',
+      prop: 'contentContainerClassName',
+      value: 'gap-5 px-4 pt-3',
+    });
+  }
+
+  it('does not wrap the Overview in a second scroller', () => {
+    expect(findOverviewScroll()).toBeNull();
+  });
+
+  it('passes the refresh control to the Overview', () => {
+    const renderScreen = PrReviewScreen;
+    const element = renderScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const overview = findElement({
+      node: element,
+      type: 'PrReviewOverview',
+      prop: 'isActive',
+      value: true,
+    });
+    expect(overview).not.toBeNull();
+    if (!overview) {
+      throw new Error('Overview not found');
+    }
+    const refresh = (overview.props as { refreshControl: React.ReactElement }).refreshControl;
+    expect(refresh.type).toBe('RefreshControl');
+    expect((refresh.props as { onRefresh: unknown }).onRefresh).toEqual(expect.any(Function));
+  });
+});
+
+// The recents store is keyed on `owner/repo#number` and its rows navigate to
+// the GitHub route, so only a GitHub pull request may be written there — a
+// GitLab MR filed under that key would send the user to a GitHub PR on the
+// way back. This describe is the only one that runs effects: the rest of the
+// file asserts render output, where the recents backfill is noise.
+describe('PrReviewScreen recents backfill per provider', () => {
+  const GITLAB_SCOPE = {
+    ref: { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+    organizationId: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(upsertRecentPr).mockClear();
+    vi.mocked(markRecentPrFailed).mockClear();
+    vi.mocked(React.useEffect).mockImplementation((effect: React.EffectCallback) => {
+      effect();
+    });
+  });
+
+  afterEach(() => {
+    vi.mocked(React.useEffect).mockImplementation(() => undefined);
+    vi.mocked(React.useContext).mockReturnValue(null);
+  });
+
+  it('writes a recents entry for a loaded GitHub pull request', () => {
+    prQueryResult = {
+      data: { title: 'Fix the thing' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: 'octocat', repo: 'hello', number: 7, lastResult: 'ok' })
+    );
+  });
+
+  it('marks the GitHub entry failed when the load errors', () => {
+    prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    expect(markRecentPrFailed).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 7,
+      platform: 'github',
+    });
+  });
+
+  it('files a loaded GitLab merge request under its GitLab identity, never a GitHub triple', () => {
+    vi.mocked(React.useContext).mockReturnValue(GITLAB_SCOPE);
+    prQueryResult = {
+      data: { title: 'Bump the dep' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'group/sub',
+        repo: 'repo',
+        number: 12,
+        platform: 'gitlab',
+        title: 'Bump the dep',
+        lastResult: 'ok',
+      })
+    );
+    const written = vi.mocked(upsertRecentPr).mock.calls[0]?.[0];
+    expect(written?.platform).toBe('gitlab');
+    // No instance hint on the scope: no hint key on the entry.
+    expect(written && 'instanceHint' in written).toBe(false);
+  });
+
+  it('keeps the GitLab instance hint on the entry for identity and recents', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/sub/repo',
+        mrIid: 12,
+        instanceHint: 'https://gl.acme.dev',
+      },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: { title: 'Bump the dep' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'gitlab', instanceHint: 'https://gl.acme.dev' })
+    );
+  });
+
+  it('marks a GitLab merge request failed on its own row, not the GitHub twin', () => {
+    vi.mocked(React.useContext).mockReturnValue(GITLAB_SCOPE);
+    prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    expect(markRecentPrFailed).toHaveBeenCalledWith({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      platform: 'gitlab',
+    });
+  });
+});
+
+describe('PrReviewScreen fixed header and disabled actions', () => {
+  afterEach(() => {
+    vi.mocked(React.useContext).mockReturnValue(null);
+  });
+
+  it('keeps the title single-line and opts out of action stacking', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'allowHeaderRightStacking',
+      value: false,
+    });
+    expect(header).not.toBeNull();
+    expect(header?.props).toEqual(expect.objectContaining({ titleNumberOfLines: 1 }));
+  });
+
+  it('disables all actions after the initial load fails', () => {
+    prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    for (const label of ['Share pull request', 'Submit review', 'Merge now']) {
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: label,
+      });
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+    }
+  });
+
+  it('disables every action when a terminal read replaces a loaded request', () => {
+    // A refetch can fail after an earlier read left the request behind: the
+    // body then shows the unavailable state while `pr.data` still holds the
+    // merge request. The actions must follow the body, not the stale data.
+    prQueryResult = {
+      data: {
+        title: 'Bump the dep',
+        state: 'open',
+        mergeable: true,
+        webUrl: 'https://gl.example.com/group/repo/-/merge_requests/12',
+      },
+      isLoading: false,
+      isError: true,
+      error: { data: { code: 'NOT_FOUND' } },
+      isFetching: false,
+    };
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/repo',
+        mrIid: 12,
+        instanceHint: 'https://gl.example.com',
+      },
+      organizationId: null,
+    });
+    try {
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'group', repo: 'repo', number: 12 });
+      for (const label of ['Share merge request', 'Submit review', 'Merge now']) {
+        const button = findElement({
+          node: element,
+          type: 'Button',
+          prop: 'accessibilityLabel',
+          value: label,
+        });
+        expect(button).not.toBeNull();
+        expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+      }
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
+  });
+
+  it('keeps the actions available when a retryable read keeps the loaded request', () => {
+    prQueryResult = {
+      data: {
+        title: 'Bump the dep',
+        state: 'open',
+        mergeable: true,
+        webUrl: 'https://gl.example.com/group/repo/-/merge_requests/12',
+      },
+      isLoading: false,
+      isError: true,
+      error: { data: { code: 'BAD_GATEWAY' } },
+      isFetching: false,
+    };
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/repo',
+        mrIid: 12,
+        instanceHint: 'https://gl.example.com',
+      },
+      organizationId: null,
+    });
+    try {
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'group', repo: 'repo', number: 12 });
+      for (const label of ['Share merge request', 'Submit review', 'Merge now']) {
+        const button = findElement({
+          node: element,
+          type: 'Button',
+          prop: 'accessibilityLabel',
+          value: label,
+        });
+        expect(button).not.toBeNull();
+        expect(button?.props).toEqual(expect.objectContaining({ disabled: false }));
+      }
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
+  });
+
+  it('keeps the Overview tab reachable when a terminal read fails from another tab', () => {
+    // The reader had Files or Discussion open when a refetch turned terminal:
+    // the body still holds the cached request, so the tabs that read from it
+    // stay shut, and the Overview entry — the surface with the failure and its
+    // recovery — is the way back.
+    for (const tab of ['files', 'discussion'] as const) {
+      prQueryResult = {
+        data: {
+          title: 'Bump the dep',
+          state: 'open',
+          mergeable: true,
+          headSha: 'head-1',
+          counts: { changedFiles: 2 },
+        },
+        isLoading: false,
+        isError: true,
+        error: { data: { code: 'NOT_FOUND' } },
+        isFetching: false,
+      };
+      vi.mocked(React.useState).mockReturnValueOnce([tab, vi.fn<() => void>()]);
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+      const selector = findElement({
+        node: element,
+        type: 'PrReviewTabSelector',
+        prop: 'activeTab',
+        value: tab,
+      });
+      expect(selector?.props).toEqual(
+        expect.objectContaining({ disabledTabs: ['files', 'discussion'] })
+      );
+      // The cached request still reaches the tab body under the reader.
+      const filesBody = findElement({
+        node: element,
+        type: 'PrReviewFilesTab',
+        prop: 'headSha',
+        value: 'head-1',
+      });
+      const discussionBody = findElement({
+        node: element,
+        type: 'PrReviewDiscussionTab',
+        prop: 'owner',
+        value: 'octocat',
+      });
+      expect(tab === 'files' ? filesBody : discussionBody).not.toBeNull();
+    }
+  });
+
+  it('keeps the Overview tab reachable after the initial load fails', () => {
+    prQueryResult = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: { data: { code: 'NOT_FOUND' } },
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const selector = findElement({
+      node: element,
+      type: 'PrReviewTabSelector',
+      prop: 'activeTab',
+      value: 'overview',
+    });
+    expect(selector?.props).toEqual(
+      expect.objectContaining({ disabledTabs: ['files', 'discussion'] })
+    );
+  });
+
+  it('keeps every tab reachable while a retryable read keeps the loaded request', () => {
+    prQueryResult = {
+      data: { title: 'Bump the dep', state: 'open', mergeable: true, headSha: 'head-1' },
+      isLoading: false,
+      isError: true,
+      error: { data: { code: 'BAD_GATEWAY' } },
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const selector = findElement({
+      node: element,
+      type: 'PrReviewTabSelector',
+      prop: 'activeTab',
+      value: 'overview',
+    });
+    expect(selector?.props).toEqual(expect.objectContaining({ disabledTabs: [] }));
+  });
+
+  it('disables Review and Merge at the Bitbucket organization boundary', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: { platform: 'bitbucket', workspace: 'team', repoSlug: 'repo', prId: 7 },
+      organizationId: null,
+    });
+    prQueryResult = { data: undefined, isLoading: true, isError: false, isFetching: false };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'team', repo: 'repo', number: 7 });
+    for (const label of ['Submit review', 'Merge now']) {
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: label,
+      });
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+    }
+  });
+});
+
+describe('PrReviewScreen header eyebrow cap', () => {
+  beforeEach(() => {
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+  });
+
+  it('caps the repository eyebrow to a single line so it cannot wrap onto the title', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'eyebrowNumberOfLines',
+      value: 1,
+    });
+    expect(header).not.toBeNull();
+  });
+});
+
+describe('PrReviewScreen Back target', () => {
+  beforeEach(() => {
+    routerDismissTo.mockClear();
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+  });
+
+  it('dismisses to the PR Review inbox instead of popping to the tab anchor', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'showBackButton',
+      value: true,
+    });
+    expect(header).not.toBeNull();
+
+    const onBack = (header?.props as { onBack?: () => void } | undefined)?.onBack;
+    onBack?.();
+
+    expect(routerDismissTo).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
+    expect(routerBack).not.toHaveBeenCalled();
   });
 });

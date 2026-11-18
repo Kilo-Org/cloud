@@ -1,0 +1,129 @@
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  apiKeyUpstream,
+  type DirectByokModel,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  effortOptions,
+  REASONING_TOGGLE,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
+
+export const BYTEPLUS_CODING_PROVIDER_ID = 'byteplus-coding';
+
+export const BYTEPLUS_CODING_MODELS = [
+  {
+    id: 'bytedance-seed-code',
+    name: 'ByteDance-Seed-Code',
+    description:
+      "ByteDance's latest code model has been deeply optimized for agentic programming tasks.",
+    flags: ['vision', 'reasoning'],
+    context_length: 262144,
+    max_completion_tokens: 32768,
+    reasoning_options: REASONING_TOGGLE,
+  },
+  {
+    id: 'kimi-k2.5',
+    name: 'Kimi-K2.5',
+    description:
+      'Open-source SoTA native multimodal model with text-only input (for now), stronger code/UI generation.',
+    flags: ['reasoning'],
+    context_length: 262144,
+    max_completion_tokens: 32768,
+    reasoning_options: REASONING_TOGGLE,
+  },
+  {
+    id: 'glm-5.1',
+    name: 'GLM-5.1',
+    description:
+      'Z.AI’s latest flagship model, designed for long-horizon tasks. It can work continuously and autonomously on a single task for up to 8 hours.',
+    flags: ['reasoning'],
+    context_length: 204800,
+    max_completion_tokens: 131072,
+    reasoning_options: REASONING_TOGGLE,
+  },
+  {
+    id: 'glm-5.2',
+    name: 'GLM-5.2',
+    description: 'Z.AI’s latest flagship model for long-horizon agentic work.',
+    flags: ['reasoning'],
+    context_length: 204800,
+    max_completion_tokens: 131072,
+    reasoning_options: REASONING_TOGGLE,
+  },
+  {
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek-V4-Flash',
+    description: 'DeepSeek V4 optimized for fast coding and agentic tasks.',
+    flags: ['reasoning'],
+    context_length: 128000,
+    max_completion_tokens: 65536,
+    reasoning_options: REASONING_TOGGLE,
+  },
+  {
+    id: 'deepseek-v4-pro',
+    name: 'DeepSeek-V4-Pro',
+    description: 'DeepSeek V4 for complex coding and agentic tasks.',
+    flags: ['reasoning'],
+    context_length: 128000,
+    max_completion_tokens: 65536,
+    reasoning_options: REASONING_TOGGLE,
+  },
+  {
+    id: 'gpt-oss-120b',
+    name: 'GPT-OSS-120B',
+    description:
+      "OpenAI's open-weight model, 117B parameters with 5.1B active parameters for production, general purpose, high reasoning use cases.",
+    flags: ['reasoning'],
+    context_length: 131072,
+    max_completion_tokens: 65536,
+  },
+  {
+    id: 'dola-seed-2.0-code',
+    name: 'Dola-Seed-2.0-Code',
+    description: 'An enhanced coding version of Seed 2.0, better suited for agentic coding.',
+    flags: ['vision', 'reasoning'],
+    context_length: 262144,
+    max_completion_tokens: 131072,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
+  },
+  {
+    id: 'dola-seed-2.0-pro',
+    name: 'Dola-Seed-2.0-Pro',
+    description:
+      'Focused on long-chain reasoning and stability in complex task execution, designed for complex real-world business scenarios.',
+    flags: ['vision', 'reasoning'],
+    context_length: 262144,
+    max_completion_tokens: 131072,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
+  },
+  {
+    id: 'dola-seed-2.0-lite',
+    name: 'Dola-Seed-2.0-Lite',
+    description:
+      'Balances generation quality and response speed, making it a strong general-purpose production model.',
+    flags: ['vision', 'reasoning'],
+    context_length: 262144,
+    max_completion_tokens: 131072,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
+  },
+] as const satisfies ReadonlyArray<DirectByokModel>;
+
+export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
+  model => `${BYTEPLUS_CODING_PROVIDER_ID}/${model.id}`
+);
+
+export default {
+  id: BYTEPLUS_CODING_PROVIDER_ID,
+  openrouter_inference_provider_id: 'seed',
+  ...apiKeyUpstream({
+    apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
+  transformRequest(context) {
+    applyThinkingToggleAndReasoningEffort(context.request);
+  },
+  models: () => Promise.resolve(BYTEPLUS_CODING_MODELS),
+} satisfies DirectByokProvider;

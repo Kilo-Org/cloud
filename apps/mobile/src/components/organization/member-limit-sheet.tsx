@@ -1,24 +1,37 @@
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { limitError, parseLimit } from '@/components/organization/member-limit-validators';
+import {
+  limitError,
+  parseLimit,
+  saveErrorCopy,
+} from '@/components/organization/member-limit-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   type ActiveOrgMember,
+  isActiveOrgMember,
+  type OrgMember,
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { firstNonEmpty } from '@/lib/utils';
+import { cn, firstNonEmpty } from '@/lib/utils';
 
 type MemberLimitFormProps = Readonly<{
   memberId: string;
@@ -28,16 +41,41 @@ type MemberLimitFormProps = Readonly<{
 
 function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '', {
-    silenceUpdateMemberToast: true,
+    silenceMemberToast: true,
   });
   const currentLimit = member.dailyUsageLimitUsd;
+  const hasCurrentLimit = currentLimit != null;
 
-  const limitRef = useRef(currentLimit != null ? String(currentLimit) : '');
-  const [canSave, setCanSave] = useState(limitError(limitRef.current) == null);
+  const initialValue =
+    currentLimit == null ? '' : formatNumber(currentLimit, i18n.language, { useGrouping: false });
+  const limitRef = useRef(initialValue);
+  // Live validation, not FormField's blur-only `validate`: Save is already
+  // disabled while the value is invalid, so the reason has to be on screen then,
+  // not after the person gives up and taps elsewhere. The message waits for the
+  // first edit or blur so the sheet does not open showing an error.
+  const [fieldError, setFieldError] = useState<string | null>(() =>
+    limitError(initialValue, hasCurrentLimit)
+  );
+  const [fieldTouched, setFieldTouched] = useState(false);
+  const canSave = fieldError === null;
+  // A rejected save is rendered in localized copy, never as the server wrote it.
+  const saveError = mutations.updateMember.isError
+    ? saveErrorCopy(mutations.updateMember.error)
+    : null;
+  const resetUpdateMember = mutations.updateMember.reset;
+  const clearSaveError = () => {
+    if (mutations.updateMember.isError) {
+      resetUpdateMember();
+    }
+  };
+
+  const touchedFieldError = fieldTouched ? fieldError : null;
+  const limitFieldError = saveError?.field === 'limit' ? saveError.message : touchedFieldError;
 
   const onSaved = () => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
 
@@ -56,15 +94,20 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   return (
     <>
       <FormField
-        label="Limit (USD per day)"
+        label={t('organization.memberLimit.limitLabel')}
         required
-        placeholder="No limit"
+        placeholder={t('organization.memberLimit.noLimitPlaceholder')}
         keyboardType="decimal-pad"
-        defaultValue={currentLimit != null ? String(currentLimit) : undefined}
-        validate={limitError}
+        defaultValue={initialValue || undefined}
+        error={limitFieldError ?? undefined}
         onChangeText={value => {
           limitRef.current = value;
-          setCanSave(limitError(value) == null);
+          setFieldError(limitError(value, hasCurrentLimit));
+          setFieldTouched(true);
+          clearSaveError();
+        }}
+        onBlur={() => {
+          setFieldTouched(true);
         }}
       />
 
@@ -72,21 +115,37 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
           is the single announcement owner: one announcement per platform,
           visuals preserved (tone error). */}
       <AccessibleStatus
-        message={mutations.updateMember.isError ? mutations.updateMember.error.message : null}
+        message={saveError?.field === 'form' ? saveError.message : null}
         className="text-sm"
       />
 
-      <Button disabled={!canSave} loading={mutations.updateMember.isPending} onPress={onSave}>
-        <Text className="text-primary-foreground">Save</Text>
+      {/* This footer has one filled action, so the fill keeps the scheme's
+          brand olive in both themes: the dark theme's accent fill glares at
+          this width and drops the hue the light sheet shows, which is why the
+          session screens fill their large action with the muted selection
+          olive too. An invalid amount keeps the button's own muted disabled
+          fill, so the label still reads as unavailable. */}
+      <Button
+        className={canSave ? 'bg-primary dark:bg-selection' : undefined}
+        disabled={!canSave}
+        loading={mutations.updateMember.isPending}
+        onPress={onSave}
+      >
+        <Text className={cn(canSave && 'text-primary-foreground dark:text-selection-foreground')}>
+          {t('common.save')}
+        </Text>
       </Button>
 
       {currentLimit != null && (
+        // Removing the limit sits beside the forward action, so it keeps the
+        // destructive ink and paints no fill of its own: Save stays the only
+        // filled control in the sheet.
         <Button
-          variant="destructive"
+          variant="outline-destructive"
           disabled={mutations.updateMember.isPending}
           onPress={onRemove}
         >
-          <Text className="text-destructive-foreground">Remove limit</Text>
+          {t('organization.memberLimit.removeLimit')}
         </Button>
       )}
     </>
@@ -94,22 +153,33 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 }
 
 export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
+  const { t } = useTranslation();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
-  const member = orgWithMembers.data?.members.find(
-    (m): m is ActiveOrgMember => m.status === 'active' && m.id === memberId
+  const members: OrgMember[] = orgWithMembers.data?.members ?? [];
+  const member = members.find(
+    (m): m is ActiveOrgMember => isActiveOrgMember(m) && m.id === memberId
   );
 
-  if (isResolving || orgWithMembers.isLoading) {
+  // isPending (no data AND no error) rather than isLoading: an offline paused
+  // fetch has isLoading false but no data — it must show the skeleton instead
+  // of a settled state until the read answers (reconnect) or the person
+  // retries, while a real error still reaches QueryError. The organizationId
+  // guard keeps a disabled query (null org, pending forever) falling through
+  // to OrganizationBoundary below.
+  if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      >
         <View className="gap-1">
           <Text className="text-center text-lg font-semibold text-foreground">
-            Daily usage limit
+            {t('organization.memberLimit.title')}
           </Text>
         </View>
         <Skeleton className="h-11 rounded-lg" />
-      </ScrollView>
+      </SheetScrollView>
     );
   }
 
@@ -117,47 +187,57 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     return <OrganizationBoundary />;
   }
 
-  if (role !== 'owner') {
-    return <PermissionDenied description="Only the organization owner can manage usage limits." />;
+  // The same roles that manage organization members (owner and admin): the
+  // server's `organizationMembers.update` limit-only branch is an
+  // `organizationAdminMutationProcedure`, and the web members card gates its
+  // limit editor on `canManageMembers`.
+  if (!canManageOrganization(role)) {
+    return <PermissionDenied description={t('organization.memberLimit.permissionDenied')} />;
   }
 
-  if (orgWithMembers.isError && !orgWithMembers.data) {
+  const loadFailed = orgWithMembers.isError && !orgWithMembers.data;
+  if (loadFailed || !member) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
-        <QueryError
-          onRetry={() => void orgWithMembers.refetch()}
-          isRetrying={orgWithMembers.isFetching}
-          placement="top"
-        />
-      </ScrollView>
-    );
-  }
-
-  if (!member) {
-    return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
-        <Text className="text-center text-sm text-muted-foreground">Member not found</Text>
-      </ScrollView>
+      <>
+        <View collapsable={false} className="bg-background px-6 pt-4">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            {t('organization.memberLimit.title')}
+          </Text>
+        </View>
+        {loadFailed ? (
+          <QueryError
+            className="bg-background"
+            onRetry={() => void orgWithMembers.refetch()}
+            isRetrying={orgWithMembers.isFetching}
+          />
+        ) : (
+          <CenteredState className="bg-background" contentContainerClassName="px-6">
+            <Text className="text-center text-sm text-muted-foreground">
+              {t('organization.memberLimit.memberNotFound')}
+            </Text>
+          </CenteredState>
+        )}
+      </>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
+    <SheetScrollView
+      className="flex-1 bg-background"
+      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >
       <View className="gap-1">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
+        <Text className="text-center text-lg font-semibold text-foreground">
+          {t('organization.memberLimit.title')}
+        </Text>
         <Text className="text-center text-sm text-muted-foreground" numberOfLines={1}>
           {firstNonEmpty(member.name, member.email)}
         </Text>
       </View>
 
       <MemberLimitForm memberId={memberId} organizationId={organizationId} member={member} />
-    </ScrollView>
+    </SheetScrollView>
   );
 }

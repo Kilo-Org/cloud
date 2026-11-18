@@ -4,8 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ToolPatchModel } from '../tool-patch-model';
 import { PatchToolCard, PatchToolCardBody } from './patch-tool-card';
 import * as React from 'react';
+import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/icons', () => ({ FileDiff: 'FileDiff', Plug: 'Plug' }));
 // Real context so the shared `SelectableText` can call `useContext(TextClassContext)`.
 vi.mock('@/components/ui/text', async () => {
@@ -180,7 +188,7 @@ describe('PatchToolCard — fixed row', () => {
       icon: 'FileDiff',
       label: 'app.ts',
       status: 'completed',
-      accessibilityLabel: 'app.ts tool, completed',
+      accessibilityLabel: 'agentChat.toolCard.accessibilityLabel',
     });
     expect(rowProps.badge).toBeUndefined();
   });

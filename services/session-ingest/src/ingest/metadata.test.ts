@@ -1,4 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import {
+  buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
+} from '../../../../packages/app-shared/src/glanceable-agents-snapshot';
+import { deliverGlanceableSnapshot } from '../../../notifications/src/lib/glanceable-delivery';
+import type { ExpoPushMessage } from '../../../notifications/src/lib/expo-push';
+import type { RefreshGlanceableSessionsParams } from '@kilocode/notifications';
+import type { SessionEventDbRow } from '../session-events';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
@@ -20,30 +30,48 @@ vi.mock('../dos/SessionAccessCacheDO', () => ({
 }));
 
 vi.mock('../session-events', () => ({
-  mapSessionEventRow: vi.fn((row: { session_id: string; status: string | null }) => ({
+  mapSessionEventRow: vi.fn((row: SessionEventDbRow) => ({
     source: 'v2' as const,
     sessionId: row.session_id,
+    worktreeId: row.cloud_agent_worktree_id ?? null,
     status: row.status,
+    organizationId: row.organization_id,
+    parentSessionId: row.parent_session_id,
     statusUpdatedAt: '2026-07-25T00:00:00.000Z',
     updatedAt: '2026-07-25T00:00:00.000Z',
   })),
   notifyUserSessionEvent: vi.fn(),
 }));
 
+vi.mock('../services/workspace-checkout', () => ({
+  recordWorkspaceCheckout: vi.fn(async () => undefined),
+}));
+
+vi.mock('../services/worktree-deletion', () => ({
+  isWorktreeDeleting: vi.fn(async () => false),
+}));
+
 import { getWorkerDb } from '@kilocode/db/client';
+import { recordWorkspaceCheckout } from '../services/workspace-checkout';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from '../session-events';
 import {
   applyMetadataChanges,
   CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+  CLI_DISCONNECT_STALE_BUSY_WINDOW_MS,
   computeSessionMetadataUpdates,
+  prUrlMatchesGitUrl,
+  repoUrlFromPrUrl,
   resetAttentionStatusOnCliDisconnect,
 } from './metadata';
 
-type StatusRow = { status: string | null };
+type StatusRow = { status: string | null; statusUpdatedAt: string | null };
 
 function createTransactionDb(options: {
   initialStatus: string | null;
+  /** Stored status_updated_at before the call. Defaults to null (no status write). */
+  initialStatusUpdatedAt?: string | null;
+  cloudAgentWorktreeId?: string | null;
   /** After the conditional update, status read-back (simulates concurrent overwrite). */
   persistedStatus?: string | null;
   rowMissing?: boolean;
@@ -59,13 +87,23 @@ function createTransactionDb(options: {
     selectCall += 1;
     if (options.rowMissing) return [];
     if (selectCall === 1) {
-      return [{ status: options.initialStatus } satisfies StatusRow];
+      return [
+        {
+          status: options.initialStatus,
+          statusUpdatedAt: options.initialStatusUpdatedAt ?? null,
+        } satisfies StatusRow,
+      ];
     }
     const status =
       options.persistedStatus !== undefined
         ? options.persistedStatus
         : options.initialStatus !== null &&
-            (options.initialStatus === 'question' || options.initialStatus === 'permission')
+            (options.initialStatus === 'question' ||
+              options.initialStatus === 'permission' ||
+              (options.initialStatus === 'busy' &&
+                options.initialStatusUpdatedAt != null &&
+                new Date(options.initialStatusUpdatedAt).getTime() <=
+                  Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS))
           ? CLI_DISCONNECT_ATTENTION_RESET_STATUS
           : options.initialStatus;
     return [
@@ -79,6 +117,7 @@ function createTransactionDb(options: {
         git_url: null,
         git_branch: null,
         parent_session_id: null,
+        cloud_agent_worktree_id: options.cloudAgentWorktreeId ?? null,
         status,
         status_updated_at: '2026-07-25T00:00:00.000Z',
       },
@@ -113,15 +152,24 @@ type ApplyMetadataDbOptions = {
   membershipRows?: number;
   /** When set, the next non-lock session select is treated as a parent lookup. */
   parentExists?: boolean;
+  parentCloudAgentScopeId?: string;
+  parentWorktreeId?: string;
   initialStatus?: string | null;
+  initialStatusUpdatedAt?: string | null;
+  initialStatusTransitionId?: string | null;
   rowMissing?: boolean;
   cloudAgentSessionScopeId?: string | null;
   cloudAgentSessionId?: string | null;
+  cloudAgentWorktreeId?: string | null;
   parentSessionId?: string | null;
   createsCycle?: boolean;
   scopeRootMissing?: boolean;
   /** Title stored on the row before applyMetadataChanges runs. Defaults to the creation placeholder (NULL). */
   initialTitle?: string | null;
+  /** git_url stored on the row before applyMetadataChanges runs. Defaults to NULL. */
+  initialGitUrl?: string | null;
+  initialOrganizationId?: string | null;
+  beforeCommit?: () => Promise<void>;
 };
 
 /**
@@ -148,31 +196,39 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
   let initialReadDone = false;
   let parentLookupDone = false;
   let lockCount = 0;
+  let lastCondition: SQL | undefined;
 
   function currentSessionState() {
     return {
       title: options.initialTitle ?? null,
       status: options.initialStatus ?? 'idle',
+      statusUpdatedAt: options.initialStatusUpdatedAt ?? null,
+      statusTransitionId: options.initialStatusTransitionId ?? null,
       parentSessionId: options.parentSessionId ?? null,
       cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
       cloudAgentSessionId: options.cloudAgentSessionId ?? null,
+      gitUrl: options.initialGitUrl ?? null,
+      organizationId: options.initialOrganizationId ?? null,
+      worktreeId: options.cloudAgentWorktreeId ?? null,
     };
   }
 
-  function persistedSessionRow() {
-    return {
+  function persistedSessionRow(): SessionEventDbRow {
+    const row: SessionEventDbRow = {
       session_id: 'ses_1',
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:01.000Z',
       title: 'T',
       created_on_platform: 'cli',
-      organization_id: null,
-      git_url: null,
+      organization_id: options.initialOrganizationId ?? null,
+      git_url: options.initialGitUrl ?? null,
       git_branch: null,
-      parent_session_id: null,
+      parent_session_id: options.parentSessionId ?? null,
+      cloud_agent_worktree_id: options.cloudAgentWorktreeId ?? null,
       status: options.initialStatus ?? 'idle',
       status_updated_at: '2026-07-25T00:00:00.000Z',
     };
+    return Object.assign(row, ...updateSets);
   }
 
   function sessionLimitResult() {
@@ -188,6 +244,13 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       if (options.parentExists !== undefined && !parentLookupDone) {
         parentLookupDone = true;
         queryLog.push('parent');
+        const querySql = lastCondition ? new PgDialect().sqlToQuery(lastCondition).sql : '';
+        if (
+          (options.parentCloudAgentScopeId &&
+            /"cloud_agent_session_scope_id" IS NULL/i.test(querySql)) ||
+          (options.parentWorktreeId && /"cloud_agent_worktree_id" IS NULL/i.test(querySql))
+        )
+          return [];
         return options.parentExists ? [{ sessionId: 'ses_parent' }] : [];
       }
       queryLog.push('read-back');
@@ -225,20 +288,26 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
           }),
         })),
       })),
-      where: vi.fn(() => ({
-        limit: vi.fn(() => sessionLimitResult()),
-      })),
+      where: vi.fn((condition: SQL) => {
+        lastCondition = condition;
+        return { limit: vi.fn(() => sessionLimitResult()) };
+      }),
     })),
   }));
 
   const execute = vi.fn(async () => ({
     rows: [{ creates_cycle: options.createsCycle ?? false }],
   }));
-  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ select, update: applyUpdate, execute })
-  );
+  let committedSession = persistedSessionRow();
+  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+    const result = await fn({ select, update: applyUpdate, execute });
+    await options.beforeCommit?.();
+    committedSession = persistedSessionRow();
+    return result;
+  });
 
   return {
+    readCommittedSession: () => committedSession,
     transaction,
     select,
     applyUpdate,
@@ -248,6 +317,56 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     execute,
     queryLog,
     membershipQueryCount: () => queryLog.filter(k => k === 'membership').length,
+  };
+}
+
+function metadataDelivery(db: ReturnType<typeof createApplyMetadataDb>) {
+  const messages: ExpoPushMessage[] = [];
+  const tasks: Promise<unknown>[] = [];
+  const refreshParams: RefreshGlanceableSessionsParams[] = [];
+  const env = {
+    HYPERDRIVE: { connectionString: 'postgres://unused' },
+    NOTIFICATIONS: {
+      async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+        refreshParams.push(params);
+        if (params.userId !== 'usr_1' || !params.cliSessionIds.includes('ses_1')) return;
+        const row = db.readCommittedSession();
+        await deliverGlanceableSnapshot(
+          { userId: params.userId, organizationId: row.organization_id },
+          {
+            buildSnapshot: async (userId, organizationId) => ({
+              type: 'active_agents_glanceable',
+              ...buildGlanceableSnapshot({
+                userId,
+                organizationId,
+                sessions:
+                  row.parent_session_id === null && row.status ? [{ status: row.status }] : [],
+                now: Date.now(),
+              }),
+            }),
+            listIosActivityTokens: async () => [],
+            sendIosLiveActivity: async () => undefined,
+            listIosExpoTokens: async () => [{ token: 'ExponentPushToken[ios]', locale: null }],
+            hasAndroidOngoingToken: async () => false,
+            listAndroidExpoTokens: async () => [],
+            sendExpoPush: async incoming => {
+              messages.push(...incoming);
+            },
+          }
+        );
+      },
+    },
+  };
+  return {
+    env,
+    messages,
+    tasks,
+    refreshParams,
+    ctx: {
+      waitUntil: (task: Promise<unknown>) => {
+        tasks.push(task);
+      },
+    },
   };
 }
 
@@ -283,6 +402,27 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     );
   });
 
+  it('preserves the worktree ID when resetting an attention status', async () => {
+    const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const db = createTransactionDb({ initialStatus: 'question', cloudAgentWorktreeId });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({
+        type: 'session.status.updated',
+        data: expect.objectContaining({
+          session: expect.objectContaining({ worktreeId: cloudAgentWorktreeId }),
+        }),
+      }),
+      undefined
+    );
+  });
+
   it('writes retry and notifies when stored status is permission', async () => {
     const db = createTransactionDb({ initialStatus: 'permission' });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -305,7 +445,112 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     );
   });
 
-  it.each(['busy', 'idle', 'retry', null] as const)(
+  it('asks for an approval-exempt refresh when a permission wait clears', async () => {
+    const db = createTransactionDb({ initialStatus: 'permission' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const refreshParams: RefreshGlanceableSessionsParams[] = [];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      NOTIFICATIONS: {
+        async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+          refreshParams.push(params);
+        },
+      },
+    } as never;
+
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    // The deferred `permission -> retry` write is what actually clears the
+    // stored attention, so it — not the socket close ten minutes earlier — must
+    // get the window exemption that makes the Approve control disappear.
+    expect(refreshParams).toEqual([
+      { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+    ]);
+  });
+
+  it('does not exempt a cleared question from the delivery window', async () => {
+    const db = createTransactionDb({ initialStatus: 'question' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const refreshParams: RefreshGlanceableSessionsParams[] = [];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      NOTIFICATIONS: {
+        async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+          refreshParams.push(params);
+        },
+      },
+    } as never;
+
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    // A question is not an approval: it keeps counting as needs-input after the
+    // clear, so no wake is worth spending the window on.
+    expect(refreshParams).toEqual([]);
+  });
+
+  it('clears a busy row whose owning CLI is gone and emits session.status.updated', async () => {
+    const db = createTransactionDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: new Date(
+        Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS - 1_000
+      ).toISOString(),
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    expect(db.applyUpdate).toHaveBeenCalled();
+    expect(db.updateSet).toHaveBeenCalledWith({
+      status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+      status_updated_at: expect.any(String),
+    });
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({
+        type: 'session.status.updated',
+        data: expect.objectContaining({
+          previousStatus: 'busy',
+          status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        }),
+      }),
+      undefined
+    );
+  });
+
+  it('leaves a live busy row untouched when its status write is recent', async () => {
+    const db = createTransactionDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await resetAttentionStatusOnCliDisconnect(
+      { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never,
+      'usr_1',
+      'ses_1'
+    );
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('leaves a busy row untouched when status_updated_at is missing', async () => {
+    const db = createTransactionDb({ initialStatus: 'busy', initialStatusUpdatedAt: null });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await resetAttentionStatusOnCliDisconnect(
+      { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never,
+      'usr_1',
+      'ses_1'
+    );
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(['idle', 'retry', null] as const)(
     'no-ops without write or notify when stored status is %s',
     async status => {
       const db = createTransactionDb({ initialStatus: status });
@@ -321,6 +566,19 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
       expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     }
   );
+
+  it('leaves an unknown stored status untouched without throwing', async () => {
+    const db = createTransactionDb({ initialStatus: 'scheduled' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await expect(
+      resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1')
+    ).resolves.toBeUndefined();
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
 
   it('no-ops when the session row is missing', async () => {
     const db = createTransactionDb({ initialStatus: 'question', rowMissing: true });
@@ -360,6 +618,7 @@ describe('applyMetadataChanges', () => {
   const cacheRemove = vi.fn(async () => undefined);
 
   beforeEach(() => {
+    vi.mocked(recordWorkspaceCheckout).mockClear();
     vi.mocked(getWorkerDb).mockReset();
     vi.mocked(notifyUserSessionEvent).mockReset();
     vi.mocked(getSessionAccessCacheDO).mockReset();
@@ -369,6 +628,649 @@ describe('applyMetadataChanges', () => {
     } as never);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
+  it.each([null, 'workspace_other'])(
+    'rejects a Cloud Agent status update for a different runtime owner (%s)',
+    async cloudAgentSessionId => {
+      const db = createApplyMetadataDb({ cloudAgentSessionId });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        undefined,
+        'workspace_expected'
+      );
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    }
+  );
+
+  it('publishes the scoped Cloud Agent status through the existing user notification channel after commit', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionId: 'workspace_expected',
+      initialStatus: 'idle',
+      beforeCommit: async () => {
+        expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+      },
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', '2026-11-09T12:00:00.000Z'],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+      ]),
+      undefined,
+      'workspace_expected'
+    );
+    expect(db.updateSets).toEqual([
+      {
+        status: 'busy',
+        status_updated_at: '2026-11-09T12:00:00.000Z',
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      },
+    ]);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({ type: 'session.status.updated' }),
+      undefined
+    );
+  });
+
+  it("records a Cloud Agent workspace chat's reported branch on its workspace", async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentWorktreeId: 'worktree_1',
+      cloudAgentSessionId: 'workspace_1',
+      initialGitUrl: 'https://github.com/acme/widgets',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitBranch', 'kilo/feature']]));
+
+    expect(recordWorkspaceCheckout).toHaveBeenCalledWith(db, 'usr_1', {
+      worktreeId: 'worktree_1',
+      gitUrl: 'https://github.com/acme/widgets',
+      gitBranch: 'kilo/feature',
+    });
+  });
+
+  it('does not record a branch for a session outside a workspace or a cleared branch', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitBranch', 'kilo/feature']]));
+
+    const worktreeDb = createApplyMetadataDb({
+      cloudAgentWorktreeId: 'worktree_1',
+      initialGitUrl: 'https://github.com/acme/widgets',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(worktreeDb as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitBranch', null]]));
+
+    expect(recordWorkspaceCheckout).not.toHaveBeenCalled();
+  });
+
+  it('projects blocker clearing at source time without inventing history from the projection', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'question' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', '2026-07-24T23:00:00.000Z'],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({
+      status: 'busy',
+      status_updated_at: '2026-07-24T23:00:00.000Z',
+    });
+  });
+  it('preserves a pre-cutoff originating status even when projection happens after cutoff', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'busy' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({ status_updated_at: occurredAt });
+  });
+
+  it('does not invent historical blocker onset for an untimestamped legacy status', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'busy' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['status', 'question']]));
+    expect(db.updateSets[0]).toMatchObject({ status: 'question' });
+  });
+  it('does not regress newer SQL status for a delayed historical transition', async () => {
+    const db = createApplyMetadataDb({
+      initialStatus: 'idle',
+      initialStatusUpdatedAt: '2026-07-24T08:05:00.000Z',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', '2026-07-24T07:59:00.000Z'],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+  it('does not rewrite a same-state snapshot from an older source timestamp', async () => {
+    const db = createApplyMetadataDb({
+      initialStatus: 'question',
+      initialStatusUpdatedAt: '2026-07-24T08:01:00.000Z',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+  it('does not reverse SQL projection for a delayed equal-millisecond older transition id', async () => {
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    const db = createApplyMetadataDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: occurredAt,
+      initialStatusTransitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAV'],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('persists newer same-millisecond transition identity and clears it on legacy writes', async () => {
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    const db = createApplyMetadataDb({
+      initialStatus: 'question',
+      initialStatusUpdatedAt: occurredAt,
+      initialStatusTransitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', occurredAt],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({
+      status: 'busy',
+      status_updated_at: occurredAt,
+      status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+    });
+    expect(computeSessionMetadataUpdates(new Map([['status', 'idle']]))).toMatchObject({
+      status_transition_id: null,
+    });
+  });
+  describe('producer ordering across a CLI-disconnect reset', () => {
+    const questionAt = '2026-07-24T08:00:00.000Z';
+    const delayedAt = '2026-07-24T08:05:00.000Z';
+    const resetAt = '2026-07-24T08:10:00.000Z';
+    const questionId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
+    async function resetProducerQuestion() {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(resetAt));
+      try {
+        const resetDb = createTransactionDb({
+          initialStatus: 'question',
+          initialStatusUpdatedAt: questionAt,
+        });
+        vi.mocked(getWorkerDb).mockReturnValue(resetDb as never);
+        await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+        expect(resetDb.updateSet).toHaveBeenCalledWith({
+          status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+          status_updated_at: resetAt,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+      vi.mocked(notifyUserSessionEvent).mockReset();
+      const db = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+        initialStatusTransitionId: questionId,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      return db;
+    }
+
+    it('applies a delayed newer producer transition whose source time precedes the reset', async () => {
+      const db = await resetProducerQuestion();
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', delayedAt],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(db.updateSets[0]).toMatchObject({
+        status: 'idle',
+        status_updated_at: delayedAt,
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      });
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({
+          type: 'session.status.updated',
+          data: expect.objectContaining({
+            previousStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+            status: 'idle',
+          }),
+        }),
+        undefined
+      );
+    });
+
+    it.each([
+      ['an older producer transition', '01ARZ3NDEKTSV4RRFFQ69G5FAT'],
+      ['a replay of the reset producer transition', questionId],
+    ])('still rejects %s after the reset', async (_label, transitionId) => {
+      const db = await resetProducerQuestion();
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'question'],
+          ['statusOccurredAt', '2026-07-24T08:20:00.000Z'],
+          ['statusTransitionId', transitionId],
+        ])
+      );
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('keeps source-time ordering for a cursorless legacy projection', async () => {
+      const stale = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(stale as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', delayedAt],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(stale.updateSets).toEqual([]);
+
+      const fresh = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(fresh as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', '2026-07-24T08:15:00.000Z'],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(fresh.updateSets[0]).toMatchObject({
+        status: 'idle',
+        status_updated_at: '2026-07-24T08:15:00.000Z',
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      });
+    });
+  });
+
+  it('clears the old-context excerpt atomically when moving into an authorized organization', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 1 });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const before = Date.now();
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_owned']]));
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        organization_id: 'org_owned',
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: expect.any(String),
+      }),
+    ]);
+    const update = db.updateSets[0] as { briefing_excerpt_scope_changed_at: string };
+    expect(Date.parse(update.briefing_excerpt_scope_changed_at)).toBeGreaterThanOrEqual(before);
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the organization excerpt before moving the session into personal scope', async () => {
+    const db = createApplyMetadataDb({ initialOrganizationId: 'org_owned' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', null]]));
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        organization_id: null,
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: expect.any(String),
+      }),
+    ]);
+  });
+
+  it('retains the excerpt when an organization claim is refused', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 0 });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_foreign']]));
+    expect(db.updateSets).toEqual([]);
+  });
+
+  it('does not reset excerpt ordering for an unchanged organization', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 1, initialOrganizationId: 'org_owned' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_owned']]));
+    expect(db.updateSets).toEqual([{ organization_id: 'org_owned' }]);
+  });
+
+  it.each([
+    { parentCloudAgentScopeId: 'workspace_root' },
+    { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
+  ])(
+    'records owned Cloud Agent parent lineage without claiming its scope or worktree: %j',
+    identity => {
+      const db = createApplyMetadataDb({ parentExists: true, ...identity });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      return applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['parentId', 'ses_parent']])
+      ).then(() => {
+        expect(db.updateSets).toEqual([{ parent_session_id: 'ses_parent' }]);
+        expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+          env,
+          'usr_1',
+          expect.objectContaining({
+            type: 'session.updated',
+            data: expect.objectContaining({
+              session: expect.objectContaining({ parentSessionId: 'ses_parent', worktreeId: null }),
+            }),
+          }),
+          undefined
+        );
+      });
+    }
+  );
+
+  it('refuses parent lineage when the authenticated user does not own the parent', async () => {
+    const db = createApplyMetadataDb({ parentExists: false });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_other_owner']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  describe('glanceable aggregate refresh', () => {
+    it.each([
+      ['idle', 'busy', { status: 'happy', running: 1, needsInput: 0, idle: 0 }],
+      // Reconnecting is not its own count: the surfaces draw one orange state
+      // for "the agent is waiting on you", and a retry is a wait.
+      ['busy', 'retry', { status: 'happy', running: 0, needsInput: 1, idle: 0 }],
+      ['question', 'busy', { status: 'happy', running: 1, needsInput: 0, idle: 0 }],
+      // An idle agent is connected, so it is work to show, not an empty
+      // aggregate: the surfaces draw it as the third, white row.
+      ['permission', 'idle', { status: 'happy', running: 0, needsInput: 0, idle: 1 }],
+      ['busy', 'idle', { status: 'happy', running: 0, needsInput: 0, idle: 1 }],
+    ] as const)(
+      'delivers persisted cloud status %s → %s without attention or stream clients',
+      async (initialStatus, status, expected) => {
+        const db = createApplyMetadataDb({ initialStatus, cloudAgentSessionId: 'cloud-1' });
+        vi.mocked(getWorkerDb).mockReturnValue(db as never);
+        const delivery = metadataDelivery(db);
+        await applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', status]]),
+          delivery.ctx
+        );
+        await Promise.all(delivery.tasks);
+        expect(delivery.messages.map(message => message.data)).toMatchObject([expected]);
+        expect(db.readCommittedSession().status).toBe(status);
+      }
+    );
+
+    it('does not deliver the old snapshot while the transaction still awaits commit', async () => {
+      const commit = Promise.withResolvers<void>();
+      const db = createApplyMetadataDb({
+        initialStatus: 'idle',
+        beforeCommit: () => commit.promise,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      const applying = applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        delivery.ctx
+      );
+      await vi.waitFor(() => expect(db.queryLog).toContain('read-back'));
+      expect(db.readCommittedSession().status).toBe('idle');
+      expect(delivery.messages).toEqual([]);
+      commit.resolve();
+      await applying;
+      await Promise.all(delivery.tasks);
+      expect(delivery.messages.map(message => message.data)).toMatchObject([
+        { running: 1, status: 'happy' },
+      ]);
+    });
+
+    it('does not deliver a transaction that fails to commit', async () => {
+      const db = createApplyMetadataDb({
+        beforeCommit: async () => {
+          throw new Error('commit failed');
+        },
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await expect(
+        applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']]),
+          delivery.ctx
+        )
+      ).rejects.toThrow('commit failed');
+      await Promise.all(delivery.tasks);
+      expect(db.readCommittedSession().status).toBe('idle');
+      expect(delivery.messages).toEqual([]);
+    });
+
+    it.each([{ initialStatus: 'busy' }, { rowMissing: true }, { parentSessionId: 'root' }])(
+      'skips unchanged, inaccessible, and child rows: %j',
+      async options => {
+        const db = createApplyMetadataDb(options);
+        vi.mocked(getWorkerDb).mockReturnValue(db as never);
+        const delivery = metadataDelivery(db);
+        await applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']])
+        );
+        expect(delivery.messages).toEqual([]);
+      }
+    );
+
+    it.each([null, 'org_live'])(
+      'uses the persisted scope %s instead of an unauthorized org claim',
+      async organizationId => {
+        const db = createApplyMetadataDb({
+          initialOrganizationId: organizationId,
+          membershipRows: 0,
+        });
+        vi.mocked(getWorkerDb).mockReturnValue(db as never);
+        const delivery = metadataDelivery(db);
+        await applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([
+            ['status', 'busy'],
+            ['orgId', 'org_foreign'],
+          ])
+        );
+        expect(db.readCommittedSession().organization_id).toBe(organizationId);
+        expect(delivery.messages.map(message => message.data)).toMatchObject([
+          {
+            running: 1,
+            scopeKey: buildOpaqueScopeKey({ userId: 'usr_1', organizationId }),
+            organizationBound: organizationId !== null,
+          },
+        ]);
+      }
+    );
+
+    it('marks a permission move as approval-relevant for the delivery window', async () => {
+      const db = createApplyMetadataDb({ initialStatus: 'question' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'permission']]),
+        delivery.ctx
+      );
+      await Promise.all(delivery.tasks);
+      expect(delivery.refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+      ]);
+    });
+
+    it('marks a cleared permission wait as approval-relevant for the delivery window', async () => {
+      // `permission -> busy` leaves the `session.status === 'permission'` clause
+      // false, so only `previousStatus === 'permission'` can exempt the clearing
+      // move: the Approve control must disappear as promptly as it appears.
+      const db = createApplyMetadataDb({ initialStatus: 'permission' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        delivery.ctx
+      );
+      await Promise.all(delivery.tasks);
+      expect(delivery.refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+      ]);
+    });
+
+    it('does not exempt a counts-only status move from the delivery window', async () => {
+      const db = createApplyMetadataDb({ initialStatus: 'idle' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        delivery.ctx
+      );
+      await Promise.all(delivery.tasks);
+      expect(delivery.refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: [] },
+      ]);
+    });
+
+    it('keeps committed ingestion successful when aggregate transport fails', async () => {
+      const db = createApplyMetadataDb();
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      delivery.env.NOTIFICATIONS.refreshGlanceableSessions = async () => {
+        throw new Error('transport unavailable');
+      };
+      await expect(
+        applyMetadataChanges(delivery.env as never, 'usr_1', 'ses_1', new Map([['status', 'busy']]))
+      ).resolves.toBeUndefined();
+      expect(db.readCommittedSession().status).toBe('busy');
+      expect(delivery.messages).toEqual([]);
+    });
+  });
+
+  it.each(['scheduled', 'some-future-status'])(
+    'relays a stored %s status without throwing and reports it as the previous status',
+    async initialStatus => {
+      const db = createApplyMetadataDb({ initialStatus });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+
+      await expect(
+        applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']]),
+          delivery.ctx
+        )
+      ).resolves.toBeUndefined();
+      await Promise.all(delivery.tasks);
+
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        delivery.env,
+        'usr_1',
+        expect.objectContaining({
+          type: 'session.status.updated',
+          data: expect.objectContaining({
+            previousStatus: initialStatus,
+            status: 'busy',
+          }),
+        }),
+        delivery.ctx
+      );
+    }
+  );
 
   it('persists organization_id and invalidates access cache when the user is a member', async () => {
     const db = createApplyMetadataDb({ membershipRows: 1 });
@@ -397,6 +1299,26 @@ describe('applyMetadataChanges', () => {
       env,
       'usr_1',
       expect.objectContaining({ type: 'session.updated' }),
+      undefined
+    );
+  });
+
+  it('preserves the worktree ID when broadcasting metadata updates', async () => {
+    const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const db = createApplyMetadataDb({ cloudAgentWorktreeId });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['title', 'Updated']]));
+
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({
+        type: 'session.updated',
+        data: expect.objectContaining({
+          session: expect.objectContaining({ worktreeId: cloudAgentWorktreeId }),
+        }),
+      }),
       undefined
     );
   });
@@ -566,6 +1488,85 @@ describe('applyMetadataChanges', () => {
     expect(written.status).toBe('busy');
     expect(db.applyUpdate).toHaveBeenCalled();
   });
+
+  it.each([
+    [null, 'cloud-agent'],
+    ['cloud-agent-session-scope-1', 'cloud-agent'],
+    ['cloud-agent-session-scope-1', 'cloud-agent-web'],
+    ['cloud-agent-session-scope-1', null],
+  ] as const)(
+    'preserves root platform provenance without notifications (scope: %s, platform: %s)',
+    async (cloudAgentSessionScopeId, platform) => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        cloudAgentSessionScopeId,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['platform', platform]]));
+
+      expect(db.updateSets).toEqual([]);
+      expect(db.applyUpdate).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    }
+  );
+
+  it('preserves root platform provenance while applying and notifying other metadata changes', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionId: 'cloud-agent-session-1',
+      cloudAgentSessionScopeId: 'cloud-agent-session-1',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['platform', 'cloud-agent'],
+        ['title', 'Agent title'],
+        ['gitBranch', 'feature/provenance'],
+        ['status', 'busy'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      {
+        title: 'Agent title',
+        git_branch: 'feature/provenance',
+        status: 'busy',
+        status_updated_at: expect.any(String),
+        status_transition_id: null,
+      },
+    ]);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({ type: 'session.updated' }),
+      undefined
+    );
+  });
+
+  it.each([null, 'cloud-agent-session-scope-1'])(
+    'accepts platform metadata without a registered Cloud Agent root (scope: %s)',
+    async cloudAgentSessionScopeId => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionScopeId,
+        parentSessionId: cloudAgentSessionScopeId ? 'ses_root' : null,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['platform', 'vscode']]));
+
+      expect(db.updateSets).toEqual([{ created_on_platform: 'vscode' }]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    }
+  );
 
   it('refuses organization metadata changes for Cloud Agent session-scoped sessions', async () => {
     const db = createApplyMetadataDb({
@@ -770,7 +1771,7 @@ describe('applyMetadataChanges', () => {
   });
 
   it('persists the PR-link triple and emits session.updated', async () => {
-    const db = createApplyMetadataDb();
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets.git' });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
 
     await applyMetadataChanges(
@@ -799,6 +1800,114 @@ describe('applyMetadataChanges', () => {
       expect.objectContaining({ type: 'session.updated' }),
       undefined
     );
+  });
+
+  it('stores head ref and SHA and clears prior verification for the link', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'abc123'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        pr_head_ref: 'fix/typo',
+        pr_head_sha: 'abc123',
+        pr_link_verified_at: null,
+      }),
+    ]);
+  });
+
+  it('drops a link whose PR URL names another repo and stores nothing', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/someone-else/widgets/pull/42'],
+        ['prNumber', '42'],
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'abc123'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('drops a link whose same-named branch lives in another repo', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/other/repo/pull/1'],
+        ['prNumber', '1'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([]);
+  });
+
+  it('drops a link when the session reports no repository', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: null });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([]);
+  });
+
+  it('keeps the link when the session git_url arrives in the same write', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: null });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['gitUrl', 'https://github.com/acme/widgets.git'],
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        git_url: 'https://github.com/acme/widgets',
+        pr_url: 'https://github.com/acme/widgets/pull/42',
+        pr_number: 42,
+      }),
+    ]);
   });
 
   it('clears the PR-link triple and emits session.updated', async () => {
@@ -830,6 +1939,105 @@ describe('applyMetadataChanges', () => {
       undefined
     );
   });
+
+  describe('Cloud Agent git_url immutability', () => {
+    it('heals a null Cloud Agent git_url to the normalized input', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: null,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/acme/repo.git']])
+      );
+
+      expect(db.updateSets).toEqual([
+        expect.objectContaining({ git_url: 'https://github.com/acme/repo' }),
+      ]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    });
+
+    it('ignores an identical Cloud Agent git_url rewrite', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: 'https://github.com/acme/repo',
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/acme/repo.git']])
+      );
+
+      expect(db.updateSets).toEqual([]);
+      expect(db.applyUpdate).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('rejects a clear of an existing Cloud Agent git_url', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: 'https://github.com/acme/repo',
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitUrl', null]]));
+
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('rejects a different Cloud Agent git_url', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: 'https://github.com/acme/repo',
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/other/repo']])
+      );
+
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('keeps non-Cloud-Agent git_url writes unchanged', async () => {
+      const db = createApplyMetadataDb();
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/acme/repo.git']])
+      );
+
+      expect(db.updateSets).toEqual([
+        expect.objectContaining({ git_url: 'https://github.com/acme/repo' }),
+      ]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    });
+  });
 });
 
 describe('computeSessionMetadataUpdates PR link', () => {
@@ -847,6 +2055,36 @@ describe('computeSessionMetadataUpdates PR link', () => {
     expect(updates.platform).toBe('github');
     expect(updates.pr_url).toBe('https://github.com/acme/widgets/pull/42');
     expect(updates.pr_number).toBe(42);
+  });
+
+  it('maps head evidence and clears the verification timestamp', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'abc123'],
+      ]),
+      fixedNow
+    );
+    expect(updates.pr_head_ref).toBe('fix/typo');
+    expect(updates.pr_head_sha).toBe('abc123');
+    expect(updates.pr_link_verified_at).toBeNull();
+  });
+
+  it('clears the verification timestamp when only head evidence changes', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'def456'],
+      ]),
+      fixedNow
+    );
+    expect(updates.pr_head_ref).toBe('fix/typo');
+    expect(updates.pr_head_sha).toBe('def456');
+    expect(updates.pr_link_verified_at).toBeNull();
+    expect('pr_url' in updates).toBe(false);
   });
 
   it('clears all three columns on a clear triple', () => {
@@ -868,11 +2106,52 @@ describe('computeSessionMetadataUpdates PR link', () => {
     expect('platform' in updates).toBe(false);
     expect('pr_url' in updates).toBe(false);
     expect('pr_number' in updates).toBe(false);
+    expect('pr_head_ref' in updates).toBe(false);
+    expect('pr_head_sha' in updates).toBe(false);
+    expect('pr_link_verified_at' in updates).toBe(false);
   });
 
   it('does not touch created_on_platform from prPlatform', () => {
     const updates = computeSessionMetadataUpdates(new Map([['prPlatform', 'github']]), fixedNow);
     expect(updates.platform).toBe('github');
     expect('created_on_platform' in updates).toBe(false);
+  });
+});
+
+describe('prUrlMatchesGitUrl', () => {
+  it('reduces a GitHub PR URL to its repository URL', () => {
+    expect(repoUrlFromPrUrl('https://github.com/acme/widgets/pull/42')).toBe(
+      'https://github.com/acme/widgets'
+    );
+    expect(repoUrlFromPrUrl('https://github.com/acme/widgets/pull/42/files')).toBe(
+      'https://github.com/acme/widgets'
+    );
+  });
+
+  it('reduces a GitLab merge-request URL to its repository URL', () => {
+    expect(repoUrlFromPrUrl('https://gitlab.com/group/sub/repo/-/merge_requests/7')).toBe(
+      'https://gitlab.com/group/sub/repo'
+    );
+  });
+
+  it('matches a PR URL to the same repo across URL forms and casing', () => {
+    expect(
+      prUrlMatchesGitUrl(
+        'https://github.com/Acme/Widgets/pull/42',
+        'git@github.com:acme/widgets.git'
+      )
+    ).toBe(true);
+  });
+
+  it('rejects a same-named branch in another repo', () => {
+    expect(
+      prUrlMatchesGitUrl('https://github.com/other/repo/pull/42', 'https://github.com/acme/widgets')
+    ).toBe(false);
+  });
+
+  it('rejects when either URL is missing or unparseable', () => {
+    expect(prUrlMatchesGitUrl(null, 'https://github.com/acme/widgets')).toBe(false);
+    expect(prUrlMatchesGitUrl('https://github.com/acme/widgets/pull/42', null)).toBe(false);
+    expect(prUrlMatchesGitUrl('not-a-url', 'https://github.com/acme/widgets')).toBe(false);
   });
 });

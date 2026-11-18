@@ -693,7 +693,7 @@ function AuditReportEmptyState({
         <p className="text-muted-foreground type-body mt-1 max-w-[65ch]">
           {hasActiveFilters
             ? 'No Security Finding groups in this report match the selected severity, state, and repository.'
-            : `Kilo has no reportable Security Finding activity from ${startDate} to ${endDate}.`}
+            : `Kilo has no reportable Security Finding activity from ${startDate} to ${endDate} (UTC).`}
         </p>
         {hasActiveFilters && (
           <Button type="button" variant="outline" className="mt-4" onClick={onClearFilters}>

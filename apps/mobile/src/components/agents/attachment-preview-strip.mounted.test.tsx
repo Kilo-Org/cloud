@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/agents/markdown-image.mounted.test.tsx) */
 /* eslint-disable max-lines -- cohesive mounted suite: chip a11y contract and tappable-open paths share one strip harness */
-import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { createElement, type ReactElement } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,17 +11,52 @@ import {
 } from '@/lib/share-remote-file';
 
 import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { AttachmentPreviewStrip } from './attachment-preview-strip';
+import type * as AttachmentChipDescription from '@/components/agents/attachment-chip-description';
+import { describeAttachmentChip } from '@/components/agents/attachment-chip-description';
+import { AttachmentPreviewStrip, dragTargetIndex } from './attachment-preview-strip';
 
 const expoFileSystemMock = vi.hoisted(() => {
   const fileText = vi.fn(async () => {
     await Promise.resolve();
     return '# Hello';
   });
-  const File = vi.fn(function FileMock(_uri: string) {
-    return { text: fileText };
+  // The native preview flow: a test switches the verdict per case.
+  const previewBehavior = {
+    canPreview: true,
+    previewError: null as Error | null,
+    exists: true,
+  };
+  const instances: {
+    uri: string;
+    canPreview: ReturnType<typeof vi.fn>;
+    preview: ReturnType<typeof vi.fn>;
+    copy: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+  }[] = [];
+  const File = vi.fn(function FileMock(uri: string) {
+    const instance = {
+      uri,
+      get exists() {
+        return previewBehavior.exists;
+      },
+      get extension() {
+        const dot = uri.lastIndexOf('.');
+        return dot === -1 ? '' : uri.slice(dot);
+      },
+      text: fileText,
+      canPreview: vi.fn(() => Promise.resolve(previewBehavior.canPreview)),
+      preview: vi.fn(() =>
+        previewBehavior.previewError !== null
+          ? Promise.reject(previewBehavior.previewError)
+          : Promise.resolve()
+      ),
+      copy: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(),
+    };
+    instances.push(instance as unknown as (typeof instances)[number]);
+    return instance;
   });
-  return { fileText, File };
+  return { fileText, File, previewBehavior, instances };
 });
 
 const actionSheetMock = vi.hoisted(() => {
@@ -30,12 +64,81 @@ const actionSheetMock = vi.hoisted(() => {
   return { showActionSheetWithOptions };
 });
 
+const reactNativeMock = vi.hoisted(() => ({
+  Platform: { OS: 'ios' as string },
+  useWindowDimensions: vi.fn(() => ({ width: 390, height: 844 })),
+}));
+const safeAreaMock = vi.hoisted(() => ({
+  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
+}));
+
+const gestureHandlerMock = vi.hoisted(() => {
+  // One record per `Gesture.Pan()` call, in chip render order. Each builder
+  // method is chainable and captures its callback so the test can fire
+  // `onStart`/`onEnd` with a synthetic translation.
+  const gestures: {
+    onStart?: (event: { translationX: number }) => void;
+    onEnd?: (event: { translationX: number }) => void;
+  }[] = [];
+  function makeGesture(): Record<string, unknown> {
+    const record: (typeof gestures)[number] = {};
+    const g: Record<string, unknown> = {};
+    g.runOnJS = () => g;
+    g.activateAfterLongPress = () => g;
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock captures the builder callback so the test can fire the drag
+    g.onStart = (cb: unknown) => {
+      record.onStart = cb as (typeof gestures)[number]['onStart'];
+      return g;
+    };
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock captures the builder callback so the test can fire the drag
+    g.onEnd = (cb: unknown) => {
+      record.onEnd = cb as (typeof gestures)[number]['onEnd'];
+      return g;
+    };
+    gestures.push(record);
+    return g;
+  }
+  return {
+    gestures,
+    reset: () => {
+      gestures.length = 0;
+    },
+    makeGesture,
+  };
+});
+
+const a11yMock = vi.hoisted(() => ({
+  announceForA11y: vi.fn(),
+  requestA11yFocus: vi.fn(),
+}));
+
+// The chip describes itself in its render body, so the call count is a direct
+// probe of whether the memoized chip rendered again.
+vi.mock('@/components/agents/attachment-chip-description', async importOriginal => {
+  const actual = await importOriginal<typeof AttachmentChipDescription>();
+  return { describeAttachmentChip: vi.fn(actual.describeAttachmentChip) };
+});
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
-  Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  Platform: reactNativeMock.Platform,
+  useWindowDimensions: reactNativeMock.useWindowDimensions,
+}));
+vi.mock('react-native-gesture-handler', () => ({
+  Gesture: { Pan: gestureHandlerMock.makeGesture },
+  GestureDetector: 'GestureDetector',
+  ScrollView: 'ScrollView',
+}));
+vi.mock('@/lib/a11y/announce', () => a11yMock);
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
 }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -52,14 +155,19 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     mutedForeground: '#6b7280',
   }),
 }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownText' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('expo-file-system', () => ({
+  Directory: vi.fn(function DirectoryMock() {
+    return { create: vi.fn() };
+  }),
   File: expoFileSystemMock.File,
+  Paths: { cache: 'file:///cache' },
 }));
 vi.mock('@/lib/share-remote-file', () => ({
+  getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`,
   shareLocalFile: vi.fn(async () => {
     await Promise.resolve();
   }),
@@ -94,20 +202,28 @@ function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
-async function mount(
-  attachments: AgentAttachment[],
-  handlers: { onRemove?: () => void; onRetry?: () => void } = {}
-): Promise<Renderer> {
+type Handlers = {
+  onRemove?: () => void;
+  onRetry?: () => void;
+  onMove?: (id: string, direction: 'left' | 'right') => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
+};
+
+function stripElement(attachments: AgentAttachment[], handlers: Handlers = {}): ReactElement {
+  return createElement(AttachmentPreviewStrip, {
+    attachments,
+    onRemove: handlers.onRemove ?? (() => undefined),
+    onRetry: handlers.onRetry ?? (() => undefined),
+    onMove: handlers.onMove ?? (() => undefined),
+    onReorder: handlers.onReorder ?? (() => undefined),
+  });
+}
+
+async function mount(attachments: AgentAttachment[], handlers: Handlers = {}): Promise<Renderer> {
   const ref: { current: Renderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(
-      createElement(AttachmentPreviewStrip, {
-        attachments,
-        onRemove: handlers.onRemove ?? (() => undefined),
-        onRetry: handlers.onRetry ?? (() => undefined),
-      })
-    );
+    ref.current = TestRenderer.create(stripElement(attachments, handlers));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -124,6 +240,21 @@ function chipBody(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestI
       ((node.type as string) === 'View' || (node.type as string) === 'Pressable') &&
       node.props.accessible === true
   );
+}
+
+/** Every accessible chip body, in chip render order. */
+function chipBodies(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      ((node.type as string) === 'View' || (node.type as string) === 'Pressable') &&
+      node.props.accessible === true
+  );
+}
+
+/** Every chip wrapper carrying an `onLayout` width measurement. */
+function layoutNodes(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => typeof node.props.onLayout === 'function');
 }
 
 /** The hidden wrapper that isolates the chip body's visual descendants. */
@@ -159,6 +290,24 @@ function nodesByType(
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
+/** The visible rounded card of each attachment chip (thumbnail or document). */
+function chipSurfaces(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('rounded-md border border-border bg-card')
+  );
+}
+
+function findByTestID(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.props.testID === testID);
+}
+
 async function pressBody(root: TestRenderer.ReactTestInstance): Promise<void> {
   const body = chipBody(root);
   await act(async () => {
@@ -180,11 +329,30 @@ function latestSheetHandler(): (index: number) => void {
   return handler;
 }
 
-async function chooseSheetOption(
+function latestSheetOptions(): string[] {
+  const calls = vi.mocked(showActionSheetWithOptions).mock.calls;
+  const last = calls.at(-1);
+  const config = last?.[0];
+  if (config === undefined || typeof config !== 'object' || !('options' in config)) {
+    throw new TypeError('action sheet options missing');
+  }
+  const { options } = config;
+  if (!Array.isArray(options)) {
+    throw new TypeError('action sheet options are not a list');
+  }
+  return options.map(String);
+}
+
+async function chooseSheetOptionByLabel(
   root: TestRenderer.ReactTestInstance,
-  index: number
+  label: string
 ): Promise<void> {
   await pressBody(root);
+  const options = latestSheetOptions();
+  const index = options.indexOf(label);
+  if (index === -1) {
+    throw new Error(`option "${label}" missing from ${options.join(' | ')}`);
+  }
   const handler = latestSheetHandler();
   await act(async () => {
     await Promise.resolve();
@@ -207,7 +375,16 @@ function markdownAttachment(): AgentAttachment {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  gestureHandlerMock.reset();
+  a11yMock.requestA11yFocus.mockReset();
   fileText.mockResolvedValue('# Hello');
+  expoFileSystemMock.previewBehavior.canPreview = true;
+  expoFileSystemMock.previewBehavior.previewError = null;
+  expoFileSystemMock.previewBehavior.exists = true;
+  expoFileSystemMock.instances.length = 0;
+  reactNativeMock.Platform.OS = 'ios';
+  reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
+  safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 0, bottom: 0 });
 });
 
 describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
@@ -219,6 +396,23 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     expect(body.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 42 });
     expect(body.props.accessibilityState).toBeUndefined();
     expect(body.props.accessibilityLabel).toBe('doc.pdf, 42%');
+
+    renderer.unmount();
+  });
+
+  it('announces and draws a file this device keeps as no upload at all', async () => {
+    const renderer = await mount([
+      makeAttachment({ kind: 'image', filename: 'photo.png', status: 'local', progress: null }),
+    ]);
+
+    const body = chipBody(renderer.root);
+    expect(body.props.accessibilityLabel).toBe('photo.png, 1 kB');
+    expect(body.props.accessibilityRole).toBe('button');
+    expect(body.props.accessibilityState).toBeUndefined();
+    expect(body.props.accessibilityValue).toBeUndefined();
+    // No upload is under way, so the chip draws no spinner.
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ accessibilityState: { busy: true } })).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -344,6 +538,35 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
   });
 });
 
+describe('AttachmentPreviewStrip — composer chip alignment', () => {
+  it('left-pads the strip by the toolbar inset so the first chip lines up', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const scrollViews = nodesByType(renderer.root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    // pl-3 matches the px-3 composer toolbar the strip sits above, so the first
+    // thumbnail's left edge meets the mode/model chips' left edge.
+    expect(scrollViews[0]?.props.contentContainerClassName).toBe('items-center pl-3');
+
+    renderer.unmount();
+  });
+
+  it('leaves the chip surface spacing to the chips, not the strip', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const surfaces = chipSurfaces(renderer.root);
+    expect(surfaces).toHaveLength(1);
+    // The alignment lives on the strip's content container; the surface keeps
+    // its own size classes and no horizontal padding.
+    expect(surfaces[0]?.props.className).toBe(
+      'overflow-hidden rounded-md border border-border bg-card h-[46px] w-48'
+    );
+    expect(surfaces[0]?.props.className).not.toContain('pl-');
+
+    renderer.unmount();
+  });
+});
+
 describe('AttachmentPreviewStrip — tappable unsent chips', () => {
   it('opens the image viewer when an uploaded image chip is pressed', async () => {
     const renderer = await mount([
@@ -358,7 +581,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     await pressBody(renderer.root);
 
-    const viewers = nodesByType(renderer.root, 'ImageViewerModal');
+    const viewers = nodesByType(renderer.root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props.visible).toBe(true);
     expect(viewers[0]?.props.uri).toBe('file:///cache/photo.png');
@@ -388,7 +611,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(headers[0]?.props.title).toBe('notes.md');
 
     expect(shareLocalFile).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
 
     renderer.unmount();
@@ -420,20 +643,96 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     renderer.unmount();
   });
 
-  it('shows the unknown-file action sheet for a pdf chip', async () => {
+  it('offers the native preview beside the text and share choices for a pdf chip', async () => {
     const renderer = await mount([makeAttachment({})]);
 
     await pressBody(renderer.root);
 
     expect(showActionSheetWithOptions).toHaveBeenCalledTimes(1);
     expect(showActionSheetWithOptions).toHaveBeenCalledWith(
-      { options: ['Open as text', 'Open in external app', 'Cancel'], cancelButtonIndex: 2 },
+      {
+        options: ['Preview doc.pdf', 'Open as text', 'Open in external app', 'Cancel'],
+        cancelButtonIndex: 3,
+        autoFocus: true,
+        useModal: true,
+        containerStyle: expect.objectContaining({ paddingBottom: 0 }),
+        textStyle: expect.anything(),
+        titleTextStyle: expect.anything(),
+        messageTextStyle: expect.anything(),
+        destructiveColor: expect.anything(),
+      },
       expect.any(Function)
     );
     expect(shareLocalFile).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('keeps only text and share for a chip whose type has no document preview', async () => {
+    const renderer = await mount([
+      makeAttachment({
+        filename: 'bundle.zip',
+        extension: 'bin',
+        mimeType: 'application/octet-stream',
+      }),
+    ]);
+
+    await pressBody(renderer.root);
+
+    expect(latestSheetOptions()).toEqual(['Open as text', 'Open in external app', 'Cancel']);
+
+    renderer.unmount();
+  });
+
+  it('opens a pdf through the platform preview with the chip MIME', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    await chooseSheetOptionByLabel(renderer.root, 'Preview doc.pdf');
+
+    const presented = expoFileSystemMock.instances.find(
+      instance => instance.uri === 'file:///cache/doc.pdf'
+    );
+    expect(presented?.canPreview).toHaveBeenCalledWith({ mimeType: 'application/pdf' });
+    expect(presented?.preview).toHaveBeenCalledWith({
+      mimeType: 'application/pdf',
+      title: 'doc.pdf',
+    });
+    expect(presented?.delete).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('toasts "Preview unavailable" and keeps the chip file when no viewer handles the document', async () => {
+    expoFileSystemMock.previewBehavior.canPreview = false;
+    const renderer = await mount([makeAttachment({})]);
+
+    await chooseSheetOptionByLabel(renderer.root, 'Preview doc.pdf');
+
+    expect(toast.error).toHaveBeenCalledWith('Preview unavailable');
+    const presented = expoFileSystemMock.instances.find(
+      instance => instance.uri === 'file:///cache/doc.pdf'
+    );
+    expect(presented?.preview).not.toHaveBeenCalled();
+    expect(presented?.delete).not.toHaveBeenCalled();
+
+    vi.mocked(showActionSheetWithOptions).mockClear();
+    await pressBody(renderer.root);
+    expect(latestSheetOptions()).toEqual(['Open as text', 'Open in external app', 'Cancel']);
+
+    renderer.unmount();
+  });
+
+  it('toasts the opening failure when the viewer rejects the presentation', async () => {
+    expoFileSystemMock.previewBehavior.previewError = new Error('boom');
+    const renderer = await mount([makeAttachment({})]);
+
+    await chooseSheetOptionByLabel(renderer.root, 'Preview doc.pdf');
+
+    expect(toast.error).toHaveBeenCalledWith('Failed to open file. Please try again.');
 
     renderer.unmount();
   });
@@ -441,7 +740,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
   it('opens a text preview when Open as text is chosen', async () => {
     const renderer = await mount([makeAttachment({})]);
 
-    await chooseSheetOption(renderer.root, 0);
+    await chooseSheetOptionByLabel(renderer.root, 'Open as text');
 
     const selectable = nodesByType(renderer.root, 'SelectableText');
     expect(selectable).toHaveLength(1);
@@ -455,7 +754,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
   it('shares the file when Open in external app is chosen', async () => {
     const renderer = await mount([makeAttachment({})]);
 
-    await chooseSheetOption(renderer.root, 1);
+    await chooseSheetOptionByLabel(renderer.root, 'Open in external app');
 
     expect(shareLocalFile).toHaveBeenCalledTimes(1);
     expect(shareLocalFile).toHaveBeenCalledWith('file:///cache/doc.pdf', {
@@ -470,12 +769,12 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
   it('does nothing when Cancel is chosen', async () => {
     const renderer = await mount([makeAttachment({})]);
 
-    await chooseSheetOption(renderer.root, 2);
+    await chooseSheetOptionByLabel(renderer.root, 'Cancel');
 
     expect(shareLocalFile).not.toHaveBeenCalled();
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(0);
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -500,7 +799,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(shareLocalFile).not.toHaveBeenCalled();
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     await act(async () => {
       await Promise.resolve();
@@ -534,7 +833,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     vi.mocked(shareLocalFile).mockRejectedValueOnce(new ShareRemoteFileError('download-failed'));
 
-    await chooseSheetOption(renderer.root, 1);
+    await chooseSheetOptionByLabel(renderer.root, 'Open in external app');
 
     expect(toast.error).toHaveBeenCalledWith('Failed to share file. Please try again.');
 
@@ -547,7 +846,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
     vi.mocked(getShareRemoteFileReason).mockReturnValueOnce('sharing-unavailable');
 
-    await chooseSheetOption(renderer.root, 1);
+    await chooseSheetOptionByLabel(renderer.root, 'Open in external app');
 
     expect(toast.error).toHaveBeenCalledWith('File sharing is not available on this device.');
 
@@ -562,7 +861,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
 
-    await chooseSheetOption(renderer.root, 1);
+    await chooseSheetOptionByLabel(renderer.root, 'Open in external app');
 
     expect(toast.error).toHaveBeenCalledWith('Share failed');
 
@@ -573,10 +872,609 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     fileText.mockRejectedValueOnce(new Error('boom'));
     const renderer = await mount([makeAttachment({})]);
 
-    await chooseSheetOption(renderer.root, 0);
+    await chooseSheetOptionByLabel(renderer.root, 'Open as text');
 
     expect(toast.error).toHaveBeenCalledWith('Failed to open file. Please try again.');
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — text preview sheet surface', () => {
+  async function openMarkdownPreview(): Promise<TestRenderer.ReactTestRenderer> {
+    const renderer = await mount([markdownAttachment()]);
+    await pressBody(renderer.root);
+    return renderer;
+  }
+
+  it('renders the native full-window sheet on iOS', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const sheets = nodesByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.handleComponent).toBeNull();
+    expect(sheets[0]?.props.index).toBe(0);
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
+
+    renderer.unmount();
+  });
+
+  it('centers an empty preview outside the content scroller', async () => {
+    fileText.mockResolvedValueOnce('');
+    const renderer = await openMarkdownPreview();
+    const sheet = nodesByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
+    }
+    expect(nodesByType(sheet, 'CenteredState')).toHaveLength(1);
+    expect(nodesByType(sheet, 'ScrollView')).toHaveLength(0);
+    expect(nodesByType(sheet, 'SheetHeader')).toHaveLength(1);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('sizes the preview ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const previewScrollView = nodesByType(renderer.root, 'ScrollView').find(
+      node => node.props.contentContainerClassName === 'px-6 pb-6 pt-2'
+    );
+    expect(previewScrollView?.props.className).toBe('flex-1');
+
+    renderer.unmount();
+  });
+
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
+
+    const renderer = await openMarkdownPreview();
+
+    const sheets = nodesByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.index).toBe(0);
+
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // flex-1 fills the window; the padding clears the system status bar.
+    expect(surface[0]?.props.className).toContain('flex-1');
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
+
+    // The insets.bottom spacer clears the Android navigation bar.
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.style as { height?: number } | undefined)?.height === 34 &&
+        node.props.className === 'bg-background'
+    );
+    expect(spacers).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('closes the preview when the sheet is dismissed', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await openMarkdownPreview();
+
+    const sheet = nodesByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (sheet.props.onClose as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('closes the preview when Done is pressed', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const header = nodesByType(renderer.root, 'SheetHeader')[0];
+    expect(header?.props.titleEllipsis).toBe('middle');
+    if (!header) {
+      throw new Error('SheetHeader not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (header.props.onDone as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — thumbnail decode fallback', () => {
+  it('shows the AlertCircle fallback while the upload spinner still renders', async () => {
+    const renderer = await mount([
+      makeAttachment({
+        kind: 'image',
+        filename: 'photo.png',
+        status: 'uploading',
+        progress: null,
+      }),
+    ]);
+
+    const images = nodesByType(renderer.root, 'Image');
+    expect(images).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    const image = images[0];
+    if (!image) {
+      throw new Error('thumbnail Image missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    // The upload overlay is driven by status alone and stays unchanged.
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('shows the AlertCircle fallback with no spinner for an uploaded image', async () => {
+    const renderer = await mount([
+      makeAttachment({
+        kind: 'image',
+        filename: 'photo.png',
+        status: 'uploaded',
+        progress: 1,
+      }),
+    ]);
+
+    const images = nodesByType(renderer.root, 'Image');
+    expect(images).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+
+    const image = images[0];
+    if (!image) {
+      throw new Error('thumbnail Image missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('dragTargetIndex', () => {
+  const UNIFORM = [192, 192, 192];
+
+  it('stays put below the midpoint crossing', () => {
+    expect(dragTargetIndex(0, UNIFORM, 0)).toBe(0);
+    expect(dragTargetIndex(0, UNIFORM, 199)).toBe(0);
+  });
+
+  it('crosses one slot at the midpoint and clamps at the end', () => {
+    expect(dragTargetIndex(0, UNIFORM, 200)).toBe(1);
+    expect(dragTargetIndex(0, UNIFORM, 400)).toBe(2);
+    expect(dragTargetIndex(0, UNIFORM, 9999)).toBe(2);
+  });
+
+  it('moves left symmetrically', () => {
+    expect(dragTargetIndex(2, UNIFORM, -200)).toBe(1);
+    expect(dragTargetIndex(2, UNIFORM, -400)).toBe(0);
+    expect(dragTargetIndex(2, UNIFORM, -9999)).toBe(0);
+  });
+
+  it('uses each chip width for mixed image/document rows', () => {
+    // image (80) then documents (192). Crossing 0 -> 1 needs 80/2 + 8 + 192/2 = 144.
+    expect(dragTargetIndex(0, [80, 192, 192], 143)).toBe(0);
+    expect(dragTargetIndex(0, [80, 192, 192], 144)).toBe(1);
+    // Crossing 1 -> 0 back needs 192/2 + 8 + 80/2 = 144.
+    expect(dragTargetIndex(1, [80, 192, 192], -143)).toBe(1);
+    expect(dragTargetIndex(1, [80, 192, 192], -144)).toBe(0);
+  });
+});
+
+describe('AttachmentPreviewStrip — accessible move actions', () => {
+  it('offers Move left/right actions on each chip body and dispatches them', async () => {
+    const onMove = vi.fn<(id: string, direction: 'left' | 'right') => void>();
+    const renderer = await mount(
+      [
+        makeAttachment({ id: 'a1', filename: 'a.pdf' }),
+        makeAttachment({ id: 'a2', filename: 'b.pdf' }),
+        makeAttachment({ id: 'a3', filename: 'c.pdf' }),
+      ],
+      { onMove }
+    );
+
+    const bodies = chipBodies(renderer.root);
+    expect(bodies).toHaveLength(3);
+
+    // First chip: only Move right (no slot to the left).
+    expect(bodies[0]?.props.accessibilityActions).toEqual([
+      { name: 'moveRight', label: 'Move a.pdf right' },
+    ]);
+    // Last chip: only Move left.
+    expect(bodies[2]?.props.accessibilityActions).toEqual([
+      { name: 'moveLeft', label: 'Move c.pdf left' },
+    ]);
+    // Middle chip: both directions.
+    expect(bodies[1]?.props.accessibilityActions).toEqual([
+      { name: 'moveLeft', label: 'Move b.pdf left' },
+      { name: 'moveRight', label: 'Move b.pdf right' },
+    ]);
+
+    const firstBody = bodies[0];
+    if (!firstBody) {
+      throw new Error('first chip body missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (
+        firstBody.props.onAccessibilityAction as (event: {
+          nativeEvent: { actionName: string };
+        }) => void
+      )({ nativeEvent: { actionName: 'moveRight' } });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onMove).toHaveBeenCalledWith('a1', 'right');
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(1);
+
+    const middleBody = bodies[1];
+    if (!middleBody) {
+      throw new Error('middle chip body missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (
+        middleBody.props.onAccessibilityAction as (event: {
+          nativeEvent: { actionName: string };
+        }) => void
+      )({ nativeEvent: { actionName: 'moveLeft' } });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onMove).toHaveBeenLastCalledWith('a2', 'left');
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(2);
+
+    renderer.unmount();
+  });
+
+  it('offers no move actions on a single chip', async () => {
+    const renderer = await mount([makeAttachment({})]);
+    const body = chipBody(renderer.root);
+    expect(body.props.accessibilityActions).toBeUndefined();
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — drag reorder', () => {
+  function measureChips(renderer: Renderer, width: number): void {
+    for (const node of layoutNodes(renderer.root)) {
+      (node.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+        nativeEvent: { layout: { width } },
+      });
+    }
+  }
+
+  it('reorders by drag once the finger crosses the neighbor midpoint', async () => {
+    const onReorder = vi.fn<(fromIndex: number, toIndex: number) => void>();
+    const renderer = await mount(
+      [
+        makeAttachment({ id: 'a1', filename: 'a.pdf' }),
+        makeAttachment({ id: 'a2', filename: 'b.pdf' }),
+        makeAttachment({ id: 'a3', filename: 'c.pdf' }),
+      ],
+      { onReorder }
+    );
+
+    // Every document chip measures 192pt wide (w-48).
+    measureChips(renderer, 192);
+
+    const firstGesture = gestureHandlerMock.gestures[0];
+    if (!firstGesture) {
+      throw new Error('first chip gesture not registered');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      firstGesture.onStart?.({ translationX: 0 });
+      firstGesture.onEnd?.({ translationX: 200 });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    expect(onReorder).toHaveBeenCalledWith(0, 1);
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('does not reorder when the drag stays under the midpoint', async () => {
+    const onReorder = vi.fn<(fromIndex: number, toIndex: number) => void>();
+    const renderer = await mount(
+      [
+        makeAttachment({ id: 'a1', filename: 'a.pdf' }),
+        makeAttachment({ id: 'a2', filename: 'b.pdf' }),
+      ],
+      { onReorder }
+    );
+    measureChips(renderer, 192);
+
+    const firstGesture = gestureHandlerMock.gestures[0];
+    if (!firstGesture) {
+      throw new Error('first chip gesture not registered');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      firstGesture.onStart?.({ translationX: 0 });
+      firstGesture.onEnd?.({ translationX: 100 });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(a11yMock.requestA11yFocus).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — control hit targets', () => {
+  // The Remove control renders a 28 dp visible badge (h-8 at native rem 14) and
+  // reaches the platform minimum through its hitSlop. This catches a revert to
+  // the old fixed 8pt slop, which leaves Android at 44dp instead of 48dp.
+  function removeHitSlop(root: TestRenderer.ReactTestInstance): {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  } {
+    const remove = pressableByLabel(root, 'Remove attachment doc.pdf');
+    if (!remove) {
+      throw new Error('Remove button missing');
+    }
+    return remove.props.hitSlop as {
+      top: number;
+      bottom: number;
+      left: number;
+      right: number;
+    };
+  }
+
+  it('keeps the Remove target at the 44pt minimum on iOS', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const hitSlop = removeHitSlop(renderer.root);
+    expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(44);
+
+    renderer.unmount();
+  });
+
+  it('gives the document chip body a 44 dp frame, because the surface clips slop', async () => {
+    const renderer = await mount([makeAttachment({})]);
+    const surface = chipSurfaces(renderer.root)[0];
+
+    // 46 px of surface minus the 1 dp border on each side is the body's 44 dp.
+    expect(surface?.props.className).toContain('h-[46px]');
+    expect(chipBody(renderer.root).props.hitSlop).toBeUndefined();
+
+    renderer.unmount();
+  });
+
+  it('keeps the Remove target at the 48dp minimum on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await mount([makeAttachment({})]);
+
+    const hitSlop = removeHitSlop(renderer.root);
+    expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(48);
+    expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(48);
+
+    renderer.unmount();
+  });
+
+  // NativeWind's rem is 14, so one spacing unit is 3.5 dp.
+  const DP_PER_SPACING_UNIT = 3.5;
+
+  /** Resolved dp of one side's inset class, `px-*` counting for both sides. */
+  function sideDp(className: unknown, side: 'start' | 'end'): number {
+    const text = String(className);
+    const logical = new RegExp(
+      `(?:^|\\s)${side === 'start' ? 'ps' : 'pe'}-(\\d+(?:\\.\\d+)?)(?=\\s|$)`
+    );
+    const match = logical.exec(text) ?? /(?:^|\s)px-(\d+(?:\.\d+)?)(?=\s|$)/.exec(text);
+    return match ? Number(match[1]) * DP_PER_SPACING_UNIT : 0;
+  }
+
+  /** The document chip's filename Text. */
+  function filenameText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'a-rather-long-document.pdf'
+    );
+  }
+
+  /** The document chip's filename column: the filename Text's parent. */
+  function fileColumn(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    const column = filenameText(root).parent;
+    if (!column || !String(column.props.className).includes('flex-1')) {
+      throw new Error('file column missing');
+    }
+    return column;
+  }
+
+  /** The row around the icon and the filename column. */
+  function fileRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    const row = fileColumn(root).parent;
+    if (!row || !String(row.props.className).includes('flex-row')) {
+      throw new Error('file row missing');
+    }
+    return row;
+  }
+
+  function removeBadgeRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(
+      node =>
+        typeof node.type === 'string' &&
+        String(node.props.className).includes('items-end justify-center')
+    );
+  }
+
+  /** The chip's inset reserves, and the end inset of the Remove badge row. */
+  async function chipReserves(status: 'uploaded' | 'error'): Promise<{
+    badgeEndDp: number;
+    columnEndDp: number;
+    rowEndDp: number;
+    rowStartDp: number;
+  }> {
+    reactNativeMock.Platform.OS = 'android';
+    const attachment = makeAttachment({
+      filename: 'a-rather-long-document.pdf',
+      status,
+      // Only an explicit `terminal: false` failure offers Retry.
+      terminal: status === 'error' ? false : undefined,
+      progress: null,
+    });
+    const renderer = await mount([attachment]);
+    const badgeEndDp = sideDp(removeBadgeRow(renderer.root).props.className, 'end');
+    const result = {
+      badgeEndDp,
+      columnEndDp: sideDp(fileColumn(renderer.root).props.className, 'end'),
+      rowEndDp: sideDp(fileRow(renderer.root).props.className, 'end'),
+      rowStartDp: sideDp(fileRow(renderer.root).props.className, 'start'),
+    };
+    renderer.unmount();
+    return result;
+  }
+
+  it('keeps the text column clear of the Remove badge box', async () => {
+    const { badgeEndDp, columnEndDp, rowEndDp, rowStartDp } = await chipReserves('uploaded');
+
+    // The badge box starts `badgeEndDp` from the chip's end plus its own
+    // 28 dp, and the text ends after the row inset and the column inset. A
+    // shrunken row inset fails here even though the column reserve holds.
+    expect(rowEndDp + columnEndDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
+    // The reserve stays on the column, so the row keeps equal opposite insets.
+    expect(rowStartDp).toBe(rowEndDp);
+  });
+
+  it('keeps the text column clear of the badge on a chip that also offers Retry', async () => {
+    const { badgeEndDp, columnEndDp, rowEndDp, rowStartDp } = await chipReserves('error');
+
+    expect(rowEndDp + columnEndDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
+    // Retry's badge is 24.5 dp inside a `p-1` inset, so its box is 28 dp.
+    expect(rowStartDp).toBeGreaterThanOrEqual(28);
+  });
+
+  it('truncates the filename in the middle so the file type stays readable', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await mount([
+      makeAttachment({ filename: 'a-rather-long-document.pdf', status: 'uploaded', progress: 1 }),
+    ]);
+
+    // Android applies an ellipsis mode only to a single-line Text. A tail
+    // ellipsis would drop "document.pdf" and leave two files of one type
+    // looking alike.
+    expect(filenameText(renderer.root).props.numberOfLines).toBe(1);
+    expect(filenameText(renderer.root).props.ellipsizeMode).toBe('middle');
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — chip render stability', () => {
+  it("keeps an unchanged chip's pan gesture across another chip's upload tick", async () => {
+    const first = makeAttachment({ id: 'a1', filename: 'a.pdf' });
+    // The strip re-renders for this chip's upload progress; the upload hook
+    // replaces only the changed chip's object, so the other two keep identity.
+    const uploading = makeAttachment({
+      id: 'a2',
+      filename: 'b.pdf',
+      status: 'uploading',
+      progress: 0.3,
+    });
+    const third = makeAttachment({ id: 'a3', filename: 'c.pdf' });
+    const renderer = await mount([first, uploading, third]);
+    // The gesture mock records one entry per `Gesture.Pan()` call, i.e. one per
+    // gesture build.
+    expect(gestureHandlerMock.gestures).toHaveLength(3);
+    const mounted = [...gestureHandlerMock.gestures];
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(stripElement([first, { ...uploading, progress: 0.6 }, third]));
+    });
+
+    // No chip rebuilds its gesture for a progress tick: before the memoized
+    // chip and gesture, one tick rebuilt all three.
+    expect(gestureHandlerMock.gestures).toHaveLength(3);
+    // Every chip keeps the gesture object it mounted with, so no gesture
+    // detector was handed a new prop either.
+    expect(gestureHandlerMock.gestures).toEqual(mounted);
+    // The tick still reached its own chip: its progress is the new value.
+    const uploadingChip = chipBodies(renderer.root)[1];
+    if (!uploadingChip) {
+      throw new Error('the uploading chip was not rendered');
+    }
+    expect(uploadingChip.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 60 });
+
+    renderer.unmount();
+  });
+
+  it('dispatches a chip control to the render-current handler while the chip stays memoized out', async () => {
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+    // The same attachment object on both renders: every chip prop is unchanged,
+    // so `memo` skips the chip's render body and only the caller's control is
+    // new — the case a chip that re-read its controls would miss.
+    const attachment = makeAttachment({ status: 'error', terminal: false, progress: null });
+    const renderer = await mount([attachment], { onRetry: first });
+    const rendersBefore = vi.mocked(describeAttachmentChip).mock.calls.length;
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(stripElement([attachment], { onRetry: second }));
+    });
+
+    // The chip body did not run again, so the control it dispatches through is
+    // the strip's stable dispatcher reading the current handler, not a prop it
+    // captured at mount.
+    expect(vi.mocked(describeAttachmentChip).mock.calls.length).toBe(rendersBefore);
+
+    const retry = pressableByLabel(renderer.root, 'Retry uploading doc.pdf');
+    if (!retry) {
+      throw new Error('Retry button missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (retry.props.onPress as () => void)();
+    });
+
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

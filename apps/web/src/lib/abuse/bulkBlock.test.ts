@@ -1,7 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
 import { bulkBlockUsers, unblockBulkBlockedUsers } from '@/lib/abuse/bulkBlock';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 
@@ -153,6 +153,7 @@ describe('bulkBlockUsers (integration)', () => {
     const result = await unblockBulkBlockedUsers(reason, targetDate, admin.id);
 
     expect(result.updatedCount).toBe(2);
+    expect([...result.unblockedUserIds].sort()).toEqual([targetUser1.id, targetUser2.id].sort());
 
     const rows = await db
       .select({

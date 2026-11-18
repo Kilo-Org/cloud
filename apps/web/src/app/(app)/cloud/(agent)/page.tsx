@@ -1,13 +1,16 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
-import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
 
-export default async function PersonalCloudPage() {
-  const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/cloud');
-  const isDevcontainerAvailable = await isFeatureFlagEnabledOrDevelopment(
-    'cloud-agent-devcontainer',
-    user.id
-  );
+type PageProps = {
+  searchParams: Promise<{ settings?: string }>;
+};
 
-  return <NewSessionPanel isDevcontainerAvailable={isDevcontainerAvailable} />;
+export default async function PersonalCloudPage({ searchParams }: PageProps) {
+  const { settings } = await searchParams;
+  const callbackPath =
+    settings === undefined ? '/cloud' : `/cloud?settings=${encodeURIComponent(settings)}`;
+  await getUserFromAuthOrRedirect(
+    `/users/sign_in?callbackPath=${encodeURIComponent(callbackPath)}`
+  );
+  return <NewSessionPanel />;
 }

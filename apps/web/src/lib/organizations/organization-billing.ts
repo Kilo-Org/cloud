@@ -1,23 +1,32 @@
 import type { Organization, User } from '@kilocode/db/schema';
 import { organizations, credit_transactions, transactional_email_log } from '@kilocode/db/schema';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
-import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
-import { createStripeCustomer } from '@/lib/stripe-client';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getOrganizationById,
+  getOrganizationMembers,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { createStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import { resolveStripeReceiptUrl, type StripeConfig } from '@/lib/credits';
-import { toMicrodollars } from '@/lib/utils';
-import { logExceptInTest } from '@/lib/utils.server';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
-import { findUserById } from '@/lib/user';
-import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
+import { resolveStripeReceiptUrl, type StripeConfig } from '@kilocode/web-shared/lib/credits';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { sendCreditsTopUpEmail } from '@/lib/email';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
+import { sendCreditsTopUpEmail } from '@kilocode/web-shared/lib/email';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 import { after } from 'next/server';
+import {
+  resolvePaidCreditPolicy,
+  type PaidCreditGrant,
+} from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 
 export async function getOrCreateStripeCustomerIdForOrganization(
   organizationId: Organization['id'],
@@ -79,7 +88,11 @@ export async function getOrCreateStripeCustomerIdForOrganization(
 
 type Config = StripeConfig;
 type ProcessTopupForOrganizationOptions = {
+  paidCredit?: PaidCreditGrant;
   isAutoTopUp?: boolean;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
 };
 const ORGANIZATION_CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE =
   'organization_credits_top_up_confirmation';
@@ -110,6 +123,9 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
   userId: User['id'];
   organization: Organization;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
   purchaseDate?: Date;
@@ -118,6 +134,9 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
     userId,
     organization,
     amountInCents,
+    serviceFeeCents = 0,
+    grossPaidCents = amountInCents,
+    creditsCents = amountInCents,
     stripeChargeOrInvoiceId,
     isAutoTopUp,
     purchaseDate,
@@ -217,15 +236,30 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
   // accepted/delivered the message before the exception surfaced, so these
   // must NOT be treated as safe to retry.
   let ambiguousFailures = 0;
+  const [creditTransaction] = await db
+    .select({ expiryDate: credit_transactions.expiry_date })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.organization_id, organization.id),
+        eq(credit_transactions.stripe_payment_id, stripeChargeOrInvoiceId)
+      )
+    )
+    .limit(1);
 
   for (const [recipientIndex, recipient] of recipients.entries()) {
     try {
       const sendResult = await sendCreditsTopUpEmail({
         to: recipient.email,
         variant: isAutoTopUp ? 'org_auto' : 'org_manual',
-        amountCents: amountInCents,
-        creditsCents: amountInCents,
+        principalCents: amountInCents,
+        serviceFeeCents,
+        grossPaidCents,
+        creditsCents,
         purchaseDate: purchaseDate ?? new Date(),
+        creditExpiryDate: creditTransaction?.expiryDate
+          ? new Date(creditTransaction.expiryDate)
+          : null,
         receiptUrl,
         organizationId: organization.id,
         organizationName: organization.name,
@@ -345,7 +379,12 @@ export async function processTopupForOrganization(
   config: Config,
   options: ProcessTopupForOrganizationOptions = {}
 ) {
-  const { isAutoTopUp = false } = options;
+  const {
+    isAutoTopUp = false,
+    serviceFeeCents = 0,
+    grossPaidCents = amountInCents,
+    creditsCents = amountInCents,
+  } = options;
   const organization = await getOrganizationById(organizationId);
   if (!organization) throw new Error('Organization not found: ' + organizationId);
 
@@ -359,8 +398,17 @@ export async function processTopupForOrganization(
 
   const creditDescription = `Organization top-up via ${config.type}`;
   const creditAmountInMicrodollars = toMicrodollars(amountInCents / 100);
+  const policy = resolvePaidCreditPolicy(
+    options.paidCredit ?? { source: 'stripe', purchasedAt: new Date(), terms: 'legacy' }
+  );
+  const creditTransactionId = crypto.randomUUID();
 
   const didInsertCreditTransaction = await db.transaction(async (tx: DrizzleTransaction) => {
+    const current = await reconcileCreditExpirationsInTransaction(
+      { type: 'organization', id: organization.id },
+      tx
+    );
+    const baseline = Math.min(current.microdollars_used, current.total_microdollars_acquired);
     logExceptInTest(
       `processing topup for ${organization.id} - ${amountInCents} in transaction with payment id ${config.stripe_payment_id}`
     );
@@ -368,13 +416,16 @@ export async function processTopupForOrganization(
     const result = await tx
       .insert(credit_transactions)
       .values({
+        id: creditTransactionId,
         kilo_user_id: kiloUserId,
         organization_id: organization.id,
         is_free: false,
         amount_microdollars: creditAmountInMicrodollars,
         description: creditDescription,
         stripe_payment_id: config.stripe_payment_id,
-        original_baseline_microdollars_used: organization.microdollars_used,
+        original_baseline_microdollars_used: current.microdollars_used,
+        expiration_baseline_microdollars_used: baseline,
+        ...policy,
       })
       .onConflictDoNothing();
 
@@ -384,13 +435,22 @@ export async function processTopupForOrganization(
       );
       return false;
     }
+    await recordRefundDebtRepayment(tx, {
+      owner: { type: 'organization', id: organization.id },
+      transactionId: creditTransactionId,
+      priorAcquired: current.total_microdollars_acquired,
+      priorUsed: current.microdollars_used,
+      amountMicrodollars: creditAmountInMicrodollars,
+    });
 
-    // Update organization balance
     await tx
       .update(organizations)
       .set({
         total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
         microdollars_balance: sql`${organizations.microdollars_balance} + ${Math.round(creditAmountInMicrodollars)}`,
+        ...(policy.expiry_date && {
+          next_credit_expiration_at: sql`LEAST(${organizations.next_credit_expiration_at}, ${policy.expiry_date}::timestamptz)`,
+        }),
       })
       .where(eq(organizations.id, organization.id));
 
@@ -422,6 +482,9 @@ export async function processTopupForOrganization(
       userId: kiloUserId,
       organization,
       amountInCents,
+      serviceFeeCents,
+      grossPaidCents,
+      creditsCents,
       stripeChargeOrInvoiceId: config.stripe_payment_id,
       isAutoTopUp,
       purchaseDate: new Date(existingCreditTransaction.createdAt),
@@ -443,6 +506,9 @@ export async function processTopupForOrganization(
     userId: kiloUserId,
     organization,
     amountInCents,
+    serviceFeeCents,
+    grossPaidCents,
+    creditsCents,
     stripeChargeOrInvoiceId: config.stripe_payment_id,
     isAutoTopUp,
   });
@@ -452,6 +518,9 @@ async function recoverOrganizationTopUpConfirmationEmailIfMissing(params: {
   userId: User['id'];
   organization: Organization;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
   purchaseDate: Date;
@@ -500,6 +569,9 @@ async function scheduleOrganizationTopUpConfirmationEmail(params: {
   userId: User['id'];
   organization: Organization;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
   purchaseDate?: Date;

@@ -2,7 +2,16 @@
 
 import { type SetStateAction, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Bell, Bot, Clock, Loader2, RotateCcw, Save, SlidersHorizontal } from 'lucide-react';
+import {
+  Bell,
+  Bot,
+  Clock,
+  GitPullRequest,
+  Loader2,
+  RotateCcw,
+  Save,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import {
@@ -16,6 +25,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
@@ -42,6 +54,7 @@ import type {
   SecurityRepository,
   SlaConfig,
 } from './security-config-types';
+import { buildSecurityConfigSavePayload } from './security-config-types';
 import { useSecurityAgent } from './SecurityAgentContext';
 import { SecurityAgentActionBar } from './SecurityAgentActionBar';
 
@@ -99,6 +112,7 @@ const DEFAULT_FORM_CONFIG: SecurityConfigFormState = {
   autoRemediationEnabled: false,
   autoRemediationMinSeverity: 'high',
   autoRemediationIncludeExisting: false,
+  autoRemediationRequireApproval: true,
   remediationModelSlug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
   ...DEFAULT_NOTIFICATION_CONFIG,
 };
@@ -127,6 +141,7 @@ function configFingerprint(config: SecurityConfigFormState) {
     config.autoRemediationEnabled,
     config.autoRemediationMinSeverity,
     config.autoRemediationIncludeExisting,
+    config.autoRemediationRequireApproval,
     config.remediationModelSlug,
     config.slaNotificationsEnabled,
     config.slaNotificationMinSeverity,
@@ -253,33 +268,7 @@ export function SecurityConfigForm({
   const handleSave = (options?: { onSuccess?: () => void; onError?: () => void }) => {
     if (saveDisabled) return;
 
-    onSave(
-      {
-        ...state.slaConfig,
-        slaEnabled: state.slaEnabled,
-        repositorySelectionMode: state.repositorySelectionMode,
-        selectedRepositoryIds: state.selectedRepositoryIds,
-        triageModelSlug: state.triageModelSlug,
-        analysisModelSlug: state.analysisModelSlug,
-        modelSlug: state.analysisModelSlug,
-        analysisMode: state.analysisMode,
-        autoDismissEnabled: state.autoDismissEnabled,
-        autoDismissConfidenceThreshold: state.autoDismissConfidenceThreshold,
-        autoAnalysisEnabled: state.autoAnalysisEnabled,
-        autoAnalysisMinSeverity: state.autoAnalysisMinSeverity,
-        autoAnalysisIncludeExisting: state.autoAnalysisIncludeExisting,
-        autoRemediationEnabled: state.autoRemediationEnabled,
-        autoRemediationMinSeverity: state.autoRemediationMinSeverity,
-        autoRemediationIncludeExisting: state.autoRemediationIncludeExisting,
-        remediationModelSlug: state.remediationModelSlug,
-        slaNotificationsEnabled: state.slaNotificationsEnabled,
-        slaNotificationMinSeverity: state.slaNotificationMinSeverity,
-        slaNotificationWarningDays: state.slaNotificationWarningDays,
-        newFindingNotificationsEnabled: state.newFindingNotificationsEnabled,
-        newFindingNotificationMinSeverity: state.newFindingNotificationMinSeverity,
-      },
-      options
-    );
+    onSave(buildSecurityConfigSavePayload(state), options);
   };
 
   const clearPendingNavigation = () => {
@@ -478,6 +467,49 @@ export function SecurityConfigForm({
         <TabsContent value="automation" className="mt-0 space-y-6">
           <AutoAnalysisSection {...stateProps} />
           <AutoRemediationSection {...stateProps} />
+          {state.autoRemediationEnabled && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-start gap-3">
+                  <div className="bg-surface-overlay text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
+                    <GitPullRequest className="size-5" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg font-semibold">
+                      Auto-remediation approval
+                    </CardTitle>
+                    <p className="text-muted-foreground text-xs">
+                      Require approval before opening remediation PRs.
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-background border-border flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="auto-remediation-require-approval" className="font-medium">
+                      Require approval before auto-remediation
+                    </Label>
+                    <p
+                      id="auto-remediation-require-approval-description"
+                      className="text-muted-foreground text-sm"
+                    >
+                      Auto-remediation waits for your approval before opening PRs.
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-remediation-require-approval"
+                    checked={state.autoRemediationRequireApproval}
+                    onCheckedChange={autoRemediationRequireApproval =>
+                      setState(current => ({ ...current, autoRemediationRequireApproval }))
+                    }
+                    aria-describedby="auto-remediation-require-approval-description"
+                    className="shrink-0 self-end sm:self-auto"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <AutoDismissSection {...stateProps} />
         </TabsContent>
 

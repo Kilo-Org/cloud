@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
@@ -6,6 +7,7 @@ import { Text } from '@/components/ui/text';
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { FixedPartRow } from './fixed-part-row';
 import { useOpenPartDetail } from './open-part-detail-context';
+import { hasDisplayableReasoningText } from './part-types';
 
 type ReasoningPartRendererProps = {
   partId: string;
@@ -22,21 +24,30 @@ export function ReasoningPartRenderer({
 }: Readonly<ReasoningPartRendererProps>) {
   const openPartDetail = useOpenPartDetail();
   const textSelectable = useTranscriptTextSelectable();
+  const { t } = useTranslation();
 
-  if (text.trim() === '') {
+  if (!hasDisplayableReasoningText(text)) {
     return null;
   }
 
-  const label = isStreaming ? 'Thinking' : 'Thought';
+  const label = isStreaming
+    ? t('agentChat.partDetail.thinking')
+    : t('agentChat.partDetail.thought');
 
   if (defaultExpanded) {
     // Static, not collapsible: dashed container, Eyebrow label, full text.
     // No Pressable, no chevron, no collapse state.
+    // While streaming, `selectable` is dropped: the iOS read-only text view
+    // re-lays-out the whole growing text on every tick, and the same pattern
+    // in the part detail sheet already swaps to plain text for the stream.
     return (
-      <View className="rounded-xl border-[1.5px] border-dashed border-border p-3">
+      <View className="rounded-xl border-[1.5px] border-dashed border-border p-3 dark:border-neutral-700">
         <Eyebrow>{label}</Eyebrow>
         <View className="mt-2">
-          <Text selectable={textSelectable} className="text-sm leading-5 text-muted-foreground">
+          <Text
+            selectable={isStreaming ? false : textSelectable}
+            className="text-sm leading-[1.25rem] text-muted-foreground"
+          >
             {text}
           </Text>
         </View>
@@ -47,7 +58,6 @@ export function ReasoningPartRenderer({
   return (
     <FixedPartRow
       variant="dashed"
-      labelKind="eyebrow"
       label={label}
       accessibilityLabel={label}
       onPress={

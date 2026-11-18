@@ -1,66 +1,362 @@
 import type { Part } from '@kilocode/app-shared/opencode';
+import type { MessageInfo, ReadonlyPart } from '../types';
 import {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
+  applyTextDeltas,
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
-  insertPartSorted,
-  insertSorted,
+  createSubscriberRegistry,
+  forgetPartUpdateTime,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
-  upsertPartDroppingStaleSyntheticTextParts,
+  messageIdsKey,
+  messageKey,
+  messageIdKey,
+  orderMessageIds,
+  partsKey,
+  publishPartsChanged,
+  upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
+
+describe('orderMessageIds', () => {
+  function message(id: string, parentID?: string, sessionID = 'root'): MessageInfo {
+    return {
+      id,
+      sessionID,
+      role: parentID === undefined ? 'user' : 'assistant',
+      ...(parentID === undefined ? {} : { parentID }),
+    } as MessageInfo;
+  }
+
+  function timed(id: string, created: number, parentID?: string): MessageInfo {
+    return {
+      ...message(id, parentID),
+      time: { created },
+    } as MessageInfo;
+  }
+
+  test('orders rows by their creation time when the ids do not follow it', () => {
+    // An imported session: the ids say newest-first, the clock says otherwise.
+    const ids = ['b', 'a', 'd', 'c'];
+    const messages = new Map(
+      [timed('a', 10), timed('b', 20), timed('c', 30), timed('d', 40)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  test('keeps the id order for rows created in the same instant', () => {
+    const ids = ['b', 'a', 'c'];
+    const messages = new Map(
+      [timed('a', 5), timed('b', 5), timed('c', 9)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('keeps a reply after its prompt when the clock and the ids disagree', () => {
+    // The prompt's stored time can trail its reply: causality still wins.
+    const ids = ['reply', 'prompt', 'next'];
+    const messages = new Map(
+      [timed('prompt', 100), timed('reply', 90, 'prompt'), timed('next', 200)].map(info => [
+        info.id,
+        info,
+      ])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['prompt', 'reply', 'next']);
+  });
+
+  test('returns the same array when the clock and the ids already agree', () => {
+    const ids = ['a', 'b', 'c'];
+    const messages = new Map(
+      [timed('a', 1), timed('b', 2), timed('c', 3)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('keeps the id order while a row has no readable creation time', () => {
+    const ids = ['b', 'a'];
+    const messages = new Map([timed('a', 1), message('b')].map(info => [info.id, info]));
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('keeps an unconfirmed send below stored rows when the device clock trails them', () => {
+    // The optimistic row carries the device clock and the stored rows carry the
+    // writer's, so the two cannot be ranked until the server echoes the send.
+    const optimistic: MessageInfo = { ...timed('b-optimistic', 5), synthetic: true } as MessageInfo;
+    const ids = ['b-optimistic', 'a-stored'];
+    const messages = new Map([optimistic, timed('a-stored', 100)].map(info => [info.id, info]));
+    expect(orderMessageIds(ids, messages)).toEqual(['a-stored', 'b-optimistic']);
+  });
+
+  test('keeps already causal IDs and their array identity', () => {
+    const ids = ['a', 'b', 'c'];
+    const messages = new Map([
+      ['a', message('a')],
+      ['b', message('b', 'a')],
+      ['c', message('c')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('uses a stable topological order rather than a pairwise parent comparator', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e'];
+    const messages = new Map([
+      ['a', message('a', 'd')],
+      ['b', message('b', 'd')],
+      ['c', message('c')],
+      ['d', message('d')],
+      ['e', message('e', 'd')],
+    ]);
+    const ordered = orderMessageIds(ids, messages);
+    expect(ordered).toEqual(['c', 'd', 'a', 'b', 'e']);
+    expect(orderMessageIds(ordered, messages)).toBe(ordered);
+    expect(ids).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  test('keeps the earliest ready row first when parent chains release several rows', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const messages = new Map([
+      ['a', message('a', 'd')],
+      ['b', message('b', 'd')],
+      ['c', message('c', 'a')],
+      ['d', message('d')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toEqual(['d', 'a', 'b', 'c']);
+  });
+
+  test('ignores missing parents, self references and cross-session parents', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const messages = new Map([
+      ['a', message('a', 'missing')],
+      ['b', message('b', 'b')],
+      ['c', message('c', 'd', 'child')],
+      ['d', message('d')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('never drops rows from invalid parent cycles', () => {
+    const ids = ['c', 'a', 'b'];
+    const messages = new Map([
+      ['a', message('a', 'b')],
+      ['b', message('b', 'a')],
+      ['c', message('c')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  describe('turns', () => {
+    function unconfirmed(id: string, created: number, queuedAt?: number): MessageInfo {
+      return {
+        ...timed(id, created),
+        synthetic: true,
+        ...(queuedAt === undefined ? {} : { queuedAt }),
+      } as MessageInfo;
+    }
+
+    function order(ids: string[], infos: MessageInfo[]): readonly string[] {
+      return orderMessageIds(ids, new Map(infos.map(info => [info.id, info])));
+    }
+
+    test('keeps a prompt queued mid-turn below later steps of the running turn', () => {
+      const infos = [
+        timed('prompt', 900),
+        timed('step-1', 1000, 'prompt'),
+        unconfirmed('queued', 1500, 1500),
+        timed('step-2', 2000, 'prompt'),
+      ];
+      expect(order(['prompt', 'queued', 'step-1', 'step-2'], infos)).toEqual([
+        'prompt',
+        'step-1',
+        'step-2',
+        'queued',
+      ]);
+    });
+
+    test('places a queued row by its server queue time, not its device time', () => {
+      const infos = [
+        unconfirmed('failed', 60_000, 100),
+        timed('retry', 200),
+        timed('answer', 300, 'retry'),
+      ];
+      expect(order(['answer', 'failed', 'retry'], infos)).toEqual(['failed', 'retry', 'answer']);
+    });
+
+    test('keeps a row without a server time after every placed turn', () => {
+      const infos = [
+        unconfirmed('sending', 5),
+        unconfirmed('queued', 9_000, 400),
+        timed('prompt', 100),
+        timed('step', 500, 'prompt'),
+      ];
+      expect(order(['sending', 'queued', 'prompt', 'step'], infos)).toEqual([
+        'prompt',
+        'step',
+        'queued',
+        'sending',
+      ]);
+    });
+
+    test('keeps a reply under its unconfirmed prompt', () => {
+      const infos = [unconfirmed('sending', 5), timed('reply', 1, 'sending'), timed('older', 2)];
+      expect(order(['older', 'reply', 'sending'], infos)).toEqual(['older', 'sending', 'reply']);
+    });
+
+    test('orders a later prompt after a turn whose steps it answers', () => {
+      // A prompt delivered between steps: the native runtime parents the later
+      // steps to it, so they belong to its turn.
+      const infos = [
+        timed('a', 100),
+        timed('a-1', 200, 'a'),
+        timed('b', 300),
+        timed('b-1', 400, 'b'),
+      ];
+      expect(order(['b-1', 'a', 'b', 'a-1'], infos)).toEqual(['a', 'a-1', 'b', 'b-1']);
+    });
+
+    test('orders the rows of a turn by time after the prompt', () => {
+      const infos = [
+        timed('p', 100),
+        timed('s-2', 300, 'p'),
+        timed('s-1', 200, 'p'),
+        timed('q', 250),
+      ];
+      expect(order(['p', 'q', 's-1', 's-2'], infos)).toEqual(['p', 's-1', 's-2', 'q']);
+    });
+
+    test('opens a turn for a reply whose prompt is on an older page', () => {
+      const infos = [timed('reply', 100, 'missing'), timed('next', 200), timed('late', 50)];
+      expect(order(['next', 'reply', 'late'], infos)).toEqual(['late', 'reply', 'next']);
+    });
+  });
+});
 
 function makePart(id: string, text = '', messageID = 'm'): Part {
   return { id, sessionID: 's', messageID, type: 'text', text } as Part;
 }
 
-describe('insertSorted', () => {
-  test('inserts into empty array', () => {
-    expect(insertSorted([], 'b')).toEqual(['b']);
+function makeToolPart(
+  id: string,
+  status: 'pending' | 'running' | 'completed' | 'error',
+  time?: { start: number; end?: number },
+  messageID = 'm'
+): Part {
+  const base = { id, sessionID: 's', messageID, type: 'tool', callID: `call-${id}`, tool: 'task' };
+  if (status === 'pending') {
+    return { ...base, state: { status, input: {}, raw: '' } } as Part;
+  }
+  if (status === 'running') {
+    return { ...base, state: { status, input: {}, raw: '', time: time ?? { start: 1 } } } as Part;
+  }
+  return {
+    ...base,
+    state: {
+      status,
+      input: {},
+      raw: '',
+      ...(status === 'completed'
+        ? { output: 'done', title: 'task', metadata: {} }
+        : { error: 'boom' }),
+      time: time ?? { start: 1, end: 2 },
+    },
+  } as Part;
+}
+
+function toolStatus(parts: Part[], id: string): string {
+  const part = parts.find(p => p.id === id);
+  if (!part || part.type !== 'tool') throw new Error(`tool part ${id} missing`);
+  return part.state.status;
+}
+
+/**
+ * A part persisted through the ingest-frame compaction path: it keeps only
+ * `state.status`, so `state.time` is absent even for running/terminal states.
+ */
+function makeCompactedToolPart(
+  id: string,
+  status: 'pending' | 'running' | 'completed' | 'error',
+  messageID = 'm'
+): Part {
+  const base = { id, sessionID: 's', messageID, type: 'tool', callID: `call-${id}`, tool: 'task' };
+  return {
+    ...base,
+    state: {
+      status,
+      input: {},
+      ...(status === 'running'
+        ? {}
+        : status === 'completed'
+          ? { output: 'done', title: 'task', metadata: {} }
+          : status === 'error'
+            ? { error: 'boom' }
+            : { raw: '' }),
+    },
+  } as unknown as Part;
+}
+
+/**
+ * The backend owns the ordering-evidence store next to its parts array; the
+ * suite keeps one per test so a scenario's updates are ordered against each
+ * other, exactly as a storage instance orders them.
+ */
+let orderingEvidence = new Map<string, number>();
+
+beforeEach(() => {
+  orderingEvidence = new Map();
+});
+
+function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
+  return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
+}
+
+describe('insertSortedBy', () => {
+  const partKey = (part: Part): string => part.id;
+
+  test('inserts a message id into an empty array', () => {
+    expect(insertSortedBy([], 'b', messageIdKey)).toEqual(['b']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = ['b', 'd'];
-    expect(insertSorted(arr, 'a')).toEqual(['a', 'b', 'd']);
-    expect(insertSorted(arr, 'c')).toEqual(['b', 'c', 'd']);
-    expect(insertSorted(arr, 'e')).toEqual(['b', 'd', 'e']);
+  test('inserts a part into an empty array', () => {
+    const part = makePart('b');
+    expect(insertSortedBy<Part>([], part, partKey)).toEqual([part]);
   });
 
-  test('does not mutate input', () => {
-    const arr = ['a', 'c'];
-    insertSorted(arr, 'b');
-    expect(arr).toEqual(['a', 'c']);
+  test('inserts a message id at beginning, middle, and end', () => {
+    const ids = ['b', 'd'];
+    expect(insertSortedBy(ids, 'a', messageIdKey)).toEqual(['a', 'b', 'd']);
+    expect(insertSortedBy(ids, 'c', messageIdKey)).toEqual(['b', 'c', 'd']);
+    expect(insertSortedBy(ids, 'e', messageIdKey)).toEqual(['b', 'd', 'e']);
+  });
+
+  test('inserts a part at beginning, middle, and end', () => {
+    const parts = [makePart('b'), makePart('d')];
+    const inserted = (id: string) =>
+      insertSortedBy(parts, makePart(id), partKey).map(part => part.id);
+    expect(inserted('a')).toEqual(['a', 'b', 'd']);
+    expect(inserted('c')).toEqual(['b', 'c', 'd']);
+    expect(inserted('e')).toEqual(['b', 'd', 'e']);
+  });
+
+  test('does not mutate the message id array', () => {
+    const ids = ['a', 'c'];
+    insertSortedBy(ids, 'b', messageIdKey);
+    expect(ids).toEqual(['a', 'c']);
+  });
+
+  test('does not mutate the part array', () => {
+    const parts = [makePart('a'), makePart('c')];
+    insertSortedBy(parts, makePart('b'), partKey);
+    expect(parts).toHaveLength(2);
   });
 });
 
-describe('insertPartSorted', () => {
-  test('inserts into empty array', () => {
-    const p = makePart('b');
-    expect(insertPartSorted([], p)).toEqual([p]);
-  });
-
-  test('inserts at beginning, middle, and end', () => {
-    const arr = [makePart('b'), makePart('d')];
-    expect(insertPartSorted(arr, makePart('a')).map(p => p.id)).toEqual(['a', 'b', 'd']);
-    expect(insertPartSorted(arr, makePart('c')).map(p => p.id)).toEqual(['b', 'c', 'd']);
-    expect(insertPartSorted(arr, makePart('e')).map(p => p.id)).toEqual(['b', 'd', 'e']);
-  });
-
-  test('does not mutate input', () => {
-    const arr = [makePart('a'), makePart('c')];
-    insertPartSorted(arr, makePart('b'));
-    expect(arr).toHaveLength(2);
-  });
-});
-
-describe('upsertPartDroppingStaleSyntheticTextParts', () => {
+describe('upsertPartDroppingStaleSyntheticParts', () => {
   test('removes stale synthetic text part when real text part arrives', () => {
     const syntheticPart = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
     const realPart = makePart('prt-real', 'authoritative');
 
-    const result = upsertPartDroppingStaleSyntheticTextParts([syntheticPart], realPart);
+    const result = upsert([syntheticPart], realPart);
 
     expect(result).toEqual([realPart]);
   });
@@ -69,7 +365,7 @@ describe('upsertPartDroppingStaleSyntheticTextParts', () => {
     const existingSynthetic = { ...makePart('msg-1-text', 'optimistic', 'msg-1'), synthetic: true };
     const realPart = makePart('prt-real', 'authoritative', 'msg-2');
 
-    const result = upsertPartDroppingStaleSyntheticTextParts([existingSynthetic], realPart);
+    const result = upsert([existingSynthetic], realPart);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-text', 'prt-real']);
   });
@@ -78,10 +374,7 @@ describe('upsertPartDroppingStaleSyntheticTextParts', () => {
     const existingSynthetic = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
     const incomingSynthetic = { ...makePart('prt-synthetic', 'new'), synthetic: true };
 
-    const result = upsertPartDroppingStaleSyntheticTextParts(
-      [existingSynthetic],
-      incomingSynthetic
-    );
+    const result = upsert([existingSynthetic], incomingSynthetic);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-text', 'prt-synthetic']);
   });
@@ -90,9 +383,269 @@ describe('upsertPartDroppingStaleSyntheticTextParts', () => {
     const syntheticPart = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
     const toolPart = { id: 'tool-1', sessionID: 's', messageID: 'm', type: 'tool' } as Part;
 
-    const result = upsertPartDroppingStaleSyntheticTextParts([syntheticPart], toolPart);
+    const result = upsert([syntheticPart], toolPart);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-text', 'tool-1']);
+  });
+
+  test('removes stale synthetic file part when a real file part arrives', () => {
+    const syntheticFile = {
+      id: 'msg-1-file-0',
+      sessionID: 's',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: '',
+      url: '',
+      synthetic: true,
+    } as Part;
+    const realFile = {
+      id: 'prt-file',
+      sessionID: 's',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: 'image/png',
+      url: 'https://cdn/file.png',
+    } as Part;
+
+    const result = upsert([syntheticFile], realFile);
+
+    expect(result.map(part => part.id)).toEqual(['prt-file']);
+  });
+
+  test('preserves synthetic file part for a different message', () => {
+    const syntheticFile = {
+      id: 'msg-1-file-0',
+      sessionID: 's',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: '',
+      url: '',
+      synthetic: true,
+    } as Part;
+    const realFile = {
+      id: 'prt-file',
+      sessionID: 's',
+      messageID: 'msg-2',
+      type: 'file',
+      mime: 'image/png',
+      url: 'https://cdn/file.png',
+    } as Part;
+
+    const result = upsert([syntheticFile], realFile);
+
+    expect(result.map(part => part.id)).toEqual(['msg-1-file-0', 'prt-file']);
+  });
+});
+
+describe('tool part lifecycle ordering', () => {
+  test('orders by the stored part id and keeps the evidence out of the part', () => {
+    const arr = upsert([], makeToolPart('p-1', 'running'), 200);
+    const stored = arr[0];
+    expect(stored).toBeDefined();
+    // The evidence never rides on the part: no added enumerable keys and no
+    // symbol properties, so it cannot leak into a serialized or rendered part.
+    expect(Object.keys(stored ?? {}).sort()).toEqual(
+      ['callID', 'id', 'messageID', 'sessionID', 'state', 'tool', 'type'].sort()
+    );
+    expect(Object.getOwnPropertySymbols(stored ?? {})).toEqual([]);
+    expect(JSON.parse(JSON.stringify(stored))).toEqual(stored);
+
+    // The store is keyed by the part's own id, not by its object identity, so a
+    // clone a caller hands back still orders against the stored update: an
+    // out-of-order running re-delivery loses.
+    const cloned = clonePart(stored as Part);
+    expect(cloned).not.toBe(stored);
+    const result = upsert(arr, cloned, 150);
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('forgetting a part drops its ordering evidence with it', () => {
+    const arr = upsert([], makeToolPart('p-1', 'running'), 200);
+    expect(orderingEvidence.size).toBe(1);
+    forgetPartUpdateTime(orderingEvidence, 'm', 'p-1');
+    expect(orderingEvidence.size).toBe(0);
+
+    // With the part gone its evidence goes too, so a re-delivered update starts
+    // from the part's own `state.time` instead of the removed part's event time.
+    const result = upsert(arr, makeToolPart('p-1', 'completed'), 150);
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('drops a terminal update whose event time predates the stored running update', () => {
+    const arr = upsert([], makeToolPart('p-1', 'running'), 200);
+    const result = upsert(arr, makeToolPart('p-1', 'completed'), 150);
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('drops a terminal update that carries no ordering evidence over a live running task', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1 })];
+    const result = upsert(arr, makeCompactedToolPart('p-1', 'completed'));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('applies a terminal whose settle time postdates the running start with no event time', () => {
+    // The wire event time can be absent (schema `time` is optional); the
+    // terminal's own `state.time.end` is then the ordering evidence, exactly as
+    // in the terminal-vs-terminal branch.
+    const arr = [makeToolPart('p-1', 'running', { start: 1 })];
+    const result = upsert(arr, makeToolPart('p-1', 'completed', { start: 1, end: 2 }));
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('drops a terminal whose settle time predates the running start with no event time', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 5 })];
+    const result = upsert(arr, makeToolPart('p-1', 'completed', { start: 1, end: 2 }));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('bounds the running guard by the run start when the stored event time is inherited', () => {
+    // A terminal settles at 100; a replayed running part (start 200, no event
+    // time) replaces it and inherits the older part's recorded update time. A
+    // terminal that settled at 150 — before the live run began — must still lose
+    // against the run's own start, not the inherited older evidence.
+    const terminal = upsert([], makeToolPart('p-1', 'completed', { start: 1, end: 100 }), 100);
+    const arr = upsert(terminal, makeToolPart('p-1', 'running', { start: 200 }));
+    expect(toolStatus(arr, 'p-1')).toBe('running');
+
+    const result = upsert(arr, makeToolPart('p-1', 'completed', { start: 1, end: 150 }));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('keeps the recorded event time across a no-time re-delivery so a stale terminal still loses', () => {
+    const arr = upsert([], makeToolPart('p-1', 'running'), 200);
+    const replayed = upsert(arr, makeToolPart('p-1', 'running'));
+    const result = upsert(replayed, makeToolPart('p-1', 'completed'), 150);
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('applies a terminal that postdates the event time kept across a no-time re-delivery', () => {
+    const arr = upsert([], makeToolPart('p-1', 'running'), 200);
+    const replayed = upsert(arr, makeToolPart('p-1', 'running'));
+    const result = upsert(replayed, makeToolPart('p-1', 'completed'), 250);
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('applies a terminal update whose event time postdates the stored running update', () => {
+    const arr = [makeToolPart('p-1', 'running')];
+    const result = upsert(arr, makeToolPart('p-1', 'completed'), 250);
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('drops a stale running update that would downgrade a pending task', () => {
+    const arr = upsert([], makeToolPart('p-1', 'pending'), 300);
+    const result = upsert(arr, makeToolPart('p-1', 'running'), 100);
+    expect(toolStatus(result, 'p-1')).toBe('pending');
+  });
+
+  test('pending never overrides running', () => {
+    const arr = [makeToolPart('p-1', 'running')];
+    const result = upsert(arr, makeToolPart('p-1', 'pending'));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('running never overrides a terminal state', () => {
+    const arr = [makeToolPart('p-1', 'completed')];
+    const result = upsert(arr, makeToolPart('p-1', 'running'), 500);
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('applies a newer running update over a stored terminal that settled before the run', () => {
+    // Mirror reopen replay: the cache still holds a stale stored terminal while
+    // the live run (started later) is the current state of the same part.
+    const arr = [makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 })];
+    const result = upsert(arr, makeToolPart('p-1', 'running', { start: 1789655865076 }));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('drops a running update whose start predates the stored terminal', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 250 })];
+    const result = upsert(arr, makeToolPart('p-1', 'running', { start: 100 }));
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('settles terminal vs terminal by the tool state time when no event time exists', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 5 })];
+    const older = upsert(arr, makeToolPart('p-1', 'error', { start: 1, end: 4 }));
+    expect(toolStatus(older, 'p-1')).toBe('completed');
+
+    const newer = upsert(arr, makeToolPart('p-1', 'error', { start: 1, end: 6 }));
+    expect(toolStatus(newer, 'p-1')).toBe('error');
+  });
+
+  test('drops a replayed terminal whose settle time predates the stored running start', () => {
+    // Reopen replay: the snapshotted running part carries the live run's start
+    // as its only ordering evidence, and the page replay delivers a terminal
+    // that settled before that run began. The stale terminal must not flip it.
+    const arr = [makeToolPart('p-1', 'running', { start: 1789655865076 })];
+    const result = upsert(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('drops a replayed error whose settle time predates the stored running start', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1789655865076 })];
+    const result = upsert(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('applies a replayed terminal whose settle time postdates the stored running start', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1700100002000 })];
+    const result = upsert(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('first settled terminal wins when no ordering evidence exists at all', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 5 })];
+    const result = upsert(arr, makeToolPart('p-1', 'completed', { start: 1, end: 5 }));
+    expect(result).toBe(arr);
+  });
+
+  test('leaves non-tool parts unordered', () => {
+    const arr = [makePart('p-1', 'first')];
+    const result = upsert(arr, makePart('p-1', 'second'), 1);
+    expect((result[0] as Part & { text: string }).text).toBe('second');
+  });
+
+  test('does not throw on a stored compacted running part with no state time', () => {
+    const arr = [makeCompactedToolPart('p-1', 'running')];
+    const result = upsert(arr, makeToolPart('p-1', 'completed'), 250);
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('does not throw on a stored compacted terminal part with no state time', () => {
+    const arr = [makeCompactedToolPart('p-1', 'completed')];
+    const result = upsert(arr, makeCompactedToolPart('p-1', 'error'));
+    // No ordering evidence on either side: the first settled terminal wins.
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('keeps a terminal accepted by its settle time against a later older terminal', () => {
+    // The stored terminal's recorded event time (100) is older than the settle
+    // time (200) of the terminal that replaces it. An out-of-order terminal
+    // that lands between the two must lose against the applied settle time.
+    const arr = upsert([], makeToolPart('p-1', 'completed', { start: 1, end: 100 }), 100);
+    const accepted = upsert(arr, makeToolPart('p-1', 'error', { start: 1, end: 200 }));
+    expect(toolStatus(accepted, 'p-1')).toBe('error');
+
+    const result = upsert(accepted, makeToolPart('p-1', 'completed', { start: 1, end: 150 }), 150);
+    expect(toolStatus(result, 'p-1')).toBe('error');
+    expect(result).toBe(accepted);
   });
 });
 
@@ -147,25 +700,93 @@ describe('createReadonlyPartView', () => {
     delete (view as Record<string, unknown>)['text'];
     expect((view as Part & { text: string }).text).toBe('hello');
   });
+
+  test('mutations through the view do not reach the stored part', () => {
+    const stored = makePart('p1', 'hello');
+    const view = createReadonlyPartView(stored);
+    (view as { text: string }).text = 'changed';
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete (view as Record<string, unknown>)['id'];
+    expect((stored as Part & { text: string }).text).toBe('hello');
+    expect(stored.id).toBe('p1');
+    expect((view as { text: string }).text).toBe('hello');
+  });
 });
 
-describe('applyTextDelta', () => {
-  test('appends delta to existing text', () => {
+describe('applyTextDeltas', () => {
+  test('appends one chunk to existing text', () => {
     const part = makePart('p1', 'hello');
-    const result = applyTextDelta(part, ' world');
+    const result = applyTextDeltas(part, [' world']);
     expect((result as Part & { text: string }).text).toBe('hello world');
   });
 
-  test('returns new object on success', () => {
+  test('joins a batch with a single new part', () => {
     const part = makePart('p1', 'hello');
-    const result = applyTextDelta(part, ' world');
+    const result = applyTextDeltas(part, [' ', 'big', ' world']);
+    expect((result as Part & { text: string }).text).toBe('hello big world');
     expect(result).not.toBe(part);
+  });
+
+  test('returns the same part when the appended text is empty', () => {
+    const part = makePart('p1', 'hello');
+    expect(applyTextDeltas(part, [])).toBe(part);
+    expect(applyTextDeltas(part, [''])).toBe(part);
+    expect(applyTextDeltas(part, ['', ''])).toBe(part);
   });
 
   test('returns same reference for non-text part', () => {
     const part = { id: 'p1', sessionID: 's', messageID: 'm', type: 'tool' } as Part;
-    const result = applyTextDelta(part, 'delta');
-    expect(result).toBe(part);
+    expect(applyTextDeltas(part, ['delta'])).toBe(part);
+  });
+});
+
+describe('appendPartTextChunks', () => {
+  test('seeds the message with a text part when nothing is stored', () => {
+    const result = appendPartTextChunks(undefined, 'msg-1', 'part-1', ['hel', 'lo']);
+    expect(result).toEqual([createSeedTextPart('msg-1', 'part-1', 'hello')]);
+  });
+
+  test('inserts a new part in id order next to the stored ones', () => {
+    const stored = [makePart('a', 'first'), makePart('c', 'third')];
+    const result = appendPartTextChunks(stored, 'm', 'b', ['second']);
+    expect(result.map(p => p.id)).toEqual(['a', 'b', 'c']);
+    expect((result[1] as Part & { text: string }).text).toBe('second');
+    expect(stored.map(p => p.id)).toEqual(['a', 'c']);
+  });
+
+  test('appends to an existing part without mutating the stored array', () => {
+    const existing = makePart('a', 'hel');
+    const stored = [existing];
+    const result = appendPartTextChunks(stored, 'm', 'a', ['lo']);
+    expect(result).not.toBe(stored);
+    expect((result[0] as Part & { text: string }).text).toBe('hello');
+    expect((existing as Part & { text: string }).text).toBe('hel');
+  });
+
+  test('returns the same array when the chunks change nothing', () => {
+    const stored = [
+      makePart('a', 'text'),
+      { id: 'b', sessionID: 's', messageID: 'm', type: 'tool' } as Part,
+    ];
+    expect(appendPartTextChunks(stored, 'm', 'a', [''])).toBe(stored);
+    expect(appendPartTextChunks(stored, 'm', 'b', ['ignored'])).toBe(stored);
+  });
+});
+
+describe('publishPartsChanged', () => {
+  test('invalidates the message snapshot and notifies only its channel', () => {
+    const snapshot = new Map<string, readonly ReadonlyPart[] | null>([['msg-1', [makePart('a')]]]);
+    const partsCallback = jest.fn();
+    const messageCallback = jest.fn();
+    const subscribers = createSubscriberRegistry();
+    subscribers.subscribe('parts:msg-1', partsCallback);
+    subscribers.subscribe('message:msg-1', messageCallback);
+
+    publishPartsChanged(snapshot, subscribers, 'msg-1');
+
+    expect(snapshot.get('msg-1')).toBeNull();
+    expect(partsCallback).toHaveBeenCalledTimes(1);
+    expect(messageCallback).not.toHaveBeenCalled();
   });
 });
 
@@ -182,25 +803,48 @@ describe('createSeedTextPart', () => {
   });
 });
 
-describe('notify', () => {
+describe('createSubscriberRegistry', () => {
   test('calls all registered callbacks for matching key', () => {
     const cb1 = jest.fn();
     const cb2 = jest.fn();
-    const subs = new Map([['k', new Set([cb1, cb2])]]);
-    notify(subs, 'k');
+    const registry = createSubscriberRegistry();
+    registry.subscribe(messageKey('msg-1'), cb1);
+    registry.subscribe(messageKey('msg-1'), cb2);
+    registry.notify(messageKey('msg-1'));
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
   });
 
   test('no-op for missing key', () => {
     const cb = jest.fn();
-    const subs = new Map([['k', new Set([cb])]]);
-    notify(subs, 'other');
+    const registry = createSubscriberRegistry();
+    registry.subscribe(partsKey('msg-1'), cb);
+    registry.notify(messageKey('msg-2'));
     expect(cb).not.toHaveBeenCalled();
   });
 
-  test('no-op for empty subscriber map', () => {
-    expect(() => notify(new Map(), 'k')).not.toThrow();
+  test('no-op for empty registry', () => {
+    expect(() => createSubscriberRegistry().notify(messageIdsKey)).not.toThrow();
+  });
+
+  test('built keys address the channels the registry notifies', () => {
+    const registry = createSubscriberRegistry();
+    const idsCb = jest.fn();
+    const messageCb = jest.fn();
+    const partsCb = jest.fn();
+    registry.subscribe(messageIdsKey, idsCb);
+    registry.subscribe(messageKey('msg-1'), messageCb);
+    registry.subscribe(partsKey('msg-1'), partsCb);
+
+    registry.notifyMessageIds();
+    registry.notifyMessage('msg-1');
+    registry.notifyParts('msg-1');
+
+    expect(idsCb).toHaveBeenCalledTimes(1);
+    expect(messageCb).toHaveBeenCalledTimes(1);
+    expect(partsCb).toHaveBeenCalledTimes(1);
+    registry.notifyMessage('msg-2');
+    expect(messageCb).toHaveBeenCalledTimes(1);
   });
 });
 

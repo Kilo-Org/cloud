@@ -8,6 +8,20 @@
  * transport layer and response parsing.
  */
 
+import {
+  CODE_REVIEW_TERMINAL_REASONS,
+  type CodeReviewTerminalReason as CloudAgentTerminalReason,
+} from '@kilocode/db/schema-types';
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
+import type { EgressMode } from './egress-allowlist.js';
+import type { SandboxAllocationInput } from './sandbox-allocation.js';
+import {
+  GetEgressAuditResponseSchema,
+  type GetEgressAuditInput,
+  type GetEgressAuditResponse,
+} from './egress-audit';
+
 // ---------------------------------------------------------------------------
 // Types — aligned with cloud-agent-next tRPC router contracts
 // ---------------------------------------------------------------------------
@@ -52,13 +66,18 @@ export type CloudAgentPrepareSessionInput = {
   bitbucketIntegrationId?: string;
   bitbucketPullRequestId?: number;
   bitbucketExpectedHeadSha?: string;
+  githubPullRequestNumber?: number;
   kilocodeOrganizationId?: string;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, unknown>;
   upstreamBranch?: string;
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
+  sandboxAllocation?: SandboxAllocationInput;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
+  egressAudit?: boolean;
   runtimeSkills?: Array<{
     name: string;
     rawMarkdown: string;
@@ -74,6 +93,7 @@ export type CloudAgentPrepareSessionInput = {
 export type CloudAgentPrepareSessionOutput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  worktreeId?: CloudAgentWorktreeId;
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };
@@ -109,6 +129,10 @@ export type CloudAgentSendMessageOutput = {
 };
 
 export type CloudAgentSessionHealthInput = {
+  cloudAgentSessionId: string;
+};
+
+export type CloudAgentGetEgressAuditInput = GetEgressAuditInput & {
   cloudAgentSessionId: string;
 };
 
@@ -154,57 +178,12 @@ export type CloudAgentInterruptOutput = {
  * services/code-review-infra/src/types.ts, where a missing value used to be
  * silently coerced to undefined by a `.catch(undefined)` zod enum.
  *
- * KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS in
- * packages/db/src/schema-types.ts — both lists must contain the same literal
- * values, and a mismatch makes the orchestrator send a reason the callback's
- * allowlist rejects. apps/web asserts the two are equal (see
- * apps/web/src/lib/code-reviews/terminal-reason-from-failure.test.ts).
+ * Single source of truth is CODE_REVIEW_TERMINAL_REASONS in
+ * packages/db/src/schema-types.ts; re-exported here under the worker-side
+ * name for orchestrator consumers.
  */
-export const CLOUD_AGENT_TERMINAL_REASONS = [
-  'billing',
-  'model_not_found',
-  'github_installation_required',
-  'github_ip_allow_list',
-  'gitlab_project_access_required',
-  'byok_invalid_key',
-  'selected_model_unavailable',
-  'repeated_repository_clone_timeout',
-  'user_cancelled',
-  'superseded',
-  'interrupted',
-  'timeout',
-  'upstream_error',
-  'sandbox_error',
-  'workspace_capacity',
-  'assistant_failed',
-  'assistant_rate_limited',
-  'assistant_rate_limited_byok',
-  'assistant_rate_limited_managed',
-  'assistant_unavailable',
-  'assistant_timeout',
-  'assistant_unauthorized',
-  'assistant_invalid_request',
-  'assistant_no_reply',
-  'wrapper_failed',
-  'runtime_startup_failed',
-  'sandbox_connection',
-  'delivery_failed',
-  'workspace_setup_failed',
-  'repository_clone_failed',
-  'repository_auth_failed',
-  'repository_checkout_failed',
-  'session_import_failed',
-  'setup_command_failed',
-  'container_shutdown',
-  // Written only by the stale review reaper on the app side, never sent by the
-  // orchestrator. It is listed here because this enum and the db one are kept
-  // identical: the callback allowlist is built from this list, so an omission
-  // would reject the reason if it ever did arrive on a callback.
-  'abandoned',
-  'unknown',
-] as const;
-
-export type CloudAgentTerminalReason = (typeof CLOUD_AGENT_TERMINAL_REASONS)[number];
+export { CODE_REVIEW_TERMINAL_REASONS as CLOUD_AGENT_TERMINAL_REASONS };
+export type { CloudAgentTerminalReason };
 
 export class CloudAgentNextError extends Error {
   readonly procedure: string;
@@ -238,13 +217,6 @@ export const CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS = [
   'insufficient funds',
   'payment required',
 ] as const;
-
-/**
- * User-facing message for auto-fix billing failures.
- * Shared by the web app and auto-fix-infra so the copy stays in sync.
- */
-export const AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE =
-  'Insufficient credits. Auto-fix requires at least $1 in available credits. Add credits, then retry.';
 
 export function isCloudAgentNextBillingErrorBody(body: string): boolean {
   const normalizedBody = body.toLowerCase();
@@ -339,6 +311,11 @@ export type CloudAgentNextFetchClient = {
     headers: Record<string, string>,
     input: CloudAgentSessionHealthInput
   ): Promise<CloudAgentSessionHealthOutput>;
+
+  getEgressAudit(
+    headers: Record<string, string>,
+    input: CloudAgentGetEgressAuditInput
+  ): Promise<GetEgressAuditResponse>;
 
   interruptSession(
     headers: Record<string, string>,
@@ -448,6 +425,27 @@ export function createCloudAgentNextFetchClient(baseUrl: string): CloudAgentNext
         input,
         'interruptSession'
       );
+    },
+
+    async getEgressAudit(headers, input) {
+      const url = new URL(trpc('getEgressAudit'));
+      url.searchParams.set('input', JSON.stringify(input));
+      const response = await fetch(url.toString(), { method: 'GET', headers });
+      if (!response.ok) {
+        throw new CloudAgentNextError('getEgressAudit', response.status, await response.text());
+      }
+      const envelope: unknown = await response.json();
+      if (
+        typeof envelope !== 'object' ||
+        envelope === null ||
+        !('result' in envelope) ||
+        typeof envelope.result !== 'object' ||
+        envelope.result === null ||
+        !('data' in envelope.result)
+      ) {
+        throw new Error('Unexpected getEgressAudit response shape');
+      }
+      return GetEgressAuditResponseSchema.parse(envelope.result.data);
     },
   };
 }

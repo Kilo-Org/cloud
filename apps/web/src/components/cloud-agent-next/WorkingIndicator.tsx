@@ -54,10 +54,10 @@ export function WorkingIndicator({ messages, isStreaming }: WorkingIndicatorProp
   }
 
   return (
-    <div className="text-muted-foreground flex items-center gap-2 py-2 text-xs">
-      <StatusSpinner className="h-4 w-4" />
-      <span>
-        {statusText} · {formatElapsed(elapsed)}
+    <div className="text-muted-foreground flex min-w-0 items-center gap-2 py-2 text-xs">
+      <StatusSpinner className="h-4 w-4 shrink-0" />
+      <span className="truncate" title={statusText}>
+        {statusText} <span aria-hidden="true">· {formatElapsed(elapsed)}</span>
       </span>
     </div>
   );

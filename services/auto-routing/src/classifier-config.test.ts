@@ -5,6 +5,8 @@ import {
   clearClassifierConfigCache,
   getClassifierModel,
   getClassifierModelInfo,
+  getShadowRoutingTable,
+  SHADOW_ROUTING_TABLE_CONFIG_KEY,
 } from './classifier-config';
 import { CLASSIFIER_WINNER_KV_KEY } from '@kilocode/auto-routing-contracts';
 
@@ -14,7 +16,8 @@ type ClassifierEnvStub = Pick<
 >;
 
 const EXAMPLE_WINNER = {
-  model: 'google/gemini-2.5-flash-lite',
+  engine: 'system-one',
+  model: 'cloudflare/clef',
   runId: 'run-abc',
   accuracy: 0.95,
   generatedAt: '2026-06-11T00:00:00.000Z',
@@ -30,7 +33,7 @@ type EnvSetup = {
 function makeEnv(opts: {
   overrideModel?: string | null;
   winnerKvValue?: string | null;
-  originWinner?: typeof EXAMPLE_WINNER | null;
+  originWinner?: Record<string, unknown> | null;
   originStatus?: number;
   originThrow?: boolean;
   onPut?: (key: string, value: string, options: unknown) => void;
@@ -158,6 +161,22 @@ describe('classifier config', () => {
     warn.mockRestore();
   });
 
+  it('ignores and does not cache a winner from a benchmark worker that predates System One', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine: _engine, ...preCutoverWinner } = EXAMPLE_WINNER;
+    const { env, configPut } = makeEnv({
+      winnerKvValue: null,
+      originWinner: { ...preCutoverWinner, model: 'google/gemini-2.5-flash-lite' },
+    });
+
+    const info = await getClassifierModelInfo(env);
+
+    expect(info.benchmarkWinner).toBeNull();
+    expect(info.model).toBe(DEFAULT_CLASSIFIER_MODEL);
+    expect(configPut).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it('keeps a healthy admin override when the winner origin fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { env } = makeEnv({ overrideModel: 'override/model', originThrow: true });
@@ -178,5 +197,60 @@ describe('classifier config', () => {
     const info = await getClassifierModelInfo(env);
     expect(info.override).toBe('openai/gpt-4o');
     expect(info.model).toBe('openai/gpt-4o');
+  });
+});
+
+describe('shadow routing table config', () => {
+  beforeEach(() => {
+    clearClassifierConfigCache();
+  });
+
+  it('caches a missing shadow key without origin calls or writes', async () => {
+    const { env, configGet, configPut, benchmarkFetch } = makeEnv({});
+    await expect(getShadowRoutingTable(env)).resolves.toBeNull();
+    await expect(getShadowRoutingTable(env)).resolves.toBeNull();
+    expect(configGet).toHaveBeenCalledTimes(1);
+    expect(configGet).toHaveBeenCalledWith(SHADOW_ROUTING_TABLE_CONFIG_KEY);
+    expect(configPut).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('validates and caches the candidate with the live routing table schema', async () => {
+    const { env, configGet, configPut, benchmarkFetch } = makeEnv({});
+    const table = {
+      version: 'shadow-fixture',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.5,
+      switchCostFactor: 2,
+      bestAccuracySwitchThreshold: 0.05,
+      source: 'benchmark',
+      routes: {
+        'implementation/code_generation': [
+          { model: 'fixture/model', accuracy: 1, avgCostUsd: 0.01, meetsThreshold: true },
+        ],
+      },
+    };
+    configGet.mockResolvedValue(JSON.stringify(table));
+    expect(await getShadowRoutingTable(env)).toMatchObject(table);
+    expect(await getShadowRoutingTable(env)).toMatchObject(table);
+    expect(configGet).toHaveBeenCalledTimes(1);
+    expect(configPut).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['{', '{"version":"invalid"}'])('ignores invalid shadow data: %s', async raw => {
+    const { env, configGet } = makeEnv({});
+    configGet.mockResolvedValue(raw);
+    await expect(getShadowRoutingTable(env)).resolves.toBeNull();
+  });
+
+  it('ignores a failed KV read and allows the next read to retry', async () => {
+    const { env, configGet, configPut, benchmarkFetch } = makeEnv({});
+    configGet.mockRejectedValueOnce(new Error('shadow KV unavailable')).mockResolvedValue(null);
+    await expect(getShadowRoutingTable(env)).resolves.toBeNull();
+    await expect(getShadowRoutingTable(env)).resolves.toBeNull();
+    expect(configGet).toHaveBeenCalledTimes(2);
+    expect(configPut).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 });

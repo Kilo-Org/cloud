@@ -1,6 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   agent_configs,
   code_review_feedback_events,
@@ -166,7 +166,77 @@ describe('GitHub review memory feedback', () => {
       payload: buildPayload({ parentCommentId: 303, body: 'Looks wrong.' }),
       integration: buildIntegration(user.id),
       deliveryId: 'delivery-4',
-      fetchParentComment: parentFetcher({ userLogin: 'octocat' }),
+      fetchParentComment: parentFetcher({ userLogin: 'octocat', userType: 'User' }),
+      fetchRepositoryPermission: permissionFetcher('write', permissionRequests),
+    });
+
+    expect(result).toEqual({ recorded: false, reason: 'not-kilo-comment' });
+    expect(permissionRequests).toHaveLength(0);
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
+  });
+
+  it('skips replies when the parent author only matches a bot name but is not a bot account', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await setReviewMemoryEnabled({ owner, platform: 'github', enabled: true, createdBy: user.id });
+    const permissionRequests: Array<Parameters<FetchRepositoryPermission>[0]> = [];
+
+    const result = await handleGitHubReviewCommentReply({
+      payload: buildPayload({ parentCommentId: 313, body: 'Same concern here.' }),
+      integration: buildIntegration(user.id),
+      deliveryId: 'delivery-4c',
+      fetchParentComment: parentFetcher({ userLogin: 'kilo-code-review-bot', userType: 'User' }),
+      fetchRepositoryPermission: permissionFetcher('write', permissionRequests),
+    });
+
+    expect(result).toEqual({ recorded: false, reason: 'not-kilo-comment' });
+    expect(permissionRequests).toHaveLength(0);
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
+  });
+
+  it('records replies when the parent bot account matches a Kilo app user id after an app rename', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await setReviewMemoryEnabled({ owner, platform: 'github', enabled: true, createdBy: user.id });
+
+    const result = await handleGitHubReviewCommentReply({
+      payload: buildPayload({ parentCommentId: 323, body: 'This naming needs updating.' }),
+      integration: buildIntegration(user.id),
+      deliveryId: 'delivery-4d',
+      fetchParentComment: parentFetcher({
+        userLogin: 'renamed-kilo-app[bot]',
+        userType: 'Bot',
+        userId: 240665456,
+      }),
+      fetchRepositoryPermission: permissionFetcher('write'),
+    });
+
+    expect(result.recorded).toBe(true);
+    const events = await db.select().from(code_review_feedback_events);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        owned_by_user_id: user.id,
+        kilo_comment_id: '323',
+      })
+    );
+  });
+
+  it('skips replies when the parent is a bot account outside the Kilo app identities', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await setReviewMemoryEnabled({ owner, platform: 'github', enabled: true, createdBy: user.id });
+    const permissionRequests: Array<Parameters<FetchRepositoryPermission>[0]> = [];
+
+    const result = await handleGitHubReviewCommentReply({
+      payload: buildPayload({ parentCommentId: 333, body: 'Different bot.' }),
+      integration: buildIntegration(user.id),
+      deliveryId: 'delivery-4e',
+      fetchParentComment: parentFetcher({
+        userLogin: 'renamed-other-app[bot]',
+        userType: 'Bot',
+        userId: 999,
+      }),
       fetchRepositoryPermission: permissionFetcher('write', permissionRequests),
     });
 
@@ -364,11 +434,15 @@ function permissionFetcher(
 
 function parentFetcher(input: {
   userLogin: string | null;
+  userType?: string | null;
+  userId?: number | null;
   body?: string;
 }): FetchParentReviewComment {
   return async request => ({
     id: request.commentId,
     body: input.body ?? 'Kilo review comment',
     userLogin: input.userLogin,
+    userType: input.userType ?? 'Bot',
+    userId: input.userId ?? null,
   });
 }

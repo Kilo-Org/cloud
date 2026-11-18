@@ -5,7 +5,7 @@
 process.env.KILO_CHAT_INTERNAL_URL = 'https://chat.kiloapps.io';
 process.env.NEXT_PUBLIC_KILO_CHAT_URL = 'https://chat.kiloapps.io';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
 }));
 

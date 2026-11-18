@@ -6,8 +6,6 @@ import { getBearerToken } from './gateway';
 import { CONFIG_FILE, KILO_CONFIG_DIR } from '../kilo-cli-config';
 import { DEFAULT_MCPORTER_CONFIG_PATH } from '../config-writer';
 
-// ── Types ─────────────────────────────────────────────────────────────
-
 type RunState = {
   process: ChildProcess;
   output: string;
@@ -18,12 +16,8 @@ type RunState = {
   prompt: string;
 };
 
-// ── Constants ─────────────────────────────────────────────────────────
-
 /** Cap output buffer at ~1MB to prevent OOM from verbose agent runs. */
 const MAX_OUTPUT_BYTES = 1_048_576;
-
-// ── Prompt template ───────────────────────────────────────────────────
 
 /**
  * Wrap the user's prompt with system context so the agent knows where
@@ -71,18 +65,12 @@ The OpenClaw gateway process listens on \`127.0.0.1:3001\` (loopback), managed b
 ${userPrompt}`;
 }
 
-// ── Module-level state (one run at a time per machine) ────────────────
-
 let activeRun: RunState | null = null;
 let startQueue: Promise<void> = Promise.resolve();
-
-// ── Request schemas ───────────────────────────────────────────────────
 
 const StartRunBodySchema = z.object({
   prompt: z.string().min(1).max(10_000),
 });
-
-// ── Helpers ───────────────────────────────────────────────────────────
 
 function appendOutput(run: RunState, chunk: string): void {
   run.output += chunk;
@@ -118,8 +106,6 @@ function runStartExclusive<T>(fn: () => Promise<T>): Promise<T> {
   );
   return next;
 }
-
-// ── Route registration ────────────────────────────────────────────────
 
 export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void {
   // Auth middleware for all kilo-cli-run routes

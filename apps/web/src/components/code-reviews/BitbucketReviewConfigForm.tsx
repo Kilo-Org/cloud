@@ -25,11 +25,12 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { useTRPC } from '@/lib/trpc/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
 import { FOCUS_AREAS, REVIEW_STYLES } from './ReviewConfigForm';
+import { CodeReviewComputeNotice } from './CodeReviewComputeNotice';
 
 type ReviewStyle = (typeof REVIEW_STYLES)[number]['value'];
 
@@ -75,7 +76,10 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
   const readinessQuery = useQuery(
     trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({ organizationId })
   );
-  const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
+  const { modelOptions, isLoadingModels } = useOrganizationModels(
+    organizationId,
+    'shared_services'
+  );
   const [draft, setDraft] = useState<BitbucketReviewConfig>(DEFAULT_CONFIG);
   const [baseline, setBaseline] = useState<BitbucketReviewConfig>(DEFAULT_CONFIG);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -349,6 +353,7 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
             handleSave();
           }}
         >
+          <CodeReviewComputeNotice organizationId={organizationId} />
           <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <Label htmlFor="bitbucket-code-reviewer-enabled" className="type-body-lg font-medium">
